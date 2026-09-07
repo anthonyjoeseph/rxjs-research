@@ -158,6 +158,9 @@ open import Probed.Regs-Store-Currency
   using (figures≡; verdicts≡; separates;
          composed≡; separatesJoin; joinVerdicts≡)
 
+open import Probed.Regs-Split-Budget
+  using (figures≡; margins≡; verdicts≡; confirm1; confirm3)
+
 open import Probed.Drain-Count-Slot
   using (slotCharges≡; slotRows≡; tieDrainSlot12; tieDrainSlot13)
 

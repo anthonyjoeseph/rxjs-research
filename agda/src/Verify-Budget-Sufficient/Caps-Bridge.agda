@@ -2191,6 +2191,18 @@ burst-nodes≤inc e ins =
 --   summand, which those rows spend NOWHERE -- the unit alone pays on
 --   that corpus, so they reach the budget and still cannot decide the
 --   split or report a margin against the sum.
+-- PROBED: `Probed.Regs-Split-Budget` crosses the two, and is the only
+--   row that spends BOTH summands at this row's own budget: the
+--   carrying fold with a carrying map above it, at `budgetAt e ins 0`.
+--   Covered: the conclusion at two programs of that family, the join
+--   still dying at the composed one, and the MARGIN, which is what
+--   neither of the others could report -- the sum clears by five at
+--   both, so it is not tight here and has room to lose at a consumer.
+--   The figures are identical to the ones the same corpus reads at
+--   padded gas, so the run finishes inside the pad and the tower's
+--   height is never forced.  NOT covered: retirement, a registration
+--   minted anywhere but a delivery or the walk's own descent, and any
+--   instant but the subscribe frame.
 postulate
   burst-regs-split : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
     let r = subscribeE (budgetAt e ins 0) e root 0 0

@@ -215,18 +215,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE DELIVERED SUMMAND AT THE ROW'S OWN BUDGET, which is the one
-  region the split's evidence declines to reach.** `burst-regs-split`
-  now carries the registry, and its shape is settled: three candidates
-  were separated and only the sum survived. What no row touches is the
-  MARGIN — every witness runs at padded gas, so what is covered is the
-  climb's shape, not whether the sum has room at `budgetAt e ins 0`.
-  The commit instantiates the split at its own budget on the carrying
-  fold, reading the delivered summand against the node the value sits
-  in rather than the table's maximum. A crossing there restates the
-  right summand, not the sum; none promotes the row off a coverage gap
-  that currently reads as safe.
-
 - **WHETHER `fan-regsSz` IS STILL THE FAN'S SUPPLIER AT ALL.** It is
   the last cap-denominated receipt the sink arm consumes, and the four
   dead routes under it close every re-denomination of the cap it names.
@@ -249,6 +237,16 @@ does not fit is a finding about the shared statement, not about the head.
   smaller, where a region is half the size to name, and measures each
   half. A half that stays over names the region; both coming in names
   the whole-file pass instead.
+
+- **THE MINT, WHERE TWO ROWS NOW POINT AND NEITHER IS STATED.**
+  `walk-share-strat`'s free form dies at one `register`, so the
+  strictness it claims is owed where a chain is MINTED and not where
+  the walk carries it; and what the fan row leaves open, its chain now
+  arriving with its own reading, is that same site. The commit states
+  the register-time obligation once, at the index the mint actually
+  has, and puts both consumers against it — either they spend the one
+  statement, retiring a carrying problem nothing can thread, or the two
+  shapes differ and that difference is the finding.
 
 ### The ledger
 
@@ -385,7 +383,7 @@ does not fit is a finding about the shared statement, not about the head.
   stream leaf — the walk over it is a proven body, so what remains per instant
   is the frame widths, which are sealed and taken as a quantified premise
   wherever a row reads them.
-- **`burst-regs-split`** (Caps-Bridge) — DIFFICULTY, `REFUTED, PROBED×2`: the
+- **`burst-regs-split`** (Caps-Bridge) — DIFFICULTY, `REFUTED, PROBED×3`: the
   registry after the subscribe frame, split between the program's unit and the
   node table. A chain SUMS its two kinds of frame, so neither source alone pays
   and neither does their join; the sum is what is left, tight where they
