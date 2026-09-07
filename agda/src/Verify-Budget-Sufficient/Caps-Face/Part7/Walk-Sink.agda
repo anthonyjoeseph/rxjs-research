@@ -101,6 +101,13 @@ open import Verify-Budget-Sufficient.Caps-Face.Part7.Ring-Vocabulary using
 -- admitted continuation whose floor is at or above `i` inherits them
 -- by `ib-monoᵛ`.  That is why `admEntry?` carries the floor ordering
 -- beside the stratification: one premise, spent twice.
+--
+-- AND THE ENTRY TUPLE IS OWED ONCE PER FACE, which is what prices this
+-- move rather than any one of its statements.  A walk's entry
+-- hypotheses are built in one place and entered from two -- the caps
+-- ring and the burst ring -- so a premise added to that tuple is a
+-- premise both rings must carry to their own dispatch.  The two are
+-- structurally identical and neither derives the other.
 postulate
   sink-admit-entry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (c : Caps) (i : Fin n) (sched : Sched Γ) (st : EvalSt e) →
@@ -1133,18 +1140,23 @@ sink-ring-burst-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sched : Sched Γ) (st : EvalSt e) →
   RingState {t = t} sl id i vals gas Lv J g k sched st →
   admSz? (Caps.cSize (frameStep L₀ (capsAt e sl id))) ps ≡ true →
+  admEntry? (Fin.toℕ i) ps ≡ true →
+  all (inputsBelowᵛ (Fin.toℕ i) (lookup Γ i)) vals ≡ true →
   L₀ ≤ Lv →
   k + length ps ≤ regAt (Caps.cSize (capsAt e sl id)) (Caps.cReg (capsAt e sl id)) J →
   depthShareGo sf gas nid now i vals fin ps sched st ≤ capsH e sl id →
   shareBurstsOK (nestBurstAt e sl id) sf gas nid now i vals fin ps sched st
-sink-ring-burst-go sl id sf gas nid now i vals fin [] L₀ Lv J g k sched st RS hadm hL₀ hlen hdp = tt
+sink-ring-burst-go sl id sf gas nid now i vals fin [] L₀ Lv J g k sched st RS hadm hent hib hL₀ hlen hdp = tt
 sink-ring-burst-go {e = e} sl id sf gas nid now i vals fin ((rid , p) ∷ ps) L₀ Lv J g k sched st
-  RS hadm hL₀ hlen hdp
+  RS hadm hent hib hL₀ hlen hdp
   with any (_≡ᵇ rid) (EvalSt.cancelled st)
 ... | true =
   sink-ring-burst-go sl id sf gas nid now i vals fin ps L₀ Lv J g k sched st RS
     (proj₂ (∧-true (pathSz? (Caps.cSize (frameStep L₀ (capsAt e sl id))) p)
                    (admSz? (Caps.cSize (frameStep L₀ (capsAt e sl id))) ps) hadm))
+    (proj₂ (∧-true (pathStrat? p ∧ (Fin.toℕ i ≤ᵇ pathFloor p))
+                   (admEntry? (Fin.toℕ i) ps) hent))
+    hib
     hL₀
     (≤-trans (+-monoʳ-≤ k (n≤1+n (length ps))) hlen)
     (lub3-l (depthShareGo sf gas nid now i vals fin ps sched st)
@@ -1158,10 +1170,13 @@ sink-ring-burst-go {e = e} sl id sf gas nid now i vals fin ((rid , p) ∷ ps) L�
 ... | false =
     chain-walk-burst sl id Lv sf gas nid now (Fin.toℕ i) p vals EVS fin sched st′
       (sink-entry-hyps sl id sf gas nid now i vals fin rid p Lv J g k sched st
-         RS hpzL HI (lub3-m DA DB DC hdp))
+         RS hpzL HI (lub3-m DA DB DC hdp) (proj₁ hentH) (proj₂ hentH) hib)
   , sink-ring-burst-go sl id sf gas nid now i vals fin ps L₀ (Lv + L′) J g (suc k)
       sched₁ st₁ RS₁
       (proj₂ (∧-true (pathSz? B₀ p) (admSz? B₀ ps) hadm))
+      (proj₂ (∧-true (pathStrat? p ∧ (Fin.toℕ i ≤ᵇ pathFloor p))
+                     (admEntry? (Fin.toℕ i) ps) hent))
+      hib
       (≤-trans hL₀ (m≤m+n Lv L′))
       (subst (_≤ regAt (Caps.cSize c) (Caps.cReg c) J) (+-suc k (length ps)) hlen)
       (lub3-r DA DB DC hdp)
@@ -1175,6 +1190,9 @@ sink-ring-burst-go {e = e} sl id sf gas nid now i vals fin ((rid , p) ∷ ps) L�
                hlen
   hpzL = pathSz?-widen p (proj₁ (frameStep-mono-j c 2≤S hL₀))
            (proj₁ (∧-true (pathSz? B₀ p) (admSz? B₀ ps) hadm))
+  hentH = ∧-true (pathStrat? p) (Fin.toℕ i ≤ᵇ pathFloor p)
+            (proj₁ (∧-true (pathStrat? p ∧ (Fin.toℕ i ≤ᵇ pathFloor p))
+                           (admEntry? (Fin.toℕ i) ps) hent))
   sched₁ = proj₁ (ringFold sf gas nid now i vals fin rid p sched st)
   st₁    = proj₂ (ringFold sf gas nid now i vals fin rid p sched st)
   st′ = record st { delivered = rid ∷ EvalSt.delivered st }
@@ -1213,7 +1231,7 @@ walk-sink-burst sl id L sf zero nid now src i vals evs fin sched st H = tt
 walk-sink-burst sl id L sf (suc gas) nid now src i vals evs fin sched st
   (_ , _ , _ , _ , _ , _ , _ , _ , (zero , _ , () , _ , _))
 walk-sink-burst {n = n} {Γ = Γ} {t = t} {e = e} sl id L sf (suc gas) nid now src i vals evs fin sched st
-  (sleq , cok , hvc , hcl , _ , hdp , _ , _ , (suc g₀ , P , hfl , hlvP , hR)) =
+  (sleq , cok , hvc , hcl , _ , hdp , hib , _ , (suc g₀ , P , hfl , hlvP , hR)) =
   sink-ring-burst-go sl id sf gas nid now i vals fin
     (shareAdmit i (EvalSt.registry st)) L L P g₀ 0 sched (shareLatch i fin st)
     ( sleq
@@ -1223,6 +1241,8 @@ walk-sink-burst {n = n} {Γ = Γ} {t = t} {e = e} sl id L sf (suc gas) nid now s
     , hfl₀ , hR , hL₀ )
     (shareAdmit-sz i (Caps.cSize (frameStep L c)) (EvalSt.registry st)
        (capsOK?-regs (frameStep L c) sched st cok))
+    (sink-admit-entry (frameStep L c) i sched st cok)
+    hib
     ≤-refl
     hlen₀
     hdp

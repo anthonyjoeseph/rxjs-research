@@ -216,16 +216,15 @@ does not fit is a finding about the shared statement, not about the head.
 ### Big picture tier roadmap
 
 - **TYING THE CASCADE'S ENTRY TO THE STORE — THE HALF THE RING'S MOVE
-  DOES NOT REACH.** The ring entry now draws its pair from a statement
-  over the list the SHARE ADMITTED, which is read out of the state the
-  receipt already names, so the refuted quantifier is gone from that
-  side and the two refuted leaves survive at ONE consumer each. An
-  arrival's chain comes off `chainsOf` and its value is the source's,
-  and neither is tied to the state, so the subject that has to move
-  there is the LIVE source. The leg states that form, carries it
-  through the cascade's entry tuple, and retires the pair. The store
-  conjunct is still owed: it is what the hop leaf, which no refutation
-  touches, needs on its own.
+  DOES NOT REACH.** The ring's pair now comes off a statement over the
+  list the SHARE ADMITTED, read out of the state the receipt already
+  names. The fit test priced that move at TWO ring entries and not one:
+  the burst face enters the same tuple and owes the same premises. Both
+  are carried. An arrival's chain comes off `chainsOf` and its value is
+  the source's, neither tied to the state, so the subject that has to
+  move there is the LIVE source. The leg states that form and carries
+  it through the cascade's entry. The store conjunct is still owed: the
+  hop leaf, which no refutation touches, needs it on its own.
 
 - **PRICING A FANNED CHAIN IN SOMETHING THAT IS NOT A CAP, where every
   route under `fan-regsSz` now converges.** Five closed routes leave
