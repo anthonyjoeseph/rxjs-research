@@ -655,16 +655,26 @@ postulate
 -- the round these leaves are otherwise instantiated at and finds it
 -- EMPTY.  So the absence is of a POINT.
 --
--- AND THE POINT IS NOT ONE PROGRAM AWAY, which was the first reading of
--- that emptiness and is refuted.  The round it was read at defers its
--- shared slot behind a capacity-one outer, so the slot being merely
--- unspent yet explains the nought -- but the same list is read on a
--- family that subscribes its shared slot at the ROOT instead, and it
--- is empty too.  Two opposite connect timings agree, so the timing is
--- not what empties it, and what is open is whether a slot subscribed
--- as a program reaches the registry under the source index the admit
--- filters on at all.  That is a reading of the registration path
--- rather than another corpus family.
+-- AND WHAT EMPTIES IT IS THE SHARED SLOT'S DEF, not the connect that
+-- was the first reading and not the admit's own guard that was the
+-- second.  The round is read again beside the two latches the connect
+-- sets, and the slot is recorded as CONNECTED and as COMPLETED at the
+-- same point: `sharedConnect` subscribes the def, asks whether the
+-- burst came back completed, and on yes drops every registration on
+-- that source before it returns.  The entry is written and does not
+-- survive the call that writes it, so a def built from one-shots can
+-- never leave one -- which is why two opposite connect timings agreed,
+-- both families sharing the def that decides it.
+--
+-- SO THE POINT NEEDS A DEF THAT OUTLIVES ITS CONNECT, and the
+-- telescope invariant is what keeps this corpus from having one: a
+-- slot's def may name only strictly earlier slots, so its
+-- nought-indexed share reaches no scripted source and every def open to
+-- it is synchronous.  A share at a later index over a scripted slot
+-- below it is the shape that clears this, and `Probed.Root` already
+-- builds one and pins its registrations as still standing.  The row is
+-- unpointed by the corpus this face is otherwise instantiated at, and
+-- pointed by that one.
 postulate
   share-fold-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (sf : Gas) (gas : ℕ) (bid : Id) (now : Tick) (i : Fin n)

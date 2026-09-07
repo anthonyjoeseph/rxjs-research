@@ -42,7 +42,7 @@
 -- TARGET: chain-fit-step @266bd8
 module Probed.Depth-Join where
 
-open import Data.Bool using (Bool; false)
+open import Data.Bool using (Bool; false; true)
 open import Data.List using (List; _∷_; [])
 open import Data.Nat using (ℕ; suc; _+_; _*_)
 open import Data.Nat.Properties using (≤ᵇ⇒≤)
@@ -58,7 +58,7 @@ open import Rx.Evaluator
 
 open import Data.List renaming (length to lengthL) using ()
 open import Data.Fin using (zero)
-open import Rx.Evaluator using (shareAdmit; EvalSt; mergeAllᵒ; RegId)
+open import Rx.Evaluator using (shareAdmit; EvalSt; mergeAllᵒ; RegId; memberSource)
 
 open import Refuted.Demand-Programs using (Γ₂; progU; progF; sucGF)
 open import Probed.Depth-Sighted
@@ -235,3 +235,55 @@ admFig = lengthL (shareAdmit zero (EvalSt.registry fSt))
 
 admFig≡ : admFig ≡ 10
 admFig≡ = refl
+
+-- AND WHAT EMPTIES IT IS THE DEF, WHICH IS NEITHER OF THE TWO THINGS
+-- THE WRAPPER CONTROLS.  Reading the admit list alone cannot separate
+-- three ways of arriving at a nought -- the slot was never connected
+-- because the fuel ran dry at the edge, the slot connected and the
+-- entry is simply not admitted, or the entry was written and then
+-- taken back -- and only the last of those says anything about the
+-- statement's index.  The figure reads the whole registry beside the
+-- two latches the connect sets, so one run decides among them: the
+-- units are the registrations standing at that point -- the width
+-- family subscribes its scripted slot once per copy, so that digit is
+-- not a nought and the flags are carried clear of it -- the thousands
+-- say whether source nought has completed, the ten-thousands whether
+-- it ever connected at all.
+--
+-- IT IS THE THIRD, AND THAT NAMES THE OBSTRUCTION.  The slot connects
+-- and completes in the same call, because `sharedConnect` subscribes
+-- the def and asks whether the burst it got back completed -- and the
+-- def here is built from one-shots under a scan, so it exhausts inside
+-- its own connect burst and the branch that latches it drops every
+-- registration on that source before returning.  The registration IS
+-- written; it does not survive the call that writes it.  So the
+-- emptiness is a property of the DEF being synchronous, which both
+-- families share and neither wrapper alters -- which is why connecting
+-- eagerly and connecting late agreed.  `Probed.Root` had already read
+-- the general fact off a one-shot def; what the flags add is that this
+-- corpus reaches it by the connect-and-latch route rather than by a
+-- fuel that ran dry before the edge, which is the reading that would
+-- have pointed at the gas instead of at the program.
+--
+-- SO WHAT `share-step-fit` WANTS IS A SHARE WHOSE DEF OUTLIVES ITS OWN
+-- CONNECT, and the telescope invariant is what puts that out of this
+-- corpus's reach rather than out of reach: a slot's def may reference
+-- only STRICTLY EARLIER slots, so a nought-indexed share can name no
+-- scripted source at all and every def available to it is sync by
+-- construction.  A share at a LATER index over a scripted slot below
+-- it is the shape that clears this, and `Probed.Root` builds one -- a
+-- share over an empty hot, which never fires and so never completes,
+-- whose registrations are pinned there as still standing at the root
+-- exit.  The row is unpointed by THIS corpus and not by its own index,
+-- and the point it wants already exists one module over.
+b2n : Bool → ℕ
+b2n false = 0
+b2n true  = 1
+
+regFig : ℕ
+regFig = lengthL (EvalSt.registry fSt)
+       + 1000 * b2n (memberSource 0 (EvalSt.completedSources fSt))
+       + 10000 * b2n (memberSource 0 (EvalSt.connectedShares fSt))
+
+regFig≡ : regFig ≡ 11004
+regFig≡ = refl

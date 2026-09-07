@@ -215,17 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **WHETHER A SHARED SLOT REACHES THE REGISTRY UNDER THE INDEX THE
-  ADMIT FILTERS ON — a reading of the registration path, not another
-  program.** Writing the family between is dead: two families connected
-  in OPPOSITE ways, one at the root and one deferred behind a
-  capacity-one outer, both admit nothing, so timing is not what empties
-  the list. What is left is `shareAdmit`'s own guard against what
-  `register` writes when the thing subscribed is a slot's PROGRAM. The
-  commit reads that path and pins what the registry holds. If the guard
-  cannot be met from a slot at all, `share-step-fit` is unpointed by
-  construction and its index is wrong — a SHAPE finding, and larger
-  than the coverage gap it now reads as.
+- **POINT `share-step-fit` AT THE SHARE WHOSE DEF OUTLIVES ITS CONNECT,
+  which exists already and is one module over.** What empties the admit
+  list is settled: the def is synchronous, so the connect latches it
+  completed and drops its own registration before returning — not the
+  connect's timing and not the admit's guard. `Probed.Root` builds the
+  clearing shape, a share over an empty hot that never fires, and pins
+  its registrations as still standing at the root exit. The commit
+  spends that state: read the admit entries there and take the leaf at
+  one. It is the first instantiation this row would have, so a green
+  moves it off FALSITY and a red is worth more.
 
 - **THE SUBSTITUTING TELESCOPE, WHICH IS THE ONE SHAPE THAT HAS ALREADY
   REFUTED AN ADDITIVE SUMMAND ON A SIBLING FACE.** `Rx.Clos-Size` exists
