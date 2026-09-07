@@ -215,15 +215,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE MINT, WHERE TWO ROWS NOW POINT AND NEITHER IS STATED.**
-  `walk-share-strat`'s free form dies at one `register`, so the
-  strictness it claims is owed where a chain is MINTED and not where
-  the walk carries it; and what the fan row leaves open, its chain now
-  arriving with its own reading, is that same site. The commit states
-  the register-time obligation once, at the index the mint actually
-  has, and puts both consumers against it — either they spend the one
-  statement, retiring a carrying problem nothing can thread, or the two
-  shapes differ and that difference is the finding.
+- **INDEXING THE WALK'S VALUE LEDGER BY THE CHAIN, now that the mint's
+  fifth arm is instantiated rather than inferred.** A real run reaches
+  it and mints exactly the entry the four descent arms cannot: a slot
+  source under a share's sink, out of an observable that arrived as a
+  value, one dispatch after the subscribe frame and never inside it.
+  The reading held at every row reached, so PRESERVATION is what is
+  left to fear, not truth at a point. The commit states the floor
+  per-chain — the source form is unpreserved, a frame carrying the
+  syntax of whatever pushed it — and puts both consumers against it,
+  so a shape nothing can thread fails at the walk's bundle and not
+  here.
 
 - **PRICING A FANNED CHAIN IN SOMETHING THAT IS NOT A CAP, where every
   route under `fan-regsSz` now converges.** Five closed routes leave

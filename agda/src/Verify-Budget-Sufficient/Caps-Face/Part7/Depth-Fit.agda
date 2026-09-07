@@ -1597,6 +1597,26 @@ postulate
 -- own vocabulary and not of this face alone.  Every other face reading
 -- that ledger ignores the index.
 
+-- AND THE ARM IS REACHABLE, WHICH UNTIL NOW WAS AN INFERENCE FROM THE
+-- TYPES.  A three-slot program in `Harness.Main` -- a hot, an
+-- `obs`-typed share mapping it to an observable that names the hot,
+-- and a flatten over that share -- mints an entry whose source is the
+-- hot and whose chain ends at the flatten's sink, and the flatten's
+-- def names no input but the share.  So the entry cannot have come
+-- from the descent, and the site is not merely unreached by the four
+-- arms but genuinely populated.  It is populated one DISPATCH after
+-- the subscribe frame and never inside it, a hot's emissions being
+-- scheduled rather than delivered at connect -- which says the arm
+-- lives exactly where this statement is made and not earlier.
+--
+-- AND THE READING HELD AT EVERY ROW, WHICH BOUNDS WHAT IS LEFT TO
+-- FEAR RATHER THAN LOWERING ANYTHING.  Those rows are
+-- measured-not-rechecked, so they discharge nothing and move no class;
+-- what they buy is a direction.  Nothing in reach produced a registry
+-- the reading rejects, so the open question is not whether the arm can
+-- mint a violating entry at a point but whether the per-chain floor
+-- SURVIVES the arm -- preservation, which no instantiation settles.
+--
 -- AND IT IS OWED TO THE WALK'S BUNDLE RATHER THAN STATED FREE, because
 -- the free form is false: the obligations that would establish it are
 -- enumerated at the statement this receipt is spent on, which is where
