@@ -215,16 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **INDEXING THE WALK'S VALUE LEDGER BY THE CHAIN, WHICH IS WHAT THE
-  SLOT-SOURCED MINT TURNED OUT TO COST.** The descent floor pays four
-  of the mint's five registrations for nothing. The fifth subscribes a
-  DELIVERED observable, so its floor rides on the value — per CHAIN,
-  since a frame applies the syntax of whatever pushed it; why the
-  source-indexed form is not preserved is in `walk-share-strat`'s
-  header. The commit puts the chain into the walk's value ledger, every
-  other face ignoring the index. The risk is SHAPE: the ledger is
-  asserted for the arriving value against a LIST of chains, so the
-  index has to distribute where nothing has selected one yet.
+- **PAYING FOR THE CHAIN INDEX ON THE FACE THAT IGNORES IT.** The index
+  is in, and the SHAPE risk is discharged: the generic and the caps face
+  are green, `chP?-const` carrying every face with nothing to say about
+  the chain. What the leg cost is the burst face, whose check went up by
+  a multiple on an index none of its own proofs mention — a
+  record-projection cost, not a proof cost, and the finding is in the
+  ledger field's own header. The remaining work is to cut that
+  projection, or failing that to leave the burst ledger unindexed and
+  carry the fan's reading in a second field. The mint's fifth site, which
+  the index is for, waits on it.
 
 - **THE DELIVERED SUMMAND AT THE ROW'S OWN BUDGET, which is the one
   region the split's evidence declines to reach.** `burst-regs-split`

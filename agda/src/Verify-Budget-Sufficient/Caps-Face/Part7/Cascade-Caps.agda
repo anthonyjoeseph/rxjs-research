@@ -30,11 +30,11 @@ open import Verify-Budget-Sufficient.Caps-Depth using
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; arrVal; RegId; Chain; lookupNode; NodeId; AllOp; cascadeLatch;
   cascadeFinish; arrSource; chainsOf; chainsGo; cascadeGo; Path; arrTy; stepFrame;
   subscribeInner; innerFinish; sameSource; regAt; fLvlD; lvls; sLvlD; chainStep; budgetAt;
-  arrTick)
+  arrTick; shareAdmit)
 open import Rx.Slots using (Slots; slotsSize)
 
 open import Verify-Budget-Sufficient.Delivery-Walk using
-  (module Walk; Walk-Hyps)
+  (module Walk; Walk-Hyps; chP?-const)
 open import Verify-Budget-Sufficient.Deliveries using
   (delivN)
 open import Verify-Budget-Sufficient.Caps using
@@ -126,7 +126,9 @@ walkH :
 walkH siC ifc c d sl 2≤S 1≤R slC slSz = record
   { OK        = walkOK c sl
   ; Pb        = λ J p → pathSz? (Caps.cSize (frameStep J c)) p
-  ; Vb        = λ J vs → valsCaps? (frameStep J c) sl vs
+  -- PATH-BLIND ON THIS FACE, for now: the caps reading of a payload is a
+  -- size bound, and a size does not depend on where the payload is going
+  ; Vb        = λ _ J vs → valsCaps? (frameStep J c) sl vs
   -- TRIVIAL BURST INSTANTIATION: Eb and Bb are always true, so every
   -- closure fact is refl and Res.burst is never projected by callers.
   -- GAS-BLIND: the caps axis carries no fuel content, so GOK is ⊤;
@@ -149,7 +151,10 @@ walkH siC ifc c d sl 2≤S 1≤R slC slSz = record
   ; p-len     = λ J p h → pathSz?-len (Caps.cSize (frameStep J c)) p h
   ; p-tail    = λ J f p h → pathSz?-tail (Caps.cSize (frameStep J c)) f p h
   ; p-widen   = λ le p h → pathSz?-widen p (proj₁ (frameStep-mono-j c 2≤S le)) h
-  ; v-widen   = λ le vs h → valsCaps?-lvl _ _ sl vs (frameStep-mono-j c 2≤S le) h
+  ; v-widen   = λ le _ vs h → valsCaps?-lvl _ _ sl vs (frameStep-mono-j c 2≤S le) h
+  ; v-fan     = λ J i vs _ st _ h →
+                  chP?-const (valsCaps? (frameStep J c) sl vs)
+                    (shareAdmit i (EvalSt.registry st)) h
   ; ok-reg    = λ J sched st ok → capsOK?-count (frameStep J c) sched st (proj₂ ok)
   ; ok-cons   = λ J rid sched st ok →
                   proj₁ ok , capsOK?-delivered (frameStep J c) rid sched st (proj₂ ok)
@@ -252,7 +257,8 @@ cascadeGo-deliveries :
 cascadeGo-deliveries siC ifc {n = n} {e = e} c d a id chains sl sched st 2≤S 1≤R slC slEq inv vC pS n≤S lenB slSz hD =
   ≤-trans (W.Res.cnt (W.cascadeGo-go 0 a id chains sched st
              ((slEq , invʲ) , capsOK?-regs c sched st inv)
-             pS (∧-intro (∧-intro vC refl) refl) tt hD))
+             pS (chP?-const (valsCaps? (frameStep 0 c) sl (arrVal a ∷ [])) chains
+              (∧-intro (∧-intro vC refl) refl)) tt hD))
     (≤-trans (dWalkᶜ-mono n (Caps.cSize c) (length chains)
                 (regAt (Caps.cSize c) (Caps.cReg c) 0)
                 2≤S ≤-refl ≤-refl ≤-refl n≤S ≤-refl
@@ -372,7 +378,8 @@ cascadeGo-level siC ifc {e = e} c d a id chains sl sched st 2≤S 1≤R slC slEq
                   (walkH siC ifc c d sl 2≤S 1≤R slC slSz)
   GO = W.cascadeGo-go 0 a id chains sched st
          ((slEq , invʲ) , capsOK?-regs c sched st inv)
-         pS (∧-intro (∧-intro vC refl) refl) tt hD
+         pS (chP?-const (valsCaps? (frameStep 0 c) sl (arrVal a ∷ [])) chains
+              (∧-intro (∧-intro vC refl) refl)) tt hD
 
 -- and the assembly declared above: the landing level with the delivery
 -- count widened to its own recursion, which is `sizeCount` by definition

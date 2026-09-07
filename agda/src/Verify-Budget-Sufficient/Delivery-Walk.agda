@@ -126,6 +126,16 @@ chP? : ∀ {n} {Γ : Ctx n} {s t} → (∀ {u} → Path Γ u t → Bool) →
        List (RegId × Path Γ s t) → Bool
 chP? Pb = all (λ rc → Pb (proj₂ rc))
 
+-- WHAT A LEDGER THAT DOES NOT READ THE PATH COSTS TO DISTRIBUTE: nothing.
+-- A face whose payload reading ignores the chain hands the same Bool to
+-- every entry, so the list-level form is the entry-level one repeated —
+-- which is what lets the index be introduced without any face that has
+-- nothing to say about the chain paying for it
+chP?-const : ∀ {n} {Γ : Ctx n} {s t} (b : Bool)
+  (ps : List (RegId × Path Γ s t)) → b ≡ true → chP? (λ _ → b) ps ≡ true
+chP?-const b []       h = refl
+chP?-const b (p ∷ ps) h = ∧-intro h (chP?-const b ps h)
+
 -- the two share-boundary bookkeeping steps, on the REGISTRY axis (the
 -- ledger axis is .Deliveries' shareLatch-deliv / shareFinish-deliv)
 shareLatch-reg : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
@@ -222,7 +232,24 @@ record Walk-Hyps {n} {Γ : Ctx n} {t} (e : Closed Γ t) (S W R d : ℕ) : Set₁
 
     -- the two syntactic side conditions, now READ AT A LEVEL
     Pb : ℕ → ∀ {u} → Path Γ u t → Bool
-    Vb : ℕ → ∀ {s} → List (Val Γ s) → Bool
+    -- AND THE PAYLOAD LEDGER IS READ AGAINST THE CHAIN THE PAYLOAD IS
+    -- TRAVELLING, not against the slot that emitted it.  A frame applies
+    -- the syntax of whichever definition PUSHED it, so a reading taken
+    -- at the source is not preserved across one step while a reading
+    -- taken at the chain is.  Every face that has nothing to say about
+    -- the chain ignores the index, which is most of them.
+    --
+    -- AND IGNORING IT IS NOT FREE, WHICH IS THE ONE THING THE DESIGN DID
+    -- NOT PREDICT.  A face whose reading is a constant function of the
+    -- path still pays: the burst face's check went up by a MULTIPLE on
+    -- an index none of its own proofs mention, since they state their
+    -- ledger directly rather than through this field.  So the cost is in
+    -- the record — projecting a lambda-valued field out of a literal
+    -- whose other fields are enormous — and not in what the index says.
+    -- The figures are in `typecheck-performance-numbers.md`, which is
+    -- where a figure lives; what belongs here is that the cheap-looking
+    -- half of this change is the half to measure.
+    Vb : ∀ {u} → Path Γ u t → ℕ → ∀ {s} → List (Val Γ s) → Bool
 
     -- BURST LEDGERS: an abstract Bool over the accumulated protocol events
     -- in one emit (Eb) and over a whole stream (Bb).  Threaded through the
@@ -276,7 +303,7 @@ record Walk-Hyps {n} {Γ : Ctx n} {t} (e : Closed Γ t) (S W R d : ℕ) : Set₁
     -- foldPath's root envelope: events + mapped values + optional complete
     b-deliv : ∀ J (id : Id) (src : Source)
               (evs : List (InstEvent (Val Γ t))) (vals : List (Val Γ t)) (fin : Bool) →
-              Eb J evs ≡ true → Vb J vals ≡ true →
+              Eb J evs ≡ true → Vb root J vals ≡ true →
               Bb J (((evs ++ map value vals ++ (if fin then complete ∷ [] else []))
                       at id from src as delivery) ∷ []) ≡ true
     -- foldPath's share-sink envelope: events + handoff (valueless)
@@ -294,8 +321,19 @@ record Walk-Hyps {n} {Γ : Ctx n} {t} (e : Closed Γ t) (S W R d : ℕ) : Set₁
     -- and both ledgers widen along the level
     p-widen : ∀ {J J′ : ℕ} → J ≤ J′ → ∀ {u} (p : Path Γ u t) →
               Pb J p ≡ true → Pb J′ p ≡ true
-    v-widen : ∀ {J J′ : ℕ} → J ≤ J′ → ∀ {s} (vs : List (Val Γ s)) →
-              Vb J vs ≡ true → Vb J′ vs ≡ true
+    v-widen : ∀ {J J′ : ℕ} → J ≤ J′ → ∀ {u} (κ : Path Γ u t) {s} (vs : List (Val Γ s)) →
+              Vb κ J vs ≡ true → Vb κ J′ vs ≡ true
+
+    -- AND THE FAN IS WHERE THE INDEX MOVES, which is the one step the
+    -- widening above cannot do.  Values reaching a share's sink are
+    -- re-emitted BY that share, so their reading at the sink is what
+    -- every chain the share admits inherits -- and the state predicate
+    -- is what carries whatever makes that inheritance sound, since the
+    -- admitted chains are read out of the registry it speaks about.
+    v-fan : ∀ (J : ℕ) (i : Fin n) {s} (vs : List (Val Γ s))
+            (sched : Sched Γ) (st : EvalSt e) → OK J sched st →
+            Vb (share-sink {t = t} i) J vs ≡ true →
+            chP? (λ κ → Vb κ J vs) (shareAdmit {t = t} i (EvalSt.registry st)) ≡ true
 
     ok-reg : ∀ (J : ℕ) (sched : Sched Γ) (st : EvalSt e) → OK J sched st →
              length (EvalSt.registry st) ≤ regAt S R J
@@ -316,7 +354,7 @@ record Walk-Hyps {n} {Γ : Ctx n} {t} (e : Closed Γ t) (S W R d : ℕ) : Set₁
     sf-step : ∀ (J : ℕ) {s u} (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u)
       (path′ : Path Γ u t) (vals : List (Val Γ s)) (fin : Bool)
       (sched : Sched Γ) (st : EvalSt e) → OK J sched st →
-      Pb J (f ↠ path′) ≡ true → Vb J vals ≡ true →
+      Pb J (f ↠ path′) ≡ true → Vb (f ↠ path′) J vals ≡ true →
       regP? (Pb J) (EvalSt.registry st) ≡ true →
       GOK sf id →
       CL (fLvlD S W d J) id →
@@ -330,7 +368,7 @@ record Walk-Hyps {n} {Γ : Ctx n} {t} (e : Closed Γ t) (S W R d : ℕ) : Set₁
       Σ ℕ λ j′ → (J + j′ ≤ fLvlD S W d J)
         × OK (J + j′) (proj₁ (proj₂ (proj₂ (proj₂ r))))
                       (proj₂ (proj₂ (proj₂ (proj₂ r))))
-        × (Vb (J + j′) (proj₁ r) ≡ true)
+        × (Vb path′ (J + j′) (proj₁ r) ≡ true)
         × (regP? (Pb (J + j′))
                  (EvalSt.registry (proj₂ (proj₂ (proj₂ (proj₂ r))))) ≡ true)
         -- NEW: the frame's protocol events are covered by Eb at the
@@ -367,6 +405,17 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   chP?-widen le ((rid , p) ∷ ps) h =
     ∧-intro (p-widen le p (proj₁ (∧-true _ _ h)))
             (chP?-widen le ps (proj₂ (∧-true _ _ h)))
+
+  -- and the payload ledger widens the same way once it is read per chain:
+  -- `v-widen` moves ONE reading up a level, and a chain list is that
+  -- reading pointwise, so the distributed form widens entry by entry
+  chV?-widen : ∀ {J J′ : ℕ} → J ≤ J′ → ∀ {s} (vs : List (Val Γ s)) →
+    ∀ {u} (ps : List (RegId × Path Γ u t)) →
+    chP? (λ κ → Vb κ J vs) ps ≡ true → chP? (λ κ → Vb κ J′ vs) ps ≡ true
+  chV?-widen le vs []             h = refl
+  chV?-widen le vs ((rid , p) ∷ ps) h =
+    ∧-intro (v-widen le p vs (proj₁ (∧-true _ _ h)))
+            (chV?-widen le vs ps (proj₂ (∧-true _ _ h)))
 
   -- THE SEED EVENTS a delivery starts from: a spent source contributes its
   -- own exhausted close, an unspent one contributes nothing.  Both callers
@@ -407,7 +456,7 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     {u} (path : Path Γ u t) (vals : List (Val Γ u))
     (evs : List (InstEvent (Val Γ t))) (fin : Bool)
     (sched : Sched Γ) (st : EvalSt e) → Good J sched st →
-    Pb J path ≡ true → Vb J vals ≡ true →
+    Pb J path ≡ true → Vb path J vals ≡ true →
     Eb J evs ≡ true →
     GOK sf id →
     CL (lvls S W d (iterL S W d (pathLen path) J)
@@ -420,7 +469,8 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 
   dispatchShare-go : ∀ (J : ℕ) (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
     (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
-    (sched : Sched Γ) (st : EvalSt e) → Good J sched st → Vb J vals ≡ true →
+    (sched : Sched Γ) (st : EvalSt e) → Good J sched st →
+    chP? (λ κ → Vb κ J vals) (shareAdmit {t = t} i (EvalSt.registry st)) ≡ true →
     GOK sf id →
     CL (lvls S W d J (dCapᶜ S W R d gas J)) id →
     depthDisp sf gas id now i vals fin sched st ≤ d →
@@ -431,7 +481,7 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
     (ps : List (RegId × Path Γ (lookup Γ i) t))
     (sched : Sched Γ) (st : EvalSt e) → Good J sched st →
-    chP? (Pb J) ps ≡ true → Vb J vals ≡ true →
+    chP? (Pb J) ps ≡ true → chP? (λ κ → Vb κ J vals) ps ≡ true →
     GOK sf id →
     CL (lvls S W d J (dWalkᶜ S W R d gas J (length ps))) id →
     depthShareGo sf gas id now i vals fin ps sched st ≤ d →
@@ -470,7 +520,8 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
         (Res.burst DS))
     where
     ds       = dispatchShare {t = t} sf gas id now i vals fin sched st
-    DS       = dispatchShare-go J sf gas id now i vals fin sched st g hV gk hC hD
+    DS       = dispatchShare-go J sf gas id now i vals fin sched st g
+                 (v-fan J i vals sched st (proj₁ g) hV) gk hC hD
     envelope = (evs ++ handoff (toℕ i) ∷ []) at id from envSrc as delivery
 
   foldPath-go J sf gas id now envSrc (f ↠ path′) vals evs fin sched st (ok , len) hP hV hE gk hC hD =
@@ -650,7 +701,7 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
         dREST = depthShareGo sf gas id now i vals fin ps
                   (proj₁ (proj₂ fp)) (proj₂ (proj₂ fp))
         SK = shareGo-go J sf gas id now i vals fin ps sched st g
-               (proj₂ (∧-true _ _ hp)) hV gk
+               (proj₂ (∧-true _ _ hp)) (proj₂ (∧-true _ _ hV)) gk
                (cl-anti id
                   (lvls-mono (dWalkᶜ S W R d gas J (length ps))
                      (dWalkᶜ S W R d gas J (suc (length ps)))
@@ -710,7 +761,8 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
                   hC
         FP  = foldPath-go J sf gas id now (toℕ i) p vals evs₀ fin sched st₀
                 ( ok-cons J rid sched st (proj₁ g) , proj₂ g )
-                (proj₁ (∧-true _ _ hp)) hV hE₀ gk hC-FP (lub3-m dSK dFP dREST hD)
+                (proj₁ (∧-true _ _ hp)) (proj₁ (∧-true _ _ hV)) hE₀ gk hC-FP
+                (lub3-m dSK dFP dREST hD)
         J₁  = Res.lvl FP
         rest = shareGo sf gas id now i vals fin ps (proj₁ (proj₂ fp)) st₁
         st₂ = proj₂ (proj₂ rest)
@@ -743,7 +795,7 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
         REST = shareGo-go J₁ sf gas id now i vals fin ps (proj₁ (proj₂ fp)) st₁
                  (Res.good FP)
                  (chP?-widen (Res.lo FP) ps (proj₂ (∧-true _ _ hp)))
-                 (v-widen (Res.lo FP) vals hV)
+                 (chV?-widen (Res.lo FP) vals ps (proj₂ (∧-true _ _ hV)))
                  gk hC-REST (lub3-r dSK dFP dREST hD)
         restCnt : D₂ ≤ dWalkᶜ S W R d gas (lvls S W d J (suc A)) (length ps)
         restCnt = ≤-trans (Res.cnt REST)
@@ -768,7 +820,8 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   cascadeGo-go : ∀ (J : ℕ) (a : Arrival Γ) (id : Id)
     (chains : List (RegId × Path Γ (arrTy a) t))
     (sched : Sched Γ) (st : EvalSt e) → Good J sched st →
-    chP? (Pb J) chains ≡ true → Vb J (arrVal a ∷ []) ≡ true →
+    chP? (Pb J) chains ≡ true →
+    chP? (λ κ → Vb κ J (arrVal a ∷ [])) chains ≡ true →
     CL (lvls S W d J (dWalkᶜ S W R d n J (length chains))) id →
     depthCascade a id chains sched st ≤ d →
     let cg = cascadeGo a id chains sched st in
@@ -798,7 +851,8 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
         dSK   = depthCascade a id chains sched st
         dFP   = depthChain id a c sched st₀
         dREST = depthCascade a id chains (proj₁ (proj₂ cs)) (proj₂ (proj₂ cs))
-        SK = cascadeGo-go J a id chains sched st g (proj₂ (∧-true _ _ hp)) hV
+        SK = cascadeGo-go J a id chains sched st g (proj₂ (∧-true _ _ hp))
+               (proj₂ (∧-true _ _ hV))
                (cl-anti id
                   (lvls-mono (dWalkᶜ S W R d n J (length chains))
                      (dWalkᶜ S W R d n J (suc (length chains)))
@@ -863,7 +917,8 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
         FP   = foldPath-go J sf₀ n id (arrTick a) (arrSource a) c (arrVal a ∷ [])
                  evs₀ (Arrival.isLast a) sched st₀
                  ( ok-cons J rid sched st (proj₁ g) , proj₂ g )
-                 (proj₁ (∧-true _ _ hp)) hV hE₀ gk₀ hC-FP (lub3-m dSK dFP dREST hD)
+                 (proj₁ (∧-true _ _ hp)) (proj₁ (∧-true _ _ hV)) hE₀ gk₀ hC-FP
+                 (lub3-m dSK dFP dREST hD)
         J₁   = Res.lvl FP
         st₂  = proj₂ (proj₂ rest)
         D₁   = delivN st₀ st₁
@@ -892,7 +947,7 @@ module Walk {n} {Γ : Ctx n} {t} {e : Closed Γ t}
         REST = cascadeGo-go J₁ a id chains (proj₁ (proj₂ cs)) st₁
                  (Res.good FP)
                  (chP?-widen (Res.lo FP) chains (proj₂ (∧-true _ _ hp)))
-                 (v-widen (Res.lo FP) (arrVal a ∷ []) hV)
+                 (chV?-widen (Res.lo FP) (arrVal a ∷ []) chains (proj₂ (∧-true _ _ hV)))
                  hC-REST (lub3-r dSK dFP dREST hD)
         restCnt : D₂ ≤ dWalkᶜ S W R d n (lvls S W d J (suc A)) (length chains)
         restCnt = ≤-trans (Res.cnt REST)
