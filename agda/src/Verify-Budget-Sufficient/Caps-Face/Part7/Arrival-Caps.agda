@@ -72,7 +72,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part7.Cascade-Nodes using
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Ring-Vocabulary using
   (WalkHyps; floor-parts)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Walk-Sink using
-  (chain-walk-burst; chain-walk-caps)
+  (chain-walk-burst; chain-walk-caps; walk-path-strat; walk-vals-strat)
 
 -- THE TUPLE ONE CHAIN'S WALK IS ENTERED WITH, met once and spent by
 -- both ledgers below.  The cascade's round package carries every
@@ -100,7 +100,10 @@ arr-chain-hyps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (Arrival.isLast a) sched st
 arr-chain-hyps {e = e} sl id Lv a nextId path sched st sleq cok hvc hcl hpz hdp
   (g , P , hfl , hlvP , hR) =
-  sleq , cok , hvc , hcl , hpz , hdp , (g , P , hfl , ENTRY , hR)
+  sleq , cok , hvc , hcl , hpz , hdp
+  , walk-vals-strat (frameStep Lv c) path (arrVal a ∷ []) sched st cok
+  , walk-path-strat (frameStep Lv c) path sched st cok
+  , (g , P , hfl , ENTRY , hR)
   where
   c   = capsAt e sl id
   d   = capsH e sl id

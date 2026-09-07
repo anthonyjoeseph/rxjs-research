@@ -26,7 +26,7 @@ open import Relation.Binary.PropositionalEquality
 
 open import Rx.Prim      using (Tick; Id; Source; _at_from_as_; Gas; g0; gs; after_,_; close; exhausted;
   InstEvent)
-open import Rx.Exp       using (Ctx; Closed; Val; sizeᵉ; obs)
+open import Rx.Exp       using (Ctx; Closed; Val; inputsBelowᵛ; sizeᵉ; obs)
 open import Verify-Budget-Sufficient.Nest-Ceiling using
   (Ent; Reached; ent-step; reached-room; ceilS-frame)
 open import Verify-Budget-Sufficient.Subscribe-Face using (stepFrame-caps)
@@ -62,7 +62,8 @@ open import Verify-Budget-Sufficient.Caps-Depth
   using (depthFrame)
 
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
-  (capsOK?-mono; frameSz?; pathSz?; pathSz?-widen; nestClosOK?ᵛ-widen; valCaps?)
+  (capsOK?; capsOK?-mono; frameStrat?; frameSz?; pathFloor; pathStrat?; pathSz?; pathSz?-widen;
+  nestClosOK?ᵛ-widen; valCaps?)
 open import Verify-Budget-Sufficient.Caps-Face.Part5 using
   (clos-lift; valsCaps?-parts)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
@@ -73,6 +74,36 @@ open import Verify-Budget-Sufficient.Caps-Face.Part3 using
 open import Decide using (T-to)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Ring-Vocabulary using
   (RingState; WalkHyps; ent-infl; floor-parts; frameStep-regAt; regs-exit; ring-room; ringFold; sink-deliv-cap; sink-entry-ladder; sink-step-caps; walk-frame-clos)
+
+-- WHERE A WALK'S STRATIFICATION READING COMES FROM AT ITS ENTRY, and
+-- the honest answer today is nowhere.  Both faces that enter a walk
+-- need it and neither can rearrange it out of what it holds: the ring
+-- enters at an admitted REGISTRATION, whose path and delivered values
+-- are the registry's rather than the walk's, and the cascade enters
+-- at an ARRIVAL, whose value is the source's.  Six of the walk's
+-- seven other hypotheses are rearrangements of the round package;
+-- these two are not.
+--
+-- SO ONE PAIR OF LEAVES SERVES BOTH, and that is the finding rather
+-- than a convenience.  Both are stated against the STATE receipt, for
+-- the same reason the frame's hop is -- a registration's path is
+-- built from the observable that was subscribed and an arrival's
+-- value is held by a live source, so both live in the store, and
+-- `capsOK?` is the store's receipt.  One stratification conjunct on
+-- the invariant record turns all three of this module's leaves into
+-- projections, which is why they are stated at one premise: they are
+-- discharged together or not at all.
+postulate
+  walk-path-strat : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (c : Caps) (p : Path Γ u t) (sched : Sched Γ) (st : EvalSt e) →
+    capsOK? c sched st ≡ true →
+    pathStrat? p ≡ true
+
+  walk-vals-strat : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (c : Caps) (p : Path Γ u t) (vals : List (Val Γ u))
+    (sched : Sched Γ) (st : EvalSt e) →
+    capsOK? c sched st ≡ true →
+    all (inputsBelowᵛ (pathFloor p) u) vals ≡ true
 
 -- WHAT AN ADMITTED REGISTRATION HANDS ITS OWN WALK, AS A TUPLE AND NOT
 -- AS A STEP.  The entry's path lives in the REGISTRY rather than in the
@@ -108,6 +139,8 @@ sink-entry-hyps {e = e} sl id sf gas nid now i vals fin rid p Lv J g k sched st
   , hcl
   , hpz
   , hdf
+  , walk-vals-strat (frameStep Lv (capsAt e sl id)) p vals sched st cok
+  , walk-path-strat (frameStep Lv (capsAt e sl id)) p sched st cok
   , sink-entry-ladder sl id i vals p gas Lv J g k sched st RS hpz hi
 
 -- AND WHAT ONE TURN OF THE RING LEAVES, WHICH IS THE PACKAGE AGAIN ONE
@@ -302,9 +335,9 @@ walk-sink-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   dispatchCapsOK (capsAt e sl id) (capsAt e sl (suc id)) sl (capsH e sl id) L sf gas nid now i vals fin sched st
 walk-sink-caps sl id L sf zero nid now src i vals evs fin sched st H = tt
 walk-sink-caps sl id L sf (suc gas) nid now src i vals evs fin sched st
-  (_ , _ , _ , _ , _ , _ , (zero , _ , () , _ , _))
+  (_ , _ , _ , _ , _ , _ , _ , _ , (zero , _ , () , _ , _))
 walk-sink-caps {n = n} {Γ = Γ} {t = t} {e = e} sl id L sf (suc gas) nid now src i vals evs fin sched st
-  (sleq , cok , hvc , hcl , _ , hdp , (suc g₀ , P , hfl , hlvP , hR)) =
+  (sleq , cok , hvc , hcl , _ , hdp , _ , _ , (suc g₀ , P , hfl , hlvP , hR)) =
     shareAdmit-sz i (Caps.cSize (capsAt e sl (suc id))) (EvalSt.registry st)
       (regs-exit sl id L sched st L≤TOP cok)
   , ≤-trans (shareAdmit-len i (EvalSt.registry st))
@@ -369,7 +402,7 @@ walk-frame-room : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   fLvlD (Caps.cSize (capsAt e sl id)) (Caps.cWid (capsAt e sl id)) (capsH e sl id) L
     ≤ sizeCount (capsAt e sl id) (capsH e sl id) ⊔ Caps.cSize (capsAt e sl id)
 walk-frame-room {e = e} sl id L sf gas nid now src f p vals evs fin sched st
-  (_ , _ , _ , _ , _ , _ , (g , P , _ , hlvP , hR)) =
+  (_ , _ , _ , _ , _ , _ , _ , _ , (g , P , _ , hlvP , hR)) =
   ≤-trans (≤-trans (iterL-infl S W d (pathLen p) (fLvlD S W d L)) hlvP)
           (≤-trans (lvls-infl S W d P (dCapᶜ S W (Caps.cReg c) d g P))
                    (reached-room c d P g 2≤S hR))
@@ -589,6 +622,40 @@ walk-frame-drain sl id L sf gas nid now src (from-inner op allNid inst) p vals e
 
 
 
+-- WHAT A HOP DOES TO THE CHAIN'S STRATIFICATION READING, and it is
+-- the one reading the walk cannot transport.  A frame REBUILDS the
+-- payload -- a `map` applies its template, a `scan` folds one in --
+-- so the values leaving are not the values that arrived, and the
+-- reading has to be re-established rather than carried.  The template
+-- half is `frameStrat?`, at the two heads that carry syntax at all;
+-- the other three forward or subscribe what they are handed and add
+-- none of their own.
+--
+-- AND THE SCAN'S ACCUMULATOR IS WHY THE STATE RECEIPT IS A PREMISE
+-- AND NOT DECORATION.  A `scan-f` carries a NODE ID, not an
+-- accumulator: the value it folds against lives in the store, so NO
+-- predicate over the path can see it, and an accumulator holding an
+-- observable that names an input above the floor defeats the template
+-- reading on its own.  So the store is where the missing half has to
+-- come from, and `capsOK?` is the store's receipt.
+--
+-- WHICH MAKES THIS LEAF'S RESIDUE A NAMED, SINGLE FACT: `capsOK?` does
+-- not yet read a scan accumulator's stratification, and until it does
+-- this is not provable.  Stating it as a premise here rather than
+-- adding a hypothesis to the walk is deliberate -- the fact belongs to
+-- the invariant record, where every producer owes it and every
+-- consumer re-establishes it, and a signature obliges only whoever
+-- happens to call.
+postulate
+  walk-strat-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+    (c : Caps) (sl : Slots Γ) (k : ℕ) (sf : Gas) (nid : Id) (now : Tick)
+    (f : Frame Γ s u) (p : Path Γ u t) (vals : List (Val Γ s)) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) →
+    capsOK? c sched st ≡ true →
+    frameStrat? k f ≡ true →
+    all (inputsBelowᵛ k s) vals ≡ true →
+    all (inputsBelowᵛ k u) (proj₁ (stepFrame sf nid now f p vals fin sched st)) ≡ true
+
 -- THE TAIL'S HYPOTHESES OUT OF THE HEAD'S, ONE FRAME UP, which both
 -- walks spend and neither owns.  The frame face reports the level it
 -- climbed to and hands back the caps and the values at it; the tail
@@ -613,7 +680,7 @@ walk-hyps-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (proj₁ (proj₂ (proj₂ (proj₂ (stepFrame sf nid now f p vals fin sched st)))))
     (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame sf nid now f p vals fin sched st)))))
 walk-hyps-step {e = e} sl id L sf gas nid now src f p vals evs fin sched st
-  (sleq , cok , hvc , hcl , hpz , hdp , (g , P , hfl , hlvP , hR)) =
+  (sleq , cok , hvc , hcl , hpz , hdp , hib , hst , (g , P , hfl , hlvP , hR)) =
     trans (KeepsC.slotsEq (stepFrame-keeps sf nid now f p vals fin sched st)) sleq
   , capsOK?-mono (frameStep (L + proj₁ ST) c) (frameStep Lt c)
       (proj₁ (proj₂ (proj₂ (proj₂ r)))) (proj₂ (proj₂ (proj₂ (proj₂ r))))
@@ -631,9 +698,16 @@ walk-hyps-step {e = e} sl id L sf gas nid now src f p vals evs fin sched st
                      (proj₁ (proj₂ (proj₂ ST)))))))
   , pathSz?-widen p (proj₁ (frameStep-mono-j c 2≤S L≤t)) pz2
   , ≤-trans (m≤n⊔m (depthFrame sf nid now f p vals fin sched st) _) hdp
+  , walk-strat-step (frameStep L c) sl (pathFloor p) sf nid now f p vals fin sched st
+      cok hstf hib
+  , hstp
   , (g , P , hfl , hlvP , hR)
   where
   c   = capsAt e sl id
+  hstf : frameStrat? (pathFloor p) f ≡ true
+  hstf = proj₁ (∧-true (frameStrat? (pathFloor p) f) (pathStrat? p) hst)
+  hstp : pathStrat? p ≡ true
+  hstp = proj₂ (∧-true (frameStrat? (pathFloor p) f) (pathStrat? p) hst)
   S   = Caps.cSize c
   W   = Caps.cWid c
   d   = capsH e sl id
@@ -678,13 +752,15 @@ chain-walk-caps sl id L sf gas nid now src (share-sink i) vals evs fin sched st 
   proj₁ (proj₂ H)
   , walk-sink-caps sl id L sf gas nid now src i vals evs fin sched st H
 chain-walk-caps {e = e} sl id L sf gas nid now src (f ↠ p) vals evs fin sched st
-  H@(sleq , cok , hvc , hcl , hpz , hdp , (g , P , hfl , hlvP , hR)) =
+  H@(sleq , cok , hvc , hcl , hpz , hdp , hib , hst , (g , P , hfl , hlvP , hR)) =
     cok
   , proj₁ (valsCaps?-parts (frameStep L c) sl vals hvc)
   , slSz
   , hpz
   , walk-frame-clos sl id L sf gas nid now src f p vals evs fin sched st H
   , walk-frame-drain sl id L sf gas nid now src f p vals evs fin sched st H
+  , hib
+  , proj₁ (∧-true (frameStrat? (pathFloor p) f) (pathStrat? p) hst)
   , Lt ∸ L
   , subst (_≤ sizeCount c d ⊔ S) (sym hLt) Lt≤TOP
   , subst (λ x → capsWalkOK c (capsAt e sl (suc id)) sl d x sf gas nid now p
@@ -730,9 +806,9 @@ walk-len : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   WalkHyps sl id L sf gas nid now src p vals evs fin sched st →
   length vals ≤ nestBurstAt e sl id
 walk-len sl id L sf gas nid now src p vals evs fin sched st
-  (_ , _ , _ , _ , _ , _ , (zero , _ , () , _ , _))
+  (_ , _ , _ , _ , _ , _ , _ , _ , (zero , _ , () , _ , _))
 walk-len {e = e} sl id L sf gas nid now src p vals evs fin sched st
-  (_ , _ , hvc , _ , _ , _ , (suc g , P , _ , hlvP , hR)) =
+  (_ , _ , hvc , _ , _ , _ , _ , _ , (suc g , P , _ , hlvP , hR)) =
   ≤-trans (proj₂ (valsCaps?-parts (frameStep L c) sl vals hvc))
           (reached-len e sl id L P g hR
              (≤-trans (iterL-infl (Caps.cSize c) (Caps.cWid c) (capsH e sl id) (pathLen p) L)
@@ -845,9 +921,9 @@ walk-frame-thru-burst : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   WalkHyps sl id L sf gas nid now src (thru-outer op tn ↠ p) vals evs fin sched st →
   thruRoomWOK (nestBurstAt e sl id) sf op tn p nid now vals sched st
 walk-frame-thru-burst sl id L sf gas nid now src op tn p vals evs fin sched st
-  (_ , _ , _ , _ , _ , _ , (zero , _ , () , _ , _))
+  (_ , _ , _ , _ , _ , _ , _ , _ , (zero , _ , () , _ , _))
 walk-frame-thru-burst {e = e} sl id L sf gas nid now src op tn p vals evs fin sched st
-  (heq , _ , hvc , _ , _ , _ , (suc g , P , _ , hlvP , hR)) =
+  (heq , _ , hvc , _ , _ , _ , _ , _ , (suc g , P , _ , hlvP , hR)) =
   thru-room-list sl id L P g sf op tn nid now p vals sched st heq hR
     (≤-trans (suc≤iterL (Caps.cSize c) (Caps.cWid c) (capsH e sl id) (pathLen p) L) hlvP)
     (proj₁ (valsCaps?-parts (frameStep L c) sl vals hvc))
@@ -911,9 +987,9 @@ walk-frame-inner-burst : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     lookupNode allNid (EvalSt.nodes st) ≡ just (mergeAll-st lim act q od) →
     drainW sf allNid p nid now q sched st ≤ nestBurstAt e sl id
 walk-frame-inner-burst sl id L sf gas nid now src op allNid inst p vals evs fin sched st
-  (_ , _ , _ , _ , _ , _ , (zero , _ , () , _ , _)) lim act q od hnd
+  (_ , _ , _ , _ , _ , _ , _ , _ , (zero , _ , () , _ , _)) lim act q od hnd
 walk-frame-inner-burst {e = e} sl id L sf gas nid now src op allNid inst p vals evs fin sched st
-  (heq , hok , _ , _ , _ , _ , (suc g , P , _ , hlvP , hR)) lim act q od hnd =
+  (heq , hok , _ , _ , _ , _ , _ , _ , (suc g , P , _ , hlvP , hR)) lim act q od hnd =
   drain-room sl id L P g sf allNid nid now p q sched st heq hR
     (≤-trans (suc≤iterL (Caps.cSize c) (Caps.cWid c) (capsH e sl id) (pathLen p) L) hlvP)
     (subst (λ z → all (λ o → 3 + (sizeᵉ o + slotsSize z)
@@ -1070,9 +1146,9 @@ walk-sink-burst : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   dispatchBurstsOK (nestBurstAt e sl id) sf gas nid now i vals fin sched st
 walk-sink-burst sl id L sf zero nid now src i vals evs fin sched st H = tt
 walk-sink-burst sl id L sf (suc gas) nid now src i vals evs fin sched st
-  (_ , _ , _ , _ , _ , _ , (zero , _ , () , _ , _))
+  (_ , _ , _ , _ , _ , _ , _ , _ , (zero , _ , () , _ , _))
 walk-sink-burst {n = n} {Γ = Γ} {t = t} {e = e} sl id L sf (suc gas) nid now src i vals evs fin sched st
-  (sleq , cok , hvc , hcl , _ , hdp , (suc g₀ , P , hfl , hlvP , hR)) =
+  (sleq , cok , hvc , hcl , _ , hdp , _ , _ , (suc g₀ , P , hfl , hlvP , hR)) =
   sink-ring-burst-go sl id sf gas nid now i vals fin
     (shareAdmit i (EvalSt.registry st)) L L P g₀ 0 sched (shareLatch i fin st)
     ( sleq

@@ -121,7 +121,7 @@ open import Rx.Prim      using (Tick; Source; InstEmit; _at_from_as_; InstEvent;
 open import Rx.Exp       using (Ty; natᵗ; unitᵗ; boolᵗ; _×ᵗ_; _+ᵗ_; obs; isData; Ctx; Closed; Val; sizeᵉ; sizeᵗ; sizeᵗˢ; sizeᵛ; syncSizeᵛ; Exp; Tm; Fn; varᵗ; unit̂;
   bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ; add; sub; mul; eqᵖ;
   ltᵖ; notᵖ; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ;
-  exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; evalWith; evalTm; applyFn)
+  exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; evalWith; evalTm; applyFn; inputsBelowᵗ)
 open import Rx.Frame-Width using (entryCeil; pWᵉ; pWᵛ; dWᵉ; outWᵉ; innWᵉ; innWᵗ; innWᵗˢ; pmOᵉ; pmOᵗ; pmIᵉ; pmIᵗ; pmIᵗˢ; _∈ᵇ_; outWⱽ;
   innWⱽ; innWᵗⱽ; innWᵗˢⱽ; pmIᵗⱽ; slotPW; slotsPW; slotsPWgo; slotIW; slotsIW; slotsIWgo)
 open import Rx.Evaluator using (capsBase; Sched; EvalSt; LiveSource; RegId; Chain; NodeState; scan-st; take-st; mergeAll-st; switch-st;
@@ -328,6 +328,61 @@ pathSz? B (f ↠ p)        = frameSz? B f ∧ ((suc (pathLen p) ≤ᵇ B) ∧ pa
 
 regsSz? : ∀ {n} {Γ : Ctx n} {t} → ℕ → List (RegId × Source × Chain Γ t) → Bool
 regsSz? B = all (λ en → pathSz? B (proj₂ (proj₂ (proj₂ en))))
+
+-- THE CHAIN'S OWN FLOOR, WHICH IS WHAT `sinkAbove?` DECIDES AGAINST
+-- AND THE QUANTITY IT NEVER NAMES.  A chain ends either at a share's
+-- slot, where the stratification receipt wants every source strictly
+-- under that slot's index, or at the root, where no slot bounds
+-- anything and the telescope's own length is the bound.  A frame does
+-- not move it: a hop changes what a value looks like, never where the
+-- chain terminates, which is why the reading survives a step with no
+-- transport at all.
+--
+-- AND IT IS A NUMBER RATHER THAN THE BOOLEAN BESIDE IT because the
+-- consumer is not a comparison this time.  `sinkAbove?` asks whether
+-- ONE source clears the terminal; what a delivered observable owes is
+-- that EVERY input its syntax names does -- a reading on an expression
+-- and not on a source, so it needs the bound itself in hand.
+pathFloor : ∀ {n} {Γ : Ctx n} {s t} → Path Γ s t → ℕ
+pathFloor {n = n} root       = n
+pathFloor (share-sink i)     = toℕ i
+pathFloor (_ ↠ p)            = pathFloor p
+
+-- AND WHAT THE FRAME ITSELF MAY NAME, WHICH IS WHAT KEEPS THE VALUE
+-- READING ALIVE ACROSS A HOP.  A frame applies its closure to whatever
+-- passes through, so an observable can leave a hop naming inputs that
+-- never appeared in the value that entered it -- the closure's own
+-- syntax is a second source of `input` references, and a reading on
+-- the payload alone is not preserved.
+--
+-- Only two constructors carry syntax, exactly as on the size axis: a
+-- map and a scan hold a `Fn`, and `Fn` is a `Tm`, so the term reading
+-- applies unchanged.  The other three hold node identifiers and an
+-- operator tag, which name no input at all -- `thru-outer` included,
+-- and that is the interesting one: it is the frame that SUBSCRIBES a
+-- delivered observable, so what it registers comes entirely from the
+-- value and none of it from the frame.
+frameStrat? : ∀ {n} {Γ : Ctx n} {s u} → ℕ → Frame Γ s u → Bool
+frameStrat? k (map-f fn)         = inputsBelowᵗ k fn
+frameStrat? k (scan-f fn _)      = inputsBelowᵗ k fn
+frameStrat? k (take-f _)         = true
+frameStrat? k (from-inner _ _ _) = true
+frameStrat? k (thru-outer _ _)   = true
+
+-- AND THE WHOLE CHAIN'S READING, WHICH IS WHAT A WALK CARRIES.  Every
+-- frame is charged at the SAME floor, the terminal's, because that is
+-- the one `pathFloor` reports from anywhere along the chain -- so this
+-- is a conjunction and not a recurrence, and a frame's obligation does
+-- not depend on how far down it sits.
+--
+-- The terminals are `true` for the reason the size reading's are: a
+-- chain that ends carries no closure of its own, and what the sink
+-- then owes is a fact about the REGISTRY it fans into, which is a
+-- different predicate stated over entries rather than over one path.
+pathStrat? : ∀ {n} {Γ : Ctx n} {s t} → Path Γ s t → Bool
+pathStrat? root           = true
+pathStrat? (share-sink i) = true
+pathStrat? (f ↠ p)        = frameStrat? (pathFloor p) f ∧ pathStrat? p
 
 -- THE CAP READ AGAINST THE ARRIVAL'S CLOSURE, which is the shape the
 -- arr-keyed descent needs and the one `nestValOK?` deliberately does

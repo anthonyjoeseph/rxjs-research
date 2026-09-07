@@ -706,3 +706,26 @@ mutual
   inputsBelowᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → ℕ → List (Tm Γ Δᵍ Δ Θ t) → Bool
   inputsBelowᵗˢ k []       = true
   inputsBelowᵗˢ k (y ∷ ys) = inputsBelowᵗ k y ∧ inputsBelowᵗˢ k ys
+
+-- AND THE SAME READING ON A RUNTIME VALUE, WHICH IS NOT THE SAME
+-- QUESTION AS ON A DEF.  A slot's def is stratified once, at the
+-- telescope, and that check sees the def's whole syntax.  A VALUE of
+-- `obs` type is an arbitrary closed expression assembled while the
+-- program runs, so nothing about the telescope constrains which inputs
+-- it names -- which is why an observable that arrives as a payload and
+-- is then subscribed can register against inputs the def it came from
+-- never mentioned.
+--
+-- The recursion is structural on the TYPE, following `Val` itself, and
+-- the data arms are `true` rather than absent: a `natᵗ` payload names
+-- no input because it has no syntax, not because the question is
+-- inapplicable.  Only the `obs` arm carries content, and it is the
+-- expression reading above, unchanged.
+inputsBelowᵛ : ∀ {n} {Γ : Ctx n} → ℕ → (t : Ty) → Val Γ t → Bool
+inputsBelowᵛ k unitᵗ    _        = true
+inputsBelowᵛ k boolᵗ    _        = true
+inputsBelowᵛ k natᵗ     _        = true
+inputsBelowᵛ k (s ×ᵗ t) (a , b)  = inputsBelowᵛ k s a ∧ inputsBelowᵛ k t b
+inputsBelowᵛ k (s +ᵗ t) (inj₁ a) = inputsBelowᵛ k s a
+inputsBelowᵛ k (s +ᵗ t) (inj₂ b) = inputsBelowᵛ k t b
+inputsBelowᵛ k (obs t)  e        = inputsBelowᵉ k e

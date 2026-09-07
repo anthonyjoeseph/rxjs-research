@@ -215,17 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **INDEXING THE WALK'S VALUE LEDGER BY THE CHAIN, now that the mint's
-  fifth arm is instantiated rather than inferred.** A real run reaches
-  it and mints exactly the entry the four descent arms cannot: a slot
-  source under a share's sink, out of an observable that arrived as a
-  value, one dispatch after the subscribe frame and never inside it.
-  The reading held at every row reached, so PRESERVATION is what is
-  left to fear, not truth at a point. The commit states the floor
-  per-chain — the source form is unpreserved, a frame carrying the
-  syntax of whatever pushed it — and puts both consumers against it,
-  so a shape nothing can thread fails at the walk's bundle and not
-  here.
+- **PUTTING THE STRATIFICATION READING IN THE INVARIANT RECORD, which
+  is where writing the walk's bundle says all three of its new leaves
+  converge.** The floor is now indexed by the chain and both consumers
+  stand against it, and the residue is not three gaps but one: a
+  `scan-f` carries a NODE ID rather than an accumulator, so the value
+  a frame folds against lives in the STORE and no predicate over a
+  path can reach it — and the two entry leaves are the same fact about
+  a registry path and a live source. So the commit adds the conjunct
+  to the state receipt, where every producer owes it, rather than
+  threading a hypothesis that obliges only today's callers.
 
 - **PRICING A FANNED CHAIN IN SOMETHING THAT IS NOT A CAP, where every
   route under `fan-regsSz` now converges.** Five closed routes leave
@@ -252,6 +251,20 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### The ledger
 
+- **`walk-strat-step`** (Part7/Walk-Sink) — FALSITY, `NO EVIDENCE`: what a hop
+  does to the chain's stratification reading, the one reading a walk cannot
+  transport. A `scan-f` folds against a value in the STORE, which no path
+  predicate reaches and the premised state receipt does not yet read.
+- **`walk-vals-strat`** (Part7/Walk-Sink) — FALSITY, `NO EVIDENCE`: the values
+  a walk is entered with, read at the chain's own floor. Six of the bundle's
+  hypotheses rearrange the round package and this does not: the ring enters at
+  a registration and the cascade at an arrival, and both values are the
+  store's.
+- **`walk-path-strat`** (Part7/Walk-Sink) — FALSITY, `NO EVIDENCE`: the same
+  premise for the path, whose frames carry the syntax of whatever pushed them.
+  Registered or arriving, a chain's path is built from an observable the store
+  holds, so one record conjunct settles this, its value twin and the hop
+  together.
 - **`walk-frame-drain-entries`** (Part7/Walk-Sink) — FALSITY,
   `REFUTED×2, DEAD ROUTE, TWIN, PROBED×2`: the per-entry tuple the `from-inner`
   drain owes, the wrapper's ceiling now minted from the frame's own room. Both

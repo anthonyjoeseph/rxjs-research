@@ -251,7 +251,7 @@ foldPath-nodes {e = e} c ac d W sl Lv sf gas id now envSrc (f ↠ p) vals evs fi
   HPL2  = ∧-true (suc (pathLen p) ≤ᵇ Bᴸ) (pathSz? Bᴸ p)
             (proj₂ (∧-true (frameSz? Bᴸ f)
                      ((suc (pathLen p) ≤ᵇ Bᴸ) ∧ pathSz? Bᴸ p) HPL))
-  tail  = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hc)))))
+  tail  = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hc)))))))
   L′    = proj₁ tail
   hL′   = proj₁ (proj₂ tail)
   hstep = c⊑step c Lv (FaceOK.fSize faceHere)

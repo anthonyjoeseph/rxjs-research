@@ -1906,7 +1906,7 @@ mutual
           (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id) hΦ hF)
     where
     step = stepFrame sf nid now f p vals fin sched st
-    hL   = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcw)))))
+    hL   = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcw)))))))
     hF = frameΦ-fit sl id sf nid now Lv f p vals fin sched st hsl hpz hnd hΦ
            (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcw))))))
            (≤-trans (m≤m⊔n (depthFrame sf nid now f p vals fin sched st) _) hdf)
