@@ -128,7 +128,7 @@ open import Verify-Budget-Sufficient.Caps
   frameStep-mono-j; sizeCount; capsAt-entry-room)
 open import Verify-Budget-Sufficient.Caps-Face.Nest-Arith
   using (entry-fit≤pow)
-open import Verify-Budget-Sufficient.Burst-Walk
+open import Verify-Budget-Sufficient.Burst-Walk.Burst-Face
   using (cascadeGo-nodry)
 open import Verify-Budget-Sufficient.Psi-Split using
   (pathBΨ?; pathBΨ?-of; regsB?-of-parts; regsBΨ?; regsBΨ?-of)
