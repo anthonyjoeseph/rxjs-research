@@ -34,6 +34,8 @@ open import Verify-Budget-Sufficient.Caps-Depth using
 open import Verify-Budget-Sufficient.Nest-Store using
   (storeSyncMax; realWidAt-def; nestUnit; sightCeil; sightCeil-mono; nestBurstAt)
 open import Verify-Budget-Sufficient.Nest-Walk using (nestDᵛˢ)
+open import Verify-Budget-Sufficient.Keeps-Ring using (stepFrame-slots)
+open import Verify-Budget-Sufficient.Caps-Face.Nest-Arith using (nestΦAt)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Depth-Join using (fold-le; disp-le; latch-sync)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; arrVal; RegId; cascadeLatch; arrSource; chainsOf; cascadeGo; Path;
   Frame; stepFrame; foldPath; arrTy; regAt; dCapᶜ; lvls; iterL; chainStep; budgetAt; arrTick)
@@ -56,7 +58,8 @@ open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (capsAt-round-size; capsOK?; n≤capsAt-size; pathSz?; pathSz?-widen; valCaps?; nestClosOK?ᵛ;
   nestClosOK?ᵛ-widen)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
-  (capsOK?-count; capsOK?-regs; pathSz?-len; slotsCaps?-capsAt; valsCaps?; valsCaps?-lvl)
+  (capsOK?-count; capsOK?-regs; pathSz?-len; slotsCaps?-capsAt; valsCaps?; valsCaps?-lvl;
+  foldPath-slots)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (valCaps?-widen)
 open import Decide using (∧-intro)
@@ -690,7 +693,7 @@ postulate
 -- since only a shared slot has an admit list.  One slot further and the
 -- chain sinks into a LATER share rather than the root, which is
 -- `foldPath`'s recursive arm.
---
+
 -- AND `scan-f` IS THE ARM THAT KILLS IT.  `storeSyncMax` maximises over
 -- slots, nodes and registry.  Of the three arms the rows below miss,
 -- `map-f` returns the schedule and store it was handed, and `take-f`
@@ -703,51 +706,84 @@ postulate
 -- two to three and the ceiling up with it, on a chain a share whose def
 -- never completes actually admits.
 --
--- SO PRESERVATION IS THE WRONG SHAPE FOR THIS OBLIGATION, and the
--- statement is owed a PRICE instead: a factor times the store plus an
--- increment, which is what the growth statement one level up already
--- charges a cascade.  The restatement has to reach the consumer too --
--- `disp-depth-fit` spends this conjunct by transitivity against a
--- ceiling stated once for the whole dispatch, and a priced step cannot
--- be chained that way without the fan-out's own count entering the
--- bound.
--- REFUTED: `Refuted.Share-Step-Scan` crosses the second conjunct at a
---   `scan-f` head over an `obs`-typed accumulator, taking `rid` and `p`
---   off `shareAdmit` at the state the subscribe returned.  The ceiling
---   goes 78 to 91 across the fold.
--- PROBED: `Probed.Depth-Join` stands seven rows at shares whose defs
---   cannot complete, taking `rid` and `p` off `shareAdmit` at the state
---   and schedule the same subscribe returns.  Both `fin` branches at
---   every point -- the statement hands the fold a close emit at `true`
---   and an empty list at `false`, so one says nothing about the other.
---   Reached: the `from-inner` head at both of its admitted
---   registrations, so no row rests on whichever was first; the
---   `thru-outer` head, at an observable-typed shared slot; and that
---   head again over a chain sinking into a later share, which is the
---   `dispatchShare` re-entry.  The tails are pinned, not assumed: the
---   first two families end at `root`.  The gas is the budget the
---   statement names.  Not covered: the `map-f` and `take-f` heads, and
---   any share carrying more registrations than these do.
+-- SO PRESERVATION IS THE WRONG SHAPE FOR THIS OBLIGATION, and what
+-- stands in its place is a PRICE denominated in the round's own grant:
+-- the fold leaves the store under whatever ceiling the walk entered
+-- under, PROVIDED that ceiling already covers what one instant of this
+-- program can add.  A price of that form chains where a repaired
+-- preservation could not have: the grant is ONE number for the whole
+-- round and the bound is a join against it, so a fan-out of any width
+-- climbs no further than a single registration does, and the count the
+-- dispatch would otherwise have had to carry never enters the bound.
+--
+-- AND IT IS SEALED ON BOTH SIDES, WHICH IS WHAT STATING IT COSTS.  The
+-- grant belongs to the nesting tower's abstract block, so it reduces at
+-- no program: the premise cannot be discharged at a numeral and the
+-- conclusion compares against a symbol.  Anything smaller that WOULD
+-- reduce is too small to pay -- the wrap unit is fixed by the program
+-- text, while a scan wrapping its accumulator once per delivered value
+-- is not -- so the region this leaf is risky in is closed to
+-- instantiation exactly as the fold obligation above it is, and it
+-- moves only by proof.
+-- REFUTED: `Refuted.Share-Step-Scan` is why the conclusion is a price
+--   rather than a preservation.  It crosses the old second conjunct at
+--   a `scan-f` head over an `obs`-typed accumulator, taking `rid` and
+--   `p` off `shareAdmit` at the state the subscribe returned; the
+--   ceiling goes 78 to 91 across the fold.
+-- TWIN: `chainStep-store≤` prices a whole chain's step in this same
+--   currency and is proven, which is what says the shape is right.  It
+--   is also what says the route is not mechanical: that proof spends
+--   the round's caps package, and a fold standing inside one chain does
+--   not hold one.
 postulate
-  share-step-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sl : Slots Γ) (sf : Gas) (gas : ℕ) (bid : Id) (now : Tick) (i : Fin n)
+  share-fold-store≤ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sl : Slots Γ) (id : ℕ) (sf : Gas) (gas : ℕ) (bid : Id) (now : Tick)
+    (S : ℕ) (i : Fin n)
     (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
     (rid : RegId) (p : Path Γ (lookup Γ i) t)
     (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl → sf ≡ budgetAt e sl bid →
-    (Sched.slots (proj₁ (proj₂ (foldPath sf gas bid now (Fin.toℕ i) p vals
-       (if fin then close (Fin.toℕ i) exhausted ∷ [] else []) fin sched
-       (record st { delivered = rid ∷ EvalSt.delivered st })))) ≡ sl)
-    × (sightCeil (sizeᵉ e) (nestDᵛˢ vals)
-         (storeSyncMax
-            (proj₁ (proj₂ (foldPath sf gas bid now (Fin.toℕ i) p vals
-               (if fin then close (Fin.toℕ i) exhausted ∷ [] else []) fin sched
-               (record st { delivered = rid ∷ EvalSt.delivered st }))))
-            (proj₂ (proj₂ (foldPath sf gas bid now (Fin.toℕ i) p vals
-               (if fin then close (Fin.toℕ i) exhausted ∷ [] else []) fin sched
-               (record st { delivered = rid ∷ EvalSt.delivered st })))))
-         (nestUnit e sl)
-       ≤ sightCeil (sizeᵉ e) (nestDᵛˢ vals) (storeSyncMax sched st) (nestUnit e sl))
+    nestΦAt e sl id ≤ S →
+    storeSyncMax sched st ≤ S →
+    storeSyncMax
+      (proj₁ (proj₂ (foldPath sf gas bid now (Fin.toℕ i) p vals
+         (if fin then close (Fin.toℕ i) exhausted ∷ [] else []) fin sched
+         (record st { delivered = rid ∷ EvalSt.delivered st }))))
+      (proj₂ (proj₂ (foldPath sf gas bid now (Fin.toℕ i) p vals
+         (if fin then close (Fin.toℕ i) exhausted ∷ [] else []) fin sched
+         (record st { delivered = rid ∷ EvalSt.delivered st }))))
+      ≤ S
+
+-- AND THE PAIR THE DISPATCH ACTUALLY WALKS WITH, which is that price
+-- beside the vocabulary fact -- and the vocabulary half is not a gap at
+-- all: a fold threads the slots untouched, and that is proven.
+share-step-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (id : ℕ) (sf : Gas) (gas : ℕ) (bid : Id) (now : Tick)
+  (S : ℕ) (i : Fin n)
+  (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
+  (rid : RegId) (p : Path Γ (lookup Γ i) t)
+  (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl → sf ≡ budgetAt e sl bid →
+  nestΦAt e sl id ≤ S →
+  storeSyncMax sched st ≤ S →
+  (Sched.slots (proj₁ (proj₂ (foldPath sf gas bid now (Fin.toℕ i) p vals
+     (if fin then close (Fin.toℕ i) exhausted ∷ [] else []) fin sched
+     (record st { delivered = rid ∷ EvalSt.delivered st })))) ≡ sl)
+  × (storeSyncMax
+       (proj₁ (proj₂ (foldPath sf gas bid now (Fin.toℕ i) p vals
+          (if fin then close (Fin.toℕ i) exhausted ∷ [] else []) fin sched
+          (record st { delivered = rid ∷ EvalSt.delivered st }))))
+       (proj₂ (proj₂ (foldPath sf gas bid now (Fin.toℕ i) p vals
+          (if fin then close (Fin.toℕ i) exhausted ∷ [] else []) fin sched
+          (record st { delivered = rid ∷ EvalSt.delivered st }))))
+     ≤ S)
+share-step-fit sl id sf gas bid now S i vals fin rid p sched st hsl hsf hΦ hS =
+  trans (foldPath-slots sf gas bid now (Fin.toℕ i) p vals
+           (if fin then close (Fin.toℕ i) exhausted ∷ [] else []) fin sched
+           (record st { delivered = rid ∷ EvalSt.delivered st }))
+        hsl
+  , share-fold-store≤ sl id sf gas bid now S i vals fin rid p sched st
+      hsl hsf hΦ hS
 
 -- THE SHARE SINK IS THE SAME INDUCTION ONE LEVEL DOWN, over the
 -- registrations the share admits rather than over the path -- and the
@@ -755,114 +791,147 @@ postulate
 -- identity and only the two state-moving obligations are owed.  What
 -- the fan-out costs is therefore stated at ONE registration, which is
 -- the smallest unit anything here can be instantiated at.
+--
+-- AND ITS CEILING IS READ OFF THE GRANT RATHER THAN OFF THE STATE IT
+-- WAS ENTERED AT, which is what the priced step forces and is no loss:
+-- the walk's own invariant is now the two ingredient bounds separately
+-- -- the payload under the grant and the store under the ceiling's
+-- store slot -- so each position recovers its ceiling by monotonicity
+-- and the one number the dispatch states is spent unchanged at every
+-- registration.
 disp-depth-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (sl : Slots Γ) (sf : Gas) (gas : ℕ) (bid : Id) (now : Tick) (i : Fin n)
+  (sl : Slots Γ) (id : ℕ) (sf : Gas) (gas : ℕ) (bid : Id) (now : Tick)
+  (S : ℕ) (i : Fin n)
   (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
   (sched : Sched Γ) (st : EvalSt e) →
   Sched.slots sched ≡ sl → sf ≡ budgetAt e sl bid →
+  nestΦAt e sl id ≤ S →
+  nestDᵛˢ vals ≤ S →
+  storeSyncMax sched st ≤ S →
   depthDisp sf gas bid now i vals fin sched st
-    ≤ sightCeil (sizeᵉ e) (nestDᵛˢ vals) (storeSyncMax sched st) (nestUnit e sl)
-disp-depth-fit {e = e} sl sf gas bid now i vals fin sched st hsl hsf =
+    ≤ sightCeil (sizeᵉ e) S S (nestUnit e sl)
+disp-depth-fit {e = e} sl id sf gas bid now S i vals fin sched st hsl hsf hΦ hval hS =
   disp-le D sf gas bid now i vals fin
-    (λ _ sch sto →
-       (Sched.slots sch ≡ sl)
-       × (sightCeil (sizeᵉ e) (nestDᵛˢ vals) (storeSyncMax sch sto) (nestUnit e sl) ≤ D))
+    (λ _ sch sto → (Sched.slots sch ≡ sl) × (storeSyncMax sch sto ≤ S))
     (λ g rid p ps sch sto q →
        ≤-trans (share-fold-fit sl sf g bid now i vals fin rid p sch sto (proj₁ q) hsf)
-               (proj₂ q))
+               (sightCeil-mono (sizeᵉ e) (nestUnit e sl) hval (proj₂ q)))
     (λ rid p ps sch sto q → q)
     (λ g rid p ps sch sto q →
-       proj₁ (share-step-fit sl sf g bid now i vals fin rid p sch sto (proj₁ q) hsf)
-       , ≤-trans (proj₂ (share-step-fit sl sf g bid now i vals fin rid p sch sto
-                           (proj₁ q) hsf))
-                 (proj₂ q))
+       share-step-fit sl id sf g bid now S i vals fin rid p sch sto
+         (proj₁ q) hsf hΦ (proj₂ q))
     sched st
-    (hsl , ≤-reflexive (cong (λ z → sightCeil (sizeᵉ e) (nestDᵛˢ vals) z (nestUnit e sl))
-                             (latch-sync i fin sched st)))
+    (hsl , ≤-trans (≤-reflexive (latch-sync i fin sched st)) hS)
   where
   D : ℕ
-  D = sightCeil (sizeᵉ e) (nestDᵛˢ vals) (storeSyncMax sched st) (nestUnit e sl)
+  D = sightCeil (sizeᵉ e) S S (nestUnit e sl)
 
--- AND THE CEILING SURVIVES THE STEP THAT FRAME MAKES, which is the
--- obligation the fold cannot discharge for itself and the reason the
--- invariant is a ceiling rather than a store bound: the values and the
--- store are free to trade, and only their combination is held.
+-- AND THE STEP THAT FRAME MAKES IS PRICED THE SAME WAY, on both axes
+-- the ceiling reads: what the frame EMITS stays under the round's
+-- grant, and the state it leaves stays under the walk's ceiling.  The
+-- two are one obligation split, because one arm moves both -- a scan's
+-- emitted values ARE the accumulator it writes back into the nodes, so
+-- an `obs`-typed accumulator deepens the payload axis and the store
+-- axis together and there is no trade between them to be had.
 --
--- BUT A SCAN MOVES BOTH SIDES THE SAME WAY, so the trade is not there
--- to be made.  Its emitted values ARE its accumulator, and it writes
--- that accumulator back into the nodes -- so an `obs`-typed accumulator
--- deepens the left ceiling twice, once through `nestDᵛˢ` of what the
--- frame emits and once through the store the frame leaves.  The step
--- half therefore crosses by MORE than the fold half at the same point,
--- which is the reverse of what a trade would give.  What survives of
--- the design is the ceiling as a shape; what does not is asking a
--- step-taking arm to preserve it, and both this and its sibling are
--- owed the same priced restatement.
--- REFUTED: `Refuted.Share-Step-Scan` -- the same witness at the chain's
---   own frame rather than at the fold around it: the ceiling goes 78 to
---   130 across one `stepFrame`.
--- PROBED: `Probed.Depth-Join` reads both conjuncts at the chain edge
---   the frame row stands at -- slots by reflexivity, the ceiling as two
---   numerals at states one `stepFrame` apart -- and again at the
---   `thru-outer` frame, so the step is taken at each arm that charges
---   rather than at the one the corpus happens to head a chain with.
---   The second point's state is assembled rather than walked, which is
---   what the coverage still wants.
+-- WHICH IS WHY THE WALK CARRIES THE INGREDIENTS AND NOT THE CEILING.
+-- Holding a combination lets a position pay for a deeper payload out of
+-- a shallower store, and that is exactly the exchange the arm that
+-- charges refuses; holding the two bounds separately asks each axis for
+-- what it can actually supply, and the ceiling is then recovered at
+-- each position by monotonicity rather than transported across a step.
+-- REFUTED: `Refuted.Share-Step-Scan` at the chain's own frame rather
+--   than at the fold around it: under the old combined form the ceiling
+--   goes 78 to 130 across one `stepFrame`, which is further than the
+--   fold half moves at the same point.
+-- TWIN: `chainStep-store≤` -- the store axis of this, priced in the
+--   same currency at the granularity of a whole chain, and proven.
 postulate
-  chain-fit-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (sl : Slots Γ) (sf : Gas) (bid : Id) (now : Tick)
+  step-frame-vals≤ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+    (sl : Slots Γ) (id : ℕ) (sf : Gas) (bid : Id) (now : Tick) (S : ℕ)
     (f : Frame Γ s u) (p : Path Γ u t) (vals : List (Val Γ s)) (fin : Bool)
     (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl → sf ≡ budgetAt e sl bid →
-    (Sched.slots (proj₁ (proj₂ (proj₂ (proj₂
-       (stepFrame sf bid now f p vals fin sched st))))) ≡ sl)
-    × (sightCeil (sizeᵉ e)
-         (nestDᵛˢ (proj₁ (stepFrame sf bid now f p vals fin sched st)))
-         (storeSyncMax (proj₁ (proj₂ (proj₂ (proj₂
-                          (stepFrame sf bid now f p vals fin sched st)))))
-                       (proj₂ (proj₂ (proj₂ (proj₂
-                          (stepFrame sf bid now f p vals fin sched st))))))
-         (nestUnit e sl)
-       ≤ sightCeil (sizeᵉ e) (nestDᵛˢ vals) (storeSyncMax sched st) (nestUnit e sl))
+    nestΦAt e sl id ≤ S →
+    nestDᵛˢ vals ≤ S →
+    storeSyncMax sched st ≤ S →
+    nestDᵛˢ (proj₁ (stepFrame sf bid now f p vals fin sched st)) ≤ S
 
--- the position's ceiling, still under the one the round stated
-ChainFit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (sl : Slots Γ) (C : ℕ)
+  step-frame-store≤ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+    (sl : Slots Γ) (id : ℕ) (sf : Gas) (bid : Id) (now : Tick) (S : ℕ)
+    (f : Frame Γ s u) (p : Path Γ u t) (vals : List (Val Γ s)) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots sched ≡ sl → sf ≡ budgetAt e sl bid →
+    nestΦAt e sl id ≤ S →
+    nestDᵛˢ vals ≤ S →
+    storeSyncMax sched st ≤ S →
+    storeSyncMax (proj₁ (proj₂ (proj₂ (proj₂
+                    (stepFrame sf bid now f p vals fin sched st)))))
+                 (proj₂ (proj₂ (proj₂ (proj₂
+                    (stepFrame sf bid now f p vals fin sched st)))))
+      ≤ S
+
+-- the three things a position is entered with: the vocabulary, the
+-- payload under the round's grant, and the store under the ceiling's
+-- own store slot
+ChainFit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (sl : Slots Γ) (S : ℕ)
   {v} → Path Γ v t → List (Val Γ v) → Bool → Sched Γ → EvalSt e → Set
-ChainFit {e = e} sl C p vals _ sch sto =
+ChainFit sl S p vals _ sch sto =
   (Sched.slots sch ≡ sl)
-  × (sightCeil (sizeᵉ e) (nestDᵛˢ vals) (storeSyncMax sch sto) (nestUnit e sl) ≤ C)
+  × (nestDᵛˢ vals ≤ S)
+  × (storeSyncMax sch sto ≤ S)
+
+-- AND THE FRAME'S OWN STEP RE-ESTABLISHES ALL THREE, the vocabulary
+-- half out of the proven fact that a frame threads the slots untouched
+-- and the other two out of the priced leaves above.
+chain-fit-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (sl : Slots Γ) (id : ℕ) (sf : Gas) (bid : Id) (now : Tick) (S : ℕ)
+  (f : Frame Γ s u) (p : Path Γ u t) (vals : List (Val Γ s)) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl → sf ≡ budgetAt e sl bid →
+  nestΦAt e sl id ≤ S →
+  nestDᵛˢ vals ≤ S →
+  storeSyncMax sched st ≤ S →
+  ChainFit sl S p
+    (proj₁ (stepFrame sf bid now f p vals fin sched st))
+    (proj₁ (proj₂ (proj₂ (stepFrame sf bid now f p vals fin sched st))))
+    (proj₁ (proj₂ (proj₂ (proj₂ (stepFrame sf bid now f p vals fin sched st)))))
+    (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame sf bid now f p vals fin sched st)))))
+chain-fit-step sl id sf bid now S f p vals fin sched st hsl hsf hΦ hval hS =
+  trans (stepFrame-slots sf bid now f p vals fin sched st) hsl
+  , step-frame-vals≤  sl id sf bid now S f p vals fin sched st hsl hsf hΦ hval hS
+  , step-frame-store≤ sl id sf bid now S f p vals fin sched st hsl hsf hΦ hval hS
 
 chain-depth-sighted : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (sl : Slots Γ) (a : Arrival Γ) (nextId : Id) (S : ℕ)
+  (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id) (S : ℕ)
   (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
   Sched.slots sched ≡ sl →
+  nestΦAt e sl id ≤ S →
+  nestDᵛ (arrTy a) (arrVal a) ≤ S →
   storeSyncMax sched st ≤ S →
   depthChain nextId a path sched st
-    ≤ sightCeil (sizeᵉ e) (nestDᵛ (arrTy a) (arrVal a)) S (nestUnit e sl)
-chain-depth-sighted {n = n} {e = e} sl a nextId S path sched st hsl hS =
+    ≤ sightCeil (sizeᵉ e) S S (nestUnit e sl)
+chain-depth-sighted {n = n} {e = e} sl id a nextId S path sched st hsl hΦ hval hS =
   fold-le C sf n nextId (arrTick a) (arrSource a)
-    (λ {v} → ChainFit sl C {v})
+    (λ {v} → ChainFit sl S {v})
     (λ f p′ vals fin sch sto h →
        ≤-trans (frame-depth-fit sl sf nextId (arrTick a) f p′ vals fin sch sto
                   (proj₁ h) hsf)
-               (proj₂ h))
+               (sightCeil-mono (sizeᵉ e) (nestUnit e sl)
+                  (proj₁ (proj₂ h)) (proj₂ (proj₂ h))))
     (λ i vals fin sch sto h →
-       ≤-trans (disp-depth-fit sl sf n nextId (arrTick a) i vals fin sch sto
-                  (proj₁ h) hsf)
-               (proj₂ h))
+       disp-depth-fit sl id sf n nextId (arrTick a) S i vals fin sch sto
+         (proj₁ h) hsf hΦ (proj₁ (proj₂ h)) (proj₂ (proj₂ h)))
     (λ f p′ vals fin sch sto h →
-       proj₁ (chain-fit-step sl sf nextId (arrTick a) f p′ vals fin sch sto
-                (proj₁ h) hsf)
-       , ≤-trans (proj₂ (chain-fit-step sl sf nextId (arrTick a) f p′ vals fin
-                           sch sto (proj₁ h) hsf))
-                 (proj₂ h))
+       chain-fit-step sl id sf nextId (arrTick a) S f p′ vals fin sch sto
+         (proj₁ h) hsf hΦ (proj₁ (proj₂ h)) (proj₂ (proj₂ h)))
     path (arrVal a ∷ [])
     (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
     (Arrival.isLast a) sched st
-    (hsl , sightCeil-mono (sizeᵉ e) (nestUnit e sl) (⊔-lub ≤-refl z≤n) hS)
+    (hsl , ⊔-lub hval z≤n , hS)
   where
   C : ℕ
-  C = sightCeil (sizeᵉ e) (nestDᵛ (arrTy a) (arrVal a)) S (nestUnit e sl)
+  C = sightCeil (sizeᵉ e) S S (nestUnit e sl)
   sf : Gas
   sf = budgetAt e (Sched.slots sched) nextId
   hsf : sf ≡ budgetAt e sl nextId

@@ -215,18 +215,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE PRICED STEP, WHICH IS WHAT THE CROSSING LEAVES OWED — and a
-  restatement can introduce falsity where the crossed form could only
-  fail.** Both `share-step-fit` and `chain-fit-step` asked a step to
-  PRESERVE the position ceiling; a scan writing an obs-typed
-  accumulator into the nodes crosses both. Preservation becomes a
-  price — a factor times the store plus an increment. The commit
-  restates the two conjuncts in that currency and carries it into
-  `disp-depth-fit`, which spends them by transitivity against one
-  ceiling for the whole dispatch. A priced step cannot chain that way
-  unless the fan-out's own count is available where the dispatch
-  stands, and whether it is is the decision the commit makes.
-
 - **THE SUBSTITUTING TELESCOPE, WHICH IS THE ONE SHAPE THAT HAS ALREADY
   REFUTED AN ADDITIVE SUMMAND ON A SIBLING FACE.** `Rx.Clos-Size` exists
   because a slot definition that SUBSTITUTES doubles what it delivers per
@@ -250,6 +238,18 @@ does not fit is a finding about the shared statement, not about the head.
   in rather than the table's maximum. A crossing there restates the
   right summand, not the sum; none promotes the row off a coverage gap
   that currently reads as safe.
+
+- **THE CARRIED STORE PREDICATE FOUR ROWS ARE ALL OWED, and a field
+  rather than a hypothesis is what it has to be.** `walk-share-nestOK`,
+  `sink-fan-sink` and both `innerΦ-*-fit` arms end at the same residue
+  written four ways: the walk reads the node table and the registry and
+  carries no conjunct about either, so every route threading one down is
+  refused by the store's own growth toward the NEXT cap. The commit puts
+  the missing conjunct on the walk's invariant record, which obliges
+  every producer where a hypothesis obliges only today's caller, and
+  reads it at the fan's reach. Whether ONE field serves all four is what
+  decides if this is one statement or four; a crossing there is a
+  finding about the walk rather than about a row.
 
 ### The ledger
 
@@ -295,15 +295,19 @@ does not fit is a finding about the shared statement, not about the head.
   ONE LEAF INHERITING THE BARRIER — it is `depthFold` again, so the doubling
   recorded at `depthShareGo` closes its conclusion to instantiation exactly as
   the parent's was.
-- **`share-step-fit`** (Part7/Arrival-Caps) — SHAPE, `REFUTED, PROBED`: the
-  position's ceiling across one `foldPath`, slots unmoved. Seven rows held at
-  the two subscribing heads; a `scan-f` head at an obs-typed accumulator takes
-  the store two to three. The step is owed a PRICE, which `disp-depth-fit`
-  then has to chain.
-- **`chain-fit-step`** (Part7/Arrival-Caps) — SHAPE, `REFUTED, PROBED`: the
-  same across one `stepFrame`. The values-against-store TRADE the ceiling was
-  chosen to permit runs one way only — a scan emits its own accumulator and
-  writes it back — so the same witness crosses here by more than at the fold.
+- **`share-fold-store≤`** (Part7/Arrival-Caps) — FALSITY, `REFUTED, TWIN`: the
+  store across one `foldPath`, PRICED against the round's grant rather than
+  preserved. A `scan-f` at an obs-typed accumulator crossed the preservation,
+  and the grant is sealed — so the repair closes the region to instantiation on
+  both sides at once.
+- **`step-frame-vals≤`** (Part7/Arrival-Caps) — FALSITY, `REFUTED, TWIN`: what
+  one `stepFrame` leaves in the delivered values, at that same grant. This is
+  the axis the frame moves and the fold does not — a scan emits the accumulator
+  it just wrote — so the trade the old ceiling permitted ran one way only.
+- **`step-frame-store≤`** (Part7/Arrival-Caps) — FALSITY, `REFUTED, TWIN`: the
+  store half of that step, carried APART from the values half so that no
+  ceiling has to cross a step at all; the position's ceiling is rebuilt from
+  the two ingredients where it is spent.
 - **`scanΦ-fit`** (Part7/Depth-Fit) — SHAPE, `DEAD ROUTE`: the producing side
   of the fold's grant. THE MECHANISM IS DEAD, NOT A DENOMINATION: a flat
   per-instant potential cannot dominate a count exponential in itself; the one
