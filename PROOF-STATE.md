@@ -215,16 +215,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **PUTTING THE STRATIFICATION READING IN THE INVARIANT RECORD, which
-  is where writing the walk's bundle says all three of its new leaves
-  converge.** The floor is now indexed by the chain and both consumers
-  stand against it, and the residue is not three gaps but one: a
-  `scan-f` carries a NODE ID rather than an accumulator, so the value
-  a frame folds against lives in the STORE and no predicate over a
-  path can reach it — and the two entry leaves are the same fact about
-  a registry path and a live source. So the commit adds the conjunct
-  to the state receipt, where every producer owes it, rather than
-  threading a hypothesis that obliges only today's callers.
+- **SEALING THE STRATIFICATION READING, WHICH ITS COST SAYS IS OWED
+  BEFORE THE RECORD CONJUNCT.** The reading landed and the walk's
+  bundle carries it, but the predicates behind it are TRANSPARENT and
+  sit inside a recursive premise, so they normalise at every
+  application of every statement carrying one — a measure landing in
+  types. The leg is `abstract` over them plus the one equation the hop
+  step spends, proven inside the block, and a measurement attributing
+  the cost to a face rather than to a cone. Then the conjunct the
+  three leaves converge on: a `scan-f` folds against a value in the
+  STORE that no path predicate reaches, so it is owed on the state
+  receipt where every producer pays it.
 
 - **PRICING A FANNED CHAIN IN SOMETHING THAT IS NOT A CAP, where every
   route under `fan-regsSz` now converges.** Five closed routes leave
