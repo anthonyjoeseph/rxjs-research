@@ -28,6 +28,31 @@ entStrat? : ∀ {n} {Γ : Ctx n} {u t} → Source → Path Γ u t → Bool
 entStrat? {n = n} s p =
   (n ≤ᵇ pathFloor p) ∨ (pathStrat? p ∧ (s ≤ᵇ pathFloor p))
 
+-- THE WALK CARRIES NO ABSTRACT LEDGER, SO THERE IS NOTHING HERE TO
+-- GENERALISE.  The burst walk does thread a registry reading across
+-- its steps, but it REBUILDS it entrywise at each one out of two
+-- faces that exist for other reasons: the size half falls out of the
+-- new `capsOK?`, because `regsSz?` IS that half of the reading, and
+-- the Ψ half has its own per-step face.  The peel-and-glue pair
+-- between them exists precisely because neither face hands back the
+-- conjunction.  `entStrat?` has no half inside `capsOK?` and no
+-- per-step face, so nothing recombines and abstracting that ledger
+-- over an arbitrary predicate buys this statement nothing.
+--
+-- AND THE PRESERVATION IS THE CHEAP HALF; THE CARRIER IS NOT.  The
+-- registry has exactly ONE growth site -- `register` appends a single
+-- entry, and every other write in the evaluator is the empty initial
+-- list or a FILTER, `cutThrough`'s kept list and `dropSource`, which
+-- cannot break a reading of the shape `all`.  So this reading is free
+-- at every step but the mint, and at the mint it asks exactly the
+-- per-registration side condition the telescope pays at four of the
+-- five sites.  What is missing is therefore not a proof but a
+-- CARRIER: a reading nothing threads has to become a conjunct of the
+-- state predicate, and seventy-six faces re-establish that predicate.
+-- `srcFloor?` is the precedent rather than an analogy -- it names no
+-- cap, it is the one conjunct `capsOK?-mono` hands straight back, and
+-- it already crosses all of them.
+
 -- WHAT IS OPEN, AND IT IS THE WHOLE OF WHAT THE TWO SITES USED TO ASK
 -- SEPARATELY.  The telescope is what should supply this: a
 -- sink-floored chain is registered by the CONNECT, which subscribes

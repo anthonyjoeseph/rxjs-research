@@ -238,17 +238,18 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **PRESERVING THE ENTRY LEDGER ACROSS THE SUBSCRIBE WALK, which is
-  what the transports left owed.** Both entry faces now read one
-  ledger over the registry and the transports onto their two sublists
-  are proven, so the whole of the region is a single leaf: that the
-  state the caps receipt is taken at is one the evaluator BUILT. The
-  walk already threads a registry predicate — `regP? (PbB …)` crosses
-  the switch's kill and the flatten's drain — but at a cap-indexed
-  reading that weakens upward, while the entry ledger is exact and
-  entry-level. So the commit generalises that threading over the
-  abstract ledger the transports take, and the per-registration side
-  condition is what the telescope pays at four of five sites.
+- **PUTTING THE ENTRY LEDGER WHERE THE WALK ALREADY CARRIES A
+  CAPS-INDEPENDENT CONJUNCT.** The transports are proven and the
+  region is one leaf, whose obstacle is the CARRIER and not the
+  proof. The registry has ONE growth site, so an `all`-shaped
+  reading is free at every other step and the mint asks just the
+  side condition the telescope pays; what is missing is anything
+  threading it, since the burst walk's ledger is rebuilt per step
+  from halves this reading does not have. `capsOK?` already carries
+  `srcFloor?`, which names no cap and crosses every face. So the
+  commit adds the reading beside it, makes `registry-entStrat` its
+  projection, and defers the per-face obligations to one shared
+  leaf — the mint's being the only one with content.
 
 - **WALKING AN ADMITTED CHAIN AT THE LEVEL IT WAS REGISTERED AT, which
   is the one door the pricing leaves open.** Both ends are closed by
