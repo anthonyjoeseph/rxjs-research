@@ -29,8 +29,7 @@ open import Probed.Scan-Burst-Nest
   using (premises; scanBursts≡; scanEmits≡; fits₁₃; fits₁₄; flat≡; flat-fails;
          tie₁₃; tie₁₄)
 open import Probed.Burst-Nest-Unit
-  using (figures≡; okM; okS; okX; regsM; deferFigs≡; strongFigs≡; strongFits;
-         strongHeads; richFigs≡; richFits)
+  using (figures≡; okM; okS; okX; regsM)
 open import Probed.Cascade-Store-Components
   using (U-parts; C-parts; F-parts; tieRegs)
 open import Probed.Burst-Nest-Ladder
@@ -161,7 +160,8 @@ open import Probed.Slot-Cascade-Store
          tieHop; tieFar; tieScan)
 
 open import Probed.Regs-Store-Currency
-  using (figures≡; verdicts≡; separates)
+  using (figures≡; verdicts≡; separates;
+         composed≡; separatesJoin; joinVerdicts≡)
 
 open import Probed.Drain-Count-Slot
   using (slotCharges≡; slotRows≡; tieDrainSlot12; tieDrainSlot13)
