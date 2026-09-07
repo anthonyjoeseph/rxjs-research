@@ -215,17 +215,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE ARRIVAL COUNT AGAINST FIXED TEXT, which is what is left
-  measure-side once the telescope is read as bound-side.** Every `-sz`
-  bound iterates once per unit of its summand, so an axis costing syntax
-  cannot refute. An accumulator the step WRAPS rather than replaces grows with
-  arrivals alone — the mechanism that has just crossed the step
-  obligation one face over — and a source emitting many values from
-  fixed text is what decouples the two: an unfolding `μ` plants its
-  copies without the layer count charging for them. The commit builds
-  that pair against `subscribeE-sz-store-scan`, whose four receipts all
-  stand at one arrival shape. It refutes, or it is the first row over
-  this family that could have.
+- **A CHARGE THAT COUNTS DELIVERIES, which is what the refuted arrival
+  axis leaves owed.** `descChg` sums an unfolding depth and a layer
+  depth, so nothing in it moves when a synchronous source fires many
+  values, while a step wrapping its accumulator doubles the cell per
+  arrival. The witness carries up from the `scanᵉ` leaf to
+  `subscribeE-sz-store` itself, so a body the tower builds on concludes
+  something false — why the currency and not the arm is what moves. No
+  delivery measure exists to reach for, and the commit decides between
+  minting one and spending the seed: a synchronous run delivers no more
+  than its source spells, so `B` may already bound it, at a tower's cost
+  the consumers must afford. Then both bounds are restated over it.
 
 - **THE CARRIED STORE PREDICATE FOUR ROWS ARE ALL OWED, and a field
   rather than a hypothesis is what it has to be.** `walk-share-nestOK`,
@@ -268,10 +268,10 @@ does not fit is a finding about the shared statement, not about the head.
   duplication chain buys no rung; a handed-out `μ` is charged at one nesting
   and at two; the rate is beyond a fold that parks them.
 - **`subscribeE-sz-store-scan`** (Regs-Nest-Walk) — FALSITY,
-  `DEAD ROUTE, PROBED×4`: the reified seed and the cell each arrival rewrites,
-  in a currency the layer premise is not stated in. Cells in series do not
-  compound; a parked queue reads the program's own run; a source resolving a
-  slot leaves the telescope carrying the climb.
+  `REFUTED, DEAD ROUTE, PROBED×4`: the reified seed and the cell each arrival
+  rewrites. REFUTED on the arrival count — a wrapping step doubles the cell
+  where a depth-only charge stays fixed — and the same witness carries up to
+  the assembly consuming it, so the currency is what moves.
 - **`subscribeSharedSlot-sz-store`** (Regs-Nest-Walk) — FALSITY,
   `DEAD ROUTE, PROBED×2`: the definition behind a reference, whose entire climb
   is the telescope summand — `input` charges nought, so no program reading

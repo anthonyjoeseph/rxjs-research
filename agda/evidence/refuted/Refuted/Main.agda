@@ -281,3 +281,6 @@ open import Refuted.Share-Step-Scan
   using (census≡41; storeBefore≡2; storeAfter≡3;
          ceilBefore≡78; ceilAfter≡91; chainAfter≡130;
          share-step-scan-absurd; chain-fit-scan-absurd)
+open import Refuted.Subscribe-Store-Scan-Arrivals
+  using (charges≡; rows≡;
+         subscribeE-sz-store-scan-absurd; subscribeE-sz-store-absurd)

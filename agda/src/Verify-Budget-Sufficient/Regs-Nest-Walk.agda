@@ -1285,15 +1285,32 @@ postulate
   -- SO THE ARM IS A LEAF FOR AN ARITHMETIC REASON AND NOT A STRUCTURAL
   -- ONE.  The recursion into the source is available and every one of
   -- its premises transports; what does not transport is the cell.
+  -- AND IT IS FALSE AS STATED, ON THE ONE AXIS THE CHARGE DOES NOT
+  -- READ.  `descChg` is two DEPTH counts and carries no size, so a
+  -- synchronous source buys arrivals without buying a single
+  -- iteration: the exponent is FIXED across the crossing and the bound
+  -- moves only through the seed, which is the program's own syntax and
+  -- grows by one per arrival.  What spends them is a step that WRAPS
+  -- its accumulator rather than replacing it, doubling the stored cell
+  -- per arrival from fixed text.  Affine against geometric, so the
+  -- repair is a charge that counts what a subscription DELIVERS, and
+  -- no hypothesis available here is a substitute for it.
+  -- REFUTED: `Refuted.Subscribe-Store-Scan-Arrivals` -- a scan whose
+  --   step rebuilds its accumulator at two occurrences, over a
+  --   synchronous run, entered at `root` on the initial table with the
+  --   least `M` the premise admits.  The crossing is bracketed: three
+  --   arrivals fewer and the claim HOLDS at the very same program
+  --   shape, so what fails is the arrival count and not the gas, the
+  --   telescope, or the arithmetic of `iterSize`.  The same witness
+  --   carries up to `subscribeE-sz-store`, whose bound is spelled in
+  --   this currency -- so the defect is the charge and not this arm.
   -- DEAD ROUTE: the SUBSTITUTING telescope is bound-side HERE TOO, and
   --   for the same arithmetic the sibling slot statement records: this
   --   premise iterates `sizeStep S` once per unit of `descChg` plus the
   --   summand alike, so a hop that doubles what a layer delivers buys
-  --   the bound at least four times what it buys the cell.  What that
-  --   leaves measure-side is the ARRIVAL count against a program whose
-  --   syntax does not grow with it -- an accumulator the step wraps
-  --   rather than replaces, fed by a source emitting many values from
-  --   fixed text -- which is the axis no row over this statement sweeps.
+  --   the bound at least four times what it buys the cell.  So no
+  --   instantiation of that axis is a counterexample, however far the
+  --   telescope is walked.
   -- PROBED: `Probed.Cross-Count-Outer-Store` at the very state that
   --   killed the constant, a scan whose step stores the arriving datum
   --   back as a one-shot observable, subscribed at all three doors.
@@ -1558,6 +1575,21 @@ crossSz a B hb = sz-sub a (suc a) B (n≤1+n a) hb
 --   source whose single emission is a `μ`, entered at an empty table
 --   with the crossing bracketed on both sides so what fails is the
 --   multiplicity and not the door or the arithmetic.
+
+-- AND ITS OWN CONCLUSION IS FALSE TODAY, WHICH IS A FACT ABOUT THE
+-- CHARGE RATHER THAN ABOUT ANY ARM.  The body reduces to leaves and
+-- one of them is false, so this statement inherits that without a
+-- clause of it being individually wrong -- the retroactive shape, and
+-- the reason the assembly is worth instantiating at all.
+-- The axis is the ARRIVAL count: `descChg` sums an unfolding depth and
+-- a layer depth, neither of which a synchronous run moves, so the
+-- exponent is fixed while a step that wraps its accumulator doubles
+-- the cell per value delivered.  Nothing here can be repaired by
+-- moving the recursion; the charge has to learn to count deliveries.
+-- REFUTED: `Refuted.Subscribe-Store-Scan-Arrivals` -- the same witness
+--   that kills the `scanᵉ` leaf, entered against this statement
+--   directly, since the two bounds are spelled identically and this
+--   program is an ordinary closed term.
 subscribeE-sz-store : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (sl : Slots Γ) (g : Gas) (o : Closed Γ u) (κ : Path Γ u t)
   (id : Id) (now : Tick)
