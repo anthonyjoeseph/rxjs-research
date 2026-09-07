@@ -238,18 +238,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **CARRYING THE TELESCOPE TO THE REGISTER, which takes the two frame
-  readings off the state at four of their five sites.** A sink-floored
-  chain is registered by the CONNECT, so a frame the descent pushes is
-  a subterm of the slot's def, and `Rx.Slots.shared` constrains that
-  def to exactly what the frame predicate asks at such a chain's floor.
-  The home is already built: `regP?` carries a path predicate over
-  every registry entry, `shareAdmit-chP` moves one onto the admitted
-  chains, and the walk preserves one. So the commit instantiates it at
-  the frame predicate and writes `chainsOf`'s missing twin of that
-  transport. The fifth site is excluded rather than proven, and it is
-  `walk-share-strat`'s own: a delivered observable carries syntax the
-  telescope never checked.
+- **PRESERVING THE ENTRY LEDGER ACROSS THE SUBSCRIBE WALK, which is
+  what the transports left owed.** Both entry faces now read one
+  ledger over the registry and the transports onto their two sublists
+  are proven, so the whole of the region is a single leaf: that the
+  state the caps receipt is taken at is one the evaluator BUILT. The
+  walk already threads a registry predicate — `regP? (PbB …)` crosses
+  the switch's kill and the flatten's drain — but at a cap-indexed
+  reading that weakens upward, while the entry ledger is exact and
+  entry-level. So the commit generalises that threading over the
+  abstract ledger the transports take, and the per-registration side
+  condition is what the telescope pays at four of five sites.
 
 - **WALKING AN ADMITTED CHAIN AT THE LEVEL IT WAS REGISTERED AT, which
   is the one door the pricing leaves open.** Both ends are closed by
@@ -316,13 +315,11 @@ does not fit is a finding about the shared statement, not about the head.
   does to the chain's stratification reading, the one reading a walk cannot
   transport. A `scan-f` folds against a value in the STORE, which no path
   predicate reaches and the premised state receipt does not yet read.
-- **`sink-admit-sink`** (Part7/Walk-Sink) — FALSITY, `NO EVIDENCE`: what a share
-  hands each chain it admitted, asked ONLY where the chain ends at a sink. Both
-  conjuncts are free at the root's floor, so the risky region is a share's own
-  registrations rather than the registry.
-- **`cascade-admit-sink`** (Part7/Arrival-Caps) — FALSITY, `REFUTED`: the same
-  reading for a cascade's chains, over `chainsOf`, and the same disjunct. The
-  refutation is what forbids trading the disjunct for a free path plus a floor.
+- **`registry-entStrat`** (Part7/Reg-Strat) — FALSITY, `DEAD ROUTE`: every
+  registration's chain is stratified and floored at or above the source it
+  listens to, asked ONLY where the floor drops below the context. Both entry
+  faces are transports of it; what it asks of `capsOK?` is that the state was
+  BUILT.
 - **`pop-head-strat-sink`** (Caps-Bridge) — FALSITY, `REFUTED`: where the
   arrival's own value sits against every chain that will receive it, asked only
   below the root. It wants a fact relating a source's pending values to the
@@ -362,8 +359,8 @@ does not fit is a finding about the shared statement, not about the head.
 - **`fan-regsSz`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE×5`: the
   registry's own size receipt at the PROGRAM's cap. `register-caps` prices a
   mint at one frame step, so the reading sits above the cap the conclusion
-  names and the connect puts a mint inside every fan. Open: the Φ arithmetic
-  at one step, not a currency.
+  names and the connect puts a mint inside every fan. Open: the Φ arithmetic at
+  one step, not a currency.
 - **`walk-share-nestOK`** (Part7/Depth-Fit) — FALSITY, `DEAD ROUTE×4`: the
   instant's nest predicate at the state the fan reads the registry. The door
   has it and the walk carries no nest conjunct at all; threading it down is

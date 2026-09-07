@@ -60,7 +60,7 @@ module Verify-Budget-Sufficient.Delivery-Walk where
 
 open import Data.Bool    using (Bool; true; false; if_then_else_)
 open import Data.Nat     using (ℕ; zero; suc; _+_; _≤_; _≡ᵇ_; z≤n; s≤s)
-open import Data.Nat.Properties using (≤-trans; ≤-refl; ≤-reflexive; +-mono-≤; n≤1+n; m≤m+n; m≤m⊔n; m≤n⊔m)
+open import Data.Nat.Properties using (≤-trans; ≤-refl; ≤-reflexive; +-mono-≤; n≤1+n; m≤m+n; m≤m⊔n; m≤n⊔m; ≡ᵇ⇒≡)
 open import Data.List    using (List; []; _∷_; _++_; length; map)
 open import Data.Bool.ListAction using (all; any)
 open import Data.Fin     using (Fin; toℕ)
@@ -75,7 +75,7 @@ open import Rx.Prim      using (Tick; Id; Source; InstEvent;
                                 _at_from_as_; delivery; Gas)
 open import Rx.Exp       using (Ctx; Closed; Val; _≟ᵗ_)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; RegId; Chain; Path; Frame; root; share-sink; _↠_; Stream; stepFrame;
-  foldPath; dispatchShare; shareGo; shareAdmit; shareLatch; shareFinish; chainStep; cascadeGo;
+  foldPath; dispatchShare; shareGo; shareAdmit; shareLatch; shareFinish; chainStep; cascadeGo; chainsGo;
   sameSource; arrTy; arrTick; arrSource; arrVal; budgetAt; sizeAt; regAt; fLvlD; iterL; lvls;
   dCapᶜ; dWalkᶜ)
 
@@ -102,7 +102,7 @@ open import Verify-Budget-Sufficient.Deliveries using
 open import Verify-Budget-Sufficient.Caps-Depth
   using (depthFrame; depthFold; depthDisp; depthShareGo; depthChain;
          depthCascade; lub3-l; lub3-m; lub3-r)
-open import Decide using (∧-intro)
+open import Decide using (∧-intro; T-to)
 
 ------------------------------------------------------------------
 -- § B.  THE REGISTRY LEDGER THE WALK READS.
@@ -195,6 +195,54 @@ shareAdmit-chP {Γ = Γ} Pb i ((rid , s , (u , p)) ∷ r) h
 ... | true  | no  _    = shareAdmit-chP Pb i r (proj₂ (∧-true _ _ h))
 ... | true  | yes refl = ∧-intro (proj₁ (∧-true _ _ h))
                                  (shareAdmit-chP Pb i r (proj₂ (∧-true _ _ h)))
+
+-- THE SAME LEDGER READ AT AN ENTRY'S OWN SOURCE, which is the half a
+-- path-level `Pb` cannot state.  A stratification reading of a chain
+-- wants two things, and only one of them is about the path: that the
+-- chain's frames are stratified, and that its floor is at or above the
+-- SOURCE it listens to.  The second names the registration rather than
+-- the path, so no `Pb` can carry it, and a face wanting both would
+-- otherwise have to ask for them as two ledgers over the same list.
+--
+-- WHAT MAKES THE SOURCE FORGETTABLE AGAIN IS THAT EACH FILTER TESTS
+-- THE SOURCE IT FILTERS FOR.  Both transports below drop the source
+-- from every entry they keep, and both may: the entry survives only
+-- past `sameSource`, so its source IS the one the filter was given,
+-- and the predicate arrives on the output list already instantiated
+-- there.  That is what lets the consumers stay `chP?`-shaped and share
+-- every lemma the path-level ledger already has.
+regQ? : ∀ {n} {Γ : Ctx n} {t} → (∀ {u} → Source → Path Γ u t → Bool) →
+        List (RegId × Source × Chain Γ t) → Bool
+regQ? Q = all (λ en → Q (proj₁ (proj₂ en)) (proj₂ (proj₂ (proj₂ en))))
+
+shareAdmit-chQ : ∀ {n} {Γ : Ctx n} {t} (Q : ∀ {u} → Source → Path Γ u t → Bool)
+  (i : Fin n) (rs : List (RegId × Source × Chain Γ t)) →
+  regQ? Q rs ≡ true → chP? (λ {u} → Q {u} (toℕ i)) (shareAdmit {t = t} i rs) ≡ true
+shareAdmit-chQ Q i [] h = refl
+shareAdmit-chQ {Γ = Γ} Q i ((rid , s , (u , p)) ∷ r) h
+  with sameSource (toℕ i) s in eqs | u ≟ᵗ lookup Γ i
+... | false | _        = shareAdmit-chQ Q i r (proj₂ (∧-true _ _ h))
+... | true  | no  _    = shareAdmit-chQ Q i r (proj₂ (∧-true _ _ h))
+... | true  | yes refl =
+  ∧-intro (subst (λ z → Q z p ≡ true) (sym (≡ᵇ⇒≡ (toℕ i) s (T-to eqs)))
+                 (proj₁ (∧-true _ _ h)))
+          (shareAdmit-chQ Q i r (proj₂ (∧-true _ _ h)))
+
+-- the cascade's side of the same step, and it is the same filter: an
+-- arrival's chains are the registry's entries past a source test and a
+-- type test, in that order, so the clauses correspond one for one
+chainsGo-chQ : ∀ {n} {Γ : Ctx n} {t} (Q : ∀ {u} → Source → Path Γ u t → Bool)
+  (a : Arrival Γ) (rs : List (RegId × Source × Chain Γ t)) →
+  regQ? Q rs ≡ true → chP? (λ {u} → Q {u} (arrSource a)) (chainsGo {t = t} a rs) ≡ true
+chainsGo-chQ Q a [] h = refl
+chainsGo-chQ Q a ((rid , s , (u , p)) ∷ r) h
+  with sameSource (arrSource a) s in eqs | u ≟ᵗ arrTy a
+... | false | _        = chainsGo-chQ Q a r (proj₂ (∧-true _ _ h))
+... | true  | no  _    = chainsGo-chQ Q a r (proj₂ (∧-true _ _ h))
+... | true  | yes refl =
+  ∧-intro (subst (λ z → Q z p ≡ true) (sym (≡ᵇ⇒≡ (arrSource a) s (T-to eqs)))
+                 (proj₁ (∧-true _ _ h)))
+          (chainsGo-chQ Q a r (proj₂ (∧-true _ _ h)))
 
 ------------------------------------------------------------------
 -- § C.  THE HYPOTHESES: ONE FRAME, AT THE LEVEL IT RUNS AT.

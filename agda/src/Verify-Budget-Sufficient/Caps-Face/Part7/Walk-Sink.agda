@@ -76,6 +76,10 @@ open import Verify-Budget-Sufficient.Caps-Face.Part3 using
 open import Decide using (T-to; T⇒≡true; ∧-intro)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Root-Strat using
   (pathStrat-top)
+open import Verify-Budget-Sufficient.Caps-Face.Part7.Reg-Strat using
+  (entStrat?; registry-entStrat)
+open import Verify-Budget-Sufficient.Delivery-Walk using
+  (shareAdmit-chQ)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Ring-Vocabulary using
   (RingState; WalkHyps; ent-infl; floor-parts; frameStep-regAt; regs-exit; ring-room; ringFold; sink-deliv-cap; sink-entry-ladder; sink-step-caps; walk-frame-clos)
 
@@ -123,13 +127,21 @@ open import Verify-Budget-Sufficient.Caps-Face.Part7.Ring-Vocabulary using
 -- through it, are recorded once at `cascade-admit-sink`; the second
 -- conjunct here needs neither, since `toℕ i ≤ pathFloor` holds at a
 -- chain the share itself registered by definition of the floor.
-postulate
-  sink-admit-sink : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (c : Caps) (i : Fin n) (sched : Sched Γ) (st : EvalSt e) →
-    capsOK? c sched st ≡ true →
-    all (λ en → (n ≤ᵇ pathFloor (proj₂ en)) ∨
-                (pathStrat? (proj₂ en) ∧ (Fin.toℕ i ≤ᵇ pathFloor (proj₂ en))))
-        (shareAdmit {t = t} i (EvalSt.registry st)) ≡ true
+--
+-- AND BOTH CONJUNCTS ARE ONE ENTRY READING, WHICH IS WHY THIS IS NOW A
+-- TRANSPORT RATHER THAN A CLAIM.  `shareAdmit` keeps an entry only
+-- past the source test it is filtering FOR, so the slot's index IS
+-- that entry's source and the second conjunct is the source half of
+-- the registry's own ledger, arriving already instantiated.
+sink-admit-sink : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (c : Caps) (i : Fin n) (sched : Sched Γ) (st : EvalSt e) →
+  capsOK? c sched st ≡ true →
+  all (λ en → (n ≤ᵇ pathFloor (proj₂ en)) ∨
+              (pathStrat? (proj₂ en) ∧ (Fin.toℕ i ≤ᵇ pathFloor (proj₂ en))))
+      (shareAdmit {t = t} i (EvalSt.registry st)) ≡ true
+sink-admit-sink c i sched st cok =
+  shareAdmit-chQ (λ {u} → entStrat? {u = u}) i (EvalSt.registry st)
+                 (registry-entStrat c sched st cok)
 
 sink-admit-entry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (c : Caps) (i : Fin n) (sched : Sched Γ) (st : EvalSt e) →

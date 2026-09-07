@@ -42,7 +42,7 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; arrVal; RegId; cascadeLa
 open import Rx.Slots using (Slots; slotsSize)
 
 open import Verify-Budget-Sufficient.Delivery-Walk using
-  (module Walk)
+  (module Walk; chainsGo-chQ)
 open import Verify-Budget-Sufficient.Deliveries using
   (delivN; delivN-cons; delivN-split; chainStep-deliv; cascadeGo-deliv; ⊑ᵈ-trans)
 open import Verify-Budget-Sufficient.Caps using
@@ -64,7 +64,9 @@ open import Verify-Budget-Sufficient.Caps-Face.Part4 using
   foldPath-slots)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (valCaps?-widen)
-open import Decide using (∧-intro; T-to)
+open import Decide using (∧-intro; ∧-trueˡ; T-to)
+open import Verify-Budget-Sufficient.Caps-Face.Part7.Reg-Strat using
+  (entStrat?; registry-entStrat)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Cascade-Caps using
   (cascadeGo-deliveries; cascadeLatch-caps; chainStep-slots; chainsOf-length; walkH)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Chain-Caps-OK using
@@ -145,6 +147,13 @@ open import Verify-Budget-Sufficient.Caps-Face.Part7.Walk-Sink using
 -- checked never contained the inputs then being registered.  Read off
 -- the constructors, not instantiated, so nothing here lowers a class.
 --
+-- AND WHAT IS LEFT IS ONE LEDGER OVER THE REGISTRY, NOT ONE STATEMENT
+-- PER FACE.  `chainsGo` filters the registry by source and type, so a
+-- reading held at every entry is inherited by the arrival's chains --
+-- and the source half the entry reading also carries is dropped here
+-- rather than being a second premise, because the cascade's own claim
+-- says nothing about where the values are leaving from.
+--
 -- REFUTED: `Refuted.Walk-Entry-Strat.walk-path-strat-absurd` kills the
 --   free form this replaces, where the path was quantified after the
 --   receipt: one frame over a sink -- a `map` whose template names
@@ -155,12 +164,22 @@ open import Verify-Budget-Sufficient.Caps-Face.Part7.Walk-Sink using
 --   are not any slot's def.  It is also why the disjunct above may not
 --   be traded for a premise on a free path: that is the refuted form
 --   with a floor hypothesis, and the counterexample's floor is nought.
-postulate
-  cascade-admit-sink : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (c : Caps) (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
-    capsOK? c sched st ≡ true →
-    all (λ rc → (n ≤ᵇ pathFloor (proj₂ rc)) ∨ pathStrat? (proj₂ rc))
-        (chainsOf a st) ≡ true
+cascade-admit-sink : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (c : Caps) (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
+  capsOK? c sched st ≡ true →
+  all (λ rc → (n ≤ᵇ pathFloor (proj₂ rc)) ∨ pathStrat? (proj₂ rc))
+      (chainsOf a st) ≡ true
+cascade-admit-sink {n = n} {Γ = Γ} {t = t} c a sched st cok =
+  all-impl _ _ drop (chainsOf a st)
+    (chainsGo-chQ (λ {u} → entStrat? {u = u}) a (EvalSt.registry st)
+                  (registry-entStrat c sched st cok))
+  where
+  drop : ∀ (rc : RegId × Path Γ (arrTy a) t) →
+         entStrat? (arrSource a) (proj₂ rc) ≡ true →
+         ((n ≤ᵇ pathFloor (proj₂ rc)) ∨ pathStrat? (proj₂ rc)) ≡ true
+  drop rc h with n ≤ᵇ pathFloor (proj₂ rc)
+  ... | true  = refl
+  ... | false = ∧-trueˡ h
 
 cascade-admit-entry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (c : Caps) (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
