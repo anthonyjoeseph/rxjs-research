@@ -2,10 +2,10 @@
 -- arr-chain-caps … arr-chains-caps-all
 module Verify-Budget-Sufficient.Caps-Face.Part7.Arrival-Caps where
 
-open import Data.Bool    using (true; false; if_then_else_)
+open import Data.Bool    using (Bool; true; false; if_then_else_)
 open import Data.Nat     using (ℕ; suc; _+_; _∸_; _⊔_; _≤_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (m+[n∸m]≡n; ≤-trans; ≤-refl; ≤-reflexive; m≤m+n; m≤n+m; n≤1+n; *-identityʳ; +-monoʳ-≤; m≤m⊔n;
-  +-suc)
+  +-suc; ⊔-lub)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.List    using (List; []; _∷_; length)
@@ -23,18 +23,20 @@ open import Data.Unit    using (tt)
 open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; subst; cong)
 
-open import Rx.Prim      using (Id; _at_from_as_; after_,_; close; exhausted)
-open import Rx.Exp       using (Ctx; Closed; sizeᵉ)
+open import Rx.Prim      using (Gas; Id; Tick; _at_from_as_; after_,_; close; exhausted)
+open import Rx.Exp       using (Ctx; Closed; Val; sizeᵉ)
 open import Rx.Nest-Depth using (nestDᵛ)
 open import Verify-Budget-Sufficient.Nest-Ceiling using
   (Reached; Ent; Pos; ent-step; base; walk)
 open import Verify-Budget-Sufficient.Subscribe-Face using (subscribeInner-caps; innerFinish-caps)
 open import Verify-Budget-Sufficient.Caps-Depth using
-  (depthCascade; depthChain; lub3-l; lub3-m; lub3-r)
+  (depthCascade; depthChain; depthFold; depthFrame; depthDisp; lub3-l; lub3-m; lub3-r)
 open import Verify-Budget-Sufficient.Nest-Store using
-  (storeSyncMax; realWidAt-def; nestUnit; sightCeil; nestBurstAt)
+  (storeSyncMax; realWidAt-def; nestUnit; sightCeil; sightCeil-mono; nestBurstAt)
+open import Verify-Budget-Sufficient.Nest-Walk using (nestDᵛˢ)
+open import Verify-Budget-Sufficient.Caps-Face.Part7.Depth-Join using (fold-le; disp-le; latch-sync)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; arrVal; RegId; cascadeLatch; arrSource; chainsOf; cascadeGo; Path;
-  arrTy; regAt; dCapᶜ; lvls; iterL; chainStep; budgetAt; arrTick)
+  Frame; stepFrame; foldPath; arrTy; regAt; dCapᶜ; lvls; iterL; chainStep; budgetAt; arrTick)
 open import Rx.Slots using (Slots; slotsSize)
 
 open import Verify-Budget-Sufficient.Delivery-Walk using
@@ -558,6 +560,26 @@ arr-chains-bursts sl id a nextId sched st sleq cok hpz hvc hcl hdp =
 -- this instant's fuel affords.  The three-place store is what a chain
 -- can be held to, and it is the weaker premise, so this is the
 -- stronger statement.
+
+-- AND THE DESCENT IS A JOIN DOWN THE PATH, WHICH IS WHY THE STATEMENT
+-- IS A BODY AND NOT A LEAF.  `depthFold` branches at exactly two heads
+-- -- a frame's own spend, and a share sink's dispatch -- and threads
+-- the values and the state through everything else, so a ceiling on it
+-- is an induction over the path whose only content is that an
+-- invariant survives one frame step.  The induction is spelled once,
+-- at `.Part7.Depth-Join`, apart from any particular ceiling; what is
+-- chosen here is the invariant, and the three leaves below are what
+-- that choice owes.
+--
+-- THE INVARIANT IS THE POSITION'S OWN CEILING, NOT THE STATEMENT'S
+-- PARAMETERS, and that is what makes the leaves instantiable where the
+-- conclusion is not.  Carrying `storeSyncMax ≤ S` down the path would
+-- demand that a frame step move the store not at all, which the walk's
+-- own growth bound already says it may; carrying the CEILING lets the
+-- values and the store trade against each other, and reduces the step
+-- obligation to a comparison between two numerals at states one
+-- `stepFrame` apart.  Both sides of that comparison compute, which the
+-- descent itself does not.
 --
 -- REFUTED: `Refuted.Chain-Step-Store` is why the reading could not be
 --   carried -- nine before one chain and sixteen after, at the instant
@@ -597,63 +619,139 @@ arr-chains-bursts sl id a nextId sched st sleq cok hpz hvc hcl hdp =
 --   clause responsible.  Speed is a constant against that, so the
 --   conclusion side is closed to instantiation permanently and this row
 --   moves only by proof.
--- PROBED: `Probed.Depth-Sighted` reads this side at the second cascade
---   along both axes -- fold depths two and eight, delivered counts two,
---   six and twenty -- and at the width family that drains nothing.
---   Those rows are what killed the two cheaper shapes: a bare factor of
---   two fails forty-nine against forty-four, and a size SUMMAND fails
---   one hundred and ninety-three against one hundred and fourteen at
---   the far end of the count axis.  A THIRD cascade is reached too, on
---   one family at fold depths two and eight, and the ceiling holds
---   there with room -- fifteen against three hundred and forty-eight,
---   fifty-seven against one thousand five hundred and ninety.  Not
---   covered: any instant past the third, and the count axis at the
---   third, which is one family only.
---   The DOUBLING family is covered and is the one axis that turns out
---   not to be one: a step naming its accumulator in both additive
---   slots an inner `scanᵉ` offers -- the family that kills the entry
---   fold's width-free grant -- leaves the descent at TWO across the
---   second instant, the third, and twice the script length, while the
---   ceiling moves eighty-four to ninety-eight.  What that family grows
---   is a SUM over an instant's emitted values and a descent is a JOIN
---   over them, so it cannot reach this side.
---   The reading rows take the whole ROUND rather than one chain, and
---   the round's descent is the join over its chains, so a green round
---   is a green chain -- but that step is an ARGUMENT, so two further
---   rows instantiate this statement at the chain itself, both premises
---   discharged at the tightest value each admits: the slots equation
---   at the schedule's own slots, the store bound at the store's own
---   synchronous maximum, which is the strongest reading since the
---   ceiling is monotone in it.  What those two report is that the chain leaf does
---   not see the delivered COUNT.  The round's descent moves forty-nine
---   to one hundred and ninety-three across that axis while the first
---   chain's stays at seventeen either side, so the growth lives wholly
---   in the join over LATER chains and the states they leave, and no
---   row at any count constrains this leaf along it.
---   EVERY ROW IS TAKEN AT THE STATE ITS ROUND STARTED FROM, and the
---   store slot is that state's own synchronous maximum -- the tightest
---   value the hypothesis admits, since the ceiling is monotone in it.
---   What the rows do NOT reach is the point the consumer spends this
---   at: a chain runs on a state the chains before it moved, and one
---   chain moves the store from nine to sixteen, so a row supplying
---   nine says nothing where the store has passed it.  That gap is why
---   a round threads a cap-denominated `S` rather than its entry store.
---   AND IT IS CLOSED TO INSTANTIATION, which is a coverage boundary
---   and not a sweep nobody ran.  `depthChain` is seconds at a round's
---   entry and does not return at a state a chain has stepped -- at the
---   corpus's SMALLEST family, with the cascade and the step each
---   evaluated once, and worse rather than better one family up.  Since
---   the descent is this statement's whole conclusion, no row here can
---   be taken at a walked state at all, and the store climb is pinned
---   instead.
 postulate
-  chain-depth-sighted : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sl : Slots Γ) (a : Arrival Γ) (nextId : Id) (S : ℕ)
-    (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
-    Sched.slots sched ≡ sl →
-    storeSyncMax sched st ≤ S →
-    depthChain nextId a path sched st
-      ≤ sightCeil (sizeᵉ e) (nestDᵛ (arrTy a) (arrVal a)) S (nestUnit e sl)
+  frame-depth-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+    (sl : Slots Γ) (sf : Gas) (bid : Id) (now : Tick)
+    (f : Frame Γ s u) (p : Path Γ u t) (vals : List (Val Γ s)) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots sched ≡ sl → sf ≡ budgetAt e sl bid →
+    depthFrame sf bid now f p vals fin sched st
+      ≤ sightCeil (sizeᵉ e) (nestDᵛˢ vals) (storeSyncMax sched st) (nestUnit e sl)
+
+  share-fold-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sl : Slots Γ) (sf : Gas) (gas : ℕ) (bid : Id) (now : Tick) (i : Fin n)
+    (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
+    (rid : RegId) (p : Path Γ (lookup Γ i) t)
+    (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots sched ≡ sl → sf ≡ budgetAt e sl bid →
+    depthFold sf gas bid now (Fin.toℕ i) p vals
+      (if fin then close (Fin.toℕ i) exhausted ∷ [] else []) fin sched
+      (record st { delivered = rid ∷ EvalSt.delivered st })
+      ≤ sightCeil (sizeᵉ e) (nestDᵛˢ vals) (storeSyncMax sched st) (nestUnit e sl)
+
+  share-step-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sl : Slots Γ) (sf : Gas) (gas : ℕ) (bid : Id) (now : Tick) (i : Fin n)
+    (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
+    (rid : RegId) (p : Path Γ (lookup Γ i) t)
+    (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots sched ≡ sl → sf ≡ budgetAt e sl bid →
+    (Sched.slots (proj₁ (proj₂ (foldPath sf gas bid now (Fin.toℕ i) p vals
+       (if fin then close (Fin.toℕ i) exhausted ∷ [] else []) fin sched
+       (record st { delivered = rid ∷ EvalSt.delivered st })))) ≡ sl)
+    × (sightCeil (sizeᵉ e) (nestDᵛˢ vals)
+         (storeSyncMax
+            (proj₁ (proj₂ (foldPath sf gas bid now (Fin.toℕ i) p vals
+               (if fin then close (Fin.toℕ i) exhausted ∷ [] else []) fin sched
+               (record st { delivered = rid ∷ EvalSt.delivered st }))))
+            (proj₂ (proj₂ (foldPath sf gas bid now (Fin.toℕ i) p vals
+               (if fin then close (Fin.toℕ i) exhausted ∷ [] else []) fin sched
+               (record st { delivered = rid ∷ EvalSt.delivered st })))))
+         (nestUnit e sl)
+       ≤ sightCeil (sizeᵉ e) (nestDᵛˢ vals) (storeSyncMax sched st) (nestUnit e sl))
+
+-- THE SHARE SINK IS THE SAME INDUCTION ONE LEVEL DOWN, over the
+-- registrations the share admits rather than over the path -- and the
+-- invariant is the same shape, so the weakening down the list is the
+-- identity and only the two state-moving obligations are owed.  What
+-- the fan-out costs is therefore stated at ONE registration, which is
+-- the smallest unit anything here can be instantiated at.
+disp-depth-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (sf : Gas) (gas : ℕ) (bid : Id) (now : Tick) (i : Fin n)
+  (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl → sf ≡ budgetAt e sl bid →
+  depthDisp sf gas bid now i vals fin sched st
+    ≤ sightCeil (sizeᵉ e) (nestDᵛˢ vals) (storeSyncMax sched st) (nestUnit e sl)
+disp-depth-fit {e = e} sl sf gas bid now i vals fin sched st hsl hsf =
+  disp-le D sf gas bid now i vals fin
+    (λ _ sch sto →
+       (Sched.slots sch ≡ sl)
+       × (sightCeil (sizeᵉ e) (nestDᵛˢ vals) (storeSyncMax sch sto) (nestUnit e sl) ≤ D))
+    (λ g rid p ps sch sto q →
+       ≤-trans (share-fold-fit sl sf g bid now i vals fin rid p sch sto (proj₁ q) hsf)
+               (proj₂ q))
+    (λ rid p ps sch sto q → q)
+    (λ g rid p ps sch sto q →
+       proj₁ (share-step-fit sl sf g bid now i vals fin rid p sch sto (proj₁ q) hsf)
+       , ≤-trans (proj₂ (share-step-fit sl sf g bid now i vals fin rid p sch sto
+                           (proj₁ q) hsf))
+                 (proj₂ q))
+    sched st
+    (hsl , ≤-reflexive (cong (λ z → sightCeil (sizeᵉ e) (nestDᵛˢ vals) z (nestUnit e sl))
+                             (latch-sync i fin sched st)))
+  where
+  D : ℕ
+  D = sightCeil (sizeᵉ e) (nestDᵛˢ vals) (storeSyncMax sched st) (nestUnit e sl)
+
+postulate
+  chain-fit-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+    (sl : Slots Γ) (sf : Gas) (bid : Id) (now : Tick)
+    (f : Frame Γ s u) (p : Path Γ u t) (vals : List (Val Γ s)) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots sched ≡ sl → sf ≡ budgetAt e sl bid →
+    (Sched.slots (proj₁ (proj₂ (proj₂ (proj₂
+       (stepFrame sf bid now f p vals fin sched st))))) ≡ sl)
+    × (sightCeil (sizeᵉ e)
+         (nestDᵛˢ (proj₁ (stepFrame sf bid now f p vals fin sched st)))
+         (storeSyncMax (proj₁ (proj₂ (proj₂ (proj₂
+                          (stepFrame sf bid now f p vals fin sched st)))))
+                       (proj₂ (proj₂ (proj₂ (proj₂
+                          (stepFrame sf bid now f p vals fin sched st))))))
+         (nestUnit e sl)
+       ≤ sightCeil (sizeᵉ e) (nestDᵛˢ vals) (storeSyncMax sched st) (nestUnit e sl))
+
+-- the position's ceiling, still under the one the round stated
+ChainFit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (sl : Slots Γ) (C : ℕ)
+  {v} → Path Γ v t → List (Val Γ v) → Bool → Sched Γ → EvalSt e → Set
+ChainFit {e = e} sl C p vals _ sch sto =
+  (Sched.slots sch ≡ sl)
+  × (sightCeil (sizeᵉ e) (nestDᵛˢ vals) (storeSyncMax sch sto) (nestUnit e sl) ≤ C)
+
+chain-depth-sighted : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (a : Arrival Γ) (nextId : Id) (S : ℕ)
+  (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  storeSyncMax sched st ≤ S →
+  depthChain nextId a path sched st
+    ≤ sightCeil (sizeᵉ e) (nestDᵛ (arrTy a) (arrVal a)) S (nestUnit e sl)
+chain-depth-sighted {n = n} {e = e} sl a nextId S path sched st hsl hS =
+  fold-le C sf n nextId (arrTick a) (arrSource a)
+    (λ {v} → ChainFit sl C {v})
+    (λ f p′ vals fin sch sto h →
+       ≤-trans (frame-depth-fit sl sf nextId (arrTick a) f p′ vals fin sch sto
+                  (proj₁ h) hsf)
+               (proj₂ h))
+    (λ i vals fin sch sto h →
+       ≤-trans (disp-depth-fit sl sf n nextId (arrTick a) i vals fin sch sto
+                  (proj₁ h) hsf)
+               (proj₂ h))
+    (λ f p′ vals fin sch sto h →
+       proj₁ (chain-fit-step sl sf nextId (arrTick a) f p′ vals fin sch sto
+                (proj₁ h) hsf)
+       , ≤-trans (proj₂ (chain-fit-step sl sf nextId (arrTick a) f p′ vals fin
+                           sch sto (proj₁ h) hsf))
+                 (proj₂ h))
+    path (arrVal a ∷ [])
+    (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
+    (Arrival.isLast a) sched st
+    (hsl , sightCeil-mono (sizeᵉ e) (nestUnit e sl) (⊔-lub ≤-refl z≤n) hS)
+  where
+  C : ℕ
+  C = sightCeil (sizeᵉ e) (nestDᵛ (arrTy a) (arrVal a)) S (nestUnit e sl)
+  sf : Gas
+  sf = budgetAt e (Sched.slots sched) nextId
+  hsf : sf ≡ budgetAt e sl nextId
+  hsf = cong (λ z → budgetAt e z nextId) hsl
 
 -- AND THE BOUND SURVIVES A CHAIN, which is the other half of the same
 -- design: the round states its ceiling once and spends it at every

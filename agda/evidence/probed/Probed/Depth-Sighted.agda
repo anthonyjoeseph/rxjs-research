@@ -43,7 +43,6 @@
 -- ceiling admits and so the strongest reading: the grant is monotone
 -- in it, so a row holding here holds at every legal `descW` bound.
 -- TARGET: sight-all-walk @b9a208
--- TARGET: chain-depth-sighted @a192df
 module Probed.Depth-Sighted where
 
 open import Data.Nat using (ℕ; suc; _+_; _*_; _^_; _≤ᵇ_; _≤_)
@@ -76,8 +75,6 @@ open import Refuted.Demand-Programs
   using (Γ₂; progU; progF; insT; insF; sucGU; sucGF; asyncNats)
 open import Verify-Budget-Sufficient.Caps-Depth
   using (depthE; depthCascade; depthChain; depthFrame)
-open import Verify-Budget-Sufficient.Caps-Face.Part7.Arrival-Caps
-  using (chain-depth-sighted)
 open import Verify-Budget-Sufficient.Nest-Store
   using (storeNestMax; storeSyncMax; nestUnit; sightCeil; pathNestD; sightCeil-mono;
          fitB)
@@ -442,10 +439,6 @@ chainDesc = depthChain 2 uArr uPth uSc uSt
 
 chainDesc≡ : chainDesc ≡ 17
 
-chainRow : Confirms
-  (chain-depth-sighted (Sched.slots uSc) uArr 2 (storeSyncMax uSc uSt)
-     uPth uSc uSt refl ≤-refl)
-chainRow = ≤ᵇ⇒≤ _ _ tt
 
 -- AND THE SAME TIE AT THE FAR END OF THE COUNT AXIS -- WHERE THE
 -- READING IS THAT THE CHAIN LEAF DOES NOT SEE THAT AXIS AT ALL, which
@@ -480,10 +473,6 @@ farDesc = depthChain 2 fArr fPth fSc fSt
 
 farDesc≡ : farDesc ≡ 17
 
-farChainRow : Confirms
-  (chain-depth-sighted (Sched.slots fSc) fArr 2 (storeSyncMax fSc fSt)
-     fPth fSc fSt refl ≤-refl)
-farChainRow = ≤ᵇ⇒≤ _ _ tt
 
 -- AND THE STORE A CHAIN LEAVES BEHIND IT, which is where the consumer
 -- spends this leaf and where every row above stands nowhere near.  A
