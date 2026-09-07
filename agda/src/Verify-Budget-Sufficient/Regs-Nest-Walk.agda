@@ -1234,6 +1234,20 @@ postulate
   --   reading fails at both.  So the summand REACHES the written table,
   --   never that its size is right: one slot, one queue entry, and the
   --   merging door alone.
+  -- PROBED: `Probed.Slot-Cascade-Store` at a STRATIFIED telescope, where
+  --   the connect re-enters this door on the definition it resolves and
+  --   one subscription walks a chain of slots the call never names.
+  --   Every upper slot is a bare reference, so the subscribed slot's own
+  --   reading is one unit of syntax while the slot the cascade lands on
+  --   holds the emission.  Read at one hop and at two: the stated sum
+  --   holds, and the charge over the named slot, the charge over the
+  --   named slot plus the one passed through, and the telescope-free
+  --   charge all fail.  So the summand is owed the connect's TRANSITIVE
+  --   reach and not the reference's entry -- which is a claim about the
+  --   slots it ranges over.  Whether it is a sum or a maximum is not
+  --   reachable: the charge is geometric in the summand, so the largest
+  --   slot alone clears the table by a margin that would need a stored
+  --   value of half a million units to cross.
   subscribeSharedSlot-sz-store : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (g : Gas) (i : Fin n) (d : Closed Γ (lookup Γ i))
     (κ : Path Γ (lookup Γ i) t) (id : Id) (now : Tick)
@@ -1282,6 +1296,13 @@ postulate
   --   short.  One chain, of one length, with the telescope a single
   --   scripted slot -- so nothing about a chain whose cells resolve a
   --   SLOT, where the summand would do the work.
+  -- PROBED: `Probed.Slot-Cascade-Store` at exactly that shape, a scan
+  --   whose source is a bare reference to a SHARED slot, so subscribing
+  --   the cell connects the definition behind it.  The term's own
+  --   descent charge is ONE there -- which is the whole of what reading
+  --   the program buys when the reference charges nought -- and the
+  --   summand carries the climb: the stated charge holds and the
+  --   telescope-free one fails.  One slot, one connect, no queue.
   subscribeE-sz-store-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u s}
     (sl : Slots Γ) (g : Gas) (f : Fn Γ [] [] [] (u ×ᵗ s) u)
     (z : Tm Γ [] [] [] u) (b : Closed Γ s) (κ : Path Γ u t)

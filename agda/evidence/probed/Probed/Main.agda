@@ -86,7 +86,8 @@ open import Probed.Depth-Sighted
          third2Figs≡; cornerFigs≡; rootWideFigs≡; seedFigs≡;
          rootRow≡; rootWideRow≡; seedRow≡; dblFigs≡; dblLongFigs≡;
          chainDesc≡; chainRow; farDesc≡; farChainRow;
-         walkFigs≡; walkRow≡; tieWalk1; tieWalk4)
+         walkFigs≡; walkRow≡; tieWalk1; tieWalk4;
+         stepStore≡)
 open import Probed.Sight-Fit-Width
   using (figures≡; oldRow≡; newRow≡; tie12; tie13; tie16)
 
@@ -154,6 +155,13 @@ open import Probed.Parked-Queue-Store
 open import Probed.Parked-Slot-Store
   using (slotStoreFigures≡; slotStoreNodes≡; slotStoreRows≡;
          tieParkedSlot12; tieParkedSlot13)
+
+open import Probed.Slot-Cascade-Store
+  using (hopFigures≡; hopRows≡; farRows≡; scanFigures≡; scanRows≡;
+         tieHop; tieFar; tieScan)
+
+open import Probed.Regs-Store-Currency
+  using (figures≡; verdicts≡; separates)
 
 open import Probed.Drain-Count-Slot
   using (slotCharges≡; slotRows≡; tieDrainSlot12; tieDrainSlot13)

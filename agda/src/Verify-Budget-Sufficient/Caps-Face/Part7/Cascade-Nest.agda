@@ -202,7 +202,11 @@ cascadeGo-nest-nodes {n = n} {e = e} sl id a nextId chains sched st hsl hcaps hn
 --   it is the only region that could move this component: a walk that
 --   leaves a registration STANDING whose path is deeper than any the
 --   store held, which is what the `nestUnit` factor of the increment
---   would have to pay for.  No family reaches it, so the reading is a
+--   would have to pay for.  No family here reaches it -- though the
+--   SUBSCRIBE face does, where `Refuted.Reg-Nest-Reached` leaves five
+--   registrations standing at a depth the unit does not cover, so the
+--   region is one this face has not driven rather than one no run
+--   enters.  The reading is therefore a
 --   receipt about retirement rather than about the bound.  TIED at the
 --   demand family, with the three cap premises LEFT STANDING as the
 --   seal forces, so the row asserts the conclusion with the caps

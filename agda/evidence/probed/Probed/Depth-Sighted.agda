@@ -68,7 +68,8 @@ open import Data.Unit using (tt)
 open import Rx.Evaluator
   using (Sched; EvalSt; subscribeE; sched-init; st-init; root; sched-next;
          cascade; cascadeLatch; chainsOf; arrTy; arrVal; budgetAt; LiveSource;
-         Arrival; Path; thru-outer; mergeAllᵒ; installNode; mergeAll-st)
+         Arrival; Path; thru-outer; mergeAllᵒ; installNode; mergeAll-st;
+         chainStep)
 open import Rx.Nest-Depth using (nestDᵛ; nestDᵉ)
 
 open import Refuted.Demand-Programs
@@ -484,6 +485,49 @@ farChainRow : Confirms
      fPth fSc fSt refl ≤-refl)
 farChainRow = ≤ᵇ⇒≤ _ _ tt
 
+-- AND THE STORE A CHAIN LEAVES BEHIND IT, which is where the consumer
+-- spends this leaf and where every row above stands nowhere near.  A
+-- round's store is not fixed under its own walk, so a point taken at
+-- the entry is a point about the state the round STARTED from: the
+-- store the rows above discharge reflexively is nine, and one chain
+-- later it is sixteen.  The hypothesis is `≤ S`, so a row at the entry
+-- says nothing about a point where the store has passed the number
+-- that row supplied -- which is why a round threads a cap-denominated
+-- `S` rather than the store it started from, and it is visible here as
+-- two numbers rather than as an appeal to the round's assembly.
+--
+-- AND THE DESCENT AT THAT STATE IS BLOCKED, WHICH IS A FINDING ABOUT
+-- WHAT CAN BE INSTANTIATED AND NOT A GAP IN THE SWEEPING.  `depthChain`
+-- is cheap at the entry -- `chainDesc` pins it at seventeen, seconds of
+-- checking -- and does not return at a state a chain has stepped, at
+-- this corpus's SMALLEST family and with the cascade and the step each
+-- evaluated once.  Neither does the leaf's own tie there, since it
+-- reads the same descent.  So the conclusion side, which is what makes
+-- every row above a row, closes to instantiation at exactly the point
+-- the consumer uses; the store side stays open and is what is pinned.
+-- Widening the family only makes it worse: the next one up exhausts
+-- memory rather than time.
+-- LOAD-BEARING ON THE CLIMB, and it is the ONE quantity of the three
+-- this section wanted that can be read at all: the chain count, and the
+-- store either side of the step, at the same point `chainDesc` is
+-- pinned at.  A round opening ONE chain still moves the store by seven
+-- across it, so the movement is not an artefact of later chains piling
+-- up -- the first chain alone leaves the number the entry row
+-- discharged behind.
+stepStore : ℕ
+stepStore with sched-next (proj₁ (after1 (progU 8 2) slotsF (sucGU 1 2 2 8 2)))
+... | inj₁ _        = 0
+... | inj₂ (a , sd) with chainsOf a (proj₂ (after1 (progU 8 2) slotsF (sucGU 1 2 2 8 2)))
+...   | []            = 0
+...   | (_ , c) ∷ cs =
+        let st₀ = cascadeLatch a (proj₂ (after1 (progU 8 2) slotsF (sucGU 1 2 2 8 2)))
+            r   = chainStep 2 a c sd st₀
+        in suc (length cs)
+         + 1000 * storeSyncMax sd st₀
+         + 1000000 * storeSyncMax (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+
+stepStore≡ : stepStore ≡ 16009001
+
 rootFigs≡ = refl
 rootRow≡ = refl
 chainDesc≡ = refl
@@ -498,6 +542,7 @@ thirdFigs≡ = refl
 third2Figs≡ = refl
 cornerFigs≡ = refl
 rootWideFigs≡ = refl
+stepStore≡ = refl
 
 
 -- ── THE SCAN'S OWN SEED, which is the one shape the corpus above has
