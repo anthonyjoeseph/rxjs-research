@@ -277,3 +277,7 @@ open import Refuted.Drain-Queue-Slot
 open import Refuted.Walk-Burst-Rung
   using (WidthAtOwnInstant; Γ₀; sl₀; e₀; S; K; 2≤S; 2≤K; 1<sucK;
          S<climb; climb≤burst; walk-burst-rung-absurd)
+open import Refuted.Share-Step-Scan
+  using (census≡41; storeBefore≡2; storeAfter≡3;
+         ceilBefore≡78; ceilAfter≡91; chainAfter≡130;
+         share-step-scan-absurd; chain-fit-scan-absurd)
