@@ -215,15 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE VALUES-IN-FLIGHT PAIRING, WHICH IS WHAT THE SLOT-SOURCED MINT
-  TURNED OUT TO COST.** The descent stratum pays four of the five
-  registrations and is preserved at every arm by construction. The
-  fifth cannot take a premise at all — the reason is in
-  `walk-share-strat`'s header — so its fact is owed to the invariant
-  record, which pairs no stored value with the continuation it will be
-  delivered under. The commit states that conjunct and asks whether
-  delivery preserves it. The risk is SHAPE: a pairing keyed on the node
-  the value sits in may not survive a frame step.
+- **THE FLOOR AS A WALK PARAMETER, WHICH IS WHAT THE SLOT-SOURCED MINT
+  TURNED OUT TO COST.** The descent stratum pays four of the mint's
+  five registrations for nothing. The fifth subscribes a DELIVERED
+  observable and needs the floor as a fact about the VALUE, which the
+  inner-subscribe family's value predicate cannot state — the reason,
+  and why it stays mechanical, is in `walk-share-strat`'s header. The
+  commit carries the floor into the caps face's own value vocabulary,
+  where it is a parameter rather than an index because a hop does not
+  move it. The risk is SHAPE: the predicate is spelled out again at the
+  walk's binder, so a floor the binder cannot see restates nothing.
 
 - **THE DELIVERED SUMMAND AT THE ROW'S OWN BUDGET, which is the one
   region the split's evidence declines to reach.** `burst-regs-split`

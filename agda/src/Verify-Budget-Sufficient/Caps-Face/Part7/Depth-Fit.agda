@@ -1547,7 +1547,7 @@ postulate
 -- descent has stepped.  Source and sink are both fixed when an entry
 -- is minted, so nothing here moves with a cap at all and the direction
 -- that elimination needs does not exist.
---
+
 -- AND THE ROUTE TO IT IS A DESCENT-CARRIED STRATUM, WHICH PAYS FOUR OF
 -- THE MINT'S FIVE REGISTRATION SITES AND CANNOT REACH THE FIFTH.  Read
 -- the continuation's terminal as a FLOOR -- the slot index at a sink,
@@ -1559,17 +1559,19 @@ postulate
 -- the slot constructor's stratification field, the fixpoint arm from
 -- `ib-unfoldμ`, and at an input arm the carried form reduces
 -- definitionally to the very guard the registration wants.
--- DEAD ROUTE: threading that stratum as a PREMISE of the descent, which
---   is the shape those arms ask for.  The inner-subscribe family is
---   passed HIGHER-ORDER to the walk, at sites across the ring
---   vocabulary, the arrival face and the caps bridge, so its signature
---   is fixed by the walk's binder rather than by the descent -- and the
---   fifth site is the arm subscribing a DELIVERED observable, which
---   inherits the floor unchanged while its syntax is not the enclosing
---   definition's at all.  That arm's fact therefore cannot be a premise
---   on any signature reachable from where it is spent, and is owed to
---   the invariant record, which today pairs no stored value with the
---   continuation it will be delivered under.
+
+-- AND THE FIFTH IS AN ARM THE DESCENT DOES NOT REACH, so the stratum
+-- has to arrive there as a fact about the VALUE.  That arm subscribes a
+-- DELIVERED observable, whose syntax is not the enclosing definition's
+-- at all, and the value predicate the inner-subscribe family carries
+-- reads caps and slots and no path -- so it cannot state a floor.  That
+-- family is also passed HIGHER-ORDER to the walk, its whole type
+-- spelled out again there, so strengthening the predicate is a
+-- restatement across the caps face rather than an added premise.  What
+-- keeps it mechanical is that the floor is INVARIANT along a hop: it
+-- moves only where a share descent renews it, so it is a parameter of a
+-- WALK rather than an index on a value, and the walk's value vocabulary
+-- is already a boolean closing over the caps and the slots.
 
 -- AND IT IS OWED TO THE WALK'S BUNDLE RATHER THAN STATED FREE, because
 -- the free form is false: the obligations that would establish it are
