@@ -42,7 +42,8 @@ open import Verify-Budget-Sufficient.Fold-Room using (reached-len; suc≤iterL)
 open import Verify-Budget-Sufficient.Caps-Depth using
   (depthFold; depthShareGo; lub3-l; lub3-m; lub3-r)
 open import Verify-Budget-Sufficient.Deliver-Measure using
-  (shareAdmit-len; shareAdmit-sz; admSz?)
+  (shareAdmit-len; shareAdmit-sz; admSz?; admEntry?)
+open import Rx.Inputs-Below using (ib-monoᵛ)
 open import Rx.Evaluator using (Sched; EvalSt; RegId; mergeAll-st; lookupNode; NodeId; _↠_; Frame; AllOp; map-f; scan-f;
   take-f; from-inner; thru-outer; Path; stepFrame; regAt; share-sink; root; dCapᶜ; fLvlD; lvls;
   shareAdmit; shareLatch; thruConsume; switchKill; subscribeInner; mergeAllᵒ; sizeAt; widAt)
@@ -75,33 +76,48 @@ open import Decide using (T-to)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Ring-Vocabulary using
   (RingState; WalkHyps; ent-infl; floor-parts; frameStep-regAt; regs-exit; ring-room; ringFold; sink-deliv-cap; sink-entry-ladder; sink-step-caps; walk-frame-clos)
 
--- WHERE A WALK'S STRATIFICATION READING COMES FROM AT ITS ENTRY, and
--- the honest answer today is nowhere.  Both faces that enter a walk
--- need it and neither can rearrange it out of what it holds: the ring
--- enters at an admitted REGISTRATION, whose path and delivered values
--- are the registry's rather than the walk's, and the cascade enters
--- at an ARRIVAL, whose value is the source's.  Six of the walk's
--- seven other hypotheses are rearrangements of the round package;
--- these two are not.
+-- WHERE A WALK'S STRATIFICATION READING COMES FROM AT ITS ENTRY.  Both
+-- faces that enter a walk need it and neither can rearrange it out of
+-- what it holds: the ring enters at an admitted REGISTRATION, whose
+-- path and delivered values are the registry's rather than the walk's,
+-- and the cascade enters at an ARRIVAL, whose value is the source's.
+-- Six of the walk's seven other hypotheses are rearrangements of the
+-- round package; these two are not.
 --
--- AND A CONJUNCT ON THE RECEIPT CANNOT REACH EITHER OF THEM, which is
--- what separates this pair from the frame's hop rather than joining
--- them to it.  The receipt names the caps, the schedule and the state;
--- the path and the values are quantified AFTER it and appear in no
--- hypothesis.  So each statement says "if `capsOK?` is satisfiable at
--- all, every path (every value) is stratified", and no strengthening
--- of a predicate over the store changes a word of that -- the
--- quantifier, not the receipt's contents, is what is wrong.
+-- AND NO CONJUNCT ON THE RECEIPT CAN REACH A FREE FORM OF EITHER,
+-- which is what separates this pair from the frame's hop rather than
+-- joining them to it.  A receipt names the caps, the schedule and the
+-- state; a path and its values quantified AFTER it appear in no
+-- hypothesis, so such a statement reads "if `capsOK?` is satisfiable
+-- at all, every path (every value) is stratified", and strengthening a
+-- predicate over the store changes not a word of it.
 --
--- WHAT THE RESTATEMENT OWES IS A MEMBERSHIP PREMISE, not a stronger
--- receipt: the path and the values have to be tied to the store the
--- receipt is about, and both entries can supply the tie -- the ring
--- from its admitted registration, the cascade from its live source.
--- A store conjunct is then what the membership is spent AGAINST, so it
--- is still owed; it is just not sufficient on its own.  The frame's
--- hop is the contrasting case and is repairable by a conjunct alone,
--- because the value it is missing is a store node its hypotheses
--- already reach.
+-- SO THE SUBJECT IS WHAT MOVES, NOT THE RECEIPT.  The ring's entry
+-- path is not an arbitrary path: it is one the SHARE ADMITTED, so it
+-- is read out of the state the receipt is already about, and a
+-- statement over that list is a statement the store can answer.  The
+-- values need no second claim at all -- the sink's own walk already
+-- knows them below `share-sink i`'s floor, which is `i`, so an
+-- admitted continuation whose floor is at or above `i` inherits them
+-- by `ib-monoᵛ`.  That is why `admEntry?` carries the floor ordering
+-- beside the stratification: one premise, spent twice.
+postulate
+  sink-admit-entry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (c : Caps) (i : Fin n) (sched : Sched Γ) (st : EvalSt e) →
+    capsOK? c sched st ≡ true →
+    admEntry? {t = t} (Fin.toℕ i) (shareAdmit i (EvalSt.registry st)) ≡ true
+
+-- AND THE CASCADE'S ENTRY IS THE HALF THAT MOVE DOES NOT REACH, so the
+-- free pair stands here rather than being reissued under a fresh name.
+-- An arrival's chain comes off `chainsOf` and its value is the
+-- source's, and neither is tied here to the state, so a statement over
+-- the admitted list says nothing about either.  What the move above
+-- buys the pair is CONSUMERS: one entry each rather than two, so the
+-- region either can go wrong in is the cascade's alone.  The fix when
+-- it comes is the same one -- name the subject the store can answer
+-- for, which for a cascade is its LIVE source -- and reissuing either
+-- shape under a new name before then would carry the defect across
+-- with the witnesses left pointing elsewhere.
 --
 -- REFUTED: `Refuted.Walk-Entry-Strat.walk-path-strat-absurd` kills the
 --   free path form at one frame over a sink -- a `map` whose template
@@ -116,8 +132,6 @@ open import Verify-Budget-Sufficient.Caps-Face.Part7.Ring-Vocabulary using
 --   not a corollary. `Val Γ (obs t)` is an arbitrary closed
 --   expression, so nothing about the telescope constrains what an
 --   entered value may name.
---   Not covered: whether any membership premise the two entries can
---   actually supply is enough, which is the restatement's own question.
 postulate
   walk-path-strat : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (p : Path Γ u t) (sched : Sched Γ) (st : EvalSt e) →
@@ -153,19 +167,27 @@ sink-entry-hyps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (if fin then close (Fin.toℕ i) exhausted ∷ [] else []) fin sched
     (record st { delivered = rid ∷ EvalSt.delivered st })
     ≤ capsH e sl id →
+  pathStrat? p ≡ true →
+  (Fin.toℕ i ≤ᵇ pathFloor p) ≡ true →
+  all (inputsBelowᵛ (Fin.toℕ i) (lookup Γ i)) vals ≡ true →
   WalkHyps sl id Lv sf gas nid now (Fin.toℕ i) p vals
     (if fin then close (Fin.toℕ i) exhausted ∷ [] else []) fin sched
     (record st { delivered = rid ∷ EvalSt.delivered st })
-sink-entry-hyps {e = e} sl id sf gas nid now i vals fin rid p Lv J g k sched st
-  RS@(sleq , cok , hvc , hcl , _) hpz hi hdf =
+sink-entry-hyps {Γ = Γ} {e = e} sl id sf gas nid now i vals fin rid p Lv J g k sched st
+  RS@(sleq , cok , hvc , hcl , _) hpz hi hdf hstp hflr hib =
     sleq
   , capsOK?-delivered (frameStep Lv (capsAt e sl id)) rid sched st cok
   , hvc
   , hcl
   , hpz
   , hdf
-  , walk-vals-strat (frameStep Lv (capsAt e sl id)) p vals sched st cok
-  , walk-path-strat (frameStep Lv (capsAt e sl id)) p sched st cok
+  , all-impl (inputsBelowᵛ (Fin.toℕ i) (lookup Γ i))
+             (inputsBelowᵛ (pathFloor p) (lookup Γ i))
+             (λ v hv → ib-monoᵛ (Fin.toℕ i) (pathFloor p)
+                         (≤ᵇ⇒≤ (Fin.toℕ i) (pathFloor p) (T-to hflr))
+                         (lookup Γ i) v hv)
+             vals hib
+  , hstp
   , sink-entry-ladder sl id i vals p gas Lv J g k sched st RS hpz hi
 
 -- AND WHAT ONE TURN OF THE RING LEAVES, WHICH IS THE PACKAGE AGAIN ONE
@@ -248,13 +270,18 @@ sink-entry-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (if fin then close (Fin.toℕ i) exhausted ∷ [] else []) fin sched
     (record st { delivered = rid ∷ EvalSt.delivered st })
     ≤ capsH e sl id →
+  pathStrat? p ≡ true →
+  (Fin.toℕ i ≤ᵇ pathFloor p) ≡ true →
+  all (inputsBelowᵛ (Fin.toℕ i) (lookup Γ i)) vals ≡ true →
   capsWalkOK (capsAt e sl id) (capsAt e sl (suc id)) sl (capsH e sl id) Lv sf gas nid now
     p vals fin sched (record st { delivered = rid ∷ EvalSt.delivered st })
-sink-entry-caps sl id sf gas nid now i vals fin rid p Lv J g k sched st RS hpz hi hdf =
+sink-entry-caps sl id sf gas nid now i vals fin rid p Lv J g k sched st RS hpz hi hdf
+  hstp hflr hib =
   chain-walk-caps sl id Lv sf gas nid now (Fin.toℕ i) p vals
     (if fin then close (Fin.toℕ i) exhausted ∷ [] else []) fin sched
     (record st { delivered = rid ∷ EvalSt.delivered st })
-    (sink-entry-hyps sl id sf gas nid now i vals fin rid p Lv J g k sched st RS hpz hi hdf)
+    (sink-entry-hyps sl id sf gas nid now i vals fin rid p Lv J g k sched st RS hpz hi hdf
+       hstp hflr hib)
 
 -- THE RING, AND IT IS THE RECURSION AND NOTHING ELSE.  A cancelled
 -- registration is skipped at the position it was reached at; a live one
@@ -271,19 +298,24 @@ sink-ring-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sched : Sched Γ) (st : EvalSt e) →
   RingState {t = t} sl id i vals gas Lv J g k sched st →
   admSz? (Caps.cSize (frameStep L₀ (capsAt e sl id))) ps ≡ true →
+  admEntry? (Fin.toℕ i) ps ≡ true →
+  all (inputsBelowᵛ (Fin.toℕ i) (lookup Γ i)) vals ≡ true →
   L₀ ≤ Lv →
   k + length ps ≤ regAt (Caps.cSize (capsAt e sl id)) (Caps.cReg (capsAt e sl id)) J →
   depthShareGo sf gas nid now i vals fin ps sched st ≤ capsH e sl id →
   shareCapsOK (capsAt e sl id) (capsAt e sl (suc id)) sl (capsH e sl id) Lv sf gas nid now
     i vals fin ps sched st
-sink-ring-go sl id sf gas nid now i vals fin [] L₀ Lv J g k sched st RS hadm hL₀ hlen hdp = tt
+sink-ring-go sl id sf gas nid now i vals fin [] L₀ Lv J g k sched st RS hadm hent hib hL₀ hlen hdp = tt
 sink-ring-go {n = n} {e = e} sl id sf gas nid now i vals fin ((rid , p) ∷ ps) L₀ Lv J g k sched st
-  RS hadm hL₀ hlen hdp
+  RS hadm hent hib hL₀ hlen hdp
   with any (_≡ᵇ rid) (EvalSt.cancelled st)
 ... | true =
   sink-ring-go sl id sf gas nid now i vals fin ps L₀ Lv J g k sched st RS
     (proj₂ (∧-true (pathSz? (Caps.cSize (frameStep L₀ (capsAt e sl id))) p)
                    (admSz? (Caps.cSize (frameStep L₀ (capsAt e sl id))) ps) hadm))
+    (proj₂ (∧-true (pathStrat? p ∧ (Fin.toℕ i ≤ᵇ pathFloor p))
+                   (admEntry? (Fin.toℕ i) ps) hent))
+    hib
     hL₀
     (≤-trans (+-monoʳ-≤ k (n≤1+n (length ps))) hlen)
     (lub3-l (depthShareGo sf gas nid now i vals fin ps sched st)
@@ -296,12 +328,15 @@ sink-ring-go {n = n} {e = e} sl id sf gas nid now i vals fin ((rid , p) ∷ ps) 
             hdp)
 ... | false =
     sink-entry-caps sl id sf gas nid now i vals fin rid p Lv J g k sched st RS hpzL HI
-      (lub3-m DA DB DC hdp)
+      (lub3-m DA DB DC hdp) (proj₁ hentH) (proj₂ hentH) hib
   , L′
   , ring-room c d g J k (Lv + L′) 2≤S HI hR (proj₂ (proj₂ (proj₂ (proj₂ (proj₂
       (proj₂ RS₁))))))
   , sink-ring-go sl id sf gas nid now i vals fin ps L₀ (Lv + L′) J g (suc k) sched₁ st₁ RS₁
       (proj₂ (∧-true (pathSz? B₀ p) (admSz? B₀ ps) hadm))
+      (proj₂ (∧-true (pathStrat? p ∧ (Fin.toℕ i ≤ᵇ pathFloor p))
+                     (admEntry? (Fin.toℕ i) ps) hent))
+      hib
       (≤-trans hL₀ (m≤m+n Lv L′))
       (subst (_≤ regAt (Caps.cSize c) (Caps.cReg c) J) (+-suc k (length ps)) hlen)
       (lub3-r DA DB DC hdp)
@@ -316,6 +351,9 @@ sink-ring-go {n = n} {e = e} sl id sf gas nid now i vals fin ((rid , p) ∷ ps) 
                       (s≤s (m≤m+n k (length ps))))
                hlen
   hpz = proj₁ (∧-true (pathSz? B₀ p) (admSz? B₀ ps) hadm)
+  hentH = ∧-true (pathStrat? p) (Fin.toℕ i ≤ᵇ pathFloor p)
+            (proj₁ (∧-true (pathStrat? p ∧ (Fin.toℕ i ≤ᵇ pathFloor p))
+                           (admEntry? (Fin.toℕ i) ps) hent))
   sched₁ = proj₁ (ringFold sf gas nid now i vals fin rid p sched st)
   st₁    = proj₂ (ringFold sf gas nid now i vals fin rid p sched st)
   st′ = record st { delivered = rid ∷ EvalSt.delivered st }
@@ -362,7 +400,7 @@ walk-sink-caps sl id L sf zero nid now src i vals evs fin sched st H = tt
 walk-sink-caps sl id L sf (suc gas) nid now src i vals evs fin sched st
   (_ , _ , _ , _ , _ , _ , _ , _ , (zero , _ , () , _ , _))
 walk-sink-caps {n = n} {Γ = Γ} {t = t} {e = e} sl id L sf (suc gas) nid now src i vals evs fin sched st
-  (sleq , cok , hvc , hcl , _ , hdp , _ , _ , (suc g₀ , P , hfl , hlvP , hR)) =
+  (sleq , cok , hvc , hcl , _ , hdp , hib , _ , (suc g₀ , P , hfl , hlvP , hR)) =
     shareAdmit-sz i (Caps.cSize (capsAt e sl (suc id))) (EvalSt.registry st)
       (regs-exit sl id L sched st L≤TOP cok)
   , ≤-trans (shareAdmit-len i (EvalSt.registry st))
@@ -379,6 +417,8 @@ walk-sink-caps {n = n} {Γ = Γ} {t = t} {e = e} sl id L sf (suc gas) nid now sr
       , hfl₀ , hR , hL₀ )
       (shareAdmit-sz i (Caps.cSize (frameStep L c)) (EvalSt.registry st)
          (capsOK?-regs (frameStep L c) sched st cok))
+      (sink-admit-entry (frameStep L c) i sched st cok)
+      hib
       ≤-refl
       hlen₀
       hdp

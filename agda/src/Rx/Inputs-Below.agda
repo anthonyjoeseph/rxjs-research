@@ -29,11 +29,13 @@ module Rx.Inputs-Below where
 
 open import Data.Bool using (Bool; true; false; T; _∧_)
 open import Data.Unit using (tt)
-open import Data.Nat  using (ℕ)
+open import Data.Nat  using (ℕ; _≤_)
 open import Data.List using (List; []; _∷_)
 open import Data.Sum  using (inj₁; inj₂)
+open import Data.Product using (_,_)
+open import Data.Fin using (toℕ)
 open import Data.Fin.Properties using (toℕ<n)
-open import Data.Nat.Properties using (<⇒<ᵇ)
+open import Data.Nat.Properties using (<⇒<ᵇ; <ᵇ⇒<; ≤-trans)
 open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; subst; cong₂)
 
@@ -52,8 +54,10 @@ open import Rx.Exp using (Ctx; Exp; Tm; Closed; Ren∈; ext∈;
                           μᵉ; varᵉ; deferᵉ;
                           varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ;
                           inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ;
-                          inputsBelowᵉ; inputsBelowᵗ; inputsBelowᵗˢ)
-open import Decide using (∧ʳ; ∧ˡ)
+                          inputsBelowᵉ; inputsBelowᵗ; inputsBelowᵗˢ;
+                          Ty; Val; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs;
+                          inputsBelowᵛ)
+open import Decide using (∧ʳ; ∧ˡ; T-to; T⇒≡true)
 
 -- The introduction rule the projections in `Decide` are missing.  The
 -- Bools are explicit for the same reason they are there: `T` is a
@@ -362,3 +366,113 @@ mutual
     T (inputsBelowᵗˢ n ts)
   ib-topᵗˢ []       = tt
   ib-topᵗˢ (y ∷ ys) = ∧⁺ _ _ (ib-topᵗ y) (ib-topᵗˢ ys)
+
+------------------------------------------------------------------
+-- RAISING THE FLOOR ONLY WEAKENS THE READING.  `input i` is the sole
+-- arm that consults the floor at all, and there the obligation is one
+-- transitivity; every other clause is a congruence, walked only so
+-- that the widening reaches each occurrence.
+--
+-- THE BOOLS ARE WRITTEN OUT for the reason `∧⁺` states above: `_∧_`
+-- is a defined function, so a hypothesis of the form `T (a ∧ b)`
+-- cannot have its halves recovered by unification and an eliminator
+-- with implicit Bools leaves a meta per split.
+mutual
+  ib-monoᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (k k′ : ℕ) → k ≤ k′ →
+    (e : Exp Γ Δᵍ Δ Θ t) →
+    T (inputsBelowᵉ k e) → T (inputsBelowᵉ k′ e)
+  ib-monoᵉ k k′ le (input i)       h = <⇒<ᵇ (≤-trans (<ᵇ⇒< (toℕ i) k h) le)
+  ib-monoᵉ k k′ le (ofᵉ ts)        h = ib-monoᵗˢ k k′ le ts h
+  ib-monoᵉ k k′ le emptyᵉ          h = tt
+  ib-monoᵉ k k′ le (mapᵉ f e)      h =
+    ∧⁺ (inputsBelowᵗ k′ f) (inputsBelowᵉ k′ e)
+       (ib-monoᵗ k k′ le f (∧ˡ (inputsBelowᵗ k f) (inputsBelowᵉ k e) h))
+       (ib-monoᵉ k k′ le e (∧ʳ (inputsBelowᵗ k f) (inputsBelowᵉ k e) h))
+  ib-monoᵉ k k′ le (takeᵉ c e)     h =
+    ∧⁺ (inputsBelowᵗ k′ c) (inputsBelowᵉ k′ e)
+       (ib-monoᵗ k k′ le c (∧ˡ (inputsBelowᵗ k c) (inputsBelowᵉ k e) h))
+       (ib-monoᵉ k k′ le e (∧ʳ (inputsBelowᵗ k c) (inputsBelowᵉ k e) h))
+  ib-monoᵉ k k′ le (scanᵉ f z e)   h =
+    ∧⁺ (inputsBelowᵗ k′ f) (inputsBelowᵗ k′ z ∧ inputsBelowᵉ k′ e)
+       (ib-monoᵗ k k′ le f (∧ˡ (inputsBelowᵗ k f) ze h))
+       (∧⁺ (inputsBelowᵗ k′ z) (inputsBelowᵉ k′ e)
+           (ib-monoᵗ k k′ le z (∧ˡ (inputsBelowᵗ k z) (inputsBelowᵉ k e) rest))
+           (ib-monoᵉ k k′ le e (∧ʳ (inputsBelowᵗ k z) (inputsBelowᵉ k e) rest)))
+    where
+      ze   = inputsBelowᵗ k z ∧ inputsBelowᵉ k e
+      rest = ∧ʳ (inputsBelowᵗ k f) ze h
+  ib-monoᵉ k k′ le (mergeAllᵉ _ e) h = ib-monoᵉ k k′ le e h
+  ib-monoᵉ k k′ le (switchAllᵉ e)  h = ib-monoᵉ k k′ le e h
+  ib-monoᵉ k k′ le (exhaustAllᵉ e) h = ib-monoᵉ k k′ le e h
+  ib-monoᵉ k k′ le (μᵉ e)          h = ib-monoᵉ k k′ le e h
+  ib-monoᵉ k k′ le (varᵉ x)        h = tt
+  ib-monoᵉ k k′ le (deferᵉ e)      h = ib-monoᵉ k k′ le e h
+
+  ib-monoᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (k k′ : ℕ) → k ≤ k′ →
+    (tm : Tm Γ Δᵍ Δ Θ t) →
+    T (inputsBelowᵗ k tm) → T (inputsBelowᵗ k′ tm)
+  ib-monoᵗ k k′ le (varᵗ x)      h = tt
+  ib-monoᵗ k k′ le unit̂          h = tt
+  ib-monoᵗ k k′ le (bool̂ _)      h = tt
+  ib-monoᵗ k k′ le (nat̂ _)       h = tt
+  ib-monoᵗ k k′ le (pairᵗ a b)   h =
+    ∧⁺ (inputsBelowᵗ k′ a) (inputsBelowᵗ k′ b)
+       (ib-monoᵗ k k′ le a (∧ˡ (inputsBelowᵗ k a) (inputsBelowᵗ k b) h))
+       (ib-monoᵗ k k′ le b (∧ʳ (inputsBelowᵗ k a) (inputsBelowᵗ k b) h))
+  ib-monoᵗ k k′ le (fstᵗ p)      h = ib-monoᵗ k k′ le p h
+  ib-monoᵗ k k′ le (sndᵗ p)      h = ib-monoᵗ k k′ le p h
+  ib-monoᵗ k k′ le (inlᵗ a)      h = ib-monoᵗ k k′ le a h
+  ib-monoᵗ k k′ le (inrᵗ a)      h = ib-monoᵗ k k′ le a h
+  ib-monoᵗ k k′ le (caseᵗ s l r) h =
+    ∧⁺ (inputsBelowᵗ k′ s) (inputsBelowᵗ k′ l ∧ inputsBelowᵗ k′ r)
+       (ib-monoᵗ k k′ le s (∧ˡ (inputsBelowᵗ k s) lr h))
+       (∧⁺ (inputsBelowᵗ k′ l) (inputsBelowᵗ k′ r)
+           (ib-monoᵗ k k′ le l (∧ˡ (inputsBelowᵗ k l) (inputsBelowᵗ k r) rest))
+           (ib-monoᵗ k k′ le r (∧ʳ (inputsBelowᵗ k l) (inputsBelowᵗ k r) rest)))
+    where
+      lr   = inputsBelowᵗ k l ∧ inputsBelowᵗ k r
+      rest = ∧ʳ (inputsBelowᵗ k s) lr h
+  ib-monoᵗ k k′ le (ifᵗ c a b)   h =
+    ∧⁺ (inputsBelowᵗ k′ c) (inputsBelowᵗ k′ a ∧ inputsBelowᵗ k′ b)
+       (ib-monoᵗ k k′ le c (∧ˡ (inputsBelowᵗ k c) ab h))
+       (∧⁺ (inputsBelowᵗ k′ a) (inputsBelowᵗ k′ b)
+           (ib-monoᵗ k k′ le a (∧ˡ (inputsBelowᵗ k a) (inputsBelowᵗ k b) rest))
+           (ib-monoᵗ k k′ le b (∧ʳ (inputsBelowᵗ k a) (inputsBelowᵗ k b) rest)))
+    where
+      ab   = inputsBelowᵗ k a ∧ inputsBelowᵗ k b
+      rest = ∧ʳ (inputsBelowᵗ k c) ab h
+  ib-monoᵗ k k′ le (primᵗ _ a)   h = ib-monoᵗ k k′ le a h
+  ib-monoᵗ k k′ le (strmᵗ e)     h = ib-monoᵉ k k′ le e h
+
+  ib-monoᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (k k′ : ℕ) → k ≤ k′ →
+    (ts : List (Tm Γ Δᵍ Δ Θ t)) →
+    T (inputsBelowᵗˢ k ts) → T (inputsBelowᵗˢ k′ ts)
+  ib-monoᵗˢ k k′ le []       h = tt
+  ib-monoᵗˢ k k′ le (y ∷ ys) h =
+    ∧⁺ (inputsBelowᵗ k′ y) (inputsBelowᵗˢ k′ ys)
+       (ib-monoᵗ k k′ le y (∧ˡ (inputsBelowᵗ k y) (inputsBelowᵗˢ k ys) h))
+       (ib-monoᵗˢ k k′ le ys (∧ʳ (inputsBelowᵗ k y) (inputsBelowᵗˢ k ys) h))
+
+-- AND THE SAME ON A RUNTIME VALUE, WHICH RECURSES ON THE TYPE.  The
+-- data arms have no syntax to move, so only `obs` carries content and
+-- it hands straight over to the expression walk.  The `≡ true`
+-- phrasing is the caps face's, which is the only consumer.
+ib-monoᵛ : ∀ {n} {Γ : Ctx n} (k k′ : ℕ) → k ≤ k′ →
+  (t : Ty) (v : Val Γ t) →
+  inputsBelowᵛ k t v ≡ true → inputsBelowᵛ k′ t v ≡ true
+ib-monoᵛ k k′ le unitᵗ    v        h = refl
+ib-monoᵛ k k′ le boolᵗ    v        h = refl
+ib-monoᵛ k k′ le natᵗ     v        h = refl
+ib-monoᵛ k k′ le (s ×ᵗ t) (a , b)  h =
+  T⇒≡true (inputsBelowᵛ k′ s a ∧ inputsBelowᵛ k′ t b)
+    (∧⁺ (inputsBelowᵛ k′ s a) (inputsBelowᵛ k′ t b)
+        (T-to (ib-monoᵛ k k′ le s a
+                (T⇒≡true (inputsBelowᵛ k s a)
+                  (∧ˡ (inputsBelowᵛ k s a) (inputsBelowᵛ k t b) (T-to h)))))
+        (T-to (ib-monoᵛ k k′ le t b
+                (T⇒≡true (inputsBelowᵛ k t b)
+                  (∧ʳ (inputsBelowᵛ k s a) (inputsBelowᵛ k t b) (T-to h))))))
+ib-monoᵛ k k′ le (s +ᵗ t) (inj₁ a) h = ib-monoᵛ k k′ le s a h
+ib-monoᵛ k k′ le (s +ᵗ t) (inj₂ b) h = ib-monoᵛ k k′ le t b h
+ib-monoᵛ k k′ le (obs t)  e        h =
+  T⇒≡true (inputsBelowᵉ k′ e) (ib-monoᵉ k k′ le e (T-to h))

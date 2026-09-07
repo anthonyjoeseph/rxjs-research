@@ -38,7 +38,8 @@ open import Rx.Evaluator using
   Chain; sameSource; shareAdmit)
 open import Verify-Budget-Sufficient.Caps using (Caps)
 open import Verify-Budget-Sufficient.Fan-Caps using (fanLen; fanSq)
-open import Verify-Budget-Sufficient.Caps-Face.Part1 using (frameSz?; pathSz?; regsSz?)
+open import Verify-Budget-Sufficient.Caps-Face.Part1 using
+  (frameSz?; pathSz?; regsSz?; pathFloor; pathStrat?)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using (pathSz?-len)
 open import Verify-Budget-Sufficient.Measures using (pathLen; ∧-true)
 open import Verify-Budget-Sufficient.Nest-Store using
@@ -180,6 +181,17 @@ deliverNestD-path g c (thru-outer _ _ ↠ p)   = s≤s (deliverNestD-path g c p)
 -- reached at is not the state the cap was read at.
 admSz? : ∀ {n} {Γ : Ctx n} {s t} → ℕ → List (RegId × Path Γ s t) → Bool
 admSz? B = all (λ en → pathSz? B (proj₂ en))
+
+-- AND WHAT A SHARE HANDS EACH ADMITTED CHAIN ABOUT ITS STRATUM, which
+-- is the pair the entry to a walk needs and cannot read off a receipt
+-- about the store.  Both halves are about the ENTRY rather than about
+-- the walk: that the continuation is itself stratified, and that its
+-- floor is at or above the slot the values are leaving.  The second is
+-- what makes the values usable at the entry -- they are known below the
+-- slot's own floor, and raising a floor only weakens that -- so the two
+-- travel together rather than as separate premises.
+admEntry? : ∀ {n} {Γ : Ctx n} {s t} → ℕ → List (RegId × Path Γ s t) → Bool
+admEntry? k = all (λ en → pathStrat? (proj₂ en) ∧ (k ≤ᵇ pathFloor (proj₂ en)))
 
 -- THE STEP FROM THE REGISTRY TO THE SUBLIST A SINK DISPATCHES TO, and
 -- it is stated at an ARBITRARY bound on purpose: `shareAdmit` filters,
