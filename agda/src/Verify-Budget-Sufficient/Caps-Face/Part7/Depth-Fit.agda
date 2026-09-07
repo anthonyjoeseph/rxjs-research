@@ -6,7 +6,7 @@ open import Data.Bool    using (Bool; true; false; _∧_; if_then_else_)
 open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (*-assoc; ≤ᵇ⇒≤; ≤⇒≤ᵇ; ^-monoʳ-≤; *-monoˡ-≤; *-cancelˡ-≤; ≤-trans; ≤-refl; ≤-reflexive; m≤m+n;
   m≤n+m; n≤1+n; *-identityʳ; *-mono-≤; *-monoʳ-≤; +-monoʳ-≤; +-monoˡ-≤; ⊔-lub; m≤m⊔n; m≤n⊔m;
-  +-mono-≤; +-suc; +-assoc)
+  +-mono-≤; +-suc; +-assoc; ≡ᵇ⇒≡)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.List    using (List; []; _∷_; _++_; length; foldr)
@@ -40,7 +40,7 @@ open import Verify-Budget-Sufficient.Nest-Cap using (nestFac; nestU)
 open import Verify-Budget-Sufficient.Deliveries using
   (delivN)
 open import Verify-Budget-Sufficient.Walk-Factor using
-  (pathΦF; pathΦF-cap; pathΦD; pathRoots; pathΦF-cap-root; pathΦD-cap-root)
+  (pathΦF; pathΦF-cap; pathΦD; pathRoots; pathΦF-cap-root; pathΦD-cap-root; sinkAbove?)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk using
   (foldPath-nest-regs; PathΦHyp; DispatchΦHyp; ShareGoΦHyp; FrameΦHyp; valsΦ?; valsΦ?-mono;
   stepFrame-nest-Φ; Φ-to-bound)
@@ -56,7 +56,7 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; arrVal; RegId; lookupNod
   take-f; from-inner; thru-outer; cascadeLatch; chainsOf; cascadeGo; Path; arrTy; stepFrame;
   subscribeInner; innerFinish; cascade; share-sink; root; fLvlD; sLvlD; chainStep; budgetAt;
   arrSource; arrTick; shareAdmit; shareLatch; foldPath; NodeState; mergeAll-st; scan-st;
-  take-st; switch-st; exhaust-st; regAt; lvls)
+  take-st; switch-st; exhaust-st; regAt; lvls; Chain; sameSource)
 open import Rx.Slots using (Slots; slotsSize)
 
 open import Verify-Budget-Sufficient.Caps using
@@ -1193,9 +1193,11 @@ sink-fan-root {e = e} sl id i p vals hr hz hΦ =
 -- denominated in the slot count is available the moment the chain is
 -- read out of the REGISTRY -- and the registry is what the walk holds
 -- at an arbitrary state, which is the wall `fan-regsSz` stands at one
--- statement over.  Stratification is therefore owed as a CARRIED
--- conjunct of the invariant, where every producer re-establishes it,
--- and not as a hypothesis here, where only today's caller supplies it.
+-- statement over.  So the chain arrives here already carrying its
+-- reading: `sinkAbove?` is a premise, `walk-share-strat` is the
+-- carried conjunct that pays it, and `fan-chain-strat` transports it
+-- through admission with the source pinned.  What that leaves open is
+-- the MINT, below, and not anything this statement can supply.
 -- REFUTED: `Refuted.Sink-Phi-Leaf`, at the size floor this arm
 --   discharges from and at the budget the sink's own receipt exactly
 --   exhausts, so the crossing is not an artifact of a small budget.
@@ -1224,6 +1226,7 @@ postulate
     (vals : List (Val Γ (lookup Γ i))) →
     pathRoots p ≡ false →
     pathSz? (Caps.cSize (capsAt e sl id)) p ≡ true →
+    sinkAbove? (toℕ i) p ≡ true →
     valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
       (share-sink {t = t} i) vals ≡ true →
     valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id) p vals ≡ true
@@ -1351,6 +1354,36 @@ fan-chain-sz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 fan-chain-sz {e = e} sl id i st h =
   shareAdmit-caps (Caps.cSize (capsAt e sl id)) i (EvalSt.registry st) h
 
+-- WHAT THE REGISTRY HOLDS WHEN IT IS READ, IN THE ONE CURRENCY THAT IS
+-- NOT A CAP.  Every entry's continuation ends STRICTLY ABOVE the input
+-- it was minted subscribing: a shared slot's definition may name only
+-- inputs below its own index, so a registration whose path terminates
+-- at slot `j`'s sink was minted subscribing something that definition
+-- contains, and its source is under `j`.  Read entry by entry off the
+-- registry, which is what the fan-out's selection is filtered from.
+regStrat? : ∀ {n} {Γ : Ctx n} {t} → List (RegId × Source × Chain Γ t) → Bool
+regStrat? = all (λ en → sinkAbove? (proj₁ (proj₂ en)) (proj₂ (proj₂ (proj₂ en))))
+
+-- AND THE SELECTION INHERITS IT WITH THE SOURCE PINNED, WHICH COSTS NO
+-- ARGUMENT.  `shareAdmit` keeps an entry only where `sameSource` holds
+-- against the share's own index, so the admitted chains are exactly
+-- those minted at `toℕ i` and the reading transports along that
+-- equality rather than being asserted afresh.
+fan-chain-strat : ∀ {n} {Γ : Ctx n} {t} (i : Fin n)
+  (rs : List (RegId × Source × Chain Γ t)) →
+  regStrat? rs ≡ true →
+  all (λ rp → sinkAbove? (toℕ i) (proj₂ rp)) (shareAdmit {t = t} i rs) ≡ true
+fan-chain-strat i [] h = refl
+fan-chain-strat {Γ = Γ} i ((rid , s , (u , p)) ∷ r) h
+  with sameSource (toℕ i) s in eqs | u ≟ᵗ lookup Γ i
+     | ∧-true (sinkAbove? s p) (regStrat? r) h
+... | false | _        | _  , hr = fan-chain-strat i r hr
+... | true  | no _     | _  , hr = fan-chain-strat i r hr
+... | true  | yes refl | hp , hr =
+      ∧-intro (subst (λ z → sinkAbove? z p ≡ true)
+                     (sym (≡ᵇ⇒≡ (toℕ i) s (T-to eqs))) hp)
+              (fan-chain-strat i r hr)
+
 -- ONE CHAIN'S DEPTH OUT OF THE SELECTION'S JOIN.  The cascade-level
 -- reading is a ⊔-fold over the whole selection, and the walk spends it
 -- one chain at a time, so the fold has to be taken apart before the
@@ -1477,6 +1510,38 @@ postulate
       sf (suc gas) nid now i vals fin sched st →
     Sched.slots sched ≡ sl →
     nestOK? e sl id sched st ≡ true
+
+-- THE STRATIFICATION RECEIPT, TAKEN AT THE STATE THE WALK IS STANDING
+-- ON.  It says the registry holds no entry whose continuation ends at
+-- or below the input it was minted subscribing, which is what bounds
+-- the fan-out's escalation by the PROGRAM: a sink hop strictly climbs
+-- the slot telescope, so no chain is re-entered through its own sink
+-- and the hop count cannot exceed the slot count.
+--
+-- AND ITS CONCLUSION NAMES NO CAP, WHICH IS THE WHOLE REASON IT IS
+-- AVAILABLE WHERE THE FOUR CARRIED PREDICATES ARE NOT.  The
+-- elimination that closed those turns on a predicate WEAKENING as its
+-- cap grows, so a receipt taken at the entry cap is useless once the
+-- descent has stepped.  Source and sink are both fixed when an entry
+-- is minted, so nothing here moves with a cap at all and the direction
+-- that elimination needs does not exist.
+--
+-- AND IT IS OWED TO THE WALK'S BUNDLE RATHER THAN STATED FREE, because
+-- the free form is false: the obligations that would establish it are
+-- enumerated at the statement this receipt is spent on, which is where
+-- the mint side of the question belongs.
+-- REFUTED: `Refuted.Fan-Chain-Registry`, at a single `register` onto
+--   the initial state -- a zero source handed a zero sink -- so a
+--   reading over an arbitrary state is dead rather than unproven.
+postulate
+  walk-share-strat : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sl : Slots Γ) (id : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
+    (Lv : ℕ) (i : Fin n) (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) →
+    dispatchCapsOK (capsAt e sl id) (capsAt e sl (suc id)) sl (capsH e sl id) Lv
+      sf (suc gas) nid now i vals fin sched st →
+    Sched.slots sched ≡ sl →
+    regStrat? (EvalSt.registry st) ≡ true
 
 -- AND THE FAN-OUT HALF IS A PROVEN FOLD RATHER THAN A FILTER LEMMA,
 -- which is the whole of what the store denomination bought.  A
@@ -1654,6 +1719,7 @@ mutual
     Sched.slots sched ≡ sl →
     all (λ rp → pathSz? (Caps.cSize (capsAt e sl id)) (proj₂ rp)) ps ≡ true →
     all (λ rp → pathNestD (proj₂ rp) ≤ᵇ nestCapAt e sl id) ps ≡ true →
+    all (λ rp → sinkAbove? (toℕ i) (proj₂ rp)) ps ≡ true →
     valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
       (share-sink {t = t} i) vals ≡ true →
     ShareGoΦHyp sf gas nid now (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
@@ -1669,7 +1735,10 @@ mutual
           (fan-chain-nestD (nestCapAt e sl id) i st
              (fan-regsNest sl id sched st
                 (walk-share-nestOK sl id sf gas nid now Lv i vals false
-                   sched st hd hsl))) hΦ
+                   sched st hd hsl)))
+          (fan-chain-strat i (EvalSt.registry st)
+             (walk-share-strat sl id sf gas nid now Lv i vals false
+                sched st hd hsl)) hΦ
   walk-share-ΦHyp {e = e} sl id sf (suc gas) nid now Lv i vals true sched st
                   hd hdd hsl hΦ =
     walk-shareGo-ΦHyp sl id sf gas nid now Lv i vals true
@@ -1679,16 +1748,19 @@ mutual
           (fan-chain-nestD (nestCapAt e sl id) i st
              (fan-regsNest sl id sched st
                 (walk-share-nestOK sl id sf gas nid now Lv i vals true
-                   sched st hd hsl))) hΦ
+                   sched st hd hsl)))
+          (fan-chain-strat i (EvalSt.registry st)
+             (walk-share-strat sl id sf gas nid now Lv i vals true
+                sched st hd hsl)) hΦ
 
   walk-shareGo-ΦHyp sl id sf gas nid now Lv i vals fin [] sched st
-                    _ _ _ _ _ _ = tt
+                    _ _ _ _ _ _ _ = tt
   walk-shareGo-ΦHyp {e = e} sl id sf gas nid now Lv i vals fin
-                    ((rid , p) ∷ ps) sched st hsg hdsg hsl hpz hnd hΦ
+                    ((rid , p) ∷ ps) sched st hsg hdsg hsl hpz hnd hsa hΦ
     with any (_≡ᵇ rid) (EvalSt.cancelled st)
   ... | true  = walk-shareGo-ΦHyp sl id sf gas nid now Lv i vals fin ps sched st
                   hsg (depthShareGo-tail sf gas nid now i vals fin rid p ps sched st hdsg)
-                  hsl (∧-trueʳ hpz) (∧-trueʳ hnd) hΦ
+                  hsl (∧-trueʳ hpz) (∧-trueʳ hnd) (∧-trueʳ hsa) hΦ
   ... | false =
       hΦp
     , walk-ΦHyp-go sl id sf gas nid now Lv (toℕ i) evs p vals fin sched st₀
@@ -1701,7 +1773,7 @@ mutual
         (proj₂ (proj₂ (proj₂ hsg)))
         (depthShareGo-step sf gas nid now i vals fin rid p ps sched st hdsg)
         (trans (foldPath-slots sf gas nid now (toℕ i) p vals evs fin sched st₀) hsl)
-        (∧-trueʳ hpz) (∧-trueʳ hnd)
+        (∧-trueʳ hpz) (∧-trueʳ hnd) (∧-trueʳ hsa)
         hΦ
     where
     B : ℕ
@@ -1717,7 +1789,7 @@ mutual
     hΦp : valsΦ? B (nestΦAt e sl id) p vals ≡ true
     hΦp with pathRoots p in eqr
     ... | true  = sink-fan-root sl id i p vals eqr hp₀ hΦ
-    ... | false = sink-fan-sink sl id i p vals eqr hp₀ hΦ
+    ... | false = sink-fan-sink sl id i p vals eqr hp₀ (∧-trueˡ hsa) hΦ
 
   walk-ΦHyp-go sl id sf gas nid now Lv envSrc evs root vals fin sched st
                _ _ _ _ _ _ = tt

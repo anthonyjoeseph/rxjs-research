@@ -215,18 +215,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **STRATIFICATION AT THE MINT, WHERE THE FOUR-ROW OBSTACLE LEAVES
-  IT.** `sink-fan-sink`'s escalation is program-bounded: sink hops
-  climb the slot telescope, so no chain re-enters its own sink and the
-  count is capped by the slot count — a price that is NOT a cap, which
-  is what this neighbourhood is short of. Asserting it at the READ is
-  dead, one `register` killing that and `fan-regsSz` alike, so it is
-  owed at the mint — and the mint is FOUR obligations. A slot-sourced
-  registration wants the telescope carried down the subscribe descent;
-  a minted-sourced one wants a floor on the sched's next source that
-  nothing carries; a delivered inner reaches the input arm under
-  syntax the telescope never saw. The commit states four, wires one.
-
 - **WHAT PRICES A REGISTERED CHAIN, since no cap does and the flat
   potential is dead.** `fan-regsSz` and `scanΦ-fit` are one question
   written twice: the stepped cap the receipt names is a blowup of the
@@ -250,6 +238,18 @@ does not fit is a finding about the shared statement, not about the head.
   in rather than the table's maximum. A crossing there restates the
   right summand, not the sum; none promotes the row off a coverage gap
   that currently reads as safe.
+
+- **THE FIRST MINT OBLIGATION: CARRYING THE TELESCOPE DOWN THE
+  SUBSCRIBE DESCENT.** `walk-share-strat` is now the read-side receipt
+  and the mint side is where it is paid. Three of the four obligations
+  are open; the slot-sourced one is the one a descent can carry,
+  because the continuation's terminal and the expression's inputs meet
+  at the enclosing share's own `inputsBelowᵉ` field and nothing else
+  has to be invented. The commit threads that field through the
+  subscribe descent and discharges the slot-sourced arm, leaving the
+  minted-source floor and the delivered inner stated where they are.
+  Its risk is that the field turns out not to reach the arm that
+  registers, which is a SHAPE finding and not a grind.
 
 ### The ledger
 
@@ -279,8 +279,12 @@ does not fit is a finding about the shared statement, not about the head.
   maximum is closed to instantiation.
 - **`sink-fan-sink`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE`: the
   potential at an admitted chain that ends at a SECOND hand-over. Its
-  escalation is PROGRAM-bounded after all — hops climb the stratified telescope
-  — so the residue is the arbitrary chain, owed as a carried invariant.
+  escalation is PROGRAM-bounded: hops climb the stratified telescope. The chain
+  now arrives carrying its `sinkAbove?` reading, so what is open is the MINT.
+- **`walk-share-strat`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: every
+  registered chain ends strictly ABOVE the input it was minted subscribing.
+  The only receipt here naming no cap, which is what makes it carryable; the
+  free form dies at one `register`, so it is owed at the mint.
 - **`fan-regsSz`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE×4`: the
   registry's own size receipt at the PROGRAM's cap. NO CAP PRICES A REGISTERED
   CHAIN: the stepped cap the receipt names is a blowup of the depth budget any
