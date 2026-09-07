@@ -215,18 +215,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE THREE LEAVES THAT NOW COMPUTE, WHICH IS WHAT THE INDUCTION
-  BOUGHT.** The descent is a body over a join spelled apart from any
-  ceiling, and what it owes is four leaves stated at ONE frame or ONE
-  registration. Three of them — `frame-depth-fit`, `share-step-fit`,
-  `chain-fit-step` — read only `stepFrame`, `foldPath`, `nestDᵛˢ` and
-  `storeSyncMax`, all of which reduce, so a row closed to instantiation
-  has become three that are open. The commit instantiates them at the
-  corpus the round's own rows already run at, at both delivered counts,
-  since the barrier is a doubling in the registry and these leaves are
-  read at one registration. A crossing restates the INVARIANT, not the
-  ceiling, which is the whole point of having chosen the position's own
-  ceiling as the thing carried.
+- **THE TWO REGIONS THE FIRST ROWS COULD NOT STAND IN, now that the
+  leaves are known to be instantiable at all.** `frame-depth-fit` and
+  `chain-fit-step` hold at the first chain a round admits, whose path is
+  headed by `from-inner`; what that leaves is the OTHER arm that
+  charges — `thru-outer`, which is a successor above the react and so
+  the larger of the two — and the share sink, where `share-step-fit`
+  wants a registration and a `from-inner` edge admits none. Both are
+  absences of a POINT, not of a sweep, so the commit builds the points:
+  a corpus whose chain crosses a crossing door, and a registration read
+  off the registry rather than constructed. Neither region can be
+  reached by re-running what is there.
 
 - **THE SUBSTITUTING TELESCOPE, WHICH IS THE ONE SHAPE THAT HAS ALREADY
   REFUTED AN ADDITIVE SUMMAND ON A SIBLING FACE.** `Rx.Clos-Size` exists
@@ -291,25 +290,23 @@ does not fit is a finding about the shared statement, not about the head.
   instant's nest predicate at the state the fan reads the registry. The door
   has it and the walk carries no nest conjunct at all; threading it down is
   refused by the store's own growth toward the NEXT cap.
-- **`share-fold-fit`** (Part7/Arrival-Caps) — FALSITY,
-  `REFUTED×2, DEAD ROUTE×3`: one admitted registration's path, descended at the
-  delivered-marked state. THE ONE LEAF INHERITING THE BARRIER — it is
-  `depthFold` again, so the doubling recorded at `depthShareGo` closes its
-  conclusion to instantiation exactly as the parent's was.
-- **`share-step-fit`** (Part7/Arrival-Caps) — FALSITY,
-  `REFUTED×2, DEAD ROUTE×3`: the position's ceiling survives one `foldPath`,
-  slots unmoved. The registration fold owes preservation across a fold that has
-  ALREADY RUN, which is the join's second state-moving obligation and the one
-  no path row reaches.
-- **`chain-fit-step`** (Part7/Arrival-Caps) — FALSITY, `NO EVIDENCE`: the same
+- **`share-fold-fit`** (Part7/Arrival-Caps) — FALSITY, `NO EVIDENCE`: one
+  admitted registration's path, descended at the delivered-marked state. THE
+  ONE LEAF INHERITING THE BARRIER — it is `depthFold` again, so the doubling
+  recorded at `depthShareGo` closes its conclusion to instantiation exactly as
+  the parent's was.
+- **`share-step-fit`** (Part7/Arrival-Caps) — FALSITY, `NO EVIDENCE`: the
+  position's ceiling survives one `foldPath`, slots unmoved. The registration
+  fold owes preservation across a fold that has ALREADY RUN, which is the
+  join's second state-moving obligation and the one no path row reaches.
+- **`chain-fit-step`** (Part7/Arrival-Caps) — FALSITY, `PROBED`: the same
   across one `stepFrame`, values and store trading under a fixed ceiling. The
   invariant was chosen to make this a comparison between two numerals; that it
   computes is not yet evidence that it holds.
-- **`frame-depth-fit`** (Part7/Arrival-Caps) — FALSITY,
-  `REFUTED×2, DEAD ROUTE×3`: one frame's own spend under the position's
-  ceiling. Map, scan and take charge nothing, so the entire claim is the
-  `thru-outer` walk and the `from-inner` react — both reducible at a state,
-  unlike the fold above them.
+- **`frame-depth-fit`** (Part7/Arrival-Caps) — FALSITY, `PROBED`: one frame's
+  own spend under the position's ceiling. Map, scan and take charge nothing, so
+  the entire claim is the `thru-outer` walk and the `from-inner` react — both
+  reducible at a state, unlike the fold above them.
 - **`scanΦ-fit`** (Part7/Depth-Fit) — SHAPE, `DEAD ROUTE`: the producing side
   of the fold's grant. THE MECHANISM IS DEAD, NOT A DENOMINATION: a flat
   per-instant potential cannot dominate a count exponential in itself; the one
