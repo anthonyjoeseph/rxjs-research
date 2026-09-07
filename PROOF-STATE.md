@@ -238,17 +238,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **TYING THE CASCADE'S ENTRY TO THE STORE — BOTH SUBJECTS ARE NOW
-  LOCATED AND THE INDEX IS NOT.** The ring's pair is carried on both
-  faces. The cascade's two free variables are reachable after all: a
-  chain is a FILTER of the registry, so the path half restates off the
-  ring's own form, and a value is the head of a live source's pending
-  queue, so the value half restates over the schedule, which the
-  receipt names beside the state. What is open is the INDEX: a sink
-  had its own slot, a
-  source has none, so the bound relates two lists where the sink's
-  related a list to a number. The leg states that quantity and enters
-  both halves. The store conjunct stays owed by the hop leaf alone.
+- **THE CONJUNCT ON THE VALUES IN FLIGHT, WHICH TWO FACES ASK FOR FROM
+  OPPOSITE ENDS.** The cascade's entry needs it at the DELIVERY: an
+  arrival's value is the ARRIVAL'S, so no move over the registry
+  reaches it and the subject is the live source it was minted from. A
+  registration's dead route named the same conjunct at the MINT — the
+  last of four obligations there, and explicitly a different invariant
+  from the one it was refuting. They are one obligation. The leg states
+  it over `Sched.live`, reads the head off it the way five proven
+  `pop-head-` lemmas already read their own, and spends it at whichever
+  end takes it first.
 
 - **PRICING A FANNED CHAIN IN SOMETHING THAT IS NOT A CAP, where every
   route under `fan-regsSz` now converges.** Five closed routes leave
@@ -320,6 +319,9 @@ does not fit is a finding about the shared statement, not about the head.
   at or above the slot the values leave. Its subject is read off the registry
   the receipt names, so no refuted quantifier survives in it; nothing has
   instantiated it.
+- **`cascade-admit-entry`** (Part7/Arrival-Caps) — FALSITY, `REFUTED`: the same
+  reading for a cascade's chains, over `chainsOf` — a filter of the registry, so
+  the subject is the state's and not a free path's. Nothing has instantiated it.
 - **`walk-frame-drain-entries`** (Part7/Walk-Sink) — FALSITY,
   `REFUTED×2, DEAD ROUTE, TWIN, PROBED×2`: the per-entry tuple the `from-inner`
   drain owes, the wrapper's ceiling now minted from the frame's own room. Both
@@ -379,14 +381,10 @@ does not fit is a finding about the shared statement, not about the head.
   store half of that step, carried APART from the values half so that no
   ceiling has to cross a step at all; the position's ceiling is rebuilt from
   the two ingredients where it is spent.
-- **`walk-path-strat`** (Part7/Walk-Sink) — SHAPE, `REFUTED×2`: the path a walk
-  is entered with, read at its own floor. The free form is dead: the path is
-  quantified after a receipt naming only the store, so no conjunct reaches it.
-  The ring no longer spends it; the cascade's entry is the region left.
-- **`walk-vals-strat`** (Part7/Walk-Sink) — SHAPE, `REFUTED×2`: its value twin,
-  refuted INDEPENDENTLY at a path that is itself stratified — an entered value
-  is an arbitrary closed expression, so the telescope constrains nothing. The
-  ring gets it by monotonicity off its own floor; the cascade still asserts it.
+- **`walk-vals-strat`** (Part7/Walk-Sink) — SHAPE, `REFUTED`: the value a walk is
+  entered with, refuted at a path that is itself stratified — an entered value
+  is arbitrary, so the telescope constrains nothing. Its subject is the LIVE
+  SOURCE, and the conjunct carrying it is owed at the mint.
 - **`scanΦ-fit`** (Part7/Depth-Fit) — SHAPE, `DEAD ROUTE`: the producing side
   of the fold's grant. THE MECHANISM IS DEAD, NOT A DENOMINATION: a flat
   per-instant potential cannot dominate a count exponential in itself; the one

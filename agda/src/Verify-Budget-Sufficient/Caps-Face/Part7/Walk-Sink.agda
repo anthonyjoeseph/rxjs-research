@@ -122,45 +122,28 @@ postulate
 -- alone.  Reissuing either shape before its subject has a home would
 -- carry the defect across with the witnesses left pointing elsewhere.
 --
--- AND BOTH SUBJECTS DO HAVE A HOME, which is the repair rather than a
--- hope for one.  `capsOK?` names the SCHEDULE as well as the state,
--- and each of the cascade's two free variables is reachable from one
--- of them.  A chain is `chainsGo` over `EvalSt.registry` -- a FILTER
--- of the registry, the same shape as the admitted list above, so the
--- path half restates over it almost verbatim.  A value is the payload
--- of the head of some live source's pending queue, so the value half
--- restates over `Sched.live`; and the subject there is the LIVE SOURCE
--- and not the arrival, because an arrival is MINTED from that list at
--- the moment it is taken and is nowhere stored, which is exactly why
--- quantifying over arrivals put the pair out of the state's reach.
--- Read off the definitions rather than instantiated.
+-- AND THE PATH HALF HAS SINCE MOVED, to `cascade-admit-entry`, where
+-- its subject is `chainsOf a st` -- a FILTER of the registry, so the
+-- same shape as the admitted list above.  What stays here is the VALUE
+-- half, and it stays because the two are not repairable by one move:
+-- a chain comes off the state, while the value a chain is entered with
+-- is the arrival's, and the arrival is universally quantified at every
+-- statement on that route.  So this witness transfers untouched, and
+-- the subject that would move is the LIVE SOURCE -- an arrival being
+-- minted from `Sched.live` at the moment it is taken and nowhere
+-- stored, which is exactly why quantifying over arrivals put it out of
+-- the state's reach.  The route is proven five times at the drain,
+-- where each `pop-head-` lemma reads a fact about the arrival's value
+-- off a `capsOK?` conjunct over that list.  What is missing is the
+-- conjunct, and it is owed at the MINT rather than here.
 --
--- WHAT IS NOT SETTLED IS THE INDEX, and it is the part that makes this
--- a leg rather than a transcription.  The sink's move had one to hand,
--- its own slot.  A cascade's entry carries a Source and no slot, so
--- what a source's pending values must sit below is the floor of the
--- chains registered AGAINST that source -- a quantity relating the two
--- lists, where the sink's related one list to a number.
---
--- REFUTED: `Refuted.Walk-Entry-Strat.walk-path-strat-absurd` kills the
---   free path form at one frame over a sink -- a `map` whose template
---   names input one, ending at slot nought, whose floor is nought --
---   against the receipt taken at the INITIAL state of a two-slot
---   program, where `okₛ` computes it. The telescope's own
---   stratification does not reach it: `shared` constrains a slot's
---   DEF, and a path's frames are not any slot's def.
 -- REFUTED: `Refuted.Walk-Entry-Strat.walk-vals-strat-absurd` kills the
---   free value form INDEPENDENTLY, at a path that is itself
---   stratified -- a bare sink, pinned -- so it is a second defect and
---   not a corollary. `Val Γ (obs t)` is an arbitrary closed
+--   free value form at a path that is itself stratified -- a bare
+--   sink, pinned -- so it is a defect of its own and not a corollary
+--   of the path half's. `Val Γ (obs t)` is an arbitrary closed
 --   expression, so nothing about the telescope constrains what an
 --   entered value may name.
 postulate
-  walk-path-strat : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (c : Caps) (p : Path Γ u t) (sched : Sched Γ) (st : EvalSt e) →
-    capsOK? c sched st ≡ true →
-    pathStrat? p ≡ true
-
   walk-vals-strat : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (p : Path Γ u t) (vals : List (Val Γ u))
     (sched : Sched Γ) (st : EvalSt e) →
