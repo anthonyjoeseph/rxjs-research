@@ -1341,6 +1341,23 @@ postulate
 --   the obligation `pathSz?`'s header already states over its two
 --   callers: a chain the fan-out hands values to has to be priced by
 --   something that is not a cap.
+-- DEAD ROUTE: retiring the row by retiring its CONSUMER -- dropping the
+--   size premise from `sink-fan-sink`, on the reading that an admitted
+--   chain now arrives carrying its own `sinkAbove?` and that a climb up
+--   the stratified telescope is bounded by the slot count while naming
+--   no cap.  The premise has THREE consumers and only one is that leaf.
+--   The root-terminating leaf spends it on the cap lemmas its own
+--   assembly is built from, and the walk DOWN an admitted chain spends
+--   it at `frameΦ-fit`, in three of that function's five arms, and
+--   rebuilds it for the tail out of the head it just consumed -- so the
+--   fan owes a size receipt per chain whatever the leaf is paid in.
+--   Nor could the stratification reading substitute at any of the
+--   three, and the two predicates say so by their own recursion:
+--   `sinkAbove?` walks past every frame and speaks only at the
+--   terminal, while the size receipt speaks at each frame it passes.
+--   They are not two readings of one climb -- one counts HOPS and the
+--   other counts FRAMES, and no bound on either is a bound on the
+--   other.
 postulate
   fan-regsSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (st : EvalSt e) →

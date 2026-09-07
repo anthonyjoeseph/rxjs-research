@@ -215,29 +215,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **WHETHER `fan-regsSz` IS STILL THE FAN'S SUPPLIER AT ALL.** It is
-  the last cap-denominated receipt the sink arm consumes, and the four
-  dead routes under it close every re-denomination of the cap it names.
-  What none of them asked is whether the arm needs it: the size
-  receipt buys a LENGTH through `pathSz?-len`, the length lands in the
-  Φ leaf's exponent, and the stratification receipt now bounds the same
-  climb by the slot count without naming a cap. The commit puts the two
-  side by side at the leaf and either drops the size premise from
-  `sink-fan-sink` — retiring the row's only consumer, which is what the
-  four dead routes leave as the escape — or records why the exponent
-  still wants a length the telescope cannot give.
-
-- **WHAT MAKES THE NODRY FACE EXPENSIVE, now the only thing holding
-  `subscribeE-Ψ` out of the dev loop.** All three cuts are measured: the
-  LARGEST checks in twenty seconds and the other two are killed at the
-  budget, one of them the smallest. So BOTH readings are dead in the
-  field's own header — the record only one expensive piece can see, and
-  the amount of text, which the cheap piece outruns. Neither over-budget
-  piece holds a mutual cycle, so both cut freely: the commit bisects the
-  smaller, where a region is half the size to name, and measures each
-  half. A half that stays over names the region; both coming in names
-  the whole-file pass instead.
-
 - **THE MINT, WHERE TWO ROWS NOW POINT AND NEITHER IS STATED.**
   `walk-share-strat`'s free form dies at one `register`, so the
   strictness it claims is owed where a chain is MINTED and not where
@@ -247,6 +224,29 @@ does not fit is a finding about the shared statement, not about the head.
   has, and puts both consumers against it — either they spend the one
   statement, retiring a carrying problem nothing can thread, or the two
   shapes differ and that difference is the finding.
+
+- **PRICING A FANNED CHAIN IN SOMETHING THAT IS NOT A CAP, where every
+  route under `fan-regsSz` now converges.** Five closed routes leave
+  one residue and all five name it. The escape they left — paying the
+  leaf in the stratified climb instead — is now closed too, and closed
+  by a QUANTITY rather than by arithmetic: the climb counts hops and
+  the receipt counts frames. So the commit asks what the Φ leaf's
+  exponent can be denominated in when neither a cap nor the telescope
+  will pay it, and either states that pricing or establishes that the
+  factor admits no denomination the walk can carry — which moves the
+  face's MECHANISM onto the table and off its currency.
+
+- **RE-MEASURING EVERY MODULE THIS TIER RECORDS AS OVER BUDGET, because
+  three of them just turned out not to be.** The numbers file marks a
+  budget-killed run as a FLOOR, and a floor taken against an unbuilt
+  cone is a reading about the container, not the module — the whole of
+  a face charged with cost that a control truncated to its imports
+  prices almost entirely. Three rows fell that way in one sitting, one
+  by a factor of twenty-five, and each had a shape reading standing
+  ready to explain it. The commit re-runs the remaining floors
+  bottom-up on a coherent cache and deletes the findings resting on the
+  ones that fall — the expensive half, since a diagnosis outlives the
+  number it came from.
 
 ### The ledger
 
@@ -282,7 +282,7 @@ does not fit is a finding about the shared statement, not about the head.
   registered chain ends strictly ABOVE the input it was minted subscribing. The
   only receipt here naming no cap, which is what makes it carryable; the free
   form dies at one `register`, so it is owed at the mint.
-- **`fan-regsSz`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE×4`: the
+- **`fan-regsSz`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE×5`: the
   registry's own size receipt at the PROGRAM's cap. NO CAP PRICES A REGISTERED
   CHAIN: the stepped cap the receipt names is a blowup of the depth budget any
   Φ pricing must fit under, so the residue is a mechanism rather than a

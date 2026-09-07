@@ -61,6 +61,23 @@ throwaway module — a cached dependency answers in seconds and the culprit does
 not. Both runs are decisive, and both are cheaper than one more killed check of
 the consumer.
 
+**AND AN EVIDENCE MODULE IS THE WORST CASE, BECAUSE ITS COST IS ALMOST ALL CONE.**
+A probe is a handful of `refl` rows and imports a whole proof face to state them, so
+the asymmetry above is at its most extreme — nearly everything the run pays for sits
+below the file. It bites harder there than at a `src` consumer for a structural
+reason: the evidence trees are outside `src`'s claim graph, so the cone under a proof
+module a probe imports may never have been built in this container at all, however
+much else has been checked.
+
+And the symptom misdirects perfectly, which is why it is worth writing down. A
+probe's whole content is about the statement it imports, so a slow run reads as that
+statement being expensive to compute — which is exactly what a probe exists to
+suspect. Measured once: two otherwise-identical probes differing by ONE import of a
+proof module read in seconds against a run killed at the budget, and five successive
+theories about the statement's own arithmetic were raised and refuted before the
+import was. The attribution above finds it in two cheap runs; the mistake is skipping
+them because the file obviously studies something expensive.
+
 ## There is no whole-project sweep, and do not rebuild one
 
 It existed, was measured against `make gate`, and lost on both cost and fidelity —

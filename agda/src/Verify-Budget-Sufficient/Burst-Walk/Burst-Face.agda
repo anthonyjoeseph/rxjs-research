@@ -598,12 +598,6 @@ cascadeGo-burst-nodry siC ifc {n = n} {e = e} id a chains sched st
 -- anchor risk CONSOLIDATED onto one statement — plus `stepFrame-nodry`'s two
 -- named manufacture obligations, (i) mid-delivery INV? and (ii) the
 -- general-id fuel, each a crib of a proven sibling, and each since paid.
---
--- History (mirror census, demand-side probe,
--- the can't-probe receipt): superseded by this discharge; recover the
--- full text from the parent of the landing commit if the route ever
--- needs re-litigating.  The can't-probe receipt SURVIVES on `stepFrame-nodry`'s header,
--- restated there.
 ------------------------------------------------------------------
 
 -- (DELETED) `cascadeGo-burst-dry` sat here — `proj₁` of
