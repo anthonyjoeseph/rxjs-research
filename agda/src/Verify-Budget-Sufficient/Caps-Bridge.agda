@@ -2096,6 +2096,7 @@ pop-head-nest {e = e} id sched st eq h with schedGo (Sched.live sched) in eqL | 
 -- smaller of the two would be the harder leaf for no consumer's sake.
 -- `nestCapAt-1-floor` carries the pair under the instant-one cap
 -- without the factor ever being read.
+
 -- AND THE REGISTRY IS THE ONE PLACE THIS FRAME'S OWN CAPS PREDICATE
 -- CANNOT REACH, which is why the store's other two moving places are
 -- bodies here and this one stays a leaf.  `cascadeGo-nest-regs` is the
@@ -2112,9 +2113,24 @@ pop-head-nest {e = e} id sched st eq h with schedGo (Sched.live sched) in eqL | 
 --   frame's function separately while `pathNestD` SUMS them, so the
 --   fold is under `pathLen p * B` and under nothing smaller.  The
 --   predicate's own length conjunct then closes it at `B * B`, which
---   sits above this row's right-hand side and not under it.  A bound in
---   this currency has to be read off the SYNTAX the frame registers
---   from, not off the size predicate the frame leaves behind.
+--   sits above this row's right-hand side and not under it.  What the
+--   frame leaves behind cannot price this component at all.
+-- REFUTED: `Refuted.Reg-Nest-Reached` kills the reading that suggests
+--   itself once the predicate route is gone -- pricing this component
+--   off the SYNTAX the frame registers from -- five against a unit of
+--   four, and diverging rather than tight.  A registration's path is
+--   not built out of the program's own term alone: a scan whose
+--   accumulator is observable-typed carries syntax as a VALUE, the
+--   frame subscribes that value where it is delivered, and the `map-f`
+--   minted there is charged the DELIVERED function's depth, which
+--   climbs one per fold while every quantity read off the program
+--   stands still.  So the increment is the only summand that can pay,
+--   and the currency this component is owed in is the burst's own
+--   nesting -- which the walk face grants and then deliberately spends
+--   nowhere, because it prices a path frame at the delivery that mints
+--   it rather than at the subscribe that walks past it.  The witness
+--   runs at padded gas rather than at this row's own budget, so what it
+--   covers is the shape of the climb and not this row's margin.
 -- PROBED: `Probed.Burst-Nest-Unit` instantiates the left half against
 --   the unit at the three `*All` heads over a two-layer wrap, where
 --   the store reads 1 against a unit of 5 -- neither vacuous nor

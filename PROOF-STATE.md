@@ -215,17 +215,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE REGISTRY IS THE ONE STORE PLACE THE FRAME'S OWN PREDICATE
-  CANNOT ANSWER, so its bound has to be read off the syntax instead.**
-  `burst-nest-regs` is what is left of the subscribe frame's nesting
-  receipt once its two sibling places are bodies. A registration's path
-  measure SUMS each frame's function depth, while the size predicate
-  the frame leaves behind bounds each of them separately, so the
-  pointwise reading delivers the square of the size. Every path in this
-  registry was built by the frame out of the program's own term, so the
-  commit states the syntax-side bound instead: a registered path's
-  depth under the program's own `nestDᵉ`, the currency the unit is
-  already written in.
+- **THE REGISTRY COMPONENT IS OWED IN THE BURST'S CURRENCY, AND ITS TWO
+  FACES DISAGREE ABOUT WHETHER ANYTHING IS OWED AT ALL.** Both readings
+  of `burst-nest-regs` are now dead — the frame's own predicate prices
+  a path above the row, and the syntax the frame registers from is
+  refuted, since a delivered accumulator climbs a layer per fold while
+  the program stands still. Its delivery-face sibling
+  `cascadeGo-nest-regs` reads ZERO on every family, all registrations
+  retired; the subscribe face leaves five standing above the unit. The
+  commit instantiates that gap — which face keeps a registration, and
+  whether the depth it keeps tracks the burst grant the walk already
+  computes and spends nowhere.
 
 - **THE TWO ROWS WHOSE CONCLUSIONS HAVE NOW BOTH CLOSED, which is a
   scheduling fact and not two separate findings.** `walk-frame-drain-entries`
@@ -364,10 +364,10 @@ does not fit is a finding about the shared statement, not about the head.
   stream leaf — the walk over it is a proven body, so what remains per instant
   is the frame widths, which are sealed and taken as a quantified premise
   wherever a row reads them.
-- **`burst-nest-regs`** (Caps-Bridge) — DIFFICULTY, `DEAD ROUTE, PROBED`: the
-  registry's paths after the subscribe frame, under the unit plus one increment.
-  Its siblings read off the frame's caps predicate; a path's depth SUMS what
-  that predicate bounds frame by frame, so this one cannot.
+- **`burst-nest-regs`** (Caps-Bridge) — DIFFICULTY, `REFUTED, DEAD ROUTE, PROBED`:
+  the registry after the subscribe frame, under the unit plus an increment. Both
+  readings died: the predicate prices a path above the row, and the registered
+  depth climbs with the delivered value, not the program.
 - **`subscribeE-nest-scan`** (Nest-Walk) — DIFFICULTY,
   `REFUTED, DEAD ROUTE, PROBED`: `NestAt` now carries the pointwise store
   conjunct this head's accumulator read demanded, so the shape is settled; what
