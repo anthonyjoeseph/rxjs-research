@@ -86,7 +86,8 @@ open import Probed.Depth-Sighted
          third2Figs≡; cornerFigs≡; rootWideFigs≡; seedFigs≡;
          rootRow≡; rootWideRow≡; seedRow≡; dblFigs≡; dblLongFigs≡;
          chainDesc≡; chainRow; farDesc≡; farChainRow;
-         walkFigs≡; walkRow≡; tieWalk1; tieWalk4)
+         walkFigs≡; walkRow≡; tieWalk1; tieWalk4;
+         stepStore≡)
 open import Probed.Sight-Fit-Width
   using (figures≡; oldRow≡; newRow≡; tie12; tie13; tie16)
 

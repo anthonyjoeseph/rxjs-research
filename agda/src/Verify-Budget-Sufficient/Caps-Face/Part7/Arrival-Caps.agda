@@ -608,9 +608,22 @@ arr-chains-bursts sl id a nextId sched st sleq cok hpz hvc hcl hdp =
 --   chain's stays at seventeen either side, so the growth lives wholly
 --   in the join over LATER chains and the states they leave, and no
 --   row at any count constrains this leaf along it.
---   Every row is taken at the entry store itself, which is the
---   statement's own store slot instantiated at the tightest value its
---   hypothesis admits.
+--   EVERY ROW IS TAKEN AT THE STATE ITS ROUND STARTED FROM, and the
+--   store slot is that state's own synchronous maximum -- the tightest
+--   value the hypothesis admits, since the ceiling is monotone in it.
+--   What the rows do NOT reach is the point the consumer spends this
+--   at: a chain runs on a state the chains before it moved, and one
+--   chain moves the store from nine to sixteen, so a row supplying
+--   nine says nothing where the store has passed it.  That gap is why
+--   a round threads a cap-denominated `S` rather than its entry store.
+--   AND IT IS CLOSED TO INSTANTIATION, which is a coverage boundary
+--   and not a sweep nobody ran.  `depthChain` is seconds at a round's
+--   entry and does not return at a state a chain has stepped -- at the
+--   corpus's SMALLEST family, with the cascade and the step each
+--   evaluated once, and worse rather than better one family up.  Since
+--   the descent is this statement's whole conclusion, no row here can
+--   be taken at a walked state at all, and the store climb is pinned
+--   instead.
 postulate
   chain-depth-sighted : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (a : Arrival Γ) (nextId : Id) (S : ℕ)

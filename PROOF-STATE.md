@@ -215,17 +215,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE SYNCHRONOUS MAXIMUM IS A PREMISE NO PRODUCER ESTABLISHES.**
-  `chain-depth-sighted` prices one chain's descent under the round's
-  ceiling off the store's synchronous maximum — slots, nodes and
-  registry, the live fold deliberately absent, which the reading above
-  vindicates rather than merely permits. Its rows tie that premise to
-  the ENTRY store's own maximum and a store filled past it is
-  uncovered, so what the row rests on is an invariant nothing supplies.
-  The commit instantiates the premise at a program whose walk writes
-  the store before the chain is taken; the answer decides between a
-  carried record field and a restatement at the exit cap.
-
 - **THE TELESCOPE PAST ONE SLOT, WHERE TWO ROWS ARE UNCOVERED IN THE
   SAME PLACE.** `subscribeSharedSlot-sz-store`'s entire climb IS the
   telescope summand — an `input` charges nought, so no reading of the
@@ -250,6 +239,18 @@ does not fit is a finding about the shared statement, not about the head.
   commit states the syntax-side bound instead: a registered path's
   depth under the program's own `nestDᵉ`, the currency the unit is
   already written in.
+
+- **THE TWO ROWS WHOSE CONCLUSIONS HAVE NOW BOTH CLOSED, which is a
+  scheduling fact and not two separate findings.** `walk-frame-drain-entries`
+  was already there — both its denominations sealed — and
+  `chain-depth-sighted` has just joined it: its descent computes at a
+  round's entry and not at the state a chain leaves, so no row can be
+  taken where its consumer spends it. Neither class can fall to another
+  probe, and grinding a FALSITY row is what de-risk mode orders last.
+  The commit asks the question that is still open about both: whether
+  the consumer needs the leaf at that state at all, or threads a
+  slack enough `S` that a proven monotonicity carries the entry's row
+  to it — which would move the risk off the leaf and onto the round.
 
 ### The ledger
 
@@ -288,6 +289,11 @@ does not fit is a finding about the shared statement, not about the head.
   instant's nest predicate at the state the fan reads the registry. The door
   has it and the walk carries no nest conjunct at all; threading it down is
   refused by the store's own growth toward the NEXT cap.
+- **`chain-depth-sighted`** (Part7/Arrival-Caps) — FALSITY,
+  `REFUTED×2, DEAD ROUTE, PROBED`: ONE chain's descent under the round's
+  ceiling, premised on the store's SYNCHRONOUS maximum. Every row sits at a
+  round's entry; the descent does not compute at a state a chain left, so
+  the region the consumer uses is closed to instantiation.
 - **`scanΦ-fit`** (Part7/Depth-Fit) — SHAPE, `DEAD ROUTE`: the producing side
   of the fold's grant. THE MECHANISM IS DEAD, NOT A DENOMINATION: a flat
   per-instant potential cannot dominate a count exponential in itself; the one
@@ -327,11 +333,6 @@ does not fit is a finding about the shared statement, not about the head.
   now instantiated where they move — the store at the PARKING branch, tight to
   equality — and the subscribing branch is blocked rather than uncovered.
 
-- **`chain-depth-sighted`** (Part7/Arrival-Caps) — DIFFICULTY,
-  `REFUTED×2, DEAD ROUTE, PROBED`: ONE chain's descent under the round's
-  ceiling, premised on the store's SYNCHRONOUS maximum — slots, nodes and
-  registry, the live fold left out. The rows tie the premise to the entry
-  store's own maximum; a store filled past it is open.
 - **`subscribeE-fit`** (Sighted-Fit) — DIFFICULTY, `REFUTED×3, PROBED×2`: what
   ANY subscription's emitted VALUES cost, in the `nestB` currency against a
   `descW` bound. The family that kills the width-free form holds here at and
