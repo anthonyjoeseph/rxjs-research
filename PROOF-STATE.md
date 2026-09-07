@@ -215,17 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE TWO ROWS WHOSE CONCLUSIONS HAVE NOW BOTH CLOSED, which is a
-  scheduling fact and not two separate findings.** `walk-frame-drain-entries`
-  was already there — both its denominations sealed — and
-  `chain-depth-sighted` has just joined it: its descent computes at a
-  round's entry and not at the state a chain leaves, so no row can be
-  taken where its consumer spends it. Neither class can fall to another
-  probe, and grinding a FALSITY row is what de-risk mode orders last.
-  The commit asks the question that is still open about both: whether
-  the consumer needs the leaf at that state at all, or threads a
-  slack enough `S` that a proven monotonicity carries the entry's row
-  to it — which would move the risk off the leaf and onto the round.
+- **THE TWO CLOSED ROWS, NOW THAT RE-THREADING `S` IS KNOWN NOT TO
+  REACH THEM.** That route is now dead on `chain-depth-sighted`, in its
+  header: the premise side was already handled, so the gap is the
+  CONCLUSION and nothing transports it. `walk-frame-drain-entries` sits
+  the same way. The commit therefore attacks the instantiation barrier
+  rather than the statements — the compiled harness runs bodies the
+  checker will not unfold, so it is the one instrument that could price
+  a descent at a walked state. Its existing series report rows killed
+  natively too, so the product may be a BLOCKED verdict; that is a
+  coverage boundary worth recording, not a failure.
 
 - **THE SUBSTITUTING TELESCOPE, WHICH IS THE ONE SHAPE THAT HAS ALREADY
   REFUTED AN ADDITIVE SUMMAND ON A SIBLING FACE.** `Rx.Clos-Size` exists
@@ -291,7 +290,7 @@ does not fit is a finding about the shared statement, not about the head.
   has it and the walk carries no nest conjunct at all; threading it down is
   refused by the store's own growth toward the NEXT cap.
 - **`chain-depth-sighted`** (Part7/Arrival-Caps) — FALSITY,
-  `REFUTED×2, DEAD ROUTE, PROBED`: ONE chain's descent under the round's
+  `REFUTED×2, DEAD ROUTE×2, PROBED`: ONE chain's descent under the round's
   ceiling, premised on the store's SYNCHRONOUS maximum. Every row sits at a
   round's entry; the descent does not compute at a state a chain left, so the
   region the consumer uses is closed to instantiation.
