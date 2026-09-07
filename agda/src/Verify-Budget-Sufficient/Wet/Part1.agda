@@ -25,7 +25,7 @@
 -- (the upside-down ruling): a
 -- module above `.Wet` can consume `.Caps-Bridge`'s `cascade-wet-via-caps`
 -- in place of the cascade wet face (whose dry half is now
--- `cascadeGo-nodry`, .Burst-Walk); `.Wet` itself
+-- `cascadeGo-nodry`, .Burst-Walk.Burst-Face); `.Wet` itself
 -- cannot, since `.Caps-Bridge` imports `.Wet`.
 --
 -- This module is a LAYER OVER .Caps: the wet cores'

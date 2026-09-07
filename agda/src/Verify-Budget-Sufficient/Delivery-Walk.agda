@@ -239,16 +239,22 @@ record Walk-Hyps {n} {Γ : Ctx n} {t} (e : Closed Γ t) (S W R d : ℕ) : Set₁
     -- taken at the chain is.  Every face that has nothing to say about
     -- the chain ignores the index, which is most of them.
     --
-    -- AND IGNORING IT IS NOT FREE, WHICH IS THE ONE THING THE DESIGN DID
-    -- NOT PREDICT.  A face whose reading is a constant function of the
-    -- path still pays: the burst face's check went up by a MULTIPLE on an
-    -- index none of its own proofs mention, since they state their ledger
-    -- directly rather than through this field.  What the index changed is
-    -- the SHAPE of three loop premises — one Bool became an `all` over
-    -- the chain list — so at a face whose own reading is a fold over the
-    -- payload, every recursive site now nests a fold in a fold.  That is
-    -- read off the statements rather than measured, and the standing
-    -- alternative is the record projection.  The figures live in
+    -- AND THE COST CHARGED TO THIS INDEX IS NOT THE INDEX'S, which is
+    -- worth more than the attribution it replaces.  The burst face's
+    -- module went up by a multiple as the index landed, and a shape
+    -- reading stood ready to explain it: three loop premises turned from
+    -- one Bool into an `all` over the chain list, so a face whose own
+    -- reading is a fold nests one wherever it states its ledger THROUGH
+    -- this field.  The burst face is now cut in three, and exactly ONE
+    -- of the pieces names this record in a type at all.  The other two
+    -- are both blind to the index, and they land on OPPOSITE sides of
+    -- the dev budget — one checks in seconds, the other is killed at the
+    -- budget by itself, on a cache a sibling's control run showed
+    -- coherent.  So the index does not separate them; and neither does
+    -- size, since the undivided module's own record is a small fraction
+    -- of what the killed piece alone now floors at.  What is expensive
+    -- is therefore neither this field nor the amount of text, and naming
+    -- it is OPEN.  The figures live in
     -- `typecheck-performance-numbers.md`.
     --
     -- DEAD ROUTE: SEALING THE FIELD AT THE FACE DOES NOT RECOVER IT, so

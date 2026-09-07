@@ -215,17 +215,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **GETTING THE BURST FACE BACK INTO THE DEV LOOP.** The chain index is
-  in and its SHAPE risk is discharged, `chP?-const` carrying every face
-  with nothing to say about the chain. What is left is a tooling loss,
-  not an attribution: the measurement that was to separate the two cost
-  candidates KILLED BOTH, and is recorded dead in the field's own
-  header. So the face's only surviving loop is the gate, and the commit
-  SPLITS it at its non-cycle boundaries — safe by the loop's own
-  criterion, since it holds no mutual cycle — because nothing else on
-  this face, the next measurement and the mint's fifth site included, is
-  payable until it measures in seconds again.
-
 - **THE DELIVERED SUMMAND AT THE ROW'S OWN BUDGET, which is the one
   region the split's evidence declines to reach.** `burst-regs-split`
   now carries the registry, and its shape is settled: three candidates
@@ -249,6 +238,17 @@ does not fit is a finding about the shared statement, not about the head.
   `sink-fan-sink` — retiring the row's only consumer, which is what the
   four dead routes leave as the escape — or records why the exponent
   still wants a length the telescope cannot give.
+
+- **WHAT MAKES THE NODRY FACE EXPENSIVE, now the only thing holding
+  `subscribeE-Ψ` out of the dev loop.** The face is cut in three; two
+  pieces check in seconds and the third is killed at the budget by
+  itself, and BOTH candidate explanations are dead in the field's own
+  header — the record that piece cannot see, and the amount of text,
+  which the undivided module's own record outruns. It holds no mutual
+  cycle, so it cuts freely: the commit bisects it and measures each
+  half, which localises the cost and returns the row to a seconds-scale
+  loop in one act. A half that stays over budget names the region; both
+  halves coming in names the whole-file pass instead.
 
 ### The ledger
 
