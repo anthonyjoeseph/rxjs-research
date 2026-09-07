@@ -1226,6 +1226,17 @@ postulate
   -- registers, a spent one answers out of the completed list, and only
   -- the FIRST arrival walks the definition -- so what the leaf owes is
   -- that one walk, at a level the telescope has already paid for.
+  -- DEAD ROUTE: the SUBSTITUTING telescope -- each hop a duplication
+  --   applied to the slot beneath it, which is the shape `Rx.Clos-Size`
+  --   exists because it broke the value face's key -- cannot cross this
+  --   statement, and the obstruction is arithmetic rather than a matter
+  --   of reaching far enough.  The premise iterates `sizeStep S` once
+  --   per UNIT of the summand, and at the smallest `S` admitted one
+  --   iteration already multiplies by four, where a substituting hop
+  --   multiplies the emission by two and cannot be written for less than
+  --   a unit of slot syntax.  So the axis moves the BOUND faster than
+  --   the store however far the telescope is walked, and no
+  --   instantiation of it is a counterexample.
   -- PROBED: `Probed.Parked-Slot-Store` at the program whose OWN layers
   --   are nought -- a bare reference to a shared slot -- so the whole
   --   climb rests on the telescope.  Read at two depths behind the same
@@ -1274,6 +1285,15 @@ postulate
   -- SO THE ARM IS A LEAF FOR AN ARITHMETIC REASON AND NOT A STRUCTURAL
   -- ONE.  The recursion into the source is available and every one of
   -- its premises transports; what does not transport is the cell.
+  -- DEAD ROUTE: the SUBSTITUTING telescope is bound-side HERE TOO, and
+  --   for the same arithmetic the sibling slot statement records: this
+  --   premise iterates `sizeStep S` once per unit of `descChg` plus the
+  --   summand alike, so a hop that doubles what a layer delivers buys
+  --   the bound at least four times what it buys the cell.  What that
+  --   leaves measure-side is the ARRIVAL count against a program whose
+  --   syntax does not grow with it -- an accumulator the step wraps
+  --   rather than replaces, fed by a source emitting many values from
+  --   fixed text -- which is the axis no row over this statement sweeps.
   -- PROBED: `Probed.Cross-Count-Outer-Store` at the very state that
   --   killed the constant, a scan whose step stores the arriving datum
   --   back as a one-shot observable, subscribed at all three doors.
