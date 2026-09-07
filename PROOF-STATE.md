@@ -215,16 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **POINT `share-step-fit` AT THE SHARE WHOSE DEF OUTLIVES ITS CONNECT,
-  which exists already and is one module over.** What empties the admit
-  list is settled: the def is synchronous, so the connect latches it
-  completed and drops its own registration before returning — not the
-  connect's timing and not the admit's guard. `Probed.Root` builds the
-  clearing shape, a share over an empty hot that never fires, and pins
-  its registrations as still standing at the root exit. The commit
-  spends that state: read the admit entries there and take the leaf at
-  one. It is the first instantiation this row would have, so a green
-  moves it off FALSITY and a red is worth more.
+- **REACH THE `thru-outer` ARM FOR `share-step-fit`, which is the one
+  residue its new rows leave and the same gap the frame leaf carried.**
+  The row is pointed now, at both admitted registrations and both `fin`
+  branches — but `p` is the registered chain, and every registration a
+  share admits today is `from-inner` headed, because the share is
+  subscribed as an INNER of the root fan. A `thru-outer` head needs the
+  share to be an outer's SOURCE, which wants an observable-typed slot.
+  The commit builds that slot pair and reads the admit there. Covering
+  both charging arms is what moved the frame leaf off FALSITY, so this
+  is the commit that decides the same for this one.
 
 - **THE SUBSTITUTING TELESCOPE, WHICH IS THE ONE SHAPE THAT HAS ALREADY
   REFUTED AN ADDITIVE SUMMAND ON A SIBLING FACE.** `Rx.Clos-Size` exists
@@ -294,10 +294,10 @@ does not fit is a finding about the shared statement, not about the head.
   ONE LEAF INHERITING THE BARRIER — it is `depthFold` again, so the doubling
   recorded at `depthShareGo` closes its conclusion to instantiation exactly as
   the parent's was.
-- **`share-step-fit`** (Part7/Arrival-Caps) — FALSITY, `NO EVIDENCE`: the
-  position's ceiling survives one `foldPath`, slots unmoved. Unpointed, and not
-  by the connect's timing — its point is a `shareAdmit` entry, and that list is
-  empty on two families whose shared slots are connected in opposite ways.
+- **`share-step-fit`** (Part7/Arrival-Caps) — FALSITY, `PROBED`: the position's
+  ceiling survives one `foldPath`, slots unmoved. POINTED AT LAST, at a share
+  whose def cannot complete — both admitted registrations, both `fin` branches.
+  The residue is the arm: every registration there is `from-inner` headed.
 - **`scanΦ-fit`** (Part7/Depth-Fit) — SHAPE, `DEAD ROUTE`: the producing side
   of the fold's grant. THE MECHANISM IS DEAD, NOT A DENOMINATION: a flat
   per-instant potential cannot dominate a count exponential in itself; the one

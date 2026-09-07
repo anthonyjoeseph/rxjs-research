@@ -641,40 +641,11 @@ postulate
     depthFrame sf bid now f p vals fin sched st
       ≤ sightCeil (sizeᵉ e) (nestDᵛˢ vals) (storeSyncMax sched st) (nestUnit e sl)
 
--- THE TWO OBLIGATIONS THE SHARE SINK OWES, which are the same pair one
--- level down: the registrations a share admits rather than the frames a
--- path crosses.  Neither is covered, and for two different reasons.
--- `share-fold-fit` is `depthFold` again, so it inherits the parent's
--- own barrier and no instrument reaches it.
---
--- AND `share-step-fit` IS BLOCKED BY THE CORPUS RATHER THAN BY THE
--- MEASURE, which is the weaker obstruction and the one worth writing
--- down.  Its `rid` and `p` are exactly a `shareAdmit` entry, so a point
--- is whatever the shared slot has registered where the row would
--- stand -- and `Probed.Depth-Join` reads that list off the registry at
--- the round these leaves are otherwise instantiated at and finds it
--- EMPTY.  So the absence is of a POINT.
---
--- AND WHAT EMPTIES IT IS THE SHARED SLOT'S DEF, not the connect that
--- was the first reading and not the admit's own guard that was the
--- second.  The round is read again beside the two latches the connect
--- sets, and the slot is recorded as CONNECTED and as COMPLETED at the
--- same point: `sharedConnect` subscribes the def, asks whether the
--- burst came back completed, and on yes drops every registration on
--- that source before it returns.  The entry is written and does not
--- survive the call that writes it, so a def built from one-shots can
--- never leave one -- which is why two opposite connect timings agreed,
--- both families sharing the def that decides it.
---
--- SO THE POINT NEEDS A DEF THAT OUTLIVES ITS CONNECT, and the
--- telescope invariant is what keeps this corpus from having one: a
--- slot's def may name only strictly earlier slots, so its
--- nought-indexed share reaches no scripted source and every def open to
--- it is synchronous.  A share at a later index over a scripted slot
--- below it is the shape that clears this, and `Probed.Root` already
--- builds one and pins its registrations as still standing.  The row is
--- unpointed by the corpus this face is otherwise instantiated at, and
--- pointed by that one.
+-- THE FOLD HALF OF WHAT THE SHARE SINK OWES, over the registrations a
+-- share admits rather than the frames a path crosses.  It is
+-- `depthFold` again, so it inherits the parent's own barrier and no
+-- instrument reaches it -- which is a different obstruction from the
+-- one its sibling had, and the reason the two no longer share a block.
 postulate
   share-fold-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (sf : Gas) (gas : ℕ) (bid : Id) (now : Tick) (i : Fin n)
@@ -687,6 +658,47 @@ postulate
       (record st { delivered = rid ∷ EvalSt.delivered st })
       ≤ sightCeil (sizeᵉ e) (nestDᵛˢ vals) (storeSyncMax sched st) (nestUnit e sl)
 
+-- AND THE STEP HALF, WHICH IS REACHED.  Its `rid` and `p` are exactly a
+-- `shareAdmit` entry, so a point is whatever the shared slot has
+-- registered where the row stands -- and what decides whether it has
+-- registered anything is the DEF.  A share whose def COMPLETES leaves
+-- none: `sharedConnect` subscribes the def, asks whether the burst came
+-- back completed, and on yes drops every registration on that source
+-- before it returns, so the entry is written and does not survive the
+-- call that writes it.  A def built from one-shots can therefore never
+-- leave one, which is why the corpus this face is otherwise
+-- instantiated at admits nothing at either connect timing -- both its
+-- families share the def that decides it, and neither wrapper alters
+-- that.
+--
+-- WHAT CLEARS IT IS A DEF THAT OUTLIVES ITS OWN CONNECT, and the
+-- telescope invariant is what puts that outside that corpus rather than
+-- outside reach: a slot's def may name only strictly earlier slots, so
+-- a nought-indexed share reaches no scripted source and every def open
+-- to it is synchronous.  A share at a LATER index over a scripted slot
+-- below it is the shape that clears this, and the rows below stand at
+-- one -- a share over an empty hot, a source that never fires and so
+-- never completes.
+--
+-- THE RESIDUE IS THE ARM, which is why the class does not move on
+-- these.  `p` is the registered chain, so its head decides what
+-- `foldPath` does, and every registration reachable at that share is
+-- headed by `from-inner`: the share is subscribed AS an inner of the
+-- root fan.  A `thru-outer` head needs the share to be the SOURCE of an
+-- outer rather than one of its inners, which wants an observable-typed
+-- slot and no family here has one.  Same shape of gap the frame leaf
+-- carried until its second arm was reached, and it is named here so the
+-- receipt below is not read as covering it.
+-- PROBED: `Probed.Depth-Join` stands three rows at a share whose def
+--   cannot complete, taking `rid` and `p` off `shareAdmit` at the state
+--   and schedule the same subscribe returns.  Both admitted
+--   registrations are read, so the row does not rest on whichever was
+--   first, and both `fin` branches are -- the statement hands the fold
+--   a close emit at `true` and an empty list at `false`, so one says
+--   nothing about the other.  The gas is the budget the statement
+--   names.  Not covered: the `thru-outer` arm, and any share carrying
+--   more than the two registrations this one does.
+postulate
   share-step-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (sf : Gas) (gas : ℕ) (bid : Id) (now : Tick) (i : Fin n)
     (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
