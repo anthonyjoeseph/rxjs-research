@@ -215,19 +215,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE TELESCOPE PAST ONE SLOT, WHERE TWO ROWS ARE UNCOVERED IN THE
-  SAME PLACE.** `subscribeSharedSlot-sz-store`'s entire climb IS the
-  telescope summand — an `input` charges nought, so no reading of the
-  program term reaches it — and it is instantiated only behind ONE
-  reference; `subscribeE-sz-store-scan` says the same of slots in
-  series. That is one region carrying two statements: the region
-  where a summand really a MAXIMUM reads identically to one really a
-  SUM, since one slot makes the two agree.
-  The commit builds a telescope of several DISTINCT slots behind
-  distinct references and reads both charges at it; whichever way the
-  figures fall one of the two denominations is refuted, which is why
-  this is worth more than either row's remaining grind.
-
 - **THE REGISTRY IS THE ONE STORE PLACE THE FRAME'S OWN PREDICATE
   CANNOT ANSWER, so its bound has to be read off the syntax instead.**
   `burst-nest-regs` is what is left of the subscribe frame's nesting
@@ -252,6 +239,18 @@ does not fit is a finding about the shared statement, not about the head.
   slack enough `S` that a proven monotonicity carries the entry's row
   to it — which would move the risk off the leaf and onto the round.
 
+- **THE SUBSTITUTING TELESCOPE, WHICH IS THE ONE SHAPE THAT HAS ALREADY
+  REFUTED AN ADDITIVE SUMMAND ON A SIBLING FACE.** `Rx.Clos-Size` exists
+  because a slot definition that SUBSTITUTES doubles what it delivers per
+  layer, so the value face's key had to see through the reference. The
+  store rows have now walked a telescope, but every upper slot in them
+  was a bare reference, delivering only what the slot below emits. The
+  commit builds the refuting shape — each hop a duplication applied to
+  the slot beneath — and reads the store charge across the hops against
+  the summand's growth. Either it transfers and
+  `subscribeSharedSlot-sz-store` and `subscribeE-sz-store-scan` are
+  restated in an expanded currency, or the two faces differ.
+
 ### The ledger
 
 - **`walk-frame-drain-entries`** (Part7/Walk-Sink) — FALSITY,
@@ -268,14 +267,16 @@ does not fit is a finding about the shared statement, not about the head.
   keyed on the source program since an arbitrary burst is unbounded. A
   duplication chain buys no rung; a handed-out `μ` is charged at one nesting
   and at two; the rate is beyond a fold that parks them.
-- **`subscribeE-sz-store-scan`** (Regs-Nest-Walk) — FALSITY, `PROBED×3`: the
+- **`subscribeE-sz-store-scan`** (Regs-Nest-Walk) — FALSITY, `PROBED×4`: the
   reified seed and the cell each arrival rewrites, in a currency the layer
   premise is not stated in. Cells in series do not compound; a parked queue
-  reads the program's own run; slots in series are open.
-- **`subscribeSharedSlot-sz-store`** (Regs-Nest-Walk) — FALSITY, `PROBED`: the
+  reads the program's own run; a source resolving a slot leaves the
+  telescope carrying the climb.
+- **`subscribeSharedSlot-sz-store`** (Regs-Nest-Walk) — FALSITY, `PROBED×2`: the
   definition behind a reference, whose entire climb is the telescope summand —
-  `input` charges nought, so no reading of the program term reaches it. Read at
-  two depths behind one reference; a telescope of more than one slot is open.
+  `input` charges nought, so no program reading reaches it. The summand is
+  owed the connect's TRANSITIVE reach; sum against maximum is closed to
+  instantiation.
 - **`sink-fan-sink`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE`: the
   potential at an admitted chain that ends at a SECOND hand-over. Its
   escalation is PROGRAM-bounded after all — hops climb the stratified telescope

@@ -156,6 +156,10 @@ open import Probed.Parked-Slot-Store
   using (slotStoreFigures≡; slotStoreNodes≡; slotStoreRows≡;
          tieParkedSlot12; tieParkedSlot13)
 
+open import Probed.Slot-Cascade-Store
+  using (hopFigures≡; hopRows≡; farRows≡; scanFigures≡; scanRows≡;
+         tieHop; tieFar; tieScan)
+
 open import Probed.Drain-Count-Slot
   using (slotCharges≡; slotRows≡; tieDrainSlot12; tieDrainSlot13)
 
