@@ -239,34 +239,22 @@ record Walk-Hyps {n} {Γ : Ctx n} {t} (e : Closed Γ t) (S W R d : ℕ) : Set₁
     -- taken at the chain is.  Every face that has nothing to say about
     -- the chain ignores the index, which is most of them.
     --
-    -- AND THE COST CHARGED TO THIS INDEX IS NOT THE INDEX'S, which is
-    -- worth more than the attribution it replaces.  The burst face's
-    -- module went up by a multiple as the index landed, and a shape
-    -- reading stood ready to explain it: three loop premises turned from
-    -- one Bool into an `all` over the chain list, so a face whose own
+    -- AND THE COST ONCE CHARGED TO THIS INDEX IS NOT A COST.  The burst
+    -- face read as a multiple of its pre-index self, and a shape reading
+    -- stood ready to explain it: three loop premises turned from one
+    -- Bool into an `all` over the chain list, so a face whose own
     -- reading is a fold nests one wherever it states its ledger THROUGH
-    -- this field.  The burst face is now cut in three and all three are
-    -- measured, on a cache a control run showed coherent.  Exactly ONE
-    -- of the pieces names this record in a type, and it is over the dev
-    -- budget — but so is a piece that cannot see the index at all,
-    -- while the LARGEST of the three checks in seconds.  So the index
-    -- does not separate them, and neither does size: the piece that is
-    -- over the budget alone is half the length of the piece that is
-    -- not.  What is expensive is therefore neither this field nor the
-    -- amount of text, and naming it is OPEN.  The figures live in
-    -- `typecheck-performance-numbers.md`.
-    --
-    -- DEAD ROUTE: SEALING THE FIELD AT THE FACE DOES NOT RECOVER IT, so
-    --   neither candidate survives as a sufficient one.  An `abstract`
-    --   wrapper over the burst ledger — the field bound to an opaque
-    --   head, with the two projections, the widening and the fan's
-    --   distribution proven inside the block, since a sealed head is no
-    --   longer syntactically constant in the chain and the free
-    --   distribution stops matching — still ran past the dev budget on a
-    --   warm cache, against a pre-index baseline that completed well
-    --   inside it.  An opaque head is exactly what keeps a body out of
-    --   the generated types, so whatever is being paid for is not the
-    --   ledger's body reaching them.
+    -- this field.  The face is cut in three, and all three pieces check
+    -- in SECONDS — the one naming this record in a type included — and
+    -- so does the uncut face they came from.  Every reading that ever
+    -- ran past the dev budget here was taken against a cone the
+    -- container had not built, and the attribution followed the FILE
+    -- rather than what the run was paying for; a control truncated to
+    -- the imports prices that cone at very nearly the whole of what the
+    -- face costs.  So this index is not a build cost and there is no
+    -- cost to recover by sealing it.  The figures live in
+    -- `typecheck-performance-numbers.md`, and the misattribution's shape
+    -- is in `docs/agda-dev.md`, which is where the next one gets caught.
     Vb : ∀ {u} → Path Γ u t → ℕ → ∀ {s} → List (Val Γ s) → Bool
 
     -- BURST LEDGERS: an abstract Bool over the accumulated protocol events

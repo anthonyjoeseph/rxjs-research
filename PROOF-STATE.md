@@ -215,17 +215,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **WHAT MAKES THE NODRY FACE EXPENSIVE, now the only thing holding
-  `subscribeE-Ψ` out of the dev loop.** All three cuts are measured: the
-  LARGEST checks in twenty seconds and the other two are killed at the
-  budget, one of them the smallest. So BOTH readings are dead in the
-  field's own header — the record only one expensive piece can see, and
-  the amount of text, which the cheap piece outruns. Neither over-budget
-  piece holds a mutual cycle, so both cut freely: the commit bisects the
-  smaller, where a region is half the size to name, and measures each
-  half. A half that stays over names the region; both coming in names
-  the whole-file pass instead.
-
 - **THE MINT, WHERE TWO ROWS NOW POINT AND NEITHER IS STATED.**
   `walk-share-strat`'s free form dies at one `register`, so the
   strictness it claims is owed where a chain is MINTED and not where
@@ -246,6 +235,18 @@ does not fit is a finding about the shared statement, not about the head.
   will pay it, and either states that pricing or establishes that the
   factor admits no denomination the walk can carry — which moves the
   face's MECHANISM onto the table and off its currency.
+
+- **RE-MEASURING EVERY MODULE THIS TIER RECORDS AS OVER BUDGET, because
+  three of them just turned out not to be.** The numbers file marks a
+  budget-killed run as a FLOOR, and a floor taken against an unbuilt
+  cone is a reading about the container, not the module — the whole of
+  a face charged with cost that a control truncated to its imports
+  prices almost entirely. Three rows fell that way in one sitting, one
+  by a factor of twenty-five, and each had a shape reading standing
+  ready to explain it. The commit re-runs the remaining floors
+  bottom-up on a coherent cache and deletes the findings resting on the
+  ones that fall — the expensive half, since a diagnosis outlives the
+  number it came from.
 
 ### The ledger
 
