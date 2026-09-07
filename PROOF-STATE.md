@@ -215,29 +215,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE SUBSTITUTING TELESCOPE, WHICH IS THE ONE SHAPE THAT HAS ALREADY
-  REFUTED AN ADDITIVE SUMMAND ON A SIBLING FACE.** `Rx.Clos-Size` exists
-  because a slot definition that SUBSTITUTES doubles what it delivers per
-  layer, so the value face's key had to see through the reference. The
-  store rows have now walked a telescope, but every upper slot in them
-  was a bare reference, delivering only what the slot below emits. The
-  commit builds the refuting shape — each hop a duplication applied to
-  the slot beneath — and reads the store charge across the hops against
-  the summand's growth. Either it transfers and
-  `subscribeSharedSlot-sz-store` and `subscribeE-sz-store-scan` are
-  restated in an expanded currency, or the two faces differ.
-
-- **THE DELIVERED SUMMAND AT THE ROW'S OWN BUDGET, which is the one
-  region the split's evidence declines to reach.** `burst-regs-split`
-  now carries the registry, and its shape is settled: three candidates
-  were separated and only the sum survived. What no row touches is the
-  MARGIN — every witness runs at padded gas, so what is covered is the
-  climb's shape, not whether the sum has room at `budgetAt e ins 0`.
-  The commit instantiates the split at its own budget on the carrying
-  fold, reading the delivered summand against the node the value sits
-  in rather than the table's maximum. A crossing there restates the
-  right summand, not the sum; none promotes the row off a coverage gap
-  that currently reads as safe.
+- **THE ARRIVAL COUNT AGAINST FIXED TEXT, which is what is left
+  measure-side once the telescope is read as bound-side.** Every `-sz`
+  bound iterates once per unit of its summand, so an axis costing syntax
+  cannot refute. An accumulator the step WRAPS rather than replaces grows with
+  arrivals alone — the mechanism that has just crossed the step
+  obligation one face over — and a source emitting many values from
+  fixed text is what decouples the two: an unfolding `μ` plants its
+  copies without the layer count charging for them. The commit builds
+  that pair against `subscribeE-sz-store-scan`, whose four receipts all
+  stand at one arrival shape. It refutes, or it is the first row over
+  this family that could have.
 
 - **THE CARRIED STORE PREDICATE FOUR ROWS ARE ALL OWED, and a field
   rather than a hypothesis is what it has to be.** `walk-share-nestOK`,
@@ -250,6 +238,18 @@ does not fit is a finding about the shared statement, not about the head.
   reads it at the fan's reach. Whether ONE field serves all four is what
   decides if this is one statement or four; a crossing there is a
   finding about the walk rather than about a row.
+
+- **THE DELIVERED SUMMAND AT THE ROW'S OWN BUDGET, which is the one
+  region the split's evidence declines to reach.** `burst-regs-split`
+  now carries the registry, and its shape is settled: three candidates
+  were separated and only the sum survived. What no row touches is the
+  MARGIN — every witness runs at padded gas, so what is covered is the
+  climb's shape, not whether the sum has room at `budgetAt e ins 0`.
+  The commit instantiates the split at its own budget on the carrying
+  fold, reading the delivered summand against the node the value sits
+  in rather than the table's maximum. A crossing there restates the
+  right summand, not the sum; none promotes the row off a coverage gap
+  that currently reads as safe.
 
 ### The ledger
 
@@ -267,16 +267,16 @@ does not fit is a finding about the shared statement, not about the head.
   keyed on the source program since an arbitrary burst is unbounded. A
   duplication chain buys no rung; a handed-out `μ` is charged at one nesting
   and at two; the rate is beyond a fold that parks them.
-- **`subscribeE-sz-store-scan`** (Regs-Nest-Walk) — FALSITY, `PROBED×4`: the
-  reified seed and the cell each arrival rewrites, in a currency the layer
-  premise is not stated in. Cells in series do not compound; a parked queue
-  reads the program's own run; a source resolving a slot leaves the telescope
-  carrying the climb.
-- **`subscribeSharedSlot-sz-store`** (Regs-Nest-Walk) — FALSITY, `PROBED×2`:
-  the definition behind a reference, whose entire climb is the telescope
-  summand — `input` charges nought, so no program reading reaches it. The
-  summand is owed the connect's TRANSITIVE reach; sum against maximum is closed
-  to instantiation.
+- **`subscribeE-sz-store-scan`** (Regs-Nest-Walk) — FALSITY,
+  `DEAD ROUTE, PROBED×4`: the reified seed and the cell each arrival rewrites,
+  in a currency the layer premise is not stated in. Cells in series do not
+  compound; a parked queue reads the program's own run; a source resolving a
+  slot leaves the telescope carrying the climb.
+- **`subscribeSharedSlot-sz-store`** (Regs-Nest-Walk) — FALSITY,
+  `DEAD ROUTE, PROBED×2`: the definition behind a reference, whose entire climb
+  is the telescope summand — `input` charges nought, so no program reading
+  reaches it. The summand is owed the connect's TRANSITIVE reach; sum against
+  maximum is closed to instantiation.
 - **`sink-fan-sink`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE`: the
   potential at an admitted chain that ends at a SECOND hand-over. Its
   escalation is PROGRAM-bounded after all — hops climb the stratified telescope
