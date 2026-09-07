@@ -215,16 +215,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **REACH THE `thru-outer` ARM FOR `share-step-fit`, which is the one
-  residue its new rows leave and the same gap the frame leaf carried.**
-  The row is pointed now, at both admitted registrations and both `fin`
-  branches — but `p` is the registered chain, and every registration a
-  share admits today is `from-inner` headed, because the share is
-  subscribed as an INNER of the root fan. A `thru-outer` head needs the
-  share to be an outer's SOURCE, which wants an observable-typed slot.
-  The commit builds that slot pair and reads the admit there. Covering
-  both charging arms is what moved the frame leaf off FALSITY, so this
-  is the commit that decides the same for this one.
+- **THE `scan-f` HEAD AT AN OBSERVABLE-TYPED ACCUMULATOR, which the
+  arm sweep just named as the one place `share-step-fit` can still be
+  false.** `storeSyncMax` maximises over slots, nodes and registry, and
+  of the three heads no row reaches, two cannot move it — `map-f`
+  returns what it was handed, `take-f` only shrinks. `scan-f` writes a
+  node back with a fresh accumulator, and an observable-typed one
+  carries nesting, so `nodeNest` can grow across the step the
+  conclusion says cannot. The commit builds a share whose registration
+  is `scan-f` headed at that type and reads the ceiling either side. A
+  crossing refutes the row outright and is worth more than the seven
+  rows standing; a hold is the last arm, and the class moves.
 
 - **THE SUBSTITUTING TELESCOPE, WHICH IS THE ONE SHAPE THAT HAS ALREADY
   REFUTED AN ADDITIVE SUMMAND ON A SIBLING FACE.** `Rx.Clos-Size` exists
@@ -295,9 +296,10 @@ does not fit is a finding about the shared statement, not about the head.
   recorded at `depthShareGo` closes its conclusion to instantiation exactly as
   the parent's was.
 - **`share-step-fit`** (Part7/Arrival-Caps) — FALSITY, `PROBED`: the position's
-  ceiling survives one `foldPath`, slots unmoved. POINTED AT LAST, at a share
-  whose def cannot complete — both admitted registrations, both `fin` branches.
-  The residue is the arm: every registration there is `from-inner` headed.
+  ceiling survives one `foldPath`, slots unmoved. Seven rows, at shares whose
+  defs cannot complete — `from-inner` and `thru-outer` heads, root and
+  share-sink tails, both `fin`. The residue is one arm: `scan-f` at an
+  obs-typed accumulator.
 - **`scanΦ-fit`** (Part7/Depth-Fit) — SHAPE, `DEAD ROUTE`: the producing side
   of the fold's grant. THE MECHANISM IS DEAD, NOT A DENOMINATION: a flat
   per-instant potential cannot dominate a count exponential in itself; the one
