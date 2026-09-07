@@ -54,12 +54,33 @@ to a mid-tower module invalidated two such modules, and four successive checks o
 a consumer were killed by the budget while paying for them — each one reading as
 a blowup in the consumer, which was never slow at all.
 
-**The attribution, and it is two cheap runs.** Truncate the consumer to its
-import list and check that: if the truncation is slow too, nothing in the module
-is slow and the cost is entirely below it. Then check each import alone in a
-throwaway module — a cached dependency answers in seconds and the culprit does
-not. Both runs are decisive, and both are cheaper than one more killed check of
-the consumer.
+**THE TOOL NOW DECIDES THIS, AND YOU DO NOT HAVE TO REMEMBER TO ASK.** Before
+each run `stale_cone` reads which of the target's transitive dependencies have
+no interface newer than the mirror source it was built from — the exact set the
+run is about to rebuild. It is filesystem-only (no Agda, well under a second),
+and it is decidable rather than heuristic, because the mirror writes only on a
+real change. On a non-empty set the run prints `CONE`, names the modules, and
+**the timing is not recorded at all** — a cone number bounds the module from
+neither side, so a row carrying one states a cost the module has never had. An
+over-budget run then reports which cost it was instead of listing candidates.
+
+This replaced a two-run recipe that was correct, complete, documented, and
+skipped — it costs two runs at exactly the moment there is no time for two runs,
+and the file under test always looks like the better suspect. A rule you can
+satisfy while still failing is a rule that needs a machine.
+
+**The manual attribution is now the ESCALATION, for when the tool says the cone
+was warm and the number still looks wrong.** Truncate the consumer to its import
+list and check that: if the truncation is slow too, nothing in the module is slow
+and the cost is entirely below it. Then check each import alone in a throwaway
+module — a cached dependency answers in seconds and the culprit does not.
+
+`make agda-dev-selftest` proves the attribution fires **in both directions**: a
+hidden interface must be charged to a consumer and must not be charged to a
+module that does not import it. The silent-pass direction is the dangerous one —
+a check that never reports anything stale is indistinguishable from a warm tree,
+which is the state the selftest normally runs in, so the positive control is
+manufactured rather than waited for.
 
 **AND AN EVIDENCE MODULE IS THE WORST CASE, BECAUSE ITS COST IS ALMOST ALL CONE.**
 A probe is a handful of `refl` rows and imports a whole proof face to state them, so

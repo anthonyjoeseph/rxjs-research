@@ -135,7 +135,9 @@ from __future__ import annotations
 import argparse
 import copy
 import resource
+import glob
 import hashlib
+import importlib.util
 import os
 import re
 import shutil
@@ -255,6 +257,74 @@ def sync_mirror() -> None:
         [os.path.join(os.path.dirname(os.path.abspath(__file__)),
                       "strip-comments.py")],
         check=True, capture_output=True)
+
+
+def _load(name: str):
+    """Import a sibling script, so the two tools cannot drift apart."""
+    path = os.path.join(REPO, "scripts", name + ".py")
+    spec = importlib.util.spec_from_file_location(name.replace("-", "_"), path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def stale_cone(rel: str) -> list[str]:
+    """Which modules BELOW the target this run will have to rebuild.
+
+    THE LOOP STUBS MUTUAL BLOCKS IN THE TARGET ONLY AND CHECKS EVERY DEPENDENCY
+    FOR REAL, so a run entered with a cold cone measures the cone.  The number
+    that comes back reads as a fact about the module named on the command line
+    and is a fact about everything under it.  The symptom misdirects perfectly:
+    a file studying something expensive, running long, invites exactly the
+    theory it was written to test -- and the theory is then written into a
+    source header, where nothing ever re-derives it.
+
+    So THE TOOL DECIDES THIS RATHER THAN REMINDING ANYONE TO.  The two-run
+    attribution recipe was correct, complete, documented, and skipped, because
+    it costs two runs precisely at the moment there is no time for two runs.  A
+    rule that can be satisfied while still failing is a rule that needs a
+    machine, and this is the machine: staleness is read off the filesystem, no
+    Agda process and no judgement, and it is decidable rather than heuristic --
+    an interface older than the mirror source it was built from is one this run
+    rebuilds.  The mirror WRITES ONLY ON A REAL CHANGE, which is the property
+    that makes an mtime mean something here rather than tracking the last sweep.
+
+    A miss is safe in the direction that matters: an unknown build layout or a
+    module outside the trees reports nothing stale, so the tool falls back to
+    charging the module, which is what it did before.  Returns module names;
+    EMPTY MEANS THE ELAPSED TIME IS THE MODULE'S OWN.
+    """
+    ci = _load("check-imports")
+    files = []
+    for tree in ci.TREES:
+        for root, _, fs in os.walk(os.path.join(REPO, tree)):
+            for f in fs:
+                if f.endswith(".agda"):
+                    files.append(os.path.relpath(os.path.join(root, f), REPO))
+    graph = ci.import_graph(files)
+    by_mod = {ci.module_of(p): p for p in files}
+    target = ci.module_of(os.path.join("agda", "src", rel))
+    if target not in graph:
+        return []
+    builds = glob.glob(os.path.join(MIRROR, "_build", "*", "agda"))
+    if not builds:
+        return []
+    stale = []
+    for m in sorted(ci.reachable(graph, [target])):
+        src = by_mod.get(m)
+        if m == target or src is None:
+            continue
+        rest = os.path.relpath(src, "agda")
+        mir = os.path.join(MIRROR, rest)
+        if not os.path.exists(mir):
+            continue
+        ifaces = [os.path.join(b, rest[:-5] + ".agdai") for b in builds]
+        fresh = [i for i in ifaces
+                 if os.path.exists(i)
+                 and os.path.getmtime(i) >= os.path.getmtime(mir)]
+        if not fresh:
+            stale.append(m)
+    return stale
 
 # A top-level line opening a construct we keep VERBATIM and never stub.  Its
 # indented body comes along with it.  `mutual`/`private`/`abstract` blocks are
@@ -1340,17 +1410,83 @@ def has_heavy(rel: str) -> bool:
         return False
 
 
-def within_budget(args, secs: float) -> bool:
+def within_budget(args, secs: float, cone: list[str] = []) -> bool:
+    """Fail an over-budget run, and say WHICH cost it was.
+
+    The cause list this used to print led with `a cold interface cache (run it
+    again)`, which is both the commonest cause and the one piece of advice that
+    cannot work: a budget-killed run caches nothing, so the retry redoes the
+    same partial rebuild and dies in the same place.  `stale_cone` decides the
+    question outright, so the branch below is a verdict rather than a menu.
+    """
     if not args.budget or secs <= args.budget:
         return True
     print(f"\nagda-dev: OVER BUDGET — {secs:.1f}s against a {args.budget:.0f}s target.\n"
-          "  The budget is the point of this tool, so it fails rather than warns.\n"
-          "  Usual causes, cheapest first: a cold interface cache (run it again --\n"
-          "  the second run is the loop); a NEW multi-member mutual block, which is\n"
-          "  the cost curve biting (`--list <file>` shows the blocks); or --batch\n"
-          "  drifting off 4 (measured optimum: 1->42.3s 2->18.5s 4->17.2s 8->45.7s).\n"
-          "  If the work genuinely grew, move the number in the Makefile and say so.")
+          "  The budget is the point of this tool, so it fails rather than warns.")
+    if cone:
+        print(f"  AND THIS NUMBER IS NOT THIS MODULE'S.  {len(cone)} module(s) below it\n"
+              "  had no current interface, so the run paid to rebuild them and the\n"
+              "  elapsed time is the cone's.  Do NOT retry at this budget -- a killed\n"
+              "  run caches nothing.  Let ONE run finish with a generous `BUDGET=`,\n"
+              "  then re-measure; the second number is the module's own.  Rebuilt:\n"
+              + "".join(f"    {m}\n" for m in cone[:8])
+              + (f"    ... and {len(cone) - 8} more\n" if len(cone) > 8 else "")
+              + "  Nothing about this run is evidence about the module, its statement,\n"
+                "  or its arithmetic.  Do not write a finding from it.")
+    else:
+        print("  The cone was WARM, so the cost is this module's own.  A new\n"
+              "  multi-member mutual block is the usual cause (`--list <file>` shows\n"
+              "  the blocks); --batch drifting off 4 is the other (measured optimum:\n"
+              "  1->42.3s 2->18.5s 4->17.2s 8->45.7s).  If the work genuinely grew,\n"
+              "  move the number in the Makefile and say so.")
     return False
+
+
+def falsify_cone() -> int:
+    """Prove the cost attribution fires, and fires on the right module.
+
+    BOTH DIRECTIONS, because only one of them is the dangerous failure.  A
+    check that never reports anything stale reads exactly like a warm tree and
+    silently restores the misattribution it exists to end -- and a warm tree is
+    the state this selftest normally runs in, so a positive control has to be
+    MANUFACTURED rather than waited for.  One interface is moved aside and put
+    back (`mv` preserves the mtime, so the tree is left as it was found), a
+    consumer must then name that module, and a module that does not import it
+    must stay silent.
+
+    No Agda process: the whole mechanism is `os.path.getmtime`, which is why it
+    can sit in a selftest that runs in a second.
+    """
+    victim, consumer, stranger = "Rx.Exp", "Rx/Frame-Width.agda", "Rx/Prim.agda"
+    ifaces = glob.glob(os.path.join(
+        MIRROR, "_build", "*", "agda", "src", *victim.split(".")) + ".agdai")
+    if not ifaces:
+        print(f"agda-dev --falsify: no interface for {victim}; cone check "
+              "UNTESTED (build the tree once, then re-run).", file=sys.stderr)
+        return 2
+    hidden = [(i, i + ".selftest-bak") for i in ifaces]
+    try:
+        for i, bak in hidden:
+            os.rename(i, bak)
+        hit, miss = stale_cone(consumer), stale_cone(stranger)
+    finally:
+        for i, bak in hidden:
+            if os.path.exists(bak):
+                os.rename(bak, i)
+    for i, _ in hidden:
+        assert os.path.exists(i), f"RESTORE FAILED: {i}"
+    if victim not in hit:
+        print(f"agda-dev --falsify: FAILED — {consumer} imports {victim}, whose "
+              f"interface was missing, and the cone check reported {hit or '[]'}. "
+              "A slow run would be charged to the module.", file=sys.stderr)
+        return 1
+    if victim in miss:
+        print(f"agda-dev --falsify: FAILED — {stranger} does not import "
+              f"{victim} and the cone check named it anyway.", file=sys.stderr)
+        return 1
+    print(f"agda-dev --falsify: PASSED — a missing {victim} interface is "
+          f"charged to {consumer} and not to {stranger}.")
+    return 0
 
 
 def falsify(args) -> int:
@@ -1410,7 +1546,7 @@ def falsify(args) -> int:
         return 1
     print("agda-dev --falsify: PASSED — the corruption was caught, so the fast "
           "check is load-bearing.")
-    return 0
+    return falsify_cone()
 
 
 def main() -> int:
@@ -1503,6 +1639,10 @@ def main() -> int:
                           "worth 35s of\n     255s positivity -- the cost lives in the "
                           "SCC's TERM SIZE, not the count.)")
             return 0
+        # SNAPSHOT THE CONE BEFORE THE RUN, because the run is what warms it:
+        # asked afterwards the question always answers "warm" and the check is
+        # a no-op that reads as a clean bill.
+        cone = stale_cone(rel)
         t0 = time.time()
         ok = dev_check(rel, args, args.focus)
         elapsed = time.time() - t0
@@ -1520,10 +1660,24 @@ def main() -> int:
         # its output was never parsed and the `Checking` counter is still zero.
         # Requiring it there would drop every floor silently, which is the
         # failure this recording exists to end.
+        # AND NOT A RUN THAT REBUILT ITS OWN CONE, which is a stronger exclusion
+        # than the floor beside it rather than a second flavour of one.  A floor
+        # at least bounds this module from below; a cone number bounds it from
+        # neither side, since nothing in it is about the module.  Recording one
+        # is how a row comes to state a cost the module has never had -- and a
+        # row here is quoted later as settled, so the number outlives every
+        # chance to notice what it measured.  Three of this tier's over-budget
+        # rows were that, one by a factor of twenty-five.
         timed_out = WORK["timeout"]
-        if not args.focus and (timed_out or (ok and WORK["checking"] > 0)):
+        if cone:
+            print(f"\nagda-dev: CONE — {len(cone)} module(s) under {rel} were rebuilt by\n"
+                  f"  this run ({', '.join(cone[:4])}"
+                  + (", ..." if len(cone) > 4 else "")
+                  + f").  {elapsed:.1f}s is not a measurement of\n"
+                    "  the module and is not recorded.  Re-run to measure it.")
+        if not args.focus and not cone and (timed_out or (ok and WORK["checking"] > 0)):
             perf_record.record(f"agda-dev {rel}", elapsed, floor=timed_out)
-        return 0 if (ok and within_budget(args, elapsed)) else 1
+        return 0 if (ok and within_budget(args, elapsed, cone)) else 1
 
     # A FILE IS REQUIRED.  There is deliberately no whole-project mode: it was
     # measured against `make gate` and lost on both cost and fidelity, and the
