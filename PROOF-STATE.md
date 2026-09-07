@@ -215,17 +215,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE SLOT-SOURCED MINT, WHICH IS THE ONE OBLIGATION LEFT ON
-  `walk-share-strat`.** Two of the three the sink leaf enumerates are
-  now spent: the minted-source arm is the reading's own guard, carried
-  by `srcFloor?`, and the delivered inner is a different invariant.
-  What is left is the descent: a share's def may name only inputs below
-  its index, `inputsBelowᵉ` is the field that says so, and the
-  subscribe descent does not carry it to the arm that registers. The
-  commit threads it. The risk is SHAPE — the field may not reach that
-  arm at all, a `deferᵉ` body being subscribed under syntax the
-  enclosing def never named — and `Rx.Slot-Hop` is the precedent, its
-  recursion on the slot index resting on the same fact.
+- **THE VALUES-IN-FLIGHT PAIRING, WHICH IS WHAT THE SLOT-SOURCED MINT
+  TURNED OUT TO COST.** The descent stratum pays four of the five
+  registrations and is preserved at every arm by construction. The
+  fifth cannot take a premise at all — the reason is in
+  `walk-share-strat`'s header — so its fact is owed to the invariant
+  record, which pairs no stored value with the continuation it will be
+  delivered under. The commit states that conjunct and asks whether
+  delivery preserves it. The risk is SHAPE: a pairing keyed on the node
+  the value sits in may not survive a frame step.
 
 - **THE DELIVERED SUMMAND AT THE ROW'S OWN BUDGET, which is the one
   region the split's evidence declines to reach.** `burst-regs-split`
