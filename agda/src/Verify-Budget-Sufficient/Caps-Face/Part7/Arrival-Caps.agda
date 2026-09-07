@@ -680,24 +680,40 @@ postulate
 -- one -- a share over an empty hot, a source that never fires and so
 -- never completes.
 --
--- THE RESIDUE IS THE ARM, which is why the class does not move on
--- these.  `p` is the registered chain, so its head decides what
--- `foldPath` does, and every registration reachable at that share is
--- headed by `from-inner`: the share is subscribed AS an inner of the
--- root fan.  A `thru-outer` head needs the share to be the SOURCE of an
--- outer rather than one of its inners, which wants an observable-typed
--- slot and no family here has one.  Same shape of gap the frame leaf
--- carried until its second arm was reached, and it is named here so the
--- receipt below is not read as covering it.
--- PROBED: `Probed.Depth-Join` stands three rows at a share whose def
+-- AN OBSERVABLE-TYPED SLOT IS WHAT PUTS THE SUBSCRIBING ARM UNDER A
+-- SHARE.  `p` is the registered chain, so its head decides what
+-- `foldPath` does, and a `thru-outer` head is written only by
+-- `subscribeAll`, which subscribes its OUTER under one -- so the share
+-- must BE the outer, and an outer is typed `obs u`.  `Rx.Slots` permits
+-- exactly one way to carry that type: `scripted` is barred at a
+-- non-data type, `shared` is not, which is the shape wanted anyway
+-- since only a shared slot has an admit list.  One slot further and the
+-- chain sinks into a LATER share rather than the root, which is
+-- `foldPath`'s recursive arm.
+--
+-- WHAT REMAINS IS `scan-f`, AND IT IS THE ONE ARM THAT CAN STILL MOVE
+-- THE CEILING.  `storeSyncMax` maximises over slots, nodes and
+-- registry.  Of the three arms no row reaches, `map-f` returns the
+-- schedule and store it was handed, and `take-f` only ever shrinks them
+-- -- it drops registrations, sweeps the live set and stores a numeral.
+-- `scan-f` writes a node back with a fresh ACCUMULATOR, and at an
+-- observable-typed accumulator that value carries nesting of its own,
+-- so `nodeNest` can grow across the very step the conclusion says
+-- cannot grow.  That is where a counterexample would be, and it is the
+-- reason the class does not move on the rows below.
+-- PROBED: `Probed.Depth-Join` stands seven rows at shares whose defs
 --   cannot complete, taking `rid` and `p` off `shareAdmit` at the state
---   and schedule the same subscribe returns.  Both admitted
---   registrations are read, so the row does not rest on whichever was
---   first, and both `fin` branches are -- the statement hands the fold
---   a close emit at `true` and an empty list at `false`, so one says
---   nothing about the other.  The gas is the budget the statement
---   names.  Not covered: the `thru-outer` arm, and any share carrying
---   more than the two registrations this one does.
+--   and schedule the same subscribe returns.  Both `fin` branches at
+--   every point -- the statement hands the fold a close emit at `true`
+--   and an empty list at `false`, so one says nothing about the other.
+--   Reached: the `from-inner` head at both of its admitted
+--   registrations, so no row rests on whichever was first; the
+--   `thru-outer` head, at an observable-typed shared slot; and that
+--   head again over a chain sinking into a later share, which is the
+--   `dispatchShare` re-entry.  The tails are pinned, not assumed: the
+--   first two families end at `root`.  The gas is the budget the
+--   statement names.  Not covered: the `map-f`, `scan-f` and `take-f`
+--   heads, and any share carrying more registrations than these do.
 postulate
   share-step-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (sf : Gas) (gas : ℕ) (bid : Id) (now : Tick) (i : Fin n)
