@@ -2099,10 +2099,11 @@ pop-head-nest {e = e} id sched st eq h with schedGo (Sched.live sched) in eqL | 
 
 -- AND THE REGISTRY IS THE ONE PLACE THIS FRAME'S OWN CAPS PREDICATE
 -- CANNOT REACH, which is why the store's other two moving places are
--- bodies here and this one stays a leaf.  `cascadeGo-nest-regs` is the
--- same component one face over and in the same currency -- the registry
--- against the store the step began at plus one increment -- so the two
--- are worth reading together, though it is a leaf there as well.
+-- read straight off it and this one is assembled.
+-- `cascadeGo-nest-regs` is the same component one face over and in the
+-- same currency -- the registry against the store the step began at
+-- plus one increment -- so the two are worth reading together, though
+-- it is a leaf there as well.
 -- DEAD ROUTE: reading this component out of `burst-caps`, the way the
 --   live place and the node table are read, is STRUCTURALLY DEAD rather
 --   than merely unfinished.  The only registry conjunct
@@ -2115,55 +2116,95 @@ pop-head-nest {e = e} id sched st eq h with schedGo (Sched.live sched) in eqL | 
 --   predicate's own length conjunct then closes it at `B * B`, which
 --   sits above this row's right-hand side and not under it.  What the
 --   frame leaves behind cannot price this component at all.
--- REFUTED: `Refuted.Reg-Nest-Reached` kills the reading that suggests
---   itself once the predicate route is gone -- pricing this component
---   off the SYNTAX the frame registers from -- five against a unit of
---   four, and diverging rather than tight.  A registration's path is
---   not built out of the program's own term alone: a scan whose
---   accumulator is observable-typed carries syntax as a VALUE, the
+
+-- THE NODE TABLE UNDER THE INCREMENT ALONE, which is the reading the
+-- sibling row takes and then throws half of away.  `burst-nest-nodes`
+-- wants the unit on the left for the floor's sake and so weakens
+-- through it, but the chain it walks never reads the unit at all: the
+-- caps predicate bounds a node by instant one's SIZE, and that size is
+-- under the increment.  Naming the tighter half is what lets the
+-- registry's two summands be paid by two different quantities.
+burst-nodes≤inc : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+  let r = subscribeE (budgetAt e ins 0) e root 0 0
+                     (sched-init e ins) (st-init e)
+  in foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0
+           (EvalSt.nodes (proj₂ (proj₂ r)))
+       ≤ nestIncAt e ins 0
+burst-nodes≤inc e ins =
+  ≤-trans (stBounded?-nodes (Caps.cSize (capsAt e ins 1)) sched₁ st₁
+             (proj₁ (capsOK?-parts (capsAt e ins 1) sched₁ st₁ (burst-caps e ins))))
+          (sizeSuc≤nestIncAt e ins 0)
+  where
+  r      = subscribeE (budgetAt e ins 0) e root 0 0
+                      (sched-init e ins) (st-init e)
+  sched₁ = proj₁ (proj₂ r)
+  st₁    = proj₂ (proj₂ r)
+
+-- WHAT A REGISTERED PATH IS BUILT FROM, WHICH IS TWO THINGS AND THEY
+-- ADD.  A registration's chain carries the frames the walk descended
+-- THROUGH and the frames minted out of a value DELIVERED into it, and
+-- `pathNestD` sums a frame's function depth along the chain -- so the
+-- two halves accumulate instead of competing for one ceiling.  The
+-- walk's half is the program's own syntax, which the unit reads.  The
+-- delivered half is syntax that arrived as a value, and a value a run
+-- is holding sits in a node, so the node table is what reads it.
+--
+-- NEITHER SUMMAND SURVIVES ALONE, AND THE JOIN OF THEM DOES NOT
+-- EITHER.  A map frame whose function CARRIES a stream registers at
+-- positive depth over an empty node table, so the table alone cannot
+-- pay; a fold whose accumulator carries one climbs past every quantity
+-- the program can state, so the unit alone cannot.  Composing the two
+-- --  a carrying map above a carrying fold -- puts the registry over
+-- BOTH at once, since the frames stack into one sum while each
+-- candidate sees only the source it was read off.  That is why this is
+-- stated as a sum, and the sum is the weakest form left standing.
+--
+-- REFUTED: `Refuted.Reg-Nest-Reached` kills the unit-alone reading at
+--   the states a run reaches -- five against a unit of four, and
+--   diverging with the fold count rather than tight.  A scan whose
+--   accumulator is observable-typed carries syntax as a value, the
 --   frame subscribes that value where it is delivered, and the `map-f`
 --   minted there is charged the DELIVERED function's depth, which
 --   climbs one per fold while every quantity read off the program
---   stands still.  So the increment is the only summand that can pay.
---   What does track the climb is the STORE the frame is walking: the
---   accumulator lives in a node, and `Probed.Regs-Store-Currency`
---   separates the two candidates on that witness's own length axis,
---   the registry reading one under the node table at every length
---   while the unit stands still.  That is the currency the walk face
---   already grants at every clause and carries for the node table
---   alone, declining the registry because it prices a path frame at
---   the delivery that mints it rather than at the subscribe that walks
---   past it.  The witness runs at padded gas rather than at this row's
---   own budget, so what it covers is the shape of the climb and not
---   this row's margin.
--- PROBED: `Probed.Burst-Nest-Unit` instantiates the left half against
---   the unit at the three `*All` heads over a two-layer wrap, where
---   the store reads 1 against a unit of 5 -- neither vacuous nor
---   tight.  And it REACHES the region that reading leaves open: a
---   defer-headed program at a body two deep is tight, a store of 2
---   against a unit of 2, and at four deep the unit FAILS, a store of 4
---   against the same unit of 2.  That crossing is what the second
---   summand exists for and it is load-bearing rather than slack.
---   The conclusion itself does not reduce -- the increment is built
---   over `capsAt`'s size, which is sealed through `capsBase` -- but
---   `capsAt-base-size⁺` and `sizeSuc≤nestIncAt` are PROVEN and compose
---   into a lower bound on it built from `sizeᵉ`, and putting that bound
---   in the increment's place gives a STRICTLY STRONGER claim that
---   computes.  Green there is green here.  It is taken at the same defer-headed family that
---   killed the unit form, four deep and nine and twenty, and at the
---   three heads: the store rises one per level against a floor rising
---   four, so the two do not converge.  The slot axis is off zero as
---   well, and it is two-sided rather than a weakening -- the merge
---   head's store reads one at empty slots and four at these.
---   NOT covered: the factor, which the route deliberately never reads.
---   Every row reads the store's MAXIMUM, so what it says about a
---   component is said about all four at once.
+--   stands still.  The witness runs at padded gas rather than at this
+--   row's own budget, so what it covers is the shape of the climb and
+--   not any margin.
+-- PROBED: `Probed.Regs-Store-Currency` separates the three candidates
+--   on one family, at the fold count the refutation drives.  Covered:
+--   the table alone, refuted at a carrying map over an empty table;
+--   the join, refuted at the composed program, where the registry
+--   reads eight against a table of six and a unit of seven; and the
+--   sum, which holds at all three and holds tightly at the composed
+--   one.  The climb axis is load-bearing throughout -- the unit stands
+--   still while both sides move -- and the syntactic axis is
+--   two-sided, since deepening the map moves the registry and the unit
+--   together and the table not at all.  NOT covered: retirement, since
+--   this family keeps every registration it makes; a registration
+--   minted anywhere but a delivery or the walk's own descent; and the
+--   margin at this row's own budget rather than at padded gas.
 postulate
-  burst-nest-regs : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+  burst-regs-split : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
     let r = subscribeE (budgetAt e ins 0) e root 0 0
                        (sched-init e ins) (st-init e)
     in regsNestMax (EvalSt.registry (proj₂ (proj₂ r)))
-         ≤ nestUnit e ins + nestIncAt e ins 0
+         ≤ nestUnit e ins
+             + foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0
+                     (EvalSt.nodes (proj₂ (proj₂ r)))
+
+-- AND THE ROW'S OWN RIGHT-HAND SIDE IS ALREADY THAT SUM, which is what
+-- makes the split an assembly rather than a restatement.  The unit
+-- summand pays the walk's half unchanged; the increment summand pays
+-- the delivered half, through the node the value sits in.  Nothing
+-- here chooses a currency -- the statement was written in both of them
+-- before either was known to be load-bearing.
+burst-nest-regs : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+  let r = subscribeE (budgetAt e ins 0) e root 0 0
+                     (sched-init e ins) (st-init e)
+  in regsNestMax (EvalSt.registry (proj₂ (proj₂ r)))
+       ≤ nestUnit e ins + nestIncAt e ins 0
+burst-nest-regs e ins =
+  ≤-trans (burst-regs-split e ins)
+          (+-monoʳ-≤ (nestUnit e ins) (burst-nodes≤inc e ins))
 
 -- THE LIVE PLACE IS NOT CARRIED — IT IS READ OFF THE PREDICATE THE
 -- FRAME ALREADY LEAVES BEHIND.  `burst-caps` certifies the
@@ -2205,15 +2246,8 @@ burst-nest-nodes : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) �
            (EvalSt.nodes (proj₂ (proj₂ r)))
        ≤ nestUnit e ins + nestIncAt e ins 0
 burst-nest-nodes e ins =
-  ≤-trans (stBounded?-nodes (Caps.cSize (capsAt e ins 1)) sched₁ st₁
-             (proj₁ (capsOK?-parts (capsAt e ins 1) sched₁ st₁ (burst-caps e ins))))
-          (≤-trans (sizeSuc≤nestIncAt e ins 0)
-                   (m≤n+m (nestIncAt e ins 0) (nestUnit e ins)))
-  where
-  r      = subscribeE (budgetAt e ins 0) e root 0 0
-                      (sched-init e ins) (st-init e)
-  sched₁ = proj₁ (proj₂ r)
-  st₁    = proj₂ (proj₂ r)
+  ≤-trans (burst-nodes≤inc e ins)
+          (m≤n+m (nestIncAt e ins 0) (nestUnit e ins))
 
 -- THE BURST'S OWN NESTING RECEIPT, the mirror of `burst-caps`.  The
 -- subscribe frame is the one place a run's nesting can jump without an

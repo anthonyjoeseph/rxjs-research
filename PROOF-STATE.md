@@ -215,16 +215,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE REGISTRY CONJUNCT THE WALK FACE DECLINES TO CARRY, NOW THAT THE
-  STORE IS KNOWN TO DOMINATE IT.** `NestAt` grants a bound for the node
-  table at every clause and states nothing about the registry, on the
-  reading that a path frame mints at delivery rather than at subscribe.
-  The registry reads one under that same node table at every length of
-  the family whose syntactic bound diverges, so the grant already
-  covers it. The commit adds the conjunct and walks the clauses it
-  costs — the arms that register are the slot doors and the `*All`
-  installs, and each mints a path the node it installs already holds.
-
 - **THE TWO ROWS WHOSE CONCLUSIONS HAVE NOW BOTH CLOSED, which is a
   scheduling fact and not two separate findings.** `walk-frame-drain-entries`
   was already there — both its denominations sealed — and
@@ -249,6 +239,18 @@ does not fit is a finding about the shared statement, not about the head.
   `subscribeSharedSlot-sz-store` and `subscribeE-sz-store-scan` are
   restated in an expanded currency, or the two faces differ.
 
+- **THE DELIVERED SUMMAND AT THE ROW'S OWN BUDGET, which is the one
+  region the split's evidence declines to reach.** `burst-regs-split`
+  now carries the registry, and its shape is settled: three candidates
+  were separated and only the sum survived. What no row touches is the
+  MARGIN — every witness runs at padded gas, so what is covered is the
+  climb's shape, not whether the sum has room at `budgetAt e ins 0`.
+  The commit instantiates the split at its own budget on the carrying
+  fold, reading the delivered summand against the node the value sits
+  in rather than the table's maximum. A crossing there restates the
+  right summand, not the sum; none promotes the row off a coverage gap
+  that currently reads as safe.
+
 ### The ledger
 
 - **`walk-frame-drain-entries`** (Part7/Walk-Sink) — FALSITY,
@@ -257,9 +259,9 @@ does not fit is a finding about the shared statement, not about the head.
   denominations stay closed to instantiation — the cap does not return, the
   climb bound is sealed — so evidence can raise this class, never lower it.
 - **`subscribeE-sz`** (Regs-Nest-Walk) — FALSITY, `REFUTED, PROBED`: what ONE
-  subscription delivers, in its charge plus its telescope. The WHOLE value
-  side is a body over it. A max is refuted at a chain of eleven; a slot named
-  twice is free; the block reaches three nestings, the last twice-squared.
+  subscription delivers, in its charge plus its telescope. The WHOLE value side
+  is a body over it. A max is refuted at a chain of eleven; a slot named twice
+  is free; the block reaches three nestings, the last twice-squared.
 - **`pushBurst-sz-store-outer`** (Regs-Nest-Walk) — FALSITY,
   `REFUTED, PROBED×3`: the burst a crossing door pushes back through itself,
   keyed on the source program since an arbitrary burst is unbounded. A
@@ -268,13 +270,13 @@ does not fit is a finding about the shared statement, not about the head.
 - **`subscribeE-sz-store-scan`** (Regs-Nest-Walk) — FALSITY, `PROBED×4`: the
   reified seed and the cell each arrival rewrites, in a currency the layer
   premise is not stated in. Cells in series do not compound; a parked queue
-  reads the program's own run; a source resolving a slot leaves the
-  telescope carrying the climb.
-- **`subscribeSharedSlot-sz-store`** (Regs-Nest-Walk) — FALSITY, `PROBED×2`: the
-  definition behind a reference, whose entire climb is the telescope summand —
-  `input` charges nought, so no program reading reaches it. The summand is
-  owed the connect's TRANSITIVE reach; sum against maximum is closed to
-  instantiation.
+  reads the program's own run; a source resolving a slot leaves the telescope
+  carrying the climb.
+- **`subscribeSharedSlot-sz-store`** (Regs-Nest-Walk) — FALSITY, `PROBED×2`:
+  the definition behind a reference, whose entire climb is the telescope
+  summand — `input` charges nought, so no program reading reaches it. The
+  summand is owed the connect's TRANSITIVE reach; sum against maximum is closed
+  to instantiation.
 - **`sink-fan-sink`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE`: the
   potential at an admitted chain that ends at a SECOND hand-over. Its
   escalation is PROGRAM-bounded after all — hops climb the stratified telescope
@@ -291,8 +293,8 @@ does not fit is a finding about the shared statement, not about the head.
 - **`chain-depth-sighted`** (Part7/Arrival-Caps) — FALSITY,
   `REFUTED×2, DEAD ROUTE, PROBED`: ONE chain's descent under the round's
   ceiling, premised on the store's SYNCHRONOUS maximum. Every row sits at a
-  round's entry; the descent does not compute at a state a chain left, so
-  the region the consumer uses is closed to instantiation.
+  round's entry; the descent does not compute at a state a chain left, so the
+  region the consumer uses is closed to instantiation.
 - **`scanΦ-fit`** (Part7/Depth-Fit) — SHAPE, `DEAD ROUTE`: the producing side
   of the fold's grant. THE MECHANISM IS DEAD, NOT A DENOMINATION: a flat
   per-instant potential cannot dominate a count exponential in itself; the one
@@ -362,10 +364,11 @@ does not fit is a finding about the shared statement, not about the head.
   stream leaf — the walk over it is a proven body, so what remains per instant
   is the frame widths, which are sealed and taken as a quantified premise
   wherever a row reads them.
-- **`burst-nest-regs`** (Caps-Bridge) — DIFFICULTY, `REFUTED, DEAD ROUTE, PROBED`:
-  the registry after the subscribe frame, under the unit plus an increment. Both
-  readings died: the predicate prices a path above the row, and the registered
-  depth climbs with the delivered value, not the program.
+- **`burst-regs-split`** (Caps-Bridge) — DIFFICULTY, `REFUTED, PROBED`: the
+  registry after the subscribe frame, split between the program's unit and the
+  node table. A chain SUMS its two kinds of frame, so neither source alone pays
+  and neither does their join; the sum is what is left, tight where they
+  compose.
 - **`subscribeE-nest-scan`** (Nest-Walk) — DIFFICULTY,
   `REFUTED, DEAD ROUTE, PROBED`: `NestAt` now carries the pointwise store
   conjunct this head's accumulator read demanded, so the shape is settled; what
