@@ -5,7 +5,7 @@ module Verify-Budget-Sufficient.Caps-Face.Part7.Walk-Sink where
 open import Data.Bool    using (Bool; true; false; _∧_; _∨_; if_then_else_)
 open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _∸_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_; s≤s; z≤n)
 open import Data.Nat.Properties using (m+[n∸m]≡n; ≤ᵇ⇒≤; ≤⇒≤ᵇ; <⇒≤; ≤-trans; ≤-refl; ≤-reflexive; m≤m+n; m≤n+m; n≤1+n; +-monoʳ-≤; ⊔-lub; m≤m⊔n;
-  m≤n⊔m; +-suc; ≤-pred)
+  m≤n⊔m; +-suc; ≤-pred; 1+n≰n)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.List    using (List; []; _∷_; _++_; length)
@@ -22,8 +22,9 @@ open import Data.Maybe   using (Maybe; just)
 open import Data.Vec     using (Vec; lookup) renaming ([] to []ᵛ; _∷_ to _∷ᵛ_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Unit    using (tt)
+open import Data.Empty   using (⊥-elim)
 open import Relation.Binary.PropositionalEquality
-  using (_≡_; sym; trans; subst)
+  using (_≡_; refl; sym; trans; subst)
 
 open import Rx.Prim      using (Tick; Id; Source; _at_from_as_; Gas; g0; gs; after_,_; close; exhausted;
   InstEvent)
@@ -73,7 +74,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part4 using
   shareLatch-caps; slotsCaps?-capsAt; valsCaps?-lvl)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (frameStep-⊑-+; valCaps?-size)
-open import Decide using (T-to; T⇒≡true; ∧-intro)
+open import Decide using (T-to; T⇒≡true; ∧-intro; ∧-trueˡ; ∧-trueʳ; ∨-trueʳ)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Root-Strat using
   (pathStrat-top)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Reg-Strat using
@@ -139,9 +140,26 @@ sink-admit-sink : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   all (λ en → (n ≤ᵇ pathFloor (proj₂ en)) ∨
               (pathStrat? (proj₂ en) ∧ (Fin.toℕ i ≤ᵇ pathFloor (proj₂ en))))
       (shareAdmit {t = t} i (EvalSt.registry st)) ≡ true
-sink-admit-sink c i sched st cok =
-  shareAdmit-chQ (λ {u} → entStrat? {u = u}) i (EvalSt.registry st)
-                 (registry-entStrat c sched st cok)
+sink-admit-sink {n = n} {Γ = Γ} {t = t} c i sched st cok =
+  all-impl _ _ up (shareAdmit {t = t} i (EvalSt.registry st))
+    (shareAdmit-chQ (λ {u} → entStrat? {u = u}) i (EvalSt.registry st)
+                    (registry-entStrat c sched st cok))
+  where
+  gFalse : (n ≤ᵇ Fin.toℕ i) ≡ false
+  gFalse with n ≤ᵇ Fin.toℕ i in eq
+  ... | false = refl
+  ... | true  = ⊥-elim (1+n≰n (≤-trans (toℕ<n i) (≤ᵇ⇒≤ n (Fin.toℕ i) (T-to eq))))
+
+  up : ∀ (en : RegId × Path Γ (lookup Γ i) t) →
+       entStrat? (Fin.toℕ i) (proj₂ en) ≡ true →
+       ((n ≤ᵇ pathFloor (proj₂ en)) ∨
+        (pathStrat? (proj₂ en) ∧ (Fin.toℕ i ≤ᵇ pathFloor (proj₂ en)))) ≡ true
+  up en h =
+    subst (λ y → ((n ≤ᵇ pathFloor (proj₂ en)) ∨ y) ≡ true)
+          (sym (∧-intro (∧-trueʳ h)
+                        (subst (λ b → (b ∨ (Fin.toℕ i ≤ᵇ pathFloor (proj₂ en))) ≡ true)
+                               gFalse (∧-trueˡ h))))
+          (∨-trueʳ (n ≤ᵇ pathFloor (proj₂ en)))
 
 sink-admit-entry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (c : Caps) (i : Fin n) (sched : Sched Γ) (st : EvalSt e) →

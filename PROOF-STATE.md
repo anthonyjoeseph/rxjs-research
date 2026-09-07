@@ -238,18 +238,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **PUTTING THE ENTRY LEDGER WHERE THE WALK ALREADY CARRIES A
-  CAPS-INDEPENDENT CONJUNCT.** The transports are proven and the
-  region is one leaf, whose obstacle is the CARRIER and not the
-  proof. The registry has ONE growth site, so an `all`-shaped
-  reading is free at every other step and the mint asks just the
-  side condition the telescope pays; what is missing is anything
-  threading it, since the burst walk's ledger is rebuilt per step
-  from halves this reading does not have. `capsOK?` already carries
-  `srcFloor?`, which names no cap and crosses every face. So the
-  commit adds the reading beside it, makes `registry-entStrat` its
-  projection, and defers the per-face obligations to one shared
-  leaf — the mint's being the only one with content.
+- **INSTANTIATING THE ENTRY LEDGER AGAINST ITS OWN RECEIPT, BEFORE A
+  CARRIER IS BUILT FOR IT.** The guard just moved onto the source
+  because the reading was false where it sat, and what found that arm
+  makes the RECEIPT the next suspect: `capsOK?` is quantified over the
+  caps, so a refutation picks them generous, and its registry conjuncts
+  are a length and a size while the reading asks stratification.
+  `Refuted.Fan-Chain-Registry` already mints a violating chain onto an
+  initial state through the evaluator's own `register`, so the harness
+  is built and only the receipt is new. The commit asks that state for
+  one: if it lands, the carrier is dead before it is paid for and the
+  fact is owed at the MINT, where two siblings already say theirs are.
 
 - **WALKING AN ADMITTED CHAIN AT THE LEVEL IT WAS REGISTERED AT, which
   is the one door the pricing leaves open.** Both ends are closed by
@@ -317,10 +316,9 @@ does not fit is a finding about the shared statement, not about the head.
   transport. A `scan-f` folds against a value in the STORE, which no path
   predicate reaches and the premised state receipt does not yet read.
 - **`registry-entStrat`** (Part7/Reg-Strat) — FALSITY, `DEAD ROUTE`: every
-  registration's chain is stratified and floored at or above the source it
-  listens to, asked ONLY where the floor drops below the context. Both entry
-  faces are transports of it; what it asks of `capsOK?` is that the state was
-  BUILT.
+  registration's chain is stratified, and floored at or above the SOURCE it
+  listens to wherever the slots reach that source. Both entry faces are
+  transports of it; what it asks of `capsOK?` is that the state was BUILT.
 - **`pop-head-strat-sink`** (Caps-Bridge) — FALSITY, `REFUTED`: where the
   arrival's own value sits against every chain that will receive it, asked only
   below the root. It wants a fact relating a source's pending values to the

@@ -16,17 +16,47 @@ open import Verify-Budget-Sufficient.Delivery-Walk using (regQ?)
 
 -- THE ONE READING BOTH ENTRY FACES WANT OF THE REGISTRY, and it is
 -- stated at an entry rather than at a path because half of it is about
--- the REGISTRATION.  A chain is either charged at the whole context --
--- the free half, which `pathStrat-top` settles without spending
--- anything -- or it is stratified AND its floor is at or above the
--- source it listens to.  The two travel together because the second is
--- what makes the first usable at a fan: values leaving a slot are
--- known below that slot's index, and raising a floor only weakens
--- that, so a continuation whose floor is at or above the source
--- inherits them.
+-- the REGISTRATION.  A chain's frames are stratified, and its floor is
+-- at or above the source it listens to.  The second is what makes the
+-- first usable at a fan: values leaving a slot are known below that
+-- slot's index, and raising a floor only weakens that, so a
+-- continuation floored at or above the source inherits them.
+--
+-- ONLY THE ORDERING IS GUARDED, and the asymmetry is the shape of the
+-- statement rather than an economy.  The frame reading is asked of
+-- every entry because nothing exempts a frame; the ordering is asked
+-- only of sources the slot telescope reaches, because there is an arm
+-- where it is false and the guard is what a carried conjunct already
+-- pays for.
 entStrat? : ∀ {n} {Γ : Ctx n} {u t} → Source → Path Γ u t → Bool
-entStrat? {n = n} s p =
-  (n ≤ᵇ pathFloor p) ∨ (pathStrat? p ∧ (s ≤ᵇ pathFloor p))
+entStrat? {n = n} s p = ((n ≤ᵇ s) ∨ (s ≤ᵇ pathFloor p)) ∧ pathStrat? p
+
+-- AND THE GUARD IS ON THE SOURCE, WHICH IS NOT WHERE IT SAT.  Guarding
+-- on the PATH's floor instead -- exempting a chain that terminates at
+-- `root`, and asking the ordering of every other -- makes this reading
+-- FALSE, and the arm is written down in `regStrat?`'s own header rather
+-- than merely possible: a cold slot subscribed from inside a share's
+-- definition mints a fresh source, `srcFloor?` puts every minted source
+-- at or above the slot count, and the continuation it registers ends at
+-- the ENCLOSING share's sink, which is below it.  At such an entry a
+-- root guard is false and the ordering is false under it, so nothing
+-- can hold the conjunction.  On the source the same entry discharges
+-- the disjunct outright, which is why that sibling can afford to state
+-- the ordering at all.
+--
+-- WHAT THE FACES LOSE BY IT IS NOTHING, and that is the check that the
+-- guard moved rather than the claim.  A source the fan admits IS a slot
+-- index, so the guard is false there and the ordering arrives; the
+-- cascade's face reads only the frame half and never meets the guard.
+
+-- AND THE ORDERING HALF IS A SIBLING'S STATEMENT, NOT A NEW ONE.
+-- `walk-share-strat` asks a registry-wide reading of the same registry
+-- for the same purpose, out of the DISPATCH bundle rather than the caps
+-- one, and its `sinkAbove?` is this ordering at a strict inequality.
+-- The two differ in their receipt and in whether the frame half rides
+-- along, so neither is today derivable from the other -- but they are
+-- one fact about one list, and the merge is owed at whichever receipt
+-- can be handed to both faces.
 
 -- THE WALK CARRIES NO ABSTRACT LEDGER, SO THERE IS NOTHING HERE TO
 -- GENERALISE.  The burst walk does thread a registry reading across
@@ -64,14 +94,14 @@ entStrat? {n = n} s p =
 -- observable that arrived as a VALUE, and `Val Γ (obs t)` is arbitrary
 -- closed syntax the telescope never checked.
 --
--- AND THE RECEIPT IS THE SUSPECT PART OF THE STATEMENT, NOT THE
--- PREDICATE.  `capsOK?` carries a length ledger over the registry and
--- nothing about stratification, so what is being asserted is that a
--- state satisfying the cap reading is one the evaluator could have
--- BUILT -- which no conjunct of that reading says.  If it turns out
--- false, the repair is a conjunct on the state predicate rather than a
--- weaker statement here: a producer obligation, cascading through
--- every site that builds a state, is the cost of the fact being true.
+-- AND THE RECEIPT IS WHAT IS SUSPECT NOW THAT THE GUARD IS PINNED.
+-- `capsOK?` carries a length ledger over the registry and nothing
+-- about stratification, so what is being asserted is that a state
+-- satisfying the cap reading is one the evaluator could have BUILT --
+-- which no conjunct of that reading says.  If it turns out false, the
+-- repair is a conjunct on the state predicate rather than a weaker
+-- statement here: a producer obligation, cascading through every site
+-- that builds a state, is the cost of the fact being true.
 --
 -- DEAD ROUTE: a free path quantified after the receipt cannot be
 --   asked for at all, and the refutation of that form is recorded at

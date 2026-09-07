@@ -64,7 +64,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part4 using
   foldPath-slots)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (valCaps?-widen)
-open import Decide using (∧-intro; ∧-trueˡ; T-to)
+open import Decide using (∧-intro; ∧-trueʳ; T-to)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Reg-Strat using
   (entStrat?; registry-entStrat)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Cascade-Caps using
@@ -150,9 +150,11 @@ open import Verify-Budget-Sufficient.Caps-Face.Part7.Walk-Sink using
 -- AND WHAT IS LEFT IS ONE LEDGER OVER THE REGISTRY, NOT ONE STATEMENT
 -- PER FACE.  `chainsGo` filters the registry by source and type, so a
 -- reading held at every entry is inherited by the arrival's chains --
--- and the source half the entry reading also carries is dropped here
+-- and the ORDERING half that reading also carries is dropped here
 -- rather than being a second premise, because the cascade's own claim
--- says nothing about where the values are leaving from.
+-- says nothing about where the values are leaving from.  Which is why
+-- this face never meets that half's guard: the frame reading it does
+-- want is the entry ledger's unguarded conjunct.
 --
 -- REFUTED: `Refuted.Walk-Entry-Strat.walk-path-strat-absurd` kills the
 --   free form this replaces, where the path was quantified after the
@@ -179,7 +181,7 @@ cascade-admit-sink {n = n} {Γ = Γ} {t = t} c a sched st cok =
          ((n ≤ᵇ pathFloor (proj₂ rc)) ∨ pathStrat? (proj₂ rc)) ≡ true
   drop rc h with n ≤ᵇ pathFloor (proj₂ rc)
   ... | true  = refl
-  ... | false = ∧-trueˡ h
+  ... | false = ∧-trueʳ h
 
 cascade-admit-entry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (c : Caps) (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
