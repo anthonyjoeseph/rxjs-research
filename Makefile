@@ -1,4 +1,4 @@
-.PHONY: find-prose gate roadmap-moved roadmap-moved-selftest roadmap-evidence gate-heavy gate-cheap gate-light dev-changed dev-changed-selftest stripped strip-selftest unmap-selftest postulates dup-check dup-selftest imports-check imports-fix imports-selftest find all help agda-dev agda-dev-selftest bg bg-check bg-wait bug-cache unsafe-check wiring wiring-selftest comments-check comments-selftest refuted ev ts-check cli-build oracle qc-build quickcheck harness harness-build
+.PHONY: find-prose gate roadmap-moved roadmap-moved-selftest roadmap-order roadmap-order-selftest roadmap-evidence gate-heavy gate-cheap gate-light dev-changed dev-changed-selftest stripped strip-selftest unmap-selftest postulates dup-check dup-selftest imports-check imports-fix imports-selftest find all help agda-dev agda-dev-selftest bg bg-check bg-wait bug-cache unsafe-check wiring wiring-selftest comments-check comments-selftest refuted ev ts-check cli-build oracle qc-build quickcheck harness harness-build
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -607,6 +607,48 @@ roadmap-moved-selftest:
 	  fi; \
 	  if [ $$fail -eq 0 ]; then echo "roadmap-moved-selftest: OK"; else exit 1; fi
 
+# SETTLE RISK NEAR THE TRUNK: while a tier holds an open FALSITY or SHAPE row,
+# a commit may not BANK a GRINDABLE or DIFFICULTY row of that tier.  The pull
+# it resists is structural rather than careless -- a risky leg often ends in a
+# finding, a finding-only commit reads as unfinished, and a mechanical row gets
+# closed alongside it to make the commit whole.  See docs/roadmap-check.md.
+roadmap-order:
+	@scripts/check-roadmap-order.py
+
+# PROVES roadmap-order IS LOAD-BEARING, and -- the harder half -- that it stays
+# QUIET on the four shapes the proof must remain free to take.  A check that
+# fired on a deletion or a reclassification would stop the proof changing shape,
+# which is a worse failure than the one it prevents.
+roadmap-order-selftest:
+	@fail=0; S=scripts/roadmap-selftest; \
+	  if scripts/check-roadmap-order.py --file $$S/order-banked.md \
+	       --baseline-file $$S/sorted.md --ledger $$S/order-ledger-banked.txt \
+	       --src-names $$S/order-src-names.txt --headers $$S/order-headers-none.txt \
+	       > /dev/null 2>&1; then \
+	    echo "SELFTEST FAIL: a GRINDABLE row banked under an open FALSITY PASSED — the check is dead"; fail=1; \
+	  fi; \
+	  scripts/check-roadmap-order.py --file $$S/sorted.md --baseline-file $$S/sorted.md \
+	      --ledger $$S/ledger.txt --src-names $$S/src-names.txt \
+	      --headers $$S/order-headers-none.txt > /dev/null \
+	    || { echo "SELFTEST FAIL: a roadmap that banked nothing was rejected"; fail=1; }; \
+	  scripts/check-roadmap-order.py --file $$S/order-banked.md --baseline-file $$S/sorted.md \
+	      --ledger $$S/order-ledger-banked.txt --src-names $$S/src-names.txt \
+	      --headers $$S/order-headers-none.txt > /dev/null \
+	    || { echo "SELFTEST FAIL: a row DELETED from agda/src was read as discharged — the proof cannot drop a statement"; fail=1; }; \
+	  scripts/check-roadmap-order.py --file $$S/order-reclass.md --baseline-file $$S/sorted.md \
+	      --ledger $$S/ledger.txt --src-names $$S/order-src-names.txt \
+	      --headers $$S/order-headers-none.txt > /dev/null \
+	    || { echo "SELFTEST FAIL: a RECLASSIFIED row was read as discharged — the proof cannot re-rank its own risk"; fail=1; }; \
+	  scripts/check-roadmap-order.py --file $$S/order-banked-t1.md --baseline-file $$S/sorted.md \
+	      --ledger $$S/order-ledger-t1.txt --src-names $$S/order-src-t1.txt \
+	      --headers $$S/order-headers-none.txt > /dev/null \
+	    || { echo "SELFTEST FAIL: ANOTHER tier's open FALSITY blocked a discharge — the law is per-tier"; fail=1; }; \
+	  scripts/check-roadmap-order.py --file $$S/order-banked.md --baseline-file $$S/sorted.md \
+	      --ledger $$S/order-ledger-banked.txt --src-names $$S/order-src-names.txt \
+	      --headers $$S/order-headers-prereq.txt > /dev/null \
+	    || { echo "SELFTEST FAIL: a NAMED prerequisite was refused — the carve-out is dead"; fail=1; }; \
+	  if [ $$fail -eq 0 ]; then echo "roadmap-order-selftest: PASS (banking fires; deleting, reclassifying, another tier's risk and a named prerequisite do not)"; else exit 1; fi
+
 # PROVES roadmap-check IS LOAD-BEARING, against fixtures outside PROOF-STATE.md.
 # Same reason dup-selftest exists: the real file is (and should stay) SORTED, so
 # the failing path never runs on it and would rot untested.  The MUST-NOT row is
@@ -926,6 +968,7 @@ GATE_CHEAP = wiring-selftest wiring-gate wiring-refuted wiring-probed \
              evidence-selftest evidence-check \
              roadmap-selftest roadmap-check \
              roadmap-moved-selftest roadmap-moved \
+             roadmap-order-selftest roadmap-order \
              comments-selftest comments-check dev-changed-selftest \
              unmap-selftest
 

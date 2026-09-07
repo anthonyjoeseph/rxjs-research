@@ -1,0 +1,8 @@
+=== a-falsity
+-- The chain's own floor cannot be read without the slot bound, and
+-- `d-grindable` is exactly that bound at the index this is stated at,
+-- so it is consumed here rather than merely adjacent to it.
+a-falsity : ∀ {n} → Chain n → Set
+=== b-shape
+-- A restatement is owed; nothing is consumed from the mechanical shelf.
+b-shape : Set

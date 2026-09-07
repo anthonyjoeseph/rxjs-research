@@ -123,6 +123,71 @@ def agda_content_changed(ref_from, ref_to, strip_text):
     return False
 
 
+class Unreadable(Exception):
+    """A file the caller asked for does not exist — a failure, not a pass."""
+
+
+class NoBaseline(Exception):
+    """No comparison point exists at the requested ref — every caller passes."""
+
+
+def resolve_endpoints(file, ref, baseline_file=None):
+    """-> (cur, base, against, exempt_from, exempt_to)
+
+    WHICH TWO VERSIONS OF THE ROADMAP A CHECK IS COMPARING, resolved once
+    for every check that asks the question.  The two reading contexts and
+    the whole-tree-clean fallback are explained in the module docstring.
+
+    It is a function rather than two copies because that fallback is the
+    subtle part, and a second check needing the same endpoints would
+    otherwise carry its own copy of it.  A drifted copy answers CI's
+    question at a local checkout or the reverse -- which is the one wrong
+    answer that produces no symptom, since both readings return a pair of
+    plausible file versions and neither raises.
+    """
+    try:
+        cur = open(file, encoding="utf-8").read()
+    except OSError as e:
+        raise Unreadable(f"cannot read {file}: {e}") from e
+
+    # exempt_from/exempt_to are the two endpoints an exemption check diffs
+    # for agda/ paths — kept in lockstep with the endpoints the comparison
+    # itself ends up using.
+    exempt_from, exempt_to = ref, None
+
+    if baseline_file is not None:
+        try:
+            base = open(baseline_file, encoding="utf-8").read()
+        except OSError as e:
+            raise Unreadable(f"cannot read {baseline_file}: {e}") from e
+        return cur, base, baseline_file, None, None  # fixtures aren't commits
+
+    base = baseline_from_git(file, ref)
+    if base is None:
+        raise NoBaseline(f"no {file} at {ref} — nothing to compare against")
+    against = ref
+
+    # This file matches the ref *and* nothing else in the tree is dirty
+    # either — a whole-tree-clean checkout, which is what CI always looks
+    # like, committed edit included. That makes disk-vs-ref compare HEAD
+    # against itself, so re-ask the question CI needs answered instead:
+    # did HEAD's own commit move the file, i.e. does HEAD differ from
+    # HEAD~1. A dirty tree that merely leaves THIS file untouched (the
+    # ordinary local-dev "haven't written the roadmap update yet" case)
+    # must not take this branch — the working-tree-clean gate is what
+    # keeps the two apart. Only at the default ref — an explicit --ref is
+    # a deliberate comparison point and is not second-guessed.
+    if ref == "HEAD" and norm(cur) == norm(base) and working_tree_clean():
+        parent = baseline_from_git(file, "HEAD~1")
+        if parent is None:
+            raise NoBaseline(f"no {file} at HEAD~1 — nothing to compare against")
+        base = parent
+        against = "HEAD~1"
+        exempt_from, exempt_to = "HEAD~1", "HEAD"
+
+    return cur, base, against, exempt_from, exempt_to
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--file", default="PROOF-STATE.md")
@@ -132,51 +197,14 @@ def main():
     args = ap.parse_args()
 
     try:
-        cur = open(args.file, encoding="utf-8").read()
-    except OSError as e:
-        print(f"roadmap-moved: cannot read {args.file}: {e}")
+        cur, base, against, exempt_from, exempt_to = resolve_endpoints(
+            args.file, args.ref, args.baseline_file)
+    except Unreadable as e:
+        print(f"roadmap-moved: {e}")
         return 1
-
-    # exempt_from/exempt_to are the two endpoints the exemption check diffs
-    # for agda/ paths — kept in lockstep with whatever endpoints the movement
-    # comparison itself ends up using.
-    exempt_from, exempt_to = args.ref, None
-
-    if args.baseline_file is not None:
-        try:
-            base = open(args.baseline_file, encoding="utf-8").read()
-        except OSError as e:
-            print(f"roadmap-moved: cannot read {args.baseline_file}: {e}")
-            return 1
-        against = args.baseline_file
-        exempt_from = None  # selftest fixtures aren't git commits
-    else:
-        base = baseline_from_git(args.file, args.ref)
-        if base is None:
-            print(f"roadmap-moved: no {args.file} at {args.ref} — nothing to "
-                  f"compare against, passing")
-            return 0
-        against = args.ref
-
-        # This file matches the ref *and* nothing else in the tree is dirty
-        # either — a whole-tree-clean checkout, which is what CI always looks
-        # like, committed edit included. That makes disk-vs-ref compare HEAD
-        # against itself, so re-ask the question CI needs answered instead:
-        # did HEAD's own commit move the file, i.e. does HEAD differ from
-        # HEAD~1. A dirty tree that merely leaves THIS file untouched (the
-        # ordinary local-dev "haven't written the roadmap update yet" case)
-        # must not take this branch — the working-tree-clean gate is what
-        # keeps the two apart. Only at the default ref — an explicit --ref is
-        # a deliberate comparison point and is not second-guessed.
-        if args.ref == "HEAD" and norm(cur) == norm(base) and working_tree_clean():
-            parent = baseline_from_git(args.file, "HEAD~1")
-            if parent is None:
-                print(f"roadmap-moved: no {args.file} at HEAD~1 — nothing to "
-                      f"compare against, passing")
-                return 0
-            base = parent
-            against = "HEAD~1"
-            exempt_from, exempt_to = "HEAD~1", "HEAD"
+    except NoBaseline as e:
+        print(f"roadmap-moved: {e}, passing")
+        return 0
 
     if norm(cur) == norm(base):
         if exempt_from is not None:
