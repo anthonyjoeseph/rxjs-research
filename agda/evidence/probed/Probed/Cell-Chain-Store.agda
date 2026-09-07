@@ -130,10 +130,12 @@ postFlat = proj₂ (proj₂ (proj₂ (proj₂
 -- THE FIGURES.
 ----------------------------------------------------------------------
 
--- LOAD-BEARING: the two arrivals' layer counts stand apart, so a
--- reading that charged the CHAIN what it charges the control would
--- have to say so here; and the telescope is one scripted slot, so
--- what the rungs below are bought by is the arrival.
+-- LOAD-BEARING: the two arrivals' charges stand apart, and they stand
+-- apart by their LAYERS, since the delivery block above those is a
+-- function of the size bound both share.  A reading that charged the
+-- CHAIN what it charges the control would report one figure twice.
+-- The telescope is one scripted slot, so what the rungs below are
+-- bought by is the arrival.
 chainFigures : List ℕ
 chainFigures = descChgˢ {Γ = Γᶜ} (obs (obs (Pw 8))) 52 valsChain
              ∷ descChgˢ {Γ = Γᶜ} (obs (obs (Pw 8))) 52 valsFlat
@@ -142,7 +144,7 @@ chainFigures = descChgˢ {Γ = Γᶜ} (obs (obs (Pw 8))) 52 valsChain
              ∷ sizeᵉ lowC
              ∷ []
 
-chainFigures≡ : chainFigures ≡ 11 ∷ 9 ∷ 1 ∷ 52 ∷ 43 ∷ []
+chainFigures≡ : chainFigures ≡ 323 ∷ 321 ∷ 1 ∷ 52 ∷ 43 ∷ []
 chainFigures≡ = refl
 
 -- LOAD-BEARING, and this file's premise: the chain writes THREE cells

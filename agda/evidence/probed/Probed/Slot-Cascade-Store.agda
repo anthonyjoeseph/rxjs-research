@@ -31,9 +31,11 @@
 -- telescope dropped.  So the summand is owed the TRANSITIVE reach of
 -- the connect and not the reference's own entry, which is a fact
 -- about which slots the sum ranges over rather than about its size.
--- The scan face reads the same way from the other side: a scan whose
--- source is a bare reference has a descent charge of ONE, so the term
--- contributes a rung and the telescope contributes the climb.
+-- All three are taken in SLOT SIZES, which is why they are indifferent
+-- to how the term half of the sum is spelled.  The scan face then
+-- confirms the stated sum from the other side, at the shape that
+-- face's own rows declined: a source that resolves a shared slot
+-- rather than a written-out program.
 --
 -- WHAT THE ROWS DO NOT BUY, and the first half is a boundary rather
 -- than a gap.  Whether the summand is really a SUM or really a MAXIMUM
@@ -193,12 +195,23 @@ scanFigures = Bᶜ
             + 1000 * descChg (obs (obs (Pw K))) Bᶜ eᶜ
             + 1000000 * slotsSize slᶜ
 
-scanFigures≡ : scanFigures ≡ 27001009
+scanFigures≡ : scanFigures ≡ 27037009
 scanFigures≡ = refl
 
--- LOAD-BEARING: the second entry is the charge with the summand
--- dropped, which at a scan over a bare reference is one rung off the
--- premise's own bound.
+-- LOAD-BEARING: it fails for any level the resolved cascade's stored
+-- emission outruns, and the cascade is what puts that emission in the
+-- table -- a door that declined to resolve the reference leaves
+-- nothing here to bound.
+-- DEAD ROUTE: separating the TELESCOPE summand at this door, by
+--   reading the same table at the term's charge with the summand
+--   dropped.  The charge now carries a delivery block geometric in
+--   the size bound, and it clears this table on its own -- so the row
+--   holds either way and decides nothing.  Recovering the separation
+--   needs a telescope whose climb outruns that block, which at this
+--   corpus's rate of growth is a slot of some hundreds of leaves; the
+--   separation the cascade witnesses above buy is over WHICH slots are
+--   counted, and it is taken in slot sizes rather than through the
+--   charge, so it is untouched by this.
 scanRows : List Bool
 scanRows =
   let r  = subscribeE (gasPad 64 g0) eᶜ root 0 0
@@ -208,12 +221,9 @@ scanRows =
                    (iterSize 2 (descChg (obs (obs (Pw K))) Bᶜ eᶜ
                                 + slotsSize slᶜ) Bᶜ)
                    (proj₂ kv)) ns
-   ∷ all (λ kv → boundedNode
-                   (iterSize 2 (descChg (obs (obs (Pw K))) Bᶜ eᶜ) Bᶜ)
-                   (proj₂ kv)) ns
    ∷ []
 
-scanRows≡ : scanRows ≡ true ∷ false ∷ []
+scanRows≡ : scanRows ≡ true ∷ []
 scanRows≡ = refl
 
 ----------------------------------------------------------------------

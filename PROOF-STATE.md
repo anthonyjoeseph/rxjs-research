@@ -215,17 +215,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **A CHARGE THAT COUNTS DELIVERIES, which is what the refuted arrival
-  axis leaves owed.** `descChg` sums an unfolding depth and a layer
-  depth, so nothing in it moves when a synchronous source fires many
-  values, while a step wrapping its accumulator doubles the cell per
-  arrival. The witness carries up from the `scanᵉ` leaf to
-  `subscribeE-sz-store` itself, so a body the tower builds on concludes
-  something false — why the currency and not the arm is what moves. No
-  delivery measure exists to reach for, and the commit decides between
-  minting one and spending the seed: a synchronous run delivers no more
-  than its source spells, so `B` may already bound it, at a tower's cost
-  the consumers must afford. Then both bounds are restated over it.
+- **THE DELIVERY BLOCK'S SIZE, WHICH NOTHING NOW CROSSES — the live
+  consequence of minting it.** It is `B` bits per node at each
+  level of nesting, sized by an argument in `descRungsᴺ`'s own header
+  and instantiated by no row. And it is large enough that
+  every BLINDED reading — the charge with the block or the telescope
+  dropped — now clears the small tables it used to fail, so four
+  separations went degenerate and were deleted. The charge the whole
+  value side is a body over is therefore unfalsifiable by the evidence
+  standing over it. The commit builds the scan family at the split
+  that sizing maximises and reads the delivered cell against the block
+  alone. A crossing resizes the block; a hold restores a separation.
 
 - **THE CARRIED STORE PREDICATE FOUR ROWS ARE ALL OWED, and a field
   rather than a hypothesis is what it has to be.** `walk-share-nestOK`,
@@ -261,17 +261,17 @@ does not fit is a finding about the shared statement, not about the head.
 - **`subscribeE-sz`** (Regs-Nest-Walk) — FALSITY, `REFUTED, PROBED`: what ONE
   subscription delivers, in its charge plus its telescope. The WHOLE value side
   is a body over it. A max is refuted at a chain of eleven; a slot named twice
-  is free; the block reaches three nestings, the last twice-squared.
+  is free; the delivery block clears ONE nesting and no deeper level computes.
 - **`pushBurst-sz-store-outer`** (Regs-Nest-Walk) — FALSITY,
-  `REFUTED, PROBED×3`: the burst a crossing door pushes back through itself,
-  keyed on the source program since an arbitrary burst is unbounded. A
-  duplication chain buys no rung; a handed-out `μ` is charged at one nesting
-  and at two; the rate is beyond a fold that parks them.
+  `REFUTED, DEAD ROUTE, PROBED, RECOVERY`: the burst a crossing door pushes
+  back through itself, keyed on the source program since an arbitrary burst is
+  unbounded. A duplication chain buys no rung; the climb rows say no second
+  block is owed, read in rungs rather than through the charge.
 - **`subscribeE-sz-store-scan`** (Regs-Nest-Walk) — FALSITY,
   `REFUTED, DEAD ROUTE, PROBED×4`: the reified seed and the cell each arrival
-  rewrites. REFUTED on the arrival count — a wrapping step doubles the cell
-  where a depth-only charge stays fixed — and the same witness carries up to
-  the assembly consuming it, so the currency is what moves.
+  rewrites. The arrival count REFUTED the depth-only denomination — a wrapping
+  step doubles the cell where unfoldings and layers hold fixed — and the charge
+  now buys a delivery block at the SIZE bound.
 - **`subscribeSharedSlot-sz-store`** (Regs-Nest-Walk) — FALSITY,
   `DEAD ROUTE, PROBED×2`: the definition behind a reference, whose entire climb
   is the telescope summand — `input` charges nought, so no program reading

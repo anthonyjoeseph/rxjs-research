@@ -74,13 +74,16 @@ charge : ℕ
 charge = descChgˢ {Γ = Γ₁} (obs (obs (Pow K))) 63 vals₀ + slotsSize sl₁
 
 -- LOAD-BEARING: it is what says the charge is the PROGRAM's and not
--- the run's.  The arrival's layers and the one scripted slot against
--- the emission the table ends up holding -- a reading that had grown
--- with what the run produced would not report fourteen here.
+-- the run's.  The arrival's layers and the one scripted slot are read
+-- off the text, and the charge above them is a function of the size
+-- bound and those two alone -- so it stands still while the emission
+-- the table ends up holding grows exponentially in the same run.  A
+-- reading that had moved with what the run produced would not report a
+-- figure the text fixes.
 figures : List ℕ
 figures = layᵉ inner ∷ slotsSize sl₁ ∷ charge ∷ []
 
-figures≡ : figures ≡ 14 ∷ 1 ∷ 15 ∷ []
+figures≡ : figures ≡ 14 ∷ 1 ∷ 393 ∷ []
 figures≡ = refl
 
 ----------------------------------------------------------------------

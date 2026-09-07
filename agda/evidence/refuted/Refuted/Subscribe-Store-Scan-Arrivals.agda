@@ -2,13 +2,14 @@
 -- THE ARRIVAL COUNT, WHICH IS THE ONE AXIS THIS BOUND DOES NOT PAY
 -- FOR.
 --
--- The premise bounds the table by iterating `sizeStep` once per unit
--- of `descChg` plus the telescope, and `descChg` is two DEPTH counts
--- -- unfoldings and layers -- with no size in either.  A synchronous
--- source therefore buys arrivals without buying iterations: the
--- emitted values sit at one layer whatever their number, so the
--- exponent is fixed while the seed grows only with the program's
--- syntax.
+-- The premise is spelled out LOCALLY, as a layer count plus the
+-- telescope, rather than imported from the live charge -- so the
+-- witness goes on refuting the DEPTH-ONLY reading whatever the live
+-- charge is respelled to.  A depth reading is a count of unfoldings
+-- and layers with no size in either, so a synchronous source buys
+-- arrivals without buying iterations: the emitted values sit at one
+-- layer whatever their number, so the exponent is fixed while the seed
+-- grows only with the program's syntax.
 --
 -- WHAT SPENDS THEM IS A STEP THAT WRAPS ITS OWN ACCUMULATOR.  The
 -- cell holds the accumulator VALUE, and a step planting that value at
@@ -37,8 +38,8 @@ open import Rx.Exp using (Ctx; Tm; Fn; Closed; natᵗ; obs; _×ᵗ_;
 open import Rx.Slots using (Slots; scripted; slotsSize)
 open import Rx.Evaluator using (Sched; EvalSt; Path; root; st-init;
   sched-init; subscribeE; iterSize)
+open import Rx.Layer-Count using (layᵉ)
 open import Verify-Budget-Sufficient.Measures using (boundedNode)
-open import Verify-Budget-Sufficient.Regs-Nest-Walk using (descChg)
 
 ----------------------------------------------------------------------
 -- THE STATEMENT, WRITTEN OUT RATHER THAN IMPORTED.  Importing the
@@ -52,7 +53,7 @@ SubscribeEStoreScan = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u s}
   (id : Id) (now : Tick)
   (sched : Sched Γ) (st : EvalSt e) (S B M : ℕ) → 2 ≤ S →
   Sched.slots sched ≡ sl →
-  iterSize S (descChg (obs u) B (scanᵉ f z b) + slotsSize sl) B ≤ M →
+  iterSize S (layᵉ (scanᵉ f z b) + slotsSize sl) B ≤ M →
   all (λ kv → boundedNode M (proj₂ kv)) (EvalSt.nodes st) ≡ true →
   (sizeᵉ (scanᵉ f z b) ≤ᵇ B) ≡ true →
   all (λ kv → boundedNode M (proj₂ kv))
@@ -71,7 +72,7 @@ SubscribeESzStore = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (id : Id) (now : Tick)
   (sched : Sched Γ) (st : EvalSt e) (S B M : ℕ) → 2 ≤ S →
   Sched.slots sched ≡ sl →
-  iterSize S (descChg (obs u) B o + slotsSize sl) B ≤ M →
+  iterSize S (layᵉ o + slotsSize sl) B ≤ M →
   all (λ kv → boundedNode M (proj₂ kv)) (EvalSt.nodes st) ≡ true →
   (sizeᵉ o ≤ᵇ B) ≡ true →
   all (λ kv → boundedNode M (proj₂ kv))
@@ -121,8 +122,7 @@ Bval : ℕ → ℕ
 Bval k = sizeᵉ (progAt k)
 
 Mval : ℕ → ℕ
-Mval k = iterSize 2 (descChg (obs (obs natᵗ)) (Bval k) (progAt k)
-                     + slotsSize sl) (Bval k)
+Mval k = iterSize 2 (layᵉ (progAt k) + slotsSize sl) (Bval k)
 
 stAt : (k : ℕ) → EvalSt e₀
 stAt k = proj₂ (proj₂ (subscribeE (gasPad 512 g0) (progAt k)
@@ -138,8 +138,8 @@ stAt k = proj₂ (proj₂ (subscribeE (gasPad 512 g0) (progAt k)
 -- through the seed, which is the program's own syntax.  A charge that
 -- saw the arrivals would not report the same figure twice.
 charges : List ℕ
-charges = descChg (obs (obs natᵗ)) (Bval 6) (progAt 6) + slotsSize sl
-        ∷ descChg (obs (obs natᵗ)) (Bval 9) (progAt 9) + slotsSize sl
+charges = layᵉ (progAt 6) + slotsSize sl
+        ∷ layᵉ (progAt 9) + slotsSize sl
         ∷ Bval 6 ∷ Bval 9 ∷ []
 
 charges≡ : charges ≡ 3 ∷ 3 ∷ 21 ∷ 24 ∷ []

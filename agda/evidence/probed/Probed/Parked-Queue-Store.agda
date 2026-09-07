@@ -87,10 +87,11 @@ outerCharge : ℕ
 outerCharge = descChgˢ {Γ = Γ₁} (obs (obs (Pow K))) 63 vals₀ + slotsSize sl₁
 
 -- LOAD-BEARING: the charge is the ARRIVAL's, so it does not move when
--- the queue beside it does -- fifteen here and fifteen at an empty
--- queue.  A count that had joined the parked entries in would report
--- sixteen.
-outerCharge≡ : outerCharge ≡ 15
+-- the queue beside it does -- the same figure at this queue of two as
+-- at an empty one, since the quantity reads the arriving values and
+-- the size bound and nothing else.  A count that had joined the parked
+-- entries in would report a larger figure here than there.
+outerCharge≡ : outerCharge ≡ 393
 outerCharge≡ = refl
 
 -- LOAD-BEARING: the first is the rung the refutation killed, so a
