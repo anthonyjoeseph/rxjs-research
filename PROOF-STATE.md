@@ -215,17 +215,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE REGISTRY COMPONENT IS OWED IN THE BURST'S CURRENCY, AND ITS TWO
-  FACES DISAGREE ABOUT WHETHER ANYTHING IS OWED AT ALL.** Both readings
-  of `burst-nest-regs` are now dead — the frame's own predicate prices
-  a path above the row, and the syntax the frame registers from is
-  refuted, since a delivered accumulator climbs a layer per fold while
-  the program stands still. Its delivery-face sibling
-  `cascadeGo-nest-regs` reads ZERO on every family, all registrations
-  retired; the subscribe face leaves five standing above the unit. The
-  commit instantiates that gap — which face keeps a registration, and
-  whether the depth it keeps tracks the burst grant the walk already
-  computes and spends nowhere.
+- **THE REGISTRY CONJUNCT THE WALK FACE DECLINES TO CARRY, NOW THAT THE
+  STORE IS KNOWN TO DOMINATE IT.** `NestAt` grants a bound for the node
+  table at every clause and states nothing about the registry, on the
+  reading that a path frame mints at delivery rather than at subscribe.
+  The registry reads one under that same node table at every length of
+  the family whose syntactic bound diverges, so the grant already
+  covers it. The commit adds the conjunct and walks the clauses it
+  costs — the arms that register are the slot doors and the `*All`
+  installs, and each mints a path the node it installs already holds.
 
 - **THE TWO ROWS WHOSE CONCLUSIONS HAVE NOW BOTH CLOSED, which is a
   scheduling fact and not two separate findings.** `walk-frame-drain-entries`

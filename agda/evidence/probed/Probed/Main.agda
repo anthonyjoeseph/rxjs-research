@@ -160,6 +160,9 @@ open import Probed.Slot-Cascade-Store
   using (hopFigures≡; hopRows≡; farRows≡; scanFigures≡; scanRows≡;
          tieHop; tieFar; tieScan)
 
+open import Probed.Regs-Store-Currency
+  using (figures≡; verdicts≡; separates)
+
 open import Probed.Drain-Count-Slot
   using (slotCharges≡; slotRows≡; tieDrainSlot12; tieDrainSlot13)
 

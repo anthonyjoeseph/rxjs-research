@@ -2124,13 +2124,18 @@ pop-head-nest {e = e} id sched st eq h with schedGo (Sched.live sched) in eqL | 
 --   frame subscribes that value where it is delivered, and the `map-f`
 --   minted there is charged the DELIVERED function's depth, which
 --   climbs one per fold while every quantity read off the program
---   stands still.  So the increment is the only summand that can pay,
---   and the currency this component is owed in is the burst's own
---   nesting -- which the walk face grants and then deliberately spends
---   nowhere, because it prices a path frame at the delivery that mints
---   it rather than at the subscribe that walks past it.  The witness
---   runs at padded gas rather than at this row's own budget, so what it
---   covers is the shape of the climb and not this row's margin.
+--   stands still.  So the increment is the only summand that can pay.
+--   What does track the climb is the STORE the frame is walking: the
+--   accumulator lives in a node, and `Probed.Regs-Store-Currency`
+--   separates the two candidates on that witness's own length axis,
+--   the registry reading one under the node table at every length
+--   while the unit stands still.  That is the currency the walk face
+--   already grants at every clause and carries for the node table
+--   alone, declining the registry because it prices a path frame at
+--   the delivery that mints it rather than at the subscribe that walks
+--   past it.  The witness runs at padded gas rather than at this row's
+--   own budget, so what it covers is the shape of the climb and not
+--   this row's margin.
 -- PROBED: `Probed.Burst-Nest-Unit` instantiates the left half against
 --   the unit at the three `*All` heads over a two-layer wrap, where
 --   the store reads 1 against a unit of 5 -- neither vacuous nor
