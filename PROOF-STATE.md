@@ -215,18 +215,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **WHETHER `fan-regsSz` IS STILL THE FAN'S SUPPLIER AT ALL.** It is
-  the last cap-denominated receipt the sink arm consumes, and the four
-  dead routes under it close every re-denomination of the cap it names.
-  What none of them asked is whether the arm needs it: the size
-  receipt buys a LENGTH through `pathSz?-len`, the length lands in the
-  Φ leaf's exponent, and the stratification receipt now bounds the same
-  climb by the slot count without naming a cap. The commit puts the two
-  side by side at the leaf and either drops the size premise from
-  `sink-fan-sink` — retiring the row's only consumer, which is what the
-  four dead routes leave as the escape — or records why the exponent
-  still wants a length the telescope cannot give.
-
 - **WHAT MAKES THE NODRY FACE EXPENSIVE, now the only thing holding
   `subscribeE-Ψ` out of the dev loop.** All three cuts are measured: the
   LARGEST checks in twenty seconds and the other two are killed at the
@@ -247,6 +235,17 @@ does not fit is a finding about the shared statement, not about the head.
   has, and puts both consumers against it — either they spend the one
   statement, retiring a carrying problem nothing can thread, or the two
   shapes differ and that difference is the finding.
+
+- **PRICING A FANNED CHAIN IN SOMETHING THAT IS NOT A CAP, where every
+  route under `fan-regsSz` now converges.** Five closed routes leave
+  one residue and all five name it. The escape they left — paying the
+  leaf in the stratified climb instead — is now closed too, and closed
+  by a QUANTITY rather than by arithmetic: the climb counts hops and
+  the receipt counts frames. So the commit asks what the Φ leaf's
+  exponent can be denominated in when neither a cap nor the telescope
+  will pay it, and either states that pricing or establishes that the
+  factor admits no denomination the walk can carry — which moves the
+  face's MECHANISM onto the table and off its currency.
 
 ### The ledger
 
@@ -282,7 +281,7 @@ does not fit is a finding about the shared statement, not about the head.
   registered chain ends strictly ABOVE the input it was minted subscribing. The
   only receipt here naming no cap, which is what makes it carryable; the free
   form dies at one `register`, so it is owed at the mint.
-- **`fan-regsSz`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE×4`: the
+- **`fan-regsSz`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE×5`: the
   registry's own size receipt at the PROGRAM's cap. NO CAP PRICES A REGISTERED
   CHAIN: the stepped cap the receipt names is a blowup of the depth budget any
   Φ pricing must fit under, so the residue is a mechanism rather than a
