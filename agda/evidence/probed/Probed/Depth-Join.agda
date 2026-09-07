@@ -31,22 +31,23 @@
 -- taken: five is the `from-inner` head, and it is read in the same
 -- build as the rows.
 --
--- WHAT IS NOT COVERED IS THE OTHER TWO LEAVES, and their obstructions
--- are not the same one.  `share-fold-fit` is `depthFold` again, so it
+-- WHAT IS NOT COVERED IS ONE LEAF, and the obstruction is not the one
+-- the other two had.  `share-fold-fit` is `depthFold` again, so it
 -- inherits the parent's own barrier and no instrument reaches it.
--- `share-step-fit` is merely unpointed: its `rid` and `p` are a
--- `shareAdmit` entry, and `admitFig` reads that list off the registry
--- here and finds it empty, so what it wants is a program rather than
--- an instrument.
+-- `share-step-fit` is reached: its `rid` and `p` are a `shareAdmit`
+-- entry, and the figures below establish which shares leave one --
+-- a share over a source that COMPLETES leaves none, and one over a
+-- source that cannot leaves two.
 -- TARGET: frame-depth-fit @9d21e7
 -- TARGET: chain-fit-step @266bd8
+-- TARGET: share-step-fit @81b8f2
 module Probed.Depth-Join where
 
-open import Data.Bool using (Bool; false)
+open import Data.Bool using (Bool; false; true)
 open import Data.List using (List; _∷_; [])
 open import Data.Nat using (ℕ; suc; _+_; _*_)
 open import Data.Nat.Properties using (≤ᵇ⇒≤)
-open import Data.Product using (_,_)
+open import Data.Product using (_,_; _×_; proj₁; proj₂)
 open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
@@ -57,15 +58,17 @@ open import Rx.Evaluator
   thru-outer; arrTy; arrVal; budgetAt)
 
 open import Data.List renaming (length to lengthL) using ()
-open import Data.Fin using (zero)
-open import Rx.Evaluator using (shareAdmit; EvalSt; mergeAllᵒ)
+open import Data.Fin using (zero) renaming (suc to fsuc)
+open import Rx.Evaluator using (shareAdmit; EvalSt; mergeAllᵒ; RegId; memberSource;
+  subscribeE; sched-init; st-init)
 
-open import Refuted.Demand-Programs using (Γ₂; progU)
+open import Refuted.Demand-Programs using (Γ₂; progU; progF; sucGF)
 open import Probed.Depth-Sighted
-  using (uArr; uPth; uSc; uSt; slotsT; deep; wSched; wSt)
+  using (uArr; uPth; uSc; uSt; slotsT; deep; wSched; wSt; after1; slotsF)
+open import Probed.Root using (sh₂; S2)
 open import Probed.Apparatus using (Confirms)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Arrival-Caps
-  using (frame-depth-fit; chain-fit-step)
+  using (frame-depth-fit; chain-fit-step; share-step-fit)
 
 -- WHICH FRAME HEADS THE PATH, WHICH IS WHAT DECIDES WHETHER THE ROWS
 -- BELOW COULD FAIL.  Three of `depthFrame`'s five arms are flatly
@@ -194,3 +197,176 @@ admitFig = lengthL (shareAdmit zero (EvalSt.registry uSt))
 
 admitFig≡ : admitFig ≡ 0
 admitFig≡ = refl
+
+-- AND THE POINT IS NOT ONE FAMILY OVER, which is what this figure was
+-- written to test and what it refutes.  The round above defers its
+-- shared slot behind a capacity-one outer, so a natural reading of the
+-- empty admit list is that the slot is merely unspent yet -- and the
+-- width family subscribes every inner at the root, the shared one
+-- included, so on that reading its registry should carry the entry at
+-- the very first arrival.  It does not.  The figure reads the count
+-- and the head of the first admitted path together, because a nought
+-- count hands the extractor its degenerate filler, and it reports
+-- exactly that pair: no entry, and `root` standing in for the path.
+--
+-- SO THE BOUNDARY IS WIDER THAN A DEFERRED CONNECT, and what makes it
+-- so is NOT established here.  Two families whose shared slots are
+-- connected in opposite ways agree, which rules out the connect's
+-- timing as the whole story and leaves the question at `shareAdmit`'s
+-- own guard -- whether a slot subscribed as a program appears in the
+-- registry under the source index the admit filters on at all.  That
+-- is a reading of the registration path, not another program.
+fSt : EvalSt (progF 3 2)
+fSt = proj₂ (after1 (progF 3 2) slotsF (sucGF 1 2 2 3 2))
+
+record Adm : Set where
+  constructor adm
+  field
+    rid : RegId
+    pth : Path Γ₂ natᵗ natᵗ
+
+firstAdm : List (RegId × Path Γ₂ natᵗ natᵗ) → Adm
+firstAdm []            = adm 0 root
+firstAdm ((r , p) ∷ _) = adm r p
+
+fAdm : Adm
+fAdm = firstAdm (shareAdmit zero (EvalSt.registry fSt))
+
+admFig : ℕ
+admFig = lengthL (shareAdmit zero (EvalSt.registry fSt))
+       + 10 * suc (pathTag (Adm.pth fAdm))
+
+admFig≡ : admFig ≡ 10
+admFig≡ = refl
+
+-- AND WHAT EMPTIES IT IS THE DEF, WHICH IS NEITHER OF THE TWO THINGS
+-- THE WRAPPER CONTROLS.  Reading the admit list alone cannot separate
+-- three ways of arriving at a nought -- the slot was never connected
+-- because the fuel ran dry at the edge, the slot connected and the
+-- entry is simply not admitted, or the entry was written and then
+-- taken back -- and only the last of those says anything about the
+-- statement's index.  The figure reads the whole registry beside the
+-- two latches the connect sets, so one run decides among them: the
+-- units are the registrations standing at that point -- the width
+-- family subscribes its scripted slot once per copy, so that digit is
+-- not a nought and the flags are carried clear of it -- the thousands
+-- say whether source nought has completed, the ten-thousands whether
+-- it ever connected at all.
+--
+-- IT IS THE THIRD, AND THAT NAMES THE OBSTRUCTION.  The slot connects
+-- and completes in the same call, because `sharedConnect` subscribes
+-- the def and asks whether the burst it got back completed -- and the
+-- def here is built from one-shots under a scan, so it exhausts inside
+-- its own connect burst and the branch that latches it drops every
+-- registration on that source before returning.  The registration IS
+-- written; it does not survive the call that writes it.  So the
+-- emptiness is a property of the DEF being synchronous, which both
+-- families share and neither wrapper alters -- which is why connecting
+-- eagerly and connecting late agreed.  `Probed.Root` had already read
+-- the general fact off a one-shot def; what the flags add is that this
+-- corpus reaches it by the connect-and-latch route rather than by a
+-- fuel that ran dry before the edge, which is the reading that would
+-- have pointed at the gas instead of at the program.
+--
+-- SO WHAT `share-step-fit` WANTS IS A SHARE WHOSE DEF OUTLIVES ITS OWN
+-- CONNECT, and the telescope invariant is what puts that out of this
+-- corpus's reach rather than out of reach: a slot's def may reference
+-- only STRICTLY EARLIER slots, so a nought-indexed share can name no
+-- scripted source at all and every def available to it is sync by
+-- construction.  A share at a LATER index over a scripted slot below
+-- it is the shape that clears this, and `Probed.Root` builds one -- a
+-- share over an empty hot, which never fires and so never completes,
+-- whose registrations are pinned there as still standing at the root
+-- exit.  The row is unpointed by THIS corpus and not by its own index,
+-- and the point it wants already exists one module over.
+b2n : Bool → ℕ
+b2n false = 0
+b2n true  = 1
+
+regFig : ℕ
+regFig = lengthL (EvalSt.registry fSt)
+       + 1000 * b2n (memberSource 0 (EvalSt.completedSources fSt))
+       + 10000 * b2n (memberSource 0 (EvalSt.connectedShares fSt))
+
+regFig≡ : regFig ≡ 11004
+regFig≡ = refl
+
+-- AND HERE IS THAT SHARE, SPENT.  `Probed.Root` assembles a slot pair
+-- whose upper member is a share over an empty hot -- a source that
+-- never fires and so never completes -- and its root subscribe leaves
+-- the share's own registrations standing, which is the one thing the
+-- corpus above cannot produce.  Reading the admit list there gives
+-- `share-step-fit` the `rid` and `p` it quantifies over, at the state
+-- and schedule the same run returns, so the row below is the leaf read
+-- at a registration the evaluator actually wrote rather than at a pair
+-- put beside a state that never held them.
+--
+-- NON-VACUITY IS PINNED THE SAME WAY THE ADMIT NOUGHTS WERE.  A nought
+-- count would hand the extractor its `root` filler and the row would
+-- stand at a degenerate path, which is exactly the failure the two
+-- figures above were written to detect; `admShare` reports the count
+-- beside the head's arm so a fallback cannot pass for a point.
+rTri : _
+rTri = subscribeE (budgetAt S2 sh₂ 0) S2 root 0 0
+                  (sched-init S2 sh₂) (st-init S2)
+
+rSc : Sched Γ₂
+rSc = proj₁ (proj₂ rTri)
+
+rSt : EvalSt S2
+rSt = proj₂ (proj₂ rTri)
+
+rAdms : List (RegId × Path Γ₂ natᵗ natᵗ)
+rAdms = shareAdmit (fsuc zero) (EvalSt.registry rSt)
+
+rAdm : Adm
+rAdm = firstAdm rAdms
+
+admShare : ℕ
+admShare = lengthL rAdms + 10 * suc (pathTag (Adm.pth rAdm))
+
+admShare≡ : admShare ≡ 62
+admShare≡ = refl
+
+rSf : Gas
+rSf = budgetAt S2 sh₂ 0
+
+shareStepRow : Confirms
+  (share-step-fit sh₂ rSf 8 0 0 (fsuc zero)
+     (3 ∷ []) false (Adm.rid rAdm) (Adm.pth rAdm) rSc rSt refl refl)
+shareStepRow = refl , ≤ᵇ⇒≤ _ _ tt
+
+-- AND AT THE OTHER REGISTRATION, AND AT THE CLOSING DELIVERY.  One
+-- point is a foothold rather than coverage, and the two axes worth
+-- moving first are the ones the statement itself branches on.  The
+-- share carries TWO admitted entries -- both inners of the root
+-- mergeAll subscribe the same slot -- so the second is a different
+-- `rid` at the same arm, which is what says the row is not standing on
+-- whichever entry happened to be first.  And `fin` is a genuine branch
+-- in the statement rather than a parameter: at `true` the fold is
+-- handed a close emit to carry and at `false` an empty list, so a pass
+-- at one says nothing about the other.
+dropAdm : List (RegId × Path Γ₂ natᵗ natᵗ) → List (RegId × Path Γ₂ natᵗ natᵗ)
+dropAdm []       = []
+dropAdm (_ ∷ xs) = xs
+
+rAdm2 : Adm
+rAdm2 = firstAdm (dropAdm rAdms)
+
+-- the second entry is a DIFFERENT registration at the same arm, which
+-- is what makes the row below more than a restatement of the one above
+admPair : ℕ
+admPair = lengthL (dropAdm rAdms) + 10 * suc (pathTag (Adm.pth rAdm2))
+
+admPair≡ : admPair ≡ 61
+admPair≡ = refl
+
+shareStepRow2 : Confirms
+  (share-step-fit sh₂ rSf 8 0 0 (fsuc zero)
+     (3 ∷ []) false (Adm.rid rAdm2) (Adm.pth rAdm2) rSc rSt refl refl)
+shareStepRow2 = refl , ≤ᵇ⇒≤ _ _ tt
+
+shareStepFin : Confirms
+  (share-step-fit sh₂ rSf 8 0 0 (fsuc zero)
+     (3 ∷ []) true (Adm.rid rAdm) (Adm.pth rAdm) rSc rSt refl refl)
+shareStepFin = refl , ≤ᵇ⇒≤ _ _ tt
