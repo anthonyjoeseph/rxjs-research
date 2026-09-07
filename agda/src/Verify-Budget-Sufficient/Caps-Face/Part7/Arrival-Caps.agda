@@ -653,10 +653,18 @@ postulate
 -- is whatever the shared slot has registered where the row would
 -- stand -- and `Probed.Depth-Join` reads that list off the registry at
 -- the round these leaves are otherwise instantiated at and finds it
--- EMPTY.  So the absence is of a POINT and the point is a program
--- away: a family whose shared slot is connected and delivering by the
--- instant the descent is priced at would supply one, where every
--- family here connects inside the root subscribe or not at all.
+-- EMPTY.  So the absence is of a POINT.
+--
+-- AND THE POINT IS NOT ONE PROGRAM AWAY, which was the first reading of
+-- that emptiness and is refuted.  The round it was read at defers its
+-- shared slot behind a capacity-one outer, so the slot being merely
+-- unspent yet explains the nought -- but the same list is read on a
+-- family that subscribes its shared slot at the ROOT instead, and it
+-- is empty too.  Two opposite connect timings agree, so the timing is
+-- not what empties it, and what is open is whether a slot subscribed
+-- as a program reaches the registry under the source index the admit
+-- filters on at all.  That is a reading of the registration path
+-- rather than another corpus family.
 postulate
   share-fold-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (sf : Gas) (gas : ℕ) (bid : Id) (now : Tick) (i : Fin n)

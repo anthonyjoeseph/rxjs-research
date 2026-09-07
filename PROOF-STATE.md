@@ -215,18 +215,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE REGISTRATION THE CORPUS DOES NOT OFFER, which is now a program
-  to write rather than a region to find.** Both charging arms of
-  `frame-depth-fit` are instantiated and the share sink is what is
-  left, and the registry read says why: `share-step-fit`'s point is a
-  `shareAdmit` entry and the shared slot has none where the leaves are
-  priced. Every family here either spends its connect inside the root
-  subscribe or defers it behind an outer that has not fired. The commit
-  adds the family between — a shared slot whose connect lands on an
-  early arrival and is still delivering at the next — and reads the
-  leaf at a registration off its registry. `share-fold-fit` stays
-  closed whatever this finds; it is `depthFold` and inherits the
-  barrier.
+- **WHETHER A SHARED SLOT REACHES THE REGISTRY UNDER THE INDEX THE
+  ADMIT FILTERS ON — a reading of the registration path, not another
+  program.** Writing the family between is dead: two families connected
+  in OPPOSITE ways, one at the root and one deferred behind a
+  capacity-one outer, both admit nothing, so timing is not what empties
+  the list. What is left is `shareAdmit`'s own guard against what
+  `register` writes when the thing subscribed is a slot's PROGRAM. The
+  commit reads that path and pins what the registry holds. If the guard
+  cannot be met from a slot at all, `share-step-fit` is unpointed by
+  construction and its index is wrong — a SHAPE finding, and larger
+  than the coverage gap it now reads as.
 
 - **THE SUBSTITUTING TELESCOPE, WHICH IS THE ONE SHAPE THAT HAS ALREADY
   REFUTED AN ADDITIVE SUMMAND ON A SIBLING FACE.** `Rx.Clos-Size` exists
@@ -297,9 +296,9 @@ does not fit is a finding about the shared statement, not about the head.
   recorded at `depthShareGo` closes its conclusion to instantiation exactly as
   the parent's was.
 - **`share-step-fit`** (Part7/Arrival-Caps) — FALSITY, `NO EVIDENCE`: the
-  position's ceiling survives one `foldPath`, slots unmoved. Blocked by the
-  CORPUS and not by the measure — its point is a `shareAdmit` entry, and the
-  list is read off the registry at the probed round and comes back empty.
+  position's ceiling survives one `foldPath`, slots unmoved. Unpointed, and not
+  by the connect's timing — its point is a `shareAdmit` entry, and that list is
+  empty on two families whose shared slots are connected in opposite ways.
 - **`scanΦ-fit`** (Part7/Depth-Fit) — SHAPE, `DEAD ROUTE`: the producing side
   of the fold's grant. THE MECHANISM IS DEAD, NOT A DENOMINATION: a flat
   per-instant potential cannot dominate a count exponential in itself; the one

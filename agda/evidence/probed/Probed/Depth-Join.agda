@@ -46,7 +46,7 @@ open import Data.Bool using (Bool; false)
 open import Data.List using (List; _∷_; [])
 open import Data.Nat using (ℕ; suc; _+_; _*_)
 open import Data.Nat.Properties using (≤ᵇ⇒≤)
-open import Data.Product using (_,_)
+open import Data.Product using (_,_; _×_; proj₂)
 open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
@@ -58,11 +58,11 @@ open import Rx.Evaluator
 
 open import Data.List renaming (length to lengthL) using ()
 open import Data.Fin using (zero)
-open import Rx.Evaluator using (shareAdmit; EvalSt; mergeAllᵒ)
+open import Rx.Evaluator using (shareAdmit; EvalSt; mergeAllᵒ; RegId)
 
-open import Refuted.Demand-Programs using (Γ₂; progU)
+open import Refuted.Demand-Programs using (Γ₂; progU; progF; sucGF)
 open import Probed.Depth-Sighted
-  using (uArr; uPth; uSc; uSt; slotsT; deep; wSched; wSt)
+  using (uArr; uPth; uSc; uSt; slotsT; deep; wSched; wSt; after1; slotsF)
 open import Probed.Apparatus using (Confirms)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Arrival-Caps
   using (frame-depth-fit; chain-fit-step)
@@ -194,3 +194,44 @@ admitFig = lengthL (shareAdmit zero (EvalSt.registry uSt))
 
 admitFig≡ : admitFig ≡ 0
 admitFig≡ = refl
+
+-- AND THE POINT IS NOT ONE FAMILY OVER, which is what this figure was
+-- written to test and what it refutes.  The round above defers its
+-- shared slot behind a capacity-one outer, so a natural reading of the
+-- empty admit list is that the slot is merely unspent yet -- and the
+-- width family subscribes every inner at the root, the shared one
+-- included, so on that reading its registry should carry the entry at
+-- the very first arrival.  It does not.  The figure reads the count
+-- and the head of the first admitted path together, because a nought
+-- count hands the extractor its degenerate filler, and it reports
+-- exactly that pair: no entry, and `root` standing in for the path.
+--
+-- SO THE BOUNDARY IS WIDER THAN A DEFERRED CONNECT, and what makes it
+-- so is NOT established here.  Two families whose shared slots are
+-- connected in opposite ways agree, which rules out the connect's
+-- timing as the whole story and leaves the question at `shareAdmit`'s
+-- own guard -- whether a slot subscribed as a program appears in the
+-- registry under the source index the admit filters on at all.  That
+-- is a reading of the registration path, not another program.
+fSt : EvalSt (progF 3 2)
+fSt = proj₂ (after1 (progF 3 2) slotsF (sucGF 1 2 2 3 2))
+
+record Adm : Set where
+  constructor adm
+  field
+    rid : RegId
+    pth : Path Γ₂ natᵗ natᵗ
+
+firstAdm : List (RegId × Path Γ₂ natᵗ natᵗ) → Adm
+firstAdm []            = adm 0 root
+firstAdm ((r , p) ∷ _) = adm r p
+
+fAdm : Adm
+fAdm = firstAdm (shareAdmit zero (EvalSt.registry fSt))
+
+admFig : ℕ
+admFig = lengthL (shareAdmit zero (EvalSt.registry fSt))
+       + 10 * suc (pathTag (Adm.pth fAdm))
+
+admFig≡ : admFig ≡ 10
+admFig≡ = refl
