@@ -691,16 +691,30 @@ postulate
 -- chain sinks into a LATER share rather than the root, which is
 -- `foldPath`'s recursive arm.
 --
--- WHAT REMAINS IS `scan-f`, AND IT IS THE ONE ARM THAT CAN STILL MOVE
--- THE CEILING.  `storeSyncMax` maximises over slots, nodes and
--- registry.  Of the three arms no row reaches, `map-f` returns the
--- schedule and store it was handed, and `take-f` only ever shrinks them
--- -- it drops registrations, sweeps the live set and stores a numeral.
--- `scan-f` writes a node back with a fresh ACCUMULATOR, and at an
--- observable-typed accumulator that value carries nesting of its own,
--- so `nodeNest` can grow across the very step the conclusion says
--- cannot grow.  That is where a counterexample would be, and it is the
--- reason the class does not move on the rows below.
+-- AND `scan-f` IS THE ARM THAT KILLS IT.  `storeSyncMax` maximises over
+-- slots, nodes and registry.  Of the three arms the rows below miss,
+-- `map-f` returns the schedule and store it was handed, and `take-f`
+-- only ever shrinks them -- it drops registrations, sweeps the live set
+-- and stores a numeral.  `scan-f` writes a node back with a fresh
+-- ACCUMULATOR, and at an observable-typed accumulator that value
+-- carries nesting of its own, so `nodeNest` grows across the very step
+-- the conclusion says cannot grow.  A step function wrapping the
+-- previous accumulator once per delivered value takes the store from
+-- two to three and the ceiling up with it, on a chain a share whose def
+-- never completes actually admits.
+--
+-- SO PRESERVATION IS THE WRONG SHAPE FOR THIS OBLIGATION, and the
+-- statement is owed a PRICE instead: a factor times the store plus an
+-- increment, which is what the growth statement one level up already
+-- charges a cascade.  The restatement has to reach the consumer too --
+-- `disp-depth-fit` spends this conjunct by transitivity against a
+-- ceiling stated once for the whole dispatch, and a priced step cannot
+-- be chained that way without the fan-out's own count entering the
+-- bound.
+-- REFUTED: `Refuted.Share-Step-Scan` crosses the second conjunct at a
+--   `scan-f` head over an `obs`-typed accumulator, taking `rid` and `p`
+--   off `shareAdmit` at the state the subscribe returned.  The ceiling
+--   goes 78 to 91 across the fold.
 -- PROBED: `Probed.Depth-Join` stands seven rows at shares whose defs
 --   cannot complete, taking `rid` and `p` off `shareAdmit` at the state
 --   and schedule the same subscribe returns.  Both `fin` branches at
@@ -712,8 +726,8 @@ postulate
 --   head again over a chain sinking into a later share, which is the
 --   `dispatchShare` re-entry.  The tails are pinned, not assumed: the
 --   first two families end at `root`.  The gas is the budget the
---   statement names.  Not covered: the `map-f`, `scan-f` and `take-f`
---   heads, and any share carrying more registrations than these do.
+--   statement names.  Not covered: the `map-f` and `take-f` heads, and
+--   any share carrying more registrations than these do.
 postulate
   share-step-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (sf : Gas) (gas : ℕ) (bid : Id) (now : Tick) (i : Fin n)
@@ -773,6 +787,20 @@ disp-depth-fit {e = e} sl sf gas bid now i vals fin sched st hsl hsf =
 -- obligation the fold cannot discharge for itself and the reason the
 -- invariant is a ceiling rather than a store bound: the values and the
 -- store are free to trade, and only their combination is held.
+--
+-- BUT A SCAN MOVES BOTH SIDES THE SAME WAY, so the trade is not there
+-- to be made.  Its emitted values ARE its accumulator, and it writes
+-- that accumulator back into the nodes -- so an `obs`-typed accumulator
+-- deepens the left ceiling twice, once through `nestDᵛˢ` of what the
+-- frame emits and once through the store the frame leaves.  The step
+-- half therefore crosses by MORE than the fold half at the same point,
+-- which is the reverse of what a trade would give.  What survives of
+-- the design is the ceiling as a shape; what does not is asking a
+-- step-taking arm to preserve it, and both this and its sibling are
+-- owed the same priced restatement.
+-- REFUTED: `Refuted.Share-Step-Scan` -- the same witness at the chain's
+--   own frame rather than at the fold around it: the ceiling goes 78 to
+--   130 across one `stepFrame`.
 -- PROBED: `Probed.Depth-Join` reads both conjuncts at the chain edge
 --   the frame row stands at -- slots by reflexivity, the ceiling as two
 --   numerals at states one `stepFrame` apart -- and again at the

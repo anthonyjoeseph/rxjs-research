@@ -215,17 +215,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE `scan-f` HEAD AT AN OBSERVABLE-TYPED ACCUMULATOR, which the
-  arm sweep just named as the one place `share-step-fit` can still be
-  false.** `storeSyncMax` maximises over slots, nodes and registry, and
-  of the three heads no row reaches, two cannot move it — `map-f`
-  returns what it was handed, `take-f` only shrinks. `scan-f` writes a
-  node back with a fresh accumulator, and an observable-typed one
-  carries nesting, so `nodeNest` can grow across the step the
-  conclusion says cannot. The commit builds a share whose registration
-  is `scan-f` headed at that type and reads the ceiling either side. A
-  crossing refutes the row outright and is worth more than the seven
-  rows standing; a hold is the last arm, and the class moves.
+- **THE PRICED STEP, WHICH IS WHAT THE CROSSING LEAVES OWED — and a
+  restatement can introduce falsity where the crossed form could only
+  fail.** Both `share-step-fit` and `chain-fit-step` asked a step to
+  PRESERVE the position ceiling; a scan writing an obs-typed
+  accumulator into the nodes crosses both. Preservation becomes a
+  price — a factor times the store plus an increment. The commit
+  restates the two conjuncts in that currency and carries it into
+  `disp-depth-fit`, which spends them by transitivity against one
+  ceiling for the whole dispatch. A priced step cannot chain that way
+  unless the fan-out's own count is available where the dispatch
+  stands, and whether it is is the decision the commit makes.
 
 - **THE SUBSTITUTING TELESCOPE, WHICH IS THE ONE SHAPE THAT HAS ALREADY
   REFUTED AN ADDITIVE SUMMAND ON A SIBLING FACE.** `Rx.Clos-Size` exists
@@ -295,11 +295,15 @@ does not fit is a finding about the shared statement, not about the head.
   ONE LEAF INHERITING THE BARRIER — it is `depthFold` again, so the doubling
   recorded at `depthShareGo` closes its conclusion to instantiation exactly as
   the parent's was.
-- **`share-step-fit`** (Part7/Arrival-Caps) — FALSITY, `PROBED`: the position's
-  ceiling survives one `foldPath`, slots unmoved. Seven rows, at shares whose
-  defs cannot complete — `from-inner` and `thru-outer` heads, root and
-  share-sink tails, both `fin`. The residue is one arm: `scan-f` at an
-  obs-typed accumulator.
+- **`share-step-fit`** (Part7/Arrival-Caps) — SHAPE, `REFUTED, PROBED`: the
+  position's ceiling across one `foldPath`, slots unmoved. Seven rows held at
+  the two subscribing heads; a `scan-f` head at an obs-typed accumulator takes
+  the store two to three. The step is owed a PRICE, which `disp-depth-fit`
+  then has to chain.
+- **`chain-fit-step`** (Part7/Arrival-Caps) — SHAPE, `REFUTED, PROBED`: the
+  same across one `stepFrame`. The values-against-store TRADE the ceiling was
+  chosen to permit runs one way only — a scan emits its own accumulator and
+  writes it back — so the same witness crosses here by more than at the fold.
 - **`scanΦ-fit`** (Part7/Depth-Fit) — SHAPE, `DEAD ROUTE`: the producing side
   of the fold's grant. THE MECHANISM IS DEAD, NOT A DENOMINATION: a flat
   per-instant potential cannot dominate a count exponential in itself; the one
@@ -318,10 +322,6 @@ does not fit is a finding about the shared statement, not about the head.
   nothing, and BOTH arms that do are now instantiated — the react at a walked
   edge, the walk at an assembled one. The residue is the state axis, not an
   arm.
-- **`chain-fit-step`** (Part7/Arrival-Caps) — DIFFICULTY, `PROBED`: the same
-  across one `stepFrame`, values and store trading under a fixed ceiling. The
-  invariant was chosen to make this two numerals, and the step is now taken at
-  each charging arm rather than at whichever one the corpus heads a chain with.
 - **`stepFrame-nest-nodes-inner`** (Nodes-Nest-Walk) — DIFFICULTY,
   `PROBED, RECOVERY`: what the drain writes at the nodes map. The pop shrinks,
   and the park its subscribe makes lands one layer under the term popped — so
