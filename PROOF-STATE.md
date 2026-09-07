@@ -218,13 +218,13 @@ does not fit is a finding about the shared statement, not about the head.
 - **PAYING FOR THE CHAIN INDEX ON THE FACE THAT IGNORES IT.** The index
   is in, and the SHAPE risk is discharged: the generic and the caps face
   are green, `chP?-const` carrying every face with nothing to say about
-  the chain. What the leg cost is the burst face, whose check went up by
-  a multiple on an index none of its own proofs mention — a
-  record-projection cost, not a proof cost, and the finding is in the
-  ledger field's own header. The remaining work is to cut that
-  projection, or failing that to leave the burst ledger unindexed and
-  carry the fan's reading in a second field. The mint's fifth site, which
-  the index is for, waits on it.
+  the chain. The burst face's check went up by a multiple, and the
+  attribution is now a candidate rather than a claim: the index turned
+  three loop premises from one Bool into an `all` over the chain list, so
+  a face whose own reading is a fold nests one. Next is the measurement
+  separating that from the record projection, then the repair it names —
+  most likely splitting the ledger so only the small per-chain half sits
+  inside the fold. The mint's fifth site waits on it.
 
 - **THE DELIVERED SUMMAND AT THE ROW'S OWN BUDGET, which is the one
   region the split's evidence declines to reach.** `burst-regs-split`

@@ -241,14 +241,16 @@ record Walk-Hyps {n} {Γ : Ctx n} {t} (e : Closed Γ t) (S W R d : ℕ) : Set₁
     --
     -- AND IGNORING IT IS NOT FREE, WHICH IS THE ONE THING THE DESIGN DID
     -- NOT PREDICT.  A face whose reading is a constant function of the
-    -- path still pays: the burst face's check went up by a MULTIPLE on
-    -- an index none of its own proofs mention, since they state their
-    -- ledger directly rather than through this field.  So the cost is in
-    -- the record — projecting a lambda-valued field out of a literal
-    -- whose other fields are enormous — and not in what the index says.
-    -- The figures are in `typecheck-performance-numbers.md`, which is
-    -- where a figure lives; what belongs here is that the cheap-looking
-    -- half of this change is the half to measure.
+    -- path still pays: the burst face's check went up by a MULTIPLE on an
+    -- index none of its own proofs mention, since they state their ledger
+    -- directly rather than through this field.  What the index changed is
+    -- the SHAPE of three loop premises — one Bool became an `all` over
+    -- the chain list — so at a face whose own reading is a fold over the
+    -- payload, every recursive site now nests a fold in a fold.  That is
+    -- read off the statements rather than measured, and the standing
+    -- alternative is the record projection; separating the two is what
+    -- the next measurement is for, and the figures live in
+    -- `typecheck-performance-numbers.md`.
     Vb : ∀ {u} → Path Γ u t → ℕ → ∀ {s} → List (Val Γ s) → Bool
 
     -- BURST LEDGERS: an abstract Bool over the accumulated protocol events
