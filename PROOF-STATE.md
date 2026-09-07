@@ -215,18 +215,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE DELIVERY BLOCK'S SIZE, WHICH NOTHING NOW CROSSES — the live
-  consequence of minting it.** It is `B` bits per node at each
-  level of nesting, sized by an argument in `descRungsᴺ`'s own header
-  and instantiated by no row. And it is large enough that
-  every BLINDED reading — the charge with the block or the telescope
-  dropped — now clears the small tables it used to fail, so four
-  separations went degenerate and were deleted. The charge the whole
-  value side is a body over is therefore unfalsifiable by the evidence
-  standing over it. The commit builds the scan family at the split
-  that sizing maximises and reads the delivered cell against the block
-  alone. A crossing resizes the block; a hold restores a separation.
-
 - **THE CARRIED STORE PREDICATE FOUR ROWS ARE ALL OWED, and a field
   rather than a hypothesis is what it has to be.** `walk-share-nestOK`,
   `sink-fan-sink` and both `innerΦ-*-fit` arms end at the same residue
@@ -250,6 +238,18 @@ does not fit is a finding about the shared statement, not about the head.
   in rather than the table's maximum. A crossing there restates the
   right summand, not the sum; none promotes the row off a coverage gap
   that currently reads as safe.
+
+- **WHAT PRICES A REGISTERED CHAIN, since no cap does and the flat
+  potential is dead.** `fan-regsSz` and `scanΦ-fit` are one question
+  written twice: the stepped cap the receipt names is a blowup of the
+  depth budget any Φ pricing must fit under, and a flat per-instant
+  potential cannot dominate a count exponential in itself. So the
+  residue is a MECHANISM and not a denomination, so grinding either
+  row spends effort on a refuted shape. The commit picks the pricing:
+  the store's exit-index factor is the one affording ceiling on offer
+  and it was priced in a refuted width, so the choice is re-pricing it
+  or finding a second. Both rows are then restated over whichever
+  lands, since a pricing serving one and not the other is not it.
 
 ### The ledger
 
