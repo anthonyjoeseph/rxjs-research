@@ -407,6 +407,21 @@ depthDisp sf (suc gas) id now i vals fin sched st =
 -- so the mirror covers whichever the test picks and the consuming clause
 -- reads its case off a projection rather than off a with-abstraction.
 -- Both tails recurse on `ps`, so the walk still terminates on the list
+--
+-- AND THAT COLLAPSE IS WHAT PUTS THIS MEASURE OUT OF INSTANTIATION'S
+-- REACH, WHICH IS A PROPERTY OF THE DEFINITION AND NOT OF ANY HARNESS.
+-- Two recursive calls per element make the work exponential in the
+-- length of `ps` -- and `ps` is read off the REGISTRY, so it grows as a
+-- run registers, which is exactly the direction a consumer walks in.  A
+-- descent is therefore cheap at a round's entry and unreachable a chain
+-- later, and the gap between those is a doubling rather than a factor.
+-- Nothing in this module is `abstract`, so the compiled harness's one
+-- advantage -- running bodies the checker will not unfold -- does not
+-- apply, and raw speed buys a constant against a `2ⁿ`: a thousandfold
+-- is ten more paths.  The collapse is not a defect to repair, since the
+-- consumer's projections are what it buys; the consequence is that any
+-- statement about this measure at a walked state has to be PROVEN, and
+-- can never be de-risked by a row.
 depthShareGo sf gas id now i vals fin []               sched₀ st₀ = 0
 depthShareGo sf gas id now i vals fin ((rid , p) ∷ ps) sched₀ st₀ =
   depthShareGo sf gas id now i vals fin ps sched₀ st₀

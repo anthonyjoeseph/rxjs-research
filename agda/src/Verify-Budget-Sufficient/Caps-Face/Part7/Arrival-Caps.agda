@@ -589,6 +589,14 @@ arr-chains-bursts sl id a nextId sched st sleq cok hpz hvc hcl hdp =
 --   there is no monotonicity to borrow.  Slackening `S` only weakens a
 --   premise that is already discharged, and moves no risk off this
 --   leaf onto the round.
+-- DEAD ROUTE: the compiled harness cannot price the descent at a walked
+--   state either, so the barrier is not an instrument that is missing.
+--   Its one advantage is running bodies the checker will not unfold,
+--   and `Caps-Depth` seals nothing at all; what actually blocks the
+--   descent is a doubling per registered share path, recorded at the
+--   clause responsible.  Speed is a constant against that, so the
+--   conclusion side is closed to instantiation permanently and this row
+--   moves only by proof.
 -- PROBED: `Probed.Depth-Sighted` reads this side at the second cascade
 --   along both axes -- fold depths two and eight, delivered counts two,
 --   six and twenty -- and at the width family that drains nothing.

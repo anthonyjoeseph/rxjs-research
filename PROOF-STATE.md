@@ -215,16 +215,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE TWO CLOSED ROWS, NOW THAT RE-THREADING `S` IS KNOWN NOT TO
-  REACH THEM.** That route is now dead on `chain-depth-sighted`, in its
-  header: the premise side was already handled, so the gap is the
-  CONCLUSION and nothing transports it. `walk-frame-drain-entries` sits
-  the same way. The commit therefore attacks the instantiation barrier
-  rather than the statements — the compiled harness runs bodies the
-  checker will not unfold, so it is the one instrument that could price
-  a descent at a walked state. Its existing series report rows killed
-  natively too, so the product may be a BLOCKED verdict; that is a
-  coverage boundary worth recording, not a failure.
+- **THE TWO CLOSED ROWS, NOW THAT THE BARRIER IS KNOWN TO BE
+  PERMANENT.** Neither re-threading `S` nor the compiled harness reaches
+  `chain-depth-sighted`'s conclusion, and both routes are dead in its
+  header. `walk-frame-drain-entries` sits the same way, so these are the
+  tier's only rows that cannot be de-risked at all. The commit treats
+  that as the schedule rather than the obstacle and takes the proof
+  directly, off the one structural fact the barrier hands over: the
+  measure is a join over a list read from the registry, which is the
+  shape an induction on that list wants.
 
 - **THE SUBSTITUTING TELESCOPE, WHICH IS THE ONE SHAPE THAT HAS ALREADY
   REFUTED AN ADDITIVE SUMMAND ON A SIBLING FACE.** `Rx.Clos-Size` exists
@@ -290,7 +289,7 @@ does not fit is a finding about the shared statement, not about the head.
   has it and the walk carries no nest conjunct at all; threading it down is
   refused by the store's own growth toward the NEXT cap.
 - **`chain-depth-sighted`** (Part7/Arrival-Caps) — FALSITY,
-  `REFUTED×2, DEAD ROUTE×2, PROBED`: ONE chain's descent under the round's
+  `REFUTED×2, DEAD ROUTE×3, PROBED`: ONE chain's descent under the round's
   ceiling, premised on the store's SYNCHRONOUS maximum. Every row sits at a
   round's entry; the descent does not compute at a state a chain left, so the
   region the consumer uses is closed to instantiation.
