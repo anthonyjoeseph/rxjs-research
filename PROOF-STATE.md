@@ -238,16 +238,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **TYING THE CASCADE'S ENTRY TO THE STORE — THE HALF THE RING'S MOVE
-  DOES NOT REACH.** The ring's pair now comes off a statement over the
-  list the SHARE ADMITTED, read out of the state the receipt already
-  names. The fit test priced that move at TWO ring entries and not one:
-  the burst face enters the same tuple and owes the same premises. Both
-  are carried. An arrival's chain comes off `chainsOf` and its value is
-  the source's, neither tied to the state, so the subject that has to
-  move there is the LIVE source. The leg states that form and carries
-  it through the cascade's entry. The store conjunct is still owed: the
-  hop leaf, which no refutation touches, needs it on its own.
+- **TYING THE CASCADE'S ENTRY TO THE STORE — BOTH SUBJECTS ARE NOW
+  LOCATED AND THE INDEX IS NOT.** The ring's pair is carried on both
+  faces. The cascade's two free variables are reachable after all: a
+  chain is a FILTER of the registry, so the path half restates off the
+  ring's own form, and a value is the head of a live source's pending
+  queue, so the value half restates over the schedule, which the
+  receipt names beside the state. What is open is the INDEX: a sink
+  had its own slot, a
+  source has none, so the bound relates two lists where the sink's
+  related a list to a number. The leg states that quantity and enters
+  both halves. The store conjunct stays owed by the hop leaf alone.
 
 - **PRICING A FANNED CHAIN IN SOMETHING THAT IS NOT A CAP, where every
   route under `fan-regsSz` now converges.** Five closed routes leave

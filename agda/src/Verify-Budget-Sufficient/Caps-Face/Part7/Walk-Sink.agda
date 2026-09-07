@@ -115,16 +115,32 @@ postulate
     admEntry? {t = t} (Fin.toℕ i) (shareAdmit i (EvalSt.registry st)) ≡ true
 
 -- AND THE CASCADE'S ENTRY IS THE HALF THAT MOVE DOES NOT REACH, so the
--- free pair stands here rather than being reissued under a fresh name.
--- An arrival's chain comes off `chainsOf` and its value is the
--- source's, and neither is tied here to the state, so a statement over
--- the admitted list says nothing about either.  What the move above
--- buys the pair is CONSUMERS: one entry each rather than two, so the
--- region either can go wrong in is the cascade's alone.  The fix when
--- it comes is the same one -- name the subject the store can answer
--- for, which for a cascade is its LIVE source -- and reissuing either
--- shape under a new name before then would carry the defect across
--- with the witnesses left pointing elsewhere.
+-- free pair stands here rather than being reissued under a fresh name:
+-- a statement over the admitted list says nothing about either.  What
+-- the move above buys them is CONSUMERS -- one entry each rather than
+-- two -- so the region either can still go wrong in is the cascade's
+-- alone.  Reissuing either shape before its subject has a home would
+-- carry the defect across with the witnesses left pointing elsewhere.
+--
+-- AND BOTH SUBJECTS DO HAVE A HOME, which is the repair rather than a
+-- hope for one.  `capsOK?` names the SCHEDULE as well as the state,
+-- and each of the cascade's two free variables is reachable from one
+-- of them.  A chain is `chainsGo` over `EvalSt.registry` -- a FILTER
+-- of the registry, the same shape as the admitted list above, so the
+-- path half restates over it almost verbatim.  A value is the payload
+-- of the head of some live source's pending queue, so the value half
+-- restates over `Sched.live`; and the subject there is the LIVE SOURCE
+-- and not the arrival, because an arrival is MINTED from that list at
+-- the moment it is taken and is nowhere stored, which is exactly why
+-- quantifying over arrivals put the pair out of the state's reach.
+-- Read off the definitions rather than instantiated.
+--
+-- WHAT IS NOT SETTLED IS THE INDEX, and it is the part that makes this
+-- a leg rather than a transcription.  The sink's move had one to hand,
+-- its own slot.  A cascade's entry carries a Source and no slot, so
+-- what a source's pending values must sit below is the floor of the
+-- chains registered AGAINST that source -- a quantity relating the two
+-- lists, where the sink's related one list to a number.
 --
 -- REFUTED: `Refuted.Walk-Entry-Strat.walk-path-strat-absurd` kills the
 --   free path form at one frame over a sink -- a `map` whose template
