@@ -240,15 +240,15 @@ does not fit is a finding about the shared statement, not about the head.
   still wants a length the telescope cannot give.
 
 - **WHAT MAKES THE NODRY FACE EXPENSIVE, now the only thing holding
-  `subscribeE-Ψ` out of the dev loop.** The face is cut in three; two
-  pieces check in seconds and the third is killed at the budget by
-  itself, and BOTH candidate explanations are dead in the field's own
-  header — the record that piece cannot see, and the amount of text,
-  which the undivided module's own record outruns. It holds no mutual
-  cycle, so it cuts freely: the commit bisects it and measures each
-  half, which localises the cost and returns the row to a seconds-scale
-  loop in one act. A half that stays over budget names the region; both
-  halves coming in names the whole-file pass instead.
+  `subscribeE-Ψ` out of the dev loop.** All three cuts are measured: the
+  LARGEST checks in twenty seconds and the other two are killed at the
+  budget, one of them the smallest. So BOTH readings are dead in the
+  field's own header — the record only one expensive piece can see, and
+  the amount of text, which the cheap piece outruns. Neither over-budget
+  piece holds a mutual cycle, so both cut freely: the commit bisects the
+  smaller, where a region is half the size to name, and measures each
+  half. A half that stays over names the region; both coming in names
+  the whole-file pass instead.
 
 ### The ledger
 
@@ -281,9 +281,9 @@ does not fit is a finding about the shared statement, not about the head.
   escalation is PROGRAM-bounded: hops climb the stratified telescope. The chain
   now arrives carrying its `sinkAbove?` reading, so what is open is the MINT.
 - **`walk-share-strat`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: every
-  registered chain ends strictly ABOVE the input it was minted subscribing.
-  The only receipt here naming no cap, which is what makes it carryable; the
-  free form dies at one `register`, so it is owed at the mint.
+  registered chain ends strictly ABOVE the input it was minted subscribing. The
+  only receipt here naming no cap, which is what makes it carryable; the free
+  form dies at one `register`, so it is owed at the mint.
 - **`fan-regsSz`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE×4`: the
   registry's own size receipt at the PROGRAM's cap. NO CAP PRICES A REGISTERED
   CHAIN: the stepped cap the receipt names is a blowup of the depth budget any
@@ -385,7 +385,7 @@ does not fit is a finding about the shared statement, not about the head.
   stream leaf — the walk over it is a proven body, so what remains per instant
   is the frame widths, which are sealed and taken as a quantified premise
   wherever a row reads them.
-- **`burst-regs-split`** (Caps-Bridge) — DIFFICULTY, `REFUTED, PROBED`: the
+- **`burst-regs-split`** (Caps-Bridge) — DIFFICULTY, `REFUTED, PROBED×2`: the
   registry after the subscribe frame, split between the program's unit and the
   node table. A chain SUMS its two kinds of frame, so neither source alone pays
   and neither does their join; the sum is what is left, tight where they
