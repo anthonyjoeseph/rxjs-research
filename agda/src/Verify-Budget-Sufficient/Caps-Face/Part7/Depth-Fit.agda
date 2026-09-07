@@ -1272,6 +1272,33 @@ postulate
 -- denominated in the entry cap at all, which is a restatement of the
 -- walk rather than a fact about the registry.
 
+-- AND THE MINT'S OWN CONTRACT PRICES THIS, WHICH TURNS THE RESIDUE
+-- FROM A CURRENCY INTO A COUNT.  `register-caps` is proven, and it is
+-- the only rule carrying a registry reading across a registration: it
+-- consumes the reading at one frame level and returns it one level
+-- HIGHER, per chain registered.  So a state that has minted k times
+-- since the instant's entry holds its reading at the k-th step and
+-- nowhere below it, while `pathSz?` weakens upward.  That is not a
+-- gap in the registry's theory -- `capsOK?-regs` already delivers
+-- this row's exact conclusion from a receipt at the cap the reading
+-- is held at, so nothing here is unproven.  The reading is held at a
+-- level the conclusion does not name, and the search for a price that
+-- is not a cap was looking for the wrong kind of object.
+
+-- SO THE RISKY REGION IS SAME-INSTANT REGISTRATION -- STRICTLY
+-- SMALLER THAN THE ROW, AND THE CONNECT PATH SITS INSIDE IT.  At no
+-- mints the step is the identity and the row discharges outright out
+-- of `capsOK?-regs`, so every counterexample needs a registration
+-- between the instant's entry and the fan.  `sharedConnect-core` is
+-- one: it registers the subscriber's own continuation and THEN
+-- subscribes the share's definition with `share-sink` as the
+-- continuation, so a definition emitting synchronously reaches the
+-- fan with that registration already in the registry -- and
+-- `register-caps` prices exactly that registration at one step.  The
+-- region is therefore not a corner but the ordinary shared-subscribe
+-- path, which is what makes the entry-cap reading unavailable rather
+-- than merely unproven.  Read off the connect, not instantiated.
+
 -- AND NEITHER IS THE ADMISSION FILTER'S TO CARRY, which is what the
 -- pair being stated over the fan-out was hiding.  `shareAdmit`
 -- selects on the source and the element type and never reads a path,

@@ -238,16 +238,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **PRICING A FANNED CHAIN IN SOMETHING THAT IS NOT A CAP, where every
-  route under `fan-regsSz` now converges.** Five closed routes leave
-  one residue and all five name it. The escape they left — paying the
-  leaf in the stratified climb instead — is now closed too, and closed
-  by a QUANTITY rather than by arithmetic: the climb counts hops and
-  the receipt counts frames. So the commit asks what the Φ leaf's
-  exponent can be denominated in when neither a cap nor the telescope
-  will pay it, and either states that pricing or establishes that the
-  factor admits no denomination the walk can carry — which moves the
-  face's MECHANISM onto the table and off its currency.
+- **AFFORDING ONE FRAME STEP IN THE Φ PRICING, which is what the
+  registry question turned out to be.** The currency search is over:
+  `register-caps` prices a mint at exactly one step, `capsOK?-regs`
+  already delivers the conclusion at whatever level the reading is
+  held, and the connect path puts a mint inside the ordinary fan — so
+  nothing about registries is unproven and the entry-cap reading is
+  unavailable rather than merely unwritten. That leaves one number.
+  The commit takes `pathΦF`'s sink clause at a single step and either
+  finds the exponent affordable there — the whole row falls out of
+  proven parts if it is — or pins WHICH factor overruns, so the
+  refutation can be written against a quantity instead of a route.
 
 - **RE-MEASURING EVERY MODULE THIS TIER RECORDS AS OVER BUDGET, because
   three of them just turned out not to be.** The numbers file marks a
@@ -360,10 +361,10 @@ does not fit is a finding about the shared statement, not about the head.
   only receipt here naming no cap, which is what makes it carryable; the free
   form dies at one `register`, so it is owed at the mint.
 - **`fan-regsSz`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE×5`: the
-  registry's own size receipt at the PROGRAM's cap. NO CAP PRICES A REGISTERED
-  CHAIN: the stepped cap the receipt names is a blowup of the depth budget any
-  Φ pricing must fit under, so the residue is a mechanism rather than a
-  denomination.
+  registry's own size receipt at the PROGRAM's cap. `register-caps` prices a
+  mint at one frame step, so the reading sits above the cap the conclusion
+  names and the connect puts a mint inside every fan. Open: the Φ arithmetic
+  at one step, not a currency.
 - **`walk-share-nestOK`** (Part7/Depth-Fit) — FALSITY, `DEAD ROUTE×4`: the
   instant's nest predicate at the state the fan reads the registry. The door
   has it and the walk carries no nest conjunct at all; threading it down is
