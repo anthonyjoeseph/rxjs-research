@@ -1560,18 +1560,25 @@ postulate
 -- `ib-unfoldμ`, and at an input arm the carried form reduces
 -- definitionally to the very guard the registration wants.
 
--- AND THE FIFTH IS AN ARM THE DESCENT DOES NOT REACH, so the stratum
--- has to arrive there as a fact about the VALUE.  That arm subscribes a
--- DELIVERED observable, whose syntax is not the enclosing definition's
--- at all, and the value predicate the inner-subscribe family carries
--- reads caps and slots and no path -- so it cannot state a floor.  That
--- family is also passed HIGHER-ORDER to the walk, its whole type
--- spelled out again there, so strengthening the predicate is a
--- restatement across the caps face rather than an added premise.  What
--- keeps it mechanical is that the floor is INVARIANT along a hop: it
--- moves only where a share descent renews it, so it is a parameter of a
--- WALK rather than an index on a value, and the walk's value vocabulary
--- is already a boolean closing over the caps and the slots.
+-- AND THE FIFTH IS AN ARM THE DESCENT DOES NOT REACH, so the floor has
+-- to arrive there as a fact about the VALUE, carried on the CHAIN and
+-- not on the source.  Reading it at the arrival's own source is the
+-- tempting form and it is not preserved: a frame applies its closure to
+-- what passes through, and that closure is the syntax of whichever
+-- definition PUSHED the frame, which is the chain's sink and not the
+-- arrival's slot.  Both readings meet where the walk starts -- the
+-- emitting slot's own stratum is under every admitted chain's floor,
+-- admission being what the receipt above already delivers -- so the
+-- per-chain form is what is preserved and the source form is what
+-- establishes it.
+--
+-- WHICH PUTS THE COST IN THE WALK'S VALUE LEDGER RATHER THAN IN A
+-- PREMISE.  That ledger is a boolean over payloads read at a LEVEL and
+-- at no path, and it is asserted for the arriving value once, against a
+-- LIST of chains, before any of them is selected -- so a per-chain
+-- floor indexes it by the chain, which is a restatement of the walk's
+-- own vocabulary and not of this face alone.  Every other face reading
+-- that ledger ignores the index.
 
 -- AND IT IS OWED TO THE WALK'S BUNDLE RATHER THAN STATED FREE, because
 -- the free form is false: the obligations that would establish it are

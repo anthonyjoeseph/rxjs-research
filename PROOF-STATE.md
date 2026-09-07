@@ -215,16 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE FLOOR AS A WALK PARAMETER, WHICH IS WHAT THE SLOT-SOURCED MINT
-  TURNED OUT TO COST.** The descent stratum pays four of the mint's
-  five registrations for nothing. The fifth subscribes a DELIVERED
-  observable and needs the floor as a fact about the VALUE, which the
-  inner-subscribe family's value predicate cannot state — the reason,
-  and why it stays mechanical, is in `walk-share-strat`'s header. The
-  commit carries the floor into the caps face's own value vocabulary,
-  where it is a parameter rather than an index because a hop does not
-  move it. The risk is SHAPE: the predicate is spelled out again at the
-  walk's binder, so a floor the binder cannot see restates nothing.
+- **INDEXING THE WALK'S VALUE LEDGER BY THE CHAIN, WHICH IS WHAT THE
+  SLOT-SOURCED MINT TURNED OUT TO COST.** The descent floor pays four
+  of the mint's five registrations for nothing. The fifth subscribes a
+  DELIVERED observable, so its floor rides on the value — per CHAIN,
+  since a frame applies the syntax of whatever pushed it; why the
+  source-indexed form is not preserved is in `walk-share-strat`'s
+  header. The commit puts the chain into the walk's value ledger, every
+  other face ignoring the index. The risk is SHAPE: the ledger is
+  asserted for the arriving value against a LIST of chains, so the
+  index has to distribute where nothing has selected one yet.
 
 - **THE DELIVERED SUMMAND AT THE ROW'S OWN BUDGET, which is the one
   region the split's evidence declines to reach.** `burst-regs-split`
