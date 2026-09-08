@@ -1,0 +1,132 @@
+name: Prune caches
+
+# The interface cache in `gate.yml` is what keeps a CI gate from re-elaborating
+# the whole tower, and it lives inside a HARD 10 GB per-repo ceiling that
+# GitHub enforces by evicting least-recently-used entries. So the store filling
+# up is not untidiness -- it is the mechanism by which the one entry that
+# matters gets thrown away. At the sweep that prompted this workflow the store
+# sat at 9.94 GB across 127 entries, of which 74 (5.71 GB) belonged to pull
+# requests that had already merged or closed.
+#
+# A PR-scoped cache is USEFUL WHILE THE PR IS OPEN -- a second push to the same
+# branch restores the first push's snapshot, which is the only thing that makes
+# a re-run of a long gate cheap -- and it is DEAD THE INSTANT THE PR CLOSES,
+# because Actions scopes a cache to the branch that wrote it: nothing on main
+# and no other PR can ever read it again. That asymmetry is the whole design
+# here. Do not "fix" the bloat by refusing to save on PR branches; that trades
+# a recoverable cost for an unrecoverable one.
+#
+# Two triggers, because neither alone is sound. The `closed` event is prompt
+# but skippable -- it carries a read-only token on a fork PR, and an event
+# missed while the workflow is broken is missed forever. The schedule is the
+# backstop that needs no event to have fired, and it is also the only place the
+# main-branch trim can live, since no event marks a snapshot as superseded.
+
+on:
+  pull_request:
+    types: [closed]
+  schedule:
+    # Daily. The gate's own runs are what refill the store, so a sweep that
+    # ran only weekly would spend most of the week above the ceiling.
+    - cron: "17 4 * * *"
+  workflow_dispatch: {}
+
+# Deleting a cache entry is an `actions: write` operation, and nothing here
+# reads the repository's contents.
+permissions:
+  actions: write
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: cache-prune
+  cancel-in-progress: false
+
+jobs:
+  prune:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      # How many `agda-interfaces-` snapshots to keep on main. The restore step
+      # in `gate.yml` picks the NEWEST entry matching its prefix, so exactly one
+      # is ever read; the spares exist only so that a run which lands while the
+      # newest entry is being written still finds something warm.
+      KEEP_MAIN: "3"
+    steps:
+      - name: Prune caches of the PR that just closed
+        if: github.event_name == 'pull_request'
+        run: |
+          set -euo pipefail
+          ref="refs/pull/${{ github.event.number }}/merge"
+          echo "pruning caches scoped to $ref"
+          gh api "repos/$REPO/actions/caches?ref=$ref" --paginate \
+            --jq '.actions_caches[] | "\(.id) \(.size_in_bytes) \(.key)"' > closed.txt || true
+          freed=0
+          while read -r id size key; do
+            [ -z "${id:-}" ] && continue
+            if gh api -X DELETE "repos/$REPO/actions/caches/$id" >/dev/null; then
+              freed=$((freed + size))
+              echo "  deleted $key"
+            else
+              echo "  FAILED  $key"
+            fi
+          done < closed.txt
+          echo "freed $((freed / 1048576)) MiB"
+
+      - name: Sweep every closed PR, and trim superseded main snapshots
+        if: github.event_name != 'pull_request'
+        run: |
+          set -euo pipefail
+
+          gh api "repos/$REPO/actions/caches" --paginate \
+            --jq '.actions_caches[] | [.id, .size_in_bytes, .ref, .key, .created_at] | @tsv' > all.tsv
+          echo "store holds $(wc -l < all.tsv) entries, \
+            $(awk -F'\t' '{s+=$2} END {printf "%.2f", s/1073741824}' all.tsv) GB"
+
+          freed=0
+
+          # --- dead PR scopes -------------------------------------------------
+          # A cache whose PR is no longer open is unreachable by construction.
+          # Ask the API rather than inferring from the number: a PR can be
+          # closed without merging, and both states are equally dead.
+          for n in $(awk -F'\t' '$3 ~ /^refs\/pull\// {split($3,a,"/"); print a[3]}' all.tsv | sort -un); do
+            state=$(gh api "repos/$REPO/pulls/$n" --jq '.state' 2>/dev/null || echo "unknown")
+            if [ "$state" = "open" ] || [ "$state" = "unknown" ]; then
+              echo "PR #$n is $state -- keeping its caches"
+              continue
+            fi
+            while IFS=$'\t' read -r id size ref key created; do
+              if gh api -X DELETE "repos/$REPO/actions/caches/$id" >/dev/null; then
+                freed=$((freed + size))
+                echo "  deleted (PR #$n $state) $key"
+              fi
+            done < <(awk -F'\t' -v r="refs/pull/$n/merge" '$3 == r' all.tsv)
+          done
+
+          # --- superseded main snapshots --------------------------------------
+          # Newest-first, keep $KEEP_MAIN, delete the tail. Restricted to the
+          # interface key prefix on purpose: the toolchain cache is keyed by a
+          # hash of the install script, so there is only ever one live entry and
+          # a count-based trim would be the wrong tool for it.
+          i=0
+          while IFS=$'\t' read -r id size ref key created; do
+            i=$((i + 1))
+            if [ "$i" -le "$KEEP_MAIN" ]; then
+              echo "keeping main snapshot $key"
+              continue
+            fi
+            if gh api -X DELETE "repos/$REPO/actions/caches/$id" >/dev/null; then
+              freed=$((freed + size))
+              echo "  deleted (superseded) $key"
+            fi
+          done < <(awk -F'\t' '$3 == "refs/heads/main" && $4 ~ /^agda-interfaces-/' all.tsv \
+                     | sort -t$'\t' -k5,5r)
+
+          echo "freed $((freed / 1048576)) MiB"
+
+          remaining=$(gh api "repos/$REPO/actions/caches" --paginate \
+            --jq '[.actions_caches[].size_in_bytes] | add // 0')
+          printf 'store now %.2f GB of the 10 GB ceiling\n' \
+            "$(echo "$remaining" | awk '{print $1/1073741824}')"
