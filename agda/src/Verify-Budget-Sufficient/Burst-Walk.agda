@@ -31,7 +31,8 @@ open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
 
 open import Rx.Prim using (Gas; gs; Id; Tick; gasPad; gasTower; towerℕ)
-open import Rx.Exp  using (Ctx; Closed; Val; obs; _≟ᵗ_; sizeᵉ; syncSizeᵉ; inputsBelowᵛ)
+open import Rx.Exp  using (Ctx; Closed; Val; obs; _≟ᵗ_; sizeᵉ; syncSizeᵉ; inputsBelowᵉ;
+  inputsBelowᵛ)
 open import Rx.Evaluator
   using (Sched; EvalSt; Path; Frame; _↠_; map-f; scan-f; take-f; from-inner; thru-outer; Stream;
   stepFrame; dropSource; shareLatch; shareFinish; hasDry; dryEvent; budgetAt; capsHgo;
@@ -337,6 +338,13 @@ SiNodry = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
                                  (suc (sizeᵉ o)) (suc J)) c)
     ≤ sizeCapAt e sl (suc id) →
   g ≡ budgetAt e sl id →
+  -- THE ENTRY/PARK READING, AT THE CALLER'S PATH AND VALUE.  The walk face
+  -- underneath is applied at the EXTENDED path `from-inner … ↠ κ`, but both
+  -- readings reduce there: `pathFloor (_ ↠ p) = pathFloor p` and
+  -- `frameStrat? _ (from-inner _ _ _) = true`, so the extension asks for
+  -- exactly what κ already carries.  Hence they are threaded, not rebuilt.
+  pathStrat? κ ≡ true →
+  inputsBelowᵉ (pathFloor κ) o ≡ true →
   any dryEvent (proj₁ (proj₂ (proj₂
     (subscribeInner g op allNid κ id now o sched st))))
     ≡ false
@@ -657,13 +665,16 @@ subscribeE-inner-nodry-core : WalkLevel → ∀ {n} {Γ : Ctx n} {t} {e : Closed
                                  (suc (sizeᵉ o)) (suc J)) c)
     ≤ sizeCapAt e sl (suc id) →
   gs fuel ≡ budgetAt e sl id →
+  -- the entry/park reading; see SiNodry for why κ's own suffices
+  pathStrat? κ ≡ true →
+  inputsBelowᵉ (pathFloor κ) o ≡ true →
   hasDry (proj₁ (subscribeE fuel o
            (from-inner op allNid (Sched.nextNode sched) ↠ κ) id now
            (record sched { nextNode = suc (Sched.nextNode sched) }) st))
     ≡ false
 subscribeE-inner-nodry-core wl {n} {Γ} {t} {e} {u}
     c sl Ψ dep bud 2≤S 1≤R hCR slC slSz slFc
-    J fuel op allNid κ id now o sched st ok pb sspLen vb rg nB hD cl gk =
+    J fuel op allNid κ id now o sched st ok pb sspLen vb rg nB hD cl gk stP stI =
   dry
   where
   inst   = Sched.nextNode sched
@@ -770,6 +781,8 @@ subscribeE-inner-nodry-core wl {n} {Γ} {t} {e} {u}
                                       ok nB hD gk sz≤Ŝr)
          (m≤n+m (suc (pathLen κ) + G) B)
          regsO
+         stP
+         stI
 
   j′  = proj₁ W
   p2  = proj₂ W
@@ -804,6 +817,9 @@ subscribeE-inner-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
                                  (suc (sizeᵉ o)) (suc J)) c)
     ≤ sizeCapAt e sl (suc id) →
   gs fuel ≡ budgetAt e sl id →
+  -- the entry/park reading; see SiNodry for why κ's own suffices
+  pathStrat? κ ≡ true →
+  inputsBelowᵉ (pathFloor κ) o ≡ true →
   hasDry (proj₁ (subscribeE fuel o
            (from-inner op allNid (Sched.nextNode sched) ↠ κ) id now
            (record sched { nextNode = suc (Sched.nextNode sched) }) st))
@@ -814,7 +830,7 @@ subscribeE-inner-nodry = subscribeE-inner-nodry-core subscribeE-walk-level
 -- construction rather than by hypothesis.
 subscribeInner-nodry : SiNodry
 subscribeInner-nodry {e = e} c sl Ψ dep bud 2≤S 1≤R hCR slC slSz slFc J g op allNid
-                     κ id now o sched st ok pb sspLen vb rg nB hD cl gk
+                     κ id now o sched st ok pb sspLen vb rg nB hD cl gk stP stI
   with budgetAt-gs e sl id
 ... | g′ , eq
       rewrite trans gk eq =
@@ -823,7 +839,7 @@ subscribeInner-nodry {e = e} c sl Ψ dep bud 2≤S 1≤R hCR slC slSz slFc J g o
                  (from-inner op allNid (Sched.nextNode sched) ↠ κ) id now
                  (record sched { nextNode = suc (Sched.nextNode sched) }) st))
         (subscribeE-inner-nodry c sl Ψ dep bud 2≤S 1≤R hCR slC slSz slFc J g′ op allNid
-           κ id now o sched st ok pb sspLen vb rg nB hD cl (sym eq))
+           κ id now o sched st ok pb sspLen vb rg nB hD cl (sym eq) stP stI)
 
 -- THE CONCAT NODE'S STORED QUEUE IS VbB-BOUNDED, and this is a real body: the
 -- leaves it stands on are all proven, so nothing here is postulated.  It is the
@@ -1176,10 +1192,15 @@ mergeAllDrain-nodry {e = e} {s = s} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz
                           (nodry-elem-size c sl Ψ J o q 2≤S vbq))
                        (≤-trans (walk-desc S W dep (suc bud) (length q) J) dsc)
       hDo    = ≤-trans (m≤m⊔n _ _) hD
+      -- `valsStrat? k = all (inputsBelowᵛ k s)` and
+      -- `inputsBelowᵛ k (obs u) = inputsBelowᵉ k`, both definitional, so the
+      -- ring's own head/tail split is the reading each half needs
+      stVH   = proj₁ (∧-true (inputsBelowᵛ (pathFloor κ) (obs s) o)
+                             (all (inputsBelowᵛ (pathFloor κ) (obs s)) q) stV)
       h-head = subscribeInner-nodry c sl Ψ dep bud 2≤S 1≤R hCR slC slSz slFc
                  J sf mergeAllᵒ allNid κ id now o sched₀ st₀
                  ok pb sspLen (VbB-head c sl Ψ J o q vbq) rg nBst hDo
-                 (≤-trans (proj₁ (frameStep-mono-j c 2≤S dsc₀)) clL̂) gk
+                 (≤-trans (proj₁ (frameStep-mono-j c 2≤S dsc₀)) clL̂) gk stP stVH
       loop   = mergeAllDrain-nodry-loop c sl Ψ dep bud J sf allNid κ id now o q sched₀ st₀
                  2≤S 1≤R slC slSz ok pb sspLen vbq nBst hDo rg stP stV
       stVT   = proj₂ (∧-true (inputsBelowᵛ (pathFloor κ) (obs s) o)
@@ -1368,6 +1389,9 @@ thruConsume-nodry : ∀ {n} {Γ : Ctx n} {u t} {e : Closed Γ t}
   nest o sl (EvalSt.connectedShares st) ≤ bud →
   Caps.cSize (frameStep L̂ c) ≤ sizeCapAt e sl (suc id) →
   opIterD (Caps.cSize c) (Caps.cWid c) dep bud (suc (sizeᵉ o)) (suc J) ≤ L̂ →
+  -- the element's own reading, split off the walk's list by the caller
+  pathStrat? κ ≡ true →
+  inputsBelowᵉ (pathFloor κ) o ≡ true →
   any dryEvent (proj₁ (proj₂ (thruConsume sf op nid κ id now o sched st))) ≡ false
 
 -- helper: apply subscribeInner-nodry for one thruConsume call.
@@ -1406,19 +1430,22 @@ thruConsume-nodry-apply : ∀ {n} {Γ : Ctx n} {u t} {e : Closed Γ t}
   nest o sl (EvalSt.connectedShares st) ≤ bud →
   Caps.cSize (frameStep L̂ c) ≤ sizeCapAt e sl (suc id) →
   opIterD (Caps.cSize c) (Caps.cWid c) dep bud (suc (sizeᵉ o)) (suc J) ≤ L̂ →
+  -- the element's own reading, split off the walk's list by the caller
+  pathStrat? κ ≡ true →
+  inputsBelowᵉ (pathFloor κ) o ≡ true →
   any dryEvent (proj₁ (proj₂ (proj₂ (subscribeInner sf op nid κ id now o sched st)))) ≡ false
-thruConsume-nodry-apply c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf op nid κ id now o os sched st ok pb sspLen vb rg gk hD-elem nBst clL̂ dsc =
+thruConsume-nodry-apply c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf op nid κ id now o os sched st ok pb sspLen vb rg gk hD-elem nBst clL̂ dsc stP stI =
   subscribeInner-nodry c sl Ψ dep bud 2≤S 1≤R hCR slC slSz slFc
     J sf op nid κ id now o sched st
     ok pb sspLen (VbB-head c sl Ψ J o os vb) rg nBst hD-elem
-    (≤-trans (proj₁ (frameStep-mono-j c 2≤S dsc)) clL̂) gk
+    (≤-trans (proj₁ (frameStep-mono-j c 2≤S dsc)) clL̂) gk stP stI
 
 -- FLATTEN: dispatch on node state.
 -- The scrutinee and the clause ORDER both mirror Rx.Evaluator's own
 -- `with w ≟ᵗ u` exactly.  Writing `w ≟ᵗ _` here does not abstract the
 -- goal's occurrence (the metavariable is not syntactically the
 -- evaluator's `u`), leaving the with-function stuck and `refl` red.
-thruConsume-nodry {u = u} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf mergeAllᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD nBst clL̂ dsc
+thruConsume-nodry {u = u} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf mergeAllᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD nBst clL̂ dsc stP stI
   with lookupNode nid (EvalSt.nodes st)
 ... | just (mergeAll-st {w} lim act q od) with w ≟ᵗ u
 ...   | no _     = refl
@@ -1426,27 +1453,27 @@ thruConsume-nodry {u = u} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf
 -- a lane is free: one subscribeInner call, events = bs
 ...     | true  =
   thruConsume-nodry-apply c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf mergeAllᵒ nid κ id now o os sched st ok pb sspLen vb rg gk
-    (≤-trans (m≤m⊔n _ _) hD) nBst clL̂ dsc
+    (≤-trans (m≤m⊔n _ _) hD) nBst clL̂ dsc stP stI
 -- the gate is shut: the element is parked and nothing is emitted
 ...     | false = refl
 -- other node shapes: thruConsume's own catch-all emits [].  These are
 -- enumerated rather than written `| _`, because a VARIABLE scrutinee
 -- leaves the evaluator's with-function stuck — its catch-all only fires
 -- once Agda knows the shape is none of the mergeAll cases.
-thruConsume-nodry {u = u} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf mergeAllᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD nBst clL̂ dsc
+thruConsume-nodry {u = u} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf mergeAllᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD nBst clL̂ dsc stP stI
     | nothing = refl
-thruConsume-nodry {u = u} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf mergeAllᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD nBst clL̂ dsc
+thruConsume-nodry {u = u} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf mergeAllᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD nBst clL̂ dsc stP stI
     | just (scan-st _) = refl
-thruConsume-nodry {u = u} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf mergeAllᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD nBst clL̂ dsc
+thruConsume-nodry {u = u} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf mergeAllᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD nBst clL̂ dsc stP stI
     | just (take-st _) = refl
-thruConsume-nodry {u = u} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf mergeAllᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD nBst clL̂ dsc
+thruConsume-nodry {u = u} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf mergeAllᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD nBst clL̂ dsc stP stI
     | just (switch-st _ _) = refl
-thruConsume-nodry {u = u} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf mergeAllᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD nBst clL̂ dsc
+thruConsume-nodry {u = u} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf mergeAllᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD nBst clL̂ dsc stP stI
     | just (exhaust-st _ _) = refl
 
 -- SWITCH: switchKill (closes only, nodry by switchKill-closes-nodry)
 --         + subscribeInner (bs, nodry by SiNodry), combined by any-dry-++
-thruConsume-nodry c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf switchᵒ nid κ id now o os sched₀ st₀ ok pb sspLen vb rg gk hD nBst clL̂ dsc
+thruConsume-nodry c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf switchᵒ nid κ id now o os sched₀ st₀ ok pb sspLen vb rg gk hD nBst clL̂ dsc stP stI
   with lookupNode nid (EvalSt.nodes st₀)
 -- NO `with subscribeInner …` here.  Scrutinising the tuple rebinds its
 -- third component as a FRESH variable `bs`, which no longer unifies with
@@ -1473,7 +1500,7 @@ thruConsume-nodry c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf switch�
       hD-elem    = ≤-trans (m≤m⊔n _ _) hD
       h-bs       = subscribeInner-nodry c sl Ψ dep bud 2≤S 1≤R hCR slC slSz slFc
                      J sf switchᵒ nid κ id now o sched₁ st₁
-                     ok₁ pb sspLen vb-elem rg₁ nB hD-elem cl-elem gk
+                     ok₁ pb sspLen vb-elem rg₁ nB hD-elem cl-elem gk stP stI
   in any-dry-++ (proj₁ (switchKill cur sched₀ st₀)) _ h-closes h-bs
 ... | nothing = refl
 ... | just (scan-st _) = refl
@@ -1482,13 +1509,13 @@ thruConsume-nodry c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf switch�
 ... | just (exhaust-st _ _) = refl
 
 -- EXHAUST active=true: drops the payload, emits []
-thruConsume-nodry c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf exhaustᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD nBst clL̂ dsc
+thruConsume-nodry c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf exhaustᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD nBst clL̂ dsc stP stI
   with lookupNode nid (EvalSt.nodes st)
 ... | just (exhaust-st true od)  = refl
 -- EXHAUST active=false: subscribes, emits bs
 ... | just (exhaust-st false od) =
   thruConsume-nodry-apply c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf exhaustᵒ nid κ id now o os sched st ok pb sspLen vb rg gk
-    (≤-trans (m≤m⊔n _ _) hD) nBst clL̂ dsc
+    (≤-trans (m≤m⊔n _ _) hD) nBst clL̂ dsc stP stI
 ... | nothing = refl
 ... | just (scan-st _) = refl
 ... | just (take-st _) = refl
@@ -1553,8 +1580,13 @@ thruWalk-nodry {u = u} {e = e} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc
       dsc₀   = ≤-trans (inner-desc S W dep bud J (sizeᵉ o) 2≤S
                           (nodry-elem-size c sl Ψ J o os 2≤S vb))
                        (≤-trans (walk-desc S W dep (suc bud) (length os) J) dsc)
+      -- `valsStrat? k = all (inputsBelowᵛ k _)` and
+      -- `inputsBelowᵛ k (obs u) = inputsBelowᵉ k`, both definitional, so the
+      -- ring's own head/tail split is the reading each half needs
+      stVH   = proj₁ (∧-true (inputsBelowᵛ (pathFloor κ) (obs u) o)
+                             (all (inputsBelowᵛ (pathFloor κ) (obs u)) os) stV)
       h-head = thruConsume-nodry c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf op nid κ id now o os
-                 sched₀ st₀ ok pb sspLen vb rg gk hD nBst clL̂ dsc₀
+                 sched₀ st₀ ok pb sspLen vb rg gk hD nBst clL̂ dsc₀ stP stVH
       loop   = thruConsume-nodry-loop c sl Ψ dep bud J sf op nid κ id now o os sched₀ st₀
                  2≤S 1≤R slC slSz ok pb sspLen vb nBst (≤-trans (m≤m⊔n _ _) hD) rg
                  stP stV
