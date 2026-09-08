@@ -80,8 +80,8 @@ open import Verify-Budget-Sufficient.Caps-Face.Part7.Root-Strat using
   (pathStrat-top)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves using
   (foldPath-park; pathPark-step; shareAdmit-park;
-   map-strat-step; scan-strat-step; take-strat-step; inner-strat-step;
-   thru-strat-step)
+   map-strat-step; scan-strat-step; take-strat-step;
+   inner-strat-step; thru-strat-step)
 open import Verify-Budget-Sufficient.Delivery-Walk using
   (shareAdmit-chQ)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Ring-Vocabulary using
@@ -813,7 +813,7 @@ walk-strat-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
 walk-strat-step c sl k sf nid now (map-f fn) p vals fin sched st cok hstf hpk hib =
   map-strat-step k fn vals hstf hib
 walk-strat-step c sl k sf nid now (scan-f fn nd) p vals fin sched st cok hstf hpk hib =
-  scan-strat-step c k sf nid now fn nd p vals fin sched st cok hstf hib
+  scan-strat-step k sf nid now fn nd p vals fin sched st hpk hstf hib
 walk-strat-step c sl k sf nid now (take-f nd) p vals fin sched st cok hstf hpk hib =
   take-strat-step k sf nid now nd p vals fin sched st hib
 walk-strat-step c sl k sf nid now (from-inner op allNid inst) p vals fin sched st
@@ -871,7 +871,7 @@ walk-hyps-step {e = e} sl id L sf gas nid now src f p vals evs fin sched st
   -- the parked reading is the one conjunct the step does not TRANSPORT:
   -- a hop can subscribe out of a flatten node's queue, so what survives
   -- is re-established at the stepped state rather than carried
-  , pathPark-step sf nid now f p vals fin sched st hib hpkp
+  , pathPark-step sf nid now f p vals fin sched st hstp hib hpkp
   , (g , P , hfl , hlvP , hR)
   where
   c   = capsAt e sl id

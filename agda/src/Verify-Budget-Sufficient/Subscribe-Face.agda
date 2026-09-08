@@ -153,7 +153,8 @@ open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   slotsCaps?-clos)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves using
   (framePark-step; subscribeE-burstStrat; stepFrame-valsStrat; pathPark-step;
-   shareAdmit-strat; shareAdmit-park; foldPath-park)
+   shareAdmit-strat; shareAdmit-park; foldPath-park; evalTm-strat;
+   installNode-scanPark; subscribeE-framePark)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (2≤frameStep-size; burstCaps?-++; burstCaps?-widen; closeList-caps;
    eventsCaps?-widen; finList-caps; frameStep-+assoc-burst;
@@ -2543,7 +2544,8 @@ pushBurst-caps {Γ = Γ} {t = t} {s = s} {u = u} c dep bud j g id now f κ (em �
            (burstCount?-widen ems ⊑₁ (burstCount?-tail (frameStep j c) em ems cC))
            (≤-trans (m≤n⊔m _ _) dpt)
            stF stP (proj₂ (∧-true _ _ stB))
-           (framePark-step g id now f κ (proj₁ sp) (proj₂ (proj₂ sp)) sched st EV stK)
+           (framePark-step g id now f κ (proj₁ sp) (proj₂ (proj₂ sp)) sched st
+              stF EV stK)
   j₂   = proj₁ IH
   REST = pushBurst g id now f κ ems sd₁ st₁
   ⊑₂   = frameStep-⊑-+ c 2≤S (j + j₁) j₂
@@ -3184,7 +3186,12 @@ subscribeE-caps {n = n} {u = u} c dep bud (suc ops′) j g (scanᵉ f z b) κ bi
           (≤-trans (m≤n⊔m _ _) dpt)
           stF′ stP
           (subscribeE-burstStrat g b (scan-f f nid ↠ κ) bid now sched₀ st₀ stP′ stB′)
-          refl
+          (subscribeE-framePark (pathFloor κ) g b (scan-f f nid ↠ κ) bid now
+             (scan-f f nid) sched₀ st₀
+             (installNode-scanPark (pathFloor κ) f nid (evalTm z) st
+                (evalTm-strat (pathFloor κ) z
+                   (proj₁ (∧-true (inputsBelowᵗ (pathFloor κ) z)
+                                  (inputsBelowᵉ (pathFloor κ) b) stZB)))))
   j₂  = proj₁ PBc
   PB  = pushBurst g bid now (scan-f f nid) κ (proj₁ res)
           (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
@@ -3536,7 +3543,8 @@ foldPath-caps c dep bud j sf gas id now envSrc (f ↠ p) vals evs fin sl sched s
            -- receipt reports a reading for, so both come off a leaf
            (stepFrame-valsStrat sf id now f p vals fin sched st
               (proj₁ stP1) stV)
-           (pathPark-step sf id now f p vals fin sched st stV (proj₂ stK1))
+           (pathPark-step sf id now f p vals fin sched st
+              (proj₂ stP1) stV (proj₂ stK1))
   j₂   = proj₁ IH
   REST = foldPath sf gas id now envSrc p (proj₁ step) (evs ++ proj₁ (proj₂ step))
            (proj₁ (proj₂ (proj₂ step))) sd₁ st₁

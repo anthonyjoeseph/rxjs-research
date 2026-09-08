@@ -238,16 +238,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **GIVING THE PARK READING THE ARM IT IS MISSING, WHICH IS ALL THAT
-  IS LEFT OF THE STORE QUESTION.** Splitting the hop's reading into
-  five heads answered that question at four of them: a path predicate
-  that sees the store already exists, this walk already threads it,
-  and the two subscribing heads spend it rather than owing a fact to
-  nobody. What survives is COVERAGE — the reading names the nodes a
-  frame declares, and a `scan-f`'s accumulator is not declared. The
-  commit gives that node an arm and cascades the obligation through
-  every producer of the reading, which is the standing ruling's own
-  answer to a missing invariant, and reports what the cascade costs.
+- **GIVING THE TAIL'S READING A DISJOINTNESS VOCABULARY, which is what
+  the arm turned the store question into.** The accumulator now has an
+  arm, so every node a frame declares is read — and that closed the
+  head's obligation while sharpening the TAIL's. A step writes the
+  stepped frame's own cell, so the tail's reading survives exactly when
+  that write names no node a tail frame does, and no reading of a
+  closure says which node the tail points at. The frame half is proven
+  and spent, and the SUBSCRIBE side is a leaf already; nowhere stated
+  is the lift across a STEP. The commit states it, decides
+  whether it belongs on the walk's hypotheses record or beside the node
+  watermark, and wires it into `pathPark-step`.
 
 - **WALKING AN ADMITTED CHAIN AT THE LEVEL IT WAS REGISTERED AT, the
   one door the pricing question leaves open.** Both ends are closed by
@@ -272,17 +273,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Open questions
 
-- **WHICH STORE CELLS DOES A PATH PREDICATE REACH?** Six rows fail in one
+- **WHICH STORE CELLS DOES A PATH PREDICATE REACH?** Five rows fail in one
   place: the statement reads a PATH or a chain, and the quantity it must
-  bound is a cell in the STORE. Whether ANY conjunct can be carried there is
-  now settled and the answer is yes — the park reading takes the state, reads
-  the node a `from-inner` names, and survives `stepFrame` by a lemma this
-  walk already spends. What is open is COVERAGE. That reading reaches the
-  nodes a frame DECLARES, and the cells these rows need are the ones nothing
-  announces: a scan's accumulator, a share's fold. So the question is whether
-  each unannounced cell gets an arm on the existing reading, or whether the
-  reading has to be minted where the cell is WRITTEN.
-  relevant: `scan-strat-step`, `step-frame-store≤`, `share-fold-store≤`, `subscribeE-sz-store-scan`, `pushBurst-sz-store-outer`, `subscribeSharedSlot-sz-store`
+  bound is a cell in the STORE. Two thirds are answered. A path predicate
+  CAN see the store, and its coverage is extensible — the
+  accumulator was the first unannounced cell and it took an arm, at the
+  price of restating both step lemmas, so the pattern is known and priced.
+  What is open is the third part, and the arm is what exposed it: an arm
+  reaches a cell the STEPPED frame names, and these rows are read at frames
+  that did not step. So the question is now whether a reading survives a
+  write it does not own — a disjointness fact, which no arm supplies.
+  relevant: `step-frame-store≤`, `share-fold-store≤`, `subscribeE-sz-store-scan`, `pushBurst-sz-store-outer`, `subscribeSharedSlot-sz-store`
 
 - **IS THERE A COMPUTABLE SHADOW OF THE SEALED FACES?** Three rows say in
   their own headers that they cannot be instantiated — the cap does not
@@ -308,10 +309,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### The ledger
 
-- **`scan-strat-step`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the one
-  hop head whose output is folded against a value in the STORE. The park
-  reading names the nodes a frame declares and an accumulator is not among
-  them, so no predicate over the path reaches this cell.
 - **`thru-strat-step`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the
   payload that IS an observable, subscribed here and its burst grafted. What
   leaves is the inner's, so nothing the caller handed in reads it and the store
@@ -404,17 +401,25 @@ does not fit is a finding about the shared statement, not about the head.
   output the caps receipt prices but does not read; the floor does not move
   across a frame, which is what lets one statement cover the walk.
 - **`framePark-step`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the
-  frame-keyed park reading across one step. The push re-steps the SAME frame,
-  so the reading is asked of a state the previous emit produced, where the
-  frame is a variable and no clause reduces.
+  frame-keyed park reading across one step, at a frame the push re-steps and
+  so cannot reduce. Two shapes write a cell it reads, and only one leaves a
+  suffix — the other overwrites, which is why the closure is a premise.
 - **`frame-parkStrat`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the
   frame's queue read at the floor its tail is read at, off the caps invariant
   alone. That invariant prices a node's queue for size and for width and reads
   no floor, so the conjunct it would project out of is not there.
-- **`pathPark-step`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: that same
-  reading lifted off one frame onto the tail the walk is about to enter. Not a
-  corollary of the frame-keyed form: what must survive is a reading of nodes
-  the step did not name.
+- **`pathPark-step`** (Part7/Strat-Leaves) — FALSITY, `DEAD ROUTE`: that same
+  reading lifted onto the tail the walk is about to enter. What it owes is
+  DISJOINTNESS and not arithmetic — the step writes the stepped frame's cell,
+  and no closure reading says which node a tail frame names.
+- **`subscribeE-framePark`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the
+  same disjointness one construct over. A subscribe mints its cells from the
+  scheduler's counter and so writes none the frame in hand names — but the
+  frame is a variable here, and nothing in it says which node that is.
+- **`installNode-scanPark`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: what
+  an install leaves at its OWN cell, which is the disjointness question's easy
+  side. `lookupNode` walks an assoc list, so nothing reduces at a variable
+  identifier, and the evaluator's type test sits on top of the roundtrip.
 - **`shareAdmit-park`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the park
   reading over the admitted chains at the LATCHED state the fan-out starts from
   — stated after the close, because that is where the fan reads the registry.
@@ -525,10 +530,18 @@ does not fit is a finding about the shared statement, not about the head.
 - **`subscribeE-Ψ`** (Burst-Walk) — DIFFICULTY, `TWIN`, large: the Ψ reading of
   the clique its header mirrors, clause for clause at a different measure. The
   cost is that the induction covers every clause; nothing in it is undecided.
+- **`evalTm-strat`** (Part7/Strat-Leaves) — DIFFICULTY, `TWIN`: a closed term's
+  VALUE read below the floor, which the scan arm made load-bearing — the seed
+  arrives as a term and the cell is read as a value. The same induction is
+  walked at the hop measure; what does not transfer is the arithmetic.
 - **`map-strat-step`** (Part7/Strat-Leaves) — GRINDABLE, `TWIN`: one template
   application read below the floor, lifted over the payload. The only hop head
   whose statement names no state at all, and the induction behind it is walked
   already at a hereditary value predicate of the same shape.
+- **`scanVals-strat`** (Part7/Strat-Leaves) — GRINDABLE, `TWIN`: the fold's own
+  transport, reporting the new accumulator as well as the outputs because the
+  cell it overwrote is what the next emit reads. The same shelf carries this
+  shape at another measure, nil clause and cons clause alike.
 
 ## Tier 2 — Verify-Well-Formed (parked behind tier 1)
 
