@@ -68,7 +68,8 @@ open import Verify-Budget-Sufficient.Caps using (sizeAt-mono; Caps; frameStep)
 
 -- named explicitly: .Caps-Face and .Wet share .Measures names
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
-  (capsOK?; eventCaps?; pathSz?; regsSz?; slotsCaps?; valCaps?; pathFloor; pathStrat?)
+  (capsOK?; eventCaps?; parkStrat?; pathSz?; regsSz?; slotsCaps?; valCaps?; pathFloor;
+  pathStrat?)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
   (frameBud; mList?; mList?-keeps; valsCaps?; valsStrat?)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
@@ -368,6 +369,7 @@ IfcFace =
       (lookupNode allNid (EvalSt.nodes st)) ≤ dep →
     pathStrat? κ ≡ true →
     valsStrat? (pathFloor κ) vals ≡ true →
+    parkStrat? (pathFloor κ) (lookupNode allNid (EvalSt.nodes st)) ≡ true →
     let r = innerFinish g op allNid inst κ id now vals sched st
               (lookupNode allNid (EvalSt.nodes st))
     in Σ ℕ λ j′ →

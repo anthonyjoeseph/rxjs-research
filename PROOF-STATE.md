@@ -261,17 +261,18 @@ does not fit is a finding about the shared statement, not about the head.
   bottom-up on a coherent cache, attributes each to cone, edge or
   block, and deletes the findings resting on the ones that fall.
 
-- **THE PARK READING IS THE HALF NOTHING PRODUCES, and the leg is to
-  establish where it can be.** The PATH side is carried end to end now.
-  Below the fold it was free — the caps predicate already records each
-  frame's reading at its tail's floor and the tail's whole reading under
-  it — but not on the `*All` arms, where three layers of the nest walk
-  took both readings as premises and the fit shelf needed a burst
-  witness minted from them by a sibling face. The STORE side is what
-  that leaves, owed at every `from-inner` and now a leaf of its own
-  beside six siblings saying the same thing. The commit puts the field
-  on the walk's hypotheses record and reports, producer by producer,
-  which can establish it.
+- **THE PARK READING IS THE HALF NOTHING PRODUCES, and the caps face
+  now says where it can be.** The PATH side is carried end to end. The
+  STORE side is owed at every `from-inner`, and the `*All` face clique
+  takes it now: both named hypothesis types and every finish/react face
+  under them, so a premise added to the real lemma lands at each site
+  consuming it. At the frame walk's own `from-inner` clause it costs
+  NOTHING — `framePark?` reduces on that constructor, and
+  `frame-parkStrat` derives the reading from the `capsOK?` and the path
+  reading the clause already holds, so no signature above it moved.
+  What remains is the producers that cannot reach `capsOK?`: the commit
+  reports them, and puts the field on the walk's hypotheses record only
+  where that reduction cannot be had.
 
 ### Open questions
 

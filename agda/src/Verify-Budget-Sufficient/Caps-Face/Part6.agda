@@ -94,8 +94,8 @@ open import Verify-Budget-Sufficient.Caps-Face.Part4 using
    thruWrap-caps; valsCaps?; valsStrat?; valsCaps→mList-strict;
    capsOK?-nodePark; parkList-push)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
-  (burstCaps?; capsOK?; capsOK?-mono; eventCaps?; obsCaps?; pathFloor; pathStrat?; pathSz?;
-   slotsCaps?; valCaps?; widNode-push)
+  (burstCaps?; capsOK?; capsOK?-mono; eventCaps?; obsCaps?; parkStrat?; pathFloor; pathStrat?;
+   pathSz?; slotsCaps?; valCaps?; widNode-push)
 open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen)
 
 -- THE TWO HYPOTHESIS TYPES THE FACE CLIQUE RUNS AGAINST.  Every face
@@ -161,6 +161,7 @@ IfcType =
       (lookupNode allNid (EvalSt.nodes st)) ≤ dep →
     pathStrat? κ ≡ true →
     valsStrat? (pathFloor κ) vals ≡ true →
+    parkStrat? (pathFloor κ) (lookupNode allNid (EvalSt.nodes st)) ≡ true →
     let r = innerFinish g op allNid inst κ id now vals sched st
               (lookupNode allNid (EvalSt.nodes st))
     in Σ ℕ λ j′ →
@@ -279,28 +280,29 @@ innerFinish-mergeAll-face-go :
     nd ≡ lookupNode allNid (EvalSt.nodes st) →
     pathStrat? κ ≡ true →
     valsStrat? (pathFloor κ) vals ≡ true →
+    parkStrat? (pathFloor κ) (lookupNode allNid (EvalSt.nodes st)) ≡ true →
     FrameFace c d j sl (innerFinish g mergeAllᵒ allNid inst κ id now vals sched st nd)
 
 -- § 1  TRIVIAL CASES — innerFinish returns vals , [] , false , sched , st
 innerFinish-mergeAll-face-go ifc k₁ k₂ k₃ k₄ k₅
     c d j g allNid inst κ id now vals sl sched st
-    nothing _ _ _ _ inv _ _ vC _ _ _ _ _
+    nothing _ _ _ _ inv _ _ vC _ _ _ _ _ _
   = innerFinish-face-keep c d j sl vals false sched st inv vC
 innerFinish-mergeAll-face-go ifc k₁ k₂ k₃ k₄ k₅
     c d j g allNid inst κ id now vals sl sched st
-    (just (scan-st _)) _ _ _ _ inv _ _ vC _ _ _ _ _
+    (just (scan-st _)) _ _ _ _ inv _ _ vC _ _ _ _ _ _
   = innerFinish-face-keep c d j sl vals false sched st inv vC
 innerFinish-mergeAll-face-go ifc k₁ k₂ k₃ k₄ k₅
     c d j g allNid inst κ id now vals sl sched st
-    (just (take-st _)) _ _ _ _ inv _ _ vC _ _ _ _ _
+    (just (take-st _)) _ _ _ _ inv _ _ vC _ _ _ _ _ _
   = innerFinish-face-keep c d j sl vals false sched st inv vC
 innerFinish-mergeAll-face-go ifc k₁ k₂ k₃ k₄ k₅
     c d j g allNid inst κ id now vals sl sched st
-    (just (switch-st _ _)) _ _ _ _ inv _ _ vC _ _ _ _ _
+    (just (switch-st _ _)) _ _ _ _ inv _ _ vC _ _ _ _ _ _
   = innerFinish-face-keep c d j sl vals false sched st inv vC
 innerFinish-mergeAll-face-go ifc k₁ k₂ k₃ k₄ k₅
     c d j g allNid inst κ id now vals sl sched st
-    (just (exhaust-st _ _)) _ _ _ _ inv _ _ vC _ _ _ _ _
+    (just (exhaust-st _ _)) _ _ _ _ inv _ _ vC _ _ _ _ _ _
   = innerFinish-face-keep c d j sl vals false sched st inv vC
 
 -- § 2  FLATTEN CASE — delegate entirely to ifc (= innerFinish-caps).
@@ -309,7 +311,7 @@ innerFinish-mergeAll-face-go ifc k₁ k₂ k₃ k₄ k₅
 innerFinish-mergeAll-face-go ifc k₁ k₂ k₃ k₄ k₅
     c d j g allNid inst κ id now vals sl sched st
     (just (mergeAll-st {w} lim act q od))
-    2≤S 1≤R slEq slC inv pC lC vC slSz dpt ndEq hps hvs
+    2≤S 1≤R slEq slC inv pC lC vC slSz dpt ndEq hps hvs hpq
   = let
       -- Step 1: transport dpt from nd to (lookupNode …)
       dpt′ = subst
@@ -317,7 +319,7 @@ innerFinish-mergeAll-face-go ifc k₁ k₂ k₃ k₄ k₅
                ndEq dpt
       -- Step 2: call ifc (= innerFinish-caps) at dep=d, bud=frameBud c j
       res = ifc c d (frameBud c j) j g mergeAllᵒ allNid inst κ id now vals
-              sl sched st 2≤S 1≤R slEq slC slSz inv pC lC vC ≤-refl dpt′ hps hvs
+              sl sched st 2≤S 1≤R slEq slC slSz inv pC lC vC ≤-refl dpt′ hps hvs hpq
       -- Step 3: rearrange tuple
       --   ifc returns: (j′ , capsOK , valsCaps , evts , level)
       --   FrameFace expects: (j′ , level , capsOK , valsCaps , evts)
@@ -899,11 +901,12 @@ innerFinish-mergeAll-face-core :
       (lookupNode allNid (EvalSt.nodes st)) ≤ d →
     pathStrat? κ ≡ true →
     valsStrat? (pathFloor κ) vals ≡ true →
+    parkStrat? (pathFloor κ) (lookupNode allNid (EvalSt.nodes st)) ≡ true →
     FrameFace c d j sl (innerFinish g mergeAllᵒ allNid inst κ id now vals sched st
                           (lookupNode allNid (EvalSt.nodes st)))
 innerFinish-mergeAll-face-core ifc k₁ k₂ k₃ k₄ k₅
     c d j g allNid inst κ id now vals sl sched st
-    2≤S 1≤R slEq slC inv pC lC vC slSz dpt hps hvs =
+    2≤S 1≤R slEq slC inv pC lC vC slSz dpt hps hvs hpq =
   -- the five kit hypotheses are ETA-EXPANDED, not passed bare: their
   -- implicits are not determined by any explicit argument, so a bare
   -- `k₂`/`k₅` leaves unsolved metas.  Fresh binder names so the lambdas
@@ -917,7 +920,7 @@ innerFinish-mergeAll-face-core ifc k₁ k₂ k₃ k₄ k₅
     c d j g allNid inst κ id now vals sl sched st
     (lookupNode allNid (EvalSt.nodes st))
     2≤S 1≤R slEq slC inv pC lC vC slSz dpt
-    refl hps hvs
+    refl hps hvs hpq
 
 innerFinish-mergeAll-face :
   IfcType →
@@ -938,6 +941,7 @@ innerFinish-mergeAll-face :
     (lookupNode allNid (EvalSt.nodes st)) ≤ d →
   pathStrat? κ ≡ true →
   valsStrat? (pathFloor κ) vals ≡ true →
+  parkStrat? (pathFloor κ) (lookupNode allNid (EvalSt.nodes st)) ≡ true →
   FrameFace c d j sl (innerFinish g mergeAllᵒ allNid inst κ id now vals sched st
                         (lookupNode allNid (EvalSt.nodes st)))
 innerFinish-mergeAll-face ifc =

@@ -58,7 +58,9 @@ open import Verify-Budget-Sufficient.Caps-Face.Part6 using
    SiCType; IfcType)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (capsOK?; capsOK?-mono; eventCaps?; frameSz?; pathSz?; slotsCaps?; widNode; pathFloor;
-  pathStrat?)
+  pathStrat?; parkStrat?)
+open import Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves using
+  (frame-parkStrat)
 open import Verify-Budget-Sufficient.Caps-Face.Part5 using
   (face-charge; face-charge1; face-vals; mapFrame-caps; scanFrame-caps; scanVals-len;
   stepFrame-face-zero; takeDispatch-len; valsCaps?-parts)
@@ -124,6 +126,7 @@ innerFinish-face :
     (lookupNode allNid (EvalSt.nodes st)) ≤ d →
   pathStrat? κ ≡ true →
   valsStrat? (pathFloor κ) vals ≡ true →
+  parkStrat? (pathFloor κ) (lookupNode allNid (EvalSt.nodes st)) ≡ true →
   FrameFace c d j sl (innerFinish g op allNid inst κ id now vals sched st
                         (lookupNode allNid (EvalSt.nodes st)))
 
@@ -134,13 +137,13 @@ innerFinish-face :
 -- face used to state separately — one obligation now covers both, and
 -- the bounded limit between them that neither old face could express
 innerFinish-face ifc c d j g mergeAllᵒ allNid inst κ id now vals sl sched st
-                 2≤S 1≤R slEq slC inv pC lC vC slSz hD hps hvs =
+                 2≤S 1≤R slEq slC inv pC lC vC slSz hD hps hvs hpq =
   innerFinish-mergeAll-face ifc c d j g allNid inst κ id now vals sl sched st
-    2≤S 1≤R slEq slC inv pC lC vC slSz hD hps hvs
+    2≤S 1≤R slEq slC inv pC lC vC slSz hD hps hvs hpq
 
 -- SWITCH: clear the current-inner slot if this was it
 innerFinish-face _ c d j g switchᵒ allNid inst κ id now vals sl sched st
-                 2≤S 1≤R slEq slC inv pC lC vC _ _ _ _
+                 2≤S 1≤R slEq slC inv pC lC vC _ _ _ _ _
   with lookupNode allNid (EvalSt.nodes st)
 ... | nothing                = innerFinish-face-keep c d j sl vals false sched st inv vC
 ... | just (scan-st _)       = innerFinish-face-keep c d j sl vals false sched st inv vC
@@ -159,7 +162,7 @@ innerFinish-face _ c d j g switchᵒ allNid inst κ id now vals sl sched st
 
 -- EXHAUST: clear the busy flag
 innerFinish-face _ c d j g exhaustᵒ allNid inst κ id now vals sl sched st
-                 2≤S 1≤R slEq slC inv pC lC vC _ _ _ _
+                 2≤S 1≤R slEq slC inv pC lC vC _ _ _ _ _
   with lookupNode allNid (EvalSt.nodes st)
 ... | nothing                = innerFinish-face-keep c d j sl vals false sched st inv vC
 ... | just (scan-st _)       = innerFinish-face-keep c d j sl vals false sched st inv vC
@@ -194,20 +197,21 @@ innerReact-face :
   depthReact g op allNid inst κ id now vals sched st fin ≤ d →
   pathStrat? κ ≡ true →
   valsStrat? (pathFloor κ) vals ≡ true →
+  parkStrat? (pathFloor κ) (lookupNode allNid (EvalSt.nodes st)) ≡ true →
   FrameFace c d j sl (innerReact g op allNid inst κ id now vals sched st fin)
 -- an absorbed fin finishes nothing: `depthReact … false = 0`
 innerReact-face _ c d j g op allNid inst κ id now vals false sl sched st
-                2≤S 1≤R slEq slC inv pC lC vC _ _ _ _ =
+                2≤S 1≤R slEq slC inv pC lC vC _ _ _ _ _ =
   innerFinish-face-keep c d j sl vals false sched st inv vC
 -- `depthReact … true = depthFin … (lookupNode …)`, and the aliveThroughᶠ
 -- test below is NOT a scrutinee of the depth mirror, so `hD` survives the
 -- with-abstraction untouched and reaches `innerFinish-face` as-is
 innerReact-face ifc c d j g op allNid inst κ id now vals true sl sched st
-                2≤S 1≤R slEq slC inv pC lC vC slSz hD hps hvs
+                2≤S 1≤R slEq slC inv pC lC vC slSz hD hps hvs hpq
   with any (aliveThroughᶠ inst st) (EvalSt.registry st)
 ... | true  = innerFinish-face-keep c d j sl vals false sched st inv vC
 ... | false = innerFinish-face ifc c d j g op allNid inst κ id now vals sl sched st
-                2≤S 1≤R slEq slC inv pC lC vC slSz hD hps hvs
+                2≤S 1≤R slEq slC inv pC lC vC slSz hD hps hvs hpq
 
 -- SCAN, its own top-level piece as in the companion: the nested `with`
 -- on the stored accumulator's type cannot be elaborated inside a
@@ -355,6 +359,12 @@ stepFrame-face _ ifc c d j sl g id now (from-inner op allNid inst) κ vals fin s
     2≤S 1≤R slEq slC inv (proj₂ pS2)
     (≤ᵇ⇒≤ (suc (pathLen κ)) B (T-to (proj₁ pS2))) vC slSz hD
     (∧-trueʳ hps) hvs
+    -- THE PARK READING IS FREE HERE, and that is why no signature above
+    -- this clause moves: `framePark? k (from-inner _ allNid _) st` IS
+    -- `parkStrat? k (lookupNode allNid (EvalSt.nodes st))` by reduction,
+    -- and `frame-parkStrat`'s two premises are this clause's own `inv`
+    -- and `hps`
+    (frame-parkStrat (frameStep j c) (from-inner op allNid inst) κ sched st inv hps)
   where
   B   = Caps.cSize (frameStep j c)
   -- frameSz? is `true` on both *All frames, so naming the frame again
