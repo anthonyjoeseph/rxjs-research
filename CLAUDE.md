@@ -1129,6 +1129,31 @@ What comes after the third leg is left unnamed deliberately: it will be re-group
 whatever the first three turn up, so naming it now writes a schedule that ages before
 anyone reads it. A leg enumerating every remaining row has stopped being a plan.
 
+**AND THE THREE LEGS ARE AIMED AT THE TIER'S OPEN QUESTIONS (Anthony).** The rows are
+the ledger and the legs are the schedule; the QUESTIONS are what the schedule is FOR. A
+tier's open questions are what several FALSITY rows are jointly waiting on, so they are
+the only thing in the file that names the risk ABOVE any single statement — and a trio of
+legs that moves none of them is three commits of work with nothing underneath it that got
+smaller. Write each leg so its own prose says which question it narrows; where the
+grouping is real this costs nothing, because a leg is already a group of rows sharing a
+currency and a claim, and a question is already a group of rows sharing a doubt.
+
+**AND NARROWING COUNTS — IT IS USUALLY WHAT A LEG BUYS (Anthony).** A question is not
+expected to be ANSWERED by the leg that works it; it is expected to come back SMALLER,
+which is the convergence test arriving at the schedule rather than at a postulate. So the
+outcome to write down when a leg retires is the question's NEW FORM: which half is
+settled, which region is left, and which rows still hang off it. A question rewritten that
+way has moved even when every row under it is still open, and that is the honest report —
+where the `relevant:` list shrinks the question narrowed, where it merely changes the
+question was restated, and the two must not be reported as the same thing.
+
+**AND THE ONE EXCEPTION IS A COST THAT STOPS THE QUESTIONS BEING WORKED AT ALL.** A leg
+that removes such a cost — a loop that is no longer a loop, a check that cannot run,
+apparatus a whole face needs before any of it can be instantiated — narrows nothing on its
+own and is still the right leg, because the questions are unreachable until it lands. It
+justifies itself in its own prose, saying what it unblocks; and it is never more than one
+of the three, since a trio that is all tooling is a tier that has stopped being worked.
+
 **A RISING POSTULATE COUNT IS THE MECHANISM WORKING, NOT A REGRESSION.** This needs saying
 because every instinct — and every subagent's default — runs the other way. Anthony, in
 the session that set this rule: *"the relentless mindset of reducing those numbers is very
