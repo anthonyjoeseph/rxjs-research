@@ -1,10 +1,16 @@
 # The CI interface cache — why a docs-only PR can still pay for the tower
 
 `gate.yml` restores Agda's own `.agdai` interfaces before `make gate` runs, so a
-module whose content is unchanged is not re-elaborated. When that works, a PR
-touching no Agda file finishes in minutes. When it does not, the same PR pays a
-near-cold tower — and the reason is never the key SHAPE, which is what everyone
-guesses first. It is *which snapshot the prefix restore-key can see.*
+module whose content is unchanged is not re-elaborated. The gap between that
+working and not working is the largest single lever in CI — measured at roughly
+38x on the gate step, in `typecheck-performance-numbers.md` under *The gate in
+CI*. Same command, same tree, same checks; the only variable is whether the
+restored snapshot is one Agda still considers valid.
+
+**The reason it fails is never the key SHAPE**, which is what everyone guesses
+first, this doc's author included. It is *which snapshot the prefix restore-key
+can see* — and the answer depends on what has merged recently, not on anything
+in the workflow file.
 
 ## What is cached, and why it is two directories
 

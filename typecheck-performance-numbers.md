@@ -33,10 +33,13 @@ recorded real, checked-for-real numbers for whichever modules its cache had not 
 seen (13 of them, at the last run). The AUTO block below is that real, growing sample
 rather than the laptop's one exhaustive sweep. Treat its rows as real but partial.
 
-GitHub Actions: not yet measured at all. `AGDA_DEV_BUDGET`/`CONE_BUDGET` currently borrow
-the cloud container's figures as an honest placeholder (same non-macOS shape, comparable
-core count) rather than the laptop's; the first PR whose `make gate` takes the light path
-in CI will start accumulating real `ci`-tagged rows the same way the cloud section grew.
+GitHub Actions: the shared runner. `AGDA_DEV_BUDGET`/`CONE_BUDGET` still borrow the cloud
+container's figures as an honest placeholder (same non-macOS shape, comparable core
+count) rather than the laptop's, and no `ci`-tagged per-module rows exist yet — CI always
+takes `gate-heavy`, so nothing there has ever run the per-module dev loop that writes
+them, and the light path this file once expected to start the accumulation cannot occur
+in CI at all. What IS measured is the whole-gate figure, cold and warm, under *The gate in
+CI* below.
 
 ## Recorded by the build
 
@@ -470,6 +473,33 @@ decisive evidence is the recorded row and `git log` over it, not another run.
 
 Agda 2.7.0.1 → 2.8.0 was the one lever that ever moved the gate: **927 s → 384 s** total
 on Subscribe-Face, **779 s → 300 s** of that being Positivity (2.6×).
+
+## The gate in CI — the interface cache is worth ~38x on the gate step
+
+CI always takes `gate-heavy` (`.gate-heavy-stamp` is gitignored, so a fresh checkout
+never has one), so these two rows are the SAME command over the same tree. The only
+variable is whether `actions/cache` restored a snapshot Agda still considers valid.
+
+| | `make gate` | job total |
+|---|---|---|
+| cold — restored snapshot 10 Agda commits stale | **3789 s** (63 m 09 s) | 3887 s (64 m 47 s) |
+| warm — no Agda file changed since the snapshot | **78–101 s** | 163–192 s |
+
+Five warm runs, gate step: 78, 80, 86, 100, 101 s. The spread is runner noise, not
+tree state.
+
+**The restore itself is free and the toolchain is not.** Restoring the interface cache
+measures 0–2 s for ~85 MB, and `Checkout` at `fetch-depth: 0` is 2–4 s. What actually
+floors a warm run is `Set up GHC + cabal` at 71–79 s — comparable to the entire warm
+gate. So the warm number is roughly half toolchain and half Agda, and shaving the gate
+further buys less than the table suggests.
+
+**Do not read the cold row as the cost of a cold cache.** It is the cost of a snapshot
+that is stale by a specific amount — ten commits touching `agda/src`, spanning the walk,
+caps and nest faces — so it measures that cone, not the tower from nothing. A snapshot
+stale by one cheap commit sits somewhere between the two rows, and nothing here says
+where. Why a PR that changes no Agda file can land on the cold row anyway:
+[docs/ci-cache.md](docs/ci-cache.md).
 
 ## The comment-stripped mirror — what a comment edit costs (2026-08-18)
 
