@@ -261,17 +261,16 @@ does not fit is a finding about the shared statement, not about the head.
   bottom-up on a coherent cache, attributes each to cone, edge or
   block, and deletes the findings resting on the ones that fall.
 
-- **A HYPOTHESIS WRITTEN INLINE IS NOT A DECLARATION, AND THE COPIES
-  ARE NOT ONLY OF NAMED TYPES.** Naming the face hypothesis types was
-  supposed to end the shape where a premise added to the real lemma
-  must be added again by hand at every site. Threading the entry
-  reading has found three survivors, and the third widens the
-  criterion: a `-core` whose applied form restates the core's telescope
-  inline rather than naming it, so one premise is typed three times in
-  one file and the miss reports at a consumer. `dup-check` reads
-  declarations and an inline `∀ … → Σ …` is not one. The commit
-  replaces every hand-written copy of a named telescope, and decides
-  whether the sweep is a check.
+- **A HYPOTHESIS WRITTEN INLINE IS NOT A DECLARATION, AND NEITHER IS A
+  CONJUNCT ADDED AT AN INSTANTIATION.** Naming the face hypothesis
+  types was supposed to end the shape where a premise added to the real
+  lemma must be added again by hand at every site. Threading the entry
+  reading found three inline survivors, and a fourth that is no copy at
+  all: a record field conjoined with a second half AT the instance, so
+  every sibling field must split what it reads and nothing holds them
+  to agreeing — one did not, and reported many minutes downstream at a
+  consumer. The commit replaces every hand-written copy of a named
+  telescope, and decides whether either sweep is mechanisable.
 
 ### Open questions
 

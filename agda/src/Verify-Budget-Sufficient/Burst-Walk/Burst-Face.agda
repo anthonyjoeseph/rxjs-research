@@ -409,18 +409,23 @@ module BurstWalk
                     ∧-intro (burstCaps?-widen sl str (frameStep-mono-j c 2≤S le)
                               (bbC J str h))
                             (∧-intro (bbΨ J str h) (bbD J str h))
+    -- AND THE ENVELOPE DROPS THE READING, WHICH IS NOT A LOSS.  `Bb` is
+    -- the burst ledger and carries no floor, so the payload's reading has
+    -- no conjunct to land in here; it is spent where the floor MOVES,
+    -- which is the fan, and re-earned per frame at the step
     ; b-deliv   = λ J id src evs vals fin hE hV →
                     ∧-intro
                       (∧-intro (all-++-intro _ evs _ (ebC J evs hE)
                                  (all-++-intro _ (map value vals) _
                                    (mv-caps (frameStep J c) vals
-                                     (vsC-all (frameStep J c) vals (vbC J vals hV)))
+                                     (vsC-all (frameStep J c) vals
+                                       (vbC J vals (∧-trueˡ hV))))
                                    (ft-caps (frameStep J c) fin)))
                                refl)
                       (∧-intro
                         (∧-intro (all-++-intro _ evs _ (ebΨ J evs hE)
                                    (all-++-intro _ (map value vals) _
-                                     (mv-Ψ vals (vbΨ J vals hV))
+                                     (mv-Ψ vals (vbΨ J vals (∧-trueˡ hV)))
                                      (ft-Ψ fin)))
                                  refl)
                         (nodry-one
