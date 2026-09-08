@@ -238,17 +238,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **RESTATING THE ENTRY LEDGER AT THE MINT, NOW THAT ITS RECEIPT IS
-  REFUTED.** `capsOK?` prices a registry by length and by size and
-  reads no frame, so a caps-legal state may hold a chain that reads
-  the very slot its own sink sits at — machine-checked, at caps the
-  statement itself lets a counterexample choose. What survives is the
-  PRESERVATION half, and that half is nearly free: `register` is the
+- **RESTATING THE ENTRY LEDGER AT THE MINT.** Unstarted: the refutation
+  landed and the gate came back red on an unrelated stale `using`
+  clause, so the leg is still owed in full. It opens at the
+  PRESERVATION half, which is nearly free — `register` is the
   registry's one growth site and every other write is the empty list
-  or a filter. So the commit states the mint's side condition as its
-  own leaf, proves preservation across the append, and reports what
-  the two entry faces must then be handed — which is the place each
-  of this row's siblings independently landed.
+  or a filter — and that half is what survives the refutation intact.
+  So the commit states the mint's side condition as its own leaf,
+  proves preservation across the append, and reports what the two
+  entry faces must then be handed, which is the place each of this
+  row's siblings independently landed. The reading's own defect is
+  written down where it is owed and is not restated here.
 
 - **WALKING AN ADMITTED CHAIN AT THE LEVEL IT WAS REGISTERED AT, which
   is the one door the pricing leaves open.** Both ends are closed by

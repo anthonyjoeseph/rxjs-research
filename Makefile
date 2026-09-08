@@ -393,16 +393,20 @@ imports-selftest:
 	    || { echo "SELFTEST FAIL: a module declaration disagreeing with its path was not reported"; fail=1; }; \
 	  echo "$$out" | grep -q '2 file(s) whose module DECLARATION' \
 	    || { echo "SELFTEST FAIL: expected exactly 2 module-declaration findings"; fail=1; }; \
-	  for n in gone hidden absent; do \
+	  for n in gone hidden absent borrowed; do \
 	    echo "$$out" | grep -q "PHANTOM NAME  $$n" \
-	      || { echo "SELFTEST FAIL: $$n is imported from a module of this tree that does not contain it — Agda finds that only as a ModuleDoesntExport warning, many minutes down the tower"; fail=1; }; \
+	      || { echo "SELFTEST FAIL: $$n is imported from a module of this tree that does not declare it — Agda finds that only as a ModuleDoesntExport warning, many minutes down the tower"; fail=1; }; \
 	  done; \
+	  echo "$$out" | grep -q "PHANTOM NAME  borrowed .*IMPORTS" \
+	    || { echo "SELFTEST FAIL: a name the source module SPENDS after importing it was not caught as borrowed — its use is a body token, so the token reading calls it exported and only the import reading is left; this is the shape that reached CI"; fail=1; }; \
+	  echo "$$out" | grep -q "PHANTOM NAME  gone .*IMPORTS" \
+	    && { echo "SELFTEST FAIL: a name the source module holds NOWHERE was reported as borrowed — the two arms have different repairs, and only the borrowed one can name where the name actually lives"; fail=1; }; \
 	  for n in real-thing Sub-Mod r2; do \
 	    echo "$$out" | grep -q "PHANTOM NAME  $$n" \
 	      && { echo "SELFTEST FAIL: $$n reported PHANTOM, but Phantom-Src does export it ($$n tests, in order: a plain definition; a \`module M\` item whose keyword must come off; and the SOURCE side of a renaming, since \`x to y\` binds y and the module must export x)"; fail=1; }; \
 	  done; \
-	  echo "$$out" | grep -q '3 PHANTOM name(s)' \
-	    || { echo "SELFTEST FAIL: expected exactly 3 phantom names — a count over 3 means the check guessed at a module it cannot read, and every Fixture.* name in this tree names no file"; fail=1; }; \
+	  echo "$$out" | grep -q '4 PHANTOM name(s)' \
+	    || { echo "SELFTEST FAIL: expected exactly 4 phantom names — a count over 4 means the check guessed at a module it cannot read, and every Fixture.* name in this tree names no file"; fail=1; }; \
 	  echo "$$out" | grep -q 'PHANTOM MODULE  Phantom-Src.Nowhere' \
 	    || { echo "SELFTEST FAIL: an import of a module of this tree that has NO FILE went unreported — Agda meets that as a hard FileNotFound, and a split is what leaves them"; fail=1; }; \
 	  echo "$$out" | grep -q '1 PHANTOM module(s)' \
@@ -443,7 +447,7 @@ imports-selftest:
 	  done; \
 	  echo "$$after" | grep -q '4 BLANKET import(s)' \
 	    || { echo "SELFTEST FAIL: the blanket findings vanished after --fix"; fail=1; }; \
-	  echo "$$after" | grep -q '3 PHANTOM name(s)' \
+	  echo "$$after" | grep -q '4 PHANTOM name(s)' \
 	    || { echo "SELFTEST FAIL: --fix deleted a phantom name — the repair is the RIGHT module, which the fixer cannot know, and deleting the item trades a scope-check warning for an unbound name"; fail=1; }; \
 	  echo "$$after" | grep -q '1 PHANTOM module(s)' \
 	    || { echo "SELFTEST FAIL: --fix deleted a phantom module — same reason as a phantom name, one level up: only a human knows which module the definition moved to"; fail=1; }; \
@@ -462,7 +466,7 @@ imports-selftest:
 	  diff -q scripts/imports-selftest/Quiet.agda $$tmp/Quiet.agda >/dev/null \
 	    || { echo "SELFTEST FAIL: --fix rewrote the file it must not touch"; fail=1; }; \
 	  rm -rf $$tmp; \
-	  if [ $$fail -eq 0 ]; then echo "imports-selftest: PASS (fires on a comment-only mention, a multi-line clause, a token near-miss and a dead name beside a live one; not on an infix mixfix, a MIXFIX SECTION (one or many holes), a renaming, a qualified import or a \`module M\` entry whose use is an \`open M\`; --fix is idempotent on BOTH counts and spares the live names, a dead \`module M\` item included; the claim root is exempt from the USE check but not from the blanket rule; a sole-route edge is held back as a WIRING finding rather than deleted, jointly as well as one at a time; and an import with no \`using\` list is BLANKET, while \`using ()\` and a qualified import are not; and a \`public\` re-export is illegal outright, named or bare; and a file with no module declaration, or one disagreeing with its path, is reported before any finding about its imports; and a name no module of this tree contains is PHANTOM, read on the source side of a renaming and with a \`module\` keyword off, surviving --fix because only a human knows the right module; and a MODULE of this tree that has no file is PHANTOM too, while an out-of-tree namespace is not)"; \
+	  if [ $$fail -eq 0 ]; then echo "imports-selftest: PASS (fires on a comment-only mention, a multi-line clause, a token near-miss and a dead name beside a live one; not on an infix mixfix, a MIXFIX SECTION (one or many holes), a renaming, a qualified import or a \`module M\` entry whose use is an \`open M\`; --fix is idempotent on BOTH counts and spares the live names, a dead \`module M\` item included; the claim root is exempt from the USE check but not from the blanket rule; a sole-route edge is held back as a WIRING finding rather than deleted, jointly as well as one at a time; and an import with no \`using\` list is BLANKET, while \`using ()\` and a qualified import are not; and a \`public\` re-export is illegal outright, named or bare; and a file with no module declaration, or one disagreeing with its path, is reported before any finding about its imports; and a name no module of this tree contains is PHANTOM, read on the source side of a renaming and with a \`module\` keyword off, surviving --fix because only a human knows the right module; and so is a name the source module merely BORROWED and then spent, which its body tokens cannot tell from one it declares, reported against the module it was borrowed from; and a MODULE of this tree that has no file is PHANTOM too, while an out-of-tree namespace is not)"; \
 	  else echo "$$out"; exit 1; fi
 
 # PROVES dup-check IS LOAD-BEARING, against a fixture outside agda/src.  It

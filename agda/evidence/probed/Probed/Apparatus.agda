@@ -47,7 +47,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; cong; trans)
 open import Relation.Nullary using (¬_)
 
 open import Rx.Prim using (InstEmit)
-open import Rx.Exp using (Ctx; Closed; Val; Ty; sizeᵉ)
+open import Rx.Exp using (Ctx; Closed; Val; Ty; sizeᵉ; inputsBelowᵛ)
 open import Rx.Nest-Depth using (nestDᵛ)
 open import Rx.Slots using (Slots)
 open import Rx.Evaluator using (EvalSt; NodeId; NodeState; lookupNode; Stream; splitEvents)
@@ -56,7 +56,7 @@ open import Verify-Budget-Sufficient.Nest-Store
   using (nodeNest; fitB; slotWrapSum; nestUnit)
 open import Verify-Budget-Sufficient.Nest-Walk using (nodeNestAt; nodesMax)
 open import Verify-Budget-Sufficient.Sighted-Fit
-  using (inputsBelowᵛ; ValsFitG; StreamFitG)
+  using (ValsFitG; StreamFitG)
 
 Confirms : {A : Set} → .(claim : A) → Set
 Confirms {A} _ = A

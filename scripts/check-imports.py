@@ -525,6 +525,31 @@ def main() -> int:
     exports = {module_of(path): body_tokens(res[1], res[2])
                for path, (_, res) in per_file.items()}
 
+    # AND THE HALF THE TOKEN READING IS BLIND TO, WHICH IS THE COMMON CASE
+    # RATHER THAN A CORNER.  Excising the declarations answers the question
+    # only for a name the source module never SPENDS: the moment it imports a
+    # name and uses it, the use is a body token and the token reading calls it
+    # exported.  So a consumer asking the wrong module for a name that module
+    # merely borrows passes, and Agda reports it as a scope warning `-W error`
+    # promotes many minutes up the tower -- which is the failure this whole
+    # check exists to move to the front of the gate, arriving through it.
+    #
+    # The `public` ban is what makes the repair exact rather than heuristic: a
+    # module can export only what it DECLARES, so a name it brings into its own
+    # unqualified scope by an `open import` is one it cannot hand on, whether or
+    # not it spends it.  This asks that directly and owes the token reading
+    # nothing.  A module that both imported and declared one name would be the
+    # gap, and it is not reachable from here: Agda warns on the shadowing and a
+    # warning is a build failure.
+    #
+    # It maps each borrowed name to the module it was borrowed FROM, because
+    # that module is the repair.  The sibling arm cannot say where a name went
+    # and says so; this one knows, and a finding that names the right import is
+    # worth more than one that only rejects the wrong one.
+    binds = {module_of(path): {nm: d.mod
+                               for d in res[2] if d.opened for nm in d.names}
+             for path, (_, res) in per_file.items()}
+
     # AND WHETHER THE MODULE IS THERE AT ALL, which is the strictly worse
     # failure of the two and the one nothing here could see.  A phantom NAME is
     # a warning Agda raises against a file that is itself correct; a phantom
@@ -594,8 +619,10 @@ def main() -> int:
                                             or "renaming" in d.clauses):
                 continue
             for nm in imported_sources(d, stripped):
-                if not mentions(nm, exports[d.mod]):
-                    phantoms.append((path, d, nm))
+                if nm in binds[d.mod]:
+                    phantoms.append((path, d, nm, binds[d.mod][nm]))
+                elif not mentions(nm, exports[d.mod]):
+                    phantoms.append((path, d, nm, None))
         # Collected before the claim-root skip on purpose: the blanket rule binds
         # every file in the tree, roots included.
         blankets += [(path, d) for d in blanket]
@@ -652,11 +679,17 @@ def main() -> int:
               f"Agda stops the build with `FileNotFound`. Point it at the "
               f"module the definition moved to, or delete it.")
 
-    for path, d, nm in phantoms:
+    for path, d, nm, home in phantoms:
         n_phantom += 1
-        print(f"{path}:{d.line}: PHANTOM NAME  {nm}  — {d.mod} does not "
-              f"mention `{nm}` anywhere, so it cannot be exporting it.  Import "
-              f"it from where it is defined, or delete it.")
+        if home is None:
+            print(f"{path}:{d.line}: PHANTOM NAME  {nm}  — {d.mod} does not "
+                  f"mention `{nm}` anywhere, so it cannot be exporting it.  "
+                  f"Import it from where it is defined, or delete it.")
+        else:
+            print(f"{path}:{d.line}: PHANTOM NAME  {nm}  — {d.mod} IMPORTS "
+                  f"`{nm}` rather than declaring it, and a `public` re-export "
+                  f"is illegal here, so it cannot be exporting it.  Import it "
+                  f"from `{home}`, where it is defined.")
 
     for path, d in reexports:
         n_reex += 1
@@ -704,7 +737,8 @@ def main() -> int:
               f"only a human knows which module the definition went to")
     if n_phantom:
         print(f"imports-check: and {n_phantom} PHANTOM name(s) — imported from a "
-              f"module of this tree that does not contain the name at all.  Agda "
+              f"module of this tree that does not declare the name: it holds it "
+              f"nowhere, or it borrowed it by an import of its own.  Agda "
               f"reports it as a ModuleDoesntExport WARNING, which `-W error` "
               f"turns into exit 42 many minutes down the tower, in a module that "
               f"is itself correct.  Not auto-fixable: the repair is the right "
