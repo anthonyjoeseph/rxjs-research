@@ -4,7 +4,7 @@ module Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves where
 
 open import Data.Bool    using (Bool; true)
 open import Data.Fin     using (Fin; toℕ)
-open import Data.List    using (List)
+open import Data.List    using (List; map; [])
 open import Data.Bool.ListAction using (all)
 open import Data.Nat     using (ℕ)
 open import Data.Vec     using (lookup)
@@ -12,10 +12,13 @@ open import Data.Product using (_×_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 
 open import Rx.Prim      using (Tick; Id; Gas; Source; InstEvent)
-open import Rx.Exp       using (Ctx; Closed; Val; inputsBelowᵉ)
+open import Rx.Exp       using
+  (Ctx; Closed; Val; Fn; _×ᵗ_; obs; applyFn; inputsBelowᵉ; inputsBelowᵗ;
+   inputsBelowᵛ)
 open import Rx.Evaluator using
   (Frame; Path; Sched; EvalSt; RegId; _↠_; stepFrame; subscribeE;
-   foldPath; shareAdmit; shareLatch;
+   foldPath; shareAdmit; shareLatch; NodeId; AllOp;
+   scan-f; take-f; from-inner; thru-outer;
    Arrival; arrTy; chainsOf; chainStep; cascadeLatch)
 open import Verify-Budget-Sufficient.Caps using (Caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
@@ -204,3 +207,74 @@ postulate
     capsOK? c sched st ≡ true →
     pathStrat? (f ↠ κ) ≡ true →
     framePark? (pathFloor κ) f st ≡ true
+
+-- (9) WHAT ONE HOP LEAVES BELOW THE FLOOR, ONE HEAD AT A TIME.  The
+-- five heads do not rebuild a payload the same way -- a `map` applies
+-- a template, a `scan` folds one against a value it keeps in the
+-- store, and the other three re-emit what they were handed or what
+-- they subscribed -- so a single fact over a frame VARIABLE could not
+-- reduce at any of them, and every head's obligation arrived as the
+-- same opaque premise with no way to tell which owed the store
+-- anything.  Split, the `map` head owes it NOTHING: its statement
+-- mentions no state at all.
+--
+-- AND `framePark?` IS A PATH PREDICATE THAT DOES SEE THE STORE, which
+-- is what lets the two subscribing heads state theirs.  It reads the
+-- node a `from-inner` names, and the tier threads it from the top, so
+-- their store half is a conjunct that EXISTS and is spent here rather
+-- than a fact owed to nobody.  Where the predicate reads `true` -- at
+-- a `scan-f`, whose accumulator is a node it does not name -- there is
+-- no conjunct to come out of, and `capsOK?` stands in its place; that
+-- one head is the residue, not the whole reading.
+
+  scan-strat-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+    (c : Caps) (k : ℕ) (sf : Gas) (nid : Id) (now : Tick)
+    (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nd : NodeId) (κ : Path Γ u t)
+    (vals : List (Val Γ s)) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) →
+    capsOK? c sched st ≡ true →
+    inputsBelowᵗ k fn ≡ true →
+    all (inputsBelowᵛ k s) vals ≡ true →
+    all (inputsBelowᵛ k u)
+      (proj₁ (stepFrame sf nid now (scan-f fn nd) κ vals fin sched st)) ≡ true
+
+  take-strat-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+    (k : ℕ) (sf : Gas) (nid : Id) (now : Tick)
+    (nd : NodeId) (κ : Path Γ s t)
+    (vals : List (Val Γ s)) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) →
+    all (inputsBelowᵛ k s) vals ≡ true →
+    all (inputsBelowᵛ k s)
+      (proj₁ (stepFrame sf nid now (take-f nd) κ vals fin sched st)) ≡ true
+
+  inner-strat-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+    (k : ℕ) (sf : Gas) (nid : Id) (now : Tick)
+    (op : AllOp) (allNid inst : NodeId) (κ : Path Γ s t)
+    (vals : List (Val Γ s)) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) →
+    framePark? k (from-inner {s = s} op allNid inst) st ≡ true →
+    all (inputsBelowᵛ k s) vals ≡ true →
+    all (inputsBelowᵛ k s)
+      (proj₁ (stepFrame sf nid now (from-inner op allNid inst) κ vals fin sched st))
+        ≡ true
+
+  thru-strat-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (c : Caps) (k : ℕ) (sf : Gas) (nid : Id) (now : Tick)
+    (op : AllOp) (nd : NodeId) (κ : Path Γ u t)
+    (vals : List (Val Γ (obs u))) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) →
+    capsOK? c sched st ≡ true →
+    all (inputsBelowᵛ k (obs u)) vals ≡ true →
+    all (inputsBelowᵛ k u)
+      (proj₁ (stepFrame sf nid now (thru-outer op nd) κ vals fin sched st)) ≡ true
+
+-- and the template head's route is walked already, at a hereditary
+-- value predicate whose term-side reading has the same shape: the
+-- induction runs over the TERM with the type as an index, and only the
+-- stream arm does any work
+-- TWIN: `applyFn-hopSpn`
+  map-strat-step : ∀ {n} {Γ : Ctx n} {s u}
+    (k : ℕ) (fn : Fn Γ [] [] [] s u) (vals : List (Val Γ s)) →
+    inputsBelowᵗ k fn ≡ true →
+    all (inputsBelowᵛ k s) vals ≡ true →
+    all (inputsBelowᵛ k u) (map (applyFn fn) vals) ≡ true

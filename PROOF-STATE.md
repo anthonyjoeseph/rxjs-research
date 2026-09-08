@@ -238,53 +238,51 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **WALKING AN ADMITTED CHAIN AT THE LEVEL IT WAS REGISTERED AT, which
-  is the one door the pricing leaves open.** Both ends are closed by
+- **GIVING THE PARK READING THE ARM IT IS MISSING, WHICH IS ALL THAT
+  IS LEFT OF THE STORE QUESTION.** Splitting the hop's reading into
+  five heads answered that question at four of them: a path predicate
+  that sees the store already exists, this walk already threads it,
+  and the two subscribing heads spend it rather than owing a fact to
+  nobody. What survives is COVERAGE — the reading names the nodes a
+  frame declares, and a `scan-f`'s accumulator is not declared. The
+  commit gives that node an arm and cascades the obligation through
+  every producer of the reading, which is the standing ruling's own
+  answer to a missing invariant, and reports what the cascade costs.
+
+- **WALKING AN ADMITTED CHAIN AT THE LEVEL IT WAS REGISTERED AT, the
+  one door the pricing question leaves open.** Both ends are closed by
   arithmetic now, and `fan-regsSz`'s header carries which: the fan can
   reach neither the entry-cap receipt nor the stepped one. What
   neither end touches is the fan's own choice to re-enter a chain from
-  the instant's TOP. A chain re-entered at the level it was registered
-  at needs exactly the receipt `register-caps` left behind. The commit
-  asks what the walk must carry for that to be stateable, and whether
-  the depth measure still decreases when a chain is entered below the
-  top — the mechanism question the currency search stood in for.
+  the instant's TOP, where a chain entered at the level it was
+  registered at needs exactly the receipt `register-caps` left behind.
+  The commit asks what the walk must carry for that to be stateable,
+  and whether the depth measure still decreases below the top — the
+  form the pricing question has to take to be answerable at all.
 
-- **RE-MEASURING WHAT IS LEFT OF THE OVER-BUDGET LIST, now that one
-  cause is mechanised and cannot be paid twice.** The cold cone has
-  stopped being a cost: it is read off the filesystem BEFORE the run
-  and refused there, and a cone can now be built against a module
-  carrying no bodies, so it clears while the file being edited is
-  still broken. What remains is the cause a shape reading cannot
-  see — a new module-graph edge into a widely imported module,
-  measured at sixty-three seconds against over eight minutes with
-  the bodies unchanged. The commit re-runs the remaining floors
-  bottom-up on a coherent cache, attributes each to edge or block,
-  and deletes the findings resting on the ones that fall.
-
-- **BRINGING THE STORE QUESTION TO A STATEMENT, AT THE ROW THAT
-  NAMES IT.** The tier asks whether ANY store conjunct survives
-  `stepFrame`, and `walk-strat-step` is where the answer is owed: a
-  `scan-f` folds against a value the path does not carry, so the
-  reading cannot be transported and has to be re-established. The
-  entry reading is the first worked instance of that shape — a
-  registry conjunct on the admission predicate, and a face deriving
-  a path reading from it. The commit asks whether that route reaches
-  a scan accumulator, or whether the step is where a second conjunct
-  must be minted rather than carried.
+- **LOOKING FOR A COMPUTABLE SHADOW OF THE SEALED FACES, the question
+  nothing in the ledger can lower.** Three rows say in their own
+  headers that they cannot be instantiated, so every piece of evidence
+  they will ever take RAISES their class and none can de-risk them
+  first. The commit does not attack them: it looks for a weaker family
+  that REDUCES and whose truth would imply one of them, and reports
+  either a candidate or that the sealing is load-bearing in the
+  STATEMENT and not merely in the checking cost. Either answer settles
+  a question the ledger currently carries against three rows at once.
 
 ### Open questions
 
-- **CAN A PREDICATE OVER THE PATH SEE WHAT LIVES IN THE STORE?** Six rows
-  fail in one place: the statement reads a PATH or a chain, and the quantity
-  it must bound is a cell in the STORE. A `scan-f` carries a `NodeId`, so
-  the value it folds against is not in the syntax at all and no reading of
-  the term reaches it. The standing ruling says a missing invariant goes in
-  the RECORD and never in a signature — but a conjunct there must survive
-  `stepFrame`, and that is exactly where two of these are refuted. So the
-  question is not whether to add it; it is whether ANY store conjunct is
-  preserved by the step, or whether the step is where the reading has to be
-  re-established rather than transported.
-  relevant: `walk-strat-step`, `step-frame-store≤`, `share-fold-store≤`, `subscribeE-sz-store-scan`, `pushBurst-sz-store-outer`, `subscribeSharedSlot-sz-store`
+- **WHICH STORE CELLS DOES A PATH PREDICATE REACH?** Six rows fail in one
+  place: the statement reads a PATH or a chain, and the quantity it must
+  bound is a cell in the STORE. Whether ANY conjunct can be carried there is
+  now settled and the answer is yes — the park reading takes the state, reads
+  the node a `from-inner` names, and survives `stepFrame` by a lemma this
+  walk already spends. What is open is COVERAGE. That reading reaches the
+  nodes a frame DECLARES, and the cells these rows need are the ones nothing
+  announces: a scan's accumulator, a share's fold. So the question is whether
+  each unannounced cell gets an arm on the existing reading, or whether the
+  reading has to be minted where the cell is WRITTEN.
+  relevant: `scan-strat-step`, `step-frame-store≤`, `share-fold-store≤`, `subscribeE-sz-store-scan`, `pushBurst-sz-store-outer`, `subscribeSharedSlot-sz-store`
 
 - **IS THERE A COMPUTABLE SHADOW OF THE SEALED FACES?** Three rows say in
   their own headers that they cannot be instantiated — the cap does not
@@ -310,10 +308,22 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### The ledger
 
-- **`walk-strat-step`** (Part7/Walk-Sink) — FALSITY, `NO EVIDENCE`: what a hop
-  does to the chain's stratification reading, the one reading a walk cannot
-  transport. A `scan-f` folds against a value in the STORE, which no path
-  predicate reaches and the premised state receipt does not yet read.
+- **`scan-strat-step`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the one
+  hop head whose output is folded against a value in the STORE. The park
+  reading names the nodes a frame declares and an accumulator is not among
+  them, so no predicate over the path reaches this cell.
+- **`thru-strat-step`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the
+  payload that IS an observable, subscribed here and its burst grafted. What
+  leaves is the inner's, so nothing the caller handed in reads it and the store
+  receipt is the only premise standing.
+- **`inner-strat-step`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: what a
+  drained inner re-emits, read below the floor. The first head to SPEND the
+  park conjunct the walk already threads, so what is open is the drain's own
+  reduction rather than the reading.
+- **`take-strat-step`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the head
+  that fabricates nothing — its output is a PREFIX of what arrived, so the
+  reading survives by the list and not by the store. Nothing has instantiated
+  it, which is the whole of why it sits here.
 - **`pop-head-strat-sink`** (Caps-Bridge) — FALSITY, `REFUTED`: where the
   arrival's own value sits against every chain that will receive it, asked only
   below the root. It wants a fact relating a source's pending values to the
@@ -406,9 +416,8 @@ does not fit is a finding about the shared statement, not about the head.
   corollary of the frame-keyed form: what must survive is a reading of nodes
   the step did not name.
 - **`shareAdmit-park`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the park
-  reading over the admitted chains at the LATCHED state the fan-out starts
-  from — stated after the close, because that is where the fan reads the
-  registry.
+  reading over the admitted chains at the LATCHED state the fan-out starts from
+  — stated after the close, because that is where the fan reads the registry.
 - **`foldPath-park`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the same
   reading again once a SIBLING chain has folded. It is about a state the walk
   PRODUCED rather than one it was handed, which is why the latched form does
@@ -516,6 +525,10 @@ does not fit is a finding about the shared statement, not about the head.
 - **`subscribeE-Ψ`** (Burst-Walk) — DIFFICULTY, `TWIN`, large: the Ψ reading of
   the clique its header mirrors, clause for clause at a different measure. The
   cost is that the induction covers every clause; nothing in it is undecided.
+- **`map-strat-step`** (Part7/Strat-Leaves) — GRINDABLE, `TWIN`: one template
+  application read below the floor, lifted over the payload. The only hop head
+  whose statement names no state at all, and the induction behind it is walked
+  already at a hereditary value predicate of the same shape.
 
 ## Tier 2 — Verify-Well-Formed (parked behind tier 1)
 

@@ -79,7 +79,9 @@ open import Decide using (T-to; T⇒≡true; ∧-intro; ∧-trueˡ; ∧-trueʳ; 
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Root-Strat using
   (pathStrat-top)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves using
-  (foldPath-park; pathPark-step; shareAdmit-park)
+  (foldPath-park; pathPark-step; shareAdmit-park;
+   map-strat-step; scan-strat-step; take-strat-step; inner-strat-step;
+   thru-strat-step)
 open import Verify-Budget-Sufficient.Delivery-Walk using
   (shareAdmit-chQ)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Ring-Vocabulary using
@@ -779,30 +781,47 @@ walk-frame-drain sl id L sf gas nid now src (from-inner op allNid inst) p vals e
 -- the other three forward or subscribe what they are handed and add
 -- none of their own.
 --
--- AND THE SCAN'S ACCUMULATOR IS WHY THE STATE RECEIPT IS A PREMISE
--- AND NOT DECORATION.  A `scan-f` carries a NODE ID, not an
--- accumulator: the value it folds against lives in the store, so NO
--- predicate over the path can see it, and an accumulator holding an
--- observable that names an input above the floor defeats the template
--- reading on its own.  So the store is where the missing half has to
--- come from, and `capsOK?` is the store's receipt.
+-- IT IS A BODY OVER FIVE HEAD LEAVES, WHICH IS WHERE THE STORE
+-- QUESTION ACTUALLY LANDS.  Stated over a frame VARIABLE the fact
+-- reduced at no head, so every head's obligation read as the same
+-- opaque premise and the tier could not tell which of them owed the
+-- store anything.  Split, three answers fall out: the `map` head owes
+-- it nothing and its leaf mentions no state; the two SUBSCRIBING
+-- heads owe a reading of nodes, and `framePark?` -- a path predicate
+-- that DOES see the store, threaded by this walk already -- is the
+-- conjunct that pays it, spent here rather than owed to nobody; and
+-- the `scan` head is the one place the predicate reads `true`, since
+-- its accumulator is a node it does not name.
 --
--- WHICH MAKES THIS LEAF'S RESIDUE A NAMED, SINGLE FACT: `capsOK?` does
--- not yet read a scan accumulator's stratification, and until it does
--- this is not provable.  Stating it as a premise here rather than
--- adding a hypothesis to the walk is deliberate -- the fact belongs to
--- the invariant record, where every producer owes it and every
--- consumer re-establishes it, and a signature obliges only whoever
--- happens to call.
-postulate
-  walk-strat-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (c : Caps) (sl : Slots Γ) (k : ℕ) (sf : Gas) (nid : Id) (now : Tick)
-    (f : Frame Γ s u) (p : Path Γ u t) (vals : List (Val Γ s)) (fin : Bool)
-    (sched : Sched Γ) (st : EvalSt e) →
-    capsOK? c sched st ≡ true →
-    frameStrat? k f ≡ true →
-    all (inputsBelowᵛ k s) vals ≡ true →
-    all (inputsBelowᵛ k u) (proj₁ (stepFrame sf nid now f p vals fin sched st)) ≡ true
+-- SO THE RESIDUE IS ONE HEAD AND ONE PREDICATE, not a question about
+-- readings in general: `framePark?` has no `scan-f` arm, `capsOK?`
+-- prices what a node has queued and reads no floor, and until one of
+-- them reaches a scan accumulator that leaf is where this stops.
+-- Taking the park reading as a premise is spending the invariant
+-- record's own conjunct, which is where the earlier ruling put the
+-- fact; it is not a hypothesis this statement invented, and the call
+-- site already had it in hand.
+walk-strat-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (c : Caps) (sl : Slots Γ) (k : ℕ) (sf : Gas) (nid : Id) (now : Tick)
+  (f : Frame Γ s u) (p : Path Γ u t) (vals : List (Val Γ s)) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) →
+  capsOK? c sched st ≡ true →
+  frameStrat? k f ≡ true →
+  framePark? k f st ≡ true →
+  all (inputsBelowᵛ k s) vals ≡ true →
+  all (inputsBelowᵛ k u) (proj₁ (stepFrame sf nid now f p vals fin sched st)) ≡ true
+walk-strat-step c sl k sf nid now (map-f fn) p vals fin sched st cok hstf hpk hib =
+  map-strat-step k fn vals hstf hib
+walk-strat-step c sl k sf nid now (scan-f fn nd) p vals fin sched st cok hstf hpk hib =
+  scan-strat-step c k sf nid now fn nd p vals fin sched st cok hstf hib
+walk-strat-step c sl k sf nid now (take-f nd) p vals fin sched st cok hstf hpk hib =
+  take-strat-step k sf nid now nd p vals fin sched st hib
+walk-strat-step c sl k sf nid now (from-inner op allNid inst) p vals fin sched st
+  cok hstf hpk hib =
+  inner-strat-step k sf nid now op allNid inst p vals fin sched st hpk hib
+walk-strat-step c sl k sf nid now (thru-outer op nd) p vals fin sched st
+  cok hstf hpk hib =
+  thru-strat-step c k sf nid now op nd p vals fin sched st cok hib
 
 -- THE TAIL'S HYPOTHESES OUT OF THE HEAD'S, ONE FRAME UP, which both
 -- walks spend and neither owns.  The frame face reports the level it
@@ -847,7 +866,7 @@ walk-hyps-step {e = e} sl id L sf gas nid now src f p vals evs fin sched st
   , pathSz?-widen p (proj₁ (frameStep-mono-j c 2≤S L≤t)) pz2
   , ≤-trans (m≤n⊔m (depthFrame sf nid now f p vals fin sched st) _) hdp
   , walk-strat-step (frameStep L c) sl (pathFloor p) sf nid now f p vals fin sched st
-      cok hstf hib
+      cok hstf hpkf hib
   , hstp
   -- the parked reading is the one conjunct the step does not TRANSPORT:
   -- a hop can subscribe out of a flatten node's queue, so what survives
