@@ -766,6 +766,73 @@ def render_focus(p: Parsed, mod: str, ctx: str, foci: list[str],
     return "\n".join(HOLES_PRAGMA + out).rstrip() + "\n"
 
 
+def render_warm(p: Parsed, mod: str) -> str:
+    """THE CONE AND NOTHING ELSE: the import block, with every declaration cut.
+
+    The loop can only build a module's dependencies as a SIDE EFFECT of
+    checking something that imports them, and that something has to compile.
+    Mid-edit it does not -- which is exactly when the cone most needs warming,
+    since the reason it went cold is the edit.  So this drops every
+    declaration and keeps the imports: Agda builds each dependency for real,
+    and the module left over cannot fail, whatever state the bodies above it
+    are in.
+
+    The `using` lists ride along verbatim rather than being widened to bare
+    opens.  A clause asking a module for a name it no longer exports is a
+    finding the import checker already owns, and a warm run that quietly
+    routed around it would hand back a clean cone for a tree that does not
+    build.
+    """
+    out: list[str] = []
+    for i in p.options:
+        out.append(p.lines[i])
+    out.append(f"module {mod} where")
+    out.append("")
+    for it in p.items:
+        if it.kind == "pass" and p.lines[it.start].startswith(("import ", "open import ")):
+            out.extend(p.lines[it.start : it.end])
+    return "\n".join(out).rstrip() + "\n"
+
+
+def warm_run(rel: str, args) -> int:
+    """Build the target's cone, unbudgeted, and check nothing else.
+
+    NO BUDGET APPLIES, and that is the point rather than an oversight.  The
+    budget's job is to declare that the LOOP has stopped being a loop, and this
+    is not the loop -- it is the one-time bill the loop is trying to avoid
+    paying per iteration.  Enforcing a limit here would kill the run that makes
+    every later run fast, which is the failure the whole target exists to end.
+    """
+    cone = stale_cone(rel)
+    if not cone:
+        print(f"agda-dev --warm: {rel}'s cone is already warm -- nothing to build.")
+        return 0
+    p = parse(os.path.join(SRC, rel))
+    mod = mangle(rel) + "-Warm"
+    os.makedirs(DEV, exist_ok=True)
+    with open(os.path.join(DEV, mod + ".agda"), "w", encoding="utf-8") as f:
+        f.write(render_warm(p, mod))
+    print(f"agda-dev --warm: {len(cone)} stale module(s) under {rel}.  This run is\n"
+          "  meant to be long ONCE; launch it with `make bg` and keep editing, since\n"
+          "  nothing it builds depends on the file you are changing.")
+    unbudgeted = copy.copy(args)
+    unbudgeted.budget = None
+    t0 = time.time()
+    rc, out, _ = run_one(os.path.join("_dev", mod + ".agda"), unbudgeted)
+    elapsed = time.time() - t0
+    if rc != 0:
+        print(noise(out))
+        print(f"\nagda-dev --warm: FAILED after {elapsed:.1f}s.  A warm module has no\n"
+              "  bodies of its own, so this is a real error BELOW the file you are\n"
+              "  editing, and no check of that file could have succeeded either.")
+        return 1
+    left = stale_cone(rel)
+    print(f"\nagda-dev --warm: GREEN in {elapsed:.1f}s -- "
+          f"{len(cone) - len(left)} module(s) warmed"
+          + (f", {len(left)} still stale.\n" if left else ", the cone is clean.\n"))
+    return 0
+
+
 def using_names(block: list[str]) -> list[str]:
     """The names an `open import … using (…)` claims, for the clash check.
 
@@ -1489,6 +1556,81 @@ def falsify_cone() -> int:
     return 0
 
 
+def falsify_warm() -> int:
+    """Prove the warm module builds the cone and the refusal fires BOTH ways.
+
+    TWO FAILURES, POINTING OPPOSITE WAYS, AND THE CHEAP-LOOKING ONE IS WORSE.
+    A refusal that never fires restores the burnt-budget loop this exists to
+    end -- costly, but visible, since the run still takes the whole budget and
+    says so.  A refusal that fires on a WARM cone is the dangerous one: it
+    blocks the grind loop on a tree that was fine, and the message explaining
+    why is confident and wrong.  So the warm direction is tested as hard as the
+    cold one, with the same manufactured victim the cone check uses.
+
+    And the generated module is checked for what it must NOT contain.  Its
+    whole safety property is that it cannot fail, which holds only while it
+    carries no bodies; a generator that let one declaration through would give
+    back a warm run that goes red for a reason having nothing to do with the
+    cone.
+    """
+    victim, consumer = "Rx.Exp", "Rx/Frame-Width.agda"
+    p = parse(os.path.join(SRC, consumer))
+    text = render_warm(p, mangle(consumer) + "-Warm")
+    imports = [p.lines[it.start] for it in p.items
+               if it.kind == "pass"
+               and p.lines[it.start].startswith(("import ", "open import "))]
+    missing = [l for l in imports if l not in text]
+    if missing:
+        print(f"agda-dev --falsify: FAILED — the warm module for {consumer} dropped "
+              f"{len(missing)} import(s), so it would not build the cone it names: "
+              f"{missing[0]!r}", file=sys.stderr)
+        return 1
+    bodies = [p.lines[it.start] for it in p.items
+              if it.kind in ("sig", "clauses") and p.lines[it.start] in text]
+    if bodies:
+        print(f"agda-dev --falsify: FAILED — the warm module for {consumer} kept a "
+              f"declaration ({bodies[0]!r}).  It can then go red on its own bodies, "
+              "and a warm run that can fail is not a warm run.", file=sys.stderr)
+        return 1
+
+    ifaces = glob.glob(os.path.join(
+        MIRROR, "_build", "*", "agda", "src", *victim.split(".")) + ".agdai")
+    if not ifaces:
+        print(f"agda-dev --falsify: no interface for {victim}; the cold-cone "
+              "refusal is UNTESTED (build the tree once, then re-run).",
+              file=sys.stderr)
+        return 2
+    cmd = [sys.executable, os.path.join(REPO, "scripts", "agda-dev.py"),
+           "--budget", "45", consumer]
+    warm_out = subprocess.run(cmd, capture_output=True, text=True, cwd=REPO)
+    hidden = [(i, i + ".selftest-bak") for i in ifaces]
+    try:
+        for i, bak in hidden:
+            os.rename(i, bak)
+        cold_out = subprocess.run(cmd, capture_output=True, text=True, cwd=REPO)
+    finally:
+        for i, bak in hidden:
+            if os.path.exists(bak):
+                os.rename(bak, i)
+    for i, _ in hidden:
+        assert os.path.exists(i), f"RESTORE FAILED: {i}"
+
+    if "COLD CONE" not in cold_out.stdout or cold_out.returncode == 0:
+        print(f"agda-dev --falsify: FAILED — {victim}'s interface was missing and "
+              f"the check ran anyway (exit {cold_out.returncode}).  It would be "
+              "killed at the budget having cached nothing.", file=sys.stderr)
+        return 1
+    if "COLD CONE" in warm_out.stdout:
+        print(f"agda-dev --falsify: FAILED — the cone was WARM and the check "
+              "refused to run.  That blocks the grind loop on a healthy tree, "
+              "which is worse than the cost it is avoiding.", file=sys.stderr)
+        return 1
+    print(f"agda-dev --falsify: PASSED — the warm module carries {len(imports)} "
+          f"import(s) and no bodies, and a missing {victim} is refused up front "
+          "while a warm cone runs.")
+    return 0
+
+
 def falsify(args) -> int:
     """Prove the fast check is load-bearing, not green-by-construction.
 
@@ -1546,7 +1688,7 @@ def falsify(args) -> int:
         return 1
     print("agda-dev --falsify: PASSED — the corruption was caught, so the fast "
           "check is load-bearing.")
-    return falsify_cone()
+    return falsify_cone() or falsify_warm()
 
 
 def main() -> int:
@@ -1572,6 +1714,10 @@ def main() -> int:
                          "4->17.2s 5->23.6s 8->45.7s.  Small batches pay the "
                          "4.9s per-process interface toll too often; large ones "
                          "rebuild the mutual block they exist to avoid.")
+    ap.add_argument("--warm", action="store_true",
+                    help="build the file's DEPENDENCIES and stop -- no budget")
+    ap.add_argument("--cone-ok", action="store_true",
+                    help="check anyway with a cold cone (the timing is still not recorded)")
     ap.add_argument("--clean", action="store_true", help="remove the generated dev modules and exit")
     ap.add_argument("--budget", type=float,
                     default=detect_env.AGDA_DEV_BUDGET[detect_env.detect_env()],
@@ -1639,10 +1785,38 @@ def main() -> int:
                           "worth 35s of\n     255s positivity -- the cost lives in the "
                           "SCC's TERM SIZE, not the count.)")
             return 0
+        if args.warm:
+            return warm_run(rel, args)
         # SNAPSHOT THE CONE BEFORE THE RUN, because the run is what warms it:
         # asked afterwards the question always answers "warm" and the check is
         # a no-op that reads as a clean bill.
         cone = stale_cone(rel)
+        # AND REFUSE BEFORE SPENDING THE BUDGET, BECAUSE THE VERDICT IS ALREADY
+        # IN.  Staleness is read off the filesystem with no Agda process, so a
+        # cold cone is known at t=0 -- and a budgeted run against one is a bet
+        # that the cone fits in the budget, whose losing side pays the entire
+        # budget and CACHES NOTHING.  Losing that bet repeatedly, at three
+        # different budgets, is what this branch makes impossible: the second
+        # attempt cannot learn anything the first did not already report, and
+        # raising the limit only raises the stake.
+        #
+        # The grind loop is untouched, which is what makes the refusal cheap
+        # rather than obstructive: `stale_cone` excludes the target, so editing
+        # the module you are checking leaves it EMPTY.  It goes non-empty
+        # exactly when the edit was BELOW you -- the one case the warm run
+        # amortises, and the one case where the number would not have been
+        # about your module anyway.
+        if cone and args.budget and not args.cone_ok:
+            print(f"agda-dev: COLD CONE -- {len(cone)} module(s) below {rel} have no\n"
+                  "  current interface.  This run would rebuild them, be killed at the\n"
+                  f"  {args.budget:.0f}s budget, and cache nothing.  Build them once,\n"
+                  "  unbudgeted, and the check goes back to being seconds:\n"
+                  f"\n      make bg T=warm ARGS='{rel}'\n\n"
+                  "  Stale below you:\n"
+                  + "".join(f"    {m}\n" for m in cone[:8])
+                  + (f"    ... and {len(cone) - 8} more\n" if len(cone) > 8 else "")
+                  + "  (--cone-ok checks anyway; the timing is still not recorded.)")
+            return 1
         t0 = time.time()
         ok = dev_check(rel, args, args.focus)
         elapsed = time.time() - t0

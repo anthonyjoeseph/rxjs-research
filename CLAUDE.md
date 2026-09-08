@@ -528,6 +528,12 @@ carry before opening the doc:
   and checks every dependency for real. **So work BOTTOM-UP: the module you edited, then
   its consumers.** Asking for a root-ward module right after a leaf-ward edit hands the
   seconds-scale loop the gate's bill, and the gate is what should pay it.
+  **AND THE TOOL NOW REFUSES RATHER THAN REMINDING YOU.** A cold cone is read
+  before the run, so a budgeted check against one is declined in under a second
+  with the command that clears it — a killed run caches nothing, so a larger
+  budget only raises the stake. `make warm ARGS='<file>'` builds a file's
+  dependencies against a module with no bodies, so it works while yours is
+  still broken, and it is unbudgeted by design.
 - **A RED `agda-dev` ON ANY FILE IN `src` IS A CRITICAL FAILURE — FIX IT IMMEDIATELY.**
   It is a P0 defect in the tooling, fixed *before* the work you were doing. Never route
   around it — not with a skip list, not with "it's just the tool", not by falling back to

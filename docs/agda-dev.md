@@ -71,13 +71,15 @@ satisfy while still failing is a rule that needs a machine.
 
 **The manual attribution is now the ESCALATION, for when the tool says the cone
 was warm and the number still looks wrong.** Truncate the consumer to its import
-list and check that: if the truncation is slow too, nothing in the module is slow
-and the cost is entirely below it. Then check each import alone in a throwaway
+list and check that — `make warm` is that truncation, generated, so reach for it
+rather than writing one: if the truncation is slow too, nothing in the module is
+slow and the cost is entirely below it. Then check each import alone in a throwaway
 module — a cached dependency answers in seconds and the culprit does not.
 
 `make agda-dev-selftest` proves the attribution fires **in both directions**: a
 hidden interface must be charged to a consumer and must not be charged to a
-module that does not import it. The silent-pass direction is the dangerous one —
+module that does not import it. It holds the refusal below to the same pair, and
+the warm module to carrying every import and no bodies. The silent-pass direction is the dangerous one —
 a check that never reports anything stale is indistinguishable from a warm tree,
 which is the state the selftest normally runs in, so the positive control is
 manufactured rather than waited for.
@@ -98,6 +100,49 @@ proof module read in seconds against a run killed at the budget, and five succes
 theories about the statement's own arithmetic were raised and refuted before the
 import was. The attribution above finds it in two cheap runs; the mistake is skipping
 them because the file obviously studies something expensive.
+
+## A cold cone is REFUSED up front, and `make warm` is how you clear it
+
+The detector above knows the cone is cold BEFORE the run, since staleness is read
+off the filesystem — so the verdict is in at t=0. A budgeted run against a cold
+cone is therefore a bet that the cone fits inside the budget, and the losing side
+pays the entire budget and **caches nothing**: a killed Agda leaves no interfaces
+behind, so the retry redoes the same partial rebuild and dies in the same place.
+Raising the budget does not change the outcome, it raises the stake. Measured
+once at three attempts on one module, the third budget SMALLER than the second,
+none of them reaching a verdict and none of them leaving the tree any warmer —
+about an hour spent establishing something the first run had already printed.
+
+So the check **refuses before spending anything**, names what is stale beneath
+you, and prints the command that fixes it. `--cone-ok` checks anyway and the
+timing is still not recorded; `BUDGET=0` is the same statement made another way,
+since no budget means no bet.
+
+The refusal is targeted rather than broad, which is what keeps it from becoming
+an obstacle. `stale_cone` excludes the target itself, so editing the module you
+are checking leaves the set EMPTY and the grind loop never reaches this branch at
+all. It goes non-empty exactly when the edit landed BELOW you — the one case
+where the number would not have been about your module anyway.
+
+**`make warm ARGS='<file>'` builds a file's dependencies and stops.** It emits the
+file's import block with every declaration cut, which is a module that cannot
+fail, and lets Agda build each dependency for real. Two properties are the whole
+point of it:
+
+- **It is unbudgeted, deliberately.** The budget exists to declare that the LOOP
+  has stopped being a loop. This is not the loop — it is the one-time bill the
+  loop is trying not to pay per iteration, so it is meant to be long once. A limit
+  here would kill the run that makes every later run fast, which is the failure
+  the target exists to end.
+- **It works while your own module is broken.** Until it existed the only way to
+  build a cone was to check something that imports it, and that something has to
+  compile. So the moment the cone most needs warming — you edited underneath it,
+  and your own file is half-written — was the moment it could not be had.
+
+Launch it detached and keep editing, since nothing it builds depends on the file
+you are changing:
+
+    make bg T=warm ARGS='<file>'
 
 ## There is no whole-project sweep, and do not rebuild one
 

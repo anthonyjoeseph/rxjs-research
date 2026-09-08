@@ -1,4 +1,4 @@
-.PHONY: find-prose gate roadmap-moved roadmap-moved-selftest roadmap-order roadmap-order-selftest roadmap-evidence gate-heavy gate-cheap gate-light dev-changed dev-changed-selftest stripped strip-selftest unmap-selftest postulates dup-check dup-selftest imports-check imports-fix imports-selftest find all help agda-dev agda-dev-selftest bg bg-check bg-wait bug-cache unsafe-check wiring wiring-selftest comments-check comments-selftest refuted ev ts-check cli-build oracle qc-build quickcheck harness harness-build
+.PHONY: find-prose gate roadmap-moved roadmap-moved-selftest roadmap-order roadmap-order-selftest roadmap-evidence gate-heavy gate-cheap gate-light dev-changed dev-changed-selftest stripped strip-selftest unmap-selftest postulates dup-check dup-selftest imports-check imports-fix imports-selftest find all help agda-dev agda-dev-selftest warm bg bg-check bg-wait bug-cache unsafe-check wiring wiring-selftest comments-check comments-selftest refuted ev ts-check cli-build oracle qc-build quickcheck harness harness-build
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -63,6 +63,10 @@ help:
 	@echo "                  make agda-dev ARGS='<file> <member>'   (the grind loop)"
 	@echo "                  make agda-dev ARGS='--list <file>'    (block structure)"
 	@echo "                  HOLES=1 tolerate ? holes"
+	@echo "  warm          build a file's DEPENDENCIES and stop -- unbudgeted, for"
+	@echo "                after you edit BELOW the module you are working on."
+	@echo "                  make bg T=warm ARGS='<file>'"
+	@echo ""
 	@echo "  agda-dev-selftest  falsification test for agda-dev: corrupt a real"
 	@echo "                  body in src, demand the fast check goes RED, restore."
 	@echo "                  Run whenever the stubbing logic changes"
@@ -206,6 +210,18 @@ AGDA_DEV_CONE_BUDGET ?= $(shell scripts/detect_env.py --cone-budget)
 agda-dev:
 	scripts/agda-dev.py --budget $(if $(BUDGET),$(BUDGET),$(AGDA_DEV_BUDGET)) \
 	  $(if $(HOLES),--holes) $(ARGS)
+
+# BUILD A FILE'S DEPENDENCIES AND STOP.  The dev loop can only warm a cone as a
+# side effect of checking something that imports it, and that something has to
+# compile -- so the moment you most need the cone (you just edited underneath
+# it, and your own module is half-written) is the moment you cannot get it.
+# This emits the import block with every declaration cut, which cannot fail,
+# and lets Agda build the dependencies for real.  DELIBERATELY UNBUDGETED: it
+# is the one-time bill the loop is trying not to pay per iteration, so it is
+# meant to be long once.  Launch it detached and keep editing:
+#     make bg T=warm ARGS='Verify-Budget-Sufficient/Burst-Walk/Burst-Face.agda'
+warm:
+	scripts/agda-dev.py --warm $(ARGS)
 
 # Is the fast loop load-bearing, or green by construction?  Corrupts one token
 # in a real body in src, demands the dev check go RED, and restores the file
