@@ -318,6 +318,23 @@ valsCaps? {s = s} c sl vs =
 valsStrat? : ∀ {n} {Γ : Ctx n} {s} → ℕ → List (Val Γ s) → Bool
 valsStrat? {s = s} k = all (inputsBelowᵛ k s)
 
+-- AND THE SINGLETON LIFT ONTO A CHAIN LIST, WHICH EVERY CASCADE ENTRY
+-- POINT SPENDS.  An arrival carries ONE value while a walk's payload
+-- ledger reads a LIST, so the two shapes differ by an `all` over a
+-- singleton -- a conversion rather than a fact.  It is named here
+-- because three faces enter the cascade and each would otherwise inline
+-- it against a different chain list, which is how one convention
+-- becomes three.
+chainsStrat?-one : ∀ {n} {Γ : Ctx n} {t u s} (v : Val Γ s)
+  (cs : List (RegId × Path Γ u t)) →
+  all (λ rc → inputsBelowᵛ (pathFloor (proj₂ rc)) s v) cs ≡ true →
+  all (λ rc → valsStrat? (pathFloor (proj₂ rc)) (v ∷ [])) cs ≡ true
+chainsStrat?-one v []       h = refl
+chainsStrat?-one {s = s} v (rc ∷ cs) h
+  with ∧-true (inputsBelowᵛ (pathFloor (proj₂ rc)) s v)
+              (all (λ r → inputsBelowᵛ (pathFloor (proj₂ r)) s v) cs) h
+... | a , b = ∧-intro (∧-intro a refl) (chainsStrat?-one v cs b)
+
 ------------------------------------------------------------------
 -- THE NESTING HYPOTHESIS, AS THE CLIQUE CARRIES IT.
 --

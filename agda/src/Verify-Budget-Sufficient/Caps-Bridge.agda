@@ -103,7 +103,10 @@ open import Verify-Budget-Sufficient.Caps-Face.Part7.Depth-Fit using
 open import Verify-Budget-Sufficient.Caps-Nest using
   (nest; nest≤)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
-  (capsOK?-clos; capsOK?-count; capsOK?-parts; capsOK?-regs; slotsCaps?-capsAt)
+  (capsOK?-clos; capsOK?-count; capsOK?-parts; capsOK?-regs; chainsStrat?-one;
+  registry-entStrat; slotsCaps?-capsAt)
+open import Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves using
+  (chainsOf-strat)
 
 -- the depth mirror (S4's currency)
 -- `depthChain` joins `depthE` here because `dry-tick`'s assembly consumes
@@ -600,6 +603,11 @@ dry-tick {n = n} {e = e} a id sched st inv val pre nok bnd valC closC strC =
       (≤ᵇ⇒≤ (sizeᵛ (arrTy a) (arrVal a)) (Caps.cSize (capsAt e sl id))
             (T-to (valCaps?-size (capsAt e sl id) sl (arrTy a) (arrVal a) valC)))
       valC closC strC)
+    -- the entry reading, off the pre-latch registry the chains are
+    -- filtered from and off the payload obligation this statement
+    -- already carries
+    (chainsOf-strat a st (registry-entStrat c sched st pre))
+    (chainsStrat?-one (arrVal a) (chainsOf a st) strC)
   where
   sl      = Sched.slots sched
   Ψ       = ΨAt e sl
@@ -1316,7 +1324,7 @@ pop-caps {n = n} c sched st eq h with capsOK?-parts c sched st h
                   (sym (pop-slots sched eq)) pk)
   (∧-intro (pop-closSt c sched st eq cl)
   (∧-intro (subst (λ x → (n ≤ᵇ x) ≡ true) (sym (pop-nextSource sched eq)) fl)
-           rs))))))))
+           rs)))))))
 
 ------------------------------------------------------------------
 -- § 3  THE ASSEMBLY.  The fuel loop and the theorem, with `capsOK?`

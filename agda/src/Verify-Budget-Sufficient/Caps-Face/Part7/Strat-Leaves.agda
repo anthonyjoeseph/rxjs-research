@@ -150,14 +150,22 @@ postulate
            (proj₂ (proj₂ (foldPath sf gas id now envSrc p vals evs fin sched st))))
         ps ≡ true
 
--- (7) AND THE CASCADE'S TWO, WHICH ARE (5) AND (6) ARRIVING FROM THE
+-- (7) AND THE CASCADE'S THREE, WHICH ARE (5) AND (6) ARRIVING FROM THE
 -- OTHER FACE.  The share reaches its chains through `shareAdmit` and the
 -- cascade through `chainsOf`, and neither filter can be rearranged into
 -- the other -- one is keyed by a SLOT, the other by an ARRIVAL's source
--- -- so the entry reading is owed once per face.  What makes them leaves
--- rather than corollaries is the same thing as at every other park
--- statement: a chain's frames name nodes, and no conjunct of the caps
--- receipt prices what those nodes have parked.
+-- -- so the entry reading is owed once per face.  The chain reading is
+-- the admission filter's own conjunct carried across, exactly as its
+-- share sibling is; what makes the park pair leaves rather than
+-- corollaries is the same thing as at every other park statement: a
+-- chain's frames name nodes, and no conjunct of the caps receipt prices
+-- what those nodes have parked.
+  chainsOf-strat : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (a : Arrival Γ) (st : EvalSt e) →
+    regStrat? (EvalSt.registry st) ≡ true →
+    all (λ rc → pathStrat? {n} {Γ} {arrTy a} {t} (proj₂ rc))
+        (chainsOf a st) ≡ true
+
   cascade-admit-park : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (a : Arrival Γ) (st : EvalSt e) →
     all (λ rc → pathPark? {n} {Γ} {arrTy a} {t} (proj₂ rc) (cascadeLatch a st))

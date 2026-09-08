@@ -381,6 +381,10 @@ does not fit is a finding about the shared statement, not about the head.
   share hands the chains it admitted, and THE ONE PLACE THE REGISTRY READING IS
   SPENT rather than established. The chain half rides the admission filter,
   which drops entries and rewrites none; the value half widens off the slot.
+- **`chainsOf-strat`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: that same
+  chain reading arriving from the CASCADE's face. The two filters are keyed by
+  a slot and by an arrival's source, so neither rearranges into the other and
+  the entry reading is owed once per face.
 - **`subscribeE-burstStrat`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`:
   what a subscribe EMITS, read at the chain it was subscribed under. Every push
   in this development pushes a burst whose payloads the frame will subscribe

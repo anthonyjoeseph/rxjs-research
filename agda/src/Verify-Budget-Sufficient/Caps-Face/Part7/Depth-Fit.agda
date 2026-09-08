@@ -80,10 +80,11 @@ open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   pathPark?; pathStrat?; pathSz?; pathSz?-widen; regsSz?; slotsCaps?; valCaps?; nestClosOK?ᵛ;
   nestClosOK?ᵛ-widen)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
-  (capsOK?-count; capsOK?-regs; frameBud; pathPark-delivered; pathsPark-delivered;
-  slotsCaps?-capsAt; valsCaps?; valsCaps?-lvl; foldPath-slots; shareAdmit-caps)
+  (capsOK?-count; capsOK?-regs; chainsStrat?-one; frameBud; pathPark-delivered;
+  pathsPark-delivered; registry-entStrat; slotsCaps?-capsAt; valsCaps?; valsCaps?-lvl;
+  foldPath-slots; shareAdmit-caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves using
-  (cascade-admit-park; chainStep-park)
+  (cascade-admit-park; chainStep-park; chainsOf-strat)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (valCaps?-size; valCaps?-widen)
 open import Decide using (T-to; T⇒≡true; ∧-intro; ∧-trueˡ; ∧-trueʳ)
@@ -2592,6 +2593,11 @@ caps-go siC ifc {e = e} sl id a nextId sched st slEq pre nok bnd val closV strC 
              (≤ᵇ⇒≤ (sizeᵛ (arrTy a) (arrVal a)) (Caps.cSize c)
                    (T-to (valCaps?-size c sl (arrTy a) (arrVal a) val)))
              val closV strC)
+           -- the entry reading, both halves local: the chain half is the
+           -- registry's own conjunct carried across `chainsOf`, and the
+           -- payload half is `strC` in the list shape the walk reads
+           (chainsOf-strat a st (registry-entStrat c sched st pre))
+           (chainsStrat?-one (arrVal a) (chainsOf a st) strC)
   GOr   = cascadeGo a nextId (chainsOf a st) sched st₀
   j     = proj₁ GO
   jFits = proj₁ (proj₂ GO)

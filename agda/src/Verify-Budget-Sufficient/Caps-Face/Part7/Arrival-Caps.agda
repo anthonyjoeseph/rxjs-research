@@ -60,10 +60,10 @@ open import Verify-Budget-Sufficient.Caps-Face.Part1 using
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Root-Strat using
   (pathStrat-top)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves using
-  (cascade-admit-park; chainStep-park)
+  (cascade-admit-park; chainStep-park; chainsOf-strat)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
-  (capsOK?-count; capsOK?-regs; pathPark-delivered; pathsPark-delivered; pathSz?-len;
-  registry-entStrat; slotsCaps?-capsAt; valsCaps?; valsCaps?-lvl; foldPath-slots)
+  (capsOK?-count; capsOK?-regs; chainsStrat?-one; pathPark-delivered; pathsPark-delivered;
+  pathSz?-len; registry-entStrat; slotsCaps?-capsAt; valsCaps?; valsCaps?-lvl; foldPath-slots)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (valCaps?-widen)
 open import Decide using (∧-intro; ∧-trueʳ; T-to)
@@ -640,6 +640,11 @@ arr-chains-ledgers {e = e} sl id a nextId sched st sleq cok hpz hvc hcl hsv hdp 
           (subst (length (chainsOf a st) ≤_) (realWidAt-def e sl id)
                  (chains-count-width sl id a sched st cok))
           slSz hdp
+          -- the entry reading, both halves local to this fold: the chain
+          -- half off the registry the arrival's chains are filtered from,
+          -- the payload half `hsv` in the list shape the walk reads
+          (chainsOf-strat a st (registry-entStrat c sched st cok))
+          (chainsStrat?-one (arrVal a) (chainsOf a st) hsv)
   ENTRY = ≤-trans (lvls-mono (delivN (cascadeLatch a st)
                                 (proj₂ (proj₂ (cascadeGo a nextId (chainsOf a st) sched
                                                  (cascadeLatch a st)))))
