@@ -144,6 +144,16 @@ you are changing:
 
     make bg T=warm ARGS='<file>'
 
+**BUT "keep editing" MEANS THE TARGET FILE ONLY, AND A `using`-LIST FIX IS AN EDIT.**
+Invalidation is by CONTENT, so deleting one dead name from an import list changes the
+module's hash exactly as rewriting a proof would — and if that module is BELOW the
+target it is in the cone the warm is paying for, so the run finishes GREEN and the
+next `agda-dev` refuses on the same module anyway. Measured once at 857 s thrown
+away for a one-word deletion. **Run `make imports-check` and land whatever it finds
+BEFORE launching the warm**, not while it runs: the check is textual and seconds, so
+there is no reason for it to be the thing that costs the cone. The same goes for any
+other tidy-up in the cone — a comment edit is genuinely free, a `using` list is not.
+
 ## There is no whole-project sweep, and do not rebuild one
 
 It existed, was measured against `make gate`, and lost on both cost and fidelity —
