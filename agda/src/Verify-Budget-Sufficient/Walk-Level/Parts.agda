@@ -38,7 +38,7 @@ open import Relation.Nullary using (yes; no)
 open import Rx.Prim      using (Tick; Id; Source; init; value; close; complete; handoff; exhausted; dried; cut; cutPending;
   InstEmit; InstEvent; Gas; gs; ObservableInput; hot; cold)
 open import Rx.Exp       using (Ty; natᵗ; _×ᵗ_; Ctx; Closed; Val; Tm; Fn; isData; _≟ᵗ_; sizeᵉ; sizeᵗ; sizeᵗˢ; syncSizeᵉ;
-  syncSizeᵗ; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; applyFn; evalTm)
+  syncSizeᵗ; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; applyFn; evalTm; inputsBelowᵉ; inputsBelowᵗ)
 open import Rx.Frame-Width using (dWᵉ; dWᵗ)
 open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵗˢ; hopDᵛ; pmᵗ)
 open import Rx.Slot-Hop  using (slotHop)
@@ -70,7 +70,10 @@ open import Verify-Budget-Sufficient.Wet.Part2 using
 open import Verify-Budget-Sufficient.Caps-Term using
   (evalSeed-caps; evalTms-caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
-  (burstCaps?; burstCount?; capsOK?; capsOK?-mono; frameSz?; pathSz?; valCaps?; widNode)
+  (burstCaps?; burstCount?; burstStrat?; capsOK?; capsOK?-mono; frameSz?; frameStrat?;
+   pathFloor; pathStrat?; pathSz?; valCaps?; widNode)
+open import Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves using
+  (subscribeE-burstStrat)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
   (capsOK?-nextNode; capsOK?-parts; capsOK?-setNode)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
@@ -625,7 +628,7 @@ walk-empty : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} →
   WalkStmt {e = e} (emptyᵉ {t = u})
 walk-empty {u = u} c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
   2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
-  s2 fS rS ceil lb dmd gas lℓ rgs =
+  s2 fS rS ceil lb dmd gas lℓ rgs hps hib =
   proj₁ CAPS
     , proj₁ (proj₂ CAPS)
     , proj₁ (proj₂ (proj₂ CAPS))
@@ -636,7 +639,7 @@ walk-empty {u = u} c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched s
     , refl , refl , refl , rgs
   where
   CAPS = subscribeE-caps c dep bud ops j g (emptyᵉ {t = u}) κ bid now sl sched st
-           2≤S 1≤R slEq slC slSz inv szb wdb pC lC nst hidx dpt
+           2≤S 1≤R slEq slC slSz inv szb wdb pC lC nst hidx dpt hps hib
 
 -- A LITERAL'S PAYLOAD, WET, FROM THE CAPS RECEIPT PLUS ONE HYPOTHESIS.
 --
@@ -711,7 +714,7 @@ walk-of ts c Ψ F Ŝ R̂ G ℓ L̂ dep bud zero j g κ bid now sl sched st
   s2 fS rS ceil lb dmd gas lℓ rgs
 walk-of {Γ = Γ} {u = u} ts c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j g κ bid now sl sched st
   2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
-  s2 fS rS ceil lb dmd gas lℓ rgs =
+  s2 fS rS ceil lb dmd gas lℓ rgs hps hib =
   proj₁ CAPS
     , proj₁ (proj₂ CAPS)
     , proj₁ (proj₂ (proj₂ CAPS))
@@ -731,7 +734,7 @@ walk-of {Γ = Γ} {u = u} ts c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j g κ
     , rgs
   where
   CAPS = subscribeE-caps c dep bud (suc ops′) j g (ofᵉ ts) κ bid now sl sched st
-           2≤S 1≤R slEq slC slSz inv szb wdb pC lC nst hidx dpt
+           2≤S 1≤R slEq slC slSz inv szb wdb pC lC nst hidx dpt hps hib
   VALS = map (λ tm → evalTm tm) ts
   B′   = Caps.cSize (frameStep (j + proj₁ CAPS) c)
   EV   = evalTms-caps c j sl ts 2≤S slC (≤-trans (n≤1+n (sizeᵗˢ ts)) szb) wdb
@@ -776,7 +779,7 @@ walk-take-zero : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   evalTm cnt ≡ zero → WalkStmtAt {e = e} g (takeᵉ cnt b)
 walk-take-zero {u = u} g cnt b ecEq c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j κ bid now sl sched st
   2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
-  s2 fS rS ceil lb dmd gas lℓ rgs
+  s2 fS rS ceil lb dmd gas lℓ rgs hps hib
   rewrite ecEq =
   let (j′ , a₁ , a₂ , a₃ , a₄ , a₅ , a₆ , a₇ , a₈ , a₉) =
         walk-empty c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
@@ -789,7 +792,10 @@ walk-take-zero {u = u} g cnt b ecEq c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j κ bid
                                    0 (hopDᵉ F (slotHop F sl) b)
                                    1 (syncSizeᵉ (takeᵉ cnt b))
                                    z≤n (s≤s z≤n)) dmd)
-          gas lℓ rgs
+          -- the source half is `refl` rather than a projection of `hib`:
+          -- an empty source names no input at all, so it reads below
+          -- every floor without asking what this chain's floor is
+          gas lℓ rgs hps refl
   in j′ , a₁ , a₂ , a₃ , a₄ , a₅ , a₆
      -- the stream is given EXPLICITLY: left as `_` it is a meta Agda tries
      -- to solve by inverting burstHopD?'s foldr, which hits the inversion
@@ -1166,7 +1172,7 @@ walk-take-suc g cnt b k ecEq wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud zero j κ bid no
 walk-take-suc {n = n} {u = u} g cnt b k ecEq wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j
   κ bid now sl sched st
   2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
-  s2 fS rS ceil lb dmd gas lℓ rgs
+  s2 fS rS ceil lb dmd gas lℓ rgs hps hib
   rewrite ecEq =
   suc (j₁ + j₂)
     , subst (λ x → capsOK? (frameStep x c)
@@ -1232,6 +1238,21 @@ walk-take-suc {n = n} {u = u} g cnt b k ecEq wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud 
   invW′ : INV? Ψ B′ sched₀ st₀ ≡ true
   invW′ = INV?-install Ψ (Caps.cSize (frameStep j c)) B′ nid ns sched sched₀ st
             (proj₁ step⊑) refl refl refl refl invW
+  -- THE CHAIN GREW BY A FRAME AND THE FLOOR DID NOT MOVE, which is what
+  -- makes both readings a SPLIT rather than a transport: `pathFloor`
+  -- reports the terminal's floor from anywhere along a chain, and a
+  -- `take-f` names no term, so it reads legal at every floor by `refl`
+  hpsT : pathStrat? (take-f nid ↠ κ) ≡ true
+  hpsT = ∧-intro refl hps
+  hibb : inputsBelowᵉ (pathFloor κ) b ≡ true
+  hibb = proj₂ (∧-true (inputsBelowᵗ (pathFloor κ) cnt)
+                       (inputsBelowᵉ (pathFloor κ) b) hib)
+  -- the burst being pushed is the one the source walk just produced, so
+  -- its stratification is that walk's, not a fact about this frame: a
+  -- `take-f` names no term and parks nothing, which is why the frame's
+  -- own two readings are `refl`
+  BSTR = subscribeE-burstStrat g b (take-f nid ↠ κ) bid now sched₀ st₀
+           hpsT hibb
   SUB = wb c Ψ F Ŝ R̂ G′ ℓ L̂ dep bud ops′ (suc j)
           (take-f nid ↠ κ) bid now sl sched₀ st₀
           2≤S 1≤R hCR slEq slC slSz inv₀
@@ -1250,7 +1271,7 @@ walk-take-suc {n = n} {u = u} g cnt b k ecEq wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud 
           (hasAtLeast-mono (≤-trans sucG′≤G (n≤1+n G)) gas)
           (≤-trans (≤-reflexive (sym (+-suc (pathLen κ) G′)))
                    (≤-trans (+-monoʳ-≤ (pathLen κ) sucG′≤G) lℓ))
-          rgs
+          rgs hpsT hibb
   j₁  = proj₁ SUB
   a₁  = proj₁ (proj₂ SUB)
   a₂  = proj₁ (proj₂ (proj₂ SUB))
@@ -1273,6 +1294,7 @@ walk-take-suc {n = n} {u = u} g cnt b k ecEq wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud 
           a₂ a₃
           (≤-trans (burst-takef-zero g bid now nid κ (proj₁ res)
                       (proj₁ (proj₂ res)) (proj₂ (proj₂ res))) z≤n)
+          refl hps BSTR refl
   j₂  = proj₁ PBc
   PB  = pushBurst g bid now (take-f nid) κ (proj₁ res)
           (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
@@ -1347,7 +1369,7 @@ walk-map g f b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud zero j κ bid now sl sched st
 walk-map {n = n} {u = u} g f b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j
   κ bid now sl sched st
   2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
-  s2 fS rS ceil lb dmd gas lℓ rgs =
+  s2 fS rS ceil lb dmd gas lℓ rgs hps hib =
   suc (j₁ + j₂)
     , subst (λ x → capsOK? (frameStep x c)
                      (proj₁ (proj₂ PB)) (proj₂ (proj₂ PB)) ≡ true)
@@ -1405,6 +1427,20 @@ walk-map {n = n} {u = u} g f b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j
   sLt = s≤s (m≤n+m (syncSizeᵉ b) (syncSizeᵗ f))
   sucG′≤G : suc G′ ≤ G
   sucG′≤G = ≤-trans (dBound-struct Ŝ R̂ U rGrow sLt) dmd
+  -- THE FRAME NAMES A TERM, WHICH IS THE ONE PLACE THE CHAIN READING
+  -- COSTS SOMETHING: `frameStrat?` at a `map-f` is the mapped function's
+  -- own input floor, and that is exactly the conjunct this clause's
+  -- source reading already carries — so the split feeds both halves and
+  -- nothing new is owed
+  hibf : inputsBelowᵗ (pathFloor κ) f ≡ true
+  hibf = proj₁ (∧-true (inputsBelowᵗ (pathFloor κ) f)
+                       (inputsBelowᵉ (pathFloor κ) b) hib)
+  hibb : inputsBelowᵉ (pathFloor κ) b ≡ true
+  hibb = proj₂ (∧-true (inputsBelowᵗ (pathFloor κ) f)
+                       (inputsBelowᵉ (pathFloor κ) b) hib)
+  hpsM : pathStrat? (map-f f ↠ κ) ≡ true
+  hpsM = ∧-intro hibf hps
+  BSTR = subscribeE-burstStrat g b (map-f f ↠ κ) bid now sched st hpsM hibb
   SUB = wb c Ψ F Ŝ R̂ G′ ℓ L̂ dep bud ops′ (suc j)
           (map-f f ↠ κ) bid now sl sched st
           2≤S 1≤R hCR slEq slC slSz
@@ -1424,7 +1460,7 @@ walk-map {n = n} {u = u} g f b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j
           (hasAtLeast-mono (≤-trans sucG′≤G (n≤1+n G)) gas)
           (≤-trans (≤-reflexive (sym (+-suc (pathLen κ) G′)))
                    (≤-trans (+-monoʳ-≤ (pathLen κ) sucG′≤G) lℓ))
-          rgs
+          rgs hpsM hibb
   j₁  = proj₁ SUB
   a₁  = proj₁ (proj₂ SUB)
   a₂  = proj₁ (proj₂ (proj₂ SUB))
@@ -1447,6 +1483,7 @@ walk-map {n = n} {u = u} g f b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j
           (≤-trans (≤-trans lC (proj₁ step⊑)) (proj₁ ⊑₁))
           a₂ a₃
           (≤-trans (m≤n⊔m _ _) dpt)
+          hibf hps BSTR refl
   j₂  = proj₁ PBc
   PB  = pushBurst g bid now (map-f f) κ (proj₁ res)
           (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
@@ -1653,9 +1690,23 @@ walk-scan-source-tail : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
 walk-scan-source-tail {n = n} {u = u} g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j
   κ bid now sl sched st
   2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
-  s2 fS rS ceil lb dmd gas lℓ rgs =
+  s2 fS rS ceil lb dmd gas lℓ rgs hps hib =
   SUB
   where
+  -- A SCAN SOURCE READING SPLITS THREE WAYS AND TWO OF THEM ARE SPENT
+  -- HERE: the fold's own function is what the minted frame reads by, and
+  -- the source is what the recursion reads by.  The SEED's half is spare
+  -- — the seed is evaluated into the node rather than named by the chain
+  hibf : inputsBelowᵗ (pathFloor κ) f ≡ true
+  hibf = proj₁ (∧-true (inputsBelowᵗ (pathFloor κ) f)
+                       (inputsBelowᵗ (pathFloor κ) z ∧
+                        inputsBelowᵉ (pathFloor κ) b) hib)
+  hibb : inputsBelowᵉ (pathFloor κ) b ≡ true
+  hibb = proj₂ (∧-true (inputsBelowᵗ (pathFloor κ) z)
+                       (inputsBelowᵉ (pathFloor κ) b)
+                  (proj₂ (∧-true (inputsBelowᵗ (pathFloor κ) f)
+                                 (inputsBelowᵗ (pathFloor κ) z ∧
+                                  inputsBelowᵉ (pathFloor κ) b) hib)))
   -- the size splits, verbatim from the caps twin
   szsum : sizeᵗ f + sizeᵗ z + sizeᵉ b ≤ Caps.cSize (frameStep j c)
   szsum = ≤-trans (n≤1+n (sizeᵗ f + sizeᵗ z + sizeᵉ b)) szb
@@ -1744,7 +1795,7 @@ walk-scan-source-tail {n = n} {u = u} g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud
           (hasAtLeast-mono (≤-trans sucG′≤G (n≤1+n G)) gas)
           (≤-trans (≤-reflexive (sym (+-suc (pathLen κ) G′)))
                    (≤-trans (+-monoʳ-≤ (pathLen κ) sucG′≤G) lℓ))
-          rgs
+          rgs (∧-intro hibf hps) hibb
 
 -- THE SOURCE HALF, ASSEMBLED.  Both conjuncts are the frame leaf's,
 -- lifted from headline to hereditary — free, per `valHopSpn?-intro`.
@@ -1755,7 +1806,7 @@ walk-scan-source g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud zero j κ bid now sl
   2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst () dpt
 walk-scan-source g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j κ bid now sl sched st
   2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
-  s2 fS rS ceil lb dmd gas lℓ rgs =
+  s2 fS rS ceil lb dmd gas lℓ rgs hps hib =
   burstHopSpnH-intro F (slotHop F sl) (pmᵗ F 0 f) BND
     (hopDᵉ F (slotHop F sl) b) (proj₁ r)
     (m≤n+m (hopDᵉ F (slotHop F sl) b)
@@ -1773,7 +1824,7 @@ walk-scan-source g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j κ bi
   SRC = walk-scan-source-tail g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops′ j
           κ bid now sl sched st
           2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
-          s2 fS rS ceil lb dmd gas lℓ rgs
+          s2 fS rS ceil lb dmd gas lℓ rgs hps hib
   frB = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SRC)))))))
   -- THE NODE HALF, AND IT IS NOW GAPLESS.  `mint-install-survives`
   -- (.Node-Fresh) is exactly this shape — mint, install, subscribe under a
@@ -1802,7 +1853,7 @@ walk-scan-hop-spn : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   (b : Closed Γ s) (wb : WalkStmtAt {e = e} g b) → WalkStmtᴴˢ {e = e} g f z b
 walk-scan-hop-spn g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j κ bid now sl sched st
   2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
-  s2 fS rS ceil lb dmd gas lℓ rgs =
+  s2 fS rS ceil lb dmd gas lℓ rgs hps hib =
   proj₁ (pushBurst-scan-hopSpn F (slotHop F sl) (pmᵗ F 0 f) BND
            g bid now f (proj₁ (mintNode sched)) κ
            (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
@@ -1816,7 +1867,7 @@ walk-scan-hop-spn g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j κ bid now sl
         (installNode (proj₁ (mintNode sched)) (scan-st (evalTm z)) st)
   src = walk-scan-source g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j κ bid now sl sched st
           2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
-          s2 fS rS ceil lb dmd gas lℓ rgs
+          s2 fS rS ceil lb dmd gas lℓ rgs hps hib
 
 -- THE EIGHT OTHER CONJUNCTS OF THE scan CLAUSE, ASSEMBLED — and after
 -- the source tail above it is `walk-map`'s clause with three
@@ -1865,7 +1916,7 @@ walk-scan-rest g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud zero j κ bid now sl s
 walk-scan-rest {n = n} {u = u} g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j
   κ bid now sl sched st
   2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
-  s2 fS rS ceil lb dmd gas lℓ rgs =
+  s2 fS rS ceil lb dmd gas lℓ rgs hps hib =
   j₀ + suc (j₁ + j₂)
     , subst (λ x → capsOK? (frameStep x c)
                      (proj₁ (proj₂ PB)) (proj₂ (proj₂ PB)) ≡ true)
@@ -1911,7 +1962,20 @@ walk-scan-rest {n = n} {u = u} g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc o
   SRC = walk-scan-source-tail g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops′ j
           κ bid now sl sched st
           2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
-          s2 fS rS ceil lb dmd gas lℓ rgs
+          s2 fS rS ceil lb dmd gas lℓ rgs hps hib
+  -- the same three-way split the source tail makes, and made again here
+  -- rather than threaded out of it: the tail's Σ reports conjuncts, not
+  -- the readings it was handed
+  hibf : inputsBelowᵗ (pathFloor κ) f ≡ true
+  hibf = proj₁ (∧-true (inputsBelowᵗ (pathFloor κ) f)
+                       (inputsBelowᵗ (pathFloor κ) z ∧
+                        inputsBelowᵉ (pathFloor κ) b) hib)
+  hibb : inputsBelowᵉ (pathFloor κ) b ≡ true
+  hibb = proj₂ (∧-true (inputsBelowᵗ (pathFloor κ) z)
+                       (inputsBelowᵉ (pathFloor κ) b)
+                  (proj₂ (∧-true (inputsBelowᵗ (pathFloor κ) f)
+                                 (inputsBelowᵗ (pathFloor κ) z ∧
+                                  inputsBelowᵉ (pathFloor κ) b) hib)))
   j₁  = proj₁ SRC
   a₁  = proj₁ (proj₂ SRC)
   a₂  = proj₁ (proj₂ (proj₂ SRC))
@@ -1928,6 +1992,8 @@ walk-scan-rest {n = n} {u = u} g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc o
   j≤J = ≤-trans (≤-trans (m≤m+n j j₀) (m≤m+n (j + j₀) j₁))
                 (n≤1+n ((j + j₀) + j₁))
   monoJ = frameStep-mono-j c 2≤S j≤J
+  BSTR = subscribeE-burstStrat g b (scan-f f nid ↠ κ) bid now sched₁ st₀
+           (∧-intro hibf hps) hibb
   PBc = pushBurst-caps c dep bud (J₀ + j₁) g bid now (scan-f f nid) κ
           (proj₁ res) sl (proj₁ (proj₂ res)) (proj₂ (proj₂ res)) 2≤S 1≤R
           (trans (KeepsC.slotsEq
@@ -1939,6 +2005,7 @@ walk-scan-rest {n = n} {u = u} g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc o
           (≤-trans lC (proj₁ monoJ))
           a₂ a₃
           (≤-trans (m≤n⊔m _ _) dpt)
+          hibf hps BSTR refl
   j₂  = proj₁ PBc
   ⊑₂  = frameStep-⊑-+ c 2≤S (J₀ + j₁) j₂
   PB  = pushBurst g bid now (scan-f f nid) κ (proj₁ res)
@@ -1971,11 +2038,11 @@ walk-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   WalkStmtAt {e = e} g (scanᵉ f z b)
 walk-scan g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j κ bid now sl sched st
   2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
-  s2 fS rS ceil lb dmd gas lℓ rgs =
+  s2 fS rS ceil lb dmd gas lℓ rgs hps hib =
   let (j′ , a₁ , a₂ , a₃ , a₄ , a₅ , a₆ , a₇ , a₈) =
         walk-scan-rest g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j κ bid now sl sched st
           2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
-          s2 fS rS ceil lb dmd gas lℓ rgs
+          s2 fS rS ceil lb dmd gas lℓ rgs hps hib
       -- the frame the burst's SIZE receipt is stated at sits under Ŝ:
       -- a₄ puts j + j′ under opIterD, `lb` puts that under L̂, and
       -- frameStep is monotone in its index, so `ceil` closes it
@@ -1996,7 +2063,7 @@ walk-scan g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j κ bid now sl sched s
           (proj₁ (subscribeE g (scanᵉ f z b) κ bid now sched st))
           (walk-scan-hop-spn g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j κ bid now sl sched st
              2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
-             s2 fS rS ceil lb dmd gas lℓ rgs))
+             s2 fS rS ceil lb dmd gas lℓ rgs hps hib))
    , a₇ , a₈
 
 switchKill-closes-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}

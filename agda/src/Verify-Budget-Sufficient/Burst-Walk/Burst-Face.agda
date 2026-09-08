@@ -99,7 +99,7 @@ open import Rx.Evaluator
 open import Rx.Slots using (Slots; slotsSize)
 
 open import Verify-Budget-Sufficient.Delivery-Walk
-  using (Walk-Hyps; module Walk; regP?; chP?-const)
+  using (Walk-Hyps; module Walk; regP?; chP?; chP?-const)
 open import Verify-Budget-Sufficient.Deliveries using
   (delivN)
 open import Verify-Budget-Sufficient.Measures using
@@ -128,10 +128,11 @@ open import Verify-Budget-Sufficient.Caps using (1≤capsAt-reg; 2≤capsAt-size
 
 -- named explicitly: .Caps-Face and .Wet share .Measures names
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
-  (burstCaps?; capsOK?; eventCaps?; pathSz?; pathSz?-widen; slotsCaps?; valCaps?)
+  (burstCaps?; capsOK?; eventCaps?; frameStrat?; pathFloor; pathSz?; pathSz?-widen;
+  pathStrat?; slotsCaps?; valCaps?)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
-  (capsOK?-count; capsOK?-delivered; capsOK?-regs; pathSz?-len; pathSz?-tail; shareLatch-caps;
-  valsCaps?; valsCaps?-lvl; walkOK-finish)
+  (capsOK?-count; capsOK?-delivered; capsOK?-regs; pathSz?-len; pathSz?-tail; registry-entStrat;
+  shareLatch-caps; valsCaps?; valsCaps?-lvl; valsStrat?; walkOK-finish)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (burstCaps?-widen; eventsCaps?-widen)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Frame-Face using
@@ -144,9 +145,11 @@ open import Verify-Budget-Sufficient.Burst-Walk.Predicates using
 open import Verify-Budget-Sufficient.Walk-Level.Parts using
   (any-dry-++)
 open import Verify-Budget-Sufficient.Psi-Split using
-  (burstB?-halves; burstΨ?; chP?-∧; eventsΨ?; frameBΨ?; pathBΨ?; regP?-∧; regsBΨ?; valsΨ?;
-  valΨ?)
-open import Decide using (not-in; not-out; ∧-intro)
+  (burstB?-halves; burstΨ?; chP?-∧; eventsΨ?; frameBΨ?; pathBΨ?; regP?-∧; regP?-projˡ;
+  regsBΨ?; regStrat?-paths; valsΨ?; valΨ?)
+open import Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves using
+  (shareAdmit-strat; stepFrame-valsStrat)
+open import Decide using (not-in; not-out; ∧-intro; ∧-trueˡ; ∧-trueʳ)
 open import Verify-Budget-Sufficient.Burst-Walk.Leaves using
   (SiCFace; IfcFace; WetFace; wet-face)
 open import Verify-Budget-Sufficient.Burst-Walk using
@@ -184,6 +187,12 @@ stepFrame-burst-face : SiCFace → IfcFace →
   Caps.cSize (frameStep (fLvlD (Caps.cSize c) (Caps.cWid c) d J) c)
     ≤ sizeCapAt e sl (suc id) →
   depthFrame sf id now f path′ vals fin sched st ≤ d →
+  -- THE ENTRY READING, WHICH THIS FACE ONLY FORWARDS.  Nothing in the
+  -- burst content reads a stratification; the two premises are here
+  -- because `stepFrame-face` mints a registration and the mint's side
+  -- condition is stated against the frame's own path and payload
+  pathStrat? (f ↠ path′) ≡ true →
+  valsStrat? (pathFloor (f ↠ path′)) vals ≡ true →
   let r  = stepFrame sf id now f path′ vals fin sched st
       s′ = proj₁ (proj₂ (proj₂ (proj₂ r)))
       t′ = proj₂ (proj₂ (proj₂ (proj₂ r)))
@@ -193,7 +202,7 @@ stepFrame-burst-face : SiCFace → IfcFace →
     × (regP? (PbB c Ψ (J + j′)) (EvalSt.registry t′) ≡ true)
     × (EbB c sl Ψ (J + j′) (proj₁ (proj₂ r)) ≡ true)
 stepFrame-burst-face siC ifc c sl Ψ d 2≤S 1≤R hCR slC slSz slFc J sf id now f path′ vals fin sched st
-                     ok pb vb rg gk cl hD =
+                     ok pb vb rg gk cl hD hps hvs =
     j′
   , proj₁ (proj₂ FC)
   , ((proj₁ WF , wCaps) , proj₁ (proj₂ WF))
@@ -217,7 +226,7 @@ stepFrame-burst-face siC ifc c sl Ψ d 2≤S 1≤R hCR slC slSz slFc J sf id now
          (proj₁ (∧-true (pathSz? (Caps.cSize (frameStep J c)) (f ↠ path′))
                         (pathBΨ? Ψ (f ↠ path′)) pb))
          (proj₁ (∧-true (valsCaps? (frameStep J c) sl vals) (valsΨ? Ψ vals) vb))
-         slSz hD
+         slSz hD hps hvs
 
   j′       = proj₁ FC
   wCaps    = proj₁ (proj₂ (proj₂ FC))
@@ -354,10 +363,16 @@ module BurstWalk
   burstH : Walk-Hyps e S W R d
   burstH = record
     { OK        = OKB {e = e} c sl Ψ
-    ; Pb        = PbB c Ψ
-    -- PATH-BLIND: `VbB` bounds a payload's size and function caps, neither
-    -- of which depends on the chain the payload is travelling
-    ; Vb        = λ _ → VbB c sl Ψ
+    -- THE ENTRY READING, CONJOINED AT THE INSTANTIATION RATHER THAN IN
+    -- `PbB`.  Only this walk owes the registration mint's side
+    -- condition, so the stratification half rides here and every other
+    -- consumer of the burst predicates is left reading what it always did
+    ; Pb        = λ J p → PbB c Ψ J p ∧ pathStrat? p
+    -- `VbB` IS PATH-BLIND -- it bounds a payload's size and function
+    -- caps, neither of which depends on the chain the payload is
+    -- travelling -- but the reading beside it is not, and that asymmetry
+    -- is the point: the floor is what MOVES at the fan, and nowhere else
+    ; Vb        = λ p J vs → VbB c sl Ψ J vs ∧ valsStrat? (pathFloor p) vs
     ; Eb        = EbB c sl Ψ
     ; Bb        = BbB c sl Ψ
     -- THE GAS HOOK, SPENT (the anchor ruling, `cascadeGo-nodry`'s header): the
@@ -425,23 +440,46 @@ module BurstWalk
                         (nodry-one (evs ++ handoff (toℕ i) ∷ []) id src delivery
                           (any-dry-++ evs (handoff (toℕ i) ∷ [])
                             (not-out (ebD J evs hE)) refl)))
-    ; p-len     = λ J p h → pathSz?-len (Caps.cSize (frameStep J c)) p (pbC J p h)
+    ; p-len     = λ J p h →
+                    pathSz?-len (Caps.cSize (frameStep J c)) p (pbC J p (∧-trueˡ h))
     ; p-tail    = λ J f p h →
-                    ∧-intro (pathSz?-tail (Caps.cSize (frameStep J c)) f p
-                              (pbC J (f ↠ p) h))
-                            (proj₂ (∧-true (frameBΨ? Ψ f) (pathBΨ? Ψ p)
-                              (pbΨ J (f ↠ p) h)))
+                    ∧-intro
+                      (∧-intro (pathSz?-tail (Caps.cSize (frameStep J c)) f p
+                                 (pbC J (f ↠ p) (∧-trueˡ h)))
+                               (proj₂ (∧-true (frameBΨ? Ψ f) (pathBΨ? Ψ p)
+                                 (pbΨ J (f ↠ p) (∧-trueˡ h)))))
+                      -- the tail's reading is the frame's own conjunct
+                      -- dropped: `pathStrat?` of a push is the frame read
+                      -- at the TERMINAL's floor, and that floor is what
+                      -- the tail already carries
+                      (proj₂ (∧-true (frameStrat? (pathFloor p) f) (pathStrat? p)
+                                (∧-trueʳ h)))
     ; p-widen   = λ {J} {J′} le p h →
-                    ∧-intro (pathSz?-widen p (proj₁ (frameStep-mono-j c 2≤S le))
-                              (pbC J p h))
-                            (pbΨ J p h)
+                    ∧-intro
+                      (∧-intro (pathSz?-widen p (proj₁ (frameStep-mono-j c 2≤S le))
+                                 (pbC J p (∧-trueˡ h)))
+                               (pbΨ J p (∧-trueˡ h)))
+                      (∧-trueʳ h)
     ; v-widen   = λ {J} {J′} le _ vs h →
-                    ∧-intro (valsCaps?-lvl _ _ sl vs (frameStep-mono-j c 2≤S le)
-                              (vbC J vs h))
-                            (vbΨ J vs h)
-    ; v-fan     = λ J i vs _ st _ h →
-                    chP?-const (VbB c sl Ψ J vs)
-                      (shareAdmit i (EvalSt.registry st)) h
+                    ∧-intro
+                      (∧-intro (valsCaps?-lvl _ _ sl vs (frameStep-mono-j c 2≤S le)
+                                 (vbC J vs (∧-trueˡ h)))
+                               (vbΨ J vs (∧-trueˡ h)))
+                      (∧-trueʳ h)
+    -- THE ONE PLACE THE READING MOVES.  The size and Ψ halves are
+    -- constant across the admitted chains and go through unchanged; the
+    -- floor half is re-earned per chain out of the registry's own
+    -- stratification, which is exactly the conjunct `capsOK?` carries
+    ; v-fan     = λ J i vs sched st ok h →
+                    chP?-∧ (λ _ → VbB c sl Ψ J vs)
+                           (λ κ → valsStrat? (pathFloor κ) vs)
+                           (shareAdmit i (EvalSt.registry st))
+                      (chP?-const (VbB c sl Ψ J vs)
+                         (shareAdmit i (EvalSt.registry st)) (∧-trueˡ h))
+                      (proj₂ (shareAdmit-strat i vs st
+                                (registry-entStrat (frameStep J c) sched st
+                                  (proj₂ (proj₁ ok)))
+                                (∧-trueʳ h)))
     ; ok-reg    = λ J sched st ok →
                     capsOK?-count (frameStep J c) sched st (proj₂ (proj₁ ok))
     ; ok-cons   = λ J rid sched st ok →
@@ -457,9 +495,40 @@ module BurstWalk
     ; ok-finish = λ J i fin out ok →
                     ( walkOK-finish c sl J i fin out (proj₁ ok)
                     , fnCapB-finish Ψ i fin out (proj₂ ok) )
+    -- THE STEP, WITH THE READING SPENT AND RE-EARNED.  The face itself
+    -- reads nothing stratified, so its own ledgers are the burst ones
+    -- and the two halves are split off here: the registry ledger by
+    -- projection, the path and payload readings forwarded whole.  What
+    -- comes back carries no reading at all, so both are rebuilt --  the
+    -- payload's out of the frame's discarded conjunct, the registry's
+    -- out of the `capsOK?` the step lands at
     ; sf-step   = λ J sf id now f path′ vals fin sched st ok pb vb rg gk cl hD →
-                    stepFrame-burst-face siC ifc {e = e} c sl Ψ d 2≤S 1≤R hCR slC slSz slFc
-                      J sf id now f path′ vals fin sched st ok pb vb rg gk cl hD
+                    let hS = ∧-trueʳ pb
+                        hF = proj₁ (∧-true (frameStrat? (pathFloor path′) f)
+                                           (pathStrat? path′) hS)
+                        hV = ∧-trueʳ vb
+                        BF = stepFrame-burst-face siC ifc {e = e} c sl Ψ d 2≤S 1≤R hCR
+                               slC slSz slFc J sf id now f path′ vals fin sched st ok
+                               (∧-trueˡ pb) (∧-trueˡ vb)
+                               (regP?-projˡ (PbB c Ψ J) (λ {u} p → pathStrat? p)
+                                 (EvalSt.registry st) rg)
+                               gk cl hD hS hV
+                        r  = stepFrame sf id now f path′ vals fin sched st
+                        t′ = proj₂ (proj₂ (proj₂ (proj₂ r)))
+                        s′ = proj₁ (proj₂ (proj₂ (proj₂ r)))
+                        ok′ = proj₁ (proj₂ (proj₂ BF)) in
+                    proj₁ BF
+                    , proj₁ (proj₂ BF)
+                    , ok′
+                    , ∧-intro (proj₁ (proj₂ (proj₂ (proj₂ BF))))
+                        (stepFrame-valsStrat sf id now f path′ vals fin sched st hF hV)
+                    , regP?-∧ (PbB c Ψ (J + proj₁ BF)) (λ {u} p → pathStrat? p)
+                        (EvalSt.registry t′)
+                        (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ BF)))))
+                        (regStrat?-paths (EvalSt.registry t′)
+                          (registry-entStrat (frameStep (J + proj₁ BF) c) s′ t′
+                            (proj₂ (proj₁ ok′))))
+                    , proj₂ (proj₂ (proj₂ (proj₂ (proj₂ BF))))
     }
 
   module V = Walk {e = e} S W R d 2≤S burstH
@@ -502,11 +571,19 @@ cascadeGo-burst-nodry : SiCFace → IfcFace →
   n ≤ Caps.cSize c →
   length chains ≤ Caps.cReg c →
   depthCascade a id chains sched st ≤ capsH e sl id →
+  -- THE ENTRY READING, PER CHAIN.  The walk's ledgers now carry a
+  -- stratification half beside the size and Ψ ones, so the cascade's
+  -- own entry point owes both: every chain the arrival is dispatched
+  -- along is stratified, and the payload sits below that chain's floor.
+  -- The payload half is path-INDEXED, which is what lets the reading
+  -- move at the fan and nowhere else
+  chP? (λ {u} p → pathStrat? p) chains ≡ true →
+  chP? (λ {u} p → valsStrat? (pathFloor p) (arrVal a ∷ [])) chains ≡ true →
   (burstB? (sizeCapAt e sl (suc id)) Ψ
            (proj₁ (cascadeGo a id chains sched st)) ≡ true)
   × (hasDry (proj₁ (cascadeGo a id chains sched st)) ≡ false)
 cascadeGo-burst-nodry siC ifc {n = n} {e = e} id a chains sched st
-                      slC slSz inv hFC vC vΨ pS pΨ rΨ n≤S lenB hD =
+                      slC slSz inv hFC vC vΨ pS pΨ rΨ n≤S lenB hD hpS hvS =
   burstB?-halves (capsAt e sl (suc id)) sl Ψ (proj₁ cg)
     (subst (λ x → burstCaps? x sl (proj₁ cg) ≡ true)
            (sym (capsAt-suc-full e sl id))
@@ -550,11 +627,19 @@ cascadeGo-burst-nodry siC ifc {n = n} {e = e} id a chains sched st
 
   GO = BW.V.cascadeGo-go 0 a id chains sched st
          ( ((refl , inv0) , hFC)
-         , regP?-∧ (pathSz? (Caps.cSize (frameStep 0 c))) (pathBΨ? Ψ)
-             (EvalSt.registry st) (capsOK?-regs c sched st inv) rΨ )
-         (chP?-∧ (pathSz? (Caps.cSize (frameStep 0 c))) (pathBΨ? Ψ) chains pS pΨ)
-         (chP?-const (VbB c sl Ψ 0 (arrVal a ∷ [])) chains
-            (∧-intro (∧-intro (∧-intro vC refl) refl) (∧-intro vΨ refl)))
+         , regP?-∧ (PbB c Ψ 0) (λ {u} p → pathStrat? p) (EvalSt.registry st)
+             (regP?-∧ (pathSz? (Caps.cSize (frameStep 0 c))) (pathBΨ? Ψ)
+                (EvalSt.registry st) (capsOK?-regs c sched st inv) rΨ)
+             (regStrat?-paths (EvalSt.registry st)
+                (registry-entStrat c sched st inv)) )
+         (chP?-∧ (PbB c Ψ 0) (λ {u} p → pathStrat? p) chains
+            (chP?-∧ (pathSz? (Caps.cSize (frameStep 0 c))) (pathBΨ? Ψ) chains pS pΨ)
+            hpS)
+         (chP?-∧ (λ _ → VbB c sl Ψ 0 (arrVal a ∷ []))
+                 (λ κ → valsStrat? (pathFloor κ) (arrVal a ∷ [])) chains
+            (chP?-const (VbB c sl Ψ 0 (arrVal a ∷ [])) chains
+               (∧-intro (∧-intro (∧-intro vC refl) refl) (∧-intro vΨ refl)))
+            hvS)
          hC hD
 
   D = delivN st (proj₂ (proj₂ cg))
@@ -629,8 +714,10 @@ cascadeGo-nodry : SiCFace → IfcFace →
   n ≤ Caps.cSize c →
   length chains ≤ Caps.cReg c →
   depthCascade a id chains sched st ≤ capsH e sl id →
+  chP? (λ {u} p → pathStrat? p) chains ≡ true →
+  chP? (λ {u} p → valsStrat? (pathFloor p) (arrVal a ∷ [])) chains ≡ true →
   hasDry (proj₁ (cascadeGo a id chains sched st)) ≡ false
 cascadeGo-nodry siC ifc id a chains sched st
-                slC slSz inv hFC vC vΨ pS pΨ rΨ n≤S lenB hD =
+                slC slSz inv hFC vC vΨ pS pΨ rΨ n≤S lenB hD hpS hvS =
   proj₂ (cascadeGo-burst-nodry siC ifc id a chains sched st
-           slC slSz inv hFC vC vΨ pS pΨ rΨ n≤S lenB hD)
+           slC slSz inv hFC vC vΨ pS pΨ rΨ n≤S lenB hD hpS hvS)

@@ -87,8 +87,8 @@
 -- reports at the callee's post sched).
 module Verify-Budget-Sufficient.Caps-Face.Part1 where
 
-open import Data.Bool    using (Bool; true; false; _∧_; if_then_else_; T)
-open import Data.Maybe   using (Maybe)
+open import Data.Bool    using (Bool; true; false; _∧_; _∨_; if_then_else_; T)
+open import Data.Maybe   using (Maybe; just)
 open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; _⊔_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-reflexive; +-suc; +-comm; +-assoc; +-monoˡ-≤; *-monoˡ-≤; *-monoʳ-≤;
   m≤m+n; m≤n+m; n≤1+n; +-mono-≤; m≤m*n; ^-monoʳ-≤; *-assoc; *-identityʳ; <⇒≤; ^-monoˡ-≤;
@@ -121,12 +121,12 @@ open import Rx.Prim      using (Tick; Source; InstEmit; _at_from_as_; InstEvent;
 open import Rx.Exp       using (Ty; natᵗ; unitᵗ; boolᵗ; _×ᵗ_; _+ᵗ_; obs; isData; Ctx; Closed; Val; sizeᵉ; sizeᵗ; sizeᵗˢ; sizeᵛ; syncSizeᵛ; Exp; Tm; Fn; varᵗ; unit̂;
   bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ; add; sub; mul; eqᵖ;
   ltᵖ; notᵖ; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ;
-  exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; evalWith; evalTm; applyFn; inputsBelowᵗ)
+  exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; evalWith; evalTm; applyFn; inputsBelowᵗ; inputsBelowᵛ; inputsBelowᵉ)
 open import Rx.Frame-Width using (entryCeil; pWᵉ; pWᵛ; dWᵉ; outWᵉ; innWᵉ; innWᵗ; innWᵗˢ; pmOᵉ; pmOᵗ; pmIᵉ; pmIᵗ; pmIᵗˢ; _∈ᵇ_; outWⱽ;
   innWⱽ; innWᵗⱽ; innWᵗˢⱽ; pmIᵗⱽ; slotPW; slotsPW; slotsPWgo; slotIW; slotsIW; slotsIWgo)
 open import Rx.Evaluator using (capsBase; Sched; EvalSt; LiveSource; RegId; Chain; NodeState; scan-st; take-st; mergeAll-st; switch-st;
   exhaust-st; root; share-sink; _↠_; Frame; map-f; scan-f; take-f; from-inner; thru-outer;
-  Stream; Path; sizeStep; iterSize; foldStep; iterFold)
+  Stream; Path; sizeStep; iterSize; foldStep; iterFold; lookupNode)
 open import Rx.Slots using (scripted; shared; Slot; Slots; slotSize; slotsSize; inputSize)
 open import Rx.Clos-Size using (closSizeᵉ; closSize≤mulᵉ)
 open import Rx.Slot-Clos using (slotClos; slotClosD; slotsClos; σAt)
@@ -384,6 +384,108 @@ pathStrat? root           = true
 pathStrat? (share-sink i) = true
 pathStrat? (f ↠ p)        = frameStrat? (pathFloor p) f ∧ pathStrat? p
 
+-- THE SAME READING AT AN ENTRY, and it is stated there rather than at a
+-- path because half of it is about the REGISTRATION.  A chain's frames
+-- are stratified, and its floor is at or above the source it listens
+-- to.  The second is what makes the first usable at a fan: values
+-- leaving a slot are known below that slot's index, and raising a floor
+-- only weakens that, so a continuation floored at or above the source
+-- inherits them.
+--
+-- ONLY THE ORDERING IS GUARDED, and the asymmetry is the shape of the
+-- statement rather than an economy.  The frame reading is asked of
+-- every entry because nothing exempts a frame; the ordering is asked
+-- only of sources the slot telescope reaches, because there is an arm
+-- where it is false and the guard is what a carried conjunct already
+-- pays for.
+--
+-- AND THE GUARD IS ON THE SOURCE, WHICH IS NOT WHERE IT SAT.  Guarding
+-- on the PATH's floor instead -- exempting a chain that terminates at
+-- `root`, and asking the ordering of every other -- makes this reading
+-- FALSE.  A cold slot subscribed from inside a share's definition mints
+-- a fresh source, `srcFloor?` puts every minted source at or above the
+-- slot count, and the continuation it registers ends at the ENCLOSING
+-- share's sink, which is below it.  At such an entry a root guard is
+-- false and the ordering is false under it, so nothing can hold the
+-- conjunction.  On the source the same entry discharges the disjunct
+-- outright, which is why `walk-share-strat` can afford to state the
+-- ordering at all.
+entStrat? : ∀ {n} {Γ : Ctx n} {u t} → Source → Path Γ u t → Bool
+entStrat? {n = n} s p = ((n ≤ᵇ s) ∨ (s ≤ᵇ pathFloor p)) ∧ pathStrat? p
+
+-- THE REGISTRY-WIDE LEDGER, and it is a CONJUNCT rather than a
+-- derivation for the reason `srcFloor?` is one.  `capsOK?`'s registry
+-- readings are a LENGTH and a per-chain SIZE; neither looks at a frame
+-- or at a source, so neither can separate a state the evaluator built
+-- from one holding a chain that reads the very slot its own sink sits
+-- at.  Asking this of the caps receipt alone is therefore asking that a
+-- caps-legal state be a BUILT one, which is machine-refuted.
+--
+-- SO IT IS OWED AT THE MINT.  `register` is the registry's one growth
+-- site -- every other write in the evaluator is the empty initial list
+-- or a filter, and a filter cannot break a reading of the shape `all` --
+-- so the ledger is free at every step but that one, and there it asks
+-- exactly the per-registration side condition the slot telescope
+-- already pays at four of the five registration sites.  A reading
+-- nothing threads has to become a conjunct of the state predicate:
+-- a field obliges every producer, while a hypothesis obliges only
+-- whoever happens to call today.
+--
+-- IT IS INDEPENDENT OF THE CAPS, so like the source floor it is handed
+-- straight back by `capsOK?-mono` -- widening a cap cannot move a
+-- reading the caps do not appear in.
+regStrat? : ∀ {n} {Γ : Ctx n} {t}
+          → List (RegId × Source × Chain Γ t) → Bool
+regStrat? = all (λ en → entStrat? (proj₁ (proj₂ en))
+                                  (proj₂ (proj₂ (proj₂ en))))
+
+-- THE READING OF WHAT A NODE HAS PARKED, which is the one place a
+-- stratification obligation cannot be threaded from a parameter.  A
+-- mergeAll node holds a QUEUE of expressions it has not yet subscribed,
+-- and the drain that spends them reaches it through the state by node
+-- id -- so the queue is not an argument anyone hands down, and the
+-- reading has to be asked of the LOOKUP rather than of a variable.
+--
+-- EVERY OTHER NODE SHAPE IS FREE, and that is a fact about the state
+-- rather than a convenience: no other constructor parks an unsubscribed
+-- expression, so there is nothing at those shapes for a floor to be
+-- wrong about.  A miss is free for the same reason -- a lookup that
+-- fails drains nothing.
+parkStrat? : ∀ {n} {Γ : Ctx n} → ℕ → Maybe (NodeState Γ) → Bool
+parkStrat? k (just (mergeAll-st _ _ q _)) = all (inputsBelowᵉ k) q
+parkStrat? k _                            = true
+
+-- THE SAME READING KEYED BY THE FRAME THAT WILL SPEND IT.  A payload
+-- subscribe reaches its node id through the frame it is running under,
+-- so a caller one level up holds a FRAME and not a node -- and this is
+-- what lets the obligation travel as an ordinary premise past sites
+-- that cannot see a queue at all.
+--
+-- IT REDUCES AT EVERY FRAME BUT ONE, which is what makes it cheap: only
+-- `from-inner` names a node, so at the four other shapes the premise is
+-- discharged by `refl` at the call site and nothing is threaded.
+framePark? : ∀ {n} {Γ : Ctx n} {s u t} {e : Closed Γ t} →
+  ℕ → Frame Γ s u → EvalSt e → Bool
+framePark? k (from-inner _ allNid _) st =
+  parkStrat? k (lookupNode allNid (EvalSt.nodes st))
+framePark? k _ st = true
+
+-- THE SAME READING OVER A WHOLE CHAIN, which the delivery walk needs
+-- because it does not hold one frame but a path of them: it steps the
+-- head and recurses on the tail, so every frame it will reach owes the
+-- reading before the walk starts.
+--
+-- IT TAKES NO FLOOR, and that is the point rather than an economy: each
+-- frame is read at the floor of the chain BELOW it, which the chain
+-- already names -- so the argument a caller would otherwise have to
+-- supply is exactly the one `pathFloor` computes, and supplying it
+-- separately would let the two disagree.
+pathPark? : ∀ {n} {Γ : Ctx n} {u t} {e : Closed Γ t} →
+  Path Γ u t → EvalSt e → Bool
+pathPark? root           st = true
+pathPark? (share-sink _) st = true
+pathPark? (f ↠ p)        st = framePark? (pathFloor p) f st ∧ pathPark? p st
+
 -- THE CAP READ AGAINST THE ARRIVAL'S CLOSURE, which is the shape the
 -- arr-keyed descent needs and the one `nestValOK?` deliberately does
 -- not have: that predicate is a fact about a VALUE alone, while the
@@ -518,6 +620,7 @@ capsOK? c sched st =
         (EvalSt.nodes st)
   ∧ closSt? c sched st
   ∧ srcFloor? sched
+  ∧ regStrat? (EvalSt.registry st)
 
 ------------------------------------------------------------------
 -- capsOK? IS MONOTONE IN THE CAPS.  The widening the induction performs
@@ -712,7 +815,7 @@ capsOK?-mono c c′ sched st le@(sz≤ , wd≤ , rg≤) h
 ... | hWN , hRest4 with ∧-true _ _ hRest4
 ... | hLen , hRest5 with ∧-true _ _ hRest5
 ... | hPk , hRest6 with ∧-true _ _ hRest6
-... | hCL , hFl =
+... | hCL , hTail =
   ∧-intro (stBounded-widen sz≤ sched st hSt)
   (∧-intro (regsSz?-widen (EvalSt.registry st) sz≤ hRg)
   (∧-intro (all-impl _ _ (λ l → widLive-widen (Sched.slots sched) l wd≤)
@@ -724,7 +827,7 @@ capsOK?-mono c c′ sched st le@(sz≤ , wd≤ , rg≤) h
                      (EvalSt.nodes st) hPk)
   (∧-intro (all-impl _ _ (λ l → closLive-widen (Sched.slots sched) l le)
                      (Sched.live sched) hCL)
-           hFl))))))
+           hTail))))))
 
 ------------------------------------------------------------------
 -- THE SYNTAX-LINEAR EVAL RECEIPT — ONE iterSize FOLD PER SYNTAX NODE.
@@ -1059,6 +1162,29 @@ burstCount? c str =
 obsCaps? : ∀ {n} {Γ : Ctx n} {s} → Caps → Slots Γ → Closed Γ s → Bool
 obsCaps? {n = n} c sl o =
   (sizeᵉ o ≤ᵇ Caps.cSize c) ∧ (pWᵉ n sl o ≤ᵇ Caps.cWid c)
+
+-- THE PAYLOAD'S STRATIFICATION READING, AND IT IS THE CAPS SHAPE WITH
+-- ONE ARGUMENT INSTEAD OF TWO.  A caps reading is keyed on a cap and a
+-- slot telescope; this one is keyed on a FLOOR, and a floor is not a
+-- property of the state at all -- it belongs to the chain the payload
+-- is about to be pushed through.  So these cannot be conjuncts of
+-- their caps siblings however alike the recursions look, and a walk
+-- carries them as its own argument rather than reading them off `c`.
+--
+-- ONLY THE `obs` ARM CARRIES CONTENT, which is what makes the lifting
+-- worth having rather than merely uniform: a data payload names no
+-- input, so every clause of a frame whose element type is not an
+-- observable discharges its whole obligation by `refl`, and the ones
+-- that do not are exactly the arcs where a subscription can be minted.
+eventStrat? : ∀ {n} {Γ : Ctx n} {u} → ℕ → InstEvent (Val Γ u) → Bool
+eventStrat? {u = u} k (value v) = inputsBelowᵛ k u v
+eventStrat? k (init _)    = true
+eventStrat? k (close _ _) = true
+eventStrat? k (handoff _) = true
+eventStrat? k complete    = true
+
+burstStrat? : ∀ {n} {Γ : Ctx n} {u} → ℕ → Stream Γ u → Bool
+burstStrat? k = all (λ em → all (eventStrat? k) (InstEmit.events em))
 
 ------------------------------------------------------------------
 -- THE SLOT TELESCOPE, INSIDE THE CAP — the side condition that ties

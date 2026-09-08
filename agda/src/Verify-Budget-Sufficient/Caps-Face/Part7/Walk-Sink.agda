@@ -65,20 +65,20 @@ open import Verify-Budget-Sufficient.Caps-Depth
   using (depthFrame)
 
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
-  (capsOK?; capsOK?-mono; frameStrat?; frameSz?; pathFloor; pathStrat?; pathSz?; pathSz?-widen;
-  nestClosOK?ᵛ-widen; valCaps?)
+  (capsOK?; capsOK?-mono; entStrat?; framePark?; frameStrat?; frameSz?; pathFloor; pathPark?;
+  pathStrat?; pathSz?; pathSz?-widen; nestClosOK?ᵛ-widen; valCaps?)
 open import Verify-Budget-Sufficient.Caps-Face.Part5 using
   (clos-lift; valsCaps?-parts)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
   (foldPath-slots; capsOK?-count; capsOK?-delivered; capsOK?-parts; capsOK?-regs; frameBud;
-  shareLatch-caps; slotsCaps?-capsAt; valsCaps?-lvl)
+  registry-entStrat; shareLatch-caps; slotsCaps?-capsAt; valsCaps?-lvl)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (frameStep-⊑-+; valCaps?-size)
 open import Decide using (T-to; T⇒≡true; ∧-intro; ∧-trueˡ; ∧-trueʳ; ∨-trueʳ)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Root-Strat using
   (pathStrat-top)
-open import Verify-Budget-Sufficient.Caps-Face.Part7.Reg-Strat using
-  (entStrat?; registry-entStrat)
+open import Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves using
+  (pathPark-step)
 open import Verify-Budget-Sufficient.Delivery-Walk using
   (shareAdmit-chQ)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Ring-Vocabulary using
@@ -783,7 +783,7 @@ walk-hyps-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (proj₁ (proj₂ (proj₂ (proj₂ (stepFrame sf nid now f p vals fin sched st)))))
     (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame sf nid now f p vals fin sched st)))))
 walk-hyps-step {e = e} sl id L sf gas nid now src f p vals evs fin sched st
-  (sleq , cok , hvc , hcl , hpz , hdp , hib , hst , (g , P , hfl , hlvP , hR)) =
+  (sleq , cok , hvc , hcl , hpz , hdp , hib , hst , hpk , (g , P , hfl , hlvP , hR)) =
     trans (KeepsC.slotsEq (stepFrame-keeps sf nid now f p vals fin sched st)) sleq
   , capsOK?-mono (frameStep (L + proj₁ ST) c) (frameStep Lt c)
       (proj₁ (proj₂ (proj₂ (proj₂ r)))) (proj₂ (proj₂ (proj₂ (proj₂ r))))
@@ -804,6 +804,10 @@ walk-hyps-step {e = e} sl id L sf gas nid now src f p vals evs fin sched st
   , walk-strat-step (frameStep L c) sl (pathFloor p) sf nid now f p vals fin sched st
       cok hstf hib
   , hstp
+  -- the parked reading is the one conjunct the step does not TRANSPORT:
+  -- a hop can subscribe out of a flatten node's queue, so what survives
+  -- is re-established at the stepped state rather than carried
+  , pathPark-step sf nid now f p vals fin sched st hib hpkp
   , (g , P , hfl , hlvP , hR)
   where
   c   = capsAt e sl id
@@ -811,6 +815,10 @@ walk-hyps-step {e = e} sl id L sf gas nid now src f p vals evs fin sched st
   hstf = proj₁ (∧-true (frameStrat? (pathFloor p) f) (pathStrat? p) hst)
   hstp : pathStrat? p ≡ true
   hstp = proj₂ (∧-true (frameStrat? (pathFloor p) f) (pathStrat? p) hst)
+  hpkf : framePark? (pathFloor p) f st ≡ true
+  hpkf = proj₁ (∧-true (framePark? (pathFloor p) f st) (pathPark? p st) hpk)
+  hpkp : pathPark? p st ≡ true
+  hpkp = proj₂ (∧-true (framePark? (pathFloor p) f st) (pathPark? p st) hpk)
   S   = Caps.cSize c
   W   = Caps.cWid c
   d   = capsH e sl id
@@ -832,6 +840,7 @@ walk-hyps-step {e = e} sl id L sf gas nid now src f p vals evs fin sched st
           pz1 pz2 (≤ᵇ⇒≤ (suc (pathLen p)) B (T-to pzl))
           hvc ≤-refl
           (≤-trans (m≤m⊔n (depthFrame sf nid now f p vals fin sched st) _) hdp)
+          hstf hstp hib hpkf
   Lt  = fLvlD S W d L
   STs≤t : suc (L + proj₁ ST) ≤ Lt
   STs≤t = proj₂ (proj₂ (proj₂ (proj₂ ST)))
@@ -855,7 +864,7 @@ chain-walk-caps sl id L sf gas nid now src (share-sink i) vals evs fin sched st 
   proj₁ (proj₂ H)
   , walk-sink-caps sl id L sf gas nid now src i vals evs fin sched st H
 chain-walk-caps {e = e} sl id L sf gas nid now src (f ↠ p) vals evs fin sched st
-  H@(sleq , cok , hvc , hcl , hpz , hdp , hib , hst , (g , P , hfl , hlvP , hR)) =
+  H@(sleq , cok , hvc , hcl , hpz , hdp , hib , hst , hpk , (g , P , hfl , hlvP , hR)) =
     cok
   , proj₁ (valsCaps?-parts (frameStep L c) sl vals hvc)
   , slSz

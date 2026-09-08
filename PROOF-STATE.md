@@ -238,17 +238,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **RESTATING THE ENTRY LEDGER AT THE MINT.** Unstarted: the refutation
-  landed and the gate came back red on an unrelated stale `using`
-  clause, so the leg is still owed in full. It opens at the
-  PRESERVATION half, which is nearly free — `register` is the
-  registry's one growth site and every other write is the empty list
-  or a filter — and that half is what survives the refutation intact.
-  So the commit states the mint's side condition as its own leaf,
-  proves preservation across the append, and reports what the two
-  entry faces must then be handed, which is the place each of this
-  row's siblings independently landed. The reading's own defect is
-  written down where it is owed and is not restated here.
+- **CARRYING THE ENTRY READING DOWN THE WALK, which is what the mint's
+  side condition cost.** Preservation is done and the mint states its own
+  condition, so what remains is SUPPLYING it. The reading needs a pair
+  the walk carries — frames legal at the terminal's floor, and the term
+  being subscribed naming no input at or above it — and the refutation
+  settled that neither is readable off the state. The subscribe clique is
+  one mutual block, so the pair threads through all of it or none, which
+  is this commit. It also reports the one place the pair is NOT
+  walk-carried: a flatten node's PARKED queue lives in the state and the
+  node records no floor, so that reading is owed where the node opens.
 
 - **WALKING AN ADMITTED CHAIN AT THE LEVEL IT WAS REGISTERED AT, which
   is the one door the pricing leaves open.** Both ends are closed by
@@ -315,10 +314,6 @@ does not fit is a finding about the shared statement, not about the head.
   does to the chain's stratification reading, the one reading a walk cannot
   transport. A `scan-f` folds against a value in the STORE, which no path
   predicate reaches and the premised state receipt does not yet read.
-- **`registry-entStrat`** (Part7/Reg-Strat) — FALSITY, `REFUTED, DEAD ROUTE`:
-  every registration's chain is stratified, and floored at or above the SOURCE
-  it listens to wherever the slots reach that source. Both entry faces
-  transport it; the caps receipt reads no frame, so it is owed at the mint.
 - **`pop-head-strat-sink`** (Caps-Bridge) — FALSITY, `REFUTED`: where the
   arrival's own value sits against every chain that will receive it, asked only
   below the root. It wants a fact relating a source's pending values to the
@@ -382,6 +377,42 @@ does not fit is a finding about the shared statement, not about the head.
   store half of that step, carried APART from the values half so that no
   ceiling has to cross a step at all; the position's ceiling is rebuilt from
   the two ingredients where it is spent.
+- **`shareAdmit-strat`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: what a
+  share hands the chains it admitted, and THE ONE PLACE THE REGISTRY READING IS
+  SPENT rather than established. The chain half rides the admission filter,
+  which drops entries and rewrites none; the value half widens off the slot.
+- **`subscribeE-burstStrat`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`:
+  what a subscribe EMITS, read at the chain it was subscribed under. Every push
+  in this development pushes a burst whose payloads the frame will subscribe
+  again, and the caps receipt carries no reading of them.
+- **`stepFrame-valsStrat`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: what
+  a frame hands the rest of its chain. The walk re-enters on the tail with an
+  output the caps receipt prices but does not read; the floor does not move
+  across a frame, which is what lets one statement cover the walk.
+- **`framePark-step`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the
+  frame-keyed park reading across one step. The push re-steps the SAME frame,
+  so the reading is asked of a state the previous emit produced, where the
+  frame is a variable and no clause reduces.
+- **`pathPark-step`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: that same
+  reading lifted off one frame onto the tail the walk is about to enter. Not a
+  corollary of the frame-keyed form: what must survive is a reading of nodes
+  the step did not name.
+- **`shareAdmit-park`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the park
+  reading over the admitted chains at the LATCHED state the fan-out starts
+  from — stated after the close, because that is where the fan reads the
+  registry.
+- **`foldPath-park`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the same
+  reading again once a SIBLING chain has folded. It is about a state the walk
+  PRODUCED rather than one it was handed, which is why the latched form does
+  not cover it.
+- **`cascade-admit-park`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the
+  latched park reading arriving from the CASCADE's face. Its filter is keyed by
+  an arrival's source and the share's by a slot, so neither rearranges into the
+  other and the entry reading is owed once per face.
+- **`chainStep-park`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the
+  cascade's fold-through, where the tail's chains are read at the state the
+  HEAD chain's step produced. The chains that must survive are not the one that
+  stepped, which is what keeps it off the share's form.
 - **`scanΦ-fit`** (Part7/Depth-Fit) — SHAPE, `DEAD ROUTE`: the producing side
   of the fold's grant. THE MECHANISM IS DEAD, NOT A DENOMINATION: a flat
   per-instant potential cannot dominate a count exponential in itself; the one

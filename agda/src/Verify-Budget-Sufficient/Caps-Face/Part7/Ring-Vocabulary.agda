@@ -48,7 +48,7 @@ open import Verify-Budget-Sufficient.Measures using
   (pathLen)
 
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
-  (capsOK?; pathFloor; pathStrat?; pathSz?; regsSz?; regsSz?-widen; nestClosOK?ᵛ)
+  (capsOK?; pathFloor; pathPark?; pathStrat?; pathSz?; regsSz?; regsSz?-widen; nestClosOK?ᵛ)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
   (capsOK?-regs; pathSz?-len; slotsCaps?-capsAt; valsCaps?)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Cascade-Caps using
@@ -138,6 +138,14 @@ WalkHyps {n = n} {e = e} {u = u} sl id L sf gas nid now src p vals evs fin sched
   × (depthFold sf gas nid now src p vals evs fin sched st ≤ capsH e sl id)
   × (all (inputsBelowᵛ (pathFloor p) u) vals ≡ true)
   × (pathStrat? p ≡ true)
+  -- AND A THIRD READING, WHICH IS THE ONE THE OTHER TWO CANNOT REACH.
+  -- Both above are facts about SYNTAX the walk holds -- the chain and
+  -- the payload -- so a hop transports them.  A flatten node's parked
+  -- queue is neither: it lives in the STORE, the frame names only the
+  -- node id, and nothing on the walk's telescope mentions it.  So it
+  -- travels as its own conjunct, read off the state at the chain, and
+  -- the step re-establishes it rather than transporting it
+  × (pathPark? p st ≡ true)
   × (Σ ℕ λ g → Σ ℕ λ P →
       (4 + (sizeᵉ e + slotsSize sl) + n + gas ≤ g)
       × (iterL (Caps.cSize (capsAt e sl id)) (Caps.cWid (capsAt e sl id)) (capsH e sl id)

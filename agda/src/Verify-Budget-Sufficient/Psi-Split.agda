@@ -59,12 +59,12 @@ open import Verify-Budget-Sufficient.Measures using
                                                       regsB?-widen; slotsFnCap; stBounded?;
                                                       ∧-true)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
-  (burstCaps?; eventCaps?; frameSz?; pathSz?; regsSz?)
+  (burstCaps?; entStrat?; eventCaps?; frameSz?; pathSz?; pathStrat?; regsSz?; regStrat?)
 open import Verify-Budget-Sufficient.Delivery-Walk using
   (chP?; regP?)
 open import Verify-Budget-Sufficient.Caps using
   (Caps)
-open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen)
+open import Decide using (T-to; T⇒≡true; ∧-intro; ∧-trueʳ; ≤ᵇ-widen)
 
 valΨ? : ∀ {n} {Γ : Ctx n} → ℕ → (u : Ty) → Val Γ u → Bool
 valΨ? Ψ u v = fnCapᵛ u v ≤ᵇ Ψ
@@ -290,6 +290,37 @@ chP?-∧ P Q (r ∷ rs) h₁ h₂
   with ∧-true (P (proj₂ r)) (chP? P rs) h₁
      | ∧-true (Q (proj₂ r)) (chP? Q rs) h₂
 ... | a₁ , b₁ | a₂ , b₂ = ∧-intro (∧-intro a₁ a₂) (chP?-∧ P Q rs b₁ b₂)
+
+-- AND THE SPLIT ON THE REGISTRY, which the zip above cannot be spent
+-- without.  A face whose ledger is a conjunction hands a face whose
+-- ledger is one HALF of it, so the injection is usable only if the
+-- projection exists at the same list
+regP?-projˡ : ∀ {n} {Γ : Ctx n} {t} (P Q : ∀ {u} → Path Γ u t → Bool)
+  (rs : List (RegId × Source × Chain Γ t)) →
+  regP? (λ {v} p → P {v} p ∧ Q p) rs ≡ true → regP? P rs ≡ true
+regP?-projˡ P Q []       h = refl
+regP?-projˡ P Q (r ∷ rs) h
+  with ∧-true (P (proj₂ (proj₂ (proj₂ r))) ∧ Q (proj₂ (proj₂ (proj₂ r))))
+              (regP? (λ {v} p → P p ∧ Q p) rs) h
+... | a , b = ∧-intro (proj₁ (∧-true (P (proj₂ (proj₂ (proj₂ r))))
+                                     (Q (proj₂ (proj₂ (proj₂ r)))) a))
+                      (regP?-projˡ P Q rs b)
+
+-- THE REGISTRY'S ENTRY READING, AS A WALK LEDGER.  `regStrat?` reads
+-- each entry's SOURCE against its chain, and a walk ledger reads the
+-- chain alone; so the source half is dropped entry by entry, and what
+-- survives is exactly the conjunct a stratified `Pb` carries.  It is
+-- the one producer of that conjunct: every face carrying a
+-- stratification reading on the registry sources it from the state
+-- predicate, and this is the step down from one to the other
+regStrat?-paths : ∀ {n} {Γ : Ctx n} {t}
+  (rs : List (RegId × Source × Chain Γ t)) →
+  regStrat? rs ≡ true → regP? (λ {u} p → pathStrat? {n} {Γ} {u} {t} p) rs ≡ true
+regStrat?-paths []       h = refl
+regStrat?-paths (r ∷ rs) h
+  with ∧-true (entStrat? (proj₁ (proj₂ r)) (proj₂ (proj₂ (proj₂ r))))
+              (regStrat? rs) h
+... | a , b = ∧-intro (∧-trueʳ a) (regStrat?-paths rs b)
 
 ------------------------------------------------------------------
 -- THE PROJECTIONS — the other direction, and the half that makes

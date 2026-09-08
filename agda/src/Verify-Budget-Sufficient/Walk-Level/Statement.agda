@@ -55,9 +55,9 @@ open import Verify-Budget-Sufficient.Measures using
    pathLen; regsLen?; sizeBudgetAt; unconn)
 open import Verify-Budget-Sufficient.Keeps-Ring using
   (Keeps)
--- the caps face: only the five predicates the statement reads there
+-- the caps face: only the predicates the statement reads there
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
-  (burstCaps?; burstCount?; capsOK?; pathSz?; slotsCaps?)
+  (burstCaps?; burstCount?; capsOK?; pathFloor; pathStrat?; pathSz?; slotsCaps?)
 open import Verify-Budget-Sufficient.Caps-Nest using
   (nest)
 -- the chain-charge algebra subscribeE-caps' own *All head spends
@@ -153,6 +153,20 @@ WalkTail {n} {Γ} {t} {e} {u} g b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j =
     -- the length ledger, ℓ FREE (wet-ell-absurd killed the Ŝ pin)
     pathLen κ + G ≤ ℓ →
     regsLen? ℓ (EvalSt.registry st) ≡ true →
+    -- THE ENTRY READING, IN THE TWO HALVES A REGISTRATION IS PRICED BY.
+    -- `capsOK?` now reads every registry entry, and a subscribe is the
+    -- registry's growth site, so a walk that registers owes the fact its
+    -- entry will be read by -- which is a fact about the CHAIN and the
+    -- SOURCE and about nothing the state carries.  Neither half is
+    -- derivable here: the chain arrives as a parameter, and a term's own
+    -- input floor is not bounded by any cap in the telescope.
+    --
+    -- IT TERMINATES AT THE ROOT RATHER THAN CASCADING FOREVER, which is
+    -- what makes it a hypothesis rather than a conjunct: at `root` the
+    -- chain reading is `refl` and the floor is the slot count, so the
+    -- source half is the closed program's own stratification.
+    pathStrat? κ ≡ true →
+    inputsBelowᵉ (pathFloor κ) b ≡ true →
     let r = subscribeE g b κ bid now sched st
     in Σ ℕ λ j′ →
        (capsOK? (frameStep (j + j′) c) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
@@ -221,6 +235,8 @@ WalkTail⁻ {n} {Γ} {t} {e} {u} g b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j =
     g hasAtLeast suc G →
     pathLen κ + G ≤ ℓ →
     regsLen? ℓ (EvalSt.registry st) ≡ true →
+    pathStrat? κ ≡ true →
+    inputsBelowᵉ (pathFloor κ) b ≡ true →
     let r = subscribeE g b κ bid now sched st
     in Σ ℕ λ j′ →
        (capsOK? (frameStep (j + j′) c) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
@@ -313,6 +329,8 @@ WalkTailᴴˢ {n} {Γ} {t} {e} {s} {u} g f z b c Ψ F Ŝ R̂ G ℓ L̂ dep bud o
     g hasAtLeast suc G →
     pathLen κ + G ≤ ℓ →
     regsLen? ℓ (EvalSt.registry st) ≡ true →
+    pathStrat? κ ≡ true →
+    inputsBelowᵉ (pathFloor κ) (scanᵉ f z b) ≡ true →
     burstHopSpnH? F (slotHop F sl) (pmᵗ F 0 f)
       (hopDᵗ F (slotHop F sl) f + hopDᵗ F (slotHop F sl) z
          + hopDᵉ F (slotHop F sl) b)
@@ -368,6 +386,8 @@ WalkTailᴴˢ⁰ {n} {Γ} {t} {e} {s} {u} g f z b c Ψ F Ŝ R̂ G ℓ L̂ dep bu
     g hasAtLeast suc G →
     pathLen κ + G ≤ ℓ →
     regsLen? ℓ (EvalSt.registry st) ≡ true →
+    pathStrat? κ ≡ true →
+    inputsBelowᵉ (pathFloor κ) (scanᵉ f z b) ≡ true →
     let (nid , sched₁) = mintNode sched
         r = subscribeE g b (scan-f f nid ↠ κ) bid now sched₁
               (installNode nid (scan-st (evalTm z)) st)
@@ -461,6 +481,8 @@ WalkTailᴴˢˢ {n} {Γ} {t} {e} {s} {u} g f z b c Ψ F Ŝ R̂ G ℓ L̂ dep bud
     g hasAtLeast suc G →
     pathLen κ + G ≤ ℓ →
     regsLen? ℓ (EvalSt.registry st) ≡ true →
+    pathStrat? κ ≡ true →
+    inputsBelowᵉ (pathFloor κ) (scanᵉ f z b) ≡ true →
     let (nid , sched₁) = mintNode sched
         J₀ = suc (j + suc (sizeᵗ z))
         r = subscribeE g b (scan-f f nid ↠ κ) bid now sched₁
@@ -540,6 +562,8 @@ WalkTail⁻ᴴ {n} {Γ} {t} {e} {u} g b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j =
     g hasAtLeast suc G →
     pathLen κ + G ≤ ℓ →
     regsLen? ℓ (EvalSt.registry st) ≡ true →
+    pathStrat? κ ≡ true →
+    inputsBelowᵉ (pathFloor κ) b ≡ true →
     let r = subscribeE g b κ bid now sched st
     in Σ ℕ λ j′ →
        (capsOK? (frameStep (j + j′) c) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)

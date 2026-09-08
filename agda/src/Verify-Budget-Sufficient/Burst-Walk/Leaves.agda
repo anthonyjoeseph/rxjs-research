@@ -28,7 +28,7 @@ open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (Gas; gs; g0; Id; Tick; Source; InstEvent; close; cut; cutPending; InstEmit)
-open import Rx.Exp  using (Ctx; Closed; Val; obs; Fn; _×ᵗ_; _≟ᵗ_; sizeᵉ)
+open import Rx.Exp  using (Ctx; Closed; Val; obs; Fn; _×ᵗ_; _≟ᵗ_; sizeᵉ; inputsBelowᵛ)
 open import Rx.Evaluator
   using (Sched; EvalSt; RegId; Chain; Path; Frame; _↠_; map-f; scan-f; take-f; from-inner; thru-outer;
   Stream; stepFrame; dryEvent; fLvlD; subscribeInner; subscribeE; splitBurst; splitEvents;
@@ -68,9 +68,9 @@ open import Verify-Budget-Sufficient.Caps using (sizeAt-mono; Caps; frameStep)
 
 -- named explicitly: .Caps-Face and .Wet share .Measures names
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
-  (capsOK?; eventCaps?; pathSz?; regsSz?; slotsCaps?; valCaps?)
+  (capsOK?; eventCaps?; pathSz?; regsSz?; slotsCaps?; valCaps?; pathFloor; pathStrat?)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
-  (frameBud; mList?; mList?-keeps; valsCaps?)
+  (frameBud; mList?; mList?-keeps; valsCaps?; valsStrat?)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (valCaps?-size)
 open import Verify-Budget-Sufficient.Caps-Face.Part6 using
@@ -330,6 +330,8 @@ SiCFace =
     suc (pathLen κ′) ≤ Caps.cSize (frameStep j′ c′) →
     nest o′ sl′ (EvalSt.connectedShares st′) ≤ bud →
     depthInner g′ op′ allNid′ κ′ id′ now′ o′ sched′ st′ ≤ dep →
+    pathStrat? κ′ ≡ true →
+    inputsBelowᵛ (pathFloor κ′) (obs u′) o′ ≡ true →
     let r′ = subscribeInner g′ op′ allNid′ κ′ id′ now′ o′ sched′ st′
     in Σ ℕ λ j₂ →
        (capsOK? (frameStep (j′ + j₂) c′)
@@ -364,6 +366,8 @@ IfcFace =
     frameBud c j ≤ bud →
     depthFin g op allNid inst κ id now vals sched st
       (lookupNode allNid (EvalSt.nodes st)) ≤ dep →
+    pathStrat? κ ≡ true →
+    valsStrat? (pathFloor κ) vals ≡ true →
     let r = innerFinish g op allNid inst κ id now vals sched st
               (lookupNode allNid (EvalSt.nodes st))
     in Σ ℕ λ j′ →

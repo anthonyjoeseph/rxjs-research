@@ -77,11 +77,13 @@ open import Verify-Budget-Sufficient.Caps-Depth
 
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (capsAt-round-size; capsOK?; capsOK?-mono; eventCaps?; frameSz?; n≤capsAt-size; pathFloor;
-  pathStrat?; pathSz?; pathSz?-widen; regsSz?; slotsCaps?; valCaps?; nestClosOK?ᵛ;
+  pathPark?; pathStrat?; pathSz?; pathSz?-widen; regsSz?; slotsCaps?; valCaps?; nestClosOK?ᵛ;
   nestClosOK?ᵛ-widen)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
-  (capsOK?-count; capsOK?-regs; frameBud; slotsCaps?-capsAt; valsCaps?; valsCaps?-lvl;
-  foldPath-slots; shareAdmit-caps)
+  (capsOK?-count; capsOK?-regs; frameBud; pathPark-delivered; pathsPark-delivered;
+  slotsCaps?-capsAt; valsCaps?; valsCaps?-lvl; foldPath-slots; shareAdmit-caps)
+open import Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves using
+  (cascade-admit-park; chainStep-park)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (valCaps?-size; valCaps?-widen)
 open import Decide using (T-to; T⇒≡true; ∧-intro; ∧-trueˡ; ∧-trueʳ)
@@ -2269,6 +2271,7 @@ cascade-caps-all-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
                 ≤ᵇ nestUnit e sl) chains ≡ true →
   all (λ rc → pathStrat? (proj₂ rc)) chains ≡ true →
   all (λ rc → inputsBelowᵛ (pathFloor (proj₂ rc)) (arrTy a) (arrVal a)) chains ≡ true →
+  all (λ rc → pathPark? (proj₂ rc) st) chains ≡ true →
   valCaps? (capsAt e sl id) sl (arrTy a) (arrVal a) ≡ true →
   nestClosOK?ᵛ (capsAt e sl id) sl (arrTy a) (arrVal a) ≡ true →
   nestΦAt e sl id ≤ S →
@@ -2283,11 +2286,11 @@ cascade-caps-all-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   chainsCapsAll (capsAt e sl id) (capsAt e sl (suc id)) sl (capsH e sl id) Lc
     a nextId chains sched st
 cascade-caps-all-go sl id Lc a nextId S [] sched st
-  sleq cok hsc hpz hΦs hstr hsv hvc hcl hinc hval hS J g i hfl hR hlen hLc = tt
+  sleq cok hsc hpz hΦs hstr hsv hpk hvc hcl hinc hval hS J g i hfl hR hlen hLc = tt
 cascade-caps-all-go {n = n} {e = e} sl id Lc a nextId S ((rid , path) ∷ chains) sched st
-  sleq cok hsc hpz hΦs hstr hsv hvc hcl hinc hval hS J g i hfl hR hlen hLc =
+  sleq cok hsc hpz hΦs hstr hsv hpk hvc hcl hinc hval hS J g i hfl hR hlen hLc =
     cascade-caps-all-go sl id Lc a nextId S chains sched st
-      sleq cok hsc hpr hΦr hstrr hsvr hvc hcl hinc hval hS
+      sleq cok hsc hpr hΦr hstrr hsvr hpkr hvc hcl hinc hval hS
       J g i hfl hR
       (≤-trans (+-monoʳ-≤ i (n≤1+n (length chains))) hlen) hLc
   , HEAD
@@ -2296,7 +2299,11 @@ cascade-caps-all-go {n = n} {e = e} sl id Lc a nextId S ((rid , path) ∷ chains
   , cascade-caps-all-go sl id (Lc + proj₁ ST) a nextId S chains
       (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
       (trans (chainStep-slots nextId a path sched st′) sleq)
-      (proj₂ (proj₂ ST)) hsc hpr hΦr hstrr hsvr hvc hcl hinc hval
+      (proj₂ (proj₂ ST)) hsc hpr hΦr hstrr hsvr
+      -- the tail is read at the state the head's step produced
+      (chainStep-park nextId a path sched st′ chains
+         (pathsPark-delivered chains rid st hpkr))
+      hvc hcl hinc hval
       (chainStep-store≤ sl id Lc a nextId S path sched st′
          HEAD hdc sleq hpc hΦc hinc hS)
       J g (suc i) hfl hR
@@ -2322,6 +2329,9 @@ cascade-caps-all-go {n = n} {e = e} sl id Lc a nextId S ((rid , path) ∷ chains
   hstrr = proj₂ (∧-true (pathStrat? path) _ hstr)
   hsvc = proj₁ (∧-true (inputsBelowᵛ (pathFloor path) (arrTy a) (arrVal a)) _ hsv)
   hsvr = proj₂ (∧-true (inputsBelowᵛ (pathFloor path) (arrTy a) (arrVal a)) _ hsv)
+  hpkc = pathPark-delivered path rid st
+           (proj₁ (∧-true (pathPark? path st) _ hpk))
+  hpkr = proj₂ (∧-true (pathPark? path st) _ hpk)
   -- this chain's own descent, priced off the store ceiling rather than
   -- off a bound on the round -- which is the premise this door does
   -- not have and the surviving fold does
@@ -2346,7 +2356,7 @@ cascade-caps-all-go {n = n} {e = e} sl id Lc a nextId S ((rid , path) ∷ chains
   CH≤ : lvls B W d Lc 1 ≤ Pos c d J g i
   CH≤ = lvls-mono 1 1 2≤S ≤-refl ≤-refl hLc ≤-refl
   HEAD = arr-chain-caps sl id Lc a nextId path sched st′ sleq cok HVC HCL
-           (pathSz?-widen path (proj₁ c⊑) hpc) hdc hstrc hsvc
+           (pathSz?-widen path (proj₁ c⊑) hpc) hdc hstrc hsvc hpkc
            (g , Pos c d J g i , hfl , CH≤ , walk J g i HI hR)
   ST  = chainStep-caps sl id Lc a nextId path sched st′ sleq cok
           (pathSz?-widen path (proj₁ c⊑) hpc)
@@ -2388,6 +2398,7 @@ cascade-caps-all {e = e} sl id a nextId S sched st sleq cok hsc
            (cascadeLatch-caps (capsAt e sl id) a sched st cok))
     hsc hpz hΦs
     (cascade-admit-entry (capsAt e sl id) a sched st cok) hsv
+    (cascade-admit-park a st)
     hvc hcl hinc hval hsn
     0 (Caps.cSize (capsAt e sl id)) 0
     (capsAt-round-size e sl id) base REGLEN ≤-refl

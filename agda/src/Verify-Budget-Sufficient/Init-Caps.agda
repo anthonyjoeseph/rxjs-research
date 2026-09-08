@@ -16,6 +16,7 @@
 --   (6) all (parkRoom …) nodes      — refl, nodes is []
 --   (7) all (closLive caps slots) live — the closure key, same shape as (3)
 --   (8) srcFloor? sched             — sched-init sets nextSource = n, so n ≤ᵇ n
+--   (9) regStrat? registry          — refl, the registry is []
 --
 -- CONJUNCTS (3) AND (7) ARE THE TWO WITH CONTENT, and `scripted`'s own
 -- index closes both: `scripted` carries `{ok : T (isData t)}`, EVERY
@@ -171,7 +172,9 @@ init-capsOK?-base-go {n = n} e ins =
           (∧-intro refl               -- (5) 0 ≤ᵇ suc _ = refl
             (∧-intro refl             -- (6) parkRoom [] = refl
               (∧-intro C7             -- (7) closLive live
-                (≤ᵇ-true n n ≤-refl))))))) -- (8) sched-init sets nextSource = n
+                (∧-intro
+                  (≤ᵇ-true n n ≤-refl) -- (8) sched-init sets nextSource = n
+                  refl))))))) -- (9) regStrat? [] = refl
 
 abstract
   init-capsOK?-base : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
