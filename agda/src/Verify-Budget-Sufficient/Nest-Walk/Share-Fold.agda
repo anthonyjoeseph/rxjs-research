@@ -40,7 +40,7 @@ open import Verify-Budget-Sufficient.Caps-Depth using
   (depthDisp; depthFold; depthShareGo; lub3-m; lub3-r)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using (pathSz?; frameSz?)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using (foldPath-slots)
-open import Decide using (T-to)
+open import Decide using (T-to; ∧-intro)
 open import Verify-Budget-Sufficient.Measures using (∧-true; pathLen)
 open import Verify-Budget-Sufficient.Nest-Store using
   (frameNestF; 1≤frameNestF; nest-telescope; nestUnit; pow-distrib-*)
@@ -56,7 +56,8 @@ open import Verify-Budget-Sufficient.Nest-Cap using
 open import Verify-Budget-Sufficient.Nest-Walk using
   (burstsDrain; burstsHead; burstsOK; capsWalkOK; c⊑step; deliverNestD-cons; dispatchBurstsOK;
   dispatchCapsOK; fac-hoist; FaceOK; faceHere; frameNestD; nestDᵛˢ; nodesMax; one-pow;
-  shareBurstsOK; shareCapsOK; shareFold-tele; shareFold-unit; stepFrame-nodes)
+  shareBurstsOK; shareCapsOK; shareFold-tele; shareFold-unit; stepFrame-nodes;
+  capsWalkOK-strat)
 
 shareGoFold-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (c ac : Caps) (d : ℕ) (W : ℕ) (sl : Slots Γ) (Lv : ℕ) (sf : Gas) (gas : ℕ)
@@ -268,7 +269,12 @@ foldPath-nodes {e = e} c ac d W sl Lv sf gas id now envSrc (f ↠ p) vals evs fi
           (burstsDrain W sf gas id now f p vals fin sched st hb)
           1≤S
           (≤-trans (m≤m⊔n _ _) hdp)
-          (proj₂ HPL2) (≤ᵇ⇒≤ (suc (pathLen p)) Bᴸ (T-to (proj₁ HPL2))) hlv
+          (proj₂ HPL2) (≤ᵇ⇒≤ (suc (pathLen p)) Bᴸ (T-to (proj₁ HPL2)))
+          (∧-intro (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hc))))))))
+             (capsWalkOK-strat c ac sl d (Lv + L′) sf gas id now p vals′ fin′ sched₁ st₁
+                (proj₂ (proj₂ tail))))
+          (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hc)))))))
+          hlv
           (burstsHead W sf gas id now p vals′ fin′ sched₁ st₁ (proj₂ (proj₂ hb)))
   jᵢ = proj₁ IHr
   jₛ = proj₁ SFr

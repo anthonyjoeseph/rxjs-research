@@ -45,7 +45,7 @@ open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong; cong₂; subst)
 
 open import Rx.Prim      using (Gas; Tick; Id; Fuel)
-open import Rx.Exp       using (Ctx; Closed; sizeᵉ; syncSizeᵉ; sizeᵛ; inputsBelowᵛ)
+open import Rx.Exp       using (Ctx; Closed; sizeᵉ; syncSizeᵉ; sizeᵛ; inputsBelowᵉ; inputsBelowᵛ)
 open import Rx.Frame-Width using (dWᵉ; entryCeil; pWᵛ)
 open import Rx.Hop-Depth  using (hopDᵉ)
 open import Rx.Slot-Hop using (slotHop)
@@ -84,7 +84,7 @@ open import Verify-Budget-Sufficient.Subscribe-Face using
   (innerFinish-caps; subscribeE-caps; subscribeInner-caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (burstCaps?; burstCount?; capsOK?; capsOK?-mono; n≤capsAt-size; pathFloor; pathSz?;
-   regsSz?; slotsCaps?; srcFloor?; valCaps?; widLive; widNode; widNode-len;
+   pathStrat?; regsSz?; regStrat?; slotsCaps?; srcFloor?; valCaps?; widLive; widNode; widNode-len;
    nestClosOK?ᵛ; closLive; closSt?)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (valCaps?-size)
@@ -103,7 +103,10 @@ open import Verify-Budget-Sufficient.Caps-Face.Part7.Depth-Fit using
 open import Verify-Budget-Sufficient.Caps-Nest using
   (nest; nest≤)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
-  (capsOK?-clos; capsOK?-count; capsOK?-parts; capsOK?-regs; slotsCaps?-capsAt)
+  (capsOK?-clos; capsOK?-count; capsOK?-parts; capsOK?-regs; chainsStrat?-one;
+  registry-entStrat; slotsCaps?-capsAt)
+open import Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves using
+  (chainsOf-strat)
 
 -- the depth mirror (S4's currency)
 -- `depthChain` joins `depthE` here because `dry-tick`'s assembly consumes
@@ -511,7 +514,7 @@ _ = λ e id sched o hLive hFnLive hSS hSF hsz hfn →
       hNodeFn = repQ-all (λ o′ → fnCapᵉ o′ ≤ᵇ Ψ) (suc W) o hfn
       hLen : (length q ≤ᵇ W) ≡ false
       hLen = trans (cong (_≤ᵇ W) (repQ-len (suc W) o)) (sucW≰W W)
-      -- capsOK?'s eight conjuncts, NAMED.  ∧-true's Bool arguments must be
+      -- capsOK?'s conjuncts, NAMED.  ∧-true's Bool arguments must be
       -- given explicitly: `_` leaves them as metas that Agda will not
       -- solve, because decomposing `?a ∧ ?b = C ∧ REST` needs `_∧_` to be
       -- injective and it is a function.  Same lesson as the ∧-true sites
@@ -523,6 +526,7 @@ _ = λ e id sched o hLive hFnLive hSS hSF hsz hfn →
                (EvalSt.nodes st)
       A7 = all (closLive c sl) (Sched.live sched)
       A8 = srcFloor? sched
+      A9 = regStrat? (EvalSt.registry st)
       A2 = regsSz? B (EvalSt.registry st)
       A1 = stBounded? B sched st
       WD = widNode W sl (mergeAll-st nothing 0 q false)
@@ -530,12 +534,12 @@ _ = λ e id sched o hLive hFnLive hSS hSF hsz hfn →
              (∧-intro (∧-intro hFnLive (∧-intro hNodeFn refl))
                       (∧-intro refl (∧-intro refl (∧-intro hSS hSF))))
    -- capsOK? = stBounded? ∧ regsSz? ∧ widLive ∧ widNode ∧ regCount ∧ park
-   -- ∧ closSt? ∧ srcFloor?.  Peel to the widNode conjunct, then to its queue-LENGTH
+   -- ∧ closSt? ∧ srcFloor? ∧ regStrat?.  Peel to the widNode conjunct, then to its queue-LENGTH
    -- half, and read `length q ≤ᵇ W ≡ true` off against hLen's `≡ false`.
-   , λ hc → let t2 = proj₂ (∧-true A1 (A2 ∧ (A3 ∧ (A4 ∧ (A5 ∧ (A6 ∧ (A7 ∧ A8)))))) hc)
-                t3 = proj₂ (∧-true A2 (A3 ∧ (A4 ∧ (A5 ∧ (A6 ∧ (A7 ∧ A8))))) t2)
-                t4 = proj₂ (∧-true A3 (A4 ∧ (A5 ∧ (A6 ∧ (A7 ∧ A8)))) t3)
-                t5 = proj₁ (∧-true A4 (A5 ∧ (A6 ∧ (A7 ∧ A8))) t4)
+   , λ hc → let t2 = proj₂ (∧-true A1 (A2 ∧ (A3 ∧ (A4 ∧ (A5 ∧ (A6 ∧ (A7 ∧ (A8 ∧ A9))))))) hc)
+                t3 = proj₂ (∧-true A2 (A3 ∧ (A4 ∧ (A5 ∧ (A6 ∧ (A7 ∧ (A8 ∧ A9)))))) t2)
+                t4 = proj₂ (∧-true A3 (A4 ∧ (A5 ∧ (A6 ∧ (A7 ∧ (A8 ∧ A9))))) t3)
+                t5 = proj₁ (∧-true A4 (A5 ∧ (A6 ∧ (A7 ∧ (A8 ∧ A9)))) t4)
                 w  = proj₁ (∧-true WD true t5)
                 ln = widNode-len W sl nothing 0 q false w
             in f≡t-absurd (trans (sym hLen) ln)
@@ -599,6 +603,11 @@ dry-tick {n = n} {e = e} a id sched st inv val pre nok bnd valC closC strC =
       (≤ᵇ⇒≤ (sizeᵛ (arrTy a) (arrVal a)) (Caps.cSize (capsAt e sl id))
             (T-to (valCaps?-size (capsAt e sl id) sl (arrTy a) (arrVal a) valC)))
       valC closC strC)
+    -- the entry reading, off the pre-latch registry the chains are
+    -- filtered from and off the payload obligation this statement
+    -- already carries
+    (chainsOf-strat a st (registry-entStrat c sched st pre))
+    (chainsStrat?-one (arrVal a) (chainsOf a st) strC)
   where
   sl      = Sched.slots sched
   Ψ       = ΨAt e sl
@@ -637,6 +646,14 @@ dry-tick {n = n} {e = e} a id sched st inv val pre nok bnd valC closC strC =
 -- arguments" exactly as asked.  `j′ ≤ j + j′ ≤ opIterD (...)` is the
 -- one arithmetic step (`m≤n+m`) separating subscribeE-caps' own
 -- receipt from the shape asked for here.
+--
+-- THE TWO ENTRY PREMISES ARE FORWARDED AND NOTHING HERE READS THEM.
+-- They are the mint's side condition, owed by the callee and already
+-- held by this statement's one caller, so carrying them costs a pair
+-- of binders rather than a weakening: no obligation is created at
+-- either end, and the alternative -- discharging them here -- is not
+-- available, because the path is a free argument and the invariant
+-- only reads the chains the registry admits.
 sub-charge : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (bud ops j : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
   (bid : Id) (now : Tick) (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
@@ -650,6 +667,8 @@ sub-charge : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
   nest b sl (EvalSt.connectedShares st) ≤ bud →
   suc (sizeᵉ b) ≤ ops →
+  pathStrat? κ ≡ true →
+  inputsBelowᵉ (pathFloor κ) b ≡ true →
   let r = subscribeE g b κ bid now sched st in
   Σ ℕ λ j′ →
     (capsOK? (frameStep (j + j′) c) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
@@ -658,13 +677,13 @@ sub-charge : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     × (j′ ≤ opIterD (Caps.cSize c) (Caps.cWid c)
                      (depthE g b κ bid now sched st) bud ops j)
 sub-charge {n = n} c bud ops j g b κ bid now sl sched st
-           2≤S 1≤R slEq slC slSz capOK szB dwB pκ pLen nB opsB =
+           2≤S 1≤R slEq slC slSz capOK szB dwB pκ pLen nB opsB hps hib =
   j′ , capOut , burC , burN , ≤-trans (m≤n+m j′ j) jj′≤
   where
   IH   = subscribeE-caps c (depthE g b κ bid now sched st) bud ops j g b κ
                           bid now sl sched st
                           2≤S 1≤R slEq slC slSz capOK szB dwB pκ pLen nB opsB
-                          ≤-refl
+                          ≤-refl hps hib
   j′    = proj₁ IH
   capOut = proj₁ (proj₂ IH)
   burC  = proj₁ (proj₂ (proj₂ IH))
@@ -1304,7 +1323,7 @@ pop-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   sched-next sched ≡ inj₂ (a , sched′) →
   capsOK? c sched st ≡ true → capsOK? c sched′ st ≡ true
 pop-caps {n = n} c sched st eq h with capsOK?-parts c sched st h
-... | sb , rg , wl , wn , rl , pk , cl , fl =
+... | sb , rg , wl , wn , rl , pk , cl , fl , rs =
   ∧-intro (pop-bounded (Caps.cSize c) sched st eq sb)
   (∧-intro rg
   (∧-intro (pop-widLive (Caps.cWid c) sched eq wl)
@@ -1314,7 +1333,8 @@ pop-caps {n = n} c sched st eq h with capsOK?-parts c sched st h
   (∧-intro (subst (λ sl → all (λ kv → parkRoom (Caps.cSize c) (slotsSize sl) (proj₂ kv)) (EvalSt.nodes st) ≡ true)
                   (sym (pop-slots sched eq)) pk)
   (∧-intro (pop-closSt c sched st eq cl)
-           (subst (λ x → (n ≤ᵇ x) ≡ true) (sym (pop-nextSource sched eq)) fl)))))))
+  (∧-intro (subst (λ x → (n ≤ᵇ x) ≡ true) (sym (pop-nextSource sched eq)) fl)
+           rs)))))))
 
 ------------------------------------------------------------------
 -- § 3  THE ASSEMBLY.  The fuel loop and the theorem, with `capsOK?`
@@ -1864,6 +1884,8 @@ subscribeE-wet-via-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
      3 + nest b sl (EvalSt.connectedShares st) ≤ B →       -- nestOK
      suc (sizeᵉ b) ≤ B →                                   -- opsOK
      depthE g b κ id now sched st ≤ capsH e sl id →        -- depOK
+     pathStrat? κ ≡ true →
+     inputsBelowᵉ (pathFloor κ) b ≡ true →
      let r   = subscribeE g b κ id now sched st
          sl′ = Sched.slots (proj₁ (proj₂ r))
      in (hasDry (proj₁ r) ≡ false)
@@ -1873,7 +1895,7 @@ subscribeE-wet-via-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
                    (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
 subscribeE-wet-via-caps {n = n} {e = e} g b κ id now sched st
                         inv pathB pathSzκ lenκ szB fnB gas cOK dW
-                        nestOK opsOK depOK =
+                        nestOK opsOK depOK hps hib =
   dry , invOut , capsOut
   where
   sl      = Sched.slots sched
@@ -1898,7 +1920,7 @@ subscribeE-wet-via-caps {n = n} {e = e} g b κ id now sched st
   -- hypothesis of THIS definition, so they ride through unchanged.
   wet     = subscribeE-wet g b κ id now sched st
                            inv pathB pathSzκ lenκ szB fnB gas cOK dW
-                           nestOK opsOK depOK
+                           nestOK opsOK depOK hps hib
   dry     : hasDry (proj₁ r) ≡ false
   dry     = proj₁ wet
   invOut  : INV? (ΨAt e (Sched.slots sched′))
@@ -1931,6 +1953,8 @@ subscribeE-wet-via-caps {n = n} {e = e} g b κ id now sched st
                   pκLen
                   ≤-refl
                   ≤-refl
+                  hps
+                  hib
 
   j′      = proj₁ IH
   capOut  = proj₁ (proj₂ IH)
@@ -2051,6 +2075,8 @@ burst-all {n = n} e ins =
     nestOK
     opsOK
     (depthE≤capsH-root e ins)
+    refl                                          -- pathStrat? root
+    (T⇒≡true (inputsBelowᵉ n e) (ib-topᵉ e))
   where
   -- the guard repair (`3 + k ≤ S`, Op-Budget) asks for ONE unit more
   -- than capsAt-base-size gives; capsAt-base-size⁺ supplies it

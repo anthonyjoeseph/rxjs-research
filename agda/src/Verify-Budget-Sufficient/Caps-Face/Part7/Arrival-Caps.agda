@@ -43,6 +43,8 @@ open import Rx.Slots using (Slots; slotsSize)
 
 open import Verify-Budget-Sufficient.Delivery-Walk using
   (module Walk; chainsGo-chQ)
+open import Verify-Budget-Sufficient.Psi-Split using
+  (regP?-∧; regStrat?-paths)
 open import Verify-Budget-Sufficient.Deliveries using
   (delivN; delivN-cons; delivN-split; chainStep-deliv; cascadeGo-deliv; ⊑ᵈ-trans)
 open import Verify-Budget-Sufficient.Caps using
@@ -55,18 +57,18 @@ open import Verify-Budget-Sufficient.Caps-Depth
   using (depthCascade)
 
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
-  (capsAt-round-size; capsOK?; n≤capsAt-size; pathFloor; pathStrat?; pathSz?; pathSz?-widen;
-  valCaps?; nestClosOK?ᵛ; nestClosOK?ᵛ-widen)
+  (capsAt-round-size; capsOK?; entStrat?; n≤capsAt-size; pathFloor; pathPark?; pathStrat?;
+  pathSz?; pathSz?-widen; valCaps?; nestClosOK?ᵛ; nestClosOK?ᵛ-widen)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Root-Strat using
   (pathStrat-top)
+open import Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves using
+  (cascade-admit-park; chainStep-park; chainsOf-strat)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
-  (capsOK?-count; capsOK?-regs; pathSz?-len; slotsCaps?-capsAt; valsCaps?; valsCaps?-lvl;
-  foldPath-slots)
+  (capsOK?-count; capsOK?-regs; chainsStrat?-one; pathPark-delivered; pathsPark-delivered;
+  pathSz?-len; registry-entStrat; slotsCaps?-capsAt; valsCaps?; valsCaps?-lvl; foldPath-slots)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (valCaps?-widen)
 open import Decide using (∧-intro; ∧-trueʳ; T-to)
-open import Verify-Budget-Sufficient.Caps-Face.Part7.Reg-Strat using
-  (entStrat?; registry-entStrat)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Cascade-Caps using
   (cascadeGo-deliveries; cascadeLatch-caps; chainStep-slots; chainsOf-length; walkH)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Chain-Caps-OK using
@@ -214,6 +216,7 @@ arr-chain-hyps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   depthChain nextId a path sched st ≤ capsH e sl id →
   pathStrat? path ≡ true →
   inputsBelowᵛ (pathFloor path) (arrTy a) (arrVal a) ≡ true →
+  pathPark? path st ≡ true →
   (Σ ℕ λ g → Σ ℕ λ P →
      (4 + (sizeᵉ e + slotsSize sl) + n + n ≤ g)
      × (lvls (Caps.cSize (capsAt e sl id)) (Caps.cWid (capsAt e sl id)) (capsH e sl id) Lv 1
@@ -223,11 +226,12 @@ arr-chain-hyps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     path (arrVal a ∷ [])
     (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
     (Arrival.isLast a) sched st
-arr-chain-hyps {e = e} sl id Lv a nextId path sched st sleq cok hvc hcl hpz hdp hstr hsv
+arr-chain-hyps {e = e} sl id Lv a nextId path sched st sleq cok hvc hcl hpz hdp hstr hsv hpk
   (g , P , hfl , hlvP , hR) =
   sleq , cok , hvc , hcl , hpz , hdp
   , ∧-intro hsv refl
   , hstr
+  , hpk
   , (g , P , hfl , ENTRY , hR)
   where
   c   = capsAt e sl id
@@ -250,18 +254,19 @@ arr-chain-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   depthChain nextId a path sched st ≤ capsH e sl id →
   pathStrat? path ≡ true →
   inputsBelowᵛ (pathFloor path) (arrTy a) (arrVal a) ≡ true →
+  pathPark? path st ≡ true →
   (Σ ℕ λ g → Σ ℕ λ P →
      (4 + (sizeᵉ e + slotsSize sl) + n + n ≤ g)
      × (lvls (Caps.cSize (capsAt e sl id)) (Caps.cWid (capsAt e sl id)) (capsH e sl id) Lv 1
           ≤ P)
      × Reached (capsAt e sl id) (capsH e sl id) P g) →
   chainCapsOK (capsAt e sl id) (capsAt e sl (suc id)) sl (capsH e sl id) Lv nextId a path sched st
-arr-chain-caps {n = n} {e = e} sl id Lv a nextId path sched st sleq cok hvc hcl hpz hdp hstr hsv hR =
+arr-chain-caps {n = n} {e = e} sl id Lv a nextId path sched st sleq cok hvc hcl hpz hdp hstr hsv hpk hR =
   chain-walk-caps sl id Lv (budgetAt e (Sched.slots sched) nextId) n nextId
     (arrTick a) (arrSource a) path (arrVal a ∷ [])
     (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
     (Arrival.isLast a) sched st
-    (arr-chain-hyps sl id Lv a nextId path sched st sleq cok hvc hcl hpz hdp hstr hsv hR)
+    (arr-chain-hyps sl id Lv a nextId path sched st sleq cok hvc hcl hpz hdp hstr hsv hpk hR)
 
 -- AND THE SAME CHAIN'S BURST LEDGER, entered with the same tuple, so
 -- that one walk of the cascade's chains yields both.
@@ -276,18 +281,19 @@ arr-chain-burst : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   depthChain nextId a path sched st ≤ capsH e sl id →
   pathStrat? path ≡ true →
   inputsBelowᵛ (pathFloor path) (arrTy a) (arrVal a) ≡ true →
+  pathPark? path st ≡ true →
   (Σ ℕ λ g → Σ ℕ λ P →
      (4 + (sizeᵉ e + slotsSize sl) + n + n ≤ g)
      × (lvls (Caps.cSize (capsAt e sl id)) (Caps.cWid (capsAt e sl id)) (capsH e sl id) Lv 1
           ≤ P)
      × Reached (capsAt e sl id) (capsH e sl id) P g) →
   chainBurstOK (nestBurstAt e sl id) nextId a path sched st
-arr-chain-burst {n = n} {e = e} sl id Lv a nextId path sched st sleq cok hvc hcl hpz hdp hstr hsv hR =
+arr-chain-burst {n = n} {e = e} sl id Lv a nextId path sched st sleq cok hvc hcl hpz hdp hstr hsv hpk hR =
   chain-walk-burst sl id Lv (budgetAt e (Sched.slots sched) nextId) n nextId
     (arrTick a) (arrSource a) path (arrVal a ∷ [])
     (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
     (Arrival.isLast a) sched st
-    (arr-chain-hyps sl id Lv a nextId path sched st sleq cok hvc hcl hpz hdp hstr hsv hR)
+    (arr-chain-hyps sl id Lv a nextId path sched st sleq cok hvc hcl hpz hdp hstr hsv hpk hR)
 
 
 -- ONE CHAIN'S STEP IS THE PATH FOLD, so the level it lands at is the
@@ -309,13 +315,20 @@ chainStep-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   pathSz? (Caps.cSize (frameStep Lv (capsAt e sl id))) path ≡ true →
   valCaps? (frameStep Lv (capsAt e sl id)) sl (arrTy a) (arrVal a) ≡ true →
   depthChain nextId a path sched st ≤ capsH e sl id →
+  -- THE ENTRY READING, BESIDE THE SIZE ONE.  Both of the walk's ledgers
+  -- carry a stratification half now, so this direct entry owes both:
+  -- the chain is stratified, and the arriving value sits below that
+  -- chain's floor.  Neither half mentions the level, so the step's own
+  -- climb leaves them untouched
+  pathStrat? path ≡ true →
+  inputsBelowᵛ (pathFloor path) (arrTy a) (arrVal a) ≡ true →
   Σ ℕ λ L′ →
     (Lv + L′ ≤ lvls (Caps.cSize (capsAt e sl id)) (Caps.cWid (capsAt e sl id)) (capsH e sl id)
                  Lv (suc (delivN st (proj₂ (proj₂ (chainStep nextId a path sched st))))))
     × (capsOK? (frameStep (Lv + L′) (capsAt e sl id))
          (proj₁ (proj₂ (chainStep nextId a path sched st)))
          (proj₂ (proj₂ (chainStep nextId a path sched st))) ≡ true)
-chainStep-caps {n = n} {e = e} sl id Lv a nextId path sched st sleq cok hpz hvc hdp =
+chainStep-caps {n = n} {e = e} sl id Lv a nextId path sched st sleq cok hpz hvc hdp hstr hsv =
   W.Res.lvl FP ∸ Lv
   , subst (_≤ CEIL) (sym EQ) (≤-trans (W.Res.hi FP) STEP)
   , subst (λ x → capsOK? (frameStep x c)
@@ -336,12 +349,22 @@ chainStep-caps {n = n} {e = e} sl id Lv a nextId path sched st sleq cok hpz hvc 
                             innerFinish-caps {n′} {Γ′} {t′} {e′} {s′})
                          c d sl 2≤S (1≤capsAt-reg e sl id)
                          (slotsCaps?-capsAt e sl id) slSz)
+  -- THE WALK PRICES ITS REGISTRY BY BOTH READINGS NOW, so the entry
+  -- receipt is the caps invariant's two halves recombined: the size one
+  -- straight off `capsOK?`, the entry one off the same invariant's
+  -- ninth conjunct and lifted from a registry reading to a path one
+  regʲ = regP?-∧ (λ {u} pp → pathSz? (Caps.cSize (frameStep Lv c)) pp)
+                 (λ {u} pp → pathStrat? pp) (EvalSt.registry st)
+           (capsOK?-regs (frameStep Lv c) sched st cok)
+           (regStrat?-paths (EvalSt.registry st)
+              (registry-entStrat (frameStep Lv c) sched st cok))
   FP = W.foldPath-go Lv (budgetAt e (Sched.slots sched) nextId) n nextId
          (arrTick a) (arrSource a) path (arrVal a ∷ [])
          (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
          (Arrival.isLast a) sched st
-         ((sleq , cok) , capsOK?-regs (frameStep Lv c) sched st cok)
-         hpz (∧-intro (∧-intro hvc refl) refl)
+         ((sleq , cok) , regʲ)
+         (∧-intro hpz hstr)
+         (∧-intro (∧-intro (∧-intro hvc refl) refl) (∧-intro hsv refl))
          (W.eb-seed Lv (arrSource a) (Arrival.isLast a)) tt tt hdp
   EQ : Lv + (W.Res.lvl FP ∸ Lv) ≡ W.Res.lvl FP
   EQ = m+[n∸m]≡n (W.Res.lo FP)
@@ -378,18 +401,24 @@ chain-deliv-cap : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   valsCaps? (frameStep Lv (capsAt e sl id)) sl (arrVal a ∷ []) ≡ true →
   depthChain nextId a path sched st ≤ capsH e sl id →
   Lv ≤ Ent (capsAt e sl id) (capsH e sl id) J g i →
+  -- the same two halves the step above owes, for the same reason and at
+  -- the same chain: the position this is read at moves the budget, not
+  -- either reading
+  pathStrat? path ≡ true →
+  inputsBelowᵛ (pathFloor path) (arrTy a) (arrVal a) ≡ true →
   delivN st (proj₂ (proj₂ (chainStep nextId a path sched st)))
     ≤ dCapᶜ (Caps.cSize (capsAt e sl id)) (Caps.cWid (capsAt e sl id))
             (Caps.cReg (capsAt e sl id)) (capsH e sl id) g
             (Pos (capsAt e sl id) (capsH e sl id) J g i)
 chain-deliv-cap {n = n} {e = e} sl id a nextId path sched st Lv J g i
-  sleq n≤g cok hpz hvc hdp hLv =
+  sleq n≤g cok hpz hvc hdp hLv hstr hsv =
   ≤-trans (W.Res.cnt (W.foldPath-go Lv (budgetAt e (Sched.slots sched) nextId) n nextId
                         (arrTick a) (arrSource a) path (arrVal a ∷ [])
                         (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
                         (Arrival.isLast a) sched st
-                        ((sleq , cok) , capsOK?-regs (frameStep Lv c) sched st cok)
-                        hpz hvc refl tt tt hdp))
+                        ((sleq , cok) , regʲ)
+                        (∧-intro hpz hstr) (∧-intro hvc (∧-intro hsv refl))
+                        refl tt tt hdp))
           (dCapᶜ-mono {S} {S} {Wd} {Wd} {R} {R} {_} {_} {d} n g
              2≤S ≤-refl ≤-refl ≤-refl n≤g CLIMB)
   where
@@ -399,6 +428,11 @@ chain-deliv-cap {n = n} {e = e} sl id a nextId path sched st Lv J g i
   R   = Caps.cReg c
   d   = capsH e sl id
   2≤S = 2≤capsAt-size e sl id
+  regʲ = regP?-∧ (λ {u} pp → pathSz? (Caps.cSize (frameStep Lv c)) pp)
+                 (λ {u} pp → pathStrat? pp) (EvalSt.registry st)
+           (capsOK?-regs (frameStep Lv c) sched st cok)
+           (regStrat?-paths (EvalSt.registry st)
+              (registry-entStrat (frameStep Lv c) sched st cok))
   module W = Walk {e = e} S Wd R d 2≤S
     (walkH (λ {n′} {Γ′} {t′} {e′} {u′} → subscribeInner-caps {n′} {Γ′} {t′} {e′} {u′})
            (λ {n′} {Γ′} {t′} {e′} {s′} → innerFinish-caps {n′} {Γ′} {t′} {e′} {s′})
@@ -428,6 +462,10 @@ arr-chains-caps-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   all (λ rc → pathSz? (Caps.cSize (capsAt e sl id)) (proj₂ rc)) chains ≡ true →
   all (λ rc → pathStrat? (proj₂ rc)) chains ≡ true →
   all (λ rc → inputsBelowᵛ (pathFloor (proj₂ rc)) (arrTy a) (arrVal a)) chains ≡ true →
+  -- the third reading, pointwise like the two above it and unlike them
+  -- read AT THE STATE, which is what makes the fold's two recursive arms
+  -- ask for it in two different places rather than one
+  all (λ rc → pathPark? (proj₂ rc) st) chains ≡ true →
   valCaps? (capsAt e sl id) sl (arrTy a) (arrVal a) ≡ true →
   nestClosOK?ᵛ (capsAt e sl id) sl (arrTy a) (arrVal a) ≡ true →
   depthCascade a nextId chains sched st ≤ capsH e sl id →
@@ -439,14 +477,14 @@ arr-chains-caps-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   Lv ≤ Ent (capsAt e sl id) (capsH e sl id) J g i →
   chainsCapsOK (capsAt e sl id) (capsAt e sl (suc id)) sl (capsH e sl id) Lv a nextId chains sched st
   × chainsBurstOK (nestBurstAt e sl id) a nextId chains sched st
-arr-chains-caps-go sl id Lv a nextId [] sched st sleq hlv cok hpz hstr hsv hvc hcl hdp
+arr-chains-caps-go sl id Lv a nextId [] sched st sleq hlv cok hpz hstr hsv hpk hvc hcl hdp
   J g i hfl hR hlen hLv = tt , tt
-arr-chains-caps-go {n = n} {e = e} sl id Lv a nextId ((rid , path) ∷ chains) sched st sleq hlv cok hpz hstr hsv hvc hcl hdp
+arr-chains-caps-go {n = n} {e = e} sl id Lv a nextId ((rid , path) ∷ chains) sched st sleq hlv cok hpz hstr hsv hpk hvc hcl hdp
   J g i hfl hR hlen hLv
   with any (_≡ᵇ rid) (EvalSt.cancelled st)
 ... | true  = arr-chains-caps-go sl id Lv a nextId chains sched st sleq hlv cok
                 (proj₂ (∧-true _ _ hpz)) (proj₂ (∧-true _ _ hstr))
-                (proj₂ (∧-true _ _ hsv)) hvc hcl
+                (proj₂ (∧-true _ _ hsv)) (proj₂ (∧-true _ _ hpk)) hvc hcl
                 (lub3-l (depthCascade a nextId chains sched st)
                         (depthChain nextId a path sched
                            (record st { delivered = rid ∷ EvalSt.delivered st }))
@@ -459,13 +497,13 @@ arr-chains-caps-go {n = n} {e = e} sl id Lv a nextId ((rid , path) ∷ chains) s
                 (≤-trans (+-monoʳ-≤ i (n≤1+n (length chains))) hlen) hLv
 ... | false =
       ( arr-chain-caps sl id Lv a nextId path sched st′ sleq cok HVC HCL HPZ HDP
-          (proj₁ (∧-true _ _ hstr)) (proj₁ (∧-true _ _ hsv))
+          (proj₁ (∧-true _ _ hstr)) (proj₁ (∧-true _ _ hsv)) HPK
           (g , Pos c d J g i , hfl , CH≤ , walk J g i HI hR)
       , proj₁ ST
       , FLAT
       , proj₁ GO′ )
     , ( arr-chain-burst sl id Lv a nextId path sched st′ sleq cok HVC HCL HPZ HDP
-          (proj₁ (∧-true _ _ hstr)) (proj₁ (∧-true _ _ hsv))
+          (proj₁ (∧-true _ _ hstr)) (proj₁ (∧-true _ _ hsv)) HPK
           (g , Pos c d J g i , hfl , CH≤ , walk J g i HI hR)
       , proj₂ GO′ )
   where st′ = record st { delivered = rid ∷ EvalSt.delivered st }
@@ -498,6 +536,7 @@ arr-chains-caps-go {n = n} {e = e} sl id Lv a nextId ((rid , path) ∷ chains) s
                         (depthCascade a nextId chains
                            (proj₁ (proj₂ (chainStep nextId a path sched st′)))
                            (proj₂ (proj₂ (chainStep nextId a path sched st′)))) hdp)
+                (proj₁ (∧-true _ _ hstr)) (proj₁ (∧-true _ _ hsv))
         -- THE CASCADE'S OWN LEDGER LINE, at the state this arm has
         -- already reduced to: an uncancelled registration costs one
         -- delivery, plus this chain's fold, plus the tail's.  It is
@@ -545,10 +584,14 @@ arr-chains-caps-go {n = n} {e = e} sl id Lv a nextId ((rid , path) ∷ chains) s
                                      (depthCascade a nextId chains
                                         (proj₁ (proj₂ (chainStep nextId a path sched st′)))
                                         (proj₂ (proj₂ (chainStep nextId a path sched st′)))) hdp)
-                             hLv))
+                             hLv (proj₁ (∧-true _ _ hstr))
+                             (proj₁ (∧-true _ _ hsv))))
         REC  = ≤-trans (lvls-mono R R 2≤S ≤-refl ≤-refl (proj₁ (proj₂ ST)) ≤-refl)
                  (≤-trans (≤-reflexive (sym (lvls-add S W d Lv (suc D) R))) hlvC)
         HPZ  = pathSz?-widen path (proj₁ c⊑) (proj₁ (∧-true _ _ hpz))
+        -- the head chain's park reading, transported to the state this
+        -- arm has already marked delivered
+        HPK  = pathPark-delivered path rid st (proj₁ (∧-true _ _ hpk))
         HDP  = lub3-m (depthCascade a nextId chains sched st)
                       (depthChain nextId a path sched st′)
                       (depthCascade a nextId chains
@@ -561,7 +604,13 @@ arr-chains-caps-go {n = n} {e = e} sl id Lv a nextId ((rid , path) ∷ chains) s
                  (trans (chainStep-slots nextId a path sched st′) sleq)
                  REC (proj₂ (proj₂ ST))
                  (proj₂ (∧-true _ _ hpz)) (proj₂ (∧-true _ _ hstr))
-                 (proj₂ (∧-true _ _ hsv)) hvc hcl
+                 (proj₂ (∧-true _ _ hsv))
+                 -- the tail's chains are read at the state the HEAD's
+                 -- step produced, which is the one place the reading is
+                 -- re-established rather than rearranged
+                 (chainStep-park nextId a path sched st′ chains
+                    (pathsPark-delivered chains rid st (proj₂ (∧-true _ _ hpk))))
+                 hvc hcl
                  (lub3-r (depthCascade a nextId chains sched st)
                          (depthChain nextId a path sched st′)
                          (depthCascade a nextId chains
@@ -595,7 +644,8 @@ arr-chains-ledgers {e = e} sl id a nextId sched st sleq cok hpz hvc hcl hsv hdp 
     sleq ENTRY
     (subst (λ x → capsOK? x sched (cascadeLatch a st) ≡ true)
            (sym (frameStep-0 (capsAt e sl id))) LATCH)
-    hpz (cascade-admit-entry (capsAt e sl id) a sched st cok) hsv hvc hcl hdp
+    hpz (cascade-admit-entry (capsAt e sl id) a sched st cok) hsv
+    (cascade-admit-park a st) hvc hcl hdp
     0 (Caps.cSize (capsAt e sl id)) 0
     (capsAt-round-size e sl id) base REGLEN ≤-refl
   where
@@ -622,6 +672,11 @@ arr-chains-ledgers {e = e} sl id a nextId sched st sleq cok hpz hvc hcl hsv hdp 
           (subst (length (chainsOf a st) ≤_) (realWidAt-def e sl id)
                  (chains-count-width sl id a sched st cok))
           slSz hdp
+          -- the entry reading, both halves local to this fold: the chain
+          -- half off the registry the arrival's chains are filtered from,
+          -- the payload half `hsv` in the list shape the walk reads
+          (chainsOf-strat a st (registry-entStrat c sched st cok))
+          (chainsStrat?-one (arrVal a) (chainsOf a st) hsv)
   ENTRY = ≤-trans (lvls-mono (delivN (cascadeLatch a st)
                                 (proj₂ (proj₂ (cascadeGo a nextId (chainsOf a st) sched
                                                  (cascadeLatch a st)))))

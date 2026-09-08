@@ -33,7 +33,7 @@
 -- interface would not admit.
 module Refuted.Fan-Chain-Registry where
 
-open import Data.Bool using (true; false)
+open import Data.Bool using (true)
 open import Data.Bool.ListAction using (all)
 open import Data.Empty using (⊥)
 open import Data.Fin using (Fin) renaming (zero to fzero)
@@ -48,20 +48,18 @@ open import Relation.Binary.PropositionalEquality
 
 open import Rx.Prim using (hot)
 open import Rx.Exp using (Ctx; Closed; Exp; Fn; natᵗ; obs; emptyᵉ; mergeAllᵉ;
-  ofᵉ; strmᵗ; input)
+  ofᵉ; strmᵗ)
 open import Rx.Nest-Depth using (nestDᵉ)
-open import Rx.Slots using (Slots; scripted; shared)
+open import Rx.Slots using (Slots; scripted)
 open import Rx.Evaluator using (Path; _↠_; root; map-f; take-f; thru-outer;
-  mergeAllᵒ; share-sink; Sched; sched-init; EvalSt; register; st-init;
-  shareAdmit)
+  mergeAllᵒ; EvalSt; register; st-init; shareAdmit)
 open import Verify-Budget-Sufficient.Measures using (pathLen)
 open import Verify-Budget-Sufficient.Nest-Store using (pathNestD; nestUnit)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
-  (pathSz?; regsSz?; capsOK?)
+  (pathSz?; regsSz?)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using (pathSz?-len)
-open import Verify-Budget-Sufficient.Caps-Face.Part7.Reg-Strat using (entStrat?)
-open import Verify-Budget-Sufficient.Caps using (Caps; caps; capsAt)
-open import Verify-Budget-Sufficient.Delivery-Walk using (regP?; regQ?)
+open import Verify-Budget-Sufficient.Caps using (Caps; capsAt)
+open import Verify-Budget-Sufficient.Delivery-Walk using (regP?)
 open import Decide using (∧-trueˡ)
 
 ----------------------------------------------------------------------
@@ -212,75 +210,3 @@ fan-regsNest-absurd : FanRegsNest → ⊥
 fan-regsNest-absurd pr with pr {Γ = Γ₁} {t = natᵗ} {e = e₀} sl₁ (stDeep 2)
 ... | ()
 
-----------------------------------------------------------------------
--- AND THE CAPS RECEIPT DOES NOT FIX THE CHAINS EITHER, which is this
--- file's finding one premise further up.  Everything above quantifies
--- over a registry with no premise on it whatever; the statement below
--- is handed the WHOLE of `capsOK?`, the strongest reading the caps
--- face has, and it still does not survive.  That reading prices a
--- registry by LENGTH and by per-chain SIZE and asks nothing about
--- which frames a chain carries or which source it was minted against,
--- so a caps-legal state may hold a chain that reads a slot its own
--- sink sits at.
---
--- SO WHAT IS BEING ASSERTED IS THAT A CAPS-LEGAL STATE IS ONE THE
--- EVALUATOR COULD HAVE BUILT, and no conjunct of the reading says so.
--- The registry is a field, `register` is the only thing that writes
--- it, and the receipt is taken of the field rather than of the write.
--- The repair is therefore at the MINT and not at a stronger cap: a
--- conjunct on the state predicate, obliging every producer, which is
--- what the two siblings this file already refutes were each found to
--- need.
-----------------------------------------------------------------------
-
--- THE CAPS ARE UNIVERSALLY QUANTIFIED, SO THE REFUTATION PICKS THEM,
--- and picks them generous: at sixty-four a one-entry registry holding
--- a three-frame chain satisfies both registry conjuncts outright.
--- Nothing in the statement lets the cap be chosen against the state.
-cBig : Caps
-cBig = caps 64 64 64
-
--- AND THE SLOT IS SHARED RATHER THAN SCRIPTED, which is what makes the
--- other six conjuncts vacuous rather than argued.  `sched-init` mints
--- one live entry per SCRIPTED slot and none for a shared one, and an
--- initial state has no nodes -- so six of the eight readings are `all`
--- over `[]`.  What is left is the two registry conjuncts and the
--- source floor, and the floor is about the schedule, not the registry.
-sl₂ : Slots Γ₁
-sl₂ fzero = shared emptyᵉ
-
-RegistryEntStrat : Set
-RegistryEntStrat = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (c : Caps) (sched : Sched Γ) (st : EvalSt e) →
-  capsOK? c sched st ≡ true →
-  regQ? {t = t} (λ {u} → entStrat? {u = u}) (EvalSt.registry st) ≡ true
-
--- THE VIOLATING CHAIN: a map whose function reads slot zero, handed
--- through the outer frame into slot zero's OWN sink.  The sink floors
--- the chain at zero and the frame is then asked to keep its inputs
--- strictly below that floor, which nothing reading a slot can do.
---
--- IT IS THE FRAME HALF THAT FAILS, AND THAT IS DELIBERATE.  At source
--- zero in a one-slot context the ordering disjunct is SATISFIED, so
--- the row is a counterexample wherever the guard sits -- on the path's
--- floor, as it was, or on the source, as it now is.  A refutation that
--- turned on the guard would have died with the repair that moved it.
-fnBad : Fn Γ₁ [] [] [] natᵗ (obs natᵗ)
-fnBad = strmᵗ (input fzero)
-
-pBad : Path Γ₁ natᵗ natᵗ
-pBad = map-f fnBad ↠ (thru-outer mergeAllᵒ 0 ↠ share-sink fzero)
-
-badRow : entStrat? {Γ = Γ₁} {t = natᵗ} 0 pBad ≡ false
-badRow = refl
-
-stEnt : EvalSt e₀
-stEnt = register 0 pBad (st-init e₀)
-
-capsHolds : capsOK? cBig (sched-init e₀ sl₂) stEnt ≡ true
-capsHolds = refl
-
-registry-entStrat-absurd : RegistryEntStrat → ⊥
-registry-entStrat-absurd pr
-  with pr {Γ = Γ₁} {t = natᵗ} {e = e₀} cBig (sched-init e₀ sl₂) stEnt capsHolds
-... | ()

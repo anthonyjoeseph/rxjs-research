@@ -292,7 +292,7 @@ capsOK?-addLive {Γ = Γ} c l sched st bl wl cl inv =
     (∧-intro h1
     (∧-intro (∧-intro wl h2)
     (∧-intro h3 (∧-intro h4
-    (∧-intro h5 (∧-intro (∧-intro cl h6) h7))))))
+    (∧-intro h5 (∧-intro (∧-intro cl h6) (∧-intro h7 h8)))))))
   where
   P  = capsOK?-parts c sched st inv
   h0 = proj₁ P
@@ -305,7 +305,8 @@ capsOK?-addLive {Γ = Γ} c l sched st bl wl cl inv =
   h4 = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ P))))
   h5 = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))
   h6 = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P))))))
-  h7 = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P))))))
+  h7 = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))))
+  h8 = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))))
 
 -- AND THE SAME STEP BACKWARDS, which costs no hypothesis at all: every
 -- capsOK? conjunct that reads `live` reads it through an `all`, so the head
@@ -326,7 +327,7 @@ capsOK?-dropLive {Γ = Γ} c l sched st ok =
     (∧-intro h1
     (∧-intro (proj₂ hW)
     (∧-intro h3 (∧-intro h4
-    (∧-intro h5 (∧-intro (proj₂ hCL) h7))))))
+    (∧-intro h5 (∧-intro (proj₂ hCL) (∧-intro h7 h8)))))))
   where
   sched′ = record sched { live = l ∷ Sched.live sched }
   P  = capsOK?-parts c sched′ st ok
@@ -345,7 +346,8 @@ capsOK?-dropLive {Γ = Γ} c l sched st ok =
   h4 = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ P))))
   h5 = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))
   h6 = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P))))))
-  h7 = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P))))))
+  h7 = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))))
+  h8 = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))))
   hCL = ∧-true (closLive c (Sched.slots sched) l)
                (all (closLive c (Sched.slots sched))
                     (Sched.live sched))

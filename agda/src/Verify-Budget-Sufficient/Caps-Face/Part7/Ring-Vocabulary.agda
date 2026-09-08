@@ -48,9 +48,12 @@ open import Verify-Budget-Sufficient.Measures using
   (pathLen)
 
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
-  (capsOK?; pathFloor; pathStrat?; pathSz?; regsSz?; regsSz?-widen; nestClosOK?ᵛ)
+  (capsOK?; pathFloor; pathPark?; pathStrat?; pathSz?; regsSz?; regsSz?-widen; nestClosOK?ᵛ)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
-  (capsOK?-regs; pathSz?-len; slotsCaps?-capsAt; valsCaps?)
+  (capsOK?-regs; pathSz?-len; registry-entStrat; slotsCaps?-capsAt; valsCaps?; valsStrat?)
+open import Verify-Budget-Sufficient.Psi-Split using
+  (regP?-∧; regStrat?-paths)
+open import Decide using (∧-intro)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Cascade-Caps using
   (walkH)
 
@@ -138,6 +141,14 @@ WalkHyps {n = n} {e = e} {u = u} sl id L sf gas nid now src p vals evs fin sched
   × (depthFold sf gas nid now src p vals evs fin sched st ≤ capsH e sl id)
   × (all (inputsBelowᵛ (pathFloor p) u) vals ≡ true)
   × (pathStrat? p ≡ true)
+  -- AND A THIRD READING, WHICH IS THE ONE THE OTHER TWO CANNOT REACH.
+  -- Both above are facts about SYNTAX the walk holds -- the chain and
+  -- the payload -- so a hop transports them.  A flatten node's parked
+  -- queue is neither: it lives in the STORE, the frame names only the
+  -- node id, and nothing on the walk's telescope mentions it.  So it
+  -- travels as its own conjunct, read off the state at the chain, and
+  -- the step re-establishes it rather than transporting it
+  × (pathPark? p st ≡ true)
   × (Σ ℕ λ g → Σ ℕ λ P →
       (4 + (sizeᵉ e + slotsSize sl) + n + gas ≤ g)
       × (iterL (Caps.cSize (capsAt e sl id)) (Caps.cWid (capsAt e sl id)) (capsH e sl id)
@@ -357,6 +368,13 @@ sink-step-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (record st { delivered = rid ∷ EvalSt.delivered st }) ≡ true →
   pathSz? (Caps.cSize (frameStep Lv (capsAt e sl id))) p ≡ true →
   valsCaps? (frameStep Lv (capsAt e sl id)) sl vals ≡ true →
+  -- THE ENTRY READING, BESIDE THE SIZE ONE.  The walk's two ledgers each
+  -- carry a stratification half now, so the ring's entry owes both: the
+  -- registered chain is stratified, and what is delivered along it sits
+  -- below that chain's floor.  Neither half mentions the level, which is
+  -- why they ride through every widening untouched
+  pathStrat? p ≡ true →
+  valsStrat? (pathFloor p) vals ≡ true →
   depthFold sf gas nid now (Fin.toℕ i) p vals
     (if fin then close (Fin.toℕ i) exhausted ∷ [] else []) fin sched
     (record st { delivered = rid ∷ EvalSt.delivered st }) ≤ capsH e sl id →
@@ -368,7 +386,8 @@ sink-step-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     × (capsOK? (frameStep (Lv + L′) (capsAt e sl id))
          (proj₁ (ringFold sf gas nid now i vals fin rid p sched st))
          (proj₂ (ringFold sf gas nid now i vals fin rid p sched st)) ≡ true)
-sink-step-caps {e = e} sl id sf gas nid now i vals fin rid p Lv sched st sleq cok hpz hvc hdp =
+sink-step-caps {e = e} sl id sf gas nid now i vals fin rid p Lv sched st
+               sleq cok hpz hvc hps hvs hdp =
     W.Res.lvl FP ∸ Lv
   , subst (_≤ CEIL) (sym EQ) (≤-trans (W.Res.hi FP) STEP)
   , subst (λ x → capsOK? (frameStep x c)
@@ -384,14 +403,24 @@ sink-step-caps {e = e} sl id sf gas nid now i vals fin rid p Lv sched st sleq co
   st′ = record st { delivered = rid ∷ EvalSt.delivered st }
   slSz : slotsSize sl ≤ Caps.cSize c
   slSz = ≤-trans (m≤n+m (slotsSize sl) (2 + sizeᵉ e)) (capsAt-base-size e sl id)
+  -- THE WALK PRICES ITS REGISTRY BY BOTH READINGS NOW, so the entry
+  -- receipt is the caps invariant's two halves recombined: the size one
+  -- straight off `capsOK?`, the entry one off the same invariant's
+  -- ninth conjunct and lifted from a registry reading to a path one
+  regʲ = regP?-∧ (λ {u} pp → pathSz? (Caps.cSize (frameStep Lv c)) pp)
+                 (λ {u} pp → pathStrat? pp) (EvalSt.registry st′)
+           (capsOK?-regs (frameStep Lv c) sched st′ cok)
+           (regStrat?-paths (EvalSt.registry st′)
+              (registry-entStrat (frameStep Lv c) sched st′ cok))
   module W = Walk {e = e} S Wd (Caps.cReg c) d 2≤S
     (walkH (λ {n′} {Γ′} {t′} {e′} {u′} → subscribeInner-caps {n′} {Γ′} {t′} {e′} {u′})
            (λ {n′} {Γ′} {t′} {e′} {s′} → innerFinish-caps {n′} {Γ′} {t′} {e′} {s′})
            c d sl 2≤S (1≤capsAt-reg e sl id) (slotsCaps?-capsAt e sl id) slSz)
   FP = W.foldPath-go Lv sf gas nid now (Fin.toℕ i) p vals
          (if fin then close (Fin.toℕ i) exhausted ∷ [] else []) fin sched st′
-         ((sleq , cok) , capsOK?-regs (frameStep Lv c) sched st′ cok)
-         hpz hvc (W.eb-seed Lv (Fin.toℕ i) fin) tt tt hdp
+         ((sleq , cok) , regʲ)
+         (∧-intro hpz hps) (∧-intro hvc hvs)
+         (W.eb-seed Lv (Fin.toℕ i) fin) tt tt hdp
   EQ : Lv + (W.Res.lvl FP ∸ Lv) ≡ W.Res.lvl FP
   EQ = m+[n∸m]≡n (W.Res.lo FP)
   D = delivN st′ (proj₂ (ringFold sf gas nid now i vals fin rid p sched st))
@@ -421,6 +450,8 @@ sink-deliv-cap : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (record st { delivered = rid ∷ EvalSt.delivered st }) ≡ true →
   pathSz? (Caps.cSize (frameStep Lv (capsAt e sl id))) p ≡ true →
   valsCaps? (frameStep Lv (capsAt e sl id)) sl vals ≡ true →
+  pathStrat? p ≡ true →
+  valsStrat? (pathFloor p) vals ≡ true →
   depthFold sf gas nid now (Fin.toℕ i) p vals
     (if fin then close (Fin.toℕ i) exhausted ∷ [] else []) fin sched
     (record st { delivered = rid ∷ EvalSt.delivered st }) ≤ capsH e sl id →
@@ -431,7 +462,7 @@ sink-deliv-cap : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
             (Caps.cReg (capsAt e sl id)) (capsH e sl id) g
             (Pos (capsAt e sl id) (capsH e sl id) J g k)
 sink-deliv-cap {e = e} sl id sf gas nid now i vals fin rid p Lv J g k sched st
-  sleq hgas cok hpz hvc hdp hLv =
+  sleq hgas cok hpz hvc hps hvs hdp hLv =
   ≤-trans (W.Res.cnt FP)
           (dCapᶜ-mono {S} {S} {Wd} {Wd} {R} {R} {_} {_} {d} gas g
              2≤S ≤-refl ≤-refl ≤-refl hgas CLIMB)
@@ -445,14 +476,20 @@ sink-deliv-cap {e = e} sl id sf gas nid now i vals fin rid p Lv J g k sched st
   st′ = record st { delivered = rid ∷ EvalSt.delivered st }
   slSz : slotsSize sl ≤ Caps.cSize c
   slSz = ≤-trans (m≤n+m (slotsSize sl) (2 + sizeᵉ e)) (capsAt-base-size e sl id)
+  regʲ = regP?-∧ (λ {u} pp → pathSz? (Caps.cSize (frameStep Lv c)) pp)
+                 (λ {u} pp → pathStrat? pp) (EvalSt.registry st′)
+           (capsOK?-regs (frameStep Lv c) sched st′ cok)
+           (regStrat?-paths (EvalSt.registry st′)
+              (registry-entStrat (frameStep Lv c) sched st′ cok))
   module W = Walk {e = e} S Wd R d 2≤S
     (walkH (λ {n′} {Γ′} {t′} {e′} {u′} → subscribeInner-caps {n′} {Γ′} {t′} {e′} {u′})
            (λ {n′} {Γ′} {t′} {e′} {s′} → innerFinish-caps {n′} {Γ′} {t′} {e′} {s′})
            c d sl 2≤S (1≤capsAt-reg e sl id) (slotsCaps?-capsAt e sl id) slSz)
   FP = W.foldPath-go Lv sf gas nid now (Fin.toℕ i) p vals
          (if fin then close (Fin.toℕ i) exhausted ∷ [] else []) fin sched st′
-         ((sleq , cok) , capsOK?-regs (frameStep Lv c) sched st′ cok)
-         hpz hvc (W.eb-seed Lv (Fin.toℕ i) fin) tt tt hdp
+         ((sleq , cok) , regʲ)
+         (∧-intro hpz hps) (∧-intro hvc hvs)
+         (W.eb-seed Lv (Fin.toℕ i) fin) tt tt hdp
   CLIMB : iterL S Wd d (pathLen p) Lv ≤ Pos c d J g k
   CLIMB = ≤-trans (iterL-mono (pathLen p) _ 2≤S ≤-refl ≤-refl ≤-refl
                      (≤-trans (pathSz?-len (Caps.cSize (frameStep Lv c)) p hpz)

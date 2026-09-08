@@ -2,8 +2,8 @@
 -- walkH … cascadeGo-slots
 module Verify-Budget-Sufficient.Caps-Face.Part7.Cascade-Caps where
 
-open import Data.Bool    using (true; false; if_then_else_)
-open import Data.Nat     using (ℕ; suc; _+_; _≤_; _≡ᵇ_; z≤n; s≤s)
+open import Data.Bool    using (true; false; _∧_; if_then_else_)
+open import Data.Nat     using (ℕ; _+_; _≤_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤-trans; ≤-refl; ≤-reflexive; n≤1+n; *-identityʳ)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
@@ -23,38 +23,43 @@ open import Data.Unit    using (⊤; tt)
 open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; subst)
 
-open import Rx.Prim      using (Tick; Id; Source; _at_from_as_; Gas; after_,_; close; exhausted)
-open import Rx.Exp       using (obs; _≟ᵗ_; Ctx; Closed; Val)
+open import Rx.Prim      using (Id; Source; _at_from_as_; after_,_; close; exhausted)
+open import Rx.Exp       using (_≟ᵗ_; Ctx; Closed)
 open import Verify-Budget-Sufficient.Caps-Depth using
   (depthCascade)
-open import Rx.Evaluator using (Sched; EvalSt; Arrival; arrVal; RegId; Chain; lookupNode; NodeId; AllOp; cascadeLatch;
-  cascadeFinish; arrSource; chainsOf; chainsGo; cascadeGo; Path; arrTy; stepFrame;
-  subscribeInner; innerFinish; sameSource; regAt; fLvlD; lvls; sLvlD; chainStep; budgetAt;
-  arrTick; shareAdmit)
+open import Rx.Evaluator using (Sched; EvalSt; Arrival; arrVal; RegId; Chain; cascadeLatch; cascadeFinish; arrSource;
+  chainsOf; chainsGo; cascadeGo; Path; arrTy; stepFrame; sameSource; regAt; lvls; chainStep;
+  budgetAt; arrTick; shareAdmit; _↠_)
 open import Rx.Slots using (Slots; slotsSize)
 
 open import Verify-Budget-Sufficient.Delivery-Walk using
-  (module Walk; Walk-Hyps; chP?-const)
+  (module Walk; Walk-Hyps; chP?; chP?-const)
 open import Verify-Budget-Sufficient.Deliveries using
   (delivN)
 open import Verify-Budget-Sufficient.Caps using
   (Caps; cDel; cDel-body; dWalkᶜ-mono; frameStep; frameStep-0; frameStep-mono-j; lvls-mono;
   sizeCount; sizeCount-body)
 open import Verify-Budget-Sufficient.Measures using
-  (pathLen; ∧-true)
+  (∧-true)
 open import Verify-Budget-Sufficient.Keeps-Ring using
   (KeepsC; stepFrame-keeps)
-open import Verify-Budget-Sufficient.Caps-Nest using
-  (nest)
 open import Verify-Budget-Sufficient.Caps-Depth
-  using (depthInner; depthFin; depthCascade)
+  using (depthCascade)
 
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
-  (capsOK?; eventCaps?; pathSz?; pathSz?-widen; regsSz?; slotsCaps?; valCaps?)
+  (capsOK?; pathSz?; pathSz?-widen; regsSz?; slotsCaps?; valCaps?; pathFloor; pathStrat?;
+  frameStrat?)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
-  (foldPath-slots; capsOK?-count; capsOK?-delivered; capsOK?-regs; dropSweep-caps; frameBud;
-  pathSz?-len; pathSz?-tail; shareLatch-caps; valsCaps?; valsCaps?-lvl; walkOK; walkOK-finish)
-open import Decide using (∧-intro)
+  (foldPath-slots; capsOK?-count; capsOK?-delivered; capsOK?-regs; dropSweep-caps; pathSz?-len;
+  pathSz?-tail; shareLatch-caps; valsCaps?; valsCaps?-lvl; walkOK; walkOK-finish;
+  registry-entStrat; valsStrat?)
+open import Verify-Budget-Sufficient.Psi-Split using
+  (chP?-∧; regP?-∧; regStrat?-paths)
+open import Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves using
+  (shareAdmit-strat; stepFrame-valsStrat)
+open import Decide using (∧-intro; ∧-trueˡ; ∧-trueʳ)
+open import Verify-Budget-Sufficient.Caps-Face.Part6 using
+  (SiCType; IfcType)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Frame-Face using
   (stepFrame-face)
 
@@ -66,58 +71,8 @@ open import Verify-Budget-Sufficient.Caps-Face.Part7.Frame-Face using
 -- `cascadeGo-deliveries` is the theorem it buys.  `delivN`, from
 -- `.Deliveries`, is the currency the cascade conjuncts are stated in.
 walkH :
-  (∀ {n′} {Γ′ : Ctx n′} {t′} {e′ : Closed Γ′ t′} {u′}
-    (c′ : Caps) (dep bud j′ : ℕ) (g′ : Gas) (op′ : AllOp) (allNid′ : NodeId)
-    (κ′ : Path Γ′ u′ t′) (id′ : Id) (now′ : Tick) (o′ : Val Γ′ (obs u′))
-    (sl′ : Slots Γ′) (sched′ : Sched Γ′) (st′ : EvalSt e′) →
-    2 ≤ Caps.cSize c′ →
-    1 ≤ Caps.cReg c′ →
-    Sched.slots sched′ ≡ sl′ →
-    slotsCaps? (Caps.cSize c′) (Caps.cWid c′) sl′ ≡ true →
-    slotsSize sl′ ≤ Caps.cSize c′ →
-    capsOK? (frameStep j′ c′) sched′ st′ ≡ true →
-    valCaps? (frameStep j′ c′) sl′ (obs u′) o′ ≡ true →
-    pathSz? (Caps.cSize (frameStep j′ c′)) κ′ ≡ true →
-    suc (pathLen κ′) ≤ Caps.cSize (frameStep j′ c′) →
-    nest o′ sl′ (EvalSt.connectedShares st′) ≤ bud →
-    depthInner g′ op′ allNid′ κ′ id′ now′ o′ sched′ st′ ≤ dep →
-    let r′ = subscribeInner g′ op′ allNid′ κ′ id′ now′ o′ sched′ st′
-    in Σ ℕ λ j₂ →
-       (capsOK? (frameStep (j′ + j₂) c′)
-                (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r′)))))
-                (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r′))))) ≡ true)
-       × (valsCaps? (frameStep (j′ + j₂) c′) sl′ (proj₁ (proj₂ r′)) ≡ true)
-       × (all (eventCaps? (frameStep (j′ + j₂) c′) sl′)
-              (proj₁ (proj₂ (proj₂ r′))) ≡ true)
-       × (suc (j′ + j₂) ≤ sLvlD (Caps.cSize c′) (Caps.cWid c′) dep (suc bud) (suc j′))
-   ) →
-  -- ifc  (innerFinish-caps, .Subscribe-Face)
-  (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-    (c : Caps) (dep bud j : ℕ) (g : Gas) (op : AllOp) (allNid inst : NodeId)
-    (κ : Path Γ s t) (id : Id) (now : Tick) (vals : List (Val Γ s))
-    (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
-    2 ≤ Caps.cSize c →
-    1 ≤ Caps.cReg c →
-    Sched.slots sched ≡ sl →
-    slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
-    slotsSize sl ≤ Caps.cSize c →
-    capsOK? (frameStep j c) sched st ≡ true →
-    pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
-    suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
-    valsCaps? (frameStep j c) sl vals ≡ true →
-    frameBud c j ≤ bud →
-    depthFin g op allNid inst κ id now vals sched st
-      (lookupNode allNid (EvalSt.nodes st)) ≤ dep →
-    let r = innerFinish g op allNid inst κ id now vals sched st
-              (lookupNode allNid (EvalSt.nodes st))
-    in Σ ℕ λ j′ →
-       (capsOK? (frameStep (j + j′) c)
-                (proj₁ (proj₂ (proj₂ (proj₂ r)))) (proj₂ (proj₂ (proj₂ (proj₂ r))))
-                  ≡ true)
-       × (valsCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
-       × (all (eventCaps? (frameStep (j + j′) c) sl)
-              (proj₁ (proj₂ r)) ≡ true)
-       × (suc (j + j′) ≤ fLvlD (Caps.cSize c) (Caps.cWid c) dep j)) →
+  SiCType →
+  IfcType →
   ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (c : Caps) (d : ℕ) (sl : Slots Γ) →
   2 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
   slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
@@ -125,10 +80,16 @@ walkH :
   Walk-Hyps e (Caps.cSize c) (Caps.cWid c) (Caps.cReg c) d
 walkH siC ifc c d sl 2≤S 1≤R slC slSz = record
   { OK        = walkOK c sl
-  ; Pb        = λ J p → pathSz? (Caps.cSize (frameStep J c)) p
-  -- PATH-BLIND ON THIS FACE, for now: the caps reading of a payload is a
-  -- size bound, and a size does not depend on where the payload is going
-  ; Vb        = λ _ J vs → valsCaps? (frameStep J c) sl vs
+  -- BOTH LEDGERS CARRY THE ENTRY READING BESIDE THE CAPS ONE, and the
+  -- two halves are independent: a size bound does not move when the
+  -- level does, and a stratification reading does not mention the level
+  -- at all.  The payload half is the one that had to stop being
+  -- PATH-BLIND — a value's floor is the floor of where it is GOING, so
+  -- the fan is the step where the reading moves and the widenings are
+  -- the steps where it cannot
+  ; Pb        = λ J p → pathSz? (Caps.cSize (frameStep J c)) p ∧ pathStrat? p
+  ; Vb        = λ p J vs → valsCaps? (frameStep J c) sl vs
+                             ∧ valsStrat? (pathFloor p) vs
   -- TRIVIAL BURST INSTANTIATION: Eb and Bb are always true, so every
   -- closure fact is refl and Res.burst is never projected by callers.
   -- GAS-BLIND: the caps axis carries no fuel content, so GOK is ⊤;
@@ -148,34 +109,75 @@ walkH siC ifc c d sl 2≤S 1≤R slC slSz = record
   ; b-widen   = λ _ _ _ → refl
   ; b-deliv   = λ _ _ _ _ _ _ _ _ → refl
   ; b-handoff = λ _ _ _ _ _ _ → refl
-  ; p-len     = λ J p h → pathSz?-len (Caps.cSize (frameStep J c)) p h
-  ; p-tail    = λ J f p h → pathSz?-tail (Caps.cSize (frameStep J c)) f p h
-  ; p-widen   = λ le p h → pathSz?-widen p (proj₁ (frameStep-mono-j c 2≤S le)) h
-  ; v-widen   = λ le _ vs h → valsCaps?-lvl _ _ sl vs (frameStep-mono-j c 2≤S le) h
-  ; v-fan     = λ J i vs _ st _ h →
-                  chP?-const (valsCaps? (frameStep J c) sl vs)
-                    (shareAdmit i (EvalSt.registry st)) h
+  ; p-len     = λ J p h → pathSz?-len (Caps.cSize (frameStep J c)) p (∧-trueˡ h)
+  -- the cons of a path splits BOTH readings by the same ∧, and the
+  -- strat half sheds the frame's own conjunct on the way
+  ; p-tail    = λ J f p h →
+                  ∧-intro (pathSz?-tail (Caps.cSize (frameStep J c)) f p (∧-trueˡ h))
+                          (proj₂ (∧-true (frameStrat? (pathFloor p) f) (pathStrat? p)
+                                    (proj₂ (∧-true (pathSz? (Caps.cSize (frameStep J c)) (f ↠ p))
+                                                   (pathStrat? (f ↠ p)) h))))
+  ; p-widen   = λ le p h →
+                  ∧-intro (pathSz?-widen p (proj₁ (frameStep-mono-j c 2≤S le)) (∧-trueˡ h))
+                          (∧-trueʳ h)
+  ; v-widen   = λ le _ vs h →
+                  ∧-intro (valsCaps?-lvl _ _ sl vs (frameStep-mono-j c 2≤S le) (∧-trueˡ h))
+                          (∧-trueʳ h)
+  -- THE FAN IS WHERE THE READING MOVES: the caps half is constant in
+  -- the chain, the strat half is not — every chain the share admits
+  -- sinks at or above `i`, which is what the registry's own reading
+  -- says and what `shareAdmit-strat` turns into the pointwise ledger
+  ; v-fan     = λ J i vs sched st ok h →
+                  chP?-∧ (λ _ → valsCaps? (frameStep J c) sl vs)
+                         (λ κ → valsStrat? (pathFloor κ) vs)
+                         (shareAdmit i (EvalSt.registry st))
+                    (chP?-const (valsCaps? (frameStep J c) sl vs)
+                       (shareAdmit i (EvalSt.registry st)) (∧-trueˡ h))
+                    (proj₂ (shareAdmit-strat i vs st
+                              (registry-entStrat (frameStep J c) sched st (proj₂ ok))
+                              (∧-trueʳ h)))
   ; ok-reg    = λ J sched st ok → capsOK?-count (frameStep J c) sched st (proj₂ ok)
   ; ok-cons   = λ J rid sched st ok →
                   proj₁ ok , capsOK?-delivered (frameStep J c) rid sched st (proj₂ ok)
   ; ok-latch  = λ J i fin sched st ok →
                   proj₁ ok , shareLatch-caps (frameStep J c) i fin sched st (proj₂ ok)
   ; ok-finish = λ J i fin out ok → walkOK-finish c sl J i fin out ok
+  -- THE FRAME, AND THE ONE PLACE THE PAYLOAD READING IS RE-ESTABLISHED
+  -- RATHER THAN TRANSPORTED.  `stepFrame` rewrites the payload, so its
+  -- floor is earned back from the frame's own conjunct of the path
+  -- reading — which is the half `p-tail` throws away, spent here instead
   ; sf-step   = λ J sf id now f path′ vals fin sched st ok hP hV hL _ _ hD →
                   let r  = stepFrame sf id now f path′ vals fin sched st
+                      hS = proj₂ (∧-true (pathSz? (Caps.cSize (frameStep J c)) (f ↠ path′))
+                                         (pathStrat? (f ↠ path′)) hP)
+                      hF = proj₁ (∧-true (frameStrat? (pathFloor path′) f)
+                                         (pathStrat? path′) hS)
                       FC = stepFrame-face siC ifc c d J sl sf id now f path′ vals fin sched st
-                             2≤S 1≤R (proj₁ ok) slC (proj₂ ok) hP hV slSz hD in
+                             2≤S 1≤R (proj₁ ok) slC (proj₂ ok)
+                             (∧-trueˡ hP) (∧-trueˡ hV) slSz hD
+                             hS (∧-trueʳ hV) in
                   proj₁ FC
                   , proj₁ (proj₂ FC)
                   , ( trans (KeepsC.slotsEq
                                (stepFrame-keeps sf id now f path′ vals fin sched st))
                             (proj₁ ok)
                     , proj₁ (proj₂ (proj₂ FC)) )
-                  , proj₁ (proj₂ (proj₂ (proj₂ FC)))
-                  , capsOK?-regs (frameStep (J + proj₁ FC) c)
-                      (proj₁ (proj₂ (proj₂ (proj₂ r))))
-                      (proj₂ (proj₂ (proj₂ (proj₂ r))))
-                      (proj₁ (proj₂ (proj₂ FC)))
+                  , ∧-intro (proj₁ (proj₂ (proj₂ (proj₂ FC))))
+                      (stepFrame-valsStrat sf id now f path′ vals fin sched st
+                         hF (∧-trueʳ hV))
+                  , regP?-∧ (pathSz? (Caps.cSize (frameStep (J + proj₁ FC) c)))
+                      (λ {u} p → pathStrat? p)
+                      (EvalSt.registry (proj₂ (proj₂ (proj₂ (proj₂ r)))))
+                      (capsOK?-regs (frameStep (J + proj₁ FC) c)
+                        (proj₁ (proj₂ (proj₂ (proj₂ r))))
+                        (proj₂ (proj₂ (proj₂ (proj₂ r))))
+                        (proj₁ (proj₂ (proj₂ FC))))
+                      (regStrat?-paths
+                        (EvalSt.registry (proj₂ (proj₂ (proj₂ (proj₂ r)))))
+                        (registry-entStrat (frameStep (J + proj₁ FC) c)
+                           (proj₁ (proj₂ (proj₂ (proj₂ r))))
+                           (proj₂ (proj₂ (proj₂ (proj₂ r))))
+                           (proj₁ (proj₂ (proj₂ FC)))))
                   , refl
   }
 
@@ -184,58 +186,8 @@ walkH siC ifc c d sl 2≤S 1≤R slC slSz = record
 -- registry cap (length chains ≤ cReg), and dCapᶜ's own unfolding, which
 -- is what `cDel` abbreviates
 cascadeGo-deliveries :
-  (∀ {n′} {Γ′ : Ctx n′} {t′} {e′ : Closed Γ′ t′} {u′}
-    (c′ : Caps) (dep bud j′ : ℕ) (g′ : Gas) (op′ : AllOp) (allNid′ : NodeId)
-    (κ′ : Path Γ′ u′ t′) (id′ : Id) (now′ : Tick) (o′ : Val Γ′ (obs u′))
-    (sl′ : Slots Γ′) (sched′ : Sched Γ′) (st′ : EvalSt e′) →
-    2 ≤ Caps.cSize c′ →
-    1 ≤ Caps.cReg c′ →
-    Sched.slots sched′ ≡ sl′ →
-    slotsCaps? (Caps.cSize c′) (Caps.cWid c′) sl′ ≡ true →
-    slotsSize sl′ ≤ Caps.cSize c′ →
-    capsOK? (frameStep j′ c′) sched′ st′ ≡ true →
-    valCaps? (frameStep j′ c′) sl′ (obs u′) o′ ≡ true →
-    pathSz? (Caps.cSize (frameStep j′ c′)) κ′ ≡ true →
-    suc (pathLen κ′) ≤ Caps.cSize (frameStep j′ c′) →
-    nest o′ sl′ (EvalSt.connectedShares st′) ≤ bud →
-    depthInner g′ op′ allNid′ κ′ id′ now′ o′ sched′ st′ ≤ dep →
-    let r′ = subscribeInner g′ op′ allNid′ κ′ id′ now′ o′ sched′ st′
-    in Σ ℕ λ j₂ →
-       (capsOK? (frameStep (j′ + j₂) c′)
-                (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r′)))))
-                (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r′))))) ≡ true)
-       × (valsCaps? (frameStep (j′ + j₂) c′) sl′ (proj₁ (proj₂ r′)) ≡ true)
-       × (all (eventCaps? (frameStep (j′ + j₂) c′) sl′)
-              (proj₁ (proj₂ (proj₂ r′))) ≡ true)
-       × (suc (j′ + j₂) ≤ sLvlD (Caps.cSize c′) (Caps.cWid c′) dep (suc bud) (suc j′))
-   ) →
-  -- ifc  (innerFinish-caps, .Subscribe-Face)
-  (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-    (c : Caps) (dep bud j : ℕ) (g : Gas) (op : AllOp) (allNid inst : NodeId)
-    (κ : Path Γ s t) (id : Id) (now : Tick) (vals : List (Val Γ s))
-    (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
-    2 ≤ Caps.cSize c →
-    1 ≤ Caps.cReg c →
-    Sched.slots sched ≡ sl →
-    slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
-    slotsSize sl ≤ Caps.cSize c →
-    capsOK? (frameStep j c) sched st ≡ true →
-    pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
-    suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
-    valsCaps? (frameStep j c) sl vals ≡ true →
-    frameBud c j ≤ bud →
-    depthFin g op allNid inst κ id now vals sched st
-      (lookupNode allNid (EvalSt.nodes st)) ≤ dep →
-    let r = innerFinish g op allNid inst κ id now vals sched st
-              (lookupNode allNid (EvalSt.nodes st))
-    in Σ ℕ λ j′ →
-       (capsOK? (frameStep (j + j′) c)
-                (proj₁ (proj₂ (proj₂ (proj₂ r)))) (proj₂ (proj₂ (proj₂ (proj₂ r))))
-                  ≡ true)
-       × (valsCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
-       × (all (eventCaps? (frameStep (j + j′) c) sl)
-              (proj₁ (proj₂ r)) ≡ true)
-       × (suc (j + j′) ≤ fLvlD (Caps.cSize c) (Caps.cWid c) dep j)) →
+  SiCType →
+  IfcType →
   ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (c : Caps) (d : ℕ) (a : Arrival Γ) (id : Id)
   (chains : List (RegId × Path Γ (arrTy a) t))
@@ -252,13 +204,20 @@ cascadeGo-deliveries :
   -- the walk's two new obligations, sourced one level up at `caps-tick`
   slotsSize sl ≤ Caps.cSize c →
   depthCascade a id chains sched st ≤ d →
+  -- THE ENTRY READING, PER CHAIN.  The walk's ledgers now carry a
+  -- stratification half beside the size one, so the cascade's own
+  -- entry point owes both: every chain the arrival is dispatched
+  -- along is stratified, and the payload sits below that chain's
+  -- floor.  The payload half is path-INDEXED, which is what lets the
+  -- reading move at the fan and nowhere else
+  chP? (λ {u} p → pathStrat? p) chains ≡ true →
+  chP? (λ {u} p → valsStrat? (pathFloor p) (arrVal a ∷ [])) chains ≡ true →
   delivN st (proj₂ (proj₂ (cascadeGo a id chains sched st)))
     ≤ cDel c d
-cascadeGo-deliveries siC ifc {n = n} {e = e} c d a id chains sl sched st 2≤S 1≤R slC slEq inv vC pS n≤S lenB slSz hD =
+cascadeGo-deliveries siC ifc {n = n} {e = e} c d a id chains sl sched st 2≤S 1≤R slC slEq inv vC pS n≤S lenB slSz hD hpS hvS =
   ≤-trans (W.Res.cnt (W.cascadeGo-go 0 a id chains sched st
-             ((slEq , invʲ) , capsOK?-regs c sched st inv)
-             pS (chP?-const (valsCaps? (frameStep 0 c) sl (arrVal a ∷ [])) chains
-              (∧-intro (∧-intro vC refl) refl)) tt hD))
+             ((slEq , invʲ) , regʲ)
+             pS∧ vS∧ tt hD))
     (≤-trans (dWalkᶜ-mono n (Caps.cSize c) (length chains)
                 (regAt (Caps.cSize c) (Caps.cReg c) 0)
                 2≤S ≤-refl ≤-refl ≤-refl n≤S ≤-refl
@@ -267,6 +226,17 @@ cascadeGo-deliveries siC ifc {n = n} {e = e} c d a id chains sl sched st 2≤S 1
   where
   invʲ : capsOK? (frameStep 0 c) sched st ≡ true
   invʲ = subst (λ x → capsOK? x sched st ≡ true) (sym (frameStep-0 c)) inv
+  regʲ = regP?-∧ (λ {u} p → pathSz? (Caps.cSize c) p)
+                 (λ {u} p → pathStrat? p) (EvalSt.registry st)
+           (capsOK?-regs c sched st inv)
+           (regStrat?-paths (EvalSt.registry st)
+              (registry-entStrat c sched st inv))
+  pS∧ = chP?-∧ (λ {u} p → pathSz? (Caps.cSize c) p)
+               (λ {u} p → pathStrat? p) chains pS hpS
+  vS∧ = chP?-∧ (λ {u} _ → valsCaps? (frameStep 0 c) sl (arrVal a ∷ []))
+               (λ {u} p → valsStrat? (pathFloor p) (arrVal a ∷ [])) chains
+          (chP?-const (valsCaps? (frameStep 0 c) sl (arrVal a ∷ [])) chains
+             (∧-intro (∧-intro vC refl) refl)) hvS
   module W = Walk {e = e} (Caps.cSize c) (Caps.cWid c) (Caps.cReg c) d 2≤S
                   (walkH siC ifc c d sl 2≤S 1≤R slC slSz)
 
@@ -299,58 +269,8 @@ cascadeGo-deliveries siC ifc {n = n} {e = e} c d a id chains sl sched st 2≤S 1
 ------------------------------------------------------------------
 
 cascadeGo-level :
-  (∀ {n′} {Γ′ : Ctx n′} {t′} {e′ : Closed Γ′ t′} {u′}
-    (c′ : Caps) (dep bud j′ : ℕ) (g′ : Gas) (op′ : AllOp) (allNid′ : NodeId)
-    (κ′ : Path Γ′ u′ t′) (id′ : Id) (now′ : Tick) (o′ : Val Γ′ (obs u′))
-    (sl′ : Slots Γ′) (sched′ : Sched Γ′) (st′ : EvalSt e′) →
-    2 ≤ Caps.cSize c′ →
-    1 ≤ Caps.cReg c′ →
-    Sched.slots sched′ ≡ sl′ →
-    slotsCaps? (Caps.cSize c′) (Caps.cWid c′) sl′ ≡ true →
-    slotsSize sl′ ≤ Caps.cSize c′ →
-    capsOK? (frameStep j′ c′) sched′ st′ ≡ true →
-    valCaps? (frameStep j′ c′) sl′ (obs u′) o′ ≡ true →
-    pathSz? (Caps.cSize (frameStep j′ c′)) κ′ ≡ true →
-    suc (pathLen κ′) ≤ Caps.cSize (frameStep j′ c′) →
-    nest o′ sl′ (EvalSt.connectedShares st′) ≤ bud →
-    depthInner g′ op′ allNid′ κ′ id′ now′ o′ sched′ st′ ≤ dep →
-    let r′ = subscribeInner g′ op′ allNid′ κ′ id′ now′ o′ sched′ st′
-    in Σ ℕ λ j₂ →
-       (capsOK? (frameStep (j′ + j₂) c′)
-                (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r′)))))
-                (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r′))))) ≡ true)
-       × (valsCaps? (frameStep (j′ + j₂) c′) sl′ (proj₁ (proj₂ r′)) ≡ true)
-       × (all (eventCaps? (frameStep (j′ + j₂) c′) sl′)
-              (proj₁ (proj₂ (proj₂ r′))) ≡ true)
-       × (suc (j′ + j₂) ≤ sLvlD (Caps.cSize c′) (Caps.cWid c′) dep (suc bud) (suc j′))
-   ) →
-  -- ifc  (innerFinish-caps, .Subscribe-Face)
-  (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-    (c : Caps) (dep bud j : ℕ) (g : Gas) (op : AllOp) (allNid inst : NodeId)
-    (κ : Path Γ s t) (id : Id) (now : Tick) (vals : List (Val Γ s))
-    (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
-    2 ≤ Caps.cSize c →
-    1 ≤ Caps.cReg c →
-    Sched.slots sched ≡ sl →
-    slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
-    slotsSize sl ≤ Caps.cSize c →
-    capsOK? (frameStep j c) sched st ≡ true →
-    pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
-    suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
-    valsCaps? (frameStep j c) sl vals ≡ true →
-    frameBud c j ≤ bud →
-    depthFin g op allNid inst κ id now vals sched st
-      (lookupNode allNid (EvalSt.nodes st)) ≤ dep →
-    let r = innerFinish g op allNid inst κ id now vals sched st
-              (lookupNode allNid (EvalSt.nodes st))
-    in Σ ℕ λ j′ →
-       (capsOK? (frameStep (j + j′) c)
-                (proj₁ (proj₂ (proj₂ (proj₂ r)))) (proj₂ (proj₂ (proj₂ (proj₂ r))))
-                  ≡ true)
-       × (valsCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
-       × (all (eventCaps? (frameStep (j + j′) c) sl)
-              (proj₁ (proj₂ r)) ≡ true)
-       × (suc (j + j′) ≤ fLvlD (Caps.cSize c) (Caps.cWid c) dep j)) →
+  SiCType →
+  IfcType →
   ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (c : Caps) (d : ℕ) (a : Arrival Γ) (id : Id)
   (chains : List (RegId × Path Γ (arrTy a) t))
@@ -364,22 +284,40 @@ cascadeGo-level :
   all (λ rc → pathSz? (Caps.cSize c) (proj₂ rc)) chains ≡ true →
   slotsSize sl ≤ Caps.cSize c →
   depthCascade a id chains sched st ≤ d →
+  -- THE ENTRY READING, PER CHAIN.  The walk's ledgers now carry a
+  -- stratification half beside the size one, so the cascade's own
+  -- entry point owes both: every chain the arrival is dispatched
+  -- along is stratified, and the payload sits below that chain's
+  -- floor.  The payload half is path-INDEXED, which is what lets the
+  -- reading move at the fan and nowhere else
+  chP? (λ {u} p → pathStrat? p) chains ≡ true →
+  chP? (λ {u} p → valsStrat? (pathFloor p) (arrVal a ∷ [])) chains ≡ true →
   let r = cascadeGo a id chains sched st
   in Σ ℕ λ j →
      (j ≤ lvls (Caps.cSize c) (Caps.cWid c) d 0
              (delivN st (proj₂ (proj₂ r))))
      × (capsOK? (frameStep j c) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
-cascadeGo-level siC ifc {e = e} c d a id chains sl sched st 2≤S 1≤R slC slEq inv vC pS slSz hD =
+cascadeGo-level siC ifc {e = e} c d a id chains sl sched st 2≤S 1≤R slC slEq inv vC pS slSz hD hpS hvS =
   W.Res.lvl GO , W.Res.hi GO , proj₂ (proj₁ (W.Res.good GO))
   where
   invʲ : capsOK? (frameStep 0 c) sched st ≡ true
   invʲ = subst (λ x → capsOK? x sched st ≡ true) (sym (frameStep-0 c)) inv
+  regʲ = regP?-∧ (λ {u} p → pathSz? (Caps.cSize c) p)
+                 (λ {u} p → pathStrat? p) (EvalSt.registry st)
+           (capsOK?-regs c sched st inv)
+           (regStrat?-paths (EvalSt.registry st)
+              (registry-entStrat c sched st inv))
+  pS∧ = chP?-∧ (λ {u} p → pathSz? (Caps.cSize c) p)
+               (λ {u} p → pathStrat? p) chains pS hpS
+  vS∧ = chP?-∧ (λ {u} _ → valsCaps? (frameStep 0 c) sl (arrVal a ∷ []))
+               (λ {u} p → valsStrat? (pathFloor p) (arrVal a ∷ [])) chains
+          (chP?-const (valsCaps? (frameStep 0 c) sl (arrVal a ∷ [])) chains
+             (∧-intro (∧-intro vC refl) refl)) hvS
   module W = Walk {e = e} (Caps.cSize c) (Caps.cWid c) (Caps.cReg c) d 2≤S
                   (walkH siC ifc c d sl 2≤S 1≤R slC slSz)
   GO = W.cascadeGo-go 0 a id chains sched st
-         ((slEq , invʲ) , capsOK?-regs c sched st inv)
-         pS (chP?-const (valsCaps? (frameStep 0 c) sl (arrVal a ∷ [])) chains
-              (∧-intro (∧-intro vC refl) refl)) tt hD
+         ((slEq , invʲ) , regʲ)
+         pS∧ vS∧ tt hD
 
 -- and the assembly declared above: the landing level with the delivery
 -- count widened to its own recursion, which is `sizeCount` by definition
@@ -388,58 +326,8 @@ cascadeGo-level siC ifc {e = e} c d a id chains sl sched st 2≤S 1≤R slC slEq
 -- this one is (the body is at the end of the next section, where
 -- cascadeGo-level is)
 cascadeGo-caps :
-  (∀ {n′} {Γ′ : Ctx n′} {t′} {e′ : Closed Γ′ t′} {u′}
-    (c′ : Caps) (dep bud j′ : ℕ) (g′ : Gas) (op′ : AllOp) (allNid′ : NodeId)
-    (κ′ : Path Γ′ u′ t′) (id′ : Id) (now′ : Tick) (o′ : Val Γ′ (obs u′))
-    (sl′ : Slots Γ′) (sched′ : Sched Γ′) (st′ : EvalSt e′) →
-    2 ≤ Caps.cSize c′ →
-    1 ≤ Caps.cReg c′ →
-    Sched.slots sched′ ≡ sl′ →
-    slotsCaps? (Caps.cSize c′) (Caps.cWid c′) sl′ ≡ true →
-    slotsSize sl′ ≤ Caps.cSize c′ →
-    capsOK? (frameStep j′ c′) sched′ st′ ≡ true →
-    valCaps? (frameStep j′ c′) sl′ (obs u′) o′ ≡ true →
-    pathSz? (Caps.cSize (frameStep j′ c′)) κ′ ≡ true →
-    suc (pathLen κ′) ≤ Caps.cSize (frameStep j′ c′) →
-    nest o′ sl′ (EvalSt.connectedShares st′) ≤ bud →
-    depthInner g′ op′ allNid′ κ′ id′ now′ o′ sched′ st′ ≤ dep →
-    let r′ = subscribeInner g′ op′ allNid′ κ′ id′ now′ o′ sched′ st′
-    in Σ ℕ λ j₂ →
-       (capsOK? (frameStep (j′ + j₂) c′)
-                (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r′)))))
-                (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r′))))) ≡ true)
-       × (valsCaps? (frameStep (j′ + j₂) c′) sl′ (proj₁ (proj₂ r′)) ≡ true)
-       × (all (eventCaps? (frameStep (j′ + j₂) c′) sl′)
-              (proj₁ (proj₂ (proj₂ r′))) ≡ true)
-       × (suc (j′ + j₂) ≤ sLvlD (Caps.cSize c′) (Caps.cWid c′) dep (suc bud) (suc j′))
-   ) →
-  -- ifc  (innerFinish-caps, .Subscribe-Face)
-  (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-    (c : Caps) (dep bud j : ℕ) (g : Gas) (op : AllOp) (allNid inst : NodeId)
-    (κ : Path Γ s t) (id : Id) (now : Tick) (vals : List (Val Γ s))
-    (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
-    2 ≤ Caps.cSize c →
-    1 ≤ Caps.cReg c →
-    Sched.slots sched ≡ sl →
-    slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
-    slotsSize sl ≤ Caps.cSize c →
-    capsOK? (frameStep j c) sched st ≡ true →
-    pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
-    suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
-    valsCaps? (frameStep j c) sl vals ≡ true →
-    frameBud c j ≤ bud →
-    depthFin g op allNid inst κ id now vals sched st
-      (lookupNode allNid (EvalSt.nodes st)) ≤ dep →
-    let r = innerFinish g op allNid inst κ id now vals sched st
-              (lookupNode allNid (EvalSt.nodes st))
-    in Σ ℕ λ j′ →
-       (capsOK? (frameStep (j + j′) c)
-                (proj₁ (proj₂ (proj₂ (proj₂ r)))) (proj₂ (proj₂ (proj₂ (proj₂ r))))
-                  ≡ true)
-       × (valsCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
-       × (all (eventCaps? (frameStep (j + j′) c) sl)
-              (proj₁ (proj₂ r)) ≡ true)
-       × (suc (j + j′) ≤ fLvlD (Caps.cSize c) (Caps.cWid c) dep j)) →
+  SiCType →
+  IfcType →
   ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (c : Caps) (d : ℕ) (a : Arrival Γ) (id : Id)
   (chains : List (RegId × Path Γ (arrTy a) t))
@@ -455,20 +343,28 @@ cascadeGo-caps :
   length chains ≤ Caps.cReg c →
   slotsSize sl ≤ Caps.cSize c →
   depthCascade a id chains sched st ≤ d →
+  -- THE ENTRY READING, PER CHAIN.  The walk's ledgers now carry a
+  -- stratification half beside the size one, so the cascade's own
+  -- entry point owes both: every chain the arrival is dispatched
+  -- along is stratified, and the payload sits below that chain's
+  -- floor.  The payload half is path-INDEXED, which is what lets the
+  -- reading move at the fan and nowhere else
+  chP? (λ {u} p → pathStrat? p) chains ≡ true →
+  chP? (λ {u} p → valsStrat? (pathFloor p) (arrVal a ∷ [])) chains ≡ true →
   let r = cascadeGo a id chains sched st
   in Σ ℕ λ j → (j ≤ sizeCount c d)
      × (capsOK? (frameStep j c) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
-cascadeGo-caps siC ifc c d a id chains sl sched st 2≤S 1≤R slC slEq inv vC pS n≤S lenB slSz hD =
+cascadeGo-caps siC ifc c d a id chains sl sched st 2≤S 1≤R slC slEq inv vC pS n≤S lenB slSz hD hpS hvS =
   proj₁ LV
     , ≤-trans (≤-trans (proj₁ (proj₂ LV))
                        (lvls-mono D (cDel c d) 2≤S ≤-refl ≤-refl ≤-refl
                           (cascadeGo-deliveries siC ifc c d a id chains sl sched st
-                             2≤S 1≤R slC slEq inv vC pS n≤S lenB slSz hD)))
+                             2≤S 1≤R slC slEq inv vC pS n≤S lenB slSz hD hpS hvS)))
               (≤-reflexive (sym (sizeCount-body c d)))
     , proj₂ (proj₂ LV)
   where
   D  = delivN st (proj₂ (proj₂ (cascadeGo a id chains sched st)))
-  LV = cascadeGo-level siC ifc c d a id chains sl sched st 2≤S 1≤R slC slEq inv vC pS slSz hD
+  LV = cascadeGo-level siC ifc c d a id chains sl sched st 2≤S 1≤R slC slEq inv vC pS slSz hD hpS hvS
 
 ------------------------------------------------------------------
 -- THE CASCADE BOOKENDS AND THE CHAIN SNAPSHOT, ground.  Nothing here
