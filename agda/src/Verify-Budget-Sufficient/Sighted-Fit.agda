@@ -5,7 +5,7 @@
 -- on the subject without the two becoming mutual for no reason.
 module Verify-Budget-Sufficient.Sighted-Fit where
 
-open import Data.Bool using (Bool; T; true; _∧_)
+open import Data.Bool using (T)
 open import Data.List using (List; []; _∷_)
 open import Data.Nat using (ℕ; _+_; _*_; _≤_)
 open import Data.Nat.Properties using (≤-trans; +-monoˡ-≤)
@@ -15,7 +15,8 @@ open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong)
 
 open import Rx.Prim using (Gas; Id; Tick; InstEmit; InstEvent; init; value; close; handoff; complete)
-open import Rx.Exp using (Ty; Ctx; Closed; Val; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; inputsBelowᵉ)
+open import Rx.Exp using (Ty; Ctx; Closed; Val; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; inputsBelowᵉ;
+                          inputsBelowᵛ)
 open import Rx.Inputs-Below using (ib-topᵉ; ∧⁺)
 open import Rx.Slots using (Slots)
 open import Rx.Nest-Depth using (nestDᵛ)
@@ -23,23 +24,7 @@ open import Rx.Evaluator using (Sched; EvalSt; Path; Stream; subscribeE; splitEv
 open import Verify-Budget-Sufficient.Nest-Store using (pathNestD; slotWrapSum; fitG)
 open import Verify-Budget-Sufficient.Nest-Burst using (descW)
 
--- WHICH INPUTS A STORED VALUE MAY NAME, charged through its type
--- exactly as its nesting is, and for the same reason: `Val` is a
--- computed family, so the only way in is to recurse on the `Ty`, and
--- `obs` is where a value becomes syntax again.  Everything else is
--- data and names nothing, which is not a convenience -- a scripted
--- slot is DATA by construction, so the whole of what a value can carry
--- an input inside is an `obs` leaf.
-inputsBelowᵛ : ∀ {n} {Γ : Ctx n} (k : ℕ) (t : Ty) → Val Γ t → Bool
-inputsBelowᵛ k unitᵗ    _        = true
-inputsBelowᵛ k boolᵗ    _        = true
-inputsBelowᵛ k natᵗ     _        = true
-inputsBelowᵛ k (s ×ᵗ t) (a , b)  = inputsBelowᵛ k s a ∧ inputsBelowᵛ k t b
-inputsBelowᵛ k (s +ᵗ t) (inj₁ a) = inputsBelowᵛ k s a
-inputsBelowᵛ k (s +ᵗ t) (inj₂ b) = inputsBelowᵛ k t b
-inputsBelowᵛ k (obs t)  e        = inputsBelowᵉ k e
-
--- AND EVERY STORED VALUE SITS AT THE TOP STRATUM, so the guard costs a
+-- EVERY STORED VALUE SITS AT THE TOP STRATUM, so the guard costs a
 -- consumer nothing once it reads the whole context: the type's own
 -- induction bottoms out at `obs`, where the program's top-stratum fact
 -- answers it, and every other leaf is data that names no input at all.

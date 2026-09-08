@@ -9,7 +9,7 @@
 -- without re-exports a module can only export what its own text mentions.
 module Phantom where
 
-open import Phantom-Src using (real-thing; module Sub-Mod; gone; hidden)
+open import Phantom-Src using (real-thing; module Sub-Mod; gone; hidden; borrowed)
 
 -- THE SOURCE SIDE IS WHAT IS ASKED ABOUT, and this row is what pins it: `x to
 -- y` binds `y` but the module must export `x`, so a check reading the BOUND
@@ -41,4 +41,4 @@ open import Phantom-Src.Nowhere using (never-was)
 -- a name that goes unused, and a row that could also fire as a dead name would
 -- not tell the two apart.
 alive : Set
-alive = real-thing Sub-Mod.inner gone hidden r2 a2 never-was
+alive = real-thing Sub-Mod.inner gone hidden borrowed r2 a2 never-was

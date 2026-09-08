@@ -240,6 +240,37 @@ LEGS_WANTED = 3
 # piece of work -- and there is no header for a group.
 LEG_BUDGET = 700
 
+# OPEN QUESTIONS -- what sits UNDER many rows, which neither of the other two
+# units can hold.  A row is one postulate and a leg is one commit; the thing
+# this campaign keeps re-deriving is the MECHANISM several rows share, and it
+# has been living scattered across postulate headers where no reader meets it
+# whole.
+#
+# OPTIONAL WHEN ABSENT, VALIDATED WHEN PRESENT, and never mandatory -- the same
+# law the source headers' evidence sections already carry, for the same reason:
+# a required question produces a filler question, and filler here is worse than
+# silence because it reads as research nobody has done.  So a tier with no
+# section is a tier where nobody has done the grouping yet, which is honest.
+#
+# IT IS NOT REQUIRED TO MOVE.  A leg is one commit and must change with every
+# commit; a genuine open question outlives many, and churning it per commit
+# would convert the one durable section into the noisiest.  What IS held is
+# that its named postulates stay LIVE and stay FALSITY -- so the section decays
+# the way a `TWIN:` does, by pointing at something that moved.
+QUESTIONS_RE = re.compile(r"^###\s+Open questions\s*$")
+QUESTIONS_MAX = 3
+
+# Two, because a question about ONE postulate is a row wearing a heading.  The
+# entire value of the section is naming what is common to several, so a
+# singleton is the shape to refuse.
+QUESTION_NAMES_MIN = 2
+
+# The postulates a question is about, named on their own line so the check has
+# something exact to resolve.  Prose may name anything; THIS list is held.
+RELEVANT_RE = re.compile(r"^\s*relevant:\s*(.+?)\s*$", re.I)
+
+QUESTION_BUDGET = 700
+
 BACKTICK_SPAN_RE = re.compile(r"`[^`]*`")
 
 # Any ISO-ish or spelled date.  The roadmap has no legitimate use for one.
@@ -298,7 +329,9 @@ def parse(path):
     pre = None  # [lineno_or_None, [text chunks]]
     row = None  # (lineno, [text chunks])
     legs = None      # [(lineno, [text chunks])] for the roadmap subsection
+    qs = None        # [(label, lineno, cost, names)] for the questions subsection
     in_roadmap = False
+    in_questions = False
 
     def flush_pre():
         if pre is not None and pre[1]:
@@ -314,6 +347,26 @@ def parse(path):
             if in_roadmap:
                 legs.append((label, lineno, prose_cost(chunks)))
                 return
+            if in_questions:
+                # The `relevant:` line is a LEDGER, so it is free -- the same
+                # split the source headers make between an explanation and the
+                # evidence sections under it.  Everything else is charged.
+                names, prose, in_rel = [], [], False
+                for c in chunks:
+                    mr = RELEVANT_RE.match(c)
+                    if mr:
+                        names.extend(BACKTICK_RE.findall(mr.group(1)))
+                        in_rel = True
+                    elif in_rel and is_claim_head(c.strip()):
+                        # a WRAPPED ledger line is still ledger.  Without this
+                        # the wrapped names are charged as prose AND never
+                        # checked -- the silent half being the one that matters.
+                        names.extend(BACKTICK_RE.findall(c))
+                    else:
+                        prose.append(c)
+                        in_rel = False
+                qs.append((label, lineno, prose_cost(prose), names))
+                return
             m = CLASS_RE.search(text)
             rows.append((label, m.group(1) if m else None, lineno,
                          prose_cost(chunks)))
@@ -323,14 +376,16 @@ def parse(path):
         if mt:
             flush_row()
             if cur is not None:
-                tiers[-1] = (tiers[-1][0], tiers[-1][1], flush_pre(), legs)
+                tiers[-1] = (tiers[-1][0], tiers[-1][1], flush_pre(), legs, qs)
             row = None
             in_roadmap = False
+            in_questions = False
             cur = mt.group(1)
             rows = []
             legs = []
+            qs = []
             pre = [None, []]
-            tiers.append((cur, rows, (None, 0), legs))
+            tiers.append((cur, rows, (None, 0), legs, qs))
             continue
         if cur is None:
             continue
@@ -343,6 +398,7 @@ def parse(path):
             flush_row()
             row = None
             in_roadmap = bool(ROADMAP_RE.match(line))
+            in_questions = bool(QUESTIONS_RE.match(line))
             continue
         if ROW_START_RE.match(line):
             flush_row()
@@ -365,7 +421,7 @@ def parse(path):
             pre[1].append(line)
     flush_row()
     if cur is not None:
-        tiers[-1] = (tiers[-1][0], tiers[-1][1], flush_pre(), legs)
+        tiers[-1] = (tiers[-1][0], tiers[-1][1], flush_pre(), legs, qs)
     return tiers
 
 
@@ -510,7 +566,7 @@ def check_stale(tiers, live, srcnames):
     not owed).  `gone_parents` is the descriptive-head case.
     """
     discharged, vanished, gone_parents = [], [], []
-    for tier, rows, _pre, _legs in tiers:
+    for tier, rows, _pre, _legs, _qs in tiers:
         for label, _cls, lineno, _cost in rows:
             if not BACKTICK_RE.search(label):
                 continue
@@ -744,7 +800,7 @@ def check_evidence(path, tiers, cen):
     """-> ([(tier,label,lineno,have,want)], [(tier,label,lineno)]) — mismatched, missing."""
     lines = path.read_text().splitlines()
     bad, missing = [], []
-    for tier, rows, _pre, _legs in tiers:
+    for tier, rows, _pre, _legs, _qs in tiers:
         for label, cls, lineno, _cost in rows:
             if cls is None:
                 continue
@@ -772,7 +828,7 @@ def unearned_grindable(path, tiers, cen):
     walked route rather than a believed one.
     """
     out = []
-    for tier, rows, _pre, _legs in tiers:
+    for tier, rows, _pre, _legs, _qs in tiers:
         for label, cls, lineno, _cost in rows:
             if cls == "GRINDABLE" and "TWIN" not in row_evidence(label, cen):
                 out.append((tier, label, lineno))
@@ -790,7 +846,7 @@ def unevidenced_difficulty(path, tiers, cen):
     stays legal on the three classes that claim nothing.
     """
     out = []
-    for tier, rows, _pre, _legs in tiers:
+    for tier, rows, _pre, _legs, _qs in tiers:
         for label, cls, lineno, _cost in rows:
             if cls == "DIFFICULTY" and not row_evidence(label, cen):
                 out.append((tier, label, lineno))
@@ -811,7 +867,7 @@ def over_probed(path, tiers, cen, cap):
     rather than buy coverage.
     """
     out = []
-    for tier, rows, _pre, _legs in tiers:
+    for tier, rows, _pre, _legs, _qs in tiers:
         for label, cls, lineno, _cost in rows:
             if cls is None:
                 continue
@@ -828,7 +884,7 @@ def fix_evidence(path, tiers, cen):
     # BOTTOM-UP, because a rewrap changes how many lines a row occupies and
     # every row below it would shift under a top-down pass.
     spans = []
-    for _tier, rows, _pre, _legs in tiers:
+    for _tier, rows, _pre, _legs, _qs in tiers:
         for label, cls, lineno, _cost in rows:
             if cls is not None:
                 spans.append((lineno, label))
@@ -890,15 +946,53 @@ def main():
         print(f"roadmap-evidence: {n} row(s) rewritten in {path.name}")
         return 0
 
+    # The ledger is read ONCE, above every check that consults it.  It used to
+    # be read at the coverage check, which is below the per-tier loop -- and the
+    # open-questions check, which also needs it, is inside that loop.
+    live = (live_postulates(root, args.ledger)
+            if (args.ledger or not args.file) else None)
+
     failures = []
     unclassified = []
     overlong = []
     fat_tiers = []
     bad_legs = []      # (tier, found, wanted) — the count is wrong
     fat_legs = []      # (tier, label, lineno, cost) — one leg over budget
-    for tier, rows, (pre_line, pre_cost), legs in tiers:
+    many_qs = []       # (tier, found) — more than QUESTIONS_MAX
+    fat_qs = []        # (tier, label, lineno, cost)
+    thin_qs = []       # (tier, label, lineno, found) — under QUESTION_NAMES_MIN
+    stale_qs = []      # (tier, label, lineno, name, why)
+    for tier, rows, (pre_line, pre_cost), legs, qs in tiers:
         if pre_cost > TIER_BUDGET:
             fat_tiers.append((tier, pre_line, pre_cost))
+        # OPEN QUESTIONS.  Capped, never required, and never required to move --
+        # what is held is that the postulates a question names are still the
+        # ones it is about.  A question whose row got discharged or reclassified
+        # is answered or misfiled, and either way it is not this question.
+        if len(qs) > QUESTIONS_MAX:
+            many_qs.append((tier, len(qs)))
+        # Which names this tier schedules, and at what class.  Built off the row
+        # HEAD and the roadmap's own shorthand -- the same expansion the coverage
+        # check runs, so a question and a row read a name the same way.
+        row_class = {}
+        for label, cls, _ln, _c in rows:
+            for nm in expand(BACKTICK_RE.findall(label)):
+                row_class[nm] = cls
+        for q_label, q_line, q_cost, q_names in qs:
+            if q_cost > QUESTION_BUDGET:
+                fat_qs.append((tier, q_label, q_line, q_cost))
+            if len(q_names) < QUESTION_NAMES_MIN:
+                thin_qs.append((tier, q_label, q_line, len(q_names)))
+            for nm in q_names:
+                if live is not None and nm not in live:
+                    stale_qs.append((tier, q_label, q_line, nm,
+                                     "not a live postulate"))
+                elif nm not in row_class:
+                    stale_qs.append((tier, q_label, q_line, nm,
+                                     f"named by no row of tier {tier}"))
+                elif row_class[nm] != "FALSITY":
+                    stale_qs.append((tier, q_label, q_line, nm,
+                                     f"its row is {row_class[nm]}, not FALSITY"))
         # THE COUNT.  Three, unless the tier has fewer postulates than that to
         # plan over -- in which case naming three would mean inventing work.
         want = min(LEGS_WANTED, len(rows))
@@ -921,7 +1015,8 @@ def main():
             else:
                 worst, worst_label = idx, label
 
-    for tier, rows, _pre, _legs in tiers:
+    n_qs = sum(len(q) for _, _, _, _, q in tiers)
+    for tier, rows, _pre, _legs, _qs in tiers:
         shown = [f"{c or '-'}" for _, c, _, _ in rows]
         print(f"  Tier {tier}: {' → '.join(shown) if shown else '(no rows)'}")
 
@@ -930,8 +1025,6 @@ def main():
         for tier, label, lineno in unclassified:
             print(f"  Tier {tier}  {path.name}:{lineno}  {label}")
 
-    live = (live_postulates(root, args.ledger)
-            if (args.ledger or not args.file) else None)
     unscheduled = None if live is None else check_coverage(path, live)
     if unscheduled is None and not args.file:
         print("\ncheck-roadmap: WARNING — could not read the postulate ledger, "
@@ -1102,6 +1195,59 @@ def main():
         print("it retires, and what makes it one unit of work.")
         failures.append(None)
 
+    if many_qs:
+        print(f"\nTOO MANY OPEN QUESTIONS — {len(many_qs)} tier(s) name more "
+              f"than {QUESTIONS_MAX}:")
+        for tier, found in many_qs:
+            print(f"  Tier {tier}  {found} question(s), wanted at most {QUESTIONS_MAX}")
+        print("\nThe cap is what makes the section say anything. A question here is")
+        print("what the tier does not yet know that several of its FALSITY rows are")
+        print("waiting on — and a tier does not have five of those, it has a few. A")
+        print("fourth entry is a row wearing a heading, or two phrasings of one")
+        print("question. Merge them, or drop the one whose relevant list is a subset")
+        print("of another's.")
+        failures.append(None)
+
+    if fat_qs:
+        print(f"\nOPEN QUESTIONS OVER BUDGET — {len(fat_qs)} question(s) spend "
+              f"more than {QUESTION_BUDGET} prose characters:")
+        for tier, label, lineno, cost in fat_qs:
+            print(f"  Tier {tier}  {path.name}:{lineno}  {cost} chars "
+                  f"(+{cost - QUESTION_BUDGET})  {label}")
+        print("\nA question states what is not known and why several rows turn on")
+        print("it. Past the budget it has started ANSWERING — and an answer is not a")
+        print("question's to hold: it is a finding, and its home is the header of the")
+        print("statement it constrains. The `relevant:` line is FREE, so shortening")
+        print("is never done by dropping a postulate from it.")
+        failures.append(None)
+
+    if thin_qs:
+        print(f"\nOPEN QUESTIONS NAMING TOO FEW POSTULATES — {len(thin_qs)}:")
+        for tier, label, lineno, found in thin_qs:
+            print(f"  Tier {tier}  {path.name}:{lineno}  names {found}, "
+                  f"wanted at least {QUESTION_NAMES_MIN}  {label}")
+        print("\nA question over ONE postulate is that postulate's row, given a")
+        print("heading — and its research already has a home, the postulate's own")
+        print("header, where the next person to pick it up will stand. What earns a")
+        print("question is that answering it moves SEVERAL rows at once, which is")
+        print("also the only thing the section can say that the ledger cannot.")
+        print("Write it as `relevant: `a`, `b`` on its own line.")
+        failures.append(None)
+
+    if stale_qs:
+        print(f"\nOPEN QUESTIONS NAMING THE WRONG ROWS — {len(stale_qs)}:")
+        for tier, label, lineno, name, why in stale_qs:
+            print(f"  Tier {tier}  {path.name}:{lineno}  `{name}` — {why}")
+            print(f"      in: {label}")
+        print("\nThis section is NOT required to move, so nothing else would notice")
+        print("it aging — which is why the one thing held is that its relevant list")
+        print("is current. A name that left the ledger means the question is")
+        print("answered or the row was restated; a row that is no longer FALSITY")
+        print("means the uncertainty this question is about has been settled there.")
+        print("Either way the list is what moves, and if nothing risky is left under")
+        print("a question, the question goes.")
+        failures.append(None)
+
     if fat_tiers:
         print(f"\nTIER PREAMBLES OVER BUDGET — {len(fat_tiers)} preamble(s) spend "
               f"more than {TIER_BUDGET} prose characters:")
@@ -1152,7 +1298,10 @@ def main():
           f"within its {ROW_BUDGET}-char hook budget; every tier preamble "
           f"within its {TIER_BUDGET}-char budget; every tier's big picture "
           f"roadmap naming its next legs, each within {LEG_BUDGET} chars; "
-          f"no dated narrative in "
+          + (f"{n_qs} open question(s), each within {QUESTION_BUDGET} chars "
+             f"and naming only live FALSITY rows of its own tier; "
+             if n_qs else "")
+          + f"no dated narrative in "
           # named individually up to a handful, then counted -- a report line
           # that grows with docs/ stops being read
           + (" or ".join(f.name for f in date_targets) if len(date_targets) <= 4

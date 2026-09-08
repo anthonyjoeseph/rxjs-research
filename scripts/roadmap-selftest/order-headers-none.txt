@@ -1,0 +1,7 @@
+=== a-falsity
+-- The neighbouring shelf holds `f-grindable`, which is the same family
+-- and the same module, and is NOT consumed here.
+a-falsity : ∀ {n} → Chain n → Set
+=== b-shape
+-- A restatement is owed.
+b-shape : Set

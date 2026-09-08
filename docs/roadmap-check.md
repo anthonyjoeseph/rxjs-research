@@ -5,7 +5,7 @@ FIRST, so a stale row misdirects the next session's whole leg. One already did, 
 two postulates that had become real definitions. This target makes the parts a machine
 can see into build failures.
 
-## Twelve checks
+## Sixteen checks
 
 1. **Sort** — each tier is ordered riskiest-class-first (FALSITY, SHAPE, VACUITY,
    DIFFICULTY, GRINDABLE). Priority that lives only in prose gets spent on whatever is
@@ -42,6 +42,15 @@ can see into build failures.
 12. **The row's receipt cap** — no row carries more `PROBED` receipts than
     `make evidence-check` allows one postulate. The number is imported from that
     checker, so the two cannot drift apart.
+
+13. **The open-question cap** — a tier's `### Open questions` section names at most
+    `QUESTIONS_MAX`. The section is optional; the cap is not a quota.
+14. **The open-question budget** — each question's prose is within `QUESTION_BUDGET`.
+    Its `relevant:` line is free, on the same asymmetry as a row's names.
+15. **A question naming too few postulates** — under `QUESTION_NAMES_MIN`, it is one
+    row given a heading, and that row's research already has a home.
+16. **A stale relevant list** — every name a question names is still a live postulate,
+    is a row of that same tier, and is still FALSITY.
 
 ## The roadmap is the schedule; the rows are the ledger
 
@@ -122,9 +131,10 @@ by proxy**: history arrives WITH a timestamp attached, because the writer knows 
 reader will want to know when.
 
 The one file that legitimately carries dates is `typecheck-performance-numbers.md`,
-because a timing's age IS information about the timing. Source headers keep them too —
-a `-- PROBED` or `-- DEAD ROUTE` receipt is only as good as the code being unmoved
-since, so its age is a signal about the evidence.
+because a timing's age IS information about the timing. Source headers do NOT — a
+receipt's content is its coverage statement, and coverage is re-runnable, so the date
+adds nothing a reader can act on; `make comments-check` bans them there for the same
+reason this check bans them here.
 
 ## `make roadmap-selftest`
 
@@ -144,6 +154,19 @@ pin the legs, and each is built to isolate ONE of them: `legs-count.md` plans tw
 a tier with the rows for three while every leg is inside budget, and `legs-fat.md` names
 three legs of which one carries an argument instead of a reason, with the ROW budget
 silent — so neither can pass by tripping the other's check.
+
+Four more pin the open questions, on the same isolate-one-check discipline:
+`questions-many.md` names a fourth question with everything else well formed,
+`questions-thin.md` names one postulate under two good siblings, `questions-fat.md`
+carries a question that has started answering itself beside one whose `relevant:` line
+is long enough to break the budget were the list charged, and `questions-stale.md`
+names both a row that has come down out of FALSITY and a name that has left the ledger.
+`questions-good.md` is the must-NOT-fire side and it pins two things at once: a tier
+whose section is well formed, and a second tier carrying no section at all — because
+the section being optional is the property most easily lost by making the check
+uniform. Its third question wraps its `relevant:` list onto a continuation line, which
+is the failure worth a fixture: a wrapped ledger line read as prose is charged AND its
+names go unchecked, and only the second half is visible.
 
 ## The evidence field, and why a derived field may be mandatory
 
@@ -184,6 +207,41 @@ Which markers a block reaches is decided by indentation: a header associates wit
 declaration under it until the next comment run or the next construct at **column 0**.
 That is why splitting a refuted postulate out of a shared `postulate` block into its own
 is what gives it its own markers, and why siblings in one block share a header's `TWIN`.
+
+## Open questions — the one section held to its LEDGER and not to its movement
+
+Checks 13-16 have a shape none of the others do, and the shape is the point. Every
+other thing this checker holds is either required (a row per postulate, three legs per
+tier) or bounded (a budget). A question is neither: the section may be absent, and when
+present it is never required to change.
+
+That follows from what a question IS. A leg is one commit, so `make roadmap-moved` can
+demand the roadmap move with every commit and be right. A question outlives many
+commits by construction — it is what several FALSITY rows are jointly waiting on, and
+those rows do not resolve in a sitting. Demanding movement there would produce a
+question REWRITTEN rather than one answered, which is the failure mode the roadmap's
+own second outcome already warns about one level down.
+
+Nor is it required per tier, and that is the same law the source headers carry: a
+mandatory `TWIN:` produces a filler twin, which is worse than a blank because it earns
+a class the row has not earned. A mandatory question produces a filler question, which
+is worse than silence because it reads as research.
+
+So what is held is the `relevant:` list, and only it. That list is the only part of the
+section a machine can check and the only part that rots invisibly — a question's prose
+stays readable while every row under it is discharged. Three conditions, and each names
+a different way the section stops being true: a name that is no longer LIVE means the
+question is answered or its row was restated; a name that is no longer a row of THIS
+tier means the question has been misfiled or the statement moved; a name that is no
+longer FALSITY means the uncertainty it was about has been settled at that row. When
+the list empties, the question goes — and that is the intended way for one to die,
+rather than by being edited into a different question.
+
+The minimum of two is the other half. A question over one postulate is that
+postulate's row given a heading, and its research already has a home — the postulate's
+own header, which is where the next person to pick it up will stand. What earns the
+section is that answering the question moves SEVERAL rows at once, which is also the
+only thing it can say that the ledger cannot say better.
 
 ## The hygiene rules a machine cannot check
 
@@ -292,3 +350,66 @@ file to change is the only hold available, and it works by making the author
 read the three legs before each commit — which is when the question "is this
 still what we are doing?" actually gets asked.
 
+
+## `make roadmap-order` — settle risk near the trunk
+
+**The law.** While a tier holds an open FALSITY or SHAPE row, a commit may not
+DISCHARGE a GRINDABLE or DIFFICULTY row of that tier. It is the machine behind
+CLAUDE.md's ordering rule, which was prose and was obeyed unevenly for a reason
+worth stating: the pull against it is structural, not careless.
+
+`roadmap-moved` requires every commit to move the roadmap. A risky leg routinely
+ends in a FINDING rather than a discharge. A finding-only commit reads as
+unfinished — the ledger it leaves behind holds the same rows in the same classes,
+so nothing in the file registers that a risky region got smaller. Closing a
+mechanical row alongside the finding is what converts that into a legible unit of
+work, and it is exactly the move that spends effort on ground the open FALSITY
+may still move.
+
+**Why a prohibition and not an obligation.** The natural first shape is a
+disjunction — a commit must write evidence OR discharge something risky. It does
+not work. The commit this exists to stop *already writes evidence*: the finding
+is the evidence. So the disjunction is satisfied by precisely the commit it was
+drawn against, and the mechanical row rides along untouched. It would also fire
+on almost nothing, since nearly every commit here moves a row or touches a
+header, and it would push against `evidence-check`'s receipt cap, which exists
+because past seven receipts the probes have stopped deciding anything. The
+negative form has none of those problems: it names the forbidden move.
+
+**What counts as a discharge — the whole precision of the check.** A row may be
+DELETED, RENAMED, SPLIT, RESTATED or RECLASSIFIED at any time. Those are the
+proof changing shape, and a check that held them would be a worse failure than
+the one it prevents: it would stop the statement of the theorem from moving. The
+one move held is the one that BANKS a claim — the name is no longer a live
+postulate **and is still declared in `agda/src`**, i.e. the postulate became a
+proven definition. That is the same split `check-roadmap.py`'s staleness check
+draws between a discharged row and a vanished one, read here for a different
+purpose: a name that left `agda/src` entirely was deleted and is free; a name
+still on the postulate ledger under another class was reclassified and is free.
+
+**The carve-out is validated, not asserted.** A mechanical row the risky row
+actually consumes is fair game — grinding it *is* working the top leg. But
+"adjacent", "same family" and "same module" are not that, and the near miss is
+the common case, since a candidate unblocking a SIBLING of the risky row reads
+exactly like one unblocking the risky row. So the risky postulate's own header or
+statement must NAME the discharged one. The two halves are read differently
+because they name things differently: in the comment half only a BACKTICKED token
+counts, this repo's own rule for a reference, because English is full of words
+this tree happens to declare and an accidental match must not buy the exemption;
+in the statement half a bare token is the real thing, since Agda has no backticks
+and a name in a type is a dependency the typechecker enforces.
+
+**Endpoints.** The check compares the same two roadmap versions `roadmap-moved`
+does, through the same `resolve_endpoints` — disk against HEAD mid-work, HEAD
+against HEAD~1 in a clean checkout, which is what CI always is. That is a shared
+function rather than two copies on purpose: the fallback is the subtle part, and
+a drifted copy would ask CI's question at a local checkout or the reverse, which
+is the one wrong answer that raises nothing and looks right.
+
+**`make roadmap-order-selftest`** pins six directions. One is that the check
+FIRES on a banked row. The other five are that it stays QUIET: on a roadmap that
+banked nothing, on a row DELETED from `agda/src`, on a RECLASSIFIED row, on a
+discharge in a tier whose own risky rows are closed while another tier's are
+open, and on a prerequisite the risky header names. The five matter more than the
+one — an over-firing check here would hold the proof's shape hostage, and the
+quiet directions are the only thing standing between this rule and that.

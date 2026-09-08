@@ -38,7 +38,7 @@ open import Data.Bool using (true; false)
 open import Data.Empty using (⊥)
 open import Data.Nat using (ℕ; suc; _+_; _⊔_; z≤n)
 open import Data.Nat.Properties using (≤-trans; m≤m+n; n≮n)
-open import Data.Product using (proj₁; proj₂)
+open import Data.Product using (_,_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst)
 
 open import Rx.Exp using (Ctx; Closed; natᵗ)
@@ -97,10 +97,13 @@ chain-level-unbounded-absurd :
      Sched.slots sched ≡ sl →
      capsOK? (frameStep L (capsAt e sl id)) sched st ≡ true →
      chainCapsOK (capsAt e sl id) (capsAt e sl (suc id)) sl (capsH e sl id) L nextId a path sched st) → ⊥
-chain-level-unbounded-absurd H =
+-- The leaf is taken apart FLAT rather than by a chain of projections,
+-- and that is what keeps the row honest: the Σ this refutation spends
+-- is the last conjunct of a frame's tuple, so a conjunct added above it
+-- moves the Σ and a positional reach lands silently on a neighbour.  A
+-- pattern of the whole tuple cannot -- it fails on the arity, naming
+-- the file.
+chain-level-unbounded-absurd H
+  with H slots 0 lvl arr 0 pth (sched-init prog slots) (st-init prog) refl fits
+... | _ , _ , _ , _ , _ , _ , _ , _ , inc , bound , _ =
   n≮n (ceil + inc) (≤-trans bound (m≤m+n ceil inc))
-  where
-  got = H slots 0 lvl arr 0 pth (sched-init prog slots) (st-init prog) refl fits
-  step = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ got)))))
-  inc = proj₁ step
-  bound = proj₁ (proj₂ step)

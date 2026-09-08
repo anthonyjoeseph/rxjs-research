@@ -31,7 +31,7 @@ open import Rx.Prim using (Tick; Id; Source; Gas; g0; gs; InstEvent; InstEmit; v
   subscribe; init; close; handoff; complete; exhausted)
 open import Rx.Exp using (Ctx; Closed; Val; Fn; Exp; Tm; Ty; _×ᵗ_; _+ᵗ_; unitᵗ; boolᵗ; natᵗ; obs; isData; sizeᵗ;
   applyFn; _≟ᵗ_; evalTm; syncSizeᵉ; syncSizeᵗ; syncSizeᵗˢ; syncSizeᵛ; input; ofᵉ; emptyᵉ; mapᵉ;
-  takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; unfoldμ; inputsBelowᵉ; sizeᵉ)
+  takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; unfoldμ; inputsBelowᵉ; inputsBelowᵛ; sizeᵉ)
 open import Rx.Slots using (Slots; scripted; shared; slotsSize)
 open import Rx.Clos-Size using (closSizeᵉ; closSizeᵗ; closSizeᵗˢ;
   syncSize≤closᵉ; syncSize≤closᵗ; syncSize≤closᵗˢ; closSize-unfoldμ)
@@ -59,7 +59,7 @@ open import Verify-Budget-Sufficient.Caps-Term using (unfoldμ-caps)
 open import Verify-Budget-Sufficient.Caps-Depth using
   (depthDrain; depthFin; depthFrame; depthInner; depthE; depthReact)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using (burstCaps?; capsOK?; valCaps?; widNode; widNode-push; nestValOK?; pathSz?; slotsCaps?; nestClosOK?; nestClosOK?ᵛ; nestClosOK?ᵛ-widen;
-  slotsCaps?-widen; frameSz?; capsOK?-mono)
+  slotsCaps?-widen; frameSz?; capsOK?-mono; pathFloor; frameStrat?)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using (burstCaps?-widen; valCaps?-wid; valCaps?-size; valCaps?-widen; pathSz?-⊑; frameStep-chain-suc; expWid-fromSize)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using (capsOK?-nextNode; capsOK?-parts; capsOK?-setNode; switchKill-caps; NodeCaps; lookupNode-caps;
   capsOK?-nodeSz; capsOK?-nodeWid; capsOK?-nodePark; parkList-push; pathSz?-len;
@@ -7142,6 +7142,31 @@ burstsDrain W sf gas id now f p vals fin sched st h = proj₁ (proj₂ h)
 -- the proofs nothing and buys the registry a cap that a whole
 -- instant's subscribing fits under -- the recurrence's own step count
 -- is what `ac` IS, and the walk's ceiling is that count.
+
+-- AND THE FRAME ARM CARRIES A STRATIFICATION READING BESIDE THE SIZE
+-- ONE, INDEXED BY THE CHAIN AND NOT BY THE ARRIVAL'S SLOT.  The mint's
+-- stratification receipt is owed at five registration sites and the
+-- subscribe descent pays four, each from the guard a def's own syntax
+-- already carries.  The fifth is a `thru-outer` hop: the value passing
+-- through IS an observable, the evaluator subscribes it, and a runtime
+-- observable is an arbitrary closed expression -- so the telescope's
+-- check never saw the inputs about to be registered, and nothing in
+-- the four carried facts reaches them.
+--
+-- The floor is the CHAIN's, because a frame's closure is the syntax of
+-- whichever definition pushed it, which is the chain's sink and not
+-- the slot the value came from.  Reading it at the arrival's source is
+-- the tempting form and it is not preserved.  Both readings meet where
+-- the walk starts, the emitting slot's own stratum sitting under every
+-- admitted chain's floor, so the source form is what establishes this
+-- one rather than a rival to it.
+--
+-- TWO CONJUNCTS AND NOT ONE, because the value reading alone does not
+-- survive a hop.  A map or a scan can build an observable out of its
+-- OWN syntax and emit it, so a payload can leave a frame naming inputs
+-- that never appeared in the payload that entered -- and the frame
+-- reading is what closes that, at the same floor, on the only two
+-- constructors that carry syntax at all.
 mutual
   capsWalkOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c ac : Caps) (sl : Slots Γ) (d Lv : ℕ) (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (p : Path Γ u t)
@@ -7158,6 +7183,8 @@ mutual
     × (pathSz? (Caps.cSize (frameStep Lv c)) (f ↠ p) ≡ true)
     × frameClosOK (frameStep Lv c) sl f vals
     × frameDrainOK c sl d Lv sf id now f p vals sched st
+    × (all (inputsBelowᵛ (pathFloor p) u) vals ≡ true)
+    × (frameStrat? (pathFloor p) f ≡ true)
     × (Σ ℕ λ L′ →
         (Lv + L′ ≤ sizeCount c d ⊔ Caps.cSize c)
         × capsWalkOK c ac sl d (Lv + L′) sf gas id now p (proj₁ step)

@@ -24,7 +24,7 @@ open import Relation.Binary.PropositionalEquality
 
 open import Rx.Prim      using (Tick; Id; Source; _at_from_as_; Gas; after_,_; close; exhausted;
   InstEvent)
-open import Rx.Exp       using (Ctx; Closed; Val; sizeᵉ)
+open import Rx.Exp       using (Ctx; Closed; Val; inputsBelowᵛ; sizeᵉ)
 open import Verify-Budget-Sufficient.Nest-Ceiling using
   (Reached; Ent; Pos; reached-room; room-step; room-descend; walk)
 open import Verify-Budget-Sufficient.Subscribe-Face using (subscribeInner-caps; innerFinish-caps)
@@ -48,7 +48,7 @@ open import Verify-Budget-Sufficient.Measures using
   (pathLen)
 
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
-  (capsOK?; pathSz?; regsSz?; regsSz?-widen; nestClosOK?ᵛ)
+  (capsOK?; pathFloor; pathStrat?; pathSz?; regsSz?; regsSz?-widen; nestClosOK?ᵛ)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
   (capsOK?-regs; pathSz?-len; slotsCaps?-capsAt; valsCaps?)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Cascade-Caps using
@@ -100,6 +100,30 @@ floor-parts X m gas g h =
 --   killed at a subscribed inner whose path outgrows any cap the outer
 --   program fixes.
 
+-- THE BUNDLE A CHAIN'S WALK IS ENTERED WITH, and the two
+-- stratification readings are hypotheses of it rather than facts
+-- derived at a frame.  The mint's stratification receipt is owed at
+-- five registration sites; the subscribe descent pays four, each from
+-- the guard a def's own syntax carries, and the fifth is a
+-- `thru-outer` hop, where the value passing through IS an observable
+-- and a runtime observable is an arbitrary closed expression.  Nothing
+-- the other six conjuncts carry reaches it, so the walk must be handed
+-- it and every producer owes it.
+--
+-- THE FLOOR IS THE CHAIN'S, WHICH IS WHY IT IS READ OFF THE PATH.  A
+-- frame's closure is the syntax of whichever definition pushed the
+-- frame, and that is the chain's sink rather than the slot the value
+-- arrived from -- so the arrival's own stratum is what ESTABLISHES
+-- this reading where the walk starts and not what it is stated at.
+-- `pathFloor` is constant along frames, so the tail reads at the same
+-- floor the head does and a hop widens nothing.
+--
+-- AND TWO READINGS AND NOT ONE, because the value half does not
+-- survive a hop on its own: a `map` or a `scan` can build an
+-- observable out of its OWN syntax and emit it, so a payload can leave
+-- a frame naming inputs that never appeared in the payload that
+-- entered.  `pathStrat?` closes that on the only two constructors that
+-- carry syntax at all.
 WalkHyps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
   (src : Source) (p : Path Γ u t) (vals : List (Val Γ u))
@@ -112,6 +136,8 @@ WalkHyps {n = n} {e = e} {u = u} sl id L sf gas nid now src p vals evs fin sched
   × (all (nestClosOK?ᵛ (frameStep L (capsAt e sl id)) sl u) vals ≡ true)
   × (pathSz? (Caps.cSize (frameStep L (capsAt e sl id))) p ≡ true)
   × (depthFold sf gas nid now src p vals evs fin sched st ≤ capsH e sl id)
+  × (all (inputsBelowᵛ (pathFloor p) u) vals ≡ true)
+  × (pathStrat? p ≡ true)
   × (Σ ℕ λ g → Σ ℕ λ P →
       (4 + (sizeᵉ e + slotsSize sl) + n + gas ≤ g)
       × (iterL (Caps.cSize (capsAt e sl id)) (Caps.cWid (capsAt e sl id)) (capsH e sl id)

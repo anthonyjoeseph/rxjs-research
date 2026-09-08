@@ -30,7 +30,8 @@ open import Relation.Binary.PropositionalEquality
 
 open import Rx.Prim      using (Tick; Id; _at_from_as_; Gas; after_,_; close; exhausted;
                                 Source; InstEvent)
-open import Rx.Exp       using (obs; Ctx; Closed; Val; Fn; _×ᵗ_; _≟ᵗ_; sizeᵉ; sizeᵛ)
+open import Rx.Exp       using (obs; Ctx; Closed; Val; Fn; _×ᵗ_; _≟ᵗ_; sizeᵉ; sizeᵛ;
+  inputsBelowᵛ)
 open import Rx.Nest-Depth using (nestDᵛ; nestDᵗ)
 open import Verify-Budget-Sufficient.Depth-Sighted using (ValsFit; valsFit-of-max)
 open import Verify-Budget-Sufficient.Nest-Walk using
@@ -75,8 +76,9 @@ open import Verify-Budget-Sufficient.Caps-Depth
          lub3-l; lub3-m; lub3-r)
 
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
-  (capsAt-round-size; capsOK?; capsOK?-mono; eventCaps?; frameSz?; n≤capsAt-size; pathSz?;
-  pathSz?-widen; regsSz?; slotsCaps?; valCaps?; nestClosOK?ᵛ; nestClosOK?ᵛ-widen)
+  (capsAt-round-size; capsOK?; capsOK?-mono; eventCaps?; frameSz?; n≤capsAt-size; pathFloor;
+  pathStrat?; pathSz?; pathSz?-widen; regsSz?; slotsCaps?; valCaps?; nestClosOK?ᵛ;
+  nestClosOK?ᵛ-widen)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
   (capsOK?-count; capsOK?-regs; frameBud; slotsCaps?-capsAt; valsCaps?; valsCaps?-lvl;
   foldPath-slots; shareAdmit-caps)
@@ -93,7 +95,8 @@ open import Verify-Budget-Sufficient.Caps-Face.Part7.Ring-Vocabulary using
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Cascade-Nest using
   (arr-chains-nest-syn)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Arrival-Caps using
-  (chain-depth-sighted; arr-chain-caps; chainStep-caps; chain-deliv-cap)
+  (cascade-admit-entry; chain-depth-sighted; arr-chain-caps; chainStep-caps;
+   chain-deliv-cap)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Chain-Caps-OK using
   (chainCapsOK; chainsCapsAll)
 
@@ -1269,6 +1272,33 @@ postulate
 -- denominated in the entry cap at all, which is a restatement of the
 -- walk rather than a fact about the registry.
 
+-- AND THE MINT'S OWN CONTRACT PRICES THIS, WHICH TURNS THE RESIDUE
+-- FROM A CURRENCY INTO A COUNT.  `register-caps` is proven, and it is
+-- the only rule carrying a registry reading across a registration: it
+-- consumes the reading at one frame level and returns it one level
+-- HIGHER, per chain registered.  So a state that has minted k times
+-- since the instant's entry holds its reading at the k-th step and
+-- nowhere below it, while `pathSz?` weakens upward.  That is not a
+-- gap in the registry's theory -- `capsOK?-regs` already delivers
+-- this row's exact conclusion from a receipt at the cap the reading
+-- is held at, so nothing here is unproven.  The reading is held at a
+-- level the conclusion does not name, and the search for a price that
+-- is not a cap was looking for the wrong kind of object.
+
+-- SO THE RISKY REGION IS SAME-INSTANT REGISTRATION -- STRICTLY
+-- SMALLER THAN THE ROW, AND THE CONNECT PATH SITS INSIDE IT.  At no
+-- mints the step is the identity and the row discharges outright out
+-- of `capsOK?-regs`, so every counterexample needs a registration
+-- between the instant's entry and the fan.  `sharedConnect-core` is
+-- one: it registers the subscriber's own continuation and THEN
+-- subscribes the share's definition with `share-sink` as the
+-- continuation, so a definition emitting synchronously reaches the
+-- fan with that registration already in the registry -- and
+-- `register-caps` prices exactly that registration at one step.  The
+-- region is therefore not a corner but the ordinary shared-subscribe
+-- path, which is what makes the entry-cap reading unavailable rather
+-- than merely unproven.  Read off the connect, not instantiated.
+
 -- AND NEITHER IS THE ADMISSION FILTER'S TO CARRY, which is what the
 -- pair being stated over the fan-out was hiding.  `shareAdmit`
 -- selects on the source and the element type and never reads a path,
@@ -1315,6 +1345,14 @@ postulate
 -- DEAD ROUTE: that INDEXED form itself, and it dies on the same
 --   arithmetic as the flat raise -- by ONE step of the recurrence
 --   rather than at some threshold, so no ceiling is small enough.
+--   The quantity, since "one step" is the whole claim: `sizeStep`
+--   sends a size to itself times one more than twice itself, so a
+--   single step carries the cap to roughly twice its square, and
+--   `pathΦF`'s sink clause raises two to the cap times a successor of
+--   it times itself.  The exponent is therefore CUBIC in the cap
+--   before the step and SIXTH-POWER after it -- a ratio that is
+--   itself exponential, not a constant or a polynomial factor, which
+--   is why no ceiling and no per-entry indexing closes it.
 --   What a size receipt actually buys the Φ pricing is a LENGTH, via
 --   `pathSz?-len`, and the length lands in an EXPONENT: a sink's own
 --   factor is two to the cap times a square of it, and a fanned chain
@@ -1906,7 +1944,7 @@ mutual
           (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id) hΦ hF)
     where
     step = stepFrame sf nid now f p vals fin sched st
-    hL   = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcw)))))
+    hL   = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcw)))))))
     hF = frameΦ-fit sl id sf nid now Lv f p vals fin sched st hsl hpz hnd hΦ
            (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcw))))))
            (≤-trans (m≤m⊔n (depthFrame sf nid now f p vals fin sched st) _) hdf)
@@ -2229,6 +2267,8 @@ cascade-caps-all-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   all (λ rc → pathSz? (Caps.cSize (capsAt e sl id)) (proj₂ rc)) chains ≡ true →
   all (λ rc → nestDᵛ (arrTy a) (arrVal a) + pathNestD (proj₂ rc)
                 ≤ᵇ nestUnit e sl) chains ≡ true →
+  all (λ rc → pathStrat? (proj₂ rc)) chains ≡ true →
+  all (λ rc → inputsBelowᵛ (pathFloor (proj₂ rc)) (arrTy a) (arrVal a)) chains ≡ true →
   valCaps? (capsAt e sl id) sl (arrTy a) (arrVal a) ≡ true →
   nestClosOK?ᵛ (capsAt e sl id) sl (arrTy a) (arrVal a) ≡ true →
   nestΦAt e sl id ≤ S →
@@ -2243,11 +2283,11 @@ cascade-caps-all-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   chainsCapsAll (capsAt e sl id) (capsAt e sl (suc id)) sl (capsH e sl id) Lc
     a nextId chains sched st
 cascade-caps-all-go sl id Lc a nextId S [] sched st
-  sleq cok hsc hpz hΦs hvc hcl hinc hval hS J g i hfl hR hlen hLc = tt
+  sleq cok hsc hpz hΦs hstr hsv hvc hcl hinc hval hS J g i hfl hR hlen hLc = tt
 cascade-caps-all-go {n = n} {e = e} sl id Lc a nextId S ((rid , path) ∷ chains) sched st
-  sleq cok hsc hpz hΦs hvc hcl hinc hval hS J g i hfl hR hlen hLc =
+  sleq cok hsc hpz hΦs hstr hsv hvc hcl hinc hval hS J g i hfl hR hlen hLc =
     cascade-caps-all-go sl id Lc a nextId S chains sched st
-      sleq cok hsc hpr hΦr hvc hcl hinc hval hS
+      sleq cok hsc hpr hΦr hstrr hsvr hvc hcl hinc hval hS
       J g i hfl hR
       (≤-trans (+-monoʳ-≤ i (n≤1+n (length chains))) hlen) hLc
   , HEAD
@@ -2256,7 +2296,7 @@ cascade-caps-all-go {n = n} {e = e} sl id Lc a nextId S ((rid , path) ∷ chains
   , cascade-caps-all-go sl id (Lc + proj₁ ST) a nextId S chains
       (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
       (trans (chainStep-slots nextId a path sched st′) sleq)
-      (proj₂ (proj₂ ST)) hsc hpr hΦr hvc hcl hinc hval
+      (proj₂ (proj₂ ST)) hsc hpr hΦr hstrr hsvr hvc hcl hinc hval
       (chainStep-store≤ sl id Lc a nextId S path sched st′
          HEAD hdc sleq hpc hΦc hinc hS)
       J g (suc i) hfl hR
@@ -2278,6 +2318,10 @@ cascade-caps-all-go {n = n} {e = e} sl id Lc a nextId S ((rid , path) ∷ chains
                                  ≤ᵇ nestUnit e sl) _ hΦs)))
   hΦr = proj₂ (∧-true (nestDᵛ (arrTy a) (arrVal a) + pathNestD path
                          ≤ᵇ nestUnit e sl) _ hΦs)
+  hstrc = proj₁ (∧-true (pathStrat? path) _ hstr)
+  hstrr = proj₂ (∧-true (pathStrat? path) _ hstr)
+  hsvc = proj₁ (∧-true (inputsBelowᵛ (pathFloor path) (arrTy a) (arrVal a)) _ hsv)
+  hsvr = proj₂ (∧-true (inputsBelowᵛ (pathFloor path) (arrTy a) (arrVal a)) _ hsv)
   -- this chain's own descent, priced off the store ceiling rather than
   -- off a bound on the round -- which is the premise this door does
   -- not have and the surviving fold does
@@ -2302,7 +2346,7 @@ cascade-caps-all-go {n = n} {e = e} sl id Lc a nextId S ((rid , path) ∷ chains
   CH≤ : lvls B W d Lc 1 ≤ Pos c d J g i
   CH≤ = lvls-mono 1 1 2≤S ≤-refl ≤-refl hLc ≤-refl
   HEAD = arr-chain-caps sl id Lc a nextId path sched st′ sleq cok HVC HCL
-           (pathSz?-widen path (proj₁ c⊑) hpc) hdc
+           (pathSz?-widen path (proj₁ c⊑) hpc) hdc hstrc hsvc
            (g , Pos c d J g i , hfl , CH≤ , walk J g i HI hR)
   ST  = chainStep-caps sl id Lc a nextId path sched st′ sleq cok
           (pathSz?-widen path (proj₁ c⊑) hpc)
@@ -2326,6 +2370,8 @@ cascade-caps-all : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
       (chainsOf a st) ≡ true →
   all (λ rc → nestDᵛ (arrTy a) (arrVal a) + pathNestD (proj₂ rc)
                 ≤ᵇ nestUnit e sl) (chainsOf a st) ≡ true →
+  all (λ rc → inputsBelowᵛ (pathFloor (proj₂ rc)) (arrTy a) (arrVal a))
+      (chainsOf a st) ≡ true →
   valCaps? (capsAt e sl id) sl (arrTy a) (arrVal a) ≡ true →
   nestClosOK?ᵛ (capsAt e sl id) sl (arrTy a) (arrVal a) ≡ true →
   nestΦAt e sl id ≤ S →
@@ -2334,13 +2380,15 @@ cascade-caps-all : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   chainsCapsAll (capsAt e sl id) (capsAt e sl (suc id)) sl (capsH e sl id) 0
     a nextId (chainsOf a st) sched (cascadeLatch a st)
 cascade-caps-all {e = e} sl id a nextId S sched st sleq cok hsc
-                 hpz hΦs hvc hcl hinc hval hsn =
+                 hpz hΦs hsv hvc hcl hinc hval hsn =
   cascade-caps-all-go sl id 0 a nextId S (chainsOf a st) sched
     (cascadeLatch a st) sleq
     (subst (λ x → capsOK? x sched (cascadeLatch a st) ≡ true)
            (sym (frameStep-0 (capsAt e sl id)))
            (cascadeLatch-caps (capsAt e sl id) a sched st cok))
-    hsc hpz hΦs hvc hcl hinc hval hsn
+    hsc hpz hΦs
+    (cascade-admit-entry (capsAt e sl id) a sched st cok) hsv
+    hvc hcl hinc hval hsn
     0 (Caps.cSize (capsAt e sl id)) 0
     (capsAt-round-size e sl id) base REGLEN ≤-refl
   where
@@ -2371,14 +2419,16 @@ cascade-depth-sighted : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
   valCaps? (capsAt e sl id) sl (arrTy a) (arrVal a) ≡ true →
   nestClosOK?ᵛ (capsAt e sl id) sl (arrTy a) (arrVal a) ≡ true →
+  all (λ rc → inputsBelowᵛ (pathFloor (proj₂ rc)) (arrTy a) (arrVal a))
+      (chainsOf a st) ≡ true →
   depthCascade a nextId (chainsOf a st) sched (cascadeLatch a st)
     ≤ sightCeil (sizeᵉ e) (nestΦAt e sl id) (nestΦAt e sl id) (nestUnit e sl)
 cascade-depth-sighted {e = e} sl id a nextId sched st
-                      hsl hok hn hval valC closC =
+                      hsl hok hn hval valC closC strC =
   cascade-depth-go sl id 0 a nextId (nestΦAt e sl id)
     (chainsOf a st) sched (cascadeLatch a st)
     (cascade-caps-all sl id a nextId (nestΦAt e sl id) sched st hsl hok
-       SIGHT CHAINPZ CHAINΦ valC closC ≤-refl VALΦ STORE)
+       SIGHT CHAINPZ CHAINΦ strC valC closC ≤-refl VALΦ STORE)
     SIGHT
     hsl
     CHAINPZ
@@ -2424,10 +2474,12 @@ cascade-depth-capsH : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   sizeᵛ (arrTy a) (arrVal a) ≤ Caps.cSize (capsAt e sl id) →
   valCaps? (capsAt e sl id) sl (arrTy a) (arrVal a) ≡ true →
   nestClosOK?ᵛ (capsAt e sl id) sl (arrTy a) (arrVal a) ≡ true →
+  all (λ rc → inputsBelowᵛ (pathFloor (proj₂ rc)) (arrTy a) (arrVal a))
+      (chainsOf a st) ≡ true →
   depthCascade a nextId (chainsOf a st) sched (cascadeLatch a st)
     ≤ capsH e sl id
-cascade-depth-capsH {e = e} sl id a nextId sched st hsl hcaps hnest hval hsz valC closC =
-  ≤-trans (cascade-depth-sighted sl id a nextId sched st hsl hcaps hnest hval valC closC)
+cascade-depth-capsH {e = e} sl id a nextId sched st hsl hcaps hnest hval hsz valC closC strC =
+  ≤-trans (cascade-depth-sighted sl id a nextId sched st hsl hcaps hnest hval valC closC strC)
           (sighted-nest≤capsH sl id B B B ≤-refl ≤-refl
              (≤-trans (unit≤cap e sl id)
                (nestCapAt≤nestΦAt e sl id))
@@ -2502,9 +2554,11 @@ caps-go :
   nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
   valCaps? (capsAt e sl id) sl (arrTy a) (arrVal a) ≡ true →
   nestClosOK?ᵛ (capsAt e sl id) sl (arrTy a) (arrVal a) ≡ true →
+  all (λ rc → inputsBelowᵛ (pathFloor (proj₂ rc)) (arrTy a) (arrVal a))
+      (chainsOf a st) ≡ true →
   let r = cascadeGo a nextId (chainsOf a st) sched (cascadeLatch a st)
   in capsOK? (capsAt e sl (suc id)) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true
-caps-go siC ifc {e = e} sl id a nextId sched st slEq pre nok bnd val closV =
+caps-go siC ifc {e = e} sl id a nextId sched st slEq pre nok bnd val closV strC =
   capsOK?-mono (frameStep j c) (capsAt e sl (suc id))
                (proj₁ (proj₂ GOr)) (proj₂ (proj₂ GOr))
                (frameStep-mono-j c (2≤capsAt-size e sl id) jFits)
@@ -2526,7 +2580,7 @@ caps-go siC ifc {e = e} sl id a nextId sched st slEq pre nok bnd val closV =
            (cascade-depth-capsH sl id a nextId sched st slEq pre nok bnd
              (≤ᵇ⇒≤ (sizeᵛ (arrTy a) (arrVal a)) (Caps.cSize c)
                    (T-to (valCaps?-size c sl (arrTy a) (arrVal a) val)))
-             val closV)
+             val closV strC)
   GOr   = cascadeGo a nextId (chainsOf a st) sched st₀
   j     = proj₁ GO
   jFits = proj₁ (proj₂ GO)
@@ -2597,11 +2651,13 @@ caps-tick :
   nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
   valCaps? (capsAt e sl id) sl (arrTy a) (arrVal a) ≡ true →
   nestClosOK?ᵛ (capsAt e sl id) sl (arrTy a) (arrVal a) ≡ true →
+  all (λ rc → inputsBelowᵛ (pathFloor (proj₂ rc)) (arrTy a) (arrVal a))
+      (chainsOf a st) ≡ true →
   let r = cascade a nextId sched st
   in capsOK? (capsAt e sl (suc id)) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true
-caps-tick siC ifc {e = e} sl id a nextId sched st slEq pre nok bnd val closV =
+caps-tick siC ifc {e = e} sl id a nextId sched st slEq pre nok bnd val closV strC =
   cascadeFinish-caps (capsAt e sl (suc id)) a (proj₁ (proj₂ GOr)) (proj₂ (proj₂ GOr))
-    (caps-go siC ifc sl id a nextId sched st slEq pre nok bnd val closV)
+    (caps-go siC ifc sl id a nextId sched st slEq pre nok bnd val closV strC)
   where
   GOr = cascadeGo a nextId (chainsOf a st) sched (cascadeLatch a st)
 

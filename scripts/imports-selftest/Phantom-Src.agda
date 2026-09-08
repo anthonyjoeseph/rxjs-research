@@ -13,10 +13,20 @@ module Phantom-Src where
 -- row.  The `renaming` is what keeps the row honest: it puts this declaration
 -- outside the USE check, so `hidden` earns no dead-import finding and the
 -- phantom row in Phantom.agda is the only thing that can fire on it.
-open import Fixture.Deep using (hidden) renaming (deep to shallow)
+--
+-- AND `borrowed` IS THE SAME NAME SPENT, which is what the token reading is
+-- blind to and the shape that actually reached CI.  `hidden` fires either way
+-- -- excised from the tokens, it is also absent from them -- so it cannot pin
+-- the arm that asks whether this module IMPORTS the name.  A name used in the
+-- body is a body token, so the token reading calls it exported and only that
+-- arm is left; mutate the arm away and this row is the one that goes quiet.
+open import Fixture.Deep using (hidden; borrowed) renaming (deep to shallow)
 
 real-thing : Set
 real-thing = Set
+
+spends-it : Set
+spends-it = borrowed
 
 module Sub-Mod where
   inner : Set

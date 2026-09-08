@@ -65,8 +65,10 @@ walkOK :
   capsWalkOK cap cap (slots 6) 0 0 gas 0 0 0 path₀ vals false (sched 6) st₀
 walkOK =
   refl , refl , ≤ᵇ⇒≤ _ _ tt , refl , refl , tt ,
+  refl , refl ,
   0 , z≤n ,
   (refl , refl , ≤ᵇ⇒≤ _ _ tt , refl , refl , tt ,
+   refl , refl ,
    0 , z≤n , refl)
 
 handed≡6 : length (mid 6) ≡ 6

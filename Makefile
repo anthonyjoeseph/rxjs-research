@@ -1,4 +1,4 @@
-.PHONY: find-prose gate roadmap-moved roadmap-moved-selftest roadmap-evidence gate-heavy gate-cheap gate-light dev-changed dev-changed-selftest stripped strip-selftest unmap-selftest postulates dup-check dup-selftest imports-check imports-fix imports-selftest find all help agda-dev agda-dev-selftest bg bg-check bg-wait bug-cache unsafe-check wiring wiring-selftest comments-check comments-selftest refuted ev ts-check cli-build oracle qc-build quickcheck harness harness-build
+.PHONY: find-prose gate roadmap-moved roadmap-moved-selftest roadmap-order roadmap-order-selftest roadmap-evidence gate-heavy gate-cheap gate-light dev-changed dev-changed-selftest stripped strip-selftest unmap-selftest postulates dup-check dup-selftest imports-check imports-fix imports-selftest find all help agda-dev agda-dev-selftest bg bg-check bg-wait bug-cache unsafe-check wiring wiring-selftest comments-check comments-selftest refuted ev ts-check cli-build oracle qc-build quickcheck harness harness-build
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -393,16 +393,20 @@ imports-selftest:
 	    || { echo "SELFTEST FAIL: a module declaration disagreeing with its path was not reported"; fail=1; }; \
 	  echo "$$out" | grep -q '2 file(s) whose module DECLARATION' \
 	    || { echo "SELFTEST FAIL: expected exactly 2 module-declaration findings"; fail=1; }; \
-	  for n in gone hidden absent; do \
+	  for n in gone hidden absent borrowed; do \
 	    echo "$$out" | grep -q "PHANTOM NAME  $$n" \
-	      || { echo "SELFTEST FAIL: $$n is imported from a module of this tree that does not contain it — Agda finds that only as a ModuleDoesntExport warning, many minutes down the tower"; fail=1; }; \
+	      || { echo "SELFTEST FAIL: $$n is imported from a module of this tree that does not declare it — Agda finds that only as a ModuleDoesntExport warning, many minutes down the tower"; fail=1; }; \
 	  done; \
+	  echo "$$out" | grep -q "PHANTOM NAME  borrowed .*IMPORTS" \
+	    || { echo "SELFTEST FAIL: a name the source module SPENDS after importing it was not caught as borrowed — its use is a body token, so the token reading calls it exported and only the import reading is left; this is the shape that reached CI"; fail=1; }; \
+	  echo "$$out" | grep -q "PHANTOM NAME  gone .*IMPORTS" \
+	    && { echo "SELFTEST FAIL: a name the source module holds NOWHERE was reported as borrowed — the two arms have different repairs, and only the borrowed one can name where the name actually lives"; fail=1; }; \
 	  for n in real-thing Sub-Mod r2; do \
 	    echo "$$out" | grep -q "PHANTOM NAME  $$n" \
 	      && { echo "SELFTEST FAIL: $$n reported PHANTOM, but Phantom-Src does export it ($$n tests, in order: a plain definition; a \`module M\` item whose keyword must come off; and the SOURCE side of a renaming, since \`x to y\` binds y and the module must export x)"; fail=1; }; \
 	  done; \
-	  echo "$$out" | grep -q '3 PHANTOM name(s)' \
-	    || { echo "SELFTEST FAIL: expected exactly 3 phantom names — a count over 3 means the check guessed at a module it cannot read, and every Fixture.* name in this tree names no file"; fail=1; }; \
+	  echo "$$out" | grep -q '4 PHANTOM name(s)' \
+	    || { echo "SELFTEST FAIL: expected exactly 4 phantom names — a count over 4 means the check guessed at a module it cannot read, and every Fixture.* name in this tree names no file"; fail=1; }; \
 	  echo "$$out" | grep -q 'PHANTOM MODULE  Phantom-Src.Nowhere' \
 	    || { echo "SELFTEST FAIL: an import of a module of this tree that has NO FILE went unreported — Agda meets that as a hard FileNotFound, and a split is what leaves them"; fail=1; }; \
 	  echo "$$out" | grep -q '1 PHANTOM module(s)' \
@@ -443,7 +447,7 @@ imports-selftest:
 	  done; \
 	  echo "$$after" | grep -q '4 BLANKET import(s)' \
 	    || { echo "SELFTEST FAIL: the blanket findings vanished after --fix"; fail=1; }; \
-	  echo "$$after" | grep -q '3 PHANTOM name(s)' \
+	  echo "$$after" | grep -q '4 PHANTOM name(s)' \
 	    || { echo "SELFTEST FAIL: --fix deleted a phantom name — the repair is the RIGHT module, which the fixer cannot know, and deleting the item trades a scope-check warning for an unbound name"; fail=1; }; \
 	  echo "$$after" | grep -q '1 PHANTOM module(s)' \
 	    || { echo "SELFTEST FAIL: --fix deleted a phantom module — same reason as a phantom name, one level up: only a human knows which module the definition moved to"; fail=1; }; \
@@ -462,7 +466,7 @@ imports-selftest:
 	  diff -q scripts/imports-selftest/Quiet.agda $$tmp/Quiet.agda >/dev/null \
 	    || { echo "SELFTEST FAIL: --fix rewrote the file it must not touch"; fail=1; }; \
 	  rm -rf $$tmp; \
-	  if [ $$fail -eq 0 ]; then echo "imports-selftest: PASS (fires on a comment-only mention, a multi-line clause, a token near-miss and a dead name beside a live one; not on an infix mixfix, a MIXFIX SECTION (one or many holes), a renaming, a qualified import or a \`module M\` entry whose use is an \`open M\`; --fix is idempotent on BOTH counts and spares the live names, a dead \`module M\` item included; the claim root is exempt from the USE check but not from the blanket rule; a sole-route edge is held back as a WIRING finding rather than deleted, jointly as well as one at a time; and an import with no \`using\` list is BLANKET, while \`using ()\` and a qualified import are not; and a \`public\` re-export is illegal outright, named or bare; and a file with no module declaration, or one disagreeing with its path, is reported before any finding about its imports; and a name no module of this tree contains is PHANTOM, read on the source side of a renaming and with a \`module\` keyword off, surviving --fix because only a human knows the right module; and a MODULE of this tree that has no file is PHANTOM too, while an out-of-tree namespace is not)"; \
+	  if [ $$fail -eq 0 ]; then echo "imports-selftest: PASS (fires on a comment-only mention, a multi-line clause, a token near-miss and a dead name beside a live one; not on an infix mixfix, a MIXFIX SECTION (one or many holes), a renaming, a qualified import or a \`module M\` entry whose use is an \`open M\`; --fix is idempotent on BOTH counts and spares the live names, a dead \`module M\` item included; the claim root is exempt from the USE check but not from the blanket rule; a sole-route edge is held back as a WIRING finding rather than deleted, jointly as well as one at a time; and an import with no \`using\` list is BLANKET, while \`using ()\` and a qualified import are not; and a \`public\` re-export is illegal outright, named or bare; and a file with no module declaration, or one disagreeing with its path, is reported before any finding about its imports; and a name no module of this tree contains is PHANTOM, read on the source side of a renaming and with a \`module\` keyword off, surviving --fix because only a human knows the right module; and so is a name the source module merely BORROWED and then spent, which its body tokens cannot tell from one it declares, reported against the module it was borrowed from; and a MODULE of this tree that has no file is PHANTOM too, while an out-of-tree namespace is not)"; \
 	  else echo "$$out"; exit 1; fi
 
 # PROVES dup-check IS LOAD-BEARING, against a fixture outside agda/src.  It
@@ -606,6 +610,48 @@ roadmap-moved-selftest:
 	    echo "SELFTEST FAIL: a trailing-whitespace edit PASSED as movement — the check can be satisfied by saying nothing"; fail=1; \
 	  fi; \
 	  if [ $$fail -eq 0 ]; then echo "roadmap-moved-selftest: OK"; else exit 1; fi
+
+# SETTLE RISK NEAR THE TRUNK: while a tier holds an open FALSITY or SHAPE row,
+# a commit may not BANK a GRINDABLE or DIFFICULTY row of that tier.  The pull
+# it resists is structural rather than careless -- a risky leg often ends in a
+# finding, a finding-only commit reads as unfinished, and a mechanical row gets
+# closed alongside it to make the commit whole.  See docs/roadmap-check.md.
+roadmap-order:
+	@scripts/check-roadmap-order.py
+
+# PROVES roadmap-order IS LOAD-BEARING, and -- the harder half -- that it stays
+# QUIET on the four shapes the proof must remain free to take.  A check that
+# fired on a deletion or a reclassification would stop the proof changing shape,
+# which is a worse failure than the one it prevents.
+roadmap-order-selftest:
+	@fail=0; S=scripts/roadmap-selftest; \
+	  if scripts/check-roadmap-order.py --file $$S/order-banked.md \
+	       --baseline-file $$S/sorted.md --ledger $$S/order-ledger-banked.txt \
+	       --src-names $$S/order-src-names.txt --headers $$S/order-headers-none.txt \
+	       > /dev/null 2>&1; then \
+	    echo "SELFTEST FAIL: a GRINDABLE row banked under an open FALSITY PASSED — the check is dead"; fail=1; \
+	  fi; \
+	  scripts/check-roadmap-order.py --file $$S/sorted.md --baseline-file $$S/sorted.md \
+	      --ledger $$S/ledger.txt --src-names $$S/src-names.txt \
+	      --headers $$S/order-headers-none.txt > /dev/null \
+	    || { echo "SELFTEST FAIL: a roadmap that banked nothing was rejected"; fail=1; }; \
+	  scripts/check-roadmap-order.py --file $$S/order-banked.md --baseline-file $$S/sorted.md \
+	      --ledger $$S/order-ledger-banked.txt --src-names $$S/src-names.txt \
+	      --headers $$S/order-headers-none.txt > /dev/null \
+	    || { echo "SELFTEST FAIL: a row DELETED from agda/src was read as discharged — the proof cannot drop a statement"; fail=1; }; \
+	  scripts/check-roadmap-order.py --file $$S/order-reclass.md --baseline-file $$S/sorted.md \
+	      --ledger $$S/ledger.txt --src-names $$S/order-src-names.txt \
+	      --headers $$S/order-headers-none.txt > /dev/null \
+	    || { echo "SELFTEST FAIL: a RECLASSIFIED row was read as discharged — the proof cannot re-rank its own risk"; fail=1; }; \
+	  scripts/check-roadmap-order.py --file $$S/order-banked-t1.md --baseline-file $$S/sorted.md \
+	      --ledger $$S/order-ledger-t1.txt --src-names $$S/order-src-t1.txt \
+	      --headers $$S/order-headers-none.txt > /dev/null \
+	    || { echo "SELFTEST FAIL: ANOTHER tier's open FALSITY blocked a discharge — the law is per-tier"; fail=1; }; \
+	  scripts/check-roadmap-order.py --file $$S/order-banked.md --baseline-file $$S/sorted.md \
+	      --ledger $$S/order-ledger-banked.txt --src-names $$S/order-src-names.txt \
+	      --headers $$S/order-headers-prereq.txt > /dev/null \
+	    || { echo "SELFTEST FAIL: a NAMED prerequisite was refused — the carve-out is dead"; fail=1; }; \
+	  if [ $$fail -eq 0 ]; then echo "roadmap-order-selftest: PASS (banking fires; deleting, reclassifying, another tier's risk and a named prerequisite do not)"; else exit 1; fi
 
 # PROVES roadmap-check IS LOAD-BEARING, against fixtures outside PROOF-STATE.md.
 # Same reason dup-selftest exists: the real file is (and should stay) SORTED, so
@@ -800,6 +846,53 @@ roadmap-selftest:
 	    && { echo "SELFTEST FAIL: a row at the cap EXACTLY was reported — a coverage lattice is legitimate up to the cap"; fail=1; }; \
 	  echo "$$cln" | grep -q "OVER THE RECEIPT CAP" \
 	    && { echo "SELFTEST FAIL: the cap fired on a clean roadmap — a row with TWIN×9 is being charged, and only PROBED is capped"; fail=1; }; \
+	  scripts/check-roadmap.py --file scripts/roadmap-selftest/questions-good.md > /dev/null 2>&1 \
+	    || { echo "SELFTEST FAIL: a well-formed OPEN QUESTIONS section was rejected, or a tier carrying none at all was — the section is optional when absent and the cap is not a quota"; fail=1; }; \
+	  scripts/check-roadmap.py --file scripts/roadmap-selftest/questions-good.md 2>&1 \
+	    | grep -q "OPEN QUESTIONS" \
+	    && { echo "SELFTEST FAIL: a question whose relevant list WRAPPED was reported — a wrapped ledger line is being charged as prose and its names never checked"; fail=1; }; \
+	  qmy=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/questions-many.md 2>&1); \
+	  if scripts/check-roadmap.py --file scripts/roadmap-selftest/questions-many.md > /dev/null 2>&1; then \
+	    echo "SELFTEST FAIL: a tier naming FOUR open questions PASSED — the cap is dead"; fail=1; \
+	  fi; \
+	  echo "$$qmy" | grep -q "^  Tier 0  4 question(s), wanted at most 3" \
+	    || { echo "SELFTEST FAIL: the over-capped tier was not NAMED with its found and wanted counts"; fail=1; }; \
+	  echo "$$qmy" | grep -q "OVER BUDGET" \
+	    && { echo "SELFTEST FAIL: a budget check fired on questions-many.md, so it does not isolate the COUNT"; fail=1; }; \
+	  qth=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/questions-thin.md 2>&1); \
+	  if scripts/check-roadmap.py --file scripts/roadmap-selftest/questions-thin.md > /dev/null 2>&1; then \
+	    echo "SELFTEST FAIL: a question over ONE postulate PASSED — a row wearing a heading is a question again"; fail=1; \
+	  fi; \
+	  echo "$$qth" | grep -q "THE-SINGLETON-question" \
+	    || { echo "SELFTEST FAIL: the singleton question was not NAMED"; fail=1; }; \
+	  echo "$$qth" | grep -q "WELL-FORMED-QUESTION" \
+	    && { echo "SELFTEST FAIL: a question naming two postulates was reported thin"; fail=1; }; \
+	  qft=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/questions-fat.md 2>&1); \
+	  if scripts/check-roadmap.py --file scripts/roadmap-selftest/questions-fat.md > /dev/null 2>&1; then \
+	    echo "SELFTEST FAIL: a question carrying its own answer PASSED — the question budget is dead"; fail=1; \
+	  fi; \
+	  echo "$$qft" | grep -q "OPEN QUESTIONS OVER BUDGET" \
+	    || { echo "SELFTEST FAIL: the over-budget question was not reported"; fail=1; }; \
+	  echo "$$qft" | grep -q "THE-within-budget-question" \
+	    && { echo "SELFTEST FAIL: a question was charged for its relevant list — the ledger line is FREE, so shortening would mean dropping a postulate"; fail=1; }; \
+	  echo "$$qft" | grep -q "TOO FEW POSTULATES" \
+	    && { echo "SELFTEST FAIL: the name-count check fired on questions-fat.md, so it does not isolate the budget"; fail=1; }; \
+	  qst=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/questions-stale.md \
+	           --ledger scripts/roadmap-selftest/ledger.txt --census scripts/roadmap-selftest/census.txt \
+	           --src-names scripts/roadmap-selftest/src-names.txt 2>&1); \
+	  if scripts/check-roadmap.py --file scripts/roadmap-selftest/questions-stale.md \
+	       --ledger scripts/roadmap-selftest/ledger.txt --census scripts/roadmap-selftest/census.txt \
+	       --src-names scripts/roadmap-selftest/src-names.txt > /dev/null 2>&1; then \
+	    echo "SELFTEST FAIL: a question naming a discharged row and a no-longer-FALSITY row PASSED — the one thing this section is held to is dead, and nothing else would notice it aging"; fail=1; \
+	  fi; \
+	  echo "$$qst" | grep -q "zz-off-the-ledger. — not a live postulate" \
+	    || { echo "SELFTEST FAIL: a relevant name that left the ledger was not reported"; fail=1; }; \
+	  echo "$$qst" | grep -q "b-shape. — its row is SHAPE, not FALSITY" \
+	    || { echo "SELFTEST FAIL: a relevant name whose row is no longer FALSITY was not reported"; fail=1; }; \
+	  echo "$$qst" | grep -q "a-falsity. —" \
+	    && { echo "SELFTEST FAIL: a live FALSITY row of the tier was reported stale"; fail=1; }; \
+	  echo "$$cln" | grep -q "OPEN QUESTIONS" \
+	    && { echo "SELFTEST FAIL: a questions check fired on a roadmap carrying NO questions section — the section is mandatory again, and a required question is a filler question"; fail=1; }; \
 	  if [ $$fail -eq 0 ]; then echo "roadmap-selftest: OK"; else exit 1; fi
 
 # `imports-check` JOINS THIS LIST IN THE COMMIT THAT MAKES THE TREE PASS IT, and
@@ -926,6 +1019,7 @@ GATE_CHEAP = wiring-selftest wiring-gate wiring-refuted wiring-probed \
              evidence-selftest evidence-check \
              roadmap-selftest roadmap-check \
              roadmap-moved-selftest roadmap-moved \
+             roadmap-order-selftest roadmap-order \
              comments-selftest comments-check dev-changed-selftest \
              unmap-selftest
 
