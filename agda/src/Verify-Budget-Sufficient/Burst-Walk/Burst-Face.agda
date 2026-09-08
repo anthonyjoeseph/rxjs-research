@@ -266,6 +266,20 @@ module BurstWalk
   pbΨ : ∀ (J : ℕ) {u} (p : Path Γ u t) → PbB c Ψ J p ≡ true → pathBΨ? Ψ p ≡ true
   pbΨ J p h = proj₂ (∧-true (pathSz? (Caps.cSize (frameStep J c)) p) (pathBΨ? Ψ p) h)
 
+  -- AND THE STRAT HALF NEEDS ITS OWN, FOR A SHARPER REASON THAN THE
+  -- REST OF THIS SHELF.  The others name their sides because the
+  -- unifier will not invert a function application; this one is
+  -- ambiguous even once it does.  At a CONS the right factor
+  -- `pathStrat? (f ↠ p)` REDUCES to a conjunction of its own, so the
+  -- ledger's outer ∧ and the reading's inner one are the same symbol
+  -- and nothing says where the split falls -- the left side is left
+  -- blocked and reports many minutes downstream, at the importer.  The
+  -- projection is stated over a path VARIABLE, where the reading is
+  -- neutral and the split is forced, and applied at the cons.
+  pbS : ∀ (J : ℕ) {u} (p : Path Γ u t) →
+        (PbB c Ψ J p ∧ pathStrat? p) ≡ true → pathStrat? p ≡ true
+  pbS J p h = proj₂ (∧-true (PbB c Ψ J p) (pathStrat? p) h)
+
   vbC : ∀ (J : ℕ) {s} (vs : List (Val Γ s)) → VbB c sl Ψ J vs ≡ true →
         valsCaps? (frameStep J c) sl vs ≡ true
   vbC J vs h = proj₁ (∧-true (valsCaps? (frameStep J c) sl vs) (valsΨ? Ψ vs) h)
@@ -458,7 +472,7 @@ module BurstWalk
                       -- at the TERMINAL's floor, and that floor is what
                       -- the tail already carries
                       (proj₂ (∧-true (frameStrat? (pathFloor p) f) (pathStrat? p)
-                                (∧-trueʳ h)))
+                                (pbS J (f ↠ p) h)))
     ; p-widen   = λ {J} {J′} le p h →
                     ∧-intro
                       (∧-intro (pathSz?-widen p (proj₁ (frameStep-mono-j c 2≤S le))
@@ -508,7 +522,7 @@ module BurstWalk
     -- payload's out of the frame's discarded conjunct, the registry's
     -- out of the `capsOK?` the step lands at
     ; sf-step   = λ J sf id now f path′ vals fin sched st ok pb vb rg gk cl hD →
-                    let hS = ∧-trueʳ pb
+                    let hS = pbS J (f ↠ path′) pb
                         hF = proj₁ (∧-true (frameStrat? (pathFloor path′) f)
                                            (pathStrat? path′) hS)
                         hV = ∧-trueʳ vb

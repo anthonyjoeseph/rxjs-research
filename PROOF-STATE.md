@@ -261,16 +261,17 @@ does not fit is a finding about the shared statement, not about the head.
   bottom-up on a coherent cache, attributes each to cone, edge or
   block, and deletes the findings resting on the ones that fall.
 
-- **A HYPOTHESIS WRITTEN INLINE IS NOT A DECLARATION, AND NEITHER IS A
-  CONJUNCT ADDED AT AN INSTANTIATION.** Naming the face hypothesis
-  types was supposed to end the shape where a premise added to the real
-  lemma must be added again by hand at every site. Threading the entry
-  reading found three inline survivors, and a fourth that is no copy at
-  all: a record field conjoined with a second half AT the instance, so
-  every sibling field must split what it reads and nothing holds them
-  to agreeing — one did not, and reported many minutes downstream at a
-  consumer. The commit replaces every hand-written copy of a named
-  telescope, and decides whether either sweep is mechanisable.
+- **MECHANISING THE SPLIT, AND THEN CHECKING THE DOOR.** Two shapes
+  fell here and only one wants a checker. The split has a cause now
+  and not a count: at a CONS the reading REDUCES to a conjunction of
+  its own, so the ledger's outer `∧` and the reading's inner one are
+  the same symbol, nothing determines where the split falls, and the
+  left side blocks — reported at the importer, many minutes down.
+  That is machine-visible, so the commit asks whether the duplicate
+  reader carries it. The second wanted no check at all, only
+  a RUN: the tier's door was never brought to a verdict, and it
+  held an unthreaded call the tower's FIRST error was hiding. A
+  door is one dev check, and it goes in the changed-set sweep.
 
 ### Open questions
 

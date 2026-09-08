@@ -646,6 +646,14 @@ dry-tick {n = n} {e = e} a id sched st inv val pre nok bnd valC closC strC =
 -- arguments" exactly as asked.  `j′ ≤ j + j′ ≤ opIterD (...)` is the
 -- one arithmetic step (`m≤n+m`) separating subscribeE-caps' own
 -- receipt from the shape asked for here.
+--
+-- THE TWO ENTRY PREMISES ARE FORWARDED AND NOTHING HERE READS THEM.
+-- They are the mint's side condition, owed by the callee and already
+-- held by this statement's one caller, so carrying them costs a pair
+-- of binders rather than a weakening: no obligation is created at
+-- either end, and the alternative -- discharging them here -- is not
+-- available, because the path is a free argument and the invariant
+-- only reads the chains the registry admits.
 sub-charge : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (bud ops j : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
   (bid : Id) (now : Tick) (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
@@ -659,6 +667,8 @@ sub-charge : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
   nest b sl (EvalSt.connectedShares st) ≤ bud →
   suc (sizeᵉ b) ≤ ops →
+  pathStrat? κ ≡ true →
+  inputsBelowᵉ (pathFloor κ) b ≡ true →
   let r = subscribeE g b κ bid now sched st in
   Σ ℕ λ j′ →
     (capsOK? (frameStep (j + j′) c) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
@@ -667,13 +677,13 @@ sub-charge : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     × (j′ ≤ opIterD (Caps.cSize c) (Caps.cWid c)
                      (depthE g b κ bid now sched st) bud ops j)
 sub-charge {n = n} c bud ops j g b κ bid now sl sched st
-           2≤S 1≤R slEq slC slSz capOK szB dwB pκ pLen nB opsB =
+           2≤S 1≤R slEq slC slSz capOK szB dwB pκ pLen nB opsB hps hib =
   j′ , capOut , burC , burN , ≤-trans (m≤n+m j′ j) jj′≤
   where
   IH   = subscribeE-caps c (depthE g b κ bid now sched st) bud ops j g b κ
                           bid now sl sched st
                           2≤S 1≤R slEq slC slSz capOK szB dwB pκ pLen nB opsB
-                          ≤-refl
+                          ≤-refl hps hib
   j′    = proj₁ IH
   capOut = proj₁ (proj₂ IH)
   burC  = proj₁ (proj₂ (proj₂ IH))
@@ -1943,6 +1953,8 @@ subscribeE-wet-via-caps {n = n} {e = e} g b κ id now sched st
                   pκLen
                   ≤-refl
                   ≤-refl
+                  hps
+                  hib
 
   j′      = proj₁ IH
   capOut  = proj₁ (proj₂ IH)
