@@ -90,8 +90,8 @@ open import Relation.Nullary using (yes; no)
 
 open import Rx.Prim      using (Tick; Id; Source; value; complete; InstEmit; _at_from_as_; Gas; g0; gs)
 open import Rx.Exp       using (obs; Ctx; Closed; Val; Exp; _≟ᵗ_; sizeᵉ; sizeᵛ; syncSizeᵉ; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ;
-  scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; unfoldμ;
-  inputsBelowᵉ; inputsBelowᵛ; inputsBelowᵗ)
+  scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; unfoldμ; inputsBelowᵉ;
+  inputsBelowᵛ)
 open import Rx.Frame-Width using (dWᵉ; pWᵉ; pWᵛ)
 open import Rx.Hop-Depth using (hopDᵉ; hopDᵛ; hopD-unfoldμ)
 open import Rx.Slot-Hop  using (slotHop)

@@ -3,7 +3,7 @@
 module Verify-Budget-Sufficient.Caps-Face.Part7.Cascade-Caps where
 
 open import Data.Bool    using (true; false; _∧_; if_then_else_)
-open import Data.Nat     using (ℕ; suc; _+_; _≤_; _≡ᵇ_; z≤n; s≤s)
+open import Data.Nat     using (ℕ; _+_; _≤_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤-trans; ≤-refl; ≤-reflexive; n≤1+n; *-identityʳ)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
@@ -23,38 +23,35 @@ open import Data.Unit    using (⊤; tt)
 open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; subst)
 
-open import Rx.Prim      using (Tick; Id; Source; _at_from_as_; Gas; after_,_; close; exhausted)
-open import Rx.Exp       using (obs; _≟ᵗ_; Ctx; Closed; Val)
+open import Rx.Prim      using (Id; Source; _at_from_as_; after_,_; close; exhausted)
+open import Rx.Exp       using (_≟ᵗ_; Ctx; Closed)
 open import Verify-Budget-Sufficient.Caps-Depth using
   (depthCascade)
-open import Rx.Evaluator using (Sched; EvalSt; Arrival; arrVal; RegId; Chain; lookupNode; NodeId; AllOp; cascadeLatch;
-  cascadeFinish; arrSource; chainsOf; chainsGo; cascadeGo; Path; arrTy; stepFrame;
-  subscribeInner; innerFinish; sameSource; regAt; fLvlD; lvls; sLvlD; chainStep; budgetAt;
-  arrTick; shareAdmit; _↠_)
+open import Rx.Evaluator using (Sched; EvalSt; Arrival; arrVal; RegId; Chain; cascadeLatch; cascadeFinish; arrSource;
+  chainsOf; chainsGo; cascadeGo; Path; arrTy; stepFrame; sameSource; regAt; lvls; chainStep;
+  budgetAt; arrTick; shareAdmit; _↠_)
 open import Rx.Slots using (Slots; slotsSize)
 
 open import Verify-Budget-Sufficient.Delivery-Walk using
-  (module Walk; Walk-Hyps; chP?; chP?-const; regP?)
+  (module Walk; Walk-Hyps; chP?; chP?-const)
 open import Verify-Budget-Sufficient.Deliveries using
   (delivN)
 open import Verify-Budget-Sufficient.Caps using
   (Caps; cDel; cDel-body; dWalkᶜ-mono; frameStep; frameStep-0; frameStep-mono-j; lvls-mono;
   sizeCount; sizeCount-body)
 open import Verify-Budget-Sufficient.Measures using
-  (pathLen; ∧-true)
+  (∧-true)
 open import Verify-Budget-Sufficient.Keeps-Ring using
   (KeepsC; stepFrame-keeps)
-open import Verify-Budget-Sufficient.Caps-Nest using
-  (nest)
 open import Verify-Budget-Sufficient.Caps-Depth
-  using (depthInner; depthFin; depthCascade)
+  using (depthCascade)
 
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
-  (capsOK?; eventCaps?; pathSz?; pathSz?-widen; regsSz?; slotsCaps?; valCaps?;
-   pathFloor; pathStrat?; frameStrat?)
+  (capsOK?; pathSz?; pathSz?-widen; regsSz?; slotsCaps?; valCaps?; pathFloor; pathStrat?;
+  frameStrat?)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
-  (foldPath-slots; capsOK?-count; capsOK?-delivered; capsOK?-regs; dropSweep-caps; frameBud;
-  pathSz?-len; pathSz?-tail; shareLatch-caps; valsCaps?; valsCaps?-lvl; walkOK; walkOK-finish;
+  (foldPath-slots; capsOK?-count; capsOK?-delivered; capsOK?-regs; dropSweep-caps; pathSz?-len;
+  pathSz?-tail; shareLatch-caps; valsCaps?; valsCaps?-lvl; walkOK; walkOK-finish;
   registry-entStrat; valsStrat?)
 open import Verify-Budget-Sufficient.Psi-Split using
   (chP?-∧; regP?-∧; regStrat?-paths)

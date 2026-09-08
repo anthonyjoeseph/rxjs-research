@@ -238,16 +238,18 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **CARRYING THE ENTRY READING DOWN THE WALK, which is what the mint's
-  side condition cost.** Preservation is done and the mint states its own
-  condition, so what remains is SUPPLYING it. The reading needs a pair
-  the walk carries — frames legal at the terminal's floor, and the term
-  being subscribed naming no input at or above it — and the refutation
-  settled that neither is readable off the state. The subscribe clique is
-  one mutual block, so the pair threads through all of it or none, which
-  is this commit. It also reports the one place the pair is NOT
-  walk-carried: a flatten node's PARKED queue lives in the state and the
-  node records no floor, so that reading is owed where the node opens.
+- **SUPPLYING THE ENTRY READING ON THE BURST FACE, the one walk the
+  cascade's three entry points did not close.** The caps face is
+  supplied: `chainsStrat?-one` is proven, `chainsOf-strat` is the leaf
+  the cascade's own filter needs, a slot-keyed admission being no
+  rearrangement of a source-keyed one, and all three entry points build
+  both halves locally, so no signature above it moved. The
+  burst walk conjoins its halves in the `burstH` instantiation rather
+  than in the burst predicates, so no other consumer pays a reading it
+  does not owe — and that record has reached no verdict, each check
+  cone-bound rather than measuring the module. The commit checks those
+  clauses and reports what the flatten node owes, its PARKED queue
+  recording no floor.
 
 - **WALKING AN ADMITTED CHAIN AT THE LEVEL IT WAS REGISTERED AT, which
   is the one door the pricing leaves open.** Both ends are closed by

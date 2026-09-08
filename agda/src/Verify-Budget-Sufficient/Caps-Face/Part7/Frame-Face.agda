@@ -20,7 +20,7 @@ open import Data.List.Properties using (length-map)
 open import Data.Maybe   using (nothing; just)
 open import Relation.Nullary using (yes; no)
 open import Data.Vec     using (Vec; lookup) renaming ([] to []ᵛ; _∷_ to _∷ᵛ_)
-open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.Product using (_,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; subst)
 
@@ -29,8 +29,8 @@ open import Rx.Exp       using (_×ᵗ_; obs; _≟ᵗ_; Ctx; Closed; Val; size�
 open import Rx.Frame-Width using (pWᵛ)
 open import Rx.Evaluator using (Sched; EvalSt; scanVals; scan-st; take-st; mergeAll-st; switch-st; exhaust-st; setNode;
   lookupNode; NodeId; _↠_; Frame; AllOp; map-f; scan-f; take-f; from-inner; thru-outer;
-  takeDispatch; Path; stepFrame; subscribeInner; mergeAllᵒ; switchᵒ; exhaustᵒ; thruWalk;
-  thruWrap; innerFinish; innerReact; aliveThroughᶠ; fLvlD; sLvlD)
+  takeDispatch; Path; stepFrame; mergeAllᵒ; switchᵒ; exhaustᵒ; thruWalk; thruWrap; innerFinish;
+  innerReact; aliveThroughᶠ)
 open import Rx.Slots using (Slots; slotsSize)
 
 open import Verify-Budget-Sufficient.Delivery-Walk using
@@ -41,8 +41,6 @@ open import Verify-Budget-Sufficient.Caps using
   (Caps; frameStep)
 open import Verify-Budget-Sufficient.Measures using
   (pathLen; reach-reset; ∧-true)
-open import Verify-Budget-Sufficient.Caps-Nest using
-  (nest)
 -- THE DEPTH MIRROR: `depthInner` is the fuel `thruOuter-face-core`'s
 -- depth hypothesis ranges over, and the rest of the family carries THE
 -- DEPTH PREMISE down the frame chain.  It threads by IDENTITY, because
@@ -53,20 +51,20 @@ open import Verify-Budget-Sufficient.Caps-Nest using
 -- so each face passes its premise straight to the next, and the
 -- absorbed branch needs nothing at all.
 open import Verify-Budget-Sufficient.Caps-Depth
-  using (depthInner; depthFrame; depthReact; depthFin; depthWalk)
+  using (depthFrame; depthReact; depthFin; depthWalk)
 
 open import Verify-Budget-Sufficient.Caps-Face.Part6 using
   (innerFinish-mergeAll-face; innerFinish-face-keep; thruOuter-face-core;
    SiCType; IfcType)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
-  (capsOK?; capsOK?-mono; eventCaps?; frameSz?; pathSz?; slotsCaps?; valCaps?; widNode;
-   pathFloor; pathStrat?)
+  (capsOK?; capsOK?-mono; eventCaps?; frameSz?; pathSz?; slotsCaps?; widNode; pathFloor;
+  pathStrat?)
 open import Verify-Budget-Sufficient.Caps-Face.Part5 using
   (face-charge; face-charge1; face-vals; mapFrame-caps; scanFrame-caps; scanVals-len;
   stepFrame-face-zero; takeDispatch-len; valsCaps?-parts)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
-  (capsOK?-nodeSz; capsOK?-nodeWid; capsOK?-setNode; face-lift; frameBud; FrameFace;
-  lookupNode-caps; takeDispatch-caps; valsCaps?; valsStrat?)
+  (capsOK?-nodeSz; capsOK?-nodeWid; capsOK?-setNode; face-lift; FrameFace; lookupNode-caps;
+  takeDispatch-caps; valsCaps?; valsStrat?)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (frameStep-⊑-+; valCaps?-size; valCaps?-wid)
 open import Decide using (T-to; T⇒≡true; ∧-intro; ∧-trueʳ)

@@ -70,8 +70,8 @@ open import Verify-Budget-Sufficient.Wet.Part2 using
 open import Verify-Budget-Sufficient.Caps-Term using
   (evalSeed-caps; evalTms-caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
-  (burstCaps?; burstCount?; burstStrat?; capsOK?; capsOK?-mono; frameSz?; frameStrat?;
-   pathFloor; pathStrat?; pathSz?; valCaps?; widNode)
+  (burstCaps?; burstCount?; capsOK?; capsOK?-mono; frameSz?; pathFloor; pathStrat?; pathSz?;
+  valCaps?; widNode)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves using
   (subscribeE-burstStrat)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using

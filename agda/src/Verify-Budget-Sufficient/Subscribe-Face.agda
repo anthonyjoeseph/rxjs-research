@@ -126,17 +126,15 @@ open import Verify-Budget-Sufficient.Caps-Face.Part5 using
    scanVals-len; stepFrame-scan-caps; takeDispatch-len; valsCaps?-data)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
   (capsOK?-delivered; capsOK?-mergeAllBump; capsOK?-mint; capsOK?-nextNode; capsOK?-nodeSz;
-   capsOK?-nodeWid; capsOK?-regs; capsOK?-setNode; dropOnly-caps;
-   foldPath-slots; frameBud; j+1; lookupNode-caps;
-   capsOK?-nodePark; parkList-push; mList?; mList?-head;
-   mList?-keeps; mList?-tail; obsList-intro; obsList-nodeSz; obsList-nodeWid;
-   obsList→mList-strict; register-caps; shareAdmit-caps; sharedPlumb-caps;
-   shareFinish-caps; shareLatch-caps; splitBurst-bk-caps; splitBurst-vals-caps;
-   splitEvents-bk-caps; splitEvents-len; splitEvents-valsCaps; splitEvents-valsStrat; switchKill-caps;
-   switchKill-closes-caps; takeDispatch-caps; thruWrap-caps; valsCaps?;
-   valsCaps?-lvl; valsCaps→mList-strict; valsStrat?;
-   capsOK?-srcFloor; entStrat-mint; entStrat-slot; entStrat-slot<;
-   pathPark-delivered; pathsPark-delivered; registry-entStrat)
+  capsOK?-nodeWid; capsOK?-regs; capsOK?-setNode; dropOnly-caps; foldPath-slots; frameBud; j+1;
+  lookupNode-caps; capsOK?-nodePark; parkList-push; mList?; mList?-head; mList?-keeps;
+  mList?-tail; obsList-intro; obsList-nodeSz; obsList-nodeWid; obsList→mList-strict;
+  register-caps; shareAdmit-caps; sharedPlumb-caps; shareFinish-caps; shareLatch-caps;
+  splitBurst-bk-caps; splitBurst-vals-caps; splitEvents-bk-caps; splitEvents-len;
+  splitEvents-valsCaps; splitEvents-valsStrat; switchKill-caps; switchKill-closes-caps;
+  takeDispatch-caps; thruWrap-caps; valsCaps?; valsCaps?-lvl; valsCaps→mList-strict;
+  valsStrat?; capsOK?-srcFloor; entStrat-mint; entStrat-slot<; pathPark-delivered;
+  pathsPark-delivered; registry-entStrat)
 open import Verify-Budget-Sufficient.Measures using
   (2X≡X+X; thruWrap-vals; all-++-intro; all-impl; lookupNode-park;
                                                       boundedLive; boundedNode; parkRoom; fᵢ≤sum-tab;
@@ -148,11 +146,11 @@ open import Verify-Budget-Sufficient.Caps using
   (1≤pow≤; _⊑ᶜ_; Caps; frameStep; frameStep-mono-j; frameStep-size-suc;
    frameStep-wid-suc; iterFold-mono-count; iterFold-suc; iterSize-suc)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
-  (burstCaps?; burstCount?; burstStrat?; capsOK?; capsOK?-mono; entStrat?;
-   eventCaps?; eventStrat?; frameSz?; frameStrat?; k≤iterFold; len≤sizeᵗˢ;
-   obsCaps?; parkStrat?; framePark?; pathFloor; pathPark?; pathStrat?; pathSz?; slotCaps?;
-   slotsCaps?; slotsCaps?-lookup; suc≤foldStep; valCaps?; valCountᵉ; widLive;
-   widNode; widNode-push; nestClosOK?; closLive; closLive-data; slotsCaps?-clos)
+  (burstCaps?; burstCount?; burstStrat?; capsOK?; capsOK?-mono; entStrat?; eventCaps?; frameSz?;
+  frameStrat?; k≤iterFold; len≤sizeᵗˢ; obsCaps?; parkStrat?; framePark?; pathFloor; pathPark?;
+  pathStrat?; pathSz?; slotCaps?; slotsCaps?; slotsCaps?-lookup; suc≤foldStep; valCaps?;
+  valCountᵉ; widLive; widNode; widNode-push; nestClosOK?; closLive; closLive-data;
+  slotsCaps?-clos)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves using
   (framePark-step; subscribeE-burstStrat; stepFrame-valsStrat; pathPark-step;
    shareAdmit-strat; shareAdmit-park; foldPath-park)
