@@ -144,9 +144,20 @@ def multi_member(rel_src: str) -> int | None:
 
 
 def dev_check(rel_src: str, budget: str) -> tuple[int, str]:
+    """`--cone-ok` IS DELIBERATE: this path does its own cone accounting.
+
+    The interactive loop refuses to start against a cold cone, because there
+    the run is a bet that pays the whole budget and caches nothing when it
+    loses.  The sweep is not making that bet blind -- it holds a separate cone
+    budget, it stops spending once the cone has had its share, and a cone
+    member that runs out of time is already reported as an unchecked consumer
+    rather than a red.  Inheriting the refusal on top of that would convert a
+    small cold cone the sweep would have rebuilt in seconds into a failure, and
+    a changed module into one nothing checked at all.
+    """
     pr = subprocess.run([sys.executable,
                          os.path.join(REPO, "scripts", "agda-dev.py"),
-                         "--budget", budget, rel_src],
+                         "--budget", budget, "--cone-ok", rel_src],
                         cwd=REPO, capture_output=True, text=True)
     return pr.returncode, pr.stdout + pr.stderr
 

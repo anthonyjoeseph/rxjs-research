@@ -249,29 +249,28 @@ does not fit is a finding about the shared statement, not about the head.
   the depth measure still decreases when a chain is entered below the
   top — the mechanism question the currency search stood in for.
 
-- **RE-MEASURING WHAT IS LEFT OF THE OVER-BUDGET LIST, now that the
-  cause of one reading is known and it was not the module.** A dev
-  check charges a consumer for its imports' CONTENTS, so a new
-  module-graph edge into a widely imported module raises the cost of
-  everything downstream: measured at sixty-three seconds against over
-  eight minutes for one edge into the module defining the path
-  predicates, with the bodies unchanged. That is a third cause
-  beside the cold cone and the genuine SCC, and it is the one a shape
-  reading cannot see. The commit re-runs the remaining floors
-  bottom-up on a coherent cache, attributes each to cone, edge or
-  block, and deletes the findings resting on the ones that fall.
+- **RE-MEASURING WHAT IS LEFT OF THE OVER-BUDGET LIST, now that one
+  cause is mechanised and cannot be paid twice.** The cold cone has
+  stopped being a cost: it is read off the filesystem BEFORE the run
+  and refused there, and a cone can now be built against a module
+  carrying no bodies, so it clears while the file being edited is
+  still broken. What remains is the cause a shape reading cannot
+  see — a new module-graph edge into a widely imported module,
+  measured at sixty-three seconds against over eight minutes with
+  the bodies unchanged. The commit re-runs the remaining floors
+  bottom-up on a coherent cache, attributes each to edge or block,
+  and deletes the findings resting on the ones that fall.
 
-- **MECHANISING THE SPLIT, AND THEN CHECKING THE DOOR.** Two shapes
-  fell here and only one wants a checker. The split has a cause now
-  and not a count: at a CONS the reading REDUCES to a conjunction of
-  its own, so the ledger's outer `∧` and the reading's inner one are
-  the same symbol, nothing determines where the split falls, and the
-  left side blocks — reported at the importer, many minutes down.
-  That is machine-visible, so the commit asks whether the duplicate
-  reader carries it. The second wanted no check at all, only
-  a RUN: the tier's door was never brought to a verdict, and it
-  held an unthreaded call the tower's FIRST error was hiding. A
-  door is one dev check, and it goes in the changed-set sweep.
+- **BRINGING THE STORE QUESTION TO A STATEMENT, AT THE ROW THAT
+  NAMES IT.** The tier asks whether ANY store conjunct survives
+  `stepFrame`, and `walk-strat-step` is where the answer is owed: a
+  `scan-f` folds against a value the path does not carry, so the
+  reading cannot be transported and has to be re-established. The
+  entry reading is the first worked instance of that shape — a
+  registry conjunct on the admission predicate, and a face deriving
+  a path reading from it. The commit asks whether that route reaches
+  a scan accumulator, or whether the step is where a second conjunct
+  must be minted rather than carried.
 
 ### Open questions
 
