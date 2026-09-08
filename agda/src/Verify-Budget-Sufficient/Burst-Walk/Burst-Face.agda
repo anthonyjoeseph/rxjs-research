@@ -215,7 +215,7 @@ stepFrame-burst-face siC ifc c sl Ψ d 2≤S 1≤R hCR slC slSz slFc J sf id now
       (∧-intro (proj₂ (proj₂ (proj₂ (proj₂ WF))))
                (not-in (stepFrame-nodry c sl Ψ d 2≤S 1≤R hCR slC slSz slFc
                           J sf id now f path′ vals fin sched st
-                          ok pb vb rg gk cl hD)))
+                          ok pb vb rg gk cl hD hps hvs)))
   where
   r  = stepFrame sf id now f path′ vals fin sched st
   s′ = proj₁ (proj₂ (proj₂ (proj₂ r)))

@@ -238,19 +238,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **SUPPLYING THE ENTRY READING ON THE BURST FACE, the one walk the
-  cascade's three entry points did not close.** The caps face is
-  supplied: `chainsStrat?-one` is proven, `chainsOf-strat` is the leaf
-  the cascade's own filter needs, a slot-keyed admission being no
-  rearrangement of a source-keyed one, and all three entry points build
-  both halves locally, so no signature above it moved. The
-  burst walk conjoins its halves in the `burstH` instantiation rather
-  than in the burst predicates, so no other consumer pays a reading it
-  does not owe — and that record has reached no verdict, each check
-  cone-bound rather than measuring the module. The commit checks those
-  clauses and reports what the flatten node owes, its PARKED queue
-  recording no floor.
-
 - **WALKING AN ADMITTED CHAIN AT THE LEVEL IT WAS REGISTERED AT, which
   is the one door the pricing leaves open.** Both ends are closed by
   arithmetic now, and `fan-regsSz`'s header carries which: the fan can
@@ -273,6 +260,17 @@ does not fit is a finding about the shared statement, not about the head.
   reading cannot see. The commit re-runs the remaining floors
   bottom-up on a coherent cache, attributes each to cone, edge or
   block, and deletes the findings resting on the ones that fall.
+
+- **THE PARK READING IS THE HALF NOTHING PRODUCES, and the leg is to
+  establish where it can be.** Carrying the entry reading down the walk
+  cost nothing on the PATH side: the caps predicate already records each
+  frame's reading at its tail's floor, and the tail's whole reading
+  under it, so the descent takes a projection rather than a premise —
+  which is why the fold and the Φ walk took it with no signature above
+  them moving. The STORE side is what that left, owed at every
+  `from-inner` and now a leaf of its own beside six siblings saying the
+  same thing. The commit puts the field on the walk's hypotheses record
+  and reports, producer by producer, which can establish it.
 
 ### Open questions
 
@@ -399,6 +397,10 @@ does not fit is a finding about the shared statement, not about the head.
   frame-keyed park reading across one step. The push re-steps the SAME frame,
   so the reading is asked of a state the previous emit produced, where the
   frame is a variable and no clause reduces.
+- **`frame-parkStrat`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the
+  frame's queue read at the floor its tail is read at, off the caps invariant
+  alone. That invariant prices a node's queue for size and for width and reads
+  no floor, so the conjunct it would project out of is not there.
 - **`pathPark-step`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: that same
   reading lifted off one frame onto the tail the walk is about to enter. Not a
   corollary of the frame-keyed form: what must survive is a reading of nodes

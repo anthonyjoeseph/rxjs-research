@@ -36,7 +36,7 @@ open import Rx.Nest-Depth using (nestDᵛ; nestDᵗ)
 open import Verify-Budget-Sufficient.Depth-Sighted using (ValsFit; valsFit-of-max)
 open import Verify-Budget-Sufficient.Nest-Walk using
   (nestDᵛˢ; nodeNestAt; capsDrainOK; FaceOK; faceOK; frameDrainOK; capsWalkOK; dispatchCapsOK;
-  shareCapsOK)
+  shareCapsOK; capsWalkOK-strat)
 open import Verify-Budget-Sufficient.Nest-Burst using (drainW)
 open import Verify-Budget-Sufficient.Nest-Cap using (nestFac; nestU)
 open import Verify-Budget-Sufficient.Deliveries using
@@ -78,13 +78,14 @@ open import Verify-Budget-Sufficient.Caps-Depth
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (capsAt-round-size; capsOK?; capsOK?-mono; eventCaps?; frameSz?; n≤capsAt-size; pathFloor;
   pathPark?; pathStrat?; pathSz?; pathSz?-widen; regsSz?; slotsCaps?; valCaps?; nestClosOK?ᵛ;
+  parkStrat?; framePark?;
   nestClosOK?ᵛ-widen)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
   (capsOK?-count; capsOK?-regs; chainsStrat?-one; frameBud; pathPark-delivered;
   pathsPark-delivered; registry-entStrat; slotsCaps?-capsAt; valsCaps?; valsCaps?-lvl;
   foldPath-slots; shareAdmit-caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves using
-  (cascade-admit-park; chainStep-park; chainsOf-strat)
+  (cascade-admit-park; chainStep-park; chainsOf-strat; frame-parkStrat)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (valCaps?-size; valCaps?-widen)
 open import Decide using (T-to; T⇒≡true; ∧-intro; ∧-trueˡ; ∧-trueʳ)
@@ -963,16 +964,18 @@ innerΦ-quiet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   pathNestD (from-inner op allNid inst ↠ p) ≤ nestCapAt e sl id →
   valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
          (from-inner op allNid inst ↠ p) vals ≡ true →
+  pathStrat? p ≡ true →
+  parkStrat? (pathFloor p) (lookupNode allNid (EvalSt.nodes st)) ≡ true →
   FrameΦHyp sf eid now (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
             (from-inner op allNid inst) p vals fin sched st
-innerΦ-quiet sl id sf eid now op allNid inst p vals fin sched st ¬m hsl hpz hnd hΦ
+innerΦ-quiet sl id sf eid now op allNid inst p vals fin sched st ¬m hsl hpz hnd hΦ stP stQ
   with innerΦ-fit-quiet sl id sf eid now op allNid inst p vals fin sched st
          hsl hpz hnd hΦ
 ... | c , d , Lv , G , fok , hdr , hsz , hlen , hG , hnum =
   c , d , 0 , Lv , G , fok
   , (λ lim act q od h → ⊥-elim (¬m lim act q od h))
   , (λ lim act q od h → ⊥-elim (¬m lim act q od h))
-  , hdr , hsz , hlen , hG , hnum
+  , hdr , hsz , hlen , stP , stQ , hG , hnum
 
 -- AND THE DRAIN ASSEMBLY, where the two ledgers are read at the one
 -- queue and transported to any the premise names -- which is the same
@@ -991,10 +994,12 @@ innerΦ-drain : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   frameDrainOK (capsAt e sl id) sl (capsH e sl id) Lv sf eid now
     (from-inner op allNid inst) p vals sched st →
   depthReact sf op allNid inst p eid now vals sched st fin ≤ capsH e sl id →
+  pathStrat? p ≡ true →
+  parkStrat? (pathFloor p) (lookupNode allNid (EvalSt.nodes st)) ≡ true →
   FrameΦHyp sf eid now (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
             (from-inner op allNid inst) p vals fin sched st
 innerΦ-drain sl id sf eid now Lv op allNid inst p vals fin sched st lim act q od
-             eqn hsl hpz hnd hΦ hfd hdep
+             eqn hsl hpz hnd hΦ hfd hdep stP stQ
   with innerΦ-fit-drain sl id sf eid now Lv op allNid inst p vals fin sched st
          lim act q od eqn hsl hpz hnd hΦ (hfd lim act q od eqn) hdep
 ... | c , d , Lv , G , hdrain , fok , hdr , hsz , hlen , hG , hnum =
@@ -1004,7 +1009,7 @@ innerΦ-drain sl id sf eid now Lv op allNid inst p vals fin sched st lim act q o
           transport {P = λ _ _ q′ _ → drainW sf allNid p eid now q′ sched st
                                         ≤ drainW sf allNid p eid now q sched st}
             h ≤-refl })
-  , hdr , hsz , hlen , hG , hnum
+  , hdr , hsz , hlen , stP , stQ , hG , hnum
   where
   transport : ∀ {ℓ} {lim′ : Maybe ℕ} {act′ : ℕ} {q′ : List (Closed _ _)}
     {od′ : Bool} {P : Maybe ℕ → ℕ → List (Closed _ _) → Bool → Set ℓ} →
@@ -1034,37 +1039,39 @@ innerΦ-fit-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   frameDrainOK (capsAt e sl id) sl (capsH e sl id) Lv sf eid now
     (from-inner op allNid inst) p vals sched st →
   depthReact sf op allNid inst p eid now vals sched st fin ≤ capsH e sl id →
+  pathStrat? p ≡ true →
+  parkStrat? (pathFloor p) (lookupNode allNid (EvalSt.nodes st)) ≡ true →
   FrameΦHyp sf eid now (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
             (from-inner op allNid inst) p vals fin sched st
 innerΦ-fit-go sl id sf eid now Lv op allNid inst p vals fin sched st
-              nothing eqn hsl hpz hnd hΦ hfd hdep =
+              nothing eqn hsl hpz hnd hΦ hfd hdep stP stQ =
   innerΦ-quiet sl id sf eid now op allNid inst p vals fin sched st
-    (notMerge-none eqn) hsl hpz hnd hΦ
+    (notMerge-none eqn) hsl hpz hnd hΦ stP stQ
 innerΦ-fit-go sl id sf eid now Lv op allNid inst p vals fin sched st
-              (just (scan-st v)) eqn hsl hpz hnd hΦ hfd hdep =
+              (just (scan-st v)) eqn hsl hpz hnd hΦ hfd hdep stP stQ =
   innerΦ-quiet sl id sf eid now op allNid inst p vals fin sched st
-    (notMerge-scan v eqn) hsl hpz hnd hΦ
+    (notMerge-scan v eqn) hsl hpz hnd hΦ stP stQ
 innerΦ-fit-go sl id sf eid now Lv op allNid inst p vals fin sched st
-              (just (take-st k)) eqn hsl hpz hnd hΦ hfd hdep =
+              (just (take-st k)) eqn hsl hpz hnd hΦ hfd hdep stP stQ =
   innerΦ-quiet sl id sf eid now op allNid inst p vals fin sched st
-    (notMerge-take k eqn) hsl hpz hnd hΦ
+    (notMerge-take k eqn) hsl hpz hnd hΦ stP stQ
 innerΦ-fit-go sl id sf eid now Lv op allNid inst p vals fin sched st
-              (just (switch-st cur od)) eqn hsl hpz hnd hΦ hfd hdep =
+              (just (switch-st cur od)) eqn hsl hpz hnd hΦ hfd hdep stP stQ =
   innerΦ-quiet sl id sf eid now op allNid inst p vals fin sched st
-    (notMerge-switch cur od eqn) hsl hpz hnd hΦ
+    (notMerge-switch cur od eqn) hsl hpz hnd hΦ stP stQ
 innerΦ-fit-go sl id sf eid now Lv op allNid inst p vals fin sched st
-              (just (exhaust-st ia od)) eqn hsl hpz hnd hΦ hfd hdep =
+              (just (exhaust-st ia od)) eqn hsl hpz hnd hΦ hfd hdep stP stQ =
   innerΦ-quiet sl id sf eid now op allNid inst p vals fin sched st
-    (notMerge-exhaust ia od eqn) hsl hpz hnd hΦ
+    (notMerge-exhaust ia od eqn) hsl hpz hnd hΦ stP stQ
 innerΦ-fit-go {s = s} sl id sf eid now Lv op allNid inst p vals fin sched st
-              (just (mergeAll-st {w} lim act q od)) eqn hsl hpz hnd hΦ hfd hdep
+              (just (mergeAll-st {w} lim act q od)) eqn hsl hpz hnd hΦ hfd hdep stP stQ
   with w ≟ᵗ s
 ... | no ne =
   innerΦ-quiet sl id sf eid now op allNid inst p vals fin sched st
-    (notMerge-other lim act q od eqn ne) hsl hpz hnd hΦ
+    (notMerge-other lim act q od eqn ne) hsl hpz hnd hΦ stP stQ
 ... | yes refl =
   innerΦ-drain sl id sf eid now Lv op allNid inst p vals fin sched st
-    lim act q od eqn hsl hpz hnd hΦ hfd hdep
+    lim act q od eqn hsl hpz hnd hΦ hfd hdep stP stQ
 
 innerΦ-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (sl : Slots Γ) (id : ℕ) (sf : Gas) (eid : Id) (now : Tick) (Lv : ℕ)
@@ -1079,11 +1086,13 @@ innerΦ-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   frameDrainOK (capsAt e sl id) sl (capsH e sl id) Lv sf eid now
     (from-inner op allNid inst) p vals sched st →
   depthReact sf op allNid inst p eid now vals sched st fin ≤ capsH e sl id →
+  pathStrat? p ≡ true →
+  parkStrat? (pathFloor p) (lookupNode allNid (EvalSt.nodes st)) ≡ true →
   FrameΦHyp sf eid now (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
             (from-inner op allNid inst) p vals fin sched st
-innerΦ-fit sl id sf eid now Lv op allNid inst p vals fin sched st hsl hpz hnd hΦ hfd hdep =
+innerΦ-fit sl id sf eid now Lv op allNid inst p vals fin sched st hsl hpz hnd hΦ hfd hdep stP stQ =
   innerΦ-fit-go sl id sf eid now Lv op allNid inst p vals fin sched st
-    (lookupNode allNid (EvalSt.nodes st)) refl hsl hpz hnd hΦ hfd hdep
+    (lookupNode allNid (EvalSt.nodes st)) refl hsl hpz hnd hΦ hfd hdep stP stQ
 
 -- AND THE FRAME'S SIDE-CONDITION IS A CASE SPLIT AND NOTHING ELSE,
 -- which is the point of separating it from the walk below: the silent
@@ -1105,17 +1114,19 @@ frameΦ-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id) (f ↠ p) vals ≡ true →
   frameDrainOK (capsAt e sl id) sl (capsH e sl id) Lv sf eid now f p vals sched st →
   depthFrame sf eid now f p vals fin sched st ≤ capsH e sl id →
+  pathStrat? (f ↠ p) ≡ true →
+  framePark? (pathFloor p) f st ≡ true →
   FrameΦHyp sf eid now (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
             f p vals fin sched st
-frameΦ-fit sl id sf eid now Lv (map-f _)  p vals fin sched st _ _ _ _ _ _ = tt
-frameΦ-fit sl id sf eid now Lv (take-f _) p vals fin sched st _ _ _ _ _ _ = tt
-frameΦ-fit sl id sf eid now Lv (scan-f fn nid) p vals fin sched st hsl hpz hnd hΦ _ _ =
+frameΦ-fit sl id sf eid now Lv (map-f _)  p vals fin sched st _ _ _ _ _ _ _ _ = tt
+frameΦ-fit sl id sf eid now Lv (take-f _) p vals fin sched st _ _ _ _ _ _ _ _ = tt
+frameΦ-fit sl id sf eid now Lv (scan-f fn nid) p vals fin sched st hsl hpz hnd hΦ _ _ _ _ =
   scanΦ-fit sl id sf eid now fn nid p vals fin sched st hsl hpz hnd hΦ
 frameΦ-fit sl id sf eid now Lv (from-inner op allNid inst) p vals fin sched st
-           hsl hpz hnd hΦ hfd hdep =
+           hsl hpz hnd hΦ hfd hdep stP stQ =
   innerΦ-fit sl id sf eid now Lv op allNid inst p vals fin sched st
-    hsl hpz hnd hΦ hfd hdep
-frameΦ-fit sl id sf eid now Lv (thru-outer op nid) p vals fin sched st hsl hpz hnd hΦ _ _ =
+    hsl hpz hnd hΦ hfd hdep stP stQ
+frameΦ-fit sl id sf eid now Lv (thru-outer op nid) p vals fin sched st hsl hpz hnd hΦ _ _ _ _ =
   walk-thru-fit sl id sf eid now op nid p vals fin sched st hsl hpz hnd hΦ
 
 -- THE WALK ITSELF, and it is the fold's own recursion with the grant
@@ -1951,6 +1962,20 @@ mutual
     hF = frameΦ-fit sl id sf nid now Lv f p vals fin sched st hsl hpz hnd hΦ
            (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcw))))))
            (≤-trans (m≤m⊔n (depthFrame sf nid now f p vals fin sched st) _) hdf)
+           stP
+           (frame-parkStrat (frameStep Lv (capsAt e sl id)) f p sched st
+              (proj₁ hcw) stP)
+    -- THE WALK'S OWN FRAME READING, JOINED TO ITS TAIL'S.  The
+    -- predicate records the frame's reading at the floor the tail is
+    -- read at and the tail's whole reading under it, which is the
+    -- recursion `pathStrat?` is defined by -- so the head's reading is
+    -- a pairing and mints nothing.  The PARK reading is then derived
+    -- rather than carried: a frame's stored queue is under the same
+    -- floor whenever the caps invariant holds at the state it is read
+    -- at, which is the leaf the caps face proves.
+    stP = ∧-intro (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcw))))))))
+            (capsWalkOK-strat _ _ sl _ _ sf gas nid now p _ _ _ _
+               (proj₂ (proj₂ hL)))
     B  = Caps.cSize (capsAt e sl id)
     hpz′ : pathSz? B p ≡ true
     hpz′ = proj₂ (∧-true (suc (pathLen p) ≤ᵇ B) (pathSz? B p)

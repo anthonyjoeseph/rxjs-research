@@ -14,11 +14,12 @@ open import Relation.Binary.PropositionalEquality using (_≡_)
 open import Rx.Prim      using (Tick; Id; Gas; Source; InstEvent)
 open import Rx.Exp       using (Ctx; Closed; Val; inputsBelowᵉ)
 open import Rx.Evaluator using
-  (Frame; Path; Sched; EvalSt; RegId; stepFrame; subscribeE;
+  (Frame; Path; Sched; EvalSt; RegId; _↠_; stepFrame; subscribeE;
    foldPath; shareAdmit; shareLatch;
    Arrival; arrTy; chainsOf; chainStep; cascadeLatch)
+open import Verify-Budget-Sufficient.Caps using (Caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
-  (burstStrat?; framePark?; frameStrat?; pathFloor; pathPark?; pathStrat?;
+  (burstStrat?; capsOK?; framePark?; frameStrat?; pathFloor; pathPark?; pathStrat?;
    regStrat?)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using (valsStrat?)
 
@@ -181,3 +182,25 @@ postulate
     all (λ rc → pathPark? (proj₂ rc) st) chains ≡ true →
     all (λ rc → pathPark? (proj₂ rc)
            (proj₂ (proj₂ (chainStep id a path sched st)))) chains ≡ true
+
+-- THE PARK READING WHERE NO PREMISE CARRIES IT.  Every other park
+-- statement here MOVES the reading across a step and takes it as a
+-- hypothesis; the caps face can, because its walk threads `framePark?`
+-- from the top.  The burst face's nodry half cannot: its hypotheses
+-- record has no park field, and the mergeAll drain subscribes exactly
+-- what the predicate reads, so the obligation arrives at a site with
+-- nothing above it to ask.
+--
+-- IT IS STATED OVER `capsOK?` AND NOT DERIVED FROM IT, which is the
+-- finding rather than an economy: the invariant prices what a node has
+-- QUEUED for size and for width and reads no floor at all, so a floor-
+-- keyed reading of that queue has no conjunct to come out of.  The
+-- repair is a park field on the walk's hypotheses record, cascading
+-- through every producer of it -- the cost of the fact being true, and
+-- the reason the drain is not weakened to avoid it.
+  frame-parkStrat : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+    (c : Caps) (f : Frame Γ s u) (κ : Path Γ u t)
+    (sched : Sched Γ) (st : EvalSt e) →
+    capsOK? c sched st ≡ true →
+    pathStrat? (f ↠ κ) ≡ true →
+    framePark? (pathFloor κ) f st ≡ true

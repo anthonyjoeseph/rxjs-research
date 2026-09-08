@@ -69,7 +69,7 @@ open import Verify-Budget-Sufficient.Nest-Burst using (drainW)
 open import Verify-Budget-Sufficient.Caps-Depth using (depthReact)
 open import Verify-Budget-Sufficient.Walk-Factor using (pathΦF; pathΦD)
 open import Verify-Budget-Sufficient.Caps-Face.Part1
-  using (pathSz?; iterSize-+; iterSize-mono-s)
+  using (pathSz?; iterSize-+; iterSize-mono-s; pathStrat?; pathFloor; parkStrat?)
 open import Verify-Budget-Sufficient.Nest-Subst using (applyFn-nest)
 
 -- the potential, read off the values still in flight and the path they
@@ -163,6 +163,8 @@ InnerΦFit {Γ = Γ} {e = e} {s = s} sf id now B U op allNid inst path vals fin 
     × (depthReact sf op allNid inst path id now vals sched st fin ≤ d)
     × (pathSz? (Caps.cSize (frameStep Lv c)) path ≡ true)
     × (suc (pathLen path) ≤ Caps.cSize (frameStep Lv c))
+    × (pathStrat? path ≡ true)
+    × (parkStrat? (pathFloor path) (lookupNode allNid (EvalSt.nodes st)) ≡ true)
     × (nodeNestAt allNid st ⊔ nestDᵛˢ vals ≤ G)
     × (∀ (j : ℕ) → j ≤ sizeCount c d ⊔ Caps.cSize c →
          pathΦF B path
@@ -558,14 +560,14 @@ innerΦ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
                       fin sched st))
     ≡ true
 innerΦ {e = e} sf id now op allNid inst path vals fin sched st B U
-       (c , d , W , Lv , G , face , hdr , hw , hdp , hpk , hpl , hst , hnum) =
+       (c , d , W , Lv , G , face , hdr , hw , hdp , hpk , hpl , stP , stQ , hst , hnum) =
   Φ-of-bound B U (nestFac S′ W * (G + nestU S′ (nestUnit e (Sched.slots sched))))
     path (proj₁ r) bound (hnum j (proj₁ (proj₂ INNER)))
   where
   r = stepFrame sf id now (from-inner op allNid inst) path vals fin sched st
 
   INNER = stepFrame-nodes-inner c d (Sched.slots sched) W Lv sf id now op
-            allNid inst path vals fin sched st ⦃ face ⦄ refl hdr hw hdp hpk hpl
+            allNid inst path vals fin sched st ⦃ face ⦄ refl hdr hw hdp hpk hpl stP stQ
 
   j = proj₁ INNER
 
