@@ -261,18 +261,16 @@ does not fit is a finding about the shared statement, not about the head.
   bottom-up on a coherent cache, attributes each to cone, edge or
   block, and deletes the findings resting on the ones that fall.
 
-- **THE PARK READING IS THE HALF NOTHING PRODUCES, and the caps face
-  now says where it can be.** The PATH side is carried end to end. The
-  STORE side is owed at every `from-inner`, and the `*All` face clique
-  takes it now: both named hypothesis types and every finish/react face
-  under them, so a premise added to the real lemma lands at each site
-  consuming it. At the frame walk's own `from-inner` clause it costs
-  NOTHING — `framePark?` reduces on that constructor, and
-  `frame-parkStrat` derives the reading from the `capsOK?` and the path
-  reading the clause already holds, so no signature above it moved.
-  What remains is the producers that cannot reach `capsOK?`: the commit
-  reports them, and puts the field on the walk's hypotheses record only
-  where that reduction cannot be had.
+- **A HYPOTHESIS WRITTEN INLINE IS NOT A DECLARATION, AND THE CLIQUE
+  STILL HAS COPIES.** Naming the two face hypothesis types was supposed
+  to end the shape where a premise added to the real lemma has to be
+  added again by hand at every site; threading the entry reading found
+  two survivors sitting in one module's own signatures, and they failed
+  only at the far end of a cone, many minutes after the edit that broke
+  them. Nothing sees them: `dup-check` reads declarations, and an
+  inline `∀ … → Σ …` is not one. The commit sweeps the tree for
+  every remaining hand-written copy of a named hypothesis type, replaces
+  each with the name, and decides whether the sweep is a check.
 
 ### Open questions
 

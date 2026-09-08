@@ -56,9 +56,9 @@ open import Verify-Budget-Sufficient.Nest-Store using
   nestOK?-latch; nestOK?-store; shareAdmit-nest; storeNest-regs≤)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; arrVal; RegId; lookupNode; NodeId; _↠_; Frame; AllOp; map-f; scan-f;
   take-f; from-inner; thru-outer; cascadeLatch; chainsOf; cascadeGo; Path; arrTy; stepFrame;
-  subscribeInner; innerFinish; cascade; share-sink; root; fLvlD; sLvlD; chainStep; budgetAt;
-  arrSource; arrTick; shareAdmit; shareLatch; foldPath; NodeState; mergeAll-st; scan-st;
-  take-st; switch-st; exhaust-st; regAt; lvls; Chain; sameSource)
+  cascade; share-sink; root; chainStep; budgetAt; arrSource; arrTick; shareAdmit; shareLatch;
+  foldPath; NodeState; mergeAll-st; scan-st; take-st; switch-st; exhaust-st; regAt; lvls;
+  Chain; sameSource)
 open import Rx.Slots using (Slots; slotsSize)
 
 open import Verify-Budget-Sufficient.Caps using
@@ -68,24 +68,22 @@ open import Verify-Budget-Sufficient.Measures using
   (pathLen; ∧-true; 2X≡X+X; all-impl)
 open import Verify-Budget-Sufficient.Keeps-Ring using
   (KeepsC; stepFrame-keeps)
-open import Verify-Budget-Sufficient.Caps-Nest using
-  (nest)
 open import Verify-Budget-Sufficient.Caps-Depth
-  using (depthInner; depthFin; depthCascade; depthReact;
-         depthFrame; depthFold; depthDisp; depthShareGo; depthChain;
-         lub3-l; lub3-m; lub3-r)
+  using (depthCascade; depthReact; depthFrame; depthFold; depthDisp; depthShareGo; depthChain; lub3-l;
+  lub3-m; lub3-r)
 
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
-  (capsAt-round-size; capsOK?; capsOK?-mono; eventCaps?; frameSz?; n≤capsAt-size; pathFloor;
-  pathPark?; pathStrat?; pathSz?; pathSz?-widen; regsSz?; slotsCaps?; valCaps?; nestClosOK?ᵛ;
-  parkStrat?; framePark?;
+  (capsAt-round-size; capsOK?; capsOK?-mono; frameSz?; n≤capsAt-size; pathFloor; pathPark?;
+  pathStrat?; pathSz?; pathSz?-widen; regsSz?; valCaps?; nestClosOK?ᵛ; parkStrat?; framePark?;
   nestClosOK?ᵛ-widen)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
-  (capsOK?-count; capsOK?-regs; chainsStrat?-one; frameBud; pathPark-delivered;
-  pathsPark-delivered; registry-entStrat; slotsCaps?-capsAt; valsCaps?; valsCaps?-lvl;
-  foldPath-slots; shareAdmit-caps)
+  (capsOK?-count; capsOK?-regs; chainsStrat?-one; pathPark-delivered; pathsPark-delivered;
+  registry-entStrat; slotsCaps?-capsAt; valsCaps?; valsCaps?-lvl; foldPath-slots;
+  shareAdmit-caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves using
   (cascade-admit-park; chainStep-park; chainsOf-strat; frame-parkStrat)
+open import Verify-Budget-Sufficient.Caps-Face.Part6 using
+  (SiCType; IfcType)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (valCaps?-size; valCaps?-widen)
 open import Decide using (T-to; T⇒≡true; ∧-intro; ∧-trueˡ; ∧-trueʳ)
@@ -1959,12 +1957,6 @@ mutual
     where
     step = stepFrame sf nid now f p vals fin sched st
     hL   = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcw)))))))
-    hF = frameΦ-fit sl id sf nid now Lv f p vals fin sched st hsl hpz hnd hΦ
-           (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcw))))))
-           (≤-trans (m≤m⊔n (depthFrame sf nid now f p vals fin sched st) _) hdf)
-           stP
-           (frame-parkStrat (frameStep Lv (capsAt e sl id)) f p sched st
-              (proj₁ hcw) stP)
     -- THE WALK'S OWN FRAME READING, JOINED TO ITS TAIL'S.  The
     -- predicate records the frame's reading at the floor the tail is
     -- read at and the tail's whole reading under it, which is the
@@ -1976,6 +1968,12 @@ mutual
     stP = ∧-intro (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcw))))))))
             (capsWalkOK-strat _ _ sl _ _ sf gas nid now p _ _ _ _
                (proj₂ (proj₂ hL)))
+    hF = frameΦ-fit sl id sf nid now Lv f p vals fin sched st hsl hpz hnd hΦ
+           (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcw))))))
+           (≤-trans (m≤m⊔n (depthFrame sf nid now f p vals fin sched st) _) hdf)
+           stP
+           (frame-parkStrat (frameStep Lv (capsAt e sl id)) f p sched st
+              (proj₁ hcw) stP)
     B  = Caps.cSize (capsAt e sl id)
     hpz′ : pathSz? B p ≡ true
     hpz′ = proj₂ (∧-true (suc (pathLen p) ≤ᵇ B) (pathSz? B p)
@@ -2386,7 +2384,7 @@ cascade-caps-all-go {n = n} {e = e} sl id Lc a nextId S ((rid , path) ∷ chains
            (g , Pos c d J g i , hfl , CH≤ , walk J g i HI hR)
   ST  = chainStep-caps sl id Lc a nextId path sched st′ sleq cok
           (pathSz?-widen path (proj₁ c⊑) hpc)
-          (valCaps?-widen sl (arrTy a) (arrVal a) c⊑ hvc) hdc
+          (valCaps?-widen sl (arrTy a) (arrVal a) c⊑ hvc) hdc hstrc hsvc
   -- and the fold's own climb lands on the NEXT position exactly when
   -- this chain's deliveries fit the budget read at this one
   STEP : lvls B W d Lc (suc D) ≤ Ent c d J g (suc i)
@@ -2394,7 +2392,7 @@ cascade-caps-all-go {n = n} {e = e} sl id Lc a nextId S ((rid , path) ∷ chains
                  (ent-step c d J g i D 2≤S
                     (chain-deliv-cap sl id a nextId path sched st′ Lc J g i
                        sleq hgn cok (pathSz?-widen path (proj₁ c⊑) hpc)
-                       HVC hdc hLc))
+                       HVC hdc hLc hstrc hsvc))
 
 cascade-caps-all : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id) (S : ℕ)
@@ -2530,58 +2528,8 @@ cascade-depth-capsH {e = e} sl id a nextId sched st hsl hcaps hnest hval hsz val
 -- the walk's post-state, before the finish shortens any list, so a fit
 -- stated after the finish is not one it can spend.
 caps-go :
-  (∀ {n′} {Γ′ : Ctx n′} {t′} {e′ : Closed Γ′ t′} {u′}
-    (c′ : Caps) (dep bud j′ : ℕ) (g′ : Gas) (op′ : AllOp) (allNid′ : NodeId)
-    (κ′ : Path Γ′ u′ t′) (id′ : Id) (now′ : Tick) (o′ : Val Γ′ (obs u′))
-    (sl′ : Slots Γ′) (sched′ : Sched Γ′) (st′ : EvalSt e′) →
-    2 ≤ Caps.cSize c′ →
-    1 ≤ Caps.cReg c′ →
-    Sched.slots sched′ ≡ sl′ →
-    slotsCaps? (Caps.cSize c′) (Caps.cWid c′) sl′ ≡ true →
-    slotsSize sl′ ≤ Caps.cSize c′ →
-    capsOK? (frameStep j′ c′) sched′ st′ ≡ true →
-    valCaps? (frameStep j′ c′) sl′ (obs u′) o′ ≡ true →
-    pathSz? (Caps.cSize (frameStep j′ c′)) κ′ ≡ true →
-    suc (pathLen κ′) ≤ Caps.cSize (frameStep j′ c′) →
-    nest o′ sl′ (EvalSt.connectedShares st′) ≤ bud →
-    depthInner g′ op′ allNid′ κ′ id′ now′ o′ sched′ st′ ≤ dep →
-    let r′ = subscribeInner g′ op′ allNid′ κ′ id′ now′ o′ sched′ st′
-    in Σ ℕ λ j₂ →
-       (capsOK? (frameStep (j′ + j₂) c′)
-                (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r′)))))
-                (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r′))))) ≡ true)
-       × (valsCaps? (frameStep (j′ + j₂) c′) sl′ (proj₁ (proj₂ r′)) ≡ true)
-       × (all (eventCaps? (frameStep (j′ + j₂) c′) sl′)
-              (proj₁ (proj₂ (proj₂ r′))) ≡ true)
-       × (suc (j′ + j₂) ≤ sLvlD (Caps.cSize c′) (Caps.cWid c′) dep (suc bud) (suc j′))
-   ) →
-  -- ifc  (innerFinish-caps, .Subscribe-Face)
-  (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-    (c : Caps) (dep bud j : ℕ) (g : Gas) (op : AllOp) (allNid inst : NodeId)
-    (κ : Path Γ s t) (id : Id) (now : Tick) (vals : List (Val Γ s))
-    (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
-    2 ≤ Caps.cSize c →
-    1 ≤ Caps.cReg c →
-    Sched.slots sched ≡ sl →
-    slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
-    slotsSize sl ≤ Caps.cSize c →
-    capsOK? (frameStep j c) sched st ≡ true →
-    pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
-    suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
-    valsCaps? (frameStep j c) sl vals ≡ true →
-    frameBud c j ≤ bud →
-    depthFin g op allNid inst κ id now vals sched st
-      (lookupNode allNid (EvalSt.nodes st)) ≤ dep →
-    let r = innerFinish g op allNid inst κ id now vals sched st
-              (lookupNode allNid (EvalSt.nodes st))
-    in Σ ℕ λ j′ →
-       (capsOK? (frameStep (j + j′) c)
-                (proj₁ (proj₂ (proj₂ (proj₂ r)))) (proj₂ (proj₂ (proj₂ (proj₂ r))))
-                  ≡ true)
-       × (valsCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
-       × (all (eventCaps? (frameStep (j + j′) c) sl)
-              (proj₁ (proj₂ r)) ≡ true)
-       × (suc (j + j′) ≤ fLvlD (Caps.cSize c) (Caps.cWid c) dep j)) →
+  SiCType →
+  IfcType →
   ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
   (sched : Sched Γ) (st : EvalSt e) →
@@ -2632,58 +2580,8 @@ caps-go siC ifc {e = e} sl id a nextId sched st slEq pre nok bnd val closV strC 
 -- exit cap above, and the finish only shortens lists, so the instant's
 -- fit is the walk's fit widened by the one clause between them.
 caps-tick :
-  (∀ {n′} {Γ′ : Ctx n′} {t′} {e′ : Closed Γ′ t′} {u′}
-    (c′ : Caps) (dep bud j′ : ℕ) (g′ : Gas) (op′ : AllOp) (allNid′ : NodeId)
-    (κ′ : Path Γ′ u′ t′) (id′ : Id) (now′ : Tick) (o′ : Val Γ′ (obs u′))
-    (sl′ : Slots Γ′) (sched′ : Sched Γ′) (st′ : EvalSt e′) →
-    2 ≤ Caps.cSize c′ →
-    1 ≤ Caps.cReg c′ →
-    Sched.slots sched′ ≡ sl′ →
-    slotsCaps? (Caps.cSize c′) (Caps.cWid c′) sl′ ≡ true →
-    slotsSize sl′ ≤ Caps.cSize c′ →
-    capsOK? (frameStep j′ c′) sched′ st′ ≡ true →
-    valCaps? (frameStep j′ c′) sl′ (obs u′) o′ ≡ true →
-    pathSz? (Caps.cSize (frameStep j′ c′)) κ′ ≡ true →
-    suc (pathLen κ′) ≤ Caps.cSize (frameStep j′ c′) →
-    nest o′ sl′ (EvalSt.connectedShares st′) ≤ bud →
-    depthInner g′ op′ allNid′ κ′ id′ now′ o′ sched′ st′ ≤ dep →
-    let r′ = subscribeInner g′ op′ allNid′ κ′ id′ now′ o′ sched′ st′
-    in Σ ℕ λ j₂ →
-       (capsOK? (frameStep (j′ + j₂) c′)
-                (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r′)))))
-                (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r′))))) ≡ true)
-       × (valsCaps? (frameStep (j′ + j₂) c′) sl′ (proj₁ (proj₂ r′)) ≡ true)
-       × (all (eventCaps? (frameStep (j′ + j₂) c′) sl′)
-              (proj₁ (proj₂ (proj₂ r′))) ≡ true)
-       × (suc (j′ + j₂) ≤ sLvlD (Caps.cSize c′) (Caps.cWid c′) dep (suc bud) (suc j′))
-   ) →
-  -- ifc  (innerFinish-caps, .Subscribe-Face)
-  (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-    (c : Caps) (dep bud j : ℕ) (g : Gas) (op : AllOp) (allNid inst : NodeId)
-    (κ : Path Γ s t) (id : Id) (now : Tick) (vals : List (Val Γ s))
-    (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
-    2 ≤ Caps.cSize c →
-    1 ≤ Caps.cReg c →
-    Sched.slots sched ≡ sl →
-    slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
-    slotsSize sl ≤ Caps.cSize c →
-    capsOK? (frameStep j c) sched st ≡ true →
-    pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
-    suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
-    valsCaps? (frameStep j c) sl vals ≡ true →
-    frameBud c j ≤ bud →
-    depthFin g op allNid inst κ id now vals sched st
-      (lookupNode allNid (EvalSt.nodes st)) ≤ dep →
-    let r = innerFinish g op allNid inst κ id now vals sched st
-              (lookupNode allNid (EvalSt.nodes st))
-    in Σ ℕ λ j′ →
-       (capsOK? (frameStep (j + j′) c)
-                (proj₁ (proj₂ (proj₂ (proj₂ r)))) (proj₂ (proj₂ (proj₂ (proj₂ r))))
-                  ≡ true)
-       × (valsCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
-       × (all (eventCaps? (frameStep (j + j′) c) sl)
-              (proj₁ (proj₂ r)) ≡ true)
-       × (suc (j + j′) ≤ fLvlD (Caps.cSize c) (Caps.cWid c) dep j)) →
+  SiCType →
+  IfcType →
   ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
   (sched : Sched Γ) (st : EvalSt e) →
