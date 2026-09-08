@@ -59,6 +59,7 @@ yours. `gate-light` and `gate-heavy` force a path.
 | [agda-dev.md](agda-dev.md) | `make agda-dev` — the per-member iteration loop |
 | [gate.md](gate.md) | `make gate` routing, `gate-light` / `gate-heavy` — the four escalation triggers, and the consumer cone the light path does not reach |
 | [bg.md](bg.md) | `make bg` / `bg-check` / `bg-wait` — detaching a build that outlives a tool call |
+| [ci-cache.md](ci-cache.md) | the Actions interface cache — why a PR's snapshot reaches nobody else, the window in which main's is one merge stale, and the ceiling that evicts what you need |
 | [find.md](find.md) | `make find` and `make dup-check` — search by the shape of the STATEMENT |
 | [find-prose.md](find-prose.md) | `make find-prose` — search FINDINGS: dead routes, coverage boundaries, rulings, traps |
 | [stub-proofs.md](stub-proofs.md) | `scripts/stub-proofs.py` — a `src` mirror with the proofs postulated; measured, and why it is not on the gate path |
