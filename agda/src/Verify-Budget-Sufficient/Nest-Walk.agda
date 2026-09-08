@@ -5336,13 +5336,15 @@ pushVals-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (proj₁ (subscribeE g b (thru-outer op (proj₁ (mintNode sched)) ↠ κ)
               id now (proj₂ (mintNode sched))
               (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st))) ≡ true →
+  pathStrat? κ ≡ true →
+  inputsBelowᵉ (pathFloor κ) b ≡ true →
   let res = subscribeE g b (thru-outer op (proj₁ (mintNode sched)) ↠ κ)
           id now (proj₂ (mintNode sched))
           (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st)
   in Σ ℕ λ L₀ →
      pushValsCapsOK (frameStep j c) L₀ sl W g op (proj₁ (mintNode sched)) κ id now
        (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
-pushVals-caps {u = u} c j Lv sl W g op lim b κ id now sched st hj hLv hsl hc hv hcl hw hsz hpk hpl hbc hbn =
+pushVals-caps {u = u} c j Lv sl W g op lim b κ id now sched st hj hLv hsl hc hv hcl hw hsz hpk hpl hbc hbn stP stB =
   proj₁ ST ,
   pushVals-caps-join (frameStep j c) (proj₁ ST) sl W g op (proj₁ (mintNode sched)) κ id now
     (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
@@ -5350,10 +5352,10 @@ pushVals-caps {u = u} c j Lv sl W g op lim b κ id now sched st hj hLv hsl hc hv
     (pushVals-adm-ems (frameStep j c) sl (proj₁ res) hbn)
     hbc
     (pushVals-caps-room c j Lv sl W g op lim b κ id now sched st hj hLv hsl hc hv hcl hw
-       hsz hpk hpl hbc hbn)
+       hsz hpk hpl hbc hbn stP stB)
   where
   ST = pushVals-caps-st c j Lv sl W g op lim b κ id now sched st hj hLv hsl hc hv hcl hw
-         hsz hpk hpl hbc hbn
+         hsz hpk hpl hbc hbn stP stB
   res = subscribeE g b (thru-outer op (proj₁ (mintNode sched)) ↠ κ)
           id now (proj₂ (mintNode sched))
           (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st)
@@ -5385,6 +5387,8 @@ pushVals-merge : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
               (installNode (proj₁ (mintNode sched)) (mergeAll-st {t = u} lim 0 [] false) st)
    in nestDᵛˢ (proj₁ (splitBurst {A = Val Γ t} (proj₁ r₀)))
         ≤ nestB (Caps.cSize (frameStep j c)) W (nestUnit e sl) B (syncSizeᵉ b)) →
+  pathStrat? κ ≡ true →
+  inputsBelowᵉ (pathFloor κ) b ≡ true →
   let res = subscribeE g b (thru-outer mergeAllᵒ (proj₁ (mintNode sched)) ↠ κ)
           id now (proj₂ (mintNode sched))
           (installNode (proj₁ (mintNode sched)) (mergeAll-st {t = u} lim 0 [] false) st)
@@ -5393,7 +5397,7 @@ pushVals-merge : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
        g mergeAllᵒ (proj₁ (mintNode sched)) κ id now
        (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
 pushVals-merge {Γ = Γ} {t = t} {e = e} {u = u} c j Lv sl B W g lim b κ id now sched st
-               hj hLv hsl hc hv hcl hn hw hsz hpk hpl hbc hbn hbu =
+               hj hLv hsl hc hv hcl hn hw hsz hpk hpl hbc hbn hbu stP stB =
   proj₁ CAPS ,
   pushVals-both (frameStep j c) (proj₁ CAPS) sl B W (syncSizeᵉ b) g mergeAllᵒ (proj₁ (mintNode sched)) κ id now
     (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
@@ -5405,7 +5409,7 @@ pushVals-merge {Γ = Γ} {t = t} {e = e} {u = u} c j Lv sl B W g lim b κ id now
               (splitBurst-vals-A {A = Val Γ t} {B = Val Γ u} (proj₁ res)) hbu))
   where
   CAPS = pushVals-caps c j Lv sl W g mergeAllᵒ lim b κ id now sched st hj hLv hsl hc hv hcl hw
-           hsz hpk hpl hbc hbn
+           hsz hpk hpl hbc hbn stP stB
   res = subscribeE g b (thru-outer mergeAllᵒ (proj₁ (mintNode sched)) ↠ κ)
           id now (proj₂ (mintNode sched))
           (installNode (proj₁ (mintNode sched)) (mergeAll-st {t = u} lim 0 [] false) st)
@@ -5437,6 +5441,8 @@ pushVals-switch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
               (installNode (proj₁ (mintNode sched)) (switch-st nothing false) st)
    in nestDᵛˢ (proj₁ (splitBurst {A = Val Γ t} (proj₁ r₀)))
         ≤ nestB (Caps.cSize (frameStep j c)) W (nestUnit e sl) B (syncSizeᵉ b)) →
+  pathStrat? κ ≡ true →
+  inputsBelowᵉ (pathFloor κ) b ≡ true →
   let res = subscribeE g b (thru-outer switchᵒ (proj₁ (mintNode sched)) ↠ κ)
           id now (proj₂ (mintNode sched))
           (installNode (proj₁ (mintNode sched)) (switch-st nothing false) st)
@@ -5445,7 +5451,7 @@ pushVals-switch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
        g switchᵒ (proj₁ (mintNode sched)) κ id now
        (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
 pushVals-switch {Γ = Γ} {t = t} {e = e} {u = u} c j Lv sl B W g b κ id now sched st
-               hj hLv hsl hc hv hcl hn hw hsz hpk hpl hbc hbn hbu =
+               hj hLv hsl hc hv hcl hn hw hsz hpk hpl hbc hbn hbu stP stB =
   proj₁ CAPS ,
   pushVals-both (frameStep j c) (proj₁ CAPS) sl B W (syncSizeᵉ b) g switchᵒ (proj₁ (mintNode sched)) κ id now
     (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
@@ -5457,7 +5463,7 @@ pushVals-switch {Γ = Γ} {t = t} {e = e} {u = u} c j Lv sl B W g b κ id now sc
               (splitBurst-vals-A {A = Val Γ t} {B = Val Γ u} (proj₁ res)) hbu))
   where
   CAPS = pushVals-caps c j Lv sl W g switchᵒ nothing b κ id now sched st hj hLv hsl hc hv hcl hw
-           hsz hpk hpl hbc hbn
+           hsz hpk hpl hbc hbn stP stB
   res = subscribeE g b (thru-outer switchᵒ (proj₁ (mintNode sched)) ↠ κ)
           id now (proj₂ (mintNode sched))
           (installNode (proj₁ (mintNode sched)) (switch-st nothing false) st)
@@ -5489,6 +5495,8 @@ pushVals-exhaust : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
               (installNode (proj₁ (mintNode sched)) (exhaust-st false false) st)
    in nestDᵛˢ (proj₁ (splitBurst {A = Val Γ t} (proj₁ r₀)))
         ≤ nestB (Caps.cSize (frameStep j c)) W (nestUnit e sl) B (syncSizeᵉ b)) →
+  pathStrat? κ ≡ true →
+  inputsBelowᵉ (pathFloor κ) b ≡ true →
   let res = subscribeE g b (thru-outer exhaustᵒ (proj₁ (mintNode sched)) ↠ κ)
           id now (proj₂ (mintNode sched))
           (installNode (proj₁ (mintNode sched)) (exhaust-st false false) st)
@@ -5497,7 +5505,7 @@ pushVals-exhaust : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
        g exhaustᵒ (proj₁ (mintNode sched)) κ id now
        (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
 pushVals-exhaust {Γ = Γ} {t = t} {e = e} {u = u} c j Lv sl B W g b κ id now sched st
-               hj hLv hsl hc hv hcl hn hw hsz hpk hpl hbc hbn hbu =
+               hj hLv hsl hc hv hcl hn hw hsz hpk hpl hbc hbn hbu stP stB =
   proj₁ CAPS ,
   pushVals-both (frameStep j c) (proj₁ CAPS) sl B W (syncSizeᵉ b) g exhaustᵒ (proj₁ (mintNode sched)) κ id now
     (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
@@ -5509,7 +5517,7 @@ pushVals-exhaust {Γ = Γ} {t = t} {e = e} {u = u} c j Lv sl B W g b κ id now s
               (splitBurst-vals-A {A = Val Γ t} {B = Val Γ u} (proj₁ res)) hbu))
   where
   CAPS = pushVals-caps c j Lv sl W g exhaustᵒ nothing b κ id now sched st hj hLv hsl hc hv hcl hw
-           hsz hpk hpl hbc hbn
+           hsz hpk hpl hbc hbn stP stB
   res = subscribeE g b (thru-outer exhaustᵒ (proj₁ (mintNode sched)) ↠ κ)
           id now (proj₂ (mintNode sched))
           (installNode (proj₁ (mintNode sched)) (exhaust-st false false) st)
@@ -5546,6 +5554,8 @@ thruFit-merge : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
               (installNode (proj₁ (mintNode sched)) (mergeAll-st {t = u} lim 0 [] false) st)
    in nestDᵛˢ (proj₁ (splitBurst {A = Val Γ t} (proj₁ r₀)))
         ≤ nestB (Caps.cSize (frameStep j c)) W (nestUnit e sl) B (syncSizeᵉ b)) →
+  pathStrat? κ ≡ true →
+  inputsBelowᵉ (pathFloor κ) b ≡ true →
   let res = subscribeE g b (thru-outer mergeAllᵒ (proj₁ (mintNode sched)) ↠ κ)
               id now (proj₂ (mintNode sched))
               (installNode (proj₁ (mintNode sched))
@@ -5554,16 +5564,22 @@ thruFit-merge : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
                   (syncSizeᵉ (mergeAllᵉ lim b)))
        g mergeAllᵒ (proj₁ (mintNode sched)) κ id now
        (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
-thruFit-merge {e = e} {u = u} c j Lv sl B W g lim b κ id now sched st hj hLv hsl hc hv hcl hn hw hsz hpk hpl hbc hbn hbu =
+thruFit-merge {e = e} {u = u} c j Lv sl B W g lim b κ id now sched st hj hLv hsl hc hv hcl hn hw hsz hpk hpl hbc hbn hbu stP stB =
   pushFit-ems (frameStep j c) (proj₁ PV) sl B W (syncSizeᵉ b) (syncSizeᵉ (mergeAllᵉ lim b))
     g mergeAllᵒ (proj₁ (mintNode sched)) κ id now
     (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res)) ≤-refl
     (proj₂ PV)
     hpk hpl
+    stP bStr
     ⦃ face⊑ c (frameStep j c) sl (c⊑step c j (FaceOK.fSize faceHere)) faceHere ⦄
   where
   PV = pushVals-merge c j Lv sl B W g lim b κ id now sched st hj hLv hsl hc hv hcl hn hw
-         hsz hpk hpl hbc hbn hbu
+         hsz hpk hpl hbc hbn hbu stP stB
+
+  bStr = subscribeE-burstStrat g b (thru-outer mergeAllᵒ (proj₁ (mintNode sched)) ↠ κ)
+           id now (proj₂ (mintNode sched))
+           (installNode (proj₁ (mintNode sched))
+                        (mergeAll-st {t = u} lim 0 [] false) st) stP stB
   res = subscribeE g b (thru-outer mergeAllᵒ (proj₁ (mintNode sched)) ↠ κ)
           id now (proj₂ (mintNode sched))
           (installNode (proj₁ (mintNode sched))
@@ -5595,6 +5611,8 @@ thruFit-switch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
               (installNode (proj₁ (mintNode sched)) (switch-st nothing false) st)
    in nestDᵛˢ (proj₁ (splitBurst {A = Val Γ t} (proj₁ r₀)))
         ≤ nestB (Caps.cSize (frameStep j c)) W (nestUnit e sl) B (syncSizeᵉ b)) →
+  pathStrat? κ ≡ true →
+  inputsBelowᵉ (pathFloor κ) b ≡ true →
   let res = subscribeE g b (thru-outer switchᵒ (proj₁ (mintNode sched)) ↠ κ)
               id now (proj₂ (mintNode sched))
               (installNode (proj₁ (mintNode sched)) (switch-st nothing false) st)
@@ -5602,16 +5620,21 @@ thruFit-switch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
                   (syncSizeᵉ (switchAllᵉ b)))
        g switchᵒ (proj₁ (mintNode sched)) κ id now
        (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
-thruFit-switch {e = e} c j Lv sl B W g b κ id now sched st hj hLv hsl hc hv hcl hn hw hsz hpk hpl hbc hbn hbu =
+thruFit-switch {e = e} c j Lv sl B W g b κ id now sched st hj hLv hsl hc hv hcl hn hw hsz hpk hpl hbc hbn hbu stP stB =
   pushFit-ems (frameStep j c) (proj₁ PV) sl B W (syncSizeᵉ b) (syncSizeᵉ (switchAllᵉ b))
     g switchᵒ (proj₁ (mintNode sched)) κ id now
     (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res)) ≤-refl
     (proj₂ PV)
     hpk hpl
+    stP bStr
     ⦃ face⊑ c (frameStep j c) sl (c⊑step c j (FaceOK.fSize faceHere)) faceHere ⦄
   where
   PV = pushVals-switch c j Lv sl B W g b κ id now sched st hj hLv hsl hc hv hcl hn hw
-         hsz hpk hpl hbc hbn hbu
+         hsz hpk hpl hbc hbn hbu stP stB
+
+  bStr = subscribeE-burstStrat g b (thru-outer switchᵒ (proj₁ (mintNode sched)) ↠ κ)
+           id now (proj₂ (mintNode sched))
+           (installNode (proj₁ (mintNode sched)) (switch-st nothing false) st) stP stB
   res = subscribeE g b (thru-outer switchᵒ (proj₁ (mintNode sched)) ↠ κ)
           id now (proj₂ (mintNode sched))
           (installNode (proj₁ (mintNode sched)) (switch-st nothing false) st)
@@ -5642,6 +5665,8 @@ thruFit-exhaust : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
               (installNode (proj₁ (mintNode sched)) (exhaust-st false false) st)
    in nestDᵛˢ (proj₁ (splitBurst {A = Val Γ t} (proj₁ r₀)))
         ≤ nestB (Caps.cSize (frameStep j c)) W (nestUnit e sl) B (syncSizeᵉ b)) →
+  pathStrat? κ ≡ true →
+  inputsBelowᵉ (pathFloor κ) b ≡ true →
   let res = subscribeE g b (thru-outer exhaustᵒ (proj₁ (mintNode sched)) ↠ κ)
               id now (proj₂ (mintNode sched))
               (installNode (proj₁ (mintNode sched)) (exhaust-st false false) st)
@@ -5649,16 +5674,21 @@ thruFit-exhaust : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
                   (syncSizeᵉ (exhaustAllᵉ b)))
        g exhaustᵒ (proj₁ (mintNode sched)) κ id now
        (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
-thruFit-exhaust {e = e} c j Lv sl B W g b κ id now sched st hj hLv hsl hc hv hcl hn hw hsz hpk hpl hbc hbn hbu =
+thruFit-exhaust {e = e} c j Lv sl B W g b κ id now sched st hj hLv hsl hc hv hcl hn hw hsz hpk hpl hbc hbn hbu stP stB =
   pushFit-ems (frameStep j c) (proj₁ PV) sl B W (syncSizeᵉ b) (syncSizeᵉ (exhaustAllᵉ b))
     g exhaustᵒ (proj₁ (mintNode sched)) κ id now
     (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res)) ≤-refl
     (proj₂ PV)
     hpk hpl
+    stP bStr
     ⦃ face⊑ c (frameStep j c) sl (c⊑step c j (FaceOK.fSize faceHere)) faceHere ⦄
   where
   PV = pushVals-exhaust c j Lv sl B W g b κ id now sched st hj hLv hsl hc hv hcl hn hw
-         hsz hpk hpl hbc hbn hbu
+         hsz hpk hpl hbc hbn hbu stP stB
+
+  bStr = subscribeE-burstStrat g b (thru-outer exhaustᵒ (proj₁ (mintNode sched)) ↠ κ)
+           id now (proj₂ (mintNode sched))
+           (installNode (proj₁ (mintNode sched)) (exhaust-st false false) st) stP stB
   res = subscribeE g b (thru-outer exhaustᵒ (proj₁ (mintNode sched)) ↠ κ)
           id now (proj₂ (mintNode sched))
           (installNode (proj₁ (mintNode sched)) (exhaust-st false false) st)
@@ -6056,7 +6086,7 @@ subscribeE-nest {e = e} {u = u} c d sl B W Lv g (mergeAllᵉ lim b) κ id now sc
           (frameStep-mono-j c 2≤c (m≤m⊔n (proj₁ BN) J₀))
           (proj₂ (proj₂ BN))
 
-  FIT = thruFit-merge c J Lv sl B W g lim b κ id now sched st J≥S J≥Lv hsl hc hv hcl hn hw hszJ hpkJ hplJ HBC HBN (proj₁ IH)
+  FIT = thruFit-merge c J Lv sl B W g lim b κ id now sched st J≥S J≥Lv hsl hc hv hcl hn hw hszJ hpkJ hplJ HBC HBN (proj₁ IH) stP stB
 
   PUSH = pushBurst-nest-thru
            (nestB S′ W (nestUnit e sl) B (syncSizeᵉ (mergeAllᵉ lim b)))
@@ -6196,7 +6226,7 @@ subscribeE-nest {e = e} {u = u} c d sl B W Lv g (switchAllᵉ b) κ id now sched
           (frameStep-mono-j c 2≤c (m≤m⊔n (proj₁ BN) J₀))
           (proj₂ (proj₂ BN))
 
-  FIT = thruFit-switch c J Lv sl B W g b κ id now sched st J≥S J≥Lv hsl hc hv hcl hn hw hszJ hpkJ hplJ HBC HBN (proj₁ IH)
+  FIT = thruFit-switch c J Lv sl B W g b κ id now sched st J≥S J≥Lv hsl hc hv hcl hn hw hszJ hpkJ hplJ HBC HBN (proj₁ IH) stP stB
 
   PUSH = pushBurst-nest-thru
            (nestB S′ W (nestUnit e sl) B (syncSizeᵉ (switchAllᵉ b)))
@@ -6334,7 +6364,7 @@ subscribeE-nest {e = e} {u = u} c d sl B W Lv g (exhaustAllᵉ b) κ id now sche
           (frameStep-mono-j c 2≤c (m≤m⊔n (proj₁ BN) J₀))
           (proj₂ (proj₂ BN))
 
-  FIT = thruFit-exhaust c J Lv sl B W g b κ id now sched st J≥S J≥Lv hsl hc hv hcl hn hw hszJ hpkJ hplJ HBC HBN (proj₁ IH)
+  FIT = thruFit-exhaust c J Lv sl B W g b κ id now sched st J≥S J≥Lv hsl hc hv hcl hn hw hszJ hpkJ hplJ HBC HBN (proj₁ IH) stP stB
 
   PUSH = pushBurst-nest-thru
            (nestB S′ W (nestUnit e sl) B (syncSizeᵉ (exhaustAllᵉ b)))
