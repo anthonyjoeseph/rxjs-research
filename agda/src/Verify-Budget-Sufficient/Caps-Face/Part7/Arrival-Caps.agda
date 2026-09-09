@@ -65,7 +65,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves using
   (cascade-admit-park; chainStep-park; chainsOf-strat;
    cascade-admit-ord; chainStep-ord)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
-  (capsOK?-count; capsOK?-regs; chainsStrat?-one; pathPark-delivered; pathsPark-delivered;
+  (capsOK?-count; capsOK?-delivered; capsOK?-regs; chainsStrat?-one; pathPark-delivered; pathsPark-delivered;
   pathSz?-len; registry-entStrat; slotsCaps?-capsAt; valsCaps?; valsCaps?-lvl; foldPath-slots;
   capsOK?-regOrd; capsOK?-regPark)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
@@ -514,14 +514,14 @@ arr-chains-caps-go {n = n} {e = e} sl id Lv a nextId ((rid , path) ∷ chains) s
                 J g i hfl hR
                 (≤-trans (+-monoʳ-≤ i (n≤1+n (length chains))) hlen) hLv
 ... | false =
-      ( arr-chain-caps sl id Lv a nextId path sched st′ sleq cok HVC HCL HPZ HDP
+      ( arr-chain-caps sl id Lv a nextId path sched st′ sleq COK′ HVC HCL HPZ HDP
           (proj₁ (∧-true _ _ hstr)) (proj₁ (∧-true _ _ hsv)) HPK
           (proj₁ (∧-true _ _ hord))
           (g , Pos c d J g i , hfl , CH≤ , walk J g i HI hR)
       , proj₁ ST
       , FLAT
       , proj₁ GO′ )
-    , ( arr-chain-burst sl id Lv a nextId path sched st′ sleq cok HVC HCL HPZ HDP
+    , ( arr-chain-burst sl id Lv a nextId path sched st′ sleq COK′ HVC HCL HPZ HDP
           (proj₁ (∧-true _ _ hstr)) (proj₁ (∧-true _ _ hsv)) HPK
           (proj₁ (∧-true _ _ hord))
           (g , Pos c d J g i , hfl , CH≤ , walk J g i HI hR)
@@ -548,7 +548,8 @@ arr-chains-caps-go {n = n} {e = e} sl id Lv a nextId ((rid , path) ∷ chains) s
         HCL = all-impl _ _
                 (λ v h → nestClosOK?ᵛ-widen sl _ v c⊑ h)
                 (arrVal a ∷ []) (∧-intro hcl refl)
-        ST  = chainStep-caps sl id Lv a nextId path sched st′ sleq cok
+        COK′ = capsOK?-delivered (frameStep Lv c) rid sched st cok
+        ST  = chainStep-caps sl id Lv a nextId path sched st′ sleq COK′
                 (pathSz?-widen path (proj₁ c⊑) (proj₁ (∧-true _ _ hpz)))
                 (valCaps?-widen sl (arrTy a) (arrVal a) c⊑ hvc)
                 (lub3-m (depthCascade a nextId chains sched st)
@@ -598,7 +599,7 @@ arr-chains-caps-go {n = n} {e = e} sl id Lv a nextId ((rid , path) ∷ chains) s
         STEP = ≤-trans (lvls-mono (suc D) (suc D) 2≤S ≤-refl ≤-refl hLv ≤-refl)
                        (ent-step c d J g i D 2≤S
                           (chain-deliv-cap sl id a nextId path sched st′ Lv J g i
-                             sleq hgn cok
+                             sleq hgn COK′
                              (pathSz?-widen path (proj₁ c⊑) (proj₁ (∧-true _ _ hpz)))
                              HVC
                              (lub3-m (depthCascade a nextId chains sched st)

@@ -79,7 +79,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part1 using
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
   (capsOK?-count; capsOK?-regs; chainsStrat?-one; pathPark-delivered; pathsPark-delivered;
   registry-entStrat; slotsCaps?-capsAt; valsCaps?; valsCaps?-lvl; foldPath-slots;
-  shareAdmit-caps; capsOK?-regOrd; capsOK?-regPark)
+  shareAdmit-caps; capsOK?-delivered; capsOK?-regOrd; capsOK?-regPark)
 open import Verify-Budget-Sufficient.Psi-Split using
   (chP?-∧)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves using
@@ -2357,6 +2357,7 @@ cascade-caps-all-go {n = n} {e = e} sl id Lc a nextId S ((rid , path) ∷ chains
       (≤-trans (proj₁ (proj₂ ST)) STEP)
   where
   st′ = record st { delivered = rid ∷ EvalSt.delivered st }
+  COK′ = capsOK?-delivered (frameStep Lc (capsAt e sl id)) rid sched st cok
   r   = chainStep nextId a path sched st′
   c   = capsAt e sl id
   B   = Caps.cSize c
@@ -2403,10 +2404,10 @@ cascade-caps-all-go {n = n} {e = e} sl id Lc a nextId S ((rid , path) ∷ chains
                hlen
   CH≤ : lvls B W d Lc 1 ≤ Pos c d J g i
   CH≤ = lvls-mono 1 1 2≤S ≤-refl ≤-refl hLc ≤-refl
-  HEAD = arr-chain-caps sl id Lc a nextId path sched st′ sleq cok HVC HCL
+  HEAD = arr-chain-caps sl id Lc a nextId path sched st′ sleq COK′ HVC HCL
            (pathSz?-widen path (proj₁ c⊑) hpc) hdc hstrc hsvc hpkc hordc
            (g , Pos c d J g i , hfl , CH≤ , walk J g i HI hR)
-  ST  = chainStep-caps sl id Lc a nextId path sched st′ sleq cok
+  ST  = chainStep-caps sl id Lc a nextId path sched st′ sleq COK′
           (pathSz?-widen path (proj₁ c⊑) hpc)
           (valCaps?-widen sl (arrTy a) (arrVal a) c⊑ hvc) hdc hstrc hsvc
           hpkc hordc
@@ -2416,7 +2417,7 @@ cascade-caps-all-go {n = n} {e = e} sl id Lc a nextId S ((rid , path) ∷ chains
   STEP = ≤-trans (lvls-mono (suc D) (suc D) 2≤S ≤-refl ≤-refl hLc ≤-refl)
                  (ent-step c d J g i D 2≤S
                     (chain-deliv-cap sl id a nextId path sched st′ Lc J g i
-                       sleq hgn cok (pathSz?-widen path (proj₁ c⊑) hpc)
+                       sleq hgn COK′ (pathSz?-widen path (proj₁ c⊑) hpc)
                        HVC hdc hLc hstrc hsvc hpkc hordc))
 
 cascade-caps-all : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
