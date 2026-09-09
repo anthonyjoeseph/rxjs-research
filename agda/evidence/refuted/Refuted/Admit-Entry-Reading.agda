@@ -1,5 +1,6 @@
 -- ══════════════════════════════════════════════════════════════════
--- WHAT AN ADMITTED ENTRY READS, IN ITS FREE FORM: four refutations
+-- WHAT AN ADMITTED ENTRY READS, IN ITS FREE FORM, AND WHAT THE CAPS
+-- RECEIPT CANNOT PAY FOR IT: six refutations
 --
 -- REFUTATIONS: machine-checked `… → ⊥`.  Each theorem here says a route
 -- CANNOT work, and says it in a form the typechecker rechecks — unlike a
@@ -24,7 +25,8 @@ open import Rx.Evaluator using (Path; share-sink; _↠_; take-f; from-inner;
                                 mergeAllᵒ; mergeAll-st; Sched; EvalSt; Arrival;
                                 sched-init; st-init; shareAdmit; shareLatch;
                                 chainsOf; cascadeLatch; arrTy)
-open import Verify-Budget-Sufficient.Caps-Face.Part1 using (pathPark?)
+open import Verify-Budget-Sufficient.Caps using (Caps; caps)
+open import Verify-Budget-Sufficient.Caps-Face.Part1 using (pathPark?; capsOK?)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves using (pathOrd?)
 
 ------------------------------------------------------------------
@@ -186,4 +188,60 @@ cascade-admit-park-absurd :
          (chainsOf a st) ≡ true) →
   ⊥
 cascade-admit-park-absurd h with h {e = progᵣ} aᵣ stPark
+... | ()
+
+------------------------------------------------------------------
+-- (3) AND THE CAPS RECEIPT CANNOT PAY THE REPAIR EITHER, which is a
+-- separate finding and the one that decides where the repair has to
+-- come from.  The repair for (1) and (2) is a registry-level reading
+-- taken as a hypothesis, and the cheapest place to get one would be the
+-- receipt every one of those statements' call sites already carries:
+-- `capsOK?` is a nine-conjunct reading of the same state, one of whose
+-- conjuncts is exactly the stratification sibling's premise.  It does
+-- not extend.  Both witness states above satisfy the receipt outright
+-- while failing the reading, so neither reading is a corollary of it,
+-- and each is owed instead by whatever WRITES what it reads — the
+-- registry's growth site for the order half, and every producer that
+-- touches a node cell for the park half as well.
+--
+-- SO THE READING HAS TO BE CARRIED, and the shape it is carried in is
+-- what the two rows below pin down: a conjunct of the invariant that
+-- travels with the state, beside `regStrat?` and read at the same
+-- level, rather than anything derived where it is spent.
+--
+-- The witnesses are the same two states, which is what makes this a
+-- separation rather than two unrelated facts: one receipt, two readings
+-- of it, and the receipt cannot tell either apart from its negation.
+------------------------------------------------------------------
+
+cᵣ : Caps
+cᵣ = caps 99 99 99
+
+-- LOAD-BEARING: the whole finding is that this reads `true`.  A cap
+-- below the witness's own sizes would make it read `false` and the row
+-- would separate nothing.
+ordSt-capsOK : capsOK? cᵣ schedᵣ stOrd ≡ true
+ordSt-capsOK = refl
+
+parkSt-capsOK : capsOK? cᵣ schedᵣ stPark ≡ true
+parkSt-capsOK = refl
+
+regOrd-from-caps-absurd :
+  (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+     (c : Caps) (sched : Sched Γ) (st : EvalSt e) →
+     capsOK? c sched st ≡ true →
+     all (λ en → pathOrd? (Sched.nextNode sched) (proj₂ (proj₂ (proj₂ en))))
+         (EvalSt.registry st) ≡ true) →
+  ⊥
+regOrd-from-caps-absurd h with h {e = progᵣ} cᵣ schedᵣ stOrd ordSt-capsOK
+... | ()
+
+regPark-from-caps-absurd :
+  (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+     (c : Caps) (sched : Sched Γ) (st : EvalSt e) →
+     capsOK? c sched st ≡ true →
+     all (λ en → pathPark? (proj₂ (proj₂ (proj₂ en))) st)
+         (EvalSt.registry st) ≡ true) →
+  ⊥
+regPark-from-caps-absurd h with h {e = progᵣ} cᵣ schedᵣ stPark parkSt-capsOK
 ... | ()

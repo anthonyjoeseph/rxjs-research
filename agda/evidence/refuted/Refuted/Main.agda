@@ -24,7 +24,8 @@ open import Refuted.Admit-Entry-Reading
          badParkChain-ordered; badParkChain-unparked; shareLatch-keeps-park;
          cascadeLatch-keeps-park; shareAdmit-ord-absurd;
          cascade-admit-ord-absurd; shareAdmit-park-absurd;
-         cascade-admit-park-absurd)
+         cascade-admit-park-absurd; ordSt-capsOK; parkSt-capsOK;
+         regOrd-from-caps-absurd; regPark-from-caps-absurd)
 open import Refuted.Hop-Drag
   using (hop-drag-absurd)
 open import Refuted.Cut-Through

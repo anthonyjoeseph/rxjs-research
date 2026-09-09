@@ -238,15 +238,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **RESTATING THE FOUR ENTRY READINGS OVER WHAT `register` RECORDS.**
-  Their free forms are dead — each is machine-refuted at one hand-built
-  entry, the order pair against the counter and the park pair against a
-  populated cell — so the absent registry premise is the statement and
-  not an economy. What remains is the premise: a registry-level order
-  reading and a registry-level park reading beside the stratification
-  one already there, each carried across BOTH admission filters, since
-  neither rearranges into the other. The commit states them, restates
-  the four rows over them, and reports what the mint can pay.
+- **CARRYING THE TWO ENTRY READINGS, NOW THAT NOTHING AT THEIR CALL
+  SITES PAYS FOR THEM.** The premise the four refuted rows are missing
+  is a registry-level order reading and a registry-level park reading,
+  and the receipt every one of those sites already holds implies
+  NEITHER: both hand-built states satisfy `capsOK?` outright while
+  failing the reading, refuted beside the four. So each is carried
+  rather than derived — a conjunct beside `regStrat?`, owed by whatever
+  WRITES what it reads, which is the registry's growth site for the
+  order half and every node-cell producer for the park half. The commit
+  states the two readings, restates the four rows over them, and pays
+  the producers the new conjuncts oblige.
 
 - **WALKING AN ADMITTED CHAIN AT THE LEVEL IT WAS REGISTERED AT, the
   one door the pricing question leaves open.** Both ends are closed by
@@ -274,13 +276,12 @@ does not fit is a finding about the shared statement, not about the head.
 - **WHICH STORE CELLS DOES A PATH PREDICATE REACH?** Five rows fail in one
   place: the statement reads a PATH or a chain, and the quantity it must
   bound is a cell in the STORE. A path predicate CAN see the store, and
-  extending its coverage is priced. Whether a reading survives a write it does
-  not own is answered at both doors; whether a WALKED chain carries the
-  watermark that buys it is answered by construction, as a field every
-  producer supplies; and the transport across a SIBLING's fold is now a
-  proven ring. All three were about the walk. What is left is not, and it is
-  now known rather than suspected: an admitted entry's readings are REFUTED
-  in their free form, so the answer is at the mint.
+  extending its coverage is priced. Every half about the WALK is settled: a
+  reading survives a write it does not own, a walked chain carries its
+  watermark by construction, a sibling's fold transports it. What is left is
+  at the MINT, and is known rather than suspected — an admitted entry's
+  readings are refuted free-standing AND are not corollaries of the caps
+  receipt, so the reading must be CARRIED to reach the site that owes it.
   relevant: `step-frame-store≤`, `share-fold-store≤`, `subscribeE-sz-store-scan`, `pushBurst-sz-store-outer`, `subscribeSharedSlot-sz-store`
 
 - **IS THERE A COMPUTABLE SHADOW OF THE SEALED FACES?** Three rows say in
