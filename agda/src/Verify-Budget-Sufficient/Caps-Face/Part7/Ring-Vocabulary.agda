@@ -56,6 +56,8 @@ open import Verify-Budget-Sufficient.Psi-Split using
 open import Decide using (∧-intro)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Cascade-Caps using
   (walkH)
+open import Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves using
+  (pathOrd?)
 
 frameStep-regAt : ∀ (c : Caps) (j : ℕ) →
   Caps.cReg (frameStep j c) ≡ regAt (Caps.cSize c) (Caps.cReg c) j
@@ -149,6 +151,15 @@ WalkHyps {n = n} {e = e} {u = u} sl id L sf gas nid now src p vals evs fin sched
   -- travels as its own conjunct, read off the state at the chain, and
   -- the step re-establishes it rather than transporting it
   × (pathPark? p st ≡ true)
+  -- AND THE CHAIN'S OWN ORDER, which is the one thing the reading above
+  -- it cannot be transported without.  A step writes the head's cell and
+  -- mints from the counter up, so what the tail keeps is exactly what it
+  -- does not alias -- and a `Frame` and a `Path` are independent
+  -- arguments everywhere the transport is spent, so nothing there ties
+  -- them.  It is a field rather than a premise because a premise obliges
+  -- only whichever caller exists today: here every producer of a chain
+  -- establishes the order and every consumer re-establishes it
+  × (pathOrd? (Sched.nextNode sched) p ≡ true)
   × (Σ ℕ λ g → Σ ℕ λ P →
       (4 + (sizeᵉ e + slotsSize sl) + n + gas ≤ g)
       × (iterL (Caps.cSize (capsAt e sl id)) (Caps.cWid (capsAt e sl id)) (capsH e sl id)

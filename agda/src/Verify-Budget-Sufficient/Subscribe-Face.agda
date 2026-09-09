@@ -153,7 +153,9 @@ open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   slotsCaps?-clos)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves using
   (framePark-step; subscribeE-burstStrat; stepFrame-valsStrat; pathPark-step;
-   shareAdmit-strat; shareAdmit-park; foldPath-park)
+   shareAdmit-strat; shareAdmit-park; foldPath-park; evalTm-strat;
+   installNode-scanPark; subscribeE-framePark;
+   pathOrd?; pathOrd-step; foldPath-ord; shareAdmit-ord)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (2≤frameStep-size; burstCaps?-++; burstCaps?-widen; closeList-caps;
    eventsCaps?-widen; finList-caps; frameStep-+assoc-burst;
@@ -2543,7 +2545,8 @@ pushBurst-caps {Γ = Γ} {t = t} {s = s} {u = u} c dep bud j g id now f κ (em �
            (burstCount?-widen ems ⊑₁ (burstCount?-tail (frameStep j c) em ems cC))
            (≤-trans (m≤n⊔m _ _) dpt)
            stF stP (proj₂ (∧-true _ _ stB))
-           (framePark-step g id now f κ (proj₁ sp) (proj₂ (proj₂ sp)) sched st EV stK)
+           (framePark-step g id now f κ (proj₁ sp) (proj₂ (proj₂ sp)) sched st
+              stF EV stK)
   j₂   = proj₁ IH
   REST = pushBurst g id now f κ ems sd₁ st₁
   ⊑₂   = frameStep-⊑-+ c 2≤S (j + j₁) j₂
@@ -3184,7 +3187,12 @@ subscribeE-caps {n = n} {u = u} c dep bud (suc ops′) j g (scanᵉ f z b) κ bi
           (≤-trans (m≤n⊔m _ _) dpt)
           stF′ stP
           (subscribeE-burstStrat g b (scan-f f nid ↠ κ) bid now sched₀ st₀ stP′ stB′)
-          refl
+          (subscribeE-framePark (pathFloor κ) g b (scan-f f nid ↠ κ) bid now
+             (scan-f f nid) sched₀ st₀ ≤-refl
+             (installNode-scanPark (pathFloor κ) f nid (evalTm z) st
+                (evalTm-strat (pathFloor κ) z
+                   (proj₁ (∧-true (inputsBelowᵗ (pathFloor κ) z)
+                                  (inputsBelowᵉ (pathFloor κ) b) stZB)))))
   j₂  = proj₁ PBc
   PB  = pushBurst g bid now (scan-f f nid) κ (proj₁ res)
           (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
@@ -3402,6 +3410,10 @@ foldPath-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   pathStrat? path ≡ true →
   valsStrat? (pathFloor path) vals ≡ true →
   pathPark? path st ≡ true →
+  -- AND THE CHAIN'S OWN ORDER, which is what the parked reading is
+  -- transported ON: a step writes the head's cell and mints from the
+  -- counter up, so the tail keeps exactly what it does not alias
+  pathOrd? (Sched.nextNode sched) path ≡ true →
   let r = foldPath sf gas id now envSrc path vals evs fin sched st
   in Σ ℕ λ j′ → (capsOK? (frameStep (j + j′) c)
                           (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
@@ -3448,6 +3460,7 @@ shareGo-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   all (λ rp → pathStrat? (proj₂ rp)) ps ≡ true →
   all (λ rp → valsStrat? (pathFloor (proj₂ rp)) vals) ps ≡ true →
   all (λ rp → pathPark? (proj₂ rp) st) ps ≡ true →
+  all (λ rp → pathOrd? (Sched.nextNode sched) (proj₂ rp)) ps ≡ true →
   let r = shareGo sf gas id now i vals fin ps sched st
   in Σ ℕ λ j′ → (capsOK? (frameStep (j + j′) c)
                           (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
@@ -3456,7 +3469,7 @@ shareGo-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 -- ROOT: the chain's sink.  Nothing steps, so j′ = 0 and the only work
 -- is assembling one emit out of bounds already in hand
 foldPath-caps c dep bud j sf gas id now envSrc root vals evs fin sl sched st
-              2≤S 1≤R slEq slC slSz inv pS vC eC dpt stP stV stK =
+              2≤S 1≤R slEq slC slSz inv pS vC eC dpt stP stV stK stO =
   0 , subst (λ x → capsOK? (frameStep x c) sched st ≡ true)
             (sym (+-identityʳ j)) inv
     , subst (λ x → burstCaps? (frameStep x c) sl
@@ -3476,7 +3489,7 @@ foldPath-caps c dep bud j sf gas id now envSrc root vals evs fin sl sched st
 -- fans out.  The handoff emit is built at the entry level and widened
 -- to the fan-out's exit level exactly once
 foldPath-caps c dep bud j sf gas id now envSrc (share-sink i) vals evs fin sl sched st
-              2≤S 1≤R slEq slC slSz inv pS vC eC dpt stP stV stK =
+              2≤S 1≤R slEq slC slSz inv pS vC eC dpt stP stV stK stO =
   j₁ , proj₁ (proj₂ DS)
      , ∧-intro (all-++-intro (eventCaps? (frameStep (j + j₁) c) sl) evs _
                   (eventsCaps?-widen sl evs (frameStep-⊑-+ c 2≤S j j₁) eC)
@@ -3493,7 +3506,7 @@ foldPath-caps c dep bud j sf gas id now envSrc (share-sink i) vals evs fin sl sc
 -- tail, and the clause reports j₁ + j₂ — the additive composition,
 -- rebracketed by +-assoc and nothing else
 foldPath-caps c dep bud j sf gas id now envSrc (f ↠ p) vals evs fin sl sched st
-              2≤S 1≤R slEq slC slSz inv pS vC eC dpt stP stV stK =
+              2≤S 1≤R slEq slC slSz inv pS vC eC dpt stP stV stK stO =
   j₁ + j₂
     , frameStep-+assoc-caps c j j₁ j₂ (proj₁ (proj₂ REST)) (proj₂ (proj₂ REST))
         (proj₁ (proj₂ IH))
@@ -3536,7 +3549,10 @@ foldPath-caps c dep bud j sf gas id now envSrc (f ↠ p) vals evs fin sl sched s
            -- receipt reports a reading for, so both come off a leaf
            (stepFrame-valsStrat sf id now f p vals fin sched st
               (proj₁ stP1) stV)
-           (pathPark-step sf id now f p vals fin sched st stV (proj₂ stK1))
+           (pathPark-step sf id now f p vals fin sched st stO (proj₂ stK1))
+           -- and the order reproduces itself one hop shorter, against a
+           -- counter the step only raised
+           (pathOrd-step sf id now f p vals fin sched st stO)
   j₂   = proj₁ IH
   REST = foldPath sf gas id now envSrc p (proj₁ step) (evs ++ proj₁ (proj₂ step))
            (proj₁ (proj₂ (proj₂ step))) sd₁ st₁
@@ -3567,6 +3583,7 @@ dispatchShare-caps c dep bud j sf (suc gas) id now i vals fin sl sched st 2≤S 
           (shareAdmit-caps (Caps.cSize (frameStep j c)) i (EvalSt.registry st)
              (capsOK?-regs (frameStep j c) sched st inv))
           vC dpt (proj₁ SA) (proj₂ SA) (shareAdmit-park i fin st)
+          (shareAdmit-ord i sched st)
   j₁  = proj₁ GO
   out = shareGo sf gas id now i vals fin (shareAdmit i (EvalSt.registry st))
           sched st₀
@@ -3576,19 +3593,19 @@ dispatchShare-caps c dep bud j sf (suc gas) id now i vals fin sl sched st 2≤S 
 -- FAN-OUT: one registration at a time.  A cancelled chain delivers
 -- nothing and costs nothing; a survivor folds, and the two receipts add
 shareGo-caps {t = t} c dep bud j sf gas id now i vals fin [] sl sched st
-             2≤S 1≤R slEq slC slSz inv pS vC dpt stQP stQV stQK =
+             2≤S 1≤R slEq slC slSz inv pS vC dpt stQP stQV stQK stQO =
   0 , subst (λ x → capsOK? (frameStep x c) sched st ≡ true)
             (sym (+-identityʳ j)) inv
     , subst (λ x → burstCaps? {u = t} (frameStep x c) sl [] ≡ true)
             (sym (+-identityʳ j)) refl
 shareGo-caps {Γ = Γ} c dep bud j sf gas id now i vals fin ((rid , p) ∷ ps) sl sched st
-             2≤S 1≤R slEq slC slSz inv pS vC dpt stQP stQV stQK
+             2≤S 1≤R slEq slC slSz inv pS vC dpt stQP stQV stQK stQO
   with any (_≡ᵇ rid) (EvalSt.cancelled st)
 ... | true  = shareGo-caps c dep bud j sf gas id now i vals fin ps sl sched st
                 2≤S 1≤R slEq slC slSz inv (proj₂ (∧-true _ _ pS)) vC
                 (≤-trans (m≤m⊔n _ _) dpt)
                 (proj₂ (∧-true _ _ stQP)) (proj₂ (∧-true _ _ stQV))
-                (proj₂ (∧-true _ _ stQK))
+                (proj₂ (∧-true _ _ stQK)) (proj₂ (∧-true _ _ stQO))
 ... | false =
   j₁ + j₂
     , frameStep-+assoc-caps c j j₁ j₂ (proj₁ (proj₂ REST)) (proj₂ (proj₂ REST))
@@ -3625,6 +3642,10 @@ shareGo-caps {Γ = Γ} c dep bud j sf gas id now i vals fin ((rid , p) ∷ ps) s
           -- the two states stay apart however little separates them
           (proj₁ (∧-true _ _ stQP)) (proj₁ (∧-true _ _ stQV))
           (pathPark-delivered p rid st (proj₁ (∧-true _ _ stQK)))
+          -- the order needs no transport at either site: the head folds
+          -- at the counter it was read against, and a delivery mark is
+          -- not a mint
+          (proj₁ (∧-true _ _ stQO))
   j₁  = proj₁ HD
   IH  = shareGo-caps c dep bud (j + j₁) sf gas id now i vals fin ps sl
           (proj₁ (proj₂ FP)) (proj₂ (proj₂ FP))
@@ -3643,6 +3664,8 @@ shareGo-caps {Γ = Γ} c dep bud j sf gas id now i vals fin ((rid , p) ∷ ps) s
           (proj₂ (∧-true _ _ stQP)) (proj₂ (∧-true _ _ stQV))
           (foldPath-park sf gas id now (toℕ i) p vals cl fin sched st₀ ps
              (pathsPark-delivered ps rid st (proj₂ (∧-true _ _ stQK))))
+          (foldPath-ord sf gas id now (toℕ i) p vals cl fin sched st₀ ps
+             (proj₂ (∧-true _ _ stQO)))
   j₂  = proj₁ IH
   REST = shareGo sf gas id now i vals fin ps (proj₁ (proj₂ FP)) (proj₂ (proj₂ FP))
 

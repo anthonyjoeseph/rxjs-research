@@ -73,7 +73,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (burstCaps?; burstCount?; capsOK?; capsOK?-mono; frameSz?; pathFloor; pathStrat?; pathSz?;
   valCaps?; widNode)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves using
-  (subscribeE-burstStrat)
+  (subscribeE-burstStrat; subscribeE-framePark; installNode-scanPark; evalTm-strat)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
   (capsOK?-nextNode; capsOK?-parts; capsOK?-setNode)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
@@ -1976,6 +1976,16 @@ walk-scan-rest {n = n} {u = u} g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc o
                   (proj₂ (∧-true (inputsBelowᵗ (pathFloor κ) f)
                                  (inputsBelowᵗ (pathFloor κ) z ∧
                                   inputsBelowᵉ (pathFloor κ) b) hib)))
+  -- the SEED's own reading, which the two arms beside it do not need.
+  -- The accumulator this subscribe installs IS the evaluated seed, so
+  -- the floor the seed satisfies is the floor the frame's cell is then
+  -- read at, and the park premise below is exactly that composition
+  hibz : inputsBelowᵗ (pathFloor κ) z ≡ true
+  hibz = proj₁ (∧-true (inputsBelowᵗ (pathFloor κ) z)
+                       (inputsBelowᵉ (pathFloor κ) b)
+                  (proj₂ (∧-true (inputsBelowᵗ (pathFloor κ) f)
+                                 (inputsBelowᵗ (pathFloor κ) z ∧
+                                  inputsBelowᵉ (pathFloor κ) b) hib)))
   j₁  = proj₁ SRC
   a₁  = proj₁ (proj₂ SRC)
   a₂  = proj₁ (proj₂ (proj₂ SRC))
@@ -2005,7 +2015,16 @@ walk-scan-rest {n = n} {u = u} g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc o
           (≤-trans lC (proj₁ monoJ))
           a₂ a₃
           (≤-trans (m≤n⊔m _ _) dpt)
-          hibf hps BSTR refl
+          hibf hps BSTR
+          -- the park reading at the cell this subscribe just minted:
+          -- `≤-refl` pays the disjointness because `mintNode` hands back
+          -- the OLD counter and leaves `suc` of it behind, so the node
+          -- the frame names sits strictly below the watermark the callee
+          -- is handed
+          (subscribeE-framePark (pathFloor κ) g b (scan-f f nid ↠ κ) bid now
+             (scan-f f nid) sched₁ st₀ ≤-refl
+             (installNode-scanPark (pathFloor κ) f nid (evalTm z) st
+                (evalTm-strat (pathFloor κ) z hibz)))
   j₂  = proj₁ PBc
   ⊑₂  = frameStep-⊑-+ c 2≤S (J₀ + j₁) j₂
   PB  = pushBurst g bid now (scan-f f nid) κ (proj₁ res)

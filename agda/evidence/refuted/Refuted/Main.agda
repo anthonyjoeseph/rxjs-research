@@ -19,6 +19,13 @@ open import Refuted.Wet
 open import Refuted.Walk-Entry-Strat
   using (okₛ; badPath-unstratified; goodPath-stratified; badVal-unstratified;
          walk-path-strat-absurd; walk-vals-strat-absurd)
+open import Refuted.Admit-Entry-Reading
+  using (badOrdChain-disordered; shareAdmit-keeps-ord; chainsOf-keeps-ord;
+         badParkChain-ordered; badParkChain-unparked; shareLatch-keeps-park;
+         cascadeLatch-keeps-park; shareAdmit-ord-absurd;
+         cascade-admit-ord-absurd; shareAdmit-park-absurd;
+         cascade-admit-park-absurd; ordSt-capsOK; parkSt-capsOK;
+         regOrd-from-caps-absurd; regPark-from-caps-absurd)
 open import Refuted.Hop-Drag
   using (hop-drag-absurd)
 open import Refuted.Cut-Through
@@ -287,3 +294,5 @@ open import Refuted.Share-Step-Scan
 open import Refuted.Subscribe-Store-Scan-Arrivals
   using (charges≡; rows≡;
          subscribeE-sz-store-scan-absurd; subscribeE-sz-store-absurd)
+open import Refuted.Subscribe-Frame-Park
+  using (before≡true; after≡false; subscribeE-framePark-absurd)

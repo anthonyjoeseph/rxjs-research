@@ -446,14 +446,25 @@ regStrat? = all (λ en → entStrat? (proj₁ (proj₂ en))
 -- id -- so the queue is not an argument anyone hands down, and the
 -- reading has to be asked of the LOOKUP rather than of a variable.
 --
--- EVERY OTHER NODE SHAPE IS FREE, and that is a fact about the state
--- rather than a convenience: no other constructor parks an unsubscribed
--- expression, so there is nothing at those shapes for a floor to be
--- wrong about.  A miss is free for the same reason -- a lookup that
--- fails drains nothing.
+-- A SCAN'S ACCUMULATOR IS THE SECOND SUCH CELL, and it is parked in a
+-- different sense: the queue holds syntax nobody has run yet, while the
+-- accumulator holds a VALUE the fold has already built -- but both are
+-- reached by node id and neither is an argument, which is what the
+-- reading is about.  It takes no type dispatch, and that is worth
+-- saying because the store-side reading this development already has
+-- needs one: that predicate is charged at an EXPECTED type and must ask
+-- whether the cell's matches, while a floor is a fact about whatever
+-- type the cell happens to hold, so binding the constructor's own index
+-- is the whole of it.
+--
+-- THE REMAINING SHAPES ARE FREE, and that is a fact about the state
+-- rather than a convenience: no other constructor holds a payload a
+-- floor could be wrong about.  A miss is free for the same reason -- a
+-- lookup that fails drains nothing.
 parkStrat? : ∀ {n} {Γ : Ctx n} → ℕ → Maybe (NodeState Γ) → Bool
-parkStrat? k (just (mergeAll-st _ _ q _)) = all (inputsBelowᵉ k) q
-parkStrat? k _                            = true
+parkStrat? k (just (mergeAll-st _ _ q _))  = all (inputsBelowᵉ k) q
+parkStrat? k (just (scan-st {w} acc))      = inputsBelowᵛ k w acc
+parkStrat? k _                             = true
 
 -- THE SAME READING KEYED BY THE FRAME THAT WILL SPEND IT.  A payload
 -- subscribe reaches its node id through the frame it is running under,
@@ -461,13 +472,25 @@ parkStrat? k _                            = true
 -- what lets the obligation travel as an ordinary premise past sites
 -- that cannot see a queue at all.
 --
--- IT REDUCES AT EVERY FRAME BUT ONE, which is what makes it cheap: only
--- `from-inner` names a node, so at the four other shapes the premise is
--- discharged by `refl` at the call site and nothing is threaded.
+-- IT REDUCES AT EVERY FRAME BUT TWO, which is still most of what makes
+-- it cheap: only `from-inner` and `scan-f` name a node, so at the three
+-- other shapes the premise is discharged by `refl` at the call site and
+-- nothing is threaded.
+--
+-- AND THE TWO ARMS ARE NOT EQUALLY WELL BEHAVED ACROSS A STEP, which is
+-- the reading's real cost rather than its width.  Every write this
+-- development can reach into a QUEUE leaves a SUFFIX of what was read,
+-- and a reading of the shape `all` tolerates that with no hypothesis at
+-- all; a scan's step OVERWRITES its cell outright, so what survives
+-- there depends on the frame's own closure being stratified.  That is
+-- why the step lemmas take a stratification premise that the queue arm
+-- alone never needed.
 framePark? : ∀ {n} {Γ : Ctx n} {s u t} {e : Closed Γ t} →
   ℕ → Frame Γ s u → EvalSt e → Bool
 framePark? k (from-inner _ allNid _) st =
   parkStrat? k (lookupNode allNid (EvalSt.nodes st))
+framePark? k (scan-f _ nd) st =
+  parkStrat? k (lookupNode nd (EvalSt.nodes st))
 framePark? k _ st = true
 
 -- THE SAME READING OVER A WHOLE CHAIN, which the delivery walk needs
