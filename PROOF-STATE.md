@@ -238,17 +238,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **CARRYING THE TWO ENTRY READINGS, NOW THAT NOTHING AT THEIR CALL
-  SITES PAYS FOR THEM.** The premise the four refuted rows are missing
-  is a registry-level order reading and a registry-level park reading,
-  and the receipt every one of those sites already holds implies
-  NEITHER: both hand-built states satisfy `capsOK?` outright while
-  failing the reading, refuted beside the four. So each is carried
-  rather than derived — a conjunct beside `regStrat?`, owed by whatever
-  WRITES what it reads, which is the registry's growth site for the
-  order half and every node-cell producer for the park half. The commit
-  states the two readings, restates the four rows over them, and pays
-  the producers the new conjuncts oblige.
+- **ESTABLISHING WHICH SIDE OF EACH SEALED FACE IS ACTUALLY SEALED,
+  AND WHETHER THE HARNESS REACHES THE CONCLUSION.** Three rows claim
+  in their own headers that they cannot be instantiated, and the claim
+  is INHERITED rather than measured: a seal is added for checking cost,
+  so what a row said when written need not hold now. The commit re-reads
+  each definition site, says per row which SIDE is sealed, and runs the
+  compiled harness at the conclusion, which ignores the seal and so
+  answers what the checker cannot. A hypothesis-side seal leaves the
+  conclusion probeable and the row moves; a conclusion-side seal on all
+  three makes the sealing load-bearing in the STATEMENT.
 
 - **WALKING AN ADMITTED CHAIN AT THE LEVEL IT WAS REGISTERED AT, the
   one door the pricing question leaves open.** Both ends are closed by
@@ -261,33 +260,29 @@ does not fit is a finding about the shared statement, not about the head.
   and whether the depth measure still decreases below the top — the
   form the pricing question has to take to be answerable at all.
 
-- **LOOKING FOR A COMPUTABLE SHADOW OF THE SEALED FACES, the question
-  nothing in the ledger can lower.** Three rows say in their own
-  headers that they cannot be instantiated, so every piece of evidence
-  they will ever take RAISES their class and none can de-risk them
-  first. The commit does not attack them: it looks for a weaker family
-  that REDUCES and whose truth would imply one of them, and reports
-  either a candidate or that the sealing is load-bearing in the
-  STATEMENT and not merely in the checking cost. Either answer settles
-  a question the ledger currently carries against three rows at once.
+- **PAYING THE PRODUCERS THE CARRIED READINGS NOW OBLIGE.** The walk
+  carries the two readings as one ledger on paths rather than deriving
+  them from a receipt that implies neither, so what was a gap at the
+  mint is five named leaves — a kill, a consume, a drain, the outer's
+  own cell, and a node write — each owing back what it writes. None is
+  instantiated, which is why all five are born FALSITY. The commit
+  probes them, both readings being decidable over a reachable state,
+  and reports which survive. That narrows WHICH STORE CELLS DOES A
+  PATH PREDICATE REACH from a question about the mint to one about the
+  cells these five write.
 
 ### Open questions
 
 - **IS THERE A COMPUTABLE SHADOW OF THE SEALED FACES? — FIRST, because it is
   the one question the ledger cannot lower (Anthony).** Three rows say in
-  their own headers that they cannot be instantiated — the cap does not
-  return, the climb bound is sealed, the fold's doubling closes the
-  conclusion. That sealing is what makes the tower checkable, so it is not
-  removable per row. It leaves a block of this tier whose class evidence can
-  only RAISE and never lower: a refutation still lands, a probe cannot be
-  written. So the de-risk pass cannot COMPLETE while it sits, whatever the
-  other two questions do — which is what ranks it above questions that are
-  merely larger. The question is whether a weaker family exists that REDUCES
-  and whose truth would imply these, because absent one they reach a proof
-  only by being proven. And the sealing claim is INHERITED rather than
-  measured: the compiled harness runs bodies the checker refuses to unfold,
-  so the first move is to re-verify each row's seal and say which SIDE is
-  sealed, since a hypothesis-side seal leaves the conclusion probeable.
+  their own headers that they cannot be instantiated. That sealing is what
+  makes the tower checkable, so it is not removable per row, and it leaves a
+  block of this tier whose class evidence can only RAISE: a refutation lands,
+  a probe cannot be written. So the de-risk pass cannot COMPLETE while it
+  sits, whatever the other two questions do. Is there a weaker family that
+  REDUCES and whose truth would imply these? And which SIDE of each row is
+  sealed — the claim is INHERITED rather than measured, and a hypothesis-side
+  seal leaves the conclusion probeable.
   relevant: `walk-frame-drain-entries`, `subscribeE-sz`, `share-fold-fit`
 
 - **WHICH STORE CELLS DOES A PATH PREDICATE REACH?** Five rows fail in one
@@ -422,22 +417,26 @@ does not fit is a finding about the shared statement, not about the head.
   cascade's fold-through, where the tail's chains are read at the state the
   HEAD chain's step produced. The chains that must survive are not the one that
   stepped, which is what keeps it off the share's form.
-- **`shareAdmit-park`** (Part7/Strat-Leaves) — SHAPE, `REFUTED`: the park
-  reading over the admitted chains at the LATCHED state the fan-out starts
-  from. FALSE as written: it quantifies the state freely, so a registry entry
-  over a populated cell kills it. Restate with what `register` records.
-- **`shareAdmit-ord`** (Part7/Strat-Leaves) — SHAPE, `REFUTED`: the chain's own
-  ORDER over those same admitted chains, the counter-side twin. FALSE for the
-  same reason and by the same witness's other half — an entry whose chain names
-  a node above the counter in its tail.
-- **`cascade-admit-park`** (Part7/Strat-Leaves) — SHAPE, `REFUTED`: the latched
-  park reading arriving from the CASCADE's face. Its filter is keyed by an
-  arrival's source and the share's by a slot, so neither rearranges into the
-  other and the same entry kills both.
-- **`cascade-admit-ord`** (Part7/Strat-Leaves) — SHAPE, `REFUTED`: the same
-  order arriving from that face, refuted once per face for the reason the
-  filters are owed once per face. The cascade's latch preserves the node table
-  and the registry, so nothing between the state and the fan repairs it.
+- **`switchKill-readings`** (Part6) — FALSITY, `NO EVIDENCE`: the order and
+  park readings carried across a kill. The kill retires registrations and may
+  bump the registry counter, so it writes exactly what both readings read, and
+  nothing yet says the pair survives it.
+- **`thruConsume-readings`** (Part6) — FALSITY, `NO EVIDENCE`: the same pair
+  carried across one consumed value, which may enqueue on the outer's own cell.
+  Stated over the whole triple, since the three travel together at every site
+  that spends them.
+- **`thruConsume-cellPark`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the
+  one cell a walk cannot freeze. The consume enqueues into exactly the cell the
+  reading is about, so no watermark both covers it and excludes the write; the
+  payload's own reading is what is asked to keep it true.
+- **`mergeAllDrain-ownerQueue`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`:
+  what the drain leaves in the owner's cell. The drain writes that cell as each
+  inner is subscribed, so the reinstall owes the new cell's reading at an
+  arbitrary floor against the old one's at the same floor.
+- **`setNode-regPark-owner`** (Part1) — FALSITY, `NO EVIDENCE`: a write that
+  overwrites parked content pays at its OWN floor. What would close it is node
+  OWNERSHIP — a cell is named by the frame that installed it — and no record in
+  this development carries that fact.
 - **`scanΦ-fit`** (Part7/Depth-Fit) — SHAPE, `DEAD ROUTE`: the producing side
   of the fold's grant. THE MECHANISM IS DEAD, NOT A DENOMINATION: a flat
   per-instant potential cannot dominate a count exponential in itself; the one
