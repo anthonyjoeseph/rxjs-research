@@ -260,16 +260,17 @@ does not fit is a finding about the shared statement, not about the head.
   and whether the depth measure still decreases below the top — the
   form the pricing question has to take to be answerable at all.
 
-- **PAYING THE PRODUCERS THE CARRIED READINGS NOW OBLIGE.** The walk
-  face now TYPECHECKS carrying the two readings as one ledger on paths
-  rather than deriving them from a receipt that implies neither, so
-  what was a gap at the mint is five named leaves — a kill, a consume, a drain, the outer's
-  own cell, and a node write — each owing back what it writes. None is
-  instantiated, which is why all five are born FALSITY. The commit
-  probes them, both readings being decidable over a reachable state,
-  and reports which survive. That narrows WHICH STORE CELLS DOES A
-  PATH PREDICATE REACH from a question about the mint to one about the
-  cells these five write.
+- **PROBING THE SIX LEAVES THE CARRIED READINGS NOW OBLIGE.** The two
+  entry readings are carried on paths through BOTH faces now — the burst
+  face's nodry cascade and its consumers take them as hypotheses — so
+  `frame-parkStrat`, which pulled a floor-keyed cell reading out of a
+  receipt pricing no floor and was machine-refuted for it, is GONE rather
+  than weakened. The threading turns the gap at the mint into six named
+  leaves — a kill, a consume, a drain, an inner subscribe, the outer's own
+  cell, a node write — each owing back what it writes, none instantiated,
+  all born FALSITY. The commit probes them and reports which survive,
+  narrowing WHICH STORE CELLS DOES A PATH PREDICATE REACH from the mint
+  to these six.
 
 ### Open questions
 
@@ -405,10 +406,6 @@ does not fit is a finding about the shared statement, not about the head.
   frame-keyed park reading across one step, at a frame the push re-steps and so
   cannot reduce. Two shapes write a cell it reads, and only one leaves a suffix
   — the other overwrites, which is why the closure is a premise.
-- **`frame-parkStrat`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the
-  frame's queue read at the floor its tail is read at, off the caps invariant
-  alone. That invariant prices a node's queue for size and for width and reads
-  no floor, so the conjunct it would project out of is not there.
 - **`foldPath-park`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the park
   reading once a SIBLING chain has folded. It is about a state the walk
   PRODUCED rather than one it was handed, and it TAKES the reading as a
@@ -425,6 +422,11 @@ does not fit is a finding about the shared statement, not about the head.
   carried across one consumed value, which may enqueue on the outer's own cell.
   Stated over the whole triple, since the three travel together at every site
   that spends them.
+- **`subscribeInner-readings`** (Part6) — FALSITY, `NO EVIDENCE`: the same
+  triple across one drained inner, the writer the drain's recursion spends. The
+  mint moves here — the instance node is allocated and the counter the ordering
+  is read against is raised — so the ordering half is an obligation, not a
+  transport.
 - **`thruConsume-cellPark`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the
   one cell a walk cannot freeze. The consume enqueues into exactly the cell the
   reading is about, so no watermark both covers it and excludes the write; the

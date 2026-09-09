@@ -118,3 +118,20 @@ error message actively misdirects. Read the entry before reasoning from the erro
   is spent with `subst` over `m∸n+n≡m` at `S ∸ k` rather than a `k`-deep wall of `s≤s`.
   Measured on one fifth-power threshold in this tree: over a hundred and sixty seconds,
   killed by the dev budget, down to twelve and a half.
+
+- **A `with` ON A STORE LOOKUP REWRITES A CARRIED PREMISE ABOUT THAT CELL, AND EVERY
+  CALLEE STILL STATES IT AT THE LOOKUP.** A clause that carries a hypothesis
+  `P (lookupNode nid (nodes st)) ≡ true` and then matches the cell with
+  `with lookupNode nid (nodes st)` gets that hypothesis abstracted along with the
+  scrutinee: in each arm its type is `P` applied to the arm's PATTERN, already reduced
+  through `P`'s own clauses — a `foldr _∧_ true (map …)` where the source said
+  `parkStrat? k (lookupNode …)`. Every callee below was elaborated against the STUCK
+  lookup term, which the abstraction does not touch, so handing the hypothesis on gives
+  `UnequalTerms` between two spellings of one fact, reported at the ARGUMENT and reading
+  as a wrong premise. The repair is `with … in eqN`, then
+  `subst (λ z → P z ≡ true) (sym eqN) h` at each call site — and note the direction:
+  `sym` when the premise is in pattern form and the callee wants the lookup, bare `eqN`
+  when a hypothesis arrived in lookup form and the GOAL is in pattern form, which is the
+  same trap seen from the other end. `in` names the proof and adds no pattern position,
+  so the arms themselves need no change; the whole cost of this is finding it, four
+  sites at a time.

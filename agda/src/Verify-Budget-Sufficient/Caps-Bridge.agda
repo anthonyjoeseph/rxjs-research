@@ -83,7 +83,8 @@ open import Verify-Budget-Sufficient.Wet.Part3 using
 open import Verify-Budget-Sufficient.Subscribe-Face using
   (innerFinish-caps; subscribeE-caps; subscribeInner-caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
-  (burstCaps?; burstCount?; capsOK?; capsOK?-mono; n≤capsAt-size; pathFloor; pathSz?;
+  (burstCaps?; burstCount?; capsOK?; capsOK?-mono; n≤capsAt-size; pathFloor; pathOrd?;
+   pathPark?; pathSz?;
    pathStrat?; regsSz?; regStrat?; slotsCaps?; srcFloor?; valCaps?; widLive; widNode; widNode-len;
    nestClosOK?ᵛ; closLive; closSt?)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
@@ -103,10 +104,11 @@ open import Verify-Budget-Sufficient.Caps-Face.Part7.Depth-Fit using
 open import Verify-Budget-Sufficient.Caps-Nest using
   (nest; nest≤)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
-  (capsOK?-clos; capsOK?-count; capsOK?-parts; capsOK?-regs; chainsStrat?-one;
+  (capsOK?-clos; capsOK?-count; capsOK?-parts; capsOK?-regOrd; capsOK?-regPark; capsOK?-regs;
+  chainsStrat?-one;
   registry-entStrat; slotsCaps?-capsAt)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves using
-  (chainsOf-strat)
+  (cascade-admit-ord; cascade-admit-park; chainsOf-strat)
 
 -- the depth mirror (S4's currency)
 -- `depthChain` joins `depthE` here because `dry-tick`'s assembly consumes
@@ -134,7 +136,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Nest-Arith
 open import Verify-Budget-Sufficient.Burst-Walk.Burst-Face
   using (cascadeGo-nodry)
 open import Verify-Budget-Sufficient.Psi-Split using
-  (pathBΨ?; pathBΨ?-of; regsB?-of-parts; regsBΨ?; regsBΨ?-of)
+  (chP?-∧; pathBΨ?; pathBΨ?-of; regsB?-of-parts; regsBΨ?; regsBΨ?-of)
 -- the wet contract itself, stated over the COLLAPSED walk.
 -- It lives one arrow above .Wet and .Subscribe-Face because its
 -- statement is the only one reading BOTH vocabularies; this module is
@@ -608,6 +610,14 @@ dry-tick {n = n} {e = e} a id sched st inv val pre nok bnd valC closC strC =
     -- already carries
     (chainsOf-strat a st (registry-entStrat c sched st pre))
     (chainsStrat?-one (arrVal a) (chainsOf a st) strC)
+    -- and the chain's two entry readings, both filters of the registry's
+    -- own.  The order half is state-blind, so the latch does not move it;
+    -- the park half is taken AT the latched state, which is the state the
+    -- cascade walk enters
+    (chP?-∧ (λ {u} κ → pathOrd? (Sched.nextNode sched) κ)
+            (λ {u} κ → pathPark? κ latched) chains
+       (cascade-admit-ord a sched st (capsOK?-regOrd c sched st pre))
+       (cascade-admit-park a st (capsOK?-regPark c sched st pre)))
   where
   sl      = Sched.slots sched
   Ψ       = ΨAt e sl

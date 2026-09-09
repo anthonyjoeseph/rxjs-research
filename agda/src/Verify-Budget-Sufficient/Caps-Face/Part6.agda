@@ -218,6 +218,30 @@ postulate
        × (parkStrat? (pathFloor κ)
             (lookupNode nid (EvalSt.nodes (proj₂ (proj₂ (proj₂ r))))) ≡ true)
 
+  -- AND ACROSS ONE DRAINED INNER, which is the third writer and the one
+  -- the drain's own recursion spends: the tail is called at the state the
+  -- head's subscribe landed in, so the readings the head consumed must
+  -- come back at that state or the recursion has nothing to hand its
+  -- tail.  The mint is what moves here -- `subscribeInner` allocates the
+  -- instance node and raises the counter the ordering is read against --
+  -- so the ordering conjunct is a genuine obligation rather than a
+  -- transport, and the cell conjunct is owed because the inner may park
+  -- back onto the outer's queue.
+  subscribeInner-readings : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (g : Gas) (op : AllOp) (allNid : NodeId) (κ : Path Γ u t)
+    (id : Id) (now : Tick) (o : Val Γ (obs u))
+    (sched : Sched Γ) (st : EvalSt e) →
+    pathOrd? (Sched.nextNode sched) (thru-outer op allNid ↠ κ) ≡ true →
+    pathPark? κ st ≡ true →
+    parkStrat? (pathFloor κ) (lookupNode allNid (EvalSt.nodes st)) ≡ true →
+    let r = subscribeInner g op allNid κ id now o sched st
+    in (pathOrd? (Sched.nextNode (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r))))))
+          (thru-outer op allNid ↠ κ) ≡ true)
+       × (pathPark? κ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))) ≡ true)
+       × (parkStrat? (pathFloor κ)
+            (lookupNode allNid
+               (EvalSt.nodes (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))))) ≡ true)
+
 -- innerFinish's clauses that hand the payload straight back — switch's
 -- cleared slot, exhaust's cleared flag, the absorb path, and every
 -- op/node pair the evaluator's catch-all covers.  None
@@ -267,7 +291,7 @@ innerFinish-face-keep c d j sl vals b sched st inv vC =
 -- to `innerFinish-face-keep` at j′ = 0, and mergeAll+yes is the one real
 -- obligation — `innerFinish-caps` (.Subscribe-Face), which is
 -- exactly what H1 and H2 were added to feed.
--- `ifc` (IfcFace = innerFinish-caps' type) threads as the FIRST kit arg
+-- `ifc` (IfcType = innerFinish-caps' type) threads as the FIRST kit arg
 -- so the proof can call innerFinish-caps without creating a circular
 -- import — Subscribe-Face already imports Caps-Face.
 innerFinish-mergeAll-face-go :
