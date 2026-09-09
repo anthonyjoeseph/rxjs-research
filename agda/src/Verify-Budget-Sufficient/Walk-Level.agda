@@ -140,11 +140,13 @@ open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (burstCaps?; burstCount?; burstStrat?; capsOK?; capsOK?-mono; eventCaps?; parkStrat?;
   pathFloor; pathOrd?; pathOrd?-inner; pathOrd?-mono; pathOrd?-push;
   pathOrd?-read; pathPark?;
-  pathPark?-set-fresh; pathRead; pathStrat?; pathSz?; slotsCaps?; valCaps?;
+  pathPark?-set-fresh; pathRead; pathStrat?; pathSz?; setNode-regPark-owner;
+  slotsCaps?; valCaps?;
   valCountᵉ; widNode; widNode-push)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
   (capsOK?-mergeAllBump; capsOK?-nextNode; capsOK?-nodeSz; capsOK?-nodeWid; capsOK?-regs;
-  capsOK?-nodePark; capsOK?-setNode; frameBud; lookupNode-caps; mList?; mList?-head;
+  capsOK?-nodePark; capsOK?-regPark; capsOK?-setNode; capsOK?-setNode-park;
+  frameBud; lookupNode-caps; mList?; mList?-head;
   mList?-keeps; mList?-tail; parkList-push;
   pathSz?-len; slotsCaps?-capsAt; splitBurst-bk-caps; splitBurst-vals-caps;
   splitEvents-bk-caps; splitEvents-valsCaps; splitEvents-valsStrat;
@@ -1492,6 +1494,9 @@ walk-mu {n = n} body c Ψ F Ŝ R̂ G ℓ L̂ dep (suc bud′) (suc ops′) j (gs
          hps
          (T⇒≡true (inputsBelowᵉ (pathFloor κ) (unfoldμ body))
             (ib-unfoldμ (pathFloor κ) body (T-to hib)))
+         -- the chain and the state are both untouched by the unfolding,
+         -- so the two entry readings forward verbatim
+         hord hpk
   j₁  = proj₁ IH
   S1  = proj₁ (proj₂ IH)
   S2  = proj₁ (proj₂ (proj₂ IH))
@@ -1512,7 +1517,7 @@ walk-mu {n = n} body c Ψ F Ŝ R̂ G ℓ L̂ dep (suc bud′) (suc ops′) j (gs
 -- and the successor clause spends op-step's one operator.
 subscribeAll-walk c Ψ F Ŝ R̂ G ℓ L̂ dep bud zero j g op ns b κ bid now sl sched st
   2≤S 1≤R hCR slEq slC slSz inv bn pk wn pkS szb wdb pC lC nst ()
-subscribeAll-walk c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j g op ns b κ bid now sl sched st
+subscribeAll-walk {u = u} c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j g op ns b κ bid now sl sched st
   2≤S 1≤R hCR slEq slC slSz inv bn pk wn pkS szb wdb pC lC nst hidx dpt invW fnC fnN pB s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk =
   suc (j₁ + j₂)
     , subst (λ x → capsOK? (frameStep x c)
@@ -1556,7 +1561,7 @@ subscribeAll-walk c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j g op ns b κ bi
                      (≤⇒≤ᵇ (≤-trans lC (proj₁ step⊑))))
                    (pathSz?-⊑ κ step⊑ pC))
   inv₀ : capsOK? (frameStep (suc j) c) sched₀ st₀ ≡ true
-  inv₀ = capsOK?-setNode (frameStep (suc j) c) nid ns sched₀ st bn
+  inv₀ = capsOK?-setNode-park (frameStep (suc j) c) nid ns sched₀ st bn
            (subst (λ y → parkRoom (Caps.cSize (frameStep (suc j) c))
                            (slotsSize y) ns ≡ true)
                   (sym slEq) pk)
@@ -1565,6 +1570,8 @@ subscribeAll-walk c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j g op ns b κ bi
            (capsOK?-mono (frameStep j c) (frameStep (suc j) c) sched₀ st step⊑
               (capsOK?-nextNode (frameStep j c) (suc (Sched.nextNode sched))
                                 sched st (n≤1+n (Sched.nextNode sched)) inv))
+           (setNode-regPark-owner nid κ ns st (λ _ → pkS)
+              (capsOK?-regPark (frameStep j c) sched st inv))
   invW′ : INV? Ψ B′ sched₀ st₀ ≡ true
   invW′ = INV?-install Ψ (Caps.cSize (frameStep j c)) B′ nid ns sched sched₀ st
             (proj₁ step⊑) refl refl bn fnN invW
@@ -1582,7 +1589,7 @@ subscribeAll-walk c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j g op ns b κ bi
             (T⇒≡true (pathRead κ ≤ᵇ nid) (≤⇒≤ᵇ (pathOrd?-read nid κ hord)))
             (pathOrd?-mono nid (suc nid) κ (n≤1+n nid) hord)
   hparkK : pathPark? κ′ st₀ ≡ true
-  hparkK = ∧-intro (installNode-cellPark (pathFloor κ) op nid ns st pkS)
+  hparkK = ∧-intro (installNode-cellPark {u = u} (pathFloor κ) op nid ns st pkS)
                    (pathPark?-set-fresh nid κ nid ns st ≤-refl hord hpk)
   SUB = walkFace b c Ψ F Ŝ R̂ G′ ℓ L̂ dep bud ops′ (suc j) g κ′ bid now sl sched₀ st₀
           2≤S 1≤R hCR slEq slC slSz inv₀
@@ -1985,11 +1992,16 @@ thruConsume-walk {n = n} {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g me
                 (subst (λ y → all (λ x → 3 + (sizeᵉ x + slotsSize y)
                                            ≤ᵇ Caps.cSize (frameStep j c)) q ≡ true)
                        slEq pk))
-  capsPark = capsOK?-setNode (frameStep (suc j) c)
+  capsPark = capsOK?-setNode-park (frameStep (suc j) c)
                nid (mergeAll-st lim act (q ++ o ∷ []) od)
                sched st BN PK WN
                (capsOK?-mono (frameStep j c) (frameStep (suc j) c) sched st
                   (frameStep-mono-j c 2≤S (n≤1+n j)) inv)
+               (setNode-regPark-owner nid κ
+                  (mergeAll-st lim act (q ++ o ∷ []) od) st
+                  (λ _ → all-++-intro (inputsBelowᵉ (pathFloor κ)) q (o ∷ [])
+                           hqk (∧-intro hib refl))
+                  (capsOK?-regPark (frameStep j c) sched st inv))
   FN : fnCapNode Ψ (mergeAll-st lim act (q ++ o ∷ []) od) ≡ true
   FN = all-++-intro (λ x → fnCapᵉ x ≤ᵇ Ψ) q (o ∷ []) fnW
          (∧-intro (proj₂ (∧-true (sizeᵛ (obs u) o ≤ᵇ Caps.cSize (frameStep j c))
@@ -2053,7 +2065,7 @@ thruConsume-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g switchᵒ nid κ b
                      else just (proj₁ R)) od)
          (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ R)))))
          (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ R)))))
-         refl refl refl (proj₁ (proj₂ SI))
+         refl refl refl (proj₁ (proj₂ SI)) (λ _ _ → refl)
      , proj₁ (proj₂ (proj₂ SI))
      , all-++-intro (eventCaps? (frameStep (j + j′) c) sl)
          (proj₁ KILL) _
@@ -2164,7 +2176,7 @@ thruConsume-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g exhaustᵒ nid κ 
          (exhaust-st (not (proj₁ (proj₂ (proj₂ (proj₂ R))))) od)
          (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ R)))))
          (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ R)))))
-         refl refl refl (proj₁ (proj₂ SI))
+         refl refl refl (proj₁ (proj₂ SI)) (λ _ _ → refl)
      , proj₁ (proj₂ (proj₂ SI))
      , proj₁ (proj₂ (proj₂ (proj₂ SI)))
      , proj₁ (proj₂ (proj₂ (proj₂ (proj₂ SI))))

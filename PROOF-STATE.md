@@ -261,9 +261,9 @@ does not fit is a finding about the shared statement, not about the head.
   form the pricing question has to take to be answerable at all.
 
 - **PAYING THE PRODUCERS THE CARRIED READINGS NOW OBLIGE.** The walk
-  carries the two readings as one ledger on paths rather than deriving
-  them from a receipt that implies neither, so what was a gap at the
-  mint is five named leaves — a kill, a consume, a drain, the outer's
+  face now TYPECHECKS carrying the two readings as one ledger on paths
+  rather than deriving them from a receipt that implies neither, so
+  what was a gap at the mint is five named leaves — a kill, a consume, a drain, the outer's
   own cell, and a node write — each owing back what it writes. None is
   instantiated, which is why all five are born FALSITY. The commit
   probes them, both readings being decidable over a reachable state,
