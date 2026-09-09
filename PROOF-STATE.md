@@ -238,17 +238,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **GIVING THE TAIL'S READING A DISJOINTNESS VOCABULARY, which is what
-  the arm turned the store question into.** The accumulator now has an
-  arm, so every node a frame declares is read — and that closed the
-  head's obligation while sharpening the TAIL's. A step writes the
-  stepped frame's own cell, so the tail's reading survives exactly when
-  that write names no node a tail frame does, and no reading of a
-  closure says which node the tail points at. The frame half is proven
-  and spent, and the SUBSCRIBE side is a leaf already; nowhere stated
-  is the lift across a STEP. The commit states it, decides
-  whether it belongs on the walk's hypotheses record or beside the node
-  watermark, and wires it into `pathPark-step`.
+- **LIFTING THE DISJOINTNESS ONTO A PATH, now that the frame-keyed half
+  is a body.** A frame reads ONE cell, so pinning that cell below the
+  scheduler's watermark lets the freshness ring transport the whole
+  reading by a `cong`. The STEP
+  side is that shape one level up: the ring freezes everything below a
+  watermark and a step writes only at or above it, so a path's reading
+  survives when every cell its frames READ sits below the cell the head
+  WRITES. The commit states that as a path predicate, proves the
+  transport by induction over the chain, and asks what makes a real
+  chain satisfy it — the head is minted LAST, which is a fact no
+  invariant carries yet.
 
 - **WALKING AN ADMITTED CHAIN AT THE LEVEL IT WAS REGISTERED AT, the
   one door the pricing question leaves open.** Both ends are closed by
@@ -279,10 +279,10 @@ does not fit is a finding about the shared statement, not about the head.
   CAN see the store, and its coverage is extensible — the
   accumulator was the first unannounced cell and it took an arm, at the
   price of restating both step lemmas, so the pattern is known and priced.
-  What is open is the third part, and the arm is what exposed it: an arm
-  reaches a cell the STEPPED frame names, and these rows are read at frames
-  that did not step. So the question is now whether a reading survives a
-  write it does not own — a disjointness fact, which no arm supplies.
+  What is open is the third part: whether a reading survives a write it does
+  not own. That is answered at a SUBSCRIBE — a frame reads one cell, so the
+  freshness ring transports it, and the unpinned form is refuted — and open
+  at a STEP, where the reading is spread over a whole chain.
   relevant: `step-frame-store≤`, `share-fold-store≤`, `subscribeE-sz-store-scan`, `pushBurst-sz-store-outer`, `subscribeSharedSlot-sz-store`
 
 - **IS THERE A COMPUTABLE SHADOW OF THE SEALED FACES?** Three rows say in
@@ -412,14 +412,6 @@ does not fit is a finding about the shared statement, not about the head.
   reading lifted onto the tail the walk is about to enter. What it owes is
   DISJOINTNESS and not arithmetic — the step writes the stepped frame's cell,
   and no closure reading says which node a tail frame names.
-- **`subscribeE-framePark`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the
-  same disjointness one construct over. A subscribe mints its cells from the
-  scheduler's counter and so writes none the frame in hand names — but the
-  frame is a variable here, and nothing in it says which node that is.
-- **`installNode-scanPark`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: what
-  an install leaves at its OWN cell, which is the disjointness question's easy
-  side. `lookupNode` walks an assoc list, so nothing reduces at a variable
-  identifier, and the evaluator's type test sits on top of the roundtrip.
 - **`shareAdmit-park`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the park
   reading over the admitted chains at the LATCHED state the fan-out starts from
   — stated after the close, because that is where the fan reads the registry.

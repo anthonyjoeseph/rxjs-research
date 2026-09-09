@@ -7,10 +7,11 @@ open import Data.Fin     using (Fin; toℕ)
 open import Data.List    using (List; map; [])
 open import Data.Bool.ListAction using (all)
 open import Data.Maybe   using (just; nothing)
-open import Data.Nat     using (ℕ)
+open import Data.Nat     using (ℕ; suc; _≤_)
+open import Data.Unit    using (⊤)
 open import Data.Vec     using (lookup)
 open import Data.Product using (_×_; proj₁; proj₂)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; cong)
 open import Relation.Nullary using (yes; no)
 
 open import Rx.Prim      using (Tick; Id; Gas; Source; InstEvent)
@@ -22,13 +23,15 @@ open import Rx.Evaluator using
    foldPath; shareAdmit; shareLatch; NodeId; AllOp; scanVals; lookupNode;
    installNode;
    scan-st; take-st; mergeAll-st; switch-st; exhaust-st;
-   scan-f; take-f; from-inner; thru-outer;
+   map-f; scan-f; take-f; from-inner; thru-outer;
    Arrival; arrTy; chainsOf; chainStep; cascadeLatch)
 open import Verify-Budget-Sufficient.Caps using (Caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
-  (burstStrat?; capsOK?; framePark?; frameStrat?; pathFloor; pathPark?; pathStrat?;
-   regStrat?)
+  (burstStrat?; capsOK?; framePark?; frameStrat?; parkStrat?; pathFloor;
+   pathPark?; pathStrat?; regStrat?)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using (valsStrat?)
+open import Verify-Budget-Sufficient.Node-Fresh using (subscribeE-nodes-below)
+open import Verify-Budget-Sufficient.Node-Table using (lookupNode-setNode)
 
 -- THE TWO FACTS THE STRATIFICATION THREAD CANNOT GET BY REDUCTION, and
 -- they sit together because they fail for the same reason: each is
@@ -334,37 +337,6 @@ postulate
     inputsBelowᵗ k z ≡ true →
     inputsBelowᵛ k u (evalTm z) ≡ true
 
--- WHAT AN INSTALL LEAVES AT ITS OWN CELL.  The arm reads the node the
--- frame NAMES, and a subscribe that mints a scan installs that cell in
--- the same breath as it builds the frame -- so at the install site the
--- reading is about a cell whose contents are in hand rather than about
--- one the state happens to carry.  It is a leaf and not a reduction
--- because `lookupNode` walks an assoc list: the roundtrip holds at the
--- head by the identifier test and at the tail by recursion, and the
--- evaluator's own type test sits on top of it, so nothing here reduces
--- at a variable identifier.
-  installNode-scanPark : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (k : ℕ) (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
-    (ac : Val Γ u) (st : EvalSt e) →
-    inputsBelowᵛ k u ac ≡ true →
-    framePark? k (scan-f fn nid) (installNode nid (scan-st ac) st) ≡ true
-
--- WHAT A SUBSCRIBE DOES TO A CELL IT DOES NOT OWN, and this is the
--- DISJOINTNESS half of the store question rather than a second
--- arithmetic.  A subscribe mints its nodes from the scheduler's
--- counter, so it writes only cells the frame in hand cannot name -- but
--- the reading is stated at a frame that is a VARIABLE here, and nothing
--- in the frame says which node it names.  The freshness vocabulary that
--- would settle it exists one face over at the node level and has no
--- lift to a reading keyed by a frame, which is why this is stated
--- rather than derived.
-  subscribeE-framePark : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u w}
-    (k : ℕ) (g : Gas) (b : Closed Γ w) (κ : Path Γ w t)
-    (bid : Id) (now : Tick) (f : Frame Γ s u)
-    (sched : Sched Γ) (st : EvalSt e) →
-    framePark? k f st ≡ true →
-    framePark? k f (proj₂ (proj₂ (subscribeE g b κ bid now sched st))) ≡ true
-
 -- WHAT THE SCAN HEAD LEAVES BELOW THE FLOOR, and it is a BODY because
 -- the park reading now has an arm at this node.  The head dispatches on
 -- the cell, and every shape but one emits nothing at all -- so the
@@ -393,3 +365,67 @@ scan-strat-step {u = u} k sf nid now fn nd κ vals fin sched st hpk hfn hib
 ... | just (scan-st {w} acc) with w ≟ᵗ u
 ...   | yes refl = proj₂ (scanVals-strat k fn acc vals hfn hpk hib)
 ...   | no _     = refl
+
+-- WHAT AN INSTALL LEAVES AT ITS OWN CELL, and it is a BODY over the
+-- node table's own roundtrip rather than the leaf this once was.  The
+-- arm reads the node the frame NAMES, and a subscribe that mints a scan
+-- installs that cell in the same breath as it builds the frame -- so
+-- the reading is about a cell whose contents are in hand rather than
+-- about one the state happens to carry.  What makes it one `cong` is
+-- that `parkStrat?` asks NO type test at this arm: it binds the
+-- accumulator's own index, so the cell answers at whatever type it
+-- holds and the install site never has to align two of them.
+installNode-scanPark : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (k : ℕ) (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
+  (ac : Val Γ u) (st : EvalSt e) →
+  inputsBelowᵛ k u ac ≡ true →
+  framePark? k (scan-f fn nid) (installNode nid (scan-st ac) st) ≡ true
+installNode-scanPark k fn nid ac st hac =
+  trans (cong (parkStrat? k)
+           (lookupNode-setNode nid (scan-st ac) (EvalSt.nodes st))) hac
+
+-- WHICH CELLS THE PARK READING WILL ASK ABOUT, as a bound on their ids.
+-- Only two frame shapes name a node, so this is the exact DUAL of the
+-- freshness ring's own frame predicate: that one says which cell a
+-- frame WRITES and asks it to sit at or above a watermark, this says
+-- which cell a frame READS and asks it to sit strictly below one.  The
+-- three silent shapes are free because the reading does not reach the
+-- store at them at all, which is the same economy that lets most call
+-- sites discharge the reading itself by `refl`.
+parkBelow : ∀ {n} {Γ : Ctx n} {s u} → ℕ → Frame Γ s u → Set
+parkBelow w (from-inner _ allNid _) = suc allNid ≤ w
+parkBelow w (scan-f _ nd)           = suc nd ≤ w
+parkBelow w _                       = ⊤
+
+-- WHAT A SUBSCRIBE DOES TO A CELL IT DOES NOT OWN, and this is the
+-- DISJOINTNESS half of the store question rather than a second
+-- arithmetic.  A subscribe writes nothing below the watermark it was
+-- handed -- everything it writes, it minted -- so a frame naming a cell
+-- minted EARLIER reads that cell back unchanged and the whole reading
+-- travels by one `cong`.  The node-level half was proven long before
+-- the park reading existed; what was missing was only the observation
+-- that a frame reads ONE cell, which is what makes the lift a case
+-- split rather than an induction.
+--
+-- THE PREMISE REPLACES A FALSE STATEMENT rather than weakening a true
+-- one, which is the one sanctioned justification for adding a
+-- hypothesis.  Unconditioned, the frame may name a cell the subscribe
+-- is about to MINT: the reading holds vacuously at the miss beforehand
+-- and fails at the seed the scan clause installs there.
+-- REFUTED: `Refuted.Subscribe-Frame-Park`
+subscribeE-framePark : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u w}
+  (k : ℕ) (g : Gas) (b : Closed Γ w) (κ : Path Γ w t)
+  (bid : Id) (now : Tick) (f : Frame Γ s u)
+  (sched : Sched Γ) (st : EvalSt e) →
+  parkBelow (Sched.nextNode sched) f →
+  framePark? k f st ≡ true →
+  framePark? k f (proj₂ (proj₂ (subscribeE g b κ bid now sched st))) ≡ true
+subscribeE-framePark k g b κ bid now (map-f _)        sched st hb hp = hp
+subscribeE-framePark k g b κ bid now (take-f _)       sched st hb hp = hp
+subscribeE-framePark k g b κ bid now (thru-outer _ _) sched st hb hp = hp
+subscribeE-framePark k g b κ bid now (scan-f _ nd) sched st hb hp =
+  trans (cong (parkStrat? k)
+           (subscribeE-nodes-below g b κ bid now sched st nd hb)) hp
+subscribeE-framePark k g b κ bid now (from-inner _ a _) sched st hb hp =
+  trans (cong (parkStrat? k)
+           (subscribeE-nodes-below g b κ bid now sched st a hb)) hp

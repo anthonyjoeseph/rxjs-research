@@ -3187,7 +3187,7 @@ subscribeE-caps {n = n} {u = u} c dep bud (suc ops′) j g (scanᵉ f z b) κ bi
           stF′ stP
           (subscribeE-burstStrat g b (scan-f f nid ↠ κ) bid now sched₀ st₀ stP′ stB′)
           (subscribeE-framePark (pathFloor κ) g b (scan-f f nid ↠ κ) bid now
-             (scan-f f nid) sched₀ st₀
+             (scan-f f nid) sched₀ st₀ ≤-refl
              (installNode-scanPark (pathFloor κ) f nid (evalTm z) st
                 (evalTm-strat (pathFloor κ) z
                    (proj₁ (∧-true (inputsBelowᵗ (pathFloor κ) z)

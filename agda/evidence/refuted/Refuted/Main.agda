@@ -287,3 +287,5 @@ open import Refuted.Share-Step-Scan
 open import Refuted.Subscribe-Store-Scan-Arrivals
   using (charges≡; rows≡;
          subscribeE-sz-store-scan-absurd; subscribeE-sz-store-absurd)
+open import Refuted.Subscribe-Frame-Park
+  using (before≡true; after≡false; subscribeE-framePark-absurd)
