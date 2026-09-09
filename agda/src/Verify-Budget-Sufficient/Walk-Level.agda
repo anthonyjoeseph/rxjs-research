@@ -137,8 +137,10 @@ open import Verify-Budget-Sufficient.Wet.Part2 using
   (finList-B)
 -- the caps face: only the five predicates the statement reads there
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
-  (burstCaps?; burstCount?; burstStrat?; capsOK?; capsOK?-mono; eventCaps?; pathFloor;
-  pathStrat?; pathSz?; slotsCaps?; valCaps?;
+  (burstCaps?; burstCount?; burstStrat?; capsOK?; capsOK?-mono; eventCaps?; parkStrat?;
+  pathFloor; pathOrd?; pathOrd?-inner; pathOrd?-mono; pathOrd?-push;
+  pathOrd?-read; pathPark?;
+  pathPark?-set-fresh; pathRead; pathStrat?; pathSz?; slotsCaps?; valCaps?;
   valCountᵉ; widNode; widNode-push)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
   (capsOK?-mergeAllBump; capsOK?-nextNode; capsOK?-nodeSz; capsOK?-nodeWid; capsOK?-regs;
@@ -177,12 +179,14 @@ open import Verify-Budget-Sufficient.Subscribe-Face
          burstCount?-widen; burstCount?-tail;
          splitBurst-len; mul-fits)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves using
-  (subscribeE-burstStrat)
+  (framePark-step; installNode-cellPark; pathPark-step; subscribeE-burstStrat;
+  subscribeE-readings)
+open import Verify-Budget-Sufficient.Delivery-Counter using (stepFrame-nextNode)
 open import Verify-Budget-Sufficient.Caps-Term using
   (unfoldμ-caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part6 using
-  (concat-fits; frameStep-+suc; lenWiden; valsIn; valsLen;
-   valsOf)
+  (concat-fits; frameStep-+suc; lenWiden; switchKill-readings;
+   thruConsume-readings; valsIn; valsLen; valsOf)
 open import Verify-Budget-Sufficient.Caps-Depth
   using (depthE; depthAll; depthBurst; depthFrame; depthInner; depthConsume; depthWalk)
 open import Verify-Budget-Sufficient.Caps-Nest
@@ -565,6 +569,15 @@ SubscribeInnerWalk = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   -- the reading of the term this face is walking.
   pathStrat? κ ≡ true →
   inputsBelowᵛ (pathFloor κ) (obs u) o ≡ true →
+  -- AND THE THREE THE FRAME STEP CONSUMES, in the caps twin's own
+  -- order and shape: the chain's ordering against the counter, the
+  -- tail's park reading, and the cell's.  The frame is the SAME one at
+  -- every emit, so the chain never moves and only the state under it
+  -- does -- which is why the order is stated at the OUTER chain and
+  -- converted where an inner one is entered
+  pathOrd? (Sched.nextNode sched) (thru-outer op allNid ↠ κ) ≡ true →
+  pathPark? κ st ≡ true →
+  parkStrat? (pathFloor κ) (lookupNode allNid (EvalSt.nodes st)) ≡ true →
   let r = subscribeInner g op allNid κ bid now o sched st
   in Σ ℕ λ j′ →
      (capsOK? (frameStep (j + j′) c)
@@ -625,12 +638,18 @@ StepThruWalk = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   g hasAtLeast suc G →
   pathLen κ + G ≤ ℓ →
   regsLen? ℓ (EvalSt.registry st) ≡ true →
-  -- the frame's own two readings are dropped for the reason the
-  -- frameSz? hypothesis above is: `frameStrat?` and `framePark?` at a
-  -- `thru-outer` are `true` definitionally, since the frame names no
-  -- term and parks nothing
+  -- `frameStrat?` at a `thru-outer` is `true` definitionally -- the
+  -- frame names no term -- so the frame's STRAT reading is dropped for
+  -- the reason the frameSz? hypothesis above is.  Its PARK reading is
+  -- not: a `thru-outer` reads the cell it names, and that is the third
+  -- premise below
   pathStrat? κ ≡ true →
   valsStrat? (pathFloor κ) vals ≡ true →
+  -- the three the caps twin takes, in its order: the chain against the
+  -- counter, the tail's park reading, and the cell's own
+  pathOrd? (Sched.nextNode sched) (thru-outer op nid ↠ κ) ≡ true →
+  pathPark? κ st ≡ true →
+  parkStrat? (pathFloor κ) (lookupNode nid (EvalSt.nodes st)) ≡ true →
   let r = stepFrame g bid now (thru-outer op nid) κ vals fin sched st
   in Σ ℕ λ j′ →
      (capsOK? (frameStep (j + j′) c)
@@ -710,6 +729,11 @@ thruConsume-walk : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   regsLen? ℓ (EvalSt.registry st) ≡ true →
   pathStrat? κ ≡ true →
   inputsBelowᵛ (pathFloor κ) (obs u) o ≡ true →
+  -- the three the inner leaf takes, forwarded per op -- switch cuts
+  -- first, so its arm moves them across the kill
+  pathOrd? (Sched.nextNode sched) (thru-outer op nid ↠ κ) ≡ true →
+  pathPark? κ st ≡ true →
+  parkStrat? (pathFloor κ) (lookupNode nid (EvalSt.nodes st)) ≡ true →
   let r = thruConsume g op nid κ bid now o sched st
   in Σ ℕ λ j′ →
      (capsOK? (frameStep (j + j′) c)
@@ -759,6 +783,11 @@ thruWalk-walk : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   regsLen? ℓ (EvalSt.registry st) ≡ true →
   pathStrat? κ ≡ true →
   valsStrat? (pathFloor κ) vals ≡ true →
+  -- the three, re-established per consumed value: one value may enqueue
+  -- on the outer's own cell, which is what the fold's transport pays
+  pathOrd? (Sched.nextNode sched) (thru-outer op nid ↠ κ) ≡ true →
+  pathPark? κ st ≡ true →
+  parkStrat? (pathFloor κ) (lookupNode nid (EvalSt.nodes st)) ≡ true →
   let r = thruWalk g op nid κ bid now vals sched st
   in Σ ℕ λ j′ →
      (capsOK? (frameStep (j + j′) c)
@@ -818,10 +847,15 @@ pushThru-walk : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   g hasAtLeast suc G →
   pathLen κ + G ≤ ℓ →
   regsLen? ℓ (EvalSt.registry st) ≡ true →
-  -- the frame's readings are `refl` here too, exactly as at the step
-  -- face; what is left is the chain's and the burst's
+  -- the frame's STRAT reading is `refl` here too, exactly as at the step
+  -- face; what is left is the chain's, the burst's, and the three below
   pathStrat? κ ≡ true →
   burstStrat? (pathFloor κ) str ≡ true →
+  -- the three, re-established per EMIT: the frame stays on the chain --
+  -- the next emit pushes the same one -- so only the state moves
+  pathOrd? (Sched.nextNode sched) (thru-outer op nid ↠ κ) ≡ true →
+  pathPark? κ st ≡ true →
+  parkStrat? (pathFloor κ) (lookupNode nid (EvalSt.nodes st)) ≡ true →
   let r = pushBurst g bid now (thru-outer op nid) κ str sched st
   in Σ ℕ λ j′ →
      (capsOK? (frameStep (j + j′) c) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
@@ -835,7 +869,7 @@ pushThru-walk : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
      × (hasDry (proj₁ r) ≡ false)
      × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
 pushThru-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g bid now op nid κ [] sl sched st
-  2≤S 1≤R hCR slEq slC slSz inv pS lC bC cC dpt invW pB bB bH hDry s2 fS rS ceil lb hU dmd gas lℓ rgs _ _ =
+  2≤S 1≤R hCR slEq slC slSz inv pS lC bC cC dpt invW pB bB bH hDry s2 fS rS ceil lb hU dmd gas lℓ rgs _ _ _ _ _ =
   0 , subst (λ x → capsOK? (frameStep x c) sched st ≡ true)
             (sym (+-identityʳ j)) inv
     , refl
@@ -848,7 +882,7 @@ pushThru-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g bid now op nid κ [] 
     , refl
     , rgs
 pushThru-walk {n = n} {Γ = Γ} {t = t} {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g bid now op nid κ (em ∷ ems) sl sched st
-  2≤S 1≤R hCR slEq slC slSz inv pS lC bC cC dpt invW pB bB bH hDry s2 fS rS ceil lb hU dmd gas lℓ rgs hps hbs =
+  2≤S 1≤R hCR slEq slC slSz inv pS lC bC cC dpt invW pB bB bH hDry s2 fS rS ceil lb hU dmd gas lℓ rgs hps hbs hord hpk hqk =
   j₁ + j₂
     , subst (λ x → capsOK? (frameStep x c)
                      (proj₁ (proj₂ REST)) (proj₂ (proj₂ REST)) ≡ true) EQA W1
@@ -889,6 +923,7 @@ pushThru-walk {n = n} {Γ = Γ} {t = t} {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ
   -- `thru-outer` names no term
   eS   = proj₁ (∧-true _ _ hbs)
   bStl = proj₂ (∧-true _ _ hbs)
+  eV   = splitEvents-valsStrat {u = u} (pathFloor κ) E eS
   SF   = stepThru-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep (frameBud c j) j g bid now op nid κ
            (proj₁ sp) (proj₂ (proj₂ sp)) sl sched st
            2≤S 1≤R hCR slEq slC slSz inv pS lC
@@ -907,7 +942,7 @@ pushThru-walk {n = n} {Γ = Γ} {t = t} {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ
            s2 fS rS ceil
            (≤-trans (frame-desc (Caps.cSize c) (Caps.cWid c) dep bud (length ems) j) lb)
            hU dmd gas lℓ rgs
-           hps (splitEvents-valsStrat {u = u} (pathFloor κ) E eS)
+           hps eV hord hpk hqk
   j₁   = proj₁ SF
   S1   = proj₁ (proj₂ SF)
   S2   = proj₁ (proj₂ (proj₂ SF))
@@ -949,6 +984,19 @@ pushThru-walk {n = n} {Γ = Γ} {t = t} {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ
            UK₁ dmd gas lℓ
            S9
            hps bStl
+           -- ACROSS ONE EMIT, and the frame does not move: the next emit
+           -- pushes the SAME one, so the chain is not shed here as a
+           -- fold's is -- a step only raises the counter, and the
+           -- ordering is upward-closed in it
+           (pathOrd?-mono (Sched.nextNode sched) (Sched.nextNode sd₁)
+              (thru-outer op nid ↠ κ)
+              (stepFrame-nextNode g bid now (thru-outer op nid) κ (proj₁ sp)
+                 (proj₂ (proj₂ sp)) sched st)
+              hord)
+           (pathPark-step g bid now (thru-outer op nid) κ (proj₁ sp)
+              (proj₂ (proj₂ sp)) sched st hord hpk)
+           (framePark-step g bid now (thru-outer op nid) κ (proj₁ sp)
+              (proj₂ (proj₂ sp)) sched st refl eV hqk)
   j₂   = proj₁ IH
   W1   = proj₁ (proj₂ IH)
   W2   = proj₁ (proj₂ (proj₂ IH))
@@ -1102,6 +1150,10 @@ subscribeAll-walk : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   boundedNode (Caps.cSize (frameStep (suc j) c)) ns ≡ true →
   parkRoom (Caps.cSize (frameStep (suc j) c)) (slotsSize sl) ns ≡ true →
   widNode (Caps.cWid (frameStep (suc j) c)) sl ns ≡ true →
+  -- THE CELL'S OWN PARK READING, and a head that does not know which
+  -- flatten it is installing cannot derive it: `ns` is a parameter, so
+  -- the reading is carried beside it and each *All head pays `refl`
+  parkStrat? (pathFloor κ) (just ns) ≡ true →
   sizeᵉ b ≤ Caps.cSize (frameStep j c) →
   dWᵉ n sl b ≤ Caps.cWid (frameStep j c) →
   pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
@@ -1157,7 +1209,7 @@ walk-mergeAll {u = u} lim b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now s
   2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk =
   subscribeAll-walk c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g mergeAllᵒ
     (mergeAll-st {t = u} lim 0 [] false) b κ bid now sl sched st
-    2≤S 1≤R hCR slEq slC slSz inv refl refl refl
+    2≤S 1≤R hCR slEq slC slSz inv refl refl refl refl
     (≤-trans (n≤1+n (sizeᵉ b)) szb) wdb pC lC
     (mergeAll-step lim _ sl _ bud nst) hidx dpt
     invW fnC refl pB s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk
@@ -1168,7 +1220,7 @@ walk-switchAll b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
   2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk =
   subscribeAll-walk c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g switchᵒ
     (switch-st nothing false) b κ bid now sl sched st
-    2≤S 1≤R hCR slEq slC slSz inv refl refl refl
+    2≤S 1≤R hCR slEq slC slSz inv refl refl refl refl
     (≤-trans (n≤1+n (sizeᵉ b)) szb) wdb pC lC
     (switch-step _ sl _ bud nst) hidx dpt
     invW fnC refl pB s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk
@@ -1179,7 +1231,7 @@ walk-exhaustAll b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
   2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk =
   subscribeAll-walk c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g exhaustᵒ
     (exhaust-st false false) b κ bid now sl sched st
-    2≤S 1≤R hCR slEq slC slSz inv refl refl refl
+    2≤S 1≤R hCR slEq slC slSz inv refl refl refl refl
     (≤-trans (n≤1+n (sizeᵉ b)) szb) wdb pC lC
     (exhaust-step _ sl _ bud nst) hidx dpt
     invW fnC refl pB s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk
@@ -1455,9 +1507,9 @@ walk-mu {n = n} body c Ψ F Ŝ R̂ G ℓ L̂ dep (suc bud′) (suc ops′) j (gs
 -- zero the index hypothesis `suc (suc (sizeᵉ b)) ≤ zero` is uninhabited,
 -- and the successor clause spends op-step's one operator.
 subscribeAll-walk c Ψ F Ŝ R̂ G ℓ L̂ dep bud zero j g op ns b κ bid now sl sched st
-  2≤S 1≤R hCR slEq slC slSz inv bn pk wn szb wdb pC lC nst ()
+  2≤S 1≤R hCR slEq slC slSz inv bn pk wn pkS szb wdb pC lC nst ()
 subscribeAll-walk c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j g op ns b κ bid now sl sched st
-  2≤S 1≤R hCR slEq slC slSz inv bn pk wn szb wdb pC lC nst hidx dpt invW fnC fnN pB s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk =
+  2≤S 1≤R hCR slEq slC slSz inv bn pk wn pkS szb wdb pC lC nst hidx dpt invW fnC fnN pB s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk =
   suc (j₁ + j₂)
     , subst (λ x → capsOK? (frameStep x c)
                      (proj₁ (proj₂ PB)) (proj₂ (proj₂ PB)) ≡ true) EQ W1
@@ -1508,12 +1560,26 @@ subscribeAll-walk c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j g op ns b κ bi
                   (sym slEq) wn)
            (capsOK?-mono (frameStep j c) (frameStep (suc j) c) sched₀ st step⊑
               (capsOK?-nextNode (frameStep j c) (suc (Sched.nextNode sched))
-                                sched st inv))
+                                sched st (n≤1+n (Sched.nextNode sched)) inv))
   invW′ : INV? Ψ B′ sched₀ st₀ ≡ true
   invW′ = INV?-install Ψ (Caps.cSize (frameStep j c)) B′ nid ns sched sched₀ st
             (proj₁ step⊑) refl refl bn fnN invW
   hpsK : pathStrat? κ′ ≡ true
   hpsK = ∧-intro refl hps
+  -- THE TWO READINGS ACROSS THE FLATTEN'S OWN FRAME.  The order half is
+  -- the push law at a cell the counter has just been raised past, so the
+  -- head's charge is `≤-refl` and the tail's is the reading it arrived
+  -- with, moved up one.  The park half is the MINT transport for the
+  -- tail — nothing registered can name a cell at or above the counter —
+  -- and, for the frame itself, the carried reading on the cell being
+  -- installed, since a head handed `ns` abstractly has nothing else
+  hordK : pathOrd? (suc nid) κ′ ≡ true
+  hordK = pathOrd?-push (suc nid) (thru-outer op nid) κ ≤-refl
+            (T⇒≡true (pathRead κ ≤ᵇ nid) (≤⇒≤ᵇ (pathOrd?-read nid κ hord)))
+            (pathOrd?-mono nid (suc nid) κ (n≤1+n nid) hord)
+  hparkK : pathPark? κ′ st₀ ≡ true
+  hparkK = ∧-intro (installNode-cellPark (pathFloor κ) op nid ns st pkS)
+                   (pathPark?-set-fresh nid κ nid ns st ≤-refl hord hpk)
   SUB = walkFace b c Ψ F Ŝ R̂ G′ ℓ L̂ dep bud ops′ (suc j) g κ′ bid now sl sched₀ st₀
           2≤S 1≤R hCR slEq slC slSz inv₀
           (≤-trans szb (proj₁ step⊑))
@@ -1537,7 +1603,7 @@ subscribeAll-walk c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j g op ns b κ bi
           -- chain is `refl ∧ hps`, and `pathFloor` is invariant across
           -- any frame — which is why the source's reading transports
           -- with no conversion at all
-          hpsK hib
+          hpsK hib hordK hparkK
   j₁  = proj₁ SUB
   S1  = proj₁ (proj₂ SUB)
   S2  = proj₁ (proj₂ (proj₂ SUB))
@@ -1583,6 +1649,13 @@ subscribeAll-walk c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j g op ns b κ bi
           -- produced, so its reading is that walk's rather than a fact
           -- about this frame
           hps (subscribeE-burstStrat g b κ′ bid now sched₀ st₀ hpsK hib)
+          -- AND THE THREE AT THE POST-WALK STATE, which is one receipt:
+          -- the walk's own transport reports the extended chain, and the
+          -- extended chain's park reading IS the cell's beside the
+          -- tail's, so the pair splits with no second fact
+          (proj₁ RDA) (proj₂ (∧-true _ _ (proj₂ RDA)))
+          (proj₁ (∧-true _ _ (proj₂ RDA)))
+  RDA = subscribeE-readings g b κ′ bid now sched₀ st₀ hordK hparkK
   j₂  = proj₁ PBW
   W1  = proj₁ (proj₂ PBW)
   W2  = proj₁ (proj₂ (proj₂ PBW))
@@ -1620,7 +1693,8 @@ subscribeInner-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g0 op allNid κ b
 subscribeInner-walk {n = n} {Γ = Γ} {t = t} {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ
                     dep bud j (gs fuel) op allNid κ bid now o sl sched st
                     2≤S 1≤R hCR slEq slC slSz inv vC pC lC nst dpt
-                    invW vB pB hR s2 fS rS ceil lb hU dmd gas lℓ rgs hps hib hord hpk =
+                    invW vB pB hR s2 fS rS ceil lb hU dmd gas lℓ rgs hps hib
+                    hord hpk hqk =
   suc (suc (suc j₂)) , R1 , R2 , R3
     , inner-step (Caps.cSize c) (Caps.cWid c) dep bud j j₂ 2≤S S4
     , R5 , R6 , R7 , R8 , S9
@@ -1646,7 +1720,7 @@ subscribeInner-walk {n = n} {Γ = Γ} {t = t} {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U 
   inv₀ : capsOK? (frameStep (suc j) c) sched₀ st ≡ true
   inv₀ = capsOK?-mono (frameStep j c) (frameStep (suc j) c) sched₀ st step⊑
            (capsOK?-nextNode (frameStep j c) (suc (Sched.nextNode sched))
-                             sched st inv)
+                             sched st (n≤1+n (Sched.nextNode sched)) inv)
   -- the nextNode bump is invisible to INV? (it reads live and slots,
   -- both definitionally unchanged by the record update)
   invW′ : INV? Ψ B′ sched₀ st ≡ true
@@ -1702,6 +1776,12 @@ subscribeInner-walk {n = n} {Γ = Γ} {t = t} {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U 
          -- `from-inner` names no term either, so the frame's half is
          -- `refl` and the inner value's own reading passes untouched
          (∧-intro refl hps) hib
+         -- ENTERING THE INNER CHAIN: the frame the counter was just
+         -- raised past names the SAME cell the outer frame did, so the
+         -- park reading is the outer one unchanged and only the order
+         -- reading is converted
+         (pathOrd?-inner (Sched.nextNode sched) allNid op κ hord)
+         (∧-intro hqk hpk)
   j₂  = proj₁ IH
   S1  = proj₁ (proj₂ IH)
   S2  = proj₁ (proj₂ (proj₂ IH))
@@ -1773,7 +1853,7 @@ subscribeInner-walk {n = n} {Γ = Γ} {t = t} {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U 
 ------------------------------------------------------------------
 thruConsume-walk {n = n} {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g mergeAllᵒ
                  nid κ bid now o sl sched st 2≤S 1≤R hCR slEq slC slSz inv vC pC
-                 lC nst dpt invW vB pB hR s2 fS rS ceil lb hU dmd gas lℓ rgs hps hib hord hpk
+                 lC nst dpt invW vB pB hR s2 fS rS ceil lb hU dmd gas lℓ rgs hps hib hord hpk hqk
   with lookupNode nid (EvalSt.nodes st)
      | lookupNode-caps (frameStep j c) (Sched.slots sched) nid (EvalSt.nodes st)
          (capsOK?-nodeSz (frameStep j c) sched st inv)
@@ -1858,7 +1938,7 @@ thruConsume-walk {n = n} {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g me
   where
   SI = subscribeInner-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g mergeAllᵒ nid κ
          bid now o sl sched st 2≤S 1≤R hCR slEq slC slSz inv vC pC lC nst dpt
-         invW vB pB hR s2 fS rS ceil lb hU dmd gas lℓ rgs hps hib hord hpk
+         invW vB pB hR s2 fS rS ceil lb hU dmd gas lℓ rgs hps hib hord hpk hqk
   j′   = proj₁ SI
   S1   = proj₁ (proj₂ SI)
   R    = subscribeInner g mergeAllᵒ nid κ bid now o sched st
@@ -1917,7 +1997,7 @@ thruConsume-walk {n = n} {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g me
 
 thruConsume-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g switchᵒ nid κ bid now o
                  sl sched st 2≤S 1≤R hCR slEq slC slSz inv vC pC lC nst dpt
-                 invW vB pB hR s2 fS rS ceil lb hU dmd gas lℓ rgs hps hib hord hpk
+                 invW vB pB hR s2 fS rS ceil lb hU dmd gas lℓ rgs hps hib hord hpk hqk
   with lookupNode nid (EvalSt.nodes st) | dpt
 ... | nothing                | dpt′ =
   0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
@@ -2001,6 +2081,7 @@ thruConsume-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g switchᵒ nid κ b
                   (unconn-keeps sched st sched₁ st₁
                      (switchKill-keeps cur sched st)))
           hU
+  RDK = switchKill-readings switchᵒ nid κ cur sched st hord hpk hqk
   SI = subscribeInner-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g switchᵒ nid κ
          bid now o sl sched₁ st₁ 2≤S 1≤R hCR
          (trans (KeepsC.slotsEq (switchKill-keeps cur sched st)) slEq) slC slSz
@@ -2012,13 +2093,17 @@ thruConsume-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g switchᵒ nid κ b
          vB pB hR s2 fS rS ceil lb
          hU′ dmd gas lℓ
          (switchKill-regsLen ℓ cur sched st rgs)
-         hps hib hord hpk
+         hps hib
+         -- ACROSS THE CUT: the kill retires registrations and may bump
+         -- the registry counter, so all three are re-established from
+         -- the killed state rather than carried
+         (proj₁ RDK) (proj₁ (proj₂ RDK)) (proj₂ (proj₂ RDK))
   j′ = proj₁ SI
   R  = subscribeInner g switchᵒ nid κ bid now o sched₁ st₁
 
 thruConsume-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g exhaustᵒ nid κ bid now o
                  sl sched st 2≤S 1≤R hCR slEq slC slSz inv vC pC lC nst dpt
-                 invW vB pB hR s2 fS rS ceil lb hU dmd gas lℓ rgs hps hib hord hpk
+                 invW vB pB hR s2 fS rS ceil lb hU dmd gas lℓ rgs hps hib hord hpk hqk
   with lookupNode nid (EvalSt.nodes st)
 ... | nothing                =
   0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
@@ -2090,7 +2175,7 @@ thruConsume-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g exhaustᵒ nid κ 
   where
   SI = subscribeInner-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g exhaustᵒ nid κ
          bid now o sl sched st 2≤S 1≤R hCR slEq slC slSz inv vC pC lC nst dpt
-         invW vB pB hR s2 fS rS ceil lb hU dmd gas lℓ rgs hps hib hord hpk
+         invW vB pB hR s2 fS rS ceil lb hU dmd gas lℓ rgs hps hib hord hpk hqk
   j′ = proj₁ SI
   R  = subscribeInner g exhaustᵒ nid κ bid now o sched st
 
@@ -2101,7 +2186,7 @@ thruConsume-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g exhaustᵒ nid κ 
 ------------------------------------------------------------------
 thruWalk-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g op nid κ bid now []
               sl sched st 2≤S 1≤R hCR slEq slC slSz inv pC vC lC nst dpt
-              invW pB vBs hops s2 fS rS ceil lb hU dmd gas lℓ rgs _ _ =
+              invW pB vBs hops s2 fS rS ceil lb hU dmd gas lℓ rgs _ _ _ _ _ =
   0 , subst (λ x → capsOK? (frameStep x c) sched st ≡ true)
             (sym (+-identityʳ j)) inv
     , refl , refl , walk-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
@@ -2110,7 +2195,8 @@ thruWalk-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g op nid κ bid now []
     , refl , refl , refl , rgs
 thruWalk-walk {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g op nid κ bid now
               (o ∷ os) sl sched st 2≤S 1≤R hCR slEq slC slSz inv pC vC lC nst dpt
-              invW pB vBs hops s2 fS rS ceil lb hU dmd gas lℓ rgs hps hvs =
+              invW pB vBs hops s2 fS rS ceil lb hU dmd gas lℓ rgs hps hvs
+              hord hpk hqk =
   suc (j₁ + j₂)
     , capsOK?-mono (frameStep ((j + j₁) + j₂) c) (frameStep (j + suc (j₁ + j₂)) c)
         (proj₁ (proj₂ (proj₂ REST))) (proj₂ (proj₂ (proj₂ REST)))
@@ -2174,7 +2260,11 @@ thruWalk-walk {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g op nid κ bid
          s2 fS rS ceil
          (≤-trans (walk-desc (Caps.cSize c) (Caps.cWid c) dep (suc bud)
                      (length os) j) lb)
-         hU dmd gas lℓ rgs hps (proj₁ hvh)
+         hU dmd gas lℓ rgs hps (proj₁ hvh) hord hpk hqk
+  -- ACROSS ONE CONSUMED VALUE: the value may enqueue on the outer's own
+  -- cell, so the cell reading is re-established rather than carried,
+  -- and the counter only rises
+  RDC = thruConsume-readings g op nid κ bid now o sched st hord hpk hqk
   j₁ = proj₁ HD
   H1 = proj₁ (proj₂ HD)
   H2 = proj₁ (proj₂ (proj₂ HD))
@@ -2227,6 +2317,7 @@ thruWalk-walk {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g op nid κ bid
          s2 fS rS ceil
          TAILPIN
          hU′ dmd gas lℓ H9 hps (proj₂ hvh)
+         (proj₁ RDC) (proj₁ (proj₂ RDC)) (proj₂ (proj₂ RDC))
   j₂ = proj₁ IH
   W1 = proj₁ (proj₂ IH)
   W2 = proj₁ (proj₂ (proj₂ IH))
@@ -2254,7 +2345,8 @@ stepThru-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ zero bud j g bid now op nid κ va
               sl sched st 2≤S 1≤R hCR slEq slC slSz inv pC lC vC fb ()
 stepThru-walk {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ (suc dep′) bud j g bid now op nid
               κ vals fin sl sched st 2≤S 1≤R hCR slEq slC slSz inv pC lC vC fb dpt
-              invW pB vBs hops s2 fS rS ceil lb hU dmd gas lℓ rgs hps hvs =
+              invW pB vBs hops s2 fS rS ceil lb hU dmd gas lℓ rgs hps hvs
+              hord hpk hqk =
   j′ , proj₁ WR
      , valsIn (frameStep (j + j′) c) sl (proj₁ (thruWrap op nid fin WK))
          (proj₁ (proj₂ WR))
@@ -2306,7 +2398,7 @@ stepThru-walk {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ (suc dep′) bud j g bid 
          (≤-pred dpt)
          invW pB vBs hops s2 fS rS ceil
          WALKPIN
-         hU dmd gas lℓ rgs hps hvs
+         hU dmd gas lℓ rgs hps hvs hord hpk hqk
   j′ = proj₁ TW
   T1 = proj₁ (proj₂ TW)
   T2 = proj₁ (proj₂ (proj₂ TW))

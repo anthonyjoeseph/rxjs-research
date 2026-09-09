@@ -837,3 +837,29 @@ cascade-admit-park a st h =
     (EvalSt.registry st)
     (regPark?-nodes (EvalSt.registry st) st (cascadeLatch a st)
        (cascadeLatch-nodes a st) h)
+
+-- THE TWO READINGS ACROSS A WHOLE WALK, and neither is a new fact.  A
+-- walk mints strictly ABOVE the counter it entered at, so every cell
+-- the chain reads is frozen under it and the counter only rises --
+-- which is exactly the pair `FreshC` records.  `subscribeE-fresh` is
+-- that receipt and the two `fresh-` transports spend it, so this is one
+-- composition; it is stated once because every push site needs it, and
+-- the order reading is what unlocks the freezing premise, since a chain
+-- whose cells outran the counter is a chain no run built
+subscribeE-readings : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (g : Gas) (b : Closed Γ u) (κ : Path Γ u t) (id : Id) (now : Tick)
+  (sched : Sched Γ) (st : EvalSt e) →
+  pathOrd? (Sched.nextNode sched) κ ≡ true →
+  pathPark? κ st ≡ true →
+  let r = subscribeE g b κ id now sched st
+  in (pathOrd? (Sched.nextNode (proj₁ (proj₂ r))) κ ≡ true)
+     × (pathPark? κ (proj₂ (proj₂ r)) ≡ true)
+subscribeE-readings g b κ id now sched st ho hp =
+    fresh-ord κ (Sched.nextNode sched) (Sched.nextNode (proj₁ (proj₂ r))) st
+      (proj₂ (proj₂ r)) FR ho
+  , fresh-pathPark κ (Sched.nextNode sched) (Sched.nextNode (proj₁ (proj₂ r))) st
+      (proj₂ (proj₂ r)) FR hp
+  where
+  r  = subscribeE g b κ id now sched st
+  FR = subscribeE-fresh (pathRead κ) g b κ id now sched st
+         (pathOrd?-read (Sched.nextNode sched) κ ho)
