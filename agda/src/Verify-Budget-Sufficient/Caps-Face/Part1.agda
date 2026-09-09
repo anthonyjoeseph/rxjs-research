@@ -93,7 +93,7 @@ open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; _⊔_; _�
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-reflexive; +-suc; +-comm; +-assoc; +-monoˡ-≤; *-monoˡ-≤; *-monoʳ-≤;
   m≤m+n; m≤n+m; n≤1+n; +-mono-≤; m≤m*n; ^-monoʳ-≤; *-assoc; *-identityʳ; <⇒≤; ^-monoˡ-≤;
   ^-*-assoc; ^-distribˡ-+-*; *-mono-≤; +-monoʳ-≤; m≤m⊔n; m≤n⊔m; ⊔-lub; *-identityˡ;
-  *-distribˡ-+)
+  *-distribˡ-+; ≤-refl; ⊔-mono-≤)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.List    using (List; []; _∷_; _++_; length; tabulate; map)
@@ -114,7 +114,7 @@ open import Data.Sum     using (inj₁; inj₂)
 open import Data.Unit    using (tt)
 open import Data.Empty   using (⊥-elim)
 open import Relation.Binary.PropositionalEquality
-  using (_≡_; refl; sym; trans; cong; subst)
+  using (_≡_; refl; sym; trans; cong; cong₂; subst)
 
 open import Rx.Prim      using (Tick; Source; InstEmit; _at_from_as_; InstEvent; init; value; close; handoff; complete; Timed;
   after_,_; hot; cold)
@@ -124,9 +124,9 @@ open import Rx.Exp       using (Ty; natᵗ; unitᵗ; boolᵗ; _×ᵗ_; _+ᵗ_; o
   exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; evalWith; evalTm; applyFn; inputsBelowᵗ; inputsBelowᵛ; inputsBelowᵉ)
 open import Rx.Frame-Width using (entryCeil; pWᵉ; pWᵛ; dWᵉ; outWᵉ; innWᵉ; innWᵗ; innWᵗˢ; pmOᵉ; pmOᵗ; pmIᵉ; pmIᵗ; pmIᵗˢ; _∈ᵇ_; outWⱽ;
   innWⱽ; innWᵗⱽ; innWᵗˢⱽ; pmIᵗⱽ; slotPW; slotsPW; slotsPWgo; slotIW; slotsIW; slotsIWgo)
-open import Rx.Evaluator using (capsBase; Sched; EvalSt; LiveSource; RegId; Chain; NodeState; scan-st; take-st; mergeAll-st; switch-st;
+open import Rx.Evaluator using (capsBase; Sched; EvalSt; LiveSource; RegId; Chain; NodeId; NodeState; setNode; scan-st; take-st; mergeAll-st; switch-st;
   exhaust-st; root; share-sink; _↠_; Frame; map-f; scan-f; take-f; from-inner; thru-outer;
-  Stream; Path; sizeStep; iterSize; foldStep; iterFold; lookupNode)
+  Stream; Path; sizeStep; iterSize; foldStep; iterFold; lookupNode; AllOp)
 open import Rx.Slots using (scripted; shared; Slot; Slots; slotSize; slotsSize; inputSize)
 open import Rx.Clos-Size using (closSizeᵉ; closSize≤mulᵉ)
 open import Rx.Slot-Clos using (slotClos; slotClosD; slotsClos; σAt)
@@ -161,7 +161,9 @@ open import Verify-Budget-Sufficient.Measures using
                                                       syncSize≤sizeᵉ;
                                                       parkRoom; parkRoom-widen;
                                                       stBounded-widen; stBounded?; ∧-true)
-open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen)
+open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen; ≡ᵇ→≡; sucle→≢ᵇ)
+open import Verify-Budget-Sufficient.Node-Table using
+  (lookupNode-setNode; lookupNode-setNode-other)
 -- the nesting measure the subscribe budget descends on, and the frame
 -- row that supplies it.  Re-exported, so the clique names one module
 -- the depth mirror: `depthInner` is the fuel `thruOuter-face-core`'s
@@ -384,6 +386,229 @@ pathStrat? root           = true
 pathStrat? (share-sink i) = true
 pathStrat? (f ↠ p)        = frameStrat? (pathFloor p) f ∧ pathStrat? p
 
+-- THE SMALLEST WATERMARK A CHAIN'S READS FIT UNDER, COMPUTED RATHER
+-- THAN GUESSED.  A frame that reaches no cell contributes zero, which
+-- is the same economy that makes three of the five shapes free in every
+-- store-side reading here: only `from-inner` and `scan-f` name a node
+-- at all.  Handing a bound back rather than asking a caller for one is
+-- what lets the ordering below be a fact about the chain alone.
+frameRead : ∀ {n} {Γ : Ctx n} {s u} → Frame Γ s u → ℕ
+frameRead (from-inner _ allNid _) = suc allNid
+frameRead (scan-f _ nd)           = suc nd
+frameRead (thru-outer _ nid)      = suc nid
+frameRead _                       = 0
+
+pathRead : ∀ {n} {Γ : Ctx n} {u t} → Path Γ u t → ℕ
+pathRead root           = 0
+pathRead (share-sink _) = 0
+pathRead (f ↠ p)        = frameRead f ⊔ pathRead p
+
+-- AND THE CELLS A FRAME NAMES AT ALL, WHICH IS STRICTLY MORE THAN THE
+-- ONES IT READS.  A frame OWNS a cell it never reads back through the
+-- park reading -- a take's counter -- and the freezing argument is
+-- blind to it by design, since a write nobody reads cannot disturb a
+-- reading.  The COUNTER is not blind to them: a chain
+-- naming a cell the scheduler has not handed out yet is a chain no run
+-- built, and a producer extending such a chain would mint on top of its
+-- own frame.  So the two quantities are separate and only the second is
+-- what the counter conjunct is stated over.
+frameCell : ∀ {n} {Γ : Ctx n} {s u} → Frame Γ s u → ℕ
+frameCell (map-f _)          = 0
+frameCell (scan-f _ nd)      = suc nd
+frameCell (take-f nid)       = suc nid
+frameCell (thru-outer _ nid) = suc nid
+frameCell (from-inner _ a i) = suc a ⊔ suc i
+
+pathCell : ∀ {n} {Γ : Ctx n} {u t} → Path Γ u t → ℕ
+pathCell root           = 0
+pathCell (share-sink _) = 0
+pathCell (f ↠ p)        = frameCell f ⊔ pathCell p
+
+frameRead≤frameCell : ∀ {n} {Γ : Ctx n} {s u} (f : Frame Γ s u) →
+  frameRead f ≤ frameCell f
+frameRead≤frameCell (map-f _)          = z≤n
+frameRead≤frameCell (scan-f _ nd)      = ≤-refl
+frameRead≤frameCell (take-f _)         = z≤n
+frameRead≤frameCell (thru-outer _ _)   = ≤-refl
+frameRead≤frameCell (from-inner _ a i) = m≤m⊔n (suc a) (suc i)
+
+pathRead≤pathCell : ∀ {n} {Γ : Ctx n} {u t} (κ : Path Γ u t) →
+  pathRead κ ≤ pathCell κ
+pathRead≤pathCell root           = z≤n
+pathRead≤pathCell (share-sink _) = z≤n
+pathRead≤pathCell (f ↠ p)        =
+  ⊔-mono-≤ (frameRead≤frameCell f) (pathRead≤pathCell p)
+
+-- AND THE WRITE SIDE AS A DECISION, which is what lets a chain's
+-- ordering be a BOOLEAN conjunct instead of a Σ.  The difference is not
+-- cosmetic: the registry, the fan-out and the cascade hold LISTS of
+-- chains and owe every reading pointwise through `all`, which takes a
+-- predicate into `Bool` and cannot take one into `Set`.  Every arm of
+-- the freshness ring's own frame predicate is a comparison of numerals,
+-- so the decision is that predicate with `≤ᵇ` for `≤`.
+frameAbove? : ∀ {n} {Γ : Ctx n} {s u} → ℕ → Frame Γ s u → Bool
+frameAbove? w (map-f _)          = true
+frameAbove? w (scan-f _ nid)     = w ≤ᵇ nid
+frameAbove? w (take-f nid)       = w ≤ᵇ nid
+frameAbove? w (from-inner _ a i) = (w ≤ᵇ a) ∧ (w ≤ᵇ i)
+frameAbove? w (thru-outer _ nid) = w ≤ᵇ nid
+
+-- A CHAIN IS ORDERED WHEN EVERY FRAME WRITES AT OR ABOVE WHAT THE REST
+-- OF IT READS, and the watermark each hop spends is the tail's own
+-- reading rather than a witness someone supplies.  It is true of a
+-- chain the evaluator BUILT, since a subscribe descends outward-in and
+-- a head is therefore minted after everything under it -- but nothing
+-- in a frame's type ties it to the path beside it, so the fact is
+-- carried and not derived.
+--
+-- AND THE SCHEDULER'S COUNTER IS THE SAME FACT ABOUT CELLS THAT DO NOT
+-- EXIST YET.  A step may mint, and it mints from the counter up, so a
+-- tail reading below the counter is a tail no minting can reach.
+pathOrd? : ∀ {n} {Γ : Ctx n} {u t} → ℕ → Path Γ u t → Bool
+pathOrd? nx root           = true
+pathOrd? nx (share-sink _) = true
+pathOrd? nx (f ↠ p)        =
+  (pathCell (f ↠ p) ≤ᵇ nx) ∧ frameAbove? (pathRead p) f ∧ pathOrd? nx p
+
+-- AND THE COUNTER BOUND IS STATED OVER THE WHOLE CHAIN, HEAD INCLUDED,
+-- which is what makes the reading survive being EXTENDED.  A producer
+-- registers a chain by putting a fresh frame on the front of one it was
+-- handed, and the new hop's own charge is the tail's reading -- so the
+-- reading has to hand back a bound on the tail it is stated over, and a
+-- conjunct that skipped the head could not: the head is exactly the hop
+-- the extension is charged against.  Stating it over `pathRead` of the
+-- whole chain rather than as a fourth conjunct keeps that bound
+-- projectable in one step, and costs nothing at a concrete frame, where
+-- the ⊔ reduces.
+pathOrd?-cell : ∀ {n} {Γ : Ctx n} {u t} (nx : ℕ) (κ : Path Γ u t) →
+  pathOrd? nx κ ≡ true → pathCell κ ≤ nx
+pathOrd?-cell nx root           h = z≤n
+pathOrd?-cell nx (share-sink _) h = z≤n
+pathOrd?-cell nx (f ↠ p)        h =
+  ≤ᵇ⇒≤ (pathCell (f ↠ p)) nx
+    (T-to (proj₁ (∧-true (pathCell (f ↠ p) ≤ᵇ nx)
+                         (frameAbove? (pathRead p) f ∧ pathOrd? nx p) h)))
+
+pathOrd?-read : ∀ {n} {Γ : Ctx n} {u t} (nx : ℕ) (κ : Path Γ u t) →
+  pathOrd? nx κ ≡ true → pathRead κ ≤ nx
+pathOrd?-read nx κ h = ≤-trans (pathRead≤pathCell κ) (pathOrd?-cell nx κ h)
+
+-- THE HOP'S OWN CHARGE, PROJECTED, and it is the half `pathOrd?-read`
+-- cannot give: that lemma reads the chain against the COUNTER, while a
+-- producer extending the chain at its head needs the head's charge
+-- against the TAIL.  The two are separate conjuncts and neither bounds
+-- the other, since a counter far above everything says nothing about
+-- the order the frames sit in.
+pathOrd?-hop : ∀ {n} {Γ : Ctx n} {u t} (nx nid : ℕ) (op : AllOp)
+  (κ : Path Γ u t) →
+  pathOrd? nx (thru-outer {u = u} op nid ↠ κ) ≡ true → pathRead κ ≤ nid
+pathOrd?-hop {n = n} {Γ = Γ} {u = u} nx nid op κ h =
+  ≤ᵇ⇒≤ (pathRead κ) nid (T-to (proj₁ SQ))
+  where
+  f : Frame Γ (obs u) u
+  f = thru-outer op nid
+  SP = ∧-true (pathCell (f ↠ κ) ≤ᵇ nx)
+              (frameAbove? (pathRead κ) f ∧ pathOrd? nx κ) h
+  SQ = ∧-true (frameAbove? (pathRead κ) f) (pathOrd? nx κ) (proj₂ SP)
+
+-- and the tail, which every extension consumer wants beside it
+pathOrd?-tail : ∀ {n} {Γ : Ctx n} {s u t} (nx : ℕ) (f : Frame Γ s u)
+  (κ : Path Γ u t) →
+  pathOrd? nx (f ↠ κ) ≡ true → pathOrd? nx κ ≡ true
+pathOrd?-tail nx f κ h =
+  proj₂ (∧-true (frameAbove? (pathRead κ) f) (pathOrd? nx κ)
+          (proj₂ (∧-true (pathCell (f ↠ κ) ≤ᵇ nx)
+                         (frameAbove? (pathRead κ) f ∧ pathOrd? nx κ) h)))
+
+-- AND THE CONVERSE OF BOTH, which is what a producer PUSHING a frame
+-- owes.  The three premises are the three conjuncts read forward: the
+-- new head's own cell sits under the counter, the head is above what
+-- the tail reads, and the tail was already ordered.  The counter half
+-- of the head's charge is the join of those first two facts, since a
+-- chain's cell is the head's joined with the tail's and the tail's is
+-- already under the counter by `pathOrd?-cell`.
+pathOrd?-push : ∀ {n} {Γ : Ctx n} {s u t} (nx : ℕ) (f : Frame Γ s u)
+  (κ : Path Γ u t) →
+  frameCell f ≤ nx → frameAbove? (pathRead κ) f ≡ true →
+  pathOrd? nx κ ≡ true → pathOrd? nx (f ↠ κ) ≡ true
+pathOrd?-push nx f κ hc ha h =
+  ∧-intro (T⇒≡true _ (≤⇒≤ᵇ (⊔-lub hc (pathOrd?-cell nx κ h)))) (∧-intro ha h)
+
+-- AND THE STEP FACE'S OWN CONVERSION.  A frame walk arrives holding a
+-- `from-inner`, which names BOTH the flatten's cell and the payload's,
+-- while everything the *All edge consumes downstream is stated over the
+-- `thru-outer` naming the flatten alone.  The three conjuncts transfer
+-- one for one: the outer's cell is the smaller half of the inner's
+-- join, its charge against the tail is the left half of the inner's
+-- pair, and the tail is untouched.
+pathOrd?-outer : ∀ {n} {Γ : Ctx n} {u t} (nx a i : ℕ) (op : AllOp)
+  (κ : Path Γ u t) →
+  pathOrd? nx (from-inner {s = u} op a i ↠ κ) ≡ true →
+  pathOrd? nx (thru-outer {u = u} op a ↠ κ) ≡ true
+pathOrd?-outer {Γ = Γ} {u = u} nx a i op κ h =
+  pathOrd?-push nx (thru-outer op a) κ
+    (≤-trans (m≤m⊔n (suc a) (suc i))
+             (≤-trans (m≤m⊔n (suc a ⊔ suc i) (pathCell κ))
+                      (pathOrd?-cell nx (fi ↠ κ) h)))
+    (proj₁ AB)
+    (pathOrd?-tail nx fi κ h)
+  where
+  fi : Frame Γ u u
+  fi = from-inner op a i
+  SP = ∧-true (pathCell (fi ↠ κ) ≤ᵇ nx)
+              (frameAbove? (pathRead κ) fi ∧ pathOrd? nx κ) h
+  SQ = ∧-true (frameAbove? (pathRead κ) fi) (pathOrd? nx κ) (proj₂ SP)
+  AB = ∧-true (pathRead κ ≤ᵇ a) (pathRead κ ≤ᵇ i) (proj₁ SQ)
+
+-- RAISING THE COUNTER CANNOT DISORDER A CHAIN, which is what every
+-- counter write in the evaluator spends: the reading bounds the chain's
+-- own reads from ABOVE by the counter, and only the frame charges are
+-- fixed by the chain itself.
+pathOrd?-mono : ∀ {n} {Γ : Ctx n} {u t} (nx nx′ : ℕ) (κ : Path Γ u t) →
+  nx ≤ nx′ → pathOrd? nx κ ≡ true → pathOrd? nx′ κ ≡ true
+pathOrd?-mono nx nx′ root           hn h = refl
+pathOrd?-mono nx nx′ (share-sink _) hn h = refl
+pathOrd?-mono nx nx′ (f ↠ p) hn h =
+  ∧-intro (≤ᵇ-widen (pathCell (f ↠ p)) hn (proj₁ SP))
+          (∧-intro (proj₁ SQ) (pathOrd?-mono nx nx′ p hn (proj₂ SQ)))
+  where
+  SP = ∧-true (pathCell (f ↠ p) ≤ᵇ nx)
+              (frameAbove? (pathRead p) f ∧ pathOrd? nx p) h
+  SQ = ∧-true (frameAbove? (pathRead p) f) (pathOrd? nx p) (proj₂ SP)
+
+-- THE ONE HOP THE READING HAS TO SURVIVE, and it is the flatten's:
+-- the outer's frame comes OFF the chain and the inner's goes ON, at a
+-- cell the scheduler mints in the same breath.  Every part of the new
+-- reading is already in the old one -- the outer's cell sits strictly
+-- under the counter, so it also sits under the counter's successor,
+-- and the chain below reads under the outer's cell, so it reads under
+-- both.  Stating the hop once is what keeps the flatten clique's call
+-- sites free of arithmetic they would otherwise each redo.
+pathOrd?-inner : ∀ {n} {Γ : Ctx n} {u t} (nx allNid : ℕ) (op : AllOp)
+  (κ : Path Γ u t) →
+  pathOrd? nx (thru-outer {u = u} op allNid ↠ κ) ≡ true →
+  pathOrd? (suc nx) (from-inner op allNid nx ↠ κ) ≡ true
+pathOrd?-inner {u = u} nx allNid op κ h =
+  ∧-intro
+    (T⇒≡true _
+      (≤⇒≤ᵇ (⊔-lub (⊔-lub (≤-trans (≤-trans (m≤m⊔n (suc allNid) (pathCell κ)) cellB)
+                                   (n≤1+n nx))
+                          ≤-refl)
+                   (≤-trans (≤-trans (m≤n⊔m (suc allNid) (pathCell κ)) cellB)
+                            (n≤1+n nx)))))
+    (∧-intro (∧-intro (proj₁ SQ)
+                      (T⇒≡true _
+                        (≤⇒≤ᵇ (≤-trans (≤-trans (pathRead≤pathCell κ)
+                                                (m≤n⊔m (suc allNid) (pathCell κ)))
+                                       cellB))))
+             (pathOrd?-mono nx (suc nx) κ (n≤1+n nx) (proj₂ SQ)))
+  where
+  SP = ∧-true (suc allNid ⊔ pathCell κ ≤ᵇ nx)
+              ((pathRead κ ≤ᵇ allNid) ∧ pathOrd? nx κ) h
+  SQ = ∧-true (pathRead κ ≤ᵇ allNid) (pathOrd? nx κ) (proj₂ SP)
+  cellB : suc allNid ⊔ pathCell κ ≤ nx
+  cellB = ≤ᵇ⇒≤ (suc allNid ⊔ pathCell κ) nx (T-to (proj₁ SP))
+
 -- THE SAME READING AT AN ENTRY, and it is stated there rather than at a
 -- path because half of it is about the REGISTRATION.  A chain's frames
 -- are stratified, and its floor is at or above the source it listens
@@ -472,12 +697,16 @@ parkStrat? k _                             = true
 -- what lets the obligation travel as an ordinary premise past sites
 -- that cannot see a queue at all.
 --
--- IT REDUCES AT EVERY FRAME BUT TWO, which is still most of what makes
--- it cheap: only `from-inner` and `scan-f` name a node, so at the three
--- other shapes the premise is discharged by `refl` at the call site and
--- nothing is threaded.
+-- IT REDUCES AT EVERY FRAME BUT THREE, which is still most of what
+-- makes it cheap: only `from-inner`, `scan-f` and `thru-outer` name a
+-- node, so at the two other shapes the premise is discharged by `refl`
+-- at the call site and nothing is threaded.  The outer is here because
+-- the flatten it heads APPENDS to the cell it names, so the reading of
+-- what is already parked there is what the append has to extend -- and
+-- a frame reaching that cell through the state by id is the only way
+-- the fact travels to a site holding no queue.
 --
--- AND THE TWO ARMS ARE NOT EQUALLY WELL BEHAVED ACROSS A STEP, which is
+-- AND THE ARMS ARE NOT EQUALLY WELL BEHAVED ACROSS A STEP, which is
 -- the reading's real cost rather than its width.  Every write this
 -- development can reach into a QUEUE leaves a SUFFIX of what was read,
 -- and a reading of the shape `all` tolerates that with no hypothesis at
@@ -491,6 +720,8 @@ framePark? k (from-inner _ allNid _) st =
   parkStrat? k (lookupNode allNid (EvalSt.nodes st))
 framePark? k (scan-f _ nd) st =
   parkStrat? k (lookupNode nd (EvalSt.nodes st))
+framePark? k (thru-outer _ nid) st =
+  parkStrat? k (lookupNode nid (EvalSt.nodes st))
 framePark? k _ st = true
 
 -- THE SAME READING OVER A WHOLE CHAIN, which the delivery walk needs
@@ -508,6 +739,209 @@ pathPark? : ∀ {n} {Γ : Ctx n} {u t} {e : Closed Γ t} →
 pathPark? root           st = true
 pathPark? (share-sink _) st = true
 pathPark? (f ↠ p)        st = framePark? (pathFloor p) f st ∧ pathPark? p st
+
+-- THE TWO REMAINING REGISTRY-WIDE LEDGERS, and they are conjuncts for
+-- the reason the stratification ledger beside them is one: a registry
+-- priced by LENGTH and per-chain SIZE cannot separate a state the
+-- evaluator built from one holding a chain whose head is minted before
+-- its tail, nor one whose parked cells name inputs the chain's own
+-- floor cannot cover.  Both readings are machine-refuted as corollaries
+-- of the caps receipt at a state satisfying every other conjunct.
+--
+-- THE ORDER LEDGER IS READ AGAINST THE COUNTER, so unlike its two
+-- neighbours it is not a fact about the registry alone: it says every
+-- registered chain reads only cells that already exist.  Every counter
+-- write in the evaluator raises the counter, so the ledger transports
+-- through one by monotonicity and is owed only where the registry grows.
+regOrd? : ∀ {n} {Γ : Ctx n} {t}
+        → ℕ → List (RegId × Source × Chain Γ t) → Bool
+regOrd? nx = all (λ en → pathOrd? nx (proj₂ (proj₂ (proj₂ en))))
+
+-- THE PARK LEDGER IS READ AGAINST THE STORE, which makes it the one
+-- conjunct a NODE write can break: the other registry readings are
+-- facts about the entries and a node write leaves those alone.  So it
+-- is owed at every producer that touches a cell as well as at the
+-- registry's growth site, which is what the delivery walk's own park
+-- premises have been paying by hand at the sites that hold a frame.
+regPark? : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+         → List (RegId × Source × Chain Γ t) → EvalSt e → Bool
+regPark? rs st = all (λ en → pathPark? (proj₂ (proj₂ (proj₂ en))) st) rs
+
+-- AND THE PARK LEDGER SEES NOTHING BUT THE NODE TABLE, which is what
+-- every state write that is not a node write spends.  It has to be an
+-- INDUCTION rather than a reduction: a registered chain is a variable
+-- at every site that carries the ledger, so the reading does not unfold
+-- and the two states are compared whole -- a completion mark or a
+-- delivered id then blocks a transport that is otherwise identity.
+framePark?-nodes : ∀ {n} {Γ : Ctx n} {s u t} {e : Closed Γ t}
+  (k : ℕ) (f : Frame Γ s u) (st st′ : EvalSt e) →
+  EvalSt.nodes st ≡ EvalSt.nodes st′ →
+  framePark? k f st ≡ framePark? k f st′
+framePark?-nodes k (map-f _)          st st′ eq = refl
+framePark?-nodes k (take-f _)         st st′ eq = refl
+framePark?-nodes k (scan-f _ nd)      st st′ eq =
+  cong (λ ns → parkStrat? k (lookupNode nd ns)) eq
+framePark?-nodes k (from-inner _ a _) st st′ eq =
+  cong (λ ns → parkStrat? k (lookupNode a ns)) eq
+framePark?-nodes k (thru-outer _ nd)  st st′ eq =
+  cong (λ ns → parkStrat? k (lookupNode nd ns)) eq
+
+pathPark?-nodes : ∀ {n} {Γ : Ctx n} {u t} {e : Closed Γ t}
+  (κ : Path Γ u t) (st st′ : EvalSt e) →
+  EvalSt.nodes st ≡ EvalSt.nodes st′ →
+  pathPark? κ st ≡ pathPark? κ st′
+pathPark?-nodes root           st st′ eq = refl
+pathPark?-nodes (share-sink _) st st′ eq = refl
+pathPark?-nodes (f ↠ p)        st st′ eq =
+  cong₂ _∧_ (framePark?-nodes (pathFloor p) f st st′ eq)
+            (pathPark?-nodes p st st′ eq)
+
+regPark?-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (rs : List (RegId × Source × Chain Γ t)) (st st′ : EvalSt e) →
+  EvalSt.nodes st ≡ EvalSt.nodes st′ →
+  regPark? rs st ≡ true → regPark? rs st′ ≡ true
+regPark?-nodes rs st st′ eq =
+  all-impl _ _
+    (λ en → subst (_≡ true)
+              (pathPark?-nodes (proj₂ (proj₂ (proj₂ en))) st st′ eq))
+    rs
+
+-- AND A NODE WRITE IS SEEN ONLY THROUGH THE CELL IT REPLACES, which is
+-- what turns a registry-wide obligation into a one-cell one.  Three of
+-- the five node shapes are read `true` at every floor, so a producer
+-- writing one of those discharges the premise without looking at the
+-- registry at all; the two that hold a payload owe exactly that the new
+-- payload is stratified wherever the old one was, which is a fact about
+-- the write and not about who reads it.
+setNode-parkStrat : ∀ {n} {Γ : Ctx n} (j : ℕ) (m nid : NodeId)
+  (ns : NodeState Γ) (nodes : List (NodeId × NodeState Γ)) →
+  (∀ i → parkStrat? i (lookupNode nid nodes) ≡ true
+       → parkStrat? i (just ns) ≡ true) →
+  parkStrat? j (lookupNode m nodes) ≡ true →
+  parkStrat? j (lookupNode m (setNode nid ns nodes)) ≡ true
+setNode-parkStrat j m nid ns nodes pv h with nid ≡ᵇ m in e
+... | true  rewrite ≡ᵇ→≡ nid m e | lookupNode-setNode m ns nodes = pv j h
+... | false rewrite lookupNode-setNode-other m nid ns nodes e = h
+
+framePark?-set : ∀ {n} {Γ : Ctx n} {s u t} {e : Closed Γ t}
+  (k : ℕ) (f : Frame Γ s u) (nid : NodeId) (ns : NodeState Γ) (st : EvalSt e) →
+  (∀ i → parkStrat? i (lookupNode nid (EvalSt.nodes st)) ≡ true
+       → parkStrat? i (just ns) ≡ true) →
+  framePark? k f st ≡ true →
+  framePark? k f (record st { nodes = setNode nid ns (EvalSt.nodes st) }) ≡ true
+framePark?-set k (map-f _)          nid ns st pv h = refl
+framePark?-set k (take-f _)         nid ns st pv h = refl
+framePark?-set k (scan-f _ nd)      nid ns st pv h =
+  setNode-parkStrat k nd nid ns (EvalSt.nodes st) pv h
+framePark?-set k (from-inner _ a _) nid ns st pv h =
+  setNode-parkStrat k a nid ns (EvalSt.nodes st) pv h
+framePark?-set k (thru-outer _ nd)  nid ns st pv h =
+  setNode-parkStrat k nd nid ns (EvalSt.nodes st) pv h
+
+pathPark?-set : ∀ {n} {Γ : Ctx n} {u t} {e : Closed Γ t}
+  (κ : Path Γ u t) (nid : NodeId) (ns : NodeState Γ) (st : EvalSt e) →
+  (∀ i → parkStrat? i (lookupNode nid (EvalSt.nodes st)) ≡ true
+       → parkStrat? i (just ns) ≡ true) →
+  pathPark? κ st ≡ true →
+  pathPark? κ (record st { nodes = setNode nid ns (EvalSt.nodes st) }) ≡ true
+pathPark?-set root           nid ns st pv h = refl
+pathPark?-set (share-sink _) nid ns st pv h = refl
+pathPark?-set (f ↠ p)        nid ns st pv h =
+  ∧-intro (framePark?-set (pathFloor p) f nid ns st pv
+             (proj₁ (∧-true (framePark? (pathFloor p) f st) (pathPark? p st) h)))
+          (pathPark?-set p nid ns st pv
+             (proj₂ (∧-true (framePark? (pathFloor p) f st) (pathPark? p st) h)))
+
+-- AND THE OTHER WAY A NODE WRITE CLEARS THE LEDGER, which is the only
+-- one a MINT has: not that the new content is as stratified as the old,
+-- but that NOTHING REGISTERED NAMES THE CELL AT ALL.  The order reading
+-- is what says so -- it bounds every registered chain's cells by the
+-- counter -- so a write at or above the counter is invisible to the
+-- whole registry and the reading survives without any fact about what
+-- was written.  This is what a fresh cell born holding a SEED needs, and
+-- the owner transport cannot give it: the seed is bounded by the
+-- installing chain's floor and by nothing else.
+framePark?-set-fresh : ∀ {n} {Γ : Ctx n} {s u t} {e : Closed Γ t}
+  (k : ℕ) (f : Frame Γ s u) (nid : NodeId) (ns : NodeState Γ) (st : EvalSt e) →
+  frameCell f ≤ nid →
+  framePark? k f st ≡ true →
+  framePark? k f (record st { nodes = setNode nid ns (EvalSt.nodes st) }) ≡ true
+framePark?-set-fresh k (map-f _)  nid ns st hc h = refl
+framePark?-set-fresh k (take-f _) nid ns st hc h = refl
+framePark?-set-fresh k (scan-f _ nd) nid ns st hc h
+  rewrite lookupNode-setNode-other nd nid ns (EvalSt.nodes st) (sucle→≢ᵇ hc) = h
+framePark?-set-fresh k (thru-outer _ nd) nid ns st hc h
+  rewrite lookupNode-setNode-other nd nid ns (EvalSt.nodes st) (sucle→≢ᵇ hc) = h
+framePark?-set-fresh k (from-inner _ a i) nid ns st hc h
+  rewrite lookupNode-setNode-other a nid ns (EvalSt.nodes st)
+            (sucle→≢ᵇ (≤-trans (m≤m⊔n (suc a) (suc i)) hc)) = h
+
+pathPark?-set-fresh : ∀ {n} {Γ : Ctx n} {u t} {e : Closed Γ t}
+  (nx : ℕ) (κ : Path Γ u t) (nid : NodeId) (ns : NodeState Γ) (st : EvalSt e) →
+  nx ≤ nid → pathOrd? nx κ ≡ true →
+  pathPark? κ st ≡ true →
+  pathPark? κ (record st { nodes = setNode nid ns (EvalSt.nodes st) }) ≡ true
+pathPark?-set-fresh nx root           nid ns st hn ho h = refl
+pathPark?-set-fresh nx (share-sink _) nid ns st hn ho h = refl
+pathPark?-set-fresh nx (f ↠ p) nid ns st hn ho h =
+  ∧-intro (framePark?-set-fresh (pathFloor p) f nid ns st
+             (≤-trans (≤-trans (m≤m⊔n (frameCell f) (pathCell p))
+                               (pathOrd?-cell nx (f ↠ p) ho)) hn)
+             (proj₁ hs))
+          (pathPark?-set-fresh nx p nid ns st hn (pathOrd?-tail nx f p ho)
+             (proj₂ hs))
+  where
+  hs = ∧-true (framePark? (pathFloor p) f st) (pathPark? p st) h
+
+regPark?-set-fresh : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (nx : ℕ) (rs : List (RegId × Source × Chain Γ t)) (nid : NodeId)
+  (ns : NodeState Γ) (st : EvalSt e) →
+  nx ≤ nid → regOrd? nx rs ≡ true → regPark? rs st ≡ true →
+  regPark? rs (record st { nodes = setNode nid ns (EvalSt.nodes st) }) ≡ true
+regPark?-set-fresh nx []        nid ns st hn ho h = refl
+regPark?-set-fresh nx (en ∷ rs) nid ns st hn ho h =
+  ∧-intro (pathPark?-set-fresh nx (proj₂ (proj₂ (proj₂ en))) nid ns st hn
+             (proj₁ ho′) (proj₁ h′))
+          (regPark?-set-fresh nx rs nid ns st hn (proj₂ ho′) (proj₂ h′))
+  where
+  ho′ = ∧-true (pathOrd? nx (proj₂ (proj₂ (proj₂ en)))) (regOrd? nx rs) ho
+  h′  = ∧-true (pathPark? (proj₂ (proj₂ (proj₂ en))) st) (regPark? rs st) h
+
+regPark?-set : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (rs : List (RegId × Source × Chain Γ t)) (nid : NodeId) (ns : NodeState Γ)
+  (st : EvalSt e) →
+  (∀ i → parkStrat? i (lookupNode nid (EvalSt.nodes st)) ≡ true
+       → parkStrat? i (just ns) ≡ true) →
+  regPark? rs st ≡ true →
+  regPark? rs (record st { nodes = setNode nid ns (EvalSt.nodes st) }) ≡ true
+regPark?-set rs nid ns st pv =
+  all-impl _ _
+    (λ en → pathPark?-set (proj₂ (proj₂ (proj₂ en))) nid ns st pv)
+    rs
+
+-- AND A WRITE THAT OVERWRITES PARKED CONTENT PAYS AT ITS OWN FLOOR,
+-- which is the one thing the transport above cannot give it.  That
+-- transport asks the write to preserve stratification at EVERY
+-- watermark, and a store or an enqueue cannot: the new content is
+-- bounded by the writing chain's floor and by nothing else, since the
+-- fold's closure and the pushed payload may name inputs above any
+-- other reading.  A registered chain reaching the same cell reads it
+-- at ITS floor, and no receipt in this development ties the two.
+--
+-- What closes the gap is NODE OWNERSHIP -- a cell is named by exactly
+-- the frame that installed it, so a registered chain reaching it is
+-- reaching it through that frame and reads it at that frame's floor.
+-- No record in this development carries that fact, so it is stated
+-- here as the premise's one-floor form rather than threaded as a
+-- hypothesis, which would launder the gap out of the ledger.
+postulate
+  setNode-regPark-owner : ∀ {n} {Γ : Ctx n} {u t} {e : Closed Γ t}
+    (nid : NodeId) (κ : Path Γ u t) (ns : NodeState Γ) (st : EvalSt e) →
+    (parkStrat? (pathFloor κ) (lookupNode nid (EvalSt.nodes st)) ≡ true →
+     parkStrat? (pathFloor κ) (just ns) ≡ true) →
+    regPark? (EvalSt.registry st) st ≡ true →
+    regPark? (EvalSt.registry st)
+      (record st { nodes = setNode nid ns (EvalSt.nodes st) }) ≡ true
 
 -- THE CAP READ AGAINST THE ARRIVAL'S CLOSURE, which is the shape the
 -- arr-keyed descent needs and the one `nestValOK?` deliberately does
@@ -644,6 +1078,8 @@ capsOK? c sched st =
   ∧ closSt? c sched st
   ∧ srcFloor? sched
   ∧ regStrat? (EvalSt.registry st)
+  ∧ regOrd? (Sched.nextNode sched) (EvalSt.registry st)
+  ∧ regPark? (EvalSt.registry st) st
 
 ------------------------------------------------------------------
 -- capsOK? IS MONOTONE IN THE CAPS.  The widening the induction performs

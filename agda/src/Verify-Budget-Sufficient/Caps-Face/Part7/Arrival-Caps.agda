@@ -58,12 +58,12 @@ open import Verify-Budget-Sufficient.Caps-Depth
 
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (capsAt-round-size; capsOK?; entStrat?; n≤capsAt-size; pathFloor; pathPark?; pathStrat?;
-  pathSz?; pathSz?-widen; valCaps?; nestClosOK?ᵛ; nestClosOK?ᵛ-widen)
+  pathSz?; pathSz?-widen; valCaps?; nestClosOK?ᵛ; nestClosOK?ᵛ-widen; pathOrd?)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Root-Strat using
   (pathStrat-top)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves using
   (cascade-admit-park; chainStep-park; chainsOf-strat;
-   pathOrd?; cascade-admit-ord; chainStep-ord)
+   cascade-admit-ord; chainStep-ord)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
   (capsOK?-count; capsOK?-regs; chainsStrat?-one; pathPark-delivered; pathsPark-delivered;
   pathSz?-len; registry-entStrat; slotsCaps?-capsAt; valsCaps?; valsCaps?-lvl; foldPath-slots)

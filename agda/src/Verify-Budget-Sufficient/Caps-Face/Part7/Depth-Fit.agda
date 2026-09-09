@@ -75,14 +75,14 @@ open import Verify-Budget-Sufficient.Caps-Depth
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (capsAt-round-size; capsOK?; capsOK?-mono; frameSz?; n≤capsAt-size; pathFloor; pathPark?;
   pathStrat?; pathSz?; pathSz?-widen; regsSz?; valCaps?; nestClosOK?ᵛ; parkStrat?; framePark?;
-  nestClosOK?ᵛ-widen)
+  nestClosOK?ᵛ-widen; pathOrd?; pathOrd?-outer)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
   (capsOK?-count; capsOK?-regs; chainsStrat?-one; pathPark-delivered; pathsPark-delivered;
   registry-entStrat; slotsCaps?-capsAt; valsCaps?; valsCaps?-lvl; foldPath-slots;
   shareAdmit-caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves using
-  (cascade-admit-park; chainStep-park; chainsOf-strat; frame-parkStrat;
-   pathOrd?; cascade-admit-ord; chainStep-ord)
+  (cascade-admit-park; chainStep-park; chainsOf-strat;
+   cascade-admit-ord; chainStep-ord)
 open import Verify-Budget-Sufficient.Caps-Face.Part6 using
   (SiCType; IfcType)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
@@ -1115,17 +1115,24 @@ frameΦ-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   depthFrame sf eid now f p vals fin sched st ≤ capsH e sl id →
   pathStrat? (f ↠ p) ≡ true →
   framePark? (pathFloor p) f st ≡ true →
+  -- AND THE CHAIN'S OWN TWO READINGS, which only the inner descent
+  -- spends: it re-reads the outer's frame beneath itself, and neither
+  -- half is derivable from the caps receipt this fit already holds.
+  pathOrd? (Sched.nextNode sched) (f ↠ p) ≡ true →
+  pathPark? (f ↠ p) st ≡ true →
   FrameΦHyp sf eid now (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
             f p vals fin sched st
-frameΦ-fit sl id sf eid now Lv (map-f _)  p vals fin sched st _ _ _ _ _ _ _ _ = tt
-frameΦ-fit sl id sf eid now Lv (take-f _) p vals fin sched st _ _ _ _ _ _ _ _ = tt
-frameΦ-fit sl id sf eid now Lv (scan-f fn nid) p vals fin sched st hsl hpz hnd hΦ _ _ _ _ =
+frameΦ-fit sl id sf eid now Lv (map-f _)  p vals fin sched st _ _ _ _ _ _ _ _ _ _ = tt
+frameΦ-fit sl id sf eid now Lv (take-f _) p vals fin sched st _ _ _ _ _ _ _ _ _ _ = tt
+frameΦ-fit sl id sf eid now Lv (scan-f fn nid) p vals fin sched st hsl hpz hnd hΦ _ _ _ _ _ _ =
   scanΦ-fit sl id sf eid now fn nid p vals fin sched st hsl hpz hnd hΦ
 frameΦ-fit sl id sf eid now Lv (from-inner op allNid inst) p vals fin sched st
-           hsl hpz hnd hΦ hfd hdep stP stQ =
+           hsl hpz hnd hΦ hfd hdep stP stQ stR stK =
   innerΦ-fit sl id sf eid now Lv op allNid inst p vals fin sched st
     hsl hpz hnd hΦ hfd hdep stP stQ
-frameΦ-fit sl id sf eid now Lv (thru-outer op nid) p vals fin sched st hsl hpz hnd hΦ _ _ _ _ =
+    (pathOrd?-outer (Sched.nextNode sched) allNid inst op p stR)
+    (proj₂ (∧-true _ _ stK))
+frameΦ-fit sl id sf eid now Lv (thru-outer op nid) p vals fin sched st hsl hpz hnd hΦ _ _ _ _ _ _ =
   walk-thru-fit sl id sf eid now op nid p vals fin sched st hsl hpz hnd hΦ
 
 -- THE WALK ITSELF, and it is the fold's own recursion with the grant
@@ -1957,15 +1964,17 @@ mutual
           (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id) hΦ hF)
     where
     step = stepFrame sf nid now f p vals fin sched st
-    hL   = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcw)))))))
+    hL   = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcw)))))))))
+    hord  = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcw))))))))
+    hpark = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcw)))))))))
     -- THE WALK'S OWN FRAME READING, JOINED TO ITS TAIL'S.  The
     -- predicate records the frame's reading at the floor the tail is
     -- read at and the tail's whole reading under it, which is the
     -- recursion `pathStrat?` is defined by -- so the head's reading is
-    -- a pairing and mints nothing.  The PARK reading is then derived
-    -- rather than carried: a frame's stored queue is under the same
-    -- floor whenever the caps invariant holds at the state it is read
-    -- at, which is the leaf the caps face proves.
+    -- a pairing and mints nothing.  The PARK reading is a pairing too,
+    -- and CARRIED rather than derived: deriving it from the caps
+    -- receipt is machine-refuted, since a caps-legal state need not be
+    -- one the evaluator built.
     stP = ∧-intro (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcw))))))))
             (capsWalkOK-strat _ _ sl _ _ sf gas nid now p _ _ _ _
                (proj₂ (proj₂ hL)))
@@ -1973,8 +1982,8 @@ mutual
            (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcw))))))
            (≤-trans (m≤m⊔n (depthFrame sf nid now f p vals fin sched st) _) hdf)
            stP
-           (frame-parkStrat (frameStep Lv (capsAt e sl id)) f p sched st
-              (proj₁ hcw) stP)
+           (proj₁ (∧-true _ _ hpark))
+           hord hpark
     B  = Caps.cSize (capsAt e sl id)
     hpz′ : pathSz? B p ≡ true
     hpz′ = proj₂ (∧-true (suc (pathLen p) ≤ᵇ B) (pathSz? B p)

@@ -29,7 +29,7 @@ open import Relation.Binary.PropositionalEquality
 
 open import Rx.Prim      using (Tick; Id; _at_from_as_; Gas; Timed; after_,_)
 open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; _≟ᵗ_; isData; Ctx; Closed; Val; sizeᵗ; sizeᵛ; Fn;
-  applyFn)
+  applyFn; inputsBelowᵗ; inputsBelowᵛ)
 open import Rx.Frame-Width using (pWᵛ; dWᵛ; outWᵛ)
 open import Rx.Evaluator using (Sched; EvalSt; LiveSource; resolve; scanVals; NodeState; scan-st; take-st;
   mergeAll-st; switch-st; exhaust-st; lookupNode; NodeId; scan-f; takeVals; takeDispatch; Path;
@@ -72,12 +72,14 @@ open import Verify-Budget-Sufficient.Caps using
 -- arithmetic lemmas consumed by thruOuter-face-core's walk helpers
 
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
-  (capsOK?-nodeSz; capsOK?-nodeWid; capsOK?-parts; capsOK?-setNode; face-lift;
-   FrameFace; lookupNode-caps; valsCaps?)
+  (capsOK?-nodeSz; capsOK?-nodeWid; capsOK?-parts; capsOK?-regPark;
+   capsOK?-setNode-park; face-lift;
+   FrameFace; lookupNode-caps; valsCaps?; valsStrat?)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (applyFn-iterSize; capsOK?; capsOK?-mono; closLive; eventCaps?;
    closSizeᵛ; closSizeᵛ-OK; closSizeᵛ≤mul;
-   frameSz?; iterFold-+; iterSize-+; nestClosOK?ᵛ; pathSz?;
+   frameSz?; iterFold-+; iterSize-+; nestClosOK?ᵛ; parkStrat?; pathFloor;
+   pathSz?; setNode-regPark-owner;
    slotsCaps?; slotsCaps?-clos; SlotWid; valCaps?; widLive; widNode)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (applyFn-iterFold; frameStep-⊑-+; valCaps?-size; valCaps?-wid; wid-lift)
@@ -292,7 +294,7 @@ capsOK?-addLive {Γ = Γ} c l sched st bl wl cl inv =
     (∧-intro h1
     (∧-intro (∧-intro wl h2)
     (∧-intro h3 (∧-intro h4
-    (∧-intro h5 (∧-intro (∧-intro cl h6) (∧-intro h7 h8)))))))
+    (∧-intro h5 (∧-intro (∧-intro cl h6) (∧-intro h7 (∧-intro h8 (∧-intro h9 h10)))))))))
   where
   P  = capsOK?-parts c sched st inv
   h0 = proj₁ P
@@ -306,7 +308,9 @@ capsOK?-addLive {Γ = Γ} c l sched st bl wl cl inv =
   h5 = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))
   h6 = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P))))))
   h7 = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))))
-  h8 = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))))
+  h8 = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P))))))))
+  h9 = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))))))
+  h10 = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))))))
 
 -- AND THE SAME STEP BACKWARDS, which costs no hypothesis at all: every
 -- capsOK? conjunct that reads `live` reads it through an `all`, so the head
@@ -327,7 +331,7 @@ capsOK?-dropLive {Γ = Γ} c l sched st ok =
     (∧-intro h1
     (∧-intro (proj₂ hW)
     (∧-intro h3 (∧-intro h4
-    (∧-intro h5 (∧-intro (proj₂ hCL) (∧-intro h7 h8)))))))
+    (∧-intro h5 (∧-intro (proj₂ hCL) (∧-intro h7 (∧-intro h8 (∧-intro h9 h10)))))))))
   where
   sched′ = record sched { live = l ∷ Sched.live sched }
   P  = capsOK?-parts c sched′ st ok
@@ -347,7 +351,9 @@ capsOK?-dropLive {Γ = Γ} c l sched st ok =
   h5 = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))
   h6 = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P))))))
   h7 = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))))
-  h8 = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))))
+  h8 = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P))))))))
+  h9 = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))))))
+  h10 = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))))))
   hCL = ∧-true (closLive c (Sched.slots sched) l)
                (all (closLive c (Sched.slots sched))
                     (Sched.live sched))
@@ -764,6 +770,24 @@ stepFrame-zero-caps c j u sl sched st inv =
   0 , subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
     , refl , refl , z≤n
 
+-- AND THE FOLD'S OWN TRANSPORT, which reports BOTH halves because the
+-- accumulator it hands on is the one the next emit reads: a step that
+-- proved only the outputs would leave the cell it just overwrote
+-- unread, and the cell is the whole reason this statement exists.  The
+-- same shelf carries this shape at several other measures, and each is
+-- a nil clause returning the accumulator untouched and a cons clause
+-- that steps it and recurses.
+-- TWIN: `scanVals-hopSpn`
+postulate
+  scanVals-strat : ∀ {n} {Γ : Ctx n} {s u}
+    (k : ℕ) (fn : Fn Γ [] [] [] (u ×ᵗ s) u)
+    (ac : Val Γ u) (vs : List (Val Γ s)) →
+    inputsBelowᵗ k fn ≡ true →
+    inputsBelowᵛ k u ac ≡ true →
+    all (inputsBelowᵛ k s) vs ≡ true →
+    (inputsBelowᵛ k u (proj₂ (scanVals fn ac vs)) ≡ true)
+    × (all (inputsBelowᵛ k u) (proj₁ (scanVals fn ac vs)) ≡ true)
+
 stepFrame-scan-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   (c : Caps) (j : ℕ) (g : Gas) (id : Id) (now : Tick)
   (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId) (κ : Path Γ u t)
@@ -783,6 +807,10 @@ stepFrame-scan-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   -- drop it here
   length vals ≤ suc (Caps.cWid (frameStep j c)) →
   all (valCaps? (frameStep j c) sl s) vals ≡ true →
+  -- and the two stratification readings the store write spends, both
+  -- already carried by the frame face one level up
+  inputsBelowᵗ (pathFloor κ) fn ≡ true →
+  valsStrat? (pathFloor κ) vals ≡ true →
   let r = stepFrame g id now (scan-f fn nid) κ vals fin sched st
   in Σ ℕ λ j′ →
      (capsOK? (frameStep (j + j′) c)
@@ -797,8 +825,8 @@ stepFrame-scan-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
      -- bound is invisible at the call site unless it is reported
      × (j′ ≤ fCharge (Caps.cSize c) (Caps.cWid c) j)
 stepFrame-scan-caps {s = s} {u = u} c j g id now fn nid κ vals fin sl sched st
-                    2≤S slC slEq inv fS pS vL vC
-  with lookupNode nid (EvalSt.nodes st)
+                    2≤S slC slEq inv fS pS vL vC sF sV
+  with lookupNode nid (EvalSt.nodes st) in eqN
      | lookupNode-caps (frameStep j c) (Sched.slots sched) nid (EvalSt.nodes st)
          (capsOK?-nodeSz (frameStep j c) sched st inv)
          (capsOK?-nodeWid (frameStep j c) sched st inv)
@@ -810,7 +838,7 @@ stepFrame-scan-caps {s = s} {u = u} c j g id now fn nid κ vals fin sl sched st
 ... | just (scan-st {w} ac)  | nb with w ≟ᵗ u
 ...   | no _    = stepFrame-zero-caps c j u sl sched st inv
 ...   | yes refl =
-  j′ , capsOK?-setNode (frameStep (j + j′) c) nid
+  j′ , capsOK?-setNode-park (frameStep (j + j′) c) nid
          (scan-st (proj₂ run)) sched st
          (valCaps?-size (frameStep (j + j′) c) sl _ (proj₂ run) (proj₂ (proj₂ SC)))
          refl
@@ -821,6 +849,10 @@ stepFrame-scan-caps {s = s} {u = u} c j g id now fn nid κ vals fin sl sched st
                    (proj₂ (proj₂ SC))))
          (capsOK?-mono (frameStep j c) (frameStep (j + j′) c) sched st
             (frameStep-⊑-+ c 2≤S j j′) inv)
+         (setNode-regPark-owner nid κ (scan-st (proj₂ run)) st
+            (λ hold → proj₁ (scanVals-strat (pathFloor κ) fn ac vals sF
+                        (subst (λ m → parkStrat? (pathFloor κ) m ≡ true) eqN hold) sV))
+            (capsOK?-regPark (frameStep j c) sched st inv))
      , proj₁ (proj₂ SC)
      , refl
      -- ONE FOLD PER PAYLOAD PER NODE of the step function, and that is

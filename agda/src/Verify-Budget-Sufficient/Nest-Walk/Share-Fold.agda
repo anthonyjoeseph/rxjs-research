@@ -252,7 +252,12 @@ foldPath-nodes {e = e} c ac d W sl Lv sf gas id now envSrc (f ↠ p) vals evs fi
   HPL2  = ∧-true (suc (pathLen p) ≤ᵇ Bᴸ) (pathSz? Bᴸ p)
             (proj₂ (∧-true (frameSz? Bᴸ f)
                      ((suc (pathLen p) ≤ᵇ Bᴸ) ∧ pathSz? Bᴸ p) HPL))
-  tail  = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hc)))))))
+  -- THE TWO REGISTRY READINGS THE PREDICATE NOW CARRIES, spent at the
+  -- frame receipt below and handed to the tail by the predicate's own
+  -- recursion, which states them at the STEPPED state
+  hord  = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hc))))))))
+  hpark = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hc)))))))))
+  tail  = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hc)))))))))
   L′    = proj₁ tail
   hL′   = proj₁ (proj₂ tail)
   hstep = c⊑step c Lv (FaceOK.fSize faceHere)
@@ -274,6 +279,7 @@ foldPath-nodes {e = e} c ac d W sl Lv sf gas id now envSrc (f ↠ p) vals evs fi
              (capsWalkOK-strat c ac sl d (Lv + L′) sf gas id now p vals′ fin′ sched₁ st₁
                 (proj₂ (proj₂ tail))))
           (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hc)))))))
+          hord hpark
           hlv
           (burstsHead W sf gas id now p vals′ fin′ sched₁ st₁ (proj₂ (proj₂ hb)))
   jᵢ = proj₁ IHr

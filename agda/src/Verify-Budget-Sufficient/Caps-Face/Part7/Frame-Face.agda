@@ -25,7 +25,7 @@ open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; subst)
 
 open import Rx.Prim      using (Tick; Id; _at_from_as_; Gas; after_,_)
-open import Rx.Exp       using (_×ᵗ_; obs; _≟ᵗ_; Ctx; Closed; Val; sizeᵗ; Fn; applyFn)
+open import Rx.Exp       using (_×ᵗ_; obs; _≟ᵗ_; Ctx; Closed; Val; sizeᵗ; Fn; applyFn; inputsBelowᵗ)
 open import Rx.Frame-Width using (pWᵛ)
 open import Rx.Evaluator using (Sched; EvalSt; scanVals; scan-st; take-st; mergeAll-st; switch-st; exhaust-st; setNode;
   lookupNode; NodeId; _↠_; Frame; AllOp; map-f; scan-f; take-f; from-inner; thru-outer;
@@ -57,15 +57,16 @@ open import Verify-Budget-Sufficient.Caps-Face.Part6 using
   (innerFinish-mergeAll-face; innerFinish-face-keep; thruOuter-face-core;
    SiCType; IfcType)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
-  (capsOK?; capsOK?-mono; eventCaps?; frameSz?; pathSz?; slotsCaps?; widNode; pathFloor;
-  pathStrat?; parkStrat?)
+  (capsOK?; capsOK?-mono; eventCaps?; frameSz?; frameStrat?; pathSz?; slotsCaps?;
+  widNode; pathFloor; pathStrat?; parkStrat?; setNode-regPark-owner)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves using
   (frame-parkStrat)
 open import Verify-Budget-Sufficient.Caps-Face.Part5 using
   (face-charge; face-charge1; face-vals; mapFrame-caps; scanFrame-caps; scanVals-len;
-  stepFrame-face-zero; takeDispatch-len; valsCaps?-parts)
+  scanVals-strat; stepFrame-face-zero; takeDispatch-len; valsCaps?-parts)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
-  (capsOK?-nodeSz; capsOK?-nodeWid; capsOK?-setNode; face-lift; FrameFace; lookupNode-caps;
+  (capsOK?-nodeSz; capsOK?-nodeWid; capsOK?-regPark; capsOK?-setNode;
+   capsOK?-setNode-park; face-lift; FrameFace; lookupNode-caps;
   takeDispatch-caps; valsCaps?; valsStrat?)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (frameStep-⊑-+; valCaps?-size; valCaps?-wid)
@@ -157,7 +158,7 @@ innerFinish-face _ c d j g switchᵒ allNid inst κ id now vals sl sched st
   innerFinish-face-keep c d j sl vals od sched
     (record st { nodes = setNode allNid (switch-st nothing od) (EvalSt.nodes st) })
     (capsOK?-setNode (frameStep j c) allNid (switch-st nothing od)
-       sched st refl refl refl inv)
+       sched st refl refl refl inv (λ i h → refl))
     vC
 
 -- EXHAUST: clear the busy flag
@@ -173,7 +174,7 @@ innerFinish-face _ c d j g exhaustᵒ allNid inst κ id now vals sl sched st
   innerFinish-face-keep c d j sl vals od sched
     (record st { nodes = setNode allNid (exhaust-st false od) (EvalSt.nodes st) })
     (capsOK?-setNode (frameStep j c) allNid (exhaust-st false od)
-       sched st refl refl refl inv)
+       sched st refl refl refl inv (λ i h → refl))
     vC
 
 -- and the from-inner FRAME: a fin that nothing absorbs finishes the
@@ -228,10 +229,14 @@ stepFrame-face-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   capsOK? (frameStep j c) sched st ≡ true →
   frameSz? (Caps.cSize (frameStep j c)) (scan-f fn nid) ≡ true →
   valsCaps? (frameStep j c) sl vals ≡ true →
+  -- and the two stratification readings the store write spends, both
+  -- already carried by the frame face one level up
+  inputsBelowᵗ (pathFloor κ) fn ≡ true →
+  valsStrat? (pathFloor κ) vals ≡ true →
   FrameFace c d j sl (stepFrame g id now (scan-f fn nid) κ vals fin sched st)
 stepFrame-face-scan {s = s} {u = u} c d j g id now fn nid κ vals fin sl sched st
-                    2≤S slC slEq inv fS vC
-  with lookupNode nid (EvalSt.nodes st)
+                    2≤S slC slEq inv fS vC sF sV
+  with lookupNode nid (EvalSt.nodes st) in eqN
      | lookupNode-caps (frameStep j c) (Sched.slots sched) nid (EvalSt.nodes st)
          (capsOK?-nodeSz (frameStep j c) sched st inv)
          (capsOK?-nodeWid (frameStep j c) sched st inv)
@@ -246,7 +251,7 @@ stepFrame-face-scan {s = s} {u = u} c d j g id now fn nid κ vals fin sl sched s
   j′ , face-lift c d j j′
            (face-charge c j (length vals) (sizeᵗ fn) (proj₂ VP)
               (≤ᵇ⇒≤ (sizeᵗ fn) (Caps.cSize (frameStep j c)) (T-to fS)))
-     , capsOK?-setNode (frameStep (j + j′) c) nid
+     , capsOK?-setNode-park (frameStep (j + j′) c) nid
          (scan-st (proj₂ run)) sched st
          (valCaps?-size (frameStep (j + j′) c) sl _ (proj₂ run) (proj₂ (proj₂ SC)))
          refl
@@ -257,6 +262,10 @@ stepFrame-face-scan {s = s} {u = u} c d j g id now fn nid κ vals fin sl sched s
                    (proj₂ (proj₂ SC))))
          (capsOK?-mono (frameStep j c) (frameStep (j + j′) c) sched st
             (frameStep-⊑-+ c 2≤S j j′) inv)
+         (setNode-regPark-owner nid κ (scan-st (proj₂ run)) st
+            (λ hold → proj₁ (scanVals-strat (pathFloor κ) fn ac vals sF
+                        (subst (λ m → parkStrat? (pathFloor κ) m ≡ true) eqN hold) sV))
+            (capsOK?-regPark (frameStep j c) sched st inv))
      , face-vals c j j′ sl (proj₁ run) 2≤S (proj₁ (proj₂ SC))
          (≤-trans (≤-reflexive (scanVals-len fn ac vals)) (proj₂ VP))
      , refl
@@ -318,13 +327,15 @@ stepFrame-face _ _ {s = s} {u = u} c d j sl g id now (map-f fn) κ vals fin sche
   j′  = proj₁ MP
 
 stepFrame-face _ _ c d j sl g id now (scan-f fn nid) κ vals fin sched st
-               2≤S 1≤R slEq slC inv pS vC _ _ _ _ =
+               2≤S 1≤R slEq slC inv pS vC _ _ stP stV =
   stepFrame-face-scan c d j g id now fn nid κ vals fin sl sched st
     2≤S slC slEq inv
     (proj₁ (∧-true (frameSz? (Caps.cSize (frameStep j c)) (scan-f fn nid))
                    ((suc (pathLen κ) ≤ᵇ Caps.cSize (frameStep j c))
                       ∧ pathSz? (Caps.cSize (frameStep j c)) κ) pS))
     vC
+    (proj₁ (∧-true (frameStrat? (pathFloor κ) (scan-f fn nid)) (pathStrat? κ) stP))
+    stV
 
 -- TAKE: a prefix and a cut, no folds — j′ = 0 either way
 stepFrame-face _ _ {s = s} c d j sl g id now (take-f nid) κ vals fin sched st

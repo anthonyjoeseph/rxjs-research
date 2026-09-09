@@ -14,7 +14,7 @@ open import Data.Nat.Properties using
   (≤-refl; ≤-trans; ≤-reflexive; ≤ᵇ⇒≤; n≤1+n; m≤n+m; +-assoc; +-comm; +-monoˡ-≤; +-monoʳ-≤;
   *-assoc; *-comm; m^n>0; *-identityˡ; *-identityʳ; *-zeroʳ; *-mono-≤; *-monoˡ-≤; *-monoʳ-≤;
   +-mono-≤; *-distribˡ-+; ^-zeroˡ; +-identityʳ; m≤m+n; m≤m⊔n; m≤n⊔m; ⊔-lub; ⊔-assoc; ⊔-mono-≤;
-  ^-distribˡ-+-*; ^-monoˡ-≤)
+  ^-distribˡ-+-*; ^-monoˡ-≤; ≤⇒≤ᵇ)
 open import Data.Nat.Solver using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.Maybe using (Maybe; just; nothing; maybe)
@@ -47,7 +47,8 @@ open import Rx.Evaluator using
   retagEvents; subscribeSharedSlot; memberSource; mintSource; sharedConnect; sharedPlumb;
   burstCompleted; register; dropSource; opIterD; sLvlD)
 open import Verify-Budget-Sufficient.Keeps-Ring using
-  (KeepsC; subscribeE-keeps; subscribeInner-keeps; stepFrame-keeps; thruConsume-keeps)
+  (KeepsC; subscribeE-keeps; subscribeInner-keeps; stepFrame-keeps; thruConsume-keeps;
+  switchKill-nodes; switchKill-nextNode)
 open import Verify-Budget-Sufficient.Caps using
   (_⊑ᶜ_; 1≤pow≤; Caps; frameStep; frameStep-0; frameStep-mono-j; iterFold-infl; iterSize-infl;
   iterSize-mono-count; capsAt; capsAt-base-size; 2≤capsAt-size; opIterD-mono; 1≤capsAt-reg;
@@ -57,7 +58,16 @@ open import Verify-Budget-Sufficient.Subscribe-Face using (subscribeE-caps; subs
 -- THE SUBSCRIBED BURST'S OWN READING, which the caps face does not
 -- report: its conclusion carries caps and a count and no floor at all
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves using
-  (subscribeE-burstStrat; frame-parkStrat)
+  (subscribeE-burstStrat; fresh-pathPark; thruConsume-cellPark;
+  framePark-step; pathPark-step; installNode-cellPark; installNode-pathPark;
+  subscribeE-ord; subscribeE-pathPark; subscribeE-framePark;
+  subscribeInner-ord; subscribeInner-pathPark; subscribeInner-cellPark)
+-- a frame step only RAISES the counter, which is what the order reading
+-- rides across one emit of a burst
+open import Verify-Budget-Sufficient.Delivery-Counter using (stepFrame-nextNode)
+-- the freshness receipt a consume hands back is what both chain-wide
+-- readings ride across one payload of the walk
+open import Verify-Budget-Sufficient.Node-Fresh using (FreshC; thruConsume-fresh)
 -- THE ONE SUBSTITUTION THIS DEVELOPMENT PERFORMS, read on the term
 open import Rx.Inputs-Below using (ib-unfoldμ)
 open import Verify-Budget-Sufficient.Caps-Chain using (leaf-lvl)
@@ -66,9 +76,11 @@ open import Verify-Budget-Sufficient.Caps-Depth using
   (depthDrain; depthFin; depthFrame; depthInner; depthE; depthReact)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using (burstCaps?; capsOK?; valCaps?; widNode; widNode-push; nestValOK?; pathSz?; slotsCaps?; nestClosOK?; nestClosOK?ᵛ; nestClosOK?ᵛ-widen;
   slotsCaps?-widen; frameSz?; capsOK?-mono; pathFloor; frameStrat?; pathStrat?; burstStrat?;
-  parkStrat?)
+  parkStrat?; setNode-regPark-owner; pathOrd?; pathPark?; pathPark?-nodes;
+  pathOrd?-mono; pathOrd?-read; pathOrd?-hop; pathOrd?-push; pathOrd?-inner;
+  pathOrd?-cell; pathOrd?-outer; pathOrd?-tail; pathCell; pathRead; frameRead)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using (burstCaps?-widen; valCaps?-wid; valCaps?-size; valCaps?-widen; pathSz?-⊑; frameStep-chain-suc; expWid-fromSize)
-open import Verify-Budget-Sufficient.Caps-Face.Part4 using (capsOK?-nextNode; capsOK?-parts; capsOK?-setNode; switchKill-caps; NodeCaps; lookupNode-caps;
+open import Verify-Budget-Sufficient.Caps-Face.Part4 using (capsOK?-nextNode; capsOK?-parts; capsOK?-setNode; capsOK?-setNode-park; capsOK?-regPark; switchKill-caps; NodeCaps; lookupNode-caps;
   capsOK?-nodeSz; capsOK?-nodeWid; capsOK?-nodePark; parkList-push; pathSz?-len;
   splitEvents-vals-caps; slotsCaps?-capsAt; valsStrat?; splitEvents-valsStrat)
 open import Verify-Budget-Sufficient.Node-Table using (lookupNode-setNode; lookupNode-setNode-other)
@@ -1704,8 +1716,14 @@ thruRoomWOK W fuel op nid κ id now (o ∷ os) sched st =
 -- arrival whose frame width the room record bounds, so the table's
 -- width fold still passes.  Extracted so the measure-free walk below
 -- and the measured step both spend it.
+-- AND THE ENQUEUE IS THE ONE WRITE ON THIS FACE THAT OVERWRITES PARKED
+-- CONTENT, so it is the one that takes the chain.  Every other node
+-- write here either mints a cell whose reading is `true` outright or
+-- moves a field the reading does not look at; this one grows a queue a
+-- registered reader reads at its OWN floor, and node ownership is what
+-- ties that floor to the one the arrival is bounded by.
 merge-park-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (c : Caps) (L : ℕ) (nid : NodeId) (lim : Maybe ℕ) (act : ℕ)
+  (c : Caps) (L : ℕ) (nid : NodeId) (κ : Path Γ u t) (lim : Maybe ℕ) (act : ℕ)
   (q : List (Val Γ (obs u))) (od : Bool) (o : Val Γ (obs u))
   (sched : Sched Γ) (st : EvalSt e) →
   2 ≤ Caps.cSize c →
@@ -1714,16 +1732,24 @@ merge-park-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   capsOK? (frameStep L c) sched st ≡ true →
   sizeᵉ o ≤ Caps.cSize (frameStep L c) →
   pWᵉ n (Sched.slots sched) o ≤ Caps.cWid c →
+  inputsBelowᵛ (pathFloor κ) (obs u) o ≡ true →
   capsOK? (frameStep (suc L) c) sched
     (record st { nodes = setNode nid (mergeAll-st {t = u} lim act (q ++ o ∷ []) od)
                    (EvalSt.nodes st) }) ≡ true
-merge-park-caps {n = n} {u = u} c L nid lim act q od o sched st hS hsz₀ eq hc hsz hw =
-  capsOK?-setNode (frameStep (suc L) c) nid ns sched st bn pk wn
-    (capsOK?-mono (frameStep L c) (frameStep (suc L) c) sched st
-      (frameStep-mono-j c hS (n≤1+n L)) hc)
+merge-park-caps {n = n} {u = u} c L nid κ lim act q od o sched st hS hsz₀ eq hc hsz hw stO =
+  capsOK?-setNode-park (frameStep (suc L) c) nid ns sched st bn pk wn INV PARK
   where
   ns = mergeAll-st {t = u} lim act (q ++ o ∷ []) od
   stepL = frameStep-mono-j c hS (n≤1+n L)
+
+  INV : capsOK? (frameStep (suc L) c) sched st ≡ true
+  INV = capsOK?-mono (frameStep L c) (frameStep (suc L) c) sched st stepL hc
+
+  PARK = setNode-regPark-owner nid κ ns st
+           (λ h → all-++-intro (inputsBelowᵉ (pathFloor κ)) q (o ∷ [])
+                    (subst (λ m → parkStrat? (pathFloor κ) m ≡ true) eq h)
+                    (∧-intro stO refl))
+           (capsOK?-regPark (frameStep (suc L) c) sched st INV)
 
   pk₀ : all (λ x → 3 + (sizeᵉ x + slotsSize (Sched.slots sched))
                      ≤ᵇ Caps.cSize (frameStep L c)) q ≡ true
@@ -2784,6 +2810,13 @@ subscribeInner-nestCaps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   -- the one call this body makes
   pathStrat? κ ≡ true →
   inputsBelowᵛ (pathFloor κ) (obs u) o ≡ true →
+  -- AND THE THREE THE CAPS FACE ASKS OF AN EDGE THAT MINTS A
+  -- REGISTRATION, forwarded exactly as received: the nest currency reads
+  -- no floor and no counter, so none of them constrains anything stated
+  -- here
+  pathOrd? (Sched.nextNode sched) (thru-outer op nid ↠ κ) ≡ true →
+  pathPark? κ st ≡ true →
+  parkStrat? (pathFloor κ) (lookupNode nid (EvalSt.nodes st)) ≡ true →
   ⦃ _ : FaceOK c sl ⦄ →
   let R      = subscribeInner fuel op nid κ id now o sched st
       sched₁ = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ R))))
@@ -2791,7 +2824,7 @@ subscribeInner-nestCaps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (Σ ℕ λ L′ → capsOK? (frameStep (L′ + L) c) sched₁ st₁ ≡ true)
   × (Sched.slots sched₁ ≡ sl)
 subscribeInner-nestCaps c L sl fuel op nid κ id now o sched st
-  hsl hc hv hpk hpl stP stO =
+  hsl hc hv hpk hpl stP stO stR stK stQ =
   (proj₁ R
    , subst (λ z → capsOK? (frameStep z c) sched₁ st₁ ≡ true)
        (+-comm L (proj₁ R)) (proj₁ (proj₂ R)))
@@ -2805,7 +2838,7 @@ subscribeInner-nestCaps c L sl fuel op nid κ id now o sched st
         fuel op nid κ id now o sl sched st
         (FaceOK.fSize faceHere) (FaceOK.fReg faceHere) hsl
         (FaceOK.fSlC faceHere) (FaceOK.fSlSz faceHere)
-        hc hv hpk hpl ≤-refl ≤-refl stP stO
+        hc hv hpk hpl ≤-refl ≤-refl stP stO stR stK stQ
 
 
 -- A bump rewrites one node to a state the width predicate cannot tell
@@ -2823,6 +2856,9 @@ mergeAllBump-caps c sl nid done sched st h
       capsOK?-setNode c nid
         (mergeAll-st lim (if done then act else suc act) q od) sched st
         (proj₁ NC) PK (proj₂ NC) h
+        -- the bump moves the SUBSCRIPTION COUNT and leaves the queue
+        -- where it was, so the reading is the cell's own
+        (λ i h′ → subst (λ m → parkStrat? i m ≡ true) eq h′)
       where
       NC = subst (NodeCaps c (Sched.slots sched)) eq
              (lookupNode-caps c (Sched.slots sched) nid (EvalSt.nodes st)
@@ -2850,6 +2886,9 @@ thruStep-merge-inner-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   suc (pathLen κ) ≤ Caps.cSize (frameStep L c) →
   pathStrat? κ ≡ true →
   inputsBelowᵛ (pathFloor κ) (obs u) o ≡ true →
+  pathOrd? (Sched.nextNode sched) (thru-outer mergeAllᵒ nid ↠ κ) ≡ true →
+  pathPark? κ st ≡ true →
+  parkStrat? (pathFloor κ) (lookupNode nid (EvalSt.nodes st)) ≡ true →
   ⦃ _ : FaceOK c sl ⦄ →
   let R      = subscribeInner fuel mergeAllᵒ nid κ id now o sched st
       done   = proj₁ (proj₂ (proj₂ (proj₂ R)))
@@ -2859,7 +2898,7 @@ thruStep-merge-inner-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (Σ ℕ λ L′ → capsOK? (frameStep (L′ + L) c) sched₁ st′ ≡ true)
   × (Sched.slots sched₁ ≡ sl)
 thruStep-merge-inner-caps c L sl fuel nid κ id now lim act q od o sched st
-  hl hsl hc hv hpk hpl stP stO =
+  hl hsl hc hv hpk hpl stP stO stR stK stQ =
   (proj₁ (proj₁ SUB)
    , mergeAllBump-caps (frameStep (proj₁ (proj₁ SUB) + L) c) sl nid done
        sched₁ st₁ (proj₂ (proj₁ SUB)))
@@ -2870,7 +2909,7 @@ thruStep-merge-inner-caps c L sl fuel nid κ id now lim act q od o sched st
   sched₁ = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ R))))
   st₁    = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ R))))
   SUB = subscribeInner-nestCaps c L sl fuel mergeAllᵒ nid κ id now o sched st
-          hsl hc hv hpk hpl stP stO
+          hsl hc hv hpk hpl stP stO stR stK stQ
 
 thruStep-merge-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (L : ℕ) (sl : Slots Γ) (B W m m′ : ℕ) (fuel : Gas) (nid : NodeId)
@@ -2962,12 +3001,6 @@ thruStep-merge-inner {e = e} c L sl B W m m′ fuel nid κ id now lim act q od o
 -- from it: `switchKill` rewrites the registry, the cancelled list and
 -- the live set, and the node table is carried through untouched.
 abstract
-  switchKill-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (cur : Maybe Id) (sched : Sched Γ) (st : EvalSt e) →
-    EvalSt.nodes (proj₂ (proj₂ (switchKill cur sched st))) ≡ EvalSt.nodes st
-  switchKill-nodes nothing  sched st = refl
-  switchKill-nodes (just v) sched st = refl
-
   -- and neither the slots nor the width fold over them, so the whole
   -- invariant rides the kill at ANY cap -- which is what lets the
   -- levelled arm below read it at the level it was entered with
@@ -2998,6 +3031,13 @@ thruStep-switch-inner-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   suc (pathLen κ) ≤ Caps.cSize (frameStep L c) →
   pathStrat? κ ≡ true →
   inputsBelowᵛ (pathFloor κ) (obs u) o ≡ true →
+  -- THE THREE READINGS ARE ASKED AT THE PRE-KILL STATE, which is where
+  -- the caller stands; the kill rewrites the registry, the cancelled
+  -- list and the live set and touches neither the node table nor the
+  -- counter, so both halves transport across it by `refl` per arm
+  pathOrd? (Sched.nextNode sched) (thru-outer switchᵒ nid ↠ κ) ≡ true →
+  pathPark? κ st ≡ true →
+  parkStrat? (pathFloor κ) (lookupNode nid (EvalSt.nodes st)) ≡ true →
   ⦃ _ : FaceOK c sl ⦄ →
   let K      = switchKill cur sched st
       sched₁ = proj₁ (proj₂ K)
@@ -3014,11 +3054,11 @@ thruStep-switch-inner-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (Σ ℕ λ L′ → capsOK? (frameStep (L′ + L) c) sched₂ st′ ≡ true)
   × (Sched.slots sched₂ ≡ sl)
 thruStep-switch-inner-caps c L sl fuel nid κ id now nothing od o sched st
-  hl hsl hc hv hpk hpl stP stO =
+  hl hsl hc hv hpk hpl stP stO stR stK stQ =
   (proj₁ (proj₁ SUB)
    , capsOK?-setNode (frameStep (proj₁ (proj₁ SUB) + L) c) nid
        (switch-st (if done then nothing else just inst) od) sched₂ st₂
-       refl refl refl (proj₂ (proj₁ SUB)))
+       refl refl refl (proj₂ (proj₁ SUB)) (λ i h → refl))
   , proj₂ SUB
   where
   R      = subscribeInner fuel switchᵒ nid κ id now o sched st
@@ -3027,13 +3067,13 @@ thruStep-switch-inner-caps c L sl fuel nid κ id now nothing od o sched st
   sched₂ = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ R))))
   st₂    = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ R))))
   SUB = subscribeInner-nestCaps c L sl fuel switchᵒ nid κ id now o sched st
-          hsl hc hv hpk hpl stP stO
+          hsl hc hv hpk hpl stP stO stR stK stQ
 thruStep-switch-inner-caps c L sl fuel nid κ id now (just v) od o sched st
-  hl hsl hc hv hpk hpl stP stO =
+  hl hsl hc hv hpk hpl stP stO stR stK stQ =
   (proj₁ (proj₁ SUB)
    , capsOK?-setNode (frameStep (proj₁ (proj₁ SUB) + L) c) nid
        (switch-st (if done then nothing else just inst) od) sched₂ st₂
-       refl refl refl (proj₂ (proj₁ SUB)))
+       refl refl refl (proj₂ (proj₁ SUB)) (λ i h → refl))
   , proj₂ SUB
   where
   K      = switchKill (just v) sched st
@@ -3047,6 +3087,13 @@ thruStep-switch-inner-caps c L sl fuel nid κ id now (just v) od o sched st
   SUB = subscribeInner-nestCaps c L sl fuel switchᵒ nid κ id now o sched₁ st₁
           hsl (switchKill-caps (frameStep L c) (just v) sched st hc) hv hpk hpl
           stP stO
+          (subst (λ x → pathOrd? x (thru-outer switchᵒ nid ↠ κ) ≡ true)
+                 (sym (switchKill-nextNode (just v) sched st)) stR)
+          (subst (_≡ true)
+                 (pathPark?-nodes κ st st₁ (sym (switchKill-nodes (just v) sched st)))
+                 stK)
+          (subst (λ m → parkStrat? (pathFloor κ) (lookupNode nid m) ≡ true)
+                 (sym (switchKill-nodes (just v) sched st)) stQ)
 
 thruStep-switch-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (L : ℕ) (sl : Slots Γ) (B W m m′ : ℕ) (fuel : Gas) (nid : NodeId)
@@ -3160,6 +3207,9 @@ thruStep-exhaust-inner-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   suc (pathLen κ) ≤ Caps.cSize (frameStep L c) →
   pathStrat? κ ≡ true →
   inputsBelowᵛ (pathFloor κ) (obs u) o ≡ true →
+  pathOrd? (Sched.nextNode sched) (thru-outer exhaustᵒ nid ↠ κ) ≡ true →
+  pathPark? κ st ≡ true →
+  parkStrat? (pathFloor κ) (lookupNode nid (EvalSt.nodes st)) ≡ true →
   ⦃ _ : FaceOK c sl ⦄ →
   let R      = subscribeInner fuel exhaustᵒ nid κ id now o sched st
       done   = proj₁ (proj₂ (proj₂ (proj₂ R)))
@@ -3171,10 +3221,11 @@ thruStep-exhaust-inner-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (Σ ℕ λ L′ → capsOK? (frameStep (L′ + L) c) sched₁ st′ ≡ true)
   × (Sched.slots sched₁ ≡ sl)
 thruStep-exhaust-inner-caps c L sl fuel nid κ id now od o sched st
-  hl hsl hc hv hpk hpl stP stO =
+  hl hsl hc hv hpk hpl stP stO stR stK stQ =
   (proj₁ (proj₁ SUB)
    , capsOK?-setNode (frameStep (proj₁ (proj₁ SUB) + L) c) nid
-       (exhaust-st (not done) od) sched₁ st₁ refl refl refl (proj₂ (proj₁ SUB)))
+       (exhaust-st (not done) od) sched₁ st₁ refl refl refl (proj₂ (proj₁ SUB))
+       (λ i h → refl))
   , proj₂ SUB
   where
   R      = subscribeInner fuel exhaustᵒ nid κ id now o sched st
@@ -3182,7 +3233,7 @@ thruStep-exhaust-inner-caps c L sl fuel nid κ id now od o sched st
   sched₁ = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ R))))
   st₁    = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ R))))
   SUB = subscribeInner-nestCaps c L sl fuel exhaustᵒ nid κ id now o sched st
-          hsl hc hv hpk hpl stP stO
+          hsl hc hv hpk hpl stP stO stR stK stQ
 
 thruStep-exhaust-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (L : ℕ) (sl : Slots Γ) (B W m m′ : ℕ) (fuel : Gas) (nid : NodeId)
@@ -3338,11 +3389,19 @@ thruConsume-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   -- back the state they were given and consume neither
   pathStrat? κ ≡ true →
   inputsBelowᵛ (pathFloor κ) (obs u) o ≡ true →
+  -- AND THE TWO CHAIN READINGS PLUS THE OUTER'S OWN CELL, forwarded to
+  -- the same three arms for the same reason: a mint registers the
+  -- payload under this chain, so the order it is registered at and the
+  -- stratification of everything already parked below it are what the
+  -- registry-level conjuncts will ask of the state that comes back
+  pathOrd? (Sched.nextNode sched) (thru-outer op nid ↠ κ) ≡ true →
+  pathPark? κ st ≡ true →
+  parkStrat? (pathFloor κ) (lookupNode nid (EvalSt.nodes st)) ≡ true →
   let rc = thruConsume fuel op nid κ id now o sched st in
   Σ ℕ λ L′ →
     capsOK? (frameStep (L′ + L) c)
       (proj₁ (proj₂ (proj₂ rc))) (proj₂ (proj₂ (proj₂ rc))) ≡ true
-thruConsume-caps {u = u} c L sl W fuel mergeAllᵒ nid κ id now o sched st hsl hc hv hpk hpl hr stP stO
+thruConsume-caps {u = u} c L sl W fuel mergeAllᵒ nid κ id now o sched st hsl hc hv hpk hpl hr stP stO stR stK stQ
   with lookupNode nid (EvalSt.nodes st) in eq
 ... | just (mergeAll-st {w} lim act q od) with w ≟ᵗ u
 ...   | no _ = 0 , hc
@@ -3350,38 +3409,42 @@ thruConsume-caps {u = u} c L sl W fuel mergeAllᵒ nid κ id now o sched st hsl 
 ...     | true =
           let C = thruStep-merge-inner-caps c L sl fuel nid κ id now
                     lim act q od o sched st eq hsl hc hv hpk hpl stP stO
+                    stR stK
+                    (subst (λ m → parkStrat? (pathFloor κ) m ≡ true) (sym eq) stQ)
           in proj₁ C
 ...     | false =
-          1 , (merge-park-caps c L nid lim act q od o sched st
+          1 , (merge-park-caps c L nid κ lim act q od o sched st
                    (FaceOK.fSize faceHere)
                    (subst (λ y → slotsSize y ≤ Caps.cSize c) (sym hsl)
                       (FaceOK.fSlSz faceHere))
                    eq hc
                    (≤ᵇ⇒≤ (sizeᵉ o) (Caps.cSize (frameStep L c))
                       (T-to (valCaps?-size (frameStep L c) sl (obs u) o hv)))
-                   (proj₁ hr))
-thruConsume-caps c L sl W fuel mergeAllᵒ nid κ id now o sched st hsl hc hv hpk hpl hr _ _ | nothing = 0 , hc
-thruConsume-caps c L sl W fuel mergeAllᵒ nid κ id now o sched st hsl hc hv hpk hpl hr _ _ | just (scan-st _) = 0 , hc
-thruConsume-caps c L sl W fuel mergeAllᵒ nid κ id now o sched st hsl hc hv hpk hpl hr _ _ | just (take-st _) = 0 , hc
-thruConsume-caps c L sl W fuel mergeAllᵒ nid κ id now o sched st hsl hc hv hpk hpl hr _ _ | just (switch-st _ _) = 0 , hc
-thruConsume-caps c L sl W fuel mergeAllᵒ nid κ id now o sched st hsl hc hv hpk hpl hr _ _ | just (exhaust-st _ _) = 0 , hc
-thruConsume-caps c L sl W fuel switchᵒ nid κ id now o sched st hsl hc hv hpk hpl hr stP stO
+                   (proj₁ hr) stO)
+thruConsume-caps c L sl W fuel mergeAllᵒ nid κ id now o sched st hsl hc hv hpk hpl hr _ _ _ _ _ | nothing = 0 , hc
+thruConsume-caps c L sl W fuel mergeAllᵒ nid κ id now o sched st hsl hc hv hpk hpl hr _ _ _ _ _ | just (scan-st _) = 0 , hc
+thruConsume-caps c L sl W fuel mergeAllᵒ nid κ id now o sched st hsl hc hv hpk hpl hr _ _ _ _ _ | just (take-st _) = 0 , hc
+thruConsume-caps c L sl W fuel mergeAllᵒ nid κ id now o sched st hsl hc hv hpk hpl hr _ _ _ _ _ | just (switch-st _ _) = 0 , hc
+thruConsume-caps c L sl W fuel mergeAllᵒ nid κ id now o sched st hsl hc hv hpk hpl hr _ _ _ _ _ | just (exhaust-st _ _) = 0 , hc
+thruConsume-caps c L sl W fuel switchᵒ nid κ id now o sched st hsl hc hv hpk hpl hr stP stO stR stK stQ
   with lookupNode nid (EvalSt.nodes st) in eq
 ... | just (switch-st cur od) =
       let C = thruStep-switch-inner-caps c L sl fuel nid κ id now cur od o sched st
-                eq hsl hc hv hpk hpl stP stO
+                eq hsl hc hv hpk hpl stP stO stR stK
+                (subst (λ m → parkStrat? (pathFloor κ) m ≡ true) (sym eq) stQ)
       in proj₁ C
 ... | nothing = 0 , hc
 ... | just (scan-st _) = 0 , hc
 ... | just (take-st _) = 0 , hc
 ... | just (mergeAll-st _ _ _ _) = 0 , hc
 ... | just (exhaust-st _ _) = 0 , hc
-thruConsume-caps c L sl W fuel exhaustᵒ nid κ id now o sched st hsl hc hv hpk hpl hr stP stO
+thruConsume-caps c L sl W fuel exhaustᵒ nid κ id now o sched st hsl hc hv hpk hpl hr stP stO stR stK stQ
   with lookupNode nid (EvalSt.nodes st) in eq
 ... | just (exhaust-st true od)  = 0 , hc
 ... | just (exhaust-st false od) =
       let C = thruStep-exhaust-inner-caps c L sl fuel nid κ id now od o sched st
-                eq hsl hc hv hpk hpl stP stO
+                eq hsl hc hv hpk hpl stP stO stR stK
+                (subst (λ m → parkStrat? (pathFloor κ) m ≡ true) (sym eq) stQ)
       in proj₁ C
 ... | nothing = 0 , hc
 ... | just (scan-st _) = 0 , hc
@@ -3426,13 +3489,20 @@ thruWalk-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   -- splits at each cons exactly as the caps reading beside it does
   pathStrat? κ ≡ true →
   valsStrat? (pathFloor κ) os ≡ true →
+  -- AND THE TWO CHAIN READINGS PLUS THE OUTER'S OWN CELL.  All three are
+  -- constant in the payload -- nothing here extends the chain -- so the
+  -- walk carries them along its own state thread rather than splitting
+  -- them at each cons the way the caps reading beside them is split
+  pathOrd? (Sched.nextNode sched) (thru-outer op nid ↠ κ) ≡ true →
+  pathPark? κ st ≡ true →
+  parkStrat? (pathFloor κ) (lookupNode nid (EvalSt.nodes st)) ≡ true →
   let rw = thruWalk fuel op nid κ id now os sched st in
   Σ ℕ λ L′ →
     capsOK? (frameStep (L′ + L) c)
       (proj₁ (proj₂ (proj₂ rw))) (proj₂ (proj₂ (proj₂ rw))) ≡ true
-thruWalk-caps c L sl W fuel op nid κ id now [] sched st hsl hc hv hpk hpl hr _ _ =
+thruWalk-caps c L sl W fuel op nid κ id now [] sched st hsl hc hv hpk hpl hr _ _ _ _ _ =
   0 , hc
-thruWalk-caps {u = u} c L sl W fuel op nid κ id now (o ∷ os) sched st hsl hc hv hpk hpl (hro , hros) stP stV =
+thruWalk-caps {u = u} c L sl W fuel op nid κ id now (o ∷ os) sched st hsl hc hv hpk hpl (hro , hros) stP stV stR stK stQ =
   proj₁ IH + proj₁ C
   , subst (λ z → capsOK? (frameStep z c)
                    (proj₁ (proj₂ (proj₂ rw))) (proj₂ (proj₂ (proj₂ rw))) ≡ true)
@@ -3450,10 +3520,28 @@ thruWalk-caps {u = u} c L sl W fuel op nid κ id now (o ∷ os) sched st hsl hc 
   C  = thruConsume-caps c L sl W fuel op nid κ id now o sched st hsl hc
          (valCaps?-widen sl (obs u) o stepL (proj₁ (∧-true _ _ hv)))
          (pathSz?-⊑ κ stepL hpk) (≤-trans hpl (proj₁ stepL)) hro stP stO
+         stR stK stQ
+  sd₁ = proj₁ (proj₂ (proj₂ rc))
+  st₁ = proj₂ (proj₂ (proj₂ rc))
+  FR0 = thruConsume-fresh 0 fuel op nid κ id now o sched st z≤n z≤n
+  FRκ = thruConsume-fresh (pathRead κ) fuel op nid κ id now o sched st
+          (≤-trans (m≤n⊔m (suc nid) (pathRead κ))
+                   (pathOrd?-read (Sched.nextNode sched)
+                      (thru-outer op nid ↠ κ) stR))
+          (pathOrd?-hop (Sched.nextNode sched) nid op κ stR)
   IH = thruWalk-caps c (proj₁ C + L) sl W fuel op nid κ id now os
          (proj₁ (proj₂ (proj₂ rc))) (proj₂ (proj₂ (proj₂ rc)))
          (trans (KeepsC.slotsEq (thruConsume-keeps fuel op nid κ id now o sched st)) hsl)
          (proj₂ C) (proj₂ (∧-true _ _ hv)) hpk hpl hros stP stT
+         -- ONE PAYLOAD ONLY RAISES THE COUNTER, and the chain is fixed
+         (pathOrd?-mono (Sched.nextNode sched) (Sched.nextNode sd₁)
+            (thru-outer op nid ↠ κ) (FreshC.nxMono FR0) stR)
+         -- and everything below the watermark the consume owes nothing
+         -- about is exactly the chain under the outer
+         (fresh-pathPark κ (Sched.nextNode sched) (Sched.nextNode sd₁) st st₁ FRκ stK)
+         -- the outer's own cell is the one the consume may write, and
+         -- what keeps its reading true is this payload's own
+         (thruConsume-cellPark fuel op nid κ id now o sched st stO stQ)
 
 -- the wrap on its own: it writes one node whose width reading is
 -- unchanged -- the done flag is the one field `widNode` never reads --
@@ -3471,6 +3559,10 @@ thruWrap-caps c sl mergeAllᵒ nid true (vs , bs , sched′ , st′) hc
 ... | just (mergeAll-st lim act q od) =
       capsOK?-setNode c nid (mergeAll-st lim act q true) sched′ st′
         (proj₁ NC) PK (proj₂ NC) hc
+        -- the wrap flips the DONE flag and nothing else, and the park
+        -- reading does not look at it: the queue it reports on is the
+        -- one already in the cell
+        (λ i h → subst (λ m → parkStrat? i m ≡ true) eq h)
       where
       NC = subst (NodeCaps c (Sched.slots sched′)) eq
              (lookupNode-caps c (Sched.slots sched′) nid (EvalSt.nodes st′)
@@ -3487,6 +3579,7 @@ thruWrap-caps c sl switchᵒ nid true (vs , bs , sched′ , st′) hc
   with lookupNode nid (EvalSt.nodes st′)
 ... | just (switch-st cur od) =
       capsOK?-setNode c nid (switch-st cur true) sched′ st′ refl refl refl hc
+        (λ i h → refl)
 ... | nothing = hc
 ... | just (scan-st _) = hc
 ... | just (take-st _) = hc
@@ -3496,6 +3589,7 @@ thruWrap-caps c sl exhaustᵒ nid true (vs , bs , sched′ , st′) hc
   with lookupNode nid (EvalSt.nodes st′)
 ... | just (exhaust-st act od) =
       capsOK?-setNode c nid (exhaust-st act true) sched′ st′ refl refl refl hc
+        (λ i h → refl)
 ... | nothing = hc
 ... | just (scan-st _) = hc
 ... | just (take-st _) = hc
@@ -3519,17 +3613,22 @@ stepThru-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   thruRoomOK c W fuel op nid κ id now vals sched st →
   pathStrat? κ ≡ true →
   valsStrat? (pathFloor κ) vals ≡ true →
+  -- the wrap flips a done flag the readings never look at, so the three
+  -- the walk under it asks for are the three this clause is handed
+  pathOrd? (Sched.nextNode sched) (thru-outer op nid ↠ κ) ≡ true →
+  pathPark? κ st ≡ true →
+  parkStrat? (pathFloor κ) (lookupNode nid (EvalSt.nodes st)) ≡ true →
   let sf = stepFrame fuel id now (thru-outer op nid) κ vals fin sched st in
   Σ ℕ λ L′ →
     capsOK? (frameStep (L′ + L) c) (proj₁ (proj₂ (proj₂ (proj₂ sf))))
               (proj₂ (proj₂ (proj₂ (proj₂ sf)))) ≡ true
-stepThru-caps c L sl W fuel op nid κ id now vals fin sched st hsl hc hv hpk hpl hr stP stV =
+stepThru-caps c L sl W fuel op nid κ id now vals fin sched st hsl hc hv hpk hpl hr stP stV stR stK stQ =
   proj₁ TW
   , thruWrap-caps (frameStep (proj₁ TW + L) c) sl op nid fin
       (thruWalk fuel op nid κ id now vals sched st) (proj₂ TW)
   where
   TW = thruWalk-caps c L sl W fuel op nid κ id now vals sched st hsl hc hv hpk hpl hr
-         stP stV
+         stP stV stR stK stQ
 
 -- THE STEP, ASSEMBLED: the case split is `thruConsume`'s own, so the
 -- arms that return their inputs untouched are discharged here and only
@@ -3657,11 +3756,20 @@ thruFit-vals : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   nestDᵛˢ os ≤ nestB (Caps.cSize c) W (nestUnit e sl) B m →
   pathStrat? κ ≡ true →
   valsStrat? (pathFloor κ) os ≡ true →
+  -- AND THE TWO CHAIN READINGS PLUS THE OUTER'S OWN CELL, carried along
+  -- the walk's own state thread.  All three are constant in the payload,
+  -- so unlike the caps reading beside them they are not split at each
+  -- cons -- what they need instead is a transport across the ONE consume
+  -- the cons performs, which is where the counter rises and where the
+  -- outer's cell may be written
+  pathOrd? (Sched.nextNode sched) (thru-outer op nid ↠ κ) ≡ true →
+  pathPark? κ st ≡ true →
+  parkStrat? (pathFloor κ) (lookupNode nid (EvalSt.nodes st)) ≡ true →
   ⦃ _ : FaceOK c sl ⦄ →
   thruFitOK (nestB (Caps.cSize c) W (nestUnit e sl) B m′)
     fuel op nid κ id now os sched st
-thruFit-vals c L sl B W m m′ fuel op nid κ id now [] sched st hsl hm hc hv hcl hva hpk hpl hr hn _ _ = tt
-thruFit-vals {u = u} c L sl B W m m′ fuel mergeAllᵒ nid κ id now (o ∷ os) sched st hsl hm hc hv hcl hva hpk hpl hr hn stP stV =
+thruFit-vals c L sl B W m m′ fuel op nid κ id now [] sched st hsl hm hc hv hcl hva hpk hpl hr hn _ _ _ _ _ = tt
+thruFit-vals {u = u} c L sl B W m m′ fuel mergeAllᵒ nid κ id now (o ∷ os) sched st hsl hm hc hv hcl hva hpk hpl hr hn stP stV stR stK stQ =
   proj₁ S , proj₁ (proj₂ S) , proj₂ (proj₂ S)
   , thruFit-vals c (proj₁ K + L) sl B W m m′ fuel mergeAllᵒ nid κ id now os
       (proj₁ (proj₂ (proj₂ rc))) (proj₂ (proj₂ (proj₂ rc)))
@@ -3670,8 +3778,25 @@ thruFit-vals {u = u} c L sl B W m m′ fuel mergeAllᵒ nid κ id now (o ∷ os)
       (proj₂ K) (proj₂ (∧-true _ _ hv))
       (proj₂ (∧-true _ _ hcl)) (proj₂ (∧-true _ _ hva)) hpk hpl (proj₂ hr)
       (≤-trans (m≤n⊔m (nestDᵛ (obs u) o) (nestDᵛˢ os)) hn) stP stT
+      -- ONE PAYLOAD ONLY RAISES THE COUNTER, and the chain is fixed
+      (pathOrd?-mono (Sched.nextNode sched) (Sched.nextNode sd₁)
+         (thru-outer mergeAllᵒ nid ↠ κ) (FreshC.nxMono FR0) stR)
+      -- and everything below the watermark the consume owes nothing
+      -- about is exactly the chain under the outer
+      (fresh-pathPark κ (Sched.nextNode sched) (Sched.nextNode sd₁) st st₁ FRκ stK)
+      -- the outer's own cell is the one the consume may write, and what
+      -- keeps its reading true is this payload's own
+      (thruConsume-cellPark fuel mergeAllᵒ nid κ id now o sched st stO stQ)
   where
   rc = thruConsume fuel mergeAllᵒ nid κ id now o sched st
+  sd₁ = proj₁ (proj₂ (proj₂ rc))
+  st₁ = proj₂ (proj₂ (proj₂ rc))
+  FR0 = thruConsume-fresh 0 fuel mergeAllᵒ nid κ id now o sched st z≤n z≤n
+  FRκ = thruConsume-fresh (pathRead κ) fuel mergeAllᵒ nid κ id now o sched st
+          (≤-trans (m≤n⊔m (suc nid) (pathRead κ))
+                   (pathOrd?-read (Sched.nextNode sched)
+                      (thru-outer mergeAllᵒ nid ↠ κ) stR))
+          (pathOrd?-hop (Sched.nextNode sched) nid mergeAllᵒ κ stR)
   2≤S = FaceOK.fSize faceHere
   stepL = c⊑step c L 2≤S
   stO = proj₁ (∧-true (inputsBelowᵛ (pathFloor κ) (obs u) o)
@@ -3681,12 +3806,13 @@ thruFit-vals {u = u} c L sl B W m m′ fuel mergeAllᵒ nid κ id now (o ∷ os)
   K = thruConsume-caps c L sl W fuel mergeAllᵒ nid κ id now o sched st hsl hc
         (valCaps?-widen sl (obs u) o stepL (proj₁ (∧-true _ _ hva)))
         (pathSz?-⊑ κ stepL hpk) (≤-trans hpl (proj₁ stepL)) (proj₁ hr) stP stO
+        stR stK stQ
   S = thruStep-merge c L sl B W m m′ fuel nid κ id now o sched st hsl hm
         (capsOK?⇒nest (frameStep L c) sched st hc)
         (proj₁ (∧-true _ _ hv))
         (nestClosOK?-size c sl o (proj₁ (∧-true _ _ hcl))) (proj₁ hr)
         (≤-trans (m≤m⊔n (nestDᵛ (obs u) o) (nestDᵛˢ os)) hn)
-thruFit-vals {u = u} c L sl B W m m′ fuel switchᵒ nid κ id now (o ∷ os) sched st hsl hm hc hv hcl hva hpk hpl hr hn stP stV =
+thruFit-vals {u = u} c L sl B W m m′ fuel switchᵒ nid κ id now (o ∷ os) sched st hsl hm hc hv hcl hva hpk hpl hr hn stP stV stR stK stQ =
   proj₁ S , proj₁ (proj₂ S) , proj₂ (proj₂ S)
   , thruFit-vals c (proj₁ K + L) sl B W m m′ fuel switchᵒ nid κ id now os
       (proj₁ (proj₂ (proj₂ rc))) (proj₂ (proj₂ (proj₂ rc)))
@@ -3695,8 +3821,25 @@ thruFit-vals {u = u} c L sl B W m m′ fuel switchᵒ nid κ id now (o ∷ os) s
       (proj₂ K) (proj₂ (∧-true _ _ hv))
       (proj₂ (∧-true _ _ hcl)) (proj₂ (∧-true _ _ hva)) hpk hpl (proj₂ hr)
       (≤-trans (m≤n⊔m (nestDᵛ (obs u) o) (nestDᵛˢ os)) hn) stP stT
+      -- ONE PAYLOAD ONLY RAISES THE COUNTER, and the chain is fixed
+      (pathOrd?-mono (Sched.nextNode sched) (Sched.nextNode sd₁)
+         (thru-outer switchᵒ nid ↠ κ) (FreshC.nxMono FR0) stR)
+      -- and everything below the watermark the consume owes nothing
+      -- about is exactly the chain under the outer
+      (fresh-pathPark κ (Sched.nextNode sched) (Sched.nextNode sd₁) st st₁ FRκ stK)
+      -- the outer's own cell is the one the consume may write, and what
+      -- keeps its reading true is this payload's own
+      (thruConsume-cellPark fuel switchᵒ nid κ id now o sched st stO stQ)
   where
   rc = thruConsume fuel switchᵒ nid κ id now o sched st
+  sd₁ = proj₁ (proj₂ (proj₂ rc))
+  st₁ = proj₂ (proj₂ (proj₂ rc))
+  FR0 = thruConsume-fresh 0 fuel switchᵒ nid κ id now o sched st z≤n z≤n
+  FRκ = thruConsume-fresh (pathRead κ) fuel switchᵒ nid κ id now o sched st
+          (≤-trans (m≤n⊔m (suc nid) (pathRead κ))
+                   (pathOrd?-read (Sched.nextNode sched)
+                      (thru-outer switchᵒ nid ↠ κ) stR))
+          (pathOrd?-hop (Sched.nextNode sched) nid switchᵒ κ stR)
   2≤S = FaceOK.fSize faceHere
   stepL = c⊑step c L 2≤S
   stO = proj₁ (∧-true (inputsBelowᵛ (pathFloor κ) (obs u) o)
@@ -3706,12 +3849,13 @@ thruFit-vals {u = u} c L sl B W m m′ fuel switchᵒ nid κ id now (o ∷ os) s
   K = thruConsume-caps c L sl W fuel switchᵒ nid κ id now o sched st hsl hc
         (valCaps?-widen sl (obs u) o stepL (proj₁ (∧-true _ _ hva)))
         (pathSz?-⊑ κ stepL hpk) (≤-trans hpl (proj₁ stepL)) (proj₁ hr) stP stO
+        stR stK stQ
   S = thruStep-switch c L sl B W m m′ fuel nid κ id now o sched st hsl hm
         (capsOK?⇒nest (frameStep L c) sched st hc)
         (proj₁ (∧-true _ _ hv))
         (nestClosOK?-size c sl o (proj₁ (∧-true _ _ hcl))) (proj₁ hr)
         (≤-trans (m≤m⊔n (nestDᵛ (obs u) o) (nestDᵛˢ os)) hn)
-thruFit-vals {u = u} c L sl B W m m′ fuel exhaustᵒ nid κ id now (o ∷ os) sched st hsl hm hc hv hcl hva hpk hpl hr hn stP stV =
+thruFit-vals {u = u} c L sl B W m m′ fuel exhaustᵒ nid κ id now (o ∷ os) sched st hsl hm hc hv hcl hva hpk hpl hr hn stP stV stR stK stQ =
   proj₁ S , proj₁ (proj₂ S) , proj₂ (proj₂ S)
   , thruFit-vals c (proj₁ K + L) sl B W m m′ fuel exhaustᵒ nid κ id now os
       (proj₁ (proj₂ (proj₂ rc))) (proj₂ (proj₂ (proj₂ rc)))
@@ -3720,8 +3864,25 @@ thruFit-vals {u = u} c L sl B W m m′ fuel exhaustᵒ nid κ id now (o ∷ os) 
       (proj₂ K) (proj₂ (∧-true _ _ hv))
       (proj₂ (∧-true _ _ hcl)) (proj₂ (∧-true _ _ hva)) hpk hpl (proj₂ hr)
       (≤-trans (m≤n⊔m (nestDᵛ (obs u) o) (nestDᵛˢ os)) hn) stP stT
+      -- ONE PAYLOAD ONLY RAISES THE COUNTER, and the chain is fixed
+      (pathOrd?-mono (Sched.nextNode sched) (Sched.nextNode sd₁)
+         (thru-outer exhaustᵒ nid ↠ κ) (FreshC.nxMono FR0) stR)
+      -- and everything below the watermark the consume owes nothing
+      -- about is exactly the chain under the outer
+      (fresh-pathPark κ (Sched.nextNode sched) (Sched.nextNode sd₁) st st₁ FRκ stK)
+      -- the outer's own cell is the one the consume may write, and what
+      -- keeps its reading true is this payload's own
+      (thruConsume-cellPark fuel exhaustᵒ nid κ id now o sched st stO stQ)
   where
   rc = thruConsume fuel exhaustᵒ nid κ id now o sched st
+  sd₁ = proj₁ (proj₂ (proj₂ rc))
+  st₁ = proj₂ (proj₂ (proj₂ rc))
+  FR0 = thruConsume-fresh 0 fuel exhaustᵒ nid κ id now o sched st z≤n z≤n
+  FRκ = thruConsume-fresh (pathRead κ) fuel exhaustᵒ nid κ id now o sched st
+          (≤-trans (m≤n⊔m (suc nid) (pathRead κ))
+                   (pathOrd?-read (Sched.nextNode sched)
+                      (thru-outer exhaustᵒ nid ↠ κ) stR))
+          (pathOrd?-hop (Sched.nextNode sched) nid exhaustᵒ κ stR)
   2≤S = FaceOK.fSize faceHere
   stepL = c⊑step c L 2≤S
   stO = proj₁ (∧-true (inputsBelowᵛ (pathFloor κ) (obs u) o)
@@ -3731,6 +3892,7 @@ thruFit-vals {u = u} c L sl B W m m′ fuel exhaustᵒ nid κ id now (o ∷ os) 
   K = thruConsume-caps c L sl W fuel exhaustᵒ nid κ id now o sched st hsl hc
         (valCaps?-widen sl (obs u) o stepL (proj₁ (∧-true _ _ hva)))
         (pathSz?-⊑ κ stepL hpk) (≤-trans hpl (proj₁ stepL)) (proj₁ hr) stP stO
+        stR stK stQ
   S = thruStep-exhaust c L sl B W m m′ fuel nid κ id now o sched st hsl hm
         (capsOK?⇒nest (frameStep L c) sched st hc)
         (proj₁ (∧-true _ _ hv))
@@ -3767,19 +3929,40 @@ thruRoom-frame : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   thruRoomWOK W sf op nid p id now vals sched st →
   pathStrat? p ≡ true →
   valsStrat? (pathFloor p) vals ≡ true →
+  -- AND THE TWO CHAIN READINGS PLUS THE OUTER'S OWN CELL, carried along
+  -- the walk's own state thread.  All three are constant in the payload,
+  -- so unlike the caps reading beside them they are not split at each
+  -- cons -- what they need instead is a transport across the ONE consume
+  -- the cons performs, which is where the counter rises and where the
+  -- outer's cell may be written
+  pathOrd? (Sched.nextNode sched) (thru-outer op nid ↠ p) ≡ true →
+  pathPark? p st ≡ true →
+  parkStrat? (pathFloor p) (lookupNode nid (EvalSt.nodes st)) ≡ true →
   thruRoomOK c W sf op nid p id now vals sched st
 thruRoom-frame c L W sl sf id now op nid p [] sched st
-  hsl hc hval hpk hpl hw _ _ = tt
+  hsl hc hval hpk hpl hw _ _ _ _ _ = tt
 thruRoom-frame {n = n} {u = u} c L W sl sf id now op nid p (o ∷ os) sched st
-  hsl hc hval hpk hpl (hw , hws) stP stV =
+  hsl hc hval hpk hpl (hw , hws) stP stV stR stK stQ =
   ROOM
   , thruRoom-frame c (proj₁ K + L) W sl sf id now op nid p os
       (proj₁ (proj₂ (proj₂ rc))) (proj₂ (proj₂ (proj₂ rc)))
       (trans (KeepsC.slotsEq
                 (thruConsume-keeps sf op nid p id now o sched st)) hsl) (proj₂ K)
       (proj₂ (∧-true _ _ hval)) hpk hpl hws stP stT
+      (pathOrd?-mono (Sched.nextNode sched) (Sched.nextNode sd₁)
+         (thru-outer op nid ↠ p) (FreshC.nxMono FR0) stR)
+      (fresh-pathPark p (Sched.nextNode sched) (Sched.nextNode sd₁) st st₁ FRκ stK)
+      (thruConsume-cellPark sf op nid p id now o sched st stO stQ)
   where
   rc = thruConsume sf op nid p id now o sched st
+  sd₁ = proj₁ (proj₂ (proj₂ rc))
+  st₁ = proj₂ (proj₂ (proj₂ rc))
+  FR0 = thruConsume-fresh 0 sf op nid p id now o sched st z≤n z≤n
+  FRκ = thruConsume-fresh (pathRead p) sf op nid p id now o sched st
+          (≤-trans (m≤n⊔m (suc nid) (pathRead p))
+                   (pathOrd?-read (Sched.nextNode sched)
+                      (thru-outer op nid ↠ p) stR))
+          (pathOrd?-hop (Sched.nextNode sched) nid op p stR)
   2≤S = FaceOK.fSize faceHere
   stepL = c⊑step c L 2≤S
   stO = proj₁ (∧-true (inputsBelowᵛ (pathFloor p) (obs u) o)
@@ -3798,6 +3981,7 @@ thruRoom-frame {n = n} {u = u} c L W sl sf id now op nid p (o ∷ os) sched st
   K = thruConsume-caps c L sl W sf op nid p id now o sched st hsl hc
         (valCaps?-widen sl (obs u) o stepL (proj₁ (∧-true _ _ hval)))
         (pathSz?-⊑ p stepL hpk) (≤-trans hpl (proj₁ stepL)) ROOM stP stO
+        stR stK stQ
 
 -- THE ARRIVAL'S SYNC READING IS UNDER ITS RESOLVED CLOSURE, so the
 -- key premise pays for the size premise the walk asks about each
@@ -3929,12 +4113,18 @@ thruFit-frame : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   thruRoomWOK W sf op nid p id now vals sched st →
   pathStrat? p ≡ true →
   valsStrat? (pathFloor p) vals ≡ true →
+  -- AND THE THREE THE WALK UNDER THIS FRAME CARRIES, forwarded twice:
+  -- the room walk and the fit walk make the same consumes in the same
+  -- order, so each is entered at the state this frame was handed
+  pathOrd? (Sched.nextNode sched) (thru-outer op nid ↠ p) ≡ true →
+  pathPark? p st ≡ true →
+  parkStrat? (pathFloor p) (lookupNode nid (EvalSt.nodes st)) ≡ true →
   thruFitOK (nestFac (Caps.cSize c) W
               * ((nodesMax st ⊔ nestDᵛˢ vals)
                  + nestU (Caps.cSize c) (nestUnit e sl)))
     sf op nid p id now vals sched st
 thruFit-frame {e = e} c W sl sf id now op nid p vals sched st
-  hsl h1w hlv h1S hcap hval hss hclos hpk hpl hrw stP stV =
+  hsl h1w hlv h1S hcap hval hss hclos hpk hpl hrw stP stV stR stK stQ =
   thruFitOK-mono
     (nestB (Caps.cSize c) W (nestUnit e sl) (nestDᵛˢ vals) (Caps.cSize c))
     (nestFac (Caps.cSize c) W
@@ -3950,9 +4140,9 @@ thruFit-frame {e = e} c W sl sf id now op nid p vals sched st
           (λ o → nestClosOK?⇒val c sl o) vals hclos)
        hclos hval hpk hpl
        (thruRoom-frame c 0 W sl sf id now op nid p vals sched st
-          hsl cap0 hval hpk hpl hrw stP stV)
+          hsl cap0 hval hpk hpl hrw stP stV stR stK stQ)
        (nestB-base (Caps.cSize c) W (nestUnit e sl) (nestDᵛˢ vals) 0)
-       stP stV)
+       stP stV stR stK stQ)
   where
   cap0 : capsOK? (frameStep 0 c) sched st ≡ true
   cap0 = subst (λ z → capsOK? z sched st ≡ true) (sym (frameStep-0 c)) hcap
@@ -3976,13 +4166,19 @@ stepFrame-nodes-thru : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   thruRoomWOK W sf op nid p id now vals sched st →
   pathStrat? p ≡ true →
   valsStrat? (pathFloor p) vals ≡ true →
+  -- AND THE THREE THE FIT UNDER THIS HEAD CARRIES.  The wrap that
+  -- follows the walk reads none of them -- it flips a done flag -- so
+  -- they are forwarded to the fit and nowhere else
+  pathOrd? (Sched.nextNode sched) (thru-outer op nid ↠ p) ≡ true →
+  pathPark? p st ≡ true →
+  parkStrat? (pathFloor p) (lookupNode nid (EvalSt.nodes st)) ≡ true →
   let r = stepFrame sf id now (thru-outer op nid) p vals fin sched st in
   length (proj₁ r) ≤ W →
   (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r)))) ⊔ nestDᵛˢ (proj₁ r))
     ≤ nestFac (Caps.cSize c) W
       * ((nodesMax st ⊔ nestDᵛˢ vals) + nestU (Caps.cSize c) (nestUnit e sl))
 stepFrame-nodes-thru {e = e} c W sl sf id now op nid p vals fin sched st
-  hsl h1w hlv hcap hval hss hclos h1S hpk hpl hrw stP stV hlr =
+  hsl h1w hlv hcap hval hss hclos h1S hpk hpl hrw stP stV stR stK stQ hlr =
   ⊔-lub
     (≤-trans (proj₁ (proj₂ WRAP))
       (≤-trans (proj₁ (proj₂ WALK))
@@ -3998,7 +4194,8 @@ stepFrame-nodes-thru {e = e} c W sl sf id now op nid p vals fin sched st
   w = thruWalk sf op nid p id now vals sched st
   WALK = thruWalk-nest G sf op nid p id now vals sched st
            (thruFit-frame c W sl sf id now op nid p vals sched st
-              hsl h1w hlv h1S hcap hval hss hclos hpk hpl hrw stP stV)
+              hsl h1w hlv h1S hcap hval hss hclos hpk hpl hrw stP stV
+              stR stK stQ)
   WRAP = thruWrap-nest op nid fin (proj₁ w) (proj₁ (proj₂ w))
            (proj₁ (proj₂ (proj₂ w))) (proj₂ (proj₂ (proj₂ w)))
 
@@ -4215,10 +4412,17 @@ pushValsSt-walk : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   -- so the per-instant reading is `splitEvents-valsStrat` of this one
   pathStrat? κ ≡ true →
   burstStrat? (pathFloor κ) str ≡ true →
+  -- AND THE THREE THE PER-INSTANT STEP CONSUMES, carried along the state
+  -- thread rather than split with the burst: the frame is the SAME one
+  -- at every emit, so the chain never changes and only the state under
+  -- it does
+  pathOrd? (Sched.nextNode sched) (thru-outer op nid ↠ κ) ≡ true →
+  pathPark? κ st ≡ true →
+  parkStrat? (pathFloor κ) (lookupNode nid (EvalSt.nodes st)) ≡ true →
   pushValsStOK c L sl fuel op nid κ id now str sched st
-pushValsSt-walk c L sl W fuel op nid κ id now [] sched st hsl hc hadm hbc hpk hpl hroom _ _ = tt
+pushValsSt-walk c L sl W fuel op nid κ id now [] sched st hsl hc hadm hbc hpk hpl hroom _ _ _ _ _ = tt
 pushValsSt-walk {Γ = Γ} {u = u} c L sl W fuel op nid κ id now (em ∷ ems) sched st
-    hsl hc (hv , hcl , restAdm) hbc hpk hpl (hr , restRoom) stP stB =
+    hsl hc (hv , hcl , restAdm) hbc hpk hpl (hr , restRoom) stP stB stR stK stQ =
   hsl , hc
   , (proj₁ S
      , pushValsSt-walk c (proj₁ S + L) sl W fuel op nid κ id now ems
@@ -4226,7 +4430,17 @@ pushValsSt-walk {Γ = Γ} {u = u} c L sl W fuel op nid κ id now (em ∷ ems) sc
          (trans (KeepsC.slotsEq (stepFrame-keeps fuel id now (thru-outer op nid) κ (proj₁ sp)
                                 (proj₂ (proj₂ sp)) sched st)) hsl)
          (proj₂ S) restAdm (proj₂ (∧-true _ _ hbc)) hpk hpl restRoom
-         stP (proj₂ (∧-true _ _ stB)))
+         stP (proj₂ (∧-true _ _ stB))
+         (pathOrd?-mono (Sched.nextNode sched)
+            (Sched.nextNode (proj₁ (proj₂ (proj₂ (proj₂ sf)))))
+            (thru-outer op nid ↠ κ)
+            (stepFrame-nextNode fuel id now (thru-outer op nid) κ (proj₁ sp)
+               (proj₂ (proj₂ sp)) sched st)
+            stR)
+         (pathPark-step fuel id now (thru-outer op nid) κ (proj₁ sp)
+            (proj₂ (proj₂ sp)) sched st stR stK)
+         (framePark-step fuel id now (thru-outer op nid) κ (proj₁ sp)
+            (proj₂ (proj₂ sp)) sched st refl stV stQ))
   where
   sp = splitEvents {A = Val Γ u} (InstEmit.events em)
   sf = stepFrame fuel id now (thru-outer op nid) κ (proj₁ sp)
@@ -4237,7 +4451,7 @@ pushValsSt-walk {Γ = Γ} {u = u} c L sl W fuel op nid κ id now (em ∷ ems) sc
         (proj₂ (proj₂ sp)) sched st hsl hc
         (splitEvents-vals-caps {u = u} c sl (InstEmit.events em)
            (proj₁ (∧-true _ _ hbc)))
-        hpk hpl hr stP stV
+        hpk hpl hr stP stV stR stK stQ
 
 -- AND THE ROOM WALK IS A CHECKED FOLD.  Each instant's arrivals are
 -- handed to the frame's own record, and the state pair the next
@@ -4259,11 +4473,14 @@ pushVals-room-join : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   pushValsWOK W fuel op nid κ id now str sched st →
   pathStrat? κ ≡ true →
   burstStrat? (pathFloor κ) str ≡ true →
+  pathOrd? (Sched.nextNode sched) (thru-outer op nid ↠ κ) ≡ true →
+  pathPark? κ st ≡ true →
+  parkStrat? (pathFloor κ) (lookupNode nid (EvalSt.nodes st)) ≡ true →
   pushValsRoomOK c sl W fuel op nid κ id now str sched st
 pushVals-room-join c L sl W fuel op nid κ id now [] sched st
-  hsl hc hadm hbc hpk hpl hwid hw _ _ = tt
+  hsl hc hadm hbc hpk hpl hwid hw _ _ _ _ _ = tt
 pushVals-room-join {Γ = Γ} {u = u} c L sl W fuel op nid κ id now (em ∷ ems) sched st
-    hsl hc (hv , hcl , restAdm) hbc hpk hpl (hd , restWid) (hw , restW) stP stB =
+    hsl hc (hv , hcl , restAdm) hbc hpk hpl (hd , restWid) (hw , restW) stP stB stR stK stQ =
   R
   , pushVals-room-join c (proj₁ S + L) sl W fuel op nid κ id now ems
       (proj₁ (proj₂ (proj₂ (proj₂ sf)))) (proj₂ (proj₂ (proj₂ (proj₂ sf))))
@@ -4271,6 +4488,16 @@ pushVals-room-join {Γ = Γ} {u = u} c L sl W fuel op nid κ id now (em ∷ ems)
                              (proj₂ (proj₂ sp)) sched st)) hsl)
       (proj₂ S) restAdm (proj₂ (∧-true _ _ hbc)) hpk hpl restWid restW
       stP (proj₂ (∧-true _ _ stB))
+      (pathOrd?-mono (Sched.nextNode sched)
+         (Sched.nextNode (proj₁ (proj₂ (proj₂ (proj₂ sf)))))
+         (thru-outer op nid ↠ κ)
+         (stepFrame-nextNode fuel id now (thru-outer op nid) κ (proj₁ sp)
+            (proj₂ (proj₂ sp)) sched st)
+         stR)
+      (pathPark-step fuel id now (thru-outer op nid) κ (proj₁ sp)
+         (proj₂ (proj₂ sp)) sched st stR stK)
+      (framePark-step fuel id now (thru-outer op nid) κ (proj₁ sp)
+         (proj₂ (proj₂ sp)) sched st refl stV stQ)
   where
   sp = splitEvents {A = Val Γ u} (InstEmit.events em)
   sf = stepFrame fuel id now (thru-outer op nid) κ (proj₁ sp)
@@ -4280,9 +4507,9 @@ pushVals-room-join {Γ = Γ} {u = u} c L sl W fuel op nid κ id now (em ∷ ems)
   stV = splitEvents-valsStrat {u = u} (pathFloor κ) (InstEmit.events em)
           (proj₁ (∧-true _ _ stB))
   R = thruRoom-frame c L W sl fuel id now op nid κ (proj₁ sp) sched st
-        hsl hc hva hpk hpl hw stP stV
+        hsl hc hva hpk hpl hw stP stV stR stK stQ
   S = stepThru-caps c L sl W fuel op nid κ id now (proj₁ sp)
-        (proj₂ (proj₂ sp)) sched st hsl hc hva hpk hpl R stP stV
+        (proj₂ (proj₂ sp)) sched st hsl hc hva hpk hpl R stP stV stR stK stQ
 
 -- and the lift, CHECKED: one emit's fit is its values' fit, and the
 -- rest runs at the frame the emit left
@@ -4296,17 +4523,33 @@ pushFit-ems : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   suc (pathLen κ) ≤ Caps.cSize c →
   pathStrat? κ ≡ true →
   burstStrat? (pathFloor κ) str ≡ true →
+  -- AND THE THREE THE PER-INSTANT FIT CONSUMES, on the same state thread
+  -- the state walk beside this one advances: the chain is fixed at every
+  -- emit and only the state under it moves
+  pathOrd? (Sched.nextNode sched) (thru-outer op nid ↠ κ) ≡ true →
+  pathPark? κ st ≡ true →
+  parkStrat? (pathFloor κ) (lookupNode nid (EvalSt.nodes st)) ≡ true →
   ⦃ _ : FaceOK c sl ⦄ →
   pushFitOK (nestB (Caps.cSize c) W (nestUnit e sl) B m′)
     fuel op nid κ id now str sched st
-pushFit-ems c L sl B W m m′ fuel op nid κ id now [] sched st hm vals hpk hpl _ _ = tt
+pushFit-ems c L sl B W m m′ fuel op nid κ id now [] sched st hm vals hpk hpl _ _ _ _ _ = tt
 pushFit-ems {Γ = Γ} {u = u} c L sl B W m m′ fuel op nid κ id now (em ∷ ems) sched st hm
-            (hsl , hc , hv , hcl , hva , hr , hn , rest) hpk hpl stP stB =
+            (hsl , hc , hv , hcl , hva , hr , hn , rest) hpk hpl stP stB stR stK stQ =
   thruFit-vals c L sl B W m m′ fuel op nid κ id now (proj₁ sp) sched st
-    hsl hm hc hv hcl hva hpk hpl hr hn stP stV
+    hsl hm hc hv hcl hva hpk hpl hr hn stP stV stR stK stQ
   , pushFit-ems c (proj₁ rest + L) sl B W m m′ fuel op nid κ id now ems
       (proj₁ (proj₂ (proj₂ (proj₂ sf)))) (proj₂ (proj₂ (proj₂ (proj₂ sf)))) hm (proj₂ rest)
       hpk hpl stP (proj₂ (∧-true _ _ stB))
+      (pathOrd?-mono (Sched.nextNode sched)
+         (Sched.nextNode (proj₁ (proj₂ (proj₂ (proj₂ sf)))))
+         (thru-outer op nid ↠ κ)
+         (stepFrame-nextNode fuel id now (thru-outer op nid) κ (proj₁ sp)
+            (proj₂ (proj₂ sp)) sched st)
+         stR)
+      (pathPark-step fuel id now (thru-outer op nid) κ (proj₁ sp)
+         (proj₂ (proj₂ sp)) sched st stR stK)
+      (framePark-step fuel id now (thru-outer op nid) κ (proj₁ sp)
+         (proj₂ (proj₂ sp)) sched st refl stV stQ)
   where
   sp = splitEvents {A = Val Γ u} (InstEmit.events em)
   sf = stepFrame fuel id now (thru-outer op nid) κ (proj₁ sp)
@@ -4455,6 +4698,19 @@ NestAt {n = n} {Γ = Γ} {t = t} {e = e} c d sl B W Lv g o κ id now sched st =
   -- ignores every frame.
   pathStrat? κ ≡ true →
   inputsBelowᵉ (pathFloor κ) o ≡ true →
+  -- AND THE TWO REGISTRY-LEVEL READINGS BESIDE THEM, FOR EXACTLY THE
+  -- REASON THE BLOCK ABOVE GIVES ABOUT THE OTHER TWO.  Both are premises
+  -- of the caps face this walk descends into at its `*All` arms, both
+  -- are refuted as derivable from the receipt the call site holds --
+  -- the two hand-built states satisfy `capsOK?` outright while failing
+  -- the reading -- and neither is producible here, since a walk sees
+  -- neither the registry's growth site nor the cell a mint will write.
+  -- So they are carried clause for clause, and a frame the descent adds
+  -- passes both by the same two facts: `pathOrd?` grows only at a cell
+  -- the mint has just allocated, and `pathPark?` reads the table the
+  -- mint installs into.
+  pathOrd? (Sched.nextNode sched) κ ≡ true →
+  pathPark? κ st ≡ true →
   CeilD c (pred d) d Lv (nest o sl (EvalSt.connectedShares st)) (suc (sizeᵉ o)) →
   let r = subscribeE g o κ id now sched st in
   Σ ℕ λ j →
@@ -4514,6 +4770,87 @@ allFresh-park B Z u mergeAllᵒ lim = refl
 allFresh-park B Z u switchᵒ   _   = refl
 allFresh-park B Z u exhaustᵒ  _   = refl
 
+-- AND THE SAME CELL AT EVERY FLOOR.  The three shapes a mint installs
+-- hold no payload at all -- an empty queue and two flags -- so the park
+-- reading passes them without looking at the floor, which is what lets
+-- a mint discharge its own cell obligation with no fact about the
+-- chain it is being installed under
+allFresh-parkStrat : ∀ {n} {Γ : Ctx n} (k : ℕ)
+  (u : Ty) (op : AllOp) (lim : Maybe ℕ) →
+  parkStrat? {Γ = Γ} k (just (allFresh u op lim)) ≡ true
+allFresh-parkStrat k u mergeAllᵒ lim = refl
+allFresh-parkStrat k u switchᵒ   _   = refl
+allFresh-parkStrat k u exhaustᵒ  _   = refl
+
+-- AND THE THREE READINGS A MINT-AND-SUBSCRIBE HANDS BACK, which is the
+-- one composite every `*All` head performs and which the install and
+-- subscribe transports cannot be applied to directly: the chain the
+-- walk below reads names the cell the mint has only now allocated, so
+-- neither statement is at the counter the caller holds.  Stating the
+-- composite once is what keeps each head's call a line -- the head
+-- chooses the op and the payload and nothing else varies -- and it is
+-- what makes the ORDER reading a construction rather than a premise,
+-- since the frame being pushed sits at exactly the cell just handed out.
+mintSub-ord : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (g : Gas) (op : AllOp) (lim : Maybe ℕ) (b : Closed Γ (obs u))
+  (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+  pathOrd? (Sched.nextNode sched) κ ≡ true →
+  pathOrd?
+    (Sched.nextNode
+      (proj₁ (proj₂ (subscribeE g b (thru-outer op (proj₁ (mintNode sched)) ↠ κ)
+                       id now (proj₂ (mintNode sched))
+                       (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st)))))
+    (thru-outer op (proj₁ (mintNode sched)) ↠ κ) ≡ true
+mintSub-ord {u = u} g op lim b κ id now sched st stO =
+  subscribeE-ord g b (thru-outer op (Sched.nextNode sched) ↠ κ)
+    (thru-outer op (Sched.nextNode sched) ↠ κ) id now
+    (proj₂ (mintNode sched))
+    (installNode (Sched.nextNode sched) (allFresh u op lim) st)
+    (pathOrd?-push (suc (Sched.nextNode sched))
+       (thru-outer op (Sched.nextNode sched)) κ ≤-refl
+       (T⇒≡true _ (≤⇒≤ᵇ (pathOrd?-read (Sched.nextNode sched) κ stO)))
+       (pathOrd?-mono (Sched.nextNode sched) (suc (Sched.nextNode sched)) κ
+          (n≤1+n (Sched.nextNode sched)) stO))
+
+mintSub-pathPark : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (g : Gas) (op : AllOp) (lim : Maybe ℕ) (b : Closed Γ (obs u))
+  (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+  pathOrd? (Sched.nextNode sched) κ ≡ true →
+  pathPark? κ st ≡ true →
+  pathPark? κ
+    (proj₂ (proj₂ (subscribeE g b (thru-outer op (proj₁ (mintNode sched)) ↠ κ)
+                     id now (proj₂ (mintNode sched))
+                     (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st))))
+    ≡ true
+mintSub-pathPark {u = u} g op lim b κ id now sched st stO stK =
+  subscribeE-pathPark g b (thru-outer op (Sched.nextNode sched) ↠ κ) κ id now
+    (proj₂ (mintNode sched))
+    (installNode (Sched.nextNode sched) (allFresh u op lim) st)
+    (≤-trans read≤ (n≤1+n (Sched.nextNode sched)))
+    (installNode-pathPark (Sched.nextNode sched) (allFresh u op lim) κ st read≤ stK)
+  where
+  read≤ = pathOrd?-read (Sched.nextNode sched) κ stO
+
+mintSub-cellPark : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (g : Gas) (op : AllOp) (lim : Maybe ℕ) (b : Closed Γ (obs u))
+  (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+  parkStrat? (pathFloor κ)
+    (lookupNode (proj₁ (mintNode sched))
+      (EvalSt.nodes
+        (proj₂ (proj₂ (subscribeE g b (thru-outer op (proj₁ (mintNode sched)) ↠ κ)
+                         id now (proj₂ (mintNode sched))
+                         (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st))))))
+    ≡ true
+mintSub-cellPark {u = u} g op lim b κ id now sched st =
+  subscribeE-framePark (pathFloor κ) g b
+    (thru-outer op (Sched.nextNode sched) ↠ κ) id now
+    (thru-outer {u = u} op (Sched.nextNode sched))
+    (proj₂ (mintNode sched))
+    (installNode (Sched.nextNode sched) (allFresh u op lim) st)
+    ≤-refl
+    (installNode-cellPark {u = u} (pathFloor κ) op (Sched.nextNode sched)
+       (allFresh u op lim) st (allFresh-parkStrat (pathFloor κ) u op lim))
+
 -- the wrapper is one node above its source on every head, which is the
 -- size step a descent into that source needs
 allWrap-size : ∀ {n} {Γ : Ctx n} {u} (op : AllOp) (lim : Maybe ℕ)
@@ -4546,20 +4883,22 @@ subscribeE-burst-capsL : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   suc (pathLen κ) ≤ Caps.cSize (frameStep L c) →
   pathStrat? κ ≡ true →
   inputsBelowᵉ (pathFloor κ) o ≡ true →
+  pathOrd? (Sched.nextNode sched) κ ≡ true →
+  pathPark? κ st ≡ true →
   Σ ℕ λ L′ →
     (L + L′ ≤ opIterD (Caps.cSize c) (Caps.cWid c)
                 (depthE g o κ id now sched st)
                 (nest o sl (EvalSt.connectedShares st)) (suc (sizeᵉ o)) L)
     × (burstCaps? (frameStep (L + L′) c) sl
          (proj₁ (subscribeE g o κ id now sched st)) ≡ true)
-subscribeE-burst-capsL c L sl g o κ id now sched st ⦃ f ⦄ hsl hc hsz hdw hpk hpl stP stB =
+subscribeE-burst-capsL c L sl g o κ id now sched st ⦃ f ⦄ hsl hc hsz hdw hpk hpl stP stB stR stK =
   proj₁ R , proj₂ (proj₂ (proj₂ (proj₂ R))) , proj₁ (proj₂ (proj₂ R))
   where
   R = subscribeE-caps c (depthE g o κ id now sched st)
         (nest o sl (EvalSt.connectedShares st)) (suc (sizeᵉ o)) L
         g o κ id now sl sched st
         (FaceOK.fSize f) (FaceOK.fReg f) hsl (FaceOK.fSlC f) (FaceOK.fSlSz f)
-        hc hsz hdw hpk hpl ≤-refl ≤-refl ≤-refl stP stB
+        hc hsz hdw hpk hpl ≤-refl ≤-refl ≤-refl stP stB stR stK
 
 postulate
   -- THE SCAN HEAD, WHICH IS WHERE THE BURST INDEX IS REALLY BET.  A
@@ -4871,6 +5210,8 @@ subscribeE-burst-capsAt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   suc (pathLen κ) ≤ Caps.cSize (frameStep Lv c) →
   pathStrat? κ ≡ true →
   inputsBelowᵉ (pathFloor κ) o ≡ true →
+  pathOrd? (Sched.nextNode sched) κ ≡ true →
+  pathPark? κ st ≡ true →
   depthE g o κ id now sched st ≤ pred d →
   CeilD c (pred d) d Lv (nest o sl (EvalSt.connectedShares st)) (suc (sizeᵉ o)) →
   Σ ℕ λ L →
@@ -4878,7 +5219,7 @@ subscribeE-burst-capsAt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     × (burstCaps? (frameStep L c) sl
          (proj₁ (subscribeE g o κ id now sched st)) ≡ true)
 subscribeE-burst-capsAt {n = n} c d sl Lv g o κ id now sched st ⦃ f ⦄
-                        hsl hc hsz hdw hpk hpl stP stB hd hceil =
+                        hsl hc hsz hdw hpk hpl stP stB stR stK hd hceil =
   Lv + proj₁ R
   , hceil (proj₁ R)
       (≤-trans (proj₁ (proj₂ R))
@@ -4890,7 +5231,7 @@ subscribeE-burst-capsAt {n = n} c d sl Lv g o κ id now sched st ⦃ f ⦄
   , proj₂ (proj₂ R)
   where
   R = subscribeE-burst-capsL c Lv sl g o κ id now sched st hsl hc hsz hdw hpk hpl
-        stP stB
+        stP stB stR stK
 
 
 -- AND THE NESTING HALF CONVERTS THE SAME WAY, off the same carried
@@ -5142,6 +5483,14 @@ pushVals-caps-exit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   -- two and the descent takes them unchanged
   pathStrat? κ ≡ true →
   inputsBelowᵉ (pathFloor κ) b ≡ true →
+  -- AND THE TWO REGISTRY READINGS, WHICH THE MINT SPENDS RATHER THAN
+  -- FORWARDS.  The frame this body pushes names the cell the mint just
+  -- allocated, so the extended chain's order reading is the parent's
+  -- pushed at a cell the counter has only now handed out, and its park
+  -- reading is the parent's beside the cell the install writes -- both
+  -- built here, neither asked of the caller at the extended chain
+  pathOrd? (Sched.nextNode sched) κ ≡ true →
+  pathPark? κ st ≡ true →
   ⦃ _ : FaceOK c sl ⦄ →
   let res = subscribeE g b (thru-outer op (proj₁ (mintNode sched)) ↠ κ)
           id now (proj₂ (mintNode sched))
@@ -5149,7 +5498,7 @@ pushVals-caps-exit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   in Σ ℕ λ L₀ →
      capsOK? (frameStep L₀ c) (proj₁ (proj₂ res)) (proj₂ (proj₂ res)) ≡ true
 pushVals-caps-exit {n = n} {u = u} c sl W g op lim b κ id now sched st
-                   hsl hc hv hcl hw hsz hpk hpl stP stB =
+                   hsl hc hv hcl hw hsz hpk hpl stP stB stO stK =
   suc k + proj₁ R , proj₁ (proj₂ R)
   where
   nid    = proj₁ (mintNode sched)
@@ -5165,11 +5514,25 @@ pushVals-caps-exit {n = n} {u = u} c sl W g op lim b κ id now sched st
   capsE = capsOK?-setNode c nid (allFresh u op lim) sched′ st
             (allFresh-bnd (Caps.cSize c) u op lim)
             (allFresh-park (Caps.cSize c) (slotsSize (Sched.slots sched′)) u op lim)
-            (allFresh-widN (Caps.cWid c) (Sched.slots sched′) u op lim) hc
+            (allFresh-widN (Caps.cWid c) (Sched.slots sched′) u op lim)
+            (capsOK?-nextNode c (suc (Sched.nextNode sched)) sched st
+               (n≤1+n (Sched.nextNode sched)) hc)
+            (λ i h → allFresh-parkStrat i u op lim)
   PL : suc (pathLen κ) ≤ Caps.cSize (frameStep k c)
   PL = ≤-trans hpl (proj₁ (c⊑step c k 2≤S))
   PS = path-step c k (thru-outer op nid) κ 2≤S refl
          (pathSz?-lvl c k κ 2≤S hpk) PL
+  read≤ : pathRead κ ≤ nid
+  read≤ = pathOrd?-read (Sched.nextNode sched) κ stO
+  ordPUSH : pathOrd? (Sched.nextNode sched′) κ′ ≡ true
+  ordPUSH = pathOrd?-push (suc nid) (thru-outer op nid) κ ≤-refl
+              (T⇒≡true _ (≤⇒≤ᵇ read≤))
+              (pathOrd?-mono nid (suc nid) κ (n≤1+n nid) stO)
+  parkκ′ : pathPark? κ′ st′ ≡ true
+  parkκ′ = ∧-intro
+             (installNode-cellPark {u = u} (pathFloor κ) op nid
+                (allFresh u op lim) st (allFresh-parkStrat (pathFloor κ) u op lim))
+             (installNode-pathPark nid (allFresh u op lim) κ st read≤ stK)
   R = subscribeE-caps c (depthE g b κ′ id now sched′ st′)
         (nest b sl (EvalSt.connectedShares st′)) (suc (sizeᵉ b)) (suc k)
         g b κ′ id now sl sched′ st′
@@ -5177,7 +5540,7 @@ pushVals-caps-exit {n = n} {u = u} c sl W g op lim b κ id now sched st
         (capsOK?-lvl c (suc k) sched′ st′ 2≤S capsE)
         (≤-trans szb (proj₁ (c⊑step c (suc k) 2≤S)))
         (expWid-fromSize c 0 0 k sl 2≤S (FaceOK.fSlC faceHere) b ≤-refl)
-        (proj₁ PS) (proj₂ PS) ≤-refl ≤-refl ≤-refl stP stB
+        (proj₁ PS) (proj₂ PS) ≤-refl ≤-refl ≤-refl stP stB ordPUSH parkκ′
 
 -- THE ROOM WALK ASSEMBLED, over the three leaves the block above
 -- states apart.  The exit pair is the descent's, so the fold starts at
@@ -5209,12 +5572,19 @@ pushVals-caps-room : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   -- below `pathFloor κ` by `subscribeE-burstStrat` and by nothing here
   pathStrat? κ ≡ true →
   inputsBelowᵉ (pathFloor κ) b ≡ true →
+  -- AND THE TWO REGISTRY READINGS AT THE UNEXTENDED CHAIN, which the
+  -- mint below spends rather than forwards: the frame this head pushes
+  -- names the cell the counter has only now handed out, so the extended
+  -- chain's order reading is built here and the caller is asked for the
+  -- parent's
+  pathOrd? (Sched.nextNode sched) κ ≡ true →
+  pathPark? κ st ≡ true →
   let res = subscribeE g b (thru-outer op (proj₁ (mintNode sched)) ↠ κ)
           id now (proj₂ (mintNode sched))
           (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st)
   in pushValsRoomOK (frameStep j c) sl W g op (proj₁ (mintNode sched)) κ id now
        (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
-pushVals-caps-room {u = u} c j Lv sl W g op lim b κ id now sched st hj hLv hsl hc hv hcl hw hsz hpk hpl hbc hbn stP stB =
+pushVals-caps-room {u = u} c j Lv sl W g op lim b κ id now sched st hj hLv hsl hc hv hcl hw hsz hpk hpl hbc hbn stP stB stO stK =
   pushVals-room-join (frameStep j c) (proj₁ EX) sl W g op (proj₁ (mintNode sched)) κ id now
     (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
     ⦃ face⊑ c (frameStep j c) sl (c⊑step c j (FaceOK.fSize faceHere)) faceHere ⦄
@@ -5229,6 +5599,9 @@ pushVals-caps-room {u = u} c j Lv sl W g op lim b κ id now sched st hj hLv hsl 
     (pushVals-caps-burstW (frameStep Lv c) sl W g op lim b κ id now sched st
        ⦃ face⊑ c (frameStep Lv c) sl (c⊑step c Lv 2≤S) faceHere ⦄ hsl hc hv hcl hw)
     stP bStr
+    (mintSub-ord g op lim b κ id now sched st stO)
+    (mintSub-pathPark g op lim b κ id now sched st stO stK)
+    (mintSub-cellPark g op lim b κ id now sched st)
   where
   res = subscribeE g b (thru-outer op (proj₁ (mintNode sched)) ↠ κ)
           id now (proj₂ (mintNode sched))
@@ -5246,7 +5619,7 @@ pushVals-caps-room {u = u} c j Lv sl W g op lim b κ id now sched st hj hLv hsl 
          hsl (capsOK?-mono (frameStep Lv c) (frameStep j c) sched st stepL hc)
          (nestValOK?-widen (obs u) (allWrap op lim b) stepL hv)
          (nestClosOK?-widen (frameStep Lv c) (frameStep j c) sl (allWrap op lim b) stepL hcl)
-         hw hsz hpk hpl stP stB ⦃ facej ⦄
+         hw hsz hpk hpl stP stB stO stK ⦃ facej ⦄
 
 -- the state half assembled: exit pair in, checked chain out
 pushVals-caps-st : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
@@ -5272,13 +5645,20 @@ pushVals-caps-st : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
               (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st))) ≡ true →
   pathStrat? κ ≡ true →
   inputsBelowᵉ (pathFloor κ) b ≡ true →
+  -- AND THE TWO REGISTRY READINGS AT THE UNEXTENDED CHAIN, which the
+  -- mint below spends rather than forwards: the frame this head pushes
+  -- names the cell the counter has only now handed out, so the extended
+  -- chain's order reading is built here and the caller is asked for the
+  -- parent's
+  pathOrd? (Sched.nextNode sched) κ ≡ true →
+  pathPark? κ st ≡ true →
   let res = subscribeE g b (thru-outer op (proj₁ (mintNode sched)) ↠ κ)
           id now (proj₂ (mintNode sched))
           (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st)
   in Σ ℕ λ L₀ →
      pushValsStOK (frameStep j c) L₀ sl g op (proj₁ (mintNode sched)) κ id now
        (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
-pushVals-caps-st {u = u} c j Lv sl W g op lim b κ id now sched st hj hLv hsl hc hv hcl hw hsz hpk hpl hbc hbn stP stB =
+pushVals-caps-st {u = u} c j Lv sl W g op lim b κ id now sched st hj hLv hsl hc hv hcl hw hsz hpk hpl hbc hbn stP stB stO stK =
   proj₁ EX ,
   pushValsSt-walk (frameStep j c) (proj₁ EX) sl W g op (proj₁ (mintNode sched)) κ id now (proj₁ res)
     (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
@@ -5291,8 +5671,11 @@ pushVals-caps-st {u = u} c j Lv sl W g op lim b κ id now sched st hj hLv hsl hc
     (pushVals-adm-ems (frameStep j c) sl (proj₁ res) hbn)
     hbc hpk hpl
     (pushVals-caps-room c j Lv sl W g op lim b κ id now sched st hj hLv hsl hc hv hcl hw
-       hsz hpk hpl hbc hbn stP stB)
+       hsz hpk hpl hbc hbn stP stB stO stK)
     stP bStr
+    (mintSub-ord g op lim b κ id now sched st stO)
+    (mintSub-pathPark g op lim b κ id now sched st stO stK)
+    (mintSub-cellPark g op lim b κ id now sched st)
   where
   res = subscribeE g b (thru-outer op (proj₁ (mintNode sched)) ↠ κ)
           id now (proj₂ (mintNode sched))
@@ -5310,7 +5693,7 @@ pushVals-caps-st {u = u} c j Lv sl W g op lim b κ id now sched st hj hLv hsl hc
          hsl (capsOK?-mono (frameStep Lv c) (frameStep j c) sched st stepL hc)
          (nestValOK?-widen (obs u) (allWrap op lim b) stepL hv)
          (nestClosOK?-widen (frameStep Lv c) (frameStep j c) sl (allWrap op lim b) stepL hcl)
-         hw hsz hpk hpl stP stB ⦃ facej ⦄
+         hw hsz hpk hpl stP stB stO stK ⦃ facej ⦄
 
 -- THE CAPS MASTER IS AN ASSEMBLY.  The walk owes three kinds of fact
 -- and the leaves above state them apart; the composition into the
@@ -5338,13 +5721,20 @@ pushVals-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
               (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st))) ≡ true →
   pathStrat? κ ≡ true →
   inputsBelowᵉ (pathFloor κ) b ≡ true →
+  -- AND THE TWO REGISTRY READINGS AT THE UNEXTENDED CHAIN, which the
+  -- mint below spends rather than forwards: the frame this head pushes
+  -- names the cell the counter has only now handed out, so the extended
+  -- chain's order reading is built here and the caller is asked for the
+  -- parent's
+  pathOrd? (Sched.nextNode sched) κ ≡ true →
+  pathPark? κ st ≡ true →
   let res = subscribeE g b (thru-outer op (proj₁ (mintNode sched)) ↠ κ)
           id now (proj₂ (mintNode sched))
           (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st)
   in Σ ℕ λ L₀ →
      pushValsCapsOK (frameStep j c) L₀ sl W g op (proj₁ (mintNode sched)) κ id now
        (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
-pushVals-caps {u = u} c j Lv sl W g op lim b κ id now sched st hj hLv hsl hc hv hcl hw hsz hpk hpl hbc hbn stP stB =
+pushVals-caps {u = u} c j Lv sl W g op lim b κ id now sched st hj hLv hsl hc hv hcl hw hsz hpk hpl hbc hbn stP stB stO stK =
   proj₁ ST ,
   pushVals-caps-join (frameStep j c) (proj₁ ST) sl W g op (proj₁ (mintNode sched)) κ id now
     (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
@@ -5352,10 +5742,10 @@ pushVals-caps {u = u} c j Lv sl W g op lim b κ id now sched st hj hLv hsl hc hv
     (pushVals-adm-ems (frameStep j c) sl (proj₁ res) hbn)
     hbc
     (pushVals-caps-room c j Lv sl W g op lim b κ id now sched st hj hLv hsl hc hv hcl hw
-       hsz hpk hpl hbc hbn stP stB)
+       hsz hpk hpl hbc hbn stP stB stO stK)
   where
   ST = pushVals-caps-st c j Lv sl W g op lim b κ id now sched st hj hLv hsl hc hv hcl hw
-         hsz hpk hpl hbc hbn stP stB
+         hsz hpk hpl hbc hbn stP stB stO stK
   res = subscribeE g b (thru-outer op (proj₁ (mintNode sched)) ↠ κ)
           id now (proj₂ (mintNode sched))
           (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st)
@@ -5389,6 +5779,10 @@ pushVals-merge : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
         ≤ nestB (Caps.cSize (frameStep j c)) W (nestUnit e sl) B (syncSizeᵉ b)) →
   pathStrat? κ ≡ true →
   inputsBelowᵉ (pathFloor κ) b ≡ true →
+  -- AND THE TWO REGISTRY READINGS AT THE UNEXTENDED CHAIN, forwarded to
+  -- the caps master, which is the only thing under this head that mints
+  pathOrd? (Sched.nextNode sched) κ ≡ true →
+  pathPark? κ st ≡ true →
   let res = subscribeE g b (thru-outer mergeAllᵒ (proj₁ (mintNode sched)) ↠ κ)
           id now (proj₂ (mintNode sched))
           (installNode (proj₁ (mintNode sched)) (mergeAll-st {t = u} lim 0 [] false) st)
@@ -5397,7 +5791,7 @@ pushVals-merge : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
        g mergeAllᵒ (proj₁ (mintNode sched)) κ id now
        (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
 pushVals-merge {Γ = Γ} {t = t} {e = e} {u = u} c j Lv sl B W g lim b κ id now sched st
-               hj hLv hsl hc hv hcl hn hw hsz hpk hpl hbc hbn hbu stP stB =
+               hj hLv hsl hc hv hcl hn hw hsz hpk hpl hbc hbn hbu stP stB stO stK =
   proj₁ CAPS ,
   pushVals-both (frameStep j c) (proj₁ CAPS) sl B W (syncSizeᵉ b) g mergeAllᵒ (proj₁ (mintNode sched)) κ id now
     (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
@@ -5409,7 +5803,7 @@ pushVals-merge {Γ = Γ} {t = t} {e = e} {u = u} c j Lv sl B W g lim b κ id now
               (splitBurst-vals-A {A = Val Γ t} {B = Val Γ u} (proj₁ res)) hbu))
   where
   CAPS = pushVals-caps c j Lv sl W g mergeAllᵒ lim b κ id now sched st hj hLv hsl hc hv hcl hw
-           hsz hpk hpl hbc hbn stP stB
+           hsz hpk hpl hbc hbn stP stB stO stK
   res = subscribeE g b (thru-outer mergeAllᵒ (proj₁ (mintNode sched)) ↠ κ)
           id now (proj₂ (mintNode sched))
           (installNode (proj₁ (mintNode sched)) (mergeAll-st {t = u} lim 0 [] false) st)
@@ -5443,6 +5837,10 @@ pushVals-switch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
         ≤ nestB (Caps.cSize (frameStep j c)) W (nestUnit e sl) B (syncSizeᵉ b)) →
   pathStrat? κ ≡ true →
   inputsBelowᵉ (pathFloor κ) b ≡ true →
+  -- AND THE TWO REGISTRY READINGS AT THE UNEXTENDED CHAIN, forwarded to
+  -- the caps master, which is the only thing under this head that mints
+  pathOrd? (Sched.nextNode sched) κ ≡ true →
+  pathPark? κ st ≡ true →
   let res = subscribeE g b (thru-outer switchᵒ (proj₁ (mintNode sched)) ↠ κ)
           id now (proj₂ (mintNode sched))
           (installNode (proj₁ (mintNode sched)) (switch-st nothing false) st)
@@ -5451,7 +5849,7 @@ pushVals-switch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
        g switchᵒ (proj₁ (mintNode sched)) κ id now
        (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
 pushVals-switch {Γ = Γ} {t = t} {e = e} {u = u} c j Lv sl B W g b κ id now sched st
-               hj hLv hsl hc hv hcl hn hw hsz hpk hpl hbc hbn hbu stP stB =
+               hj hLv hsl hc hv hcl hn hw hsz hpk hpl hbc hbn hbu stP stB stO stK =
   proj₁ CAPS ,
   pushVals-both (frameStep j c) (proj₁ CAPS) sl B W (syncSizeᵉ b) g switchᵒ (proj₁ (mintNode sched)) κ id now
     (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
@@ -5463,7 +5861,7 @@ pushVals-switch {Γ = Γ} {t = t} {e = e} {u = u} c j Lv sl B W g b κ id now sc
               (splitBurst-vals-A {A = Val Γ t} {B = Val Γ u} (proj₁ res)) hbu))
   where
   CAPS = pushVals-caps c j Lv sl W g switchᵒ nothing b κ id now sched st hj hLv hsl hc hv hcl hw
-           hsz hpk hpl hbc hbn stP stB
+           hsz hpk hpl hbc hbn stP stB stO stK
   res = subscribeE g b (thru-outer switchᵒ (proj₁ (mintNode sched)) ↠ κ)
           id now (proj₂ (mintNode sched))
           (installNode (proj₁ (mintNode sched)) (switch-st nothing false) st)
@@ -5497,6 +5895,10 @@ pushVals-exhaust : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
         ≤ nestB (Caps.cSize (frameStep j c)) W (nestUnit e sl) B (syncSizeᵉ b)) →
   pathStrat? κ ≡ true →
   inputsBelowᵉ (pathFloor κ) b ≡ true →
+  -- AND THE TWO REGISTRY READINGS AT THE UNEXTENDED CHAIN, forwarded to
+  -- the caps master, which is the only thing under this head that mints
+  pathOrd? (Sched.nextNode sched) κ ≡ true →
+  pathPark? κ st ≡ true →
   let res = subscribeE g b (thru-outer exhaustᵒ (proj₁ (mintNode sched)) ↠ κ)
           id now (proj₂ (mintNode sched))
           (installNode (proj₁ (mintNode sched)) (exhaust-st false false) st)
@@ -5505,7 +5907,7 @@ pushVals-exhaust : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
        g exhaustᵒ (proj₁ (mintNode sched)) κ id now
        (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
 pushVals-exhaust {Γ = Γ} {t = t} {e = e} {u = u} c j Lv sl B W g b κ id now sched st
-               hj hLv hsl hc hv hcl hn hw hsz hpk hpl hbc hbn hbu stP stB =
+               hj hLv hsl hc hv hcl hn hw hsz hpk hpl hbc hbn hbu stP stB stO stK =
   proj₁ CAPS ,
   pushVals-both (frameStep j c) (proj₁ CAPS) sl B W (syncSizeᵉ b) g exhaustᵒ (proj₁ (mintNode sched)) κ id now
     (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
@@ -5517,7 +5919,7 @@ pushVals-exhaust {Γ = Γ} {t = t} {e = e} {u = u} c j Lv sl B W g b κ id now s
               (splitBurst-vals-A {A = Val Γ t} {B = Val Γ u} (proj₁ res)) hbu))
   where
   CAPS = pushVals-caps c j Lv sl W g exhaustᵒ nothing b κ id now sched st hj hLv hsl hc hv hcl hw
-           hsz hpk hpl hbc hbn stP stB
+           hsz hpk hpl hbc hbn stP stB stO stK
   res = subscribeE g b (thru-outer exhaustᵒ (proj₁ (mintNode sched)) ↠ κ)
           id now (proj₂ (mintNode sched))
           (installNode (proj₁ (mintNode sched)) (exhaust-st false false) st)
@@ -5556,6 +5958,10 @@ thruFit-merge : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
         ≤ nestB (Caps.cSize (frameStep j c)) W (nestUnit e sl) B (syncSizeᵉ b)) →
   pathStrat? κ ≡ true →
   inputsBelowᵉ (pathFloor κ) b ≡ true →
+  -- AND THE TWO READINGS THE MINT UNDER THIS HEAD SPENDS, forwarded to
+  -- the value walk and, at the counter the subscribe leaves, to the fit
+  pathOrd? (Sched.nextNode sched) κ ≡ true →
+  pathPark? κ st ≡ true →
   let res = subscribeE g b (thru-outer mergeAllᵒ (proj₁ (mintNode sched)) ↠ κ)
               id now (proj₂ (mintNode sched))
               (installNode (proj₁ (mintNode sched))
@@ -5564,17 +5970,20 @@ thruFit-merge : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
                   (syncSizeᵉ (mergeAllᵉ lim b)))
        g mergeAllᵒ (proj₁ (mintNode sched)) κ id now
        (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
-thruFit-merge {e = e} {u = u} c j Lv sl B W g lim b κ id now sched st hj hLv hsl hc hv hcl hn hw hsz hpk hpl hbc hbn hbu stP stB =
+thruFit-merge {e = e} {u = u} c j Lv sl B W g lim b κ id now sched st hj hLv hsl hc hv hcl hn hw hsz hpk hpl hbc hbn hbu stP stB stO stK =
   pushFit-ems (frameStep j c) (proj₁ PV) sl B W (syncSizeᵉ b) (syncSizeᵉ (mergeAllᵉ lim b))
     g mergeAllᵒ (proj₁ (mintNode sched)) κ id now
     (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res)) ≤-refl
     (proj₂ PV)
     hpk hpl
     stP bStr
+    (mintSub-ord g mergeAllᵒ lim b κ id now sched st stO)
+    (mintSub-pathPark g mergeAllᵒ lim b κ id now sched st stO stK)
+    (mintSub-cellPark g mergeAllᵒ lim b κ id now sched st)
     ⦃ face⊑ c (frameStep j c) sl (c⊑step c j (FaceOK.fSize faceHere)) faceHere ⦄
   where
   PV = pushVals-merge c j Lv sl B W g lim b κ id now sched st hj hLv hsl hc hv hcl hn hw
-         hsz hpk hpl hbc hbn hbu stP stB
+         hsz hpk hpl hbc hbn hbu stP stB stO stK
 
   bStr = subscribeE-burstStrat g b (thru-outer mergeAllᵒ (proj₁ (mintNode sched)) ↠ κ)
            id now (proj₂ (mintNode sched))
@@ -5613,6 +6022,10 @@ thruFit-switch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
         ≤ nestB (Caps.cSize (frameStep j c)) W (nestUnit e sl) B (syncSizeᵉ b)) →
   pathStrat? κ ≡ true →
   inputsBelowᵉ (pathFloor κ) b ≡ true →
+  -- AND THE TWO READINGS THE MINT UNDER THIS HEAD SPENDS, forwarded to
+  -- the value walk and, at the counter the subscribe leaves, to the fit
+  pathOrd? (Sched.nextNode sched) κ ≡ true →
+  pathPark? κ st ≡ true →
   let res = subscribeE g b (thru-outer switchᵒ (proj₁ (mintNode sched)) ↠ κ)
               id now (proj₂ (mintNode sched))
               (installNode (proj₁ (mintNode sched)) (switch-st nothing false) st)
@@ -5620,17 +6033,20 @@ thruFit-switch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
                   (syncSizeᵉ (switchAllᵉ b)))
        g switchᵒ (proj₁ (mintNode sched)) κ id now
        (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
-thruFit-switch {e = e} c j Lv sl B W g b κ id now sched st hj hLv hsl hc hv hcl hn hw hsz hpk hpl hbc hbn hbu stP stB =
+thruFit-switch {e = e} c j Lv sl B W g b κ id now sched st hj hLv hsl hc hv hcl hn hw hsz hpk hpl hbc hbn hbu stP stB stO stK =
   pushFit-ems (frameStep j c) (proj₁ PV) sl B W (syncSizeᵉ b) (syncSizeᵉ (switchAllᵉ b))
     g switchᵒ (proj₁ (mintNode sched)) κ id now
     (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res)) ≤-refl
     (proj₂ PV)
     hpk hpl
     stP bStr
+    (mintSub-ord g switchᵒ nothing b κ id now sched st stO)
+    (mintSub-pathPark g switchᵒ nothing b κ id now sched st stO stK)
+    (mintSub-cellPark g switchᵒ nothing b κ id now sched st)
     ⦃ face⊑ c (frameStep j c) sl (c⊑step c j (FaceOK.fSize faceHere)) faceHere ⦄
   where
   PV = pushVals-switch c j Lv sl B W g b κ id now sched st hj hLv hsl hc hv hcl hn hw
-         hsz hpk hpl hbc hbn hbu stP stB
+         hsz hpk hpl hbc hbn hbu stP stB stO stK
 
   bStr = subscribeE-burstStrat g b (thru-outer switchᵒ (proj₁ (mintNode sched)) ↠ κ)
            id now (proj₂ (mintNode sched))
@@ -5667,6 +6083,10 @@ thruFit-exhaust : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
         ≤ nestB (Caps.cSize (frameStep j c)) W (nestUnit e sl) B (syncSizeᵉ b)) →
   pathStrat? κ ≡ true →
   inputsBelowᵉ (pathFloor κ) b ≡ true →
+  -- AND THE TWO READINGS THE MINT UNDER THIS HEAD SPENDS, forwarded to
+  -- the value walk and, at the counter the subscribe leaves, to the fit
+  pathOrd? (Sched.nextNode sched) κ ≡ true →
+  pathPark? κ st ≡ true →
   let res = subscribeE g b (thru-outer exhaustᵒ (proj₁ (mintNode sched)) ↠ κ)
               id now (proj₂ (mintNode sched))
               (installNode (proj₁ (mintNode sched)) (exhaust-st false false) st)
@@ -5674,17 +6094,20 @@ thruFit-exhaust : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
                   (syncSizeᵉ (exhaustAllᵉ b)))
        g exhaustᵒ (proj₁ (mintNode sched)) κ id now
        (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
-thruFit-exhaust {e = e} c j Lv sl B W g b κ id now sched st hj hLv hsl hc hv hcl hn hw hsz hpk hpl hbc hbn hbu stP stB =
+thruFit-exhaust {e = e} c j Lv sl B W g b κ id now sched st hj hLv hsl hc hv hcl hn hw hsz hpk hpl hbc hbn hbu stP stB stO stK =
   pushFit-ems (frameStep j c) (proj₁ PV) sl B W (syncSizeᵉ b) (syncSizeᵉ (exhaustAllᵉ b))
     g exhaustᵒ (proj₁ (mintNode sched)) κ id now
     (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res)) ≤-refl
     (proj₂ PV)
     hpk hpl
     stP bStr
+    (mintSub-ord g exhaustᵒ nothing b κ id now sched st stO)
+    (mintSub-pathPark g exhaustᵒ nothing b κ id now sched st stO stK)
+    (mintSub-cellPark g exhaustᵒ nothing b κ id now sched st)
     ⦃ face⊑ c (frameStep j c) sl (c⊑step c j (FaceOK.fSize faceHere)) faceHere ⦄
   where
   PV = pushVals-exhaust c j Lv sl B W g b κ id now sched st hj hLv hsl hc hv hcl hn hw
-         hsz hpk hpl hbc hbn hbu stP stB
+         hsz hpk hpl hbc hbn hbu stP stB stO stK
 
   bStr = subscribeE-burstStrat g b (thru-outer exhaustᵒ (proj₁ (mintNode sched)) ↠ κ)
            id now (proj₂ (mintNode sched))
@@ -5766,7 +6189,7 @@ subscribeE-nest-slot : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sched : Sched Γ) (st : EvalSt e) →
   ⦃ _ : FaceOK c sl ⦄ →
   NestAt c d sl B W Lv g (input i) κ id now sched st
-subscribeE-nest-slot {e = e} c d sl B W Lv g i κ id now sched st hsl hc hv hcl hn hw hd hsz hdw hpk hpl _ _ hceil =
+subscribeE-nest-slot {e = e} c d sl B W Lv g i κ id now sched st hsl hc hv hcl hn hw hd hsz hdw hpk hpl _ _ _ _ hceil =
   Lv , ceil-here c (pred d) d Lv _ _ hceil , ≤-refl
   , nestTriple-widen
         (arrD≤nestB (Caps.cSize (frameStep Lv c)) W (nestUnit e sl) B
@@ -5788,7 +6211,7 @@ subscribeE-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
 subscribeE-nest c d sl B W Lv g (input i) κ id now sched st =
   subscribeE-nest-slot c d sl B W Lv g i κ id now sched st
 subscribeE-nest {Γ = Γ} {t = t} {e = e} {u = u} c d sl B W Lv g (ofᵉ ts) κ id now sched st
-  hsl hc hv hcl hn hw hd hsz hdw hpk hpl _ _ hceil =
+  hsl hc hv hcl hn hw hd hsz hdw hpk hpl _ _ _ _ hceil =
   Lv , ceil-here c (pred d) d Lv _ _ hceil , ≤-refl ,
   ≤-trans (≤-reflexive (cong (nestDᵛˢ {u = u})
              (oneShot-vals {A = Val Γ t} (map (λ tm → evalTm tm) ts) id sched)))
@@ -5799,9 +6222,9 @@ subscribeE-nest {Γ = Γ} {t = t} {e = e} {u = u} c d sl B W Lv g (ofᵉ ts) κ 
                   0 (syncSizeᵗˢ ts) (syncSizeᵉ (ofᵉ ts))
                   (nestValOK?-size (frameStep Lv c) (ofᵉ ts) hv) (s≤s z≤n))))
   , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _)
-subscribeE-nest c d sl B W Lv g emptyᵉ κ id now sched st hsl hc hv hcl hn hw hd hsz hdw hpk hpl _ _ hceil =
+subscribeE-nest c d sl B W Lv g emptyᵉ κ id now sched st hsl hc hv hcl hn hw hd hsz hdw hpk hpl _ _ _ _ hceil =
   Lv , ceil-here c (pred d) d Lv _ _ hceil , ≤-refl , z≤n , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _)
-subscribeE-nest {e = e} c d sl B W Lv g (mapᵉ f b) κ id now sched st hsl hc hv hcl hn hw hd hsz hdw hpk hpl stP stB hceil =
+subscribeE-nest {e = e} c d sl B W Lv g (mapᵉ f b) κ id now sched st hsl hc hv hcl hn hw hd hsz hdw hpk hpl stP stB stR stK hceil =
   jIH
   , jB
   , ≤-trans (n≤1+n Lv) IH≥
@@ -5853,7 +6276,12 @@ subscribeE-nest {e = e} c d sl B W Lv g (mapᵉ f b) κ id now sched st hsl hc h
          (≤-trans (descW-map g f b κ id now sched st) hw)
          (≤-trans (m≤m⊔n _ _) hd)
          hsz′ hdw′ (proj₁ KEY) (proj₂ KEY)
-         (∧-intro (proj₁ (∧-true _ _ stB)) stP) (proj₂ (∧-true _ _ stB)) hceil′
+         (∧-intro (proj₁ (∧-true _ _ stB)) stP) (proj₂ (∧-true _ _ stB))
+         -- A MAP FRAME READS NOTHING AND OWNS NO CELL, so both readings
+         -- cross it on their unit: its cell is zero and its store arm
+         -- is silent
+         (pathOrd?-push (Sched.nextNode sched) (map-f f) κ z≤n refl stR)
+         (∧-intro refl stK) hceil′
 
   jIH = proj₁ IH₀
   jB  = proj₁ (proj₂ IH₀)
@@ -5888,7 +6316,7 @@ subscribeE-nest {e = e} c d sl B W Lv g (mapᵉ f b) κ id now sched st hsl hc h
            ≤ nestB S′ W (nestUnit e sl) B (syncSizeᵉ (mapᵉ f b))
   grow = nestB-mono S′ W (nestUnit e sl) B
            (≤-trans (n≤1+n (syncSizeᵉ b)) hm)
-subscribeE-nest {e = e} c d sl B W Lv g (takeᵉ cnt b) κ id now sched st hsl hc hv hcl hn hw hd hsz hdw hpk hpl stP stB hceil
+subscribeE-nest {e = e} c d sl B W Lv g (takeᵉ cnt b) κ id now sched st hsl hc hv hcl hn hw hd hsz hdw hpk hpl stP stB stR stK hceil
   with evalTm cnt in eqc
 ... | zero  = Lv , ceil-here c (pred d) d Lv _ _ hceil , ≤-refl , z≤n , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _)
 ... | suc k =
@@ -5908,7 +6336,9 @@ subscribeE-nest {e = e} c d sl B W Lv g (takeᵉ cnt b) κ id now sched st hsl h
 
   inv₀ : capsOK? (frameStep Lv c) sched₀ st₀ ≡ true
   inv₀ = capsOK?-setNode (frameStep Lv c) nid (take-st (suc k)) sched₀ st refl refl refl
-           (capsOK?-nextNode (frameStep Lv c) (suc (Sched.nextNode sched)) sched st hc)
+           (capsOK?-nextNode (frameStep Lv c) (suc (Sched.nextNode sched)) sched st
+              (n≤1+n (Sched.nextNode sched)) hc)
+           (λ i h → refl)
 
   push = pushBurst-nest-take g id now nid κ
            (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
@@ -5919,6 +6349,9 @@ subscribeE-nest {e = e} c d sl B W Lv g (takeᵉ cnt b) κ id now sched st hsl h
   step⊑ = frameStep-mono-j c 2≤c (n≤1+n Lv)
 
   KEY = path-step c Lv (take-f nid) κ 2≤c refl hpk hpl
+
+  read≤ : pathRead κ ≤ nid
+  read≤ = pathOrd?-read (Sched.nextNode sched) κ stR
 
   hsz′ = ≤-trans (≤-trans (m≤n+m (sizeᵉ b) (sizeᵗ cnt))
                           (≤-trans (n≤1+n _) hsz))
@@ -5940,7 +6373,15 @@ subscribeE-nest {e = e} c d sl B W Lv g (takeᵉ cnt b) κ id now sched st hsl h
          (≤-trans (descW-take g cnt b κ id now sched st k eqc) hw)
          (≤-trans (m≤m⊔n _ _) hd)
          hsz′ hdw′ (proj₁ KEY) (proj₂ KEY)
-         (∧-intro refl stP) (proj₂ (∧-true _ _ stB)) hceil′
+         (∧-intro refl stP) (proj₂ (∧-true _ _ stB))
+         -- AND THE MINT'S TWO, BUILT HERE: the frame sits at the cell
+         -- the counter has only now handed out, and the cell a take
+         -- installs holds no payload for the store arm to read
+         (pathOrd?-push (suc nid) (take-f nid) κ ≤-refl
+            (T⇒≡true _ (≤⇒≤ᵇ read≤))
+            (pathOrd?-mono nid (suc nid) κ (n≤1+n nid) stR))
+         (∧-intro refl (installNode-pathPark nid (take-st (suc k)) κ st read≤ stK))
+         hceil′
 
   jIH = proj₁ IH₀
   jB  = proj₁ (proj₂ IH₀)
@@ -5967,7 +6408,7 @@ subscribeE-nest {e = e} c d sl B W Lv g (takeᵉ cnt b) κ id now sched st hsl h
 subscribeE-nest c d sl B W Lv g (scanᵉ f z b) κ id now sched st =
   subscribeE-nest-scan c d sl B W Lv g f z b κ id now sched st
 subscribeE-nest {e = e} {u = u} c d sl B W Lv g (mergeAllᵉ lim b) κ id now sched st
-  hsl hc hv hcl hn hw hd hsz hdw hpk hpl stP stB hceil =
+  hsl hc hv hcl hn hw hd hsz hdw hpk hpl stP stB stR stK hceil =
   J
   , Jb
   , J≥Lv
@@ -5983,7 +6424,9 @@ subscribeE-nest {e = e} {u = u} c d sl B W Lv g (mergeAllᵉ lim b) κ id now sc
 
   inv₀ : capsOK? (frameStep Lv c) sched₀ st₀ ≡ true
   inv₀ = capsOK?-setNode (frameStep Lv c) nid (mergeAll-st {t = u} lim 0 [] false) sched₀ st refl refl refl
-           (capsOK?-nextNode (frameStep Lv c) (suc (Sched.nextNode sched)) sched st hc)
+           (capsOK?-nextNode (frameStep Lv c) (suc (Sched.nextNode sched)) sched st
+              (n≤1+n (Sched.nextNode sched)) hc)
+           (λ i h → refl)
 
   2≤c : 2 ≤ Caps.cSize c
   2≤c = FaceOK.fSize faceHere
@@ -5993,6 +6436,24 @@ subscribeE-nest {e = e} {u = u} c d sl B W Lv g (mergeAllᵉ lim b) κ id now sc
   -- the child sits one frame down, so its four keys are read one level
   -- up; the frame is a `thru-outer`, whose written size is nothing
   KEY = path-step c Lv (thru-outer mergeAllᵒ nid) κ 2≤c refl hpk hpl
+
+  read≤ : pathRead κ ≤ nid
+  read≤ = pathOrd?-read (Sched.nextNode sched) κ stR
+
+  -- THE MINT'S TWO READINGS, BUILT RATHER THAN CARRIED.  The frame the
+  -- child descends under names the cell the counter has only now handed
+  -- out, so the order reading is the parent's pushed at a cell nothing
+  -- below can already read, and the park reading is the parent's beside
+  -- a freshly installed cell that carries no payload at all.
+  ordPUSH : pathOrd? (Sched.nextNode sched₀) (thru-outer mergeAllᵒ nid ↠ κ) ≡ true
+  ordPUSH = pathOrd?-push (suc nid) (thru-outer mergeAllᵒ nid) κ ≤-refl
+              (T⇒≡true _ (≤⇒≤ᵇ read≤))
+              (pathOrd?-mono nid (suc nid) κ (n≤1+n nid) stR)
+
+  parkPUSH : pathPark? (thru-outer mergeAllᵒ nid ↠ κ) st₀ ≡ true
+  parkPUSH = ∧-intro
+               (installNode-cellPark {u = u} (pathFloor κ) mergeAllᵒ nid (mergeAll-st {t = u} lim 0 [] false) st refl)
+               (installNode-pathPark nid (mergeAll-st {t = u} lim 0 [] false) κ st read≤ stK)
 
   hsz′ = ≤-trans (≤-trans (n≤1+n (sizeᵉ b)) hsz) (proj₁ step⊑)
   hdw′ = ≤-trans hdw (proj₁ (proj₂ step⊑))
@@ -6010,11 +6471,11 @@ subscribeE-nest {e = e} {u = u} c d sl B W Lv g (mergeAllᵉ lim b) κ id now sc
          (≤-trans (n≤1+n (nestDᵉ b)) hn)
          (≤-trans (descW-merge g lim b κ id now sched st) hw)
          (≤-trans (m≤m⊔n _ _) hd)
-         hsz′ hdw′ (proj₁ KEY) (proj₂ KEY) stP stB hceil′
+         hsz′ hdw′ (proj₁ KEY) (proj₂ KEY) stP stB ordPUSH parkPUSH hceil′
 
   BC  = subscribeE-burst-capsAt c d sl (suc Lv) g b (thru-outer mergeAllᵒ nid ↠ κ) id now sched₀ st₀
          hsl (capsOK?-mono (frameStep Lv c) (frameStep (suc Lv) c) sched₀ st₀ step⊑ inv₀)
-         hsz′ hdw′ (proj₁ KEY) (proj₂ KEY) stP stB
+         hsz′ hdw′ (proj₁ KEY) (proj₂ KEY) stP stB ordPUSH parkPUSH
          (≤-trans (m≤m⊔n _ _) hd) hceil′
 
   BN  = subscribeE-burst-nestAt c d sl (suc Lv) W g b (thru-outer mergeAllᵒ nid ↠ κ) id now sched₀ st₀
@@ -6086,7 +6547,7 @@ subscribeE-nest {e = e} {u = u} c d sl B W Lv g (mergeAllᵉ lim b) κ id now sc
           (frameStep-mono-j c 2≤c (m≤m⊔n (proj₁ BN) J₀))
           (proj₂ (proj₂ BN))
 
-  FIT = thruFit-merge c J Lv sl B W g lim b κ id now sched st J≥S J≥Lv hsl hc hv hcl hn hw hszJ hpkJ hplJ HBC HBN (proj₁ IH) stP stB
+  FIT = thruFit-merge c J Lv sl B W g lim b κ id now sched st J≥S J≥Lv hsl hc hv hcl hn hw hszJ hpkJ hplJ HBC HBN (proj₁ IH) stP stB stR stK
 
   PUSH = pushBurst-nest-thru
            (nestB S′ W (nestUnit e sl) B (syncSizeᵉ (mergeAllᵉ lim b)))
@@ -6108,7 +6569,7 @@ subscribeE-nest {e = e} {u = u} c d sl B W Lv g (mergeAllᵉ lim b) κ id now sc
            ≤ nestB S′ W (nestUnit e sl) B (syncSizeᵉ (mergeAllᵉ lim b))
   grow = nestB-mono S′ W (nestUnit e sl) B (n≤1+n (syncSizeᵉ b))
 subscribeE-nest {e = e} {u = u} c d sl B W Lv g (switchAllᵉ b) κ id now sched st
-  hsl hc hv hcl hn hw hd hsz hdw hpk hpl stP stB hceil =
+  hsl hc hv hcl hn hw hd hsz hdw hpk hpl stP stB stR stK hceil =
   J
   , Jb
   , J≥Lv
@@ -6124,7 +6585,9 @@ subscribeE-nest {e = e} {u = u} c d sl B W Lv g (switchAllᵉ b) κ id now sched
 
   inv₀ : capsOK? (frameStep Lv c) sched₀ st₀ ≡ true
   inv₀ = capsOK?-setNode (frameStep Lv c) nid (switch-st nothing false) sched₀ st refl refl refl
-           (capsOK?-nextNode (frameStep Lv c) (suc (Sched.nextNode sched)) sched st hc)
+           (capsOK?-nextNode (frameStep Lv c) (suc (Sched.nextNode sched)) sched st
+              (n≤1+n (Sched.nextNode sched)) hc)
+           (λ i h → refl)
 
   2≤c : 2 ≤ Caps.cSize c
   2≤c = FaceOK.fSize faceHere
@@ -6134,6 +6597,24 @@ subscribeE-nest {e = e} {u = u} c d sl B W Lv g (switchAllᵉ b) κ id now sched
   -- the child sits one frame down, so its four keys are read one level
   -- up; the frame is a `thru-outer`, whose written size is nothing
   KEY = path-step c Lv (thru-outer switchᵒ nid) κ 2≤c refl hpk hpl
+
+  read≤ : pathRead κ ≤ nid
+  read≤ = pathOrd?-read (Sched.nextNode sched) κ stR
+
+  -- THE MINT'S TWO READINGS, BUILT RATHER THAN CARRIED.  The frame the
+  -- child descends under names the cell the counter has only now handed
+  -- out, so the order reading is the parent's pushed at a cell nothing
+  -- below can already read, and the park reading is the parent's beside
+  -- a freshly installed cell that carries no payload at all.
+  ordPUSH : pathOrd? (Sched.nextNode sched₀) (thru-outer switchᵒ nid ↠ κ) ≡ true
+  ordPUSH = pathOrd?-push (suc nid) (thru-outer switchᵒ nid) κ ≤-refl
+              (T⇒≡true _ (≤⇒≤ᵇ read≤))
+              (pathOrd?-mono nid (suc nid) κ (n≤1+n nid) stR)
+
+  parkPUSH : pathPark? (thru-outer switchᵒ nid ↠ κ) st₀ ≡ true
+  parkPUSH = ∧-intro
+               (installNode-cellPark {u = u} (pathFloor κ) switchᵒ nid (switch-st nothing false) st refl)
+               (installNode-pathPark nid (switch-st nothing false) κ st read≤ stK)
 
   hsz′ = ≤-trans (≤-trans (n≤1+n (sizeᵉ b)) hsz) (proj₁ step⊑)
   hdw′ = ≤-trans hdw (proj₁ (proj₂ step⊑))
@@ -6151,11 +6632,11 @@ subscribeE-nest {e = e} {u = u} c d sl B W Lv g (switchAllᵉ b) κ id now sched
          (≤-trans (n≤1+n (nestDᵉ b)) hn)
          (≤-trans (descW-switch g b κ id now sched st) hw)
          (≤-trans (m≤m⊔n _ _) hd)
-         hsz′ hdw′ (proj₁ KEY) (proj₂ KEY) stP stB hceil′
+         hsz′ hdw′ (proj₁ KEY) (proj₂ KEY) stP stB ordPUSH parkPUSH hceil′
 
   BC  = subscribeE-burst-capsAt c d sl (suc Lv) g b (thru-outer switchᵒ nid ↠ κ) id now sched₀ st₀
          hsl (capsOK?-mono (frameStep Lv c) (frameStep (suc Lv) c) sched₀ st₀ step⊑ inv₀)
-         hsz′ hdw′ (proj₁ KEY) (proj₂ KEY) stP stB
+         hsz′ hdw′ (proj₁ KEY) (proj₂ KEY) stP stB ordPUSH parkPUSH
          (≤-trans (m≤m⊔n _ _) hd) hceil′
 
   BN  = subscribeE-burst-nestAt c d sl (suc Lv) W g b (thru-outer switchᵒ nid ↠ κ) id now sched₀ st₀
@@ -6226,7 +6707,7 @@ subscribeE-nest {e = e} {u = u} c d sl B W Lv g (switchAllᵉ b) κ id now sched
           (frameStep-mono-j c 2≤c (m≤m⊔n (proj₁ BN) J₀))
           (proj₂ (proj₂ BN))
 
-  FIT = thruFit-switch c J Lv sl B W g b κ id now sched st J≥S J≥Lv hsl hc hv hcl hn hw hszJ hpkJ hplJ HBC HBN (proj₁ IH) stP stB
+  FIT = thruFit-switch c J Lv sl B W g b κ id now sched st J≥S J≥Lv hsl hc hv hcl hn hw hszJ hpkJ hplJ HBC HBN (proj₁ IH) stP stB stR stK
 
   PUSH = pushBurst-nest-thru
            (nestB S′ W (nestUnit e sl) B (syncSizeᵉ (switchAllᵉ b)))
@@ -6246,7 +6727,7 @@ subscribeE-nest {e = e} {u = u} c d sl B W Lv g (switchAllᵉ b) κ id now sched
            ≤ nestB S′ W (nestUnit e sl) B (syncSizeᵉ (switchAllᵉ b))
   grow = nestB-mono S′ W (nestUnit e sl) B (n≤1+n (syncSizeᵉ b))
 subscribeE-nest {e = e} {u = u} c d sl B W Lv g (exhaustAllᵉ b) κ id now sched st
-  hsl hc hv hcl hn hw hd hsz hdw hpk hpl stP stB hceil =
+  hsl hc hv hcl hn hw hd hsz hdw hpk hpl stP stB stR stK hceil =
   J
   , Jb
   , J≥Lv
@@ -6262,7 +6743,9 @@ subscribeE-nest {e = e} {u = u} c d sl B W Lv g (exhaustAllᵉ b) κ id now sche
 
   inv₀ : capsOK? (frameStep Lv c) sched₀ st₀ ≡ true
   inv₀ = capsOK?-setNode (frameStep Lv c) nid (exhaust-st false false) sched₀ st refl refl refl
-           (capsOK?-nextNode (frameStep Lv c) (suc (Sched.nextNode sched)) sched st hc)
+           (capsOK?-nextNode (frameStep Lv c) (suc (Sched.nextNode sched)) sched st
+              (n≤1+n (Sched.nextNode sched)) hc)
+           (λ i h → refl)
 
   2≤c : 2 ≤ Caps.cSize c
   2≤c = FaceOK.fSize faceHere
@@ -6272,6 +6755,24 @@ subscribeE-nest {e = e} {u = u} c d sl B W Lv g (exhaustAllᵉ b) κ id now sche
   -- the child sits one frame down, so its four keys are read one level
   -- up; the frame is a `thru-outer`, whose written size is nothing
   KEY = path-step c Lv (thru-outer exhaustᵒ nid) κ 2≤c refl hpk hpl
+
+  read≤ : pathRead κ ≤ nid
+  read≤ = pathOrd?-read (Sched.nextNode sched) κ stR
+
+  -- THE MINT'S TWO READINGS, BUILT RATHER THAN CARRIED.  The frame the
+  -- child descends under names the cell the counter has only now handed
+  -- out, so the order reading is the parent's pushed at a cell nothing
+  -- below can already read, and the park reading is the parent's beside
+  -- a freshly installed cell that carries no payload at all.
+  ordPUSH : pathOrd? (Sched.nextNode sched₀) (thru-outer exhaustᵒ nid ↠ κ) ≡ true
+  ordPUSH = pathOrd?-push (suc nid) (thru-outer exhaustᵒ nid) κ ≤-refl
+              (T⇒≡true _ (≤⇒≤ᵇ read≤))
+              (pathOrd?-mono nid (suc nid) κ (n≤1+n nid) stR)
+
+  parkPUSH : pathPark? (thru-outer exhaustᵒ nid ↠ κ) st₀ ≡ true
+  parkPUSH = ∧-intro
+               (installNode-cellPark {u = u} (pathFloor κ) exhaustᵒ nid (exhaust-st false false) st refl)
+               (installNode-pathPark nid (exhaust-st false false) κ st read≤ stK)
 
   hsz′ = ≤-trans (≤-trans (n≤1+n (sizeᵉ b)) hsz) (proj₁ step⊑)
   hdw′ = ≤-trans hdw (proj₁ (proj₂ step⊑))
@@ -6289,11 +6790,11 @@ subscribeE-nest {e = e} {u = u} c d sl B W Lv g (exhaustAllᵉ b) κ id now sche
          (≤-trans (n≤1+n (nestDᵉ b)) hn)
          (≤-trans (descW-exhaust g b κ id now sched st) hw)
          (≤-trans (m≤m⊔n _ _) hd)
-         hsz′ hdw′ (proj₁ KEY) (proj₂ KEY) stP stB hceil′
+         hsz′ hdw′ (proj₁ KEY) (proj₂ KEY) stP stB ordPUSH parkPUSH hceil′
 
   BC  = subscribeE-burst-capsAt c d sl (suc Lv) g b (thru-outer exhaustᵒ nid ↠ κ) id now sched₀ st₀
          hsl (capsOK?-mono (frameStep Lv c) (frameStep (suc Lv) c) sched₀ st₀ step⊑ inv₀)
-         hsz′ hdw′ (proj₁ KEY) (proj₂ KEY) stP stB
+         hsz′ hdw′ (proj₁ KEY) (proj₂ KEY) stP stB ordPUSH parkPUSH
          (≤-trans (m≤m⊔n _ _) hd) hceil′
 
   BN  = subscribeE-burst-nestAt c d sl (suc Lv) W g b (thru-outer exhaustᵒ nid ↠ κ) id now sched₀ st₀
@@ -6364,7 +6865,7 @@ subscribeE-nest {e = e} {u = u} c d sl B W Lv g (exhaustAllᵉ b) κ id now sche
           (frameStep-mono-j c 2≤c (m≤m⊔n (proj₁ BN) J₀))
           (proj₂ (proj₂ BN))
 
-  FIT = thruFit-exhaust c J Lv sl B W g b κ id now sched st J≥S J≥Lv hsl hc hv hcl hn hw hszJ hpkJ hplJ HBC HBN (proj₁ IH) stP stB
+  FIT = thruFit-exhaust c J Lv sl B W g b κ id now sched st J≥S J≥Lv hsl hc hv hcl hn hw hszJ hpkJ hplJ HBC HBN (proj₁ IH) stP stB stR stK
 
   PUSH = pushBurst-nest-thru
            (nestB S′ W (nestUnit e sl) B (syncSizeᵉ (exhaustAllᵉ b)))
@@ -6383,9 +6884,9 @@ subscribeE-nest {e = e} {u = u} c d sl B W Lv g (exhaustAllᵉ b) κ id now sche
   grow : nestB S′ W (nestUnit e sl) B (syncSizeᵉ b)
            ≤ nestB S′ W (nestUnit e sl) B (syncSizeᵉ (exhaustAllᵉ b))
   grow = nestB-mono S′ W (nestUnit e sl) B (n≤1+n (syncSizeᵉ b))
-subscribeE-nest c d sl B W Lv g0 (μᵉ body) κ id now sched st hsl hc hv hcl hn hw hd hsz hdw hpk hpl _ _ hceil =
+subscribeE-nest c d sl B W Lv g0 (μᵉ body) κ id now sched st hsl hc hv hcl hn hw hd hsz hdw hpk hpl _ _ _ _ hceil =
   Lv , ceil-here c (pred d) d Lv _ _ hceil , ≤-refl , z≤n , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _)
-subscribeE-nest {e = e} c d sl B W Lv (gs fuel) (μᵉ body) κ id now sched st hsl hc hv hcl hn hw hd hsz hdw hpk hpl stP stB hceil =
+subscribeE-nest {e = e} c d sl B W Lv (gs fuel) (μᵉ body) κ id now sched st hsl hc hv hcl hn hw hd hsz hdw hpk hpl stP stB stR stK hceil =
   jIH
   , jB
   , ≤-trans (m≤m+n Lv (proj₁ US)) IH≥
@@ -6431,7 +6932,10 @@ subscribeE-nest {e = e} c d sl B W Lv (gs fuel) (μᵉ body) κ id now sched st 
          (proj₁ (proj₂ US)) (proj₂ (proj₂ US))
          (pathSz?-⊑ κ up⊑ hpk) (≤-trans hpl (proj₁ up⊑)) stP
          (T⇒≡true (inputsBelowᵉ (pathFloor κ) (unfoldμ body))
-            (ib-unfoldμ (pathFloor κ) body (T-to stB))) hceil′
+            (ib-unfoldμ (pathFloor κ) body (T-to stB)))
+         -- the unfolding subscribes the SAME chain at the SAME state,
+         -- so both readings cross the substitution untouched
+         stR stK hceil′
 
   jIH = proj₁ IH₀
   jB  = proj₁ (proj₂ IH₀)
@@ -6447,7 +6951,7 @@ subscribeE-nest {e = e} c d sl B W Lv (gs fuel) (μᵉ body) κ id now sched st 
   grow = nestB-mono S′ W (nestUnit e sl) B
            (≤-trans (≤-reflexive (syncSize-unfoldμ body)) (n≤1+n _))
 subscribeE-nest c d sl B W Lv g (varᵉ ()) κ id now sched st
-subscribeE-nest c d sl B W Lv g (deferᵉ body) κ id now sched st hsl hc hv hcl hn hw hd hsz hdw hpk hpl _ _ hceil =
+subscribeE-nest c d sl B W Lv g (deferᵉ body) κ id now sched st hsl hc hv hcl hn hw hd hsz hdw hpk hpl _ _ _ _ hceil =
   Lv , ceil-here c (pred d) d Lv _ _ hceil , ≤-refl , z≤n
   , ≤-trans (setNode-nodes _ _ (EvalSt.nodes st)) (⊔-lub z≤n (m≤m⊔n _ _))
   , (λ j → ≤-trans (nodeNestAt-set j _ _ st) (⊔-lub z≤n (m≤m⊔n _ _)))
@@ -6474,6 +6978,15 @@ subscribeInner-nest-tight : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   suc (pathLen κ) ≤ Caps.cSize (frameStep Lv c) →
   pathStrat? κ ≡ true →
   inputsBelowᵉ (pathFloor κ) o ≡ true →
+  -- AND THE THREE THE DESCENT UNDER THE OUTER'S OWN FRAME SPENDS.  The
+  -- inner subscribes below a `from-inner` whose sibling is the outer's
+  -- cell, so the order reading is asked for at the chain the outer
+  -- ALREADY extends and the park reading splits into that cell's own
+  -- and the chain's below it -- which is exactly how the proven caps
+  -- face beside this walk states them.
+  pathOrd? (Sched.nextNode sched) (thru-outer op allNid ↠ κ) ≡ true →
+  pathPark? κ st ≡ true →
+  parkStrat? (pathFloor κ) (lookupNode allNid (EvalSt.nodes st)) ≡ true →
   CeilD c (pred d) d Lv (nest o sl (EvalSt.connectedShares st)) (suc (suc (sizeᵉ o))) →
   let r = subscribeInner sf op allNid κ id now o sched st in
   Σ ℕ λ j →
@@ -6484,10 +6997,10 @@ subscribeInner-nest-tight : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   × (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))) ≤ nodesMax st ⊔ G)
   × (∀ (k : NodeId) →
        nodeNestAt k (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))) ≤ nodeNestAt k st ⊔ G)
-subscribeInner-nest-tight c d sl B W Lv g0 op allNid κ id now o sched st hsl hc hv hcl hn hw hd hsz hdw hpk hpl _ _ hceil =
+subscribeInner-nest-tight c d sl B W Lv g0 op allNid κ id now o sched st hsl hc hv hcl hn hw hd hsz hdw hpk hpl _ _ _ _ _ hceil =
   Lv , ceil-here c (pred d) d Lv _ _ hceil , ≤-refl , z≤n , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _)
 subscribeInner-nest-tight {e = e} c d sl B W Lv (gs fuel) op allNid κ id now o sched st
-                          hsl hc hv hcl hn hw hd hsz hdw hpk hpl stP stB hceil =
+                          hsl hc hv hcl hn hw hd hsz hdw hpk hpl stP stB stR stK stQ hceil =
   proj₁ R , proj₁ (proj₂ R)
   , ≤-trans (n≤1+n Lv) (proj₁ (proj₂ (proj₂ R)))
   , proj₂ (proj₂ (proj₂ R))
@@ -6505,12 +7018,19 @@ subscribeInner-nest-tight {e = e} c d sl B W Lv (gs fuel) op allNid κ id now o 
     (record sched { nextNode = suc (Sched.nextNode sched) }) st hsl
     (capsOK?-mono (frameStep Lv c) (frameStep (suc Lv) c)
        (record sched { nextNode = suc (Sched.nextNode sched) }) st step⊑
-       (capsOK?-nextNode (frameStep Lv c) (suc (Sched.nextNode sched)) sched st hc))
+       (capsOK?-nextNode (frameStep Lv c) (suc (Sched.nextNode sched)) sched st
+              (n≤1+n (Sched.nextNode sched)) hc))
     (nestValOK?-widen _ o step⊑ hv)
     (nestClosOK?-widen (frameStep Lv c) (frameStep (suc Lv) c) sl o step⊑ hcl) hn
     (≤-trans (innerW-gs fuel op allNid κ id now o sched st) hw) hd
     (≤-trans hsz (proj₁ step⊑)) (≤-trans hdw (proj₁ (proj₂ step⊑)))
     (proj₁ KEY) (proj₂ KEY) (∧-intro refl stP) stB
+    -- THE FLATTEN HOP, and both halves are already in hand: the order
+    -- reading crosses from the outer's frame to the inner's by the one
+    -- counter step the mint takes, and the park reading splits into the
+    -- outer's own cell and the chain beneath it
+    (pathOrd?-inner (Sched.nextNode sched) allNid op κ stR)
+    (∧-intro stQ stK)
     (ceil-step c (pred d) d Lv _ _ _ _ 2≤c ≤-refl ≤-refl hceil)
 
 -- AND FLATTENED AT THE CAP, which is what the DRAIN wants and only the
@@ -6539,6 +7059,15 @@ subscribeInner-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   suc (pathLen κ) ≤ Caps.cSize (frameStep Lv c) →
   pathStrat? κ ≡ true →
   inputsBelowᵉ (pathFloor κ) o ≡ true →
+  -- AND THE THREE THE DESCENT UNDER THE OUTER'S OWN FRAME SPENDS.  The
+  -- inner subscribes below a `from-inner` whose sibling is the outer's
+  -- cell, so the order reading is asked for at the chain the outer
+  -- ALREADY extends and the park reading splits into that cell's own
+  -- and the chain's below it -- which is exactly how the proven caps
+  -- face beside this walk states them.
+  pathOrd? (Sched.nextNode sched) (thru-outer op allNid ↠ κ) ≡ true →
+  pathPark? κ st ≡ true →
+  parkStrat? (pathFloor κ) (lookupNode allNid (EvalSt.nodes st)) ≡ true →
   CeilD c (pred d) d Lv (nest o sl (EvalSt.connectedShares st)) (suc (suc (sizeᵉ o))) →
   let r = subscribeInner sf op allNid κ id now o sched st in
   Σ ℕ λ j →
@@ -6550,7 +7079,7 @@ subscribeInner-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   × (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))) ≤ nodesMax st ⊔ G)
   × (∀ (k : NodeId) →
        nodeNestAt k (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))) ≤ nodeNestAt k st ⊔ G)
-subscribeInner-nest {e = e} c d sl B W Lv sf op allNid κ id now o sched st hsl hc hv hcl hn hw hd hsz hdw hpk hpl stP stB hceil =
+subscribeInner-nest {e = e} c d sl B W Lv sf op allNid κ id now o sched st hsl hc hv hcl hn hw hd hsz hdw hpk hpl stP stB stR stK stQ hceil =
   jT
   , proj₁ (proj₂ tight₀)
   , Lv≤jT
@@ -6559,7 +7088,7 @@ subscribeInner-nest {e = e} c d sl B W Lv sf op allNid κ id now o sched st hsl 
   , (λ j → ≤-trans (proj₂ (proj₂ tight) j) (⊔-mono-≤ ≤-refl grow))
   where
   tight₀ = subscribeInner-nest-tight c d sl B W Lv sf op allNid κ id now o sched st
-             hsl hc hv hcl hn hw hd hsz hdw hpk hpl stP stB hceil
+             hsl hc hv hcl hn hw hd hsz hdw hpk hpl stP stB stR stK stQ hceil
 
   jT    = proj₁ tight₀
   Lv≤jT = proj₁ (proj₂ (proj₂ tight₀))
@@ -6596,6 +7125,13 @@ mergeAllDrain-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   suc (pathLen κ) ≤ Caps.cSize (frameStep Lv c) →
   pathStrat? κ ≡ true →
   all (inputsBelowᵉ (pathFloor κ)) q ≡ true →
+  -- AND THE THREE THE DRAIN'S OWN DESCENT SPENDS, carried across the
+  -- queue: every entry is subscribed under the SAME outer cell, so the
+  -- chain is fixed and what has to travel entry to entry is only the
+  -- state under it -- which the subscribe's own freshness receipt gives.
+  pathOrd? (Sched.nextNode sched) (thru-outer mergeAllᵒ allNid ↠ κ) ≡ true →
+  pathPark? κ st ≡ true →
+  parkStrat? (pathFloor κ) (lookupNode allNid (EvalSt.nodes st)) ≡ true →
   let r = mergeAllDrain sf allNid κ id now lim act q sched st in
   Σ ℕ λ j →
   let S′ = Caps.cSize (frameStep j c)
@@ -6604,9 +7140,9 @@ mergeAllDrain-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   × (nestDᵛˢ (proj₁ r) ≤ G)
   × ((nodesMax (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r)))))
         ⊔ queueNest (proj₁ (proj₂ (proj₂ (proj₂ r))))) ≤ nodesMax st ⊔ G)
-mergeAllDrain-nest {e = e} c d sl B W Lv sf allNid κ id now lim act [] sched st hcd hq hw hd hpk hpl _ _ =
+mergeAllDrain-nest {e = e} c d sl B W Lv sf allNid κ id now lim act [] sched st hcd hq hw hd hpk hpl _ _ _ _ _ =
   0 , z≤n , z≤n , ⊔-lub (m≤m⊔n _ _) z≤n
-mergeAllDrain-nest {e = e} c d sl B W Lv sf allNid κ id now lim act (o ∷ q) sched st hcd hq hw hd hpk hpl stP stQ
+mergeAllDrain-nest {e = e} c d sl B W Lv sf allNid κ id now lim act (o ∷ q) sched st hcd hq hw hd hpk hpl stP stQ stR stK stC
   with hasRoom lim act
 ... | false =
   0
@@ -6692,6 +7228,7 @@ mergeAllDrain-nest {e = e} c d sl B W Lv sf allNid κ id now lim act (o ∷ q) s
                    (proj₁ (proj₂ stepʰ)))
           (pathSz?-⊑ κ stepʰ hpk) (≤-trans hpl (proj₁ stepʰ))
           stP (proj₁ (∧-true _ _ stQ))
+          stR stK stC
           ceilHere
 
   IH₀ = mergeAllDrain-nest c d sl B W Lv″ sf allNid κ id now lim
@@ -6702,6 +7239,22 @@ mergeAllDrain-nest {e = e} c d sl B W Lv sf allNid κ id now lim act (o ∷ q) s
          (≤-trans (m≤n⊔m _ _) hd)
          (pathSz?-⊑ κ step″ hpk) (≤-trans hpl (proj₁ step″))
          stP (proj₂ (∧-true _ _ stQ))
+         -- ONE ENTRY'S SUBSCRIBE ONLY RAISES THE COUNTER AND WRITES
+         -- CELLS IT MINTED, so all three readings ride it on the
+         -- subscribe's own freshness and no arithmetic enters here
+         (subscribeInner-ord sf mergeAllᵒ allNid κ
+            (thru-outer mergeAllᵒ allNid ↠ κ) id now o sched st stR)
+         (subscribeInner-pathPark sf mergeAllᵒ allNid κ κ id now o sched st
+            (pathOrd?-read (Sched.nextNode sched) κ
+               (pathOrd?-tail (Sched.nextNode sched)
+                  (thru-outer mergeAllᵒ allNid) κ stR))
+            stK)
+         (subscribeInner-cellPark (pathFloor κ) sf mergeAllᵒ allNid κ κ id now o
+            sched st
+            (≤-trans (m≤m⊔n (suc allNid) (pathCell κ))
+               (pathOrd?-cell (Sched.nextNode sched)
+                  (thru-outer mergeAllᵒ allNid ↠ κ) stR))
+            stC)
 
   jS = proj₁ SUB₀
   jI = proj₁ IH₀
@@ -6754,6 +7307,12 @@ innerFinish-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   suc (pathLen p) ≤ Caps.cSize (frameStep Lv c) →
   pathStrat? p ≡ true →
   parkStrat? (pathFloor p) (lookupNode allNid (EvalSt.nodes st)) ≡ true →
+  -- AND THE TWO THE DRAIN UNDER THIS FRAME SPENDS.  The finish descends
+  -- beneath the outer's own frame, so the order reading is asked for at
+  -- the chain the outer ALREADY extends; the cell's own park reading is
+  -- the `parkStrat?` premise directly above, so only the chain's is new.
+  pathOrd? (Sched.nextNode sched) (thru-outer op allNid ↠ p) ≡ true →
+  pathPark? p st ≡ true →
   let r = innerFinish sf op allNid inst p id now vals sched st
             (lookupNode allNid (EvalSt.nodes st)) in
   Σ ℕ λ j →
@@ -6764,7 +7323,7 @@ innerFinish-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   × (nestDᵛˢ (proj₁ r)
        ≤ nestFac S′ W * ((nodeNestAt allNid st ⊔ nestDᵛˢ vals) + nestU S′ (nestUnit e sl)))
 
-innerFinish-nest {e = e} c d sl W Lv sf switchᵒ allNid inst p id now vals sched st hsl hdr hw hdp hpk hpl _ _
+innerFinish-nest {e = e} c d sl W Lv sf switchᵒ allNid inst p id now vals sched st hsl hdr hw hdp hpk hpl _ _ _ _
   with lookupNode allNid (EvalSt.nodes st)
 ... | nothing                    = 0 , z≤n , raiseN (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestU (Caps.cSize c) (nestUnit e sl)) , ≤-trans (m≤n⊔m _ (nestDᵛˢ vals)) (raiseN (Caps.cSize c) W _ (nestU (Caps.cSize c) (nestUnit e sl)))
 ... | just (scan-st _)           = 0 , z≤n , raiseN (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestU (Caps.cSize c) (nestUnit e sl)) , ≤-trans (m≤n⊔m _ (nestDᵛˢ vals)) (raiseN (Caps.cSize c) W _ (nestU (Caps.cSize c) (nestUnit e sl)))
@@ -6782,7 +7341,7 @@ innerFinish-nest {e = e} c d sl W Lv sf switchᵒ allNid inst p id now vals sche
   ≤-trans (m≤n⊔m _ (nestDᵛˢ vals))
           (raiseN (Caps.cSize c) W _ (nestU (Caps.cSize c) (nestUnit e sl)))
 
-innerFinish-nest {e = e} c d sl W Lv sf exhaustᵒ allNid inst p id now vals sched st hsl hdr hw hdp hpk hpl _ _
+innerFinish-nest {e = e} c d sl W Lv sf exhaustᵒ allNid inst p id now vals sched st hsl hdr hw hdp hpk hpl _ _ _ _
   with lookupNode allNid (EvalSt.nodes st)
 ... | nothing                    = 0 , z≤n , raiseN (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestU (Caps.cSize c) (nestUnit e sl)) , ≤-trans (m≤n⊔m _ (nestDᵛˢ vals)) (raiseN (Caps.cSize c) W _ (nestU (Caps.cSize c) (nestUnit e sl)))
 ... | just (scan-st _)           = 0 , z≤n , raiseN (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestU (Caps.cSize c) (nestUnit e sl)) , ≤-trans (m≤n⊔m _ (nestDᵛˢ vals)) (raiseN (Caps.cSize c) W _ (nestU (Caps.cSize c) (nestUnit e sl)))
@@ -6797,7 +7356,7 @@ innerFinish-nest {e = e} c d sl W Lv sf exhaustᵒ allNid inst p id now vals sch
   ≤-trans (m≤n⊔m _ (nestDᵛˢ vals))
           (raiseN (Caps.cSize c) W _ (nestU (Caps.cSize c) (nestUnit e sl)))
 
-innerFinish-nest {e = e} {s = s} c d sl W Lv sf mergeAllᵒ allNid inst p id now vals sched st hsl hdr hw hdp hpk hpl stP stQ
+innerFinish-nest {e = e} {s = s} c d sl W Lv sf mergeAllᵒ allNid inst p id now vals sched st hsl hdr hw hdp hpk hpl stP stQ stR stK
   with lookupNode allNid (EvalSt.nodes st) in eq | stQ
 ... | nothing                | _ = 0 , z≤n , raiseN (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestU (Caps.cSize c) (nestUnit e sl)) , ≤-trans (m≤n⊔m _ (nestDᵛˢ vals)) (raiseN (Caps.cSize c) W _ (nestU (Caps.cSize c) (nestUnit e sl)))
 ... | just (scan-st _)       | _ = 0 , z≤n , raiseN (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestU (Caps.cSize c) (nestUnit e sl)) , ≤-trans (m≤n⊔m _ (nestDᵛˢ vals)) (raiseN (Caps.cSize c) W _ (nestU (Caps.cSize c) (nestUnit e sl)))
@@ -6843,7 +7402,8 @@ innerFinish-nest {e = e} {s = s} c d sl W Lv sf mergeAllᵒ allNid inst p id now
   -- frame's own room cannot mint.
   DR = mergeAllDrain-nest c d sl (queueNest q) W Lv sf allNid p id now lim (pred act) q sched st
          (hdr lim act q od refl) ≤-refl dw
-         (fuel-pred hdp) hpk hpl stP stQ′
+         (fuel-pred hdp) hpk hpl stP stQ′ stR stK
+         (subst (λ m → parkStrat? (pathFloor p) m ≡ true) (sym eq) stQ′)
 
   S′ = Caps.cSize (frameStep (proj₁ DR) c)
 
@@ -6945,6 +7505,12 @@ stepFrame-nodes-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   suc (pathLen p) ≤ Caps.cSize (frameStep Lv c) →
   pathStrat? p ≡ true →
   parkStrat? (pathFloor p) (lookupNode allNid (EvalSt.nodes st)) ≡ true →
+  -- AND THE TWO THE DRAIN UNDER THIS FRAME SPENDS.  The finish descends
+  -- beneath the outer's own frame, so the order reading is asked for at
+  -- the chain the outer ALREADY extends; the cell's own park reading is
+  -- the `parkStrat?` premise directly above, so only the chain's is new.
+  pathOrd? (Sched.nextNode sched) (thru-outer op allNid ↠ p) ≡ true →
+  pathPark? p st ≡ true →
   let r = stepFrame sf id now (from-inner op allNid inst) p vals fin sched st in
   Σ ℕ λ j →
   let S′ = Caps.cSize (frameStep j c) in
@@ -6953,12 +7519,12 @@ stepFrame-nodes-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
        ≤ nestFac S′ W * ((nodesMax st ⊔ nestDᵛˢ vals) + nestU S′ (nestUnit e sl)))
   × (nestDᵛˢ (proj₁ r)
        ≤ nestFac S′ W * ((nodeNestAt allNid st ⊔ nestDᵛˢ vals) + nestU S′ (nestUnit e sl)))
-stepFrame-nodes-inner {e = e} c d sl W Lv sf id now op allNid inst p vals false sched st hsl hdr hw hdp hpk hpl _ _ =
+stepFrame-nodes-inner {e = e} c d sl W Lv sf id now op allNid inst p vals false sched st hsl hdr hw hdp hpk hpl _ _ _ _ =
   0 , z≤n , raiseN (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestU (Caps.cSize c) (nestUnit e sl)) , ≤-trans (m≤n⊔m _ (nestDᵛˢ vals)) (raiseN (Caps.cSize c) W _ (nestU (Caps.cSize c) (nestUnit e sl)))
-stepFrame-nodes-inner {e = e} c d sl W Lv sf id now op allNid inst p vals true sched st hsl hdr hw hdp hpk hpl stP stQ
+stepFrame-nodes-inner {e = e} c d sl W Lv sf id now op allNid inst p vals true sched st hsl hdr hw hdp hpk hpl stP stQ stR stK
   with any (aliveThroughᶠ inst st) (EvalSt.registry st)
 ... | true  = 0 , z≤n , raiseN (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestU (Caps.cSize c) (nestUnit e sl)) , ≤-trans (m≤n⊔m _ (nestDᵛˢ vals)) (raiseN (Caps.cSize c) W _ (nestU (Caps.cSize c) (nestUnit e sl)))
-... | false = innerFinish-nest c d sl W Lv sf op allNid inst p id now vals sched st hsl hdr hw hdp hpk hpl stP stQ
+... | false = innerFinish-nest c d sl W Lv sf op allNid inst p id now vals sched st hsl hdr hw hdp hpk hpl stP stQ stR stK
 
 -- THE TWO SHAPES A UNIT FACTOR TAKES ONCE THE BURST IS IN THE
 -- EXPONENT, which is all that separates the three frames that charge
@@ -7111,6 +7677,13 @@ abstract
     suc (pathLen p) ≤ Caps.cSize (frameStep Lv c) →
     pathStrat? (f ↠ p) ≡ true →
     valsStrat? (pathFloor p) vals ≡ true →
+    -- AND THE TWO REGISTRY READINGS AT THE CHAIN THIS FRAME ALREADY
+    -- SITS ON, which only the inner descent spends: it re-reads the
+    -- outer's own frame beneath itself, and the order reading at a
+    -- `from-inner` is exactly the reading at the `thru-outer` it
+    -- flattened out of.
+    pathOrd? (Sched.nextNode sched) (f ↠ p) ≡ true →
+    pathPark? (f ↠ p) st ≡ true →
     Lv ≤ sizeCount c d ⊔ Caps.cSize c →
     let r = stepFrame sf id now f p vals fin sched st in
     length (proj₁ r) ≤ W →
@@ -7121,7 +7694,7 @@ abstract
          ≤ nestFac S′ W
            * (frameNestF f ^ W * ((nodesMax st ⊔ nestDᵛˢ vals) + W * frameNestD f)
               + nestU S′ (nestUnit e sl)))
-  stepFrame-nodes {e = e} c d W sl Lv sf id now (map-f fn) p vals fin sched st hsl 1≤W hlen hc hv hss hfc hfd hfw h1S hdp hpk hpl _ _ hlv hw =
+  stepFrame-nodes {e = e} c d W sl Lv sf id now (map-f fn) p vals fin sched st hsl 1≤W hlen hc hv hss hfc hfd hfw h1S hdp hpk hpl _ _ _ _ hlv hw =
     0 , z≤n ,
     ≤-trans (⊔-lub (≤-trans (≤-trans (m≤m⊔n (nodesMax st) (nestDᵛˢ vals)) (m≤m+n _ _)) up)
           (≤-trans (mapVals-nest fn vals)
@@ -7136,34 +7709,42 @@ abstract
     up : X ≤ (2 ^ sizeᵗ fn) ^ W * X
     up = ≤-trans (≤-reflexive (sym (*-identityˡ X)))
                  (*-monoˡ-≤ X (1≤pow≤ (2 ^ sizeᵗ fn) W (1≤frameNestF (map-f fn))))
-  stepFrame-nodes {e = e} c d W sl Lv sf id now (scan-f fn nid) p vals fin sched st hsl 1≤W hlen hc hv hss hfc hfd hfw h1S hdp hpk hpl _ _ hlv hw =
+  stepFrame-nodes {e = e} c d W sl Lv sf id now (scan-f fn nid) p vals fin sched st hsl 1≤W hlen hc hv hss hfc hfd hfw h1S hdp hpk hpl _ _ _ _ hlv hw =
     0 , z≤n ,
     ≤-trans (stepFrame-nodes-scan W sf id now fn nid p vals fin sched st hlen)
             (raiseN (Caps.cSize c) W _ (nestU (Caps.cSize c) (nestUnit e sl)))
-  stepFrame-nodes {e = e} c d W sl Lv sf id now (take-f nid) p vals fin sched st hsl 1≤W hlen hc hv hss hfc hfd hfw h1S hdp hpk hpl _ _ hlv hw =
+  stepFrame-nodes {e = e} c d W sl Lv sf id now (take-f nid) p vals fin sched st hsl 1≤W hlen hc hv hss hfc hfd hfw h1S hdp hpk hpl _ _ _ _ hlv hw =
     0 , z≤n ,
     ≤-trans (≤-trans (stepFrame-nodes-take sf id now nid p vals fin sched st)
                      (zero-charge W _))
             (raiseN (Caps.cSize c) W _ (nestU (Caps.cSize c) (nestUnit e sl)))
-  stepFrame-nodes {e = e} c d W sl Lv sf id now (from-inner op allNid inst) p vals fin sched st hsl 1≤W hlen hc hv hss hfc hfd hfw h1S hdp hpk hpl stP _ hlv hw =
+  stepFrame-nodes {e = e} c d W sl Lv sf id now (from-inner op allNid inst) p vals fin sched st hsl 1≤W hlen hc hv hss hfc hfd hfw h1S hdp hpk hpl stP _ stR stK hlv hw =
     let INNER = stepFrame-nodes-inner c d sl W Lv sf id now op allNid inst p vals fin sched st
                   hsl hfd hfw
                   hdp hpk hpl stP
-                  (frame-parkStrat (frameStep Lv c) (from-inner op allNid inst) p sched st
-                     hc stP)
+                  -- THE OUTER'S OWN CELL, READ OFF THE CARRIED CHAIN
+                  -- rather than derived from `capsOK?`: an inner frame
+                  -- reads the cell its outer minted, so the chain's own
+                  -- head IS that reading
+                  (proj₁ (∧-true _ _ stK))
+                  -- AND THE FLATTEN HOP READ BACKWARDS: the frame under
+                  -- the walk is the inner's, and the outer's own reading
+                  -- is what it was pushed out of
+                  (pathOrd?-outer (Sched.nextNode sched) allNid inst op p stR)
+                  (proj₂ (∧-true _ _ stK))
         S′ = Caps.cSize (frameStep (proj₁ INNER) c) in
     proj₁ INNER
     , proj₁ (proj₂ INNER)
     , ≤-trans (proj₁ (proj₂ (proj₂ INNER)))
             (*-monoʳ-≤ (nestFac S′ W)
               (+-monoˡ-≤ (nestU S′ (nestUnit e sl)) (zero-charge W _)))
-  stepFrame-nodes {e = e} c d W sl Lv sf id now (thru-outer op nid) p vals fin sched st hsl 1≤W hlen hc hv hss hfc hfd hfw h1S hdp hpk hpl stP stV hlv hw =
+  stepFrame-nodes {e = e} c d W sl Lv sf id now (thru-outer op nid) p vals fin sched st hsl 1≤W hlen hc hv hss hfc hfd hfw h1S hdp hpk hpl stP stV stR stK hlv hw =
     Lv , hlv ,
     ≤-trans (stepFrame-nodes-thru (frameStep Lv c) W sl sf id now op nid p vals fin sched st
                ⦃ face⊑ c (frameStep Lv c) sl (c⊑step c Lv (FaceOK.fSize faceHere)) faceHere ⦄
                hsl 1≤W hlen hc hv hss hfc
                (≤-trans h1S (proj₁ (c⊑step c Lv (FaceOK.fSize faceHere)))) hpk hpl hfw
-               stP stV hw)
+               stP stV stR (proj₂ (∧-true _ _ stK)) (proj₁ (∧-true _ _ stK)) hw)
             (*-monoʳ-≤ (nestFac (Caps.cSize (frameStep Lv c)) W)
               (+-monoˡ-≤ (nestU (Caps.cSize (frameStep Lv c)) (nestUnit e sl))
                 (≤-trans (m≤m+n (nodesMax st ⊔ nestDᵛˢ vals) (W * 1))
@@ -7356,6 +7937,16 @@ mutual
     × frameDrainOK c sl d Lv sf id now f p vals sched st
     × (all (inputsBelowᵛ (pathFloor p) u) vals ≡ true)
     × (frameStrat? (pathFloor p) f ≡ true)
+    -- AND THE TWO REGISTRY READINGS AT THE CHAIN THIS WALK STANDS ON.
+    -- `capsOK?` holds both of the REGISTRY, and the walk's chain is a
+    -- registry chain descended through frames, so the link is made once
+    -- where the walk starts rather than re-derived at every frame --
+    -- which is refuted, since a caps-legal state need not be a BUILT
+    -- one.  They sit here and not in the caps receipt for the reason
+    -- `frameStrat?` does: the recursion below carries them to the
+    -- stepped state, which is the only place the descent can read them.
+    × (pathOrd? (Sched.nextNode sched) (f ↠ p) ≡ true)
+    × (pathPark? (f ↠ p) st ≡ true)
     × (Σ ℕ λ L′ →
         (Lv + L′ ≤ sizeCount c d ⊔ Caps.cSize c)
         × capsWalkOK c ac sl d (Lv + L′) sf gas id now p (proj₁ step)
@@ -7522,7 +8113,7 @@ capsWalkOK-strat c ac sl d Lv sf gas id now (share-sink i) vals fin sched st _ =
 capsWalkOK-strat c ac sl d Lv sf gas id now (f ↠ p)        vals fin sched st h =
   ∧-intro (proj₁ tl)
     (capsWalkOK-strat c ac sl d _ sf gas id now p _ _ _ _
-      (proj₂ (proj₂ (proj₂ tl))))
+      (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ tl))))))
   where
   tl = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ h))))))
 

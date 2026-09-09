@@ -2,7 +2,7 @@
 -- walkH … cascadeGo-slots
 module Verify-Budget-Sufficient.Caps-Face.Part7.Cascade-Caps where
 
-open import Data.Bool    using (true; false; _∧_; if_then_else_)
+open import Data.Bool    using (Bool; true; false; _∧_; if_then_else_)
 open import Data.Nat     using (ℕ; _+_; _≤_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤-trans; ≤-refl; ≤-reflexive; n≤1+n; *-identityʳ)
 open import Data.Nat.Solver     using (module +-*-Solver)
@@ -47,12 +47,12 @@ open import Verify-Budget-Sufficient.Caps-Depth
   using (depthCascade)
 
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
-  (capsOK?; pathSz?; pathSz?-widen; regsSz?; slotsCaps?; valCaps?; pathFloor; pathStrat?;
-  frameStrat?)
+  (capsOK?; pathSz?; pathSz?-widen; regsSz?; regPark?-nodes; slotsCaps?; valCaps?;
+  pathFloor; pathStrat?; frameStrat?)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
   (foldPath-slots; capsOK?-count; capsOK?-delivered; capsOK?-regs; dropSweep-caps; pathSz?-len;
   pathSz?-tail; shareLatch-caps; valsCaps?; valsCaps?-lvl; walkOK; walkOK-finish;
-  registry-entStrat; valsStrat?)
+  registry-entStrat; valsStrat?; capsOK?-parts)
 open import Verify-Budget-Sufficient.Psi-Split using
   (chP?-∧; regP?-∧; regStrat?-paths)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves using
@@ -373,15 +373,41 @@ cascadeGo-caps siC ifc c d a id chains sl sched st 2≤S 1≤R slC slEq inv vC p
 -- and the snapshot is a filter of the registry.
 ------------------------------------------------------------------
 
+-- THE LATCH TAKEN AT AN OPEN FLAG, which is what makes the transport
+-- writable at all: `with` on the flag abstracts only the occurrences
+-- the goal spells out, and the caps receipt spells the state a dozen
+-- ways -- so the flag is a PARAMETER here and every clause meets a
+-- state whose fields reduce.  Ten conjuncts then ride on reduction as
+-- they always did; the park reading is the one that reads the STATE
+-- rather than a projection of it, so it is the one handed over
+-- explicitly, on the node table the latch does not touch.
+latch-caps-flag : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (c : Caps) (sched : Sched Γ) (st : EvalSt e) (s₀ : Source) (b : Bool) →
+  capsOK? c sched st ≡ true →
+  capsOK? c sched
+    (record (if b then record st { completedSources = s₀ ∷ EvalSt.completedSources st } else st)
+       { delivered = [] ; cancelled = [] ; regWatermark = EvalSt.nextReg st
+       ; dying = if b then s₀ ∷ [] else [] }) ≡ true
+latch-caps-flag c sched st s₀ true h with capsOK?-parts c sched st h
+... | h0 , h1 , h2 , h3 , h4 , h5 , h6 , h7 , h8 , h9 , h10 =
+  ∧-intro h0 (∧-intro h1 (∧-intro h2 (∧-intro h3 (∧-intro h4 (∧-intro h5
+    (∧-intro h6 (∧-intro h7 (∧-intro h8 (∧-intro h9
+      (regPark?-nodes (EvalSt.registry st) st _ refl h10))))))))))
+latch-caps-flag c sched st s₀ false h with capsOK?-parts c sched st h
+... | h0 , h1 , h2 , h3 , h4 , h5 , h6 , h7 , h8 , h9 , h10 =
+  ∧-intro h0 (∧-intro h1 (∧-intro h2 (∧-intro h3 (∧-intro h4 (∧-intro h5
+    (∧-intro h6 (∧-intro h7 (∧-intro h8 (∧-intro h9
+      (regPark?-nodes (EvalSt.registry st) st _ refl h10))))))))))
+
 -- the latch resets delivered/cancelled/regWatermark/dying and may add
--- to completedSources — none of the five conjuncts sees any of them
+-- to completedSources — no conjunct but the park reading sees any of
+-- them
 cascadeLatch-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (c : Caps) (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
   capsOK? c sched st ≡ true →
   capsOK? c sched (cascadeLatch a st) ≡ true
-cascadeLatch-caps c a sched st h with Arrival.isLast a
-... | true  = h
-... | false = h
+cascadeLatch-caps c a sched st h =
+  latch-caps-flag c sched st (arrSource a) (Arrival.isLast a) h
 
 cascadeFinish-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (c : Caps) (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →

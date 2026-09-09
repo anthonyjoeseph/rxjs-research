@@ -88,6 +88,8 @@ open import Verify-Budget-Sufficient.Caps-Face.Part3 using
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (burstCaps?; capsOK?; capsOK?-mono; eventCaps?; frameSz?; obsCaps?; pathSz?;
    entStrat?; eventStrat?; framePark?; pathFloor; pathPark?; pathStrat?;
+   pathOrd?; pathOrd?-mono; parkStrat?; regOrd?; regPark?; regPark?-nodes;
+   regPark?-set; regPark?-set-fresh;
    regStrat?; regsSz?; slotsCaps?; slotsCaps?-bound; srcFloor?; valCaps?; valCountᵉ; widLive; widNode; closSt?; closLive)
 open import Decide using (T-to; T⇒≡true; ∧-intro; ∨-trueʳ; ≤ᵇ-true; ≤ᵇ-widen)
 
@@ -801,6 +803,8 @@ capsOK?-parts : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   × (closSt? c sched st ≡ true)
   × (srcFloor? sched ≡ true)
   × (regStrat? (EvalSt.registry st) ≡ true)
+  × (regOrd? (Sched.nextNode sched) (EvalSt.registry st) ≡ true)
+  × (regPark? (EvalSt.registry st) st ≡ true)
 capsOK?-parts c sched st h with ∧-true _ _ h
 ... | h0 , r1 with ∧-true _ _ r1
 ... | h1 , r2 with ∧-true _ _ r2
@@ -809,7 +813,9 @@ capsOK?-parts c sched st h with ∧-true _ _ h
 ... | h4 , r5 with ∧-true _ _ r5
 ... | h5 , r6 with ∧-true _ _ r6
 ... | h6 , r7 with ∧-true _ _ r7
-... | h7 , h8 = h0 , h1 , h2 , h3 , h4 , h5 , h6 , h7 , h8
+... | h7 , r8 with ∧-true _ _ r8
+... | h8 , r9 with ∧-true _ _ r9
+... | h9 , h10 = h0 , h1 , h2 , h3 , h4 , h5 , h6 , h7 , h8 , h9 , h10
 
 -- THE COUNTER MOVE, and the source floor is what makes it a step
 -- rather than a no-op.  A mint writes `nextSource`, an install writes
@@ -828,15 +834,21 @@ capsOK?-parts c sched st h with ∧-true _ _ h
 capsOK?-mint : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (c : Caps) (o k nd : ℕ) (sched : Sched Γ) (st : EvalSt e) →
   Sched.nextSource sched ≤ k →
+  Sched.nextNode sched ≤ nd →
   capsOK? c sched st ≡ true →
   capsOK? c (record sched { nextOrdinal = o ; nextSource = k
                           ; nextNode = nd }) st ≡ true
-capsOK?-mint {n = n} c o k nd sched st le h with capsOK?-parts c sched st h
-... | h0 , h1 , h2 , h3 , h4 , h5 , h6 , h7 , h8 =
+capsOK?-mint {n = n} c o k nd sched st le lnd h with capsOK?-parts c sched st h
+... | h0 , h1 , h2 , h3 , h4 , h5 , h6 , h7 , h8 , h9 , h10 =
   ∧-intro h0 (∧-intro h1 (∧-intro h2 (∧-intro h3 (∧-intro h4 (∧-intro h5
     (∧-intro h6
       (∧-intro (≤ᵇ-true n k (≤-trans (≤ᵇ⇒≤ n (Sched.nextSource sched) (T-to h7)) le))
-               h8)))))))
+               (∧-intro h8 (∧-intro ORD h10)))))))))
+  where
+  ORD = all-impl _ _
+          (λ en → pathOrd?-mono (Sched.nextNode sched) nd
+                    (proj₂ (proj₂ (proj₂ en))) lnd)
+          (EvalSt.registry st) h9
 
 capsOK?-regs : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (c : Caps) (sched : Sched Γ) (st : EvalSt e) →
@@ -861,8 +873,29 @@ registry-entStrat : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   capsOK? c sched st ≡ true →
   regStrat? (EvalSt.registry st) ≡ true
 registry-entStrat c sched st h =
-  proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂
-    (capsOK?-parts c sched st h))))))))
+  proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂
+    (capsOK?-parts c sched st h)))))))))
+
+-- THE ORDER LEDGER AND THE PARK LEDGER, HANDED BACK THE SAME WAY, and
+-- they are separate accessors rather than one because the two faces
+-- that spend them are separate: the ordering is read against the
+-- scheduler's counter and the parking against the store, so a site
+-- holding one rarely wants the other.
+capsOK?-regOrd : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (c : Caps) (sched : Sched Γ) (st : EvalSt e) →
+  capsOK? c sched st ≡ true →
+  regOrd? (Sched.nextNode sched) (EvalSt.registry st) ≡ true
+capsOK?-regOrd c sched st h =
+  proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂
+    (capsOK?-parts c sched st h))))))))))
+
+capsOK?-regPark : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (c : Caps) (sched : Sched Γ) (st : EvalSt e) →
+  capsOK? c sched st ≡ true →
+  regPark? (EvalSt.registry st) st ≡ true
+capsOK?-regPark c sched st h =
+  proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂
+    (capsOK?-parts c sched st h))))))))))
 
 -- THE SOURCE FLOOR ON ITS OWN, which is what a MINTED registration
 -- spends.  Reading it through the counter lemma beside it would ask for
@@ -942,14 +975,25 @@ shareLatch-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (c : Caps) (i : Fin n) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
   capsOK? c sched st ≡ true → capsOK? c sched (shareLatch i fin st) ≡ true
 shareLatch-caps c i false sched st h = h
-shareLatch-caps c i true  sched st h = h
+shareLatch-caps c i true  sched st h with capsOK?-parts c sched st h
+... | h0 , h1 , h2 , h3 , h4 , h5 , h6 , h7 , h8 , h9 , h10 =
+  ∧-intro h0 (∧-intro h1 (∧-intro h2 (∧-intro h3 (∧-intro h4 (∧-intro h5
+    (∧-intro h6 (∧-intro h7 (∧-intro h8 (∧-intro h9
+      (regPark?-nodes (EvalSt.registry st) st (shareLatch i true st)
+                      refl h10))))))))))
 
 -- and marking a registration delivered is the same kind of nothing
 capsOK?-delivered : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (c : Caps) (rid : RegId) (sched : Sched Γ) (st : EvalSt e) →
   capsOK? c sched st ≡ true →
   capsOK? c sched (record st { delivered = rid ∷ EvalSt.delivered st }) ≡ true
-capsOK?-delivered c rid sched st h = h
+capsOK?-delivered c rid sched st h with capsOK?-parts c sched st h
+... | h0 , h1 , h2 , h3 , h4 , h5 , h6 , h7 , h8 , h9 , h10 =
+  ∧-intro h0 (∧-intro h1 (∧-intro h2 (∧-intro h3 (∧-intro h4 (∧-intro h5
+    (∧-intro h6 (∧-intro h7 (∧-intro h8 (∧-intro h9
+      (regPark?-nodes (EvalSt.registry st) st
+        (record st { delivered = rid ∷ EvalSt.delivered st })
+        refl h10))))))))))
 
 -- AND THE PARKED-QUEUE READING IS THE SAME KIND OF NOTHING, but it
 -- cannot be `h`: the caps predicate above reduces on the state's own
@@ -1016,7 +1060,8 @@ dropSweep-caps c src sched st inv =
     (∧-intro h3
     (∧-intro (T⇒≡true _ (≤⇒≤ᵇ (≤-trans (dropSource-len src (EvalSt.registry st))
                                        (≤ᵇ⇒≤ _ _ (T-to h4)))))
-    (∧-intro h5 (∧-intro CLOS (∧-intro h7 STRAT)))))))
+    (∧-intro h5 (∧-intro CLOS (∧-intro h7
+      (∧-intro STRAT (∧-intro ORD PARK)))))))))
   where
   kept = dropSource src (EvalSt.registry st)
   P    = capsOK?-parts c sched st inv
@@ -1030,12 +1075,22 @@ dropSweep-caps c src sched st inv =
   h5   = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))
   h6   = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P))))))
   h7   = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))))
-  h8   = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))))
+  h8   = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P))))))))
   CLOS = sweepLive-all (closLive c (Sched.slots sched)) kept
            (Sched.live sched) h6
   STRAT = dropSource-all (λ en → entStrat? (proj₁ (proj₂ en))
                                            (proj₂ (proj₂ (proj₂ en))))
             src (EvalSt.registry st) h8
+  h9   = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))))))
+  h10  = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))))))
+  ORD  = dropSource-all (λ en → pathOrd? (Sched.nextNode sched)
+                                         (proj₂ (proj₂ (proj₂ en))))
+            src (EvalSt.registry st) h9
+  PARK = regPark?-nodes kept st
+           (record st { registry = kept })
+           refl
+           (dropSource-all (λ en → pathPark? (proj₂ (proj₂ (proj₂ en))) st)
+              src (EvalSt.registry st) h10)
 
 -- the admitted snapshot is a SUBLIST of the registry — its own filter
 -- rather than dropSource's, because it also has to match the chain's
@@ -1278,9 +1333,18 @@ face-lift c d j j′ h =
 -- minting an instance id is free (record eta makes this refl)
 capsOK?-nextNode : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (c : Caps) (k : NodeId) (sched : Sched Γ) (st : EvalSt e) →
+  Sched.nextNode sched ≤ k →
   capsOK? c sched st ≡ true →
   capsOK? c (record sched { nextNode = k }) st ≡ true
-capsOK?-nextNode c k sched st h = h
+capsOK?-nextNode c k sched st le h with capsOK?-parts c sched st h
+... | h0 , h1 , h2 , h3 , h4 , h5 , h6 , h7 , h8 , h9 , h10 =
+  ∧-intro h0 (∧-intro h1 (∧-intro h2 (∧-intro h3 (∧-intro h4 (∧-intro h5
+    (∧-intro h6 (∧-intro h7 (∧-intro h8 (∧-intro ORD h10))))))))) 
+  where
+  ORD = all-impl _ _
+          (λ en → pathOrd?-mono (Sched.nextNode sched) k
+                    (proj₂ (proj₂ (proj₂ en))) le)
+          (EvalSt.registry st) h9
 
 -- splitting one emit's events, and a whole burst, at the caps
 splitEvents-vals-caps : ∀ {n} {Γ : Ctx n} {s u : Ty} (c : Caps) (sl : Slots Γ)
@@ -1424,15 +1488,18 @@ register-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   capsOK? (frameStep j c) sched st ≡ true →
   pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
   entStrat? src κ ≡ true →
+  pathOrd? (Sched.nextNode sched) κ ≡ true →
+  pathPark? κ st ≡ true →
   capsOK? (frameStep (suc j) c) sched (register src κ st) ≡ true
-register-caps {u = u} c j src κ sched st 2≤S 1≤R inv pC hS =
+register-caps {u = u} c j src κ sched st 2≤S 1≤R inv pC hS pO pP =
     ∧-intro h0
     (∧-intro (all-++-intro (λ en → pathSz? (Caps.cSize (frameStep (suc j) c))
                                      (proj₂ (proj₂ (proj₂ en))))
                 (EvalSt.registry st) ((EvalSt.nextReg st , src , u , κ) ∷ [])
                 h1 (∧-intro (pathSz?-⊑ κ (frameStep-mono-j c 2≤S (n≤1+n j)) pC) refl))
     (∧-intro h2
-    (∧-intro h3 (∧-intro COUNT (∧-intro h5 (∧-intro h6 (∧-intro h7 STRAT)))))))
+    (∧-intro h3 (∧-intro COUNT (∧-intro h5 (∧-intro h6 (∧-intro h7
+      (∧-intro STRAT (∧-intro ORD PARK)))))))))
   where
   inv′ = capsOK?-mono (frameStep j c) (frameStep (suc j) c) sched st
            (frameStep-mono-j c 2≤S (n≤1+n j)) inv
@@ -1444,13 +1511,26 @@ register-caps {u = u} c j src κ sched st 2≤S 1≤R inv pC hS =
   h5   = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))
   h6   = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P))))))
   h7   = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))))
-  h8   = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))))
+  h8   = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P))))))))
   STRAT : regStrat? (EvalSt.registry st
                        ++ (EvalSt.nextReg st , src , u , κ) ∷ []) ≡ true
   STRAT = all-++-intro (λ en → entStrat? (proj₁ (proj₂ en))
                                          (proj₂ (proj₂ (proj₂ en))))
             (EvalSt.registry st) ((EvalSt.nextReg st , src , u , κ) ∷ [])
             h8 (∧-intro hS refl)
+  h9   = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))))))
+  h10  = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))))))
+  ORD : regOrd? (Sched.nextNode sched)
+          (EvalSt.registry st ++ (EvalSt.nextReg st , src , u , κ) ∷ []) ≡ true
+  ORD = all-++-intro (λ en → pathOrd? (Sched.nextNode sched)
+                               (proj₂ (proj₂ (proj₂ en))))
+          (EvalSt.registry st) ((EvalSt.nextReg st , src , u , κ) ∷ [])
+          h9 (∧-intro pO refl)
+  PARK = regPark?-nodes (EvalSt.registry st ++ (EvalSt.nextReg st , src , u , κ) ∷ [])
+           st (register src κ st) refl
+           (all-++-intro (λ en → pathPark? (proj₂ (proj₂ (proj₂ en))) st)
+              (EvalSt.registry st) ((EvalSt.nextReg st , src , u , κ) ∷ [])
+              h10 (∧-intro pP refl))
   1≤RS : 1 ≤ Caps.cReg c * Caps.cSize c
   1≤RS = ≤-trans (≤-reflexive refl) (*-mono-≤ 1≤R (≤-trans (s≤s z≤n) 2≤S))
   COUNT : (length (EvalSt.registry st ++ (EvalSt.nextReg st , src , u , κ) ∷ [])
@@ -1485,7 +1565,8 @@ dropOnly-caps c src sched st inv =
     (∧-intro h3
     (∧-intro (T⇒≡true _ (≤⇒≤ᵇ (≤-trans (dropSource-len src (EvalSt.registry st))
                                        (≤ᵇ⇒≤ _ _ (T-to h4)))))
-    (∧-intro h5 (∧-intro h6 (∧-intro h7 STRAT)))))))
+    (∧-intro h5 (∧-intro h6 (∧-intro h7
+      (∧-intro STRAT (∧-intro ORD PARK)))))))))
   where
   P  = capsOK?-parts c sched st inv
   h0 = proj₁ P
@@ -1496,10 +1577,20 @@ dropOnly-caps c src sched st inv =
   h5 = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))
   h6 = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P))))))
   h7 = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))))
-  h8 = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))))
+  h8 = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P))))))))
   STRAT = dropSource-all (λ en → entStrat? (proj₁ (proj₂ en))
                                            (proj₂ (proj₂ (proj₂ en))))
             src (EvalSt.registry st) h8
+  h9   = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))))))
+  h10  = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))))))
+  ORD  = dropSource-all (λ en → pathOrd? (Sched.nextNode sched)
+                                         (proj₂ (proj₂ (proj₂ en))))
+            src (EvalSt.registry st) h9
+  PARK = regPark?-nodes (dropSource src (EvalSt.registry st)) st
+           (record st { registry = dropSource src (EvalSt.registry st) })
+           refl
+           (dropSource-all (λ en → pathPark? (proj₂ (proj₂ (proj₂ en))) st)
+              src (EvalSt.registry st) h10)
 
 -- `j + 1` and `j + suc k` against the shapes register-caps and
 -- subscribeE-caps hand back
@@ -1533,16 +1624,29 @@ setNode-widNode W sl nid ns ((k , s′) ∷ r) bn h with k ≡ᵇ nid
 ... | false = ∧-intro (proj₁ (∧-true _ _ h))
                       (setNode-widNode W sl nid ns r bn (proj₂ (∧-true _ _ h)))
 
--- so installing one bounded node keeps every conjunct: the registry,
--- the live set and the slot telescope are untouched
-capsOK?-setNode : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+-- so installing one bounded node keeps every conjunct but the park
+-- ledger: the registry, the live set and the slot telescope are
+-- untouched, and the ledger is the one reading a cell write can move.
+--
+-- IT TAKES THE LEDGER RATHER THAN DERIVING IT, and that split is the
+-- whole reason there are two entry points here.  A write whose cell is
+-- CELL-LOCAL -- a counter bumped, a flag set, a fresh cell installed --
+-- proves the ledger from a one-cell condition and reaches this through
+-- the wrapper below.  A write that OVERWRITES parked content proves
+-- nothing from the cell alone: what the new content reads is bounded by
+-- the writing chain's own floor, while a registered chain reaching the
+-- same cell reads it at ITS floor, and no receipt in this development
+-- ties the two.  Such a site supplies the ledger itself.
+capsOK?-setNode-park : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (c : Caps) (nid : NodeId) (ns : NodeState Γ) (sched : Sched Γ) (st : EvalSt e) →
   boundedNode (Caps.cSize c) ns ≡ true →
   parkRoom (Caps.cSize c) (slotsSize (Sched.slots sched)) ns ≡ true →
   widNode (Caps.cWid c) (Sched.slots sched) ns ≡ true →
   capsOK? c sched st ≡ true →
+  regPark? (EvalSt.registry st)
+           (record st { nodes = setNode nid ns (EvalSt.nodes st) }) ≡ true →
   capsOK? c sched (record st { nodes = setNode nid ns (EvalSt.nodes st) }) ≡ true
-capsOK?-setNode {Γ = Γ} c nid ns sched st bn pk wn inv =
+capsOK?-setNode-park {Γ = Γ} c nid ns sched st bn pk wn inv PARK =
     ∧-intro (∧-intro (proj₁ hL)
                      (setNode-bounded (Caps.cSize c) nid ns (EvalSt.nodes st) bn
                         (proj₂ hL)))
@@ -1553,7 +1657,7 @@ capsOK?-setNode {Γ = Γ} c nid ns sched st bn pk wn inv =
     (∧-intro h4
     (∧-intro (setNode-park (Caps.cSize c) (slotsSize (Sched.slots sched))
                 nid ns (EvalSt.nodes st) pk h5)
-    (∧-intro h6 (∧-intro h7 h8)))))))
+    (∧-intro h6 (∧-intro h7 (∧-intro h8 (∧-intro h9 PARK)))))))))
   where
   P  = capsOK?-parts c sched st inv
   h0 = proj₁ P
@@ -1567,7 +1671,105 @@ capsOK?-setNode {Γ = Γ} c nid ns sched st bn pk wn inv =
   h5 = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))
   h6 = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P))))))
   h7 = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))))
-  h8 = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))))
+  h8 = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P))))))))
+  h9 = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))))))
+
+-- and the wrapper the cell-local writes reach: a one-cell condition
+-- carries the ledger over the write, entry by entry
+capsOK?-setNode : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (c : Caps) (nid : NodeId) (ns : NodeState Γ) (sched : Sched Γ) (st : EvalSt e) →
+  boundedNode (Caps.cSize c) ns ≡ true →
+  parkRoom (Caps.cSize c) (slotsSize (Sched.slots sched)) ns ≡ true →
+  widNode (Caps.cWid c) (Sched.slots sched) ns ≡ true →
+  capsOK? c sched st ≡ true →
+  (∀ i → parkStrat? i (lookupNode nid (EvalSt.nodes st)) ≡ true
+       → parkStrat? i (just ns) ≡ true) →
+  capsOK? c sched (record st { nodes = setNode nid ns (EvalSt.nodes st) }) ≡ true
+capsOK?-setNode c nid ns sched st bn pk wn inv pv =
+  capsOK?-setNode-park c nid ns sched st bn pk wn inv
+    (regPark?-set (EvalSt.registry st) nid ns st pv
+       (capsOK?-regPark c sched st inv))
+
+-- AND THE MINT'S OWN WRAPPER, which asks nothing of the cell it writes.
+-- The one above wants the new content stratified wherever the old was,
+-- and a cell born holding a SEED cannot answer that at an arbitrary
+-- floor.  What a mint has instead is that the cell is at or above the
+-- counter, and the order ledger says no registered chain reaches there.
+capsOK?-setNode-fresh : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (c : Caps) (nx : ℕ) (nid : NodeId) (ns : NodeState Γ)
+  (sched : Sched Γ) (st : EvalSt e) →
+  boundedNode (Caps.cSize c) ns ≡ true →
+  parkRoom (Caps.cSize c) (slotsSize (Sched.slots sched)) ns ≡ true →
+  widNode (Caps.cWid c) (Sched.slots sched) ns ≡ true →
+  capsOK? c sched st ≡ true →
+  regOrd? nx (EvalSt.registry st) ≡ true →
+  nx ≤ nid →
+  capsOK? c sched (record st { nodes = setNode nid ns (EvalSt.nodes st) }) ≡ true
+capsOK?-setNode-fresh c nx nid ns sched st bn pk wn inv ho hn =
+  capsOK?-setNode-park c nid ns sched st bn pk wn inv
+    (regPark?-set-fresh nx (EvalSt.registry st) nid ns st hn ho
+       (capsOK?-regPark c sched st inv))
+
+-- MARKING A SLOT CONNECTED, and it is a transport at all only because
+-- the park reading takes the STATE whole.  Every other conjunct reads
+-- the registry or the node table through a projection, so a record
+-- update touching neither reduces past it; `regPark?` hands the state
+-- to a chain that is stuck on its own frames, and the two states then
+-- have to be compared by the node table they agree on.
+capsOK?-connect : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (c : Caps) (s : Source) (sched : Sched Γ) (st : EvalSt e) →
+  capsOK? c sched st ≡ true →
+  capsOK? c sched
+    (record st { connectedShares = s ∷ EvalSt.connectedShares st }) ≡ true
+capsOK?-connect c s sched st inv =
+    ∧-intro h0 (∧-intro h1 (∧-intro h2 (∧-intro h3 (∧-intro h4 (∧-intro h5
+    (∧-intro h6 (∧-intro h7 (∧-intro h8 (∧-intro h9
+      (regPark?-nodes (EvalSt.registry st) st _ refl h10))))))))))
+  where
+  P   = capsOK?-parts c sched st inv
+  h0  = proj₁ P
+  h1  = proj₁ (proj₂ P)
+  h2  = proj₁ (proj₂ (proj₂ P))
+  h3  = proj₁ (proj₂ (proj₂ (proj₂ P)))
+  h4  = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ P))))
+  h5  = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))
+  h6  = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P))))))
+  h7  = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))))
+  h8  = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P))))))))
+  h9  = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂
+          (proj₂ P)))))))))
+  h10 = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂
+          (proj₂ P)))))))))
+
+-- AND MARKING A SOURCE COMPLETE, which is the same transport over a
+-- different field and needs its own statement for the same reason: the
+-- park reading holds the state whole, so a record update the other ten
+-- conjuncts reduce past is opaque to it, and the two states have to be
+-- put beside each other at the node table they share.
+capsOK?-completed : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (c : Caps) (s : Source) (sched : Sched Γ) (st : EvalSt e) →
+  capsOK? c sched st ≡ true →
+  capsOK? c sched
+    (record st { completedSources = s ∷ EvalSt.completedSources st }) ≡ true
+capsOK?-completed c s sched st inv =
+    ∧-intro h0 (∧-intro h1 (∧-intro h2 (∧-intro h3 (∧-intro h4 (∧-intro h5
+    (∧-intro h6 (∧-intro h7 (∧-intro h8 (∧-intro h9
+      (regPark?-nodes (EvalSt.registry st) st _ refl h10))))))))))
+  where
+  P   = capsOK?-parts c sched st inv
+  h0  = proj₁ P
+  h1  = proj₁ (proj₂ P)
+  h2  = proj₁ (proj₂ (proj₂ P))
+  h3  = proj₁ (proj₂ (proj₂ (proj₂ P)))
+  h4  = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ P))))
+  h5  = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))
+  h6  = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P))))))
+  h7  = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))))
+  h8  = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P))))))))
+  h9  = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂
+          (proj₂ P)))))))))
+  h10 = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂
+          (proj₂ P)))))))))
 
 -- take's cut is dropSweep's sibling: cutThrough is a filter on the
 -- registry (by node membership rather than by source), its closes carry
@@ -1600,6 +1802,8 @@ cutSweep-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   parkRoom (Caps.cSize c) (slotsSize (Sched.slots sched)) ns ≡ true →
   widNode (Caps.cWid c) (Sched.slots sched) ns ≡ true →
   capsOK? c sched st ≡ true →
+  (∀ i → parkStrat? i (lookupNode nid (EvalSt.nodes st)) ≡ true
+       → parkStrat? i (just ns) ≡ true) →
   let kept = proj₁ (cutThrough nid (EvalSt.delivered st) (EvalSt.regWatermark st)
                                (EvalSt.dying st) (EvalSt.registry st))
   in capsOK? c (record sched { live = sweepLive kept (Sched.live sched) })
@@ -1610,7 +1814,7 @@ cutSweep-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
                                                        (EvalSt.registry st)))
                                         ++ EvalSt.cancelled st
                           ; nodes     = setNode nid ns (EvalSt.nodes st) }) ≡ true
-cutSweep-caps {Γ = Γ} c nid ns sched st bn pk wn inv =
+cutSweep-caps {Γ = Γ} c nid ns sched st bn pk wn inv pv =
     ∧-intro (∧-intro (sweepLive-all (boundedLive (Caps.cSize c)) kept
                         (Sched.live sched) (proj₁ hL))
                      (setNode-bounded (Caps.cSize c) nid ns (EvalSt.nodes st) bn
@@ -1629,7 +1833,7 @@ cutSweep-caps {Γ = Γ} c nid ns sched st bn pk wn inv =
                 nid ns (EvalSt.nodes st) pk h5)
     (∧-intro (sweepLive-all (closLive c (Sched.slots sched)) kept
                 (Sched.live sched) h6)
-    (∧-intro h7 STRAT)))))))
+    (∧-intro h7 (∧-intro STRAT (∧-intro ORD PARK)))))))))
   where
   kept = proj₁ (cutThrough nid (EvalSt.delivered st) (EvalSt.regWatermark st)
                            (EvalSt.dying st) (EvalSt.registry st))
@@ -1645,11 +1849,30 @@ cutSweep-caps {Γ = Γ} c nid ns sched st bn pk wn inv =
   h5 = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))
   h6 = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P))))))
   h7 = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))))
-  h8 = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))))
+  h8 = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P))))))))
   STRAT = cutThrough-all (λ en → entStrat? (proj₁ (proj₂ en))
                                            (proj₂ (proj₂ (proj₂ en))))
             nid (EvalSt.delivered st) (EvalSt.regWatermark st)
             (EvalSt.dying st) (EvalSt.registry st) h8
+  h9 = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))))))
+  h10 = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))))))
+  ORD = cutThrough-all (λ en → pathOrd? (Sched.nextNode sched)
+                                        (proj₂ (proj₂ (proj₂ en))))
+            nid (EvalSt.delivered st) (EvalSt.regWatermark st)
+            (EvalSt.dying st) (EvalSt.registry st) h9
+  stW = record st { nodes = setNode nid ns (EvalSt.nodes st) }
+  stC = record st { registry  = kept
+                  ; cancelled = proj₂ (proj₂ (cutThrough nid (EvalSt.delivered st)
+                                                (EvalSt.regWatermark st)
+                                                (EvalSt.dying st)
+                                                (EvalSt.registry st)))
+                                 ++ EvalSt.cancelled st
+                  ; nodes     = setNode nid ns (EvalSt.nodes st) }
+  PARK = regPark?-nodes kept stW stC refl
+           (regPark?-set kept nid ns st pv
+              (cutThrough-all (λ en → pathPark? (proj₂ (proj₂ (proj₂ en))) st)
+                 nid (EvalSt.delivered st) (EvalSt.regWatermark st)
+                 (EvalSt.dying st) (EvalSt.registry st) h10))
 
 -- take passes a PREFIX of what it was given, so its payload bound is
 -- inherited rather than paid for
@@ -1673,7 +1896,7 @@ takeDispatch-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
      × (all (eventCaps? c sl) (proj₁ (proj₂ r)) ≡ true)
 takeDispatch-caps c nid vals fin sl sched st (just (take-st k)) slEq inv vC
   with proj₂ (proj₂ (takeVals k vals))
-... | true  = cutSweep-caps c nid (take-st zero) sched st refl refl refl inv
+... | true  = cutSweep-caps c nid (take-st zero) sched st refl refl refl inv (λ i h → refl)
             , takeVals-caps c sl k vals vC
             , subst (λ x → all (eventCaps? c x)
                              (proj₁ (proj₂ (cutThrough nid (EvalSt.delivered st)
@@ -1684,7 +1907,7 @@ takeDispatch-caps c nid vals fin sl sched st (just (take-st k)) slEq inv vC
                        (EvalSt.delivered st) (EvalSt.regWatermark st)
                        (EvalSt.dying st) (EvalSt.registry st))
 ... | false = capsOK?-setNode c nid (take-st (proj₁ (proj₂ (takeVals k vals))))
-                sched st refl refl refl inv
+                sched st refl refl refl inv (λ i h → refl)
             , takeVals-caps c sl k vals vC
             , refl
 takeDispatch-caps c nid vals fin sl sched st nothing slEq inv vC = inv , refl , refl
@@ -1762,13 +1985,14 @@ thruWrap-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
      × (all (eventCaps? c sl) (proj₁ (proj₂ r)) ≡ true)
 thruWrap-caps c op nid false sl (vs , bs , sd , st) inv vC eC = inv , vC , eC
 thruWrap-caps c mergeAllᵒ nid true sl (vs , bs , sd , st) inv vC eC
-  with lookupNode nid (EvalSt.nodes st)
+  with lookupNode nid (EvalSt.nodes st) in eqN
      | lookupNode-caps c (Sched.slots sd) nid (EvalSt.nodes st)
          (capsOK?-nodeSz c sd st inv) (capsOK?-nodeWid c sd st inv)
      | lookupNode-park (Caps.cSize c) (slotsSize (Sched.slots sd)) nid
          (EvalSt.nodes st) (capsOK?-nodePark c sd st inv)
 ... | just (mergeAll-st lim act q od) | (bn , wn) | pk =
       capsOK?-setNode c nid (mergeAll-st lim act q true) sd st bn pk wn inv
+        (λ i h → subst (λ m → parkStrat? i m ≡ true) eqN h)
     , vC , eC
 ... | nothing              | _ | _ = inv , vC , eC
 ... | just (scan-st _)     | _ | _ = inv , vC , eC
@@ -1778,7 +2002,7 @@ thruWrap-caps c mergeAllᵒ nid true sl (vs , bs , sd , st) inv vC eC
 thruWrap-caps c switchᵒ nid true sl (vs , bs , sd , st) inv vC eC
   with lookupNode nid (EvalSt.nodes st)
 ... | just (switch-st cur od) =
-      capsOK?-setNode c nid (switch-st cur true) sd st refl refl refl inv , vC , eC
+      capsOK?-setNode c nid (switch-st cur true) sd st refl refl refl inv (λ i h → refl) , vC , eC
 ... | nothing              = inv , vC , eC
 ... | just (scan-st _)     = inv , vC , eC
 ... | just (take-st _)     = inv , vC , eC
@@ -1787,7 +2011,7 @@ thruWrap-caps c switchᵒ nid true sl (vs , bs , sd , st) inv vC eC
 thruWrap-caps c exhaustᵒ nid true sl (vs , bs , sd , st) inv vC eC
   with lookupNode nid (EvalSt.nodes st)
 ... | just (exhaust-st act od) =
-      capsOK?-setNode c nid (exhaust-st act true) sd st refl refl refl inv , vC , eC
+      capsOK?-setNode c nid (exhaust-st act true) sd st refl refl refl inv (λ i h → refl) , vC , eC
 ... | nothing              = inv , vC , eC
 ... | just (scan-st _)     = inv , vC , eC
 ... | just (take-st _)     = inv , vC , eC
@@ -1821,7 +2045,7 @@ capsOK?-mergeAllBump : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   capsOK? c sched st ≡ true →
   capsOK? c sched (record st { nodes = mergeAllBump nid done (EvalSt.nodes st) }) ≡ true
 capsOK?-mergeAllBump c nid done sched st inv
-  with lookupNode nid (EvalSt.nodes st)
+  with lookupNode nid (EvalSt.nodes st) in eqN
      | lookupNode-caps c (Sched.slots sched) nid (EvalSt.nodes st)
          (capsOK?-nodeSz c sched st inv) (capsOK?-nodeWid c sched st inv)
      | lookupNode-park (Caps.cSize c) (slotsSize (Sched.slots sched)) nid
@@ -1829,7 +2053,7 @@ capsOK?-mergeAllBump c nid done sched st inv
 ... | just (mergeAll-st lim k q od) | (bn , wn) | pk =
       capsOK?-setNode c nid
         (mergeAll-st lim (if done then k else suc k) q od) sched st
-        bn pk wn inv
+        bn pk wn inv (λ i h → subst (λ m → parkStrat? i m ≡ true) eqN h)
 ... | nothing                | _ | _ = inv
 ... | just (scan-st _)       | _ | _ = inv
 ... | just (take-st _)       | _ | _ = inv
@@ -1860,7 +2084,7 @@ switchKill-caps {Γ = Γ} c (just v) sched st inv =
     (∧-intro h5
     (∧-intro (sweepLive-all (closLive c (Sched.slots sched)) kept
                 (Sched.live sched) h6)
-    (∧-intro h7 STRAT)))))))
+    (∧-intro h7 (∧-intro STRAT (∧-intro ORD PARK)))))))))
   where
   kept = proj₁ (cutThrough v (EvalSt.delivered st) (EvalSt.regWatermark st)
                            (EvalSt.dying st) (EvalSt.registry st))
@@ -1876,11 +2100,28 @@ switchKill-caps {Γ = Γ} c (just v) sched st inv =
   h5 = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))
   h6 = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P))))))
   h7 = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))))
-  h8 = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))))
+  h8 = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P))))))))
   STRAT = cutThrough-all (λ en → entStrat? (proj₁ (proj₂ en))
                                            (proj₂ (proj₂ (proj₂ en))))
             v (EvalSt.delivered st) (EvalSt.regWatermark st)
             (EvalSt.dying st) (EvalSt.registry st) h8
+  h9 = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))))))
+  h10 = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))))))
+  ORD = cutThrough-all (λ en → pathOrd? (Sched.nextNode sched)
+                                        (proj₂ (proj₂ (proj₂ en))))
+            v (EvalSt.delivered st) (EvalSt.regWatermark st)
+            (EvalSt.dying st) (EvalSt.registry st) h9
+  PARK = regPark?-nodes kept st
+           (record st { registry  = kept
+                      ; cancelled = proj₂ (proj₂ (cutThrough v (EvalSt.delivered st)
+                                                    (EvalSt.regWatermark st)
+                                                    (EvalSt.dying st)
+                                                    (EvalSt.registry st)))
+                                     ++ EvalSt.cancelled st })
+           refl
+           (cutThrough-all (λ en → pathPark? (proj₂ (proj₂ (proj₂ en))) st)
+              v (EvalSt.delivered st) (EvalSt.regWatermark st)
+              (EvalSt.dying st) (EvalSt.registry st) h10)
 
 -- the cut's closes carry no payload
 switchKill-closes-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}

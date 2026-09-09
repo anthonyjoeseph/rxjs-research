@@ -273,6 +273,23 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Open questions
 
+- **IS THERE A COMPUTABLE SHADOW OF THE SEALED FACES? — FIRST, because it is
+  the one question the ledger cannot lower (Anthony).** Three rows say in
+  their own headers that they cannot be instantiated — the cap does not
+  return, the climb bound is sealed, the fold's doubling closes the
+  conclusion. That sealing is what makes the tower checkable, so it is not
+  removable per row. It leaves a block of this tier whose class evidence can
+  only RAISE and never lower: a refutation still lands, a probe cannot be
+  written. So the de-risk pass cannot COMPLETE while it sits, whatever the
+  other two questions do — which is what ranks it above questions that are
+  merely larger. The question is whether a weaker family exists that REDUCES
+  and whose truth would imply these, because absent one they reach a proof
+  only by being proven. And the sealing claim is INHERITED rather than
+  measured: the compiled harness runs bodies the checker refuses to unfold,
+  so the first move is to re-verify each row's seal and say which SIDE is
+  sealed, since a hypothesis-side seal leaves the conclusion probeable.
+  relevant: `walk-frame-drain-entries`, `subscribeE-sz`, `share-fold-fit`
+
 - **WHICH STORE CELLS DOES A PATH PREDICATE REACH?** Five rows fail in one
   place: the statement reads a PATH or a chain, and the quantity it must
   bound is a cell in the STORE. A path predicate CAN see the store, and
@@ -284,16 +301,6 @@ does not fit is a finding about the shared statement, not about the head.
   receipt, so the reading must be CARRIED to reach the site that owes it.
   relevant: `step-frame-store≤`, `share-fold-store≤`, `subscribeE-sz-store-scan`, `pushBurst-sz-store-outer`, `subscribeSharedSlot-sz-store`
 
-- **IS THERE A COMPUTABLE SHADOW OF THE SEALED FACES?** Three rows say in
-  their own headers that they cannot be instantiated — the cap does not
-  return, the climb bound is sealed, the fold's doubling closes the
-  conclusion. That sealing is what makes the tower checkable, so it is not
-  removable per row. It leaves a block of this tier whose class evidence can
-  only RAISE and never lower: a refutation still lands, a probe cannot be
-  written. The question is whether a weaker family exists that REDUCES and
-  whose truth would imply these, because absent one they reach a proof only
-  by being proven, and nothing de-risks them first.
-  relevant: `walk-frame-drain-entries`, `subscribeE-sz`, `share-fold-fit`
 
 - **WHAT PRICES A REGISTERED CHAIN, AND WHERE IS THE RECEIPT OWED?** Five
   closed routes under `fan-regsSz` name one residue: no cap prices a

@@ -1156,3 +1156,25 @@ size-unfoldμ : ∀ {n} {Γ : Ctx n} {t} (body : Exp Γ (t ∷ []) [] [] t) →
 size-unfoldμ body =
   ≤-trans (size-elimGᵉ (here refl) (μᵉ body) body)
           (*-monoˡ-≤ (sizeᵉ (μᵉ body)) (n≤1+n (sizeᵉ body)))
+
+-- THE KILL MOVES NEITHER THE NODE TABLE NOR THE COUNTER.  `switchKill`
+-- rewrites the registry, the cancelled list and the live set and
+-- carries everything else through, but that is only visible once the
+-- outgoing inner has been case-split -- so a caller holding a reading
+-- over `nodes` or over `nextNode` at the pre-kill state needs these to
+-- transport it, and both arms are `refl`.  The `Keeps` record above
+-- reports the slots and the connected shares and deliberately not
+-- these, since it is a statement about what a STEP preserves while
+-- these two are about one particular kill
+switchKill-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (cur : Maybe NodeId) (sched : Sched Γ) (st : EvalSt e) →
+  EvalSt.nodes (proj₂ (proj₂ (switchKill cur sched st))) ≡ EvalSt.nodes st
+switchKill-nodes nothing  sched st = refl
+switchKill-nodes (just v) sched st = refl
+
+switchKill-nextNode : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (cur : Maybe NodeId) (sched : Sched Γ) (st : EvalSt e) →
+  Sched.nextNode (proj₁ (proj₂ (switchKill {t = t} {e = e} cur sched st)))
+    ≡ Sched.nextNode sched
+switchKill-nextNode nothing  sched st = refl
+switchKill-nextNode (just v) sched st = refl

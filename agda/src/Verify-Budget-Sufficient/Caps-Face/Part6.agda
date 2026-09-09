@@ -26,7 +26,7 @@ open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong; subst)
 
 open import Rx.Prim      using (Tick; Id; Source; InstEmit; _at_from_as_; InstEvent; close; exhausted; Gas; after_,_)
-open import Rx.Exp       using (Ty; obs; _≟ᵗ_; Ctx; Closed; Val; sizeᵉ; syncSizeᵉ; Exp; inputsBelowᵛ)
+open import Rx.Exp       using (Ty; obs; _≟ᵗ_; Ctx; Closed; Val; sizeᵉ; syncSizeᵉ; Exp; inputsBelowᵉ; inputsBelowᵛ)
 open import Rx.Frame-Width using (pWᵉ)
 open import Rx.Hop-Depth using (hopDᵉ)
 open import Rx.Evaluator using (Sched; EvalSt; RegId; NodeState; scan-st; take-st; mergeAll-st; switch-st;
@@ -88,14 +88,15 @@ open import Verify-Budget-Sufficient.Caps-Face.Part3 using
    frameStep-⊑-+; obsListCaps?-slots; pathSz?-⊑; valCaps?-size; valCaps?-wid;
    valsCaps?-slots; valsCaps?-widen)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
-  (capsOK?-mergeAllBump; capsOK?-nodeSz; capsOK?-nodeWid; capsOK?-setNode;
+  (capsOK?-mergeAllBump; capsOK?-nodeSz; capsOK?-nodeWid; capsOK?-regPark;
+   capsOK?-setNode; capsOK?-setNode-park;
    face-lift; frameBud; FrameFace; lookupNode-caps; mList?; mList?-head;
    mList?-keeps; mList?-tail; switchKill-caps; switchKill-closes-caps;
    thruWrap-caps; valsCaps?; valsStrat?; valsCaps→mList-strict;
    capsOK?-nodePark; parkList-push)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (burstCaps?; capsOK?; capsOK?-mono; eventCaps?; obsCaps?; parkStrat?; pathFloor; pathStrat?;
-   pathSz?; slotsCaps?; valCaps?; widNode-push)
+   pathSz?; setNode-regPark-owner; slotsCaps?; valCaps?; widNode-push)
 open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen)
 
 -- THE TWO HYPOTHESIS TYPES THE FACE CLIQUE RUNS AGAINST.  Every face
@@ -438,7 +439,7 @@ private
        × (suc (j + j′) ≤ sLvlD (Caps.cSize c) (Caps.cWid c) dep (suc bud) (suc j))
   thruConsume-caps-go {n = n} {u = u} siC c dep bud j g mergeAllᵒ nid κ id now o sl sched st
                       2≤S 1≤R slEq slC slSz inv vC pC lC nst dpt hps hib
-    with lookupNode nid (EvalSt.nodes st)
+    with lookupNode nid (EvalSt.nodes st) in eqN
        | lookupNode-caps (frameStep j c) (Sched.slots sched) nid (EvalSt.nodes st)
            (capsOK?-nodeSz (frameStep j c) sched st inv)
            (capsOK?-nodeWid (frameStep j c) sched st inv)
@@ -483,11 +484,17 @@ private
                        (record st { nodes = setNode nid (mergeAll-st lim act (q ++ o ∷ []) od)
                                               (EvalSt.nodes st) }) ≡ true)
               (sym lvl)
-              (capsOK?-setNode (frameStep (suc j) c)
+              (capsOK?-setNode-park (frameStep (suc j) c)
                  nid (mergeAll-st lim act (q ++ o ∷ []) od)
                  sched st BN PK WN
                  (capsOK?-mono (frameStep j c) (frameStep (suc j) c) sched st
-                    (frameStep-mono-j c 2≤S (n≤1+n j)) inv))
+                    (frameStep-mono-j c 2≤S (n≤1+n j)) inv)
+                 (setNode-regPark-owner nid κ
+                    (mergeAll-st lim act (q ++ o ∷ []) od) st
+                    (λ hold → all-++-intro (inputsBelowᵉ (pathFloor κ)) q (o ∷ [])
+                                (subst (λ m → parkStrat? (pathFloor κ) m ≡ true) eqN hold)
+                                (∧-intro hib refl))
+                    (capsOK?-regPark (frameStep j c) sched st inv)))
       , refl , refl
       , queue-push (Caps.cSize c) (Caps.cWid c) dep (suc bud) j (s≤s z≤n)
     where
@@ -531,7 +538,7 @@ private
                        else just (proj₁ R)) od)
            (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ R)))))
            (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ R)))))
-           refl refl refl (proj₁ (proj₂ SI))
+           refl refl refl (proj₁ (proj₂ SI)) (λ i h → refl)
        , proj₁ (proj₂ (proj₂ SI))
        , all-++-intro (eventCaps? (frameStep (j + j′) c) sl)
            (proj₁ KILL) _
@@ -570,7 +577,7 @@ private
            (exhaust-st (not (proj₁ (proj₂ (proj₂ (proj₂ R))))) od)
            (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ R)))))
            (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ R)))))
-           refl refl refl (proj₁ (proj₂ SI))
+           refl refl refl (proj₁ (proj₂ SI)) (λ i h → refl)
        , proj₁ (proj₂ (proj₂ SI))
        , proj₁ (proj₂ (proj₂ (proj₂ SI)))
        , proj₂ (proj₂ (proj₂ (proj₂ SI)))

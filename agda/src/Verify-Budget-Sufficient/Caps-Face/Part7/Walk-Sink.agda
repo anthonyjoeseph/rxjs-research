@@ -66,7 +66,7 @@ open import Verify-Budget-Sufficient.Caps-Depth
 
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (capsOK?; capsOK?-mono; entStrat?; framePark?; frameStrat?; frameSz?; pathFloor; pathPark?;
-  pathStrat?; pathSz?; pathSz?-widen; nestClosOK?ᵛ-widen; valCaps?)
+  pathStrat?; pathSz?; pathSz?-widen; nestClosOK?ᵛ-widen; valCaps?; pathOrd?)
 open import Verify-Budget-Sufficient.Caps-Face.Part5 using
   (clos-lift; valsCaps?-parts)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
@@ -80,7 +80,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part7.Root-Strat using
   (pathStrat-top)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves using
   (foldPath-park; pathPark-step; pathOrd-step; shareAdmit-park;
-   pathOrd?; foldPath-ord; shareAdmit-ord;
+   foldPath-ord; shareAdmit-ord;
    map-strat-step; scan-strat-step; take-strat-step;
    inner-strat-step; thru-strat-step)
 open import Verify-Budget-Sufficient.Delivery-Walk using
@@ -956,6 +956,12 @@ chain-walk-caps {e = e} sl id L sf gas nid now src (f ↠ p) vals evs fin sched 
   , walk-frame-drain sl id L sf gas nid now src f p vals evs fin sched st H
   , hib
   , proj₁ (∧-true (frameStrat? (pathFloor p) f) (pathStrat? p) hst)
+  -- THE TWO REGISTRY READINGS, HANDED STRAIGHT ACROSS.  The walk's
+  -- hypothesis bundle already carries both at this very chain, so the
+  -- predicate's new conjuncts cost the producer nothing -- which is
+  -- what makes carrying them cheaper than deriving them.
+  , hord
+  , hpk
   , Lt ∸ L
   , subst (_≤ sizeCount c d ⊔ S) (sym hLt) Lt≤TOP
   , subst (λ x → capsWalkOK c (capsAt e sl (suc id)) sl d x sf gas nid now p

@@ -48,7 +48,7 @@ open import Verify-Budget-Sufficient.Measures using
   (pathLen)
 
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
-  (capsOK?; pathFloor; pathPark?; pathStrat?; pathSz?; regsSz?; regsSz?-widen; nestClosOK?ᵛ)
+  (capsOK?; pathFloor; pathOrd?; pathPark?; pathStrat?; pathSz?; regsSz?; regsSz?-widen; nestClosOK?ᵛ)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
   (capsOK?-regs; pathSz?-len; registry-entStrat; slotsCaps?-capsAt; valsCaps?; valsStrat?)
 open import Verify-Budget-Sufficient.Psi-Split using
@@ -56,8 +56,6 @@ open import Verify-Budget-Sufficient.Psi-Split using
 open import Decide using (∧-intro)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Cascade-Caps using
   (walkH)
-open import Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves using
-  (pathOrd?)
 
 frameStep-regAt : ∀ (c : Caps) (j : ℕ) →
   Caps.cReg (frameStep j c) ≡ regAt (Caps.cSize c) (Caps.cReg c) j
