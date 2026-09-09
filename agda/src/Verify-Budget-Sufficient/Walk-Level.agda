@@ -1294,6 +1294,8 @@ input-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   regsLen? ℓ (EvalSt.registry st) ≡ true →
   pathStrat? κ ≡ true →
   inputsBelowᵉ (pathFloor κ) b ≡ true →
+  pathOrd? (Sched.nextNode sched) κ ≡ true →
+  pathPark? κ st ≡ true →
   let r = subscribeE g b κ bid now sched st
   in capsOK? (frameStep (j + j′) c)
              (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true →
@@ -1856,7 +1858,7 @@ subscribeInner-walk {n = n} {Γ = Γ} {t = t} {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U 
 thruConsume-walk {n = n} {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g mergeAllᵒ
                  nid κ bid now o sl sched st 2≤S 1≤R hCR slEq slC slSz inv vC pC
                  lC nst dpt invW vB pB hR s2 fS rS ceil lb hU dmd gas lℓ rgs hps hib hord hpk hqk
-  with lookupNode nid (EvalSt.nodes st)
+  with lookupNode nid (EvalSt.nodes st) in nEqM
      | lookupNode-caps (frameStep j c) (Sched.slots sched) nid (EvalSt.nodes st)
          (capsOK?-nodeSz (frameStep j c) sched st inv)
          (capsOK?-nodeWid (frameStep j c) sched st inv)
@@ -1940,7 +1942,8 @@ thruConsume-walk {n = n} {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g me
   where
   SI = subscribeInner-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g mergeAllᵒ nid κ
          bid now o sl sched st 2≤S 1≤R hCR slEq slC slSz inv vC pC lC nst dpt
-         invW vB pB hR s2 fS rS ceil lb hU dmd gas lℓ rgs hps hib hord hpk hqk
+         invW vB pB hR s2 fS rS ceil lb hU dmd gas lℓ rgs hps hib hord hpk
+         (subst (λ w → parkStrat? (pathFloor κ) w ≡ true) (sym nEqM) hqk)
   j′   = proj₁ SI
   S1   = proj₁ (proj₂ SI)
   R    = subscribeInner g mergeAllᵒ nid κ bid now o sched st
@@ -2000,7 +2003,7 @@ thruConsume-walk {n = n} {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g me
 thruConsume-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g switchᵒ nid κ bid now o
                  sl sched st 2≤S 1≤R hCR slEq slC slSz inv vC pC lC nst dpt
                  invW vB pB hR s2 fS rS ceil lb hU dmd gas lℓ rgs hps hib hord hpk hqk
-  with lookupNode nid (EvalSt.nodes st) | dpt
+  with lookupNode nid (EvalSt.nodes st) in nEqS | dpt
 ... | nothing                | dpt′ =
   0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
     , ZW , refl , refl , refl , rgs
@@ -2083,7 +2086,8 @@ thruConsume-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g switchᵒ nid κ b
                   (unconn-keeps sched st sched₁ st₁
                      (switchKill-keeps cur sched st)))
           hU
-  RDK = switchKill-readings switchᵒ nid κ cur sched st hord hpk hqk
+  RDK = switchKill-readings switchᵒ nid κ cur sched st hord hpk
+          (subst (λ w → parkStrat? (pathFloor κ) w ≡ true) (sym nEqS) hqk)
   SI = subscribeInner-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g switchᵒ nid κ
          bid now o sl sched₁ st₁ 2≤S 1≤R hCR
          (trans (KeepsC.slotsEq (switchKill-keeps cur sched st)) slEq) slC slSz
@@ -2106,7 +2110,7 @@ thruConsume-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g switchᵒ nid κ b
 thruConsume-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g exhaustᵒ nid κ bid now o
                  sl sched st 2≤S 1≤R hCR slEq slC slSz inv vC pC lC nst dpt
                  invW vB pB hR s2 fS rS ceil lb hU dmd gas lℓ rgs hps hib hord hpk hqk
-  with lookupNode nid (EvalSt.nodes st)
+  with lookupNode nid (EvalSt.nodes st) in nEqX
 ... | nothing                =
   0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
     , ZW , refl , refl , refl , rgs
@@ -2177,7 +2181,8 @@ thruConsume-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g exhaustᵒ nid κ 
   where
   SI = subscribeInner-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g exhaustᵒ nid κ
          bid now o sl sched st 2≤S 1≤R hCR slEq slC slSz inv vC pC lC nst dpt
-         invW vB pB hR s2 fS rS ceil lb hU dmd gas lℓ rgs hps hib hord hpk hqk
+         invW vB pB hR s2 fS rS ceil lb hU dmd gas lℓ rgs hps hib hord hpk
+         (subst (λ w → parkStrat? (pathFloor κ) w ≡ true) (sym nEqX) hqk)
   j′ = proj₁ SI
   R  = subscribeInner g exhaustᵒ nid κ bid now o sched st
 
@@ -2471,6 +2476,8 @@ WetOuter =
      -- is the context size, where every closed expression already sits
      pathStrat? κ ≡ true →
      inputsBelowᵉ (pathFloor κ) b ≡ true →
+     pathOrd? (Sched.nextNode sched) κ ≡ true →
+     pathPark? κ st ≡ true →
      let r = subscribeE g b κ id now sched st
      in (hasDry (proj₁ r) ≡ false)
         × (INV? (ΨAt e (Sched.slots (proj₁ (proj₂ r))))
