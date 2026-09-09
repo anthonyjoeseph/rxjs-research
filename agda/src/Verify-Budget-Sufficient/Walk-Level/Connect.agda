@@ -54,10 +54,11 @@ open import Verify-Budget-Sufficient.Wet.Part6 using
   (connect-edge)
 -- the caps face: only the five predicates the statement reads there
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
-  (burstCaps?; burstCount?; capsOK?; pathFloor; pathStrat?; pathSz?; slotCaps?;
-   slotsCaps?; slotsCaps?-lookup)
+  (burstCaps?; burstCount?; capsOK?; pathFloor; pathOrd?; pathPark?;
+   pathPark?-nodes; pathStrat?; pathSz?; slotCaps?; slotsCaps?;
+   slotsCaps?-lookup)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
-  (capsOK?-parts; entStrat-slot<; register-caps)
+  (capsOK?-connect; capsOK?-parts; entStrat-slot<; register-caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part5 using
   (cSize≤frameStep; cWid≤frameStep)
 open import Verify-Budget-Sufficient.Psi-Split using
@@ -291,6 +292,8 @@ private
     -- carried, because a `shared` slot cannot be built without it.
     pathStrat? κ ≡ true →
     inputsBelowᵉ (pathFloor κ) b ≡ true →
+    pathOrd? (Sched.nextNode sched) κ ≡ true →
+    pathPark? κ st ≡ true →
     let r = subscribeE fuel d (share-sink i) bid now sched
               (register (toℕ i) κ
                 (record st { connectedShares =
@@ -346,8 +349,10 @@ private
     -- at `j + 1`, which is where shared-live-INV and mu-lvl-desc deliver
     CAPS₁ : capsOK? (frameStep (j + 1) c) sched st₁ ≡ true
     CAPS₁ = subst (λ x → capsOK? (frameStep x c) sched st₁ ≡ true) (sym jsuc)
-              (register-caps c j (toℕ i) κ sched st₀ 2≤S 1≤R cOK pSz
-                 (entStrat-slot< (toℕ i) κ hib hps))
+              (register-caps c j (toℕ i) κ sched st₀ 2≤S 1≤R
+                 (capsOK?-connect (frameStep j c) (toℕ i) sched st cOK) pSz
+                 (entStrat-slot< (toℕ i) κ hib hps) hord
+                 (subst (_≡ true) (pathPark?-nodes κ st st₀ refl) hpk))
     INV₁ : INV? Ψ (Caps.cSize (frameStep (j + 1) c)) sched st₁ ≡ true
     INV₁ = shared-live-INV c Ψ j 1 (toℕ i) κ sched st₀ 2≤S hCR CAPS₁ invW pB
     fnCd : fnCapᵉ d ≤ Ψ
@@ -502,6 +507,8 @@ abstract
     -- carried, because a `shared` slot cannot be built without it.
     pathStrat? κ ≡ true →
     inputsBelowᵉ (pathFloor κ) b ≡ true →
+    pathOrd? (Sched.nextNode sched) κ ≡ true →
+    pathPark? κ st ≡ true →
     let r = subscribeE fuel d (share-sink i) bid now sched
               (register (toℕ i) κ
                 (record st { connectedShares =
@@ -616,6 +623,8 @@ private
     regsLen? ℓ (EvalSt.registry st) ≡ true →
     pathStrat? κ ≡ true →
     inputsBelowᵉ (pathFloor κ) b ≡ true →
+    pathOrd? (Sched.nextNode sched) κ ≡ true →
+    pathPark? κ st ≡ true →
     let r = sharedConnect (gs fuel) i d κ bid now sched st
     in capsOK? (frameStep (j + j′) c)
                (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true →
@@ -783,6 +792,8 @@ abstract
     regsLen? ℓ (EvalSt.registry st) ≡ true →
     pathStrat? κ ≡ true →
     inputsBelowᵉ (pathFloor κ) b ≡ true →
+    pathOrd? (Sched.nextNode sched) κ ≡ true →
+    pathPark? κ st ≡ true →
     let r = sharedConnect (gs fuel) i d κ bid now sched st
     in capsOK? (frameStep (j + j′) c)
                (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true →
@@ -877,6 +888,8 @@ sharedConnect-walk : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   regsLen? ℓ (EvalSt.registry st) ≡ true →
   pathStrat? κ ≡ true →
   inputsBelowᵉ (pathFloor κ) b ≡ true →
+  pathOrd? (Sched.nextNode sched) κ ≡ true →
+  pathPark? κ st ≡ true →
   let r = sharedConnect g i d κ bid now sched st
   in capsOK? (frameStep (j + j′) c)
              (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true →

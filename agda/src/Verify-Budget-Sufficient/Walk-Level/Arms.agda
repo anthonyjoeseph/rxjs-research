@@ -55,8 +55,8 @@ open import Verify-Budget-Sufficient.Caps using
   (Caps; frameStep; frameStep-mono-j)
 -- the caps face: only the five predicates the statement reads there
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
-  (burstCaps?; burstCount?; capsOK?; pathFloor; pathStrat?; pathSz?; slotCaps?;
-   slotsCaps?; slotsCaps?-lookup)
+  (burstCaps?; burstCount?; capsOK?; pathFloor; pathOrd?; pathPark?; pathStrat?;
+   pathSz?; slotCaps?; slotsCaps?; slotsCaps?-lookup)
 open import Verify-Budget-Sufficient.Caps-Nest using
   (nest)
 open import Verify-Budget-Sufficient.Caps-Face.Part5 using
@@ -149,6 +149,8 @@ input-wet-shared : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     -- registers, and it is the arm that hands both halves on
     pathStrat? κ ≡ true →
     inputsBelowᵉ (pathFloor κ) b ≡ true →
+    pathOrd? (Sched.nextNode sched) κ ≡ true →
+    pathPark? κ st ≡ true →
     let r = subscribeE g b κ bid now sched st
     in capsOK? (frameStep (j + j′) c)
                (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true →
@@ -724,10 +726,12 @@ input-wet-scripted : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   regsLen? ℓ (EvalSt.registry st) ≡ true →
   -- TAKEN AND DROPPED, for the same reason the ops ledger above is: a
   -- scripted slot never registers, so nothing here reads an entry, and
-  -- these two ride along only to keep the telescope aligned with
+  -- these ride along only to keep the telescope aligned with
   -- input-wet-core's, whose shared arm DOES spend them
   pathStrat? κ ≡ true →
   inputsBelowᵉ (pathFloor κ) b ≡ true →
+  pathOrd? (Sched.nextNode sched) κ ≡ true →
+  pathPark? κ st ≡ true →
   let r = subscribeE g b κ bid now sched st
   in capsOK? (frameStep (j + j′) c)
              (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true →
@@ -792,6 +796,8 @@ input-wet-core : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   regsLen? ℓ (EvalSt.registry st) ≡ true →
   pathStrat? κ ≡ true →
   inputsBelowᵉ (pathFloor κ) b ≡ true →
+  pathOrd? (Sched.nextNode sched) κ ≡ true →
+  pathPark? κ st ≡ true →
   let r = subscribeE g b κ bid now sched st
   in capsOK? (frameStep (j + j′) c)
              (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true →
