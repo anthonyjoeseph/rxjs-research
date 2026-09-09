@@ -343,6 +343,8 @@ WalkTailᴴˢ {n} {Γ} {t} {e} {s} {u} g f z b c Ψ F Ŝ R̂ G ℓ L̂ dep bud o
     regsLen? ℓ (EvalSt.registry st) ≡ true →
     pathStrat? κ ≡ true →
     inputsBelowᵉ (pathFloor κ) (scanᵉ f z b) ≡ true →
+    pathOrd? (Sched.nextNode sched) κ ≡ true →
+    pathPark? κ st ≡ true →
     burstHopSpnH? F (slotHop F sl) (pmᵗ F 0 f)
       (hopDᵗ F (slotHop F sl) f + hopDᵗ F (slotHop F sl) z
          + hopDᵉ F (slotHop F sl) b)
@@ -400,6 +402,8 @@ WalkTailᴴˢ⁰ {n} {Γ} {t} {e} {s} {u} g f z b c Ψ F Ŝ R̂ G ℓ L̂ dep bu
     regsLen? ℓ (EvalSt.registry st) ≡ true →
     pathStrat? κ ≡ true →
     inputsBelowᵉ (pathFloor κ) (scanᵉ f z b) ≡ true →
+    pathOrd? (Sched.nextNode sched) κ ≡ true →
+    pathPark? κ st ≡ true →
     let (nid , sched₁) = mintNode sched
         r = subscribeE g b (scan-f f nid ↠ κ) bid now sched₁
               (installNode nid (scan-st (evalTm z)) st)
@@ -495,6 +499,8 @@ WalkTailᴴˢˢ {n} {Γ} {t} {e} {s} {u} g f z b c Ψ F Ŝ R̂ G ℓ L̂ dep bud
     regsLen? ℓ (EvalSt.registry st) ≡ true →
     pathStrat? κ ≡ true →
     inputsBelowᵉ (pathFloor κ) (scanᵉ f z b) ≡ true →
+    pathOrd? (Sched.nextNode sched) κ ≡ true →
+    pathPark? κ st ≡ true →
     let (nid , sched₁) = mintNode sched
         J₀ = suc (j + suc (sizeᵗ z))
         r = subscribeE g b (scan-f f nid ↠ κ) bid now sched₁

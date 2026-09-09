@@ -1302,6 +1302,7 @@ walk-take-suc {n = n} {u = u} g cnt b k ecEq wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud 
   a₉  = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SUB))))))))
   res = subscribeE g b (take-f nid ↠ κ) bid now sched₀ st₀
   ⊑₁  = frameStep-⊑-+ c 2≤S (suc j) j₁
+  RDT = subscribeE-readings g b (take-f nid ↠ κ) bid now sched₀ st₀ hordT hparkT
   PBc = pushBurst-caps c dep bud (suc j + j₁) g bid now (take-f nid) κ (proj₁ res)
           sl (proj₁ (proj₂ res)) (proj₂ (proj₂ res)) 2≤S 1≤R
           (trans (KeepsC.slotsEq
@@ -1313,7 +1314,6 @@ walk-take-suc {n = n} {u = u} g cnt b k ecEq wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud 
           (≤-trans (burst-takef-zero g bid now nid κ (proj₁ res)
                       (proj₁ (proj₂ res)) (proj₂ (proj₂ res))) z≤n)
           refl hps BSTR refl (proj₁ RDT) (proj₂ RDT)
-  RDT = subscribeE-readings g b (take-f nid ↠ κ) bid now sched₀ st₀ hordT hparkT
   j₂  = proj₁ PBc
   PB  = pushBurst g bid now (take-f nid) κ (proj₁ res)
           (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
@@ -1499,6 +1499,7 @@ walk-map {n = n} {u = u} g f b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j
   a₉  = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SUB))))))))
   res = subscribeE g b (map-f f ↠ κ) bid now sched st
   ⊑₁  = frameStep-⊑-+ c 2≤S (suc j) j₁
+  RDM = subscribeE-readings g b (map-f f ↠ κ) bid now sched st hordM hparkM
   PBc = pushBurst-caps c dep bud (suc j + j₁) g bid now (map-f f) κ (proj₁ res)
           sl (proj₁ (proj₂ res)) (proj₂ (proj₂ res)) 2≤S 1≤R
           (trans (KeepsC.slotsEq
@@ -1510,7 +1511,6 @@ walk-map {n = n} {u = u} g f b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j
           a₂ a₃
           (≤-trans (m≤n⊔m _ _) dpt)
           hibf hps BSTR refl (proj₁ RDM) (proj₂ RDM)
-  RDM = subscribeE-readings g b (map-f f ↠ κ) bid now sched st hordM hparkM
   j₂  = proj₁ PBc
   PB  = pushBurst g bid now (map-f f) κ (proj₁ res)
           (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
@@ -2052,6 +2052,20 @@ walk-scan-rest {n = n} {u = u} g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc o
   monoJ = frameStep-mono-j c 2≤S j≤J
   BSTR = subscribeE-burstStrat g b (scan-f f nid ↠ κ) bid now sched₁ st₀
            (∧-intro hibf hps) hibb
+  -- THE TWO READINGS ACROSS THE MINTED CELL, the same pair the source
+  -- tail owes and paid the same way -- the tail's Σ reports conjuncts
+  -- rather than the readings it was handed, so they are rebuilt here
+  hordZ : pathOrd? (suc nid) (scan-f f nid ↠ κ) ≡ true
+  hordZ = pathOrd?-push (suc nid) (scan-f f nid) κ ≤-refl
+            (T⇒≡true (pathRead κ ≤ᵇ nid) (≤⇒≤ᵇ (pathOrd?-read nid κ hord)))
+            (pathOrd?-mono nid (suc nid) κ (n≤1+n nid) hord)
+  hparkZ : pathPark? (scan-f f nid ↠ κ) st₀ ≡ true
+  hparkZ = ∧-intro (installNode-scanPark (pathFloor κ) f nid (evalTm z) st
+                      (evalTm-strat (pathFloor κ) z hibz))
+                   (pathPark?-set-fresh nid κ nid (scan-st (evalTm z)) st
+                      ≤-refl hord hpk)
+  RDZ = subscribeE-readings g b (scan-f f nid ↠ κ) bid now sched₁ st₀
+          hordZ hparkZ
   PBc = pushBurst-caps c dep bud (J₀ + j₁) g bid now (scan-f f nid) κ
           (proj₁ res) sl (proj₁ (proj₂ res)) (proj₂ (proj₂ res)) 2≤S 1≤R
           (trans (KeepsC.slotsEq
@@ -2073,21 +2087,7 @@ walk-scan-rest {n = n} {u = u} g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc o
              (scan-f f nid) sched₁ st₀ ≤-refl
              (installNode-scanPark (pathFloor κ) f nid (evalTm z) st
                 (evalTm-strat (pathFloor κ) z hibz)))
-          (proj₁ RDZ) (proj₂ RDZ)
-  -- THE TWO READINGS ACROSS THE MINTED CELL, the same pair the source
-  -- tail owes and paid the same way -- the tail's Σ reports conjuncts
-  -- rather than the readings it was handed, so they are rebuilt here
-  hordZ : pathOrd? (suc nid) (scan-f f nid ↠ κ) ≡ true
-  hordZ = pathOrd?-push (suc nid) (scan-f f nid) κ ≤-refl
-            (T⇒≡true (pathRead κ ≤ᵇ nid) (≤⇒≤ᵇ (pathOrd?-read nid κ hord)))
-            (pathOrd?-mono nid (suc nid) κ (n≤1+n nid) hord)
-  hparkZ : pathPark? (scan-f f nid ↠ κ) st₀ ≡ true
-  hparkZ = ∧-intro (installNode-scanPark (pathFloor κ) f nid (evalTm z) st
-                      (evalTm-strat (pathFloor κ) z hibz))
-                   (pathPark?-set-fresh nid κ nid (scan-st (evalTm z)) st
-                      ≤-refl hord hpk)
-  RDZ = subscribeE-readings g b (scan-f f nid ↠ κ) bid now sched₁ st₀
-          hordZ hparkZ
+          (proj₁ RDZ) (proj₂ (∧-true _ _ (proj₂ RDZ)))
   j₂  = proj₁ PBc
   ⊑₂  = frameStep-⊑-+ c 2≤S (J₀ + j₁) j₂
   PB  = pushBurst g bid now (scan-f f nid) κ (proj₁ res)

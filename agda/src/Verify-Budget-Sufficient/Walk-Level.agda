@@ -1625,6 +1625,7 @@ subscribeAll-walk c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j g op ns b κ bi
                          ≤ unconn z (EvalSt.connectedShares st))
               sl₂eq slEq
               (unconn-keeps sched₀ st₀ (proj₁ (proj₂ res)) (proj₂ (proj₂ res)) KP)
+  RDA = subscribeE-readings g b κ′ bid now sched₀ st₀ hordK hparkK
   PBW = pushThru-walk c Ψ F Ŝ R̂ G ℓ L̂ U (hopDᵉ F (slotHop F sl) b) (suc (syncSizeᵉ b))
           dep bud (suc j + j₁) g bid now op nid
           κ (proj₁ res) sl (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
@@ -1655,7 +1656,6 @@ subscribeAll-walk c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j g op ns b κ bi
           -- tail's, so the pair splits with no second fact
           (proj₁ RDA) (proj₂ (∧-true _ _ (proj₂ RDA)))
           (proj₁ (∧-true _ _ (proj₂ RDA)))
-  RDA = subscribeE-readings g b κ′ bid now sched₀ st₀ hordK hparkK
   j₂  = proj₁ PBW
   W1  = proj₁ (proj₂ PBW)
   W2  = proj₁ (proj₂ (proj₂ PBW))
