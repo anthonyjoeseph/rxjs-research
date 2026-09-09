@@ -128,7 +128,8 @@ open import Verify-Budget-Sufficient.Caps using (1≤capsAt-reg; 2≤capsAt-size
 
 -- named explicitly: .Caps-Face and .Wet share .Measures names
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
-  (burstCaps?; capsOK?; eventCaps?; frameStrat?; pathFloor; pathOrd?; pathPark?; pathSz?;
+  (burstCaps?; capsOK?; eventCaps?; framePark?; frameStrat?; pathFloor; pathOrd?; pathPark?;
+  pathSz?;
   pathSz?-widen;
   pathStrat?; slotsCaps?; valCaps?)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
@@ -153,7 +154,8 @@ open import Verify-Budget-Sufficient.Psi-Split using
   regP?-∧; regP?-projˡ;
   regsBΨ?; regStrat?-paths; valsΨ?; valΨ?)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves using
-  (chainStep-ord; chainStep-park; foldPath-ord; foldPath-park; shareAdmit-ord; shareAdmit-park;
+  (chainStep-ord; chainStep-park; foldPath-ord; foldPath-park; pathOrd-step; pathPark-step;
+  shareAdmit-ord; shareAdmit-park;
   shareAdmit-strat; stepFrame-valsStrat)
 open import Decide using (not-in; not-out; ∧-intro; ∧-trueˡ; ∧-trueʳ)
 open import Verify-Budget-Sufficient.Burst-Walk.Leaves using
@@ -586,6 +588,8 @@ module BurstWalk
                         hF = proj₁ (∧-true (frameStrat? (pathFloor path′) f)
                                            (pathStrat? path′) hS)
                         hV = ∧-trueʳ vb
+                        hKt = proj₂ (∧-true (framePark? (pathFloor path′) f st)
+                                            (pathPark? path′ st) (proj₂ hOb2))
                         BF = stepFrame-burst-face siC ifc {e = e} c sl Ψ d 2≤S 1≤R hCR
                                slC slSz slFc J sf id now f path′ vals fin sched st ok
                                (∧-trueˡ pb) (∧-trueˡ vb)
@@ -608,7 +612,14 @@ module BurstWalk
                           (registry-entStrat (frameStep (J + proj₁ BF) c) s′ t′
                             (proj₂ (proj₁ ok′))))
                     , proj₂ (proj₂ (proj₂ (proj₂ (proj₂ BF))))
-                    , refl
+                    -- AND THE TAIL'S OWN READING, WHICH IS THE HALF THE
+                    -- FRAME KEEPS.  The counter can only have moved up and
+                    -- the cells the tail reads are frozen by the step, so
+                    -- both are transports of the reading spent above
+                    , ∧-intro
+                        (pathOrd-step sf id now f path′ vals fin sched st (proj₁ hOb2))
+                        (pathPark-step sf id now f path′ vals fin sched st
+                           (proj₁ hOb2) hKt)
     }
 
   module V = Walk {e = e} S W R d 2≤S burstH
