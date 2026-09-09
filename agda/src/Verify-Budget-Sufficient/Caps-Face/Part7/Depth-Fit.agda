@@ -2409,6 +2409,7 @@ cascade-caps-all-go {n = n} {e = e} sl id Lc a nextId S ((rid , path) ∷ chains
   ST  = chainStep-caps sl id Lc a nextId path sched st′ sleq cok
           (pathSz?-widen path (proj₁ c⊑) hpc)
           (valCaps?-widen sl (arrTy a) (arrVal a) c⊑ hvc) hdc hstrc hsvc
+          hpkc hordc
   -- and the fold's own climb lands on the NEXT position exactly when
   -- this chain's deliveries fit the budget read at this one
   STEP : lvls B W d Lc (suc D) ≤ Ent c d J g (suc i)
@@ -2416,7 +2417,7 @@ cascade-caps-all-go {n = n} {e = e} sl id Lc a nextId S ((rid , path) ∷ chains
                  (ent-step c d J g i D 2≤S
                     (chain-deliv-cap sl id a nextId path sched st′ Lc J g i
                        sleq hgn cok (pathSz?-widen path (proj₁ c⊑) hpc)
-                       HVC hdc hLc hstrc hsvc))
+                       HVC hdc hLc hstrc hsvc hpkc hordc))
 
 cascade-caps-all : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id) (S : ℕ)

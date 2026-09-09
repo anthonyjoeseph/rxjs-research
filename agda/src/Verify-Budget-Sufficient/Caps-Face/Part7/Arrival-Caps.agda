@@ -328,13 +328,18 @@ chainStep-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   -- climb leaves them untouched
   pathStrat? path ≡ true →
   inputsBelowᵛ (pathFloor path) (arrTy a) (arrVal a) ≡ true →
+  -- AND THE CHAIN'S TWO ENTRY READINGS, which the walk's ledger prices
+  -- its registry by: neither is derivable from the caps receipt, so
+  -- each is carried in from whatever wrote what it reads
+  pathPark? path st ≡ true →
+  pathOrd? (Sched.nextNode sched) path ≡ true →
   Σ ℕ λ L′ →
     (Lv + L′ ≤ lvls (Caps.cSize (capsAt e sl id)) (Caps.cWid (capsAt e sl id)) (capsH e sl id)
                  Lv (suc (delivN st (proj₂ (proj₂ (chainStep nextId a path sched st))))))
     × (capsOK? (frameStep (Lv + L′) (capsAt e sl id))
          (proj₁ (proj₂ (chainStep nextId a path sched st)))
          (proj₂ (proj₂ (chainStep nextId a path sched st))) ≡ true)
-chainStep-caps {n = n} {e = e} sl id Lv a nextId path sched st sleq cok hpz hvc hdp hstr hsv =
+chainStep-caps {n = n} {e = e} sl id Lv a nextId path sched st sleq cok hpz hvc hdp hstr hsv hpk hord =
   W.Res.lvl FP ∸ Lv
   , subst (_≤ CEIL) (sym EQ) (≤-trans (W.Res.hi FP) STEP)
   , subst (λ x → capsOK? (frameStep x c)
@@ -372,6 +377,7 @@ chainStep-caps {n = n} {e = e} sl id Lv a nextId path sched st sleq cok hpz hvc 
          (∧-intro hpz hstr)
          (∧-intro (∧-intro (∧-intro hvc refl) refl) (∧-intro hsv refl))
          (W.eb-seed Lv (arrSource a) (Arrival.isLast a)) tt tt hdp
+         (∧-intro hord hpk)
   EQ : Lv + (W.Res.lvl FP ∸ Lv) ≡ W.Res.lvl FP
   EQ = m+[n∸m]≡n (W.Res.lo FP)
   D = delivN st (proj₂ (proj₂ (chainStep nextId a path sched st)))
@@ -412,19 +418,21 @@ chain-deliv-cap : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   -- either reading
   pathStrat? path ≡ true →
   inputsBelowᵛ (pathFloor path) (arrTy a) (arrVal a) ≡ true →
+  pathPark? path st ≡ true →
+  pathOrd? (Sched.nextNode sched) path ≡ true →
   delivN st (proj₂ (proj₂ (chainStep nextId a path sched st)))
     ≤ dCapᶜ (Caps.cSize (capsAt e sl id)) (Caps.cWid (capsAt e sl id))
             (Caps.cReg (capsAt e sl id)) (capsH e sl id) g
             (Pos (capsAt e sl id) (capsH e sl id) J g i)
 chain-deliv-cap {n = n} {e = e} sl id a nextId path sched st Lv J g i
-  sleq n≤g cok hpz hvc hdp hLv hstr hsv =
+  sleq n≤g cok hpz hvc hdp hLv hstr hsv hpk hord =
   ≤-trans (W.Res.cnt (W.foldPath-go Lv (budgetAt e (Sched.slots sched) nextId) n nextId
                         (arrTick a) (arrSource a) path (arrVal a ∷ [])
                         (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
                         (Arrival.isLast a) sched st
                         ((sleq , cok) , regʲ)
                         (∧-intro hpz hstr) (∧-intro hvc (∧-intro hsv refl))
-                        refl tt tt hdp))
+                        refl tt tt hdp (∧-intro hord hpk)))
           (dCapᶜ-mono {S} {S} {Wd} {Wd} {R} {R} {_} {_} {d} n g
              2≤S ≤-refl ≤-refl ≤-refl n≤g CLIMB)
   where
@@ -549,6 +557,8 @@ arr-chains-caps-go {n = n} {e = e} sl id Lv a nextId ((rid , path) ∷ chains) s
                            (proj₁ (proj₂ (chainStep nextId a path sched st′)))
                            (proj₂ (proj₂ (chainStep nextId a path sched st′)))) hdp)
                 (proj₁ (∧-true _ _ hstr)) (proj₁ (∧-true _ _ hsv))
+                (pathPark-delivered path rid st (proj₁ (∧-true _ _ hpk)))
+                (proj₁ (∧-true _ _ hord))
         -- THE CASCADE'S OWN LEDGER LINE, at the state this arm has
         -- already reduced to: an uncancelled registration costs one
         -- delivery, plus this chain's fold, plus the tail's.  It is
@@ -597,7 +607,9 @@ arr-chains-caps-go {n = n} {e = e} sl id Lv a nextId ((rid , path) ∷ chains) s
                                         (proj₁ (proj₂ (chainStep nextId a path sched st′)))
                                         (proj₂ (proj₂ (chainStep nextId a path sched st′)))) hdp)
                              hLv (proj₁ (∧-true _ _ hstr))
-                             (proj₁ (∧-true _ _ hsv))))
+                             (proj₁ (∧-true _ _ hsv))
+                             (pathPark-delivered path rid st (proj₁ (∧-true _ _ hpk)))
+                             (proj₁ (∧-true _ _ hord))))
         REC  = ≤-trans (lvls-mono R R 2≤S ≤-refl ≤-refl (proj₁ (proj₂ ST)) ≤-refl)
                  (≤-trans (≤-reflexive (sym (lvls-add S W d Lv (suc D) R))) hlvC)
         HPZ  = pathSz?-widen path (proj₁ c⊑) (proj₁ (∧-true _ _ hpz))
