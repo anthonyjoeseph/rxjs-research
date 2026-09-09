@@ -305,7 +305,7 @@ private
        × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
   sharedConnect-inner-wet-go {n = n} {Γ = Γ} c Ψ F Ŝ R̂ G ℓ L̂ dep (suc bud′) (suc ops′) j fuel wl i _ κ
     bid now sl sched st d {ok = ok} slotEq refl fresh 2≤S 1≤R hCR slEq slC slSz cOK szb pSz lC
-    (s≤s nstᵖ) (s≤s _) dpt invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs hps hib =
+    (s≤s nstᵖ) (s≤s _) dpt invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk =
       j′
     , iINV
     , iBB
@@ -631,7 +631,7 @@ private
        × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
   sharedConnect-walk-conn-go {Γ = Γ} c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ fuel wl i b κ bid now sl
     sched st d slotEq bEq fresh 2≤S 1≤R hCR slEq slC slSz cOK szb pSz lC nst hidx dpt invW fnC pB
-    s2 fS rS ceil lb dmd gas lℓ rgs hps hib cOK′ bC bCnt jle
+    s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk cOK′ bC bCnt jle
     with burstCompleted (proj₁ (subscribeE fuel d (share-sink i) bid now sched
                                  (register (toℕ i) κ
                                    (record st { connectedShares =
@@ -658,7 +658,7 @@ private
                       ; completedSources = toℕ i ∷ EvalSt.completedSources st₂ }
     IW = sharedConnect-inner-wet c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j fuel wl i b κ bid now sl
            sched st d slotEq bEq fresh 2≤S 1≤R hCR slEq slC slSz cOK szb pSz lC nst hidx
-           dpt invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs hps hib
+           dpt invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk
     j₂ = proj₁ IW
     B₂ = Caps.cSize (frameStep (suc j + j₂) c)
     B′ = Caps.cSize (frameStep (j + j′) c)
@@ -698,7 +698,7 @@ private
     st₂    = proj₂ (proj₂ res)
     IW = sharedConnect-inner-wet c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j fuel wl i b κ bid now sl
            sched st d slotEq bEq fresh 2≤S 1≤R hCR slEq slC slSz cOK szb pSz lC nst hidx
-           dpt invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs hps hib
+           dpt invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk
     j₂ = proj₁ IW
     B₂ = Caps.cSize (frameStep (suc j + j₂) c)
     B′ = Caps.cSize (frameStep (j + j′) c)
@@ -894,7 +894,7 @@ sharedConnect-walk c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ g0 wl i b κ bid n
   sched st d _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ ()
 sharedConnect-walk c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ (gs fuel) wl i b κ bid now sl
   sched st d slotEq bEq fresh 2≤S 1≤R hCR slEq slC slSz cOK szb pSz lC nst hidx dpt invW fnC pB
-  s2 fS rS ceil lb dmd gas lℓ rgs hps hib cOK′ bC bCnt jle =
+  s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk cOK′ bC bCnt jle =
   sharedConnect-walk-conn c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ fuel wl i b κ bid now sl
     sched st d slotEq bEq fresh 2≤S 1≤R hCR slEq slC slSz cOK szb pSz lC nst hidx dpt invW fnC pB
-    s2 fS rS ceil lb dmd gas lℓ rgs hps hib cOK′ bC bCnt jle
+    s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk cOK′ bC bCnt jle

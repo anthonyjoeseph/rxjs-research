@@ -2448,7 +2448,8 @@ cascade-caps-all {e = e} sl id a nextId S sched st sleq cok hsc
            (cascadeLatch-caps (capsAt e sl id) a sched st cok))
     hsc hpz hΦs
     (cascade-admit-entry (capsAt e sl id) a sched st cok) hsv
-    (cascade-admit-park a st) (cascade-admit-ord a sched st)
+    (cascade-admit-park a st (capsOK?-regPark (capsAt e sl id) sched st cok))
+    (cascade-admit-ord a sched st (capsOK?-regOrd (capsAt e sl id) sched st cok))
     hvc hcl hinc hval hsn
     0 (Caps.cSize (capsAt e sl id)) 0
     (capsAt-round-size e sl id) base REGLEN ≤-refl

@@ -57,7 +57,8 @@ open import Verify-Budget-Sufficient.Keeps-Ring using
   (Keeps)
 -- the caps face: only the predicates the statement reads there
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
-  (burstCaps?; burstCount?; capsOK?; pathFloor; pathStrat?; pathSz?; slotsCaps?)
+  (burstCaps?; burstCount?; capsOK?; pathFloor; pathOrd?; pathPark?; pathStrat?;
+  pathSz?; slotsCaps?)
 open import Verify-Budget-Sufficient.Caps-Nest using
   (nest)
 -- the chain-charge algebra subscribeE-caps' own *All head spends
@@ -167,6 +168,15 @@ WalkTail {n} {Γ} {t} {e} {u} g b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j =
     -- source half is the closed program's own stratification.
     pathStrat? κ ≡ true →
     inputsBelowᵉ (pathFloor κ) b ≡ true →
+    -- AND THE CHAIN'S TWO REGISTRY READINGS, for the reason the two
+    -- above it are here: a subscribe WRITES the registry, so it owes
+    -- whatever the entry it writes will be read by.  Neither is a fact
+    -- about the term -- the order is against the scheduler's counter
+    -- and the park against the node table -- so neither is derivable
+    -- from any cap in the telescope, and both terminate at the root
+    -- exactly as the stratification pair does
+    pathOrd? (Sched.nextNode sched) κ ≡ true →
+    pathPark? κ st ≡ true →
     let r = subscribeE g b κ bid now sched st
     in Σ ℕ λ j′ →
        (capsOK? (frameStep (j + j′) c) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
@@ -237,6 +247,8 @@ WalkTail⁻ {n} {Γ} {t} {e} {u} g b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j =
     regsLen? ℓ (EvalSt.registry st) ≡ true →
     pathStrat? κ ≡ true →
     inputsBelowᵉ (pathFloor κ) b ≡ true →
+    pathOrd? (Sched.nextNode sched) κ ≡ true →
+    pathPark? κ st ≡ true →
     let r = subscribeE g b κ bid now sched st
     in Σ ℕ λ j′ →
        (capsOK? (frameStep (j + j′) c) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
@@ -564,6 +576,8 @@ WalkTail⁻ᴴ {n} {Γ} {t} {e} {u} g b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j =
     regsLen? ℓ (EvalSt.registry st) ≡ true →
     pathStrat? κ ≡ true →
     inputsBelowᵉ (pathFloor κ) b ≡ true →
+    pathOrd? (Sched.nextNode sched) κ ≡ true →
+    pathPark? κ st ≡ true →
     let r = subscribeE g b κ bid now sched st
     in Σ ℕ λ j′ →
        (capsOK? (frameStep (j + j′) c) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)

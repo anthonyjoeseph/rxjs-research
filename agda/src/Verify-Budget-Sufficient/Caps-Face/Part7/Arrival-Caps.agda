@@ -674,7 +674,8 @@ arr-chains-ledgers {e = e} sl id a nextId sched st sleq cok hpz hvc hcl hsv hdp 
     (subst (λ x → capsOK? x sched (cascadeLatch a st) ≡ true)
            (sym (frameStep-0 (capsAt e sl id))) LATCH)
     hpz (cascade-admit-entry (capsAt e sl id) a sched st cok) hsv
-    (cascade-admit-park a st) (cascade-admit-ord a sched st) hvc hcl hdp
+    (cascade-admit-park a st (capsOK?-regPark (capsAt e sl id) sched st cok))
+    (cascade-admit-ord a sched st (capsOK?-regOrd (capsAt e sl id) sched st cok)) hvc hcl hdp
     0 (Caps.cSize (capsAt e sl id)) 0
     (capsAt-round-size e sl id) base REGLEN ≤-refl
   where

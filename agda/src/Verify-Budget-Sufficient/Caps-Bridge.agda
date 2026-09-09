@@ -677,13 +677,13 @@ sub-charge : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     × (j′ ≤ opIterD (Caps.cSize c) (Caps.cWid c)
                      (depthE g b κ bid now sched st) bud ops j)
 sub-charge {n = n} c bud ops j g b κ bid now sl sched st
-           2≤S 1≤R slEq slC slSz capOK szB dwB pκ pLen nB opsB hps hib =
+           2≤S 1≤R slEq slC slSz capOK szB dwB pκ pLen nB opsB hps hib hord hpk =
   j′ , capOut , burC , burN , ≤-trans (m≤n+m j′ j) jj′≤
   where
   IH   = subscribeE-caps c (depthE g b κ bid now sched st) bud ops j g b κ
                           bid now sl sched st
                           2≤S 1≤R slEq slC slSz capOK szB dwB pκ pLen nB opsB
-                          ≤-refl hps hib
+                          ≤-refl hps hib hord hpk
   j′    = proj₁ IH
   capOut = proj₁ (proj₂ IH)
   burC  = proj₁ (proj₂ (proj₂ IH))
@@ -1895,7 +1895,7 @@ subscribeE-wet-via-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
                    (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
 subscribeE-wet-via-caps {n = n} {e = e} g b κ id now sched st
                         inv pathB pathSzκ lenκ szB fnB gas cOK dW
-                        nestOK opsOK depOK hps hib =
+                        nestOK opsOK depOK hps hib hord hpk =
   dry , invOut , capsOut
   where
   sl      = Sched.slots sched
@@ -1920,7 +1920,7 @@ subscribeE-wet-via-caps {n = n} {e = e} g b κ id now sched st
   -- hypothesis of THIS definition, so they ride through unchanged.
   wet     = subscribeE-wet g b κ id now sched st
                            inv pathB pathSzκ lenκ szB fnB gas cOK dW
-                           nestOK opsOK depOK hps hib
+                           nestOK opsOK depOK hps hib hord hpk
   dry     : hasDry (proj₁ r) ≡ false
   dry     = proj₁ wet
   invOut  : INV? (ΨAt e (Sched.slots sched′))

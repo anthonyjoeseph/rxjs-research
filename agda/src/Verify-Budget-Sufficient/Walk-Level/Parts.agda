@@ -628,7 +628,7 @@ walk-empty : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} →
   WalkStmt {e = e} (emptyᵉ {t = u})
 walk-empty {u = u} c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
   2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
-  s2 fS rS ceil lb dmd gas lℓ rgs hps hib =
+  s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk =
   proj₁ CAPS
     , proj₁ (proj₂ CAPS)
     , proj₁ (proj₂ (proj₂ CAPS))
@@ -639,7 +639,7 @@ walk-empty {u = u} c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched s
     , refl , refl , refl , rgs
   where
   CAPS = subscribeE-caps c dep bud ops j g (emptyᵉ {t = u}) κ bid now sl sched st
-           2≤S 1≤R slEq slC slSz inv szb wdb pC lC nst hidx dpt hps hib
+           2≤S 1≤R slEq slC slSz inv szb wdb pC lC nst hidx dpt hps hib hord hpk
 
 -- A LITERAL'S PAYLOAD, WET, FROM THE CAPS RECEIPT PLUS ONE HYPOTHESIS.
 --
@@ -714,7 +714,7 @@ walk-of ts c Ψ F Ŝ R̂ G ℓ L̂ dep bud zero j g κ bid now sl sched st
   s2 fS rS ceil lb dmd gas lℓ rgs
 walk-of {Γ = Γ} {u = u} ts c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j g κ bid now sl sched st
   2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
-  s2 fS rS ceil lb dmd gas lℓ rgs hps hib =
+  s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk =
   proj₁ CAPS
     , proj₁ (proj₂ CAPS)
     , proj₁ (proj₂ (proj₂ CAPS))
@@ -734,7 +734,7 @@ walk-of {Γ = Γ} {u = u} ts c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j g κ
     , rgs
   where
   CAPS = subscribeE-caps c dep bud (suc ops′) j g (ofᵉ ts) κ bid now sl sched st
-           2≤S 1≤R slEq slC slSz inv szb wdb pC lC nst hidx dpt hps hib
+           2≤S 1≤R slEq slC slSz inv szb wdb pC lC nst hidx dpt hps hib hord hpk
   VALS = map (λ tm → evalTm tm) ts
   B′   = Caps.cSize (frameStep (j + proj₁ CAPS) c)
   EV   = evalTms-caps c j sl ts 2≤S slC (≤-trans (n≤1+n (sizeᵗˢ ts)) szb) wdb
@@ -779,7 +779,7 @@ walk-take-zero : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   evalTm cnt ≡ zero → WalkStmtAt {e = e} g (takeᵉ cnt b)
 walk-take-zero {u = u} g cnt b ecEq c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j κ bid now sl sched st
   2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
-  s2 fS rS ceil lb dmd gas lℓ rgs hps hib
+  s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk
   rewrite ecEq =
   let (j′ , a₁ , a₂ , a₃ , a₄ , a₅ , a₆ , a₇ , a₈ , a₉) =
         walk-empty c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
@@ -1172,7 +1172,7 @@ walk-take-suc g cnt b k ecEq wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud zero j κ bid no
 walk-take-suc {n = n} {u = u} g cnt b k ecEq wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j
   κ bid now sl sched st
   2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
-  s2 fS rS ceil lb dmd gas lℓ rgs hps hib
+  s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk
   rewrite ecEq =
   suc (j₁ + j₂)
     , subst (λ x → capsOK? (frameStep x c)
@@ -1369,7 +1369,7 @@ walk-map g f b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud zero j κ bid now sl sched st
 walk-map {n = n} {u = u} g f b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j
   κ bid now sl sched st
   2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
-  s2 fS rS ceil lb dmd gas lℓ rgs hps hib =
+  s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk =
   suc (j₁ + j₂)
     , subst (λ x → capsOK? (frameStep x c)
                      (proj₁ (proj₂ PB)) (proj₂ (proj₂ PB)) ≡ true)
@@ -1690,7 +1690,7 @@ walk-scan-source-tail : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
 walk-scan-source-tail {n = n} {u = u} g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j
   κ bid now sl sched st
   2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
-  s2 fS rS ceil lb dmd gas lℓ rgs hps hib =
+  s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk =
   SUB
   where
   -- A SCAN SOURCE READING SPLITS THREE WAYS AND TWO OF THEM ARE SPENT
@@ -1806,7 +1806,7 @@ walk-scan-source g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud zero j κ bid now sl
   2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst () dpt
 walk-scan-source g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j κ bid now sl sched st
   2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
-  s2 fS rS ceil lb dmd gas lℓ rgs hps hib =
+  s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk =
   burstHopSpnH-intro F (slotHop F sl) (pmᵗ F 0 f) BND
     (hopDᵉ F (slotHop F sl) b) (proj₁ r)
     (m≤n+m (hopDᵉ F (slotHop F sl) b)
@@ -1824,7 +1824,7 @@ walk-scan-source g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j κ bi
   SRC = walk-scan-source-tail g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops′ j
           κ bid now sl sched st
           2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
-          s2 fS rS ceil lb dmd gas lℓ rgs hps hib
+          s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk
   frB = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SRC)))))))
   -- THE NODE HALF, AND IT IS NOW GAPLESS.  `mint-install-survives`
   -- (.Node-Fresh) is exactly this shape — mint, install, subscribe under a
@@ -1853,7 +1853,7 @@ walk-scan-hop-spn : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   (b : Closed Γ s) (wb : WalkStmtAt {e = e} g b) → WalkStmtᴴˢ {e = e} g f z b
 walk-scan-hop-spn g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j κ bid now sl sched st
   2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
-  s2 fS rS ceil lb dmd gas lℓ rgs hps hib =
+  s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk =
   proj₁ (pushBurst-scan-hopSpn F (slotHop F sl) (pmᵗ F 0 f) BND
            g bid now f (proj₁ (mintNode sched)) κ
            (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
@@ -1867,7 +1867,7 @@ walk-scan-hop-spn g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j κ bid now sl
         (installNode (proj₁ (mintNode sched)) (scan-st (evalTm z)) st)
   src = walk-scan-source g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j κ bid now sl sched st
           2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
-          s2 fS rS ceil lb dmd gas lℓ rgs hps hib
+          s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk
 
 -- THE EIGHT OTHER CONJUNCTS OF THE scan CLAUSE, ASSEMBLED — and after
 -- the source tail above it is `walk-map`'s clause with three
@@ -1916,7 +1916,7 @@ walk-scan-rest g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud zero j κ bid now sl s
 walk-scan-rest {n = n} {u = u} g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j
   κ bid now sl sched st
   2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
-  s2 fS rS ceil lb dmd gas lℓ rgs hps hib =
+  s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk =
   j₀ + suc (j₁ + j₂)
     , subst (λ x → capsOK? (frameStep x c)
                      (proj₁ (proj₂ PB)) (proj₂ (proj₂ PB)) ≡ true)
@@ -1962,7 +1962,7 @@ walk-scan-rest {n = n} {u = u} g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc o
   SRC = walk-scan-source-tail g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops′ j
           κ bid now sl sched st
           2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
-          s2 fS rS ceil lb dmd gas lℓ rgs hps hib
+          s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk
   -- the same three-way split the source tail makes, and made again here
   -- rather than threaded out of it: the tail's Σ reports conjuncts, not
   -- the readings it was handed
@@ -2057,11 +2057,11 @@ walk-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   WalkStmtAt {e = e} g (scanᵉ f z b)
 walk-scan g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j κ bid now sl sched st
   2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
-  s2 fS rS ceil lb dmd gas lℓ rgs hps hib =
+  s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk =
   let (j′ , a₁ , a₂ , a₃ , a₄ , a₅ , a₆ , a₇ , a₈) =
         walk-scan-rest g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j κ bid now sl sched st
           2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
-          s2 fS rS ceil lb dmd gas lℓ rgs hps hib
+          s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk
       -- the frame the burst's SIZE receipt is stated at sits under Ŝ:
       -- a₄ puts j + j′ under opIterD, `lb` puts that under L̂, and
       -- frameStep is monotone in its index, so `ceil` closes it
@@ -2082,7 +2082,7 @@ walk-scan g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j κ bid now sl sched s
           (proj₁ (subscribeE g (scanᵉ f z b) κ bid now sched st))
           (walk-scan-hop-spn g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j κ bid now sl sched st
              2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
-             s2 fS rS ceil lb dmd gas lℓ rgs hps hib))
+             s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk))
    , a₇ , a₈
 
 switchKill-closes-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}

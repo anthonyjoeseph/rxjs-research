@@ -1154,35 +1154,35 @@ subscribeAll-walk : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
 walk-mergeAll : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (lim : Maybe ℕ) (b : Closed Γ (obs u)) → WalkStmt {e = e} (mergeAllᵉ lim b)
 walk-mergeAll {u = u} lim b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
-  2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs hps hib =
+  2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk =
   subscribeAll-walk c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g mergeAllᵒ
     (mergeAll-st {t = u} lim 0 [] false) b κ bid now sl sched st
     2≤S 1≤R hCR slEq slC slSz inv refl refl refl
     (≤-trans (n≤1+n (sizeᵉ b)) szb) wdb pC lC
     (mergeAll-step lim _ sl _ bud nst) hidx dpt
-    invW fnC refl pB s2 fS rS ceil lb dmd gas lℓ rgs hps hib
+    invW fnC refl pB s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk
 
 walk-switchAll : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (b : Closed Γ (obs u)) → WalkStmt {e = e} (switchAllᵉ b)
 walk-switchAll b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
-  2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs hps hib =
+  2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk =
   subscribeAll-walk c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g switchᵒ
     (switch-st nothing false) b κ bid now sl sched st
     2≤S 1≤R hCR slEq slC slSz inv refl refl refl
     (≤-trans (n≤1+n (sizeᵉ b)) szb) wdb pC lC
     (switch-step _ sl _ bud nst) hidx dpt
-    invW fnC refl pB s2 fS rS ceil lb dmd gas lℓ rgs hps hib
+    invW fnC refl pB s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk
 
 walk-exhaustAll : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (b : Closed Γ (obs u)) → WalkStmt {e = e} (exhaustAllᵉ b)
 walk-exhaustAll b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
-  2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs hps hib =
+  2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk =
   subscribeAll-walk c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g exhaustᵒ
     (exhaust-st false false) b κ bid now sl sched st
     2≤S 1≤R hCR slEq slC slSz inv refl refl refl
     (≤-trans (n≤1+n (sizeᵉ b)) szb) wdb pC lC
     (exhaust-step _ sl _ bud nst) hidx dpt
-    invW fnC refl pB s2 fS rS ceil lb dmd gas lℓ rgs hps hib
+    invW fnC refl pB s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk
 
 
 
@@ -1270,7 +1270,7 @@ walk-input : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (i : Fin n) → WalkStmt {e = e} (input i)
 walk-input i c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
            2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt
-           invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs hps hib =
+           invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk =
   j′ , C1 , C2 , C3 , C4
      , proj₁ WET
      , proj₁ (proj₂ WET)
@@ -1279,7 +1279,7 @@ walk-input i c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
      , proj₂ (proj₂ (proj₂ (proj₂ WET)))
   where
   CAPS = subscribeE-caps c dep bud ops j g (input i) κ bid now sl sched st
-           2≤S 1≤R slEq slC slSz inv szb wdb pC lC nst hidx dpt hps hib
+           2≤S 1≤R slEq slC slSz inv szb wdb pC lC nst hidx dpt hps hib hord hpk
   j′ = proj₁ CAPS
   C1 = proj₁ (proj₂ CAPS)
   C2 = proj₁ (proj₂ (proj₂ CAPS))
@@ -1288,7 +1288,7 @@ walk-input i c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
   WET = input-wet c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ g i (input i) κ
           bid now sl sched st refl
           2≤S 1≤R hCR slEq slC slSz inv szb pC lC nst hidx dpt
-          invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs hps hib
+          invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk
           C1 C2 C3 C4
 
 -- THE DISPATCH, real from day one: match the subscribed expression,
@@ -1363,7 +1363,7 @@ walk-mu body c Ψ F Ŝ R̂ G ℓ L̂ dep zero (suc ops′) j (gs fuel) κ bid no
 walk-mu {n = n} body c Ψ F Ŝ R̂ G ℓ L̂ dep (suc bud′) (suc ops′) j (gs fuel)
         κ bid now sl sched st
         2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt
-        invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs hps hib =
+        invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk =
   j₀ + j₁
     , subst (λ x → capsOK? (frameStep x c)
                      (proj₁ (proj₂ res)) (proj₂ (proj₂ res)) ≡ true) EQ S1
@@ -1457,7 +1457,7 @@ walk-mu {n = n} body c Ψ F Ŝ R̂ G ℓ L̂ dep (suc bud′) (suc ops′) j (gs
 subscribeAll-walk c Ψ F Ŝ R̂ G ℓ L̂ dep bud zero j g op ns b κ bid now sl sched st
   2≤S 1≤R hCR slEq slC slSz inv bn pk wn szb wdb pC lC nst ()
 subscribeAll-walk c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j g op ns b κ bid now sl sched st
-  2≤S 1≤R hCR slEq slC slSz inv bn pk wn szb wdb pC lC nst hidx dpt invW fnC fnN pB s2 fS rS ceil lb dmd gas lℓ rgs hps hib =
+  2≤S 1≤R hCR slEq slC slSz inv bn pk wn szb wdb pC lC nst hidx dpt invW fnC fnN pB s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk =
   suc (j₁ + j₂)
     , subst (λ x → capsOK? (frameStep x c)
                      (proj₁ (proj₂ PB)) (proj₂ (proj₂ PB)) ≡ true) EQ W1
@@ -1620,7 +1620,7 @@ subscribeInner-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g0 op allNid κ b
 subscribeInner-walk {n = n} {Γ = Γ} {t = t} {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ
                     dep bud j (gs fuel) op allNid κ bid now o sl sched st
                     2≤S 1≤R hCR slEq slC slSz inv vC pC lC nst dpt
-                    invW vB pB hR s2 fS rS ceil lb hU dmd gas lℓ rgs hps hib =
+                    invW vB pB hR s2 fS rS ceil lb hU dmd gas lℓ rgs hps hib hord hpk =
   suc (suc (suc j₂)) , R1 , R2 , R3
     , inner-step (Caps.cSize c) (Caps.cWid c) dep bud j j₂ 2≤S S4
     , R5 , R6 , R7 , R8 , S9
@@ -1773,7 +1773,7 @@ subscribeInner-walk {n = n} {Γ = Γ} {t = t} {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U 
 ------------------------------------------------------------------
 thruConsume-walk {n = n} {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g mergeAllᵒ
                  nid κ bid now o sl sched st 2≤S 1≤R hCR slEq slC slSz inv vC pC
-                 lC nst dpt invW vB pB hR s2 fS rS ceil lb hU dmd gas lℓ rgs hps hib
+                 lC nst dpt invW vB pB hR s2 fS rS ceil lb hU dmd gas lℓ rgs hps hib hord hpk
   with lookupNode nid (EvalSt.nodes st)
      | lookupNode-caps (frameStep j c) (Sched.slots sched) nid (EvalSt.nodes st)
          (capsOK?-nodeSz (frameStep j c) sched st inv)
@@ -1858,7 +1858,7 @@ thruConsume-walk {n = n} {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g me
   where
   SI = subscribeInner-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g mergeAllᵒ nid κ
          bid now o sl sched st 2≤S 1≤R hCR slEq slC slSz inv vC pC lC nst dpt
-         invW vB pB hR s2 fS rS ceil lb hU dmd gas lℓ rgs hps hib
+         invW vB pB hR s2 fS rS ceil lb hU dmd gas lℓ rgs hps hib hord hpk
   j′   = proj₁ SI
   S1   = proj₁ (proj₂ SI)
   R    = subscribeInner g mergeAllᵒ nid κ bid now o sched st
@@ -1917,7 +1917,7 @@ thruConsume-walk {n = n} {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g me
 
 thruConsume-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g switchᵒ nid κ bid now o
                  sl sched st 2≤S 1≤R hCR slEq slC slSz inv vC pC lC nst dpt
-                 invW vB pB hR s2 fS rS ceil lb hU dmd gas lℓ rgs hps hib
+                 invW vB pB hR s2 fS rS ceil lb hU dmd gas lℓ rgs hps hib hord hpk
   with lookupNode nid (EvalSt.nodes st) | dpt
 ... | nothing                | dpt′ =
   0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
@@ -2012,13 +2012,13 @@ thruConsume-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g switchᵒ nid κ b
          vB pB hR s2 fS rS ceil lb
          hU′ dmd gas lℓ
          (switchKill-regsLen ℓ cur sched st rgs)
-         hps hib
+         hps hib hord hpk
   j′ = proj₁ SI
   R  = subscribeInner g switchᵒ nid κ bid now o sched₁ st₁
 
 thruConsume-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g exhaustᵒ nid κ bid now o
                  sl sched st 2≤S 1≤R hCR slEq slC slSz inv vC pC lC nst dpt
-                 invW vB pB hR s2 fS rS ceil lb hU dmd gas lℓ rgs hps hib
+                 invW vB pB hR s2 fS rS ceil lb hU dmd gas lℓ rgs hps hib hord hpk
   with lookupNode nid (EvalSt.nodes st)
 ... | nothing                =
   0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
@@ -2090,7 +2090,7 @@ thruConsume-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g exhaustᵒ nid κ 
   where
   SI = subscribeInner-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g exhaustᵒ nid κ
          bid now o sl sched st 2≤S 1≤R hCR slEq slC slSz inv vC pC lC nst dpt
-         invW vB pB hR s2 fS rS ceil lb hU dmd gas lℓ rgs hps hib
+         invW vB pB hR s2 fS rS ceil lb hU dmd gas lℓ rgs hps hib hord hpk
   j′ = proj₁ SI
   R  = subscribeInner g exhaustᵒ nid κ bid now o sched st
 
@@ -2604,7 +2604,7 @@ abstract
 subscribeE-wet-core : WalkLevel → WetOuter
 subscribeE-wet-core wl {n} {Γ} {t} {e} {u} g b κ id now sched st
                     inv pB pS pLen szB fcB gas cOK dW nestOK opsOK depOK
-                    hps hib =
+                    hps hib hord hpk =
     dry
   , wet-landing-lift g b κ id now sched st j′ nestOK opsOK depOK lvl invL
   where
@@ -2640,7 +2640,7 @@ subscribeE-wet-core wl {n} {Γ} {t} {e} {u} g b κ id now sched st
          -- entry budget itself (so the budget pin is ≤-refl)
          (2≤capsAt-size e sl (suc id)) refl refl
          (entry-ceiling e sl id b (EvalSt.connectedShares st) nestOK opsOK) ≤-refl
-         ≤-refl gas (m≤n+m (pathLen κ + G) B) regs hps hib
+         ≤-refl gas (m≤n+m (pathLen κ + G) B) regs hps hib hord hpk
 
   -- the Σ's nine conjuncts, named rather than counted: capsOK?,
   -- burstCaps?, burstCount?, the opIterD level bound, INV?, burstB?,
