@@ -238,15 +238,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **ESTABLISHING THE ORDER AT THE TWO DOORS THAT MINT IT, which is
-  all the invariant left behind.** The field landed and the cascade is
-  paid: `walk-hyps-step` reproduces the order one hop shorter off the
-  counter the step raised, and both entry doors take it as a premise.
-  The residue is four leaves: two entry readings that a REGISTERED
-  chain sits below the counter, and two saying the counter only rises
-  across the folds the freshness ring misses. The commit takes the
-  counter half — the ring already reports it everywhere it reaches, so
-  the delivery clique is a named gap and not a new mechanism.
+- **WHAT A REGISTRATION RECORDS, which is all the store question has
+  left.** The counter half is proven: a ring over the delivery clique,
+  mirroring the ledger's own induction and spending the freshness ring
+  at its weakest watermark, so no FOLD is a gap any more. Every row the
+  question still carries reads the REGISTRY instead — that an entry's
+  chain is parked and sits below the counter, at the latched state each
+  face reaches it through. The commit asks what is true of an entry at
+  the moment `register` makes it, since two filters that never
+  rearrange into one another can only be answered from one place.
 
 - **WALKING AN ADMITTED CHAIN AT THE LEVEL IT WAS REGISTERED AT, the
   one door the pricing question leaves open.** Both ends are closed by
@@ -273,15 +273,14 @@ does not fit is a finding about the shared statement, not about the head.
 
 - **WHICH STORE CELLS DOES A PATH PREDICATE REACH?** Five rows fail in one
   place: the statement reads a PATH or a chain, and the quantity it must
-  bound is a cell in the STORE. A path predicate CAN see the store and its
-  coverage is extensible: the accumulator took an arm at the price of
-  restating both step lemmas, so the pattern is priced.
-  Whether a reading survives a write it does
-  not own is answered at both doors, and whether a WALKED chain carries the
-  watermark that buys it is answered by construction — it is a field every
-  producer supplies. What is left is narrower than either: whether a chain
-  the REGISTRY hands back sits below the counter, which reads the registry
-  and not a path at all.
+  bound is a cell in the STORE. A path predicate CAN see the store, and
+  extending its coverage is priced. Whether a reading survives a write it does
+  not own is answered at both doors; whether a WALKED chain carries the
+  watermark that buys it is answered by construction, as a field every
+  producer supplies; and the transport across a SIBLING's fold is now a
+  proven ring. All three were about the walk. What is left is not: it is
+  what an entry RECORDS when `register` makes it, which no path predicate
+  can see and no walk establishes.
   relevant: `step-frame-store≤`, `share-fold-store≤`, `subscribeE-sz-store-scan`, `pushBurst-sz-store-outer`, `subscribeSharedSlot-sz-store`
 
 - **IS THERE A COMPUTABLE SHADOW OF THE SEALED FACES?** Three rows say in
@@ -429,14 +428,6 @@ does not fit is a finding about the shared statement, not about the head.
   cascade's fold-through, where the tail's chains are read at the state the
   HEAD chain's step produced. The chains that must survive are not the one that
   stepped, which is what keeps it off the share's form.
-- **`foldPath-nextNode`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: that
-  the node counter only RISES across a path fold. The freshness ring reports
-  exactly this at every construct it covers, and the delivery clique is the one
-  region it does not reach — so the fold owes it directly.
-- **`chainStep-nextNode`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the
-  same across the cascade's fold-through. The two carry an order over a
-  SIBLING's work rather than across a chain's own step, which is the whole of
-  what a fan-out needs: a chain nothing touched is the chain it was.
 - **`scanΦ-fit`** (Part7/Depth-Fit) — SHAPE, `DEAD ROUTE`: the producing side
   of the fold's grant. THE MECHANISM IS DEAD, NOT A DENOMINATION: a flat
   per-instant potential cannot dominate a count exponential in itself; the one

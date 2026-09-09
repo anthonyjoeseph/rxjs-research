@@ -36,6 +36,8 @@ open import Decide using (∧-intro; ∧-trueˡ; ∧-trueʳ; ≤ᵇ-widen; T-to)
 open import Verify-Budget-Sufficient.Node-Fresh using
   (FreshC; frameAbove; stepFrame-fresh; subscribeE-nodes-below)
 open import Verify-Budget-Sufficient.Node-Table using (lookupNode-setNode)
+open import Verify-Budget-Sufficient.Delivery-Counter using
+  (foldPath-nextNode; chainStep-nextNode)
 open import Verify-Budget-Sufficient.Measures using (∧-true; all-impl)
 
 -- THE TWO FACTS THE STRATIFICATION THREAD CANNOT GET BY REDUCTION, and
@@ -212,38 +214,6 @@ postulate
     (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
     all (λ rc → pathOrd? {n} {Γ} {arrTy a} {t} (Sched.nextNode sched) (proj₂ rc))
         (chainsOf a st) ≡ true
-
--- AND THAT THE COUNTER ONLY RISES ACROSS THE TWO FOLDS, which is what
--- carries an ordering across a SIBLING's work rather than across the
--- chain's own step.  The freshness ring reports exactly this at every
--- construct it covers, and the delivery clique is the one region it does
--- not reach -- so the two folds owe it directly.  It is the whole of what
--- the fan-out needs, because the chain a sibling did not touch is
--- unchanged and its reading is then one widening.
---
--- TWO ROUTES, and the choice is about the ring's RECORD rather than
--- about either fold.  `FreshC` bundles the counter's monotonicity with
--- the freeze below a watermark, so bringing these two into the ring
--- proves strictly more than either statement asks -- and the delivery
--- clique is MUTUAL, so it enters as one family or not at all.  The
--- cheaper route proves the counter half alone, by the same induction
--- with no store obligation attached; what decides between them is
--- whether any later consumer wants the freeze at these two, and today
--- none does.
-  foldPath-nextNode : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
-    (p : Path Γ u t) (vals : List (Val Γ u))
-    (evs : List (InstEvent (Val Γ t))) (fin : Bool)
-    (sched : Sched Γ) (st : EvalSt e) →
-    Sched.nextNode sched ≤
-      Sched.nextNode
-        (proj₁ (proj₂ (foldPath sf gas id now envSrc p vals evs fin sched st)))
-
-  chainStep-nextNode : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (id : Id) (a : Arrival Γ) (path : Path Γ (arrTy a) t)
-    (sched : Sched Γ) (st : EvalSt e) →
-    Sched.nextNode sched ≤
-      Sched.nextNode (proj₁ (proj₂ (chainStep id a path sched st)))
 
 -- (5) WHAT A SHARE HANDS THE CHAINS IT ADMITTED.  This is the one place
 -- the registry reading is SPENT rather than established, and the two
