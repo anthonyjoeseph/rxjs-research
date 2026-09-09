@@ -747,7 +747,7 @@ input-wet-scripted : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
      × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
 input-wet-scripted c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ g i b κ bid now sl sched st
   src slotEq bEq 2≤S 1≤R hCR slEq slC slSz cOK szb pSz lC nst _ dpt invW fnC pB
-  s2 fS rS ceil lb dmd gas lℓ rgs _ _ cOK′ bC bCnt jle =
+  s2 fS rS ceil lb dmd gas lℓ rgs _ _ _ _ cOK′ bC bCnt jle =
   let (a₁ , a₂ , a₃ , a₄) =
         input-wet-scripted-four c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ g i b κ bid
           now sl sched st src slotEq bEq 2≤S 1≤R hCR slEq slC slSz cOK szb pSz

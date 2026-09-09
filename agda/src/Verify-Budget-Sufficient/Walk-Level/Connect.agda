@@ -409,6 +409,9 @@ private
            -- the sink's chain is a leaf and its floor IS the slot, so the
            -- def's reading is the slot telescope's own side condition
            refl (T⇒≡true (inputsBelowᵉ (toℕ i) d) ok)
+           -- the two readings are free at the sink: a `share-sink` is a
+           -- terminal, so neither predicate has a cell to read
+           refl refl
     j′ = proj₁ IH
     -- the walk reports at `(j + 1) + j′`; the statement reads `suc j + j′`
     lvl : (j + 1) + j′ ≡ suc j + j′
