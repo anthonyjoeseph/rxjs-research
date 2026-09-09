@@ -205,6 +205,22 @@ postulate
 -- cascade through `chainsOf`, neither filter rearranges into the other,
 -- and no conjunct of the caps receipt prices either -- the receipt is
 -- INDIFFERENT to the counter, which `capsOK?-nextNode` states outright.
+
+-- AND THE FREE FORM OF BOTH IS FALSE, which is what makes the missing
+-- premise the statement rather than an economy.  Neither reads a
+-- registry premise, and a registry is an ordinary field of the state
+-- they quantify over -- so as written each says every entry ANY state
+-- could carry is ordered.  A chain the evaluator BUILDS is ordered by
+-- construction, so the repair is a premise recording what `register`
+-- makes, mirroring the one the `shareAdmit-strat` sibling already
+-- takes, and never a weaker conclusion.
+--
+-- REFUTED: `Refuted.Admit-Entry-Reading.shareAdmit-ord-absurd` and
+--   `Refuted.Admit-Entry-Reading.cascade-admit-ord-absurd`, at one
+--   entry whose chain names a node above the counter in its TAIL.  Two
+--   frames are needed and one is not: each frame is charged at the read
+--   of the chain below it, so a single frame over a sink is charged at
+--   nought and passes.
   shareAdmit-ord : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (i : Fin n) (sched : Sched Γ) (st : EvalSt e) →
     all (λ rp → pathOrd? {n} {Γ} {lookup Γ i} {t} (Sched.nextNode sched) (proj₂ rp))
@@ -241,11 +257,26 @@ postulate
 -- fan-out spends them in one place and neither is derivable from the
 -- other -- the first is about a state the walk was handed, the second
 -- about one the walk produced.
+
+-- AND THE LATCHED ONE'S FREE FORM IS FALSE, independently of the order
+-- pair: it fails at a chain that IS ordered, so the defect is in the
+-- STORE the chain's node names rather than in the chain.  A node-table
+-- miss reads well, so the cell has to be present and hold a queue
+-- naming an input the sink's floor cannot cover -- which an arbitrary
+-- state may, and a latched one does not repair.
+--
+-- REFUTED: `Refuted.Admit-Entry-Reading.shareAdmit-park-absurd`, at a
+--   one-frame chain over a populated `mergeAll` cell, with the latch
+--   taken at `false` so nothing between the state and the fan-out can
+--   be blamed for the reading.
   shareAdmit-park : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (i : Fin n) (fin : Bool) (st : EvalSt e) →
     all (λ rp → pathPark? {n} {Γ} {lookup Γ i} {t} (proj₂ rp) (shareLatch i fin st))
         (shareAdmit i (EvalSt.registry st)) ≡ true
 
+-- AND THE FOLD-THROUGH IS NOT THAT STATEMENT: it TAKES the reading as a
+-- hypothesis and moves it across a step, so an arbitrary registry
+-- reaches its conclusion only through its own premise.
   foldPath-park : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
     (p : Path Γ u t) (vals : List (Val Γ u))
@@ -272,6 +303,15 @@ postulate
     all (λ rc → pathStrat? {n} {Γ} {arrTy a} {t} (proj₂ rc))
         (chainsOf a st) ≡ true
 
+-- AND THIS FACE'S FREE FORM IS FALSE TOO, once per face exactly as the
+-- reading itself is owed once per face: the cascade's latch rewrites
+-- the completion bookkeeping and leaves the node table and the registry
+-- where they were, so the one populated cell that kills the share's
+-- form kills this one through the other filter.
+--
+-- REFUTED: `Refuted.Admit-Entry-Reading.cascade-admit-park-absurd`, at
+--   an arrival whose source and element type the entry was built to
+--   match, since the filter admits on nothing else.
   cascade-admit-park : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (a : Arrival Γ) (st : EvalSt e) →
     all (λ rc → pathPark? {n} {Γ} {arrTy a} {t} (proj₂ rc) (cascadeLatch a st))

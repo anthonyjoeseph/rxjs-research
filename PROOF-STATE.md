@@ -238,15 +238,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **WHAT A REGISTRATION RECORDS, which is all the store question has
-  left.** The counter half is proven: a ring over the delivery clique,
-  mirroring the ledger's own induction and spending the freshness ring
-  at its weakest watermark, so no FOLD is a gap any more. Every row the
-  question still carries reads the REGISTRY instead — that an entry's
-  chain is parked and sits below the counter, at the latched state each
-  face reaches it through. The commit asks what is true of an entry at
-  the moment `register` makes it, since two filters that never
-  rearrange into one another can only be answered from one place.
+- **RESTATING THE FOUR ENTRY READINGS OVER WHAT `register` RECORDS.**
+  Their free forms are dead — each is machine-refuted at one hand-built
+  entry, the order pair against the counter and the park pair against a
+  populated cell — so the absent registry premise is the statement and
+  not an economy. What remains is the premise: a registry-level order
+  reading and a registry-level park reading beside the stratification
+  one already there, each carried across BOTH admission filters, since
+  neither rearranges into the other. The commit states them, restates
+  the four rows over them, and reports what the mint can pay.
 
 - **WALKING AN ADMITTED CHAIN AT THE LEVEL IT WAS REGISTERED AT, the
   one door the pricing question leaves open.** Both ends are closed by
@@ -278,9 +278,9 @@ does not fit is a finding about the shared statement, not about the head.
   not own is answered at both doors; whether a WALKED chain carries the
   watermark that buys it is answered by construction, as a field every
   producer supplies; and the transport across a SIBLING's fold is now a
-  proven ring. All three were about the walk. What is left is not: it is
-  what an entry RECORDS when `register` makes it, which no path predicate
-  can see and no walk establishes.
+  proven ring. All three were about the walk. What is left is not, and it is
+  now known rather than suspected: an admitted entry's readings are REFUTED
+  in their free form, so the answer is at the mint.
   relevant: `step-frame-store≤`, `share-fold-store≤`, `subscribeE-sz-store-scan`, `pushBurst-sz-store-outer`, `subscribeSharedSlot-sz-store`
 
 - **IS THERE A COMPUTABLE SHADOW OF THE SEALED FACES?** Three rows say in
@@ -406,28 +406,30 @@ does not fit is a finding about the shared statement, not about the head.
   frame's queue read at the floor its tail is read at, off the caps invariant
   alone. That invariant prices a node's queue for size and for width and reads
   no floor, so the conjunct it would project out of is not there.
-- **`shareAdmit-park`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the park
-  reading over the admitted chains at the LATCHED state the fan-out starts from
-  — stated after the close, because that is where the fan reads the registry.
-- **`shareAdmit-ord`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the
-  chain's own ORDER over those same admitted chains, the counter-side twin of
-  the park reading. Boolean rather than Σ-valued because the fan owes its
-  chains pointwise through an `all`, and a Σ cannot ride in one.
-- **`foldPath-park`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the same
-  reading again once a SIBLING chain has folded. It is about a state the walk
-  PRODUCED rather than one it was handed, which is why the latched form does
-  not cover it.
-- **`cascade-admit-park`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the
-  latched park reading arriving from the CASCADE's face. Its filter is keyed by
-  an arrival's source and the share's by a slot, so neither rearranges into the
-  other and the entry reading is owed once per face.
-- **`cascade-admit-ord`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the
-  same order arriving from that face, and owed separately for the same reason
-  the park reading is: the two filters do not rearrange into one another.
+- **`foldPath-park`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the park
+  reading once a SIBLING chain has folded. It is about a state the walk
+  PRODUCED rather than one it was handed, and it TAKES the reading as a
+  premise, which is what keeps it off the four refuted forms.
 - **`chainStep-park`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the
   cascade's fold-through, where the tail's chains are read at the state the
   HEAD chain's step produced. The chains that must survive are not the one that
   stepped, which is what keeps it off the share's form.
+- **`shareAdmit-park`** (Part7/Strat-Leaves) — SHAPE, `REFUTED`: the park
+  reading over the admitted chains at the LATCHED state the fan-out starts
+  from. FALSE as written: it quantifies the state freely, so a registry entry
+  over a populated cell kills it. Restate with what `register` records.
+- **`shareAdmit-ord`** (Part7/Strat-Leaves) — SHAPE, `REFUTED`: the chain's own
+  ORDER over those same admitted chains, the counter-side twin. FALSE for the
+  same reason and by the same witness's other half — an entry whose chain names
+  a node above the counter in its tail.
+- **`cascade-admit-park`** (Part7/Strat-Leaves) — SHAPE, `REFUTED`: the latched
+  park reading arriving from the CASCADE's face. Its filter is keyed by an
+  arrival's source and the share's by a slot, so neither rearranges into the
+  other and the same entry kills both.
+- **`cascade-admit-ord`** (Part7/Strat-Leaves) — SHAPE, `REFUTED`: the same
+  order arriving from that face, refuted once per face for the reason the
+  filters are owed once per face. The cascade's latch preserves the node table
+  and the registry, so nothing between the state and the fan repairs it.
 - **`scanΦ-fit`** (Part7/Depth-Fit) — SHAPE, `DEAD ROUTE`: the producing side
   of the fold's grant. THE MECHANISM IS DEAD, NOT A DENOMINATION: a flat
   per-instant potential cannot dominate a count exponential in itself; the one

@@ -19,6 +19,12 @@ open import Refuted.Wet
 open import Refuted.Walk-Entry-Strat
   using (okₛ; badPath-unstratified; goodPath-stratified; badVal-unstratified;
          walk-path-strat-absurd; walk-vals-strat-absurd)
+open import Refuted.Admit-Entry-Reading
+  using (badOrdChain-disordered; shareAdmit-keeps-ord; chainsOf-keeps-ord;
+         badParkChain-ordered; badParkChain-unparked; shareLatch-keeps-park;
+         cascadeLatch-keeps-park; shareAdmit-ord-absurd;
+         cascade-admit-ord-absurd; shareAdmit-park-absurd;
+         cascade-admit-park-absurd)
 open import Refuted.Hop-Drag
   using (hop-drag-absurd)
 open import Refuted.Cut-Through
