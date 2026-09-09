@@ -238,17 +238,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **PUTTING THE CHAIN'S ORDER WHERE EVERY PRODUCER MUST SUPPLY IT, now
-  that the transport is a body.** The step-side lift landed: a chain's
-  reading survives any write at or above a watermark, by induction and
-  one freeze the ring already leaves behind. What that
-  body is HANDED is that the chain has such a watermark — true of a
-  built chain, since the head is minted last and every tail cell is
-  older, and a free leaf today only because a frame and a path are
-  independent arguments there. That is a missing INVARIANT, so it
-  belongs on `WalkHyps` and not in a signature, and the commit pays the
-  cascade: every producer establishes the order, every consumer spends
-  it, and the four park rows still open inherit it.
+- **ESTABLISHING THE ORDER AT THE TWO DOORS THAT MINT IT, which is
+  all the invariant left behind.** The field landed and the cascade is
+  paid: `walk-hyps-step` reproduces the order one hop shorter off the
+  counter the step raised, and both entry doors take it as a premise.
+  The residue is four leaves: two entry readings that a REGISTERED
+  chain sits below the counter, and two saying the counter only rises
+  across the folds the freshness ring misses. The commit takes the
+  counter half — the ring already reports it everywhere it reaches, so
+  the delivery clique is a named gap and not a new mechanism.
 
 - **WALKING AN ADMITTED CHAIN AT THE LEVEL IT WAS REGISTERED AT, the
   one door the pricing question leaves open.** Both ends are closed by
@@ -275,14 +273,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 - **WHICH STORE CELLS DOES A PATH PREDICATE REACH?** Five rows fail in one
   place: the statement reads a PATH or a chain, and the quantity it must
-  bound is a cell in the STORE. A path predicate CAN see the store, and its
-  coverage is extensible — the accumulator was the first unannounced cell
-  and it took an arm, at the price of restating both step lemmas, so the
-  pattern is known and priced. Whether a reading survives a write it does
-  not own is now answered at BOTH doors: a subscribe and a step alike
-  transport it, given a watermark the head writes at or above and the tail
-  reads below. What is left is whether a WALKED chain has one — a question
-  about the invariant the walk carries, not the store.
+  bound is a cell in the STORE. A path predicate CAN see the store and its
+  coverage is extensible: the accumulator took an arm at the price of
+  restating both step lemmas, so the pattern is priced.
+  Whether a reading survives a write it does
+  not own is answered at both doors, and whether a WALKED chain carries the
+  watermark that buys it is answered by construction — it is a field every
+  producer supplies. What is left is narrower than either: whether a chain
+  the REGISTRY hands back sits below the counter, which reads the registry
+  and not a path at all.
   relevant: `step-frame-store≤`, `share-fold-store≤`, `subscribeE-sz-store-scan`, `pushBurst-sz-store-outer`, `subscribeSharedSlot-sz-store`
 
 - **IS THERE A COMPUTABLE SHADOW OF THE SEALED FACES?** Three rows say in
@@ -408,13 +407,13 @@ does not fit is a finding about the shared statement, not about the head.
   frame's queue read at the floor its tail is read at, off the caps invariant
   alone. That invariant prices a node's queue for size and for width and reads
   no floor, so the conjunct it would project out of is not there.
-- **`step-chain-below`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: that a
-  chain admits a watermark its head writes at or above and its tail reads only
-  below. True of a BUILT chain, since the head is minted last — but frame and
-  path are independent arguments here, so the repair is a `WalkHyps` field.
 - **`shareAdmit-park`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the park
   reading over the admitted chains at the LATCHED state the fan-out starts from
   — stated after the close, because that is where the fan reads the registry.
+- **`shareAdmit-ord`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the
+  chain's own ORDER over those same admitted chains, the counter-side twin of
+  the park reading. Boolean rather than Σ-valued because the fan owes its
+  chains pointwise through an `all`, and a Σ cannot ride in one.
 - **`foldPath-park`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the same
   reading again once a SIBLING chain has folded. It is about a state the walk
   PRODUCED rather than one it was handed, which is why the latched form does
@@ -423,10 +422,21 @@ does not fit is a finding about the shared statement, not about the head.
   latched park reading arriving from the CASCADE's face. Its filter is keyed by
   an arrival's source and the share's by a slot, so neither rearranges into the
   other and the entry reading is owed once per face.
+- **`cascade-admit-ord`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the
+  same order arriving from that face, and owed separately for the same reason
+  the park reading is: the two filters do not rearrange into one another.
 - **`chainStep-park`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the
   cascade's fold-through, where the tail's chains are read at the state the
   HEAD chain's step produced. The chains that must survive are not the one that
   stepped, which is what keeps it off the share's form.
+- **`foldPath-nextNode`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: that
+  the node counter only RISES across a path fold. The freshness ring reports
+  exactly this at every construct it covers, and the delivery clique is the one
+  region it does not reach — so the fold owes it directly.
+- **`chainStep-nextNode`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the
+  same across the cascade's fold-through. The two carry an order over a
+  SIBLING's work rather than across a chain's own step, which is the whole of
+  what a fan-out needs: a chain nothing touched is the chain it was.
 - **`scanΦ-fit`** (Part7/Depth-Fit) — SHAPE, `DEAD ROUTE`: the producing side
   of the fold's grant. THE MECHANISM IS DEAD, NOT A DENOMINATION: a flat
   per-instant potential cannot dominate a count exponential in itself; the one

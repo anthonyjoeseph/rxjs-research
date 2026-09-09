@@ -79,7 +79,8 @@ open import Decide using (T-to; T⇒≡true; ∧-intro; ∧-trueˡ; ∧-trueʳ; 
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Root-Strat using
   (pathStrat-top)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves using
-  (foldPath-park; pathPark-step; shareAdmit-park; step-chain-below;
+  (foldPath-park; pathPark-step; pathOrd-step; shareAdmit-park;
+   pathOrd?; foldPath-ord; shareAdmit-ord;
    map-strat-step; scan-strat-step; take-strat-step;
    inner-strat-step; thru-strat-step)
 open import Verify-Budget-Sufficient.Delivery-Walk using
@@ -239,11 +240,15 @@ sink-entry-hyps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   -- it is at the cascade's twin, and the delivered mark is transported
   -- across rather than re-established
   pathPark? p st ≡ true →
+  -- and its order, which the park reading is transported ON at every
+  -- frame the walk steps past.  A delivery mark mints nothing, so this
+  -- crosses the entry unchanged
+  pathOrd? (Sched.nextNode sched) p ≡ true →
   WalkHyps sl id Lv sf gas nid now (Fin.toℕ i) p vals
     (if fin then close (Fin.toℕ i) exhausted ∷ [] else []) fin sched
     (record st { delivered = rid ∷ EvalSt.delivered st })
 sink-entry-hyps {Γ = Γ} {e = e} sl id sf gas nid now i vals fin rid p Lv J g k sched st
-  RS@(sleq , cok , hvc , hcl , _) hpz hi hdf hstp hflr hib hpk =
+  RS@(sleq , cok , hvc , hcl , _) hpz hi hdf hstp hflr hib hpk hord =
     sleq
   , capsOK?-delivered (frameStep Lv (capsAt e sl id)) rid sched st cok
   , hvc
@@ -253,6 +258,7 @@ sink-entry-hyps {Γ = Γ} {e = e} sl id sf gas nid now i vals fin rid p Lv J g k
   , sink-entry-vals i vals p hflr hib
   , hstp
   , pathPark-delivered p rid st hpk
+  , hord
   , sink-entry-ladder sl id i vals p gas Lv J g k sched st RS hpz hi
 
 -- AND WHAT ONE TURN OF THE RING LEAVES, WHICH IS THE PACKAGE AGAIN ONE
@@ -344,15 +350,16 @@ sink-entry-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (Fin.toℕ i ≤ᵇ pathFloor p) ≡ true →
   all (inputsBelowᵛ (Fin.toℕ i) (lookup Γ i)) vals ≡ true →
   pathPark? p st ≡ true →
+  pathOrd? (Sched.nextNode sched) p ≡ true →
   capsWalkOK (capsAt e sl id) (capsAt e sl (suc id)) sl (capsH e sl id) Lv sf gas nid now
     p vals fin sched (record st { delivered = rid ∷ EvalSt.delivered st })
 sink-entry-caps sl id sf gas nid now i vals fin rid p Lv J g k sched st RS hpz hi hdf
-  hstp hflr hib hpk =
+  hstp hflr hib hpk hord =
   chain-walk-caps sl id Lv sf gas nid now (Fin.toℕ i) p vals
     (if fin then close (Fin.toℕ i) exhausted ∷ [] else []) fin sched
     (record st { delivered = rid ∷ EvalSt.delivered st })
     (sink-entry-hyps sl id sf gas nid now i vals fin rid p Lv J g k sched st RS hpz hi hdf
-       hstp hflr hib hpk)
+       hstp hflr hib hpk hord)
 
 -- THE RING, AND IT IS THE RECURSION AND NOTHING ELSE.  A cancelled
 -- registration is skipped at the position it was reached at; a live one
@@ -377,14 +384,16 @@ sink-ring-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   -- it twice, once by the mark and once by the fold, and each has its
   -- own transport
   all (λ rp → pathPark? (proj₂ rp) st) ps ≡ true →
+  -- and the same list's orders, at the counter the ring entered on
+  all (λ rp → pathOrd? (Sched.nextNode sched) (proj₂ rp)) ps ≡ true →
   L₀ ≤ Lv →
   k + length ps ≤ regAt (Caps.cSize (capsAt e sl id)) (Caps.cReg (capsAt e sl id)) J →
   depthShareGo sf gas nid now i vals fin ps sched st ≤ capsH e sl id →
   shareCapsOK (capsAt e sl id) (capsAt e sl (suc id)) sl (capsH e sl id) Lv sf gas nid now
     i vals fin ps sched st
-sink-ring-go sl id sf gas nid now i vals fin [] L₀ Lv J g k sched st RS hadm hent hib hpk hL₀ hlen hdp = tt
+sink-ring-go sl id sf gas nid now i vals fin [] L₀ Lv J g k sched st RS hadm hent hib hpk hord hL₀ hlen hdp = tt
 sink-ring-go {n = n} {e = e} sl id sf gas nid now i vals fin ((rid , p) ∷ ps) L₀ Lv J g k sched st
-  RS hadm hent hib hpk hL₀ hlen hdp
+  RS hadm hent hib hpk hord hL₀ hlen hdp
   with any (_≡ᵇ rid) (EvalSt.cancelled st)
 ... | true =
   sink-ring-go sl id sf gas nid now i vals fin ps L₀ Lv J g k sched st RS
@@ -394,6 +403,7 @@ sink-ring-go {n = n} {e = e} sl id sf gas nid now i vals fin ((rid , p) ∷ ps) 
                    (admEntry? (Fin.toℕ i) ps) hent))
     hib
     (∧-trueʳ hpk)
+    (∧-trueʳ hord)
     hL₀
     (≤-trans (+-monoʳ-≤ k (n≤1+n (length ps))) hlen)
     (lub3-l (depthShareGo sf gas nid now i vals fin ps sched st)
@@ -407,6 +417,7 @@ sink-ring-go {n = n} {e = e} sl id sf gas nid now i vals fin ((rid , p) ∷ ps) 
 ... | false =
     sink-entry-caps sl id sf gas nid now i vals fin rid p Lv J g k sched st RS hpzL HI
       (lub3-m DA DB DC hdp) (proj₁ hentH) (proj₂ hentH) hib (∧-trueˡ hpk)
+      (∧-trueˡ hord)
   , L′
   , ring-room c d g J k (Lv + L′) 2≤S HI hR (proj₂ (proj₂ (proj₂ (proj₂ (proj₂
       (proj₂ RS₁))))))
@@ -416,6 +427,7 @@ sink-ring-go {n = n} {e = e} sl id sf gas nid now i vals fin ((rid , p) ∷ ps) 
                      (admEntry? (Fin.toℕ i) ps) hent))
       hib
       hpkT
+      hordT
       (≤-trans hL₀ (m≤m+n Lv L′))
       (subst (_≤ regAt (Caps.cSize c) (Caps.cReg c) J) (+-suc k (length ps)) hlen)
       (lub3-r DA DB DC hdp)
@@ -445,6 +457,9 @@ sink-ring-go {n = n} {e = e} sl id sf gas nid now i vals fin ((rid , p) ∷ ps) 
   -- in the order the head makes them: the delivered mark, then the fold
   hpkT = foldPath-park sf gas nid now (Fin.toℕ i) p vals EVS fin sched st′ ps
            (pathsPark-delivered ps rid st (∧-trueʳ hpk))
+  -- and the same at the counter, which the head's fold only raised
+  hordT = foldPath-ord sf gas nid now (Fin.toℕ i) p vals EVS fin sched st′ ps
+            (∧-trueʳ hord)
   ADV = sink-ring-adv sl id sf gas nid now i vals fin rid p Lv J g k sched st
           RS hpzL HI (lub3-m DA DB DC hdp) (proj₁ hentH)
           (sink-entry-vals i vals p (proj₂ hentH) hib)
@@ -482,9 +497,9 @@ walk-sink-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   dispatchCapsOK (capsAt e sl id) (capsAt e sl (suc id)) sl (capsH e sl id) L sf gas nid now i vals fin sched st
 walk-sink-caps sl id L sf zero nid now src i vals evs fin sched st H = tt
 walk-sink-caps sl id L sf (suc gas) nid now src i vals evs fin sched st
-  (_ , _ , _ , _ , _ , _ , _ , _ , _ , (zero , _ , () , _ , _))
+  (_ , _ , _ , _ , _ , _ , _ , _ , _ , _ , (zero , _ , () , _ , _))
 walk-sink-caps {n = n} {Γ = Γ} {t = t} {e = e} sl id L sf (suc gas) nid now src i vals evs fin sched st
-  (sleq , cok , hvc , hcl , _ , hdp , hib , _ , _ , (suc g₀ , P , hfl , hlvP , hR)) =
+  (sleq , cok , hvc , hcl , _ , hdp , hib , _ , _ , _ , (suc g₀ , P , hfl , hlvP , hR)) =
     shareAdmit-sz i (Caps.cSize (capsAt e sl (suc id))) (EvalSt.registry st)
       (regs-exit sl id L sched st L≤TOP cok)
   , ≤-trans (shareAdmit-len i (EvalSt.registry st))
@@ -504,6 +519,7 @@ walk-sink-caps {n = n} {Γ = Γ} {t = t} {e = e} sl id L sf (suc gas) nid now sr
       (sink-admit-entry (frameStep L c) i sched st cok)
       hib
       (shareAdmit-park i fin st)
+      (shareAdmit-ord i sched st)
       ≤-refl
       hlen₀
       hdp
@@ -552,7 +568,7 @@ walk-frame-room : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   fLvlD (Caps.cSize (capsAt e sl id)) (Caps.cWid (capsAt e sl id)) (capsH e sl id) L
     ≤ sizeCount (capsAt e sl id) (capsH e sl id) ⊔ Caps.cSize (capsAt e sl id)
 walk-frame-room {e = e} sl id L sf gas nid now src f p vals evs fin sched st
-  (_ , _ , _ , _ , _ , _ , _ , _ , _ , (g , P , _ , hlvP , hR)) =
+  (_ , _ , _ , _ , _ , _ , _ , _ , _ , _ , (g , P , _ , hlvP , hR)) =
   ≤-trans (≤-trans (iterL-infl S W d (pathLen p) (fLvlD S W d L)) hlvP)
           (≤-trans (lvls-infl S W d P (dCapᶜ S W (Caps.cReg c) d g P))
                    (reached-room c d P g 2≤S hR))
@@ -847,7 +863,7 @@ walk-hyps-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (proj₁ (proj₂ (proj₂ (proj₂ (stepFrame sf nid now f p vals fin sched st)))))
     (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame sf nid now f p vals fin sched st)))))
 walk-hyps-step {e = e} sl id L sf gas nid now src f p vals evs fin sched st
-  (sleq , cok , hvc , hcl , hpz , hdp , hib , hst , hpk , (g , P , hfl , hlvP , hR)) =
+  (sleq , cok , hvc , hcl , hpz , hdp , hib , hst , hpk , hord , (g , P , hfl , hlvP , hR)) =
     trans (KeepsC.slotsEq (stepFrame-keeps sf nid now f p vals fin sched st)) sleq
   , capsOK?-mono (frameStep (L + proj₁ ST) c) (frameStep Lt c)
       (proj₁ (proj₂ (proj₂ (proj₂ r)))) (proj₂ (proj₂ (proj₂ (proj₂ r))))
@@ -868,17 +884,16 @@ walk-hyps-step {e = e} sl id L sf gas nid now src f p vals evs fin sched st
   , walk-strat-step (frameStep L c) sl (pathFloor p) sf nid now f p vals fin sched st
       cok hstf hpkf hib
   , hstp
-  -- the parked reading IS transported now, and what the step buys it
-  -- with is disjointness: the freeze the ring leaves behind covers every
-  -- cell below the head's own, so the only thing the walk still has to
-  -- be handed is that its chain is ordered that way
-  , pathPark-step (proj₁ SCB) sf nid now f p vals fin sched st
-      (proj₁ (proj₂ SCB)) (proj₁ (proj₂ (proj₂ SCB)))
-      (proj₂ (proj₂ (proj₂ SCB))) hpkp
+  -- the parked reading IS transported now, and both halves of what buys
+  -- it come off the chain's own order: the freeze covers every cell
+  -- below what the tail reads, and the counter covers the cells the step
+  -- has not minted yet.  The order then reproduces itself one hop
+  -- shorter, against a counter that only rises
+  , pathPark-step sf nid now f p vals fin sched st hord hpkp
+  , pathOrd-step sf nid now f p vals fin sched st hord
   , (g , P , hfl , hlvP , hR)
   where
   c   = capsAt e sl id
-  SCB = step-chain-below f p sched
   hstf : frameStrat? (pathFloor p) f ≡ true
   hstf = proj₁ (∧-true (frameStrat? (pathFloor p) f) (pathStrat? p) hst)
   hstp : pathStrat? p ≡ true
@@ -932,7 +947,7 @@ chain-walk-caps sl id L sf gas nid now src (share-sink i) vals evs fin sched st 
   proj₁ (proj₂ H)
   , walk-sink-caps sl id L sf gas nid now src i vals evs fin sched st H
 chain-walk-caps {e = e} sl id L sf gas nid now src (f ↠ p) vals evs fin sched st
-  H@(sleq , cok , hvc , hcl , hpz , hdp , hib , hst , hpk , (g , P , hfl , hlvP , hR)) =
+  H@(sleq , cok , hvc , hcl , hpz , hdp , hib , hst , hpk , hord , (g , P , hfl , hlvP , hR)) =
     cok
   , proj₁ (valsCaps?-parts (frameStep L c) sl vals hvc)
   , slSz
@@ -986,9 +1001,9 @@ walk-len : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   WalkHyps sl id L sf gas nid now src p vals evs fin sched st →
   length vals ≤ nestBurstAt e sl id
 walk-len sl id L sf gas nid now src p vals evs fin sched st
-  (_ , _ , _ , _ , _ , _ , _ , _ , _ , (zero , _ , () , _ , _))
+  (_ , _ , _ , _ , _ , _ , _ , _ , _ , _ , (zero , _ , () , _ , _))
 walk-len {e = e} sl id L sf gas nid now src p vals evs fin sched st
-  (_ , _ , hvc , _ , _ , _ , _ , _ , _ , (suc g , P , _ , hlvP , hR)) =
+  (_ , _ , hvc , _ , _ , _ , _ , _ , _ , _ , (suc g , P , _ , hlvP , hR)) =
   ≤-trans (proj₂ (valsCaps?-parts (frameStep L c) sl vals hvc))
           (reached-len e sl id L P g hR
              (≤-trans (iterL-infl (Caps.cSize c) (Caps.cWid c) (capsH e sl id) (pathLen p) L)
@@ -1101,9 +1116,9 @@ walk-frame-thru-burst : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   WalkHyps sl id L sf gas nid now src (thru-outer op tn ↠ p) vals evs fin sched st →
   thruRoomWOK (nestBurstAt e sl id) sf op tn p nid now vals sched st
 walk-frame-thru-burst sl id L sf gas nid now src op tn p vals evs fin sched st
-  (_ , _ , _ , _ , _ , _ , _ , _ , _ , (zero , _ , () , _ , _))
+  (_ , _ , _ , _ , _ , _ , _ , _ , _ , _ , (zero , _ , () , _ , _))
 walk-frame-thru-burst {e = e} sl id L sf gas nid now src op tn p vals evs fin sched st
-  (heq , _ , hvc , _ , _ , _ , _ , _ , _ , (suc g , P , _ , hlvP , hR)) =
+  (heq , _ , hvc , _ , _ , _ , _ , _ , _ , _ , (suc g , P , _ , hlvP , hR)) =
   thru-room-list sl id L P g sf op tn nid now p vals sched st heq hR
     (≤-trans (suc≤iterL (Caps.cSize c) (Caps.cWid c) (capsH e sl id) (pathLen p) L) hlvP)
     (proj₁ (valsCaps?-parts (frameStep L c) sl vals hvc))
@@ -1167,9 +1182,9 @@ walk-frame-inner-burst : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     lookupNode allNid (EvalSt.nodes st) ≡ just (mergeAll-st lim act q od) →
     drainW sf allNid p nid now q sched st ≤ nestBurstAt e sl id
 walk-frame-inner-burst sl id L sf gas nid now src op allNid inst p vals evs fin sched st
-  (_ , _ , _ , _ , _ , _ , _ , _ , _ , (zero , _ , () , _ , _)) lim act q od hnd
+  (_ , _ , _ , _ , _ , _ , _ , _ , _ , _ , (zero , _ , () , _ , _)) lim act q od hnd
 walk-frame-inner-burst {e = e} sl id L sf gas nid now src op allNid inst p vals evs fin sched st
-  (heq , hok , _ , _ , _ , _ , _ , _ , _ , (suc g , P , _ , hlvP , hR)) lim act q od hnd =
+  (heq , hok , _ , _ , _ , _ , _ , _ , _ , _ , (suc g , P , _ , hlvP , hR)) lim act q od hnd =
   drain-room sl id L P g sf allNid nid now p q sched st heq hR
     (≤-trans (suc≤iterL (Caps.cSize c) (Caps.cWid c) (capsH e sl id) (pathLen p) L) hlvP)
     (subst (λ z → all (λ o → 3 + (sizeᵉ o + slotsSize z)
@@ -1251,13 +1266,14 @@ sink-ring-burst-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   admEntry? (Fin.toℕ i) ps ≡ true →
   all (inputsBelowᵛ (Fin.toℕ i) (lookup Γ i)) vals ≡ true →
   all (λ rp → pathPark? (proj₂ rp) st) ps ≡ true →
+  all (λ rp → pathOrd? (Sched.nextNode sched) (proj₂ rp)) ps ≡ true →
   L₀ ≤ Lv →
   k + length ps ≤ regAt (Caps.cSize (capsAt e sl id)) (Caps.cReg (capsAt e sl id)) J →
   depthShareGo sf gas nid now i vals fin ps sched st ≤ capsH e sl id →
   shareBurstsOK (nestBurstAt e sl id) sf gas nid now i vals fin ps sched st
-sink-ring-burst-go sl id sf gas nid now i vals fin [] L₀ Lv J g k sched st RS hadm hent hib hpk hL₀ hlen hdp = tt
+sink-ring-burst-go sl id sf gas nid now i vals fin [] L₀ Lv J g k sched st RS hadm hent hib hpk hord hL₀ hlen hdp = tt
 sink-ring-burst-go {e = e} sl id sf gas nid now i vals fin ((rid , p) ∷ ps) L₀ Lv J g k sched st
-  RS hadm hent hib hpk hL₀ hlen hdp
+  RS hadm hent hib hpk hord hL₀ hlen hdp
   with any (_≡ᵇ rid) (EvalSt.cancelled st)
 ... | true =
   sink-ring-burst-go sl id sf gas nid now i vals fin ps L₀ Lv J g k sched st RS
@@ -1267,6 +1283,7 @@ sink-ring-burst-go {e = e} sl id sf gas nid now i vals fin ((rid , p) ∷ ps) L�
                    (admEntry? (Fin.toℕ i) ps) hent))
     hib
     (∧-trueʳ hpk)
+    (∧-trueʳ hord)
     hL₀
     (≤-trans (+-monoʳ-≤ k (n≤1+n (length ps))) hlen)
     (lub3-l (depthShareGo sf gas nid now i vals fin ps sched st)
@@ -1281,7 +1298,7 @@ sink-ring-burst-go {e = e} sl id sf gas nid now i vals fin ((rid , p) ∷ ps) L�
     chain-walk-burst sl id Lv sf gas nid now (Fin.toℕ i) p vals EVS fin sched st′
       (sink-entry-hyps sl id sf gas nid now i vals fin rid p Lv J g k sched st
          RS hpzL HI (lub3-m DA DB DC hdp) (proj₁ hentH) (proj₂ hentH) hib
-         (∧-trueˡ hpk))
+         (∧-trueˡ hpk) (∧-trueˡ hord))
   , sink-ring-burst-go sl id sf gas nid now i vals fin ps L₀ (Lv + L′) J g (suc k)
       sched₁ st₁ RS₁
       (proj₂ (∧-true (pathSz? B₀ p) (admSz? B₀ ps) hadm))
@@ -1289,6 +1306,7 @@ sink-ring-burst-go {e = e} sl id sf gas nid now i vals fin ((rid , p) ∷ ps) L�
                      (admEntry? (Fin.toℕ i) ps) hent))
       hib
       hpkT
+      hordT
       (≤-trans hL₀ (m≤m+n Lv L′))
       (subst (_≤ regAt (Caps.cSize c) (Caps.cReg c) J) (+-suc k (length ps)) hlen)
       (lub3-r DA DB DC hdp)
@@ -1313,6 +1331,8 @@ sink-ring-burst-go {e = e} sl id sf gas nid now i vals fin ((rid , p) ∷ ps) L�
   -- in the order the head makes them: the delivered mark, then the fold
   hpkT = foldPath-park sf gas nid now (Fin.toℕ i) p vals EVS fin sched st′ ps
            (pathsPark-delivered ps rid st (∧-trueʳ hpk))
+  hordT = foldPath-ord sf gas nid now (Fin.toℕ i) p vals EVS fin sched st′ ps
+            (∧-trueʳ hord)
   DA = depthShareGo sf gas nid now i vals fin ps sched st
   DB = depthFold sf gas nid now (Fin.toℕ i) p vals EVS fin sched st′
   DC = depthShareGo sf gas nid now i vals fin ps sched₁ st₁
@@ -1346,9 +1366,9 @@ walk-sink-burst : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   dispatchBurstsOK (nestBurstAt e sl id) sf gas nid now i vals fin sched st
 walk-sink-burst sl id L sf zero nid now src i vals evs fin sched st H = tt
 walk-sink-burst sl id L sf (suc gas) nid now src i vals evs fin sched st
-  (_ , _ , _ , _ , _ , _ , _ , _ , _ , (zero , _ , () , _ , _))
+  (_ , _ , _ , _ , _ , _ , _ , _ , _ , _ , (zero , _ , () , _ , _))
 walk-sink-burst {n = n} {Γ = Γ} {t = t} {e = e} sl id L sf (suc gas) nid now src i vals evs fin sched st
-  (sleq , cok , hvc , hcl , _ , hdp , hib , _ , _ , (suc g₀ , P , hfl , hlvP , hR)) =
+  (sleq , cok , hvc , hcl , _ , hdp , hib , _ , _ , _ , (suc g₀ , P , hfl , hlvP , hR)) =
   sink-ring-burst-go sl id sf gas nid now i vals fin
     (shareAdmit i (EvalSt.registry st)) L L P g₀ 0 sched (shareLatch i fin st)
     ( sleq
@@ -1361,6 +1381,7 @@ walk-sink-burst {n = n} {Γ = Γ} {t = t} {e = e} sl id L sf (suc gas) nid now s
     (sink-admit-entry (frameStep L c) i sched st cok)
     hib
     (shareAdmit-park i fin st)
+    (shareAdmit-ord i sched st)
     ≤-refl
     hlen₀
     hdp

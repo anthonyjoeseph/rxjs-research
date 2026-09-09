@@ -2,15 +2,16 @@
 -- framePark-step … shareAdmit-park
 module Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves where
 
-open import Data.Bool    using (Bool; true)
+open import Data.Bool    using (Bool; true; _∧_)
 open import Data.Fin     using (Fin; toℕ)
 open import Data.List    using (List; map; [])
 open import Data.Bool.ListAction using (all)
 open import Data.Maybe   using (just; nothing)
-open import Data.Nat     using (ℕ; suc; _≤_)
-open import Data.Unit    using (⊤)
+open import Data.Nat     using (ℕ; suc; _≤_; _≤ᵇ_; _⊔_)
+open import Data.Nat.Properties using (≤-refl; ≤-trans; ≤ᵇ⇒≤; m≤m⊔n; m≤n⊔m)
+open import Data.Unit    using (⊤; tt)
 open import Data.Vec     using (lookup)
-open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; cong)
 open import Relation.Nullary using (yes; no)
 
@@ -31,10 +32,11 @@ open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (burstStrat?; capsOK?; framePark?; frameStrat?; parkStrat?; pathFloor;
    pathPark?; pathStrat?; regStrat?)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using (valsStrat?)
-open import Decide using (∧-intro; ∧-trueˡ; ∧-trueʳ)
+open import Decide using (∧-intro; ∧-trueˡ; ∧-trueʳ; ≤ᵇ-widen; T-to)
 open import Verify-Budget-Sufficient.Node-Fresh using
   (FreshC; frameAbove; stepFrame-fresh; subscribeE-nodes-below)
 open import Verify-Budget-Sufficient.Node-Table using (lookupNode-setNode)
+open import Verify-Budget-Sufficient.Measures using (∧-true; all-impl)
 
 -- THE TWO FACTS THE STRATIFICATION THREAD CANNOT GET BY REDUCTION, and
 -- they sit together because they fail for the same reason: each is
@@ -82,6 +84,56 @@ pathBelow : ∀ {n} {Γ : Ctx n} {u t} → ℕ → Path Γ u t → Set
 pathBelow w root           = ⊤
 pathBelow w (share-sink _) = ⊤
 pathBelow w (f ↠ p)        = parkBelow w f × pathBelow w p
+
+-- AND THE SMALLEST WATERMARK THAT WORKS, COMPUTED RATHER THAN GUESSED.
+-- The two predicates above ask a caller for a bound; this hands one
+-- back, so the existential a transport used to carry disappears and the
+-- caller picks nothing.  A frame that reaches no cell contributes zero,
+-- which is the same economy that makes three of the five shapes free
+-- above.
+frameRead : ∀ {n} {Γ : Ctx n} {s u} → Frame Γ s u → ℕ
+frameRead (from-inner _ allNid _) = suc allNid
+frameRead (scan-f _ nd)           = suc nd
+frameRead _                       = 0
+
+pathRead : ∀ {n} {Γ : Ctx n} {u t} → Path Γ u t → ℕ
+pathRead root           = 0
+pathRead (share-sink _) = 0
+pathRead (f ↠ p)        = frameRead f ⊔ pathRead p
+
+-- AND THE WRITE SIDE AS A DECISION, which is what lets a chain's
+-- ordering be a BOOLEAN conjunct of the walk instead of a Σ.  The
+-- difference is not cosmetic: the fan-out and the cascade hold LISTS of
+-- chains and owe every reading pointwise through `all`, which takes a
+-- predicate into `Bool` and cannot take one into `Set`.  Every arm of
+-- the freshness ring's own frame predicate is a comparison of numerals,
+-- so the decision is that predicate with `≤ᵇ` for `≤`.
+frameAbove? : ∀ {n} {Γ : Ctx n} {s u} → ℕ → Frame Γ s u → Bool
+frameAbove? w (map-f _)          = true
+frameAbove? w (scan-f _ nid)     = w ≤ᵇ nid
+frameAbove? w (take-f nid)       = w ≤ᵇ nid
+frameAbove? w (from-inner _ a i) = (w ≤ᵇ a) ∧ (w ≤ᵇ i)
+frameAbove? w (thru-outer _ nid) = w ≤ᵇ nid
+
+-- A CHAIN IS ORDERED WHEN EVERY FRAME WRITES AT OR ABOVE WHAT THE REST
+-- OF IT READS, and the watermark each hop spends is the tail's own
+-- reading rather than a witness someone supplies.  It is true of a
+-- chain the evaluator BUILT, since a subscribe descends outward-in and
+-- a head is therefore minted after everything under it -- but nothing
+-- in a frame's type ties it to the path beside it, so the fact is
+-- carried and not derived.
+--
+-- AND THE SCHEDULER'S COUNTER IS THE SAME FACT ABOUT CELLS THAT DO NOT
+-- EXIST YET.  A step may mint, and it mints from the counter up, so a
+-- tail reading below the counter is a tail no minting can reach.  The
+-- caps receipt cannot supply this: it is INDIFFERENT to the counter,
+-- which `capsOK?-nextNode` states outright by setting the field
+-- arbitrarily and preserving the invariant.
+pathOrd? : ∀ {n} {Γ : Ctx n} {u t} → ℕ → Path Γ u t → Bool
+pathOrd? nx root           = true
+pathOrd? nx (share-sink _) = true
+pathOrd? nx (f ↠ p)        =
+  (pathRead p ≤ᵇ nx) ∧ frameAbove? (pathRead p) f ∧ pathOrd? nx p
 
 postulate
   framePark-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
@@ -137,26 +189,61 @@ postulate
     valsStrat? (pathFloor κ)
       (proj₁ (stepFrame g id now f κ vals fin sched st)) ≡ true
 
--- (4) THAT A WALKED CHAIN ADMITS A WATERMARK, which is the whole residue
--- of the step-side park reading now that its transport is a body.  The
--- witness is the head's own smallest node: a chain is built outward-in
--- and every frame is minted before the descent that extends it, so the
--- head is the YOUNGEST cell in the chain and everything the tail reads
--- was minted earlier.  That is a fact about chains the evaluator BUILDS.
+-- (4) THAT THE CHAINS A CASCADE REACHES ARE ORDERED, which is where the
+-- step-side park reading's residue comes to rest now that its transport
+-- is a body.  A chain is built outward-in: every frame is minted before
+-- the descent that extends it, so a head is the YOUNGEST cell in the
+-- chain and everything its tail reads was minted earlier and sits below
+-- the counter.  That is a fact about chains the evaluator BUILDS, and it
+-- is stated at the door the built chains come through rather than over
+-- an arbitrary frame-and-path pair, which no descent ever produces.
 --
--- AND IT IS NOT ONE THE TYPE CARRIES, which is why the row is FALSITY
--- rather than hard: a `Frame` and a `Path` are independent arguments
--- here, so the statement quantifies over pairs no descent ever produces
--- -- a head naming a cell BELOW one its tail reads refutes it outright.
--- The repair is not a hypothesis: it is a field on `WalkHyps`, which
--- obliges every producer of a chain to supply the ordering and every
--- consumer to re-establish it, where a premise would oblige only the one
--- caller that happens to exist.  The scheduler's counter cannot stand in
--- for the witness -- it bounds what the tail reads and sits ABOVE the
--- head, which is the wrong side of the ring's own inequality.
-  step-chain-below : ∀ {n} {Γ : Ctx n} {s u t}
-    (f : Frame Γ s u) (κ : Path Γ u t) (sched : Sched Γ) →
-    Σ ℕ λ w → (w ≤ Sched.nextNode sched) × frameAbove w f × pathBelow w κ
+-- IT IS THE PARK PAIR'S THIRD MEMBER AND SITS BESIDE THEM FOR THE SAME
+-- REASON: the share reaches its chains through `shareAdmit` and the
+-- cascade through `chainsOf`, neither filter rearranges into the other,
+-- and no conjunct of the caps receipt prices either -- the receipt is
+-- INDIFFERENT to the counter, which `capsOK?-nextNode` states outright.
+  shareAdmit-ord : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (i : Fin n) (sched : Sched Γ) (st : EvalSt e) →
+    all (λ rp → pathOrd? {n} {Γ} {lookup Γ i} {t} (Sched.nextNode sched) (proj₂ rp))
+        (shareAdmit i (EvalSt.registry st)) ≡ true
+
+  cascade-admit-ord : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
+    all (λ rc → pathOrd? {n} {Γ} {arrTy a} {t} (Sched.nextNode sched) (proj₂ rc))
+        (chainsOf a st) ≡ true
+
+-- AND THAT THE COUNTER ONLY RISES ACROSS THE TWO FOLDS, which is what
+-- carries an ordering across a SIBLING's work rather than across the
+-- chain's own step.  The freshness ring reports exactly this at every
+-- construct it covers, and the delivery clique is the one region it does
+-- not reach -- so the two folds owe it directly.  It is the whole of what
+-- the fan-out needs, because the chain a sibling did not touch is
+-- unchanged and its reading is then one widening.
+--
+-- TWO ROUTES, and the choice is about the ring's RECORD rather than
+-- about either fold.  `FreshC` bundles the counter's monotonicity with
+-- the freeze below a watermark, so bringing these two into the ring
+-- proves strictly more than either statement asks -- and the delivery
+-- clique is MUTUAL, so it enters as one family or not at all.  The
+-- cheaper route proves the counter half alone, by the same induction
+-- with no store obligation attached; what decides between them is
+-- whether any later consumer wants the freeze at these two, and today
+-- none does.
+  foldPath-nextNode : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
+    (p : Path Γ u t) (vals : List (Val Γ u))
+    (evs : List (InstEvent (Val Γ t))) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) →
+    Sched.nextNode sched ≤
+      Sched.nextNode
+        (proj₁ (proj₂ (foldPath sf gas id now envSrc p vals evs fin sched st)))
+
+  chainStep-nextNode : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (id : Id) (a : Arrival Γ) (path : Path Γ (arrTy a) t)
+    (sched : Sched Γ) (st : EvalSt e) →
+    Sched.nextNode sched ≤
+      Sched.nextNode (proj₁ (proj₂ (chainStep id a path sched st)))
 
 -- (5) WHAT A SHARE HANDS THE CHAINS IT ADMITTED.  This is the one place
 -- the registry reading is SPENT rather than established, and the two
@@ -461,6 +548,52 @@ frozen-pathPark w (f ↠ p) st st′ hfz (hbf , hbp) hp =
   ∧-intro (frozen-framePark (pathFloor p) w f st st′ hfz hbf (∧-trueˡ hp))
           (frozen-pathPark w p st st′ hfz hbp (∧-trueʳ hp))
 
+-- THE COMPUTED WATERMARK MEETS THE ASKED-FOR ONE, in both directions
+-- and neither is arithmetic.  The read side is a fold, so its bound
+-- distributes over the chain by the two halves of a join; the write
+-- side is a decision, so its soundness is the `≤ᵇ` reflection at each
+-- arm.  Together they are what lets a caller stop choosing a witness.
+frameRead-below : ∀ {n} {Γ : Ctx n} {s u} (w : ℕ) (f : Frame Γ s u) →
+  frameRead f ≤ w → parkBelow w f
+frameRead-below w (map-f _)          h = tt
+frameRead-below w (take-f _)         h = tt
+frameRead-below w (thru-outer _ _)   h = tt
+frameRead-below w (scan-f _ _)       h = h
+frameRead-below w (from-inner _ _ _) h = h
+
+pathRead-below : ∀ {n} {Γ : Ctx n} {u t} (w : ℕ) (κ : Path Γ u t) →
+  pathRead κ ≤ w → pathBelow w κ
+pathRead-below w root           h = tt
+pathRead-below w (share-sink _) h = tt
+pathRead-below w (f ↠ p) h =
+  frameRead-below w f (≤-trans (m≤m⊔n (frameRead f) (pathRead p)) h)
+  , pathRead-below w p (≤-trans (m≤n⊔m (frameRead f) (pathRead p)) h)
+
+frameAbove?-sound : ∀ {n} {Γ : Ctx n} {s u} (w : ℕ) (f : Frame Γ s u) →
+  frameAbove? w f ≡ true → frameAbove w f
+frameAbove?-sound w (map-f _)          h = tt
+frameAbove?-sound w (scan-f _ nid)     h = ≤ᵇ⇒≤ w nid (T-to h)
+frameAbove?-sound w (take-f nid)       h = ≤ᵇ⇒≤ w nid (T-to h)
+frameAbove?-sound w (thru-outer _ nid) h = ≤ᵇ⇒≤ w nid (T-to h)
+frameAbove?-sound w (from-inner _ a i) h =
+  ≤ᵇ⇒≤ w a (T-to (∧-trueˡ h)) , ≤ᵇ⇒≤ w i (T-to (∧-trueʳ h))
+
+-- AND THE ORDERING SURVIVES A RISING COUNTER, which is the only way a
+-- step moves it: the reading is about the chain's own cells and the
+-- chain does not change, so every hop's bound is one widening and the
+-- frame's own comparison is carried across untouched.
+pathOrd?-mono : ∀ {n} {Γ : Ctx n} {u t} (nx nx′ : ℕ) (κ : Path Γ u t) →
+  nx ≤ nx′ → pathOrd? nx κ ≡ true → pathOrd? nx′ κ ≡ true
+pathOrd?-mono nx nx′ root           hn h = refl
+pathOrd?-mono nx nx′ (share-sink _) hn h = refl
+pathOrd?-mono nx nx′ (f ↠ p) hn h =
+  ∧-intro (≤ᵇ-widen (pathRead p) hn (proj₁ SP))
+          (∧-intro (proj₁ SQ) (pathOrd?-mono nx nx′ p hn (proj₂ SQ)))
+  where
+  SP = ∧-true (pathRead p ≤ᵇ nx)
+              (frameAbove? (pathRead p) f ∧ pathOrd? nx p) h
+  SQ = ∧-true (frameAbove? (pathRead p) f) (pathOrd? nx p) (proj₂ SP)
+
 -- (4) THE CHAIN-KEYED PARK READING ACROSS ONE FRAME STEP, and it is the
 -- subscribe's statement one construct up rather than a second mechanism.
 -- A step writes the STEPPED frame's own cell, so what the tail loses is
@@ -470,11 +603,12 @@ frozen-pathPark w (f ↠ p) st st′ hfz (hbf , hbp) hp =
 -- closure premises the free form carried are gone: they priced what the
 -- write CONTAINS, and the question was never about the contents.
 --
--- THE WATERMARK IS THE HEAD'S SMALLEST NODE, not the scheduler's, which
--- is why it is quantified rather than computed.  A `from-inner` head
--- names two cells and only the *All's own is old enough to bound the
--- tail, so a caller picks the witness its own chain supports and no
--- minimum-of-ids function has to exist.
+-- THE WATERMARK IS THE TAIL'S OWN READING, so the statement asks for
+-- the chain's ORDER and nothing else.  The earlier form quantified the
+-- watermark and left every caller to produce one, which put a Σ where
+-- an `all` has to go and made the residue a fact about a frame and a
+-- path that arrive as independent arguments.  Read off the tail, the
+-- bound is the walk's own conjunct.
 --
 -- DEAD ROUTE: transporting the tail's reading by the SUFFIX property
 --   the frame-level statement rests on.  It held while a reinstall was
@@ -482,16 +616,91 @@ frozen-pathPark w (f ↠ p) st st′ hfz (hbf , hbp) hp =
 --   gained an arm at a cell a step OVERWRITES: an `all` reading tolerates
 --   losing a prefix and nothing tolerates a replacement.
 pathPark-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-  (w : ℕ) (g : Gas) (id : Id) (now : Tick)
+  (g : Gas) (id : Id) (now : Tick)
   (f : Frame Γ s u) (κ : Path Γ u t)
   (vals : List (Val Γ s)) (fin : Bool)
   (sched : Sched Γ) (st : EvalSt e) →
-  w ≤ Sched.nextNode sched → frameAbove w f → pathBelow w κ →
+  pathOrd? (Sched.nextNode sched) (f ↠ κ) ≡ true →
   pathPark? κ st ≡ true →
   pathPark? κ
     (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame g id now f κ vals fin sched st)))))
       ≡ true
-pathPark-step w g id now f κ vals fin sched st hw hf hb hp =
-  frozen-pathPark w κ st _
+pathPark-step g id now f κ vals fin sched st ho hp =
+  frozen-pathPark (pathRead κ) κ st _
     (FreshC.frozen
-      (stepFrame-fresh w g id now f κ vals fin sched st hw hf)) hb hp
+      (stepFrame-fresh (pathRead κ) g id now f κ vals fin sched st
+        (≤ᵇ⇒≤ (pathRead κ) (Sched.nextNode sched) (T-to (proj₁ SP)))
+        (frameAbove?-sound (pathRead κ) f (proj₁ SQ))))
+    (pathRead-below (pathRead κ) κ ≤-refl) hp
+  where
+  SP = ∧-true (pathRead κ ≤ᵇ Sched.nextNode sched)
+              (frameAbove? (pathRead κ) f ∧ pathOrd? (Sched.nextNode sched) κ) ho
+  SQ = ∧-true (frameAbove? (pathRead κ) f)
+              (pathOrd? (Sched.nextNode sched) κ) (proj₂ SP)
+
+-- AND THE ORDER ITSELF ACROSS THE SAME STEP, which is the counter's
+-- half: the chain loses its head and the counter only rises, so the
+-- tail's ordering is the head's minus one hop, widened once by the
+-- monotonicity the freshness ring already reports.
+pathOrd-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (g : Gas) (id : Id) (now : Tick)
+  (f : Frame Γ s u) (κ : Path Γ u t)
+  (vals : List (Val Γ s)) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) →
+  pathOrd? (Sched.nextNode sched) (f ↠ κ) ≡ true →
+  pathOrd?
+    (Sched.nextNode
+      (proj₁ (proj₂ (proj₂ (proj₂ (stepFrame g id now f κ vals fin sched st))))))
+    κ ≡ true
+pathOrd-step g id now f κ vals fin sched st ho =
+  pathOrd?-mono _ _ κ
+    (FreshC.nxMono
+      (stepFrame-fresh (pathRead κ) g id now f κ vals fin sched st
+        (≤ᵇ⇒≤ (pathRead κ) (Sched.nextNode sched) (T-to (proj₁ SP)))
+        (frameAbove?-sound (pathRead κ) f (proj₁ SQ))))
+    (proj₂ SQ)
+  where
+  SP = ∧-true (pathRead κ ≤ᵇ Sched.nextNode sched)
+              (frameAbove? (pathRead κ) f ∧ pathOrd? (Sched.nextNode sched) κ) ho
+  SQ = ∧-true (frameAbove? (pathRead κ) f)
+              (pathOrd? (Sched.nextNode sched) κ) (proj₂ SP)
+
+-- AND THE SAME ORDER OVER A SIBLING'S WORK, which is the fan-out's
+-- shape rather than the descent's: the chains a fold did not walk are
+-- the SAME chains afterwards, so nothing about the reading changes and
+-- the only thing that moves is the counter it is read against.  Both are
+-- bodies over one counter leaf apiece, which is what makes them
+-- corollaries rather than a second mechanism -- and it is why the
+-- ordering could be made Boolean at all: a Σ cannot ride in an `all`,
+-- and the fan-out owes its chains pointwise.
+foldPath-ord : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
+  (p : Path Γ u t) (vals : List (Val Γ u))
+  (evs : List (InstEvent (Val Γ t))) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) (ps : List (RegId × Path Γ u t)) →
+  all (λ rp → pathOrd? (Sched.nextNode sched) (proj₂ rp)) ps ≡ true →
+  all (λ rp → pathOrd?
+         (Sched.nextNode
+           (proj₁ (proj₂ (foldPath sf gas id now envSrc p vals evs fin sched st))))
+         (proj₂ rp))
+      ps ≡ true
+foldPath-ord sf gas id now envSrc p vals evs fin sched st ps h =
+  all-impl _ _
+    (λ rp → pathOrd?-mono _ _ (proj₂ rp)
+              (foldPath-nextNode sf gas id now envSrc p vals evs fin sched st))
+    ps h
+
+chainStep-ord : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (id : Id) (a : Arrival Γ) (path : Path Γ (arrTy a) t)
+  (sched : Sched Γ) (st : EvalSt e)
+  (chains : List (RegId × Path Γ (arrTy a) t)) →
+  all (λ rc → pathOrd? (Sched.nextNode sched) (proj₂ rc)) chains ≡ true →
+  all (λ rc → pathOrd?
+         (Sched.nextNode (proj₁ (proj₂ (chainStep id a path sched st))))
+         (proj₂ rc))
+      chains ≡ true
+chainStep-ord id a path sched st chains h =
+  all-impl _ _
+    (λ rc → pathOrd?-mono _ _ (proj₂ rc)
+              (chainStep-nextNode id a path sched st))
+    chains h
