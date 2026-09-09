@@ -604,6 +604,14 @@ and the top-line results fully stated and typechecking _in terms of postulates_.
 start chipping the postulates away, one at a time, until everything is defined and there are
 no gaps.
 
+**AND ONE AT A TIME MEANS TOPMOST FIRST (Anthony).** Chipping is not a free-for-all once
+the top line typechecks: the layer directly beneath the settled one is the only layer being
+worked, and everything below it stays POSTULATED — low-risk detail especially, since a
+mechanical transport is exactly what a settled layer above makes cheap, and exactly what
+nothing yet guarantees will still be wanted in the shape it has today. The tell that a
+session has slipped a layer: the edit in hand is threading an argument through a fourth
+signature while the statement it serves is still red.
+
 **A Σ-receipt has content only through its witness.** If every conjunct of a Σ-statement is
 upward-closed in the witness (each survives enlarging it), the statement is vacuously
 satisfiable and proves nothing — check this BEFORE grinding clauses. Pin the witness to the

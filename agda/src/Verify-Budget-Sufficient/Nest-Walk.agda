@@ -74,11 +74,11 @@ open import Verify-Budget-Sufficient.Caps-Chain using (leaf-lvl)
 open import Verify-Budget-Sufficient.Caps-Term using (unfoldμ-caps)
 open import Verify-Budget-Sufficient.Caps-Depth using
   (depthDrain; depthFin; depthFrame; depthInner; depthE; depthReact)
-open import Verify-Budget-Sufficient.Caps-Face.Part1 using (burstCaps?; capsOK?; valCaps?; widNode; widNode-push; nestValOK?; pathSz?; slotsCaps?; nestClosOK?; nestClosOK?ᵛ; nestClosOK?ᵛ-widen;
-  slotsCaps?-widen; frameSz?; capsOK?-mono; pathFloor; frameStrat?; pathStrat?; burstStrat?;
-  parkStrat?; setNode-regPark-owner; pathOrd?; pathPark?; pathPark?-nodes;
-  pathOrd?-mono; pathOrd?-read; pathOrd?-hop; pathOrd?-push; pathOrd?-inner;
-  pathOrd?-cell; pathOrd?-outer; pathOrd?-tail; pathCell; pathRead; frameRead)
+open import Verify-Budget-Sufficient.Caps-Face.Part1 using (burstCaps?; capsOK?; valCaps?; widNode; widNode-push; nestValOK?; pathSz?; slotsCaps?;
+  nestClosOK?; nestClosOK?ᵛ; nestClosOK?ᵛ-widen; slotsCaps?-widen; frameSz?; capsOK?-mono;
+  pathFloor; frameStrat?; pathStrat?; burstStrat?; parkStrat?; setNode-regPark-owner; pathOrd?;
+  pathPark?; pathPark?-nodes; pathOrd?-mono; pathOrd?-read; pathOrd?-hop; pathOrd?-push;
+  pathOrd?-inner; pathOrd?-cell; pathOrd?-outer; pathOrd?-tail; pathCell; pathRead)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using (burstCaps?-widen; valCaps?-wid; valCaps?-size; valCaps?-widen; pathSz?-⊑; frameStep-chain-suc; expWid-fromSize)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using (capsOK?-nextNode; capsOK?-parts; capsOK?-setNode; capsOK?-setNode-park; capsOK?-regPark; switchKill-caps; NodeCaps; lookupNode-caps;
   capsOK?-nodeSz; capsOK?-nodeWid; capsOK?-nodePark; parkList-push; pathSz?-len;

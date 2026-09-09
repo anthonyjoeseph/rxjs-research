@@ -499,6 +499,16 @@ module BurstWalk
                                 (registry-entStrat (frameStep J c) sched st
                                   (proj₂ (proj₁ ok)))
                                 (∧-trueʳ h)))
+    -- THE CHAIN READING, UNUSED HERE.  The burst face reads bursts and
+    -- levels; nothing on it inspects the scheduler's counter or the
+    -- store's parks, so the ledger is the constant `true` and every one
+    -- of its transports is the trivial one
+    ; Ob        = λ _ _ _ → true
+    ; o-cons    = λ _ _ _ _ _ → refl
+    ; o-fan     = λ _ i _ _ st _ →
+                    chP?-const true (shareAdmit i (EvalSt.registry st)) refl
+    ; o-fold    = λ _ _ _ _ _ _ _ _ _ _ _ ps _ → chP?-const true ps refl
+    ; o-chain   = λ _ _ _ _ _ chains _ → chP?-const true chains refl
     ; ok-reg    = λ J sched st ok →
                     capsOK?-count (frameStep J c) sched st (proj₂ (proj₁ ok))
     ; ok-cons   = λ J rid sched st ok →
@@ -521,7 +531,7 @@ module BurstWalk
     -- comes back carries no reading at all, so both are rebuilt --  the
     -- payload's out of the frame's discarded conjunct, the registry's
     -- out of the `capsOK?` the step lands at
-    ; sf-step   = λ J sf id now f path′ vals fin sched st ok pb vb rg gk cl hD →
+    ; sf-step   = λ J sf id now f path′ vals fin sched st ok pb vb rg gk cl hD _ →
                     let hS = pbS J (f ↠ path′) pb
                         hF = proj₁ (∧-true (frameStrat? (pathFloor path′) f)
                                            (pathStrat? path′) hS)
@@ -548,6 +558,7 @@ module BurstWalk
                           (registry-entStrat (frameStep (J + proj₁ BF) c) s′ t′
                             (proj₂ (proj₁ ok′))))
                     , proj₂ (proj₂ (proj₂ (proj₂ (proj₂ BF))))
+                    , refl
     }
 
   module V = Walk {e = e} S W R d 2≤S burstH

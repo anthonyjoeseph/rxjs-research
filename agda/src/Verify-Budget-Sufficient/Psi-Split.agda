@@ -306,6 +306,28 @@ regP?-projˡ P Q (r ∷ rs) h
                                      (Q (proj₂ (proj₂ (proj₂ r)))) a))
                       (regP?-projˡ P Q rs b)
 
+-- AND THE SAME SPLIT ON A CHAIN LIST, both halves.  A chain ledger is
+-- conjoined at the walk's entry and spent one half at a time by the
+-- transports, each of which reads one flavour, so the projection is
+-- what makes the conjoined form usable at all
+chP?-projˡ : ∀ {n} {Γ : Ctx n} {s t} (P Q : ∀ {u} → Path Γ u t → Bool)
+  (ps : List (RegId × Path Γ s t)) →
+  chP? (λ {v} p → P {v} p ∧ Q p) ps ≡ true → chP? P ps ≡ true
+chP?-projˡ P Q []       h = refl
+chP?-projˡ P Q (r ∷ rs) h
+  with ∧-true (P (proj₂ r) ∧ Q (proj₂ r)) (chP? (λ {v} p → P p ∧ Q p) rs) h
+... | a , b = ∧-intro (proj₁ (∧-true (P (proj₂ r)) (Q (proj₂ r)) a))
+                      (chP?-projˡ P Q rs b)
+
+chP?-projʳ : ∀ {n} {Γ : Ctx n} {s t} (P Q : ∀ {u} → Path Γ u t → Bool)
+  (ps : List (RegId × Path Γ s t)) →
+  chP? (λ {v} p → P {v} p ∧ Q p) ps ≡ true → chP? Q ps ≡ true
+chP?-projʳ P Q []       h = refl
+chP?-projʳ P Q (r ∷ rs) h
+  with ∧-true (P (proj₂ r) ∧ Q (proj₂ r)) (chP? (λ {v} p → P p ∧ Q p) rs) h
+... | a , b = ∧-intro (proj₂ (∧-true (P (proj₂ r)) (Q (proj₂ r)) a))
+                      (chP?-projʳ P Q rs b)
+
 -- THE REGISTRY'S ENTRY READING, AS A WALK LEDGER.  `regStrat?` reads
 -- each entry's SOURCE against its chain, and a walk ledger reads the
 -- chain alone; so the source half is dropped entry by entry, and what

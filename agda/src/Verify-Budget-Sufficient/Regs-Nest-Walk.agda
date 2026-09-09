@@ -146,12 +146,12 @@ valsΦ? {s = s} B U path vals =
 -- would trade a counted gap for an uncounted one.  The arm's own
 -- header holds the census, the deliverer, the frame that drops the
 -- receipt and the coverage boundary.
-InnerΦFit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+InnerΦBody : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (sf : Gas) (id : Id) (now : Tick) (B U : ℕ)
   (op : AllOp) (allNid inst : NodeId) (path : Path Γ s t)
   (vals : List (Val Γ s)) (fin : Bool)
   (sched : Sched Γ) (st : EvalSt e) → Set
-InnerΦFit {Γ = Γ} {e = e} {s = s} sf id now B U op allNid inst path vals fin sched st =
+InnerΦBody {Γ = Γ} {e = e} {s = s} sf id now B U op allNid inst path vals fin sched st =
   Σ Caps λ c → Σ ℕ λ d → Σ ℕ λ W → Σ ℕ λ Lv → Σ ℕ λ G →
     FaceOK c (Sched.slots sched)
     × (∀ (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ s)) (od : Bool) →
@@ -166,12 +166,6 @@ InnerΦFit {Γ = Γ} {e = e} {s = s} sf id now B U op allNid inst path vals fin 
     × (suc (pathLen path) ≤ Caps.cSize (frameStep Lv c))
     × (pathStrat? path ≡ true)
     × (parkStrat? (pathFloor path) (lookupNode allNid (EvalSt.nodes st)) ≡ true)
-    -- AND THE TWO REGISTRY READINGS THE DESCENT UNDER THIS FRAME
-    -- SPENDS, carried for the reason the cell's own reading beside
-    -- them is: neither follows from a caps receipt, which a caps-legal
-    -- state that the evaluator never built already refutes.
-    × (pathOrd? (Sched.nextNode sched) (thru-outer op allNid ↠ path) ≡ true)
-    × (pathPark? path st ≡ true)
     × (nodeNestAt allNid st ⊔ nestDᵛˢ vals ≤ G)
     × (∀ (j : ℕ) → j ≤ sizeCount c d ⊔ Caps.cSize c →
          pathΦF B path
@@ -179,6 +173,23 @@ InnerΦFit {Γ = Γ} {e = e} {s = s} sf id now B U op allNid inst path vals fin 
                 * (G + nestU (Caps.cSize (frameStep j c))
                          (nestUnit e (Sched.slots sched)))
               + pathΦD B path) ≤ U)
+
+-- AND THE TWO REGISTRY READINGS THE DESCENT UNDER THIS FRAME SPENDS,
+-- carried for the reason the cell's own reading inside the body is:
+-- neither follows from a caps receipt, which a caps-legal state the
+-- evaluator never built already refutes.  They stand OUTSIDE the
+-- existential rather than beside their sibling inside it, so a producer
+-- holding them at the chain hands them straight over and nothing
+-- between the walk and the descent has to carry them.
+InnerΦFit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (sf : Gas) (id : Id) (now : Tick) (B U : ℕ)
+  (op : AllOp) (allNid inst : NodeId) (path : Path Γ s t)
+  (vals : List (Val Γ s)) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) → Set
+InnerΦFit sf id now B U op allNid inst path vals fin sched st =
+  (pathOrd? (Sched.nextNode sched) (thru-outer op allNid ↠ path) ≡ true)
+  × (pathPark? path st ≡ true)
+  × InnerΦBody sf id now B U op allNid inst path vals fin sched st
 
 FrameΦHyp : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   (sf : Gas) (id : Id) (now : Tick) (B U : ℕ)
@@ -567,7 +578,7 @@ innerΦ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
                       fin sched st))
     ≡ true
 innerΦ {e = e} sf id now op allNid inst path vals fin sched st B U
-       (c , d , W , Lv , G , face , hdr , hw , hdp , hpk , hpl , stP , stQ , stR , stK , hst , hnum) =
+       (stR , stK , c , d , W , Lv , G , face , hdr , hw , hdp , hpk , hpl , stP , stQ , hst , hnum) =
   Φ-of-bound B U (nestFac S′ W * (G + nestU S′ (nestUnit e (Sched.slots sched))))
     path (proj₁ r) bound (hnum j (proj₁ (proj₂ INNER)))
   where

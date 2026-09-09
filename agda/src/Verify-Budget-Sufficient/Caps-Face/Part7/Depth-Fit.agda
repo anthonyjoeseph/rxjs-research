@@ -44,7 +44,7 @@ open import Verify-Budget-Sufficient.Deliveries using
 open import Verify-Budget-Sufficient.Walk-Factor using
   (pathΦF; pathΦF-cap; pathΦD; pathRoots; pathΦF-cap-root; pathΦD-cap-root; sinkAbove?)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk using
-  (foldPath-nest-regs; PathΦHyp; DispatchΦHyp; ShareGoΦHyp; FrameΦHyp; valsΦ?; valsΦ?-mono;
+  (foldPath-nest-regs; PathΦHyp; DispatchΦHyp; ShareGoΦHyp; FrameΦHyp; InnerΦBody; valsΦ?; valsΦ?-mono;
   stepFrame-nest-Φ; Φ-to-bound)
 open import Verify-Budget-Sufficient.Nodes-Nest-Walk using (foldPath-nest-nodes)
 open import Verify-Budget-Sufficient.Nest-Ceiling using
@@ -79,7 +79,9 @@ open import Verify-Budget-Sufficient.Caps-Face.Part1 using
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
   (capsOK?-count; capsOK?-regs; chainsStrat?-one; pathPark-delivered; pathsPark-delivered;
   registry-entStrat; slotsCaps?-capsAt; valsCaps?; valsCaps?-lvl; foldPath-slots;
-  shareAdmit-caps)
+  shareAdmit-caps; capsOK?-regOrd; capsOK?-regPark)
+open import Verify-Budget-Sufficient.Psi-Split using
+  (chP?-∧)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves using
   (cascade-admit-park; chainStep-park; chainsOf-strat;
    cascade-admit-ord; chainStep-ord)
@@ -965,8 +967,8 @@ innerΦ-quiet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
          (from-inner op allNid inst ↠ p) vals ≡ true →
   pathStrat? p ≡ true →
   parkStrat? (pathFloor p) (lookupNode allNid (EvalSt.nodes st)) ≡ true →
-  FrameΦHyp sf eid now (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
-            (from-inner op allNid inst) p vals fin sched st
+  InnerΦBody sf eid now (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
+             op allNid inst p vals fin sched st
 innerΦ-quiet sl id sf eid now op allNid inst p vals fin sched st ¬m hsl hpz hnd hΦ stP stQ
   with innerΦ-fit-quiet sl id sf eid now op allNid inst p vals fin sched st
          hsl hpz hnd hΦ
@@ -995,8 +997,8 @@ innerΦ-drain : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   depthReact sf op allNid inst p eid now vals sched st fin ≤ capsH e sl id →
   pathStrat? p ≡ true →
   parkStrat? (pathFloor p) (lookupNode allNid (EvalSt.nodes st)) ≡ true →
-  FrameΦHyp sf eid now (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
-            (from-inner op allNid inst) p vals fin sched st
+  InnerΦBody sf eid now (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
+             op allNid inst p vals fin sched st
 innerΦ-drain sl id sf eid now Lv op allNid inst p vals fin sched st lim act q od
              eqn hsl hpz hnd hΦ hfd hdep stP stQ
   with innerΦ-fit-drain sl id sf eid now Lv op allNid inst p vals fin sched st
@@ -1040,8 +1042,8 @@ innerΦ-fit-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   depthReact sf op allNid inst p eid now vals sched st fin ≤ capsH e sl id →
   pathStrat? p ≡ true →
   parkStrat? (pathFloor p) (lookupNode allNid (EvalSt.nodes st)) ≡ true →
-  FrameΦHyp sf eid now (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
-            (from-inner op allNid inst) p vals fin sched st
+  InnerΦBody sf eid now (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
+             op allNid inst p vals fin sched st
 innerΦ-fit-go sl id sf eid now Lv op allNid inst p vals fin sched st
               nothing eqn hsl hpz hnd hΦ hfd hdep stP stQ =
   innerΦ-quiet sl id sf eid now op allNid inst p vals fin sched st
@@ -1087,9 +1089,17 @@ innerΦ-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   depthReact sf op allNid inst p eid now vals sched st fin ≤ capsH e sl id →
   pathStrat? p ≡ true →
   parkStrat? (pathFloor p) (lookupNode allNid (EvalSt.nodes st)) ≡ true →
+  -- AND THE TWO REGISTRY READINGS, WHICH THIS FIT ONLY FORWARDS.  They
+  -- sit outside the fit's existential precisely so that nothing between
+  -- the walk that holds them and the descent that spends them has to
+  -- carry them, so the assembly here is a pairing.
+  pathOrd? (Sched.nextNode sched) (thru-outer op allNid ↠ p) ≡ true →
+  pathPark? p st ≡ true →
   FrameΦHyp sf eid now (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
             (from-inner op allNid inst) p vals fin sched st
-innerΦ-fit sl id sf eid now Lv op allNid inst p vals fin sched st hsl hpz hnd hΦ hfd hdep stP stQ =
+innerΦ-fit sl id sf eid now Lv op allNid inst p vals fin sched st
+           hsl hpz hnd hΦ hfd hdep stP stQ stR stK =
+  stR , stK ,
   innerΦ-fit-go sl id sf eid now Lv op allNid inst p vals fin sched st
     (lookupNode allNid (EvalSt.nodes st)) refl hsl hpz hnd hΦ hfd hdep stP stQ
 
@@ -2585,6 +2595,14 @@ caps-go siC ifc {e = e} sl id a nextId sched st slEq pre nok bnd val closV strC 
            -- payload half is `strC` in the list shape the walk reads
            (chainsOf-strat a st (registry-entStrat c sched st pre))
            (chainsStrat?-one (arrVal a) (chainsOf a st) strC)
+           -- and the chain's two entry readings, both filters of the
+           -- registry's own.  The order half is state-blind, so the
+           -- latch does not move it; the park half is taken AT the
+           -- latched state, which is the state the walk enters
+           (chP?-∧ (λ {u} κ → pathOrd? (Sched.nextNode sched) κ)
+                   (λ {u} κ → pathPark? κ st₀) (chainsOf a st)
+              (cascade-admit-ord a sched st (capsOK?-regOrd c sched st pre))
+              (cascade-admit-park a st (capsOK?-regPark c sched st pre)))
   GOr   = cascadeGo a nextId (chainsOf a st) sched st₀
   j     = proj₁ GO
   jFits = proj₁ (proj₂ GO)

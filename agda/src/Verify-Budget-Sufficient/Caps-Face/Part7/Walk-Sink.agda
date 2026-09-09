@@ -70,7 +70,8 @@ open import Verify-Budget-Sufficient.Caps-Face.Part1 using
 open import Verify-Budget-Sufficient.Caps-Face.Part5 using
   (clos-lift; valsCaps?-parts)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
-  (foldPath-slots; capsOK?-count; capsOK?-delivered; capsOK?-parts; capsOK?-regs; frameBud;
+  (foldPath-slots; capsOK?-count; capsOK?-delivered; capsOK?-parts; capsOK?-regOrd;
+  capsOK?-regPark; capsOK?-regs; frameBud;
   pathPark-delivered; pathsPark-delivered; registry-entStrat; shareLatch-caps;
   slotsCaps?-capsAt; valsCaps?-lvl; valsStrat?)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
@@ -286,12 +287,16 @@ sink-ring-adv : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   -- the level, so what the turn leaves is what it was entered with
   pathStrat? p ≡ true →
   valsStrat? (pathFloor p) vals ≡ true →
+  -- and the same pair the turn's fold prices its ledger by, carried
+  -- past the turn for the reason the two above are
+  pathOrd? (Sched.nextNode sched) p ≡ true →
+  pathPark? p st ≡ true →
   Σ ℕ λ L′ →
     RingState {t = t} sl id i vals gas (Lv + L′) J g (suc k)
       (proj₁ (ringFold sf gas nid now i vals fin rid p sched st))
       (proj₂ (ringFold sf gas nid now i vals fin rid p sched st))
 sink-ring-adv {n = n} {e = e} sl id sf gas nid now i vals fin rid p Lv J g k sched st
-  (sleq , cok , hvc , hcl , hfl , hR , hLv) hpz hi hdf hps hvs =
+  (sleq , cok , hvc , hcl , hfl , hR , hLv) hpz hi hdf hps hvs hord hpk =
     L′
   , ( trans (foldPath-slots sf gas nid now (Fin.toℕ i) p vals EVS fin sched st′) sleq
     , proj₂ (proj₂ ST)
@@ -310,14 +315,14 @@ sink-ring-adv {n = n} {e = e} sl id sf gas nid now i vals fin rid p Lv J g k sch
   hgas = proj₂ (proj₂ (floor-parts (4 + (sizeᵉ e + slotsSize sl)) n gas g hfl))
   cok′ = capsOK?-delivered (frameStep Lv c) rid sched st cok
   ST   = sink-step-caps sl id sf gas nid now i vals fin rid p Lv sched st
-           sleq cok′ hpz hvc hps hvs hdf
+           sleq cok′ hpz hvc hps hvs hord hpk hdf
   L′   = proj₁ ST
   D    = delivN st′ (proj₂ (ringFold sf gas nid now i vals fin rid p sched st))
   STEP : lvls (Caps.cSize c) (Caps.cWid c) d Lv (suc D) ≤ Ent c d J g (suc k)
   STEP = ≤-trans (lvls-mono (suc D) (suc D) 2≤S ≤-refl ≤-refl hLv ≤-refl)
                  (ent-step c d J g k D 2≤S
                     (sink-deliv-cap sl id sf gas nid now i vals fin rid p Lv J g k sched st
-                       sleq hgas cok′ hpz hvc hps hvs hdf hLv))
+                       sleq hgas cok′ hpz hvc hps hvs hord hpk hdf hLv))
 
 chain-walk-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
@@ -463,6 +468,7 @@ sink-ring-go {n = n} {e = e} sl id sf gas nid now i vals fin ((rid , p) ∷ ps) 
   ADV = sink-ring-adv sl id sf gas nid now i vals fin rid p Lv J g k sched st
           RS hpzL HI (lub3-m DA DB DC hdp) (proj₁ hentH)
           (sink-entry-vals i vals p (proj₂ hentH) hib)
+          (∧-trueˡ hord) (∧-trueˡ hpk)
   L′  = proj₁ ADV
   RS₁ = proj₂ ADV
 
@@ -518,8 +524,10 @@ walk-sink-caps {n = n} {Γ = Γ} {t = t} {e = e} sl id L sf (suc gas) nid now sr
          (capsOK?-regs (frameStep L c) sched st cok))
       (sink-admit-entry (frameStep L c) i sched st cok)
       hib
-      (shareAdmit-park i fin st)
-      (shareAdmit-ord i sched st)
+      (shareAdmit-park i fin st
+         (capsOK?-regPark (frameStep L c) sched st cok))
+      (shareAdmit-ord i sched st
+         (capsOK?-regOrd (frameStep L c) sched st cok))
       ≤-refl
       hlen₀
       hdp
@@ -923,7 +931,7 @@ walk-hyps-step {e = e} sl id L sf gas nid now src f p vals evs fin sched st
           pz1 pz2 (≤ᵇ⇒≤ (suc (pathLen p)) B (T-to pzl))
           hvc ≤-refl
           (≤-trans (m≤m⊔n (depthFrame sf nid now f p vals fin sched st) _) hdp)
-          hstf hstp hib hpkf
+          hstf hstp hib hpkf hord hpkp
   Lt  = fLvlD S W d L
   STs≤t : suc (L + proj₁ ST) ≤ Lt
   STs≤t = proj₂ (proj₂ (proj₂ (proj₂ ST)))
@@ -1345,6 +1353,7 @@ sink-ring-burst-go {e = e} sl id sf gas nid now i vals fin ((rid , p) ∷ ps) L�
   ADV = sink-ring-adv sl id sf gas nid now i vals fin rid p Lv J g k sched st
           RS hpzL HI (lub3-m DA DB DC hdp) (proj₁ hentH)
           (sink-entry-vals i vals p (proj₂ hentH) hib)
+          (∧-trueˡ hord) (∧-trueˡ hpk)
   L′  = proj₁ ADV
   RS₁ = proj₂ ADV
 
@@ -1386,8 +1395,10 @@ walk-sink-burst {n = n} {Γ = Γ} {t = t} {e = e} sl id L sf (suc gas) nid now s
        (capsOK?-regs (frameStep L c) sched st cok))
     (sink-admit-entry (frameStep L c) i sched st cok)
     hib
-    (shareAdmit-park i fin st)
-    (shareAdmit-ord i sched st)
+    (shareAdmit-park i fin st
+       (capsOK?-regPark (frameStep L c) sched st cok))
+    (shareAdmit-ord i sched st
+       (capsOK?-regOrd (frameStep L c) sched st cok))
     ≤-refl
     hlen₀
     hdp

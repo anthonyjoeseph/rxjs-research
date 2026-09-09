@@ -7,7 +7,7 @@ open import Data.Fin     using (Fin; toℕ)
 open import Data.List    using (List; map; [])
 open import Data.Bool.ListAction using (all)
 open import Data.Maybe   using (Maybe; just; nothing)
-open import Data.Nat     using (ℕ; suc; _≤_; _≤ᵇ_; _⊔_)
+open import Data.Nat     using (ℕ; suc; _≤_; _≤ᵇ_)
 open import Data.Nat.Properties using (≤-refl; ≤-trans; ≤ᵇ⇒≤; m≤m⊔n; m≤n⊔m; n≤1+n)
 open import Data.Unit    using (⊤; tt)
 open import Data.Vec     using (lookup)
@@ -20,25 +20,20 @@ open import Rx.Exp       using
   (Ctx; Closed; Val; Fn; Tm; _×ᵗ_; obs; applyFn; evalTm; _≟ᵗ_; inputsBelowᵉ;
    inputsBelowᵗ; inputsBelowᵛ)
 open import Rx.Evaluator using
-  (Frame; Path; Sched; EvalSt; RegId; _↠_; root; share-sink;
-   stepFrame; subscribeE;
-   foldPath; shareAdmit; shareLatch; NodeId; NodeState; AllOp; scanVals; lookupNode;
-   thruConsume; mergeAllDrain; subscribeInner;
-   installNode;
-   scan-st; take-st; mergeAll-st; switch-st; exhaust-st;
-   map-f; scan-f; take-f; from-inner; thru-outer;
-   Arrival; arrTy; chainsOf; chainStep; cascadeLatch)
+  (Frame; Path; Sched; EvalSt; RegId; _↠_; root; share-sink; stepFrame; subscribeE; foldPath;
+  shareAdmit; shareLatch; NodeId; NodeState; AllOp; lookupNode; thruConsume; mergeAllDrain;
+  subscribeInner; installNode; scan-st; take-st; mergeAll-st; switch-st; exhaust-st; map-f;
+  scan-f; take-f; from-inner; thru-outer; Arrival; arrTy; chainsOf; chainStep; cascadeLatch)
 open import Verify-Budget-Sufficient.Caps using (Caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
-  (burstStrat?; capsOK?; framePark?; frameAbove?; frameRead; frameStrat?;
-   parkStrat?; pathCell; pathFloor; pathOrd?; pathOrd?-mono; pathOrd?-read;
-   pathPark?; pathOrd?-cell; pathRead;
-   pathStrat?; regOrd?; regPark?; regPark?-nodes; regStrat?)
+  (burstStrat?; capsOK?; framePark?; frameAbove?; frameRead; frameStrat?; parkStrat?; pathCell;
+  pathFloor; pathOrd?; pathOrd?-mono; pathOrd?-read; pathPark?; pathRead; pathStrat?; regOrd?;
+  regPark?; regPark?-nodes; regStrat?)
 open import Verify-Budget-Sufficient.Delivery-Walk using
   (chainsGo-chQ; shareAdmit-chQ)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using (valsStrat?)
 open import Verify-Budget-Sufficient.Caps-Face.Part5 using (scanVals-strat)
-open import Decide using (∧-intro; ∧-trueˡ; ∧-trueʳ; ≤ᵇ-widen; T-to)
+open import Decide using (∧-intro; ∧-trueˡ; ∧-trueʳ; T-to)
 open import Verify-Budget-Sufficient.Node-Fresh using
   (FreshC; frameAbove; frozen-setNode; stepFrame-fresh; subscribeE-fresh;
    subscribeE-nodes-below)

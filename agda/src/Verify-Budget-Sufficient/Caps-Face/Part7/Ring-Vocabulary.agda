@@ -50,7 +50,8 @@ open import Verify-Budget-Sufficient.Measures using
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (capsOK?; pathFloor; pathOrd?; pathPark?; pathStrat?; pathSz?; regsSz?; regsSz?-widen; nestClosOK?ᵛ)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
-  (capsOK?-regs; pathSz?-len; registry-entStrat; slotsCaps?-capsAt; valsCaps?; valsStrat?)
+  (capsOK?-regs; pathPark-delivered; pathSz?-len; registry-entStrat;
+  slotsCaps?-capsAt; valsCaps?; valsStrat?)
 open import Verify-Budget-Sufficient.Psi-Split using
   (regP?-∧; regStrat?-paths)
 open import Decide using (∧-intro)
@@ -384,6 +385,12 @@ sink-step-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   -- why they ride through every widening untouched
   pathStrat? p ≡ true →
   valsStrat? (pathFloor p) vals ≡ true →
+  -- AND THE CHAIN'S TWO ENTRY READINGS, at the state the caller holds:
+  -- the walk prices its ledger by them and the delivery mark is the one
+  -- write between here and there, so the park half is transported and
+  -- the order half rides through untouched
+  pathOrd? (Sched.nextNode sched) p ≡ true →
+  pathPark? p st ≡ true →
   depthFold sf gas nid now (Fin.toℕ i) p vals
     (if fin then close (Fin.toℕ i) exhausted ∷ [] else []) fin sched
     (record st { delivered = rid ∷ EvalSt.delivered st }) ≤ capsH e sl id →
@@ -396,7 +403,7 @@ sink-step-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
          (proj₁ (ringFold sf gas nid now i vals fin rid p sched st))
          (proj₂ (ringFold sf gas nid now i vals fin rid p sched st)) ≡ true)
 sink-step-caps {e = e} sl id sf gas nid now i vals fin rid p Lv sched st
-               sleq cok hpz hvc hps hvs hdp =
+               sleq cok hpz hvc hps hvs hord hpk hdp =
     W.Res.lvl FP ∸ Lv
   , subst (_≤ CEIL) (sym EQ) (≤-trans (W.Res.hi FP) STEP)
   , subst (λ x → capsOK? (frameStep x c)
@@ -430,6 +437,7 @@ sink-step-caps {e = e} sl id sf gas nid now i vals fin rid p Lv sched st
          ((sleq , cok) , regʲ)
          (∧-intro hpz hps) (∧-intro hvc hvs)
          (W.eb-seed Lv (Fin.toℕ i) fin) tt tt hdp
+         (∧-intro hord (pathPark-delivered p rid st hpk))
   EQ : Lv + (W.Res.lvl FP ∸ Lv) ≡ W.Res.lvl FP
   EQ = m+[n∸m]≡n (W.Res.lo FP)
   D = delivN st′ (proj₂ (ringFold sf gas nid now i vals fin rid p sched st))
@@ -461,6 +469,12 @@ sink-deliv-cap : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   valsCaps? (frameStep Lv (capsAt e sl id)) sl vals ≡ true →
   pathStrat? p ≡ true →
   valsStrat? (pathFloor p) vals ≡ true →
+  -- AND THE CHAIN'S TWO ENTRY READINGS, at the state the caller holds:
+  -- the walk prices its ledger by them and the delivery mark is the one
+  -- write between here and there, so the park half is transported and
+  -- the order half rides through untouched
+  pathOrd? (Sched.nextNode sched) p ≡ true →
+  pathPark? p st ≡ true →
   depthFold sf gas nid now (Fin.toℕ i) p vals
     (if fin then close (Fin.toℕ i) exhausted ∷ [] else []) fin sched
     (record st { delivered = rid ∷ EvalSt.delivered st }) ≤ capsH e sl id →
@@ -471,7 +485,7 @@ sink-deliv-cap : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
             (Caps.cReg (capsAt e sl id)) (capsH e sl id) g
             (Pos (capsAt e sl id) (capsH e sl id) J g k)
 sink-deliv-cap {e = e} sl id sf gas nid now i vals fin rid p Lv J g k sched st
-  sleq hgas cok hpz hvc hps hvs hdp hLv =
+  sleq hgas cok hpz hvc hps hvs hord hpk hdp hLv =
   ≤-trans (W.Res.cnt FP)
           (dCapᶜ-mono {S} {S} {Wd} {Wd} {R} {R} {_} {_} {d} gas g
              2≤S ≤-refl ≤-refl ≤-refl hgas CLIMB)
@@ -499,6 +513,7 @@ sink-deliv-cap {e = e} sl id sf gas nid now i vals fin rid p Lv J g k sched st
          ((sleq , cok) , regʲ)
          (∧-intro hpz hps) (∧-intro hvc hvs)
          (W.eb-seed Lv (Fin.toℕ i) fin) tt tt hdp
+         (∧-intro hord (pathPark-delivered p rid st hpk))
   CLIMB : iterL S Wd d (pathLen p) Lv ≤ Pos c d J g k
   CLIMB = ≤-trans (iterL-mono (pathLen p) _ 2≤S ≤-refl ≤-refl ≤-refl
                      (≤-trans (pathSz?-len (Caps.cSize (frameStep Lv c)) p hpz)

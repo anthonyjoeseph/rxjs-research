@@ -160,14 +160,12 @@ open import Verify-Budget-Sufficient.Node-Fresh using (FreshC; thruConsume-fresh
 -- ordering reading survive one emit of a burst
 open import Verify-Budget-Sufficient.Delivery-Counter using (stepFrame-nextNode)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves using
-  (framePark-step; subscribeE-burstStrat; stepFrame-valsStrat; pathPark-step;
-   shareAdmit-strat; shareAdmit-park; foldPath-park; evalTm-strat;
-   installNode-scanPark; subscribeE-framePark;
-   pathOrd-step; foldPath-ord; shareAdmit-ord;
-   installNode-pathPark; installNode-thruPark; fresh-pathPark; fresh-ord;
-   subscribeE-pathPark; subscribeE-ord; thruConsume-cellPark;
-   mergeAllDrain-ownerQueue; installNode-cellPark;
-   subscribeInner-ord; subscribeInner-pathPark; subscribeInner-cellPark)
+  (framePark-step; subscribeE-burstStrat; stepFrame-valsStrat; pathPark-step; shareAdmit-strat;
+  shareAdmit-park; foldPath-park; evalTm-strat; installNode-scanPark; subscribeE-framePark;
+  pathOrd-step; foldPath-ord; shareAdmit-ord; installNode-pathPark; installNode-thruPark;
+  fresh-pathPark; subscribeE-pathPark; subscribeE-ord; thruConsume-cellPark;
+  mergeAllDrain-ownerQueue; installNode-cellPark; subscribeInner-ord; subscribeInner-pathPark;
+  subscribeInner-cellPark)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (2≤frameStep-size; burstCaps?-++; burstCaps?-widen; closeList-caps;
    eventsCaps?-widen; finList-caps; frameStep-+assoc-burst;

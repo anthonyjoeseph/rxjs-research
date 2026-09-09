@@ -16,7 +16,7 @@
 -- cover, which is the one shape the park reading exists to reject.
 module Refuted.Frame-Park-From-Caps where
 
-open import Data.Bool using (Bool; true; false)
+open import Data.Bool using (true; false)
 open import Data.Empty using (⊥)
 open import Data.Fin using (Fin) renaming (zero to fzero; suc to fsuc)
 open import Data.List using ([]; _∷_)

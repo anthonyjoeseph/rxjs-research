@@ -44,7 +44,7 @@ open import Rx.Slots using (Slots; slotsSize)
 open import Verify-Budget-Sufficient.Delivery-Walk using
   (module Walk; chainsGo-chQ)
 open import Verify-Budget-Sufficient.Psi-Split using
-  (regP?-∧; regStrat?-paths)
+  (regP?-∧; regStrat?-paths; chP?-∧)
 open import Verify-Budget-Sufficient.Deliveries using
   (delivN; delivN-cons; delivN-split; chainStep-deliv; cascadeGo-deliv; ⊑ᵈ-trans)
 open import Verify-Budget-Sufficient.Caps using
@@ -66,7 +66,8 @@ open import Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves using
    cascade-admit-ord; chainStep-ord)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
   (capsOK?-count; capsOK?-regs; chainsStrat?-one; pathPark-delivered; pathsPark-delivered;
-  pathSz?-len; registry-entStrat; slotsCaps?-capsAt; valsCaps?; valsCaps?-lvl; foldPath-slots)
+  pathSz?-len; registry-entStrat; slotsCaps?-capsAt; valsCaps?; valsCaps?-lvl; foldPath-slots;
+  capsOK?-regOrd; capsOK?-regPark)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (valCaps?-widen)
 open import Decide using (∧-intro; ∧-trueʳ; T-to)
@@ -692,6 +693,14 @@ arr-chains-ledgers {e = e} sl id a nextId sched st sleq cok hpz hvc hcl hsv hdp 
           -- the payload half `hsv` in the list shape the walk reads
           (chainsOf-strat a st (registry-entStrat c sched st cok))
           (chainsStrat?-one (arrVal a) (chainsOf a st) hsv)
+          -- and the chain's two entry readings, both filters of the
+          -- registry's own.  The order half is state-blind, so the latch
+          -- does not move it; the park half is taken AT the latched
+          -- state, which is the state this fold enters
+          (chP?-∧ (λ {u} κ → pathOrd? (Sched.nextNode sched) κ)
+                  (λ {u} κ → pathPark? κ (cascadeLatch a st)) (chainsOf a st)
+             (cascade-admit-ord a sched st (capsOK?-regOrd c sched st cok))
+             (cascade-admit-park a st (capsOK?-regPark c sched st cok)))
   ENTRY = ≤-trans (lvls-mono (delivN (cascadeLatch a st)
                                 (proj₂ (proj₂ (cascadeGo a nextId (chainsOf a st) sched
                                                  (cascadeLatch a st)))))
