@@ -154,7 +154,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part1 using
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves using
   (framePark-step; subscribeE-burstStrat; stepFrame-valsStrat; pathPark-step;
    shareAdmit-strat; shareAdmit-park; foldPath-park; evalTm-strat;
-   installNode-scanPark; subscribeE-framePark)
+   installNode-scanPark; subscribeE-framePark; step-chain-below)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (2≤frameStep-size; burstCaps?-++; burstCaps?-widen; closeList-caps;
    eventsCaps?-widen; finList-caps; frameStep-+assoc-burst;
@@ -3543,8 +3543,12 @@ foldPath-caps c dep bud j sf gas id now envSrc (f ↠ p) vals evs fin sl sched s
            -- receipt reports a reading for, so both come off a leaf
            (stepFrame-valsStrat sf id now f p vals fin sched st
               (proj₁ stP1) stV)
-           (pathPark-step sf id now f p vals fin sched st
-              (proj₂ stP1) stV (proj₂ stK1))
+           (pathPark-step (proj₁ (step-chain-below f p sched))
+              sf id now f p vals fin sched st
+              (proj₁ (proj₂ (step-chain-below f p sched)))
+              (proj₁ (proj₂ (proj₂ (step-chain-below f p sched))))
+              (proj₂ (proj₂ (proj₂ (step-chain-below f p sched))))
+              (proj₂ stK1))
   j₂   = proj₁ IH
   REST = foldPath sf gas id now envSrc p (proj₁ step) (evs ++ proj₁ (proj₂ step))
            (proj₁ (proj₂ (proj₂ step))) sd₁ st₁

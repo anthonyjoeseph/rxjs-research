@@ -79,7 +79,7 @@ open import Decide using (T-to; T⇒≡true; ∧-intro; ∧-trueˡ; ∧-trueʳ; 
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Root-Strat using
   (pathStrat-top)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves using
-  (foldPath-park; pathPark-step; shareAdmit-park;
+  (foldPath-park; pathPark-step; shareAdmit-park; step-chain-below;
    map-strat-step; scan-strat-step; take-strat-step;
    inner-strat-step; thru-strat-step)
 open import Verify-Budget-Sufficient.Delivery-Walk using
@@ -868,13 +868,17 @@ walk-hyps-step {e = e} sl id L sf gas nid now src f p vals evs fin sched st
   , walk-strat-step (frameStep L c) sl (pathFloor p) sf nid now f p vals fin sched st
       cok hstf hpkf hib
   , hstp
-  -- the parked reading is the one conjunct the step does not TRANSPORT:
-  -- a hop can subscribe out of a flatten node's queue, so what survives
-  -- is re-established at the stepped state rather than carried
-  , pathPark-step sf nid now f p vals fin sched st hstp hib hpkp
+  -- the parked reading IS transported now, and what the step buys it
+  -- with is disjointness: the freeze the ring leaves behind covers every
+  -- cell below the head's own, so the only thing the walk still has to
+  -- be handed is that its chain is ordered that way
+  , pathPark-step (proj₁ SCB) sf nid now f p vals fin sched st
+      (proj₁ (proj₂ SCB)) (proj₁ (proj₂ (proj₂ SCB)))
+      (proj₂ (proj₂ (proj₂ SCB))) hpkp
   , (g , P , hfl , hlvP , hR)
   where
   c   = capsAt e sl id
+  SCB = step-chain-below f p sched
   hstf : frameStrat? (pathFloor p) f ≡ true
   hstf = proj₁ (∧-true (frameStrat? (pathFloor p) f) (pathStrat? p) hst)
   hstp : pathStrat? p ≡ true

@@ -10,7 +10,7 @@ open import Data.Maybe   using (just; nothing)
 open import Data.Nat     using (ℕ; suc; _≤_)
 open import Data.Unit    using (⊤)
 open import Data.Vec     using (lookup)
-open import Data.Product using (_×_; proj₁; proj₂)
+open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; cong)
 open import Relation.Nullary using (yes; no)
 
@@ -19,7 +19,8 @@ open import Rx.Exp       using
   (Ctx; Closed; Val; Fn; Tm; _×ᵗ_; obs; applyFn; evalTm; _≟ᵗ_; inputsBelowᵉ;
    inputsBelowᵗ; inputsBelowᵛ)
 open import Rx.Evaluator using
-  (Frame; Path; Sched; EvalSt; RegId; _↠_; stepFrame; subscribeE;
+  (Frame; Path; Sched; EvalSt; RegId; _↠_; root; share-sink;
+   stepFrame; subscribeE;
    foldPath; shareAdmit; shareLatch; NodeId; AllOp; scanVals; lookupNode;
    installNode;
    scan-st; take-st; mergeAll-st; switch-st; exhaust-st;
@@ -30,7 +31,9 @@ open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (burstStrat?; capsOK?; framePark?; frameStrat?; parkStrat?; pathFloor;
    pathPark?; pathStrat?; regStrat?)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using (valsStrat?)
-open import Verify-Budget-Sufficient.Node-Fresh using (subscribeE-nodes-below)
+open import Decide using (∧-intro; ∧-trueˡ; ∧-trueʳ)
+open import Verify-Budget-Sufficient.Node-Fresh using
+  (FreshC; frameAbove; stepFrame-fresh; subscribeE-nodes-below)
 open import Verify-Budget-Sufficient.Node-Table using (lookupNode-setNode)
 
 -- THE TWO FACTS THE STRATIFICATION THREAD CANNOT GET BY REDUCTION, and
@@ -57,6 +60,29 @@ open import Verify-Budget-Sufficient.Node-Table using (lookupNode-setNode)
 -- which the statement is FALSE and not merely unproven.  That is the
 -- one sanctioned justification for a premise: the conditioned form
 -- REPLACES a false statement rather than weakening a true one.
+-- WHICH CELLS THE PARK READING WILL ASK ABOUT, as a bound on their ids.
+-- Only two frame shapes name a node, so this is the exact DUAL of the
+-- freshness ring's own frame predicate: that one says which cell a
+-- frame WRITES and asks it to sit at or above a watermark, this says
+-- which cell a frame READS and asks it to sit strictly below one.  The
+-- three silent shapes are free because the reading does not reach the
+-- store at them at all, which is the same economy that lets most call
+-- sites discharge the reading itself by `refl`.
+parkBelow : ∀ {n} {Γ : Ctx n} {s u} → ℕ → Frame Γ s u → Set
+parkBelow w (from-inner _ allNid _) = suc allNid ≤ w
+parkBelow w (scan-f _ nd)           = suc nd ≤ w
+parkBelow w _                       = ⊤
+
+-- THE SAME READING OVER A WHOLE CHAIN, as a bound on the cells the chain
+-- will ask about.  A path asks its frames one at a time and each frame
+-- asks about one cell, so the predicate is the frame-level one repeated
+-- -- and the two terminals are free because a chain that has reached the
+-- root or a sink has no frame left to read through.
+pathBelow : ∀ {n} {Γ : Ctx n} {u t} → ℕ → Path Γ u t → Set
+pathBelow w root           = ⊤
+pathBelow w (share-sink _) = ⊤
+pathBelow w (f ↠ p)        = parkBelow w f × pathBelow w p
+
 postulate
   framePark-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (g : Gas) (id : Id) (now : Tick)
@@ -111,41 +137,26 @@ postulate
     valsStrat? (pathFloor κ)
       (proj₁ (stepFrame g id now f κ vals fin sched st)) ≡ true
 
--- (4) THE CHAIN-KEYED PARK READING ACROSS ONE FRAME STEP, which is (1)
--- lifted off a single frame onto the tail the walk is about to enter.
--- It is a separate statement rather than a corollary because the tail's
--- frames are not the one that stepped: what has to survive is a reading
--- of nodes the step did not name.
+-- (4) THAT A WALKED CHAIN ADMITS A WATERMARK, which is the whole residue
+-- of the step-side park reading now that its transport is a body.  The
+-- witness is the head's own smallest node: a chain is built outward-in
+-- and every frame is minted before the descent that extends it, so the
+-- head is the YOUNGEST cell in the chain and everything the tail reads
+-- was minted earlier.  That is a fact about chains the evaluator BUILDS.
 --
--- AND WHAT IT OWES IS DISJOINTNESS, NOT ARITHMETIC -- which is why the
--- closure premise cannot close it the way it closes (1).  The step
--- writes the STEPPED frame's own node, so the tail's reading survives
--- exactly when that write does not ALIAS a node some tail frame names,
--- and no reading of the closure says anything about which node the tail
--- points at.  The frame half of the vocabulary for that is proven --
--- `frameAbove` in `Verify-Budget-Sufficient.Node-Fresh` already has an
--- arm at every node-naming shape, and `stepFrame-fresh` spends it --
--- and what is missing is only its lift onto a path.
---
--- DEAD ROUTE: transporting the tail's reading by the SUFFIX property
---   (1) rests on.  It held while a reinstall was the only reachable
---   write, and stopped holding when the park reading gained an arm at a
---   cell a step OVERWRITES: an `all` reading tolerates losing a prefix
---   and nothing tolerates a replacement.  The aliasing obligation was
---   always there -- a `from-inner` step can write a node the tail names
---   too -- so what the arm removed is the property that made this row
---   look tractable, not the property that made it true.
-  pathPark-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (g : Gas) (id : Id) (now : Tick)
-    (f : Frame Γ s u) (κ : Path Γ u t)
-    (vals : List (Val Γ s)) (fin : Bool)
-    (sched : Sched Γ) (st : EvalSt e) →
-    pathStrat? κ ≡ true →
-    valsStrat? (pathFloor κ) vals ≡ true →
-    pathPark? κ st ≡ true →
-    pathPark? κ
-      (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame g id now f κ vals fin sched st)))))
-        ≡ true
+-- AND IT IS NOT ONE THE TYPE CARRIES, which is why the row is FALSITY
+-- rather than hard: a `Frame` and a `Path` are independent arguments
+-- here, so the statement quantifies over pairs no descent ever produces
+-- -- a head naming a cell BELOW one its tail reads refutes it outright.
+-- The repair is not a hypothesis: it is a field on `WalkHyps`, which
+-- obliges every producer of a chain to supply the ordering and every
+-- consumer to re-establish it, where a premise would oblige only the one
+-- caller that happens to exist.  The scheduler's counter cannot stand in
+-- for the witness -- it bounds what the tail reads and sits ABOVE the
+-- head, which is the wrong side of the ring's own inequality.
+  step-chain-below : ∀ {n} {Γ : Ctx n} {s u t}
+    (f : Frame Γ s u) (κ : Path Γ u t) (sched : Sched Γ) →
+    Σ ℕ λ w → (w ≤ Sched.nextNode sched) × frameAbove w f × pathBelow w κ
 
 -- (5) WHAT A SHARE HANDS THE CHAINS IT ADMITTED.  This is the one place
 -- the registry reading is SPENT rather than established, and the two
@@ -384,18 +395,26 @@ installNode-scanPark k fn nid ac st hac =
   trans (cong (parkStrat? k)
            (lookupNode-setNode nid (scan-st ac) (EvalSt.nodes st))) hac
 
--- WHICH CELLS THE PARK READING WILL ASK ABOUT, as a bound on their ids.
--- Only two frame shapes name a node, so this is the exact DUAL of the
--- freshness ring's own frame predicate: that one says which cell a
--- frame WRITES and asks it to sit at or above a watermark, this says
--- which cell a frame READS and asks it to sit strictly below one.  The
--- three silent shapes are free because the reading does not reach the
--- store at them at all, which is the same economy that lets most call
--- sites discharge the reading itself by `refl`.
-parkBelow : ∀ {n} {Γ : Ctx n} {s u} → ℕ → Frame Γ s u → Set
-parkBelow w (from-inner _ allNid _) = suc allNid ≤ w
-parkBelow w (scan-f _ nd)           = suc nd ≤ w
-parkBelow w _                       = ⊤
+-- THE TRANSPORT ITSELF, KEYED ON THE FREEZE AND NOT ON WHAT CAUSED IT.
+-- A subscribe and a step reach this reading by different routes and
+-- leave the same fact behind -- everything strictly below a watermark
+-- reads back unchanged -- so the case split over the frame is written
+-- once and each caller supplies its own freeze.  The three silent shapes
+-- are free because the reading does not reach the store at them at all.
+frozen-framePark : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (k w : ℕ) (f : Frame Γ s u) (st st′ : EvalSt e) →
+  (∀ j → suc j ≤ w →
+     lookupNode j (EvalSt.nodes st′) ≡ lookupNode j (EvalSt.nodes st)) →
+  parkBelow w f →
+  framePark? k f st ≡ true →
+  framePark? k f st′ ≡ true
+frozen-framePark k w (map-f _)        st st′ hfz hb hp = hp
+frozen-framePark k w (take-f _)       st st′ hfz hb hp = hp
+frozen-framePark k w (thru-outer _ _) st st′ hfz hb hp = hp
+frozen-framePark k w (scan-f _ nd) st st′ hfz hb hp =
+  trans (cong (parkStrat? k) (hfz nd hb)) hp
+frozen-framePark k w (from-inner _ a _) st st′ hfz hb hp =
+  trans (cong (parkStrat? k) (hfz a hb)) hp
 
 -- WHAT A SUBSCRIBE DOES TO A CELL IT DOES NOT OWN, and this is the
 -- DISJOINTNESS half of the store question rather than a second
@@ -420,12 +439,59 @@ subscribeE-framePark : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u w}
   parkBelow (Sched.nextNode sched) f →
   framePark? k f st ≡ true →
   framePark? k f (proj₂ (proj₂ (subscribeE g b κ bid now sched st))) ≡ true
-subscribeE-framePark k g b κ bid now (map-f _)        sched st hb hp = hp
-subscribeE-framePark k g b κ bid now (take-f _)       sched st hb hp = hp
-subscribeE-framePark k g b κ bid now (thru-outer _ _) sched st hb hp = hp
-subscribeE-framePark k g b κ bid now (scan-f _ nd) sched st hb hp =
-  trans (cong (parkStrat? k)
-           (subscribeE-nodes-below g b κ bid now sched st nd hb)) hp
-subscribeE-framePark k g b κ bid now (from-inner _ a _) sched st hb hp =
-  trans (cong (parkStrat? k)
-           (subscribeE-nodes-below g b κ bid now sched st a hb)) hp
+subscribeE-framePark k g b κ bid now f sched st hb hp =
+  frozen-framePark k (Sched.nextNode sched) f st _
+    (subscribeE-nodes-below g b κ bid now sched st) hb hp
+
+-- AND THE CHAIN-LEVEL TRANSPORT, which is the frame one under an
+-- induction and nothing else.  `pathPark?` reads each frame at the floor
+-- of the chain BELOW it, and the freeze does not look at floors at all,
+-- so the recursion carries whatever floor the path names and no
+-- arithmetic enters.
+frozen-pathPark : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (w : ℕ) (κ : Path Γ u t) (st st′ : EvalSt e) →
+  (∀ j → suc j ≤ w →
+     lookupNode j (EvalSt.nodes st′) ≡ lookupNode j (EvalSt.nodes st)) →
+  pathBelow w κ →
+  pathPark? κ st ≡ true →
+  pathPark? κ st′ ≡ true
+frozen-pathPark w root           st st′ hfz hb hp = refl
+frozen-pathPark w (share-sink _) st st′ hfz hb hp = refl
+frozen-pathPark w (f ↠ p) st st′ hfz (hbf , hbp) hp =
+  ∧-intro (frozen-framePark (pathFloor p) w f st st′ hfz hbf (∧-trueˡ hp))
+          (frozen-pathPark w p st st′ hfz hbp (∧-trueʳ hp))
+
+-- (4) THE CHAIN-KEYED PARK READING ACROSS ONE FRAME STEP, and it is the
+-- subscribe's statement one construct up rather than a second mechanism.
+-- A step writes the STEPPED frame's own cell, so what the tail loses is
+-- exactly what it ALIASES -- and the ring already freezes everything
+-- strictly below a watermark the head sits at or above, so pinning the
+-- tail's read cells under that watermark is the whole of it.  The
+-- closure premises the free form carried are gone: they priced what the
+-- write CONTAINS, and the question was never about the contents.
+--
+-- THE WATERMARK IS THE HEAD'S SMALLEST NODE, not the scheduler's, which
+-- is why it is quantified rather than computed.  A `from-inner` head
+-- names two cells and only the *All's own is old enough to bound the
+-- tail, so a caller picks the witness its own chain supports and no
+-- minimum-of-ids function has to exist.
+--
+-- DEAD ROUTE: transporting the tail's reading by the SUFFIX property
+--   the frame-level statement rests on.  It held while a reinstall was
+--   the only reachable write, and stopped holding when the park reading
+--   gained an arm at a cell a step OVERWRITES: an `all` reading tolerates
+--   losing a prefix and nothing tolerates a replacement.
+pathPark-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (w : ℕ) (g : Gas) (id : Id) (now : Tick)
+  (f : Frame Γ s u) (κ : Path Γ u t)
+  (vals : List (Val Γ s)) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) →
+  w ≤ Sched.nextNode sched → frameAbove w f → pathBelow w κ →
+  pathPark? κ st ≡ true →
+  pathPark? κ
+    (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame g id now f κ vals fin sched st)))))
+      ≡ true
+pathPark-step w g id now f κ vals fin sched st hw hf hb hp =
+  frozen-pathPark w κ st _
+    (FreshC.frozen
+      (stepFrame-fresh w g id now f κ vals fin sched st hw hf)) hb hp

@@ -238,17 +238,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **LIFTING THE DISJOINTNESS ONTO A PATH, now that the frame-keyed half
-  is a body.** A frame reads ONE cell, so pinning that cell below the
-  scheduler's watermark lets the freshness ring transport the whole
-  reading by a `cong`. The STEP
-  side is that shape one level up: the ring freezes everything below a
-  watermark and a step writes only at or above it, so a path's reading
-  survives when every cell its frames READ sits below the cell the head
-  WRITES. The commit states that as a path predicate, proves the
-  transport by induction over the chain, and asks what makes a real
-  chain satisfy it — the head is minted LAST, which is a fact no
-  invariant carries yet.
+- **PUTTING THE CHAIN'S ORDER WHERE EVERY PRODUCER MUST SUPPLY IT, now
+  that the transport is a body.** The step-side lift landed: a chain's
+  reading survives any write at or above a watermark, by induction and
+  one freeze the ring already leaves behind. What that
+  body is HANDED is that the chain has such a watermark — true of a
+  built chain, since the head is minted last and every tail cell is
+  older, and a free leaf today only because a frame and a path are
+  independent arguments there. That is a missing INVARIANT, so it
+  belongs on `WalkHyps` and not in a signature, and the commit pays the
+  cascade: every producer establishes the order, every consumer spends
+  it, and the four park rows still open inherit it.
 
 - **WALKING AN ADMITTED CHAIN AT THE LEVEL IT WAS REGISTERED AT, the
   one door the pricing question leaves open.** Both ends are closed by
@@ -275,14 +275,14 @@ does not fit is a finding about the shared statement, not about the head.
 
 - **WHICH STORE CELLS DOES A PATH PREDICATE REACH?** Five rows fail in one
   place: the statement reads a PATH or a chain, and the quantity it must
-  bound is a cell in the STORE. Two thirds are answered. A path predicate
-  CAN see the store, and its coverage is extensible — the
-  accumulator was the first unannounced cell and it took an arm, at the
-  price of restating both step lemmas, so the pattern is known and priced.
-  What is open is the third part: whether a reading survives a write it does
-  not own. That is answered at a SUBSCRIBE — a frame reads one cell, so the
-  freshness ring transports it, and the unpinned form is refuted — and open
-  at a STEP, where the reading is spread over a whole chain.
+  bound is a cell in the STORE. A path predicate CAN see the store, and its
+  coverage is extensible — the accumulator was the first unannounced cell
+  and it took an arm, at the price of restating both step lemmas, so the
+  pattern is known and priced. Whether a reading survives a write it does
+  not own is now answered at BOTH doors: a subscribe and a step alike
+  transport it, given a watermark the head writes at or above and the tail
+  reads below. What is left is whether a WALKED chain has one — a question
+  about the invariant the walk carries, not the store.
   relevant: `step-frame-store≤`, `share-fold-store≤`, `subscribeE-sz-store-scan`, `pushBurst-sz-store-outer`, `subscribeSharedSlot-sz-store`
 
 - **IS THERE A COMPUTABLE SHADOW OF THE SEALED FACES?** Three rows say in
@@ -401,17 +401,17 @@ does not fit is a finding about the shared statement, not about the head.
   output the caps receipt prices but does not read; the floor does not move
   across a frame, which is what lets one statement cover the walk.
 - **`framePark-step`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the
-  frame-keyed park reading across one step, at a frame the push re-steps and
-  so cannot reduce. Two shapes write a cell it reads, and only one leaves a
-  suffix — the other overwrites, which is why the closure is a premise.
+  frame-keyed park reading across one step, at a frame the push re-steps and so
+  cannot reduce. Two shapes write a cell it reads, and only one leaves a suffix
+  — the other overwrites, which is why the closure is a premise.
 - **`frame-parkStrat`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the
   frame's queue read at the floor its tail is read at, off the caps invariant
   alone. That invariant prices a node's queue for size and for width and reads
   no floor, so the conjunct it would project out of is not there.
-- **`pathPark-step`** (Part7/Strat-Leaves) — FALSITY, `DEAD ROUTE`: that same
-  reading lifted onto the tail the walk is about to enter. What it owes is
-  DISJOINTNESS and not arithmetic — the step writes the stepped frame's cell,
-  and no closure reading says which node a tail frame names.
+- **`step-chain-below`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: that a
+  chain admits a watermark its head writes at or above and its tail reads only
+  below. True of a BUILT chain, since the head is minted last — but frame and
+  path are independent arguments here, so the repair is a `WalkHyps` field.
 - **`shareAdmit-park`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the park
   reading over the admitted chains at the LATCHED state the fan-out starts from
   — stated after the close, because that is where the fan reads the registry.
