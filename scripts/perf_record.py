@@ -41,6 +41,18 @@ that used to be fast and now cannot finish keeps its old row and reports the old
 figure, with nothing anywhere saying otherwise.  So a timeout updates `last` and
 sets a floor flag that renders it as `>Ns`, and it never touches `best`, which is
 still a real measurement of a run that really finished.
+
+WITH ONE HOLE, WHICH IS WHY THERE IS AN `unmeasured` FLAG.  "Never touches
+`best`" holds only where a `best` already exists.  A row whose FIRST observation
+is a floor has no measurement to protect, and `best` still has to hold a number
+-- so it held the floor, and the render then bolded it under a column this file
+documents as the one to trust.  That is the inversion described directly above,
+reintroduced by the mechanism written to end it, and in the reassuring direction
+on exactly the rows that earn a floor: the ones nobody has seen finish.  Such a
+row is flagged `unmeasured`, renders its best as an em dash, and sorts on its
+floor.  The first completed run clears the flag and REPLACES the stand-in rather
+than taking a minimum against it, since a minimum against a lower bound would
+preserve the same lie one run later.
 """
 
 from __future__ import annotations
@@ -139,7 +151,11 @@ def _render(data: dict) -> str:
         rows = sorted(
             ((KEY.match(k).group(2), r) for k, r in data.items()
              if KEY.match(k).group(1) == env),
-            key=lambda kv: -kv[1]["best"])
+            # An UNMEASURED row has no `best` to sort on -- the number there is
+            # a floor standing in for one -- so it sorts on that floor, which
+            # is the only thing about it that is a real observation.
+            key=lambda kv: -(kv[1]["last"] if kv[1].get("unmeasured")
+                             else kv[1]["best"]))
         if not rows:
             continue
         out += [f"### {detect_env.LABELS[env]}", "",
@@ -147,7 +163,8 @@ def _render(data: dict) -> str:
         for name, r in rows:
             last = (f">{r['last']:.0f} s" if r.get("floor")
                     else f"{r['last']:.1f} s")
-            out.append(f"| `{name}` | **{r['best']:.1f} s** | {last} | {r['runs']} |")
+            best = ("—" if r.get("unmeasured") else f"**{r['best']:.1f} s**")
+            out.append(f"| `{name}` | {best} | {last} | {r['runs']} |")
         out.append("")
     out += [f"<!-- AUTO:DATA {json.dumps(data, sort_keys=True)} -->", "", END]
     return "\n".join(out)
@@ -176,8 +193,14 @@ def record(target: str, seconds: float, floor: bool = False, env: str | None = N
         if floor:
             # No completed run to draw a `best` from, and a floor may not become
             # one: it would understate a module nobody has ever seen finish.
+            # `best` still has to hold SOMETHING, so it holds the floor and the
+            # row is flagged UNMEASURED, which is what stops the render bolding
+            # a lower bound as though it were the cost.  Without the flag this
+            # branch produced exactly the inversion the module header disclaims
+            # two paragraphs up -- the reassuring direction, on a row whose
+            # whole point is that nobody has seen the module finish.
             data[key] = {"best": round(seconds, 1), "last": round(seconds, 1),
-                        "runs": 1, "floor": True}
+                        "runs": 1, "floor": True, "unmeasured": True}
         else:
             data[key] = {"best": round(seconds, 1), "last": round(seconds, 1),
                         "runs": 1}
@@ -186,13 +209,24 @@ def record(target: str, seconds: float, floor: bool = False, env: str | None = N
         row["runs"] += 1
         prev_last, prev_best = row["last"], row["best"]
         prev_floor = row.get("floor", False)
+        prev_unmeasured = row.get("unmeasured", False)
         row["last"] = round(seconds, 1)
         if floor:
             row["floor"] = True
         else:
             row.pop("floor", None)
-            row["best"] = round(min(prev_best, seconds), 1)
-        changed = (row["best"] < prev_best) or (row.get("floor", False) != prev_floor) or (
+            if row.pop("unmeasured", False):
+                # THE FIRST COMPLETED RUN REPLACES THE STAND-IN, IT IS NOT
+                # MIN'D AGAINST IT.  `best` was holding a floor because no run
+                # had ever finished, and a floor is a LOWER BOUND -- so the min
+                # would keep the bound forever and, the moment the flag cleared,
+                # start bolding it as the module's cost.  That is the inversion
+                # this flag exists to prevent, arriving one run later.
+                row["best"] = round(seconds, 1)
+            else:
+                row["best"] = round(min(prev_best, seconds), 1)
+        changed = (row["best"] != prev_best) or (row.get("floor", False) != prev_floor) or (
+            row.get("unmeasured", False) != prev_unmeasured) or (
             prev_last > 0 and abs(seconds - prev_last) / prev_last > NOISE
         )
         # `runs` alone is not worth a rewrite; restore it if nothing else moved.

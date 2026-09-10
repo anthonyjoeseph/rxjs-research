@@ -136,7 +136,7 @@ reason to spend those minutes only to fail on something a textual pass already k
 | `roadmap-moved-selftest` | the movement checker still fires, in both directions — and that a trailing-whitespace edit does NOT count as movement | [docs/roadmap-check.md](docs/roadmap-check.md) |
 | `roadmap-order` | no GRINDABLE or DIFFICULTY row was DISCHARGED while its tier holds an open FALSITY or SHAPE row. A discharge is the one banking move — the name left the postulate ledger and is still declared in `agda/src` — so deleting, renaming, splitting, restating and reclassifying stay free, and a PREREQUISITE the risky statement names in its own header or type is exempt | [docs/roadmap-check.md](docs/roadmap-check.md) |
 | `roadmap-order-selftest` | the ordering checker still fires — and stays QUIET on the four shapes the proof must remain free to take, since a check that held a deletion or a reclassification would be worse than the failure it prevents | [docs/roadmap-check.md](docs/roadmap-check.md) |
-| `roadmap-moved` | PROOF-STATE has CHANGED against HEAD. A LEG IS ONE COMMIT, so a commit that leaves the roadmap byte-identical has either finished a leg without retiring it or abandoned one without saying so. The check is deliberately dumb — did the file change — because what it defends is not resolvable by a machine: the checker above verifies a row's NAME, and nothing can verify that the plan a leg describes is still the plan | [docs/roadmap-check.md](docs/roadmap-check.md) |
+| `roadmap-moved` | PROOF-STATE has CHANGED against **main**. A LEG IS ONE PR, so a branch that leaves the roadmap byte-identical has either finished a leg without retiring it or abandoned one without saying so — while a fix-up INSIDE the branch costs nothing, since the baseline is the merge-base and not the previous commit. On main itself the merge-base is HEAD, so it falls back to the previous commit and a direct landing is still held. The check is deliberately dumb — did the file change — because what it defends is not resolvable by a machine: the checker above verifies a row's NAME, and nothing can verify that the plan a leg describes is still the plan | [docs/roadmap-check.md](docs/roadmap-check.md) |
 | `comments-selftest` | every comment check still fires, and four precision properties still don't | [docs/comments-check.md](docs/comments-check.md) |
 | `comments-check` | no comment in `agda/src` or `agda/evidence` carries a date, a historical marker or a LINE NUMBER — in any of `Module.agda:414`, the extensionless `Wet:514`, or the prose `line 1920`; a block's evidence sits LAST and in order; no marker is DOUBLED into the comment text (`-- -- RECOVERY:`), which is a marker every checker here reads as prose while a human reads it as a marker; every `TWIN`/`REFUTED`/`PROBED`/`RECOVERY` reference RESOLVES — a twin to a definition that is proven and not still a postulate, a spent probe to the sha holding it — while `DEAD ROUTE` is unvalidated because it names nothing; no explanation names the subject of a section the same block already carries, which is redundancy that DRIFTS rather than merely repeats; and the EXPLANATION — the prose before the first evidence marker, sha pointers free — is within a character budget. Charging explaining and not evidence is the whole design: this header is where the roadmap's own budget SENDS research, so a flat per-block ceiling would budget the destination and a finding with nowhere to go gets deleted rather than moved | [docs/comments-check.md](docs/comments-check.md) |
 | the tower (inline in `gate-heavy`, no target of its own) | the tower typechecks. **A WARNING IS A FAILURE** (`-W error`, exit 42) | [docs/agda-build.md](docs/agda-build.md) |
@@ -534,6 +534,18 @@ carry before opening the doc:
   budget only raises the stake. `make warm ARGS='<file>'` builds a file's
   dependencies against a module with no bodies, so it works while yours is
   still broken, and it is unbudgeted by design.
+  **AND THERE IS A THIRD CAUSE THE OTHER TWO HIDE: THE MODULE HAS OUTGROWN THE
+  LOOP.** Rule the first two out on a verified-quiet machine and a warm cone, and
+  what is left is a real cost — the finding is then that the loop no longer covers
+  this module, never that the budget is wrong. **The repair is placement, not a
+  ceiling**: a module the loop cannot hold is a module no new fact should be put
+  into, so put the fact one level up where the loop still runs (the rule in
+  *Module granularity*) and let CI's heavy gate cover the deep module. Raising the
+  budget instead buys a loop that is no longer a loop, and it buys it on the one
+  module where an edit is most expensive to get wrong. **DO NOT reach for
+  `--only-scope-checking` here** — it was tried, measured to buy no time (the run
+  is nearly all deserialization) and removed for writing a scope-only interface
+  against a dirty dependency; `scripts/agda-dev.py`'s header carries the route.
 - **A RED `agda-dev` ON ANY FILE IN `src` IS A CRITICAL FAILURE — FIX IT IMMEDIATELY.**
   It is a P0 defect in the tooling, fixed *before* the work you were doing. Never route
   around it — not with a skip list, not with "it's just the tool", not by falling back to
@@ -583,6 +595,17 @@ mutuality** (indirection layers, WF recursion) just to shrink a module: proof sh
 over check time. A new lemma family not mutual with an existing SCC gets its own module,
 even when it is "about" that SCC. Target ≤20 s solo recheck for every non-SCC module.
 → [docs/typecheck-cost.md](docs/typecheck-cost.md)
+
+**A NEW FACT GOES IN THE SHALLOWEST MODULE THAT REACHES ITS CONSUMERS, NOT THE
+DEEPEST ONE THAT COULD HOST IT (Anthony).** Placing it beside its siblings is the
+instinct and it is usually wrong on cost: a four-line lemma in a module near the
+bottom invalidates that module's whole cone, so the edit costs a full rebuild to
+verify something the dev loop would have checked in seconds one level up — and
+where the deep module has itself outgrown the loop, it costs a CI gate. Check the
+cone before you place it. **This does NOT contradict `dup-check`'s "MOVE THE FACT
+DOWN"** — that rule fires on a fact that already exists TWICE and names the lowest
+module reaching both copies. This one is about a fact with one consumer and no
+duplicate, where nothing is being reconciled and depth buys nothing.
 
 ## Agda language and stdlib traps
 
@@ -713,6 +736,17 @@ first, then classify, then prove — never site-by-site.** Depth-first grinding 
 set is the standard way this campaign has lost time: each design blocker is discovered only
 when its turn comes, and every blocker found late can invalidate proofs already finished
 above it. The census is one pass and it converts an unknown-length grind into a worklist.
+
+**AND THE SAME APPLIES TO ERRORS, BECAUSE AGDA REPORTS ONE PER MODULE AND ABORTS
+(Anthony).** A red module is a queue of unknown length, so iterating error-by-error
+pays a whole build per reveal — and the early runs are fast for the wrong reason,
+measuring how long it took to ABORT rather than what the module costs, so the
+timings reassure you exactly while the queue is longest. When a module goes red
+after a change to something widely consumed, CENSUS THE CONSUMER SITES TEXTUALLY
+FIRST: one `grep` for the changed name lists every site at once, and the build then
+CONFIRMS a list instead of discovering one. Worked instance on the caps face: a
+grep for the parts-splitter of the predicate that had gained conjuncts named the
+second failing site in seconds, and it was found a build later instead.
 
 - **You usually do NOT need a typecheck to read a goal.** When the obligation is *declared*
   rather than inferred — a Σ-returning family where each head's signature fixes the conjunct's
@@ -1459,12 +1493,25 @@ reclassified, or reordered. The roadmap is the file every session reads FIRST, s
 row misdirects the next session's whole leg; one already did, naming two postulates that had
 become real definitions.
 
-**A LEG IS ONE COMMIT OF WORK, AND `make roadmap-moved` ENFORCES IT (Anthony:
-"let's mechanically enforce that the roadmap cannot stay the same across
-commits").** A leg is still a GROUP — that is how PROOF-STATE states it — but
-the group is SIZED BY THE COMMIT: it is the chunk of work this session intends
-to land next, not a theme or a region that happens to be coherent. So the
-roadmap changes with every commit, and the check fails when it does not.
+**A LEG IS ONE PR OF WORK, AND `make roadmap-moved` ENFORCES IT (Anthony:
+"we should be able to fix errors within a pr without having to touch
+proof-state").** A leg is still a GROUP — that is how PROOF-STATE states it —
+but the group is SIZED BY THE BRANCH: it is the chunk of work this session
+intends to land next, not a theme or a region that happens to be coherent. So
+the roadmap must differ from **main**, and the check fails when a branch lands
+proof work having said nothing about the plan.
+
+**THE UNIT IS THE BRANCH AND NOT THE COMMIT, AND THAT IS THE WHOLE OF THE
+DIFFERENCE (Anthony).** The rule was once stated over the COMMIT, on the same
+reasoning; held there it taxed every keystroke inside a leg rather than the leg.
+A branch lands one leg but takes as many commits as the work takes — a repaired
+reassembly, a missing import, an error the first build found — and each of those
+owed the roadmap a line it had nothing true to say in. What that bought was
+edits made to satisfy the check, which is the one failure mode fatal to a check
+whose entire subject is whether someone said something true. So the baseline is
+the merge-base with main; a fix-up costs nothing, and on main itself the
+merge-base is HEAD, so the check falls back to the previous commit and a direct
+landing is still held.
 
 **THE THREE OUTCOMES, AND ONE OF THEM ALWAYS APPLIES (Anthony: "we also want to
 discard routes that are no longer applicable").** The leg LANDED: retire it,

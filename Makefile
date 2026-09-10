@@ -626,6 +626,7 @@ roadmap-moved-selftest:
 	    echo "SELFTEST FAIL: a trailing-whitespace edit PASSED as movement — the check can be satisfied by saying nothing"; fail=1; \
 	  fi; \
 	  if [ $$fail -eq 0 ]; then echo "roadmap-moved-selftest: OK"; else exit 1; fi
+	@scripts/roadmap-moved-git-selftest
 
 # SETTLE RISK NEAR THE TRUNK: while a tier holds an open FALSITY or SHAPE row,
 # a commit may not BANK a GRINDABLE or DIFFICULTY row of that tier.  The pull
