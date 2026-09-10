@@ -272,16 +272,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Open questions
 
-- **DOES A STORE CELL HAVE AN OWNER? — FIRST, because it is the only repair
-  in this tier that moves a RECORD.** Four rows fail in one place: a write
-  lands in a cell some registered chain also reads, priced at the writer's
-  floor while the chain reads at its own. No watermark separates them — the
-  consume enqueues into exactly the cell the reading is about, and a `scan-f`
-  overwrites where the other writers extend — so no rearrangement of
-  freshness reaches it. What would close all four at once is that a cell is
-  NAMED by the frame that installed it. No record here carries that fact, so
-  the answer is a FIELD every producer owes and every consumer re-establishes,
-  and not a restatement.
+- **DOES A STORE CELL HAVE AN OWNER? — FIRST, because the repair it points
+  at moves a RECORD rather than a statement.** These rows fail where a write
+  lands in a cell some registered chain also reads, each pricing it at its own
+  floor. It has narrowed AGAINST itself: a sibling was refuted for a SHALLOWER
+  reason — nothing priced the written content at all, repaired by one premise —
+  so failing at a cell does not make a row two-floor. And the row instantiated
+  here computes on both sides while missing the region entirely; reaching a
+  cell read at two floors needs two inner subscriptions on one mergeAll at
+  different depths. What is open is which of these is two-floor and which is
+  merely unpriced.
   relevant: `setNode-regPark-owner`, `thruConsume-cellPark`, `mergeAllDrain-ownerQueue`, `framePark-step`
 
 - **WHICH STORE CELLS DOES A PATH PREDICATE REACH?** Five rows fail in one
