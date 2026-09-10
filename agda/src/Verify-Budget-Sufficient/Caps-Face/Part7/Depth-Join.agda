@@ -27,8 +27,8 @@ module Verify-Budget-Sufficient.Caps-Face.Part7.Depth-Join where
 
 open import Data.Bool    using (Bool; true; false; if_then_else_)
 open import Data.List    using (List; []; _∷_; _++_)
-open import Data.Nat     using (ℕ; zero; suc; _≤_; z≤n)
-open import Data.Nat.Properties using (⊔-lub)
+open import Data.Nat     using (ℕ; zero; suc; _≤_; _<_; z≤n)
+open import Data.Nat.Properties using (⊔-lub; ≤-refl)
 open import Data.Fin     using (Fin; toℕ)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Vec     using (lookup)
@@ -90,16 +90,25 @@ shareGo-le C sf gas bid now i vals fin Q hb h0 h1 ((rid , p) ∷ ps) sch sto q =
 -- THE DISPATCH
 ------------------------------------------------------------------
 
--- THE GAS IS QUANTIFIED IN THE PREMISES RATHER THAN FIXED, because the
--- dispatch peels one before entering the fold and a consumer holds the
--- gas the dispatch was entered at.  Quantifying costs the caller
--- nothing: the element bound is a statement about a descent, and a
--- descent's ceiling does not read the gas it is walked at.
+-- THE PREMISES ARE ASKED AT A STRICTLY SMALLER GAS, AND THE BOUND IS
+-- WHAT MAKES THE PAIR WALKABLE.  The dispatch peels one unit before
+-- entering the fold, so the only gas it ever reads a fold at is below
+-- the one it was entered at; a premise quantified over EVERY gas says
+-- the same thing about this lemma and hides that peel from every
+-- caller, which is fatal for the one caller that matters.  The fold's
+-- own sink arm is a dispatch at the gas the fold holds, so fold and
+-- dispatch recur through each other, and the cycle terminates only
+-- because the dispatch descends.  With the descent absent from the
+-- type there is no measure the pair can share and the arm cannot be
+-- written at all; with it present the caller has an ordering in scope
+-- and the recursion is an ordinary walk down the gas.  Costing the
+-- caller nothing is what makes it free to state: a consumer proving
+-- the element bound at every gas proves it at a smaller one.
 disp-le : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (C : ℕ)
   (sf : Gas) (gas : ℕ) (bid : Id) (now : Tick) (i : Fin n)
   (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
   (Q : List (RegId × Path Γ (lookup Γ i) t) → Sched Γ → EvalSt e → Set) →
-  (∀ (g : ℕ) (rid : RegId) (p : Path Γ (lookup Γ i) t)
+  (∀ (g : ℕ) → g < gas → ∀ (rid : RegId) (p : Path Γ (lookup Γ i) t)
      (ps : List (RegId × Path Γ (lookup Γ i) t))
      (sch : Sched Γ) (sto : EvalSt e) → Q ((rid , p) ∷ ps) sch sto →
      depthFold sf g bid now (toℕ i) p vals
@@ -109,7 +118,7 @@ disp-le : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (C : ℕ)
      (ps : List (RegId × Path Γ (lookup Γ i) t))
      (sch : Sched Γ) (sto : EvalSt e) → Q ((rid , p) ∷ ps) sch sto →
      Q ps sch sto) →
-  (∀ (g : ℕ) (rid : RegId) (p : Path Γ (lookup Γ i) t)
+  (∀ (g : ℕ) → g < gas → ∀ (rid : RegId) (p : Path Γ (lookup Γ i) t)
      (ps : List (RegId × Path Γ (lookup Γ i) t))
      (sch : Sched Γ) (sto : EvalSt e) → Q ((rid , p) ∷ ps) sch sto →
      Q ps (proj₁ (proj₂ (foldPath sf g bid now (toℕ i) p vals
@@ -123,7 +132,8 @@ disp-le : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (C : ℕ)
   depthDisp sf gas bid now i vals fin sch sto ≤ C
 disp-le C sf zero      bid now i vals fin Q hb h0 h1 sch sto q = z≤n
 disp-le C sf (suc gas) bid now i vals fin Q hb h0 h1 sch sto q =
-  shareGo-le C sf gas bid now i vals fin Q (hb gas) h0 (h1 gas) _ sch _ q
+  shareGo-le C sf gas bid now i vals fin Q (hb gas ≤-refl) h0 (h1 gas ≤-refl)
+    _ sch _ q
 
 -- AND THE LATCH IS INVISIBLE TO THE STORE, which is what lets a
 -- consumer state the dispatch's ceiling at the state it was ENTERED

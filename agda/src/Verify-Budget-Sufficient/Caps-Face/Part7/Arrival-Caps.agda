@@ -954,22 +954,25 @@ postulate
 -- consumer nothing and is what the walk's own invariant carries.
 --
 -- AND THE ASSEMBLY IS THEN THE CHAIN FACE'S, ARM FOR ARM, WITH ONE ARM
--- MISSING A MEASURE.  `fold-le` over `ChainFit sl S` is the induction,
--- and two of its three obligations have routes already walked on the
--- chain side: the frame arm is the sibling above weakened by
--- `sightCeil-mono`, and the step arm is `chain-fit-step` verbatim.
--- What has no route is the SINK arm, and the obstruction is not a
--- missing bound but a missing descent -- the arm owes `disp-depth-fit`,
--- which is proven FROM this statement, so the pair is mutually
--- recursive through the fold gas.
--- DEAD ROUTE: closing the sink arm by making the two mutual is
---   STRUCTURALLY DEAD as the dispatch lemma is shaped.  Its hypothesis
---   quantifies over EVERY gas rather than over the one the dispatch
---   peels, so the descent `depthDisp` performs from `suc gas` to `gas`
---   is invisible to the termination checker and no measure the pair
---   could share is in scope.  Whatever closes this arm has to expose
---   that peel in the dispatch lemma's own type, which is a restatement
---   of the dispatch and not a proof of the fold.
+-- OWING A WALK RATHER THAN A BOUND.  `fold-le` over `ChainFit sl S` is
+-- the induction, and two of its three obligations have routes already
+-- walked on the chain side: the frame arm is the sibling above weakened
+-- by `sightCeil-mono`, and the step arm is `chain-fit-step` verbatim.
+-- The SINK arm owes `disp-depth-fit`, which is proven FROM this
+-- statement, so the pair recurs through the fold gas -- and the
+-- dispatch asks its own fold premise at a gas STRICTLY BELOW the one it
+-- was entered at, which is the ordering that recursion is walked on.
+-- What is left is to walk it: an induction on the gas whose step is
+-- this statement at every smaller one, the other two arms supplied
+-- unchanged.
+-- DEAD ROUTE: closing the sink arm by STRUCTURAL mutual recursion is
+--   dead however the dispatch is stated, which is a fact about the
+--   measure and not about a signature.  The fold reaches its sink at
+--   the gas it is holding, so the fold-to-dispatch edge is FLAT: no
+--   argument of either statement decreases across it, and the cycle's
+--   one decrease is the peel the dispatch performs an edge later.  A
+--   pair whose cycle decreases while an edge of it does not is not
+--   structural, so the walk has to be an explicit induction on the gas.
 -- TWIN: `chain-depth-sighted` -- this statement on the chain face, at
 --   the same ceiling in the same currency, proven by exactly the
 --   `fold-le` instantiation described above.
@@ -1141,11 +1144,11 @@ disp-depth-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 disp-depth-fit {e = e} sl id sf gas bid now S i vals fin sched st hsl hsf hΦ hval hS =
   disp-le D sf gas bid now i vals fin
     (λ _ sch sto → (Sched.slots sch ≡ sl) × (storeSyncMax sch sto ≤ S))
-    (λ g rid p ps sch sto q →
+    (λ g _ rid p ps sch sto q →
        share-fold-fit sl id sf g bid now S i vals fin rid p sch sto
          (proj₁ q) hsf hΦ hval (proj₂ q))
     (λ rid p ps sch sto q → q)
-    (λ g rid p ps sch sto q →
+    (λ g _ rid p ps sch sto q →
        share-step-fit sl id sf g bid now S i vals fin rid p sch sto
          (proj₁ q) hsf hΦ (proj₂ q))
     sched st

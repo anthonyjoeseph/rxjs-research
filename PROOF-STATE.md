@@ -238,17 +238,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **A MEASURE FOR THE SHARE WALK**, which is all `share-fold-fit` has
-  left once its ceiling is read at the grant. The fold's own assembly
-  is the chain face's arm for arm, and two of the three arms have
-  routes already walked there; the third owes the dispatch, which is
-  proven FROM the fold, so the pair recurs through the fold gas and
-  the dispatch lemma quantifies over every gas rather than the one it
-  peels. The commit restates the dispatch so the peel is in its type,
-  and the fold's remaining arm is then the sibling's. It narrows
-  WHICH STORE CELLS DOES A PATH PREDICATE REACH to the arms that
-  price a frame, the share arm having stopped being a bound at all.
-
 - **THE NODE A WRITE IS ENTERED AT**, which is the last thing the owner
   question does not have. The consume's transport is a body now, and
   its one leaf is a subscribe whose reading is about the very node it
@@ -271,6 +260,18 @@ does not fit is a finding about the shared statement, not about the head.
   not its count. The commit states the length the registry holds and
   reports whether the power it buys is one the nesting budget affords.
   It narrows WHAT PRICES A REGISTERED CHAIN to that one factor.
+
+- **A READING THAT TRAVELS TO THE MINT**, which is all the store
+  question has left. Three rows fail in the same place: the site
+  owing the bound is a `register`, an admitted entry's readings are
+  refuted free-standing, and they are not corollaries of the caps
+  receipt either — so nothing standing at the mint can derive one and
+  the reading has to arrive already held. The commit finds the lowest
+  carrier that reaches all three, weighing the invariant record
+  against the walk's own predicate, and says what each obliges its
+  producers to re-establish. It lands one row transported onto that
+  carrier, and narrows WHICH STORE CELLS DOES A PATH PREDICATE REACH
+  to the mint's own arm.
 
 ### Open questions
 
@@ -446,9 +447,9 @@ does not fit is a finding about the shared statement, not about the head.
   CONSTRUCTOR, not its depth, so a parked program runs the store term away here
   too; the width is walk-denominated besides.
 - **`share-fold-fit`** (Part7/Arrival-Caps) — DIFFICULTY, `DEAD ROUTE, TWIN`:
-  one admitted registration's path, now priced at the round's GRANT, which is
-  what its one consumer already weakened it to. The assembly is the chain
-  face's; the sink arm owes a dispatch the pair has no measure for.
+  one admitted registration's path, priced at the round's GRANT. The assembly
+  is the chain face's; the sink arm is a dispatch that now descends in its own
+  type, so what is left is an induction on the gas rather than a bound.
 - **`frame-depth-fit`** (Part7/Arrival-Caps) — DIFFICULTY, `PROBED`: one
   frame's own spend under the position's ceiling. Map, scan and take charge
   nothing, and BOTH arms that do are now instantiated — the react at a walked
