@@ -1,4 +1,4 @@
-.PHONY: find-prose gate roadmap-moved roadmap-moved-selftest roadmap-order roadmap-order-selftest roadmap-evidence gate-heavy gate-cheap gate-light dev-changed dev-changed-selftest stripped strip-selftest unmap-selftest postulates dup-check dup-selftest imports-check imports-fix imports-selftest find all help agda-dev agda-dev-selftest warm bg bg-check bg-wait bug-cache unsafe-check wiring wiring-selftest comments-check comments-selftest refuted ev ts-check cli-build oracle qc-build quickcheck harness harness-build
+.PHONY: find-prose gate cone-check cone-selftest roadmap-moved roadmap-moved-selftest roadmap-order roadmap-order-selftest roadmap-evidence gate-heavy gate-cheap gate-light dev-changed dev-changed-selftest stripped strip-selftest unmap-selftest postulates dup-check dup-selftest imports-check imports-fix imports-selftest find all help agda-dev agda-dev-selftest warm bg bg-check bg-wait bug-cache unsafe-check wiring wiring-selftest comments-check comments-selftest refuted ev ts-check cli-build oracle qc-build quickcheck harness harness-build
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -628,6 +628,17 @@ roadmap-moved-selftest:
 	  if [ $$fail -eq 0 ]; then echo "roadmap-moved-selftest: OK"; else exit 1; fi
 	@scripts/roadmap-moved-git-selftest
 
+# A NEW DECLARATION MAY NOT BE ADDED TO A DEEP MODULE -- one whose reverse cone
+# is large enough that an edit to it invalidates a big fraction of the tree.
+# The rule is decidable because an ADDITION is relocatable and an EDIT is not:
+# a new lemma has no home yet, so a new module importing this one costs seconds
+# instead of a rebuild of half the tower.
+cone-check:
+	@scripts/check-cone-adds.py
+
+cone-selftest:
+	@scripts/cone-selftest
+
 # SETTLE RISK NEAR THE TRUNK: while a tier holds an open FALSITY or SHAPE row,
 # a commit may not BANK a GRINDABLE or DIFFICULTY row of that tier.  The pull
 # it resists is structural rather than careless -- a risky leg often ends in a
@@ -1037,6 +1048,7 @@ GATE_CHEAP = wiring-selftest wiring-gate wiring-refuted wiring-probed \
              roadmap-selftest roadmap-check \
              roadmap-moved-selftest roadmap-moved \
              roadmap-order-selftest roadmap-order \
+             cone-selftest cone-check \
              comments-selftest comments-check dev-changed-selftest \
              unmap-selftest
 

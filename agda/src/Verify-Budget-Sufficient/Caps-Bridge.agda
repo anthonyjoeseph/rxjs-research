@@ -64,8 +64,10 @@ open import Verify-Budget-Sufficient.Desc-Ceil using (descW-ceil)
 open import Verify-Budget-Sufficient.Measures using
   (_hasAtLeast_; all-impl; boundedLive; capᴱ; chainsB?-widen; dBound; finish-slots;
   fnCapBounded?; fnCapLive; fnCapᵉ; fnCapᵛ; hasDry-append; hopR; INV-parts; INV?; parkRoom;
-  pathB?; pathLen; pop-bounded; pop-nextNode; pop-nextSource; pop-slots; pow1; regsB?; slotsFnCap; stBounded?; unconn; valB?;
+  pathB?; pathLen; pop-bounded; pop-nextSource; pop-slots; pow1; regsB?; slotsFnCap; stBounded?; unconn; valB?;
   valB?-widen; V≤C; ΨAt; ∧-true; szB)
+open import Verify-Budget-Sufficient.Pop-Node using
+  (pop-nextNode)
 open import Verify-Budget-Sufficient.Keeps-Ring using
   (subscribeE-slots)
 open import Verify-Budget-Sufficient.Wet.Part6 using
