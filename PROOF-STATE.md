@@ -420,10 +420,6 @@ does not fit is a finding about the shared statement, not about the head.
   cell a walk cannot freeze. The consume enqueues into exactly the cell the
   reading is about, so no watermark both covers it and excludes the write; the
   payload's own reading is what is asked to keep it true.
-- **`subscribeE-regOwn`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: what a
-  subscribe does to the owner ledger. It REGISTERS, so the ledger grows and an
-  already-owned cell must survive every entry added; stated at the entry
-  chain's own floor because at any other it is false.
 - **`stepFrame-regOwn`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the same
   ledger across one frame step. A step registers only continuations of the
   chain it was entered at and its drops only shorten a universally quantified
@@ -547,6 +543,10 @@ does not fit is a finding about the shared statement, not about the head.
   VALUE read below the floor, which the scan arm made load-bearing — the seed
   arrives as a term and the cell is read as a value. The same induction is
   walked at the hop measure; what does not transfer is the arithmetic.
+- **`subscribeE-regOwn`** (Part7/Strat-Leaves) — GRINDABLE, `TWIN, PROBED`: what
+  a subscribe does to the owner ledger. `register` APPENDS, so the reading
+  splits into the hypothesis and one conjunct about the entry chain — reflexive
+  at its own floor, hence free where the twin needs a bound handed to it.
 - **`map-strat-step`** (Part7/Strat-Leaves) — GRINDABLE, `TWIN`: one template
   application read below the floor, lifted over the payload. The only hop head
   whose statement names no state at all, and the induction behind it is walked

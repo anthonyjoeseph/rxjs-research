@@ -652,6 +652,26 @@ postulate
 -- entry names.  Stated at the one floor rather than at all of them
 -- because at any other floor it is FALSE: a freshly minted cell is
 -- owned vacuously beforehand and named by the new entry after.
+--
+-- AND THE NEW ENTRY'S CONJUNCT IS FREE, WHICH IS WHAT MAKES THE ROUTE
+-- MECHANICAL RATHER THAN MERELY PRECEDENTED.  `register` APPENDS, so
+-- an `all` over the post registry splits into the hypothesis and one
+-- conjunct about the chain just added -- and that conjunct is
+-- `pathOwn?` of the entry chain at ITS OWN floor, whose second
+-- disjunct is a reflexive `≡ᵇ`.  It is therefore true with no premise
+-- at all, where the same append carrying a LENGTH reading has to be
+-- handed a bound.  What is left is the arm-by-arm split of the
+-- subscribe, which the precedent does not reach.
+-- TWIN: `register-regsLen` (.Walk-Level.Parts), the same `all`-over-
+--   registry reading carried across the same append by
+--   `all-++-intro`, with `input-wet-scripted-regs` the worked
+--   subscribe-level assembly over it.
+-- PROBED: `Harness.Main`'s cell-floor series, at the instants either
+--   side of a real registration in a three-deep share chain: the entry
+--   the subscribe adds names a cell an existing entry already reads,
+--   and both report the same floor. NOT covered: a cell reached from
+--   two different terminals, which no context here can force.
+--   ⚠ measured-not-rechecked.
 postulate
   subscribeE-regOwn : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {w}
     (g : Gas) (b : Closed Γ w) (κ : Path Γ w t)

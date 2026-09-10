@@ -76,7 +76,8 @@ open import Rx.Evaluator using (poolCount; blowH; capsHgo; lvls; iterL;
   capsBase; subscribeE; sched-next; cascade; Sched; EvalSt; root; sched-init;
   st-init; drain; splitEvents; splitBurst; Stream; Path; share-sink; _↠_;
   shareAdmit; RegId; Chain; budgetAt; take-f; from-inner; thru-outer;
-  mergeAllᵒ)
+  mergeAllᵒ; frameNodes)
+open import Verify-Budget-Sufficient.Caps-Face.Part1 using (pathFloor)
 open import Verify-Budget-Sufficient.Caps using (Caps; capsAt)
 open import Verify-Budget-Sufficient.Nest-Store using (nestUnit; slotWrapSum;
   nestCapAt)
@@ -930,6 +931,44 @@ regRowᵍ : RegId × Source × Chain Γᵍ natᵗ → String
 regRowᵍ (_ , src , (_ , p)) =
   "  [src " ++ show src ++ " → " ++ termᵍ (pathSinkᵍ p) ++ "]"
 
+-- SERIES — THE CELLS A CHAIN NAMES, BESIDE THE FLOOR IT READS THEM AT.
+--
+-- TARGET: subscribeE-regOwn @50c39f
+--
+-- WHAT IT INSTANTIATES.  `pathOwn?` holds a cell's floor as an
+-- EQUALITY, so a registry satisfies the owner reading only if every
+-- chain naming a cell carries the same floor.  The target says a
+-- subscribe keeps that true while it REGISTERS, and the entry it adds
+-- is the entry chain with minted frames stacked on it.  The rows print
+-- each entry's floor beside the cells it names, at the instants either
+-- side of a real registration.
+--
+-- WHAT MAKES THEM LOAD-BEARING.  Between the first two instants the
+-- registry GAINS an entry that names a cell an existing entry already
+-- reads, which is the one shape that can break the reading; the row
+-- fails if the two floors differ.  The third instant is the control:
+-- the registry has emptied, so nothing there could disagree.
+--
+-- NOT COVERED.  One shape of chain, all of it terminating at a sink of
+-- this context; nothing about a cell reached from two different
+-- terminals, which the share's single subscribe is what rules out and
+-- no context here can force.
+--
+-- ⚠ measured-not-rechecked.
+nodesᵍ : ∀ {s} → Path Γᵍ s natᵗ → List ℕ
+nodesᵍ root           = []
+nodesᵍ (share-sink _) = []
+nodesᵍ (f ↠ p)        = frameNodes f ++ᴸ nodesᵍ p
+
+ownRowᵍ : RegId × Source × Chain Γᵍ natᵗ → String
+ownRowᵍ (_ , src , (_ , p)) =
+  "  [src " ++ show src ++ " floor " ++ show (pathFloor p) ++ " cells"
+    ++ foldr (λ nd s → " " ++ show nd ++ s) "" (nodesᵍ p) ++ "]"
+
+ownCensusᵍ : ℕ → String
+ownCensusᵍ k = "cell-floors@" ++ show k ++ ":"
+             ++ foldr _++_ "" (map ownRowᵍ (regsᵍ k))
+
 -- the census says which of the two axes this context actually reaches:
 -- an entry sinking at slot three is one registered through two shares,
 -- and its absence is the finding that the def nesting did not become
@@ -1146,7 +1185,9 @@ rowAt n = if n ≤ᵇ 22 then wideRow (n ∸ 19)
           else if n ≤ᵇ 62 then nestRow (n ∸ 60) 0
           -- 63 to 65 walk the share chain itself, at the instants the
           -- census shows it standing
-          else if n ≤ᵇ 65 then deepSinkRow (n ∸ 63) else "(no such row)"
+          else if n ≤ᵇ 65 then deepSinkRow (n ∸ 63)
+          -- 66 to 68 read the floors the same chain's cells are named at
+          else if n ≤ᵇ 68 then ownCensusᵍ (n ∸ 66) else "(no such row)"
 
 main : IO Unit
 main = getContents >>= λ s →
