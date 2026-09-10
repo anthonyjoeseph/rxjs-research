@@ -238,15 +238,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **PROBING THE SIX LEAVES THE CARRIED READINGS NOW OBLIGE.** The two
-  entry readings are carried on paths through BOTH faces now — the burst
-  face's nodry cascade and its consumers take them as hypotheses — and that
-  threading turns the gap at the mint into six named leaves — a kill, a consume, a drain, an inner subscribe, the outer's own
-  cell, a node write — each owing back what it writes, none instantiated,
-  all born FALSITY. The commit probes them and reports which survive. Three
-  of the six write a cell another reader owns, so it narrows DOES A STORE
-  CELL HAVE AN OWNER; the rest narrow WHICH STORE CELLS DOES A PATH
-  PREDICATE REACH from the mint to these six.
+- **RESTATING THE TWO READINGS THE PROBES KILLED, AND INSTANTIATING THE
+  LAST LEAF.** Five of the six leaves were reached and two came back
+  FALSE, for reasons that are not the same: one reading quantifies over
+  a queue extended by content nothing prices, the other reads its
+  premise off a post-state an early arm never builds, so it constrains
+  nothing. Both repairs are known and NEITHER is the record field the
+  ownership question asks for — an arrival's own floor premise, and a
+  reading taken ACROSS the call. The commit lands both and probes
+  `framePark-step`, the leaf still uninstantiated. It narrows DOES A
+  STORE CELL HAVE AN OWNER by deciding whether its last unprobed member
+  is two-floor or merely unpriced.
 
 - **PRICING THE SHARE FOLD AT THE LENGTH THE DOUBLING BITES**, now that
   `share-fold-fit`'s conclusion turns out to be instantiable and its
@@ -282,7 +284,7 @@ does not fit is a finding about the shared statement, not about the head.
   cell read at two floors needs two inner subscriptions on one mergeAll at
   different depths. What is open is which of these is two-floor and which is
   merely unpriced.
-  relevant: `setNode-regPark-owner`, `thruConsume-cellPark`, `mergeAllDrain-ownerQueue`, `framePark-step`
+  relevant: `setNode-regPark-owner`, `thruConsume-cellPark`, `framePark-step`
 
 - **WHICH STORE CELLS DOES A PATH PREDICATE REACH?** Five rows fail in one
   place: the statement reads a PATH or a chain, and the quantity it must
@@ -417,18 +419,18 @@ does not fit is a finding about the shared statement, not about the head.
   moves here — the instance node is allocated and the counter the ordering is
   read against is raised — so the ordering half is an obligation, not a
   transport.
-- **`thruConsume-cellPark`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the
-  one cell a walk cannot freeze. The consume enqueues into exactly the cell the
+- **`thruConsume-cellPark`** (Part7/Strat-Leaves) — FALSITY, `PROBED`: the one
+  cell a walk cannot freeze. The consume enqueues into exactly the cell the
   reading is about, so no watermark both covers it and excludes the write; the
   payload's own reading is what is asked to keep it true.
-- **`mergeAllDrain-ownerQueue`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`:
-  what the drain leaves in the owner's cell. The drain writes that cell as each
-  inner is subscribed, so the reinstall owes the new cell's reading at an
-  arbitrary floor against the old one's at the same floor.
 - **`setNode-regPark-owner`** (Part1) — FALSITY, `PROBED`: a write that
   overwrites parked content pays at its OWN floor. What would close it is node
   OWNERSHIP — a cell is named by the frame that installed it — and no record in
   this development carries that fact.
+- **`mergeAllDrain-ownerQueue`** (Part7/Strat-Leaves) — SHAPE, `REFUTED`: what
+  the drain leaves in the owner's cell. Its premise is read off the POST-state,
+  which the no-room arm never builds, so it is vacuously satisfiable. The
+  reading must be taken across the call, not after it.
 - **`thruConsume-readings`** (Part6) — SHAPE, `PROBED`: REFUTED as written. The
   no-room branch parks the arrival onto the cell the third conjunct reads, and
   no hypothesis prices the arrival, so a `share-sink` chain falsifies it. The

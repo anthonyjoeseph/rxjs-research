@@ -236,6 +236,20 @@ postulate
 -- that was not already in it, so the old cell's reading at any floor is
 -- the ENTRY queue's at that floor, and `drain-queue-all` carries it the
 -- rest of the way to the residue.
+--
+-- THAT ARGUMENT IS TRUE AND THE STATEMENT IS STILL FALSE, because the
+-- hypothesis it rests on is READ OFF THE POST-STATE.  The no-room arm
+-- returns immediately with the state untouched and the queue as the
+-- residue, so the cell the hypothesis reads is the one the drain never
+-- looked at -- `nothing` at an empty table, which the wildcard arm of
+-- the floor check calls true.  The premise is then satisfiable at ANY
+-- entry queue and constrains nothing, so the conclusion is asked to
+-- hold for free.  The repair is to read the owner's cell BEFORE the
+-- drain and compare across the call: the reading has to be a hypothesis
+-- about the state the caller HAS, not about the one the arm declined to
+-- build.
+--
+  -- REFUTED: `Refuted.MergeAllDrain-OwnerQueue`.
   mergeAllDrain-ownerQueue : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (i : ℕ) (g : Gas) (allNid : NodeId) (κ : Path Γ s t) (id : Id) (now : Tick)
     (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ s))
@@ -258,6 +272,14 @@ postulate
 -- extends the queue by `o`, whose inputs the walk already reads below
 -- the sink's floor, and every other arm of the consume leaves the cell
 -- as it found it.
+--
+  -- PROBED: `Probed.ThruConsume-CellPark`.  The ENQUEUE arm only -- a
+  --   capacity-zero flatten node taking `input fzero` at floor 1, where
+  --   the extended queue's reading reduces through the payload premise.
+  --   That is the arm the statement is about and the only one covered:
+  --   the subscribing arm, the two non-flatten heads and a NON-EMPTY
+  --   starting queue are all untouched, and the last of those is where a
+  --   second writer's content would have to show up.
   thruConsume-cellPark : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (g : Gas) (op : AllOp) (nid : NodeId) (κ : Path Γ u t)
     (id : Id) (now : Tick) (o : Val Γ (obs u))

@@ -174,3 +174,6 @@ open import Probed.Kill-Consume-Readings
   using (st₁-node; thruConclusions₂≡; thruConclusions₁-full≡;
          tieSwitchKillNothing; tieSwitchKillJust;
          tieThruConsumeIdentity; tieSubscribeInnerG0)
+
+open import Probed.ThruConsume-CellPark
+  using (tie)
