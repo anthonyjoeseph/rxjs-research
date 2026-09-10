@@ -5,7 +5,7 @@ module Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves where
 open import Data.Bool    using (Bool; true; false; _∧_; _∨_)
 open import Data.Bool.Properties using (∨-zeroʳ)
 open import Data.Fin     using (Fin; toℕ)
-open import Data.List    using (List; map; [])
+open import Data.List    using (List; map; []; _∷_)
 open import Data.Bool.ListAction using (all; any)
 open import Data.Maybe   using (Maybe; just; nothing)
 open import Data.Nat     using (ℕ; suc; _≤_; _≤ᵇ_; _≡ᵇ_)
@@ -25,7 +25,8 @@ open import Rx.Evaluator using
   shareAdmit; shareLatch; NodeId; NodeState; AllOp; lookupNode; thruConsume; mergeAllDrain;
   subscribeInner; installNode; scan-st; take-st; mergeAll-st; switch-st; exhaust-st; map-f;
   scan-f; take-f; from-inner; thru-outer; Arrival; arrTy; chainsOf; chainStep; cascadeLatch;
-  frameNodes; pathHasNode; switchKill)
+  frameNodes; pathHasNode; switchKill; takeVals; innerReact; thruWalk; thruWrap;
+  mergeAllᵒ; switchᵒ; exhaustᵒ; hasRoom)
 open import Verify-Budget-Sufficient.Caps using (Caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (burstStrat?; capsOK?; framePark?; frameAbove?; frameRead; frameStrat?; parkStrat?; pathCell;
@@ -589,38 +590,66 @@ switchKill-pathPark (f ↠ p)        cur sched st h =
           (switchKill-pathPark p cur sched st
              (∧-trueʳ {a = framePark? (pathFloor p) f st} h))
 
--- AND WHAT A STEP DOES TO THE SAME LEDGER, which is the cheaper half
--- and needs no conditioning at all.  A step registers only chains that
--- CONTINUE the one it was entered at, and a floor is the terminal's, so
--- every entry a step adds reports the entry chain's own floor -- at
--- which the owner reading is satisfied by whatever the entry names.
--- The drops a step performs only shorten the ledger, which the reading
--- quantifies over universally.
-postulate
-  stepFrame-regOwn : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (g : Gas) (id : Id) (now : Tick)
-    (f : Frame Γ s u) (κ : Path Γ u t)
-    (vals : List (Val Γ s)) (fin : Bool)
-    (sched : Sched Γ) (st : EvalSt e) (nd : NodeId) →
-    regOwn? nd (pathFloor κ) (EvalSt.registry st) ≡ true →
-    regOwn? nd (pathFloor κ)
-      (EvalSt.registry
-        (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame g id now f κ vals fin sched st))))))
-      ≡ true
+-- AND WHAT A STEP DOES TO THE SAME LEDGER, which is a CASE SPLIT and
+-- two writers rather than one statement.  Three of the five frames
+-- register nothing and each says so for its own reason: a map hands
+-- back the state it was given, a scan rewrites the node table on every
+-- branch of its accumulator's type test, and a take either rewrites
+-- the table or CUTS -- and a cut keeps a sublist, which is the one
+-- write a universal over the ledger survives for free.  So the gap is
+-- exactly the two arms that REGISTER, and each is stated over its own
+-- writer rather than over the frame that dispatches to it.
+--
+-- AND THE WRAP IS NOT ONE OF THEM, which is what makes the outer arm a
+-- leaf and not a pair.  Every branch of `thruWrap` rewrites `nodes`
+-- and nothing else, so the registry the outer arm reports is the walk's
+-- own -- the equality below, and the arm is a transport along it.
+thruWrap-regs : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (op : AllOp) (nid : NodeId) (b : Bool)
+  (r : List (Val Γ u) × List (InstEvent (Val Γ t)) × Sched Γ × EvalSt e) →
+  EvalSt.registry (proj₂ (proj₂ (proj₂ (proj₂ (thruWrap op nid b r)))))
+    ≡ EvalSt.registry (proj₂ (proj₂ (proj₂ r)))
+thruWrap-regs op        nid false r = refl
+thruWrap-regs mergeAllᵒ nid true  r@(_ , _ , _ , st′)
+  with lookupNode nid (EvalSt.nodes st′)
+... | just (mergeAll-st _ _ _ _) = refl
+... | just (scan-st _)           = refl
+... | just (take-st _)           = refl
+... | just (switch-st _ _)       = refl
+... | just (exhaust-st _ _)      = refl
+... | nothing                    = refl
+thruWrap-regs switchᵒ   nid true  r@(_ , _ , _ , st′)
+  with lookupNode nid (EvalSt.nodes st′)
+... | just (switch-st _ _)       = refl
+... | just (scan-st _)           = refl
+... | just (take-st _)           = refl
+... | just (mergeAll-st _ _ _ _) = refl
+... | just (exhaust-st _ _)      = refl
+... | nothing                    = refl
+thruWrap-regs exhaustᵒ  nid true  r@(_ , _ , _ , st′)
+  with lookupNode nid (EvalSt.nodes st′)
+... | just (exhaust-st _ _)      = refl
+... | just (scan-st _)           = refl
+... | just (take-st _)           = refl
+... | just (mergeAll-st _ _ _ _) = refl
+... | just (switch-st _ _)       = refl
+... | nothing                    = refl
 
--- AND THE SAME FOR A CONSUME, for the same reason and at the same
--- floor.  A consume drains and re-enters, and every chain it registers
--- continues the one it was entered at, so the ledger it hands back
--- reports that chain's floor at every new entry.
+-- THE TWO WRITERS THE STEP DISPATCHES TO, and the same argument at
+-- each: both register only chains that CONTINUE the one they were
+-- entered at, and a floor is the TERMINAL's, so every entry either
+-- adds reports the entry chain's own floor -- at which the owner
+-- reading is satisfied by whatever the entry names.
 postulate
-  thruConsume-regOwn : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (g : Gas) (op : AllOp) (nid : NodeId) (κ : Path Γ u t)
-    (id : Id) (now : Tick) (o : Val Γ (obs u))
+  innerReact-regOwn : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+    (g : Gas) (op : AllOp) (allNid inst : NodeId) (κ : Path Γ s t)
+    (id : Id) (now : Tick) (vals : List (Val Γ s)) (fin : Bool)
     (sched : Sched Γ) (st : EvalSt e) (nd : NodeId) →
     regOwn? nd (pathFloor κ) (EvalSt.registry st) ≡ true →
     regOwn? nd (pathFloor κ)
       (EvalSt.registry
-        (proj₂ (proj₂ (proj₂ (thruConsume g op nid κ id now o sched st)))))
+        (proj₂ (proj₂ (proj₂ (proj₂
+          (innerReact g op allNid inst κ id now vals sched st fin))))))
       ≡ true
 
 -- AND FOR THE DRAIN'S OWN SUBSCRIBE, which is the third writer the
@@ -640,6 +669,122 @@ postulate
         (proj₂ (proj₂ (proj₂ (proj₂ (proj₂
           (subscribeInner g op allNid κ id now o sched st)))))))
       ≡ true
+
+-- AND THE SAME FOR A CONSUME, WHICH IS NOW A BODY AND NOT A CLAIM.  A
+-- consume dispatches on the node it is entered at, and only one branch
+-- per operator registers at all -- so the reading rides the SUBSCRIBE
+-- above and the ledger writes around it are node-table rewrites the
+-- registry does not see.  Two branches are worth naming because they
+-- read as writers and are not.  The ENQUEUE arm -- a mergeAll with no
+-- room, the writer whose own cell the reading is about -- parks the
+-- value in the node's queue and touches the ledger nowhere, so it is
+-- paid by the hypothesis unchanged.  And the switch arm KILLS before
+-- it subscribes, which the proven sublist reading above carries, so
+-- the subscribe is entered at a state the thread already holds.
+thruConsume-regOwn : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (g : Gas) (op : AllOp) (nid : NodeId) (κ : Path Γ u t)
+  (id : Id) (now : Tick) (o : Val Γ (obs u))
+  (sched : Sched Γ) (st : EvalSt e) (nd : NodeId) →
+  regOwn? nd (pathFloor κ) (EvalSt.registry st) ≡ true →
+  regOwn? nd (pathFloor κ)
+    (EvalSt.registry
+      (proj₂ (proj₂ (proj₂ (thruConsume g op nid κ id now o sched st)))))
+    ≡ true
+thruConsume-regOwn {u = u} g mergeAllᵒ nid κ id now o sched st nd h
+  with lookupNode nid (EvalSt.nodes st)
+... | nothing                = h
+... | just (scan-st _)       = h
+... | just (take-st _)       = h
+... | just (switch-st _ _)   = h
+... | just (exhaust-st _ _)  = h
+... | just (mergeAll-st {w} lim act q od) with w ≟ᵗ u
+...   | no  _    = h
+...   | yes refl with hasRoom lim act
+...     | false = h
+...     | true  = subscribeInner-regOwn g mergeAllᵒ nid κ id now o sched st nd h
+thruConsume-regOwn g switchᵒ nid κ id now o sched st nd h
+  with lookupNode nid (EvalSt.nodes st)
+... | nothing                    = h
+... | just (scan-st _)           = h
+... | just (take-st _)           = h
+... | just (mergeAll-st _ _ _ _) = h
+... | just (exhaust-st _ _)      = h
+... | just (switch-st cur od)    =
+      subscribeInner-regOwn g switchᵒ nid κ id now o
+        (proj₁ (proj₂ (switchKill cur sched st)))
+        (proj₂ (proj₂ (switchKill cur sched st))) nd
+        (switchKill-regOwn nd (pathFloor κ) cur sched st h)
+thruConsume-regOwn g exhaustᵒ nid κ id now o sched st nd h
+  with lookupNode nid (EvalSt.nodes st)
+... | nothing                    = h
+... | just (scan-st _)           = h
+... | just (take-st _)           = h
+... | just (mergeAll-st _ _ _ _) = h
+... | just (switch-st _ _)       = h
+... | just (exhaust-st true  od) = h
+... | just (exhaust-st false od) =
+      subscribeInner-regOwn g exhaustᵒ nid κ id now o sched st nd h
+
+-- AND THE WALK IS THE FOLD OVER IT, which is the whole of the outer
+-- arm's remaining content: a drain consumes its emits one at a time
+-- through the same node at the same floor, so the reading is carried
+-- emit by emit and the induction is on the emit list alone.
+thruWalk-regOwn : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (g : Gas) (op : AllOp) (nid : NodeId) (κ : Path Γ u t)
+  (id : Id) (now : Tick) (vals : List (Val Γ (obs u)))
+  (sched : Sched Γ) (st : EvalSt e) (nd : NodeId) →
+  regOwn? nd (pathFloor κ) (EvalSt.registry st) ≡ true →
+  regOwn? nd (pathFloor κ)
+    (EvalSt.registry
+      (proj₂ (proj₂ (proj₂ (thruWalk g op nid κ id now vals sched st)))))
+    ≡ true
+thruWalk-regOwn g op nid κ id now []       sched st nd h = h
+thruWalk-regOwn g op nid κ id now (o ∷ os) sched st nd h =
+  thruWalk-regOwn g op nid κ id now os
+    (proj₁ (proj₂ (proj₂ (thruConsume g op nid κ id now o sched st))))
+    (proj₂ (proj₂ (proj₂ (thruConsume g op nid κ id now o sched st)))) nd
+    (thruConsume-regOwn g op nid κ id now o sched st nd h)
+
+stepFrame-regOwn : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (g : Gas) (id : Id) (now : Tick)
+  (f : Frame Γ s u) (κ : Path Γ u t)
+  (vals : List (Val Γ s)) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) (nd : NodeId) →
+  regOwn? nd (pathFloor κ) (EvalSt.registry st) ≡ true →
+  regOwn? nd (pathFloor κ)
+    (EvalSt.registry
+      (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame g id now f κ vals fin sched st))))))
+    ≡ true
+stepFrame-regOwn g id now (map-f _) κ vals fin sched st nd h = h
+stepFrame-regOwn {u = u} g id now (scan-f fn nid) κ vals fin sched st nd h
+  with lookupNode nid (EvalSt.nodes st)
+... | nothing                    = h
+... | just (take-st _)           = h
+... | just (mergeAll-st _ _ _ _) = h
+... | just (switch-st _ _)       = h
+... | just (exhaust-st _ _)      = h
+... | just (scan-st {w} _) with w ≟ᵗ u
+...   | no  _    = h
+...   | yes refl = h
+stepFrame-regOwn g id now (take-f nid) κ vals fin sched st nd h
+  with lookupNode nid (EvalSt.nodes st)
+... | nothing                    = h
+... | just (scan-st _)           = h
+... | just (mergeAll-st _ _ _ _) = h
+... | just (switch-st _ _)       = h
+... | just (exhaust-st _ _)      = h
+... | just (take-st k) with proj₂ (proj₂ (takeVals k vals))
+...   | false = h
+...   | true  =
+        cutThrough-all (λ en → pathOwn? nd (pathFloor κ) (proj₂ (proj₂ (proj₂ en))))
+          nid (EvalSt.delivered st) (EvalSt.regWatermark st)
+          (EvalSt.dying st) (EvalSt.registry st) h
+stepFrame-regOwn g id now (from-inner op allNid inst) κ vals fin sched st nd h =
+  innerReact-regOwn g op allNid inst κ id now vals fin sched st nd h
+stepFrame-regOwn g id now (thru-outer op nid) κ vals fin sched st nd h =
+  subst (λ rs → regOwn? nd (pathFloor κ) rs ≡ true)
+    (sym (thruWrap-regs op nid fin (thruWalk g op nid κ id now vals sched st)))
+    (thruWalk-regOwn g op nid κ id now vals sched st nd h)
 
 -- WHAT A SUBSCRIBE DOES TO THE OWNER LEDGER, which is the registry
 -- half of the same disjointness and cannot be read off the store one.

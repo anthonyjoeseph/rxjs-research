@@ -238,17 +238,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **FOUR WRITERS AND ONE PRECEDENT**, which is all the folded reading
-  leaves. Every consumer — level, sink, burst, depth — now splits both
-  halves off one reading and the tower stands on them, so the thread is
-  carried by a registry transport per WRITER: one statement at four
-  `register` sites. One is mechanical already: the append splits the
-  reading into the hypothesis and a conjunct reflexive at the entry
-  chain's floor, a shape a proven length reading crosses there too.
-  The commit carries that precedent to the step, the
-  consume and the drained inner, and reports whether the ENQUEUE arm —
-  the writer whose cell the reading is about — is paid by it. It
-  narrows DOES A STORE CELL HAVE AN OWNER to that one arm.
+- **TWO LEAVES, AND THE PRECEDENT THEY WERE PICKED FOR.** The four
+  writers have collapsed to two. The step and the consume are BODIES
+  now, dispatching to whatever actually registers, and the ENQUEUE arm
+  answered itself — the writer whose own cell the reading is about
+  touches the ledger nowhere. What is left
+  is a reaction and a drained inner, each a real `register`, and the
+  precedent is exactly theirs — the append splits the reading into the
+  hypothesis and a conjunct reflexive at the entry chain's floor. The
+  commit spends it at both and reports whether stacking a minted frame
+  moves the terminal that floor is read from. It narrows DOES A STORE
+  CELL HAVE AN OWNER to the walked chain.
 
 - **A LENGTH THAT IS NOT PRICED IN A CAP**, which is what the fan's
   refutation leaves as the only move. Reading the registry at the level
@@ -282,8 +282,8 @@ does not fit is a finding about the shared statement, not about the head.
   predicate cannot name the chain the writer stands on, so the reading travels
   with the chain. The PRODUCER half is settled too, and affirmatively: every
   consumer above the walk splits the folded reading and the tower stands on
-  them, so what pays it is a transport per writer. What is left is whether an
-  ENQUEUE and a walked chain are paid by the thread an overwrite is.
+  them, so what pays it is a transport per writer, and the ENQUEUE arm is
+  answered freely. What is left is the walked chain.
   relevant: `thruConsume-cellPark`, `framePark-step`
 
 - **WHICH STORE CELLS DOES A PATH PREDICATE REACH?** Five rows fail in one
@@ -421,13 +421,10 @@ does not fit is a finding about the shared statement, not about the head.
   cell a walk cannot freeze. The consume enqueues into exactly the cell the
   reading is about, so no watermark both covers it and excludes the write; the
   payload's own reading is what is asked to keep it true.
-- **`stepFrame-regOwn`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the same
-  ledger across one frame step. A step registers only continuations of the
-  chain it was entered at and its drops only shorten a universally quantified
-  reading, which is why this is the cheaper half.
-- **`thruConsume-regOwn`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the
-  ledger across a consume, which drains and re-enters. Every chain it registers
-  continues the entry chain, so the floor it reports is the one being read.
+- **`innerReact-regOwn`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the
+  ledger across a reaction on the *All edge's inner side, the one arm of a step
+  the dispatch does not reduce away. It registers under the entry chain, so the
+  floor it reports should be the one being read.
 - **`subscribeInner-regOwn`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the
   ledger across one drained inner, the writer the drain's recursion needs back.
   The inner registers under the entry chain with newly minted frames stacked on
