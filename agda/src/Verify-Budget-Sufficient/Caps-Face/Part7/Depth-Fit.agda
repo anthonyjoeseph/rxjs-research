@@ -1426,6 +1426,26 @@ postulate
 --   They are not two readings of one climb -- one counts HOPS and the
 --   other counts FRAMES, and no bound on either is a bound on the
 --   other.
+
+-- AND THE ANSWER IS THAT THE DESCENT CANNOT CARRY IT, BECAUSE THERE
+-- IS NOTHING TRUE TO CARRY.  The question this row was left on was
+-- whether a registration could be handed its receipt at the level the
+-- instant was ENTERED at rather than at the level the descent is
+-- standing at.  It cannot: the reading is false one level up, so the
+-- residue is not a lemma awaiting a premise but a statement awaiting
+-- a restatement, and no field threaded to a mint pays for it.  What
+-- is left is a choice at the CONSUMER -- read the registry at the
+-- level the fan is standing at, which `capsOK?-regs` gives away, and
+-- pay the Φ pricing's length in a currency that is not a cap; the
+-- pricing is the only consumer that cannot follow a widening, and
+-- moving it is the work rather than this reading.
+--
+-- REFUTED: `Refuted.Fan-Regs-Entry-Cap`, at the caps-generic form,
+--   which is the strongest shape any route may read while `capsAt`'s
+--   fields stay sealed.  The witness is one minted chain of eight
+--   frames against an entry size of six, with the stepped size at
+--   seventy-eight, and it discharges every side-condition the walk's
+--   doors take.
 postulate
   fan-regsSz-mint : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (Lv : ℕ) (sched : Sched Γ) (st : EvalSt e) →

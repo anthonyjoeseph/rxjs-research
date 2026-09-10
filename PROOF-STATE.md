@@ -238,18 +238,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE MINT'S LEVEL-ZERO RECEIPT, now that the fan's registry reading
-  is a real body and the residue carries the level in its own
-  statement.** `fan-regsSz-mint` and `walk-share-nestOK` stand at one
-  door — the state the fan reads the registry at after a same-instant
-  `register` — and each now differs from its own discharged half in
-  exactly one thing, that the caps stepped. The commit asks whether the
-  subscribe descent can hand a registration its receipt at the level
-  the instant was ENTERED at rather than at the level it is standing
-  at, which is the only thing that would make the two flat again, and
-  reports what the descent would have to carry to do it. It narrows
-  WHAT PRICES A REGISTERED CHAIN to the descent.
-
 - **THE ONE ARM WHERE THE WRITE IS NOT TRANSPARENT**, which is where
   `framePark-step`'s risk went once the rest of it was instantiated.
   Every other frame writing the cell its own reading is about does so by
@@ -272,6 +260,18 @@ does not fit is a finding about the shared statement, not about the head.
   context. It narrows WHICH STORE CELLS DOES A PATH PREDICATE REACH by
   saying whether the widening is arithmetic or an artifact of a
   shallow program.
+
+- **A LENGTH THAT IS NOT PRICED IN A CAP**, which is what the fan's
+  refutation leaves as the only move. Reading the registry at the level
+  the walk is standing at is free — `capsOK?-regs` gives it away — and
+  exactly one consumer cannot follow: the Φ pricing spends a size
+  receipt on a chain's LENGTH under the cap its own CONCLUSION names,
+  and a widening moves that the wrong way, by a ratio one step already
+  makes a square. The commit takes the length out of the cap: it states
+  what the pricing actually needs of a chain, in the registry's own
+  stratification rather than in a size, and reports whether the sink
+  clause's exponent can be paid in it. It narrows WHAT PRICES A
+  REGISTERED CHAIN to that one exponent.
 
 ### Open questions
 
@@ -302,10 +302,10 @@ does not fit is a finding about the shared statement, not about the head.
   not a denomination question: the fan's registry reading splits at the
   LEVEL, discharges at the instant's top, and leaves a residue whose whole
   content is that a mint stepped the caps. Two siblings die in their free
-  form at one `register` too, so each is owed AT THE MINT rather than along
-  the walk. What is left is whether a registration can be given its receipt
-  at the level the instant was entered at — the descent carries its own
-  size hypothesis one level down, so today it cannot.
+  form at one `register` too, so each is owed AT THE MINT. The entry-level
+  half is settled NEGATIVELY — that reading is refuted, so nothing threaded
+  to a mint pays it. What is left is which currency the Φ pricing reads a
+  chain's LENGTH in, it being the one consumer a widening cannot follow.
   relevant: `fan-regsSz-mint`, `sink-fan-sink`, `walk-share-strat`
 
 ### The ledger
@@ -358,10 +358,10 @@ does not fit is a finding about the shared statement, not about the head.
   registered chain ends strictly ABOVE the input it was minted subscribing. The
   only receipt here naming no cap, which is what makes it carryable; the free
   form dies at one `register`, so it is owed at the mint.
-- **`fan-regsSz-mint`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE×5`:
-  the registry's size receipt at the PROGRAM's cap, above the instant's top.
-  The level-zero half is a body now, so what is left is a registration minted
-  since entry — the connect putting one inside every fan.
+- **`fan-regsSz-mint`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the registry's
+  size receipt at the PROGRAM's cap, above the instant's top. The caps-generic
+  form is refuted at one minted chain, so the residue awaits a restatement
+  rather than a premise and the Φ pricing is what has to move.
 - **`walk-share-nestOK`** (Part7/Depth-Fit) — FALSITY, `DEAD ROUTE×4`: the
   instant's nest predicate at the state the fan reads the registry. The door
   has it and the walk carries no nest conjunct at all; threading it down is
