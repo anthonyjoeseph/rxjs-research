@@ -238,18 +238,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **A LENGTH THAT IS NOT PRICED IN A CAP**, which is what the fan's
-  refutation leaves as the only move. Reading the registry at the level
-  the walk is standing at is free — `capsOK?-regs` gives it away — and
-  exactly one consumer cannot follow: the Φ pricing spends a size
-  receipt on a chain's LENGTH under the cap its own CONCLUSION names,
-  and a widening moves that the wrong way, by a ratio one step already
-  makes a square. The commit takes the length out of the cap: it states
-  what the pricing actually needs of a chain, in the registry's own
-  stratification rather than in a size, and reports whether the sink
-  clause's exponent can be paid in it. It narrows WHAT PRICES A
-  REGISTERED CHAIN to that one exponent.
-
 - **A FOLD THAT CANNOT OUTRUN ITS PATH**, which is what the deep
   context leaves `share-fold-fit` reduced to. Neither a second nesting
   level nor a chain of three shares moves the fold, and the header now
@@ -271,6 +259,18 @@ does not fit is a finding about the shared statement, not about the head.
   finds where that fact already lives and reports whether it belongs
   on the invariant record or falls out at the walk. It closes DOES A
   STORE CELL HAVE AN OWNER or names what closing it costs.
+
+- **A LENGTH THE REGISTRY CAN ACTUALLY SUPPLY**, which is what taking
+  the length out of the cap leaves owed. The pricing now takes a frame
+  reading and a length budget separately, and the sink leaf's charge
+  is a constant — so a chain running to `k` caps costs the entry cap
+  raised to `k + 1`, a fixed power and not an exponential in a
+  stepped cap. What nothing supplies is the
+  `k`: a registered chain is the walked one plus a frame per operator
+  of the inner, and the arrival premise bounds that inner's SYNTAX and
+  not its count. The commit states the length the registry holds and
+  reports whether the power it buys is one the nesting budget affords.
+  It narrows WHAT PRICES A REGISTERED CHAIN to that one factor.
 
 ### Open questions
 
@@ -305,8 +305,10 @@ does not fit is a finding about the shared statement, not about the head.
   content is that a mint stepped the caps. Two siblings die in their free
   form at one `register` too, so each is owed AT THE MINT. The entry-level
   half is settled NEGATIVELY — that reading is refuted, so nothing threaded
-  to a mint pays it. What is left is which currency the Φ pricing reads a
-  chain's LENGTH in, it being the one consumer a widening cannot follow.
+  to a mint pays it. The CURRENCY half is settled: the pricing reads a
+  length in a budget of its own rather than in a cap, so a chain of `k`
+  caps costs a fixed power. What is left is who supplies the `k`, an
+  arrival premise bounding an inner's syntax and not its count.
   relevant: `fan-regsSz-mint`, `sink-fan-sink`, `walk-share-strat`
 
 ### The ledger
