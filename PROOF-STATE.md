@@ -238,16 +238,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **A FOLD THAT CANNOT OUTRUN ITS PATH**, which is what the deep
-  context leaves `share-fold-fit` reduced to. Neither a second nesting
-  level nor a chain of three shares moves the fold, and the header now
-  carries why. So the residue is not an axis to cover but a bound to
-  STATE: the fold is capped by its own path's frame charge, whatever
-  nests beneath it and whatever stands in the registry. The commit
-  states that leaf and assembles the fit over it, leaving the frame
-  charge as the only gap. It narrows WHICH STORE CELLS DOES A PATH
-  PREDICATE REACH to that one frame, a bound independent of the
-  registry being one no cell a chain reads can move.
+- **A MEASURE FOR THE SHARE WALK**, which is all `share-fold-fit` has
+  left once its ceiling is read at the grant. The fold's own assembly
+  is the chain face's arm for arm, and two of the three arms have
+  routes already walked there; the third owes the dispatch, which is
+  proven FROM the fold, so the pair recurs through the fold gas and
+  the dispatch lemma quantifies over every gas rather than the one it
+  peels. The commit restates the dispatch so the peel is in its type,
+  and the fold's remaining arm is then the sibling's. It narrows
+  WHICH STORE CELLS DOES A PATH PREDICATE REACH to the arms that
+  price a frame, the share arm having stopped being a bound at all.
 
 - **THE NODE A WRITE IS ENTERED AT**, which is the last thing the owner
   question does not have. The consume's transport is a body now, and
@@ -445,11 +445,10 @@ does not fit is a finding about the shared statement, not about the head.
   charge at the queue's own `drainW`. Its extra premise pins the cell's
   CONSTRUCTOR, not its depth, so a parked program runs the store term away here
   too; the width is walk-denominated besides.
-- **`share-fold-fit`** (Part7/Arrival-Caps) — DIFFICULTY, `PROBED`: one
-  admitted registration's path, at the delivered-marked state. A deep context
-  reaches both axes that could have refuted it — a second nesting level, a
-  chain of three shares — and neither moves the fold. The residue is the frame
-  charge below.
+- **`share-fold-fit`** (Part7/Arrival-Caps) — DIFFICULTY, `DEAD ROUTE, TWIN`:
+  one admitted registration's path, now priced at the round's GRANT, which is
+  what its one consumer already weakened it to. The assembly is the chain
+  face's; the sink arm owes a dispatch the pair has no measure for.
 - **`frame-depth-fit`** (Part7/Arrival-Caps) — DIFFICULTY, `PROBED`: one
   frame's own spend under the position's ceiling. Map, scan and take charge
   nothing, and BOTH arms that do are now instantiated — the react at a walked

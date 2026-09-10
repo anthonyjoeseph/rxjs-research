@@ -72,11 +72,9 @@ open import Rx.Frame-Width using (outWⱽ)
 open import Rx.Slots using (Slots; scripted; shared)
 open import Rx.Hop-Depth using (hopDᵉ)
 open import Rx.Slot-Hop using (slotHop)
-open import Rx.Evaluator using (poolCount; blowH; capsHgo; lvls; iterL;
-  capsBase; subscribeE; sched-next; cascade; Sched; EvalSt; root; sched-init;
-  st-init; drain; splitEvents; splitBurst; Stream; Path; share-sink; _↠_;
-  shareAdmit; RegId; Chain; budgetAt; take-f; from-inner; thru-outer;
-  mergeAllᵒ; frameNodes)
+open import Rx.Evaluator using (poolCount; blowH; capsHgo; lvls; iterL; capsBase; subscribeE; sched-next; cascade; Sched;
+  EvalSt; root; sched-init; st-init; drain; splitEvents; splitBurst; Stream; Path; share-sink;
+  _↠_; shareAdmit; RegId; Chain; frameNodes)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using (pathFloor)
 open import Verify-Budget-Sufficient.Caps using (Caps; capsAt)
 open import Verify-Budget-Sufficient.Nest-Store using (nestUnit; slotWrapSum;
@@ -85,9 +83,6 @@ open import Verify-Budget-Sufficient.Nest-Walk using (nodesMax)
 open import Verify-Budget-Sufficient.Caps-Face.Nest-Arith using (nestWalkAt;
   capΦAt; nestΦAt)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Depth-Fit using (regStrat?)
-open import Verify-Budget-Sufficient.Caps-Depth using (depthFold)
-open import Verify-Budget-Sufficient.Nest-Store using (sightCeil; storeSyncMax)
-open import Verify-Budget-Sufficient.Nest-Walk using (nestDᵛˢ)
 
 ------------------------------------------------------------------
 -- THE CALIBRATION PIN.  `towerℕ` is the one member of this
@@ -609,269 +604,10 @@ controlRow : ℕ → String
 controlRow = censusᵈ "control" slᶜ
 
 ------------------------------------------------------------------
--- SERIES -- WHETHER THE SHARE FOLD'S CEILING CAN BE PRICED AT ALL,
--- which is the question its row's class rests on and which nothing has
--- ever put to a machine.
---
--- TARGET: share-fold-fit @a4232d
---
--- WHY IT IS WORTH A ROW.  The statement's own block says no instrument
--- reaches it, and reads that off its parent rather than off a
--- measurement -- so the claim is INHERITED, and an inherited claim about
--- computability is exactly the kind that stops being true underneath
--- whoever wrote it.  Two things had to hold for the barrier to be where
--- the block says.  Neither does.  `Caps-Depth` seals nothing at all, so
--- opacity is not it; and the budget the hypothesis pins `sf` to is a
--- `Gas`, whose whole representation exists to be peeled lazily, so the
--- anchor family the quarantine below rules symbolic-or-nothing does not
--- reach this side either.  What is left is the doubling per registered
--- share path, and a doubling is a QUANTITY -- so it has a value at a
--- program small enough, and the row is what says which.
---
--- LOAD-BEARING, AND WHAT WOULD MAKE IT FAIL.  Both sides are printed
--- rather than the verdict alone, because the two failure modes are
--- different findings and the verdict alone hides one of them.  A fold
--- reading ABOVE the ceiling is a refutation of the target and the more
--- valuable outcome; a fold that does not return re-establishes the
--- block's claim on a measurement instead of an inheritance, which is
--- what the leg was for.  A row that merely dominates is the third
--- outcome and the weakest, and it is bounded by what the program
--- reaches -- see the coverage note below before spending it.
---
--- THE STATE IS WALKED, NOT ASSEMBLED, which is the trap this repo has
--- already paid for twice: a state written as a record update over
--- `st-init` is not one the evaluator can reach, so a reading over it is
--- evidence about nothing.  These read the sched and store the driven run
--- of the delivered-observable series above actually produces, at the
--- instants that series already prints a census for, so the registry the
--- fold walks is the registry the run built.
---
--- NOT COVERED, and the first is the one that matters: the values are
--- `natᵗ`-typed, so `nestDᵛˢ` reads them FLAT and the ceiling does not
--- move with their count at all -- the value axis is therefore uncovered
--- rather than dialled, and an obs-typed payload is what would dial it;
--- one context, whose two shares are both flat, so nothing about a share
--- registered under another share, which is where a doubling per path
--- would actually climb.  The frame-crossing arm `f ↠ path'` used to be
--- listed here too and is now entered by the rows at 51 to 53, at the
--- two frames of it that are type-preserving; `thru-outer` is still
--- uncovered, and it is the one whose charge is a `suc` rather than a
--- descent, so nothing here says what a chain of those reads.
---
--- ⚠ measured-not-rechecked, like every row in this module.
+-- THE DEEP CONTEXT -- four slots and a chain of three shares, each
+-- registered under the last.  The census series below reads it.
 ------------------------------------------------------------------
 
--- THE SOURCE THE FOLD IS READ AT, and `shareAdmit` filters on the
--- SOURCE rather than on the sink, which decides this: source zero is the
--- only one of the three whose admitted entries are headed by a frame.
--- Source two admits the ROOT chain alone, and `depthFold` at `root` is
--- the `0` clause, so a row there reads nought however many entries the
--- registry holds -- a zero belonging to the path and not to the walk.
--- Source zero is also the axis the measure's own cost note is about: the
--- run admits one entry at the subscribe frame and two an instant later,
--- so the charged rows straddle the doubling rather than sitting to one
--- side of it.  Slot zero is `natᵗ`-typed, so the payload stays a plain ℕ
--- and no second syntax enters the reading.
-iᶠ : Fin 3
-iᶠ = fzero
-
--- THE PATH IS `share-sink` AND THE FOLD GAS IS NON-ZERO, and both are
--- forced rather than chosen: `depthFold` at `root` is the literal `0`
--- clause and `depthDisp` at gas zero is another, so a row taken at
--- either reads nought whatever the registry holds and could not have
--- failed.  The `root` control below is printed for exactly that reason
--- -- it is the DEGENERATE reading, kept so the charged rows have
--- something to be different from.
-valsᶠ : ℕ → List (Val Γᵈ natᵗ)
-valsᶠ 0       = []
-valsᶠ (suc k) = k ∷ valsᶠ k
-
--- `fin` is dialled rather than fixed, and it is what makes the frame
--- rows below readable at all: `depthReact` is the literal `0` clause at
--- `false`, so every `from-inner` frame reads nought there whatever the
--- store holds.  The ceiling does not mention it, so moving it moves ONE
--- side -- which is the property an axis needs before a sweep over it
--- can refute anything.
-foldSides : ℕ → ℕ → ℕ → Bool → Path Γᵈ natᵗ natᵗ → ℕ × ℕ
-foldSides k g w fin pth = lhs , rhs
-  where
-  sd  = proj₁ (driveᵈ k slᵈ)
-  st  = proj₂ (driveᵈ k slᵈ)
-  vs  = valsᶠ w
-  lhs = depthFold (budgetAt eᵈ slᵈ 0) g 0 0 (finℕ iᶠ) pth vs [] fin sd st
-  rhs = sightCeil (sizeᵉ eᵈ) (nestDᵛˢ {Γ = Γᵈ} {u = natᵗ} vs)
-                  (storeSyncMax sd st) (nestUnit eᵈ slᵈ)
-
-foldShow : String → ℕ × ℕ → String
-foldShow tag (lhs , rhs) =
-  tag ++ ": depthFold = " ++ show lhs ++ "  sightCeil = " ++ show rhs
-      ++ "  fits = " ++ (if lhs ≤ᵇ rhs then "true" else "false")
-
--- one process per instant, and each prints the charged reading beside
--- its own degenerate control, so a zero that is the CLAUSE's and a zero
--- that is the REGISTRY's cannot be confused for one another.
-foldRow : ℕ → ℕ → String
-foldRow k g =
-  foldShow ("share-fold@inst " ++ show k ++ " gas " ++ show g)
-           (foldSides k g 3 false (share-sink iᶠ))
-    ++ "\n  [root control, must read 0] "
-    ++ foldShow "" (foldSides k g 3 false root)
-
--- THE FRAME-CROSSING ARM, which the series above lists as uncovered and
--- which is the only axis of this statement that can refute it: the
--- ceiling is a function of `e`, the values, the driven state and the
--- slots, and mentions the PATH NOWHERE, while the left side folds along
--- it.  The sibling ceiling this development already uses for the same
--- currency does carry the path -- `Sight` (.Depth-Sighted) spends
--- `fitG`, whose second summand is `pathNestD κ` -- so the gap is
--- between two live statements rather than between a statement and a
--- doubt, and these rows are what says whether it bites.
---
--- Both frames here are TYPE-PRESERVING (`Frame Γ s s`), which is why
--- they need no change to the sides above: a `thru-outer` would move the
--- source type to `obs u` and take the row to a different `i`.
-takeP : Path Γᵈ natᵗ natᵗ
-takeP = take-f 0 ↠ share-sink iᶠ
-
-innerP : ℕ → Path Γᵈ natᵗ natᵗ
-innerP a = from-inner mergeAllᵒ a 0 ↠ share-sink iᶠ
-
-inner2P : ℕ → Path Γᵈ natᵗ natᵗ
-inner2P a = from-inner mergeAllᵒ a 0 ↠ (from-inner mergeAllᵒ a 1 ↠ share-sink iᶠ)
-
--- THE FRAME WHOSE CHARGE IS A SUCCESSOR, and the one axis left once the
--- two above read the same number.  `thru-outer` moves the source type
--- from `obs u` to `u`, so a path headed by it belongs to a DIFFERENT
--- source than every row above -- slot one, the context's only
--- `obs`-typed one -- and its values are closed EXPRESSIONS rather than
--- numerals, since `Val Γ (obs t)` is `Closed Γ t`.  That is the dial:
--- `nestDᵛˢ` reads those, so the ceiling moves with them here where a
--- `natᵗ` payload left it flat, and the question is which side moves
--- faster.
-iᵗ : Fin 3
-iᵗ = fsuc fzero
-
-thruP : ℕ → Path Γᵈ (obs natᵗ) natᵗ
-thruP nd = thru-outer mergeAllᵒ nd ↠ share-sink iᶠ
-
--- flat, then one flatten deep.  Two is the most this context can state:
--- dialling further needs an `obs (obs natᵗ)` slot to draw a value from,
--- and `Γᵈ` has none -- a boundary of the CONTEXT, not of the measure.
-valsFlat : List (Val Γᵈ (obs natᵗ))
-valsFlat = input fzero ∷ []
-
-valsNest : List (Val Γᵈ (obs natᵗ))
-valsNest = mergeAllᵉ nothing (input iᵗ) ∷ []
-
-thruSides : ℕ → ℕ → Bool → List (Val Γᵈ (obs natᵗ))
-          → Path Γᵈ (obs natᵗ) natᵗ → ℕ × ℕ
-thruSides k g fin vs pth = lhs , rhs
-  where
-  sd  = proj₁ (driveᵈ k slᵈ)
-  st  = proj₂ (driveᵈ k slᵈ)
-  lhs = depthFold (budgetAt eᵈ slᵈ 0) g 0 0 (finℕ iᵗ) pth vs [] fin sd st
-  rhs = sightCeil (sizeᵉ eᵈ) (nestDᵛˢ {Γ = Γᵈ} {u = obs natᵗ} vs)
-                  (storeSyncMax sd st) (nestUnit eᵈ slᵈ)
-
--- LOAD-BEARING, and this arm can fail where the two above could not:
--- `depthFrame` at `thru-outer` is `suc` of a walk, so it charges even
--- when the walk reads nought, and the walk descends into each value's
--- own subscribe rather than stopping at the frame.  A nested value
--- reading ABOVE its ceiling refutes the target.  The empty-values row
--- is DEGENERATE and says so: `depthWalk` is the literal `0` clause
--- there, so the reading is the bare `suc` and is evidence about the
--- frame's constant and nothing else.
---
--- AND TWO OF THESE ROWS ARE DEGENERATE FOR A REASON WORTH THE LINE,
--- since both were written expecting the sibling's behaviour and the
--- measurement says otherwise: `suc (depthWalk …)` mentions neither the
--- `fin` flag nor the node table, so the last row is not a control and
--- the `nd` sweep is not a sweep.  Both are kept because a reader who
--- knows the `from-inner` rows above will expect them to move, and a
--- printed pair that does not move is what says the arm does not read
--- either -- which is itself the difference between the two charging
--- frames.
-thruRow : ℕ → ℕ → String
-thruRow k nd =
-  "thru-outer@inst " ++ show k ++ " gas 4 nid " ++ show nd ++ ", source 1"
-    ++ "\n  [no values, DEGENERATE walk]     "
-    ++ foldShow "" (thruSides k 4 true [] (thruP nd))
-    ++ "\n  [flat value, LOAD-BEARING]       "
-    ++ foldShow "" (thruSides k 4 true valsFlat (thruP nd))
-    ++ "\n  [nested value, LOAD-BEARING]     "
-    ++ foldShow "" (thruSides k 4 true valsNest (thruP nd))
-    ++ "\n  [nested at fin=false, DEGENERATE: this arm reads no flag] "
-    ++ foldShow "" (thruSides k 4 false valsNest (thruP nd))
-
--- LOAD-BEARING at `fin = true`, and what would make each fail: a
--- reading ABOVE the ceiling refutes the target, and it is the frame
--- count that would carry it there, since `depthFold`'s frame arm
--- combines by `⊔` and a second frame therefore buys nothing unless the
--- threading under it does.  The `take-f` row is DEGENERATE by
--- construction -- `depthFrame` is the literal `0` clause at all three
--- chain frames -- and is printed because it isolates the ARM from the
--- FRAME: a difference between it and the bare `share-sink` above is the
--- state threading alone, with no frame charge in it.  The `fin = false`
--- controls are degenerate for the stated reason and exist so that a
--- zero belonging to the clause cannot be read as one belonging to the
--- store.
-frameRow : ℕ → ℕ → String
-frameRow k a =
-  "frame-arm@inst " ++ show k ++ " gas 4 allNid " ++ show a ++ ", fin=true"
-    ++ "\n  [take-f, DEGENERATE frame charge] "
-    ++ foldShow "" (foldSides k 4 3 true takeP)
-    ++ "\n  [from-inner x1, LOAD-BEARING]    "
-    ++ foldShow "" (foldSides k 4 3 true (innerP a))
-    ++ "\n  [from-inner x2, LOAD-BEARING]    "
-    ++ foldShow "" (foldSides k 4 3 true (inner2P a))
-    ++ "\n  [share-sink, no frame]           "
-    ++ foldShow "" (foldSides k 4 3 true (share-sink iᶠ))
-    ++ "\n  [fin=false control, from-inner x1 must read as the no-frame row] "
-    ++ foldShow "" (foldSides k 4 3 false (innerP a))
-
-------------------------------------------------------------------
--- SERIES -- THE TWO AXES THE SHARE FOLD'S COVERAGE NOTE LEAVES OPEN,
--- both of which are boundaries of the CONTEXT above rather than of the
--- measure, and neither of which `Γᵈ` can be dialled into.
---
--- TARGET: share-fold-fit @a4232d
---
--- WHY A SECOND TELESCOPE RATHER THAN A WIDER FIRST.  Adding a slot to
--- `Γᵈ` moves `sizeᵉ`, `nestUnit` and `slotsSize` under every row the
--- series above prints, so the receipt those rows bought would have to
--- be re-measured before it said anything again.  A separate context
--- costs one census and keeps both.
---
--- THE FIRST AXIS IS A SECOND NESTING LEVEL.  A value of type `obs t` is
--- a closed expression and `nestDᵛ` reads it with `nestDᵉ`, where
--- `mergeAllᵉ` is the only constructor that adds one -- so a reading of
--- TWO is a double flatten, and the inner flatten needs a source of type
--- `obs (obs natᵗ)` to draw from.  This telescope has one.  It is also
--- the axis that moves BOTH sides, which is what makes it the only one
--- here that can refute: the block above measures one level at fold
--- one-to-two against ceiling eight-to-ten and reads the slack as
--- WIDENING, and a widening read off a single step is an extrapolation
--- until a second step agrees with it.
---
--- THE SECOND IS A SHARE REGISTERED UNDER A SHARE, which is where
--- `depthShareGo`'s two recursive calls per admitted path could climb.
--- The doubling is per REGISTERED path, so it needs a registry whose
--- entries are headed by a sink that carries registrations of its own.
--- Slot three here is a flatten of slot two, which is itself a flatten
--- of slot one, so the sink chain has a middle where `Γᵈ`'s has none.
---
--- LOAD-BEARING, AND WHAT WOULD MAKE EACH FAIL.  A fold reading ABOVE
--- its ceiling refutes the target outright and is the outcome worth the
--- leg.  A second level costing the fold more than the ceiling closes
--- the gap without refuting, which reclassifies rather than kills.  And
--- a census printing no admitted entry at slot three would say the
--- nesting is in the DEFS and not in the registry, leaving the second
--- axis uncovered here too -- a finding about the context, and the
--- reason the census is printed beside the readings rather than
--- summarised into them.
---
--- ⚠ measured-not-rechecked, like every row in this module.
-------------------------------------------------------------------
 
 Γᵍ : Ctx 4
 Γᵍ = natᵗ ∷ⱽ obs (obs natᵗ) ∷ⱽ obs natᵗ ∷ⱽ natᵗ ∷ⱽ []ⱽ
@@ -898,9 +634,9 @@ slᵍ (fsuc (fsuc (fsuc fzero))) =
 eᵍ : Closed Γᵍ natᵗ
 eᵍ = input (fsuc (fsuc (fsuc fzero)))
 
--- driven for the reason the series above is: a hot's emissions are
--- scheduled, so at the subscribe frame the flattens have had nothing to
--- subscribe and the registry the fold walks does not exist yet.
+-- driven rather than read at the subscribe frame: a hot's emissions
+-- are scheduled, so at that frame the flattens have had nothing to
+-- subscribe and the registry a census would read does not exist yet.
 stepᵍ : Sched Γᵍ × EvalSt eᵍ → Sched Γᵍ × EvalSt eᵍ
 stepᵍ (sd , st) with sched-next sd
 ... | inj₁ _       = sd , st
@@ -977,108 +713,6 @@ censusᵍ : ℕ → String
 censusᵍ k = "deep-registry@" ++ show k ++ ": "
           ++ show (length (regsᵍ k)) ++ " entries"
           ++ foldr _++_ "" (map regRowᵍ (regsᵍ k))
-
--- source two is the `obs`-typed one, so its values are closed
--- expressions and `nestDᵛˢ` reads them rather than flattening to
--- nought; the sink is slot three, the only one behind two shares.
-iᵍ : Fin 4
-iᵍ = fsuc (fsuc fzero)
-
-sinkᵍ : Fin 4
-sinkᵍ = fsuc (fsuc (fsuc fzero))
-
-thruPᵍ : ℕ → Path Γᵍ (obs natᵗ) natᵗ
-thruPᵍ nd = thru-outer mergeAllᵒ nd ↠ share-sink sinkᵍ
-
--- nought, one and two flattens deep.  Two is what the context above
--- could not state, and the inner flatten is what slot one exists for.
-vals0ᵍ : List (Val Γᵍ (obs natᵗ))
-vals0ᵍ = input fzero ∷ []
-
-vals1ᵍ : List (Val Γᵍ (obs natᵗ))
-vals1ᵍ = mergeAllᵉ nothing (input iᵍ) ∷ []
-
-vals2ᵍ : List (Val Γᵍ (obs natᵗ))
-vals2ᵍ = mergeAllᵉ nothing (mergeAllᵉ nothing (input (fsuc fzero))) ∷ []
-
-sidesᵍ : ℕ → ℕ → Bool → List (Val Γᵍ (obs natᵗ))
-       → Path Γᵍ (obs natᵗ) natᵗ → ℕ × ℕ
-sidesᵍ k g fin vs pth = lhs , rhs
-  where
-  sd  = proj₁ (driveᵍ k)
-  st  = proj₂ (driveᵍ k)
-  lhs = depthFold (budgetAt eᵍ slᵍ 0) g 0 0 (finℕ iᵍ) pth vs [] fin sd st
-  rhs = sightCeil (sizeᵉ eᵍ) (nestDᵛˢ {Γ = Γᵍ} {u = obs natᵗ} vs)
-                  (storeSyncMax sd st) (nestUnit eᵍ slᵍ)
-
--- the empty-values row is DEGENERATE and printed for the reason the
--- sibling series prints its own: `depthWalk` is the literal `0` clause
--- there, so the reading is the bare frame `suc` and the three dialled
--- rows have a constant to be different from.
--- AND THE SWEEP IS OVER THE INSTANT, NOT OVER THE NODE, which the
--- census forces rather than suggests: this context's hot is exhausted
--- by instant two, so the registry there is EMPTY and `depthShareGo`
--- is its `[]` clause -- a row taken at that instant walks no admitted
--- path and could not have failed whatever the values hold.  The
--- sibling series sweeps a node id at a fixed instant because its own
--- registry survives; here that would have been three readings of the
--- frame's constant.  Instants zero and one are the charged ones, at
--- four and five entries.
-nestRow : ℕ → ℕ → String
-nestRow k nd =
-  "nest-dial@inst " ++ show k ++ " gas 4 nid " ++ show nd ++ ", source 2"
-    ++ "\n  [no values, DEGENERATE walk] "
-    ++ foldShow "" (sidesᵍ k 4 true [] (thruPᵍ nd))
-    ++ "\n  [nest 0, LOAD-BEARING]       "
-    ++ foldShow "" (sidesᵍ k 4 true vals0ᵍ (thruPᵍ nd))
-    ++ "\n  [nest 1, LOAD-BEARING]       "
-    ++ foldShow "" (sidesᵍ k 4 true vals1ᵍ (thruPᵍ nd))
-    ++ "\n  [nest 2, LOAD-BEARING]       "
-    ++ foldShow "" (sidesᵍ k 4 true vals2ᵍ (thruPᵍ nd))
-
--- THE SHARE-NESTING ARM, and it is entered at the SOURCE rather than
--- at the deepest sink, which the census decides and intuition gets
--- backwards.  `depthFold` at a `share-sink` dispatches on that sink's
--- index and `depthDisp` then admits by SOURCE, so a fold at slot three
--- admits the one entry headed for `root` and stops at the literal `0`
--- clause one step later.  The chain this context builds runs the other
--- way -- source zero admits an entry sinking at slot one, whose own
--- source admits one sinking at slot two, and so on to root -- so slot
--- zero is the only foot from which `depthShareGo`'s two calls per path
--- can recur through more than one share.
---
--- LOAD-BEARING, AND WHY THE FRAMED ROWS ABOVE ARE NOT.  Those read the
--- same number at a registry of four, of five and of NONE, which is
--- what says their `⊔` is carried by the frame's own charge and that no
--- admitted path is being walked in them at all.  These carry no frame,
--- so the reading IS the share walk: it must move with the instant, and
--- a row that does not is evidence the arm is unreached rather than
--- evidence the arm is cheap.  The `root` control is the DEGENERATE
--- clause and must read nought.  A reading above the ceiling refutes
--- the target.
-valsⁿᵍ : ℕ → List (Val Γᵍ natᵗ)
-valsⁿᵍ 0       = []
-valsⁿᵍ (suc k) = k ∷ valsⁿᵍ k
-
-sinkSidesᵍ : ℕ → ℕ → ℕ → Bool → Path Γᵍ natᵗ natᵗ → ℕ × ℕ
-sinkSidesᵍ k g w fin pth = lhs , rhs
-  where
-  sd  = proj₁ (driveᵍ k)
-  st  = proj₂ (driveᵍ k)
-  vs  = valsⁿᵍ w
-  lhs = depthFold (budgetAt eᵍ slᵍ 0) g 0 0 0 pth vs [] fin sd st
-  rhs = sightCeil (sizeᵉ eᵍ) (nestDᵛˢ {Γ = Γᵍ} {u = natᵗ} vs)
-                  (storeSyncMax sd st) (nestUnit eᵍ slᵍ)
-
-deepSinkRow : ℕ → String
-deepSinkRow k =
-  "share-nest@inst " ++ show k ++ " gas 4, three values"
-    ++ "\n  [sink 0, foot of the chain, LOAD-BEARING] "
-    ++ foldShow "" (sinkSidesᵍ k 4 3 false (share-sink fzero))
-    ++ "\n  [sink 3, dead-ends at root, LOAD-BEARING] "
-    ++ foldShow "" (sinkSidesᵍ k 4 3 false (share-sink sinkᵍ))
-    ++ "\n  [root, DEGENERATE, must read 0]           "
-    ++ foldShow "" (sinkSidesᵍ k 4 3 false root)
 
 rowAt : ℕ → String
 rowAt 0 = "CALIBRATION towerℕ 4 (refl-pinned 65536 in this module) = "
@@ -1163,31 +797,12 @@ rowAt n = if n ≤ᵇ 22 then wideRow (n ∸ 19)
           else if n ≤ᵇ 38 then hopRow (fuelAtˢ (n ∸ 34))
           else if n ≤ᵇ 41 then deliveredRow (n ∸ 39)
           else if n ≤ᵇ 44 then controlRow (n ∸ 42)
-          else if n ≤ᵇ 47 then foldRow (n ∸ 45) 1
-          else if n ≤ᵇ 50 then foldRow (n ∸ 48) 4
-          -- 51 to 53 sweep the *All node the `from-inner` frame names,
-          -- at the instant the delivered census shows two admitted
-          -- entries: the frame reads the node table by that id, so a
-          -- row at an id the run never minted is a reading about
-          -- `nothing` and says nothing about the arm
-          else if n ≤ᵇ 53 then frameRow 2 (n ∸ 51)
-          -- 54 to 56 sweep the node the `thru-outer` frame names, at
-          -- the same instant
-          else if n ≤ᵇ 56 then thruRow 2 (n ∸ 54)
-          -- 57 to 59 census the DEEP context at instants zero to two:
+          -- 45 to 47 census the DEEP context at instants zero to two:
           -- an entry sinking at slot three is one registered through
-          -- two shares, which is the axis the sibling series above
-          -- lists as uncovered
-          else if n ≤ᵇ 59 then censusᵍ (n ∸ 57)
-          -- 60 to 62 dial the value nesting past the one level `Γᵈ`
-          -- can state, swept over the INSTANT because the census shows
-          -- this context's registry empty by instant two
-          else if n ≤ᵇ 62 then nestRow (n ∸ 60) 0
-          -- 63 to 65 walk the share chain itself, at the instants the
-          -- census shows it standing
-          else if n ≤ᵇ 65 then deepSinkRow (n ∸ 63)
-          -- 66 to 68 read the floors the same chain's cells are named at
-          else if n ≤ᵇ 68 then ownCensusᵍ (n ∸ 66) else "(no such row)"
+          -- two shares
+          else if n ≤ᵇ 47 then censusᵍ (n ∸ 45)
+          -- 48 to 50 read the floors the same chain's cells are named at
+          else if n ≤ᵇ 50 then ownCensusᵍ (n ∸ 48) else "(no such row)"
 
 main : IO Unit
 main = getContents >>= λ s →

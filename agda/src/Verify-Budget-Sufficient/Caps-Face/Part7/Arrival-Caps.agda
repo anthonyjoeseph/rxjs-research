@@ -941,49 +941,53 @@ postulate
 -- ceiling is therefore the right shape for this side, and what it needs
 -- is that one frame's charge be bounded by what the values and the store
 -- already pay for.
--- PROBED: `Harness.Main`'s share-fold series prices BOTH sides at a
---   DRIVEN state -- the sched and store a real run builds, not a record
---   update over `st-init` -- at source zero, the only one of the three
---   whose admitted entries are headed by a frame rather than by `root`.
---   The fold reads one against a ceiling of eight, so it fits with room
---   at every row.  Three separations make the rows load-bearing: the
---   reading moves with the fold gas, it differs from a `root` control
---   taken at the same state, and it is nought at the instant the
---   registry is empty.  The frame arm `f ↠ p` is covered too, at the
---   two frames that preserve the source type: a `from-inner` head reads
---   one where the bare sink reads nought and where its own `fin = false`
---   control reads nought, and a SECOND such head reads the same one --
---   the `⊔` above, measured rather than read off the clause.
---   `thru-outer` heads a path too, at the context's one `obs`-typed
---   source, where the values are closed expressions and `nestDᵛˢ` is
---   therefore DIALLED rather than read flat: one nesting level moves
---   the fold by one and the ceiling by two.
---   A SECOND context carries both axes the first could not state, at an
---   `obs (obs natᵗ)` slot and a chain of three shares each registered
---   under the last.  The second nesting level moves the ceiling by two
---   again and the fold by NOUGHT -- the fold SATURATES where the path
---   runs out of frames, which is the `⊔` above read off the numbers
---   rather than off the clause, and the gap widens eleven, twelve,
---   fourteen.  The chain is walked and priced at a constant: entering
---   at its foot reads one where the sink that dead-ends at `root`
---   reads nought at the same state, and both read nought at the
---   instant the registry has emptied.  Not covered, and NOT COVERABLE:
---   a level or a chain past those, since the walk is exponential in
---   the registry and a thousandfold of speed is ten more paths -- so
---   the saturation is a statement to PROVE and never one to extend by
---   measuring.
---   ⚠ measured-not-rechecked.
+
+-- AND THE CEILING IS READ AT THE GRANT, NOT AT THE STATE THE FOLD WAS
+-- ENTERED AT, which is the correction the assembly forced.  The two
+-- axes enter `sightCeil` as a SUM, so a ceiling naming the entry
+-- state's own two readings is strictly SMALLER than one naming a grant
+-- that covers both -- and every instrument this side has is denominated
+-- in the grant.  The statement was therefore stronger than anything
+-- available and stronger than anything wanted: its one consumer weakens
+-- it to the grant form by `sightCeil-mono` on the line it is spent, out
+-- of premises that consumer already holds.  So the grant form costs the
+-- consumer nothing and is what the walk's own invariant carries.
+--
+-- AND THE ASSEMBLY IS THEN THE CHAIN FACE'S, ARM FOR ARM, WITH ONE ARM
+-- MISSING A MEASURE.  `fold-le` over `ChainFit sl S` is the induction,
+-- and two of its three obligations have routes already walked on the
+-- chain side: the frame arm is the sibling above weakened by
+-- `sightCeil-mono`, and the step arm is `chain-fit-step` verbatim.
+-- What has no route is the SINK arm, and the obstruction is not a
+-- missing bound but a missing descent -- the arm owes `disp-depth-fit`,
+-- which is proven FROM this statement, so the pair is mutually
+-- recursive through the fold gas.
+-- DEAD ROUTE: closing the sink arm by making the two mutual is
+--   STRUCTURALLY DEAD as the dispatch lemma is shaped.  Its hypothesis
+--   quantifies over EVERY gas rather than over the one the dispatch
+--   peels, so the descent `depthDisp` performs from `suc gas` to `gas`
+--   is invisible to the termination checker and no measure the pair
+--   could share is in scope.  Whatever closes this arm has to expose
+--   that peel in the dispatch lemma's own type, which is a restatement
+--   of the dispatch and not a proof of the fold.
+-- TWIN: `chain-depth-sighted` -- this statement on the chain face, at
+--   the same ceiling in the same currency, proven by exactly the
+--   `fold-le` instantiation described above.
 postulate
   share-fold-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sl : Slots Γ) (sf : Gas) (gas : ℕ) (bid : Id) (now : Tick) (i : Fin n)
+    (sl : Slots Γ) (id : ℕ) (sf : Gas) (gas : ℕ) (bid : Id) (now : Tick)
+    (S : ℕ) (i : Fin n)
     (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
     (rid : RegId) (p : Path Γ (lookup Γ i) t)
     (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl → sf ≡ budgetAt e sl bid →
+    nestΦAt e sl id ≤ S →
+    nestDᵛˢ vals ≤ S →
+    storeSyncMax sched st ≤ S →
     depthFold sf gas bid now (Fin.toℕ i) p vals
       (if fin then close (Fin.toℕ i) exhausted ∷ [] else []) fin sched
       (record st { delivered = rid ∷ EvalSt.delivered st })
-      ≤ sightCeil (sizeᵉ e) (nestDᵛˢ vals) (storeSyncMax sched st) (nestUnit e sl)
+      ≤ sightCeil (sizeᵉ e) S S (nestUnit e sl)
 
 -- AND THE STEP HALF, WHICH IS REACHED.  Its `rid` and `p` are exactly a
 -- `shareAdmit` entry, so a point is whatever the shared slot has
@@ -1138,8 +1142,8 @@ disp-depth-fit {e = e} sl id sf gas bid now S i vals fin sched st hsl hsf hΦ hv
   disp-le D sf gas bid now i vals fin
     (λ _ sch sto → (Sched.slots sch ≡ sl) × (storeSyncMax sch sto ≤ S))
     (λ g rid p ps sch sto q →
-       ≤-trans (share-fold-fit sl sf g bid now i vals fin rid p sch sto (proj₁ q) hsf)
-               (sightCeil-mono (sizeᵉ e) (nestUnit e sl) hval (proj₂ q)))
+       share-fold-fit sl id sf g bid now S i vals fin rid p sch sto
+         (proj₁ q) hsf hΦ hval (proj₂ q))
     (λ rid p ps sch sto q → q)
     (λ g rid p ps sch sto q →
        share-step-fit sl id sf g bid now S i vals fin rid p sch sto
