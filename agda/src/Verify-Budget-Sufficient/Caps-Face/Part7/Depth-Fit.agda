@@ -673,6 +673,22 @@ postulate
 -- the drain consumes that node's queue and reaches no other cell, so
 -- a ⊔ over the table is a widening of this reading rather than a
 -- second source, and the residue is the queued terms' own depth.
+
+-- AND THE STRICT LENGTH CONJUNCT IS THE WHOLE WALK FACE'S, NOT THIS
+-- STATEMENT'S, which is what prices any attempt to hand the fan a
+-- budgeted premise through here.  The conjunct is minted for the
+-- inner arm from the arm's own size receipt at level ZERO, where the
+-- caps step is the identity and no inflation is available -- so a
+-- length known only at twice the cap cannot supply it, and the
+-- weakening has to travel.  It travels far: the same premise is
+-- forwarded, never spent, from `stepFrame-nodes-inner` through
+-- `innerFinish-nest` and `mergeAllDrain-nest` to `subscribeInner-nest`,
+-- and a census of the two conjuncts finds them threaded through
+-- ninety-odd signatures across a dozen modules, `Nest-Walk` and
+-- `Walk-Level` among them -- the two the dev loop can no longer hold.
+-- So a fan route sharing the frame face's ONE size premise inherits a
+-- whole-face restatement, and the cheaper cut is to give the fan a
+-- premise of its own rather than to widen what every arm reads.
 InnerΦCore : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (sf : Gas) (eid : Id) (now : Tick) (B U W : ℕ)
   (op : AllOp) (allNid inst : NodeId) (p : Path Γ s t)

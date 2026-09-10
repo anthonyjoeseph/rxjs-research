@@ -244,10 +244,10 @@ does not fit is a finding about the shared statement, not about the head.
   fit under it, and the potential now prices it at the budget. What
   still reads the refuted form is the FAN — its registry receipt, the
   admitted-list filter and the share fold's premise are one size
-  reading at the entry cap. The commit carries the split premise
-  there, where it widens the two conjuncts the inner arm holds; that
-  arm sees no inflation at level zero, so the widening obliges the
-  nodes face rather than transporting. It narrows WHAT PRICES A
+  reading at the entry cap. Widening the frame face's SHARED premise
+  is priced out: the strict length conjunct is forwarded, never spent,
+  through ninety-odd signatures in a dozen modules. So the commit
+  gives the fan a premise of its own, and narrows WHAT PRICES A
   REGISTERED CHAIN to the mint's own supply.
 
 - **A READING THAT TRAVELS TO THE MINT**, which is all the store
