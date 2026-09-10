@@ -237,6 +237,41 @@ make dev-changed-selftest       verdict flips both ways, and nothing passes quie
 gate is required. It also exits 1 when the changed set is non-empty but nothing
 was actually checked — checking nothing must never read as a pass.
 
+## Stacking the next leg on an open PR
+
+The workflow declares `concurrency: gate-${{ github.ref }}` with
+`cancel-in-progress: false`. For a `pull_request` event `github.ref` is
+`refs/pull/<N>/merge`, so the group is **per PR** — every push to one branch
+lands in one group. `cancel-in-progress: false` protects the *running* job, not
+the queue: GitHub holds at most one PENDING run per group, so a third push
+cancels the waiter that the second push queued. That is the shape of the
+failure — the cancelled runs are queued ones that never started, and the branch
+goes on never completing a gate however long it is worked.
+
+Stacking gives the next leg its own group:
+
+```
+git checkout -b <next-leg-branch>          # off the open PR's head
+# open the PR with the OPEN PR's BRANCH as base, not main
+make roadmap-moved BASE_REF=<parent-branch>
+```
+
+Two knobs make it work, and both fail quietly if forgotten:
+
+- `pull_request.branches` in the workflow filters on the **base** branch. It
+  names `claude/**` alongside `main` so a stacked PR is gated; a base outside
+  that list produces no run and no error.
+- `make roadmap-moved` takes `BASE_REF=`, forwarded to the checker's
+  `--base-ref`. Without it the baseline is the merge-base with `main`, which on
+  a stack sits below the parent's own roadmap edits, so the check passes on
+  work that said nothing about the plan.
+
+When the parent's gate fails, fix it **on the parent** and merge that branch
+forward into the child. The child's gate then covers both legs at once, which is
+why a green stacked run is strictly more information than the parent's own — and
+why fixing a parent failure on the child instead leaves a green PR standing over
+a tree nothing checked.
+
 ## Related
 
 - [agda-dev.md](agda-dev.md) — the dev loop itself, its budget, and the
