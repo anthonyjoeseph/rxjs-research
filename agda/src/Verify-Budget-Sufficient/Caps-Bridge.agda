@@ -64,7 +64,7 @@ open import Verify-Budget-Sufficient.Desc-Ceil using (descW-ceil)
 open import Verify-Budget-Sufficient.Measures using
   (_hasAtLeast_; all-impl; boundedLive; capᴱ; chainsB?-widen; dBound; finish-slots;
   fnCapBounded?; fnCapLive; fnCapᵉ; fnCapᵛ; hasDry-append; hopR; INV-parts; INV?; parkRoom;
-  pathB?; pathLen; pop-bounded; pop-nextSource; pop-slots; pow1; regsB?; slotsFnCap; stBounded?; unconn; valB?;
+  pathB?; pathLen; pop-bounded; pop-nextNode; pop-nextSource; pop-slots; pow1; regsB?; slotsFnCap; stBounded?; unconn; valB?;
   valB?-widen; V≤C; ΨAt; ∧-true; szB)
 open import Verify-Budget-Sufficient.Keeps-Ring using
   (subscribeE-slots)
@@ -85,7 +85,7 @@ open import Verify-Budget-Sufficient.Subscribe-Face using
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (burstCaps?; burstCount?; capsOK?; capsOK?-mono; n≤capsAt-size; pathFloor; pathOrd?;
    pathPark?; pathSz?;
-   pathStrat?; regsSz?; regStrat?; slotsCaps?; srcFloor?; valCaps?; widLive; widNode; widNode-len;
+   pathStrat?; regOrd?; regsSz?; regStrat?; slotsCaps?; srcFloor?; valCaps?; widLive; widNode; widNode-len;
    nestClosOK?ᵛ; closLive; closSt?)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (valCaps?-size)
@@ -679,6 +679,11 @@ sub-charge : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   suc (sizeᵉ b) ≤ ops →
   pathStrat? κ ≡ true →
   inputsBelowᵉ (pathFloor κ) b ≡ true →
+  -- and the two entry readings, forwarded verbatim to `subscribeE-caps`:
+  -- this statement only charges the level, so it neither reads nor moves
+  -- either one, and passing them on is the whole of its business with them
+  pathOrd? (Sched.nextNode sched) κ ≡ true →
+  pathPark? κ st ≡ true →
   let r = subscribeE g b κ bid now sched st in
   Σ ℕ λ j′ →
     (capsOK? (frameStep (j + j′) c) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
@@ -1344,7 +1349,14 @@ pop-caps {n = n} c sched st eq h with capsOK?-parts c sched st h
                   (sym (pop-slots sched eq)) pk)
   (∧-intro (pop-closSt c sched st eq cl)
   (∧-intro (subst (λ x → (n ≤ᵇ x) ≡ true) (sym (pop-nextSource sched eq)) fl)
-           rs)))))))
+  -- THE REGISTRY'S THREE READINGS.  Two are state-only and survive the
+  -- pop untouched; the order fold is keyed on the node counter, which
+  -- the pop copies, so it transports along `pop-nextNode` exactly as
+  -- the source floor transports along `pop-nextSource` one line up
+  (∧-intro (proj₁ rs)
+  (∧-intro (subst (λ x → regOrd? x (EvalSt.registry st) ≡ true)
+                  (sym (pop-nextNode sched eq)) (proj₁ (proj₂ rs)))
+           (proj₂ (proj₂ rs)))))))))))
 
 ------------------------------------------------------------------
 -- § 3  THE ASSEMBLY.  The fuel loop and the theorem, with `capsOK?`

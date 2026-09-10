@@ -403,6 +403,21 @@ pop-nextSource : ∀ {n} {Γ : Ctx n}
 pop-nextSource sched eq with schedGo (Sched.live sched) | eq
 ... | inj₂ (a″ , ls) | refl = refl
 
+-- and the NODE counter, which the pop leaves alone for exactly the
+-- reason above: nothing subscribes while an arrival is being taken off
+-- the queue, so the counter the registry's order conjunct is keyed on
+-- is the same counter on both sides of the pop.  It is a separate
+-- statement from the source floor's because the two are separate
+-- fields with separate consumers -- this one's is the registry's own
+-- ordering fold, which reads the counter as a WATERMARK rather than as
+-- a bound, so a transport is what it needs and not a weakening
+pop-nextNode : ∀ {n} {Γ : Ctx n}
+  (sched : Sched Γ) {a : Arrival Γ} {sched′ : Sched Γ} →
+  sched-next sched ≡ inj₂ (a , sched′) →
+  Sched.nextNode sched′ ≡ Sched.nextNode sched
+pop-nextNode sched eq with schedGo (Sched.live sched) | eq
+... | inj₂ (a″ , ls) | refl = refl
+
 pop-bounded : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (B : ℕ) (sched : Sched Γ) (st : EvalSt e)
   {a : Arrival Γ} {sched′ : Sched Γ} →

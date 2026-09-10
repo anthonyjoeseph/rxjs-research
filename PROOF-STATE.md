@@ -239,15 +239,15 @@ does not fit is a finding about the shared statement, not about the head.
 ### Big picture tier roadmap
 
 - **ESTABLISHING WHICH SIDE OF EACH SEALED FACE IS ACTUALLY SEALED,
-  AND WHETHER THE HARNESS REACHES THE CONCLUSION.** Three rows claim
+  AND WHETHER THE HARNESS REACHES THE CONCLUSION.** Two rows claim
   in their own headers that they cannot be instantiated, and the claim
   is INHERITED rather than measured: a seal is added for checking cost,
   so what a row said when written need not hold now. The commit re-reads
   each definition site, says per row which SIDE is sealed, and runs the
   compiled harness at the conclusion, which ignores the seal and so
   answers what the checker cannot. A hypothesis-side seal leaves the
-  conclusion probeable and the row moves; a conclusion-side seal on all
-  three makes the sealing load-bearing in the STATEMENT.
+  conclusion probeable and the row moves; a conclusion-side seal on both
+  makes the sealing load-bearing in the STATEMENT.
 
 - **WALKING AN ADMITTED CHAIN AT THE LEVEL IT WAS REGISTERED AT, the
   one door the pricing question leaves open.** Both ends are closed by
@@ -275,7 +275,7 @@ does not fit is a finding about the shared statement, not about the head.
 ### Open questions
 
 - **IS THERE A COMPUTABLE SHADOW OF THE SEALED FACES? — FIRST, because it is
-  the one question the ledger cannot lower (Anthony).** Three rows say in
+  the one question the ledger cannot lower (Anthony).** Two rows say in
   their own headers that they cannot be instantiated. That sealing is what
   makes the tower checkable, so it is not removable per row, and it leaves a
   block of this tier whose class evidence can only RAISE: a refutation lands,
@@ -284,7 +284,7 @@ does not fit is a finding about the shared statement, not about the head.
   REDUCES and whose truth would imply these? And which SIDE of each row is
   sealed — the claim is INHERITED rather than measured, and a hypothesis-side
   seal leaves the conclusion probeable.
-  relevant: `walk-frame-drain-entries`, `subscribeE-sz`, `share-fold-fit`
+  relevant: `walk-frame-drain-entries`, `share-fold-fit`
 
 - **WHICH STORE CELLS DOES A PATH PREDICATE REACH?** Five rows fail in one
   place: the statement reads a PATH or a chain, and the quantity it must
