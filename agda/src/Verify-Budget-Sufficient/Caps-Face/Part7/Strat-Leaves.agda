@@ -2,13 +2,13 @@
 -- framePark-step … shareAdmit-park
 module Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves where
 
-open import Data.Bool    using (Bool; true; false; _∧_; _∨_)
+open import Data.Bool    using (Bool; true; false; if_then_else_; _∧_; _∨_)
 open import Data.Bool.Properties using (∨-zeroʳ)
 open import Data.Fin     using (Fin; toℕ)
 open import Data.List    using (List; map; []; _∷_)
 open import Data.Bool.ListAction using (all; any)
 open import Data.Maybe   using (Maybe; just; nothing)
-open import Data.Nat     using (ℕ; suc; _≤_; _≤ᵇ_; _≡ᵇ_)
+open import Data.Nat     using (ℕ; suc; pred; _≤_; _≤ᵇ_; _≡ᵇ_)
 open import Data.Nat.Properties using (≤-refl; ≤-trans; ≤ᵇ⇒≤; m≤m⊔n; m≤n⊔m; n≤1+n)
 open import Data.Unit    using (⊤; tt)
 open import Data.Vec     using (lookup)
@@ -26,7 +26,7 @@ open import Rx.Evaluator using
   subscribeInner; installNode; scan-st; take-st; mergeAll-st; switch-st; exhaust-st; map-f;
   scan-f; take-f; from-inner; thru-outer; Arrival; arrTy; chainsOf; chainStep; cascadeLatch;
   frameNodes; pathHasNode; switchKill; takeVals; innerReact; thruWalk; thruWrap;
-  mergeAllᵒ; switchᵒ; exhaustᵒ; hasRoom)
+  mergeAllᵒ; switchᵒ; exhaustᵒ; hasRoom; innerFinish; aliveThroughᶠ)
 open import Verify-Budget-Sufficient.Caps using (Caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (burstStrat?; capsOK?; framePark?; frameAbove?; frameRead; frameStrat?; parkStrat?; pathCell;
@@ -635,40 +635,164 @@ thruWrap-regs exhaustᵒ  nid true  r@(_ , _ , _ , st′)
 ... | just (switch-st _ _)       = refl
 ... | nothing                    = refl
 
--- THE TWO WRITERS THE STEP DISPATCHES TO, and the same argument at
--- each: both register only chains that CONTINUE the one they were
--- entered at, and a floor is the TERMINAL's, so every entry either
--- adds reports the entry chain's own floor -- at which the owner
--- reading is satisfied by whatever the entry names.
+-- WHAT A SUBSCRIBE DOES TO THE OWNER LEDGER, which is the registry
+-- half of the same disjointness and cannot be read off the store one.
+-- A subscribe REGISTERS, so the ledger grows, and a cell already owned
+-- at a floor has to stay owned against every entry the subscribe adds.
+-- Each such entry is the entry chain with newly minted frames stacked
+-- on it, and a floor is the TERMINAL's, which stacking does not move --
+-- so every entry the subscribe adds reports the entry chain's own
+-- floor, and at THAT floor the owner reading is satisfied whatever the
+-- entry names.  Stated at the one floor rather than at all of them
+-- because at any other floor it is FALSE: a freshly minted cell is
+-- owned vacuously beforehand and named by the new entry after.
+--
+-- AND THE NEW ENTRY'S CONJUNCT IS FREE, WHICH IS WHAT MAKES THE ROUTE
+-- MECHANICAL RATHER THAN MERELY PRECEDENTED.  `register` APPENDS, so
+-- an `all` over the post registry splits into the hypothesis and one
+-- conjunct about the chain just added -- and that conjunct is
+-- `pathOwn?` of the entry chain at ITS OWN floor, whose second
+-- disjunct is a reflexive `≡ᵇ`.  It is therefore true with no premise
+-- at all, where the same append carrying a LENGTH reading has to be
+-- handed a bound.  What is left is the arm-by-arm split of the
+-- subscribe, which the precedent does not reach.
+-- TWIN: `register-regsLen` (.Walk-Level.Parts), the same `all`-over-
+--   registry reading carried across the same append by
+--   `all-++-intro`, with `input-wet-scripted-regs` the worked
+--   subscribe-level assembly over it.
+-- PROBED: `Harness.Main`'s cell-floor series, at the instants either
+--   side of a real registration in a three-deep share chain: the entry
+--   the subscribe adds names a cell an existing entry already reads,
+--   and both report the same floor. NOT covered: a cell reached from
+--   two different terminals, which no context here can force.
+--   ⚠ measured-not-rechecked.
 postulate
-  innerReact-regOwn : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-    (g : Gas) (op : AllOp) (allNid inst : NodeId) (κ : Path Γ s t)
-    (id : Id) (now : Tick) (vals : List (Val Γ s)) (fin : Bool)
-    (sched : Sched Γ) (st : EvalSt e) (nd : NodeId) →
+  subscribeE-regOwn : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {w}
+    (g : Gas) (b : Closed Γ w) (κ : Path Γ w t)
+    (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e)
+    (nd : NodeId) →
     regOwn? nd (pathFloor κ) (EvalSt.registry st) ≡ true →
     regOwn? nd (pathFloor κ)
-      (EvalSt.registry
-        (proj₂ (proj₂ (proj₂ (proj₂
-          (innerReact g op allNid inst κ id now vals sched st fin))))))
+      (EvalSt.registry (proj₂ (proj₂ (subscribeE g b κ bid now sched st))))
       ≡ true
 
--- AND FOR THE DRAIN'S OWN SUBSCRIBE, which is the third writer the
--- *All edge spends and the one its recursion needs back.  Same
--- argument and same floor: the inner registers under the entry chain
--- with newly minted frames stacked on it, and stacking does not move a
--- terminal, so every entry the subscribe adds reports the floor being
--- read.
-postulate
-  subscribeInner-regOwn : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (g : Gas) (op : AllOp) (allNid : NodeId) (κ : Path Γ u t)
-    (id : Id) (now : Tick) (o : Val Γ (obs u))
-    (sched : Sched Γ) (st : EvalSt e) (nd : NodeId) →
-    regOwn? nd (pathFloor κ) (EvalSt.registry st) ≡ true →
-    regOwn? nd (pathFloor κ)
-      (EvalSt.registry
+-- AND THE DRAIN'S OWN SUBSCRIBE IS THAT ONE POSTULATE AND NOTHING
+-- ELSE, which is the whole content of this shelf.  An inner
+-- subscription out of gas hands back the state it was given; with gas
+-- it IS a subscribe, entered at the outer's frame STACKED on the chain
+-- the reading names -- and stacking does not move a terminal, so the
+-- floor the two readings are taken at is one and the same and the
+-- statement above transports directly, no arithmetic in between.
+subscribeInner-regOwn : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (g : Gas) (op : AllOp) (allNid : NodeId) (κ : Path Γ u t)
+  (id : Id) (now : Tick) (o : Val Γ (obs u))
+  (sched : Sched Γ) (st : EvalSt e) (nd : NodeId) →
+  regOwn? nd (pathFloor κ) (EvalSt.registry st) ≡ true →
+  regOwn? nd (pathFloor κ)
+    (EvalSt.registry
+      (proj₂ (proj₂ (proj₂ (proj₂ (proj₂
+        (subscribeInner g op allNid κ id now o sched st)))))))
+    ≡ true
+subscribeInner-regOwn g0     op allNid κ id now o sched st nd h = h
+subscribeInner-regOwn (gs g) op allNid κ id now o sched st nd h =
+  subscribeE-regOwn g o (from-inner op allNid (Sched.nextNode sched) ↠ κ)
+    id now (record sched { nextNode = suc (Sched.nextNode sched) }) st nd h
+
+-- AND THE DRAIN IS THE FOLD OVER IT, the *All edge's remaining writer.
+-- A drain re-subscribes queued inners one at a time at the OUTER's
+-- chain, so the reading is carried queue entry by queue entry and the
+-- induction is on the queue alone -- the same shape the walk has over
+-- an emit list, at the same floor and for the same reason.
+mergeAllDrain-regOwn : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (g : Gas) (allNid : NodeId) (κ : Path Γ s t) (id : Id) (now : Tick)
+  (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ s))
+  (sched : Sched Γ) (st : EvalSt e) (nd : NodeId) →
+  regOwn? nd (pathFloor κ) (EvalSt.registry st) ≡ true →
+  regOwn? nd (pathFloor κ)
+    (EvalSt.registry
+      (proj₂ (proj₂ (proj₂ (proj₂ (proj₂
+        (mergeAllDrain g allNid κ id now lim act q sched st)))))))
+    ≡ true
+mergeAllDrain-regOwn g allNid κ id now lim act []      sched st nd h = h
+mergeAllDrain-regOwn g allNid κ id now lim act (o ∷ q) sched st nd h
+  with hasRoom lim act
+... | false = h
+... | true  =
+      mergeAllDrain-regOwn g allNid κ id now lim
+        (if proj₁ (proj₂ (proj₂ (proj₂
+              (subscribeInner g mergeAllᵒ allNid κ id now o sched st))))
+           then act else suc act)
+        q
+        (proj₁ (proj₂ (proj₂ (proj₂ (proj₂
+          (subscribeInner g mergeAllᵒ allNid κ id now o sched st))))))
         (proj₂ (proj₂ (proj₂ (proj₂ (proj₂
-          (subscribeInner g op allNid κ id now o sched st)))))))
-      ≡ true
+          (subscribeInner g mergeAllᵒ allNid κ id now o sched st))))))
+        nd
+        (subscribeInner-regOwn g mergeAllᵒ allNid κ id now o sched st nd h)
+
+-- AND THE COMPLETION IS A DISPATCH WITH ONE LIVE ARM.  A finish looks
+-- up the outer's node and only a mergeAll at the matching payload type
+-- does anything to the ledger, by draining; a switch clears its slot
+-- and an exhaust its busy flag, both node writes, and every mismatched
+-- or missing node state hands the state straight back.
+innerFinish-regOwn : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (g : Gas) (op : AllOp) (allNid inst : NodeId) (κ : Path Γ s t)
+  (id : Id) (now : Tick) (vals : List (Val Γ s))
+  (sched : Sched Γ) (st : EvalSt e) (ns : Maybe (NodeState Γ)) (nd : NodeId) →
+  regOwn? nd (pathFloor κ) (EvalSt.registry st) ≡ true →
+  regOwn? nd (pathFloor κ)
+    (EvalSt.registry
+      (proj₂ (proj₂ (proj₂ (proj₂
+        (innerFinish g op allNid inst κ id now vals sched st ns))))))
+    ≡ true
+innerFinish-regOwn {s = s} g mergeAllᵒ allNid inst κ id now vals sched st
+  (just (mergeAll-st {w} lim act q od)) nd h with w ≟ᵗ s
+... | no  _    = h
+... | yes refl =
+      mergeAllDrain-regOwn g allNid κ id now lim (pred act) q sched st nd h
+innerFinish-regOwn g mergeAllᵒ allNid inst κ id now vals sched st nothing nd h = h
+innerFinish-regOwn g mergeAllᵒ allNid inst κ id now vals sched st (just (scan-st _)) nd h = h
+innerFinish-regOwn g mergeAllᵒ allNid inst κ id now vals sched st (just (take-st _)) nd h = h
+innerFinish-regOwn g mergeAllᵒ allNid inst κ id now vals sched st (just (switch-st _ _)) nd h = h
+innerFinish-regOwn g mergeAllᵒ allNid inst κ id now vals sched st (just (exhaust-st _ _)) nd h = h
+innerFinish-regOwn g switchᵒ allNid inst κ id now vals sched st nothing nd h = h
+innerFinish-regOwn g switchᵒ allNid inst κ id now vals sched st (just (scan-st _)) nd h = h
+innerFinish-regOwn g switchᵒ allNid inst κ id now vals sched st (just (take-st _)) nd h = h
+innerFinish-regOwn g switchᵒ allNid inst κ id now vals sched st (just (mergeAll-st _ _ _ _)) nd h = h
+innerFinish-regOwn g switchᵒ allNid inst κ id now vals sched st (just (exhaust-st _ _)) nd h = h
+innerFinish-regOwn g switchᵒ allNid inst κ id now vals sched st (just (switch-st nothing _)) nd h = h
+innerFinish-regOwn g switchᵒ allNid inst κ id now vals sched st (just (switch-st (just c) od)) nd h
+  with c ≡ᵇ inst
+... | true  = h
+... | false = h
+innerFinish-regOwn g exhaustᵒ allNid inst κ id now vals sched st nothing nd h = h
+innerFinish-regOwn g exhaustᵒ allNid inst κ id now vals sched st (just (scan-st _)) nd h = h
+innerFinish-regOwn g exhaustᵒ allNid inst κ id now vals sched st (just (take-st _)) nd h = h
+innerFinish-regOwn g exhaustᵒ allNid inst κ id now vals sched st (just (mergeAll-st _ _ _ _)) nd h = h
+innerFinish-regOwn g exhaustᵒ allNid inst κ id now vals sched st (just (switch-st _ _)) nd h = h
+innerFinish-regOwn g exhaustᵒ allNid inst κ id now vals sched st (just (exhaust-st _ _)) nd h = h
+
+-- AND THE REACTION IS THE GUARD IN FRONT OF IT.  A fin that is not
+-- raised, and one absorbed because some registration under this inner
+-- is still live, both hand the state back; only the unabsorbed fin
+-- reaches the completion above.
+innerReact-regOwn : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (g : Gas) (op : AllOp) (allNid inst : NodeId) (κ : Path Γ s t)
+  (id : Id) (now : Tick) (vals : List (Val Γ s)) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) (nd : NodeId) →
+  regOwn? nd (pathFloor κ) (EvalSt.registry st) ≡ true →
+  regOwn? nd (pathFloor κ)
+    (EvalSt.registry
+      (proj₂ (proj₂ (proj₂ (proj₂
+        (innerReact g op allNid inst κ id now vals sched st fin))))))
+    ≡ true
+innerReact-regOwn g op allNid inst κ id now vals false sched st nd h = h
+innerReact-regOwn g op allNid inst κ id now vals true  sched st nd h
+  with any (aliveThroughᶠ inst st) (EvalSt.registry st)
+... | true  = h
+... | false =
+      innerFinish-regOwn g op allNid inst κ id now vals sched st
+        (lookupNode allNid (EvalSt.nodes st)) nd h
 
 -- AND THE SAME FOR A CONSUME, WHICH IS NOW A BODY AND NOT A CLAIM.  A
 -- consume dispatches on the node it is entered at, and only one branch
@@ -786,46 +910,6 @@ stepFrame-regOwn g id now (thru-outer op nid) κ vals fin sched st nd h =
     (sym (thruWrap-regs op nid fin (thruWalk g op nid κ id now vals sched st)))
     (thruWalk-regOwn g op nid κ id now vals sched st nd h)
 
--- WHAT A SUBSCRIBE DOES TO THE OWNER LEDGER, which is the registry
--- half of the same disjointness and cannot be read off the store one.
--- A subscribe REGISTERS, so the ledger grows, and a cell already owned
--- at a floor has to stay owned against every entry the subscribe adds.
--- Each such entry is the entry chain with newly minted frames stacked
--- on it, and a floor is the TERMINAL's, which stacking does not move --
--- so every entry the subscribe adds reports the entry chain's own
--- floor, and at THAT floor the owner reading is satisfied whatever the
--- entry names.  Stated at the one floor rather than at all of them
--- because at any other floor it is FALSE: a freshly minted cell is
--- owned vacuously beforehand and named by the new entry after.
---
--- AND THE NEW ENTRY'S CONJUNCT IS FREE, WHICH IS WHAT MAKES THE ROUTE
--- MECHANICAL RATHER THAN MERELY PRECEDENTED.  `register` APPENDS, so
--- an `all` over the post registry splits into the hypothesis and one
--- conjunct about the chain just added -- and that conjunct is
--- `pathOwn?` of the entry chain at ITS OWN floor, whose second
--- disjunct is a reflexive `≡ᵇ`.  It is therefore true with no premise
--- at all, where the same append carrying a LENGTH reading has to be
--- handed a bound.  What is left is the arm-by-arm split of the
--- subscribe, which the precedent does not reach.
--- TWIN: `register-regsLen` (.Walk-Level.Parts), the same `all`-over-
---   registry reading carried across the same append by
---   `all-++-intro`, with `input-wet-scripted-regs` the worked
---   subscribe-level assembly over it.
--- PROBED: `Harness.Main`'s cell-floor series, at the instants either
---   side of a real registration in a three-deep share chain: the entry
---   the subscribe adds names a cell an existing entry already reads,
---   and both report the same floor. NOT covered: a cell reached from
---   two different terminals, which no context here can force.
---   ⚠ measured-not-rechecked.
-postulate
-  subscribeE-regOwn : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {w}
-    (g : Gas) (b : Closed Γ w) (κ : Path Γ w t)
-    (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e)
-    (nd : NodeId) →
-    regOwn? nd (pathFloor κ) (EvalSt.registry st) ≡ true →
-    regOwn? nd (pathFloor κ)
-      (EvalSt.registry (proj₂ (proj₂ (subscribeE g b κ bid now sched st))))
-      ≡ true
 
 -- WHAT A SUBSCRIBE DOES TO A CELL IT DOES NOT OWN, and this is the
 -- DISJOINTNESS half of the store question rather than a second

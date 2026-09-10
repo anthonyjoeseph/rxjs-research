@@ -238,17 +238,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **TWO LEAVES, AND THE PRECEDENT THEY WERE PICKED FOR.** The four
-  writers have collapsed to two. The step and the consume are BODIES
-  now, dispatching to whatever actually registers, and the ENQUEUE arm
-  answered itself — the writer whose own cell the reading is about
-  touches the ledger nowhere. What is left
-  is a reaction and a drained inner, each a real `register`, and the
-  precedent is exactly theirs — the append splits the reading into the
-  hypothesis and a conjunct reflexive at the entry chain's floor. The
-  commit spends it at both and reports whether stacking a minted frame
-  moves the terminal that floor is read from. It narrows DOES A STORE
-  CELL HAVE AN OWNER to the walked chain.
+- **THE WALKED CHAIN, WHICH IS ALL THE OWNER QUESTION HAS LEFT.** The
+  transport now bottoms out on ONE postulate — a subscribe — and every
+  dispatcher above it is a body, so no floor is recomputed on the way:
+  stacking a minted frame does not move a terminal, and the reading
+  crosses each writer definitionally. What that leaves is the pair the
+  question names, both about a chain a WALK stands on rather than one
+  a writer was entered at: a step's frame-keyed park across an
+  overwrite, and the cell a consume enqueues into. The commit takes
+  the step's reading and reports whether the enqueue's cell is
+  reachable from it — the whole of DOES A STORE CELL HAVE AN OWNER as
+  it now stands.
 
 - **A LENGTH THAT IS NOT PRICED IN A CAP**, which is what the fan's
   refutation leaves as the only move. Reading the registry at the level
@@ -421,14 +421,6 @@ does not fit is a finding about the shared statement, not about the head.
   cell a walk cannot freeze. The consume enqueues into exactly the cell the
   reading is about, so no watermark both covers it and excludes the write; the
   payload's own reading is what is asked to keep it true.
-- **`innerReact-regOwn`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the
-  ledger across a reaction on the *All edge's inner side, the one arm of a step
-  the dispatch does not reduce away. It registers under the entry chain, so the
-  floor it reports should be the one being read.
-- **`subscribeInner-regOwn`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the
-  ledger across one drained inner, the writer the drain's recursion needs back.
-  The inner registers under the entry chain with newly minted frames stacked on
-  it, and stacking does not move a terminal.
 - **`mergeAllDrain-ownerQueue`** (Part7/Strat-Leaves) — SHAPE, `REFUTED`: what
   the drain leaves in the owner's cell. Its premise is read off the POST-state,
   which the no-room arm never builds, so it is vacuously satisfiable. The
