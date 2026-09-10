@@ -238,16 +238,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE OWNER TRAVELS WITH THE CHAIN, AND THE RECORD ROUTE IS DEAD.** A
-  conjunct over the store cannot see which chain a writer is standing on,
-  and the two ledgers that do read a chain admit the offending registry,
-  so no field excludes it. The park transport is now proven at a named
-  floor and the whole gap is `regOwn-cell` — that no registered reader of
-  the written cell stands below the walking chain, which is provenance and
-  travels beside the park and order readings the walk already threads
-  frame by frame. The commit threads it from the sites holding a frame up
-  to whoever built the chain. It narrows DOES A STORE CELL HAVE AN OWNER
-  to whether a producer can pay the reading at all.
+- **THE OWNER TRAVELS WITH THE CHAIN, AND THE THREAD STOPS AT THE WALK.** A
+  store conjunct cannot see which chain a writer stands on, and the
+  ledgers that do read a chain admit the offending registry, so no field
+  excludes it: the reading is folded into the frame park, and the record
+  route is dead. The finish chain and the nest
+  walk now split both halves off one reading, and the statement that
+  named the gap is gone. What remains is every consumer ABOVE the walk —
+  level, sink, burst, depth — still reading the park at its old shape,
+  so the thread reaches whoever built the chain only once they split it
+  too. It narrows DOES A STORE CELL HAVE AN OWNER to whether a producer
+  can pay the reading at all.
 
 - **A CONTEXT DEEP ENOUGH TO DISAGREE WITH**, which is now the only
   thing between `share-fold-fit` and a class it has earned. Every axis
@@ -437,11 +438,6 @@ does not fit is a finding about the shared statement, not about the head.
   ledger across one drained inner, the writer the drain's recursion needs back.
   The inner registers under the entry chain with newly minted frames stacked on
   it, and stacking does not move a terminal.
-- **`regOwn-cell`** (Part1) — SHAPE, `REFUTED`: no registered reader of a
-  written cell stands below the writing chain. Refuted over an arbitrary
-  state, where a share-ended chain reads at its slot index and the writer
-  stands at the root width. The transport over it is proven, so this is the
-  whole gap.
 - **`mergeAllDrain-ownerQueue`** (Part7/Strat-Leaves) — SHAPE, `REFUTED`: what
   the drain leaves in the owner's cell. Its premise is read off the POST-state,
   which the no-room arm never builds, so it is vacuously satisfiable. The

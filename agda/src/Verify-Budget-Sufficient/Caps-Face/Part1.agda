@@ -780,7 +780,7 @@ frameOwned? k f rs = all (λ nd → regOwn? nd k rs) (frameNodes f)
 -- can name.
 --
 -- REFUTED: `Refuted.SetNode-Two-Floor` is the two-floor registry the
--- unowned form admits.
+--   unowned form admits.
 frameParked? : ∀ {n} {Γ : Ctx n} {s u t} {e : Closed Γ t} →
   ℕ → Frame Γ s u → EvalSt e → Bool
 frameParked? k (from-inner _ allNid _) st =
@@ -797,15 +797,15 @@ frameParked? k _ st = true
 -- out wherever a caller hands one half onward.
 --
 -- DEAD ROUTE: naming the strat half as a lemma concluding
--- `frameParked? k f st ≡ true` is STRUCTURALLY DEAD.  A caller's goal
--- is the reduced conjunct -- a `parkStrat?` at the node the frame
--- names -- and the lemma's conclusion heads on `frameParked?` applied
--- to a frame the elaborator has not yet solved, which is stuck, so
--- the application never reaches the argument that would solve it.
--- Passing the frame explicitly does not help: the constructor carries
--- an implicit the explicit fields do not fix.  `∧-trueˡ` works at the
--- same sites precisely because its conclusion IS the goal's own head,
--- so the goal solves the operand and the premise solves the other.
+--   `frameParked? k f st ≡ true` is STRUCTURALLY DEAD.  A caller's goal
+--   is the reduced conjunct -- a `parkStrat?` at the node the frame
+--   names -- and the lemma's conclusion heads on `frameParked?` applied
+--   to a frame the elaborator has not yet solved, which is stuck, so
+--   the application never reaches the argument that would solve it.
+--   Passing the frame explicitly does not help: the constructor carries
+--   an implicit the explicit fields do not fix.  `∧-trueˡ` works at the
+--   same sites precisely because its conclusion IS the goal's own head,
+--   so the goal solves the operand and the premise solves the other.
 framePark? : ∀ {n} {Γ : Ctx n} {s u t} {e : Closed Γ t} →
   ℕ → Frame Γ s u → EvalSt e → Bool
 framePark? k f st = frameParked? k f st ∧ frameOwned? k f (EvalSt.registry st)
