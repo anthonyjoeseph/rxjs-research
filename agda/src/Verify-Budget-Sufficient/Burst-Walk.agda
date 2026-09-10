@@ -80,10 +80,10 @@ open import Verify-Budget-Sufficient.Subscribe-Face
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (capsOK?; capsOK?-mono; parkStrat?; pathFloor; pathOrd?; pathOrd?-inner;
   pathOrd?-outer; pathPark?;
-  pathStrat?; pathSz?; pathSz?-widen; slotsCaps?;
+  pathStrat?; pathSz?; pathSz?-widen; regOwn?; regOwn?-fresh; slotsCaps?;
   valCaps?)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
-  (capsOK?-nextNode; capsOK?-nodeSz; capsOK?-nodeWid; capsOK?-parts; capsOK?-regs;
+  (capsOK?-nextNode; capsOK?-nodeSz; capsOK?-nodeWid; capsOK?-parts; capsOK?-regOrd; capsOK?-regs;
   lookupNode-caps; mList?;
   mList?-head; mList?-keeps; mList?-tail; NodeCaps; pathSz?-len; pathSz?-tail; switchKill-caps;
   valsCaps?; valsCaps?-lvl; valsCaps→mList-strict; valsStrat?)
@@ -355,6 +355,7 @@ SiNodry = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   pathOrd? (Sched.nextNode sched) (thru-outer op allNid ↠ κ) ≡ true →
   pathPark? κ st ≡ true →
   parkStrat? (pathFloor κ) (lookupNode allNid (EvalSt.nodes st)) ≡ true →
+  regOwn? allNid (pathFloor κ) (EvalSt.registry st) ≡ true →
   any dryEvent (proj₁ (proj₂ (proj₂
     (subscribeInner g op allNid κ id now o sched st))))
     ≡ false
@@ -690,6 +691,10 @@ subscribeE-inner-nodry-core : WalkLevel → ∀ {n} {Γ : Ctx n} {t} {e : Closed
   pathOrd? (Sched.nextNode sched) (thru-outer op allNid ↠ κ) ≡ true →
   pathPark? κ st ≡ true →
   parkStrat? (pathFloor κ) (lookupNode allNid (EvalSt.nodes st)) ≡ true →
+  -- and the owner of that same cell, which the park reading no longer
+  -- carries on its own: the frame names TWO nodes, so the walk's own
+  -- premise is the outer one and the instance is minted fresh below
+  regOwn? allNid (pathFloor κ) (EvalSt.registry st) ≡ true →
   hasDry (proj₁ (subscribeE fuel o
            (from-inner op allNid (Sched.nextNode sched) ↠ κ) id now
            (record sched { nextNode = suc (Sched.nextNode sched) }) st))
@@ -697,7 +702,7 @@ subscribeE-inner-nodry-core : WalkLevel → ∀ {n} {Γ : Ctx n} {t} {e : Closed
 subscribeE-inner-nodry-core wl {n} {Γ} {t} {e} {u}
     c sl Ψ dep bud 2≤S 1≤R hCR slC slSz slFc
     J fuel op allNid κ id now o sched st ok pb sspLen vb rg nB hD cl gk stP stI
-    stO stK stQ =
+    stO stK stQ stW =
   dry
   where
   inst   = Sched.nextNode sched
@@ -810,7 +815,18 @@ subscribeE-inner-nodry-core wl {n} {Γ} {t} {e} {u}
          stP
          stI
          (pathOrd?-inner inst allNid op κ stO)
-         (∧-intro stQ stK)
+         -- THE FRAME NAMES TWO CELLS, so its owner reading is a pair:
+         -- the outer node is the walk's own premise, the instance is
+         -- the mint the scheduler just handed out, so it is owned at
+         -- every floor by the registry order the caps invariant carries
+         (∧-intro (∧-intro stQ
+                     (∧-intro stW
+                        (∧-intro (regOwn?-fresh inst inst (pathFloor κ)
+                                    (EvalSt.registry st) ≤-refl
+                                    (capsOK?-regOrd (frameStep J c) sched st
+                                       (proj₂ (proj₁ ok))))
+                                 refl)))
+                  stK)
 
   j′  = proj₁ W
   p2  = proj₂ W
@@ -860,6 +876,7 @@ subscribeE-inner-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   pathOrd? (Sched.nextNode sched) (thru-outer op allNid ↠ κ) ≡ true →
   pathPark? κ st ≡ true →
   parkStrat? (pathFloor κ) (lookupNode allNid (EvalSt.nodes st)) ≡ true →
+  regOwn? allNid (pathFloor κ) (EvalSt.registry st) ≡ true →
   hasDry (proj₁ (subscribeE fuel o
            (from-inner op allNid (Sched.nextNode sched) ↠ κ) id now
            (record sched { nextNode = suc (Sched.nextNode sched) }) st))
