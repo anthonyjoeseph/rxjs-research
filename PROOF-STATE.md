@@ -238,17 +238,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **WALKING AN ADMITTED CHAIN AT THE LEVEL IT WAS REGISTERED AT, the
-  one door the pricing question leaves open.** Both ends are closed by
-  arithmetic now, and `fan-regsSz`'s header carries which: the fan can
-  reach neither the entry-cap receipt nor the stepped one. What
-  neither end touches is the fan's own choice to re-enter a chain from
-  the instant's TOP, where a chain entered at the level it was
-  registered at needs exactly the receipt `register-caps` left behind.
-  The commit asks what the walk must carry for that to be stateable,
-  and whether the depth measure still decreases below the top — the
-  form the pricing question has to take to be answerable at all.
-
 - **PROBING THE SIX LEAVES THE CARRIED READINGS NOW OBLIGE.** The two
   entry readings are carried on paths through BOTH faces now — the burst
   face's nodry cascade and its consumers take them as hypotheses — so
@@ -270,6 +259,18 @@ does not fit is a finding about the shared statement, not about the head.
   degrades before it does — tight at four paths is a refutation in
   waiting, still reading one is a statement about the ceiling. It
   narrows WHICH STORE CELLS DOES A PATH PREDICATE REACH to the length.
+
+- **THE MINT'S LEVEL-ZERO RECEIPT, now that the fan's registry reading
+  is a real body and the residue carries the level in its own
+  statement.** `fan-regsSz-mint` and `walk-share-nestOK` stand at one
+  door — the state the fan reads the registry at after a same-instant
+  `register` — and each now differs from its own discharged half in
+  exactly one thing, that the caps stepped. The commit asks whether the
+  subscribe descent can hand a registration its receipt at the level
+  the instant was ENTERED at rather than at the level it is standing
+  at, which is the only thing that would make the two flat again, and
+  reports what the descent would have to carry to do it. It narrows
+  WHAT PRICES A REGISTERED CHAIN to the descent.
 
 ### Open questions
 
@@ -296,16 +297,15 @@ does not fit is a finding about the shared statement, not about the head.
   relevant: `step-frame-store≤`, `share-fold-store≤`, `subscribeE-sz-store-scan`, `pushBurst-sz-store-outer`, `subscribeSharedSlot-sz-store`
 
 
-- **WHAT PRICES A REGISTERED CHAIN, AND WHERE IS THE RECEIPT OWED?** Five
-  closed routes under `fan-regsSz` name one residue: no cap prices a
-  registered chain, and the stratified climb counts hops where the receipt
-  counts frames. Two siblings reach the same place from the other side —
-  each dies in its free form at one `register`, so each is owed AT THE MINT
-  rather than along the walk. The question is what the factor can be
-  denominated in when neither a cap nor the telescope will pay it, and
-  whether the answer is a denomination at all or a mechanism that
-  establishes the receipt where the chain is created.
-  relevant: `fan-regsSz`, `sink-fan-sink`, `walk-share-strat`
+- **WHAT PRICES A REGISTERED CHAIN, AND WHERE IS THE RECEIPT OWED?** It is
+  not a denomination question: the fan's registry reading splits at the
+  LEVEL, discharges at the instant's top, and leaves a residue whose whole
+  content is that a mint stepped the caps. Two siblings die in their free
+  form at one `register` too, so each is owed AT THE MINT rather than along
+  the walk. What is left is whether a registration can be given its receipt
+  at the level the instant was entered at — the descent carries its own
+  size hypothesis one level down, so today it cannot.
+  relevant: `fan-regsSz-mint`, `sink-fan-sink`, `walk-share-strat`
 
 ### The ledger
 
@@ -357,11 +357,10 @@ does not fit is a finding about the shared statement, not about the head.
   registered chain ends strictly ABOVE the input it was minted subscribing. The
   only receipt here naming no cap, which is what makes it carryable; the free
   form dies at one `register`, so it is owed at the mint.
-- **`fan-regsSz`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE×5`: the
-  registry's own size receipt at the PROGRAM's cap. `register-caps` prices a
-  mint at one frame step, so the reading sits above the cap the conclusion
-  names and the connect puts a mint inside every fan. Open: the Φ arithmetic at
-  one step, not a currency.
+- **`fan-regsSz-mint`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE×5`:
+  the registry's size receipt at the PROGRAM's cap, above the instant's top.
+  The level-zero half is a body now, so what is left is a registration minted
+  since entry — the connect putting one inside every fan.
 - **`walk-share-nestOK`** (Part7/Depth-Fit) — FALSITY, `DEAD ROUTE×4`: the
   instant's nest predicate at the state the fan reads the registry. The door
   has it and the walk carries no nest conjunct at all; threading it down is

@@ -1427,9 +1427,41 @@ postulate
 --   other counts FRAMES, and no bound on either is a bound on the
 --   other.
 postulate
-  fan-regsSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sl : Slots Γ) (id : ℕ) (st : EvalSt e) →
+  fan-regsSz-mint : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sl : Slots Γ) (id : ℕ) (Lv : ℕ) (sched : Sched Γ) (st : EvalSt e) →
+    capsOK? (frameStep (suc Lv) (capsAt e sl id)) sched st ≡ true →
     regsSz? (Caps.cSize (capsAt e sl id)) (EvalSt.registry st) ≡ true
+
+-- THE LEVEL IS WHAT THE FAN WAS MISSING, AND HALF OF IT IS FREE.  The
+-- walk already stands at a level: `capsWalkOK` reads its caps receipt
+-- at `frameStep Lv`, and the sink clause holds that receipt and then
+-- drops it.  Picking it up splits the fan's registry reading in two.
+-- At the instant's TOP the step is the identity, so the flat reading
+-- IS the levelled one and `capsOK?-regs` closes it outright -- which
+-- is what makes this a body rather than a weakening.  Above the top
+-- the two caps differ and the leaf above is what is left, with the
+-- risky region now named in the statement rather than in prose: a
+-- registration MINTED since the instant was entered.
+--
+-- WHAT THE CALLER HAD TO CARRY IS A LEVEL AND NOTHING ELSE, which the
+-- caps face already settled and this side had not adopted.  The ring
+-- takes its admitted-list receipt at a level of its own under the
+-- walk's, spends it after widening, and its depth premise never reads
+-- either -- so entering an admitted chain below the top costs the
+-- measure nothing, `depthShareGo` being level-free in its own
+-- signature.  The Φ face is the one consumer that cannot follow,
+-- because what it spends a size receipt on is a LENGTH under the cap
+-- its CONCLUSION names, and widening moves that the wrong way.
+--
+-- TWIN: `sink-ring-go` -- the same fan, walked at a level, proven.
+fan-regsSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (id : ℕ) (Lv : ℕ) (sched : Sched Γ) (st : EvalSt e) →
+  capsOK? (frameStep Lv (capsAt e sl id)) sched st ≡ true →
+  regsSz? (Caps.cSize (capsAt e sl id)) (EvalSt.registry st) ≡ true
+fan-regsSz {e = e} sl id zero sched st cok =
+  capsOK?-regs (capsAt e sl id) sched st
+    (subst (λ c → capsOK? c sched st ≡ true) (frameStep-0 (capsAt e sl id)) cok)
+fan-regsSz sl id (suc Lv) sched st cok = fan-regsSz-mint sl id Lv sched st cok
 
 fan-chain-sz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (i : Fin n) (st : EvalSt e) →
@@ -1854,6 +1886,7 @@ mutual
     (sched : Sched Γ) (st : EvalSt e) →
     dispatchCapsOK (capsAt e sl id) (capsAt e sl (suc id)) sl (capsH e sl id) Lv
       sf gas nid now i vals fin sched st →
+    capsOK? (frameStep Lv (capsAt e sl id)) sched st ≡ true →
     depthDisp sf gas nid now i vals fin sched st ≤ capsH e sl id →
     Sched.slots sched ≡ sl →
     valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
@@ -1884,13 +1917,13 @@ mutual
     ShareGoΦHyp sf gas nid now (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
       i vals fin ps sched st
 
-  walk-share-ΦHyp sl id sf zero nid now Lv i vals fin sched st _ _ _ _ = tt
+  walk-share-ΦHyp sl id sf zero nid now Lv i vals fin sched st _ _ _ _ _ = tt
   walk-share-ΦHyp {e = e} sl id sf (suc gas) nid now Lv i vals false sched st
-                  hd hdd hsl hΦ =
+                  hd hck hdd hsl hΦ =
     walk-shareGo-ΦHyp sl id sf gas nid now Lv i vals false
       (shareAdmit i (EvalSt.registry st)) sched st
       (proj₂ (proj₂ hd)) hdd
-      hsl (fan-chain-sz sl id i st (fan-regsSz sl id st))
+      hsl (fan-chain-sz sl id i st (fan-regsSz sl id Lv sched st hck))
           (fan-chain-nestD (nestCapAt e sl id) i st
              (fan-regsNest sl id sched st
                 (walk-share-nestOK sl id sf gas nid now Lv i vals false
@@ -1899,11 +1932,11 @@ mutual
              (walk-share-strat sl id sf gas nid now Lv i vals false
                 sched st hd hsl)) hΦ
   walk-share-ΦHyp {e = e} sl id sf (suc gas) nid now Lv i vals true sched st
-                  hd hdd hsl hΦ =
+                  hd hck hdd hsl hΦ =
     walk-shareGo-ΦHyp sl id sf gas nid now Lv i vals true
       (shareAdmit i (EvalSt.registry st)) sched (shareLatch i true st)
       (proj₂ (proj₂ hd)) hdd
-      hsl (fan-chain-sz sl id i st (fan-regsSz sl id st))
+      hsl (fan-chain-sz sl id i st (fan-regsSz sl id Lv sched st hck))
           (fan-chain-nestD (nestCapAt e sl id) i st
              (fan-regsNest sl id sched st
                 (walk-share-nestOK sl id sf gas nid now Lv i vals true
@@ -1955,7 +1988,7 @@ mutual
   walk-ΦHyp-go sl id sf gas nid now Lv envSrc evs (share-sink i) vals fin sched st
                hcw hdf hsl _ _ hΦ =
     walk-share-ΦHyp sl id sf gas nid now Lv i vals fin sched st
-      (proj₂ hcw) hdf hsl hΦ
+      (proj₂ hcw) (proj₁ hcw) hdf hsl hΦ
   walk-ΦHyp-go {e = e} sl id sf gas nid now Lv envSrc evs (f ↠ p) vals fin sched st
                hcw hdf hsl hpz hnd hΦ =
       hF
