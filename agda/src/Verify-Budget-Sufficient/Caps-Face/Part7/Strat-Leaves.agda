@@ -433,21 +433,6 @@ scan-strat-step {u = u} k sf nid now fn nd κ vals fin sched st hpk hfn hib
 ...   | yes refl = proj₂ (scanVals-strat k fn acc vals hfn (∧-trueˡ hpk) hib)
 ...   | no _     = refl
 
--- THE STRAT HALF OF A FRAME READING, as a named projection rather than
--- a `∧` split spelled at each site.  The conjunction sits behind a
--- definition, so the split reduces only once the frame's shape is
--- known; naming it here puts that reduction in one place and spares
--- each site the owner predicate it is discarding.  The OTHER half has
--- no such projection and cannot get one: an implicit-operand split
--- leaves the discarded conjunct a metavariable there, because the
--- owner side is itself a fold no argument fixes -- so an owner half is
--- taken with the explicit-operand `∧-true` and every conjunct named.
-framePark?-parked : ∀ {n} {Γ : Ctx n} {s u t} {e : Closed Γ t}
-  (k : ℕ) (f : Frame Γ s u) (st : EvalSt e) →
-  framePark? k f st ≡ true →
-  frameParked? k f st ≡ true
-framePark?-parked k f st h = ∧-trueˡ {a = frameParked? k f st} h
-
 -- THE MINT'S OWN OWNER READING, which is what every install site here
 -- spends and none of them can source locally.  A cell handed out AT
 -- the counter is named by no registered chain, because the ordering

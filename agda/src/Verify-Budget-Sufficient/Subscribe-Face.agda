@@ -167,7 +167,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves using
   fresh-pathPark; subscribeE-pathPark; subscribeE-ord; thruConsume-cellPark;
   mergeAllDrain-ownerQueue; installNode-cellPark; subscribeInner-ord; subscribeInner-pathPark;
   subscribeInner-cellPark; mint-regOwn; thruConsume-regOwn; switchKill-regOwn;
-  subscribeInner-regOwn; switchKill-pathPark; framePark?-parked)
+  subscribeInner-regOwn; switchKill-pathPark)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (2≤frameStep-size; burstCaps?-++; burstCaps?-widen; closeList-caps;
    eventsCaps?-widen; finList-caps; frameStep-+assoc-burst;
@@ -202,7 +202,7 @@ open import Verify-Budget-Sufficient.Caps-Depth
 -- unfolding replaces the recursion variable by the μ itself, so the
 -- reading has to survive the elimination rather than the grammar
 open import Rx.Inputs-Below using (ib-unfoldμ; ib-monoᵛ)
-open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen)
+open import Decide using (T-to; T⇒≡true; ∧-intro; ∧-trueˡ; ≤ᵇ-widen)
 
 ------------------------------------------------------------------
 -- THE COUNT, FOLDED IN — and now DISCHARGED, so the
@@ -2594,7 +2594,7 @@ stepFrame-caps c dep bud j g id now (from-inner op allNid inst) κ vals fin sl s
     -- into it bought: the cell half is the flatten's own queue and the
     -- owner half is its registration, and the edge below wants them
     -- apart because only the cell half travels by the node table
-    (framePark?-parked (pathFloor κ) (from-inner op allNid inst) st stK)
+    (∧-trueˡ stK)
     -- the *All edge is stated over the OUTER frame, which names the
     -- flatten alone; the walk arrives holding the inner, which names
     -- the payload beside it and so says strictly more
@@ -2666,7 +2666,7 @@ stepFrame-caps c (suc dep′) bud j g id now (thru-outer op nid) κ vals fin sl 
          -- the four the walk asks for are the clause's own two chain
          -- readings and the two halves of its frame reading, with no
          -- transport at all
-         stO stC (framePark?-parked (pathFloor κ) (thru-outer op nid) st stK) hOwn
+         stO stC (∧-trueˡ stK) hOwn
   j′ = proj₁ TW
   WK = thruWalk g op nid κ id now vals sched st
   WR = thruWrap-caps (frameStep (j + j′) c) op nid fin sl WK

@@ -791,6 +791,21 @@ frameParked? k (thru-outer _ nid) st =
   parkStrat? k (lookupNode nid (EvalSt.nodes st))
 frameParked? k _ st = true
 
+-- AND ITS TWO HALVES ARE TAKEN INLINE AT EVERY SITE, WHICH IS NOT A
+-- MISSED ABSTRACTION.  The strat half is `∧-trueˡ` and the owner half
+-- is the explicit-operand `∧-true` with every conjunct named, spelled
+-- out wherever a caller hands one half onward.
+--
+-- DEAD ROUTE: naming the strat half as a lemma concluding
+-- `frameParked? k f st ≡ true` is STRUCTURALLY DEAD.  A caller's goal
+-- is the reduced conjunct -- a `parkStrat?` at the node the frame
+-- names -- and the lemma's conclusion heads on `frameParked?` applied
+-- to a frame the elaborator has not yet solved, which is stuck, so
+-- the application never reaches the argument that would solve it.
+-- Passing the frame explicitly does not help: the constructor carries
+-- an implicit the explicit fields do not fix.  `∧-trueˡ` works at the
+-- same sites precisely because its conclusion IS the goal's own head,
+-- so the goal solves the operand and the premise solves the other.
 framePark? : ∀ {n} {Γ : Ctx n} {s u t} {e : Closed Γ t} →
   ℕ → Frame Γ s u → EvalSt e → Bool
 framePark? k f st = frameParked? k f st ∧ frameOwned? k f (EvalSt.registry st)
