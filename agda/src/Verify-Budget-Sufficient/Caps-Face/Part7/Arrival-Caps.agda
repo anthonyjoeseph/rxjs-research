@@ -919,13 +919,15 @@ postulate
 -- purpose -- the ceiling's second argument is exactly the values' nest
 -- depth -- so which side moves faster is the whole question, and it is
 -- arithmetic rather than a matter of coverage.  A nesting level buys
--- the fold ONE, since `depthFrame` at the successor arm adds a single
--- `suc` per level walked; it buys the ceiling `suc (sizeᵉ e)`, since
--- that is the factor `sightCeil` multiplies its summands by, and the
--- factor is at least two at any program with a term in it.  So the
--- slack WIDENS with nesting, and the axis that was the last candidate
--- to refute is the one that cannot.  Measured at one level, where the
--- fold goes one to two and the ceiling eight to ten.
+-- the ceiling `suc (sizeᵉ e)`, since that is the factor `sightCeil`
+-- multiplies its summands by, and the factor is at least two at any
+-- program with a term in it.  It buys the fold AT MOST one, and only
+-- while a frame is left to spend it: the whole family combines by `⊔`
+-- but for two `suc` sites, and the one on this arc is `depthFrame`'s
+-- `thru-outer`, so a path charges once per FRAME and not once per
+-- level nested beneath it.  The fold is therefore capped by the path
+-- while the ceiling keeps climbing, and the axis that was the last
+-- candidate to refute is the one that cannot.
 
 -- SO THE RESIDUE IS ONE FRAME'S CHARGE AND ONE PATH'S DEPTH, and the
 -- first of those is the sibling directly above rather than anything new.
@@ -955,10 +957,21 @@ postulate
 --   `thru-outer` heads a path too, at the context's one `obs`-typed
 --   source, where the values are closed expressions and `nestDᵛˢ` is
 --   therefore DIALLED rather than read flat: one nesting level moves
---   the fold by one and the ceiling by two.  Not covered: a second
---   nesting level, which this context cannot state for want of an
---   `obs (obs natᵗ)` slot to draw a value from; and two flat shares, so
---   nothing about one registered under another.
+--   the fold by one and the ceiling by two.
+--   A SECOND context carries both axes the first could not state, at an
+--   `obs (obs natᵗ)` slot and a chain of three shares each registered
+--   under the last.  The second nesting level moves the ceiling by two
+--   again and the fold by NOUGHT -- the fold SATURATES where the path
+--   runs out of frames, which is the `⊔` above read off the numbers
+--   rather than off the clause, and the gap widens eleven, twelve,
+--   fourteen.  The chain is walked and priced at a constant: entering
+--   at its foot reads one where the sink that dead-ends at `root`
+--   reads nought at the same state, and both read nought at the
+--   instant the registry has emptied.  Not covered, and NOT COVERABLE:
+--   a level or a chain past those, since the walk is exponential in
+--   the registry and a thousandfold of speed is ten more paths -- so
+--   the saturation is a statement to PROVE and never one to extend by
+--   measuring.
 --   ⚠ measured-not-rechecked.
 postulate
   share-fold-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}

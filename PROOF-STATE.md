@@ -250,18 +250,6 @@ does not fit is a finding about the shared statement, not about the head.
   too. It narrows DOES A STORE CELL HAVE AN OWNER to whether a producer
   can pay the reading at all.
 
-- **A CONTEXT DEEP ENOUGH TO DISAGREE WITH**, which is now the only
-  thing between `share-fold-fit` and a class it has earned. Every axis
-  its statement has moves BOTH sides, and the ceiling moves faster —
-  a nesting level buys the fold one and the ceiling `suc (sizeᵉ e)` —
-  so the rows say the slack widens where it was expected to close. What
-  they cannot say is whether that holds past ONE level, because the
-  harness context has no `obs (obs natᵗ)` slot to draw a second from
-  and no share registered under another. The commit builds that
-  context. It narrows WHICH STORE CELLS DOES A PATH PREDICATE REACH by
-  saying whether the widening is arithmetic or an artifact of a
-  shallow program.
-
 - **A LENGTH THAT IS NOT PRICED IN A CAP**, which is what the fan's
   refutation leaves as the only move. Reading the registry at the level
   the walk is standing at is free — `capsOK?-regs` gives it away — and
@@ -273,6 +261,17 @@ does not fit is a finding about the shared statement, not about the head.
   stratification rather than in a size, and reports whether the sink
   clause's exponent can be paid in it. It narrows WHAT PRICES A
   REGISTERED CHAIN to that one exponent.
+
+- **A FOLD THAT CANNOT OUTRUN ITS PATH**, which is what the deep
+  context leaves `share-fold-fit` reduced to. Neither a second nesting
+  level nor a chain of three shares moves the fold, and the header now
+  carries why. So the residue is not an axis to cover but a bound to
+  STATE: the fold is capped by its own path's frame charge, whatever
+  nests beneath it and whatever stands in the registry. The commit
+  states that leaf and assembles the fit over it, leaving the frame
+  charge as the only gap. It narrows WHICH STORE CELLS DOES A PATH
+  PREDICATE REACH to that one frame, a bound independent of the
+  registry being one no cell a chain reads can move.
 
 ### Open questions
 
@@ -289,12 +288,13 @@ does not fit is a finding about the shared statement, not about the head.
 - **WHICH STORE CELLS DOES A PATH PREDICATE REACH?** Five rows fail in one
   place: the statement reads a PATH or a chain, and the quantity it must
   bound is a cell in the STORE. A path predicate CAN see the store, and
-  extending its coverage is priced. Every half about the WALK is settled: a
-  reading survives a write it does not own, a walked chain carries its
-  watermark by construction, a sibling's fold transports it. What is left is
-  at the MINT, and is known rather than suspected — an admitted entry's
-  readings are refuted free-standing AND are not corollaries of the caps
-  receipt, so the reading must be CARRIED to reach the site that owes it.
+  extending its coverage is priced. Every half about the WALK is settled,
+  and the DELIVERY arc is now narrower too: it prices at a constant in the
+  values' nesting and in the registry's length, so what must be reached
+  there is one frame's cell and not a chain's. What is left is at the MINT,
+  and is known rather than suspected — an admitted entry's readings are
+  refuted free-standing AND are not corollaries of the caps receipt, so the
+  reading must be CARRIED to reach the site that owes it.
   relevant: `step-frame-store≤`, `share-fold-store≤`, `subscribeE-sz-store-scan`, `pushBurst-sz-store-outer`, `subscribeSharedSlot-sz-store`
 
 
@@ -366,9 +366,6 @@ does not fit is a finding about the shared statement, not about the head.
   instant's nest predicate at the state the fan reads the registry. The door
   has it and the walk carries no nest conjunct at all; threading it down is
   refused by the store's own growth toward the NEXT cap.
-- **`share-fold-fit`** (Part7/Arrival-Caps) — FALSITY, `PROBED`: one admitted
-  registration's path, descended at the delivered-marked state. It fits at a
-  driven state, so the barrier is a registry LENGTH and not a kind.
 - **`share-fold-store≤`** (Part7/Arrival-Caps) — FALSITY, `REFUTED, TWIN`: the
   store across one `foldPath`, PRICED against the round's grant rather than
   preserved. A `scan-f` at an obs-typed accumulator crossed the preservation,
@@ -459,6 +456,11 @@ does not fit is a finding about the shared statement, not about the head.
   charge at the queue's own `drainW`. Its extra premise pins the cell's
   CONSTRUCTOR, not its depth, so a parked program runs the store term away here
   too; the width is walk-denominated besides.
+- **`share-fold-fit`** (Part7/Arrival-Caps) — DIFFICULTY, `PROBED`: one admitted
+  registration's path, at the delivered-marked state. A deep context reaches
+  both axes that could have refuted it — a second nesting level, a chain of
+  three shares — and neither moves the fold. The residue is the frame charge
+  below.
 - **`frame-depth-fit`** (Part7/Arrival-Caps) — DIFFICULTY, `PROBED`: one
   frame's own spend under the position's ceiling. Map, scan and take charge
   nothing, and BOTH arms that do are now instantiated — the react at a walked
