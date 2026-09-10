@@ -434,11 +434,14 @@ scan-strat-step {u = u} k sf nid now fn nd κ vals fin sched st hpk hfn hib
 ...   | no _     = refl
 
 -- THE STRAT HALF OF A FRAME READING, as a named projection rather than
--- a `∧` split spelled at each site.  It is worth the line because the
--- split cannot be written inline: the conjunction is behind a
--- definition, so a bare projection leaves the OTHER conjunct a
--- metavariable and every site would have to name the owner predicate
--- it is discarding.
+-- a `∧` split spelled at each site.  The conjunction sits behind a
+-- definition, so the split reduces only once the frame's shape is
+-- known; naming it here puts that reduction in one place and spares
+-- each site the owner predicate it is discarding.  The OTHER half has
+-- no such projection and cannot get one: an implicit-operand split
+-- leaves the discarded conjunct a metavariable there, because the
+-- owner side is itself a fold no argument fixes -- so an owner half is
+-- taken with the explicit-operand `∧-true` and every conjunct named.
 framePark?-parked : ∀ {n} {Γ : Ctx n} {s u t} {e : Closed Γ t}
   (k : ℕ) (f : Frame Γ s u) (st : EvalSt e) →
   framePark? k f st ≡ true →
