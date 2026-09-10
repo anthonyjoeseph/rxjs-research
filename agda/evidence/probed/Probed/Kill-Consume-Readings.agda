@@ -1,9 +1,9 @@
 -- ══════════════════════════════════════════════════════════════════
 -- THREE ENTRY READINGS ACROSS KILL AND CONSUME STEPS.
 --
--- TARGET: switchKill-readings @6deac2
--- TARGET: thruConsume-readings @e5cd57
--- TARGET: subscribeInner-readings @f4ed74
+-- TARGET: switchKill-readings @c61f1f
+-- TARGET: thruConsume-readings @c07160
+-- TARGET: subscribeInner-readings @95e69c
 --
 -- WHAT THESE ROWS COVER.  All three statements ask that three boolean
 -- readings are preserved across one evaluator step:
