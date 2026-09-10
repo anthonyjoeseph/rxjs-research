@@ -1515,6 +1515,25 @@ postulate
 -- its CONCLUSION names, and widening moves that the wrong way.
 --
 -- TWIN: `sink-ring-go` -- the same fan, walked at a level, proven.
+
+-- AND THE OBLIGATION SPLITS IN TWO WITH DIFFERENT FATES, WHICH IS THE
+-- PART THE SURVIVING ROUTE HAD NOT COUNTED.  What the fan hands an
+-- admitted chain is spent twice over: once on the terminal LEAVES and
+-- once on the WALK down it.  The leaves factor cleanly -- each reads
+-- the receipt only for a frame half at the entry cap and a length
+-- under twice it, which is exactly the pair the entry reading already
+-- takes, so a split receipt serves them verbatim.  The walk does not.
+-- It spends the receipt at the subscribing frame, where the inner
+-- descent's own core carries the STRICT per-frame pair at a cap it
+-- WIDENS to -- so a split receipt cannot enter there, and the walk's
+-- half is unrestatable locally for the same reason the descent
+-- invariant is.  Nor does the stepped receipt cover it: that reading
+-- is at the LARGER cap and this predicate weakens upward, so what the
+-- level gives away is the weak form where the walk needs the strong
+-- one.  So the split answers the pricing and leaves the walk owing a
+-- frame reading at the entry cap in its own right -- a strictly
+-- smaller obligation than the refuted mint, since it drops the length
+-- the witness broke on.
 fan-regsSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (Lv : ℕ) (sched : Sched Γ) (st : EvalSt e) →
   capsOK? (frameStep Lv (capsAt e sl id)) sched st ≡ true →
