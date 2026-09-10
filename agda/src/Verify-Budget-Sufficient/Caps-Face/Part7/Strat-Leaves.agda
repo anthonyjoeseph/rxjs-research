@@ -250,12 +250,20 @@ postulate
 -- already matches on that node, so what it owes is the match's own
 -- equation and no new fact.
 --
+-- ONLY THE QUEUE IS SHARED WITH THE DRAIN'S ARGUMENTS, and the cell's
+-- other three fields are free.  The floor check on a flatten cell reads
+-- the queue and nothing else, so a cap, a live count and an outer-done
+-- flag pinned to the drain's own would buy the statement nothing --
+-- and they would cost it its consumer, which drains at a live count one
+-- below the one the cell it matched on carries.
+--
   -- REFUTED: `Refuted.MergeAllDrain-OwnerQueue`.
   mergeAllDrain-ownerQueue : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+    {lim₀ : Maybe ℕ} {act₀ : ℕ} {od : Bool}
     (i : ℕ) (g : Gas) (allNid : NodeId) (κ : Path Γ s t) (id : Id) (now : Tick)
-    (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ s)) (od : Bool)
+    (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ s))
     (sched : Sched Γ) (st : EvalSt e) →
-    lookupNode allNid (EvalSt.nodes st) ≡ just (mergeAll-st lim act q od) →
+    lookupNode allNid (EvalSt.nodes st) ≡ just (mergeAll-st lim₀ act₀ q od) →
     parkStrat? i (lookupNode allNid (EvalSt.nodes
       (proj₂ (proj₂ (proj₂ (proj₂ (proj₂
         (mergeAllDrain g allNid κ id now lim act q sched st)))))))) ≡ true →

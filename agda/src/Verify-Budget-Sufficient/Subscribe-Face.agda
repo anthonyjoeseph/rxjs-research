@@ -2005,7 +2005,7 @@ innerFinish-caps {n = n} {s = s} c dep bud j g mergeAllᵒ allNid inst κ id now
             -- reading is about
             (λ i hold →
                drain-queue-all (inputsBelowᵉ i) g allNid κ id now lim (pred act) q sched st
-                 (mergeAllDrain-ownerQueue i g allNid κ id now lim (pred act) q od sched st
+                 (mergeAllDrain-ownerQueue i g allNid κ id now lim (pred act) q sched st
                     ownEq hold)))
      , valsIn (frameStep (j + suc j′) c) sl (vals ++ proj₁ DR)
          (valsCaps?-widen sl s (vals ++ proj₁ DR) ⊑ˢ
