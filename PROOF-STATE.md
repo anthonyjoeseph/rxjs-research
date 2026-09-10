@@ -238,17 +238,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE OWNER GOES ON THE RECORD, WHICH IS THE ONLY PLACE LEFT FOR IT.**
-  The two-floor shape is no longer a suspicion: a share-ended chain reads
-  a cell at its slot index while the writer is priced at the root's
-  width, and one payload sits on either side of the two, so
-  `setNode-regPark-owner` is refuted with the write exactly as legal as
-  its premise asks. That closes the statement-shaped repairs — the
-  statement quantifies over every state, so the missing fact must
-  EXCLUDE a state. The commit puts node ownership on the invariant
-  record and pays the producer cascade. It narrows DOES A STORE CELL
-  HAVE AN OWNER to whether one field covers the other two rows or only
-  the write.
+- **THE OWNER TRAVELS WITH THE CHAIN, AND THE RECORD ROUTE IS DEAD.** A
+  conjunct over the store cannot see which chain a writer is standing on,
+  and the two ledgers that do read a chain admit the offending registry,
+  so no field excludes it. The park transport is now proven at a named
+  floor and the whole gap is `regOwn-cell` — that the registry reads the
+  written cell at the walking chain's own floor, which is provenance and
+  travels beside the park and order readings the walk already threads
+  frame by frame. The commit threads it from the sites holding a frame up
+  to whoever built the chain. It narrows DOES A STORE CELL HAVE AN OWNER
+  to whether a producer can pay the reading at all.
 
 - **A CONTEXT DEEP ENOUGH TO DISAGREE WITH**, which is now the only
   thing between `share-fold-fit` and a class it has earned. Every axis
@@ -279,13 +278,11 @@ does not fit is a finding about the shared statement, not about the head.
 - **DOES A STORE CELL HAVE AN OWNER? — FIRST, because the repair it points
   at moves a RECORD rather than a statement.** These rows fail where a write
   lands in a cell some registered chain also reads, each pricing it at its own
-  floor. It is ANSWERED for the write: the two-floor shape is machine-built,
-  and a cell read at a share sink's index breaks a registry the writer left
-  legal at the root's width, so no pricing of the write can hold and the
-  owner has to be carried. What is left is its REACH — the remaining rows
-  fail at an ENQUEUE and at a walked chain rather than at an overwrite, and
-  whether one ownership field settles those or only stops the write from
-  lying is what the next commit reports.
+  floor. It is ANSWERED for the write, and for the record negatively: a store
+  predicate cannot name the chain the writer stands on, so the reading travels
+  with the chain. What is left is whether a producer can pay it, and whether
+  the remaining rows — an ENQUEUE and a walked chain rather than an overwrite
+  — are paid by the same thread.
   relevant: `thruConsume-cellPark`, `framePark-step`
 
 - **WHICH STORE CELLS DOES A PATH PREDICATE REACH?** Five rows fail in one
@@ -425,11 +422,10 @@ does not fit is a finding about the shared statement, not about the head.
   cell a walk cannot freeze. The consume enqueues into exactly the cell the
   reading is about, so no watermark both covers it and excludes the write; the
   payload's own reading is what is asked to keep it true.
-- **`setNode-regPark-owner`** (Part1) — SHAPE, `REFUTED, PROBED`: a write
-  priced at one chain's floor, refuted at a share-ended chain reading the cell
-  at its slot index. Every surviving consumer is an OVERWRITE; the fresh
-  install spends the ordering ledger. The repair excludes a state — node
-  OWNERSHIP on the record.
+- **`regOwn-cell`** (Part1) — SHAPE, `REFUTED`: the registry reads a written
+  cell at the writing chain's floor. Refuted over an arbitrary state, where a
+  share-ended chain reads at its slot index and the writer stands at the root
+  width. The park transport over it is proven, so this is the whole gap.
 - **`mergeAllDrain-ownerQueue`** (Part7/Strat-Leaves) — SHAPE, `REFUTED`: what
   the drain leaves in the owner's cell. Its premise is read off the POST-state,
   which the no-room arm never builds, so it is vacuously satisfiable. The

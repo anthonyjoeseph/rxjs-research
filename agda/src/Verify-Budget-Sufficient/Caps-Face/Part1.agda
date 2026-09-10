@@ -87,7 +87,7 @@
 -- reports at the callee's post sched).
 module Verify-Budget-Sufficient.Caps-Face.Part1 where
 
-open import Data.Bool    using (Bool; true; false; _∧_; _∨_; if_then_else_; T)
+open import Data.Bool    using (Bool; true; false; not; _∧_; _∨_; if_then_else_; T)
 open import Data.Maybe   using (Maybe; just)
 open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; _⊔_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-reflexive; +-suc; +-comm; +-assoc; +-monoˡ-≤; *-monoˡ-≤; *-monoʳ-≤;
@@ -97,7 +97,8 @@ open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; �
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.List    using (List; []; _∷_; _++_; length; tabulate; map)
-open import Data.Bool.ListAction using (all)
+open import Data.Bool.Properties using (∨-zeroʳ)
+open import Data.Bool.ListAction using (all; any)
 open import Data.Nat.ListAction  using (sum)
 open import Data.Fin     using (Fin; toℕ)
 import Data.Fin as Fin
@@ -126,7 +127,7 @@ open import Rx.Frame-Width using (entryCeil; pWᵉ; pWᵛ; dWᵉ; outWᵉ; innW�
   innWⱽ; innWᵗⱽ; innWᵗˢⱽ; pmIᵗⱽ; slotPW; slotsPW; slotsPWgo; slotIW; slotsIW; slotsIWgo)
 open import Rx.Evaluator using (capsBase; Sched; EvalSt; LiveSource; RegId; Chain; NodeId; NodeState; setNode; scan-st; take-st; mergeAll-st; switch-st;
   exhaust-st; root; share-sink; _↠_; Frame; map-f; scan-f; take-f; from-inner; thru-outer;
-  Stream; Path; sizeStep; iterSize; foldStep; iterFold; lookupNode; AllOp)
+  Stream; Path; sizeStep; iterSize; foldStep; iterFold; lookupNode; AllOp; frameNodes; pathHasNode)
 open import Rx.Slots using (scripted; shared; Slot; Slots; slotSize; slotsSize; inputSize)
 open import Rx.Clos-Size using (closSizeᵉ; closSize≤mulᵉ)
 open import Rx.Slot-Clos using (slotClos; slotClosD; slotsClos; σAt)
@@ -161,7 +162,7 @@ open import Verify-Budget-Sufficient.Measures using
                                                       syncSize≤sizeᵉ;
                                                       parkRoom; parkRoom-widen;
                                                       stBounded-widen; stBounded?; ∧-true)
-open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen; ≡ᵇ→≡; sucle→≢ᵇ)
+open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen; ≡ᵇ→≡; ≡ᵇ-refl; sucle→≢ᵇ)
 open import Verify-Budget-Sufficient.Node-Table using
   (lookupNode-setNode; lookupNode-setNode-other)
 -- the nesting measure the subscribe budget descends on, and the frame
@@ -919,59 +920,165 @@ regPark?-set rs nid ns st pv =
     (λ en → pathPark?-set (proj₂ (proj₂ (proj₂ en))) nid ns st pv)
     rs
 
+-- THE OWNER OF A CELL, READ OFF THE REGISTRY.  A chain reads every one
+-- of its cells at ONE floor -- the terminal's, which every frame above
+-- it inherits -- so what a cell is worth to a registered reader is
+-- answerable entry by entry: an entry either does not name the cell at
+-- all, or it reads it at the floor its own terminal fixes.  The
+-- reading below says that floor is the one a writer is pricing the
+-- cell at, which is what turns the registry-wide obligation into a
+-- one-cell one at a SINGLE floor instead of at every floor.
+pathOwn? : ∀ {n} {Γ : Ctx n} {u t} → NodeId → ℕ → Path Γ u t → Bool
+pathOwn? nid k p = not (pathHasNode nid p) ∨ (pathFloor p ≡ᵇ k)
+
+regOwn? : ∀ {n} {Γ : Ctx n} {t}
+        → NodeId → ℕ → List (RegId × Source × Chain Γ t) → Bool
+regOwn? nid k = all (λ en → pathOwn? nid k (proj₂ (proj₂ (proj₂ en))))
+
+pathOwn?-floor : ∀ {n} {Γ : Ctx n} {u t} (nid : NodeId) (k : ℕ)
+  (p : Path Γ u t) →
+  pathOwn? nid k p ≡ true → pathHasNode nid p ≡ true → pathFloor p ≡ k
+pathOwn?-floor nid k p ho hh =
+  ≡ᵇ→≡ (pathFloor p) k
+    (subst (λ b → (not b ∨ (pathFloor p ≡ᵇ k)) ≡ true) hh ho)
+
+pathHasNode-tail : ∀ {n} {Γ : Ctx n} {s u t} (nid : NodeId)
+  (f : Frame Γ s u) (p : Path Γ u t) →
+  pathHasNode nid p ≡ true → pathHasNode nid (f ↠ p) ≡ true
+pathHasNode-tail nid f p hh
+  rewrite hh = ∨-zeroʳ (any (_≡ᵇ nid) (frameNodes f))
+
+-- THE TRANSPORT THE OWNER BUYS, and it sits exactly between the two
+-- readings above it: the all-floors one asks a write to be as
+-- stratified as the old cell wherever anyone might stand, which an
+-- enqueue cannot pay, and the one-floor one asks for nothing about
+-- who reads the cell, which is not enough to hold the ledger.  This
+-- one asks for the write's own floor AND for the registry to agree
+-- that the cell is read there.
+setNode-parkStrat-own : ∀ {n} {Γ : Ctx n} (k′ : ℕ) (m nid : NodeId)
+  (k : ℕ) (ns : NodeState Γ) (nodes : List (NodeId × NodeState Γ)) →
+  ((m ≡ᵇ nid) ≡ true → k′ ≡ k) →
+  (parkStrat? k (lookupNode nid nodes) ≡ true
+     → parkStrat? k (just ns) ≡ true) →
+  parkStrat? k′ (lookupNode m nodes) ≡ true →
+  parkStrat? k′ (lookupNode m (setNode nid ns nodes)) ≡ true
+setNode-parkStrat-own k′ m nid k ns nodes ek pv h with nid ≡ᵇ m in e
+... | false rewrite lookupNode-setNode-other m nid ns nodes e = h
+... | true with ≡ᵇ→≡ nid m e
+...   | refl with ek (≡ᵇ-refl m)
+...     | refl rewrite lookupNode-setNode m ns nodes = pv h
+
+framePark?-set-own : ∀ {n} {Γ : Ctx n} {s u t} {e : Closed Γ t}
+  (k′ : ℕ) (f : Frame Γ s u) (nid : NodeId) (k : ℕ) (ns : NodeState Γ)
+  (st : EvalSt e) →
+  (any (_≡ᵇ nid) (frameNodes f) ≡ true → k′ ≡ k) →
+  (parkStrat? k (lookupNode nid (EvalSt.nodes st)) ≡ true
+     → parkStrat? k (just ns) ≡ true) →
+  framePark? k′ f st ≡ true →
+  framePark? k′ f (record st { nodes = setNode nid ns (EvalSt.nodes st) }) ≡ true
+framePark?-set-own k′ (map-f _)  nid k ns st ek pv h = refl
+framePark?-set-own k′ (take-f _) nid k ns st ek pv h = refl
+framePark?-set-own k′ (scan-f _ nd) nid k ns st ek pv h =
+  setNode-parkStrat-own k′ nd nid k ns (EvalSt.nodes st)
+    (λ hf → ek (cong (_∨ false) hf)) pv h
+framePark?-set-own k′ (thru-outer _ nd) nid k ns st ek pv h =
+  setNode-parkStrat-own k′ nd nid k ns (EvalSt.nodes st)
+    (λ hf → ek (cong (_∨ false) hf)) pv h
+framePark?-set-own k′ (from-inner _ a i) nid k ns st ek pv h =
+  setNode-parkStrat-own k′ a nid k ns (EvalSt.nodes st)
+    (λ hf → ek (cong (_∨ ((i ≡ᵇ nid) ∨ false)) hf)) pv h
+
+pathPark?-set-own : ∀ {n} {Γ : Ctx n} {u t} {e : Closed Γ t}
+  (κ : Path Γ u t) (nid : NodeId) (k : ℕ) (ns : NodeState Γ)
+  (st : EvalSt e) →
+  (pathHasNode nid κ ≡ true → pathFloor κ ≡ k) →
+  (parkStrat? k (lookupNode nid (EvalSt.nodes st)) ≡ true
+     → parkStrat? k (just ns) ≡ true) →
+  pathPark? κ st ≡ true →
+  pathPark? κ (record st { nodes = setNode nid ns (EvalSt.nodes st) }) ≡ true
+pathPark?-set-own root           nid k ns st ek pv h = refl
+pathPark?-set-own (share-sink _) nid k ns st ek pv h = refl
+pathPark?-set-own (f ↠ p)        nid k ns st ek pv h =
+  ∧-intro (framePark?-set-own (pathFloor p) f nid k ns st
+             (λ hf → ek (cong (_∨ pathHasNode nid p) hf)) pv (proj₁ hs))
+          (pathPark?-set-own p nid k ns st
+             (λ ht → ek (pathHasNode-tail nid f p ht)) pv (proj₂ hs))
+  where
+  hs = ∧-true (framePark? (pathFloor p) f st) (pathPark? p st) h
+
+regPark?-set-own : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (rs : List (RegId × Source × Chain Γ t)) (nid : NodeId) (k : ℕ)
+  (ns : NodeState Γ) (st : EvalSt e) →
+  regOwn? nid k rs ≡ true →
+  (parkStrat? k (lookupNode nid (EvalSt.nodes st)) ≡ true
+     → parkStrat? k (just ns) ≡ true) →
+  regPark? rs st ≡ true →
+  regPark? rs (record st { nodes = setNode nid ns (EvalSt.nodes st) }) ≡ true
+regPark?-set-own []        nid k ns st ho pv h = refl
+regPark?-set-own (en ∷ rs) nid k ns st ho pv h =
+  ∧-intro (pathPark?-set-own κ nid k ns st
+             (pathOwn?-floor nid k κ (proj₁ ho′)) pv (proj₁ h′))
+          (regPark?-set-own rs nid k ns st (proj₂ ho′) pv (proj₂ h′))
+  where
+  κ   = proj₂ (proj₂ (proj₂ en))
+  ho′ = ∧-true (pathOwn? nid k κ) (regOwn? nid k rs) ho
+  h′  = ∧-true (pathPark? κ st) (regPark? rs st) h
+
+-- THE CELL IS READ AT THE FLOOR OF THE CHAIN THAT WRITES IT, and as
+-- stated over an arbitrary state this is FALSE: two floors are
+-- already there in a two-slot context, a root-ended chain reading at
+-- two and a share-ended one at its slot index, with one payload
+-- sitting on either side of the two.  The write is then exactly as
+-- legal as its own premise asks and the registry still breaks, so
+-- nothing is repaired by pricing the write more tightly.
+--
+-- WHAT IT IS WAITING FOR is provenance the state does not carry: the
+-- two ledgers that read a chain at all admit the offending registry,
+-- the stratification one because the entry's source sits at or below
+-- its own floor and every frame of such a chain is free, the ordering
+-- one at any counter above the cells the chain names.  A cell is
+-- named by exactly the frame that installed it, so a registered chain
+-- reaching it reaches it through that frame and reads it at that
+-- frame's floor -- and the walked chain is where that fact lives,
+-- beside the park and order readings the walk already carries frame
+-- by frame, rather than in a state predicate that cannot see which
+-- chain the writer is standing on.
+--
+-- REFUTED: `Refuted.SetNode-Two-Floor`.
+postulate
+  regOwn-cell : ∀ {n} {Γ : Ctx n} {u t} {e : Closed Γ t}
+    (nid : NodeId) (κ : Path Γ u t) (st : EvalSt e) →
+    regOwn? nid (pathFloor κ) (EvalSt.registry st) ≡ true
+
 -- AND A WRITE THAT OVERWRITES PARKED CONTENT PAYS AT ITS OWN FLOOR,
--- which is the one thing the transport above cannot give it.  That
--- transport asks the write to preserve stratification at EVERY
+-- which is the one thing the all-floors transport cannot give it.
+-- That transport asks the write to preserve stratification at EVERY
 -- watermark, and a store or an enqueue cannot: the new content is
 -- bounded by the writing chain's floor and by nothing else, since the
 -- fold's closure and the pushed payload may name inputs above any
 -- other reading.  A registered chain reaching the same cell reads it
--- at ITS floor, and no receipt in this development ties the two.
+-- at ITS floor, and the OWNER reading above is what ties the two.
 -- EVERY CONSUMER IS AN OVERWRITE -- an enqueue extending a flatten's
 -- queue, or a scan step replacing its accumulator -- because the one
 -- site that installs a FRESH cell spends the ordering ledger instead:
 -- a registered chain's cells sit at or below the counter and a fresh
 -- node IS the counter, so no registered reader can name it.
 --
--- THE ONE-FLOOR FORM BELOW IS FALSE, and the two floors are already
--- there in a two-slot context: a root-ended chain reads at two and a
--- share-ended one at its slot index, the queue reading is a strict `<`
--- against that number, and one payload naming the first slot sits on
--- either side of the two.  The write is then exactly as legal as the
--- premise asks and the registry still breaks, so nothing is repaired
--- by pricing the write more tightly.
---
--- SO THE MISSING FACT MUST EXCLUDE A STATE rather than constrain a
--- write, since the statement quantifies over every state and no proof
--- of it exists.  AND IT IS A NEW FACT rather than a derivable one: the
--- two ledgers that read a chain at all clear the offending registry,
--- the stratification one because the entry's source sits at or below
--- its own floor and every frame of such a chain is free, the ordering
--- one at any counter above the cells the chain names.  NODE OWNERSHIP
--- is that fact -- a cell is named by
--- exactly the frame that installed it, so a registered chain reaching
--- it reaches it through that frame and reads it at that frame's floor.
--- It is a field on the invariant record, which obliges every producer
--- to supply it, and not a hypothesis here, which would launder the gap
--- out of the ledger.
---
--- REFUTED: `Refuted.SetNode-Two-Floor`.
---
--- PROBED: `Probed.SetNode-RegPark-Owner`.  Two rows -- a DEGENERATE one
---   at the empty registry, where the implication is vacuous, and a
---   LOAD-BEARING one at a registry visiting the written node at the
---   chain's own floor, where the antecedent holds non-vacuously and the
---   conclusion computes.  The OWNERSHIP region is NOT covered: no row
---   reaches a registry visiting `nid` at a floor OTHER than
---   `pathFloor κ`, which is the region the refutation above reaches.
-postulate
-  setNode-regPark-owner : ∀ {n} {Γ : Ctx n} {u t} {e : Closed Γ t}
-    (nid : NodeId) (κ : Path Γ u t) (ns : NodeState Γ) (st : EvalSt e) →
-    (parkStrat? (pathFloor κ) (lookupNode nid (EvalSt.nodes st)) ≡ true →
-     parkStrat? (pathFloor κ) (just ns) ≡ true) →
-    regPark? (EvalSt.registry st) st ≡ true →
-    regPark? (EvalSt.registry st)
-      (record st { nodes = setNode nid ns (EvalSt.nodes st) }) ≡ true
+-- SO THE COMPOSITION IS CHECKED AND THE LEAF IS THE WHOLE GAP: the
+-- write's own floor is what the caller holds, the registry's reading
+-- of the cell is what nothing yet supplies, and the two meeting is
+-- the transport directly above.
+setNode-regPark-owner : ∀ {n} {Γ : Ctx n} {u t} {e : Closed Γ t}
+  (nid : NodeId) (κ : Path Γ u t) (ns : NodeState Γ) (st : EvalSt e) →
+  (parkStrat? (pathFloor κ) (lookupNode nid (EvalSt.nodes st)) ≡ true →
+   parkStrat? (pathFloor κ) (just ns) ≡ true) →
+  regPark? (EvalSt.registry st) st ≡ true →
+  regPark? (EvalSt.registry st)
+    (record st { nodes = setNode nid ns (EvalSt.nodes st) }) ≡ true
+setNode-regPark-owner nid κ ns st pv h =
+  regPark?-set-own (EvalSt.registry st) nid (pathFloor κ) ns st
+    (regOwn-cell nid κ st) pv h
+
 
 -- THE CAP READ AGAINST THE ARRIVAL'S CLOSURE, which is the shape the
 -- arr-keyed descent needs and the one `nestValOK?` deliberately does

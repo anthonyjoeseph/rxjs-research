@@ -40,11 +40,11 @@
 -- invariant as it stands would not stop one: the two conjuncts that
 -- read a chain at all clear this registry, so no repair is available
 -- from tightening either.  That is the point rather than a
--- limitation: the statement quantifies over every state, so the repair
--- cannot be a cleverer proof of it -- it is a fact that EXCLUDES this
--- state, and a fact excluding a state is a field on the invariant
--- record rather than a hypothesis on one lemma.  Node ownership is that
--- fact, and this row is what says it has to be carried.
+-- limitation: the reading quantifies over every state and over every
+-- path, so the repair cannot be a cleverer proof of it -- what is
+-- missing is the writer's PROVENANCE, that the chain it stands on is
+-- the one that installed the cell, and provenance travels with a chain
+-- rather than being read off a store.
 -- ══════════════════════════════════════════════════════════════════
 module Refuted.SetNode-Two-Floor where
 
@@ -59,10 +59,9 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Rx.Exp using (Ctx; Closed; natᵗ; obs; input)
 open import Rx.Evaluator
   using (EvalSt; NodeId; NodeState; Path; root; share-sink; _↠_;
-         from-inner; mergeAllᵒ; mergeAll-st; installNode; st-init; setNode;
-         lookupNode)
+         from-inner; mergeAllᵒ; mergeAll-st; installNode; st-init; setNode)
 open import Verify-Budget-Sufficient.Caps-Face.Part1
-  using (parkStrat?; pathFloor; regPark?; regStrat?; regOrd?)
+  using (parkStrat?; pathFloor; regPark?; regStrat?; regOrd?; regOwn?)
 open import Refuted.Demand-Programs using (Γ₂)
 open import Refuted.Walk-Burst-Additive using (e₀)
 
@@ -122,14 +121,14 @@ stratOK = refl
 ordOK : regOrd? 10 (EvalSt.registry stᵗ) ≡ true
 ordOK = refl
 
+-- THE READING THE WRITE IS WAITING ON, at this registry and this
+-- chain: the cell is visited at zero and the writer stands at two.
+ownBad : regOwn? nid (pathFloor pricedPath) (EvalSt.registry stᵗ) ≡ false
+ownBad = refl
+
 setNode-two-floor-absurd :
   (∀ {n} {Γ : Ctx n} {u t} {e : Closed Γ t}
-     (nd : NodeId) (κ : Path Γ u t) (ns : NodeState Γ) (st : EvalSt e) →
-     (parkStrat? (pathFloor κ) (lookupNode nd (EvalSt.nodes st)) ≡ true →
-      parkStrat? (pathFloor κ) (just ns) ≡ true) →
-     regPark? (EvalSt.registry st) st ≡ true →
-     regPark? (EvalSt.registry st)
-       (record st { nodes = setNode nd ns (EvalSt.nodes st) }) ≡ true) → ⊥
-setNode-two-floor-absurd h
-  with h nid pricedPath after stᵗ (λ _ → refl) refl
+     (nd : NodeId) (κ : Path Γ u t) (st : EvalSt e) →
+     regOwn? nd (pathFloor κ) (EvalSt.registry st) ≡ true) → ⊥
+setNode-two-floor-absurd h with h nid pricedPath stᵗ
 ... | ()
