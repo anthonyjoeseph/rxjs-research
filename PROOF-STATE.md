@@ -429,7 +429,7 @@ does not fit is a finding about the shared statement, not about the head.
   what the drain leaves in the owner's cell. The drain writes that cell as each
   inner is subscribed, so the reinstall owes the new cell's reading at an
   arbitrary floor against the old one's at the same floor.
-- **`setNode-regPark-owner`** (Part1) — FALSITY, `NO EVIDENCE`: a write that
+- **`setNode-regPark-owner`** (Part1) — FALSITY, `PROBED`: a write that
   overwrites parked content pays at its OWN floor. What would close it is node
   OWNERSHIP — a cell is named by the frame that installed it — and no record in
   this development carries that fact.

@@ -166,3 +166,6 @@ open import Probed.Drain-Count-Slot
 
 open import Probed.Cell-Chain-Store
   using (chainFigures≡; chainNodes≡; chainRows≡; chainPrem≡; tieCellChain)
+
+open import Probed.SetNode-RegPark-Owner
+  using (tieEmpty; tieLoad)

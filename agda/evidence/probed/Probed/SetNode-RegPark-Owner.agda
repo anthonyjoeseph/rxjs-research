@@ -45,7 +45,7 @@ open import Data.Product using (_,_)
 open import Data.Vec using () renaming ([] to []ⱽ; _∷_ to _∷ⱽ_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import Rx.Exp using (Ctx; Closed; Ty; natᵗ; obs; emptyᵉ)
+open import Rx.Exp using (Ctx; Closed; natᵗ; obs; emptyᵉ)
 open import Rx.Evaluator
   using (EvalSt; NodeState; mergeAll-st; take-st; st-init; setNode;
          from-inner; mergeAllᵒ; _↠_; root)

@@ -934,6 +934,16 @@ regPark?-set rs nid ns st pv =
 -- No record in this development carries that fact, so it is stated
 -- here as the premise's one-floor form rather than threaded as a
 -- hypothesis, which would launder the gap out of the ledger.
+--
+-- PROBED: `Probed.SetNode-RegPark-Owner`.  Two rows -- a DEGENERATE one
+--   at the empty registry, where the implication is vacuous, and a
+--   LOAD-BEARING one at a registry visiting the written node at the
+--   chain's own floor, where the antecedent holds non-vacuously and the
+--   conclusion computes.  The OWNERSHIP region is NOT covered: no row
+--   reaches a registry visiting `nid` at a floor OTHER than
+--   `pathFloor κ`, which needs two inner subscriptions on one mergeAll
+--   at different chain depths, and that is the region the statement is
+--   about.
 postulate
   setNode-regPark-owner : ∀ {n} {Γ : Ctx n} {u t} {e : Closed Γ t}
     (nid : NodeId) (κ : Path Γ u t) (ns : NodeState Γ) (st : EvalSt e) →
