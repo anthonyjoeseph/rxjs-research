@@ -25,7 +25,7 @@ open import Rx.Evaluator using
   shareAdmit; shareLatch; NodeId; NodeState; AllOp; lookupNode; thruConsume; mergeAllDrain;
   subscribeInner; installNode; scan-st; take-st; mergeAll-st; switch-st; exhaust-st; map-f;
   scan-f; take-f; from-inner; thru-outer; Arrival; arrTy; chainsOf; chainStep; cascadeLatch;
-  frameNodes; pathHasNode; switchKill; cutThrough; Chain)
+  frameNodes; pathHasNode; switchKill)
 open import Verify-Budget-Sufficient.Caps using (Caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (burstStrat?; capsOK?; framePark?; frameAbove?; frameRead; frameStrat?; parkStrat?; pathCell;
@@ -44,7 +44,7 @@ open import Verify-Budget-Sufficient.Node-Fresh using
 open import Verify-Budget-Sufficient.Node-Table using (lookupNode-setNode)
 open import Verify-Budget-Sufficient.Delivery-Counter using
   (foldPath-nextNode; chainStep-nextNode)
-open import Verify-Budget-Sufficient.Measures using (∧-true; all-impl)
+open import Verify-Budget-Sufficient.Measures using (∧-true; all-impl; cutThrough-all)
 
 -- THE TWO FACTS THE STRATIFICATION THREAD CANNOT GET BY REDUCTION, and
 -- they sit together because they fail for the same reason: each is
@@ -558,23 +558,10 @@ frozen-framePark {Γ = Γ} k w f st st′ hfz how hb hp =
 -- RATHER THAN POSTULATED.  The kill's only registry write is
 -- `cutThrough`'s survivor list, which DROPS entries and rewrites none,
 -- and the owner reading is a universal over the ledger -- so dropping
--- is the one write it survives for free.  The general shape is stated
--- over an arbitrary predicate because nothing here is about ownership:
--- what carries is that the survivors are a sublist.
-cutThrough-all : ∀ {n} {Γ : Ctx n} {t}
-  (P : RegId × Source × Chain Γ t → Bool)
-  (nid : NodeId) (dlv : List RegId) (wm : RegId) (dying : List Source)
-  (reg : List (RegId × Source × Chain Γ t)) →
-  all P reg ≡ true →
-  all P (proj₁ (cutThrough nid dlv wm dying reg)) ≡ true
-cutThrough-all P nid dlv wm dying [] h = refl
-cutThrough-all P nid dlv wm dying ((rid , src , c) ∷ r) h
-  with pathHasNode nid (proj₂ c)
-     | cutThrough nid dlv wm dying r
-     | cutThrough-all P nid dlv wm dying r (proj₂ (∧-true _ _ h))
-... | true  | _ | ih = ih
-... | false | _ | ih = ∧-intro (proj₁ (∧-true _ _ h)) ih
-
+-- is the one write it survives for free.  What carries the argument is
+-- the sublist and nothing about ownership, which is why the induction
+-- is `cutThrough-all` on the measures shelf, stated over an arbitrary
+-- predicate, rather than a second copy of it standing here.
 switchKill-regOwn : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (nd : NodeId) (k : ℕ) (cur : Maybe NodeId) (sched : Sched Γ) (st : EvalSt e) →
   regOwn? nd k (EvalSt.registry st) ≡ true →
