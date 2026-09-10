@@ -925,22 +925,26 @@ regPark?-set rs nid ns st pv =
 -- it inherits -- so what a cell is worth to a registered reader is
 -- answerable entry by entry: an entry either does not name the cell at
 -- all, or it reads it at the floor its own terminal fixes.  The
--- reading below says that floor is the one a writer is pricing the
--- cell at, which is what turns the registry-wide obligation into a
--- one-cell one at a SINGLE floor instead of at every floor.
+-- reading below asks only that that floor be NO LOWER than the one a
+-- writer prices the cell at, which turns the registry-wide obligation
+-- into a one-cell one at a single floor instead of at every floor.
+-- The inequality rather than an equality because the park ledger is a
+-- STRICT bound on input indices and so weakens as the floor rises: a
+-- reader standing further out than the writer is already paid for, and
+-- asking it to stand exactly there would refuse it for nothing.
 pathOwn? : ∀ {n} {Γ : Ctx n} {u t} → NodeId → ℕ → Path Γ u t → Bool
-pathOwn? nid k p = not (pathHasNode nid p) ∨ (pathFloor p ≡ᵇ k)
+pathOwn? nid k p = not (pathHasNode nid p) ∨ (k ≤ᵇ pathFloor p)
 
 regOwn? : ∀ {n} {Γ : Ctx n} {t}
         → NodeId → ℕ → List (RegId × Source × Chain Γ t) → Bool
 regOwn? nid k = all (λ en → pathOwn? nid k (proj₂ (proj₂ (proj₂ en))))
 
-pathOwn?-floor : ∀ {n} {Γ : Ctx n} {u t} (nid : NodeId) (k : ℕ)
+pathOwn?-le : ∀ {n} {Γ : Ctx n} {u t} (nid : NodeId) (k : ℕ)
   (p : Path Γ u t) →
-  pathOwn? nid k p ≡ true → pathHasNode nid p ≡ true → pathFloor p ≡ k
-pathOwn?-floor nid k p ho hh =
-  ≡ᵇ→≡ (pathFloor p) k
-    (subst (λ b → (not b ∨ (pathFloor p ≡ᵇ k)) ≡ true) hh ho)
+  pathOwn? nid k p ≡ true → pathHasNode nid p ≡ true → k ≤ pathFloor p
+pathOwn?-le nid k p ho hh =
+  ≤ᵇ⇒≤ k (pathFloor p)
+    (T-to (subst (λ b → (not b ∨ (k ≤ᵇ pathFloor p)) ≡ true) hh ho))
 
 pathHasNode-tail : ∀ {n} {Γ : Ctx n} {s u t} (nid : NodeId)
   (f : Frame Γ s u) (p : Path Γ u t) →
@@ -953,27 +957,30 @@ pathHasNode-tail nid f p hh
 -- stratified as the old cell wherever anyone might stand, which an
 -- enqueue cannot pay, and the one-floor one asks for nothing about
 -- who reads the cell, which is not enough to hold the ledger.  This
--- one asks for the write's own floor AND for the registry to agree
--- that the cell is read there.
+-- one asks for the write's own floor AND EVERY FLOOR ABOVE IT, which
+-- an enqueue can pay because the ledger weakens as the floor rises,
+-- AND for the registry to agree that nobody reads the cell lower.
+-- The reader's own reading is handed back as the premise at its
+-- floor, so the write never has to know where the reader stands.
 setNode-parkStrat-own : ∀ {n} {Γ : Ctx n} (k′ : ℕ) (m nid : NodeId)
   (k : ℕ) (ns : NodeState Γ) (nodes : List (NodeId × NodeState Γ)) →
-  ((m ≡ᵇ nid) ≡ true → k′ ≡ k) →
-  (parkStrat? k (lookupNode nid nodes) ≡ true
-     → parkStrat? k (just ns) ≡ true) →
+  ((m ≡ᵇ nid) ≡ true → k ≤ k′) →
+  (∀ i → k ≤ i → parkStrat? i (lookupNode nid nodes) ≡ true
+               → parkStrat? i (just ns) ≡ true) →
   parkStrat? k′ (lookupNode m nodes) ≡ true →
   parkStrat? k′ (lookupNode m (setNode nid ns nodes)) ≡ true
 setNode-parkStrat-own k′ m nid k ns nodes ek pv h with nid ≡ᵇ m in e
 ... | false rewrite lookupNode-setNode-other m nid ns nodes e = h
 ... | true with ≡ᵇ→≡ nid m e
-...   | refl with ek (≡ᵇ-refl m)
-...     | refl rewrite lookupNode-setNode m ns nodes = pv h
+...   | refl rewrite lookupNode-setNode m ns nodes =
+        pv k′ (ek (≡ᵇ-refl m)) h
 
 framePark?-set-own : ∀ {n} {Γ : Ctx n} {s u t} {e : Closed Γ t}
   (k′ : ℕ) (f : Frame Γ s u) (nid : NodeId) (k : ℕ) (ns : NodeState Γ)
   (st : EvalSt e) →
-  (any (_≡ᵇ nid) (frameNodes f) ≡ true → k′ ≡ k) →
-  (parkStrat? k (lookupNode nid (EvalSt.nodes st)) ≡ true
-     → parkStrat? k (just ns) ≡ true) →
+  (any (_≡ᵇ nid) (frameNodes f) ≡ true → k ≤ k′) →
+  (∀ i → k ≤ i → parkStrat? i (lookupNode nid (EvalSt.nodes st)) ≡ true
+               → parkStrat? i (just ns) ≡ true) →
   framePark? k′ f st ≡ true →
   framePark? k′ f (record st { nodes = setNode nid ns (EvalSt.nodes st) }) ≡ true
 framePark?-set-own k′ (map-f _)  nid k ns st ek pv h = refl
@@ -991,9 +998,9 @@ framePark?-set-own k′ (from-inner _ a i) nid k ns st ek pv h =
 pathPark?-set-own : ∀ {n} {Γ : Ctx n} {u t} {e : Closed Γ t}
   (κ : Path Γ u t) (nid : NodeId) (k : ℕ) (ns : NodeState Γ)
   (st : EvalSt e) →
-  (pathHasNode nid κ ≡ true → pathFloor κ ≡ k) →
-  (parkStrat? k (lookupNode nid (EvalSt.nodes st)) ≡ true
-     → parkStrat? k (just ns) ≡ true) →
+  (pathHasNode nid κ ≡ true → k ≤ pathFloor κ) →
+  (∀ i → k ≤ i → parkStrat? i (lookupNode nid (EvalSt.nodes st)) ≡ true
+               → parkStrat? i (just ns) ≡ true) →
   pathPark? κ st ≡ true →
   pathPark? κ (record st { nodes = setNode nid ns (EvalSt.nodes st) }) ≡ true
 pathPark?-set-own root           nid k ns st ek pv h = refl
@@ -1010,21 +1017,21 @@ regPark?-set-own : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (rs : List (RegId × Source × Chain Γ t)) (nid : NodeId) (k : ℕ)
   (ns : NodeState Γ) (st : EvalSt e) →
   regOwn? nid k rs ≡ true →
-  (parkStrat? k (lookupNode nid (EvalSt.nodes st)) ≡ true
-     → parkStrat? k (just ns) ≡ true) →
+  (∀ i → k ≤ i → parkStrat? i (lookupNode nid (EvalSt.nodes st)) ≡ true
+               → parkStrat? i (just ns) ≡ true) →
   regPark? rs st ≡ true →
   regPark? rs (record st { nodes = setNode nid ns (EvalSt.nodes st) }) ≡ true
 regPark?-set-own []        nid k ns st ho pv h = refl
 regPark?-set-own (en ∷ rs) nid k ns st ho pv h =
   ∧-intro (pathPark?-set-own κ nid k ns st
-             (pathOwn?-floor nid k κ (proj₁ ho′)) pv (proj₁ h′))
+             (pathOwn?-le nid k κ (proj₁ ho′)) pv (proj₁ h′))
           (regPark?-set-own rs nid k ns st (proj₂ ho′) pv (proj₂ h′))
   where
   κ   = proj₂ (proj₂ (proj₂ en))
   ho′ = ∧-true (pathOwn? nid k κ) (regOwn? nid k rs) ho
   h′  = ∧-true (pathPark? κ st) (regPark? rs st) h
 
--- THE CELL IS READ AT THE FLOOR OF THE CHAIN THAT WRITES IT, and as
+-- NO REGISTERED READER STANDS BELOW THE CHAIN THAT WRITES A CELL, and as
 -- stated over an arbitrary state this is FALSE: two floors are
 -- already there in a two-slot context, a root-ended chain reading at
 -- two and a share-ended one at its slot index, with one payload
@@ -1038,8 +1045,8 @@ regPark?-set-own (en ∷ rs) nid k ns st ho pv h =
 -- its own floor and every frame of such a chain is free, the ordering
 -- one at any counter above the cells the chain names.  A cell is
 -- named by exactly the frame that installed it, so a registered chain
--- reaching it reaches it through that frame and reads it at that
--- frame's floor -- and the walked chain is where that fact lives,
+-- reaching it reaches it through that frame and so no lower than
+-- that frame's floor -- and the walked chain is where that fact lives,
 -- beside the park and order readings the walk already carries frame
 -- by frame, rather than in a state predicate that cannot see which
 -- chain the writer is standing on.
@@ -1070,8 +1077,9 @@ postulate
 -- the transport directly above.
 setNode-regPark-owner : ∀ {n} {Γ : Ctx n} {u t} {e : Closed Γ t}
   (nid : NodeId) (κ : Path Γ u t) (ns : NodeState Γ) (st : EvalSt e) →
-  (parkStrat? (pathFloor κ) (lookupNode nid (EvalSt.nodes st)) ≡ true →
-   parkStrat? (pathFloor κ) (just ns) ≡ true) →
+  (∀ i → pathFloor κ ≤ i
+       → parkStrat? i (lookupNode nid (EvalSt.nodes st)) ≡ true
+       → parkStrat? i (just ns) ≡ true) →
   regPark? (EvalSt.registry st) st ≡ true →
   regPark? (EvalSt.registry st)
     (record st { nodes = setNode nid ns (EvalSt.nodes st) }) ≡ true

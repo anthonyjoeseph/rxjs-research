@@ -122,7 +122,10 @@ ordOK : regOrd? 10 (EvalSt.registry stᵗ) ≡ true
 ordOK = refl
 
 -- THE READING THE WRITE IS WAITING ON, at this registry and this
--- chain: the cell is visited at zero and the writer stands at two.
+-- chain: the cell is visited at zero and the writer stands at two, so
+-- the reader is BELOW the writer and not merely apart from it -- the
+-- direction the ledger cannot absorb, since a park reading only
+-- weakens as the floor rises.
 ownBad : regOwn? nid (pathFloor pricedPath) (EvalSt.registry stᵗ) ≡ false
 ownBad = refl
 

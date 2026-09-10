@@ -69,7 +69,7 @@ open import Verify-Budget-Sufficient.Delivery-Counter using (stepFrame-nextNode)
 -- readings ride across one payload of the walk
 open import Verify-Budget-Sufficient.Node-Fresh using (FreshC; thruConsume-fresh)
 -- THE ONE SUBSTITUTION THIS DEVELOPMENT PERFORMS, read on the term
-open import Rx.Inputs-Below using (ib-unfoldμ)
+open import Rx.Inputs-Below using (ib-unfoldμ; ib-monoᵛ)
 open import Verify-Budget-Sufficient.Caps-Chain using (leaf-lvl)
 open import Verify-Budget-Sufficient.Caps-Term using (unfoldμ-caps)
 open import Verify-Budget-Sufficient.Caps-Depth using
@@ -1746,9 +1746,9 @@ merge-park-caps {n = n} {u = u} c L nid κ lim act q od o sched st hS hsz₀ eq 
   INV = capsOK?-mono (frameStep L c) (frameStep (suc L) c) sched st stepL hc
 
   PARK = setNode-regPark-owner nid κ ns st
-           (λ h → all-++-intro (inputsBelowᵉ (pathFloor κ)) q (o ∷ [])
-                    (subst (λ m → parkStrat? (pathFloor κ) m ≡ true) eq h)
-                    (∧-intro stO refl))
+           (λ i le hold → all-++-intro (inputsBelowᵉ i) q (o ∷ [])
+              (subst (λ m → parkStrat? i m ≡ true) eq hold)
+              (∧-intro (ib-monoᵛ (pathFloor κ) i le (obs u) o stO) refl))
            (capsOK?-regPark (frameStep (suc L) c) sched st INV)
 
   pk₀ : all (λ x → 3 + (sizeᵉ x + slotsSize (Sched.slots sched))

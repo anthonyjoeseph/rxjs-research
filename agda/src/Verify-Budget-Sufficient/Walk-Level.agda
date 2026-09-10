@@ -210,7 +210,7 @@ open import Verify-Budget-Sufficient.Walk-Level.Parts using
    walk-of; walk-scan; walk-take)
 open import Verify-Budget-Sufficient.Walk-Level.Statement using
   (inputᶜ; mu-lvl-desc; WalkLevel; WalkLevelCore; WalkStmt)
-open import Rx.Inputs-Below using (ib-unfoldμ)
+open import Rx.Inputs-Below using (ib-unfoldμ; ib-monoᵛ)
 open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen)
 
 
@@ -2008,8 +2008,10 @@ thruConsume-walk {n = n} {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g me
                   (frameStep-mono-j c 2≤S (n≤1+n j)) inv)
                (setNode-regPark-owner nid κ
                   (mergeAll-st lim act (q ++ o ∷ []) od) st
-                  (λ _ → all-++-intro (inputsBelowᵉ (pathFloor κ)) q (o ∷ [])
-                           hqk (∧-intro hib refl))
+                  (λ i le hold → all-++-intro (inputsBelowᵉ i) q (o ∷ [])
+                     (subst (λ m → parkStrat? i m ≡ true) nEqM hold)
+                     (∧-intro (ib-monoᵛ (pathFloor κ) i le (obs u) o hib)
+                              refl))
                   (capsOK?-regPark (frameStep j c) sched st inv))
   FN : fnCapNode Ψ (mergeAll-st lim act (q ++ o ∷ []) od) ≡ true
   FN = all-++-intro (λ x → fnCapᵉ x ≤ᵇ Ψ) q (o ∷ []) fnW

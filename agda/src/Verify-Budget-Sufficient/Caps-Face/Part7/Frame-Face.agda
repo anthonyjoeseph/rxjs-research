@@ -25,7 +25,7 @@ open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; subst)
 
 open import Rx.Prim      using (Tick; Id; _at_from_as_; Gas; after_,_)
-open import Rx.Exp       using (_×ᵗ_; obs; _≟ᵗ_; Ctx; Closed; Val; sizeᵗ; Fn; applyFn; inputsBelowᵗ)
+open import Rx.Exp       using (_×ᵗ_; obs; _≟ᵗ_; Ctx; Closed; Val; sizeᵗ; Fn; applyFn; inputsBelowᵗ; inputsBelowᵛ)
 open import Rx.Frame-Width using (pWᵛ)
 open import Rx.Evaluator using (Sched; EvalSt; scanVals; scan-st; take-st; mergeAll-st; switch-st; exhaust-st; setNode;
   lookupNode; NodeId; _↠_; Frame; AllOp; map-f; scan-f; take-f; from-inner; thru-outer;
@@ -40,7 +40,7 @@ open import Verify-Budget-Sufficient.Deliveries using
 open import Verify-Budget-Sufficient.Caps using
   (Caps; frameStep)
 open import Verify-Budget-Sufficient.Measures using
-  (pathLen; reach-reset; ∧-true)
+  (pathLen; reach-reset; ∧-true; all-impl)
 -- THE DEPTH MIRROR: `depthInner` is the fuel `thruOuter-face-core`'s
 -- depth hypothesis ranges over, and the rest of the family carries THE
 -- DEPTH PREMISE down the frame chain.  It threads by IDENTITY, because
@@ -70,6 +70,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part4 using
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (frameStep-⊑-+; valCaps?-size; valCaps?-wid)
 open import Decide using (T-to; T⇒≡true; ∧-intro; ∧-trueʳ)
+open import Rx.Inputs-Below using (ib-monoᵗ; ib-monoᵛ)
 
 thruOuter-face :
   SiCType →
@@ -269,8 +270,12 @@ stepFrame-face-scan {s = s} {u = u} c d j g id now fn nid κ vals fin sl sched s
          (capsOK?-mono (frameStep j c) (frameStep (j + j′) c) sched st
             (frameStep-⊑-+ c 2≤S j j′) inv)
          (setNode-regPark-owner nid κ (scan-st (proj₂ run)) st
-            (λ hold → proj₁ (scanVals-strat (pathFloor κ) fn ac vals sF
-                        (subst (λ m → parkStrat? (pathFloor κ) m ≡ true) eqN hold) sV))
+            (λ i le hold → proj₁ (scanVals-strat i fn ac vals
+                        (T⇒≡true (inputsBelowᵗ i fn)
+                           (ib-monoᵗ (pathFloor κ) i le fn (T-to sF)))
+                        (subst (λ m → parkStrat? i m ≡ true) eqN hold)
+                        (all-impl (inputsBelowᵛ (pathFloor κ) _) (inputsBelowᵛ i _)
+                           (λ x hx → ib-monoᵛ (pathFloor κ) i le _ x hx) vals sV)))
             (capsOK?-regPark (frameStep j c) sched st inv))
      , face-vals c j j′ sl (proj₁ run) 2≤S (proj₁ (proj₂ SC))
          (≤-trans (≤-reflexive (scanVals-len fn ac vals)) (proj₂ VP))

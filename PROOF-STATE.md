@@ -242,8 +242,8 @@ does not fit is a finding about the shared statement, not about the head.
   conjunct over the store cannot see which chain a writer is standing on,
   and the two ledgers that do read a chain admit the offending registry,
   so no field excludes it. The park transport is now proven at a named
-  floor and the whole gap is `regOwn-cell` — that the registry reads the
-  written cell at the walking chain's own floor, which is provenance and
+  floor and the whole gap is `regOwn-cell` — that no registered reader of
+  the written cell stands below the walking chain, which is provenance and
   travels beside the park and order readings the walk already threads
   frame by frame. The commit threads it from the sites holding a frame up
   to whoever built the chain. It narrows DOES A STORE CELL HAVE AN OWNER
@@ -422,10 +422,11 @@ does not fit is a finding about the shared statement, not about the head.
   cell a walk cannot freeze. The consume enqueues into exactly the cell the
   reading is about, so no watermark both covers it and excludes the write; the
   payload's own reading is what is asked to keep it true.
-- **`regOwn-cell`** (Part1) — SHAPE, `REFUTED`: the registry reads a written
-  cell at the writing chain's floor. Refuted over an arbitrary state, where a
-  share-ended chain reads at its slot index and the writer stands at the root
-  width. The park transport over it is proven, so this is the whole gap.
+- **`regOwn-cell`** (Part1) — SHAPE, `REFUTED`: no registered reader of a
+  written cell stands below the writing chain. Refuted over an arbitrary
+  state, where a share-ended chain reads at its slot index and the writer
+  stands at the root width. The transport over it is proven, so this is the
+  whole gap.
 - **`mergeAllDrain-ownerQueue`** (Part7/Strat-Leaves) — SHAPE, `REFUTED`: what
   the drain leaves in the owner's cell. Its premise is read off the POST-state,
   which the no-room arm never builds, so it is vacuously satisfiable. The

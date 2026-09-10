@@ -86,6 +86,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part3 using
 open import Verify-Budget-Sufficient.Caps-Face.Part2 using
   (pWᵛ-pair; slotsCaps?-slotWid; SlotWid-mono)
 open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen)
+open import Rx.Inputs-Below using (ib-monoᵗ; ib-monoᵛ)
 
 -- the clauses of innerFinish that neither emit nor step: a mistyped or
 -- missing node, and every op/node pair the evaluator's catch-all covers
@@ -850,8 +851,12 @@ stepFrame-scan-caps {s = s} {u = u} c j g id now fn nid κ vals fin sl sched st
          (capsOK?-mono (frameStep j c) (frameStep (j + j′) c) sched st
             (frameStep-⊑-+ c 2≤S j j′) inv)
          (setNode-regPark-owner nid κ (scan-st (proj₂ run)) st
-            (λ hold → proj₁ (scanVals-strat (pathFloor κ) fn ac vals sF
-                        (subst (λ m → parkStrat? (pathFloor κ) m ≡ true) eqN hold) sV))
+            (λ i le hold → proj₁ (scanVals-strat i fn ac vals
+                        (T⇒≡true (inputsBelowᵗ i fn)
+                           (ib-monoᵗ (pathFloor κ) i le fn (T-to sF)))
+                        (subst (λ m → parkStrat? i m ≡ true) eqN hold)
+                        (all-impl (inputsBelowᵛ (pathFloor κ) _) (inputsBelowᵛ i _)
+                           (λ x hx → ib-monoᵛ (pathFloor κ) i le _ x hx) vals sV)))
             (capsOK?-regPark (frameStep j c) sched st inv))
      , proj₁ (proj₂ SC)
      , refl

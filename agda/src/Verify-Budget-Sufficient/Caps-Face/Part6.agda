@@ -100,6 +100,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part1 using
    pathOrd?; pathPark?;
    pathSz?; setNode-regPark-owner; slotsCaps?; valCaps?; widNode-push)
 open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen)
+open import Rx.Inputs-Below using (ib-monoᵛ)
 
 -- THE TWO HYPOTHESIS TYPES THE FACE CLIQUE RUNS AGAINST.  Every face
 -- below Subscribe-Face takes the subscribe descent and the *All finish
@@ -600,9 +601,10 @@ private
                     (frameStep-mono-j c 2≤S (n≤1+n j)) inv)
                  (setNode-regPark-owner nid κ
                     (mergeAll-st lim act (q ++ o ∷ []) od) st
-                    (λ hold → all-++-intro (inputsBelowᵉ (pathFloor κ)) q (o ∷ [])
-                                (subst (λ m → parkStrat? (pathFloor κ) m ≡ true) eqN hold)
-                                (∧-intro hib refl))
+                    (λ i le hold → all-++-intro (inputsBelowᵉ i) q (o ∷ [])
+                       (subst (λ m → parkStrat? i m ≡ true) eqN hold)
+                       (∧-intro (ib-monoᵛ (pathFloor κ) i le (obs u) o hib)
+                                refl))
                     (capsOK?-regPark (frameStep j c) sched st inv)))
       , refl , refl
       , queue-push (Caps.cSize c) (Caps.cWid c) dep (suc bud) j (s≤s z≤n)

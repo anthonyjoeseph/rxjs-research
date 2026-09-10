@@ -199,7 +199,7 @@ open import Verify-Budget-Sufficient.Caps-Depth
 -- the ONE place the stratification reading crosses a SUBSTITUTION: a μ
 -- unfolding replaces the recursion variable by the μ itself, so the
 -- reading has to survive the elimination rather than the grammar
-open import Rx.Inputs-Below using (ib-unfoldμ)
+open import Rx.Inputs-Below using (ib-unfoldμ; ib-monoᵛ)
 open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen)
 
 ------------------------------------------------------------------
@@ -1478,9 +1478,9 @@ thruConsume-caps {n = n} {u = u} c dep bud j g mergeAllᵒ nid κ id now o sl sc
   -- at its own.  Node ownership is what ties the two, and it is the
   -- one thing this site spends beyond the reading it was handed
   PARK = setNode-regPark-owner nid κ (mergeAll-st lim act (q ++ o ∷ []) od) st
-           (λ _ → all-++-intro (inputsBelowᵉ (pathFloor κ)) q (o ∷ [])
-                    stQ
-                    (∧-intro stB refl))
+           (λ i le hold → all-++-intro (inputsBelowᵉ i) q (o ∷ [])
+              (subst (λ m → parkStrat? i m ≡ true) eqN hold)
+              (∧-intro (ib-monoᵛ (pathFloor κ) i le (obs u) o stB) refl))
            (capsOK?-regPark (frameStep j c) sched st inv)
 
   BN = all-++-intro (λ x → sizeᵉ x ≤ᵇ Caps.cSize (frameStep (suc j) c)) q (o ∷ [])
