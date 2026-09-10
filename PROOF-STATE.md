@@ -240,15 +240,13 @@ does not fit is a finding about the shared statement, not about the head.
 
 - **PROBING THE SIX LEAVES THE CARRIED READINGS NOW OBLIGE.** The two
   entry readings are carried on paths through BOTH faces now — the burst
-  face's nodry cascade and its consumers take them as hypotheses — so
-  `frame-parkStrat`, which pulled a floor-keyed cell reading out of a
-  receipt pricing no floor and was machine-refuted for it, is GONE rather
-  than weakened. The threading turns the gap at the mint into six named
-  leaves — a kill, a consume, a drain, an inner subscribe, the outer's own
+  face's nodry cascade and its consumers take them as hypotheses — and that
+  threading turns the gap at the mint into six named leaves — a kill, a consume, a drain, an inner subscribe, the outer's own
   cell, a node write — each owing back what it writes, none instantiated,
-  all born FALSITY. The commit probes them and reports which survive,
-  narrowing WHICH STORE CELLS DOES A PATH PREDICATE REACH from the mint
-  to these six.
+  all born FALSITY. The commit probes them and reports which survive. Three
+  of the six write a cell another reader owns, so it narrows DOES A STORE
+  CELL HAVE AN OWNER; the rest narrow WHICH STORE CELLS DOES A PATH
+  PREDICATE REACH from the mint to these six.
 
 - **PRICING THE SHARE FOLD AT THE LENGTH THE DOUBLING BITES**, now that
   `share-fold-fit`'s conclusion turns out to be instantiable and its
@@ -274,16 +272,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Open questions
 
-- **IS THERE A COMPUTABLE SHADOW OF THE SEALED FACES? — FIRST, because it is
-  the one question the ledger cannot lower (Anthony).** Two rows say in
-  their own headers that they cannot be instantiated. That sealing is what
-  makes the tower checkable, so it is not removable per row, and it leaves a
-  block of this tier whose class evidence can only RAISE: a refutation lands,
-  a probe cannot be written. So the de-risk pass cannot COMPLETE while it
-  sits, whatever the other two do. NEITHER row is sealed — one diverges at
-  its base, the other fits — so the question narrowed: is there a family
-  that REDUCES at the LENGTHS a consumer reaches, implying these?
-  relevant: `walk-frame-drain-entries`, `share-fold-fit`
+- **DOES A STORE CELL HAVE AN OWNER? — FIRST, because it is the only repair
+  in this tier that moves a RECORD.** Four rows fail in one place: a write
+  lands in a cell some registered chain also reads, priced at the writer's
+  floor while the chain reads at its own. No watermark separates them — the
+  consume enqueues into exactly the cell the reading is about, and a `scan-f`
+  overwrites where the other writers extend — so no rearrangement of
+  freshness reaches it. What would close all four at once is that a cell is
+  NAMED by the frame that installed it. No record here carries that fact, so
+  the answer is a FIELD every producer owes and every consumer re-establishes,
+  and not a restatement.
+  relevant: `setNode-regPark-owner`, `thruConsume-cellPark`, `mergeAllDrain-ownerQueue`, `framePark-step`
 
 - **WHICH STORE CELLS DOES A PATH PREDICATE REACH?** Five rows fail in one
   place: the statement reads a PATH or a chain, and the quantity it must
