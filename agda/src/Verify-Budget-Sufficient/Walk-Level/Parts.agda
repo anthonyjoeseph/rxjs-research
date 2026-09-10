@@ -70,12 +70,13 @@ open import Verify-Budget-Sufficient.Wet.Part2 using
 open import Verify-Budget-Sufficient.Caps-Term using
   (evalSeed-caps; evalTms-caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
-  (burstCaps?; burstCount?; capsOK?; capsOK?-mono; frameSz?; pathFloor; pathOrd?;
+  (burstCaps?; burstCount?; capsOK?; capsOK?-mono; framePark?; frameSz?;
+  pathFloor; pathOrd?;
   pathOrd?-mono; pathOrd?-push; pathOrd?-read; pathPark?; pathPark?-set-fresh;
   pathRead; pathStrat?; pathSz?; valCaps?; widNode)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves using
   (subscribeE-burstStrat; subscribeE-framePark; subscribeE-readings;
-  installNode-scanPark; evalTm-strat)
+  installNode-scanPark; mint-regOwn; evalTm-strat)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
   (capsOK?-nextNode; capsOK?-parts; capsOK?-regOrd; capsOK?-setNode;
   capsOK?-setNode-fresh)
@@ -1267,8 +1268,18 @@ walk-take-suc {n = n} {u = u} g cnt b k ecEq wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud 
   hordT = pathOrd?-push (suc nid) (take-f nid) κ ≤-refl
             (T⇒≡true (pathRead κ ≤ᵇ nid) (≤⇒≤ᵇ (pathOrd?-read nid κ hord)))
             (pathOrd?-mono nid (suc nid) κ (n≤1+n nid) hord)
+  -- AND THE FRAME'S OWN HALF IS THE MINT'S OWNER READING: a `take-f`
+  -- parks nothing, so its store conjunct is `refl`, and it names the
+  -- cell this clause has just been handed at the counter, which no
+  -- registered chain can name
+  -- the frame's own indices are PINNED at every reading below: a
+  -- `take-f` names no term, so `framePark?` reduces its type index
+  -- away and neither side of the equation can solve it
+  hfpT : framePark? {s = u} {u = u} (pathFloor κ) (take-f nid) st₀ ≡ true
+  hfpT = ∧-intro (mint-regOwn _ (pathFloor κ) sched st inv) refl
   hparkT : pathPark? (take-f nid ↠ κ) st₀ ≡ true
-  hparkT = ∧-intro refl (pathPark?-set-fresh nid κ nid ns st ≤-refl hord hpk)
+  hparkT = ∧-intro hfpT
+                   (pathPark?-set-fresh nid κ nid ns st ≤-refl hord hpk)
   BSTR = subscribeE-burstStrat g b (take-f nid ↠ κ) bid now sched₀ st₀
            hpsT hibb
   SUB = wb c Ψ F Ŝ R̂ G′ ℓ L̂ dep bud ops′ (suc j)
@@ -1303,6 +1314,11 @@ walk-take-suc {n = n} {u = u} g cnt b k ecEq wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud 
   res = subscribeE g b (take-f nid ↠ κ) bid now sched₀ st₀
   ⊑₁  = frameStep-⊑-+ c 2≤S (suc j) j₁
   RDT = subscribeE-readings g b (take-f nid ↠ κ) bid now sched₀ st₀ hordT hparkT
+  hpkT-post : pathPark? κ (proj₂ (proj₂ res)) ≡ true
+  hpkT-post = proj₂ (∧-true (framePark? {s = u} {u = u} (pathFloor κ)
+                               (take-f nid) (proj₂ (proj₂ res)))
+                            (pathPark? κ (proj₂ (proj₂ res)))
+                            (proj₂ RDT))
   PBc = pushBurst-caps c dep bud (suc j + j₁) g bid now (take-f nid) κ (proj₁ res)
           sl (proj₁ (proj₂ res)) (proj₂ (proj₂ res)) 2≤S 1≤R
           (trans (KeepsC.slotsEq
@@ -1313,7 +1329,13 @@ walk-take-suc {n = n} {u = u} g cnt b k ecEq wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud 
           a₂ a₃
           (≤-trans (burst-takef-zero g bid now nid κ (proj₁ res)
                       (proj₁ (proj₂ res)) (proj₂ (proj₂ res))) z≤n)
-          refl hps BSTR refl (proj₁ RDT) (proj₂ RDT)
+          refl hps BSTR
+          -- the frame's own reading carried across the subscribe: the
+          -- cell sits strictly below the counter the callee is handed,
+          -- so nothing the subscribe registers can name it
+          (subscribeE-framePark {s = u} {u = u} (pathFloor κ) g b
+             (take-f nid ↠ κ) bid now (take-f nid) sched₀ st₀ tt refl hfpT)
+          (proj₁ RDT) hpkT-post
   j₂  = proj₁ PBc
   PB  = pushBurst g bid now (take-f nid) κ (proj₁ res)
           (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
@@ -1821,6 +1843,7 @@ walk-scan-source-tail {n = n} {u = u} g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud
             (pathOrd?-mono nid (suc nid) κ (n≤1+n nid) hord)
   hparkS : pathPark? (scan-f f nid ↠ κ) st₀ ≡ true
   hparkS = ∧-intro (installNode-scanPark (pathFloor κ) f nid (evalTm z) st
+                      (mint-regOwn _ (pathFloor κ) sched st inv)
                       (evalTm-strat (pathFloor κ) z hibz))
                    (pathPark?-set-fresh nid κ nid ns st ≤-refl hord hpk)
   SUB = wb c Ψ F Ŝ R̂ G′ ℓ L̂ dep bud ops (suc (j + j₀))
@@ -2061,6 +2084,7 @@ walk-scan-rest {n = n} {u = u} g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc o
             (pathOrd?-mono nid (suc nid) κ (n≤1+n nid) hord)
   hparkZ : pathPark? (scan-f f nid ↠ κ) st₀ ≡ true
   hparkZ = ∧-intro (installNode-scanPark (pathFloor κ) f nid (evalTm z) st
+                      (mint-regOwn _ (pathFloor κ) sched st inv)
                       (evalTm-strat (pathFloor κ) z hibz))
                    (pathPark?-set-fresh nid κ nid (scan-st (evalTm z)) st
                       ≤-refl hord hpk)
@@ -2086,6 +2110,7 @@ walk-scan-rest {n = n} {u = u} g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc o
           (subscribeE-framePark (pathFloor κ) g b (scan-f f nid ↠ κ) bid now
              (scan-f f nid) sched₁ st₀ ≤-refl refl
              (installNode-scanPark (pathFloor κ) f nid (evalTm z) st
+                (mint-regOwn _ (pathFloor κ) sched st inv)
                 (evalTm-strat (pathFloor κ) z hibz)))
           (proj₁ RDZ) (proj₂ (∧-true _ _ (proj₂ RDZ)))
   j₂  = proj₁ PBc
