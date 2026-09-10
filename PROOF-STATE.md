@@ -238,17 +238,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE PREMISE THAT REACHES THE FAN**, which is what re-pricing the
-  leaf leaves owed. Affordability was not free: the sink LEAF was
-  denominated at the cap, so a chain of the budgeted length did not
-  fit under it, and the potential now prices it at the budget. What
-  still reads the refuted form is the FAN — its registry receipt, the
-  admitted-list filter and the share fold's premise are one size
-  reading at the entry cap. Widening the frame face's SHARED premise
-  is priced out: the strict length conjunct is forwarded, never spent,
-  through ninety-odd signatures in a dozen modules. So the commit
-  gives the fan a premise of its own, and narrows WHAT PRICES A
-  REGISTERED CHAIN to the mint's own supply.
+- **A CHAIN PRICED IN SOMETHING THAT IS NOT A CAP**, which is what
+  re-pricing the leaf leaves owed. The leaf costs the budget now, so
+  the potential affords a fanned chain; what still reads a refuted
+  form is the FAN's registry receipt, whose mint is refuted at the
+  entry cap — a subscribing frame registers a path LONGER than the
+  one it walked. The walk follows a WIDENING to its own level, so the
+  level is free there; the Φ pricing is the one consumer
+  that cannot follow, since its conclusion names the cap. Weakening
+  the walk's premise instead is out — it is its invariant. So the
+  commit moves the pricing's length off the cap, narrowing WHAT
+  PRICES A REGISTERED CHAIN to the stratified climb's currency.
 
 - **A READING THAT TRAVELS TO THE MINT**, which is all the store
   question has left. Three rows fail in the same place: the site

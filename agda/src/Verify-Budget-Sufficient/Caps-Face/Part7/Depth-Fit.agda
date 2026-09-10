@@ -674,21 +674,22 @@ postulate
 -- a ⊔ over the table is a widening of this reading rather than a
 -- second source, and the residue is the queued terms' own depth.
 
--- AND THE STRICT LENGTH CONJUNCT IS THE WHOLE WALK FACE'S, NOT THIS
--- STATEMENT'S, which is what prices any attempt to hand the fan a
--- budgeted premise through here.  The conjunct is minted for the
--- inner arm from the arm's own size receipt at level ZERO, where the
--- caps step is the identity and no inflation is available -- so a
--- length known only at twice the cap cannot supply it, and the
--- weakening has to travel.  It travels far: the same premise is
--- forwarded, never spent, from `stepFrame-nodes-inner` through
+-- AND THE STRICT LENGTH CONJUNCT IS A DESCENT INVARIANT, WHICH IS WHY
+-- NO WEAKENING OF IT IS LOCAL.  It is not carried to the bottom and
+-- spent there: `path-step` consumes it at EVERY frame and re-mints it
+-- one level up, off the chain device that grows the size cap by
+-- exactly one per level -- so this conjunct is what CARRIES the
+-- descent, and a length known only at twice the cap cannot enter it
+-- at level zero, where the caps step is the identity.  Nor may the
+-- size predicate's two halves travel as separate premises: the length
+-- half is the inductively load-bearing one and the frame half rides
+-- on it.  The pair runs from `stepFrame-nodes-inner` through
 -- `innerFinish-nest` and `mergeAllDrain-nest` to `subscribeInner-nest`,
--- and a census of the two conjuncts finds them threaded through
--- ninety-odd signatures across a dozen modules, `Nest-Walk` and
--- `Walk-Level` among them -- the two the dev loop can no longer hold.
--- So a fan route sharing the frame face's ONE size premise inherits a
--- whole-face restatement, and the cheaper cut is to give the fan a
--- premise of its own rather than to widen what every arm reads.
+-- and a census finds it in ninety-odd signatures across a dozen
+-- modules, `Nest-Walk` and `Walk-Level` among them -- the two the dev
+-- loop can no longer hold.  What the walk DOES follow is a WIDENING to
+-- the level it is standing at, which is the surviving route and the
+-- one `fan-regsSz`'s own header names.
 InnerΦCore : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (sf : Gas) (eid : Id) (now : Tick) (B U W : ℕ)
   (op : AllOp) (allNid inst : NodeId) (p : Path Γ s t)
