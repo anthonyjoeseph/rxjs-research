@@ -44,7 +44,13 @@ expect 1 "a purely additive edit to a deep module did not fire"
 
 # QUIET: the same addition once something existing is also removed -- the cone
 # bill is already owed, so the addition rides along free.
-sed -i '/^x = Set$/d' agda/src/Rx/Deep.agda
+# the removal is done with grep and a rename rather than `sed -i`, whose
+# in-place flag takes a mandatory suffix on BSD and none on GNU -- so the
+# GNU spelling read the FILENAME as the script here and this selftest was
+# red on macOS while green in CI, which is the worst way for a checker's
+# own selftest to fail
+grep -v '^x = Set$' agda/src/Rx/Deep.agda > agda/src/Rx/Deep.agda.tmp
+mv agda/src/Rx/Deep.agda.tmp agda/src/Rx/Deep.agda
 expect 0 "an addition alongside a removal fired"
 git checkout -q -- agda/src/Rx/Deep.agda
 
