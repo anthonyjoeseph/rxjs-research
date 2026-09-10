@@ -305,3 +305,7 @@ open import Refuted.Subscribe-Frame-Park
 
 open import Refuted.MergeAllDrain-OwnerQueue
   using (mergeAllDrain-ownerQueue-absurd)
+
+open import Refuted.SetNode-Two-Floor
+  using (floors; pricedFloor; pricedOK; sunkBad; parkedBefore; parkedAfter;
+         setNode-two-floor-absurd)

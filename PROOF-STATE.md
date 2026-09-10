@@ -238,17 +238,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **TWO FLOORS ON ONE CELL, WHICH THE FIRST PASS DID NOT REACH.**
-  `framePark-step`'s gas-driven arm is instantiated: a finish DRAINS the
-  flatten's queue and reinstalls the residue, and the reading survives
-  that at both gas settings — so the one write whose content a caller
-  cannot see is not where the row is false. But every row is taken at a
-  root-ended chain, where the cell is read at a single floor, so the
-  question's own shape is untouched. What is left is the program: two
-  inners on one mergeAll at different chain depths, which needs a chain
-  that is not root-ended and therefore a floor below the context width.
-  The commit builds it. Red there is the two-floor witness; green
-  retires the question's premise.
+- **THE OWNER GOES ON THE RECORD, WHICH IS THE ONLY PLACE LEFT FOR IT.**
+  The two-floor shape is no longer a suspicion: a share-ended chain reads
+  a cell at its slot index while the writer is priced at the root's
+  width, and one payload sits on either side of the two, so
+  `setNode-regPark-owner` is refuted with the write exactly as legal as
+  its premise asks. That closes the statement-shaped repairs — the
+  statement quantifies over every state, so the missing fact must
+  EXCLUDE a state. The commit puts node ownership on the invariant
+  record and pays the producer cascade. It narrows DOES A STORE CELL
+  HAVE AN OWNER to whether one field covers the other two rows or only
+  the write.
 
 - **A CONTEXT DEEP ENOUGH TO DISAGREE WITH**, which is now the only
   thing between `share-fold-fit` and a class it has earned. Every axis
@@ -279,14 +279,14 @@ does not fit is a finding about the shared statement, not about the head.
 - **DOES A STORE CELL HAVE AN OWNER? — FIRST, because the repair it points
   at moves a RECORD rather than a statement.** These rows fail where a write
   lands in a cell some registered chain also reads, each pricing it at its own
-  floor. It has narrowed twice AGAINST itself: a sibling was refuted for a
-  SHALLOWER reason, so failing at a cell does not make a row two-floor; and the
-  gas-driven write, the last one whose content a caller cannot see, now holds
-  too. So every write this development can reach is instantiated and not one
-  of them needed an owner. What is left is the shape none of them had — two
-  inners on one mergeAll at different chain depths, read at a floor below the
-  context width.
-  relevant: `setNode-regPark-owner`, `thruConsume-cellPark`, `framePark-step`
+  floor. It is ANSWERED for the write: the two-floor shape is machine-built,
+  and a cell read at a share sink's index breaks a registry the writer left
+  legal at the root's width, so no pricing of the write can hold and the
+  owner has to be carried. What is left is its REACH — the remaining rows
+  fail at an ENQUEUE and at a walked chain rather than at an overwrite, and
+  whether one ownership field settles those or only stops the write from
+  lying is what the next commit reports.
+  relevant: `thruConsume-cellPark`, `framePark-step`
 
 - **WHICH STORE CELLS DOES A PATH PREDICATE REACH?** Five rows fail in one
   place: the statement reads a PATH or a chain, and the quantity it must
@@ -425,10 +425,11 @@ does not fit is a finding about the shared statement, not about the head.
   cell a walk cannot freeze. The consume enqueues into exactly the cell the
   reading is about, so no watermark both covers it and excludes the write; the
   payload's own reading is what is asked to keep it true.
-- **`setNode-regPark-owner`** (Part1) — FALSITY, `PROBED`: a write that
-  overwrites parked content pays at its OWN floor. What would close it is node
-  OWNERSHIP — a cell is named by the frame that installed it — and no record in
-  this development carries that fact.
+- **`setNode-regPark-owner`** (Part1) — SHAPE, `REFUTED, PROBED`: a write
+  priced at one chain's floor. Refuted at a share-ended registry chain reading
+  the written cell at its slot index, the write legal at the writer's own floor
+  throughout. The repair excludes a state, so it is node OWNERSHIP on the
+  record.
 - **`mergeAllDrain-ownerQueue`** (Part7/Strat-Leaves) — SHAPE, `REFUTED`: what
   the drain leaves in the owner's cell. Its premise is read off the POST-state,
   which the no-room arm never builds, so it is vacuously satisfiable. The

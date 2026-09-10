@@ -928,12 +928,24 @@ regPark?-set rs nid ns st pv =
 -- other reading.  A registered chain reaching the same cell reads it
 -- at ITS floor, and no receipt in this development ties the two.
 --
--- What closes the gap is NODE OWNERSHIP -- a cell is named by exactly
--- the frame that installed it, so a registered chain reaching it is
--- reaching it through that frame and reads it at that frame's floor.
--- No record in this development carries that fact, so it is stated
--- here as the premise's one-floor form rather than threaded as a
--- hypothesis, which would launder the gap out of the ledger.
+-- THE ONE-FLOOR FORM BELOW IS FALSE, and the two floors are already
+-- there in a two-slot context: a root-ended chain reads at two and a
+-- share-ended one at its slot index, the queue reading is a strict `<`
+-- against that number, and one payload naming the first slot sits on
+-- either side of the two.  The write is then exactly as legal as the
+-- premise asks and the registry still breaks, so nothing is repaired
+-- by pricing the write more tightly.
+--
+-- SO THE MISSING FACT MUST EXCLUDE A STATE rather than constrain a
+-- write, since the statement quantifies over every state and no proof
+-- of it exists.  NODE OWNERSHIP is that fact -- a cell is named by
+-- exactly the frame that installed it, so a registered chain reaching
+-- it reaches it through that frame and reads it at that frame's floor.
+-- It is a field on the invariant record, which obliges every producer
+-- to supply it, and not a hypothesis here, which would launder the gap
+-- out of the ledger.
+--
+-- REFUTED: `Refuted.SetNode-Two-Floor`.
 --
 -- PROBED: `Probed.SetNode-RegPark-Owner`.  Two rows -- a DEGENERATE one
 --   at the empty registry, where the implication is vacuous, and a
@@ -941,9 +953,7 @@ regPark?-set rs nid ns st pv =
 --   chain's own floor, where the antecedent holds non-vacuously and the
 --   conclusion computes.  The OWNERSHIP region is NOT covered: no row
 --   reaches a registry visiting `nid` at a floor OTHER than
---   `pathFloor κ`, which needs two inner subscriptions on one mergeAll
---   at different chain depths, and that is the region the statement is
---   about.
+--   `pathFloor κ`, which is the region the refutation above reaches.
 postulate
   setNode-regPark-owner : ∀ {n} {Γ : Ctx n} {u t} {e : Closed Γ t}
     (nid : NodeId) (κ : Path Γ u t) (ns : NodeState Γ) (st : EvalSt e) →
