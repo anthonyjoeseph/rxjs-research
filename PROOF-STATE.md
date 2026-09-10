@@ -408,18 +408,14 @@ does not fit is a finding about the shared statement, not about the head.
   cascade's fold-through, where the tail's chains are read at the state the
   HEAD chain's step produced. The chains that must survive are not the one that
   stepped, which is what keeps it off the share's form.
-- **`switchKill-readings`** (Part6) — FALSITY, `NO EVIDENCE`: the order and
-  park readings carried across a kill. The kill retires registrations and may
-  bump the registry counter, so it writes exactly what both readings read, and
+- **`switchKill-readings`** (Part6) — FALSITY, `PROBED`: the order and park
+  readings carried across a kill. The kill retires registrations and may bump
+  the registry counter, so it writes exactly what both readings read, and
   nothing yet says the pair survives it.
-- **`thruConsume-readings`** (Part6) — FALSITY, `NO EVIDENCE`: the same pair
-  carried across one consumed value, which may enqueue on the outer's own cell.
-  Stated over the whole triple, since the three travel together at every site
-  that spends them.
-- **`subscribeInner-readings`** (Part6) — FALSITY, `NO EVIDENCE`: the same
-  triple across one drained inner, the writer the drain's recursion spends. The
-  mint moves here — the instance node is allocated and the counter the ordering
-  is read against is raised — so the ordering half is an obligation, not a
+- **`subscribeInner-readings`** (Part6) — FALSITY, `PROBED`: the same triple
+  across one drained inner, the writer the drain's recursion spends. The mint
+  moves here — the instance node is allocated and the counter the ordering is
+  read against is raised — so the ordering half is an obligation, not a
   transport.
 - **`thruConsume-cellPark`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the
   one cell a walk cannot freeze. The consume enqueues into exactly the cell the
@@ -433,6 +429,10 @@ does not fit is a finding about the shared statement, not about the head.
   overwrites parked content pays at its OWN floor. What would close it is node
   OWNERSHIP — a cell is named by the frame that installed it — and no record in
   this development carries that fact.
+- **`thruConsume-readings`** (Part6) — SHAPE, `PROBED`: REFUTED as written. The
+  no-room branch parks the arrival onto the cell the third conjunct reads, and
+  no hypothesis prices the arrival, so a `share-sink` chain falsifies it. The
+  restatement is the arrival's own floor premise.
 - **`scanΦ-fit`** (Part7/Depth-Fit) — SHAPE, `DEAD ROUTE`: the producing side
   of the fold's grant. THE MECHANISM IS DEAD, NOT A DENOMINATION: a flat
   per-instant potential cannot dominate a count exponential in itself; the one

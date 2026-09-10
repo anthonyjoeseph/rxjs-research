@@ -49,23 +49,18 @@ module Probed.Kill-Consume-Readings where
 
 open import Data.Bool using (Bool; true; false)
 open import Data.Fin using (Fin) renaming (zero to fzero; suc to fsuc)
-open import Data.List using (List; []; _∷_)
-open import Data.Maybe using (Maybe; nothing; just)
-open import Data.Nat using (ℕ; suc; zero)
-open import Data.Nat.Properties using (≤ᵇ⇒≤)
+open import Data.List using ([])
+open import Data.Maybe using (nothing; just)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
-open import Data.Unit using (tt)
 open import Data.Vec using () renaming ([] to []ⱽ; _∷_ to _∷ⱽ_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (g0; gs; cold)
-open import Rx.Exp using (Ctx; Closed; natᵗ; obs; input)
+open import Rx.Exp using (Ctx; Closed; natᵗ; input)
 open import Rx.Slots using (Slots; scripted)
 open import Rx.Evaluator
-  using (EvalSt; Sched; sched-init; st-init; root; mergeAllᵒ; mergeAll-st;
-         AllOp; Path; NodeId; NodeState; lookupNode; installNode;
-         thru-outer; switchKill; thruConsume; subscribeInner; share-sink;
-         _↠_)
+  using (EvalSt; Sched; sched-init; st-init; root; mergeAllᵒ; mergeAll-st; Path; lookupNode;
+  installNode; thru-outer; thruConsume; share-sink; _↠_)
 open import Verify-Budget-Sufficient.Caps-Face.Part1
   using (pathOrd?; pathPark?; parkStrat?; pathFloor)
 open import Verify-Budget-Sufficient.Caps-Face.Part6

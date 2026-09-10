@@ -192,6 +192,12 @@ IfcType =
 -- together at every site that spends them, and separating them would
 -- buy three transports where the walk needs one.
 postulate
+  -- PROBED: `Probed.Kill-Consume-Readings`.  Both `cur` shapes -- the
+  --   `nothing` kill and a `just` one -- at `κ = root` over a one-slot
+  --   context: `switchKill` writes only the registry, the cancelled set
+  --   and the live set, so all three readings come back unchanged and
+  --   both rows are LOAD-BEARING against a write to `nodes` or to the
+  --   counter.  A registry the kill actually retires is not covered.
   switchKill-readings : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (op : AllOp) (nid : NodeId) (κ : Path Γ u t)
     (cur : Maybe NodeId) (sched : Sched Γ) (st : EvalSt e) →
@@ -204,6 +210,22 @@ postulate
        × (parkStrat? (pathFloor κ)
             (lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r)))) ≡ true)
 
+  -- THIS ONE IS FALSE AS WRITTEN, and the witness is instantiated: the
+  -- no-room branch PARKS the arrival onto the outer's own queue, so the
+  -- post-state cell reading is `all (inputsBelowᵉ (pathFloor κ))` over
+  -- the old queue EXTENDED BY `o` -- and no hypothesis says anything
+  -- about `o`.  At a `share-sink`-terminated chain the floor is below
+  -- the context width, so `o = input fzero` sits at or above it while
+  -- every hypothesis holds and the third conjunct computes to `false`.
+  -- The `root` chain is safe only accidentally, its floor being the
+  -- width itself.  The statement wants `inputsBelowᵉ (pathFloor κ) o ≡
+  -- true`, which is the same premise the drain's own sibling needs, and
+  -- the restatement is owed at both.
+  --
+  -- PROBED: `Probed.Kill-Consume-Readings`.  One row pins the falsity --
+  --   the three conclusions at the parking state compute to
+  --   `(true , true , false)` -- and one covers the identity branch,
+  --   where the arrival is dispatched rather than parked.
   thruConsume-readings : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (g : Gas) (op : AllOp) (nid : NodeId) (κ : Path Γ u t)
     (id : Id) (now : Tick) (o : Val Γ (obs u))
@@ -227,6 +249,14 @@ postulate
   -- so the ordering conjunct is a genuine obligation rather than a
   -- transport, and the cell conjunct is owed because the inner may park
   -- back onto the outer's queue.
+  --
+  -- PROBED: `Probed.Kill-Consume-Readings`.  The `g0` branch only, where
+  --   the mint raises the counter and returns the state untouched, so
+  --   the ordering conjunct rides monotonicity and the two cell
+  --   conjuncts are the identity.  The FUELLED branch is NOT covered and
+  --   is where the risk is: it descends through the same consume whose
+  --   sibling above is refuted, so it is expected to inherit that
+  --   statement's missing premise about the arrival.
   subscribeInner-readings : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (g : Gas) (op : AllOp) (allNid : NodeId) (κ : Path Γ u t)
     (id : Id) (now : Tick) (o : Val Γ (obs u))

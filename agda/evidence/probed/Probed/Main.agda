@@ -168,4 +168,9 @@ open import Probed.Cell-Chain-Store
   using (chainFigures≡; chainNodes≡; chainRows≡; chainPrem≡; tieCellChain)
 
 open import Probed.SetNode-RegPark-Owner
-  using (tieEmpty; tieLoad)
+  using (antecedent≡; regPark-before≡; regPark-after≡; tieEmpty; tieLoad)
+
+open import Probed.Kill-Consume-Readings
+  using (st₁-node; thruConclusions₂≡; thruConclusions₁-full≡;
+         tieSwitchKillNothing; tieSwitchKillJust;
+         tieThruConsumeIdentity; tieSubscribeInnerG0)
