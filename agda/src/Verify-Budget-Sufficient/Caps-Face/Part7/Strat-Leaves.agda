@@ -92,6 +92,20 @@ pathBelow w (share-sink _) = ⊤
 pathBelow w (f ↠ p)        = parkBelow w f × pathBelow w p
 
 postulate
+  -- PROBED: `Probed.FramePark-Step`.  Both ways a `scan-f`'s conclusion
+  --   can be reached, separated: a closure that keeps the accumulator,
+  --   where the post-state reading IS the pre-state one and the answer
+  --   comes from the entry premise, and one that discards it and
+  --   manufactures a reference, where the entry premise says nothing
+  --   and the answer comes from the closure premise alone.  That is the
+  --   header's transported-versus-bought claim instantiated at each of
+  --   the cases it distinguishes.  Plus the `thru-outer` ENQUEUE at a
+  --   capacity-zero flatten, and a `map-f` row labelled DEGENERATE
+  --   because the reading is `true` on both sides of it.
+  --   NOT covered: `from-inner`, whose step subscribes the inner under
+  --   gas rather than writing transparently; the room-available arm of
+  --   the enqueue; and any chain not ending at `root`, so nothing here
+  --   says what happens when the floor sits below the context width.
   framePark-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (g : Gas) (id : Id) (now : Tick)
     (f : Frame Γ s u) (κ : Path Γ u t)

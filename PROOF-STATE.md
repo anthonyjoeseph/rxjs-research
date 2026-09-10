@@ -238,19 +238,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **RESTATING THE TWO READINGS THE PROBES KILLED, AND INSTANTIATING THE
-  LAST LEAF.** Five of the six leaves were reached and two came back
-  FALSE, for reasons that are not the same: one quantifies over a queue
-  extended by content nothing prices, the other reads a post-state an
-  early arm never builds, so it constrains nothing. Both repairs are
-  known and NEITHER is the record field the
-  ownership question asks for — an arrival's own floor premise, and an
-  identification of the node the reading is about. The commit lands
-  both and probes
-  `framePark-step`, the leaf still uninstantiated. It narrows DOES A
-  STORE CELL HAVE AN OWNER by deciding whether its last unprobed member
-  is two-floor or merely unpriced.
-
 - **PRICING THE SHARE FOLD AT THE LENGTH THE DOUBLING BITES**, now that
   `share-fold-fit`'s conclusion turns out to be instantiable and its
   receipt says at what. The barrier is `depthShareGo`'s `2ⁿ` in the
@@ -273,18 +260,28 @@ does not fit is a finding about the shared statement, not about the head.
   reports what the descent would have to carry to do it. It narrows
   WHAT PRICES A REGISTERED CHAIN to the descent.
 
+- **THE ONE ARM WHERE THE WRITE IS NOT TRANSPARENT**, which is where
+  `framePark-step`'s risk went once the rest of it was instantiated.
+  Every other frame writing the cell its own reading is about does so by
+  a term the caller can see — a closure applied, a queue extended — and
+  each of those is a row now. `from-inner` subscribes under GAS, so what
+  lands in the cell is decided by a descent rather than by the frame,
+  and that is the shape DOES A STORE CELL HAVE AN OWNER says a two-floor
+  cell needs: two inner subscriptions on one mergeAll at different
+  depths. The commit builds that program. Green is the question's first
+  real negative; red is the two-floor witness it has been asking for.
+
 ### Open questions
 
 - **DOES A STORE CELL HAVE AN OWNER? — FIRST, because the repair it points
   at moves a RECORD rather than a statement.** These rows fail where a write
   lands in a cell some registered chain also reads, each pricing it at its own
   floor. It has narrowed AGAINST itself: a sibling was refuted for a SHALLOWER
-  reason — nothing priced the written content at all, repaired by one premise —
-  so failing at a cell does not make a row two-floor. And the row instantiated
-  here computes on both sides while missing the region entirely; reaching a
-  cell read at two floors needs two inner subscriptions on one mergeAll at
-  different depths. What is open is which of these is two-floor and which is
-  merely unpriced.
+  reason, so failing at a cell does not make a row two-floor. Reaching a cell
+  read at two floors needs two inner subscriptions on one mergeAll at different
+  depths, and every TRANSPARENT write is instantiated now without one reaching
+  that shape — so which is two-floor and which merely unpriced has narrowed to
+  the arm that is not transparent, the gas-driven one.
   relevant: `setNode-regPark-owner`, `thruConsume-cellPark`, `framePark-step`
 
 - **WHICH STORE CELLS DOES A PATH PREDICATE REACH?** Five rows fail in one
@@ -399,10 +396,10 @@ does not fit is a finding about the shared statement, not about the head.
   a frame hands the rest of its chain. The walk re-enters on the tail with an
   output the caps receipt prices but does not read; the floor does not move
   across a frame, which is what lets one statement cover the walk.
-- **`framePark-step`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the
-  frame-keyed park reading across one step, at a frame the push re-steps and so
-  cannot reduce. Two shapes write a cell it reads, and only one leaves a suffix
-  — the other overwrites, which is why the closure is a premise.
+- **`framePark-step`** (Part7/Strat-Leaves) — FALSITY, `PROBED`: the
+  frame-keyed park reading across one step. The overwrite the closure premise
+  exists for is instantiated now, at both its outcomes; `from-inner` writes the
+  same cell under gas and is not, which is what holds the class.
 - **`foldPath-park`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the park
   reading once a SIBLING chain has folded. It is about a state the walk
   PRODUCED rather than one it was handed, and it TAKES the reading as a
