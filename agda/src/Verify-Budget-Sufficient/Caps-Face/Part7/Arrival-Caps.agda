@@ -851,14 +851,17 @@ arr-chains-bursts sl id a nextId sched st sleq cok hpz hvc hcl hsv hdp =
 --   there is no monotonicity to borrow.  Slackening `S` only weakens a
 --   premise that is already discharged, and moves no risk off this
 --   leaf onto the round.
--- DEAD ROUTE: the compiled harness cannot price the descent at a walked
---   state either, so the barrier is not an instrument that is missing.
---   Its one advantage is running bodies the checker will not unfold,
---   and `Caps-Depth` seals nothing at all; what actually blocks the
---   descent is a doubling per registered share path, recorded at the
---   clause responsible.  Speed is a constant against that, so the
---   conclusion side is closed to instantiation permanently and this row
---   moves only by proof.
+-- DEAD ROUTE: the compiled harness cannot price this descent at a
+--   registry a consumer walks at, and the barrier is not an instrument
+--   that is missing.  Its one advantage is running bodies the checker
+--   will not unfold, and `Caps-Depth` seals nothing at all; what blocks
+--   the descent is a doubling per registered share path, recorded at the
+--   clause responsible, and speed is a constant against a `2ⁿ`.  The
+--   route is therefore dead in the LENGTH and not in the kind -- a
+--   handful of admitted paths prices in an instant, as the sibling
+--   below's rows show -- so what no row can reach is the length at
+--   which the doubling bites, which is the length every consumer here
+--   stands at.
 
 -- ONE FRAME'S OWN SPEND.  `depthFrame` is flatly nought at map, scan
 -- and take, so the whole claim is the two arms that charge: the
@@ -883,9 +886,36 @@ postulate
 
 -- THE FOLD HALF OF WHAT THE SHARE SINK OWES, over the registrations a
 -- share admits rather than the frames a path crosses.  It is
--- `depthFold` again, so it inherits the parent's own barrier and no
--- instrument reaches it -- which is a different obstruction from the
--- one its sibling had, and the reason the two no longer share a block.
+-- `depthFold` again, so it inherits the parent's obstruction rather
+-- than the sibling's -- which is why the two no longer share a block.
+--
+-- AND THE BARRIER IS A SIZE, NOT A KIND, which is the correction a
+-- measurement made to what this block used to assert.  It said no
+-- instrument reached the conclusion, and read that off the parent
+-- instead of off a row; both things that would have had to hold for it
+-- fail.  `Caps-Depth` seals nothing, so opacity is not the obstruction;
+-- and `Gas` is a lazy datatype built to be peeled, so the budget the
+-- hypothesis pins `sf` to does not carry the anchor's divergence into
+-- this side either.  What is actually there is `depthShareGo`'s two
+-- recursive calls per admitted path -- a `2ⁿ` in a length the registry
+-- grows, stated at the clause responsible.  So the conclusion computes,
+-- and computes fast, at a registry of a handful; what it cannot reach is
+-- a registry a consumer walks at, and no speed closes that gap.
+-- PROBED: `Harness.Main`'s share-fold series prices BOTH sides at a
+--   DRIVEN state -- the sched and store a real run builds, not a record
+--   update over `st-init` -- at source zero, the only one of the three
+--   whose admitted entries are headed by a frame rather than by `root`.
+--   The fold reads one against a ceiling of eight, so it fits with room
+--   at every row.  Three separations make the rows load-bearing: the
+--   reading moves with the fold gas, it differs from a `root` control
+--   taken at the same state, and it is nought at the instant the
+--   registry is empty.  Not covered, and the first is what the class
+--   still rests on: one and two admitted paths, where the doubling is
+--   four -- nothing about the length at which it bites; a `natᵗ`
+--   payload, which `nestDᵛˢ` reads FLAT, so the value axis is untouched
+--   rather than dialled; two flat shares, so nothing about one
+--   registered under another; and no `f ↠ p` arm.
+--   ⚠ measured-not-rechecked.
 postulate
   share-fold-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (sf : Gas) (gas : ℕ) (bid : Id) (now : Tick) (i : Fin n)

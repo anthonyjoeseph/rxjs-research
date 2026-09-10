@@ -238,17 +238,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **ESTABLISHING WHICH SIDE OF EACH SEALED FACE IS ACTUALLY SEALED,
-  AND WHETHER THE HARNESS REACHES THE CONCLUSION.** Two rows claim
-  in their own headers that they cannot be instantiated, and the claim
-  is INHERITED rather than measured: a seal is added for checking cost,
-  so what a row said when written need not hold now. The commit re-reads
-  each definition site, says per row which SIDE is sealed, and runs the
-  compiled harness at the conclusion, which ignores the seal and so
-  answers what the checker cannot. A hypothesis-side seal leaves the
-  conclusion probeable and the row moves; a conclusion-side seal on both
-  makes the sealing load-bearing in the STATEMENT.
-
 - **WALKING AN ADMITTED CHAIN AT THE LEVEL IT WAS REGISTERED AT, the
   one door the pricing question leaves open.** Both ends are closed by
   arithmetic now, and `fan-regsSz`'s header carries which: the fan can
@@ -272,6 +261,16 @@ does not fit is a finding about the shared statement, not about the head.
   narrowing WHICH STORE CELLS DOES A PATH PREDICATE REACH from the mint
   to these six.
 
+- **PRICING THE SHARE FOLD AT THE LENGTH THE DOUBLING BITES**, now that
+  `share-fold-fit`'s conclusion turns out to be instantiable and its
+  receipt says at what. The barrier is `depthShareGo`'s `2ⁿ` in the
+  admitted-path count and nothing else, so the one region the row still
+  rests on is a LENGTH. The commit walks a context whose shares nest,
+  finds where the reading stops returning, and reports whether the fit
+  degrades before it does — tight at four paths is a refutation in
+  waiting, still reading one is a statement about the ceiling. It
+  narrows WHICH STORE CELLS DOES A PATH PREDICATE REACH to the length.
+
 ### Open questions
 
 - **IS THERE A COMPUTABLE SHADOW OF THE SEALED FACES? — FIRST, because it is
@@ -280,10 +279,9 @@ does not fit is a finding about the shared statement, not about the head.
   makes the tower checkable, so it is not removable per row, and it leaves a
   block of this tier whose class evidence can only RAISE: a refutation lands,
   a probe cannot be written. So the de-risk pass cannot COMPLETE while it
-  sits, whatever the other two questions do. Is there a weaker family that
-  REDUCES and whose truth would imply these? And which SIDE of each row is
-  sealed — the claim is INHERITED rather than measured, and a hypothesis-side
-  seal leaves the conclusion probeable.
+  sits, whatever the other two do. NEITHER row is sealed — one diverges at
+  its base, the other fits — so the question narrowed: is there a family
+  that REDUCES at the LENGTHS a consumer reaches, implying these?
   relevant: `walk-frame-drain-entries`, `share-fold-fit`
 
 - **WHICH STORE CELLS DOES A PATH PREDICATE REACH?** Five rows fail in one
@@ -368,11 +366,9 @@ does not fit is a finding about the shared statement, not about the head.
   instant's nest predicate at the state the fan reads the registry. The door
   has it and the walk carries no nest conjunct at all; threading it down is
   refused by the store's own growth toward the NEXT cap.
-- **`share-fold-fit`** (Part7/Arrival-Caps) — FALSITY, `NO EVIDENCE`: one
-  admitted registration's path, descended at the delivered-marked state. THE
-  ONE LEAF INHERITING THE BARRIER — it is `depthFold` again, so the doubling
-  recorded at `depthShareGo` closes its conclusion to instantiation exactly as
-  the parent's was.
+- **`share-fold-fit`** (Part7/Arrival-Caps) — FALSITY, `PROBED`: one admitted
+  registration's path, descended at the delivered-marked state. It fits at a
+  driven state, so the barrier is a registry LENGTH and not a kind.
 - **`share-fold-store≤`** (Part7/Arrival-Caps) — FALSITY, `REFUTED, TWIN`: the
   store across one `foldPath`, PRICED against the round's grant rather than
   preserved. A `scan-f` at an obs-typed accumulator crossed the preservation,

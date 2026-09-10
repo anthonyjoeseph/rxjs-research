@@ -75,7 +75,7 @@ open import Rx.Slot-Hop using (slotHop)
 open import Rx.Evaluator using (poolCount; blowH; capsHgo; lvls; iterL;
   capsBase; subscribeE; sched-next; cascade; Sched; EvalSt; root; sched-init;
   st-init; drain; splitEvents; splitBurst; Stream; Path; share-sink; _↠_;
-  shareAdmit; RegId; Chain)
+  shareAdmit; RegId; Chain; budgetAt)
 open import Verify-Budget-Sufficient.Caps using (Caps; capsAt)
 open import Verify-Budget-Sufficient.Nest-Store using (nestUnit; slotWrapSum;
   nestCapAt)
@@ -83,6 +83,9 @@ open import Verify-Budget-Sufficient.Nest-Walk using (nodesMax)
 open import Verify-Budget-Sufficient.Caps-Face.Nest-Arith using (nestWalkAt;
   capΦAt; nestΦAt)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Depth-Fit using (regStrat?)
+open import Verify-Budget-Sufficient.Caps-Depth using (depthFold)
+open import Verify-Budget-Sufficient.Nest-Store using (sightCeil; storeSyncMax)
+open import Verify-Budget-Sufficient.Nest-Walk using (nestDᵛˢ)
 
 ------------------------------------------------------------------
 -- THE CALIBRATION PIN.  `towerℕ` is the one member of this
@@ -603,6 +606,106 @@ deliveredRow = censusᵈ "delivered" slᵈ
 controlRow : ℕ → String
 controlRow = censusᵈ "control" slᶜ
 
+------------------------------------------------------------------
+-- SERIES -- WHETHER THE SHARE FOLD'S CEILING CAN BE PRICED AT ALL,
+-- which is the question its row's class rests on and which nothing has
+-- ever put to a machine.
+--
+-- TARGET: share-fold-fit @a4232d
+--
+-- WHY IT IS WORTH A ROW.  The statement's own block says no instrument
+-- reaches it, and reads that off its parent rather than off a
+-- measurement -- so the claim is INHERITED, and an inherited claim about
+-- computability is exactly the kind that stops being true underneath
+-- whoever wrote it.  Two things had to hold for the barrier to be where
+-- the block says.  Neither does.  `Caps-Depth` seals nothing at all, so
+-- opacity is not it; and the budget the hypothesis pins `sf` to is a
+-- `Gas`, whose whole representation exists to be peeled lazily, so the
+-- anchor family the quarantine below rules symbolic-or-nothing does not
+-- reach this side either.  What is left is the doubling per registered
+-- share path, and a doubling is a QUANTITY -- so it has a value at a
+-- program small enough, and the row is what says which.
+--
+-- LOAD-BEARING, AND WHAT WOULD MAKE IT FAIL.  Both sides are printed
+-- rather than the verdict alone, because the two failure modes are
+-- different findings and the verdict alone hides one of them.  A fold
+-- reading ABOVE the ceiling is a refutation of the target and the more
+-- valuable outcome; a fold that does not return re-establishes the
+-- block's claim on a measurement instead of an inheritance, which is
+-- what the leg was for.  A row that merely dominates is the third
+-- outcome and the weakest, and it is bounded by what the program
+-- reaches -- see the coverage note below before spending it.
+--
+-- THE STATE IS WALKED, NOT ASSEMBLED, which is the trap this repo has
+-- already paid for twice: a state written as a record update over
+-- `st-init` is not one the evaluator can reach, so a reading over it is
+-- evidence about nothing.  These read the sched and store the driven run
+-- of the delivered-observable series above actually produces, at the
+-- instants that series already prints a census for, so the registry the
+-- fold walks is the registry the run built.
+--
+-- NOT COVERED, and the first is the one that matters: the values are
+-- `natᵗ`-typed, so `nestDᵛˢ` reads them FLAT and the ceiling does not
+-- move with their count at all -- the value axis is therefore uncovered
+-- rather than dialled, and an obs-typed payload is what would dial it;
+-- one context, whose two shares are both flat, so nothing about a share
+-- registered under another share, which is where a doubling per path
+-- would actually climb; and the frame-crossing arm, `f ↠ path'`, which
+-- neither the charged row nor its control enters.
+--
+-- ⚠ measured-not-rechecked, like every row in this module.
+------------------------------------------------------------------
+
+-- THE SOURCE THE FOLD IS READ AT, and `shareAdmit` filters on the
+-- SOURCE rather than on the sink, which decides this: source zero is the
+-- only one of the three whose admitted entries are headed by a frame.
+-- Source two admits the ROOT chain alone, and `depthFold` at `root` is
+-- the `0` clause, so a row there reads nought however many entries the
+-- registry holds -- a zero belonging to the path and not to the walk.
+-- Source zero is also the axis the measure's own cost note is about: the
+-- run admits one entry at the subscribe frame and two an instant later,
+-- so the charged rows straddle the doubling rather than sitting to one
+-- side of it.  Slot zero is `natᵗ`-typed, so the payload stays a plain ℕ
+-- and no second syntax enters the reading.
+iᶠ : Fin 3
+iᶠ = fzero
+
+-- THE PATH IS `share-sink` AND THE FOLD GAS IS NON-ZERO, and both are
+-- forced rather than chosen: `depthFold` at `root` is the literal `0`
+-- clause and `depthDisp` at gas zero is another, so a row taken at
+-- either reads nought whatever the registry holds and could not have
+-- failed.  The `root` control below is printed for exactly that reason
+-- -- it is the DEGENERATE reading, kept so the charged rows have
+-- something to be different from.
+valsᶠ : ℕ → List (Val Γᵈ natᵗ)
+valsᶠ 0       = []
+valsᶠ (suc k) = k ∷ valsᶠ k
+
+foldSides : ℕ → ℕ → ℕ → Path Γᵈ natᵗ natᵗ → ℕ × ℕ
+foldSides k g w pth = lhs , rhs
+  where
+  sd  = proj₁ (driveᵈ k slᵈ)
+  st  = proj₂ (driveᵈ k slᵈ)
+  vs  = valsᶠ w
+  lhs = depthFold (budgetAt eᵈ slᵈ 0) g 0 0 (finℕ iᶠ) pth vs [] false sd st
+  rhs = sightCeil (sizeᵉ eᵈ) (nestDᵛˢ {Γ = Γᵈ} {u = natᵗ} vs)
+                  (storeSyncMax sd st) (nestUnit eᵈ slᵈ)
+
+foldShow : String → ℕ × ℕ → String
+foldShow tag (lhs , rhs) =
+  tag ++ ": depthFold = " ++ show lhs ++ "  sightCeil = " ++ show rhs
+      ++ "  fits = " ++ (if lhs ≤ᵇ rhs then "true" else "false")
+
+-- one process per instant, and each prints the charged reading beside
+-- its own degenerate control, so a zero that is the CLAUSE's and a zero
+-- that is the REGISTRY's cannot be confused for one another.
+foldRow : ℕ → ℕ → String
+foldRow k g =
+  foldShow ("share-fold@inst " ++ show k ++ " gas " ++ show g)
+           (foldSides k g 3 (share-sink iᶠ))
+    ++ "\n  [root control, must read 0] "
+    ++ foldShow "" (foldSides k g 3 root)
+
 rowAt : ℕ → String
 rowAt 0 = "CALIBRATION towerℕ 4 (refl-pinned 65536 in this module) = "
             ++ show calibration
@@ -685,7 +788,9 @@ rowAt n = if n ≤ᵇ 22 then wideRow (n ∸ 19)
           else if n ≤ᵇ 34 then regsRow
           else if n ≤ᵇ 38 then hopRow (fuelAtˢ (n ∸ 34))
           else if n ≤ᵇ 41 then deliveredRow (n ∸ 39)
-          else if n ≤ᵇ 44 then controlRow (n ∸ 42) else "(no such row)"
+          else if n ≤ᵇ 44 then controlRow (n ∸ 42)
+          else if n ≤ᵇ 47 then foldRow (n ∸ 45) 1
+          else if n ≤ᵇ 50 then foldRow (n ∸ 48) 4 else "(no such row)"
 
 main : IO Unit
 main = getContents >>= λ s →
