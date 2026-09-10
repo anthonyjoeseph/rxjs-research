@@ -31,7 +31,8 @@ open import Rx.Evaluator using
 open import Verify-Budget-Sufficient.Caps using (Caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (burstStrat?; capsOK?; framePark?; frameAbove?; frameRead; frameStrat?; parkStrat?; pathCell;
-  pathFloor; pathOrd?; pathOrd?-mono; pathOrd?-read; pathPark?; pathRead; pathStrat?; regOrd?;
+  pathFloor; pathOrd?; pathOrd?-cell; pathOrd?-mono; pathOrd?-read; pathPark?; pathRead;
+  pathStrat?; regOrd?;
   regPark?; regPark?-nodes; regStrat?; regOwn?; pathOwn?;
   frameParked?; frameOwned?; frameParked?-nodes; any-all; all-any; regOwn?-fresh)
 open import Verify-Budget-Sufficient.Keeps-Ring using (switchKill-nodes)
@@ -309,37 +310,6 @@ postulate
       (proj₂ (proj₂ (proj₂ (proj₂ (proj₂
         (mergeAllDrain g allNid κ id now lim act q sched st)))))))) ≡ true →
     all (inputsBelowᵉ i) q ≡ true
-
--- THE ONE CELL A SUBSCRIBE IS NOT FRESH ABOVE, and it is the flatten's
--- own.  Every other reading a payload's walk carries across a subscribe
--- is moved by freshness -- the cells the chain below reads sit under a
--- watermark the subscribe does not write -- and this one cannot be,
--- because the node the subscribe is ENTERED AT is the node the reading
--- is about.  There is no rearrangement of the freshness argument that
--- both covers that cell and excludes the write.
---
--- WHAT THE ALREADY-PROVEN FORM ASKS FOR IS THE GAP.
--- `subscribeInner-cellPark` concludes exactly this from the nodes-below
--- lemma, and pays for it with `suc nid ≤ Sched.nextNode sched` -- a
--- claim that the consumed node is an OLD one.  That is a fact about the
--- ordering ledger and not about the walk, and no consumer of the walk
--- carries it, so it cannot simply be threaded: sourcing it is what this
--- leaf stands for.
---
--- AND IT IS THE ROOM ARM ALONE.  A consume that finds NO room writes
--- the payload straight into this same cell and never subscribes, and
--- that arm reduces: the extended queue's reading is the entry queue's
--- and the payload's, both of which the caller already holds.  The two
--- non-flatten heads reinstall a cell the floor check reads as `true`
--- whatever it holds.  So the whole of the consume is a body over this
--- one statement.
-  subscribeInner-ownCell : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (k : ℕ) (g : Gas) (op : AllOp) (nid : NodeId) (κ : Path Γ u t)
-    (id : Id) (now : Tick) (o : Val Γ (obs u))
-    (sched : Sched Γ) (st : EvalSt e) →
-    parkStrat? k (lookupNode nid (EvalSt.nodes st)) ≡ true →
-    parkStrat? k (lookupNode nid (EvalSt.nodes (proj₂ (proj₂ (proj₂ (proj₂ (proj₂
-      (subscribeInner g op nid κ id now o sched st)))))))) ≡ true
 
 -- (9) WHAT ONE HOP LEAVES BELOW THE FLOOR, ONE HEAD AT A TIME.  The
 -- five heads do not rebuild a payload the same way -- a `map` applies
@@ -1212,25 +1182,39 @@ mergeAllBump-cellPark k nid {done} {ns} h with lookupNode nid ns in eq
                   (mergeAll-st lim (if done then act else suc act) q od) ns))
             h
 
--- THE ONE CELL A WALK CANNOT FREEZE, and it is the outer's own -- a
--- BODY now, over the room arm alone.  The flatten's consume writes the
--- very cell the reading is about, so no watermark reaches it; but only
--- ONE of the four writes is opaque.  A consume with no room enqueues
--- the payload, and the extended queue's reading is the entry queue's
--- and the payload's, which are the two premises.  A switch and an
--- exhaust reinstall a cell the floor check reads as `true` whatever it
--- holds.  What is left is a subscribe entered at this node, and the
--- bump that follows it is transparent to the reading.
+-- THE ONE CELL A WALK CANNOT FREEZE, and it is the outer's own.  The
+-- flatten's consume writes the very cell the reading is about, so no
+-- watermark reaches it; but only ONE of the four writes is opaque.  A
+-- consume with no room enqueues the payload, and the extended queue's
+-- reading is the entry queue's and the payload's, which are two of the
+-- premises.  A switch and an exhaust reinstall a cell the floor check
+-- reads as `true` whatever it holds.  What is left is a subscribe
+-- entered at this node, and the bump that follows it is transparent to
+-- the reading.
+--
+-- AND THE ORDERING CONJUNCT IS WHAT PAYS FOR THAT ONE ARM, WITHOUT
+-- BEING A HYPOTHESIS THE CALLER HAPPENS TO HOLD.  The already-proven
+-- form of the subscribe's own reading buys it from the consumed node
+-- being an OLD one -- `suc nid` under the scheduler's counter -- which
+-- no cell-level premise can supply.  It is not a fact that had to be
+-- sourced: the node the consume is entered at is the CELL OF THE HEAD
+-- of the very chain the walk is walking, and every walk statement over
+-- this chain already carries the counter bound over the whole of it.
+-- So the premise here is the walk's own conjunct verbatim, projected
+-- at the head rather than threaded, and a second caller could not
+-- appear that does not hold it -- the chain is what makes `nid`
+-- nameable at all.
 thruConsume-cellPark : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (g : Gas) (op : AllOp) (nid : NodeId) (κ : Path Γ u t)
   (id : Id) (now : Tick) (o : Val Γ (obs u))
   (sched : Sched Γ) (st : EvalSt e) →
+  pathOrd? (Sched.nextNode sched) (thru-outer {u = u} op nid ↠ κ) ≡ true →
   inputsBelowᵛ (pathFloor κ) (obs u) o ≡ true →
   parkStrat? (pathFloor κ) (lookupNode nid (EvalSt.nodes st)) ≡ true →
   parkStrat? (pathFloor κ)
     (lookupNode nid (EvalSt.nodes (proj₂ (proj₂ (proj₂
       (thruConsume g op nid κ id now o sched st)))))) ≡ true
-thruConsume-cellPark {u = u} g mergeAllᵒ nid κ id now o sched st hb hp
+thruConsume-cellPark {u = u} g mergeAllᵒ nid κ id now o sched st ho hb hp
   with lookupNode nid (EvalSt.nodes st) in eq
 ... | nothing               = parkStrat?-cell eq hp
 ... | just (scan-st _)      = parkStrat?-cell eq hp
@@ -1244,8 +1228,12 @@ thruConsume-cellPark {u = u} g mergeAllᵒ nid κ id now o sched st hb hp
           mergeAllBump-cellPark (pathFloor κ) nid
             {done = proj₁ (proj₂ (proj₂ (proj₂ r)))}
             {ns = EvalSt.nodes (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r)))))}
-            (subscribeInner-ownCell (pathFloor κ) g mergeAllᵒ nid κ id now o
-               sched st (parkStrat?-cell eq hp))
+            (subscribeInner-cellPark (pathFloor κ) g mergeAllᵒ nid κ κ id now o
+               sched st
+               (≤-trans (m≤m⊔n (suc nid) (pathCell κ))
+                        (pathOrd?-cell (Sched.nextNode sched)
+                           (thru-outer {u = u} mergeAllᵒ nid ↠ κ) ho))
+               (parkStrat?-cell eq hp))
           where
             r = subscribeInner g mergeAllᵒ nid κ id now o sched st
 ...     | false =
@@ -1254,7 +1242,7 @@ thruConsume-cellPark {u = u} g mergeAllᵒ nid κ id now o sched st hb hp
                       (mergeAll-st lim act (q ++ o ∷ []) od) (EvalSt.nodes st)))
                 (all-++-intro (inputsBelowᵉ (pathFloor κ)) q (o ∷ [])
                    hp (∧-intro hb refl))
-thruConsume-cellPark g switchᵒ nid κ id now o sched st hb hp
+thruConsume-cellPark g switchᵒ nid κ id now o sched st _ hb hp
   with lookupNode nid (EvalSt.nodes st) in eq
 ... | nothing                    = parkStrat?-cell eq hp
 ... | just (scan-st _)           = parkStrat?-cell eq hp
@@ -1270,7 +1258,7 @@ thruConsume-cellPark g switchᵒ nid κ id now o sched st hb hp
         r = subscribeInner g switchᵒ nid κ id now o
               (proj₁ (proj₂ (switchKill cur sched st)))
               (proj₂ (proj₂ (switchKill cur sched st)))
-thruConsume-cellPark g exhaustᵒ nid κ id now o sched st hb hp
+thruConsume-cellPark g exhaustᵒ nid κ id now o sched st _ hb hp
   with lookupNode nid (EvalSt.nodes st) in eq
 ... | nothing                    = parkStrat?-cell eq hp
 ... | just (scan-st _)           = parkStrat?-cell eq hp

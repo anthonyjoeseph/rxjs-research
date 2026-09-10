@@ -238,17 +238,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE NODE A WRITE IS ENTERED AT**, which is the last thing the owner
-  question does not have. The consume's transport is a body now, and
-  its one leaf is a subscribe whose reading is about the very node it
-  is entered at — the cell no freshness watermark can exclude. The
-  proven form of that transport buys it from the consumed node being
-  an OLD one, a fact the ordering ledger holds and no walk carries, so
-  threading it as a hypothesis would launder tracked debt. The commit
-  finds where that fact already lives and reports whether it belongs
-  on the invariant record or falls out at the walk. It closes DOES A
-  STORE CELL HAVE AN OWNER or names what closing it costs.
-
 - **A LENGTH THE REGISTRY CAN ACTUALLY SUPPLY**, which is what taking
   the length out of the cap leaves owed. The pricing now takes a frame
   reading and a length budget separately, and the sink leaf's charge
@@ -273,19 +262,18 @@ does not fit is a finding about the shared statement, not about the head.
   carrier, and narrows WHICH STORE CELLS DOES A PATH PREDICATE REACH
   to the mint's own arm.
 
-### Open questions
+- **THE FINISHES A PARK READING HAS NEVER BEEN RUN THROUGH**, which is
+  what the owner question leaves standing now that the node a write is
+  entered at is priced. `frameParked-step` is instantiated at the two
+  outcomes of the overwrite its closure premise exists for and at the
+  drain that reinstalls, and at nothing else: the switch and exhaust
+  finishes write a different cell shape, the enqueue is covered only
+  where there is no room, and every row stands at a root-ended chain,
+  so a floor below the context width is untouched. The commit reaches
+  those shapes and returns a refutation or a receipt naming them.
+  Until it does the row's class rests on arms nothing has run.
 
-- **DOES A STORE CELL HAVE AN OWNER? — FIRST, because the repair it points
-  at moves a RECORD rather than a statement.** These rows fail where a write
-  lands in a cell some registered chain also reads, each pricing it at its own
-  floor. It is ANSWERED for the write, and for the record negatively: a store
-  predicate cannot name the chain the writer stands on, so the reading travels
-  with the chain. The PRODUCER half is settled too, and affirmatively: every
-  consumer above the walk splits the folded reading and the tower stands on
-  them, so what pays it is a transport per writer, and the ENQUEUE arm is
-  answered freely. What is left is the node a WRITE IS ENTERED AT, which no
-  watermark excludes.
-  relevant: `subscribeInner-ownCell`, `frameParked-step`
+### Open questions
 
 - **WHICH STORE CELLS DOES A PATH PREDICATE REACH?** Five rows fail in one
   place: the statement reads a PATH or a chain, and the quantity it must
@@ -401,8 +389,8 @@ does not fit is a finding about the shared statement, not about the head.
   across a frame, which is what lets one statement cover the walk.
 - **`frameParked-step`** (Part7/Strat-Leaves) — FALSITY, `PROBED`: the STORE
   half of the frame-keyed park reading across one step, the owner half being a
-  body now. The overwrite the closure premise exists for is instantiated at
-  both its outcomes; `from-inner` writes the same cell under gas and is not.
+  body now. The overwrite the closure premise exists for is instantiated at both
+  outcomes and at the drain; the switch and exhaust finishes are not.
 - **`foldPath-park`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the park
   reading once a SIBLING chain has folded. It is about a state the walk
   PRODUCED rather than one it was handed, and it TAKES the reading as a
@@ -420,11 +408,6 @@ does not fit is a finding about the shared statement, not about the head.
   moves here — the instance node is allocated and the counter the ordering is
   read against is raised — so the ordering half is an obligation, not a
   transport.
-- **`subscribeInner-ownCell`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`:
-  the one cell a subscribe is not fresh above, because it is the node the
-  subscribe is entered at. The proven form of the same transport buys it from a
-  freshness premise the walk does not carry; sourcing that is the whole of the
-  row.
 - **`mergeAllDrain-ownerQueue`** (Part7/Strat-Leaves) — SHAPE, `REFUTED`: what
   the drain leaves in the owner's cell. Its premise is read off the POST-state,
   which the no-room arm never builds, so it is vacuously satisfiable. The
