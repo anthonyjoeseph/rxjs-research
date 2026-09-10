@@ -3578,7 +3578,7 @@ thruWalk-caps {u = u} c L sl W fuel op nid κ id now (o ∷ os) sched st hsl hc 
             (λ nd _ → thruConsume-regOwn fuel op nid κ id now o sched st nd) stK)
          -- the outer's own cell is the one the consume may write, and
          -- what keeps its reading true is this payload's own
-         (thruConsume-cellPark fuel op nid κ id now o sched st stO stQ)
+         (thruConsume-cellPark fuel op nid κ id now o sched st stR stO stQ)
          -- and the owner ledger survives the consume at THIS floor,
          -- which is the one floor at which it does: every chain the
          -- consume registers continues the entry chain
@@ -3833,7 +3833,7 @@ thruFit-vals {u = u} c L sl B W m m′ fuel mergeAllᵒ nid κ id now (o ∷ os)
          (λ nd _ → thruConsume-regOwn fuel mergeAllᵒ nid κ id now o sched st nd) stK)
       -- the outer's own cell is the one the consume may write, and what
       -- keeps its reading true is this payload's own
-      (thruConsume-cellPark fuel mergeAllᵒ nid κ id now o sched st stO stQ)
+      (thruConsume-cellPark fuel mergeAllᵒ nid κ id now o sched st stR stO stQ)
       -- and the owner ledger survives the consume at THIS floor
       (thruConsume-regOwn fuel mergeAllᵒ nid κ id now o sched st nid stW)
   where
@@ -3879,7 +3879,7 @@ thruFit-vals {u = u} c L sl B W m m′ fuel switchᵒ nid κ id now (o ∷ os) s
          (λ nd _ → thruConsume-regOwn fuel switchᵒ nid κ id now o sched st nd) stK)
       -- the outer's own cell is the one the consume may write, and what
       -- keeps its reading true is this payload's own
-      (thruConsume-cellPark fuel switchᵒ nid κ id now o sched st stO stQ)
+      (thruConsume-cellPark fuel switchᵒ nid κ id now o sched st stR stO stQ)
       -- and the owner ledger survives the consume at THIS floor
       (thruConsume-regOwn fuel switchᵒ nid κ id now o sched st nid stW)
   where
@@ -3925,7 +3925,7 @@ thruFit-vals {u = u} c L sl B W m m′ fuel exhaustᵒ nid κ id now (o ∷ os) 
          (λ nd _ → thruConsume-regOwn fuel exhaustᵒ nid κ id now o sched st nd) stK)
       -- the outer's own cell is the one the consume may write, and what
       -- keeps its reading true is this payload's own
-      (thruConsume-cellPark fuel exhaustᵒ nid κ id now o sched st stO stQ)
+      (thruConsume-cellPark fuel exhaustᵒ nid κ id now o sched st stR stO stQ)
       -- and the owner ledger survives the consume at THIS floor
       (thruConsume-regOwn fuel exhaustᵒ nid κ id now o sched st nid stW)
   where
@@ -4010,7 +4010,7 @@ thruRoom-frame {n = n} {u = u} c L W sl sf id now op nid p (o ∷ os) sched st
          (thru-outer op nid ↠ p) (FreshC.nxMono FR0) stR)
       (fresh-pathPark p (Sched.nextNode sched) (Sched.nextNode sd₁) st st₁ FRκ
          (λ nd _ → thruConsume-regOwn sf op nid p id now o sched st nd) stK)
-      (thruConsume-cellPark sf op nid p id now o sched st stO stQ)
+      (thruConsume-cellPark sf op nid p id now o sched st stR stO stQ)
       (thruConsume-regOwn sf op nid p id now o sched st nid stW)
   where
   rc = thruConsume sf op nid p id now o sched st

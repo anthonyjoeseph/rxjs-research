@@ -1748,7 +1748,7 @@ thruWalk-caps {u = u} c dep bud j g op nid κ id now (o ∷ os) sl sched st
           -- AND THE OUTER'S OWN CELL IS THE ONE THAT IS NOT, which is
           -- the leaf: an enqueue puts the payload in the very cell the
           -- reading is about, and the payload's reading is what pays
-          (thruConsume-cellPark g op nid κ id now o sched st
+          (thruConsume-cellPark g op nid κ id now o sched st stO
              (proj₁ (∧-true _ _ stV)) stQ)
           -- AND THE OWNER LEDGER SURVIVES THE CONSUME AT THIS FLOOR,
           -- which is the one floor at which it does: every chain the

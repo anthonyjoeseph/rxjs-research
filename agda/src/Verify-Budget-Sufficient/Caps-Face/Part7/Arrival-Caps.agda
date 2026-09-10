@@ -919,13 +919,15 @@ postulate
 -- purpose -- the ceiling's second argument is exactly the values' nest
 -- depth -- so which side moves faster is the whole question, and it is
 -- arithmetic rather than a matter of coverage.  A nesting level buys
--- the fold ONE, since `depthFrame` at the successor arm adds a single
--- `suc` per level walked; it buys the ceiling `suc (sizeᵉ e)`, since
--- that is the factor `sightCeil` multiplies its summands by, and the
--- factor is at least two at any program with a term in it.  So the
--- slack WIDENS with nesting, and the axis that was the last candidate
--- to refute is the one that cannot.  Measured at one level, where the
--- fold goes one to two and the ceiling eight to ten.
+-- the ceiling `suc (sizeᵉ e)`, since that is the factor `sightCeil`
+-- multiplies its summands by, and the factor is at least two at any
+-- program with a term in it.  It buys the fold AT MOST one, and only
+-- while a frame is left to spend it: the whole family combines by `⊔`
+-- but for two `suc` sites, and the one on this arc is `depthFrame`'s
+-- `thru-outer`, so a path charges once per FRAME and not once per
+-- level nested beneath it.  The fold is therefore capped by the path
+-- while the ceiling keeps climbing, and the axis that was the last
+-- candidate to refute is the one that cannot.
 
 -- SO THE RESIDUE IS ONE FRAME'S CHARGE AND ONE PATH'S DEPTH, and the
 -- first of those is the sibling directly above rather than anything new.
@@ -939,38 +941,56 @@ postulate
 -- ceiling is therefore the right shape for this side, and what it needs
 -- is that one frame's charge be bounded by what the values and the store
 -- already pay for.
--- PROBED: `Harness.Main`'s share-fold series prices BOTH sides at a
---   DRIVEN state -- the sched and store a real run builds, not a record
---   update over `st-init` -- at source zero, the only one of the three
---   whose admitted entries are headed by a frame rather than by `root`.
---   The fold reads one against a ceiling of eight, so it fits with room
---   at every row.  Three separations make the rows load-bearing: the
---   reading moves with the fold gas, it differs from a `root` control
---   taken at the same state, and it is nought at the instant the
---   registry is empty.  The frame arm `f ↠ p` is covered too, at the
---   two frames that preserve the source type: a `from-inner` head reads
---   one where the bare sink reads nought and where its own `fin = false`
---   control reads nought, and a SECOND such head reads the same one --
---   the `⊔` above, measured rather than read off the clause.
---   `thru-outer` heads a path too, at the context's one `obs`-typed
---   source, where the values are closed expressions and `nestDᵛˢ` is
---   therefore DIALLED rather than read flat: one nesting level moves
---   the fold by one and the ceiling by two.  Not covered: a second
---   nesting level, which this context cannot state for want of an
---   `obs (obs natᵗ)` slot to draw a value from; and two flat shares, so
---   nothing about one registered under another.
---   ⚠ measured-not-rechecked.
+
+-- AND THE CEILING IS READ AT THE GRANT, NOT AT THE STATE THE FOLD WAS
+-- ENTERED AT, which is the correction the assembly forced.  The two
+-- axes enter `sightCeil` as a SUM, so a ceiling naming the entry
+-- state's own two readings is strictly SMALLER than one naming a grant
+-- that covers both -- and every instrument this side has is denominated
+-- in the grant.  The statement was therefore stronger than anything
+-- available and stronger than anything wanted: its one consumer weakens
+-- it to the grant form by `sightCeil-mono` on the line it is spent, out
+-- of premises that consumer already holds.  So the grant form costs the
+-- consumer nothing and is what the walk's own invariant carries.
+--
+-- AND THE ASSEMBLY IS THEN THE CHAIN FACE'S, ARM FOR ARM, WITH ONE ARM
+-- OWING A WALK RATHER THAN A BOUND.  `fold-le` over `ChainFit sl S` is
+-- the induction, and two of its three obligations have routes already
+-- walked on the chain side: the frame arm is the sibling above weakened
+-- by `sightCeil-mono`, and the step arm is `chain-fit-step` verbatim.
+-- The SINK arm owes `disp-depth-fit`, which is proven FROM this
+-- statement, so the pair recurs through the fold gas -- and the
+-- dispatch asks its own fold premise at a gas STRICTLY BELOW the one it
+-- was entered at, which is the ordering that recursion is walked on.
+-- What is left is to walk it: an induction on the gas whose step is
+-- this statement at every smaller one, the other two arms supplied
+-- unchanged.
+-- DEAD ROUTE: closing the sink arm by STRUCTURAL mutual recursion is
+--   dead however the dispatch is stated, which is a fact about the
+--   measure and not about a signature.  The fold reaches its sink at
+--   the gas it is holding, so the fold-to-dispatch edge is FLAT: no
+--   argument of either statement decreases across it, and the cycle's
+--   one decrease is the peel the dispatch performs an edge later.  A
+--   pair whose cycle decreases while an edge of it does not is not
+--   structural, so the walk has to be an explicit induction on the gas.
+-- TWIN: `chain-depth-sighted` -- this statement on the chain face, at
+--   the same ceiling in the same currency, proven by exactly the
+--   `fold-le` instantiation described above.
 postulate
   share-fold-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sl : Slots Γ) (sf : Gas) (gas : ℕ) (bid : Id) (now : Tick) (i : Fin n)
+    (sl : Slots Γ) (id : ℕ) (sf : Gas) (gas : ℕ) (bid : Id) (now : Tick)
+    (S : ℕ) (i : Fin n)
     (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
     (rid : RegId) (p : Path Γ (lookup Γ i) t)
     (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl → sf ≡ budgetAt e sl bid →
+    nestΦAt e sl id ≤ S →
+    nestDᵛˢ vals ≤ S →
+    storeSyncMax sched st ≤ S →
     depthFold sf gas bid now (Fin.toℕ i) p vals
       (if fin then close (Fin.toℕ i) exhausted ∷ [] else []) fin sched
       (record st { delivered = rid ∷ EvalSt.delivered st })
-      ≤ sightCeil (sizeᵉ e) (nestDᵛˢ vals) (storeSyncMax sched st) (nestUnit e sl)
+      ≤ sightCeil (sizeᵉ e) S S (nestUnit e sl)
 
 -- AND THE STEP HALF, WHICH IS REACHED.  Its `rid` and `p` are exactly a
 -- `shareAdmit` entry, so a point is whatever the shared slot has
@@ -1124,11 +1144,11 @@ disp-depth-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 disp-depth-fit {e = e} sl id sf gas bid now S i vals fin sched st hsl hsf hΦ hval hS =
   disp-le D sf gas bid now i vals fin
     (λ _ sch sto → (Sched.slots sch ≡ sl) × (storeSyncMax sch sto ≤ S))
-    (λ g rid p ps sch sto q →
-       ≤-trans (share-fold-fit sl sf g bid now i vals fin rid p sch sto (proj₁ q) hsf)
-               (sightCeil-mono (sizeᵉ e) (nestUnit e sl) hval (proj₂ q)))
+    (λ g _ rid p ps sch sto q →
+       share-fold-fit sl id sf g bid now S i vals fin rid p sch sto
+         (proj₁ q) hsf hΦ hval (proj₂ q))
     (λ rid p ps sch sto q → q)
-    (λ g rid p ps sch sto q →
+    (λ g _ rid p ps sch sto q →
        share-step-fit sl id sf g bid now S i vals fin rid p sch sto
          (proj₁ q) hsf hΦ (proj₂ q))
     sched st

@@ -238,63 +238,53 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE OWNER TRAVELS WITH THE CHAIN, AND THE THREAD STOPS AT THE WALK.** A
-  store conjunct cannot see which chain a writer stands on, and the
-  ledgers that do read a chain admit the offending registry, so no field
-  excludes it: the reading is folded into the frame park, and the record
-  route is dead. The finish chain and the nest
-  walk now split both halves off one reading, and the statement that
-  named the gap is gone. What remains is every consumer ABOVE the walk —
-  level, sink, burst, depth — still reading the park at its old shape,
-  so the thread reaches whoever built the chain only once they split it
-  too. It narrows DOES A STORE CELL HAVE AN OWNER to whether a producer
-  can pay the reading at all.
+- **A LENGTH THE REGISTRY CAN ACTUALLY SUPPLY**, which is what taking
+  the length out of the cap leaves owed. The pricing now takes a frame
+  reading and a length budget separately, and the sink leaf's charge
+  is a constant — so a chain running to `k` caps costs the entry cap
+  raised to `k + 1`, a fixed power and not an exponential in a
+  stepped cap. What nothing supplies is the
+  `k`: a registered chain is the walked one plus a frame per operator
+  of the inner, and the arrival premise bounds that inner's SYNTAX and
+  not its count. The commit states the length the registry holds and
+  reports whether the power it buys is one the nesting budget affords.
+  It narrows WHAT PRICES A REGISTERED CHAIN to that one factor.
 
-- **A CONTEXT DEEP ENOUGH TO DISAGREE WITH**, which is now the only
-  thing between `share-fold-fit` and a class it has earned. Every axis
-  its statement has moves BOTH sides, and the ceiling moves faster —
-  a nesting level buys the fold one and the ceiling `suc (sizeᵉ e)` —
-  so the rows say the slack widens where it was expected to close. What
-  they cannot say is whether that holds past ONE level, because the
-  harness context has no `obs (obs natᵗ)` slot to draw a second from
-  and no share registered under another. The commit builds that
-  context. It narrows WHICH STORE CELLS DOES A PATH PREDICATE REACH by
-  saying whether the widening is arithmetic or an artifact of a
-  shallow program.
+- **A READING THAT TRAVELS TO THE MINT**, which is all the store
+  question has left. Three rows fail in the same place: the site
+  owing the bound is a `register`, an admitted entry's readings are
+  refuted free-standing, and they are not corollaries of the caps
+  receipt either — so nothing standing at the mint can derive one and
+  the reading has to arrive already held. The commit finds the lowest
+  carrier that reaches all three, weighing the invariant record
+  against the walk's own predicate, and says what each obliges its
+  producers to re-establish. It lands one row transported onto that
+  carrier, and narrows WHICH STORE CELLS DOES A PATH PREDICATE REACH
+  to the mint's own arm.
 
-- **A LENGTH THAT IS NOT PRICED IN A CAP**, which is what the fan's
-  refutation leaves as the only move. Reading the registry at the level
-  the walk is standing at is free — `capsOK?-regs` gives it away — and
-  exactly one consumer cannot follow: the Φ pricing spends a size
-  receipt on a chain's LENGTH under the cap its own CONCLUSION names,
-  and a widening moves that the wrong way, by a ratio one step already
-  makes a square. The commit takes the length out of the cap: it states
-  what the pricing actually needs of a chain, in the registry's own
-  stratification rather than in a size, and reports whether the sink
-  clause's exponent can be paid in it. It narrows WHAT PRICES A
-  REGISTERED CHAIN to that one exponent.
+- **THE FINISHES A PARK READING HAS NEVER BEEN RUN THROUGH**, which is
+  what the owner question leaves standing now that the node a write is
+  entered at is priced. `frameParked-step` is instantiated at the two
+  outcomes of the overwrite its closure premise exists for and at the
+  drain that reinstalls, and at nothing else: the switch and exhaust
+  finishes write a different cell shape, the enqueue is covered only
+  where there is no room, and every row stands at a root-ended chain,
+  so a floor below the context width is untouched. The commit reaches
+  those shapes and returns a refutation or a receipt naming them.
+  Until it does the row's class rests on arms nothing has run.
 
 ### Open questions
-
-- **DOES A STORE CELL HAVE AN OWNER? — FIRST, because the repair it points
-  at moves a RECORD rather than a statement.** These rows fail where a write
-  lands in a cell some registered chain also reads, each pricing it at its own
-  floor. It is ANSWERED for the write, and for the record negatively: a store
-  predicate cannot name the chain the writer stands on, so the reading travels
-  with the chain. What is left is whether a producer can pay it, and whether
-  the remaining rows — an ENQUEUE and a walked chain rather than an overwrite
-  — are paid by the same thread.
-  relevant: `thruConsume-cellPark`, `framePark-step`
 
 - **WHICH STORE CELLS DOES A PATH PREDICATE REACH?** Five rows fail in one
   place: the statement reads a PATH or a chain, and the quantity it must
   bound is a cell in the STORE. A path predicate CAN see the store, and
-  extending its coverage is priced. Every half about the WALK is settled: a
-  reading survives a write it does not own, a walked chain carries its
-  watermark by construction, a sibling's fold transports it. What is left is
-  at the MINT, and is known rather than suspected — an admitted entry's
-  readings are refuted free-standing AND are not corollaries of the caps
-  receipt, so the reading must be CARRIED to reach the site that owes it.
+  extending its coverage is priced. Every half about the WALK is settled,
+  and the DELIVERY arc is now narrower too: it prices at a constant in the
+  values' nesting and in the registry's length, so what must be reached
+  there is one frame's cell and not a chain's. What is left is at the MINT,
+  and is known rather than suspected — an admitted entry's readings are
+  refuted free-standing AND are not corollaries of the caps receipt, so the
+  reading must be CARRIED to reach the site that owes it.
   relevant: `step-frame-store≤`, `share-fold-store≤`, `subscribeE-sz-store-scan`, `pushBurst-sz-store-outer`, `subscribeSharedSlot-sz-store`
 
 
@@ -304,8 +294,10 @@ does not fit is a finding about the shared statement, not about the head.
   content is that a mint stepped the caps. Two siblings die in their free
   form at one `register` too, so each is owed AT THE MINT. The entry-level
   half is settled NEGATIVELY — that reading is refuted, so nothing threaded
-  to a mint pays it. What is left is which currency the Φ pricing reads a
-  chain's LENGTH in, it being the one consumer a widening cannot follow.
+  to a mint pays it. The CURRENCY half is settled: the pricing reads a
+  length in a budget of its own rather than in a cap, so a chain of `k`
+  caps costs a fixed power. What is left is who supplies the `k`, an
+  arrival premise bounding an inner's syntax and not its count.
   relevant: `fan-regsSz-mint`, `sink-fan-sink`, `walk-share-strat`
 
 ### The ledger
@@ -366,9 +358,6 @@ does not fit is a finding about the shared statement, not about the head.
   instant's nest predicate at the state the fan reads the registry. The door
   has it and the walk carries no nest conjunct at all; threading it down is
   refused by the store's own growth toward the NEXT cap.
-- **`share-fold-fit`** (Part7/Arrival-Caps) — FALSITY, `PROBED`: one admitted
-  registration's path, descended at the delivered-marked state. It fits at a
-  driven state, so the barrier is a registry LENGTH and not a kind.
 - **`share-fold-store≤`** (Part7/Arrival-Caps) — FALSITY, `REFUTED, TWIN`: the
   store across one `foldPath`, PRICED against the round's grant rather than
   preserved. A `scan-f` at an obs-typed accumulator crossed the preservation,
@@ -398,10 +387,10 @@ does not fit is a finding about the shared statement, not about the head.
   a frame hands the rest of its chain. The walk re-enters on the tail with an
   output the caps receipt prices but does not read; the floor does not move
   across a frame, which is what lets one statement cover the walk.
-- **`framePark-step`** (Part7/Strat-Leaves) — FALSITY, `PROBED`: the
-  frame-keyed park reading across one step. The overwrite the closure premise
-  exists for is instantiated now, at both its outcomes; `from-inner` writes the
-  same cell under gas and is not, which is what holds the class.
+- **`frameParked-step`** (Part7/Strat-Leaves) — FALSITY, `PROBED`: the STORE
+  half of the frame-keyed park reading across one step, the owner half being a
+  body now. The overwrite the closure premise exists for is instantiated at both
+  outcomes and at the drain; the switch and exhaust finishes are not.
 - **`foldPath-park`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the park
   reading once a SIBLING chain has folded. It is about a state the walk
   PRODUCED rather than one it was handed, and it TAKES the reading as a
@@ -419,25 +408,6 @@ does not fit is a finding about the shared statement, not about the head.
   moves here — the instance node is allocated and the counter the ordering is
   read against is raised — so the ordering half is an obligation, not a
   transport.
-- **`thruConsume-cellPark`** (Part7/Strat-Leaves) — FALSITY, `PROBED`: the one
-  cell a walk cannot freeze. The consume enqueues into exactly the cell the
-  reading is about, so no watermark both covers it and excludes the write; the
-  payload's own reading is what is asked to keep it true.
-- **`subscribeE-regOwn`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: what a
-  subscribe does to the owner ledger. It REGISTERS, so the ledger grows and an
-  already-owned cell must survive every entry added; stated at the entry
-  chain's own floor because at any other it is false.
-- **`stepFrame-regOwn`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the same
-  ledger across one frame step. A step registers only continuations of the
-  chain it was entered at and its drops only shorten a universally quantified
-  reading, which is why this is the cheaper half.
-- **`thruConsume-regOwn`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the
-  ledger across a consume, which drains and re-enters. Every chain it registers
-  continues the entry chain, so the floor it reports is the one being read.
-- **`subscribeInner-regOwn`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the
-  ledger across one drained inner, the writer the drain's recursion needs back.
-  The inner registers under the entry chain with newly minted frames stacked on
-  it, and stacking does not move a terminal.
 - **`mergeAllDrain-ownerQueue`** (Part7/Strat-Leaves) — SHAPE, `REFUTED`: what
   the drain leaves in the owner's cell. Its premise is read off the POST-state,
   which the no-room arm never builds, so it is vacuously satisfiable. The
@@ -459,6 +429,10 @@ does not fit is a finding about the shared statement, not about the head.
   charge at the queue's own `drainW`. Its extra premise pins the cell's
   CONSTRUCTOR, not its depth, so a parked program runs the store term away here
   too; the width is walk-denominated besides.
+- **`share-fold-fit`** (Part7/Arrival-Caps) — DIFFICULTY, `DEAD ROUTE, TWIN`:
+  one admitted registration's path, priced at the round's GRANT. The assembly
+  is the chain face's; the sink arm is a dispatch that now descends in its own
+  type, so what is left is an induction on the gas rather than a bound.
 - **`frame-depth-fit`** (Part7/Arrival-Caps) — DIFFICULTY, `PROBED`: one
   frame's own spend under the position's ceiling. Map, scan and take charge
   nothing, and BOTH arms that do are now instantiated — the react at a walked
@@ -545,6 +519,10 @@ does not fit is a finding about the shared statement, not about the head.
   VALUE read below the floor, which the scan arm made load-bearing — the seed
   arrives as a term and the cell is read as a value. The same induction is
   walked at the hop measure; what does not transfer is the arithmetic.
+- **`subscribeE-regOwn`** (Part7/Strat-Leaves) — GRINDABLE, `TWIN, PROBED`:
+  what a subscribe does to the owner ledger. `register` APPENDS, so the reading
+  splits into the hypothesis and one conjunct about the entry chain — reflexive
+  at its own floor, hence free where the twin needs a bound handed to it.
 - **`map-strat-step`** (Part7/Strat-Leaves) — GRINDABLE, `TWIN`: one template
   application read below the floor, lifted over the payload. The only hop head
   whose statement names no state at all, and the induction behind it is walked
