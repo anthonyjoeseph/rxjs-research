@@ -15,7 +15,7 @@ module Verify-Budget-Sufficient.Burst-Walk.Leaves where
 
 
 open import Data.Bool    using (Bool; true; false; if_then_else_; _∧_; _∨_; not)
-open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _≤_; s≤s; z≤n; _≤ᵇ_; _≡ᵇ_; _⊔_)
+open import Data.Nat     using (ℕ; zero; suc; pred; _≤_; s≤s; z≤n; _≤ᵇ_; _≡ᵇ_; _⊔_)
 open import Data.Nat.Properties
   using (≤-trans; ≤-refl; ≤⇒≤ᵇ; ≤ᵇ⇒≤; m≤n⊔m; n≤1+n)
 open import Data.List    using (List; []; _∷_; _++_; length)
@@ -24,28 +24,28 @@ open import Data.Maybe   using (Maybe; just; nothing)
 open import Data.List.Relation.Unary.All using (All)
   renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
 open import Relation.Nullary using (yes; no)
-open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (Gas; gs; g0; Id; Tick; Source; InstEvent; close; cut; cutPending; InstEmit)
-open import Rx.Exp  using (Ctx; Closed; Val; obs; Fn; _×ᵗ_; _≟ᵗ_; sizeᵉ; inputsBelowᵛ)
+open import Rx.Exp  using (Ctx; Closed; Val; obs; Fn; _×ᵗ_; _≟ᵗ_; sizeᵉ)
 open import Rx.Evaluator
   using (Sched; EvalSt; RegId; Chain; Path; Frame; _↠_; map-f; scan-f; take-f; from-inner; thru-outer;
-  Stream; stepFrame; dryEvent; fLvlD; subscribeInner; subscribeE; splitBurst; splitEvents;
-  sLvlD; sizeAt; AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ; NodeId; NodeState; takeDispatch;
-  takeVals; cutThrough; lookupNode; pathHasNode; memberSource; scanVals; innerFinish;
-  mergeAllDrain; aliveThroughᶠ; mergeAllBump; switchKill; thruConsume; thruWalk; thruWrap;
-  scan-st; take-st; hasRoom; mergeAll-st; switch-st; exhaust-st)
-open import Rx.Slots using (Slots; slotsSize)
+  Stream; stepFrame; dryEvent; subscribeInner; subscribeE; splitBurst; splitEvents; sizeAt;
+  AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ; NodeId; NodeState; takeDispatch; takeVals; cutThrough;
+  lookupNode; pathHasNode; memberSource; scanVals; innerFinish; mergeAllDrain; aliveThroughᶠ;
+  mergeAllBump; switchKill; thruConsume; thruWalk; thruWrap; scan-st; take-st; hasRoom;
+  mergeAll-st; switch-st; exhaust-st)
+open import Rx.Slots using (Slots)
 
 open import Verify-Budget-Sufficient.Delivery-Walk
   using (regP?)
 open import Verify-Budget-Sufficient.Measures using
-  (all-++-intro; caseWᵗ; fcB-live; fcB-nodes; fnCapBounded?; fnCapNode; fnCapᵉ; fnCapᵗ; pathLen;
+  (all-++-intro; caseWᵗ; fcB-live; fcB-nodes; fnCapBounded?; fnCapNode; fnCapᵉ; fnCapᵗ;
   takeVals-all; ∧-true)
 
 open import Verify-Budget-Sufficient.Caps-Depth
-  using (depthWalk; depthInner; depthFin)
+  using (depthWalk)
 
 open import Verify-Budget-Sufficient.Caps-Nest using (nest; nest-keeps)
 
@@ -68,10 +68,9 @@ open import Verify-Budget-Sufficient.Caps using (sizeAt-mono; Caps; frameStep)
 
 -- named explicitly: .Caps-Face and .Wet share .Measures names
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
-  (capsOK?; eventCaps?; parkStrat?; pathSz?; regsSz?; slotsCaps?; valCaps?; pathFloor;
-  pathStrat?)
+  (pathSz?; regsSz?; valCaps?)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
-  (frameBud; mList?; mList?-keeps; valsCaps?; valsStrat?)
+  (mList?; mList?-keeps; valsCaps?)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (valCaps?-size)
 open import Verify-Budget-Sufficient.Caps-Face.Part6 using
@@ -307,79 +306,6 @@ cutThrough-nodry nid dl wm dy ((rid , src , c) ∷ r)
 -- wet face is Ψ-pure.  This was the fourth mis-stated bridge on this
 -- route, caught by census rather than by a dead grind.
 ------------------------------------------------------------------
-
--- THE siC HYPOTHESIS (SiCFace), named once: `stepFrame-face`'s own first
--- argument.  It is a PARAMETER rather than an import because the
--- supplier (`subscribeInner-caps`, .Subscribe-Face, PROVEN) lives in
--- the most expensive module in the tree (timings:
--- typecheck-performance-numbers.md) and importing it here would cost
--- this module its fast loop.  Caps-Bridge, which imports both, applies it.
-SiCFace : Set
-SiCFace =
-  ∀ {n′} {Γ′ : Ctx n′} {t′} {e′ : Closed Γ′ t′} {u′}
-    (c′ : Caps) (dep bud j′ : ℕ) (g′ : Gas) (op′ : AllOp) (allNid′ : NodeId)
-    (κ′ : Path Γ′ u′ t′) (id′ : Id) (now′ : Tick) (o′ : Val Γ′ (obs u′))
-    (sl′ : Slots Γ′) (sched′ : Sched Γ′) (st′ : EvalSt e′) →
-    2 ≤ Caps.cSize c′ →
-    1 ≤ Caps.cReg c′ →
-    Sched.slots sched′ ≡ sl′ →
-    slotsCaps? (Caps.cSize c′) (Caps.cWid c′) sl′ ≡ true →
-    slotsSize sl′ ≤ Caps.cSize c′ →
-    capsOK? (frameStep j′ c′) sched′ st′ ≡ true →
-    valCaps? (frameStep j′ c′) sl′ (obs u′) o′ ≡ true →
-    pathSz? (Caps.cSize (frameStep j′ c′)) κ′ ≡ true →
-    suc (pathLen κ′) ≤ Caps.cSize (frameStep j′ c′) →
-    nest o′ sl′ (EvalSt.connectedShares st′) ≤ bud →
-    depthInner g′ op′ allNid′ κ′ id′ now′ o′ sched′ st′ ≤ dep →
-    pathStrat? κ′ ≡ true →
-    inputsBelowᵛ (pathFloor κ′) (obs u′) o′ ≡ true →
-    let r′ = subscribeInner g′ op′ allNid′ κ′ id′ now′ o′ sched′ st′
-    in Σ ℕ λ j₂ →
-       (capsOK? (frameStep (j′ + j₂) c′)
-                (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r′)))))
-                (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r′))))) ≡ true)
-       × (valsCaps? (frameStep (j′ + j₂) c′) sl′ (proj₁ (proj₂ r′)) ≡ true)
-       × (all (eventCaps? (frameStep (j′ + j₂) c′) sl′)
-              (proj₁ (proj₂ (proj₂ r′))) ≡ true)
-       × (suc (j′ + j₂) ≤ sLvlD (Caps.cSize c′) (Caps.cWid c′) dep (suc bud) (suc j′))
-
--- THE ifc HYPOTHESIS (IfcFace), named once: `stepFrame-face`'s second
--- argument.  It is a PARAMETER rather than an import because the
--- supplier (`innerFinish-caps`, .Subscribe-Face, PROVEN) lives in
--- the most expensive module in the tree (timings:
--- typecheck-performance-numbers.md) and importing it here would cost
--- this module its fast loop.  Caps-Bridge, which imports both, applies it.
-IfcFace : Set
-IfcFace =
-  ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-    (c : Caps) (dep bud j : ℕ) (g : Gas) (op : AllOp) (allNid inst : NodeId)
-    (κ : Path Γ s t) (id : Id) (now : Tick) (vals : List (Val Γ s))
-    (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
-    2 ≤ Caps.cSize c →
-    1 ≤ Caps.cReg c →
-    Sched.slots sched ≡ sl →
-    slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
-    slotsSize sl ≤ Caps.cSize c →
-    capsOK? (frameStep j c) sched st ≡ true →
-    pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
-    suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
-    valsCaps? (frameStep j c) sl vals ≡ true →
-    frameBud c j ≤ bud →
-    depthFin g op allNid inst κ id now vals sched st
-      (lookupNode allNid (EvalSt.nodes st)) ≤ dep →
-    pathStrat? κ ≡ true →
-    valsStrat? (pathFloor κ) vals ≡ true →
-    parkStrat? (pathFloor κ) (lookupNode allNid (EvalSt.nodes st)) ≡ true →
-    let r = innerFinish g op allNid inst κ id now vals sched st
-              (lookupNode allNid (EvalSt.nodes st))
-    in Σ ℕ λ j′ →
-       (capsOK? (frameStep (j + j′) c)
-                (proj₁ (proj₂ (proj₂ (proj₂ r)))) (proj₂ (proj₂ (proj₂ (proj₂ r))))
-                  ≡ true)
-       × (valsCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
-       × (all (eventCaps? (frameStep (j + j′) c) sl)
-              (proj₁ (proj₂ r)) ≡ true)
-       × (suc (j + j′) ≤ fLvlD (Caps.cSize c) (Caps.cWid c) dep j)
 
 -- THE WET FACE (WetFace) — exactly what `stepFrame-face` does NOT say.
 -- Ψ-pure: no caps, no level index, no growth witness.

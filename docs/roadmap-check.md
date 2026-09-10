@@ -300,19 +300,27 @@ Only `PROBED` is counted. A refutation KILLS a statement rather than accumulatin
 against a live one, and `TWIN`, `DEAD ROUTE` and `RECOVERY` name a route rather than buy
 coverage.
 
-## `make roadmap-moved` — the roadmap cannot stay the same across commits
+## `make roadmap-moved` — the roadmap cannot stay the same across a branch
 
 `scripts/check-roadmap-moved.py` compares the working tree's `PROOF-STATE.md`
-against `git show HEAD:PROOF-STATE.md` and fails when they are the same — that
-is the check mid-work, disk carrying a pending edit against the last commit.
-Once that edit is committed, disk and HEAD are identical by construction (a CI
-checkout is always in exactly this state), so the same comparison would always
-read "unchanged" no matter what the commit did — it would be comparing HEAD
-against itself. The script detects this (this file matches its ref *and* the
-whole tree is clean — not merely this file, since a dirty tree that just hasn't
-touched the roadmap YET must still fail) and falls back to comparing HEAD
-against HEAD~1 instead, which is the question a clean checkout actually needs
-answered: did HEAD's own commit move the file. Five details:
+against its content at **the merge-base with main** and fails when they are the
+same. One reading covers both contexts, which is why the baseline is not HEAD:
+the merge-base is not HEAD, so the same comparison is correct mid-work (disk
+carries the pending edit) and at a CI checkout (disk equals HEAD and is still
+divergent from the base). It is also what makes a fix-up COMMIT free — a
+repaired reassembly or a missing import inside a branch that has already said
+its piece — while a whole branch that lands proof work silently still fails.
+
+`origin/main` is tried before the bare `main`, so a CI checkout with the remote
+ref and a local clone with only a tracking branch both resolve; a stale
+`origin/main` merely widens the range, making the check EASIER to satisfy, which
+is the right direction to fail in for a check whose false positives are the
+complaint. When the merge-base IS HEAD — on main itself, or a branch that has
+not diverged — there is nothing to compare, and the script falls back to the
+older per-commit reading: if this file matches its ref *and* the whole tree is
+clean (not merely this file, since a dirty tree that just hasn't touched the
+roadmap YET must still fail), it compares HEAD against HEAD~1, so a direct
+landing on main is still held. Five details:
 
 - **Normalisation.** Trailing whitespace on each line, and trailing blank lines,
   are stripped before comparing — so the cheapest way to satisfy the check is to
@@ -321,14 +329,17 @@ answered: did HEAD's own commit move the file. Five details:
 - **`--baseline-file F`** replaces the git lookup with a plain file, which is how
   the selftest drives both directions without touching the repo's history.
   `--ref R` compares against another commit; `--file F` picks another roadmap.
-  The HEAD~1 fallback and the exemption below only apply at the default ref —
-  an explicit `--ref` is a deliberate comparison point and is read literally.
+  `--base-ref B` picks the branch this one is measured against (default `main`).
+  The merge-base reading, the HEAD~1 fallback and the exemption below only apply
+  at the default `--ref` — an explicit one is a deliberate comparison point and
+  is read literally.
 - **No `PROOF-STATE.md` at the ref** (a first commit, an orphan branch) passes,
   because there is nothing to have moved away from.
 - **Infra-only exemption.** An unchanged roadmap is only a finding when there
   was proof work to report: if nothing under `agda/` changed either (over the
-  same two endpoints the movement comparison used — disk-vs-ref mid-work,
-  HEAD-vs-HEAD~1 once committed), the commit had no leg to retire or restate,
+  same two endpoints the movement comparison used — merge-base-vs-disk on a
+  branch, HEAD-vs-HEAD~1 where there is no divergence), there was no leg to
+  retire or restate,
   and the check prints SKIP rather than FAIL. "Changed" means changed once
   full-line comments are stripped, reusing `strip-comments.py`'s own
   stripper — the same principle the `agda/_stripped-comments/` mirror already
@@ -400,11 +411,14 @@ in the statement half a bare token is the real thing, since Agda has no backtick
 and a name in a type is a dependency the typechecker enforces.
 
 **Endpoints.** The check compares the same two roadmap versions `roadmap-moved`
-does, through the same `resolve_endpoints` — disk against HEAD mid-work, HEAD
-against HEAD~1 in a clean checkout, which is what CI always is. That is a shared
-function rather than two copies on purpose: the fallback is the subtle part, and
-a drifted copy would ask CI's question at a local checkout or the reverse, which
-is the one wrong answer that raises nothing and looks right.
+does, through the same `resolve_endpoints` — the merge-base with main against
+disk on a branch, HEAD against HEAD~1 where there is no divergence. That is a
+shared function rather than two copies on purpose: the baseline resolution is
+the subtle part, and a drifted copy would ask CI's question at a local checkout
+or the reverse, which is the one wrong answer that raises nothing and looks
+right. It also means the banking rule is scoped to the BRANCH exactly as the
+movement rule is: what may not be banked under an open FALSITY row is what the
+whole PR banks, not what its latest commit happens to.
 
 **`make roadmap-order-selftest`** pins six directions. One is that the check
 FIRES on a banked row. The other five are that it stays QUIET: on a roadmap that

@@ -16,7 +16,7 @@
 ------------------------------------------------------------------
 module Verify-Budget-Sufficient.Burst-Walk where
 
-open import Data.Bool    using (Bool; true; false; if_then_else_; _∧_)
+open import Data.Bool    using (Bool; true; false; if_then_else_; _∧_; _∨_)
 open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _*_; _^_; _≤_; s≤s; z≤n; _≤ᵇ_; _≡ᵇ_)
 open import Data.Nat.Properties
   using (≤-trans; ≤-refl; ≤-reflexive; ≤⇒≤ᵇ; ≤ᵇ⇒≤; m≤m+n; m≤n+m; m≤n⊔m; m≤m⊔n; n≤1+n; ≤-pred)
@@ -28,7 +28,7 @@ open import Data.List.Relation.Unary.All using (All)
 open import Relation.Nullary using (yes; no)
 open import Data.Fin     using (Fin; toℕ)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong)
 
 open import Rx.Prim using (Gas; gs; Id; Tick; gasPad; gasTower; towerℕ)
 open import Rx.Exp  using (Ctx; Closed; Val; obs; _≟ᵗ_; sizeᵉ; syncSizeᵉ; inputsBelowᵉ;
@@ -78,15 +78,14 @@ open import Verify-Budget-Sufficient.Subscribe-Face
 
 -- named explicitly: .Caps-Face and .Wet share .Measures names
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
-  (capsOK?; capsOK?-mono; parkStrat?; pathFloor; pathStrat?; pathSz?; pathSz?-widen; slotsCaps?;
+  (capsOK?; capsOK?-mono; parkStrat?; pathFloor; pathOrd?; pathOrd?-inner;
+  pathOrd?-outer; pathPark?;
+  pathStrat?; pathSz?; pathSz?-widen; framePark?-own; framePark?-own-thru;
+  regOwn?; regOwn?-fresh; slotsCaps?;
   valCaps?)
--- THE PARKED QUEUE'S READING, which no premise of this face carries; the
--- leaf's own header says why it is stated over `capsOK?` rather than read
--- out of it.
-open import Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves using
-  (frame-parkStrat)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
-  (capsOK?-nodeSz; capsOK?-nodeWid; capsOK?-parts; capsOK?-regs; lookupNode-caps; mList?;
+  (capsOK?-nextNode; capsOK?-nodeSz; capsOK?-nodeWid; capsOK?-parts; capsOK?-regOrd; capsOK?-regs;
+  lookupNode-caps; mList?;
   mList?-head; mList?-keeps; mList?-tail; NodeCaps; pathSz?-len; pathSz?-tail; switchKill-caps;
   valsCaps?; valsCaps?-lvl; valsCaps→mList-strict; valsStrat?)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
@@ -94,7 +93,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part3 using
 open import Verify-Budget-Sufficient.Caps-Face.Part5 using
   (cSize≤frameStep; valsCaps?-parts)
 open import Verify-Budget-Sufficient.Caps-Face.Part6 using
-  (valsLen; valsOf)
+  (valsLen; valsOf; subscribeInner-readings; switchKill-readings; thruConsume-readings)
 
 open import Verify-Budget-Sufficient.Wet.Part6 using
   (sizeCapAt)
@@ -115,7 +114,7 @@ open import Rx.Frame-Width using (pWᵉ; dWᵉ; outWᵛ; pWᵛ)
 open import Rx.Hop-Depth using (hopDᵉ)
 open import Rx.Slot-Hop using (slotHop)
 open import Rx.Frame-Width using (dWᵉ; pWᵛ; outWᵛ; pWᵉ)
-open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen)
+open import Decide using (T-to; T⇒≡true; ∧-intro; ∧-trueˡ; ≤ᵇ-widen; ≡ᵇ-refl)
 open import Verify-Budget-Sufficient.Burst-Walk.Leaves using
   (VbB-head; VbB-tail; nodry-elem-size; thruConsume-nodry-nestRec; switchKill-nest;
   thruWalk-nodry-dep; cutThrough-nodry; subscribeInner-Ψ; regP?-Ψ; regP?-of-parts;
@@ -270,7 +269,7 @@ fnCapB-finish Ψ i true  out h =
 -- TWO ROUTES WERE ON THE TABLE.  (A) take the already-proven caps
 -- faces (siC/ifc) as extra parameters and re-establish `capsOK?` at
 -- the moved state from their Σ-witness, mirroring what `stepFrame-burst-face` already
--- does one level up.  (B) widen SiCFace/IfcFace's own conclusions
+-- does one level up.  (B) widen SiCType/IfcType's own conclusions
 -- with a nodry conjunct, so the re-establishment comes for free.
 
 -- RULED: (A).  (B) is tidier to read and strictly worse to build —
@@ -345,6 +344,19 @@ SiNodry = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   -- exactly what κ already carries.  Hence they are threaded, not rebuilt.
   pathStrat? κ ≡ true →
   inputsBelowᵉ (pathFloor κ) o ≡ true →
+  -- THE TWO ENTRY READINGS, AT THE OUTER EXTENSION RATHER THAN AT κ.
+  -- Both are owed of the chain the walk underneath actually runs, which
+  -- is κ pushed by a frame naming `allNid` -- and a frame reaching a
+  -- node through the STORE is precisely what κ's own readings cannot
+  -- see, so neither reduces the way the two readings above do.  The
+  -- outer form is what the caller holds and what `pathOrd?-inner`
+  -- converts; the park half splits, since the pushed frame reads the
+  -- named cell at the floor the chain below it already has.  This is
+  -- the shape every other face in the tower states them at.
+  pathOrd? (Sched.nextNode sched) (thru-outer op allNid ↠ κ) ≡ true →
+  pathPark? κ st ≡ true →
+  parkStrat? (pathFloor κ) (lookupNode allNid (EvalSt.nodes st)) ≡ true →
+  regOwn? allNid (pathFloor κ) (EvalSt.registry st) ≡ true →
   any dryEvent (proj₁ (proj₂ (proj₂
     (subscribeInner g op allNid κ id now o sched st))))
     ≡ false
@@ -668,13 +680,30 @@ subscribeE-inner-nodry-core : WalkLevel → ∀ {n} {Γ : Ctx n} {t} {e : Closed
   -- the entry/park reading; see SiNodry for why κ's own suffices
   pathStrat? κ ≡ true →
   inputsBelowᵉ (pathFloor κ) o ≡ true →
+  -- THE TWO ENTRY READINGS, AT THE OUTER EXTENSION RATHER THAN AT κ.
+  -- Both are owed of the chain the walk underneath actually runs, which
+  -- is κ pushed by a frame naming `allNid` -- and a frame reaching a
+  -- node through the STORE is precisely what κ's own readings cannot
+  -- see, so neither reduces the way the two readings above do.  The
+  -- outer form is what the caller holds and what `pathOrd?-inner`
+  -- converts; the park half splits, since the pushed frame reads the
+  -- named cell at the floor the chain below it already has.  This is
+  -- the shape every other face in the tower states them at.
+  pathOrd? (Sched.nextNode sched) (thru-outer op allNid ↠ κ) ≡ true →
+  pathPark? κ st ≡ true →
+  parkStrat? (pathFloor κ) (lookupNode allNid (EvalSt.nodes st)) ≡ true →
+  -- and the owner of that same cell, which the park reading no longer
+  -- carries on its own: the frame names TWO nodes, so the walk's own
+  -- premise is the outer one and the instance is minted fresh below
+  regOwn? allNid (pathFloor κ) (EvalSt.registry st) ≡ true →
   hasDry (proj₁ (subscribeE fuel o
            (from-inner op allNid (Sched.nextNode sched) ↠ κ) id now
            (record sched { nextNode = suc (Sched.nextNode sched) }) st))
     ≡ false
 subscribeE-inner-nodry-core wl {n} {Γ} {t} {e} {u}
     c sl Ψ dep bud 2≤S 1≤R hCR slC slSz slFc
-    J fuel op allNid κ id now o sched st ok pb sspLen vb rg nB hD cl gk stP stI =
+    J fuel op allNid κ id now o sched st ok pb sspLen vb rg nB hD cl gk stP stI
+    stO stK stQ stW =
   dry
   where
   inst   = Sched.nextNode sched
@@ -692,9 +721,12 @@ subscribeE-inner-nodry-core wl {n} {Γ} {t} {e} {u}
   slEq : Sched.slots sched' ≡ sl
   slEq = proj₁ (proj₁ ok)
 
-  -- capsOK? definitionally ignores nextNode
+  -- the counter bump is paid rather than ignored: the caps receipt
+  -- carries the order ledger, which is read AGAINST the counter, so a
+  -- raise transports it by monotonicity
   cOK : capsOK? (frameStep J c) sched' st ≡ true
-  cOK = proj₂ (proj₁ ok)
+  cOK = capsOK?-nextNode (frameStep J c) (suc inst) sched st
+          (n≤1+n inst) (proj₂ (proj₁ ok))
 
   -- size of o: VbB → valsCaps? → all → valCaps? → sizeᵛ (obs u) o ≤ B
   vcaps : valsCaps? (frameStep J c) sl (o ∷ []) ≡ true
@@ -783,6 +815,19 @@ subscribeE-inner-nodry-core wl {n} {Γ} {t} {e} {u}
          regsO
          stP
          stI
+         (pathOrd?-inner inst allNid op κ stO)
+         -- THE FRAME NAMES TWO CELLS, so its owner reading is a pair:
+         -- the outer node is the walk's own premise, the instance is
+         -- the mint the scheduler just handed out, so it is owned at
+         -- every floor by the registry order the caps invariant carries
+         (∧-intro (∧-intro stQ
+                     (∧-intro stW
+                        (∧-intro (regOwn?-fresh inst inst (pathFloor κ)
+                                    (EvalSt.registry st) ≤-refl
+                                    (capsOK?-regOrd (frameStep J c) sched st
+                                       (proj₂ (proj₁ ok))))
+                                 refl)))
+                  stK)
 
   j′  = proj₁ W
   p2  = proj₂ W
@@ -820,6 +865,19 @@ subscribeE-inner-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   -- the entry/park reading; see SiNodry for why κ's own suffices
   pathStrat? κ ≡ true →
   inputsBelowᵉ (pathFloor κ) o ≡ true →
+  -- THE TWO ENTRY READINGS, AT THE OUTER EXTENSION RATHER THAN AT κ.
+  -- Both are owed of the chain the walk underneath actually runs, which
+  -- is κ pushed by a frame naming `allNid` -- and a frame reaching a
+  -- node through the STORE is precisely what κ's own readings cannot
+  -- see, so neither reduces the way the two readings above do.  The
+  -- outer form is what the caller holds and what `pathOrd?-inner`
+  -- converts; the park half splits, since the pushed frame reads the
+  -- named cell at the floor the chain below it already has.  This is
+  -- the shape every other face in the tower states them at.
+  pathOrd? (Sched.nextNode sched) (thru-outer op allNid ↠ κ) ≡ true →
+  pathPark? κ st ≡ true →
+  parkStrat? (pathFloor κ) (lookupNode allNid (EvalSt.nodes st)) ≡ true →
+  regOwn? allNid (pathFloor κ) (EvalSt.registry st) ≡ true →
   hasDry (proj₁ (subscribeE fuel o
            (from-inner op allNid (Sched.nextNode sched) ↠ κ) id now
            (record sched { nextNode = suc (Sched.nextNode sched) }) st))
@@ -831,6 +889,7 @@ subscribeE-inner-nodry = subscribeE-inner-nodry-core subscribeE-walk-level
 subscribeInner-nodry : SiNodry
 subscribeInner-nodry {e = e} c sl Ψ dep bud 2≤S 1≤R hCR slC slSz slFc J g op allNid
                      κ id now o sched st ok pb sspLen vb rg nB hD cl gk stP stI
+                     stO stK stQ stW
   with budgetAt-gs e sl id
 ... | g′ , eq
       rewrite trans gk eq =
@@ -839,7 +898,8 @@ subscribeInner-nodry {e = e} c sl Ψ dep bud 2≤S 1≤R hCR slC slSz slFc J g o
                  (from-inner op allNid (Sched.nextNode sched) ↠ κ) id now
                  (record sched { nextNode = suc (Sched.nextNode sched) }) st))
         (subscribeE-inner-nodry c sl Ψ dep bud 2≤S 1≤R hCR slC slSz slFc J g′ op allNid
-           κ id now o sched st ok pb sspLen vb rg nB hD cl (sym eq) stP stI)
+           κ id now o sched st ok pb sspLen vb rg nB hD cl (sym eq) stP stI
+           stO stK stQ stW)
 
 -- THE CONCAT NODE'S STORED QUEUE IS VbB-BOUNDED, and this is a real body: the
 -- leaves it stands on are all proven, so nothing here is postulated.  It is the
@@ -1047,6 +1107,14 @@ mergeAllDrain-nodry-loop : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   regP? (PbB c Ψ J) (EvalSt.registry st₀) ≡ true →
   pathStrat? κ ≡ true →
   valsStrat? (pathFloor κ) (o ∷ q) ≡ true →
+  -- the two entry readings plus the cell the pushed frame names, in the
+  -- shape every face of the tower states them at: the ordering is owed of
+  -- the chain WITH the outer's frame on it, and the cell reading is what
+  -- an enqueue here extends
+  pathOrd? (Sched.nextNode sched₀) (thru-outer mergeAllᵒ allNid ↠ κ) ≡ true →
+  pathPark? κ st₀ ≡ true →
+  parkStrat? (pathFloor κ) (lookupNode allNid (EvalSt.nodes st₀)) ≡ true →
+  regOwn? allNid (pathFloor κ) (EvalSt.registry st₀) ≡ true →
   let r      = subscribeInner sf mergeAllᵒ allNid κ id now o sched₀ st₀
       sched₁ = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r))))
       st₁    = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))
@@ -1055,7 +1123,7 @@ mergeAllDrain-nodry-loop : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
         × regP? (PbB c Ψ (J + j′)) (EvalSt.registry st₁) ≡ true
         × (J + j′ ≤ sLvlD (Caps.cSize c) (Caps.cWid c) dep (suc bud) (suc J)))
 mergeAllDrain-nodry-loop {s = s} c sl Ψ dep bud J sf allNid κ id now o q sched₀ st₀
-                       2≤S 1≤R slC slSz ok pb sspLen vb nst hD rg stP stV =
+                       2≤S 1≤R slC slSz ok pb sspLen vb nst hD rg stP stV stO stK stQ stW =
   j′
   , ((slEq₁ , inv₁) , fc₁)
   , regP?-of-parts c Ψ (J + j′) (EvalSt.registry st₁)
@@ -1074,7 +1142,7 @@ mergeAllDrain-nodry-loop {s = s} c sl Ψ dep bud J sf allNid κ id now o q sched
   oS    = proj₁ (∧-true (inputsBelowᵛ (pathFloor κ) (obs s) o)
                         (all (inputsBelowᵛ (pathFloor κ) (obs s)) q) stV)
   SI    = subscribeInner-caps c dep bud J sf mergeAllᵒ allNid κ id now o sl sched₀ st₀
-            2≤S 1≤R slEq slC slSz inv oC pb-sz sspLen nst hD stP oS
+            2≤S 1≤R slEq slC slSz inv oC pb-sz sspLen nst hD stP oS stO stK stQ stW
   j′ = proj₁ SI ; inv₁ = proj₁ (proj₂ SI)
   lvl = proj₂ (proj₂ (proj₂ (proj₂ SI)))
   SΨ    = subscribeInner-Ψ sl Ψ sf mergeAllᵒ allNid κ id now o sched₀ st₀
@@ -1154,13 +1222,20 @@ mergeAllDrain-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   -- is minted once at the node lookup and projected per element here
   pathStrat? κ ≡ true →
   valsStrat? (pathFloor κ) q ≡ true →
+  -- the two entry readings plus the outer's own cell, carried per element
+  -- by the drain's step rather than re-derived: the recursion calls its
+  -- tail at the state the head landed in
+  pathOrd? (Sched.nextNode sched) (thru-outer mergeAllᵒ allNid ↠ κ) ≡ true →
+  pathPark? κ st ≡ true →
+  parkStrat? (pathFloor κ) (lookupNode allNid (EvalSt.nodes st)) ≡ true →
+  regOwn? allNid (pathFloor κ) (EvalSt.registry st) ≡ true →
   any dryEvent (proj₁ (proj₂ (mergeAllDrain sf allNid κ id now lim act q sched st))) ≡ false
 
 mergeAllDrain-nodry c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf allNid κ id now
-                  lim act [] sched st _ _ _ _ _ _ _ _ _ _ _ _ = refl
+                  lim act [] sched st _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ = refl
 
 mergeAllDrain-nodry {e = e} {s = s} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf allNid κ id now
-                  lim act (o ∷ q) sched₀ st₀ ok pb sspLen vbq rg gk hD nst clL̂ dsc stP stV
+                  lim act (o ∷ q) sched₀ st₀ ok pb sspLen vbq rg gk hD nst clL̂ dsc stP stV stO stK stQ stW
   -- THE ONLY SCRUTINY IS THE GATE.  An inner that stays open no longer
   -- ends the walk — it spends a lane — so `done` never branches the
   -- drain, and is read only as the counter the tail is called at
@@ -1201,10 +1276,14 @@ mergeAllDrain-nodry {e = e} {s = s} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz
                  J sf mergeAllᵒ allNid κ id now o sched₀ st₀
                  ok pb sspLen (VbB-head c sl Ψ J o q vbq) rg nBst hDo
                  (≤-trans (proj₁ (frameStep-mono-j c 2≤S dsc₀)) clL̂) gk stP stVH
+                 stO stK stQ stW
       loop   = mergeAllDrain-nodry-loop c sl Ψ dep bud J sf allNid κ id now o q sched₀ st₀
-                 2≤S 1≤R slC slSz ok pb sspLen vbq nBst hDo rg stP stV
+                 2≤S 1≤R slC slSz ok pb sspLen vbq nBst hDo rg stP stV stO stK stQ stW
       stVT   = proj₂ (∧-true (inputsBelowᵛ (pathFloor κ) (obs s) o)
                              (all (inputsBelowᵛ (pathFloor κ) (obs s)) q) stV)
+      -- the three readings back at the state the head's subscribe landed in
+      RD     = subscribeInner-readings sf mergeAllᵒ allNid κ id now o sched₀ st₀
+                 stO stK stQ stW
       j₁     = proj₁ loop
       ok₁    = proj₁ (proj₂ loop)
       rg₁    = proj₁ (proj₂ (proj₂ loop))
@@ -1235,6 +1314,8 @@ mergeAllDrain-nodry {e = e} {s = s} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz
                  allNid κ id now lim (if done then act else suc act)
                  q sched₁ st₁ ok₁ pb₁ sspL₁ vb₁ rg₁ gk
                  (≤-trans (m≤n⊔m _ _) hD) nst₁ clL̂ dsc₁ stP stVT
+                 (proj₁ RD) (proj₁ (proj₂ (proj₂ RD)))
+                 (proj₂ (proj₂ (proj₂ RD))) (proj₁ (proj₂ RD))
   in any-dry-++ bs _ h-head h-tail
 
 -- Loop invariant after one thruConsume step: OKB + regP? at the level
@@ -1309,6 +1390,14 @@ thruConsume-nodry-loop : ∀ {n} {Γ : Ctx n} {u t} {e : Closed Γ t}
   regP? (PbB c Ψ J) (EvalSt.registry st₀) ≡ true →
   pathStrat? κ ≡ true →
   valsStrat? (pathFloor κ) (o ∷ os) ≡ true →
+  -- the two entry readings plus the cell the pushed frame names, in the
+  -- shape every face of the tower states them at: the ordering is owed of
+  -- the chain WITH the outer's frame on it, and the cell reading is what
+  -- an enqueue here extends
+  pathOrd? (Sched.nextNode sched₀) (thru-outer op nid ↠ κ) ≡ true →
+  pathPark? κ st₀ ≡ true →
+  parkStrat? (pathFloor κ) (lookupNode nid (EvalSt.nodes st₀)) ≡ true →
+  regOwn? nid (pathFloor κ) (EvalSt.registry st₀) ≡ true →
   let r      = thruConsume sf op nid κ id now o sched₀ st₀
       sched₁ = proj₁ (proj₂ (proj₂ r))
       st₁    = proj₂ (proj₂ (proj₂ r))
@@ -1317,7 +1406,7 @@ thruConsume-nodry-loop : ∀ {n} {Γ : Ctx n} {u t} {e : Closed Γ t}
         × regP? (PbB c Ψ (J + j′)) (EvalSt.registry st₁) ≡ true
         × (J + j′ ≤ sLvlD (Caps.cSize c) (Caps.cWid c) dep (suc bud) (suc J)))
 thruConsume-nodry-loop {u = u} c sl Ψ dep bud J sf op nid κ id now o os sched₀ st₀
-                       2≤S 1≤R slC slSz ok pb sspLen vb nst hD rg stP stV =
+                       2≤S 1≤R slC slSz ok pb sspLen vb nst hD rg stP stV stO stK stQ stW =
   j′
   , ((slEq₁ , inv₁) , fc₁)
   , regP?-of-parts c Ψ (J + j′) (EvalSt.registry st₁)
@@ -1343,7 +1432,7 @@ thruConsume-nodry-loop {u = u} c sl Ψ dep bud J sf op nid κ id now o os sched�
   oS    = proj₁ (∧-true (inputsBelowᵛ (pathFloor κ) (obs u) o)
                         (all (inputsBelowᵛ (pathFloor κ) (obs u)) os) stV)
   TC    = thruConsume-caps c dep bud J sf op nid κ id now o sl sched₀ st₀
-            2≤S 1≤R slEq slC slSz inv oC pb-sz sspLen nst hD stP oS
+            2≤S 1≤R slEq slC slSz inv oC pb-sz sspLen nst hD stP oS stO stK stQ stW
   j′    = proj₁ TC
   inv₁  = proj₁ (proj₂ TC)
   lvl   = proj₂ (proj₂ (proj₂ (proj₂ TC)))
@@ -1392,6 +1481,13 @@ thruConsume-nodry : ∀ {n} {Γ : Ctx n} {u t} {e : Closed Γ t}
   -- the element's own reading, split off the walk's list by the caller
   pathStrat? κ ≡ true →
   inputsBelowᵉ (pathFloor κ) o ≡ true →
+  -- the two entry readings plus the outer's own cell, forwarded from the
+  -- caller: `subscribeInner-nodry` consumes all three at the mint, and
+  -- nothing between here and there can manufacture them
+  pathOrd? (Sched.nextNode sched) (thru-outer op nid ↠ κ) ≡ true →
+  pathPark? κ st ≡ true →
+  parkStrat? (pathFloor κ) (lookupNode nid (EvalSt.nodes st)) ≡ true →
+  regOwn? nid (pathFloor κ) (EvalSt.registry st) ≡ true →
   any dryEvent (proj₁ (proj₂ (thruConsume sf op nid κ id now o sched st))) ≡ false
 
 -- helper: apply subscribeInner-nodry for one thruConsume call.
@@ -1433,48 +1529,62 @@ thruConsume-nodry-apply : ∀ {n} {Γ : Ctx n} {u t} {e : Closed Γ t}
   -- the element's own reading, split off the walk's list by the caller
   pathStrat? κ ≡ true →
   inputsBelowᵉ (pathFloor κ) o ≡ true →
+  -- the two entry readings plus the outer's own cell, forwarded from the
+  -- caller: `subscribeInner-nodry` consumes all three at the mint, and
+  -- nothing between here and there can manufacture them
+  pathOrd? (Sched.nextNode sched) (thru-outer op nid ↠ κ) ≡ true →
+  pathPark? κ st ≡ true →
+  parkStrat? (pathFloor κ) (lookupNode nid (EvalSt.nodes st)) ≡ true →
+  regOwn? nid (pathFloor κ) (EvalSt.registry st) ≡ true →
   any dryEvent (proj₁ (proj₂ (proj₂ (subscribeInner sf op nid κ id now o sched st)))) ≡ false
-thruConsume-nodry-apply c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf op nid κ id now o os sched st ok pb sspLen vb rg gk hD-elem nBst clL̂ dsc stP stI =
+thruConsume-nodry-apply c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf op nid κ id now o os sched st ok pb sspLen vb rg gk hD-elem nBst clL̂ dsc stP stI stO stK stQ stW =
   subscribeInner-nodry c sl Ψ dep bud 2≤S 1≤R hCR slC slSz slFc
     J sf op nid κ id now o sched st
     ok pb sspLen (VbB-head c sl Ψ J o os vb) rg nBst hD-elem
     (≤-trans (proj₁ (frameStep-mono-j c 2≤S dsc)) clL̂) gk stP stI
+    stO stK stQ stW
 
 -- FLATTEN: dispatch on node state.
 -- The scrutinee and the clause ORDER both mirror Rx.Evaluator's own
 -- `with w ≟ᵗ u` exactly.  Writing `w ≟ᵗ _` here does not abstract the
 -- goal's occurrence (the metavariable is not syntactically the
 -- evaluator's `u`), leaving the with-function stuck and `refl` red.
-thruConsume-nodry {u = u} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf mergeAllᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD nBst clL̂ dsc stP stI
-  with lookupNode nid (EvalSt.nodes st)
+thruConsume-nodry {u = u} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf mergeAllᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD nBst clL̂ dsc stP stI stO stK stQ stW
+  -- `in eqN` CAPTURES THE LOOKUP EQUATION.  The `with` rewrites the
+  -- carried cell reading into the PATTERN's shape, while every callee
+  -- below states it at the lookup -- a term the abstraction leaves
+  -- stuck -- so the equation is what carries it back across.  `in` names
+  -- the proof and adds no pattern position, so the arms are unchanged
+  with lookupNode nid (EvalSt.nodes st) in eqN
 ... | just (mergeAll-st {w} lim act q od) with w ≟ᵗ u
 ...   | no _     = refl
 ...   | yes refl with hasRoom lim act
 -- a lane is free: one subscribeInner call, events = bs
 ...     | true  =
   thruConsume-nodry-apply c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf mergeAllᵒ nid κ id now o os sched st ok pb sspLen vb rg gk
-    (≤-trans (m≤m⊔n _ _) hD) nBst clL̂ dsc stP stI
+    (≤-trans (m≤m⊔n _ _) hD) nBst clL̂ dsc stP stI stO stK
+    (subst (λ z → parkStrat? (pathFloor κ) z ≡ true) (sym eqN) stQ) stW
 -- the gate is shut: the element is parked and nothing is emitted
 ...     | false = refl
 -- other node shapes: thruConsume's own catch-all emits [].  These are
 -- enumerated rather than written `| _`, because a VARIABLE scrutinee
 -- leaves the evaluator's with-function stuck — its catch-all only fires
 -- once Agda knows the shape is none of the mergeAll cases.
-thruConsume-nodry {u = u} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf mergeAllᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD nBst clL̂ dsc stP stI
+thruConsume-nodry {u = u} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf mergeAllᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD nBst clL̂ dsc stP stI stO stK stQ stW
     | nothing = refl
-thruConsume-nodry {u = u} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf mergeAllᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD nBst clL̂ dsc stP stI
+thruConsume-nodry {u = u} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf mergeAllᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD nBst clL̂ dsc stP stI stO stK stQ stW
     | just (scan-st _) = refl
-thruConsume-nodry {u = u} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf mergeAllᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD nBst clL̂ dsc stP stI
+thruConsume-nodry {u = u} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf mergeAllᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD nBst clL̂ dsc stP stI stO stK stQ stW
     | just (take-st _) = refl
-thruConsume-nodry {u = u} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf mergeAllᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD nBst clL̂ dsc stP stI
+thruConsume-nodry {u = u} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf mergeAllᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD nBst clL̂ dsc stP stI stO stK stQ stW
     | just (switch-st _ _) = refl
-thruConsume-nodry {u = u} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf mergeAllᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD nBst clL̂ dsc stP stI
+thruConsume-nodry {u = u} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf mergeAllᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD nBst clL̂ dsc stP stI stO stK stQ stW
     | just (exhaust-st _ _) = refl
 
 -- SWITCH: switchKill (closes only, nodry by switchKill-closes-nodry)
 --         + subscribeInner (bs, nodry by SiNodry), combined by any-dry-++
-thruConsume-nodry c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf switchᵒ nid κ id now o os sched₀ st₀ ok pb sspLen vb rg gk hD nBst clL̂ dsc stP stI
-  with lookupNode nid (EvalSt.nodes st₀)
+thruConsume-nodry c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf switchᵒ nid κ id now o os sched₀ st₀ ok pb sspLen vb rg gk hD nBst clL̂ dsc stP stI stO stK stQ stW
+  with lookupNode nid (EvalSt.nodes st₀) in eqN
 -- NO `with subscribeInner …` here.  Scrutinising the tuple rebinds its
 -- third component as a FRESH variable `bs`, which no longer unifies with
 -- the `proj₁ (proj₂ (proj₂ (subscribeInner …)))` that both the goal and
@@ -1498,9 +1608,17 @@ thruConsume-nodry c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf switch�
       -- switch-st node IS depthInner at the POST-switchKill state — exactly
       -- sched₁/st₁ above.  So the same ⊔/suc projection serves here.
       hD-elem    = ≤-trans (m≤m⊔n _ _) hD
+      -- the kill retires registrations and may bump the counter the
+      -- ordering is read against, so the three come back through its
+      -- own carrier rather than transporting
+      KR         = switchKill-readings switchᵒ nid κ cur sched₀ st₀ stO stK
+                     (subst (λ z → parkStrat? (pathFloor κ) z ≡ true) (sym eqN) stQ)
+                     stW
       h-bs       = subscribeInner-nodry c sl Ψ dep bud 2≤S 1≤R hCR slC slSz slFc
                      J sf switchᵒ nid κ id now o sched₁ st₁
                      ok₁ pb sspLen vb-elem rg₁ nB hD-elem cl-elem gk stP stI
+                     (proj₁ KR) (proj₁ (proj₂ (proj₂ KR)))
+                     (proj₂ (proj₂ (proj₂ KR))) (proj₁ (proj₂ KR))
   in any-dry-++ (proj₁ (switchKill cur sched₀ st₀)) _ h-closes h-bs
 ... | nothing = refl
 ... | just (scan-st _) = refl
@@ -1509,13 +1627,14 @@ thruConsume-nodry c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf switch�
 ... | just (exhaust-st _ _) = refl
 
 -- EXHAUST active=true: drops the payload, emits []
-thruConsume-nodry c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf exhaustᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD nBst clL̂ dsc stP stI
-  with lookupNode nid (EvalSt.nodes st)
+thruConsume-nodry c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf exhaustᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD nBst clL̂ dsc stP stI stO stK stQ stW
+  with lookupNode nid (EvalSt.nodes st) in eqN
 ... | just (exhaust-st true od)  = refl
 -- EXHAUST active=false: subscribes, emits bs
 ... | just (exhaust-st false od) =
   thruConsume-nodry-apply c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf exhaustᵒ nid κ id now o os sched st ok pb sspLen vb rg gk
-    (≤-trans (m≤m⊔n _ _) hD) nBst clL̂ dsc stP stI
+    (≤-trans (m≤m⊔n _ _) hD) nBst clL̂ dsc stP stI stO stK
+    (subst (λ z → parkStrat? (pathFloor κ) z ≡ true) (sym eqN) stQ) stW
 ... | nothing = refl
 ... | just (scan-st _) = refl
 ... | just (take-st _) = refl
@@ -1550,10 +1669,16 @@ thruWalk-nodry : ∀ {n} {Γ : Ctx n} {u t} {e : Closed Γ t}
   sIterD (Caps.cSize c) (Caps.cWid c) dep (suc bud) (length vals) J ≤ L̂ →
   pathStrat? κ ≡ true →
   valsStrat? (pathFloor κ) vals ≡ true →
+  -- the two entry readings plus the outer's own cell, carried per element
+  -- by the walk's step rather than re-derived
+  pathOrd? (Sched.nextNode sched) (thru-outer op nid ↠ κ) ≡ true →
+  pathPark? κ st ≡ true →
+  parkStrat? (pathFloor κ) (lookupNode nid (EvalSt.nodes st)) ≡ true →
+  regOwn? nid (pathFloor κ) (EvalSt.registry st) ≡ true →
   any dryEvent (proj₁ (proj₂ (thruWalk sf op nid κ id now vals sched st))) ≡ false
 
 thruWalk-nodry c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf op nid κ id now
-               [] sched st _ _ _ _ _ _ _ _ _ _ _ _ = refl
+               [] sched st _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ = refl
 
 -- The head's outputs are LET-BOUND PROJECTIONS, never `with`-scrutinised.
 -- Abstracting the tuple rebinds `sched₁`/`st₁` as fresh variables, but the
@@ -1562,7 +1687,7 @@ thruWalk-nodry c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf op nid κ 
 -- instance the abstraction never touched — so the recursive call's OKB
 -- argument is compared at `Sched Γ` against a variable and fails.
 thruWalk-nodry {u = u} {e = e} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf op nid κ id now
-               (o ∷ os) sched₀ st₀ ok pb sspLen vb rg gk hD nst clL̂ dsc stP stV =
+               (o ∷ os) sched₀ st₀ ok pb sspLen vb rg gk hD nst clL̂ dsc stP stV stO stK stQ stW =
   let step   = thruConsume sf op nid κ id now o sched₀ st₀
       bs     = proj₁ (proj₂ step)
       sched₁ = proj₁ (proj₂ (proj₂ step))
@@ -1587,9 +1712,10 @@ thruWalk-nodry {u = u} {e = e} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc
                              (all (inputsBelowᵛ (pathFloor κ) (obs u)) os) stV)
       h-head = thruConsume-nodry c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf op nid κ id now o os
                  sched₀ st₀ ok pb sspLen vb rg gk hD nBst clL̂ dsc₀ stP stVH
+                 stO stK stQ stW
       loop   = thruConsume-nodry-loop c sl Ψ dep bud J sf op nid κ id now o os sched₀ st₀
                  2≤S 1≤R slC slSz ok pb sspLen vb nBst (≤-trans (m≤m⊔n _ _) hD) rg
-                 stP stV
+                 stP stV stO stK stQ stW
       j₁     = proj₁ loop
       ok₁    = proj₁ (proj₂ loop)
       rg₁    = proj₁ (proj₂ (proj₂ loop))
@@ -1619,10 +1745,19 @@ thruWalk-nodry {u = u} {e = e} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc
                           2≤S ≤-refl ≤-refl hj₁ ≤-refl ≤-refl ≤-refl)
                        (≤-trans (≤-reflexive (sym (sIterD-suc S W dep (suc bud) (length os) J)))
                                 dsc)
+      stVH   = proj₁ (∧-true (inputsBelowᵛ (pathFloor κ) (obs u) o)
+                             (all (inputsBelowᵛ (pathFloor κ) (obs u)) os) stV)
       stVT   = proj₂ (∧-true (inputsBelowᵛ (pathFloor κ) (obs u) o)
                              (all (inputsBelowᵛ (pathFloor κ) (obs u)) os) stV)
+      -- the three readings back at the state one consumed value landed in,
+      -- and the consume takes the arrival's own reading: the ledger's head
+      -- split is exactly it
+      CR     = thruConsume-readings sf op nid κ id now o sched₀ st₀
+                 stVH stO stK stQ stW
       h-tail = thruWalk-nodry c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc (J + j₁) sf op nid κ id now
                  os sched₁ st₁ ok₁ pb₁ sspL₁ vb₁ rg₁ gk hD₁ nst₁ clL̂ dsc₁ stP stVT
+                 (proj₁ CR) (proj₁ (proj₂ (proj₂ CR)))
+                 (proj₂ (proj₂ (proj₂ CR))) (proj₁ (proj₂ CR))
   -- the tail's event list is NAMED rather than left as `_`: with the head's
   -- outputs let-bound (see above) there is no with-pattern to fix it.
   in any-dry-++ bs (proj₁ (proj₂ (thruWalk sf op nid κ id now os sched₁ st₁)))
@@ -1652,10 +1787,18 @@ innerReact-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     ≤ sizeCapAt e sl (suc id) →
   depthFrame sf id now (from-inner op allNid inst) path′ vals fin sched st ≤ d →
   -- THE FRAME'S OWN READING.  Only the chain half is forwarded — the
-  -- payload half here is about `vals`, and what the drain subscribes is
-  -- the NODE's queue, which `frame-parkStrat` supplies at the lookup
+  -- payload half here is about `vals`, while what the drain subscribes is
+  -- the NODE's queue, whose reading is the carried cell below
   pathStrat? path′ ≡ true →
   valsStrat? (pathFloor path′) vals ≡ true →
+  -- the two entry readings plus the outer's own cell.  The cell reading
+  -- is what the drain's queue IS -- `parkStrat?` on a mergeAll node is
+  -- that node's `valsStrat?` -- so this arm spends it twice, once as the
+  -- queue's payload reading and once as the drain's own carried cell
+  pathOrd? (Sched.nextNode sched) (thru-outer op allNid ↠ path′) ≡ true →
+  pathPark? path′ st ≡ true →
+  parkStrat? (pathFloor path′) (lookupNode allNid (EvalSt.nodes st)) ≡ true →
+  regOwn? allNid (pathFloor path′) (EvalSt.registry st) ≡ true →
   any dryEvent
       (proj₁ (proj₂ (stepFrame sf id now (from-inner op allNid inst)
                                path′ vals fin sched st)))
@@ -1681,7 +1824,7 @@ innerFinish-switch-nodry sf allNid inst c₀ path′ id now vals od sched st
 
 -- fin = false: innerReact emits []
 innerReact-nodry c sl Ψ d 2≤S 1≤R hCR slC slSz slFc J {s} sf id now op allNid inst path′ vals fin sched st
-                 ok pb vb rg gk cl hD hps hvs
+                 ok pb vb rg gk cl hD hps hvs stO stK stQ stW
   with fin
 ... | false = refl
 -- fin = true, alive-through check passes: emits []
@@ -1763,10 +1906,7 @@ innerReact-nodry c sl Ψ d 2≤S 1≤R hCR slC slSz slFc J {s} sf id now op allN
                   -- lookup, and `parkStrat?` on a mergeAll node IS the
                   -- queue's `valsStrat?` — so the leaf lands on `eqN` and
                   -- nothing else is owed
-                  stq     = subst (λ z → parkStrat? (pathFloor path′) z ≡ true) eqN
-                              (frame-parkStrat (frameStep J c)
-                                 (from-inner op allNid inst) path′ sched st
-                                 (proj₂ (proj₁ ok)) hps)
+                  stq     = stQ
               -- hD reduces HERE and only here: the `with` above scrutinises
               -- `lookupNode allNid (nodes st)` and `w ≟ᵗ s`, so
               -- depthFrame → depthReact → depthFin → depthFinC has unfolded to
@@ -1783,7 +1923,13 @@ innerReact-nodry c sl Ψ d 2≤S 1≤R hCR slC slSz slFc J {s} sf id now op allN
                    (fuel-pred hD) nst cl
                    (frame-room S W d (length q) J 2≤S (≤-trans (s≤s z≤n) hD)
                       (valsLen (frameStep J c) sl q vbq-c))
-                   hps stq
+                   hps stq stO stK
+                   -- and the SAME reading a second time, put back into the
+                   -- lookup's shape: the drain states its carried cell at
+                   -- the lookup, which the `with` above leaves stuck
+                   (subst (λ z → parkStrat? (pathFloor path′) z ≡ true)
+                          (sym eqN) stQ)
+                   stW
 
 ------------------------------------------------------------------
 -- thruOuter-nodry — thru-outer frame; uses thruWrap-pass + thruWalk-nodry.
@@ -1808,6 +1954,11 @@ thruOuter-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   depthFrame sf id now (thru-outer op nid) path′ vals fin sched st ≤ d →
   pathStrat? path′ ≡ true →
   valsStrat? (pathFloor path′) vals ≡ true →
+  -- the two entry readings plus the outer's own cell, forwarded to the walk
+  pathOrd? (Sched.nextNode sched) (thru-outer op nid ↠ path′) ≡ true →
+  pathPark? path′ st ≡ true →
+  parkStrat? (pathFloor path′) (lookupNode nid (EvalSt.nodes st)) ≡ true →
+  regOwn? nid (pathFloor path′) (EvalSt.registry st) ≡ true →
   any dryEvent
       (proj₁ (proj₂ (stepFrame sf id now (thru-outer op nid)
                                path′ vals fin sched st)))
@@ -1822,7 +1973,7 @@ thruOuter-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 -- is `stepThru-walk`'s (.Walk-Level) own shape; the two faces split their
 -- fuel at the same place because it is the evaluator that decides where.
 thruOuter-nodry c sl Ψ zero 2≤S 1≤R hCR slC slSz slFc J sf id now op nid path′ vals fin sched st ok pb vb rg gk cl ()
-thruOuter-nodry c sl Ψ (suc d′) 2≤S 1≤R hCR slC slSz slFc J sf id now op nid path′ vals fin sched st ok pb vb rg gk cl hD hps hvs =
+thruOuter-nodry c sl Ψ (suc d′) 2≤S 1≤R hCR slC slSz slFc J sf id now op nid path′ vals fin sched st ok pb vb rg gk cl hD hps hvs stO stK stQ stW =
   let TW    = thruWalk sf op nid path′ id now vals sched st
       eq    = proj₁ (thruWrap-pass op nid fin TW)
       -- strip thru-outer frame from pb.  ∧-true's two Bool arguments are
@@ -1858,7 +2009,7 @@ thruOuter-nodry c sl Ψ (suc d′) 2≤S 1≤R hCR slC slSz slFc J sf id now op 
   in subst (λ x → any dryEvent x ≡ false) (sym eq)
            (thruWalk-nodry c sl Ψ d′ (sizeAt S (suc J)) (fLvlD S W (suc d′) J)
               2≤S 1≤R hCR slC slSz slFc J sf op nid path′ id now vals sched st
-              ok pb′ sspLen vb rg gk (≤-pred hD) nst cl room hps hvs)
+              ok pb′ sspLen vb rg gk (≤-pred hD) nst cl room hps hvs stO stK stQ stW)
 
 -- take's dispatch: the non-cut arm emits nothing, the cutting arm
 -- emits cutThrough's closes.  Unconditional — no gas, no caps, no level
@@ -1905,17 +2056,23 @@ stepFrame-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   -- `f ↠ path′` form and a callee's `path′` form are the same premise.
   pathStrat? (f ↠ path′) ≡ true →
   valsStrat? (pathFloor path′) vals ≡ true →
+  -- THE TWO ENTRY READINGS, AT THE WHOLE CHAIN.  Stated over `f ↠ path′`
+  -- because that is the chain the caller holds; each *All arm splits its
+  -- own frame off, the park half by `∧-true` and the ordering half by
+  -- `pathOrd?-outer`, and the three readings the mint consumes fall out
+  pathOrd? (Sched.nextNode sched) (f ↠ path′) ≡ true →
+  pathPark? (f ↠ path′) st ≡ true →
   any dryEvent
       (proj₁ (proj₂ (stepFrame sf id now f path′ vals fin sched st)))
     ≡ false
 
 -- MAP: the frame emits nothing at all
 stepFrame-nodry c sl Ψ d 2≤S 1≤R hCR slC slSz slFc J sf id now
-                (map-f fn) path′ vals fin sched st _ _ _ _ _ _ _ _ _ = refl
+                (map-f fn) path′ vals fin sched st _ _ _ _ _ _ _ _ _ _ _ = refl
 
 -- SCAN: every arm of the node-state dispatch emits `[]`
 stepFrame-nodry c sl Ψ d 2≤S 1≤R hCR slC slSz slFc J {u = u} sf id now
-                (scan-f fn nid) path′ vals fin sched st _ _ _ _ _ _ _ _ _
+                (scan-f fn nid) path′ vals fin sched st _ _ _ _ _ _ _ _ _ _ _
   with lookupNode nid (EvalSt.nodes st)
 ... | nothing                  = refl
 ... | just (take-st _)         = refl
@@ -1928,18 +2085,43 @@ stepFrame-nodry c sl Ψ d 2≤S 1≤R hCR slC slSz slFc J {u = u} sf id now
 
 -- TAKE: the one severing frame, and it is free (cutThrough-nodry)
 stepFrame-nodry c sl Ψ d 2≤S 1≤R hCR slC slSz slFc J sf id now
-                (take-f nid) path′ vals fin sched st _ _ _ _ _ _ _ _ _ =
+                (take-f nid) path′ vals fin sched st _ _ _ _ _ _ _ _ _ _ _ =
   takeDispatch-nodry nid vals fin sched st (lookupNode nid (EvalSt.nodes st))
 
 -- the two *All edges: real definitions, subscribeInner-nodry is APPLIED inside
-stepFrame-nodry c sl Ψ d 2≤S 1≤R hCR slC slSz slFc J sf id now
+stepFrame-nodry c sl Ψ d 2≤S 1≤R hCR slC slSz slFc J {u = u} sf id now
                 (from-inner op allNid inst) path′ vals fin sched st
-                ok pb vb rg gk cl hD hps hvs =
+                ok pb vb rg gk cl hD hps hvs stO stK =
   innerReact-nodry c sl Ψ d 2≤S 1≤R hCR slC slSz slFc J sf id now op allNid inst
                    path′ vals fin sched st ok pb vb rg gk cl hD hps hvs
+                   (pathOrd?-outer (Sched.nextNode sched) allNid inst op path′ stO)
+                   (proj₂ PK) (∧-trueˡ (proj₁ PK))
+                   -- AND THE OWNER OF THE OUTER'S CELL, read back through the
+                   -- frame's own node list.  The frame heads the very chain
+                   -- the caller's park reading is stated over, so both halves
+                   -- come off ONE projection and nothing is owed here -- the
+                   -- membership side is a `≡ᵇ` reflexivity at the first of the
+                   -- two cells a `from-inner` names.
+                   (framePark?-own {s = u} {u = u} (pathFloor path′)
+                      (from-inner op allNid inst) allNid st (proj₁ PK)
+                      (cong (_∨ ((inst ≡ᵇ allNid) ∨ false)) (≡ᵇ-refl allNid)))
+  where
+  -- the two Bool arguments are left to unification: `pathPark?` on a
+  -- `↠` reduces to exactly this conjunction, and SPELLING the frame's
+  -- half out re-elaborates `framePark?` at implicits the clause type
+  -- alone does not pin
+  PK = ∧-true _ _ stK
 
-stepFrame-nodry c sl Ψ d 2≤S 1≤R hCR slC slSz slFc J sf id now
+stepFrame-nodry c sl Ψ d 2≤S 1≤R hCR slC slSz slFc J {u = u} sf id now
                 (thru-outer op nid) path′ vals fin sched st
-                ok pb vb rg gk cl hD hps hvs =
+                ok pb vb rg gk cl hD hps hvs stO stK =
   thruOuter-nodry c sl Ψ d 2≤S 1≤R hCR slC slSz slFc J sf id now op nid
                   path′ vals fin sched st ok pb vb rg gk cl hD hps hvs
+                  stO (proj₂ PK) (∧-trueˡ (proj₁ PK))
+                  -- and the owner half of the same head, off the same
+                  -- projection: a `thru-outer` names one cell, so the
+                  -- membership side is settled by the helper
+                  (framePark?-own-thru {u = u} (pathFloor path′) op nid st
+                     (proj₁ PK))
+  where
+  PK = ∧-true _ _ stK

@@ -195,7 +195,7 @@ tie₁₃ : Confirms
   (subscribeE-nest-scan cap 0 (slots 13) (delivered 13) 0 0 gas
      deepen (strmᵗ emptyᵉ) (input (fsuc fzero)) root 0 0
      (sched-init prog (slots 13)) (st-init prog))
-tie₁₃ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =
+tie₁₃ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =
   0 , z≤n , z≤n
   , ≤-trans (≤ᵇ⇒≤ _ _ tt) base
   , ≤-trans (≤-trans (≤ᵇ⇒≤ _ _ tt) base) (m≤n⊔m _ _)
@@ -209,7 +209,7 @@ tie₁₄ : Confirms
   (subscribeE-nest-scan cap 0 (slots 14) (delivered 14) 0 0 gas
      deepen (strmᵗ emptyᵉ) (input (fsuc fzero)) root 0 0
      (sched-init prog (slots 14)) (st-init prog))
-tie₁₄ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =
+tie₁₄ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =
   0 , z≤n , z≤n
   , ≤-trans (≤ᵇ⇒≤ _ _ tt) base
   , ≤-trans (≤-trans (≤ᵇ⇒≤ _ _ tt) base) (m≤n⊔m _ _)

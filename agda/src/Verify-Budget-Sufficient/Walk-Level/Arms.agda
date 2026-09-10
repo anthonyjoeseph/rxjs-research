@@ -55,8 +55,8 @@ open import Verify-Budget-Sufficient.Caps using
   (Caps; frameStep; frameStep-mono-j)
 -- the caps face: only the five predicates the statement reads there
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
-  (burstCaps?; burstCount?; capsOK?; pathFloor; pathStrat?; pathSz?; slotCaps?;
-   slotsCaps?; slotsCaps?-lookup)
+  (burstCaps?; burstCount?; capsOK?; pathFloor; pathOrd?; pathPark?; pathStrat?;
+   pathSz?; slotCaps?; slotsCaps?; slotsCaps?-lookup)
 open import Verify-Budget-Sufficient.Caps-Nest using
   (nest)
 open import Verify-Budget-Sufficient.Caps-Face.Part5 using
@@ -149,6 +149,8 @@ input-wet-shared : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     -- registers, and it is the arm that hands both halves on
     pathStrat? κ ≡ true →
     inputsBelowᵉ (pathFloor κ) b ≡ true →
+    pathOrd? (Sched.nextNode sched) κ ≡ true →
+    pathPark? κ st ≡ true →
     let r = subscribeE g b κ bid now sched st
     in capsOK? (frameStep (j + j′) c)
                (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true →
@@ -172,14 +174,14 @@ input-wet-shared : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 -- keeps it, at the cost of a scripted branch that slotEq itself refutes.
 input-wet-shared c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ g wl i b κ bid now sl sched st
   d slotEq refl 2≤S 1≤R hCR slEq slC slSz cOK szb pSz lC nst hidx dpt invW fnC pB
-  s2 fS rS ceil lb dmd gas lℓ rgs hps hib cOK′ bC bCnt jle
+  s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk cOK′ bC bCnt jle
   with Sched.slots sched i in slotEq2
 -- the slot cannot be scripted: this face was dispatched on `shared`
 ... | scripted s with slotEq
 ...   | ()
 input-wet-shared c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ g wl i b κ bid now sl sched st
   d slotEq refl 2≤S 1≤R hCR slEq slC slSz cOK szb pSz lC nst hidx dpt invW fnC pB
-  s2 fS rS ceil lb dmd gas lℓ rgs hps hib cOK′ bC bCnt jle
+  s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk cOK′ bC bCnt jle
   | shared d′
   with memberSource (toℕ i) (EvalSt.completedSources st)
 -- ARM A — the spent share.  sched and st both untouched, so the only
@@ -206,7 +208,7 @@ input-wet-shared c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ g wl i b κ bid now 
     -- free here precisely because this arm is the not-yet-connected
     -- branch — the same branch `subscribeSharedSlot` guards on.
     sched st d′ slotEq2 refl eqM 2≤S 1≤R hCR slEq slC slSz cOK szb pSz lC nst hidx dpt
-    invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs hps hib cOK′ bC bCnt jle
+    invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk cOK′ bC bCnt jle
 
 -- ═══ THE TWO BOUNDS ON A SCRIPTED SLOT'S SYNC PREFIX, BOTH DISCHARGED ═══
 --
@@ -724,10 +726,12 @@ input-wet-scripted : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   regsLen? ℓ (EvalSt.registry st) ≡ true →
   -- TAKEN AND DROPPED, for the same reason the ops ledger above is: a
   -- scripted slot never registers, so nothing here reads an entry, and
-  -- these two ride along only to keep the telescope aligned with
+  -- these ride along only to keep the telescope aligned with
   -- input-wet-core's, whose shared arm DOES spend them
   pathStrat? κ ≡ true →
   inputsBelowᵉ (pathFloor κ) b ≡ true →
+  pathOrd? (Sched.nextNode sched) κ ≡ true →
+  pathPark? κ st ≡ true →
   let r = subscribeE g b κ bid now sched st
   in capsOK? (frameStep (j + j′) c)
              (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true →
@@ -743,7 +747,7 @@ input-wet-scripted : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
      × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
 input-wet-scripted c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ g i b κ bid now sl sched st
   src slotEq bEq 2≤S 1≤R hCR slEq slC slSz cOK szb pSz lC nst _ dpt invW fnC pB
-  s2 fS rS ceil lb dmd gas lℓ rgs _ _ cOK′ bC bCnt jle =
+  s2 fS rS ceil lb dmd gas lℓ rgs _ _ _ _ cOK′ bC bCnt jle =
   let (a₁ , a₂ , a₃ , a₄) =
         input-wet-scripted-four c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ g i b κ bid
           now sl sched st src slotEq bEq 2≤S 1≤R hCR slEq slC slSz cOK szb pSz
@@ -792,6 +796,8 @@ input-wet-core : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   regsLen? ℓ (EvalSt.registry st) ≡ true →
   pathStrat? κ ≡ true →
   inputsBelowᵉ (pathFloor κ) b ≡ true →
+  pathOrd? (Sched.nextNode sched) κ ≡ true →
+  pathPark? κ st ≡ true →
   let r = subscribeE g b κ bid now sched st
   in capsOK? (frameStep (j + j′) c)
              (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true →
@@ -845,7 +851,7 @@ walk-defer-eight : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (body : Closed Γ u) → WalkStmt⁻ {e = e} (deferᵉ body)
 walk-defer-eight {Γ = Γ} {u = u} body c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
   2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
-  s2 fS rS ceil lb dmd gas lℓ rgs hps hib =
+  s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk =
   j′ , a₁ , a₂ , a₃ , a₄
      , addLive-INV Ψ B′ SCHED₃ ST NEW BL FL
          (shared-live-INV c Ψ j j′ SRC PATH SCHED₃ ST₀ 2≤S hCR
@@ -854,7 +860,7 @@ walk-defer-eight {Γ = Γ} {u = u} body c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g 
      , refl , refl , refl
   where
   CAPS = subscribeE-caps c dep bud ops j g (deferᵉ body) κ bid now sl sched st
-           2≤S 1≤R slEq slC slSz inv szb wdb pC lC nst hidx dpt hps hib
+           2≤S 1≤R slEq slC slSz inv szb wdb pC lC nst hidx dpt hps hib hord hpk
   j′ = proj₁ CAPS
   a₁ = proj₁ (proj₂ CAPS)
   a₂ = proj₁ (proj₂ (proj₂ CAPS))
@@ -900,11 +906,11 @@ walk-defer : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (body : Closed Γ u) → WalkStmt {e = e} (deferᵉ body)
 walk-defer {u = u} body c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
   2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
-  s2 fS rS ceil lb dmd gas lℓ rgs hps hib =
+  s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk =
   let (j′ , a₁ , a₂ , a₃ , a₄ , a₅ , a₆ , a₇ , a₈) =
         walk-defer-eight body c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
           2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
-          s2 fS rS ceil lb dmd gas lℓ rgs hps hib
+          s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk
   in j′ , a₁ , a₂ , a₃ , a₄ , a₅ , a₆ , a₇ , a₈
    , register-regsLen ℓ _ (thru-outer mergeAllᵒ (proj₁ (mintNode sched)) ↠ κ)
        (installNode (proj₁ (mintNode sched)) (mergeAll-st {t = u} nothing 0 [] false) st)

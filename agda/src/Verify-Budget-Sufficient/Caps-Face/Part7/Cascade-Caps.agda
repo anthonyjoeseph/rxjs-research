@@ -2,7 +2,7 @@
 -- walkH … cascadeGo-slots
 module Verify-Budget-Sufficient.Caps-Face.Part7.Cascade-Caps where
 
-open import Data.Bool    using (true; false; _∧_; if_then_else_)
+open import Data.Bool    using (Bool; true; false; _∧_; if_then_else_)
 open import Data.Nat     using (ℕ; _+_; _≤_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤-trans; ≤-refl; ≤-reflexive; n≤1+n; *-identityʳ)
 open import Data.Nat.Solver     using (module +-*-Solver)
@@ -29,7 +29,7 @@ open import Verify-Budget-Sufficient.Caps-Depth using
   (depthCascade)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; arrVal; RegId; Chain; cascadeLatch; cascadeFinish; arrSource;
   chainsOf; chainsGo; cascadeGo; Path; arrTy; stepFrame; sameSource; regAt; lvls; chainStep;
-  budgetAt; arrTick; shareAdmit; _↠_)
+  budgetAt; arrTick; shareAdmit; shareLatch; foldPath; _↠_)
 open import Rx.Slots using (Slots; slotsSize)
 
 open import Verify-Budget-Sufficient.Delivery-Walk using
@@ -47,16 +47,19 @@ open import Verify-Budget-Sufficient.Caps-Depth
   using (depthCascade)
 
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
-  (capsOK?; pathSz?; pathSz?-widen; regsSz?; slotsCaps?; valCaps?; pathFloor; pathStrat?;
-  frameStrat?)
+  (capsOK?; pathSz?; pathSz?-widen; regsSz?; regPark?-nodes; slotsCaps?; valCaps?;
+  pathFloor; pathStrat?; frameStrat?; pathOrd?; pathPark?; framePark?)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
   (foldPath-slots; capsOK?-count; capsOK?-delivered; capsOK?-regs; dropSweep-caps; pathSz?-len;
   pathSz?-tail; shareLatch-caps; valsCaps?; valsCaps?-lvl; walkOK; walkOK-finish;
-  registry-entStrat; valsStrat?)
+  registry-entStrat; valsStrat?; capsOK?-parts; capsOK?-regOrd; capsOK?-regPark;
+  pathPark-delivered)
 open import Verify-Budget-Sufficient.Psi-Split using
-  (chP?-∧; regP?-∧; regStrat?-paths)
+  (chP?-∧; regP?-∧; regStrat?-paths; chP?-projˡ; chP?-projʳ)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves using
-  (shareAdmit-strat; stepFrame-valsStrat)
+  (shareAdmit-strat; stepFrame-valsStrat; pathOrd-step; pathPark-step;
+  foldPath-ord; foldPath-park; chainStep-ord; chainStep-park;
+  shareAdmit-ord; shareAdmit-park)
 open import Decide using (∧-intro; ∧-trueˡ; ∧-trueʳ)
 open import Verify-Budget-Sufficient.Caps-Face.Part6 using
   (SiCType; IfcType)
@@ -136,6 +139,60 @@ walkH siC ifc c d sl 2≤S 1≤R slC slSz = record
                     (proj₂ (shareAdmit-strat i vs st
                               (registry-entStrat (frameStep J c) sched st (proj₂ ok))
                               (∧-trueʳ h)))
+  -- THE CHAIN'S TWO ENTRY READINGS, CARRIED AS ONE LEDGER.  Neither
+  -- follows from the caps receipt every site here already holds: a
+  -- caps-legal state the evaluator never built satisfies `capsOK?`
+  -- outright and fails each reading, refuted beside the rows that used
+  -- to try to derive them.  So the pair is CARRIED, and carried
+  -- together, because every step that moves one moves the other and
+  -- the frame step needs both halves to move either
+  ; Ob        = λ sched st p → pathOrd? (Sched.nextNode sched) p ∧ pathPark? p st
+  -- the delivery mark touches the store and not the counter, so only
+  -- the park half has anything to say
+  ; o-cons    = λ rid sched st p h →
+                  ∧-intro (∧-trueˡ h) (pathPark-delivered p rid st (∧-trueʳ h))
+  -- THE FAN IS WHERE BOTH HALVES ARE BORN, and both out of the receipt
+  -- the state already carries: the registry's own order and park
+  -- readings, filtered down the admitted chains
+  ; o-fan     = λ J i fin sched st ok →
+                  chP?-∧ (λ {u} p → pathOrd? (Sched.nextNode sched) p)
+                         (λ {u} p → pathPark? p (shareLatch i fin st))
+                         (shareAdmit i (EvalSt.registry st))
+                    (shareAdmit-ord i sched st
+                       (capsOK?-regOrd (frameStep J c) sched st (proj₂ ok)))
+                    (shareAdmit-park i fin st
+                       (capsOK?-regPark (frameStep J c) sched st (proj₂ ok)))
+  -- and the two sibling runs, each a split-transport-rejoin: the
+  -- counter only grows and the store only freezes, so neither half is
+  -- re-earned, it is carried across
+  ; o-fold    = λ sf gas id now envSrc p vals evs fin sched st ps h →
+                  chP?-∧ (λ {u} κ → pathOrd?
+                            (Sched.nextNode
+                              (proj₁ (proj₂ (foldPath sf gas id now envSrc p vals
+                                               evs fin sched st)))) κ)
+                         (λ {u} κ → pathPark? κ
+                            (proj₂ (proj₂ (foldPath sf gas id now envSrc p vals
+                                             evs fin sched st))))
+                         ps
+                    (foldPath-ord sf gas id now envSrc p vals evs fin sched st ps
+                       (chP?-projˡ (λ {u} κ → pathOrd? (Sched.nextNode sched) κ)
+                                   (λ {u} κ → pathPark? κ st) ps h))
+                    (foldPath-park sf gas id now envSrc p vals evs fin sched st ps
+                       (chP?-projʳ (λ {u} κ → pathOrd? (Sched.nextNode sched) κ)
+                                   (λ {u} κ → pathPark? κ st) ps h))
+  ; o-chain   = λ id a p sched st chains h →
+                  chP?-∧ (λ {u} κ → pathOrd?
+                            (Sched.nextNode
+                              (proj₁ (proj₂ (chainStep id a p sched st)))) κ)
+                         (λ {u} κ → pathPark? κ
+                            (proj₂ (proj₂ (chainStep id a p sched st))))
+                         chains
+                    (chainStep-ord id a p sched st chains
+                       (chP?-projˡ (λ {u} κ → pathOrd? (Sched.nextNode sched) κ)
+                                   (λ {u} κ → pathPark? κ st) chains h))
+                    (chainStep-park id a p sched st chains
+                       (chP?-projʳ (λ {u} κ → pathOrd? (Sched.nextNode sched) κ)
+                                   (λ {u} κ → pathPark? κ st) chains h))
   ; ok-reg    = λ J sched st ok → capsOK?-count (frameStep J c) sched st (proj₂ ok)
   ; ok-cons   = λ J rid sched st ok →
                   proj₁ ok , capsOK?-delivered (frameStep J c) rid sched st (proj₂ ok)
@@ -146,8 +203,14 @@ walkH siC ifc c d sl 2≤S 1≤R slC slSz = record
   -- RATHER THAN TRANSPORTED.  `stepFrame` rewrites the payload, so its
   -- floor is earned back from the frame's own conjunct of the path
   -- reading — which is the half `p-tail` throws away, spent here instead
-  ; sf-step   = λ J sf id now f path′ vals fin sched st ok hP hV hL _ _ hD →
+  ; sf-step   = λ J sf id now f path′ vals fin sched st ok hP hV hL _ _ hD hOb →
                   let r  = stepFrame sf id now f path′ vals fin sched st
+                      hOb2 = ∧-true (pathOrd? (Sched.nextNode sched) (f ↠ path′))
+                                    (pathPark? (f ↠ path′) st) hOb
+                      hO = proj₁ hOb2
+                      hK = proj₂ hOb2
+                      hKt = proj₂ (∧-true (framePark? (pathFloor path′) f st)
+                                          (pathPark? path′ st) hK)
                       hS = proj₂ (∧-true (pathSz? (Caps.cSize (frameStep J c)) (f ↠ path′))
                                          (pathStrat? (f ↠ path′)) hP)
                       hF = proj₁ (∧-true (frameStrat? (pathFloor path′) f)
@@ -155,7 +218,7 @@ walkH siC ifc c d sl 2≤S 1≤R slC slSz = record
                       FC = stepFrame-face siC ifc c d J sl sf id now f path′ vals fin sched st
                              2≤S 1≤R (proj₁ ok) slC (proj₂ ok)
                              (∧-trueˡ hP) (∧-trueˡ hV) slSz hD
-                             hS (∧-trueʳ hV) in
+                             hS (∧-trueʳ hV) hO hK in
                   proj₁ FC
                   , proj₁ (proj₂ FC)
                   , ( trans (KeepsC.slotsEq
@@ -179,6 +242,13 @@ walkH siC ifc c d sl 2≤S 1≤R slC slSz = record
                            (proj₂ (proj₂ (proj₂ (proj₂ r))))
                            (proj₁ (proj₂ (proj₂ FC)))))
                   , refl
+                  -- AND THE TAIL'S OWN READING, WHICH IS THE HALF THE
+                  -- FRAME KEEPS.  The counter can only have moved up and
+                  -- the cells the tail reads are frozen by the step, so
+                  -- both are transports of the reading spent above
+                  , ∧-intro
+                      (pathOrd-step sf id now f path′ vals fin sched st hO)
+                      (pathPark-step sf id now f path′ vals fin sched st hO hKt)
   }
 
 -- and the bound itself: the walk at level 0, then three widenings — the
@@ -212,12 +282,20 @@ cascadeGo-deliveries :
   -- reading move at the fan and nowhere else
   chP? (λ {u} p → pathStrat? p) chains ≡ true →
   chP? (λ {u} p → valsStrat? (pathFloor p) (arrVal a ∷ [])) chains ≡ true →
+  -- AND THE CHAIN'S TWO ENTRY READINGS, WHICH THE WALK CARRIES AND
+  -- NOTHING HERE DERIVES.  The order half reads the scheduler's
+  -- counter and the park half the store; the caps receipt implies
+  -- neither, refuted at a caps-legal state the evaluator never builds.
+  -- So both are owed by whoever produced the chains, which for the
+  -- cascade is the registry filter one call up
+  chP? (λ {u} p → pathOrd? (Sched.nextNode sched) p ∧ pathPark? p st)
+       chains ≡ true →
   delivN st (proj₂ (proj₂ (cascadeGo a id chains sched st)))
     ≤ cDel c d
-cascadeGo-deliveries siC ifc {n = n} {e = e} c d a id chains sl sched st 2≤S 1≤R slC slEq inv vC pS n≤S lenB slSz hD hpS hvS =
+cascadeGo-deliveries siC ifc {n = n} {e = e} c d a id chains sl sched st 2≤S 1≤R slC slEq inv vC pS n≤S lenB slSz hD hpS hvS hOb =
   ≤-trans (W.Res.cnt (W.cascadeGo-go 0 a id chains sched st
              ((slEq , invʲ) , regʲ)
-             pS∧ vS∧ tt hD))
+             pS∧ vS∧ tt hD hOb))
     (≤-trans (dWalkᶜ-mono n (Caps.cSize c) (length chains)
                 (regAt (Caps.cSize c) (Caps.cReg c) 0)
                 2≤S ≤-refl ≤-refl ≤-refl n≤S ≤-refl
@@ -292,12 +370,20 @@ cascadeGo-level :
   -- reading move at the fan and nowhere else
   chP? (λ {u} p → pathStrat? p) chains ≡ true →
   chP? (λ {u} p → valsStrat? (pathFloor p) (arrVal a ∷ [])) chains ≡ true →
+  -- AND THE CHAIN'S TWO ENTRY READINGS, WHICH THE WALK CARRIES AND
+  -- NOTHING HERE DERIVES.  The order half reads the scheduler's
+  -- counter and the park half the store; the caps receipt implies
+  -- neither, refuted at a caps-legal state the evaluator never builds.
+  -- So both are owed by whoever produced the chains, which for the
+  -- cascade is the registry filter one call up
+  chP? (λ {u} p → pathOrd? (Sched.nextNode sched) p ∧ pathPark? p st)
+       chains ≡ true →
   let r = cascadeGo a id chains sched st
   in Σ ℕ λ j →
      (j ≤ lvls (Caps.cSize c) (Caps.cWid c) d 0
              (delivN st (proj₂ (proj₂ r))))
      × (capsOK? (frameStep j c) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
-cascadeGo-level siC ifc {e = e} c d a id chains sl sched st 2≤S 1≤R slC slEq inv vC pS slSz hD hpS hvS =
+cascadeGo-level siC ifc {e = e} c d a id chains sl sched st 2≤S 1≤R slC slEq inv vC pS slSz hD hpS hvS hOb =
   W.Res.lvl GO , W.Res.hi GO , proj₂ (proj₁ (W.Res.good GO))
   where
   invʲ : capsOK? (frameStep 0 c) sched st ≡ true
@@ -317,7 +403,7 @@ cascadeGo-level siC ifc {e = e} c d a id chains sl sched st 2≤S 1≤R slC slEq
                   (walkH siC ifc c d sl 2≤S 1≤R slC slSz)
   GO = W.cascadeGo-go 0 a id chains sched st
          ((slEq , invʲ) , regʲ)
-         pS∧ vS∧ tt hD
+         pS∧ vS∧ tt hD hOb
 
 -- and the assembly declared above: the landing level with the delivery
 -- count widened to its own recursion, which is `sizeCount` by definition
@@ -351,20 +437,28 @@ cascadeGo-caps :
   -- reading move at the fan and nowhere else
   chP? (λ {u} p → pathStrat? p) chains ≡ true →
   chP? (λ {u} p → valsStrat? (pathFloor p) (arrVal a ∷ [])) chains ≡ true →
+  -- AND THE CHAIN'S TWO ENTRY READINGS, WHICH THE WALK CARRIES AND
+  -- NOTHING HERE DERIVES.  The order half reads the scheduler's
+  -- counter and the park half the store; the caps receipt implies
+  -- neither, refuted at a caps-legal state the evaluator never builds.
+  -- So both are owed by whoever produced the chains, which for the
+  -- cascade is the registry filter one call up
+  chP? (λ {u} p → pathOrd? (Sched.nextNode sched) p ∧ pathPark? p st)
+       chains ≡ true →
   let r = cascadeGo a id chains sched st
   in Σ ℕ λ j → (j ≤ sizeCount c d)
      × (capsOK? (frameStep j c) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
-cascadeGo-caps siC ifc c d a id chains sl sched st 2≤S 1≤R slC slEq inv vC pS n≤S lenB slSz hD hpS hvS =
+cascadeGo-caps siC ifc c d a id chains sl sched st 2≤S 1≤R slC slEq inv vC pS n≤S lenB slSz hD hpS hvS hOb =
   proj₁ LV
     , ≤-trans (≤-trans (proj₁ (proj₂ LV))
                        (lvls-mono D (cDel c d) 2≤S ≤-refl ≤-refl ≤-refl
                           (cascadeGo-deliveries siC ifc c d a id chains sl sched st
-                             2≤S 1≤R slC slEq inv vC pS n≤S lenB slSz hD hpS hvS)))
+                             2≤S 1≤R slC slEq inv vC pS n≤S lenB slSz hD hpS hvS hOb)))
               (≤-reflexive (sym (sizeCount-body c d)))
     , proj₂ (proj₂ LV)
   where
   D  = delivN st (proj₂ (proj₂ (cascadeGo a id chains sched st)))
-  LV = cascadeGo-level siC ifc c d a id chains sl sched st 2≤S 1≤R slC slEq inv vC pS slSz hD hpS hvS
+  LV = cascadeGo-level siC ifc c d a id chains sl sched st 2≤S 1≤R slC slEq inv vC pS slSz hD hpS hvS hOb
 
 ------------------------------------------------------------------
 -- THE CASCADE BOOKENDS AND THE CHAIN SNAPSHOT, ground.  Nothing here
@@ -373,15 +467,41 @@ cascadeGo-caps siC ifc c d a id chains sl sched st 2≤S 1≤R slC slEq inv vC p
 -- and the snapshot is a filter of the registry.
 ------------------------------------------------------------------
 
+-- THE LATCH TAKEN AT AN OPEN FLAG, which is what makes the transport
+-- writable at all: `with` on the flag abstracts only the occurrences
+-- the goal spells out, and the caps receipt spells the state a dozen
+-- ways -- so the flag is a PARAMETER here and every clause meets a
+-- state whose fields reduce.  Ten conjuncts then ride on reduction as
+-- they always did; the park reading is the one that reads the STATE
+-- rather than a projection of it, so it is the one handed over
+-- explicitly, on the node table the latch does not touch.
+latch-caps-flag : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (c : Caps) (sched : Sched Γ) (st : EvalSt e) (s₀ : Source) (b : Bool) →
+  capsOK? c sched st ≡ true →
+  capsOK? c sched
+    (record (if b then record st { completedSources = s₀ ∷ EvalSt.completedSources st } else st)
+       { delivered = [] ; cancelled = [] ; regWatermark = EvalSt.nextReg st
+       ; dying = if b then s₀ ∷ [] else [] }) ≡ true
+latch-caps-flag c sched st s₀ true h with capsOK?-parts c sched st h
+... | h0 , h1 , h2 , h3 , h4 , h5 , h6 , h7 , h8 , h9 , h10 =
+  ∧-intro h0 (∧-intro h1 (∧-intro h2 (∧-intro h3 (∧-intro h4 (∧-intro h5
+    (∧-intro h6 (∧-intro h7 (∧-intro h8 (∧-intro h9
+      (regPark?-nodes (EvalSt.registry st) st _ refl refl h10))))))))))
+latch-caps-flag c sched st s₀ false h with capsOK?-parts c sched st h
+... | h0 , h1 , h2 , h3 , h4 , h5 , h6 , h7 , h8 , h9 , h10 =
+  ∧-intro h0 (∧-intro h1 (∧-intro h2 (∧-intro h3 (∧-intro h4 (∧-intro h5
+    (∧-intro h6 (∧-intro h7 (∧-intro h8 (∧-intro h9
+      (regPark?-nodes (EvalSt.registry st) st _ refl refl h10))))))))))
+
 -- the latch resets delivered/cancelled/regWatermark/dying and may add
--- to completedSources — none of the five conjuncts sees any of them
+-- to completedSources — no conjunct but the park reading sees any of
+-- them
 cascadeLatch-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (c : Caps) (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
   capsOK? c sched st ≡ true →
   capsOK? c sched (cascadeLatch a st) ≡ true
-cascadeLatch-caps c a sched st h with Arrival.isLast a
-... | true  = h
-... | false = h
+cascadeLatch-caps c a sched st h =
+  latch-caps-flag c sched st (arrSource a) (Arrival.isLast a) h
 
 cascadeFinish-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (c : Caps) (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →

@@ -105,5 +105,5 @@ chain-level-unbounded-absurd :
 -- the file.
 chain-level-unbounded-absurd H
   with H slots 0 lvl arr 0 pth (sched-init prog slots) (st-init prog) refl fits
-... | _ , _ , _ , _ , _ , _ , _ , _ , inc , bound , _ =
+... | _ , _ , _ , _ , _ , _ , _ , _ , _ , _ , inc , bound , _ =
   n≮n (ceil + inc) (≤-trans bound (m≤m+n ceil inc))

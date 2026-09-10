@@ -70,12 +70,16 @@ open import Verify-Budget-Sufficient.Wet.Part2 using
 open import Verify-Budget-Sufficient.Caps-Term using
   (evalSeed-caps; evalTms-caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
-  (burstCaps?; burstCount?; capsOK?; capsOK?-mono; frameSz?; pathFloor; pathStrat?; pathSz?;
-  valCaps?; widNode)
+  (burstCaps?; burstCount?; capsOK?; capsOK?-mono; framePark?; frameSz?;
+  pathFloor; pathOrd?;
+  pathOrd?-mono; pathOrd?-push; pathOrd?-read; pathPark?; pathPark?-set-fresh;
+  pathRead; pathStrat?; pathSz?; valCaps?; widNode)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves using
-  (subscribeE-burstStrat; subscribeE-framePark; installNode-scanPark; evalTm-strat)
+  (subscribeE-burstStrat; subscribeE-framePark; subscribeE-readings;
+  installNode-scanPark; mint-regOwn; evalTm-strat)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
-  (capsOK?-nextNode; capsOK?-parts; capsOK?-setNode)
+  (capsOK?-nextNode; capsOK?-parts; capsOK?-regOrd; capsOK?-setNode;
+  capsOK?-setNode-fresh)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (frameStep-+assoc-burst; frameStep-+assoc-caps; frameStep-chain-suc; frameStep-⊑-+;
   frameSz?-widen; pathSz?-⊑; valCaps?-size; valCaps?-wid; valCaps?-widen; valsCaps?-widen;
@@ -628,7 +632,7 @@ walk-empty : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} →
   WalkStmt {e = e} (emptyᵉ {t = u})
 walk-empty {u = u} c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
   2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
-  s2 fS rS ceil lb dmd gas lℓ rgs hps hib =
+  s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk =
   proj₁ CAPS
     , proj₁ (proj₂ CAPS)
     , proj₁ (proj₂ (proj₂ CAPS))
@@ -639,7 +643,7 @@ walk-empty {u = u} c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched s
     , refl , refl , refl , rgs
   where
   CAPS = subscribeE-caps c dep bud ops j g (emptyᵉ {t = u}) κ bid now sl sched st
-           2≤S 1≤R slEq slC slSz inv szb wdb pC lC nst hidx dpt hps hib
+           2≤S 1≤R slEq slC slSz inv szb wdb pC lC nst hidx dpt hps hib hord hpk
 
 -- A LITERAL'S PAYLOAD, WET, FROM THE CAPS RECEIPT PLUS ONE HYPOTHESIS.
 --
@@ -714,7 +718,7 @@ walk-of ts c Ψ F Ŝ R̂ G ℓ L̂ dep bud zero j g κ bid now sl sched st
   s2 fS rS ceil lb dmd gas lℓ rgs
 walk-of {Γ = Γ} {u = u} ts c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j g κ bid now sl sched st
   2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
-  s2 fS rS ceil lb dmd gas lℓ rgs hps hib =
+  s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk =
   proj₁ CAPS
     , proj₁ (proj₂ CAPS)
     , proj₁ (proj₂ (proj₂ CAPS))
@@ -734,7 +738,7 @@ walk-of {Γ = Γ} {u = u} ts c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j g κ
     , rgs
   where
   CAPS = subscribeE-caps c dep bud (suc ops′) j g (ofᵉ ts) κ bid now sl sched st
-           2≤S 1≤R slEq slC slSz inv szb wdb pC lC nst hidx dpt hps hib
+           2≤S 1≤R slEq slC slSz inv szb wdb pC lC nst hidx dpt hps hib hord hpk
   VALS = map (λ tm → evalTm tm) ts
   B′   = Caps.cSize (frameStep (j + proj₁ CAPS) c)
   EV   = evalTms-caps c j sl ts 2≤S slC (≤-trans (n≤1+n (sizeᵗˢ ts)) szb) wdb
@@ -779,7 +783,7 @@ walk-take-zero : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   evalTm cnt ≡ zero → WalkStmtAt {e = e} g (takeᵉ cnt b)
 walk-take-zero {u = u} g cnt b ecEq c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j κ bid now sl sched st
   2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
-  s2 fS rS ceil lb dmd gas lℓ rgs hps hib
+  s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk
   rewrite ecEq =
   let (j′ , a₁ , a₂ , a₃ , a₄ , a₅ , a₆ , a₇ , a₈ , a₉) =
         walk-empty c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
@@ -795,7 +799,7 @@ walk-take-zero {u = u} g cnt b ecEq c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j κ bid
           -- the source half is `refl` rather than a projection of `hib`:
           -- an empty source names no input at all, so it reads below
           -- every floor without asking what this chain's floor is
-          gas lℓ rgs hps refl
+          gas lℓ rgs hps refl hord hpk
   in j′ , a₁ , a₂ , a₃ , a₄ , a₅ , a₆
      -- the stream is given EXPLICITLY: left as `_` it is a meta Agda tries
      -- to solve by inverting burstHopD?'s foldr, which hits the inversion
@@ -1172,7 +1176,7 @@ walk-take-suc g cnt b k ecEq wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud zero j κ bid no
 walk-take-suc {n = n} {u = u} g cnt b k ecEq wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j
   κ bid now sl sched st
   2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
-  s2 fS rS ceil lb dmd gas lℓ rgs hps hib
+  s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk
   rewrite ecEq =
   suc (j₁ + j₂)
     , subst (λ x → capsOK? (frameStep x c)
@@ -1234,7 +1238,8 @@ walk-take-suc {n = n} {u = u} g cnt b k ecEq wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud 
   inv₀ = capsOK?-setNode (frameStep (suc j) c) nid ns sched₀ st refl refl refl
            (capsOK?-mono (frameStep j c) (frameStep (suc j) c) sched₀ st step⊑
               (capsOK?-nextNode (frameStep j c) (suc (Sched.nextNode sched))
-                                sched st inv))
+                                sched st (n≤1+n (Sched.nextNode sched)) inv))
+           (λ i h → refl)
   invW′ : INV? Ψ B′ sched₀ st₀ ≡ true
   invW′ = INV?-install Ψ (Caps.cSize (frameStep j c)) B′ nid ns sched sched₀ st
             (proj₁ step⊑) refl refl refl refl invW
@@ -1251,6 +1256,30 @@ walk-take-suc {n = n} {u = u} g cnt b k ecEq wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud 
   -- its stratification is that walk's, not a fact about this frame: a
   -- `take-f` names no term and parks nothing, which is why the frame's
   -- own two readings are `refl`
+  -- THE TWO READINGS ACROSS THE PUSH, and each is a different half of
+  -- the same fact: this frame's cell is FRESH.  The order half is the
+  -- push law at a cell the counter has just been raised past, so the
+  -- head's own charge against the counter is `≤-refl` and the tail's is
+  -- the reading it arrived with, moved up one.  The park half is the
+  -- MINT transport: nothing registered can name a cell at or above the
+  -- counter, so the install is invisible to the chain -- and a `take-f`
+  -- parks nothing itself, which is what makes its own conjunct `refl`
+  hordT : pathOrd? (suc nid) (take-f nid ↠ κ) ≡ true
+  hordT = pathOrd?-push (suc nid) (take-f nid) κ ≤-refl
+            (T⇒≡true (pathRead κ ≤ᵇ nid) (≤⇒≤ᵇ (pathOrd?-read nid κ hord)))
+            (pathOrd?-mono nid (suc nid) κ (n≤1+n nid) hord)
+  -- AND THE FRAME'S OWN HALF IS THE MINT'S OWNER READING: a `take-f`
+  -- parks nothing, so its store conjunct is `refl`, and it names the
+  -- cell this clause has just been handed at the counter, which no
+  -- registered chain can name
+  -- the frame's own indices are PINNED at every reading below: a
+  -- `take-f` names no term, so `framePark?` reduces its type index
+  -- away and neither side of the equation can solve it
+  hfpT : framePark? {s = u} {u = u} (pathFloor κ) (take-f nid) st₀ ≡ true
+  hfpT = ∧-intro (mint-regOwn _ (pathFloor κ) sched st inv) refl
+  hparkT : pathPark? (take-f nid ↠ κ) st₀ ≡ true
+  hparkT = ∧-intro hfpT
+                   (pathPark?-set-fresh nid κ nid ns st ≤-refl hord hpk)
   BSTR = subscribeE-burstStrat g b (take-f nid ↠ κ) bid now sched₀ st₀
            hpsT hibb
   SUB = wb c Ψ F Ŝ R̂ G′ ℓ L̂ dep bud ops′ (suc j)
@@ -1271,7 +1300,7 @@ walk-take-suc {n = n} {u = u} g cnt b k ecEq wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud 
           (hasAtLeast-mono (≤-trans sucG′≤G (n≤1+n G)) gas)
           (≤-trans (≤-reflexive (sym (+-suc (pathLen κ) G′)))
                    (≤-trans (+-monoʳ-≤ (pathLen κ) sucG′≤G) lℓ))
-          rgs hpsT hibb
+          rgs hpsT hibb hordT hparkT
   j₁  = proj₁ SUB
   a₁  = proj₁ (proj₂ SUB)
   a₂  = proj₁ (proj₂ (proj₂ SUB))
@@ -1284,6 +1313,12 @@ walk-take-suc {n = n} {u = u} g cnt b k ecEq wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud 
   a₉  = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SUB))))))))
   res = subscribeE g b (take-f nid ↠ κ) bid now sched₀ st₀
   ⊑₁  = frameStep-⊑-+ c 2≤S (suc j) j₁
+  RDT = subscribeE-readings g b (take-f nid ↠ κ) bid now sched₀ st₀ hordT hparkT
+  hpkT-post : pathPark? κ (proj₂ (proj₂ res)) ≡ true
+  hpkT-post = proj₂ (∧-true (framePark? {s = u} {u = u} (pathFloor κ)
+                               (take-f nid) (proj₂ (proj₂ res)))
+                            (pathPark? κ (proj₂ (proj₂ res)))
+                            (proj₂ RDT))
   PBc = pushBurst-caps c dep bud (suc j + j₁) g bid now (take-f nid) κ (proj₁ res)
           sl (proj₁ (proj₂ res)) (proj₂ (proj₂ res)) 2≤S 1≤R
           (trans (KeepsC.slotsEq
@@ -1294,7 +1329,13 @@ walk-take-suc {n = n} {u = u} g cnt b k ecEq wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud 
           a₂ a₃
           (≤-trans (burst-takef-zero g bid now nid κ (proj₁ res)
                       (proj₁ (proj₂ res)) (proj₂ (proj₂ res))) z≤n)
-          refl hps BSTR refl
+          refl hps BSTR
+          -- the frame's own reading carried across the subscribe: the
+          -- cell sits strictly below the counter the callee is handed,
+          -- so nothing the subscribe registers can name it
+          (subscribeE-framePark {s = u} {u = u} (pathFloor κ) g b
+             (take-f nid ↠ κ) bid now (take-f nid) sched₀ st₀ tt refl hfpT)
+          (proj₁ RDT) hpkT-post
   j₂  = proj₁ PBc
   PB  = pushBurst g bid now (take-f nid) κ (proj₁ res)
           (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
@@ -1369,7 +1410,7 @@ walk-map g f b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud zero j κ bid now sl sched st
 walk-map {n = n} {u = u} g f b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j
   κ bid now sl sched st
   2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
-  s2 fS rS ceil lb dmd gas lℓ rgs hps hib =
+  s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk =
   suc (j₁ + j₂)
     , subst (λ x → capsOK? (frameStep x c)
                      (proj₁ (proj₂ PB)) (proj₂ (proj₂ PB)) ≡ true)
@@ -1440,6 +1481,13 @@ walk-map {n = n} {u = u} g f b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j
                        (inputsBelowᵉ (pathFloor κ) b) hib)
   hpsM : pathStrat? (map-f f ↠ κ) ≡ true
   hpsM = ∧-intro hibf hps
+  -- A `map-f` NAMES NO CELL, so neither reading costs anything: the
+  -- order push is charged at cell zero against a counter it cannot
+  -- exceed, and the frame parks nothing
+  hordM : pathOrd? (Sched.nextNode sched) (map-f f ↠ κ) ≡ true
+  hordM = pathOrd?-push (Sched.nextNode sched) (map-f f) κ z≤n refl hord
+  hparkM : pathPark? (map-f f ↠ κ) st ≡ true
+  hparkM = ∧-intro refl hpk
   BSTR = subscribeE-burstStrat g b (map-f f ↠ κ) bid now sched st hpsM hibb
   SUB = wb c Ψ F Ŝ R̂ G′ ℓ L̂ dep bud ops′ (suc j)
           (map-f f ↠ κ) bid now sl sched st
@@ -1460,7 +1508,7 @@ walk-map {n = n} {u = u} g f b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j
           (hasAtLeast-mono (≤-trans sucG′≤G (n≤1+n G)) gas)
           (≤-trans (≤-reflexive (sym (+-suc (pathLen κ) G′)))
                    (≤-trans (+-monoʳ-≤ (pathLen κ) sucG′≤G) lℓ))
-          rgs hpsM hibb
+          rgs hpsM hibb hordM hparkM
   j₁  = proj₁ SUB
   a₁  = proj₁ (proj₂ SUB)
   a₂  = proj₁ (proj₂ (proj₂ SUB))
@@ -1473,6 +1521,7 @@ walk-map {n = n} {u = u} g f b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j
   a₉  = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SUB))))))))
   res = subscribeE g b (map-f f ↠ κ) bid now sched st
   ⊑₁  = frameStep-⊑-+ c 2≤S (suc j) j₁
+  RDM = subscribeE-readings g b (map-f f ↠ κ) bid now sched st hordM hparkM
   PBc = pushBurst-caps c dep bud (suc j + j₁) g bid now (map-f f) κ (proj₁ res)
           sl (proj₁ (proj₂ res)) (proj₂ (proj₂ res)) 2≤S 1≤R
           (trans (KeepsC.slotsEq
@@ -1483,7 +1532,7 @@ walk-map {n = n} {u = u} g f b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j
           (≤-trans (≤-trans lC (proj₁ step⊑)) (proj₁ ⊑₁))
           a₂ a₃
           (≤-trans (m≤n⊔m _ _) dpt)
-          hibf hps BSTR refl
+          hibf hps BSTR refl (proj₁ RDM) (proj₂ RDM)
   j₂  = proj₁ PBc
   PB  = pushBurst g bid now (map-f f) κ (proj₁ res)
           (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
@@ -1690,19 +1739,26 @@ walk-scan-source-tail : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
 walk-scan-source-tail {n = n} {u = u} g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j
   κ bid now sl sched st
   2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
-  s2 fS rS ceil lb dmd gas lℓ rgs hps hib =
+  s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk =
   SUB
   where
-  -- A SCAN SOURCE READING SPLITS THREE WAYS AND TWO OF THEM ARE SPENT
-  -- HERE: the fold's own function is what the minted frame reads by, and
-  -- the source is what the recursion reads by.  The SEED's half is spare
-  -- — the seed is evaluated into the node rather than named by the chain
+  -- A SCAN SOURCE READING SPLITS THREE WAYS AND ALL THREE ARE SPENT
+  -- HERE: the fold's own function is what the minted frame reads by, the
+  -- source is what the recursion reads by, and the SEED is what the cell
+  -- this clause installs is born holding -- so the frame's park reading
+  -- at the pushed chain's floor is that third half and nothing else
   hibf : inputsBelowᵗ (pathFloor κ) f ≡ true
   hibf = proj₁ (∧-true (inputsBelowᵗ (pathFloor κ) f)
                        (inputsBelowᵗ (pathFloor κ) z ∧
                         inputsBelowᵉ (pathFloor κ) b) hib)
   hibb : inputsBelowᵉ (pathFloor κ) b ≡ true
   hibb = proj₂ (∧-true (inputsBelowᵗ (pathFloor κ) z)
+                       (inputsBelowᵉ (pathFloor κ) b)
+                  (proj₂ (∧-true (inputsBelowᵗ (pathFloor κ) f)
+                                 (inputsBelowᵗ (pathFloor κ) z ∧
+                                  inputsBelowᵉ (pathFloor κ) b) hib)))
+  hibz : inputsBelowᵗ (pathFloor κ) z ≡ true
+  hibz = proj₁ (∧-true (inputsBelowᵗ (pathFloor κ) z)
                        (inputsBelowᵉ (pathFloor κ) b)
                   (proj₂ (∧-true (inputsBelowᵗ (pathFloor κ) f)
                                  (inputsBelowᵗ (pathFloor κ) z ∧
@@ -1765,16 +1821,31 @@ walk-scan-source-tail {n = n} {u = u} g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud
                          (T⇒≡true _ (≤⇒≤ᵇ capf)))
                 (pathB?-widen κ (proj₁ ⊑both) pB)
   inv₀ : capsOK? (frameStep (suc (j + j₀)) c) sched₀ st₀ ≡ true
-  inv₀ = capsOK?-setNode (frameStep (suc (j + j₀)) c) nid ns sched₀ st bnd refl
+  inv₀ = capsOK?-setNode-fresh (frameStep (suc (j + j₀)) c) nid nid ns sched₀ st
+           bnd refl
            (subst (λ y → widNode (Caps.cWid (frameStep (suc (j + j₀)) c)) y ns ≡ true)
                   (sym slEq)
                   (valCaps?-wid (frameStep (suc (j + j₀)) c) sl _ (evalTm z) VW))
            (capsOK?-mono (frameStep j c) (frameStep (suc (j + j₀)) c) sched₀ st ⊑both
               (capsOK?-nextNode (frameStep j c) (suc (Sched.nextNode sched))
-                                sched st inv))
+                                sched st (n≤1+n (Sched.nextNode sched)) inv))
+           (capsOK?-regOrd (frameStep j c) sched st inv) ≤-refl
   invW′ : INV? Ψ B′ sched₀ st₀ ≡ true
   invW′ = INV?-install Ψ (Caps.cSize (frameStep j c)) B′ nid ns sched sched₀ st
             (proj₁ ⊑both) refl refl bnd fnN invW
+  -- THE TWO READINGS ACROSS THE MINTED FRAME, the same pair the take
+  -- push owes and paid the same way -- except that a `scan-f` DOES park,
+  -- so its own conjunct is the seed's reading at the pushed chain's
+  -- floor rather than `refl`
+  hordS : pathOrd? (suc nid) (scan-f f nid ↠ κ) ≡ true
+  hordS = pathOrd?-push (suc nid) (scan-f f nid) κ ≤-refl
+            (T⇒≡true (pathRead κ ≤ᵇ nid) (≤⇒≤ᵇ (pathOrd?-read nid κ hord)))
+            (pathOrd?-mono nid (suc nid) κ (n≤1+n nid) hord)
+  hparkS : pathPark? (scan-f f nid ↠ κ) st₀ ≡ true
+  hparkS = ∧-intro (installNode-scanPark (pathFloor κ) f nid (evalTm z) st
+                      (mint-regOwn _ (pathFloor κ) sched st inv)
+                      (evalTm-strat (pathFloor κ) z hibz))
+                   (pathPark?-set-fresh nid κ nid ns st ≤-refl hord hpk)
   SUB = wb c Ψ F Ŝ R̂ G′ ℓ L̂ dep bud ops (suc (j + j₀))
           (scan-f f nid ↠ κ) bid now sl sched₀ st₀
           2≤S 1≤R hCR slEq slC slSz inv₀
@@ -1795,7 +1866,7 @@ walk-scan-source-tail {n = n} {u = u} g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud
           (hasAtLeast-mono (≤-trans sucG′≤G (n≤1+n G)) gas)
           (≤-trans (≤-reflexive (sym (+-suc (pathLen κ) G′)))
                    (≤-trans (+-monoʳ-≤ (pathLen κ) sucG′≤G) lℓ))
-          rgs (∧-intro hibf hps) hibb
+          rgs (∧-intro hibf hps) hibb hordS hparkS
 
 -- THE SOURCE HALF, ASSEMBLED.  Both conjuncts are the frame leaf's,
 -- lifted from headline to hereditary — free, per `valHopSpn?-intro`.
@@ -1806,7 +1877,7 @@ walk-scan-source g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud zero j κ bid now sl
   2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst () dpt
 walk-scan-source g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j κ bid now sl sched st
   2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
-  s2 fS rS ceil lb dmd gas lℓ rgs hps hib =
+  s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk =
   burstHopSpnH-intro F (slotHop F sl) (pmᵗ F 0 f) BND
     (hopDᵉ F (slotHop F sl) b) (proj₁ r)
     (m≤n+m (hopDᵉ F (slotHop F sl) b)
@@ -1824,7 +1895,7 @@ walk-scan-source g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j κ bi
   SRC = walk-scan-source-tail g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops′ j
           κ bid now sl sched st
           2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
-          s2 fS rS ceil lb dmd gas lℓ rgs hps hib
+          s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk
   frB = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SRC)))))))
   -- THE NODE HALF, AND IT IS NOW GAPLESS.  `mint-install-survives`
   -- (.Node-Fresh) is exactly this shape — mint, install, subscribe under a
@@ -1853,7 +1924,7 @@ walk-scan-hop-spn : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   (b : Closed Γ s) (wb : WalkStmtAt {e = e} g b) → WalkStmtᴴˢ {e = e} g f z b
 walk-scan-hop-spn g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j κ bid now sl sched st
   2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
-  s2 fS rS ceil lb dmd gas lℓ rgs hps hib =
+  s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk =
   proj₁ (pushBurst-scan-hopSpn F (slotHop F sl) (pmᵗ F 0 f) BND
            g bid now f (proj₁ (mintNode sched)) κ
            (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
@@ -1867,7 +1938,7 @@ walk-scan-hop-spn g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j κ bid now sl
         (installNode (proj₁ (mintNode sched)) (scan-st (evalTm z)) st)
   src = walk-scan-source g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j κ bid now sl sched st
           2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
-          s2 fS rS ceil lb dmd gas lℓ rgs hps hib
+          s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk
 
 -- THE EIGHT OTHER CONJUNCTS OF THE scan CLAUSE, ASSEMBLED — and after
 -- the source tail above it is `walk-map`'s clause with three
@@ -1916,7 +1987,7 @@ walk-scan-rest g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud zero j κ bid now sl s
 walk-scan-rest {n = n} {u = u} g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j
   κ bid now sl sched st
   2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
-  s2 fS rS ceil lb dmd gas lℓ rgs hps hib =
+  s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk =
   j₀ + suc (j₁ + j₂)
     , subst (λ x → capsOK? (frameStep x c)
                      (proj₁ (proj₂ PB)) (proj₂ (proj₂ PB)) ≡ true)
@@ -1962,7 +2033,7 @@ walk-scan-rest {n = n} {u = u} g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc o
   SRC = walk-scan-source-tail g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops′ j
           κ bid now sl sched st
           2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
-          s2 fS rS ceil lb dmd gas lℓ rgs hps hib
+          s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk
   -- the same three-way split the source tail makes, and made again here
   -- rather than threaded out of it: the tail's Σ reports conjuncts, not
   -- the readings it was handed
@@ -2004,6 +2075,21 @@ walk-scan-rest {n = n} {u = u} g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc o
   monoJ = frameStep-mono-j c 2≤S j≤J
   BSTR = subscribeE-burstStrat g b (scan-f f nid ↠ κ) bid now sched₁ st₀
            (∧-intro hibf hps) hibb
+  -- THE TWO READINGS ACROSS THE MINTED CELL, the same pair the source
+  -- tail owes and paid the same way -- the tail's Σ reports conjuncts
+  -- rather than the readings it was handed, so they are rebuilt here
+  hordZ : pathOrd? (suc nid) (scan-f f nid ↠ κ) ≡ true
+  hordZ = pathOrd?-push (suc nid) (scan-f f nid) κ ≤-refl
+            (T⇒≡true (pathRead κ ≤ᵇ nid) (≤⇒≤ᵇ (pathOrd?-read nid κ hord)))
+            (pathOrd?-mono nid (suc nid) κ (n≤1+n nid) hord)
+  hparkZ : pathPark? (scan-f f nid ↠ κ) st₀ ≡ true
+  hparkZ = ∧-intro (installNode-scanPark (pathFloor κ) f nid (evalTm z) st
+                      (mint-regOwn _ (pathFloor κ) sched st inv)
+                      (evalTm-strat (pathFloor κ) z hibz))
+                   (pathPark?-set-fresh nid κ nid (scan-st (evalTm z)) st
+                      ≤-refl hord hpk)
+  RDZ = subscribeE-readings g b (scan-f f nid ↠ κ) bid now sched₁ st₀
+          hordZ hparkZ
   PBc = pushBurst-caps c dep bud (J₀ + j₁) g bid now (scan-f f nid) κ
           (proj₁ res) sl (proj₁ (proj₂ res)) (proj₂ (proj₂ res)) 2≤S 1≤R
           (trans (KeepsC.slotsEq
@@ -2022,9 +2108,11 @@ walk-scan-rest {n = n} {u = u} g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc o
           -- the frame names sits strictly below the watermark the callee
           -- is handed
           (subscribeE-framePark (pathFloor κ) g b (scan-f f nid ↠ κ) bid now
-             (scan-f f nid) sched₁ st₀ ≤-refl
+             (scan-f f nid) sched₁ st₀ ≤-refl refl
              (installNode-scanPark (pathFloor κ) f nid (evalTm z) st
+                (mint-regOwn _ (pathFloor κ) sched st inv)
                 (evalTm-strat (pathFloor κ) z hibz)))
+          (proj₁ RDZ) (proj₂ (∧-true _ _ (proj₂ RDZ)))
   j₂  = proj₁ PBc
   ⊑₂  = frameStep-⊑-+ c 2≤S (J₀ + j₁) j₂
   PB  = pushBurst g bid now (scan-f f nid) κ (proj₁ res)
@@ -2057,11 +2145,11 @@ walk-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   WalkStmtAt {e = e} g (scanᵉ f z b)
 walk-scan g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j κ bid now sl sched st
   2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
-  s2 fS rS ceil lb dmd gas lℓ rgs hps hib =
+  s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk =
   let (j′ , a₁ , a₂ , a₃ , a₄ , a₅ , a₆ , a₇ , a₈) =
         walk-scan-rest g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j κ bid now sl sched st
           2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
-          s2 fS rS ceil lb dmd gas lℓ rgs hps hib
+          s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk
       -- the frame the burst's SIZE receipt is stated at sits under Ŝ:
       -- a₄ puts j + j′ under opIterD, `lb` puts that under L̂, and
       -- frameStep is monotone in its index, so `ceil` closes it
@@ -2082,7 +2170,7 @@ walk-scan g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j κ bid now sl sched s
           (proj₁ (subscribeE g (scanᵉ f z b) κ bid now sched st))
           (walk-scan-hop-spn g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j κ bid now sl sched st
              2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
-             s2 fS rS ceil lb dmd gas lℓ rgs hps hib))
+             s2 fS rS ceil lb dmd gas lℓ rgs hps hib hord hpk))
    , a₇ , a₈
 
 switchKill-closes-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}

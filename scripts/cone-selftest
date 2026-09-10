@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+# PROVES cone-check IS LOAD-BEARING, and -- the harder half -- that it stays
+# QUIET on the four shapes an ordinary day is made of.  A check that fired on a
+# comment, on a shallow module, or on an edit that removed something would be
+# worse than not having it: it would fire on most of the work, and a rule that
+# fires on most of the work is one people learn to route around.
+#
+# The scratch repo is built with an explicit module graph so the cone sizes are
+# known rather than measured -- DEEP is imported by ten modules, SHALLOW by
+# none -- and --threshold reads them at a size a fixture can actually reach.
+set -u
+
+CHECK="$(cd "$(dirname "$0")" && pwd)/check-cone-adds.py"
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+fail=0
+T=5
+
+run() { "$CHECK" --root "$TMP" --threshold "$T" >/dev/null 2>&1; }
+expect() {  # expect <want-exit> <label>
+  local want="$1" label="$2" got
+  run; got=$?
+  if [ "$got" -ne "$want" ]; then
+    echo "SELFTEST FAIL: $label (wanted exit $want, got $got)"; fail=1
+  fi
+}
+
+mkdir -p "$TMP/agda/src/Rx"
+cd "$TMP" || exit 1
+git init -q -b main .
+git config user.email t@t; git config user.name t
+
+printf 'module Rx.Deep where\nx : Set\nx = Set\n'      > agda/src/Rx/Deep.agda
+printf 'module Rx.Shallow where\ny : Set\ny = Set\n'   > agda/src/Rx/Shallow.agda
+for i in 1 2 3 4 5 6 7 8 9 10; do
+  printf 'module Rx.C%s where\nopen import Rx.Deep\n' "$i" > "agda/src/Rx/C$i.agda"
+done
+git add -A && git commit -qm base
+git checkout -qb leg
+
+# FIRES: a purely additive edit to a module ten others import.
+printf 'z : Set\nz = Set\n' >> agda/src/Rx/Deep.agda
+expect 1 "a purely additive edit to a deep module did not fire"
+
+# QUIET: the same addition once something existing is also removed -- the cone
+# bill is already owed, so the addition rides along free.
+# the removal is done with grep and a rename rather than `sed -i`, whose
+# in-place flag takes a mandatory suffix on BSD and none on GNU -- so the
+# GNU spelling read the FILENAME as the script here and this selftest was
+# red on macOS while green in CI, which is the worst way for a checker's
+# own selftest to fail
+grep -v '^x = Set$' agda/src/Rx/Deep.agda > agda/src/Rx/Deep.agda.tmp
+mv agda/src/Rx/Deep.agda.tmp agda/src/Rx/Deep.agda
+expect 0 "an addition alongside a removal fired"
+git checkout -q -- agda/src/Rx/Deep.agda
+
+# QUIET: a COMMENT added to the deep module.  This is the one that matters --
+# the repo mandates `-- PROBED` receipts and `-- DEAD ROUTE` lines in exactly
+# these headers, and the stripped mirror is invariant under them.
+printf -- '-- PROBED: covered at the two degenerate shapes\n' >> agda/src/Rx/Deep.agda
+expect 0 "a comment added to a deep module fired"
+git checkout -q -- agda/src/Rx/Deep.agda
+
+# QUIET: the same addition to a module nothing imports.
+printf 'w : Set\nw = Set\n' >> agda/src/Rx/Shallow.agda
+expect 0 "an addition to a shallow module fired"
+git checkout -q -- agda/src/Rx/Shallow.agda
+
+# QUIET: a brand-new module, which is the repair the check ASKS for -- so it
+# must never itself be the finding.
+printf 'module Rx.New where\nopen import Rx.Deep\nq : Set\nq = Set\n' > agda/src/Rx/New.agda
+expect 0 "creating a new module -- the repair -- fired"
+
+[ "$fail" -eq 0 ] && echo "cone-selftest: OK"
+exit "$fail"

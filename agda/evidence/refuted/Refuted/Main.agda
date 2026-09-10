@@ -24,8 +24,10 @@ open import Refuted.Admit-Entry-Reading
          badParkChain-ordered; badParkChain-unparked; shareLatch-keeps-park;
          cascadeLatch-keeps-park; shareAdmit-ord-absurd;
          cascade-admit-ord-absurd; shareAdmit-park-absurd;
-         cascade-admit-park-absurd; ordSt-capsOK; parkSt-capsOK;
-         regOrd-from-caps-absurd; regPark-from-caps-absurd)
+         cascade-admit-park-absurd)
+open import Refuted.Frame-Park-From-Caps
+  using (stᶠ-capsOK; badFrame-stratified; badFrame-unparked;
+         frame-park-from-caps-absurd)
 open import Refuted.Hop-Drag
   using (hop-drag-absurd)
 open import Refuted.Cut-Through
@@ -225,6 +227,10 @@ open import Refuted.Subscribe-Sz-Mu
 open import Refuted.Chain-Step-Regs-Cap
   using (ChainStepRegsSz; figures≡; regLens≡; premSz; premPath; premReg;
          row≡false; chain-step-regs-cap-absurd)
+open import Refuted.Fan-Regs-Entry-Cap
+  using (FanRegsMintGeneric; regLens≡; stepped≡; prem2≤; prem1≤reg;
+         premReg≤; premSlots; premSlotsCaps; premSlotsSz; premCaps;
+         row≡false; fan-regs-entry-cap-absurd)
 open import Refuted.Arr-Cap-Step
   using (cA; ArrCapStep; arr-cap-step-absurd; arr-cap-step-wide-absurd)
 open import Refuted.Nest-Clos-Flat
@@ -296,3 +302,10 @@ open import Refuted.Subscribe-Store-Scan-Arrivals
          subscribeE-sz-store-scan-absurd; subscribeE-sz-store-absurd)
 open import Refuted.Subscribe-Frame-Park
   using (before≡true; after≡false; subscribeE-framePark-absurd)
+
+open import Refuted.MergeAllDrain-OwnerQueue
+  using (mergeAllDrain-ownerQueue-absurd)
+
+open import Refuted.SetNode-Two-Floor
+  using (floors; pricedFloor; pricedOK; sunkBad; parkedBefore; parkedAfter;
+         stratOK; ordOK; ownBad; setNode-two-floor-absurd)

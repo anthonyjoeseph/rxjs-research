@@ -66,6 +66,8 @@ open import Verify-Budget-Sufficient.Measures using
   fnCapBounded?; fnCapLive; fnCapᵉ; fnCapᵛ; hasDry-append; hopR; INV-parts; INV?; parkRoom;
   pathB?; pathLen; pop-bounded; pop-nextSource; pop-slots; pow1; regsB?; slotsFnCap; stBounded?; unconn; valB?;
   valB?-widen; V≤C; ΨAt; ∧-true; szB)
+open import Verify-Budget-Sufficient.Pop-Node using
+  (pop-nextNode)
 open import Verify-Budget-Sufficient.Keeps-Ring using
   (subscribeE-slots)
 open import Verify-Budget-Sufficient.Wet.Part6 using
@@ -83,8 +85,9 @@ open import Verify-Budget-Sufficient.Wet.Part3 using
 open import Verify-Budget-Sufficient.Subscribe-Face using
   (innerFinish-caps; subscribeE-caps; subscribeInner-caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
-  (burstCaps?; burstCount?; capsOK?; capsOK?-mono; n≤capsAt-size; pathFloor; pathSz?;
-   pathStrat?; regsSz?; regStrat?; slotsCaps?; srcFloor?; valCaps?; widLive; widNode; widNode-len;
+  (burstCaps?; burstCount?; capsOK?; capsOK?-mono; n≤capsAt-size; pathFloor; pathOrd?;
+   pathPark?; pathSz?;
+   pathStrat?; regOrd?; regsSz?; regStrat?; slotsCaps?; srcFloor?; valCaps?; widLive; widNode; widNode-len;
    nestClosOK?ᵛ; closLive; closSt?)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (valCaps?-size)
@@ -103,10 +106,11 @@ open import Verify-Budget-Sufficient.Caps-Face.Part7.Depth-Fit using
 open import Verify-Budget-Sufficient.Caps-Nest using
   (nest; nest≤)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
-  (capsOK?-clos; capsOK?-count; capsOK?-parts; capsOK?-regs; chainsStrat?-one;
+  (capsOK?-clos; capsOK?-count; capsOK?-parts; capsOK?-regOrd; capsOK?-regPark; capsOK?-regs;
+  chainsStrat?-one;
   registry-entStrat; slotsCaps?-capsAt)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves using
-  (chainsOf-strat)
+  (cascade-admit-ord; cascade-admit-park; chainsOf-strat)
 
 -- the depth mirror (S4's currency)
 -- `depthChain` joins `depthE` here because `dry-tick`'s assembly consumes
@@ -134,7 +138,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Nest-Arith
 open import Verify-Budget-Sufficient.Burst-Walk.Burst-Face
   using (cascadeGo-nodry)
 open import Verify-Budget-Sufficient.Psi-Split using
-  (pathBΨ?; pathBΨ?-of; regsB?-of-parts; regsBΨ?; regsBΨ?-of)
+  (chP?-∧; pathBΨ?; pathBΨ?-of; regsB?-of-parts; regsBΨ?; regsBΨ?-of)
 -- the wet contract itself, stated over the COLLAPSED walk.
 -- It lives one arrow above .Wet and .Subscribe-Face because its
 -- statement is the only one reading BOTH vocabularies; this module is
@@ -608,6 +612,14 @@ dry-tick {n = n} {e = e} a id sched st inv val pre nok bnd valC closC strC =
     -- already carries
     (chainsOf-strat a st (registry-entStrat c sched st pre))
     (chainsStrat?-one (arrVal a) (chainsOf a st) strC)
+    -- and the chain's two entry readings, both filters of the registry's
+    -- own.  The order half is state-blind, so the latch does not move it;
+    -- the park half is taken AT the latched state, which is the state the
+    -- cascade walk enters
+    (chP?-∧ (λ {u} κ → pathOrd? (Sched.nextNode sched) κ)
+            (λ {u} κ → pathPark? κ latched) chains
+       (cascade-admit-ord a sched st (capsOK?-regOrd c sched st pre))
+       (cascade-admit-park a st (capsOK?-regPark c sched st pre)))
   where
   sl      = Sched.slots sched
   Ψ       = ΨAt e sl
@@ -669,6 +681,11 @@ sub-charge : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   suc (sizeᵉ b) ≤ ops →
   pathStrat? κ ≡ true →
   inputsBelowᵉ (pathFloor κ) b ≡ true →
+  -- and the two entry readings, forwarded verbatim to `subscribeE-caps`:
+  -- this statement only charges the level, so it neither reads nor moves
+  -- either one, and passing them on is the whole of its business with them
+  pathOrd? (Sched.nextNode sched) κ ≡ true →
+  pathPark? κ st ≡ true →
   let r = subscribeE g b κ bid now sched st in
   Σ ℕ λ j′ →
     (capsOK? (frameStep (j + j′) c) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
@@ -677,13 +694,13 @@ sub-charge : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     × (j′ ≤ opIterD (Caps.cSize c) (Caps.cWid c)
                      (depthE g b κ bid now sched st) bud ops j)
 sub-charge {n = n} c bud ops j g b κ bid now sl sched st
-           2≤S 1≤R slEq slC slSz capOK szB dwB pκ pLen nB opsB hps hib =
+           2≤S 1≤R slEq slC slSz capOK szB dwB pκ pLen nB opsB hps hib hord hpk =
   j′ , capOut , burC , burN , ≤-trans (m≤n+m j′ j) jj′≤
   where
   IH   = subscribeE-caps c (depthE g b κ bid now sched st) bud ops j g b κ
                           bid now sl sched st
                           2≤S 1≤R slEq slC slSz capOK szB dwB pκ pLen nB opsB
-                          ≤-refl hps hib
+                          ≤-refl hps hib hord hpk
   j′    = proj₁ IH
   capOut = proj₁ (proj₂ IH)
   burC  = proj₁ (proj₂ (proj₂ IH))
@@ -1334,7 +1351,14 @@ pop-caps {n = n} c sched st eq h with capsOK?-parts c sched st h
                   (sym (pop-slots sched eq)) pk)
   (∧-intro (pop-closSt c sched st eq cl)
   (∧-intro (subst (λ x → (n ≤ᵇ x) ≡ true) (sym (pop-nextSource sched eq)) fl)
-           rs)))))))
+  -- THE REGISTRY'S THREE READINGS.  Two are state-only and survive the
+  -- pop untouched; the order fold is keyed on the node counter, which
+  -- the pop copies, so it transports along `pop-nextNode` exactly as
+  -- the source floor transports along `pop-nextSource` one line up
+  (∧-intro (proj₁ rs)
+  (∧-intro (subst (λ x → regOrd? x (EvalSt.registry st) ≡ true)
+                  (sym (pop-nextNode sched eq)) (proj₁ (proj₂ rs)))
+           (proj₂ (proj₂ rs)))))))))))
 
 ------------------------------------------------------------------
 -- § 3  THE ASSEMBLY.  The fuel loop and the theorem, with `capsOK?`
@@ -1886,6 +1910,8 @@ subscribeE-wet-via-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
      depthE g b κ id now sched st ≤ capsH e sl id →        -- depOK
      pathStrat? κ ≡ true →
      inputsBelowᵉ (pathFloor κ) b ≡ true →
+     pathOrd? (Sched.nextNode sched) κ ≡ true →
+     pathPark? κ st ≡ true →
      let r   = subscribeE g b κ id now sched st
          sl′ = Sched.slots (proj₁ (proj₂ r))
      in (hasDry (proj₁ r) ≡ false)
@@ -1895,7 +1921,7 @@ subscribeE-wet-via-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
                    (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
 subscribeE-wet-via-caps {n = n} {e = e} g b κ id now sched st
                         inv pathB pathSzκ lenκ szB fnB gas cOK dW
-                        nestOK opsOK depOK hps hib =
+                        nestOK opsOK depOK hps hib hord hpk =
   dry , invOut , capsOut
   where
   sl      = Sched.slots sched
@@ -1920,7 +1946,7 @@ subscribeE-wet-via-caps {n = n} {e = e} g b κ id now sched st
   -- hypothesis of THIS definition, so they ride through unchanged.
   wet     = subscribeE-wet g b κ id now sched st
                            inv pathB pathSzκ lenκ szB fnB gas cOK dW
-                           nestOK opsOK depOK hps hib
+                           nestOK opsOK depOK hps hib hord hpk
   dry     : hasDry (proj₁ r) ≡ false
   dry     = proj₁ wet
   invOut  : INV? (ΨAt e (Sched.slots sched′))
@@ -1955,6 +1981,8 @@ subscribeE-wet-via-caps {n = n} {e = e} g b κ id now sched st
                   ≤-refl
                   hps
                   hib
+                  hord
+                  hpk
 
   j′      = proj₁ IH
   capOut  = proj₁ (proj₂ IH)
@@ -2077,6 +2105,8 @@ burst-all {n = n} e ins =
     (depthE≤capsH-root e ins)
     refl                                          -- pathStrat? root
     (T⇒≡true (inputsBelowᵉ n e) (ib-topᵉ e))
+    refl                                          -- pathOrd? _ root
+    refl                                          -- pathPark? root _
   where
   -- the guard repair (`3 + k ≤ S`, Op-Budget) asks for ONE unit more
   -- than capsAt-base-size gives; capsAt-base-size⁺ supplies it

@@ -166,3 +166,16 @@ open import Probed.Drain-Count-Slot
 
 open import Probed.Cell-Chain-Store
   using (chainFigures≡; chainNodes≡; chainRows≡; chainPrem≡; tieCellChain)
+
+open import Probed.Kill-Consume-Readings
+  using (st₁-node; thruConclusions₂≡; thruConclusions₁-full≡;
+         tieSwitchKillNothing; tieSwitchKillJust;
+         tieThruConsumeIdentity; tieSubscribeInnerG0)
+
+open import Probed.ThruConsume-CellPark
+  using (tie)
+
+open import Probed.FramePark-Step
+  using (tieScanTransport; tieScanBought; tieThruEnqueue; tieMapFree;
+         tieInnerResidue; tieInnerGassed; residue≡; residueGassed≡;
+         lowFloorPre; lowFloorPost)

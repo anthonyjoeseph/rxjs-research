@@ -2,43 +2,49 @@
 -- framePark-step … shareAdmit-park
 module Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves where
 
-open import Data.Bool    using (Bool; true; _∧_)
+open import Data.Bool    using (Bool; true; false; _∧_; _∨_)
+open import Data.Bool.Properties using (∨-zeroʳ)
 open import Data.Fin     using (Fin; toℕ)
 open import Data.List    using (List; map; [])
-open import Data.Bool.ListAction using (all)
-open import Data.Maybe   using (just; nothing)
-open import Data.Nat     using (ℕ; suc; _≤_; _≤ᵇ_; _⊔_)
-open import Data.Nat.Properties using (≤-refl; ≤-trans; ≤ᵇ⇒≤; m≤m⊔n; m≤n⊔m)
+open import Data.Bool.ListAction using (all; any)
+open import Data.Maybe   using (Maybe; just; nothing)
+open import Data.Nat     using (ℕ; suc; _≤_; _≤ᵇ_; _≡ᵇ_)
+open import Data.Nat.Properties using (≤-refl; ≤-trans; ≤ᵇ⇒≤; m≤m⊔n; m≤n⊔m; n≤1+n)
 open import Data.Unit    using (⊤; tt)
 open import Data.Vec     using (lookup)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; cong)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 open import Relation.Nullary using (yes; no)
 
-open import Rx.Prim      using (Tick; Id; Gas; Source; InstEvent)
+open import Rx.Prim      using (Tick; Id; Gas; g0; gs; Source; InstEvent)
 open import Rx.Exp       using
   (Ctx; Closed; Val; Fn; Tm; _×ᵗ_; obs; applyFn; evalTm; _≟ᵗ_; inputsBelowᵉ;
    inputsBelowᵗ; inputsBelowᵛ)
 open import Rx.Evaluator using
-  (Frame; Path; Sched; EvalSt; RegId; _↠_; root; share-sink;
-   stepFrame; subscribeE;
-   foldPath; shareAdmit; shareLatch; NodeId; AllOp; scanVals; lookupNode;
-   installNode;
-   scan-st; take-st; mergeAll-st; switch-st; exhaust-st;
-   map-f; scan-f; take-f; from-inner; thru-outer;
-   Arrival; arrTy; chainsOf; chainStep; cascadeLatch)
+  (Frame; Path; Sched; EvalSt; RegId; _↠_; root; share-sink; stepFrame; subscribeE; foldPath;
+  shareAdmit; shareLatch; NodeId; NodeState; AllOp; lookupNode; thruConsume; mergeAllDrain;
+  subscribeInner; installNode; scan-st; take-st; mergeAll-st; switch-st; exhaust-st; map-f;
+  scan-f; take-f; from-inner; thru-outer; Arrival; arrTy; chainsOf; chainStep; cascadeLatch;
+  frameNodes; pathHasNode; switchKill)
 open import Verify-Budget-Sufficient.Caps using (Caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
-  (burstStrat?; capsOK?; framePark?; frameStrat?; parkStrat?; pathFloor;
-   pathPark?; pathStrat?; regStrat?)
-open import Verify-Budget-Sufficient.Caps-Face.Part4 using (valsStrat?)
-open import Decide using (∧-intro; ∧-trueˡ; ∧-trueʳ; ≤ᵇ-widen; T-to)
+  (burstStrat?; capsOK?; framePark?; frameAbove?; frameRead; frameStrat?; parkStrat?; pathCell;
+  pathFloor; pathOrd?; pathOrd?-mono; pathOrd?-read; pathPark?; pathRead; pathStrat?; regOrd?;
+  regPark?; regPark?-nodes; regStrat?; regOwn?; pathOwn?;
+  frameParked?; frameOwned?; frameParked?-nodes; any-all; all-any; regOwn?-fresh)
+open import Verify-Budget-Sufficient.Keeps-Ring using (switchKill-nodes)
+open import Verify-Budget-Sufficient.Delivery-Walk using
+  (chainsGo-chQ; shareAdmit-chQ)
+open import Verify-Budget-Sufficient.Caps-Face.Part4 using (valsStrat?; capsOK?-regOrd)
+open import Verify-Budget-Sufficient.Caps-Face.Part5 using (scanVals-strat)
+open import Decide using (∧-intro; ∧-trueˡ; ∧-trueʳ; T-to)
 open import Verify-Budget-Sufficient.Node-Fresh using
-  (FreshC; frameAbove; stepFrame-fresh; subscribeE-nodes-below)
+  (FreshC; frameAbove; frozen-setNode; stepFrame-fresh; subscribeE-fresh;
+   subscribeE-nodes-below)
 open import Verify-Budget-Sufficient.Node-Table using (lookupNode-setNode)
 open import Verify-Budget-Sufficient.Delivery-Counter using
   (foldPath-nextNode; chainStep-nextNode)
-open import Verify-Budget-Sufficient.Measures using (∧-true; all-impl)
+open import Verify-Budget-Sufficient.Measures using (∧-true; all-impl; cutThrough-all)
 
 -- THE TWO FACTS THE STRATIFICATION THREAD CANNOT GET BY REDUCTION, and
 -- they sit together because they fail for the same reason: each is
@@ -52,12 +58,13 @@ open import Verify-Budget-Sufficient.Measures using (∧-true; all-impl)
 -- it.  Every other site holds a frame constructor and pays by `refl`.
 --
 -- WHY BOTH THE PAYLOAD AND THE CLOSURE ARE HYPOTHESES, and they are
--- not there for the same reason.  TWO frame shapes name a node and
+-- not there for the same reason.  THREE frame shapes name a node and
 -- their writes are not alike.  A `from-inner` reinstalls a queue whose
--- residue is a SUFFIX of what was read, so an `all`-shaped reading
--- survives it outright; what could break that one is an ENQUEUE, and
--- the only thing enqueued is an observable the frame's own payload
--- carried, which is exactly what the vals premise reads.  A `scan-f`
+-- residue is a SUFFIX of what was read and a `thru-outer` APPENDS to
+-- one, so an `all`-shaped reading survives both outright; what could
+-- break either is the ENQUEUE, and the only thing enqueued is an
+-- observable the frame's own payload carried, which is exactly what
+-- the vals premise reads.  A `scan-f`
 -- OVERWRITES its cell with the frame's closure applied to that
 -- payload, so no part of the old reading survives and the new one is
 -- bought rather than transported -- by the closure premise, without
@@ -65,16 +72,17 @@ open import Verify-Budget-Sufficient.Measures using (∧-true; all-impl)
 -- one sanctioned justification for a premise: the conditioned form
 -- REPLACES a false statement rather than weakening a true one.
 -- WHICH CELLS THE PARK READING WILL ASK ABOUT, as a bound on their ids.
--- Only two frame shapes name a node, so this is the exact DUAL of the
--- freshness ring's own frame predicate: that one says which cell a
+-- Only three frame shapes name a node, so this is the exact DUAL of
+-- the freshness ring's own frame predicate: that one says which cell a
 -- frame WRITES and asks it to sit at or above a watermark, this says
 -- which cell a frame READS and asks it to sit strictly below one.  The
--- three silent shapes are free because the reading does not reach the
+-- two silent shapes are free because the reading does not reach the
 -- store at them at all, which is the same economy that lets most call
 -- sites discharge the reading itself by `refl`.
 parkBelow : ∀ {n} {Γ : Ctx n} {s u} → ℕ → Frame Γ s u → Set
 parkBelow w (from-inner _ allNid _) = suc allNid ≤ w
 parkBelow w (scan-f _ nd)           = suc nd ≤ w
+parkBelow w (thru-outer _ nid)      = suc nid ≤ w
 parkBelow w _                       = ⊤
 
 -- THE SAME READING OVER A WHOLE CHAIN, as a bound on the cells the chain
@@ -87,57 +95,30 @@ pathBelow w root           = ⊤
 pathBelow w (share-sink _) = ⊤
 pathBelow w (f ↠ p)        = parkBelow w f × pathBelow w p
 
--- AND THE SMALLEST WATERMARK THAT WORKS, COMPUTED RATHER THAN GUESSED.
--- The two predicates above ask a caller for a bound; this hands one
--- back, so the existential a transport used to carry disappears and the
--- caller picks nothing.  A frame that reaches no cell contributes zero,
--- which is the same economy that makes three of the five shapes free
--- above.
-frameRead : ∀ {n} {Γ : Ctx n} {s u} → Frame Γ s u → ℕ
-frameRead (from-inner _ allNid _) = suc allNid
-frameRead (scan-f _ nd)           = suc nd
-frameRead _                       = 0
-
-pathRead : ∀ {n} {Γ : Ctx n} {u t} → Path Γ u t → ℕ
-pathRead root           = 0
-pathRead (share-sink _) = 0
-pathRead (f ↠ p)        = frameRead f ⊔ pathRead p
-
--- AND THE WRITE SIDE AS A DECISION, which is what lets a chain's
--- ordering be a BOOLEAN conjunct of the walk instead of a Σ.  The
--- difference is not cosmetic: the fan-out and the cascade hold LISTS of
--- chains and owe every reading pointwise through `all`, which takes a
--- predicate into `Bool` and cannot take one into `Set`.  Every arm of
--- the freshness ring's own frame predicate is a comparison of numerals,
--- so the decision is that predicate with `≤ᵇ` for `≤`.
-frameAbove? : ∀ {n} {Γ : Ctx n} {s u} → ℕ → Frame Γ s u → Bool
-frameAbove? w (map-f _)          = true
-frameAbove? w (scan-f _ nid)     = w ≤ᵇ nid
-frameAbove? w (take-f nid)       = w ≤ᵇ nid
-frameAbove? w (from-inner _ a i) = (w ≤ᵇ a) ∧ (w ≤ᵇ i)
-frameAbove? w (thru-outer _ nid) = w ≤ᵇ nid
-
--- A CHAIN IS ORDERED WHEN EVERY FRAME WRITES AT OR ABOVE WHAT THE REST
--- OF IT READS, and the watermark each hop spends is the tail's own
--- reading rather than a witness someone supplies.  It is true of a
--- chain the evaluator BUILT, since a subscribe descends outward-in and
--- a head is therefore minted after everything under it -- but nothing
--- in a frame's type ties it to the path beside it, so the fact is
--- carried and not derived.
---
--- AND THE SCHEDULER'S COUNTER IS THE SAME FACT ABOUT CELLS THAT DO NOT
--- EXIST YET.  A step may mint, and it mints from the counter up, so a
--- tail reading below the counter is a tail no minting can reach.  The
--- caps receipt cannot supply this: it is INDIFFERENT to the counter,
--- which `capsOK?-nextNode` states outright by setting the field
--- arbitrarily and preserving the invariant.
-pathOrd? : ∀ {n} {Γ : Ctx n} {u t} → ℕ → Path Γ u t → Bool
-pathOrd? nx root           = true
-pathOrd? nx (share-sink _) = true
-pathOrd? nx (f ↠ p)        =
-  (pathRead p ≤ᵇ nx) ∧ frameAbove? (pathRead p) f ∧ pathOrd? nx p
-
 postulate
+  -- PROBED: `Probed.FramePark-Step`.  Both ways a `scan-f`'s conclusion
+  --   can be reached, separated: a closure that keeps the accumulator,
+  --   where the post-state reading IS the pre-state one and the answer
+  --   comes from the entry premise, and one that discards it and
+  --   manufactures a reference, where the entry premise says nothing
+  --   and the answer comes from the closure premise alone.  That is the
+  --   header's transported-versus-bought claim instantiated at each of
+  --   the cases it distinguishes.  Plus the `thru-outer` ENQUEUE at a
+  --   capacity-zero flatten, and a `map-f` row labelled DEGENERATE
+  --   because the reading is `true` on both sides of it.
+  --   Plus the `from-inner` arm, the one that does not write
+  --   transparently: at a finish with nothing alive through the
+  --   instance the step DRAINS the flatten's parked queue and
+  --   reinstalls the cell with the residue, and under gas the drain's
+  --   pop re-enters `subscribeE` on a fresh chain.  Taken at a hot
+  --   inner, which is what holds the freed lane and leaves a residue
+  --   for the reading to carry -- a cold one finishes inside its own
+  --   subscribe and the drain empties the queue outright.
+  --   NOT covered: the `switchᵒ` and `exhaustᵒ` arms of the same
+  --   finish, which write a different cell shape; the room-available
+  --   arm of the enqueue; and any chain not ending at `root`, so
+  --   nothing here says what happens when the floor sits below the
+  --   context width.
   framePark-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (g : Gas) (id : Id) (now : Tick)
     (f : Frame Γ s u) (κ : Path Γ u t)
@@ -202,34 +183,9 @@ postulate
 --
 -- IT IS THE PARK PAIR'S THIRD MEMBER AND SITS BESIDE THEM FOR THE SAME
 -- REASON: the share reaches its chains through `shareAdmit` and the
--- cascade through `chainsOf`, neither filter rearranges into the other,
--- and no conjunct of the caps receipt prices either -- the receipt is
--- INDIFFERENT to the counter, which `capsOK?-nextNode` states outright.
-
--- AND THE FREE FORM OF BOTH IS FALSE, which is what makes the missing
--- premise the statement rather than an economy.  Neither reads a
--- registry premise, and a registry is an ordinary field of the state
--- they quantify over -- so as written each says every entry ANY state
--- could carry is ordered.  A chain the evaluator BUILDS is ordered by
--- construction, so the repair is a premise recording what `register`
--- makes, mirroring the one the `shareAdmit-strat` sibling already
--- takes, and never a weaker conclusion.
---
--- REFUTED: `Refuted.Admit-Entry-Reading.shareAdmit-ord-absurd` and
---   `Refuted.Admit-Entry-Reading.cascade-admit-ord-absurd`, at one
---   entry whose chain names a node above the counter in its TAIL.  Two
---   frames are needed and one is not: each frame is charged at the read
---   of the chain below it, so a single frame over a sink is charged at
---   nought and passes.
-  shareAdmit-ord : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (i : Fin n) (sched : Sched Γ) (st : EvalSt e) →
-    all (λ rp → pathOrd? {n} {Γ} {lookup Γ i} {t} (Sched.nextNode sched) (proj₂ rp))
-        (shareAdmit i (EvalSt.registry st)) ≡ true
-
-  cascade-admit-ord : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
-    all (λ rc → pathOrd? {n} {Γ} {arrTy a} {t} (Sched.nextNode sched) (proj₂ rc))
-        (chainsOf a st) ≡ true
+-- cascade through `chainsOf`, and neither filter rearranges into the
+-- other, so each face spends the registry's reading through its own
+-- filter.
 
 -- (5) WHAT A SHARE HANDS THE CHAINS IT ADMITTED.  This is the one place
 -- the registry reading is SPENT rather than established, and the two
@@ -257,22 +213,6 @@ postulate
 -- fan-out spends them in one place and neither is derivable from the
 -- other -- the first is about a state the walk was handed, the second
 -- about one the walk produced.
-
--- AND THE LATCHED ONE'S FREE FORM IS FALSE, independently of the order
--- pair: it fails at a chain that IS ordered, so the defect is in the
--- STORE the chain's node names rather than in the chain.  A node-table
--- miss reads well, so the cell has to be present and hold a queue
--- naming an input the sink's floor cannot cover -- which an arbitrary
--- state may, and a latched one does not repair.
---
--- REFUTED: `Refuted.Admit-Entry-Reading.shareAdmit-park-absurd`, at a
---   one-frame chain over a populated `mergeAll` cell, with the latch
---   taken at `false` so nothing between the state and the fan-out can
---   be blamed for the reading.
-  shareAdmit-park : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (i : Fin n) (fin : Bool) (st : EvalSt e) →
-    all (λ rp → pathPark? {n} {Γ} {lookup Γ i} {t} (proj₂ rp) (shareLatch i fin st))
-        (shareAdmit i (EvalSt.registry st)) ≡ true
 
 -- AND THE FOLD-THROUGH IS NOT THAT STATEMENT: it TAKES the reading as a
 -- hypothesis and moves it across a step, so an arbitrary registry
@@ -303,20 +243,6 @@ postulate
     all (λ rc → pathStrat? {n} {Γ} {arrTy a} {t} (proj₂ rc))
         (chainsOf a st) ≡ true
 
--- AND THIS FACE'S FREE FORM IS FALSE TOO, once per face exactly as the
--- reading itself is owed once per face: the cascade's latch rewrites
--- the completion bookkeeping and leaves the node table and the registry
--- where they were, so the one populated cell that kills the share's
--- form kills this one through the other filter.
---
--- REFUTED: `Refuted.Admit-Entry-Reading.cascade-admit-park-absurd`, at
---   an arrival whose source and element type the entry was built to
---   match, since the filter admits on nothing else.
-  cascade-admit-park : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (a : Arrival Γ) (st : EvalSt e) →
-    all (λ rc → pathPark? {n} {Γ} {arrTy a} {t} (proj₂ rc) (cascadeLatch a st))
-        (chainsOf a st) ≡ true
-
 -- and the cascade's fold-through, which is `foldPath-park` one face
 -- over: the tail's chains are read at the state the HEAD chain's step
 -- produced, and they are not the chain that stepped
@@ -328,28 +254,78 @@ postulate
     all (λ rc → pathPark? (proj₂ rc)
            (proj₂ (proj₂ (chainStep id a path sched st)))) chains ≡ true
 
--- THE PARK READING WHERE NO PREMISE CARRIES IT.  Every other park
--- statement here MOVES the reading across a step and takes it as a
--- hypothesis; the caps face can, because its walk threads `framePark?`
--- from the top.  The burst face's nodry half cannot: its hypotheses
--- record has no park field, and the mergeAll drain subscribes exactly
--- what the predicate reads, so the obligation arrives at a site with
--- nothing above it to ask.
+-- WHAT THE DRAIN LEAVES IN THE OWNER'S CELL, and the reading is the
+-- only part of it a caller can use.  A drain WRITES that cell -- the
+-- flatten's live count moves as each inner is subscribed -- so nothing
+-- freezes it, and the reinstall the caller then performs owes the new
+-- cell's reading at an ARBITRARY floor against the old one's at the
+-- same floor.  What the drain never does is put a term in that queue
+-- that was not already in it, so the old cell's reading at any floor is
+-- the ENTRY queue's at that floor, and `drain-queue-all` carries it the
+-- rest of the way to the residue.
 --
--- IT IS STATED OVER `capsOK?` AND NOT DERIVED FROM IT, which is the
--- finding rather than an economy: the invariant prices what a node
--- HOLDS -- a drain's queue, a scan's accumulator -- for size and for
--- width and reads no floor at all, so a floor-keyed reading of either
--- cell has no conjunct to come out of.  The
--- repair is a park field on the walk's hypotheses record, cascading
--- through every producer of it -- the cost of the fact being true, and
--- the reason the drain is not weakened to avoid it.
-  frame-parkStrat : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (c : Caps) (f : Frame Γ s u) (κ : Path Γ u t)
+-- THAT ARGUMENT IS TRUE AND THE STATEMENT WAS STILL FALSE, because the
+-- hypothesis said nothing about WHICH node it read.  The no-room arm
+-- returns immediately with the state untouched, so at an empty table
+-- the cell is `nothing` and the wildcard arm of the floor check calls
+-- that true: the premise was satisfiable at ANY entry queue and
+-- constrained nothing.  The repair IDENTIFIES the node.  With the
+-- owner's cell known to hold this very queue on entry, the untouched
+-- post-state reads back as the queue's own, so the premise IS the
+-- conclusion in exactly the arm that broke, and stays an ordinary
+-- reading about the drain's own cell everywhere else.  The caller
+-- already matches on that node, so what it owes is the match's own
+-- equation and no new fact.
+--
+-- ONLY THE QUEUE IS SHARED WITH THE DRAIN'S ARGUMENTS, and the cell's
+-- other three fields are free.  The floor check on a flatten cell reads
+-- the queue and nothing else, so a cap, a live count and an outer-done
+-- flag pinned to the drain's own would buy the statement nothing --
+-- and they would cost it its consumer, which drains at a live count one
+-- below the one the cell it matched on carries.
+--
+  -- REFUTED: `Refuted.MergeAllDrain-OwnerQueue`.
+  mergeAllDrain-ownerQueue : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+    {lim₀ : Maybe ℕ} {act₀ : ℕ} {od : Bool}
+    (i : ℕ) (g : Gas) (allNid : NodeId) (κ : Path Γ s t) (id : Id) (now : Tick)
+    (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ s))
     (sched : Sched Γ) (st : EvalSt e) →
-    capsOK? c sched st ≡ true →
-    pathStrat? (f ↠ κ) ≡ true →
-    framePark? (pathFloor κ) f st ≡ true
+    lookupNode allNid (EvalSt.nodes st) ≡ just (mergeAll-st lim₀ act₀ q od) →
+    parkStrat? i (lookupNode allNid (EvalSt.nodes
+      (proj₂ (proj₂ (proj₂ (proj₂ (proj₂
+        (mergeAllDrain g allNid κ id now lim act q sched st)))))))) ≡ true →
+    all (inputsBelowᵉ i) q ≡ true
+
+-- THE ONE CELL A WALK CANNOT FREEZE, and it is the outer's own.  Every
+-- other reading a payload's step has to carry across `thruConsume` is
+-- moved by freshness -- the cells the chain below reads sit under a
+-- watermark the step does not write.  This one does not: the flatten's
+-- consume ENQUEUES into exactly the cell the reading is about, so there
+-- is no watermark that both covers it and excludes the write, and no
+-- rearrangement of the freshness argument reaches it.
+--
+-- WHAT KEEPS IT TRUE IS THE PAYLOAD, NOT THE WRITE, which is why the
+-- statement takes the payload's own reading as its premise: an enqueue
+-- extends the queue by `o`, whose inputs the walk already reads below
+-- the sink's floor, and every other arm of the consume leaves the cell
+-- as it found it.
+--
+  -- PROBED: `Probed.ThruConsume-CellPark`.  The ENQUEUE arm only -- a
+  --   capacity-zero flatten node taking `input fzero` at floor 1, where
+  --   the extended queue's reading reduces through the payload premise.
+  --   That is the arm the statement is about and the only one covered:
+  --   the subscribing arm, the two non-flatten heads and a NON-EMPTY
+  --   starting queue are all untouched, and the last of those is where a
+  --   second writer's content would have to show up.
+  thruConsume-cellPark : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (g : Gas) (op : AllOp) (nid : NodeId) (κ : Path Γ u t)
+    (id : Id) (now : Tick) (o : Val Γ (obs u))
+    (sched : Sched Γ) (st : EvalSt e) →
+    inputsBelowᵛ (pathFloor κ) (obs u) o ≡ true →
+    parkStrat? (pathFloor κ) (lookupNode nid (EvalSt.nodes st)) ≡ true →
+    parkStrat? (pathFloor κ)
+      (lookupNode nid (EvalSt.nodes (proj₂ (proj₂ (proj₂
+        (thruConsume g op nid κ id now o sched st)))))) ≡ true
 
 -- (9) WHAT ONE HOP LEAVES BELOW THE FLOOR, ONE HEAD AT A TIME.  The
 -- five heads do not rebuild a payload the same way -- a `map` applies
@@ -412,23 +388,6 @@ postulate
     all (inputsBelowᵛ k s) vals ≡ true →
     all (inputsBelowᵛ k u) (map (applyFn fn) vals) ≡ true
 
--- and the fold's own transport, which reports BOTH halves because the
--- accumulator it hands on is the one the next emit reads: a step that
--- proved only the outputs would leave the cell it just overwrote
--- unread, and the cell is the whole reason this statement exists.  The
--- same shelf carries this shape at several other measures, and each is
--- a nil clause returning the accumulator untouched and a cons clause
--- that steps it and recurses.
--- TWIN: `scanVals-hopSpn`
-  scanVals-strat : ∀ {n} {Γ : Ctx n} {s u}
-    (k : ℕ) (fn : Fn Γ [] [] [] (u ×ᵗ s) u)
-    (ac : Val Γ u) (vs : List (Val Γ s)) →
-    inputsBelowᵗ k fn ≡ true →
-    inputsBelowᵛ k u ac ≡ true →
-    all (inputsBelowᵛ k s) vs ≡ true →
-    (inputsBelowᵛ k u (proj₂ (scanVals fn ac vs)) ≡ true)
-    × (all (inputsBelowᵛ k u) (proj₁ (scanVals fn ac vs)) ≡ true)
-
 -- WHAT A CLOSED TERM'S VALUE READS, which the arm made load-bearing:
 -- the scan seed arrives as a TERM and the cell it is installed into is
 -- read as a VALUE, so the arm's premise cannot be discharged at any
@@ -471,8 +430,24 @@ scan-strat-step {u = u} k sf nid now fn nd κ vals fin sched st hpk hfn hib
 ... | just (switch-st _ _)       = refl
 ... | just (exhaust-st _ _)      = refl
 ... | just (scan-st {w} acc) with w ≟ᵗ u
-...   | yes refl = proj₂ (scanVals-strat k fn acc vals hfn hpk hib)
+...   | yes refl = proj₂ (scanVals-strat k fn acc vals hfn (∧-trueˡ hpk) hib)
 ...   | no _     = refl
+
+-- THE MINT'S OWN OWNER READING, which is what every install site here
+-- spends and none of them can source locally.  A cell handed out AT
+-- the counter is named by no registered chain, because the ordering
+-- ledger puts every registered chain's cells strictly below it -- so
+-- the reading holds at EVERY floor and the ledger is the whole of the
+-- argument.  Stated over the scheduler rather than over a bare node so
+-- that the `≤` is `refl` at the site and the caps receipt is the only
+-- thing a caller has to name.
+mint-regOwn : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (c : Caps) (k : ℕ) (sched : Sched Γ) (st : EvalSt e) →
+  capsOK? c sched st ≡ true →
+  regOwn? (Sched.nextNode sched) k (EvalSt.registry st) ≡ true
+mint-regOwn c k sched st inv =
+  regOwn?-fresh (Sched.nextNode sched) (Sched.nextNode sched) k
+    (EvalSt.registry st) ≤-refl (capsOK?-regOrd c sched st inv)
 
 -- WHAT AN INSTALL LEAVES AT ITS OWN CELL, and it is a BODY over the
 -- node table's own roundtrip rather than the leaf this once was.  The
@@ -486,11 +461,46 @@ scan-strat-step {u = u} k sf nid now fn nd κ vals fin sched st hpk hfn hib
 installNode-scanPark : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   (k : ℕ) (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
   (ac : Val Γ u) (st : EvalSt e) →
+  regOwn? nid k (EvalSt.registry st) ≡ true →
   inputsBelowᵛ k u ac ≡ true →
   framePark? k (scan-f fn nid) (installNode nid (scan-st ac) st) ≡ true
-installNode-scanPark k fn nid ac st hac =
-  trans (cong (parkStrat? k)
-           (lookupNode-setNode nid (scan-st ac) (EvalSt.nodes st))) hac
+installNode-scanPark k fn nid ac st how hac =
+  ∧-intro (trans (cong (parkStrat? k)
+                    (lookupNode-setNode nid (scan-st ac) (EvalSt.nodes st))) hac)
+          (∧-intro how refl)
+
+-- AND THE OUTER'S OWN CELL AT THE INSTALL THAT MINTS IT, which is the
+-- degenerate half of the same lemma: a flatten's node is born with an
+-- EMPTY queue, so the reading holds at every floor and the only content
+-- left is that the lookup finds what was just written.  The scan sibling
+-- carries a seed and so owes one; this owes none, and stating it is
+-- still worth a line because the alternative is the defer clause
+-- unfolding the node table by hand.
+installNode-thruPark : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (k : ℕ) (op : AllOp) (nid : NodeId) (st : EvalSt e) →
+  regOwn? nid k (EvalSt.registry st) ≡ true →
+  framePark? k (thru-outer {u = u} op nid)
+    (installNode nid (mergeAll-st {t = u} nothing 0 [] false) st) ≡ true
+installNode-thruPark {u = u} k op nid st how =
+  ∧-intro (cong (parkStrat? k)
+             (lookupNode-setNode nid (mergeAll-st {t = u} nothing 0 [] false)
+                (EvalSt.nodes st)))
+          (∧-intro how refl)
+
+-- AND THE SAME WHERE THE CELL IS ABSTRACT, which is what a head that
+-- does not know which flatten it is installing needs: the two lemmas
+-- above fix `ns` and pay the reading themselves, and a head handed the
+-- cell as a parameter can only be handed the reading beside it.  All
+-- that is left is that the lookup finds what was just written.
+installNode-cellPark : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (k : ℕ) (op : AllOp) (nid : NodeId) (ns : NodeState Γ) (st : EvalSt e) →
+  regOwn? nid k (EvalSt.registry st) ≡ true →
+  parkStrat? k (just ns) ≡ true →
+  framePark? k (thru-outer {u = u} op nid) (installNode nid ns st) ≡ true
+installNode-cellPark k op nid ns st how h =
+  ∧-intro (trans (cong (parkStrat? k)
+                    (lookupNode-setNode nid ns (EvalSt.nodes st))) h)
+          (∧-intro how refl)
 
 -- THE TRANSPORT ITSELF, KEYED ON THE FREEZE AND NOT ON WHAT CAUSED IT.
 -- A subscribe and a step reach this reading by different routes and
@@ -498,20 +508,159 @@ installNode-scanPark k fn nid ac st hac =
 -- reads back unchanged -- so the case split over the frame is written
 -- once and each caller supplies its own freeze.  The three silent shapes
 -- are free because the reading does not reach the store at them at all.
+-- AND THE OWNER HALF TRAVELS BY ITS OWN PREMISE, since a freeze is a
+-- statement about the STORE and ownership reads the registry.  The two
+-- are separated rather than bundled because their sites differ: a
+-- record update that touches neither field spends `refl` for the
+-- registry half, while a subscribe grows it and owes a real argument.
 frozen-framePark : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   (k w : ℕ) (f : Frame Γ s u) (st st′ : EvalSt e) →
   (∀ j → suc j ≤ w →
      lookupNode j (EvalSt.nodes st′) ≡ lookupNode j (EvalSt.nodes st)) →
+  (∀ nd → any (_≡ᵇ nd) (frameNodes f) ≡ true →
+     regOwn? nd k (EvalSt.registry st) ≡ true →
+     regOwn? nd k (EvalSt.registry st′) ≡ true) →
   parkBelow w f →
   framePark? k f st ≡ true →
   framePark? k f st′ ≡ true
-frozen-framePark k w (map-f _)        st st′ hfz hb hp = hp
-frozen-framePark k w (take-f _)       st st′ hfz hb hp = hp
-frozen-framePark k w (thru-outer _ _) st st′ hfz hb hp = hp
-frozen-framePark k w (scan-f _ nd) st st′ hfz hb hp =
-  trans (cong (parkStrat? k) (hfz nd hb)) hp
-frozen-framePark k w (from-inner _ a _) st st′ hfz hb hp =
-  trans (cong (parkStrat? k) (hfz a hb)) hp
+frozen-framePark {Γ = Γ} k w f st st′ hfz how hb hp =
+  ∧-intro (parked f hb (proj₁ hs))
+          (any-all (λ nd → regOwn? nd k (EvalSt.registry st′)) (frameNodes f)
+             (λ nd hm → how nd hm
+                (all-any (λ m → regOwn? m k (EvalSt.registry st)) nd
+                   (frameNodes f) (proj₂ hs) hm)))
+  where
+  hs = ∧-true (frameParked? k f st) (frameOwned? k f (EvalSt.registry st)) hp
+  parked : ∀ {s′ u′} (f′ : Frame Γ s′ u′) → parkBelow w f′ →
+    frameParked? k f′ st ≡ true → frameParked? k f′ st′ ≡ true
+  parked (map-f _)          hb′ h = h
+  parked (take-f _)         hb′ h = h
+  parked (thru-outer _ nid) hb′ h = trans (cong (parkStrat? k) (hfz nid hb′)) h
+  parked (scan-f _ nd)      hb′ h = trans (cong (parkStrat? k) (hfz nd hb′)) h
+  parked (from-inner _ a _) hb′ h = trans (cong (parkStrat? k) (hfz a hb′)) h
+
+-- AND WHAT A KILL DOES TO IT, WHICH IS NOTHING, AND THAT IS PROVEN
+-- RATHER THAN POSTULATED.  The kill's only registry write is
+-- `cutThrough`'s survivor list, which DROPS entries and rewrites none,
+-- and the owner reading is a universal over the ledger -- so dropping
+-- is the one write it survives for free.  What carries the argument is
+-- the sublist and nothing about ownership, which is why the induction
+-- is `cutThrough-all` on the measures shelf, stated over an arbitrary
+-- predicate, rather than a second copy of it standing here.
+switchKill-regOwn : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (nd : NodeId) (k : ℕ) (cur : Maybe NodeId) (sched : Sched Γ) (st : EvalSt e) →
+  regOwn? nd k (EvalSt.registry st) ≡ true →
+  regOwn? nd k (EvalSt.registry (proj₂ (proj₂ (switchKill cur sched st)))) ≡ true
+switchKill-regOwn nd k nothing  sched st h = h
+switchKill-regOwn nd k (just v) sched st h =
+  cutThrough-all (λ en → pathOwn? nd k (proj₂ (proj₂ (proj₂ en)))) v
+    (EvalSt.delivered st) (EvalSt.regWatermark st) (EvalSt.dying st)
+    (EvalSt.registry st) h
+
+-- AND THE WHOLE CHAIN READING ACROSS THE SAME KILL, which is no longer
+-- a node-table transport: folding ownership into the frame reading put
+-- the REGISTRY on the side the kill writes, so the two halves travel by
+-- different arguments -- the node table is untouched, and the owner
+-- half rides the sublist above.
+switchKill-framePark : ∀ {n} {Γ : Ctx n} {s u t} {e : Closed Γ t}
+  (k : ℕ) (f : Frame Γ s u) (cur : Maybe NodeId) (sched : Sched Γ) (st : EvalSt e) →
+  framePark? k f st ≡ true →
+  framePark? k f (proj₂ (proj₂ (switchKill cur sched st))) ≡ true
+switchKill-framePark k f cur sched st h =
+  ∧-intro
+    (trans (frameParked?-nodes k f (proj₂ (proj₂ (switchKill cur sched st))) st
+              (switchKill-nodes cur sched st))
+           (∧-trueˡ {a = frameParked? k f st} h))
+    (all-impl (λ nd → regOwn? nd k (EvalSt.registry st))
+              (λ nd → regOwn? nd k
+                        (EvalSt.registry (proj₂ (proj₂ (switchKill cur sched st)))))
+              (λ nd → switchKill-regOwn nd k cur sched st)
+              (frameNodes f) (∧-trueʳ {a = frameParked? k f st} h))
+
+switchKill-pathPark : ∀ {n} {Γ : Ctx n} {u t} {e : Closed Γ t}
+  (κ : Path Γ u t) (cur : Maybe NodeId) (sched : Sched Γ) (st : EvalSt e) →
+  pathPark? κ st ≡ true →
+  pathPark? κ (proj₂ (proj₂ (switchKill cur sched st))) ≡ true
+switchKill-pathPark root           cur sched st h = refl
+switchKill-pathPark (share-sink _) cur sched st h = refl
+switchKill-pathPark (f ↠ p)        cur sched st h =
+  ∧-intro (switchKill-framePark (pathFloor p) f cur sched st
+             (∧-trueˡ {a = framePark? (pathFloor p) f st} h))
+          (switchKill-pathPark p cur sched st
+             (∧-trueʳ {a = framePark? (pathFloor p) f st} h))
+
+-- AND WHAT A STEP DOES TO THE SAME LEDGER, which is the cheaper half
+-- and needs no conditioning at all.  A step registers only chains that
+-- CONTINUE the one it was entered at, and a floor is the terminal's, so
+-- every entry a step adds reports the entry chain's own floor -- at
+-- which the owner reading is satisfied by whatever the entry names.
+-- The drops a step performs only shorten the ledger, which the reading
+-- quantifies over universally.
+postulate
+  stepFrame-regOwn : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+    (g : Gas) (id : Id) (now : Tick)
+    (f : Frame Γ s u) (κ : Path Γ u t)
+    (vals : List (Val Γ s)) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) (nd : NodeId) →
+    regOwn? nd (pathFloor κ) (EvalSt.registry st) ≡ true →
+    regOwn? nd (pathFloor κ)
+      (EvalSt.registry
+        (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame g id now f κ vals fin sched st))))))
+      ≡ true
+
+-- AND THE SAME FOR A CONSUME, for the same reason and at the same
+-- floor.  A consume drains and re-enters, and every chain it registers
+-- continues the one it was entered at, so the ledger it hands back
+-- reports that chain's floor at every new entry.
+postulate
+  thruConsume-regOwn : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (g : Gas) (op : AllOp) (nid : NodeId) (κ : Path Γ u t)
+    (id : Id) (now : Tick) (o : Val Γ (obs u))
+    (sched : Sched Γ) (st : EvalSt e) (nd : NodeId) →
+    regOwn? nd (pathFloor κ) (EvalSt.registry st) ≡ true →
+    regOwn? nd (pathFloor κ)
+      (EvalSt.registry
+        (proj₂ (proj₂ (proj₂ (thruConsume g op nid κ id now o sched st)))))
+      ≡ true
+
+-- AND FOR THE DRAIN'S OWN SUBSCRIBE, which is the third writer the
+-- *All edge spends and the one its recursion needs back.  Same
+-- argument and same floor: the inner registers under the entry chain
+-- with newly minted frames stacked on it, and stacking does not move a
+-- terminal, so every entry the subscribe adds reports the floor being
+-- read.
+postulate
+  subscribeInner-regOwn : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (g : Gas) (op : AllOp) (allNid : NodeId) (κ : Path Γ u t)
+    (id : Id) (now : Tick) (o : Val Γ (obs u))
+    (sched : Sched Γ) (st : EvalSt e) (nd : NodeId) →
+    regOwn? nd (pathFloor κ) (EvalSt.registry st) ≡ true →
+    regOwn? nd (pathFloor κ)
+      (EvalSt.registry
+        (proj₂ (proj₂ (proj₂ (proj₂ (proj₂
+          (subscribeInner g op allNid κ id now o sched st)))))))
+      ≡ true
+
+-- WHAT A SUBSCRIBE DOES TO THE OWNER LEDGER, which is the registry
+-- half of the same disjointness and cannot be read off the store one.
+-- A subscribe REGISTERS, so the ledger grows, and a cell already owned
+-- at a floor has to stay owned against every entry the subscribe adds.
+-- Each such entry is the entry chain with newly minted frames stacked
+-- on it, and a floor is the TERMINAL's, which stacking does not move --
+-- so every entry the subscribe adds reports the entry chain's own
+-- floor, and at THAT floor the owner reading is satisfied whatever the
+-- entry names.  Stated at the one floor rather than at all of them
+-- because at any other floor it is FALSE: a freshly minted cell is
+-- owned vacuously beforehand and named by the new entry after.
+postulate
+  subscribeE-regOwn : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {w}
+    (g : Gas) (b : Closed Γ w) (κ : Path Γ w t)
+    (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e)
+    (nd : NodeId) →
+    regOwn? nd (pathFloor κ) (EvalSt.registry st) ≡ true →
+    regOwn? nd (pathFloor κ)
+      (EvalSt.registry (proj₂ (proj₂ (subscribeE g b κ bid now sched st))))
+      ≡ true
 
 -- WHAT A SUBSCRIBE DOES TO A CELL IT DOES NOT OWN, and this is the
 -- DISJOINTNESS half of the store question rather than a second
@@ -534,11 +683,14 @@ subscribeE-framePark : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u w}
   (bid : Id) (now : Tick) (f : Frame Γ s u)
   (sched : Sched Γ) (st : EvalSt e) →
   parkBelow (Sched.nextNode sched) f →
+  k ≡ pathFloor κ →
   framePark? k f st ≡ true →
   framePark? k f (proj₂ (proj₂ (subscribeE g b κ bid now sched st))) ≡ true
-subscribeE-framePark k g b κ bid now f sched st hb hp =
-  frozen-framePark k (Sched.nextNode sched) f st _
-    (subscribeE-nodes-below g b κ bid now sched st) hb hp
+subscribeE-framePark k g b κ bid now f sched st hb refl hp =
+  frozen-framePark (pathFloor κ) (Sched.nextNode sched) f st _
+    (subscribeE-nodes-below g b κ bid now sched st)
+    (λ nd _ hj → subscribeE-regOwn g b κ bid now sched st nd hj)
+    hb hp
 
 -- AND THE CHAIN-LEVEL TRANSPORT, which is the frame one under an
 -- induction and nothing else.  `pathPark?` reads each frame at the floor
@@ -549,14 +701,22 @@ frozen-pathPark : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (w : ℕ) (κ : Path Γ u t) (st st′ : EvalSt e) →
   (∀ j → suc j ≤ w →
      lookupNode j (EvalSt.nodes st′) ≡ lookupNode j (EvalSt.nodes st)) →
+  (∀ nd → pathHasNode nd κ ≡ true →
+     regOwn? nd (pathFloor κ) (EvalSt.registry st) ≡ true →
+     regOwn? nd (pathFloor κ) (EvalSt.registry st′) ≡ true) →
   pathBelow w κ →
   pathPark? κ st ≡ true →
   pathPark? κ st′ ≡ true
-frozen-pathPark w root           st st′ hfz hb hp = refl
-frozen-pathPark w (share-sink _) st st′ hfz hb hp = refl
-frozen-pathPark w (f ↠ p) st st′ hfz (hbf , hbp) hp =
-  ∧-intro (frozen-framePark (pathFloor p) w f st st′ hfz hbf (∧-trueˡ hp))
-          (frozen-pathPark w p st st′ hfz hbp (∧-trueʳ hp))
+frozen-pathPark w root           st st′ hfz how hb hp = refl
+frozen-pathPark w (share-sink _) st st′ hfz how hb hp = refl
+frozen-pathPark w (f ↠ p) st st′ hfz how (hbf , hbp) hp =
+  ∧-intro (frozen-framePark (pathFloor p) w f st st′ hfz
+             (λ nd hm → how nd (cong (_∨ pathHasNode nd p) hm)) hbf
+             (∧-trueˡ hp))
+          (frozen-pathPark w p st st′ hfz
+             (λ nd hh → how nd (trans (cong (any (_≡ᵇ nd) (frameNodes f) ∨_) hh)
+                                      (∨-zeroʳ (any (_≡ᵇ nd) (frameNodes f)))))
+             hbp (∧-trueʳ hp))
 
 -- THE COMPUTED WATERMARK MEETS THE ASKED-FOR ONE, in both directions
 -- and neither is arithmetic.  The read side is a fold, so its bound
@@ -567,7 +727,7 @@ frameRead-below : ∀ {n} {Γ : Ctx n} {s u} (w : ℕ) (f : Frame Γ s u) →
   frameRead f ≤ w → parkBelow w f
 frameRead-below w (map-f _)          h = tt
 frameRead-below w (take-f _)         h = tt
-frameRead-below w (thru-outer _ _)   h = tt
+frameRead-below w (thru-outer _ _)   h = h
 frameRead-below w (scan-f _ _)       h = h
 frameRead-below w (from-inner _ _ _) h = h
 
@@ -579,6 +739,144 @@ pathRead-below w (f ↠ p) h =
   frameRead-below w f (≤-trans (m≤m⊔n (frameRead f) (pathRead p)) h)
   , pathRead-below w p (≤-trans (m≤n⊔m (frameRead f) (pathRead p)) h)
 
+-- AND THE TWO READINGS ACROSS ANY STEP THAT IS FRESH ABOVE THE CHAIN,
+-- which is every step this development takes.  A freshness receipt says
+-- exactly two things -- the counter rose and nothing below the watermark
+-- moved -- and those are precisely the two hypotheses the transports
+-- want, so a caller with such a receipt owes no arithmetic of its own.
+-- Stating them over the receipt rather than over each operation is what
+-- keeps the clique's call sites one line apiece: the operation appears
+-- only in the receipt the caller already has to produce.
+fresh-pathPark : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (κ : Path Γ u t) (nx nx′ : ℕ) (st st′ : EvalSt e) →
+  FreshC (pathRead κ) nx nx′ (EvalSt.nodes st) (EvalSt.nodes st′) →
+  (∀ nd → pathHasNode nd κ ≡ true →
+     regOwn? nd (pathFloor κ) (EvalSt.registry st) ≡ true →
+     regOwn? nd (pathFloor κ) (EvalSt.registry st′) ≡ true) →
+  pathPark? κ st ≡ true →
+  pathPark? κ st′ ≡ true
+fresh-pathPark κ nx nx′ st st′ fr how hp =
+  frozen-pathPark (pathRead κ) κ st st′ (FreshC.frozen fr) how
+    (pathRead-below (pathRead κ) κ ≤-refl) hp
+
+fresh-ord : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (κ : Path Γ u t) (nx nx′ : ℕ) (st st′ : EvalSt e) →
+  FreshC (pathRead κ) nx nx′ (EvalSt.nodes st) (EvalSt.nodes st′) →
+  pathOrd? nx κ ≡ true →
+  pathOrd? nx′ κ ≡ true
+fresh-ord κ nx nx′ st st′ fr ho = pathOrd?-mono _ _ κ (FreshC.nxMono fr) ho
+
+-- AND THE ONE A MINT SPENDS, which is the freeze at the counter rather
+-- than at a step's watermark.  An install writes a cell the counter has
+-- not handed out yet, and a chain whose order reading holds against that
+-- counter reads strictly below it -- so the write is invisible to the
+-- reading, and the bound the transport wants is exactly what the order
+-- reading hands back.
+installNode-pathPark : ∀ {n} {Γ : Ctx n} {u t} {e : Closed Γ t}
+  (nid : NodeId) (ns : NodeState Γ) (κ : Path Γ u t) (st : EvalSt e) →
+  pathRead κ ≤ nid →
+  pathPark? κ st ≡ true →
+  pathPark? κ (installNode nid ns st) ≡ true
+installNode-pathPark nid ns κ st hb hp =
+  frozen-pathPark (pathRead κ) κ st (installNode nid ns st)
+    (frozen-setNode (pathRead κ) nid ns (EvalSt.nodes st) hb)
+    (λ _ _ h → h)
+    (pathRead-below (pathRead κ) κ ≤-refl) hp
+
+-- AND THE SAME AT THE CHAIN, which is what a caller re-entering after a
+-- subscribe needs and the frame form cannot give it: a subscribe writes
+-- only cells its own mint handed out, all at or above the counter it was
+-- entered at, so a chain reading below that counter reads back
+-- unchanged.  Its bound is the order reading's, exactly as the install's
+-- is.
+subscribeE-pathPark : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u w}
+  (g : Gas) (b : Closed Γ w) (β : Path Γ w t) (κ : Path Γ u t)
+  (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+  pathRead κ ≤ Sched.nextNode sched →
+  pathFloor κ ≡ pathFloor β →
+  pathPark? κ st ≡ true →
+  pathPark? κ (proj₂ (proj₂ (subscribeE g b β bid now sched st))) ≡ true
+subscribeE-pathPark g b β κ bid now sched st hb hf hp =
+  frozen-pathPark (Sched.nextNode sched) κ st _
+    (subscribeE-nodes-below g b β bid now sched st)
+    (λ nd _ hj →
+       subst (λ m → regOwn? nd m
+                (EvalSt.registry
+                  (proj₂ (proj₂ (subscribeE g b β bid now sched st)))) ≡ true)
+         (sym hf)
+         (subscribeE-regOwn g b β bid now sched st nd
+            (subst (λ m → regOwn? nd m (EvalSt.registry st) ≡ true) hf hj)))
+    (pathRead-below (Sched.nextNode sched) κ hb) hp
+
+-- AND THE ORDER HALF OF THE SAME RE-ENTRY, which is one counter step
+-- and no case split: the reading bounds the chain's reads from ABOVE by
+-- the counter, and a subscribe only raises it.
+subscribeE-ord : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u w}
+  (g : Gas) (b : Closed Γ w) (β : Path Γ w t) (κ : Path Γ u t)
+  (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+  pathOrd? (Sched.nextNode sched) κ ≡ true →
+  pathOrd? (Sched.nextNode
+             (proj₁ (proj₂ (subscribeE g b β bid now sched st)))) κ ≡ true
+subscribeE-ord g b β κ bid now sched st ho =
+  pathOrd?-mono _ _ κ
+    (FreshC.nxMono
+      (subscribeE-fresh (Sched.nextNode sched) g b β bid now sched st ≤-refl))
+    ho
+
+-- AND THE SAME THREE ACROSS A PAYLOAD'S SUBSCRIBE, which is the one
+-- re-entry a drain performs and the one the three above cannot be
+-- applied to directly: the payload is subscribed under a MINTED
+-- instance cell, so the counter the transports are stated at is not the
+-- one the caller holds.  The gas floor is the whole reason these are
+-- three lemmas and not three call-site applications -- at `g0` nothing
+-- is subscribed at all and the state is returned untouched, so the two
+-- arms of every one of them are genuinely different proofs.
+subscribeInner-ord : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u w}
+  (g : Gas) (op : AllOp) (allNid : NodeId) (β : Path Γ w t) (κ : Path Γ u t)
+  (id : Id) (now : Tick) (o : Val Γ (obs w))
+  (sched : Sched Γ) (st : EvalSt e) →
+  pathOrd? (Sched.nextNode sched) κ ≡ true →
+  pathOrd? (Sched.nextNode (proj₁ (proj₂ (proj₂ (proj₂ (proj₂
+    (subscribeInner g op allNid β id now o sched st))))))) κ ≡ true
+subscribeInner-ord g0 op allNid β κ id now o sched st ho =
+  pathOrd?-mono _ _ κ (n≤1+n (Sched.nextNode sched)) ho
+subscribeInner-ord (gs fuel) op allNid β κ id now o sched st ho =
+  subscribeE-ord fuel o (from-inner op allNid (Sched.nextNode sched) ↠ β) κ id now
+    (record sched { nextNode = suc (Sched.nextNode sched) }) st
+    (pathOrd?-mono _ _ κ (n≤1+n (Sched.nextNode sched)) ho)
+
+subscribeInner-pathPark : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u w}
+  (g : Gas) (op : AllOp) (allNid : NodeId) (β : Path Γ w t) (κ : Path Γ u t)
+  (id : Id) (now : Tick) (o : Val Γ (obs w))
+  (sched : Sched Γ) (st : EvalSt e) →
+  pathRead κ ≤ Sched.nextNode sched →
+  pathFloor κ ≡ pathFloor β →
+  pathPark? κ st ≡ true →
+  pathPark? κ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂
+    (subscribeInner g op allNid β id now o sched st)))))) ≡ true
+subscribeInner-pathPark g0 op allNid β κ id now o sched st hb hf hp = hp
+subscribeInner-pathPark (gs fuel) op allNid β κ id now o sched st hb hf hp =
+  subscribeE-pathPark fuel o (from-inner op allNid (Sched.nextNode sched) ↠ β) κ
+    id now (record sched { nextNode = suc (Sched.nextNode sched) }) st
+    (≤-trans hb (n≤1+n (Sched.nextNode sched))) hf hp
+
+subscribeInner-cellPark : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u w}
+  (k : ℕ) (g : Gas) (op : AllOp) (allNid : NodeId) (β : Path Γ w t)
+  (κ : Path Γ u t) (id : Id) (now : Tick) (o : Val Γ (obs w))
+  (sched : Sched Γ) (st : EvalSt e) →
+  suc allNid ≤ Sched.nextNode sched →
+  parkStrat? k (lookupNode allNid (EvalSt.nodes st)) ≡ true →
+  parkStrat? k (lookupNode allNid (EvalSt.nodes (proj₂ (proj₂ (proj₂ (proj₂ (proj₂
+    (subscribeInner g op allNid β id now o sched st)))))))) ≡ true
+subscribeInner-cellPark k g0 op allNid β κ id now o sched st hb hp = hp
+subscribeInner-cellPark k (gs fuel) op allNid β κ id now o sched st hb hp =
+  trans (cong (parkStrat? k)
+           (subscribeE-nodes-below fuel o
+              (from-inner op allNid (Sched.nextNode sched) ↠ β) id now
+              (record sched { nextNode = suc (Sched.nextNode sched) }) st
+              allNid (≤-trans hb (n≤1+n (Sched.nextNode sched)))))
+        hp
+
 frameAbove?-sound : ∀ {n} {Γ : Ctx n} {s u} (w : ℕ) (f : Frame Γ s u) →
   frameAbove? w f ≡ true → frameAbove w f
 frameAbove?-sound w (map-f _)          h = tt
@@ -587,22 +885,6 @@ frameAbove?-sound w (take-f nid)       h = ≤ᵇ⇒≤ w nid (T-to h)
 frameAbove?-sound w (thru-outer _ nid) h = ≤ᵇ⇒≤ w nid (T-to h)
 frameAbove?-sound w (from-inner _ a i) h =
   ≤ᵇ⇒≤ w a (T-to (∧-trueˡ h)) , ≤ᵇ⇒≤ w i (T-to (∧-trueʳ h))
-
--- AND THE ORDERING SURVIVES A RISING COUNTER, which is the only way a
--- step moves it: the reading is about the chain's own cells and the
--- chain does not change, so every hop's bound is one widening and the
--- frame's own comparison is carried across untouched.
-pathOrd?-mono : ∀ {n} {Γ : Ctx n} {u t} (nx nx′ : ℕ) (κ : Path Γ u t) →
-  nx ≤ nx′ → pathOrd? nx κ ≡ true → pathOrd? nx′ κ ≡ true
-pathOrd?-mono nx nx′ root           hn h = refl
-pathOrd?-mono nx nx′ (share-sink _) hn h = refl
-pathOrd?-mono nx nx′ (f ↠ p) hn h =
-  ∧-intro (≤ᵇ-widen (pathRead p) hn (proj₁ SP))
-          (∧-intro (proj₁ SQ) (pathOrd?-mono nx nx′ p hn (proj₂ SQ)))
-  where
-  SP = ∧-true (pathRead p ≤ᵇ nx)
-              (frameAbove? (pathRead p) f ∧ pathOrd? nx p) h
-  SQ = ∧-true (frameAbove? (pathRead p) f) (pathOrd? nx p) (proj₂ SP)
 
 -- (4) THE CHAIN-KEYED PARK READING ACROSS ONE FRAME STEP, and it is the
 -- subscribe's statement one construct up rather than a second mechanism.
@@ -639,11 +921,12 @@ pathPark-step g id now f κ vals fin sched st ho hp =
   frozen-pathPark (pathRead κ) κ st _
     (FreshC.frozen
       (stepFrame-fresh (pathRead κ) g id now f κ vals fin sched st
-        (≤ᵇ⇒≤ (pathRead κ) (Sched.nextNode sched) (T-to (proj₁ SP)))
+        (pathOrd?-read (Sched.nextNode sched) κ (proj₂ SQ))
         (frameAbove?-sound (pathRead κ) f (proj₁ SQ))))
+    (λ nd _ hj → stepFrame-regOwn g id now f κ vals fin sched st nd hj)
     (pathRead-below (pathRead κ) κ ≤-refl) hp
   where
-  SP = ∧-true (pathRead κ ≤ᵇ Sched.nextNode sched)
+  SP = ∧-true (pathCell (f ↠ κ) ≤ᵇ Sched.nextNode sched)
               (frameAbove? (pathRead κ) f ∧ pathOrd? (Sched.nextNode sched) κ) ho
   SQ = ∧-true (frameAbove? (pathRead κ) f)
               (pathOrd? (Sched.nextNode sched) κ) (proj₂ SP)
@@ -666,11 +949,11 @@ pathOrd-step g id now f κ vals fin sched st ho =
   pathOrd?-mono _ _ κ
     (FreshC.nxMono
       (stepFrame-fresh (pathRead κ) g id now f κ vals fin sched st
-        (≤ᵇ⇒≤ (pathRead κ) (Sched.nextNode sched) (T-to (proj₁ SP)))
+        (pathOrd?-read (Sched.nextNode sched) κ (proj₂ SQ))
         (frameAbove?-sound (pathRead κ) f (proj₁ SQ))))
     (proj₂ SQ)
   where
-  SP = ∧-true (pathRead κ ≤ᵇ Sched.nextNode sched)
+  SP = ∧-true (pathCell (f ↠ κ) ≤ᵇ Sched.nextNode sched)
               (frameAbove? (pathRead κ) f ∧ pathOrd? (Sched.nextNode sched) κ) ho
   SQ = ∧-true (frameAbove? (pathRead κ) f)
               (pathOrd? (Sched.nextNode sched) κ) (proj₂ SP)
@@ -714,3 +997,101 @@ chainStep-ord id a path sched st chains h =
     (λ rc → pathOrd?-mono _ _ (proj₂ rc)
               (chainStep-nextNode id a path sched st))
     chains h
+
+------------------------------------------------------------------
+-- THE FOUR ENTRY READINGS, EACH A FILTER OF ONE THE REGISTRY CARRIES.
+--
+-- Each was once a leaf whose free form is REFUTED, and the premise
+-- that repairs it is not a call site's convenience: it is the
+-- registry-wide reading `capsOK?` now carries, owed by whatever WRITES
+-- what it reads.  With that premise in hand nothing here is
+-- mathematics -- an admission filter drops entries and rewrites none,
+-- so the reading travels through it -- and the two park rows add only
+-- a node-table transport, since neither latch touches the store the
+-- reading looks at.
+------------------------------------------------------------------
+
+-- the cascade's latch is a completion mark and a scratch reset, and
+-- the store it leaves is the one it was handed.  Cased on the same
+-- flag `cascadeLatch-caps` is
+cascadeLatch-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (a : Arrival Γ) (st : EvalSt e) →
+  EvalSt.nodes st ≡ EvalSt.nodes (cascadeLatch a st)
+cascadeLatch-nodes a st with Arrival.isLast a
+... | true  = refl
+... | false = refl
+
+cascadeLatch-registry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (a : Arrival Γ) (st : EvalSt e) →
+  EvalSt.registry st ≡ EvalSt.registry (cascadeLatch a st)
+cascadeLatch-registry a st with Arrival.isLast a
+... | true  = refl
+... | false = refl
+
+shareAdmit-ord : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (i : Fin n) (sched : Sched Γ) (st : EvalSt e) →
+  regOrd? (Sched.nextNode sched) (EvalSt.registry st) ≡ true →
+  all (λ rp → pathOrd? {n} {Γ} {lookup Γ i} {t} (Sched.nextNode sched) (proj₂ rp))
+      (shareAdmit i (EvalSt.registry st)) ≡ true
+shareAdmit-ord i sched st h =
+  shareAdmit-chQ (λ {u} _ κ → pathOrd? (Sched.nextNode sched) κ) i
+    (EvalSt.registry st) h
+
+cascade-admit-ord : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
+  regOrd? (Sched.nextNode sched) (EvalSt.registry st) ≡ true →
+  all (λ rc → pathOrd? {n} {Γ} {arrTy a} {t} (Sched.nextNode sched) (proj₂ rc))
+      (chainsOf a st) ≡ true
+cascade-admit-ord a sched st h =
+  chainsGo-chQ (λ {u} _ κ → pathOrd? (Sched.nextNode sched) κ) a
+    (EvalSt.registry st) h
+
+shareAdmit-park : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (i : Fin n) (fin : Bool) (st : EvalSt e) →
+  regPark? (EvalSt.registry st) st ≡ true →
+  all (λ rp → pathPark? {n} {Γ} {lookup Γ i} {t} (proj₂ rp) (shareLatch i fin st))
+      (shareAdmit i (EvalSt.registry st)) ≡ true
+shareAdmit-park i false st h =
+  shareAdmit-chQ (λ {u} _ κ → pathPark? κ st) i (EvalSt.registry st) h
+shareAdmit-park i true  st h =
+  shareAdmit-chQ (λ {u} _ κ → pathPark? κ (shareLatch i true st)) i
+    (EvalSt.registry st)
+    (regPark?-nodes (EvalSt.registry st) st (shareLatch i true st) refl refl h)
+
+cascade-admit-park : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (a : Arrival Γ) (st : EvalSt e) →
+  regPark? (EvalSt.registry st) st ≡ true →
+  all (λ rc → pathPark? {n} {Γ} {arrTy a} {t} (proj₂ rc) (cascadeLatch a st))
+      (chainsOf a st) ≡ true
+cascade-admit-park a st h =
+  chainsGo-chQ (λ {u} _ κ → pathPark? κ (cascadeLatch a st)) a
+    (EvalSt.registry st)
+    (regPark?-nodes (EvalSt.registry st) st (cascadeLatch a st)
+       (cascadeLatch-nodes a st) (cascadeLatch-registry a st) h)
+
+-- THE TWO READINGS ACROSS A WHOLE WALK, and neither is a new fact.  A
+-- walk mints strictly ABOVE the counter it entered at, so every cell
+-- the chain reads is frozen under it and the counter only rises --
+-- which is exactly the pair `FreshC` records.  `subscribeE-fresh` is
+-- that receipt and the two `fresh-` transports spend it, so this is one
+-- composition; it is stated once because every push site needs it, and
+-- the order reading is what unlocks the freezing premise, since a chain
+-- whose cells outran the counter is a chain no run built
+subscribeE-readings : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (g : Gas) (b : Closed Γ u) (κ : Path Γ u t) (id : Id) (now : Tick)
+  (sched : Sched Γ) (st : EvalSt e) →
+  pathOrd? (Sched.nextNode sched) κ ≡ true →
+  pathPark? κ st ≡ true →
+  let r = subscribeE g b κ id now sched st
+  in (pathOrd? (Sched.nextNode (proj₁ (proj₂ r))) κ ≡ true)
+     × (pathPark? κ (proj₂ (proj₂ r)) ≡ true)
+subscribeE-readings g b κ id now sched st ho hp =
+    fresh-ord κ (Sched.nextNode sched) (Sched.nextNode (proj₁ (proj₂ r))) st
+      (proj₂ (proj₂ r)) FR ho
+  , fresh-pathPark κ (Sched.nextNode sched) (Sched.nextNode (proj₁ (proj₂ r))) st
+      (proj₂ (proj₂ r)) FR
+      (λ nd _ hj → subscribeE-regOwn g b κ id now sched st nd hj) hp
+  where
+  r  = subscribeE g b κ id now sched st
+  FR = subscribeE-fresh (pathRead κ) g b κ id now sched st
+         (pathOrd?-read (Sched.nextNode sched) κ ho)

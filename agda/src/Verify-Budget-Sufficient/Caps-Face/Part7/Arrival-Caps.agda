@@ -44,7 +44,7 @@ open import Rx.Slots using (Slots; slotsSize)
 open import Verify-Budget-Sufficient.Delivery-Walk using
   (module Walk; chainsGo-chQ)
 open import Verify-Budget-Sufficient.Psi-Split using
-  (regP?-∧; regStrat?-paths)
+  (regP?-∧; regStrat?-paths; chP?-∧)
 open import Verify-Budget-Sufficient.Deliveries using
   (delivN; delivN-cons; delivN-split; chainStep-deliv; cascadeGo-deliv; ⊑ᵈ-trans)
 open import Verify-Budget-Sufficient.Caps using
@@ -58,15 +58,16 @@ open import Verify-Budget-Sufficient.Caps-Depth
 
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (capsAt-round-size; capsOK?; entStrat?; n≤capsAt-size; pathFloor; pathPark?; pathStrat?;
-  pathSz?; pathSz?-widen; valCaps?; nestClosOK?ᵛ; nestClosOK?ᵛ-widen)
+  pathSz?; pathSz?-widen; valCaps?; nestClosOK?ᵛ; nestClosOK?ᵛ-widen; pathOrd?)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Root-Strat using
   (pathStrat-top)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves using
   (cascade-admit-park; chainStep-park; chainsOf-strat;
-   pathOrd?; cascade-admit-ord; chainStep-ord)
+   cascade-admit-ord; chainStep-ord)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
-  (capsOK?-count; capsOK?-regs; chainsStrat?-one; pathPark-delivered; pathsPark-delivered;
-  pathSz?-len; registry-entStrat; slotsCaps?-capsAt; valsCaps?; valsCaps?-lvl; foldPath-slots)
+  (capsOK?-count; capsOK?-delivered; capsOK?-regs; chainsStrat?-one; pathPark-delivered; pathsPark-delivered;
+  pathSz?-len; registry-entStrat; slotsCaps?-capsAt; valsCaps?; valsCaps?-lvl; foldPath-slots;
+  capsOK?-regOrd; capsOK?-regPark)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (valCaps?-widen)
 open import Decide using (∧-intro; ∧-trueʳ; T-to)
@@ -327,13 +328,18 @@ chainStep-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   -- climb leaves them untouched
   pathStrat? path ≡ true →
   inputsBelowᵛ (pathFloor path) (arrTy a) (arrVal a) ≡ true →
+  -- AND THE CHAIN'S TWO ENTRY READINGS, which the walk's ledger prices
+  -- its registry by: neither is derivable from the caps receipt, so
+  -- each is carried in from whatever wrote what it reads
+  pathPark? path st ≡ true →
+  pathOrd? (Sched.nextNode sched) path ≡ true →
   Σ ℕ λ L′ →
     (Lv + L′ ≤ lvls (Caps.cSize (capsAt e sl id)) (Caps.cWid (capsAt e sl id)) (capsH e sl id)
                  Lv (suc (delivN st (proj₂ (proj₂ (chainStep nextId a path sched st))))))
     × (capsOK? (frameStep (Lv + L′) (capsAt e sl id))
          (proj₁ (proj₂ (chainStep nextId a path sched st)))
          (proj₂ (proj₂ (chainStep nextId a path sched st))) ≡ true)
-chainStep-caps {n = n} {e = e} sl id Lv a nextId path sched st sleq cok hpz hvc hdp hstr hsv =
+chainStep-caps {n = n} {e = e} sl id Lv a nextId path sched st sleq cok hpz hvc hdp hstr hsv hpk hord =
   W.Res.lvl FP ∸ Lv
   , subst (_≤ CEIL) (sym EQ) (≤-trans (W.Res.hi FP) STEP)
   , subst (λ x → capsOK? (frameStep x c)
@@ -371,6 +377,7 @@ chainStep-caps {n = n} {e = e} sl id Lv a nextId path sched st sleq cok hpz hvc 
          (∧-intro hpz hstr)
          (∧-intro (∧-intro (∧-intro hvc refl) refl) (∧-intro hsv refl))
          (W.eb-seed Lv (arrSource a) (Arrival.isLast a)) tt tt hdp
+         (∧-intro hord hpk)
   EQ : Lv + (W.Res.lvl FP ∸ Lv) ≡ W.Res.lvl FP
   EQ = m+[n∸m]≡n (W.Res.lo FP)
   D = delivN st (proj₂ (proj₂ (chainStep nextId a path sched st)))
@@ -411,19 +418,21 @@ chain-deliv-cap : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   -- either reading
   pathStrat? path ≡ true →
   inputsBelowᵛ (pathFloor path) (arrTy a) (arrVal a) ≡ true →
+  pathPark? path st ≡ true →
+  pathOrd? (Sched.nextNode sched) path ≡ true →
   delivN st (proj₂ (proj₂ (chainStep nextId a path sched st)))
     ≤ dCapᶜ (Caps.cSize (capsAt e sl id)) (Caps.cWid (capsAt e sl id))
             (Caps.cReg (capsAt e sl id)) (capsH e sl id) g
             (Pos (capsAt e sl id) (capsH e sl id) J g i)
 chain-deliv-cap {n = n} {e = e} sl id a nextId path sched st Lv J g i
-  sleq n≤g cok hpz hvc hdp hLv hstr hsv =
+  sleq n≤g cok hpz hvc hdp hLv hstr hsv hpk hord =
   ≤-trans (W.Res.cnt (W.foldPath-go Lv (budgetAt e (Sched.slots sched) nextId) n nextId
                         (arrTick a) (arrSource a) path (arrVal a ∷ [])
                         (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
                         (Arrival.isLast a) sched st
                         ((sleq , cok) , regʲ)
                         (∧-intro hpz hstr) (∧-intro hvc (∧-intro hsv refl))
-                        refl tt tt hdp))
+                        refl tt tt hdp (∧-intro hord hpk)))
           (dCapᶜ-mono {S} {S} {Wd} {Wd} {R} {R} {_} {_} {d} n g
              2≤S ≤-refl ≤-refl ≤-refl n≤g CLIMB)
   where
@@ -505,14 +514,14 @@ arr-chains-caps-go {n = n} {e = e} sl id Lv a nextId ((rid , path) ∷ chains) s
                 J g i hfl hR
                 (≤-trans (+-monoʳ-≤ i (n≤1+n (length chains))) hlen) hLv
 ... | false =
-      ( arr-chain-caps sl id Lv a nextId path sched st′ sleq cok HVC HCL HPZ HDP
+      ( arr-chain-caps sl id Lv a nextId path sched st′ sleq COK′ HVC HCL HPZ HDP
           (proj₁ (∧-true _ _ hstr)) (proj₁ (∧-true _ _ hsv)) HPK
           (proj₁ (∧-true _ _ hord))
           (g , Pos c d J g i , hfl , CH≤ , walk J g i HI hR)
       , proj₁ ST
       , FLAT
       , proj₁ GO′ )
-    , ( arr-chain-burst sl id Lv a nextId path sched st′ sleq cok HVC HCL HPZ HDP
+    , ( arr-chain-burst sl id Lv a nextId path sched st′ sleq COK′ HVC HCL HPZ HDP
           (proj₁ (∧-true _ _ hstr)) (proj₁ (∧-true _ _ hsv)) HPK
           (proj₁ (∧-true _ _ hord))
           (g , Pos c d J g i , hfl , CH≤ , walk J g i HI hR)
@@ -539,7 +548,8 @@ arr-chains-caps-go {n = n} {e = e} sl id Lv a nextId ((rid , path) ∷ chains) s
         HCL = all-impl _ _
                 (λ v h → nestClosOK?ᵛ-widen sl _ v c⊑ h)
                 (arrVal a ∷ []) (∧-intro hcl refl)
-        ST  = chainStep-caps sl id Lv a nextId path sched st′ sleq cok
+        COK′ = capsOK?-delivered (frameStep Lv c) rid sched st cok
+        ST  = chainStep-caps sl id Lv a nextId path sched st′ sleq COK′
                 (pathSz?-widen path (proj₁ c⊑) (proj₁ (∧-true _ _ hpz)))
                 (valCaps?-widen sl (arrTy a) (arrVal a) c⊑ hvc)
                 (lub3-m (depthCascade a nextId chains sched st)
@@ -548,6 +558,8 @@ arr-chains-caps-go {n = n} {e = e} sl id Lv a nextId ((rid , path) ∷ chains) s
                            (proj₁ (proj₂ (chainStep nextId a path sched st′)))
                            (proj₂ (proj₂ (chainStep nextId a path sched st′)))) hdp)
                 (proj₁ (∧-true _ _ hstr)) (proj₁ (∧-true _ _ hsv))
+                (pathPark-delivered path rid st (proj₁ (∧-true _ _ hpk)))
+                (proj₁ (∧-true _ _ hord))
         -- THE CASCADE'S OWN LEDGER LINE, at the state this arm has
         -- already reduced to: an uncancelled registration costs one
         -- delivery, plus this chain's fold, plus the tail's.  It is
@@ -587,7 +599,7 @@ arr-chains-caps-go {n = n} {e = e} sl id Lv a nextId ((rid , path) ∷ chains) s
         STEP = ≤-trans (lvls-mono (suc D) (suc D) 2≤S ≤-refl ≤-refl hLv ≤-refl)
                        (ent-step c d J g i D 2≤S
                           (chain-deliv-cap sl id a nextId path sched st′ Lv J g i
-                             sleq hgn cok
+                             sleq hgn COK′
                              (pathSz?-widen path (proj₁ c⊑) (proj₁ (∧-true _ _ hpz)))
                              HVC
                              (lub3-m (depthCascade a nextId chains sched st)
@@ -596,7 +608,9 @@ arr-chains-caps-go {n = n} {e = e} sl id Lv a nextId ((rid , path) ∷ chains) s
                                         (proj₁ (proj₂ (chainStep nextId a path sched st′)))
                                         (proj₂ (proj₂ (chainStep nextId a path sched st′)))) hdp)
                              hLv (proj₁ (∧-true _ _ hstr))
-                             (proj₁ (∧-true _ _ hsv))))
+                             (proj₁ (∧-true _ _ hsv))
+                             (pathPark-delivered path rid st (proj₁ (∧-true _ _ hpk)))
+                             (proj₁ (∧-true _ _ hord))))
         REC  = ≤-trans (lvls-mono R R 2≤S ≤-refl ≤-refl (proj₁ (proj₂ ST)) ≤-refl)
                  (≤-trans (≤-reflexive (sym (lvls-add S W d Lv (suc D) R))) hlvC)
         HPZ  = pathSz?-widen path (proj₁ c⊑) (proj₁ (∧-true _ _ hpz))
@@ -660,7 +674,8 @@ arr-chains-ledgers {e = e} sl id a nextId sched st sleq cok hpz hvc hcl hsv hdp 
     (subst (λ x → capsOK? x sched (cascadeLatch a st) ≡ true)
            (sym (frameStep-0 (capsAt e sl id))) LATCH)
     hpz (cascade-admit-entry (capsAt e sl id) a sched st cok) hsv
-    (cascade-admit-park a st) (cascade-admit-ord a sched st) hvc hcl hdp
+    (cascade-admit-park a st (capsOK?-regPark (capsAt e sl id) sched st cok))
+    (cascade-admit-ord a sched st (capsOK?-regOrd (capsAt e sl id) sched st cok)) hvc hcl hdp
     0 (Caps.cSize (capsAt e sl id)) 0
     (capsAt-round-size e sl id) base REGLEN ≤-refl
   where
@@ -692,6 +707,14 @@ arr-chains-ledgers {e = e} sl id a nextId sched st sleq cok hpz hvc hcl hsv hdp 
           -- the payload half `hsv` in the list shape the walk reads
           (chainsOf-strat a st (registry-entStrat c sched st cok))
           (chainsStrat?-one (arrVal a) (chainsOf a st) hsv)
+          -- and the chain's two entry readings, both filters of the
+          -- registry's own.  The order half is state-blind, so the latch
+          -- does not move it; the park half is taken AT the latched
+          -- state, which is the state this fold enters
+          (chP?-∧ (λ {u} κ → pathOrd? (Sched.nextNode sched) κ)
+                  (λ {u} κ → pathPark? κ (cascadeLatch a st)) (chainsOf a st)
+             (cascade-admit-ord a sched st (capsOK?-regOrd c sched st cok))
+             (cascade-admit-park a st (capsOK?-regPark c sched st cok)))
   ENTRY = ≤-trans (lvls-mono (delivN (cascadeLatch a st)
                                 (proj₂ (proj₂ (cascadeGo a nextId (chainsOf a st) sched
                                                  (cascadeLatch a st)))))
@@ -828,14 +851,17 @@ arr-chains-bursts sl id a nextId sched st sleq cok hpz hvc hcl hsv hdp =
 --   there is no monotonicity to borrow.  Slackening `S` only weakens a
 --   premise that is already discharged, and moves no risk off this
 --   leaf onto the round.
--- DEAD ROUTE: the compiled harness cannot price the descent at a walked
---   state either, so the barrier is not an instrument that is missing.
---   Its one advantage is running bodies the checker will not unfold,
---   and `Caps-Depth` seals nothing at all; what actually blocks the
---   descent is a doubling per registered share path, recorded at the
---   clause responsible.  Speed is a constant against that, so the
---   conclusion side is closed to instantiation permanently and this row
---   moves only by proof.
+-- DEAD ROUTE: the compiled harness cannot price this descent at a
+--   registry a consumer walks at, and the barrier is not an instrument
+--   that is missing.  Its one advantage is running bodies the checker
+--   will not unfold, and `Caps-Depth` seals nothing at all; what blocks
+--   the descent is a doubling per registered share path, recorded at the
+--   clause responsible, and speed is a constant against a `2ⁿ`.  The
+--   route is therefore dead in the LENGTH and not in the kind -- a
+--   handful of admitted paths prices in an instant, as the sibling
+--   below's rows show -- so what no row can reach is the length at
+--   which the doubling bites, which is the length every consumer here
+--   stands at.
 
 -- ONE FRAME'S OWN SPEND.  `depthFrame` is flatly nought at map, scan
 -- and take, so the whole claim is the two arms that charge: the
@@ -860,9 +886,80 @@ postulate
 
 -- THE FOLD HALF OF WHAT THE SHARE SINK OWES, over the registrations a
 -- share admits rather than the frames a path crosses.  It is
--- `depthFold` again, so it inherits the parent's own barrier and no
--- instrument reaches it -- which is a different obstruction from the
--- one its sibling had, and the reason the two no longer share a block.
+-- `depthFold` again, so it inherits the parent's obstruction rather
+-- than the sibling's -- which is why the two no longer share a block.
+--
+-- AND THE BARRIER IS A SIZE, NOT A KIND, which is the correction a
+-- measurement made to what this block used to assert.  It said no
+-- instrument reached the conclusion, and read that off the parent
+-- instead of off a row; both things that would have had to hold for it
+-- fail.  `Caps-Depth` seals nothing, so opacity is not the obstruction;
+-- and `Gas` is a lazy datatype built to be peeled, so the budget the
+-- hypothesis pins `sf` to does not carry the anchor's divergence into
+-- this side either.  What is actually there is `depthShareGo`'s two
+-- recursive calls per admitted path -- a `2ⁿ` stated at the clause
+-- responsible.  So the conclusion computes, and computes fast, at a
+-- registry of a handful.
+
+-- AND THAT COST IS THE INSTRUMENT'S, NOT A REGION OF THE STATEMENT,
+-- which is what a second measurement corrected.  The length was read as
+-- the region this row still rested on; it cannot be, on two counts a
+-- reader can check off the type.  The statement is over ONE path, so an
+-- admitted LIST is not a parameter of it at all; and both places a
+-- length could enter its value -- the share fold over admitted paths,
+-- and the frame arm along the path itself -- combine by `⊔`.  A max is
+-- raised by a DEEPER member and never by another member, so a count
+-- moves the left side only through the state it threads, which moves
+-- the right side too by `storeSyncMax`.  An axis that moves both sides
+-- cannot refute, and the length was the one every plan here had aimed
+-- at.
+
+-- AND THE VALUE AXIS RUNS THE SAME WAY, WHICH IS THE ONE THAT WAS
+-- EXPECTED TO BITE.  It is the only axis that moves BOTH sides on
+-- purpose -- the ceiling's second argument is exactly the values' nest
+-- depth -- so which side moves faster is the whole question, and it is
+-- arithmetic rather than a matter of coverage.  A nesting level buys
+-- the fold ONE, since `depthFrame` at the successor arm adds a single
+-- `suc` per level walked; it buys the ceiling `suc (sizeᵉ e)`, since
+-- that is the factor `sightCeil` multiplies its summands by, and the
+-- factor is at least two at any program with a term in it.  So the
+-- slack WIDENS with nesting, and the axis that was the last candidate
+-- to refute is the one that cannot.  Measured at one level, where the
+-- fold goes one to two and the ceiling eight to ten.
+
+-- SO THE RESIDUE IS ONE FRAME'S CHARGE AND ONE PATH'S DEPTH, and the
+-- first of those is the sibling directly above rather than anything new.
+-- The ceiling names no path, which reads as the shape a conclusion takes
+-- when no hypothesis carries what it needs -- and the sibling ceiling
+-- this development spends for the same currency does carry one, since
+-- `fitG` (.Nest-Store) sums `pathNestD κ` into it.  The two are
+-- reconciled by where the path CONTRIBUTES: by descent under a `Sight`,
+-- where each frame's charge accumulates, and by `⊔` here, where the
+-- whole path can charge no more than its heaviest frame.  A path-free
+-- ceiling is therefore the right shape for this side, and what it needs
+-- is that one frame's charge be bounded by what the values and the store
+-- already pay for.
+-- PROBED: `Harness.Main`'s share-fold series prices BOTH sides at a
+--   DRIVEN state -- the sched and store a real run builds, not a record
+--   update over `st-init` -- at source zero, the only one of the three
+--   whose admitted entries are headed by a frame rather than by `root`.
+--   The fold reads one against a ceiling of eight, so it fits with room
+--   at every row.  Three separations make the rows load-bearing: the
+--   reading moves with the fold gas, it differs from a `root` control
+--   taken at the same state, and it is nought at the instant the
+--   registry is empty.  The frame arm `f ↠ p` is covered too, at the
+--   two frames that preserve the source type: a `from-inner` head reads
+--   one where the bare sink reads nought and where its own `fin = false`
+--   control reads nought, and a SECOND such head reads the same one --
+--   the `⊔` above, measured rather than read off the clause.
+--   `thru-outer` heads a path too, at the context's one `obs`-typed
+--   source, where the values are closed expressions and `nestDᵛˢ` is
+--   therefore DIALLED rather than read flat: one nesting level moves
+--   the fold by one and the ceiling by two.  Not covered: a second
+--   nesting level, which this context cannot state for want of an
+--   `obs (obs natᵗ)` slot to draw a value from; and two flat shares, so
+--   nothing about one registered under another.
+--   ⚠ measured-not-rechecked.
 postulate
   share-fold-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (sf : Gas) (gas : ℕ) (bid : Id) (now : Tick) (i : Fin n)
