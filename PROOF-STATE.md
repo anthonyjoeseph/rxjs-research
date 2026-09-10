@@ -422,6 +422,21 @@ does not fit is a finding about the shared statement, not about the head.
   cell a walk cannot freeze. The consume enqueues into exactly the cell the
   reading is about, so no watermark both covers it and excludes the write; the
   payload's own reading is what is asked to keep it true.
+- **`subscribeE-regOwn`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: what a
+  subscribe does to the owner ledger. It REGISTERS, so the ledger grows and an
+  already-owned cell must survive every entry added; stated at the entry
+  chain's own floor because at any other it is false.
+- **`stepFrame-regOwn`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the same
+  ledger across one frame step. A step registers only continuations of the
+  chain it was entered at and its drops only shorten a universally quantified
+  reading, which is why this is the cheaper half.
+- **`thruConsume-regOwn`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the
+  ledger across a consume, which drains and re-enters. Every chain it registers
+  continues the entry chain, so the floor it reports is the one being read.
+- **`subscribeInner-regOwn`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the
+  ledger across one drained inner, the writer the drain's recursion needs back.
+  The inner registers under the entry chain with newly minted frames stacked on
+  it, and stacking does not move a terminal.
 - **`regOwn-cell`** (Part1) — SHAPE, `REFUTED`: no registered reader of a
   written cell stands below the writing chain. Refuted over an arbitrary
   state, where a share-ended chain reads at its slot index and the writer

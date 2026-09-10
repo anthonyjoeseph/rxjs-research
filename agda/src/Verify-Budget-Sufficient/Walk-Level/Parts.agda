@@ -2084,7 +2084,7 @@ walk-scan-rest {n = n} {u = u} g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc o
           -- the frame names sits strictly below the watermark the callee
           -- is handed
           (subscribeE-framePark (pathFloor κ) g b (scan-f f nid ↠ κ) bid now
-             (scan-f f nid) sched₁ st₀ ≤-refl
+             (scan-f f nid) sched₁ st₀ ≤-refl refl
              (installNode-scanPark (pathFloor κ) f nid (evalTm z) st
                 (evalTm-strat (pathFloor κ) z hibz)))
           (proj₁ RDZ) (proj₂ (∧-true _ _ (proj₂ RDZ)))

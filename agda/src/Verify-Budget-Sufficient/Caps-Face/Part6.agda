@@ -98,7 +98,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part4 using
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (burstCaps?; capsOK?; capsOK?-mono; eventCaps?; obsCaps?; parkStrat?; pathFloor; pathStrat?;
    pathOrd?; pathPark?;
-   pathSz?; setNode-regPark-owner; slotsCaps?; valCaps?; widNode-push)
+   pathSz?; regOwn?; setNode-regPark-owner; slotsCaps?; valCaps?; widNode-push)
 open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen)
 open import Rx.Inputs-Below using (ib-monoᵛ)
 
@@ -138,6 +138,7 @@ SiCType =
     pathOrd? (Sched.nextNode sched) (thru-outer op allNid ↠ κ) ≡ true →
     pathPark? κ st ≡ true →
     parkStrat? (pathFloor κ) (lookupNode allNid (EvalSt.nodes st)) ≡ true →
+    regOwn? allNid (pathFloor κ) (EvalSt.registry st) ≡ true →
     let r = subscribeInner g op allNid κ id now o sched st
     in Σ ℕ λ j′ →
        (capsOK? (frameStep (j + j′) c)
@@ -171,6 +172,7 @@ IfcType =
     parkStrat? (pathFloor κ) (lookupNode allNid (EvalSt.nodes st)) ≡ true →
     pathOrd? (Sched.nextNode sched) (thru-outer op allNid ↠ κ) ≡ true →
     pathPark? κ st ≡ true →
+    regOwn? allNid (pathFloor κ) (EvalSt.registry st) ≡ true →
     let r = innerFinish g op allNid inst κ id now vals sched st
               (lookupNode allNid (EvalSt.nodes st))
     in Σ ℕ λ j′ →
@@ -196,17 +198,24 @@ postulate
   -- PROBED: `Probed.Kill-Consume-Readings`.  Both `cur` shapes -- the
   --   `nothing` kill and a `just` one -- at `κ = root` over a one-slot
   --   context: `switchKill` writes only the registry, the cancelled set
-  --   and the live set, so all three readings come back unchanged and
-  --   both rows are LOAD-BEARING against a write to `nodes` or to the
-  --   counter.  A registry the kill actually retires is not covered.
+  --   and the live set, so the ordering and the two cell readings come
+  --   back unchanged and both rows are LOAD-BEARING against a write to
+  --   `nodes` or to the counter.  THE OWNERSHIP CONJUNCT IS DEGENERATE
+  --   at both rows, the registry there being empty, so a registry the
+  --   kill actually retires is the region nothing covers.
   switchKill-readings : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (op : AllOp) (nid : NodeId) (κ : Path Γ u t)
     (cur : Maybe NodeId) (sched : Sched Γ) (st : EvalSt e) →
     pathOrd? (Sched.nextNode sched) (thru-outer op nid ↠ κ) ≡ true →
     pathPark? κ st ≡ true →
     parkStrat? (pathFloor κ) (lookupNode nid (EvalSt.nodes st)) ≡ true →
+    -- AND THE CELL IS THIS CHAIN'S OWN, which the kill is the one writer
+    -- of: it retires registrations, so a chain reading the outer's cell
+    -- at this floor is exactly what a retirement could take away
+    regOwn? nid (pathFloor κ) (EvalSt.registry st) ≡ true →
     let r = switchKill cur sched st
     in (pathOrd? (Sched.nextNode (proj₁ (proj₂ r))) (thru-outer op nid ↠ κ) ≡ true)
+       × (regOwn? nid (pathFloor κ) (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
        × (pathPark? κ (proj₂ (proj₂ r)) ≡ true)
        × (parkStrat? (pathFloor κ)
             (lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r)))) ≡ true)
@@ -225,10 +234,13 @@ postulate
   -- hold its head split out.
   --
   -- PROBED: `Probed.Kill-Consume-Readings`.  One row stands at the
-  --   parking state, where the three conclusions compute to
-  --   `(true , true , false)` -- so it is what makes the premise
-  --   load-bearing rather than decorative -- and one covers the identity
-  --   branch, where the arrival is dispatched rather than parked.
+  --   parking state, where the conclusions compute to
+  --   `(true , true , true , false)` -- so it is what makes the arrival
+  --   premise load-bearing rather than decorative -- and one covers the
+  --   identity branch, where the arrival is dispatched rather than
+  --   parked.  THE OWNERSHIP CONJUNCT IS DEGENERATE at both, the
+  --   registry being empty, so a push onto a registered cell is
+  --   uncovered.
   thruConsume-readings : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (g : Gas) (op : AllOp) (nid : NodeId) (κ : Path Γ u t)
     (id : Id) (now : Tick) (o : Val Γ (obs u))
@@ -237,9 +249,16 @@ postulate
     pathOrd? (Sched.nextNode sched) (thru-outer op nid ↠ κ) ≡ true →
     pathPark? κ st ≡ true →
     parkStrat? (pathFloor κ) (lookupNode nid (EvalSt.nodes st)) ≡ true →
+    -- AND THE CELL IS THIS CHAIN'S OWN, which the queue push spends.
+    -- The head appends to the flatten's queue, so every registered
+    -- chain reading that cell has to stand at this chain's floor; the
+    -- frame's own park reading carries it one level up.
+    regOwn? nid (pathFloor κ) (EvalSt.registry st) ≡ true →
     let r = thruConsume g op nid κ id now o sched st
     in (pathOrd? (Sched.nextNode (proj₁ (proj₂ (proj₂ r))))
           (thru-outer op nid ↠ κ) ≡ true)
+       × (regOwn? nid (pathFloor κ) (EvalSt.registry (proj₂ (proj₂ (proj₂ r))))
+            ≡ true)
        × (pathPark? κ (proj₂ (proj₂ (proj₂ r))) ≡ true)
        × (parkStrat? (pathFloor κ)
             (lookupNode nid (EvalSt.nodes (proj₂ (proj₂ (proj₂ r))))) ≡ true)
@@ -257,7 +276,8 @@ postulate
   -- PROBED: `Probed.Kill-Consume-Readings`.  The `g0` branch only, where
   --   the mint raises the counter and returns the state untouched, so
   --   the ordering conjunct rides monotonicity and the two cell
-  --   conjuncts are the identity.  The FUELLED branch is NOT covered and
+  --   conjuncts are the identity; the ownership conjunct is DEGENERATE,
+  --   the registry being empty.  The FUELLED branch is NOT covered and
   --   is where the risk is: it descends through the same consume whose
   --   sibling above is refuted, so it is expected to inherit that
   --   statement's missing premise about the arrival.
@@ -268,9 +288,16 @@ postulate
     pathOrd? (Sched.nextNode sched) (thru-outer op allNid ↠ κ) ≡ true →
     pathPark? κ st ≡ true →
     parkStrat? (pathFloor κ) (lookupNode allNid (EvalSt.nodes st)) ≡ true →
+    -- AND THE CELL IS THIS CHAIN'S OWN, which the drain's recursion
+    -- spends exactly as the head did: the inner registers under a new
+    -- chain, and the outer's cell has to survive that registration
+    regOwn? allNid (pathFloor κ) (EvalSt.registry st) ≡ true →
     let r = subscribeInner g op allNid κ id now o sched st
     in (pathOrd? (Sched.nextNode (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r))))))
           (thru-outer op allNid ↠ κ) ≡ true)
+       × (regOwn? allNid (pathFloor κ)
+            (EvalSt.registry (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))))
+            ≡ true)
        × (pathPark? κ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))) ≡ true)
        × (parkStrat? (pathFloor κ)
             (lookupNode allNid
@@ -386,28 +413,29 @@ innerFinish-mergeAll-face-go :
     parkStrat? (pathFloor κ) (lookupNode allNid (EvalSt.nodes st)) ≡ true →
     pathOrd? (Sched.nextNode sched) (thru-outer mergeAllᵒ allNid ↠ κ) ≡ true →
     pathPark? κ st ≡ true →
+    regOwn? allNid (pathFloor κ) (EvalSt.registry st) ≡ true →
     FrameFace c d j sl (innerFinish g mergeAllᵒ allNid inst κ id now vals sched st nd)
 
 -- § 1  TRIVIAL CASES — innerFinish returns vals , [] , false , sched , st
 innerFinish-mergeAll-face-go ifc k₁ k₂ k₃ k₄ k₅
     c d j g allNid inst κ id now vals sl sched st
-    nothing _ _ _ _ inv _ _ vC _ _ _ _ _ _ _ _
+    nothing _ _ _ _ inv _ _ vC _ _ _ _ _ _ _ _ _
   = innerFinish-face-keep c d j sl vals false sched st inv vC
 innerFinish-mergeAll-face-go ifc k₁ k₂ k₃ k₄ k₅
     c d j g allNid inst κ id now vals sl sched st
-    (just (scan-st _)) _ _ _ _ inv _ _ vC _ _ _ _ _ _ _ _
+    (just (scan-st _)) _ _ _ _ inv _ _ vC _ _ _ _ _ _ _ _ _
   = innerFinish-face-keep c d j sl vals false sched st inv vC
 innerFinish-mergeAll-face-go ifc k₁ k₂ k₃ k₄ k₅
     c d j g allNid inst κ id now vals sl sched st
-    (just (take-st _)) _ _ _ _ inv _ _ vC _ _ _ _ _ _ _ _
+    (just (take-st _)) _ _ _ _ inv _ _ vC _ _ _ _ _ _ _ _ _
   = innerFinish-face-keep c d j sl vals false sched st inv vC
 innerFinish-mergeAll-face-go ifc k₁ k₂ k₃ k₄ k₅
     c d j g allNid inst κ id now vals sl sched st
-    (just (switch-st _ _)) _ _ _ _ inv _ _ vC _ _ _ _ _ _ _ _
+    (just (switch-st _ _)) _ _ _ _ inv _ _ vC _ _ _ _ _ _ _ _ _
   = innerFinish-face-keep c d j sl vals false sched st inv vC
 innerFinish-mergeAll-face-go ifc k₁ k₂ k₃ k₄ k₅
     c d j g allNid inst κ id now vals sl sched st
-    (just (exhaust-st _ _)) _ _ _ _ inv _ _ vC _ _ _ _ _ _ _ _
+    (just (exhaust-st _ _)) _ _ _ _ inv _ _ vC _ _ _ _ _ _ _ _ _
   = innerFinish-face-keep c d j sl vals false sched st inv vC
 
 -- § 2  FLATTEN CASE — delegate entirely to ifc (= innerFinish-caps).
@@ -416,7 +444,7 @@ innerFinish-mergeAll-face-go ifc k₁ k₂ k₃ k₄ k₅
 innerFinish-mergeAll-face-go ifc k₁ k₂ k₃ k₄ k₅
     c d j g allNid inst κ id now vals sl sched st
     (just (mergeAll-st {w} lim act q od))
-    2≤S 1≤R slEq slC inv pC lC vC slSz dpt ndEq hps hvs hpq hord hpk
+    2≤S 1≤R slEq slC inv pC lC vC slSz dpt ndEq hps hvs hpq hord hpk hown
   = let
       -- Step 1: transport dpt from nd to (lookupNode …)
       dpt′ = subst
@@ -425,7 +453,7 @@ innerFinish-mergeAll-face-go ifc k₁ k₂ k₃ k₄ k₅
       -- Step 2: call ifc (= innerFinish-caps) at dep=d, bud=frameBud c j
       res = ifc c d (frameBud c j) j g mergeAllᵒ allNid inst κ id now vals
               sl sched st 2≤S 1≤R slEq slC slSz inv pC lC vC ≤-refl dpt′ hps hvs hpq
-              hord hpk
+              hord hpk hown
       -- Step 3: rearrange tuple
       --   ifc returns: (j′ , capsOK , valsCaps , evts , level)
       --   FrameFace expects: (j′ , level , capsOK , valsCaps , evts)
@@ -537,6 +565,7 @@ private
     pathOrd? (Sched.nextNode sched) (thru-outer op nid ↠ κ) ≡ true →
     pathPark? κ st ≡ true →
     parkStrat? (pathFloor κ) (lookupNode nid (EvalSt.nodes st)) ≡ true →
+    regOwn? nid (pathFloor κ) (EvalSt.registry st) ≡ true →
     let r = thruConsume g op nid κ id now o sched st
     in Σ ℕ λ j′ →
        (capsOK? (frameStep (j + j′) c)
@@ -547,7 +576,7 @@ private
        × (suc (j + j′) ≤ sLvlD (Caps.cSize c) (Caps.cWid c) dep (suc bud) (suc j))
   thruConsume-caps-go {n = n} {u = u} siC c dep bud j g mergeAllᵒ nid κ id now o sl sched st
                       2≤S 1≤R slEq slC slSz inv vC pC lC nst dpt hps hib
-                      hord hpk hpark
+                      hord hpk hpark hown
     with lookupNode nid (EvalSt.nodes st) in eqN
        | lookupNode-caps (frameStep j c) (Sched.slots sched) nid (EvalSt.nodes st)
            (capsOK?-nodeSz (frameStep j c) sched st inv)
@@ -586,6 +615,7 @@ private
     SI = siC c dep bud j g mergeAllᵒ nid κ id now o sl sched st
            2≤S 1≤R slEq slC slSz inv vC pC lC nst dpt hps hib
            hord hpk (subst (λ nd → parkStrat? (pathFloor κ) nd ≡ true) (sym eqN) hpark)
+           hown
     R  = subscribeInner g mergeAllᵒ nid κ id now o sched st
   -- THE GATE IS SHUT: the payload is parked, and one level of width
   -- pays for the cons
@@ -600,7 +630,7 @@ private
                  (capsOK?-mono (frameStep j c) (frameStep (suc j) c) sched st
                     (frameStep-mono-j c 2≤S (n≤1+n j)) inv)
                  (setNode-regPark-owner nid κ
-                    (mergeAll-st lim act (q ++ o ∷ []) od) st
+                    (mergeAll-st lim act (q ++ o ∷ []) od) st hown
                     (λ i le hold → all-++-intro (inputsBelowᵉ i) q (o ∷ [])
                        (subst (λ m → parkStrat? i m ≡ true) eqN hold)
                        (∧-intro (ib-monoᵛ (pathFloor κ) i le (obs u) o hib)
@@ -632,7 +662,7 @@ private
                          slEq pk))
   thruConsume-caps-go siC c dep bud j g switchᵒ nid κ id now o sl sched st
                       2≤S 1≤R slEq slC slSz inv vC pC lC nst dpt hps hib
-                      hord hpk hpark
+                      hord hpk hpark hown
     with lookupNode nid (EvalSt.nodes st) in eqN | dpt
   ... | nothing                | dpt′ = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
     where ZI = subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
@@ -659,7 +689,9 @@ private
        , proj₂ (proj₂ (proj₂ (proj₂ SI)))
     where
     KILL = switchKill cur sched st
-    KILLR = switchKill-readings switchᵒ nid κ cur sched st hord hpk (subst (λ nd → parkStrat? (pathFloor κ) nd ≡ true) (sym eqN) hpark)
+    KILLR = switchKill-readings switchᵒ nid κ cur sched st hord hpk
+              (subst (λ nd → parkStrat? (pathFloor κ) nd ≡ true) (sym eqN) hpark)
+              hown
     sched₁ = proj₁ (proj₂ KILL)
     st₁    = proj₂ (proj₂ KILL)
     SI = siC c dep bud j g switchᵒ nid κ id now o sl sched₁ st₁
@@ -668,12 +700,13 @@ private
            (nest-keeps o sl _ _ bud
               (KeepsC.connMono (switchKill-keeps cur sched st)) nst)
            dpt′ hps hib
-           (proj₁ KILLR) (proj₁ (proj₂ KILLR)) (proj₂ (proj₂ KILLR))
+           (proj₁ KILLR) (proj₁ (proj₂ (proj₂ KILLR)))
+           (proj₂ (proj₂ (proj₂ KILLR))) (proj₁ (proj₂ KILLR))
     j′ = proj₁ SI
     R  = subscribeInner g switchᵒ nid κ id now o sched₁ st₁
   thruConsume-caps-go siC c dep bud j g exhaustᵒ nid κ id now o sl sched st
                       2≤S 1≤R slEq slC slSz inv vC pC lC nst dpt hps hib
-                      hord hpk hpark
+                      hord hpk hpark hown
     with lookupNode nid (EvalSt.nodes st) in eqN
   ... | nothing                = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
     where ZI = subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
@@ -700,6 +733,7 @@ private
     SI = siC c dep bud j g exhaustᵒ nid κ id now o sl sched st
            2≤S 1≤R slEq slC slSz inv vC pC lC nst dpt hps hib
            hord hpk (subst (λ nd → parkStrat? (pathFloor κ) nd ≡ true) (sym eqN) hpark)
+           hown
     j′ = proj₁ SI
     R  = subscribeInner g exhaustᵒ nid κ id now o sched st
 
@@ -724,6 +758,7 @@ private
     pathOrd? (Sched.nextNode sched) (thru-outer op nid ↠ κ) ≡ true →
     pathPark? κ st ≡ true →
     parkStrat? (pathFloor κ) (lookupNode nid (EvalSt.nodes st)) ≡ true →
+    regOwn? nid (pathFloor κ) (EvalSt.registry st) ≡ true →
     let r = thruWalk g op nid κ id now vals sched st
     in Σ ℕ λ j′ →
        (capsOK? (frameStep (j + j′) c)
@@ -734,12 +769,12 @@ private
        × (j + j′ ≤ sIterD (Caps.cSize c) (Caps.cWid c) dep (suc bud) (length vals) j)
   thruWalk-caps-go siC c dep bud j g op nid κ id now [] sl sched st
                    2≤S 1≤R slEq slC slSz inv pC vC lC nst dpt hps hvs
-                   hord hpk hpark =
+                   hord hpk hpark hown =
     0 , subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
       , refl , refl , walk-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
   thruWalk-caps-go {u = u} siC c dep bud j g op nid κ id now (o ∷ os) sl sched st
                    2≤S 1≤R slEq slC slSz inv pC vC lC nst dpt hps hvs
-                   hord hpk hpark =
+                   hord hpk hpark hown =
     suc (j₁ + j₂)
       , capsOK?-mono (frameStep ((j + j₁) + j₂) c) (frameStep (j + suc (j₁ + j₂)) c)
           (proj₁ (proj₂ (proj₂ REST))) (proj₂ (proj₂ (proj₂ REST)))
@@ -779,12 +814,12 @@ private
     hvSplit = ∧-true (inputsBelowᵛ (pathFloor κ) (obs u) o)
                      (valsStrat? (pathFloor κ) os) hvs
     TCR = thruConsume-readings g op nid κ id now o sched st
-            (proj₁ hvSplit) hord hpk hpark
+            (proj₁ hvSplit) hord hpk hpark hown
     HD  = thruConsume-caps-go siC c dep bud j g op nid κ id now o sl sched st
             2≤S 1≤R slEq slC slSz inv (proj₁ (∧-true _ _ vCa)) pC lC
             (mList?-head bud sl _ o os nst)
             (≤-trans (m≤m⊔n _ _) dpt)
-            hps (proj₁ hvSplit) hord hpk hpark
+            hps (proj₁ hvSplit) hord hpk hpark hown
     j₁  = proj₁ HD
     TC  = thruConsume g op nid κ id now o sched st
     sd₁ = proj₁ (proj₂ (proj₂ TC))
@@ -807,7 +842,8 @@ private
                (mList?-tail bud sl _ o os nst))
             (≤-trans (m≤n⊔m _ _) dpt)
             hps (proj₂ hvSplit)
-            (proj₁ TCR) (proj₁ (proj₂ TCR)) (proj₂ (proj₂ TCR))
+            (proj₁ TCR) (proj₁ (proj₂ (proj₂ TCR)))
+            (proj₂ (proj₂ (proj₂ TCR))) (proj₁ (proj₂ TCR))
     j₂   = proj₁ IH
     REST = thruWalk g op nid κ id now os sd₁ st₁
     ⊑ˢ   = frameStep-+suc c j j₁ j₂ 2≤S
@@ -872,12 +908,13 @@ private
     pathOrd? (Sched.nextNode sched) (thru-outer op nid ↠ κ) ≡ true →
     pathPark? κ st ≡ true →
     parkStrat? (pathFloor κ) (lookupNode nid (EvalSt.nodes st)) ≡ true →
+    regOwn? nid (pathFloor κ) (EvalSt.registry st) ≡ true →
     FrameFace c d j sl
       (thruWrap op nid fin (thruWalk g op nid κ id now vals sched st))
   thruOuter-face-core-go siC rr fpN sgN sgC sfL c zero j g op nid κ id now vals fin sl sched st
-      2≤S 1≤R slEq slC inv pS lC vC slSz () _ _ _ _ _
+      2≤S 1≤R slEq slC inv pS lC vC slSz () _ _ _ _ _ _
   thruOuter-face-core-go siC rr fpN sgN sgC sfL c (suc dep′) j g op nid κ id now vals fin sl sched st
-      2≤S 1≤R slEq slC inv pS lC vC slSz hd hps hvs hord hpk hpark =
+      2≤S 1≤R slEq slC inv pS lC vC slSz hd hps hvs hord hpk hpark hown =
     j′ , frame-step (Caps.cSize c) (Caps.cWid c) dep′ j 0 j′ 2≤S z≤n
            (subst (λ x → x + j′
                            ≤ sIterD (Caps.cSize c) (Caps.cWid c) dep′
@@ -901,7 +938,7 @@ private
            (valsCaps→mList-strict c j sl _ vals (≤-trans (s≤s z≤n) 2≤S) slSz
               (valsOf (frameStep j c) sl vals vC))
            (≤-pred hd)
-           hps hvs hord hpk hpark
+           hps hvs hord hpk hpark hown
     j′ = proj₁ TW
     WK = thruWalk g op nid κ id now vals sched st
     WR = thruWrap-caps (frameStep (j + j′) c) op nid fin sl WK
@@ -984,6 +1021,7 @@ abstract
     pathOrd? (Sched.nextNode sched) (thru-outer op nid ↠ κ) ≡ true →
     pathPark? κ st ≡ true →
     parkStrat? (pathFloor κ) (lookupNode nid (EvalSt.nodes st)) ≡ true →
+    regOwn? nid (pathFloor κ) (EvalSt.registry st) ≡ true →
     FrameFace c d j sl
       (thruWrap op nid fin (thruWalk g op nid κ id now vals sched st))
   thruOuter-face-core = thruOuter-face-core-go
@@ -1041,11 +1079,12 @@ innerFinish-mergeAll-face-core :
     parkStrat? (pathFloor κ) (lookupNode allNid (EvalSt.nodes st)) ≡ true →
     pathOrd? (Sched.nextNode sched) (thru-outer mergeAllᵒ allNid ↠ κ) ≡ true →
     pathPark? κ st ≡ true →
+    regOwn? allNid (pathFloor κ) (EvalSt.registry st) ≡ true →
     FrameFace c d j sl (innerFinish g mergeAllᵒ allNid inst κ id now vals sched st
                           (lookupNode allNid (EvalSt.nodes st)))
 innerFinish-mergeAll-face-core ifc k₁ k₂ k₃ k₄ k₅
     c d j g allNid inst κ id now vals sl sched st
-    2≤S 1≤R slEq slC inv pC lC vC slSz dpt hps hvs hpq hord hpk =
+    2≤S 1≤R slEq slC inv pC lC vC slSz dpt hps hvs hpq hord hpk hown =
   -- the five kit hypotheses are ETA-EXPANDED, not passed bare: their
   -- implicits are not determined by any explicit argument, so a bare
   -- `k₂`/`k₅` leaves unsolved metas.  Fresh binder names so the lambdas
@@ -1059,7 +1098,7 @@ innerFinish-mergeAll-face-core ifc k₁ k₂ k₃ k₄ k₅
     c d j g allNid inst κ id now vals sl sched st
     (lookupNode allNid (EvalSt.nodes st))
     2≤S 1≤R slEq slC inv pC lC vC slSz dpt
-    refl hps hvs hpq hord hpk
+    refl hps hvs hpq hord hpk hown
 
 innerFinish-mergeAll-face :
   IfcType →
@@ -1083,6 +1122,7 @@ innerFinish-mergeAll-face :
   parkStrat? (pathFloor κ) (lookupNode allNid (EvalSt.nodes st)) ≡ true →
   pathOrd? (Sched.nextNode sched) (thru-outer mergeAllᵒ allNid ↠ κ) ≡ true →
   pathPark? κ st ≡ true →
+  regOwn? allNid (pathFloor κ) (EvalSt.registry st) ≡ true →
   FrameFace c d j sl (innerFinish g mergeAllᵒ allNid inst κ id now vals sched st
                         (lookupNode allNid (EvalSt.nodes st)))
 innerFinish-mergeAll-face ifc =

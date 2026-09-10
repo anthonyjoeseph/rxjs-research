@@ -486,12 +486,12 @@ latch-caps-flag c sched st s₀ true h with capsOK?-parts c sched st h
 ... | h0 , h1 , h2 , h3 , h4 , h5 , h6 , h7 , h8 , h9 , h10 =
   ∧-intro h0 (∧-intro h1 (∧-intro h2 (∧-intro h3 (∧-intro h4 (∧-intro h5
     (∧-intro h6 (∧-intro h7 (∧-intro h8 (∧-intro h9
-      (regPark?-nodes (EvalSt.registry st) st _ refl h10))))))))))
+      (regPark?-nodes (EvalSt.registry st) st _ refl refl h10))))))))))
 latch-caps-flag c sched st s₀ false h with capsOK?-parts c sched st h
 ... | h0 , h1 , h2 , h3 , h4 , h5 , h6 , h7 , h8 , h9 , h10 =
   ∧-intro h0 (∧-intro h1 (∧-intro h2 (∧-intro h3 (∧-intro h4 (∧-intro h5
     (∧-intro h6 (∧-intro h7 (∧-intro h8 (∧-intro h9
-      (regPark?-nodes (EvalSt.registry st) st _ refl h10))))))))))
+      (regPark?-nodes (EvalSt.registry st) st _ refl refl h10))))))))))
 
 -- the latch resets delivered/cancelled/regWatermark/dying and may add
 -- to completedSources — no conjunct but the park reading sees any of

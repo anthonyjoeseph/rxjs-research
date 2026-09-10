@@ -352,7 +352,7 @@ private
               (register-caps c j (toℕ i) κ sched st₀ 2≤S 1≤R
                  (capsOK?-connect (frameStep j c) (toℕ i) sched st cOK) pSz
                  (entStrat-slot< (toℕ i) κ hib hps) hord
-                 (subst (_≡ true) (pathPark?-nodes κ st st₀ refl) hpk))
+                 (subst (_≡ true) (pathPark?-nodes κ st st₀ refl refl) hpk))
     INV₁ : INV? Ψ (Caps.cSize (frameStep (j + 1) c)) sched st₁ ≡ true
     INV₁ = shared-live-INV c Ψ j 1 (toℕ i) κ sched st₀ 2≤S hCR CAPS₁ invW pB
     fnCd : fnCapᵉ d ≤ Ψ

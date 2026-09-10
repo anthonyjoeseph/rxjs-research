@@ -61,7 +61,8 @@ open import Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves using
   (subscribeE-burstStrat; fresh-pathPark; thruConsume-cellPark;
   framePark-step; pathPark-step; installNode-cellPark; installNode-pathPark;
   subscribeE-ord; subscribeE-pathPark; subscribeE-framePark;
-  subscribeInner-ord; subscribeInner-pathPark; subscribeInner-cellPark)
+  subscribeInner-ord; subscribeInner-pathPark; subscribeInner-cellPark;
+  switchKill-pathPark)
 -- a frame step only RAISES the counter, which is what the order reading
 -- rides across one emit of a burst
 open import Verify-Budget-Sufficient.Delivery-Counter using (stepFrame-nextNode)
@@ -77,7 +78,7 @@ open import Verify-Budget-Sufficient.Caps-Depth using
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using (burstCaps?; capsOK?; valCaps?; widNode; widNode-push; nestValOK?; pathSz?; slotsCaps?;
   nestClosOK?; nestClosOK?ᵛ; nestClosOK?ᵛ-widen; slotsCaps?-widen; frameSz?; capsOK?-mono;
   pathFloor; frameStrat?; pathStrat?; burstStrat?; parkStrat?; setNode-regPark-owner; pathOrd?;
-  pathPark?; pathPark?-nodes; pathOrd?-mono; pathOrd?-read; pathOrd?-hop; pathOrd?-push;
+  pathPark?; pathOrd?-mono; pathOrd?-read; pathOrd?-hop; pathOrd?-push;
   pathOrd?-inner; pathOrd?-cell; pathOrd?-outer; pathOrd?-tail; pathCell; pathRead)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using (burstCaps?-widen; valCaps?-wid; valCaps?-size; valCaps?-widen; pathSz?-⊑; frameStep-chain-suc; expWid-fromSize)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using (capsOK?-nextNode; capsOK?-parts; capsOK?-setNode; capsOK?-setNode-park; capsOK?-regPark; switchKill-caps; NodeCaps; lookupNode-caps;
@@ -3089,9 +3090,11 @@ thruStep-switch-inner-caps c L sl fuel nid κ id now (just v) od o sched st
           stP stO
           (subst (λ x → pathOrd? x (thru-outer switchᵒ nid ↠ κ) ≡ true)
                  (sym (switchKill-nextNode (just v) sched st)) stR)
-          (subst (_≡ true)
-                 (pathPark?-nodes κ st st₁ (sym (switchKill-nodes (just v) sched st)))
-                 stK)
+          -- THE CHAIN READING DOES NOT TRAVEL BY THE NODE TABLE any
+          -- more: ownership lives in the registry, which is the one
+          -- thing a kill writes, so it goes by the survivor-sublist
+          -- argument rather than by rewriting along an unchanged table
+          (switchKill-pathPark κ (just v) sched st stK)
           (subst (λ m → parkStrat? (pathFloor κ) (lookupNode nid m) ≡ true)
                  (sym (switchKill-nodes (just v) sched st)) stQ)
 
@@ -3538,7 +3541,8 @@ thruWalk-caps {u = u} c L sl W fuel op nid κ id now (o ∷ os) sched st hsl hc 
             (thru-outer op nid ↠ κ) (FreshC.nxMono FR0) stR)
          -- and everything below the watermark the consume owes nothing
          -- about is exactly the chain under the outer
-         (fresh-pathPark κ (Sched.nextNode sched) (Sched.nextNode sd₁) st st₁ FRκ stK)
+         (fresh-pathPark κ (Sched.nextNode sched) (Sched.nextNode sd₁) st st₁ FRκ
+            (λ nd _ → thruConsume-regOwn fuel op nid κ id now o sched st nd) stK)
          -- the outer's own cell is the one the consume may write, and
          -- what keeps its reading true is this payload's own
          (thruConsume-cellPark fuel op nid κ id now o sched st stO stQ)
@@ -3783,7 +3787,8 @@ thruFit-vals {u = u} c L sl B W m m′ fuel mergeAllᵒ nid κ id now (o ∷ os)
          (thru-outer mergeAllᵒ nid ↠ κ) (FreshC.nxMono FR0) stR)
       -- and everything below the watermark the consume owes nothing
       -- about is exactly the chain under the outer
-      (fresh-pathPark κ (Sched.nextNode sched) (Sched.nextNode sd₁) st st₁ FRκ stK)
+      (fresh-pathPark κ (Sched.nextNode sched) (Sched.nextNode sd₁) st st₁ FRκ
+         (λ nd _ → thruConsume-regOwn fuel mergeAllᵒ nid κ id now o sched st nd) stK)
       -- the outer's own cell is the one the consume may write, and what
       -- keeps its reading true is this payload's own
       (thruConsume-cellPark fuel mergeAllᵒ nid κ id now o sched st stO stQ)
@@ -3826,7 +3831,8 @@ thruFit-vals {u = u} c L sl B W m m′ fuel switchᵒ nid κ id now (o ∷ os) s
          (thru-outer switchᵒ nid ↠ κ) (FreshC.nxMono FR0) stR)
       -- and everything below the watermark the consume owes nothing
       -- about is exactly the chain under the outer
-      (fresh-pathPark κ (Sched.nextNode sched) (Sched.nextNode sd₁) st st₁ FRκ stK)
+      (fresh-pathPark κ (Sched.nextNode sched) (Sched.nextNode sd₁) st st₁ FRκ
+         (λ nd _ → thruConsume-regOwn fuel switchᵒ nid κ id now o sched st nd) stK)
       -- the outer's own cell is the one the consume may write, and what
       -- keeps its reading true is this payload's own
       (thruConsume-cellPark fuel switchᵒ nid κ id now o sched st stO stQ)
@@ -3869,7 +3875,8 @@ thruFit-vals {u = u} c L sl B W m m′ fuel exhaustᵒ nid κ id now (o ∷ os) 
          (thru-outer exhaustᵒ nid ↠ κ) (FreshC.nxMono FR0) stR)
       -- and everything below the watermark the consume owes nothing
       -- about is exactly the chain under the outer
-      (fresh-pathPark κ (Sched.nextNode sched) (Sched.nextNode sd₁) st st₁ FRκ stK)
+      (fresh-pathPark κ (Sched.nextNode sched) (Sched.nextNode sd₁) st st₁ FRκ
+         (λ nd _ → thruConsume-regOwn fuel exhaustᵒ nid κ id now o sched st nd) stK)
       -- the outer's own cell is the one the consume may write, and what
       -- keeps its reading true is this payload's own
       (thruConsume-cellPark fuel exhaustᵒ nid κ id now o sched st stO stQ)
@@ -3951,7 +3958,8 @@ thruRoom-frame {n = n} {u = u} c L W sl sf id now op nid p (o ∷ os) sched st
       (proj₂ (∧-true _ _ hval)) hpk hpl hws stP stT
       (pathOrd?-mono (Sched.nextNode sched) (Sched.nextNode sd₁)
          (thru-outer op nid ↠ p) (FreshC.nxMono FR0) stR)
-      (fresh-pathPark p (Sched.nextNode sched) (Sched.nextNode sd₁) st st₁ FRκ stK)
+      (fresh-pathPark p (Sched.nextNode sched) (Sched.nextNode sd₁) st st₁ FRκ
+         (λ nd _ → thruConsume-regOwn sf op nid p id now o sched st nd) stK)
       (thruConsume-cellPark sf op nid p id now o sched st stO stQ)
   where
   rc = thruConsume sf op nid p id now o sched st
@@ -4827,6 +4835,7 @@ mintSub-pathPark {u = u} g op lim b κ id now sched st stO stK =
     (proj₂ (mintNode sched))
     (installNode (Sched.nextNode sched) (allFresh u op lim) st)
     (≤-trans read≤ (n≤1+n (Sched.nextNode sched)))
+    refl
     (installNode-pathPark (Sched.nextNode sched) (allFresh u op lim) κ st read≤ stK)
   where
   read≤ = pathOrd?-read (Sched.nextNode sched) κ stO
@@ -4847,7 +4856,7 @@ mintSub-cellPark {u = u} g op lim b κ id now sched st =
     (thru-outer {u = u} op (Sched.nextNode sched))
     (proj₂ (mintNode sched))
     (installNode (Sched.nextNode sched) (allFresh u op lim) st)
-    ≤-refl
+    ≤-refl refl
     (installNode-cellPark {u = u} (pathFloor κ) op (Sched.nextNode sched)
        (allFresh u op lim) st (allFresh-parkStrat (pathFloor κ) u op lim))
 
@@ -7248,7 +7257,7 @@ mergeAllDrain-nest {e = e} c d sl B W Lv sf allNid κ id now lim act (o ∷ q) s
             (pathOrd?-read (Sched.nextNode sched) κ
                (pathOrd?-tail (Sched.nextNode sched)
                   (thru-outer mergeAllᵒ allNid) κ stR))
-            stK)
+            refl stK)
          (subscribeInner-cellPark (pathFloor κ) sf mergeAllᵒ allNid κ κ id now o
             sched st
             (≤-trans (m≤m⊔n (suc allNid) (pathCell κ))

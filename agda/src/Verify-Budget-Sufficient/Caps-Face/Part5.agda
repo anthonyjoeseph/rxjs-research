@@ -79,7 +79,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (applyFn-iterSize; capsOK?; capsOK?-mono; closLive; eventCaps?;
    closSizeᵛ; closSizeᵛ-OK; closSizeᵛ≤mul;
    frameSz?; iterFold-+; iterSize-+; nestClosOK?ᵛ; parkStrat?; pathFloor;
-   pathSz?; setNode-regPark-owner;
+   pathSz?; regOwn?; setNode-regPark-owner;
    slotsCaps?; slotsCaps?-clos; SlotWid; valCaps?; widLive; widNode)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (applyFn-iterFold; frameStep-⊑-+; valCaps?-size; valCaps?-wid; wid-lift)
@@ -812,6 +812,12 @@ stepFrame-scan-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   -- already carried by the frame face one level up
   inputsBelowᵗ (pathFloor κ) fn ≡ true →
   valsStrat? (pathFloor κ) vals ≡ true →
+  -- AND THE CELL IS THE CHAIN'S OWN, which the store write spends
+  -- beside them.  The head overwrites the scan's accumulator, so every
+  -- registered chain reading that cell has to be standing at this
+  -- chain's floor; the frame face one level up holds exactly that, as
+  -- the owner half of the park reading it already carries.
+  regOwn? nid (pathFloor κ) (EvalSt.registry st) ≡ true →
   let r = stepFrame g id now (scan-f fn nid) κ vals fin sched st
   in Σ ℕ λ j′ →
      (capsOK? (frameStep (j + j′) c)
@@ -826,7 +832,7 @@ stepFrame-scan-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
      -- bound is invisible at the call site unless it is reported
      × (j′ ≤ fCharge (Caps.cSize c) (Caps.cWid c) j)
 stepFrame-scan-caps {s = s} {u = u} c j g id now fn nid κ vals fin sl sched st
-                    2≤S slC slEq inv fS pS vL vC sF sV
+                    2≤S slC slEq inv fS pS vL vC sF sV sO
   with lookupNode nid (EvalSt.nodes st) in eqN
      | lookupNode-caps (frameStep j c) (Sched.slots sched) nid (EvalSt.nodes st)
          (capsOK?-nodeSz (frameStep j c) sched st inv)
@@ -850,7 +856,7 @@ stepFrame-scan-caps {s = s} {u = u} c j g id now fn nid κ vals fin sl sched st
                    (proj₂ (proj₂ SC))))
          (capsOK?-mono (frameStep j c) (frameStep (j + j′) c) sched st
             (frameStep-⊑-+ c 2≤S j j′) inv)
-         (setNode-regPark-owner nid κ (scan-st (proj₂ run)) st
+         (setNode-regPark-owner nid κ (scan-st (proj₂ run)) st sO
             (λ i le hold → proj₁ (scanVals-strat i fn ac vals
                         (T⇒≡true (inputsBelowᵗ i fn)
                            (ib-monoᵗ (pathFloor κ) i le fn (T-to sF)))

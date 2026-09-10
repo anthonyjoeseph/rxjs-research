@@ -2,17 +2,18 @@
 -- framePark-step … shareAdmit-park
 module Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves where
 
-open import Data.Bool    using (Bool; true; false; _∧_)
+open import Data.Bool    using (Bool; true; false; _∧_; _∨_)
+open import Data.Bool.Properties using (∨-zeroʳ)
 open import Data.Fin     using (Fin; toℕ)
-open import Data.List    using (List; map; [])
-open import Data.Bool.ListAction using (all)
+open import Data.List    using (List; map; []; _∷_)
+open import Data.Bool.ListAction using (all; any)
 open import Data.Maybe   using (Maybe; just; nothing)
-open import Data.Nat     using (ℕ; suc; _≤_; _≤ᵇ_)
+open import Data.Nat     using (ℕ; suc; _≤_; _≤ᵇ_; _≡ᵇ_)
 open import Data.Nat.Properties using (≤-refl; ≤-trans; ≤ᵇ⇒≤; m≤m⊔n; m≤n⊔m; n≤1+n)
 open import Data.Unit    using (⊤; tt)
 open import Data.Vec     using (lookup)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; cong)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 open import Relation.Nullary using (yes; no)
 
 open import Rx.Prim      using (Tick; Id; Gas; g0; gs; Source; InstEvent)
@@ -23,15 +24,18 @@ open import Rx.Evaluator using
   (Frame; Path; Sched; EvalSt; RegId; _↠_; root; share-sink; stepFrame; subscribeE; foldPath;
   shareAdmit; shareLatch; NodeId; NodeState; AllOp; lookupNode; thruConsume; mergeAllDrain;
   subscribeInner; installNode; scan-st; take-st; mergeAll-st; switch-st; exhaust-st; map-f;
-  scan-f; take-f; from-inner; thru-outer; Arrival; arrTy; chainsOf; chainStep; cascadeLatch)
+  scan-f; take-f; from-inner; thru-outer; Arrival; arrTy; chainsOf; chainStep; cascadeLatch;
+  frameNodes; pathHasNode; switchKill; cutThrough; Chain)
 open import Verify-Budget-Sufficient.Caps using (Caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (burstStrat?; capsOK?; framePark?; frameAbove?; frameRead; frameStrat?; parkStrat?; pathCell;
   pathFloor; pathOrd?; pathOrd?-mono; pathOrd?-read; pathPark?; pathRead; pathStrat?; regOrd?;
-  regPark?; regPark?-nodes; regStrat?)
+  regPark?; regPark?-nodes; regStrat?; regOwn?; pathOwn?;
+  frameParked?; frameOwned?; frameParked?-nodes; any-all; all-any; regOwn?-fresh)
+open import Verify-Budget-Sufficient.Keeps-Ring using (switchKill-nodes)
 open import Verify-Budget-Sufficient.Delivery-Walk using
   (chainsGo-chQ; shareAdmit-chQ)
-open import Verify-Budget-Sufficient.Caps-Face.Part4 using (valsStrat?)
+open import Verify-Budget-Sufficient.Caps-Face.Part4 using (valsStrat?; capsOK?-regOrd)
 open import Verify-Budget-Sufficient.Caps-Face.Part5 using (scanVals-strat)
 open import Decide using (∧-intro; ∧-trueˡ; ∧-trueʳ; T-to)
 open import Verify-Budget-Sufficient.Node-Fresh using
@@ -426,8 +430,36 @@ scan-strat-step {u = u} k sf nid now fn nd κ vals fin sched st hpk hfn hib
 ... | just (switch-st _ _)       = refl
 ... | just (exhaust-st _ _)      = refl
 ... | just (scan-st {w} acc) with w ≟ᵗ u
-...   | yes refl = proj₂ (scanVals-strat k fn acc vals hfn hpk hib)
+...   | yes refl = proj₂ (scanVals-strat k fn acc vals hfn (∧-trueˡ hpk) hib)
 ...   | no _     = refl
+
+-- THE STRAT HALF OF A FRAME READING, as a named projection rather than
+-- a `∧` split spelled at each site.  It is worth the line because the
+-- split cannot be written inline: the conjunction is behind a
+-- definition, so a bare projection leaves the OTHER conjunct a
+-- metavariable and every site would have to name the owner predicate
+-- it is discarding.
+framePark?-parked : ∀ {n} {Γ : Ctx n} {s u t} {e : Closed Γ t}
+  (k : ℕ) (f : Frame Γ s u) (st : EvalSt e) →
+  framePark? k f st ≡ true →
+  frameParked? k f st ≡ true
+framePark?-parked k f st h = ∧-trueˡ {a = frameParked? k f st} h
+
+-- THE MINT'S OWN OWNER READING, which is what every install site here
+-- spends and none of them can source locally.  A cell handed out AT
+-- the counter is named by no registered chain, because the ordering
+-- ledger puts every registered chain's cells strictly below it -- so
+-- the reading holds at EVERY floor and the ledger is the whole of the
+-- argument.  Stated over the scheduler rather than over a bare node so
+-- that the `≤` is `refl` at the site and the caps receipt is the only
+-- thing a caller has to name.
+mint-regOwn : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (c : Caps) (k : ℕ) (sched : Sched Γ) (st : EvalSt e) →
+  capsOK? c sched st ≡ true →
+  regOwn? (Sched.nextNode sched) k (EvalSt.registry st) ≡ true
+mint-regOwn c k sched st inv =
+  regOwn?-fresh (Sched.nextNode sched) (Sched.nextNode sched) k
+    (EvalSt.registry st) ≤-refl (capsOK?-regOrd c sched st inv)
 
 -- WHAT AN INSTALL LEAVES AT ITS OWN CELL, and it is a BODY over the
 -- node table's own roundtrip rather than the leaf this once was.  The
@@ -441,11 +473,13 @@ scan-strat-step {u = u} k sf nid now fn nd κ vals fin sched st hpk hfn hib
 installNode-scanPark : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   (k : ℕ) (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
   (ac : Val Γ u) (st : EvalSt e) →
+  regOwn? nid k (EvalSt.registry st) ≡ true →
   inputsBelowᵛ k u ac ≡ true →
   framePark? k (scan-f fn nid) (installNode nid (scan-st ac) st) ≡ true
-installNode-scanPark k fn nid ac st hac =
-  trans (cong (parkStrat? k)
-           (lookupNode-setNode nid (scan-st ac) (EvalSt.nodes st))) hac
+installNode-scanPark k fn nid ac st how hac =
+  ∧-intro (trans (cong (parkStrat? k)
+                    (lookupNode-setNode nid (scan-st ac) (EvalSt.nodes st))) hac)
+          (∧-intro how refl)
 
 -- AND THE OUTER'S OWN CELL AT THE INSTALL THAT MINTS IT, which is the
 -- degenerate half of the same lemma: a flatten's node is born with an
@@ -456,12 +490,14 @@ installNode-scanPark k fn nid ac st hac =
 -- unfolding the node table by hand.
 installNode-thruPark : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (k : ℕ) (op : AllOp) (nid : NodeId) (st : EvalSt e) →
+  regOwn? nid k (EvalSt.registry st) ≡ true →
   framePark? k (thru-outer {u = u} op nid)
     (installNode nid (mergeAll-st {t = u} nothing 0 [] false) st) ≡ true
-installNode-thruPark {u = u} k op nid st =
-  cong (parkStrat? k)
-    (lookupNode-setNode nid (mergeAll-st {t = u} nothing 0 [] false)
-       (EvalSt.nodes st))
+installNode-thruPark {u = u} k op nid st how =
+  ∧-intro (cong (parkStrat? k)
+             (lookupNode-setNode nid (mergeAll-st {t = u} nothing 0 [] false)
+                (EvalSt.nodes st)))
+          (∧-intro how refl)
 
 -- AND THE SAME WHERE THE CELL IS ABSTRACT, which is what a head that
 -- does not know which flatten it is installing needs: the two lemmas
@@ -470,10 +506,13 @@ installNode-thruPark {u = u} k op nid st =
 -- that is left is that the lookup finds what was just written.
 installNode-cellPark : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (k : ℕ) (op : AllOp) (nid : NodeId) (ns : NodeState Γ) (st : EvalSt e) →
+  regOwn? nid k (EvalSt.registry st) ≡ true →
   parkStrat? k (just ns) ≡ true →
   framePark? k (thru-outer {u = u} op nid) (installNode nid ns st) ≡ true
-installNode-cellPark k op nid ns st h =
-  trans (cong (parkStrat? k) (lookupNode-setNode nid ns (EvalSt.nodes st))) h
+installNode-cellPark k op nid ns st how h =
+  ∧-intro (trans (cong (parkStrat? k)
+                    (lookupNode-setNode nid ns (EvalSt.nodes st))) h)
+          (∧-intro how refl)
 
 -- THE TRANSPORT ITSELF, KEYED ON THE FREEZE AND NOT ON WHAT CAUSED IT.
 -- A subscribe and a step reach this reading by different routes and
@@ -481,21 +520,172 @@ installNode-cellPark k op nid ns st h =
 -- reads back unchanged -- so the case split over the frame is written
 -- once and each caller supplies its own freeze.  The three silent shapes
 -- are free because the reading does not reach the store at them at all.
+-- AND THE OWNER HALF TRAVELS BY ITS OWN PREMISE, since a freeze is a
+-- statement about the STORE and ownership reads the registry.  The two
+-- are separated rather than bundled because their sites differ: a
+-- record update that touches neither field spends `refl` for the
+-- registry half, while a subscribe grows it and owes a real argument.
 frozen-framePark : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   (k w : ℕ) (f : Frame Γ s u) (st st′ : EvalSt e) →
   (∀ j → suc j ≤ w →
      lookupNode j (EvalSt.nodes st′) ≡ lookupNode j (EvalSt.nodes st)) →
+  (∀ nd → any (_≡ᵇ nd) (frameNodes f) ≡ true →
+     regOwn? nd k (EvalSt.registry st) ≡ true →
+     regOwn? nd k (EvalSt.registry st′) ≡ true) →
   parkBelow w f →
   framePark? k f st ≡ true →
   framePark? k f st′ ≡ true
-frozen-framePark k w (map-f _)        st st′ hfz hb hp = hp
-frozen-framePark k w (take-f _)       st st′ hfz hb hp = hp
-frozen-framePark k w (thru-outer _ nid) st st′ hfz hb hp =
-  trans (cong (parkStrat? k) (hfz nid hb)) hp
-frozen-framePark k w (scan-f _ nd) st st′ hfz hb hp =
-  trans (cong (parkStrat? k) (hfz nd hb)) hp
-frozen-framePark k w (from-inner _ a _) st st′ hfz hb hp =
-  trans (cong (parkStrat? k) (hfz a hb)) hp
+frozen-framePark {Γ = Γ} k w f st st′ hfz how hb hp =
+  ∧-intro (parked f hb (proj₁ hs))
+          (any-all (λ nd → regOwn? nd k (EvalSt.registry st′)) (frameNodes f)
+             (λ nd hm → how nd hm
+                (all-any (λ m → regOwn? m k (EvalSt.registry st)) nd
+                   (frameNodes f) (proj₂ hs) hm)))
+  where
+  hs = ∧-true (frameParked? k f st) (frameOwned? k f (EvalSt.registry st)) hp
+  parked : ∀ {s′ u′} (f′ : Frame Γ s′ u′) → parkBelow w f′ →
+    frameParked? k f′ st ≡ true → frameParked? k f′ st′ ≡ true
+  parked (map-f _)          hb′ h = h
+  parked (take-f _)         hb′ h = h
+  parked (thru-outer _ nid) hb′ h = trans (cong (parkStrat? k) (hfz nid hb′)) h
+  parked (scan-f _ nd)      hb′ h = trans (cong (parkStrat? k) (hfz nd hb′)) h
+  parked (from-inner _ a _) hb′ h = trans (cong (parkStrat? k) (hfz a hb′)) h
+
+-- AND WHAT A KILL DOES TO IT, WHICH IS NOTHING, AND THAT IS PROVEN
+-- RATHER THAN POSTULATED.  The kill's only registry write is
+-- `cutThrough`'s survivor list, which DROPS entries and rewrites none,
+-- and the owner reading is a universal over the ledger -- so dropping
+-- is the one write it survives for free.  The general shape is stated
+-- over an arbitrary predicate because nothing here is about ownership:
+-- what carries is that the survivors are a sublist.
+cutThrough-all : ∀ {n} {Γ : Ctx n} {t}
+  (P : RegId × Source × Chain Γ t → Bool)
+  (nid : NodeId) (dlv : List RegId) (wm : RegId) (dying : List Source)
+  (reg : List (RegId × Source × Chain Γ t)) →
+  all P reg ≡ true →
+  all P (proj₁ (cutThrough nid dlv wm dying reg)) ≡ true
+cutThrough-all P nid dlv wm dying [] h = refl
+cutThrough-all P nid dlv wm dying ((rid , src , c) ∷ r) h
+  with pathHasNode nid (proj₂ c)
+     | cutThrough nid dlv wm dying r
+     | cutThrough-all P nid dlv wm dying r (proj₂ (∧-true _ _ h))
+... | true  | _ | ih = ih
+... | false | _ | ih = ∧-intro (proj₁ (∧-true _ _ h)) ih
+
+switchKill-regOwn : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (nd : NodeId) (k : ℕ) (cur : Maybe NodeId) (sched : Sched Γ) (st : EvalSt e) →
+  regOwn? nd k (EvalSt.registry st) ≡ true →
+  regOwn? nd k (EvalSt.registry (proj₂ (proj₂ (switchKill cur sched st)))) ≡ true
+switchKill-regOwn nd k nothing  sched st h = h
+switchKill-regOwn nd k (just v) sched st h =
+  cutThrough-all (λ en → pathOwn? nd k (proj₂ (proj₂ (proj₂ en)))) v
+    (EvalSt.delivered st) (EvalSt.regWatermark st) (EvalSt.dying st)
+    (EvalSt.registry st) h
+
+-- AND THE WHOLE CHAIN READING ACROSS THE SAME KILL, which is no longer
+-- a node-table transport: folding ownership into the frame reading put
+-- the REGISTRY on the side the kill writes, so the two halves travel by
+-- different arguments -- the node table is untouched, and the owner
+-- half rides the sublist above.
+switchKill-framePark : ∀ {n} {Γ : Ctx n} {s u t} {e : Closed Γ t}
+  (k : ℕ) (f : Frame Γ s u) (cur : Maybe NodeId) (sched : Sched Γ) (st : EvalSt e) →
+  framePark? k f st ≡ true →
+  framePark? k f (proj₂ (proj₂ (switchKill cur sched st))) ≡ true
+switchKill-framePark k f cur sched st h =
+  ∧-intro
+    (trans (frameParked?-nodes k f (proj₂ (proj₂ (switchKill cur sched st))) st
+              (switchKill-nodes cur sched st))
+           (∧-trueˡ {a = frameParked? k f st} h))
+    (all-impl (λ nd → regOwn? nd k (EvalSt.registry st))
+              (λ nd → regOwn? nd k
+                        (EvalSt.registry (proj₂ (proj₂ (switchKill cur sched st)))))
+              (λ nd → switchKill-regOwn nd k cur sched st)
+              (frameNodes f) (∧-trueʳ {a = frameParked? k f st} h))
+
+switchKill-pathPark : ∀ {n} {Γ : Ctx n} {u t} {e : Closed Γ t}
+  (κ : Path Γ u t) (cur : Maybe NodeId) (sched : Sched Γ) (st : EvalSt e) →
+  pathPark? κ st ≡ true →
+  pathPark? κ (proj₂ (proj₂ (switchKill cur sched st))) ≡ true
+switchKill-pathPark root           cur sched st h = refl
+switchKill-pathPark (share-sink _) cur sched st h = refl
+switchKill-pathPark (f ↠ p)        cur sched st h =
+  ∧-intro (switchKill-framePark (pathFloor p) f cur sched st
+             (∧-trueˡ {a = framePark? (pathFloor p) f st} h))
+          (switchKill-pathPark p cur sched st
+             (∧-trueʳ {a = framePark? (pathFloor p) f st} h))
+
+-- AND WHAT A STEP DOES TO THE SAME LEDGER, which is the cheaper half
+-- and needs no conditioning at all.  A step registers only chains that
+-- CONTINUE the one it was entered at, and a floor is the terminal's, so
+-- every entry a step adds reports the entry chain's own floor -- at
+-- which the owner reading is satisfied by whatever the entry names.
+-- The drops a step performs only shorten the ledger, which the reading
+-- quantifies over universally.
+postulate
+  stepFrame-regOwn : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+    (g : Gas) (id : Id) (now : Tick)
+    (f : Frame Γ s u) (κ : Path Γ u t)
+    (vals : List (Val Γ s)) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) (nd : NodeId) →
+    regOwn? nd (pathFloor κ) (EvalSt.registry st) ≡ true →
+    regOwn? nd (pathFloor κ)
+      (EvalSt.registry
+        (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame g id now f κ vals fin sched st))))))
+      ≡ true
+
+-- AND THE SAME FOR A CONSUME, for the same reason and at the same
+-- floor.  A consume drains and re-enters, and every chain it registers
+-- continues the one it was entered at, so the ledger it hands back
+-- reports that chain's floor at every new entry.
+postulate
+  thruConsume-regOwn : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (g : Gas) (op : AllOp) (nid : NodeId) (κ : Path Γ u t)
+    (id : Id) (now : Tick) (o : Val Γ (obs u))
+    (sched : Sched Γ) (st : EvalSt e) (nd : NodeId) →
+    regOwn? nd (pathFloor κ) (EvalSt.registry st) ≡ true →
+    regOwn? nd (pathFloor κ)
+      (EvalSt.registry
+        (proj₂ (proj₂ (proj₂ (thruConsume g op nid κ id now o sched st)))))
+      ≡ true
+
+-- AND FOR THE DRAIN'S OWN SUBSCRIBE, which is the third writer the
+-- *All edge spends and the one its recursion needs back.  Same
+-- argument and same floor: the inner registers under the entry chain
+-- with newly minted frames stacked on it, and stacking does not move a
+-- terminal, so every entry the subscribe adds reports the floor being
+-- read.
+postulate
+  subscribeInner-regOwn : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (g : Gas) (op : AllOp) (allNid : NodeId) (κ : Path Γ u t)
+    (id : Id) (now : Tick) (o : Val Γ (obs u))
+    (sched : Sched Γ) (st : EvalSt e) (nd : NodeId) →
+    regOwn? nd (pathFloor κ) (EvalSt.registry st) ≡ true →
+    regOwn? nd (pathFloor κ)
+      (EvalSt.registry
+        (proj₂ (proj₂ (proj₂ (proj₂ (proj₂
+          (subscribeInner g op allNid κ id now o sched st)))))))
+      ≡ true
+
+-- WHAT A SUBSCRIBE DOES TO THE OWNER LEDGER, which is the registry
+-- half of the same disjointness and cannot be read off the store one.
+-- A subscribe REGISTERS, so the ledger grows, and a cell already owned
+-- at a floor has to stay owned against every entry the subscribe adds.
+-- Each such entry is the entry chain with newly minted frames stacked
+-- on it, and a floor is the TERMINAL's, which stacking does not move --
+-- so every entry the subscribe adds reports the entry chain's own
+-- floor, and at THAT floor the owner reading is satisfied whatever the
+-- entry names.  Stated at the one floor rather than at all of them
+-- because at any other floor it is FALSE: a freshly minted cell is
+-- owned vacuously beforehand and named by the new entry after.
+postulate
+  subscribeE-regOwn : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {w}
+    (g : Gas) (b : Closed Γ w) (κ : Path Γ w t)
+    (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e)
+    (nd : NodeId) →
+    regOwn? nd (pathFloor κ) (EvalSt.registry st) ≡ true →
+    regOwn? nd (pathFloor κ)
+      (EvalSt.registry (proj₂ (proj₂ (subscribeE g b κ bid now sched st))))
+      ≡ true
 
 -- WHAT A SUBSCRIBE DOES TO A CELL IT DOES NOT OWN, and this is the
 -- DISJOINTNESS half of the store question rather than a second
@@ -518,11 +708,14 @@ subscribeE-framePark : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u w}
   (bid : Id) (now : Tick) (f : Frame Γ s u)
   (sched : Sched Γ) (st : EvalSt e) →
   parkBelow (Sched.nextNode sched) f →
+  k ≡ pathFloor κ →
   framePark? k f st ≡ true →
   framePark? k f (proj₂ (proj₂ (subscribeE g b κ bid now sched st))) ≡ true
-subscribeE-framePark k g b κ bid now f sched st hb hp =
-  frozen-framePark k (Sched.nextNode sched) f st _
-    (subscribeE-nodes-below g b κ bid now sched st) hb hp
+subscribeE-framePark k g b κ bid now f sched st hb refl hp =
+  frozen-framePark (pathFloor κ) (Sched.nextNode sched) f st _
+    (subscribeE-nodes-below g b κ bid now sched st)
+    (λ nd _ hj → subscribeE-regOwn g b κ bid now sched st nd hj)
+    hb hp
 
 -- AND THE CHAIN-LEVEL TRANSPORT, which is the frame one under an
 -- induction and nothing else.  `pathPark?` reads each frame at the floor
@@ -533,14 +726,22 @@ frozen-pathPark : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (w : ℕ) (κ : Path Γ u t) (st st′ : EvalSt e) →
   (∀ j → suc j ≤ w →
      lookupNode j (EvalSt.nodes st′) ≡ lookupNode j (EvalSt.nodes st)) →
+  (∀ nd → pathHasNode nd κ ≡ true →
+     regOwn? nd (pathFloor κ) (EvalSt.registry st) ≡ true →
+     regOwn? nd (pathFloor κ) (EvalSt.registry st′) ≡ true) →
   pathBelow w κ →
   pathPark? κ st ≡ true →
   pathPark? κ st′ ≡ true
-frozen-pathPark w root           st st′ hfz hb hp = refl
-frozen-pathPark w (share-sink _) st st′ hfz hb hp = refl
-frozen-pathPark w (f ↠ p) st st′ hfz (hbf , hbp) hp =
-  ∧-intro (frozen-framePark (pathFloor p) w f st st′ hfz hbf (∧-trueˡ hp))
-          (frozen-pathPark w p st st′ hfz hbp (∧-trueʳ hp))
+frozen-pathPark w root           st st′ hfz how hb hp = refl
+frozen-pathPark w (share-sink _) st st′ hfz how hb hp = refl
+frozen-pathPark w (f ↠ p) st st′ hfz how (hbf , hbp) hp =
+  ∧-intro (frozen-framePark (pathFloor p) w f st st′ hfz
+             (λ nd hm → how nd (cong (_∨ pathHasNode nd p) hm)) hbf
+             (∧-trueˡ hp))
+          (frozen-pathPark w p st st′ hfz
+             (λ nd hh → how nd (trans (cong (any (_≡ᵇ nd) (frameNodes f) ∨_) hh)
+                                      (∨-zeroʳ (any (_≡ᵇ nd) (frameNodes f)))))
+             hbp (∧-trueʳ hp))
 
 -- THE COMPUTED WATERMARK MEETS THE ASKED-FOR ONE, in both directions
 -- and neither is arithmetic.  The read side is a fold, so its bound
@@ -574,10 +775,13 @@ pathRead-below w (f ↠ p) h =
 fresh-pathPark : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (κ : Path Γ u t) (nx nx′ : ℕ) (st st′ : EvalSt e) →
   FreshC (pathRead κ) nx nx′ (EvalSt.nodes st) (EvalSt.nodes st′) →
+  (∀ nd → pathHasNode nd κ ≡ true →
+     regOwn? nd (pathFloor κ) (EvalSt.registry st) ≡ true →
+     regOwn? nd (pathFloor κ) (EvalSt.registry st′) ≡ true) →
   pathPark? κ st ≡ true →
   pathPark? κ st′ ≡ true
-fresh-pathPark κ nx nx′ st st′ fr hp =
-  frozen-pathPark (pathRead κ) κ st st′ (FreshC.frozen fr)
+fresh-pathPark κ nx nx′ st st′ fr how hp =
+  frozen-pathPark (pathRead κ) κ st st′ (FreshC.frozen fr) how
     (pathRead-below (pathRead κ) κ ≤-refl) hp
 
 fresh-ord : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
@@ -601,6 +805,7 @@ installNode-pathPark : ∀ {n} {Γ : Ctx n} {u t} {e : Closed Γ t}
 installNode-pathPark nid ns κ st hb hp =
   frozen-pathPark (pathRead κ) κ st (installNode nid ns st)
     (frozen-setNode (pathRead κ) nid ns (EvalSt.nodes st) hb)
+    (λ _ _ h → h)
     (pathRead-below (pathRead κ) κ ≤-refl) hp
 
 -- AND THE SAME AT THE CHAIN, which is what a caller re-entering after a
@@ -613,11 +818,19 @@ subscribeE-pathPark : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u w}
   (g : Gas) (b : Closed Γ w) (β : Path Γ w t) (κ : Path Γ u t)
   (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
   pathRead κ ≤ Sched.nextNode sched →
+  pathFloor κ ≡ pathFloor β →
   pathPark? κ st ≡ true →
   pathPark? κ (proj₂ (proj₂ (subscribeE g b β bid now sched st))) ≡ true
-subscribeE-pathPark g b β κ bid now sched st hb hp =
+subscribeE-pathPark g b β κ bid now sched st hb hf hp =
   frozen-pathPark (Sched.nextNode sched) κ st _
     (subscribeE-nodes-below g b β bid now sched st)
+    (λ nd _ hj →
+       subst (λ m → regOwn? nd m
+                (EvalSt.registry
+                  (proj₂ (proj₂ (subscribeE g b β bid now sched st)))) ≡ true)
+         (sym hf)
+         (subscribeE-regOwn g b β bid now sched st nd
+            (subst (λ m → regOwn? nd m (EvalSt.registry st) ≡ true) hf hj)))
     (pathRead-below (Sched.nextNode sched) κ hb) hp
 
 -- AND THE ORDER HALF OF THE SAME RE-ENTRY, which is one counter step
@@ -662,14 +875,15 @@ subscribeInner-pathPark : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u w}
   (id : Id) (now : Tick) (o : Val Γ (obs w))
   (sched : Sched Γ) (st : EvalSt e) →
   pathRead κ ≤ Sched.nextNode sched →
+  pathFloor κ ≡ pathFloor β →
   pathPark? κ st ≡ true →
   pathPark? κ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂
     (subscribeInner g op allNid β id now o sched st)))))) ≡ true
-subscribeInner-pathPark g0 op allNid β κ id now o sched st hb hp = hp
-subscribeInner-pathPark (gs fuel) op allNid β κ id now o sched st hb hp =
+subscribeInner-pathPark g0 op allNid β κ id now o sched st hb hf hp = hp
+subscribeInner-pathPark (gs fuel) op allNid β κ id now o sched st hb hf hp =
   subscribeE-pathPark fuel o (from-inner op allNid (Sched.nextNode sched) ↠ β) κ
     id now (record sched { nextNode = suc (Sched.nextNode sched) }) st
-    (≤-trans hb (n≤1+n (Sched.nextNode sched))) hp
+    (≤-trans hb (n≤1+n (Sched.nextNode sched))) hf hp
 
 subscribeInner-cellPark : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u w}
   (k : ℕ) (g : Gas) (op : AllOp) (allNid : NodeId) (β : Path Γ w t)
@@ -680,11 +894,13 @@ subscribeInner-cellPark : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u w}
   parkStrat? k (lookupNode allNid (EvalSt.nodes (proj₂ (proj₂ (proj₂ (proj₂ (proj₂
     (subscribeInner g op allNid β id now o sched st)))))))) ≡ true
 subscribeInner-cellPark k g0 op allNid β κ id now o sched st hb hp = hp
-subscribeInner-cellPark {u = u} k (gs fuel) op allNid β κ id now o sched st hb hp =
-  subscribeE-framePark k fuel o (from-inner op allNid (Sched.nextNode sched) ↠ β)
-    id now (thru-outer {u = u} op allNid)
-    (record sched { nextNode = suc (Sched.nextNode sched) }) st
-    (≤-trans hb (n≤1+n (Sched.nextNode sched))) hp
+subscribeInner-cellPark k (gs fuel) op allNid β κ id now o sched st hb hp =
+  trans (cong (parkStrat? k)
+           (subscribeE-nodes-below fuel o
+              (from-inner op allNid (Sched.nextNode sched) ↠ β) id now
+              (record sched { nextNode = suc (Sched.nextNode sched) }) st
+              allNid (≤-trans hb (n≤1+n (Sched.nextNode sched)))))
+        hp
 
 frameAbove?-sound : ∀ {n} {Γ : Ctx n} {s u} (w : ℕ) (f : Frame Γ s u) →
   frameAbove? w f ≡ true → frameAbove w f
@@ -732,6 +948,7 @@ pathPark-step g id now f κ vals fin sched st ho hp =
       (stepFrame-fresh (pathRead κ) g id now f κ vals fin sched st
         (pathOrd?-read (Sched.nextNode sched) κ (proj₂ SQ))
         (frameAbove?-sound (pathRead κ) f (proj₁ SQ))))
+    (λ nd _ hj → stepFrame-regOwn g id now f κ vals fin sched st nd hj)
     (pathRead-below (pathRead κ) κ ≤-refl) hp
   where
   SP = ∧-true (pathCell (f ↠ κ) ≤ᵇ Sched.nextNode sched)
@@ -829,6 +1046,13 @@ cascadeLatch-nodes a st with Arrival.isLast a
 ... | true  = refl
 ... | false = refl
 
+cascadeLatch-registry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (a : Arrival Γ) (st : EvalSt e) →
+  EvalSt.registry st ≡ EvalSt.registry (cascadeLatch a st)
+cascadeLatch-registry a st with Arrival.isLast a
+... | true  = refl
+... | false = refl
+
 shareAdmit-ord : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (i : Fin n) (sched : Sched Γ) (st : EvalSt e) →
   regOrd? (Sched.nextNode sched) (EvalSt.registry st) ≡ true →
@@ -857,7 +1081,7 @@ shareAdmit-park i false st h =
 shareAdmit-park i true  st h =
   shareAdmit-chQ (λ {u} _ κ → pathPark? κ (shareLatch i true st)) i
     (EvalSt.registry st)
-    (regPark?-nodes (EvalSt.registry st) st (shareLatch i true st) refl h)
+    (regPark?-nodes (EvalSt.registry st) st (shareLatch i true st) refl refl h)
 
 cascade-admit-park : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (a : Arrival Γ) (st : EvalSt e) →
@@ -868,7 +1092,7 @@ cascade-admit-park a st h =
   chainsGo-chQ (λ {u} _ κ → pathPark? κ (cascadeLatch a st)) a
     (EvalSt.registry st)
     (regPark?-nodes (EvalSt.registry st) st (cascadeLatch a st)
-       (cascadeLatch-nodes a st) h)
+       (cascadeLatch-nodes a st) (cascadeLatch-registry a st) h)
 
 -- THE TWO READINGS ACROSS A WHOLE WALK, and neither is a new fact.  A
 -- walk mints strictly ABOVE the counter it entered at, so every cell
@@ -890,7 +1114,8 @@ subscribeE-readings g b κ id now sched st ho hp =
     fresh-ord κ (Sched.nextNode sched) (Sched.nextNode (proj₁ (proj₂ r))) st
       (proj₂ (proj₂ r)) FR ho
   , fresh-pathPark κ (Sched.nextNode sched) (Sched.nextNode (proj₁ (proj₂ r))) st
-      (proj₂ (proj₂ r)) FR hp
+      (proj₂ (proj₂ r)) FR
+      (λ nd _ hj → subscribeE-regOwn g b κ id now sched st nd hj) hp
   where
   r  = subscribeE g b κ id now sched st
   FR = subscribeE-fresh (pathRead κ) g b κ id now sched st

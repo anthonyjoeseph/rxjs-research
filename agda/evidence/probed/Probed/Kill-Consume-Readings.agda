@@ -11,11 +11,22 @@
 --   H1 pathOrd? — path cells below the nextNode counter
 --   H2 pathPark? — path frames carry valid park strategies
 --   H3 parkStrat? — the outer node's queue entries are below pathFloor
+--   H4 regOwn? — every registered chain reading the outer's cell
+--      stands at this chain's own floor
+--
+-- H4 IS DEGENERATE AT EVERY ROW BELOW, and saying so is the whole
+-- point of listing it: every state here descends from `st-init`, whose
+-- registry is empty, and `regOwn?` is an `all` over that registry.  So
+-- the fourth premise and the fourth conclusion are both `refl` for the
+-- vacuous reason, and NOTHING here is evidence about ownership.  A
+-- registry the kill actually retires, or one a subscribe extends, is
+-- the region these rows do not reach.
 --
 -- switchKill-readings: covered at κ = root and two cur shapes (nothing
 -- and just v).  switchKill never touches nodes or nextNode, so the
--- triple is the input triple at both shapes — all three readings are
--- preserved trivially.
+-- first, third and fourth conclusions are the input readings at both
+-- shapes — preserved trivially.  The ownership conclusion is H4's
+-- vacuous one.
 --
 -- thruConsume-readings (no-room case): covered at a 2-slot context and
 -- κ = share-sink fzero (pathFloor κ = 0), where thruConsume parks the
@@ -38,7 +49,7 @@
 -- subscribeInner g0 returns record sched { nextNode = suc inst } and
 -- the ORIGINAL st — nodes are unchanged.  nextNode increases, which
 -- preserves pathOrd? by monotonicity; nodes unchanged preserves H2 and
--- H3 by refl.
+-- H3 by refl; H4 is vacuous.
 --
 -- NOT COVERED: subscribeInner (gs fuel) where subscribeE is called and
 -- may itself call thruConsume; thruConsume in the hasRoom = true branch
@@ -62,7 +73,7 @@ open import Rx.Evaluator
   using (EvalSt; Sched; sched-init; st-init; root; mergeAllᵒ; mergeAll-st; Path; lookupNode;
   installNode; thru-outer; thruConsume; share-sink; _↠_)
 open import Verify-Budget-Sufficient.Caps-Face.Part1
-  using (pathOrd?; pathPark?; parkStrat?; pathFloor)
+  using (pathOrd?; pathPark?; parkStrat?; pathFloor; regOwn?)
 open import Verify-Budget-Sufficient.Caps-Face.Part6
   using (switchKill-readings; thruConsume-readings; subscribeInner-readings)
 open import Probed.Apparatus using (Confirms)
@@ -128,7 +139,7 @@ st₂-full = installNode 0 (mergeAll-st {t = natᵗ} (just 1) 1 [] false) st₂
 -- WITH κ = share-sink fzero (pathFloor κ = 0) AND o = input fzero.
 --
 -- This is the load-bearing observation: parkStrat? 0 after parking
--- input fzero reads (0 <ᵇ 0) = false.  A tie asserting C3 = true
+-- input fzero reads (0 <ᵇ 0) = false.  A tie asserting C4 = true
 -- here cannot be given a refl body — it is a REFUTATION witness.
 -- The figures row pins the actual boolean so the violation is visible.
 ----------------------------------------------------------------------
@@ -141,25 +152,27 @@ o₂ = input fzero
 thruResult₂ : _ × _ × Sched Γ₂ × EvalSt e₂
 thruResult₂ = thruConsume (gs g0) mergeAllᵒ 0 κ₂ 0 0 o₂ sched₂ st₂-full
 
--- LOAD-BEARING: pins the three conclusion booleans after the no-room park.
+-- LOAD-BEARING: pins the four conclusion booleans after the no-room park.
 -- C1 (pathOrd?) should stay true (nextNode unchanged in no-room branch).
--- C2 (pathPark?) should stay true (share-sink path always returns true).
--- C3 (parkStrat?) is the refutation: parks o₂ = input fzero with
+-- C2 (regOwn?) is DEGENERATE — the registry is empty here.
+-- C3 (pathPark?) should stay true (share-sink path always returns true).
+-- C4 (parkStrat?) is the refutation: parks o₂ = input fzero with
 --    pathFloor (share-sink fzero) = 0, so parkStrat? checks
 --    inputsBelowᵉ 0 (input fzero) = (0 <ᵇ 0) = false.
-thruConclusions₂ : Bool × Bool × Bool
+thruConclusions₂ : Bool × Bool × Bool × Bool
 thruConclusions₂ =
   let r = thruResult₂
       st-r = proj₂ (proj₂ (proj₂ r))
       sc-r = proj₁ (proj₂ (proj₂ r))
   in pathOrd? (Sched.nextNode sc-r) (thru-outer mergeAllᵒ 0 ↠ κ₂)
+   , regOwn? 0 (pathFloor κ₂) (EvalSt.registry st-r)
    , pathPark? κ₂ st-r
    , parkStrat? (pathFloor κ₂) (lookupNode 0 (EvalSt.nodes st-r))
 
--- LOAD-BEARING: C3 = false confirms the violation.
+-- LOAD-BEARING: C4 = false confirms the violation.
 -- If this were true, thruConsume-readings would hold here; it being
 -- false is the refutation of thruConsume-readings at this instantiation.
-thruConclusions₂≡ : thruConclusions₂ ≡ (true , true , false)
+thruConclusions₂≡ : thruConclusions₂ ≡ (true , true , true , false)
 thruConclusions₂≡ = refl
 
 ----------------------------------------------------------------------
@@ -179,18 +192,19 @@ thruResult₁-full = thruConsume (gs g0) mergeAllᵒ 0 κ₁ 0 0 o₁ sched₁ s
 
 -- LOAD-BEARING: at κ = root the park preserves parkStrat? because
 -- pathFloor root = 1 and inputsBelowᵉ 1 (input fzero) = true.
-thruConclusions₁-full : Bool × Bool × Bool
+thruConclusions₁-full : Bool × Bool × Bool × Bool
 thruConclusions₁-full =
   let r = thruResult₁-full
       st-r = proj₂ (proj₂ (proj₂ r))
       sc-r = proj₁ (proj₂ (proj₂ r))
   in pathOrd? (Sched.nextNode sc-r) (thru-outer mergeAllᵒ 0 ↠ κ₁)
+   , regOwn? 0 (pathFloor κ₁) (EvalSt.registry st-r)
    , pathPark? κ₁ st-r
    , parkStrat? (pathFloor κ₁) (lookupNode 0 (EvalSt.nodes st-r))
 
--- LOAD-BEARING: all three conclusions are true here, showing the
+-- LOAD-BEARING: all four conclusions are true here, showing the
 -- boundary: the violation only occurs when pathFloor κ < n.
-thruConclusions₁-full≡ : thruConclusions₁-full ≡ (true , true , true)
+thruConclusions₁-full≡ : thruConclusions₁-full ≡ (true , true , true , true)
 thruConclusions₁-full≡ = refl
 
 ----------------------------------------------------------------------
@@ -201,12 +215,12 @@ thruConclusions₁-full≡ = refl
 ----------------------------------------------------------------------
 
 -- LOAD-BEARING: the `nothing` case — switchKill returns the inputs
--- unchanged, so all three conclusions are literally the three
+-- unchanged, so all four conclusions are literally the four
 -- hypotheses at the same state.
 tieSwitchKillNothing : Confirms
   (switchKill-readings mergeAllᵒ 0 root nothing sched₁ st₁
-     refl refl refl)
-tieSwitchKillNothing = refl , refl , refl
+     refl refl refl refl)
+tieSwitchKillNothing = refl , refl , refl , refl
 
 -- LOAD-BEARING: the `just v` case — switchKill modifies registry,
 -- cancelled, live but NOT nodes or nextNode.  pathOrd? reads nextNode
@@ -214,8 +228,8 @@ tieSwitchKillNothing = refl , refl , refl
 -- The state has no registry entries so cutThrough returns empty lists.
 tieSwitchKillJust : Confirms
   (switchKill-readings mergeAllᵒ 0 root (just 0) sched₁ st₁
-     refl refl refl)
-tieSwitchKillJust = refl , refl , refl
+     refl refl refl refl)
+tieSwitchKillJust = refl , refl , refl , refl
 
 ----------------------------------------------------------------------
 -- thruConsume-readings TIES (identity path: missing node).
@@ -228,8 +242,8 @@ tieSwitchKillJust = refl , refl , refl
 -- ([], [], sched, st) unchanged.
 tieThruConsumeIdentity : Confirms
   (thruConsume-readings (gs g0) mergeAllᵒ 0 root 0 0 o₁ sched₁ st₁
-     refl refl refl refl)
-tieThruConsumeIdentity = refl , refl , refl
+     refl refl refl refl refl)
+tieThruConsumeIdentity = refl , refl , refl , refl
 
 ----------------------------------------------------------------------
 -- subscribeInner-readings TIES (g0 case).
@@ -245,5 +259,5 @@ tieThruConsumeIdentity = refl , refl , refl
 -- conclusion reads pathOrd? 2 (...) which is also true by monotonicity.
 tieSubscribeInnerG0 : Confirms
   (subscribeInner-readings g0 mergeAllᵒ 0 root 0 0 o₁ sched₁ st₁
-     refl refl refl)
-tieSubscribeInnerG0 = refl , refl , refl
+     refl refl refl refl)
+tieSubscribeInnerG0 = refl , refl , refl , refl
