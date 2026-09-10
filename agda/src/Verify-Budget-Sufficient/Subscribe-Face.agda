@@ -202,7 +202,7 @@ open import Verify-Budget-Sufficient.Caps-Depth
 -- unfolding replaces the recursion variable by the μ itself, so the
 -- reading has to survive the elimination rather than the grammar
 open import Rx.Inputs-Below using (ib-unfoldμ; ib-monoᵛ)
-open import Decide using (T-to; T⇒≡true; ∧-intro; ∧-trueˡ; ∧-trueʳ; ≤ᵇ-widen)
+open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen)
 
 ------------------------------------------------------------------
 -- THE COUNT, FOLDED IN — and now DISCHARGED, so the

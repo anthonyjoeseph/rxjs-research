@@ -5,7 +5,7 @@ module Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves where
 open import Data.Bool    using (Bool; true; false; _∧_; _∨_)
 open import Data.Bool.Properties using (∨-zeroʳ)
 open import Data.Fin     using (Fin; toℕ)
-open import Data.List    using (List; map; []; _∷_)
+open import Data.List    using (List; map; [])
 open import Data.Bool.ListAction using (all; any)
 open import Data.Maybe   using (Maybe; just; nothing)
 open import Data.Nat     using (ℕ; suc; _≤_; _≤ᵇ_; _≡ᵇ_)

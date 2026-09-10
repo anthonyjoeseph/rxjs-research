@@ -86,12 +86,11 @@ open import Verify-Budget-Sufficient.Caps-Nest using
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (pathSz?-⊑; valCaps?-size; valsCaps?-widen)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
-  (burstCaps?; capsOK?; capsOK?-mono; eventCaps?; frameSz?; obsCaps?; pathSz?;
-   entStrat?; eventStrat?; framePark?; pathFloor; pathPark?; pathStrat?;
-   pathOrd?; pathOrd?-mono; parkStrat?; regOrd?; regOwn?; pathOwn?; regPark?;
-   regPark?-nodes; regPark?-drop; regPark?-register;
-   regPark?-set; regPark?-set-fresh;
-   regStrat?; regsSz?; slotsCaps?; slotsCaps?-bound; srcFloor?; valCaps?; valCountᵉ; widLive; widNode; closSt?; closLive)
+  (burstCaps?; capsOK?; capsOK?-mono; eventCaps?; frameSz?; obsCaps?; pathSz?; entStrat?;
+  eventStrat?; framePark?; pathFloor; pathPark?; pathStrat?; pathOrd?; pathOrd?-mono;
+  parkStrat?; regOrd?; pathOwn?; regPark?; regPark?-nodes; regPark?-drop; regPark?-register;
+  regPark?-set; regPark?-set-fresh; regStrat?; regsSz?; slotsCaps?; slotsCaps?-bound;
+  srcFloor?; valCaps?; valCountᵉ; widLive; widNode; closSt?; closLive)
 open import Decide using (T-to; T⇒≡true; ∧-intro; ∨-trueʳ; ≤ᵇ-true; ≤ᵇ-widen)
 
 ------------------------------------------------------------------
