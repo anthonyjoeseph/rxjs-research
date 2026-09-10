@@ -238,16 +238,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE ONE FRAME THAT CHARGES BY A SUCCESSOR**, which is what is left
-  of `share-fold-fit` once a length is ruled out as a region rather than
-  merely uncovered. Both places a length could enter combine by `⊔`, so
-  the whole path charges no more than its heaviest frame, and a count
-  moves the ceiling with it. `thru-outer` is the one frame whose charge
-  is a `suc` above a walk rather than a descent, and it needs an
-  `obs`-typed source, which is why no row has ever headed a path with
-  it. The commit builds that context and reads the arm. It narrows WHICH
-  STORE CELLS DOES A PATH PREDICATE REACH to a single frame's spend.
-
 - **THE MINT'S LEVEL-ZERO RECEIPT, now that the fan's registry reading
   is a real body and the residue carries the level in its own
   statement.** `fan-regsSz-mint` and `walk-share-nestOK` stand at one
@@ -270,6 +260,18 @@ does not fit is a finding about the shared statement, not about the head.
   cell needs: two inner subscriptions on one mergeAll at different
   depths. The commit builds that program. Green is the question's first
   real negative; red is the two-floor witness it has been asking for.
+
+- **A CONTEXT DEEP ENOUGH TO DISAGREE WITH**, which is now the only
+  thing between `share-fold-fit` and a class it has earned. Every axis
+  its statement has moves BOTH sides, and the ceiling moves faster —
+  a nesting level buys the fold one and the ceiling `suc (sizeᵉ e)` —
+  so the rows say the slack widens where it was expected to close. What
+  they cannot say is whether that holds past ONE level, because the
+  harness context has no `obs (obs natᵗ)` slot to draw a second from
+  and no share registered under another. The commit builds that
+  context. It narrows WHICH STORE CELLS DOES A PATH PREDICATE REACH by
+  saying whether the widening is arithmetic or an artifact of a
+  shallow program.
 
 ### Open questions
 

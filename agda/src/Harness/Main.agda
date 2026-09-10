@@ -75,7 +75,8 @@ open import Rx.Slot-Hop using (slotHop)
 open import Rx.Evaluator using (poolCount; blowH; capsHgo; lvls; iterL;
   capsBase; subscribeE; sched-next; cascade; Sched; EvalSt; root; sched-init;
   st-init; drain; splitEvents; splitBurst; Stream; Path; share-sink; _↠_;
-  shareAdmit; RegId; Chain; budgetAt; take-f; from-inner; mergeAllᵒ)
+  shareAdmit; RegId; Chain; budgetAt; take-f; from-inner; thru-outer;
+  mergeAllᵒ)
 open import Verify-Budget-Sufficient.Caps using (Caps; capsAt)
 open import Verify-Budget-Sufficient.Nest-Store using (nestUnit; slotWrapSum;
   nestCapAt)
@@ -737,6 +738,70 @@ innerP a = from-inner mergeAllᵒ a 0 ↠ share-sink iᶠ
 inner2P : ℕ → Path Γᵈ natᵗ natᵗ
 inner2P a = from-inner mergeAllᵒ a 0 ↠ (from-inner mergeAllᵒ a 1 ↠ share-sink iᶠ)
 
+-- THE FRAME WHOSE CHARGE IS A SUCCESSOR, and the one axis left once the
+-- two above read the same number.  `thru-outer` moves the source type
+-- from `obs u` to `u`, so a path headed by it belongs to a DIFFERENT
+-- source than every row above -- slot one, the context's only
+-- `obs`-typed one -- and its values are closed EXPRESSIONS rather than
+-- numerals, since `Val Γ (obs t)` is `Closed Γ t`.  That is the dial:
+-- `nestDᵛˢ` reads those, so the ceiling moves with them here where a
+-- `natᵗ` payload left it flat, and the question is which side moves
+-- faster.
+iᵗ : Fin 3
+iᵗ = fsuc fzero
+
+thruP : ℕ → Path Γᵈ (obs natᵗ) natᵗ
+thruP nd = thru-outer mergeAllᵒ nd ↠ share-sink iᶠ
+
+-- flat, then one flatten deep.  Two is the most this context can state:
+-- dialling further needs an `obs (obs natᵗ)` slot to draw a value from,
+-- and `Γᵈ` has none -- a boundary of the CONTEXT, not of the measure.
+valsFlat : List (Val Γᵈ (obs natᵗ))
+valsFlat = input fzero ∷ []
+
+valsNest : List (Val Γᵈ (obs natᵗ))
+valsNest = mergeAllᵉ nothing (input iᵗ) ∷ []
+
+thruSides : ℕ → ℕ → Bool → List (Val Γᵈ (obs natᵗ))
+          → Path Γᵈ (obs natᵗ) natᵗ → ℕ × ℕ
+thruSides k g fin vs pth = lhs , rhs
+  where
+  sd  = proj₁ (driveᵈ k slᵈ)
+  st  = proj₂ (driveᵈ k slᵈ)
+  lhs = depthFold (budgetAt eᵈ slᵈ 0) g 0 0 (finℕ iᵗ) pth vs [] fin sd st
+  rhs = sightCeil (sizeᵉ eᵈ) (nestDᵛˢ {Γ = Γᵈ} {u = obs natᵗ} vs)
+                  (storeSyncMax sd st) (nestUnit eᵈ slᵈ)
+
+-- LOAD-BEARING, and this arm can fail where the two above could not:
+-- `depthFrame` at `thru-outer` is `suc` of a walk, so it charges even
+-- when the walk reads nought, and the walk descends into each value's
+-- own subscribe rather than stopping at the frame.  A nested value
+-- reading ABOVE its ceiling refutes the target.  The empty-values row
+-- is DEGENERATE and says so: `depthWalk` is the literal `0` clause
+-- there, so the reading is the bare `suc` and is evidence about the
+-- frame's constant and nothing else.
+--
+-- AND TWO OF THESE ROWS ARE DEGENERATE FOR A REASON WORTH THE LINE,
+-- since both were written expecting the sibling's behaviour and the
+-- measurement says otherwise: `suc (depthWalk …)` mentions neither the
+-- `fin` flag nor the node table, so the last row is not a control and
+-- the `nd` sweep is not a sweep.  Both are kept because a reader who
+-- knows the `from-inner` rows above will expect them to move, and a
+-- printed pair that does not move is what says the arm does not read
+-- either -- which is itself the difference between the two charging
+-- frames.
+thruRow : ℕ → ℕ → String
+thruRow k nd =
+  "thru-outer@inst " ++ show k ++ " gas 4 nid " ++ show nd ++ ", source 1"
+    ++ "\n  [no values, DEGENERATE walk]     "
+    ++ foldShow "" (thruSides k 4 true [] (thruP nd))
+    ++ "\n  [flat value, LOAD-BEARING]       "
+    ++ foldShow "" (thruSides k 4 true valsFlat (thruP nd))
+    ++ "\n  [nested value, LOAD-BEARING]     "
+    ++ foldShow "" (thruSides k 4 true valsNest (thruP nd))
+    ++ "\n  [nested at fin=false, DEGENERATE: this arm reads no flag] "
+    ++ foldShow "" (thruSides k 4 false valsNest (thruP nd))
+
 -- LOAD-BEARING at `fin = true`, and what would make each fail: a
 -- reading ABOVE the ceiling refutes the target, and it is the frame
 -- count that would carry it there, since `depthFold`'s frame arm
@@ -853,7 +918,10 @@ rowAt n = if n ≤ᵇ 22 then wideRow (n ∸ 19)
           -- entries: the frame reads the node table by that id, so a
           -- row at an id the run never minted is a reading about
           -- `nothing` and says nothing about the arm
-          else if n ≤ᵇ 53 then frameRow 2 (n ∸ 51) else "(no such row)"
+          else if n ≤ᵇ 53 then frameRow 2 (n ∸ 51)
+          -- 54 to 56 sweep the node the `thru-outer` frame names, at
+          -- the same instant
+          else if n ≤ᵇ 56 then thruRow 2 (n ∸ 54) else "(no such row)"
 
 main : IO Unit
 main = getContents >>= λ s →

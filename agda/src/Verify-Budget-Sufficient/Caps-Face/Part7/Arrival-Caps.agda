@@ -914,6 +914,19 @@ postulate
 -- cannot refute, and the length was the one every plan here had aimed
 -- at.
 
+-- AND THE VALUE AXIS RUNS THE SAME WAY, WHICH IS THE ONE THAT WAS
+-- EXPECTED TO BITE.  It is the only axis that moves BOTH sides on
+-- purpose -- the ceiling's second argument is exactly the values' nest
+-- depth -- so which side moves faster is the whole question, and it is
+-- arithmetic rather than a matter of coverage.  A nesting level buys
+-- the fold ONE, since `depthFrame` at the successor arm adds a single
+-- `suc` per level walked; it buys the ceiling `suc (sizeᵉ e)`, since
+-- that is the factor `sightCeil` multiplies its summands by, and the
+-- factor is at least two at any program with a term in it.  So the
+-- slack WIDENS with nesting, and the axis that was the last candidate
+-- to refute is the one that cannot.  Measured at one level, where the
+-- fold goes one to two and the ceiling eight to ten.
+
 -- SO THE RESIDUE IS ONE FRAME'S CHARGE AND ONE PATH'S DEPTH, and the
 -- first of those is the sibling directly above rather than anything new.
 -- The ceiling names no path, which reads as the shape a conclusion takes
@@ -938,12 +951,14 @@ postulate
 --   two frames that preserve the source type: a `from-inner` head reads
 --   one where the bare sink reads nought and where its own `fin = false`
 --   control reads nought, and a SECOND such head reads the same one --
---   the `⊔` above, measured rather than read off the clause.  Not
---   covered: a `natᵗ` payload, which `nestDᵛˢ` reads FLAT, so the value
---   axis is untouched rather than dialled; two flat shares, so nothing
---   about one registered under another; and `thru-outer`, whose charge
---   is a successor above a walk rather than a descent and which needs an
---   `obs`-typed source to head a path at all.
+--   the `⊔` above, measured rather than read off the clause.
+--   `thru-outer` heads a path too, at the context's one `obs`-typed
+--   source, where the values are closed expressions and `nestDᵛˢ` is
+--   therefore DIALLED rather than read flat: one nesting level moves
+--   the fold by one and the ceiling by two.  Not covered: a second
+--   nesting level, which this context cannot state for want of an
+--   `obs (obs natᵗ)` slot to draw a value from; and two flat shares, so
+--   nothing about one registered under another.
 --   ⚠ measured-not-rechecked.
 postulate
   share-fold-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
