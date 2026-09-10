@@ -238,17 +238,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE OWNER TRAVELS WITH THE CHAIN, AND THE THREAD STOPS AT THE WALK.** A
-  store conjunct cannot see which chain a writer stands on, and the
-  ledgers that do read a chain admit the offending registry, so no field
-  excludes it: the reading is folded into the frame park, and the record
-  route is dead. The finish chain and the nest
-  walk now split both halves off one reading, and the statement that
-  named the gap is gone. What remains is every consumer ABOVE the walk —
-  level, sink, burst, depth — still reading the park at its old shape,
-  so the thread reaches whoever built the chain only once they split it
-  too. It narrows DOES A STORE CELL HAVE AN OWNER to whether a producer
-  can pay the reading at all.
+- **FOUR WRITERS AND ONE PRECEDENT**, which is all the folded reading
+  leaves. Every consumer — level, sink, burst, depth — now splits both
+  halves off one reading and the tower stands on them, so the thread is
+  carried by a registry transport per WRITER: one statement at four
+  `register` sites. One is mechanical already: the append splits the
+  reading into the hypothesis and a conjunct reflexive at the entry
+  chain's floor, a shape a proven length reading crosses there too.
+  The commit carries that precedent to the step, the
+  consume and the drained inner, and reports whether the ENQUEUE arm —
+  the writer whose cell the reading is about — is paid by it. It
+  narrows DOES A STORE CELL HAVE AN OWNER to that one arm.
 
 - **A LENGTH THAT IS NOT PRICED IN A CAP**, which is what the fan's
   refutation leaves as the only move. Reading the registry at the level
@@ -280,9 +280,10 @@ does not fit is a finding about the shared statement, not about the head.
   lands in a cell some registered chain also reads, each pricing it at its own
   floor. It is ANSWERED for the write, and for the record negatively: a store
   predicate cannot name the chain the writer stands on, so the reading travels
-  with the chain. What is left is whether a producer can pay it, and whether
-  the remaining rows — an ENQUEUE and a walked chain rather than an overwrite
-  — are paid by the same thread.
+  with the chain. The PRODUCER half is settled too, and affirmatively: every
+  consumer above the walk splits the folded reading and the tower stands on
+  them, so what pays it is a transport per writer. What is left is whether an
+  ENQUEUE and a walked chain are paid by the thread an overwrite is.
   relevant: `thruConsume-cellPark`, `framePark-step`
 
 - **WHICH STORE CELLS DOES A PATH PREDICATE REACH?** Five rows fail in one
