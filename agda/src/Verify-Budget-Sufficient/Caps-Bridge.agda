@@ -1981,6 +1981,8 @@ subscribeE-wet-via-caps {n = n} {e = e} g b κ id now sched st
                   ≤-refl
                   hps
                   hib
+                  hord
+                  hpk
 
   j′      = proj₁ IH
   capOut  = proj₁ (proj₂ IH)
