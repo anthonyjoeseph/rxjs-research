@@ -1910,6 +1910,8 @@ subscribeE-wet-via-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
      depthE g b κ id now sched st ≤ capsH e sl id →        -- depOK
      pathStrat? κ ≡ true →
      inputsBelowᵉ (pathFloor κ) b ≡ true →
+     pathOrd? (Sched.nextNode sched) κ ≡ true →
+     pathPark? κ st ≡ true →
      let r   = subscribeE g b κ id now sched st
          sl′ = Sched.slots (proj₁ (proj₂ r))
      in (hasDry (proj₁ r) ≡ false)
@@ -2101,6 +2103,8 @@ burst-all {n = n} e ins =
     (depthE≤capsH-root e ins)
     refl                                          -- pathStrat? root
     (T⇒≡true (inputsBelowᵉ n e) (ib-topᵉ e))
+    refl                                          -- pathOrd? _ root
+    refl                                          -- pathPark? root _
   where
   -- the guard repair (`3 + k ≤ S`, Op-Budget) asks for ONE unit more
   -- than capsAt-base-size gives; capsAt-base-size⁺ supplies it
