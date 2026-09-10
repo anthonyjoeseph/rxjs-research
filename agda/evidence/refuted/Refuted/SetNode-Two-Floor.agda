@@ -36,7 +36,10 @@
 --
 -- WHAT THIS DOES AND DOES NOT DECIDE.  The state is built rather than
 -- run, so nothing here says a run REACHES a registry visiting a cell at
--- a floor other than the writer's.  That is the point rather than a
+-- a floor other than the writer's.  What it does say is that the
+-- invariant as it stands would not stop one: the two conjuncts that
+-- read a chain at all clear this registry, so no repair is available
+-- from tightening either.  That is the point rather than a
 -- limitation: the statement quantifies over every state, so the repair
 -- cannot be a cleverer proof of it -- it is a fact that EXCLUDES this
 -- state, and a fact excluding a state is a field on the invariant
@@ -59,7 +62,7 @@ open import Rx.Evaluator
          from-inner; mergeAllᵒ; mergeAll-st; installNode; st-init; setNode;
          lookupNode)
 open import Verify-Budget-Sufficient.Caps-Face.Part1
-  using (parkStrat?; pathFloor; regPark?)
+  using (parkStrat?; pathFloor; regPark?; regStrat?; regOrd?)
 open import Refuted.Demand-Programs using (Γ₂)
 open import Refuted.Walk-Burst-Additive using (e₀)
 
@@ -107,6 +110,17 @@ parkedAfter :
   regPark? (EvalSt.registry stᵗ)
     (record stᵗ { nodes = setNode nid after (EvalSt.nodes stᵗ) }) ≡ false
 parkedAfter = refl
+
+-- AND THE TWO LEDGERS THAT READ A CHAIN AT ALL ADMIT THIS REGISTRY, so
+-- the repair cannot be recovered from either.  The stratification
+-- ledger clears the entry because its source sits at or below the
+-- chain's own floor and every frame of it is free; the ordering ledger
+-- clears it at any counter standing above the cells the chain names.
+stratOK : regStrat? (EvalSt.registry stᵗ) ≡ true
+stratOK = refl
+
+ordOK : regOrd? 10 (EvalSt.registry stᵗ) ≡ true
+ordOK = refl
 
 setNode-two-floor-absurd :
   (∀ {n} {Γ : Ctx n} {u t} {e : Closed Γ t}

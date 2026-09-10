@@ -308,4 +308,4 @@ open import Refuted.MergeAllDrain-OwnerQueue
 
 open import Refuted.SetNode-Two-Floor
   using (floors; pricedFloor; pricedOK; sunkBad; parkedBefore; parkedAfter;
-         setNode-two-floor-absurd)
+         stratOK; ordOK; setNode-two-floor-absurd)

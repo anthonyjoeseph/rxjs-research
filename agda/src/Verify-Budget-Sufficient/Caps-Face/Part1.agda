@@ -938,7 +938,12 @@ regPark?-set rs nid ns st pv =
 --
 -- SO THE MISSING FACT MUST EXCLUDE A STATE rather than constrain a
 -- write, since the statement quantifies over every state and no proof
--- of it exists.  NODE OWNERSHIP is that fact -- a cell is named by
+-- of it exists.  AND IT IS A NEW FACT rather than a derivable one: the
+-- two ledgers that read a chain at all clear the offending registry,
+-- the stratification one because the entry's source sits at or below
+-- its own floor and every frame of such a chain is free, the ordering
+-- one at any counter above the cells the chain names.  NODE OWNERSHIP
+-- is that fact -- a cell is named by
 -- exactly the frame that installed it, so a registered chain reaching
 -- it reaches it through that frame and reads it at that frame's floor.
 -- It is a field on the invariant record, which obliges every producer
