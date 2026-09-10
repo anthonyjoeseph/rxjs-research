@@ -432,6 +432,61 @@ walkExp-widen S 1≤S =
   C3≤C5 : C3 ≤ C5
   C3≤C5 = ≤-trans (≤mul C3) (≤mul (S * C3))
 
+-- AND THE SAME EXPONENT AFFORDS A CHAIN OF NEARLY TWICE THE CAP,
+-- which is the affordability question a REGISTERED chain raises and
+-- the reason the path factor's length was taken out of the cap.  A
+-- registry entry is the walked chain with one frame per operator of
+-- the inner pushed on top, so its length is bounded by the cap twice
+-- over and not once -- and the path factor's exponent is linear in
+-- that length, so what the widening has to absorb is a THIRD cube
+-- and a THIRD square rather than the two of each the walked reading
+-- pays.  Both fit inside a single fifth power at a cap of two or
+-- more, which is the answer: the walk's charge affords the cube, and
+-- the length budget it affords is anything up to twice the cap.
+--
+-- AND TWO IS WHERE THE HYPOTHESIS COMES FROM RATHER THAN ONE, which
+-- is what separates this from the walked reading directly above.  The
+-- absorbing step needs a fifth power to cover FOUR cubes, and a cap
+-- of one makes every power equal -- so the sibling's `1 ≤ S` is not
+-- enough here.  Every caller has the stronger reading already, the
+-- caps recurrence starting at two.
+walkExpL-widen : ∀ (S L : ℕ) → 2 ≤ S → L ≤ S + S →
+  (L + S) * (suc S * S)
+    ≤ S * (S * (S * (S * S))) + S * (S * (S * (S * S)))
+      + S * (S * (S * (S * S))) + (S * S + S * S)
+walkExpL-widen S L 2≤S hL =
+  ≤-trans (*-monoˡ-≤ (suc S * S) (+-monoˡ-≤ S hL))
+  (≤-trans (≤-reflexive expand)
+           (+-monoˡ-≤ (Sq + Sq)
+             (≤-trans (≤-reflexive regroup)
+                      (+-mono-≤ (+-mono-≤ Cu≤C5 Cu≤C5) CuSq≤C5))))
+  where
+  Sq = S * S
+  Cu = S * (S * S)
+  C5 = S * (S * (S * (S * S)))
+  1≤S : 1 ≤ S
+  1≤S = ≤-trans (s≤s z≤n) 2≤S
+  ≤mul : ∀ (x : ℕ) → x ≤ S * x
+  ≤mul x = ≤-trans (≤-reflexive (sym (*-identityˡ x))) (*-monoˡ-≤ x 1≤S)
+  expand : (S + S + S) * (suc S * S) ≡ Cu + Cu + Cu + Sq + (Sq + Sq)
+  expand = solve 1 (λ s → (s :+ s :+ s) :* ((con 1 :+ s) :* s)
+                            := s :* (s :* s) :+ s :* (s :* s) :+ s :* (s :* s)
+                               :+ s :* s :+ (s :* s :+ s :* s))
+                 refl S
+  regroup : Cu + Cu + Cu + Sq ≡ Cu + Cu + (Cu + Sq)
+  regroup = solve 2 (λ c q → c :+ c :+ c :+ q := c :+ c :+ (c :+ q))
+                  refl Cu Sq
+  Cu≤C5 : Cu ≤ C5
+  Cu≤C5 = ≤-trans (≤mul Cu) (≤mul (S * Cu))
+  Sq≤Cu : Sq ≤ Cu
+  Sq≤Cu = ≤mul Sq
+  twice : Cu + Cu ≡ 2 * Cu
+  twice = solve 1 (λ c → c :+ c := con 2 :* c) refl Cu
+  CuSq≤C5 : Cu + Sq ≤ C5
+  CuSq≤C5 = ≤-trans (+-monoʳ-≤ Cu Sq≤Cu)
+            (≤-trans (≤-reflexive twice)
+            (≤-trans (*-monoˡ-≤ Cu 2≤S) (≤mul (S * Cu))))
+
 -- WHAT ONE FRAME ARM MAY SPEND, AND IT IS THE WHOLE OF WHY THE
 -- POTENTIAL IS A SUM.  An outer frame charges its remaining path
 -- depth and the context's wrap through the factor the path can still

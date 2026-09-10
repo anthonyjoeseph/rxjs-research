@@ -42,7 +42,8 @@ open import Verify-Budget-Sufficient.Nest-Cap using (nestFac; nestU)
 open import Verify-Budget-Sufficient.Deliveries using
   (delivN)
 open import Verify-Budget-Sufficient.Walk-Factor using
-  (pathΦF; pathΦF-cap; pathΦD; pathRoots; pathΦF-cap-root; pathΦD-cap-root; sinkAbove?)
+  (pathΦF; pathΦF-cap; pathΦF-cap-atLen; pathFrameSz?; pathSz?-frames; pathΦD;
+  pathRoots; pathΦF-cap-root; pathΦD-cap-root; sinkAbove?)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk using
   (foldPath-nest-regs; PathΦHyp; DispatchΦHyp; ShareGoΦHyp; FrameΦHyp; InnerΦBody; valsΦ?; valsΦ?-mono;
   stepFrame-nest-Φ; Φ-to-bound)
@@ -78,7 +79,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   framePark?-own; regOwn?;
   nestClosOK?ᵛ-widen; pathOrd?; pathOrd?-outer)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
-  (capsOK?-count; capsOK?-regs; chainsStrat?-one; pathPark-delivered; pathsPark-delivered;
+  (capsOK?-count; capsOK?-regs; chainsStrat?-one; pathPark-delivered; pathsPark-delivered; pathSz?-len;
   registry-entStrat; slotsCaps?-capsAt; valsCaps?; valsCaps?-lvl; foldPath-slots;
   shareAdmit-caps; capsOK?-delivered; capsOK?-regOrd; capsOK?-regPark)
 open import Verify-Budget-Sufficient.Psi-Split using
@@ -93,7 +94,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part3 using
 open import Decide using (T-to; T⇒≡true; ∧-intro; ∧-trueˡ; ∧-trueʳ; ≡ᵇ-refl)
 open import Verify-Budget-Sufficient.Caps-Face.Nest-Arith using
   (nestWalkAt-def; nestΦAt; nestΦ-sight≤capsH; nestCapAt≤nestΦAt; nestWalkAt≤nestΦAt;
-  walkExp-widen; nestΦ-frame-charge)
+  walkExpL-widen; nestΦ-frame-charge)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Cascade-Caps using
   (cascadeFinish-caps; cascadeGo-caps; cascadeLatch-caps; chainStep-slots; chainsOf-caps; chainsOf-length)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Ring-Vocabulary using
@@ -2066,21 +2067,41 @@ mutual
                    (proj₂ (∧-true (frameSz? B f)
                             ((suc (pathLen p) ≤ᵇ B) ∧ pathSz? B p) hpz)))
 
--- THE ARRIVAL'S OWN POTENTIAL, which is the entry reading BOTH the
--- walk's side-condition and the fold's own premise are spent at: one
+-- THE ARRIVAL'S OWN POTENTIAL, READ AGAINST A LENGTH BUDGET RATHER
+-- THAN AGAINST THE CAP.  The entry reading is where the walk's
+-- side-condition and the fold's own premise are both spent -- one
 -- value on the path, so the depth premise the arm was stated with is
--- the whole of it once the path's factor is applied.
-entryΦ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (path : Path Γ (arrTy a) t) →
-  pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
+-- the whole of it once the path's factor is applied.  What the factor
+-- costs is linear in the path's LENGTH, and a chain the registry
+-- holds is longer than the cap: a subscribing frame swaps its head
+-- for a `from-inner` and pushes one frame per operator of the inner,
+-- so the count is the walked one plus an inner the arrival premise
+-- bounds by the cap again.  Splitting the length off the frame
+-- reading is what lets such a chain enter here at all.
+--
+-- AND THE ANSWER IS THAT THE CHARGE AFFORDS IT, WHICH IS THE WHOLE
+-- POINT OF STATING IT AT A BUDGET.  The premise is the budget the
+-- walk's exponent can absorb -- twice the cap -- and it is not a
+-- convenience: the walk's charge is three fifth powers beside two
+-- squares while a chain of that length prices at three cubes and
+-- three squares, so the third cube and the third square fit inside
+-- one fifth power and nothing else moves.  A budget larger than
+-- twice the cap is not refuted here, merely unclaimed; twice is what
+-- a registered chain is known to need.
+entryΦ-atLen : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (id L : ℕ) (a : Arrival Γ) (path : Path Γ (arrTy a) t) →
+  L ≤ Caps.cSize (capsAt e sl id) + Caps.cSize (capsAt e sl id) →
+  pathFrameSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
+  pathLen path ≤ L →
   nestDᵛ (arrTy a) (arrVal a) + pathNestD path ≤ nestUnit e sl →
   valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id) path
          (arrVal a ∷ []) ≡ true
-entryΦ {e = e} sl id a path hp hΦ = ∧-intro (T⇒≡true _ (≤⇒≤ᵇ Φfit)) refl
+entryΦ-atLen {e = e} sl id L a path hL hf hl hΦ =
+  ∧-intro (T⇒≡true _ (≤⇒≤ᵇ Φfit)) refl
   where
   Sz = Caps.cSize (capsAt e sl id)
-  1≤Sz : 1 ≤ Sz
-  1≤Sz = ≤-trans (s≤s z≤n) (2≤capsAt-size e sl id)
+  2≤Sz : 2 ≤ Sz
+  2≤Sz = 2≤capsAt-size e sl id
   dΦ : nestDᵛ (arrTy a) (arrVal a) + pathΦD Sz path
          ≤ nestUnit e sl + (Sz * Sz + Sz * Sz) + Sz
   dΦ =
@@ -2095,13 +2116,29 @@ entryΦ {e = e} sl id a path hp hΦ = ∧-intro (T⇒≡true _ (≤⇒≤ᵇ Φf
   Φfit = ≤-trans
     (subst (pathΦF Sz path * (nestDᵛ (arrTy a) (arrVal a) + pathΦD Sz path) ≤_)
            (sym (nestWalkAt-def e sl id))
-           (*-mono-≤ (≤-trans (pathΦF-cap Sz path hp)
+           (*-mono-≤ (≤-trans (pathΦF-cap-atLen Sz L path hf hl)
                               (^-monoʳ-≤ 2
-                                (≤-trans (walkExp-widen Sz 1≤Sz) (n≤1+n _))))
+                                (≤-trans (walkExpL-widen Sz L 2≤Sz hL)
+                                         (n≤1+n _))))
                      (≤-trans dΦ
                               (m≤m+n (nestUnit e sl + (Sz * Sz + Sz * Sz) + Sz)
                                      (Sz * slotWrapSum sl)))))
     (nestWalkAt≤nestΦAt e sl id)
+
+-- AND A CHAIN THE WALK ITSELF PRICED ENTERS AT THE CAP, which is the
+-- budget above at the one length a size receipt supplies directly.
+entryΦ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (path : Path Γ (arrTy a) t) →
+  pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
+  nestDᵛ (arrTy a) (arrVal a) + pathNestD path ≤ nestUnit e sl →
+  valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id) path
+         (arrVal a ∷ []) ≡ true
+entryΦ {e = e} sl id a path hp hΦ =
+  entryΦ-atLen sl id (Caps.cSize (capsAt e sl id)) a path
+    (m≤m+n (Caps.cSize (capsAt e sl id)) (Caps.cSize (capsAt e sl id)))
+    (pathSz?-frames (Caps.cSize (capsAt e sl id)) path hp)
+    (pathSz?-len (Caps.cSize (capsAt e sl id)) path hp) hΦ
+
 
 -- AND THE CHAIN ENTERS THE WALK WITH IT, the path's remaining depth
 -- being under the same unit the arrival's is read against.

@@ -238,17 +238,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **A LENGTH THE REGISTRY CAN ACTUALLY SUPPLY**, which is what taking
-  the length out of the cap leaves owed. The pricing now takes a frame
-  reading and a length budget separately, and the sink leaf's charge
-  is a constant — so a chain running to `k` caps costs the entry cap
-  raised to `k + 1`, a fixed power and not an exponential in a
-  stepped cap. What nothing supplies is the
-  `k`: a registered chain is the walked one plus a frame per operator
-  of the inner, and the arrival premise bounds that inner's SYNTAX and
-  not its count. The commit states the length the registry holds and
-  reports whether the power it buys is one the nesting budget affords.
-  It narrows WHAT PRICES A REGISTERED CHAIN to that one factor.
+- **THE CASCADE THAT CARRIES A LENGTH**, which is what the entry
+  reading now being stated at a budget leaves owed. The affordability
+  half is answered YES: the potential affords twice the cap, the
+  length a registered chain is known to need. What still reads the
+  refuted form is the FAN: its registry receipt, the
+  admitted-list filter and the share fold's premise are one size
+  reading at the entry cap, which a mint cannot preserve. The commit
+  splits that premise into the frame half the refutation leaves
+  standing and a length half at twice the cap, and carries both to the
+  leaf that spends them. It narrows WHAT PRICES A REGISTERED CHAIN to
+  the mint's own supply.
 
 - **A READING THAT TRAVELS TO THE MINT**, which is all the store
   question has left. Three rows fail in the same place: the site
@@ -294,10 +294,10 @@ does not fit is a finding about the shared statement, not about the head.
   content is that a mint stepped the caps. Two siblings die in their free
   form at one `register` too, so each is owed AT THE MINT. The entry-level
   half is settled NEGATIVELY — that reading is refuted, so nothing threaded
-  to a mint pays it. The CURRENCY half is settled: the pricing reads a
-  length in a budget of its own rather than in a cap, so a chain of `k`
-  caps costs a fixed power. What is left is who supplies the `k`, an
-  arrival premise bounding an inner's syntax and not its count.
+  to a mint pays it. The CURRENCY half is settled and the AFFORDABILITY
+  with it: the entry potential is PROVEN to afford twice the cap. What is
+  left is the SUPPLY — an arrival premise bounds the inner's syntax and not
+  its count, and no reading of the count reaches the mint.
   relevant: `fan-regsSz-mint`, `sink-fan-sink`, `walk-share-strat`
 
 ### The ledger
