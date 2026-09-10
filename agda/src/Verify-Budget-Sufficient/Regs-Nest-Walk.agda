@@ -70,7 +70,7 @@ open import Verify-Budget-Sufficient.Caps-Depth using (depthReact)
 open import Verify-Budget-Sufficient.Walk-Factor using (pathΦF; pathΦD)
 open import Verify-Budget-Sufficient.Caps-Face.Part1
   using (pathSz?; iterSize-+; iterSize-mono-s; pathStrat?; pathFloor; parkStrat?;
-  pathOrd?; pathPark?)
+  pathOrd?; pathPark?; regOwn?)
 open import Verify-Budget-Sufficient.Nest-Subst using (applyFn-nest)
 
 -- the potential, read off the values still in flight and the path they
@@ -174,13 +174,18 @@ InnerΦBody {Γ = Γ} {e = e} {s = s} sf id now B U op allNid inst path vals fin
                          (nestUnit e (Sched.slots sched)))
               + pathΦD B path) ≤ U)
 
--- AND THE TWO REGISTRY READINGS THE DESCENT UNDER THIS FRAME SPENDS,
+-- AND THE THREE REGISTRY READINGS THE DESCENT UNDER THIS FRAME SPENDS,
 -- carried for the reason the cell's own reading inside the body is:
--- neither follows from a caps receipt, which a caps-legal state the
+-- none follows from a caps receipt, which a caps-legal state the
 -- evaluator never built already refutes.  They stand OUTSIDE the
 -- existential rather than beside their sibling inside it, so a producer
 -- holding them at the chain hands them straight over and nothing
--- between the walk and the descent has to carry them.
+-- between the walk and the descent has to carry them.  The third is the
+-- OWNER of the outer's cell, which this frame only forwards: the drain
+-- one call down subscribes under a frame naming that cell, and since the
+-- park reading a chain headed by such a frame carries now holds the
+-- owner half too, the producer already has it where a re-derivation
+-- from the caps invariant would have nothing to stand on.
 InnerΦFit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (sf : Gas) (id : Id) (now : Tick) (B U : ℕ)
   (op : AllOp) (allNid inst : NodeId) (path : Path Γ s t)
@@ -189,6 +194,7 @@ InnerΦFit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
 InnerΦFit sf id now B U op allNid inst path vals fin sched st =
   (pathOrd? (Sched.nextNode sched) (thru-outer op allNid ↠ path) ≡ true)
   × (pathPark? path st ≡ true)
+  × (regOwn? allNid (pathFloor path) (EvalSt.registry st) ≡ true)
   × InnerΦBody sf id now B U op allNid inst path vals fin sched st
 
 FrameΦHyp : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
@@ -578,14 +584,14 @@ innerΦ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
                       fin sched st))
     ≡ true
 innerΦ {e = e} sf id now op allNid inst path vals fin sched st B U
-       (stR , stK , c , d , W , Lv , G , face , hdr , hw , hdp , hpk , hpl , stP , stQ , hst , hnum) =
+       (stR , stK , stW , c , d , W , Lv , G , face , hdr , hw , hdp , hpk , hpl , stP , stQ , hst , hnum) =
   Φ-of-bound B U (nestFac S′ W * (G + nestU S′ (nestUnit e (Sched.slots sched))))
     path (proj₁ r) bound (hnum j (proj₁ (proj₂ INNER)))
   where
   r = stepFrame sf id now (from-inner op allNid inst) path vals fin sched st
 
   INNER = stepFrame-nodes-inner c d (Sched.slots sched) W Lv sf id now op
-            allNid inst path vals fin sched st ⦃ face ⦄ refl hdr hw hdp hpk hpl stP stQ stR stK
+            allNid inst path vals fin sched st ⦃ face ⦄ refl hdr hw hdp hpk hpl stP stQ stR stK stW
 
   j = proj₁ INNER
 

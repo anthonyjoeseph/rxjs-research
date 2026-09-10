@@ -75,6 +75,7 @@ open import Verify-Budget-Sufficient.Caps-Depth
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (capsAt-round-size; capsOK?; capsOK?-mono; frameSz?; n≤capsAt-size; pathFloor; pathPark?;
   pathStrat?; pathSz?; pathSz?-widen; regsSz?; valCaps?; nestClosOK?ᵛ; parkStrat?; framePark?;
+  framePark?-own; regOwn?;
   nestClosOK?ᵛ-widen; pathOrd?; pathOrd?-outer)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
   (capsOK?-count; capsOK?-regs; chainsStrat?-one; pathPark-delivered; pathsPark-delivered;
@@ -89,7 +90,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part6 using
   (SiCType; IfcType)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (valCaps?-size; valCaps?-widen)
-open import Decide using (T-to; T⇒≡true; ∧-intro; ∧-trueˡ; ∧-trueʳ)
+open import Decide using (T-to; T⇒≡true; ∧-intro; ∧-trueˡ; ∧-trueʳ; ≡ᵇ-refl)
 open import Verify-Budget-Sufficient.Caps-Face.Nest-Arith using
   (nestWalkAt-def; nestΦAt; nestΦ-sight≤capsH; nestCapAt≤nestΦAt; nestWalkAt≤nestΦAt;
   walkExp-widen; nestΦ-frame-charge)
@@ -1089,17 +1090,20 @@ innerΦ-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   depthReact sf op allNid inst p eid now vals sched st fin ≤ capsH e sl id →
   pathStrat? p ≡ true →
   parkStrat? (pathFloor p) (lookupNode allNid (EvalSt.nodes st)) ≡ true →
-  -- AND THE TWO REGISTRY READINGS, WHICH THIS FIT ONLY FORWARDS.  They
+  -- AND THE THREE REGISTRY READINGS, WHICH THIS FIT ONLY FORWARDS.  They
   -- sit outside the fit's existential precisely so that nothing between
   -- the walk that holds them and the descent that spends them has to
-  -- carry them, so the assembly here is a pairing.
+  -- carry them, so the assembly here is a pairing.  The owner of the
+  -- outer's cell is one of them because the descent subscribes under a
+  -- frame naming that cell, and a caps receipt cannot pay for it.
   pathOrd? (Sched.nextNode sched) (thru-outer op allNid ↠ p) ≡ true →
   pathPark? p st ≡ true →
+  regOwn? allNid (pathFloor p) (EvalSt.registry st) ≡ true →
   FrameΦHyp sf eid now (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
             (from-inner op allNid inst) p vals fin sched st
 innerΦ-fit sl id sf eid now Lv op allNid inst p vals fin sched st
-           hsl hpz hnd hΦ hfd hdep stP stQ stR stK =
-  stR , stK ,
+           hsl hpz hnd hΦ hfd hdep stP stQ stR stK stW =
+  stR , stK , stW ,
   innerΦ-fit-go sl id sf eid now Lv op allNid inst p vals fin sched st
     (lookupNode allNid (EvalSt.nodes st)) refl hsl hpz hnd hΦ hfd hdep stP stQ
 
@@ -1136,12 +1140,21 @@ frameΦ-fit sl id sf eid now Lv (map-f _)  p vals fin sched st _ _ _ _ _ _ _ _ _
 frameΦ-fit sl id sf eid now Lv (take-f _) p vals fin sched st _ _ _ _ _ _ _ _ _ _ = tt
 frameΦ-fit sl id sf eid now Lv (scan-f fn nid) p vals fin sched st hsl hpz hnd hΦ _ _ _ _ _ _ =
   scanΦ-fit sl id sf eid now fn nid p vals fin sched st hsl hpz hnd hΦ
-frameΦ-fit sl id sf eid now Lv (from-inner op allNid inst) p vals fin sched st
+frameΦ-fit {s = s} sl id sf eid now Lv (from-inner op allNid inst) p vals fin sched st
            hsl hpz hnd hΦ hfd hdep stP stQ stR stK =
   innerΦ-fit sl id sf eid now Lv op allNid inst p vals fin sched st
-    hsl hpz hnd hΦ hfd hdep stP stQ
+    hsl hpz hnd hΦ hfd hdep stP (∧-trueˡ stQ)
     (pathOrd?-outer (Sched.nextNode sched) allNid inst op p stR)
     (proj₂ (∧-true _ _ stK))
+    -- and the owner of the outer's cell, off the SAME frame reading the
+    -- strat half came from: a `from-inner` names two cells and the outer
+    -- is the first, so the membership side is a `≡ᵇ` reflexivity.  The
+    -- frame's two source indices are SPELLED because neither the helper's
+    -- conclusion nor the node list mentions them, so unification has
+    -- nothing to solve them from
+    (framePark?-own {s = s} {u = s} (pathFloor p) (from-inner op allNid inst)
+       allNid st stQ
+       (cong (_∨ ((inst ≡ᵇ allNid) ∨ false)) (≡ᵇ-refl allNid)))
 frameΦ-fit sl id sf eid now Lv (thru-outer op nid) p vals fin sched st hsl hpz hnd hΦ _ _ _ _ _ _ =
   walk-thru-fit sl id sf eid now op nid p vals fin sched st hsl hpz hnd hΦ
 
