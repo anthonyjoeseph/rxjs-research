@@ -1,8 +1,11 @@
 -- ══════════════════════════════════════════════════════════════════
--- A FRAME'S OWN PARK READING SURVIVES ITS STEP, at the two frame
--- shapes that actually WRITE the cell the reading is about.
+-- THE STORE HALF OF A FRAME'S OWN PARK READING SURVIVES ITS STEP, at
+-- the two frame shapes that actually WRITE the cell it is about.  The
+-- owner half of the same reading is a body, so the rows below are
+-- taken against the node-table conjunct alone -- the premise is still
+-- the whole reading, which is what every row supplies.
 --
--- TARGET: framePark-step @112abf
+-- TARGET: frameParked-step @000000
 --
 -- WHAT THE ROWS INSTANTIATE.  A two-slot context, so `pathFloor` at a
 -- root-ended chain is 2 and an `input` reference at index 0 or 1 sits
@@ -51,7 +54,7 @@ open import Rx.Evaluator
   sched-init; st-init; installNode; scan-st; mergeAll-st; stepFrame; mergeAllDrain)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using (framePark?)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves
-  using (framePark-step)
+  using (frameParked-step)
 open import Probed.Apparatus using (Confirms)
 
 ----------------------------------------------------------------------
@@ -97,7 +100,7 @@ stˢ = installNode 5 (scan-st {t = obs natᵗ} (input fzero)) (st-init e₂)
 ----------------------------------------------------------------------
 
 tieScanTransport : Confirms
-  (framePark-step g0 0 0 (scan-f fn₀ 5) κˢ (3 ∷ []) false
+  (frameParked-step g0 0 0 (scan-f fn₀ 5) κˢ (3 ∷ []) false
      (sched-init e₂ sl₂) stˢ refl refl refl)
 tieScanTransport = refl
 
@@ -114,14 +117,14 @@ tieScanTransport = refl
 ----------------------------------------------------------------------
 
 tieScanBought : Confirms
-  (framePark-step g0 0 0 (scan-f fn₁ 5) κˢ (3 ∷ []) false
+  (frameParked-step g0 0 0 (scan-f fn₁ 5) κˢ (3 ∷ []) false
      (sched-init e₂ sl₂) stˢ refl refl refl)
 tieScanBought = refl
 
 ----------------------------------------------------------------------
--- ROW 3 — THE ENQUEUE, one level above `thruConsume-cellPark`'s leaf
--- and the assembly's conclusion at the point `Probed.ThruConsume-
--- CellPark` instantiates it.  A capacity-zero mergeAll node at nid 0,
+-- ROW 3 — THE ENQUEUE, one level above the arm of
+-- `thruConsume-cellPark` that reduces without a leaf at all.
+-- A capacity-zero mergeAll node at nid 0,
 -- so `hasRoom` fails and the arriving observable is appended to the
 -- queue the reading is about.  LOAD-BEARING on the vals premise, which
 -- prices the appended term.
@@ -131,7 +134,7 @@ stᵗ : EvalSt e₂
 stᵗ = installNode 0 (mergeAll-st {t = natᵗ} (just 0) 0 [] false) (st-init e₂)
 
 tieThruEnqueue : Confirms
-  (framePark-step g0 0 0 (thru-outer mergeAllᵒ 0) root
+  (frameParked-step g0 0 0 (thru-outer mergeAllᵒ 0) root
      (input fzero ∷ []) false (sched-init e₂ sl₂) stᵗ refl refl refl)
 tieThruEnqueue = refl
 
@@ -142,7 +145,7 @@ tieThruEnqueue = refl
 ----------------------------------------------------------------------
 
 tieMapFree : Confirms
-  (framePark-step g0 0 0 (map-f (nat̂ 0)) root (input fzero ∷ []) false
+  (frameParked-step g0 0 0 (map-f (nat̂ 0)) root (input fzero ∷ []) false
      (sched-init e₂ sl₂) stᵗ refl refl refl)
 tieMapFree = refl
 
@@ -190,12 +193,12 @@ drained g = mergeAllDrain g 7 root 0 0 (just 1) 0
               (input fzero ∷ input (fsuc fzero) ∷ []) (sched-init e₂ sl₂ʰ) stᶠ
 
 tieInnerResidue : Confirms
-  (framePark-step g0 0 0 (from-inner mergeAllᵒ 7 9) root (3 ∷ []) true
+  (frameParked-step g0 0 0 (from-inner mergeAllᵒ 7 9) root (3 ∷ []) true
      (sched-init e₂ sl₂ʰ) stᶠ refl refl refl)
 tieInnerResidue = refl
 
 tieInnerGassed : Confirms
-  (framePark-step (gasPad 40 g0) 0 0 (from-inner mergeAllᵒ 7 9) root
+  (frameParked-step (gasPad 40 g0) 0 0 (from-inner mergeAllᵒ 7 9) root
      (3 ∷ []) true (sched-init e₂ sl₂ʰ) stᶠ refl refl refl)
 tieInnerGassed = refl
 
