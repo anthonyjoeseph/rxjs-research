@@ -177,3 +177,6 @@ open import Probed.Kill-Consume-Readings
 
 open import Probed.ThruConsume-CellPark
   using (tie)
+
+open import Probed.FramePark-Step
+  using (tieScanTransport; tieScanBought; tieThruEnqueue; tieMapFree)

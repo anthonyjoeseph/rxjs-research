@@ -1718,10 +1718,15 @@ thruWalk-nodry {u = u} {e = e} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc
                           2≤S ≤-refl ≤-refl hj₁ ≤-refl ≤-refl ≤-refl)
                        (≤-trans (≤-reflexive (sym (sIterD-suc S W dep (suc bud) (length os) J)))
                                 dsc)
+      stVH   = proj₁ (∧-true (inputsBelowᵛ (pathFloor κ) (obs u) o)
+                             (all (inputsBelowᵛ (pathFloor κ) (obs u)) os) stV)
       stVT   = proj₂ (∧-true (inputsBelowᵛ (pathFloor κ) (obs u) o)
                              (all (inputsBelowᵛ (pathFloor κ) (obs u)) os) stV)
-      -- the three readings back at the state one consumed value landed in
-      CR     = thruConsume-readings sf op nid κ id now o sched₀ st₀ stO stK stQ
+      -- the three readings back at the state one consumed value landed in,
+      -- and the consume takes the arrival's own reading: the ledger's head
+      -- split is exactly it
+      CR     = thruConsume-readings sf op nid κ id now o sched₀ st₀
+                 stVH stO stK stQ
       h-tail = thruWalk-nodry c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc (J + j₁) sf op nid κ id now
                  os sched₁ st₁ ok₁ pb₁ sspL₁ vb₁ rg₁ gk hD₁ nst₁ clL̂ dsc₁ stP stVT
                  (proj₁ CR) (proj₁ (proj₂ CR)) (proj₂ (proj₂ CR))

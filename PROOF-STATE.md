@@ -240,12 +240,13 @@ does not fit is a finding about the shared statement, not about the head.
 
 - **RESTATING THE TWO READINGS THE PROBES KILLED, AND INSTANTIATING THE
   LAST LEAF.** Five of the six leaves were reached and two came back
-  FALSE, for reasons that are not the same: one reading quantifies over
-  a queue extended by content nothing prices, the other reads its
-  premise off a post-state an early arm never builds, so it constrains
-  nothing. Both repairs are known and NEITHER is the record field the
-  ownership question asks for — an arrival's own floor premise, and a
-  reading taken ACROSS the call. The commit lands both and probes
+  FALSE, for reasons that are not the same: one quantifies over a queue
+  extended by content nothing prices, the other reads a post-state an
+  early arm never builds, so it constrains nothing. Both repairs are
+  known and NEITHER is the record field the
+  ownership question asks for — an arrival's own floor premise, and an
+  identification of the node the reading is about. The commit lands
+  both and probes
   `framePark-step`, the leaf still uninstantiated. It narrows DOES A
   STORE CELL HAVE AN OWNER by deciding whether its last unprobed member
   is two-floor or merely unpriced.

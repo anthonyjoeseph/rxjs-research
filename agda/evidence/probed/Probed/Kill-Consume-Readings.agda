@@ -2,7 +2,7 @@
 -- THREE ENTRY READINGS ACROSS KILL AND CONSUME STEPS.
 --
 -- TARGET: switchKill-readings @6deac2
--- TARGET: thruConsume-readings @e590fc
+-- TARGET: thruConsume-readings @e5cd57
 -- TARGET: subscribeInner-readings @f4ed74
 --
 -- WHAT THESE ROWS COVER.  All three statements ask that three boolean
@@ -21,12 +21,12 @@
 -- κ = share-sink fzero (pathFloor κ = 0), where thruConsume parks the
 -- arrival o = input fzero into the merge node's queue.  After the park
 -- parkStrat? reads all (inputsBelowᵉ 0) [input fzero] = (0 <ᵇ 0) =
--- false.  The figures row pins this reading; a tie row that asserted
--- conclusion C3 = true here would carry refl : false ≡ true, which
--- does not typecheck.  This is a REFUTATION candidate — the no-room
--- branch violates H3 unless inputsBelowᵉ (pathFloor κ) o is separately
--- guaranteed.  The figures≡ pin below records the actual boolean
--- so the conclusion the statement makes is visible.
+-- false.  The figures row pins that reading, and it is what makes the
+-- statement's arrival premise LOAD-BEARING rather than decorative:
+-- drop the premise and this point satisfies every remaining hypothesis
+-- while the third conclusion is false, so a tie row asserting it would
+-- carry refl : false ≡ true.  With the premise the point is excluded,
+-- since inputsBelowᵛ 0 (obs _) (input fzero) is that same false.
 --
 -- thruConsume-readings (identity paths): covered at κ = root,
 -- missing-node path (thruConsume returns sched and st unchanged) and
@@ -228,7 +228,7 @@ tieSwitchKillJust = refl , refl , refl
 -- ([], [], sched, st) unchanged.
 tieThruConsumeIdentity : Confirms
   (thruConsume-readings (gs g0) mergeAllᵒ 0 root 0 0 o₁ sched₁ st₁
-     refl refl refl)
+     refl refl refl refl)
 tieThruConsumeIdentity = refl , refl , refl
 
 ----------------------------------------------------------------------

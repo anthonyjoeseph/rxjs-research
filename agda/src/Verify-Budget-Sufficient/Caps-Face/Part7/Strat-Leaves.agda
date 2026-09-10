@@ -237,23 +237,25 @@ postulate
 -- the ENTRY queue's at that floor, and `drain-queue-all` carries it the
 -- rest of the way to the residue.
 --
--- THAT ARGUMENT IS TRUE AND THE STATEMENT IS STILL FALSE, because the
--- hypothesis it rests on is READ OFF THE POST-STATE.  The no-room arm
--- returns immediately with the state untouched and the queue as the
--- residue, so the cell the hypothesis reads is the one the drain never
--- looked at -- `nothing` at an empty table, which the wildcard arm of
--- the floor check calls true.  The premise is then satisfiable at ANY
--- entry queue and constrains nothing, so the conclusion is asked to
--- hold for free.  The repair is to read the owner's cell BEFORE the
--- drain and compare across the call: the reading has to be a hypothesis
--- about the state the caller HAS, not about the one the arm declined to
--- build.
+-- THAT ARGUMENT IS TRUE AND THE STATEMENT WAS STILL FALSE, because the
+-- hypothesis said nothing about WHICH node it read.  The no-room arm
+-- returns immediately with the state untouched, so at an empty table
+-- the cell is `nothing` and the wildcard arm of the floor check calls
+-- that true: the premise was satisfiable at ANY entry queue and
+-- constrained nothing.  The repair IDENTIFIES the node.  With the
+-- owner's cell known to hold this very queue on entry, the untouched
+-- post-state reads back as the queue's own, so the premise IS the
+-- conclusion in exactly the arm that broke, and stays an ordinary
+-- reading about the drain's own cell everywhere else.  The caller
+-- already matches on that node, so what it owes is the match's own
+-- equation and no new fact.
 --
   -- REFUTED: `Refuted.MergeAllDrain-OwnerQueue`.
   mergeAllDrain-ownerQueue : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (i : ℕ) (g : Gas) (allNid : NodeId) (κ : Path Γ s t) (id : Id) (now : Tick)
-    (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ s))
+    (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ s)) (od : Bool)
     (sched : Sched Γ) (st : EvalSt e) →
+    lookupNode allNid (EvalSt.nodes st) ≡ just (mergeAll-st lim act q od) →
     parkStrat? i (lookupNode allNid (EvalSt.nodes
       (proj₂ (proj₂ (proj₂ (proj₂ (proj₂
         (mergeAllDrain g allNid κ id now lim act q sched st)))))))) ≡ true →

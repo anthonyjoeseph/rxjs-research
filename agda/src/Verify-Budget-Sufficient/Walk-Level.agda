@@ -2283,7 +2283,8 @@ thruWalk-walk {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g op nid κ bid
   -- ACROSS ONE CONSUMED VALUE: the value may enqueue on the outer's own
   -- cell, so the cell reading is re-established rather than carried,
   -- and the counter only rises
-  RDC = thruConsume-readings g op nid κ bid now o sched st hord hpk hqk
+  RDC = thruConsume-readings g op nid κ bid now o sched st
+          (proj₁ hvh) hord hpk hqk
   j₁ = proj₁ HD
   H1 = proj₁ (proj₂ HD)
   H2 = proj₁ (proj₂ (proj₂ HD))

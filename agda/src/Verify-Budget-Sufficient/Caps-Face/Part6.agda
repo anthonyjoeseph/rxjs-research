@@ -210,26 +210,29 @@ postulate
        × (parkStrat? (pathFloor κ)
             (lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r)))) ≡ true)
 
-  -- THIS ONE IS FALSE AS WRITTEN, and the witness is instantiated: the
-  -- no-room branch PARKS the arrival onto the outer's own queue, so the
-  -- post-state cell reading is `all (inputsBelowᵉ (pathFloor κ))` over
-  -- the old queue EXTENDED BY `o` -- and no hypothesis says anything
-  -- about `o`.  At a `share-sink`-terminated chain the floor is below
-  -- the context width, so `o = input fzero` sits at or above it while
-  -- every hypothesis holds and the third conjunct computes to `false`.
-  -- The `root` chain is safe only accidentally, its floor being the
-  -- width itself.  The statement wants `inputsBelowᵉ (pathFloor κ) o ≡
-  -- true`, which is the same premise the drain's own sibling needs, and
-  -- the restatement is owed at both.
+  -- AND THE ARRIVAL'S OWN READING IS A PREMISE HERE, because without it
+  -- the statement is FALSE and not merely unproven.  The no-room branch
+  -- PARKS the arrival onto the outer's own queue, so the post-state cell
+  -- reading runs over the old queue EXTENDED BY `o`: at a
+  -- `share-sink`-terminated chain the floor sits below the context
+  -- width, and `o = input fzero` falsifies the third conjunct while
+  -- every other hypothesis holds.  A `root` chain is safe only
+  -- accidentally, its floor being the width itself, so nothing about
+  -- the shape of the path repairs it.  The premise is the same one the
+  -- cell face beside this one already takes, and it is FREE at both
+  -- call sites, which read the payload ledger one value at a time and
+  -- hold its head split out.
   --
-  -- PROBED: `Probed.Kill-Consume-Readings`.  One row pins the falsity --
-  --   the three conclusions at the parking state compute to
-  --   `(true , true , false)` -- and one covers the identity branch,
-  --   where the arrival is dispatched rather than parked.
+  -- PROBED: `Probed.Kill-Consume-Readings`.  One row stands at the
+  --   parking state, where the three conclusions compute to
+  --   `(true , true , false)` -- so it is what makes the premise
+  --   load-bearing rather than decorative -- and one covers the identity
+  --   branch, where the arrival is dispatched rather than parked.
   thruConsume-readings : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (g : Gas) (op : AllOp) (nid : NodeId) (κ : Path Γ u t)
     (id : Id) (now : Tick) (o : Val Γ (obs u))
     (sched : Sched Γ) (st : EvalSt e) →
+    inputsBelowᵛ (pathFloor κ) (obs u) o ≡ true →
     pathOrd? (Sched.nextNode sched) (thru-outer op nid ↠ κ) ≡ true →
     pathPark? κ st ≡ true →
     parkStrat? (pathFloor κ) (lookupNode nid (EvalSt.nodes st)) ≡ true →
@@ -768,12 +771,13 @@ private
           (proj₂ (proj₂ (proj₂ (proj₂ IH))))
     where
     vCa = valsOf (frameStep j c) sl (o ∷ os) vC
-    TCR = thruConsume-readings g op nid κ id now o sched st hord hpk hpark
     -- the stratification reading of a LIST is pointwise, so the cons
     -- splits by the same ∧ the caps reading does and neither half needs
     -- the walk's state: a value's inputs do not move when the state does
     hvSplit = ∧-true (inputsBelowᵛ (pathFloor κ) (obs u) o)
                      (valsStrat? (pathFloor κ) os) hvs
+    TCR = thruConsume-readings g op nid κ id now o sched st
+            (proj₁ hvSplit) hord hpk hpark
     HD  = thruConsume-caps-go siC c dep bud j g op nid κ id now o sl sched st
             2≤S 1≤R slEq slC slSz inv (proj₁ (∧-true _ _ vCa)) pC lC
             (mList?-head bud sl _ o os nst)

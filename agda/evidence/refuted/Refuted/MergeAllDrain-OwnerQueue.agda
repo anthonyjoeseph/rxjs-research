@@ -28,11 +28,14 @@
 -- But `inputsBelowᵉ 1 (input (fsuc fzero)) = 1 <ᵇ 1 = false`, so
 -- the conclusion is `false ≡ true` — absurd.
 --
--- WHAT THIS CLOSES.  The repair needs the owner's cell to be readable
--- BEFORE the drain, so the reading can be compared across the call
--- rather than read from the post-drain state the floor-check never
--- reached.  The conditioned form — OKB carries the link or a separate
--- hypothesis ties the pre-drain cell — is where the statement lives.
+-- WHAT THIS CLOSES.  The defect is that the reading names no NODE:
+-- `parkStrat? i nothing` is true, so the premise never touches the
+-- cell it is supposed to be about.  The conditioned form IDENTIFIES
+-- the owner's cell on entry, which puts this arm's untouched
+-- post-state back on the queue itself.  Reading the cell BEFORE the
+-- drain instead is a strictly stronger ask that the consumer cannot
+-- meet — it owes the reading at an ARBITRARY floor, decided after the
+-- call — and it is not what closes this.
 -- ══════════════════════════════════════════════════════════════════
 module Refuted.MergeAllDrain-OwnerQueue where
 

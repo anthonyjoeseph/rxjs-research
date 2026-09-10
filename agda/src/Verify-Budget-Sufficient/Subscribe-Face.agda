@@ -1953,7 +1953,7 @@ innerFinish-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
 -- drain degenerates to the decrement the merge face used to state alone
 innerFinish-caps {n = n} {s = s} c dep bud j g mergeAllᵒ allNid inst κ id now vals sl sched st
                  2≤S 1≤R slEq slC slSz inv pC lC vC fb dpt stP stV stQ stO stK
-  with lookupNode allNid (EvalSt.nodes st)
+  with lookupNode allNid (EvalSt.nodes st) in ownEq
      | lookupNode-caps (frameStep j c) (Sched.slots sched) allNid (EvalSt.nodes st)
          (capsOK?-nodeSz (frameStep j c) sched st inv)
          (capsOK?-nodeWid (frameStep j c) sched st inv)
@@ -2000,11 +2000,13 @@ innerFinish-caps {n = n} {s = s} c dep bud j g mergeAllᵒ allNid inst κ id now
             -- THE REINSTALL PUTS BACK THE RESIDUE, and the reading it
             -- owes is the entry queue's: a drain never adds a term the
             -- queue did not carry, so whatever floor the owner's cell
-            -- is asked at, the residue answers at it too
+            -- is asked at, the residue answers at it too.  The clause's
+            -- own match on the owner is what identifies the cell the
+            -- reading is about
             (λ i hold →
                drain-queue-all (inputsBelowᵉ i) g allNid κ id now lim (pred act) q sched st
-                 (mergeAllDrain-ownerQueue i g allNid κ id now lim (pred act) q sched st
-                    hold)))
+                 (mergeAllDrain-ownerQueue i g allNid κ id now lim (pred act) q od sched st
+                    ownEq hold)))
      , valsIn (frameStep (j + suc j′) c) sl (vals ++ proj₁ DR)
          (valsCaps?-widen sl s (vals ++ proj₁ DR) ⊑ˢ
             (all-++-intro (valCaps? (frameStep (j + j′) c) sl s) vals (proj₁ DR)
