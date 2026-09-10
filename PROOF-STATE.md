@@ -426,10 +426,10 @@ does not fit is a finding about the shared statement, not about the head.
   reading is about, so no watermark both covers it and excludes the write; the
   payload's own reading is what is asked to keep it true.
 - **`setNode-regPark-owner`** (Part1) — SHAPE, `REFUTED, PROBED`: a write
-  priced at one chain's floor. Refuted at a share-ended registry chain reading
-  the written cell at its slot index, the write legal at the writer's own floor
-  throughout. The repair excludes a state, so it is node OWNERSHIP on the
-  record.
+  priced at one chain's floor, refuted at a share-ended chain reading the cell
+  at its slot index. Every surviving consumer is an OVERWRITE; the fresh
+  install spends the ordering ledger. The repair excludes a state — node
+  OWNERSHIP on the record.
 - **`mergeAllDrain-ownerQueue`** (Part7/Strat-Leaves) — SHAPE, `REFUTED`: what
   the drain leaves in the owner's cell. Its premise is read off the POST-state,
   which the no-room arm never builds, so it is vacuously satisfiable. The

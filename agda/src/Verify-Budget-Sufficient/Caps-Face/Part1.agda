@@ -927,6 +927,11 @@ regPark?-set rs nid ns st pv =
 -- fold's closure and the pushed payload may name inputs above any
 -- other reading.  A registered chain reaching the same cell reads it
 -- at ITS floor, and no receipt in this development ties the two.
+-- EVERY CONSUMER IS AN OVERWRITE -- an enqueue extending a flatten's
+-- queue, or a scan step replacing its accumulator -- because the one
+-- site that installs a FRESH cell spends the ordering ledger instead:
+-- a registered chain's cells sit at or below the counter and a fresh
+-- node IS the counter, so no registered reader can name it.
 --
 -- THE ONE-FLOOR FORM BELOW IS FALSE, and the two floors are already
 -- there in a two-slot context: a root-ended chain reads at two and a

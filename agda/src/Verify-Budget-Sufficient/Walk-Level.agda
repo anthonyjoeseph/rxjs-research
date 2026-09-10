@@ -140,12 +140,14 @@ open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (burstCaps?; burstCount?; burstStrat?; capsOK?; capsOK?-mono; eventCaps?; parkStrat?;
   pathFloor; pathOrd?; pathOrd?-inner; pathOrd?-mono; pathOrd?-push;
   pathOrd?-read; pathPark?;
-  pathPark?-set-fresh; pathRead; pathStrat?; pathSz?; setNode-regPark-owner;
+  pathPark?-set-fresh; pathRead; pathStrat?; pathSz?; regPark?-set-fresh;
+  setNode-regPark-owner;
   slotsCaps?; valCaps?;
   valCountᵉ; widNode; widNode-push)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
   (capsOK?-mergeAllBump; capsOK?-nextNode; capsOK?-nodeSz; capsOK?-nodeWid; capsOK?-regs;
-  capsOK?-nodePark; capsOK?-regPark; capsOK?-setNode; capsOK?-setNode-park;
+  capsOK?-nodePark; capsOK?-regOrd; capsOK?-regPark; capsOK?-setNode;
+  capsOK?-setNode-park;
   frameBud; lookupNode-caps; mList?; mList?-head;
   mList?-keeps; mList?-tail; parkList-push;
   pathSz?-len; slotsCaps?-capsAt; splitBurst-bk-caps; splitBurst-vals-caps;
@@ -1570,7 +1572,14 @@ subscribeAll-walk {u = u} c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j g op ns
            (capsOK?-mono (frameStep j c) (frameStep (suc j) c) sched₀ st step⊑
               (capsOK?-nextNode (frameStep j c) (suc (Sched.nextNode sched))
                                 sched st (n≤1+n (Sched.nextNode sched)) inv))
-           (setNode-regPark-owner nid κ ns st (λ _ → pkS)
+           -- THE FRESH CELL NEEDS NO OWNER, and the ordering ledger is
+           -- what says so: every registered chain's cells sit at or
+           -- below the counter, and this node IS the counter, so no
+           -- registered reader can name it and no floor of theirs is
+           -- in play.  The one-floor reading is spent only where a
+           -- write lands in a cell somebody may already be reading.
+           (regPark?-set-fresh nid (EvalSt.registry st) nid ns st ≤-refl
+              (capsOK?-regOrd (frameStep j c) sched st inv)
               (capsOK?-regPark (frameStep j c) sched st inv))
   invW′ : INV? Ψ B′ sched₀ st₀ ≡ true
   invW′ = INV?-install Ψ (Caps.cSize (frameStep j c)) B′ nid ns sched sched₀ st
