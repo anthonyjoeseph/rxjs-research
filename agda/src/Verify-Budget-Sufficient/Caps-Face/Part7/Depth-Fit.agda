@@ -6,7 +6,7 @@ open import Data.Bool    using (Bool; true; false; _∧_; _∨_; if_then_else_)
 open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (*-assoc; ≤ᵇ⇒≤; ≤⇒≤ᵇ; ^-monoʳ-≤; *-monoˡ-≤; *-cancelˡ-≤; ≤-trans; ≤-refl; ≤-reflexive; m≤m+n;
   m≤n+m; n≤1+n; *-identityʳ; *-mono-≤; *-monoʳ-≤; +-monoʳ-≤; +-monoˡ-≤; ⊔-lub; m≤m⊔n; m≤n⊔m;
-  +-mono-≤; +-suc; +-assoc; ≡ᵇ⇒≡; 1+n≰n)
+  +-mono-≤; +-suc; +-assoc; ≡ᵇ⇒≡; 1+n≰n; *-distribʳ-+)
 open import Data.Fin.Properties using (toℕ<n)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
@@ -42,8 +42,9 @@ open import Verify-Budget-Sufficient.Nest-Cap using (nestFac; nestU)
 open import Verify-Budget-Sufficient.Deliveries using
   (delivN)
 open import Verify-Budget-Sufficient.Walk-Factor using
-  (pathΦF; pathΦF-cap; pathΦF-cap-atLen; pathFrameSz?; pathSz?-frames; pathΦD;
-  pathRoots; pathΦF-cap-root; pathΦD-cap-root; sinkAbove?)
+  (pathΦF; pathΦF-cap-atLen; pathFrameSz?; pathSz?-frames; pathΦD;
+  pathRoots; pathΦF-cap-root-atLen; pathΦD-cap-root-atLen; sinkAbove?;
+  pathSzL?; pathSzL?-frames; pathSzL?-len; pathSz?-szL)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk using
   (foldPath-nest-regs; PathΦHyp; DispatchΦHyp; ShareGoΦHyp; FrameΦHyp; InnerΦBody; valsΦ?; valsΦ?-mono;
   stepFrame-nest-Φ; Φ-to-bound)
@@ -122,15 +123,15 @@ pathNestD-step (thru-outer _ _)   p = n≤1+n (pathNestD p)
 -- prices nothing.  A path carries exactly one leaf, so the gap is a
 -- constant and not a recursion.
 pathΦD≤nestD : ∀ {n} {Γ : Ctx n} {s t} (B : ℕ) (p : Path Γ s t) →
-  pathΦD B p ≤ pathNestD p + B * B
+  pathΦD B p ≤ pathNestD p + (B + B) * B
 pathΦD≤nestD B root                   = z≤n
 pathΦD≤nestD B (share-sink _)         = ≤-refl
 pathΦD≤nestD B (map-f fn ↠ p)         =
   ≤-trans (+-monoʳ-≤ (nestDᵗ fn) (pathΦD≤nestD B p))
-          (≤-reflexive (sym (+-assoc (nestDᵗ fn) (pathNestD p) (B * B))))
+          (≤-reflexive (sym (+-assoc (nestDᵗ fn) (pathNestD p) ((B + B) * B))))
 pathΦD≤nestD B (scan-f fn _ ↠ p)      =
   ≤-trans (+-monoʳ-≤ (nestDᵗ fn) (pathΦD≤nestD B p))
-          (≤-reflexive (sym (+-assoc (nestDᵗ fn) (pathNestD p) (B * B))))
+          (≤-reflexive (sym (+-assoc (nestDᵗ fn) (pathNestD p) ((B + B) * B))))
 pathΦD≤nestD B (take-f _ ↠ p)         = pathΦD≤nestD B p
 pathΦD≤nestD B (from-inner _ _ _ ↠ p) = pathΦD≤nestD B p
 pathΦD≤nestD B (thru-outer _ _ ↠ p)   = s≤s (pathΦD≤nestD B p)
@@ -199,17 +200,19 @@ walk-thru-fit {n = n} {e = e} sl id sf eid now op nid p vals fin sched st
   M    = nestDᵛˢ vals
   W    = slotWrapSum sl
   G    = Dn + M + n * W
-  hpp  : pathSz? S p ≡ true
-  hpp  = ∧-trueʳ hpz
+  hpp  : pathSzL? S p ≡ true
+  hpp  = pathSz?-szL S p (∧-trueʳ hpz)
   2≤S  = 2≤capsAt-size e sl id
   1≤S  = ≤-trans (s≤s z≤n) 2≤S
   EXP  : ℕ
-  EXP  = (S + S) * (suc S * S)
+  EXP  = (S + S + (S + S)) * (suc S * S)
   Q≤   : Q ≤ 2 ^ EXP
-  Q≤   = pathΦF-cap S p hpp
-  D≤   : D ≤ nestCapAt e sl id + S * S
+  Q≤   = pathΦF-cap-atLen S (S + S) p (pathSzL?-frames S p hpp)
+                          (pathSzL?-len S p hpp)
+  D≤   : D ≤ nestCapAt e sl id + (S + S) * S
   D≤   = ≤-trans (pathΦD≤nestD S p)
-                 (+-monoˡ-≤ (S * S) (≤-trans (n≤1+n (pathNestD p)) hnd))
+                 (+-monoˡ-≤ ((S + S) * S)
+                            (≤-trans (n≤1+n (pathNestD p)) hnd))
   n≤S  : n ≤ S
   n≤S  = n≤capsAt-size e sl id
   2≤2^S : 2 ≤ 2 ^ S
@@ -1186,10 +1189,12 @@ frameΦ-fit sl id sf eid now Lv (thru-outer op nid) p vals fin sched st hsl hpz 
 -- a factor and a depth of its own rather than one and zero, and a path
 -- holds exactly one leaf -- so a chain ending at `root` spends its
 -- whole factor on frames, legality caps that count by the size cap,
--- and the leaf is priced at exactly that exponent.  Its depth is
--- capped in the same currency by the same premise.  That half closes
--- off `pathΦF-cap-root`, `pathΦD-cap-root` and monotonicity, with no
--- new fact -- and this is the assembly that spends the three.
+-- and the leaf is priced at TWICE it.  So the root arm is paid with
+-- room to spare rather than exactly, which is what re-pricing the leaf
+-- at the budget bought here; the depth reads off the same length in
+-- the same currency.  That half closes off `pathΦF-cap-root-atLen`,
+-- `pathΦD-cap-root-atLen` and monotonicity, with no new fact -- and
+-- this is the assembly that spends the three.
 sink-fan-root : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (i : Fin n) (p : Path Γ (lookup Γ i) t)
   (vals : List (Val Γ (lookup Γ i))) →
@@ -1200,12 +1205,17 @@ sink-fan-root : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id) p vals ≡ true
 sink-fan-root {e = e} sl id i p vals hr hz hΦ =
   valsΦ?-mono B (nestΦAt e sl id) p (share-sink i) vals
-    (pathΦF-cap-root B p hr hz) (pathΦD-cap-root B p 1≤B hr hz) hΦ
+    (pathΦF-cap-root-atLen B (B + B) p hr hf hl)
+    (pathΦD-cap-root-atLen B (B + B) p 1≤B hr hf hl) hΦ
   where
   B : ℕ
   B = Caps.cSize (capsAt e sl id)
   1≤B : 1 ≤ B
   1≤B = ≤-trans (s≤s z≤n) (8≤capsAt-size e sl id)
+  hf : pathFrameSz? B p ≡ true
+  hf = pathSz?-frames B p hz
+  hl : pathLen p ≤ B + B
+  hl = pathSzL?-len B p (pathSz?-szL B p hz)
 
 -- WHAT IS LEFT IS THE CHAIN THAT ENDS AT A SECOND HAND-OVER.  Its
 -- factor is the leaf's own multiplied by its frames', so the leaf
@@ -2082,10 +2092,10 @@ mutual
 -- AND THE ANSWER IS THAT THE CHARGE AFFORDS IT, WHICH IS THE WHOLE
 -- POINT OF STATING IT AT A BUDGET.  The premise is the budget the
 -- walk's exponent can absorb -- twice the cap -- and it is not a
--- convenience: the walk's charge is three fifth powers beside two
--- squares while a chain of that length prices at three cubes and
--- three squares, so the third cube and the third square fit inside
--- one fifth power and nothing else moves.  A budget larger than
+-- convenience: the walk's charge is three fifth powers beside four
+-- squares while a chain of that length prices at four cubes and
+-- four squares, so the cubes and the squares each fit inside one
+-- fifth power and nothing else moves.  A budget larger than
 -- twice the cap is not refuted here, merely unclaimed; twice is what
 -- a registered chain is known to need.
 entryΦ-atLen : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
@@ -2102,15 +2112,18 @@ entryΦ-atLen {e = e} sl id L a path hL hf hl hΦ =
   Sz = Caps.cSize (capsAt e sl id)
   2≤Sz : 2 ≤ Sz
   2≤Sz = 2≤capsAt-size e sl id
+  twoSq : (Sz + Sz) * Sz ≤ Sz * Sz + Sz * Sz + (Sz * Sz + Sz * Sz)
+  twoSq = ≤-trans (≤-reflexive (*-distribʳ-+ Sz Sz Sz))
+                  (m≤m+n (Sz * Sz + Sz * Sz) (Sz * Sz + Sz * Sz))
   dΦ : nestDᵛ (arrTy a) (arrVal a) + pathΦD Sz path
-         ≤ nestUnit e sl + (Sz * Sz + Sz * Sz) + Sz
+         ≤ nestUnit e sl + (Sz * Sz + Sz * Sz + (Sz * Sz + Sz * Sz)) + Sz
   dΦ =
     ≤-trans (+-monoʳ-≤ (nestDᵛ (arrTy a) (arrVal a)) (pathΦD≤nestD Sz path))
     (≤-trans (≤-reflexive (sym (+-assoc (nestDᵛ (arrTy a) (arrVal a))
-                                        (pathNestD path) (Sz * Sz))))
-    (≤-trans (+-monoˡ-≤ (Sz * Sz) hΦ)
-    (≤-trans (+-monoʳ-≤ (nestUnit e sl) (m≤m+n (Sz * Sz) (Sz * Sz)))
-             (m≤m+n (nestUnit e sl + (Sz * Sz + Sz * Sz)) Sz))))
+                                        (pathNestD path) ((Sz + Sz) * Sz))))
+    (≤-trans (+-mono-≤ hΦ twoSq)
+             (m≤m+n (nestUnit e sl
+                     + (Sz * Sz + Sz * Sz + (Sz * Sz + Sz * Sz))) Sz)))
   Φfit : pathΦF Sz path * (nestDᵛ (arrTy a) (arrVal a) + pathΦD Sz path)
            ≤ nestΦAt e sl id
   Φfit = ≤-trans
@@ -2118,10 +2131,14 @@ entryΦ-atLen {e = e} sl id L a path hL hf hl hΦ =
            (sym (nestWalkAt-def e sl id))
            (*-mono-≤ (≤-trans (pathΦF-cap-atLen Sz L path hf hl)
                               (^-monoʳ-≤ 2
-                                (≤-trans (walkExpL-widen Sz L 2≤Sz hL)
+                                (≤-trans (walkExpL-widen Sz (L + (Sz + Sz))
+                                            2≤Sz (+-monoˡ-≤ (Sz + Sz) hL))
                                          (n≤1+n _))))
                      (≤-trans dΦ
-                              (m≤m+n (nestUnit e sl + (Sz * Sz + Sz * Sz) + Sz)
+                              (m≤m+n (nestUnit e sl
+                                      + (Sz * Sz + Sz * Sz
+                                         + (Sz * Sz + Sz * Sz))
+                                      + Sz)
                                      (Sz * slotWrapSum sl)))))
     (nestWalkAt≤nestΦAt e sl id)
 

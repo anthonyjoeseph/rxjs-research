@@ -238,17 +238,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE CASCADE THAT CARRIES A LENGTH**, which is what the entry
-  reading now being stated at a budget leaves owed. The affordability
-  half is answered YES: the potential affords twice the cap, the
-  length a registered chain is known to need. What still reads the
-  refuted form is the FAN: its registry receipt, the
+- **THE PREMISE THAT REACHES THE FAN**, which is what re-pricing the
+  leaf leaves owed. Affordability was not free: the sink LEAF was
+  denominated at the cap, so a chain of the budgeted length did not
+  fit under it, and the potential now prices it at the budget. What
+  still reads the refuted form is the FAN — its registry receipt, the
   admitted-list filter and the share fold's premise are one size
-  reading at the entry cap, which a mint cannot preserve. The commit
-  splits that premise into the frame half the refutation leaves
-  standing and a length half at twice the cap, and carries both to the
-  leaf that spends them. It narrows WHAT PRICES A REGISTERED CHAIN to
-  the mint's own supply.
+  reading at the entry cap. The commit carries the split premise
+  there, where it widens the two conjuncts the inner arm holds; that
+  arm sees no inflation at level zero, so the widening obliges the
+  nodes face rather than transporting. It narrows WHAT PRICES A
+  REGISTERED CHAIN to the mint's own supply.
 
 - **A READING THAT TRAVELS TO THE MINT**, which is all the store
   question has left. Three rows fail in the same place: the site
