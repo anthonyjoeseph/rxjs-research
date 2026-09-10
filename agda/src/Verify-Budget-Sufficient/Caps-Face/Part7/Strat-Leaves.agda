@@ -102,10 +102,19 @@ postulate
   --   the cases it distinguishes.  Plus the `thru-outer` ENQUEUE at a
   --   capacity-zero flatten, and a `map-f` row labelled DEGENERATE
   --   because the reading is `true` on both sides of it.
-  --   NOT covered: `from-inner`, whose step subscribes the inner under
-  --   gas rather than writing transparently; the room-available arm of
-  --   the enqueue; and any chain not ending at `root`, so nothing here
-  --   says what happens when the floor sits below the context width.
+  --   Plus the `from-inner` arm, the one that does not write
+  --   transparently: at a finish with nothing alive through the
+  --   instance the step DRAINS the flatten's parked queue and
+  --   reinstalls the cell with the residue, and under gas the drain's
+  --   pop re-enters `subscribeE` on a fresh chain.  Taken at a hot
+  --   inner, which is what holds the freed lane and leaves a residue
+  --   for the reading to carry -- a cold one finishes inside its own
+  --   subscribe and the drain empties the queue outright.
+  --   NOT covered: the `switchᵒ` and `exhaustᵒ` arms of the same
+  --   finish, which write a different cell shape; the room-available
+  --   arm of the enqueue; and any chain not ending at `root`, so
+  --   nothing here says what happens when the floor sits below the
+  --   context width.
   framePark-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (g : Gas) (id : Id) (now : Tick)
     (f : Frame Γ s u) (κ : Path Γ u t)

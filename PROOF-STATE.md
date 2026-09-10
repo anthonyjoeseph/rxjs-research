@@ -238,16 +238,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE ONE ARM WHERE THE WRITE IS NOT TRANSPARENT**, which is where
-  `framePark-step`'s risk went once the rest of it was instantiated.
-  Every other frame writing the cell its own reading is about does so by
-  a term the caller can see — a closure applied, a queue extended — and
-  each of those is a row now. `from-inner` subscribes under GAS, so what
-  lands in the cell is decided by a descent rather than by the frame,
-  and that is the shape DOES A STORE CELL HAVE AN OWNER says a two-floor
-  cell needs: two inner subscriptions on one mergeAll at different
-  depths. The commit builds that program. Green is the question's first
-  real negative; red is the two-floor witness it has been asking for.
+- **TWO FLOORS ON ONE CELL, WHICH THE FIRST PASS DID NOT REACH.**
+  `framePark-step`'s gas-driven arm is instantiated: a finish DRAINS the
+  flatten's queue and reinstalls the residue, and the reading survives
+  that at both gas settings — so the one write whose content a caller
+  cannot see is not where the row is false. But every row is taken at a
+  root-ended chain, where the cell is read at a single floor, so the
+  question's own shape is untouched. What is left is the program: two
+  inners on one mergeAll at different chain depths, which needs a chain
+  that is not root-ended and therefore a floor below the context width.
+  The commit builds it. Red there is the two-floor witness; green
+  retires the question's premise.
 
 - **A CONTEXT DEEP ENOUGH TO DISAGREE WITH**, which is now the only
   thing between `share-fold-fit` and a class it has earned. Every axis
@@ -278,12 +279,13 @@ does not fit is a finding about the shared statement, not about the head.
 - **DOES A STORE CELL HAVE AN OWNER? — FIRST, because the repair it points
   at moves a RECORD rather than a statement.** These rows fail where a write
   lands in a cell some registered chain also reads, each pricing it at its own
-  floor. It has narrowed AGAINST itself: a sibling was refuted for a SHALLOWER
-  reason, so failing at a cell does not make a row two-floor. Reaching a cell
-  read at two floors needs two inner subscriptions on one mergeAll at different
-  depths, and every TRANSPARENT write is instantiated now without one reaching
-  that shape — so which is two-floor and which merely unpriced has narrowed to
-  the arm that is not transparent, the gas-driven one.
+  floor. It has narrowed twice AGAINST itself: a sibling was refuted for a
+  SHALLOWER reason, so failing at a cell does not make a row two-floor; and the
+  gas-driven write, the last one whose content a caller cannot see, now holds
+  too. So every write this development can reach is instantiated and not one
+  of them needed an owner. What is left is the shape none of them had — two
+  inners on one mergeAll at different chain depths, read at a floor below the
+  context width.
   relevant: `setNode-regPark-owner`, `thruConsume-cellPark`, `framePark-step`
 
 - **WHICH STORE CELLS DOES A PATH PREDICATE REACH?** Five rows fail in one

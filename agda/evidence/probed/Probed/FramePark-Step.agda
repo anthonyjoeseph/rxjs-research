@@ -22,48 +22,34 @@
 -- scan's reading is bought rather than transported, instantiated at
 -- both of the cases it distinguishes.
 --
--- WHAT MAKES THE BOUGHT ROW LOAD-BEARING.  Drop the floor to 1 and the
--- conclusion goes false — `inputsBelowᵉ 1 (input (fsuc fzero))` is
--- `1 <ᵇ 1 = false` — and the closure premise goes false at exactly the
--- same point, since `frameStrat? 1 (scan-f fn₁ _)` is the same
--- comparison. The premise is the only thing standing between this row
--- and a counterexample.  The transport row is load-bearing on the
--- THIRD premise instead: at floor 0 the pre-state reading is already
--- false and the hypothesis blocks, while the closure premise stays
--- true, an identity closure naming no input.
---
--- THE ENQUEUE ROW IS THE ASSEMBLY'S CONCLUSION at the point
--- `Probed.ThruConsume-CellPark` instantiates its leaf: a capacity-zero
--- mergeAll node, so `hasRoom` fails and the arriving observable is
--- appended to the queue the reading is about.  It is load-bearing on
--- the vals premise, which is what prices the term being appended.
---
--- WHAT IS NOT COVERED.  `from-inner`, whose step is `innerReact` — a
--- gas-driven subscription of the inner, not a transparent write.  The
--- `hasRoom = true` arm of the enqueue row, for the same reason.  A
--- `share-sink` chain, where the floor sits below the context width:
--- every row here is taken at a root-ended chain, so nothing says what
--- happens when the floor is not the full width.  `map-f` and `take-f`
--- are covered only degenerately, `framePark?` being `true` at both.
+-- WHAT IS NOT COVERED.  The `switchᵒ` and `exhaustᵒ` arms of
+-- `innerFinish`, which write a different cell shape; the
+-- `hasRoom = true` arm of the enqueue row; and a `share-sink` chain,
+-- where the floor sits below the context width: every row here is
+-- taken at a root-ended chain, so nothing says what happens when the
+-- floor is not the full width.  `map-f` and `take-f` are covered only
+-- degenerately, `framePark?` being `true` at both.
 -- ══════════════════════════════════════════════════════════════════
 module Probed.FramePark-Step where
 
-open import Data.Bool using (false)
+open import Data.Bool using (false; true)
 open import Data.Fin using () renaming (zero to fzero; suc to fsuc)
 open import Data.List using ([]; _∷_)
 open import Data.List.Relation.Unary.Any using (here)
 open import Data.Maybe using (just)
 open import Data.Vec using () renaming ([] to []ⱽ; _∷_ to _∷ⱽ_)
-open import Relation.Binary.PropositionalEquality using (refl)
+open import Data.Product using (proj₁; proj₂)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import Rx.Prim using (g0; cold)
+open import Rx.Prim using (Gas; g0; gasPad; cold; hot)
 open import Rx.Exp
   using (Ctx; Closed; Fn; natᵗ; obs; _×ᵗ_; emptyᵉ; input;
          strmᵗ; fstᵗ; varᵗ; nat̂)
 open import Rx.Slots using (Slots; scripted)
 open import Rx.Evaluator
-  using (EvalSt; Path; root; _↠_; map-f; scan-f; thru-outer; mergeAllᵒ; sched-init; st-init;
-  installNode; scan-st; mergeAll-st)
+  using (EvalSt; Path; root; _↠_; map-f; scan-f; from-inner; thru-outer; mergeAllᵒ;
+  sched-init; st-init; installNode; scan-st; mergeAll-st; stepFrame; mergeAllDrain)
+open import Verify-Budget-Sufficient.Caps-Face.Part1 using (framePark?)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves
   using (framePark-step)
 open import Probed.Apparatus using (Confirms)
@@ -119,7 +105,12 @@ tieScanTransport = refl
 -- ROW 2 — BOUGHT.  `applyFn fn₁ (acc , v)` is `input (fsuc fzero)`,
 -- which the pre-state cell never held: the post-state reading is
 -- `1 <ᵇ 2 = true`, and the only premise that mentions it is the
--- closure's.  LOAD-BEARING on the first premise.
+-- closure's.  LOAD-BEARING on the first premise: drop the floor to 1
+-- and the conclusion goes false, `inputsBelowᵉ 1 (input (fsuc fzero))`
+-- being `1 <ᵇ 1 = false`, while the closure premise goes false at
+-- exactly the same point.  Row 1 is load-bearing on the THIRD premise
+-- instead -- at floor 0 the pre-state reading is already false and the
+-- hypothesis blocks, an identity closure naming no input.
 ----------------------------------------------------------------------
 
 tieScanBought : Confirms
@@ -128,10 +119,12 @@ tieScanBought : Confirms
 tieScanBought = refl
 
 ----------------------------------------------------------------------
--- ROW 3 — THE ENQUEUE, one level above `thruConsume-cellPark`'s leaf.
--- A capacity-zero mergeAll node at nid 0, so the arriving observable
--- is appended rather than subscribed.  LOAD-BEARING on the vals
--- premise, which prices the appended term.
+-- ROW 3 — THE ENQUEUE, one level above `thruConsume-cellPark`'s leaf
+-- and the assembly's conclusion at the point `Probed.ThruConsume-
+-- CellPark` instantiates it.  A capacity-zero mergeAll node at nid 0,
+-- so `hasRoom` fails and the arriving observable is appended to the
+-- queue the reading is about.  LOAD-BEARING on the vals premise, which
+-- prices the appended term.
 ----------------------------------------------------------------------
 
 stᵗ : EvalSt e₂
@@ -152,3 +145,80 @@ tieMapFree : Confirms
   (framePark-step g0 0 0 (map-f (nat̂ 0)) root (input fzero ∷ []) false
      (sched-init e₂ sl₂) stᵗ refl refl refl)
 tieMapFree = refl
+
+----------------------------------------------------------------------
+-- ROWS 5 AND 6 — THE ARM WHERE THE WRITE IS NOT TRANSPARENT.  A
+-- `from-inner` step at `fin = true` and an empty registry runs
+-- `innerFinish`, which DRAINS the flatten's parked queue and reinstalls
+-- the cell with whatever the drain left.  So the post-state reading is
+-- about a queue the frame itself rewrote, and the question is whether
+-- what it rewrote is priced.
+--
+-- The cell is at capacity one with one lane live, so the drain's first
+-- pop takes the freed lane and its second finds none: the residue is a
+-- PROPER SUFFIX and the reading is carried rather than emptied.  Both
+-- parked terms name inputs below the floor; drop the floor to one and
+-- the second term falsifies the conclusion and the third premise
+-- together, which is what makes these LOAD-BEARING on that premise.
+--
+-- Row 5 runs the pop at `g0`, where `subscribeInner` mints an instance
+-- and returns the state untouched, so what is measured is the drain
+-- and the reinstall alone.  Row 6 runs it under gas, where the pop
+-- re-enters `subscribeE` on a fresh `from-inner` chain and the state
+-- coming back is one a subscription built.
+----------------------------------------------------------------------
+
+stᶠ : EvalSt e₂
+stᶠ = installNode 7
+        (mergeAll-st {t = natᵗ} (just 1) 1
+          (input fzero ∷ input (fsuc fzero) ∷ []) false)
+        (st-init e₂)
+
+-- the drain the step runs, named so its residue can be pinned beside
+-- the rows that depend on it
+-- slot 0 is HOT, so the inner the drain's first pop subscribes never
+-- completes and the freed lane stays taken.  Under gas a COLD inner
+-- finishes inside its own subscribe, the count never rises, and the
+-- drain empties the queue outright -- which would leave the reading
+-- with nothing to carry and the rows below degenerate.
+sl₂ʰ : Slots Γ₂
+sl₂ʰ fzero        = scripted (hot [])
+sl₂ʰ (fsuc fzero) = scripted (cold [] [])
+
+drained : Gas → _
+drained g = mergeAllDrain g 7 root 0 0 (just 1) 0
+              (input fzero ∷ input (fsuc fzero) ∷ []) (sched-init e₂ sl₂ʰ) stᶠ
+
+tieInnerResidue : Confirms
+  (framePark-step g0 0 0 (from-inner mergeAllᵒ 7 9) root (3 ∷ []) true
+     (sched-init e₂ sl₂ʰ) stᶠ refl refl refl)
+tieInnerResidue = refl
+
+tieInnerGassed : Confirms
+  (framePark-step (gasPad 40 g0) 0 0 (from-inner mergeAllᵒ 7 9) root
+     (3 ∷ []) true (sched-init e₂ sl₂ʰ) stᶠ refl refl refl)
+tieInnerGassed = refl
+
+-- what the drain actually left, so the two rows above are not read as
+-- a claim about an emptied queue: the second parked term survives the
+-- step at both gas settings, and it is the term the reading is about
+residue≡ : proj₁ (proj₂ (proj₂ (proj₂ (drained g0)))) ≡ input (fsuc fzero) ∷ []
+residue≡ = refl
+
+residueGassed≡ :
+  proj₁ (proj₂ (proj₂ (proj₂ (drained (gasPad 40 g0))))) ≡ input (fsuc fzero) ∷ []
+residueGassed≡ = refl
+
+-- and the floor at which both the conclusion and the premise it stands
+-- on go false together, which is what makes the rows load-bearing
+-- rather than degenerate
+lowFloorPre : framePark? 1 (from-inner {s = natᵗ} mergeAllᵒ 7 9) stᶠ ≡ false
+lowFloorPre = refl
+
+lowFloorPost :
+  framePark? 1 (from-inner {s = natᵗ} mergeAllᵒ 7 9)
+    (proj₂ (proj₂ (proj₂ (proj₂
+      (stepFrame g0 0 0 (from-inner mergeAllᵒ 7 9) root (3 ∷ []) true
+         (sched-init e₂ sl₂ʰ) stᶠ)))))
+    ≡ false
+lowFloorPost = refl

@@ -179,4 +179,6 @@ open import Probed.ThruConsume-CellPark
   using (tie)
 
 open import Probed.FramePark-Step
-  using (tieScanTransport; tieScanBought; tieThruEnqueue; tieMapFree)
+  using (tieScanTransport; tieScanBought; tieThruEnqueue; tieMapFree;
+         tieInnerResidue; tieInnerGassed; residue≡; residueGassed≡;
+         lowFloorPre; lowFloorPost)
