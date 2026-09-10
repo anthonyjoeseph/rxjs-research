@@ -897,10 +897,35 @@ postulate
 -- and `Gas` is a lazy datatype built to be peeled, so the budget the
 -- hypothesis pins `sf` to does not carry the anchor's divergence into
 -- this side either.  What is actually there is `depthShareGo`'s two
--- recursive calls per admitted path -- a `2ⁿ` in a length the registry
--- grows, stated at the clause responsible.  So the conclusion computes,
--- and computes fast, at a registry of a handful; what it cannot reach is
--- a registry a consumer walks at, and no speed closes that gap.
+-- recursive calls per admitted path -- a `2ⁿ` stated at the clause
+-- responsible.  So the conclusion computes, and computes fast, at a
+-- registry of a handful.
+
+-- AND THAT COST IS THE INSTRUMENT'S, NOT A REGION OF THE STATEMENT,
+-- which is what a second measurement corrected.  The length was read as
+-- the region this row still rested on; it cannot be, on two counts a
+-- reader can check off the type.  The statement is over ONE path, so an
+-- admitted LIST is not a parameter of it at all; and both places a
+-- length could enter its value -- the share fold over admitted paths,
+-- and the frame arm along the path itself -- combine by `⊔`.  A max is
+-- raised by a DEEPER member and never by another member, so a count
+-- moves the left side only through the state it threads, which moves
+-- the right side too by `storeSyncMax`.  An axis that moves both sides
+-- cannot refute, and the length was the one every plan here had aimed
+-- at.
+
+-- SO THE RESIDUE IS ONE FRAME'S CHARGE AND ONE PATH'S DEPTH, and the
+-- first of those is the sibling directly above rather than anything new.
+-- The ceiling names no path, which reads as the shape a conclusion takes
+-- when no hypothesis carries what it needs -- and the sibling ceiling
+-- this development spends for the same currency does carry one, since
+-- `fitG` (.Nest-Store) sums `pathNestD κ` into it.  The two are
+-- reconciled by where the path CONTRIBUTES: by descent under a `Sight`,
+-- where each frame's charge accumulates, and by `⊔` here, where the
+-- whole path can charge no more than its heaviest frame.  A path-free
+-- ceiling is therefore the right shape for this side, and what it needs
+-- is that one frame's charge be bounded by what the values and the store
+-- already pay for.
 -- PROBED: `Harness.Main`'s share-fold series prices BOTH sides at a
 --   DRIVEN state -- the sched and store a real run builds, not a record
 --   update over `st-init` -- at source zero, the only one of the three
@@ -909,12 +934,16 @@ postulate
 --   at every row.  Three separations make the rows load-bearing: the
 --   reading moves with the fold gas, it differs from a `root` control
 --   taken at the same state, and it is nought at the instant the
---   registry is empty.  Not covered, and the first is what the class
---   still rests on: one and two admitted paths, where the doubling is
---   four -- nothing about the length at which it bites; a `natᵗ`
---   payload, which `nestDᵛˢ` reads FLAT, so the value axis is untouched
---   rather than dialled; two flat shares, so nothing about one
---   registered under another; and no `f ↠ p` arm.
+--   registry is empty.  The frame arm `f ↠ p` is covered too, at the
+--   two frames that preserve the source type: a `from-inner` head reads
+--   one where the bare sink reads nought and where its own `fin = false`
+--   control reads nought, and a SECOND such head reads the same one --
+--   the `⊔` above, measured rather than read off the clause.  Not
+--   covered: a `natᵗ` payload, which `nestDᵛˢ` reads FLAT, so the value
+--   axis is untouched rather than dialled; two flat shares, so nothing
+--   about one registered under another; and `thru-outer`, whose charge
+--   is a successor above a walk rather than a descent and which needs an
+--   `obs`-typed source to head a path at all.
 --   ⚠ measured-not-rechecked.
 postulate
   share-fold-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}

@@ -46,7 +46,7 @@
 --     make harness ARGS='1'       just row 1
 module Harness.Main where
 
-open import Data.Bool using (Bool; false; if_then_else_)
+open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.Char using (toℕ)
 open import Data.List using (List; []; _∷_; map; length; foldr)
   renaming (_++_ to _++ᴸ_)
@@ -75,7 +75,7 @@ open import Rx.Slot-Hop using (slotHop)
 open import Rx.Evaluator using (poolCount; blowH; capsHgo; lvls; iterL;
   capsBase; subscribeE; sched-next; cascade; Sched; EvalSt; root; sched-init;
   st-init; drain; splitEvents; splitBurst; Stream; Path; share-sink; _↠_;
-  shareAdmit; RegId; Chain; budgetAt)
+  shareAdmit; RegId; Chain; budgetAt; take-f; from-inner; mergeAllᵒ)
 open import Verify-Budget-Sufficient.Caps using (Caps; capsAt)
 open import Verify-Budget-Sufficient.Nest-Store using (nestUnit; slotWrapSum;
   nestCapAt)
@@ -650,8 +650,11 @@ controlRow = censusᵈ "control" slᶜ
 -- rather than dialled, and an obs-typed payload is what would dial it;
 -- one context, whose two shares are both flat, so nothing about a share
 -- registered under another share, which is where a doubling per path
--- would actually climb; and the frame-crossing arm, `f ↠ path'`, which
--- neither the charged row nor its control enters.
+-- would actually climb.  The frame-crossing arm `f ↠ path'` used to be
+-- listed here too and is now entered by the rows at 51 to 53, at the
+-- two frames of it that are type-preserving; `thru-outer` is still
+-- uncovered, and it is the one whose charge is a `suc` rather than a
+-- descent, so nothing here says what a chain of those reads.
 --
 -- ⚠ measured-not-rechecked, like every row in this module.
 ------------------------------------------------------------------
@@ -681,13 +684,19 @@ valsᶠ : ℕ → List (Val Γᵈ natᵗ)
 valsᶠ 0       = []
 valsᶠ (suc k) = k ∷ valsᶠ k
 
-foldSides : ℕ → ℕ → ℕ → Path Γᵈ natᵗ natᵗ → ℕ × ℕ
-foldSides k g w pth = lhs , rhs
+-- `fin` is dialled rather than fixed, and it is what makes the frame
+-- rows below readable at all: `depthReact` is the literal `0` clause at
+-- `false`, so every `from-inner` frame reads nought there whatever the
+-- store holds.  The ceiling does not mention it, so moving it moves ONE
+-- side -- which is the property an axis needs before a sweep over it
+-- can refute anything.
+foldSides : ℕ → ℕ → ℕ → Bool → Path Γᵈ natᵗ natᵗ → ℕ × ℕ
+foldSides k g w fin pth = lhs , rhs
   where
   sd  = proj₁ (driveᵈ k slᵈ)
   st  = proj₂ (driveᵈ k slᵈ)
   vs  = valsᶠ w
-  lhs = depthFold (budgetAt eᵈ slᵈ 0) g 0 0 (finℕ iᶠ) pth vs [] false sd st
+  lhs = depthFold (budgetAt eᵈ slᵈ 0) g 0 0 (finℕ iᶠ) pth vs [] fin sd st
   rhs = sightCeil (sizeᵉ eᵈ) (nestDᵛˢ {Γ = Γᵈ} {u = natᵗ} vs)
                   (storeSyncMax sd st) (nestUnit eᵈ slᵈ)
 
@@ -702,9 +711,57 @@ foldShow tag (lhs , rhs) =
 foldRow : ℕ → ℕ → String
 foldRow k g =
   foldShow ("share-fold@inst " ++ show k ++ " gas " ++ show g)
-           (foldSides k g 3 (share-sink iᶠ))
+           (foldSides k g 3 false (share-sink iᶠ))
     ++ "\n  [root control, must read 0] "
-    ++ foldShow "" (foldSides k g 3 root)
+    ++ foldShow "" (foldSides k g 3 false root)
+
+-- THE FRAME-CROSSING ARM, which the series above lists as uncovered and
+-- which is the only axis of this statement that can refute it: the
+-- ceiling is a function of `e`, the values, the driven state and the
+-- slots, and mentions the PATH NOWHERE, while the left side folds along
+-- it.  The sibling ceiling this development already uses for the same
+-- currency does carry the path -- `Sight` (.Depth-Sighted) spends
+-- `fitG`, whose second summand is `pathNestD κ` -- so the gap is
+-- between two live statements rather than between a statement and a
+-- doubt, and these rows are what says whether it bites.
+--
+-- Both frames here are TYPE-PRESERVING (`Frame Γ s s`), which is why
+-- they need no change to the sides above: a `thru-outer` would move the
+-- source type to `obs u` and take the row to a different `i`.
+takeP : Path Γᵈ natᵗ natᵗ
+takeP = take-f 0 ↠ share-sink iᶠ
+
+innerP : ℕ → Path Γᵈ natᵗ natᵗ
+innerP a = from-inner mergeAllᵒ a 0 ↠ share-sink iᶠ
+
+inner2P : ℕ → Path Γᵈ natᵗ natᵗ
+inner2P a = from-inner mergeAllᵒ a 0 ↠ (from-inner mergeAllᵒ a 1 ↠ share-sink iᶠ)
+
+-- LOAD-BEARING at `fin = true`, and what would make each fail: a
+-- reading ABOVE the ceiling refutes the target, and it is the frame
+-- count that would carry it there, since `depthFold`'s frame arm
+-- combines by `⊔` and a second frame therefore buys nothing unless the
+-- threading under it does.  The `take-f` row is DEGENERATE by
+-- construction -- `depthFrame` is the literal `0` clause at all three
+-- chain frames -- and is printed because it isolates the ARM from the
+-- FRAME: a difference between it and the bare `share-sink` above is the
+-- state threading alone, with no frame charge in it.  The `fin = false`
+-- controls are degenerate for the stated reason and exist so that a
+-- zero belonging to the clause cannot be read as one belonging to the
+-- store.
+frameRow : ℕ → ℕ → String
+frameRow k a =
+  "frame-arm@inst " ++ show k ++ " gas 4 allNid " ++ show a ++ ", fin=true"
+    ++ "\n  [take-f, DEGENERATE frame charge] "
+    ++ foldShow "" (foldSides k 4 3 true takeP)
+    ++ "\n  [from-inner x1, LOAD-BEARING]    "
+    ++ foldShow "" (foldSides k 4 3 true (innerP a))
+    ++ "\n  [from-inner x2, LOAD-BEARING]    "
+    ++ foldShow "" (foldSides k 4 3 true (inner2P a))
+    ++ "\n  [share-sink, no frame]           "
+    ++ foldShow "" (foldSides k 4 3 true (share-sink iᶠ))
+    ++ "\n  [fin=false control, from-inner x1 must read as the no-frame row] "
+    ++ foldShow "" (foldSides k 4 3 false (innerP a))
 
 rowAt : ℕ → String
 rowAt 0 = "CALIBRATION towerℕ 4 (refl-pinned 65536 in this module) = "
@@ -790,7 +847,13 @@ rowAt n = if n ≤ᵇ 22 then wideRow (n ∸ 19)
           else if n ≤ᵇ 41 then deliveredRow (n ∸ 39)
           else if n ≤ᵇ 44 then controlRow (n ∸ 42)
           else if n ≤ᵇ 47 then foldRow (n ∸ 45) 1
-          else if n ≤ᵇ 50 then foldRow (n ∸ 48) 4 else "(no such row)"
+          else if n ≤ᵇ 50 then foldRow (n ∸ 48) 4
+          -- 51 to 53 sweep the *All node the `from-inner` frame names,
+          -- at the instant the delivered census shows two admitted
+          -- entries: the frame reads the node table by that id, so a
+          -- row at an id the run never minted is a reading about
+          -- `nothing` and says nothing about the arm
+          else if n ≤ᵇ 53 then frameRow 2 (n ∸ 51) else "(no such row)"
 
 main : IO Unit
 main = getContents >>= λ s →

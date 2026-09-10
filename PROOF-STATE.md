@@ -238,15 +238,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **PRICING THE SHARE FOLD AT THE LENGTH THE DOUBLING BITES**, now that
-  `share-fold-fit`'s conclusion turns out to be instantiable and its
-  receipt says at what. The barrier is `depthShareGo`'s `2ⁿ` in the
-  admitted-path count and nothing else, so the one region the row still
-  rests on is a LENGTH. The commit walks a context whose shares nest,
-  finds where the reading stops returning, and reports whether the fit
-  degrades before it does — tight at four paths is a refutation in
-  waiting, still reading one is a statement about the ceiling. It
-  narrows WHICH STORE CELLS DOES A PATH PREDICATE REACH to the length.
+- **THE ONE FRAME THAT CHARGES BY A SUCCESSOR**, which is what is left
+  of `share-fold-fit` once a length is ruled out as a region rather than
+  merely uncovered. Both places a length could enter combine by `⊔`, so
+  the whole path charges no more than its heaviest frame, and a count
+  moves the ceiling with it. `thru-outer` is the one frame whose charge
+  is a `suc` above a walk rather than a descent, and it needs an
+  `obs`-typed source, which is why no row has ever headed a path with
+  it. The commit builds that context and reads the arm. It narrows WHICH
+  STORE CELLS DOES A PATH PREDICATE REACH to a single frame's spend.
 
 - **THE MINT'S LEVEL-ZERO RECEIPT, now that the fan's registry reading
   is a real body and the residue carries the level in its own
