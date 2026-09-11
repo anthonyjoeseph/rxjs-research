@@ -7,9 +7,8 @@
 -- repairs cheap.
 module Verify-Budget-Sufficient.Walk-Factor where
 
-open import Data.Bool using (Bool; true; false; _∧_)
-open import Data.Nat using (ℕ; suc; _+_; _*_; _^_; _≤_; z≤n; s≤s; _≤ᵇ_; _<ᵇ_)
-open import Data.Fin using (toℕ)
+open import Data.Bool using (Bool; true; _∧_)
+open import Data.Nat using (ℕ; suc; _+_; _*_; _^_; _≤_; z≤n; s≤s; _≤ᵇ_)
 open import Data.Nat.Properties using
   (≤-refl; ≤-trans; ≤-reflexive; ≤ᵇ⇒≤; ≤⇒≤ᵇ; +-mono-≤; +-monoˡ-≤; +-assoc; *-monoˡ-≤;
   *-identityˡ; *-distribʳ-+; m≤m+n; m≤n+m; m^n>0; ^-distribˡ-+-*; ^-monoʳ-≤; ^-*-assoc)
@@ -360,82 +359,3 @@ pathΦD-len B (thru-outer _ _ ↠ p) 1B h
 ... | _ , hp =
       ≤-trans (+-mono-≤ 1B (pathΦD-len B p 1B hp))
               (≤-reflexive (sym (+-assoc B (pathLen p * B) ((B + B) * B))))
-
--- AND A CHAIN THAT ENDS AT THE ROOT PAYS ONLY THE LENGTH HALF, which is
--- what lets a hand-over's price cover it.  A path carries exactly one
--- leaf, so this decides which of the two shares above is present -- and
--- where it answers root, both caps shed the leaf's constant and land on
--- exactly the two quantities a sink is charged.
-pathRoots : ∀ {n} {Γ : Ctx n} {s t} → Path Γ s t → Bool
-pathRoots root           = true
-pathRoots (share-sink _) = false
-pathRoots (_ ↠ p)        = pathRoots p
-
--- AND WHERE IT ANSWERS SINK, THE PRICE IS THE TELESCOPE'S OWN INDEX
--- AND NOT A CAP.  A shared slot's definition may name only inputs
--- BELOW its own index, so a registration whose continuation ends at
--- some slot's sink was minted subscribing an input that slot's
--- definition contains, and its source is strictly under that slot.
--- Reading that off one entry is what this decides, and the reading is
--- the whole reason the fan's escalation is bounded by the program: a
--- sink hop strictly climbs, so no chain is re-entered through its own
--- sink and the hop count cannot exceed the slot count.
---
--- AND IT MENTIONS NO CAP, WHICH IS WHAT LETS IT BE CARRIED WHERE THE
--- CAP-DENOMINATED PREDICATES CANNOT.  The elimination that closed the
--- flat carried field, and the indexed shape under it, turns on those
--- predicates WEAKENING as their cap grows -- so a receipt taken at an
--- entry cap is useless at a descent that has stepped.  Nothing here
--- moves with a cap at all: source and sink are both fixed when the
--- entry is minted, so a receipt survives every step the instant takes
--- and the direction the elimination turns on does not exist.
-sinkAbove? : ∀ {n} {Γ : Ctx n} {s t} → ℕ → Path Γ s t → Bool
-sinkAbove? src root           = true
-sinkAbove? src (share-sink j) = src <ᵇ toℕ j
-sinkAbove? src (_ ↠ p)        = sinkAbove? src p
-
-pathΦSz-root : ∀ {n} {Γ : Ctx n} {s t} (B : ℕ) (p : Path Γ s t) →
-  pathRoots p ≡ true → pathFrameSz? B p ≡ true →
-  pathΦSz B p ≤ pathLen p * (suc B * B)
-pathΦSz-root B root           _  _ = z≤n
-pathΦSz-root B (share-sink _) () _
-pathΦSz-root B (f ↠ p) hr h
-  with ∧-true (frameSz? B f) (pathFrameSz? B p) h
-... | hf , hp = +-mono-≤ (frameΦSz≤ B f hf) (pathΦSz-root B p hr hp)
-
-pathΦF-cap-root-atLen : ∀ {n} {Γ : Ctx n} {s t} (B L : ℕ) (p : Path Γ s t) →
-  pathRoots p ≡ true → pathFrameSz? B p ≡ true → pathLen p ≤ L →
-  pathΦF B p ≤ 2 ^ (L * (suc B * B))
-pathΦF-cap-root-atLen B L p hr h hl =
-  ≤-trans (≤-reflexive (pathΦF≡ B p))
-          (^-monoʳ-≤ 2 (≤-trans (pathΦSz-root B p hr h)
-                                (*-monoˡ-≤ (suc B * B) hl)))
-
-pathΦD-root : ∀ {n} {Γ : Ctx n} {s t} (B : ℕ) (p : Path Γ s t) →
-  1 ≤ B → pathRoots p ≡ true → pathFrameSz? B p ≡ true →
-  pathΦD B p ≤ pathLen p * B
-pathΦD-root B root           _  _  _ = z≤n
-pathΦD-root B (share-sink _) _  () _
-pathΦD-root B (map-f fn ↠ p) 1B hr h
-  with ∧-true (frameSz? B (map-f fn)) (pathFrameSz? B p) h
-... | hf , hp = +-mono-≤ (≤-trans (nestDᵗ≤sizeᵗ fn) (≤ᵇ⇒≤ (sizeᵗ fn) B (T-to hf)))
-                         (pathΦD-root B p 1B hr hp)
-pathΦD-root B (scan-f fn z ↠ p) 1B hr h
-  with ∧-true (frameSz? B (scan-f fn z)) (pathFrameSz? B p) h
-... | hf , hp = +-mono-≤ (≤-trans (nestDᵗ≤sizeᵗ fn) (≤ᵇ⇒≤ (sizeᵗ fn) B (T-to hf)))
-                         (pathΦD-root B p 1B hr hp)
-pathΦD-root B (take-f _ ↠ p) 1B hr h
-  with ∧-true true (pathFrameSz? B p) h
-... | _ , hp = ≤-trans (pathΦD-root B p 1B hr hp) (m≤n+m (pathLen p * B) B)
-pathΦD-root B (from-inner _ _ _ ↠ p) 1B hr h
-  with ∧-true true (pathFrameSz? B p) h
-... | _ , hp = ≤-trans (pathΦD-root B p 1B hr hp) (m≤n+m (pathLen p * B) B)
-pathΦD-root B (thru-outer _ _ ↠ p) 1B hr h
-  with ∧-true true (pathFrameSz? B p) h
-... | _ , hp = +-mono-≤ 1B (pathΦD-root B p 1B hr hp)
-
-pathΦD-cap-root-atLen : ∀ {n} {Γ : Ctx n} {s t} (B L : ℕ) (p : Path Γ s t) →
-  1 ≤ B → pathRoots p ≡ true → pathFrameSz? B p ≡ true → pathLen p ≤ L →
-  pathΦD B p ≤ L * B
-pathΦD-cap-root-atLen B L p 1B hr h hl =
-  ≤-trans (pathΦD-root B p 1B hr h) (*-monoˡ-≤ B hl)

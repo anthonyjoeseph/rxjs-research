@@ -3,11 +3,10 @@
 module Verify-Budget-Sufficient.Caps-Face.Part7.Depth-Fit where
 
 open import Data.Bool    using (Bool; true; false; _∧_; _∨_; if_then_else_)
-open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; _<ᵇ_; _≡ᵇ_; z≤n; s≤s)
+open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (*-assoc; ≤ᵇ⇒≤; ≤⇒≤ᵇ; ^-monoʳ-≤; *-monoˡ-≤; *-cancelˡ-≤; ≤-trans; ≤-refl; ≤-reflexive; m≤m+n;
   m≤n+m; n≤1+n; *-identityʳ; *-mono-≤; *-monoʳ-≤; +-monoʳ-≤; +-monoˡ-≤; ⊔-lub; m≤m⊔n; m≤n⊔m;
-  +-mono-≤; +-suc; +-assoc; ≡ᵇ⇒≡; 1+n≰n; *-distribʳ-+)
-open import Data.Fin.Properties using (toℕ<n)
+  +-mono-≤; +-suc; +-assoc; *-distribʳ-+)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.List    using (List; []; _∷_; _++_; length; foldr)
@@ -42,11 +41,10 @@ open import Verify-Budget-Sufficient.Nest-Cap using (nestFac; nestU)
 open import Verify-Budget-Sufficient.Deliveries using
   (delivN)
 open import Verify-Budget-Sufficient.Walk-Factor using
-  (pathΦF; pathΦF-cap-atLen; pathFrameSz?; pathSz?-frames; pathΦD;
-  pathRoots; pathΦF-cap-root-atLen; pathΦD-cap-root-atLen; sinkAbove?;
-  pathSzL?; pathSzL?-frames; pathSzL?-len; pathSz?-szL)
+  (pathΦF; pathΦF-cap-atLen; pathFrameSz?; pathSz?-frames; pathΦD; pathΦD-len; pathSzL?;
+  pathSzL?-frames; pathSzL?-len; pathSz?-szL)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk using
-  (foldPath-nest-regs; PathΦHyp; DispatchΦHyp; ShareGoΦHyp; FrameΦHyp; InnerΦBody; valsΦ?; valsΦ?-mono;
+  (foldPath-nest-regs; PathΦHyp; DispatchΦHyp; ShareGoΦHyp; FrameΦHyp; InnerΦBody; valsΦ?;
   stepFrame-nest-Φ; Φ-to-bound)
 open import Verify-Budget-Sufficient.Nodes-Nest-Walk using (foldPath-nest-nodes)
 open import Verify-Budget-Sufficient.Nest-Ceiling using
@@ -59,8 +57,7 @@ open import Verify-Budget-Sufficient.Nest-Store using
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; arrVal; RegId; lookupNode; NodeId; _↠_; Frame; AllOp; map-f; scan-f;
   take-f; from-inner; thru-outer; cascadeLatch; chainsOf; cascadeGo; Path; arrTy; stepFrame;
   cascade; share-sink; root; chainStep; budgetAt; arrSource; arrTick; shareAdmit; shareLatch;
-  foldPath; NodeState; mergeAll-st; scan-st; take-st; switch-st; exhaust-st; regAt; lvls;
-  Chain; sameSource)
+  foldPath; NodeState; mergeAll-st; scan-st; take-st; switch-st; exhaust-st; regAt; lvls)
 open import Rx.Slots using (Slots; slotsSize)
 
 open import Verify-Budget-Sufficient.Caps using
@@ -77,10 +74,8 @@ open import Verify-Budget-Sufficient.Caps-Depth
 
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (capsAt-round-size; capsOK?; capsOK?-mono; frameSz?; n≤capsAt-size; pathFloor; pathPark?;
-  entStrat?; regStrat?;
   pathStrat?; pathSz?; pathSz?-widen; regsSz?; valCaps?; nestClosOK?ᵛ; parkStrat?; framePark?;
-  framePark?-own; regOwn?;
-  nestClosOK?ᵛ-widen; pathOrd?; pathOrd?-outer)
+  framePark?-own; regOwn?; nestClosOK?ᵛ-widen; pathOrd?; pathOrd?-outer)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
   (capsOK?-count; capsOK?-regs; chainsStrat?-one; pathPark-delivered; pathsPark-delivered; pathSz?-len;
   registry-entStrat; slotsCaps?-capsAt; valsCaps?; valsCaps?-lvl; foldPath-slots;
@@ -96,7 +91,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part6 using
   (SiCType; IfcType)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (valCaps?-size; valCaps?-widen)
-open import Decide using (T-to; T⇒≡true; ∧-intro; ∧-trueˡ; ∧-trueʳ; ≡ᵇ-refl)
+open import Decide using (T-to; T⇒≡true; ∧-intro; ∧-trueˡ; ∧-trueʳ; ≡ᵇ-refl; ≤ᵇ-true)
 open import Verify-Budget-Sufficient.Caps-Face.Nest-Arith using
   (nestWalkAt-def; nestΦAt; nestΦ-sight≤capsH; nestCapAt≤nestΦAt; nestWalkAt≤nestΦAt;
   walkExpL-widen; nestΦ-frame-charge)
@@ -1294,133 +1289,87 @@ frameΦ-fit sl id sf eid now Lv (thru-outer op nid) p vals fin sched st hsl _ hp
 -- accumulated on the way in.  The witnesses that closed the level arm
 -- are therefore silent about this one, and it has to be read on its own.
 
--- AND READ ON ITS OWN THE DEFICIT SPLITS BY THE ADMITTED CHAIN'S
--- TERMINAL, which is what pricing the leaf bought.  A sink now carries
--- a factor and a depth of its own rather than one and zero, and a path
--- holds exactly one leaf -- so a chain ending at `root` spends its
--- whole factor on frames, legality caps that count by the size cap,
--- and the leaf is priced at TWICE it.  So the root arm is paid with
--- room to spare rather than exactly, which is what re-pricing the leaf
--- at the budget bought here; the depth reads off the same length in
--- the same currency.  That half closes off `pathΦF-cap-root-atLen`,
--- `pathΦD-cap-root-atLen` and monotonicity, with no new fact -- and
--- this is the assembly that spends the three.
--- AND THE ARM IS CAP-GENERIC IN ITS BODY, WHICH IS WHAT THE
--- DENOMINATION QUESTION ABOVE TURNS ON.  Nothing here reads the caps
--- recurrence: the two re-pricings and the monotonicity are stated over
--- whatever cap and potential they are handed, and the only thing the
--- instant supplies is that the cap is positive.  So this half of what
--- spends the packed reading follows a re-denomination for free, and a
--- move of the face to another cap is not a proof to redo here -- it is
--- an argument to pass.  The specialisation below is the instance the
--- fan calls, and it is all the caps knowledge this arm ever had.
-sink-fan-root-gen : ∀ {n} {Γ : Ctx n} {t} (B Φ : ℕ) (i : Fin n)
-  (p : Path Γ (lookup Γ i) t) (vals : List (Val Γ (lookup Γ i))) →
-  1 ≤ B →
-  pathRoots p ≡ true →
-  pathSzL? B p ≡ true →
-  valsΦ? B Φ (share-sink {t = t} i) vals ≡ true →
-  valsΦ? B Φ p vals ≡ true
-sink-fan-root-gen B Φ i p vals 1≤B hr hz hΦ =
-  valsΦ?-mono B Φ p (share-sink i) vals
-    (pathΦF-cap-root-atLen B (B + B) p hr hf hl)
-    (pathΦD-cap-root-atLen B (B + B) p 1≤B hr hf hl) hΦ
-  where
-  hf : pathFrameSz? B p ≡ true
-  hf = pathSzL?-frames B p hz
-  hl : pathLen p ≤ B + B
-  hl = pathSzL?-len B p hz
+-- AND READ ON ITS OWN IT IS NOT A CAP QUESTION AT ALL, WHICH IS WHAT
+-- SPLITTING BY THE ADMITTED CHAIN'S TERMINAL HID.  What the fit owes
+-- is the chain's own factor times a value's depth plus its own depth,
+-- under the instant's nest potential.  Reading that against the LEAF's
+-- two numbers closes a root-terminated chain and cannot close any
+-- other, since a chain ending at a second hand-over carries the leaf's
+-- price MULTIPLIED by its frames' and no leaf price dominates itself
+-- times a product.  But the leaf was never the ceiling the fit needs.
+-- The budget is; and a chain's factor and depth are both bounded off
+-- its size legality at a length budget, with no reference to what its
+-- terminal is.  So the split collapses to one arm, and what is left
+-- over is an inequality between two arithmetics neither of which
+-- mentions a path.
+chgF : ℕ → ℕ
+chgF B = 2 ^ ((B + B + (B + B)) * (suc B * B))
 
-sink-fan-root : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+chgD : ℕ → ℕ
+chgD B = (B + B) * B + (B + B) * B
+
+-- the fit read one value at a time, so the list's maximum is never
+-- formed and the empty list is not a special case
+valsΦ?-ceil : ∀ {n} {Γ : Ctx n} {u t} (B U F D : ℕ) (p q : Path Γ u t)
+  (vs : List (Val Γ u)) →
+  pathΦF B p ≤ F → pathΦD B p ≤ D →
+  (∀ (d : ℕ) → pathΦF B q * (d + pathΦD B q) ≤ U → F * (d + D) ≤ U) →
+  valsΦ? B U q vs ≡ true → valsΦ? B U p vs ≡ true
+valsΦ?-ceil B U F D p q []       hF hD hh h = refl
+valsΦ?-ceil {u = u} B U F D p q (v ∷ vs) hF hD hh h =
+  ∧-intro
+    (≤ᵇ-true (pathΦF B p * (nestDᵛ u v + pathΦD B p)) U
+      (≤-trans (*-mono-≤ hF (+-monoʳ-≤ (nestDᵛ u v) hD))
+        (hh (nestDᵛ u v)
+          (≤ᵇ⇒≤ (pathΦF B q * (nestDᵛ u v + pathΦD B q)) U
+            (T-to (∧-trueˡ h))))))
+    (valsΦ?-ceil B U F D p q vs hF hD hh (∧-trueʳ h))
+
+-- WHAT IS LEFT NAMES NO PATH AND NO REGISTRY.  The walk hands the sink
+-- its own receipt; what an admitted chain needs is that same shape at
+-- the legality ceilings rather than at the leaf's two numbers.  The
+-- gap between the two is one exponential in the size cap, against a
+-- nest potential carrying a fifth power of it -- so this is headroom
+-- in the instant's own arithmetic, and it is what the terminal turned
+-- out to be once the leaf stopped being asked to be the ceiling.
+-- REFUTED: `Refuted.Sink-Phi-Leaf`, which is why the reading is
+--   against the BUDGET and not against the leaf.  That witness
+--   quantifies the budget and takes it at the number the sink's own
+--   receipt exactly exhausts, so it kills the leaf comparison at an
+--   ordinary two-generation share and says nothing whatever about the
+--   potential an instant actually carries.
+postulate
+  sink-fan-headroom : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sl : Slots Γ) (id : ℕ) (i : Fin n) (d : ℕ) →
+    pathΦF {Γ = Γ} {s = lookup Γ i} {t = t}
+      (Caps.cSize (capsAt e sl id)) (share-sink i)
+      * (d + pathΦD {Γ = Γ} {s = lookup Γ i} {t = t}
+               (Caps.cSize (capsAt e sl id)) (share-sink i))
+      ≤ nestΦAt e sl id →
+    chgF (Caps.cSize (capsAt e sl id))
+      * (d + chgD (Caps.cSize (capsAt e sl id))) ≤ nestΦAt e sl id
+
+sink-fan-chg : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (i : Fin n) (p : Path Γ (lookup Γ i) t)
   (vals : List (Val Γ (lookup Γ i))) →
-  pathRoots p ≡ true →
   pathSzL? (Caps.cSize (capsAt e sl id)) p ≡ true →
   valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
     (share-sink {t = t} i) vals ≡ true →
   valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id) p vals ≡ true
-sink-fan-root {e = e} sl id i p vals hr hz hΦ =
-  sink-fan-root-gen (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
-    i p vals (≤-trans (s≤s z≤n) (8≤capsAt-size e sl id)) hr hz hΦ
-
--- WHAT IS LEFT IS THE CHAIN THAT ENDS AT A SECOND HAND-OVER.  Its
--- factor is the leaf's own multiplied by its frames', so the leaf
--- would have to dominate itself times a frame product -- which no
--- function of the cap does at an ARBITRARY chain, and arbitrary is
--- what this statement gets: `pathRoots p ≡ false` is the whole of
--- what it knows about the path it is handed.  An ordinary program
--- does put a hand-over there, since a registration minted while a
--- share's definition is being subscribed carries that share's sink as
--- its continuation.  So the residue is the sink-terminated arm and
--- nothing else.
-
--- AND THE ESCALATION IS BOUNDED BY THE PROGRAM, WHICH IS WHAT THIS
--- HEADER USED TO DENY.  The reading it carried -- that the hop count
--- is capped by nothing but the dispatch gas, since admission filters
--- on the source and the element type and never on whether a chain has
--- been delivered to -- is a fact about ADMISSION, and admission is not
--- what bounds it.  The slot telescope is STRATIFIED: a shared slot's
--- def may name only inputs below its own index, so a registration
--- whose continuation ends at some slot's sink was minted subscribing
--- an input that slot's def contains, and its source is strictly below
--- that slot.  Sink hops therefore climb the telescope, no chain can be
--- re-entered through its own sink, and the count is capped by the slot
--- count.  Instantiated in `Harness.Main` over a run of two shared
--- slots stacked on a hot source: every registration carrying a sink
--- terminal has its source strictly under that sink, none re-enters its
--- own, and the hop depth saturates at the telescope's own bound while
--- the walking fuel is taken to four times the slot count.  Those rows
--- are measured-not-rechecked, as everything in that module is.
-
--- SO THE RESIDUE IS THE ARBITRARY CHAIN, NOT A MISSING NUMBER, and
--- that relocates the row rather than shrinking it.  A price
--- denominated in the slot count is available the moment the chain is
--- read out of the REGISTRY -- and the registry is what the walk holds
--- at an arbitrary state, which is the wall `fan-regsSz` stands at one
--- statement over.  So the chain arrives here already carrying its
--- reading: `sinkAbove?` is a premise, `entStrat?` is the carried
--- conjunct of the caps bundle that pays it, and `fan-chain-strat`
--- transports it through admission with the source pinned.  What that
--- leaves open is the MINT, and not anything this statement can supply.
--- AND THE PREMISE IT TAKES IS THE PACKED READING, WHICH COSTS THE
--- ARM'S KNOWN CROSSING NOTHING.  It asks for less than the walked size
--- receipt -- a frame syntax and a length under twice the cap, rather
--- than the strict per-frame ledger -- because that is the reading the
--- fan can supply at the entry cap.  The crossing below is legal at the
--- cap under BOTH readings, so the escalation it builds was never
--- excluded by the strength of the size premise, and what rules it out
--- here is the stratification conjunct in either form.
--- REFUTED: `Refuted.Sink-Phi-Leaf`, at the size floor this arm
---   discharges from and at the budget the sink's own receipt exactly
---   exhausts, so the crossing is not an artifact of a small budget.
--- DEAD ROUTE: asserting the stratification receipt AT THE READ, as its
---   own postulate over the same arbitrary state `fan-regsSz` stands
---   at, is structurally dead rather than merely unproven --
---   `Refuted.Fan-Chain-Registry` kills that shape at a single
---   `register` onto the initial state, and the stratification reading
---   falls to the same witness family with a zero source handed a zero
---   sink.  So the fact is owed at the MINT, and the mint is FOUR
---   obligations rather than the one the carried conjunct reads as: a
---   slot-sourced registration wants the telescope carried down the
---   subscribe descent, since the continuation's terminal and the
---   expression's inputs meet only at the enclosing share's own
---   `inputsBelowᵉ` field; a minted-sourced one is FREE, `srcFloor?`
---   carrying the floor the reading's own guard is stated as, so that
---   arm is spent rather than owed; and an inner subscribe of a DELIVERED
---   observable reaches the input arm under syntax the telescope never
---   saw, so it registers a slot source against a continuation nothing
---   local relates it to -- a conjunct on the values in flight, which
---   is a different invariant from this one.
-postulate
-  sink-fan-sink : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sl : Slots Γ) (id : ℕ) (i : Fin n) (p : Path Γ (lookup Γ i) t)
-    (vals : List (Val Γ (lookup Γ i))) →
-    pathRoots p ≡ false →
-    pathSzL? (Caps.cSize (capsAt e sl id)) p ≡ true →
-    sinkAbove? (toℕ i) p ≡ true →
-    valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
-      (share-sink {t = t} i) vals ≡ true →
-    valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id) p vals ≡ true
+sink-fan-chg {e = e} sl id i p vals hz hΦ =
+  valsΦ?-ceil B (nestΦAt e sl id) (chgF B) (chgD B) p (share-sink i) vals
+    (pathΦF-cap-atLen B (B + B) p hf hl)
+    (≤-trans (pathΦD-len B p 1≤B hf)
+      (+-monoˡ-≤ ((B + B) * B) (*-monoˡ-≤ B hl)))
+    (sink-fan-headroom sl id i) hΦ
+  where
+  B = Caps.cSize (capsAt e sl id)
+  1≤B : 1 ≤ B
+  1≤B = ≤-trans (s≤s z≤n) (8≤capsAt-size e sl id)
+  hf : pathFrameSz? B p ≡ true
+  hf = pathSzL?-frames B p hz
+  hl : pathLen p ≤ B + B
+  hl = pathSzL?-len B p hz
 
 -- THE LEVEL IS WHAT THE FAN WAS MISSING, AND PICKING IT UP COSTS
 -- NOTHING.  The walk already stands at a level: `capsWalkOK` reads its
@@ -1615,7 +1564,7 @@ fan-regsSz {e = e} sl id Lv sched st cok =
 --   cannot.
 -- DEAD ROUTE: a FLAT carried field -- one predicate at one cap, added
 --   to the walk's bundle -- answering this row together with
---   `walk-share-nestOK`, `sink-fan-sink` and the two inner potential
+--   `walk-share-nestOK`, `sink-fan-chg` and the two inner potential
 --   arms, which is what those four sharing an obstacle invites.  Each
 --   currency kills it separately and for the same reason: the descent
 --   reads a state the instant has STEPPED, every receipt in hand is
@@ -1672,15 +1621,16 @@ fan-regsSz {e = e} sl id Lv sched st cok =
 --   next; and the leaf alone cannot follow it either, because the
 --   stepped cap is a blowup OF that same depth budget.
 -- DEAD ROUTE: retiring the row by dropping the size premise from
---   `sink-fan-sink`, on the reading that an admitted chain arrives
---   carrying its own `sinkAbove?` and that a climb up the stratified
---   telescope is bounded by the slot count while naming no cap.  The
---   stratification reading cannot substitute, and the two predicates
---   say so by their own recursion: `sinkAbove?` walks past every frame
---   and speaks only at the terminal, while the size receipt speaks at
---   each frame it passes.  They are not two readings of one climb --
---   one counts HOPS and the other counts FRAMES, and no bound on
---   either is a bound on the other.
+--   `sink-fan-chg`, on the reading that an admitted chain arrives
+--   carrying the registry's own stratification -- every source
+--   strictly under the slot its chain terminates at -- and that a
+--   climb up the stratified telescope is bounded by the slot count
+--   while naming no cap.  That reading cannot substitute, and the two
+--   predicates say so by their own recursion: a terminal-ordering
+--   reading walks past every frame and speaks only at the leaf, while
+--   the size receipt speaks at each frame it passes.  They are not two
+--   readings of one climb -- one counts HOPS and the other counts
+--   FRAMES, and no bound on either is a bound on the other.
 -- DEAD ROUTE: stating the whole face at the CLIMBED cap -- the one the
 --   registry receipt is free at -- now that the grant is denomination-
 --   free and neither spender reads the instant.  This is the shape the
@@ -1733,51 +1683,6 @@ fan-chain-szL : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 fan-chain-szL {e = e} sl id i st h =
   shareAdmit-chP (λ {u} → pathSzL? {s = u} (Caps.cSize (capsAt e sl id)))
     i (EvalSt.registry st) h
-
--- THE ENTRY READING SPENT AS THE FAN'S OWN, and the two are the same
--- fact read at different granularity.  `entStrat?` bounds the source by
--- the chain's FLOOR, a number; `sinkAbove?` asks the same ordering of
--- the terminal it is reached through, a Bool -- and `pathFloor` is
--- exactly what `sinkAbove?` decides against, so the step is the
--- recursion both of them already are.  It is stated strictly on both
--- sides, which is why nothing is owed between them: a frame moves
--- neither, a root bounds nothing and answers true, and a sink is
--- the one place either says anything at all.
-entStrat⇒above : ∀ {n} {Γ : Ctx n} {u t} (s : Source) (p : Path Γ u t) →
-  (s <ᵇ pathFloor p) ≡ true → sinkAbove? s p ≡ true
-entStrat⇒above s root           h = refl
-entStrat⇒above s (share-sink j) h = h
-entStrat⇒above s (_ ↠ p)        h = entStrat⇒above s p h
-
--- A SLOT INDEX IS UNDER THE FLOOR, which is what makes the guard
--- vanish on everything admission keeps.
-floorFalse : ∀ {n} (i : Fin n) → (n ≤ᵇ toℕ i) ≡ false
-floorFalse {n} i with n ≤ᵇ toℕ i in eq
-... | false = refl
-... | true  = ⊥-elim (1+n≰n (≤-trans (toℕ<n i) (≤ᵇ⇒≤ n (toℕ i) (T-to eq))))
-
--- AND THE SELECTION INHERITS IT WITH THE SOURCE PINNED, WHICH COSTS NO
--- ARGUMENT.  `shareAdmit` keeps an entry only where `sameSource` holds
--- against the share's own index, so the admitted chains are exactly
--- those minted at `toℕ i` and the reading transports along that
--- equality rather than being asserted afresh.
-fan-chain-strat : ∀ {n} {Γ : Ctx n} {t} (i : Fin n)
-  (rs : List (RegId × Source × Chain Γ t)) →
-  regStrat? rs ≡ true →
-  all (λ rp → sinkAbove? (toℕ i) (proj₂ rp)) (shareAdmit {t = t} i rs) ≡ true
-fan-chain-strat i [] h = refl
-fan-chain-strat {n = n} {Γ = Γ} i ((rid , s , (u , p)) ∷ r) h
-  with sameSource (toℕ i) s in eqs | u ≟ᵗ lookup Γ i
-     | ∧-true (entStrat? s p) (regStrat? r) h
-... | false | _        | _  , hr = fan-chain-strat i r hr
-... | true  | no _     | _  , hr = fan-chain-strat i r hr
-... | true  | yes refl | hp , hr =
-      ∧-intro (entStrat⇒above (toℕ i) p
-                (subst (λ b → b ∨ (toℕ i <ᵇ pathFloor p) ≡ true) (floorFalse i)
-                       (subst (λ z → (n ≤ᵇ z) ∨ (z <ᵇ pathFloor p) ≡ true)
-                              (sym (≡ᵇ⇒≡ (toℕ i) s (T-to eqs)))
-                              (∧-trueˡ hp))))
-              (fan-chain-strat i r hr)
 
 -- ONE CHAIN'S DEPTH OUT OF THE SELECTION'S JOIN.  The cascade-level
 -- reading is a ⊔-fold over the whole selection, and the walk spends it
@@ -2086,7 +1991,6 @@ mutual
         ps ≡ true →
     all (λ rp → pathSzL? (Caps.cSize (capsAt e sl id)) (proj₂ rp)) ps ≡ true →
     all (λ rp → pathNestD (proj₂ rp) ≤ᵇ nestCapAt e sl id) ps ≡ true →
-    all (λ rp → sinkAbove? (toℕ i) (proj₂ rp)) ps ≡ true →
     valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
       (share-sink {t = t} i) vals ≡ true →
     ShareGoΦHyp sf gas nid now (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
@@ -2105,8 +2009,7 @@ mutual
              (fan-regsNest sl id sched st
                 (walk-share-nestOK sl id sf gas nid now Lv i vals false
                    sched st hd hsl)))
-          (fan-chain-strat i (EvalSt.registry st)
-             (registry-entStrat (frameStep Lv (capsAt e sl id)) sched st hck)) hΦ
+          hΦ
   walk-share-ΦHyp {e = e} sl id sf (suc gas) nid now Lv i vals true sched st
                   hd hck hdd hsl hΦ =
     walk-shareGo-ΦHyp sl id sf gas nid now Lv i vals true
@@ -2119,17 +2022,16 @@ mutual
              (fan-regsNest sl id sched st
                 (walk-share-nestOK sl id sf gas nid now Lv i vals true
                    sched st hd hsl)))
-          (fan-chain-strat i (EvalSt.registry st)
-             (registry-entStrat (frameStep Lv (capsAt e sl id)) sched st hck)) hΦ
+          hΦ
 
   walk-shareGo-ΦHyp sl id sf gas nid now Lv i vals fin [] sched st
-                    _ _ _ _ _ _ _ _ = tt
+                    _ _ _ _ _ _ _ = tt
   walk-shareGo-ΦHyp {e = e} sl id sf gas nid now Lv i vals fin
-                    ((rid , p) ∷ ps) sched st hsg hdsg hsl hpz hpl hnd hsa hΦ
+                    ((rid , p) ∷ ps) sched st hsg hdsg hsl hpz hpl hnd hΦ
     with any (_≡ᵇ rid) (EvalSt.cancelled st)
   ... | true  = walk-shareGo-ΦHyp sl id sf gas nid now Lv i vals fin ps sched st
                   hsg (depthShareGo-tail sf gas nid now i vals fin rid p ps sched st hdsg)
-                  hsl (∧-trueʳ hpz) (∧-trueʳ hpl) (∧-trueʳ hnd) (∧-trueʳ hsa) hΦ
+                  hsl (∧-trueʳ hpz) (∧-trueʳ hpl) (∧-trueʳ hnd) hΦ
   ... | false =
       hΦp
     , walk-ΦHyp-go sl id sf gas nid now Lv (toℕ i) evs p vals fin sched st₀
@@ -2142,7 +2044,7 @@ mutual
         (proj₂ (proj₂ (proj₂ hsg)))
         (depthShareGo-step sf gas nid now i vals fin rid p ps sched st hdsg)
         (trans (foldPath-slots sf gas nid now (toℕ i) p vals evs fin sched st₀) hsl)
-        hpzs (∧-trueʳ hpl) (∧-trueʳ hnd) (∧-trueʳ hsa)
+        hpzs (∧-trueʳ hpl) (∧-trueʳ hnd)
         hΦ
     where
     B : ℕ
@@ -2170,9 +2072,7 @@ mutual
     evs = if fin then close (toℕ i) exhausted ∷ [] else []
     FP = foldPath sf gas nid now (toℕ i) p vals evs fin sched st₀
     hΦp : valsΦ? B (nestΦAt e sl id) p vals ≡ true
-    hΦp with pathRoots p in eqr
-    ... | true  = sink-fan-root sl id i p vals eqr hpl₀ hΦ
-    ... | false = sink-fan-sink sl id i p vals eqr hpl₀ (∧-trueˡ hsa) hΦ
+    hΦp = sink-fan-chg sl id i p vals hpl₀ hΦ
 
   walk-ΦHyp-go sl id sf gas nid now Lv envSrc evs root vals fin sched st
                _ _ _ _ _ _ _ = tt
