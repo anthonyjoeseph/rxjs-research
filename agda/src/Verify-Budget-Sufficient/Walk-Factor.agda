@@ -8,10 +8,13 @@
 module Verify-Budget-Sufficient.Walk-Factor where
 
 open import Data.Bool using (Bool; true; _∧_)
-open import Data.Nat using (ℕ; suc; _+_; _*_; _^_; _≤_; z≤n; s≤s; _≤ᵇ_)
+open import Data.Nat using (ℕ; suc; _+_; _*_; _^_; _∸_; _≤_; _<_; z≤n; s≤s; _≤ᵇ_)
 open import Data.Nat.Properties using
   (≤-refl; ≤-trans; ≤-reflexive; ≤ᵇ⇒≤; ≤⇒≤ᵇ; +-mono-≤; +-monoˡ-≤; +-assoc; *-monoˡ-≤;
-  *-identityˡ; *-distribʳ-+; m≤m+n; m≤n+m; m^n>0; ^-distribˡ-+-*; ^-monoʳ-≤; ^-*-assoc)
+  *-identityˡ; *-distribʳ-+; m≤m+n; m≤n+m; m^n>0; ^-distribˡ-+-*; ^-monoʳ-≤; ^-*-assoc;
+  ∸-monoʳ-<; m<n⇒0<n∸m; m∸n≤m; *-monoʳ-≤; *-assoc; <⇒≤)
+open import Data.Fin using (Fin; toℕ)
+open import Data.Fin.Properties using (toℕ<n)
 open import Data.Product using (_,_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong)
 
@@ -20,7 +23,7 @@ open import Rx.Nest-Depth using (nestDᵗ)
 open import Verify-Budget-Sufficient.Nest-Depth-Size using (nestDᵗ≤sizeᵗ)
 open import Rx.Evaluator using
   (Frame; map-f; scan-f; take-f; from-inner; thru-outer; Path; root; share-sink; _↠_)
-open import Verify-Budget-Sufficient.Caps-Face.Part1 using (frameSz?; pathSz?)
+open import Verify-Budget-Sufficient.Caps-Face.Part1 using (frameSz?; pathSz?; pathFloor)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using (pathSz?-len)
 open import Verify-Budget-Sufficient.Measures using (pathLen; ∧-true)
 open import Decide using (T-to; T⇒≡true; ∧-intro; ∧-trueˡ; ∧-trueʳ)
@@ -132,37 +135,37 @@ frameΦSz B (thru-outer _ _)   = B
 -- `pathSz?`'s own header states over its two callers, arriving at the
 -- potential rather than at the size predicate.
 
--- AND THE LEAF'S PRICE IS FLAT IN THE REMAINING SHARE DEPTH, WHICH IS
--- A DEFECT NO CHOICE OF CAP REPAIRS.  The number it charges is exactly
--- one chain-length of frame factor -- the longest frame factor the
--- size predicate admits, raised to the length that predicate admits --
--- so it dominates a registered chain whose own terminal is ROOT and
--- nothing more.  A chain terminating at a SECOND sink carries that
--- same leaf price UNDER its own frames, so dominating it asks a
--- constant to exceed itself times a frame product, which no constant
--- does.  That is the structural reading of `Refuted.Sink-Phi-Leaf`,
--- whose witness quantifies the budget rather than exhibiting a deep
--- share: the leaf fails at one generation of nesting, not at some
--- adversarial arithmetic.
+-- AND THE LEAF IS PRICED BY THE CLIMB, WHICH IS THE ONE INDEX UNDER
+-- WHICH A SINK CAN PAY ITS OWN CHAINS.  A FLAT price cannot: it would
+-- be one chain-length of frame factor, which dominates a registered
+-- chain terminating at ROOT and nothing else, while a chain
+-- terminating at a SECOND sink carries that same price UNDER its own
+-- frames -- a constant asked to exceed itself times a frame product.
+-- That is the structural reading of `Refuted.Sink-Phi-Leaf`, whose
+-- witness quantifies the budget rather than exhibiting a deep share,
+-- so the flat leaf fails at ONE generation of nesting.  Enlarging it
+-- is invariant rather than expensive, the length ceiling that reads it
+-- being a power of the same exponent.
 --
--- AND ENLARGING IT IS SELF-DEFEATING RATHER THAN MERELY EXPENSIVE,
--- because the ceiling that reads this price is stated as a power of
--- the same exponent: raising the leaf raises the length bound every
--- consumer spends by the identical amount, so the gap between a chain
--- and the price meant to cover it is invariant under the move.  The
--- repair the two together leave standing is to index the charge by
--- the CLIMB -- the share depth still ahead of the walk -- so that a
--- sink's price strictly exceeds what its own registered chains cost
--- by construction, in the way a decreasing measure does and a
--- constant cannot.
+-- SO THE CHARGE IS THE FLAT ONE RAISED TO THE SHARE DEPTH STILL AHEAD,
+-- AND `pathFloor` ALREADY MEASURES THAT.  A registry entry's own
+-- stratification puts its source strictly BELOW the floor of the chain
+-- it installs, so fanning out of a sink at slot `i` reaches only
+-- terminals whose floor exceeds `toℕ i` -- and `n ∸ toℕ i` therefore
+-- strictly decreases along every fan.  A chain out of that sink costs
+-- its frames, at most one flat factor, times its own terminal's price,
+-- at most `n ∸ toℕ i` less one flat factor: the sink's price dominates
+-- by arithmetic the index supplies rather than by a margin anyone
+-- chose.  The root reads as the same clause at exponent zero, its
+-- floor being `n`.
 pathΦF : ∀ {n} {Γ : Ctx n} {s t} (B : ℕ) → Path Γ s t → ℕ
 pathΦF B root           = 1
-pathΦF B (share-sink _) = 2 ^ ((B + B) * (suc B * B))
+pathΦF {n = n} B (share-sink i) = 2 ^ ((n ∸ toℕ i) * ((B + B) * (suc B * B)))
 pathΦF B (f ↠ p)        = frameΦF B f * pathΦF B p
 
 pathΦSz : ∀ {n} {Γ : Ctx n} {s t} (B : ℕ) → Path Γ s t → ℕ
 pathΦSz B root           = 0
-pathΦSz B (share-sink _) = (B + B) * (suc B * B)
+pathΦSz {n = n} B (share-sink i) = (n ∸ toℕ i) * ((B + B) * (suc B * B))
 pathΦSz B (f ↠ p)        = frameΦSz B f + pathΦSz B p
 
 -- THE DEPTH HALF, AND IT IS SEPARATE FROM THE STORE FACE'S BECAUSE ONLY
@@ -174,7 +177,7 @@ pathΦSz B (f ↠ p)        = frameΦSz B f + pathΦSz B p
 -- opaque.
 pathΦD : ∀ {n} {Γ : Ctx n} {s t} (B : ℕ) → Path Γ s t → ℕ
 pathΦD B root                    = 0
-pathΦD B (share-sink _)          = (B + B) * B
+pathΦD {n = n} B (share-sink i)  = (n ∸ toℕ i) * ((B + B) * B)
 pathΦD B (map-f f ↠ p)           = nestDᵗ f + pathΦD B p
 pathΦD B (scan-f f _ ↠ p)        = nestDᵗ f + pathΦD B p
 pathΦD B (take-f _ ↠ p)          = pathΦD B p
@@ -306,16 +309,18 @@ frameΦSz≤ B (thru-outer _ _)   h = m≤m+n B (B * B)
 -- caps below are where it happens.
 pathΦSz-len : ∀ {n} {Γ : Ctx n} {s t} (B : ℕ) (p : Path Γ s t) →
   pathFrameSz? B p ≡ true →
-  pathΦSz B p ≤ pathLen p * (suc B * B) + (B + B) * (suc B * B)
+  pathΦSz B p ≤ pathLen p * (suc B * B) + (n * (B + B)) * (suc B * B)
 pathΦSz-len B root           h = z≤n
-pathΦSz-len B (share-sink _) h = ≤-refl
-pathΦSz-len B (f ↠ p) h
+pathΦSz-len {n = n} B (share-sink i) h =
+  ≤-trans (*-monoˡ-≤ ((B + B) * (suc B * B)) (m∸n≤m n (toℕ i)))
+          (≤-reflexive (sym (*-assoc n (B + B) (suc B * B))))
+pathΦSz-len {n = n} B (f ↠ p) h
   with ∧-true (frameSz? B f) (pathFrameSz? B p) h
 ... | hf , hp =
         ≤-trans (+-mono-≤ (frameΦSz≤ B f hf) (pathΦSz-len B p hp))
                 (≤-reflexive (sym (+-assoc (suc B * B)
                                            (pathLen p * (suc B * B))
-                                           ((B + B) * (suc B * B)))))
+                                           ((n * (B + B)) * (suc B * B)))))
 
 -- AND THE LENGTH IS A SEPARATE BUDGET FROM THE CAP, which is the only
 -- thing a registered chain can be held to: the frame half is a piece
@@ -337,15 +342,15 @@ pathΦSz-len B (f ↠ p) h
 -- question, and it is a question about a fixed power.
 pathΦF-cap-atLen : ∀ {n} {Γ : Ctx n} {s t} (B L : ℕ) (p : Path Γ s t) →
   pathFrameSz? B p ≡ true → pathLen p ≤ L →
-  pathΦF B p ≤ 2 ^ ((L + (B + B)) * (suc B * B))
-pathΦF-cap-atLen B L p h hl =
+  pathΦF B p ≤ 2 ^ ((L + n * (B + B)) * (suc B * B))
+pathΦF-cap-atLen {n = n} B L p h hl =
   ≤-trans (≤-reflexive (pathΦF≡ B p))
           (^-monoʳ-≤ 2
             (≤-trans (pathΦSz-len B p h)
-              (≤-trans (+-monoˡ-≤ ((B + B) * (suc B * B))
+              (≤-trans (+-monoˡ-≤ ((n * (B + B)) * (suc B * B))
                          (*-monoˡ-≤ (suc B * B) hl))
                        (≤-reflexive
-                         (sym (*-distribʳ-+ (suc B * B) L (B + B)))))))
+                         (sym (*-distribʳ-+ (suc B * B) L (n * (B + B))))))))
 
 -- THE DEPTH HALF'S OWN CAP, and it is a square rather than a cube: a
 -- frame installs a step function's nesting and a `thru-outer` one unit,
@@ -353,33 +358,87 @@ pathΦF-cap-atLen B L p h hl =
 -- that cap -- plus, at a hand-over, the square the chain it hands to is
 -- owed.
 pathΦD-len : ∀ {n} {Γ : Ctx n} {s t} (B : ℕ) (p : Path Γ s t) →
-  1 ≤ B → pathFrameSz? B p ≡ true → pathΦD B p ≤ pathLen p * B + (B + B) * B
+  1 ≤ B → pathFrameSz? B p ≡ true →
+  pathΦD B p ≤ pathLen p * B + (n * (B + B)) * B
 pathΦD-len B root           _  h = z≤n
-pathΦD-len B (share-sink _) _  h = ≤-refl
-pathΦD-len B (map-f fn ↠ p) 1B h
+pathΦD-len {n = n} B (share-sink i) _ h =
+  ≤-trans (*-monoˡ-≤ ((B + B) * B) (m∸n≤m n (toℕ i)))
+          (≤-reflexive (sym (*-assoc n (B + B) B)))
+pathΦD-len {n = n} B (map-f fn ↠ p) 1B h
   with ∧-true (frameSz? B (map-f fn)) (pathFrameSz? B p) h
 ... | hf , hp =
         ≤-trans (+-mono-≤ (≤-trans (nestDᵗ≤sizeᵗ fn) (≤ᵇ⇒≤ (sizeᵗ fn) B (T-to hf)))
                           (pathΦD-len B p 1B hp))
-                (≤-reflexive (sym (+-assoc B (pathLen p * B) ((B + B) * B))))
-pathΦD-len B (scan-f fn z ↠ p) 1B h
+                (≤-reflexive (sym (+-assoc B (pathLen p * B) ((n * (B + B)) * B))))
+pathΦD-len {n = n} B (scan-f fn z ↠ p) 1B h
   with ∧-true (frameSz? B (scan-f fn z)) (pathFrameSz? B p) h
 ... | hf , hp =
         ≤-trans (+-mono-≤ (≤-trans (nestDᵗ≤sizeᵗ fn) (≤ᵇ⇒≤ (sizeᵗ fn) B (T-to hf)))
                           (pathΦD-len B p 1B hp))
-                (≤-reflexive (sym (+-assoc B (pathLen p * B) ((B + B) * B))))
-pathΦD-len B (take-f _ ↠ p) 1B h
+                (≤-reflexive (sym (+-assoc B (pathLen p * B) ((n * (B + B)) * B))))
+pathΦD-len {n = n} B (take-f _ ↠ p) 1B h
   with ∧-true true (pathFrameSz? B p) h
 ... | _ , hp =
       ≤-trans (pathΦD-len B p 1B hp)
-              (+-monoˡ-≤ ((B + B) * B) (m≤n+m (pathLen p * B) B))
-pathΦD-len B (from-inner _ _ _ ↠ p) 1B h
+              (+-monoˡ-≤ ((n * (B + B)) * B) (m≤n+m (pathLen p * B) B))
+pathΦD-len {n = n} B (from-inner _ _ _ ↠ p) 1B h
   with ∧-true true (pathFrameSz? B p) h
 ... | _ , hp =
       ≤-trans (pathΦD-len B p 1B hp)
-              (+-monoˡ-≤ ((B + B) * B) (m≤n+m (pathLen p * B) B))
-pathΦD-len B (thru-outer _ _ ↠ p) 1B h
+              (+-monoˡ-≤ ((n * (B + B)) * B) (m≤n+m (pathLen p * B) B))
+pathΦD-len {n = n} B (thru-outer _ _ ↠ p) 1B h
   with ∧-true true (pathFrameSz? B p) h
 ... | _ , hp =
       ≤-trans (+-mono-≤ 1B (pathΦD-len B p 1B hp))
-              (≤-reflexive (sym (+-assoc B (pathLen p * B) ((B + B) * B))))
+              (≤-reflexive (sym (+-assoc B (pathLen p * B) ((n * (B + B)) * B))))
+
+-- THE FLOOR IS BOUNDED BY THE SLOT COUNT, which is what makes the
+-- climb a `∸` at all: a terminal names either a slot of the context or
+-- the root, and the root is the slot count itself, so the index the
+-- pricing subtracts is never larger than what it subtracts from.
+pathFloor≤ : ∀ {n} {Γ : Ctx n} {s t} (p : Path Γ s t) → pathFloor p ≤ n
+pathFloor≤ root           = ≤-refl
+pathFloor≤ (share-sink i) = <⇒≤ (toℕ<n i)
+pathFloor≤ (_ ↠ p)        = pathFloor≤ p
+
+-- AND THE SAME CEILING READ AT THE CHAIN'S OWN TERMINAL RATHER THAN AT
+-- THE SLOT COUNT, which is the sharpening the climb exists for.  The
+-- length half is untouched; what changes is that the leaf's share is
+-- charged at the terminal this chain actually reaches instead of at
+-- the deepest one the context admits.
+pathΦSz-floor : ∀ {n} {Γ : Ctx n} {s t} (B : ℕ) (p : Path Γ s t) →
+  pathFrameSz? B p ≡ true →
+  pathΦSz B p ≤
+    pathLen p * (suc B * B) + (n ∸ pathFloor p) * ((B + B) * (suc B * B))
+pathΦSz-floor B root           h = z≤n
+pathΦSz-floor B (share-sink i) h = ≤-refl
+pathΦSz-floor {n = n} B (f ↠ p) h
+  with ∧-true (frameSz? B f) (pathFrameSz? B p) h
+... | hf , hp =
+        ≤-trans (+-mono-≤ (frameΦSz≤ B f hf) (pathΦSz-floor B p hp))
+                (≤-reflexive (sym (+-assoc (suc B * B)
+                                           (pathLen p * (suc B * B))
+                                           ((n ∸ pathFloor p)
+                                             * ((B + B) * (suc B * B))))))
+
+-- THE PRICING'S OWN REASON FOR BEING INDEXED, AND IT IS AN EQUALITY OF
+-- INDICES RATHER THAN A MARGIN.  A registry entry's stratification puts
+-- its source strictly below the floor of the chain it installs, so a
+-- chain fanned out of the sink at slot `i` has `toℕ i` under its own
+-- terminal -- and the climb, being `n ∸ _`, therefore drops by at least
+-- one across the hand-over.  That one step is exactly the flat factor a
+-- size-legal chain's frames can cost, so the sink's charge covers its
+-- own chains with nothing left over and nothing missing.  A flat leaf
+-- has no such step and is refuted; the header above says why.
+pathΦF-under-sink : ∀ {n} {Γ : Ctx n} {s t} (B : ℕ) (i : Fin n)
+  (q : Path Γ s t) →
+  pathFrameSz? B q ≡ true → pathLen q ≤ B + B → toℕ i < pathFloor q →
+  pathΦF B q ≤ pathΦF B (share-sink {Γ = Γ} {t = t} i)
+pathΦF-under-sink {n = n} {t = t} B i q h hl hi =
+  ≤-trans (≤-reflexive (pathΦF≡ B q))
+    (^-monoʳ-≤ 2
+      (≤-trans (pathΦSz-floor B q h)
+        (≤-trans (+-monoˡ-≤ ((n ∸ pathFloor q) * ((B + B) * (suc B * B)))
+                   (*-monoˡ-≤ (suc B * B) hl))
+                 (*-monoˡ-≤ ((B + B) * (suc B * B))
+                   (∸-monoʳ-< hi (pathFloor≤ q))))))
