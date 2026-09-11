@@ -238,15 +238,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **FACTOR THE SIZE CHARGE INTO CAP-FREE COEFFICIENTS.** Every cap
-  reading is closed and they are one route: a receipt wants the cap
-  large, the leaf's charge is two to a cube of it, one number does both
-  jobs — and splitting the pair is refuted too, each half at its own
-  witness. But the charge is LINEAR in the cap with cap-free
-  coefficients: a syntax sum, a weight, a sink indicator. Every
-  refutation busts a cap READING and none bounds those three. The
-  commit lands the factoring and its recovery equation against the
-  first consumer that can spend it, and returns what registration owes.
+- **CARRY THE CHARGE, NOT THE CAP READING.** The two are now measured
+  apart at a state the evaluator reaches: the predicate the face is
+  written in is false at every cap to forty-eight and true at
+  sixty-four, while the charge the hand-over actually spends is true
+  from three. So every refutation on that row busts a cap READING and
+  none of them reaches the charge. What stays open is the producer
+  half — each chain in that registry ends at the root, so the sink
+  leaf's cubic goes uncharged and nothing yet says the charge survives
+  a registration. The commit states the charge premise at the fan and
+  returns the first producer that cannot re-establish it.
 
 - **THE SECOND HAND-OVER, NOW THAT THE CLIMB IS STRICT**, which is the
   one arm of WHAT PRICES A REGISTERED CHAIN the entry ledger did not

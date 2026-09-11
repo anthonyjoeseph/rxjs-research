@@ -1541,6 +1541,22 @@ fan-regsSz {e = e} sl id Lv sched st cok =
 -- and not an arithmetic one.  Read off the pricing's own clauses
 -- rather than instantiated.
 
+-- AND THE TWO READINGS ARE MEASURED APART AT A STATE THE EVALUATOR
+-- REACHES, which is what moves this off a reading of the clauses.
+-- `Probed.Regs-Charge-Currency` runs a scan that carries syntax as a
+-- value under a merge, takes the registry the run actually leaves, and
+-- asks both questions of it at a range of caps.  The predicate this
+-- statement is written in is false at every cap up to and including
+-- forty-eight and turns true at sixty-four; the charge the hand-over
+-- actually spends is false at two and true from three upward.  So the
+-- gap is more than an order of magnitude wide and it is an interval
+-- rather than one awkward cap, and inside it the face's own premise is
+-- unavailable while the quantity the face spends is affordable.  What
+-- the separation does not buy is the producer obligation: every chain
+-- in that registry ends at the root, so the sink leaf's own cubic is
+-- never charged, and nothing there says the charge is re-establishable
+-- where a registration is made.
+
 -- the frame conjunct is the half the leaves' pricing actually spends.
 -- It fails for the same reason at a different witness: the frame a
 -- subscribe pushes carries its operator's TRANSFORMER verbatim, and
