@@ -235,64 +235,66 @@ statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **MEASURE THE VALUE, NOT THE TEXT — THE ONE ROUTE THE REFUTATION
-  LEAVES OPEN.** `Spike.Wide` kills the syntactic reading outright: no
-  affine plug law exists for a template plugging into an `allᵉ` that
-  feeds a `scanᵉ`, though every term of the fragment satisfies one, so a
-  fold count is read off the plugged VALUE and no ceiling can be
-  predicted from a program. What that leaves untouched is DESCENT: a
-  value's hop depth is finite by structural recursion, and the order
-  never mentions the refuted quantity. The commit states the re-entry
-  step over the value in hand rather than over a number fixed before the
-  run, and returns either that descent or the emission whose depth its
-  own emitter cannot bound.
+- **CLOSE THE FRAGMENT'S SILENCE BEFORE READING ANOTHER GREEN.** Two
+  refutations running came from shapes the toy cannot write — a slope of
+  two, then a plug into an `allᵉ` source — and both times the
+  conclusion was written from the silence. The real term language
+  carries an arbitrary-expression constructor at the ambient scope
+  against the toy's six fixed ones, and that absence is what both misses
+  have in common. The commit gives the fragment a genuine
+  arbitrary-body plug and re-runs descent against it, returning the
+  first order surviving a template the fragment cannot enumerate — or a
+  third FALSITY here, which is a stop and not a finding. Narrows
+  DOES DESCENT SURVIVE A TEMPLATE THE FRAGMENT CANNOT WRITE?
 
-- **THE STORE READING NOTHING CARRIES.** Both inner arms and the fan die
-  at one installed cell, and all three owe the same absent fact: the
-  ambient store predicate a cascade door holds at an instant's entry,
-  which the walk's carried bundle has no conjunct of. Threading it as a
-  premise is recorded dead — inside one instant the store grows toward
-  the NEXT cap, so an entry-cap reading asks a step to leave the store
-  where it found it. The commit states it as a carried FIELD, in
-  whatever denomination the first leg fixes, and returns the first arm
-  whose step does not re-establish it.
+- **THE RE-ENTRY EDGES THE TOY HAS NO CLAUSE FOR.** The real evaluator
+  has six synchronous re-entry sites and the fragment models three.
+  Absent: a merge join's queue drain, which re-enters on a COMPLETION
+  with no arriving value and recurses over its own queue, so nothing in
+  hand is smaller; the top-level fan of one arrival across every chain;
+  and the share-to-share fan, bounded only by telescope size. Teardown
+  is a confirmed negative — it writes markers and the registry, reaching
+  neither fold nor subscribe. The commit adds the completion-driven
+  edge, the one with no obvious witness, and returns what decreases
+  across it. Narrows WHAT DOES AN INTRA-INSTANT RE-ENTRY LEAVE SMALLER?
 
-- **THE BURST'S ONLY TIE, WHICH BOTH FACES SPEND AND NEITHER OWNS.**
-  `burst-out` is this development's single syntax-to-values ceiling and
-  it prices the SUBSCRIBE frame alone, so nothing bounds what a LATER
-  frame hands on within one instant — which is the scan charge's dead
-  count, the crossing door's unbounded burst and the size face's product
-  rate, one absence read in three currencies. The commit takes it at a
-  STEPPED frame and denominates it in the SLOT SCRIPT rather than the
-  term — the reading nothing has asked for, and one the budget already
-  takes an argument for. Either the ceiling extends and those rows
-  become one statement, or it returns why no bound exists in either
-  argument.
+- **AN ORDER IS NOT A BOUND, AND ONLY BOUNDS WERE REFUTED.** The caps
+  face records three currencies machine-refuted — bare positivity, any
+  measure of the syntax or of the subscribed value, the evaluator's own
+  gas — and records them as BOUNDS, fixed ahead of a run. It then
+  names what stays open: an ORDER asks strictly less, nothing is
+  totalled, the unconnected-slot count is monotone everywhere and so
+  fixed outermost, and below it nothing orders. So the refutations do
+  not reach a descent, and what is owed is the COMPOSITION. The
+  commit puts that face's edge census beside the fragment's order and
+  returns the first component pair with no seam. Narrows WHAT DOES AN
+  INTRA-INSTANT RE-ENTRY LEAVE SMALLER?
 
 ### Open questions
 
-- **IS THE NESTING CEILING NEEDED AT ALL?** Every caps-denominated route
-  is closed — entry cap, exit cap, and moving the recurrence's own fuel.
-  The ceiling is only owed because the evaluator's gas is a NUMBER fixed
-  before the run, and the half now SETTLED is that no syntactic quantity
-  replaces it: `Spike.Wide` refutes the affine plug law at a template
-  plugging into an `allᵉ` that feeds a `scanᵉ`, which is ordinary rxjs.
-  The region left is the VALUE
-  side, where a depth read off the emission in hand is finite by
-  construction and needs no prediction; what is open there is whether
-  descent survives, or whether a run's emission can outrun its emitter.
-  relevant: `fan-regsSzL-mint`, `walk-share-nestOK`, `walk-share-valsNest`
+- **DOES DESCENT SURVIVE A TEMPLATE THE FRAGMENT CANNOT WRITE?** Every
+  caps-denominated route to a ceiling is closed — entry cap, exit cap,
+  the recurrence's own fuel — and the syntactic half is now settled
+  against it too: no affine plug law exists at a template plugging into
+  an `allᵉ` that feeds a `scanᵉ`, which is ordinary rxjs. That leaves
+  DESCENT, where a depth read off the emission in hand needs no
+  prediction at all. What is not known is whether it survives the
+  templates the toy has no constructor for, and the question is asked
+  this way because both refutations so far were silences of the toy read
+  as greens.
+  relevant: `fan-regsSzL-mint`, `walk-share-valsNest`, `subscribeE-sz`
 
-- **WHAT CARRIES A STORE READING DOWN THE WALK?** The statements read a
-  PATH or a chain and the quantity they must bound is a cell in the STORE.
-  Coverage is settled and is not the obstacle: a path predicate CAN see
-  the store, extending it is priced, the WALK half is done, the DELIVERY
-  arc is one frame's cell rather than a chain's, and the GRAIN is settled
-  against the reading — what is reached must be reached CELL-WISE. What is
-  left is PRESERVATION. The fact exists one level up, at every cascade
-  door, and a step does not re-establish it, because within the instant
-  the store grows toward the next cap by design.
-  relevant: `walk-share-nestOK`, `step-frame-store≤`, `subscribeSharedSlot-sz-store`
+- **WHAT DOES AN INTRA-INSTANT RE-ENTRY LEAVE SMALLER?** One question
+  with two faces, joined because the finding is the same on both. On the
+  STORE face a step is asked to preserve a reading the cascade door
+  holds at entry, and cannot: inside the instant the store grows toward
+  the NEXT cap by design. On the CONTROL face a merge join's drain
+  re-enters on a completion carrying no value at all, recursing over its
+  own queue, so there is nothing in hand for an order to read. Both say
+  the intra-instant step has no established decrease, and until one
+  exists neither a preserved bound nor a descent can cross it.
+  relevant: `walk-share-nestOK`, `step-frame-store≤`,
+  `subscribeSharedSlot-sz-store`
 
 - **WHAT BOUNDS A BURST INSIDE ONE INSTANT?** Rows on two faces fail on one
   absence: nothing ties the values a frame hands ON to the program's
