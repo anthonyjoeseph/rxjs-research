@@ -11,9 +11,8 @@ open import Data.Bool using (Bool; true; false; _∧_)
 open import Data.Nat using (ℕ; suc; _+_; _*_; _^_; _≤_; z≤n; s≤s; _≤ᵇ_; _<ᵇ_)
 open import Data.Fin using (toℕ)
 open import Data.Nat.Properties using
-  (≤-refl; ≤-trans; ≤-reflexive; ≤ᵇ⇒≤; +-mono-≤; +-monoˡ-≤; +-assoc; *-monoˡ-≤;
-   *-identityˡ; *-distribʳ-+; m≤m+n; m≤n+m; m^n>0; ^-distribˡ-+-*; ^-monoʳ-≤;
-   ^-*-assoc)
+  (≤-refl; ≤-trans; ≤-reflexive; ≤ᵇ⇒≤; ≤⇒≤ᵇ; +-mono-≤; +-monoˡ-≤; +-assoc; *-monoˡ-≤;
+  *-identityˡ; *-distribʳ-+; m≤m+n; m≤n+m; m^n>0; ^-distribˡ-+-*; ^-monoʳ-≤; ^-*-assoc)
 open import Data.Product using (_,_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong)
 
@@ -25,7 +24,7 @@ open import Rx.Evaluator using
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using (frameSz?; pathSz?)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using (pathSz?-len)
 open import Verify-Budget-Sufficient.Measures using (pathLen; ∧-true)
-open import Decide using (T-to; ∧-intro)
+open import Decide using (T-to; T⇒≡true; ∧-intro; ∧-trueˡ; ∧-trueʳ)
 
 -- AND THE WALK NEEDS A LARGER ONE AT EXACTLY TWO FRAMES.  `frameNestF`
 -- prices a frame by the term IT carries, which is right for delivery
@@ -107,12 +106,12 @@ frameΦSz B (thru-outer _ _)   = B
 -- potential rather than at the size predicate.
 pathΦF : ∀ {n} {Γ : Ctx n} {s t} (B : ℕ) → Path Γ s t → ℕ
 pathΦF B root           = 1
-pathΦF B (share-sink _) = 2 ^ (B * (suc B * B))
+pathΦF B (share-sink _) = 2 ^ ((B + B) * (suc B * B))
 pathΦF B (f ↠ p)        = frameΦF B f * pathΦF B p
 
 pathΦSz : ∀ {n} {Γ : Ctx n} {s t} (B : ℕ) → Path Γ s t → ℕ
 pathΦSz B root           = 0
-pathΦSz B (share-sink _) = B * (suc B * B)
+pathΦSz B (share-sink _) = (B + B) * (suc B * B)
 pathΦSz B (f ↠ p)        = frameΦSz B f + pathΦSz B p
 
 -- THE DEPTH HALF, AND IT IS SEPARATE FROM THE STORE FACE'S BECAUSE ONLY
@@ -124,7 +123,7 @@ pathΦSz B (f ↠ p)        = frameΦSz B f + pathΦSz B p
 -- opaque.
 pathΦD : ∀ {n} {Γ : Ctx n} {s t} (B : ℕ) → Path Γ s t → ℕ
 pathΦD B root                    = 0
-pathΦD B (share-sink _)          = B * B
+pathΦD B (share-sink _)          = (B + B) * B
 pathΦD B (map-f f ↠ p)           = nestDᵗ f + pathΦD B p
 pathΦD B (scan-f f _ ↠ p)        = nestDᵗ f + pathΦD B p
 pathΦD B (take-f _ ↠ p)          = pathΦD B p
@@ -190,6 +189,38 @@ pathSz?-frames B (f ↠ p) h
 ... | hf , hr with ∧-true (suc (pathLen p) ≤ᵇ B) (pathSz? B p) hr
 ...   | _ , hp = ∧-intro hf (pathSz?-frames B p hp)
 
+-- THE READING THE Φ FACE TAKES, WHICH IS THE SPLIT ABOVE PACKED BACK
+-- INTO ONE PREDICATE AT A BUDGET THAT IS NOT THE CAP.  Splitting the
+-- size receipt buys the pricing a length it can pay somewhere else;
+-- packing the two back together at a FIXED budget is what keeps that
+-- purchase from costing every statement in the face an extra index.
+-- The budget is twice the cap because that is the length a registered
+-- chain is known to need -- the walked chain plus one frame per
+-- operator of the inner, each half under the cap -- and because the
+-- walk's own charge is proven to afford exactly that.
+--
+-- AND THE WALKED READING IMPLIES IT, so nothing that already holds a
+-- size receipt has to acquire anything: a chain the walk priced is
+-- under the cap once, which is under the cap twice.  That is what
+-- makes this a widening of the premise rather than a new obligation,
+-- and it is why the face may take it without any producer changing.
+pathSzL? : ∀ {n} {Γ : Ctx n} {s t} → ℕ → Path Γ s t → Bool
+pathSzL? B p = pathFrameSz? B p ∧ (pathLen p ≤ᵇ B + B)
+
+pathSzL?-frames : ∀ {n} {Γ : Ctx n} {s t} (B : ℕ) (p : Path Γ s t) →
+  pathSzL? B p ≡ true → pathFrameSz? B p ≡ true
+pathSzL?-frames B p h = ∧-trueˡ h
+
+pathSzL?-len : ∀ {n} {Γ : Ctx n} {s t} (B : ℕ) (p : Path Γ s t) →
+  pathSzL? B p ≡ true → pathLen p ≤ B + B
+pathSzL?-len B p h = ≤ᵇ⇒≤ (pathLen p) (B + B) (T-to (∧-trueʳ {a = pathFrameSz? B p} h))
+
+pathSz?-szL : ∀ {n} {Γ : Ctx n} {s t} (B : ℕ) (p : Path Γ s t) →
+  pathSz? B p ≡ true → pathSzL? B p ≡ true
+pathSz?-szL B p h =
+  ∧-intro (pathSz?-frames B p h)
+          (T⇒≡true _ (≤⇒≤ᵇ (≤-trans (pathSz?-len B p h) (m≤m+n B B))))
+
 -- AND EVERY FRAME'S EXPONENT IS UNDER THE FOLD'S, which is what keeps
 -- the whole path under a single power: the burst factor is the largest
 -- a frame can surrender, so a path of legal length pays at most its
@@ -219,7 +250,7 @@ frameΦSz≤ B (thru-outer _ _)   h = m≤m+n B (B * B)
 -- caps below are where it happens.
 pathΦSz-len : ∀ {n} {Γ : Ctx n} {s t} (B : ℕ) (p : Path Γ s t) →
   pathFrameSz? B p ≡ true →
-  pathΦSz B p ≤ pathLen p * (suc B * B) + B * (suc B * B)
+  pathΦSz B p ≤ pathLen p * (suc B * B) + (B + B) * (suc B * B)
 pathΦSz-len B root           h = z≤n
 pathΦSz-len B (share-sink _) h = ≤-refl
 pathΦSz-len B (f ↠ p) h
@@ -228,7 +259,7 @@ pathΦSz-len B (f ↠ p) h
         ≤-trans (+-mono-≤ (frameΦSz≤ B f hf) (pathΦSz-len B p hp))
                 (≤-reflexive (sym (+-assoc (suc B * B)
                                            (pathLen p * (suc B * B))
-                                           (B * (suc B * B)))))
+                                           ((B + B) * (suc B * B)))))
 
 -- AND THE LENGTH IS A SEPARATE BUDGET FROM THE CAP, which is the only
 -- thing a registered chain can be held to: the frame half is a piece
@@ -250,20 +281,15 @@ pathΦSz-len B (f ↠ p) h
 -- question, and it is a question about a fixed power.
 pathΦF-cap-atLen : ∀ {n} {Γ : Ctx n} {s t} (B L : ℕ) (p : Path Γ s t) →
   pathFrameSz? B p ≡ true → pathLen p ≤ L →
-  pathΦF B p ≤ 2 ^ ((L + B) * (suc B * B))
+  pathΦF B p ≤ 2 ^ ((L + (B + B)) * (suc B * B))
 pathΦF-cap-atLen B L p h hl =
   ≤-trans (≤-reflexive (pathΦF≡ B p))
           (^-monoʳ-≤ 2
             (≤-trans (pathΦSz-len B p h)
-              (≤-trans (+-monoˡ-≤ (B * (suc B * B))
+              (≤-trans (+-monoˡ-≤ ((B + B) * (suc B * B))
                          (*-monoˡ-≤ (suc B * B) hl))
                        (≤-reflexive
-                         (sym (*-distribʳ-+ (suc B * B) L B))))))
-
-pathΦF-cap : ∀ {n} {Γ : Ctx n} {s t} (B : ℕ) (p : Path Γ s t) →
-  pathSz? B p ≡ true → pathΦF B p ≤ 2 ^ ((B + B) * (suc B * B))
-pathΦF-cap B p h =
-  pathΦF-cap-atLen B B p (pathSz?-frames B p h) (pathSz?-len B p h)
+                         (sym (*-distribʳ-+ (suc B * B) L (B + B)))))))
 
 -- THE DEPTH HALF'S OWN CAP, and it is a square rather than a cube: a
 -- frame installs a step function's nesting and a `thru-outer` one unit,
@@ -271,7 +297,7 @@ pathΦF-cap B p h =
 -- that cap -- plus, at a hand-over, the square the chain it hands to is
 -- owed.
 pathΦD-len : ∀ {n} {Γ : Ctx n} {s t} (B : ℕ) (p : Path Γ s t) →
-  1 ≤ B → pathFrameSz? B p ≡ true → pathΦD B p ≤ pathLen p * B + B * B
+  1 ≤ B → pathFrameSz? B p ≡ true → pathΦD B p ≤ pathLen p * B + (B + B) * B
 pathΦD-len B root           _  h = z≤n
 pathΦD-len B (share-sink _) _  h = ≤-refl
 pathΦD-len B (map-f fn ↠ p) 1B h
@@ -279,28 +305,28 @@ pathΦD-len B (map-f fn ↠ p) 1B h
 ... | hf , hp =
         ≤-trans (+-mono-≤ (≤-trans (nestDᵗ≤sizeᵗ fn) (≤ᵇ⇒≤ (sizeᵗ fn) B (T-to hf)))
                           (pathΦD-len B p 1B hp))
-                (≤-reflexive (sym (+-assoc B (pathLen p * B) (B * B))))
+                (≤-reflexive (sym (+-assoc B (pathLen p * B) ((B + B) * B))))
 pathΦD-len B (scan-f fn z ↠ p) 1B h
   with ∧-true (frameSz? B (scan-f fn z)) (pathFrameSz? B p) h
 ... | hf , hp =
         ≤-trans (+-mono-≤ (≤-trans (nestDᵗ≤sizeᵗ fn) (≤ᵇ⇒≤ (sizeᵗ fn) B (T-to hf)))
                           (pathΦD-len B p 1B hp))
-                (≤-reflexive (sym (+-assoc B (pathLen p * B) (B * B))))
+                (≤-reflexive (sym (+-assoc B (pathLen p * B) ((B + B) * B))))
 pathΦD-len B (take-f _ ↠ p) 1B h
   with ∧-true true (pathFrameSz? B p) h
 ... | _ , hp =
       ≤-trans (pathΦD-len B p 1B hp)
-              (+-monoˡ-≤ (B * B) (m≤n+m (pathLen p * B) B))
+              (+-monoˡ-≤ ((B + B) * B) (m≤n+m (pathLen p * B) B))
 pathΦD-len B (from-inner _ _ _ ↠ p) 1B h
   with ∧-true true (pathFrameSz? B p) h
 ... | _ , hp =
       ≤-trans (pathΦD-len B p 1B hp)
-              (+-monoˡ-≤ (B * B) (m≤n+m (pathLen p * B) B))
+              (+-monoˡ-≤ ((B + B) * B) (m≤n+m (pathLen p * B) B))
 pathΦD-len B (thru-outer _ _ ↠ p) 1B h
   with ∧-true true (pathFrameSz? B p) h
 ... | _ , hp =
       ≤-trans (+-mono-≤ 1B (pathΦD-len B p 1B hp))
-              (≤-reflexive (sym (+-assoc B (pathLen p * B) (B * B))))
+              (≤-reflexive (sym (+-assoc B (pathLen p * B) ((B + B) * B))))
 
 -- AND A CHAIN THAT ENDS AT THE ROOT PAYS ONLY THE LENGTH HALF, which is
 -- what lets a hand-over's price cover it.  A path carries exactly one
@@ -352,12 +378,6 @@ pathΦF-cap-root-atLen B L p hr h hl =
           (^-monoʳ-≤ 2 (≤-trans (pathΦSz-root B p hr h)
                                 (*-monoˡ-≤ (suc B * B) hl)))
 
-pathΦF-cap-root : ∀ {n} {Γ : Ctx n} {s t} (B : ℕ) (p : Path Γ s t) →
-  pathRoots p ≡ true → pathSz? B p ≡ true →
-  pathΦF B p ≤ 2 ^ (B * (suc B * B))
-pathΦF-cap-root B p hr h =
-  pathΦF-cap-root-atLen B B p hr (pathSz?-frames B p h) (pathSz?-len B p h)
-
 pathΦD-root : ∀ {n} {Γ : Ctx n} {s t} (B : ℕ) (p : Path Γ s t) →
   1 ≤ B → pathRoots p ≡ true → pathFrameSz? B p ≡ true →
   pathΦD B p ≤ pathLen p * B
@@ -386,8 +406,3 @@ pathΦD-cap-root-atLen : ∀ {n} {Γ : Ctx n} {s t} (B L : ℕ) (p : Path Γ s t
   pathΦD B p ≤ L * B
 pathΦD-cap-root-atLen B L p 1B hr h hl =
   ≤-trans (pathΦD-root B p 1B hr h) (*-monoˡ-≤ B hl)
-
-pathΦD-cap-root : ∀ {n} {Γ : Ctx n} {s t} (B : ℕ) (p : Path Γ s t) →
-  1 ≤ B → pathRoots p ≡ true → pathSz? B p ≡ true → pathΦD B p ≤ B * B
-pathΦD-cap-root B p 1B hr h =
-  pathΦD-cap-root-atLen B B p 1B hr (pathSz?-frames B p h) (pathSz?-len B p h)

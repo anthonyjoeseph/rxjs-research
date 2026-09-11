@@ -606,8 +606,12 @@ roadmap-evidence:
 # be resolved by a machine: `roadmap-check` verifies that a row's NAME exists,
 # and nothing can verify that the plan a leg describes is still the plan.
 # See docs/roadmap-check.md.
+# BASE_REF= measures against another branch, and a STACKED PR needs it: the
+# default baseline is the merge-base with main, which on a stack is where the
+# PARENT left main -- so the parent's own roadmap edits already satisfy the
+# check and the stacked leg passes having said nothing about the plan.
 roadmap-moved:
-	@scripts/check-roadmap-moved.py
+	@scripts/check-roadmap-moved.py $(if $(BASE_REF),--base-ref $(BASE_REF))
 
 # PROVES roadmap-moved IS LOAD-BEARING, in BOTH directions -- and the third
 # fixture is the one that matters: a trailing-whitespace edit is the cheapest

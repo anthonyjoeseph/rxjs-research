@@ -362,7 +362,7 @@ smallRow k = "small layer " ++ show k
 ------------------------------------------------------------------
 -- SERIES — WHERE A SINK HANDS ON TO, AND HOW FAR THAT CAN GO.
 --
--- TARGET: sink-fan-sink @3b3b85
+-- TARGET: sink-fan-sink @b6c341
 --
 -- WHAT IS OWED.  The arm now takes its stratification reading as a
 -- PREMISE -- every registered chain ends strictly above the input it

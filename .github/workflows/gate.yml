@@ -10,10 +10,20 @@ name: Gate
 on:
   push:
     branches: [main]
+  # A `pull_request` filter names the BASE branch, not the head, so a PR
+  # STACKED on another PR's branch matches nothing under a bare [main] and
+  # gets no run at all -- no red, no queue, just a PR with no checks, which
+  # reads exactly like one with nothing left to wait for. The stacking
+  # namespace is named here so a stacked leg is gated like any other
+  # (CLAUDE.md, "A SECOND PR STACKS ON THE FIRST").
   pull_request:
-    branches: [main]
+    branches: [main, 'claude/**']
   workflow_dispatch: {}
 
+# Keyed on the PR, and ONE pending run is held per group: a push to a branch
+# whose gate is already queued DISPLACES the waiter rather than cancelling the
+# runner. That is why a continuously-worked branch never finishes a gate, and
+# why the next leg is stacked into a group of its own instead of queued here.
 concurrency:
   group: gate-${{ github.ref }}
   cancel-in-progress: false

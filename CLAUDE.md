@@ -348,6 +348,39 @@ open a PR and let the `Gate` GitHub Actions workflow run it**, and subscribe to 
 with `subscribe_pr_activity` to learn when the run completes rather than polling. Timings:
 `typecheck-performance-numbers.md`.
 
+**AND THE NEXT LEG STACKS ON THE OPEN PR RATHER THAN QUEUEING BEHIND IT
+(Anthony).** A gate run is over an hour, and the workflow holds ONE pending run
+per PR — so a push to a branch whose gate is already queued DISPLACES the
+waiter, and a branch worked continuously never finishes a gate at all. Measured
+on the branch that set this rule: forty-five runs, not one completed. The repair
+is not to stop pushing, which is the one thing the autonomy grant forbids; it is
+to give the next leg a queue of its own. Branch off the open PR's head, open the
+next PR with **the first PR's branch as its base**, and work there — different
+groups, so neither run can displace the other, and a leg is still one PR.
+
+Three things it costs, each a trap rather than a chore:
+
+- **THE WORKFLOW MUST ACCEPT THE BASE, OR NOTHING RUNS AND NOTHING SAYS SO.** A
+  `pull_request` filter names the BASE branch, so a stacked PR outside it gets no
+  run — no red, no queue, just a PR with no checks, which reads exactly like one
+  with nothing left to wait for. Widen the filter in the commit that first stacks
+  outside it.
+- **`roadmap-moved` GOES VACUOUS ON A STACK UNLESS TOLD.** Its baseline is the
+  merge-base with main, which on a stack is where the PARENT left main — so the
+  parent's roadmap edits satisfy it and the stacked leg passes having said
+  nothing about the plan. Measure against the parent instead; the target takes
+  the base ref for exactly this.
+- **ONE LEVEL AT A TIME.** A stack two deep multiplies the merge whenever
+  anything below it moves, and the parent's gate is the only thing establishing
+  the ground under both.
+
+**AND A RED PARENT IS FIXED ON THE PARENT AND MERGED FORWARD, NEVER ON THE
+CHILD** — fixing it on the child leaves the parent red and the child green over
+a tree nothing ever checked, which is the false green the whole apparatus exists
+to prevent. Merging forward is also what makes the child worth waiting for: its
+gate covers both legs, so a green stacked run subsumes the parent's own.
+→ [docs/gate.md](docs/gate.md)
+
 **AND THE CARVE-OUT IS TERMINATION, NOT ANY NAMEABLE REASON (Anthony).** Forcing
 `make gate-heavy` is for a change that could have broken the TERMINATION CHECK — the one
 property the dev loop cannot see, since it stubs mutual blocks and the real mutual
