@@ -100,7 +100,7 @@ sunkBad = refl
 
 stᵗ : EvalSt e₀
 stᵗ = record (installNode nid before (st-init e₀))
-        { registry = (0 , 0 , (natᵗ , regPath)) ∷ [] }
+        { registry = (0 , 2 , (natᵗ , regPath)) ∷ [] }
 
 parkedBefore : regPark? (EvalSt.registry stᵗ) stᵗ ≡ true
 parkedBefore = refl
@@ -112,9 +112,14 @@ parkedAfter = refl
 
 -- AND THE TWO LEDGERS THAT READ A CHAIN AT ALL ADMIT THIS REGISTRY, so
 -- the repair cannot be recovered from either.  The stratification
--- ledger clears the entry because its source sits at or below the
--- chain's own floor and every frame of it is free; the ordering ledger
+-- ledger clears the entry on its MINTED disjunct -- the source is at
+-- the slot count, which is what the entry a cold slot registers from
+-- inside a share's definition looks like, so the climb is not asked of
+-- it at all and every frame of the chain is free; the ordering ledger
 -- clears it at any counter standing above the cells the chain names.
+-- The source is the only field either ledger reads that the write is
+-- indifferent to, and it is pinned here rather than left at nought so
+-- the witness stands on a registry a run can hold.
 stratOK : regStrat? (EvalSt.registry stᵗ) ≡ true
 stratOK = refl
 

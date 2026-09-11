@@ -3,7 +3,7 @@
 module Verify-Budget-Sufficient.Caps-Face.Part7.Depth-Fit where
 
 open import Data.Bool    using (Bool; true; false; _∧_; _∨_; if_then_else_)
-open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
+open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; _<ᵇ_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (*-assoc; ≤ᵇ⇒≤; ≤⇒≤ᵇ; ^-monoʳ-≤; *-monoˡ-≤; *-cancelˡ-≤; ≤-trans; ≤-refl; ≤-reflexive; m≤m+n;
   m≤n+m; n≤1+n; *-identityʳ; *-mono-≤; *-monoʳ-≤; +-monoʳ-≤; +-monoˡ-≤; ⊔-lub; m≤m⊔n; m≤n⊔m;
   +-mono-≤; +-suc; +-assoc; ≡ᵇ⇒≡; 1+n≰n; *-distribʳ-+)
@@ -77,6 +77,7 @@ open import Verify-Budget-Sufficient.Caps-Depth
 
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (capsAt-round-size; capsOK?; capsOK?-mono; frameSz?; n≤capsAt-size; pathFloor; pathPark?;
+  entStrat?; regStrat?;
   pathStrat?; pathSz?; pathSz?-widen; regsSz?; valCaps?; nestClosOK?ᵛ; parkStrat?; framePark?;
   framePark?-own; regOwn?;
   nestClosOK?ᵛ-widen; pathOrd?; pathOrd?-outer)
@@ -1313,10 +1314,10 @@ sink-fan-root {e = e} sl id i p vals hr hz hΦ =
 -- read out of the REGISTRY -- and the registry is what the walk holds
 -- at an arbitrary state, which is the wall `fan-regsSz` stands at one
 -- statement over.  So the chain arrives here already carrying its
--- reading: `sinkAbove?` is a premise, `walk-share-strat` is the
--- carried conjunct that pays it, and `fan-chain-strat` transports it
--- through admission with the source pinned.  What that leaves open is
--- the MINT, below, and not anything this statement can supply.
+-- reading: `sinkAbove?` is a premise, `entStrat?` is the carried
+-- conjunct of the caps bundle that pays it, and `fan-chain-strat`
+-- transports it through admission with the source pinned.  What that
+-- leaves open is the MINT, and not anything this statement can supply.
 -- AND THE PREMISE IT TAKES IS THE PACKED READING, WHICH COSTS THE
 -- ARM'S KNOWN CROSSING NOTHING.  It asks for less than the walked size
 -- receipt -- a frame syntax and a length under twice the cap, rather
@@ -1501,29 +1502,20 @@ fan-chain-szL {e = e} sl id i st h =
   shareAdmit-chP (λ {u} → pathSzL? {s = u} (Caps.cSize (capsAt e sl id)))
     i (EvalSt.registry st) h
 
--- WHAT THE REGISTRY HOLDS WHEN IT IS READ, IN THE ONE CURRENCY THAT IS
--- NOT A CAP.  A SLOT-SOURCED entry's continuation ends STRICTLY ABOVE
--- the input it was minted subscribing: a shared slot's definition may
--- name only inputs below its own index, so a registration whose path
--- terminates at slot `j`'s sink was minted subscribing something that
--- definition contains, and its source is under `j`.  Read entry by
--- entry off the registry, which is what the selection is filtered from.
---
--- AND THE FLOOR IS A GUARD AND NOT A CONJUNCT, WHICH IS WHAT KEEPS THE
--- READING TRUE.  The unguarded form -- the climb demanded of EVERY
--- entry -- is false at a cold slot subscribed from inside a share's
--- definition: that arm mints a fresh source, `srcFloor?` puts every
--- minted source at or above the slot count, and the continuation it
--- registers ends at the enclosing share's sink, which is below it.  So
--- the climb is asked only of sources the telescope reaches, and a
--- minted one discharges the disjunct instead of the ordering.  That is
--- also why the minted arm costs nothing at the mint: `srcFloor?` is
--- already a carried conjunct of the caps bundle and is exactly this
--- disjunct, so the obligation is spent where it is established.
-regStrat? : ∀ {n} {Γ : Ctx n} {t} → List (RegId × Source × Chain Γ t) → Bool
-regStrat? {n = n} =
-  all (λ en → (n ≤ᵇ proj₁ (proj₂ en))
-            ∨ sinkAbove? (proj₁ (proj₂ en)) (proj₂ (proj₂ (proj₂ en))))
+-- THE ENTRY READING SPENT AS THE FAN'S OWN, and the two are the same
+-- fact read at different granularity.  `entStrat?` bounds the source by
+-- the chain's FLOOR, a number; `sinkAbove?` asks the same ordering of
+-- the terminal it is reached through, a Bool -- and `pathFloor` is
+-- exactly what `sinkAbove?` decides against, so the step is the
+-- recursion both of them already are.  It is stated strictly on both
+-- sides, which is why nothing is owed between them: a frame moves
+-- neither, a root bounds nothing and answers true, and a sink is
+-- the one place either says anything at all.
+entStrat⇒above : ∀ {n} {Γ : Ctx n} {u t} (s : Source) (p : Path Γ u t) →
+  (s <ᵇ pathFloor p) ≡ true → sinkAbove? s p ≡ true
+entStrat⇒above s root           h = refl
+entStrat⇒above s (share-sink j) h = h
+entStrat⇒above s (_ ↠ p)        h = entStrat⇒above s p h
 
 -- A SLOT INDEX IS UNDER THE FLOOR, which is what makes the guard
 -- vanish on everything admission keeps.
@@ -1544,13 +1536,15 @@ fan-chain-strat : ∀ {n} {Γ : Ctx n} {t} (i : Fin n)
 fan-chain-strat i [] h = refl
 fan-chain-strat {n = n} {Γ = Γ} i ((rid , s , (u , p)) ∷ r) h
   with sameSource (toℕ i) s in eqs | u ≟ᵗ lookup Γ i
-     | ∧-true ((n ≤ᵇ s) ∨ sinkAbove? s p) (regStrat? r) h
+     | ∧-true (entStrat? s p) (regStrat? r) h
 ... | false | _        | _  , hr = fan-chain-strat i r hr
 ... | true  | no _     | _  , hr = fan-chain-strat i r hr
 ... | true  | yes refl | hp , hr =
-      ∧-intro (subst (λ b → b ∨ sinkAbove? (toℕ i) p ≡ true) (floorFalse i)
-                     (subst (λ z → (n ≤ᵇ z) ∨ sinkAbove? z p ≡ true)
-                            (sym (≡ᵇ⇒≡ (toℕ i) s (T-to eqs))) hp))
+      ∧-intro (entStrat⇒above (toℕ i) p
+                (subst (λ b → b ∨ (toℕ i <ᵇ pathFloor p) ≡ true) (floorFalse i)
+                       (subst (λ z → (n ≤ᵇ z) ∨ (z <ᵇ pathFloor p) ≡ true)
+                              (sym (≡ᵇ⇒≡ (toℕ i) s (T-to eqs)))
+                              (∧-trueˡ hp))))
               (fan-chain-strat i r hr)
 
 -- ONE CHAIN'S DEPTH OUT OF THE SELECTION'S JOIN.  The cascade-level
@@ -1679,90 +1673,6 @@ postulate
       sf (suc gas) nid now i vals fin sched st →
     Sched.slots sched ≡ sl →
     nestOK? e sl id sched st ≡ true
-
--- THE STRATIFICATION RECEIPT, TAKEN AT THE STATE THE WALK IS STANDING
--- ON.  It says the registry holds no slot-sourced entry whose
--- continuation ends at or below the input it was minted subscribing,
--- which is what bounds the fan-out's escalation by the PROGRAM: a sink
--- hop strictly climbs the slot telescope, so no chain is re-entered
--- through its own sink and the hop count cannot exceed the slot count.
---
--- AND ITS CONCLUSION NAMES NO CAP, WHICH IS THE WHOLE REASON IT IS
--- AVAILABLE WHERE THE FOUR CARRIED PREDICATES ARE NOT.  The
--- elimination that closed those turns on a predicate WEAKENING as its
--- cap grows, so a receipt taken at the entry cap is useless once the
--- descent has stepped.  Source and sink are both fixed when an entry
--- is minted, so nothing here moves with a cap at all and the direction
--- that elimination needs does not exist.
-
--- AND THE ROUTE TO IT IS A DESCENT-CARRIED STRATUM, WHICH PAYS FOUR OF
--- THE MINT'S FIVE REGISTRATION SITES AND CANNOT REACH THE FIFTH.  Read
--- the continuation's terminal as a FLOOR -- the slot index at a sink,
--- the input count at a root, unchanged by a hop -- and the fact the
--- subscribe descent should carry is that the expression being
--- subscribed names only inputs below that floor.  It is preserved at
--- every arm by construction rather than proven: an operator projects it
--- from `inputsBelowᵉ`'s own conjuncts, the share descent takes it from
--- the slot constructor's stratification field, the fixpoint arm from
--- `ib-unfoldμ`, and at an input arm the carried form reduces
--- definitionally to the very guard the registration wants.
-
--- AND THE FIFTH IS AN ARM THE DESCENT DOES NOT REACH, so the floor has
--- to arrive there as a fact about the VALUE, carried on the CHAIN and
--- not on the source.  Reading it at the arrival's own source is the
--- tempting form and it is not preserved: a frame applies its closure to
--- what passes through, and that closure is the syntax of whichever
--- definition PUSHED the frame, which is the chain's sink and not the
--- arrival's slot.  Both readings meet where the walk starts -- the
--- emitting slot's own stratum is under every admitted chain's floor,
--- admission being what the receipt above already delivers -- so the
--- per-chain form is what is preserved and the source form is what
--- establishes it.
---
--- WHICH PUTS THE COST IN THE WALK'S VALUE LEDGER RATHER THAN IN A
--- PREMISE.  That ledger is a boolean over payloads read at a LEVEL and
--- at no path, and it is asserted for the arriving value once, against a
--- LIST of chains, before any of them is selected -- so a per-chain
--- floor indexes it by the chain, which is a restatement of the walk's
--- own vocabulary and not of this face alone.  Every other face reading
--- that ledger ignores the index.
-
--- AND THE ARM IS REACHABLE, WHICH UNTIL NOW WAS AN INFERENCE FROM THE
--- TYPES.  A three-slot program in `Harness.Main` -- a hot, an
--- `obs`-typed share mapping it to an observable that names the hot,
--- and a flatten over that share -- mints an entry whose source is the
--- hot and whose chain ends at the flatten's sink, and the flatten's
--- def names no input but the share.  So the entry cannot have come
--- from the descent, and the site is not merely unreached by the four
--- arms but genuinely populated.  It is populated one DISPATCH after
--- the subscribe frame and never inside it, a hot's emissions being
--- scheduled rather than delivered at connect -- which says the arm
--- lives exactly where this statement is made and not earlier.
---
--- AND THE READING HELD AT EVERY ROW, WHICH BOUNDS WHAT IS LEFT TO
--- FEAR RATHER THAN LOWERING ANYTHING.  Those rows are
--- measured-not-rechecked, so they discharge nothing and move no class;
--- what they buy is a direction.  Nothing in reach produced a registry
--- the reading rejects, so the open question is not whether the arm can
--- mint a violating entry at a point but whether the per-chain floor
--- SURVIVES the arm -- preservation, which no instantiation settles.
---
--- AND IT IS OWED TO THE WALK'S BUNDLE RATHER THAN STATED FREE, because
--- the free form is false: the obligations that would establish it are
--- enumerated at the statement this receipt is spent on, which is where
--- the mint side of the question belongs.
--- REFUTED: `Refuted.Fan-Chain-Registry`, at a single `register` onto
---   the initial state -- a zero source handed a zero sink -- so a
---   reading over an arbitrary state is dead rather than unproven.
-postulate
-  walk-share-strat : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sl : Slots Γ) (id : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
-    (Lv : ℕ) (i : Fin n) (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
-    (sched : Sched Γ) (st : EvalSt e) →
-    dispatchCapsOK (capsAt e sl id) (capsAt e sl (suc id)) sl (capsH e sl id) Lv
-      sf (suc gas) nid now i vals fin sched st →
-    Sched.slots sched ≡ sl →
-    regStrat? (EvalSt.registry st) ≡ true
 
 -- AND THE FAN-OUT HALF IS A PROVEN FOLD RATHER THAN A FILTER LEMMA,
 -- which is the whole of what the store denomination bought.  A
@@ -1964,8 +1874,7 @@ mutual
                 (walk-share-nestOK sl id sf gas nid now Lv i vals false
                    sched st hd hsl)))
           (fan-chain-strat i (EvalSt.registry st)
-             (walk-share-strat sl id sf gas nid now Lv i vals false
-                sched st hd hsl)) hΦ
+             (registry-entStrat (frameStep Lv (capsAt e sl id)) sched st hck)) hΦ
   walk-share-ΦHyp {e = e} sl id sf (suc gas) nid now Lv i vals true sched st
                   hd hck hdd hsl hΦ =
     walk-shareGo-ΦHyp sl id sf gas nid now Lv i vals true
@@ -1979,8 +1888,7 @@ mutual
                 (walk-share-nestOK sl id sf gas nid now Lv i vals true
                    sched st hd hsl)))
           (fan-chain-strat i (EvalSt.registry st)
-             (walk-share-strat sl id sf gas nid now Lv i vals true
-                sched st hd hsl)) hΦ
+             (registry-entStrat (frameStep Lv (capsAt e sl id)) sched st hck)) hΦ
 
   walk-shareGo-ΦHyp sl id sf gas nid now Lv i vals fin [] sched st
                     _ _ _ _ _ _ _ _ = tt
