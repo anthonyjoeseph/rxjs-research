@@ -572,9 +572,16 @@ probed: stripped
 # would assert a coherence that is not there, and would make one fragment's
 # refutation take the other's green down with it.
 #
-# What keeps this tree from parking itself is not a root but the ROADMAP: an
-# EVIDENCE TIER's rows resolve against this tree by name, so a spike deleted
-# without its row fails `make roadmap-check` the same day.
+# AND IT HAS A RETIREMENT CONDITION RATHER THAN A CLAIM ROOT, WHICH IS THE ONE
+# THING A DECIDED EXPERIMENT NEEDS.  The gate typechecks every file here, so the
+# tree cannot rot into not compiling; what it CAN rot into is answering a
+# question nobody is asking any more, and no root would see that.  These
+# fragments decide whether a lexicographic stratification can stand in for the
+# evaluator's gas counter, and they answered yes.  They go — the target with
+# them — in the commit where `agda/src` carries that descent over the real term
+# language, because that commit proves everything they prove and more.  Until
+# then they are the only worked instance of the shape, and deleting them would
+# be deleting the evidence the real proof is being written from.
 spike:
 	@fail=0; n=0; \
 	  for f in agda/spike/Spike/*.agda; do \
@@ -952,27 +959,6 @@ roadmap-selftest:
 	    && { echo "SELFTEST FAIL: a live FALSITY row of the tier was reported stale"; fail=1; }; \
 	  echo "$$cln" | grep -q "OPEN QUESTIONS" \
 	    && { echo "SELFTEST FAIL: a questions check fired on a roadmap carrying NO questions section — the section is mandatory again, and a required question is a filler question"; fail=1; }; \
-	  EV="--ledger scripts/roadmap-selftest/ledger-ev.txt --census scripts/roadmap-selftest/census-ev.txt --src-names scripts/roadmap-selftest/ev-names.txt --ev-names scripts/roadmap-selftest/ev-names.txt"; \
-	  scripts/check-roadmap.py --file scripts/roadmap-selftest/ev-tier.md $$EV > /dev/null 2>&1 \
-	    || { echo "SELFTEST FAIL: an EVIDENCE TIER was rejected — a tier deciding whether a MECHANISM works has no postulates to name, and holding it to that join forces filler postulates"; fail=1; }; \
-	  scripts/check-roadmap.py --file scripts/roadmap-selftest/ev-tier-unmarked.md $$EV > /dev/null 2>&1 \
-	    && { echo "SELFTEST FAIL: the same tier PASSED with the marker taken OUT of its heading — the postulate join is dead everywhere, and the exemption cannot be told apart from that"; fail=1; }; \
-	  evl=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/ev-tier-leak.md $$EV 2>&1); \
-	  if scripts/check-roadmap.py --file scripts/roadmap-selftest/ev-tier-leak.md $$EV > /dev/null 2>&1; then \
-	    echo "SELFTEST FAIL: an ORDINARY tier's unevidenced DIFFICULTY row PASSED beside an evidence tier — the exemption is spreading from the tier that carries the marker to the whole FILE"; fail=1; \
-	  fi; \
-	  echo "$$evl" | grep -q "Tier 1  ev-tier-leak.md" \
-	    || { echo "SELFTEST FAIL: the leak was reported against the wrong tier"; fail=1; }; \
-	  evs=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/ev-tier-stale.md $$EV 2>&1); \
-	  if scripts/check-roadmap.py --file scripts/roadmap-selftest/ev-tier-stale.md $$EV > /dev/null 2>&1; then \
-	    echo "SELFTEST FAIL: an evidence tier naming a module the spike and evidence trees do not declare PASSED — the exemption is a hole rather than a narrower join, which is the one way it can rot silently"; fail=1; \
-	  fi; \
-	  echo "$$evs" | grep -q "EVIDENCE TIER row head(s) naming something the spike and evidence trees do not declare" \
-	    || { echo "SELFTEST FAIL: an exempt row's dead name was reported against agda/src, which is the one tree the row was never supposed to name"; fail=1; }; \
-	  echo "$$evs" | grep -q "ev-beta. — named by no row of tier 0" \
-	    || { echo "SELFTEST FAIL: an exempt tier's question outliving its row was not reported — the questions half of the narrower join is dead"; fail=1; }; \
-	  echo "$$evs" | grep -q "ev-alpha" \
-	    && { echo "SELFTEST FAIL: a row and a question naming a module that still exists were reported stale"; fail=1; }; \
 	  if [ $$fail -eq 0 ]; then echo "roadmap-selftest: OK"; else exit 1; fi
 
 # `imports-check` JOINS THIS LIST IN THE COMMIT THAT MAKES THE TREE PASS IT, and
