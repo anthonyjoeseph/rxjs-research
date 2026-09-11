@@ -332,8 +332,8 @@ pathSz? B (f ↠ p)        = frameSz? B f ∧ ((suc (pathLen p) ≤ᵇ B) ∧ pa
 regsSz? : ∀ {n} {Γ : Ctx n} {t} → ℕ → List (RegId × Source × Chain Γ t) → Bool
 regsSz? B = all (λ en → pathSz? B (proj₂ (proj₂ (proj₂ en))))
 
--- THE CHAIN'S OWN FLOOR, WHICH IS WHAT `sinkAbove?` DECIDES AGAINST
--- AND THE QUANTITY IT NEVER NAMES.  A chain ends either at a share's
+-- THE CHAIN'S OWN FLOOR, WHICH IS WHAT A TERMINAL-ORDERING READING
+-- DECIDES AGAINST AND NEVER NAMES.  A chain ends either at a share's
 -- slot, where the stratification receipt wants every source strictly
 -- under that slot's index, or at the root, where no slot bounds
 -- anything and the telescope's own length is the bound.  A frame does
@@ -341,9 +341,9 @@ regsSz? B = all (λ en → pathSz? B (proj₂ (proj₂ (proj₂ en))))
 -- chain terminates, which is why the reading survives a step with no
 -- transport at all.
 --
--- AND IT IS A NUMBER RATHER THAN THE BOOLEAN BESIDE IT because the
--- consumer is not a comparison this time.  `sinkAbove?` asks whether
--- ONE source clears the terminal; what a delivered observable owes is
+-- AND IT IS A NUMBER RATHER THAN A BOOLEAN because the consumer is
+-- not a comparison this time.  An ordering reading asks whether ONE
+-- source clears the terminal; what a delivered observable owes is
 -- that EVERY input its syntax names does -- a reading on an expression
 -- and not on a source, so it needs the bound itself in hand.
 pathFloor : ∀ {n} {Γ : Ctx n} {s t} → Path Γ s t → ℕ

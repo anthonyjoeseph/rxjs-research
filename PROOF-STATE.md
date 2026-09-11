@@ -238,26 +238,28 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **CARRY THE CHARGE, NOT THE CAP READING.** The two are now measured
-  apart at a state the evaluator reaches: the predicate the face is
-  written in is false at every cap to forty-eight and true at
-  sixty-four, while the charge the hand-over actually spends is true
-  from three. So every refutation on that row busts a cap READING and
-  none of them reaches the charge. What stays open is the producer
-  half — each chain in that registry ends at the root, so the sink
-  leaf's cubic goes uncharged and nothing yet says the charge survives
-  a registration. The commit states the charge premise at the fan and
-  returns the first producer that cannot re-establish it.
+- **THE HEADROOM, WHICH IS ALL THE TERMINAL TURNED OUT TO BE.** The
+  fan's terminal split by what the admitted chain ends at, and the sink
+  arm was refuted because the LEAF was being asked to be the ceiling.
+  The budget is the ceiling; read against it the split collapses, since
+  `pathΦF-cap-atLen` and `pathΦD-len` bound a chain's factor and depth
+  off its packed size legality alone and name no terminal. What is left
+  is one inequality between two arithmetics: a legality ceiling of two
+  to twice the cap times a square of it, against a nest potential
+  carrying a fifth power of it. The commit instantiates both sides at
+  reachable caps and either lands the leaf or returns the cap at which
+  the gap closes.
 
-- **THE SECOND HAND-OVER, NOW THAT THE CLIMB IS STRICT**, which is the
-  one arm of WHAT PRICES A REGISTERED CHAIN the entry ledger did not
-  close. `sink-fan-sink`'s refutation stands at a chain ending at a
-  second sink, and the escalation it builds is bounded only by the slot
-  telescope being genuinely climbed — which the ledger now asserts
-  rather than leaves to a carried premise. The commit spends the strict
-  ordering where that arm is priced: it converts the hop count into a
-  bound the telescope supplies, and either lands the leaf or returns the
-  first shape the strictness does not reach.
+- **THE FRAME ARMS IN THE SAME CURRENCY**, which is the rest of WHAT
+  PRICES A REGISTERED CHAIN once the terminal stops asking for a
+  terminal. The walk's frame clauses still read the cap-denominated
+  legality and forward it to the four `*Φ-fit` heads, so the charge
+  reading is settled at the leaf and re-derived at every frame above
+  it. The commit carries the two ceilings down the walk in place of the
+  cap reading — both potentials only grow when a frame is put in front,
+  so a tail is charged no more than the chain it was taken from — and
+  returns the first head whose own arithmetic is not stated in that
+  currency.
 
 - **THE MINT READING, CARRIED RATHER THAN DERIVED**, which is the half of
   WHICH STORE CELLS DOES A PATH PREDICATE REACH that the walk did not
@@ -293,7 +295,7 @@ does not fit is a finding about the shared statement, not about the head.
   cannot follow a widening because the pricing reads a length under the
   cap its own conclusion names — and under them the SUPPLY, since two
   siblings die free-standing at one `register`.
-  relevant: `fan-regsSzL-mint`, `sink-fan-sink`
+  relevant: `fan-regsSzL-mint`, `sink-fan-headroom`
 
 ### The ledger
 
@@ -337,10 +339,10 @@ does not fit is a finding about the shared statement, not about the head.
   is the telescope summand — `input` charges nought, so no program reading
   reaches it. The summand is owed the connect's TRANSITIVE reach; sum against
   maximum is closed to instantiation.
-- **`sink-fan-sink`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE`: the
-  potential at an admitted chain that ends at a SECOND hand-over. Its
-  escalation is PROGRAM-bounded: hops climb the stratified telescope. It now
-  takes the PACKED size reading, which its own refutation is indifferent to.
+- **`sink-fan-headroom`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the fan's
+  terminal with the terminal gone — the legality ceilings' charge under the
+  instant's nest potential, naming no path and no registry. The leaf
+  comparison its refutation kills is not this, which quantifies no budget.
 - **`fan-regsSzL-mint`** (Part7/Depth-Fit) — FALSITY,
   `REFUTED×4, DEAD ROUTE×7`: the registry read at the ENTRY cap in the PACKED
   form, which only the terminal leaves now ask for. Both conjuncts refuted at

@@ -103,8 +103,9 @@ open import Verify-Budget-Sufficient.Caps-Face.Part7.Walk-Sink using
 -- travel it.  What is missing is the conjunct itself.
 --
 -- AND IT IS THE SAME OBLIGATION THE MINT ALREADY NAMED, which is what
--- makes it one finding rather than two.  `sink-fan-sink`'s dead route
--- enumerates four obligations at a registration and calls its last "a
+-- makes it one finding rather than two.  `registry-entStrat`'s dead
+-- route enumerates four obligations at a registration and calls its
+-- last "a
 -- conjunct on the values in flight, a different invariant from this
 -- one".  This is that invariant, reached from the delivery end.
 --

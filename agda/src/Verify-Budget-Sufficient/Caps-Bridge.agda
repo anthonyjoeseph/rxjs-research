@@ -1167,8 +1167,8 @@ pop-head-clos c sched st eq cOK
 -- registered against it may terminate at any slot below.  So the fact
 -- relates two lists -- the pending values of a source and the floors of
 -- the chains registered against it -- and the register is where it is
--- owed, which is exactly the obligation `sink-fan-sink`'s dead route
--- enumerates last.
+-- owed, which is exactly the obligation `registry-entStrat`'s dead
+-- route enumerates last.
 
 -- AND ONLY THE SINK-FLOORED CHAINS ARE ASKED FOR, the same split the
 -- two admitted-entry readings make and for the same reason: a chain

@@ -868,6 +868,36 @@ capsOK?-regs c sched st h = proj₁ (proj₂ (capsOK?-parts c sched st h))
 -- state the evaluator built from one holding a chain that reads the
 -- very slot its own sink sits at; the repair was at the MINT, and this
 -- is that repair being spent.
+-- DEAD ROUTE: asserting the stratification receipt AT THE READ, as its
+--   own postulate over an arbitrary state, is structurally dead rather
+--   than merely unproven -- `Refuted.Fan-Chain-Registry` kills that
+--   shape at a single `register` onto the initial state, and the
+--   stratification reading falls to the same witness family with a
+--   zero source handed a zero sink.  So the fact is owed at the MINT,
+--   and the mint is FOUR obligations rather than the one the carried
+--   conjunct reads as: a slot-sourced registration wants the telescope
+--   carried down the subscribe descent, since the continuation's
+--   terminal and the expression's inputs meet only at the enclosing
+--   share's own `inputsBelowᵉ` field; a minted-sourced one is FREE,
+--   `srcFloor?` carrying the floor the reading's own guard is stated
+--   as, so that arm is spent rather than owed; and an inner subscribe
+--   of a DELIVERED observable reaches the input arm under syntax the
+--   telescope never saw, so it registers a slot source against a
+--   continuation nothing local relates it to -- a conjunct on the
+--   values in flight, which is a different invariant from this one.
+-- DEAD ROUTE: reading the whole obligation off a RUN, which is how the
+--   stratification was aimed before the fan stopped asking for it.
+--   Measured over two shared slots stacked on a hot source: every
+--   registration carrying a sink terminal had its source strictly
+--   under that sink, none re-entered its own, and the hop depth stood
+--   still while the walking fuel was taken to four times the slot
+--   count.  It cannot be more than an aim, and not because the rows
+--   are measured-not-rechecked: every slot such a program can offer is
+--   hot or shared, so every entry is SLOT-SOURCED, and the arm where a
+--   cold subscribe registers a fresh source under an enclosing share's
+--   sink appears in no row a run can print.  That arm is exactly the
+--   one `srcFloor?` carries, so the boundary is where the measurement
+--   stops rather than a hole in the reading.
 registry-entStrat : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (c : Caps) (sched : Sched Γ) (st : EvalSt e) →
   capsOK? c sched st ≡ true →
