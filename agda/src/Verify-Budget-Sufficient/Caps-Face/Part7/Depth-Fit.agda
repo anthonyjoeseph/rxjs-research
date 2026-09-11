@@ -1453,22 +1453,15 @@ fan-regsSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 fan-regsSz {e = e} sl id Lv sched st cok =
   capsOK?-regs (frameStep Lv (capsAt e sl id)) sched st cok
 
--- THE GRANT IS DENOMINATION-FREE AND THE POTENTIAL IS NOT, WHICH IS
--- WHERE THE RE-DENOMINATION STOPS.  The frame arm's budget is proven
--- of four bare numbers asking of the cap only that it be at least
--- two, and both spenders of the packed reading are cap-generic, so
--- restating this row at the cap the registry receipt is actually held
--- at costs nothing in the grant and nothing at either spender.  What
--- it costs sits one level out.  The walk's share conclusion is indexed
--- by the cap its premise names, so moving the premise moves the
--- conclusion -- and the potential that conclusion is priced against
--- GROWS with the cap, strictly, through an exponent.  The ceiling the
--- whole face is fitted under is stated at the instant's entry cap, so
--- a stepped-cap reading does not re-letter the face: it asks that
--- ceiling to absorb a potential taken at the NEXT instant's entry cap.
--- That is the same quantity the enlargement route recorded for this
--- statement already dies on, reached from the pricing side rather than
--- from the receipt.  The cap is free to climb; the potential is not.
+-- THE READING IS FREE OF THE INSTANT'S CAPS EVERYWHERE IT IS SPENT,
+-- AND THE ROW IS STILL OPEN.  The frame arm's budget is proven of four
+-- bare numbers asking of the cap only that it be at least two, and
+-- both spenders of the packed reading are proven cap-generic, so the
+-- cap this row names is now a free choice at every site that READS it.
+-- That is worth knowing because it settles which end the obstacle sits
+-- at: nothing about the supply, the spenders or the grant's arithmetic
+-- holds the reading at entry, so a repair does not have to buy any of
+-- them, and what remains is the ceiling the chosen cap is priced under.
 --
 -- THE LEAVES' HALF OF THE SAME READING, AND THE DOUBLING DOES NOT SAVE
 -- IT.  The packed form was adopted because the witness that kills the
@@ -1609,6 +1602,23 @@ fan-regsSz {e = e} sl id Lv sched st cok =
 --   each frame it passes.  They are not two readings of one climb --
 --   one counts HOPS and the other counts FRAMES, and no bound on
 --   either is a bound on the other.
+-- DEAD ROUTE: stating the whole face at the CLIMBED cap -- the one the
+--   registry receipt is free at -- now that the grant is denomination-
+--   free and neither spender reads the instant.  This is the shape the
+--   first two dead routes each left open at one end, and the generic
+--   grant closes it rather than opening it.  A pricing exponent is
+--   polynomial in the cap it names, and the ceiling the face is fitted
+--   under affords an exponent of two to the entry cap; so the climbed
+--   cap may exceed the entry one by a power and no more.  It exceeds it
+--   by an exponential instead: the walk's level runs to the instant's
+--   whole fold count, the cap stepped that far is what the exit door
+--   already fits under the NEXT instant's entry cap, and that cap is a
+--   blowup of this instant's HEIGHT -- the same height whose logarithm
+--   is the entire exponent budget.  So the gap is not a factor at any
+--   level and the choice of cap is not where the repair is.  Read off
+--   the pricing and the step function rather than instantiated: the
+--   fold count is sealed for cost, and what is checkable here is that
+--   one endpoint bounds the other.
 postulate
   fan-regsSzL-mint : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (Lv : ℕ) (sched : Sched Γ) (st : EvalSt e) →

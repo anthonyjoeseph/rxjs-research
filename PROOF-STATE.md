@@ -238,16 +238,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **SPEND THE DENOMINATION-FREE GRANT: STATE THE FACE AT THE CLIMBED
-  CAP.** No SPENDER is tied to the instant's caps any more: both are
-  cap-generic and `nestΦ-frame-charge-ℕ` proves the grant of bare
-  numbers. The POTENTIAL still is, and that is the leg's question —
-  the climb is free at the cap and priced at the ceiling. Restate the
-  walk's premise at `frameStep Lv`, where `capsOK?-regs` already
-  issues a receipt, thread it to the two spenders, and carry the
-  conclusion's cap with it. The commit either closes
-  `fan-regsSzL-mint` that way or returns the first site the climbed
-  potential outruns.
+- **INDEX THE PRICING BY THE CLIMB, NOT BY EITHER CAP.** The stepped
+  reading is dead the way the entry one is, and the grant going
+  denomination-free is what settled it: the pricing exponent stays
+  polynomial in whatever cap it names, and a cap
+  stepped to where a receipt exists reaches the NEXT instant's entry
+  cap — a blowup of the very ceiling that exponent is fitted under. So
+  neither endpoint carries the reading and what is left is the LEVEL.
+  The commit states the registry reading per level, with the cap it
+  names and the budget it spends both moving with the climb, and either
+  telescopes the descent against the entry budget or returns the level
+  at which the accumulated charge outruns it.
 
 - **THE SECOND HAND-OVER, NOW THAT THE CLIMB IS STRICT**, which is the
   one arm of WHAT PRICES A REGISTERED CHAIN the entry ledger did not
