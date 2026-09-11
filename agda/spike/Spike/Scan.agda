@@ -40,25 +40,36 @@
 --
 -- WHAT THE TEMPLATE LAWS REACH, since a fragment's silence is what let
 -- the last claim through.  Both laws are AFFINE in the plugged value,
--- and the fragment exercises the two positions a plug can land in:
+-- and the fragment exercises the three positions a plug can land in.
 -- `dupᵗ` puts it in two ADDED positions (slope 2, so the multiplier is
--- not vacuous), and `nestᵗ` puts it under an `allᵉ` that SUBSCRIBES to
+-- not vacuous).  `nestᵗ` puts it under an `allᵉ` that SUBSCRIBES to
 -- it, which is the position where the image's own burst length depends
 -- on the plugged value — the case `Hv` exists to carry, since
 -- `Hv (obsᵛ o)` is the larger of `o`'s two widths and one affine law
 -- therefore covers both.
 --
--- WHAT THEY DO NOT REACH is a template that plugs into a `scanᵉ`, which
--- the real language's `strmᵗ` permits and no `Tm` here can express.
--- Reading the clause off the measures: a plug landing in such a seed or
--- source is transported by `iter c p k`, which is affine with slope
--- `p ^ k` — so the LAW survives, and what has to change is `ph`, which
--- gains a clause exponential in the TEMPLATE's own text.  That is
--- finite and syntactic, because the inner scan's source belongs to the
--- template rather than to the program it is applied to; it is not a
--- second tower, and it is not `V`.  ANALYSIS ONLY — no row here
--- instantiates it, and the reading above is what the clause says, not
--- what a witness showed.
+-- AND `scnᵗ` PUTS IT INSIDE A `scanᵉ`, which this header once recorded
+-- as analysis with nothing instantiating it.  It plugs its argument
+-- into the SOURCE of an inner scan whose LENGTH the template's own
+-- text writes down, so the plug is transported by that many steps of
+-- the recurrence and the slope is the inner step's squared, times the
+-- plug's.  The law survives AFFINE, and the exponent is exponential in
+-- the TEMPLATE's text rather than in anything a run produces — the
+-- inner source belongs to the template and not to the program it is
+-- applied to, so it is finite, syntactic, and not a second tower.
+-- `scn-slope` and `scn-image` pin it at a program where composing the
+-- slopes once would report 2 against an image of 4.
+--
+-- IT IS ALSO WHERE THE RECURRENCE'S TWO DIRECTIONS COME APART.  A plug
+-- into a scan moves the recurrence's BASE, which the fold's own
+-- induction never does, so `iter-mono-x` is needed for this case and
+-- for no other.
+--
+-- WHAT IS STILL NOT REACHED: a plug into the inner scan's SEED, which
+-- lands in the same base position through the `⊔` and so takes the
+-- same transport, but which no row here instantiates; and a template
+-- body of arbitrary shape, which the real `strmᵗ` permits and this
+-- `Tm` does not.
 ------------------------------------------------------------------
 module Spike.Scan where
 
@@ -67,7 +78,7 @@ open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _⊔_; _≤_; _<_; _<?_; 
 open import Data.Nat.Properties using
   ( ≤-refl; ≤-trans; ≤-reflexive; n≤1+n; +-suc
   ; m≤m+n; m≤n+m; m≤m⊔n; m≤n⊔m; ⊔-lub
-  ; +-monoʳ-≤; +-mono-≤; *-monoʳ-≤; *-monoˡ-≤; *-identityˡ
+  ; +-monoʳ-≤; +-monoˡ-≤; +-mono-≤; *-monoʳ-≤; *-monoˡ-≤; *-mono-≤; *-identityˡ
   ; m≤n⇒m<n∨m≡n; m<1+n⇒m<n∨m≡n; ≮⇒≥ )
 open import Data.Nat.Induction using (<-wellFounded)
 open import Data.Nat.Solver using (module +-*-Solver)
@@ -88,7 +99,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong;
 open +-*-Solver using (solve; _:=_; _:+_; _:*_)
 
 ------------------------------------------------------------------
--- THE LANGUAGE — `Spike.Total` plus `scanᵉ`, `accᵗ` and `dupᵗ`.
+-- THE LANGUAGE — `Spike.Total` plus `scanᵉ`, `accᵗ`, `dupᵗ` and `scnᵗ`.
 ------------------------------------------------------------------
 
 data Val : Set
@@ -105,6 +116,7 @@ data Tm where
   konstᵗ : Val → Tm
   nestᵗ  : Tm → Tm
   dupᵗ   : Tm → Tm
+  scnᵗ   : Tm → Tm → Tm
 
 data Exp where
   ofᵉ    : List Val → Exp
@@ -124,6 +136,8 @@ evalTm (konstᵗ k) a v = k
 evalTm (nestᵗ t)  a v = obsᵛ (allᵉ (ofᵉ (evalTm t a v ∷ [])))
 evalTm (dupᵗ t)   a v =
   obsᵛ (mapᵉ (konstᵗ (evalTm t a v)) (ofᵉ (evalTm t a v ∷ [])))
+evalTm (scnᵗ g t) a v =
+  obsᵛ (scanᵉ g (natᵛ 0) (ofᵉ (evalTm t a v ∷ evalTm t a v ∷ [])))
 
 mapB : Tm → List Val → List Val
 mapB f []       = []
@@ -153,6 +167,7 @@ pm accᵗ       = 1
 pm (konstᵗ k) = 1
 pm (nestᵗ t)  = pm t
 pm (dupᵗ t)   = pm t + pm t
+pm (scnᵗ g t) = pm g * (pm g * pm t)
 
 ph : Tm → ℕ
 ph inᵗ        = 1
@@ -160,6 +175,10 @@ ph accᵗ       = 1
 ph (konstᵗ k) = 1
 ph (nestᵗ t)  = ph t
 ph (dupᵗ t)   = ph t + ph t
+ph (scnᵗ g t) = ph g * (ph g * ph t)
+
+one≤* : ∀ {x y} → 1 ≤ x → 1 ≤ y → 1 ≤ x * y
+one≤* hx hy = *-mono-≤ hx hy
 
 pm-pos : ∀ f → 1 ≤ pm f
 pm-pos inᵗ        = ≤-refl
@@ -167,6 +186,7 @@ pm-pos accᵗ       = ≤-refl
 pm-pos (konstᵗ k) = ≤-refl
 pm-pos (nestᵗ t)  = pm-pos t
 pm-pos (dupᵗ t)   = ≤-trans (pm-pos t) (m≤m+n _ _)
+pm-pos (scnᵗ g t) = one≤* (pm-pos g) (one≤* (pm-pos g) (pm-pos t))
 
 ph-pos : ∀ f → 1 ≤ ph f
 ph-pos inᵗ        = ≤-refl
@@ -174,14 +194,22 @@ ph-pos accᵗ       = ≤-refl
 ph-pos (konstᵗ k) = ≤-refl
 ph-pos (nestᵗ t)  = ph-pos t
 ph-pos (dupᵗ t)   = ≤-trans (ph-pos t) (m≤m+n _ _)
+ph-pos (scnᵗ g t) = one≤* (ph-pos g) (one≤* (ph-pos g) (ph-pos t))
 
 ------------------------------------------------------------------
 -- THE REFOLD RECURRENCE, UNSOLVED.  `iter c p k` is the k-fold affine
--- map; every fact the scan clause needs is one of these three, and
--- none of them is a closed form.  Monotonicity in the BASE is not
--- among them: the fold's induction lands on a base that is already
--- one step of the recurrence, so `iter-shift` absorbs it exactly and
--- nothing ever has to widen the starting point.
+-- map; every fact below is one of four, and none of them is a closed
+-- form.
+--
+-- THE FOLD ITSELF NEEDS ONLY THREE, AND `iter-mono-x` IS NOT ONE OF
+-- THEM: the fold's induction lands on a base that is already one step
+-- of the recurrence, so `iter-shift` absorbs it exactly and nothing
+-- ever has to widen the starting point.  What needs base monotonicity
+-- is a TEMPLATE plugging into a `scanᵉ` (`scnᵗ`), where the plugged
+-- value lands in the inner scan's SOURCE and so moves the base rather
+-- than the count.  That is the one place the two directions of the
+-- recurrence come apart, and it is why the lemma is here and not in
+-- `Spike.Total`.
 ------------------------------------------------------------------
 
 iter : ℕ → ℕ → ℕ → ℕ → ℕ
@@ -203,6 +231,11 @@ iter-mono-k c     x {k = k} hp z≤n       = iter-base c k x hp
 iter-mono-k c {p} x         hp (s≤s j≤k) =
   +-monoʳ-≤ c (*-monoʳ-≤ p (iter-mono-k c x hp j≤k))
 
+-- the base direction, which only a plug into a `scanᵉ` asks for
+iter-mono-x : ∀ c p k {x y} → x ≤ y → iter c p k x ≤ iter c p k y
+iter-mono-x c p zero    h = h
+iter-mono-x c p (suc k) h = +-monoʳ-≤ c (*-monoʳ-≤ p (iter-mono-x c p k h))
+
 -- one fold step absorbed into the count: this is what turns the
 -- fold's induction into an `iter` bound without ever solving it
 iter-shift : ∀ c p k x → iter c p k (c + p * x) ≡ iter c p (suc k) x
@@ -213,6 +246,19 @@ dup-arith : ∀ c p m → (c + p * m) + (c + p * m) ≡ (c + c) + (p + p) * m
 dup-arith =
   solve 3 (λ c p m → (c :+ p :* m) :+ (c :+ p :* m)
                   := (c :+ c) :+ (p :+ p) :* m) refl
+
+-- TWO steps of the recurrence applied to an affine base, re-bracketed
+-- as one affine map.  The slope it lands is `p * (p * p₁)` — the plug's
+-- own slope times the inner step's, raised to the SOURCE LENGTH the
+-- template wrote down.  That is where an exponent in the template's
+-- text enters, and it is the whole content of the `scnᵗ` case.
+scn-arith : ∀ c p c₁ p₁ m →
+            c + p * (c + p * (c₁ + p₁ * m))
+            ≡ ((c + p * c) + p * (p * c₁)) + (p * (p * p₁)) * m
+scn-arith =
+  solve 5 (λ c p c₁ p₁ m →
+             c :+ p :* (c :+ p :* (c₁ :+ p₁ :* m))
+          := ((c :+ p :* c) :+ p :* (p :* c₁)) :+ (p :* (p :* p₁)) :* m) refl
 
 ------------------------------------------------------------------
 -- THE UNFOLD.  `recᵉ` becomes a GATED copy, so every measure reads it
@@ -244,6 +290,7 @@ substT accᵗ       m = accᵗ
 substT (konstᵗ k) m = konstᵗ (substV k m)
 substT (nestᵗ t)  m = nestᵗ (substT t m)
 substT (dupᵗ t)   m = dupᵗ (substT t m)
+substT (scnᵗ g t) m = scnᵗ (substT g m) (substT t m)
 
 unfoldμ : Exp → Exp
 unfoldμ b = substE b (μᵉ b)
@@ -258,6 +305,8 @@ pm-subst accᵗ       m = refl
 pm-subst (konstᵗ k) m = refl
 pm-subst (nestᵗ t)  m = pm-subst t m
 pm-subst (dupᵗ t)   m = cong₂ _+_ (pm-subst t m) (pm-subst t m)
+pm-subst (scnᵗ g t) m =
+  cong₂ _*_ (pm-subst g m) (cong₂ _*_ (pm-subst g m) (pm-subst t m))
 
 ph-subst : ∀ f m → ph (substT f m) ≡ ph f
 ph-subst inᵗ        m = refl
@@ -265,6 +314,8 @@ ph-subst accᵗ       m = refl
 ph-subst (konstᵗ k) m = refl
 ph-subst (nestᵗ t)  m = ph-subst t m
 ph-subst (dupᵗ t)   m = cong₂ _+_ (ph-subst t m) (ph-subst t m)
+ph-subst (scnᵗ g t) m =
+  cong₂ _*_ (ph-subst g m) (cong₂ _*_ (ph-subst g m) (ph-subst t m))
 
 syncSize : Exp → ℕ
 syncSize (ofᵉ vs)      = 1
@@ -336,6 +387,7 @@ module M (η ν : ℕ → ℕ) where
   Ht (konstᵗ k) = Hv k
   Ht (nestᵗ t)  = Ht t
   Ht (dupᵗ t)   = suc (Ht t + Ht t)
+  Ht (scnᵗ g t) = 2 + (((Ht g + ph g * Ht g) + ph g * (ph g * Ht t)))
 
   ----------------------------------------------------------------
   -- DEPTH.  The `mapᵉ` clause multiplies, and `dupᵗ` is what makes
@@ -368,6 +420,7 @@ module M (η ν : ℕ → ℕ) where
   hopDt (konstᵗ k) = hopDv k
   hopDt (nestᵗ t)  = suc (hopDt t)
   hopDt (dupᵗ t)   = hopDt t + hopDt t
+  hopDt (scnᵗ g t) = (hopDt g + pm g * hopDt g) + pm g * (pm g * hopDt t)
 
   ----------------------------------------------------------------
   -- THE UNFOLD IS NEUTRAL FOR EVERY MEASURE.
@@ -411,6 +464,10 @@ module M (η ν : ℕ → ℕ) where
   Ht-subst (konstᵗ k) m = Hv-subst k m
   Ht-subst (nestᵗ t)  m = Ht-subst t m
   Ht-subst (dupᵗ t)   m = cong suc (cong₂ _+_ (Ht-subst t m) (Ht-subst t m))
+  Ht-subst (scnᵗ g t) m =
+    cong (2 +_)
+      (cong₂ _+_ (cong₂ _+_ (Ht-subst g m) (cong₂ _*_ (ph-subst g m) (Ht-subst g m)))
+                (cong₂ _*_ (ph-subst g m) (cong₂ _*_ (ph-subst g m) (Ht-subst t m))))
 
   hopD-subst  : ∀ e m → hopD (substE e m) ≡ hopD e
   hopDv-subst : ∀ v m → hopDv (substV v m) ≡ hopDv v
@@ -440,6 +497,9 @@ module M (η ν : ℕ → ℕ) where
   hopDt-subst (konstᵗ k) m = hopDv-subst k m
   hopDt-subst (nestᵗ t)  m = cong suc (hopDt-subst t m)
   hopDt-subst (dupᵗ t)   m = cong₂ _+_ (hopDt-subst t m) (hopDt-subst t m)
+  hopDt-subst (scnᵗ g t) m =
+    cong₂ _+_ (cong₂ _+_ (hopDt-subst g m) (cong₂ _*_ (pm-subst g m) (hopDt-subst g m)))
+              (cong₂ _*_ (pm-subst g m) (cong₂ _*_ (pm-subst g m) (hopDt-subst t m)))
 
   ----------------------------------------------------------------
   -- THE TEMPLATE LAWS — both AFFINE, with the slope the template's
@@ -458,6 +518,11 @@ module M (η ν : ℕ → ℕ) where
                                   (≤-trans (⊔-lub ≤-refl z≤n) ih)))
             (≤-reflexive (dup-arith (hopDt t) (pm t) (hopDv a ⊔ hopDv v)))
     where ih = evalTm-hop t a v
+  evalTm-hop (scnᵗ g t) a v =
+    ≤-trans (iter-mono-x (hopDt g) (pm g) 2
+              (≤-trans (⊔-lub ≤-refl (⊔-lub ≤-refl z≤n)) (evalTm-hop t a v)))
+            (≤-reflexive
+              (scn-arith (hopDt g) (pm g) (hopDt t) (pm t) (hopDv a ⊔ hopDv v)))
 
   evalTm-wid : ∀ f a v → Hv (evalTm f a v) ≤ Ht f + ph f * (Hv a ⊔ Hv v)
   evalTm-wid inᵗ a v =
@@ -478,6 +543,15 @@ module M (η ν : ℕ → ℕ) where
                                      (≤-trans (⊔-lub ≤-refl z≤n) ih)))
                           (≤-reflexive (dup-arith (Ht t) (ph t) (Hv a ⊔ Hv v))))))
     where ih = evalTm-wid t a v
+  evalTm-wid (scnᵗ g t) a v =
+    ⊔-lub (≤-trans (m≤m+n 2 _) (m≤m+n _ _))
+          (≤-trans (≤-trans (iter-mono-x (Ht g) (ph g) 2
+                              (≤-trans (⊔-lub ≤-refl (⊔-lub ≤-refl z≤n))
+                                       (evalTm-wid t a v)))
+                            (≤-reflexive
+                              (scn-arith (Ht g) (ph g) (Ht t) (ph t)
+                                         (Hv a ⊔ Hv v))))
+                   (+-monoˡ-≤ _ (m≤n+m _ 2)))
 
   ----------------------------------------------------------------
   -- MEMBERSHIP BOUNDS for the two burst constructions.
@@ -989,3 +1063,29 @@ module Demo where
 
   dup-slope : hopD dupProg ≡ 2
   dup-slope = refl
+
+  -- LOAD-BEARING, and it is the one row that separates a slope
+  -- EXPONENTIAL in the template's text from a merely multiplicative
+  -- one.  `scnᵗ g t` plugs its argument into the SOURCE of an inner
+  -- scan whose length the template itself writes down — two here — so
+  -- the plug is transported by two steps of the recurrence and the
+  -- slope is `pm g` SQUARED times `pm t`.  With `pm (dupᵗ inᵗ) = 2` and
+  -- `pm inᵗ = 1` that reads 4, against the 2 a single step would give;
+  -- a clause that composed the slopes ONCE would report 2 and be false
+  -- at the image below.  The exponent is the source length, which is
+  -- syntax and not a budget — no `V` reaches it.
+  scnTm : Tm
+  scnTm = scnᵗ (dupᵗ inᵗ) inᵗ
+
+  scn-slope : pm scnTm ≡ 4
+  scn-slope = refl
+
+  scn-one-step : pm (dupᵗ inᵗ) * pm inᵗ ≡ 2
+  scn-one-step = refl
+
+  -- the image attains it: a plug of hop depth 1 lands at depth 4
+  scnCarrier : Val
+  scnCarrier = obsᵛ (allᵉ (ofᵉ (natᵛ 3 ∷ [])))
+
+  scn-image : hopDv (evalTm scnTm scnCarrier scnCarrier) ≡ 4
+  scn-image = refl
