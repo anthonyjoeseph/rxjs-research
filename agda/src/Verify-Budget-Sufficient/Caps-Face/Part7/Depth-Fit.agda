@@ -83,6 +83,8 @@ open import Verify-Budget-Sufficient.Caps-Face.Part4 using
   (capsOK?-count; capsOK?-regs; chainsStrat?-one; pathPark-delivered; pathsPark-delivered; pathSz?-len;
   registry-entStrat; slotsCaps?-capsAt; valsCaps?; valsCaps?-lvl; foldPath-slots;
   shareAdmit-caps; capsOK?-delivered; capsOK?-regOrd; capsOK?-regPark)
+open import Verify-Budget-Sufficient.Delivery-Walk using
+  (shareAdmit-chP)
 open import Verify-Budget-Sufficient.Psi-Split using
   (chP?-∧)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves using
@@ -1216,7 +1218,7 @@ sink-fan-root : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (i : Fin n) (p : Path Γ (lookup Γ i) t)
   (vals : List (Val Γ (lookup Γ i))) →
   pathRoots p ≡ true →
-  pathSz? (Caps.cSize (capsAt e sl id)) p ≡ true →
+  pathSzL? (Caps.cSize (capsAt e sl id)) p ≡ true →
   valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
     (share-sink {t = t} i) vals ≡ true →
   valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id) p vals ≡ true
@@ -1230,9 +1232,9 @@ sink-fan-root {e = e} sl id i p vals hr hz hΦ =
   1≤B : 1 ≤ B
   1≤B = ≤-trans (s≤s z≤n) (8≤capsAt-size e sl id)
   hf : pathFrameSz? B p ≡ true
-  hf = pathSz?-frames B p hz
+  hf = pathSzL?-frames B p hz
   hl : pathLen p ≤ B + B
-  hl = pathSzL?-len B p (pathSz?-szL B p hz)
+  hl = pathSzL?-len B p hz
 
 -- WHAT IS LEFT IS THE CHAIN THAT ENDS AT A SECOND HAND-OVER.  Its
 -- factor is the leaf's own multiplied by its frames', so the leaf
@@ -1294,12 +1296,21 @@ sink-fan-root {e = e} sl id i p vals hr hz hΦ =
 --   saw, so it registers a slot source against a continuation nothing
 --   local relates it to -- a conjunct on the values in flight, which
 --   is a different invariant from this one.
+-- AND THE PREMISE IT TAKES IS THE PACKED READING, WHICH COSTS ITS
+-- KNOWN REFUTATION NOTHING.  The arm asks for less than the walked
+-- size receipt -- a frame syntax and a length under twice the cap,
+-- rather than the strict per-frame ledger -- because that is the
+-- reading the fan can supply without a refuted mint.  It does not move
+-- the arm toward `Refuted.Sink-Phi-Leaf`: that witness is legal at the
+-- cap under BOTH readings, so the escalation it builds was never
+-- excluded by the strength of the size premise, and what rules it out
+-- here is the stratification conjunct in either form.
 postulate
   sink-fan-sink : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (i : Fin n) (p : Path Γ (lookup Γ i) t)
     (vals : List (Val Γ (lookup Γ i))) →
     pathRoots p ≡ false →
-    pathSz? (Caps.cSize (capsAt e sl id)) p ≡ true →
+    pathSzL? (Caps.cSize (capsAt e sl id)) p ≡ true →
     sinkAbove? (toℕ i) p ≡ true →
     valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
       (share-sink {t = t} i) vals ≡ true →
@@ -1557,6 +1568,59 @@ fan-chain-sz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
       (shareAdmit {t = t} i (EvalSt.registry st)) ≡ true
 fan-chain-sz {e = e} sl id i st h =
   shareAdmit-caps (Caps.cSize (capsAt e sl id)) i (EvalSt.registry st) h
+
+-- THE LEAVES' HALF OF THE SAME READING, AND IT IS THE HALF THE FLAT
+-- ONE'S REFUTATION LEAVES STANDING.  What killed the entry-cap reading
+-- of the registry was the LENGTH ledger and not the frame syntax:
+-- `Refuted.Fan-Regs-Entry-Cap`'s witness is a minted chain of eight
+-- frames against an entry size of six, so it fails the STRICT
+-- per-frame conjunct `pathSz?` carries and satisfies both halves of
+-- the packed reading, whose length side asks only for twice the cap.
+-- So the split predicate is unrefuted exactly where the flat one is
+-- not, and the risky region shrinks from the registry's per-frame
+-- ledger to a frame syntax and a doubled length.
+--
+-- AND THE TOP OF THE INSTANT PAYS FOR ITSELF, which is what makes this
+-- a body over one leaf rather than a second monolith.  At level zero
+-- the step is the identity, the flat receipt is free from
+-- `capsOK?-regs`, and the packed reading is the flat one pointwise --
+-- so the mint below carries only the levels above the top, which is
+-- where a registration minted since entry can sit.
+postulate
+  fan-regsSzL-mint : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sl : Slots Γ) (id : ℕ) (Lv : ℕ) (sched : Sched Γ) (st : EvalSt e) →
+    capsOK? (frameStep (suc Lv) (capsAt e sl id)) sched st ≡ true →
+    all (λ en → pathSzL? (Caps.cSize (capsAt e sl id))
+                  (proj₂ (proj₂ (proj₂ en))))
+        (EvalSt.registry st) ≡ true
+
+fan-regsSzL : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (id : ℕ) (Lv : ℕ) (sched : Sched Γ) (st : EvalSt e) →
+  capsOK? (frameStep Lv (capsAt e sl id)) sched st ≡ true →
+  all (λ en → pathSzL? (Caps.cSize (capsAt e sl id))
+                (proj₂ (proj₂ (proj₂ en))))
+      (EvalSt.registry st) ≡ true
+fan-regsSzL {e = e} sl id zero sched st cok =
+  all-impl _ _
+    (λ en h → pathSz?-szL (Caps.cSize (capsAt e sl id))
+                (proj₂ (proj₂ (proj₂ en))) h)
+    (EvalSt.registry st)
+    (capsOK?-regs (capsAt e sl id) sched st
+      (subst (λ c → capsOK? c sched st ≡ true) (frameStep-0 (capsAt e sl id)) cok))
+fan-regsSzL sl id (suc Lv) sched st cok = fan-regsSzL-mint sl id Lv sched st cok
+
+-- the admitted sublist inherits it, by the generic filter rather than
+-- a second copy of the size-shaped one beside it
+fan-chain-szL : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (id : ℕ) (i : Fin n) (st : EvalSt e) →
+  all (λ en → pathSzL? (Caps.cSize (capsAt e sl id))
+                (proj₂ (proj₂ (proj₂ en))))
+      (EvalSt.registry st) ≡ true →
+  all (λ rp → pathSzL? (Caps.cSize (capsAt e sl id)) (proj₂ rp))
+      (shareAdmit {t = t} i (EvalSt.registry st)) ≡ true
+fan-chain-szL {e = e} sl id i st h =
+  shareAdmit-chP (λ {u} → pathSzL? {s = u} (Caps.cSize (capsAt e sl id)))
+    i (EvalSt.registry st) h
 
 -- WHAT THE REGISTRY HOLDS WHEN IT IS READ, IN THE ONE CURRENCY THAT IS
 -- NOT A CAP.  A SLOT-SOURCED entry's continuation ends STRICTLY ABOVE
@@ -1997,6 +2061,7 @@ mutual
     depthShareGo sf gas nid now i vals fin ps sched st ≤ capsH e sl id →
     Sched.slots sched ≡ sl →
     all (λ rp → pathSz? (Caps.cSize (capsAt e sl id)) (proj₂ rp)) ps ≡ true →
+    all (λ rp → pathSzL? (Caps.cSize (capsAt e sl id)) (proj₂ rp)) ps ≡ true →
     all (λ rp → pathNestD (proj₂ rp) ≤ᵇ nestCapAt e sl id) ps ≡ true →
     all (λ rp → sinkAbove? (toℕ i) (proj₂ rp)) ps ≡ true →
     valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
@@ -2011,6 +2076,7 @@ mutual
       (shareAdmit i (EvalSt.registry st)) sched st
       (proj₂ (proj₂ hd)) hdd
       hsl (fan-chain-sz sl id i st (fan-regsSz sl id Lv sched st hck))
+          (fan-chain-szL sl id i st (fan-regsSzL sl id Lv sched st hck))
           (fan-chain-nestD (nestCapAt e sl id) i st
              (fan-regsNest sl id sched st
                 (walk-share-nestOK sl id sf gas nid now Lv i vals false
@@ -2024,6 +2090,7 @@ mutual
       (shareAdmit i (EvalSt.registry st)) sched (shareLatch i true st)
       (proj₂ (proj₂ hd)) hdd
       hsl (fan-chain-sz sl id i st (fan-regsSz sl id Lv sched st hck))
+          (fan-chain-szL sl id i st (fan-regsSzL sl id Lv sched st hck))
           (fan-chain-nestD (nestCapAt e sl id) i st
              (fan-regsNest sl id sched st
                 (walk-share-nestOK sl id sf gas nid now Lv i vals true
@@ -2033,13 +2100,13 @@ mutual
                 sched st hd hsl)) hΦ
 
   walk-shareGo-ΦHyp sl id sf gas nid now Lv i vals fin [] sched st
-                    _ _ _ _ _ _ _ = tt
+                    _ _ _ _ _ _ _ _ = tt
   walk-shareGo-ΦHyp {e = e} sl id sf gas nid now Lv i vals fin
-                    ((rid , p) ∷ ps) sched st hsg hdsg hsl hpz hnd hsa hΦ
+                    ((rid , p) ∷ ps) sched st hsg hdsg hsl hpz hpl hnd hsa hΦ
     with any (_≡ᵇ rid) (EvalSt.cancelled st)
   ... | true  = walk-shareGo-ΦHyp sl id sf gas nid now Lv i vals fin ps sched st
                   hsg (depthShareGo-tail sf gas nid now i vals fin rid p ps sched st hdsg)
-                  hsl (∧-trueʳ hpz) (∧-trueʳ hnd) (∧-trueʳ hsa) hΦ
+                  hsl (∧-trueʳ hpz) (∧-trueʳ hpl) (∧-trueʳ hnd) (∧-trueʳ hsa) hΦ
   ... | false =
       hΦp
     , walk-ΦHyp-go sl id sf gas nid now Lv (toℕ i) evs p vals fin sched st₀
@@ -2052,13 +2119,15 @@ mutual
         (proj₂ (proj₂ (proj₂ hsg)))
         (depthShareGo-step sf gas nid now i vals fin rid p ps sched st hdsg)
         (trans (foldPath-slots sf gas nid now (toℕ i) p vals evs fin sched st₀) hsl)
-        (∧-trueʳ hpz) (∧-trueʳ hnd) (∧-trueʳ hsa)
+        (∧-trueʳ hpz) (∧-trueʳ hpl) (∧-trueʳ hnd) (∧-trueʳ hsa)
         hΦ
     where
     B : ℕ
     B = Caps.cSize (capsAt e sl id)
     hp₀ : pathSz? B p ≡ true
     hp₀ = ∧-trueˡ hpz
+    hpl₀ : pathSzL? B p ≡ true
+    hpl₀ = ∧-trueˡ hpl
     hndp : pathNestD p ≤ nestCapAt e sl id
     hndp = ≤ᵇ⇒≤ (pathNestD p) (nestCapAt e sl id) (T-to (∧-trueˡ hnd))
     st₀ : EvalSt e
@@ -2067,8 +2136,8 @@ mutual
     FP = foldPath sf gas nid now (toℕ i) p vals evs fin sched st₀
     hΦp : valsΦ? B (nestΦAt e sl id) p vals ≡ true
     hΦp with pathRoots p in eqr
-    ... | true  = sink-fan-root sl id i p vals eqr hp₀ hΦ
-    ... | false = sink-fan-sink sl id i p vals eqr hp₀ (∧-trueˡ hsa) hΦ
+    ... | true  = sink-fan-root sl id i p vals eqr hpl₀ hΦ
+    ... | false = sink-fan-sink sl id i p vals eqr hpl₀ (∧-trueˡ hsa) hΦ
 
   walk-ΦHyp-go sl id sf gas nid now Lv envSrc evs root vals fin sched st
                _ _ _ _ _ _ = tt

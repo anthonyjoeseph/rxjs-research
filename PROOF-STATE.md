@@ -238,17 +238,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **A CHAIN PRICED IN SOMETHING THAT IS NOT A CAP**, which is what
-  re-pricing the leaf leaves owed. The leaf costs the budget now, so
-  the potential affords a fanned chain; what still reads a refuted
-  form is the FAN's registry receipt, whose mint is refuted at the
-  entry cap — a subscribing frame registers a path LONGER than the
-  one it walked. The walk follows a WIDENING to its own level, so the
-  level is free there; the Φ pricing is the one consumer
-  that cannot follow, since its conclusion names the cap. Weakening
-  the walk's premise instead is out — it is its invariant. So the
-  commit moves the pricing's length off the cap, narrowing WHAT
-  PRICES A REGISTERED CHAIN to the stratified climb's currency.
+- **THE WALK'S HALF OF THE FAN'S RECEIPT**, which is all the refuted
+  mint still serves. Splitting by CONSUMER landed: the terminal leaves
+  take the packed reading, unrefuted because the witness that killed
+  the flat form dies on the strict per-frame ledger, and they now
+  stand on a mint of their own. The walk cannot take it — the inner
+  descent carries the strict pair at a cap it WIDENS to, and the
+  predicate weakens upward, so the level's free receipt is the wrong
+  direction. The commit re-indexes the walk to the level it is
+  standing at, where `capsOK?-regs` gives the receipt away, and
+  retires the refuted mint outright — narrowing WHAT PRICES A
+  REGISTERED CHAIN to the descent's own widening step.
 
 - **A READING THAT TRAVELS TO THE MINT**, which is all the store
   question has left. Three rows fail in the same place: the site
@@ -289,16 +289,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 - **WHAT PRICES A REGISTERED CHAIN, AND WHERE IS THE RECEIPT OWED?** It is
-  not a denomination question: the fan's registry reading splits at the
-  LEVEL, discharges at the instant's top, and leaves a residue whose whole
-  content is that a mint stepped the caps. Two siblings die in their free
-  form at one `register` too, so each is owed AT THE MINT. The entry-level
-  half is settled NEGATIVELY — that reading is refuted, so nothing threaded
-  to a mint pays it. The CURRENCY half is settled and the AFFORDABILITY
-  with it: the entry potential is PROVEN to afford twice the cap. What is
-  left is the SUPPLY — an arrival premise bounds the inner's syntax and not
-  its count, and no reading of the count reaches the mint.
-  relevant: `fan-regsSz-mint`, `sink-fan-sink`, `walk-share-strat`
+  not a denomination question, and it no longer splits at the LEVEL: the
+  entry-level reading is refuted, so nothing threaded to a mint pays it,
+  and the currency and the affordability are both settled. It splits by
+  CONSUMER. The terminal leaves are served by the packed reading, which
+  the flat form's refutation leaves standing; what is open is the WALK,
+  whose descent wants the strict pair at a cap it WIDENS to, and the
+  SUPPLY under it, since two siblings die free-standing at one `register`
+  and an arrival premise bounds the inner's syntax and not its count.
+  relevant: `fan-regsSz-mint`, `fan-regsSzL-mint`, `sink-fan-sink`, `walk-share-strat`
 
 ### The ledger
 
@@ -344,16 +343,20 @@ does not fit is a finding about the shared statement, not about the head.
   maximum is closed to instantiation.
 - **`sink-fan-sink`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE`: the
   potential at an admitted chain that ends at a SECOND hand-over. Its
-  escalation is PROGRAM-bounded: hops climb the stratified telescope. The chain
-  now arrives carrying its `sinkAbove?` reading, so what is open is the MINT.
+  escalation is PROGRAM-bounded: hops climb the stratified telescope. It now
+  takes the PACKED size reading, which its own refutation is indifferent to.
 - **`walk-share-strat`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: every
   registered chain ends strictly ABOVE the input it was minted subscribing. The
   only receipt here naming no cap, which is what makes it carryable; the free
   form dies at one `register`, so it is owed at the mint.
 - **`fan-regsSz-mint`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the registry's
-  size receipt at the PROGRAM's cap, above the instant's top. The caps-generic
-  form is refuted at one minted chain, so the residue awaits a restatement
-  rather than a premise and the Φ pricing is what has to move.
+  size receipt at the PROGRAM's cap, above the instant's top. Refuted at one
+  minted chain and now read by the WALK alone, so the residue is re-indexing
+  that consumer to its own level rather than restating this.
+- **`fan-regsSzL-mint`** (Part7/Depth-Fit) — FALSITY, `NO EVIDENCE`: the same
+  receipt at the PACKED reading — frame syntax plus a length under twice the
+  cap. It is what the refutation of the flat form leaves standing, since that
+  witness dies on the strict per-frame ledger; nothing has instantiated it.
 - **`walk-share-nestOK`** (Part7/Depth-Fit) — FALSITY, `DEAD ROUTE×4`: the
   instant's nest predicate at the state the fan reads the registry. The door
   has it and the walk carries no nest conjunct at all; threading it down is
@@ -389,8 +392,8 @@ does not fit is a finding about the shared statement, not about the head.
   across a frame, which is what lets one statement cover the walk.
 - **`frameParked-step`** (Part7/Strat-Leaves) — FALSITY, `PROBED`: the STORE
   half of the frame-keyed park reading across one step, the owner half being a
-  body now. The overwrite the closure premise exists for is instantiated at both
-  outcomes and at the drain; the switch and exhaust finishes are not.
+  body now. The overwrite the closure premise exists for is instantiated at
+  both outcomes and at the drain; the switch and exhaust finishes are not.
 - **`foldPath-park`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the park
   reading once a SIBLING chain has folded. It is about a state the walk
   PRODUCED rather than one it was handed, and it TAKES the reading as a
