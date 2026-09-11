@@ -1616,6 +1616,22 @@ shareFinish i true  (emits , sched′ , st′) =
      record sched′ { live = sweepLive kept (Sched.live sched′) } ,
      record st′ { registry = kept }
 
+-- THE DISPATCH COUNTER IS THE ONE RE-ENTRY WHOSE SUFFICIENCY NOTHING
+-- STATES, and that is a gap rather than a convention.  `chainStep`
+-- seeds it at the context size and every share boundary peels it, on
+-- the reading that a chain registered on a share can only meet shares
+-- of strictly higher index — the slot telescope's own stratification,
+-- lifted through the registry.  That reading is a runtime invariant
+-- about what the registry holds, not a syntactic fact about the
+-- program, and it is asserted in prose at the clause that fires when it
+-- fails and nowhere else: no postulate carries it, so the remaining-work
+-- ledger cannot see it.
+--
+-- AND IT IS NOT OWED TO THE DRY FACE, which is why it has stayed
+-- invisible.  Exhausting this counter mints no dry event — the clause
+-- returns an empty fan-out — so every statement about dryness passes
+-- over it for free, and the face that would catch a silently truncated
+-- delivery is the one comparing this machine to the spec.
 dispatchShare : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
               → Gas      -- sync fuel, handed to stepFrame's re-entries
               → ℕ       -- dispatch gas, the telescope bound

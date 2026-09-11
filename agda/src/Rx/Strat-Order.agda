@@ -74,6 +74,20 @@ Tri = ℕ × ℕ × ℕ
 -- own queue and its one outward call peels inside the callee; and the
 -- share hop's counter is a separate component reached one way, so it
 -- composes without sharing a measure and buys no fourth field here.
+
+-- AND THE RESIDUE OF THAT CENSUS IS EXACTLY ONE SITE, WHICH IS WHY THE
+-- COVERAGE CLAIM ABOVE IS NARROWER THAN IT READS.  Three peels are
+-- declared and only two of them are edges of this order — the
+-- subscribe-inner peel is `ltR` and the shared-connect peel is `ltU`,
+-- while the μ peel is a self-edge the component check cannot see and
+-- `ltS` covers.  The third declared peel, the share fan-out's, inhabits
+-- NONE of the three, and the reason it needs none is the one-way
+-- composition: the fan-out's clique calls into the subscribe clique and
+-- is never called back, so the two are separate strata rather than one
+-- recursion, and a stratum above another is ordered by nothing they
+-- share.  Read the constructor count that way and it is a claim about
+-- ONE stratum: a fourth constructor would mean a fourth edge inside the
+-- subscribe clique, and a fan-out edge is not one.
 ------------------------------------------------------------------
 
 infix 4 _≺_

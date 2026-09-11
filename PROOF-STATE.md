@@ -235,18 +235,6 @@ statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE CONTRACT RESTATED OVER THE ORDER, WHOLE.** The flattening
-  cannot come off one edge at a time: gas is a unary counter, so the
-  wet contract's demand is one natural and no induction mixes an `Acc`
-  motive with a `dBound` one. The unit is therefore a whole recursion,
-  and `make recursion-cover` now holds that the recursion is the one
-  the order covers. This commit states the subscribe component's
-  contract over `Rx.Strat-Order` with its seven flattening premises
-  struck, lands the order's well-foundedness in the same commit as its
-  first consumer, and walks every clause asking which constructor it
-  inhabits. The product is the residue: the clauses inhabiting none.
-  Narrows DOES DESCENT SURVIVE THE REAL TERM LANGUAGE?
-
 - **THE FOLD'S COUNT, READ OFF THE STATE RATHER THAN PREDICTED.** The
   one survivor, and where the nesting face's refutations all live: the
   count is sighted at an instant's ENTRY cap while what it prices
@@ -258,29 +246,44 @@ statement, not about the head.
   on this region and so a stop — or the form that admits none of them.
   Narrows WHAT BOUNDS A BURST INSIDE ONE INSTANT?
 
+- **THE EMITTED-VALUE INVARIANT, STATED WITHOUT THE SPINE.** The hop
+  edge's `≺` form takes ONE premise — every emitted value's rank is
+  strictly under its emitter's — and the toy proves exactly that in
+  three congruences and a sub-induction, reading no size bound and no
+  cap. The tree states it spine-indexed instead,
+  carrying a `(2 + P) ^ spn` factor, because one clause needs a count
+  and the statement was widened for it. This commit states the
+  spine-free form over the real term language, proves every clause the
+  toy's proof covers, and returns the residue. The fold clause alone
+  means the tier's risk is one clause; anything else names what the
+  fragment could not write. Narrows DOES DESCENT SURVIVE THE REAL TERM
+  LANGUAGE?
+
 - **WHAT THE CONVERSION RETIRES, ROW BY ROW.** A census already sorted
   the ledger by what funds each row and found forty-seven funded by a
-  cap and nothing else — so the conversion's real size is not the
-  contract but what falls out under it, and reading that off after the
-  fact is how a tier comes to be ground twice. With the contract
-  stated, this commit puts each cap-funded row against it and returns
-  three lists: gone with the flattening, surviving re-denominated onto
-  the order, and surviving unchanged because the cap was never what
-  they were about. The store face is where the answer bites. Narrows
-  WHAT DOES AN INTRA-INSTANT RE-ENTRY LEAVE SMALLER?
+  cap and nothing else — so the conversion's real size is what falls
+  out under it, and reading that off after the fact is how a tier comes
+  to be ground twice. The three edge lemmas are proven and cap-free
+  already, so the measure is against THEM rather than against a
+  contract nobody can state: each cap-funded row goes into one of three
+  lists — gone with the flattening, surviving re-denominated, and
+  surviving unchanged because the cap was never what it was about. The
+  store face is where the answer bites. Narrows WHAT DOES AN
+  INTRA-INSTANT RE-ENTRY LEAVE SMALLER?
 
 ### Open questions
 
 - **DOES DESCENT SURVIVE THE REAL TERM LANGUAGE?** Every caps-denominated
   route to a ceiling is closed — entry cap, exit cap, the recurrence's
-  own fuel — and the syntactic half is settled against it too: no affine
-  plug law exists at a template plugging into an `allᵉ` that feeds a
-  `scanᵉ`, which is ordinary rxjs. That leaves DESCENT, where a depth
-  read off the emission in hand predicts nothing. It is asked against
-  the REAL tree and no longer against a fragment, because both
-  refutations so far were silences of the fragment read as greens — an
-  arbitrary-body plug at the ambient scope is what neither could write,
-  and the real language has one.
+  own fuel — and so is the syntactic half: no affine plug law exists at
+  a template plugging into an `allᵉ` that feeds a `scanᵉ`, which is
+  ordinary rxjs. That leaves DESCENT, where a depth read off the
+  emission in hand predicts nothing. It is asked against the REAL tree,
+  because both refutations so far were silences of the fragment read as
+  greens. The UNIT is settled and it is the
+  evaluator's SIGNATURE, not any contract over it, recorded on the one
+  the attempt died against. So it is asked clause by clause: which the
+  toy's proof covers, and which it could not write.
   relevant: `fan-regsSzL-mint`, `walk-share-valsNest`, `subscribeE-sz`
 
 - **WHAT DOES AN INTRA-INSTANT RE-ENTRY LEAVE SMALLER?** The CONTROL

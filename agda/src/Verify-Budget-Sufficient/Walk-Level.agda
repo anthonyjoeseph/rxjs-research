@@ -510,6 +510,24 @@ open import Decide using (T-to; T⇒≡true; ∧-intro; ∧-trueˡ; ≤ᵇ-widen
 -- walk face itself consumes.  Same evaluator function, opposite
 -- direction of dependency.)
 
+-- DEAD ROUTE: restating this contract over `Rx.Strat-Order` — striking
+--   the premises that fund the flattening and descending on an
+--   accessibility witness instead.  Of the seven, six are the packing's
+--   (the two-and-above anchor, the two anchor equations, the frame-step
+--   size ceiling, the level ceiling, and the `dBound` demand), and the
+--   seventh is not a premise about descent AT ALL: `g hasAtLeast suc G`
+--   is what excludes the machine's `g0` clause, whose event list is a
+--   dry close — so the conclusion's own dry conjunct is FALSE the
+--   moment it comes off, at every instantiation with an exhausted
+--   counter.  The order cannot supply it, because an `Acc` witness
+--   bounds a recursion and says nothing about which constructor the
+--   argument has.  So the unit of the conversion is not this statement
+--   but the SIGNATURE underneath it: the dry clause exists only because
+--   the evaluator takes a counter that can run out, and a domain
+--   witness in its place deletes the clause rather than excluding it,
+--   which is what makes this face's obligation disappear instead of
+--   being re-denominated.
+
 -- PAYABILITY (census): the ceiling conversion the gs body
 -- owes the inner walkFace call — its own `sLvlD S W dep (suc bud)
 -- (suc j) ≤ L̂` into the inner's `opIterD … (suc j) ≤ L̂` — is
