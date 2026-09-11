@@ -1538,6 +1538,18 @@ subscribeE {u = u} fuel (deferᵉ body) κ id now sched st =
 -- consumes one unit and chainStep seeds n, so the zero clamp is
 -- unreachable on real registries (the telescope invariant, Inv-phase
 -- work) and termination needs no pragma
+
+-- AND THAT MAKES THIS COUNTER THE SECOND PROXY IN THE FAMILY, WITH THE
+-- SAME SHAPE AS `Gas` AND A CHEAPER ORDER BEHIND IT.  What really
+-- descends here is the telescope position: a chain on share i sinks
+-- only into the root or a strictly later share, so `n - toℕ i` falls
+-- at every dispatch, and the premise is `inputsBelowᵉ`, which a shared
+-- slot already carries in its OWN TYPE rather than as a run fact.  So
+-- this edge asks less than the subscribe edges do — those spend
+-- `dBound`, whose hop half is a fact about what a run emits, while
+-- this one is discharged by the syntax's well-formedness.  Both
+-- counters are structural stand-ins for orders the tree already has.
+
 -- latch completion AND mark the share dying: a delivered fan-out
 -- registration's exhausted close rides its own emit, so a cut during
 -- the fan-out suppresses its second close (cutThrough's
