@@ -19,7 +19,15 @@ error message actively misdirects. Read the entry before reasoning from the erro
   pattern.** Inline it — write `suc (suc j)`, not a bound alias.
 
 - **As-patterns break the termination checker** in nested-`Acc` `where`-helpers. Keep
-  the plain `go` shape.
+  the plain `go` shape. The mechanism, and it decides the shape of every
+  lexicographic well-foundedness proof here: an as-pattern handed back to a recursive
+  call is REBUILT rather than passed on, so `aU@(acc fU)` is not the argument that was
+  matched and nothing is structurally smaller. A flat helper taking all the
+  accessibility witnesses at once therefore cannot work — its off-component arms have to
+  return the outer witnesses unchanged — and the error names EVERY recursive call, which
+  reads as a bad measure rather than as a pattern problem. **Nest instead: one
+  `where`-bound level per component, each binding its own witness in an enclosing
+  pattern**, so every inner recursion descends on its own argument alone.
 
 - **Implicits sitting under `_+_` are not inferred from `≤-refl`.** Agda refuses to
   invert `_+_` (it hits inversion depth 50) and reports the failure as an *unsolved

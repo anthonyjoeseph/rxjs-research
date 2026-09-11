@@ -87,6 +87,7 @@ open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; o
   elimDTms; compare∈; ⊟-++ˡ; ⊟-++ʳ; unfoldμ; evalWith; applyFn; lookupEnv)
 open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵗˢ; hopDᵛ; pmᵉ; pmᵗ; pmᵗˢ)
 open import Rx.Slot-Hop using (slotHop; ηAt)
+open import Rx.Strat-Order using (_≺_; ltU; ltR; ltS)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; LiveSource; resolve; mkHot; scanVals; memberSource; RegId; Chain;
   NodeState; scan-st; take-st; mergeAll-st; switch-st; exhaust-st; installNode;
   setNode; NodeId; root; share-sink; _↠_; Frame; map-f; scan-f; take-f; from-inner; thru-outer;
@@ -2049,22 +2050,43 @@ dBound-struct : ∀ (V R U : ℕ) {r′ r s′ s} → r′ ≤ r → s′ < s �
 dBound-struct V R U r′≤r s′<s =
   +-mono-<-≤ s′<s (*-monoʳ-≤ (suc V) (+-monoˡ-≤ (suc R * U) r′≤r))
 
+-- THE THREE FLATTENING LEMMAS, AND THE ONE THING READING THEM TOGETHER
+-- SAYS.  Each takes the SAME premise — one `_≺_` step, which is what
+-- the evaluator's three gas edges actually establish and all any of
+-- them establishes — and the caps are what each pays to pack that step
+-- into `dBound`.  So the caps a flattening asks for are a function of
+-- how much of the triple is known to be FIXED, and of nothing else: the
+-- μ edge fixes both outer components and needs none, the hop edge fixes
+-- one and needs one, the connect edge fixes none and needs two.  The
+-- arms below the diagonal make that mechanical rather than argued —
+-- each delegates to the lemma with FEWER caps and leaves its own
+-- unspent.  `Rx.Strat-Order` is the same order with no flattening at
+-- all, and so with no cap anywhere in sight.
+
 -- edge 2 (μ-unfold): syncSize drops at fixed (U, r).  THE SPECIALISATION
--- of dBound-struct (below) at r′ = r — every real μ-edge call site holds
+-- of dBound-struct (above) at r′ = r — every real μ-edge call site holds
 -- r fixed, which is the only reason the general form looked orphaned.
 -- Stated as its own name because the clause proofs read better for it,
 -- but proven by delegation rather than by a second derivation.
-dBound-μ : ∀ {V R U r s′ s} → s′ < s →
+dBound-μ : ∀ {V R U r s′ s} → (U , r , s′) ≺ (U , r , s) →
   dBound V R U r s′ < dBound V R U r s
+dBound-μ {U = U} (ltU h) = ⊥-elim (<-irrefl refl h)
+dBound-μ {r = r} (ltR h) = ⊥-elim (<-irrefl refl h)
 -- r′ is given EXPLICITLY: from `≤-refl` alone Agda must solve
 -- `_r′ + suc R * U = r + suc R * U`, and it refuses to invert `_+_`
 -- (inversion depth 50), so the meta stays blocked
-dBound-μ {V} {R} {U} {r} s′<s = dBound-struct V R U {r} {r} ≤-refl s′<s
+dBound-μ {V} {R} {U} {r} (ltS s′<s) = dBound-struct V R U {r} {r} ≤-refl s′<s
 
 -- edge 3 (inner hop): rank drops, syncSize resets within the store
-dBound-hop : ∀ {V R U r′ r s′ s} → r′ < r → s′ ≤ V →
+dBound-hop : ∀ {V R U r′ r s′ s} → (U , r′ , s′) ≺ (U , r , s) → s′ ≤ V →
   suc (dBound V R U r′ s′) ≤ dBound V R U r s
-dBound-hop {V} {R} {U} {r′} {r} {s′} {s} r′<r s′≤V =
+dBound-hop {U = U} (ltU h) _ = ⊥-elim (<-irrefl refl h)
+-- EVERY implicit named, on both sides: dBound unfolds through `_+_`
+-- and `_*_`, so a meta left in one of these positions is a `_+_`
+-- inversion Agda refuses (depth 50) rather than a solvable constraint.
+dBound-hop {V} {R} {U} {r′} {.r′} {s′} {s} (ltS s′<s) _ =
+  dBound-μ {V} {R} {U} {r′} {s′} {s} (ltS s′<s)
+dBound-hop {V} {R} {U} {r′} {r} {s′} {s} (ltR r′<r) s′≤V =
   ≤-trans (+-monoˡ-≤ (suc V * (r′ + suc R * U)) (s≤s s′≤V))
   (≤-trans (≤-reflexive (sym (*-suc (suc V) (r′ + suc R * U))))
   (≤-trans (*-monoʳ-≤ (suc V) (+-monoˡ-≤ (suc R * U) r′<r))
@@ -2072,9 +2094,14 @@ dBound-hop {V} {R} {U} {r′} {r} {s′} {s} r′<r s′≤V =
 
 -- edge 1 (connect): unconn drops, rank and syncSize reset within
 -- the store bounds
-dBound-connect : ∀ {V R U′ U r′ r s′ s} → U′ < U → r′ ≤ R → s′ ≤ V →
+dBound-connect : ∀ {V R U′ U r′ r s′ s} → (U′ , r′ , s′) ≺ (U , r , s) →
+  r′ ≤ R → s′ ≤ V →
   suc (dBound V R U′ r′ s′) ≤ dBound V R U r s
-dBound-connect {V} {R} {U′} {U} {r′} {r} {s′} {s} U′<U r′≤R s′≤V =
+dBound-connect {V} {R} {U′} {.U′} {r′} {r} {s′} {s} (ltR r′<r) _ s′≤V =
+  dBound-hop {V} {R} {U′} {r′} {r} {s′} {s} (ltR r′<r) s′≤V
+dBound-connect {V} {R} {U′} {.U′} {r′} {.r′} {s′} {s} (ltS s′<s) _ _ =
+  dBound-μ {V} {R} {U′} {r′} {s′} {s} (ltS s′<s)
+dBound-connect {V} {R} {U′} {U} {r′} {r} {s′} {s} (ltU U′<U) r′≤R s′≤V =
   ≤-trans (+-monoˡ-≤ (suc V * (r′ + suc R * U′)) (s≤s s′≤V))
   (≤-trans (≤-reflexive (sym (*-suc (suc V) (r′ + suc R * U′))))
   (≤-trans (*-monoʳ-≤ (suc V)

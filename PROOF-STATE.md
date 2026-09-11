@@ -235,29 +235,17 @@ statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE ORDER WITHOUT THE FLATTENING, AND THE RESIDUE IT LEAVES.** The
-  triple is well founded on its own; the caps live only in the
-  arithmetic packing it into one number. The commit states it as a
-  relation with three constructors, proves it well founded from the
-  ordinary order on the naturals, and restates the three proven
-  descents against it — at which point the hop edge's syncSize premise
-  and the connect edge's rank premise have nothing left to do and are
-  dropped. What it returns is the RESIDUE, listed rather than argued:
-  which cap hypotheses survive the restatement. One is expected, the
-  fold's refold count, and any second is a finding. Narrows WHAT DOES
-  AN INTRA-INSTANT RE-ENTRY LEAVE SMALLER?
-
 - **THE SIX RE-ENTRY SITES PUT AGAINST IT.** Three are the gas edges,
-  done by the leg above. The burst walk and the share fan descend
-  structurally on a cons list, which the evaluator's own clauses
-  show. The merge join's completion-driven drain is the one
-  with nothing obvious in hand: it re-enters on a COMPLETION carrying
-  no value and recurses over its own queue. The commit gives each of
-  the six a measure and returns whether the drain needs a fourth
-  component or rides its queue's length, and whether the cascade's own
-  counter — the second proxy, whose order is the telescope position —
-  composes with the triple or sits beside it. Narrows WHAT DOES AN
-  INTRA-INSTANT RE-ENTRY LEAVE SMALLER?
+  already restated. The burst walk and the share fan descend
+  structurally on a cons list, which the evaluator's clauses show. The
+  merge join's drain is the one with nothing in hand: it re-enters on
+  a COMPLETION carrying no value and recurses over its own queue. The
+  commit gives each of the six a measure and returns whether the drain
+  needs a fourth component or rides its queue's length, and whether
+  the cascade's counter — the second proxy, whose order is the
+  telescope position — composes with the triple. It also lands the
+  order's well-foundedness, taken back out unconsumed. Narrows WHAT
+  DOES AN INTRA-INSTANT RE-ENTRY LEAVE SMALLER?
 
 - **THE FOLD'S COUNT, READ OFF THE STATE RATHER THAN PREDICTED.** The
   one survivor, and where the nesting face's refutations all live: the
@@ -269,6 +257,17 @@ statement, not about the head.
   to it, returning the first that survives — which is a third FALSITY
   on this region and so a stop — or the form that admits none of them.
   Narrows WHAT BOUNDS A BURST INSIDE ONE INSTANT?
+
+- **ONE EDGE OFF THE FLATTENING, AND WHAT THE MOTIVE COSTS.** Both
+  forms stand today: the order is established at each edge and then
+  spent to build the number the recursion still descends on, so
+  nothing has been retired. This commit takes the cheapest of the
+  three — the unfold, which fixes both outer components and asks for
+  no cap at all — has the recursion descend on the order itself, and
+  reports what the strengthened return type costs at every clause that
+  threads past it. That cost decides whether the other two follow one
+  at a time or the flattening comes out whole. Narrows DOES DESCENT
+  SURVIVE THE REAL TERM LANGUAGE?
 
 ### Open questions
 

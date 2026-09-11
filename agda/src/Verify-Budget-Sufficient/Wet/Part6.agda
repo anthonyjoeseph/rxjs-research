@@ -39,6 +39,7 @@ open import Rx.Prim      using (Id; Source; _at_from_as_; after_,_; hot; cold; t
 open import Rx.Exp       using (obs; _≟ᵗ_; inputsBelowᵉ; Ctx; Closed; Val; sizeᵉ; sizeᵛ; syncSizeᵉ; Exp; μᵉ; unfoldμ)
 open import Rx.Hop-Depth using (hopDᵉ; hopDᵛ; hopD-unfoldμ)
 open import Rx.Slot-Hop using (slotHop)
+open import Rx.Strat-Order using (_≺_; ltU; ltR; ltS)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; LiveSource; mkHot; arrVal; memberSource; RegId; Chain; sched-init;
   st-init; sched-next; schedHeadOf; schedGo; schedEarlier; cascadeLatch; cascadeFinish;
   dropSource; arrSource; chainsOf; chainsGo; arrTy; sameSource; budgetAt; capsHgo; capsBase)
@@ -346,10 +347,37 @@ hop-step-needs V R U r s s′ h =
 -- threading; this is the termination content.
 ------------------------------------------------------------------
 
+-- AND EACH OF THE THREE IS TWO FACTS, NOT ONE, WHICH IS WHY THE ≺ FORM
+-- IS STATED FIRST.  What the machine establishes at an edge is a step
+-- of `Rx.Strat-Order`'s lexicographic order on (unconn , rank ,
+-- syncSize) — the `-edge≺` lemmas below, and they are the termination
+-- content.  Everything a `-edge` adds on top is the price of PACKING
+-- that step into one natural, which is where every cap in this section
+-- comes from and the only place any of them is spent.
+--
+-- READ THE THREE ≺ FORMS TOGETHER AND THE RESIDUE IS THE WHOLE FINDING:
+-- none of them takes a cap.  `2 ≤ Ŝ`, `sizeᵛ (obs u) o ≤ Ŝ`,
+-- `slotsSize sl ≤ Ŝ` and `sizeᵉ d ≤ Ŝ` are all premises of the flat
+-- forms and of nothing else, and `slotHop-cap` — the one genuinely
+-- expensive supplier among them — has no caller at all on the ≺ side.
+-- Ŝ itself survives as an INDEX of `hopDᵉ` and is constrained nowhere,
+-- so the one cap the order cannot shed is the one inside that
+-- definition's own fold clause, where the store bounds a refold count
+-- the program does not; `Rx.Hop-Depth` is where that is argued.
+
 -- (1) THE μ EDGE.  r is fixed (hopD-unfoldμ), s strictly drops
 -- (unfoldμ-shrinks), U is untouched — an unfold moves no state at all.
 -- GENERIC IN η: an unfold moves no input, so the environment is
 -- carried untouched and no property of it is used.
+-- STATED POST-UNFOLD on the rank, since `hopD-unfoldμ` is an equation
+-- rather than a reduction: the caller spends it with a `rewrite` and
+-- what is left is the drop itself.
+mu-edge≺ : ∀ {n} {Γ : Ctx n} {t} (Ŝ U : ℕ) (η : Fin n → ℕ)
+  (body : Exp Γ (t ∷ []) [] [] t) →
+  (U , hopDᵉ Ŝ η body , syncSizeᵉ (unfoldμ body))
+    ≺ (U , hopDᵉ Ŝ η body , syncSizeᵉ (μᵉ body))
+mu-edge≺ Ŝ U η body = ltS (unfoldμ-shrinks body)
+
 mu-edge : ∀ {n} {Γ : Ctx n} {t} (Ŝ R̂ U : ℕ) (η : Fin n → ℕ)
   (body : Exp Γ (t ∷ []) [] [] t) →
   suc (dBound Ŝ R̂ U (hopDᵉ Ŝ η (unfoldμ body)) (syncSizeᵉ (unfoldμ body)))
@@ -358,7 +386,7 @@ mu-edge Ŝ R̂ U η body
   rewrite hopD-unfoldμ Ŝ η body =
   dBound-μ {Ŝ} {R̂} {U} {hopDᵉ Ŝ η body}
            {syncSizeᵉ (unfoldμ body)} {syncSizeᵉ (μᵉ body)}
-           (unfoldμ-shrinks body)
+           (mu-edge≺ Ŝ U η body)
 
 -- (2) THE HOP EDGE, at the entry-fixed anchor.  The r-drop is the
 -- emitted-value invariant (burstHopD?) against the *All frame's
@@ -395,13 +423,23 @@ mu-edge Ŝ R̂ U η body
 --           git show fa9692d:agda/src/Verify-Budget-Sufficient/Tick-Headroom.agda
 --           git show fa9692d:agda/src/Verify-Budget-Sufficient/Occurrences.agda
 
+-- THE ≺ FORM TAKES NEITHER OF THE FLAT FORM'S TWO EXTRA PREMISES.  The
+-- emitted-value invariant is the whole of the edge; `2 ≤ Ŝ` and the
+-- size premise below exist to reset syncSize under V, and there is
+-- nothing to reset when nothing is packed under the rank.
+hop-edge≺ : ∀ {n} {Γ : Ctx n} {u} (Ŝ U r s : ℕ) (η : Fin n → ℕ)
+  (o : Val Γ (obs u)) → hopDᵛ Ŝ η (obs u) o < r →
+  (U , hopDᵛ Ŝ η (obs u) o , syncSizeᵉ o) ≺ (U , r , s)
+hop-edge≺ Ŝ U r s η o r′<r = ltR r′<r
+
 hop-edge : ∀ {n} {Γ : Ctx n} {u} (Ŝ U r s : ℕ) (η : Fin n → ℕ) → 2 ≤ Ŝ →
   (o : Val Γ (obs u)) → sizeᵛ (obs u) o ≤ Ŝ → hopDᵛ Ŝ η (obs u) o < r →
   suc (dBound Ŝ (hopR Ŝ) U (hopDᵛ Ŝ η (obs u) o) (syncSizeᵉ o))
     ≤ dBound Ŝ (hopR Ŝ) U r s
 hop-edge Ŝ U r s η 2≤Ŝ o szo r′<r =
   dBound-hop {Ŝ} {hopR Ŝ} {U} {hopDᵉ Ŝ η o} {r} {syncSizeᵉ o} {s}
-             r′<r (≤-trans (syncSize≤sizeᵉ o) szo)
+             (hop-edge≺ Ŝ U r s η o r′<r)
+             (≤-trans (syncSize≤sizeᵉ o) szo)
 
 -- (3) THE CONNECT EDGE.  U strictly drops (unconn-insert, behind the
 -- machine's own `memberSource … ≡ false` guard), and BOTH of the
@@ -417,6 +455,19 @@ hop-edge Ŝ U r s η 2≤Ŝ o szo r′<r =
 -- `slotHop Ŝ sl` is unbounded and the hop reset is simply false.  It
 -- is carried at every walk level already (WalkStmt's slots bound,
 -- lifted along the frameStep ceiling), so no call site loses.
+-- THE ≺ FORM TAKES NONE OF THE THREE.  `2 ≤ Ŝ`, `slotsSize sl ≤ Ŝ` and
+-- `sizeᵉ d ≤ Ŝ` are exactly the arguments of `slotHop-cap` and
+-- `syncSize≤sizeᵉ`, and both of those suppliers feed the packing and
+-- nothing else.  The machine's own freshness guard is the whole edge.
+connect-edge≺ : ∀ {n} {Γ : Ctx n} (Ŝ r s : ℕ)
+  (sl : Slots Γ) (cs : List Source) (i : Fin n)
+  {d : Closed Γ (lookup Γ i)} {ok : T (inputsBelowᵉ (toℕ i) d)} →
+  sl i ≡ shared d {ok = ok} →
+  memberSource (toℕ i) cs ≡ false →
+  (unconn sl (toℕ i ∷ cs) , hopDᵉ Ŝ (slotHop Ŝ sl) d , syncSizeᵉ d)
+    ≺ (unconn sl cs , r , s)
+connect-edge≺ Ŝ r s sl cs i eqi fresh = ltU (unconn-insert sl cs i eqi fresh)
+
 connect-edge : ∀ {n} {Γ : Ctx n} (Ŝ r s : ℕ) → 2 ≤ Ŝ →
   (sl : Slots Γ) → slotsSize sl ≤ Ŝ → (cs : List Source) (i : Fin n)
   {d : Closed Γ (lookup Γ i)} {ok : T (inputsBelowᵉ (toℕ i) d)} →
@@ -428,7 +479,7 @@ connect-edge : ∀ {n} {Γ : Ctx n} (Ŝ r s : ℕ) → 2 ≤ Ŝ →
 connect-edge Ŝ r s 2≤Ŝ sl slSz cs i {d} eqi fresh szd =
   dBound-connect {Ŝ} {hopR Ŝ} {unconn sl (toℕ i ∷ cs)} {unconn sl cs}
                  {hopDᵉ Ŝ (slotHop Ŝ sl) d} {r} {syncSizeᵉ d} {s}
-                 (unconn-insert sl cs i eqi fresh)
+                 (connect-edge≺ Ŝ r s sl cs i eqi fresh)
                  (slotHop-cap Ŝ sl 2≤Ŝ slSz d szd)
                  (≤-trans (syncSize≤sizeᵉ d) szd)
 
