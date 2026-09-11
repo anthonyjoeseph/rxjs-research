@@ -1513,6 +1513,34 @@ fan-regsSz {e = e} sl id Lv sched st cok =
 -- AND THE PAIR DOES NOT COME APART, WHICH IS WHAT SHUTS THE OBVIOUS
 -- ESCAPE.  Keeping the frame conjunct at the entry cap and finding the
 -- length elsewhere is the repair a dead length side invites, since
+-- AND THE CURRENCY THAT IS NOT A CAP IS ALREADY LEGIBLE IN THE
+-- PRICING, WHICH IS WHERE THE NEXT ATTEMPT GOES.  The walk's size
+-- charge is LINEAR in the cap it reads, and its coefficients are
+-- cap-free: a mapping frame contributes its own operator's syntax and
+-- nothing else, a folding frame and a subscribing frame each
+-- contribute a fixed weight times the cap, and the sink leaf
+-- contributes one fixed cubic in the cap according to whether the
+-- chain ends at a sink.  So a chain's charge at EVERY cap is
+-- determined by three cap-free numbers read off its syntax -- a syntax
+-- sum, a weight, and a sink indicator -- and the cap enters only where
+-- the charge is finally spent.
+--
+-- That is what makes a carried reading stateable at all.  The registry
+-- would hold the three numbers, registration would establish them from
+-- the walk that minted the entry, and a reader would recover the
+-- charge at whatever cap it is spending under -- instead of holding a
+-- predicate whose truth depends on which cap happened to be current.
+-- It is the depth dimension's shape, whose per-path measure is
+-- likewise cap-free and whose receipt is one conjunct indexed by the
+-- instant alone.  And nothing recorded below reaches it: every one of
+-- those witnesses busts a CAP READING -- a frame wider than the entry
+-- cap, a chain longer than twice it -- and none of them bounds the
+-- three numbers, which is what says the obstacle was the denomination
+-- rather than the registry.  What is left to establish is that the
+-- carried numbers survive registration, which is a producer obligation
+-- and not an arithmetic one.  Read off the pricing's own clauses
+-- rather than instantiated.
+
 -- the frame conjunct is the half the leaves' pricing actually spends.
 -- It fails for the same reason at a different witness: the frame a
 -- subscribe pushes carries its operator's TRANSFORMER verbatim, and

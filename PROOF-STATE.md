@@ -238,15 +238,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **SPLIT THE PRICING'S ONE CAP IN TWO — ARRIVAL AND RECEIPT.** Every
-  cap reading is closed and they are one route: a receipt wants the cap
+- **FACTOR THE SIZE CHARGE INTO CAP-FREE COEFFICIENTS.** Every cap
+  reading is closed and they are one route: a receipt wants the cap
   large, the leaf's charge is two to a cube of it, one number does both
-  jobs. The pricing says why. Two clauses charge for the ARRIVAL, which
-  the descent holds constant at the entry cap; the rest read whichever
-  cap a registry entry was admitted under, which climbs. The depth
-  dimension is the worked instance — cap-free potential, one conjunct
-  indexed by the instant alone. The commit gives the arrival its own
-  parameter and returns the first site that cannot supply it.
+  jobs — and splitting the pair is refuted too, each half at its own
+  witness. But the charge is LINEAR in the cap with cap-free
+  coefficients: a syntax sum, a weight, a sink indicator. Every
+  refutation busts a cap READING and none bounds those three. The
+  commit lands the factoring and its recovery equation against the
+  first consumer that can spend it, and returns what registration owes.
 
 - **THE SECOND HAND-OVER, NOW THAT THE CLIMB IS STRICT**, which is the
   one arm of WHAT PRICES A REGISTERED CHAIN the entry ledger did not
