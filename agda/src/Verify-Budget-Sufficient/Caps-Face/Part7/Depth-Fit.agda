@@ -199,6 +199,116 @@ pathSzL?-tail B f p h =
 -- ledger was being weakened to this on arrival.  Asking for what is
 -- spent is what frees the walk to carry the strict reading at its OWN
 -- level rather than at the entry, where minting it was refuted.
+
+-- AND THE CAP IT SPENDS AT IS THE ONE THE CAPS RECURRENCE ISSUES NO
+-- RECEIPT AT, WHICH IS THE FINDING ABOVE THE ROW.  That recurrence's
+-- own contract is that the walk starts at level zero and climbs, and
+-- that every registry length, chain cap and per-frame receipt is read
+-- off the level it has reached -- nothing is charged at the entry
+-- caps.  This arm charges there, and so does the terminal leaf's
+-- re-pricing beside it; between them they are the whole of what
+-- spends the entry-cap reading, and each names that cap only because
+-- the potential handed to it is indexed by the INSTANT rather than by
+-- the level.  So minting that reading was refuted rather than merely
+-- hard: the face asks the registry for a receipt at the one cap no
+-- receipt is issued at.  Moving the demand to the other endpoint does
+-- not help either, since the next instant's caps are a blowup of THIS
+-- instant's height, so a potential denominated there exceeds the
+-- budget the descent is held under.  What is left is the climb
+-- itself, and whether a potential exponential in the cap can be
+-- indexed by it is a question about the caps mechanism rather than
+-- about any statement underneath it.
+-- AND THE ARM READS THE CAPS RECURRENCE IN EXACTLY THREE PLACES,
+-- WHICH IS WHAT MAKES THE DENOMINATION QUESTION ANSWERABLE RATHER
+-- THAN OPEN.  Everything else it applies is already stated over an
+-- arbitrary cap and potential: both path re-pricings, the value
+-- bound, and the fit of the values against the slots.  What it
+-- genuinely takes from the instant is that the cap admits the
+-- context, that the cap is at least two, and the grant itself.  So
+-- the generic arm carries those three as hypotheses and the
+-- specialisation supplies today's.  A re-denomination is then one
+-- restated grant rather than a rebuilt arm -- and the grant is the
+-- only thing left on this whole face that names the entry cap,
+-- since the fan's root arm needs nothing but positivity.
+walk-thru-fit-gen : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (sl : Slots Γ) (S NC Φ : ℕ) (sf : Gas) (eid : Id) (now : Tick)
+  (op : AllOp) (nid : NodeId)
+  (p : Path Γ u t) (vals : List (Val Γ (obs u))) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) →
+  2 ≤ S →
+  n ≤ S →
+  4 * (2 ^ ((S + S + (S + S)) * (suc S * S)) * (NC + (S + S) * S))
+    + 2 * (2 ^ ((S + S + (S + S)) * (suc S * S)) * (S * slotWrapSum sl))
+    ≤ Φ →
+  Sched.slots sched ≡ sl →
+  pathSzL? S (thru-outer op nid ↠ p) ≡ true →
+  pathNestD (thru-outer op nid ↠ p) ≤ NC →
+  valsΦ? S Φ (thru-outer op nid ↠ p) vals ≡ true →
+  FrameΦHyp sf eid now S Φ (thru-outer op nid) p vals fin sched st
+walk-thru-fit-gen {n = n} sl S NC Φ sf eid now op nid p vals fin sched st
+                  2≤S n≤S hch hsl hpz hnd hΦ =
+  n , G
+  , subst (λ z → ValsFit n z G p vals) (sym hsl)
+      (valsFit-of-max sl p vals M ≤-refl)
+  , *-cancelˡ-≤ 2
+      (≤-trans (*-monoʳ-≤ 2 (*-monoʳ-≤ (pathΦF S p)
+                 (+-monoˡ-≤ (pathΦD S p)
+                   (+-monoˡ-≤ (n * slotWrapSum sl)
+                     (+-monoˡ-≤ (nestDᵛˢ vals) (nestD≤pathΦD S p))))))
+      (≤-trans (≤-reflexive spread)
+        (≤-trans (+-mono-≤ hA2 hBC2)
+                 (≤-reflexive (sym (2X≡X+X Φ))))))
+  where
+  Q    = pathΦF S p
+  Dn   = pathNestD p
+  D    = pathΦD S p
+  M    = nestDᵛˢ vals
+  W    = slotWrapSum sl
+  G    = Dn + M + n * W
+  hpp  : pathSzL? S p ≡ true
+  hpp  = pathSzL?-tail S (thru-outer op nid) p hpz
+  1≤S  = ≤-trans (s≤s z≤n) 2≤S
+  EXP  : ℕ
+  EXP  = (S + S + (S + S)) * (suc S * S)
+  Q≤   : Q ≤ 2 ^ EXP
+  Q≤   = pathΦF-cap-atLen S (S + S) p (pathSzL?-frames S p hpp)
+                          (pathSzL?-len S p hpp)
+  D≤   : D ≤ NC + (S + S) * S
+  D≤   = ≤-trans (pathΦD≤nestD S p)
+                 (+-monoˡ-≤ ((S + S) * S)
+                            (≤-trans (n≤1+n (pathNestD p)) hnd))
+  2≤2^S : 2 ≤ 2 ^ S
+  2≤2^S = ≤-trans (≤-reflexive (sym (*-identityʳ 2))) (^-monoʳ-≤ 2 1≤S)
+  -- the values in flight, paid by the outer frame's own factor
+  hA   : 2 ^ S * (Q * M) ≤ Φ
+  hA   = ≤-trans (≤-reflexive (sym (*-assoc (2 ^ S) Q M)))
+                 (Φ-to-bound S Φ (thru-outer op nid ↠ p) vals hΦ)
+  hA2  : 2 * (Q * M) ≤ Φ
+  hA2  = ≤-trans (*-monoˡ-≤ (Q * M) 2≤2^S) hA
+  -- the path's own depth, and the wrap, against the charge a frame arm
+  -- is granted: the depth's cap piece against the cap's half and its
+  -- leaf square beside the wrap against the walk's
+  reshape : ∀ q d w → 2 * (2 * (q * d) + q * w)
+                        ≡ 4 * (q * d) + 2 * (q * w)
+  reshape q d w = solve 3 (λ q′ d′ w′ →
+                    con 2 :* (con 2 :* (q′ :* d′) :+ q′ :* w′)
+                      := con 4 :* (q′ :* d′) :+ con 2 :* (q′ :* w′))
+                  refl q d w
+  hBC2 : 2 * (2 * (Q * D) + Q * (n * W)) ≤ Φ
+  hBC2 =
+    ≤-trans (≤-reflexive (reshape Q D (n * W)))
+    (≤-trans (+-mono-≤ (*-monoʳ-≤ 4 (*-mono-≤ Q≤ D≤))
+                       (*-monoʳ-≤ 2 (*-mono-≤ Q≤ (*-monoˡ-≤ W n≤S))))
+             hch)
+  spread : 2 * (Q * (D + M + n * W + D))
+             ≡ 2 * (Q * M) + 2 * (2 * (Q * D) + Q * (n * W))
+  spread =
+    solve 4 (λ q d m w →
+               con 2 :* (q :* (d :+ m :+ w :+ d))
+                 := con 2 :* (q :* m)
+                    :+ con 2 :* (con 2 :* (q :* d) :+ q :* w))
+          refl Q D M (n * W)
+
 walk-thru-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (sl : Slots Γ) (id : ℕ) (sf : Gas) (eid : Id) (now : Tick)
   (op : AllOp) (nid : NodeId)
@@ -211,74 +321,12 @@ walk-thru-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
          (thru-outer op nid ↠ p) vals ≡ true →
   FrameΦHyp sf eid now (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
             (thru-outer op nid) p vals fin sched st
-walk-thru-fit {n = n} {e = e} sl id sf eid now op nid p vals fin sched st
+walk-thru-fit {e = e} sl id sf eid now op nid p vals fin sched st
               hsl hpz hnd hΦ =
-  n , G
-  , subst (λ z → ValsFit n z G p vals) (sym hsl)
-      (valsFit-of-max sl p vals M ≤-refl)
-  , *-cancelˡ-≤ 2
-      (≤-trans (*-monoʳ-≤ 2 (*-monoʳ-≤ (pathΦF S p)
-                 (+-monoˡ-≤ (pathΦD S p)
-                   (+-monoˡ-≤ (n * slotWrapSum sl)
-                     (+-monoˡ-≤ (nestDᵛˢ vals) (nestD≤pathΦD S p))))))
-      (≤-trans (≤-reflexive spread)
-        (≤-trans (+-mono-≤ hA2 hBC2)
-                 (≤-reflexive (sym (2X≡X+X (nestΦAt e sl id)))))))
-  where
-  S    = Caps.cSize (capsAt e sl id)
-  Q    = pathΦF S p
-  Dn   = pathNestD p
-  D    = pathΦD S p
-  M    = nestDᵛˢ vals
-  W    = slotWrapSum sl
-  G    = Dn + M + n * W
-  hpp  : pathSzL? S p ≡ true
-  hpp  = pathSzL?-tail S (thru-outer op nid) p hpz
-  2≤S  = 2≤capsAt-size e sl id
-  1≤S  = ≤-trans (s≤s z≤n) 2≤S
-  EXP  : ℕ
-  EXP  = (S + S + (S + S)) * (suc S * S)
-  Q≤   : Q ≤ 2 ^ EXP
-  Q≤   = pathΦF-cap-atLen S (S + S) p (pathSzL?-frames S p hpp)
-                          (pathSzL?-len S p hpp)
-  D≤   : D ≤ nestCapAt e sl id + (S + S) * S
-  D≤   = ≤-trans (pathΦD≤nestD S p)
-                 (+-monoˡ-≤ ((S + S) * S)
-                            (≤-trans (n≤1+n (pathNestD p)) hnd))
-  n≤S  : n ≤ S
-  n≤S  = n≤capsAt-size e sl id
-  2≤2^S : 2 ≤ 2 ^ S
-  2≤2^S = ≤-trans (≤-reflexive (sym (*-identityʳ 2))) (^-monoʳ-≤ 2 1≤S)
-  -- the values in flight, paid by the outer frame's own factor
-  hA   : 2 ^ S * (Q * M) ≤ nestΦAt e sl id
-  hA   = ≤-trans (≤-reflexive (sym (*-assoc (2 ^ S) Q M)))
-                 (Φ-to-bound S (nestΦAt e sl id) (thru-outer op nid ↠ p)
-                             vals hΦ)
-  hA2  : 2 * (Q * M) ≤ nestΦAt e sl id
-  hA2  = ≤-trans (*-monoˡ-≤ (Q * M) 2≤2^S) hA
-  -- the path's own depth, and the wrap, against the charge a frame arm
-  -- is granted: the depth's cap piece against the cap's half and its
-  -- leaf square beside the wrap against the walk's
-  reshape : ∀ q d w → 2 * (2 * (q * d) + q * w)
-                        ≡ 4 * (q * d) + 2 * (q * w)
-  reshape q d w = solve 3 (λ q′ d′ w′ →
-                    con 2 :* (con 2 :* (q′ :* d′) :+ q′ :* w′)
-                      := con 4 :* (q′ :* d′) :+ con 2 :* (q′ :* w′))
-                  refl q d w
-  hBC2 : 2 * (2 * (Q * D) + Q * (n * W)) ≤ nestΦAt e sl id
-  hBC2 =
-    ≤-trans (≤-reflexive (reshape Q D (n * W)))
-    (≤-trans (+-mono-≤ (*-monoʳ-≤ 4 (*-mono-≤ Q≤ D≤))
-                       (*-monoʳ-≤ 2 (*-mono-≤ Q≤ (*-monoˡ-≤ W n≤S))))
-             (nestΦ-frame-charge e sl id))
-  spread : 2 * (Q * (D + M + n * W + D))
-             ≡ 2 * (Q * M) + 2 * (2 * (Q * D) + Q * (n * W))
-  spread =
-    solve 4 (λ q d m w →
-               con 2 :* (q :* (d :+ m :+ w :+ d))
-                 := con 2 :* (q :* m)
-                    :+ con 2 :* (con 2 :* (q :* d) :+ q :* w))
-          refl Q D M (n * W)
+  walk-thru-fit-gen sl (Caps.cSize (capsAt e sl id)) (nestCapAt e sl id)
+    (nestΦAt e sl id) sf eid now op nid p vals fin sched st
+    (2≤capsAt-size e sl id) (n≤capsAt-size e sl id)
+    (nestΦ-frame-charge e sl id) hsl hpz hnd hΦ
 
 postulate
   -- THE FOLD'S GRANT HAS NOWHERE TO COME FROM ON THIS SIDE, and that
@@ -1257,6 +1305,32 @@ frameΦ-fit sl id sf eid now Lv (thru-outer op nid) p vals fin sched st hsl _ hp
 -- the same currency.  That half closes off `pathΦF-cap-root-atLen`,
 -- `pathΦD-cap-root-atLen` and monotonicity, with no new fact -- and
 -- this is the assembly that spends the three.
+-- AND THE ARM IS CAP-GENERIC IN ITS BODY, WHICH IS WHAT THE
+-- DENOMINATION QUESTION ABOVE TURNS ON.  Nothing here reads the caps
+-- recurrence: the two re-pricings and the monotonicity are stated over
+-- whatever cap and potential they are handed, and the only thing the
+-- instant supplies is that the cap is positive.  So this half of what
+-- spends the packed reading follows a re-denomination for free, and a
+-- move of the face to another cap is not a proof to redo here -- it is
+-- an argument to pass.  The specialisation below is the instance the
+-- fan calls, and it is all the caps knowledge this arm ever had.
+sink-fan-root-gen : ∀ {n} {Γ : Ctx n} {t} (B Φ : ℕ) (i : Fin n)
+  (p : Path Γ (lookup Γ i) t) (vals : List (Val Γ (lookup Γ i))) →
+  1 ≤ B →
+  pathRoots p ≡ true →
+  pathSzL? B p ≡ true →
+  valsΦ? B Φ (share-sink {t = t} i) vals ≡ true →
+  valsΦ? B Φ p vals ≡ true
+sink-fan-root-gen B Φ i p vals 1≤B hr hz hΦ =
+  valsΦ?-mono B Φ p (share-sink i) vals
+    (pathΦF-cap-root-atLen B (B + B) p hr hf hl)
+    (pathΦD-cap-root-atLen B (B + B) p 1≤B hr hf hl) hΦ
+  where
+  hf : pathFrameSz? B p ≡ true
+  hf = pathSzL?-frames B p hz
+  hl : pathLen p ≤ B + B
+  hl = pathSzL?-len B p hz
+
 sink-fan-root : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (i : Fin n) (p : Path Γ (lookup Γ i) t)
   (vals : List (Val Γ (lookup Γ i))) →
@@ -1266,18 +1340,8 @@ sink-fan-root : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (share-sink {t = t} i) vals ≡ true →
   valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id) p vals ≡ true
 sink-fan-root {e = e} sl id i p vals hr hz hΦ =
-  valsΦ?-mono B (nestΦAt e sl id) p (share-sink i) vals
-    (pathΦF-cap-root-atLen B (B + B) p hr hf hl)
-    (pathΦD-cap-root-atLen B (B + B) p 1≤B hr hf hl) hΦ
-  where
-  B : ℕ
-  B = Caps.cSize (capsAt e sl id)
-  1≤B : 1 ≤ B
-  1≤B = ≤-trans (s≤s z≤n) (8≤capsAt-size e sl id)
-  hf : pathFrameSz? B p ≡ true
-  hf = pathSzL?-frames B p hz
-  hl : pathLen p ≤ B + B
-  hl = pathSzL?-len B p hz
+  sink-fan-root-gen (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
+    i p vals (≤-trans (s≤s z≤n) (8≤capsAt-size e sl id)) hr hz hΦ
 
 -- WHAT IS LEFT IS THE CHAIN THAT ENDS AT A SECOND HAND-OVER.  Its
 -- factor is the leaf's own multiplied by its frames', so the leaf
@@ -1401,6 +1465,17 @@ fan-regsSz {e = e} sl id Lv sched st cok =
 -- here, and the row is open on the same ground the flat one died on
 -- rather than on a smaller region.
 --
+-- AND THE PAIR DOES NOT COME APART, WHICH IS WHAT SHUTS THE OBVIOUS
+-- ESCAPE.  Keeping the frame conjunct at the entry cap and finding the
+-- length elsewhere is the repair a dead length side invites, since
+-- the frame conjunct is the half the leaves' pricing actually spends.
+-- It fails for the same reason at a different witness: the frame a
+-- subscribe pushes carries its operator's TRANSFORMER verbatim, and
+-- that transformer is legal at the stepped cap, so ONE operator wider
+-- than the entry cap registers a short chain that busts the syntax.
+-- The two conjuncts therefore fail independently, and the entry cap is
+-- not a reading the mint supports in either currency.
+--
 -- AND THE TOP OF THE INSTANT PAYS FOR ITSELF, which is what makes this
 -- a body over one leaf rather than a second monolith.  At level zero
 -- the step is the identity, the flat receipt is free from
@@ -1408,6 +1483,13 @@ fan-regsSz {e = e} sl id Lv sched st cok =
 -- so the mint below carries only the levels above the top, which is
 -- where a registration minted since entry can sit.
 --
+-- REFUTED: `Refuted.Fan-Regs-Packed-Frame`, the same generic form with
+--   the packed pair replaced by its FRAME conjunct alone.  Its witness
+--   carries ONE operator whose transformer has a syntax size of ten
+--   against an entry size of six, so the chain it registers is seven
+--   frames -- inside the doubled budget its sibling busts -- and fails
+--   the per-frame conjunct instead.  The two halves die at different
+--   witnesses, so no split of the pair survives.
 -- REFUTED: `Refuted.Fan-Regs-Packed-Len`, which is this statement's
 --   own caps-generic form rather than the flat one's.  It is the
 --   sibling's witness with nine operators in the arrival's payload
@@ -1457,6 +1539,40 @@ fan-regsSz {e = e} sl id Lv sched st cok =
 --   mechanism -- dies on the arithmetic directly above, by ONE step of
 --   the recurrence rather than at some threshold, so no ceiling is
 --   small enough.
+-- DEAD ROUTE: DECOUPLING the cap a frame's syntax is known under from
+--   the cap the potential is priced at, and spending the stepped-cap
+--   receipt -- which is free -- at the smaller pricing cap.  The
+--   separation itself is sound and cheap: a map frame's charge is its
+--   raw term size and names no cap, every other arm is monotone in the
+--   syntax bound, and the sink leaf's share is a constant of the
+--   pricing cap alone, so the receipt's cap would appear exactly once,
+--   multiplying the length.  It dies on the GRANT rather than on the
+--   separation.  `nestΦ-frame-charge` (.Caps-Face.Nest-Arith) hands the
+--   frame arm a budget denominated at two to a CUBE of the entry cap,
+--   and a stepped-cap receipt prices the same chain at a sixth power,
+--   since one `sizeStep` squares the cap and the length is bounded by
+--   that same stepped number.  The shortfall is a factor of the cap
+--   SQUARED inside the exponent, so it is not a margin to tighten.
+--   What this leaves is an obligation with two ends and neither of them
+--   the receipt: the grant is fixed at the entry cap and the registry
+--   supplies nothing there, so the repair is owed at the pricing's own
+--   denomination or at the budget the grant is drawn from.
+-- DEAD ROUTE: ENLARGING that budget, which is the second of those two
+--   ends and the one that reads affordable.  The headroom is real and
+--   it is an entire exponential level: `capsAt-exp2≤capsH` affords two
+--   to a DOUBLE exponential of the entry cap while the grant spends two
+--   to a cube of it, and the ceiling's own fit already carries a size
+--   floor generous enough for any polynomial degree the stepped reading
+--   could ask for.  It dies because the stepped cap is not a polynomial
+--   in the entry one.  The level a chain is registered at is bounded by
+--   the size COUNT of the instant being walked, and a cap stepped that
+--   many times is the NEXT instant's entry cap by construction -- which
+--   is a blowup OF this instant's height, not a quantity underneath it.
+--   So the enlarged budget would have to exceed the ceiling it is
+--   fitted under, and the affordable headroom is affordable for the
+--   wrong quantity.  Read off the definitions rather than instantiated:
+--   the count's own recurrence is sealed for cost, so what is checkable
+--   here is the shape of the bound and not a witness at numerals.
 -- DEAD ROUTE: moving the pricing's DENOMINATION rather than any
 --   receipt, so that the face names the cap the receipt is held at.
 --   Both answers die on the pricing rather than on the registry, and

@@ -238,17 +238,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **WHERE THE LEAVES MAY READ THE REGISTRY AT ALL**, now that no
-  multiple of the entry cap can be the answer. The packed reading is
-  refuted at its own caps-generic form — the gap grows with the inner
-  and the inner is priced at the STEPPED cap — so `fan-regsSzL-mint`
-  is not a row to grind and a larger budget is not a repair. What is
-  left is a placement question, the same one the flat form was
-  restated to answer, and the leaves are the hard half of it — their
-  own header says why they cannot follow a widening. The commit
-  decides whether they can be re-indexed to the level the fan stands
-  at or must be paid in a currency that is not a cap, and either
-  restates them or returns the first arm that refuses.
+- **RE-DENOMINATE THE ONE GRANT THAT STILL NAMES THE ENTRY CAP.** Both
+  spenders of the packed reading are now proven cap- and
+  potential-GENERIC: `sink-fan-root-gen` needs only that the cap is
+  positive, and `walk-thru-fit-gen` takes its three caps facts as
+  hypotheses. So the question is no longer whether the face can be
+  re-indexed — it carries a re-denomination for free — but whether
+  `nestΦ-frame-charge` holds at the level the walk has climbed to
+  rather than at the instant's entry caps. Neither endpoint is the
+  repair: the next instant's caps are a blowup of this instant's
+  height. The commit states that grant at the climb and either proves
+  it or returns the first cap its exponent cannot absorb.
 
 - **THE SECOND HAND-OVER, NOW THAT THE CLIMB IS STRICT**, which is the
   one arm of WHAT PRICES A REGISTERED CHAIN the entry ledger did not
@@ -343,10 +343,10 @@ does not fit is a finding about the shared statement, not about the head.
   escalation is PROGRAM-bounded: hops climb the stratified telescope. It now
   takes the PACKED size reading, which its own refutation is indifferent to.
 - **`fan-regsSzL-mint`** (Part7/Depth-Fit) — FALSITY,
-  `REFUTED×3, DEAD ROUTE×4`: the registry read at the ENTRY cap in the PACKED
-  form — frame syntax plus a length under twice it — which only the terminal
-  leaves now ask for. Refuted at its own generic form: the gap grows with the
-  inner, so no multiple of the entry cap bounds it.
+  `REFUTED×4, DEAD ROUTE×6`: the registry read at the ENTRY cap in the PACKED
+  form, which only the terminal leaves now ask for. Both conjuncts refuted at
+  its generic form, at separate witnesses, so no budget and no split repairs
+  it.
 - **`walk-share-nestOK`** (Part7/Depth-Fit) — FALSITY, `DEAD ROUTE×4`: the
   instant's nest predicate at the state the fan reads the registry. The door
   has it and the walk carries no nest conjunct at all; threading it down is
