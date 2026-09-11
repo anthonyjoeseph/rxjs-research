@@ -209,11 +209,11 @@ schedP : Sched Γᶜ
 schedP = record (sched-init eᶜ slᶜ) { nextNode = 2 }
 
 stP : EvalSt eᶜ
-stP = installNode 1 (scan-st (evalTm (strmᵗ emptyᵉ))) stᶜ
+stP = installNode 1 (scan-st (evalTm (strmᵗ (emptyᵉ {t = Pw 8})))) stᶜ
 
 tieCellChain : Confirms
   (pushBurst-sz-store-scan {e = eᶜ} slᶜ (gasPad 63 g0)
-     keepG (strmᵗ emptyᵉ) midC 1
+     keepG (strmᵗ (emptyᵉ {t = Pw 8})) midC 1
      (from-inner mergeAllᵒ 0 0 ↠ root) 0 0
      schedP stP
      (subscribeE (gasPad 63 g0) midC

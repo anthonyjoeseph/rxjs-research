@@ -257,11 +257,11 @@ schedS : Sched Γᶜ
 schedS = record (sched-init eᶜ slᶜ) { nextNode = 1 }
 
 stS : EvalSt eᶜ
-stS = installNode 0 (scan-st (evalTm (strmᵗ emptyᵉ))) (st-init eᶜ)
+stS = installNode 0 (scan-st (evalTm (strmᵗ (emptyᵉ {t = Pw K})))) (st-init eᶜ)
 
 tieScan : Confirms
   (pushBurst-sz-store-scan {e = eᶜ} slᶜ (gasPad 64 g0) keepG
-     (strmᵗ emptyᵉ) (input fz) 0 root 0 0
+     (strmᵗ (emptyᵉ {t = Pw K})) (input fz) 0 root 0 0
      schedS stS
      (subscribeE (gasPad 64 g0) (input fz) (scan-f keepG 0 ↠ root) 0 0
         schedS stS)

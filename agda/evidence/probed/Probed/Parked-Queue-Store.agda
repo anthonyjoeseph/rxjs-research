@@ -23,17 +23,8 @@
 -- neither has a queue at all and the shape does not arise there.  And
 -- nothing about a queue whose entries name a SHARED slot each, where
 -- one definition would run once for the several entries reaching it.
---
--- AND THE FOLD ITSELF IS NOT REACHED HERE, which is a boundary rather
--- than an omission.  This fixture's emission is a thirteen-deep
--- product, and the arrival rewriting the cell with it is not a
--- quantity the checker can evaluate at all -- measured past twenty
--- minutes and nine gigabytes on one arrival, against fifteen seconds
--- for the same subscription read without the fold.  So the tie is
--- taken at the DRY entry, where the burst is empty and what the row
--- decides is that the table the fold is entered on is priceable at
--- the level the arrival bought.  A fold with values in it is read at
--- the narrower products of the chain and cascade witnesses.
+-- The fold below is entered on a burst of ONE, so nothing here about
+-- a cell rewritten twice while the queue stands beside it.
 -- ══════════════════════════════════════════════════════════════════
 module Probed.Parked-Queue-Store where
 
@@ -131,18 +122,20 @@ outerRows≡ = refl
 -- id this scheduler hands out, the seed cell installed under it, and
 -- the source subscription whose burst the fold is entered on -- and
 -- the table it is entered on is the one carrying the parked queue.
--- It would fail on a queue entry the level does not reach, which is
--- the whole of what this file doubts; it is the arrival's own rewrite
--- that the boundary above puts out of reach.
+-- The burst is the chain's own emission, a thirteen-deep product, so
+-- the row prices the seed cell AFTER the arrival has rewritten it and
+-- not merely the table the fold was handed.  It would fail on a queue
+-- entry the level does not reach, which is the whole of what this
+-- file doubts.
 schedP : Sched Γ₁
 schedP = record (sched-init e₀ sl₁) { nextNode = 2 }
 
 stP : EvalSt e₀
-stP = installNode 1 (scan-st (evalTm (strmᵗ emptyᵉ))) stRun
+stP = installNode 1 (scan-st (evalTm (strmᵗ (emptyᵉ {t = Pow K})))) stRun
 
 tieParkedOuterRun : Confirms
   (pushBurst-sz-store-scan {e = e₀} sl₁ g0
-     keep (strmᵗ emptyᵉ) (chain K) 1
+     keep (strmᵗ (emptyᵉ {t = Pow K})) (chain K) 1
      (from-inner mergeAllᵒ 0 0 ↠ root) 0 0
      schedP stP
      (subscribeE g0 (chain K)

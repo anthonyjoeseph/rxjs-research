@@ -238,16 +238,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE ARRIVAL FOLD, NOW THAT THE MINT IS NOT THE QUESTION.** The scan
-  arm's seed is payable out of the descent's own delivery block, so its
-  mint, seed and descent are a checked body and only the fold is left.
-  That is what the three rows share and it is not a mint: each rewrites
-  ONE cell once per arriving emit, so the charge compounds where a
-  mint's is paid once. The commit states the two remaining folds at the
-  burst they are entered on and either lands one or returns the first
-  emit the entering table cannot price — which tells WHICH STORE CELLS
-  DOES A PATH PREDICATE REACH whether the arc it fails on is the
-  arrival's or the table's.
+- **THE ARRIVAL FOLD, WHICH IS AN INDUCTION AND NOT A PRICE.** Both
+  folds are now INSTANTIATED and not merely stated — the scan arm at
+  four points, each entered on the burst its own source produced — so
+  the arrival count, the product width and the entering table are all
+  innocent, and no coverage boundary stands where one was recorded.
+  What is left is the burst recursion: the commit writes the scan arm
+  as a body over per-emit leaves and returns the first emit whose
+  rewrite the entering table's own reading does not survive — which
+  tells WHICH STORE CELLS DOES A PATH PREDICATE REACH whether the arc
+  it fails on is the arrival's or the table's.
 
 - **THE SUBSCRIBE READING, CARRIED THROUGH THE EVALUATOR'S OWN
   RECURSION.** The probe reached the one arm that can emit syntax the
@@ -320,9 +320,9 @@ does not fit is a finding about the shared statement, not about the head.
   unbounded. A duplication chain buys no rung; the climb rows say no second
   block is owed, read in rungs rather than through the charge.
 - **`pushBurst-sz-store-scan`** (Regs-Nest-Walk) — FALSITY,
-  `REFUTED, DEAD ROUTE×2, PROBED×4`: the cell each arrival rewrites, keyed on the
-  source subscription. The receipts are the replaced statement's: the fold does
-  not normalise at either fixture, so no point instantiates it today.
+  `REFUTED, DEAD ROUTE, PROBED×4`: the cell each arrival rewrites, keyed on the
+  source subscription. Four points instantiate it at the arrival's own rewrite —
+  a parked queue, a crossing door, a chain of cells, a resolved slot.
 - **`subscribeSharedSlot-sz-store`** (Regs-Nest-Walk) — FALSITY,
   `DEAD ROUTE, PROBED×2`: the definition behind a reference, whose entire climb
   is the telescope summand — `input` charges nought, so no program reading

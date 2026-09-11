@@ -153,11 +153,11 @@ schedP : Sched Γ₁
 schedP = record (sched-init e₀ sl₁) { nextNode = 2 }
 
 stP : EvalSt e₀
-stP = installNode 1 (scan-st (evalTm (strmᵗ emptyᵉ))) st₀
+stP = installNode 1 (scan-st (evalTm (strmᵗ (emptyᵉ {t = Pow K})))) st₀
 
 tieOuterStore : Confirms
   (pushBurst-sz-store-scan {e = e₀} sl₁ (gasPad 7 g0)
-     keep (strmᵗ emptyᵉ) (chain K) 1
+     keep (strmᵗ (emptyᵉ {t = Pow K})) (chain K) 1
      (from-inner mergeAllᵒ 0 0 ↠ root) 0 0
      schedP stP
      (subscribeE (gasPad 7 g0) (chain K)
