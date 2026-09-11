@@ -238,17 +238,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE LEAF THE TELESCOPE ALREADY PAYS FOR.** Three frame heads became
-  two recursions and then ONE leaf, and the premise it turned out to
-  need is none: the only arm that can emit what the source's syntax does
-  not contain is the slot read, and the slot TYPE forbids both ways that
-  could land above the floor. So the row is off the store question
-  entirely and the risk is an induction over the evaluator rather than a
-  missing conjunct. The commit INSTANTIATES it at the arm that carries
-  the doubt — an observable-typed shared slot, which is the one shape
-  whose emission has syntax at all — and either receipts the leaf or
-  returns the arm the telescope does not in fact cover.
-
 - **THE FRAME ARMS IN THE SAME CURRENCY**, which is the rest of WHAT
   PRICES A REGISTERED CHAIN once the terminal stops asking for a
   terminal. The walk's frame clauses still read the cap-denominated
@@ -270,6 +259,16 @@ does not fit is a finding about the shared statement, not about the head.
   and either lands one of the three on it or returns the first site the
   carrier cannot be supplied from — which is what turns a supply question
   into a placement one.
+
+- **THE SUBSCRIBE READING, CARRIED THROUGH THE EVALUATOR'S OWN
+  RECURSION.** The probe reached the one arm that can emit syntax the
+  source does not carry and found the telescope already paying for it,
+  so what is left on this leaf is an INDUCTION rather than a missing
+  conjunct. The commit writes it as a body over `subscribeE`-level
+  leaves and returns the first arm whose reading the recursion does not
+  preserve — which is what decides whether the floor reading survives
+  the delivery arc WHICH STORE CELLS DOES A PATH PREDICATE REACH is
+  still open at.
 
 ### Open questions
 
@@ -299,7 +298,7 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### The ledger
 
-- **`subscribeInner-strat`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: one
+- **`subscribeInner-strat`** (Part7/Strat-Leaves) — FALSITY, `PROBED`: one
   subscribe's burst read below the floor, which both subscribing heads reduce
   to. The slot read is the only arm emitting syntax the source does not carry,
   and the telescope's own receipt covers it, so what is open is the induction.

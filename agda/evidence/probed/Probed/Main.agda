@@ -182,3 +182,6 @@ open import Probed.FramePark-Step
          lowFloorPre; lowFloorPost; switchCellFree; exhaustCellFree;
          tieSwitchFinish; tieExhaustFinish; tieThruRoom; tieThruRoomGassed;
          floorᵏ; tieSinkFloor)
+
+open import Probed.Subscribe-Inner-Strat
+  using (tieSharedSlot; tieDry)

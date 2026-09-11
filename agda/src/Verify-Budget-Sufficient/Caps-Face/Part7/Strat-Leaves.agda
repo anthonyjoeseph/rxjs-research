@@ -366,6 +366,17 @@ postulate
 -- whenever the source is below the floor.  So the fact is discharged
 -- by unification at every concrete program and no conjunct of the
 -- invariant record has to carry it.
+--
+  -- PROBED: `Probed.Subscribe-Inner-Strat` instantiates this at an
+  --   observable-typed shared slot -- the one slot shape whose emission
+  --   carries syntax at all -- with the premise reading the index and
+  --   the conclusion reading the def's own input, over a merge op at a
+  --   padded gas and again at the dry branch.  NOT covered: every
+  --   recursive arm past a single slot read, so no `μ`, no nested
+  --   `*All`, no take cut and no arrival routed back through the frame;
+  --   a scripted slot is reached only at data, so nothing here
+  --   separates it from the data arm of the reading; and the floor
+  --   equals the context width throughout, so no row tells them apart.
   subscribeInner-strat : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (k : ℕ) (g : Gas) (op : AllOp) (allNid : NodeId) (κ : Path Γ u t)
     (id : Id) (now : Tick) (o : Val Γ (obs u))
