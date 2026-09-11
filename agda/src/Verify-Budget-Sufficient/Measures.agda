@@ -2003,6 +2003,30 @@ connect-anchor e sl id i {d} eq =
 -- them, never redo arithmetic.
 ------------------------------------------------------------------
 
+-- AND THIS IS THE ORDER `Gas` STANDS IN FOR, WHICH IS WHY THE CONTRACT
+-- HAS THE SHAPE IT HAS.  The evaluator peels gas at exactly three
+-- edges and holds it fixed everywhere else, staying at one nesting
+-- level; `peelGas`'s own header says what that buys — at `gs fuel` it
+-- reduces to `fuel`, making the call STRUCTURALLY smaller and so
+-- visible to the termination checker.  Each of those three edges is an
+-- edge this demand strictly drops at, and the drop is proven, not
+-- assumed: `unfoldμ-shrinks` for the μ edge, `unconn-insert` for the
+-- connect edge, and the hop edge by definitional `suc` at the three
+-- `*All` nodes.  So gas buys structural VISIBILITY and nothing else
+-- mathematical, and what it charges for that is the `hasAtLeast`
+-- obligation together with every tower that sizes it.
+
+-- THE PRICE OF SPENDING THIS ORDER DIRECTLY IS THAT TWO OF THE THREE
+-- PREMISES ARE INVARIANTS RATHER THAN SYNTAX, and that is the whole of
+-- what a stratified evaluator would cost.  The μ edge needs only its
+-- own body, so it transports with nothing threaded.  The connect edge
+-- needs the slot telescope bounded and the hop edge needs the emitted
+-- value's depth under its emitter's rank — both facts this development
+-- establishes in a pass ABOUT the evaluator, so recursing on the order
+-- directly means the evaluator must carry them as indices while it is
+-- being defined.  That is the invariant-record cascade rather than a
+-- new proof, but it is the reason the question is not free.
+
 dBound : (V R U r s : ℕ) → ℕ
 dBound V R U r s = s + suc V * (r + suc R * U)
 
