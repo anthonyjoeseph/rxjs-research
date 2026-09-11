@@ -65,7 +65,8 @@ open import Rx.Slots using (Slots; slotsSize)
 
 open import Verify-Budget-Sufficient.Caps using
   (1≤capsAt-reg; 2≤capsAt-size; 8≤capsAt-size; Caps; capsAt; capsAt-base-size; capsH; frameStep;
-  frameStep-0; sizeCount; iterSize-infl; frameStep-mono-j; _⊑ᶜ_; lvls-mono)
+  frameStep-0; sizeCount; iterSize-infl; iterSize-mono-count; frameStep-mono-j; _⊑ᶜ_;
+  lvls-mono)
 open import Verify-Budget-Sufficient.Measures using
   (pathLen; ∧-true; 2X≡X+X; all-impl)
 open import Verify-Budget-Sufficient.Keeps-Ring using
@@ -150,6 +151,26 @@ nestD≤pathΦD B (take-f _ ↠ p)         = nestD≤pathΦD B p
 nestD≤pathΦD B (from-inner _ _ _ ↠ p) = nestD≤pathΦD B p
 nestD≤pathΦD B (thru-outer _ _ ↠ p)   = s≤s (nestD≤pathΦD B p)
 
+-- THE PACKED READING SURVIVES A STEP, which is what lets it travel
+-- down the walk beside the strict one rather than being re-derived at
+-- every frame.  Both halves step for their own reason and neither
+-- needs the cap to move: the frame half is a pairing, so the tail's is
+-- one projection; and the length half is a BUDGET rather than a
+-- per-frame ledger, so dropping a frame can only spend less of it.
+-- That is the asymmetry the strict reading does not have -- it re-mints
+-- its length conjunct at every frame against the cap itself, which is
+-- why it is a descent invariant and this is not.
+pathSzL?-tail : ∀ {n} {Γ : Ctx n} {s u t} (B : ℕ)
+  (f : Frame Γ s u) (p : Path Γ u t) →
+  pathSzL? B (f ↠ p) ≡ true → pathSzL? B p ≡ true
+pathSzL?-tail B f p h =
+  ∧-intro (∧-trueʳ {a = frameSz? B f} {b = pathFrameSz? B p}
+             (∧-trueˡ {a = pathFrameSz? B (f ↠ p)}
+                      {b = pathLen (f ↠ p) ≤ᵇ B + B} h))
+          (T⇒≡true _ (≤⇒≤ᵇ (≤-trans (n≤1+n (pathLen p))
+            (≤ᵇ⇒≤ (suc (pathLen p)) (B + B)
+              (T-to (∧-trueʳ {a = pathFrameSz? B (f ↠ p)} h))))))
+
 -- THE GRANT AT ONE OUTER FRAME, which was the whole of what the walk
 -- still owed: the four other frame kinds owe nothing, so a path with
 -- no `thru-outer` in it needs none of this.  What is owed is a SIGHTED
@@ -169,13 +190,21 @@ nestD≤pathΦD B (thru-outer _ _ ↠ p)   = s≤s (nestD≤pathΦD B p)
 -- leaf's square beside the wrap on the walk's.  The doubling in the
 -- charge is what lets the first piece sit beside the other two rather
 -- than competing with them.
+
+-- AND IT ASKS FOR THE PACKED SIZE READING, WHICH IS THE ONLY ONE THIS
+-- ARM EVER SPENDS.  The grant is priced by `pathΦF-cap-atLen` at the
+-- entry cap against a length budget of twice it, so a frame syntax and
+-- a doubled length is the currency exactly -- the strict per-frame
+-- ledger was being weakened to this on arrival.  Asking for what is
+-- spent is what frees the walk to carry the strict reading at its OWN
+-- level rather than at the entry, where minting it was refuted.
 walk-thru-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (sl : Slots Γ) (id : ℕ) (sf : Gas) (eid : Id) (now : Tick)
   (op : AllOp) (nid : NodeId)
   (p : Path Γ u t) (vals : List (Val Γ (obs u))) (fin : Bool)
   (sched : Sched Γ) (st : EvalSt e) →
   Sched.slots sched ≡ sl →
-  pathSz? (Caps.cSize (capsAt e sl id)) (thru-outer op nid ↠ p) ≡ true →
+  pathSzL? (Caps.cSize (capsAt e sl id)) (thru-outer op nid ↠ p) ≡ true →
   pathNestD (thru-outer op nid ↠ p) ≤ nestCapAt e sl id →
   valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
          (thru-outer op nid ↠ p) vals ≡ true →
@@ -203,7 +232,7 @@ walk-thru-fit {n = n} {e = e} sl id sf eid now op nid p vals fin sched st
   W    = slotWrapSum sl
   G    = Dn + M + n * W
   hpp  : pathSzL? S p ≡ true
-  hpp  = pathSz?-szL S p (∧-trueʳ hpz)
+  hpp  = pathSzL?-tail S (thru-outer op nid) p hpz
   2≤S  = 2≤capsAt-size e sl id
   1≤S  = ≤-trans (s≤s z≤n) 2≤S
   EXP  : ℕ
@@ -653,12 +682,14 @@ postulate
   --   spiral stop were all inside this potential, so a fourth is the
   --   same route under a new name.
   scanΦ-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (sl : Slots Γ) (id : ℕ) (sf : Gas) (eid : Id) (now : Tick)
+    (sl : Slots Γ) (id : ℕ) (sf : Gas) (eid : Id) (now : Tick) (Lv : ℕ)
     (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
     (p : Path Γ u t) (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ)
     (st : EvalSt e) →
     Sched.slots sched ≡ sl →
-    pathSz? (Caps.cSize (capsAt e sl id)) (scan-f fn nid ↠ p) ≡ true →
+    pathSz? (Caps.cSize (frameStep Lv (capsAt e sl id)))
+            (scan-f fn nid ↠ p) ≡ true →
+    pathSzL? (Caps.cSize (capsAt e sl id)) (scan-f fn nid ↠ p) ≡ true →
     pathNestD (scan-f fn nid ↠ p) ≤ nestCapAt e sl id →
     valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
            (scan-f fn nid ↠ p) vals ≡ true →
@@ -807,12 +838,14 @@ postulate
   --   charge is read under -- the store ceiling sits under the budget,
   --   so the fold arm's settlement binds this one too.
   innerΦ-quiet-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-    (sl : Slots Γ) (id : ℕ) (sf : Gas) (eid : Id) (now : Tick)
+    (sl : Slots Γ) (id : ℕ) (sf : Gas) (eid : Id) (now : Tick) (Lv : ℕ)
     (op : AllOp) (allNid inst : NodeId)
     (p : Path Γ s t) (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ)
     (st : EvalSt e) →
     Sched.slots sched ≡ sl →
-    pathSz? (Caps.cSize (capsAt e sl id)) (from-inner op allNid inst ↠ p) ≡ true →
+    pathSz? (Caps.cSize (frameStep Lv (capsAt e sl id)))
+            (from-inner op allNid inst ↠ p) ≡ true →
+    pathSzL? (Caps.cSize (capsAt e sl id)) (from-inner op allNid inst ↠ p) ≡ true →
     pathNestD (from-inner op allNid inst ↠ p) ≤ nestCapAt e sl id →
     valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
            (from-inner op allNid inst ↠ p) vals ≡ true →
@@ -872,13 +905,15 @@ postulate
   --   instant's fuel cannot dominate the factor, for the reason the
   --   scan arm's mechanism route records.
   innerΦ-drain-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-    (sl : Slots Γ) (id : ℕ) (sf : Gas) (eid : Id) (now : Tick)
+    (sl : Slots Γ) (id : ℕ) (sf : Gas) (eid : Id) (now : Tick) (Lv : ℕ)
     (op : AllOp) (allNid inst : NodeId)
     (p : Path Γ s t) (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ)
     (st : EvalSt e) (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ s)) (od : Bool) →
     lookupNode allNid (EvalSt.nodes st) ≡ just (mergeAll-st lim act q od) →
     Sched.slots sched ≡ sl →
-    pathSz? (Caps.cSize (capsAt e sl id)) (from-inner op allNid inst ↠ p) ≡ true →
+    pathSz? (Caps.cSize (frameStep Lv (capsAt e sl id)))
+            (from-inner op allNid inst ↠ p) ≡ true →
+    pathSzL? (Caps.cSize (capsAt e sl id)) (from-inner op allNid inst ↠ p) ≡ true →
     pathNestD (from-inner op allNid inst ↠ p) ≤ nestCapAt e sl id →
     valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
            (from-inner op allNid inst ↠ p) vals ≡ true →
@@ -894,47 +929,47 @@ postulate
            + pathΦD (Caps.cSize (capsAt e sl id)) p)
       ≤ nestΦAt e sl id
 
--- THE QUIET ARM, ASSEMBLED, and the level it reports is zero because
--- nothing here descends: no queue, no subscribe, so the entry's own
--- receipts are already the ones the arm owes.
+-- THE QUIET ARM, ASSEMBLED, and the level it reports is the WALK'S
+-- because that is the level its size receipt is read at.  Nothing here
+-- descends, so the arm is free to report any level the receipt covers;
+-- reporting the walk's is what lets the receipt arrive un-widened, and
+-- the two path conjuncts are then projections.
 innerΦ-fit-quiet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-  (sl : Slots Γ) (id : ℕ) (sf : Gas) (eid : Id) (now : Tick)
+  (sl : Slots Γ) (id : ℕ) (sf : Gas) (eid : Id) (now : Tick) (Lv : ℕ)
   (op : AllOp) (allNid inst : NodeId)
   (p : Path Γ s t) (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ)
   (st : EvalSt e) →
   Sched.slots sched ≡ sl →
-  pathSz? (Caps.cSize (capsAt e sl id)) (from-inner op allNid inst ↠ p) ≡ true →
+  pathSz? (Caps.cSize (frameStep Lv (capsAt e sl id)))
+          (from-inner op allNid inst ↠ p) ≡ true →
+  pathSzL? (Caps.cSize (capsAt e sl id)) (from-inner op allNid inst ↠ p) ≡ true →
   pathNestD (from-inner op allNid inst ↠ p) ≤ nestCapAt e sl id →
   valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
          (from-inner op allNid inst ↠ p) vals ≡ true →
-  Σ Caps λ c → Σ ℕ λ d → Σ ℕ λ Lv → Σ ℕ λ G →
+  Σ Caps λ c → Σ ℕ λ d → Σ ℕ λ Lv′ → Σ ℕ λ G →
     InnerΦCore sf eid now (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id) 0
-      op allNid inst p vals fin sched st c d Lv G
-innerΦ-fit-quiet {e = e} sl id sf eid now op allNid inst p vals fin sched st
-                 hsl hpz hnd hΦ =
+      op allNid inst p vals fin sched st c d Lv′ G
+innerΦ-fit-quiet {e = e} sl id sf eid now Lv op allNid inst p vals fin sched st
+                 hsl hpz hpl hnd hΦ =
   capsAt e sl id
   , depthReact sf op allNid inst p eid now vals sched st fin
-  , 0
+  , Lv
   , (nodeNestAt allNid st ⊔ nestDᵛˢ vals)
   , subst (λ z → FaceOK (capsAt e sl id) z) (sym hsl) (faceOK-capsAt e sl id)
   , ≤-refl
-  , pathSz?-widen p (iterSize-infl B 1≤B 0 B) (∧-trueʳ hpz)
-  , ≤-trans (≤ᵇ⇒≤ _ _ (T-to (∧-trueˡ hpz))) (iterSize-infl B 1≤B 0 B)
+  , ∧-trueʳ hpz
+  , ≤ᵇ⇒≤ _ _ (T-to (∧-trueˡ hpz))
   , ≤-refl
-  , innerΦ-quiet-fit sl id sf eid now op allNid inst p vals fin sched st
-      hsl hpz hnd hΦ
-  where
-  B   = Caps.cSize (capsAt e sl id)
-  1≤B : 1 ≤ B
-  1≤B = ≤-trans (s≤s z≤n) (2≤capsAt-size e sl id)
+  , innerΦ-quiet-fit sl id sf eid now Lv op allNid inst p vals fin sched st
+      hsl hpz hpl hnd hΦ
 
 -- AND THE DRAIN ARM, WHOSE LEDGER IS CARRIED IN RATHER THAN MINTED.
 -- The queue's caps receipt is the caps face's own product, delivered
 -- along the walk this arm sits on, so the level it is read at is the
 -- walk's -- and the record's count is the ROUND's, since that is the
 -- count the carried ledger is denominated at.  The two path conjuncts
--- are read at the walk's level by widening, so the arm still never has
--- to know how far the descent climbed.
+-- arrive at the walk's level already, so the arm still never has to
+-- know how far the descent climbed and nothing is widened here.
 innerΦ-fit-drain : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (sl : Slots Γ) (id : ℕ) (sf : Gas) (eid : Id) (now : Tick) (Lv : ℕ)
   (op : AllOp) (allNid inst : NodeId)
@@ -942,7 +977,9 @@ innerΦ-fit-drain : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (st : EvalSt e) (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ s)) (od : Bool) →
   lookupNode allNid (EvalSt.nodes st) ≡ just (mergeAll-st lim act q od) →
   Sched.slots sched ≡ sl →
-  pathSz? (Caps.cSize (capsAt e sl id)) (from-inner op allNid inst ↠ p) ≡ true →
+  pathSz? (Caps.cSize (frameStep Lv (capsAt e sl id)))
+          (from-inner op allNid inst ↠ p) ≡ true →
+  pathSzL? (Caps.cSize (capsAt e sl id)) (from-inner op allNid inst ↠ p) ≡ true →
   pathNestD (from-inner op allNid inst ↠ p) ≤ nestCapAt e sl id →
   valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
          (from-inner op allNid inst ↠ p) vals ≡ true →
@@ -955,7 +992,7 @@ innerΦ-fit-drain : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
         (drainW sf allNid p eid now q sched st)
         op allNid inst p vals fin sched st c d Lv′ G
 innerΦ-fit-drain {e = e} sl id sf eid now Lv op allNid inst p vals fin sched st
-                 lim act q od eqn hsl hpz hnd hΦ hdrain hdep =
+                 lim act q od eqn hsl hpz hpl hnd hΦ hdrain hdep =
   capsAt e sl id
   , capsH e sl id
   , Lv
@@ -965,27 +1002,25 @@ innerΦ-fit-drain {e = e} sl id sf eid now Lv op allNid inst p vals fin sched st
           (sym hsl) hdrain
   , subst (λ z → FaceOK (capsAt e sl id) z) (sym hsl) (faceOK-capsAt e sl id)
   , hdep
-  , pathSz?-widen p (iterSize-infl B 1≤B Lv B) (∧-trueʳ hpz)
-  , ≤-trans (≤ᵇ⇒≤ _ _ (T-to (∧-trueˡ hpz))) (iterSize-infl B 1≤B Lv B)
+  , ∧-trueʳ hpz
+  , ≤ᵇ⇒≤ _ _ (T-to (∧-trueˡ hpz))
   , ≤-refl
-  , innerΦ-drain-fit sl id sf eid now op allNid inst p vals fin sched st
-      lim act q od eqn hsl hpz hnd hΦ
-  where
-  B   = Caps.cSize (capsAt e sl id)
-  1≤B : 1 ≤ B
-  1≤B = ≤-trans (s≤s z≤n) (2≤capsAt-size e sl id)
+  , innerΦ-drain-fit sl id sf eid now Lv op allNid inst p vals fin sched st
+      lim act q od eqn hsl hpz hpl hnd hΦ
 
 -- THE QUIET ASSEMBLY, and the two ledgers are discharged rather than
 -- carried: a lookup that is not a merge at this type cannot satisfy
 -- either premise, so both are functions out of an impossibility.
 innerΦ-quiet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-  (sl : Slots Γ) (id : ℕ) (sf : Gas) (eid : Id) (now : Tick)
+  (sl : Slots Γ) (id : ℕ) (sf : Gas) (eid : Id) (now : Tick) (Lv : ℕ)
   (op : AllOp) (allNid inst : NodeId)
   (p : Path Γ s t) (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ)
   (st : EvalSt e) →
   NotMergeAt {s = s} (lookupNode allNid (EvalSt.nodes st)) →
   Sched.slots sched ≡ sl →
-  pathSz? (Caps.cSize (capsAt e sl id)) (from-inner op allNid inst ↠ p) ≡ true →
+  pathSz? (Caps.cSize (frameStep Lv (capsAt e sl id)))
+          (from-inner op allNid inst ↠ p) ≡ true →
+  pathSzL? (Caps.cSize (capsAt e sl id)) (from-inner op allNid inst ↠ p) ≡ true →
   pathNestD (from-inner op allNid inst ↠ p) ≤ nestCapAt e sl id →
   valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
          (from-inner op allNid inst ↠ p) vals ≡ true →
@@ -993,11 +1028,11 @@ innerΦ-quiet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   parkStrat? (pathFloor p) (lookupNode allNid (EvalSt.nodes st)) ≡ true →
   InnerΦBody sf eid now (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
              op allNid inst p vals fin sched st
-innerΦ-quiet sl id sf eid now op allNid inst p vals fin sched st ¬m hsl hpz hnd hΦ stP stQ
-  with innerΦ-fit-quiet sl id sf eid now op allNid inst p vals fin sched st
-         hsl hpz hnd hΦ
-... | c , d , Lv , G , fok , hdr , hsz , hlen , hG , hnum =
-  c , d , 0 , Lv , G , fok
+innerΦ-quiet sl id sf eid now Lv op allNid inst p vals fin sched st ¬m hsl hpz hpl hnd hΦ stP stQ
+  with innerΦ-fit-quiet sl id sf eid now Lv op allNid inst p vals fin sched st
+         hsl hpz hpl hnd hΦ
+... | c , d , Lv′ , G , fok , hdr , hsz , hlen , hG , hnum =
+  c , d , 0 , Lv′ , G , fok
   , (λ lim act q od h → ⊥-elim (¬m lim act q od h))
   , (λ lim act q od h → ⊥-elim (¬m lim act q od h))
   , hdr , hsz , hlen , stP , stQ , hG , hnum
@@ -1012,7 +1047,9 @@ innerΦ-drain : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (st : EvalSt e) (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ s)) (od : Bool) →
   lookupNode allNid (EvalSt.nodes st) ≡ just (mergeAll-st lim act q od) →
   Sched.slots sched ≡ sl →
-  pathSz? (Caps.cSize (capsAt e sl id)) (from-inner op allNid inst ↠ p) ≡ true →
+  pathSz? (Caps.cSize (frameStep Lv (capsAt e sl id)))
+          (from-inner op allNid inst ↠ p) ≡ true →
+  pathSzL? (Caps.cSize (capsAt e sl id)) (from-inner op allNid inst ↠ p) ≡ true →
   pathNestD (from-inner op allNid inst ↠ p) ≤ nestCapAt e sl id →
   valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
          (from-inner op allNid inst ↠ p) vals ≡ true →
@@ -1024,11 +1061,11 @@ innerΦ-drain : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   InnerΦBody sf eid now (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
              op allNid inst p vals fin sched st
 innerΦ-drain sl id sf eid now Lv op allNid inst p vals fin sched st lim act q od
-             eqn hsl hpz hnd hΦ hfd hdep stP stQ
+             eqn hsl hpz hpl hnd hΦ hfd hdep stP stQ
   with innerΦ-fit-drain sl id sf eid now Lv op allNid inst p vals fin sched st
-         lim act q od eqn hsl hpz hnd hΦ (hfd lim act q od eqn) hdep
-... | c , d , Lv , G , hdrain , fok , hdr , hsz , hlen , hG , hnum =
-  c , d , drainW sf allNid p eid now q sched st , Lv , G , fok
+         lim act q od eqn hsl hpz hpl hnd hΦ (hfd lim act q od eqn) hdep
+... | c , d , Lv′ , G , hdrain , fok , hdr , hsz , hlen , hG , hnum =
+  c , d , drainW sf allNid p eid now q sched st , Lv′ , G , fok
   , (λ { _ _ _ _ h → transport h hdrain })
   , (λ { _ _ _ _ h →
           transport {P = λ _ _ q′ _ → drainW sf allNid p eid now q′ sched st
@@ -1057,7 +1094,9 @@ innerΦ-fit-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (st : EvalSt e) (ns : Maybe (NodeState Γ)) →
   lookupNode allNid (EvalSt.nodes st) ≡ ns →
   Sched.slots sched ≡ sl →
-  pathSz? (Caps.cSize (capsAt e sl id)) (from-inner op allNid inst ↠ p) ≡ true →
+  pathSz? (Caps.cSize (frameStep Lv (capsAt e sl id)))
+          (from-inner op allNid inst ↠ p) ≡ true →
+  pathSzL? (Caps.cSize (capsAt e sl id)) (from-inner op allNid inst ↠ p) ≡ true →
   pathNestD (from-inner op allNid inst ↠ p) ≤ nestCapAt e sl id →
   valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
          (from-inner op allNid inst ↠ p) vals ≡ true →
@@ -1069,34 +1108,34 @@ innerΦ-fit-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   InnerΦBody sf eid now (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
              op allNid inst p vals fin sched st
 innerΦ-fit-go sl id sf eid now Lv op allNid inst p vals fin sched st
-              nothing eqn hsl hpz hnd hΦ hfd hdep stP stQ =
-  innerΦ-quiet sl id sf eid now op allNid inst p vals fin sched st
-    (notMerge-none eqn) hsl hpz hnd hΦ stP stQ
+              nothing eqn hsl hpz hpl hnd hΦ hfd hdep stP stQ =
+  innerΦ-quiet sl id sf eid now Lv op allNid inst p vals fin sched st
+    (notMerge-none eqn) hsl hpz hpl hnd hΦ stP stQ
 innerΦ-fit-go sl id sf eid now Lv op allNid inst p vals fin sched st
-              (just (scan-st v)) eqn hsl hpz hnd hΦ hfd hdep stP stQ =
-  innerΦ-quiet sl id sf eid now op allNid inst p vals fin sched st
-    (notMerge-scan v eqn) hsl hpz hnd hΦ stP stQ
+              (just (scan-st v)) eqn hsl hpz hpl hnd hΦ hfd hdep stP stQ =
+  innerΦ-quiet sl id sf eid now Lv op allNid inst p vals fin sched st
+    (notMerge-scan v eqn) hsl hpz hpl hnd hΦ stP stQ
 innerΦ-fit-go sl id sf eid now Lv op allNid inst p vals fin sched st
-              (just (take-st k)) eqn hsl hpz hnd hΦ hfd hdep stP stQ =
-  innerΦ-quiet sl id sf eid now op allNid inst p vals fin sched st
-    (notMerge-take k eqn) hsl hpz hnd hΦ stP stQ
+              (just (take-st k)) eqn hsl hpz hpl hnd hΦ hfd hdep stP stQ =
+  innerΦ-quiet sl id sf eid now Lv op allNid inst p vals fin sched st
+    (notMerge-take k eqn) hsl hpz hpl hnd hΦ stP stQ
 innerΦ-fit-go sl id sf eid now Lv op allNid inst p vals fin sched st
-              (just (switch-st cur od)) eqn hsl hpz hnd hΦ hfd hdep stP stQ =
-  innerΦ-quiet sl id sf eid now op allNid inst p vals fin sched st
-    (notMerge-switch cur od eqn) hsl hpz hnd hΦ stP stQ
+              (just (switch-st cur od)) eqn hsl hpz hpl hnd hΦ hfd hdep stP stQ =
+  innerΦ-quiet sl id sf eid now Lv op allNid inst p vals fin sched st
+    (notMerge-switch cur od eqn) hsl hpz hpl hnd hΦ stP stQ
 innerΦ-fit-go sl id sf eid now Lv op allNid inst p vals fin sched st
-              (just (exhaust-st ia od)) eqn hsl hpz hnd hΦ hfd hdep stP stQ =
-  innerΦ-quiet sl id sf eid now op allNid inst p vals fin sched st
-    (notMerge-exhaust ia od eqn) hsl hpz hnd hΦ stP stQ
+              (just (exhaust-st ia od)) eqn hsl hpz hpl hnd hΦ hfd hdep stP stQ =
+  innerΦ-quiet sl id sf eid now Lv op allNid inst p vals fin sched st
+    (notMerge-exhaust ia od eqn) hsl hpz hpl hnd hΦ stP stQ
 innerΦ-fit-go {s = s} sl id sf eid now Lv op allNid inst p vals fin sched st
-              (just (mergeAll-st {w} lim act q od)) eqn hsl hpz hnd hΦ hfd hdep stP stQ
+              (just (mergeAll-st {w} lim act q od)) eqn hsl hpz hpl hnd hΦ hfd hdep stP stQ
   with w ≟ᵗ s
 ... | no ne =
-  innerΦ-quiet sl id sf eid now op allNid inst p vals fin sched st
-    (notMerge-other lim act q od eqn ne) hsl hpz hnd hΦ stP stQ
+  innerΦ-quiet sl id sf eid now Lv op allNid inst p vals fin sched st
+    (notMerge-other lim act q od eqn ne) hsl hpz hpl hnd hΦ stP stQ
 ... | yes refl =
   innerΦ-drain sl id sf eid now Lv op allNid inst p vals fin sched st
-    lim act q od eqn hsl hpz hnd hΦ hfd hdep stP stQ
+    lim act q od eqn hsl hpz hpl hnd hΦ hfd hdep stP stQ
 
 innerΦ-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (sl : Slots Γ) (id : ℕ) (sf : Gas) (eid : Id) (now : Tick) (Lv : ℕ)
@@ -1104,7 +1143,9 @@ innerΦ-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (p : Path Γ s t) (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ)
   (st : EvalSt e) →
   Sched.slots sched ≡ sl →
-  pathSz? (Caps.cSize (capsAt e sl id)) (from-inner op allNid inst ↠ p) ≡ true →
+  pathSz? (Caps.cSize (frameStep Lv (capsAt e sl id)))
+          (from-inner op allNid inst ↠ p) ≡ true →
+  pathSzL? (Caps.cSize (capsAt e sl id)) (from-inner op allNid inst ↠ p) ≡ true →
   pathNestD (from-inner op allNid inst ↠ p) ≤ nestCapAt e sl id →
   valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
          (from-inner op allNid inst ↠ p) vals ≡ true →
@@ -1125,10 +1166,10 @@ innerΦ-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   FrameΦHyp sf eid now (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
             (from-inner op allNid inst) p vals fin sched st
 innerΦ-fit sl id sf eid now Lv op allNid inst p vals fin sched st
-           hsl hpz hnd hΦ hfd hdep stP stQ stR stK stW =
+           hsl hpz hpl hnd hΦ hfd hdep stP stQ stR stK stW =
   stR , stK , stW ,
   innerΦ-fit-go sl id sf eid now Lv op allNid inst p vals fin sched st
-    (lookupNode allNid (EvalSt.nodes st)) refl hsl hpz hnd hΦ hfd hdep stP stQ
+    (lookupNode allNid (EvalSt.nodes st)) refl hsl hpz hpl hnd hΦ hfd hdep stP stQ
 
 -- AND THE FRAME'S SIDE-CONDITION IS A CASE SPLIT AND NOTHING ELSE,
 -- which is the point of separating it from the walk below: the silent
@@ -1145,7 +1186,8 @@ frameΦ-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   (f : Frame Γ s u) (p : Path Γ u t)
   (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
   Sched.slots sched ≡ sl →
-  pathSz? (Caps.cSize (capsAt e sl id)) (f ↠ p) ≡ true →
+  pathSz? (Caps.cSize (frameStep Lv (capsAt e sl id))) (f ↠ p) ≡ true →
+  pathSzL? (Caps.cSize (capsAt e sl id)) (f ↠ p) ≡ true →
   pathNestD (f ↠ p) ≤ nestCapAt e sl id →
   valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id) (f ↠ p) vals ≡ true →
   frameDrainOK (capsAt e sl id) sl (capsH e sl id) Lv sf eid now f p vals sched st →
@@ -1159,14 +1201,14 @@ frameΦ-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   pathPark? (f ↠ p) st ≡ true →
   FrameΦHyp sf eid now (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
             f p vals fin sched st
-frameΦ-fit sl id sf eid now Lv (map-f _)  p vals fin sched st _ _ _ _ _ _ _ _ _ _ = tt
-frameΦ-fit sl id sf eid now Lv (take-f _) p vals fin sched st _ _ _ _ _ _ _ _ _ _ = tt
-frameΦ-fit sl id sf eid now Lv (scan-f fn nid) p vals fin sched st hsl hpz hnd hΦ _ _ _ _ _ _ =
-  scanΦ-fit sl id sf eid now fn nid p vals fin sched st hsl hpz hnd hΦ
+frameΦ-fit sl id sf eid now Lv (map-f _)  p vals fin sched st _ _ _ _ _ _ _ _ _ _ _ = tt
+frameΦ-fit sl id sf eid now Lv (take-f _) p vals fin sched st _ _ _ _ _ _ _ _ _ _ _ = tt
+frameΦ-fit sl id sf eid now Lv (scan-f fn nid) p vals fin sched st hsl hpz hpl hnd hΦ _ _ _ _ _ _ =
+  scanΦ-fit sl id sf eid now Lv fn nid p vals fin sched st hsl hpz hpl hnd hΦ
 frameΦ-fit {s = s} sl id sf eid now Lv (from-inner op allNid inst) p vals fin sched st
-           hsl hpz hnd hΦ hfd hdep stP stQ stR stK =
+           hsl hpz hpl hnd hΦ hfd hdep stP stQ stR stK =
   innerΦ-fit sl id sf eid now Lv op allNid inst p vals fin sched st
-    hsl hpz hnd hΦ hfd hdep stP (∧-trueˡ stQ)
+    hsl hpz hpl hnd hΦ hfd hdep stP (∧-trueˡ stQ)
     (pathOrd?-outer (Sched.nextNode sched) allNid inst op p stR)
     (proj₂ (∧-true _ _ stK))
     -- and the owner of the outer's cell, off the SAME frame reading the
@@ -1178,8 +1220,8 @@ frameΦ-fit {s = s} sl id sf eid now Lv (from-inner op allNid inst) p vals fin s
     (framePark?-own {s = s} {u = s} (pathFloor p) (from-inner op allNid inst)
        allNid st stQ
        (cong (_∨ ((inst ≡ᵇ allNid) ∨ false)) (≡ᵇ-refl allNid)))
-frameΦ-fit sl id sf eid now Lv (thru-outer op nid) p vals fin sched st hsl hpz hnd hΦ _ _ _ _ _ _ =
-  walk-thru-fit sl id sf eid now op nid p vals fin sched st hsl hpz hnd hΦ
+frameΦ-fit sl id sf eid now Lv (thru-outer op nid) p vals fin sched st hsl _ hpl hnd hΦ _ _ _ _ _ _ =
+  walk-thru-fit sl id sf eid now op nid p vals fin sched st hsl hpl hnd hΦ
 
 -- THE WALK ITSELF, and it is the fold's own recursion with the grant
 -- hung off each frame.  Nothing here is arithmetic: the potential is
@@ -1315,204 +1357,14 @@ postulate
       (share-sink {t = t} i) vals ≡ true →
     valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id) p vals ≡ true
 
--- AND WRITING THE BODY FOUND TWO MORE, BOTH ABOUT WHAT THE REGISTRY
--- MAY HOLD RATHER THAN ABOUT THE POTENTIAL.  A chain the fan-out
--- re-enters is walked FROM THE TOP, so it needs its size receipt at
--- the program's own cap -- and the walk carries no registry reading of
--- its own to narrow down to it, the level ledger having turned out to
--- pay for the fan-out on its own.  Only the registration side supplies
--- this one.
-
--- AND WHAT A SIZE RECEIPT HAS TO PRICE IS THE REGISTERED LENGTH, which
--- does not sit at a constant.  The reachable maximum is two frames per
--- flatten layer standing above a share -- so it climbs with the
--- program's own syntax, and a receipt
--- stated at any numeral is outrun by the fourth layer.  That is why the
--- mint-side fact cannot be a bound chosen here: it has to read the
--- program, which is what the cap does, and which is equally why this
--- row admits no instantiation of its own -- the cap returns at no
--- program, so only the conjunct underneath it is reachable.
-
--- AND THE FIELD IT WANTS ALREADY EXISTS -- WHAT IS MISSING IS A
--- DIRECTION, NOT AN INVARIANT.  Asking whether the registry belongs to
--- the invariant record as a CARRIED field rather than a measured one
--- answers itself: `capsOK?` carries the registry's size receipt as a
--- conjunct already, the sink's own predicate carries the same receipt
--- over the ADMITTED sublist, and the walk's sink clause holds a third
--- at the stepped cap.  So there is no producer that fails to
--- re-establish it, because there is nothing to add.
---
--- EVERY ONE OF THE THREE IS READ AT A CAP ABOVE THE ONE THE FANNED
--- WALK DEMANDS, AND THE RECEIPT WEAKENS UPWARD.  The sink's conjunct
--- is denominated in the round's EXIT cap and the walk's clause in the
--- STEPPED one, while the chains a sink fans into are walked at the
--- round's ENTRY cap -- and entry is under both, provably.  A receipt
--- at a larger cap does not deliver one at a smaller, so all three are
--- in hand and none can be spent.  That is why this row survived the
--- field question: the residue is that the fanned chain's walk is
--- denominated in the entry cap at all, which is a restatement of the
--- walk rather than a fact about the registry.
-
--- AND THE MINT'S OWN CONTRACT PRICES THIS, WHICH TURNS THE RESIDUE
--- FROM A CURRENCY INTO A COUNT.  `register-caps` is proven, and it is
--- the only rule carrying a registry reading across a registration: it
--- consumes the reading at one frame level and returns it one level
--- HIGHER, per chain registered.  So a state that has minted k times
--- since the instant's entry holds its reading at the k-th step and
--- nowhere below it, while `pathSz?` weakens upward.  That is not a
--- gap in the registry's theory -- `capsOK?-regs` already delivers
--- this row's exact conclusion from a receipt at the cap the reading
--- is held at, so nothing here is unproven.  The reading is held at a
--- level the conclusion does not name, and the search for a price that
--- is not a cap was looking for the wrong kind of object.
-
--- SO THE RISKY REGION IS SAME-INSTANT REGISTRATION -- STRICTLY
--- SMALLER THAN THE ROW, AND THE CONNECT PATH SITS INSIDE IT.  At no
--- mints the step is the identity and the row discharges outright out
--- of `capsOK?-regs`, so every counterexample needs a registration
--- between the instant's entry and the fan.  `sharedConnect-core` is
--- one: it registers the subscriber's own continuation and THEN
--- subscribes the share's definition with `share-sink` as the
--- continuation, so a definition emitting synchronously reaches the
--- fan with that registration already in the registry -- and
--- `register-caps` prices exactly that registration at one step.  The
--- region is therefore not a corner but the ordinary shared-subscribe
--- path, which is what makes the entry-cap reading unavailable rather
--- than merely unproven.  Read off the connect, not instantiated.
-
--- AND NEITHER IS THE ADMISSION FILTER'S TO CARRY, which is what the
--- pair being stated over the fan-out was hiding.  `shareAdmit`
--- selects on the source and the element type and never reads a path,
--- so it can only pass a receipt along, never establish one -- and
--- both passings are already proven, a size one and a generic one over
--- an arbitrary path predicate.  So the residue is the REGISTRY read
--- at the program's own cap, and it is owed at whatever mints a
--- registration.
---
--- REFUTED: `Refuted.Fan-Chain-Registry`, which is what licenses the
---   two premises below being premises rather than facts.  Stated over
---   an arbitrary state each fails at a single `register` onto the
---   initial one: a `take` chain one longer than the bound, at EVERY
---   bound rather than at a chosen one, and a mapped ladder of `*All`
---   layers against a unit of one.
--- DEAD ROUTE: restating the fanned walk at whichever of the three caps
---   is in hand, so that the receipt is spent rather than re-derived.
---   The entry cap is load-bearing for exactly one thing and it is not
---   a bookkeeping one: the Φ PRICING reads `pathΦF` and `pathΦD` at
---   the cap the walk's own budget is denominated at, so a receipt
---   taken higher moves the leaf's exponent and the budget under it --
---   which is the share ring's fold budget, the quantity the sink
---   predicate's own dead route records as unmovable, arriving here
---   from the registry's side rather than the caps face's.  Nothing
---   else in the walk reads the cap, the size and registry receipts it
---   used to thread having reached no obligation at all.
--- DEAD ROUTE: a FLAT carried field -- one predicate at one cap, added
---   to the walk's bundle -- answering this row together with
---   `walk-share-nestOK`, `sink-fan-sink` and the two inner Φ arms,
---   which is what those four sharing an obstacle invites.  Each
---   currency kills it separately and for the same reason: the descent
---   reads a state the instant has STEPPED, every receipt in hand is
---   denominated at or above the cap it stepped to, and each of these
---   predicates WEAKENS as its cap grows -- so a field fixed at one cap
---   is either unavailable at the read or useless at the consumer, and
---   no producer cascade repairs a direction.  What the elimination
---   leaves standing is the INDEXED form, a per-entry cap under an
---   absolute ceiling rather than one cap for the whole fold; and that
---   is not a new mechanism, `stepFrame-nodes` already proving a
---   per-frame advance under exactly such a ceiling.  The residue is
---   whether the Φ pricing affords a leaf exponent read at a stepped
---   cap, which the route directly above prices at a FLAT raise and
---   therefore does not answer for an indexed one.
--- DEAD ROUTE: that INDEXED form itself, and it dies on the same
---   arithmetic as the flat raise -- by ONE step of the recurrence
---   rather than at some threshold, so no ceiling is small enough.
---   The quantity, since "one step" is the whole claim: `sizeStep`
---   sends a size to itself times one more than twice itself, so a
---   single step carries the cap to roughly twice its square, and
---   `pathΦF`'s sink clause raises two to the cap times a successor of
---   it times itself.  The exponent is therefore CUBIC in the cap
---   before the step and SIXTH-POWER after it -- a ratio that is
---   itself exponential, not a constant or a polynomial factor, which
---   is why no ceiling and no per-entry indexing closes it.
---   What a size receipt actually buys the Φ pricing is a LENGTH, via
---   `pathSz?-len`, and the length lands in an EXPONENT: a sink's own
---   factor is two to the cap times a square of it, and a fanned chain
---   is affordable exactly while its length is under the cap the
---   CONCLUSION is stated at.  A receipt at any larger cap bounds the
---   length by that cap instead and multiplies the exponent by the
---   ratio, which one step already makes a square.  Nor does weakening
---   only the PREMISE escape it, which is how the caps face repaired
---   its own version: there the conclusions already named the larger
---   cap, and here they cannot, so the premise's cap reaches the
---   conclusion through the factor lemmas either way.
--- DEAD ROUTE: moving the Φ face's DENOMINATION rather than any
---   receipt, which is the one shape the routes above leave standing --
---   the receipt in hand names the stepped cap and the conclusion names
---   the entry one, so the remaining question is which instant's
---   numbers the whole pricing is stated at.  Both answers die on the
---   pricing rather than on the registry, and `pathΦF`'s sink clause
---   carries the arithmetic: the face cannot follow the cap to the
---   stepped instant, because every frame arm spends a tie between the
---   potential and the depth budget of the instant being WALKED and the
---   descent carries no reading of the next; and the leaf alone cannot
---   follow it either, because the stepped cap is a blowup OF that same
---   depth budget.  What that leaves is not a further denomination but
---   the obligation `pathSz?`'s header already states over its two
---   callers: a chain the fan-out hands values to has to be priced by
---   something that is not a cap.
--- DEAD ROUTE: retiring the row by retiring its CONSUMER -- dropping the
---   size premise from `sink-fan-sink`, on the reading that an admitted
---   chain now arrives carrying its own `sinkAbove?` and that a climb up
---   the stratified telescope is bounded by the slot count while naming
---   no cap.  The premise has THREE consumers and only one is that leaf.
---   The root-terminating leaf spends it on the cap lemmas its own
---   assembly is built from, and the walk DOWN an admitted chain spends
---   it at `frameΦ-fit`, in three of that function's five arms, and
---   rebuilds it for the tail out of the head it just consumed -- so the
---   fan owes a size receipt per chain whatever the leaf is paid in.
---   Nor could the stratification reading substitute at any of the
---   three, and the two predicates say so by their own recursion:
---   `sinkAbove?` walks past every frame and speaks only at the
---   terminal, while the size receipt speaks at each frame it passes.
---   They are not two readings of one climb -- one counts HOPS and the
---   other counts FRAMES, and no bound on either is a bound on the
---   other.
-
--- AND THE ANSWER IS THAT THE DESCENT CANNOT CARRY IT, BECAUSE THERE
--- IS NOTHING TRUE TO CARRY.  The question this row was left on was
--- whether a registration could be handed its receipt at the level the
--- instant was ENTERED at rather than at the level the descent is
--- standing at.  It cannot: the reading is false one level up, so the
--- residue is not a lemma awaiting a premise but a statement awaiting
--- a restatement, and no field threaded to a mint pays for it.  What
--- is left is a choice at the CONSUMER -- read the registry at the
--- level the fan is standing at, which `capsOK?-regs` gives away, and
--- pay the Φ pricing's length in a currency that is not a cap; the
--- pricing is the only consumer that cannot follow a widening, and
--- moving it is the work rather than this reading.
---
--- REFUTED: `Refuted.Fan-Regs-Entry-Cap`, at the caps-generic form,
---   which is the strongest shape any route may read while `capsAt`'s
---   fields stay sealed.  The witness is one minted chain of eight
---   frames against an entry size of six, with the stepped size at
---   seventy-eight, and it discharges every side-condition the walk's
---   doors take.
-postulate
-  fan-regsSz-mint : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sl : Slots Γ) (id : ℕ) (Lv : ℕ) (sched : Sched Γ) (st : EvalSt e) →
-    capsOK? (frameStep (suc Lv) (capsAt e sl id)) sched st ≡ true →
-    regsSz? (Caps.cSize (capsAt e sl id)) (EvalSt.registry st) ≡ true
-
--- THE LEVEL IS WHAT THE FAN WAS MISSING, AND HALF OF IT IS FREE.  The
--- walk already stands at a level: `capsWalkOK` reads its caps receipt
--- at `frameStep Lv`, and the sink clause holds that receipt and then
--- drops it.  Picking it up splits the fan's registry reading in two.
--- At the instant's TOP the step is the identity, so the flat reading
--- IS the levelled one and `capsOK?-regs` closes it outright -- which
--- is what makes this a body rather than a weakening.  Above the top
--- the two caps differ and the leaf above is what is left, with the
--- risky region now named in the statement rather than in prose: a
--- registration MINTED since the instant was entered.
+-- THE LEVEL IS WHAT THE FAN WAS MISSING, AND PICKING IT UP COSTS
+-- NOTHING.  The walk already stands at a level: `capsWalkOK` reads its
+-- caps receipt at `frameStep Lv`, and the sink clause used to hold that
+-- receipt and then drop it.  Read at that level the registry's strict
+-- size reading is exactly what `capsOK?-regs` returns, so the fan's
+-- strict half is a projection rather than a statement -- and the
+-- entry-cap reading it used to ask for, the one a registration minted
+-- since the instant was entered makes false, is not asked for at all.
 --
 -- WHAT THE CALLER HAD TO CARRY IS A LEVEL AND NOTHING ELSE, which the
 -- caps face already settled and this side had not adopted.  The ring
@@ -1520,64 +1372,31 @@ postulate
 -- walk's, spends it after widening, and its depth premise never reads
 -- either -- so entering an admitted chain below the top costs the
 -- measure nothing, `depthShareGo` being level-free in its own
--- signature.  The Φ face is the one consumer that cannot follow,
--- because what it spends a size receipt on is a LENGTH under the cap
--- its CONCLUSION names, and widening moves that the wrong way.
+-- signature.
 --
--- TWIN: `sink-ring-go` -- the same fan, walked at a level, proven.
-
--- AND THE OBLIGATION SPLITS IN TWO WITH DIFFERENT FATES, WHICH IS THE
--- PART THE SURVIVING ROUTE HAD NOT COUNTED.  What the fan hands an
--- admitted chain is spent twice over: once on the terminal LEAVES and
--- once on the WALK down it.  The leaves factor cleanly -- each reads
--- the receipt only for a frame half at the entry cap and a length
--- under twice it, which is exactly the pair the entry reading already
--- takes, so a split receipt serves them verbatim.  The walk does not.
--- It spends the receipt at the subscribing frame, where the inner
--- descent's own core carries the STRICT per-frame pair at a cap it
--- WIDENS to -- so a split receipt cannot enter there, and the walk's
--- half is unrestatable locally for the same reason the descent
--- invariant is.  Nor does the stepped receipt cover it: that reading
--- is at the LARGER cap and this predicate weakens upward, so what the
--- level gives away is the weak form where the walk needs the strong
--- one.  So the two consumers want DIFFERENT receipts, which is what
--- makes the split pay rather than merely halve: the leaves take the
--- pair at the entry cap, and the walk takes the whole predicate at the
--- level it is standing at, where the fan's own caps receipt already
--- delivers it.  The cap the walk reads and the cap its potential is
--- denominated at are separate premises and only the leaves tie them,
--- so serving the leaves is what frees the walk to be re-indexed.  The
--- residue is then the descent's own step -- the inner core wants the
--- pair at a cap it widens to, and a receipt at the walk's level
--- reaches that by the same monotonicity the chain device already
--- spends, rather than by the entry-cap widening it uses today.
+-- THE ONE CONSUMER THAT CANNOT FOLLOW A WIDENING IS THE POTENTIAL
+-- PRICING, because what it spends a size receipt on is a LENGTH under
+-- the cap its CONCLUSION names.  That is the whole reason the fan
+-- reads the registry twice: the walk takes the strict predicate at the
+-- level it is standing at, which is free here, and the terminal leaves
+-- take the packed pair at the entry cap, which is the statement below.
 fan-regsSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (Lv : ℕ) (sched : Sched Γ) (st : EvalSt e) →
   capsOK? (frameStep Lv (capsAt e sl id)) sched st ≡ true →
-  regsSz? (Caps.cSize (capsAt e sl id)) (EvalSt.registry st) ≡ true
-fan-regsSz {e = e} sl id zero sched st cok =
-  capsOK?-regs (capsAt e sl id) sched st
-    (subst (λ c → capsOK? c sched st ≡ true) (frameStep-0 (capsAt e sl id)) cok)
-fan-regsSz sl id (suc Lv) sched st cok = fan-regsSz-mint sl id Lv sched st cok
-
-fan-chain-sz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (sl : Slots Γ) (id : ℕ) (i : Fin n) (st : EvalSt e) →
-  regsSz? (Caps.cSize (capsAt e sl id)) (EvalSt.registry st) ≡ true →
-  all (λ rp → pathSz? (Caps.cSize (capsAt e sl id)) (proj₂ rp))
-      (shareAdmit {t = t} i (EvalSt.registry st)) ≡ true
-fan-chain-sz {e = e} sl id i st h =
-  shareAdmit-caps (Caps.cSize (capsAt e sl id)) i (EvalSt.registry st) h
+  regsSz? (Caps.cSize (frameStep Lv (capsAt e sl id)))
+    (EvalSt.registry st) ≡ true
+fan-regsSz {e = e} sl id Lv sched st cok =
+  capsOK?-regs (frameStep Lv (capsAt e sl id)) sched st cok
 
 -- THE LEAVES' HALF OF THE SAME READING, AND IT IS THE HALF THE FLAT
--- ONE'S REFUTATION LEAVES STANDING.  What killed the entry-cap reading
--- of the registry was the LENGTH ledger and not the frame syntax:
--- `Refuted.Fan-Regs-Entry-Cap`'s witness is a minted chain of eight
--- frames against an entry size of six, so it fails the STRICT
--- per-frame conjunct `pathSz?` carries and satisfies both halves of
--- the packed reading, whose length side asks only for twice the cap.
--- So the split predicate is unrefuted exactly where the flat one is
--- not, and the risky region shrinks from the registry's per-frame
--- ledger to a frame syntax and a doubled length.
+-- ONE LEAVES STANDING.  What kills the entry-cap reading of the
+-- registry is the LENGTH ledger and not the frame syntax: the witness
+-- below is a minted chain of eight frames against an entry size of
+-- six, so it fails the STRICT per-frame conjunct `pathSz?` carries and
+-- satisfies both halves of the packed reading, whose length side asks
+-- only for twice the cap.  So the split predicate survives exactly
+-- where the flat one does not, and the risky region shrinks from the
+-- registry's per-frame ledger to a frame syntax and a doubled length.
 --
 -- AND THE TOP OF THE INSTANT PAYS FOR ITSELF, which is what makes this
 -- a body over one leaf rather than a second monolith.  At level zero
@@ -1585,6 +1404,67 @@ fan-chain-sz {e = e} sl id i st h =
 -- `capsOK?-regs`, and the packed reading is the flat one pointwise --
 -- so the mint below carries only the levels above the top, which is
 -- where a registration minted since entry can sit.
+--
+-- REFUTED: `Refuted.Fan-Regs-Entry-Cap`, at the caps-generic form,
+--   which is the strongest shape any route may read while `capsAt`'s
+--   fields stay sealed.  It discharges every side-condition the walk's
+--   doors take, and it is the strict per-frame conjunct it fails.
+-- REFUTED: `Refuted.Fan-Chain-Registry`, which is what licenses this
+--   being a premise rather than a fact.  Stated over an arbitrary
+--   state it fails at a single `register` onto the initial one: a
+--   `take` chain one longer than the bound, at EVERY bound rather than
+--   at a chosen one, and a mapped ladder of `*All` layers against a
+--   unit of one.
+-- DEAD ROUTE: serving the LEAVES from a receipt read at the level the
+--   fan is standing at, which is what the walk's own half is now
+--   restated to take and is therefore free.  The leaves cannot follow
+--   it: the potential pricing reads `pathΦF` and `pathΦD` at the cap
+--   the budget handed to the terminal is denominated at, and what a
+--   size receipt buys that pricing is a LENGTH via `pathSz?-len`
+--   landing in an EXPONENT -- a sink's factor is two to the cap times
+--   a square of it, and a fanned chain is affordable exactly while its
+--   length is under the cap the CONCLUSION is stated at.  A receipt at
+--   a larger cap bounds the length by that cap instead and multiplies
+--   the exponent by the ratio, which ONE step of `sizeStep` already
+--   makes a square: the exponent is cubic in the cap before the step
+--   and sixth-power after it.  Nor does weakening only the PREMISE
+--   escape it, which is how the caps face repaired its own version --
+--   there the conclusions already named the larger cap, and here they
+--   cannot.
+-- DEAD ROUTE: a FLAT carried field -- one predicate at one cap, added
+--   to the walk's bundle -- answering this row together with
+--   `walk-share-nestOK`, `sink-fan-sink` and the two inner potential
+--   arms, which is what those four sharing an obstacle invites.  Each
+--   currency kills it separately and for the same reason: the descent
+--   reads a state the instant has STEPPED, every receipt in hand is
+--   denominated at or above the cap it stepped to, and each of these
+--   predicates WEAKENS as its cap grows -- so a field fixed at one cap
+--   is either unavailable at the read or useless at the consumer, and
+--   no producer cascade repairs a direction.  The INDEXED form the
+--   elimination leaves standing -- a per-entry cap under an absolute
+--   ceiling, which `stepFrame-nodes` already shows is not a new
+--   mechanism -- dies on the arithmetic directly above, by ONE step of
+--   the recurrence rather than at some threshold, so no ceiling is
+--   small enough.
+-- DEAD ROUTE: moving the pricing's DENOMINATION rather than any
+--   receipt, so that the face names the cap the receipt is held at.
+--   Both answers die on the pricing rather than on the registry, and
+--   `pathΦF`'s sink clause carries the arithmetic: the face cannot
+--   follow the cap to the stepped instant, because every frame arm
+--   spends a tie between the potential and the depth budget of the
+--   instant being WALKED and the descent carries no reading of the
+--   next; and the leaf alone cannot follow it either, because the
+--   stepped cap is a blowup OF that same depth budget.
+-- DEAD ROUTE: retiring the row by dropping the size premise from
+--   `sink-fan-sink`, on the reading that an admitted chain arrives
+--   carrying its own `sinkAbove?` and that a climb up the stratified
+--   telescope is bounded by the slot count while naming no cap.  The
+--   stratification reading cannot substitute, and the two predicates
+--   say so by their own recursion: `sinkAbove?` walks past every frame
+--   and speaks only at the terminal, while the size receipt speaks at
+--   each frame it passes.  They are not two readings of one climb --
+--   one counts HOPS and the other counts FRAMES, and no bound on
+--   either is a bound on the other.
 postulate
   fan-regsSzL-mint : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (Lv : ℕ) (sched : Sched Γ) (st : EvalSt e) →
@@ -2018,7 +1898,8 @@ mutual
       sf gas nid now path vals fin sched st →
     depthFold sf gas nid now envSrc path vals evs fin sched st ≤ capsH e sl id →
     Sched.slots sched ≡ sl →
-    pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
+    pathSz? (Caps.cSize (frameStep Lv (capsAt e sl id))) path ≡ true →
+    pathSzL? (Caps.cSize (capsAt e sl id)) path ≡ true →
     pathNestD path ≤ nestCapAt e sl id →
     valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id) path vals ≡ true →
     PathΦHyp sf gas nid now (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
@@ -2059,7 +1940,8 @@ mutual
       sf gas nid now i vals fin ps sched st →
     depthShareGo sf gas nid now i vals fin ps sched st ≤ capsH e sl id →
     Sched.slots sched ≡ sl →
-    all (λ rp → pathSz? (Caps.cSize (capsAt e sl id)) (proj₂ rp)) ps ≡ true →
+    all (λ rp → pathSz? (Caps.cSize (frameStep Lv (capsAt e sl id))) (proj₂ rp))
+        ps ≡ true →
     all (λ rp → pathSzL? (Caps.cSize (capsAt e sl id)) (proj₂ rp)) ps ≡ true →
     all (λ rp → pathNestD (proj₂ rp) ≤ᵇ nestCapAt e sl id) ps ≡ true →
     all (λ rp → sinkAbove? (toℕ i) (proj₂ rp)) ps ≡ true →
@@ -2074,7 +1956,8 @@ mutual
     walk-shareGo-ΦHyp sl id sf gas nid now Lv i vals false
       (shareAdmit i (EvalSt.registry st)) sched st
       (proj₂ (proj₂ hd)) hdd
-      hsl (fan-chain-sz sl id i st (fan-regsSz sl id Lv sched st hck))
+      hsl (shareAdmit-caps (Caps.cSize (frameStep Lv (capsAt e sl id)))
+             i (EvalSt.registry st) (fan-regsSz sl id Lv sched st hck))
           (fan-chain-szL sl id i st (fan-regsSzL sl id Lv sched st hck))
           (fan-chain-nestD (nestCapAt e sl id) i st
              (fan-regsNest sl id sched st
@@ -2088,7 +1971,8 @@ mutual
     walk-shareGo-ΦHyp sl id sf gas nid now Lv i vals true
       (shareAdmit i (EvalSt.registry st)) sched (shareLatch i true st)
       (proj₂ (proj₂ hd)) hdd
-      hsl (fan-chain-sz sl id i st (fan-regsSz sl id Lv sched st hck))
+      hsl (shareAdmit-caps (Caps.cSize (frameStep Lv (capsAt e sl id)))
+             i (EvalSt.registry st) (fan-regsSz sl id Lv sched st hck))
           (fan-chain-szL sl id i st (fan-regsSzL sl id Lv sched st hck))
           (fan-chain-nestD (nestCapAt e sl id) i st
              (fan-regsNest sl id sched st
@@ -2111,20 +1995,32 @@ mutual
     , walk-ΦHyp-go sl id sf gas nid now Lv (toℕ i) evs p vals fin sched st₀
         (proj₁ hsg)
         (depthShareGo-head sf gas nid now i vals fin rid p ps sched st hdsg)
-        hsl hp₀ hndp hΦp
+        hsl hp₀ hpl₀ hndp hΦp
     , walk-shareGo-ΦHyp sl id sf gas nid now (Lv + proj₁ (proj₂ hsg))
         i vals fin ps
         (proj₁ (proj₂ FP)) (proj₂ (proj₂ FP))
         (proj₂ (proj₂ (proj₂ hsg)))
         (depthShareGo-step sf gas nid now i vals fin rid p ps sched st hdsg)
         (trans (foldPath-slots sf gas nid now (toℕ i) p vals evs fin sched st₀) hsl)
-        (∧-trueʳ hpz) (∧-trueʳ hpl) (∧-trueʳ hnd) (∧-trueʳ hsa)
+        hpzs (∧-trueʳ hpl) (∧-trueʳ hnd) (∧-trueʳ hsa)
         hΦ
     where
     B : ℕ
     B = Caps.cSize (capsAt e sl id)
-    hp₀ : pathSz? B p ≡ true
+    1≤B : 1 ≤ B
+    1≤B = ≤-trans (s≤s z≤n) (2≤capsAt-size e sl id)
+    hp₀ : pathSz? (Caps.cSize (frameStep Lv (capsAt e sl id))) p ≡ true
     hp₀ = ∧-trueˡ hpz
+    -- and the rest of the fan is read at the level the fold has climbed
+    -- to by the time it reaches them, which the strict reading permits
+    hpzs : all (λ rp → pathSz? (Caps.cSize
+                   (frameStep (Lv + proj₁ (proj₂ hsg)) (capsAt e sl id)))
+                 (proj₂ rp)) ps ≡ true
+    hpzs = all-impl _ _
+             (λ rp h → pathSz?-widen (proj₂ rp)
+                         (iterSize-mono-count B B 1≤B
+                            (m≤m+n Lv (proj₁ (proj₂ hsg)))) h)
+             ps (∧-trueʳ hpz)
     hpl₀ : pathSzL? B p ≡ true
     hpl₀ = ∧-trueˡ hpl
     hndp : pathNestD p ≤ nestCapAt e sl id
@@ -2139,13 +2035,13 @@ mutual
     ... | false = sink-fan-sink sl id i p vals eqr hpl₀ (∧-trueˡ hsa) hΦ
 
   walk-ΦHyp-go sl id sf gas nid now Lv envSrc evs root vals fin sched st
-               _ _ _ _ _ _ = tt
+               _ _ _ _ _ _ _ = tt
   walk-ΦHyp-go sl id sf gas nid now Lv envSrc evs (share-sink i) vals fin sched st
-               hcw hdf hsl _ _ hΦ =
+               hcw hdf hsl _ _ _ hΦ =
     walk-share-ΦHyp sl id sf gas nid now Lv i vals fin sched st
       (proj₂ hcw) (proj₁ hcw) hdf hsl hΦ
   walk-ΦHyp-go {e = e} sl id sf gas nid now Lv envSrc evs (f ↠ p) vals fin sched st
-               hcw hdf hsl hpz hnd hΦ =
+               hcw hdf hsl hpz hpl hnd hΦ =
       hF
     , walk-ΦHyp-go sl id sf gas nid now (Lv + proj₁ hL) envSrc
         (evs ++ proj₁ (proj₂ step))
@@ -2157,6 +2053,7 @@ mutual
         (≤-trans (m≤n⊔m (depthFrame sf nid now f p vals fin sched st) _) hdf)
         (trans (KeepsC.slotsEq (stepFrame-keeps sf nid now f p vals fin sched st)) hsl)
         hpz′
+        (pathSzL?-tail (Caps.cSize (capsAt e sl id)) f p hpl)
         (≤-trans (pathNestD-step f p) hnd)
         (stepFrame-nest-Φ sf nid now f p vals fin sched st
           (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id) hΦ hF)
@@ -2176,17 +2073,27 @@ mutual
     stP = ∧-intro (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcw))))))))
             (capsWalkOK-strat _ _ sl _ _ sf gas nid now p _ _ _ _
                (proj₂ (proj₂ hL)))
-    hF = frameΦ-fit sl id sf nid now Lv f p vals fin sched st hsl hpz hnd hΦ
+    hF = frameΦ-fit sl id sf nid now Lv f p vals fin sched st hsl hpz hpl hnd hΦ
            (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcw))))))
            (≤-trans (m≤m⊔n (depthFrame sf nid now f p vals fin sched st) _) hdf)
            stP
            (proj₁ (∧-true _ _ hpark))
            hord hpark
-    B  = Caps.cSize (capsAt e sl id)
-    hpz′ : pathSz? B p ≡ true
-    hpz′ = proj₂ (∧-true (suc (pathLen p) ≤ᵇ B) (pathSz? B p)
+    S  = Caps.cSize (capsAt e sl id)
+    1≤S : 1 ≤ S
+    1≤S = ≤-trans (s≤s z≤n) (2≤capsAt-size e sl id)
+    B  = Caps.cSize (frameStep Lv (capsAt e sl id))
+    -- THE TAIL'S READING AT THE LEVEL THE TAIL IS WALKED AT.  The head's
+    -- comes off the pairing, and the step's own level is then reached by
+    -- widening, which the strict reading permits upward.
+    hpz₀ : pathSz? B p ≡ true
+    hpz₀ = proj₂ (∧-true (suc (pathLen p) ≤ᵇ B) (pathSz? B p)
                    (proj₂ (∧-true (frameSz? B f)
                             ((suc (pathLen p) ≤ᵇ B) ∧ pathSz? B p) hpz)))
+    hpz′ : pathSz? (Caps.cSize (frameStep (Lv + proj₁ hL) (capsAt e sl id))) p
+             ≡ true
+    hpz′ = pathSz?-widen p (iterSize-mono-count S S 1≤S (m≤m+n Lv (proj₁ hL)))
+             hpz₀
 
 -- THE ARRIVAL'S OWN POTENTIAL, READ AGAINST A LENGTH BUDGET RATHER
 -- THAN AGAINST THE CAP.  The entry reading is where the walk's
@@ -2293,7 +2200,13 @@ chain-walk-ΦHyp {n = n} {e = e} sl id Lc a nextId path sched st hcc hdc hsl hp 
   walk-ΦHyp-go sl id _ n nextId (arrTick a) Lc (arrSource a)
     (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
     path (arrVal a ∷ [])
-    (Arrival.isLast a) sched st hcc hdc hsl hp
+    (Arrival.isLast a) sched st hcc hdc hsl
+    (pathSz?-widen path
+      (iterSize-infl (Caps.cSize (capsAt e sl id))
+        (≤-trans (s≤s z≤n) (2≤capsAt-size e sl id)) Lc
+        (Caps.cSize (capsAt e sl id)))
+      hp)
+    (pathSz?-szL (Caps.cSize (capsAt e sl id)) path hp)
     (≤-trans (≤-trans (m≤n+m (pathNestD path) (nestDᵛ (arrTy a) (arrVal a))) hΦ)
              (unit≤cap e sl id))
     (entryΦ sl id a path hp hΦ)
