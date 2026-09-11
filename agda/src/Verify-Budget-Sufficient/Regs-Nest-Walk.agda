@@ -1343,6 +1343,38 @@ postulate
   -- What answers it is a count that grows with the SIZE bound, which
   -- is what a delivery block is; no hypothesis available here is a
   -- substitute, since the arrivals are the source's own text.
+
+  -- AND IT IS SHORT AT THE ONE CELL THIS FRAME OWNS, which is what
+  -- writing the fold finds and what no row above it could have seen.
+  -- The arm rewrites node `nid` to `applyFn f` of what it held, so the
+  -- cell the conclusion must leave under `M` is strictly the larger of
+  -- the two -- and the entering premise bounds it by `M` itself, which
+  -- is the level of the whole table.  A table meeting that premise with
+  -- its scan cell AT `M` is therefore above `M` after ONE value,
+  -- whatever the charge is spelled as and however few arrivals follow.
+  -- What the fold can afford is the SEED, which the caller installs and
+  -- prices far below `M`; so the premise owed here reads the cell this
+  -- frame owns apart from the ambient ones, and a level carried over
+  -- every cell alike cannot say it.  The gap is the FACE's denomination
+  -- rather than this arm's, since the caller states the same flat
+  -- reading as its own conclusion and so has nothing finer to hand
+  -- down.
+  --
+  -- AND THE BLOCK'S RATE IS SHORT OF THE FOLD'S, WHICH IS A SECOND AND
+  -- INDEPENDENT WAY THIS IS WRONG AS WRITTEN.  A delivery block buys
+  -- rungs linear in the bound times its bit length, while the fold
+  -- spends one rung per unit of the step function per arrival -- so
+  -- what it costs is the PRODUCT of the source's width and the step's
+  -- size, and a program is free to split its size budget evenly
+  -- between the two.  Then the product is quadratic where the block is
+  -- linear-times-logarithmic, and the two cross: below the crossing
+  -- the claim holds at every shape, above it the accumulator a
+  -- doubling step leaves outruns any table the charge admits.  What
+  -- keeps this an argument rather than a witness is that the crossing
+  -- sits far past what can be built -- the value it turns on has more
+  -- nodes than the bound it must exceed has bits -- so the finding is
+  -- the arithmetic and no row below could reach it.  The
+  -- charge owed carries that product, and is not a larger block.
   -- REFUTED: `Refuted.Subscribe-Store-Scan-Arrivals` -- the DEPTH-ONLY
   --   denomination this premise replaces, spelled out locally there so
   --   the witness survives the live charge moving.  A scan whose step
@@ -1361,6 +1393,15 @@ postulate
   --   the bound at least four times what it buys the cell.  So no
   --   instantiation of that axis is a counterexample, however far the
   --   telescope is walked.
+  -- DEAD ROUTE: the per-emit fold at a FIXED level, written the way the
+  --   flat frames' own induction is and handing each emit the table the
+  --   one before it left.  The rung has to re-establish exactly its own
+  --   hypothesis over a cell the arm has just enlarged, so it is short
+  --   at the FIRST value and no subdivision of the burst reaches it --
+  --   an emit carrying no values is the only rung that closes.  The
+  --   flat twin carries across only because a map hands its values on
+  --   untouched and a take writes a counter the reading does not price;
+  --   neither is a weaker version of this arm.
   -- PROBED: `Probed.Cross-Count-Outer-Store` at the very state that
   --   killed the constant, a scan whose step stores the arriving datum
   --   back as a one-shot observable, subscribed at all three doors.

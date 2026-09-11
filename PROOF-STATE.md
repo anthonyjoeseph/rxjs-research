@@ -238,16 +238,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE ARRIVAL FOLD, WHICH IS AN INDUCTION AND NOT A PRICE.** Both
-  folds are now INSTANTIATED and not merely stated — the scan arm at
-  four points, each entered on the burst its own source produced — so
-  the arrival count, the product width and the entering table are all
-  innocent, and no coverage boundary stands where one was recorded.
-  What is left is the burst recursion: the commit writes the scan arm
-  as a body over per-emit leaves and returns the first emit whose
-  rewrite the entering table's own reading does not survive — which
-  tells WHICH STORE CELLS DOES A PATH PREDICATE REACH whether the arc
-  it fails on is the arrival's or the table's.
+- **THE FOLD'S CHARGE, WHOSE RATE IS THE PRODUCT AND NOT THE BLOCK.**
+  The arm is short two ways and the second is the one that moves: it
+  bounds the cell it enlarges by the same level it must leave, and the
+  block it is paid out of buys rungs log-linear in the bound where the
+  fold spends the source's width TIMES the step's size. Both are
+  arguments, since the crossing sits past any value that can be built.
+  So the commit restates the charge in that product and re-reads the
+  four points against it — which is what tells WHICH STORE CELLS DOES A
+  PATH PREDICATE REACH whether a cell-wise premise is enough or the
+  face's whole denomination moves with it.
 
 - **THE SUBSCRIBE READING, CARRIED THROUGH THE EVALUATOR'S OWN
   RECURSION.** The probe reached the one arm that can emit syntax the
@@ -271,17 +271,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Open questions
 
-- **WHICH STORE CELLS DOES A PATH PREDICATE REACH?** Five rows fail in one
+- **WHICH STORE CELLS DOES A PATH PREDICATE REACH?** Four rows fail in one
   place: the statement reads a PATH or a chain, and the quantity it must
   bound is a cell in the STORE. A path predicate CAN see the store, and
-  extending its coverage is priced. Every half about the WALK is settled,
-  and the DELIVERY arc is now narrower too: it prices at a constant in the
-  values' nesting and in the registry's length, so what must be reached
-  there is one frame's cell and not a chain's. What is left is at the MINT,
-  and is known rather than suspected — an admitted entry's readings are
-  refuted free-standing AND are not corollaries of the caps receipt, so the
+  extending its coverage is priced. The WALK half is settled and the
+  DELIVERY arc is narrower — one frame's cell, not a chain's. The GRAIN is
+  settled too, and against the reading rather than the coverage: what is
+  reached must be reached CELL-WISE. What is left is at the MINT, known
+  rather than suspected — an admitted entry's readings are refuted
+  free-standing AND are not corollaries of the caps receipt, so the
   reading must be CARRIED to reach the site that owes it.
-  relevant: `step-frame-store≤`, `share-fold-store≤`, `pushBurst-sz-store-scan`, `pushBurst-sz-store-outer`, `subscribeSharedSlot-sz-store`
+  relevant: `step-frame-store≤`, `share-fold-store≤`, `pushBurst-sz-store-outer`, `subscribeSharedSlot-sz-store`
 
 
 - **WHAT PRICES A REGISTERED CHAIN, AND WHERE IS THE RECEIPT OWED?** It is
@@ -319,10 +319,6 @@ does not fit is a finding about the shared statement, not about the head.
   back through itself, keyed on the source program since an arbitrary burst is
   unbounded. A duplication chain buys no rung; the climb rows say no second
   block is owed, read in rungs rather than through the charge.
-- **`pushBurst-sz-store-scan`** (Regs-Nest-Walk) — FALSITY,
-  `REFUTED, DEAD ROUTE, PROBED×4`: the cell each arrival rewrites, keyed on the
-  source subscription. Four points instantiate it at the arrival's own rewrite —
-  a parked queue, a crossing door, a chain of cells, a resolved slot.
 - **`subscribeSharedSlot-sz-store`** (Regs-Nest-Walk) — FALSITY,
   `DEAD ROUTE, PROBED×2`: the definition behind a reference, whose entire climb
   is the telescope summand — `input` charges nought, so no program reading
@@ -387,6 +383,11 @@ does not fit is a finding about the shared statement, not about the head.
   moves here — the instance node is allocated and the counter the ordering is
   read against is raised — so the ordering half is an obligation, not a
   transport.
+- **`pushBurst-sz-store-scan`** (Regs-Nest-Walk) — SHAPE,
+  `REFUTED, DEAD ROUTE×2, PROBED×4`: the cell each arrival rewrites, short two
+  ways. The entering premise levels that cell with the ambient table at the very
+  `M` the conclusion demands; and the block's rate is log-linear where the fold
+  spends the source's width times the step's size.
 - **`mergeAllDrain-ownerQueue`** (Part7/Strat-Leaves) — SHAPE, `REFUTED`: what
   the drain leaves in the owner's cell. Its premise is read off the POST-state,
   which the no-room arm never builds, so it is vacuously satisfiable. The
