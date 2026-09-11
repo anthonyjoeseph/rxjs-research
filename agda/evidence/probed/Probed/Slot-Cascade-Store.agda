@@ -3,7 +3,7 @@
 -- THE SUMMAND HAS TO REACH A SLOT NOBODY NAMED.
 --
 -- TARGET: subscribeSharedSlot-sz-store @048f7d
--- TARGET: subscribeE-sz-store-scan @8ed5af
+-- TARGET: pushBurst-sz-store-scan @8db9e9
 --
 -- WHAT EVERY SLOT ROW SO FAR LEFT OPEN, and both statements left it
 -- open in the SAME place.  A telescope is stratified, so slot k's
@@ -63,13 +63,13 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (g0; gasPad)
 open import Rx.Exp using (Ctx; Closed; Fn; obs; _×ᵗ_;
-  emptyᵉ; ofᵉ; scanᵉ; input; varᵗ; sndᵗ; strmᵗ; sizeᵉ)
+  emptyᵉ; ofᵉ; scanᵉ; input; varᵗ; sndᵗ; strmᵗ; sizeᵉ; evalTm)
 open import Rx.Slots using (Slots; shared; slotSize; slotsSize)
-open import Rx.Evaluator using (EvalSt; root; st-init; sched-init; iterSize;
-  subscribeSharedSlot; subscribeE)
+open import Rx.Evaluator using (EvalSt; Sched; root; _↠_; scan-st; scan-f;
+  installNode; st-init; sched-init; iterSize; subscribeSharedSlot; subscribeE)
 open import Verify-Budget-Sufficient.Measures using (boundedNode)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk
-  using (descChg; subscribeSharedSlot-sz-store; subscribeE-sz-store-scan)
+  using (descChg; subscribeSharedSlot-sz-store; pushBurst-sz-store-scan)
 open import Refuted.Frame-Step-Size-Slot using (Pw; chnG)
 open import Probed.Apparatus using (Confirms)
 
@@ -252,9 +252,19 @@ tieFar = λ _ _ _ _ _ → refl
 
 -- LOAD-BEARING: the scan face at the shape its own rows declined, a
 -- cell whose source is a slot rather than a written-out program.
+-- the mint is the caller's now, so the point is taken past it
+schedS : Sched Γᶜ
+schedS = record (sched-init eᶜ slᶜ) { nextNode = 1 }
+
+stS : EvalSt eᶜ
+stS = installNode 0 (scan-st (evalTm (strmᵗ emptyᵉ))) (st-init eᶜ)
+
 tieScan : Confirms
-  (subscribeE-sz-store-scan {e = eᶜ} slᶜ (gasPad 64 g0) keepG
-     (strmᵗ emptyᵉ) (input fz) root 0 0
-     (sched-init eᶜ slᶜ) (st-init eᶜ) 2 Bᶜ
+  (pushBurst-sz-store-scan {e = eᶜ} slᶜ (gasPad 64 g0) keepG
+     (strmᵗ emptyᵉ) (input fz) 0 root 0 0
+     schedS stS
+     (subscribeE (gasPad 64 g0) (input fz) (scan-f keepG 0 ↠ root) 0 0
+        schedS stS)
+     2 Bᶜ
      (iterSize 2 (descChg (obs (obs (Pw K))) Bᶜ eᶜ + slotsSize slᶜ) Bᶜ))
-tieScan = λ _ _ _ _ _ → refl
+tieScan = λ _ _ _ _ _ _ → refl

@@ -24,7 +24,7 @@ open import Data.Fin using (Fin; toℕ)
 open import Data.List using (List; []; _∷_; _++_; map; length)
 open import Data.Nat using (ℕ; zero; suc; pred; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤-trans; ≤-refl; ⊔-lub; m≤m⊔n; m≤n⊔m; m≤m+n; ≤-reflexive; *-monoʳ-≤; +-monoˡ-≤; +-monoʳ-≤;
-  ≤⇒≤ᵇ; ≤ᵇ⇒≤; m^n>0; *-zeroʳ; *-distribˡ-⊔; *-identityˡ; *-mono-≤; +-assoc; n≤1+n; m≤n+m)
+  ≤⇒≤ᵇ; ≤ᵇ⇒≤; m^n>0; *-zeroʳ; *-distribˡ-⊔; *-identityˡ; *-identityʳ; *-mono-≤; +-assoc; n≤1+n; m≤n+m)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat.Solver using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
@@ -70,7 +70,7 @@ open import Verify-Budget-Sufficient.Caps-Depth using (depthReact)
 open import Verify-Budget-Sufficient.Walk-Factor using (pathΦF; pathΦD)
 open import Verify-Budget-Sufficient.Caps-Face.Part1
   using (pathSz?; iterSize-+; iterSize-mono-s; pathStrat?; pathFloor; parkStrat?;
-  pathOrd?; pathPark?; regOwn?)
+  pathOrd?; pathPark?; regOwn?; evalTm-iterSize)
 open import Verify-Budget-Sufficient.Nest-Subst using (applyFn-nest)
 
 -- the potential, read off the values still in flight and the path they
@@ -1319,19 +1319,22 @@ postulate
           (proj₂ (proj₂ (subscribeSharedSlot g i d κ id now sched st))))
       ≡ true
 
-  -- THE SEED AND THE CELL A SCAN WRITES, the one arm whose own charge
-  -- is not the descent's.  The node is minted before the source is
-  -- subscribed and its cell holds the REIFIED seed, so what has to fit
-  -- is a term's evaluation rather than a program's layers -- and the
-  -- two are denominated differently: the proven bound on an evaluated
-  -- term is a rung count in that term's SYNTAX, where the premise buys
-  -- one rung for the whole operator.  The burst then rewrites the same
-  -- cell once per arriving value at the step function's own draw, which
-  -- is a second charge in the same currency.
+  -- THE BURST A SCAN'S OWN FRAME FOLDS BACK THROUGH ITSELF, which is
+  -- what is left of the arm once the mint, the seed and the descent
+  -- into the source are a checked body.  Every arriving value rewrites
+  -- the same cell at the step function's own draw, so this is a charge
+  -- the seed's does not answer: a seed is paid ONCE, out of the
+  -- delivery block the descent already carries, while the fold is paid
+  -- once per arrival and compounds.
   --
-  -- SO THE ARM IS A LEAF FOR AN ARITHMETIC REASON AND NOT A STRUCTURAL
-  -- ONE.  The recursion into the source is available and every one of
-  -- its premises transports; what does not transport is the cell.
+  -- AND IT IS KEYED ON THE SOURCE PROGRAM RATHER THAN ON THE BURST,
+  -- deliberately, and for the reason the crossing door's own fold is.
+  -- An arbitrary burst at this type is unbounded and a statement over
+  -- one would be false, so what makes the fold affordable is that
+  -- these emits are what subscribing `b` produced -- which is why the
+  -- equation naming that subscription is a premise rather than a
+  -- convenience, and why the table the fold enters at is the one that
+  -- subscription left.
   -- AND THE ARRIVALS ARE WHY THE CHARGE CARRIES A DELIVERY BLOCK AND
   -- NOT TWO DEPTH COUNTS.  A synchronous source buys arrivals without
   -- buying depth, so a reading denominated in unfoldings and layers
@@ -1387,18 +1390,23 @@ postulate
   --   the program buys when the reference charges nought -- and the
   --   summand carries the climb: the stated charge holds and the
   --   telescope-free one fails.  One slot, one connect, no queue.
-  subscribeE-sz-store-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u s}
+  pushBurst-sz-store-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u s}
     (sl : Slots Γ) (g : Gas) (f : Fn Γ [] [] [] (u ×ᵗ s) u)
-    (z : Tm Γ [] [] [] u) (b : Closed Γ s) (κ : Path Γ u t)
+    (z : Tm Γ [] [] [] u) (b : Closed Γ s) (nid : NodeId) (κ : Path Γ u t)
     (id : Id) (now : Tick)
-    (sched : Sched Γ) (st : EvalSt e) (S B M : ℕ) → 2 ≤ S →
+    (sched : Sched Γ) (st : EvalSt e)
+    (r : Stream Γ s × Sched Γ × EvalSt e) (S B M : ℕ) → 2 ≤ S →
     Sched.slots sched ≡ sl →
-    iterSize S (descChg (obs u) B (scanᵉ f z b) + slotsSize sl) B ≤ M →
-    all (λ kv → boundedNode M (proj₂ kv)) (EvalSt.nodes st) ≡ true →
+    r ≡ subscribeE g b (scan-f f nid ↠ κ) id now sched st →
+    iterSize S (descRungsᴺ (muDepthᵉ b) B
+                + suc (layᵗ f ⊔ layᵗ z ⊔ layᵉ b) + slotsSize sl) B ≤ M →
+    all (λ kv → boundedNode M (proj₂ kv)) (EvalSt.nodes (proj₂ (proj₂ r)))
+      ≡ true →
     (sizeᵉ (scanᵉ f z b) ≤ᵇ B) ≡ true →
     all (λ kv → boundedNode M (proj₂ kv))
         (EvalSt.nodes
-          (proj₂ (proj₂ (subscribeE g (scanᵉ f z b) κ id now sched st))))
+          (proj₂ (proj₂ (pushBurst g id now (scan-f f nid) κ
+                          (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))))))
       ≡ true
 
   -- THE BURST A CROSSING DOOR PUSHES BACK THROUGH ITSELF, which is all
@@ -1513,6 +1521,41 @@ muLay-sub S B M d j j′ s 2≤S h le =
   lay-sub S B M (descRungsᴺ d B + j + s) (descRungsᴺ d B + j′ + s) 2≤S
     (+-monoˡ-≤ s (+-monoʳ-≤ (descRungsᴺ d B) h)) le
 
+-- EVERY DESCENT BUYS AT LEAST ITS OWN DELIVERY BLOCK, whatever the
+-- nesting it is taken at: the outermost level's deliveries are charged
+-- before any unfolding is, and an unfolding only adds.  So the block
+-- is a FLOOR under the charge rather than a term of it, which is what
+-- lets something priced in the bound be paid for out of a charge whose
+-- other summand is priced in layers.
+descRungs-floor : ∀ (d B : ℕ) → B * bitsᴺ B ≤ descRungsᴺ d B
+descRungs-floor zero    B = ≤-refl
+descRungs-floor (suc d) B =
+  ≤-trans (m≤n+m (B * bitsᴺ B) (bitsᴺ B))
+          (m≤m+n (bitsᴺ B + B * bitsᴺ B) (descRungsᴺ d (B * B)))
+
+-- AND A BOUND ADMITTING ANY NESTING AT ALL COSTS AT LEAST ONE BIT,
+-- which is the only thing standing between that block and the bound.
+1≤bitsᴺ : ∀ (B : ℕ) → 2 ≤ B → 1 ≤ bitsᴺ B
+1≤bitsᴺ (suc zero)    (s≤s ())
+1≤bitsᴺ (suc (suc k)) _ = s≤s z≤n
+
+-- SO A PROPER SUBTERM'S SIZE IS ALREADY PAID FOR IN RUNGS, and that is
+-- the exchange rate the two currencies were thought not to have.  A
+-- term sitting strictly inside the program is SMALLER than the size
+-- bound, and a bound that leaves room for a subterm at all is two or
+-- more -- so the delivery block under the descent is at least the
+-- bound, and the degenerate case has nothing to buy.  The reading that
+-- made this look unavailable priced the descent by its LAYER summand,
+-- which indeed buys one rung for a whole operator; the block is the
+-- summand that does not.
+sz-rungs : ∀ (a B d : ℕ) → suc a ≤ B → a ≤ descRungsᴺ d B
+sz-rungs zero    B d h = z≤n
+sz-rungs (suc a) B d h =
+  ≤-trans (≤-trans (n≤1+n (suc a)) h)
+    (≤-trans (≤-trans (≤-reflexive (sym (*-identityʳ B)))
+                      (*-monoʳ-≤ B (1≤bitsᴺ B (≤-trans (s≤s (s≤s z≤n)) h))))
+             (descRungs-floor d B))
+
 -- ONE SQUARING, PAID FOR IN RUNGS.  A rung at least doubles, so
 -- `bitsᴺ B` of them carry a bound past `2 ^ bitsᴺ B * B` and
 -- therefore past `B * B` -- and that is the whole of why the charge can
@@ -1626,6 +1669,39 @@ crossSz a B hb = sz-sub a (suc a) B (n≤1+n a) hb
 --   with the crossing bracketed on both sides so what fails is the
 --   multiplicity and not the door or the arithmetic.
 
+-- THE SEED A SCAN'S CELL IS BORN HOLDING, priced against the charge
+-- the subscription installing it has already been granted.  What has
+-- to fit is a TERM'S EVALUATION rather than a program's layers, and
+-- the two are denominated differently -- but not incomparably: the
+-- evaluation costs one fold per unit of the seed's own syntax, the
+-- seed is a proper subterm so its syntax is under the size bound, and
+-- the descent's delivery block is at least that bound.  So the rungs
+-- are there to be spent and the exchange runs through `sz-rungs`.
+scanSeed-bounded : ∀ {n} {Γ : Ctx n} {u s} (S B M : ℕ) → 2 ≤ S →
+  (f : Fn Γ [] [] [] (u ×ᵗ s) u) (z : Tm Γ [] [] [] u) (b : Closed Γ s)
+  (d sls : ℕ) →
+  iterSize S (descRungsᴺ d B + suc (layᵗ f ⊔ layᵗ z ⊔ layᵉ b) + sls) B ≤ M →
+  (sizeᵉ (scanᵉ f z b) ≤ᵇ B) ≡ true →
+  boundedNode M (scan-st (evalTm z)) ≡ true
+scanSeed-bounded {u = u} S B M 2≤S f z b d sls le hb =
+  ≤ᵇ-true (sizeᵛ u (evalTm z)) M
+    (≤-trans (evalTm-iterSize S 1≤S z)
+      (≤-trans (iterSize-mono-count S 0 1≤S zRungs)
+        (≤-trans (iterSize-mono-s S J z≤n) le)))
+  where
+  1≤S : 1 ≤ S
+  1≤S = ≤-trans (s≤s z≤n) 2≤S
+  L   = suc (layᵗ f ⊔ layᵗ z ⊔ layᵉ b)
+  J   = descRungsᴺ d B + L + sls
+  szz : suc (sizeᵗ z) ≤ B
+  szz = ≤-trans (s≤s (≤-trans (m≤n+m (sizeᵗ z) (sizeᵗ f))
+                              (m≤m+n (sizeᵗ f + sizeᵗ z) (sizeᵉ b))))
+                (≤ᵇ⇒≤ (suc (sizeᵗ f + sizeᵗ z + sizeᵉ b)) B (T-to hb))
+  zRungs : sizeᵗ z ≤ J
+  zRungs = ≤-trans (≤-trans (sz-rungs (sizeᵗ z) B d szz)
+                            (m≤m+n (descRungsᴺ d B) L))
+                   (m≤m+n (descRungsᴺ d B + L) sls)
+
 -- AND THIS IS THE ASSEMBLY WHOSE OWN CONCLUSION WAS INSTANTIATED, not
 -- merely its leaves -- which is why the charge under it counts
 -- deliveries at all.  A real body over postulated leaves computes
@@ -1701,7 +1777,24 @@ subscribeE-sz-store sl g (takeᵉ c b) κ id now sched st S B M 2≤S slEq le hn
       st₀    = installNode nid (take-st (suc k)) st
       SE     = subscribeE g b (take-f nid ↠ κ) id now sched₁ st₀
 subscribeE-sz-store sl g (scanᵉ f z b) κ id now sched st S B M 2≤S slEq le hns hb =
-  subscribeE-sz-store-scan sl g f z b κ id now sched st S B M 2≤S slEq le hns hb
+  pushBurst-sz-store-scan sl g f z b nid κ id now sched₁ st₀ SE S B M
+    2≤S slEq refl le
+    (subscribeE-sz-store sl g b (scan-f f nid ↠ κ) id now sched₁ st₀ S B M
+      2≤S slEq
+      (muLay-sub S B M (muDepthᵉ b) (layᵉ b) (suc (layᵗ f ⊔ layᵗ z ⊔ layᵉ b))
+        (slotsSize sl) 2≤S
+        (≤-trans (m≤n⊔m (layᵗ f ⊔ layᵗ z) (layᵉ b)) (n≤1+n _)) le)
+      (setNode-bounded M nid (scan-st (evalTm z)) (EvalSt.nodes st)
+        (scanSeed-bounded S B M 2≤S f z b (muDepthᵉ b) (slotsSize sl) le hb)
+        hns)
+      (sz-sub (sizeᵉ b) (suc (sizeᵗ f + sizeᵗ z + sizeᵉ b)) B
+        (≤-trans (m≤n+m (sizeᵉ b) (sizeᵗ f + sizeᵗ z)) (n≤1+n _)) hb))
+    hb
+  where
+  nid    = Sched.nextNode sched
+  sched₁ = record sched { nextNode = suc (Sched.nextNode sched) }
+  st₀    = installNode nid (scan-st (evalTm z)) st
+  SE     = subscribeE g b (scan-f f nid ↠ κ) id now sched₁ st₀
 subscribeE-sz-store {u = u} sl g (mergeAllᵉ lim b) κ id now sched st S B M
                     2≤S slEq le hns hb =
   pushBurst-sz-store-outer sl g mergeAllᵒ nid b κ id now sched₁ st₀ SE

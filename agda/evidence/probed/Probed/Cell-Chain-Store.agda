@@ -2,7 +2,7 @@
 -- A TABLE WHOSE CELLS WERE WRITTEN IN SERIES, WHICH IS THE SHAPE THE
 -- SINGLE CLIMB HAS NEVER BEEN ASKED ABOUT.
 --
--- TARGET: subscribeE-sz-store-scan @8ed5af
+-- TARGET: pushBurst-sz-store-scan @8db9e9
 --
 -- WHAT EVERY STORE ROW SO FAR DECLINED.  Each witness at either half
 -- subscribes a program that installs ONE node, and the refutation
@@ -61,15 +61,16 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (g0; gasPad; hot)
 open import Rx.Exp using (Ctx; Closed; Val; Fn; natᵗ; obs; _×ᵗ_;
-  emptyᵉ; ofᵉ; scanᵉ; mergeAllᵉ; varᵗ; sndᵗ; strmᵗ; sizeᵉ)
+  emptyᵉ; ofᵉ; scanᵉ; mergeAllᵉ; varᵗ; sndᵗ; strmᵗ; sizeᵉ; evalTm)
 open import Rx.Slots using (Slots; scripted; slotsSize)
 open import Rx.Layer-Count using (layᵉ)
-open import Rx.Evaluator using (EvalSt; root; mergeAllᵒ; thru-outer;
+open import Rx.Evaluator using (EvalSt; Sched; root; mergeAllᵒ; thru-outer;
   from-inner; _↠_;
-  mergeAll-st; installNode; st-init; sched-init; iterSize; stepFrame)
+  mergeAll-st; scan-st; scan-f; installNode; st-init; sched-init; subscribeE;
+  iterSize; stepFrame)
 open import Verify-Budget-Sufficient.Measures using (boundedNode)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk
-  using (valsSz?; descChgˢ; subscribeE-sz-store-scan)
+  using (valsSz?; descChgˢ; pushBurst-sz-store-scan)
 open import Refuted.Frame-Step-Size-Slot using (Pw; chnG)
 open import Probed.Apparatus using (Confirms)
 
@@ -201,10 +202,21 @@ chainPrem≡ = refl
 -- a `from-inner` decoration, one gas spent, the minted instance
 -- counted -- so the row computes what a crossing at this state
 -- computes.
+-- the mint is the caller's now, so the point is taken past it: the id
+-- this scheduler hands out, the seed cell under it, and the source
+-- subscription whose burst the fold is entered on
+schedP : Sched Γᶜ
+schedP = record (sched-init eᶜ slᶜ) { nextNode = 2 }
+
+stP : EvalSt eᶜ
+stP = installNode 1 (scan-st (evalTm (strmᵗ emptyᵉ))) stᶜ
+
 tieCellChain : Confirms
-  (subscribeE-sz-store-scan {e = eᶜ} slᶜ (gasPad 63 g0)
-     keepG (strmᵗ emptyᵉ) midC
+  (pushBurst-sz-store-scan {e = eᶜ} slᶜ (gasPad 63 g0)
+     keepG (strmᵗ emptyᵉ) midC 1
      (from-inner mergeAllᵒ 0 0 ↠ root) 0 0
-     (record (sched-init eᶜ slᶜ) { nextNode = 1 }) stᶜ 2 52
-     (iterSize 2 (layᵉ topC + slotsSize slᶜ) 52))
-tieCellChain = λ _ _ _ _ _ → refl
+     schedP stP
+     (subscribeE (gasPad 63 g0) midC
+        (scan-f keepG 1 ↠ (from-inner mergeAllᵒ 0 0 ↠ root)) 0 0 schedP stP)
+     2 52 (iterSize 2 (layᵉ topC + slotsSize slᶜ) 52))
+tieCellChain = λ _ _ _ _ _ _ → refl

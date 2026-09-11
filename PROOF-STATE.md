@@ -238,16 +238,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE MINT READING, CARRIED RATHER THAN DERIVED**, which is the half of
-  WHICH STORE CELLS DOES A PATH PREDICATE REACH that the walk did not
-  settle. Three rows of the nest face read a cell an ARRIVAL rewrites
-  rather than one a chain carries, and each dies free-standing — so no
-  strengthening of the caps receipt reaches them, and the reading has to
-  arrive at the mint as a premise something upstream already established.
-  The commit states that carrier at the index the mint consumes it at,
-  and either lands one of the three on it or returns the first site the
-  carrier cannot be supplied from — which is what turns a supply question
-  into a placement one.
+- **THE ARRIVAL FOLD, NOW THAT THE MINT IS NOT THE QUESTION.** The scan
+  arm's seed is payable out of the descent's own delivery block, so its
+  mint, seed and descent are a checked body and only the fold is left.
+  That is what the three rows share and it is not a mint: each rewrites
+  ONE cell once per arriving emit, so the charge compounds where a
+  mint's is paid once. The commit states the two remaining folds at the
+  burst they are entered on and either lands one or returns the first
+  emit the entering table cannot price — which tells WHICH STORE CELLS
+  DOES A PATH PREDICATE REACH whether the arc it fails on is the
+  arrival's or the table's.
 
 - **THE SUBSCRIBE READING, CARRIED THROUGH THE EVALUATOR'S OWN
   RECURSION.** The probe reached the one arm that can emit syntax the
@@ -281,7 +281,7 @@ does not fit is a finding about the shared statement, not about the head.
   and is known rather than suspected — an admitted entry's readings are
   refuted free-standing AND are not corollaries of the caps receipt, so the
   reading must be CARRIED to reach the site that owes it.
-  relevant: `step-frame-store≤`, `share-fold-store≤`, `subscribeE-sz-store-scan`, `pushBurst-sz-store-outer`, `subscribeSharedSlot-sz-store`
+  relevant: `step-frame-store≤`, `share-fold-store≤`, `pushBurst-sz-store-scan`, `pushBurst-sz-store-outer`, `subscribeSharedSlot-sz-store`
 
 
 - **WHAT PRICES A REGISTERED CHAIN, AND WHERE IS THE RECEIPT OWED?** It is
@@ -319,11 +319,11 @@ does not fit is a finding about the shared statement, not about the head.
   back through itself, keyed on the source program since an arbitrary burst is
   unbounded. A duplication chain buys no rung; the climb rows say no second
   block is owed, read in rungs rather than through the charge.
-- **`subscribeE-sz-store-scan`** (Regs-Nest-Walk) — FALSITY,
-  `REFUTED, DEAD ROUTE, PROBED×4`: the reified seed and the cell each arrival
-  rewrites. The arrival count REFUTED the depth-only denomination — a wrapping
-  step doubles the cell where unfoldings and layers hold fixed — and the charge
-  now buys a delivery block at the SIZE bound.
+- **`pushBurst-sz-store-scan`** (Regs-Nest-Walk) — FALSITY,
+  `REFUTED, DEAD ROUTE, PROBED×4`: the cell each arrival rewrites, keyed on the
+  source subscription since an arbitrary burst is unbounded. The arrival count
+  REFUTED the depth-only denomination — a wrapping step doubles the cell where
+  unfoldings and layers hold fixed.
 - **`subscribeSharedSlot-sz-store`** (Regs-Nest-Walk) — FALSITY,
   `DEAD ROUTE, PROBED×2`: the definition behind a reference, whose entire climb
   is the telescope summand — `input` charges nought, so no program reading

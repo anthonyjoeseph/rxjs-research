@@ -2,7 +2,7 @@
 -- WHAT ONE ARRIVING SUBSCRIPTION WRITES, WHICH IS THE READING NOTHING
 -- HAD EVER STOOD AT.
 --
--- TARGET: subscribeE-sz-store-scan @8ed5af
+-- TARGET: pushBurst-sz-store-scan @8db9e9
 --
 -- WHY THE OTHER HALF'S ROWS DO NOT REACH HERE.  The level this leaf is
 -- held to is the arrival's own layers plus the telescope, and every
@@ -50,16 +50,16 @@ open import Data.Product using (proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (g0; gasPad)
-open import Rx.Exp using (obs; emptyᵉ; strmᵗ)
+open import Rx.Exp using (obs; emptyᵉ; strmᵗ; evalTm)
 open import Rx.Layer-Count using (layᵉ)
 open import Rx.Slots using (slotsSize)
-open import Rx.Evaluator using (EvalSt; root; mergeAllᵒ; switchᵒ; exhaustᵒ;
+open import Rx.Evaluator using (EvalSt; Sched; root; mergeAllᵒ; switchᵒ; exhaustᵒ;
   from-inner; _↠_;
-  thru-outer; switch-st; exhaust-st; installNode; st-init; stepFrame;
-  sched-init; iterSize)
+  thru-outer; switch-st; exhaust-st; scan-st; scan-f; installNode; st-init;
+  stepFrame; sched-init; subscribeE; iterSize)
 open import Verify-Budget-Sufficient.Measures using (boundedNode)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk
-  using (descChgˢ; subscribeE-sz-store-scan)
+  using (descChgˢ; pushBurst-sz-store-scan)
 open import Refuted.Frame-Step-Size-Cross-Store
   using (Γ₁; sl₁; Pow; K; inner; keep; chain; e₀; st₀; vals₀; post₀)
 open import Probed.Apparatus using (Confirms)
@@ -146,10 +146,21 @@ sinkRows≡ = refl
 -- door hands the descent -- the caller's path under a `from-inner`
 -- decoration, one gas spent, the minted instance counted -- so the row
 -- computes what a crossing at this state computes.
+-- the mint is the caller's now, so the point is taken past it: the id
+-- this scheduler hands out, the seed cell under it, and the source
+-- subscription whose burst the fold is entered on
+schedP : Sched Γ₁
+schedP = record (sched-init e₀ sl₁) { nextNode = 2 }
+
+stP : EvalSt e₀
+stP = installNode 1 (scan-st (evalTm (strmᵗ emptyᵉ))) st₀
+
 tieOuterStore : Confirms
-  (subscribeE-sz-store-scan {e = e₀} sl₁ (gasPad 7 g0)
-     keep (strmᵗ emptyᵉ) (chain K)
+  (pushBurst-sz-store-scan {e = e₀} sl₁ (gasPad 7 g0)
+     keep (strmᵗ emptyᵉ) (chain K) 1
      (from-inner mergeAllᵒ 0 0 ↠ root) 0 0
-     (record (sched-init e₀ sl₁) { nextNode = 1 }) st₀ 63 63
-     (iterSize 63 (layᵉ inner + slotsSize sl₁) 63))
-tieOuterStore = λ _ _ _ _ _ → refl
+     schedP stP
+     (subscribeE (gasPad 7 g0) (chain K)
+        (scan-f keep 1 ↠ (from-inner mergeAllᵒ 0 0 ↠ root)) 0 0 schedP stP)
+     63 63 (iterSize 63 (layᵉ inner + slotsSize sl₁) 63))
+tieOuterStore = λ _ _ _ _ _ _ → refl

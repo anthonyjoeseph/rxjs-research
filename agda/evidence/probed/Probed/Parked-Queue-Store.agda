@@ -1,7 +1,7 @@
 -- ══════════════════════════════════════════════════════════════════
 -- THE PARKED QUEUE A SUBSCRIPTION STANDS BESIDE AND NEVER READS.
 --
--- TARGET: subscribeE-sz-store-scan @8ed5af
+-- TARGET: pushBurst-sz-store-scan @8db9e9
 --
 -- WHAT WAS UNTESTED, AND WHY NO READING OF THE DELIVERED LIST COULD
 -- REACH IT.  A `*All` node holds programs it could not admit, and the
@@ -23,6 +23,17 @@
 -- neither has a queue at all and the shape does not arise there.  And
 -- nothing about a queue whose entries name a SHARED slot each, where
 -- one definition would run once for the several entries reaching it.
+--
+-- AND THE FOLD ITSELF IS NOT REACHED HERE, which is a boundary rather
+-- than an omission.  This fixture's emission is a thirteen-deep
+-- product, and the arrival rewriting the cell with it is not a
+-- quantity the checker can evaluate at all -- measured past twenty
+-- minutes and nine gigabytes on one arrival, against fifteen seconds
+-- for the same subscription read without the fold.  So the tie is
+-- taken at the DRY entry, where the burst is empty and what the row
+-- decides is that the table the fold is entered on is priceable at
+-- the level the arrival bought.  A fold with values in it is read at
+-- the narrower products of the chain and cascade witnesses.
 -- ══════════════════════════════════════════════════════════════════
 module Probed.Parked-Queue-Store where
 
@@ -37,15 +48,15 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (g0; gasPad)
 open import Rx.Exp using (Closed; Fn; obs; emptyᵉ; ofᵉ; mapᵉ;
-  varᵗ; strmᵗ)
+  varᵗ; strmᵗ; evalTm)
 open import Rx.Layer-Count using (layᵉ)
 open import Rx.Slots using (slotsSize)
-open import Rx.Evaluator using (EvalSt; root; mergeAllᵒ; from-inner; _↠_;
-  thru-outer; mergeAll-st; installNode; st-init; stepFrame; sched-init;
-  iterSize)
+open import Rx.Evaluator using (EvalSt; Sched; root; mergeAllᵒ; from-inner; _↠_;
+  thru-outer; mergeAll-st; scan-st; scan-f; installNode; st-init; stepFrame;
+  sched-init; subscribeE; iterSize)
 open import Verify-Budget-Sufficient.Measures using (boundedNode)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk
-  using (descChgˢ; subscribeE-sz-store-scan)
+  using (descChgˢ; pushBurst-sz-store-scan)
 open import Refuted.Frame-Step-Size-Cross-Store
   using (Γ₁; sl₁; Pow; K; inner; keep; chain; e₀; vals₀)
 open import Probed.Apparatus using (Confirms)
@@ -115,14 +126,26 @@ outerRows≡ = refl
 ----------------------------------------------------------------------
 
 -- LOAD-BEARING: the reading whose level never counts the queue it must
--- nonetheless leave bounded.  The point is the one the merging door
--- hands the descent -- the caller's path under a `from-inner`
--- decoration, one gas spent, the minted instance counted -- so the row
--- computes what a crossing at this state computes.
+-- nonetheless leave bounded.  The mint the arm performs before its own
+-- fold is the caller's now, so the point is taken past it -- the node
+-- id this scheduler hands out, the seed cell installed under it, and
+-- the source subscription whose burst the fold is entered on -- and
+-- the table it is entered on is the one carrying the parked queue.
+-- It would fail on a queue entry the level does not reach, which is
+-- the whole of what this file doubts; it is the arrival's own rewrite
+-- that the boundary above puts out of reach.
+schedP : Sched Γ₁
+schedP = record (sched-init e₀ sl₁) { nextNode = 2 }
+
+stP : EvalSt e₀
+stP = installNode 1 (scan-st (evalTm (strmᵗ emptyᵉ))) stRun
+
 tieParkedOuterRun : Confirms
-  (subscribeE-sz-store-scan {e = e₀} sl₁ (gasPad 7 g0)
-     keep (strmᵗ emptyᵉ) (chain K)
+  (pushBurst-sz-store-scan {e = e₀} sl₁ g0
+     keep (strmᵗ emptyᵉ) (chain K) 1
      (from-inner mergeAllᵒ 0 0 ↠ root) 0 0
-     (record (sched-init e₀ sl₁) { nextNode = 1 }) stRun 65 65
-     (iterSize 65 (layᵉ inner + slotsSize sl₁) 65))
-tieParkedOuterRun = λ _ _ _ _ _ → refl
+     schedP stP
+     (subscribeE g0 (chain K)
+        (scan-f keep 1 ↠ (from-inner mergeAllᵒ 0 0 ↠ root)) 0 0 schedP stP)
+     65 65 (iterSize 65 (layᵉ inner + slotsSize sl₁) 65))
+tieParkedOuterRun = λ _ _ _ _ _ _ → refl
