@@ -886,13 +886,13 @@ postulate
   -- instant's fuel: it lands the potential under `capsH` at the entry
   -- index, and the caps recurrence puts the next instant's factor two
   -- exponentials above what that fuel can see.  So the repair is not
-  -- inside this statement, and the row is SHAPE rather than FALSITY:
-  -- either the depth face is re-denominated to carry the walk's count
-  -- ledger and be sighted one instant later -- which is one argument of
-  -- `capsAt`, whose own header prices what that then owes the gas -- or a
-  -- dynamics argument puts the same-instant burst under this instant's
-  -- fuel, and `Harness.Main`'s rows (measured-not-rechecked) say a
-  -- run's count is script-denominated, so no premise here carries it.
+  -- inside this statement, and the row is SHAPE rather than FALSITY: a
+  -- dynamics argument has to put the same-instant burst under this
+  -- instant's fuel, and `Harness.Main`'s rows (measured-not-rechecked)
+  -- say a run's count is script-denominated, so no premise here carries
+  -- it.  Sighting the depth face one instant later is not a second way
+  -- out: that instant is one argument of `capsAt`, whose own header
+  -- carries the arithmetic that move cannot close.
   -- DEAD ROUTE: a sixth local denomination of the scan arm -- an
   --   existential width in place of the burst count, threaded from
   --   `burstsOK` the way the store face threads it.  The threading is

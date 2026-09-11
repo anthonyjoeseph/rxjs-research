@@ -471,27 +471,40 @@ capsH e sl id = capsHgo (capsBase e sl) id
 -- here by `capsH e sl (suc id)` -- the walk's depth demand lands under
 -- this blowup's own count, so the two move together or neither does.
 --
--- AND THE PREMISE SIDE RAISES NO OBSTACLE, which is what makes the fuel
--- the whole question.  Every entry-state fact the depth face takes
--- transports up by monotonicity already proven: `capsAt-⊑-suc` with
--- `capsOK?-mono` and the widening family for the cap-indexed
+-- AND THE PREMISE SIDE RAISES NO OBSTACLE, so nothing about the entry
+-- state is what decides this.  Every entry-state fact the depth face
+-- takes transports up by monotonicity already proven: `capsAt-⊑-suc`
+-- with `capsOK?-mono` and the widening family for the cap-indexed
 -- predicates, `capsAt-size-mono` for the size premise, and the nesting
 -- cap's own step for the depth one, its factor being at least one
 -- (`1≤nestFacAt`, .Nest-Store).  `nestΦ-sight≤capsH` (.Nest-Arith) is
 -- stated over every index, so the sighted ceiling follows at `suc id`
 -- with nothing re-proven.  Nor does a cycle return: this height reads
 -- `capsBase`, which is syntactic, and the cycle `blowH` breaks is the
--- one that would take the fuel from the GAS instead.
---
--- SO WHAT THE TOWER MUST AFFORD IS ONE STORY, AND IT IS OWED BY THE
--- GAS.  `capsAt-tower` is `blowup-tower` at this argument, so moving the
--- argument moves the bracket with it: instant `id`'s cap would land
--- under `towerℕ (capsH e sl (suc (suc id)))` where it now lands under
--- `towerℕ (capsH e sl (suc id))`.  `syncBudget` (Rx.Evaluator) hands
--- instant `id` a tower over `3 + capsH e sl (suc id)`, and three stories
--- of padding are not a `blowH` story -- so the evaluator's own index
--- moves with the fuel or the re-sighting does not land.  Read off the
+-- one that would take the fuel from the GAS instead.  What decides it
+-- is the arithmetic the moved argument then has to close, read off the
 -- two recurrences rather than instantiated, both being sealed for cost.
+--
+-- DEAD ROUTE: re-sighting the nesting potential at the exit cap by
+--   moving this fuel argument.  The potential must dominate
+--   `Caps.cSize (capsAt e sl (suc id))`, which is the currency the
+--   charges are already in (`nestBurstAt-def`, .Nest-Store), and must
+--   itself stay under the fuel, since that is what the cascade's depth
+--   is measured in (`nestΦ-sight≤capsH`, .Nest-Arith).  At the moved
+--   argument those two together demand the EXIT cap's double
+--   exponential under the fuel `capsH e sl id` itself -- and
+--   `capsAt-exp2≤capsH`, the one thing delivering that reading, lands
+--   it under `blowH` OF that fuel instead, its step being
+--   `blowup-exp2≤blowH` at exactly this pair.  So the route asks for
+--   `blowH f ≤ f`, which no fuel satisfies: `blowH m` is `6 + m + …`
+--   and strictly inflationary.  Nor is it a near miss to be closed by a
+--   tighter pricing -- `capsAt-size-lower` (.Nest-Arith) puts the exit
+--   cap alone at `Caps.cSize (capsAt e sl id) ^ suc (sizeCount …)`,
+--   past the fuel before any exponential is taken.  And raising the
+--   base is this same route renamed, since `capsHgo m (suc id)` unfolds
+--   to `capsHgo (blowH m) id`: a shifted index IS a raised base, which
+--   moves the charge with the potential, which is why the choice of cap
+--   is not where the repair is (`fan-regsSzL-mint`, .Part7.Depth-Fit).
 
 capsAt : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → (id : ℕ) → Caps
 capsAt {n = n} e sl zero =

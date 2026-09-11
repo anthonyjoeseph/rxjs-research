@@ -235,18 +235,6 @@ statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **MOVE THE FUEL, WHICH IS WHERE THE SIGHTING LIVES.** Re-sighting is
-  not a restatement of the depth face: the potential's instant and the
-  caps recurrence's blowup fuel are ONE argument, so it is that
-  argument read one instant later, with the base raised to match. The
-  premise side is free and proven — every entry-state fact transports
-  by cap monotonicity, and the sighted ceiling is stated over every
-  index. What it costs is the bracket: the tower's own tower bound is
-  that argument's, so the raise carries it a whole `blowH` story past
-  what an instant's gas is padded to cover. The commit moves the
-  evaluator's index with the fuel and returns the first bound that
-  does not follow.
-
 - **THE STORE READING NOTHING CARRIES.** Both inner arms and the fan die
   at one installed cell, and all three owe the same absent fact: the
   ambient store predicate a cascade door holds at an instant's entry,
@@ -269,19 +257,31 @@ statement, not about the head.
   become one statement, or it returns why no bound exists in either
   argument.
 
+- **THE ONE EXIT-INDEXED CEILING, AND WHETHER ITS CLOSURE RESTATES.**
+  The store's `nestCapAt` is the only ladder here that affords the
+  fold, because its factor towers in the burst at the NEXT index
+  instead of reading this instant's fuel — which is why it survives the
+  arithmetic that closed the caps-denominated routes. What ties it off
+  today is FLAT: `burstsOK` at every hop, closed at the top by
+  `arr-chains-bursts`, and `Refuted.Chains-Burst-Flat` kills flat, two
+  `thru` frames squaring a burst. The commit restates that closure
+  along the chain as a PRODUCT and returns either the ladder the
+  nesting face could then be sighted against, or the frame at which a
+  product closure fails too.
+
 ### Open questions
 
-- **WILL THE GAS'S STORY INDEX MOVE WITH THE FUEL?** The sighting half is
-  settled and is no longer the question: the potential's instant and the
-  caps recurrence's blowup fuel are one argument, so moving it is an edit
-  rather than a design, and every entry-state premise transports up by
-  monotonicity already proven — nothing on that side objects, which is
-  what the entry-cap reading was thought to be fighting. What is left is
-  ONE story, in the other direction: the tower bound is that same
-  argument's, so raising it raises the bracket past a gas padded three
-  units over a height the raise clears by a whole `blowH`. The region is
-  the evaluator's own index, and whether it can rise.
-  relevant: `fan-regsSzL-mint`, `share-fold-store≤`, `step-frame-vals≤`
+- **IS THE NESTING CEILING CAPS-DENOMINATED AT ALL?** Every route tried
+  reads the potential off the caps recurrence — at the entry cap, at the
+  exit cap, or by moving the recurrence's own blowup fuel — and the last
+  of those is now closed by arithmetic rather than by a missing premise.
+  The premise side was free, and the move still asks the fuel to dominate
+  a blowup taken AT that fuel; a shifted index is a raised base, so the
+  charge rises with the potential. What that leaves is not a sixth
+  denomination but a question about the currency: the one ladder that
+  affords the fold reads no `capsH` at all. The region is whether a
+  non-caps ceiling can close.
+  relevant: `fan-regsSzL-mint`, `walk-share-nestOK`, `walk-share-valsNest`
 
 - **WHAT CARRIES A STORE READING DOWN THE WALK?** The statements read a
   PATH or a chain and the quantity they must bound is a cell in the STORE.
