@@ -52,11 +52,11 @@
 module Spike.Total where
 
 open import Level using (0ℓ)
-open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _⊔_; _≤_; _<_; _<?_; z≤n; s≤s; _≡ᵇ_)
+open import Data.Nat  using (ℕ; zero; suc; _+_; _⊔_; _≤_; _<_; _<?_; z≤n; s≤s; _≡ᵇ_)
 open import Data.Nat.Properties using
   ( ≤-refl; ≤-trans; ≤-reflexive; n≤1+n; +-suc
   ; m≤m+n; m≤n+m; m≤m⊔n; m≤n⊔m; ⊔-lub
-  ; +-monoʳ-≤; *-monoʳ-≤; *-monoˡ-≤; *-identityˡ
+  ; +-monoʳ-≤
   ; m≤n⇒m<n∨m≡n; m<1+n⇒m<n∨m≡n )
 open import Data.Nat.Induction using (<-wellFounded)
 open import Data.Bool using (Bool; true; false; if_then_else_)
@@ -148,7 +148,6 @@ hopDv : (ℕ → ℕ) → Val → ℕ
 hopD  : (ℕ → ℕ) → Exp → ℕ
 hopDt : (ℕ → ℕ) → Tm  → ℕ
 hopDl : (ℕ → ℕ) → List Val → ℕ
-pm    : Tm → ℕ
 
 hopDv η (natᵛ n) = 0
 hopDv η (obsᵛ e) = hopD η e
@@ -160,12 +159,8 @@ hopDt η inᵗ        = 0
 hopDt η (konstᵗ k) = hopDv η k
 hopDt η (nestᵗ t)  = suc (hopDt η t)
 
-pm inᵗ        = 1
-pm (konstᵗ k) = 0
-pm (nestᵗ t)  = pm t
-
 hopD η (ofᵉ vs)   = hopDl η vs
-hopD η (mapᵉ f e) = hopDt η f + (pm f ⊔ 1) * hopD η e
+hopD η (mapᵉ f e) = hopDt η f + hopD η e
 hopD η (allᵉ e)   = suc (hopD η e)
 hopD η (μᵉ b)     = hopD η b
 hopD η recᵉ       = 0
@@ -191,12 +186,10 @@ hopD-subst  : ∀ η b m → hopD η (substE b m) ≡ hopD η b
 hopDv-subst : ∀ η v m → hopDv η (substV v m) ≡ hopDv η v
 hopDl-subst : ∀ η vs m → hopDl η (substL vs m) ≡ hopDl η vs
 hopDt-subst : ∀ η f m → hopDt η (substT f m) ≡ hopDt η f
-pm-subst    : ∀ f m → pm (substT f m) ≡ pm f
 
 hopD-subst η (ofᵉ vs)   m = hopDl-subst η vs m
 hopD-subst η (mapᵉ f e) m =
-  cong₂ _+_ (hopDt-subst η f m)
-            (cong₂ _*_ (cong (_⊔ 1) (pm-subst f m)) (hopD-subst η e m))
+  cong₂ _+_ (hopDt-subst η f m) (hopD-subst η e m)
 hopD-subst η (allᵉ e)   m = cong suc (hopD-subst η e m)
 hopD-subst η (μᵉ b)     m = refl
 hopD-subst η recᵉ       m = refl
@@ -213,10 +206,6 @@ hopDt-subst η inᵗ        m = refl
 hopDt-subst η (konstᵗ k) m = hopDv-subst η k m
 hopDt-subst η (nestᵗ t)  m = cong suc (hopDt-subst η t m)
 
-pm-subst inᵗ        m = refl
-pm-subst (konstᵗ k) m = refl
-pm-subst (nestᵗ t)  m = pm-subst t m
-
 syncSize-subst : ∀ b m → syncSize (substE b m) ≡ syncSize b
 syncSize-subst (ofᵉ vs)   m = refl
 syncSize-subst (mapᵉ f e) m = cong suc (syncSize-subst e m)
@@ -227,39 +216,43 @@ syncSize-subst (deferᵉ b) m = refl
 syncSize-subst (slotᵉ i)  m = refl
 
 ------------------------------------------------------------------
--- THE TEMPLATE BOUND.  A template applied to a value of hop `h`
--- produces one of hop at most `hopDt f + (pm f ⊔ 1) * h` — which is
--- precisely the `mapᵉ` clause.  `nestᵗ` is the case that matters: it
--- adds a hop frame, and the clause's own `suc` pays for it ONCE,
--- independently of how many values arrive.  That is the whole
--- difference from the refold, where the cost is per-arrival and no
--- syntactic clause can see the arrival count.
+-- THE TEMPLATE BOUND, AND IT IS ADDITIVE.  A template applied to a
+-- value of hop `h` produces one of hop at most `hopDt f + h` — which
+-- is precisely the `mapᵉ` clause.
 --
--- `⊔ 1` on the multiplier is not decoration: without it a template
--- that drops its argument prices the source at zero, and the descent
--- edge's own non-increase `hopD e ≤ hopD (mapᵉ f e)` is false.
+-- The additivity is the load-bearing part, and it is why no
+-- MULTIPLIER appears anywhere in this file.  Hop depth composes by
+-- `⊔`, not by `+`: a template that plugs its argument twice nests
+-- neither copy inside the other, so the two occurrences take a max
+-- and the plug COUNT is invisible to a depth measure.  The real
+-- development's plug multiplier is therefore paying for a breadth
+-- that a depth cannot see, and it is what turns that clause's
+-- per-fold cost into an exponent.
+--
+-- `nestᵗ` is the case that matters: it adds a hop frame, and the
+-- clause's own `suc` pays for it ONCE, independently of how many
+-- values arrive.  That is the whole difference from the refold, where
+-- the cost is per-arrival and no syntactic clause can see the arrival
+-- count.
 ------------------------------------------------------------------
 
-evalTm-hop : ∀ η f v → hopDv η (evalTm f v) ≤ hopDt η f + (pm f ⊔ 1) * hopDv η v
-evalTm-hop η inᵗ        v = m≤m+n _ _
+evalTm-hop : ∀ η f v → hopDv η (evalTm f v) ≤ hopDt η f + hopDv η v
+evalTm-hop η inᵗ        v = ≤-refl
 evalTm-hop η (konstᵗ k) v = m≤m+n _ _
 evalTm-hop η (nestᵗ t)  v = s≤s (⊔-lub (evalTm-hop η t v) z≤n)
 
 hopD-map-mono : ∀ η f e → hopD η e ≤ hopD η (mapᵉ f e)
-hopD-map-mono η f e =
-  ≤-trans (≤-reflexive (sym (*-identityˡ (hopD η e))))
-          (≤-trans (*-monoˡ-≤ (hopD η e) (m≤n⊔m (pm f) 1))
-                   (m≤n+m _ _))
+hopD-map-mono η f e = m≤n+m _ _
 
 hopDl-mem : ∀ η ws {u} → u ∈ ws → hopDv η u ≤ hopDl η ws
 hopDl-mem η (w ∷ ws) (here refl) = m≤m⊔n _ _
 hopDl-mem η (w ∷ ws) (there p)   = ≤-trans (hopDl-mem η ws p) (m≤n⊔m _ _)
 
 mapB-mem : ∀ η f ws {u B} → (∀ {x} → x ∈ ws → hopDv η x ≤ B) →
-           u ∈ mapB f ws → hopDv η u ≤ hopDt η f + (pm f ⊔ 1) * B
+           u ∈ mapB f ws → hopDv η u ≤ hopDt η f + B
 mapB-mem η f (w ∷ ws) h (here refl) =
   ≤-trans (evalTm-hop η f w)
-          (+-monoʳ-≤ (hopDt η f) (*-monoʳ-≤ (pm f ⊔ 1) (h (here refl))))
+          (+-monoʳ-≤ (hopDt η f) (h (here refl)))
 mapB-mem η f (w ∷ ws) h (there p) = mapB-mem η f ws (λ q → h (there q)) p
 
 ------------------------------------------------------------------
