@@ -238,16 +238,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **CARRY THE REGISTRY'S POTENTIAL, STOP COMPUTING IT FROM A CAP.**
-  Every cap reading is closed and they are one route: a receipt wants
-  the cap large, the leaf's charge is two to a cube of it, one number
-  does both jobs, and the roof — though a CHOSEN power with several
-  rungs of slack under this face's size floor — buys only a bounded
-  number of recurrence steps, which the walk's accumulating level does
-  not respect. That exhausts the mechanism rather than the endpoints.
-  The commit puts the entry's own bound in the INVARIANT RECORD, where
-  registration must supply it and every consumer re-establish it, and
-  returns either the leaf or the first producer that cannot.
+- **SPLIT THE PRICING'S ONE CAP IN TWO — ARRIVAL AND RECEIPT.** Every
+  cap reading is closed and they are one route: a receipt wants the cap
+  large, the leaf's charge is two to a cube of it, one number does both
+  jobs. The pricing says why. Two clauses charge for the ARRIVAL, which
+  the descent holds constant at the entry cap; the rest read whichever
+  cap a registry entry was admitted under, which climbs. The depth
+  dimension is the worked instance — cap-free potential, one conjunct
+  indexed by the instant alone. The commit gives the arrival its own
+  parameter and returns the first site that cannot supply it.
 
 - **THE SECOND HAND-OVER, NOW THAT THE CLIMB IS STRICT**, which is the
   one arm of WHAT PRICES A REGISTERED CHAIN the entry ledger did not
