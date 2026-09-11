@@ -1453,6 +1453,51 @@ fan-regsSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 fan-regsSz {e = e} sl id Lv sched st cok =
   capsOK?-regs (frameStep Lv (capsAt e sl id)) sched st cok
 
+-- THE READING IS FREE OF THE INSTANT'S CAPS EVERYWHERE IT IS SPENT,
+-- AND THE ROW IS STILL OPEN.  The frame arm's budget is proven of four
+-- bare numbers asking of the cap only that it be at least two, and
+-- both spenders of the packed reading are proven cap-generic, so the
+-- cap this row names is now a free choice at every site that READS it.
+-- That is worth knowing because it settles which end the obstacle sits
+-- at: nothing about the supply, the spenders or the grant's arithmetic
+-- holds the reading at entry, so a repair does not have to buy any of
+-- them, and what remains is the ceiling the chosen cap is priced under.
+--
+-- AND THE CAP IS PULLED BOTH WAYS BY ONE NUMBER, WHICH IS WHY NO CHOICE
+-- OF IT LANDS.  The two obligations the cap answers move in opposite
+-- directions and are denominated in the SAME quantity.  A receipt asks
+-- the cap to be LARGE: the frame conjunct weakens as it grows, and the
+-- entry reading is refuted precisely because an admitted chain carries
+-- a frame the entry cap does not cover.  The pricing asks it to be
+-- SMALL, and far more steeply: the sink leaf's charge is two to a CUBE
+-- of the cap the conclusion names, under a ceiling that affords two to
+-- the cap itself.  So the receipt's floor and the pricing's roof are
+-- the same variable.  That is a property of the DENOMINATION and not of
+-- any endpoint, which is what says the routes below are one route: a
+-- cap chosen anywhere -- entry, stepped, climbed, or carried per entry
+-- under a ceiling -- is chosen for both jobs at once.
+--
+-- AND THE GAP BETWEEN FLOOR AND ROOF IS REAL BUT FINITE, WHICH IS THE
+-- ONE NUMBER A REPAIR HAS TO BEAT.  The roof is not where it looks: the
+-- budget's own exponent is a chosen power of the cap, the ceiling
+-- affords two to the cap, and the ladder that fits one under the other
+-- is the same lemma at a higher rung -- the tree already carries the
+-- square and the fifth power, each at its own threshold, and every
+-- threshold on that ladder sits far under the size floor this face
+-- proves.  So the roof lifts by several powers for the cost of one
+-- arithmetic lemma.  What it does not lift by is unboundedly many: each
+-- step of the recurrence roughly squares the cap and so CUBES the
+-- degree the charge needs, and the floor admits only a couple of those
+-- before the ladder runs past two to the cap.  So the repair a lifted
+-- roof would license is exactly one: a receipt at a BOUNDED number of
+-- steps.  The walk does not have one -- its level accumulates across
+-- the chain list rather than standing still -- which is what turns
+-- every cap reading into the same dead end and says the number to beat
+-- is not the one to work on.  What is left is not a better cap but a
+-- potential that is not a function of one: carried with the entry and
+-- re-established where the entry is made.  Read off the pricing, the
+-- step function and the ladder's thresholds rather than instantiated.
+
 -- THE LEAVES' HALF OF THE SAME READING, AND THE DOUBLING DOES NOT SAVE
 -- IT.  The packed form was adopted because the witness that kills the
 -- flat reading satisfies it -- a minted chain of eight frames against
@@ -1468,6 +1513,50 @@ fan-regsSz {e = e} sl id Lv sched st cok =
 -- AND THE PAIR DOES NOT COME APART, WHICH IS WHAT SHUTS THE OBVIOUS
 -- ESCAPE.  Keeping the frame conjunct at the entry cap and finding the
 -- length elsewhere is the repair a dead length side invites, since
+-- AND THE CURRENCY THAT IS NOT A CAP IS ALREADY LEGIBLE IN THE
+-- PRICING, WHICH IS WHERE THE NEXT ATTEMPT GOES.  The walk's size
+-- charge is LINEAR in the cap it reads, and its coefficients are
+-- cap-free: a mapping frame contributes its own operator's syntax and
+-- nothing else, a folding frame and a subscribing frame each
+-- contribute a fixed weight times the cap, and the sink leaf
+-- contributes one fixed cubic in the cap according to whether the
+-- chain ends at a sink.  So a chain's charge at EVERY cap is
+-- determined by three cap-free numbers read off its syntax -- a syntax
+-- sum, a weight, and a sink indicator -- and the cap enters only where
+-- the charge is finally spent.
+--
+-- That is what makes a carried reading stateable at all.  The registry
+-- would hold the three numbers, registration would establish them from
+-- the walk that minted the entry, and a reader would recover the
+-- charge at whatever cap it is spending under -- instead of holding a
+-- predicate whose truth depends on which cap happened to be current.
+-- It is the depth dimension's shape, whose per-path measure is
+-- likewise cap-free and whose receipt is one conjunct indexed by the
+-- instant alone.  And nothing recorded below reaches it: every one of
+-- those witnesses busts a CAP READING -- a frame wider than the entry
+-- cap, a chain longer than twice it -- and none of them bounds the
+-- three numbers, which is what says the obstacle was the denomination
+-- rather than the registry.  What is left to establish is that the
+-- carried numbers survive registration, which is a producer obligation
+-- and not an arithmetic one.  Read off the pricing's own clauses
+-- rather than instantiated.
+
+-- AND THE TWO READINGS ARE MEASURED APART AT A STATE THE EVALUATOR
+-- REACHES, which is what moves this off a reading of the clauses.
+-- `Probed.Regs-Charge-Currency` runs a scan that carries syntax as a
+-- value under a merge, takes the registry the run actually leaves, and
+-- asks both questions of it at a range of caps.  The predicate this
+-- statement is written in is false at every cap up to and including
+-- forty-eight and turns true at sixty-four; the charge the hand-over
+-- actually spends is false at two and true from three upward.  So the
+-- gap is more than an order of magnitude wide and it is an interval
+-- rather than one awkward cap, and inside it the face's own premise is
+-- unavailable while the quantity the face spends is affordable.  What
+-- the separation does not buy is the producer obligation: every chain
+-- in that registry ends at the root, so the sink leaf's own cubic is
+-- never charged, and nothing there says the charge is re-establishable
+-- where a registration is made.
+
 -- the frame conjunct is the half the leaves' pricing actually spends.
 -- It fails for the same reason at a different witness: the frame a
 -- subscribe pushes carries its operator's TRANSFORMER verbatim, and
@@ -1592,6 +1681,23 @@ fan-regsSz {e = e} sl id Lv sched st cok =
 --   each frame it passes.  They are not two readings of one climb --
 --   one counts HOPS and the other counts FRAMES, and no bound on
 --   either is a bound on the other.
+-- DEAD ROUTE: stating the whole face at the CLIMBED cap -- the one the
+--   registry receipt is free at -- now that the grant is denomination-
+--   free and neither spender reads the instant.  This is the shape the
+--   first two dead routes each left open at one end, and the generic
+--   grant closes it rather than opening it.  A pricing exponent is
+--   polynomial in the cap it names, and the ceiling the face is fitted
+--   under affords an exponent of two to the entry cap; so the climbed
+--   cap may exceed the entry one by a power and no more.  It exceeds it
+--   by an exponential instead: the walk's level runs to the instant's
+--   whole fold count, the cap stepped that far is what the exit door
+--   already fits under the NEXT instant's entry cap, and that cap is a
+--   blowup of this instant's HEIGHT -- the same height whose logarithm
+--   is the entire exponent budget.  So the gap is not a factor at any
+--   level and the choice of cap is not where the repair is.  Read off
+--   the pricing and the step function rather than instantiated: the
+--   fold count is sealed for cost, and what is checkable here is that
+--   one endpoint bounds the other.
 postulate
   fan-regsSzL-mint : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (Lv : ℕ) (sched : Sched Γ) (st : EvalSt e) →

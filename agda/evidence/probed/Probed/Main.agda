@@ -158,6 +158,10 @@ open import Probed.Regs-Store-Currency
   using (figures≡; verdicts≡; separates;
          composed≡; separatesJoin; joinVerdicts≡)
 
+open import Probed.Regs-Charge-Currency
+  using (interval≡; inside≡)
+  renaming (separates to separatesCharge)
+
 open import Probed.Regs-Split-Budget
   using (figures≡; margins≡; verdicts≡; confirm1; confirm3)
 

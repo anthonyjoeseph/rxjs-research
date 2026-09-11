@@ -99,6 +99,34 @@ frameΦSz B (thru-outer _ _)   = B
 -- quantity the leaf would read is built by iterating on the quantity
 -- it must fit under, and no program makes that ordering the other way.
 
+-- AND THE ONE PARAMETER IS SERVING TWO DIFFERENT OBJECTS, WHICH IS
+-- WHERE THE DEAD CAP READINGS COME FROM.  Two of the clauses here are
+-- priced at a cap because the thing they charge for is the ARRIVAL --
+-- the subscribing frame runs a term the walk was handed, and the sink
+-- leaf carries a chain the walk hands values to.  The arrival is
+-- instant-constant: the descent's premise bounds it by the cap at the
+-- instant's ENTRY and nothing in the climb moves it.  The remaining
+-- clauses are not charges for an arrival at all; they read a cap only
+-- because a registry entry's legality is stated at whichever cap that
+-- entry was admitted under, and THAT one climbs with the walk.  So a
+-- single parameter is asked to be the entry cap and the climbed cap at
+-- once, and every reading of it is chosen for both jobs -- which is
+-- the shape the four dead readings share, stated at the pricing rather
+-- than at any endpoint.
+--
+-- AND THE DEPTH DIMENSION IS THE WORKED INSTANCE OF THE SPLIT, WHICH
+-- IS WHY IT NEVER HAD THIS PROBLEM.  Its registry potential is a fold
+-- of a cap-free per-path measure, and its receipt is one conjunct
+-- indexed by the instant alone; there is no cap in the potential for a
+-- climb to move.  The map clause here is already that shape -- priced
+-- by its own operator's syntax and cap-free -- so the split to test is
+-- not a better cap but TWO parameters: an arrival charge, constant at
+-- the entry cap for the whole instant, and a frame receipt free to
+-- climb with the entry it is stated over.  What the split may NOT do
+-- is re-denominate the subscribing frame by its own syntax, which is
+-- refuted above; the arrival is what that refutation leaves standing,
+-- and it is a different quantity from the cap the receipt names.
+
 -- SO THIS LEAF'S CAP IS A WALK QUANTITY PERMANENTLY, and a chain the
 -- fan-out hands values to is priced by this clause or by a mechanism
 -- that does not price it at a cap at all.  That is the obligation
