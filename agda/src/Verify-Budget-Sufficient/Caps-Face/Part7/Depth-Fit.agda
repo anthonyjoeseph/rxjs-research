@@ -1472,12 +1472,31 @@ fan-regsSz {e = e} sl id Lv sched st cok =
 -- SMALL, and far more steeply: the sink leaf's charge is two to a CUBE
 -- of the cap the conclusion names, under a ceiling that affords two to
 -- the cap itself.  So the receipt's floor and the pricing's roof are
--- the same variable, and one step of the recurrence is already wider
--- than the whole polynomial gap between them.  That is a property of
--- the DENOMINATION and not of any endpoint, which is what says the four
--- routes below are one route: a cap chosen anywhere -- entry, stepped,
--- climbed, or carried per entry under a ceiling -- is chosen for both
--- jobs at once.  Read off the leaf's own clause and the ceiling's fit.
+-- the same variable.  That is a property of the DENOMINATION and not of
+-- any endpoint, which is what says the routes below are one route: a
+-- cap chosen anywhere -- entry, stepped, climbed, or carried per entry
+-- under a ceiling -- is chosen for both jobs at once.
+--
+-- AND THE GAP BETWEEN FLOOR AND ROOF IS REAL BUT FINITE, WHICH IS THE
+-- ONE NUMBER A REPAIR HAS TO BEAT.  The roof is not where it looks: the
+-- budget's own exponent is a chosen power of the cap, the ceiling
+-- affords two to the cap, and the ladder that fits one under the other
+-- is the same lemma at a higher rung -- the tree already carries the
+-- square and the fifth power, each at its own threshold, and every
+-- threshold on that ladder sits far under the size floor this face
+-- proves.  So the roof lifts by several powers for the cost of one
+-- arithmetic lemma.  What it does not lift by is unboundedly many: each
+-- step of the recurrence roughly squares the cap and so CUBES the
+-- degree the charge needs, and the floor admits only a couple of those
+-- before the ladder runs past two to the cap.  So the repair a lifted
+-- roof would license is exactly one: a receipt at a BOUNDED number of
+-- steps.  The walk does not have one -- its level accumulates across
+-- the chain list rather than standing still -- which is what turns
+-- every cap reading into the same dead end and says the number to beat
+-- is not the one to work on.  What is left is not a better cap but a
+-- potential that is not a function of one: carried with the entry and
+-- re-established where the entry is made.  Read off the pricing, the
+-- step function and the ladder's thresholds rather than instantiated.
 
 -- THE LEAVES' HALF OF THE SAME READING, AND THE DOUBLING DOES NOT SAVE
 -- IT.  The packed form was adopted because the witness that kills the
