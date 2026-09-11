@@ -2036,6 +2036,21 @@ connect-anchor e sl id i {d} eq =
 -- carrying that one receipt — induction with the invariant in the
 -- motive — and not a domain predicate.
 
+-- DEAD ROUTE: taking the flattening off ONE edge at a time — leaving the
+--   other two edges denominated in `dBound` and letting the cheapest
+--   recursion descend on `Rx.Strat-Order` directly.  `Gas` is a UNARY
+--   counter, so a demand stated against it is necessarily a single
+--   natural: `Walk-Level`'s subscribe-inner contract threads
+--   `g hasAtLeast suc G` against `dBound Ŝ R̂ U (suc r̂) ŝ ≤ G`.  One
+--   induction cannot carry an `Acc`-shaped motive at one of its re-entry
+--   edges and a `dBound`-shaped one at the others, so the conversion is
+--   ALL-OR-NOTHING PER RECURSION and there is no partial form to stage it
+--   through.  What a whole one would delete is measurable on that same
+--   contract, which carries `2 ≤ Ŝ`, `F ≡ Ŝ`, `R̂ ≡ hopR Ŝ`, a frame-step
+--   size cap, a level cap, the `dBound` demand and the `hasAtLeast` —
+--   seven premises, every one of them funding the flattening rather than
+--   the descent.
+
 dBound : (V R U r s : ℕ) → ℕ
 dBound V R U r s = s + suc V * (r + suc R * U)
 

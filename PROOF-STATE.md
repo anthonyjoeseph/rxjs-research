@@ -258,16 +258,16 @@ statement, not about the head.
   on this region and so a stop — or the form that admits none of them.
   Narrows WHAT BOUNDS A BURST INSIDE ONE INSTANT?
 
-- **ONE EDGE OFF THE FLATTENING, AND WHAT THE MOTIVE COSTS.** Both
-  forms stand today: the order is established at each edge and then
-  spent to build the number the recursion still descends on, so
-  nothing has been retired. This commit takes the cheapest of the
-  three — the unfold, which fixes both outer components and asks for
-  no cap at all — has the recursion descend on the order itself, and
-  reports what the strengthened return type costs at every clause that
-  threads past it. That cost decides whether the other two follow one
-  at a time or the flattening comes out whole. Narrows DOES DESCENT
-  SURVIVE THE REAL TERM LANGUAGE?
+- **THE CONTRACT RESTATED OVER THE ORDER, WHOLE.** The flattening
+  cannot come off one edge at a time: gas is a unary counter, so the
+  wet contract's demand is one natural and no induction mixes an `Acc`
+  motive with a `dBound` one. The finding sits on `dBound`'s header and
+  the leg it killed is discarded. The unit is therefore a whole
+  recursion, so this commit states the subscribe SCC's contract over
+  `Rx.Strat-Order` with its seven flattening premises struck, then
+  walks every clause of the real `subscribeE` asking which of the three
+  constructors it inhabits. The product is the residue: the clauses
+  inhabiting none. Narrows DOES DESCENT SURVIVE THE REAL TERM LANGUAGE?
 
 ### Open questions
 
