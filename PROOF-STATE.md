@@ -238,17 +238,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE HEADROOM, WHICH IS ALL THE TERMINAL TURNED OUT TO BE.** The
-  fan's terminal split by what the admitted chain ends at, and the sink
-  arm was refuted because the LEAF was being asked to be the ceiling.
-  The budget is the ceiling; read against it the split collapses, since
-  `pathΦF-cap-atLen` and `pathΦD-len` bound a chain's factor and depth
-  off its packed size legality alone and name no terminal. What is left
-  is one inequality between two arithmetics: a legality ceiling of two
-  to twice the cap times a square of it, against a nest potential
-  carrying a fifth power of it. The commit instantiates both sides at
-  reachable caps and either lands the leaf or returns the cap at which
-  the gap closes.
+- **THE DEPTH RECEIPT ON THE VALUES IN FLIGHT.** The headroom closed
+  outright, so the fan's terminal is now a DEPTH statement rather than
+  an inequality — and a different currency from every other row of WHAT
+  PRICES A REGISTERED CHAIN, since the values a dispatch hands on are
+  what the walk carried IN and no store or registry reading mentions
+  them. The commit states the carrier at the frame arms that produce a
+  dispatch's list and returns the first arm whose emission the nest cap
+  cannot cover, which decides whether the fan's half of that question
+  is a supply problem or a cap one.
 
 - **THE FRAME ARMS IN THE SAME CURRENCY**, which is the rest of WHAT
   PRICES A REGISTERED CHAIN once the terminal stops asking for a
@@ -294,8 +292,10 @@ does not fit is a finding about the shared statement, not about the head.
   left is CAP-DENOMINATED and only that: the TERMINAL LEAVES, which
   cannot follow a widening because the pricing reads a length under the
   cap its own conclusion names — and under them the SUPPLY, since two
-  siblings die free-standing at one `register`.
-  relevant: `fan-regsSzL-mint`, `sink-fan-headroom`
+  siblings die free-standing at one `register`. The fan's half is no longer
+  priced at all: its arithmetic closed against the cap charge, and what is
+  left is a DEPTH receipt on values the registry never sees.
+  relevant: `fan-regsSzL-mint`, `walk-share-valsNest`
 
 ### The ledger
 
@@ -339,10 +339,10 @@ does not fit is a finding about the shared statement, not about the head.
   is the telescope summand — `input` charges nought, so no program reading
   reaches it. The summand is owed the connect's TRANSITIVE reach; sum against
   maximum is closed to instantiation.
-- **`sink-fan-headroom`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the fan's
-  terminal with the terminal gone — the legality ceilings' charge under the
-  instant's nest potential, naming no path and no registry. The leaf
-  comparison its refutation kills is not this, which quantifies no budget.
+- **`walk-share-valsNest`** (Part7/Depth-Fit) — FALSITY, `NO EVIDENCE`: the
+  values a dispatch hands on are under the instant's nest cap. The headroom
+  closed, so this is what the fan's terminal was; nothing in the store mentions
+  a list the walk carried in, so it is owed at whatever frame emitted it.
 - **`fan-regsSzL-mint`** (Part7/Depth-Fit) — FALSITY,
   `REFUTED×4, DEAD ROUTE×7`: the registry read at the ENTRY cap in the PACKED
   form, which only the terminal leaves now ask for. Both conjuncts refuted at

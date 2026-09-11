@@ -1310,58 +1310,76 @@ chgD B = (B + B) * B + (B + B) * B
 
 -- the fit read one value at a time, so the list's maximum is never
 -- formed and the empty list is not a special case
-valsΦ?-ceil : ∀ {n} {Γ : Ctx n} {u t} (B U F D : ℕ) (p q : Path Γ u t)
+valsΦ?-ceil : ∀ {n} {Γ : Ctx n} {u t} (B U F D N : ℕ) (p : Path Γ u t)
   (vs : List (Val Γ u)) →
   pathΦF B p ≤ F → pathΦD B p ≤ D →
-  (∀ (d : ℕ) → pathΦF B q * (d + pathΦD B q) ≤ U → F * (d + D) ≤ U) →
-  valsΦ? B U q vs ≡ true → valsΦ? B U p vs ≡ true
-valsΦ?-ceil B U F D p q []       hF hD hh h = refl
-valsΦ?-ceil {u = u} B U F D p q (v ∷ vs) hF hD hh h =
+  (∀ (d : ℕ) → d ≤ N → F * (d + D) ≤ U) →
+  all (λ v → nestDᵛ u v ≤ᵇ N) vs ≡ true →
+  valsΦ? B U p vs ≡ true
+valsΦ?-ceil B U F D N p []       hF hD hh h = refl
+valsΦ?-ceil {u = u} B U F D N p (v ∷ vs) hF hD hh h =
   ∧-intro
     (≤ᵇ-true (pathΦF B p * (nestDᵛ u v + pathΦD B p)) U
       (≤-trans (*-mono-≤ hF (+-monoʳ-≤ (nestDᵛ u v) hD))
-        (hh (nestDᵛ u v)
-          (≤ᵇ⇒≤ (pathΦF B q * (nestDᵛ u v + pathΦD B q)) U
-            (T-to (∧-trueˡ h))))))
-    (valsΦ?-ceil B U F D p q vs hF hD hh (∧-trueʳ h))
+        (hh (nestDᵛ u v) (≤ᵇ⇒≤ (nestDᵛ u v) N (T-to (∧-trueˡ h))))))
+    (valsΦ?-ceil B U F D N p vs hF hD hh (∧-trueʳ h))
 
--- WHAT IS LEFT NAMES NO PATH AND NO REGISTRY.  The walk hands the sink
--- its own receipt; what an admitted chain needs is that same shape at
--- the legality ceilings rather than at the leaf's two numbers.  The
--- gap between the two is one exponential in the size cap, against a
--- nest potential carrying a fifth power of it -- so this is headroom
--- in the instant's own arithmetic, and it is what the terminal turned
--- out to be once the leaf stopped being asked to be the ceiling.
+-- WHAT IS LEFT NAMES NO PATH AND NO REGISTRY, AND ONCE THE CEILING IS
+-- THE BUDGET IT IS NOT A GAP AT ALL.  The ceilings' factor is the cap
+-- charge's own coefficient exactly -- four cubes and four squares of
+-- the size cap, which is what a registered chain budgeted at twice
+-- that cap costs to apply -- and that charge already carries the
+-- coefficient against the instant's NEST CAP with two doublings
+-- beside it.  So one doubling pays a value whose depth is under the
+-- nest cap and the other pays the chain's own two depths, and the
+-- walk half of the potential is not asked for anything.  What the
+-- terminal turned out to be is therefore not arithmetic headroom but
+-- a DEPTH RECEIPT on the values in flight, which is a different
+-- currency and is owed where the fan reads them.
 -- REFUTED: `Refuted.Sink-Phi-Leaf`, which is why the reading is
 --   against the BUDGET and not against the leaf.  That witness
 --   quantifies the budget and takes it at the number the sink's own
 --   receipt exactly exhausts, so it kills the leaf comparison at an
 --   ordinary two-generation share and says nothing whatever about the
 --   potential an instant actually carries.
-postulate
-  sink-fan-headroom : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sl : Slots Γ) (id : ℕ) (i : Fin n) (d : ℕ) →
-    pathΦF {Γ = Γ} {s = lookup Γ i} {t = t}
-      (Caps.cSize (capsAt e sl id)) (share-sink i)
-      * (d + pathΦD {Γ = Γ} {s = lookup Γ i} {t = t}
-               (Caps.cSize (capsAt e sl id)) (share-sink i))
-      ≤ nestΦAt e sl id →
-    chgF (Caps.cSize (capsAt e sl id))
-      * (d + chgD (Caps.cSize (capsAt e sl id))) ≤ nestΦAt e sl id
+chg-headroom : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ)
+  (d : ℕ) → d ≤ nestCapAt e sl id →
+  chgF (Caps.cSize (capsAt e sl id))
+    * (d + chgD (Caps.cSize (capsAt e sl id))) ≤ nestΦAt e sl id
+chg-headroom e sl id d hd =
+  ≤-trans (*-monoʳ-≤ Z (+-monoˡ-≤ (X + X) hd))
+  (≤-trans (*-monoʳ-≤ Z fold2)
+  (≤-trans (≤-reflexive (pull2 Z (C + X)))
+  (≤-trans (*-monoˡ-≤ (Z * (C + X)) (≤ᵇ⇒≤ 2 4 tt))
+  (≤-trans (m≤m+n (4 * (Z * (C + X))) (2 * (Z * (B * slotWrapSum sl))))
+           (nestΦ-frame-charge e sl id)))))
+  where
+  B = Caps.cSize (capsAt e sl id)
+  Z = chgF B
+  X = (B + B) * B
+  C = nestCapAt e sl id
+  two : 2 * (C + X) ≡ C + X + (C + X)
+  two = solve 2 (λ c x → con 2 :* (c :+ x) := c :+ x :+ (c :+ x)) refl C X
+  fold2 : C + (X + X) ≤ 2 * (C + X)
+  fold2 = ≤-trans (≤-reflexive (sym (+-assoc C X X)))
+          (≤-trans (+-monoʳ-≤ (C + X) (m≤n+m X C))
+                   (≤-reflexive (sym two)))
+  pull2 : ∀ (z y : ℕ) → z * (2 * y) ≡ 2 * (z * y)
+  pull2 z y = solve 2 (λ z′ y′ → z′ :* (con 2 :* y′) := con 2 :* (z′ :* y′))
+                    refl z y
 
 sink-fan-chg : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (i : Fin n) (p : Path Γ (lookup Γ i) t)
   (vals : List (Val Γ (lookup Γ i))) →
   pathSzL? (Caps.cSize (capsAt e sl id)) p ≡ true →
-  valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
-    (share-sink {t = t} i) vals ≡ true →
+  all (λ v → nestDᵛ (lookup Γ i) v ≤ᵇ nestCapAt e sl id) vals ≡ true →
   valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id) p vals ≡ true
-sink-fan-chg {e = e} sl id i p vals hz hΦ =
-  valsΦ?-ceil B (nestΦAt e sl id) (chgF B) (chgD B) p (share-sink i) vals
+sink-fan-chg {e = e} sl id i p vals hz hnv =
+  valsΦ?-ceil B (nestΦAt e sl id) (chgF B) (chgD B) (nestCapAt e sl id) p vals
     (pathΦF-cap-atLen B (B + B) p hf hl)
     (≤-trans (pathΦD-len B p 1≤B hf)
       (+-monoˡ-≤ ((B + B) * B) (*-monoˡ-≤ B hl)))
-    (sink-fan-headroom sl id i) hΦ
+    (chg-headroom e sl id) hnv
   where
   B = Caps.cSize (capsAt e sl id)
   1≤B : 1 ≤ B
@@ -1811,6 +1829,32 @@ postulate
     Sched.slots sched ≡ sl →
     nestOK? e sl id sched st ≡ true
 
+-- THE VALUES IN FLIGHT ARE THE OTHER HALF OF THE FAN'S READING, AND
+-- THEY ARE NOT IN THE STORE.  The receipt directly above answers what
+-- the fan reads OUT of the state; these are what the walk carries INTO
+-- it, and no store predicate mentions them at all -- a dispatch's list
+-- is whatever the frame above emitted, so it is related to the
+-- instant's nest cap only through the chain of frames it came down.
+-- The cap is the right ceiling and not merely an available one: the
+-- charge the potential's cap half carries is denominated there
+-- exactly, so a value under it is paid for and a value over it would
+-- have to be paid by the walk half, whose multiplicand names the
+-- syntactic unit rather than any depth a run accumulates.
+--
+-- AND THE BOUND IS EXPLICIT BECAUSE IT STANDS INSIDE AN `all`
+-- PREDICATE, where an implicit is a fresh meta per element -- the same
+-- reason the chain-side fold beside it takes its ceiling as a
+-- parameter.
+postulate
+  walk-share-valsNest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sl : Slots Γ) (id : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
+    (Lv : ℕ) (i : Fin n) (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) →
+    dispatchCapsOK (capsAt e sl id) (capsAt e sl (suc id)) sl (capsH e sl id) Lv
+      sf (suc gas) nid now i vals fin sched st →
+    Sched.slots sched ≡ sl →
+    all (λ v → nestDᵛ (lookup Γ i) v ≤ᵇ nestCapAt e sl id) vals ≡ true
+
 -- AND THE FAN-OUT HALF IS A PROVEN FOLD RATHER THAN A FILTER LEMMA,
 -- which is the whole of what the store denomination bought.  A
 -- share's admitted selection is under the registry's own place in the
@@ -1967,8 +2011,6 @@ mutual
     capsOK? (frameStep Lv (capsAt e sl id)) sched st ≡ true →
     depthDisp sf gas nid now i vals fin sched st ≤ capsH e sl id →
     Sched.slots sched ≡ sl →
-    valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
-      (share-sink {t = t} i) vals ≡ true →
     DispatchΦHyp sf gas nid now (Caps.cSize (capsAt e sl id))
       (nestΦAt e sl id) i vals fin sched st
 
@@ -1991,14 +2033,13 @@ mutual
         ps ≡ true →
     all (λ rp → pathSzL? (Caps.cSize (capsAt e sl id)) (proj₂ rp)) ps ≡ true →
     all (λ rp → pathNestD (proj₂ rp) ≤ᵇ nestCapAt e sl id) ps ≡ true →
-    valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
-      (share-sink {t = t} i) vals ≡ true →
+    all (λ v → nestDᵛ (lookup Γ i) v ≤ᵇ nestCapAt e sl id) vals ≡ true →
     ShareGoΦHyp sf gas nid now (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
       i vals fin ps sched st
 
-  walk-share-ΦHyp sl id sf zero nid now Lv i vals fin sched st _ _ _ _ _ = tt
+  walk-share-ΦHyp sl id sf zero nid now Lv i vals fin sched st _ _ _ _ = tt
   walk-share-ΦHyp {e = e} sl id sf (suc gas) nid now Lv i vals false sched st
-                  hd hck hdd hsl hΦ =
+                  hd hck hdd hsl =
     walk-shareGo-ΦHyp sl id sf gas nid now Lv i vals false
       (shareAdmit i (EvalSt.registry st)) sched st
       (proj₂ (proj₂ hd)) hdd
@@ -2009,9 +2050,10 @@ mutual
              (fan-regsNest sl id sched st
                 (walk-share-nestOK sl id sf gas nid now Lv i vals false
                    sched st hd hsl)))
-          hΦ
+          (walk-share-valsNest sl id sf gas nid now Lv i vals false
+             sched st hd hsl)
   walk-share-ΦHyp {e = e} sl id sf (suc gas) nid now Lv i vals true sched st
-                  hd hck hdd hsl hΦ =
+                  hd hck hdd hsl =
     walk-shareGo-ΦHyp sl id sf gas nid now Lv i vals true
       (shareAdmit i (EvalSt.registry st)) sched (shareLatch i true st)
       (proj₂ (proj₂ hd)) hdd
@@ -2022,16 +2064,17 @@ mutual
              (fan-regsNest sl id sched st
                 (walk-share-nestOK sl id sf gas nid now Lv i vals true
                    sched st hd hsl)))
-          hΦ
+          (walk-share-valsNest sl id sf gas nid now Lv i vals true
+             sched st hd hsl)
 
   walk-shareGo-ΦHyp sl id sf gas nid now Lv i vals fin [] sched st
                     _ _ _ _ _ _ _ = tt
   walk-shareGo-ΦHyp {e = e} sl id sf gas nid now Lv i vals fin
-                    ((rid , p) ∷ ps) sched st hsg hdsg hsl hpz hpl hnd hΦ
+                    ((rid , p) ∷ ps) sched st hsg hdsg hsl hpz hpl hnd hnv
     with any (_≡ᵇ rid) (EvalSt.cancelled st)
   ... | true  = walk-shareGo-ΦHyp sl id sf gas nid now Lv i vals fin ps sched st
                   hsg (depthShareGo-tail sf gas nid now i vals fin rid p ps sched st hdsg)
-                  hsl (∧-trueʳ hpz) (∧-trueʳ hpl) (∧-trueʳ hnd) hΦ
+                  hsl (∧-trueʳ hpz) (∧-trueʳ hpl) (∧-trueʳ hnd) hnv
   ... | false =
       hΦp
     , walk-ΦHyp-go sl id sf gas nid now Lv (toℕ i) evs p vals fin sched st₀
@@ -2045,7 +2088,7 @@ mutual
         (depthShareGo-step sf gas nid now i vals fin rid p ps sched st hdsg)
         (trans (foldPath-slots sf gas nid now (toℕ i) p vals evs fin sched st₀) hsl)
         hpzs (∧-trueʳ hpl) (∧-trueʳ hnd)
-        hΦ
+        hnv
     where
     B : ℕ
     B = Caps.cSize (capsAt e sl id)
@@ -2072,14 +2115,14 @@ mutual
     evs = if fin then close (toℕ i) exhausted ∷ [] else []
     FP = foldPath sf gas nid now (toℕ i) p vals evs fin sched st₀
     hΦp : valsΦ? B (nestΦAt e sl id) p vals ≡ true
-    hΦp = sink-fan-chg sl id i p vals hpl₀ hΦ
+    hΦp = sink-fan-chg sl id i p vals hpl₀ hnv
 
   walk-ΦHyp-go sl id sf gas nid now Lv envSrc evs root vals fin sched st
                _ _ _ _ _ _ _ = tt
   walk-ΦHyp-go sl id sf gas nid now Lv envSrc evs (share-sink i) vals fin sched st
-               hcw hdf hsl _ _ _ hΦ =
+               hcw hdf hsl _ _ _ _ =
     walk-share-ΦHyp sl id sf gas nid now Lv i vals fin sched st
-      (proj₂ hcw) (proj₁ hcw) hdf hsl hΦ
+      (proj₂ hcw) (proj₁ hcw) hdf hsl
   walk-ΦHyp-go {e = e} sl id sf gas nid now Lv envSrc evs (f ↠ p) vals fin sched st
                hcw hdf hsl hpz hpl hnd hΦ =
       hF
