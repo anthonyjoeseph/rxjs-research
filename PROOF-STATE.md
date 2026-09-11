@@ -218,14 +218,14 @@ research lives; where they disagree, the header wins.
 (Caps-Bridge) says `hasDry (evaluate fuel e ins) ≡ false` and is the only CLAIM
 this tree exports; every module sits in its import cone, bar a corpus reaching
 Main through `Harness.Main`, and its one door inward is `mint-install-survives`
-(Node-Fresh). It is a definition and not a postulate, so a row whose OBSTACLE
-is written down is not thereby a row whose STATEMENT is right.
+(Node-Fresh).
 
-**THE NESTING FACE IS WHERE THIS TIER'S RISK IS, AND EVERY LEG AIMS THERE.**
-The potential is sighted at an instant's ENTRY cap while what it must dominate
-— a fold's burst in an exponent, a chain's climb, a parked cell's depth — is
-denominated at the EXIT one, and every local repair is recorded dead. The size
-face's rows ride two of the same questions and are scheduled behind it.
+**IT IS BEING DISSOLVED, NOT GROUND.** Gas is peeled at three edges and held
+fixed elsewhere, and a lexicographic triple — `unconn`, rank, `syncSizeᵉ` —
+drops strictly at each, all three drops being proven bodies. Caps live only in
+the arithmetic FLATTENING that triple into one number, which a lexicographic
+order does not need. One survives: the rank's fold clause, whose refold count
+the store bounds and the program does not. That bound is the tier's whole risk.
 
 **THE `subscribeE-nest-*` ROWS ARE ONE STATEMENT, NOT ONE PER HEAD.** They all
 instantiate `NestAt`; a head that does not fit is a finding about the shared
@@ -235,53 +235,53 @@ statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **CLOSE THE FRAGMENT'S SILENCE BEFORE READING ANOTHER GREEN.** Two
-  refutations running came from shapes the toy cannot write — a slope of
-  two, then a plug into an `allᵉ` source — and both times the
-  conclusion was written from the silence. The real term language
-  carries an arbitrary-expression constructor at the ambient scope
-  against the toy's six fixed ones, and that absence is what both misses
-  have in common. The commit gives the fragment a genuine
-  arbitrary-body plug and re-runs descent against it, returning the
-  first order surviving a template the fragment cannot enumerate — or a
-  third FALSITY here, which is a stop and not a finding. Narrows
-  DOES DESCENT SURVIVE A TEMPLATE THE FRAGMENT CANNOT WRITE?
+- **THE ORDER WITHOUT THE FLATTENING, AND THE RESIDUE IT LEAVES.** The
+  triple is well founded on its own; the caps live only in the
+  arithmetic packing it into one number. The commit states it as a
+  relation with three constructors, proves it well founded from the
+  ordinary order on the naturals, and restates the three proven
+  descents against it — at which point the hop edge's syncSize premise
+  and the connect edge's rank premise have nothing left to do and are
+  dropped. What it returns is the RESIDUE, listed rather than argued:
+  which cap hypotheses survive the restatement. One is expected, the
+  fold's refold count, and any second is a finding. Narrows WHAT DOES
+  AN INTRA-INSTANT RE-ENTRY LEAVE SMALLER?
 
-- **THE RE-ENTRY EDGES THE TOY HAS NO CLAUSE FOR.** The real evaluator
-  has six synchronous re-entry sites and the fragment models three.
-  Absent: a merge join's queue drain, which re-enters on a COMPLETION
-  with no arriving value and recurses over its own queue, so nothing in
-  hand is smaller; the top-level fan of one arrival across every chain;
-  and the share-to-share fan, bounded only by telescope size. Teardown
-  is a confirmed negative — it writes markers and the registry, reaching
-  neither fold nor subscribe. The commit adds the completion-driven
-  edge, the one with no obvious witness, and returns what decreases
-  across it. Narrows WHAT DOES AN INTRA-INSTANT RE-ENTRY LEAVE SMALLER?
+- **THE SIX RE-ENTRY SITES PUT AGAINST IT.** Three are the gas edges,
+  done by the leg above. The burst walk and the share fan descend
+  structurally on a cons list, which the evaluator's own clauses
+  show. The merge join's completion-driven drain is the one
+  with nothing obvious in hand: it re-enters on a COMPLETION carrying
+  no value and recurses over its own queue. The commit gives each of
+  the six a measure and returns whether the drain needs a fourth
+  component or rides its queue's length, and whether the cascade's own
+  counter — the second proxy, whose order is the telescope position —
+  composes with the triple or sits beside it. Narrows WHAT DOES AN
+  INTRA-INSTANT RE-ENTRY LEAVE SMALLER?
 
-- **THE COMPOSITION EXISTS AND IS PROVEN; WHAT IS OPEN IS NARROWER.**
-  The composition this leg was to go looking for is already in the
-  tree: `dBound` orders the three edges gas is peeled at, unconn
-  outermost, then rank, then syncSize, and all three descents are
-  real bodies. So the caps face's refuted BOUNDS never reached it.
-  What is left is the intra-instant re-entry, where the burst walk
-  and the share fan descend structurally on a cons list and owe
-  nothing, while a merge join's queue drain and the cascade's own
-  counter owe a component. The commit states those two against
-  `dBound`'s and returns whether either needs a fourth. Narrows WHAT
-  DOES AN INTRA-INSTANT RE-ENTRY LEAVE SMALLER?
+- **THE FOLD'S COUNT, READ OFF THE STATE RATHER THAN PREDICTED.** The
+  one survivor, and where the nesting face's refutations all live: the
+  count is sighted at an instant's ENTRY cap while what it prices
+  happens later, and every local repair of that is recorded dead. Under
+  the order there is no entry to sight from, since the recursion
+  carries what it needs in its own motive. The commit states the fold's
+  depth bound against the cell in hand and puts the refuted witnesses
+  to it, returning the first that survives — which is a third FALSITY
+  on this region and so a stop — or the form that admits none of them.
+  Narrows WHAT BOUNDS A BURST INSIDE ONE INSTANT?
 
 ### Open questions
 
-- **DOES DESCENT SURVIVE A TEMPLATE THE FRAGMENT CANNOT WRITE?** Every
-  caps-denominated route to a ceiling is closed — entry cap, exit cap,
-  the recurrence's own fuel — and the syntactic half is now settled
-  against it too: no affine plug law exists at a template plugging into
-  an `allᵉ` that feeds a `scanᵉ`, which is ordinary rxjs. That leaves
-  DESCENT, where a depth read off the emission in hand needs no
-  prediction at all. What is not known is whether it survives the
-  templates the toy has no constructor for, and the question is asked
-  this way because both refutations so far were silences of the toy read
-  as greens.
+- **DOES DESCENT SURVIVE THE REAL TERM LANGUAGE?** Every caps-denominated
+  route to a ceiling is closed — entry cap, exit cap, the recurrence's
+  own fuel — and the syntactic half is settled against it too: no affine
+  plug law exists at a template plugging into an `allᵉ` that feeds a
+  `scanᵉ`, which is ordinary rxjs. That leaves DESCENT, where a depth
+  read off the emission in hand predicts nothing. It is asked against
+  the REAL tree and no longer against a fragment, because both
+  refutations so far were silences of the fragment read as greens — an
+  arbitrary-body plug at the ambient scope is what neither could write,
+  and the real language has one.
   relevant: `fan-regsSzL-mint`, `walk-share-valsNest`, `subscribeE-sz`
 
 - **WHAT DOES AN INTRA-INSTANT RE-ENTRY LEAVE SMALLER?** One question
