@@ -199,6 +199,25 @@ pathSzL?-tail B f p h =
 -- ledger was being weakened to this on arrival.  Asking for what is
 -- spent is what frees the walk to carry the strict reading at its OWN
 -- level rather than at the entry, where minting it was refuted.
+
+-- AND THE CAP IT SPENDS AT IS THE ONE THE CAPS RECURRENCE ISSUES NO
+-- RECEIPT AT, WHICH IS THE FINDING ABOVE THE ROW.  That recurrence's
+-- own contract is that the walk starts at level zero and climbs, and
+-- that every registry length, chain cap and per-frame receipt is read
+-- off the level it has reached -- nothing is charged at the entry
+-- caps.  This arm charges there, and so does the terminal leaf's
+-- re-pricing beside it; between them they are the whole of what
+-- spends the entry-cap reading, and each names that cap only because
+-- the potential handed to it is indexed by the INSTANT rather than by
+-- the level.  So minting that reading was refuted rather than merely
+-- hard: the face asks the registry for a receipt at the one cap no
+-- receipt is issued at.  Moving the demand to the other endpoint does
+-- not help either, since the next instant's caps are a blowup of THIS
+-- instant's height, so a potential denominated there exceeds the
+-- budget the descent is held under.  What is left is the climb
+-- itself, and whether a potential exponential in the cap can be
+-- indexed by it is a question about the caps mechanism rather than
+-- about any statement underneath it.
 walk-thru-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (sl : Slots Γ) (id : ℕ) (sf : Gas) (eid : Id) (now : Tick)
   (op : AllOp) (nid : NodeId)

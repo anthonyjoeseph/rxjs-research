@@ -238,17 +238,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **DENOMINATE THE FACE AT THE INSTANT THE RECEIPT NAMES**, which is
-  where WHAT PRICES A REGISTERED CHAIN now stands. Both ends the
-  entry-cap reading left are dead routes on `fan-regsSzL-mint`: the
-  pricing cannot follow the cap up, and the budget cannot be enlarged
-  to meet it, since the stepped cap is the next instant's entry cap and
-  so a blowup of the ceiling that budget is fitted under. What is left
-  is to stop asking the walk to price a chain at the instant it began
-  in. A lift to the next instant's caps already exists in
-  `sub-charge-capsOK-lift`, and there the potential and the ceiling are
-  the denomination the receipt names. The commit is the census: which
-  obligations name the entry cap because they must, which by scope.
+- **INDEX THE POTENTIAL BY THE CLIMB, NOT BY EITHER ENDPOINT.** The
+  census names two spenders — the outer frame arm's grant and the
+  terminal leaf's re-pricing — and both name the entry cap only
+  because the potential handed to them is indexed by the INSTANT.
+  That is the mechanism error, and it sits above `fan-regsSzL-mint`
+  rather than in it: the caps recurrence charges nothing at the entry
+  caps and issues its receipts at the level the walk has climbed to.
+  Neither endpoint is the repair — the next instant's caps are a
+  blowup of this instant's height, so a potential denominated there
+  breaks the budget the descent is held under. The commit
+  re-denominates both spenders at the level.
 
 - **THE SECOND HAND-OVER, NOW THAT THE CLIMB IS STRICT**, which is the
   one arm of WHAT PRICES A REGISTERED CHAIN the entry ledger did not
