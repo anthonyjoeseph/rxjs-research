@@ -1530,10 +1530,17 @@ postulate
 -- invariant is.  Nor does the stepped receipt cover it: that reading
 -- is at the LARGER cap and this predicate weakens upward, so what the
 -- level gives away is the weak form where the walk needs the strong
--- one.  So the split answers the pricing and leaves the walk owing a
--- frame reading at the entry cap in its own right -- a strictly
--- smaller obligation than the refuted mint, since it drops the length
--- the witness broke on.
+-- one.  So the two consumers want DIFFERENT receipts, which is what
+-- makes the split pay rather than merely halve: the leaves take the
+-- pair at the entry cap, and the walk takes the whole predicate at the
+-- level it is standing at, where the fan's own caps receipt already
+-- delivers it.  The cap the walk reads and the cap its potential is
+-- denominated at are separate premises and only the leaves tie them,
+-- so serving the leaves is what frees the walk to be re-indexed.  The
+-- residue is then the descent's own step -- the inner core wants the
+-- pair at a cap it widens to, and a receipt at the walk's level
+-- reaches that by the same monotonicity the chain device already
+-- spends, rather than by the entry-cap widening it uses today.
 fan-regsSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (Lv : ℕ) (sched : Sched Γ) (st : EvalSt e) →
   capsOK? (frameStep Lv (capsAt e sl id)) sched st ≡ true →
