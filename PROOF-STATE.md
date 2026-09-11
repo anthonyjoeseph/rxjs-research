@@ -238,15 +238,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE DEPTH RECEIPT ON THE VALUES IN FLIGHT.** The headroom closed
-  outright, so the fan's terminal is now a DEPTH statement rather than
-  an inequality — and a different currency from every other row of WHAT
-  PRICES A REGISTERED CHAIN, since the values a dispatch hands on are
-  what the walk carried IN and no store or registry reading mentions
-  them. The commit states the carrier at the frame arms that produce a
-  dispatch's list and returns the first arm whose emission the nest cap
-  cannot cover, which decides whether the fan's half of that question
-  is a supply problem or a cap one.
+- **THE SINK'S PRICE, INDEXED BY THE CLIMB.** The depth-receipt route is
+  DISCARDED: no frame arm can supply a nest-cap ceiling on what it emits,
+  since substitution installs a payload's nesting once per occurrence, and
+  the reason it was asked for at all is that the sink leaf's factor is FLAT
+  — one chain-length of frame product, which pays a chain ending at ROOT and
+  can never pay one ending at a second sink. Enlarging it moves the ceiling
+  that reads it by the same amount, so WHAT PRICES A REGISTERED CHAIN is not
+  a question about which cap. The commit indexes the leaf by the share depth
+  still ahead of the walk and returns the first consumer whose arithmetic
+  the index does not survive.
 
 - **THE FRAME ARMS IN THE SAME CURRENCY**, which is the rest of WHAT
   PRICES A REGISTERED CHAIN once the terminal stops asking for a
@@ -339,7 +340,7 @@ does not fit is a finding about the shared statement, not about the head.
   is the telescope summand — `input` charges nought, so no program reading
   reaches it. The summand is owed the connect's TRANSITIVE reach; sum against
   maximum is closed to instantiation.
-- **`walk-share-valsNest`** (Part7/Depth-Fit) — FALSITY, `NO EVIDENCE`: the
+- **`walk-share-valsNest`** (Part7/Depth-Fit) — FALSITY, `DEAD ROUTE×2`: the
   values a dispatch hands on are under the instant's nest cap. The headroom
   closed, so this is what the fan's terminal was; nothing in the store mentions
   a list the walk carried in, so it is owed at whatever frame emitted it.
