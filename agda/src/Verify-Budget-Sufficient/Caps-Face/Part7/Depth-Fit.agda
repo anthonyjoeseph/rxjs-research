@@ -1463,6 +1463,22 @@ fan-regsSz {e = e} sl id Lv sched st cok =
 -- holds the reading at entry, so a repair does not have to buy any of
 -- them, and what remains is the ceiling the chosen cap is priced under.
 --
+-- AND THE CAP IS PULLED BOTH WAYS BY ONE NUMBER, WHICH IS WHY NO CHOICE
+-- OF IT LANDS.  The two obligations the cap answers move in opposite
+-- directions and are denominated in the SAME quantity.  A receipt asks
+-- the cap to be LARGE: the frame conjunct weakens as it grows, and the
+-- entry reading is refuted precisely because an admitted chain carries
+-- a frame the entry cap does not cover.  The pricing asks it to be
+-- SMALL, and far more steeply: the sink leaf's charge is two to a CUBE
+-- of the cap the conclusion names, under a ceiling that affords two to
+-- the cap itself.  So the receipt's floor and the pricing's roof are
+-- the same variable, and one step of the recurrence is already wider
+-- than the whole polynomial gap between them.  That is a property of
+-- the DENOMINATION and not of any endpoint, which is what says the four
+-- routes below are one route: a cap chosen anywhere -- entry, stepped,
+-- climbed, or carried per entry under a ceiling -- is chosen for both
+-- jobs at once.  Read off the leaf's own clause and the ceiling's fit.
+
 -- THE LEAVES' HALF OF THE SAME READING, AND THE DOUBLING DOES NOT SAVE
 -- IT.  The packed form was adopted because the witness that kills the
 -- flat reading satisfies it -- a minted chain of eight frames against

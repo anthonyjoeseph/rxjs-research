@@ -238,17 +238,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **PRICE THE CLIMB BY THE WALK'S GAS, NOT BY ANY CAP.** Every cap-
-  denominated reading is now closed: entry refuted, stepped dead, and
-  the CLIMBED one dead too — the denomination-free grant settled that
-  rather than opening it, since a pricing exponent stays
-  polynomial in whatever cap it names while the level accumulates
-  across the chain list and carries it past the ceiling's own
-  logarithm. What no refutation touches is the fuel. It strictly
-  decreases down the walk, it is sighted under the same ceiling, and a
-  charge paid by its DROP names no cap at all. The commit states the
-  registry reading against the gas and either lands the leaf or returns
-  the first hop whose charge the drop does not cover.
+- **SPLIT THE CAP THE SINK LEAF IS PRICED AT FROM THE CAP THE FRAMES
+  ARE KNOWN UNDER.** Four cap readings are now closed — entry refuted,
+  stepped, climbed and per-entry all dead — and they are ONE route: a
+  receipt asks the cap to be large, the sink leaf's charge is two to a
+  cube of it under a ceiling affording two to the cap itself, and both
+  jobs are handed to the same number. So the repair is at the leaf's
+  DENOMINATION, not at any endpoint. The pricing lemmas already take
+  the frame bound and the length separately, so the split is stateable;
+  the commit makes the leaf's charge read a bound the registry entry
+  CARRIES and either lands it or returns the first site with nothing to
+  carry.
 
 - **THE SECOND HAND-OVER, NOW THAT THE CLIMB IS STRICT**, which is the
   one arm of WHAT PRICES A REGISTERED CHAIN the entry ledger did not
