@@ -238,17 +238,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **RE-DENOMINATE THE ONE GRANT THAT STILL NAMES THE ENTRY CAP.** Both
-  spenders of the packed reading are now proven cap- and
-  potential-GENERIC: `sink-fan-root-gen` needs only that the cap is
-  positive, and `walk-thru-fit-gen` takes its three caps facts as
-  hypotheses. So the question is no longer whether the face can be
-  re-indexed — it carries a re-denomination for free — but whether
-  `nestΦ-frame-charge` holds at the level the walk has climbed to
-  rather than at the instant's entry caps. Neither endpoint is the
-  repair: the next instant's caps are a blowup of this instant's
-  height. The commit states that grant at the climb and either proves
-  it or returns the first cap its exponent cannot absorb.
+- **SPEND THE DENOMINATION-FREE GRANT: STATE THE FACE AT THE CLIMBED
+  CAP.** The denomination question is ANSWERED, not narrowed. Both
+  spenders are proven cap-generic, and `nestΦ-frame-charge-ℕ` now
+  proves the grant itself of any four bare numbers, asking of the cap
+  only that it be at least two — which every cap on this face carries,
+  entry or stepped. So nothing on the face is tied to the instant's
+  caps any more. What remains is to USE it: restate the walk's premise
+  at `frameStep Lv`, where `capsOK?-regs` already issues a receipt, and
+  thread it to the two spenders through their generic forms. The commit
+  either closes `fan-regsSzL-mint` that way or returns the first site
+  whose premise the stepped receipt does not reach.
 
 - **THE SECOND HAND-OVER, NOW THAT THE CLIMB IS STRICT**, which is the
   one arm of WHAT PRICES A REGISTERED CHAIN the entry ledger did not

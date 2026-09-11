@@ -124,33 +124,38 @@ open import Verify-Budget-Sufficient.Caps-Face.Part1 using
 -- path and carries no level ledger at all, is the one already standing.
 
 abstract
+  -- THE POTENTIAL IS ARITHMETIC IN THE CAP, AND NAMING ITS ARGUMENTS
+  -- IS WHAT MAKES THE DENOMINATION QUESTION DECIDABLE.  Every
+  -- quantity the walk half reads is one of three numbers beside the
+  -- size cap: the nest unit and the wrap sum, neither of which
+  -- carries an instant or a level at all.  So the only thing that
+  -- moves when the potential is re-denominated is the cap itself.
+  -- Stating the family over bare numbers and reading the instant's
+  -- off it is what lets a charge proven here be spent at a cap the
+  -- walk has CLIMBED to rather than only at the entry one; the
+  -- caps-indexed form below is then a reading and not a definition.
+  nestWalk : (S U W : ℕ) → ℕ
+  nestWalk S U W =
+    2 ^ suc (S * (S * (S * (S * S)))
+             + S * (S * (S * (S * S)))
+             + S * (S * (S * (S * S)))
+             + (S * S + S * S))
+      * (U + (S * S + S * S + (S * S + S * S)) + S + S * W)
+
+  nestWalk-def : ∀ (S U W : ℕ) →
+    nestWalk S U W
+      ≡ 2 ^ suc (S * (S * (S * (S * S)))
+                 + S * (S * (S * (S * S)))
+                 + S * (S * (S * (S * S)))
+                 + (S * S + S * S))
+          * (U + (S * S + S * S + (S * S + S * S)) + S + S * W)
+  nestWalk-def _ _ _ = refl
+
   nestWalkAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
     (id : ℕ) → ℕ
   nestWalkAt e sl id =
-    2 ^ suc (Caps.cSize (capsAt e sl id)
-               * (Caps.cSize (capsAt e sl id)
-                  * (Caps.cSize (capsAt e sl id)
-                     * (Caps.cSize (capsAt e sl id)
-                        * Caps.cSize (capsAt e sl id))))
-             + Caps.cSize (capsAt e sl id)
-               * (Caps.cSize (capsAt e sl id)
-                  * (Caps.cSize (capsAt e sl id)
-                     * (Caps.cSize (capsAt e sl id)
-                        * Caps.cSize (capsAt e sl id))))
-             + Caps.cSize (capsAt e sl id)
-               * (Caps.cSize (capsAt e sl id)
-                  * (Caps.cSize (capsAt e sl id)
-                     * (Caps.cSize (capsAt e sl id)
-                        * Caps.cSize (capsAt e sl id))))
-             + (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id)
-                + Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id)))
-      * (nestUnit e sl
-         + (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id)
-            + Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id)
-            + (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id)
-               + Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id)))
-         + Caps.cSize (capsAt e sl id)
-         + Caps.cSize (capsAt e sl id) * slotWrapSum sl)
+    nestWalk (Caps.cSize (capsAt e sl id)) (nestUnit e sl) (slotWrapSum sl)
+
 
   nestWalkAt-def : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
     (id : ℕ) →
@@ -199,23 +204,27 @@ abstract
   -- of the inner pushed on top, and the leaf a walk hands over at is
   -- priced to dominate exactly such a chain.  Four cubes and four
   -- squares is what that expands to.
+  capΦ : (S C : ℕ) → ℕ
+  capΦ S C =
+    2 ^ suc (suc (S * (S * S)
+                  + S * (S * S)
+                  + (S * (S * S) + S * (S * S))
+                  + (S * S + S * S + (S * S + S * S))))
+      * C
+
+  capΦ-def : ∀ (S C : ℕ) →
+    capΦ S C
+      ≡ 2 ^ suc (suc (S * (S * S)
+                      + S * (S * S)
+                      + (S * (S * S) + S * (S * S))
+                      + (S * S + S * S + (S * S + S * S))))
+          * C
+  capΦ-def _ _ = refl
+
   capΦAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
     (id : ℕ) → ℕ
-  capΦAt e sl id =
-    2 ^ suc (suc (Caps.cSize (capsAt e sl id)
-                    * (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))
-                  + Caps.cSize (capsAt e sl id)
-                    * (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))
-                  + (Caps.cSize (capsAt e sl id)
-                       * (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))
-                     + Caps.cSize (capsAt e sl id)
-                       * (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id)))
-                  + (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id)
-                     + Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id)
-                     + (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id)
-                        + Caps.cSize (capsAt e sl id)
-                          * Caps.cSize (capsAt e sl id)))))
-      * nestCapAt e sl id
+  capΦAt e sl id = capΦ (Caps.cSize (capsAt e sl id)) (nestCapAt e sl id)
+
 
   capΦAt-def : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
     (id : ℕ) →
@@ -241,9 +250,22 @@ abstract
           * nestCapAt e sl id
   capΦAt-def _ _ _ = refl
 
+  nestΦ : (S C U W : ℕ) → ℕ
+  nestΦ S C U W = capΦ S C + nestWalk S U W
+
+  nestΦ-def : ∀ (S C U W : ℕ) → nestΦ S C U W ≡ capΦ S C + nestWalk S U W
+  nestΦ-def _ _ _ _ = refl
+
   nestΦAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
     (id : ℕ) → ℕ
   nestΦAt e sl id = capΦAt e sl id + nestWalkAt e sl id
+
+  nestΦAt≡ : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+    (id : ℕ) →
+    nestΦAt e sl id
+      ≡ nestΦ (Caps.cSize (capsAt e sl id)) (nestCapAt e sl id)
+              (nestUnit e sl) (slotWrapSum sl)
+  nestΦAt≡ _ _ _ = refl
 
   nestΦAt-def : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
     (id : ℕ) →
@@ -506,6 +528,56 @@ walkExpL-widen S K 2≤S hK =
                              (+-mono-≤ Sq≤Cu Sq≤Cu))
                    4Cu≤C5
 
+-- THE GRANT IS DENOMINATION-FREE, AND THAT IS THE ANSWER TO WHERE
+-- THE POTENTIAL MAY BE INDEXED.  Nothing about the caps recurrence
+-- survives into this statement: it holds of any four numbers, and the
+-- only thing it asks of the cap is that it be at least two -- which
+-- is the same hypothesis the widening below already needed and which
+-- every cap on this face carries, entry or stepped.  So a frame arm
+-- spending this charge is not spending a fact about the instant it
+-- stands in, and re-denominating the potential at the level the walk
+-- has climbed to costs nothing here.  The caps-indexed form is the
+-- reading of this at the entry caps, kept because its callers are
+-- stated there.
+nestΦ-frame-charge-ℕ : ∀ (S C U W : ℕ) → 2 ≤ S →
+  4 * (2 ^ ((S + S + (S + S)) * (suc S * S)) * (C + (S + S) * S))
+    + 2 * (2 ^ ((S + S + (S + S)) * (suc S * S)) * (S * W))
+    ≤ nestΦ S C U W
+nestΦ-frame-charge-ℕ S C U W 2≤S =
+  ≤-trans (≤-reflexive split)
+  (≤-trans (+-mono-≤ (≤-reflexive capHalf) walkHalf)
+           (≤-reflexive (sym (nestΦ-def S C U W))))
+  where
+  Sq = S * S
+  Cu = S * (S * S)
+  EL = Cu + Cu + (Cu + Cu) + (Sq + Sq + (Sq + Sq))
+  Z  = 2 ^ ((S + S + (S + S)) * (suc S * S))
+  split : 4 * (Z * (C + (S + S) * S)) + 2 * (Z * (S * W))
+            ≡ 4 * (Z * C) + 2 * (Z * (Sq + Sq + (Sq + Sq) + S * W))
+  split = solve 4 (λ z c s v →
+                     con 4 :* (z :* (c :+ (s :+ s) :* s)) :+ con 2 :* (z :* v)
+                       := con 4 :* (z :* c)
+                          :+ con 2 :* (z :* (s :* s :+ s :* s
+                                             :+ (s :* s :+ s :* s) :+ v)))
+                refl Z C S (S * W)
+  coeff : 4 * Z ≡ 2 ^ suc (suc EL)
+  coeff = trans (cong (λ z → 4 * 2 ^ z) (pathExpL≡ S)) (*-assoc 2 2 (2 ^ EL))
+  capHalf : 4 * (Z * C) ≡ capΦ S C
+  capHalf = trans (sym (*-assoc 4 Z C))
+                  (trans (cong (_* C) coeff) (sym (capΦ-def S C)))
+  xwFit : Sq + Sq + (Sq + Sq) + S * W
+            ≤ U + (Sq + Sq + (Sq + Sq)) + S + S * W
+  xwFit = +-monoˡ-≤ (S * W)
+            (≤-trans (m≤n+m (Sq + Sq + (Sq + Sq)) U)
+                     (m≤m+n (U + (Sq + Sq + (Sq + Sq))) S))
+  walkHalf : 2 * (Z * (Sq + Sq + (Sq + Sq) + S * W)) ≤ nestWalk S U W
+  walkHalf =
+    ≤-trans (≤-reflexive (sym (*-assoc 2 Z (Sq + Sq + (Sq + Sq) + S * W))))
+    (≤-trans (*-mono-≤ (^-monoʳ-≤ 2
+                         (s≤s (walkExpL-widen S (S + S + (S + S)) 2≤S ≤-refl)))
+                       xwFit)
+             (≤-reflexive (sym (nestWalk-def S U W))))
+
 -- WHAT ONE FRAME ARM MAY SPEND, AND IT IS THE WHOLE OF WHY THE
 -- POTENTIAL IS A SUM.  An outer frame charges its remaining path
 -- depth and the context's wrap through the factor the path can still
@@ -536,45 +608,28 @@ nestΦ-frame-charge : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
            * (Caps.cSize (capsAt e sl id) * slotWrapSum sl))
     ≤ nestΦAt e sl id
 nestΦ-frame-charge e sl id =
-  ≤-trans (≤-reflexive split)
-  (≤-trans (+-mono-≤ (≤-reflexive capHalf) walkHalf)
-           (≤-reflexive (sym (nestΦAt-def e sl id))))
-  where
-  S  = Caps.cSize (capsAt e sl id)
-  Sq = S * S
-  Cu = S * (S * S)
-  EL = Cu + Cu + (Cu + Cu) + (Sq + Sq + (Sq + Sq))
-  Z  = 2 ^ ((S + S + (S + S)) * (suc S * S))
-  C  = nestCapAt e sl id
-  U  = nestUnit e sl
-  W  = slotWrapSum sl
-  2≤S : 2 ≤ S
-  2≤S = 2≤capsAt-size e sl id
-  split : 4 * (Z * (C + (S + S) * S)) + 2 * (Z * (S * W))
-            ≡ 4 * (Z * C) + 2 * (Z * (Sq + Sq + (Sq + Sq) + S * W))
-  split = solve 4 (λ z c s v →
-                     con 4 :* (z :* (c :+ (s :+ s) :* s)) :+ con 2 :* (z :* v)
-                       := con 4 :* (z :* c)
-                          :+ con 2 :* (z :* (s :* s :+ s :* s
-                                             :+ (s :* s :+ s :* s) :+ v)))
-                refl Z C S (S * W)
-  coeff : 4 * Z ≡ 2 ^ suc (suc EL)
-  coeff = trans (cong (λ z → 4 * 2 ^ z) (pathExpL≡ S)) (*-assoc 2 2 (2 ^ EL))
-  capHalf : 4 * (Z * C) ≡ capΦAt e sl id
-  capHalf = trans (sym (*-assoc 4 Z C))
-                  (trans (cong (_* C) coeff) (sym (capΦAt-def e sl id)))
-  xwFit : Sq + Sq + (Sq + Sq) + S * W
-            ≤ U + (Sq + Sq + (Sq + Sq)) + S + S * W
-  xwFit = +-monoˡ-≤ (S * W)
-            (≤-trans (m≤n+m (Sq + Sq + (Sq + Sq)) U)
-                     (m≤m+n (U + (Sq + Sq + (Sq + Sq))) S))
-  walkHalf : 2 * (Z * (Sq + Sq + (Sq + Sq) + S * W)) ≤ nestWalkAt e sl id
-  walkHalf =
-    ≤-trans (≤-reflexive (sym (*-assoc 2 Z (Sq + Sq + (Sq + Sq) + S * W))))
-    (≤-trans (*-mono-≤ (^-monoʳ-≤ 2
-                         (s≤s (walkExpL-widen S (S + S + (S + S)) 2≤S ≤-refl)))
-                       xwFit)
-             (≤-reflexive (sym (nestWalkAt-def e sl id))))
+  subst (λ z → 4 * (2 ^ ((Caps.cSize (capsAt e sl id)
+                          + Caps.cSize (capsAt e sl id)
+                          + (Caps.cSize (capsAt e sl id)
+                             + Caps.cSize (capsAt e sl id)))
+                         * (suc (Caps.cSize (capsAt e sl id))
+                            * Caps.cSize (capsAt e sl id)))
+                    * (nestCapAt e sl id
+                       + (Caps.cSize (capsAt e sl id)
+                          + Caps.cSize (capsAt e sl id))
+                         * Caps.cSize (capsAt e sl id)))
+                  + 2 * (2 ^ ((Caps.cSize (capsAt e sl id)
+                               + Caps.cSize (capsAt e sl id)
+                               + (Caps.cSize (capsAt e sl id)
+                                  + Caps.cSize (capsAt e sl id)))
+                              * (suc (Caps.cSize (capsAt e sl id))
+                                 * Caps.cSize (capsAt e sl id)))
+                         * (Caps.cSize (capsAt e sl id) * slotWrapSum sl))
+                  ≤ z)
+        (sym (nestΦAt≡ e sl id))
+        (nestΦ-frame-charge-ℕ (Caps.cSize (capsAt e sl id))
+                              (nestCapAt e sl id) (nestUnit e sl)
+                              (slotWrapSum sl) (2≤capsAt-size e sl id))
 
 -- THE STEP'S ARITHMETIC, OVER BARE NUMBERS, and it is a body rather
 -- than a leaf.  Nothing about caps survives here: a cap that steps by
