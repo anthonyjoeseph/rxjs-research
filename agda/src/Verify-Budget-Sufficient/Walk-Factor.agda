@@ -8,13 +8,11 @@
 module Verify-Budget-Sufficient.Walk-Factor where
 
 open import Data.Bool using (Bool; true; _∧_)
-open import Data.Nat using (ℕ; suc; _+_; _*_; _^_; _∸_; _≤_; _<_; z≤n; s≤s; _≤ᵇ_)
+open import Data.Nat using (ℕ; suc; _+_; _*_; _^_; _∸_; _≤_; z≤n; s≤s; _≤ᵇ_)
 open import Data.Nat.Properties using
-  (≤-refl; ≤-trans; ≤-reflexive; ≤ᵇ⇒≤; ≤⇒≤ᵇ; +-mono-≤; +-monoˡ-≤; +-assoc; *-monoˡ-≤;
-  *-identityˡ; *-distribʳ-+; m≤m+n; m≤n+m; m^n>0; ^-distribˡ-+-*; ^-monoʳ-≤; ^-*-assoc;
-  ∸-monoʳ-<; m<n⇒0<n∸m; m∸n≤m; *-monoʳ-≤; *-assoc; <⇒≤)
-open import Data.Fin using (Fin; toℕ)
-open import Data.Fin.Properties using (toℕ<n)
+  (≤-trans; ≤-reflexive; ≤ᵇ⇒≤; ≤⇒≤ᵇ; +-mono-≤; +-monoˡ-≤; +-assoc; *-monoˡ-≤; *-identityˡ;
+  *-distribʳ-+; m≤m+n; m≤n+m; m^n>0; ^-distribˡ-+-*; ^-monoʳ-≤; ^-*-assoc; m∸n≤m; *-assoc)
+open import Data.Fin using (toℕ)
 open import Data.Product using (_,_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong)
 
@@ -23,7 +21,7 @@ open import Rx.Nest-Depth using (nestDᵗ)
 open import Verify-Budget-Sufficient.Nest-Depth-Size using (nestDᵗ≤sizeᵗ)
 open import Rx.Evaluator using
   (Frame; map-f; scan-f; take-f; from-inner; thru-outer; Path; root; share-sink; _↠_)
-open import Verify-Budget-Sufficient.Caps-Face.Part1 using (frameSz?; pathSz?; pathFloor)
+open import Verify-Budget-Sufficient.Caps-Face.Part1 using (frameSz?; pathSz?)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using (pathSz?-len)
 open import Verify-Budget-Sufficient.Measures using (pathLen; ∧-true)
 open import Decide using (T-to; T⇒≡true; ∧-intro; ∧-trueˡ; ∧-trueʳ)
@@ -391,54 +389,3 @@ pathΦD-len {n = n} B (thru-outer _ _ ↠ p) 1B h
 ... | _ , hp =
       ≤-trans (+-mono-≤ 1B (pathΦD-len B p 1B hp))
               (≤-reflexive (sym (+-assoc B (pathLen p * B) ((n * (B + B)) * B))))
-
--- THE FLOOR IS BOUNDED BY THE SLOT COUNT, which is what makes the
--- climb a `∸` at all: a terminal names either a slot of the context or
--- the root, and the root is the slot count itself, so the index the
--- pricing subtracts is never larger than what it subtracts from.
-pathFloor≤ : ∀ {n} {Γ : Ctx n} {s t} (p : Path Γ s t) → pathFloor p ≤ n
-pathFloor≤ root           = ≤-refl
-pathFloor≤ (share-sink i) = <⇒≤ (toℕ<n i)
-pathFloor≤ (_ ↠ p)        = pathFloor≤ p
-
--- AND THE SAME CEILING READ AT THE CHAIN'S OWN TERMINAL RATHER THAN AT
--- THE SLOT COUNT, which is the sharpening the climb exists for.  The
--- length half is untouched; what changes is that the leaf's share is
--- charged at the terminal this chain actually reaches instead of at
--- the deepest one the context admits.
-pathΦSz-floor : ∀ {n} {Γ : Ctx n} {s t} (B : ℕ) (p : Path Γ s t) →
-  pathFrameSz? B p ≡ true →
-  pathΦSz B p ≤
-    pathLen p * (suc B * B) + (n ∸ pathFloor p) * ((B + B) * (suc B * B))
-pathΦSz-floor B root           h = z≤n
-pathΦSz-floor B (share-sink i) h = ≤-refl
-pathΦSz-floor {n = n} B (f ↠ p) h
-  with ∧-true (frameSz? B f) (pathFrameSz? B p) h
-... | hf , hp =
-        ≤-trans (+-mono-≤ (frameΦSz≤ B f hf) (pathΦSz-floor B p hp))
-                (≤-reflexive (sym (+-assoc (suc B * B)
-                                           (pathLen p * (suc B * B))
-                                           ((n ∸ pathFloor p)
-                                             * ((B + B) * (suc B * B))))))
-
--- THE PRICING'S OWN REASON FOR BEING INDEXED, AND IT IS AN EQUALITY OF
--- INDICES RATHER THAN A MARGIN.  A registry entry's stratification puts
--- its source strictly below the floor of the chain it installs, so a
--- chain fanned out of the sink at slot `i` has `toℕ i` under its own
--- terminal -- and the climb, being `n ∸ _`, therefore drops by at least
--- one across the hand-over.  That one step is exactly the flat factor a
--- size-legal chain's frames can cost, so the sink's charge covers its
--- own chains with nothing left over and nothing missing.  A flat leaf
--- has no such step and is refuted; the header above says why.
-pathΦF-under-sink : ∀ {n} {Γ : Ctx n} {s t} (B : ℕ) (i : Fin n)
-  (q : Path Γ s t) →
-  pathFrameSz? B q ≡ true → pathLen q ≤ B + B → toℕ i < pathFloor q →
-  pathΦF B q ≤ pathΦF B (share-sink {Γ = Γ} {t = t} i)
-pathΦF-under-sink {n = n} {t = t} B i q h hl hi =
-  ≤-trans (≤-reflexive (pathΦF≡ B q))
-    (^-monoʳ-≤ 2
-      (≤-trans (pathΦSz-floor B q h)
-        (≤-trans (+-monoˡ-≤ ((n ∸ pathFloor q) * ((B + B) * (suc B * B)))
-                   (*-monoˡ-≤ (suc B * B) hl))
-                 (*-monoˡ-≤ ((B + B) * (suc B * B))
-                   (∸-monoʳ-< hi (pathFloor≤ q))))))

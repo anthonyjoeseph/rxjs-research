@@ -3,7 +3,7 @@
 module Verify-Budget-Sufficient.Caps-Face.Part7.Depth-Fit where
 
 open import Data.Bool    using (Bool; true; false; _∧_; _∨_; if_then_else_)
-open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _*_; _^_; _⊔_; _∸_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
+open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (*-assoc; ≤ᵇ⇒≤; ≤⇒≤ᵇ; ^-monoʳ-≤; *-monoˡ-≤; *-cancelˡ-≤; ≤-trans; ≤-refl; ≤-reflexive; m≤m+n;
   m≤n+m; n≤1+n; *-identityʳ; *-mono-≤; *-monoʳ-≤; +-monoʳ-≤; +-monoˡ-≤; ⊔-lub; m≤m⊔n; m≤n⊔m;
   +-mono-≤; +-suc; +-assoc; m∸n≤m; *-identityˡ)
@@ -1381,6 +1381,21 @@ chg-headroom e sl id d hd =
   pull2 z y = solve 2 (λ z′ y′ → z′ :* (con 2 :* y′) := con 2 :* (z′ :* y′))
                     refl z y
 
+-- AND THE SHARPENING THIS CHARGE DOES NOT YET TAKE, which is a
+-- question about what the arm CARRIES rather than about the
+-- arithmetic.  The chain is charged here at the deepest terminal the
+-- context admits, because that is all a path predicate says; a
+-- registry entry's source sits strictly BELOW the floor of the chain
+-- it installs, so the climb drops by at least one across the hand-over
+-- and the sink's own price would cover its chains outright.  The fan
+-- reaches this site with no receipt about where its chain came from,
+-- so the strict drop is unavailable and the slot count stands in for
+-- it.
+-- RECOVERY: `git show da065b2e` restores `pathFloor≤`,
+--   `pathΦSz-floor` and `pathΦF-under-sink`, which state and prove
+--   exactly that reading of a fanned-out chain's factor against the
+--   sink's -- the piece this site would spend once the entry's
+--   stratification reaches it.
 sink-fan-chg : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (i : Fin n) (p : Path Γ (lookup Γ i) t)
   (vals : List (Val Γ (lookup Γ i))) →
