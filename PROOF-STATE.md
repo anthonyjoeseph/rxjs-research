@@ -238,17 +238,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **INDEX THE POTENTIAL BY THE CLIMB, NOT BY EITHER ENDPOINT.** The
-  census names two spenders — the outer frame arm's grant and the
-  terminal leaf's re-pricing — and both name the entry cap only
-  because the potential handed to them is indexed by the INSTANT.
-  That is the mechanism error, and it sits above `fan-regsSzL-mint`
-  rather than in it: the caps recurrence charges nothing at the entry
-  caps and issues its receipts at the level the walk has climbed to.
-  Neither endpoint is the repair — the next instant's caps are a
-  blowup of this instant's height, so a potential denominated there
-  breaks the budget the descent is held under. The commit
-  re-denominates both spenders at the level.
+- **RE-DENOMINATE THE ONE GRANT THAT STILL NAMES THE ENTRY CAP.** Both
+  spenders of the packed reading are now proven cap- and
+  potential-GENERIC: `sink-fan-root-gen` needs only that the cap is
+  positive, and `walk-thru-fit-gen` takes its three caps facts as
+  hypotheses. So the question is no longer whether the face can be
+  re-indexed — it carries a re-denomination for free — but whether
+  `nestΦ-frame-charge` holds at the level the walk has climbed to
+  rather than at the instant's entry caps. Neither endpoint is the
+  repair: the next instant's caps are a blowup of this instant's
+  height. The commit states that grant at the climb and either proves
+  it or returns the first cap its exponent cannot absorb.
 
 - **THE SECOND HAND-OVER, NOW THAT THE CLIMB IS STRICT**, which is the
   one arm of WHAT PRICES A REGISTERED CHAIN the entry ledger did not

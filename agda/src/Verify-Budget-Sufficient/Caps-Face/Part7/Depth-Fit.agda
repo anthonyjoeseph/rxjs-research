@@ -218,6 +218,97 @@ pathSzL?-tail B f p h =
 -- itself, and whether a potential exponential in the cap can be
 -- indexed by it is a question about the caps mechanism rather than
 -- about any statement underneath it.
+-- AND THE ARM READS THE CAPS RECURRENCE IN EXACTLY THREE PLACES,
+-- WHICH IS WHAT MAKES THE DENOMINATION QUESTION ANSWERABLE RATHER
+-- THAN OPEN.  Everything else it applies is already stated over an
+-- arbitrary cap and potential: both path re-pricings, the value
+-- bound, and the fit of the values against the slots.  What it
+-- genuinely takes from the instant is that the cap admits the
+-- context, that the cap is at least two, and the grant itself.  So
+-- the generic arm carries those three as hypotheses and the
+-- specialisation supplies today's.  A re-denomination is then one
+-- restated grant rather than a rebuilt arm -- and the grant is the
+-- only thing left on this whole face that names the entry cap,
+-- since the fan's root arm needs nothing but positivity.
+walk-thru-fit-gen : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (sl : Slots Γ) (S NC Φ : ℕ) (sf : Gas) (eid : Id) (now : Tick)
+  (op : AllOp) (nid : NodeId)
+  (p : Path Γ u t) (vals : List (Val Γ (obs u))) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) →
+  2 ≤ S →
+  n ≤ S →
+  4 * (2 ^ ((S + S + (S + S)) * (suc S * S)) * (NC + (S + S) * S))
+    + 2 * (2 ^ ((S + S + (S + S)) * (suc S * S)) * (S * slotWrapSum sl))
+    ≤ Φ →
+  Sched.slots sched ≡ sl →
+  pathSzL? S (thru-outer op nid ↠ p) ≡ true →
+  pathNestD (thru-outer op nid ↠ p) ≤ NC →
+  valsΦ? S Φ (thru-outer op nid ↠ p) vals ≡ true →
+  FrameΦHyp sf eid now S Φ (thru-outer op nid) p vals fin sched st
+walk-thru-fit-gen {n = n} sl S NC Φ sf eid now op nid p vals fin sched st
+                  2≤S n≤S hch hsl hpz hnd hΦ =
+  n , G
+  , subst (λ z → ValsFit n z G p vals) (sym hsl)
+      (valsFit-of-max sl p vals M ≤-refl)
+  , *-cancelˡ-≤ 2
+      (≤-trans (*-monoʳ-≤ 2 (*-monoʳ-≤ (pathΦF S p)
+                 (+-monoˡ-≤ (pathΦD S p)
+                   (+-monoˡ-≤ (n * slotWrapSum sl)
+                     (+-monoˡ-≤ (nestDᵛˢ vals) (nestD≤pathΦD S p))))))
+      (≤-trans (≤-reflexive spread)
+        (≤-trans (+-mono-≤ hA2 hBC2)
+                 (≤-reflexive (sym (2X≡X+X Φ))))))
+  where
+  Q    = pathΦF S p
+  Dn   = pathNestD p
+  D    = pathΦD S p
+  M    = nestDᵛˢ vals
+  W    = slotWrapSum sl
+  G    = Dn + M + n * W
+  hpp  : pathSzL? S p ≡ true
+  hpp  = pathSzL?-tail S (thru-outer op nid) p hpz
+  1≤S  = ≤-trans (s≤s z≤n) 2≤S
+  EXP  : ℕ
+  EXP  = (S + S + (S + S)) * (suc S * S)
+  Q≤   : Q ≤ 2 ^ EXP
+  Q≤   = pathΦF-cap-atLen S (S + S) p (pathSzL?-frames S p hpp)
+                          (pathSzL?-len S p hpp)
+  D≤   : D ≤ NC + (S + S) * S
+  D≤   = ≤-trans (pathΦD≤nestD S p)
+                 (+-monoˡ-≤ ((S + S) * S)
+                            (≤-trans (n≤1+n (pathNestD p)) hnd))
+  2≤2^S : 2 ≤ 2 ^ S
+  2≤2^S = ≤-trans (≤-reflexive (sym (*-identityʳ 2))) (^-monoʳ-≤ 2 1≤S)
+  -- the values in flight, paid by the outer frame's own factor
+  hA   : 2 ^ S * (Q * M) ≤ Φ
+  hA   = ≤-trans (≤-reflexive (sym (*-assoc (2 ^ S) Q M)))
+                 (Φ-to-bound S Φ (thru-outer op nid ↠ p) vals hΦ)
+  hA2  : 2 * (Q * M) ≤ Φ
+  hA2  = ≤-trans (*-monoˡ-≤ (Q * M) 2≤2^S) hA
+  -- the path's own depth, and the wrap, against the charge a frame arm
+  -- is granted: the depth's cap piece against the cap's half and its
+  -- leaf square beside the wrap against the walk's
+  reshape : ∀ q d w → 2 * (2 * (q * d) + q * w)
+                        ≡ 4 * (q * d) + 2 * (q * w)
+  reshape q d w = solve 3 (λ q′ d′ w′ →
+                    con 2 :* (con 2 :* (q′ :* d′) :+ q′ :* w′)
+                      := con 4 :* (q′ :* d′) :+ con 2 :* (q′ :* w′))
+                  refl q d w
+  hBC2 : 2 * (2 * (Q * D) + Q * (n * W)) ≤ Φ
+  hBC2 =
+    ≤-trans (≤-reflexive (reshape Q D (n * W)))
+    (≤-trans (+-mono-≤ (*-monoʳ-≤ 4 (*-mono-≤ Q≤ D≤))
+                       (*-monoʳ-≤ 2 (*-mono-≤ Q≤ (*-monoˡ-≤ W n≤S))))
+             hch)
+  spread : 2 * (Q * (D + M + n * W + D))
+             ≡ 2 * (Q * M) + 2 * (2 * (Q * D) + Q * (n * W))
+  spread =
+    solve 4 (λ q d m w →
+               con 2 :* (q :* (d :+ m :+ w :+ d))
+                 := con 2 :* (q :* m)
+                    :+ con 2 :* (con 2 :* (q :* d) :+ q :* w))
+          refl Q D M (n * W)
+
 walk-thru-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (sl : Slots Γ) (id : ℕ) (sf : Gas) (eid : Id) (now : Tick)
   (op : AllOp) (nid : NodeId)
@@ -230,74 +321,12 @@ walk-thru-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
          (thru-outer op nid ↠ p) vals ≡ true →
   FrameΦHyp sf eid now (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
             (thru-outer op nid) p vals fin sched st
-walk-thru-fit {n = n} {e = e} sl id sf eid now op nid p vals fin sched st
+walk-thru-fit {e = e} sl id sf eid now op nid p vals fin sched st
               hsl hpz hnd hΦ =
-  n , G
-  , subst (λ z → ValsFit n z G p vals) (sym hsl)
-      (valsFit-of-max sl p vals M ≤-refl)
-  , *-cancelˡ-≤ 2
-      (≤-trans (*-monoʳ-≤ 2 (*-monoʳ-≤ (pathΦF S p)
-                 (+-monoˡ-≤ (pathΦD S p)
-                   (+-monoˡ-≤ (n * slotWrapSum sl)
-                     (+-monoˡ-≤ (nestDᵛˢ vals) (nestD≤pathΦD S p))))))
-      (≤-trans (≤-reflexive spread)
-        (≤-trans (+-mono-≤ hA2 hBC2)
-                 (≤-reflexive (sym (2X≡X+X (nestΦAt e sl id)))))))
-  where
-  S    = Caps.cSize (capsAt e sl id)
-  Q    = pathΦF S p
-  Dn   = pathNestD p
-  D    = pathΦD S p
-  M    = nestDᵛˢ vals
-  W    = slotWrapSum sl
-  G    = Dn + M + n * W
-  hpp  : pathSzL? S p ≡ true
-  hpp  = pathSzL?-tail S (thru-outer op nid) p hpz
-  2≤S  = 2≤capsAt-size e sl id
-  1≤S  = ≤-trans (s≤s z≤n) 2≤S
-  EXP  : ℕ
-  EXP  = (S + S + (S + S)) * (suc S * S)
-  Q≤   : Q ≤ 2 ^ EXP
-  Q≤   = pathΦF-cap-atLen S (S + S) p (pathSzL?-frames S p hpp)
-                          (pathSzL?-len S p hpp)
-  D≤   : D ≤ nestCapAt e sl id + (S + S) * S
-  D≤   = ≤-trans (pathΦD≤nestD S p)
-                 (+-monoˡ-≤ ((S + S) * S)
-                            (≤-trans (n≤1+n (pathNestD p)) hnd))
-  n≤S  : n ≤ S
-  n≤S  = n≤capsAt-size e sl id
-  2≤2^S : 2 ≤ 2 ^ S
-  2≤2^S = ≤-trans (≤-reflexive (sym (*-identityʳ 2))) (^-monoʳ-≤ 2 1≤S)
-  -- the values in flight, paid by the outer frame's own factor
-  hA   : 2 ^ S * (Q * M) ≤ nestΦAt e sl id
-  hA   = ≤-trans (≤-reflexive (sym (*-assoc (2 ^ S) Q M)))
-                 (Φ-to-bound S (nestΦAt e sl id) (thru-outer op nid ↠ p)
-                             vals hΦ)
-  hA2  : 2 * (Q * M) ≤ nestΦAt e sl id
-  hA2  = ≤-trans (*-monoˡ-≤ (Q * M) 2≤2^S) hA
-  -- the path's own depth, and the wrap, against the charge a frame arm
-  -- is granted: the depth's cap piece against the cap's half and its
-  -- leaf square beside the wrap against the walk's
-  reshape : ∀ q d w → 2 * (2 * (q * d) + q * w)
-                        ≡ 4 * (q * d) + 2 * (q * w)
-  reshape q d w = solve 3 (λ q′ d′ w′ →
-                    con 2 :* (con 2 :* (q′ :* d′) :+ q′ :* w′)
-                      := con 4 :* (q′ :* d′) :+ con 2 :* (q′ :* w′))
-                  refl q d w
-  hBC2 : 2 * (2 * (Q * D) + Q * (n * W)) ≤ nestΦAt e sl id
-  hBC2 =
-    ≤-trans (≤-reflexive (reshape Q D (n * W)))
-    (≤-trans (+-mono-≤ (*-monoʳ-≤ 4 (*-mono-≤ Q≤ D≤))
-                       (*-monoʳ-≤ 2 (*-mono-≤ Q≤ (*-monoˡ-≤ W n≤S))))
-             (nestΦ-frame-charge e sl id))
-  spread : 2 * (Q * (D + M + n * W + D))
-             ≡ 2 * (Q * M) + 2 * (2 * (Q * D) + Q * (n * W))
-  spread =
-    solve 4 (λ q d m w →
-               con 2 :* (q :* (d :+ m :+ w :+ d))
-                 := con 2 :* (q :* m)
-                    :+ con 2 :* (con 2 :* (q :* d) :+ q :* w))
-          refl Q D M (n * W)
+  walk-thru-fit-gen sl (Caps.cSize (capsAt e sl id)) (nestCapAt e sl id)
+    (nestΦAt e sl id) sf eid now op nid p vals fin sched st
+    (2≤capsAt-size e sl id) (n≤capsAt-size e sl id)
+    (nestΦ-frame-charge e sl id) hsl hpz hnd hΦ
 
 postulate
   -- THE FOLD'S GRANT HAS NOWHERE TO COME FROM ON THIS SIDE, and that
