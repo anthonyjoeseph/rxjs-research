@@ -469,6 +469,34 @@ not two measurements, and the honest conclusion from them is that neither run
 finished. Where the question is attribution rather than iteration, the cheap
 decisive evidence is the recorded row and `git log` over it, not another run.
 
+## The cloud container's real ceiling is MEMORY, and one warm may build one module
+
+A `--warm` of `Caps-Bridge` with THREE stale modules below it was OOM-killed by the
+cgroup after 3046 s at 13.9 GB anon-RSS. The same three built one at a time went
+green: the one holding `Walk-Level` took 3305 s and peaked at 13.65 GB, which is
+under the limit by a margin too small to call comfortable.
+
+**Read the numbers in that order, because the tempting reading is the wrong one.**
+The kill is not "three modules is too many" — a single module reaches the same
+figure, so the second run was as close to the ceiling as the first. What one
+module per process buys is that Agda frees its allocation when the process exits,
+and nothing else does: Agda frees nothing across a single invocation, so a warm
+that spans several modules carries every earlier module's peak into the later
+ones and the ceiling arrives sooner in the list.
+
+**What it means for a session, and it is not a tuning knob.** A warm below this
+part of the tower is launched one module at a time — read the stale list the
+refusal prints and warm each one's own consumer in turn — and a cone deep enough
+that no single module fits is one the container cannot check at all, which is
+what CI's gate is for. **A kill here is silent**: nothing is piped, and the log
+carries no Agda diagnostic whatever, so a warm that reports RED with an empty
+error section is an OOM until `dmesg` says otherwise. Check `dmesg` before
+reading such a RED as a proof failure — twice now it was not one.
+
+**And it says nothing about the module named.** `Caps-Bridge`'s own dev best is
+2.0 s. The cost was its cone every time, which is the cold-cone misattribution
+one section up, arriving as a memory figure rather than as a duration.
+
 ## The gate
 
 | | |
