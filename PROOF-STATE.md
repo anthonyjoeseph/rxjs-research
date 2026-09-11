@@ -238,29 +238,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **A READING THAT TRAVELS TO THE MINT**, which is all the store
-  question has left. Three rows fail in the same place: the site
-  owing the bound is a `register`, an admitted entry's readings are
-  refuted free-standing, and they are not corollaries of the caps
-  receipt either — so nothing standing at the mint can derive one and
-  the reading has to arrive already held. The commit finds the lowest
-  carrier that reaches all three, weighing the invariant record
-  against the walk's own predicate, and says what each obliges its
-  producers to re-establish. It lands one row transported onto that
-  carrier, and narrows WHICH STORE CELLS DOES A PATH PREDICATE REACH
-  to the mint's own arm.
-
-- **THE FINISHES A PARK READING HAS NEVER BEEN RUN THROUGH**, which is
-  what the owner question leaves standing now that the node a write is
-  entered at is priced. `frameParked-step` is instantiated at the two
-  outcomes of the overwrite its closure premise exists for and at the
-  drain that reinstalls, and at nothing else: the switch and exhaust
-  finishes write a different cell shape, the enqueue is covered only
-  where there is no room, and every row stands at a root-ended chain,
-  so a floor below the context width is untouched. The commit reaches
-  those shapes and returns a refutation or a receipt naming them.
-  Until it does the row's class rests on arms nothing has run.
-
 - **THE PACKED READING NOTHING HAS EVER INSTANTIATED**, which is the
   whole of what the leaves half now stands on. The walk no longer
   reads the registry at the entry cap, so the one surviving mint asks
@@ -272,6 +249,27 @@ does not fit is a finding about the shared statement, not about the head.
   run actually reaches and returns a refutation or a receipt naming
   the shapes, narrowing WHAT PRICES A REGISTERED CHAIN from a supply
   question to a bounded one.
+
+- **THE SECOND HAND-OVER, NOW THAT THE CLIMB IS STRICT**, which is the
+  one arm of WHAT PRICES A REGISTERED CHAIN the entry ledger did not
+  close. `sink-fan-sink`'s refutation stands at a chain ending at a
+  second sink, and the escalation it builds is bounded only by the slot
+  telescope being genuinely climbed — which the ledger now asserts
+  rather than leaves to a carried premise. The commit spends the strict
+  ordering where that arm is priced: it converts the hop count into a
+  bound the telescope supplies, and either lands the leaf or returns the
+  first shape the strictness does not reach.
+
+- **THE MINT READING, CARRIED RATHER THAN DERIVED**, which is the half of
+  WHICH STORE CELLS DOES A PATH PREDICATE REACH that the walk did not
+  settle. Three rows of the nest face read a cell an ARRIVAL rewrites
+  rather than one a chain carries, and each dies free-standing — so no
+  strengthening of the caps receipt reaches them, and the reading has to
+  arrive at the mint as a premise something upstream already established.
+  The commit states that carrier at the index the mint consumes it at,
+  and either lands one of the three on it or returns the first site the
+  carrier cannot be supplied from — which is what turns a supply question
+  into a placement one.
 
 ### Open questions
 
@@ -289,15 +287,14 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 - **WHAT PRICES A REGISTERED CHAIN, AND WHERE IS THE RECEIPT OWED?** It is
-  not a denomination question, it does not split at the LEVEL, and the
-  WALK's half is now gone: re-indexing the descent to the level it stands
-  at makes its receipt a projection of the caps conjunct, so no mint
-  serves it. What is left is the TERMINAL LEAVES, which cannot follow a
-  widening because the pricing reads a length under the cap its own
-  conclusion names — and under them the SUPPLY, since two siblings die
-  free-standing at one `register` and an arrival premise bounds the
-  inner's syntax and not its count.
-  relevant: `fan-regsSzL-mint`, `sink-fan-sink`, `walk-share-strat`
+  not a denomination question, it does not split at the LEVEL, and both
+  halves that named no cap are now gone — each a projection of a caps
+  conjunct once stated at the index the consumer reads it at. What is
+  left is CAP-DENOMINATED and only that: the TERMINAL LEAVES, which
+  cannot follow a widening because the pricing reads a length under the
+  cap its own conclusion names — and under them the SUPPLY, since two
+  siblings die free-standing at one `register`.
+  relevant: `fan-regsSzL-mint`, `sink-fan-sink`
 
 ### The ledger
 
@@ -345,10 +342,6 @@ does not fit is a finding about the shared statement, not about the head.
   potential at an admitted chain that ends at a SECOND hand-over. Its
   escalation is PROGRAM-bounded: hops climb the stratified telescope. It now
   takes the PACKED size reading, which its own refutation is indifferent to.
-- **`walk-share-strat`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: every
-  registered chain ends strictly ABOVE the input it was minted subscribing. The
-  only receipt here naming no cap, which is what makes it carryable; the free
-  form dies at one `register`, so it is owed at the mint.
 - **`fan-regsSzL-mint`** (Part7/Depth-Fit) — FALSITY,
   `REFUTED×2, DEAD ROUTE×4`: the registry read at the ENTRY cap in the PACKED
   form — frame syntax plus a length under twice it — which only the terminal
@@ -387,10 +380,6 @@ does not fit is a finding about the shared statement, not about the head.
   a frame hands the rest of its chain. The walk re-enters on the tail with an
   output the caps receipt prices but does not read; the floor does not move
   across a frame, which is what lets one statement cover the walk.
-- **`frameParked-step`** (Part7/Strat-Leaves) — FALSITY, `PROBED`: the STORE
-  half of the frame-keyed park reading across one step, the owner half being a
-  body now. The overwrite the closure premise exists for is instantiated at
-  both outcomes and at the drain; the switch and exhaust finishes are not.
 - **`foldPath-park`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the park
   reading once a SIBLING chain has folded. It is about a state the walk
   PRODUCED rather than one it was handed, and it TAKES the reading as a
@@ -429,6 +418,10 @@ does not fit is a finding about the shared statement, not about the head.
   charge at the queue's own `drainW`. Its extra premise pins the cell's
   CONSTRUCTOR, not its depth, so a parked program runs the store term away here
   too; the width is walk-denominated besides.
+- **`frameParked-step`** (Part7/Strat-Leaves) — DIFFICULTY, `PROBED`: the STORE
+  half of the frame-keyed park reading across one step. Every arm that WRITES
+  is instantiated, a floor below the width included; the two finishes left are
+  free of the reading by a quantified equation, not by a chosen state.
 - **`share-fold-fit`** (Part7/Arrival-Caps) — DIFFICULTY, `DEAD ROUTE, TWIN`:
   one admitted registration's path, priced at the round's GRANT. The assembly
   is the chain face's; the sink arm is a dispatch that now descends in its own

@@ -89,7 +89,7 @@ module Verify-Budget-Sufficient.Caps-Face.Part1 where
 
 open import Data.Bool    using (Bool; true; false; not; _∧_; _∨_; if_then_else_; T)
 open import Data.Maybe   using (Maybe; just)
-open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; _⊔_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
+open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; _⊔_; _≤ᵇ_; _<ᵇ_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-reflexive; +-suc; +-comm; +-assoc; +-monoˡ-≤; *-monoˡ-≤; *-monoʳ-≤;
   m≤m+n; m≤n+m; n≤1+n; +-mono-≤; m≤m*n; ^-monoʳ-≤; *-assoc; *-identityʳ; <⇒≤; ^-monoˡ-≤;
   ^-*-assoc; ^-distribˡ-+-*; *-mono-≤; +-monoʳ-≤; m≤m⊔n; m≤n⊔m; ⊔-lub; *-identityˡ;
@@ -612,11 +612,24 @@ pathOrd?-inner {u = u} nx allNid op κ h =
 
 -- THE SAME READING AT AN ENTRY, and it is stated there rather than at a
 -- path because half of it is about the REGISTRATION.  A chain's frames
--- are stratified, and its floor is at or above the source it listens
+-- are stratified, and its floor is STRICTLY above the source it listens
 -- to.  The second is what makes the first usable at a fan: values
 -- leaving a slot are known below that slot's index, and raising a floor
--- only weakens that, so a continuation floored at or above the source
+-- only weakens that, so a continuation floored above the source
 -- inherits them.
+--
+-- AND THE ORDERING IS STRICT, WHICH IS THE WHOLE OF WHAT THE FAN BUYS
+-- FROM IT.  A shared slot's definition may name only inputs BELOW its
+-- own index, so an entry whose continuation ends at slot `j`'s sink was
+-- minted subscribing something under `j` -- and the fan-out's own
+-- reading of an admitted chain is the strict one, because what bounds
+-- the escalation is that a sink hop CLIMBS: at equality a chain is
+-- re-entered through its own sink and the hop count is bounded by
+-- nothing.  A non-strict ordering here would be a reading no producer
+-- needs and no consumer can spend: every site that establishes this
+-- disjunct delivers a term's own `input` reading, which is strict at
+-- the leaf, and the only entry the weaker form additionally admits is
+-- the self-entry the telescope forbids.
 --
 -- ONLY THE ORDERING IS GUARDED, and the asymmetry is the shape of the
 -- statement rather than an economy.  The frame reading is asked of
@@ -634,10 +647,10 @@ pathOrd?-inner {u = u} nx allNid op κ h =
 -- share's sink, which is below it.  At such an entry a root guard is
 -- false and the ordering is false under it, so nothing can hold the
 -- conjunction.  On the source the same entry discharges the disjunct
--- outright, which is why `walk-share-strat` can afford to state the
--- ordering at all.
+-- outright, which is why a fan-out can afford to spend the ordering at
+-- all.
 entStrat? : ∀ {n} {Γ : Ctx n} {u t} → Source → Path Γ u t → Bool
-entStrat? {n = n} s p = ((n ≤ᵇ s) ∨ (s ≤ᵇ pathFloor p)) ∧ pathStrat? p
+entStrat? {n = n} s p = ((n ≤ᵇ s) ∨ (s <ᵇ pathFloor p)) ∧ pathStrat? p
 
 -- THE REGISTRY-WIDE LEDGER, and it is a CONJUNCT rather than a
 -- derivation for the reason `srcFloor?` is one.  `capsOK?`'s registry
@@ -659,7 +672,55 @@ entStrat? {n = n} s p = ((n ≤ᵇ s) ∨ (s ≤ᵇ pathFloor p)) ∧ pathStrat?
 --
 -- IT IS INDEPENDENT OF THE CAPS, so like the source floor it is handed
 -- straight back by `capsOK?-mono` -- widening a cap cannot move a
--- reading the caps do not appear in.
+-- reading the caps do not appear in.  Which is also what makes it
+-- spendable at a fan-out, where the four cap-denominated readings are
+-- not: the elimination those turn on needs a predicate that WEAKENS as
+-- its cap grows, so a receipt taken at an entry cap is useless once the
+-- descent has stepped, while a source and a sink are both fixed when
+-- the entry is minted.
+
+-- AND THE ROUTE TO IT IS A DESCENT-CARRIED STRATUM, WHICH PAYS FOUR OF
+-- THE MINT'S FIVE REGISTRATION SITES AND CANNOT REACH THE FIFTH.  Read
+-- the continuation's terminal as a FLOOR -- the slot index at a sink,
+-- the input count at a root, unchanged by a hop -- and the fact the
+-- subscribe descent should carry is that the expression being
+-- subscribed names only inputs below that floor.  It is preserved at
+-- every arm by construction rather than proven: an operator projects it
+-- from `inputsBelowᵉ`'s own conjuncts, the share descent takes it from
+-- the slot constructor's stratification field, the fixpoint arm from
+-- `ib-unfoldμ`, and at an input arm the carried form reduces
+-- definitionally to the very guard the registration wants.
+
+-- AND THE FIFTH IS AN ARM THE DESCENT DOES NOT REACH, so the floor has
+-- to arrive there as a fact about the VALUE, carried on the CHAIN and
+-- not on the source.  Reading it at the arrival's own source is the
+-- tempting form and it is not preserved: a frame applies its closure to
+-- what passes through, and that closure is the syntax of whichever
+-- definition PUSHED the frame, which is the chain's sink and not the
+-- arrival's slot.  Both readings meet where a fan-out starts -- the
+-- emitting slot's own stratum is under every admitted chain's floor,
+-- admission being what this ledger already delivers -- so the per-chain
+-- form is what is preserved and the source form is what establishes it.
+
+-- AND THE ARM IS REACHABLE, WHICH WOULD OTHERWISE BE AN INFERENCE FROM
+-- THE TYPES.  A three-slot program -- a hot, an `obs`-typed share
+-- mapping it to an observable that names the hot, and a flatten over
+-- that share -- mints an entry whose source is the hot and whose chain
+-- ends at the flatten's sink, and the flatten's def names no input but
+-- the share.  So the entry cannot have come from the descent, and the
+-- site is not merely unreached by the four arms but genuinely
+-- populated.  It is populated one DISPATCH after the subscribe frame
+-- and never inside it, a hot's emissions being scheduled rather than
+-- delivered at connect -- which says the arm lives at a later instant
+-- than any census of the connect can see.
+--
+-- AND THE READING HELD AT EVERY ROW OF THAT CENSUS, WHICH BOUNDS WHAT
+-- IS LEFT TO FEAR RATHER THAN LOWERING ANYTHING.  Those rows were
+-- measured-not-rechecked, so they discharge nothing and move no class;
+-- what they buy is a direction.  Nothing in reach produced a registry
+-- the reading rejects, so the open question is not whether the arm can
+-- mint a violating entry at a point but whether the per-chain floor
+-- SURVIVES the arm -- preservation, which no instantiation settles.
 regStrat? : ∀ {n} {Γ : Ctx n} {t}
           → List (RegId × Source × Chain Γ t) → Bool
 regStrat? = all (λ en → entStrat? (proj₁ (proj₂ en))

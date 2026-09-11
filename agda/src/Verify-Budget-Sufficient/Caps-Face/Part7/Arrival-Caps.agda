@@ -136,15 +136,14 @@ open import Verify-Budget-Sufficient.Caps-Face.Part7.Walk-Sink using
 -- disjunct's free half and could not have failed.
 --
 -- AND THE TELESCOPE CLOSES MOST OF THAT REGION, BUT NOT ALL OF IT,
--- WHICH IS WHERE THIS MEETS `walk-share-strat`.  A sink-terminated
--- chain is registered by the CONNECT, which subscribes the slot's def
--- under `share-sink i`, so a frame the DESCENT pushes is a subterm of
--- that def -- and `Rx.Slots.shared` admits a def only with its inputs
--- below the slot's own index, which is definitionally what
+-- WHICH IS WHERE THIS MEETS THE ENTRY LEDGER'S OWN MINT OBLIGATION.  A
+-- sink-terminated chain is registered by the CONNECT, which subscribes
+-- the slot's def under `share-sink i`, so a frame the DESCENT pushes is
+-- a subterm of that def -- and `Rx.Slots.shared` admits a def only with
+-- its inputs below the slot's own index, which is definitionally what
 -- `frameStrat?` asks at the floor such a chain reports.  That is four
--- of the five registration sites the reading is owed at, and the
--- series in `Harness.Main` targeting `walk-share-strat` enumerates
--- them.  The fifth is NOT telescope induction and the tempting
+-- of the five registration sites the reading is owed at, enumerated at
+-- `regStrat?` itself.  The fifth is NOT telescope induction and the tempting
 -- argument that it is, is false: a flatten frame inside the def can
 -- subscribe an observable that arrived as a VALUE, and `Val Γ (obs t)`
 -- is an arbitrary closed expression, so the syntax the telescope

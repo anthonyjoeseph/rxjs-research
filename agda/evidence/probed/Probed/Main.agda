@@ -175,4 +175,6 @@ open import Probed.Kill-Consume-Readings
 open import Probed.FramePark-Step
   using (tieScanTransport; tieScanBought; tieThruEnqueue; tieMapFree;
          tieInnerResidue; tieInnerGassed; residue≡; residueGassed≡;
-         lowFloorPre; lowFloorPost)
+         lowFloorPre; lowFloorPost; switchCellFree; exhaustCellFree;
+         tieSwitchFinish; tieExhaustFinish; tieThruRoom; tieThruRoomGassed;
+         floorᵏ; tieSinkFloor)

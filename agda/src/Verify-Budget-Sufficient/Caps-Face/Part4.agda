@@ -922,35 +922,18 @@ capsOK?-srcFloor c sched st h =
 -- already be legal before its source is even looked at.
 entStrat-mint : ∀ {n} {Γ : Ctx n} {u t} (s : Source) (p : Path Γ u t) →
   (n ≤ᵇ s) ≡ true → pathStrat? p ≡ true → entStrat? s p ≡ true
-entStrat-mint s p hs hp = ∧-intro (cong (λ x → x ∨ (s ≤ᵇ pathFloor p)) hs) hp
+entStrat-mint s p hs hp = ∧-intro (cong (λ x → x ∨ (s <ᵇ pathFloor p)) hs) hp
 
-entStrat-slot : ∀ {n} {Γ : Ctx n} {u t} (s : Source) (p : Path Γ u t) →
-  (s ≤ᵇ pathFloor p) ≡ true → pathStrat? p ≡ true → entStrat? s p ≡ true
-entStrat-slot {n = n} s p hs hp =
-  ∧-intro (trans (cong (λ x → (n ≤ᵇ s) ∨ x) hs) (∨-trueʳ (n ≤ᵇ s))) hp
-
--- THE SHAPE THE WALK ACTUALLY DELIVERS.  What travels down a subscribe
--- is the term's own reading, and at an `input` leaf that reading is
--- STRICT -- a slot index is below the floor, not at it -- while the
--- entry disjunct is stated non-strictly, because a MINTED source may sit
--- exactly at a floor.  The gap is one step of the same Bool recursion,
--- so it is discharged here rather than at every leaf that spends it.
+-- THE SHAPE THE WALK ACTUALLY DELIVERS, and it is the disjunct itself
+-- rather than a weakening of it.  What travels down a subscribe is the
+-- term's own reading, and at an `input` leaf that reading is STRICT --
+-- a slot index is below the floor, not at it -- which is exactly the
+-- ordering the entry disjunct asks for, so the slot half of the reading
+-- costs the introduction and nothing else.
 entStrat-slot< : ∀ {n} {Γ : Ctx n} {u t} (s : Source) (p : Path Γ u t) →
   (s <ᵇ pathFloor p) ≡ true → pathStrat? p ≡ true → entStrat? s p ≡ true
-entStrat-slot< s p hs hp = entStrat-slot s p (lt⇒le s (pathFloor p) hs) hp
-  where
-  -- and it is NOT the obvious recursion, because `_≤ᵇ_` recurses THROUGH
-  -- `_<ᵇ_` at a successor: `suc a ≤ᵇ suc b` is `a <ᵇ suc b`, which does
-  -- not reduce to `a ≤ᵇ b` while `a` is a variable.  So the step the
-  -- successor clause actually needs is a WEAKENING of the strict reading
-  ltS : ∀ (a b : ℕ) → (a <ᵇ b) ≡ true → (a <ᵇ suc b) ≡ true
-  ltS _       zero    ()
-  ltS zero    (suc b) _ = refl
-  ltS (suc a) (suc b) h = ltS a b h
-  lt⇒le : ∀ (a b : ℕ) → (a <ᵇ b) ≡ true → (a ≤ᵇ b) ≡ true
-  lt⇒le zero    b       _ = refl
-  lt⇒le (suc a) zero    ()
-  lt⇒le (suc a) (suc b) h = ltS a b h
+entStrat-slot< {n = n} s p hs hp =
+  ∧-intro (trans (cong (λ x → (n ≤ᵇ s) ∨ x) hs) (∨-trueʳ (n ≤ᵇ s))) hp
 
 capsOK?-count : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (c : Caps) (sched : Sched Γ) (st : EvalSt e) →
