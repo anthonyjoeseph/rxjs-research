@@ -1,7 +1,6 @@
 ------------------------------------------------------------------
 -- THE ORDER DISCHARGES THE DOMAIN WITH `scanᵉ` PRESENT, AND THE
--- EXPONENT IS A SYNTACTIC BURST LENGTH RATHER THAN A PREDICTED
--- BUDGET.
+-- SYNTACTIC READING OF ITS EXPONENT IS REFUTED.
 --
 -- `Spike.Total` settled totality for the fragment WITHOUT `scanᵉ`.
 -- The refold is what `scanᵉ` adds: the accumulator is re-templated
@@ -11,22 +10,37 @@
 -- `(2 + pm)^V`, where `V` is a tower of twos justified by a store
 -- invariant — the caps face.
 --
--- This module answers it with `blE`, a syntactic upper bound on a
+-- This module answers it with `blE`, an upper bound on a
 -- subscription's synchronous burst LENGTH.  The scan clause reads
 --
 --   hopD (scanᵉ f z e) = iter (hopDt f) (pm f) (blE e) (hopDv z ⊔ hopD e)
 --
 -- where `iter c p k` is the k-fold affine map `x ↦ c + p · x`: the
--- refold recurrence written as a recursion instead of solved.  Its
--- exponent is `blE e`, a number the PROGRAM TEXT carries.  Nothing
--- here computes a cap and `V` does not appear.
+-- refold recurrence written as a recursion instead of solved.  On THIS
+-- fragment every `blE` is computed from the expression tree, no cap is
+-- computed anywhere and `V` does not appear, which is what the domain
+-- result below rests on.
+--
+-- WHAT IS NOT TRUE IS THAT THE EXPONENT IS CARRIED BY THE PROGRAM
+-- TEXT, AND THE GAP BETWEEN THOSE TWO IS THE WHOLE FINDING.  `blE` is
+-- not invariant under PLUGGING: a value substituted into an `allᵉ`'s
+-- source contributes its own WIDTH to the burst length, so a template
+-- plugging into an `allᵉ` that feeds a `scanᵉ` takes its fold count
+-- from the plugged VALUE.  The plug lands in `iter`'s EXPONENT and the
+-- transport is exponential rather than affine.  No `Tm` here can build
+-- such a template; the real `strmᵗ` can, and it is ordinary rxjs —
+-- `map(v => v.pipe(mergeAll(), scan(…)))`.  So the reading that would
+-- let this fragment's result DELETE `V` does not survive the real
+-- language.  What survives is the order itself, which never mentions
+-- `blE`.
 --
 -- `blE` cannot be read off one expression alone — `allᵉ` concatenates
 -- the bursts of the observables its source emits — so it comes with a
 -- HEREDITARY WIDTH `H`, bounding every emitted value's own width
 -- exactly as `emit-hop` bounds every emitted value's own depth.  The
 -- two are one mutual induction (`emit-len`/`emit-H`), and the `allᵉ`
--- clause `blE (allᵉ e) = blE e * H e` is where they meet.
+-- clause `blE (allᵉ e) = blE e * H e` is where they meet — the same
+-- clause the refutation turns on.
 --
 -- `dupᵗ` IS DELIBERATE AND IS NOT DECORATION.  `Spike.Total` carried
 -- no template that could mention its argument twice in ADDED position,
@@ -53,12 +67,12 @@
 -- into the SOURCE of an inner scan whose LENGTH the template's own
 -- text writes down, so the plug is transported by that many steps of
 -- the recurrence and the slope is the inner step's squared, times the
--- plug's.  The law survives AFFINE, and the exponent is exponential in
--- the TEMPLATE's text rather than in anything a run produces — the
--- inner source belongs to the template and not to the program it is
--- applied to, so it is finite, syntactic, and not a second tower.
--- `scn-slope` and `scn-image` pin it at a program where composing the
--- slopes once would report 2 against an image of 4.
+-- plug's.  The law survives AFFINE here, and `scn-slope` and
+-- `scn-image` pin it at a program where composing the slopes once
+-- would report 2 against an image of 4.  But that is a fact about the
+-- LITERAL SOURCE `scnᵗ` writes down, not about the position: swap that
+-- source for the plug itself and the affine law fails outright, which
+-- is what the refutation below does.
 --
 -- IT IS ALSO WHERE THE RECURRENCE'S TWO DIRECTIONS COME APART.  A plug
 -- into a scan moves the recurrence's BASE, which the fold's own
@@ -69,7 +83,13 @@
 -- lands in the same base position through the `⊔` and so takes the
 -- same transport, but which no row here instantiates; and a template
 -- body of arbitrary shape, which the real `strmᵗ` permits and this
--- `Tm` does not.
+-- `Tm` does not — the gap the refutation walks through.
+--
+-- REFUTED: `Spike.Wide` — no affine plug law exists for a template
+-- plugging into an `allᵉ` that feeds a `scanᵉ`, so this module's
+-- exponent cannot be read as syntactic in the real language.  Every
+-- `Tm` here does satisfy that law (`template-affine`), which is
+-- exactly why the fragment stays green while the reading is false.
 ------------------------------------------------------------------
 module Spike.Scan where
 
@@ -543,15 +563,18 @@ module M (η ν : ℕ → ℕ) where
                                      (≤-trans (⊔-lub ≤-refl z≤n) ih)))
                           (≤-reflexive (dup-arith (Ht t) (ph t) (Hv a ⊔ Hv v))))))
     where ih = evalTm-wid t a v
+  -- `Ht (scnᵗ g t)` leads with a literal 2, which REDUCES — the goal's
+  -- right side is headed by `suc`, not by `_+_`, so the two arms weaken
+  -- through `n≤1+n` rather than through an addition that is not there.
   evalTm-wid (scnᵗ g t) a v =
-    ⊔-lub (≤-trans (m≤m+n 2 _) (m≤m+n _ _))
+    ⊔-lub (s≤s (s≤s z≤n))
           (≤-trans (≤-trans (iter-mono-x (Ht g) (ph g) 2
                               (≤-trans (⊔-lub ≤-refl (⊔-lub ≤-refl z≤n))
                                        (evalTm-wid t a v)))
                             (≤-reflexive
                               (scn-arith (Ht g) (ph g) (Ht t) (ph t)
                                          (Hv a ⊔ Hv v))))
-                   (+-monoˡ-≤ _ (m≤n+m _ 2)))
+                   (≤-trans (n≤1+n _) (n≤1+n _)))
 
   ----------------------------------------------------------------
   -- MEMBERSHIP BOUNDS for the two burst constructions.

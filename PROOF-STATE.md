@@ -235,17 +235,17 @@ statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **PORT THE ORDER, WHICH DECIDES HOW MUCH OF THE OTHER TWO LEGS
-  SURVIVES.** The spike now discharges the same domain on a fragment
-  carrying all four synchronous re-entry edges AND the refold, reading
-  the triple lexicographically and pricing the scan clause by a burst
-  length the PROGRAM TEXT carries — no cap, no tower, no `V`. Both legs
-  below are owed to a gas that is a NUMBER fixed before the run, while
-  an order asks only that each re-entry go down, so where the reading
-  ports a ceiling is deleted rather than restated. The commit takes the
-  real language's measure, whose template plug can land in a `scanᵉ`
-  that no spike term can express, and returns either the ported clause
-  or the construct that defeats it.
+- **MEASURE THE VALUE, NOT THE TEXT — THE ONE ROUTE THE REFUTATION
+  LEAVES OPEN.** `Spike.Wide` kills the syntactic reading outright: no
+  affine plug law exists for a template plugging into an `allᵉ` that
+  feeds a `scanᵉ`, though every term of the fragment satisfies one, so a
+  fold count is read off the plugged VALUE and no ceiling can be
+  predicted from a program. What that leaves untouched is DESCENT: a
+  value's hop depth is finite by structural recursion, and the order
+  never mentions the refuted quantity. The commit states the re-entry
+  step over the value in hand rather than over a number fixed before the
+  run, and returns either that descent or the emission whose depth its
+  own emitter cannot bound.
 
 - **THE STORE READING NOTHING CARRIES.** Both inner arms and the fan die
   at one installed cell, and all three owe the same absent fact: the
@@ -273,15 +273,14 @@ statement, not about the head.
 
 - **IS THE NESTING CEILING NEEDED AT ALL?** Every caps-denominated route
   is closed — entry cap, exit cap, and moving the recurrence's own fuel.
-  What narrowed the question is that the ceiling is only owed because
-  the evaluator's gas is a NUMBER, fixed before the run. The order now
-  COMPOSES on a
-  fragment carrying every synchronous re-entry edge and the refold
-  besides, with the scan clause priced by a burst length the program
-  text carries — so the region left is what the real language adds over
-  that fragment: a template plugging into a `scanᵉ`, share's connect,
-  and `takeᵉ`. Defeat the reading with one of those three, or the
-  ceilings are not restated but deleted.
+  The ceiling is only owed because the evaluator's gas is a NUMBER fixed
+  before the run, and the half now SETTLED is that no syntactic quantity
+  replaces it: `Spike.Wide` refutes the affine plug law at a template
+  plugging into an `allᵉ` that feeds a `scanᵉ`, which is ordinary rxjs.
+  The region left is the VALUE
+  side, where a depth read off the emission in hand is finite by
+  construction and needs no prediction; what is open there is whether
+  descent survives, or whether a run's emission can outrun its emitter.
   relevant: `fan-regsSzL-mint`, `walk-share-nestOK`, `walk-share-valsNest`
 
 - **WHAT CARRIES A STORE READING DOWN THE WALK?** The statements read a
