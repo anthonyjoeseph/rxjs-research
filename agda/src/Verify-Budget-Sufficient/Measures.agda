@@ -2016,16 +2016,24 @@ connect-anchor e sl id i {d} eq =
 -- mathematical, and what it charges for that is the `hasAtLeast`
 -- obligation together with every tower that sizes it.
 
--- THE PRICE OF SPENDING THIS ORDER DIRECTLY IS THAT TWO OF THE THREE
--- PREMISES ARE INVARIANTS RATHER THAN SYNTAX, and that is the whole of
--- what a stratified evaluator would cost.  The μ edge needs only its
--- own body, so it transports with nothing threaded.  The connect edge
--- needs the slot telescope bounded and the hop edge needs the emitted
--- value's depth under its emitter's rank — both facts this development
--- establishes in a pass ABOUT the evaluator, so recursing on the order
--- directly means the evaluator must carry them as indices while it is
--- being defined.  That is the invariant-record cascade rather than a
--- new proof, but it is the reason the question is not free.
+-- AND EXACTLY ONE OF THE THREE EDGES SPENDS AN INVARIANT; THE OTHER
+-- TWO ARE ENTRY SYNTAX.  The μ edge reads its own body.  The connect
+-- edge reads a slot def, its guard is the machine's own freshness
+-- test, and its telescope bound is a fact about the PROGRAM rather
+-- than about a run — `KeepsC`'s slots field is an equation, so the
+-- telescope is literally unchanged and the bound transports by `refl`.
+-- Only the hop edge spends a run fact: an emitted value's depth under
+-- its emitter's rank, which is `burstHopD?`.
+
+-- THAT ONE IS NOT CIRCULAR, WHICH IS THE WHOLE QUESTION, and the
+-- reason is definitional.  An inner is drawn from the burst a sibling
+-- call produced, so the bound arrives from that call rather than from
+-- a pass about the finished evaluator; and the three `*All` nodes put
+-- a `suc` on `hopDᵉ`, so the carrier's own bound already sits strictly
+-- under the emitter's rank with no arithmetic in between.  Spending
+-- the order directly therefore costs a strengthened return type
+-- carrying that one receipt — induction with the invariant in the
+-- motive — and not a domain predicate.
 
 dBound : (V R U r s : ℕ) → ℕ
 dBound V R U r s = s + suc V * (r + suc R * U)
