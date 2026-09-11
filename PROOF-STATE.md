@@ -257,30 +257,27 @@ statement, not about the head.
   become one statement, or it returns why no bound exists in either
   argument.
 
-- **THE ONE EXIT-INDEXED CEILING, AND WHETHER ITS CLOSURE RESTATES.**
-  The store's `nestCapAt` is the only ladder here that affords the
-  fold, because its factor towers in the burst at the NEXT index
-  instead of reading this instant's fuel — which is why it survives the
-  arithmetic that closed the caps-denominated routes. What ties it off
-  today is FLAT: `burstsOK` at every hop, closed at the top by
-  `arr-chains-bursts`, and `Refuted.Chains-Burst-Flat` kills flat, two
-  `thru` frames squaring a burst. The commit restates that closure
-  along the chain as a PRODUCT and returns either the ladder the
-  nesting face could then be sighted against, or the frame at which a
-  product closure fails too.
+- **COMPOSE THE ORDER, WHICH IS ALL THE CENSUS LEFT OPEN.** The tower
+  is owed only because the gas is a NUMBER; an ORDER asks merely that
+  each re-entry go down. The edge census landed — three edges, each
+  already carrying its own decrease, and neither cold nor `deferᵉ` a
+  depth edge — so what remains is the tuple, every component of which
+  rises along some other edge. The commit fixes the one monotone
+  component outermost and returns either the order or the pair of
+  edges that cannot be ordered.
 
 ### Open questions
 
-- **IS THE NESTING CEILING CAPS-DENOMINATED AT ALL?** Every route tried
-  reads the potential off the caps recurrence — at the entry cap, at the
-  exit cap, or by moving the recurrence's own blowup fuel — and the last
-  of those is now closed by arithmetic rather than by a missing premise.
-  The premise side was free, and the move still asks the fuel to dominate
-  a blowup taken AT that fuel; a shifted index is a raised base, so the
-  charge rises with the potential. What that leaves is not a sixth
-  denomination but a question about the currency: the one ladder that
-  affords the fold reads no `capsH` at all. The region is whether a
-  non-caps ceiling can close.
+- **IS THE NESTING CEILING NEEDED AT ALL?** Every caps-denominated route
+  is closed — entry cap, exit cap, and moving the recurrence's own fuel,
+  the last by arithmetic rather than by a missing premise, since it asks
+  the fuel to dominate a blowup taken AT that fuel. What narrowed the
+  question is that the ceiling is only owed because the evaluator's gas
+  is a NUMBER, fixed before the run. Three of the re-entry edges are now
+  confirmed to carry their own decrease, and width — the quantity these
+  ceilings exist to predict — is not a depth edge at all. The region is
+  no longer which cap to read but whether a well-founded order composes;
+  if it does, the ceilings are not restated but deleted.
   relevant: `fan-regsSzL-mint`, `walk-share-nestOK`, `walk-share-valsNest`
 
 - **WHAT CARRIES A STORE READING DOWN THE WALK?** The statements read a

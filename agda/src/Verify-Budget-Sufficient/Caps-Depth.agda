@@ -32,6 +32,45 @@
 --     stratification, not a domination").  A hypothesis known false at
 --     its own supply site is not a hypothesis.
 
+-- A FOURTH CANDIDATE, AND IT IS NOT A BOUND.  All three above are
+-- refuted as BOUNDS -- a quantity computed ahead of the run that
+-- dominates the depth demand.  A well-founded ORDER asks something
+-- strictly weaker: that each re-entry go DOWN, with nothing totalled.
+-- The evaluator's synchronous re-entry edges are exactly three, and
+-- this census is read off the clauses rather than argued:
+--
+--   · the SHARE connect.  `sharedConnect` extends `connectedShares`
+--     BEFORE its recursive call, and `subscribeSharedSlot` returns a
+--     mid-flight join without recursing once the source is in that
+--     list -- so the unconnected slots strictly decrease here, and rise
+--     nowhere, the list being append-only and the slot count syntactic.
+--   · the μ UNFOLD.  The recursive occurrences inside `unfoldμ body`
+--     are `deferᵉ`-gated and `deferᵉ` SCHEDULES rather than recursing,
+--     so a μ costs a schedule hop and not synchronous depth; the
+--     defer-free μ binders of the term strictly decrease.
+--   · `subscribeInner`, reached from `thruConsume` and from
+--     `mergeAllDrain`.  Both walk their list structurally, and both
+--     hand it a `Val Γ (obs u)` to subscribe under a `Path Γ u t` --
+--     so the obs-nesting of the TYPE drops, and types cannot grow,
+--     every one in a run coming from the program's own finite set.
+--
+-- Two shapes that read as re-entries are not: a COLD `input` mints a
+-- source and registers, recursing nowhere, and `deferᵉ` parks its body
+-- as a pending payload.  Both are schedule hops.  So WIDTH -- what a
+-- cold source multiplies, and what this tower must predict -- is not a
+-- depth edge at all, and stops being load-bearing the moment the
+-- demand is an order rather than a number.
+--
+-- WHAT IS OPEN IS THE COMPOSITION, and it is now the whole question.
+-- Each component rises along some other edge: the share connect jumps
+-- to a slot's def at an unrelated type, so the obs-nesting may rise
+-- there; a `mapᵉ`/`scanᵉ` descent into its own source moves to an
+-- unrelated element type, so it may rise there too; and
+-- `subscribeInner` jumps to a runtime payload whose TERM is unbounded,
+-- so no term measure sits above it.  The unconnected-slot count is the
+-- one component monotone everywhere, which fixes it as outermost.
+-- Below it nothing yet orders.
+
 -- SO THE CURRENCY IS THE RUN ITSELF.  Each head below shadows one
 -- evaluator head, clause for clause, taking the SAME arguments and
 -- returning the `⊔` of its callees' mirrors on the SAME expressions —
