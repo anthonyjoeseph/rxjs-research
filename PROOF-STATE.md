@@ -238,17 +238,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE FRAME ARMS IN THE SAME CURRENCY**, which is the rest of WHAT
-  PRICES A REGISTERED CHAIN once the terminal stops asking for a
-  terminal. The walk's frame clauses still read the cap-denominated
-  legality and forward it to the four `*Φ-fit` heads, so the charge
-  reading is settled at the leaf and re-derived at every frame above
-  it. The commit carries the two ceilings down the walk in place of the
-  cap reading — both potentials only grow when a frame is put in front,
-  so a tail is charged no more than the chain it was taken from — and
-  returns the first head whose own arithmetic is not stated in that
-  currency.
-
 - **THE MINT READING, CARRIED RATHER THAN DERIVED**, which is the half of
   WHICH STORE CELLS DOES A PATH PREDICATE REACH that the walk did not
   settle. Three rows of the nest face read a cell an ARRIVAL rewrites
@@ -269,6 +258,16 @@ does not fit is a finding about the shared statement, not about the head.
   preserve — which is what decides whether the floor reading survives
   the delivery arc WHICH STORE CELLS DOES A PATH PREDICATE REACH is
   still open at.
+
+- **THE INNER ARMS' OWN CURRENCY**, which is what the fold's arm returned
+  and where WHICH STORE CELLS DOES A PATH PREDICATE REACH bites hardest
+  inside this face. Both outer heads are bodies over ceilings carried
+  down the walk now; both INNER heads charge against a record that
+  quantifies its own caps and reads the stepped size inside it, so no
+  carried ceiling reaches their arithmetic. The commit states that
+  record over the two ceilings instead, and either lands one head on it
+  or returns the conjunct that is genuinely caps-shaped — which decides
+  whether the store predicate those two are owed has one index at all.
 
 ### Open questions
 
@@ -397,11 +396,14 @@ does not fit is a finding about the shared statement, not about the head.
   no-room branch parks the arrival onto the cell the third conjunct reads, and
   no hypothesis prices the arrival, so a `share-sink` chain falsifies it. The
   restatement is the arrival's own floor premise.
-- **`scanΦ-fit`** (Part7/Depth-Fit) — SHAPE, `DEAD ROUTE`: the producing side
-  of the fold's grant. THE MECHANISM IS DEAD, NOT A DENOMINATION: a flat
-  per-instant potential cannot dominate a count exponential in itself; the one
-  affording ceiling is the store's exit-index factor, priced in a refuted
-  width.
+- **`scanΦ-burst-count`** (Part7/Depth-Fit) — SHAPE, `DEAD ROUTE`: the count
+  the fold's charge is a power in, read at the instant's SIZE cap. THE
+  MECHANISM IS DEAD, NOT A DENOMINATION: the value ledger bounds by the WIDTH
+  cap, the crossing needs the size one, and no conjunct on the values names it.
+- **`scanΦ-store-charge`** (Part7/Depth-Fit) — SHAPE, `REFUTED`: the fold's
+  node ceiling under the potential, stated premise-free because nothing the arm
+  around it reads `EvalSt.nodes`. Owed as a carried store predicate, with the
+  two inner arms.
 - **`innerΦ-quiet-fit`** (Part7/Depth-Fit) — SHAPE, `REFUTED×2`: the charge at
   width zero, refuted at one installed cell — it reads the node table and no
   premise of it bounds the table. Owed as a carried store predicate, with the
@@ -516,6 +518,10 @@ does not fit is a finding about the shared statement, not about the head.
   transport, reporting the new accumulator as well as the outputs because the
   cell it overwrote is what the next emit reads. The same shelf carries this
   shape at another measure, nil clause and cons clause alike.
+- **`scanΦ-syn-charge`** (Part7/Depth-Fit) — GRINDABLE, `TWIN`: the syntax a
+  burst substitutes, landed under the potential. Four ceilings and no state at
+  all; the outer frame's own product of ceilings already lands under the same
+  split, and what is new is one burst power the same widening absorbs.
 
 ## Tier 2 — Verify-Well-Formed (parked behind tier 1)
 

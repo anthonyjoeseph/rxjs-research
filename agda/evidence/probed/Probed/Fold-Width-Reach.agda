@@ -1,6 +1,6 @@
 -- THE BINARY THE FOLD ARM WAITS ON, AND IT IS A CHOICE BETWEEN TWO
--- WIDTH READINGS RATHER THAN A COVERAGE CLAIM.  `scanΦ-fit` sets a
--- depth fixed before an instant runs against a delivery count that
+-- WIDTH READINGS RATHER THAN A COVERAGE CLAIM.  `scanΦ-burst-count`
+-- reads a cap fixed before an instant runs against a delivery count that
 -- towers in it, and every denomination tried so far moves both numbers
 -- together -- which is why this file is a FORK and not a receipt: its
 -- product is that two candidate readings of the same width DISAGREE,
@@ -14,7 +14,7 @@
 -- level.  They agree at the entry and part at the first hop, which is
 -- what `separates` pins.
 --
--- FORK: scanΦ-fit
+-- FORK: scanΦ-burst-count
 --
 -- AND THE ROWS SAY WHICH SIDE THE SYNTAX SITS ON, which is the
 -- whole reason the fork can be DECIDED rather than merely stated.  The
