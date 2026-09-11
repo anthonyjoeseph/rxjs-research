@@ -61,6 +61,19 @@ Tri = ℕ × ℕ × ℕ
 -- constructor here would mean a fourth edge in the evaluator, and a
 -- re-entry site inhabiting none of the three is a site this order does
 -- not yet cover.
+
+-- AND THAT COVERAGE CLAIM IS HELD BY A MACHINE RATHER THAN BY THIS
+-- PARAGRAPH: `make recursion-cover` cuts the evaluator's three declared
+-- peels and fails on any cycle left standing the source does not declare
+-- structural.  Today it cuts both of the evaluator's multi-member
+-- recursions down to singletons and leaves exactly one pair, which walks
+-- the expression — so the three constructors here are not a guess at
+-- which sites matter, and a fourth site would go red rather than compile
+-- quietly.  Two of that check's readings decided this type's shape: the
+-- merge join's drain wants no component of its own, since it rides its
+-- own queue and its one outward call peels inside the callee; and the
+-- share hop's counter is a separate component reached one way, so it
+-- composes without sharing a measure and buys no fourth field here.
 ------------------------------------------------------------------
 
 infix 4 _≺_

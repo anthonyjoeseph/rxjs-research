@@ -677,6 +677,33 @@ cone-check:
 cone-selftest:
 	@scripts/cone-selftest
 
+# EVERY CYCLE IN THE EVALUATOR'S RECURSION IS COVERED BY A DECLARED DESCENT.
+# Agda's termination checker is satisfied by the counter and says nothing about
+# which edges carry it, so the reading the stratification rests on -- a peel at
+# a few named sites, everything else descending on an argument it already holds
+# -- was true by inspection and checked by nothing.  This cuts the edges the
+# source declares as peels and fails on any cycle left standing that the source
+# does not declare as structural, in both directions: a declaration naming
+# nothing has aged past the code, which is what makes it worse than none.
+recursion-cover:
+	@scripts/check-recursion-cover.py
+
+# PROVES recursion-cover IS LOAD-BEARING, on each of the three ways it can go
+# wrong -- an undeclared cycle, a peel naming no call, a structural cycle that
+# is no longer one -- and that a graph whose cycles are all declared stays
+# quiet.  The quiet half is the one worth pinning: a check that fired on a
+# covered recursion would be routed around within a day.
+recursion-cover-selftest:
+	@fail=0; S=scripts/recursion-cover-selftest; \
+	  for bad in uncovered stale-peel stale-scc; do \
+	    if scripts/check-recursion-cover.py --file $$S/$$bad.agda > /dev/null 2>&1; then \
+	      echo "SELFTEST FAIL: $$bad PASSED — the check is dead"; fail=1; \
+	    fi; \
+	  done; \
+	  scripts/check-recursion-cover.py --file $$S/covered.agda > /dev/null \
+	    || { echo "SELFTEST FAIL: a recursion whose every cycle is declared was rejected"; fail=1; }; \
+	  if [ $$fail -eq 0 ]; then echo "recursion-cover-selftest: OK"; else exit 1; fi
+
 # SETTLE RISK NEAR THE TRUNK: while a tier holds an open FALSITY or SHAPE row,
 # a commit may not BANK a GRINDABLE or DIFFICULTY row of that tier.  The pull
 # it resists is structural rather than careless -- a risky leg often ends in a
@@ -1095,6 +1122,7 @@ GATE_CHEAP = wiring-selftest wiring-gate wiring-refuted wiring-probed \
              roadmap-moved-selftest roadmap-moved \
              roadmap-order-selftest roadmap-order \
              cone-selftest cone-check \
+             recursion-cover-selftest recursion-cover \
              comments-selftest comments-check dev-changed-selftest \
              unmap-selftest spike
 

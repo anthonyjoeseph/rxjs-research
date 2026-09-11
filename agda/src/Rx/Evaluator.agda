@@ -708,6 +708,39 @@ fLvl S W J = J + fCharge S W J
 --   subscribe-nesting depth ≤ the gas the instant runs under, by
 --   induction on the evaluator's own recursion.
 
+-- AND THAT READING IS NOW CHECKED RATHER THAN READ OFF, WHICH IS WHAT
+-- LETS AN ORDER STAND IN FOR THE COUNTER.  `make recursion-cover` cuts
+-- the edges declared below and requires every cycle still standing to
+-- be declared too.  The result is the coverage claim `Rx.Strat-Order`
+-- is written against: cutting three edges collapses BOTH of this
+-- module's multi-member recursions — the twelve-member subscribe one
+-- and the three-member share one — and exactly one cycle survives, the
+-- pair that walks the expression.  So a counter is buying visibility at
+-- three sites and everything else already descends on an argument it
+-- holds; a clause that opened a fourth would fail the check rather than
+-- go on compiling, which is the one thing Agda's own termination
+-- checker cannot say, since it is satisfied by the counter and silent
+-- about which edges carry it.
+--
+-- THE SHARE HOP IS ITS OWN RECURSION AND DOES NOT JOIN THE TRIPLE.  Its
+-- counter is a plain `ℕ` bounding the slot telescope, it peels once per
+-- hop, and it reaches the frame walk one way only — nothing in the
+-- subscribe recursion calls back into it.  It composes by being a
+-- separate component, not by sharing a measure.
+
+-- PEEL: subscribeInner -> subscribeE
+-- PEEL: sharedConnect -> subscribeE
+-- PEEL: dispatchShare -> shareGo
+-- STRUCTURAL SCC: subscribeE subscribeAll
+
+-- THE ONE DECLARATION TAKEN ON TRUST IS THAT LAST PAIR, and it is the
+-- μ edge that makes it worth naming.  `subscribeE` reaches
+-- `subscribeAll` and back on a strictly smaller expression at every
+-- operator node, so the pair is structural — except at `μᵉ`, where the
+-- body is UNFOLDED rather than descended into and the third peel lives.
+-- A self-edge is invisible to a component check, so this is where the
+-- check stops and `unfoldμ-shrinks` starts.
+
 -- THE INSTANTIATION IS THEREFORE AT THE TOP, TWICE, AND THE CYCLE IS
 -- BROKEN BY THE STORY INDEX.  `budgetAt`'s height runs through
 -- `capsHgo`, hence `blowH`, hence `poolCount`, hence `lvls` — so a `d`

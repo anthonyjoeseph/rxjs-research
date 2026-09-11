@@ -235,17 +235,17 @@ statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE SIX RE-ENTRY SITES PUT AGAINST IT.** Three are the gas edges,
-  already restated. The burst walk and the share fan descend
-  structurally on a cons list, which the evaluator's clauses show. The
-  merge join's drain is the one with nothing in hand: it re-enters on
-  a COMPLETION carrying no value and recurses over its own queue. The
-  commit gives each of the six a measure and returns whether the drain
-  needs a fourth component or rides its queue's length, and whether
-  the cascade's counter — the second proxy, whose order is the
-  telescope position — composes with the triple. It also lands the
-  order's well-foundedness, taken back out unconsumed. Narrows WHAT
-  DOES AN INTRA-INSTANT RE-ENTRY LEAVE SMALLER?
+- **THE CONTRACT RESTATED OVER THE ORDER, WHOLE.** The flattening
+  cannot come off one edge at a time: gas is a unary counter, so the
+  wet contract's demand is one natural and no induction mixes an `Acc`
+  motive with a `dBound` one. The unit is therefore a whole recursion,
+  and `make recursion-cover` now holds that the recursion is the one
+  the order covers. This commit states the subscribe component's
+  contract over `Rx.Strat-Order` with its seven flattening premises
+  struck, lands the order's well-foundedness in the same commit as its
+  first consumer, and walks every clause asking which constructor it
+  inhabits. The product is the residue: the clauses inhabiting none.
+  Narrows DOES DESCENT SURVIVE THE REAL TERM LANGUAGE?
 
 - **THE FOLD'S COUNT, READ OFF THE STATE RATHER THAN PREDICTED.** The
   one survivor, and where the nesting face's refutations all live: the
@@ -258,16 +258,16 @@ statement, not about the head.
   on this region and so a stop — or the form that admits none of them.
   Narrows WHAT BOUNDS A BURST INSIDE ONE INSTANT?
 
-- **THE CONTRACT RESTATED OVER THE ORDER, WHOLE.** The flattening
-  cannot come off one edge at a time: gas is a unary counter, so the
-  wet contract's demand is one natural and no induction mixes an `Acc`
-  motive with a `dBound` one. The finding sits on `dBound`'s header and
-  the leg it killed is discarded. The unit is therefore a whole
-  recursion, so this commit states the subscribe SCC's contract over
-  `Rx.Strat-Order` with its seven flattening premises struck, then
-  walks every clause of the real `subscribeE` asking which of the three
-  constructors it inhabits. The product is the residue: the clauses
-  inhabiting none. Narrows DOES DESCENT SURVIVE THE REAL TERM LANGUAGE?
+- **WHAT THE CONVERSION RETIRES, ROW BY ROW.** A census already sorted
+  the ledger by what funds each row and found forty-seven funded by a
+  cap and nothing else — so the conversion's real size is not the
+  contract but what falls out under it, and reading that off after the
+  fact is how a tier comes to be ground twice. With the contract
+  stated, this commit puts each cap-funded row against it and returns
+  three lists: gone with the flattening, surviving re-denominated onto
+  the order, and surviving unchanged because the cap was never what
+  they were about. The store face is where the answer bites. Narrows
+  WHAT DOES AN INTRA-INSTANT RE-ENTRY LEAVE SMALLER?
 
 ### Open questions
 
@@ -283,15 +283,16 @@ statement, not about the head.
   and the real language has one.
   relevant: `fan-regsSzL-mint`, `walk-share-valsNest`, `subscribeE-sz`
 
-- **WHAT DOES AN INTRA-INSTANT RE-ENTRY LEAVE SMALLER?** One question
-  with two faces, joined because the finding is the same on both. On the
-  STORE face a step is asked to preserve a reading the cascade door
-  holds at entry, and cannot: inside the instant the store grows toward
-  the NEXT cap by design. On the CONTROL face a merge join's drain
-  re-enters on a completion carrying no value at all, recursing over its
-  own queue, so there is nothing in hand for an order to read. Both say
-  the intra-instant step has no established decrease, and until one
-  exists neither a preserved bound nor a descent can cross it.
+- **WHAT DOES AN INTRA-INSTANT RE-ENTRY LEAVE SMALLER?** The CONTROL
+  half is settled and gone: every such re-entry descends on an argument
+  it already carries, the merge join's drain on its own queue, and
+  `make recursion-cover` goes red the day one stops. What is left is the
+  STORE half, and it is not a descent question at all but a
+  PRESERVATION one — a step is asked to hold a reading the cascade door
+  takes at entry, and cannot, since inside the instant the store grows
+  toward the NEXT cap by design. So the region is a bound sighted at the
+  wrong end, and what decides it is whether a motive can carry what the
+  entry cap was standing in for.
   relevant: `walk-share-nestOK`, `step-frame-store≤`,
   `subscribeSharedSlot-sz-store`
 

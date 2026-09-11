@@ -44,6 +44,8 @@ yours. `gate-light` and `gate-heavy` force a path.
 | `roadmap-selftest` | [roadmap-check.md](roadmap-check.md) | ship a roadmap checker that has stopped firing |
 | `dev-changed-selftest` | [gate.md](gate.md) | ship a light gate that passes while checking nothing |
 | `roadmap-check` | [roadmap-check.md](roadmap-check.md) | leave PROOF-STATE stale, unsorted, verbose, or dated — or date CLAUDE.md |
+| `recursion-cover-selftest` | [recursion-cover.md](recursion-cover.md) | ship a recursion-cover checker that has stopped firing |
+| `recursion-cover` | [recursion-cover.md](recursion-cover.md) | open a cycle in the evaluator that no declared peel cuts and no declared structural descent carries |
 | `comments-selftest` | [comments-check.md](comments-check.md) | ship a comment checker that has stopped firing |
 | `comments-check` | [comments-check.md](comments-check.md) | date a source comment, record what happened to a declaration, bury the evidence mid-paragraph, cite a twin or probe that is not there, re-say in charged prose what a section below already says resolvably, or let an explanation grow into an essay |
 | the tower (inline in `gate-heavy`) | [agda-build.md](agda-build.md) | land anything that does not typecheck, warnings included |
