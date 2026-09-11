@@ -464,6 +464,35 @@ capsH e sl id = capsHgo (capsBase e sl) id
 --   hand-built-state trap: it is not one `capsAt` reaches, so a row
 --   over it is evidence about nothing.
 
+-- AND THE DEPTH FACE'S SIGHTING IS THIS FUEL ARGUMENT, NOT A SEPARATE
+-- CHOICE.  The nesting potential is read at an instant's ENTRY cap while
+-- every charge it must dominate is denominated at the EXIT one, and
+-- sighting it one instant later is exactly replacing `capsH e sl id`
+-- here by `capsH e sl (suc id)` -- the walk's depth demand lands under
+-- this blowup's own count, so the two move together or neither does.
+--
+-- AND THE PREMISE SIDE RAISES NO OBSTACLE, which is what makes the fuel
+-- the whole question.  Every entry-state fact the depth face takes
+-- transports up by monotonicity already proven: `capsAt-⊑-suc` with
+-- `capsOK?-mono` and the widening family for the cap-indexed
+-- predicates, `capsAt-size-mono` for the size premise, and the nesting
+-- cap's own step for the depth one, its factor being at least one
+-- (`1≤nestFacAt`, .Nest-Store).  `nestΦ-sight≤capsH` (.Nest-Arith) is
+-- stated over every index, so the sighted ceiling follows at `suc id`
+-- with nothing re-proven.  Nor does a cycle return: this height reads
+-- `capsBase`, which is syntactic, and the cycle `blowH` breaks is the
+-- one that would take the fuel from the GAS instead.
+--
+-- SO WHAT THE TOWER MUST AFFORD IS ONE STORY, AND IT IS OWED BY THE
+-- GAS.  `capsAt-tower` is `blowup-tower` at this argument, so moving the
+-- argument moves the bracket with it: instant `id`'s cap would land
+-- under `towerℕ (capsH e sl (suc (suc id)))` where it now lands under
+-- `towerℕ (capsH e sl (suc id))`.  `syncBudget` (Rx.Evaluator) hands
+-- instant `id` a tower over `3 + capsH e sl (suc id)`, and three stories
+-- of padding are not a `blowH` story -- so the evaluator's own index
+-- moves with the fuel or the re-sighting does not land.  Read off the
+-- two recurrences rather than instantiated, both being sealed for cost.
+
 capsAt : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → (id : ℕ) → Caps
 capsAt {n = n} e sl zero =
   frameBlowup (caps (2 + sizeᵉ e + slotsSize sl + slotsClos sl)

@@ -235,16 +235,17 @@ statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **RE-SIGHT THE POTENTIAL, THE ONE DECISION THE WHOLE FACE WAITS ON.**
-  Five dead routes under the fold's charge share one shape: a budget
-  fixed per instant and read at the ENTRY cap must dominate a term
-  carrying the burst in an exponent, and the only ceiling that affords
-  that fold is read at the EXIT index. Both local ends are closed, so
-  the commit moves the DOOR: state the depth face against the walk's own
-  count ledger, sighted one instant later, and return what the CAPS
-  TOWER must then afford. Enlarging the tower is not the alternative and
-  is recorded dead — the next cap is a blowup OF the current one, so a
-  bigger budget raises what it must beat.
+- **MOVE THE FUEL, WHICH IS WHERE THE SIGHTING LIVES.** Re-sighting is
+  not a restatement of the depth face: the potential's instant and the
+  caps recurrence's blowup fuel are ONE argument, so it is that
+  argument read one instant later, with the base raised to match. The
+  premise side is free and proven — every entry-state fact transports
+  by cap monotonicity, and the sighted ceiling is stated over every
+  index. What it costs is the bracket: the tower's own tower bound is
+  that argument's, so the raise carries it a whole `blowH` story past
+  what an instant's gas is padded to cover. The commit moves the
+  evaluator's index with the fuel and returns the first bound that
+  does not follow.
 
 - **THE STORE READING NOTHING CARRIES.** Both inner arms and the fan die
   at one installed cell, and all three owe the same absent fact: the
@@ -270,16 +271,16 @@ statement, not about the head.
 
 ### Open questions
 
-- **AT WHICH INSTANT IS THE POTENTIAL SIGHTED?** The budget is fixed at an
-  instant's ENTRY cap and the charges it must dominate are denominated at
-  the EXIT one, and the gap is not a margin to tighten: the stepped cap is
-  not a polynomial in the entry cap, so the shortfall sits inside an
-  exponent and no ceiling chosen at the entry is small enough. Both local
-  ends are closed — enlarging the budget asks it to exceed the ceiling it
-  is fitted under, and following the cap to the stepped instant is refused
-  by every frame arm, each of which ties the potential to the instant being
-  WALKED. So what is left is the DOOR: whether the depth face can be
-  sighted one instant later, and what that moves underneath it.
+- **WILL THE GAS'S STORY INDEX MOVE WITH THE FUEL?** The sighting half is
+  settled and is no longer the question: the potential's instant and the
+  caps recurrence's blowup fuel are one argument, so moving it is an edit
+  rather than a design, and every entry-state premise transports up by
+  monotonicity already proven — nothing on that side objects, which is
+  what the entry-cap reading was thought to be fighting. What is left is
+  ONE story, in the other direction: the tower bound is that same
+  argument's, so raising it raises the bracket past a gas padded three
+  units over a height the raise clears by a whole `blowH`. The region is
+  the evaluator's own index, and whether it can rise.
   relevant: `fan-regsSzL-mint`, `share-fold-store≤`, `step-frame-vals≤`
 
 - **WHAT CARRIES A STORE READING DOWN THE WALK?** The statements read a
