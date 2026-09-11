@@ -320,10 +320,9 @@ does not fit is a finding about the shared statement, not about the head.
   unbounded. A duplication chain buys no rung; the climb rows say no second
   block is owed, read in rungs rather than through the charge.
 - **`pushBurst-sz-store-scan`** (Regs-Nest-Walk) — FALSITY,
-  `REFUTED, DEAD ROUTE, PROBED×4`: the cell each arrival rewrites, keyed on the
-  source subscription since an arbitrary burst is unbounded. The arrival count
-  REFUTED the depth-only denomination — a wrapping step doubles the cell where
-  unfoldings and layers hold fixed.
+  `REFUTED, DEAD ROUTE×2, PROBED×4`: the cell each arrival rewrites, keyed on the
+  source subscription. The receipts are the replaced statement's: the fold does
+  not normalise at either fixture, so no point instantiates it today.
 - **`subscribeSharedSlot-sz-store`** (Regs-Nest-Walk) — FALSITY,
   `DEAD ROUTE, PROBED×2`: the definition behind a reference, whose entire climb
   is the telescope summand — `input` charges nought, so no program reading
