@@ -131,6 +131,30 @@ frameΦSz B (thru-outer _ _)   = B
 -- that does not price it at a cap at all.  That is the obligation
 -- `pathSz?`'s own header states over its two callers, arriving at the
 -- potential rather than at the size predicate.
+
+-- AND THE LEAF'S PRICE IS FLAT IN THE REMAINING SHARE DEPTH, WHICH IS
+-- A DEFECT NO CHOICE OF CAP REPAIRS.  The number it charges is exactly
+-- one chain-length of frame factor -- the longest frame factor the
+-- size predicate admits, raised to the length that predicate admits --
+-- so it dominates a registered chain whose own terminal is ROOT and
+-- nothing more.  A chain terminating at a SECOND sink carries that
+-- same leaf price UNDER its own frames, so dominating it asks a
+-- constant to exceed itself times a frame product, which no constant
+-- does.  That is the structural reading of `Refuted.Sink-Phi-Leaf`,
+-- whose witness quantifies the budget rather than exhibiting a deep
+-- share: the leaf fails at one generation of nesting, not at some
+-- adversarial arithmetic.
+--
+-- AND ENLARGING IT IS SELF-DEFEATING RATHER THAN MERELY EXPENSIVE,
+-- because the ceiling that reads this price is stated as a power of
+-- the same exponent: raising the leaf raises the length bound every
+-- consumer spends by the identical amount, so the gap between a chain
+-- and the price meant to cover it is invariant under the move.  The
+-- repair the two together leave standing is to index the charge by
+-- the CLIMB -- the share depth still ahead of the walk -- so that a
+-- sink's price strictly exceeds what its own registered chains cost
+-- by construction, in the way a decreasing measure does and a
+-- constant cannot.
 pathΦF : ∀ {n} {Γ : Ctx n} {s t} (B : ℕ) → Path Γ s t → ℕ
 pathΦF B root           = 1
 pathΦF B (share-sink _) = 2 ^ ((B + B) * (suc B * B))

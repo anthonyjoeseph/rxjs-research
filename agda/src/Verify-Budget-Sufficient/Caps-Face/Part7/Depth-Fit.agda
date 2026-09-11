@@ -1845,6 +1845,25 @@ postulate
 -- PREDICATE, where an implicit is a fresh meta per element -- the same
 -- reason the chain-side fold beside it takes its ceiling as a
 -- parameter.
+--
+-- DEAD ROUTE: carrying the entry cap's depth bound down the walk, so
+--   that the arrival predicate every cascade door already holds
+--   reaches the frame arm that emits this list.  A frame does not
+--   preserve a depth bound, it MULTIPLIES one: a step function may
+--   name its payload at several occurrences and substitution installs
+--   the payload's nesting once per occurrence, which is what
+--   `Refuted.Apply-Fn-Nest` kills additivity for.  So the arms above a
+--   sink outrun any ceiling fixed at the instant's door, and the
+--   store analogue is recorded dead one block up for the same reason
+--   read at the state rather than at the values.
+-- DEAD ROUTE: pricing the emission instead -- letting the potential's
+--   walk half pay whatever depth a frame installs, so that no ceiling
+--   on the values is owed at all.  The sink leaf's factor is FLAT in
+--   the remaining share depth, so it pays a chain that ends at ROOT
+--   and cannot pay one that ends at a second sink, and enlarging it
+--   moves the length ceiling that reads it by the same amount.  That
+--   is a defect of the pricing and not of this row; the finding is
+--   recorded where the leaf is priced.
 postulate
   walk-share-valsNest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
