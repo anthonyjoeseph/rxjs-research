@@ -1276,6 +1276,32 @@ frameΦ-fit sl id sf eid now Lv (thru-outer op nid) p vals fin sched st hsl _ hp
 -- the same currency.  That half closes off `pathΦF-cap-root-atLen`,
 -- `pathΦD-cap-root-atLen` and monotonicity, with no new fact -- and
 -- this is the assembly that spends the three.
+-- AND THE ARM IS CAP-GENERIC IN ITS BODY, WHICH IS WHAT THE
+-- DENOMINATION QUESTION ABOVE TURNS ON.  Nothing here reads the caps
+-- recurrence: the two re-pricings and the monotonicity are stated over
+-- whatever cap and potential they are handed, and the only thing the
+-- instant supplies is that the cap is positive.  So this half of what
+-- spends the packed reading follows a re-denomination for free, and a
+-- move of the face to another cap is not a proof to redo here -- it is
+-- an argument to pass.  The specialisation below is the instance the
+-- fan calls, and it is all the caps knowledge this arm ever had.
+sink-fan-root-gen : ∀ {n} {Γ : Ctx n} {t} (B Φ : ℕ) (i : Fin n)
+  (p : Path Γ (lookup Γ i) t) (vals : List (Val Γ (lookup Γ i))) →
+  1 ≤ B →
+  pathRoots p ≡ true →
+  pathSzL? B p ≡ true →
+  valsΦ? B Φ (share-sink {t = t} i) vals ≡ true →
+  valsΦ? B Φ p vals ≡ true
+sink-fan-root-gen B Φ i p vals 1≤B hr hz hΦ =
+  valsΦ?-mono B Φ p (share-sink i) vals
+    (pathΦF-cap-root-atLen B (B + B) p hr hf hl)
+    (pathΦD-cap-root-atLen B (B + B) p 1≤B hr hf hl) hΦ
+  where
+  hf : pathFrameSz? B p ≡ true
+  hf = pathSzL?-frames B p hz
+  hl : pathLen p ≤ B + B
+  hl = pathSzL?-len B p hz
+
 sink-fan-root : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (i : Fin n) (p : Path Γ (lookup Γ i) t)
   (vals : List (Val Γ (lookup Γ i))) →
@@ -1285,18 +1311,8 @@ sink-fan-root : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (share-sink {t = t} i) vals ≡ true →
   valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id) p vals ≡ true
 sink-fan-root {e = e} sl id i p vals hr hz hΦ =
-  valsΦ?-mono B (nestΦAt e sl id) p (share-sink i) vals
-    (pathΦF-cap-root-atLen B (B + B) p hr hf hl)
-    (pathΦD-cap-root-atLen B (B + B) p 1≤B hr hf hl) hΦ
-  where
-  B : ℕ
-  B = Caps.cSize (capsAt e sl id)
-  1≤B : 1 ≤ B
-  1≤B = ≤-trans (s≤s z≤n) (8≤capsAt-size e sl id)
-  hf : pathFrameSz? B p ≡ true
-  hf = pathSzL?-frames B p hz
-  hl : pathLen p ≤ B + B
-  hl = pathSzL?-len B p hz
+  sink-fan-root-gen (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
+    i p vals (≤-trans (s≤s z≤n) (8≤capsAt-size e sl id)) hr hz hΦ
 
 -- WHAT IS LEFT IS THE CHAIN THAT ENDS AT A SECOND HAND-OVER.  Its
 -- factor is the leaf's own multiplied by its frames', so the leaf
