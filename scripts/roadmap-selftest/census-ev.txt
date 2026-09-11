@@ -1,0 +1,4 @@
+# fixture standing in for a scan of agda/src headers
+a-falsity: REFUTED, PROBED
+c-falsity: REFUTED
+e-difficulty: PROBED

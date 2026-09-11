@@ -186,6 +186,21 @@ import pathlib
 CLASSES = ["FALSITY", "SHAPE", "VACUITY", "DIFFICULTY", "GRINDABLE"]
 CLASS_RE = re.compile(r"\b(" + "|".join(CLASSES) + r")\b")
 TIER_RE = re.compile(r"^##\s+Tier\s+(\S+)")
+
+# AN EVIDENCE TIER SCHEDULES EXPERIMENTS, NOT POSTULATES, and the marker in its
+# heading is what tells this checker to resolve its rows somewhere else.
+#
+# WHY THE EXEMPTION IS NARROW AND NOT A HOLE.  Every other check here rests on
+# one join: a row head names a live postulate, so a discharged or deleted name
+# is a build failure and the file cannot rot quietly.  A tier deciding whether a
+# MECHANISM works has no postulates to name -- its product is a probe, a spike
+# module, a refutation -- so holding it to that join would force filler
+# postulates, which is the one repair worse than the gap.  What it is held to
+# instead is the SAME join against the evidence and spike trees: a row naming a
+# module that has been deleted still fails, and that is the decay this check
+# exists to catch.  The classes still apply and still order, because "the
+# mechanism may not work" is a FALSITY claim whoever is holding it.
+EV_TIER_RE = re.compile(r"\(EVIDENCE TIER\)")
 # A row STARTS at a bulleted bold open; the label is closed in the JOINED text,
 # not on the opening line.  A name list long enough to wrap is exactly the shape
 # the tier-3 abstraction rows have, and requiring the close on line one made
@@ -425,6 +440,23 @@ def parse(path):
     return tiers
 
 
+def ev_tier_ids(path):
+    """-> the ids of the tiers whose heading carries the EVIDENCE TIER marker.
+
+    A SECOND PASS, deliberately, rather than a second return value from `parse`:
+    that function's shape is read by two other checkers and by the notifier, and
+    widening it to carry something only this file needs breaks all three for no
+    gain.  A tier heading is one line and reads the same in isolation, which is
+    exactly what the row and preamble scans could not claim.
+    """
+    out = set()
+    for line in path.read_text().splitlines():
+        mt = TIER_RE.match(line)
+        if mt and EV_TIER_RE.search(line):
+            out.add(mt.group(1))
+    return out
+
+
 BACKTICK_RE = re.compile(r"`([^`]+)`")
 
 
@@ -504,17 +536,34 @@ DECL_RE = re.compile(r"^\s*([^\s:(){}@]+)\s*:(?:\s|$)")
 DECL_KW_RE = re.compile(r"\b(?:data|record|module)\s+([^\s({]+)")
 
 
-def src_decl_names(root):
+def decl_names(*roots):
     names = set()
-    for f in sorted((root / "agda" / "src").rglob("*.agda")):
-        for line in f.read_text().splitlines():
-            line = re.sub(r"--.*$", "", line)
-            m = DECL_RE.match(line)
-            if m:
-                names.add(m.group(1))
-            for m in DECL_KW_RE.finditer(line):
-                names.add(m.group(1))
+    for r in roots:
+        if not r.is_dir():
+            continue
+        for f in sorted(r.rglob("*.agda")):
+            for line in f.read_text().splitlines():
+                line = re.sub(r"--.*$", "", line)
+                m = DECL_RE.match(line)
+                if m:
+                    names.add(m.group(1))
+                for m in DECL_KW_RE.finditer(line):
+                    names.add(m.group(1))
     return names
+
+
+def src_decl_names(root):
+    return decl_names(root / "agda" / "src")
+
+
+def evidence_decl_names(root):
+    """Everything an EVIDENCE TIER's row is allowed to name.
+
+    The spike and evidence trees, and nothing else.  A tier of experiments is
+    exempt from the postulate join and held to this one instead, so the row
+    that outlives the module it names still fails.
+    """
+    return decl_names(root / "agda" / "spike", root / "agda" / "evidence")
 
 
 # A head that is nothing but names and separators CLAIMS them; a head carrying
@@ -556,17 +605,34 @@ def head_groups(label):
     return groups
 
 
-def check_stale(tiers, live, srcnames):
-    """-> (discharged, vanished, gone_parents) — rows naming what is no longer live.
+def check_stale(tiers, live, srcnames, ev_tiers=frozenset(), evnames=frozenset()):
+    """-> (discharged, vanished, gone_parents, ev_gone) — rows naming what is no
+    longer live.
 
     `discharged` and `vanished` split a CLAIM head's dead names by what became of
     them, because the two want different repairs and the message should say which:
     a name still declared in agda/src was DISCHARGED (delete the row), a name gone
     from agda/src entirely was DELETED (delete the row, and the work it named is
     not owed).  `gone_parents` is the descriptive-head case.
+
+    `ev_gone` is the EVIDENCE TIER's own channel and it is separate for the sake
+    of the MESSAGE rather than the logic: an exempt row is resolved against the
+    spike and evidence trees, so telling its author the name is "not in agda/src"
+    would send them to the one tree the row was never supposed to name.
     """
-    discharged, vanished, gone_parents = [], [], []
+    discharged, vanished, gone_parents, ev_gone = [], [], [], []
     for tier, rows, _pre, _legs, _qs in tiers:
+        if tier in ev_tiers:
+            # the same join, taken against the evidence and spike trees: a row
+            # naming a module that is gone is still a finding, and that is the
+            # whole of what the exemption keeps
+            for label, _cls, lineno, _cost in rows:
+                if not BACKTICK_RE.search(label):
+                    continue
+                for group in head_groups(label):
+                    if not any(g in evnames for g in group):
+                        ev_gone.append((tier, lineno, label, group[0]))
+            continue
         for label, _cls, lineno, _cost in rows:
             if not BACKTICK_RE.search(label):
                 continue
@@ -580,7 +646,7 @@ def check_stale(tiers, live, srcnames):
                      else vanished).append((tier, lineno, label, name))
                 elif not any(g in srcnames for g in group):
                     gone_parents.append((tier, lineno, label, name))
-    return discharged, vanished, gone_parents
+    return discharged, vanished, gone_parents, ev_gone
 
 
 # ── THE EVIDENCE FIELD ────────────────────────────────────────────────
@@ -911,6 +977,9 @@ def main():
     ap.add_argument("--src-names", help="file of names declared in agda/src, one "
                                        "per line, standing in for a scan of the "
                                        "tree; selftest only")
+    ap.add_argument("--ev-names", help="file of names declared in the evidence and "
+                                       "spike trees, one per line, standing in for a "
+                                       "scan of them; selftest only")
     ap.add_argument("--census", help="file of 'name: MARKER, MARKER×2' lines "
                                      "standing in for a scan of agda/src headers; "
                                      "selftest only")
@@ -929,10 +998,17 @@ def main():
         return 2
 
     tiers = parse(path)
+    ev_tiers = ev_tier_ids(path)
     if not tiers:
         print("check-roadmap: no '## Tier' sections found — parser or file is wrong",
               file=sys.stderr)
         return 2
+
+    # The postulate-denominated tiers.  Every check that reads a postulate's own
+    # HEADER -- the derived evidence field, the twin, the receipt cap -- takes
+    # this list, because an evidence tier's rows name no postulate and there is
+    # no header for such a check to read.
+    ptiers = [t for t in tiers if t[0] not in ev_tiers]
 
     if args.fix_evidence:
         live = live_postulates(root, args.ledger)
@@ -942,7 +1018,7 @@ def main():
                   file=sys.stderr)
             return 2
         cen = census(root, live or [], args.census)
-        n = fix_evidence(path, tiers, cen)
+        n = fix_evidence(path, [t for t in tiers if t[0] not in ev_tiers], cen)
         print(f"roadmap-evidence: {n} row(s) rewritten in {path.name}")
         return 0
 
@@ -984,7 +1060,14 @@ def main():
             if len(q_names) < QUESTION_NAMES_MIN:
                 thin_qs.append((tier, q_label, q_line, len(q_names)))
             for nm in q_names:
-                if live is not None and nm not in live:
+                if tier in ev_tiers:
+                    # no postulate to be live, and no class to be FALSITY: what
+                    # is left of the check is that the question is still about
+                    # rows this tier actually carries
+                    if nm not in row_class:
+                        stale_qs.append((tier, q_label, q_line, nm,
+                                         f"named by no row of tier {tier}"))
+                elif live is not None and nm not in live:
                     stale_qs.append((tier, q_label, q_line, nm,
                                      "not a live postulate"))
                 elif nm not in row_class:
@@ -1044,8 +1127,11 @@ def main():
     if live is not None:
         srcnames = (set(pathlib.Path(args.src_names).read_text().split())
                     if args.src_names else src_decl_names(root))
-        discharged, vanished, gone_parents = check_stale(tiers, set(live), srcnames)
-        stale = discharged + vanished + gone_parents
+        evnames = (set(pathlib.Path(args.ev_names).read_text().split())
+                   if args.ev_names else evidence_decl_names(root))
+        discharged, vanished, gone_parents, ev_gone = check_stale(
+            tiers, set(live), srcnames, ev_tiers, evnames)
+        stale = discharged + vanished + gone_parents + ev_gone
         if discharged:
             print(f"\nSTALE ROWS — {len(discharged)} row head(s) naming a postulate "
                   "that has been DISCHARGED:")
@@ -1074,12 +1160,22 @@ def main():
                 print(f"    in **{label}**")
             print("\nA head carrying prose names a PARENT, so it is held only to still")
             print("existing in agda/src. This one does not. Delete the row or rename it.")
+        if ev_gone:
+            print(f"\nSTALE ROWS — {len(ev_gone)} EVIDENCE TIER row head(s) naming "
+                  "something the spike and evidence trees do not declare:")
+            for tier, lineno, label, name in ev_gone:
+                print(f"  Tier {tier}  {path.name}:{lineno}  {name}")
+                print(f"    in **{label}**")
+            print("\nAn evidence tier schedules experiments, so its rows are resolved")
+            print("against agda/spike and agda/evidence rather than against the")
+            print("postulate ledger — and this name is in neither. The experiment was")
+            print("deleted, renamed, or never built. Delete the row, or fix the name.")
         if stale:
             failures.append(None)
 
     if live is not None:
         cen = census(root, live, args.census)
-        bad, missing = check_evidence(path, tiers, cen)
+        bad, missing = check_evidence(path, ptiers, cen)
         if missing:
             print(f"\nROWS WITH NO EVIDENCE FIELD — {len(missing)}:")
             for tier, label, lineno in missing:
@@ -1097,7 +1193,7 @@ def main():
                 print(f"    headers say `{want}`")
             print("\nThe headers are the authority — a marker was added, deleted or")
             print("retargeted and the row did not follow. Run  make roadmap-evidence")
-        unearned = unearned_grindable(path, tiers, cen)
+        unearned = unearned_grindable(path, ptiers, cen)
         if unearned:
             print(f"\nGRINDABLE ROWS THAT NAME NO PROVEN TWIN — {len(unearned)}:")
             for tier, label, lineno in unearned:
@@ -1109,7 +1205,7 @@ def main():
             print("PROVEN counterpart (comments-check refuses a twin that is itself")
             print("still a postulate), then run  make roadmap-evidence . Or demote")
             print("the row to DIFFICULTY, which is what it is until then.")
-        unev = unevidenced_difficulty(path, tiers, cen)
+        unev = unevidenced_difficulty(path, ptiers, cen)
         if unev:
             print(f"\nDIFFICULTY ROWS WITH NO EVIDENCE — {len(unev)}:")
             for tier, label, lineno in unev:
@@ -1122,7 +1218,7 @@ def main():
             print("the evidence in the postulate's header as a durable marker and")
             print("run  make roadmap-evidence , or raise the class.")
         cap = receipt_cap()
-        fat = over_probed(path, tiers, cen, cap)
+        fat = over_probed(path, ptiers, cen, cap)
         if fat:
             print(f"\nROWS OVER THE RECEIPT CAP OF {cap} — {len(fat)}:")
             for tier, label, lineno, n in fat:

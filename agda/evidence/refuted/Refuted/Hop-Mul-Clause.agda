@@ -39,13 +39,12 @@
 -- ══════════════════════════════════════════════════════════════════
 module Refuted.Hop-Mul-Clause where
 
-open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; s≤s; z≤n)
+open import Data.Nat using (ℕ; suc; _+_; _⊔_; _≤_; s≤s; z≤n)
 open import Data.Nat.Properties using (<-irrefl)
 open import Data.Empty using (⊥)
 open import Data.Fin using (Fin)
 open import Data.Vec using (Vec; []) renaming (_∷_ to _∷ᵛ_)
 open import Data.List using (List; []; _∷_)
-open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Product using (_,_)
 open import Data.Sum using (inj₁; inj₂)
@@ -59,7 +58,7 @@ open import Rx.Exp using
    mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ;
    varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ;
    inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ)
-open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵛ)
+open import Rx.Hop-Depth using (hopDᵉ; hopDᵛ)
 
 ------------------------------------------------------------------
 -- hopD WITH EVERY MULTIPLIER DELETED.  Clause for clause the same

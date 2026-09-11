@@ -556,6 +556,33 @@ refuted: stripped
 probed: stripped
 	@$(call AGDA_RUN_EV,probed/Probed/Main.agda)
 
+# THE SPIKE TREE.  A third Agda library (`rxjs-spike`), with its own `_build`
+# and NO edge to `rxjs-research` -- which is what makes it safe beside a live
+# gate and is the whole reason it is a library rather than a directory of `src`.
+# It holds the toy fragments that decide whether a MECHANISM works before any of
+# it is built for real, so its product is a green or a refutation and never a
+# lemma anything depends on.
+#
+# EVERY FILE IS CHECKED INDEPENDENTLY, and that is deliberate rather than a gap
+# in the wiring law.  The evidence trees each carry a claim root because a probe
+# must be CLAIMED -- it is evidence about a live postulate, and an unclaimed one
+# rots silently.  A spike names no postulate at all; it is a fragment that
+# either expresses the risky shape or does not, and two fragments deciding two
+# different mechanisms have nothing to say to each other.  A root joining them
+# would assert a coherence that is not there, and would make one fragment's
+# refutation take the other's green down with it.
+#
+# What keeps this tree from parking itself is not a root but the ROADMAP: an
+# EVIDENCE TIER's rows resolve against this tree by name, so a spike deleted
+# without its row fails `make roadmap-check` the same day.
+spike:
+	@fail=0; n=0; \
+	  for f in agda/spike/Spike/*.agda; do \
+	    n=$$((n + 1)); \
+	    (cd agda/spike && $(AGDA) Spike/$$(basename $$f)) || fail=1; \
+	  done; \
+	  if [ $$fail -eq 0 ]; then echo "spike: $$n module(s) GREEN"; else exit 1; fi
+
 # ONE EVIDENCE FILE, BY PATH -- the probe loop's fast path.  `make agda-dev`
 # resolves only src-relative names, so a probe under construction had no cheap
 # check at all and the only route was the whole claim root.  A file reached
@@ -925,6 +952,27 @@ roadmap-selftest:
 	    && { echo "SELFTEST FAIL: a live FALSITY row of the tier was reported stale"; fail=1; }; \
 	  echo "$$cln" | grep -q "OPEN QUESTIONS" \
 	    && { echo "SELFTEST FAIL: a questions check fired on a roadmap carrying NO questions section — the section is mandatory again, and a required question is a filler question"; fail=1; }; \
+	  EV="--ledger scripts/roadmap-selftest/ledger-ev.txt --census scripts/roadmap-selftest/census-ev.txt --src-names scripts/roadmap-selftest/ev-names.txt --ev-names scripts/roadmap-selftest/ev-names.txt"; \
+	  scripts/check-roadmap.py --file scripts/roadmap-selftest/ev-tier.md $$EV > /dev/null 2>&1 \
+	    || { echo "SELFTEST FAIL: an EVIDENCE TIER was rejected — a tier deciding whether a MECHANISM works has no postulates to name, and holding it to that join forces filler postulates"; fail=1; }; \
+	  scripts/check-roadmap.py --file scripts/roadmap-selftest/ev-tier-unmarked.md $$EV > /dev/null 2>&1 \
+	    && { echo "SELFTEST FAIL: the same tier PASSED with the marker taken OUT of its heading — the postulate join is dead everywhere, and the exemption cannot be told apart from that"; fail=1; }; \
+	  evl=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/ev-tier-leak.md $$EV 2>&1); \
+	  if scripts/check-roadmap.py --file scripts/roadmap-selftest/ev-tier-leak.md $$EV > /dev/null 2>&1; then \
+	    echo "SELFTEST FAIL: an ORDINARY tier's unevidenced DIFFICULTY row PASSED beside an evidence tier — the exemption is spreading from the tier that carries the marker to the whole FILE"; fail=1; \
+	  fi; \
+	  echo "$$evl" | grep -q "Tier 1  ev-tier-leak.md" \
+	    || { echo "SELFTEST FAIL: the leak was reported against the wrong tier"; fail=1; }; \
+	  evs=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/ev-tier-stale.md $$EV 2>&1); \
+	  if scripts/check-roadmap.py --file scripts/roadmap-selftest/ev-tier-stale.md $$EV > /dev/null 2>&1; then \
+	    echo "SELFTEST FAIL: an evidence tier naming a module the spike and evidence trees do not declare PASSED — the exemption is a hole rather than a narrower join, which is the one way it can rot silently"; fail=1; \
+	  fi; \
+	  echo "$$evs" | grep -q "EVIDENCE TIER row head(s) naming something the spike and evidence trees do not declare" \
+	    || { echo "SELFTEST FAIL: an exempt row's dead name was reported against agda/src, which is the one tree the row was never supposed to name"; fail=1; }; \
+	  echo "$$evs" | grep -q "ev-beta. — named by no row of tier 0" \
+	    || { echo "SELFTEST FAIL: an exempt tier's question outliving its row was not reported — the questions half of the narrower join is dead"; fail=1; }; \
+	  echo "$$evs" | grep -q "ev-alpha" \
+	    && { echo "SELFTEST FAIL: a row and a question naming a module that still exists were reported stale"; fail=1; }; \
 	  if [ $$fail -eq 0 ]; then echo "roadmap-selftest: OK"; else exit 1; fi
 
 # `imports-check` JOINS THIS LIST IN THE COMMIT THAT MAKES THE TREE PASS IT, and
@@ -1045,6 +1093,14 @@ comments-selftest:
 
 # Everything decidable without Agda: seconds, and deliberately FIRST, so a
 # textual violation never costs a full build to discover.  Both gates run it.
+#
+# `spike` IS THE ONE AGDA RUN HERE, AND IT IS LAST FOR THAT REASON.  It costs
+# well under a minute against the tower's tens of them, on a cache no other
+# check shares, so putting it on this list is what gets the fragments checked on
+# BOTH paths -- and the light path is where a tier of experiments does all its
+# work, so a spike gated only by the heavy path would be gated by nothing.  Last
+# in the list keeps the property the list exists for: a textual violation still
+# fails in seconds, ahead of anything that compiles.
 GATE_CHEAP = wiring-selftest wiring-gate wiring-refuted wiring-probed \
              unsafe-check dup-selftest dup-check \
              imports-selftest imports-check \
@@ -1054,7 +1110,7 @@ GATE_CHEAP = wiring-selftest wiring-gate wiring-refuted wiring-probed \
              roadmap-order-selftest roadmap-order \
              cone-selftest cone-check \
              comments-selftest comments-check dev-changed-selftest \
-             unmap-selftest
+             unmap-selftest spike
 
 gate-cheap:
 	@for t in $(GATE_CHEAP); do \

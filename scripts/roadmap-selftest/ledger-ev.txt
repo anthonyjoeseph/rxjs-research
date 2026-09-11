@@ -1,0 +1,5 @@
+a-falsity  Fixture/One.agda:1
+b-falsity  Fixture/One.agda:2
+c-falsity  Fixture/One.agda:3
+d-shape  Fixture/One.agda:4
+e-difficulty  Fixture/One.agda:5
