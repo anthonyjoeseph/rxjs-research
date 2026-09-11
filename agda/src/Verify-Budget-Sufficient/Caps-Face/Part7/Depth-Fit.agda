@@ -1391,6 +1391,15 @@ chg-headroom e sl id d hd =
 -- reaches this site with no receipt about where its chain came from,
 -- so the strict drop is unavailable and the slot count stands in for
 -- it.
+-- DEAD ROUTE: threading that receipt in is STRUCTURALLY AVAILABLE and
+--   buys nothing.  The fan's hypothesis already carries the caps
+--   conjunct, the registry's own stratification reading follows from
+--   it, and an admitted entry's source sits below the context width --
+--   so the strict drop IS derivable at this site.  But every conjunct
+--   this charge owes is already discharged by the slot count, so the
+--   sharper factor arrives with no obligation left to pay.  It is a
+--   route to a STRONGER statement, not to this one, and it may only be
+--   walked from a consumer that demands the stronger charge.
 -- RECOVERY: `git show da065b2e` restores `pathFloor≤`,
 --   `pathΦSz-floor` and `pathΦF-under-sink`, which state and prove
 --   exactly that reading of a fanned-out chain's factor against the

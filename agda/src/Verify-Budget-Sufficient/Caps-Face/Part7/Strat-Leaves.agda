@@ -48,7 +48,7 @@ open import Verify-Budget-Sufficient.Node-Table using (lookupNode-setNode)
 open import Verify-Budget-Sufficient.Delivery-Counter using
   (foldPath-nextNode; chainStep-nextNode)
 open import Verify-Budget-Sufficient.Measures using
-  (∧-true; all-impl; cutThrough-all; all-++-intro)
+  (∧-true; all-impl; cutThrough-all; all-++-intro; takeVals-all)
 
 -- THE TWO FACTS THE STRATIFICATION THREAD CANNOT GET BY REDUCTION, and
 -- they sit together because they fail for the same reason: each is
@@ -343,35 +343,39 @@ postulate
 -- the reading covers every node a frame declares instead of the one
 -- shape it happened to have been written for.
 
-  take-strat-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-    (k : ℕ) (sf : Gas) (nid : Id) (now : Tick)
-    (nd : NodeId) (κ : Path Γ s t)
-    (vals : List (Val Γ s)) (fin : Bool)
+-- WHAT THE DRAIN PUTS BELOW THE FLOOR, which is the one thing the
+-- inner head's own dispatch cannot hand back.  Every other arm of that
+-- head re-emits exactly what it was given, so the reading is inherited;
+-- the merge arm alone APPENDS, and what it appends is whatever the
+-- parked queue's observables produce once a lane frees.  The queue's
+-- own reading is what the park conjunct carries, so this is the step
+-- from a reading of the QUEUE to a reading of what subscribing to it
+-- emits -- and it is a walk over the drain's recursion, not a
+-- projection.
+  mergeAllDrain-strat : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+    (k : ℕ) (g : Gas) (allNid : NodeId) (κ : Path Γ s t) (id : Id) (now : Tick)
+    (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ s))
     (sched : Sched Γ) (st : EvalSt e) →
-    all (inputsBelowᵛ k s) vals ≡ true →
+    all (inputsBelowᵉ k) q ≡ true →
     all (inputsBelowᵛ k s)
-      (proj₁ (stepFrame sf nid now (take-f nd) κ vals fin sched st)) ≡ true
+      (proj₁ (mergeAllDrain g allNid κ id now lim act q sched st)) ≡ true
 
-  inner-strat-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-    (k : ℕ) (sf : Gas) (nid : Id) (now : Tick)
-    (op : AllOp) (allNid inst : NodeId) (κ : Path Γ s t)
-    (vals : List (Val Γ s)) (fin : Bool)
-    (sched : Sched Γ) (st : EvalSt e) →
-    framePark? k (from-inner {s = s} op allNid inst) st ≡ true →
-    all (inputsBelowᵛ k s) vals ≡ true →
-    all (inputsBelowᵛ k s)
-      (proj₁ (stepFrame sf nid now (from-inner op allNid inst) κ vals fin sched st))
-        ≡ true
-
-  thru-strat-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (c : Caps) (k : ℕ) (sf : Gas) (nid : Id) (now : Tick)
-    (op : AllOp) (nd : NodeId) (κ : Path Γ u t)
-    (vals : List (Val Γ (obs u))) (fin : Bool)
+-- WHAT THE OUTER WALK PUTS BELOW THE FLOOR, and it is the whole of
+-- what that head owes: the completion wrap around it reads a cell and
+-- rewrites it, touching the payload at no arm.  What arrives is a list
+-- of OBSERVABLES and what leaves is a list of the values subscribing
+-- to them produced, so this is not a projection of the reading it is
+-- handed -- it is the claim that a source below the floor cannot emit
+-- above it, and the store receipt is what says the lanes it
+-- subscribes through were below it too.
+  thruWalk-strat : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (c : Caps) (k : ℕ) (g : Gas) (op : AllOp) (nd : NodeId) (κ : Path Γ u t)
+    (id : Id) (now : Tick) (vals : List (Val Γ (obs u)))
     (sched : Sched Γ) (st : EvalSt e) →
     capsOK? c sched st ≡ true →
     all (inputsBelowᵛ k (obs u)) vals ≡ true →
     all (inputsBelowᵛ k u)
-      (proj₁ (stepFrame sf nid now (thru-outer op nd) κ vals fin sched st)) ≡ true
+      (proj₁ (thruWalk g op nd κ id now vals sched st)) ≡ true
 
 -- and the template head's route is walked already, at a hereditary
 -- value predicate whose term-side reading has the same shape: the
@@ -428,6 +432,144 @@ scan-strat-step {u = u} k sf nid now fn nd κ vals fin sched st hpk hfn hib
 ... | just (scan-st {w} acc) with w ≟ᵗ u
 ...   | yes refl = proj₂ (scanVals-strat k fn acc vals hfn (∧-trueˡ hpk) hib)
 ...   | no _     = refl
+
+-- WHAT THE TAKE HEAD LEAVES BELOW THE FLOOR, and it owes the store
+-- NOTHING -- which is why it needs no park premise where its two
+-- subscribing siblings do.  The head emits a PREFIX of what it was
+-- handed, at both sides of the cut: the budgeted branch and the
+-- severing branch differ in the registry, the completion flag and the
+-- cell they write back, and agree exactly on the list.  So the reading
+-- survives by the LIST and not by the state, and every cell shape that
+-- is not a take emits nothing at all.
+take-strat-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (k : ℕ) (sf : Gas) (nid : Id) (now : Tick)
+  (nd : NodeId) (κ : Path Γ s t)
+  (vals : List (Val Γ s)) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) →
+  all (inputsBelowᵛ k s) vals ≡ true →
+  all (inputsBelowᵛ k s)
+    (proj₁ (stepFrame sf nid now (take-f nd) κ vals fin sched st)) ≡ true
+take-strat-step {s = s} k sf nid now nd κ vals fin sched st hib
+  with lookupNode nd (EvalSt.nodes st)
+... | nothing                    = refl
+... | just (scan-st _)           = refl
+... | just (mergeAll-st _ _ _ _) = refl
+... | just (switch-st _ _)       = refl
+... | just (exhaust-st _ _)      = refl
+... | just (take-st m) with proj₂ (proj₂ (takeVals m vals))
+...   | true  = takeVals-all (inputsBelowᵛ k s) m vals hib
+...   | false = takeVals-all (inputsBelowᵛ k s) m vals hib
+
+-- WHAT THE INNER HEAD LEAVES BELOW THE FLOOR, and the dispatch is
+-- almost all inheritance: an inner that is not finishing, one whose
+-- exit frame still carries a live registration, and every cell shape
+-- the op does not own re-emit precisely what arrived.  The merge arm
+-- is the only one that APPENDS, and its addend is the drain's, whose
+-- premise is the park conjunct read at the node the frame names.  So
+-- the head owes exactly one fact about the drain and nothing about
+-- itself.
+inner-strat-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (k : ℕ) (sf : Gas) (nid : Id) (now : Tick)
+  (op : AllOp) (allNid inst : NodeId) (κ : Path Γ s t)
+  (vals : List (Val Γ s)) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) →
+  framePark? k (from-inner {s = s} op allNid inst) st ≡ true →
+  all (inputsBelowᵛ k s) vals ≡ true →
+  all (inputsBelowᵛ k s)
+    (proj₁ (stepFrame sf nid now (from-inner op allNid inst) κ vals fin sched st))
+      ≡ true
+inner-strat-step k sf nid now op allNid inst κ vals false sched st hpk hib = hib
+inner-strat-step {s = s} k sf nid now op allNid inst κ vals true sched st hpk hib
+  with any (aliveThroughᶠ inst st) (EvalSt.registry st)
+... | true  = hib
+... | false = innerFinish-strat k sf op allNid inst κ nid now vals sched st
+                (lookupNode allNid (EvalSt.nodes st)) (∧-trueˡ hpk) hib
+  where
+  innerFinish-strat : ∀ {n′} {Γ′ : Ctx n′} {t′} {e′ : Closed Γ′ t′} {s′}
+    (k′ : ℕ) (g : Gas) (o : AllOp) (aN i′ : NodeId) (κ′ : Path Γ′ s′ t′)
+    (id′ : Id) (nw : Tick) (vs : List (Val Γ′ s′))
+    (sc : Sched Γ′) (s″ : EvalSt e′) (ns : Maybe (NodeState Γ′)) →
+    parkStrat? k′ ns ≡ true →
+    all (inputsBelowᵛ k′ s′) vs ≡ true →
+    all (inputsBelowᵛ k′ s′)
+      (proj₁ (innerFinish g o aN i′ κ′ id′ nw vs sc s″ ns)) ≡ true
+  innerFinish-strat k′ g mergeAllᵒ aN i′ κ′ id′ nw vs sc s″ nothing _ h = h
+  innerFinish-strat k′ g switchᵒ   aN i′ κ′ id′ nw vs sc s″ nothing _ h = h
+  innerFinish-strat k′ g exhaustᵒ  aN i′ κ′ id′ nw vs sc s″ nothing _ h = h
+  innerFinish-strat k′ g mergeAllᵒ aN i′ κ′ id′ nw vs sc s″ (just (scan-st _)) _ h = h
+  innerFinish-strat k′ g switchᵒ   aN i′ κ′ id′ nw vs sc s″ (just (scan-st _)) _ h = h
+  innerFinish-strat k′ g exhaustᵒ  aN i′ κ′ id′ nw vs sc s″ (just (scan-st _)) _ h = h
+  innerFinish-strat k′ g mergeAllᵒ aN i′ κ′ id′ nw vs sc s″ (just (take-st _)) _ h = h
+  innerFinish-strat k′ g switchᵒ   aN i′ κ′ id′ nw vs sc s″ (just (take-st _)) _ h = h
+  innerFinish-strat k′ g exhaustᵒ  aN i′ κ′ id′ nw vs sc s″ (just (take-st _)) _ h = h
+  innerFinish-strat k′ g switchᵒ   aN i′ κ′ id′ nw vs sc s″ (just (mergeAll-st _ _ _ _)) _ h = h
+  innerFinish-strat k′ g exhaustᵒ  aN i′ κ′ id′ nw vs sc s″ (just (mergeAll-st _ _ _ _)) _ h = h
+  innerFinish-strat k′ g mergeAllᵒ aN i′ κ′ id′ nw vs sc s″ (just (switch-st _ _)) _ h = h
+  innerFinish-strat k′ g exhaustᵒ  aN i′ κ′ id′ nw vs sc s″ (just (switch-st _ _)) _ h = h
+  innerFinish-strat k′ g mergeAllᵒ aN i′ κ′ id′ nw vs sc s″ (just (exhaust-st _ _)) _ h = h
+  innerFinish-strat k′ g switchᵒ   aN i′ κ′ id′ nw vs sc s″ (just (exhaust-st _ _)) _ h = h
+  innerFinish-strat k′ g exhaustᵒ  aN i′ κ′ id′ nw vs sc s″ (just (exhaust-st _ _)) _ h = h
+  innerFinish-strat k′ g switchᵒ   aN i′ κ′ id′ nw vs sc s″ (just (switch-st nothing _)) _ h = h
+  innerFinish-strat k′ g switchᵒ   aN i′ κ′ id′ nw vs sc s″ (just (switch-st (just c) _)) _ h
+    with c ≡ᵇ i′
+  ...  | true  = h
+  ...  | false = h
+  innerFinish-strat {s′ = s′} k′ g mergeAllᵒ aN i′ κ′ id′ nw vs sc s″
+                    (just (mergeAll-st {w} lim act q od)) hq h with w ≟ᵗ s′
+  ...  | no _     = h
+  ...  | yes refl =
+         all-++-intro (inputsBelowᵛ k′ s′) vs _ h
+           (mergeAllDrain-strat k′ g aN κ′ id′ nw lim (pred act) q sc s″ hq)
+
+-- WHAT THE OUTER HEAD LEAVES BELOW THE FLOOR, and the head's own
+-- contribution is nothing: the completion wrap reads a cell to decide
+-- whether the frame is done and writes the decision back, and hands
+-- the payload on untouched at every arm and every op.  So the reading
+-- is entirely the walk's, and the enumeration below is the price of
+-- saying so -- a wrap that dispatches on the op and on a cell cannot
+-- reduce at a variable of either.
+thru-strat-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (k : ℕ) (sf : Gas) (nid : Id) (now : Tick)
+  (op : AllOp) (nd : NodeId) (κ : Path Γ u t)
+  (vals : List (Val Γ (obs u))) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) →
+  capsOK? c sched st ≡ true →
+  all (inputsBelowᵛ k (obs u)) vals ≡ true →
+  all (inputsBelowᵛ k u)
+    (proj₁ (stepFrame sf nid now (thru-outer op nd) κ vals fin sched st)) ≡ true
+thru-strat-step {Γ = Γ} {t = t} {e = e} {u = u} c k sf nid now op nd κ vals fin sched st hck hib =
+  wrap op nd fin (thruWalk sf op nd κ nid now vals sched st)
+       (thruWalk-strat c k sf op nd κ nid now vals sched st hck hib)
+  where
+  P = inputsBelowᵛ k u
+  wrap : (o : AllOp) (nd′ : NodeId) (b : Bool)
+    (r : List (Val Γ u) × List (InstEvent (Val Γ t)) × Sched Γ × EvalSt e) →
+    all P (proj₁ r) ≡ true → all P (proj₁ (thruWrap o nd′ b r)) ≡ true
+  wrap o         nd′ false (vs , bs , sc , s″) h = h
+  wrap mergeAllᵒ nd′ true  (vs , bs , sc , s″) h
+    with lookupNode nd′ (EvalSt.nodes s″)
+  ...  | nothing                    = h
+  ...  | just (scan-st _)           = h
+  ...  | just (take-st _)           = h
+  ...  | just (mergeAll-st _ _ _ _) = h
+  ...  | just (switch-st _ _)       = h
+  ...  | just (exhaust-st _ _)      = h
+  wrap switchᵒ   nd′ true  (vs , bs , sc , s″) h
+    with lookupNode nd′ (EvalSt.nodes s″)
+  ...  | nothing                    = h
+  ...  | just (scan-st _)           = h
+  ...  | just (take-st _)           = h
+  ...  | just (mergeAll-st _ _ _ _) = h
+  ...  | just (switch-st _ _)       = h
+  ...  | just (exhaust-st _ _)      = h
+  wrap exhaustᵒ  nd′ true  (vs , bs , sc , s″) h
+    with lookupNode nd′ (EvalSt.nodes s″)
+  ...  | nothing                    = h
+  ...  | just (scan-st _)           = h
+  ...  | just (take-st _)           = h
+  ...  | just (mergeAll-st _ _ _ _) = h
+  ...  | just (switch-st _ _)       = h
+  ...  | just (exhaust-st _ _)      = h
 
 -- THE MINT'S OWN OWNER READING, which is what every install site here
 -- spends and none of them can source locally.  A cell handed out AT
