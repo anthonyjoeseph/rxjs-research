@@ -234,6 +234,9 @@ open import Refuted.Fan-Regs-Entry-Cap
 open import Refuted.Fan-Regs-Packed-Len
   using (FanRegsSzLMintGeneric; fan-regs-packed-len-absurd)
   renaming (regLens≡ to regLens≡ᴾ; stepped≡ to stepped≡ᴾ)
+open import Refuted.Fan-Regs-Packed-Frame
+  using (FanRegsFrameMintGeneric; fan-regs-packed-frame-absurd; fatSz≡)
+  renaming (regLens≡ to regLens≡ᶠ; stepped≡ to stepped≡ᶠ)
 open import Refuted.Arr-Cap-Step
   using (cA; ArrCapStep; arr-cap-step-absurd; arr-cap-step-wide-absurd)
 open import Refuted.Nest-Clos-Flat

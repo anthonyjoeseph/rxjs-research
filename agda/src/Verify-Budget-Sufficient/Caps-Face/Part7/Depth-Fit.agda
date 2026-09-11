@@ -1401,6 +1401,17 @@ fan-regsSz {e = e} sl id Lv sched st cok =
 -- here, and the row is open on the same ground the flat one died on
 -- rather than on a smaller region.
 --
+-- AND THE PAIR DOES NOT COME APART, WHICH IS WHAT SHUTS THE OBVIOUS
+-- ESCAPE.  Keeping the frame conjunct at the entry cap and finding the
+-- length elsewhere is the repair a dead length side invites, since
+-- the frame conjunct is the half the leaves' pricing actually spends.
+-- It fails for the same reason at a different witness: the frame a
+-- subscribe pushes carries its operator's TRANSFORMER verbatim, and
+-- that transformer is legal at the stepped cap, so ONE operator wider
+-- than the entry cap registers a short chain that busts the syntax.
+-- The two conjuncts therefore fail independently, and the entry cap is
+-- not a reading the mint supports in either currency.
+--
 -- AND THE TOP OF THE INSTANT PAYS FOR ITSELF, which is what makes this
 -- a body over one leaf rather than a second monolith.  At level zero
 -- the step is the identity, the flat receipt is free from
@@ -1408,6 +1419,13 @@ fan-regsSz {e = e} sl id Lv sched st cok =
 -- so the mint below carries only the levels above the top, which is
 -- where a registration minted since entry can sit.
 --
+-- REFUTED: `Refuted.Fan-Regs-Packed-Frame`, the same generic form with
+--   the packed pair replaced by its FRAME conjunct alone.  Its witness
+--   carries ONE operator whose transformer has a syntax size of ten
+--   against an entry size of six, so the chain it registers is seven
+--   frames -- inside the doubled budget its sibling busts -- and fails
+--   the per-frame conjunct instead.  The two halves die at different
+--   witnesses, so no split of the pair survives.
 -- REFUTED: `Refuted.Fan-Regs-Packed-Len`, which is this statement's
 --   own caps-generic form rather than the flat one's.  It is the
 --   sibling's witness with nine operators in the arrival's payload
