@@ -1275,6 +1275,14 @@ sink-fan-root {e = e} sl id i p vals hr hz hΦ =
 -- carried conjunct that pays it, and `fan-chain-strat` transports it
 -- through admission with the source pinned.  What that leaves open is
 -- the MINT, below, and not anything this statement can supply.
+-- AND THE PREMISE IT TAKES IS THE PACKED READING, WHICH COSTS THE
+-- ARM'S KNOWN CROSSING NOTHING.  It asks for less than the walked size
+-- receipt -- a frame syntax and a length under twice the cap, rather
+-- than the strict per-frame ledger -- because that is the reading the
+-- fan can supply at the entry cap.  The crossing below is legal at the
+-- cap under BOTH readings, so the escalation it builds was never
+-- excluded by the strength of the size premise, and what rules it out
+-- here is the stratification conjunct in either form.
 -- REFUTED: `Refuted.Sink-Phi-Leaf`, at the size floor this arm
 --   discharges from and at the budget the sink's own receipt exactly
 --   exhausts, so the crossing is not an artifact of a small budget.
@@ -1296,15 +1304,6 @@ sink-fan-root {e = e} sl id i p vals hr hz hΦ =
 --   saw, so it registers a slot source against a continuation nothing
 --   local relates it to -- a conjunct on the values in flight, which
 --   is a different invariant from this one.
--- AND THE PREMISE IT TAKES IS THE PACKED READING, WHICH COSTS ITS
--- KNOWN REFUTATION NOTHING.  The arm asks for less than the walked
--- size receipt -- a frame syntax and a length under twice the cap,
--- rather than the strict per-frame ledger -- because that is the
--- reading the fan can supply without a refuted mint.  It does not move
--- the arm toward `Refuted.Sink-Phi-Leaf`: that witness is legal at the
--- cap under BOTH readings, so the escalation it builds was never
--- excluded by the strength of the size premise, and what rules it out
--- here is the stratification conjunct in either form.
 postulate
   sink-fan-sink : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (i : Fin n) (p : Path Γ (lookup Γ i) t)
