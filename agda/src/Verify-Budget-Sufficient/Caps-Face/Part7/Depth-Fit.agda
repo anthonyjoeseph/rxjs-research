@@ -6,7 +6,7 @@ open import Data.Bool    using (Bool; true; false; _∧_; _∨_; if_then_else_)
 open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (*-assoc; ≤ᵇ⇒≤; ≤⇒≤ᵇ; ^-monoʳ-≤; *-monoˡ-≤; *-cancelˡ-≤; ≤-trans; ≤-refl; ≤-reflexive; m≤m+n;
   m≤n+m; n≤1+n; *-identityʳ; *-mono-≤; *-monoʳ-≤; +-monoʳ-≤; +-monoˡ-≤; ⊔-lub; m≤m⊔n; m≤n⊔m;
-  +-mono-≤; +-suc; +-assoc; m∸n≤m; *-identityˡ)
+  +-mono-≤; +-suc; +-assoc; m∸n≤m; *-identityˡ; ^-*-assoc; ^-distribˡ-+-*)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.List    using (List; []; _∷_; _++_; length; foldr)
@@ -29,9 +29,10 @@ open import Relation.Binary.PropositionalEquality
 
 open import Rx.Prim      using (Tick; Id; _at_from_as_; Gas; after_,_; close; exhausted;
                                 Source; InstEvent)
-open import Rx.Exp       using (obs; Ctx; Closed; Val; Fn; _×ᵗ_; _≟ᵗ_; sizeᵉ; sizeᵛ;
+open import Rx.Exp       using (obs; Ctx; Closed; Val; Fn; _×ᵗ_; _≟ᵗ_; sizeᵉ; sizeᵛ; sizeᵗ;
   inputsBelowᵛ)
 open import Rx.Nest-Depth using (nestDᵛ; nestDᵗ)
+open import Verify-Budget-Sufficient.Nest-Depth-Size using (nestDᵗ≤sizeᵗ)
 open import Verify-Budget-Sufficient.Depth-Sighted using (ValsFit; valsFit-of-max)
 open import Verify-Budget-Sufficient.Nest-Walk using
   (nestDᵛˢ; nodeNestAt; capsDrainOK; FaceOK; faceOK; frameDrainOK; capsWalkOK; dispatchCapsOK;
@@ -329,16 +330,148 @@ walk-thru-fit {e = e} sl id sf eid now op nid p vals fin sched st
     (2≤capsAt-size e sl id) (n≤capsAt-size e sl id)
     (nestΦ-frame-charge e sl id) hsl hpz hnd hΦ
 
+-- THE FOLD'S ARM IN THE SAME CURRENCY, and what it settles is that the
+-- ARITHMETIC was never the obstacle.  Stated over two ceilings and two
+-- readings rather than over an instant, the whole charge goes through:
+-- the fold's own frame factor pays for the values it was handed, and
+-- the three remaining pieces -- the node's depth, the syntax the burst
+-- substitutes, and the path's own residue -- land on three grants
+-- against the potential.  They are asked SEPARATELY and not as a sum,
+-- because that is how the body spends them: each piece is transported
+-- to its own ceiling and then to the potential, so summing them first
+-- would ask the caller for strictly more than the proof uses, and one
+-- of the three is proven outright at the specialisation below.
+-- Nothing about the caps recurrence survives into the statement, so
+-- re-denominating the potential costs restated grants rather than a
+-- rebuilt arm.
+--
+-- AND THE FRAME PAYS FOR ITS OWN VALUES WITH ROOM TO SPARE, which is
+-- the one piece not owed to the grant.  A fold's factor is the
+-- operator's syntax raised to the CEILING while the charge raises it
+-- to the COUNT, so under a count below that ceiling the factor
+-- dominates by a whole power of two per unit of slack -- and two units
+-- of slack is all the split needs, which the ceiling's own lower bound
+-- supplies.  That is why the count premise is stated at the ceiling
+-- and not at some width the ledger picks: at the ceiling the exponents
+-- subtract, and the leftover is what lets this piece sit beside the
+-- other three rather than competing with them.
+--
+-- AND THE TWO READINGS IT ASKS FOR ARE THE WHOLE NON-ARITHMETIC
+-- RESIDUE, which is what the generic form buys over the arm it
+-- replaces: a ceiling on the node the fold writes, and the burst
+-- count under the same ceiling the factor is priced at.  Neither is
+-- derivable from the values, and neither is a size question; each is
+-- now a named obligation rather than a clause of a statement nothing
+-- could instantiate.
+scanΦ-fit-gen : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (sl : Slots Γ) (S NC ND Φ : ℕ) (sf : Gas) (eid : Id) (now : Tick)
+  (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
+  (p : Path Γ u t) (vals : List (Val Γ s)) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) →
+  2 ≤ S →
+  n ≤ S →
+  nodeNestAt nid st ≤ ND →
+  length vals ≤ S →
+  4 * (2 ^ ((suc S * (S + S)) * (suc S * S)) * (2 ^ (S * S) * ND)) ≤ Φ →
+  4 * (2 ^ ((suc S * (S + S)) * (suc S * S)) * (2 ^ (S * S) * (S * S))) ≤ Φ →
+  4 * (2 ^ ((suc S * (S + S)) * (suc S * S)) * (NC + (S * (S + S)) * S))
+    ≤ Φ →
+  pathSzL? S (scan-f fn nid ↠ p) ≡ true →
+  pathNestD (scan-f fn nid ↠ p) ≤ NC →
+  valsΦ? S Φ (scan-f fn nid ↠ p) vals ≡ true →
+  FrameΦHyp sf eid now S Φ (scan-f fn nid) p vals fin sched st
+scanΦ-fit-gen {n = n} sl S NC ND Φ sf eid now fn nid p vals fin sched st
+              2≤S n≤S hN hL hcS hcY hcZ hpl hnd hΦ =
+  ND + M
+  , ⊔-lub (≤-trans hN (m≤m+n ND M)) (m≤n+m M ND)
+  , *-cancelˡ-≤ 4
+      (≤-trans (≤-reflexive spread)
+      (≤-trans (+-mono-≤ hStore (+-mono-≤ hSyn (+-mono-≤ hVals hResid)))
+               (≤-reflexive (sym 4Φ))))
+  where
+  a    = sizeᵗ fn
+  L    = length vals
+  M    = nestDᵛˢ vals
+  Q    = pathΦF S p
+  D    = pathΦD S p
+  T    = nestDᵗ fn
+  K    = (2 ^ a) ^ L
+  EXP  : ℕ
+  EXP  = (suc S * (S + S)) * (suc S * S)
+  reassoc : ∀ w q k m → w * (q * (k * m)) ≡ w * k * q * m
+  reassoc w q k m = solve 4 (λ w′ q′ k′ m′ →
+                      w′ :* (q′ :* (k′ :* m′)) := w′ :* k′ :* q′ :* m′)
+                    refl w q k m
+  hpp  : pathSzL? S p ≡ true
+  hpp  = pathSzL?-tail S (scan-f fn nid) p hpl
+  a≤S  : a ≤ S
+  a≤S  = ≤ᵇ⇒≤ a S (T-to (∧-trueˡ {a = frameSz? S (scan-f fn nid)}
+                            {b = pathFrameSz? S p}
+                            (pathSzL?-frames S (scan-f fn nid ↠ p) hpl)))
+  -- THE FOUR CEILINGS THE PIECES ARE PRICED AT, each read off a
+  -- premise and none of them off an instant.
+  Q≤   : Q ≤ 2 ^ EXP
+  Q≤   = ≤-trans (pathΦF-cap-atLen S (S + S) p (pathSzL?-frames S p hpp)
+                                   (pathSzL?-len S p hpp))
+                 (^-monoʳ-≤ 2 (*-monoˡ-≤ (suc S * S)
+                                (+-monoʳ-≤ (S + S) (*-monoˡ-≤ (S + S) n≤S))))
+  K≡   : K ≡ 2 ^ (a * L)
+  K≡   = ^-*-assoc 2 a L
+  K≤   : K ≤ 2 ^ (S * S)
+  K≤   = ≤-trans (≤-reflexive K≡) (^-monoʳ-≤ 2 (*-mono-≤ a≤S hL))
+  T≤   : T ≤ S
+  T≤   = ≤-trans (nestDᵗ≤sizeᵗ fn) a≤S
+  D≤   : D ≤ NC + (S * (S + S)) * S
+  D≤   = ≤-trans (pathΦD≤nestD S p)
+                 (+-mono-≤ (≤-trans (m≤n+m (pathNestD p) T) hnd)
+                           (*-monoˡ-≤ S (*-monoˡ-≤ (S + S) n≤S)))
+  -- THE FRAME'S OWN FACTOR, AND THE SLACK IN IT.  The fold's factor
+  -- raises the operator's syntax to the CEILING; the charge raises it
+  -- to the COUNT, which the premise puts under that ceiling -- so the
+  -- difference is a power of two the split spends.
+  4K≤F : 4 * K ≤ (2 ^ suc a) ^ S
+  4K≤F = ≤-trans (≤-reflexive (cong (4 *_) K≡))
+         (≤-trans (≤-reflexive (sym (^-distribˡ-+-* 2 2 (a * L))))
+         (≤-trans (^-monoʳ-≤ 2 (+-mono-≤ 2≤S (*-monoʳ-≤ a hL)))
+                  (≤-reflexive (sym (^-*-assoc 2 (suc a) S)))))
+  hΦM  : (2 ^ suc a) ^ S * Q * M ≤ Φ
+  hΦM  = Φ-to-bound S Φ (scan-f fn nid ↠ p) vals hΦ
+  hVals : 4 * (Q * (K * M)) ≤ Φ
+  hVals = ≤-trans (≤-reflexive (reassoc 4 Q K M))
+          (≤-trans (*-monoˡ-≤ M (*-monoˡ-≤ Q 4K≤F)) hΦM)
+  -- AND THE THREE THE GRANT PAYS FOR, each a product of ceilings.
+  hStore : 4 * (Q * (K * ND)) ≤ Φ
+  hStore = ≤-trans (*-monoʳ-≤ 4 (*-mono-≤ Q≤ (*-monoˡ-≤ ND K≤))) hcS
+  hSyn : 4 * (Q * (K * (L * T))) ≤ Φ
+  hSyn = ≤-trans (*-monoʳ-≤ 4 (*-mono-≤ Q≤ (*-mono-≤ K≤ (*-mono-≤ hL T≤))))
+                 hcY
+  hResid : 4 * (Q * D) ≤ Φ
+  hResid = ≤-trans (*-monoʳ-≤ 4 (*-mono-≤ Q≤ D≤)) hcZ
+  spread : 4 * (Q * (K * ((ND + M) + L * T) + D))
+             ≡ 4 * (Q * (K * ND))
+               + (4 * (Q * (K * (L * T)))
+                  + (4 * (Q * (K * M)) + 4 * (Q * D)))
+  spread = solve 6 (λ q k nd m lt d →
+             con 4 :* (q :* (k :* (nd :+ m :+ lt) :+ d))
+               := con 4 :* (q :* (k :* nd))
+                  :+ (con 4 :* (q :* (k :* lt))
+                      :+ (con 4 :* (q :* (k :* m)) :+ con 4 :* (q :* d))))
+           refl Q K ND M (L * T) D
+  4Φ : 4 * Φ ≡ Φ + (Φ + (Φ + Φ))
+  4Φ = solve 1 (λ f → con 4 :* f := f :+ (f :+ (f :+ f))) refl Φ
+
 postulate
   -- THE FOLD'S GRANT HAS NOWHERE TO COME FROM ON THIS SIDE, and that
   -- is the finding rather than the size of the proof.  The consuming
-  -- face now asks a scan frame for a ceiling on what its NODE holds --
-  -- it has to, since the value a fold emits is its accumulator and no
-  -- statement about the arriving values reaches it.  Every premise
-  -- here is about the schedule, the path or the values; not one of
-  -- them mentions `EvalSt.nodes`, so the store's depth is a free
-  -- parameter of this statement and its conclusion is not derivable
-  -- from its hypotheses.
+  -- face asks a scan frame for a ceiling on what its NODE holds -- it
+  -- has to, since the value a fold emits is its accumulator and no
+  -- statement about the arriving values reaches it.  The statement is
+  -- stated PREMISE-FREE for exactly that reason: every fact the arm
+  -- around it carries is about the schedule, the path or the values,
+  -- not one of them mentions `EvalSt.nodes`, and a hypothesis list
+  -- that cannot reach the conclusion is decoration rather than a
+  -- route.  So the store's depth enters the potential here with
+  -- nothing between them, which is the shape the gap actually has.
   --
   -- SO WHAT IS OWED IS AN INVARIANT AND NOT A LEMMA -- AND NOT ONE IN
   -- THIS BUDGET'S CURRENCY EITHER.  A ceiling on the table is a fact
@@ -406,6 +539,45 @@ postulate
   --   its bound -- and no axis moves the gap the other way.  It kills
   --   the walk-currency reading this statement used to be stated in,
   --   which is what the budget above it moved for.
+  scanΦ-store-charge : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sl : Slots Γ) (id : ℕ) (nid : NodeId) (st : EvalSt e) →
+    4 * (2 ^ ((suc (Caps.cSize (capsAt e sl id))
+               * (Caps.cSize (capsAt e sl id) + Caps.cSize (capsAt e sl id)))
+              * (suc (Caps.cSize (capsAt e sl id))
+                 * Caps.cSize (capsAt e sl id)))
+         * (2 ^ (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))
+            * nodeNestAt nid st))
+      ≤ nestΦAt e sl id
+
+  -- THE SYNTAX THE BURST SUBSTITUTES IS PURE ARITHMETIC, and that is
+  -- the whole of what this leaf says: no state, no schedule, no
+  -- values -- four ceilings and the potential they are charged
+  -- against.  A fold re-wraps its accumulator once per value and each
+  -- wrap costs the operator's own nesting depth, so the piece is the
+  -- count times that depth, both read at the size cap, under the path
+  -- factor and the burst power.  Nothing here can be false for a
+  -- reason about the run.
+  --
+  -- AND THE ROUTE IS THE ONE THE OUTER FRAME ALREADY WALKS, which is
+  -- what earns the class rather than the size of the exponents.  The
+  -- potential's walk half carries an exponent a whole power of the
+  -- cap above the path factor's, and the widening that lands one
+  -- product of ceilings inside it is proven; what is new here is only
+  -- that the product carries the burst power as a third factor, which
+  -- the same widening absorbs because the cap bounds the count.
+  -- TWIN: `nestΦ-frame-charge`, which lands the outer frame's own
+  --   product of ceilings under this potential by the same split --
+  --   cap charge on one half, widened exponent on the other.
+  scanΦ-syn-charge : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+    (id : ℕ) →
+    4 * (2 ^ ((suc (Caps.cSize (capsAt e sl id))
+               * (Caps.cSize (capsAt e sl id) + Caps.cSize (capsAt e sl id)))
+              * (suc (Caps.cSize (capsAt e sl id))
+                 * Caps.cSize (capsAt e sl id)))
+         * (2 ^ (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))
+            * (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))))
+      ≤ nestΦAt e sl id
+
 
   -- AND THE BURST'S COUNT IS A FREE PARAMETER WHILE THE CHARGE IS AN
   -- EXPONENTIAL IN IT, which is a second and independent defect: not
@@ -731,10 +903,10 @@ postulate
   --   carries that factor.  The three subdivisions that reached the
   --   spiral stop were all inside this potential, so a fourth is the
   --   same route under a new name.
-  scanΦ-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (sl : Slots Γ) (id : ℕ) (sf : Gas) (eid : Id) (now : Tick) (Lv : ℕ)
+  scanΦ-burst-count : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+    (sl : Slots Γ) (id : ℕ) (Lv : ℕ)
     (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
-    (p : Path Γ u t) (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ)
+    (p : Path Γ u t) (vals : List (Val Γ s)) (sched : Sched Γ)
     (st : EvalSt e) →
     Sched.slots sched ≡ sl →
     pathSz? (Caps.cSize (frameStep Lv (capsAt e sl id)))
@@ -743,8 +915,43 @@ postulate
     pathNestD (scan-f fn nid ↠ p) ≤ nestCapAt e sl id →
     valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
            (scan-f fn nid ↠ p) vals ≡ true →
-    FrameΦHyp sf eid now (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
-              (scan-f fn nid) p vals fin sched st
+    length vals ≤ Caps.cSize (capsAt e sl id)
+
+-- THE FOLD'S ARM AT TODAY'S CEILINGS, which is a body now rather than
+-- a postulate: the arithmetic is spent against the generic arm above
+-- and what is left is the three leaves beside it.  Two of the four
+-- pieces the arm charges are settled here -- the path's own residue
+-- is the outer frame's charge with its walk summand dropped, and the
+-- node's depth is taken at its own reading rather than at a ceiling
+-- somebody has to name -- so the specialisation carries no ceiling
+-- choice of its own and nothing about it can be wrong independently
+-- of the leaves.
+scanΦ-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (sl : Slots Γ) (id : ℕ) (sf : Gas) (eid : Id) (now : Tick) (Lv : ℕ)
+  (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
+  (p : Path Γ u t) (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ)
+  (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  pathSz? (Caps.cSize (frameStep Lv (capsAt e sl id)))
+          (scan-f fn nid ↠ p) ≡ true →
+  pathSzL? (Caps.cSize (capsAt e sl id)) (scan-f fn nid ↠ p) ≡ true →
+  pathNestD (scan-f fn nid ↠ p) ≤ nestCapAt e sl id →
+  valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
+         (scan-f fn nid ↠ p) vals ≡ true →
+  FrameΦHyp sf eid now (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
+            (scan-f fn nid) p vals fin sched st
+scanΦ-fit {e = e} sl id sf eid now Lv fn nid p vals fin sched st
+          hsl hpz hpl hnd hΦ =
+  scanΦ-fit-gen sl (Caps.cSize (capsAt e sl id)) (nestCapAt e sl id)
+    (nodeNestAt nid st) (nestΦAt e sl id) sf eid now fn nid p vals fin
+    sched st
+    (2≤capsAt-size e sl id) (n≤capsAt-size e sl id) ≤-refl
+    (scanΦ-burst-count sl id Lv fn nid p vals sched st hsl hpz hpl hnd hΦ)
+    (scanΦ-store-charge sl id nid st)
+    (scanΦ-syn-charge e sl id)
+    (≤-trans (m≤m+n _ _) (nestΦ-frame-charge e sl id))
+    hpl hnd hΦ
+
 
 -- AND THE DRAIN'S GRANT IS OWED THREE THINGS, AND THE STORE HALF OF
 -- IT IS THE FOLD'S.  A `from-inner` hands on what the inner run
