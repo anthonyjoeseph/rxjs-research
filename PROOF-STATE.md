@@ -238,18 +238,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE WALK'S HALF OF THE FAN'S RECEIPT**, which is all the refuted
-  mint still serves. Splitting by CONSUMER landed: the terminal leaves
-  take the packed reading, unrefuted because the witness that killed
-  the flat form dies on the strict per-frame ledger, and they now
-  stand on a mint of their own. The walk cannot take it — the inner
-  descent carries the strict pair at a cap it WIDENS to, and the
-  predicate weakens upward, so the level's free receipt is the wrong
-  direction. The commit re-indexes the walk to the level it is
-  standing at, where `capsOK?-regs` gives the receipt away, and
-  retires the refuted mint outright — narrowing WHAT PRICES A
-  REGISTERED CHAIN to the descent's own widening step.
-
 - **A READING THAT TRAVELS TO THE MINT**, which is all the store
   question has left. Three rows fail in the same place: the site
   owing the bound is a `register`, an admitted entry's readings are
@@ -273,6 +261,18 @@ does not fit is a finding about the shared statement, not about the head.
   those shapes and returns a refutation or a receipt naming them.
   Until it does the row's class rests on arms nothing has run.
 
+- **THE PACKED READING NOTHING HAS EVER INSTANTIATED**, which is the
+  whole of what the leaves half now stands on. The walk no longer
+  reads the registry at the entry cap, so the one surviving mint asks
+  for a frame syntax plus a length under twice the cap — and its class
+  rests on a single inference, that the witness killing the strict
+  form fails the per-frame conjunct and satisfies both halves of this
+  one. That is a claim about ONE witness family and not about the
+  reading. The commit builds the packed predicate at minted states a
+  run actually reaches and returns a refutation or a receipt naming
+  the shapes, narrowing WHAT PRICES A REGISTERED CHAIN from a supply
+  question to a bounded one.
+
 ### Open questions
 
 - **WHICH STORE CELLS DOES A PATH PREDICATE REACH?** Five rows fail in one
@@ -289,15 +289,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 - **WHAT PRICES A REGISTERED CHAIN, AND WHERE IS THE RECEIPT OWED?** It is
-  not a denomination question, and it no longer splits at the LEVEL: the
-  entry-level reading is refuted, so nothing threaded to a mint pays it,
-  and the currency and the affordability are both settled. It splits by
-  CONSUMER. The terminal leaves are served by the packed reading, which
-  the flat form's refutation leaves standing; what is open is the WALK,
-  whose descent wants the strict pair at a cap it WIDENS to, and the
-  SUPPLY under it, since two siblings die free-standing at one `register`
-  and an arrival premise bounds the inner's syntax and not its count.
-  relevant: `fan-regsSz-mint`, `fan-regsSzL-mint`, `sink-fan-sink`, `walk-share-strat`
+  not a denomination question, it does not split at the LEVEL, and the
+  WALK's half is now gone: re-indexing the descent to the level it stands
+  at makes its receipt a projection of the caps conjunct, so no mint
+  serves it. What is left is the TERMINAL LEAVES, which cannot follow a
+  widening because the pricing reads a length under the cap its own
+  conclusion names — and under them the SUPPLY, since two siblings die
+  free-standing at one `register` and an arrival premise bounds the
+  inner's syntax and not its count.
+  relevant: `fan-regsSzL-mint`, `sink-fan-sink`, `walk-share-strat`
 
 ### The ledger
 
@@ -349,14 +349,11 @@ does not fit is a finding about the shared statement, not about the head.
   registered chain ends strictly ABOVE the input it was minted subscribing. The
   only receipt here naming no cap, which is what makes it carryable; the free
   form dies at one `register`, so it is owed at the mint.
-- **`fan-regsSz-mint`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the registry's
-  size receipt at the PROGRAM's cap, above the instant's top. Refuted at one
-  minted chain and now read by the WALK alone, so the residue is re-indexing
-  that consumer to its own level rather than restating this.
-- **`fan-regsSzL-mint`** (Part7/Depth-Fit) — FALSITY, `NO EVIDENCE`: the same
-  receipt at the PACKED reading — frame syntax plus a length under twice the
-  cap. It is what the refutation of the flat form leaves standing, since that
-  witness dies on the strict per-frame ledger; nothing has instantiated it.
+- **`fan-regsSzL-mint`** (Part7/Depth-Fit) — FALSITY,
+  `REFUTED×2, DEAD ROUTE×4`: the registry read at the ENTRY cap in the PACKED
+  form — frame syntax plus a length under twice it — which only the terminal
+  leaves now ask for. It is what the flat form's refutation leaves standing;
+  nothing has instantiated it.
 - **`walk-share-nestOK`** (Part7/Depth-Fit) — FALSITY, `DEAD ROUTE×4`: the
   instant's nest predicate at the state the fan reads the registry. The door
   has it and the walk carries no nest conjunct at all; threading it down is

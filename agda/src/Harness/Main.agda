@@ -138,7 +138,7 @@ private
 ------------------------------------------------------------------
 -- SERIES — THE DEPTH CHARGE AT THE ENTRY INSTANT, PRICED.
 --
--- TARGET: scanΦ-fit @f61ffa
+-- TARGET: scanΦ-fit @408c85
 --
 -- WHY THIS CANNOT BE A PROBE.  The arm's residue is that no premise
 -- names the node table, and the fact that would is ambient — so the
@@ -219,7 +219,7 @@ driveH n = go n (let r = subscribeE
 ------------------------------------------------------------------
 -- SERIES — THE DRIVEN REFOLD PAST THE LAYER THE PROBE TREE REACHES.
 --
--- TARGET: scanΦ-fit @f61ffa
+-- TARGET: scanΦ-fit @408c85
 --
 -- WHAT IS OWED.  `Probed.Fold-Width-Reach` decides the fork between
 -- the two width READINGS and stops one layer in: its run crosses the
