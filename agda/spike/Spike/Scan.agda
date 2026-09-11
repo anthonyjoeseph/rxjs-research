@@ -85,6 +85,19 @@
 -- body of arbitrary shape, which the real `strmᵗ` permits and this
 -- `Tm` does not — the gap the refutation walks through.
 --
+-- `takeᵉ` IS IN THE FRAGMENT AND THE ORDER IS INDIFFERENT TO IT, WHICH
+-- IS A WEAKER RESULT THAN IT LOOKS.  Every measure passes it through,
+-- mirroring the real tree where no depth or burst family reads the
+-- count; the domain gains one clause that descends on `syncSize` and
+-- nothing else moves.  What that green does NOT cover is the thing a
+-- real `take` actually does: COMPLETE its source, and completion runs
+-- teardown, which is a synchronous re-entry edge.  This fragment has no
+-- completion at all — every run is a burst and then silence — so the
+-- clause cannot fail here whatever teardown does, and reading the green
+-- as evidence about `take` would be the same move that let the last two
+-- claims through.  It is evidence about the MEASURES and about nothing
+-- else.
+--
 -- REFUTED: `Spike.Wide` — no affine plug law exists for a template
 -- plugging into an `allᵉ` that feeds a `scanᵉ`, so this module's
 -- exponent cannot be read as syntactic in the real language.  Every
@@ -142,6 +155,7 @@ data Exp where
   ofᵉ    : List Val → Exp
   mapᵉ   : Tm → Exp → Exp
   scanᵉ  : Tm → Val → Exp → Exp
+  takeᵉ  : ℕ → Exp → Exp
   allᵉ   : Exp → Exp
   μᵉ     : Exp → Exp
   recᵉ   : Exp
@@ -158,6 +172,24 @@ evalTm (dupᵗ t)   a v =
   obsᵛ (mapᵉ (konstᵗ (evalTm t a v)) (ofᵉ (evalTm t a v ∷ [])))
 evalTm (scnᵗ g t) a v =
   obsᵛ (scanᵉ g (natᵛ 0) (ofᵉ (evalTm t a v ∷ evalTm t a v ∷ [])))
+
+-- `takeᵉ`'s count is a plain ℕ here because the real language's count is
+-- a `Tm` that NO depth or burst measure reads — only the frame-width
+-- family does — so a term-valued count would add a plug position the
+-- measures cannot see, which is a different question from this one.
+takeN : ℕ → List Val → List Val
+takeN zero    xs       = []
+takeN (suc n) []       = []
+takeN (suc n) (x ∷ xs) = x ∷ takeN n xs
+
+takeN-length : ∀ n xs → length (takeN n xs) ≤ length xs
+takeN-length zero    xs       = z≤n
+takeN-length (suc n) []       = z≤n
+takeN-length (suc n) (x ∷ xs) = s≤s (takeN-length n xs)
+
+takeN-∈ : ∀ n xs {u} → u ∈ takeN n xs → u ∈ xs
+takeN-∈ (suc n) (x ∷ xs) (here p)  = here p
+takeN-∈ (suc n) (x ∷ xs) (there p) = there (takeN-∈ n xs p)
 
 mapB : Tm → List Val → List Val
 mapB f []       = []
@@ -293,6 +325,7 @@ substT : Tm → Exp → Tm
 substE (ofᵉ vs)      m = ofᵉ (substL vs m)
 substE (mapᵉ f e)    m = mapᵉ (substT f m) (substE e m)
 substE (scanᵉ f z e) m = scanᵉ (substT f m) (substV z m) (substE e m)
+substE (takeᵉ n e)   m = takeᵉ n (substE e m)
 substE (allᵉ e)      m = allᵉ (substE e m)
 substE (μᵉ b)        m = μᵉ b
 substE recᵉ          m = deferᵉ m
@@ -341,6 +374,7 @@ syncSize : Exp → ℕ
 syncSize (ofᵉ vs)      = 1
 syncSize (mapᵉ f e)    = suc (syncSize e)
 syncSize (scanᵉ f z e) = suc (syncSize e)
+syncSize (takeᵉ n e)   = suc (syncSize e)
 syncSize (allᵉ e)      = suc (syncSize e)
 syncSize (μᵉ b)        = suc (syncSize b)
 syncSize recᵉ          = 1
@@ -351,6 +385,7 @@ syncSize-subst : ∀ b m → syncSize (substE b m) ≡ syncSize b
 syncSize-subst (ofᵉ vs)      m = refl
 syncSize-subst (mapᵉ f e)    m = cong suc (syncSize-subst e m)
 syncSize-subst (scanᵉ f z e) m = cong suc (syncSize-subst e m)
+syncSize-subst (takeᵉ n e)   m = cong suc (syncSize-subst e m)
 syncSize-subst (allᵉ e)      m = cong suc (syncSize-subst e m)
 syncSize-subst (μᵉ b)        m = refl
 syncSize-subst recᵉ          m = refl
@@ -381,6 +416,7 @@ module M (η ν : ℕ → ℕ) where
   blE (ofᵉ vs)      = length vs
   blE (mapᵉ f e)    = blE e
   blE (scanᵉ f z e) = blE e
+  blE (takeᵉ n e)   = blE e
   blE (allᵉ e)      = blE e * H e
   blE (μᵉ b)        = blE b
   blE recᵉ          = 0
@@ -390,6 +426,7 @@ module M (η ν : ℕ → ℕ) where
   H (ofᵉ vs)      = Hl vs
   H (mapᵉ f e)    = Ht f + ph f * H e
   H (scanᵉ f z e) = iter (Ht f) (ph f) (blE e) (Hv z ⊔ H e)
+  H (takeᵉ n e)   = H e
   H (allᵉ e)      = H e
   H (μᵉ b)        = H b
   H recᵉ          = 0
@@ -423,6 +460,7 @@ module M (η ν : ℕ → ℕ) where
   hopD (ofᵉ vs)      = hopDl vs
   hopD (mapᵉ f e)    = hopDt f + pm f * hopD e
   hopD (scanᵉ f z e) = iter (hopDt f) (pm f) (blE e) (hopDv z ⊔ hopD e)
+  hopD (takeᵉ n e)   = hopD e
   hopD (allᵉ e)      = suc (hopD e)
   hopD (μᵉ b)        = hopD b
   hopD recᵉ          = 0
@@ -455,6 +493,7 @@ module M (η ν : ℕ → ℕ) where
   blE-subst (ofᵉ vs)      m = substL-length vs m
   blE-subst (mapᵉ f e)    m = blE-subst e m
   blE-subst (scanᵉ f z e) m = blE-subst e m
+  blE-subst (takeᵉ n e)   m = blE-subst e m
   blE-subst (allᵉ e)      m = cong₂ _*_ (blE-subst e m) (H-subst e m)
   blE-subst (μᵉ b)        m = refl
   blE-subst recᵉ          m = refl
@@ -467,6 +506,7 @@ module M (η ν : ℕ → ℕ) where
   H-subst (scanᵉ f z e) m
     rewrite Ht-subst f m | ph-subst f m | blE-subst e m
           | Hv-subst z m | H-subst e m = refl
+  H-subst (takeᵉ n e)   m = H-subst e m
   H-subst (allᵉ e)      m = H-subst e m
   H-subst (μᵉ b)        m = refl
   H-subst recᵉ          m = refl
@@ -500,6 +540,7 @@ module M (η ν : ℕ → ℕ) where
   hopD-subst (scanᵉ f z e) m
     rewrite hopDt-subst f m | pm-subst f m | blE-subst e m
           | hopDv-subst z m | hopD-subst e m = refl
+  hopD-subst (takeᵉ n e)   m = hopD-subst e m
   hopD-subst (allᵉ e)      m = cong suc (hopD-subst e m)
   hopD-subst (μᵉ b)        m = refl
   hopD-subst recᵉ          m = refl
@@ -761,6 +802,7 @@ module Run (N : ℕ) (sl : List Exp) (η ν : ℕ → ℕ) where
     dOf    : ∀ {vs cs} → Dom (ofᵉ vs) cs
     dMap   : ∀ {f e cs} → Dom e cs → Dom (mapᵉ f e) cs
     dScan  : ∀ {f z e cs} → Dom e cs → Dom (scanᵉ f z e) cs
+    dTake  : ∀ {n e cs} → Dom e cs → Dom (takeᵉ n e) cs
     dMu    : ∀ {b cs} → Dom (unfoldμ b) cs → Dom (μᵉ b) cs
     dRec   : ∀ {cs} → Dom recᵉ cs
     dDefer : ∀ {b cs} → Dom (deferᵉ b) cs
@@ -783,6 +825,8 @@ module Run (N : ℕ) (sl : List Exp) (η ν : ℕ → ℕ) where
     mapB f (proj₁ (run e cs d)) , proj₂ (run e cs d)
   run (scanᵉ f z e) cs (dScan d)      =
     foldB f z (proj₁ (run e cs d)) , proj₂ (run e cs d)
+  run (takeᵉ n e)   cs (dTake d)      =
+    takeN n (proj₁ (run e cs d)) , proj₂ (run e cs d)
   run (μᵉ b)        cs (dMu d)        = run (unfoldμ b) cs d
   run recᵉ          cs dRec           = [] , cs
   run (deferᵉ b)    cs dDefer         = [] , cs
@@ -809,6 +853,7 @@ module Run (N : ℕ) (sl : List Exp) (η ν : ℕ → ℕ) where
   run-unconn (ofᵉ vs)      cs dOf            = ≤-refl
   run-unconn (mapᵉ f e)    cs (dMap d)       = run-unconn e cs d
   run-unconn (scanᵉ f z e) cs (dScan d)      = run-unconn e cs d
+  run-unconn (takeᵉ n e)   cs (dTake d)      = run-unconn e cs d
   run-unconn (μᵉ b)        cs (dMu d)        = run-unconn (unfoldμ b) cs d
   run-unconn recᵉ          cs dRec           = ≤-refl
   run-unconn (deferᵉ b)    cs dDefer         = ≤-refl
@@ -851,6 +896,8 @@ module Run (N : ℕ) (sl : List Exp) (η ν : ℕ → ℕ) where
     emit-len (scanᵉ f z e) cs (dScan d) =
       ≤-trans (≤-reflexive (foldB-length f z (proj₁ (run e cs d))))
               (emit-len e cs d)
+    emit-len (takeᵉ n e) cs (dTake d) =
+      ≤-trans (takeN-length n (proj₁ (run e cs d))) (emit-len e cs d)
     emit-len (μᵉ b) cs (dMu d) =
       ≤-trans (emit-len (unfoldμ b) cs d)
               (≤-reflexive (blE-subst b (μᵉ b)))
@@ -887,6 +934,8 @@ module Run (N : ℕ) (sl : List Exp) (η ν : ℕ → ℕ) where
                  (λ p → ≤-trans (emit-H e cs d p) (m≤n⊔m _ _))
                  mem)
               (iter-mono-k (Ht f) _ (ph-pos f) (emit-len e cs d))
+    emit-H (takeᵉ n e) cs (dTake d) mem =
+      emit-H e cs d (takeN-∈ n (proj₁ (run e cs d)) mem)
     emit-H (μᵉ b) cs (dMu d) mem =
       ≤-trans (emit-H (unfoldμ b) cs d mem)
               (≤-reflexive (H-subst b (μᵉ b)))
@@ -929,6 +978,8 @@ module Run (N : ℕ) (sl : List Exp) (η ν : ℕ → ℕ) where
                  (λ p → ≤-trans (emit-hop e cs d p) (m≤n⊔m _ _))
                  mem)
               (iter-mono-k (hopDt f) _ (pm-pos f) (emit-len e cs d))
+    emit-hop (takeᵉ n e) cs (dTake d) mem =
+      emit-hop e cs d (takeN-∈ n (proj₁ (run e cs d)) mem)
     emit-hop (μᵉ b) cs (dMu d) mem =
       ≤-trans (emit-hop (unfoldμ b) cs d mem)
               (≤-reflexive (hopD-subst b (μᵉ b)))
@@ -977,6 +1028,8 @@ module Run (N : ℕ) (sl : List Exp) (η ν : ℕ → ℕ) where
       dMap (total e cs (rs (descend (hopD-map-mono f e) ≤-refl)))
     total (scanᵉ f z e) cs (acc rs) =
       dScan (total e cs (rs (descend (hopD-scan-mono f z e) ≤-refl)))
+    total (takeᵉ n e) cs (acc rs) =
+      dTake (total e cs (rs (descend ≤-refl ≤-refl)))
     total (μᵉ b) cs (acc rs) =
       dMu (total (unfoldμ b) cs
              (rs (descend (≤-reflexive (hopD-subst b (μᵉ b)))
@@ -1112,3 +1165,51 @@ module Demo where
 
   scn-image : hopDv (evalTm scnTm scnCarrier scnCarrier) ≡ 4
   scn-image = refl
+
+  -- `takeᵉ`.  Every measure passes it straight through, mirroring the
+  -- real tree, where no depth or burst family reads the count at all.
+  -- The order therefore gets nothing from it and pays nothing for it:
+  -- the descent is on `syncSize` alone.
+  --
+  -- WHAT THE ROWS BUY, since a clause set that cannot fail is not a
+  -- test.  `take-slack` is the pass-through made concrete — the source's
+  -- deeper value is DROPPED and the clause reports its depth anyway, so
+  -- the bound is sound and can never be tight.  `take-witness` puts the
+  -- truncation UNDER the re-entry edge: the kept value is the one that
+  -- connects a slot, the dropped one is deeper, and the burst and the
+  -- connection set are both unchanged from the un-taken program.  That
+  -- is the only way this constructor could have touched the order.
+  shallowV : Val
+  shallowV = obsᵛ (ofᵉ (natᵛ 1 ∷ []))
+
+  deepV : Val
+  deepV = obsᵛ (allᵉ (ofᵉ (natᵛ 2 ∷ [])))
+
+  takeInner : Exp
+  takeInner = takeᵉ 1 (ofᵉ (shallowV ∷ deepV ∷ []))
+
+  take-drops : proj₁ (run takeInner [] (dTake dOf)) ≡ shallowV ∷ []
+  take-drops = refl
+
+  -- LOAD-BEARING: the clause reads 1, the emission reads 0.  A clause
+  -- reading the TAKEN prefix would report 0 and still be sound here —
+  -- which is exactly why the pass-through costs nothing and buys
+  -- nothing.
+  take-slack : hopD takeInner ≡ 1
+  take-slack = refl
+
+  take-actual : hopDl (proj₁ (run takeInner [] (dTake dOf))) ≡ 0
+  take-actual = refl
+
+  takeProg : Exp
+  takeProg = allᵉ (takeᵉ 1 (ofᵉ (obsᵛ (μᵉ (mapᵉ inᵗ (slotᵉ 0))) ∷ deepV ∷ [])))
+
+  take-witness : Dom takeProg []
+  take-witness = total! η-fix0 bl-fix0 H-fix0 takeProg []
+
+  take-burst : proj₁ (run takeProg [] take-witness)
+             ≡ obsᵛ (ofᵉ (natᵛ 7 ∷ [])) ∷ []
+  take-burst = refl
+
+  take-connected : proj₂ (run takeProg [] take-witness) ≡ 0 ∷ []
+  take-connected = refl
