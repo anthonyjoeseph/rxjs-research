@@ -235,6 +235,18 @@ statement, not about the head.
 
 ### Big picture tier roadmap
 
+- **PORT THE ORDER, WHICH DECIDES HOW MUCH OF THE OTHER TWO LEGS
+  SURVIVES.** The spike now discharges the same domain on a fragment
+  carrying all four synchronous re-entry edges AND the refold, reading
+  the triple lexicographically and pricing the scan clause by a burst
+  length the PROGRAM TEXT carries — no cap, no tower, no `V`. Both legs
+  below are owed to a gas that is a NUMBER fixed before the run, while
+  an order asks only that each re-entry go down, so where the reading
+  ports a ceiling is deleted rather than restated. The commit takes the
+  real language's measure, whose template plug can land in a `scanᵉ`
+  that no spike term can express, and returns either the ported clause
+  or the construct that defeats it.
+
 - **THE STORE READING NOTHING CARRIES.** Both inner arms and the fan die
   at one installed cell, and all three owe the same absent fact: the
   ambient store predicate a cascade door holds at an instant's entry,
@@ -257,27 +269,19 @@ statement, not about the head.
   become one statement, or it returns why no bound exists in either
   argument.
 
-- **COMPOSE THE ORDER, WHICH IS ALL THE CENSUS LEFT OPEN.** The tower
-  is owed only because the gas is a NUMBER; an ORDER asks merely that
-  each re-entry go down. The edge census landed — three edges, each
-  already carrying its own decrease, and neither cold nor `deferᵉ` a
-  depth edge — so what remains is the tuple, every component of which
-  rises along some other edge. The commit fixes the one monotone
-  component outermost and returns either the order or the pair of
-  edges that cannot be ordered.
-
 ### Open questions
 
 - **IS THE NESTING CEILING NEEDED AT ALL?** Every caps-denominated route
-  is closed — entry cap, exit cap, and moving the recurrence's own fuel,
-  the last by arithmetic rather than by a missing premise, since it asks
-  the fuel to dominate a blowup taken AT that fuel. What narrowed the
-  question is that the ceiling is only owed because the evaluator's gas
-  is a NUMBER, fixed before the run. Three of the re-entry edges are now
-  confirmed to carry their own decrease, and width — the quantity these
-  ceilings exist to predict — is not a depth edge at all. The region is
-  no longer which cap to read but whether a well-founded order composes;
-  if it does, the ceilings are not restated but deleted.
+  is closed — entry cap, exit cap, and moving the recurrence's own fuel.
+  What narrowed the question is that the ceiling is only owed because
+  the evaluator's gas is a NUMBER, fixed before the run. The order now
+  COMPOSES on a
+  fragment carrying every synchronous re-entry edge and the refold
+  besides, with the scan clause priced by a burst length the program
+  text carries — so the region left is what the real language adds over
+  that fragment: a template plugging into a `scanᵉ`, share's connect,
+  and `takeᵉ`. Defeat the reading with one of those three, or the
+  ceilings are not restated but deleted.
   relevant: `fan-regsSzL-mint`, `walk-share-nestOK`, `walk-share-valsNest`
 
 - **WHAT CARRIES A STORE READING DOWN THE WALK?** The statements read a
