@@ -238,16 +238,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **WHAT A SUBSCRIBED SOURCE EMITS, READ BELOW THE FLOOR.** The three
-  frame heads that had no instantiation are now BODIES, and two of them
-  owe nothing: a take emits a prefix of what arrived and an inner
-  re-emits it. The residue is two statements about what the EVALUATOR
-  produces when it subscribes, which is WHICH STORE CELLS DOES A PATH
-  PREDICATE REACH — a source below the floor is a claim about the cell
-  the frame names, not the list it was handed. The commit walks the
-  drain's recursion, the smaller of the two and the one whose premise
-  the park conjunct supplies, and returns whether the walk's is the
-  same induction.
+- **THE LEAF THE TELESCOPE ALREADY PAYS FOR.** Three frame heads became
+  two recursions and then ONE leaf, and the premise it turned out to
+  need is none: the only arm that can emit what the source's syntax does
+  not contain is the slot read, and the slot TYPE forbids both ways that
+  could land above the floor. So the row is off the store question
+  entirely and the risk is an induction over the evaluator rather than a
+  missing conjunct. The commit INSTANTIATES it at the arm that carries
+  the doubt — an observable-typed shared slot, which is the one shape
+  whose emission has syntax at all — and either receipts the leaf or
+  returns the arm the telescope does not in fact cover.
 
 - **THE FRAME ARMS IN THE SAME CURRENCY**, which is the rest of WHAT
   PRICES A REGISTERED CHAIN once the terminal stops asking for a
@@ -299,14 +299,10 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### The ledger
 
-- **`thruWalk-strat`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the
-  payload that IS an observable, subscribed here and its burst grafted. What
-  leaves is the inner's, so nothing the caller handed in reads it and the store
-  receipt is the only premise standing.
-- **`mergeAllDrain-strat`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: what
-  the parked queue emits once a lane frees, read below the floor. The queue's
-  own reading is what the park conjunct carries, so what is open is the step
-  from a queue of sources to what subscribing to them produces.
+- **`subscribeInner-strat`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: one
+  subscribe's burst read below the floor, which both subscribing heads reduce
+  to. The slot read is the only arm emitting syntax the source does not carry,
+  and the telescope's own receipt covers it, so what is open is the induction.
 - **`pop-head-strat-sink`** (Caps-Bridge) — FALSITY, `REFUTED`: where the
   arrival's own value sits against every chain that will receive it, asked only
   below the root. It wants a fact relating a source's pending values to the
