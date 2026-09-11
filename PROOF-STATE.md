@@ -243,12 +243,12 @@ does not fit is a finding about the shared statement, not about the head.
   refuted at separate witnesses — a long thin inner busts the length,
   one fat operator busts the syntax — so splitting it is no repair
   either, and `fan-regsSzL-mint` is not a row to grind at any budget.
-  What survives is that the mint is priced at the STEPPED cap while
-  the leaves' pricing names the entry one, which is a placement
-  question and not an arithmetic one. The commit decides whether the
-  leaves can be re-indexed to the level the fan stands at or must be
-  paid in a currency that is not a cap, and either restates them or
-  returns the first arm that refuses.
+  The obstruction is now located, and recorded as a dead route on that
+  row: the frame arm's grant and the only free receipt are denominated
+  at different powers of the cap, and decoupling the syntax cap from
+  the pricing one is sound without closing that. So neither end that
+  must move is the receipt, and the leg asks which does: the grant's
+  denomination, or the budget it is drawn from.
 
 - **THE SECOND HAND-OVER, NOW THAT THE CLIMB IS STRICT**, which is the
   one arm of WHAT PRICES A REGISTERED CHAIN the entry ledger did not
@@ -343,7 +343,7 @@ does not fit is a finding about the shared statement, not about the head.
   escalation is PROGRAM-bounded: hops climb the stratified telescope. It now
   takes the PACKED size reading, which its own refutation is indifferent to.
 - **`fan-regsSzL-mint`** (Part7/Depth-Fit) — FALSITY,
-  `REFUTED×4, DEAD ROUTE×4`: the registry read at the ENTRY cap in the PACKED
+  `REFUTED×4, DEAD ROUTE×5`: the registry read at the ENTRY cap in the PACKED
   form, which only the terminal leaves now ask for. Both conjuncts refuted at
   its generic form, at separate witnesses, so no budget and no split repairs
   it.

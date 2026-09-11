@@ -1475,6 +1475,24 @@ fan-regsSz {e = e} sl id Lv sched st cok =
 --   mechanism -- dies on the arithmetic directly above, by ONE step of
 --   the recurrence rather than at some threshold, so no ceiling is
 --   small enough.
+-- DEAD ROUTE: DECOUPLING the cap a frame's syntax is known under from
+--   the cap the potential is priced at, and spending the stepped-cap
+--   receipt -- which is free -- at the smaller pricing cap.  The
+--   separation itself is sound and cheap: a map frame's charge is its
+--   raw term size and names no cap, every other arm is monotone in the
+--   syntax bound, and the sink leaf's share is a constant of the
+--   pricing cap alone, so the receipt's cap would appear exactly once,
+--   multiplying the length.  It dies on the GRANT rather than on the
+--   separation.  `nestΦ-frame-charge` (.Caps-Face.Nest-Arith) hands the
+--   frame arm a budget denominated at two to a CUBE of the entry cap,
+--   and a stepped-cap receipt prices the same chain at a sixth power,
+--   since one `sizeStep` squares the cap and the length is bounded by
+--   that same stepped number.  The shortfall is a factor of the cap
+--   SQUARED inside the exponent, so it is not a margin to tighten.
+--   What this leaves is an obligation with two ends and neither of them
+--   the receipt: the grant is fixed at the entry cap and the registry
+--   supplies nothing there, so the repair is owed at the pricing's own
+--   denomination or at the budget the grant is drawn from.
 -- DEAD ROUTE: moving the pricing's DENOMINATION rather than any
 --   receipt, so that the face names the cap the receipt is held at.
 --   Both answers die on the pricing rather than on the registry, and
