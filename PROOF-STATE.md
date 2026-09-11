@@ -215,88 +215,124 @@ research lives; where they disagree, the header wins.
 ## Tier 1 — `budget-sufficient`
 
 **The tier is ONE statement, not a directory.** `budget-sufficient`
-(Caps-Bridge) says `hasDry (evaluate fuel e ins) ≡ false`, and it is the only
-CLAIM the `Verify-Budget-Sufficient` tree exports: every module in the tree
-sits in Caps-Bridge's import cone, bar a program corpus that reaches Main
-through `Harness.Main`.
+(Caps-Bridge) says `hasDry (evaluate fuel e ins) ≡ false` and is the only CLAIM
+this tree exports; every module sits in its import cone, bar a corpus reaching
+Main through `Harness.Main`, and its one door inward is `mint-install-survives`
+(Node-Fresh). It is a definition and not a postulate, so a row whose OBSTACLE
+is written down is not thereby a row whose STATEMENT is right.
 
-**IT IS ALSO THE TREE'S ONLY DOOR.** `Verify-Well-Formed` draws
-`mint-install-survives` (Node-Fresh) by name, and that is the one real
-cross-tier claim into this tree.
-
-**"A REAL BODY" IS NOT "POSTULATE-FREE".** `budget-sufficient` is a definition
-rather than a postulate; the rows below are the leaves still under it. Reading
-a real body as a discharged cone is how a row gets mis-ranked, and a row whose
-OBSTACLE is written down is not thereby a row whose STATEMENT is right.
+**THE NESTING FACE IS WHERE THIS TIER'S RISK IS, AND EVERY LEG AIMS THERE.**
+The potential is sighted at an instant's ENTRY cap while what it must dominate
+— a fold's burst in an exponent, a chain's climb, a parked cell's depth — is
+denominated at the EXIT one, and every local repair is recorded dead. The size
+face's rows ride two of the same questions and are scheduled behind it.
 
 **THE `subscribeE-nest-*` ROWS ARE ONE STATEMENT, NOT ONE PER HEAD.** They all
-instantiate `NestAt`, whose grant now shrinks with the term and whose store
-half is a join; why it is shaped that way is in its own header. A head that
-does not fit is a finding about the shared statement, not about the head.
+instantiate `NestAt`; a head that does not fit is a finding about the shared
+statement, not about the head.
 
 
 
 ### Big picture tier roadmap
 
-- **THE FOLD'S CHARGE, WHOSE RATE IS THE PRODUCT AND NOT THE BLOCK.**
-  The arm is short two ways and the second is the one that moves: it
-  bounds the cell it enlarges by the same level it must leave, and the
-  block it is paid out of buys rungs log-linear in the bound where the
-  fold spends the source's width TIMES the step's size. Both are
-  arguments, since the crossing sits past any value that can be built.
-  So the commit restates the charge in that product and re-reads the
-  four points against it — which is what tells WHICH STORE CELLS DOES A
-  PATH PREDICATE REACH whether a cell-wise premise is enough or the
-  face's whole denomination moves with it.
+- **RE-SIGHT THE POTENTIAL, THE ONE DECISION THE WHOLE FACE WAITS ON.**
+  Five dead routes under the fold's charge share one shape: a budget
+  fixed per instant and read at the ENTRY cap must dominate a term
+  carrying the burst in an exponent, and the only ceiling that affords
+  that fold is read at the EXIT index. Both local ends are closed, so
+  the commit moves the DOOR: state the depth face against the walk's own
+  count ledger, sighted one instant later, and return what the CAPS
+  TOWER must then afford. Enlarging the tower is not the alternative and
+  is recorded dead — the next cap is a blowup OF the current one, so a
+  bigger budget raises what it must beat.
 
-- **THE SUBSCRIBE READING, CARRIED THROUGH THE EVALUATOR'S OWN
-  RECURSION.** The probe reached the one arm that can emit syntax the
-  source does not carry and found the telescope already paying for it,
-  so what is left on this leaf is an INDUCTION rather than a missing
-  conjunct. The commit writes it as a body over `subscribeE`-level
-  leaves and returns the first arm whose reading the recursion does not
-  preserve — which is what decides whether the floor reading survives
-  the delivery arc WHICH STORE CELLS DOES A PATH PREDICATE REACH is
-  still open at.
+- **THE STORE READING NOTHING CARRIES.** Both inner arms and the fan die
+  at one installed cell, and all three owe the same absent fact: the
+  ambient store predicate a cascade door holds at an instant's entry,
+  which the walk's carried bundle has no conjunct of. Threading it as a
+  premise is recorded dead — inside one instant the store grows toward
+  the NEXT cap, so an entry-cap reading asks a step to leave the store
+  where it found it. The commit states it as a carried FIELD, in
+  whatever denomination the first leg fixes, and returns the first arm
+  whose step does not re-establish it.
 
-- **THE INNER ARMS' OWN CURRENCY**, which is what the fold's arm returned
-  and where WHICH STORE CELLS DOES A PATH PREDICATE REACH bites hardest
-  inside this face. Both outer heads are bodies over ceilings carried
-  down the walk now; both INNER heads charge against a record that
-  quantifies its own caps and reads the stepped size inside it, so no
-  carried ceiling reaches their arithmetic. The commit states that
-  record over the two ceilings instead, and either lands one head on it
-  or returns the conjunct that is genuinely caps-shaped — which decides
-  whether the store predicate those two are owed has one index at all.
+- **THE BURST'S ONLY TIE, WHICH BOTH FACES SPEND AND NEITHER OWNS.**
+  `burst-out` is this development's single syntax-to-values ceiling and
+  it prices the SUBSCRIBE frame alone, so nothing bounds what a LATER
+  frame hands on within one instant — which is the scan charge's dead
+  count, the crossing door's unbounded burst and the size face's product
+  rate, one absence read in three currencies. The commit takes it at a
+  STEPPED frame and denominates it in the SLOT SCRIPT rather than the
+  term — the reading nothing has asked for, and one the budget already
+  takes an argument for. Either the ceiling extends and those rows
+  become one statement, or it returns why no bound exists in either
+  argument.
 
 ### Open questions
 
-- **WHICH STORE CELLS DOES A PATH PREDICATE REACH?** Four rows fail in one
-  place: the statement reads a PATH or a chain, and the quantity it must
-  bound is a cell in the STORE. A path predicate CAN see the store, and
-  extending its coverage is priced. The WALK half is settled and the
-  DELIVERY arc is narrower — one frame's cell, not a chain's. The GRAIN is
-  settled too, and against the reading rather than the coverage: what is
-  reached must be reached CELL-WISE. What is left is at the MINT, known
-  rather than suspected — an admitted entry's readings are refuted
-  free-standing AND are not corollaries of the caps receipt, so the
-  reading must be CARRIED to reach the site that owes it.
-  relevant: `step-frame-store≤`, `share-fold-store≤`, `pushBurst-sz-store-outer`, `subscribeSharedSlot-sz-store`
+- **AT WHICH INSTANT IS THE POTENTIAL SIGHTED?** The budget is fixed at an
+  instant's ENTRY cap and the charges it must dominate are denominated at
+  the EXIT one, and the gap is not a margin to tighten: the stepped cap is
+  not a polynomial in the entry cap, so the shortfall sits inside an
+  exponent and no ceiling chosen at the entry is small enough. Both local
+  ends are closed — enlarging the budget asks it to exceed the ceiling it
+  is fitted under, and following the cap to the stepped instant is refused
+  by every frame arm, each of which ties the potential to the instant being
+  WALKED. So what is left is the DOOR: whether the depth face can be
+  sighted one instant later, and what that moves underneath it.
+  relevant: `fan-regsSzL-mint`, `share-fold-store≤`, `step-frame-vals≤`
 
+- **WHAT CARRIES A STORE READING DOWN THE WALK?** The statements read a
+  PATH or a chain and the quantity they must bound is a cell in the STORE.
+  Coverage is settled and is not the obstacle: a path predicate CAN see
+  the store, extending it is priced, the WALK half is done, the DELIVERY
+  arc is one frame's cell rather than a chain's, and the GRAIN is settled
+  against the reading — what is reached must be reached CELL-WISE. What is
+  left is PRESERVATION. The fact exists one level up, at every cascade
+  door, and a step does not re-establish it, because within the instant
+  the store grows toward the next cap by design.
+  relevant: `walk-share-nestOK`, `step-frame-store≤`, `subscribeSharedSlot-sz-store`
 
-- **WHAT PRICES A REGISTERED CHAIN, AND WHERE IS THE RECEIPT OWED?** It is
-  not a denomination question and it does not split at the LEVEL. The
-  TERMINAL LEAVES are settled: the leaf is priced by the CLIMB the walk
-  still has ahead of it rather than by either endpoint, and every
-  consumer's arithmetic absorbed the widening that cost. What is left is
-  the SUPPLY, where two siblings die free-standing at one `register`.
-  The fan's half is not priced at all — its arithmetic closed against
-  the cap charge, and what is left there is a DEPTH receipt on values
-  the registry never sees.
-  relevant: `fan-regsSzL-mint`, `walk-share-valsNest`
+- **WHAT BOUNDS A BURST INSIDE ONE INSTANT?** Rows on two faces fail on one
+  absence: nothing ties the values a frame hands ON to the program's
+  syntax. `burst-out` is the only such tie and it prices the SUBSCRIBE
+  frame, whose one width-towering family emits nothing at every length
+  measured — so it constrains none of the instants that carry a width. The
+  quantity is real and not an artefact of the accounting: a count field
+  threaded for it died to measurement at the first hop. What is NOT settled
+  is that it is unreachable — it moves with the SLOT SCRIPT, which
+  `budgetAt` already takes beside the program, so a slots-denominated
+  ceiling is in bounds and has never been asked for.
+  relevant: `pushBurst-sz-store-outer`, `subscribeE-sz`, `walk-share-valsNest`
 
 ### The ledger
 
+- **`fan-regsSzL-mint`** (Part7/Depth-Fit) — FALSITY,
+  `REFUTED×4, DEAD ROUTE×7`: the registry read at the ENTRY cap in the PACKED
+  form, which only the terminal leaves now ask for. Both conjuncts refuted at
+  its generic form, at separate witnesses, so no budget and no split repairs
+  it.
+- **`walk-share-nestOK`** (Part7/Depth-Fit) — FALSITY, `DEAD ROUTE×4`: the
+  instant's nest predicate at the state the fan reads the registry. The door
+  has it and the walk carries no nest conjunct at all; threading it down is
+  refused by the store's own growth toward the NEXT cap.
+- **`walk-share-valsNest`** (Part7/Depth-Fit) — FALSITY, `DEAD ROUTE×2`: the
+  values a dispatch hands on are under the instant's nest cap. The headroom
+  closed, so this is what the fan's terminal was; nothing in the store mentions
+  a list the walk carried in, so it is owed at whatever frame emitted it.
+- **`share-fold-store≤`** (Part7/Arrival-Caps) — FALSITY, `REFUTED, TWIN`: the
+  store across one `foldPath`, PRICED against the round's grant rather than
+  preserved. A `scan-f` at an obs-typed accumulator crossed the preservation,
+  and the grant is sealed — so the repair closes the region to instantiation on
+  both sides at once.
+- **`step-frame-vals≤`** (Part7/Arrival-Caps) — FALSITY, `REFUTED, TWIN`: what
+  one `stepFrame` leaves in the delivered values, at that same grant. This is
+  the axis the frame moves and the fold does not — a scan emits the accumulator
+  it just wrote — so the trade the old ceiling permitted ran one way only.
+- **`step-frame-store≤`** (Part7/Arrival-Caps) — FALSITY, `REFUTED, TWIN`: the
+  store half of that step, carried APART from the values half so that no
+  ceiling has to cross a step at all; the position's ceiling is rebuilt from
+  the two ingredients where it is spent.
 - **`subscribeInner-strat`** (Part7/Strat-Leaves) — FALSITY, `PROBED`: one
   subscribe's burst read below the floor, which both subscribing heads reduce
   to. The slot read is the only arm emitting syntax the source does not carry,
@@ -324,32 +360,6 @@ does not fit is a finding about the shared statement, not about the head.
   is the telescope summand — `input` charges nought, so no program reading
   reaches it. The summand is owed the connect's TRANSITIVE reach; sum against
   maximum is closed to instantiation.
-- **`walk-share-valsNest`** (Part7/Depth-Fit) — FALSITY, `DEAD ROUTE×2`: the
-  values a dispatch hands on are under the instant's nest cap. The headroom
-  closed, so this is what the fan's terminal was; nothing in the store mentions
-  a list the walk carried in, so it is owed at whatever frame emitted it.
-- **`fan-regsSzL-mint`** (Part7/Depth-Fit) — FALSITY,
-  `REFUTED×4, DEAD ROUTE×7`: the registry read at the ENTRY cap in the PACKED
-  form, which only the terminal leaves now ask for. Both conjuncts refuted at
-  its generic form, at separate witnesses, so no budget and no split repairs
-  it.
-- **`walk-share-nestOK`** (Part7/Depth-Fit) — FALSITY, `DEAD ROUTE×4`: the
-  instant's nest predicate at the state the fan reads the registry. The door
-  has it and the walk carries no nest conjunct at all; threading it down is
-  refused by the store's own growth toward the NEXT cap.
-- **`share-fold-store≤`** (Part7/Arrival-Caps) — FALSITY, `REFUTED, TWIN`: the
-  store across one `foldPath`, PRICED against the round's grant rather than
-  preserved. A `scan-f` at an obs-typed accumulator crossed the preservation,
-  and the grant is sealed — so the repair closes the region to instantiation on
-  both sides at once.
-- **`step-frame-vals≤`** (Part7/Arrival-Caps) — FALSITY, `REFUTED, TWIN`: what
-  one `stepFrame` leaves in the delivered values, at that same grant. This is
-  the axis the frame moves and the fold does not — a scan emits the accumulator
-  it just wrote — so the trade the old ceiling permitted ran one way only.
-- **`step-frame-store≤`** (Part7/Arrival-Caps) — FALSITY, `REFUTED, TWIN`: the
-  store half of that step, carried APART from the values half so that no
-  ceiling has to cross a step at all; the position's ceiling is rebuilt from
-  the two ingredients where it is spent.
 - **`shareAdmit-strat`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: what a
   share hands the chains it admitted, and THE ONE PLACE THE REGISTRY READING IS
   SPENT rather than established. The chain half rides the admission filter,
