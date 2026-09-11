@@ -6,7 +6,7 @@ open import Data.Bool    using (Bool; true; false; _∧_; _∨_; if_then_else_)
 open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (*-assoc; ≤ᵇ⇒≤; ≤⇒≤ᵇ; ^-monoʳ-≤; *-monoˡ-≤; *-cancelˡ-≤; ≤-trans; ≤-refl; ≤-reflexive; m≤m+n;
   m≤n+m; n≤1+n; *-identityʳ; *-mono-≤; *-monoʳ-≤; +-monoʳ-≤; +-monoˡ-≤; ⊔-lub; m≤m⊔n; m≤n⊔m;
-  +-mono-≤; +-suc; +-assoc; *-distribʳ-+)
+  +-mono-≤; +-suc; +-assoc; m∸n≤m; *-identityˡ)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.List    using (List; []; _∷_; _++_; length; foldr)
@@ -115,22 +115,26 @@ pathNestD-step (take-f _)         p = ≤-refl
 pathNestD-step (from-inner _ _ _) p = ≤-refl
 pathNestD-step (thru-outer _ _)   p = n≤1+n (pathNestD p)
 
--- AND THE WALK'S DEPTH IS THE STORE'S PLUS ONE SQUARE, which is the
--- whole difference between the two ledgers: they step identically at
--- every frame and part company only at the leaf, where the walk's
--- prices the chain a hand-over passes its values to and the store's
--- prices nothing.  A path carries exactly one leaf, so the gap is a
--- constant and not a recursion.
+-- AND THE WALK'S DEPTH IS THE STORE'S PLUS THE CLIMB'S SQUARE, which
+-- is the whole difference between the two ledgers: they step
+-- identically at every frame and part company only at the leaf, where
+-- the walk's prices the chain a hand-over passes its values to and the
+-- store's prices nothing.  A path carries exactly one leaf, so the gap
+-- is a constant and not a recursion -- but the constant is now indexed
+-- by the climb the leaf still has left, and the climb is at most the
+-- slot count, so the ledger-side reading takes that as its cap.
 pathΦD≤nestD : ∀ {n} {Γ : Ctx n} {s t} (B : ℕ) (p : Path Γ s t) →
-  pathΦD B p ≤ pathNestD p + (B + B) * B
+  pathΦD B p ≤ pathNestD p + (n * (B + B)) * B
 pathΦD≤nestD B root                   = z≤n
-pathΦD≤nestD B (share-sink _)         = ≤-refl
-pathΦD≤nestD B (map-f fn ↠ p)         =
+pathΦD≤nestD {n = n} B (share-sink i) =
+  ≤-trans (*-monoˡ-≤ ((B + B) * B) (m∸n≤m n (toℕ i)))
+          (≤-reflexive (sym (*-assoc n (B + B) B)))
+pathΦD≤nestD {n = n} B (map-f fn ↠ p)         =
   ≤-trans (+-monoʳ-≤ (nestDᵗ fn) (pathΦD≤nestD B p))
-          (≤-reflexive (sym (+-assoc (nestDᵗ fn) (pathNestD p) ((B + B) * B))))
-pathΦD≤nestD B (scan-f fn _ ↠ p)      =
+          (≤-reflexive (sym (+-assoc (nestDᵗ fn) (pathNestD p) ((n * (B + B)) * B))))
+pathΦD≤nestD {n = n} B (scan-f fn _ ↠ p)      =
   ≤-trans (+-monoʳ-≤ (nestDᵗ fn) (pathΦD≤nestD B p))
-          (≤-reflexive (sym (+-assoc (nestDᵗ fn) (pathNestD p) ((B + B) * B))))
+          (≤-reflexive (sym (+-assoc (nestDᵗ fn) (pathNestD p) ((n * (B + B)) * B))))
 pathΦD≤nestD B (take-f _ ↠ p)         = pathΦD≤nestD B p
 pathΦD≤nestD B (from-inner _ _ _ ↠ p) = pathΦD≤nestD B p
 pathΦD≤nestD B (thru-outer _ _ ↠ p)   = s≤s (pathΦD≤nestD B p)
@@ -232,8 +236,8 @@ walk-thru-fit-gen : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (sched : Sched Γ) (st : EvalSt e) →
   2 ≤ S →
   n ≤ S →
-  4 * (2 ^ ((S + S + (S + S)) * (suc S * S)) * (NC + (S + S) * S))
-    + 2 * (2 ^ ((S + S + (S + S)) * (suc S * S)) * (S * slotWrapSum sl))
+  4 * (2 ^ ((suc S * (S + S)) * (suc S * S)) * (NC + (S * (S + S)) * S))
+    + 2 * (2 ^ ((suc S * (S + S)) * (suc S * S)) * (S * slotWrapSum sl))
     ≤ Φ →
   Sched.slots sched ≡ sl →
   pathSzL? S (thru-outer op nid ↠ p) ≡ true →
@@ -264,14 +268,16 @@ walk-thru-fit-gen {n = n} sl S NC Φ sf eid now op nid p vals fin sched st
   hpp  = pathSzL?-tail S (thru-outer op nid) p hpz
   1≤S  = ≤-trans (s≤s z≤n) 2≤S
   EXP  : ℕ
-  EXP  = (S + S + (S + S)) * (suc S * S)
+  EXP  = (suc S * (S + S)) * (suc S * S)
   Q≤   : Q ≤ 2 ^ EXP
-  Q≤   = pathΦF-cap-atLen S (S + S) p (pathSzL?-frames S p hpp)
-                          (pathSzL?-len S p hpp)
-  D≤   : D ≤ NC + (S + S) * S
+  Q≤   = ≤-trans (pathΦF-cap-atLen S (S + S) p (pathSzL?-frames S p hpp)
+                                   (pathSzL?-len S p hpp))
+                 (^-monoʳ-≤ 2 (*-monoˡ-≤ (suc S * S)
+                                (+-monoʳ-≤ (S + S) (*-monoˡ-≤ (S + S) n≤S))))
+  D≤   : D ≤ NC + (S * (S + S)) * S
   D≤   = ≤-trans (pathΦD≤nestD S p)
-                 (+-monoˡ-≤ ((S + S) * S)
-                            (≤-trans (n≤1+n (pathNestD p)) hnd))
+                 (+-mono-≤ (≤-trans (n≤1+n (pathNestD p)) hnd)
+                           (*-monoˡ-≤ S (*-monoˡ-≤ (S + S) n≤S)))
   2≤2^S : 2 ≤ 2 ^ S
   2≤2^S = ≤-trans (≤-reflexive (sym (*-identityʳ 2))) (^-monoʳ-≤ 2 1≤S)
   -- the values in flight, paid by the outer frame's own factor
@@ -1303,10 +1309,10 @@ frameΦ-fit sl id sf eid now Lv (thru-outer op nid) p vals fin sched st hsl _ hp
 -- over is an inequality between two arithmetics neither of which
 -- mentions a path.
 chgF : ℕ → ℕ
-chgF B = 2 ^ ((B + B + (B + B)) * (suc B * B))
+chgF B = 2 ^ ((suc B * (B + B)) * (suc B * B))
 
 chgD : ℕ → ℕ
-chgD B = (B + B) * B + (B + B) * B
+chgD B = (B + B) * B + (B * (B + B)) * B
 
 -- the fit read one value at a time, so the list's maximum is never
 -- formed and the empty list is not a special case
@@ -1347,27 +1353,49 @@ chg-headroom : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : 
   chgF (Caps.cSize (capsAt e sl id))
     * (d + chgD (Caps.cSize (capsAt e sl id))) ≤ nestΦAt e sl id
 chg-headroom e sl id d hd =
-  ≤-trans (*-monoʳ-≤ Z (+-monoˡ-≤ (X + X) hd))
+  ≤-trans (*-monoʳ-≤ Z (+-monoˡ-≤ (X₁ + X₂) hd))
   (≤-trans (*-monoʳ-≤ Z fold2)
-  (≤-trans (≤-reflexive (pull2 Z (C + X)))
-  (≤-trans (*-monoˡ-≤ (Z * (C + X)) (≤ᵇ⇒≤ 2 4 tt))
-  (≤-trans (m≤m+n (4 * (Z * (C + X))) (2 * (Z * (B * slotWrapSum sl))))
+  (≤-trans (≤-reflexive (pull2 Z (C + X₂)))
+  (≤-trans (*-monoˡ-≤ (Z * (C + X₂)) (≤ᵇ⇒≤ 2 4 tt))
+  (≤-trans (m≤m+n (4 * (Z * (C + X₂))) (2 * (Z * (B * slotWrapSum sl))))
            (nestΦ-frame-charge e sl id)))))
   where
   B = Caps.cSize (capsAt e sl id)
   Z = chgF B
-  X = (B + B) * B
+  X₁ = (B + B) * B
+  X₂ = (B * (B + B)) * B
   C = nestCapAt e sl id
-  two : 2 * (C + X) ≡ C + X + (C + X)
-  two = solve 2 (λ c x → con 2 :* (c :+ x) := c :+ x :+ (c :+ x)) refl C X
-  fold2 : C + (X + X) ≤ 2 * (C + X)
-  fold2 = ≤-trans (≤-reflexive (sym (+-assoc C X X)))
-          (≤-trans (+-monoʳ-≤ (C + X) (m≤n+m X C))
-                   (≤-reflexive (sym two)))
+  1≤B : 1 ≤ B
+  1≤B = ≤-trans (s≤s z≤n) (8≤capsAt-size e sl id)
+  X₁≤X₂ : X₁ ≤ X₂
+  X₁≤X₂ = *-monoˡ-≤ B (≤-trans (≤-reflexive (sym (*-identityˡ (B + B))))
+                               (*-monoˡ-≤ (B + B) 1≤B))
+  two : 2 * (C + X₂) ≡ C + X₂ + (C + X₂)
+  two = solve 2 (λ c x → con 2 :* (c :+ x) := c :+ x :+ (c :+ x)) refl C X₂
+  fold2 : C + (X₁ + X₂) ≤ 2 * (C + X₂)
+  fold2 = ≤-trans (+-monoʳ-≤ C (+-monoˡ-≤ X₂ X₁≤X₂))
+          (≤-trans (≤-reflexive (sym (+-assoc C X₂ X₂)))
+          (≤-trans (+-monoʳ-≤ (C + X₂) (m≤n+m X₂ C))
+                   (≤-reflexive (sym two))))
   pull2 : ∀ (z y : ℕ) → z * (2 * y) ≡ 2 * (z * y)
   pull2 z y = solve 2 (λ z′ y′ → z′ :* (con 2 :* y′) := con 2 :* (z′ :* y′))
                     refl z y
 
+-- AND THE SHARPENING THIS CHARGE DOES NOT YET TAKE, which is a
+-- question about what the arm CARRIES rather than about the
+-- arithmetic.  The chain is charged here at the deepest terminal the
+-- context admits, because that is all a path predicate says; a
+-- registry entry's source sits strictly BELOW the floor of the chain
+-- it installs, so the climb drops by at least one across the hand-over
+-- and the sink's own price would cover its chains outright.  The fan
+-- reaches this site with no receipt about where its chain came from,
+-- so the strict drop is unavailable and the slot count stands in for
+-- it.
+-- RECOVERY: `git show da065b2e` restores `pathFloor≤`,
+--   `pathΦSz-floor` and `pathΦF-under-sink`, which state and prove
+--   exactly that reading of a fanned-out chain's factor against the
+--   sink's -- the piece this site would spend once the entry's
+--   stratification reaches it.
 sink-fan-chg : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (i : Fin n) (p : Path Γ (lookup Γ i) t)
   (vals : List (Val Γ (lookup Γ i))) →
@@ -1376,14 +1404,18 @@ sink-fan-chg : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id) p vals ≡ true
 sink-fan-chg {e = e} sl id i p vals hz hnv =
   valsΦ?-ceil B (nestΦAt e sl id) (chgF B) (chgD B) (nestCapAt e sl id) p vals
-    (pathΦF-cap-atLen B (B + B) p hf hl)
+    (≤-trans (pathΦF-cap-atLen B (B + B) p hf hl)
+             (^-monoʳ-≤ 2 (*-monoˡ-≤ (suc B * B)
+                            (+-monoʳ-≤ (B + B) (*-monoˡ-≤ (B + B) n≤B)))))
     (≤-trans (pathΦD-len B p 1≤B hf)
-      (+-monoˡ-≤ ((B + B) * B) (*-monoˡ-≤ B hl)))
+      (+-mono-≤ (*-monoˡ-≤ B hl)
+                (*-monoˡ-≤ B (*-monoˡ-≤ (B + B) n≤B))))
     (chg-headroom e sl id) hnv
   where
   B = Caps.cSize (capsAt e sl id)
   1≤B : 1 ≤ B
   1≤B = ≤-trans (s≤s z≤n) (8≤capsAt-size e sl id)
+  n≤B = n≤capsAt-size e sl id
   hf : pathFrameSz? B p ≡ true
   hf = pathSzL?-frames B p hz
   hl : pathLen p ≤ B + B
@@ -2226,24 +2258,26 @@ entryΦ-atLen : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   nestDᵛ (arrTy a) (arrVal a) + pathNestD path ≤ nestUnit e sl →
   valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id) path
          (arrVal a ∷ []) ≡ true
-entryΦ-atLen {e = e} sl id L a path hL hf hl hΦ =
+entryΦ-atLen {n = n} {e = e} sl id L a path hL hf hl hΦ =
   ∧-intro (T⇒≡true _ (≤⇒≤ᵇ Φfit)) refl
   where
   Sz = Caps.cSize (capsAt e sl id)
   2≤Sz : 2 ≤ Sz
   2≤Sz = 2≤capsAt-size e sl id
-  twoSq : (Sz + Sz) * Sz ≤ Sz * Sz + Sz * Sz + (Sz * Sz + Sz * Sz)
-  twoSq = ≤-trans (≤-reflexive (*-distribʳ-+ Sz Sz Sz))
-                  (m≤m+n (Sz * Sz + Sz * Sz) (Sz * Sz + Sz * Sz))
+  n≤Sz : n ≤ Sz
+  n≤Sz = n≤capsAt-size e sl id
+  Cu = (Sz * (Sz + Sz)) * Sz
+  twoCu : (n * (Sz + Sz)) * Sz ≤ Cu + Cu
+  twoCu = ≤-trans (*-monoˡ-≤ Sz (*-monoˡ-≤ (Sz + Sz) n≤Sz))
+                  (m≤m+n Cu Cu)
   dΦ : nestDᵛ (arrTy a) (arrVal a) + pathΦD Sz path
-         ≤ nestUnit e sl + (Sz * Sz + Sz * Sz + (Sz * Sz + Sz * Sz)) + Sz
+         ≤ nestUnit e sl + (Cu + Cu) + Sz
   dΦ =
     ≤-trans (+-monoʳ-≤ (nestDᵛ (arrTy a) (arrVal a)) (pathΦD≤nestD Sz path))
     (≤-trans (≤-reflexive (sym (+-assoc (nestDᵛ (arrTy a) (arrVal a))
-                                        (pathNestD path) ((Sz + Sz) * Sz))))
-    (≤-trans (+-mono-≤ hΦ twoSq)
-             (m≤m+n (nestUnit e sl
-                     + (Sz * Sz + Sz * Sz + (Sz * Sz + Sz * Sz))) Sz)))
+                                        (pathNestD path) ((n * (Sz + Sz)) * Sz))))
+    (≤-trans (+-mono-≤ hΦ twoCu)
+             (m≤m+n (nestUnit e sl + (Cu + Cu)) Sz)))
   Φfit : pathΦF Sz path * (nestDᵛ (arrTy a) (arrVal a) + pathΦD Sz path)
            ≤ nestΦAt e sl id
   Φfit = ≤-trans
@@ -2251,14 +2285,13 @@ entryΦ-atLen {e = e} sl id L a path hL hf hl hΦ =
            (sym (nestWalkAt-def e sl id))
            (*-mono-≤ (≤-trans (pathΦF-cap-atLen Sz L path hf hl)
                               (^-monoʳ-≤ 2
-                                (≤-trans (walkExpL-widen Sz (L + (Sz + Sz))
-                                            2≤Sz (+-monoˡ-≤ (Sz + Sz) hL))
+                                (≤-trans (walkExpL-widen Sz (L + n * (Sz + Sz))
+                                            2≤Sz
+                                            (+-mono-≤ hL
+                                              (*-monoˡ-≤ (Sz + Sz) n≤Sz)))
                                          (n≤1+n _))))
                      (≤-trans dΦ
-                              (m≤m+n (nestUnit e sl
-                                      + (Sz * Sz + Sz * Sz
-                                         + (Sz * Sz + Sz * Sz))
-                                      + Sz)
+                              (m≤m+n (nestUnit e sl + (Cu + Cu) + Sz)
                                      (Sz * slotWrapSum sl)))))
     (nestWalkAt≤nestΦAt e sl id)
 

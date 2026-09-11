@@ -126,10 +126,10 @@ deepens _ = refl
 -- THE TWO QUANTITIES AT THE FLOOR THE TOWER DISCHARGES FROM, pinned,
 -- so a repair moving either fails here naming the number rather than
 -- turning the crossing into an equality.
-leafFac≡ : pathΦF 8 sink ≡ 2 ^ 1152
+leafFac≡ : pathΦF 8 sink ≡ 2 ^ 2304
 leafFac≡ = refl
 
-leafDep≡ : pathΦD 8 sink ≡ 128
+leafDep≡ : pathΦD 8 sink ≡ 256
 leafDep≡ = refl
 
 legal : pathSz? 8 chain ≡ true

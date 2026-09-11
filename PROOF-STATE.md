@@ -287,15 +287,14 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 - **WHAT PRICES A REGISTERED CHAIN, AND WHERE IS THE RECEIPT OWED?** It is
-  not a denomination question, it does not split at the LEVEL, and both
-  halves that named no cap are now gone — each a projection of a caps
-  conjunct once stated at the index the consumer reads it at. What is
-  left is CAP-DENOMINATED and only that: the TERMINAL LEAVES, which
-  cannot follow a widening because the pricing reads a length under the
-  cap its own conclusion names — and under them the SUPPLY, since two
-  siblings die free-standing at one `register`. The fan's half is no longer
-  priced at all: its arithmetic closed against the cap charge, and what is
-  left is a DEPTH receipt on values the registry never sees.
+  not a denomination question and it does not split at the LEVEL. The
+  TERMINAL LEAVES are settled: the leaf is priced by the CLIMB the walk
+  still has ahead of it rather than by either endpoint, and every
+  consumer's arithmetic absorbed the widening that cost. What is left is
+  the SUPPLY, where two siblings die free-standing at one `register`.
+  The fan's half is not priced at all — its arithmetic closed against
+  the cap charge, and what is left there is a DEPTH receipt on values
+  the registry never sees.
   relevant: `fan-regsSzL-mint`, `walk-share-valsNest`
 
 ### The ledger
