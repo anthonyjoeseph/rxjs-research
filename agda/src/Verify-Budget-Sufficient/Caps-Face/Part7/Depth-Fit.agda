@@ -903,6 +903,20 @@ postulate
   --   carries that factor.  The three subdivisions that reached the
   --   spiral stop were all inside this potential, so a fourth is the
   --   same route under a new name.
+
+  -- AND THE GAS THAT FUNDS THIS INSTANT IS ALREADY SIGHTED AT THE NEXT
+  -- ONE, which is the asymmetry every route above was read against
+  -- without it being stated.  `budgetAt-gs-pad` (.Burst-Walk) pins the
+  -- gas handed to instant `id` as a tower over the height at `suc id`,
+  -- while the potential these arms charge against is read at `id`.  So
+  -- an exit-index denomination is not foreign to this accounting --
+  -- half of it is already spent that way -- and what a re-sighting
+  -- costs is a restatement of the depth face rather than a quantity
+  -- nothing here can name.  It revives none of the routes above: each
+  -- moved the CHARGE or the BUDGET at a fixed sighting, and this moves
+  -- the sighting.  Read off the two definitions rather than
+  -- instantiated, the height recurrence being sealed for cost.
+
   scanΦ-burst-count : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sl : Slots Γ) (id : ℕ) (Lv : ℕ)
     (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
