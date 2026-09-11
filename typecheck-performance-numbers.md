@@ -482,7 +482,11 @@ figure, so the second run was as close to the ceiling as the first. What one
 module per process buys is that Agda frees its allocation when the process exits,
 and nothing else does: Agda frees nothing across a single invocation, so a warm
 that spans several modules carries every earlier module's peak into the later
-ones and the ceiling arrives sooner in the list.
+ones and the ceiling arrives sooner in the list. The split also said which
+module it was, which the kill could not: the other two warmed in **53.3 s
+together** once `Walk-Level` was cached, so essentially the whole of both the
+duration and the peak was one module, and the two cheap ones were only
+unlucky enough to share its process.
 
 **What it means for a session, and it is not a tuning knob.** A warm below this
 part of the tower is launched one module at a time — read the stale list the

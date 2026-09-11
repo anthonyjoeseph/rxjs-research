@@ -238,17 +238,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE FINISHES A PARK READING HAS NEVER BEEN RUN THROUGH**, which is
-  what the owner question leaves standing now that the node a write is
-  entered at is priced. `frameParked-step` is instantiated at the two
-  outcomes of the overwrite its closure premise exists for and at the
-  drain that reinstalls, and at nothing else: the switch and exhaust
-  finishes write a different cell shape, the enqueue is covered only
-  where there is no room, and every row stands at a root-ended chain,
-  so a floor below the context width is untouched. The commit reaches
-  those shapes and returns a refutation or a receipt naming them.
-  Until it does the row's class rests on arms nothing has run.
-
 - **THE PACKED READING NOTHING HAS EVER INSTANTIATED**, which is the
   whole of what the leaves half now stands on. The walk no longer
   reads the registry at the entry cap, so the one surviving mint asks
@@ -270,6 +259,17 @@ does not fit is a finding about the shared statement, not about the head.
   ordering where that arm is priced: it converts the hop count into a
   bound the telescope supplies, and either lands the leaf or returns the
   first shape the strictness does not reach.
+
+- **THE MINT READING, CARRIED RATHER THAN DERIVED**, which is the half of
+  WHICH STORE CELLS DOES A PATH PREDICATE REACH that the walk did not
+  settle. Three rows of the nest face read a cell an ARRIVAL rewrites
+  rather than one a chain carries, and each dies free-standing — so no
+  strengthening of the caps receipt reaches them, and the reading has to
+  arrive at the mint as a premise something upstream already established.
+  The commit states that carrier at the index the mint consumes it at,
+  and either lands one of the three on it or returns the first site the
+  carrier cannot be supplied from — which is what turns a supply question
+  into a placement one.
 
 ### Open questions
 
@@ -380,10 +380,6 @@ does not fit is a finding about the shared statement, not about the head.
   a frame hands the rest of its chain. The walk re-enters on the tail with an
   output the caps receipt prices but does not read; the floor does not move
   across a frame, which is what lets one statement cover the walk.
-- **`frameParked-step`** (Part7/Strat-Leaves) — FALSITY, `PROBED`: the STORE
-  half of the frame-keyed park reading across one step, the owner half being a
-  body now. The overwrite the closure premise exists for is instantiated at
-  both outcomes and at the drain; the switch and exhaust finishes are not.
 - **`foldPath-park`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the park
   reading once a SIBLING chain has folded. It is about a state the walk
   PRODUCED rather than one it was handed, and it TAKES the reading as a
@@ -422,6 +418,10 @@ does not fit is a finding about the shared statement, not about the head.
   charge at the queue's own `drainW`. Its extra premise pins the cell's
   CONSTRUCTOR, not its depth, so a parked program runs the store term away here
   too; the width is walk-denominated besides.
+- **`frameParked-step`** (Part7/Strat-Leaves) — DIFFICULTY, `PROBED`: the STORE
+  half of the frame-keyed park reading across one step. Every arm that WRITES
+  is instantiated, a floor below the width included; the two finishes left are
+  free of the reading by a quantified equation, not by a chosen state.
 - **`share-fold-fit`** (Part7/Arrival-Caps) — DIFFICULTY, `DEAD ROUTE, TWIN`:
   one admitted registration's path, priced at the round's GRANT. The assembly
   is the chain face's; the sink arm is a dispatch that now descends in its own
