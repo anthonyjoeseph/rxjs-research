@@ -1453,6 +1453,23 @@ fan-regsSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 fan-regsSz {e = e} sl id Lv sched st cok =
   capsOK?-regs (frameStep Lv (capsAt e sl id)) sched st cok
 
+-- THE GRANT IS DENOMINATION-FREE AND THE POTENTIAL IS NOT, WHICH IS
+-- WHERE THE RE-DENOMINATION STOPS.  The frame arm's budget is proven
+-- of four bare numbers asking of the cap only that it be at least
+-- two, and both spenders of the packed reading are cap-generic, so
+-- restating this row at the cap the registry receipt is actually held
+-- at costs nothing in the grant and nothing at either spender.  What
+-- it costs sits one level out.  The walk's share conclusion is indexed
+-- by the cap its premise names, so moving the premise moves the
+-- conclusion -- and the potential that conclusion is priced against
+-- GROWS with the cap, strictly, through an exponent.  The ceiling the
+-- whole face is fitted under is stated at the instant's entry cap, so
+-- a stepped-cap reading does not re-letter the face: it asks that
+-- ceiling to absorb a potential taken at the NEXT instant's entry cap.
+-- That is the same quantity the enlargement route recorded for this
+-- statement already dies on, reached from the pricing side rather than
+-- from the receipt.  The cap is free to climb; the potential is not.
+--
 -- THE LEAVES' HALF OF THE SAME READING, AND THE DOUBLING DOES NOT SAVE
 -- IT.  The packed form was adopted because the witness that kills the
 -- flat reading satisfies it -- a minted chain of eight frames against
