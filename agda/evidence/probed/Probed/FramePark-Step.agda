@@ -25,21 +25,23 @@
 -- scan's reading is bought rather than transported, instantiated at
 -- both of the cases it distinguishes.
 --
--- WHAT IS NOT COVERED.  The `switchᵒ` and `exhaustᵒ` arms of
--- `innerFinish`, which write a different cell shape; the
--- `hasRoom = true` arm of the enqueue row; and a `share-sink` chain,
--- where the floor sits below the context width: every row here is
--- taken at a root-ended chain, so nothing says what happens when the
--- floor is not the full width.  `map-f` and `take-f` are covered only
--- degenerately, `framePark?` being `true` at both.
+-- WHAT IS NOT COVERED.  A `take-f`, which is free for `map-f`'s
+-- reason; the absorbing arm of `innerReact`, where a live
+-- registration under the instance stops the finish and the step
+-- writes nothing at all; and the `switchᵒ` arm at an instance the
+-- cell is not currently holding, which likewise writes nothing.
+-- Every row is taken at a two-slot context, so no floor above two is
+-- reached and nothing here separates the width from the floor except
+-- by lowering it.
 -- ══════════════════════════════════════════════════════════════════
 module Probed.FramePark-Step where
 
-open import Data.Bool using (false; true)
+open import Data.Bool using (Bool; false; true)
 open import Data.Fin using () renaming (zero to fzero; suc to fsuc)
 open import Data.List using ([]; _∷_)
 open import Data.List.Relation.Unary.Any using (here)
-open import Data.Maybe using (just)
+open import Data.Maybe using (Maybe; just)
+open import Data.Nat using (ℕ)
 open import Data.Vec using () renaming ([] to []ⱽ; _∷_ to _∷ⱽ_)
 open import Data.Product using (proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
@@ -50,9 +52,10 @@ open import Rx.Exp
          strmᵗ; fstᵗ; varᵗ; nat̂)
 open import Rx.Slots using (Slots; scripted)
 open import Rx.Evaluator
-  using (EvalSt; Path; root; _↠_; map-f; scan-f; from-inner; thru-outer; mergeAllᵒ;
+  using (EvalSt; NodeId; Path; root; share-sink; _↠_; map-f; scan-f; from-inner;
+  thru-outer; mergeAllᵒ; switchᵒ; exhaustᵒ; switch-st; exhaust-st;
   sched-init; st-init; installNode; scan-st; mergeAll-st; stepFrame; mergeAllDrain)
-open import Verify-Budget-Sufficient.Caps-Face.Part1 using (framePark?)
+open import Verify-Budget-Sufficient.Caps-Face.Part1 using (framePark?; parkStrat?; pathFloor)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Strat-Leaves
   using (frameParked-step)
 open import Probed.Apparatus using (Confirms)
@@ -225,3 +228,103 @@ lowFloorPost :
          (sched-init e₂ sl₂ʰ) stᶠ)))))
     ≡ false
 lowFloorPost = refl
+
+----------------------------------------------------------------------
+-- ROWS 7 AND 8 — THE TWO FINISHES THAT WRITE A DIFFERENT CELL SHAPE,
+-- and they are DEGENERATE for a STRUCTURAL reason rather than because
+-- these states happen to be quiet.  `innerFinish` at a `switchᵒ`
+-- reinstalls `switch-st nothing od` and at an `exhaustᵒ` reinstalls
+-- `exhaust-st false od`; `parkStrat?` reads a queue at a
+-- `mergeAll-st` and an accumulator at a `scan-st`, and is `true` at
+-- every other cell shape.  So no write either arm can make is visible
+-- to the reading at all, and the two rows below could not have
+-- failed.  The equations beside them are what makes that a fact about
+-- the predicate rather than about the states chosen here: they
+-- quantify over every field either cell carries.
+----------------------------------------------------------------------
+
+switchCellFree : ∀ (k : ℕ) (c : Maybe NodeId) (od : Bool) →
+  parkStrat? {Γ = Γ₂} k (just (switch-st c od)) ≡ true
+switchCellFree k c od = refl
+
+exhaustCellFree : ∀ (k : ℕ) (act od : Bool) →
+  parkStrat? {Γ = Γ₂} k (just (exhaust-st act od)) ≡ true
+exhaustCellFree k act od = refl
+
+stˢʷ : EvalSt e₂
+stˢʷ = installNode 4 (switch-st (just 11) false) (st-init e₂)
+
+tieSwitchFinish : Confirms
+  (frameParked-step g0 0 0 (from-inner switchᵒ 4 11) root (3 ∷ []) true
+     (sched-init e₂ sl₂) stˢʷ refl refl refl)
+tieSwitchFinish = refl
+
+stᵉˣ : EvalSt e₂
+stᵉˣ = installNode 4 (exhaust-st true false) (st-init e₂)
+
+tieExhaustFinish : Confirms
+  (frameParked-step g0 0 0 (from-inner exhaustᵒ 4 11) root (3 ∷ []) true
+     (sched-init e₂ sl₂) stᵉˣ refl refl refl)
+tieExhaustFinish = refl
+
+----------------------------------------------------------------------
+-- ROWS 9 AND 10 — THE ENQUEUE ARM WHERE THERE IS ROOM, which is the
+-- half of the outer's consume the enqueue row above does not reach.
+-- With a lane free the arriving observable is SUBSCRIBED instead of
+-- parked, so the queue the reading is about is not written by this
+-- step at all and the answer is transported from the premise.  The
+-- cell is given a parked term anyway, so the reading is not the
+-- vacuous `all` over an empty queue: LOAD-BEARING on the third
+-- premise, since at floor zero that term falsifies the premise and
+-- the conclusion together.
+--
+-- Row 10 runs the same state under gas, where the subscription is
+-- real and the inner's own burst can route back through this node —
+-- the one way a room-available step can reach the queue.  Slot zero
+-- is COLD, so the inner finishes inside its own subscribe and the
+-- finish runs the drain on the very cell the reading names.
+----------------------------------------------------------------------
+
+stʳ : EvalSt e₂
+stʳ = installNode 0
+        (mergeAll-st {t = natᵗ} (just 2) 0 (input fzero ∷ []) false)
+        (st-init e₂)
+
+tieThruRoom : Confirms
+  (frameParked-step g0 0 0 (thru-outer mergeAllᵒ 0) root
+     (input fzero ∷ []) false (sched-init e₂ sl₂) stʳ refl refl refl)
+tieThruRoom = refl
+
+tieThruRoomGassed : Confirms
+  (frameParked-step (gasPad 40 g0) 0 0 (thru-outer mergeAllᵒ 0) root
+     (input fzero ∷ []) false (sched-init e₂ sl₂) stʳ refl refl refl)
+tieThruRoomGassed = refl
+
+----------------------------------------------------------------------
+-- ROW 11 — A CHAIN THAT DOES NOT END AT THE ROOT, which is the shape
+-- every row above is silent about: the floor is the SLOT INDEX there
+-- and not the context width, so the reading is asked at a number
+-- strictly below the one it has always been asked at.  Sinking at
+-- slot one gives floor one, where `input fzero` is admissible and
+-- `input (fsuc fzero)` is not — so the floor separates the two
+-- references rather than admitting both, which is what a row at the
+-- root could not do.  LOAD-BEARING on the vals premise: it is the
+-- arriving term that lands in the queue, and at the other reference
+-- premise and conclusion go false together.
+----------------------------------------------------------------------
+
+κᵏ : Path Γ₂ natᵗ natᵗ
+κᵏ = share-sink (fsuc fzero)
+
+floorᵏ : pathFloor κᵏ ≡ 1
+floorᵏ = refl
+
+stᵏ : EvalSt e₂
+stᵏ = installNode 0
+        (mergeAll-st {t = natᵗ} (just 0) 0 (input fzero ∷ []) false)
+        (st-init e₂)
+
+tieSinkFloor : Confirms
+  (frameParked-step g0 0 0 (thru-outer mergeAllᵒ 0) κᵏ
+     (input fzero ∷ []) false (sched-init e₂ sl₂) stᵏ refl refl refl)
+tieSinkFloor = refl

@@ -128,12 +128,24 @@ postulate
   --   inner, which is what holds the freed lane and leaves a residue
   --   for the reading to carry -- a cold one finishes inside its own
   --   subscribe and the drain empties the queue outright.
-  --   NOT covered: the `switchᵒ` and `exhaustᵒ` arms of the same
-  --   finish, which write a different cell shape; the room-available
-  --   arm of the enqueue; and any chain not ending at `root`, so
-  --   nothing here says what happens when the floor sits below the
-  --   context width.  Every row is taken against the STORE conjunct,
-  --   the whole reading being what its premise still asks for.
+  --   Plus the room-available arm of the outer's consume, at g0 and
+  --   under gas, where the arriving observable is subscribed instead
+  --   of parked and a cold inner's finish drains the very cell the
+  --   reading names.  Plus a chain ending at a SHARE SINK, where the
+  --   floor is the slot index rather than the context width and
+  --   separates the two references instead of admitting both.
+  --   Plus the `switchᵒ` and `exhaustᵒ` arms of the finish, labelled
+  --   DEGENERATE and shown so: `parkStrat?` reads a queue at a
+  --   `mergeAll-st` and an accumulator at a `scan-st` and is `true` at
+  --   every other cell shape, so no write either arm can make is
+  --   visible to this reading -- which is a fact about the predicate
+  --   rather than about the states the rows chose, the probe
+  --   quantifying over every field either cell carries.
+  --   NOT covered: a `take-f`; the absorbing arm of `innerReact`,
+  --   where a live registration stops the finish; and the `switchᵒ`
+  --   arm at an instance the cell is not holding.  Every row is taken
+  --   against the STORE conjunct, the whole reading being what its
+  --   premise still asks for.
   frameParked-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (g : Gas) (id : Id) (now : Tick)
     (f : Frame Γ s u) (κ : Path Γ u t)
