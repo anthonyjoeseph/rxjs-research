@@ -1389,15 +1389,17 @@ fan-regsSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 fan-regsSz {e = e} sl id Lv sched st cok =
   capsOK?-regs (frameStep Lv (capsAt e sl id)) sched st cok
 
--- THE LEAVES' HALF OF THE SAME READING, AND IT IS THE HALF THE FLAT
--- ONE LEAVES STANDING.  What kills the entry-cap reading of the
--- registry is the LENGTH ledger and not the frame syntax: the witness
--- below is a minted chain of eight frames against an entry size of
--- six, so it fails the STRICT per-frame conjunct `pathSz?` carries and
--- satisfies both halves of the packed reading, whose length side asks
--- only for twice the cap.  So the split predicate survives exactly
--- where the flat one does not, and the risky region shrinks from the
--- registry's per-frame ledger to a frame syntax and a doubled length.
+-- THE LEAVES' HALF OF THE SAME READING, AND THE DOUBLING DOES NOT SAVE
+-- IT.  The packed form was adopted because the witness that kills the
+-- flat reading satisfies it -- a minted chain of eight frames against
+-- an entry size of six, which fails the strict per-frame conjunct
+-- while clearing a length side that asks only for twice the cap.  That
+-- is a figure about one witness and not a bound the operation
+-- respects: a subscribing frame pushes one frame per operator of the
+-- INNER, and what bounds the inner is the receipt in hand, taken at
+-- the STEPPED cap.  So no multiple of the entry cap is a length bound
+-- here, and the row is open on the same ground the flat one died on
+-- rather than on a smaller region.
 --
 -- AND THE TOP OF THE INSTANT PAYS FOR ITSELF, which is what makes this
 -- a body over one leaf rather than a second monolith.  At level zero
@@ -1406,6 +1408,14 @@ fan-regsSz {e = e} sl id Lv sched st cok =
 -- so the mint below carries only the levels above the top, which is
 -- where a registration minted since entry can sit.
 --
+-- REFUTED: `Refuted.Fan-Regs-Packed-Len`, which is this statement's
+--   own caps-generic form rather than the flat one's.  It is the
+--   sibling's witness with nine operators in the arrival's payload
+--   instead of two -- same state, node, chain and triple -- and the
+--   chain it registers runs to fifteen frames against a doubled entry
+--   budget of twelve.  The gap grows with the inner and the inner is
+--   priced at the stepped cap, so a larger multiple is refuted by a
+--   longer one and the repair is not a bigger budget.
 -- REFUTED: `Refuted.Fan-Regs-Entry-Cap`, at the caps-generic form,
 --   which is the strongest shape any route may read while `capsAt`'s
 --   fields stay sealed.  It discharges every side-condition the walk's

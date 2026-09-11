@@ -148,5 +148,14 @@ jobs:
           restore-keys: |
             agda-interfaces-${{ runner.os }}-
 
+      # `roadmap-moved` measures PROOF-STATE against the merge-base with its
+      # BASE ref, and its default is main -- so on a PR STACKED on another
+      # PR's branch the parent's roadmap edits satisfy it and the stacked leg
+      # passes having said nothing about the plan. Handing it the PR's real
+      # base is what keeps the check about THIS leg (CLAUDE.md, "roadmap-moved
+      # GOES VACUOUS ON A STACK UNLESS TOLD"). Empty on a push event, where
+      # there is no base and the target falls back to the previous commit.
       - name: make gate
+        env:
+          BASE_REF: ${{ github.base_ref && format('origin/{0}', github.base_ref) || '' }}
         run: make gate

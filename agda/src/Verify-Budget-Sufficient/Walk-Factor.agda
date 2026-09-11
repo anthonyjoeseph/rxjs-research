@@ -194,10 +194,15 @@ pathSz?-frames B (f ↠ p) h
 -- size receipt buys the pricing a length it can pay somewhere else;
 -- packing the two back together at a FIXED budget is what keeps that
 -- purchase from costing every statement in the face an extra index.
--- The budget is twice the cap because that is the length a registered
--- chain is known to need -- the walked chain plus one frame per
--- operator of the inner, each half under the cap -- and because the
--- walk's own charge is proven to afford exactly that.
+-- The budget is twice the cap because that is what the walk's own
+-- charge affords.  It is NOT a length a registered chain is known to
+-- stay under: `Refuted.Fan-Regs-Packed-Len` mints one at fifteen
+-- frames against a doubled budget of twelve, by pushing one frame per
+-- operator of an inner that the receipt in hand prices at the STEPPED
+-- cap.  So the budget is a figure about what can be PAID, and any
+-- statement asking for it at the ENTRY cap is asking for something the
+-- mint does not supply -- which is a fact about where such a reading
+-- may be taken, not about this predicate.
 --
 -- AND THE WALKED READING IMPLIES IT, so nothing that already holds a
 -- size receipt has to acquire anything: a chain the walk priced is
