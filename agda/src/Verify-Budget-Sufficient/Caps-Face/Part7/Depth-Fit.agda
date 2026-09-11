@@ -1493,6 +1493,22 @@ fan-regsSz {e = e} sl id Lv sched st cok =
 --   the receipt: the grant is fixed at the entry cap and the registry
 --   supplies nothing there, so the repair is owed at the pricing's own
 --   denomination or at the budget the grant is drawn from.
+-- DEAD ROUTE: ENLARGING that budget, which is the second of those two
+--   ends and the one that reads affordable.  The headroom is real and
+--   it is an entire exponential level: `capsAt-exp2≤capsH` affords two
+--   to a DOUBLE exponential of the entry cap while the grant spends two
+--   to a cube of it, and the ceiling's own fit already carries a size
+--   floor generous enough for any polynomial degree the stepped reading
+--   could ask for.  It dies because the stepped cap is not a polynomial
+--   in the entry one.  The level a chain is registered at is bounded by
+--   the size COUNT of the instant being walked, and a cap stepped that
+--   many times is the NEXT instant's entry cap by construction -- which
+--   is a blowup OF this instant's height, not a quantity underneath it.
+--   So the enlarged budget would have to exceed the ceiling it is
+--   fitted under, and the affordable headroom is affordable for the
+--   wrong quantity.  Read off the definitions rather than instantiated:
+--   the count's own recurrence is sealed for cost, so what is checkable
+--   here is the shape of the bound and not a witness at numerals.
 -- DEAD ROUTE: moving the pricing's DENOMINATION rather than any
 --   receipt, so that the face names the cap the receipt is held at.
 --   Both answers die on the pricing rather than on the registry, and
