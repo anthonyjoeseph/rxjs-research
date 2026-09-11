@@ -238,16 +238,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE SINK'S PRICE, INDEXED BY THE CLIMB.** The depth-receipt route is
-  DISCARDED: no frame arm can supply a nest-cap ceiling on what it emits,
-  since substitution installs a payload's nesting once per occurrence, and
-  the reason it was asked for at all is that the sink leaf's factor is FLAT
-  — one chain-length of frame product, which pays a chain ending at ROOT and
-  can never pay one ending at a second sink. Enlarging it moves the ceiling
-  that reads it by the same amount, so WHAT PRICES A REGISTERED CHAIN is not
-  a question about which cap. The commit indexes the leaf by the share depth
-  still ahead of the walk and returns the first consumer whose arithmetic
-  the index does not survive.
+- **THE LEAF THE TELESCOPE ALREADY PAYS FOR.** Three frame heads became
+  two recursions and then ONE leaf, and the premise it turned out to
+  need is none: the only arm that can emit what the source's syntax does
+  not contain is the slot read, and the slot TYPE forbids both ways that
+  could land above the floor. So the row is off the store question
+  entirely and the risk is an induction over the evaluator rather than a
+  missing conjunct. The commit INSTANTIATES it at the arm that carries
+  the doubt — an observable-typed shared slot, which is the one shape
+  whose emission has syntax at all — and either receipts the leaf or
+  returns the arm the telescope does not in fact cover.
 
 - **THE FRAME ARMS IN THE SAME CURRENCY**, which is the rest of WHAT
   PRICES A REGISTERED CHAIN once the terminal stops asking for a
@@ -299,18 +299,10 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### The ledger
 
-- **`thru-strat-step`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the
-  payload that IS an observable, subscribed here and its burst grafted. What
-  leaves is the inner's, so nothing the caller handed in reads it and the store
-  receipt is the only premise standing.
-- **`inner-strat-step`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: what a
-  drained inner re-emits, read below the floor. The first head to SPEND the
-  park conjunct the walk already threads, so what is open is the drain's own
-  reduction rather than the reading.
-- **`take-strat-step`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the head
-  that fabricates nothing — its output is a PREFIX of what arrived, so the
-  reading survives by the list and not by the store. Nothing has instantiated
-  it, which is the whole of why it sits here.
+- **`subscribeInner-strat`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: one
+  subscribe's burst read below the floor, which both subscribing heads reduce
+  to. The slot read is the only arm emitting syntax the source does not carry,
+  and the telescope's own receipt covers it, so what is open is the induction.
 - **`pop-head-strat-sink`** (Caps-Bridge) — FALSITY, `REFUTED`: where the
   arrival's own value sits against every chain that will receive it, asked only
   below the root. It wants a fact relating a source's pending values to the
