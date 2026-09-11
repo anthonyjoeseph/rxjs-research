@@ -315,3 +315,8 @@ open import Refuted.MergeAllDrain-OwnerQueue
 open import Refuted.SetNode-Two-Floor
   using (floors; pricedFloor; pricedOK; sunkBad; parkedBefore; parkedAfter;
          stratOK; ordOK; ownBad; setNode-two-floor-absurd)
+
+open import Refuted.Hop-Mul-Clause
+  using (carrier; src; dup; prog; emitted; src-depth; add-prog; add-emitted;
+         mul-prog; mul-emitted; AdditiveClauseDominates;
+         hop-mul-clause-absurd)

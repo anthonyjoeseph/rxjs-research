@@ -17,12 +17,17 @@
 -- stop a lower digit from overflowing into a higher one.  A lex order
 -- has no digits and needs only the strict component.
 --
--- What does NOT vanish is `hopD`'s own `V`, and this file refutes the
--- hope that it does.  The refold separation below exhibits two
--- programs agreeing on every quantity a syntax-directed scan clause
--- can read, whose deepest emissions differ — so the clause must read
--- something else, and the something else is how many values the source
--- delivers.
+-- What does NOT vanish is the scan clause's need for a fold COUNT, and
+-- this file is what pins that down.  The refold separation below
+-- exhibits two programs agreeing on every DEPTH quantity a
+-- syntax-directed scan clause can read, whose deepest emissions differ
+-- — so the clause must read something else, and the something else is
+-- how many values the source delivers.
+--
+-- That is a constraint on the clause, not a licence for `V`.  A count
+-- can come from a predicted budget or from the program text, and
+-- `Spike.Scan` takes the second route: a syntactic burst-length bound
+-- discharges the same domain with `scanᵉ` present and no `V` at all.
 ------------------------------------------------------------------
 module Spike.Order where
 
@@ -105,8 +110,18 @@ hopD (slotᵉ i)     = 0
 -- hop frame: fold it k times and the accumulator nests k deep.  That
 -- is the real `hopDᵉ`'s scan clause in miniature, and it is why that
 -- clause is priced `(2 + pm)^V` — the exponent is a bound on the fold
--- count, and this pair shows the fold count cannot be read off the
--- syntax at all.
+-- count.
+--
+-- WHAT THIS DOES NOT SHOW, and the distinction is the whole value of
+-- the pair: it does not show that the fold count is unreadable from the
+-- SYNTAX.  It is readable, and trivially so here — both sources are
+-- literal lists, and their lengths are 3 and 5 in the program text.
+-- What the pair separates is the fold count from the four DEPTH
+-- quantities `readable` names, none of which is a length; a clause
+-- built from those cannot see it, and a clause reading a length can.
+-- `Spike.Scan` is that clause: its `blE` is a syntactic burst-length
+-- bound whose `ofᵉ` case is exactly `length vs`, and it discharges the
+-- same domain with `scanᵉ` present and no `V` anywhere.
 ------------------------------------------------------------------
 
 step : Tm

@@ -216,24 +216,31 @@ syncSize-subst (deferᵉ b) m = refl
 syncSize-subst (slotᵉ i)  m = refl
 
 ------------------------------------------------------------------
--- THE TEMPLATE BOUND, AND IT IS ADDITIVE.  A template applied to a
--- value of hop `h` produces one of hop at most `hopDt f + h` — which
--- is precisely the `mapᵉ` clause.
+-- THE TEMPLATE BOUND IS ADDITIVE HERE, AND THAT IS A PROPERTY OF THIS
+-- FRAGMENT AND NOT OF DEPTH.  A template applied to a value of hop `h`
+-- produces one of hop at most `hopDt f + h` — precisely the `mapᵉ`
+-- clause, with no multiplier — and the reason is that `Tm` above can
+-- mention its argument AT MOST ONCE.  Every template expressible here
+-- therefore has plug slope 1, so a multiplier would be vacuous, and a
+-- fragment in which a law is vacuous says nothing about a language in
+-- which it is not.
 --
--- The additivity is the load-bearing part, and it is why no
--- MULTIPLIER appears anywhere in this file.  Hop depth composes by
--- `⊔`, not by `+`: a template that plugs its argument twice nests
--- neither copy inside the other, so the two occurrences take a max
--- and the plug COUNT is invisible to a depth measure.  The real
--- development's plug multiplier is therefore paying for a breadth
--- that a depth cannot see, and it is what turns that clause's
--- per-fold cost into an exponent.
+-- READ IT THE OTHER WAY AND IT IS FALSE.  A template whose argument
+-- reaches two ADDED positions — an inner map's template and that same
+-- map's source — has slope 2, and the additive clause then underprices
+-- the map's own first emission.  Depth does not compose by `⊔` there,
+-- because neither occurrence is under the other.  `Spike.Scan` extends
+-- `Tm` with exactly that template (`dupᵗ`) so the property stops
+-- holding by accident of the fragment.
 --
--- `nestᵗ` is the case that matters: it adds a hop frame, and the
--- clause's own `suc` pays for it ONCE, independently of how many
--- values arrive.  That is the whole difference from the refold, where
--- the cost is per-arrival and no syntactic clause can see the arrival
--- count.
+-- REFUTED: `Refuted.Hop-Mul-Clause` — the additive `mapᵉ` clause in the
+-- real language, by `refl`-checked numerals against a one-value source.
+--
+-- `nestᵗ` is the case that matters for the refold: it adds a hop frame,
+-- and the clause's own `suc` pays for it ONCE, independently of how
+-- many values arrive.  That is the whole difference from the refold,
+-- where the cost is per-arrival and no syntactic clause can see the
+-- arrival count.
 ------------------------------------------------------------------
 
 evalTm-hop : ∀ η f v → hopDv η (evalTm f v) ≤ hopDt η f + hopDv η v
