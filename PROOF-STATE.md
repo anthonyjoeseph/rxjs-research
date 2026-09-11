@@ -238,17 +238,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **INDEX THE PRICING BY THE CLIMB, NOT BY EITHER CAP.** The stepped
-  reading is dead the way the entry one is, and the grant going
-  denomination-free is what settled it: the pricing exponent stays
-  polynomial in whatever cap it names, and a cap
-  stepped to where a receipt exists reaches the NEXT instant's entry
-  cap — a blowup of the very ceiling that exponent is fitted under. So
-  neither endpoint carries the reading and what is left is the LEVEL.
-  The commit states the registry reading per level, with the cap it
-  names and the budget it spends both moving with the climb, and either
-  telescopes the descent against the entry budget or returns the level
-  at which the accumulated charge outruns it.
+- **PRICE THE CLIMB BY THE WALK'S GAS, NOT BY ANY CAP.** Every cap-
+  denominated reading is now closed: entry refuted, stepped dead, and
+  the CLIMBED one dead too — the denomination-free grant settled that
+  rather than opening it, since a pricing exponent stays
+  polynomial in whatever cap it names while the level accumulates
+  across the chain list and carries it past the ceiling's own
+  logarithm. What no refutation touches is the fuel. It strictly
+  decreases down the walk, it is sighted under the same ceiling, and a
+  charge paid by its DROP names no cap at all. The commit states the
+  registry reading against the gas and either lands the leaf or returns
+  the first hop whose charge the drop does not cover.
 
 - **THE SECOND HAND-OVER, NOW THAT THE CLIMB IS STRICT**, which is the
   one arm of WHAT PRICES A REGISTERED CHAIN the entry ledger did not
@@ -343,7 +343,7 @@ does not fit is a finding about the shared statement, not about the head.
   escalation is PROGRAM-bounded: hops climb the stratified telescope. It now
   takes the PACKED size reading, which its own refutation is indifferent to.
 - **`fan-regsSzL-mint`** (Part7/Depth-Fit) — FALSITY,
-  `REFUTED×4, DEAD ROUTE×6`: the registry read at the ENTRY cap in the PACKED
+  `REFUTED×4, DEAD ROUTE×7`: the registry read at the ENTRY cap in the PACKED
   form, which only the terminal leaves now ask for. Both conjuncts refuted at
   its generic form, at separate witnesses, so no budget and no split repairs
   it.
