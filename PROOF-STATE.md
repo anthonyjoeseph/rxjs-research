@@ -258,17 +258,17 @@ statement, not about the head.
   edge, the one with no obvious witness, and returns what decreases
   across it. Narrows WHAT DOES AN INTRA-INSTANT RE-ENTRY LEAVE SMALLER?
 
-- **AN ORDER IS NOT A BOUND, AND ONLY BOUNDS WERE REFUTED.** The caps
-  face records three currencies machine-refuted — bare positivity, any
-  measure of the syntax or of the subscribed value, the evaluator's own
-  gas — and records them as BOUNDS, fixed ahead of a run. It then
-  names what stays open: an ORDER asks strictly less, nothing is
-  totalled, the unconnected-slot count is monotone everywhere and so
-  fixed outermost, and below it nothing orders. So the refutations do
-  not reach a descent, and what is owed is the COMPOSITION. The
-  commit puts that face's edge census beside the fragment's order and
-  returns the first component pair with no seam. Narrows WHAT DOES AN
-  INTRA-INSTANT RE-ENTRY LEAVE SMALLER?
+- **THE COMPOSITION EXISTS AND IS PROVEN; WHAT IS OPEN IS NARROWER.**
+  The composition this leg was to go looking for is already in the
+  tree: `dBound` orders the three edges gas is peeled at, unconn
+  outermost, then rank, then syncSize, and all three descents are
+  real bodies. So the caps face's refuted BOUNDS never reached it.
+  What is left is the intra-instant re-entry, where the burst walk
+  and the share fan descend structurally on a cons list and owe
+  nothing, while a merge join's queue drain and the cascade's own
+  counter owe a component. The commit states those two against
+  `dBound`'s and returns whether either needs a fourth. Narrows WHAT
+  DOES AN INTRA-INSTANT RE-ENTRY LEAVE SMALLER?
 
 ### Open questions
 
