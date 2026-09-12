@@ -51,6 +51,19 @@ open import Rx.Evaluator using (evaluate; hasDry)
 -- the sha is in `scripts/attic.txt`, so `make find` and `make find-prose`
 -- already reach the statements and the dead routes on their own.
 --
+-- PROBED: `Probed.Descent` — twelve recursive programs, every one green, and
+--   they are the first rows ever run against this statement.  What they cover,
+--   guard by guard: the μ peel at every program, since all twelve are `μᵉ`;
+--   the connect peel at the five carrying a slot, `shared` and `scripted`
+--   both, one of them a diamond reaching the share twice in an instant; and
+--   the RANK peel at the recursive self-reference, which is an emitted inner
+--   that unfolds to its own emitter, at μ nested directly in μ, and at a share
+--   holding a recursion — the shape whose nesting the guard cannot read off
+--   the term it compares.  Each row pins its run's EVENT COUNT beside it, so
+--   none is `false` by an empty stream.  THE BOUNDARY, and it is the whole of
+--   what is left: one fuel, hand-written programs, μ nested two deep and no
+--   deeper.  Nothing random has ever reached here, because the generator this
+--   repo sweeps cannot produce `μᵉ` at all.
 -- RECOVERY: `git show 919f115:agda/src/Verify-Budget-Sufficient/Measures.agda`
 --   restores the μ guard's whole reading: `unfoldμ-shrinks` is two lines over
 --   `syncSize-unfoldμ`, which is one line over a `syncSize-elimG` whose
