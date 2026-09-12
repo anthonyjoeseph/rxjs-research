@@ -226,39 +226,36 @@ procedure rather than a pin.
 
 ### Open questions
 
-- **CAN A STEP EMIT A FOLD THE PARENT NEVER FOLDED OVER?** The exponent was the
-  whole of what is false wherever it could be measured: `Probed.Swapped-Exponent`
-  mirrors the reading with the fold exponent read off its source's own delivery
-  count, and the depths the refuting runs hand out sit under it at every length
-  and both bounds. What that family cannot ask is the thing its own refutation
-  was built on — a frame's emissions are not subterms of the term it entered on.
-  Its step emits a MERGE, whose reading is the nesting it writes. A step emitting
-  a SCAN reads an exponent off a source the parent never folded over, and nothing
-  at the entry ties the two. That is the same escape the live reading died of,
-  one clause across.
+- **CAN A DOOR PRICE A VARIABLE AT WHAT WILL BE PLUGGED INTO IT?** Both term
+  readings are dead and neither died of its exponent. `Probed.Step-Fold` gives
+  the step an emission that is itself a fold: that fold's exponent is read off
+  the accumulator, which the entry sees as a VARIABLE reading zero, so the door
+  underprices by a rate no coefficient reaches. The live clause is blind to what
+  the step folds over and the swapped one to what the step's OWN fold folds
+  over — the same blindness one level in. The delivery count already prices a
+  plug, through a slope family; no depth family does.
   relevant: `drain-dry-free`, `dry-operator`
 
 ### Big picture tier roadmap
 
-- **EMIT A FOLD FROM THE STEP AND SEE WHETHER THE READING STILL COVERS IT.** The
-  swapped reading now dominates at the family that refutes the live one, and
-  that family's step emits a merge — a shape whose emissions the entry can see.
-  The attack that killed the live reading was that emissions are not subterms,
-  and it has an exact analogue one clause across: a step whose emission is
-  itself a fold carries an exponent read off a source the parent never folded
-  over. Build it and take the same rows. A refutation here kills the swap before
-  the cascade below is paid for; a green says the reading survives the escape it
-  was designed against.
+- **PRICE THE PLUG: GIVE THE DEPTH READING THE SLOPE THE COUNT ALREADY HAS.**
+  The delivery count survives a variable because it carries a slope family —
+  how a reading scales in what is plugged at an index — and solves the fold's
+  recurrence in closed form out of it. The depth families carry a multiplicity
+  that is only ever a coefficient, never an exponent's argument, which is
+  precisely where both readings died. Mirror the count's shape: a depth slope, a
+  solved fold clause, and then the rows `Probed.Step-Fold` crosses at, whose
+  measured recurrences are the target: a candidate missing them is refuted
+  before it is stated.
 
-- **RAISE THE SCAN CLAUSE TO ITS SOURCE'S OWN DELIVERY COUNT.** The exponent is
-  the store bound today and the refolds it pays for are deliveries; the count
-  the rows above dominate the family with is what replaces it. This is the
-  restatement, and it cascades: every face is stated in the reading, so the two
-  peel lemmas, the fit and both drain halves move together — which is why the
-  leg above is paid first. It converts the question from a doubt about a reading
-  into an obligation the tower carries, and the affine section under the clause
-  does not survive it: a delivery count takes a product at every flattener, so
-  the coefficient is two slopes rather than one.
+- **RAISE THE SCAN CLAUSE TO WHATEVER FORM THAT LEG LEAVES STANDING.** The
+  restatement, and it waits on the leg above to say which form, since the two
+  candidates tried so far are both refuted and a third stated blind would be a
+  third refutation. It cascades: every face is stated in the reading, so the two
+  peel lemmas, the fit and both drain halves move together. And the affine
+  section under the clause does not survive a solved fold — the coefficient
+  becomes two slopes rather than one, and the exponent's argument is itself a
+  reading rather than a parameter the caller supplies.
 
 - **MOVE THE BUG CACHE OFF THE TYPECHECKER (Anthony).** Every stored case pins a
   whole run by `refl`, so the gate normalises the evaluator once per case and

@@ -170,19 +170,31 @@
 -- at every length and at both bounds — including the pair the
 -- refutation pins, where this reading is three and the run carries
 -- four.
+------------------------------------------------------------------
+
+------------------------------------------------------------------
+-- AND THE SWAP IS FALSE ANYWAY, ONE CLAUSE ACROSS FROM WHERE THIS ONE
+-- IS.  `Probed.Step-Fold` gives the step an emission that is itself a
+-- FOLD, and the crossing comes straight back.  A frame's emissions are
+-- not subterms of the term it was entered on: the emitted fold's own
+-- exponent is read off ITS source, and that source is the accumulator,
+-- which the entry sees only as a VARIABLE.  A variable delivers zero,
+-- so the door prices at one an exponent the run then pays in full, once
+-- per refold.  Two families settle that this is not an off-by-one: a
+-- single reference to the accumulator leaves the reading tight at one
+-- refold and crossed at two, which a coefficient could repair, and a
+-- second reference doubles the emitted exponent per refold on a reading
+-- that does not move at all — the same numeral, and a depth ninety
+-- times it one refold later.
 --
--- WHAT IT DOES NOT SAY, AND IT IS THE NEXT QUESTION RATHER THAN A
--- CAVEAT.  Not one of those rows is TIGHT: the reading is geometric in
--- the count against a rate that is linear in it, so the margin is three,
--- seven, twenty-four and seventy-seven and it widens.  The crossing
--- stopping is therefore established and the reading's SIZE is not — a
--- measure this far above what the fold exhausts still owes an argument
--- that it descends, and the slack is this clause exponentiating a
--- quantity that was already exact at its own shortest source.  Nor does
--- anything there run the guard: it is stated over this reading, so a run
--- against the swapped one cannot be taken until the swap has landed, and
--- what carries the rows across is the refutation's own finding that the
--- report alongside the emissions and the guard are one statement.
+-- SO NEITHER READING OF THE TERM SURVIVES, AND WHAT SEPARATES THEM IS
+-- NOT THE EXPONENT.  Both die on a quantity that exists only after the
+-- plug: this clause is blind to what the step folds over, the swapped
+-- one is blind to what the step's OWN fold folds over, and the second
+-- blindness is the first one level in.  A reading a door can take has
+-- to price a variable at what will be plugged into it — which is
+-- exactly what the delivery count's slope families already do for
+-- deliveries and what no depth family here does for depth.
 ------------------------------------------------------------------
 
 ------------------------------------------------------------------
