@@ -224,6 +224,19 @@ guarded clause returns a `dry` emit and the run continues, so both sides
 compute at every program — `hopFits` included, which is why its rows spend a
 decision procedure rather than a pin.
 
+### Open questions
+
+- **IS THE RANK AN OBLIGATION BETWEEN TWO CURRENCIES, OR IS THERE NO RANK AT
+  ALL?** The seed is exponential in the program's SIZE; what a run emits is
+  priced by a template's REUSE of its argument. Nothing relates the two, and
+  every refuted seeding route has that one shape — the run multiplies where
+  the seed doubles. So either they are tied, which no reading off the term has
+  managed, or the counter is deleted and the hop edge descends in the carried
+  reading instead, where the drop is a `suc` the three flatteners put there by
+  definition. Both rows are refuted on the identical cause, which is what makes
+  this one question and not two.
+  relevant: `drain-dry-free`, `dry-operator`
+
 ### Big picture tier roadmap
 
 - **THREAD THE STORE BOUND INTO THE SEED — the one input the counter-free rank

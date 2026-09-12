@@ -256,10 +256,22 @@ LEG_BUDGET = 700
 # IT IS NOT REQUIRED TO MOVE.  A leg is one commit and must change with every
 # commit; a genuine open question outlives many, and churning it per commit
 # would convert the one durable section into the noisiest.  What IS held is
-# that its named postulates stay LIVE and stay FALSITY -- so the section decays
-# the way a `TWIN:` does, by pointing at something that moved.
+# that its named postulates stay LIVE and stay classed at a class that asserts
+# nothing -- so the section decays the way a `TWIN:` does, by pointing at
+# something that moved.
 QUESTIONS_RE = re.compile(r"^###\s+Open questions\s*$")
 QUESTIONS_MAX = 3
+
+# THE CLASSES A QUESTION MAY NAME, and SHAPE is here because the rule that
+# admitted only FALSITY retired a question at the moment it began to converge.
+# A question's rows convert FALSITY -> SHAPE as it is ANSWERED: SHAPE is
+# precisely "the statement is wrong and the restatement is guaranteed", which
+# is what a half-answer leaves behind.  So holding the list to FALSITY deletes
+# the section exactly when the narrowing it exists to record has happened --
+# and narrowing is what a leg is expected to buy.  VACUITY is not admitted: a
+# vacuous statement asserts nothing about the world, so nothing is WAITING on
+# it, which is the property a question's rows have to share.
+QUESTION_CLASSES = ("FALSITY", "SHAPE")
 
 # Two, because a question about ONE postulate is a row wearing a heading.  The
 # entire value of the section is naming what is common to several, so a
@@ -999,9 +1011,9 @@ def main():
                 elif nm not in row_class:
                     stale_qs.append((tier, q_label, q_line, nm,
                                      f"named by no row of tier {tier}"))
-                elif row_class[nm] != "FALSITY":
+                elif row_class[nm] not in QUESTION_CLASSES:
                     stale_qs.append((tier, q_label, q_line, nm,
-                                     f"its row is {row_class[nm]}, not FALSITY"))
+                                     f"its row is {row_class[nm]}, not FALSITY or SHAPE"))
         # THE COUNT.  Three, unless the tier has fewer postulates than that to
         # plan over -- in which case naming three would mean inventing work.
         want = min(LEGS_WANTED, len(rows))
@@ -1210,7 +1222,7 @@ def main():
         for tier, found in many_qs:
             print(f"  Tier {tier}  {found} question(s), wanted at most {QUESTIONS_MAX}")
         print("\nThe cap is what makes the section say anything. A question here is")
-        print("what the tier does not yet know that several of its FALSITY rows are")
+        print("what the tier does not yet know that several of its risky rows are")
         print("waiting on — and a tier does not have five of those, it has a few. A")
         print("fourth entry is a row wearing a heading, or two phrasings of one")
         print("question. Merge them, or drop the one whose relevant list is a subset")
@@ -1252,7 +1264,8 @@ def main():
         print("it aging — which is why the one thing held is that its relevant list")
         print("is current. A name that left the ledger means the question is")
         print("answered or the row was restated; a row that is no longer FALSITY")
-        print("means the uncertainty this question is about has been settled there.")
+        print("or SHAPE means the uncertainty this question is about has been")
+        print("settled there.")
         print("Either way the list is what moves, and if nothing risky is left under")
         print("a question, the question goes.")
         failures.append(None)
@@ -1308,7 +1321,7 @@ def main():
           f"within its {TIER_BUDGET}-char budget; every tier's big picture "
           f"roadmap naming its next legs, each within {LEG_BUDGET} chars; "
           + (f"{n_qs} open question(s), each within {QUESTION_BUDGET} chars "
-             f"and naming only live FALSITY rows of its own tier; "
+             f"and naming only live FALSITY or SHAPE rows of its own tier; "
              if n_qs else "")
           + f"no dated narrative in "
           # named individually up to a handful, then counted -- a report line

@@ -981,12 +981,14 @@ roadmap-selftest:
 	  if scripts/check-roadmap.py --file scripts/roadmap-selftest/questions-stale.md \
 	       --ledger scripts/roadmap-selftest/ledger.txt --census scripts/roadmap-selftest/census.txt \
 	       --src-names scripts/roadmap-selftest/src-names.txt > /dev/null 2>&1; then \
-	    echo "SELFTEST FAIL: a question naming a discharged row and a no-longer-FALSITY row PASSED — the one thing this section is held to is dead, and nothing else would notice it aging"; fail=1; \
+	    echo "SELFTEST FAIL: a question naming a discharged row and a row at an asserting class PASSED — the one thing this section is held to is dead, and nothing else would notice it aging"; fail=1; \
 	  fi; \
 	  echo "$$qst" | grep -q "zz-off-the-ledger. — not a live postulate" \
 	    || { echo "SELFTEST FAIL: a relevant name that left the ledger was not reported"; fail=1; }; \
-	  echo "$$qst" | grep -q "b-shape. — its row is SHAPE, not FALSITY" \
-	    || { echo "SELFTEST FAIL: a relevant name whose row is no longer FALSITY was not reported"; fail=1; }; \
+	  echo "$$qst" | grep -q "c-difficulty. — its row is DIFFICULTY, not FALSITY or SHAPE" \
+	    || { echo "SELFTEST FAIL: a relevant name whose row asserts the statement is right was not reported"; fail=1; }; \
+	  echo "$$qst" | grep -q "b-shape. —" \
+	    && { echo "SELFTEST FAIL: a relevant name whose row is SHAPE was reported stale — a question is retired at the moment the narrowing it exists to record has happened, which is the one thing it may not do"; fail=1; }; \
 	  echo "$$qst" | grep -q "a-falsity. —" \
 	    && { echo "SELFTEST FAIL: a live FALSITY row of the tier was reported stale"; fail=1; }; \
 	  echo "$$cln" | grep -q "OPEN QUESTIONS" \
