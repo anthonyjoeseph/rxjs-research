@@ -35,9 +35,16 @@
 -- survives is the one that does not grow under μ-unfolding.  A bound
 -- on `sizeᵉ` fails there outright: `unfoldμ body` is larger than
 -- `μᵉ body` while the witness keeps its rank.  `nestDᵉ` truncates at
--- the `deferᵉ` gate, so unfolding leaves it EQUAL, and the same
--- truncation is why the inner a burst carries reads strictly under
--- its emitter's — which is exactly one peel.
+-- the `deferᵉ` gate, so unfolding leaves it EQUAL.  What it does NOT
+-- buy is the HOP: an inner a burst carries does not read under its
+-- emitter, so this component bounds the subject a walk is entered ON
+-- and nothing the run goes on to emit, and a peel at a hop has to be
+-- paid out of the seed's exponential slack rather than by comparing
+-- two readings of syntax.
+--
+-- REFUTED: `Refuted.Burst-Nesting` — the inner-under-emitter reading,
+--   at a scan whose step re-wraps its accumulator in one merge layer:
+--   the program reads 1 and its burst reads 3.
 ------------------------------------------------------------------
 module Verify-Rank-Sufficient.Entry where
 

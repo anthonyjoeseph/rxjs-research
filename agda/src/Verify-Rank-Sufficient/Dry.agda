@@ -86,22 +86,29 @@ opShape _         = true
 -- cannot be re-established across the μ clause, since `unfoldμ body` is
 -- LARGER in `sizeᵉ` than `μᵉ body` while the witness keeps the same rank.
 -- What survives is a measure the unfolding leaves EQUAL, which is why the
--- conjunct is a nesting.  The emitted inner is reachable after all — a
--- `Val` at `obs` IS a closed expression, so a measure of syntax does
--- reach it — and what the walk still owes is that a burst's inner reads
--- STRICTLY under its emitter's, which is one peel.  That travels as a
--- STRENGTHENED RETURN TYPE on the burst-producing functions, invariant in
--- the motive, rather than as a fourth measure nobody has.  And the peel's
--- own `≺`-witness is `ltR` applied to its hypothesis and so says nothing
--- — every gram of this reading is establishing the hypothesis, which is
--- the whole asymmetry between this leaf and the two peels proven below.
+-- conjunct is a nesting.  And the peel's own `≺`-witness is `ltR`
+-- applied to its hypothesis and so says nothing — every gram of this
+-- reading is establishing the hypothesis, which is the whole asymmetry
+-- between this leaf and the two peels proven below.
 --
--- AND THE SEED IS EXPONENTIAL IN PROGRAM SIZE, WHICH IS THE PART THE
--- MEASURE DOES NOT HAND OVER.  The machine seeds the rank at
--- `2 ^ (sizeᵉ e + slotsSize sl)`, re-seeds it at `2 ^ sizeᵉ d` on a
--- connect, and peels ONE per nesting hop, so the conclusion owed is that
--- the count is never spent — not a comparison.
+-- AND THE BURST DOES NOT READ UNDER ITS EMITTER, SO THE HOP IS NOT PAID
+-- IN SYNTAX.  The reading the peel wants is that an inner a burst
+-- carries reads STRICTLY under the expression that emitted it — one
+-- layer, one peel — and it is false.  A `scanᵉ` threads its own output
+-- back in, so a step function re-wrapping its accumulator in one layer
+-- emits a value a layer deeper than the value before it, while the term
+-- is charged for that layer once; no measure of the emitter repairs it,
+-- because the fold count is not in the term.  What survives is that the
+-- seed is EXPONENTIAL in program size, re-seeded at `2 ^ sizeᵉ d` on a
+-- connect, against ONE peel per hop — so the conclusion owed is that the
+-- count is never SPENT, priced against the deliveries a run can make,
+-- and never a comparison between two readings of syntax.
 --
+-- REFUTED: `Refuted.Burst-Nesting` — the inner-under-emitter reading, by
+--   a scan over a three-element synchronous source whose step re-wraps
+--   the accumulator in one merge layer: the program reads 1 and its
+--   burst reads 3.  It kills the NON-STRICT comparison, so the strict
+--   one the peel needs goes with it.
 -- REFUTED: `Refuted.Rank-Entry` — the two-conjunct invariant, refuted by
 --   the smallest merge over a synchronous one-element outer, entered at a
 --   triple whose rank is zero with both of those conjuncts satisfied at

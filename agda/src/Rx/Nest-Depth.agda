@@ -12,25 +12,35 @@
 -- right, and that re-entry is the hop.
 --
 -- A `scanᵉ` IS WORTH ITS STEP FUNCTION'S LAYERS ONCE, because on any
--- ONE chain the walk enters the step function once per scan frame; the
--- layers the folds pile onto the ACCUMULATOR live in the store, whose
--- measure is read off the state and so sees them as they accrue.  The
--- fold-times-wrap product is real, but it is priced where the folds
--- happen, never inside a measure of syntax, which cannot know a count
--- that has not happened yet.
+-- ONE chain the walk enters the step function once per scan frame.
+-- What that does NOT price is the layers the folds pile onto the
+-- ACCUMULATOR.  That product is real and it grows with the deliveries a
+-- run makes, so no measure of syntax can carry it: a term does not know
+-- a count that has not happened yet.  A reading here therefore bounds
+-- the subject a walk is ENTERED on, and says nothing about what the run
+-- goes on to emit.
 --
 -- A LIST OF PAYLOADS IS WORTH THEIR MAX, NOT THEIR SUM, because a
 -- burst's values are entered one at a time, each from the same frame,
 -- so two payloads abreast cost what the deeper of them costs.
 
--- THE MAX IS NOT A TIGHTENING FOR ITS OWN SAKE — the summing form is
--- priced dead by the one statement this measure exists to support.
--- The hop bound needs an emitted inner's nesting to be STRICTLY under
--- its EMITTER'S, since that is what turns one peel of the rank into a
--- re-established invariant.  Under a summing list clause it is not:
--- a step function may hand its input observable to a list TWICE — the
--- emitter reads 2, the inner it emits reads 3, and the inner's own
--- depth is 2, so the sum is over the depth by exactly the duplication.
+-- THE MAX IS NOT A TIGHTENING FOR ITS OWN SAKE, AND IT BUYS LESS THAN
+-- IT WAS CHOSEN FOR.  The clause was picked so that an emitted inner
+-- reads STRICTLY under its EMITTER, which is what would turn one peel
+-- of the rank into a re-established invariant; a summing clause loses
+-- that outright, since a step function may hand its input observable to
+-- a list TWICE — the emitter reads 2, the inner it emits reads 3, and
+-- the inner's own depth is 2, so the sum is over by the duplication.
+-- The max decides that case and NOT the fold, and the fold is fatal:
+-- the strictly-under reading is false here and false for every measure
+-- of syntax, since an accumulator gains a layer per delivery and no
+-- term knows how many deliveries there will be.  So what this measure
+-- is for is the ENTRY side — bounding the subject a walk is entered on
+-- — and the hop has to be paid out of the seed's own slack instead.
+--
+-- REFUTED: `Refuted.Burst-Nesting` instantiates the strictly-under
+--   reading at a scan whose step re-wraps its accumulator in one merge
+--   layer, and kills even the non-strict form: program 1, burst 3.
 
 -- THE DEFER GATE TRUNCATES, AND THE μ CLAUSE IS WHY.  The measure
 -- returns zero at a `deferᵉ` — a deferred body is not entered
