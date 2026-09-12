@@ -4,8 +4,8 @@ module Verify-Budget-Sufficient.Caps-Face.Part7.Arrival-Caps where
 
 open import Data.Bool    using (Bool; true; false; if_then_else_; _∨_)
 open import Data.Nat     using (ℕ; suc; _+_; _∸_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
-open import Data.Nat.Properties using (m+[n∸m]≡n; ≤-trans; ≤-refl; ≤-reflexive; m≤m+n; m≤n+m; n≤1+n; *-identityʳ; +-monoʳ-≤; m≤m⊔n;
-  +-suc; ⊔-lub; ≤ᵇ⇒≤)
+open import Data.Nat.Properties using (m+[n∸m]≡n; ≤-trans; ≤-refl; ≤-reflexive; m≤m+n; m≤n+m; n≤1+n; *-identityʳ; *-identityˡ;
+  *-monoˡ-≤; +-monoʳ-≤; m≤m⊔n; +-suc; ≤ᵇ⇒≤)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.List    using (List; []; _∷_; length)
@@ -25,7 +25,6 @@ open import Relation.Binary.PropositionalEquality
 
 open import Rx.Prim      using (Gas; Id; Tick; _at_from_as_; after_,_; close; exhausted)
 open import Rx.Exp       using (Ctx; Closed; Val; sizeᵉ; inputsBelowᵛ)
-open import Rx.Nest-Depth using (nestDᵛ)
 open import Verify-Budget-Sufficient.Nest-Ceiling using
   (Reached; Ent; Pos; ent-step; base; walk)
 open import Verify-Budget-Sufficient.Subscribe-Face using (subscribeInner-caps; innerFinish-caps)
@@ -37,7 +36,10 @@ open import Verify-Budget-Sufficient.Nest-Walk using (nestDᵛˢ)
 open import Verify-Budget-Sufficient.Keeps-Ring using (stepFrame-slots)
 open import Verify-Budget-Sufficient.Caps-Face.Nest-Arith using (nestΦAt)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Depth-Join using (fold-le; disp-le; latch-sync)
-open import Verify-Budget-Sufficient.Caps-Face.Part7.Frame-Vals using (step-frame-vals≤)
+open import Verify-Budget-Sufficient.Caps-Face.Part7.Frame-Vals using (chain-frame-ΦHyp)
+open import Verify-Budget-Sufficient.Regs-Nest-Walk using
+  (valsΦ?; stepFrame-nest-Φ; Φ-to-bound)
+open import Verify-Budget-Sufficient.Walk-Factor using (pathΦF-pos)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; arrVal; RegId; cascadeLatch; arrSource; chainsOf; cascadeGo; Path;
   Frame; stepFrame; foldPath; arrTy; regAt; dCapᶜ; lvls; iterL; chainStep; budgetAt; arrTick)
 open import Rx.Slots using (Slots; slotsSize)
@@ -1193,65 +1195,107 @@ postulate
                     (stepFrame sf bid now f p vals fin sched st)))))
       ≤ S
 
+-- READING A GRANT BACK OUT OF THE POTENTIAL, which is what lets the
+-- two leaf obligations below go on being stated against one number
+-- while the invariant that reaches them steps.  The potential charges
+-- a value at the factor of the path still to be walked, and that
+-- factor is at least one, so the values' own maximum is under the
+-- potential's ceiling with the path's share left unspent.
+Φ-vals≤ : ∀ {n} {Γ : Ctx n} {u t} (B U S : ℕ) (p : Path Γ u t)
+  (vals : List (Val Γ u)) → valsΦ? B U p vals ≡ true → U ≤ S →
+  nestDᵛˢ vals ≤ S
+Φ-vals≤ B U S p vals hΦ hUS =
+  ≤-trans (≤-trans (≤-trans (≤-reflexive (sym (*-identityˡ (nestDᵛˢ vals))))
+                            (*-monoˡ-≤ (nestDᵛˢ vals) (pathΦF-pos B p)))
+                   (Φ-to-bound B U p vals hΦ))
+          hUS
+
 -- the three things a position is entered with: the vocabulary, the
--- payload under the round's grant, and the store under the ceiling's
--- own store slot
-ChainFit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (sl : Slots Γ) (S : ℕ)
+-- payload's POTENTIAL at the path still ahead of it, and the store
+-- under the ceiling's own store slot.
+--
+-- AND THE MIDDLE ONE IS NOT A NUMBER, WHICH IS THE WHOLE CORRECTION.
+-- A fixed grant on what a frame emits dies at the arms that
+-- substitute: the frame is quantified over, so its step function's
+-- body is chosen after the grant is, and one layer deeper than any of
+-- them admits.  The potential reads the payload at the factor and
+-- summand of what remains to be walked, so a position's reading
+-- changes as the path shortens -- which is what a term minted at the
+-- position can be charged against.
+-- REFUTED: `Refuted.Step-Frame-Vals-Map` -- the grant form this
+--   replaces, at a step function one layer deeper than whatever the
+--   numeric hypotheses admit.
+ChainFit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (sl : Slots Γ) (id : ℕ)
+  (S : ℕ)
   {v} → Path Γ v t → List (Val Γ v) → Bool → Sched Γ → EvalSt e → Set
-ChainFit sl S p vals _ sch sto =
+ChainFit {e = e} sl id S p vals _ sch sto =
   (Sched.slots sch ≡ sl)
-  × (nestDᵛˢ vals ≤ S)
+  × (valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id) p vals ≡ true)
   × (storeSyncMax sch sto ≤ S)
 
 -- AND THE FRAME'S OWN STEP RE-ESTABLISHES ALL THREE, the vocabulary
--- half out of the proven fact that a frame threads the slots untouched
--- and the other two out of the priced leaves above.
+-- half out of the proven fact that a frame threads the slots untouched,
+-- the payload half out of the walk face's own transport, and the store
+-- half out of the priced leaf above.
 chain-fit-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   (sl : Slots Γ) (id : ℕ) (sf : Gas) (bid : Id) (now : Tick) (S : ℕ)
   (f : Frame Γ s u) (p : Path Γ u t) (vals : List (Val Γ s)) (fin : Bool)
   (sched : Sched Γ) (st : EvalSt e) →
   Sched.slots sched ≡ sl → sf ≡ budgetAt e sl bid →
   nestΦAt e sl id ≤ S →
-  nestDᵛˢ vals ≤ S →
+  valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id) (f ↠ p) vals ≡ true →
   storeSyncMax sched st ≤ S →
-  ChainFit sl S p
+  ChainFit sl id S p
     (proj₁ (stepFrame sf bid now f p vals fin sched st))
     (proj₁ (proj₂ (proj₂ (stepFrame sf bid now f p vals fin sched st))))
     (proj₁ (proj₂ (proj₂ (proj₂ (stepFrame sf bid now f p vals fin sched st)))))
     (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame sf bid now f p vals fin sched st)))))
-chain-fit-step sl id sf bid now S f p vals fin sched st hsl hsf hΦ hval hS =
+chain-fit-step {e = e} sl id sf bid now S f p vals fin sched st hsl hsf hΦ hval hS =
   trans (stepFrame-slots sf bid now f p vals fin sched st) hsl
-  , step-frame-vals≤  sl id sf bid now S f p vals fin sched st hsl hsf hΦ hval hS
-  , step-frame-store≤ sl id sf bid now S f p vals fin sched st hsl hsf hΦ hval hS
+  , stepFrame-nest-Φ sf bid now f p vals fin sched st
+      (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id) hval
+      (chain-frame-ΦHyp sl id sf bid now S f p vals fin sched st hsl hsf hval hS)
+  , step-frame-store≤ sl id sf bid now S f p vals fin sched st hsl hsf hΦ
+      (Φ-vals≤ (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id) S (f ↠ p) vals
+         hval hΦ)
+      hS
 
 chain-depth-sighted : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id) (S : ℕ)
   (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
   Sched.slots sched ≡ sl →
   nestΦAt e sl id ≤ S →
-  nestDᵛ (arrTy a) (arrVal a) ≤ S →
+  valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id) path
+         (arrVal a ∷ []) ≡ true →
   storeSyncMax sched st ≤ S →
   depthChain nextId a path sched st
     ≤ sightCeil (sizeᵉ e) S S (nestUnit e sl)
 chain-depth-sighted {n = n} {e = e} sl id a nextId S path sched st hsl hΦ hval hS =
   fold-le C sf n nextId (arrTick a) (arrSource a)
-    (λ {v} → ChainFit sl S {v})
+    (λ {v} → ChainFit sl id S {v})
     (λ f p′ vals fin sch sto h →
        ≤-trans (frame-depth-fit sl sf nextId (arrTick a) f p′ vals fin sch sto
                   (proj₁ h) hsf)
                (sightCeil-mono (sizeᵉ e) (nestUnit e sl)
-                  (proj₁ (proj₂ h)) (proj₂ (proj₂ h))))
+                  (Φ-vals≤ B (nestΦAt e sl id) S (f ↠ p′) vals
+                     (proj₁ (proj₂ h)) hΦ)
+                  (proj₂ (proj₂ h))))
     (λ i vals fin sch sto h →
        disp-depth-fit sl id sf n nextId (arrTick a) S i vals fin sch sto
-         (proj₁ h) hsf hΦ (proj₁ (proj₂ h)) (proj₂ (proj₂ h)))
+         (proj₁ h) hsf hΦ
+         (Φ-vals≤ B (nestΦAt e sl id) S (share-sink i) vals
+            (proj₁ (proj₂ h)) hΦ)
+         (proj₂ (proj₂ h)))
     (λ f p′ vals fin sch sto h →
        chain-fit-step sl id sf nextId (arrTick a) S f p′ vals fin sch sto
          (proj₁ h) hsf hΦ (proj₁ (proj₂ h)) (proj₂ (proj₂ h)))
     path (arrVal a ∷ [])
     (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
     (Arrival.isLast a) sched st
-    (hsl , ⊔-lub hval z≤n , hS)
+    (hsl , hval , hS)
   where
+  B : ℕ
+  B = Caps.cSize (capsAt e sl id)
   C : ℕ
   C = sightCeil (sizeᵉ e) S S (nestUnit e sl)
   sf : Gas

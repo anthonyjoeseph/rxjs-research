@@ -260,17 +260,17 @@ statement, not about the head.
   store face is where the answer bites. Narrows WHAT DOES AN
   INTRA-INSTANT RE-ENTRY LEAVE SMALLER?
 
-- **ASK THE SLOTS FOR THE BURST CEILING.** Every denomination of the
-  potential is dead and the last is the recorded spiral stop, so a
-  sixth is that route renamed — the width rider this slot used to name
-  included. But all six price the CHARGE, and what is missing is a
-  ceiling on the COUNT. The measurements that killed the others say
-  where one lives: the count moves with the SLOT SCRIPT and with
-  nothing the program names, and `budgetAt` already takes the slots
-  beside the program, so every site owing the count can read one. The
-  commit states that ceiling, wires it at the arm split just landed,
-  and probes it where the program-denominated attempts died. Narrows
-  WHAT BOUNDS A BURST INSIDE ONE INSTANT?
+- **THE GRANT THAT STEPS WITH THE FRAME.** A slots-denominated COUNT
+  ceiling was this slot's plan and that route is DISCARDED: the arm
+  split it was to be wired at is refuted at a burst of ONE value. A
+  substituting arm emits its step function's own body — a term chosen
+  after the grant was — and no number fixed along a path dominates
+  one. The answering shape is
+  already PROVEN, one face over: `valsΦ?` reads the payload at the
+  factor and summand of the path STILL TO BE WALKED, and
+  `stepFrame-nest-Φ` transports it across all five arms. This commit
+  restates the arrival face's fit predicate against it, deletes the
+  four superseded arm leaves, and returns what the walk still owes. Narrows WHAT BOUNDS A BURST INSIDE ONE INSTANT?
 
 ### Open questions
 
@@ -396,6 +396,11 @@ statement, not about the head.
   moves here — the instance node is allocated and the counter the ordering is
   read against is raised — so the ordering half is an obligation, not a
   transport.
+- **`chain-frame-ΦHyp`** (Part7/Frame-Vals) — FALSITY, `REFUTED, TWIN`: the
+  walk's per-frame obligation, out of what an arrival position holds. The four
+  arm grants it replaces die at a burst of ONE, so what is left is the
+  position's size, strat, park and order readings — and nothing says the
+  arrival door carries them.
 - **`pushBurst-sz-store-scan`** (Regs-Nest-Walk) — SHAPE,
   `REFUTED, DEAD ROUTE×2, PROBED×4`: the cell each arrival rewrites, short two
   ways. The entering premise levels that cell with the ambient table at the
@@ -425,22 +430,6 @@ statement, not about the head.
   charge at the queue's own `drainW`. Its extra premise pins the cell's
   CONSTRUCTOR, not its depth, so a parked program runs the store term away here
   too; the width is walk-denominated besides.
-- **`step-frame-vals-scan`** (Part7/Frame-Vals) — SHAPE, `NO EVIDENCE`: what
-  the scan arm leaves in the delivered values, at the position's grant. The
-  fold threads, so its charge is a POWER in a burst count no hypothesis here
-  names — the gap the row four above carries, inherited rather than repeated.
-- **`step-frame-vals-inner`** (Part7/Frame-Vals) — SHAPE, `NO EVIDENCE`: the
-  same axis at the arm that grafts an inner's burst. What it hands on is the
-  inner's own emission, so the count is the walk's and the grant is sighted an
-  instant below where it is bounded.
-- **`step-frame-vals-outer`** (Part7/Frame-Vals) — SHAPE, `NO EVIDENCE`: the
-  same at the outer arm, whose payload is an obs and whose graft is a subscribe
-  — so the grant is asked to cover a value the position has not yet seen, at a
-  count it also does not carry.
-- **`step-frame-vals-map`** (Part7/Frame-Vals) — SHAPE, `NO EVIDENCE`: the
-  substituting arm alone, the one that carries a factor and no burst of its
-  own. Its twin still takes the count into an exponent, so the arm is short by
-  the same number as its siblings.
 - **`frameParked-step`** (Part7/Strat-Leaves) — DIFFICULTY, `PROBED`: the STORE
   half of the frame-keyed park reading across one step. Every arm that WRITES
   is instantiated, a floor below the width included; the two finishes left are

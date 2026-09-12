@@ -1,13 +1,17 @@
 ------------------------------------------------------------------
--- THE FRAME'S PAYLOAD AXIS, ARM BY ARM.
+-- THE FRAME'S PAYLOAD AXIS, AS A POTENTIAL RATHER THAN AS A GRANT.
 --
--- A chain position is entered with a GRANT -- one number every
--- hypothesis is stated under -- and what the frame emits has to stay
--- under it.  Splitting the obligation by `stepFrame`'s own arms is
--- what makes each remaining price greppable rather than hidden inside
--- one statement over an abstract `Frame`: two of the five substitute
--- and so carry a factor, two graft a burst and carry the walk's, and
--- the fifth carries nothing and is discharged here.
+-- A chain position used to be entered with one number every hypothesis
+-- was stated under, and what the frame emitted had to stay under it.
+-- That form is refuted at the arm that substitutes: the frame is
+-- quantified over and named in none of the hypotheses, so the step
+-- function's own body is a term chosen after the number was, and one
+-- layer deeper than whatever the other hypotheses admit.  What answers
+-- it is a reading that moves with the path -- the payload charged at
+-- the factor and summand of what is STILL TO BE WALKED -- which the
+-- walk face already carries and already transports across all five
+-- arms.  What is left here is one leaf: that the arrival face's own
+-- per-position data is enough to pay the walk's frame obligation.
 --
 -- IT SITS ABOVE THE ARRIVAL FACE RATHER THAN INSIDE IT, because the
 -- module that consumes this is at the iteration loop's edge, and a
@@ -15,152 +19,71 @@
 ------------------------------------------------------------------
 module Verify-Budget-Sufficient.Caps-Face.Part7.Frame-Vals where
 
-open import Data.Bool using (Bool)
-open import Data.List using (List; [])
+open import Data.Bool using (Bool; true)
+open import Data.List using (List)
 open import Data.Nat  using (ℕ; _≤_)
-open import Data.Nat.Properties using (≤-trans; m≤n⊔m; ⊔-lub)
-open import Data.Product using (proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 
 open import Rx.Prim  using (Gas; Id; Tick)
-open import Rx.Exp   using (Ctx; Closed; Val; Fn; obs; _×ᵗ_)
+open import Rx.Exp   using (Ctx; Closed; Val)
 open import Rx.Slots using (Slots)
-open import Rx.Evaluator using (Sched; EvalSt; Path; Frame; NodeId; AllOp;
-  stepFrame; budgetAt; map-f; scan-f; take-f; from-inner; thru-outer)
-open import Verify-Budget-Sufficient.Nest-Store using
-  (storeSyncMax; storeSync-nodes≤)
-open import Verify-Budget-Sufficient.Nest-Walk using
-  (nestDᵛˢ; nodesMax; stepFrame-nodes-take)
+open import Rx.Evaluator using (Sched; EvalSt; Path; Frame; budgetAt)
+open import Verify-Budget-Sufficient.Nest-Store using (storeSyncMax)
+open import Verify-Budget-Sufficient.Regs-Nest-Walk using (valsΦ?; FrameΦHyp)
+open import Verify-Budget-Sufficient.Caps using (Caps; capsAt)
 open import Verify-Budget-Sufficient.Caps-Face.Nest-Arith using (nestΦAt)
 
--- AND THE PAYLOAD AXIS IS PRICED ARM BY ARM, because only two of the
--- five move it.  `take-f` writes a numeral, sweeps the live set and
--- drops registrations, so what it emits is either what it was handed or
--- what its own node already held -- both already under the grant, which
--- is why that arm is DISCHARGED below rather than postulated.  The
--- remaining four are leaves, and splitting them is what makes each
--- one's price greppable: the map and scan arms substitute and so carry
--- a factor, while the two `*All` arms graft a burst and carry the
--- walk's own.
--- REFUTED: `Refuted.Scan-Phi-Burst` is why no leaf here may be given a
---   charge CONSTANT in the burst.  `scanVals` THREADS, so a burst of
---   sixty-five values folds sixty-five layers onto the accumulator
---   while a premise reading the step function alone clears at
---   sixty-four -- a constant against a linear conclusion.
--- REFUTED: `Refuted.Share-Step-Scan` kills PRESERVATION OF THE CEILING
---   across this very step, and naming it is what says which statement
---   this is not: `sightCeil` is a function of what is in hand and moves
---   with it, where S is a GRANT every hypothesis is stated under and
---   `nestΦ-frame-charge` (.Caps-Face.Nest-Arith, PROVEN) puts a tower
---   in the position's own size cap underneath it.
--- DEAD ROUTE: ASSEMBLING THESE LEAVES OUT OF THAT TWIN, which is the
---   obvious route and the one the split was written for.  The twin's
---   conclusion carries the burst count in an EXPONENT -- a threading
---   frame applies its step function once per value handed to it -- so
---   spending it asks the position's grant to dominate a power in a
---   count, and `Refuted.Walk-Phi-Room` kills exactly that product at a
---   count the caps recurrence admits.  The count is under the NEXT
---   instant's size cap and under nothing smaller (`burst≤size′`), while
---   the grant here is sighted at THIS instant, so the two are one index
---   apart and the width axis towers where the size steps geometrically.
---   The same arithmetic is already a live SHAPE row one module over, at
---   the statement that would have supplied the count; these leaves
---   inherit it rather than adding a second instance of it.
--- TWIN: `stepFrame-nodes` (.Nest-Walk) -- the same quantity over all
---   five arms, PROVEN, in the walk's priced currency.  It is what says
---   the growth is bounded at all rather than only conjectured to be,
---   and the dead route above is what says it is not what closes these.
-
--- BUT SPENDING IT IS NOT A TRANSPORT, AND THE PREMISE LIST IS WHY.  The
--- twin asks for the OUTPUT's width as a hypothesis and not only the
--- input's, so it prices a burst it is handed rather than bounding one;
--- a chain loop threading it therefore owes that width at every step,
--- and that obligation is the region's open question rather than a
--- bookkeeping detail of this module.  Beside it sit a caps rider and
--- several path readings the fit predicate these leaves are consumed
--- under carries none of -- so the rider is what has to move first, and
--- it moves in the predicate rather than here.  What is left after it
--- moves is NOT arithmetic, which is the finding the split turned up and
--- the dead route below states: the rider carries a count, the twin
--- charges a power in that count, and the grant these leaves are stated
--- against cannot pay for one.
-
--- AND THE OUTPUT WIDTH IS SPENT AT ONE ARM OF FIVE, which is what says
--- how much a rider carrying it would have to buy.  Read off the twin's
--- own clauses rather than its signature: the two substituting arms and
--- the taking one discard that premise, the arm grafting an inner binds
--- it and never spends it, and only the arm that subscribes an outer
--- uses it -- there, through the park reading it hands its own delivery
--- lemma.  So three of these four leaves are owed the INPUT width alone.
--- The fold around them is the one that owes the output width, at every
--- arm and not at one, because what it carries forward is the predicate
--- at the NEXT position; and that is why the obligation is a leaf of the
--- loop rather than a premise of any leaf here.
+-- THE ONE LEAF, AND IT IS A DELIVERY QUESTION RATHER THAN AN
+-- ARITHMETIC ONE.  `frameΦ-fit` (.Caps-Face.Part7.Depth-Fit, PROVEN)
+-- already produces this from the caps receipt at the position, so what
+-- is owed is not the frame's price but the receipt: the arrival face
+-- enters a chain holding the potential, the vocabulary and the store,
+-- and the walk face asks in addition for the position's size, strat,
+-- park and order readings.  Stating it here is what says the gap is
+-- THOSE readings and nothing else.
+--
+-- AND THE SIZE SLOT IS THE ROUND'S OWN CAP RATHER THAN A QUANTIFIED
+-- ONE, which costs nothing and is worth a line: every consumer enters
+-- at that cap, and the producer concludes at it, so a slot open to an
+-- arbitrary number would claim the fit at caps no position is ever
+-- read against -- strength nothing spends, on the axis where a cap too
+-- small makes the reading it carries false.
+--
+-- AND THE ROUTE OUT IS A SIGNATURE CHANGE ONE FACE OVER, WHICH IS WHY
+-- IT IS STATED HERE RATHER THAN ASSEMBLED.  The walk face already
+-- produces this reading for an arbitrary position -- `frameΦ-fit` is
+-- what `walk-ΦHyp-go` spends at each frame -- and the arrival face
+-- cannot reach it only because that walk is entered through the WHOLE
+-- chain's descent bound, which is the statement this leaf serves.  The
+-- circle is not real: that premise is spent nowhere except to project
+-- a bound on the position's OWN frame out of a join, and per position
+-- `frame-depth-fit` delivers exactly that from the potential the
+-- motive already carries.  So what discharges this is restating the
+-- walk's entry against the ceiling rather than against the fold, after
+-- which this becomes a projection.
+--
+-- AND IT IS ONE LEAF WHERE THE SPLIT WAS FOUR, WHICH IS THE POINT.
+-- The four arms differed only in which frame they named, and what
+-- kills the fixed form reaches every one of them -- the quantifier is
+-- the same in each and the map arm is merely the one that needs no
+-- burst count to say so.  So splitting by arm bought nothing: it
+-- multiplied a single missing receipt into four statements that each
+-- asked the impossible thing separately.
+-- REFUTED: `Refuted.Step-Frame-Vals-Map` -- the fixed-grant form these
+--   replace, at a step function one layer deeper than whatever grant
+--   the three numeric hypotheses admit.  The frame appears in none of
+--   them, so the crossing holds at every program rather than at one
+--   arithmetic.
+-- TWIN: `stepFrame-nest-Φ` (.Regs-Nest-Walk) -- the transport this
+--   feeds, PROVEN over all five arms, which is what says the potential
+--   is the right shape and the receipt is the whole of what is left.
 postulate
-  step-frame-vals-map : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  chain-frame-ΦHyp : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sl : Slots Γ) (id : ℕ) (sf : Gas) (bid : Id) (now : Tick) (S : ℕ)
-    (fn : Fn Γ [] [] [] s u) (p : Path Γ u t) (vals : List (Val Γ s))
-    (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
+    (f : Frame Γ s u) (p : Path Γ u t) (vals : List (Val Γ s)) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl → sf ≡ budgetAt e sl bid →
-    nestΦAt e sl id ≤ S →
-    nestDᵛˢ vals ≤ S →
+    valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id) (f ↠ p) vals ≡ true →
     storeSyncMax sched st ≤ S →
-    nestDᵛˢ (proj₁ (stepFrame sf bid now (map-f fn) p vals fin sched st)) ≤ S
-
-  step-frame-vals-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (sl : Slots Γ) (id : ℕ) (sf : Gas) (bid : Id) (now : Tick) (S : ℕ)
-    (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId) (p : Path Γ u t)
-    (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
-    Sched.slots sched ≡ sl → sf ≡ budgetAt e sl bid →
-    nestΦAt e sl id ≤ S →
-    nestDᵛˢ vals ≤ S →
-    storeSyncMax sched st ≤ S →
-    nestDᵛˢ (proj₁ (stepFrame sf bid now (scan-f fn nid) p vals fin sched st)) ≤ S
-
-  step-frame-vals-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-    (sl : Slots Γ) (id : ℕ) (sf : Gas) (bid : Id) (now : Tick) (S : ℕ)
-    (op : AllOp) (allNid inst : NodeId) (p : Path Γ s t)
-    (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
-    Sched.slots sched ≡ sl → sf ≡ budgetAt e sl bid →
-    nestΦAt e sl id ≤ S →
-    nestDᵛˢ vals ≤ S →
-    storeSyncMax sched st ≤ S →
-    nestDᵛˢ (proj₁ (stepFrame sf bid now (from-inner op allNid inst) p vals
-                        fin sched st)) ≤ S
-
-  step-frame-vals-outer : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (sl : Slots Γ) (id : ℕ) (sf : Gas) (bid : Id) (now : Tick) (S : ℕ)
-    (op : AllOp) (nid : NodeId) (p : Path Γ u t)
-    (vals : List (Val Γ (obs u))) (fin : Bool) (sched : Sched Γ)
-    (st : EvalSt e) →
-    Sched.slots sched ≡ sl → sf ≡ budgetAt e sl bid →
-    nestΦAt e sl id ≤ S →
-    nestDᵛˢ vals ≤ S →
-    storeSyncMax sched st ≤ S →
-    nestDᵛˢ (proj₁ (stepFrame sf bid now (thru-outer op nid) p vals
-                        fin sched st)) ≤ S
-
-step-frame-vals≤ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-  (sl : Slots Γ) (id : ℕ) (sf : Gas) (bid : Id) (now : Tick) (S : ℕ)
-  (f : Frame Γ s u) (p : Path Γ u t) (vals : List (Val Γ s)) (fin : Bool)
-  (sched : Sched Γ) (st : EvalSt e) →
-  Sched.slots sched ≡ sl → sf ≡ budgetAt e sl bid →
-  nestΦAt e sl id ≤ S →
-  nestDᵛˢ vals ≤ S →
-  storeSyncMax sched st ≤ S →
-  nestDᵛˢ (proj₁ (stepFrame sf bid now f p vals fin sched st)) ≤ S
-step-frame-vals≤ sl id sf bid now S (map-f fn) p vals fin sched st =
-  step-frame-vals-map sl id sf bid now S fn p vals fin sched st
-step-frame-vals≤ sl id sf bid now S (scan-f fn nid) p vals fin sched st =
-  step-frame-vals-scan sl id sf bid now S fn nid p vals fin sched st
-step-frame-vals≤ sl id sf bid now S (take-f nid) p vals fin sched st
-  _ _ _ hval hS =
-  ≤-trans (m≤n⊔m (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ R))))) (nestDᵛˢ (proj₁ R)))
-          (≤-trans (stepFrame-nodes-take sf bid now nid p vals fin sched st)
-                   (⊔-lub (≤-trans (storeSync-nodes≤ sched st) hS) hval))
-  where
-  R = stepFrame sf bid now (take-f nid) p vals fin sched st
-step-frame-vals≤ sl id sf bid now S (from-inner op allNid inst) p vals fin sched st =
-  step-frame-vals-inner sl id sf bid now S op allNid inst p vals fin sched st
-step-frame-vals≤ sl id sf bid now S (thru-outer op nid) p vals fin sched st =
-  step-frame-vals-outer sl id sf bid now S op nid p vals fin sched st
+    FrameΦHyp sf bid now (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
+              f p vals fin sched st

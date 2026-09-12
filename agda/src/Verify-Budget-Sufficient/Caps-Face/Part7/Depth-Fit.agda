@@ -2690,22 +2690,22 @@ cascade-depth-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   all (λ rc → nestDᵛ (arrTy a) (arrVal a) + pathNestD (proj₂ rc)
                 ≤ᵇ nestUnit e sl) chains ≡ true →
   nestΦAt e sl id ≤ S →
-  nestDᵛ (arrTy a) (arrVal a) ≤ S →
   storeSyncMax sched st ≤ S →
   depthCascade a nextId chains sched st
     ≤ sightCeil (sizeᵉ e) S S (nestUnit e sl)
 cascade-depth-go sl id Lc a nextId S [] sched st
-                 hca hsight hsl hps hΦs hinc hval hS = z≤n
+                 hca hsight hsl hps hΦs hinc hS = z≤n
 cascade-depth-go {e = e} sl id Lc a nextId S ((rid , c) ∷ cs) sched st
-  hca hsight hsl hps hΦs hinc hval hS =
+  hca hsight hsl hps hΦs hinc hS =
   ⊔-lub (cascade-depth-go sl id Lc a nextId S cs sched st
-           (proj₁ hca) hsight hsl hpr hΦr hinc hval hS)
-        (⊔-lub (chain-depth-sighted sl id a nextId S c sched st₀ hsl hinc hval hS)
+           (proj₁ hca) hsight hsl hpr hΦr hinc hS)
+        (⊔-lub (chain-depth-sighted sl id a nextId S c sched st₀
+                  hsl hinc hΦe hS)
                (cascade-depth-go sl id (Lc + L′) a nextId S cs
                   (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
                   (proj₂ (proj₂ (proj₂ (proj₂ hca)))) hsight
                   (trans (chainStep-slots nextId a c sched st₀) hsl)
-                  hpr hΦr hinc hval
+                  hpr hΦr hinc
                   (chainStep-store≤ sl id Lc a nextId S c sched st₀
                      (proj₁ (proj₂ hca)) hdc hsl hpc
                      (≤ᵇ⇒≤ (nestDᵛ (arrTy a) (arrVal a) + pathNestD c)
@@ -2713,7 +2713,8 @@ cascade-depth-go {e = e} sl id Lc a nextId S ((rid , c) ∷ cs) sched st
                      hinc hS)))
   where
   st₀ = record st { delivered = rid ∷ EvalSt.delivered st }
-  hdc = ≤-trans (chain-depth-sighted sl id a nextId S c sched st₀ hsl hinc hval hS)
+  hdc = ≤-trans (chain-depth-sighted sl id a nextId S c sched st₀
+                   hsl hinc hΦe hS)
                 hsight
   r   = chainStep nextId a c sched st₀
   hpc = proj₁ (∧-true (pathSz? (Caps.cSize (capsAt e sl id)) c) _ hps)
@@ -2722,6 +2723,9 @@ cascade-depth-go {e = e} sl id Lc a nextId S ((rid , c) ∷ cs) sched st
                          ≤ᵇ nestUnit e sl) _ hΦs)
   hΦr = proj₂ (∧-true (nestDᵛ (arrTy a) (arrVal a) + pathNestD c
                          ≤ᵇ nestUnit e sl) _ hΦs)
+  hΦe = entryΦ sl id a c hpc
+          (≤ᵇ⇒≤ (nestDᵛ (arrTy a) (arrVal a) + pathNestD c)
+                (nestUnit e sl) (T-to hΦc))
   L′ = proj₁ (proj₂ (proj₂ hca))
 
 -- AND ALL THREE OF THE CEILING'S SUMMANDS ARE THE SAME CAP.  The
@@ -2816,7 +2820,6 @@ cascade-caps-all-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   valCaps? (capsAt e sl id) sl (arrTy a) (arrVal a) ≡ true →
   nestClosOK?ᵛ (capsAt e sl id) sl (arrTy a) (arrVal a) ≡ true →
   nestΦAt e sl id ≤ S →
-  nestDᵛ (arrTy a) (arrVal a) ≤ S →
   storeSyncMax sched st ≤ S →
   (J g i : ℕ) →
   4 + (sizeᵉ e + slotsSize sl) + n + n ≤ g →
@@ -2827,11 +2830,11 @@ cascade-caps-all-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   chainsCapsAll (capsAt e sl id) (capsAt e sl (suc id)) sl (capsH e sl id) Lc
     a nextId chains sched st
 cascade-caps-all-go sl id Lc a nextId S [] sched st
-  sleq cok hsc hpz hΦs hstr hsv hpk hord hvc hcl hinc hval hS J g i hfl hR hlen hLc = tt
+  sleq cok hsc hpz hΦs hstr hsv hpk hord hvc hcl hinc hS J g i hfl hR hlen hLc = tt
 cascade-caps-all-go {n = n} {e = e} sl id Lc a nextId S ((rid , path) ∷ chains) sched st
-  sleq cok hsc hpz hΦs hstr hsv hpk hord hvc hcl hinc hval hS J g i hfl hR hlen hLc =
+  sleq cok hsc hpz hΦs hstr hsv hpk hord hvc hcl hinc hS J g i hfl hR hlen hLc =
     cascade-caps-all-go sl id Lc a nextId S chains sched st
-      sleq cok hsc hpr hΦr hstrr hsvr hpkr hordr hvc hcl hinc hval hS
+      sleq cok hsc hpr hΦr hstrr hsvr hpkr hordr hvc hcl hinc hS
       J g i hfl hR
       (≤-trans (+-monoʳ-≤ i (n≤1+n (length chains))) hlen) hLc
   , HEAD
@@ -2845,7 +2848,7 @@ cascade-caps-all-go {n = n} {e = e} sl id Lc a nextId S ((rid , path) ∷ chains
       (chainStep-park nextId a path sched st′ chains
          (pathsPark-delivered chains rid st hpkr))
       (chainStep-ord nextId a path sched st′ chains hordr)
-      hvc hcl hinc hval
+      hvc hcl hinc
       (chainStep-store≤ sl id Lc a nextId S path sched st′
          HEAD hdc sleq hpc hΦc hinc hS)
       J g (suc i) hfl hR
@@ -2881,7 +2884,7 @@ cascade-caps-all-go {n = n} {e = e} sl id Lc a nextId S ((rid , path) ∷ chains
   -- off a bound on the round -- which is the premise this door does
   -- not have and the surviving fold does
   hdc = ≤-trans (chain-depth-sighted sl id a nextId S path sched st′
-                   sleq hinc hval hS)
+                   sleq hinc (entryΦ sl id a path hpc hΦc) hS)
                 hsc
   step⊑ = frameStep-mono-j c 2≤S (z≤n {Lc})
   c⊑ : c ⊑ᶜ frameStep Lc c
@@ -2931,12 +2934,11 @@ cascade-caps-all : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   valCaps? (capsAt e sl id) sl (arrTy a) (arrVal a) ≡ true →
   nestClosOK?ᵛ (capsAt e sl id) sl (arrTy a) (arrVal a) ≡ true →
   nestΦAt e sl id ≤ S →
-  nestDᵛ (arrTy a) (arrVal a) ≤ S →
   storeSyncMax sched (cascadeLatch a st) ≤ S →
   chainsCapsAll (capsAt e sl id) (capsAt e sl (suc id)) sl (capsH e sl id) 0
     a nextId (chainsOf a st) sched (cascadeLatch a st)
 cascade-caps-all {e = e} sl id a nextId S sched st sleq cok hsc
-                 hpz hΦs hsv hvc hcl hinc hval hsn =
+                 hpz hΦs hsv hvc hcl hinc hsn =
   cascade-caps-all-go sl id 0 a nextId S (chainsOf a st) sched
     (cascadeLatch a st) sleq
     (subst (λ x → capsOK? x sched (cascadeLatch a st) ≡ true)
@@ -2946,7 +2948,7 @@ cascade-caps-all {e = e} sl id a nextId S sched st sleq cok hsc
     (cascade-admit-entry (capsAt e sl id) a sched st cok) hsv
     (cascade-admit-park a st (capsOK?-regPark (capsAt e sl id) sched st cok))
     (cascade-admit-ord a sched st (capsOK?-regOrd (capsAt e sl id) sched st cok))
-    hvc hcl hinc hval hsn
+    hvc hcl hinc hsn
     0 (Caps.cSize (capsAt e sl id)) 0
     (capsAt-round-size e sl id) base REGLEN ≤-refl
   where
@@ -2974,7 +2976,6 @@ cascade-depth-sighted : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   Sched.slots sched ≡ sl →
   capsOK? (capsAt e sl id) sched st ≡ true →
   nestOK? e sl id sched st ≡ true →
-  nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
   valCaps? (capsAt e sl id) sl (arrTy a) (arrVal a) ≡ true →
   nestClosOK?ᵛ (capsAt e sl id) sl (arrTy a) (arrVal a) ≡ true →
   all (λ rc → inputsBelowᵛ (pathFloor (proj₂ rc)) (arrTy a) (arrVal a))
@@ -2982,20 +2983,18 @@ cascade-depth-sighted : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   depthCascade a nextId (chainsOf a st) sched (cascadeLatch a st)
     ≤ sightCeil (sizeᵉ e) (nestΦAt e sl id) (nestΦAt e sl id) (nestUnit e sl)
 cascade-depth-sighted {e = e} sl id a nextId sched st
-                      hsl hok hn hval valC closC strC =
+                      hsl hok hn valC closC strC =
   cascade-depth-go sl id 0 a nextId (nestΦAt e sl id)
     (chainsOf a st) sched (cascadeLatch a st)
     (cascade-caps-all sl id a nextId (nestΦAt e sl id) sched st hsl hok
-       SIGHT CHAINPZ CHAINΦ strC valC closC ≤-refl VALΦ STORE)
+       SIGHT CHAINPZ CHAINΦ strC valC closC ≤-refl STORE)
     SIGHT
     hsl
     CHAINPZ
     CHAINΦ
     ≤-refl
-    VALΦ
     STORE
   where
-  VALΦ = ≤-trans hval (nestCapAt≤nestΦAt e sl id)
   CHAINPZ = chainsOf-caps (Caps.cSize (capsAt e sl id)) a st
               (capsOK?-regs (capsAt e sl id) sched st hok)
   CHAINΦ = chainsNest-all (nestDᵛ (arrTy a) (arrVal a)) (nestUnit e sl)
@@ -3017,11 +3016,16 @@ cascade-depth-sighted {e = e} sl id a nextId sched st
 -- and the second is arithmetic about two currencies, and only the
 -- second is where the height comparison lives.
 --
--- THE SIZE PREMISE IS CARRIED AND NOT SPENT.  It is the caller's, and
--- it belongs to the statement rather than to this route: a descent
--- bounded through the payload's NESTING says nothing about the
--- payload's size, and the consumers that hand this premise in are
--- pricing the same arrival on the size axis in the same breath.
+-- BOTH PAYLOAD PREMISES ARE CARRIED AND NOT SPENT.  They are the
+-- caller's, and they belong to the statement rather than to this
+-- route: the consumers that hand them in are pricing the same arrival
+-- on those two axes in the same breath, so a door that dropped them
+-- would only move the same premise to the line above.  The size one
+-- never reached this route at all -- a descent bounded through the
+-- payload's NESTING says nothing about its size.  The nesting one is
+-- the more recent: the entry it used to pay for is now the PATH-INDEXED
+-- potential, which every position under here re-reads for itself, and
+-- a single number about the value that arrived pays for none of it.
 cascade-depth-capsH : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
   (sched : Sched Γ) (st : EvalSt e) →
@@ -3037,7 +3041,7 @@ cascade-depth-capsH : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   depthCascade a nextId (chainsOf a st) sched (cascadeLatch a st)
     ≤ capsH e sl id
 cascade-depth-capsH {e = e} sl id a nextId sched st hsl hcaps hnest hval hsz valC closC strC =
-  ≤-trans (cascade-depth-sighted sl id a nextId sched st hsl hcaps hnest hval valC closC strC)
+  ≤-trans (cascade-depth-sighted sl id a nextId sched st hsl hcaps hnest valC closC strC)
           (sighted-nest≤capsH sl id B B B ≤-refl ≤-refl
              (≤-trans (unit≤cap e sl id)
                (nestCapAt≤nestΦAt e sl id))

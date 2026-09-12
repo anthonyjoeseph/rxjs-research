@@ -67,6 +67,8 @@ open import Refuted.Eval-Seed-Nest
   using (evald≡3; syntactic≡2; eval-seed-nest-absurd)
 open import Refuted.Step-Frame-Nest-Dup
   using (dup≡80; perFrame≡40; stepFrame-nest-dup-absurd)
+open import Refuted.Step-Frame-Vals-Map
+  using (out₄≡4; step-frame-vals-map-absurd)
 open import Refuted.Ceil-Unfold-Mu
   using (parked≡6; unfolded≡18; ceil-unfoldμ-absurd;
          parked₂≡6; unfolded₂≡12)
