@@ -226,22 +226,16 @@ decision procedure rather than a pin.
 
 ### Big picture tier roadmap
 
-- **PROBE THE FIT ACROSS A CASCADE, BEFORE ANY OF IT IS GROUND.** The rows say
-  `hopFits` holds at the door; nothing says it holds at the state a drain step
-  hands its own recursive call, and that is the whole of whether this
-  invariant is the right one. `drain` computes, so the question is a row and
-  not an argument: take the fit at the state after one arrival, then after two.
-  A failure is the cheapest possible refutation of the new design and names a
-  strictly smaller region — which conjunct moved and at which frame — where
-  grinding first would spend the tier on an invariant that was never preserved.
-
-- **RESTATE THE OPERATOR LEAF ONTO THE SAME READING.** `dry-operator` is the
-  burst half and is refuted on the identical cause, one peel above its tightest
-  triple; the measure that repairs the drain half is now in `src`, so the
-  repair is the counterpart rather than new mathematics. `Push-Dry` already
-  proves three of the five frame shapes quiet outright, and the residue is
-  `from-inner` and `thru-outer` — which is exactly where `chainHopD` puts its
-  edge, so the leaf's hypothesis and the frame walk's are the same statement.
+- **DECIDE THE RANK: DESCEND ON THE CARRIED READING, OR GO ON COMPARING TWO
+  CURRENCIES.** The evaluator's middle component is a counter seeded off SIZE,
+  and `hopFits` asserts it never runs out — so the one quantity a run can
+  exhaust survived the massacre, and every row here hangs off it. The
+  alternative deletes it: witness the hop edge's descent by the inner value's
+  own reading, a `suc` below its flattener's by definition, so nothing depletes
+  and the guard's zero clause is unreachable and deletable. The leg establishes
+  whether that witness is available where the edge is taken — an impl change,
+  paid for in QuickCheck and the oracle, not the spec. If it is, this tier
+  loses its FALSITY row rather than proving it.
 
 - **CARRY THE BOUND OUT OF THE WALK RATHER THAN ASSERTING IT ABOUT THE VALUE.**
   Every dead route asked the emitter's rank to dominate a value it had not
@@ -252,13 +246,22 @@ decision procedure rather than a pin.
   and the hop edge spends that report instead of a fact about an arbitrary
   inner. Ordinary induction, and `entry-hop-fits` is its base case.
 
+- **RESTATE THE OPERATOR LEAF ONTO THE SAME READING.** `dry-operator` is the
+  burst half and is refuted on the identical cause, one peel above its tightest
+  triple; the measure that repairs the drain half is now in `src`, so the
+  repair is the counterpart rather than new mathematics. `Push-Dry` already
+  proves three of the five frame shapes quiet outright, and the residue is
+  `from-inner` and `thru-outer` — which is exactly where `chainHopD` puts its
+  edge, so the leaf's hypothesis and the frame walk's are the same statement.
+  Held behind the rank decision, which fixes what the invariant is stated over.
+
 ### The ledger
 
 - **`drain-dry-free`** (Verify-Rank-Sufficient) — FALSITY,
-  `REFUTED×2, PROBED×4`: every arrival after the root frame, now conditioned on
-  `hopFits`. Vacuous at the registry that refuted the unconditional form, and
-  instantiated at fifteen entry states — but at no state a cascade produced, so
-  whether the fit is PRESERVED is untested.
+  `REFUTED×2, PROBED×5`: every arrival after the root frame, now conditioned on
+  `hopFits`. Vacuous at the refuting registry; the fit then survives three
+  cascades on three recursive programs, and the quantity it bounds does not
+  move while the registry churns.
 
 - **`dry-operator`** (Verify-Rank-Sufficient.Dry) — SHAPE,
   `REFUTED×4, PROBED, RECOVERY`: the THREE FLATTENERS' dry-freedom under an

@@ -97,6 +97,29 @@ liveHopD V η []       = 0
 liveHopD V η (l ∷ ls) = pendHopD V η l ⊔ liveHopD V η ls
 
 ------------------------------------------------------------------
+-- THE TWO SIDES ARE DENOMINATED DIFFERENTLY, AND THAT IS THE OPEN
+-- QUESTION UNDER THIS STATEMENT.  The left side prices a template's
+-- REUSE of its argument — a map multiplies, a scan raises to the
+-- sweep — so it bounds how deep what a program EMITS can get.  The
+-- right side is the evaluator's own rank, seeded off SIZE, and the
+-- companion measure the seed is actually built from is the SYNTACTIC
+-- nesting, which this tree proves bounded by that size.  Nothing
+-- relates the two, and every refuted seeding route has the same
+-- shape: the run multiplies where the seed merely doubles.
+--
+-- So preservation here is an obligation BETWEEN TWO CURRENCIES rather
+-- than a structural fact, and the alternative is to stop comparing
+-- them.  Let the hop edge's well-founded descent be the carried
+-- reading of the value being subscribed: a flattener's reading is a
+-- `suc` of its source's by definition, and the inner came from that
+-- source, so the descent is definitional.  Then no counter exists to
+-- exhaust, the guard's zero clause is unreachable and deletable, and
+-- this statement is not needed at all.  What that route costs is the
+-- burst walk's strengthened return type — which is owed either way,
+-- and is the whole of what it would then be spent on.
+------------------------------------------------------------------
+
+------------------------------------------------------------------
 -- THE FIT.
 ------------------------------------------------------------------
 
