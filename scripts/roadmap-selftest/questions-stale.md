@@ -2,7 +2,10 @@
 # QUESTIONS have gone stale.  This section is NOT required to move, so nothing
 # else would notice it aging: the one thing held is that its relevant list is
 # current.  Both ways a list rots are here — a name that left the ledger, and a
-# name whose row is no longer FALSITY.
+# name whose row has come down to a class that ASSERTS something.  The third
+# question is the BOUNDARY: it names a SHAPE row, which is where a question's
+# rows land as it is answered rather than where it stops being a question, so
+# it must pass.
 
 ## Tier 0 — anchor
 
@@ -19,12 +22,16 @@
 ### Open questions
 
 - **THE-SETTLED-question.** Its list still names a row whose class has since
-  come down, so the uncertainty this question is about has been settled there
-  and the list is what moves.
-  relevant: `a-falsity`, `b-shape`
+  come down to one that ASSERTS the statement is right, so the uncertainty this
+  question is about has been settled there and the list is what moves.
+  relevant: `a-falsity`, `c-difficulty`
 - **THE-ANSWERED-question.** Its list names something that has left the
   postulate ledger, so the question is answered or the row was restated.
   relevant: `a-falsity`, `zz-off-the-ledger`
+- **THE-NARROWED-question.** Its list names a SHAPE row, which is the class a
+  question's rows convert INTO as it is half-answered — the restatement is
+  guaranteed and still owed — so this list is current and must not be reported.
+  relevant: `a-falsity`, `b-shape`
 
 ### The ledger
 
