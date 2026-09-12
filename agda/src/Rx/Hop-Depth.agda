@@ -103,6 +103,37 @@
 ------------------------------------------------------------------
 
 ------------------------------------------------------------------
+-- AND THE SECOND QUANTITY IS A READING OF THE TERM, WHICH IS WHY THE
+-- REPAIR BELONGS AT THIS CLAUSE RATHER THAN IN THE STORE.  A source's
+-- synchronous delivery count is recoverable from the syntax, and
+-- `Probed.Delivery-Count` separates it from the store bound on one
+-- signature: six against three hundred and twenty-four, at the inner
+-- fold of the very family whose crossing is measured above.  That
+-- count dominates the depth the run hands out at four source lengths
+-- and is TIGHT at the shortest, so the domination is earned rather
+-- than bought with slack, and it MOVES with the source where the
+-- reading here is flat.
+------------------------------------------------------------------
+
+------------------------------------------------------------------
+-- WHAT THE SWAP COSTS, AND IT IS NOT ONE EXPONENT.  A delivery count
+-- is NOT affine, so the section below does not apply to it: a
+-- flattener delivers the PRODUCT of how many inners arrive and how
+-- much each of them delivers, and a product's slope needs BOTH
+-- factors' slopes — three readings and two slopes where this measure
+-- has two and one.  And a fold's own contribution has to be SOLVED
+-- rather than bounded by a power: a step that re-wraps once deepens
+-- linearly in the refolds, and charging a base of two for that is free
+-- while the exponent is a single-digit store bound and unreachable
+-- once it is a delivery count.
+--
+-- THE REGION IT DOES NOT REACH is the two shapes a term reads
+-- coarsely: an `input`, whose count comes off the telescope and so
+-- stands for a definition of any size, and a `deferᵉ`, cut to zero by
+-- the same gate that makes a reading survive unfolding.
+------------------------------------------------------------------
+
+------------------------------------------------------------------
 -- WHY IT IS η-PARAMETERISED.  η assigns a hop depth to each slot of
 -- the telescope, and the `input` clause reports it.  A constant-zero
 -- reading there is false: an obs-typed shared slot's def emits values

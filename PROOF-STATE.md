@@ -226,38 +226,36 @@ procedure rather than a pin.
 
 ### Open questions
 
-- **CAN A SYNCHRONOUS DELIVERY COUNT BE READ OFF THE TERM AT ALL?** Both sides
-  this question used to hold are gone. `Refuted.Root-Refold` puts the crossing
-  inside the root subscribe frame, so no number a store carries between cascades
-  reaches it; and the report a walk would make alongside its emissions is
-  refuted there too, at exactly the pairs the dry marker crosses at, which makes
-  it the same statement rather than a weaker one. What is left is the door, and
-  the door reads the term. A count there has to MULTIPLY, since deliveries do.
-  The doubt is whether the term carries one: an `input` stands for a definition
-  of any size, and a `deferᵉ` is cut by the very reading that has to survive
-  unfolding.
+- **DOES A TERM-READ DELIVERY COUNT REACH A SLOT AND A DEFER?** The general half
+  is settled: `Probed.Delivery-Count` reads one off the syntax, separates it
+  from the store bound on one signature, and dominates the depths the fold that
+  crosses actually hands out at four source lengths, tight at the shortest. What
+  is left is the two shapes the reading is coarse at. An `input` takes its count
+  off the telescope, so it stands for a definition of any size; a `deferᵉ` is cut
+  to zero by the same gate that makes a reading survive unfolding. Either is
+  enough to make the clause false at a program neither probe reaches, and both
+  are the door's own business rather than the store's.
   relevant: `drain-dry-free`, `dry-operator`
 
 ### Big picture tier roadmap
 
-- **DECIDE THE NEW EXPONENT BEFORE PAYING FOR IT.** The two legs this replaces
-  are DISCARDED rather than shrunk — one carried the accumulator's depth between
-  cascades, the other reported it out of the walk, and `Refuted.Root-Refold`
-  puts the crossing where neither arrives. What that file leaves standing is a
-  count read off the TERM that multiplies. Write it and instantiate it first, on
-  the fold that killed the additive one, at the four lengths and two bounds where
-  the marker crosses: rows rather than a restatement, which is the cheap half,
-  and it either answers the tier's question or narrows it to the two shapes a
-  term cannot answer for — a slot and a defer.
+- **INSTANTIATE THE NEW COUNT AT THE TWO SHAPES IT READS COARSELY.** It is
+  settled over the fold family and untested at a slot and a `deferᵉ`, which is
+  now the whole of the tier's question — and a restatement paid before this is
+  paid over a clause that may be false at a program the fold family cannot
+  reach. Build one cascade whose source is a SHARED def and one that recurses
+  through a defer, and take the same domination rows against what those runs
+  hand out: the telescope reading either covers a def of any size or it does
+  not, and the defer gate either survives an unfold with the count intact or the
+  clause is false at every recursion.
 
 - **RAISE THE SCAN CLAUSE TO ITS SOURCE'S OWN DELIVERY COUNT.** The exponent is
   the store bound today and the refolds it pays for are deliveries, which is the
-  whole of what is false; a count the rows above have already dominated the
-  family with is what replaces it. This is the restatement, and it cascades:
-  every face is stated in the reading, so the two peel lemmas, the fit and both
-  drain halves move together. It converts the tier's question from open to
-  answered-or-localised, since a clause that fails at a slot fails visibly at the
-  one clause that reads the telescope.
+  whole of what is false; the count the rows above dominate the family with is
+  what replaces it. This is the restatement, and it cascades: every face is
+  stated in the reading, so the two peel lemmas, the fit and both drain halves
+  move together. It is what converts the question the leg above narrows from a
+  doubt about a reading into an obligation the tower carries.
 
 - **MOVE THE BUG CACHE OFF THE TYPECHECKER (Anthony).** Every stored case pins a
   whole run by `refl`, so the gate normalises the evaluator once per case and
