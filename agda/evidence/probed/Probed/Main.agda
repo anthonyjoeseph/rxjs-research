@@ -46,3 +46,6 @@ open import Probed.Seed
 
 open import Probed.Fuel-Growth
   using (opF; drF)
+
+open import Probed.Cascade-Growth
+  using (opC; drC)
