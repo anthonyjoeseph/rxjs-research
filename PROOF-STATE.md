@@ -258,14 +258,15 @@ decision procedure rather than a pin.
   and the hop edge spends that report instead of a fact about an arbitrary
   inner. Ordinary induction, and `entry-hop-fits` is its base case.
 
-- **RESTATE THE OPERATOR LEAF ONTO THE SAME READING.** `dry-operator` is the
-  burst half and is refuted on the identical cause, one peel above its tightest
-  triple; the measure that repairs the drain half is now in `src`, so the
-  repair is the counterpart rather than new mathematics. `Push-Dry` already
-  proves three of the five frame shapes quiet outright, and the residue is
-  `from-inner` and `thru-outer` — which is exactly where `chainHopD` puts its
-  edge, so the leaf's hypothesis and the frame walk's are the same statement.
-  Held behind the re-seeding, which fixes what the invariant is stated over.
+- **MOVE THE BUG CACHE OFF THE TYPECHECKER (Anthony).** Every stored case pins a
+  whole run by `refl`, so the gate normalises the evaluator once per case and
+  the file is append-only: two cases already cost minutes, and the larger one
+  took the gate down twice. The two predicates a case pins — agreement and
+  well-formedness — are the two `QuickCheck.agda` already evaluates COMPILED, so
+  the leg is a corpus and a `main` reading it rather than new machinery; compare
+  the BOOLEANS, and hold every row to BOTH, which the per-case cost forbade.
+  This narrows no question. It is what makes the other two affordable to probe:
+  every rank measurement they need pays the cache's cost on the way to CI.
 
 ### The ledger
 

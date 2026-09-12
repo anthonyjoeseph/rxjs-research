@@ -798,8 +798,8 @@ MODULE_ROOTS = {
                  ("main",)),
     "QuickCheck": ("the all-Agda QuickCheck — `make qc-build` / `make quickcheck`",
                    ("main",)),
-    "Implementation.Unit-Test": ("the type-level bug cache — `make bug-cache`",
-                                 ()),
+    "Implementation.Unit-Test.Bug-Cache": ("the bug cache's runner — `make bug-cache`",
+                                           ("main",)),
 }
 
 _IMPORT_RE = re.compile(r"^\s*(?:open\s+)?import\s+([^\s;()]+)")
