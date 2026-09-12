@@ -1,4 +1,4 @@
-.PHONY: find-prose gate cone-check cone-selftest roadmap-moved roadmap-moved-selftest roadmap-order roadmap-order-selftest roadmap-evidence gate-heavy gate-cheap gate-light dev-changed dev-changed-selftest stripped strip-selftest unmap-selftest postulates dup-check dup-selftest imports-check imports-fix imports-selftest find all help agda-dev agda-dev-selftest warm bg bg-check bg-wait bug-cache unsafe-check wiring wiring-selftest comments-check comments-selftest refuted ev ts-check cli-build oracle qc-build quickcheck
+.PHONY: find-prose gate cone-check cone-selftest roadmap-moved roadmap-moved-selftest roadmap-order roadmap-order-selftest roadmap-evidence gate-heavy gate-cheap gate-light dev-changed dev-changed-selftest stripped strip-selftest unmap-selftest postulates dup-check dup-selftest imports-check imports-fix imports-selftest find all help agda-dev agda-dev-selftest warm bg bg-check bg-wait bug-cache unsafe-check wiring wiring-selftest comments-check comments-selftest refuted ev ts-check cli-build oracle qc-build quickcheck quickcheck-sweep
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -167,6 +167,11 @@ help:
 	@echo "                  make quickcheck              (seeds 1..300, 200 runs each)"
 	@echo "                  make quickcheck ARGS='42 42' (ONE seed, 200 runs, depth 4)"
 	@echo "                  make quickcheck ARGS='1 500 300 5' (seeds 1..500, 300 runs, depth 5)"
+	@echo "  quickcheck-sweep  the SAME binary over a fixed seed range, writing"
+	@echo "                nothing -- red on any counterexample.  This is the"
+	@echo "                gate's form; \`quickcheck\` grows the cache instead."
+	@echo "                  make quickcheck-sweep"
+	@echo "                  make quickcheck-sweep QC_FIRST=1 QC_LAST=300 QC_RUNS=200 QC_DEPTH=4"
 
 # THE FAST DEV LOOP.  Checks one mutual-block member at a time against its
 # siblings POSTULATED at their exact signatures; agda/src is never written to.
@@ -1206,6 +1211,7 @@ gate-heavy: stripped
 	@$(MAKE) --no-print-directory refuted
 	@$(MAKE) --no-print-directory probed
 	@$(MAKE) --no-print-directory bug-cache
+	@$(MAKE) --no-print-directory quickcheck-sweep || { scripts/notify.py "RED (quickcheck)"; exit 1; }
 	@scripts/dev-changed.py --stamp
 	@echo "gate-heavy: ALL GREEN"
 	@scripts/notify.py "GREEN (heavy)"
@@ -1367,6 +1373,28 @@ qc-build: stripped
 
 quickcheck: qc-build
 	scripts/gen-unit-tests.sh $(ARGS)
+
+# THE GATE'S FORM OF THE SAME BINARY, and the split is not a convenience.
+# `quickcheck` APPENDS a case module per new counterexample, so a run of it
+# leaves a different tree depending on what it found — which is the one
+# thing a gate step may not do, since the red run has already written the
+# finding it was supposed to report.  This one pins the seeds, writes
+# nothing, and puts the verdict in the exit code.  Range in variables rather
+# than ARGS so the gate's own sweep is the default and an override is
+# visible at the call site.
+#
+# AND IT IS THE OTHER HALF OF `bug-cache`, not a duplicate of it.  The cache
+# is green iff no KNOWN counterexample remains — it re-checks what has
+# already been found and can say nothing about a region nobody has run.  The
+# sweep is what RUNS the region, so between them the gate holds both: the
+# found ones stay fixed, and the pinned seeds stay clean.
+QC_FIRST ?= 1
+QC_LAST  ?= 60
+QC_RUNS  ?= 200
+QC_DEPTH ?= 4
+
+quickcheck-sweep: qc-build
+	@scripts/quickcheck-sweep.sh $(QC_FIRST) $(QC_LAST) $(QC_RUNS) $(QC_DEPTH)
 
 
 # THE ONE TO POLL.  Exits 3 while running, 1 when red -- but never loop on it
