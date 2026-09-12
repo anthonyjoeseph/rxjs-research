@@ -71,3 +71,6 @@ open import Probed.Plug-Priced
 
 open import Probed.Clause-Sweep
   using (clause-sweep-fork)
+
+open import Probed.Slot-Priced
+  using (slot-priced-fork)

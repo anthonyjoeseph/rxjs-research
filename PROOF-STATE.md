@@ -226,34 +226,27 @@ procedure rather than a pin.
 
 ### Open questions
 
-- **IS AN EXACT DOOR READING PAYABLE?** A door CAN price a variable — with an
-  environment rather than the slope the count carries, since a fold knows its
-  own accumulator — and the reading now equals the run at every clause a sweep
-  reaches, iterating twenty-five times against a count a flattener multiplied.
-  What is left of the price is the two ends that sweep did not touch: a SLOT,
-  which no closed program can even state, and a count in the hundreds, which one
-  signature the count's own probe measures does reach. Both rows are stated IN
-  the measure, so the list does not shrink however the region moved.
+- **IS AN EXACT DOOR READING PAYABLE?** No — and the answer arrived from the
+  slot end. A reference reports its def's WHOLE reading, so the pair a plug
+  takes reads under the run at the first fold above an input; carrying the
+  triple fixes that and costs exactness, because the iteration joins the source
+  into the accumulator and an accumulator is not a source. Where a source has
+  hop the door sits ONE above its run. So the question is now a bound tight by a
+  CONSTANT, and what is open is whether that constant stays one as the telescope
+  stages and as the refolds reach the hundreds.
   relevant: `drain-dry-free`, `dry-operator`
 
 ### Big picture tier roadmap
 
-- **PRICE THE SLOT, THE ONE CLAUSE NOTHING HAS INSTANTIATED.** Every program in
-  both receipts is CLOSED, so the `input` clause has only ever been read at the
-  empty environment — the position the whole reading stood in before the sweep,
-  now narrowed to one clause and no smaller a risk for it. A slot's def emits
-  values of positive hop and a subscription connecting to it receives them, so a
-  constant there is false at the first flattener over an input. Build the staged
-  reading the way the count's defer probe builds its delivery one, and enter it
-  at a share holding a recursion. Coverage, so it precedes any restatement.
-
 - **RAISE THE SCAN CLAUSE, AND THE CASCADE WITH IT.** The restatement itself,
-  now the sweep leaves the reading standing at every clause but the slot. It
-  cascades: every face is stated in the reading, so the two peel lemmas, the fit
-  and both drain halves move together. And the affine section under the clause does not survive an iterated
-  fold at all — an environment prices a variable exactly, so the multiplicity
-  family has no job left and goes rather than being restated, which is the one
-  part of this leg that makes the tree smaller.
+  now every clause of the reading is decided — the slot one carrying the def's
+  whole triple rather than the pair a plug takes. It cascades: every face is
+  stated in the reading, so the two peel lemmas, the fit and both drain halves
+  move together. And the affine section under the clause does not survive an
+  iterated fold at all — an environment prices a variable directly, so the
+  multiplicity family has no job left and goes rather than being restated, which
+  is the one part of this leg that makes the tree smaller. It answers the
+  question's live half by fixing what the raised clause has to bound.
 
 - **MOVE THE BUG CACHE OFF THE TYPECHECKER (Anthony).** Every stored case pins a
   whole run by `refl`, so the gate normalises the evaluator once per case and
@@ -264,6 +257,16 @@ procedure rather than a pin.
   the BOOLEANS, and hold every row to BOTH, which the per-case cost forbade.
   This narrows no question. It is what makes the other two affordable to probe:
   every rank measurement they need pays the cache's cost on the way to CI.
+
+- **CARRY THE READING PAST ONE SLOT AND INTO THE HUNDREDS.** Every receipt so
+  far PICKS a stage rather than exercising the recursion that builds the slot
+  environment, and every fold instantiated iterates in single or double digits
+  while a delivery count is a PRODUCT at each flattener — one signature the
+  count's own probe measures reaches the hundreds. Those are the two ends where
+  a one-unit slack is least likely to hold and where an iterated clause stops
+  being obviously computable. Neither is a restatement, so
+  the leg either pins the slack at one or refutes the bound the raise is written
+  against, which is the question's remaining half either way.
 
 ### The ledger
 
