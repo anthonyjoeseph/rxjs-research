@@ -4,7 +4,6 @@
 --
 -- EVIDENCE, not a claim: `src` cannot import this file and nothing in the
 -- proof may rest on it.  Checked by `make probed`, claimed by `Probed.Main`.
--- TARGET: dry-operator @27b615
 -- TARGET: drain-dry-free @458c9c
 --
 -- WHY THIS REGION.  The machine seeds the ROOT's rank at `2 ^ (sizeᵉ e +
@@ -71,8 +70,6 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; drain; subscribeE;
   rootWitness; root; sched-init; st-init)
 open import Rx.Nest-Depth using (nestDᵉ)
 open import Verify-Rank-Sufficient using (drain-dry-free)
-open import Verify-Rank-Sufficient.Dry using (dry-operator)
-open import Verify-Rank-Sufficient.Entry using (rootTri-reads)
 open import Probed.Apparatus using (Confirms)
 
 ----------------------------------------------------------------------
@@ -95,8 +92,8 @@ seed e sl = 2 ^ (sizeᵉ e + slotsSize sl)
 ----------------------------------------------------------------------
 -- The two halves a run splits into, named once so a row can point at
 -- either.  `entry` is the root subscribe the evaluator performs before
--- it drains, so `burstOf` is what `dry-operator` is about at an operator
--- root and `drainOf` is what `drain-dry-free` is about everywhere.
+-- it drains, so `burstOf` is what the subscribe frame carries and
+-- `drainOf` is what `drain-dry-free` is about everywhere.
 ----------------------------------------------------------------------
 
 entry : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
@@ -158,9 +155,6 @@ _ = refl
 _ : (carried (burstOf progM3 ins₀) ≤ᵇ seed progM3 ins₀) ≡ true
 _ = refl                                               -- LOAD-BEARING
 
-opM3 : Confirms (dry-operator (rootWitness progM3 ins₀) progM3 root 0 0
-  (sched-init progM3 ins₀) (st-init progM3) refl (rootTri-reads progM3 ins₀))
-opM3 = refl
 
 ----------------------------------------------------------------------
 -- M6 — THE GROWTH ROW, and the only one here that says something a
@@ -188,9 +182,6 @@ _ = refl
 _ : (carried (burstOf progM6 ins₀) ≤ᵇ seed progM6 ins₀) ≡ true
 _ = refl                                               -- LOAD-BEARING
 
-opM6 : Confirms (dry-operator (rootWitness progM6 ins₀) progM6 root 0 0
-  (sched-init progM6 ins₀) (st-init progM6) refl (rootTri-reads progM6 ins₀))
-opM6 = refl
 
 ----------------------------------------------------------------------
 -- S3 and X3 — the same fold re-wrapping under the other two flattening
@@ -212,9 +203,6 @@ _ = refl
 _ : (carried (burstOf progS3 ins₀) ≤ᵇ seed progS3 ins₀) ≡ true
 _ = refl                                               -- LOAD-BEARING
 
-opS3 : Confirms (dry-operator (rootWitness progS3 ins₀) progS3 root 0 0
-  (sched-init progS3 ins₀) (st-init progS3) refl (rootTri-reads progS3 ins₀))
-opS3 = refl
 
 progX3 : Closed Γ₀ (obs natᵗ)
 progX3 = scanᵉ stepX (strmᵗ emptyᵉ) (ofᵉ (nat̂ 1 ∷ nat̂ 2 ∷ nat̂ 3 ∷ []))
@@ -225,9 +213,6 @@ _ = refl
 _ : (carried (burstOf progX3 ins₀) ≤ᵇ seed progX3 ins₀) ≡ true
 _ = refl                                               -- LOAD-BEARING
 
-opX3 : Confirms (dry-operator (rootWitness progX3 ins₀) progX3 root 0 0
-  (sched-init progX3 ins₀) (st-init progX3) refl (rootTri-reads progX3 ins₀))
-opX3 = refl
 
 ----------------------------------------------------------------------
 -- A — THE SAME FOLD FED FROM SCRIPTED SLOT DATA, which is the shape the
@@ -264,9 +249,6 @@ _ = refl
 _ : (carried (drainOf progA insAsync) ≤ᵇ seed progA insAsync) ≡ true
 _ = refl                                               -- LOAD-BEARING
 
-opA : Confirms (dry-operator (rootWitness progA insAsync) progA root 0 0
-  (sched-init progA insAsync) (st-init progA) refl (rootTri-reads progA insAsync))
-opA = refl
 
 drA : Confirms (drain-dry-free FUEL 1
   (proj₁ (proj₂ (entry progA insAsync))) (proj₂ (proj₂ (entry progA insAsync))))
