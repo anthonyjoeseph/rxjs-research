@@ -135,9 +135,10 @@ open import Verify-Rank-Sufficient.Entry using (rootTri-reads)
 -- generality after all.  What no seed reads is what happens AFTER it is
 -- minted: one arrival's chain fold can deliver many times, a fold
 -- deepens its accumulator by the step's own reading per delivery, and the
--- entry was taken once.  So a burst long enough peels the inner subscribe
--- to zero and emits the dry close, exactly as the operator leaf does from
--- the other side.
+-- entry was taken once.  Whether that ever reaches the dry close is the
+-- question the operator leaf answers YES to from the other side, and it
+-- is the one this row could not put until a cascade had been
+-- instantiated rather than argued about.
 --
 -- SO THE ROW IS STILL SHAPE AND THE RESTATEMENT IS NOT A FIELD.  An
 -- invariant on `EvalSt` was the obvious repair while the seed read the
@@ -146,6 +147,19 @@ open import Verify-Rank-Sufficient.Entry using (rootTri-reads)
 -- growth INSIDE the cascade — the only growth still outrunning an entry —
 -- exactly where it is.  What is owed is a bound on ONE burst's
 -- deliveries, denominated in something the entry triple carries.
+
+-- AND THE CASCADE DOES NOT OUTGROW ITS ENTRY, WHICH IS WHY THIS ROW IS
+-- NOT THE OPERATOR ROW UNDER ANOTHER NAME.  A cascade is ONE INSTANT,
+-- and both axes a term does not read are tick-gated: an arrival is a
+-- tick by construction, and a recursion re-enters only through
+-- `deferᵉ`, whose body is pending at `suc now`.  So what a single entry
+-- has to cover is the deliveries a term can produce SYNCHRONOUSLY — and
+-- a fold's reading gains one layer per delivery while the seed doubles
+-- per symbol of the term producing them.  Linear against exponential in
+-- the one parameter that moves both, which is the same shape the
+-- arrival rows found ACROSS entries; so the denomination the paragraph
+-- above asks for is the seed the machine already mints, and what is
+-- left in this row is the unconstrained schedule alone.
 --
 -- PROBED: `Probed.Descent` — twelve recursive programs, every one green,
 --   taken against the DRAIN of each run rather than the whole of it.  What
@@ -179,6 +193,17 @@ open import Verify-Rank-Sufficient.Entry using (rootTri-reads)
 --   one delivery lands per arrival, so every layer the rows count is
 --   paid for by a fresh entry and none of them reaches a burst
 --   delivering many times inside one cascade.
+-- PROBED: `Probed.Cascade-Growth` — that last region, instantiated.  An
+--   empty synchronous slot part and one late value put the entire run
+--   under a SINGLE arrival; the value is mapped to a literal observable
+--   and flattened, so one entry buys the inner's whole length.  Three
+--   layers at one unit of fuel and still three at two — so the layers
+--   are one cascade's and not a queue drained one arrival per unit —
+--   then six under one entry as the source gains three literals, while
+--   the seed moves from `2 ^ 20` to `2 ^ 23`.  THE BOUNDARY: the inner
+--   is a literal and the flattener a merge, so no row reaches a cascade
+--   whose inner is itself a recursion — which the gate above says
+--   cannot lengthen one, and which nothing here instantiates.
 
 postulate
   drain-dry-free : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}

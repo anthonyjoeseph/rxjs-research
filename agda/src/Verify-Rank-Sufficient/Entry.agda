@@ -65,9 +65,19 @@
 -- entry and deepens only after.  Both a `suc` and a store-reading
 -- conjunct are read BEFORE the growth they would have to pay for, which
 -- is the property they share and the reason one witness kills both.
--- What bounds a burst's deliveries and survives μ-unfolding is the
--- SYNCHRONOUS size — already the third component, already guarded.
+-- The last quantity that looked like it bounded a burst's deliveries
+-- while surviving μ-unfolding was the SYNCHRONOUS size — already the
+-- third component, already guarded — and it does not: the deliveries
+-- are exponential in a source's length where that measure is linear in
+-- it.  So no conjunct of this shape remains to be tried, and what is
+-- owed is a bound on what a run EMITS, carried as a strengthened return
+-- type on the burst-producing functions rather than as a reading of the
+-- term this invariant is about.
 --
+-- REFUTED: `Refuted.Sync-Count` — the synchronous size as a bound on a
+--   burst's deliveries, at a doubling fold over a live seed: 2, 6, 14,
+--   30 deliveries as the source gains one literal at a time, against a
+--   measure gaining one per literal.  The first three rows HOLD.
 -- REFUTED: `Refuted.Rank-Fold` — the three-conjunct form entered one
 --   peel ABOVE its tightest triple, so the crossing is not an
 --   off-by-one: a fold under a flattener reaches the dry close in three

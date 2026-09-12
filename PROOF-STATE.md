@@ -237,15 +237,15 @@ compute at every program with nothing sealed between them.
   inequality is available, so it lands the strict form or restates that
   refutation about the emitter.
 
-- **MEASURE ONE CASCADE'S GROWTH AGAINST THE ARRIVAL THAT ENTERED IT.** The
-  drain's remaining gap is deliveries INSIDE one cascade, and nothing has
-  instantiated it: `Probed.Fuel-Growth` lands one delivery per arrival by
-  construction, so the region is uncovered rather than known bad. `foldPath`
-  steps a path structurally and `dispatchShare` a telescope, so the growth may
-  already be bounded by syntax the entry reads — which would make the drain leaf
-  a different statement from the operator one. Probe before restating: this leg
-  is a witness family that reaches a many-delivery cascade, and its product is
-  which of the two the row is.
+- **PIN THE DRAIN LEAF TO SCHEDULES A RUN CAN REACH.** The cascade question is
+  answered and the two leaves are different statements: `Probed.Cascade-Growth`
+  grows three then six layers under ONE entry apiece against seeds of `2 ^ 20`
+  and `2 ^ 23`, and the reason is structural — a cascade is one instant, an
+  arrival is a tick, and a recursion re-enters only through `deferᵉ`, pending at
+  `suc now`. So nothing a term does not read can lengthen a cascade. What is
+  left in this row is what it never shared with its sibling: `sched` and `st`
+  arrive unconstrained, so the leaf is quantified over states no run mints. The
+  leg is that reachability premise and the arms that establish it.
 
 ### The ledger
 
@@ -255,10 +255,10 @@ compute at every program with nothing sealed between them.
   ABOVE its tightest triple — so no conjunct read off the term repairs it, the
   sync component included.
 
-- **`drain-dry-free`** (Verify-Rank-Sufficient) — SHAPE, `PROBED×3`: every
-  arrival after the root frame. Schedule and state arrive unconstrained; the
-  arrival's re-seed now reads the store it is handed, so what is left open is
-  the growth INSIDE a cascade, which no re-seed sees.
+- **`drain-dry-free`** (Verify-Rank-Sufficient) — SHAPE, `PROBED×4`: every
+  arrival after the root frame. The cascade's own growth is now instantiated and
+  the seed dominates it, so the residue is the unconstrained schedule and state:
+  the leaf is quantified over registries no run mints.
 
 ## Tier 2 — Verify-Well-Formed (parked behind tier 1)
 

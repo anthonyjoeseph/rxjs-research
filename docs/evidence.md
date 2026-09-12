@@ -75,6 +75,34 @@ cache.
    A receipt on a `postulate` BLOCK MEMBER is indented, and E3 reads it there
    and attributes it to that member rather than to the member above.
 
+### Getting the figures out — one build, not one per row
+
+A probe's rows are numerals, and you do not know them before you run. Agda
+reports ONE error per module and aborts, so pinning them one at a time costs a
+build per figure. Two things that look like the fix are not: a tuple compared
+against sentinels descends to the FIRST mismatching component and stops, and a
+list compared against `[]` mismatches at the top level and is printed
+UNNORMALISED, which tells you nothing at all.
+
+What works is forcing the whole report into one scalar the comparison has to
+evaluate:
+
+```agda
+open import Data.Nat.Show using (show)
+open import Data.String using (String; intersperse)
+
+census : String
+census = intersperse "," (show <fig₁> ∷ show <fig₂> ∷ … ∷ [])
+
+_ : census ≡ ""
+_ = refl
+```
+
+The error reads `"0,3,3,3,2,20,0,6,6,23" != ""`, which is every figure in one
+run. Write it as a throwaway module beside the probe, read the line, delete it,
+and pin the real rows — it is scaffolding, so it never earns a `-- TARGET:` and
+never reaches `Probed.Main`.
+
 ## What bites
 
 - **`make gate-heavy` never sees this tree, and never did.** Before the move the
