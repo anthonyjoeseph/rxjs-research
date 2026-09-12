@@ -225,23 +225,24 @@ statement compute at every program with nothing sealed between them.
 
 ### Big picture tier roadmap
 
-- **REACH μ AT RANDOM — THE GENERATOR, NOT A THIRTEENTH HAND ROW.**
-  Twelve hand-written programs instantiate all three guards, the rank one at a
-  share holding a recursion, so what is left is COVERAGE. Hand rows have
-  stopped paying: the next is the same shape by the same author, and depth two
-  is where they all stop. The generator is μ-FREE, so no seed ever
-  swept produced the constructor the rank guard lives under; teaching it `μᵉ`,
-  `varᵉ` and `deferᵉ` puts the sweep on the region and closes the behavioural
-  gap in one edit. It goes first because the route is no longer the unknown —
-  what each reading costs, and the shape of the hard one, are in the
-  statement's header — so a red here is the last thing that moves ground.
+- **STATE THE ENTRY INVARIANT AND LAND ITS TWO CHEAP ARMS.**
+  The coverage question is spent: the sweep reaches the recursion region and
+  4500 programs report no dry run, so the doubt left is not behavioural.
+  What is left is the proof, and both settled peels wait on one
+  motive — that the triple the evaluator stands at is the READING OF THE TERM
+  it is about to subscribe, seeded at the root and re-seeded at a connect.
+  State that, then discharge the μ and connect arms off the recovered
+  `unfoldμ-shrinks` and `unconn-insert`, one line each under `ltS` and `ltU`.
+  It goes before the rank arm because that arm is a STRENGTHENING of the
+  burst-producing functions' return type, so its statement is written against
+  a motive that has to exist first.
 
 ### The ledger
 
 - **`rank-sufficient`** (Verify-Rank-Sufficient) — DIFFICULTY,
   `PROBED, RECOVERY×3`: the three descent guards never fail at the triple the
-  evaluator enters at. Twelve recursive programs reach all three and hold;
-  nothing random reaches μ at all, and no program yet nests it deeper than two.
+  evaluator enters at. Twelve recursive programs reach all three and hold, and
+  4500 swept ones report no dry run; the rank reading is the one still open.
 
 ## Tier 2 — Verify-Well-Formed (parked behind tier 1)
 

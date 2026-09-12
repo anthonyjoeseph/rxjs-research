@@ -50,12 +50,13 @@ open import Data.List using ([]; _∷_)
 open import Data.Fin using (zero; suc)
 open import Data.Maybe using (nothing; just)
 open import Data.Vec using () renaming (_∷_ to _∷ⱽ_; [] to []ⱽ)
-open import Data.List.Relation.Unary.Any using (here)
+open import Data.List.Relation.Unary.Any using (here; there)
 open import Relation.Binary.PropositionalEquality using (refl)
 
 open import Rx.Prim using (after_,_; hot; cold)
 open import Rx.Exp using (input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ;
-  switchAllᵉ; exhaustAllᵉ; nat̂; primᵗ; pairᵗ; fstᵗ; sndᵗ; strmᵗ; varᵗ; add; mul)
+  switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ;
+  nat̂; primᵗ; pairᵗ; fstᵗ; sndᵗ; strmᵗ; varᵗ; add; mul)
 open import Rx.Slots using (scripted)
 AGDA
 
