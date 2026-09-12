@@ -4,7 +4,7 @@
 --
 -- EVIDENCE, not a claim: `src` cannot import this file and nothing in the
 -- proof may rest on it.  Checked by `make probed`, claimed by `Probed.Main`.
--- TARGET: drain-dry-free @140a87
+-- TARGET: drain-dry-free @400cf7
 --
 -- WHY THIS REGION.  The machine seeds the ROOT's rank at `2 ^ (sizeᵉ e +
 -- slotsSize sl)` and peels ONE per inner-subscribe hop, so the guard
@@ -250,6 +250,6 @@ _ : (carried (drainOf progA insAsync) ≤ᵇ seed progA insAsync) ≡ true
 _ = refl                                               -- LOAD-BEARING
 
 
-drA : Confirms (drain-dry-free FUEL 1 0 (λ _ → 0)
+drA : Confirms (drain-dry-free FUEL 1 0
   (proj₁ (proj₂ (entry progA insAsync))) (proj₂ (proj₂ (entry progA insAsync))) Below)
 drA = refl
