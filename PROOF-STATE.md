@@ -226,29 +226,29 @@ procedure rather than a pin.
 
 ### Open questions
 
-- **IS THE EXPONENT THE WHOLE OF WHAT IS FALSE?** The reading exists and is sound
-  everywhere it has been taken — `Probed.Delivery-Count` over the fold family,
-  `Probed.Slot-Defer` at the two clauses that read something other than the
-  term. What none of it establishes
-  is that the CROSSING goes away once the exponent is swapped. The refutations
-  are programs and the swapped clause computes at them, so the marker either
-  stops appearing there or it does not; if it does not, the store bound was one
-  of several quantities read in the wrong currency and a restatement aimed at it
-  is aimed at a symptom.
+- **CAN A STEP EMIT A FOLD THE PARENT NEVER FOLDED OVER?** The exponent was the
+  whole of what is false wherever it could be measured: `Probed.Swapped-Exponent`
+  mirrors the reading with the fold exponent read off its source's own delivery
+  count, and the depths the refuting runs hand out sit under it at every length
+  and both bounds. What that family cannot ask is the thing its own refutation
+  was built on — a frame's emissions are not subterms of the term it entered on.
+  Its step emits a MERGE, whose reading is the nesting it writes. A step emitting
+  a SCAN reads an exponent off a source the parent never folded over, and nothing
+  at the entry ties the two. That is the same escape the live reading died of,
+  one clause across.
   relevant: `drain-dry-free`, `dry-operator`
 
 ### Big picture tier roadmap
 
-- **TAKE THE SWAPPED CLAUSE TO THE PROGRAMS THAT REFUTE THE OLD ONE.** The
-  reading is now sound at every shape it has been taken at, and what nothing has
-  asked is whether swapping it in makes the crossing STOP — which is the tier's
-  question and the one thing a cascade cannot be walked back from. Build the
-  swapped depth in the probe tree, clause for clause with the one in `src` but
-  reading the scan exponent off its own source's count, and evaluate it at the
-  two witnesses of `Refuted.Rank-Cross` and at the root crossing of
-  `Refuted.Root-Refold`. Both sides compute, so the answer is rows rather than a
-  restatement: the marker stops appearing there or the exponent is not the whole
-  of what is false.
+- **EMIT A FOLD FROM THE STEP AND SEE WHETHER THE READING STILL COVERS IT.** The
+  swapped reading now dominates at the family that refutes the live one, and
+  that family's step emits a merge — a shape whose emissions the entry can see.
+  The attack that killed the live reading was that emissions are not subterms,
+  and it has an exact analogue one clause across: a step whose emission is
+  itself a fold carries an exponent read off a source the parent never folded
+  over. Build it and take the same rows. A refutation here kills the swap before
+  the cascade below is paid for; a green says the reading survives the escape it
+  was designed against.
 
 - **RAISE THE SCAN CLAUSE TO ITS SOURCE'S OWN DELIVERY COUNT.** The exponent is
   the store bound today and the refolds it pays for are deliveries; the count

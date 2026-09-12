@@ -158,6 +158,34 @@
 ------------------------------------------------------------------
 
 ------------------------------------------------------------------
+-- AND THE SWAP STOPS THE CROSSING, WHICH IS THE ONE THING THE COUNT
+-- BEING SOUND DID NOT SAY.  `Probed.Swapped-Exponent` mirrors this
+-- family and the multiplicity below it clause for clause with the fold
+-- exponent read off its source's own delivery count, and takes the
+-- result to the terms that refute the live reading.  The store bound
+-- then leaves the reading ENTIRELY, at both families: once the refolds
+-- are paid for in deliveries there is nothing left for it to bound.
+-- At the refutation's four source lengths the swapped reading climbs
+-- where this one is flat, and the depths the runs hand out sit under it
+-- at every length and at both bounds — including the pair the
+-- refutation pins, where this reading is three and the run carries
+-- four.
+--
+-- WHAT IT DOES NOT SAY, AND IT IS THE NEXT QUESTION RATHER THAN A
+-- CAVEAT.  Not one of those rows is TIGHT: the reading is geometric in
+-- the count against a rate that is linear in it, so the margin is three,
+-- seven, twenty-four and seventy-seven and it widens.  The crossing
+-- stopping is therefore established and the reading's SIZE is not — a
+-- measure this far above what the fold exhausts still owes an argument
+-- that it descends, and the slack is this clause exponentiating a
+-- quantity that was already exact at its own shortest source.  Nor does
+-- anything there run the guard: it is stated over this reading, so a run
+-- against the swapped one cannot be taken until the swap has landed, and
+-- what carries the rows across is the refutation's own finding that the
+-- report alongside the emissions and the guard are one statement.
+------------------------------------------------------------------
+
+------------------------------------------------------------------
 -- WHY IT IS η-PARAMETERISED.  η assigns a hop depth to each slot of
 -- the telescope, and the `input` clause reports it.  A constant-zero
 -- reading there is false: an obs-typed shared slot's def emits values

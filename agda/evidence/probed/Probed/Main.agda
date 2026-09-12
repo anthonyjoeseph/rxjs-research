@@ -59,3 +59,6 @@ open import Probed.Delivery-Count
 
 open import Probed.Slot-Defer
   using (slot-fork)
+
+open import Probed.Swapped-Exponent
+  using (measure-fork)
