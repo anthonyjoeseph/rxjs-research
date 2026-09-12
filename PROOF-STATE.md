@@ -240,14 +240,15 @@ decision procedure rather than a pin.
 
 ### Big picture tier roadmap
 
-- **PAY FOR `k ≤ V`, OR ESTABLISH THAT IT CANNOT BE PAID.** The reading's scan
-  clause charges a store-bound-th power on the premise that a scan refolds at
-  most bound-many times, and `Rx.Hop-Depth`'s header carries why nothing pays
-  for it. The family that shows the gap is built and measured in
-  `Probed.Operator-Root`, and its root is a flattener, so every layer it grows
-  is a layer the run enters. This is the only open leg that can still refute the
-  measure the other two are built on, which is why it goes first and why its
-  outcome may be a restatement rather than a discharge.
+- **RESTORE THE SECOND QUANTITY THE SCAN CLAUSE IS OWED.** `k ≤ V` cannot be
+  paid off the store bound at all: one field serves both the drain's arrival
+  allowance and the reading's refold count, and `Probed.Operator-Root` separates
+  them — a cascade inside one subscribe frame refolds per literal and spends no
+  arrival. The premise did fall out once, of a store-SIZE invariant against an
+  allowance growing per instant, which never counted arrivals; `Rx.Hop-Depth`
+  carries the recovery. So the leg is that second quantity restated over the
+  current state, not a tighter reading of the first, and what it narrows is what
+  the store counts.
 
 - **CARRY THE BOUND OUT OF THE WALK RATHER THAN ASSERTING IT ABOUT THE VALUE.**
   Every dead route asked the emitter's rank to dominate a value it had not

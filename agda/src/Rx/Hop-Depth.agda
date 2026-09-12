@@ -82,6 +82,25 @@
 ------------------------------------------------------------------
 
 ------------------------------------------------------------------
+-- AND THE PREMISE HAS BEEN PAID BEFORE, BY A QUANTITY OF ANOTHER
+-- KIND — which is the shape of the repair, and the reason the current
+-- reading cannot be patched into one.  The earlier route never counted
+-- arrivals at all: the store invariant bounded a stored value's SIZE
+-- against a budget that GREW with the instant id, so a refold inside
+-- one instant was covered by the same instant's allowance and the
+-- accumulator's nesting fell out of the size bound without anything
+-- having to know how the refold was reached.  Today's `storeBound` is
+-- one field serving two jobs at once — the drain's arrival allowance
+-- and the measure's refold bound — and the counterexample above is
+-- exactly the gap between them, so no reading of that single field can
+-- close it.  What has to come back is the SECOND quantity, not a
+-- better bound on the first.
+--
+-- RECOVERY: git show f205085 restores the size invariant and the
+--   id-growing budget the premise used to fall out of.
+------------------------------------------------------------------
+
+------------------------------------------------------------------
 -- WHY IT IS η-PARAMETERISED.  η assigns a hop depth to each slot of
 -- the telescope, and the `input` clause reports it.  A constant-zero
 -- reading there is false: an obs-typed shared slot's def emits values
