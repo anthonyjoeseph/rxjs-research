@@ -198,6 +198,39 @@
 ------------------------------------------------------------------
 
 ------------------------------------------------------------------
+-- AND IT CAN, BUT NOT WITH A SLOPE.  A slope is what a reading
+-- carries when the plug's own reading is unavailable; at a fold it IS
+-- available, because the fold knows its accumulator — that starts at
+-- the seed, and each refold is the step read against the previous one.
+-- So the clause ITERATES where this one exponentiates, and every
+-- variable is read off an ENVIRONMENT the descent through the term
+-- extends at each binder.  `Probed.Plug-Priced` carries that reading
+-- to every term either dead reading crosses at — the refutation's own
+-- inner family and both emitted-fold families that killed the swap —
+-- and the door equals the run at all three, at every length.  What
+-- replaces the power is therefore not a larger bound but an EXACT one,
+-- which is the part worth having: a bound dominating by a growing
+-- margin is unusable as a descent measure however true it is.
+------------------------------------------------------------------
+
+------------------------------------------------------------------
+-- WHAT THAT COSTS AND WHAT IT REMOVES.  The closed form goes: a fold's
+-- contribution stops being a power a proof can rewrite and becomes a
+-- recursion over the refold count, so every arithmetic fact about the
+-- measure becomes a fact about that recursion.  Against it, the
+-- multiplicity family below and both of the count's delivery slopes
+-- have no job left — a slope exists to price a variable, and an
+-- environment prices it exactly.
+--
+-- WHAT IS UNTOUCHED: whether the clause is COMPUTABLE at the refold
+-- counts a real store reaches.  The iteration count is itself a
+-- delivery count, and those run to the hundreds on one signature the
+-- count's own probe measures, where these families run to single
+-- digits.  Nothing here reaches that, and the rows say nothing about
+-- it.
+------------------------------------------------------------------
+
+------------------------------------------------------------------
 -- WHY IT IS η-PARAMETERISED.  η assigns a hop depth to each slot of
 -- the telescope, and the `input` clause reports it.  A constant-zero
 -- reading there is false: an obs-typed shared slot's def emits values
