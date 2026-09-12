@@ -4,7 +4,7 @@
 -- EVIDENCE, not a claim: `src` cannot import this file and nothing in
 -- the proof may rest on it.  Checked by `make probed`, claimed by
 -- `Probed.Main`.
--- TARGET: drain-dry-free @140a87
+-- TARGET: drain-dry-free @400cf7
 --
 -- WHAT THE SIBLING ROWS LEFT OPEN.  The seed rows put a fold's carried
 -- nesting beside the rank the machine seeds and found the margin
@@ -179,6 +179,6 @@ _ = refl
 -- rather than at a triple chosen to break it.
 ----------------------------------------------------------------------
 
-drF : Confirms (drain-dry-free 6 1 0 (λ _ → 0)
+drF : Confirms (drain-dry-free 6 1 0
   (proj₁ (proj₂ (entry fold ins₀))) (proj₂ (proj₂ (entry fold ins₀))) Below)
 drF = refl

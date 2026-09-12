@@ -46,7 +46,7 @@
 -- either — a merge only — since what is being asked is whether a cascade
 -- can grow at all under one entry, not which registry clause carries it.
 --
--- TARGET: drain-dry-free @140a87
+-- TARGET: drain-dry-free @400cf7
 module Probed.Cascade-Growth where
 
 open import Data.Fin using (zero)
@@ -181,6 +181,6 @@ _ = refl
 -- carries the cascade, and it is the one this file is really about.
 ----------------------------------------------------------------------
 
-drC : Confirms (drain-dry-free 2 1 0 (λ _ → 0)
+drC : Confirms (drain-dry-free 2 1 0
   (proj₁ (proj₂ (entry casc6 insLate))) (proj₂ (proj₂ (entry casc6 insLate))) Below)
 drC = refl

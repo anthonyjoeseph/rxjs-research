@@ -26,9 +26,10 @@
 
 -- WHAT THE ROWS FOUND, and it is stronger than preservation.  The fit's
 -- left side does not merely stay under the rank, it does not MOVE: two
--- at every step of the plain recursion, three at every step of both
--- nested ones, against rank exponents of eleven, nineteen and
--- twenty-eight.  The registry churns underneath all of it — a `repeat`
+-- at every step of the plain recursion, three at every step of the
+-- doubly nested one and four at every step of the shared one, against
+-- rank exponents of eleven, nineteen and twenty-eight.  The registry
+-- churns underneath all of it — a `repeat`
 -- registers a fresh inner and drops the spent one, so its length returns
 -- to where it was while the mint counter climbs — and the reading is
 -- flat across that churn.  Which is what the measure was chosen for: a
@@ -63,20 +64,21 @@
 -- recursion referenced from inside a second one — the shape whose
 -- nesting the rank guard cannot read off the term it compares.
 
--- THE BOUNDARY.  Three arrivals deep, at the naive reading `V = 0` and
--- `η` constantly zero, over one flattening strategy, and exactly one
--- row runs a drain — six steps, on the cheapest of the three programs.
+-- THE BOUNDARY.  Three arrivals deep, at the store bound `V = 0`, over
+-- one flattening strategy, and exactly one row runs a drain — six
+-- steps, on the cheapest of the three programs.
 -- That last bound is what the iteration loop will hold rather than what
 -- the question wants: a drain is the one thing here that is not nearly
 -- free, so the file buys its coverage from the fit rows and spends the
 -- drain once, where the target demands it.  Nothing here reaches the
 -- late-slot cascade its sibling instantiates, where one arrival
--- delivers many times, and nothing sweeps a nonzero slot reading.  Nor
--- does a flat reading over three steps establish a flat
--- reading over all of them: what the rows buy is that the fit SURVIVES a
--- cascade, and that the quantity it bounds is not the one that grows.
+-- delivers many times, and the only nonzero slot reading swept is Q3's
+-- single shared one.  Nor does a flat reading over three steps
+-- establish a flat reading over all of them: what the rows buy is that
+-- the fit SURVIVES a cascade, and that the quantity it bounds is not
+-- the one that grows.
 --
--- TARGET: drain-dry-free @140a87
+-- TARGET: drain-dry-free @400cf7
 module Probed.Fit-Preserved where
 
 open import Data.Fin using (zero)
@@ -97,6 +99,7 @@ open import Rx.Evaluator using (Sched; EvalSt; cascade;
 open import Rx.Slots using (Slots; slotsSize; shared)
 open import Verify-Rank-Sufficient using (drain-dry-free)
 open import Verify-Rank-Sufficient.Hop using (liveHopD; regsHopD; hopFits)
+open import Rx.Slot-Hop using (slotHop)
 open import Probed.Apparatus using (Confirms; Below)
 
 ----------------------------------------------------------------------
@@ -133,8 +136,9 @@ FUEL = 6
 
 carriedAt : ∀ {n} {Γ : Ctx n} {t} → ℕ → (e : Closed Γ t) (ins : Slots Γ) → ℕ
 carriedAt k e ins =
-  liveHopD 0 (λ _ → 0) (Sched.live (proj₁ (at k e ins)))
-    + regsHopD 0 (λ _ → 0) (EvalSt.registry (proj₂ (at k e ins)))
+  let η = slotHop 0 (Sched.slots (proj₁ (at k e ins))) in
+  liveHopD 0 η (Sched.live (proj₁ (at k e ins)))
+    + regsHopD 0 η (EvalSt.registry (proj₂ (at k e ins)))
 
 rankAt : ∀ {n} {Γ : Ctx n} {t} → ℕ → (e : Closed Γ t) (ins : Slots Γ) → ℕ
 rankAt k e ins =
@@ -145,7 +149,7 @@ mintAt : ∀ {n} {Γ : Ctx n} {t} → ℕ → (e : Closed Γ t) (ins : Slots Γ)
 mintAt k e ins = EvalSt.nextReg (proj₂ (at k e ins))
 
 fitAt : ∀ {n} {Γ : Ctx n} {t} → ℕ → (e : Closed Γ t) (ins : Slots Γ) → Set
-fitAt k e ins = hopFits 0 (λ _ → 0) (proj₁ (at k e ins)) (proj₂ (at k e ins))
+fitAt k e ins = hopFits 0 (proj₁ (at k e ins)) (proj₂ (at k e ins))
 
 ----------------------------------------------------------------------
 -- The programs.  Q1 is plain recursion over the empty context, Q2 is μ
@@ -303,16 +307,16 @@ _ = refl
 _ : mintAt 3 progQ3 insMu ≡ 10          -- LOAD-BEARING
 _ = refl
 
-_ : carriedAt 0 progQ3 insMu ≡ 3       -- LOAD-BEARING
+_ : carriedAt 0 progQ3 insMu ≡ 4       -- LOAD-BEARING
 _ = refl
 
-_ : carriedAt 1 progQ3 insMu ≡ 3       -- LOAD-BEARING
+_ : carriedAt 1 progQ3 insMu ≡ 4       -- LOAD-BEARING
 _ = refl
 
-_ : carriedAt 2 progQ3 insMu ≡ 3       -- LOAD-BEARING
+_ : carriedAt 2 progQ3 insMu ≡ 4       -- LOAD-BEARING
 _ = refl
 
-_ : carriedAt 3 progQ3 insMu ≡ 3       -- LOAD-BEARING
+_ : carriedAt 3 progQ3 insMu ≡ 4       -- LOAD-BEARING
 _ = refl
 
 _ : rankAt 0 progQ3 insMu ≡ 28             -- LOAD-BEARING
@@ -336,6 +340,6 @@ fpQ3₃ = Below
 -- is why there is one of these and not nine.
 ----------------------------------------------------------------------
 
-fpDrain : Confirms (drain-dry-free FUEL 2 0 (λ _ → 0)
+fpDrain : Confirms (drain-dry-free FUEL 2 0
             (proj₁ (at 1 progQ1 ins₀)) (proj₂ (at 1 progQ1 ins₀)) fpQ1₁)
 fpDrain = refl

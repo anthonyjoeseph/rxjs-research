@@ -49,7 +49,6 @@
 module Verify-Rank-Sufficient where
 
 open import Data.Bool using (false)
-open import Data.Fin using (Fin)
 open import Data.Nat using (ℕ)
 open import Data.Product using (_×_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_)
@@ -252,9 +251,9 @@ open import Verify-Rank-Sufficient.Hop using (hopFits)
 
 postulate
   drain-dry-free : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (fuel : Fuel) (nextId : Id) (V : ℕ) (η : Fin n → ℕ)
+    (fuel : Fuel) (nextId : Id) (V : ℕ)
     (sched : Sched Γ) (st : EvalSt e) →
-    hopFits V η sched st →
+    hopFits V sched st →
     hasDry (drain fuel nextId sched st) ≡ false
 
 -- THE FIT AT THE DOOR.  `evaluate` hands the drain the state its root
@@ -281,7 +280,7 @@ postulate
     (ins : Slots Γ) →
     let ent = subscribeE (rootWitness e ins) e root 0 0 (sched-init e ins)
                 (st-init e)
-    in hopFits 0 (λ _ → 0) (proj₁ (proj₂ ent)) (proj₂ (proj₂ ent))
+    in hopFits 0 (proj₁ (proj₂ ent)) (proj₂ (proj₂ ent))
 
 -- THE ASSEMBLY, AND THE ONLY THING IT ADDS IS THE SEEDING.  `evaluate`
 -- concatenates its root burst with its drain, so dryness of the run is
@@ -297,7 +296,7 @@ rank-sufficient {Γ = Γ} {t = t} fuel e ins =
   hasDry-++ (proj₁ ent) (drain fuel 1 (proj₁ (proj₂ ent)) (proj₂ (proj₂ ent)))
     (subscribe-dry-free (rootWitness e ins) e root 0 0 (sched-init e ins)
       (st-init e) (rootTri-reads e ins))
-    (drain-dry-free fuel 1 0 (λ _ → 0) (proj₁ (proj₂ ent)) (proj₂ (proj₂ ent))
+    (drain-dry-free fuel 1 0 (proj₁ (proj₂ ent)) (proj₂ (proj₂ ent))
       (entry-hop-fits e ins))
   where
   ent : Stream Γ t × Sched Γ × EvalSt e
