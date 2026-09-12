@@ -222,11 +222,38 @@
 -- have no job left — a slope exists to price a variable, and an
 -- environment prices it exactly.
 --
--- WHAT IS UNTOUCHED: the SLOT clause, which every program either
--- receipt reaches is closed against.  Pricing a slot needs a staged
--- reading built the way the count's own defer probe builds its delivery
--- one, and until one exists the environment prices every variable but
--- that one.
+-- WHAT IS UNTOUCHED: the second STAGE of the telescope, since every
+-- receipt picks a slot rather than exercising the recursion that builds
+-- the environment, and the refold counts a delivery count can reach,
+-- which run to the hundreds while every fold instantiated so far
+-- iterates in single or double digits.
+------------------------------------------------------------------
+
+------------------------------------------------------------------
+-- AND A SLOT IS PRICED BY THE DEF'S WHOLE READING, NOT BY THE PAIR A
+-- PLUG TAKES.  An expression reads as a triple — what it delivers, what
+-- one delivered value itself delivers, how deep it is — while a plug
+-- needs only the outer two, so the environment was built at the pair and
+-- a reference rebuilt the missing middle from the top count.  A slot is
+-- not a plug: a reference stands for the def, so the middle is precisely
+-- what it has to report.  `Probed.Slot-Priced` stages the environment
+-- both ways over a def delivering one observable of three values, and
+-- the pair reads UNDER the run at the first fold above it — a crossing
+-- and not a coarseness, since a fold takes its refold count off its
+-- source.  The two agree, and both bound rather than equal the run,
+-- where a def's arms differ in width: one per-value figure is joined
+-- over all of them.
+--
+-- AND EXACTNESS STOPS AT A SOURCE THAT CARRIES HOP.  The iteration joins
+-- the SOURCE's reading into the accumulator at every refold, and an
+-- accumulator is not a source — a step's inner flattener is over what
+-- the fold has built.  Every family swept before this one sources from
+-- literals, whose hop is zero, so the join cost nothing and the rows
+-- read as exact; a flattened input is the first source with a hop to
+-- contribute, and there the reading sits one above its run.  The slack
+-- does not grow with the refolds, which is what says it is the join and
+-- not the rate — so the reading is still a bound tight enough to descend
+-- against, and the exactness receipt is about sources of hop zero.
 ------------------------------------------------------------------
 
 ------------------------------------------------------------------
