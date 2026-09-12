@@ -66,7 +66,7 @@ module Verify-Rank-Sufficient.Entry where
 open import Data.List using (List; [])
 open import Data.Nat using (ℕ; _+_; _≤_)
 open import Data.Nat.Properties using (≤-refl; ≤-trans; ≤-reflexive; m≤m+n;
-  m≤n+m; m≤n⊔m; m^n>0; *-mono-≤; *-identityˡ)
+  m≤n+m; m≤n⊔m; ⊔≡⊔′; m^n>0; *-mono-≤; *-identityˡ)
 open import Data.Product using (_×_; _,_)
 open import Data.Fin using (Fin)
 open import Relation.Binary.PropositionalEquality using (sym)
@@ -111,18 +111,20 @@ rootTri-reads V e ins = ≤-refl , m≤m+n (hopDᵉ V (slotsη V ins) e) 0 , ≤
 -- needs no entry here, since its clause IS its subterm's reading, and
 -- the three flatteners need none either, since each reads `suc` of it.
 --
--- THE COEFFICIENT IS WHERE THE `⊔ 1` AND THE BASE-TWO POWER EARN
+-- THE COEFFICIENT IS WHERE THE `⊔′ 1` AND THE BASE-TWO POWER EARN
 -- THEMSELVES, and it is the one thing these two lines check.  A
 -- template that DROPS its argument has slope zero, and a coefficient of
 -- zero would send the subterm's reading to a product of zero — the
--- clause would stop dominating its own source.  `⊔ 1` at a map and a
+-- clause would stop dominating its own source.  `⊔′ 1` at a map and a
 -- base of at least two at a scan are exactly what rule that out.
 hop-mapᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ s t} (V : ℕ) (η : Fin n → ℕ)
   (f : Fn Γ Δᵍ Δ Θ s t) (b : Exp Γ Δᵍ Δ Θ s) →
   hopDᵉ V η b ≤ hopDᵉ V η (mapᵉ f b)
 hop-mapᵉ V η f b =
   ≤-trans (≤-trans (≤-reflexive (sym (*-identityˡ (hopDᵉ V η b))))
-                   (*-mono-≤ (m≤n⊔m (pmᵗ V 0 f) 1) ≤-refl))
+                   (*-mono-≤ (≤-trans (m≤n⊔m (pmᵗ V 0 f) 1)
+                                      (≤-reflexive (⊔≡⊔′ (pmᵗ V 0 f) 1)))
+                             ≤-refl))
           (m≤n+m _ _)
 
 hop-scanᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ s t} (V : ℕ) (η : Fin n → ℕ)

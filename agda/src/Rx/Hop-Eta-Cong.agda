@@ -23,7 +23,7 @@
 module Rx.Hop-Eta-Cong where
 
 open import Data.Bool using (T; _∧_)
-open import Data.Nat  using (ℕ; suc; _+_; _*_; _^_; _⊔_; _<ᵇ_)
+open import Data.Nat  using (ℕ; suc; _+_; _*_; _^_; _⊔′_; _<ᵇ_)
 open import Data.Fin  using (Fin; toℕ)
 open import Data.List using (List; []; _∷_)
 open import Relation.Binary.PropositionalEquality
@@ -52,7 +52,7 @@ mutual
   hopD-η-congᵉ V k ag emptyᵉ          ok = refl
   hopD-η-congᵉ V k ag (mapᵉ f e)      ok =
     cong₂ _+_ (hopD-η-congᵗ V k ag f (∧ˡ (inputsBelowᵗ k f) (inputsBelowᵉ k e) ok))
-              (cong ((pmᵗ V 0 f ⊔ 1) *_)
+              (cong ((pmᵗ V 0 f ⊔′ 1) *_)
                     (hopD-η-congᵉ V k ag e
                        (∧ʳ (inputsBelowᵗ k f) (inputsBelowᵉ k e) ok)))
   -- the count is a natᵗ term: the measure does not read it, so neither
@@ -88,7 +88,7 @@ mutual
   hopD-η-congᵗ V k ag (bool̂ _)      ok = refl
   hopD-η-congᵗ V k ag (nat̂ _)       ok = refl
   hopD-η-congᵗ V k ag (pairᵗ a b)   ok =
-    cong₂ _⊔_ (hopD-η-congᵗ V k ag a
+    cong₂ _⊔′_ (hopD-η-congᵗ V k ag a
                  (∧ˡ (inputsBelowᵗ k a) (inputsBelowᵗ k b) ok))
               (hopD-η-congᵗ V k ag b
                  (∧ʳ (inputsBelowᵗ k a) (inputsBelowᵗ k b) ok))
@@ -97,17 +97,17 @@ mutual
   hopD-η-congᵗ V k ag (inlᵗ a)      ok = hopD-η-congᵗ V k ag a ok
   hopD-η-congᵗ V k ag (inrᵗ a)      ok = hopD-η-congᵗ V k ag a ok
   hopD-η-congᵗ V k ag (caseᵗ s l r) ok =
-    cong₂ _+_ (cong₂ _⊔_ (hopD-η-congᵗ V k ag l
+    cong₂ _+_ (cong₂ _⊔′_ (hopD-η-congᵗ V k ag l
                             (∧ˡ (inputsBelowᵗ k l) (inputsBelowᵗ k r) rest))
                          (hopD-η-congᵗ V k ag r
                             (∧ʳ (inputsBelowᵗ k l) (inputsBelowᵗ k r) rest)))
-              (cong ((pmᵗ V 0 l ⊔ pmᵗ V 0 r ⊔ 1) *_)
+              (cong ((pmᵗ V 0 l ⊔′ pmᵗ V 0 r ⊔′ 1) *_)
                     (hopD-η-congᵗ V k ag s (∧ˡ (inputsBelowᵗ k s) lr ok)))
     where
     lr   = inputsBelowᵗ k l ∧ inputsBelowᵗ k r
     rest = ∧ʳ (inputsBelowᵗ k s) lr ok
   hopD-η-congᵗ V k ag (ifᵗ c a b)   ok =
-    cong₂ _⊔_ (hopD-η-congᵗ V k ag a
+    cong₂ _⊔′_ (hopD-η-congᵗ V k ag a
                  (∧ˡ (inputsBelowᵗ k a) (inputsBelowᵗ k b) rest))
               (hopD-η-congᵗ V k ag b
                  (∧ʳ (inputsBelowᵗ k a) (inputsBelowᵗ k b) rest))
@@ -125,7 +125,7 @@ mutual
     hopDᵗˢ V η₁ ts ≡ hopDᵗˢ V η₂ ts
   hopD-η-congᵗˢ V k ag []       ok = refl
   hopD-η-congᵗˢ V k ag (y ∷ ys) ok =
-    cong₂ _⊔_ (hopD-η-congᵗ  V k ag y
+    cong₂ _⊔′_ (hopD-η-congᵗ  V k ag y
                  (∧ˡ (inputsBelowᵗ k y) (inputsBelowᵗˢ k ys) ok))
               (hopD-η-congᵗˢ V k ag ys
                  (∧ʳ (inputsBelowᵗ k y) (inputsBelowᵗˢ k ys) ok))
