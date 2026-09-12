@@ -30,6 +30,16 @@ agda/*.out
 # agda-dev generates stubbed copies here; build artifacts, never sources
 _dev/
 
+# a probe BEGINS as a scratch measurement — a deliberate mismatch packing
+# several figures into one numeral, so one build answers what would
+# otherwise cost one build per figure.  It must live inside the evidence
+# library for `make ev` to resolve it, and it must never be committed: it
+# declares no `-- TARGET:` and no claim root reaches it, so it is exactly
+# what `evidence-check` E2 and `wiring-probed` exist to refuse.  A LOCAL
+# gate still goes red while one is on disk, and that is the point — the
+# file is deleted or converted into a claimed receipt, never left lying
+agda/evidence/*/*/Scratch-*.agda
+
 # python bytecode from scripts/
 __pycache__/
 
