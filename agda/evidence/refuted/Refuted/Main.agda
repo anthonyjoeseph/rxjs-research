@@ -13,7 +13,6 @@
 -- RECOVERY: git show 919f115:agda/evidence/refuted/Refuted/
 module Refuted.Main where
 
-open import Refuted.Burst-Nesting using (burst-under-emitter-false)
 open import Refuted.Drain-Reachable using (drain-dry-free-false;
   drain-dry-free-inv-false)
 open import Refuted.Rank-Cross using (rank-sufficient-false)

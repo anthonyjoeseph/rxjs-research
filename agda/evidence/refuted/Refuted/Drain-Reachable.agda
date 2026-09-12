@@ -13,12 +13,12 @@
 -- that kills the leaf is arithmetic about what a written chain can do.
 --
 -- WHAT THE RE-SEED READS AND WHAT IT MISSES.  One arrival enters at
--- `nestDᵛ` of its own payload joined with the store's node nesting, and
+-- `hopDᵛ` of its own payload joined with the store's own reading, and
 -- `foldPath` threads that ONE witness through every frame of the chain
 -- without re-seeding at any of them.  So a `map-f` frame is free: it
 -- applies a function to the payload, and the function's body is an
 -- expression of whatever size the registry's author wrote.  A plain
--- numeral arrives — nesting zero, and a store whose only node holds an
+-- numeral arrives — reading zero, and a store whose only node holds an
 -- empty queue adds zero — and the frame hands back a tower.  The
 -- `thru-outer` frame behind it then subscribes that tower, and every
 -- flattener inside it peels the rank once more.

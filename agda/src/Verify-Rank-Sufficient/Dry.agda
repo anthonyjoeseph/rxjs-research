@@ -115,13 +115,18 @@ opShape _                = false
 --   14, 30 as the source lengthens by one literal, against a measure
 --   that gains one per literal: the first three rows HOLD the bound, so
 --   it is not an off-by-one that a tighter constant repairs.
--- REFUTED: `Refuted.Burst-Nesting` — the inner-under-emitter reading
---   taken in NESTING, by a scan over a three-element synchronous source
---   whose step re-wraps the accumulator in one merge layer: the program
---   reads 1 and its burst reads 3.  It kills the NON-STRICT comparison,
---   so the strict one the peel needs goes with it — and it is what says
---   the surviving form has to be read at a measure the store bound
---   parameterises.
+-- DEAD ROUTE: the inner-under-emitter comparison taken in NESTING,
+--   killed by machine while `src` still had that measure — a scan over
+--   a three-element synchronous source whose step re-wraps the
+--   accumulator in one merge layer reads 1 at the program and 3 at its
+--   burst.  The NON-STRICT comparison goes and the strict one the peel
+--   needs goes with it, which is what says the surviving form has to be
+--   read at a measure the store bound parameterises.  It is a dead
+--   route rather than a standing refutation because the claim does not
+--   survive the change of currency: at a store bound large enough to
+--   run anything, the scan clause's own power makes the hop-currency
+--   form TRUE, so what the witness refuted was the nesting and it died
+--   with it.
 -- PROBED: `Probed.Operator-Root` — the first row this leaf has ever had
 --   at a root it ANSWERS for, since every earlier one sat at a root
 --   `opShape` refuses.  A run whose inner fold triples its deliveries per

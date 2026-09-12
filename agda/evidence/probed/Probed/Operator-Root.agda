@@ -44,7 +44,9 @@
 -- layer the run enters.  What the rate then says is that the store
 -- bound has to cover the deliveries a cascade makes SYNCHRONOUSLY, and
 -- a synchronous cascade consumes no fuel — which is where the reading's
--- `k ≤ V` premise is owed and where nothing yet pays it.
+-- `k ≤ V` premise sits, and `Refuted.Rank-Cross` since settled that it
+-- is not merely unpaid but FALSE at the bound `evaluate` seeds itself
+-- with.
 --
 -- THE COVERAGE BOUNDARY, and it is an infrastructure limit rather than
 -- a choice.  MEASURING a burst and SUBSCRIBING one cost differently: at
@@ -83,26 +85,29 @@ open import Rx.Hop-Depth using (hopDᵉ)
 open import Rx.Slot-Hop using (slotHop)
 open import Rx.Evaluator using (Stream; subscribeE; rootWitness; root;
   sched-init; st-init)
-open import Rx.Nest-Depth using (nestDᵉ)
 open import Verify-Rank-Sufficient.Dry using (dry-operator)
 open import Verify-Rank-Sufficient.Entry using (rootTri-reads)
 open import Probed.Apparatus using (Confirms)
 
 ----------------------------------------------------------------------
--- HOW DEEP THE VALUES A RUN HANDS OUT READ.  Taken verbatim from the
--- sibling probes and from `Refuted.Burst-Nesting`, so a row here is
--- comparable with a row there — and the payloads it reads are exactly
--- the ones the root flattener goes on to subscribe.
+-- HOW DEEP THE VALUES A RUN HANDS OUT READ, IN THE RANK'S OWN
+-- CURRENCY.  The payloads it reads are exactly the ones the root
+-- flattener goes on to subscribe, so a depth here is comparable with
+-- the rank rows below rather than merely alongside them — which a
+-- reading in NESTING was not, since the two orders disagree at the
+-- `deferᵉ` gate.
 ----------------------------------------------------------------------
 
-evNest : ∀ {n} {Γ : Ctx n} {u} → List (InstEvent (Closed Γ u)) → ℕ
-evNest []             = 0
-evNest (value v ∷ es) = nestDᵉ v ⊔ evNest es
-evNest (_ ∷ es)       = evNest es
+evHop : ∀ {n} {Γ : Ctx n} {u} (V : ℕ) (η : Fin n → ℕ) →
+        List (InstEvent (Closed Γ u)) → ℕ
+evHop V η []             = 0
+evHop V η (value v ∷ es) = hopDᵉ V η v ⊔ evHop V η es
+evHop V η (_ ∷ es)       = evHop V η es
 
-carried : ∀ {n} {Γ : Ctx n} {u} → Stream Γ (obs u) → ℕ
-carried []         = 0
-carried (em ∷ ems) = evNest (InstEmit.events em) ⊔ carried ems
+carried : ∀ {n} {Γ : Ctx n} {u} (V : ℕ) (η : Fin n → ℕ) →
+          Stream Γ (obs u) → ℕ
+carried V η []         = 0
+carried V η (em ∷ ems) = evHop V η (InstEmit.events em) ⊔ carried V η ems
 
 Γ₀ : Ctx 0
 Γ₀ = []ⱽ
@@ -181,16 +186,16 @@ _ = refl
 -- multiply.  It multiplies, by three, against a seed that doubles.
 ----------------------------------------------------------------------
 
-_ : carried (burstOf e1 ins₀) ≡ 3                      -- LOAD-BEARING
+_ : carried SB η₀ (burstOf e1 ins₀) ≡ 3                      -- LOAD-BEARING
 _ = refl
 
-_ : carried (burstOf e2 ins₀) ≡ 12                     -- LOAD-BEARING
+_ : carried SB η₀ (burstOf e2 ins₀) ≡ 12                     -- LOAD-BEARING
 _ = refl
 
-_ : carried (burstOf e3 ins₀) ≡ 39                     -- LOAD-BEARING
+_ : carried SB η₀ (burstOf e3 ins₀) ≡ 39                     -- LOAD-BEARING
 _ = refl
 
-_ : carried (burstOf e4 ins₀) ≡ 120                    -- LOAD-BEARING
+_ : carried SB η₀ (burstOf e4 ins₀) ≡ 120                    -- LOAD-BEARING
 _ = refl
 
 ----------------------------------------------------------------------

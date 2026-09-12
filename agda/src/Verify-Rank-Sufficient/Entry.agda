@@ -55,11 +55,12 @@
 --   yet.  What survives is a rate that MULTIPLIES per fold, and the
 --   fold count is a property of the STORE, which is the whole reason
 --   this conjunct is V-parameterised rather than a measure of `o`
---   alone.  `Refuted.Burst-Nesting` carries the witness — the same
---   accumulator-rewrapping step, against the nesting measure.
--- REFUTED: `Refuted.Burst-Nesting` — the inner-under-emitter reading,
---   at a scan whose step re-wraps its accumulator in one merge layer:
---   the program reads 1 and its burst reads 3.
+--   alone.  The witness was a scan whose step re-wraps its accumulator
+--   in one merge layer: read in NESTING, the program comes back 1 and
+--   its burst 3.  It is not restatable in the live currency — at a
+--   store bound large enough to run anything the scan clause's own
+--   power makes the hop-currency form true — so what it killed was the
+--   unparameterised reading and it went with that measure.
 ------------------------------------------------------------------
 module Verify-Rank-Sufficient.Entry where
 
