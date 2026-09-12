@@ -21,35 +21,66 @@
 -- small, because nothing un-latches; that asymmetry is what makes one
 -- inequality the whole of what either peel needs.
 --
--- THE RANK COMPONENT IS ABSENT HERE ON PURPOSE.  An emitted inner is a
--- runtime value structurally unrelated to the term its emitter was
--- subscribing, so no reading of the term bounds it and no conjunct
--- stated over syntax could carry it.  That reading travels as a
--- strengthened return type on the burst-producing functions instead,
--- which is why this motive stops at two.
+-- THE RANK COMPONENT IS THE NESTING, AND IT IS AN INEQUALITY FOR A
+-- THIRD REASON AGAIN.  The rank peels once per `subscribeInner` hop,
+-- and a hop is a `*All` layer entered — so `nestDᵉ` is what the
+-- component is a bound on.  It is loose because the seed is
+-- exponential in the program while the measure is linear in it, and
+-- because a connect RE-SEEDS at the shared definition's own reading
+-- while the caller's rank is untouched.
+--
+-- WHAT MAKES THIS THE CONJUNCT AND NOT A SIZE.  An emitted inner is a
+-- runtime value, so no SUBTERM relation reaches it — but a `Val` at
+-- `obs` IS a closed expression, so a measure does, and the one that
+-- survives is the one that does not grow under μ-unfolding.  A bound
+-- on `sizeᵉ` fails there outright: `unfoldμ body` is larger than
+-- `μᵉ body` while the witness keeps its rank.  `nestDᵉ` truncates at
+-- the `deferᵉ` gate, so unfolding leaves it EQUAL, and the same
+-- truncation is why the inner a burst carries reads strictly under
+-- its emitter's — which is exactly one peel.
 ------------------------------------------------------------------
 module Verify-Rank-Sufficient.Entry where
 
 open import Data.List using (List; [])
-open import Data.Nat using (_≤_)
-open import Data.Nat.Properties using (≤-refl)
+open import Data.Nat using (ℕ; zero; suc; _+_; _^_; _≤_; z≤n; s≤s)
+open import Data.Nat.Properties using (≤-refl; ≤-trans; ≤-reflexive; m≤m+n;
+  m^n>0; +-mono-≤; +-identityʳ)
 open import Data.Product using (_×_; _,_)
+open import Relation.Binary.PropositionalEquality using (cong; sym)
 
 open import Rx.Prim using (Source)
-open import Rx.Exp using (Ctx; Closed; syncSizeᵉ)
-open import Rx.Slots using (Slots)
+open import Rx.Exp using (Ctx; Closed; sizeᵉ; syncSizeᵉ)
+open import Rx.Slots using (Slots; slotsSize)
 open import Rx.Strat-Order using (Tri)
+open import Rx.Nest-Depth using (nestDᵉ; nestDᵉ≤sizeᵉ)
 open import Rx.Evaluator using (unconn; rootTri)
 
 -- the triple the machine stands at READS the term it is about to
--- subscribe: the unconnected count bounds the first component and the
--- sync size the third.  The rank component is unconstrained here.
+-- subscribe: the unconnected count bounds the first component, the
+-- nesting the second, the sync size the third
 EntryReads : ∀ {n} {Γ : Ctx n} {u} → Tri → Closed Γ u → Slots Γ → List Source → Set
-EntryReads (U , _ , s) o sl cs = unconn sl cs ≤ U × syncSizeᵉ o ≤ s
+EntryReads (U , R , s) o sl cs =
+  unconn sl cs ≤ U × nestDᵉ o ≤ R × syncSizeᵉ o ≤ s
 
--- the root seeds both components at the term's own reading, so the
--- invariant holds there by reflexivity — the one place the seeding has
--- to be shown adequate
+-- the exponential seed is generous, and this is the only place that
+-- has to be said.  It is stated over a bare numeral rather than off
+-- the machine because that is all the seeding arm needs: the rank is
+-- `2 ^ (…)` and the measure is under the exponent.
+n≤2^n : ∀ (n : ℕ) → n ≤ 2 ^ n
+n≤2^n zero    = z≤n
+n≤2^n (suc n) =
+  ≤-trans (s≤s (n≤2^n n))
+          (≤-trans (+-mono-≤ (m^n>0 2 n) (≤-refl {2 ^ n}))
+                   (≤-reflexive (cong (2 ^ n +_) (sym (+-identityʳ (2 ^ n))))))
+
+-- the root seeds all three components at the term's own reading — two
+-- by reflexivity, the rank through the size it is exponential in.
+-- This is the one place the seeding has to be shown adequate.
 rootTri-reads : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
   EntryReads (rootTri e ins) e ins []
-rootTri-reads e ins = ≤-refl , ≤-refl
+rootTri-reads e ins =
+  ≤-refl
+  , ≤-trans (nestDᵉ≤sizeᵉ e)
+            (≤-trans (m≤m+n (sizeᵉ e) (slotsSize ins))
+                     (n≤2^n (sizeᵉ e + slotsSize ins)))
+  , ≤-refl
