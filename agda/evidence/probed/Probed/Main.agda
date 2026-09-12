@@ -53,3 +53,6 @@ open import Probed.Fit-Preserved
 
 open import Probed.Operator-Root
   using (opRoot)
+
+open import Probed.Delivery-Count
+  using (exponent-fork)

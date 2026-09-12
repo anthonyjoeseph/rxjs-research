@@ -33,19 +33,19 @@
 -- `-- TARGET:`, since an arbitrary function applied to the postulate
 -- could return any type at all and the tie would be gone.
 --
--- WHAT THIS MODULE USED TO ALSO HOLD, and why only `Confirms` is left.
--- The `Separates` record the FORK law is stated in, and a computable
--- floor under the sealed caps grant that the nesting rows read their
--- figures against, are both apparatus for a face this development no
--- longer has: the grant, the nest store and the walk maximum they are
--- written over went with the budget.  A fork between two candidate
--- mechanisms will want `Separates` back verbatim.
+-- WHAT THIS MODULE USED TO ALSO HOLD BESIDE THE TWO BELOW.  A
+-- computable floor under the sealed caps grant that the nesting rows
+-- read their figures against is apparatus for a face this development
+-- no longer has: the grant, the nest store and the walk maximum it was
+-- written over went with the budget.
 --
 -- RECOVERY: git show 919f115:agda/evidence/probed/Probed/Apparatus.agda
 module Probed.Apparatus where
 
 open import Data.Nat using (_<_)
 open import Data.Nat.Properties using (_<?_)
+open import Relation.Binary.PropositionalEquality using (_≡_)
+open import Relation.Nullary using (¬_)
 open import Relation.Nullary.Decidable using (True; toWitness)
 
 -- A CONDITIONED TARGET'S PREMISE, DECIDED RATHER THAN ASSERTED.  A
@@ -63,3 +63,21 @@ Below {t = t} = toWitness t
 
 Confirms : {A : Set} → .(claim : A) → Set
 Confirms {A} _ = A
+
+-- THE FORK'S PRODUCT, AND IT IS A TYPE RATHER THAN A MARKER.  A
+-- `-- FORK:` probe stands between two candidate MECHANISMS, and what it
+-- earns is that they DISAGREE -- prose saying so is a claim no machine
+-- reads, and a `-- TARGET:` receipt written from such a file would
+-- report coverage the separating rows never bought.
+--
+-- The candidates are two definitions of ONE signature, so the
+-- disagreement is a value: `at` names the point and `apart` carries it
+-- there.  When the two agree, `apart` is uninhabited at every point and
+-- the record cannot be written at all -- which is what makes the marker
+-- decide only WHICH law applies and leaves Agda to decide whether the
+-- claim is true.
+record Separates {A : Set} {B : A → Set} (f g : (x : A) → B x) : Set where
+  constructor separates-at
+  field
+    at    : A
+    apart : ¬ (f at ≡ g at)
