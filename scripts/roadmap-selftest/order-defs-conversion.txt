@@ -1,0 +1,3 @@
+=== d-grindable
+d-grindable : ∀ {n} → Chain n → Set
+d-grindable c = assemble (a-falsity c) (proven-glue c)

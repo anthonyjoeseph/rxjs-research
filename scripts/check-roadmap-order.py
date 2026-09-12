@@ -36,6 +36,24 @@ read here for a different purpose.  A name that left agda/src entirely is a
 deletion and is free; a name still on the postulate ledger under a different
 class is a reclassification and is free.
 
+A CONVERSION IS A SPLIT AND NOT A BANK, WHICH IS THE ONE SHAPE THE
+DISCHARGE TEST ABOVE READS WRONG.  This repo's central move takes a
+monolithic postulate, turns it into a REAL BODY over smaller postulated
+leaves, and keeps the parent's name on the definition.  Read by the letter
+that is a discharge -- the name is off the ledger and still declared -- and
+it is nothing of the kind: the ledger went UP, every gap is still greppable,
+and the claim the parent used to assert is asserted by nobody.  Banking is
+what the rule holds, and a definition standing on a live postulate has
+banked nothing, so it is exempt.  It is also the shape that MINTS the risky
+rows this check then reports as blockers: the leaves are discovered by
+writing the body, which is the whole payoff of the leaf-only form.
+
+The test is the one the exemption is named after and needs no list: read
+the banked name's own DEFINITION out of agda/src and ask whether it names a
+live postulate.  Nothing can be gamed into it, because a definition that
+mentions an open statement IS one that proved nothing -- the same fact,
+read by a machine instead of claimed by a commit message.
+
 THE CARVE-OUT IS THE PREREQUISITE ONE, AND IT IS VALIDATED RATHER THAN
 ASSERTED.  A mechanical row the risky row actually CONSUMES is fair game --
 grinding it is working the top leg, not avoiding it.  But "adjacent", "same
@@ -147,6 +165,35 @@ def header_text(root, name):
     return "\n".join(chunks)
 
 
+def definition_text(root, name):
+    """`name`'s DECLARATION AND ITS CLAUSES in agda/src — the type, plus every
+    line of the body.  `header_text` deliberately stops at the first column-0
+    line, because a header is what sits ABOVE a statement; this is the other
+    half, and it is what says whether the definition stands on anything open."""
+    pat = re.compile(DECL_OF_RE.format(re.escape(name)))
+    own = re.compile(r"^" + re.escape(name) + r"(?:[ \t]|$)")
+    chunks = []
+    for f in sorted((root / "agda" / "src").rglob("*.agda")):
+        lines = f.read_text().splitlines()
+        for i, line in enumerate(lines):
+            if not pat.match(line):
+                continue
+            k = i + 1
+            while k < len(lines) and (lines[k].startswith((" ", "\t"))
+                                      or not lines[k].strip()
+                                      or own.match(lines[k])):
+                k += 1
+            chunks.append("\n".join(lines[i:k]))
+    return "\n".join(chunks)
+
+
+def stands_on_live(name, live, defs, root):
+    """Did the banked name become a REAL BODY over still-open leaves?  Then the
+    conversion split the debt rather than banking a claim."""
+    text = defs.get(name, "") if defs is not None else definition_text(root, name)
+    return sorted(set(live) & names_in(text))
+
+
 def load_headers(fixture):
     """Fixture form of `header_text`: blocks introduced by `=== <name>`."""
     out, cur = {}, None
@@ -195,6 +242,8 @@ def main():
                     help="agda/src declared names (selftest fixture)")
     ap.add_argument("--headers", default=None,
                     help="risky postulates' headers (selftest fixture)")
+    ap.add_argument("--definitions", default=None,
+                    help="banked names' definitions in agda/src (selftest fixture)")
     args = ap.parse_args()
 
     try:
@@ -220,8 +269,10 @@ def main():
     was = claimed_names(_CR.parse(Text(base_text)), MECHANICAL)
     now = claimed_names(_CR.parse(Text(cur_text)), RISKY)
     headers = load_headers(args.headers) if args.headers else None
+    defs = load_headers(args.definitions) if args.definitions else None
 
     findings = []
+    converted = []
     for tier, groups in sorted(was.items()):
         banked = discharged(groups, live, srcnames)
         if not banked:
@@ -230,6 +281,10 @@ def main():
         if not blockers:
             continue
         for name in banked:
+            leaves = stands_on_live(name, live, defs, root)
+            if leaves:
+                converted.append((tier, name, leaves))
+                continue
             excused = None
             for grp in blockers:
                 for risky in grp:
@@ -242,6 +297,11 @@ def main():
                     break
             if not excused:
                 findings.append((tier, name, [g[0] for g in blockers]))
+
+    for tier, name, leaves in converted:
+        shown = ", ".join(f"`{l}`" for l in leaves[:3])
+        print(f"roadmap-order: Tier {tier}: `{name}` is a CONVERSION, not a "
+              f"discharge — its body still stands on {shown}")
 
     if not findings:
         print(f"roadmap-order: OK — no mechanical row was banked under an open "

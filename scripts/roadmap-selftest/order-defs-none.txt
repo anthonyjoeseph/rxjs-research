@@ -1,0 +1,3 @@
+=== d-grindable
+d-grindable : ∀ {n} → Chain n → Set
+d-grindable c = assemble (proven-one c) (proven-two c)

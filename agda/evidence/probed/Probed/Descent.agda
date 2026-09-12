@@ -1,9 +1,11 @@
--- THE DESCENT GUARDS, INSTANTIATED — the first rows ever run against
--- `rank-sufficient`.
+-- THE DESCENT GUARDS, INSTANTIATED — the rows that stand under
+-- `rank-sufficient`, now that the statement itself is a real body and its
+-- two remaining leaves are what evidence can be about.
 --
 -- EVIDENCE, not a claim: `src` cannot import this file and nothing in the
 -- proof may rest on it.  Checked by `make probed`, claimed by `Probed.Main`.
--- TARGET: rank-sufficient @a538eb
+-- TARGET: drain-dry-free @458c9c
+-- TARGET: dry-operator @27b615
 --
 -- WHY THIS REGION AND NOT THE CANONICAL PROGRAMS.  `evaluate` descends on
 -- a triple and three of its clauses are guarded by a comparison that can
@@ -15,13 +17,24 @@
 -- That is why these rows are hand-written and why they are recursion
 -- first: the behavioural gap and the proof gap are the same region.
 --
+-- THE RUN SPLITS WHERE THE ASSEMBLY SPLITS IT, which is what changed here
+-- and is the reason a row is no longer one per program.  `evaluate` is the
+-- root subscribe followed by the drain, and dry-freedom of each half is
+-- now a separate obligation: the drain's is `drain-dry-free`, and the
+-- burst's is proven outright except at an OPERATOR root, where it is
+-- `dry-operator`.  So the twelve recursive programs land on the drain
+-- leaf, which is where every one of them does its recursion, and the
+-- operator leaf is reached by rooting three of the same shapes under a
+-- `takeᵉ` — the wrapper a user writes anyway, and the only one of the
+-- twelve that already had one.
+--
 -- EVERY ROW IS LABELLED, because a row that could not have failed is not a
 -- row.  `hasDry` is `any` over the emit stream, so it is `false` outright
 -- on a run that emitted nothing — which is the vacuity available here and
--- the only one.  Each program therefore pins its own EVENT COUNT beside
--- its confirmation, by `refl`: the count is what `hasDry` walks, so a
--- positive one says the quantifier the row discharges was not empty, and
--- it is free, since the row forced every one of those events already.
+-- the only one.  Each row therefore pins the EVENT COUNT of the half it is
+-- about, by `refl`: the count is what `hasDry` walks, so a positive one
+-- says the quantifier the row discharges was not empty, and it is free,
+-- since the row forced every one of those events already.
 --
 -- WHAT THE COUNTS DO NOT SEPARATE, and it is a fact about rxjs rather
 -- than a gap here.  Over the empty context the three flattening
@@ -41,6 +54,7 @@ open import Data.List.Relation.Unary.Any using (here)
 open import Data.Maybe using (nothing; just)
 open import Data.Nat using (ℕ)
 open import Data.Nat.ListAction using (sum)
+open import Data.Product using (_×_; proj₁; proj₂)
 open import Data.Vec using () renaming ([] to []ⱽ; _∷_ to _∷ⱽ_)
 open import Function using (_∘_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
@@ -48,9 +62,12 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Rx.Prim using (Fuel; InstEmit; cold; after_,_)
 open import Rx.Exp using (Ctx; Closed; natᵗ; nat̂; strmᵗ; ofᵉ; takeᵉ;
   mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ)
-open import Rx.Evaluator using (evaluate)
+open import Rx.Evaluator using (Stream; Sched; EvalSt; drain; subscribeE;
+  rootWitness; root; sched-init; st-init)
 open import Rx.Slots using (Slots; scripted)
-open import Verify-Rank-Sufficient using (rank-sufficient)
+open import Verify-Rank-Sufficient using (drain-dry-free)
+open import Verify-Rank-Sufficient.Dry using (dry-operator)
+open import Verify-Rank-Sufficient.Entry using (rootTri-reads)
 open import Probed.Apparatus using (Confirms)
 
 ----------------------------------------------------------------------
@@ -63,6 +80,20 @@ open import Probed.Apparatus using (Confirms)
 
 evs : ∀ {A : Set} → List (InstEmit A) → ℕ
 evs = sum ∘ map (length ∘ InstEmit.events)
+
+----------------------------------------------------------------------
+-- The two halves a run splits into, named once so a row can point at
+-- either.  `entry` is the root subscribe the evaluator performs before
+-- it drains, so `burstOf` is what `dry-operator` is about at an operator
+-- root and `drainOf` is what `drain-dry-free` is about everywhere.
+----------------------------------------------------------------------
+
+entry : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+  Stream Γ t × Sched Γ × EvalSt e
+entry e ins = subscribeE (rootWitness e ins) e root 0 0 (sched-init e ins) (st-init e)
+
+burstOf : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) → Stream Γ t
+burstOf e ins = proj₁ (entry e ins)
 
 ----------------------------------------------------------------------
 -- The empty context: these programs are pure recursion, with no slot to
@@ -79,6 +110,9 @@ ins₀ = λ ()
 FUEL : Fuel
 FUEL = 30
 
+drainOf : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) → Stream Γ t
+drainOf e ins = drain FUEL 1 (proj₁ (proj₂ (entry e ins))) (proj₂ (proj₂ (entry e ins)))
+
 ----------------------------------------------------------------------
 -- P1 — the recursive merge, which is `repeat` and the smallest program
 -- that forces `unfoldμ` at all.  LOAD-BEARING: the μ guard compares
@@ -92,13 +126,11 @@ progP1 = μᵉ (mergeAllᵉ nothing
        ∷ strmᵗ (deferᵉ (varᵉ (here refl)))
        ∷ [])))
 
-streamP1 : List (InstEmit ℕ)
-streamP1 = evaluate FUEL progP1 ins₀
-
-descP1 : Confirms (rank-sufficient FUEL progP1 ins₀)
+descP1 : Confirms (drain-dry-free FUEL 1
+  (proj₁ (proj₂ (entry progP1 ins₀))) (proj₂ (proj₂ (entry progP1 ins₀))))
 descP1 = refl
 
-_ : evs streamP1 ≡ 216      -- LOAD-BEARING
+_ : evs (drainOf progP1 ins₀) ≡ 210      -- LOAD-BEARING
 _ = refl
 
 ----------------------------------------------------------------------
@@ -107,19 +139,25 @@ _ = refl
 -- for a different reason than P1: the cut arrives from OUTSIDE the μ, so
 -- the unfolding is interrupted mid-descent rather than run out of fuel,
 -- and the count below is an order of magnitude smaller for exactly that
--- reason.
+-- reason.  It is also the one program of the twelve whose ROOT is an
+-- operator, so it carries the operator leaf's first row as well.
 ----------------------------------------------------------------------
 
 progP2 : Closed Γ₀ natᵗ
 progP2 = takeᵉ (nat̂ 3) progP1
 
-streamP2 : List (InstEmit ℕ)
-streamP2 = evaluate FUEL progP2 ins₀
-
-descP2 : Confirms (rank-sufficient FUEL progP2 ins₀)
+descP2 : Confirms (drain-dry-free FUEL 1
+  (proj₁ (proj₂ (entry progP2 ins₀))) (proj₂ (proj₂ (entry progP2 ins₀))))
 descP2 = refl
 
-_ : evs streamP2 ≡ 22       -- LOAD-BEARING
+_ : evs (drainOf progP2 ins₀) ≡ 16       -- LOAD-BEARING
+_ = refl
+
+opP2 : Confirms (dry-operator (rootWitness progP2 ins₀) progP2 root 0 0
+  (sched-init progP2 ins₀) (st-init progP2) refl (rootTri-reads progP2 ins₀))
+opP2 = refl
+
+_ : evs (burstOf progP2 ins₀) ≡ 6        -- LOAD-BEARING
 _ = refl
 
 ----------------------------------------------------------------------
@@ -139,13 +177,11 @@ progP3 = μᵉ (mergeAllᵉ nothing
        ∷ strmᵗ (deferᵉ (varᵉ (here refl)))
        ∷ [])))
 
-streamP3 : List (InstEmit ℕ)
-streamP3 = evaluate FUEL progP3 ins₀
-
-descP3 : Confirms (rank-sufficient FUEL progP3 ins₀)
+descP3 : Confirms (drain-dry-free FUEL 1
+  (proj₁ (proj₂ (entry progP3 ins₀))) (proj₂ (proj₂ (entry progP3 ins₀))))
 descP3 = refl
 
-_ : evs streamP3 ≡ 237      -- LOAD-BEARING
+_ : evs (drainOf progP3 ins₀) ≡ 228      -- LOAD-BEARING
 _ = refl
 
 ----------------------------------------------------------------------
@@ -162,13 +198,11 @@ progP4 = μᵉ (switchAllᵉ
        ∷ strmᵗ (deferᵉ (varᵉ (here refl)))
        ∷ [])))
 
-streamP4 : List (InstEmit ℕ)
-streamP4 = evaluate FUEL progP4 ins₀
-
-descP4 : Confirms (rank-sufficient FUEL progP4 ins₀)
+descP4 : Confirms (drain-dry-free FUEL 1
+  (proj₁ (proj₂ (entry progP4 ins₀))) (proj₂ (proj₂ (entry progP4 ins₀))))
 descP4 = refl
 
-_ : evs streamP4 ≡ 216      -- LOAD-BEARING
+_ : evs (drainOf progP4 ins₀) ≡ 210      -- LOAD-BEARING
 _ = refl
 
 progP5 : Closed Γ₀ natᵗ
@@ -177,13 +211,11 @@ progP5 = μᵉ (exhaustAllᵉ
        ∷ strmᵗ (deferᵉ (varᵉ (here refl)))
        ∷ [])))
 
-streamP5 : List (InstEmit ℕ)
-streamP5 = evaluate FUEL progP5 ins₀
-
-descP5 : Confirms (rank-sufficient FUEL progP5 ins₀)
+descP5 : Confirms (drain-dry-free FUEL 1
+  (proj₁ (proj₂ (entry progP5 ins₀))) (proj₂ (proj₂ (entry progP5 ins₀))))
 descP5 = refl
 
-_ : evs streamP5 ≡ 216      -- LOAD-BEARING
+_ : evs (drainOf progP5 ins₀) ≡ 210      -- LOAD-BEARING
 _ = refl
 
 ----------------------------------------------------------------------
@@ -198,13 +230,11 @@ progP6 = μᵉ (mergeAllᵉ (just 1)
        ∷ strmᵗ (deferᵉ (varᵉ (here refl)))
        ∷ [])))
 
-streamP6 : List (InstEmit ℕ)
-streamP6 = evaluate FUEL progP6 ins₀
-
-descP6 : Confirms (rank-sufficient FUEL progP6 ins₀)
+descP6 : Confirms (drain-dry-free FUEL 1
+  (proj₁ (proj₂ (entry progP6 ins₀))) (proj₂ (proj₂ (entry progP6 ins₀))))
 descP6 = refl
 
-_ : evs streamP6 ≡ 216      -- LOAD-BEARING
+_ : evs (drainOf progP6 ins₀) ≡ 210      -- LOAD-BEARING
 _ = refl
 
 ----------------------------------------------------------------------
@@ -231,13 +261,11 @@ progP7 = μᵉ (mergeAllᵉ nothing
        ∷ strmᵗ (deferᵉ (varᵉ (here refl)))
        ∷ [])))
 
-streamP7 : List (InstEmit ℕ)
-streamP7 = evaluate FUEL progP7 insShared
-
-descP7 : Confirms (rank-sufficient FUEL progP7 insShared)
+descP7 : Confirms (drain-dry-free FUEL 1
+  (proj₁ (proj₂ (entry progP7 insShared))) (proj₂ (proj₂ (entry progP7 insShared))))
 descP7 = refl
 
-_ : evs streamP7 ≡ 189      -- LOAD-BEARING
+_ : evs (drainOf progP7 insShared) ≡ 180  -- LOAD-BEARING
 _ = refl
 
 ----------------------------------------------------------------------
@@ -253,13 +281,11 @@ progP8 = μᵉ (mergeAllᵉ nothing
        ∷ strmᵗ (deferᵉ (varᵉ (here refl)))
        ∷ [])))
 
-streamP8 : List (InstEmit ℕ)
-streamP8 = evaluate FUEL progP8 insShared
-
-descP8 : Confirms (rank-sufficient FUEL progP8 insShared)
+descP8 : Confirms (drain-dry-free FUEL 1
+  (proj₁ (proj₂ (entry progP8 insShared))) (proj₂ (proj₂ (entry progP8 insShared))))
 descP8 = refl
 
-_ : evs streamP8 ≡ 251      -- LOAD-BEARING
+_ : evs (drainOf progP8 insShared) ≡ 240  -- LOAD-BEARING
 _ = refl
 
 ----------------------------------------------------------------------
@@ -280,13 +306,11 @@ progP9 = μᵉ (mergeAllᵉ nothing
        ∷ strmᵗ (deferᵉ (varᵉ (here refl)))
        ∷ [])))
 
-streamP9 : List (InstEmit ℕ)
-streamP9 = evaluate FUEL progP9 insAsync
-
-descP9 : Confirms (rank-sufficient FUEL progP9 insAsync)
+descP9 : Confirms (drain-dry-free FUEL 1
+  (proj₁ (proj₂ (entry progP9 insAsync))) (proj₂ (proj₂ (entry progP9 insAsync))))
 descP9 = refl
 
-_ : evs streamP9 ≡ 99       -- LOAD-BEARING
+_ : evs (drainOf progP9 insAsync) ≡ 94    -- LOAD-BEARING
 _ = refl
 
 progP10 : Closed Γ₁ natᵗ
@@ -295,13 +319,11 @@ progP10 = μᵉ (switchAllᵉ
        ∷ strmᵗ (deferᵉ (varᵉ (here refl)))
        ∷ [])))
 
-streamP10 : List (InstEmit ℕ)
-streamP10 = evaluate FUEL progP10 insAsync
-
-descP10 : Confirms (rank-sufficient FUEL progP10 insAsync)
+descP10 : Confirms (drain-dry-free FUEL 1
+  (proj₁ (proj₂ (entry progP10 insAsync))) (proj₂ (proj₂ (entry progP10 insAsync))))
 descP10 = refl
 
-_ : evs streamP10 ≡ 216     -- LOAD-BEARING
+_ : evs (drainOf progP10 insAsync) ≡ 210  -- LOAD-BEARING
 _ = refl
 
 ----------------------------------------------------------------------
@@ -326,13 +348,11 @@ progP11 = μᵉ (mergeAllᵉ nothing
        ∷ strmᵗ (deferᵉ (varᵉ (here refl)))
        ∷ [])))
 
-streamP11 : List (InstEmit ℕ)
-streamP11 = evaluate FUEL progP11 insMu
-
-descP11 : Confirms (rank-sufficient FUEL progP11 insMu)
+descP11 : Confirms (drain-dry-free FUEL 1
+  (proj₁ (proj₂ (entry progP11 insMu))) (proj₂ (proj₂ (entry progP11 insMu))))
 descP11 = refl
 
-_ : evs streamP11 ≡ 310     -- LOAD-BEARING
+_ : evs (drainOf progP11 insMu) ≡ 300     -- LOAD-BEARING
 _ = refl
 
 progP12 : Closed Γ₁ natᵗ
@@ -344,11 +364,40 @@ progP12 = μᵉ (mergeAllᵉ nothing
        ∷ strmᵗ (deferᵉ (varᵉ (here refl)))
        ∷ [])))
 
-streamP12 : List (InstEmit ℕ)
-streamP12 = evaluate FUEL progP12 insMu
-
-descP12 : Confirms (rank-sufficient FUEL progP12 insMu)
+descP12 : Confirms (drain-dry-free FUEL 1
+  (proj₁ (proj₂ (entry progP12 insMu))) (proj₂ (proj₂ (entry progP12 insMu))))
 descP12 = refl
 
-_ : evs streamP12 ≡ 246     -- LOAD-BEARING
+_ : evs (drainOf progP12 insMu) ≡ 233     -- LOAD-BEARING
+_ = refl
+
+----------------------------------------------------------------------
+-- THE OPERATOR ROOT, which is the other leaf and a different half of the
+-- run: the subscribe FRAME rather than the drain.  A `takeᵉ` over each
+-- of the three shapes above that carry something the burst has to walk —
+-- plain recursion, a recursion reaching a share, and a share HOLDING a
+-- recursion — so the leaf is reached with the connect peel live and with
+-- the nesting the rank peel is about.  No drain runs here at all, which
+-- is why these rows are cheap and why they say something the twelve
+-- above cannot.
+----------------------------------------------------------------------
+
+progO7 : Closed Γ₁ natᵗ
+progO7 = takeᵉ (nat̂ 3) progP7
+
+opO7 : Confirms (dry-operator (rootWitness progO7 insShared) progO7 root 0 0
+  (sched-init progO7 insShared) (st-init progO7) refl (rootTri-reads progO7 insShared))
+opO7 = refl
+
+_ : evs (burstOf progO7 insShared) ≡ 9    -- LOAD-BEARING
+_ = refl
+
+progO11 : Closed Γ₁ natᵗ
+progO11 = takeᵉ (nat̂ 3) progP11
+
+opO11 : Confirms (dry-operator (rootWitness progO11 insMu) progO11 root 0 0
+  (sched-init progO11 insMu) (st-init progO11) refl (rootTri-reads progO11 insMu))
+opO11 = refl
+
+_ : evs (burstOf progO11 insMu) ≡ 10       -- LOAD-BEARING
 _ = refl
