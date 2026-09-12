@@ -226,16 +226,16 @@ decision procedure rather than a pin.
 
 ### Big picture tier roadmap
 
-- **DECIDE THE RANK: DESCEND ON THE CARRIED READING, OR GO ON COMPARING TWO
-  CURRENCIES.** The evaluator's middle component is a counter seeded off SIZE,
-  and `hopFits` asserts it never runs out — so the one quantity a run can
-  exhaust survived the massacre, and every row here hangs off it. The
-  alternative deletes it: witness the hop edge's descent by the inner value's
-  own reading, a `suc` below its flattener's by definition, so nothing depletes
-  and the guard's zero clause is unreachable and deletable. The leg establishes
-  whether that witness is available where the edge is taken — an impl change,
-  paid for in QuickCheck and the oracle, not the spec. If it is, this tier
-  loses its FALSITY row rather than proving it.
+- **THREAD THE STORE BOUND INTO THE SEED — the one input the counter-free rank
+  still lacks.** The decision is made: the hop edge's descent is witnessed by
+  the inner value's own reading, whose invariance across the recursive edge is
+  already a complete body in the attic. What
+  blocks re-seeding is that the reading is parameterised by the STORE bound,
+  which the entry triple cannot see: it reads the term, the telescope and the
+  nesting and nothing else. The leg threads that bound from the drain's fuel
+  through the evaluator's mutual block, so the middle component becomes the
+  reading and no counter is left to exhaust. Impl change, paid for in
+  QuickCheck and the oracle, not the spec.
 
 - **CARRY THE BOUND OUT OF THE WALK RATHER THAN ASSERTING IT ABOUT THE VALUE.**
   Every dead route asked the emitter's rank to dominate a value it had not
@@ -253,15 +253,15 @@ decision procedure rather than a pin.
   proves three of the five frame shapes quiet outright, and the residue is
   `from-inner` and `thru-outer` — which is exactly where `chainHopD` puts its
   edge, so the leaf's hypothesis and the frame walk's are the same statement.
-  Held behind the rank decision, which fixes what the invariant is stated over.
+  Held behind the re-seeding, which fixes what the invariant is stated over.
 
 ### The ledger
 
 - **`drain-dry-free`** (Verify-Rank-Sufficient) — FALSITY,
-  `REFUTED×2, PROBED×5`: every arrival after the root frame, now conditioned on
-  `hopFits`. Vacuous at the refuting registry; the fit then survives three
-  cascades on three recursive programs, and the quantity it bounds does not
-  move while the registry churns.
+  `REFUTED×2, PROBED×5`: every arrival after the root frame, conditioned on
+  `hopFits` at the schedule's own slot reading and not one the caller picks.
+  The fit survives three cascades on three recursive programs, and the
+  quantity it bounds holds still while the registry churns.
 
 - **`dry-operator`** (Verify-Rank-Sufficient.Dry) — SHAPE,
   `REFUTED×4, PROBED, RECOVERY`: the THREE FLATTENERS' dry-freedom under an

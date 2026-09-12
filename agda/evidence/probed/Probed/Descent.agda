@@ -4,8 +4,8 @@
 --
 -- EVIDENCE, not a claim: `src` cannot import this file and nothing in the
 -- proof may rest on it.  Checked by `make probed`, claimed by `Probed.Main`.
--- TARGET: drain-dry-free @140a87
--- TARGET: entry-hop-fits @3a11cc
+-- TARGET: drain-dry-free @400cf7
+-- TARGET: entry-hop-fits @581e85
 --
 -- WHY THIS REGION AND NOT THE CANONICAL PROGRAMS.  `evaluate` descends on
 -- a triple and three of its clauses are guarded by a comparison that can
@@ -116,7 +116,7 @@ progP1 = μᵉ (mergeAllᵉ nothing
        ∷ strmᵗ (deferᵉ (varᵉ (here refl)))
        ∷ [])))
 
-descP1 : Confirms (drain-dry-free FUEL 1 0 (λ _ → 0)
+descP1 : Confirms (drain-dry-free FUEL 1 0
   (proj₁ (proj₂ (entry progP1 ins₀))) (proj₂ (proj₂ (entry progP1 ins₀))) Below)
 descP1 = refl
 
@@ -135,7 +135,7 @@ _ = refl
 progP2 : Closed Γ₀ natᵗ
 progP2 = takeᵉ (nat̂ 3) progP1
 
-descP2 : Confirms (drain-dry-free FUEL 1 0 (λ _ → 0)
+descP2 : Confirms (drain-dry-free FUEL 1 0
   (proj₁ (proj₂ (entry progP2 ins₀))) (proj₂ (proj₂ (entry progP2 ins₀))) Below)
 descP2 = refl
 
@@ -159,7 +159,7 @@ progP3 = μᵉ (mergeAllᵉ nothing
        ∷ strmᵗ (deferᵉ (varᵉ (here refl)))
        ∷ [])))
 
-descP3 : Confirms (drain-dry-free FUEL 1 0 (λ _ → 0)
+descP3 : Confirms (drain-dry-free FUEL 1 0
   (proj₁ (proj₂ (entry progP3 ins₀))) (proj₂ (proj₂ (entry progP3 ins₀))) Below)
 descP3 = refl
 
@@ -180,7 +180,7 @@ progP4 = μᵉ (switchAllᵉ
        ∷ strmᵗ (deferᵉ (varᵉ (here refl)))
        ∷ [])))
 
-descP4 : Confirms (drain-dry-free FUEL 1 0 (λ _ → 0)
+descP4 : Confirms (drain-dry-free FUEL 1 0
   (proj₁ (proj₂ (entry progP4 ins₀))) (proj₂ (proj₂ (entry progP4 ins₀))) Below)
 descP4 = refl
 
@@ -193,7 +193,7 @@ progP5 = μᵉ (exhaustAllᵉ
        ∷ strmᵗ (deferᵉ (varᵉ (here refl)))
        ∷ [])))
 
-descP5 : Confirms (drain-dry-free FUEL 1 0 (λ _ → 0)
+descP5 : Confirms (drain-dry-free FUEL 1 0
   (proj₁ (proj₂ (entry progP5 ins₀))) (proj₂ (proj₂ (entry progP5 ins₀))) Below)
 descP5 = refl
 
@@ -212,7 +212,7 @@ progP6 = μᵉ (mergeAllᵉ (just 1)
        ∷ strmᵗ (deferᵉ (varᵉ (here refl)))
        ∷ [])))
 
-descP6 : Confirms (drain-dry-free FUEL 1 0 (λ _ → 0)
+descP6 : Confirms (drain-dry-free FUEL 1 0
   (proj₁ (proj₂ (entry progP6 ins₀))) (proj₂ (proj₂ (entry progP6 ins₀))) Below)
 descP6 = refl
 
@@ -243,7 +243,7 @@ progP7 = μᵉ (mergeAllᵉ nothing
        ∷ strmᵗ (deferᵉ (varᵉ (here refl)))
        ∷ [])))
 
-descP7 : Confirms (drain-dry-free FUEL 1 0 (λ _ → 0)
+descP7 : Confirms (drain-dry-free FUEL 1 0
   (proj₁ (proj₂ (entry progP7 insShared))) (proj₂ (proj₂ (entry progP7 insShared))) Below)
 descP7 = refl
 
@@ -263,7 +263,7 @@ progP8 = μᵉ (mergeAllᵉ nothing
        ∷ strmᵗ (deferᵉ (varᵉ (here refl)))
        ∷ [])))
 
-descP8 : Confirms (drain-dry-free FUEL 1 0 (λ _ → 0)
+descP8 : Confirms (drain-dry-free FUEL 1 0
   (proj₁ (proj₂ (entry progP8 insShared))) (proj₂ (proj₂ (entry progP8 insShared))) Below)
 descP8 = refl
 
@@ -288,7 +288,7 @@ progP9 = μᵉ (mergeAllᵉ nothing
        ∷ strmᵗ (deferᵉ (varᵉ (here refl)))
        ∷ [])))
 
-descP9 : Confirms (drain-dry-free FUEL 1 0 (λ _ → 0)
+descP9 : Confirms (drain-dry-free FUEL 1 0
   (proj₁ (proj₂ (entry progP9 insAsync))) (proj₂ (proj₂ (entry progP9 insAsync))) Below)
 descP9 = refl
 
@@ -301,7 +301,7 @@ progP10 = μᵉ (switchAllᵉ
        ∷ strmᵗ (deferᵉ (varᵉ (here refl)))
        ∷ [])))
 
-descP10 : Confirms (drain-dry-free FUEL 1 0 (λ _ → 0)
+descP10 : Confirms (drain-dry-free FUEL 1 0
   (proj₁ (proj₂ (entry progP10 insAsync))) (proj₂ (proj₂ (entry progP10 insAsync))) Below)
 descP10 = refl
 
@@ -330,7 +330,7 @@ progP11 = μᵉ (mergeAllᵉ nothing
        ∷ strmᵗ (deferᵉ (varᵉ (here refl)))
        ∷ [])))
 
-descP11 : Confirms (drain-dry-free FUEL 1 0 (λ _ → 0)
+descP11 : Confirms (drain-dry-free FUEL 1 0
   (proj₁ (proj₂ (entry progP11 insMu))) (proj₂ (proj₂ (entry progP11 insMu))) Below)
 descP11 = refl
 
@@ -346,7 +346,7 @@ progP12 = μᵉ (mergeAllᵉ nothing
        ∷ strmᵗ (deferᵉ (varᵉ (here refl)))
        ∷ [])))
 
-descP12 : Confirms (drain-dry-free FUEL 1 0 (λ _ → 0)
+descP12 : Confirms (drain-dry-free FUEL 1 0
   (proj₁ (proj₂ (entry progP12 insMu))) (proj₂ (proj₂ (entry progP12 insMu))) Below)
 descP12 = refl
 

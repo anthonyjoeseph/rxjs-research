@@ -54,6 +54,7 @@ open import Rx.Prim using (Source)
 open import Rx.Exp using (Ctx; Closed; sizeᵉ)
 open import Rx.Slots using (slotsSize)
 open import Rx.Hop-Depth using (hopDᵗ; hopDᵛ)
+open import Rx.Slot-Hop using (slotHop)
 open import Rx.Evaluator using (Path; root; share-sink; _↠_; map-f; scan-f;
   take-f; from-inner; thru-outer; Chain; RegId; LiveSource; Sched; EvalSt;
   stNest)
@@ -120,11 +121,19 @@ liveHopD V η (l ∷ ls) = pendHopD V η l ⊔ liveHopD V η ls
 ------------------------------------------------------------------
 
 ------------------------------------------------------------------
--- THE FIT.
+-- THE FIT, AND ITS ENVIRONMENT IS PINNED RATHER THAN QUANTIFIED.  The
+-- measure reads η at `input` and nowhere else, so a caller free to
+-- choose η can choose the constant zero — and that reading is refuted:
+-- an obs-typed shared slot's def emits values of positive hop, which a
+-- subscription connecting to that slot receives.  `slotHop` is the
+-- honest environment, computed off the schedule's own telescope, and
+-- naming it here is what stops the premise being satisfiable by a
+-- reading of the program nobody runs.
 ------------------------------------------------------------------
 
 hopFits : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} →
-          ℕ → (Fin n → ℕ) → Sched Γ → EvalSt e → Set
-hopFits {e = e} V η sched st =
+          ℕ → Sched Γ → EvalSt e → Set
+hopFits {e = e} V sched st =
+  let η = slotHop V (Sched.slots sched) in
   liveHopD V η (Sched.live sched) + regsHopD V η (EvalSt.registry st)
     < 2 ^ (sizeᵉ e + slotsSize (Sched.slots sched) + stNest st)
