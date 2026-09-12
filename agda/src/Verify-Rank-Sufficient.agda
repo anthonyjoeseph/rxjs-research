@@ -91,6 +91,19 @@ open import Rx.Evaluator using (evaluate; hasDry)
 -- the telescope position and whose premise a shared slot carries in its own
 -- type.  Neither needs anything from here.
 
+-- THE RANDOM SWEEP REACHES THE REGION, and that is a number rather than a
+-- claim.  `QuickCheck` emits `μᵉ`, `varᵉ` and `deferᵉ` with the binder scopes
+-- carried as INDICES, so a synchronous self-reference is not a program it can
+-- write down and be rejected for; and its recursion is linear by grammar,
+-- since a body reading its own var twice respawns per tick and real rxjs hangs
+-- on that program too.  Every case reads `hasDry` off the run, which is this
+-- statement instantiated rather than a proxy for it.  Twenty seeds at depth
+-- four and five at depth five — 4500 programs, a third of them carrying a live
+-- recursion — report no dry run.  IT IS MEASURED, NOT RECHECKED: a compiled
+-- binary's row discharges nothing here, and what it buys is the coverage
+-- doubt, which was that the three peels had been reached only at shapes one
+-- author chose.
+
 -- TWO OF THE THREE GUARDS HAVE THEIR CURRENCY ALREADY PROVEN, and it is
 -- deleted rather than absent — a different starting position from the one
 -- this row's class describes, and the class is still right, because a
@@ -116,10 +129,10 @@ open import Rx.Evaluator using (evaluate; hasDry)
 --   that unfolds to its own emitter, at μ nested directly in μ, and at a share
 --   holding a recursion — the shape whose nesting the guard cannot read off
 --   the term it compares.  Each row pins its run's EVENT COUNT beside it, so
---   none is `false` by an empty stream.  THE BOUNDARY, and it is the whole of
---   what is left: one fuel, hand-written programs, μ nested two deep and no
---   deeper.  Nothing random has ever reached here, because the generator this
---   repo sweeps cannot produce `μᵉ` at all.
+--   none is `false` by an empty stream.  THE BOUNDARY: one fuel, hand-written
+--   programs, μ nested two deep and no deeper.  These rows are `refl` pins and
+--   buy exactly the twelve shapes they name, which is why the coverage past
+--   them is bought by an instrument that is not a pin.
 -- RECOVERY: `git show 919f115:agda/src/Verify-Budget-Sufficient/Measures.agda`
 --   restores BOTH settled readings, each postulate-free.  The μ guard's:
 --   `unfoldμ-shrinks` is two lines over `syncSize-unfoldμ`, which is one line
