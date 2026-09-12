@@ -3,7 +3,7 @@ module Rx.Evaluator where
 open import Data.Bool    using (Bool; true; false; if_then_else_; not; _∨_; _∧_)
 open import Data.Fin     using (Fin; toℕ)
 open import Data.Maybe   using (Maybe; just; nothing; is-nothing)
-open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _^_; _⊔_; _<ᵇ_; _≡ᵇ_; _≤ᵇ_)
+open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _⊔_; _<ᵇ_; _≡ᵇ_; _≤ᵇ_)
 open import Data.Nat.Properties using (_<?_; ≤-refl)
 open import Data.Nat.ListAction using (sum)
 open import Induction.WellFounded using (Acc; acc)
@@ -19,7 +19,7 @@ open import Relation.Binary.PropositionalEquality using (refl)
 open import Rx.Prim using (Tick; Fuel; Ordinal; Id; Source; Timed; after_,_; hot;
   cold; InstEvent; init; value; close; handoff; complete; cut; cutPending; exhausted; dried;
   subscribe; delivery; plumbing; InstEmit; _at_from_as_)
-open import Rx.Exp  using (Ty; obs; _×ᵗ_; _≟ᵗ_; Ctx; Val; Closed; Fn; applyFn; evalTm; unfoldμ; sizeᵉ; syncSizeᵉ; input; ofᵉ;
+open import Rx.Exp  using (Ty; obs; _×ᵗ_; _≟ᵗ_; Ctx; Val; Closed; Fn; applyFn; evalTm; unfoldμ; syncSizeᵉ; input; ofᵉ;
   emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ)
 -- the order the subscription machine recurses on, in place of a
 -- counter: one constructor per non-structural edge, and nothing
@@ -38,8 +38,10 @@ variable
 -- must reference only strictly earlier slots (a const telescope) —
 -- checked by the generator/decoder, not by these types; a forward
 -- reference is rejected there.
-open import Rx.Slots using (scripted; shared; Slots; slotsSize)
+open import Rx.Slots using (scripted; shared; Slots)
 open import Rx.Nest-Depth using (nestDᵉ; nestDᵛ)
+open import Rx.Hop-Depth using (hopDᵉ; hopDᵛ)
+open import Rx.Slot-Hop using (slotHop)
 
 Stream : ∀ {n} → Ctx n → Ty → Set          -- flat, canonical emission order
 Stream Γ t = List (InstEmit (Val Γ t))
@@ -58,12 +60,22 @@ record LiveSource {n} (Γ : Ctx n) : Set where
         elemTy  : Ty
         pending : List (Tick × Val Γ elemTy)   -- absolute ticks, strictly increasing
 
+-- THE STORE BOUND RIDES ON THE SCHEDULE, AND IT IS A RUN PARAMETER
+-- RATHER THAN A MEASURE.  `Rx.Hop-Depth` prices a scan by how many
+-- times its accumulator can be refolded, so every reading of a term is
+-- relative to that count — and the entry rank is now such a reading.
+-- The count belongs to the RUN and not to the term, exactly as the slot
+-- telescope does, so it is carried where the telescope is: threaded by
+-- every function the machine has, re-seeded by nobody, and read at the
+-- two places a witness is built.  A parameter on the subscription block
+-- instead would put it in twenty-nine signatures to be read in two.
 record Sched {n} (Γ : Ctx n) : Set where
   field nextOrdinal : Ordinal          -- ordinals mint in subscription order
         nextSource  : Source           -- dynamic sources (colds, deferᵉ bodies) mint from n up
         nextNode    : ℕ                -- node instances mint in subscription order
         live        : List (LiveSource Γ)
         slots       : Slots Γ          -- scripts and shared defs, kept so subscribeE can anchor colds and connect shares
+        storeBound  : ℕ                -- the refold count every hop reading is relative to
 
 record Arrival {n} (Γ : Ctx n) : Set where
   field tick    : Tick
@@ -124,10 +136,10 @@ mkHot {Γ = Γ} ins i with ins i
 ... | scripted (cold _ _)  = []
 ... | shared _             = []
 
-sched-init : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → Sched Γ
-sched-init {n = n} {Γ = Γ} e ins = record
+sched-init : ∀ {n} {Γ : Ctx n} {t} → ℕ → Closed Γ t → Slots Γ → Sched Γ
+sched-init {n = n} {Γ = Γ} V e ins = record
   { nextOrdinal = n ; nextSource = n ; nextNode = 0
-  ; live = concat (tabulate (mkHot ins)) ; slots = ins }
+  ; live = concat (tabulate (mkHot ins)) ; slots = ins ; storeBound = V }
 
 -- pop the pending arrival minimal by (tick, ordinal), or report empty.
 -- The workers are TOP-LEVEL (not where-local of sched-next) so
@@ -404,58 +416,72 @@ stNest st = nestDᴺ (EvalSt.nodes st)
 -- rather than a second seeding — which keeps the one place the seed
 -- has to be shown adequate at the root, where it always was.
 --
--- THE SEED IS BEATEN IN ITS OWN CURRENCY, AND THAT IS MEASURED RATHER
--- THAN FEARED.  The reading `m` is a DEPTH while the seed is
--- exponential in the program's SIZE, so the two are comparable only
--- through how each moves as the program grows.  `Probed.Operator-Root`
--- moves it: a fold whose accumulator is re-wrapped three times per
--- source value, flattened under a fold that wraps once per delivery,
--- hands out values reading 3, 12, 39 and 120 layers deep at four source
--- literals.  One literal is one symbol, so the seed DOUBLES where the
--- depth TRIPLES — both sides exponential in the same parameter, and the
--- run's base the larger.
+-- THE RANK IS THE TERM'S OWN HOP READING, NOT A COUNTER SEEDED OVER
+-- IT.  A `*All` node's reading is a `suc` of its source's by
+-- definition, and the inner a hop descends into came from that source —
+-- so the descent the hop edge needs is an equation about the measure
+-- rather than an obligation between a run and a budget.  Nothing here
+-- is exhaustible: what the component counts is how many flattener
+-- layers the term still has, and a run that keeps hopping is a run
+-- walking down them.  The reading is taken at the schedule's own
+-- environment, since a slot reference emits whatever its definition
+-- emits, and at the run's store bound, since a fold's reuse of its
+-- accumulator is what makes one layer many.
 --
--- WHAT THAT SETTLES AND WHAT IT DOES NOT.  It does not exhibit a run
--- the seed fails to cover: the ratio closes by half a bit per literal
--- from a margin the machinery's own twenty-seven symbols open, so the
--- crossing sits past a hundred million layers and no row reaches it.
--- What it settles is the shape of any repair, and the reason is a
--- DIRECTION.  A value deepens on the way OUT — the frames above a
--- flattener re-wrap what it delivers — and it re-enters the pipeline at
--- the caller's own witness, so whatever seeds that caller has to
--- dominate everything its subtree will ever emit.  Seeding from the
--- entered VALUE therefore fails exactly as seeding from the program
--- does, and no bound on what a burst carries stated in a measure of
--- SYNTAX can be it either, which is the half `Rx.Nest-Depth` records.
--- A larger seed is not a third answer; it is the same answer with a
--- larger constant.
-entryTri : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → ℕ → Tri
-entryTri e sl m = unconn sl [] , 2 ^ (sizeᵉ e + slotsSize sl + m) , syncSizeᵉ e
+-- DEAD ROUTE: seeding the component off SYNTAX — a power of two in the
+--   program's size plus the slot telescope's was the seed, and the two
+--   currencies never met.
+--   A value deepens on the way OUT, the frames above a flattener
+--   re-wrap what it delivers, and it re-enters at the caller's own
+--   witness, so whatever seeds that caller has to dominate everything
+--   its subtree will ever emit; the run multiplies where the seed
+--   merely doubles.  Seeding from the entered VALUE fails identically,
+--   and a larger seed is the same answer with a larger constant.
+entryTri : ∀ {n} {Γ : Ctx n} {t} → ℕ → Closed Γ t → Slots Γ → ℕ → Tri
+entryTri V e sl m = unconn sl [] , hopDᵉ V (slotHop V sl) e + m , syncSizeᵉ e
 
-entryWitness : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (m : ℕ)
-             → Acc _≺_ (entryTri e sl m)
-entryWitness e sl m = ≺-wellFounded (entryTri e sl m)
+entryWitness : ∀ {n} {Γ : Ctx n} {t} (V : ℕ) (e : Closed Γ t) (sl : Slots Γ) (m : ℕ)
+             → Acc _≺_ (entryTri V e sl m)
+entryWitness V e sl m = ≺-wellFounded (entryTri V e sl m)
 
-rootTri : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → Tri
-rootTri e sl = entryTri e sl 0
+rootTri : ∀ {n} {Γ : Ctx n} {t} → ℕ → Closed Γ t → Slots Γ → Tri
+rootTri V e sl = entryTri V e sl 0
 
-rootWitness : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
-            → Acc _≺_ (rootTri e sl)
-rootWitness e sl = entryWitness e sl 0
+rootWitness : ∀ {n} {Γ : Ctx n} {t} (V : ℕ) (e : Closed Γ t) (sl : Slots Γ)
+            → Acc _≺_ (rootTri V e sl)
+rootWitness V e sl = entryWitness V e sl 0
 
 -- AND THE ARRIVAL'S IS NAMED FOR THE SAME REASON THE ROOT'S IS.  A value
--- delivered on a later tick carries nesting no reading of the program
--- contains, and the store it lands in carries more — so the chain fold
--- enters at the ⊔ of the two rather than at zero.  Naming it is what
--- keeps a well-formedness statement ABOUT the chain fold quantified over
--- the witness the evaluator passes: spelled out at each site, the two
--- drift the moment either summand moves, and the drift is a type error
--- many minutes down the tower rather than here.
+-- delivered on a later tick reads deeper than any reading of the program
+-- does — a `deferᵉ` body is cut to zero by the measure precisely so that
+-- unfolding cannot move it — and the store it lands in reads deeper
+-- still, so the chain fold enters at the ⊔ of the two rather than at
+-- zero.  Naming it is what keeps a well-formedness statement ABOUT the
+-- chain fold quantified over the witness the evaluator passes: spelled
+-- out at each site, the two drift the moment either summand moves, and
+-- the drift is a type error many minutes down the tower rather than here.
+--
+-- THE STORE'S HALF IS STILL A NESTING AND THE PAYLOAD'S IS A READING,
+-- AND THAT SEAM IS WHAT THIS RE-SEED LEAVES OWED.  A ⊔ of the two is
+-- SLACK in the safe direction — the rank is larger than either alone —
+-- but the entry invariant can only spend the half denominated in its own
+-- currency, so what a stored chain can still do has to be read off the
+-- registry rather than off its nodes' nesting.  The registry's reading
+-- exists (`Verify-Rank-Sufficient.Hop`) and cannot be named here: it is
+-- stated over this module's own types, so it sits above it.
 arrivalWitness : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-                 (a : Arrival Γ) (sl : Slots Γ) (st : EvalSt e)
-               → Acc _≺_ (entryTri e sl (nestDᵛ (arrTy a) (arrVal a) ⊔ stNest st))
-arrivalWitness a sl st =
-  entryWitness _ sl (nestDᵛ (arrTy a) (arrVal a) ⊔ stNest st)
+                 (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e)
+               → Acc _≺_ (entryTri (Sched.storeBound sched) e (Sched.slots sched)
+                           (hopDᵛ (Sched.storeBound sched)
+                              (slotHop (Sched.storeBound sched) (Sched.slots sched))
+                              (arrTy a) (arrVal a)
+                            ⊔ stNest st))
+arrivalWitness a sched st =
+  entryWitness (Sched.storeBound sched) _ (Sched.slots sched)
+    (hopDᵛ (Sched.storeBound sched)
+       (slotHop (Sched.storeBound sched) (Sched.slots sched))
+       (arrTy a) (arrVal a)
+     ⊔ stNest st)
 
 -- a source that lives and dies inside its own subscription burst
 -- (ofᵉ, emptyᵉ, take 0, a cold with no async tail): init, values,
@@ -998,16 +1024,22 @@ sharedConnect : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
               → Path Γ (lookup Γ i) t → Id → Tick
               → Sched Γ → EvalSt e
               → Stream Γ (lookup Γ i) × Sched Γ × EvalSt e
-sharedConnect {τ = U , _ , _} (acc rec) i d κ id now sched st
+-- THE CONNECT KEEPS THE RANK IT ENTERED AT, WHICH IS WHAT MAKES THE
+-- RE-SEED FREE.  `ltU` descends the unconnected count and leaves the
+-- other two components to be chosen, so the old face chose an
+-- exponential of the definition's size and owed a bridge between two
+-- currencies.  It does not have to choose anything: the caller was
+-- walking a term whose `input i` clause reads η at i, and η at i IS the
+-- definition's own reading, so the rank the caller already stands at
+-- dominates the definition by the environment's defining equation.
+sharedConnect {τ = U , r , _} (acc rec) i d κ id now sched st
   with unconn (Sched.slots sched) (toℕ i ∷ EvalSt.connectedShares st) <? U
 ... | no  _ = dryBurst id , sched , st
 ... | yes p =
   let st₁ = register (toℕ i) κ
               (record st { connectedShares = toℕ i ∷ EvalSt.connectedShares st })
       (burst , sched₁ , st₂) =
-        subscribeE (rec (ltU {r′ = 2 ^ (sizeᵉ d + slotsSize (Sched.slots sched)
-                                          + stNest st₁)}
-                             {s′ = syncSizeᵉ d} p))
+        subscribeE (rec (ltU {r′ = r} {s′ = syncSizeᵉ d} p))
                    d (share-sink i) id now sched st₁
       -- the def's connect burst flows up the first subscriber's own
       -- frames (the returned burst); dispatch only serves arrivals
@@ -1283,7 +1315,7 @@ chainStep : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
           → Id → (a : Arrival Γ) → Path Γ (arrTy a) t → Sched Γ → EvalSt e
           → Stream Γ t × Sched Γ × EvalSt e
 chainStep {n = n} {e = e} id a path sched st =
-  foldPath (arrivalWitness a (Sched.slots sched) st)
+  foldPath (arrivalWitness a sched st)
            n id (arrTick a) (arrSource a) path (arrVal a ∷ [])
            (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
            (Arrival.isLast a) sched st
@@ -1368,8 +1400,15 @@ drain (suc k) nextId sched st with sched-next sched
   let (out , sched″ , st′) = cascade a nextId sched′ st
   in out ++ drain k (suc nextId) sched″ st′
 
+-- THE FUEL IS THE STORE BOUND, AND THAT IS THE ONE PLACE THE TWO MEET.
+-- `drain` processes at most `fuel` arrivals, so nothing a fold stores
+-- can be refolded more often than that — which is exactly what the hop
+-- reading of a `scanᵉ` is parameterised by.  The run therefore names its
+-- own bound rather than taking one on trust, and a caller cannot pick a
+-- reading its run outgrows.
 evaluate : ∀ {n} {Γ : Ctx n} {t} → Fuel → Closed Γ t → Slots Γ → Stream Γ t
 evaluate fuel e ins =
   let (burst , sched₀ , st₀) =
-        subscribeE (rootWitness e ins) e root 0 0 (sched-init e ins) (st-init e)
+        subscribeE (rootWitness fuel e ins) e root 0 0 (sched-init fuel e ins)
+          (st-init e)
   in burst ++ drain fuel 1 sched₀ st₀

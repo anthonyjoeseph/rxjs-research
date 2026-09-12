@@ -226,29 +226,28 @@ decision procedure rather than a pin.
 
 ### Open questions
 
-- **IS THE RANK AN OBLIGATION BETWEEN TWO CURRENCIES, OR IS THERE NO RANK AT
-  ALL?** The seed is exponential in the program's SIZE; what a run emits is
-  priced by a template's REUSE of its argument. Nothing relates the two, and
-  every refuted seeding route has that one shape — the run multiplies where
-  the seed doubles. So either they are tied, which no reading off the term has
-  managed, or the counter is deleted and the hop edge descends in the carried
-  reading instead, where the drop is a `suc` the three flatteners put there by
-  definition. Both rows are refuted on the identical cause, which is what makes
-  this one question and not two.
+- **WHAT BOUNDS THE REFOLD COUNT, NOW THAT NOTHING ELSE IS UNTIED?** The
+  two-currency half is settled: the entry's rank IS the hop reading, each
+  flattener's drop is a definitional `suc`, and no counter is left to exhaust.
+  What the reading buys that in exchange for is one premise — that a scan
+  refolds at most STORE-BOUND times — argued from the accumulator being stored.
+  A run's bound is the fuel it was given and fuel counts ARRIVALS, so a cascade
+  landing entirely inside one subscribe frame refolds once per literal and
+  consumes none. Measured: four programs differing in literals alone read the
+  SAME rank while their depth multiplies by three per literal. Both rows are
+  open on exactly that region.
   relevant: `drain-dry-free`, `dry-operator`
 
 ### Big picture tier roadmap
 
-- **THREAD THE STORE BOUND INTO THE SEED — the one input the counter-free rank
-  still lacks.** The decision is made: the hop edge's descent is witnessed by
-  the inner value's own reading, whose invariance across the recursive edge is
-  already a complete body in the attic. What
-  blocks re-seeding is that the reading is parameterised by the STORE bound,
-  which the entry triple cannot see: it reads the term, the telescope and the
-  nesting and nothing else. The leg threads that bound from the drain's fuel
-  through the evaluator's mutual block, so the middle component becomes the
-  reading and no counter is left to exhaust. Impl change, paid for in
-  QuickCheck and the oracle, not the spec.
+- **PAY FOR `k ≤ V`, OR ESTABLISH THAT IT CANNOT BE PAID.** The reading's scan
+  clause charges a store-bound-th power on the premise that a scan refolds at
+  most bound-many times, and `Rx.Hop-Depth`'s header carries why nothing pays
+  for it. The family that shows the gap is built and measured in
+  `Probed.Operator-Root`, and its root is a flattener, so every layer it grows
+  is a layer the run enters. This is the only open leg that can still refute the
+  measure the other two are built on, which is why it goes first and why its
+  outcome may be a restatement rather than a discharge.
 
 - **CARRY THE BOUND OUT OF THE WALK RATHER THAN ASSERTING IT ABOUT THE VALUE.**
   Every dead route asked the emitter's rank to dominate a value it had not
@@ -271,16 +270,16 @@ decision procedure rather than a pin.
 ### The ledger
 
 - **`drain-dry-free`** (Verify-Rank-Sufficient) — FALSITY,
-  `REFUTED×2, PROBED×5`: every arrival after the root frame, conditioned on
+  `REFUTED×2, PROBED×4`: every arrival after the root frame, conditioned on
   `hopFits` at the schedule's own slot reading and not one the caller picks.
-  The fit survives three cascades on three recursive programs, and the
-  quantity it bounds holds still while the registry churns.
+  The fit holds flat across twelve drain states and is TIGHT at the plainest,
+  so the rows sit where it is closest to false.
 
 - **`dry-operator`** (Verify-Rank-Sufficient.Dry) — SHAPE,
-  `REFUTED×4, PROBED, RECOVERY`: the THREE FLATTENERS' dry-freedom under an
-  invariant bounding the nesting on entry. Refuted at the LIVE form one peel
-  ABOVE its tightest triple — so no conjunct read off the term repairs it, the
-  sync component included.
+  `REFUTED×2, DEAD ROUTE, PROBED, RECOVERY`: the THREE FLATTENERS' dry-freedom
+  under the entry invariant read at the schedule's own store bound. First
+  coverage at a root `opShape` admits, and the rank it is entered against was
+  measured there NOT to move with the source the run folds over.
 
 - **`entry-hop-fits`** (Verify-Rank-Sufficient) — DIFFICULTY, `PROBED`: the fit
   at the door, where the chain really is the one the root subscribe built out

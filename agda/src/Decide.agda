@@ -41,7 +41,8 @@
 -- when you add to it; do not launch a rename.
 module Decide where
 
-open import Data.Bool using (Bool; true; false; not; _∧_; _∨_; if_then_else_)
+open import Data.Bool using (Bool; true; false; not; _∧_; _∨_; if_then_else_; T)
+open import Data.Unit using (tt)
 open import Data.Bool.Properties using (∨-assoc; ∨-comm)
 open import Data.Nat using (ℕ; zero; suc; _≤_; z≤n; s≤s; _≡ᵇ_; _≤ᵇ_)
 open import Data.Nat.Properties using (≤⇒≤ᵇ)
@@ -75,6 +76,22 @@ f≡t-absurd ()
 
 ∧-intro : ∀ {a b : Bool} → a ≡ true → b ≡ true → (a ∧ b) ≡ true
 ∧-intro refl refl = refl
+
+-- the same two projections in `T` form, and THE BOOLS ARE EXPLICIT ON
+-- PURPOSE.  `T` is a FUNCTION on `Bool`, not a datatype, so
+-- `T ?a =?= T (f k x)` cannot be inverted while the argument is stuck
+-- on a variable — which it always is at the recursive call sites these
+-- serve.  With the Bools implicit every one of those raises an unsolved
+-- meta; passing them costs verbosity and buys independence from
+-- inference.  `T-∧` in `Data.Bool.Properties` has the same problem
+-- behind a ⇔.
+∧ˡ : ∀ (a b : Bool) → T (a ∧ b) → T a
+∧ˡ true  b _  = tt
+∧ˡ false b ()
+
+∧ʳ : ∀ (a b : Bool) → T (a ∧ b) → T b
+∧ʳ true  b h = h
+∧ʳ false b ()
 
 ∨-fˡ : ∀ (b c : Bool) → (b ∨ c) ≡ false → b ≡ false
 ∨-fˡ false c h = refl

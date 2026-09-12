@@ -28,10 +28,11 @@
 -- payable.  It kills it for every additive syntactic measure and not
 -- merely for this one: the counterexample scales by lengthening the
 -- source, which multiplies the deliveries and adds one to the measure.
--- What is left standing is the seed itself, which is exponential in the
--- literals that produce the deliveries — a quantity no conjunct of the
--- entry invariant reads, and the reason the operator leaf is refuted
--- while the top-line claim is not.
+-- What a measure has to have to survive is a rate that MULTIPLIES per
+-- delivery, and the delivery count is a property of the store rather
+-- than of the term — so the surviving reading is one parameterised by
+-- the store's own bound, which is why the entry's rank conjunct is
+-- V-parameterised and no additive syntactic component replaced it.
 --
 -- THE COUNT IS THE HONEST ONE, and that is why it is not `burstLen`.  A
 -- burst's emits carry `init`, `close`, `handoff` and `complete` beside
@@ -93,6 +94,15 @@ maxInstant b = foldr (λ em acc → InstEmit.instant em ⊔ acc) 0 b
 -- more values than the program's synchronous size.
 ----------------------------------------------------------------------
 
+-- THE STORE BOUND every run below is taken at.  `evaluate` builds its
+-- schedule at the fuel it then hands the drain, so a row is about a RUN
+-- only when the two agree — and the bound is what the root enters at,
+-- so a small one truncates the cascade whose growth is the subject
+-- here.  Chosen generously for that reason: the four counts below are
+-- the untruncated ones.
+SB : ℕ
+SB = 30
+
 Γ₀ : Ctx 0
 Γ₀ = []ⱽ
 
@@ -101,7 +111,7 @@ ins₀ = λ ()
 
 burstOf : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) → Stream Γ t
 burstOf e ins =
-  proj₁ (subscribeE (rootWitness e ins) e root 0 0 (sched-init e ins) (st-init e))
+  proj₁ (subscribeE (rootWitness SB e ins) e root 0 0 (sched-init SB e ins) (st-init e))
 
 SyncCountBounded : Set
 SyncCountBounded = ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →

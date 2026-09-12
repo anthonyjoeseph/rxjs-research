@@ -6,7 +6,7 @@
 -- the proof may rest on it.  Checked by `make probed`, claimed by
 -- `Probed.Main`.
 
--- WHY THIS REGION.  Fifteen rows say the fit holds at the door, where
+-- WHY THIS REGION.  Its sibling says the fit holds at the door, where
 -- the chain really is the one the root subscribe built out of `e`.  None
 -- of them says anything about the state the drain hands its own
 -- recursive call, and that is the direction the statement is USED in: a
@@ -25,17 +25,24 @@
 -- material at best, and the fit is being asked about REACHED ones.
 
 -- WHAT THE ROWS FOUND, and it is stronger than preservation.  The fit's
--- left side does not merely stay under the rank, it does not MOVE: two
--- at every step of the plain recursion, three at every step of the
--- doubly nested one and four at every step of the shared one, against
--- rank exponents of eleven, nineteen and twenty-eight.  The registry
--- churns underneath all of it — a `repeat`
--- registers a fresh inner and drops the spent one, so its length returns
--- to where it was while the mint counter climbs — and the reading is
--- flat across that churn.  Which is what the measure was chosen for: a
--- `μᵉ` unfolding substitutes rather than adding a flattener, so it adds
--- no hop, and the three `*All` nodes that do add one are already in the
--- term when the entry reads it.
+-- left side does not merely stay under the program's reading, it does
+-- not MOVE: one at every step of all three programs, against readings of
+-- one, two and three.  The registry churns underneath all of it — a
+-- `repeat` registers a fresh inner and drops the spent one, so its
+-- length returns to where it was while the mint counter climbs — and the
+-- reading is flat across that churn.  Which is what the measure was
+-- chosen for: a `μᵉ` unfolding substitutes rather than adding a
+-- flattener, so it adds no hop, and the three `*All` nodes that do add
+-- one are already in the term when the entry reads it.
+
+-- AND THE PLAIN RECURSION IS TIGHT, WHICH IS WHERE THE COVERAGE IS.  Q1
+-- reads one against one, so the fit has no slack whatever on the
+-- simplest program run here: a registry carrying one hop more than the
+-- term does would fail it outright, and the deeper two only widen it.
+-- That is what makes flat rows evidence rather than comfort — the
+-- statement is being instantiated at the point it is closest to false,
+-- and a preservation claim bought only where there was room to spare
+-- would say nothing about the clause a proof actually has to walk.
 
 -- WHAT MAKES A FIT ROW LOAD-BEARING.  It spends `Below` — the decision
 -- procedure on the comparison — so its implicit is inhabited exactly
@@ -64,9 +71,10 @@
 -- recursion referenced from inside a second one — the shape whose
 -- nesting the rank guard cannot read off the term it compares.
 
--- THE BOUNDARY.  Three arrivals deep, at the store bound `V = 0`, over
--- one flattening strategy, and exactly one row runs a drain — six
--- steps, on the cheapest of the three programs.
+-- THE BOUNDARY.  Three arrivals deep, at the store bound the run was
+-- BUILT at rather than one a row chose, over one flattening strategy,
+-- and exactly one row runs a drain — six steps, on the cheapest of the
+-- three programs.
 -- That last bound is what the iteration loop will hold rather than what
 -- the question wants: a drain is the one thing here that is not nearly
 -- free, so the file buys its coverage from the fit rows and spends the
@@ -78,27 +86,28 @@
 -- the fit SURVIVES a cascade, and that the quantity it bounds is not
 -- the one that grows.
 --
--- TARGET: drain-dry-free @400cf7
+-- TARGET: drain-dry-free @0b82eb
 module Probed.Fit-Preserved where
 
 open import Data.Fin using (zero)
 open import Data.List using ([]; _∷_)
 open import Data.List.Relation.Unary.Any using (here)
 open import Data.Maybe using (nothing)
-open import Data.Nat using (ℕ; suc; _+_)
+open import Data.Nat using (ℕ; suc)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Vec using () renaming ([] to []ⱽ; _∷_ to _∷ⱽ_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (Fuel; Id)
-open import Rx.Exp using (Ctx; Closed; sizeᵉ; natᵗ; nat̂; strmᵗ; ofᵉ;
+open import Rx.Exp using (Ctx; Closed; natᵗ; nat̂; strmᵗ; ofᵉ;
   mergeAllᵉ; μᵉ; varᵉ; deferᵉ; input)
 open import Rx.Evaluator using (Sched; EvalSt; cascade;
-  sched-next; subscribeE; rootWitness; root; sched-init; st-init; stNest)
-open import Rx.Slots using (Slots; slotsSize; shared)
+  sched-next; subscribeE; rootWitness; root; sched-init; st-init)
+open import Rx.Slots using (Slots; shared)
 open import Verify-Rank-Sufficient using (drain-dry-free)
-open import Verify-Rank-Sufficient.Hop using (liveHopD; regsHopD; hopFits)
+open import Verify-Rank-Sufficient.Hop using (regsHopD; hopFits)
+open import Rx.Hop-Depth using (hopDᵉ)
 open import Rx.Slot-Hop using (slotHop)
 open import Probed.Apparatus using (Confirms; Below)
 
@@ -120,36 +129,48 @@ after : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} →
 after 0       _      p = p
 after (suc k) nextId p = after k (suc nextId) (stepOnce nextId p)
 
+FUEL : Fuel
+FUEL = 6
+
 entry : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
   Sched Γ × EvalSt e
 entry e ins =
   let (_ , sched , st) =
-        subscribeE (rootWitness e ins) e root 0 0 (sched-init e ins) (st-init e)
+        subscribeE (rootWitness FUEL e ins) e root 0 0 (sched-init FUEL e ins)
+          (st-init e)
   in sched , st
 
 at : ∀ {n} {Γ : Ctx n} {t} → ℕ → (e : Closed Γ t) (ins : Slots Γ) →
   Sched Γ × EvalSt e
 at k e ins = after k 1 (entry e ins)
 
-FUEL : Fuel
-FUEL = 6
-
+-- THE TWO SIDES, READ OFF THE SCHEDULE RATHER THAN OFF A CHOICE.  Both
+-- take their store bound from `Sched.storeBound`, which is what the fit
+-- itself reads, so neither can be taken at a bound the run was not
+-- built at — and the environment is `slotHop` at that same bound, which
+-- `Rx.Slot-Hop` records as the one honest reading.
 carriedAt : ∀ {n} {Γ : Ctx n} {t} → ℕ → (e : Closed Γ t) (ins : Slots Γ) → ℕ
 carriedAt k e ins =
-  let η = slotHop 0 (Sched.slots (proj₁ (at k e ins))) in
-  liveHopD 0 η (Sched.live (proj₁ (at k e ins)))
-    + regsHopD 0 η (EvalSt.registry (proj₂ (at k e ins)))
+  let sched = proj₁ (at k e ins)
+      V     = Sched.storeBound sched
+      η     = slotHop V (Sched.slots sched) in
+  regsHopD V η (EvalSt.registry (proj₂ (at k e ins)))
 
+-- WHAT THE CARRIED AMOUNT IS MEASURED AGAINST, and it is now the
+-- program's own reading rather than a counter seeded off its SIZE.  The
+-- two are not comparable and nothing here converts between them: this
+-- is one currency, which is exactly what deleting the seed bought.
 rankAt : ∀ {n} {Γ : Ctx n} {t} → ℕ → (e : Closed Γ t) (ins : Slots Γ) → ℕ
 rankAt k e ins =
-  sizeᵉ e + slotsSize (Sched.slots (proj₁ (at k e ins)))
-    + stNest (proj₂ (at k e ins))
+  let sched = proj₁ (at k e ins)
+      V     = Sched.storeBound sched in
+  hopDᵉ V (slotHop V (Sched.slots sched)) e
 
 mintAt : ∀ {n} {Γ : Ctx n} {t} → ℕ → (e : Closed Γ t) (ins : Slots Γ) → ℕ
 mintAt k e ins = EvalSt.nextReg (proj₂ (at k e ins))
 
 fitAt : ∀ {n} {Γ : Ctx n} {t} → ℕ → (e : Closed Γ t) (ins : Slots Γ) → Set
-fitAt k e ins = hopFits 0 (proj₁ (at k e ins)) (proj₂ (at k e ins))
+fitAt k e ins = hopFits (proj₁ (at k e ins)) (proj₂ (at k e ins))
 
 ----------------------------------------------------------------------
 -- The programs.  Q1 is plain recursion over the empty context, Q2 is μ
@@ -202,9 +223,9 @@ progQ3 = μᵉ (mergeAllᵉ nothing
 -- distinct values, so each of the three steps ran a cascade that
 -- registered.  The carried reading is flat across all of them while the
 -- registry returns to length one each time — a `repeat` drops the spent
--- inner as it registers the next — and it sits at two against a rank
--- exponent of eleven, so the margin is three orders of magnitude wide
--- and not moving.
+-- inner as it registers the next — and it sits at ONE against a term
+-- reading of one, which is the tight case: there is no margin here to
+-- absorb a step that added a hop.
 ----------------------------------------------------------------------
 
 _ : mintAt 0 progQ1 ins₀ ≡ 1          -- LOAD-BEARING
@@ -219,19 +240,24 @@ _ = refl
 _ : mintAt 3 progQ1 ins₀ ≡ 4          -- LOAD-BEARING
 _ = refl
 
-_ : carriedAt 0 progQ1 ins₀ ≡ 2       -- LOAD-BEARING
+
+
+
+
+
+_ : carriedAt 0 progQ1 ins₀ ≡ 1       -- LOAD-BEARING
 _ = refl
 
-_ : carriedAt 1 progQ1 ins₀ ≡ 2       -- LOAD-BEARING
+_ : carriedAt 1 progQ1 ins₀ ≡ 1       -- LOAD-BEARING
 _ = refl
 
-_ : carriedAt 2 progQ1 ins₀ ≡ 2       -- LOAD-BEARING
+_ : carriedAt 2 progQ1 ins₀ ≡ 1       -- LOAD-BEARING
 _ = refl
 
-_ : carriedAt 3 progQ1 ins₀ ≡ 2       -- LOAD-BEARING
+_ : carriedAt 3 progQ1 ins₀ ≡ 1       -- LOAD-BEARING
 _ = refl
 
-_ : rankAt 0 progQ1 ins₀ ≡ 11             -- LOAD-BEARING
+_ : rankAt 0 progQ1 ins₀ ≡ 1          -- LOAD-BEARING
 _ = refl
 
 fpQ1₁ : fitAt 1 progQ1 ins₀
@@ -246,8 +272,9 @@ fpQ1₃ = Below
 ----------------------------------------------------------------------
 -- μ INSIDE μ.  The inner recursion is an observable EMITTED by the outer
 -- one, so a step here grows the registry along the axis the rank guard
--- is stated over rather than merely along its length — and the registry
--- does grow, two to three, while the carried reading stays at three.
+-- is stated over rather than merely along its length — and the mint
+-- counter does climb, two to six, while the carried reading stays at
+-- one against a term reading of two.
 ----------------------------------------------------------------------
 
 _ : mintAt 0 progQ2 ins₀ ≡ 2          -- LOAD-BEARING
@@ -262,20 +289,22 @@ _ = refl
 _ : mintAt 3 progQ2 ins₀ ≡ 6          -- LOAD-BEARING
 _ = refl
 
-_ : carriedAt 0 progQ2 ins₀ ≡ 3       -- LOAD-BEARING
+_ : carriedAt 0 progQ2 ins₀ ≡ 1       -- LOAD-BEARING
 _ = refl
 
-_ : carriedAt 1 progQ2 ins₀ ≡ 3       -- LOAD-BEARING
+_ : carriedAt 1 progQ2 ins₀ ≡ 1       -- LOAD-BEARING
 _ = refl
 
-_ : carriedAt 2 progQ2 ins₀ ≡ 3       -- LOAD-BEARING
+_ : carriedAt 2 progQ2 ins₀ ≡ 1       -- LOAD-BEARING
 _ = refl
 
-_ : carriedAt 3 progQ2 ins₀ ≡ 3       -- LOAD-BEARING
+_ : carriedAt 3 progQ2 ins₀ ≡ 1       -- LOAD-BEARING
 _ = refl
 
-_ : rankAt 0 progQ2 ins₀ ≡ 19             -- LOAD-BEARING
+_ : rankAt 0 progQ2 ins₀ ≡ 2          -- LOAD-BEARING
 _ = refl
+
+
 
 fpQ2₁ : fitAt 1 progQ2 ins₀
 fpQ2₁ = Below
@@ -291,8 +320,8 @@ fpQ2₃ = Below
 -- sharpest shape the sibling file reaches, and the one where a fit read
 -- off the term alone would be expected to fail — a slot reference is one
 -- symbol standing for a definition of any size.  It is also the one
--- whose registry grows fastest, four to seven across three steps, and
--- its carried reading is flat too.
+-- whose registry grows fastest, four to ten across three steps, and its
+-- carried reading is flat at one against a term reading of three.
 ----------------------------------------------------------------------
 
 _ : mintAt 0 progQ3 insMu ≡ 4          -- LOAD-BEARING
@@ -304,23 +333,25 @@ _ = refl
 _ : mintAt 2 progQ3 insMu ≡ 7          -- LOAD-BEARING
 _ = refl
 
-_ : mintAt 3 progQ3 insMu ≡ 10          -- LOAD-BEARING
+_ : mintAt 3 progQ3 insMu ≡ 10         -- LOAD-BEARING
 _ = refl
 
-_ : carriedAt 0 progQ3 insMu ≡ 4       -- LOAD-BEARING
+_ : carriedAt 0 progQ3 insMu ≡ 1      -- LOAD-BEARING
 _ = refl
 
-_ : carriedAt 1 progQ3 insMu ≡ 4       -- LOAD-BEARING
+_ : carriedAt 1 progQ3 insMu ≡ 1      -- LOAD-BEARING
 _ = refl
 
-_ : carriedAt 2 progQ3 insMu ≡ 4       -- LOAD-BEARING
+_ : carriedAt 2 progQ3 insMu ≡ 1      -- LOAD-BEARING
 _ = refl
 
-_ : carriedAt 3 progQ3 insMu ≡ 4       -- LOAD-BEARING
+_ : carriedAt 3 progQ3 insMu ≡ 1      -- LOAD-BEARING
 _ = refl
 
-_ : rankAt 0 progQ3 insMu ≡ 28             -- LOAD-BEARING
+_ : rankAt 0 progQ3 insMu ≡ 3         -- LOAD-BEARING
 _ = refl
+
+
 
 fpQ3₁ : fitAt 1 progQ3 insMu
 fpQ3₁ = Below
@@ -340,6 +371,6 @@ fpQ3₃ = Below
 -- is why there is one of these and not nine.
 ----------------------------------------------------------------------
 
-fpDrain : Confirms (drain-dry-free FUEL 2 0
+fpDrain : Confirms (drain-dry-free FUEL 2
             (proj₁ (at 1 progQ1 ins₀)) (proj₂ (at 1 progQ1 ins₀)) fpQ1₁)
 fpDrain = refl

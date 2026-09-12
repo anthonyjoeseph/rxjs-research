@@ -98,24 +98,31 @@ open import Verify-Rank-Sufficient.Hop using (hopFits)
 -- the motive, rather than as a measure nobody has.  Ordinary induction,
 -- and the thing to get right is the strengthening and not arithmetic.
 --
--- AND THE SEED IS EXPONENTIAL WHILE THE PEEL IS ONE PER HOP, so what is
--- owed is that the count is never SPENT rather than any comparison of two
--- quantities.  An entry is `2 ^ (sizeᵉ e + slotsSize sl + m)`, where `m` is
--- zero at the root and the arriving value's nesting joined with the store's
--- at every arrival after it — so one nesting layer costs one doubling, and
--- a route is dead exactly when a single entry has to pay for growth it
--- cannot see.  `Refuted.Sync-Count` is where the last additive candidate
--- for that currency died.
-
--- TWO CORRECTIONS AGAINST THE GENERATION THIS ARGUMENT WAS RECOVERED FROM,
--- because its apparatus is the obvious thing to reach for and neither half
--- transports.  The FLATTENING does not: a fold of the triple into one ℕ
--- existed so that a counter could dominate the order structurally, and this
--- evaluator descends on the order ITSELF, so the fold and every cap feeding
--- it are apparatus for a machine that is gone.  And the CURRENCY moved —
--- the generation before this one carried a hop DEPTH under its own cap,
--- which answers a different question from a rank that peels one per hop.
--- Its rows are a lead to read, never a statement to cite.
+-- AND THERE IS NO LONGER A SECOND QUANTITY TO COMPARE AGAINST, which is
+-- what the strengthening is FOR.  The entry's rank IS the hop reading, so
+-- the peel and the thing it peels are denominated alike and the whole of
+-- what is owed is that an emitted inner reads under its emitter.  Every
+-- route this row used to describe was an attempt to relate two currencies
+-- — a counter over SYNTAX against growth a RUN produces — and each died
+-- the same way, the run multiplying where the seed merely doubled.
+--
+-- DEAD ROUTE: a rank SEEDED off the term, in every form it was tried:
+--   a power of two in the program's syntactic size plus the slot
+--   telescope's, at each entry, and the additive
+--   candidates before it.  A seed grows with the SYNTAX while what has
+--   to be dominated is what the run DELIVERS, which a fold multiplies
+--   once per delivery; and a size seed cannot survive the μ clause at
+--   all, since an unfolding is larger than its redex while the witness
+--   keeps its rank.  `Refuted.Sync-Count` is where the last additive
+--   candidate for that currency died.
+-- DEAD ROUTE: the apparatus of the generation this argument was
+--   recovered from — a FOLD of the triple into one ℕ, and the caps
+--   feeding it.  It existed so a counter could dominate the order
+--   structurally; this evaluator descends on the order ITSELF, so there
+--   is nothing for a fold to dominate.  Its rows are a lead to read,
+--   never a statement to cite: the currency moved too, that generation
+--   carrying a hop DEPTH under its own cap, which answers a different
+--   question from a rank that peels one per hop.
 
 -- THE DRAIN IS THE SECOND HALF OF A RUN AND THE HALF THAT RECURSES.  The
 -- root subscribe returns one burst and a schedule; everything after it is
@@ -162,10 +169,12 @@ open import Verify-Rank-Sufficient.Hop using (hopFits)
 -- close that off, the second of them against the obvious weaker repair.
 -- `hopFits` is the quantity they say is absent:
 -- a chain's own remaining-hop content, read off the very frames the
--- witness exploits, against the rank the entry seeds.  It is quantified
--- over every V and η, so the statement is false if the fit at the naive
--- reading does not already carry the run — which makes this refutable
--- at a concrete registry rather than merely unproven.
+-- witness exploits, against the reading of the program those frames
+-- belong to.  Its environment is the schedule's OWN — the store bound
+-- the run was built at, and `slotHop` at that bound — so no caller may
+-- soften it by choosing a reading nobody runs; and both sides compute,
+-- which makes this refutable at a concrete registry rather than merely
+-- unproven.
 --
 -- REFUTED: `Refuted.Drain-Reachable` — the form as written, at a store
 --   whose root term is the EMPTY observable.  A chain is a `Path` typed
@@ -204,22 +213,14 @@ open import Verify-Rank-Sufficient.Hop using (hopFits)
 --   These rows are `refl` pins and buy exactly the twelve shapes they
 --   name, which is why the coverage past them is bought by an instrument
 --   that is not a pin.
--- PROBED: `Probed.Seed` — one row past the subscribe frame, at a scan
---   re-wrapping its accumulator over a scripted source with an async
---   tail.  The burst carries a reading of one and the DRAIN carries
---   three, against a seed of `2 ^ 14` that the slot's own data is counted
---   into — the half a literal source cannot show, since it delivers
---   entirely inside the frame.  THE BOUNDARY: one slot, one fold, and a
---   state reached by RUNNING, so the arbitrary schedule and store this
---   statement quantifies over are as uninstantiated as they were.
 -- PROBED: `Probed.Fuel-Growth` — six drains of ONE run, differing in
 --   FUEL alone, at a fold whose source is a recursion, so how many
 --   arrivals happen is the drain's business and not the term's.  Both
 --   readings of the term hold still across the six while the carried
---   nesting is the fuel plus one: the rate is ONE per arrival, exactly,
---   and it is the quantity an arrival's own entry reads.  THE BOUNDARY:
---   one delivery lands per arrival, so every layer the rows count is
---   paid for by a fresh entry and none of them reaches a burst
+--   hop reading is the fuel plus one: the rate is ONE per arrival,
+--   exactly, and it is the quantity an arrival's own entry reads.  THE
+--   BOUNDARY: one delivery lands per arrival, so every layer the rows
+--   count is paid for by a fresh entry and none of them reaches a burst
 --   delivering many times inside one cascade.
 -- PROBED: `Probed.Cascade-Growth` — that last region, instantiated.  An
 --   empty synchronous slot part and one late value put the entire run
@@ -228,10 +229,15 @@ open import Verify-Rank-Sufficient.Hop using (hopFits)
 --   layers at one unit of fuel and still three at two — so the layers
 --   are one cascade's and not a queue drained one arrival per unit —
 --   then six under one entry as the source gains three literals, while
---   the seed moves from `2 ^ 20` to `2 ^ 23`.  THE BOUNDARY: the inner
---   is a literal and the flattener a merge, so no row reaches a cascade
---   whose inner is itself a recursion — which the gate above says
---   cannot lengthen one, and which nothing here instantiates.
+--   the term's own reading does not move at all.  That blindness is
+--   what the rows were pushed against: at twenty-four literals the
+--   carried reading passes the term's by a third and the run is STILL
+--   dry-free, so a value reading deeper than the program that produced
+--   it is not the crossing.  THE BOUNDARY: the inner is a literal and
+--   the flattener a merge, so no row reaches a cascade whose inner is
+--   itself a recursion, nor one where the grown value is SUBSCRIBED
+--   rather than handed out of the root — which is where the guard peels
+--   and so where the crossing would have to be.
 -- PROBED: `Probed.Fit-Preserved` — the fit at states the DRAIN produced,
 --   which every receipt above is silent about.  `stepOnce` is the loop's
 --   own step with the emit stream dropped — the same pull, the same
@@ -241,19 +247,21 @@ open import Verify-Rank-Sufficient.Hop using (hopFits)
 --   arrivals, each spending the decision procedure on the comparison, so
 --   a fit the k-th arrival destroyed leaves its row unsolvable instead of
 --   letting it through.  The finding is stronger than preservation: the
---   left side does not MOVE — two across the plain recursion, three
---   across both nested ones, against rank exponents of eleven, nineteen
---   and twenty-eight — while the registration counter climbs at every
---   step on every program, which is what separates a flat reading from a
---   stepper that had become a fixed point.  THE BOUNDARY: three arrivals,
---   the naive reading, a merge only, and nothing here reaches the
---   late-slot cascade the receipt above instantiates.
+--   carried reading does not MOVE — one at all twelve states, against
+--   term readings of one, two and three — while the registration counter
+--   climbs at every step on every program, which is what separates a flat
+--   reading from a stepper that had become a fixed point.  And the
+--   plainest program is TIGHT, one against one, so a registry carrying a
+--   single hop more would fail outright and the flat rows are taken where
+--   the statement is closest to false.  THE BOUNDARY: three arrivals, a
+--   merge only, and nothing here reaches the late-slot cascade the
+--   receipt above instantiates.
 
 postulate
   drain-dry-free : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (fuel : Fuel) (nextId : Id) (V : ℕ)
+    (fuel : Fuel) (nextId : Id)
     (sched : Sched Γ) (st : EvalSt e) →
-    hopFits V sched st →
+    hopFits sched st →
     hasDry (drain fuel nextId sched st) ≡ false
 
 -- THE FIT AT THE DOOR.  `evaluate` hands the drain the state its root
@@ -272,15 +280,16 @@ postulate
 --   which is the shape whose nesting the rank guard cannot read off the
 --   term it compares, and so the one a fit read off the term alone
 --   would be expected to miss.  THE BOUNDARY: entry states only, at the
---   naive reading `V = 0` and `η` constantly zero; nothing here reaches
---   a state the drain itself produced, and nothing instantiates a
---   nonzero slot reading.
+--   one store bound the rows are all taken at, with `η` the schedule's
+--   own `slotHop` at that bound rather than a reading chosen for them;
+--   nothing here reaches a state the drain itself produced, and nothing
+--   sweeps the bound.
 postulate
-  entry-hop-fits : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t)
+  entry-hop-fits : ∀ {n} {Γ : Ctx n} {t} (V : ℕ) (e : Closed Γ t)
     (ins : Slots Γ) →
-    let ent = subscribeE (rootWitness e ins) e root 0 0 (sched-init e ins)
+    let ent = subscribeE (rootWitness V e ins) e root 0 0 (sched-init V e ins)
                 (st-init e)
-    in hopFits 0 (proj₁ (proj₂ ent)) (proj₂ (proj₂ ent))
+    in hopFits (proj₁ (proj₂ ent)) (proj₂ (proj₂ ent))
 
 -- THE ASSEMBLY, AND THE ONLY THING IT ADDS IS THE SEEDING.  `evaluate`
 -- concatenates its root burst with its drain, so dryness of the run is
@@ -294,10 +303,11 @@ rank-sufficient :
   hasDry (evaluate fuel e ins) ≡ false
 rank-sufficient {Γ = Γ} {t = t} fuel e ins =
   hasDry-++ (proj₁ ent) (drain fuel 1 (proj₁ (proj₂ ent)) (proj₂ (proj₂ ent)))
-    (subscribe-dry-free (rootWitness e ins) e root 0 0 (sched-init e ins)
-      (st-init e) (rootTri-reads e ins))
-    (drain-dry-free fuel 1 0 (proj₁ (proj₂ ent)) (proj₂ (proj₂ ent))
-      (entry-hop-fits e ins))
+    (subscribe-dry-free (rootWitness fuel e ins) e root 0 0
+      (sched-init fuel e ins) (st-init e) (rootTri-reads fuel e ins))
+    (drain-dry-free fuel 1 (proj₁ (proj₂ ent)) (proj₂ (proj₂ ent))
+      (entry-hop-fits fuel e ins))
   where
   ent : Stream Γ t × Sched Γ × EvalSt e
-  ent = subscribeE (rootWitness e ins) e root 0 0 (sched-init e ins) (st-init e)
+  ent = subscribeE (rootWitness fuel e ins) e root 0 0 (sched-init fuel e ins)
+          (st-init e)

@@ -1,0 +1,131 @@
+------------------------------------------------------------------
+-- hopD READS η ONLY AT THE INPUTS ITS TERM ACTUALLY CONTAINS.
+--
+-- The obvious structural congruence: environments agreeing below k
+-- agree on any term all of whose inputs sit below k.  Only the `input`
+-- clause touches η at all — every other clause either ignores it
+-- (`varᵉ`, `deferᵉ`, `primᵗ`, the ground literals) or is a congruence
+-- over its subterms — and `inputsBelowᵉ` hands exactly the guard the
+-- agreement hypothesis wants.  The plug multiplier never appears on
+-- the η side, so the coefficients pass through untouched.
+--
+-- IT LIVES IN ITS OWN MODULE BECAUSE IT IS A NEW MUTUAL FAMILY over
+-- Exp/Tm/List Tm and nothing in the measure is mutual with it:
+-- `Rx.Slot-Hop` consumes it as a finished fact, which is an import
+-- rather than mutuality, and putting it beside the measure would grow
+-- that module's checking unit for nothing.
+--
+-- WHAT IT IS SPENT ON: `slotHop-fix`, the equation saying a shared
+-- slot's staged hop IS its def's reading under the full environment.
+-- That is what the walk's input clause charges against, and it is
+-- assembled from this plus the staging lemma next to it.
+------------------------------------------------------------------
+module Rx.Hop-Eta-Cong where
+
+open import Data.Bool using (T; _∧_)
+open import Data.Nat  using (ℕ; suc; _+_; _*_; _^_; _⊔_; _<ᵇ_)
+open import Data.Fin  using (Fin; toℕ)
+open import Data.List using (List; []; _∷_)
+open import Relation.Binary.PropositionalEquality
+  using (_≡_; refl; cong; cong₂)
+
+open import Rx.Exp using (Ctx; Exp; Tm;
+                          input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ;
+                          mergeAllᵉ; switchAllᵉ; exhaustAllᵉ;
+                          μᵉ; varᵉ; deferᵉ;
+                          varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ;
+                          inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ;
+                          inputsBelowᵉ; inputsBelowᵗ; inputsBelowᵗˢ)
+open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵗˢ; pmᵗ)
+open import Decide using (∧ʳ; ∧ˡ)
+
+mutual
+  hopD-η-congᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (V k : ℕ)
+    {η₁ η₂ : Fin n → ℕ} →
+    (∀ j → T (toℕ j <ᵇ k) → η₁ j ≡ η₂ j) →
+    (e : Exp Γ Δᵍ Δ Θ t) → T (inputsBelowᵉ k e) →
+    hopDᵉ V η₁ e ≡ hopDᵉ V η₂ e
+  -- THE ONLY CLAUSE THAT READS η, and the guard is definitionally the
+  -- agreement hypothesis's own side condition
+  hopD-η-congᵉ V k ag (input i)       ok = ag i ok
+  hopD-η-congᵉ V k ag (ofᵉ ts)        ok = hopD-η-congᵗˢ V k ag ts ok
+  hopD-η-congᵉ V k ag emptyᵉ          ok = refl
+  hopD-η-congᵉ V k ag (mapᵉ f e)      ok =
+    cong₂ _+_ (hopD-η-congᵗ V k ag f (∧ˡ (inputsBelowᵗ k f) (inputsBelowᵉ k e) ok))
+              (cong ((pmᵗ V 0 f ⊔ 1) *_)
+                    (hopD-η-congᵉ V k ag e
+                       (∧ʳ (inputsBelowᵗ k f) (inputsBelowᵉ k e) ok)))
+  -- the count is a natᵗ term: the measure does not read it, so neither
+  -- does this
+  hopD-η-congᵉ V k ag (takeᵉ c e)     ok =
+    hopD-η-congᵉ V k ag e (∧ʳ (inputsBelowᵗ k c) (inputsBelowᵉ k e) ok)
+  hopD-η-congᵉ V k ag (scanᵉ f z e)   ok =
+    cong (((2 + pmᵗ V 0 f) ^ V) *_)
+         (cong₂ _+_ (cong₂ _+_ (hopD-η-congᵗ V k ag f
+                                  (∧ˡ (inputsBelowᵗ k f) zbe ok))
+                               (hopD-η-congᵗ V k ag z
+                                  (∧ˡ (inputsBelowᵗ k z) (inputsBelowᵉ k e) rest)))
+                    (hopD-η-congᵉ V k ag e
+                       (∧ʳ (inputsBelowᵗ k z) (inputsBelowᵉ k e) rest)))
+    where
+    zbe  = inputsBelowᵗ k z ∧ inputsBelowᵉ k e
+    rest = ∧ʳ (inputsBelowᵗ k f) zbe ok
+  hopD-η-congᵉ V k ag (mergeAllᵉ lim e)   ok = cong suc (hopD-η-congᵉ V k ag e ok)
+  hopD-η-congᵉ V k ag (switchAllᵉ e)  ok = cong suc (hopD-η-congᵉ V k ag e ok)
+  hopD-η-congᵉ V k ag (exhaustAllᵉ e) ok = cong suc (hopD-η-congᵉ V k ag e ok)
+  hopD-η-congᵉ V k ag (μᵉ e)          ok = hopD-η-congᵉ V k ag e ok
+  hopD-η-congᵉ V k ag (varᵉ x)        ok = refl
+  -- the measure cuts a defer, so its body's inputs are irrelevant here
+  hopD-η-congᵉ V k ag (deferᵉ e)      ok = refl
+
+  hopD-η-congᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (V k : ℕ)
+    {η₁ η₂ : Fin n → ℕ} →
+    (∀ j → T (toℕ j <ᵇ k) → η₁ j ≡ η₂ j) →
+    (f : Tm Γ Δᵍ Δ Θ t) → T (inputsBelowᵗ k f) →
+    hopDᵗ V η₁ f ≡ hopDᵗ V η₂ f
+  hopD-η-congᵗ V k ag (varᵗ x)      ok = refl
+  hopD-η-congᵗ V k ag unit̂          ok = refl
+  hopD-η-congᵗ V k ag (bool̂ _)      ok = refl
+  hopD-η-congᵗ V k ag (nat̂ _)       ok = refl
+  hopD-η-congᵗ V k ag (pairᵗ a b)   ok =
+    cong₂ _⊔_ (hopD-η-congᵗ V k ag a
+                 (∧ˡ (inputsBelowᵗ k a) (inputsBelowᵗ k b) ok))
+              (hopD-η-congᵗ V k ag b
+                 (∧ʳ (inputsBelowᵗ k a) (inputsBelowᵗ k b) ok))
+  hopD-η-congᵗ V k ag (fstᵗ p)      ok = hopD-η-congᵗ V k ag p ok
+  hopD-η-congᵗ V k ag (sndᵗ p)      ok = hopD-η-congᵗ V k ag p ok
+  hopD-η-congᵗ V k ag (inlᵗ a)      ok = hopD-η-congᵗ V k ag a ok
+  hopD-η-congᵗ V k ag (inrᵗ a)      ok = hopD-η-congᵗ V k ag a ok
+  hopD-η-congᵗ V k ag (caseᵗ s l r) ok =
+    cong₂ _+_ (cong₂ _⊔_ (hopD-η-congᵗ V k ag l
+                            (∧ˡ (inputsBelowᵗ k l) (inputsBelowᵗ k r) rest))
+                         (hopD-η-congᵗ V k ag r
+                            (∧ʳ (inputsBelowᵗ k l) (inputsBelowᵗ k r) rest)))
+              (cong ((pmᵗ V 0 l ⊔ pmᵗ V 0 r ⊔ 1) *_)
+                    (hopD-η-congᵗ V k ag s (∧ˡ (inputsBelowᵗ k s) lr ok)))
+    where
+    lr   = inputsBelowᵗ k l ∧ inputsBelowᵗ k r
+    rest = ∧ʳ (inputsBelowᵗ k s) lr ok
+  hopD-η-congᵗ V k ag (ifᵗ c a b)   ok =
+    cong₂ _⊔_ (hopD-η-congᵗ V k ag a
+                 (∧ˡ (inputsBelowᵗ k a) (inputsBelowᵗ k b) rest))
+              (hopD-η-congᵗ V k ag b
+                 (∧ʳ (inputsBelowᵗ k a) (inputsBelowᵗ k b) rest))
+    where
+    ab   = inputsBelowᵗ k a ∧ inputsBelowᵗ k b
+    rest = ∧ʳ (inputsBelowᵗ k c) ab ok
+  -- a PrimOp lands in natᵗ or boolᵗ: the measure reads it as zero
+  hopD-η-congᵗ V k ag (primᵗ _ a)   ok = refl
+  hopD-η-congᵗ V k ag (strmᵗ e)     ok = hopD-η-congᵉ V k ag e ok
+
+  hopD-η-congᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (V k : ℕ)
+    {η₁ η₂ : Fin n → ℕ} →
+    (∀ j → T (toℕ j <ᵇ k) → η₁ j ≡ η₂ j) →
+    (ts : List (Tm Γ Δᵍ Δ Θ t)) → T (inputsBelowᵗˢ k ts) →
+    hopDᵗˢ V η₁ ts ≡ hopDᵗˢ V η₂ ts
+  hopD-η-congᵗˢ V k ag []       ok = refl
+  hopD-η-congᵗˢ V k ag (y ∷ ys) ok =
+    cong₂ _⊔_ (hopD-η-congᵗ  V k ag y
+                 (∧ˡ (inputsBelowᵗ k y) (inputsBelowᵗˢ k ys) ok))
+              (hopD-η-congᵗˢ V k ag ys
+                 (∧ʳ (inputsBelowᵗ k y) (inputsBelowᵗˢ k ys) ok))

@@ -55,12 +55,25 @@ data CloseReason : Set where
                                     -- (a cut registration delivers NOTHING, as in rxjs:
                                     -- take(1)(merge(s,s)) — the second chain is silent)
   exhausted  : CloseReason          -- the source ran dry on its own
-  dried      : CloseReason          -- the EVALUATOR ran out of sync fuel — the dry
-                                    -- marker (Rx.Evaluator.dryBurst), never emitted by
-                                    -- any machine rule.  Detection is by THIS REASON
+  dried      : CloseReason          -- a GUARD REFUSED — the dry marker
+                                    -- (Rx.Evaluator.dryBurst), never emitted by any
+                                    -- machine rule.  Detection is by THIS REASON
                                     -- (hasDry), not by a sentinel source: Source is an
                                     -- unbounded ℕ and mints are breadth-many, so no
                                     -- numeric sentinel is collision-proof
+
+                                    -- THE NAME IS OLDER THAN WHAT IT MARKS, and it is
+                                    -- kept because `CLI/Encode` puts the word on the
+                                    -- oracle wire.  There is no fuel and nothing runs
+                                    -- out: the evaluator descends on a TRIPLE, and each
+                                    -- of its three components has a guard that emits
+                                    -- this when it cannot decrease — the rank at an
+                                    -- inner subscribe, the unconnected count at a shared
+                                    -- connect, the sync size at a μ unfolding.  So a run
+                                    -- free of this reason is one where the descent's
+                                    -- order never had to be argued about, which is why
+                                    -- the whole of `Verify-Rank-Sufficient` is stated as
+                                    -- its absence
 
 data InstEvent (A : Set) : Set where
   init     : Source → InstEvent A   -- a registration chain of this source came alive

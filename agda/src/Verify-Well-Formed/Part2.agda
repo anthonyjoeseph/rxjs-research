@@ -23,7 +23,7 @@ module Verify-Well-Formed.Part2 where
 open import Data.Bool    using (Bool; true; false; if_then_else_; _∧_; _∨_)
 open import Data.Fin     using (Fin; toℕ)
 open import Data.Vec     using (lookup)
-open import Data.Nat     using (suc; _≤_; z≤n; _≡ᵇ_; _<ᵇ_; _+_)
+open import Data.Nat     using (ℕ; suc; _≤_; z≤n; _≡ᵇ_; _<ᵇ_; _+_)
 open import Data.List    using (List; []; _∷_; _++_; length; map)
 open import Data.Bool.ListAction using (any)
 open import Data.Maybe   using (Maybe; just; nothing)
@@ -287,8 +287,8 @@ postulate
   -- hot slot, with `source = toℕ i` and `elemTy = lookup Γ i`.  So the
   -- fact holds by construction; what it costs is the concat/tabulate
   -- membership argument, which is why it is a leaf rather than a proof.
-  sched-init-hot-live : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
-    HotLive (sched-init e ins)
+  sched-init-hot-live : ∀ {n} {Γ : Ctx n} {t} (V : ℕ) (e : Closed Γ t)
+    (ins : Slots Γ) → HotLive (sched-init V e ins)
 
   -- STEP, minting.  `mintSource` (via oneShotBurst and the cold-input
   -- arm) prepends a FRESH source and never touches `slots`, so a hot
@@ -428,14 +428,14 @@ record BurstInv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     -- obligation, supplied to burst-final directly, not threaded through here.
 
 -- the empty states are related
-burst-init : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
-  BurstInv {e = e} 0 (sched-init e ins) (st-init e) protocol-init
-burst-init e ins = record
+burst-init : ∀ {n} {Γ : Ctx n} {t} (V : ℕ) (e : Closed Γ t) (ins : Slots Γ) →
+  BurstInv {e = e} 0 (sched-init V e ins) (st-init e) protocol-init
+burst-init V e ins = record
   { live-matches  = λ s _ → refl
   ; reg-typed     = refl
   ; horizon-low   = z≤n
   ; current-frame = inj₁ refl
-  ; hot-live      = sched-init-hot-live e ins
+  ; hot-live      = sched-init-hot-live V e ins
   }
 
 -- ── base-case brick: a oneShotBurst's protocol trajectory ────────────────

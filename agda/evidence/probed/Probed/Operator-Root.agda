@@ -1,5 +1,5 @@
--- THE RANK'S SEED AND THE DEPTH A CASCADE REACHES GROW AT DIFFERENT
--- RATES IN THE SAME PARAMETER, AND THE RUN'S RATE IS THE LARGER.
+-- THE RANK THE MACHINE ENTERS AT IS BLIND TO SOURCE LENGTH, AND THE
+-- DEPTH A CASCADE REACHES MULTIPLIES WITH IT.
 --
 -- EVIDENCE, not a claim: `src` cannot import this file and nothing in
 -- the proof may rest on it.  Checked by `make probed`, claimed by
@@ -21,69 +21,66 @@
 -- hands out read as deep as the inner fold delivers wide, and the root
 -- flattener subscribes every one of them.
 
--- THE TWO RATES, WHICH IS WHAT THE ROWS BUY.  Each literal adds ONE to
--- `sizeᵉ` and so DOUBLES the rank the machine seeds, while multiplying
--- the depth by three.  Both sides are exponential in the source length
--- and the run's base is the larger, so the ratio closes by half a bit
--- per literal from wherever the machinery's own size starts it.  That
--- is a different finding from the sibling refutations, which put an
--- exponential beside a linear measure: here nothing is mis-denominated,
--- and the seed is beaten in its own currency.
+-- ONE RATE MOVES AND THE OTHER DOES NOT, WHICH IS WHAT THE ROWS BUY.
+-- Each literal multiplies the depth by three while the rank the machine
+-- enters at reads the SAME at every source length — four programs,
+-- differing in literals alone, all reading 532899.  So this is not two
+-- exponentials racing: the reading is a function of the STORE BOUND and
+-- the term's templates, and source length is not among its inputs,
+-- while source length is exactly what moves the deliveries a fold
+-- compounds over.
 --
 -- WHERE THEY CROSS, AND THIS IS ARITHMETIC ON THE RATE RATHER THAN A
--- ROW.  The rows give depth `(3 ^ suc ℓ ∸ 3) / 2` against a rank
--- `2 ^ (27 + ℓ)`, and those meet at ℓ = 46 — a program of seventy-three
--- symbols whose run reads about 1.3e22 layers deep against a rank of
--- about 9.4e21.  NOTHING BELOW INSTANTIATES THAT.  It is an
--- extrapolation of the measured recurrence and is recorded as one.
+-- ROW.  The rows give depth `(3 ^ suc ℓ ∸ 3) / 2` against a flat
+-- 532899, and those meet at TWELVE literals — a run reading about
+-- 800000 layers deep at a bound of six.  NOTHING BELOW INSTANTIATES
+-- THAT.  It is an extrapolation of the measured recurrence and is
+-- recorded as one.
 --
--- AND IT CANNOT BE INSTANTIATED, WHICH IS THE COVERAGE BOUNDARY WORTH
--- RECORDING.  A crossing requires a run to build a value deeper than
--- `2 ^ sizeᵉ` of the program that built it, and no program does this
--- work in under about twenty-seven symbols — so the shallowest
--- crossing anywhere in the family is already past a hundred million
--- layers, which is a term no checker normalises.  Raising the fold's
--- branching moves the crossing to a shorter source and leaves the depth
--- there no smaller, since the bound it has to beat is the seed.  So the
--- rate is the whole of what a probe can buy here, and the rows are
--- chosen to pin the rate exactly.
+-- AND THIS IS THE SHAPE THE SIBLING RECEIPTS COULD NOT REACH.  A grown
+-- value handed out of the ROOT is subscribed by nobody, so its depth
+-- costs the guard nothing however far it passes the term's reading;
+-- here the root IS a flattener, so every layer the fold builds is a
+-- layer the run enters.  What the rate then says is that the store
+-- bound has to cover the deliveries a cascade makes SYNCHRONOUSLY, and
+-- a synchronous cascade consumes no fuel — which is where the reading's
+-- `k ≤ V` premise is owed and where nothing yet pays it.
+--
+-- THE COVERAGE BOUNDARY, and it is an infrastructure limit rather than
+-- a choice.  MEASURING a burst and SUBSCRIBING one cost differently: at
+-- two literals the leaf row stalled for eleven minutes with the
+-- resident set FLAT — so not a normalisation still making progress —
+-- against a whole probe root that checks in fourteen seconds.  The
+-- crossing above is therefore six orders of magnitude past anything a
+-- checker will normalise, and the rate is the whole of what a probe can
+-- buy here.
 --
 -- THE LEAF ROW IS GREEN AND THAT IS NOT COMFORT.  It sits at the ONE
--- literal root, three layers against a rank of `2 ^ 28`, so the margin
--- there is enormous — which is precisely what the rate says it would be,
--- and precisely why no row at this end can decide the statement.  What
--- the row does buy is the first coverage the leaf has ever had at a root
--- it answers for: the run really does reach `subscribeInner`, really
--- does peel the rank, and really does come back without a dry close.
+-- literal root, three layers against 532899, so the margin there is
+-- enormous — which is precisely what the rate says it would be, and
+-- precisely why no row at this end can decide the statement.  What the
+-- row does buy is the first coverage the leaf has ever had at a root it
+-- answers for: the run really does reach `subscribeInner`, really does
+-- peel the rank, and really does come back without a dry close.
 --
--- WHY ONE LITERAL, WHICH IS AN INFRASTRUCTURE LIMIT AND NOT A CHOICE.
--- MEASURING a burst and SUBSCRIBING one cost differently, and the gap is
--- not the depth.  The rate rows below run the four-literal program and
--- return, because producing a burst walks the tower once; the leaf
--- instead demands `hasDry` of a run whose root flattener SUBSCRIBES
--- every inner that burst delivers, and each of those is a tower of its
--- own.  At two literals that stalled — eleven minutes with the resident
--- set FLAT, so not a normalisation still making progress — against a
--- tree whose whole probe root checks in fourteen seconds.  So the
--- conclusion's reachable coverage stops far short of the depths the
--- rates reach, and that is the other reason the crossing above is
--- arithmetic rather than a row.
---
--- TARGET: dry-operator @27b615
+-- TARGET: dry-operator @474d33
 module Probed.Operator-Root where
 
 open import Data.List using (List; []; _∷_)
 open import Data.List.Relation.Unary.Any using (here)
 open import Data.Maybe using (nothing)
+open import Data.Fin using (Fin)
 open import Data.Nat using (ℕ; _⊔_)
 open import Data.Product using (proj₁)
 open import Data.Vec using () renaming ([] to []ⱽ)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (InstEvent; value; InstEmit)
-open import Rx.Exp using (Ctx; Closed; Fn; Tm; natᵗ; obs; _×ᵗ_; sizeᵉ;
+open import Rx.Exp using (Ctx; Closed; Fn; Tm; natᵗ; obs; _×ᵗ_;
   ofᵉ; emptyᵉ; scanᵉ; mergeAllᵉ; strmᵗ; nat̂; fstᵗ; varᵗ)
 open import Rx.Slots using (Slots)
+open import Rx.Hop-Depth using (hopDᵉ)
+open import Rx.Slot-Hop using (slotHop)
 open import Rx.Evaluator using (Stream; subscribeE; rootWitness; root;
   sched-init; st-init)
 open import Rx.Nest-Depth using (nestDᵉ)
@@ -113,9 +110,17 @@ carried (em ∷ ems) = evNest (InstEmit.events em) ⊔ carried ems
 ins₀ : Slots Γ₀
 ins₀ = λ ()
 
+-- THE STORE BOUND every reading here is taken at.  `evaluate` builds
+-- its schedule at the fuel it then hands the drain, so a row is about a
+-- RUN only when the two agree.  A row free to pick the bound separately
+-- would be picking how tight the statement it instantiates is.
+SB : ℕ
+SB = 6
+
 burstOf : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) → Stream Γ t
 burstOf e ins =
-  proj₁ (subscribeE (rootWitness e ins) e root 0 0 (sched-init e ins) (st-init e))
+  proj₁ (subscribeE (rootWitness SB e ins) e root 0 0 (sched-init SB e ins)
+           (st-init e))
 
 ----------------------------------------------------------------------
 -- THE TWO FOLDS.  `spread` re-wraps its accumulator three times, so its
@@ -149,21 +154,23 @@ e3 = emitter (nat̂ 0 ∷ nat̂ 1 ∷ nat̂ 2 ∷ [])
 e4 = emitter (nat̂ 0 ∷ nat̂ 1 ∷ nat̂ 2 ∷ nat̂ 3 ∷ [])
 
 ----------------------------------------------------------------------
--- THE FIXED RATE OF THE SEED.  One literal, one symbol, one doubling of
--- the rank — pinned so that a change to `sizeᵉ` moves these rows rather
--- than silently changing what the depths below are being compared to.
+-- THE RANK THE MACHINE ACTUALLY ENTERS AT, AND IT DOES NOT MOVE.  The
+-- entry reads `hopDᵉ` at the run's own store bound; the four programs
+-- differ in source length alone and all four read the SAME.  Each row
+-- is LOAD-BEARING and could have failed in either direction — a reading
+-- that grew with the literals would say the rank still tracks the
+-- syntax, and one that shrank would say a literal costs the measure
+-- something.  It does neither, which is what makes the depths below a
+-- comparison rather than two unrelated numbers.
 ----------------------------------------------------------------------
 
-_ : sizeᵉ e1 ≡ 28                                      -- LOAD-BEARING
+η₀ : Fin 0 → ℕ
+η₀ = slotHop SB ins₀
+
+_ : hopDᵉ SB η₀ e1 ≡ 532899                            -- LOAD-BEARING
 _ = refl
 
-_ : sizeᵉ e2 ≡ 29                                      -- LOAD-BEARING
-_ = refl
-
-_ : sizeᵉ e3 ≡ 30                                      -- LOAD-BEARING
-_ = refl
-
-_ : sizeᵉ e4 ≡ 31                                      -- LOAD-BEARING
+_ : hopDᵉ SB η₀ e4 ≡ 532899                            -- LOAD-BEARING
 _ = refl
 
 ----------------------------------------------------------------------
@@ -196,6 +203,7 @@ _ = refl
 flat1 : Closed Γ₀ natᵗ
 flat1 = mergeAllᵉ nothing e1
 
-opRoot : Confirms (dry-operator (rootWitness flat1 ins₀) flat1 root 0 0
-  (sched-init flat1 ins₀) (st-init flat1) refl (rootTri-reads flat1 ins₀))
+opRoot : Confirms (dry-operator (rootWitness SB flat1 ins₀) flat1 root 0 0
+  (sched-init SB flat1 ins₀) (st-init flat1) refl
+  (rootTri-reads SB flat1 ins₀))
 opRoot = refl

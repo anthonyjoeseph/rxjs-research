@@ -178,10 +178,10 @@ burst-final sched st S binv dyF dp cv = inv , paid (BurstInv.current-frame binv)
 -- the SETTLED root-exit state: the evaluator state the root subscription's
 -- burst leaves behind.  Both root-exit facts below are stated at it, and it
 -- is the only state at which either is claimed.
-rootExitSt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) → EvalSt e
-rootExitSt e ins =
-  proj₂ (proj₂ (subscribeE (rootWitness e ins) e root 0 0
-                           (sched-init e ins) (st-init e)))
+rootExitSt : ∀ {n} {Γ : Ctx n} {t} (V : ℕ) (e : Closed Γ t) (ins : Slots Γ) → EvalSt e
+rootExitSt V e ins =
+  proj₂ (proj₂ (subscribeE (rootWitness V e ins) e root 0 0
+                           (sched-init V e ins) (st-init e)))
 
 -- ROOT-EXIT done-plumbed, migrated out of BurstInv (see the fork note).  The
 -- root subscription's returned stream IS the emitted one, so its done-flip is a
@@ -216,14 +216,14 @@ postulate
   -- program whose root completes while a share registration survives
   -- to the root exit; the paragraph above asserts such states exist
   -- and no construction tried so far produces one.
-  root-entry-sunk : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
+  root-entry-sunk : ∀ {n} {Γ : Ctx n} {t} (V : ℕ) (e : Closed Γ t) (ins : Slots Γ)
     (S : ProtocolSt) →
     runProtocol protocol-init
-      (proj₁ (subscribeE (rootWitness e ins) e root 0 0
-                         (sched-init e ins) (st-init e))) ≡ just S →
+      (proj₁ (subscribeE (rootWitness V e ins) e root 0 0
+                         (sched-init V e ins) (st-init e))) ≡ just S →
     ProtocolSt.done S ≡ true →
     (rid : RegId) (src : Source) (u : Ty) (p : Path Γ u t) →
-    (rid , src , (u , p)) ∈ EvalSt.registry (rootExitSt e ins) →
+    (rid , src , (u , p)) ∈ EvalSt.registry (rootExitSt V e ins) →
     sinksToShare p ≡ true
 
   -- ROOT-EXIT caches, migrated out of BurstInv for the reason recorded on the
@@ -280,39 +280,39 @@ postulate
   --   asked about a count against a drained registry, and there it is
   --   asked about a live count of two against two surviving
   --   registrations.
-  root-mergeAllCache : ∀ {n} {Γ : Ctx n} {t} {w} (e : Closed Γ t) (ins : Slots Γ)
+  root-mergeAllCache : ∀ {n} {Γ : Ctx n} {t} {w} (V : ℕ) (e : Closed Γ t) (ins : Slots Γ)
     (nid : NodeId) (lim : Maybe ℕ) (k : ℕ) (q : List (Closed Γ w)) (od : Bool) →
-    (nid , mergeAll-st lim k q od) ∈ EvalSt.nodes (rootExitSt e ins) →
+    (nid , mergeAll-st lim k q od) ∈ EvalSt.nodes (rootExitSt V e ins) →
     nodeCacheOK nid (mergeAll-st lim k q od)
-      (EvalSt.registry (rootExitSt e ins)) ≡ true
+      (EvalSt.registry (rootExitSt V e ins)) ≡ true
 
 -- the per-node residue, split on the constructor: four of nodeCacheOK's
 -- five clauses are `true` outright, so the whole open content is the
 -- mergeAll one -- and it is now open at EVERY limit, the old concat face
 -- having been a `true` placeholder over the same count.
-root-nodeCache : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
+root-nodeCache : ∀ {n} {Γ : Ctx n} {t} (V : ℕ) (e : Closed Γ t) (ins : Slots Γ)
   (nid : NodeId) (s : NodeState Γ) →
-  (nid , s) ∈ EvalSt.nodes (rootExitSt e ins) →
-  nodeCacheOK nid s (EvalSt.registry (rootExitSt e ins)) ≡ true
-root-nodeCache e ins nid (scan-st _)       m = refl
-root-nodeCache e ins nid (take-st _)       m = refl
-root-nodeCache e ins nid (switch-st _ _)   m = refl
-root-nodeCache e ins nid (exhaust-st _ _)  m = refl
-root-nodeCache e ins nid (mergeAll-st lim k q od) m =
-  root-mergeAllCache e ins nid lim k q od m
+  (nid , s) ∈ EvalSt.nodes (rootExitSt V e ins) →
+  nodeCacheOK nid s (EvalSt.registry (rootExitSt V e ins)) ≡ true
+root-nodeCache V e ins nid (scan-st _)       m = refl
+root-nodeCache V e ins nid (take-st _)       m = refl
+root-nodeCache V e ins nid (switch-st _ _)   m = refl
+root-nodeCache V e ins nid (exhaust-st _ _)  m = refl
+root-nodeCache V e ins nid (mergeAll-st lim k q od) m =
+  root-mergeAllCache V e ins nid lim k q od m
 
-root-done-plumbed : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
+root-done-plumbed : ∀ {n} {Γ : Ctx n} {t} (V : ℕ) (e : Closed Γ t) (ins : Slots Γ)
   (S : ProtocolSt) →
   runProtocol protocol-init
-    (proj₁ (subscribeE (rootWitness e ins) e root 0 0
-                       (sched-init e ins) (st-init e))) ≡ just S →
+    (proj₁ (subscribeE (rootWitness V e ins) e root 0 0
+                       (sched-init V e ins) (st-init e))) ≡ just S →
   ProtocolSt.done S ≡ true →
   allShareSunk (EvalSt.registry
-    (proj₂ (proj₂ (subscribeE (rootWitness e ins) e root 0 0
-                              (sched-init e ins) (st-init e))))) ≡ true
-root-done-plumbed {n} {Γ} {t} e ins S req deq =
-  go (EvalSt.registry (rootExitSt e ins))
-     (λ rid src u p m → root-entry-sunk e ins S req deq rid src u p m)
+    (proj₂ (proj₂ (subscribeE (rootWitness V e ins) e root 0 0
+                              (sched-init V e ins) (st-init e))))) ≡ true
+root-done-plumbed {n} {Γ} {t} V e ins S req deq =
+  go (EvalSt.registry (rootExitSt V e ins))
+     (λ rid src u p m → root-entry-sunk V e ins S req deq rid src u p m)
   where
   go : (r : List (RegId × Source × Chain Γ t)) →
        (∀ rid src u (p : Path Γ u t) →
@@ -323,20 +323,20 @@ root-done-plumbed {n} {Γ} {t} e ins S req deq =
     ∧-intro (h rid src u p (here refl))
             (go r (λ rid′ src′ u′ p′ m → h rid′ src′ u′ p′ (there m)))
 
-root-caches : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+root-caches : ∀ {n} {Γ : Ctx n} {t} (V : ℕ) (e : Closed Γ t) (ins : Slots Γ) →
   cachesValid
-    (EvalSt.nodes (proj₂ (proj₂ (subscribeE (rootWitness e ins) e root 0 0
-                                            (sched-init e ins) (st-init e)))))
-    (EvalSt.registry (proj₂ (proj₂ (subscribeE (rootWitness e ins) e root 0 0
-                                               (sched-init e ins) (st-init e))))) ≡ true
-root-caches {n} {Γ} {t} e ins =
-  go (EvalSt.nodes (rootExitSt e ins))
-     (λ nid s m → root-nodeCache e ins nid s m)
+    (EvalSt.nodes (proj₂ (proj₂ (subscribeE (rootWitness V e ins) e root 0 0
+                                            (sched-init V e ins) (st-init e)))))
+    (EvalSt.registry (proj₂ (proj₂ (subscribeE (rootWitness V e ins) e root 0 0
+                                               (sched-init V e ins) (st-init e))))) ≡ true
+root-caches {n} {Γ} {t} V e ins =
+  go (EvalSt.nodes (rootExitSt V e ins))
+     (λ nid s m → root-nodeCache V e ins nid s m)
   where
   go : (ns : List (NodeId × NodeState Γ)) →
        (∀ nid s → (nid , s) ∈ ns →
-          nodeCacheOK nid s (EvalSt.registry (rootExitSt e ins)) ≡ true) →
-       cachesValid ns (EvalSt.registry (rootExitSt e ins)) ≡ true
+          nodeCacheOK nid s (EvalSt.registry (rootExitSt V e ins)) ≡ true) →
+       cachesValid ns (EvalSt.registry (rootExitSt V e ins)) ≡ true
   go []               h = refl
   go ((nid , s) ∷ ns) h =
     ∧-intro (h nid s (here refl))

@@ -24,12 +24,14 @@
 -- flattener inside it peels the rank once more.
 --
 -- SO THE PROGRAM IS IRRELEVANT, WHICH IS THE WHOLE FINDING.  The rank
--- is `2 ^ sizeᵉ e` for the ROOT term, and the root term here is the
--- empty observable: one symbol, rank two.  Nothing about the run's own
--- program constrains what the chain manufactures, so the gap is not a
--- rate to be closed by a bigger seed — it is unbounded at every seed,
--- since the tower below can be written one level deeper at no cost to
--- any quantity the entry reads.
+-- the arrival enters at reads the ROOT term, and the root term here is
+-- the empty observable — the smallest reading this language has.
+-- Nothing about the run's own program constrains what the chain
+-- manufactures, so the gap is not a rate to be closed by entering
+-- higher: it is unbounded at every entry, since the tower below can be
+-- written one level deeper at no cost to any quantity the entry reads.
+-- That is what the fit hypothesis is for, and it is a hypothesis about
+-- the REGISTRY rather than about the program precisely because of this.
 --
 -- AND THE INVARIANT DOES NOT CLOSE IT EITHER, which is the half worth
 -- having: the coherence record carried between cascades constrains the
@@ -44,7 +46,7 @@ open import Data.Bool using (true; false)
 open import Data.Empty using (⊥)
 open import Data.List using ([]; _∷_)
 open import Data.Maybe using (nothing)
-open import Data.Nat using (z≤n)
+open import Data.Nat using (ℕ; z≤n)
 open import Data.Product using (_,_)
 open import Data.Unit using (tt)
 open import Data.Vec using () renaming ([] to []ⱽ)
@@ -53,7 +55,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import Rx.Prim using (Fuel; Id)
 open import Rx.Protocol using (ProtocolSt; paidUp)
 open import Rx.Exp using (Ctx; Closed; Fn; natᵗ; obs; strmᵗ; nat̂; ofᵉ;
-  emptyᵉ; mergeAllᵉ; sizeᵉ)
+  emptyᵉ; mergeAllᵉ)
 open import Rx.Slots using (Slots)
 open import Rx.Evaluator using (Sched; EvalSt; Path; root; _↠_; map-f;
   thru-outer; mergeAllᵒ; mergeAll-st; drain; hasDry; sched-init; st-init)
@@ -78,6 +80,15 @@ DrainDryFree = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 -- source zero, so the payload's own nesting is zero.
 ----------------------------------------------------------------------
 
+-- THE STORE BOUND the schedule below is built at.  `evaluate` builds
+-- its schedule at the fuel it then hands the drain, so a witness is
+-- about a RUN only when the two agree.  A larger bound raises what the
+-- ROOT term would read, and this witness's crossing is manufactured by
+-- the chain rather than read off the program — which is the finding —
+-- so the bound is picked generously rather than tightly.
+SB : ℕ
+SB = 30
+
 Γ₀ : Ctx 0
 Γ₀ = []ⱽ
 
@@ -86,9 +97,6 @@ ins₀ = λ ()
 
 e₀ : Closed Γ₀ natᵗ
 e₀ = emptyᵉ
-
-_ : sizeᵉ e₀ ≡ 1                                       -- LOAD-BEARING
-_ = refl
 
 -- the frame's own function: a constant map into a four-deep tower of
 -- flatteners, each layer of which the `thru-outer` behind it will
@@ -106,7 +114,7 @@ chain₀ : Path Γ₀ natᵗ natᵗ
 chain₀ = map-f deep ↠ (thru-outer mergeAllᵒ 0 ↠ root)
 
 sched₀ : Sched Γ₀
-sched₀ = record (sched-init e₀ ins₀)
+sched₀ = record (sched-init SB e₀ ins₀)
   { live = record { source = 0 ; ordinal = 0 ; elemTy = natᵗ
                   ; pending = (0 , 1) ∷ [] } ∷ [] }
 

@@ -84,7 +84,8 @@
 --   never reduces and the child gets no less fuel than the parent.
 -- RECOVERY: git show
 --   919f115:agda/src/Verify-Budget-Sufficient/Nest-Depth-Size.agda
---   restores `nestDᵛ`'s pointwise bound by `sizeᵛ`, proven and gas-free.
+--   restores `nestDᵛ`'s pointwise bound by a value size, proven and
+--   gas-free.
 --   Nothing spends it while the run's reading is seeded from the store
 --   rather than compared against a size, which is what the value arm
 --   below is for.
@@ -92,22 +93,13 @@
 module Rx.Nest-Depth where
 
 open import Data.List using (List; []; _∷_)
-open import Data.List.Membership.Propositional using (_∈_)
-open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Product using (_,_)
 open import Data.Sum using (inj₁; inj₂)
-open import Data.Nat  using (ℕ; suc; _+_; _⊔_; _≤_; z≤n; s≤s)
-open import Data.Nat.Properties using
-  (≤-trans; ≤-reflexive; m≤m+n; m≤n+m; m≤n⇒m≤1+n; +-assoc; +-comm; +-mono-≤; ⊔-lub)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong; cong₂)
+open import Data.Nat  using (ℕ; suc; _+_; _⊔_)
 
-open import Rx.Exp using (Ctx; Closed; Ty; Val;
-  unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs;
-  Exp; Tm; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ;
-  scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ;
-  varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ;
-  strmᵗ; sizeᵉ; sizeᵗ; sizeᵗˢ;
-  elimGExp; elimGTm; elimGTms; unfoldμ)
+open import Rx.Exp using (Ctx; Ty; Val; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; Exp; Tm; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ;
+  scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; varᵗ; unit̂; bool̂; nat̂; pairᵗ;
+  fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ)
 
 mutual
   nestDᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → Exp Γ Δᵍ Δ Θ t → ℕ
@@ -166,137 +158,4 @@ nestDᵛ (s +ᵗ t) (inj₁ a) = nestDᵛ s a
 nestDᵛ (s +ᵗ t) (inj₂ b) = nestDᵛ t b
 nestDᵛ (obs t)  e        = nestDᵉ e
 
-------------------------------------------------------------------
--- EVERY NEST DEPTH IS UNDER A SIZE, over the whole term language at
--- once.  It is a fact about the TERM LANGUAGE and nothing else — no
--- schedule, no path, no store — which is what lets the root seeding
--- discharge its rank obligation with no induction over the machine at
--- all: the seed already carries the program's size and the slot
--- telescope's, and this says the nesting is under both.
---
--- The mutuality is the language's: a term may carry a stream and a
--- stream may carry terms, so the three arms are one induction.
-------------------------------------------------------------------
 
-mutual
-  nestDᵉ≤sizeᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ t) → nestDᵉ e ≤ sizeᵉ e
-  nestDᵉ≤sizeᵉ (input i)        = z≤n
-  nestDᵉ≤sizeᵉ (ofᵉ ts)         = m≤n⇒m≤1+n (nestDᵗˢ≤sizeᵗˢ ts)
-  nestDᵉ≤sizeᵉ emptyᵉ           = z≤n
-  nestDᵉ≤sizeᵉ (mapᵉ f e)       = m≤n⇒m≤1+n (+-mono-≤ (nestDᵗ≤sizeᵗ f) (nestDᵉ≤sizeᵉ e))
-  nestDᵉ≤sizeᵉ (takeᵉ c e)      = m≤n⇒m≤1+n (≤-trans (nestDᵉ≤sizeᵉ e) (m≤n+m (sizeᵉ e) (sizeᵗ c)))
-  nestDᵉ≤sizeᵉ (scanᵉ f z e)    =
-    m≤n⇒m≤1+n (+-mono-≤ (≤-trans (+-mono-≤ (nestDᵗ≤sizeᵗ z) (nestDᵗ≤sizeᵗ f))
-                                 (≤-reflexive (+-comm (sizeᵗ z) (sizeᵗ f))))
-                        (nestDᵉ≤sizeᵉ e))
-  nestDᵉ≤sizeᵉ (mergeAllᵉ _ e)  = s≤s (nestDᵉ≤sizeᵉ e)
-  nestDᵉ≤sizeᵉ (switchAllᵉ e)   = s≤s (nestDᵉ≤sizeᵉ e)
-  nestDᵉ≤sizeᵉ (exhaustAllᵉ e)  = s≤s (nestDᵉ≤sizeᵉ e)
-  nestDᵉ≤sizeᵉ (μᵉ e)           = m≤n⇒m≤1+n (nestDᵉ≤sizeᵉ e)
-  nestDᵉ≤sizeᵉ (varᵉ x)         = z≤n
-  nestDᵉ≤sizeᵉ (deferᵉ e)       = z≤n
-
-  nestDᵗ≤sizeᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (f : Tm Γ Δᵍ Δ Θ t) → nestDᵗ f ≤ sizeᵗ f
-  nestDᵗ≤sizeᵗ (varᵗ x)      = z≤n
-  nestDᵗ≤sizeᵗ unit̂          = z≤n
-  nestDᵗ≤sizeᵗ (bool̂ _)      = z≤n
-  nestDᵗ≤sizeᵗ (nat̂ _)       = z≤n
-  nestDᵗ≤sizeᵗ (pairᵗ a b)   =
-    m≤n⇒m≤1+n (⊔-lub (≤-trans (nestDᵗ≤sizeᵗ a) (m≤m+n (sizeᵗ a) (sizeᵗ b)))
-                     (≤-trans (nestDᵗ≤sizeᵗ b) (m≤n+m (sizeᵗ b) (sizeᵗ a))))
-  nestDᵗ≤sizeᵗ (fstᵗ p)      = m≤n⇒m≤1+n (nestDᵗ≤sizeᵗ p)
-  nestDᵗ≤sizeᵗ (sndᵗ p)      = m≤n⇒m≤1+n (nestDᵗ≤sizeᵗ p)
-  nestDᵗ≤sizeᵗ (inlᵗ a)      = m≤n⇒m≤1+n (nestDᵗ≤sizeᵗ a)
-  nestDᵗ≤sizeᵗ (inrᵗ a)      = m≤n⇒m≤1+n (nestDᵗ≤sizeᵗ a)
-  nestDᵗ≤sizeᵗ (caseᵗ s l r) =
-    m≤n⇒m≤1+n (≤-trans
-      (+-mono-≤ (nestDᵗ≤sizeᵗ s)
-                (⊔-lub (≤-trans (nestDᵗ≤sizeᵗ l) (m≤m+n (sizeᵗ l) (sizeᵗ r)))
-                       (≤-trans (nestDᵗ≤sizeᵗ r) (m≤n+m (sizeᵗ r) (sizeᵗ l)))))
-      (≤-reflexive (sym (+-assoc (sizeᵗ s) (sizeᵗ l) (sizeᵗ r)))))
-  nestDᵗ≤sizeᵗ (ifᵗ c a b)   =
-    m≤n⇒m≤1+n (⊔-lub (⊔-lub
-      (≤-trans (nestDᵗ≤sizeᵗ c) (≤-trans (m≤m+n (sizeᵗ c) (sizeᵗ a)) (m≤m+n (sizeᵗ c + sizeᵗ a) (sizeᵗ b))))
-      (≤-trans (nestDᵗ≤sizeᵗ a) (≤-trans (m≤n+m (sizeᵗ a) (sizeᵗ c)) (m≤m+n (sizeᵗ c + sizeᵗ a) (sizeᵗ b)))))
-      (≤-trans (nestDᵗ≤sizeᵗ b) (m≤n+m (sizeᵗ b) (sizeᵗ c + sizeᵗ a))))
-  nestDᵗ≤sizeᵗ (primᵗ _ a)   = m≤n⇒m≤1+n (nestDᵗ≤sizeᵗ a)
-  nestDᵗ≤sizeᵗ (strmᵗ e)     = m≤n⇒m≤1+n (nestDᵉ≤sizeᵉ e)
-
-  nestDᵗˢ≤sizeᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (ts : List (Tm Γ Δᵍ Δ Θ t)) → nestDᵗˢ ts ≤ sizeᵗˢ ts
-  nestDᵗˢ≤sizeᵗˢ []       = z≤n
-  nestDᵗˢ≤sizeᵗˢ (y ∷ ys) =
-    ⊔-lub (≤-trans (nestDᵗ≤sizeᵗ y) (m≤m+n (sizeᵗ y) (sizeᵗˢ ys)))
-          (≤-trans (nestDᵗˢ≤sizeᵗˢ ys) (m≤n+m (sizeᵗˢ ys) (sizeᵗ y)))
-
-------------------------------------------------------------------
--- THE DEPTH READING IS UNMOVED BY A μ-UNFOLDING, and that is the fact
--- the rank peel turns on: the machine descends into the unfolding
--- while the witness keeps its rank, so the invariant's second
--- conjunct has to survive the substitution exactly.  `elimGExp`
--- substitutes only where the guarded variable is reachable, which is
--- under a `deferᵉ`, and the measure reads a `deferᵉ` as a zero leaf —
--- so every clause is homomorphic and the substituted positions are
--- never looked at.  The μ node is TRANSPARENT here, unlike the sync
--- spine's `suc`, so the unfolding is an outright EQUALITY of readings
--- rather than a decrement, and the peel re-establishes its conjunct
--- with no slack spent.
---
--- TWIN: `syncSize-elimG` is this same induction at the sync size,
---   proven, clause for clause; the two measures differ only in which
---   constructors they charge.
-------------------------------------------------------------------
-
-mutual
-  nestD-elimG : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δᵍ)
-    (cl : Closed Γ t) (e : Exp Γ Δᵍ Δ Θ u) →
-    nestDᵉ (elimGExp x cl e) ≡ nestDᵉ e
-  nestD-elimG x cl (input i)       = refl
-  nestD-elimG x cl (ofᵉ ts)        = nestD-elimGᵗˢ x cl ts
-  nestD-elimG x cl emptyᵉ          = refl
-  nestD-elimG x cl (mapᵉ f e)      =
-    cong₂ _+_ (nestD-elimGᵗ x cl f) (nestD-elimG x cl e)
-  nestD-elimG x cl (takeᵉ c e)     = nestD-elimG x cl e
-  nestD-elimG x cl (scanᵉ f z e)   =
-    cong₂ _+_ (cong₂ _+_ (nestD-elimGᵗ x cl z) (nestD-elimGᵗ x cl f))
-              (nestD-elimG x cl e)
-  nestD-elimG x cl (mergeAllᵉ _ e)   = cong suc (nestD-elimG x cl e)
-  nestD-elimG x cl (switchAllᵉ e)  = cong suc (nestD-elimG x cl e)
-  nestD-elimG x cl (exhaustAllᵉ e) = cong suc (nestD-elimG x cl e)
-  nestD-elimG x cl (μᵉ e)          = nestD-elimG (there x) cl e
-  nestD-elimG x cl (varᵉ y)        = refl
-  nestD-elimG x cl (deferᵉ e)      = refl
-
-  nestD-elimGᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δᵍ)
-    (cl : Closed Γ t) (f : Tm Γ Δᵍ Δ Θ u) →
-    nestDᵗ (elimGTm x cl f) ≡ nestDᵗ f
-  nestD-elimGᵗ x cl (varᵗ y)      = refl
-  nestD-elimGᵗ x cl unit̂          = refl
-  nestD-elimGᵗ x cl (bool̂ b)      = refl
-  nestD-elimGᵗ x cl (nat̂ k)       = refl
-  nestD-elimGᵗ x cl (pairᵗ a b)   =
-    cong₂ _⊔_ (nestD-elimGᵗ x cl a) (nestD-elimGᵗ x cl b)
-  nestD-elimGᵗ x cl (fstᵗ p)      = nestD-elimGᵗ x cl p
-  nestD-elimGᵗ x cl (sndᵗ p)      = nestD-elimGᵗ x cl p
-  nestD-elimGᵗ x cl (inlᵗ a)      = nestD-elimGᵗ x cl a
-  nestD-elimGᵗ x cl (inrᵗ a)      = nestD-elimGᵗ x cl a
-  nestD-elimGᵗ x cl (caseᵗ s l r) =
-    cong₂ _+_ (nestD-elimGᵗ x cl s)
-              (cong₂ _⊔_ (nestD-elimGᵗ x cl l) (nestD-elimGᵗ x cl r))
-  nestD-elimGᵗ x cl (ifᵗ c a b)   =
-    cong₂ _⊔_ (cong₂ _⊔_ (nestD-elimGᵗ x cl c) (nestD-elimGᵗ x cl a))
-              (nestD-elimGᵗ x cl b)
-  nestD-elimGᵗ x cl (primᵗ op a)  = nestD-elimGᵗ x cl a
-  nestD-elimGᵗ x cl (strmᵗ e)     = nestD-elimG x cl e
-
-  nestD-elimGᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δᵍ)
-    (cl : Closed Γ t) (ts : List (Tm Γ Δᵍ Δ Θ u)) →
-    nestDᵗˢ (elimGTms x cl ts) ≡ nestDᵗˢ ts
-  nestD-elimGᵗˢ x cl []       = refl
-  nestD-elimGᵗˢ x cl (y ∷ ys) =
-    cong₂ _⊔_ (nestD-elimGᵗ x cl y) (nestD-elimGᵗˢ x cl ys)
-
--- the peel's own equation: the redex and its unfolding read the same,
--- since `nestDᵉ` is transparent at `μᵉ`
-nestD-unfoldμ : ∀ {n} {Γ : Ctx n} {t} (body : Exp Γ (t ∷ []) [] [] t) →
-  nestDᵉ (unfoldμ body) ≡ nestDᵉ (μᵉ body)
-nestD-unfoldμ body = nestD-elimG (here refl) (μᵉ body) body
