@@ -9,21 +9,20 @@
 --      by whatever a module happens to re-export.
 --   3. MAIN IS NEVER TOUCHED WITHOUT ANTHONY'S EXPLICIT APPROVAL.
 --
--- Note what is NOT here: `Verify-Well-Formed` and
--- `Verify-Budget-Sufficient`.  They are machinery, not claims, and they
--- are reached the honest way — `formal-verification-batchSimultaneous`
--- consumes `evaluate-well-formed`, which consumes `budget-sufficient`.
--- If any part of those towers is NOT reachable from a name below, that
--- is a finding to wire, not a reason to re-add a bulk import.
+-- Note what is NOT here: `Verify-Well-Formed`.  It is machinery, not a
+-- claim, and it is reached the honest way —
+-- `formal-verification-batchSimultaneous` consumes
+-- `evaluate-well-formed`, which consumes `rank-sufficient`.  If any part
+-- of that tower is NOT reachable from a name below, that is a finding to
+-- wire, not a reason to re-add a bulk import.
 --
 -- COVERAGE, and read this before trusting a green `make gate-heavy`: Agda
 -- compiles exactly what is transitively imported, so this file defines
--- the build's coverage as well as its claim set.  Ten V-B-S modules
--- (14,439 lines, Caps-Face and Subscribe-Face among them) are currently
--- NOT reachable from any name below.  **`make agda-all` is what keeps
--- them from rotting** — it compiles every module under src/ regardless
--- of reachability.  The DIFFERENCE between the two targets is the
--- unwired debt, and `make wiring` itemises it.
+-- the build's coverage as well as its claim set.  Every module under
+-- `agda/src` is currently reachable from a name below, which is what
+-- `make wiring-gate` establishes in seconds and what makes a green heavy
+-- gate a statement about the whole tree rather than about whichever part
+-- of it this list happens to reach.
 module Main where
 
 ------------------------------------------------------------------

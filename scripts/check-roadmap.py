@@ -186,6 +186,7 @@ import pathlib
 CLASSES = ["FALSITY", "SHAPE", "VACUITY", "DIFFICULTY", "GRINDABLE"]
 CLASS_RE = re.compile(r"\b(" + "|".join(CLASSES) + r")\b")
 TIER_RE = re.compile(r"^##\s+Tier\s+(\S+)")
+
 # A row STARTS at a bulleted bold open; the label is closed in the JOINED text,
 # not on the opening line.  A name list long enough to wrap is exactly the shape
 # the tier-3 abstraction rows have, and requiring the close on line one made
@@ -504,17 +505,24 @@ DECL_RE = re.compile(r"^\s*([^\s:(){}@]+)\s*:(?:\s|$)")
 DECL_KW_RE = re.compile(r"\b(?:data|record|module)\s+([^\s({]+)")
 
 
-def src_decl_names(root):
+def decl_names(*roots):
     names = set()
-    for f in sorted((root / "agda" / "src").rglob("*.agda")):
-        for line in f.read_text().splitlines():
-            line = re.sub(r"--.*$", "", line)
-            m = DECL_RE.match(line)
-            if m:
-                names.add(m.group(1))
-            for m in DECL_KW_RE.finditer(line):
-                names.add(m.group(1))
+    for r in roots:
+        if not r.is_dir():
+            continue
+        for f in sorted(r.rglob("*.agda")):
+            for line in f.read_text().splitlines():
+                line = re.sub(r"--.*$", "", line)
+                m = DECL_RE.match(line)
+                if m:
+                    names.add(m.group(1))
+                for m in DECL_KW_RE.finditer(line):
+                    names.add(m.group(1))
     return names
+
+
+def src_decl_names(root):
+    return decl_names(root / "agda" / "src")
 
 
 # A head that is nothing but names and separators CLAIMS them; a head carrying
@@ -557,7 +565,8 @@ def head_groups(label):
 
 
 def check_stale(tiers, live, srcnames):
-    """-> (discharged, vanished, gone_parents) — rows naming what is no longer live.
+    """-> (discharged, vanished, gone_parents) — rows naming what is no
+    longer live.
 
     `discharged` and `vanished` split a CLAIM head's dead names by what became of
     them, because the two want different repairs and the message should say which:

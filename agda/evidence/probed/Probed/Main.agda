@@ -14,174 +14,22 @@
 -- anonymous `_ : lhs ≡ rhs` rows, each checked by the typechecker and named by
 -- nobody — so `using ()` is the correct and expected clause here.  It is not
 -- an omission: it says this module's content is its pins.  See EVIDENCE.md.
+--
+-- WHY THE TREE IS ONE FILE.  A probe expires with its target, and the
+-- statements this tree was written against were the budget's: a grant,
+-- a nest store, a walk maximum, a caps arithmetic priced in gas.  None
+-- of them is stateable now, so the rows are evidence about a machine
+-- that is gone and E2 expires every one of them.  What survives is the
+-- one probe whose target is a live well-formedness postulate.
+--
+-- What is worth recovering from the forty-two expired files is the
+-- HARNESS rather than any verdict — the real-evaluator plumbing, the
+-- program families, and the coverage boundaries recorded at the foot of
+-- several of them — since a green on a bound this development no longer
+-- states says nothing about the descent that replaced it.
+--
+-- RECOVERY: git show 919f115:agda/evidence/probed/Probed/
 module Probed.Main where
 
 open import Probed.Root
   using (cellP1; rowP1; cellP4; rowP4; cellP7; rowP7; cellS2; rowS2)
-open import Probed.Cascade-Chain-Count
-  using (Ch22-fits; Ch1-fits; ChU-fits; ChC-fits;
-         Dup1-fits; Dup4-fits;
-         S22-fits; S1-fits; SU-fits; SC-fits;
-         SW-fits; ChW-fits; ChW2-fits; Adv-fits;
-         Tie22-fits; Tie1-fits; TieU-fits; TieC-fits; TieW-fits; TieC4-fits;
-         tieSyn)
-open import Probed.Scan-Burst-Nest
-  using (premises; scanBursts≡; scanEmits≡; fits₁₃; fits₁₄; flat≡; flat-fails;
-         tie₁₃; tie₁₄)
-open import Probed.Burst-Nest-Unit
-  using (figures≡; okM; okS; okX; regsM)
-open import Probed.Cascade-Store-Components
-  using (U-parts; C-parts; F-parts; tieRegs)
-open import Probed.Burst-Nest-Ladder
-  using (ladder1≡; ladder2≡; ladder3≡; ladderFlat≡; flatFace; flatRow)
-open import Probed.Sync-Factor
-  using (dupSync≡6; dupOut≡2; dupA-holds;
-         dupOut₃≡6; dupB-holds;
-         hidSync≡4; hidSize≡9; hidOut≡0;
-         mixOut≡3; mixD-holds;
-         dupRowA; dupRowB; mixRowD)
-open import Probed.PushVals-Caps
-  using (burstLens≡; capsM-1; capsM-2; capsM-0; capsS-1; capsS-2;
-         capsX-1; capsX-2; heads≡; entry≡; entryFace≡; headsClos≡; left-starved≡; census≡;
-         burstOne≡; lenSh≡; capsSh-2; lenShS≡; capsShS-2; lenShX≡; capsShX-2;
-         leavesM-1; leavesM-2; leavesM-0; leavesS-1; leavesS-2;
-         leavesX-1; leavesX-2; leavesSh; leavesShS; leavesShX;
-         axesFlat≡; axesNest≡;
-         burstsM≡; burstsS≡; burstsX≡; burstsSh≡; burstsShS≡; burstsShX≡;
-         burstsG≡; burstsA≡;
-         tieM; tieS; tieX)
-open import Probed.Thru-Outer-Store
-  using (packed≡; cells≡; tieNodes1; tieNodes2; tieNodes3;
-         tieRegs1; tieRegs2; tieRegs3)
-open import Probed.Thru-Step-Indexed
-  using (burstLen≡1; figures≡; hypAtZero; valAtOne; marginM≡;
-         tightFigures≡; valTight; nestedFigures≡; premN≡; fitN1; fitN2; fitN3;
-         residueFigures≡; resN1; resN2; resN3;
-         tsRowM; tsRowS; tsRowX)
-
-open import Probed.Scan-Arr-Clos-Key
-  using (premises; keys≡; widths≡; fit0; fit7; fit13; fit14; tie13; tie14)
-
-open import Probed.Scan-Arr-Margin
-  using (delivered≡; deliveredHi≡; keys≡; widths≡; sizes≡; premises;
-         fit0; fit4; fit8; tie8)
-
-
-open import Probed.Thru-Arr-Slot
-  using (burst≡; keys≡; delivered≡; unit≡; fitM; fitS; fitX; margin₃≡;
-         tieArr≡; tieRowM; tieRowS; tieRowX)
-
-open import Probed.Sight-All-Stream
-  using (fitDup; sides≡; fitN₁; fitN₂; fitN₃; layers≡; exps≡; tieDup; tieN₃)
-open import Probed.Sight-Thru-Val
-  using (fitRef; sidesRef≡; grantRef₀≡; grantRef₁≡;
-         grantFlat≡; delFlat≡; fitFlat; storeFlat; storeRef; storeFigs≡;
-         fitOwn; grantHid≡; delHid≡; dupCols≡; dupDepth≡;
-         storeParkFigs≡; grantParkFigs≡; storePark; store2Figs≡; store2;
-         tieFlat; tiePark)
-
-open import Probed.Depth-Sighted
-  using (rootFigs≡; delivFigs≡; axisFigs≡; farFigs≡; partsFigs≡; sizeFigs≡; thirdFigs≡;
-         third2Figs≡; cornerFigs≡; rootWideFigs≡; seedFigs≡;
-         rootRow≡; rootWideRow≡; seedRow≡; dblFigs≡; dblLongFigs≡;
-         chainDesc≡; farDesc≡;
-         walkFigs≡; walkRow≡; tieWalk1; tieWalk4;
-         stepStore≡)
-open import Probed.Depth-Join
-  using (shapeFigs≡; frameRow; thruRow1; thruRow4)
-open import Probed.Sight-Fit-Width
-  using (figures≡; oldRow≡; newRow≡; tie12; tie13; tie16)
-
-open import Probed.Burst-OutW
-  using (readout≡; tieOf; tieMerge; tieSwitch; deeper≡; tieScan; tieScanκ;
-  chained≡; tieChain; tieTwice)
-
-open import Probed.Frame-Drain-Store
-  using (packed≡; gated≡; tieDrain1; tieDrain2; tieDrain3;
-         tieDrainPark; tieDrainGated;
-         regsPacked≡; tieDrainRegs1; tieDrainRegs2; tieDrainRegs3;
-         tieDrainRegsGated)
-
-open import Probed.Fold-Width-Reach
-  using (separates; admittedRow≡; census≡; widths≡; width2≡; outruns; agrees;
-         entry≡; sizesAgree; driven≡; crossesRun)
-
-open import Probed.Cross-Count-Fork
-  using (separates; arrival₂≡; nodes₂; prem₂; cnstRow₂; ownRow₂;
-         arrival₃≡; nodes₃; prem₃; ownRow₃)
-
-open import Probed.Cross-Count-Data
-  using (separates; charges₃≡; opsRow₃; opsChain≡; opsRow₂)
-
-open import Probed.Cross-Count-Spine
-  using (separates; arrivalCounts≡; emitCounts≡; layChain≡; layRow₂; layBig≡)
-
-open import Probed.Cross-Count-Store
-  using (charges≡; valRows≡; tieDrain)
-
-open import Probed.Cross-Count-Outer-Store
-  using (figures≡; storeRows≡; sinkRows≡; tieOuterStore)
-
-open import Probed.Cross-Burst-Slack
-  using (figures≡; liveness≡; climbRows≡; ceilRows≡; sinkRows≡; tieBurstSlack)
-
-open import Probed.Subscribe-Inner-Doors
-  using (mergeDelivered≡; switchAgrees; exhaustAgrees; doorRows≡;
-         tieDoorSwitch; tieDoorExhaust)
-
-open import Probed.Subscribe-Mu-Blocks
-  using (figures≡; delivered≡; crossRows≡; tieMu)
-
-open import Probed.Slot-Telescope-Sum
-  using (figures≡; delivered≡; telescopeRows≡; tieTelescope)
-
-open import Probed.Slot-Named-Twice
-  using (diamondFigures≡; diamondDelivered≡; diamondCount≡;
-         controlDelivered≡; diamondRows≡; tieDiamond)
-
-open import Probed.Slot-Two-Depths
-  using (latticeFigures≡; latticeDelivered≡; latticeCount≡;
-         latticeControl≡; latticeRows≡; tieLattice)
-
-open import Probed.Parked-Queue-Store
-  using (outerCharge≡; outerRows≡; tieParkedOuterRun)
-
-open import Probed.Parked-Slot-Store
-  using (slotStoreFigures≡; slotStoreNodes≡; slotStoreRows≡;
-         tieParkedSlot12; tieParkedSlot13)
-
-open import Probed.Slot-Cascade-Store
-  using (hopFigures≡; hopRows≡; farRows≡; scanFigures≡; scanRows≡;
-         tieHop; tieFar; tieScan)
-
-open import Probed.Regs-Store-Currency
-  using (figures≡; verdicts≡; separates;
-         composed≡; separatesJoin; joinVerdicts≡)
-
-open import Probed.Regs-Charge-Currency
-  using (interval≡; inside≡)
-  renaming (separates to separatesCharge)
-
-open import Probed.Regs-Split-Budget
-  using (figures≡; margins≡; verdicts≡; confirm1; confirm3)
-
-open import Probed.Drain-Count-Slot
-  using (slotCharges≡; slotRows≡; tieDrainSlot12; tieDrainSlot13)
-
-open import Probed.Cell-Chain-Store
-  using (chainFigures≡; chainNodes≡; chainRows≡; chainPrem≡; tieCellChain)
-
-open import Probed.Kill-Consume-Readings
-  using (st₁-node; thruConclusions₂≡; thruConclusions₁-full≡;
-         tieSwitchKillNothing; tieSwitchKillJust;
-         tieThruConsumeIdentity; tieSubscribeInnerG0)
-
-open import Probed.FramePark-Step
-  using (tieScanTransport; tieScanBought; tieThruEnqueue; tieMapFree;
-         tieInnerResidue; tieInnerGassed; residue≡; residueGassed≡;
-         lowFloorPre; lowFloorPost; switchCellFree; exhaustCellFree;
-         tieSwitchFinish; tieExhaustFinish; tieThruRoom; tieThruRoomGassed;
-         floorᵏ; tieSinkFloor)
-
-open import Probed.Subscribe-Inner-Strat
-  using (tieSharedSlot; tieDry)

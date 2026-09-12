@@ -1639,7 +1639,7 @@ def falsify(args) -> int:
     mutation in src is the one outcome that would make this tool worse than the
     probe directory it replaces.
     """
-    rel = args.file or "Verify-Budget-Sufficient/Subscribe-Face.agda"
+    rel = args.file or "Rx/Evaluator.agda"
     path = os.path.join(SRC, rel)
     p = parse(path)
     heavy = heavy_blocks(p)
@@ -1694,7 +1694,7 @@ def falsify(args) -> int:
 def main() -> int:
     ap = argparse.ArgumentParser(add_help=True)
     ap.add_argument("file", nargs="?", help="src-relative path, e.g. "
-                    "Verify-Budget-Sufficient/Subscribe-Face.agda")
+                    "Rx/Evaluator.agda")
     ap.add_argument("focus", nargs="?", help="one mutual-block member")
     ap.add_argument("--list", action="store_true", help="print block structure only")
     ap.add_argument("--holes", action="store_true")
@@ -1862,7 +1862,7 @@ def main() -> int:
           "  make agda-dev ARGS='<file>'            one module, every member\n"
           "  make agda-dev ARGS='--list <file>'     its mutual-block structure\n"
           "\n"
-          "  Paths are src-relative, e.g. Verify-Budget-Sufficient/Wet/Part2.agda\n"
+          "  Paths are src-relative, e.g. Rx/Evaluator.agda\n"
           "  To check the whole project, use `make gate`.")
     return 2
 

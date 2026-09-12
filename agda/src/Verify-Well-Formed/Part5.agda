@@ -12,9 +12,9 @@
 --      properly hypothesised — no known-false placeholders): the
 --      step lemmas
 --      (subscribeE-wf, mid-step — the per-clause preservation
---      grind), mid-init, mid-skip, mid-final.  Budget sufficiency
---      is no longer assumed here: it is imported, proven, from
---      Verify-Budget-Sufficient.
+--      grind), mid-init, mid-skip, mid-final.  Stuck-freedom
+--      is not assumed here: it is imported as `rank-sufficient`,
+--      the one statement the descent discipline costs.
 --   3. The compositions — the subscribe frame, the chain fold, the
 --      fuel loop, and the theorem — are all DEFINED, glued by
 --      runProtocol's distribution over ++.
@@ -31,10 +31,7 @@ open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong; subst)
 
 
--- from .Caps-Bridge, not from the top module: the top module is the
--- active caps grind, and importing it here would put this file on that
--- clock.
-open import Rx.Prim      using (Gas; Tick; Id; Source; InstEmit; InstEvent; init; value; close; handoff; complete; EmitKind;
+open import Rx.Prim      using (Tick; Id; Source; InstEmit; InstEvent; init; value; close; handoff; complete; EmitKind;
   exhausted; dried; cut; cutPending; _at_from_as_)
 open import Rx.Exp       using (Ctx; Closed; Val; Fn; applyFn; mapᵉ; _×ᵗ_)
 open import Rx.Evaluator using (Sched; EvalSt; Stream; Path; _↠_; map-f; scan-f; setNode; NodeId; lookupNode; scan-st;
@@ -49,10 +46,16 @@ open import Rx.Protocol  using (ProtocolSt; Owed; countIn; allZero; stepProtocol
 
 open import Verify-Well-Formed.Part4 using (applyEvents-++just; applyEvents-done-mono;
                                            applyEvents-vc)
-open import Verify-Budget-Sufficient.Node-Table using
+open import Verify-Support.Node-Table using
   (lookupNode-setNode; ≟ᵗ-refl)
 open import Verify-Well-Formed.Part2 using (BurstInv)
 open import Decide using (just-injᵂ; n≢jᵂ)
+
+open import Induction.WellFounded using (Acc)
+open import Rx.Strat-Order using (Tri; _≺_)
+
+variable
+  τ : Tri
 
 splitEvents-faithful-done : ∀ {n} {Γ : Ctx n} {u} {B : Set}
   (es : List (InstEvent (Val Γ u))) (vals′ : List B)
@@ -398,7 +401,7 @@ runProtocol-faithful g ((es at i from s as k) ∷ ems) S S′ gempty runEq
 -- pushBurst over a map-f frame IS the reEmit map: stepFrame (map-f) only relabels
 -- values (evs = [], st/sched untouched), so each emit re-emits transparently
 pushBurst-map-char : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-  (fuel : Gas) (id : Id) (now : Tick) (fn : Fn Γ [] [] [] s u) (κ : Path Γ u t)
+  (fuel : Acc _≺_ τ) (id : Id) (now : Tick) (fn : Fn Γ [] [] [] s u) (κ : Path Γ u t)
   (burst : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) →
   pushBurst fuel id now (map-f fn) κ burst sched st
     ≡ (map (reEmit (map (applyFn fn))) burst , sched , st)
@@ -414,7 +417,7 @@ pushBurst-map-char fuel id now fn κ (em ∷ ems) sched st =
 -- it runs to the SAME S′ — so BurstInv transfers verbatim.  map (applyFn f) is
 -- empty-preserving (refl), the fold's `g [] ≡ []` obligation.
 subscribeE-map-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-  (fuel : Gas) (f : Fn Γ [] [] [] s u) (b : Closed Γ s) (κ : Path Γ u t)
+  (fuel : Acc _≺_ τ) (f : Fn Γ [] [] [] s u) (b : Closed Γ s) (κ : Path Γ u t)
   (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
   BurstInv id sched st S →
   (Σ ProtocolSt λ S′ →
@@ -452,7 +455,7 @@ subscribeE-map-wf fuel f b κ id now sched st S binv (S′ , run₀ , binv₀) =
 -- is present (lk — the subscribeE clause installs it), no global node-persistence
 -- invariant is needed.
 pushBurst-scan-run : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-  (fuel : Gas) (id : Id) (now : Tick) (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
+  (fuel : Acc _≺_ τ) (id : Id) (now : Tick) (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
   (κ : Path Γ u t) (burst : Stream Γ s) (sched : Sched Γ) (st : EvalSt e)
   (acc : Val Γ u) (S S′ : ProtocolSt) →
   lookupNode nid (EvalSt.nodes st) ≡ just (scan-st acc) →

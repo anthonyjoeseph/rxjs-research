@@ -12,9 +12,9 @@
 --      properly hypothesised — no known-false placeholders): the
 --      step lemmas
 --      (subscribeE-wf, mid-step — the per-clause preservation
---      grind), mid-init, mid-skip, mid-final.  Budget sufficiency
---      is no longer assumed here: it is imported, proven, from
---      Verify-Budget-Sufficient.
+--      grind), mid-init, mid-skip, mid-final.  Stuck-freedom
+--      is not assumed here: it is imported as `rank-sufficient`,
+--      the one statement the descent discipline costs.
 --   3. The compositions — the subscribe frame, the chain fold, the
 --      fuel loop, and the theorem — are all DEFINED, glued by
 --      runProtocol's distribution over ++.
@@ -36,10 +36,7 @@ open import Relation.Binary.PropositionalEquality
 
 open import Relation.Nullary using (yes; no)
 
--- from .Caps-Bridge, not from the top module: the top module is the
--- active caps grind, and importing it here would put this file on that
--- clock.
-open import Rx.Prim      using (Gas; Tick; Id; Source; hot; cold; InstEvent; init; value; close; complete; subscribe;
+open import Rx.Prim      using (Tick; Id; Source; hot; cold; InstEvent; init; value; close; complete; subscribe;
   exhausted; _at_from_as_)
 open import Rx.Exp       using (Ctx; Closed; Ty; _≟ᵗ_; Val)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; RegId; Chain; Path; cutThrough; pathHasNode; memberSource; NodeId;
@@ -59,6 +56,12 @@ open import Verify-Well-Formed.Part1 using (allShareSunk; cachesValid; countRegs
                                            regTyped?; sameTy)
 open import Decide using (true≢false; ∧-intro; ∧-trueʳ; ∧-trueˡ; ∨-trueʳ; ≡ᵇ-refl; ≡ᵇ→≡;
                           ≤ᵇ-true)
+
+open import Induction.WellFounded using (Acc)
+open import Rx.Strat-Order using (Tri; _≺_)
+
+variable
+  τ : Tri
 
 
 sameTy-sound : ∀ (a b : Ty) → sameTy a b ≡ true → a ≡ b
@@ -298,7 +301,7 @@ postulate
   -- the cold arm, the anchored cold tail); nothing in subscribeE removes
   -- a live source.  So a hot slot's entry is still there afterwards.
   subscribeE-hot-live : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (g : Gas) (b : Closed Γ u) (κ : Path Γ u t) (id : Id) (now : Tick)
+    (g : Acc _≺_ τ) (b : Closed Γ u) (κ : Path Γ u t) (id : Id) (now : Tick)
     (sched : Sched Γ) (st : EvalSt e) →
     HotLive sched →
     HotLive (proj₁ (proj₂ (subscribeE g b κ id now sched st)))

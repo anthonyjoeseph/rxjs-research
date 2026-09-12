@@ -12,9 +12,9 @@
 --      properly hypothesised — no known-false placeholders): the
 --      step lemmas
 --      (subscribeE-wf, mid-step — the per-clause preservation
---      grind), mid-init, mid-skip, mid-final.  Budget sufficiency
---      is no longer assumed here: it is imported, proven, from
---      Verify-Budget-Sufficient.
+--      grind), mid-init, mid-skip, mid-final.  Stuck-freedom
+--      is not assumed here: it is imported as `rank-sufficient`,
+--      the one statement the descent discipline costs.
 --   3. The compositions — the subscribe frame, the chain fold, the
 --      fuel loop, and the theorem — are all DEFINED, glued by
 --      runProtocol's distribution over ++.
@@ -31,10 +31,7 @@ open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong; subst)
 
 
--- from .Caps-Bridge, not from the top module: the top module is the
--- active caps grind, and importing it here would put this file on that
--- clock.
-open import Rx.Prim      using (Gas; Tick; Id; Source; InstEvent; init; value; close; handoff; complete; delivery; exhausted;
+open import Rx.Prim      using (Tick; Id; Source; InstEvent; init; value; close; handoff; complete; delivery; exhausted;
   dried; cut; cutPending)
 open import Rx.Exp       using (Ctx; Closed; Val)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; RegId; Path; root; arrTy; arrSource; dropSource)
@@ -58,6 +55,12 @@ open import Verify-Well-Formed.Part4 using (enterInstant; enterInstant-hz≤id; 
 open import Verify-Well-Formed.Part8 using (FoldInv)
 open import Decide using (if-false; if-true; just-injᵂ; sucle→≢ᵇ; ∧-intro; ∧-trueʳ; ∧-trueˡ;
                           ≡ᵇ-refl; ≤ᵇ-true)
+
+open import Induction.WellFounded using (Acc)
+open import Rx.Strat-Order using (Tri; _≺_)
+
+variable
+  τ : Tri
 
 lookup-pos-not-paidOff : ∀ (s : Source) (ow : Owed) (k : ℕ) →
   lookupOwed s ow ≡ suc k → paidOff ow ≡ false
@@ -222,7 +225,7 @@ readoff-cancel s evs liveS Lv ob′ Ov dn d′ R apEq shEq =
 -- aliveThrough certificate) and a thru-outer node↔registry coherence field will
 -- discharge.  This VALIDATES the FoldOut field statements (all inhabited).
 foldPath-root-out : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
+  (sf : Acc _≺_ τ) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
   (vals : List (Val Γ t)) (evs : List (InstEvent (Val Γ t)))
   (fin : Bool) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt)
   (fi : FoldInv id envSrc evs fin sched st S) →

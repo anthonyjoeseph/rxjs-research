@@ -15,8 +15,8 @@
 -- see it either — neither copy was ever in scope with the other.
 --
 -- AND IT IS WHAT CLOSES THE TIER-2 DOOR.  `The-Proof` used to reach into
--- `Verify-Well-Formed.Part12`, `.Part4` and `Verify-Budget-Sufficient`'s
--- `Node-Table` for five of these, so utility lemmas crossed two tier
+-- `Verify-Well-Formed.Part12`, `.Part4` and a support module of the
+-- budget tree for five of these, so utility lemmas crossed two tier
 -- boundaries and a reader counting the doors into either tree counted
 -- them as claims on the tier.  They are not claims on anything; they are
 -- arithmetic.  With one home below both trees, `The-Proof` names this
@@ -41,17 +41,14 @@
 -- when you add to it; do not launch a rename.
 module Decide where
 
-open import Data.Bool using (Bool; true; false; not; _∧_; _∨_;
-                            if_then_else_; T)
+open import Data.Bool using (Bool; true; false; not; _∧_; _∨_; if_then_else_)
 open import Data.Bool.Properties using (∨-assoc; ∨-comm)
 open import Data.Nat using (ℕ; zero; suc; _≤_; z≤n; s≤s; _≡ᵇ_; _≤ᵇ_)
-open import Data.Nat.Properties using (≤-refl; ≤-trans; ≤⇒≤ᵇ; ≤ᵇ⇒≤;
-                                       ≡ᵇ⇒≡; ≡⇒≡ᵇ)
+open import Data.Nat.Properties using (≤⇒≤ᵇ)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Empty using (⊥; ⊥-elim)
-open import Data.Unit using (tt)
+open import Data.Empty using (⊥)
 open import Relation.Binary.PropositionalEquality
-  using (_≡_; refl; cong; sym; trans; subst)
+  using (_≡_; refl; cong; sym; trans)
 
 ------------------------------------------------------------------
 -- eliminating an absurd equation.  Both directions land in an arbitrary
@@ -79,14 +76,6 @@ f≡t-absurd ()
 ∧-intro : ∀ {a b : Bool} → a ≡ true → b ≡ true → (a ∧ b) ≡ true
 ∧-intro refl refl = refl
 
-∧ˡ : ∀ (a b : Bool) → T (a ∧ b) → T a
-∧ˡ true  b _  = tt
-∧ˡ false b ()
-
-∧ʳ : ∀ (a b : Bool) → T (a ∧ b) → T b
-∧ʳ true  b h = h
-∧ʳ false b ()
-
 ∨-fˡ : ∀ (b c : Bool) → (b ∨ c) ≡ false → b ≡ false
 ∨-fˡ false c h = refl
 ∨-fˡ true  c h = h
@@ -109,9 +98,6 @@ f≡t-absurd ()
 not-out : ∀ {x : Bool} → not x ≡ true → x ≡ false
 not-out {false} _ = refl
 
-not-in : ∀ {x : Bool} → x ≡ false → not x ≡ true
-not-in refl = refl
-
 force-false : (b : Bool) → (b ≡ true → false ≡ true) → b ≡ false
 force-false false _ = refl
 force-false true  d with d refl
@@ -126,12 +112,6 @@ if-true b eq rewrite eq = refl
 ------------------------------------------------------------------
 -- T and `≡ true`, in both directions
 ------------------------------------------------------------------
-
-T-to : ∀ {b : Bool} → b ≡ true → T b
-T-to refl = tt
-
-T⇒≡true : ∀ b → T b → b ≡ true
-T⇒≡true true _ = refl
 
 ------------------------------------------------------------------
 -- ℕ's Bool-valued equality and order
@@ -161,35 +141,6 @@ sucle→≢ᵇ (s≤s q) = ≢ᵇ-from-< q
 ≤ᵇ-true : ∀ (a b : ℕ) → a ≤ b → (a ≤ᵇ b) ≡ true
 ≤ᵇ-true a b p with a ≤ᵇ b | ≤⇒≤ᵇ p
 ... | true | _ = refl
-
--- the `where`-local inverse this proof used to carry was a third copy of
--- `T⇒≡true`; it spends the sibling instead.
-≤ᵇ-widen : ∀ (v : ℕ) {B B′ : ℕ} → B ≤ B′ → (v ≤ᵇ B) ≡ true → (v ≤ᵇ B′) ≡ true
-≤ᵇ-widen v {B} {B′} le h with ≤⇒≤ᵇ (≤-trans (≤ᵇ⇒≤ v B (T-to h)) le)
-... | w = T⇒≡true (v ≤ᵇ B′) w
-
-------------------------------------------------------------------
--- the 0/1 indicator `if a ≡ᵇ b then 1 else 0`
-------------------------------------------------------------------
-
-ite≤ : ∀ (b : Bool) {N : ℕ} → 1 ≤ N → (if b then 1 else 0) ≤ N
-ite≤ true  h = h
-ite≤ false h = z≤n
-
-ifLe1 : ∀ (a b : ℕ) → (if a ≡ᵇ b then 1 else 0) ≤ 1
-ifLe1 a b with a ≡ᵇ b
-... | true  = ≤-refl
-... | false = z≤n
-
-ifNeq : ∀ (a b : ℕ) → (a ≡ b → ⊥) → (if a ≡ᵇ b then 1 else 0) ≡ 0
-ifNeq a b ne with a ≡ᵇ b in eq
-... | false = refl
-... | true  = ⊥-elim (ne (≡ᵇ⇒≡ a b (subst T (sym eq) tt)))
-
-ifEq : ∀ (a b : ℕ) → a ≡ b → 1 ≤ (if a ≡ᵇ b then 1 else 0)
-ifEq a b e with a ≡ᵇ b in q
-... | true  = s≤s z≤n
-... | false = ⊥-elim (subst T q (≡⇒≡ᵇ a b e))
 
 ------------------------------------------------------------------
 -- Maybe

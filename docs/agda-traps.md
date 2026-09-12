@@ -19,7 +19,15 @@ error message actively misdirects. Read the entry before reasoning from the erro
   pattern.** Inline it — write `suc (suc j)`, not a bound alias.
 
 - **As-patterns break the termination checker** in nested-`Acc` `where`-helpers. Keep
-  the plain `go` shape.
+  the plain `go` shape. The mechanism, and it decides the shape of every
+  lexicographic well-foundedness proof here: an as-pattern handed back to a recursive
+  call is REBUILT rather than passed on, so `aU@(acc fU)` is not the argument that was
+  matched and nothing is structurally smaller. A flat helper taking all the
+  accessibility witnesses at once therefore cannot work — its off-component arms have to
+  return the outer witnesses unchanged — and the error names EVERY recursive call, which
+  reads as a bad measure rather than as a pattern problem. **Nest instead: one
+  `where`-bound level per component, each binding its own witness in an enclosing
+  pattern**, so every inner recursion descends on its own argument alone.
 
 - **Implicits sitting under `_+_` are not inferred from `≤-refl`.** Agda refuses to
   invert `_+_` (it hits inversion depth 50) and reports the failure as an *unsolved
@@ -118,6 +126,24 @@ error message actively misdirects. Read the entry before reasoning from the erro
   is spent with `subst` over `m∸n+n≡m` at `S ∸ k` rather than a `k`-deep wall of `s≤s`.
   Measured on one fifth-power threshold in this tree: over a hundred and sixty seconds,
   killed by the dev budget, down to twelve and a half.
+
+- **A CONSTRUCTOR WHOSE TYPE INDEX IS EXISTENTIAL LEAVES A META NOTHING IN THE TERM CAN
+  SOLVE, AND AGDA GOES LOOKING FOR IT IN THE CONCLUSION'S NORMAL FORM.** This tree's
+  node-state family is indexed only in its CONSTRUCTORS — the state carries the payload
+  type, the record does not — so a cell built as `scan-st (evalTm (strmᵗ emptyᵉ))` and
+  installed in a store hands the checker an implicit that the result type has already
+  forgotten. Nothing downstream determines it either, so the unifier falls back on the
+  only remaining constraint, which in a probe is the tie's own conclusion: it normalises
+  the whole evaluator run to look for a type. There is no error, no yellow and no name —
+  just an allocation curve, which is why this reads as the STATEMENT being unevaluable
+  rather than as one missing annotation. **The repair is one annotation at the
+  constructor's argument**, and it makes the row MORE faithful rather than less: the
+  call site being modelled installs the seed cell from the same term the statement takes
+  as its seed, so pinning the index makes cell and seed agree by construction instead of
+  by unification. Measured across four probes at one fixture: eighteen to twenty seconds
+  each with the index pinned, against fourteen gigabytes and no verdict without it. The
+  cost is never the run it appears to be about — the same rows were read for a session
+  as evidence that a fold could not be instantiated, and the fold was innocent.
 
 - **A `with` ON A STORE LOOKUP REWRITES A CARRIED PREMISE ABOUT THAT CELL, AND EVERY
   CALLEE STILL STATES IT AT THE LOOKUP.** A clause that carries a hypothesis

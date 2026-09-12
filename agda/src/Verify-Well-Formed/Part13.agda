@@ -12,9 +12,9 @@
 --      properly hypothesised — no known-false placeholders): the
 --      step lemmas
 --      (subscribeE-wf, mid-step — the per-clause preservation
---      grind), mid-init, mid-skip, mid-final.  Budget sufficiency
---      is no longer assumed here: it is imported, proven, from
---      Verify-Budget-Sufficient.
+--      grind), mid-init, mid-skip, mid-final.  Stuck-freedom
+--      is not assumed here: it is imported as `rank-sufficient`,
+--      the one statement the descent discipline costs.
 --   3. The compositions — the subscribe frame, the chain fold, the
 --      fuel loop, and the theorem — are all DEFINED, glued by
 --      runProtocol's distribution over ++.
@@ -32,16 +32,13 @@ open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong; subst)
 
 
--- from .Caps-Bridge, not from the top module: the top module is the
--- active caps grind, and importing it here would put this file on that
--- clock.
-open import Verify-Budget-Sufficient.Caps-Bridge using (budget-sufficient)
+open import Verify-Rank-Sufficient using (rank-sufficient)
 open import Rx.Prim      using (Fuel; Id; Source)
 open import Rx.Exp       using (Ctx; Closed)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; root; memberSource; NodeId; NodeState; scan-st; take-st; mergeAll-st;
   switch-st; exhaust-st; sched-init; st-init; sched-next; schedGo; arrSource;
   chainsOf; cascadeLatch; cascadeGo; subscribeE; cascade; drain; evaluate; sameSource; hasDry;
-  dropSource; budgetAt)
+  dropSource; rootWitness)
 open import Rx.Slots using (Slots)
 open import Rx.Protocol  using (ProtocolSt; countIn; protocol-init; runProtocol; paidUp; checkFinal; Accepted; WellFormed)
 
@@ -254,14 +251,11 @@ drain-wf (suc k) nextId sched st S inv paid hd with sched-next sched in eq
   , run-++-just S (proj₁ (cascade a nextId sched′ st)) _ run₁ run₂
   , paid₂
 
--- the reified termination debt — the seeded sync budget never runs
--- dry on a canonical run, the old TERMINATING pragma's claim.  NO
--- LONGER A POSTULATE HERE: Verify-Budget-Sufficient PROVES it (the
--- instant-indexed size invariant, its burst cores, the cascade dry face and
--- drain-dry), and this module now imports that proof.  What the
--- proof still rests on is named and scoped there — subscribeE-wet
--- and cascadeGo-nodry, the fuel-accounting cores — rather than the
--- whole totality conjecture assumed outright.
+-- the reified termination debt — the descent's guards never fail on a
+-- canonical run, the old TERMINATING pragma's claim.  IT IS NOT
+-- ASSUMED HERE: `rank-sufficient` is one imported statement, and what
+-- it rests on is scoped in its own module rather than spread as a
+-- premise across this one.
 
 -- the primitives' half of the sandwich: remaining debt is the frame
 -- relations and their step lemmas
@@ -285,14 +279,14 @@ evaluate-well-formed :
   ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slots Γ) →
   WellFormed (evaluate fuel e ins)
 evaluate-well-formed fuel e ins =
-  let (nodry₀ , nodry₁)          = hasDry-++ burst rest (budget-sufficient fuel e ins)
+  let (nodry₀ , nodry₁)          = hasDry-++ burst rest (rank-sufficient fuel e ins)
       (S₀ , run₀ , inv₀ , paid₀) = subscribe-wf e ins nodry₀
       (S₁ , run₁ , paid₁)        = drain-wf fuel 1 sched₀ st₀ S₀ inv₀ paid₀ nodry₁
   in subst (λ m → Accepted (checkFinal m))
        (sym (run-++-just protocol-init burst rest run₀ run₁))
        (acceptPaid S₁ paid₁)
   where
-  r      = subscribeE (budgetAt e ins 0) e root 0 0 (sched-init e ins) (st-init e)
+  r      = subscribeE (rootWitness e ins) e root 0 0 (sched-init e ins) (st-init e)
   burst  = proj₁ r
   sched₀ = proj₁ (proj₂ r)
   st₀    = proj₂ (proj₂ r)
