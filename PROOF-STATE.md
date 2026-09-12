@@ -213,13 +213,13 @@ research lives; where they disagree, the header wins.
 dry marker. It is now a real body: `evaluate` is a root subscribe followed by a
 drain, and the two leaves below are that split.
 
-**EVERY CONJUNCT READ OFF THE TERM IS REFUTED, AND THE RESIDUE IS ONE
-HYPOTHESIS AT THREE CLAUSES.** Four denominations are dead — a `suc`, a
-state-reading conjunct, the arrival re-seed that landed, and the sync
-component, which `Refuted.Sync-Count` kills for every additive syntactic
-measure at once. What is left is not a fifth: the weight is establishing that
-what a burst CARRIES reads under what emitted it, and only the three flatteners
-reach the hop that spends it. Both rows stay SHAPE.
+**EVERY CONJUNCT READ OFF THE TERM IS REFUTED, AND NOW SO IS THE SEED'S RATE.**
+Four denominations are dead — a `suc`, a state-reading conjunct, the arrival
+re-seed, and the sync component, which `Refuted.Sync-Count` kills for every
+additive syntactic measure at once. `Probed.Operator-Root` closes the last route
+out: a run gains depth faster in the source length than the rank's exponential
+seed grows, so no bound read off the TERM is the fix and neither is a bigger
+seed. The repair is what the hop descends on. Both rows stay SHAPE.
 
 **A FAILING GUARD IS NOT AN ERROR, AND THAT IS WHY THE TIER IS PROBEABLE.** A
 guarded clause returns a `dry` emit and the run continues, so both sides
@@ -227,16 +227,16 @@ compute at every program.
 
 ### Big picture tier roadmap
 
-- **STRENGTHEN THE RETURN TYPE OF THE THREE FLATTENERS' WALK.** The shelf is no
-  longer every clause that re-enters through a burst: `subscribeInner`, reached
-  through `thru-outer` alone, is the pipeline's only rank drop, so the four
-  shapes that cannot reach it need no rank reading and are proven. What remains
-  is the strengthening itself, now owed at three clauses rather than seven: the
-  inner is a runtime VALUE no equation on syntax reaches, but it RODE a burst
-  some subscribe produced, so its nesting travels as a strengthened return type
-  on `subscribeAll` and the walk under it, invariant in the motive.
-  `Refuted.Burst-Nesting` fixes which inequality is available, so the leg lands
-  the strict form or restates that refutation about the emitter.
+- **DECIDE WHAT THE HOP DESCENDS ON — no seeding of the rank survives.**
+  `Refuted.Burst-Nesting` kills every syntactic bound on what a burst carries,
+  and `Probed.Operator-Root` now puts the run's rate beside the seed's — 3, 12,
+  39, 120 layers at four source literals against a rank that doubles per
+  literal. Seeding from the entered VALUE dies the same way, and the shared
+  cause is the direction: a value deepens on the way OUT through the
+  continuation and re-enters at `stepFrame` on the CALLER's witness, so that
+  caller's rank has to dominate everything its own subtree will ever emit. The
+  leg is what carries the re-entry instead — the burst walk is structural, so a
+  hop free to re-seed needs the descent living somewhere the run cannot outrun.
 
 - **PIN THE DRAIN LEAF TO SCHEDULES A RUN CAN REACH.** The cascade question is
   answered and the two leaves are different statements: `Probed.Cascade-Growth`
@@ -251,10 +251,10 @@ compute at every program.
 ### The ledger
 
 - **`dry-operator`** (Verify-Rank-Sufficient.Dry) — SHAPE,
-  `REFUTED×4, RECOVERY`: the THREE FLATTENERS' dry-freedom under an invariant
-  bounding the nesting on entry. Refuted at the LIVE form one peel ABOVE its
-  tightest triple — so no conjunct read off the term repairs it, the sync
-  component included.
+  `REFUTED×4, PROBED, RECOVERY`: the THREE FLATTENERS' dry-freedom under an
+  invariant bounding the nesting on entry. Refuted at the LIVE form one peel
+  ABOVE its tightest triple — so no conjunct read off the term repairs it, the
+  sync component included.
 
 - **`drain-dry-free`** (Verify-Rank-Sufficient) — SHAPE, `PROBED×4`: every
   arrival after the root frame. The cascade's own growth is now instantiated

@@ -403,6 +403,32 @@ stNest st = nestDᴺ (EvalSt.nodes st)
 -- root enters at reading ZERO and `rootTri` is that specialisation
 -- rather than a second seeding — which keeps the one place the seed
 -- has to be shown adequate at the root, where it always was.
+--
+-- THE SEED IS BEATEN IN ITS OWN CURRENCY, AND THAT IS MEASURED RATHER
+-- THAN FEARED.  The reading `m` is a DEPTH while the seed is
+-- exponential in the program's SIZE, so the two are comparable only
+-- through how each moves as the program grows.  `Probed.Operator-Root`
+-- moves it: a fold whose accumulator is re-wrapped three times per
+-- source value, flattened under a fold that wraps once per delivery,
+-- hands out values reading 3, 12, 39 and 120 layers deep at four source
+-- literals.  One literal is one symbol, so the seed DOUBLES where the
+-- depth TRIPLES — both sides exponential in the same parameter, and the
+-- run's base the larger.
+--
+-- WHAT THAT SETTLES AND WHAT IT DOES NOT.  It does not exhibit a run
+-- the seed fails to cover: the ratio closes by half a bit per literal
+-- from a margin the machinery's own twenty-seven symbols open, so the
+-- crossing sits past a hundred million layers and no row reaches it.
+-- What it settles is the shape of any repair, and the reason is a
+-- DIRECTION.  A value deepens on the way OUT — the frames above a
+-- flattener re-wrap what it delivers — and it re-enters the pipeline at
+-- the caller's own witness, so whatever seeds that caller has to
+-- dominate everything its subtree will ever emit.  Seeding from the
+-- entered VALUE therefore fails exactly as seeding from the program
+-- does, and no bound on what a burst carries stated in a measure of
+-- SYNTAX can be it either, which is the half `Rx.Nest-Depth` records.
+-- A larger seed is not a third answer; it is the same answer with a
+-- larger constant.
 entryTri : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → ℕ → Tri
 entryTri e sl m = unconn sl [] , 2 ^ (sizeᵉ e + slotsSize sl + m) , syncSizeᵉ e
 

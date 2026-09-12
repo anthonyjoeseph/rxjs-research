@@ -49,3 +49,6 @@ open import Probed.Fuel-Growth
 
 open import Probed.Cascade-Growth
   using (drC)
+
+open import Probed.Operator-Root
+  using (opRoot)
