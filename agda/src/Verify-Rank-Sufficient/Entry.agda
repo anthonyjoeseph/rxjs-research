@@ -38,6 +38,25 @@
 -- than `μᵉ body` while the witness keeps its rank.  `hopDᵉ` cuts at the
 -- `deferᵉ` gate and reads `μᵉ` through, so unfolding leaves it EQUAL.
 --
+-- AND THE DROP IS DEFINITIONAL ONLY DOWNWARD, WHICH IS EXACTLY WHERE
+-- THE ROUTE OUT OF THIS CONJUNCT WAS GOING TO GO.  A frame's own
+-- emissions are not subterms of the term it entered on: a fold builds
+-- its accumulator at RUN time, one fresh layer per refold, while the
+-- clause reading that fold is charged nothing for what it folds over.
+-- So the conjunct holds where `subscribeE` descends and fails where a
+-- frame hands a value OUT, and the two directions are not one fact.
+--
+-- REFUTED: `Refuted.Root-Refold` — the strengthened return type, which
+--   would have had the burst walk carry its emissions' hop content
+--   beside them, invariant in the motive, so the hop edge could spend
+--   that report rather than a fact about an arbitrary inner.  The
+--   carried reading climbs one per source literal while the reading the
+--   frame was entered at is blind to source length, so the two cross
+--   and a longer source crosses any bound.  They cross at exactly the
+--   pairs the dry marker crosses at, which is the half that decides
+--   it: the report is not a weaker obligation payable while the
+--   seeding is repaired alongside it, it is the same statement.
+--
 -- DEAD ROUTE: the SYNTACTIC NESTING as the conjunct, which is what
 --   this component read while the rank was a seed.  It cannot be
 --   restated onto the hop reading and it cannot be kept beside it: a

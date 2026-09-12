@@ -210,15 +210,14 @@ research lives; where they disagree, the header wins.
 
 **THE TIER IS ONE STATEMENT, AND AS STATED IT IS FALSE.** `rank-sufficient`
 (Verify-Rank-Sufficient) says no run emits the dry marker; `Refuted.Rank-Cross`
-exhibits two that do, each rescued one allowance higher. The falsity is the
-SEEDING and nothing under it: the door's fit and both drain halves take the
-store bound as given, while `evaluate` picks it by handing `sched-init` the
-FUEL — and fuel counts ARRIVALS where the scan clause spends it on REFOLDS.
+exhibits two that do, each rescued one allowance higher. The scan clause charges
+a power of the STORE BOUND for its refolds, and `evaluate` sets that bound from
+the FUEL — which counts arrivals, where a refold happens per DELIVERY.
 
-**WHAT ORDERS THE ROWS IS THE DIRECTION THE DEPTH TRAVELS.** Every route that
-seeded the rank from outside is refuted: a value deepens on the way OUT and
-re-enters on the caller's witness. `Rx.Hop-Depth` reads it off the value
-instead, so a bound rides the induction that builds it.
+**AND THE CROSSING IS AT THE DOOR, WHICH ORDERS THE ROWS.** `Refuted.Root-Refold`
+finds the marker in the ROOT SUBSCRIBE BURST — no arrival, no registration, no
+drain step — so the only fact in scope is the one the door reads off the term,
+and every route carrying a number between cascades arrives too late.
 
 **A FAILING GUARD IS NOT AN ERROR, AND THAT IS WHY THE TIER IS PROBEABLE.** A
 guarded clause returns a `dry` emit and the run continues, so both sides
@@ -227,39 +226,38 @@ procedure rather than a pin.
 
 ### Open questions
 
-- **WHICH SIDE PAYS THE REFOLD COUNT, NOW THAT THE FUEL CANNOT?** The
-  two-currency half is settled: the entry's rank IS the hop reading, and no
-  counter is left to exhaust. What it buys that in exchange for is one premise —
-  that a scan refolds at most STORE-BOUND times — and `Refuted.Rank-Cross`
-  refutes it: a cascade inside one subscribe frame refolds per literal and
-  consumes no arrival, so a longer source walks past any allowance and the run
-  emits `dried`. Two sides remain. A number chosen at SUBSCRIBE time has to
-  grow like the deliveries do, which is the shape that was torn out; or nothing
-  is bounded ahead of the run and the count is read off the entry that stores
-  the accumulator. Both rows are open on exactly that choice.
+- **CAN A SYNCHRONOUS DELIVERY COUNT BE READ OFF THE TERM AT ALL?** Both sides
+  this question used to hold are gone. `Refuted.Root-Refold` puts the crossing
+  inside the root subscribe frame, so no number a store carries between cascades
+  reaches it; and the report a walk would make alongside its emissions is
+  refuted there too, at exactly the pairs the dry marker crosses at, which makes
+  it the same statement rather than a weaker one. What is left is the door, and
+  the door reads the term. A count there has to MULTIPLY, since deliveries do.
+  The doubt is whether the term carries one: an `input` stands for a definition
+  of any size, and a `deferᵉ` is cut by the very reading that has to survive
+  unfolding.
   relevant: `drain-dry-free`, `dry-operator`
 
 ### Big picture tier roadmap
 
-- **PUT THE ACCUMULATOR'S DEPTH IN THE INVARIANT RECORD.** The currency half of
-  this leg landed and the rest is what remains. An arrival re-seeds off a store
-  read in `hopDᵉ` now, so both halves of the join are the quantity the entry
-  invariant is stated in and the seed carries the depth a fold has already
-  REACHED; `Rx.Nest-Depth` went with it, a superseded predecessor whose order
-  disagreed at the `deferᵉ` gate. What is left retires the premise. The scan
-  clause still asserts its refold count a priori, as a V-th power, and
-  `Refuted.Rank-Cross` says that number is wrong rather than unpaid. So give the
-  entry a field for its accumulator's reading, oblige every producer to
-  establish it, and have the clause spend what the drain proved.
+- **DECIDE THE NEW EXPONENT BEFORE PAYING FOR IT.** The two legs this replaces
+  are DISCARDED rather than shrunk — one carried the accumulator's depth between
+  cascades, the other reported it out of the walk, and `Refuted.Root-Refold`
+  puts the crossing where neither arrives. What that file leaves standing is a
+  count read off the TERM that multiplies. Write it and instantiate it first, on
+  the fold that killed the additive one, at the four lengths and two bounds where
+  the marker crosses: rows rather than a restatement, which is the cheap half,
+  and it either answers the tier's question or narrows it to the two shapes a
+  term cannot answer for — a slot and a defer.
 
-- **CARRY THE BOUND OUT OF THE WALK RATHER THAN ASSERTING IT ABOUT THE VALUE.**
-  Every dead route asked the emitter's rank to dominate a value it had not
-  produced yet; the measure inverts that, since the three `*All` nodes each add
-  one, so a carrier's own reading already sits strictly under the rank its
-  emitter entered on. The leg is the strengthened return type: the burst walk
-  reports its emissions' hop content alongside them, invariant in the motive,
-  and the hop edge spends that report instead of a fact about an arbitrary
-  inner. Ordinary induction, and `entry-hop-fits` is its base case.
+- **RAISE THE SCAN CLAUSE TO ITS SOURCE'S OWN DELIVERY COUNT.** The exponent is
+  the store bound today and the refolds it pays for are deliveries, which is the
+  whole of what is false; a count the rows above have already dominated the
+  family with is what replaces it. This is the restatement, and it cascades:
+  every face is stated in the reading, so the two peel lemmas, the fit and both
+  drain halves move together. It converts the tier's question from open to
+  answered-or-localised, since a clause that fails at a slot fails visibly at the
+  one clause that reads the telescope.
 
 - **MOVE THE BUG CACHE OFF THE TYPECHECKER (Anthony).** Every stored case pins a
   whole run by `refl`, so the gate normalises the evaluator once per case and
@@ -280,10 +278,10 @@ procedure rather than a pin.
   so the rows sit where it is closest to false.
 
 - **`dry-operator`** (Verify-Rank-Sufficient.Dry) — SHAPE,
-  `REFUTED, DEAD ROUTE×2, PROBED, RECOVERY`: the THREE FLATTENERS' dry-freedom
-  under the entry invariant read at the schedule's own store bound. First
-  coverage at a root `opShape` admits, and the rank it is entered against was
-  measured there NOT to move with the source the run folds over.
+  `REFUTED×2, DEAD ROUTE×2, PROBED, RECOVERY`: the THREE FLATTENERS'
+  dry-freedom under the entry invariant read at the schedule's own store bound.
+  First coverage at a root `opShape` admits, and the rank it is entered against
+  was measured there NOT to move with the source the run folds over.
 
 - **`entry-hop-fits`** (Verify-Rank-Sufficient) — DIFFICULTY, `PROBED`: the fit
   at the door, where the chain really is the one the root subscribe built out
