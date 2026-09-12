@@ -213,12 +213,12 @@ research lives; where they disagree, the header wins.
 dry marker. It is now a real body: `evaluate` is a root subscribe followed by a
 drain, and the two leaves below are that split.
 
-**THE ENTRY HALF IS STATED AND THE WAY OUT IS NOT SAYABLE IN SYNTAX.** The rank
-is seeded from the PROGRAM, and each leaf ties what it quantifies over back to
-that seed. The entry invariant does the way IN — it bounds `nestDᵉ` by the rank
-and the walk is re-proven under it. The way OUT is a burst's inners, and the
-reading that would have paid for it is REFUTED: a scan's accumulator gains a
-layer per delivery. Both rows stay SHAPE.
+**THE ENTRY HALF IS STATED AND THE WAY OUT IS PAID FROM THE SEED.** The rank is
+seeded from the PROGRAM, and each leaf ties what it quantifies over back to that
+seed. The entry invariant does the way IN. The way OUT is a burst's inners, and
+the reading that would have paid for it is REFUTED — but the growth is now
+measured against the seed rather than the emitter, at one layer and one doubling
+per delivery. Both rows stay SHAPE.
 
 **A FAILING GUARD IS NOT AN ERROR, AND THAT IS WHY THE TIER IS PROBEABLE.** A
 guarded clause returns a `dry` emit and the run continues, so both sides
@@ -226,36 +226,35 @@ compute at every program with nothing sealed between them.
 
 ### Big picture tier roadmap
 
-- **INSTANTIATE THE SEED BEFORE RESTATING ANYTHING.** The machine seeds the
-  rank at `2 ^ (sizeᵉ e + slotsSize sl)` and peels ONE per hop, and nothing has
-  ever asked whether a run's own values stay under it — the refuted reading was
-  doing that job by proxy. So run the shapes the refutation opened: a scan
-  whose step re-wraps its accumulator, the same under `switchAllᵉ` and
-  `exhaustAllᵉ`, and one fed from scripted slot data rather than a literal
-  source, since only the last puts deliveries where the seed counts them
-  differently. A row over the seed is a finding in the EVALUATOR and not in
-  either leaf, and it is the one outcome that makes restating them wasted work.
-
 - **PRICE THE HOP AT THE VALUE, NOT AT THE EMITTER.** What `subscribeInner`
   enters is a `Val`, and no reading of the emitter bounds it — so the conjunct
   belongs at the value level, where a step function's application grows a
   reading by the step's own nesting and nothing more. `nestDᵛ` and its bound by
   `sizeᵛ` are proven in the attic and come back through the recovery pointer
   the measure's own header carries. What gets stated is that every value a
-  burst carries and every accumulator the store holds reads under the rank;
-  the fold is then a substitution lemma rather than a comparison. The drain
-  leaf's own repair — a reached-state field on the invariant record — waits
-  on this, because that field is what it would be stated in.
+  burst carries and every accumulator the store holds reads under the rank,
+  which the seed rows now say is true at the shapes that grow it; the fold is
+  then a substitution lemma rather than a comparison.
+
+- **CONSTRAIN THE STATE THE DRAIN IS ENTERED AT.** `drain-dry-free` quantifies
+  over an arbitrary schedule and store, so the peel is reachable from a state
+  no run can produce and no argument about the seed reaches it — the value-level
+  conjunct is about what a burst hands OUT, while the drain's arrivals come from
+  the store instead. The repair is a field on the invariant record rather than a
+  hypothesis, since every producer then owes it and every consumer re-establishes
+  it. It waits on the leg above, because the field is stated in that reading; and
+  the scripted row is what says the two halves see different deliveries of one
+  fold, so the field cannot be read off the burst.
 
 ### The ledger
 
 - **`dry-operator`** (Verify-Rank-Sufficient.Dry) — SHAPE,
-  `REFUTED×2, PROBED, RECOVERY`: the operator shelf's dry-freedom, entered
-  under an invariant that bounds the nesting on the way in. It says nothing
-  about the burst it returns, and the reading that would have supplied that is
-  refuted.
+  `REFUTED×2, PROBED×2, RECOVERY`: the operator shelf's dry-freedom, entered
+  under an invariant that bounds the nesting on the way in. The reading that
+  would re-establish it at a hop is refuted; the rows buy the seed's margin
+  instead, measured widening.
 
-- **`drain-dry-free`** (Verify-Rank-Sufficient) — SHAPE, `PROBED`: every
+- **`drain-dry-free`** (Verify-Rank-Sufficient) — SHAPE, `PROBED×2`: every
   arrival after the root frame. Its schedule and state arrive unconstrained, so
   the same peel is reachable from a state no run could produce.
 

@@ -40,3 +40,6 @@ open import Probed.Descent
   using (descP1; descP2; descP3; descP4; descP5;
          descP6; descP7; descP8; descP9; descP10;
          descP11; descP12; opP2; opO7; opO11)
+
+open import Probed.Seed
+  using (opM3; opM6; opS3; opX3; opA; drA)
