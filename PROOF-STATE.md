@@ -213,12 +213,12 @@ research lives; where they disagree, the header wins.
 dry marker. It is now a real body: `evaluate` is a root subscribe followed by a
 drain, and the two leaves below are that split.
 
-**THE SEED IS TAKEN ONCE AND ONE CASCADE OUTGROWS IT.** The fault is the
-CURRENCY: an accumulator deepens per delivery while an entry is minted per
-arrival. Three repairs have been tried — a `suc`, a conjunct reading the state,
-and the arrival re-seed that landed, which answers the growth ACROSS arrivals
-and none inside one. What survives both edges is the triple's own SYNC
-component. Both rows stay SHAPE.
+**EVERY CONJUNCT READ OFF THE TERM IS REFUTED, AND THE RESIDUE IS ONE
+HYPOTHESIS.** Four denominations are dead — a `suc`, a state-reading conjunct,
+the arrival re-seed that landed, and the sync component, which
+`Refuted.Sync-Count` kills for every additive syntactic measure at once. What
+is left is not a fifth: the whole weight is establishing that what a burst
+CARRIES reads under what emitted it. Both rows stay SHAPE.
 
 **A FAILING GUARD IS NOT AN ERROR, AND THAT IS WHY THE TIER IS PROBEABLE.** A
 guarded clause returns a `dry` emit and the run continues, so both sides
@@ -226,33 +226,34 @@ compute at every program with nothing sealed between them.
 
 ### Big picture tier roadmap
 
-- **DENOMINATE THE RANK IN THE TRIPLE'S OWN SYNC COMPONENT.** The conjunct
-  becomes `nestDᵉ o + s ≤ R` against the triple's third component rather than
-  the term's own syncSize, which is what makes it survive the two edges that
-  killed every other candidate: the μ peel re-seeds `s` STRICTLY DOWNWARD under
-  its guard while `nestDᵉ` is equal across unfolding, so the sum drops and the
-  rank is untouched; and a burst's deliveries are bounded by the sync size, so
-  the accumulator a fold grows inside one cascade is paid for before it is
-  entered. The leg is the restatement plus the μ arm, which is the one arm that
-  is already proven and so the one that says immediately whether the currency
-  holds. The hop arm stays postulated.
+- **BOUND WHAT A BURST CARRIES, AS A STRENGTHENED RETURN TYPE.** Four
+  denominations are dead and a fifth is not the answer: the hop peel's own
+  ≺-witness is the order's constructor handed its hypothesis, so every gram goes
+  to that hypothesis. The inner is a runtime VALUE no equation on
+  syntax reaches, but it RODE a burst some subscribe produced — so its nesting
+  travels as a strengthened return type on the burst-producing functions,
+  invariant in the motive, rather than as a conjunct read off a term. The leg is
+  the strengthening and its walk arms; `Refuted.Burst-Nesting` fixes which
+  inequality is available, so it lands the strict form or restates that
+  refutation about the emitter.
 
-- **RE-ESTABLISH THE NEW CONJUNCT AT THE HOP, WHICH IS WHERE IT IS BOUGHT.**
-  `subscribeInner` peels the rank and re-seeds the sync component at the inner's
-  own reading, so the sum has to be shown to fall — and the inner is a runtime
-  VALUE, so the fact needed is that what a burst carries reads under the sync
-  size of what emitted it. That is the reading `Refuted.Burst-Nesting` kills in
-  its non-strict form, so this leg either finds the strict one or converts the
-  refutation into a second currency failure. It waits on the leg above for the
-  statement to be in the shape it re-establishes.
+- **MEASURE ONE CASCADE'S GROWTH AGAINST THE ARRIVAL THAT ENTERED IT.** The
+  drain's remaining gap is deliveries INSIDE one cascade, and nothing has
+  instantiated it: `Probed.Fuel-Growth` lands one delivery per arrival by
+  construction, so the region is uncovered rather than known bad. `foldPath`
+  steps a path structurally and `dispatchShare` a telescope, so the growth may
+  already be bounded by syntax the entry reads — which would make the drain leaf
+  a different statement from the operator one. Probe before restating: this leg
+  is a witness family that reaches a many-delivery cascade, and its product is
+  which of the two the row is.
 
 ### The ledger
 
 - **`dry-operator`** (Verify-Rank-Sufficient.Dry) — SHAPE,
-  `REFUTED×3, PROBED×3, RECOVERY`: the operator shelf's dry-freedom under an
+  `REFUTED×4, PROBED×3, RECOVERY`: the operator shelf's dry-freedom under an
   invariant bounding the nesting on entry. Refuted at the LIVE form one peel
-  ABOVE its tightest triple, off a literal source, store reading zero — so
-  neither a `suc` nor a state-reading conjunct repairs it.
+  ABOVE its tightest triple — so no conjunct read off the term repairs it, the
+  sync component included.
 
 - **`drain-dry-free`** (Verify-Rank-Sufficient) — SHAPE, `PROBED×3`: every
   arrival after the root frame. Schedule and state arrive unconstrained; the
