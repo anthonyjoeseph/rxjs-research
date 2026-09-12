@@ -1400,12 +1400,21 @@ drain (suc k) nextId sched st with sched-next sched
   let (out , sched″ , st′) = cascade a nextId sched′ st
   in out ++ drain k (suc nextId) sched″ st′
 
--- THE FUEL IS THE STORE BOUND, AND THAT IS THE ONE PLACE THE TWO MEET.
--- `drain` processes at most `fuel` arrivals, so nothing a fold stores
--- can be refolded more often than that — which is exactly what the hop
--- reading of a `scanᵉ` is parameterised by.  The run therefore names its
--- own bound rather than taking one on trust, and a caller cannot pick a
--- reading its run outgrows.
+-- THE FUEL IS HANDED ON AS THE STORE BOUND, so the run names the
+-- reading it is measured against rather than taking one on trust, and
+-- a caller cannot pick a reading its own run outgrows.
+--
+-- THAT IS ALL IT BUYS, AND THE STRONGER READING IS FALSE.  One field
+-- serves two jobs here: the allowance `drain` spends and the refold
+-- count a `scanᵉ`'s hop reading is parameterised by.  They are not the
+-- same quantity — `drain` spends one unit per ARRIVAL and each
+-- arrival's cascade runs to quiescence, while the root's burst runs
+-- before any arrival at all, so a fold reached synchronously refolds
+-- as often as its source is long against no fuel whatever.  The
+-- consequence is a premise of the measure, and it is stated and left
+-- unpaid where the measure is defined (`Rx.Hop-Depth`); nothing here
+-- discharges it, and reading this field as a refold bound is the
+-- mistake that makes it look discharged.
 evaluate : ∀ {n} {Γ : Ctx n} {t} → Fuel → Closed Γ t → Slots Γ → Stream Γ t
 evaluate fuel e ins =
   let (burst , sched₀ , st₀) =
