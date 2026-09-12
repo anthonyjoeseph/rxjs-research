@@ -4,7 +4,7 @@
 --
 -- EVIDENCE, not a claim: `src` cannot import this file and nothing in the
 -- proof may rest on it.  Checked by `make probed`, claimed by `Probed.Main`.
--- TARGET: drain-dry-free @458c9c
+-- TARGET: drain-dry-free @140a87
 --
 -- WHY THIS REGION.  The machine seeds the ROOT's rank at `2 ^ (sizeᵉ e +
 -- slotsSize sl)` and peels ONE per inner-subscribe hop, so the guard
@@ -70,7 +70,7 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; drain; subscribeE;
   rootWitness; root; sched-init; st-init)
 open import Rx.Nest-Depth using (nestDᵉ)
 open import Verify-Rank-Sufficient using (drain-dry-free)
-open import Probed.Apparatus using (Confirms)
+open import Probed.Apparatus using (Confirms; Below)
 
 ----------------------------------------------------------------------
 -- The two quantities the rows compare: how deep the values a run hands
@@ -250,6 +250,6 @@ _ : (carried (drainOf progA insAsync) ≤ᵇ seed progA insAsync) ≡ true
 _ = refl                                               -- LOAD-BEARING
 
 
-drA : Confirms (drain-dry-free FUEL 1
-  (proj₁ (proj₂ (entry progA insAsync))) (proj₂ (proj₂ (entry progA insAsync))))
+drA : Confirms (drain-dry-free FUEL 1 0 (λ _ → 0)
+  (proj₁ (proj₂ (entry progA insAsync))) (proj₂ (proj₂ (entry progA insAsync))) Below)
 drA = refl

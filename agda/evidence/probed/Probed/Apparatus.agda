@@ -44,5 +44,22 @@
 -- RECOVERY: git show 919f115:agda/evidence/probed/Probed/Apparatus.agda
 module Probed.Apparatus where
 
+open import Data.Nat using (_<_)
+open import Data.Nat.Properties using (_<?_)
+open import Relation.Nullary.Decidable using (True; toWitness)
+
+-- A CONDITIONED TARGET'S PREMISE, DECIDED RATHER THAN ASSERTED.  A
+-- statement restated onto a hypothesis can only be applied at a point
+-- that SATISFIES it, so a row instantiating one has to discharge the
+-- premise — and discharging it is the half of the row worth having,
+-- since it is what says the hypothesis is not vacuous over reachable
+-- states.  Where the premise is an arithmetic comparison of two
+-- computable readings, the decision procedure is the honest witness:
+-- it reduces at the probe's own point, so a premise that is FALSE
+-- there leaves the implicit unsolvable and the row goes red, which is
+-- exactly the refutation the conditioning was supposed to expose.
+Below : ∀ {m n} → {t : True (m <? n)} → m < n
+Below {t = t} = toWitness t
+
 Confirms : {A : Set} → .(claim : A) → Set
 Confirms {A} _ = A

@@ -39,7 +39,7 @@ open import Probed.Root
 open import Probed.Descent
   using (descP1; descP2; descP3; descP4; descP5;
          descP6; descP7; descP8; descP9; descP10;
-         descP11; descP12)
+         descP11; descP12; fitP1; fitP3; fitP12)
 
 open import Probed.Seed
   using (drA)

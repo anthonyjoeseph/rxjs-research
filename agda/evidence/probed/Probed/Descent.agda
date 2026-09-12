@@ -4,7 +4,8 @@
 --
 -- EVIDENCE, not a claim: `src` cannot import this file and nothing in the
 -- proof may rest on it.  Checked by `make probed`, claimed by `Probed.Main`.
--- TARGET: drain-dry-free @458c9c
+-- TARGET: drain-dry-free @140a87
+-- TARGET: entry-hop-fits @3a11cc
 --
 -- WHY THIS REGION AND NOT THE CANONICAL PROGRAMS.  `evaluate` descends on
 -- a triple and three of its clauses are guarded by a comparison that can
@@ -60,8 +61,8 @@ open import Rx.Exp using (Ctx; Closed; natᵗ; nat̂; strmᵗ; ofᵉ; takeᵉ;
 open import Rx.Evaluator using (Stream; Sched; EvalSt; drain; subscribeE;
   rootWitness; root; sched-init; st-init)
 open import Rx.Slots using (Slots; scripted)
-open import Verify-Rank-Sufficient using (drain-dry-free)
-open import Probed.Apparatus using (Confirms)
+open import Verify-Rank-Sufficient using (drain-dry-free; entry-hop-fits)
+open import Probed.Apparatus using (Confirms; Below)
 
 ----------------------------------------------------------------------
 -- The non-vacuity measure: how many EVENTS `hasDry` had to look at.  It
@@ -115,8 +116,8 @@ progP1 = μᵉ (mergeAllᵉ nothing
        ∷ strmᵗ (deferᵉ (varᵉ (here refl)))
        ∷ [])))
 
-descP1 : Confirms (drain-dry-free FUEL 1
-  (proj₁ (proj₂ (entry progP1 ins₀))) (proj₂ (proj₂ (entry progP1 ins₀))))
+descP1 : Confirms (drain-dry-free FUEL 1 0 (λ _ → 0)
+  (proj₁ (proj₂ (entry progP1 ins₀))) (proj₂ (proj₂ (entry progP1 ins₀))) Below)
 descP1 = refl
 
 _ : evs (drainOf progP1 ins₀) ≡ 210      -- LOAD-BEARING
@@ -134,8 +135,8 @@ _ = refl
 progP2 : Closed Γ₀ natᵗ
 progP2 = takeᵉ (nat̂ 3) progP1
 
-descP2 : Confirms (drain-dry-free FUEL 1
-  (proj₁ (proj₂ (entry progP2 ins₀))) (proj₂ (proj₂ (entry progP2 ins₀))))
+descP2 : Confirms (drain-dry-free FUEL 1 0 (λ _ → 0)
+  (proj₁ (proj₂ (entry progP2 ins₀))) (proj₂ (proj₂ (entry progP2 ins₀))) Below)
 descP2 = refl
 
 _ : evs (drainOf progP2 ins₀) ≡ 16       -- LOAD-BEARING
@@ -158,8 +159,8 @@ progP3 = μᵉ (mergeAllᵉ nothing
        ∷ strmᵗ (deferᵉ (varᵉ (here refl)))
        ∷ [])))
 
-descP3 : Confirms (drain-dry-free FUEL 1
-  (proj₁ (proj₂ (entry progP3 ins₀))) (proj₂ (proj₂ (entry progP3 ins₀))))
+descP3 : Confirms (drain-dry-free FUEL 1 0 (λ _ → 0)
+  (proj₁ (proj₂ (entry progP3 ins₀))) (proj₂ (proj₂ (entry progP3 ins₀))) Below)
 descP3 = refl
 
 _ : evs (drainOf progP3 ins₀) ≡ 228      -- LOAD-BEARING
@@ -179,8 +180,8 @@ progP4 = μᵉ (switchAllᵉ
        ∷ strmᵗ (deferᵉ (varᵉ (here refl)))
        ∷ [])))
 
-descP4 : Confirms (drain-dry-free FUEL 1
-  (proj₁ (proj₂ (entry progP4 ins₀))) (proj₂ (proj₂ (entry progP4 ins₀))))
+descP4 : Confirms (drain-dry-free FUEL 1 0 (λ _ → 0)
+  (proj₁ (proj₂ (entry progP4 ins₀))) (proj₂ (proj₂ (entry progP4 ins₀))) Below)
 descP4 = refl
 
 _ : evs (drainOf progP4 ins₀) ≡ 210      -- LOAD-BEARING
@@ -192,8 +193,8 @@ progP5 = μᵉ (exhaustAllᵉ
        ∷ strmᵗ (deferᵉ (varᵉ (here refl)))
        ∷ [])))
 
-descP5 : Confirms (drain-dry-free FUEL 1
-  (proj₁ (proj₂ (entry progP5 ins₀))) (proj₂ (proj₂ (entry progP5 ins₀))))
+descP5 : Confirms (drain-dry-free FUEL 1 0 (λ _ → 0)
+  (proj₁ (proj₂ (entry progP5 ins₀))) (proj₂ (proj₂ (entry progP5 ins₀))) Below)
 descP5 = refl
 
 _ : evs (drainOf progP5 ins₀) ≡ 210      -- LOAD-BEARING
@@ -211,8 +212,8 @@ progP6 = μᵉ (mergeAllᵉ (just 1)
        ∷ strmᵗ (deferᵉ (varᵉ (here refl)))
        ∷ [])))
 
-descP6 : Confirms (drain-dry-free FUEL 1
-  (proj₁ (proj₂ (entry progP6 ins₀))) (proj₂ (proj₂ (entry progP6 ins₀))))
+descP6 : Confirms (drain-dry-free FUEL 1 0 (λ _ → 0)
+  (proj₁ (proj₂ (entry progP6 ins₀))) (proj₂ (proj₂ (entry progP6 ins₀))) Below)
 descP6 = refl
 
 _ : evs (drainOf progP6 ins₀) ≡ 210      -- LOAD-BEARING
@@ -242,8 +243,8 @@ progP7 = μᵉ (mergeAllᵉ nothing
        ∷ strmᵗ (deferᵉ (varᵉ (here refl)))
        ∷ [])))
 
-descP7 : Confirms (drain-dry-free FUEL 1
-  (proj₁ (proj₂ (entry progP7 insShared))) (proj₂ (proj₂ (entry progP7 insShared))))
+descP7 : Confirms (drain-dry-free FUEL 1 0 (λ _ → 0)
+  (proj₁ (proj₂ (entry progP7 insShared))) (proj₂ (proj₂ (entry progP7 insShared))) Below)
 descP7 = refl
 
 _ : evs (drainOf progP7 insShared) ≡ 180  -- LOAD-BEARING
@@ -262,8 +263,8 @@ progP8 = μᵉ (mergeAllᵉ nothing
        ∷ strmᵗ (deferᵉ (varᵉ (here refl)))
        ∷ [])))
 
-descP8 : Confirms (drain-dry-free FUEL 1
-  (proj₁ (proj₂ (entry progP8 insShared))) (proj₂ (proj₂ (entry progP8 insShared))))
+descP8 : Confirms (drain-dry-free FUEL 1 0 (λ _ → 0)
+  (proj₁ (proj₂ (entry progP8 insShared))) (proj₂ (proj₂ (entry progP8 insShared))) Below)
 descP8 = refl
 
 _ : evs (drainOf progP8 insShared) ≡ 240  -- LOAD-BEARING
@@ -287,8 +288,8 @@ progP9 = μᵉ (mergeAllᵉ nothing
        ∷ strmᵗ (deferᵉ (varᵉ (here refl)))
        ∷ [])))
 
-descP9 : Confirms (drain-dry-free FUEL 1
-  (proj₁ (proj₂ (entry progP9 insAsync))) (proj₂ (proj₂ (entry progP9 insAsync))))
+descP9 : Confirms (drain-dry-free FUEL 1 0 (λ _ → 0)
+  (proj₁ (proj₂ (entry progP9 insAsync))) (proj₂ (proj₂ (entry progP9 insAsync))) Below)
 descP9 = refl
 
 _ : evs (drainOf progP9 insAsync) ≡ 94    -- LOAD-BEARING
@@ -300,8 +301,8 @@ progP10 = μᵉ (switchAllᵉ
        ∷ strmᵗ (deferᵉ (varᵉ (here refl)))
        ∷ [])))
 
-descP10 : Confirms (drain-dry-free FUEL 1
-  (proj₁ (proj₂ (entry progP10 insAsync))) (proj₂ (proj₂ (entry progP10 insAsync))))
+descP10 : Confirms (drain-dry-free FUEL 1 0 (λ _ → 0)
+  (proj₁ (proj₂ (entry progP10 insAsync))) (proj₂ (proj₂ (entry progP10 insAsync))) Below)
 descP10 = refl
 
 _ : evs (drainOf progP10 insAsync) ≡ 210  -- LOAD-BEARING
@@ -329,8 +330,8 @@ progP11 = μᵉ (mergeAllᵉ nothing
        ∷ strmᵗ (deferᵉ (varᵉ (here refl)))
        ∷ [])))
 
-descP11 : Confirms (drain-dry-free FUEL 1
-  (proj₁ (proj₂ (entry progP11 insMu))) (proj₂ (proj₂ (entry progP11 insMu))))
+descP11 : Confirms (drain-dry-free FUEL 1 0 (λ _ → 0)
+  (proj₁ (proj₂ (entry progP11 insMu))) (proj₂ (proj₂ (entry progP11 insMu))) Below)
 descP11 = refl
 
 _ : evs (drainOf progP11 insMu) ≡ 300     -- LOAD-BEARING
@@ -345,9 +346,36 @@ progP12 = μᵉ (mergeAllᵉ nothing
        ∷ strmᵗ (deferᵉ (varᵉ (here refl)))
        ∷ [])))
 
-descP12 : Confirms (drain-dry-free FUEL 1
-  (proj₁ (proj₂ (entry progP12 insMu))) (proj₂ (proj₂ (entry progP12 insMu))))
+descP12 : Confirms (drain-dry-free FUEL 1 0 (λ _ → 0)
+  (proj₁ (proj₂ (entry progP12 insMu))) (proj₂ (proj₂ (entry progP12 insMu))) Below)
 descP12 = refl
 
 _ : evs (drainOf progP12 insMu) ≡ 233     -- LOAD-BEARING
 _ = refl
+
+----------------------------------------------------------------------
+-- THE FIT ITSELF, WHICH IS THE HALF THE ROWS ABOVE DISCHARGE IN PASSING.
+-- Every row above hands the target a `Below`, so every one of them has
+-- already shown the premise holds at its own point; these three name
+-- that separately, because it is a claim about a DIFFERENT statement —
+-- the leaf the assembly spends at the door — and a receipt has to sit
+-- on the statement its rows instantiate.
+--
+-- WHAT MAKES THEM LOAD-BEARING is the witness rather than a count.
+-- `Below` is the decision procedure on the comparison, so the implicit
+-- it takes is inhabited exactly when the comparison is TRUE at the
+-- point: a fit that failed here would leave the row unsolvable instead
+-- of letting it through, which is what a `refl` pin over a hand-written
+-- predicate could never promise.  The three points are the widest
+-- spread this file has — plain recursion, μ directly inside μ, and a
+-- share holding a recursion referenced from inside a second one.
+----------------------------------------------------------------------
+
+fitP1 : Confirms (entry-hop-fits progP1 ins₀)
+fitP1 = Below
+
+fitP3 : Confirms (entry-hop-fits progP3 ins₀)
+fitP3 = Below
+
+fitP12 : Confirms (entry-hop-fits progP12 insMu)
+fitP12 = Below
