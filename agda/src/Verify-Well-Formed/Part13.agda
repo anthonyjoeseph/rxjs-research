@@ -280,13 +280,13 @@ evaluate-well-formed :
   WellFormed (evaluate fuel e ins)
 evaluate-well-formed fuel e ins =
   let (nodry₀ , nodry₁)          = hasDry-++ burst rest (rank-sufficient fuel e ins)
-      (S₀ , run₀ , inv₀ , paid₀) = subscribe-wf e ins nodry₀
+      (S₀ , run₀ , inv₀ , paid₀) = subscribe-wf fuel e ins nodry₀
       (S₁ , run₁ , paid₁)        = drain-wf fuel 1 sched₀ st₀ S₀ inv₀ paid₀ nodry₁
   in subst (λ m → Accepted (checkFinal m))
        (sym (run-++-just protocol-init burst rest run₀ run₁))
        (acceptPaid S₁ paid₁)
   where
-  r      = subscribeE (rootWitness e ins) e root 0 0 (sched-init e ins) (st-init e)
+  r      = subscribeE (rootWitness fuel e ins) e root 0 0 (sched-init fuel e ins) (st-init e)
   burst  = proj₁ r
   sched₀ = proj₁ (proj₂ r)
   st₀    = proj₂ (proj₂ r)

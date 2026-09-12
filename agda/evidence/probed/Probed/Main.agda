@@ -41,9 +41,6 @@ open import Probed.Descent
          descP6; descP7; descP8; descP9; descP10;
          descP11; descP12; fitP1; fitP3; fitP12)
 
-open import Probed.Seed
-  using (drA)
-
 open import Probed.Fuel-Growth
   using (drF)
 

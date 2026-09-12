@@ -11,11 +11,11 @@
 --
 -- What is stated here is the missing quantity rather than a new
 -- hypothesis about reachability: `chainHopD` reads a chain's own
--- remaining-hop content off its frames, and `hopFits` compares that,
--- plus the depth the schedule can deliver into it, against the rank an
--- arrival's entry seeds.  Both sides are computable, so the premise is
--- instantiable at concrete registries and the statement above it is
--- refutable rather than merely unproven.
+-- remaining-hop content off its frames, and `hopFits` compares that
+-- against the reading of the program those frames belong to.  Both
+-- sides are computable, so the premise is instantiable at concrete
+-- registries and the statement above it is refutable rather than
+-- merely unproven — which is how the fit's previous shape died.
 ------------------------------------------------------------------
 
 ------------------------------------------------------------------
@@ -35,29 +35,45 @@
 ------------------------------------------------------------------
 
 ------------------------------------------------------------------
--- WHY THE FIT READS THE STORE'S NESTING AND NOT THE ARRIVAL'S.  The
--- rank an arrival actually gets is seeded at the join of the payload's
--- own nesting with the store's, so reading the store's half alone
--- names a SMALLER rank than any arrival will see.  The premise is
--- therefore stronger than the run needs, which is the safe direction
--- for a hypothesis, and it costs no quantification over arrivals that
--- have not happened yet.
+-- WHY THE FIT MENTIONS NEITHER THE PAYLOAD NOR THE STORE, WHICH IS
+-- WHERE ITS PREDECESSOR DIED.  The rank an arrival gets is seeded at
+-- the program's reading PLUS the join of the payload's own reading
+-- with the store's nesting, and the cost of delivering that arrival is
+-- the payload's reading plus what the chain still has to flatten.  The
+-- payload therefore appears on both sides and cancels; a fit that
+-- charged it on the left while naming only the store's half on the
+-- right was charging the instant that QUEUED a value for the hops the
+-- instant that POPS it is separately granted.
+------------------------------------------------------------------
+
+------------------------------------------------------------------
+-- AND THAT SHAPE IS REFUTED RATHER THAN MERELY LOOSE, WHICH IS WHY THE
+-- CANCELLATION IS NOT AN OPTIMISATION.  The shortfall it leaves is
+-- exactly one and does not move with the program: at the door, on plain
+-- recursion, on μ directly inside μ, and on a share holding a
+-- recursion, the pending payload read one, two and three against a
+-- chain reading of one throughout.  A run whose pending payload IS the
+-- recursion reads that payload at the program's own figure by
+-- construction, so the two sides grow together and the gap never
+-- closes — no seed, no slack and no third conjunct reaches it, because
+-- the quantity is on the wrong side of the comparison rather than too
+-- small.  What survives the cancellation is the statement above, which
+-- names neither half: the worst chain the registry holds is walkable
+-- inside the reading of the program that built it.
 ------------------------------------------------------------------
 module Verify-Rank-Sufficient.Hop where
 
 open import Data.Fin using (Fin)
 open import Data.List using (List; []; _∷_)
-open import Data.Nat using (ℕ; suc; _+_; _^_; _⊔_; _<_)
+open import Data.Nat using (ℕ; suc; _+_; _⊔_; _≤_)
 open import Data.Product using (_×_; _,_; proj₂)
 
 open import Rx.Prim using (Source)
-open import Rx.Exp using (Ctx; Closed; sizeᵉ)
-open import Rx.Slots using (slotsSize)
-open import Rx.Hop-Depth using (hopDᵗ; hopDᵛ)
+open import Rx.Exp using (Ctx; Closed)
+open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ)
 open import Rx.Slot-Hop using (slotHop)
 open import Rx.Evaluator using (Path; root; share-sink; _↠_; map-f; scan-f;
-  take-f; from-inner; thru-outer; Chain; RegId; LiveSource; Sched; EvalSt;
-  stNest)
+  take-f; from-inner; thru-outer; Chain; RegId; Sched; EvalSt)
 
 ------------------------------------------------------------------
 -- A CHAIN'S OWN HOP CONTENT.
@@ -82,42 +98,23 @@ regsHopD V η ((rid , src , c) ∷ r) =
   chainHopD V η (proj₂ c) ⊔ regsHopD V η r
 
 ------------------------------------------------------------------
--- THE DEEPEST VALUE THE SCHEDULE CAN STILL DELIVER.
-------------------------------------------------------------------
-
-pendHopD : ∀ {n} {Γ : Ctx n} (V : ℕ) (η : Fin n → ℕ) (l : LiveSource Γ) → ℕ
-pendHopD V η l = go (LiveSource.pending l)
-  where
-  go : List _ → ℕ
-  go []             = 0
-  go ((tk , v) ∷ p) = hopDᵛ V η (LiveSource.elemTy l) v ⊔ go p
-
-liveHopD : ∀ {n} {Γ : Ctx n} (V : ℕ) (η : Fin n → ℕ) →
-           List (LiveSource Γ) → ℕ
-liveHopD V η []       = 0
-liveHopD V η (l ∷ ls) = pendHopD V η l ⊔ liveHopD V η ls
-
-------------------------------------------------------------------
--- THE TWO SIDES ARE DENOMINATED DIFFERENTLY, AND THAT IS THE OPEN
--- QUESTION UNDER THIS STATEMENT.  The left side prices a template's
--- REUSE of its argument — a map multiplies, a scan raises to the
--- sweep — so it bounds how deep what a program EMITS can get.  The
--- right side is the evaluator's own rank, seeded off SIZE, and the
--- companion measure the seed is actually built from is the SYNTACTIC
--- nesting, which this tree proves bounded by that size.  Nothing
--- relates the two, and every refuted seeding route has the same
--- shape: the run multiplies where the seed merely doubles.
+-- BOTH SIDES ARE NOW THE SAME QUANTITY, AND THAT IS WHAT THIS
+-- STATEMENT IS FOR.  The left side prices a template's REUSE of its
+-- argument — a map multiplies, a scan raises to the sweep — so it
+-- bounds how deep what a program EMITS can get.  The right side used
+-- to be a counter seeded off SIZE, and nothing related the two: every
+-- refuted seeding route had one shape, the run multiplying where the
+-- seed merely doubled.  The evaluator's rank IS a hop reading now, so
+-- what is left here is a structural comparison between a chain's
+-- remaining hop content and the reading of the program that built it —
+-- one currency, and a statement about the machine's own registry
+-- rather than a bridge between two measures.
 --
--- So preservation here is an obligation BETWEEN TWO CURRENCIES rather
--- than a structural fact, and the alternative is to stop comparing
--- them.  Let the hop edge's well-founded descent be the carried
--- reading of the value being subscribed: a flattener's reading is a
--- `suc` of its source's by definition, and the inner came from that
--- source, so the descent is definitional.  Then no counter exists to
--- exhaust, the guard's zero clause is unreachable and deletable, and
--- this statement is not needed at all.  What that route costs is the
--- burst walk's strengthened return type — which is owed either way,
--- and is the whole of what it would then be spent on.
+-- WHAT IS STILL OWED IS THE STORE, NOT THE RANK.  The arrival re-seeds
+-- at the ⊔ of the payload's reading and the store's NESTING, and only
+-- the first of those is denominated in this currency; reading the
+-- store's half alone names a rank no larger than the one an arrival
+-- actually gets, which is the safe direction for a hypothesis.
 ------------------------------------------------------------------
 
 ------------------------------------------------------------------
@@ -127,13 +124,14 @@ liveHopD V η (l ∷ ls) = pendHopD V η l ⊔ liveHopD V η ls
 -- an obs-typed shared slot's def emits values of positive hop, which a
 -- subscription connecting to that slot receives.  `slotHop` is the
 -- honest environment, computed off the schedule's own telescope, and
--- naming it here is what stops the premise being satisfiable by a
--- reading of the program nobody runs.
+-- the store bound it is taken at is the schedule's own, so neither is
+-- a caller's to choose: a premise satisfiable at a reading nobody runs
+-- is not a premise about this run.
 ------------------------------------------------------------------
 
 hopFits : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} →
-          ℕ → Sched Γ → EvalSt e → Set
-hopFits {e = e} V sched st =
-  let η = slotHop V (Sched.slots sched) in
-  liveHopD V η (Sched.live sched) + regsHopD V η (EvalSt.registry st)
-    < 2 ^ (sizeᵉ e + slotsSize (Sched.slots sched) + stNest st)
+          Sched Γ → EvalSt e → Set
+hopFits {e = e} sched st =
+  let V = Sched.storeBound sched
+      η = slotHop V (Sched.slots sched) in
+  regsHopD V η (EvalSt.registry st) ≤ hopDᵉ V η e

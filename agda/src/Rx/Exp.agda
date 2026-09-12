@@ -461,54 +461,13 @@ applyFn : ∀ {n} {Γ : Ctx n} {s t} → Fn Γ [] [] [] s t → Val Γ s → Val
 applyFn fn v = evalWith fn (v ∷ᵃ []ᵃ)
 
 ------------------------------------------------------------------
--- Syntax size, counting everything — including under deferᵉ and
--- inside strmᵗ templates.  Seeds the evaluator's sync-fuel budget
--- (Rx.Evaluator.syncBudget): the budget must dominate a cascade's
--- recursion depth, and every runtime value is assembled from these
--- counted templates
-------------------------------------------------------------------
-
-mutual
-  sizeᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → Exp Γ Δᵍ Δ Θ t → ℕ
-  sizeᵉ (input i)        = 1
-  sizeᵉ (ofᵉ ts)         = suc (sizeᵗˢ ts)
-  sizeᵉ emptyᵉ           = 1
-  sizeᵉ (mapᵉ f e)       = suc (sizeᵗ f + sizeᵉ e)
-  sizeᵉ (takeᵉ c e)      = suc (sizeᵗ c + sizeᵉ e)
-  sizeᵉ (scanᵉ f z e)    = suc (sizeᵗ f + sizeᵗ z + sizeᵉ e)
-  sizeᵉ (mergeAllᵉ lim e)   = suc (sizeᵉ e)
-  sizeᵉ (switchAllᵉ e)   = suc (sizeᵉ e)
-  sizeᵉ (exhaustAllᵉ e)  = suc (sizeᵉ e)
-  sizeᵉ (μᵉ e)           = suc (sizeᵉ e)
-  sizeᵉ (varᵉ x)         = 1
-  sizeᵉ (deferᵉ e)       = suc (sizeᵉ e)
-
-  sizeᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → Tm Γ Δᵍ Δ Θ t → ℕ
-  sizeᵗ (varᵗ x)      = 1
-  sizeᵗ unit̂          = 1
-  sizeᵗ (bool̂ _)      = 1
-  sizeᵗ (nat̂ _)       = 1
-  sizeᵗ (pairᵗ a b)   = suc (sizeᵗ a + sizeᵗ b)
-  sizeᵗ (fstᵗ p)      = suc (sizeᵗ p)
-  sizeᵗ (sndᵗ p)      = suc (sizeᵗ p)
-  sizeᵗ (inlᵗ a)      = suc (sizeᵗ a)
-  sizeᵗ (inrᵗ a)      = suc (sizeᵗ a)
-  sizeᵗ (caseᵗ s l r) = suc (sizeᵗ s + sizeᵗ l + sizeᵗ r)
-  sizeᵗ (ifᵗ c a b)   = suc (sizeᵗ c + sizeᵗ a + sizeᵗ b)
-  sizeᵗ (primᵗ _ a)   = suc (sizeᵗ a)
-  sizeᵗ (strmᵗ e)     = suc (sizeᵉ e)
-
-  sizeᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → List (Tm Γ Δᵍ Δ Θ t) → ℕ
-  sizeᵗˢ []       = 1
-  sizeᵗˢ (y ∷ ys) = sizeᵗ y + sizeᵗˢ ys
-
-------------------------------------------------------------------
--- Sync-reachable size: like sizeᵉ, but a deferᵉ subtree counts as
--- a leaf — nothing under a defer is subscribed within the current
--- instant.  This is the size class the descent's third component
+-- Sync-reachable size: counts the syntax, except that a deferᵉ
+-- subtree counts as a leaf — nothing under a defer is subscribed
+-- within the current instant.  This is the size class the descent's third component
 -- reads: unfoldμ substitutes (μᵉ body) only at defer-gated var
--- positions, so μ-unfolding PRESERVES syncSize while sizeᵉ grows,
--- which is what makes the μ peel's guard a real drop.
+-- positions, so μ-unfolding PRESERVES syncSize while a measure
+-- counting under the defer would grow, which is what makes the μ
+-- peel's guard a real drop.
 --
 -- **`syncSizeᵉ` DOES NOT BOUND EMISSIONS PER INSTANT**, and the shape of the
 -- failure is what makes it decisive rather than an off-by-one: the two rates
@@ -558,20 +517,6 @@ mutual
   syncSizeᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → List (Tm Γ Δᵍ Δ Θ t) → ℕ
   syncSizeᵗˢ []       = 1
   syncSizeᵗˢ (y ∷ ys) = syncSizeᵗ y + syncSizeᵗˢ ys
-
--- the size of a runtime value: embedded observables count their full
--- syntax; base payloads are opaque.  Scripted slot values are sized
--- with this too — they are part of the program-as-given, and the
--- budget must dominate the subscription work THEY demand (a scripted
--- obs value is subscribed like any other inner)
-sizeᵛ : ∀ {n} {Γ : Ctx n} (t : Ty) → Val Γ t → ℕ
-sizeᵛ unitᵗ    _        = 1
-sizeᵛ boolᵗ    _        = 1
-sizeᵛ natᵗ     _        = 1
-sizeᵛ (s ×ᵗ t) (a , b)  = suc (sizeᵛ s a + sizeᵛ t b)
-sizeᵛ (s +ᵗ t) (inj₁ a) = suc (sizeᵛ s a)
-sizeᵛ (s +ᵗ t) (inj₂ b) = suc (sizeᵛ t b)
-sizeᵛ (obs t)  e        = sizeᵉ e
 
 ------------------------------------------------------------------
 -- STRATIFICATION of the slot telescope: every `input j` an

@@ -26,10 +26,10 @@ open import Rx.Slots using (Slot; Slots)
 --   * μ SELF-SUBSCRIPTION IS A TYPE ERROR, not merely unreachable — the Δᵍ/Δ
 --     gate via `deferᵉ` rules it out at the type level, so no dynamic argument
 --     is owed for it.
---   * across a μ unfold, `sizeᵉ` DOUBLES (10 → 20) while `syncSizeᵉ` HOLDS
---     (9 → 9).  That asymmetry is the reason the budget measure reads
---     syncSize; see Rx/Exp.agda's header, which also records the refutation
---     of the emissions-per-instant bound.
+--   * across a μ unfold, a size counting the whole syntax DOUBLES while
+--     `syncSizeᵉ` HOLDS.  That asymmetry is why the descent's third
+--     component reads the sync size; `Rx.Exp`'s header also records the
+--     refutation of the emissions-per-instant bound.
 --
 postulate
   -- fuel is arrivals: processing more arrivals only extends the stream

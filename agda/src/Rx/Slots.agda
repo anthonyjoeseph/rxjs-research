@@ -10,15 +10,12 @@
 module Rx.Slots where
 
 open import Data.Bool    using (T)
-open import Data.List    using (map; tabulate)
-open import Data.Nat.ListAction  using (sum)
-open import Data.Nat     using (ℕ; suc; _+_)
+open import Data.Nat     using (ℕ)
 open import Data.Vec     using (lookup)
 open import Data.Fin     using (toℕ)
 
-open import Rx.Prim using (Timed; ObservableInput; hot; cold)
-open import Rx.Exp  using (Ty; Ctx; Val; Closed; isData; inputsBelowᵉ;
-                           sizeᵉ; sizeᵛ)
+open import Rx.Prim using (ObservableInput)
+open import Rx.Exp  using (Ty; Ctx; Val; Closed; isData; inputsBelowᵉ)
 
 -- slot i of Γ is either an external SCRIPTED input (hot/cold) or a
 -- SHARED observable: an exp tree with an implicit all-resets-false
@@ -60,22 +57,3 @@ data Slot {n} (Γ : Ctx n) (k : ℕ) (t : Ty) : Set where
 Slots : ∀ {n} → Ctx n → Set
 Slots Γ = ∀ i → Slot Γ (toℕ i) (lookup Γ i)
 
--- the size that seeds the budget is the WHOLE program's: root
--- expression, every shared slot def (connect subscribes defs, and
--- their μ/inner structure spends fuel just like the root's), AND
--- every scripted value — a scripted obs value is delivered and
--- subscribed like any other inner, so its syntax demands fuel the
--- root's size knows nothing about
-inputSize : ∀ {n} {Γ : Ctx n} {t} → ObservableInput (Val Γ t) → ℕ
-inputSize {t = t} (hot async)       =
-  suc (sum (map (λ tv → sizeᵛ t (Timed.val tv)) async))
-inputSize {t = t} (cold sync async) =
-  suc (sum (map (sizeᵛ t) sync)
-       + sum (map (λ tv → sizeᵛ t (Timed.val tv)) async))
-
-slotSize : ∀ {n} {Γ : Ctx n} {k t} → Slot Γ k t → ℕ
-slotSize (scripted i) = inputSize i
-slotSize (shared d)   = sizeᵉ d
-
-slotsSize : ∀ {n} {Γ : Ctx n} → Slots Γ → ℕ
-slotsSize sl = sum (tabulate λ i → slotSize (sl i))

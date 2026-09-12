@@ -417,7 +417,7 @@ postulate
     (fi : FoldInv nextId (arrSource a)
             (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
             (Arrival.isLast a) sched (record st { delivered = rid ∷ EvalSt.delivered st }) S) →
-    FoldOut (arrivalWitness a (Sched.slots sched)
+    FoldOut (arrivalWitness a sched
                (record st { delivered = rid ∷ EvalSt.delivered st }))
       n nextId (arrTick a) (arrSource a)
       p (arrVal a ∷ [])
@@ -443,7 +443,7 @@ mid-step {n = n} {e = e} {a = a} {nextId} {rid} {p} {ps} {sched} {st} {S} mid ce
   let fi    = mid-seed mid ceq
       certs = mid-fold-certs mid ceq
       (S′ , run , fo) =
-        foldPath-out (arrivalWitness a (Sched.slots sched)
+        foldPath-out (arrivalWitness a sched
                        (record st { delivered = rid ∷ EvalSt.delivered st }))
           n nextId
           (arrTick a) (arrSource a) p (arrVal a ∷ [])

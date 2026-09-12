@@ -4,8 +4,8 @@
 --
 -- EVIDENCE, not a claim: `src` cannot import this file and nothing in the
 -- proof may rest on it.  Checked by `make probed`, claimed by `Probed.Main`.
--- TARGET: drain-dry-free @400cf7
--- TARGET: entry-hop-fits @581e85
+-- TARGET: drain-dry-free @0b82eb
+-- TARGET: entry-hop-fits @5c4463
 --
 -- WHY THIS REGION AND NOT THE CANONICAL PROGRAMS.  `evaluate` descends on
 -- a triple and three of its clauses are guarded by a comparison that can
@@ -81,9 +81,19 @@ evs = sum ∘ map (length ∘ InstEmit.events)
 -- it drains, so `drainOf` is what `drain-dry-free` is about everywhere.
 ----------------------------------------------------------------------
 
+-- THE STORE BOUND every reading here is taken at.  `evaluate` builds
+-- its schedule at the fuel it then hands the drain, so a row is about a
+-- RUN only when the two agree — and this is the fuel `drainOf` and
+-- every row below spend.  A row free to pick the bound separately would
+-- be picking how tight the statement it instantiates is.
+FUEL : Fuel
+FUEL = 30
+
 entry : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
   Stream Γ t × Sched Γ × EvalSt e
-entry e ins = subscribeE (rootWitness e ins) e root 0 0 (sched-init e ins) (st-init e)
+entry e ins =
+  subscribeE (rootWitness FUEL e ins) e root 0 0 (sched-init FUEL e ins)
+    (st-init e)
 
 ----------------------------------------------------------------------
 -- The empty context: these programs are pure recursion, with no slot to
@@ -96,9 +106,6 @@ entry e ins = subscribeE (rootWitness e ins) e root 0 0 (sched-init e ins) (st-i
 
 ins₀ : Slots Γ₀
 ins₀ = λ ()
-
-FUEL : Fuel
-FUEL = 30
 
 drainOf : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) → Stream Γ t
 drainOf e ins = drain FUEL 1 (proj₁ (proj₂ (entry e ins))) (proj₂ (proj₂ (entry e ins)))
@@ -116,7 +123,7 @@ progP1 = μᵉ (mergeAllᵉ nothing
        ∷ strmᵗ (deferᵉ (varᵉ (here refl)))
        ∷ [])))
 
-descP1 : Confirms (drain-dry-free FUEL 1 0
+descP1 : Confirms (drain-dry-free FUEL 1
   (proj₁ (proj₂ (entry progP1 ins₀))) (proj₂ (proj₂ (entry progP1 ins₀))) Below)
 descP1 = refl
 
@@ -135,7 +142,7 @@ _ = refl
 progP2 : Closed Γ₀ natᵗ
 progP2 = takeᵉ (nat̂ 3) progP1
 
-descP2 : Confirms (drain-dry-free FUEL 1 0
+descP2 : Confirms (drain-dry-free FUEL 1
   (proj₁ (proj₂ (entry progP2 ins₀))) (proj₂ (proj₂ (entry progP2 ins₀))) Below)
 descP2 = refl
 
@@ -159,7 +166,7 @@ progP3 = μᵉ (mergeAllᵉ nothing
        ∷ strmᵗ (deferᵉ (varᵉ (here refl)))
        ∷ [])))
 
-descP3 : Confirms (drain-dry-free FUEL 1 0
+descP3 : Confirms (drain-dry-free FUEL 1
   (proj₁ (proj₂ (entry progP3 ins₀))) (proj₂ (proj₂ (entry progP3 ins₀))) Below)
 descP3 = refl
 
@@ -180,7 +187,7 @@ progP4 = μᵉ (switchAllᵉ
        ∷ strmᵗ (deferᵉ (varᵉ (here refl)))
        ∷ [])))
 
-descP4 : Confirms (drain-dry-free FUEL 1 0
+descP4 : Confirms (drain-dry-free FUEL 1
   (proj₁ (proj₂ (entry progP4 ins₀))) (proj₂ (proj₂ (entry progP4 ins₀))) Below)
 descP4 = refl
 
@@ -193,7 +200,7 @@ progP5 = μᵉ (exhaustAllᵉ
        ∷ strmᵗ (deferᵉ (varᵉ (here refl)))
        ∷ [])))
 
-descP5 : Confirms (drain-dry-free FUEL 1 0
+descP5 : Confirms (drain-dry-free FUEL 1
   (proj₁ (proj₂ (entry progP5 ins₀))) (proj₂ (proj₂ (entry progP5 ins₀))) Below)
 descP5 = refl
 
@@ -212,7 +219,7 @@ progP6 = μᵉ (mergeAllᵉ (just 1)
        ∷ strmᵗ (deferᵉ (varᵉ (here refl)))
        ∷ [])))
 
-descP6 : Confirms (drain-dry-free FUEL 1 0
+descP6 : Confirms (drain-dry-free FUEL 1
   (proj₁ (proj₂ (entry progP6 ins₀))) (proj₂ (proj₂ (entry progP6 ins₀))) Below)
 descP6 = refl
 
@@ -243,7 +250,7 @@ progP7 = μᵉ (mergeAllᵉ nothing
        ∷ strmᵗ (deferᵉ (varᵉ (here refl)))
        ∷ [])))
 
-descP7 : Confirms (drain-dry-free FUEL 1 0
+descP7 : Confirms (drain-dry-free FUEL 1
   (proj₁ (proj₂ (entry progP7 insShared))) (proj₂ (proj₂ (entry progP7 insShared))) Below)
 descP7 = refl
 
@@ -263,7 +270,7 @@ progP8 = μᵉ (mergeAllᵉ nothing
        ∷ strmᵗ (deferᵉ (varᵉ (here refl)))
        ∷ [])))
 
-descP8 : Confirms (drain-dry-free FUEL 1 0
+descP8 : Confirms (drain-dry-free FUEL 1
   (proj₁ (proj₂ (entry progP8 insShared))) (proj₂ (proj₂ (entry progP8 insShared))) Below)
 descP8 = refl
 
@@ -288,7 +295,7 @@ progP9 = μᵉ (mergeAllᵉ nothing
        ∷ strmᵗ (deferᵉ (varᵉ (here refl)))
        ∷ [])))
 
-descP9 : Confirms (drain-dry-free FUEL 1 0
+descP9 : Confirms (drain-dry-free FUEL 1
   (proj₁ (proj₂ (entry progP9 insAsync))) (proj₂ (proj₂ (entry progP9 insAsync))) Below)
 descP9 = refl
 
@@ -301,7 +308,7 @@ progP10 = μᵉ (switchAllᵉ
        ∷ strmᵗ (deferᵉ (varᵉ (here refl)))
        ∷ [])))
 
-descP10 : Confirms (drain-dry-free FUEL 1 0
+descP10 : Confirms (drain-dry-free FUEL 1
   (proj₁ (proj₂ (entry progP10 insAsync))) (proj₂ (proj₂ (entry progP10 insAsync))) Below)
 descP10 = refl
 
@@ -330,7 +337,7 @@ progP11 = μᵉ (mergeAllᵉ nothing
        ∷ strmᵗ (deferᵉ (varᵉ (here refl)))
        ∷ [])))
 
-descP11 : Confirms (drain-dry-free FUEL 1 0
+descP11 : Confirms (drain-dry-free FUEL 1
   (proj₁ (proj₂ (entry progP11 insMu))) (proj₂ (proj₂ (entry progP11 insMu))) Below)
 descP11 = refl
 
@@ -346,7 +353,7 @@ progP12 = μᵉ (mergeAllᵉ nothing
        ∷ strmᵗ (deferᵉ (varᵉ (here refl)))
        ∷ [])))
 
-descP12 : Confirms (drain-dry-free FUEL 1 0
+descP12 : Confirms (drain-dry-free FUEL 1
   (proj₁ (proj₂ (entry progP12 insMu))) (proj₂ (proj₂ (entry progP12 insMu))) Below)
 descP12 = refl
 
@@ -371,11 +378,11 @@ _ = refl
 -- share holding a recursion referenced from inside a second one.
 ----------------------------------------------------------------------
 
-fitP1 : Confirms (entry-hop-fits progP1 ins₀)
+fitP1 : Confirms (entry-hop-fits FUEL progP1 ins₀)
 fitP1 = Below
 
-fitP3 : Confirms (entry-hop-fits progP3 ins₀)
+fitP3 : Confirms (entry-hop-fits FUEL progP3 ins₀)
 fitP3 = Below
 
-fitP12 : Confirms (entry-hop-fits progP12 insMu)
+fitP12 : Confirms (entry-hop-fits FUEL progP12 insMu)
 fitP12 = Below

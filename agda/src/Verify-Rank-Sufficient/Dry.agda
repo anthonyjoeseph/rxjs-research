@@ -26,28 +26,29 @@ open import Data.Bool using (Bool; true; false; T)
 open import Data.Empty using (⊥-elim)
 open import Data.Fin using (Fin; toℕ)
 open import Data.List using ([]; _∷_; map)
-open import Data.Nat using (ℕ; zero; suc; _+_; _≤_; _^_)
+open import Data.Nat using (zero; suc; _≤_)
 open import Data.Nat.Properties using (_<?_; ≤-refl; ≤-trans; ≤-reflexive;
   m≤n+m; m≤n⇒m≤1+n)
 open import Data.Product using (_,_; proj₁; proj₂)
 open import Data.Vec using (lookup)
 open import Induction.WellFounded using (Acc; acc)
 open import Relation.Nullary using (yes; no)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym)
 
 open import Rx.Prim using (Tick; Id; hot; cold; init; close; exhausted)
-open import Rx.Exp using (Ctx; Exp; Closed; evalTm; inputsBelowᵉ; sizeᵉ; syncSizeᵉ;
+open import Rx.Exp using (Ctx; Exp; Closed; evalTm; inputsBelowᵉ; syncSizeᵉ;
   unfoldμ; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ;
   exhaustAllᵉ; μᵉ; varᵉ; deferᵉ)
-open import Rx.Slots using (shared; scripted; slotsSize)
+open import Rx.Slots using (shared; scripted)
 open import Rx.Strat-Order using (_≺_; ltS; ltU)
 open import Rx.Evaluator using (Stream; Path; Sched; EvalSt; subscribeE;
   subscribeSharedSlot; sharedConnect; register; share-sink; burstCompleted;
   mintSource; mintNode; installNode; take-st; scan-st; map-f; scan-f; take-f;
   _↠_;
-  hasDry; memberSource; unconn; stNest)
-open import Rx.Nest-Depth using (nestD-unfoldμ)
-open import Verify-Rank-Sufficient.Entry using (EntryReads; seed-reads)
+  hasDry; memberSource; unconn)
+open import Rx.Hop-Depth using (hopDᵉ; hopD-unfoldμ)
+open import Rx.Slot-Hop using (slotHop; slotHop-fix)
+open import Verify-Rank-Sufficient.Entry using (EntryReads; hop-mapᵉ; hop-scanᵉ)
 open import Verify-Rank-Sufficient.Sync-Edge using (mu-guard)
 open import Verify-Rank-Sufficient.Connect-Edge using (connect-guard)
 open import Verify-Rank-Sufficient.Dry-Emits using (hasDry-if; oneShotBurst-dry;
@@ -80,122 +81,61 @@ opShape _                = false
 -- is the pipeline's ONLY rank drop — so the four shapes that cannot
 -- reach it need no rank reading whatever, and they are proven below.
 --
--- THE RANK CONJUNCT BOUGHT THE FLOOR AND NOT THE STATEMENT, and the
--- distance between those two is the whole of what is known here.
--- Carrying only the unconnected count and the syncSize, the leaf is
--- quantified over a triple whose rank is ZERO — and at rank zero the
--- inner-subscribe clause subscribes nothing at all: it returns the dry
--- close outright.  Bounding `nestDᵉ o` by the rank refuses that entry
--- for every shape `opShape` admits, since each carries at least the
--- layer its own inner is entered through.  What the bound does not do is
--- SCALE.  It reads the TERM; a term is charged for its step function
--- once; a fold applies that step once per delivery — so two deliveries
--- are already one more than the syntax knows about, and the leaf is
--- false at three conjuncts exactly as it was at two.
-
--- AND THIS LEAF HAS NEVER ONCE BEEN INSTANTIATED IN THE REGION THAT
--- CARRIES ITS RISK, which is a finding about the evidence rather than
--- about the statement, and it is why the receipts are gone rather than
--- retargeted.  Every row ever taken against it — ten of them, across
--- four probes — was rooted at a `takeᵉ` or a `scanᵉ`, and those are
--- precisely the shapes just proven: a root that cannot reach
--- `subscribeInner` cannot spend the rank, so no row of that shape could
--- have failed however deep the program under it ran.  Narrowing
--- `opShape` did not invalidate the coverage; it made visible that the
--- coverage was zero, since `refl : opShape (scanᵉ …) ≡ true` is now not
--- even stateable.  What is owed is a row at a flattening ROOT, and the
--- probes that reach one reach it only through the drain leaf.
-
--- SO THE REPAIR IS A CHANGE OF CURRENCY AND NOT A FOURTH CONJUNCT OF
--- THE SAME KIND.  No measure of syntax can serve, and that is settled
--- rather than suspected: the counterexample scales by lengthening the
--- run, which moves the deliveries and leaves the term fixed.  What has
--- to be carried down is that the rank still dominates what the run can
--- DELIVER.
+-- WHAT THE RANK CONJUNCT BUYS AND WHAT IS LEFT OVER.  Carrying only the
+-- unconnected count and the syncSize, the leaf is quantified over a
+-- triple whose rank is ZERO — and at rank zero the inner-subscribe
+-- clause subscribes nothing at all: it returns the dry close outright.
+-- Bounding the term's own hop reading by the rank refuses that entry for
+-- every shape `opShape` admits, since each of the three reads `suc` of
+-- its source.  So the zero case is closed, and what remains is the
+-- clause's own peel.
 --
--- AND THE DELIVERIES ARE NOT ALL BOUGHT WITH FUEL, WHICH IS WHAT RULES
--- OUT READING THE STATE HANDED IN.  A recursive source buys them with
--- fuel and a re-seed at each arrival would cover that; a LITERAL source
--- makes every one of them inside ONE cascade, so the store reads zero
--- at the entry the statement is made at and deepens only afterwards.  A
--- conjunct denominated in the state handed in is therefore dead for the
--- same reason a `suc` is: both are read before the growth they would
--- have to pay for.  The quantity that looked like it survived both was
--- the SYNCHRONOUS size — already the third component, already re-seeded
--- at the μ guard — and it does not: a burst's deliveries are exponential
--- in the source length where that measure is linear in it, so no
--- additive reading of the syntax bounds them.
+-- AND WHAT REMAINS IS A FACT ABOUT WHAT A BURST CARRIES, NOT A FOURTH
+-- CONJUNCT.  `subscribeInner` steps from `suc r` to `r` and subscribes
+-- an emitted VALUE, structurally unrelated to the term the caller was
+-- walking — so re-establishing the invariant there needs the inner's own
+-- reading to sit under its emitter's, which is a strengthened return
+-- type on the burst-producing functions rather than anything stateable
+-- at this signature.  That is the one thing this leaf waits on.
 --
--- A SIZE BOUND IS THE OBVIOUS CONJUNCT AND IT IS DEAD.
--- `2 ^ (sizeᵉ o + slotsSize sl) ≤ r` holds at the root by reflexivity and
--- cannot be re-established across the μ clause, since `unfoldμ body` is
--- LARGER in `sizeᵉ` than `μᵉ body` while the witness keeps the same rank.
--- What survives is a measure the unfolding leaves EQUAL, which is why the
--- conjunct is a nesting.  And the peel's own `≺`-witness is `ltR`
--- applied to its hypothesis and so says nothing — every gram of this
--- reading is establishing the hypothesis, which is the whole asymmetry
--- between this leaf and the two peels proven below.
---
--- AND THE BURST DOES NOT READ UNDER ITS EMITTER, SO THE HOP IS NOT PAID
--- IN SYNTAX AT ALL.  What a fold hands out is deeper than the term it
--- came from, and no measure of the emitter repairs that, because the
--- fold count is not in the term.
---
--- SO THE RESTATEMENT OWED HERE IS ABOUT THE WITNESS AND NOT THE
--- CONJUNCT.  The triples this leaf is entered at are CHOSEN to satisfy
--- the invariant rather than reached by a run, and `EntryReads` permits
--- that because it reads the term alone.  The walk's two settled peels
--- enjoy the opposite — they stand where the machine seeded them — which
--- is why they landed as one-line arms.  Pinning this leaf to the
--- witnesses the machine mints is what would put it in their position;
--- what it waits on is a bound on what a burst CARRIES, since that is the
--- quantity such a seeding would have to read, and it is a strengthened
--- return type on the burst-producing functions rather than a conjunct
--- anywhere.
---
+-- DEAD ROUTE: a rank SEEDED off the term, which is what every earlier
+--   form of this conjunct compared against — a power of two in the
+--   term's syntactic size plus the slot telescope's, at the root and
+--   again at each connect.  It is dead in two
+--   independent ways, and the second is the one that cannot be patched:
+--   a size seed cannot survive the μ clause at all, since an unfolding
+--   is LARGER in that size than its redex while the witness keeps its
+--   rank; and a seed grows with the SYNTAX while what has to be
+--   dominated is what the run DELIVERS, which a fold multiplies once per
+--   delivery.  Both are gone rather than repaired: the rank IS the hop
+--   reading now, so the two sides are one quantity and there is nothing
+--   left to bridge.
 -- REFUTED: `Refuted.Sync-Count` — the synchronous size as a bound on a
---   burst's deliveries, which is the reading the paragraphs above left
---   standing.  A doubling fold over a live seed delivers 2, 6, 14, 30 as
---   the source lengthens by one literal, against a measure that gains
---   one per literal: the first three rows HOLD the bound, so it is not
---   an off-by-one that a tighter constant repairs.
--- REFUTED: `Refuted.Burst-Nesting` — the inner-under-emitter reading, by
---   a scan over a three-element synchronous source whose step re-wraps
---   the accumulator in one merge layer: the program reads 1 and its
---   burst reads 3.  It kills the NON-STRICT comparison, so the strict
---   one the peel needs goes with it.
--- REFUTED: `Refuted.Rank-Entry` — the two-conjunct invariant, refuted by
---   the smallest merge over a synchronous one-element outer, entered at a
---   triple whose rank is zero with both of those conjuncts satisfied at
---   their tightest: the unconnected count is zero over the empty context
---   and the syncSize holds by reflexivity.  Its burst is one emit long
---   and that emit is the dry close.  Its reading is one against the
---   nesting, which is `suc 0` there.
--- REFUTED: `Refuted.Rank-Fold` — the THREE-conjunct form, which the row
---   above bought.  A scan whose step re-wraps its accumulator, under a
---   flattener that subscribes what it emits: the program reads two and
---   the triple is entered at THREE, so the conjunct holds with a peel to
---   spare and the crossing is not an off-by-one.  Three deliveries, all
---   of them inside one cascade off a literal source, so the store reads
---   zero where the statement is made; the third accumulator is entered
---   below the peels left and the burst carries the dry close.  It kills
---   a `suc` in the conjunct and a conjunct reading the state handed in,
---   together, and the state is reached by running rather than written.
--- PROBED: `Probed.Operator-Root` — the first coverage this statement has
---   had inside the region `opShape` admits, every earlier row having sat
---   at a root it does not answer for.  A merge over a fold that hands
---   out layered values: the run reaches `subscribeInner`, peels the
---   rank, and returns no dry close.  It sits at the family's SHALLOWEST
---   root and cannot be moved up — subscribing a burst costs unlike
---   measuring one, and the two-literal root stalls — so the conclusion's
---   coverage stops far short of the depths the rate rows reach.
---   What the family covers is the RATE and not the margin — four source
---   lengths, depths 3, 12, 39, 120 against a seed that doubles per
---   literal — so the conclusion is green where the seed still leads by
---   twenty-seven symbols' worth, and nothing here reaches the crossing
---   those two rates have.  Untouched: a flattener over a RECURSIVE
---   inner, and the switch and exhaust arms, which the rows take at the
---   merge alone.
+--   burst's deliveries.  A doubling fold over a live seed delivers 2, 6,
+--   14, 30 as the source lengthens by one literal, against a measure
+--   that gains one per literal: the first three rows HOLD the bound, so
+--   it is not an off-by-one that a tighter constant repairs.
+-- REFUTED: `Refuted.Burst-Nesting` — the inner-under-emitter reading
+--   taken in NESTING, by a scan over a three-element synchronous source
+--   whose step re-wraps the accumulator in one merge layer: the program
+--   reads 1 and its burst reads 3.  It kills the NON-STRICT comparison,
+--   so the strict one the peel needs goes with it — and it is what says
+--   the surviving form has to be read at a measure the store bound
+--   parameterises.
+-- PROBED: `Probed.Operator-Root` — the first row this leaf has ever had
+--   at a root it ANSWERS for, since every earlier one sat at a root
+--   `opShape` refuses.  A run whose inner fold triples its deliveries per
+--   literal and whose outer fold turns that width into depth, flattened
+--   at the root so every layer is entered: the leaf comes back dry-free
+--   at one literal, against depths of 3, 12, 39, 120 as the source
+--   lengthens.  The finding beside it is that the rank those depths are
+--   entered against does NOT move — one figure at all four lengths — so
+--   the two meet at twelve literals by arithmetic on the rate.  THE
+--   BOUNDARY, and it is an infrastructure limit: subscribing a burst
+--   costs unlike measuring one, and the leaf row stalled for eleven
+--   minutes at TWO literals with the resident set flat, so the crossing
+--   is six orders of magnitude past anything that normalises and no row
+--   here decides the statement.
 -- RECOVERY: `git show 919f115:agda/src/Rx/Clos-Size.agda` restores
 --   `syncSizeᵉ` with the slot telescope substituted in, also postulate-free
 --   — the μ guard reads the UNSUBSTITUTED size, and a slot reference is one
@@ -205,14 +145,16 @@ postulate
   dry-operator : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} {τ}
     (ac : Acc _≺_ τ) (o : Closed Γ u) (κ : Path Γ u t) (id : Id) (now : Tick)
     (sched : Sched Γ) (st : EvalSt e) → opShape o ≡ true →
-    EntryReads τ o (Sched.slots sched) (EvalSt.connectedShares st) →
+    EntryReads (Sched.storeBound sched) τ o
+      (Sched.slots sched) (EvalSt.connectedShares st) →
     hasDry (proj₁ (subscribeE ac o κ id now sched st)) ≡ false
 
 mutual
   subscribe-dry-free : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} {τ}
     (ac : Acc _≺_ τ) (o : Closed Γ u) (κ : Path Γ u t) (id : Id) (now : Tick)
     (sched : Sched Γ) (st : EvalSt e) →
-    EntryReads τ o (Sched.slots sched) (EvalSt.connectedShares st) →
+    EntryReads (Sched.storeBound sched) τ o
+      (Sched.slots sched) (EvalSt.connectedShares st) →
     hasDry (proj₁ (subscribeE ac o κ id now sched st)) ≡ false
 
   -- THE μ PEEL.  The machine asks whether the unfolding fits under the
@@ -220,15 +162,17 @@ mutual
   -- did, and `mu-guard` is the strict drop that composes with it.  The
   -- recursive call re-seeds the component at the unfolding's own
   -- reading, so the invariant is restored by reflexivity.  The rank is
-  -- untouched by the step, and `nestD-unfoldμ` is what says the nesting
-  -- conjunct survives the substitution: the measure reads the redex and
-  -- its unfolding EQUAL, so nothing is spent to re-establish it.
+  -- untouched by the step, and `hopD-unfoldμ` is what says so: the hop
+  -- reading of the redex and of its unfolding are EQUAL, so nothing is
+  -- spent to re-establish that conjunct.  A measure that GREW here is
+  -- what ruled out every seeded form.
   subscribe-dry-free {τ = U , r , sz} (acc rec) (μᵉ body) κ id now sched st inv
     with syncSizeᵉ (unfoldμ body) <? sz
   ... | no  ¬p = ⊥-elim (¬p (mu-guard body (proj₂ (proj₂ inv))))
   ... | yes p  = subscribe-dry-free (rec (ltS p)) (unfoldμ body) κ id now sched st
                    ( proj₁ inv
-                   , ≤-trans (≤-reflexive (nestD-unfoldμ body)) (proj₁ (proj₂ inv))
+                   , ≤-trans (≤-reflexive (hopD-unfoldμ _ _ body))
+                             (proj₁ (proj₂ inv))
                    , ≤-refl )
 
   subscribe-dry-free ac (ofᵉ ts) κ id now sched st inv =
@@ -249,7 +193,7 @@ mutual
       (map-frame-dry ac id now f κ)
       (subscribe-dry-free ac b (map-f f ↠ κ) id now sched st
         ( proj₁ inv
-        , ≤-trans (m≤n+m _ _) (proj₁ (proj₂ inv))
+        , ≤-trans (hop-mapᵉ _ _ f b) (proj₁ (proj₂ inv))
         , ≤-trans (m≤n⇒m≤1+n (m≤n+m _ _)) (proj₂ (proj₂ inv)) ))
     where
     r = subscribeE ac b (map-f f ↠ κ) id now sched st
@@ -276,7 +220,7 @@ mutual
       (scan-frame-dry ac id now f nid κ)
       (subscribe-dry-free ac b (scan-f f nid ↠ κ) id now sched₁ st₁
         ( proj₁ inv
-        , ≤-trans (m≤n+m _ _) (proj₁ (proj₂ inv))
+        , ≤-trans (hop-scanᵉ _ _ f z b) (proj₁ (proj₂ inv))
         , ≤-trans (m≤n⇒m≤1+n (m≤n+m _ _)) (proj₂ (proj₂ inv)) ))
     where
     nid    = proj₁ (mintNode sched)
@@ -299,7 +243,12 @@ mutual
   -- four outcomes announce and register without subscribing anything.
   subscribe-dry-free ac (input i) κ id now sched st inv
     with Sched.slots sched i in eqi
-  ... | shared d {ok} = sharedSlot-dry ac i d κ id now sched st eqi (proj₁ inv)
+  ... | shared d {ok} =
+        sharedSlot-dry ac i d κ id now sched st eqi (proj₁ inv)
+          (≤-trans (≤-reflexive
+                     (sym (slotHop-fix (Sched.storeBound sched)
+                             (Sched.slots sched) i d ok)))
+                   (proj₁ (proj₂ inv)))
   ... | scripted (cold sync [])       = oneShotBurst-dry sync id sched
   ... | scripted (cold sync (x ∷ xs)) =
         cold-tail-dry sync id (proj₁ (mintSource sched))
@@ -316,21 +265,27 @@ mutual
     (st : EvalSt e) {ok : T (inputsBelowᵉ (toℕ i) d)} →
     Sched.slots sched i ≡ shared d {ok = ok} →
     unconn (Sched.slots sched) (EvalSt.connectedShares st) ≤ proj₁ τ →
+    hopDᵉ (Sched.storeBound sched)
+          (slotHop (Sched.storeBound sched) (Sched.slots sched)) d
+      ≤ proj₁ (proj₂ τ) →
     hasDry (proj₁ (subscribeSharedSlot ac i d κ id now sched st)) ≡ false
-  sharedSlot-dry ac i d κ id now sched st eqi ule
+  sharedSlot-dry ac i d κ id now sched st eqi ule hle
     with memberSource (toℕ i) (EvalSt.completedSources st)
   ... | true = refl
   ... | false with memberSource (toℕ i) (EvalSt.connectedShares st) in fresh
   ...   | true  = refl
-  ...   | false = sharedConnect-dry ac i d κ id now sched st eqi fresh ule
+  ...   | false = sharedConnect-dry ac i d κ id now sched st eqi fresh ule hle
 
   -- THE CONNECT PEEL.  The machine asks whether latching this slot
   -- keeps the unconnected count under the component it entered at; the
   -- invariant says the count already was, and `connect-guard` is the
-  -- strict drop a fresh latch buys.  The connected branch re-seeds all
-  -- three components at the def's own reading — two by reflexivity, the
-  -- rank through the size it is exponential in, exactly as the root
-  -- seeding does, since a connect IS a second root.
+  -- strict drop a fresh latch buys.  The count is the OUTERMOST
+  -- component, so the step is `ltU` and the other two ride along free:
+  -- the connected branch re-enters at the same rank and the same sync,
+  -- and what it has to show is that the DEF reads under them.  Sync is
+  -- reflexivity, and the rank arrives as a premise — transferred from
+  -- the reference to the definition it stands for at the slot clause
+  -- above, which is the one place the telescope has been matched.
   sharedConnect-dry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {τ}
     (ac : Acc _≺_ τ) (i : Fin n) (d : Closed Γ (lookup Γ i))
     (κ : Path Γ (lookup Γ i) t) (id : Id) (now : Tick) (sched : Sched Γ)
@@ -338,9 +293,12 @@ mutual
     Sched.slots sched i ≡ shared d {ok = ok} →
     memberSource (toℕ i) (EvalSt.connectedShares st) ≡ false →
     unconn (Sched.slots sched) (EvalSt.connectedShares st) ≤ proj₁ τ →
+    hopDᵉ (Sched.storeBound sched)
+          (slotHop (Sched.storeBound sched) (Sched.slots sched)) d
+      ≤ proj₁ (proj₂ τ) →
     hasDry (proj₁ (sharedConnect ac i d κ id now sched st)) ≡ false
   sharedConnect-dry {Γ = Γ} {e = e} {τ = U , r , s}
-                    (acc rec) i d κ id now sched st eqi fresh ule
+                    (acc rec) i d κ id now sched st eqi fresh ule hle
     with unconn (Sched.slots sched) (toℕ i ∷ EvalSt.connectedShares st) <? U
   ... | no  ¬p = ⊥-elim (¬p (connect-guard (Sched.slots sched)
                               (EvalSt.connectedShares st) i eqi fresh ule))
@@ -355,13 +313,10 @@ mutual
             (record st { connectedShares = toℕ i ∷ EvalSt.connectedShares st })
 
     burst : Stream Γ (lookup Γ i)
-    seed : ℕ
-    seed = 2 ^ (sizeᵉ d + slotsSize (Sched.slots sched) + stNest st₁)
-
-    burst = proj₁ (subscribeE (rec (ltU {r′ = seed} {s′ = syncSizeᵉ d} p))
+    burst = proj₁ (subscribeE (rec (ltU {r′ = r} {s′ = syncSizeᵉ d} p))
                      d (share-sink i) id now sched st₁)
 
     hb : hasDry burst ≡ false
-    hb = subscribe-dry-free (rec (ltU {r′ = seed} {s′ = syncSizeᵉ d} p))
+    hb = subscribe-dry-free (rec (ltU {r′ = r} {s′ = syncSizeᵉ d} p))
            d (share-sink i) id now sched st₁
-           (≤-refl , seed-reads d (Sched.slots sched) (stNest st₁) , ≤-refl)
+           (≤-refl , hle , ≤-refl)

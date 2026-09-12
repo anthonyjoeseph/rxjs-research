@@ -21,14 +21,14 @@
 -- burst.
 --
 -- WHAT THIS KILLS IS THE ROUTE, NOT THE INVARIANT.  The rank conjunct
--- is true at the root, where the seed is `2 ^ (sizeᵉ e + slotsSize sl)`
--- and the nesting is under the size; it survives a connect, which
--- re-seeds from the connected expression, and the μ peel, which is an
--- equality of readings.  The inner hop is the one edge whose subject is
--- a RUNTIME value rather than a subterm, and this witness says that
--- edge has no re-establishment reading syntax against syntax.  What
--- pays for it has to be the seed's exponential slack, priced against
--- the deliveries a run can make.
+-- is true at the root, where the entry reads the program itself; it
+-- survives a connect, which re-reads the connected expression, and the
+-- μ peel, which is an equality of readings.  The inner hop is the one
+-- edge whose subject is a RUNTIME value rather than a subterm, and this
+-- witness says that edge has no re-establishment reading syntax against
+-- syntax — not at this measure and not at any measure charging a step
+-- function once.  What pays for it has to price the FOLD COUNT, which
+-- is a property of the store rather than of the term.
 --
 -- THE MEASURE IS IMPORTED RATHER THAN LOCALISED, DELIBERATELY.  A
 -- refutation normally restates the currency it refutes, so that a
@@ -100,6 +100,14 @@ BurstUnderEmitter = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} {τ : Tri}
 -- single layer, charged once.
 ----------------------------------------------------------------------
 
+-- THE STORE BOUND the run below is taken at.  `evaluate` builds its
+-- schedule at the fuel it then hands the drain, so a witness is about a
+-- RUN only when the two agree — and the bound is what the root enters
+-- at, so choosing it small would truncate the very cascade this file
+-- measures.  Chosen generously for that reason, not tightly.
+SB : ℕ
+SB = 30
+
 Γ₀ : Ctx 0
 Γ₀ = []ⱽ
 
@@ -113,8 +121,8 @@ prog : Closed Γ₀ (obs natᵗ)
 prog = scanᵉ step (strmᵗ emptyᵉ) (ofᵉ (nat̂ 1 ∷ nat̂ 2 ∷ nat̂ 3 ∷ []))
 
 burst₀ : Stream Γ₀ (obs natᵗ)
-burst₀ = proj₁ (subscribeE (rootWitness prog ins₀) prog root 0 0
-                  (sched-init prog ins₀) (st-init prog))
+burst₀ = proj₁ (subscribeE (rootWitness SB prog ins₀) prog root 0 0
+                  (sched-init SB prog ins₀) (st-init prog))
 
 ----------------------------------------------------------------------
 -- THE CROSSING, PINNED BY `refl` AND SPENT IN THE ⊥.  Three against
@@ -131,8 +139,8 @@ nest-burst = refl
 burst-under-emitter-false : BurstUnderEmitter → ⊥
 burst-under-emitter-false h =
   cross nest-burst nest-prog
-        (h (rootWitness prog ins₀) prog root 0 0
-           (sched-init prog ins₀) (st-init prog))
+        (h (rootWitness SB prog ins₀) prog root 0 0
+           (sched-init SB prog ins₀) (st-init prog))
   where
     cross : ∀ {a b} → a ≡ 3 → b ≡ 1 → a ≤ b → ⊥
     cross refl refl (s≤s ())
