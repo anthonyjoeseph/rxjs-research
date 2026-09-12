@@ -1,0 +1,22 @@
+# THE ATTIC: commits holding a generation that was DELETED WHOLESALE.
+#
+# `make find` walks the tree, so a generation removed in one commit is
+# invisible to the one command the SEARCH FIRST rule tells you to run --
+# and the bigger the removal, the bigger the blind spot.  Every sha below
+# is searched too, and its hits are reported in their own section as
+# RECOVERABLE rather than live.
+#
+# WHAT EARNS A LINE HERE.  A commit that removed a body of proof whose
+# statements are about operations the SUCCESSOR STILL PERFORMS.  A
+# mechanism dying does not take its measures with it: a module with no
+# postulate in it measured something, and a measure transports even when
+# the grant it was spent on is gone.  What does NOT earn a line is an
+# ordinary deletion of dead weight -- that is what the wiring law is for,
+# and putting it here would make every search noisier for nothing.
+#
+# ONE LINE PER GENERATION: <sha>  <what it held>.  The sha is the LAST
+# COMMIT THAT STILL HAD THE WORK, not the commit that removed it.
+# `make find` fails loudly if one stops resolving, because a silent
+# all-clear is the worst possible answer to "has anyone been here".
+
+919f115  the gas/budget-sufficient tower -- 92 modules, incl. the proven layer count, mu depth and closure size

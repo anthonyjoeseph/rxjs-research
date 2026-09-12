@@ -13,6 +13,10 @@ typescript/.oracle-tmp
 # isolated from the strict one).  Build artifacts either way — never commit.
 **/*.agdai
 **/_cli
+# `make find`'s attic cache: deleted generations checked out of the shas in
+# scripts/attic.txt, so the second search of one costs nothing.  Derived from
+# history, so never committed — and rebuilt on demand if deleted.
+**/_attic
 **/_measure
 **/_harness
 **/_ih
