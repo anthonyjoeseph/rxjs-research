@@ -90,13 +90,17 @@ opShape _                = false
 -- its source.  So the zero case is closed, and what remains is the
 -- clause's own peel.
 --
--- AND WHAT REMAINS IS A FACT ABOUT WHAT A BURST CARRIES, NOT A FOURTH
--- CONJUNCT.  `subscribeInner` steps from `suc r` to `r` and subscribes
--- an emitted VALUE, structurally unrelated to the term the caller was
--- walking — so re-establishing the invariant there needs the inner's own
--- reading to sit under its emitter's, which is a strengthened return
--- type on the burst-producing functions rather than anything stateable
--- at this signature.  That is the one thing this leaf waits on.
+-- AND WHAT REMAINS IS NOT A FACT ABOUT WHAT A BURST CARRIES, WHICH IS
+-- WHERE THIS LEAF WAS EXPECTED TO GO.  `subscribeInner` steps from
+-- `suc r` to `r` and subscribes an emitted VALUE, structurally unrelated
+-- to the term the caller was walking, so the residue looked like the
+-- inner's own reading sitting under its emitter's — a strengthened
+-- return type on the burst-producing functions.  That comparison is
+-- FALSE, and false at the door rather than deep in a cascade: a fold
+-- builds its accumulator at RUN time, one fresh layer per refold, while
+-- the clause reading that fold is charged nothing for what it folds
+-- over.  What the rows leave standing is a reading that charges a scan
+-- for its SOURCE — a change to the measure, not a fact about the walk.
 --
 -- DEAD ROUTE: a rank SEEDED off the term, which is what every earlier
 --   form of this conjunct compared against — a power of two in the
@@ -110,6 +114,17 @@ opShape _                = false
 --   delivery.  Both are gone rather than repaired: the rank IS the hop
 --   reading now, so the two sides are one quantity and there is nothing
 --   left to bridge.
+-- REFUTED: `Refuted.Root-Refold` — this leaf itself, at the entry
+--   `evaluate` seeds a root subscribe with, invariant and accessibility
+--   proof both the machine's own.  The marker is in the SUBSCRIBE burst,
+--   at no arrival and no drain step, so the crossing sits between the
+--   door and the first thing the loop does and nothing carried BETWEEN
+--   cascades reaches it.  The same file kills the strengthened return
+--   type the paragraph above reports as false, and pins the rates that
+--   say why: the carried depth climbs one per source literal, the
+--   reading the frame enters at is flat in source length, and the two
+--   cross at exactly the pairs `Refuted.Rank-Cross` records for the dry
+--   marker.
 -- REFUTED: `Refuted.Sync-Count` — the synchronous size as a bound on a
 --   burst's deliveries.  A doubling fold over a live seed delivers 2, 6,
 --   14, 30 as the source lengthens by one literal, against a measure
