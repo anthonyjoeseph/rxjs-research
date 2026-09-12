@@ -1,4 +1,5 @@
--- THE GROWTH IS IN THE FUEL, AND THE SEED DOES NOT READ THE FUEL.
+-- THE ACCUMULATOR DEEPENS ONE PER ARRIVAL, WHICH IS THE RATE AN ENTRY
+-- SEED HAS TO READ.
 --
 -- EVIDENCE, not a claim: `src` cannot import this file and nothing in
 -- the proof may rest on it.  Checked by `make probed`, claimed by
@@ -17,34 +18,40 @@
 -- ONE PROGRAM, SIX FUELS.  The source here is a recursion rather than a
 -- literal, so the number of deliveries is set by the DRAIN and not by
 -- the term: the program is twenty symbols and reads two at every row
--- below, the rank the machine seeds it at is `2 ^ 20` at every row
--- below, and the carried nesting is the fuel plus one.  One layer per
--- unit of fuel, against a seed that is constant in it.
+-- below, the rank the ROOT is seeded at is `2 ^ 20` at every row below,
+-- and the carried nesting is the fuel plus one.  One layer per unit of
+-- fuel, against a root seed that is constant in it.
 --
--- SO NO SEED READ OFF THE PROGRAM BOUNDS THIS, and that is a statement
--- about every such seed rather than about this one.  The accumulator is
--- stored across arrivals and deepened by one at each, the arrivals are
--- paid for out of fuel, and fuel appears in neither `sizeᵉ` nor
--- `slotsSize` — so for a fixed program the readings are unbounded while
--- the rank is fixed, and at fuel past `2 ^ 20` a flattener over this
--- fold enters a value deeper than the rank and the peel returns the dry
--- close.  The leaves below are stated for ALL fuel, so what the rows
--- predict is a run that goes dry.
+-- SO A SEED READ OFF THE PROGRAM ALONE DOES NOT BOUND THIS, and that is
+-- a statement about every such seed rather than about this one.  The
+-- accumulator is stored across arrivals and deepened by one at each, the
+-- arrivals are paid for out of fuel, and fuel appears in neither `sizeᵉ`
+-- nor `slotsSize` — so for a fixed program the readings are unbounded
+-- while a program-only rank stands still.
 --
--- WHY IT IS MEASURED HERE AND REFUTED ONE DOOR ALONG.  A `refl` at fuel
--- `2 ^ 20` is not a row anyone can check, so the crossing itself is
--- witnessed where the arithmetic is small: `Refuted.Rank-Fold` holds the
--- rank at the entry invariant's own tightest and reaches the dry close
--- in two deliveries.  These rows are the other half — that the crossing
--- is not an artefact of a hand-picked triple, since the quantity doing
--- the growing is one the seed has no term for.
+-- WHICH IS WHY AN ENTRY IS NO LONGER TAKEN OFF THE PROGRAM ALONE.  A
+-- cascade re-seeds per arrival, at the value it carries joined with the
+-- store's own reading, and that reading takes a scan node to be its
+-- accumulator — the quantity these rows measure.  So the rate they
+-- establish is one the entry now tracks, and tracks exponentially: one
+-- layer buys one doubling.  These rows are both the reason the reading
+-- is there and the check that it moves at the rate it must.
 --
--- WHAT IS NOT COVERED.  One recursion shape and one flattening layer in
--- the step; the fuels are small because each one re-walks the whole
--- drain, so the rows establish the RATE and not the crossing.  The
--- `Confirms` rows sit at the root, where the seed is `2 ^ 20` and the
--- reading is seven, so they are green for the reason the finding says
--- they are: the fuel is nowhere near the seed yet.
+-- WHERE THE CROSSING IS STILL REACHED.  Nothing above says the OPERATOR
+-- shelf is paid for: it is handed an arbitrary triple satisfying the
+-- entry invariant rather than one the machine minted, so no re-seed
+-- reaches it.  `Refuted.Rank-Fold` holds the rank at that invariant's
+-- own tightest and reaches the dry close in two deliveries, off a
+-- literal source with the store reading zero.
+--
+-- WHAT IS NOT COVERED, AND IT IS WHERE THE DRAIN LEAF IS STILL OPEN.
+-- One delivery lands per arrival here, so every layer counted below is
+-- paid for by a fresh entry; no row reaches a burst delivering many
+-- times inside ONE cascade, which is the growth no entry sees however it
+-- is denominated.  One recursion shape and one flattening layer in the
+-- step; the fuels are small because each row re-walks the whole drain,
+-- so what is established is the RATE.  The `Confirms` rows sit at the
+-- root, where the reading is seven against `2 ^ 20`.
 module Probed.Fuel-Growth where
 
 open import Data.List using (List; []; _∷_)
@@ -70,9 +77,10 @@ open import Probed.Apparatus using (Confirms)
 
 ----------------------------------------------------------------------
 -- The two quantities the rows put side by side: how deep the values a
--- run hands out read, and what the machine seeded the rank at.  Both
--- are the sibling probe's, so a row here is comparable with a row
--- there.
+-- run hands out read, and what the ROOT is seeded at — the arrival's own
+-- entry adds a reading this does not take, which is the point the rows
+-- make.  Both are the sibling probe's, so a row here is comparable with
+-- a row there.
 ----------------------------------------------------------------------
 
 evNest : ∀ {n} {Γ : Ctx n} {u} → List (InstEvent (Closed Γ u)) → ℕ
