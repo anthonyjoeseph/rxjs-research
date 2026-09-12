@@ -15,12 +15,14 @@
 -- nobody — so `using ()` is the correct and expected clause here.  It is not
 -- an omission: it says this module's content is its pins.  See EVIDENCE.md.
 --
--- WHY THE TREE IS ONE FILE.  A probe expires with its target, and the
+-- WHY THE TREE IS SMALL.  A probe expires with its target, and the
 -- statements this tree was written against were the budget's: a grant,
 -- a nest store, a walk maximum, a caps arithmetic priced in gas.  None
 -- of them is stateable now, so the rows are evidence about a machine
--- that is gone and E2 expires every one of them.  What survives is the
--- one probe whose target is a live well-formedness postulate.
+-- that is gone and E2 expires every one of them.  What survived that
+-- was the one probe whose target is a live well-formedness postulate;
+-- `Probed.Descent` is the first written against the machine that
+-- replaced them.
 --
 -- What is worth recovering from the forty-two expired files is the
 -- HARNESS rather than any verdict — the real-evaluator plumbing, the
@@ -33,3 +35,8 @@ module Probed.Main where
 
 open import Probed.Root
   using (cellP1; rowP1; cellP4; rowP4; cellP7; rowP7; cellS2; rowS2)
+
+open import Probed.Descent
+  using (descP1; descP2; descP3; descP4; descP5;
+         descP6; descP7; descP8; descP9; descP10;
+         descP11; descP12)

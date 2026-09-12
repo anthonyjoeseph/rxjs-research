@@ -225,23 +225,22 @@ statement compute at every program with nothing sealed between them.
 
 ### Big picture tier roadmap
 
-- **INSTANTIATE THE GUARDS, AND REACH μ TO DO IT.**
-  `rank-sufficient` is the only row and nothing has ever been run against it —
-  which is why the class is FALSITY. Both sides compute at every program, so the
-  receipt would be cheap except that the one generator this repo has is μ-FREE,
-  and μ is where the rank guard lives — the behavioural gap and the proof gap
-  are the same region, which is what sets this leg's order. So the leg is the
-  apparatus and the rows together: μ, `varᵉ` and `deferᵉ` in the generator, plus
-  probe rows reporting WHICH of the three guards each exercises. A green names
-  the covered guards and never the statement; a red on the RANK guard is the
-  finding this campaign has been walking toward.
+- **REACH μ AT RANDOM — THE GENERATOR, NOT A THIRTEENTH HAND ROW.**
+  Twelve hand-written programs now instantiate all three guards, the rank one at
+  a share holding a recursion, so what is left is COVERAGE rather than a first
+  look and the class is DIFFICULTY. Hand rows have stopped paying: the next one
+  is the same shape picked by the same author, and depth two is where they all
+  stop. The generator is μ-FREE, so no seed ever swept has produced the
+  constructor the rank guard lives under; teaching it `μᵉ`, `varᵉ` and `deferᵉ`
+  puts the sweep on the region and closes the behavioural gap in the same edit.
+  A red there is the finding this campaign has been walking toward.
 
 ### The ledger
 
-- **`rank-sufficient`** (Verify-Rank-Sufficient) — FALSITY, `RECOVERY×3`: the
-  three descent guards never fail at the triple the evaluator enters at. The μ
-  and connect readings are monotone counts; the RANK one is the nesting face,
-  and nothing has been instantiated at any of the three.
+- **`rank-sufficient`** (Verify-Rank-Sufficient) — DIFFICULTY,
+  `PROBED, RECOVERY×3`: the three descent guards never fail at the triple the
+  evaluator enters at. Twelve recursive programs reach all three and hold;
+  nothing random reaches μ at all, and no program yet nests it deeper than two.
 
 ## Tier 2 — Verify-Well-Formed (parked behind tier 1)
 
