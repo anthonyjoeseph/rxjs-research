@@ -12,9 +12,9 @@
 --      properly hypothesised — no known-false placeholders): the
 --      step lemmas
 --      (subscribeE-wf, mid-step — the per-clause preservation
---      grind), mid-init, mid-skip, mid-final.  Budget sufficiency
---      is no longer assumed here: it is imported, proven, from
---      Verify-Budget-Sufficient.
+--      grind), mid-init, mid-skip, mid-final.  Stuck-freedom
+--      is not assumed here: it is imported as `rank-sufficient`,
+--      the one statement the descent discipline costs.
 --   3. The compositions — the subscribe frame, the chain fold, the
 --      fuel loop, and the theorem — are all DEFINED, glued by
 --      runProtocol's distribution over ++.
@@ -34,13 +34,10 @@ open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong; cong₂; subst)
 
 
--- from .Caps-Bridge, not from the top module: the top module is the
--- active caps grind, and importing it here would put this file on that
--- clock.
-open import Rx.Prim      using (Gas; Tick; Id; Source; InstEvent; close; delivery; exhausted)
+open import Rx.Prim      using (Tick; Id; Source; InstEvent; close; delivery; exhausted)
 open import Rx.Exp       using (Ctx; Closed; Val)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; RegId; Chain; Path; root; share-sink; _↠_; Frame; arrTy; arrSource;
-  arrVal; arrTick; chainStep; foldPath; cascadeGo; sameSource; hasDry; dropSource; budgetAt)
+  arrVal; arrTick; chainStep; foldPath; cascadeGo; sameSource; hasDry; dropSource; rootWitness)
 open import Rx.Protocol  using (ProtocolSt; Owed; countIn; allZero; runProtocol; paidUp; settle; payOwed; bumpOwed)
 
 ------------------------------------------------------------------
@@ -66,6 +63,12 @@ open import Verify-Well-Formed.Part9 using (FoldOut; foldPath-wf)
 open import Verify-Well-Formed.Part4 using (enterInstant; Mid; ≤-up)
 open import Verify-Well-Formed.Part2 using (CurrentPast)
 open import Decide using (force-false; true≢false; ∧-trueʳ; ∧-trueˡ; ≡ᵇ-refl; ≡ᵇ→≡)
+
+open import Induction.WellFounded using (Acc)
+open import Rx.Strat-Order using (Tri; _≺_)
+
+variable
+  τ : Tri
 
 seed-live-pos : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {a : Arrival Γ}
   {nextId : Id} {rid : RegId} {p : Path Γ (arrTy a) t}
@@ -289,7 +292,7 @@ postulate
   -- `foldSched` at the OUTER path, and the flip/steady certificates
   -- speak of the CURRENT (fin, st) which stepFrame rewrites.
   foldPath-frame-out : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {w u}
-    (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
+    (sf : Acc _≺_ τ) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
     (f : Frame Γ w u) (path′ : Path Γ u t)
     (vals : List (Val Γ w)) (evs : List (InstEvent (Val Γ t)))
     (fin : Bool) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt)
@@ -310,7 +313,7 @@ postulate
   -- now takes S′ and the equation from `foldPath-wf` and owes only the
   -- FoldOut, the diamond's net-zero owed statement.
   foldPath-share-out : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source) (i : Fin n)
+    (sf : Acc _≺_ τ) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source) (i : Fin n)
     (vals : List (Val Γ (lookup Γ i))) (evs : List (InstEvent (Val Γ t)))
     (fin : Bool) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt)
     (fi : FoldInv id envSrc evs fin sched st S) →
@@ -323,7 +326,7 @@ postulate
     FoldOut sf gas id now envSrc (share-sink i) vals evs fin sched st (FoldInv.ob′ fi) S S′
 
 foldPath-out : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
+  (sf : Acc _≺_ τ) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
   (path : Path Γ u t) (vals : List (Val Γ u)) (evs : List (InstEvent (Val Γ t)))
   (fin : Bool) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt)
   (fi : FoldInv id envSrc evs fin sched st S) →
@@ -414,7 +417,7 @@ postulate
     (fi : FoldInv nextId (arrSource a)
             (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
             (Arrival.isLast a) sched (record st { delivered = rid ∷ EvalSt.delivered st }) S) →
-    FoldOut (budgetAt e (Sched.slots sched) nextId) n nextId (arrTick a) (arrSource a)
+    FoldOut (rootWitness e (Sched.slots sched)) n nextId (arrTick a) (arrSource a)
       p (arrVal a ∷ [])
       (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
       (Arrival.isLast a) sched (record st { delivered = rid ∷ EvalSt.delivered st })
@@ -438,7 +441,7 @@ mid-step {n = n} {e = e} {a = a} {nextId} {rid} {p} {ps} {sched} {st} {S} mid ce
   let fi    = mid-seed mid ceq
       certs = mid-fold-certs mid ceq
       (S′ , run , fo) =
-        foldPath-out (budgetAt e (Sched.slots sched) nextId) n nextId
+        foldPath-out (rootWitness e (Sched.slots sched)) n nextId
           (arrTick a) (arrSource a) p (arrVal a ∷ [])
           (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
           (Arrival.isLast a) sched (record st { delivered = rid ∷ EvalSt.delivered st })

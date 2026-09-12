@@ -1,4 +1,4 @@
-.PHONY: find-prose gate cone-check cone-selftest roadmap-moved roadmap-moved-selftest roadmap-order roadmap-order-selftest roadmap-evidence gate-heavy gate-cheap gate-light dev-changed dev-changed-selftest stripped strip-selftest unmap-selftest postulates dup-check dup-selftest imports-check imports-fix imports-selftest find all help agda-dev agda-dev-selftest warm bg bg-check bg-wait bug-cache unsafe-check wiring wiring-selftest comments-check comments-selftest refuted ev ts-check cli-build oracle qc-build quickcheck harness harness-build
+.PHONY: find-prose gate cone-check cone-selftest roadmap-moved roadmap-moved-selftest roadmap-order roadmap-order-selftest roadmap-evidence gate-heavy gate-cheap gate-light dev-changed dev-changed-selftest stripped strip-selftest unmap-selftest postulates dup-check dup-selftest imports-check imports-fix imports-selftest find all help agda-dev agda-dev-selftest warm bg bg-check bg-wait bug-cache unsafe-check wiring wiring-selftest comments-check comments-selftest refuted ev ts-check cli-build oracle qc-build quickcheck
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -59,7 +59,7 @@ help:
 	@echo "                  are checked verbatim.  'make gate-heavy' is the merge gate"
 	@echo "                  NO whole-project sweep: measured out as costlier"
 	@echo "                  than 'make gate' at lower fidelity"
-	@echo "                  make agda-dev ARGS='Verify-Budget-Sufficient/Wet/Part2.agda'"
+	@echo "                  make agda-dev ARGS='Rx/Evaluator.agda'"
 	@echo "                  make agda-dev ARGS='<file> <member>'   (the grind loop)"
 	@echo "                  make agda-dev ARGS='--list <file>'    (block structure)"
 	@echo "                  HOLES=1 tolerate ? holes"
@@ -162,22 +162,6 @@ help:
 	@echo "                  make oracle                   (full seed sweep)"
 	@echo "                  make oracle ARGS='--seed 1'   (ONE seed only)"
 	@echo "                  make oracle ARGS='--operator mergeAll'"
-	@echo "  harness       THE COMPILED MEASUREMENT HARNESS: read a number off"
-	@echo "                  the machine's own arithmetic via the GHC backend,"
-	@echo "                  which runs the same definitions and IGNORES"
-	@echo "                  'abstract' (opacity is a typechecking contract,"
-	@echo "                  not a runtime one).  For rungs the checker cannot"
-	@echo "                  normalise -- but NOT for the caps counting family,"
-	@echo "                  measured DIVERGENT here too (see the quarantine in"
-	@echo "                  src/Harness/Main.agda: that blowup is arithmetic,"
-	@echo "                  not opacity, so no backend reaches it)"
-	@echo "                  ANYTHING READ OFF IT IS measured-not-rechecked: it"
-	@echo "                  is NOT a refl pin, cannot discharge a postulate,"
-	@echo "                  and exists to AIM the grind and to REFUTE.  Row 0"
-	@echo "                  is a refl-pinned CALIBRATION and a mismatch there"
-	@echo "                  VOIDS every other row (the run stops)"
-	@echo "                  make harness             (the terminating rows)"
-	@echo "                  make harness ARGS='10'   (one row, incl. quarantine)"
 	@echo "  qc-build      compile the all-Agda QuickCheck binary (agda/_cli/QuickCheck)"
 	@echo "  quickcheck    all-Agda QuickCheck: impl- vs spec-batchSimultaneous"
 	@echo "                  make quickcheck              (seeds 1..300, 200 runs each)"
@@ -219,7 +203,7 @@ agda-dev:
 # and lets Agda build the dependencies for real.  DELIBERATELY UNBUDGETED: it
 # is the one-time bill the loop is trying not to pay per iteration, so it is
 # meant to be long once.  Launch it detached and keep editing:
-#     make bg T=warm ARGS='Verify-Budget-Sufficient/Burst-Walk/Burst-Face.agda'
+#     make bg T=warm ARGS='Verify-Well-Formed/Part13.agda'
 warm:
 	scripts/agda-dev.py --warm $(ARGS)
 
@@ -1065,8 +1049,13 @@ comments-selftest:
 	    || { echo "SELFTEST FAIL: the path-and-colon citation form was missed"; fail=1; }; \
 	  echo "$$lr" | grep -q 'line 1920' \
 	    || { echo "SELFTEST FAIL: the prose citation form was missed -- only the path form fires"; fail=1; }; \
-	  echo "$$lr" | grep -q 'Wet:514' \
+	  ms=$$(basename $$(ls agda/src/Rx/*.agda | head -1) .agda); \
+	  md=$$(mktemp -d); \
+	  printf 'module GenRef where\n\n-- WHAT THIS LEAF OWES.  The arithmetic rides %s:514.\npostulate leaf : Set\n' "$$ms" > $$md/GenRef.agda; \
+	  mr=$$(scripts/check-comments.py --no-refs --dir $$md 2>&1); \
+	  echo "$$mr" | grep -q "$$ms:514" \
 	    || { echo "SELFTEST FAIL: the extensionless Module:NN form was missed -- the form this tree writes most often"; fail=1; }; \
+	  rm -rf $$md; \
 	  echo "$$lr" | grep -q '(~882)' \
 	    || { echo "SELFTEST FAIL: a tilde-number alone in its parentheses was missed -- the approximate citation names no module and carries no 'line', so the other three forms walk past it"; fail=1; }; \
 	  echo "$$lr" | grep -q 'see below, ~6307' \
@@ -1216,8 +1205,8 @@ NODRIFT := --drift 1000000
 
 dev-changed-selftest:
 	@fail=0; \
-	  m=agda/src/Verify-Budget-Sufficient/Walk-Level.agda; \
-	  n=agda/src/Verify-Budget-Sufficient/Walk-Level/Arms.agda; \
+	  m=agda/src/Rx/Evaluator.agda; \
+	  n=agda/src/Rx/Strat-Order.agda; \
 	  out=$$(scripts/dev-changed.py --verdict-only $(NODRIFT) --assume-stamp HEAD --files $$m 2>&1); ec=$$?; \
 	  echo "$$out" | grep -q 'FULL GATE REQUIRED' \
 	    || { echo "SELFTEST FAIL: a multi-member block did not escalate — agda-dev stubs those, so a light gate there is not a check"; fail=1; }; \
@@ -1231,7 +1220,7 @@ dev-changed-selftest:
 	  out=$$(scripts/dev-changed.py --verdict-only $(NODRIFT) --assume-stamp HEAD --max-files 2 --files $$n $$m $$n $$m 2>&1); \
 	  echo "$$out" | grep -q 'ESCALATE  4 changed modules' \
 	    || { echo "SELFTEST FAIL: a changed set over the ceiling did not escalate — N dev checks cost more than the one full build they replace"; fail=1; }; \
-	  w=agda/src/Verify-Budget-Sufficient/Caps-Face/Part5.agda; \
+	  w=agda/src/Rx/Prim.agda; \
 	  scripts/dev-changed.py --verdict-only $(NODRIFT) --assume-stamp HEAD --files $$w >/dev/null 2>&1 \
 	    || { echo "SELFTEST FAIL: a wide consumer cone escalated to the tower — a wide cone is the one thing the light path leaves unchecked, so the answer is to CHECK the cone (a few dev passes), never to buy the whole build"; fail=1; }; \
 	  out=$$(scripts/dev-changed.py --verdict-only --drift -1 --assume-stamp HEAD --files $$n 2>&1); \
@@ -1262,7 +1251,7 @@ dev-changed-selftest:
 	    || { echo "SELFTEST FAIL: a CONE member over budget was not reported as skipped — a timeout there is only the bet the light path already makes, and calling it RED makes every wide-cone run fail"; fail=1; }; \
 	  echo "$$out" | grep -q 'FAIL  agda/src/Verify-Well-Formed/Part13.agda' \
 	    || { echo "SELFTEST FAIL: a CHANGED module over budget was not a FAIL — that module is the one thing this run exists to check"; fail=1; }; \
-	  out=$$(scripts/dev-changed.py --deps --budget 2 --cone-budget 0 --files agda/src/Verify-Budget-Sufficient/Caps-Bridge.agda 2>&1); \
+	  out=$$(scripts/dev-changed.py --deps --budget 2 --cone-budget 0 --files $$n 2>&1); \
 	  echo "$$out" | grep -q 'unchecked: ' \
 	    || { echo "SELFTEST FAIL: the cone sweep spent past its TOTAL budget — the per-module budget bounds one check and nothing bounded the sum, so a changed set low in the tower outspends the one build that checks all of it"; fail=1; }; \
 	  if [ -f .gate-heavy-stamp ]; then \
@@ -1270,7 +1259,7 @@ dev-changed-selftest:
 	      || { echo "SELFTEST FAIL: the changed set is measured against HEAD while a heavy-gate stamp exists — a session that COMMITS then gates has a clean tree, so nothing gets checked and the gate reports ALL GREEN about a commit it never looked at"; fail=1; }; \
 	  fi; \
 	  out=$$(scripts/dev-changed.py --plan --deps --files $$n 2>&1); \
-	  echo "$$out" | grep -q 'skip  agda/src/Verify-Budget-Sufficient/Walk-Level.agda  — has a multi-member mutual block' \
+	  echo "$$out" | grep -q "skip  $$m  — has a multi-member mutual block" \
 	    || { echo "SELFTEST FAIL: a cone member with a multi-member block was dropped in SILENCE — agda-dev stubs a block's siblings, so a dev check there is not a check, and the consumer that validates a new arm's FIT is exactly such a module"; fail=1; }; \
 	  out=$$(scripts/dev-changed.py --verdict-only $(NODRIFT) --files 2>&1); \
 	  echo "$$out" | grep -q '0 changed .agda file(s)' \
@@ -1351,27 +1340,6 @@ cli-build: stripped
 
 oracle: cli-build
 	cd typescript && npm run oracle -- $(ARGS)
-
-# THE MEASUREMENT HARNESS -- a COMPILED calculator for numbers the typechecker
-# cannot reach.  Every row it prints is measured-not-rechecked and can
-# discharge nothing.  Row 0 is a calibration and `make harness` stops on a
-# mismatch.  See docs/harness.md.
-HARNESS_ROWS ?= 2
-harness-build: stripped
-	@$(call AGDA_RUN,--compile --compile-dir=../_harness src/Harness/Main.agda)
-
-harness: harness-build
-	@cd agda && cal=$$(echo 0 | ./_harness/Main); \
-	 case "$$cal" in \
-	   *65536*) echo "harness: $$cal  [calibrated]";; \
-	   *) echo "harness: CALIBRATION FAILED — every other row is VOID."; \
-	      echo "  row 0 printed: $$cal"; \
-	      echo "  expected 65536, the value Harness/Main.agda pins by refl."; \
-	      echo "  the GHC backend has diverged from the typechecker; do not read on."; \
-	      exit 1;; \
-	 esac; \
-	 if [ -n "$(ARGS)" ]; then echo "$(ARGS)" | ./_harness/Main; \
-	 else for n in $$(seq 1 $(HARNESS_ROWS)); do echo $$n | ./_harness/Main; done; fi
 
 qc-build: stripped
 	@$(call AGDA_RUN,--compile --compile-dir=../_cli src/QuickCheck.agda)

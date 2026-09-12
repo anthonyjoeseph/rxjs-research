@@ -12,9 +12,9 @@
 --      properly hypothesised — no known-false placeholders): the
 --      step lemmas
 --      (subscribeE-wf, mid-step — the per-clause preservation
---      grind), mid-init, mid-skip, mid-final.  Budget sufficiency
---      is no longer assumed here: it is imported, proven, from
---      Verify-Budget-Sufficient.
+--      grind), mid-init, mid-skip, mid-final.  Stuck-freedom
+--      is not assumed here: it is imported as `rank-sufficient`,
+--      the one statement the descent discipline costs.
 --   3. The compositions — the subscribe frame, the chain fold, the
 --      fuel loop, and the theorem — are all DEFINED, glued by
 --      runProtocol's distribution over ++.
@@ -31,10 +31,7 @@ open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong; cong₂; subst)
 
 
--- from .Caps-Bridge, not from the top module: the top module is the
--- active caps grind, and importing it here would put this file on that
--- clock.
-open import Rx.Prim      using (Gas; Tick; Id; Source; InstEmit; InstEvent; init; value; close; handoff; complete; EmitKind;
+open import Rx.Prim      using (Tick; Id; Source; InstEmit; InstEvent; init; value; close; handoff; complete; EmitKind;
   _at_from_as_)
 open import Rx.Exp       using (Ctx; Closed; Val; Fn; _×ᵗ_; Tm; scanᵉ; evalTm)
 open import Rx.Evaluator using (Sched; EvalSt; Stream; Path; _↠_; scan-f; take-f; takeVals; takeDispatch; cutThrough;
@@ -51,13 +48,19 @@ open import Verify-Well-Formed.Part5 using (pushBurst-scan-run)
 open import Verify-Well-Formed.Part2 using (BurstInv; HotLive;
                                             liveTypeOK?-sweepLive;
                                             subscribeE-hot-live)
-open import Verify-Budget-Sufficient.Node-Table using
+open import Verify-Support.Node-Table using
   (lookupNode-setNode; ≟ᵗ-refl)
 open import Verify-Well-Formed.Part1 using (countRegs; regTyped?)
 open import Decide using (not-out; true≢false)
 
+open import Induction.WellFounded using (Acc)
+open import Rx.Strat-Order using (Tri; _≺_)
+
+variable
+  τ : Tri
+
 pushBurst-scan-fixed : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-  (fuel : Gas) (id : Id) (now : Tick) (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
+  (fuel : Acc _≺_ τ) (id : Id) (now : Tick) (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
   (κ : Path Γ u t) (burst : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) (acc : Val Γ u) →
   lookupNode nid (EvalSt.nodes st) ≡ just (scan-st acc) →
   (EvalSt.registry (proj₂ (proj₂ (pushBurst fuel id now (scan-f fn nid) κ burst sched st)))
@@ -84,7 +87,7 @@ pushBurst-scan-fixed {u = u} fuel id now fn nid κ ((es at i from s as k) ∷ em
 -- The `acc, nodeP` node-persistence witness is the one piece
 -- still owed from the walk's fresh-node discipline.
 subscribeE-scan-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-  (fuel : Gas) (f : Fn Γ [] [] [] (u ×ᵗ s) u) (seed : Tm Γ [] [] [] u) (b : Closed Γ s)
+  (fuel : Acc _≺_ τ) (f : Fn Γ [] [] [] (u ×ᵗ s) u) (seed : Tm Γ [] [] [] u) (b : Closed Γ s)
   (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
   BurstInv id sched st S →
   (let nid = proj₁ (mintNode sched)
@@ -224,7 +227,7 @@ takeDispatch-cut nid vals fin sched st k lk dc rewrite lk | dc = refl
 -- goal.  A non-exhausted budget re-emits proj₁ (takeVals kCount vals) with no
 -- bookkeeping of its own, threading the remaining count into the node.
 pushBurst-take-noncut-cons : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-  (fuel : Gas) (id : Id) (now : Tick) (nid : NodeId) (κ : Path Γ s t)
+  (fuel : Acc _≺_ τ) (id : Id) (now : Tick) (nid : NodeId) (κ : Path Γ s t)
   (es : List (InstEvent (Val Γ s))) (i : Id) (src : Source) (ek : EmitKind)
   (ems : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) (kCount : ℕ) →
   lookupNode nid (EvalSt.nodes st) ≡ just (take-st kCount) →
@@ -259,7 +262,7 @@ pushBurst-take-noncut-cons {Γ = Γ} {t = t} {e = e} {s = s}
 -- followed by the tail pushed through the severed state (registry = kept,
 -- live swept, node reset to take-st zero).
 pushBurst-take-cut-cons : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-  (fuel : Gas) (id : Id) (now : Tick) (nid : NodeId) (κ : Path Γ s t)
+  (fuel : Acc _≺_ τ) (id : Id) (now : Tick) (nid : NodeId) (κ : Path Γ s t)
   (es : List (InstEvent (Val Γ s))) (i : Id) (src : Source) (ek : EmitKind)
   (ems : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) (kCount : ℕ) →
   lookupNode nid (EvalSt.nodes st) ≡ just (take-st kCount) →
@@ -391,7 +394,7 @@ cut-tail-nil {Γ = Γ} {s = s} kCount es i src ek ems dc vl
 -- last emit is pushed to a burst whose payload rides its last emit.  This is
 -- what lets subscribeE-wf's Σ-conclusion carry valsLast? through takeᵉ.
 pushBurst-take-valsLast : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-  (fuel : Gas) (id : Id) (now : Tick) (nid : NodeId) (κ : Path Γ s t)
+  (fuel : Acc _≺_ τ) (id : Id) (now : Tick) (nid : NodeId) (κ : Path Γ s t)
   (burst : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) (kCount : ℕ) →
   lookupNode nid (EvalSt.nodes st) ≡ just (take-st kCount) →
   valsLast? burst ≡ true →

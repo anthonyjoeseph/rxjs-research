@@ -18,9 +18,9 @@
 --      properly hypothesised — no known-false placeholders): the
 --      step lemmas
 --      (subscribeE-wf, mid-step — the per-clause preservation
---      grind), mid-init, mid-skip, mid-final.  Budget sufficiency
---      is no longer assumed here: it is imported, proven, from
---      Verify-Budget-Sufficient.
+--      grind), mid-init, mid-skip, mid-final.  Stuck-freedom
+--      is not assumed here: it is imported as `rank-sufficient`,
+--      the one statement the descent discipline costs.
 --   3. The compositions — the subscribe frame, the chain fold, the
 --      fuel loop, and the theorem — are all DEFINED, glued by
 --      runProtocol's distribution over ++.
@@ -46,9 +46,6 @@ open import Relation.Binary.PropositionalEquality
 
 open import Relation.Nullary using (yes; no)
 
--- from .Caps-Bridge, not from the top module: the top module is the
--- active caps grind, and importing it here would put this file on that
--- clock.
 open import Rx.Prim      using (Source; InstEmit; InstEvent; init; value; close; handoff; complete)
 open import Rx.Exp       using (Ctx; Closed; Ty; _≟ᵗ_)
 open import Rx.Evaluator using (EvalSt; Arrival; RegId; Chain; Path; root; share-sink; _↠_; Frame; from-inner; thru-outer;
@@ -86,7 +83,7 @@ acceptPaid : (S : ProtocolSt) → paidUp S ≡ true → Accepted (checkFinal (ju
 acceptPaid S eq rewrite eq = accepted
 
 -- dry-freeness splits over ++ (the step lemmas are conditioned on it;
--- the imported budget-sufficient supplies it for the whole seeded run)
+-- the imported `rank-sufficient` supplies it for the whole seeded run)
 
 hasDry-++ : ∀ {A : Set} (xs ys : List (InstEmit A)) →
   hasDry (xs ++ ys) ≡ false →

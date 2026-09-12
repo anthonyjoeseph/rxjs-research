@@ -3,7 +3,10 @@ module Rx.Evaluator where
 open import Data.Bool    using (Bool; true; false; if_then_else_; not; _∨_; _∧_)
 open import Data.Fin     using (Fin; toℕ)
 open import Data.Maybe   using (Maybe; just; nothing; is-nothing)
-open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _*_; _^_; _<ᵇ_; _≡ᵇ_; _≤ᵇ_)
+open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _^_; _<ᵇ_; _≡ᵇ_; _≤ᵇ_)
+open import Data.Nat.Properties using (_<?_; ≤-refl)
+open import Data.Nat.ListAction using (sum)
+open import Induction.WellFounded using (Acc; acc)
 open import Data.List    using (List; []; _∷_; _++_; map; concat; tabulate; null)
 open import Data.Bool.ListAction using (any)
 open import Data.Vec     using (lookup)
@@ -11,30 +14,31 @@ open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Unit    using (⊤; tt)
 open import Data.Sum     using (_⊎_; inj₁; inj₂)
 open import Relation.Nullary using (yes; no)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl)
+open import Relation.Binary.PropositionalEquality using (refl)
 
-open import Rx.Prim using (Tick; Fuel; Ordinal; Id; Source; Gas; g0; gs; gasTower; gasPad; towerℕ; Timed; after_,_; hot;
+open import Rx.Prim using (Tick; Fuel; Ordinal; Id; Source; Timed; after_,_; hot;
   cold; InstEvent; init; value; close; handoff; complete; cut; cutPending; exhausted; dried;
   subscribe; delivery; plumbing; InstEmit; _at_from_as_)
-open import Rx.Exp  using (Ty; obs; _×ᵗ_; _≟ᵗ_; Ctx; Val; Closed; Fn; applyFn; evalTm; unfoldμ; sizeᵉ; input; ofᵉ;
+open import Rx.Exp  using (Ty; obs; _×ᵗ_; _≟ᵗ_; Ctx; Val; Closed; Fn; applyFn; evalTm; unfoldμ; sizeᵉ; syncSizeᵉ; input; ofᵉ;
   emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ)
--- for `entryCeil`: the caps recurrence's BASE width, which `budgetAt`
--- must know because it must dominate the recurrence
-open import Rx.Frame-Width using (entryCeil)
+-- the order the subscription machine recurses on, in place of a
+-- counter: one constructor per non-structural edge, and nothing
+-- packed, so no edge owes a ceiling on the components it leaves alone
+open import Rx.Strat-Order using (Tri; _≺_; ltU; ltR; ltS; ≺-wellFounded)
+
+variable
+  τ : Tri
 
 
 ------------------------------------------------------------------
 -- Inputs, canonical stream, traces
 ------------------------------------------------------------------
 
--- THE SLOT TELESCOPE lives in Rx.Slots and is re-exported here: the
--- width measures need it too, and `budgetAt` below reads THEIR entry
--- ceiling, so the telescope has to sit under both.  Defs must reference
--- only strictly earlier slots (a const telescope) — checked by the
--- generator/decoder, not by these types; a forward reference is
--- rejected there.
+-- THE SLOT TELESCOPE lives in Rx.Slots and is re-exported here.  Defs
+-- must reference only strictly earlier slots (a const telescope) —
+-- checked by the generator/decoder, not by these types; a forward
+-- reference is rejected there.
 open import Rx.Slots using (scripted; shared; Slots; slotsSize)
-open import Rx.Slot-Clos using (slotsClos)
 
 Stream : ∀ {n} → Ctx n → Ty → Set          -- flat, canonical emission order
 Stream Γ t = List (InstEmit (Val Γ t))
@@ -85,6 +89,33 @@ sameSource = _≡ᵇ_
 
 memberSource : Source → List Source → Bool
 memberSource s = any (sameSource s)
+
+-- THE UNCONNECTED-SHARE COUNT, outermost component of the order the
+-- subscription machine descends on.  A connect moves one shared slot
+-- out of the count and nothing puts one back, so that edge descends on
+-- a quantity the telescope itself bounds and owes no budget.
+unconnAt : ∀ {n} {Γ : Ctx n} → Slots Γ → List Source → Fin n → ℕ
+unconnAt sl cs i with sl i
+... | shared _   = if memberSource (toℕ i) cs then 0 else 1
+... | scripted _ = 0
+
+unconn : ∀ {n} {Γ : Ctx n} → Slots Γ → List Source → ℕ
+unconn sl cs = sum (tabulate (unconnAt sl cs))
+
+-- THE ENTRY WITNESS, NAMED RATHER THAN INLINED.  Every re-entry from
+-- OUTSIDE the subscription machine — the root subscribe, and each
+-- arrival's chain fold — starts a fresh descent, so each supplies its
+-- own accessibility at the point the program and the slots determine.
+-- It is one definition because those points agree, and because every
+-- well-formedness statement that quantifies over an entry has to name
+-- the same triple: a statement entered at a triple nothing else uses is
+-- a statement about a run the evaluator never makes.
+rootTri : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → Tri
+rootTri e sl = unconn sl [] , 2 ^ (sizeᵉ e + slotsSize sl) , syncSizeᵉ e
+
+rootWitness : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+            → Acc _≺_ (rootTri e sl)
+rootWitness e sl = ≺-wellFounded (rootTri e sl)
 
 -- delta-encoded waits → absolute ticks (gap = suc wait, so a source's
 -- ticks are strictly increasing by construction)
@@ -342,12 +373,14 @@ oneShotBurst vals id sched =
   in ((init src ∷ map value vals ++ close src exhausted ∷ complete ∷ [])
        at id from src as subscribe) ∷ [] , sched₁
 
--- sync fuel: the totality budget for one cascade's synchronous work.
--- The subscription machine decrements it at exactly its three
--- non-structural edges — a μ unfold, a share connect, an inner-value
--- subscription — and every other recursion is structural, so
--- termination is a lexicographic (fuel, expression) descent, no
--- pragma.  A dry run does NOT truncate silently: it emits a close
+-- THE STUCK MARKER.  The subscription machine recurses on an
+-- accessibility witness for `Rx.Strat-Order`'s lexicographic triple,
+-- dropping one component at each of its three non-structural edges — a
+-- share connect, an inner-value subscription, a μ unfold — while every
+-- other recursion stays structural, so termination needs no pragma.
+-- Two of the three drops are facts about measures the run cannot move
+-- the wrong way; the third is a rank a run may exhaust, and exhausting
+-- it is what this marker reports.  A dry run does NOT truncate silently: it emits a close
 -- with reason `dried` — a CloseReason no machine rule ever emits —
 -- so hasDry recognizes it EXACTLY, QuickCheck's WF check flags it at
 -- runtime (the close's source is never inited, which the strict
@@ -357,10 +390,7 @@ oneShotBurst vals id sched =
 -- Source is an unbounded ℕ and mints are breadth-many (fuel is only
 -- depth-consumed), so a burst can legally mint past any numeric
 -- sentinel — a sentinel-source check would misfire on a wet run.
--- drySource survives only as the envelope's cosmetic source id.  The
--- seeded budget (syncBudget below) is exponential in program size and
--- instant index — astronomically above the sync work any canonical
--- program performs; proving that is Formal-Verification work
+-- drySource survives only as the envelope's cosmetic source id.
 drySource : Source
 drySource = 18446744073709551615
 
@@ -369,9 +399,8 @@ dryBurst id =
   ((close drySource dried ∷ []) at id from drySource as subscribe) ∷ []
 
 -- did the run go dry anywhere?  Verify-Well-Formed's step lemmas are
--- conditioned on `hasDry … ≡ false`, and the budget-sufficient
--- postulate asserts it for the seeded budget — the totality debt as a
--- provable statement
+-- conditioned on `hasDry … ≡ false`, and `rank-sufficient` asserts it
+-- for the seeded descent — the totality debt as a provable statement
 dryEvent : ∀ {A : Set} → InstEvent A → Bool
 dryEvent (close _ dried) = true
 dryEvent _               = false
@@ -380,348 +409,40 @@ hasDry : ∀ {A : Set} → List (InstEmit A) → Bool
 hasDry []         = false
 hasDry (em ∷ ems) = any dryEvent (InstEmit.events em) ∨ hasDry ems
 
--- a TOWER of 2s, height (size+1)·(id+1) — no 2^(polynomial) budget is
--- sufficient.  Why: a scanᵉ with an obs-typed accumulator whose
--- template embeds the accumulator twice (acc ↦ mergeAll(of[acc,acc]))
--- converts value COUNT into subscription DEPTH one-for-one (after k
--- folded values the acc nests k deep, and fuel is depth-consumed —
--- siblings share it), while SUBSCRIBING that acc emits its 2^k leaves
--- as values — count exponentiates at each chained scan.  Measured
--- exactly: thresholds 2,3,5,9 = 2^d+1 for one scan over
--- 2^d values; counts 2,6,30,510 = 2^(2^d+1)−2; the next scan's
--- threshold tracks that count.  So fuel demand towers in the number
--- of chained scans (≤ size per instant, and scan state compounds one
--- story per instant across cascades) while syntax stays linear —
--- e.g. two scans over 2^7 values: size 80, demand ~2^129.  μ adds no
--- stories across instants (unfoldμ substitutes the ORIGINAL closed
--- μ).  Height linear in size and instant dominates with slack.
--- Gas, not ℕ: see Rx.Prim — a tower can never materialize strictly.
--- The gasPad literal head (the old quadratic budget) is a pure fast
--- path: every physically runnable consumption stays inside it, so the
--- tower tail is never forced — evaluation cost is exactly the old
--- ℕ budget's, while the tail carries the theorem's sufficiency.
--- Height (7+size)·(id+2), THREE-plus stories above the store bound
--- (Verify-Budget-Sufficient's sizeBudgetAt, height (4+size)·(id+1)):
--- the wet contract's demand anchors at the instant's LANDING budget
--- (mid-walk stores legitimately outgrow the entry cap, so the
--- fixed-per-instant demand base is the next instant's store bound,
--- height (4+size)·(id+2)) and is polynomial in that bound with a
--- syntax-sized exponent (rank of the shell multiset); a tower
--- absorbs any polynomial fudge within two stories — the rest is
--- margin.  The extra stories are free: the tower tail is lazy and
--- never forced on a feasible run.
-
--- AND THE HEIGHT IS NO LONGER LINEAR IN THE INSTANT.  It was, while the
--- caps recurrence's per-instant fold count was `D̂ · cSize`: four tower
--- stories an instant, height (7+sz)(id+2), and `capsAt-tower` bracketed
--- the whole recurrence by that closed form.  Charge-Probe and
--- Instant-Height then priced the frame receipt the induction actually
--- builds — `suc (length vals · suc (sizeᵗ fn))` per frame, a PAYLOAD
--- WIDTH — and the count that fits every measured row reads cWid.  It is
--- now the WALK'S OWN LANDING LEVEL rather than a product of it:
+-- THE DESCENT DISCIPLINE, read off the clauses below.  Each of the
+-- three edges that reaches a deeper subscribe drops its OWN component
+-- of the triple and leaves the other two free to be re-seeded, which is
+-- what a lexicographic order buys and what a single counter could not:
+-- packing the three into one number is exactly what made a budget owe a
+-- ceiling on the two components it was not descending on.
 --
---     sizeCount c d = lvls (cSize c) (cWid c) d 0 (cDel c d)
+--   · `sharedConnect → subscribeE` drops the unconnected-share count;
+--   · `subscribeInner → subscribeE` drops the hop rank;
+--   · `subscribeE (μᵉ body) → subscribeE (unfoldμ body)` drops syncSize.
 --
--- i.e. the level one instant's deliveries climb to, each delivery
--- charged at the level the one before it LEFT.  The product it replaces
--- (`cDel c · cSize c · suc (suc cWid · suc cSize)`, a whole cascade
--- charged at its ENTRY level) is DOMINATED by it — a linearity step at J = 0,
--- measured by a probe module since DELETED (git history) — so nothing the old count covered is
--- lost, and the iterated form is what `cascadeGo-level` actually proves,
--- which is what makes the per-instant charge a theorem.
---
--- A count reading cWid iterates the tower FUNCTION once per instant
--- (Width-Count-Probe), so no towerℕ-of-linear-height bracket exists and
--- no closed form does either.  What replaces it is the same move the
--- caps themselves made: a RECURRENCE.  `capsHt sz id` is the tower
--- height of `capsAt e sl id`, one `blowH` per instant, and `blowH` is
--- exactly what one frameBlowup's inequalities demand plus visible
--- margin — so domination is by construction rather than by arithmetic.
+-- EVERY other route through the pipeline carries the witness unchanged
+-- because it stays at ONE nesting level — `subscribeE` walking its own
+-- operator chain (map / take / scan / the three *All), the `pushBurst →
+-- stepFrame → thruWalk → thruConsume` re-entry of a burst,
+-- `mergeAllDrain` off `innerFinish`, and `foldPath → dispatchShare →
+-- shareGo → stepFrame`, which threads the witness unchanged through a
+-- delivery.  So no path reaches `subscribeInner` at the witness it was
+-- called with: the three `thruConsume` sites and the one
+-- `mergeAllDrain` site are reached from a `stepFrame` running at the
+-- caller's witness, and the drop happens INSIDE `subscribeInner` before
+-- control reaches `subscribeE`.  `deferᵉ` is not a nesting edge at all
+-- — it parks the body for `suc now`, a later instant seeded afresh.
 
--- THE PER-INSTANT COST, at a pooled level M (every Caps field ≤ M):
+-- AND THAT READING IS CHECKED RATHER THAN READ OFF.  `make
+-- recursion-cover` cuts the edges declared below and requires every
+-- cycle still standing to be declared too: cutting three edges
+-- collapses BOTH of this module's multi-member recursions and exactly
+-- one cycle survives, the pair that walks the expression.  A clause
+-- opening a fourth edge fails that check rather than going on
+-- compiling, which is the one thing Agda's own termination checker
+-- cannot say — it is satisfied by the witness and silent about which
+-- edges carry it.
 
---   THE COUNT     sizeCount c m ≤ poolCount M m     (by monotonicity —
---                 poolCount IS sizeCount with every field pooled and
---                 the SAME fuel, so this costs no arithmetic at all)
---   THE SIZE      a factor (3T) per fold, sizeCount folds
---                                                  TWO stories
---   THE REGISTRY  linear in the count               ONE more
---   THE WIDTH     TWO stories PER FOLD (foldStep squares into the
---                 next-but-one level), sizeCount folds
---                                                  → m + 2 · sizeCount
---
--- and the width term dominates everything else by an exponential, which
--- is why the height is now tower-VALUED rather than linear.  It costs
--- nothing: Gas is lazy, `capsHt` is never normalised, and the gasPad
--- literal head in front of it is the same fast path it always was
-
-------------------------------------------------------------------
--- THE DELIVERY BUDGET, AND WHY IT IS A RECURSION AND NOT A FORMULA.
-
--- One cascade's deliveries are a TREE: `cascadeGo` walks the chains
--- (at most cReg of them), a delivery's `foldPath` bottoms out at one
--- `share-sink`, and `dispatchShare` fans out over `shareAdmit`'s
--- SNAPSHOT of the registry, one dispatch gas cheaper.  So the depth is
--- capped by the dispatch gas and the branching by the registry AS OF
--- THAT DISPATCH — and the registry GROWS mid-cascade, by at most `Q`
--- mints per delivery (a mint is a subscribe, hence a charged step, so Q
--- is the per-delivery charge).
-
--- EVERY CLOSED FORM FAILS, AND NOT BY A CONSTANT.  Each closed attempt
--- bounded the registry through the deliveries and the deliveries
--- through the registry:
---
---     R ≤ cReg + Q · D          D ≤ (1 + R) ^ (1 + n)
---
--- i.e. `D ≤ (1 + cReg + Q · D) ^ (1 + n)`, which has NO solution — the
--- right-hand side outgrows the left at every D, so the pair of facts
--- bounds nothing whatever the constants.  A bigger closed form does not
--- help; the fix is to stop asking for one.
-
--- `dCapᶜ` IS THE SEQUENTIAL READING OF THE SAME TWO FACTS.  The walk
--- happens one chain at a time, and what a later chain sees is what the
--- deliveries ALREADY MADE left behind — which is exactly the ordering
--- fact the mint loop obeys (a minted registration is reachable only by
--- dispatches that come AFTER it, Mint-Loop-Shapes' reading of R_end).
--- Written that way the recursion is on the dispatch gas outside and the
--- walk position inside, and it is well-founded precisely where the
--- closed form was circular.
-
--- AND WHAT IT THREADS IS THE CAPS LEVEL, NOT A REGISTRY.  The first
--- version threaded `R + Q · suc d` with `Q` a per-delivery mint budget
--- read once at the cascade's ENTRY caps, and charging anything
--- per-frame at the entry caps is machine-refuted by
--- `Refuted.Caps-Face.caps-frame-boundary-absurd`: one `map-f` frame's output
--- breaches the very cap it was charged at, because `applyFn` grows a
--- value.  The honest per-frame face REPORTS its growth as an index j′
--- and lands at `frameStep (j + j′) c`, so the walk carries that index:
---
---   · a FRAME costs `fCharge S W J`, the receipt `scanFrame-caps` pays
---     (`suc (length vals * suc (sizeᵗ fn))`) read at the level the frame
---     RUNS at — its factors are the burst ledger's width conjunct and
---     the size cap, both at `frameStep J c`;
---   · a DELIVERY is a chain of frames, each at the level the one before
---     it LEFT, so `dLvl` ITERATES that receipt over the chain (capped at
---     `suc (sizeAt S J)`, pathSz?'s own length conjunct) instead of
---     multiplying by it — a product would repeat the refuted error one
---     level down;
---   · and the REGISTRY needs no accounting at all: `capsOK?`'s fifth
---     conjunct is `length registry ≤ cReg (frameStep J c)`, so the walk
---     a dispatch fans out over is `regAt S R J` long.
-
--- It is POINTWISE ABOVE the registry walk it replaces
--- (measured as `old-cDel≤new-cDel` in a probe module since DELETED), so every
--- measured delivery row the old bound cleared this one clears too.
-
--- IT IS ACKERMANN-FLAVOURED IN THE GAS, and that costs nothing here:
--- `blowH` READS it, so the per-instant story increment stays true by
--- construction rather than by arithmetic.  The price of a lazy Gas
--- tower's height being large is nothing at all
--- ONE FOLD's worst case on a width — AND WHY IT READS THE SIZE.
-
--- The earlier `2 ^ suc w` was gated against deepScan's PAYLOAD count and
--- is refuted against the quantity capsOK? actually bounds: one fold
--- takes deepScan's stored width 1 ↦ 6 where it allowed 4
--- (State-Blowup-Probe).  The reason is structural — `innWᵉ (scanᵉ f z e)`
--- puts the source's width in an EXPONENT whose base is read off the step
--- function's syntax — so the per-fold multiplier is a property of `f`,
--- and cSize is the only thing in Caps that bounds a step function.
-
--- Note this is a strict GENERALISATION: at S = 2 it is exactly the old
--- step, so Frame-Work-Probe's 2 / 6 / 126 gates still read as before
-foldStep : ℕ → ℕ → ℕ
-foldStep S w = S ^ suc w
-
-iterFold : ℕ → ℕ → ℕ → ℕ
-iterFold S zero    w = w
-iterFold S (suc k) w = iterFold S k (foldStep S w)
-
--- ONE FOLD's worst case on a SIZE, straight off size-subΘᵉ: a fold
--- substitutes the accumulator into the step function, and
--- size-subΘᵉ bounds that by `sizeᵉ f * suc (2 * V)` with V the env cap.
--- Both `sizeᵉ f` and V are ≤ cSize, hence S in both positions
-sizeStep : ℕ → ℕ → ℕ
-sizeStep S s = S * suc (2 * s)
-
-iterSize : ℕ → ℕ → ℕ → ℕ
-iterSize S zero    s = s
-iterSize S (suc k) s = iterSize S k (sizeStep S s)
-
-
-------------------------------------------------------------------
--- THE LEVEL READING, AND THE WALK THAT CARRIES IT.
---
--- `dCap` above threads a REGISTRY and charges each delivery a fixed `Q`
--- read once at the cascade's ENTRY caps.  That charging is refuted by
--- `Refuted.Caps-Face.caps-frame-boundary-absurd`: one `map-f` frame's output
--- breaches the entry cap it was charged at, because `applyFn` grows a
--- value.  The honest per-frame face — the PROVEN `stepFrame-caps`
--- — reports a growth index j′ and lands its post-state at
--- `frameStep (j + j′) c`.  So the walk carries the LEVEL instead:
---
---   · a FRAME costs `fCharge`, the receipt `scanFrame-caps` pays
---     (`suc (length vals * suc (sizeᵗ fn))`) read at the level the frame
---     RUNS at — its two factors are the burst ledger's width conjunct
---     `suc (widAt S W J)` and the size cap `sizeAt S J`;
---   · a DELIVERY is a CHAIN of frames, each running at the level the one
---     before it left, so its cost is `iterL` — an ITERATION, not a
---     product.  (A product would charge a delivery's later frames at the
---     level it entered at, which is the same error one level down that
---     the refuted entry axioms made one level up.)  The chain is capped
---     at `suc (sizeAt S J)` by pathSz?'s own length conjunct, read at
---     the delivery's entry level;
---   · and the REGISTRY a later dispatch fans out over needs no separate
---     mint accounting at all: it is `capsOK?`'s own fifth conjunct read
---     at the current level, `regAt S R J = R * suc (J * S)`.
---
--- The recursion is the same lexicographic (dispatch gas, walk position)
--- descent `dCap` runs on — only the threaded quantity changed — and it
--- is POINTWISE ABOVE `dCap` at the same entry caps
--- (`old-cDel≤new-cDel`, in a probe module since DELETED), so every
--- measured D row the old bound cleared this one clears too, with no
--- re-measurement
-------------------------------------------------------------------
-
-sizeAt : ℕ → ℕ → ℕ
-sizeAt S J = iterSize S J S
-
-widAt : ℕ → ℕ → ℕ → ℕ
-widAt S W J = iterFold S J W
-
-regAt : ℕ → ℕ → ℕ → ℕ
-regAt S R J = R * suc (J * S)
-
-fCharge : ℕ → ℕ → ℕ → ℕ
-fCharge S W J = suc (suc (widAt S W J) * suc (sizeAt S J))
-
-fLvl : ℕ → ℕ → ℕ → ℕ
-fLvl S W J = J + fCharge S W J
-
-------------------------------------------------------------------
--- AND ONE FRAME COSTS MORE THAN ITS OWN RECEIPT, BECAUSE IT
--- SUBSCRIBES.  `fCharge` is what `scanFrame-caps` pays for the folds a
--- frame runs; it is NOT what a frame COSTS.  A `thru-outer` frame
--- subscribes one inner per payload, and that subscribe walks the
--- inner's operator chain installing frames of its own — so
---
---     one FRAME     ⟶ ≤ suc (widAt S W J) subscribes  (valsCaps?'s
---                                                      length conjunct)
---     one SUBSCRIBE ⟶ ≤ suc (sizeAt S J) operators, each ⟶
---                     ≤ suc (widAt S W J) frames      (pushBurst, one
---                                                      frame per emit)
---
--- and the two charges are MUTUALLY RECURSIVE, measured clause by clause off
--- the ground companion tree.  NO CLOSED FORM IN (S, W, J)
--- CLOSES THAT LOOP; it is the same failure `dCapᶜ` takes one stratum up
--- ("EVERY CLOSED FORM FAILS, AND NOT BY A CONSTANT", below), and it
--- takes the same repair: a RECURSION on a budget, with every level
--- quantity read at the level the walk has CLIMBED TO rather than at the
--- entry (charging at the entry is machine-refuted by
--- `Refuted.Caps-Face.caps-frame-boundary-absurd`).
-
--- THE BUDGET IS THE SUBSCRIBE-NESTING DEPTH `k`, and the loop is not
--- gas-escaping.  The obvious breach is a synchronous fixpoint
--- `μ x. mergeAll (of x)`, which would re-enter `subscribeE` once per
--- unfolding and be bounded by the GAS alone — and `budgetAt` is a tower
--- three stories above `capsAt`, so no reading of the Caps triple could
--- pay for it.  It is a TYPE ERROR: `μᵉ` binds into Δᵍ, `varᵉ` reads Δ,
--- and `deferᵉ` is the sole gate moving Δᵍ into scope (Rx.Exp), so a μ's
--- self-reference is reachable only across a TICK.  One subscribe
--- unfolds a μ at most as many times as the syntax nests them.
-
--- AND THE FAMILY IS WRITTEN IN THE ORDER THE CLAUSES RUN, which is not
--- a cosmetic choice: the receipts compose as a CHAIN of inflationary
--- maps, and two of them applied in the wrong order bound nothing.  A
--- map / take / *All clause spends one j on the frame its chain gains,
--- then subscribes its SOURCE (the rest of the operator chain), and only
--- then pushes the source's burst back through that frame — so `opIterK`
--- runs `opIterK` on the rest and `fIterK` on the result, never the
--- other way round.  Two further receipts the shape has to admit, both
--- read off the ground clauses: a payload's subscribe runs at `suc J`
--- (`subscribeInner` adds a from-inner frame before it subscribes), and
--- the per-operator EVAL receipt is QUADRATIC in the size cap, not
--- linear — `unfoldμ-caps` pays `m + suc (m * m)`, which `suc B` does
--- not cover and `suc B * suc B` does.  Each of the four clause shapes
--- then lands in one monotonicity step.
---
--- RECOVERY: `git show 94a5a3c^:agda/probe/Sub-Charge-Probe.agda` restores the
---   rows for the mutual recursion of the two charges and for the four clause
---   shapes' monotonicity step.
-
--- THE BUDGET IS RE-READ AT EVERY FRAME ENTRY, AND THE DEPTH FUEL `d` IS
--- WHAT PAYS FOR THE RE-READING.  `fLvlD S W (suc d) J` spends one unit
--- and instantiates k at `suc (sizeAt S J)`, the size cap at the level
--- THAT frame runs at — not at the level the subscribe that reached it
--- began at.  Inheriting the budget instead is refuted: a `scanᵉ` under an
--- *All mints a payload per fold, the k-th mint nests k deep and is subscribed in
--- the SAME delivery, and the carrier's own nesting stands still — so a
--- k read where the subscribe BEGAN (2, at S = 2, W = 1, J = 0) is spent
--- where the walk has CLIMBED TO (43690).  It is the Entry-Caps-Refuted
--- distinction moved from the caps to the budget.
---
--- DEAD ROUTE: inheriting the budget from the level the subscribe began at,
---   rather than re-reading it at the level the frame runs at.  Refuted in § 3
---   of the probe `git show 1f1730e^:agda/probe/Nest-Budget-Probe.agda`
---   recovers.
-
--- THE REFRESH IS SOUND AS A THEOREM.
--- `stepFrame` reaches `subscribeInner` from two clauses only —
--- `thru-outer`, whose payloads are its own arriving values, and a concat
--- drain, whose queue was filled at a LOWER level — so `valsCaps?` at the
--- frame's entry plus `sizeAt-mono` plus `nestᵛ ≤ sizeᵛ` bound every
--- payload a frame subscribes, and no row can breach it.  What it costs
--- is TERMINATION: `k` was the one descending argument (every cycle
--- passes `sLvlD`) and a refresh at a climbed level returns it LARGER, so
--- the fuel `d` is threaded as the argument that descends and the d = 0
--- clause is the old family's own k = 0 answer, `J + m`.
---
--- RECOVERY: `git show 94a5a3c^:agda/probe/Refresh-Probe.agda` restores the
---   rows for the refresh's soundness.
-
--- AND `d` IS THE BUDGET RECURRENCE'S OWN HEIGHT, THREADED EXPLICITLY
--- (the ruling).  It is NOT read off (S, W, J): a fuel read
--- at a level is spent after a climb, which is the same refutation one
--- stratum up.  The one supplier that owes no new invariant is the
--- evaluator's OWN `Gas`, and the gas discipline that licenses it is
--- read off the clauses below:
---
---   · `subscribeInner g0 … = close drySource dried ∷ []` — a subscribe
---     with no gas installs NOTHING, so a nesting level costs a peel;
---   · the only three edges that reach a deeper subscribe all peel one:
---     `subscribeInner (gs fuel) → subscribeE fuel`,
---     `sharedConnect (gs fuel′) → subscribeE fuel′`, and
---     `subscribeE (gs fuel) (μᵉ body) → subscribeE fuel (unfoldμ body)`;
---   · and EVERY other route through the pipeline keeps the gas fixed
---     because it stays at ONE nesting level — `subscribeE fuel` walking
---     its own operator chain (map / take / scan / the three *All), the
---     `pushBurst fuel → stepFrame fuel → thruWalk fuel → thruConsume
---     fuel` re-entry of a burst, `mergeAllDrain fuel` off `innerFinish`,
---     and `foldPath sf → dispatchShare sf → shareGo sf → stepFrame sf`,
---     which threads the SYNC fuel unchanged through a delivery.
---
---   So no path reaches `subscribeInner` at the gas it was called with:
---   the three `thruConsume` sites and the one `mergeAllDrain` site are
---   reached from a `stepFrame` running at the caller's gas, and the peel
---   happens INSIDE `subscribeInner` before control reaches `subscribeE`.
---   `deferᵉ` is not a nesting edge at all — it parks the body for
---   `suc now`, a later instant with a budget of its own.  Hence
---   subscribe-nesting depth ≤ the gas the instant runs under, by
---   induction on the evaluator's own recursion.
-
--- AND THAT READING IS NOW CHECKED RATHER THAN READ OFF, WHICH IS WHAT
--- LETS AN ORDER STAND IN FOR THE COUNTER.  `make recursion-cover` cuts
--- the edges declared below and requires every cycle still standing to
--- be declared too.  The result is the coverage claim `Rx.Strat-Order`
--- is written against: cutting three edges collapses BOTH of this
--- module's multi-member recursions — the twelve-member subscribe one
--- and the three-member share one — and exactly one cycle survives, the
--- pair that walks the expression.  So a counter is buying visibility at
--- three sites and everything else already descends on an argument it
--- holds; a clause that opened a fourth would fail the check rather than
--- go on compiling, which is the one thing Agda's own termination
--- checker cannot say, since it is satisfied by the counter and silent
--- about which edges carry it.
---
 -- THE SHARE HOP IS ITS OWN RECURSION AND DOES NOT JOIN THE TRIPLE.  Its
 -- counter is a plain `ℕ` bounding the slot telescope, it peels once per
 -- hop, and it reaches the frame walk one way only — nothing in the
@@ -737,262 +458,9 @@ fLvl S W J = J + fCharge S W J
 -- μ edge that makes it worth naming.  `subscribeE` reaches
 -- `subscribeAll` and back on a strictly smaller expression at every
 -- operator node, so the pair is structural — except at `μᵉ`, where the
--- body is UNFOLDED rather than descended into and the third peel lives.
+-- body is UNFOLDED rather than descended into and the third drop lives.
 -- A self-edge is invisible to a component check, so this is where the
--- check stops and `unfoldμ-shrinks` starts.
-
--- THE INSTANTIATION IS THEREFORE AT THE TOP, TWICE, AND THE CYCLE IS
--- BROKEN BY THE STORY INDEX.  `budgetAt`'s height runs through
--- `capsHgo`, hence `blowH`, hence `poolCount`, hence `lvls` — so a `d`
--- taken from the gas at the level would make `poolCount` depend on
--- `budgetAt` and `budgetAt` on `poolCount`.  `blowH` breaks it by handing the
--- count ITS OWN story index `m`: `blowH m = 6 + m + 2 · poolCount
--- (towerℕ m) m`, where m is blowH's own argument and the recurrence
--- builds it incrementally.  `capsAt` (.Caps) makes the same reading one
--- level up — instant id's blowup runs at `d := capsH e sl id` — so the
--- two agree by construction and `blowup-tower`'s count axis compares
--- `sizeCount c m` against `poolCount (towerℕ m) m` at the SAME fuel.
-
--- WHAT IS STILL OWED, AND IT IS OWED BY THE SIGNATURE PASS RATHER THAN
--- BY THIS DEFINITION: that the story index dominates the depth the
--- instant actually reaches.  The bridge above bounds that depth by the
--- gas, and the gas at instant id is `gasTower (3 + capsHgo m (suc id))`
--- — one blowH story ABOVE the m this count is instantiated at.  So the
--- placement is a stratification, not a domination: it is what breaks the
--- cycle, and the inequality it needs (nesting depth ≤ m, rather than ≤
--- the gas height) is a smaller claim than the gas bound supplies.
--- Reported, not assumed
-
--- ABSTRACT, and for the same PERFORMANCE reason `blowH` and `sizeCount`
--- are.  Every one of these clauses matches on an argument that is a
--- literal `suc` even at a variable J (`suc (widAt S W J)`,
--- `suc (sizeAt S J)`), so with the bodies visible one whnf unfolds the
--- whole family one turn of the loop and mentions its arguments many
--- times over.  Opaque, a frame's level is one symbol everywhere above
--- it, and the `-body` equations hand the clauses back where the
--- arithmetic needs them (.Caps)
-
--- THIS FAMILY CANNOT BE PROBED, and the seal is not the reason — so
--- unsealing it would not help.  `blowH-body` unfolds `blowH`, but
--- `poolCount` then sticks on THIS block, and `poolCount 1 0` does not
--- reduce to a numeral at the smallest possible arguments.  A non-abstract
--- COPY of the whole family fails the same way: the blowup is
--- COMPUTATIONAL, not definitional.  Confirmed independently with no
--- typechecker in the loop — the compiled harness (`make harness`) ran
--- `poolCount 1 0` and `blowH 0` for 45 s at `-O` without printing, in the
--- same binary whose calibration row passed.
--- `blowH m = 6 + m + 2 · poolCount (towerℕ m) m` feeds `poolCount` a
--- TOWER, so the value is astronomically large by construction and no
--- backend or hardware prints it.  `towerℕ` is NOT the blocker (it
--- computes to height 4).
---
--- AND CHECK THIS BEFORE PLANNING A PROBE: a statement whose CONCLUSION
--- depends on this family is symbolic-or-nothing.  A statement that touches
--- it only in its HYPOTHESES is a different case and may well be probeable on
--- the conclusion side — do not read this note as covering the whole caps
--- development.
---
--- DEAD ROUTE: probing this family at all, sealed or unsealed.
-------------------------------------------------------------------
-
-abstract
-  -- ONE FRAME that ran at J: its own receipt, then one inner subscribe
-  -- per payload — at most `suc (widAt S W J)` of them.  The budget its
-  -- payloads are walked under is read HERE, at this frame's own level,
-  -- and one unit of DEPTH FUEL is what pays for the re-reading.
-  --
-  -- AND IT IS READ ONE SIZE LEVEL UP, at `suc (sizeAt S (suc J))`.  The
-  -- nesting a subscribe descends on is not the payload's alone: the
-  -- share edge hands its callee the slot's STORED def, so the measure
-  -- carries the shares not yet connected too (.Caps-Nest's `M`).  A
-  -- frame's receipts bound that by `sizeAt S J + S` — its payload's
-  -- size plus the whole telescope's — which the entry level provably
-  -- cannot cover (it would need `S ≤ 1`, against `2 ≤ S`), and which
-  -- one more size level covers with room, since `sizeAt S (suc J)` is
-  -- `S * suc (2 * sizeAt S J)`.  Levels are the cheap currency here and
-  -- reading one more of them is a RAISE, so every consumer moves up
-  -- under the monotonicity already proven and nothing is re-derived
-  fLvlD : ℕ → ℕ → ℕ → ℕ → ℕ            -- S W d J
-  -- m payloads in sequence, each at the level the one before it LEFT.
-  -- ONE PAYLOAD costs the `from-inner` frame its chain gains (the `suc
-  -- J`, which is `subscribeInner-caps`'s own `suc j`) and then the
-  -- inner's subscribe at the level that frame left
-  sIterD : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → ℕ   -- S W d k m J
-  -- ONE SUBSCRIBE at J: it walks the target's operator chain, and the
-  -- chain is no longer than the size cap (`sizeᵉ b ≤ cSize`, the
-  -- telescope's own hypothesis)
-  sLvlD : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ        -- S W d k J
-  -- ONE OPERATOR, IN THE ORDER THE CLAUSE RUNS IT: the frame the chain
-  -- gains (frameStep-chain-suc) and the operator's own EVAL receipt,
-  -- then a μ's re-entry at one less nesting, then the REST of the
-  -- chain, and only then `pushBurst` — the source's burst back through
-  -- that frame, one frame per emit, at the level the chain left
-  opIterD : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → ℕ  -- S W d k m J
-  fIterD : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → ℕ   -- S W d k m J
-
-  -- THE FUEL-EXHAUSTED CLAUSE is not a hole: it is exactly what the
-  -- inherited-budget family did at k = 0 (`J + m`), so the refresh
-  -- dominates it at every budget including the empty one.  It also
-  -- carries the termination — it makes no recursive call, so every
-  -- cycle passes the `suc d` clause, where d descends
-  fLvlD S W zero    J = fLvl S W J + suc (widAt S W J)
-  fLvlD S W (suc d) J =
-    sIterD S W d (suc (sizeAt S (suc J))) (suc (widAt S W J)) (fLvl S W J)
-
-  sIterD S W d k zero    J = J
-  sIterD S W d k (suc m) J = sIterD S W d k m (sLvlD S W d k (suc J))
-
-  sLvlD S W d zero    J = J
-  sLvlD S W d (suc k) J = opIterD S W d k (suc (sizeAt S J)) J
-
-  opIterD S W d k zero    J = J
-  opIterD S W d k (suc m) J =
-    let J₀ = suc (J + suc (sizeAt S J) * suc (sizeAt S J))
-        J₂ = opIterD S W d k m (sLvlD S W d k J₀)
-    in fIterD S W d k (suc (widAt S W J₂)) J₂
-
-  fIterD S W d k zero    J = J
-  fIterD S W d k (suc m) J = fIterD S W d k m (fLvlD S W d J)
-
-  -- the clauses, handed back one at a time for .Caps's arithmetic
-  fLvlD-0 : ∀ (S W J : ℕ) → fLvlD S W 0 J ≡ fLvl S W J + suc (widAt S W J)
-  fLvlD-0 _ _ _ = refl
-
-  fLvlD-suc : ∀ (S W d J : ℕ) →
-    fLvlD S W (suc d) J
-      ≡ sIterD S W d (suc (sizeAt S (suc J))) (suc (widAt S W J)) (fLvl S W J)
-  fLvlD-suc _ _ _ _ = refl
-
-  sIterD-0 : ∀ (S W d k J : ℕ) → sIterD S W d k 0 J ≡ J
-  sIterD-0 _ _ _ _ _ = refl
-
-  sIterD-suc : ∀ (S W d k m J : ℕ) →
-    sIterD S W d k (suc m) J ≡ sIterD S W d k m (sLvlD S W d k (suc J))
-  sIterD-suc _ _ _ _ _ _ = refl
-
-  sLvlD-0 : ∀ (S W d J : ℕ) → sLvlD S W d 0 J ≡ J
-  sLvlD-0 _ _ _ _ = refl
-
-  sLvlD-suc : ∀ (S W d k J : ℕ) →
-    sLvlD S W d (suc k) J ≡ opIterD S W d k (suc (sizeAt S J)) J
-  sLvlD-suc _ _ _ _ _ = refl
-
-  opIterD-0 : ∀ (S W d k J : ℕ) → opIterD S W d k 0 J ≡ J
-  opIterD-0 _ _ _ _ _ = refl
-
-  opIterD-suc : ∀ (S W d k m J : ℕ) →
-    opIterD S W d k (suc m) J
-      ≡ fIterD S W d k
-          (suc (widAt S W (opIterD S W d k m
-                  (sLvlD S W d k (suc (J + suc (sizeAt S J) * suc (sizeAt S J)))))))
-          (opIterD S W d k m
-             (sLvlD S W d k (suc (J + suc (sizeAt S J) * suc (sizeAt S J)))))
-  opIterD-suc _ _ _ _ _ _ = refl
-
-  fIterD-0 : ∀ (S W d k J : ℕ) → fIterD S W d k 0 J ≡ J
-  fIterD-0 _ _ _ _ _ = refl
-
-  fIterD-suc : ∀ (S W d k m J : ℕ) →
-    fIterD S W d k (suc m) J ≡ fIterD S W d k m (fLvlD S W d J)
-  fIterD-suc _ _ _ _ _ _ = refl
-
--- A CHAIN IS FRAMES, each running at the level the one before it LEFT,
--- and each costing `fLvlD` — its own receipt PLUS the subscribes it
--- runs.  It was `fLvl` (the receipt alone) until the subscribe charge
--- was priced; `fLvl ≤ fLvlD` pointwise at every depth (.Caps), so every
--- consumer above this — `dLvl`, `lvls`, `sizeCount`, the pooled count
--- and the gate against the product it replaces — moves up with it by
--- the monotonicity lemmas already proven, with no arithmetic re-derived
--- and no measured row re-run.
---
--- AND EVERY ONE OF THEM CARRIES THE DEPTH FUEL `d`, threaded down to
--- the frame unchanged.  It is not read off (S, W, J) anywhere on this
--- ladder, and that is the ruling: a fuel read at a level is spent after
--- a climb, which is what Nest-Budget-Probe refuted one stratum down.
--- The instantiation happens exactly twice, both at the top — `poolBody`
--- (below, from `blowH`'s own story index) and `capsAt` (.Caps, from the
--- same recurrence's height `capsH`) — so the level ladder itself never
--- chooses it
-iterL : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ        -- S W d k J
-iterL S W d zero    J = J
-iterL S W d (suc k) J = iterL S W d k (fLvlD S W d J)
-
-dLvl : ℕ → ℕ → ℕ → ℕ → ℕ             -- S W d J
-dLvl S W d J = iterL S W d (suc (sizeAt S J)) J
-
-lvls : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ         -- S W d J count
-lvls S W d J zero    = J
-lvls S W d J (suc n) = dLvl S W d (lvls S W d J n)
-
-dCapᶜ  : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → ℕ       -- S W R d gas level
-dWalkᶜ : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → ℕ   -- S W R d gas level position
-
-dCapᶜ S W R d zero    J = 0
-dCapᶜ S W R d (suc g) J = dWalkᶜ S W R d g J (regAt S R J)
-
-dWalkᶜ S W R d g J zero    = 0
-dWalkᶜ S W R d g J (suc i) =
-  let w = dWalkᶜ S W R d g J i
-  in w + suc (dCapᶜ S W R d g (lvls S W d J (suc w)))
-
-
--- THE POOLED COUNT: `sizeCount` with every Caps field replaced by one
--- bound M.  `blowH` reads it, which is what makes "one instant costs
--- this much height" a monotonicity fact instead of a tower estimate.
---
--- AND IT PATTERN-MATCHES ON ITS ARGUMENT ON PURPOSE.  `blowH` applies
--- it to `towerℕ m`, which is STUCK for a variable m — so with a
--- match in front the whole count stays one opaque symbol, and
--- `capsHgo`'s nested `blowH (blowH m)` stays the size the old closed
--- increment was.  Written without the match the body inlines on every
--- whnf and mentions its argument SIX times, which squares per instant:
--- .Wet's caps-fuel-root, which normalises `blowH (blowH (capsBase …))`,
--- ran past an hour on it and finished in minutes with the match in.
--- The level form keeps that property for the same reason it keeps it
--- at `sizeCount`: `lvls` matches on its DELIVERY COUNT, which is a
--- `dCapᶜ` stuck at a variable, so the whole body is stuck at whnf
-poolBody : ℕ → ℕ → ℕ                 -- pooled bound, depth fuel
-poolBody M d = lvls M M d 0 (dCapᶜ M M M d (suc M) 0)
-
-poolCount : ℕ → ℕ → ℕ
-poolCount zero    d = 0
-poolCount (suc M) d = poolBody (suc M) d
-
--- ABSTRACT, and it is a PERFORMANCE contract rather than an abstraction
--- one.  `capsHgo` nests this per instant, so `blowH (blowH m)` is what
--- .Wet's caps-fuel-root normalises — and with the body visible the
--- delivery count is inlined twice, squared, and that module ran past an
--- hour without finishing (measured twice).  Opaque, the height is one
--- symbol everywhere except where the recurrence's own arithmetic needs
--- it, and `blowH-body` hands that back on demand
-abstract
-  blowH : ℕ → ℕ
-  blowH m = 6 + m + 2 * poolCount (towerℕ m) m
-
-  blowH-body : ∀ (m : ℕ) → blowH m ≡ 6 + m + 2 * poolCount (towerℕ m) m
-  blowH-body m = refl
-
-capsHgo : ℕ → Id → ℕ
-capsHgo m zero    = blowH m
-capsHgo m (suc id) = blowH (capsHgo m id)
-
-syncBudget : ℕ → ℕ → Id → Gas
-syncBudget sz m id =
-  gasPad (2 ^ (sz * suc id * suc id)) (gasTower (3 + capsHgo m (suc id)))
-
--- THE BASE LEVEL of the caps recurrence: everything `capsAt`'s base
--- carries, under one `towerℕ` by `k≤towerℕ` and nothing else.  cSize's
--- base is `2 + sz` and cReg's is `suc sz`; cWid's is the ENTRY CEILING,
--- and the ceiling is read HERE rather than bounded by some function of
--- sz because the five static width measures TOWER in the syntax and no
--- closed bracket on them exists that is worth proving.  Reading it costs
--- nothing: the height is never normalised
-capsBase : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → ℕ
-capsBase {n = n} e sl =
-  3 + (sizeᵉ e + slotsSize sl + slotsClos sl) + suc (entryCeil n sl e)
-
-budgetAt : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → Id → Gas
-budgetAt e sl id = syncBudget (sizeᵉ e + slotsSize sl) (capsBase e sl) id
+-- check stops and syncSize starts.
 
 -- the subscription machine: walk the target expression, minting
 -- NodeIds for its operator nodes and installing their states (evalTm
@@ -1006,7 +474,7 @@ budgetAt e sl id = syncBudget (sizeᵉ e + slotsSize sl) (capsBase e sl) id
 -- time (pushBurst → stepFrame), and the *All frames subscribe inners
 -- (stepFrame → subscribeInner → subscribeE)
 subscribeE : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-           → Gas → Closed Γ u → Path Γ u t → Id → Tick
+           → Acc _≺_ τ → Closed Γ u → Path Γ u t → Id → Tick
            → Sched Γ → EvalSt e
            → Stream Γ u × Sched Γ × EvalSt e
 
@@ -1065,20 +533,24 @@ burstCompleted : ∀ {n} {Γ : Ctx n} {u} → Stream Γ u → Bool
 burstCompleted = any (λ em → hasComplete (InstEmit.events em))
 
 -- mint the inner's exit-frame instance, subscribe it inside the
--- current instant, split its burst.  A fuel decrement edge: the inner
--- is a runtime VALUE, structurally unrelated to the caller
+-- current instant, split its burst.  THE HOP EDGE: the inner is a
+-- runtime VALUE, structurally unrelated to the caller, so the rank is
+-- what descends here — and it is the one component of the triple a run
+-- can exhaust, since nothing the syntax says bounds the nesting of what
+-- a program emits.  The zero clause is where that shows.
 subscribeInner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-               → Gas → AllOp → NodeId → Path Γ u t → Id → Tick
+               → Acc _≺_ τ → AllOp → NodeId → Path Γ u t → Id → Tick
                → Val Γ (obs u) → Sched Γ → EvalSt e
                → NodeId × List (Val Γ u) × List (InstEvent (Val Γ t)) × Bool × Sched Γ × EvalSt e
-subscribeInner g0 op allNid κ id now o sched st =
+subscribeInner {τ = _ , zero , _} _ op allNid κ id now o sched st =
   let inst = Sched.nextNode sched
   in inst , [] , close drySource dried ∷ [] , false
      , record sched { nextNode = suc inst } , st
-subscribeInner (gs fuel) op allNid κ id now o sched st =
+subscribeInner {τ = _ , suc r , _} (acc rec) op allNid κ id now o sched st =
   let inst = Sched.nextNode sched
       (burst , sched′ , st′) =
-        subscribeE fuel o (from-inner op allNid inst ↠ κ) id now
+        subscribeE (rec (ltR {r′ = r} {s′ = syncSizeᵉ o} ≤-refl))
+                   o (from-inner op allNid inst ↠ κ) id now
                    (record sched { nextNode = suc inst }) st
       (vs , bs , done) = splitBurst burst
   in inst , vs , bs , done , sched′ , st′
@@ -1121,11 +593,11 @@ aliveThroughᶠ inst st (rid , src , (w , p)) =
 -- transform it feeds to the protocol-transparency fold.
 scanVals : ∀ {n} {Γ : Ctx n} {s u} → Fn Γ [] [] [] (u ×ᵗ s) u
          → Val Γ u → List (Val Γ s) → List (Val Γ u) × Val Γ u
-scanVals fn acc []       = [] , acc
-scanVals fn acc (v ∷ vs) =
-  let acc′          = applyFn fn (acc , v)
-      (outs , last) = scanVals fn acc′ vs
-  in acc′ ∷ outs , last
+scanVals fn ac []       = [] , ac
+scanVals fn ac (v ∷ vs) =
+  let ac′           = applyFn fn (ac , v)
+      (outs , last) = scanVals fn ac′ vs
+  in ac′ ∷ outs , last
 
 -- take's per-emit step, lifted out of stepFrame so the well-formedness proof
 -- can reason about its reduction over a stuck node lookup.  Non-cut passes the
@@ -1185,7 +657,7 @@ switchKill (just v) sched₀ st₀ =
                 ; cancelled = cutRids ++ EvalSt.cancelled st₀ }
 
 thruConsume : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-            → Gas → AllOp → NodeId → Path Γ u t → Id → Tick
+            → Acc _≺_ τ → AllOp → NodeId → Path Γ u t → Id → Tick
             → Val Γ (obs u) → Sched Γ → EvalSt e
             → List (Val Γ u) × List (InstEvent (Val Γ t)) × Sched Γ × EvalSt e
 thruConsume {u = u} fuel mergeAllᵒ nid κ id now o sched₀ st₀
@@ -1224,7 +696,7 @@ thruConsume fuel exhaustᵒ nid κ id now o sched₀ st₀
 ... | _ = [] , [] , sched₀ , st₀
 
 thruWalk : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-         → Gas → AllOp → NodeId → Path Γ u t → Id → Tick
+         → Acc _≺_ τ → AllOp → NodeId → Path Γ u t → Id → Tick
          → List (Val Γ (obs u)) → Sched Γ → EvalSt e
          → List (Val Γ u) × List (InstEvent (Val Γ t)) × Sched Γ × EvalSt e
 thruWalk fuel op nid κ id now []       sched₀ st₀ = [] , [] , sched₀ , st₀
@@ -1277,7 +749,7 @@ thruWrap exhaustᵒ nid true (vs , bs , sched′ , st′)
 -- a missed self-finish costs the drain its only lane, at limit k it
 -- can cost several, and the two do not fail the same way
 mergeAllDrain : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-             → Gas → NodeId → Path Γ s t → Id → Tick
+             → Acc _≺_ τ → NodeId → Path Γ s t → Id → Tick
              → Maybe ℕ → ℕ → List (Closed Γ s) → Sched Γ → EvalSt e
              → List (Val Γ s) × List (InstEvent (Val Γ t)) × ℕ
                × List (Closed Γ s) × Sched Γ × EvalSt e
@@ -1295,7 +767,7 @@ mergeAllDrain fuel allNid κ id now lim act (o ∷ q) sched₀ st₀
       in vs ++ vs′ , bs ++ bs′ , act′ , q′ , sched₂ , st₂
 
 innerFinish : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-            → Gas → AllOp → NodeId → NodeId → Path Γ s t → Id → Tick
+            → Acc _≺_ τ → AllOp → NodeId → NodeId → Path Γ s t → Id → Tick
             → List (Val Γ s) → Sched Γ → EvalSt e → Maybe (NodeState Γ)
             → List (Val Γ s) × List (InstEvent (Val Γ t)) × Bool × Sched Γ × EvalSt e
 innerFinish {s = s} fuel mergeAllᵒ allNid inst κ id now vals sched st
@@ -1322,7 +794,7 @@ innerFinish fuel _ allNid inst κ id now vals sched st _ = vals , [] , false , s
 -- it (the TS join's open-multiset, read off the registry) — one
 -- chain's exhaustion is not a multi-registration subtree's completion
 innerReact : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-           → Gas → AllOp → NodeId → NodeId → Path Γ s t → Id → Tick
+           → Acc _≺_ τ → AllOp → NodeId → NodeId → Path Γ s t → Id → Tick
            → List (Val Γ s) → Sched Γ → EvalSt e → Bool
            → List (Val Γ s) × List (InstEvent (Val Γ t)) × Bool × Sched Γ × EvalSt e
 innerReact fuel op allNid inst κ id now vals sched st false =
@@ -1334,7 +806,7 @@ innerReact fuel op allNid inst κ id now vals sched st true =
          (lookupNode allNid (EvalSt.nodes st))
 
 stepFrame : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-          → Gas → Id → Tick → Frame Γ s u → Path Γ u t
+          → Acc _≺_ τ → Id → Tick → Frame Γ s u → Path Γ u t
           → List (Val Γ s) → Bool → Sched Γ → EvalSt e
           → List (Val Γ u) × List (InstEvent (Val Γ t)) × Bool × Sched Γ × EvalSt e
 
@@ -1346,11 +818,11 @@ stepFrame {Γ = Γ} {t = t} {e = e} {s = s} {u = u} fuel id now (scan-f fn nid) 
   where
   dispatch : Maybe (NodeState Γ)
            → List (Val Γ u) × List (InstEvent (Val Γ t)) × Bool × Sched Γ × EvalSt e
-  dispatch (just (scan-st {w} acc)) with w ≟ᵗ u
+  dispatch (just (scan-st {w} ac)) with w ≟ᵗ u
   ... | yes refl =
-        let (outs , acc′) = scanVals fn acc vals
+        let (outs , ac′) = scanVals fn ac vals
         in outs , [] , fin , sched ,
-           record st { nodes = setNode nid (scan-st acc′) (EvalSt.nodes st) }
+           record st { nodes = setNode nid (scan-st ac′) (EvalSt.nodes st) }
   ... | no _ = [] , [] , fin , sched , st
   dispatch _ = [] , [] , fin , sched , st
 
@@ -1379,7 +851,7 @@ retagEvents (value _   ∷ es) = retagEvents es
 -- envelope — the burst leaves each subscription level already shaped
 -- like any later emit of its source
 pushBurst : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-          → Gas → Id → Tick → Frame Γ s u → Path Γ u t
+          → Acc _≺_ τ → Id → Tick → Frame Γ s u → Path Γ u t
           → Stream Γ s → Sched Γ → EvalSt e
           → Stream Γ u × Sched Γ × EvalSt e
 pushBurst fuel id now f κ []         sched st = [] , sched , st
@@ -1396,7 +868,7 @@ pushBurst fuel id now f κ (em ∷ ems) sched st =
 -- the shared *All shape: mint the node, install its initial state,
 -- subscribe the outer under a thru-outer frame, push the burst through
 subscribeAll : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-             → Gas → AllOp → NodeState Γ → Closed Γ (obs u) → Path Γ u t
+             → Acc _≺_ τ → AllOp → NodeState Γ → Closed Γ (obs u) → Path Γ u t
              → Id → Tick → Sched Γ → EvalSt e
              → Stream Γ u × Sched Γ × EvalSt e
 subscribeAll fuel op initialState b κ id now sched st =
@@ -1428,15 +900,19 @@ sharedPlumb = map (λ em → record em { kind = plumbing })
 -- Lifted out of subscribeSharedSlot's where block so the budget
 -- proof can name it (as with takeVals / thruConsume / mergeAllDrain)
 sharedConnect : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-              → Gas → (i : Fin n) → Closed Γ (lookup Γ i)
+              → Acc _≺_ τ → (i : Fin n) → Closed Γ (lookup Γ i)
               → Path Γ (lookup Γ i) t → Id → Tick
               → Sched Γ → EvalSt e
               → Stream Γ (lookup Γ i) × Sched Γ × EvalSt e
-sharedConnect g0 i d κ id now sched st = dryBurst id , sched , st
-sharedConnect (gs fuel′) i d κ id now sched st =
+sharedConnect {τ = U , _ , _} (acc rec) i d κ id now sched st
+  with unconn (Sched.slots sched) (toℕ i ∷ EvalSt.connectedShares st) <? U
+... | no  _ = dryBurst id , sched , st
+... | yes p =
   let st₁ = register (toℕ i) κ
               (record st { connectedShares = toℕ i ∷ EvalSt.connectedShares st })
-      (burst , sched₁ , st₂) = subscribeE fuel′ d (share-sink i) id now sched st₁
+      (burst , sched₁ , st₂) =
+        subscribeE (rec (ltU {r′ = 2 ^ sizeᵉ d} {s′ = syncSizeᵉ d} p))
+                   d (share-sink i) id now sched st₁
       -- the def's connect burst flows up the first subscriber's own
       -- frames (the returned burst); dispatch only serves arrivals
   in if burstCompleted burst
@@ -1451,7 +927,7 @@ sharedConnect (gs fuel′) i d κ id now sched st =
           , sched₁ , st₂
 
 subscribeSharedSlot : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-                    → Gas → (i : Fin n) → Closed Γ (lookup Γ i)
+                    → Acc _≺_ τ → (i : Fin n) → Closed Γ (lookup Γ i)
                     → Path Γ (lookup Γ i) t → Id → Tick
                     → Sched Γ → EvalSt e
                     → Stream Γ (lookup Γ i) × Sched Γ × EvalSt e
@@ -1538,9 +1014,10 @@ subscribeE fuel (exhaustAllᵉ b) κ id now sched st =
 -- unfolding are deferᵉ-gated, so each re-entry costs a schedule hop —
 -- no synchronous loop.  A fuel decrement edge: the unfolding is
 -- larger than the μ, not a subterm
-subscribeE g0         (μᵉ body) κ id now sched st = dryBurst id , sched , st
-subscribeE (gs fuel)  (μᵉ body) κ id now sched st =
-  subscribeE fuel (unfoldμ body) κ id now sched st
+subscribeE {τ = _ , _ , sz} (acc rec) (μᵉ body) κ id now sched st
+  with syncSizeᵉ (unfoldμ body) <? sz
+... | no  _ = dryBurst id , sched , st
+... | yes p = subscribeE (rec (ltS p)) (unfoldμ body) κ id now sched st
 
 subscribeE fuel (varᵉ ()) κ id now sched st
 
@@ -1573,7 +1050,7 @@ subscribeE {u = u} fuel (deferᵉ body) κ id now sched st =
 -- work) and termination needs no pragma
 
 -- AND THAT MAKES THIS COUNTER THE SECOND PROXY IN THE FAMILY, WITH THE
--- SAME SHAPE AS `Gas` AND A CHEAPER ORDER BEHIND IT.  What really
+-- SAME SHAPE AS THE DESCENT AND A CHEAPER ORDER BEHIND IT.  What really
 -- descends here is the telescope position: a chain on share i sinks
 -- only into the root or a strictly later share, so `n - toℕ i` falls
 -- at every dispatch, and the premise is `inputsBelowᵉ`, which a shared
@@ -1633,7 +1110,7 @@ shareFinish i true  (emits , sched′ , st′) =
 -- over it for free, and the face that would catch a silently truncated
 -- delivery is the one comparing this machine to the spec.
 dispatchShare : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-              → Gas      -- sync fuel, handed to stepFrame's re-entries
+              → Acc _≺_ τ  -- the witness, handed to stepFrame's re-entries
               → ℕ       -- dispatch gas, the telescope bound
               → Id → Tick → (i : Fin n)
               → List (Val Γ (lookup Γ i)) → Bool
@@ -1646,7 +1123,7 @@ dispatchShare : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 -- Lifted out of dispatchShare's where block so the budget proof can
 -- name it (as with takeVals / thruConsume / sharedConnect)
 shareGo : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-        → Gas → ℕ → Id → Tick → (i : Fin n)
+        → Acc _≺_ τ → ℕ → Id → Tick → (i : Fin n)
         → List (Val Γ (lookup Γ i)) → Bool
         → List (RegId × Path Γ (lookup Γ i) t) → Sched Γ → EvalSt e
         → Stream Γ t × Sched Γ × EvalSt e
@@ -1657,7 +1134,7 @@ shareGo : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 -- running on an empty value list, so the emit is emptied, never
 -- swallowed.  The envelope is assembled here and nowhere else
 foldPath : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-         → Gas → ℕ → Id → Tick → Source → Path Γ u t
+         → Acc _≺_ τ → ℕ → Id → Tick → Source → Path Γ u t
          → List (Val Γ u) → List (InstEvent (Val Γ t)) → Bool
          → Sched Γ → EvalSt e
          → Stream Γ t × Sched Γ × EvalSt e
@@ -1710,7 +1187,7 @@ chainStep : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
           → Id → (a : Arrival Γ) → Path Γ (arrTy a) t → Sched Γ → EvalSt e
           → Stream Γ t × Sched Γ × EvalSt e
 chainStep {n = n} {e = e} id a path sched st =
-  foldPath (budgetAt e (Sched.slots sched) id) n id (arrTick a) (arrSource a) path (arrVal a ∷ [])
+  foldPath (rootWitness e (Sched.slots sched)) n id (arrTick a) (arrSource a) path (arrVal a ∷ [])
            (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
            (Arrival.isLast a) sched st
 
@@ -1797,5 +1274,5 @@ drain (suc k) nextId sched st with sched-next sched
 evaluate : ∀ {n} {Γ : Ctx n} {t} → Fuel → Closed Γ t → Slots Γ → Stream Γ t
 evaluate fuel e ins =
   let (burst , sched₀ , st₀) =
-        subscribeE (budgetAt e ins 0) e root 0 0 (sched-init e ins) (st-init e)
+        subscribeE (rootWitness e ins) e root 0 0 (sched-init e ins) (st-init e)
   in burst ++ drain fuel 1 sched₀ st₀

@@ -343,7 +343,18 @@ def extract_definitions(src_dir, files):
     # would) would blind the checker to a large fraction of the codebase.
     # So: recurse into these exactly as into `postulate`, just without
     # marking their members as postulates.
-    BLOCK_OPENERS = {"postulate", "mutual", "abstract", "opaque", "private", "instance"}
+    #
+    # `variable` belongs here for a sharper reason than the others.  It has
+    # the identical textual shape — a bare keyword opening an indented body
+    # of `name : Type` members — so leaving it out does not merely skip the
+    # block, it registers a DEFINITION called `variable`, one node that
+    # every such block in the tree merges into and that nothing can ever
+    # consume.  Recursing instead registers the generalized variables
+    # themselves, which is the answer worth having: a generalized variable
+    # no signature mentions is dead weight exactly as an unused definition
+    # is, and it is reached by the same textual edge.
+    BLOCK_OPENERS = {"postulate", "mutual", "abstract", "opaque", "private",
+                     "instance", "variable"}
 
     def register(name, relpath, lineno, kind):
         def_lines[name].add((relpath, lineno))
@@ -789,8 +800,6 @@ MODULE_ROOTS = {
                    ("main",)),
     "Implementation.Unit-Test": ("the type-level bug cache — `make bug-cache`",
                                  ()),
-    "Harness.Main": ("the compiled measurement harness — `make harness-build` / `make harness`",
-                     ("main",)),
 }
 
 _IMPORT_RE = re.compile(r"^\s*(?:open\s+)?import\s+([^\s;()]+)")

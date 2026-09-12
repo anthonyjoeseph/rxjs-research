@@ -1,12 +1,10 @@
 -- THE SLOT TELESCOPE, on its own so that BOTH the width measures and
 -- the evaluator can read it.
 --
--- WHY IT IS NOT IN Rx.Evaluator any more.  `budgetAt` — the seeded gas —
--- now reads `Rx.Frame-Width.entryCeil`, because the caps recurrence's
--- BASE width IS the entry ceiling and a budget that must dominate the
--- recurrence has to know the number it starts from.  Frame-Width in turn
--- needs `Slot` / `Slots` to walk a shared def.  With the telescope in
--- the evaluator that is a cycle; here it is a shared prerequisite, and
+-- WHY IT IS NOT IN Rx.Evaluator.  A width measure has to walk a shared
+-- def, so it needs `Slot` / `Slots`; the evaluator needs the same
+-- telescope to seed its descent.  With the telescope inside the
+-- evaluator that is a cycle; here it is a shared prerequisite, and
 -- Rx.Evaluator re-exports the whole module so the ~1400 sites that read
 -- `Slots` off the evaluator are untouched.
 module Rx.Slots where
@@ -49,11 +47,12 @@ open import Rx.Exp  using (Ty; Ctx; Val; Closed; isData; inputsBelowᵉ;
 -- `isData` on scripted slots, it discharges by unification at every
 -- concrete program.  What it buys: a per-slot hop depth is
 -- computable by recursion on the slot index (slot k's hop reads only
--- hops j < k), which is what lets Rx.Hop-Depth's input clause report
--- the slot's true hop instead of the refuted constant 0 — see the
--- input-wet refutation (Verify-Budget-Sufficient.Walk-Level) that
--- forced this: an obs-typed shared def emits values of positive hop,
--- so a hop bound that zeroes the share boundary is false.
+-- hops j < k), which is what let a per-slot hop measure report the
+-- slot's true hop instead of the refuted constant 0: an obs-typed
+-- shared def emits values of positive hop, so a hop bound that zeroes
+-- the share boundary is false.  The measure that spent this is gone
+-- with the budget; the side condition stays, because the TS generator
+-- builds exactly this telescope and a JS const cannot read forward.
 data Slot {n} (Γ : Ctx n) (k : ℕ) (t : Ty) : Set where
   scripted : {ok : T (isData t)} → ObservableInput (Val Γ t) → Slot Γ k t
   shared   : (d : Closed Γ t) {ok : T (inputsBelowᵉ k d)} → Slot Γ k t

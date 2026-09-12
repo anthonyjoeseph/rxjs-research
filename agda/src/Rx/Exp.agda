@@ -505,10 +505,10 @@ mutual
 ------------------------------------------------------------------
 -- Sync-reachable size: like sizeᵉ, but a deferᵉ subtree counts as
 -- a leaf — nothing under a defer is subscribed within the current
--- instant.  This is the size class the budget-sufficiency measure
--- reads (Verify-Budget-Sufficient): unfoldμ substitutes (μᵉ body)
--- only at defer-gated var positions, so μ-unfolding PRESERVES
--- syncSize while sizeᵉ grows.
+-- instant.  This is the size class the descent's third component
+-- reads: unfoldμ substitutes (μᵉ body) only at defer-gated var
+-- positions, so μ-unfolding PRESERVES syncSize while sizeᵉ grows,
+-- which is what makes the μ peel's guard a real drop.
 --
 -- **`syncSizeᵉ` DOES NOT BOUND EMISSIONS PER INSTANT**, and the shape of the
 -- failure is the part worth carrying: K = 1..3 all hold (2≤17, 6≤18, 14≤19),
@@ -571,90 +571,6 @@ sizeᵛ (s +ᵗ t) (inj₁ a) = suc (sizeᵛ s a)
 sizeᵛ (s +ᵗ t) (inj₂ b) = suc (sizeᵛ t b)
 sizeᵛ (obs t)  e        = sizeᵉ e
 
--- and the value reading of the sync spine, delegating to `syncSizeᵉ` at
--- an observable exactly as `sizeᵛ` delegates to `sizeᵉ` -- ground values
--- have no defers to truncate at, so the two readings differ only there
-syncSizeᵛ : ∀ {n} {Γ : Ctx n} (t : Ty) → Val Γ t → ℕ
-syncSizeᵛ unitᵗ    _        = 1
-syncSizeᵛ boolᵗ    _        = 1
-syncSizeᵛ natᵗ     _        = 1
-syncSizeᵛ (s ×ᵗ t) (a , b)  = suc (syncSizeᵛ s a + syncSizeᵛ t b)
-syncSizeᵛ (s +ᵗ t) (inj₁ a) = suc (syncSizeᵛ s a)
-syncSizeᵛ (s +ᵗ t) (inj₂ b) = suc (syncSizeᵛ t b)
-syncSizeᵛ (obs t)  e        = syncSizeᵉ e
-------------------------------------------------------------------
--- Shells: the shell of an expression is its OPERATOR skeleton —
--- Exp constructors only, with deferᵉ a leaf, embedded observables
--- (strmᵗ) a boundary, and Tm material weightless.  subΘ rewrites
--- only Tm material (Θ var positions), so substitution preserves
--- every shell size EXACTLY — runtime instantiation neither
--- inflates nor deflates a shell.  `shellSizeᵉ` is what survives of
--- that idea and it has one consumer, `innerᵗ`, which lists a
--- carrier's own shell size ahead of its inner ones.
-------------------------------------------------------------------
-
-shellSizeᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → Exp Γ Δᵍ Δ Θ t → ℕ
-shellSizeᵉ (input i)       = 1
-shellSizeᵉ (ofᵉ ts)        = 1
-shellSizeᵉ emptyᵉ          = 1
-shellSizeᵉ (mapᵉ f e)      = suc (shellSizeᵉ e)
-shellSizeᵉ (takeᵉ c e)     = suc (shellSizeᵉ e)
-shellSizeᵉ (scanᵉ f z e)   = suc (shellSizeᵉ e)
-shellSizeᵉ (mergeAllᵉ lim e)  = suc (shellSizeᵉ e)
-shellSizeᵉ (switchAllᵉ e)  = suc (shellSizeᵉ e)
-shellSizeᵉ (exhaustAllᵉ e) = suc (shellSizeᵉ e)
-shellSizeᵉ (μᵉ e)          = suc (shellSizeᵉ e)
-shellSizeᵉ (varᵉ x)        = 1
-shellSizeᵉ (deferᵉ e)      = 1
-
-mutual
-  innerᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → Exp Γ Δᵍ Δ Θ t → List ℕ
-  innerᵉ (input i)       = []
-  innerᵉ (ofᵉ ts)        = innerᵗˢ ts
-  innerᵉ emptyᵉ          = []
-  innerᵉ (mapᵉ f e)      = innerᵗ f ++ innerᵉ e
-  innerᵉ (takeᵉ c e)     = innerᵗ c ++ innerᵉ e
-  innerᵉ (scanᵉ f z e)   = innerᵗ f ++ innerᵗ z ++ innerᵉ e
-  innerᵉ (mergeAllᵉ lim e)  = innerᵉ e
-  innerᵉ (switchAllᵉ e)  = innerᵉ e
-  innerᵉ (exhaustAllᵉ e) = innerᵉ e
-  innerᵉ (μᵉ e)          = innerᵉ e
-  innerᵉ (varᵉ x)        = []
-  innerᵉ (deferᵉ e)      = []
-
-  innerᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → Tm Γ Δᵍ Δ Θ t → List ℕ
-  innerᵗ (varᵗ x)      = []
-  innerᵗ unit̂          = []
-  innerᵗ (bool̂ _)      = []
-  innerᵗ (nat̂ _)       = []
-  innerᵗ (pairᵗ a b)   = innerᵗ a ++ innerᵗ b
-  innerᵗ (fstᵗ p)      = innerᵗ p
-  innerᵗ (sndᵗ p)      = innerᵗ p
-  innerᵗ (inlᵗ a)      = innerᵗ a
-  innerᵗ (inrᵗ a)      = innerᵗ a
-  innerᵗ (caseᵗ s l r) = innerᵗ s ++ innerᵗ l ++ innerᵗ r
-  innerᵗ (ifᵗ c a b)   = innerᵗ c ++ innerᵗ a ++ innerᵗ b
-  innerᵗ (primᵗ _ a)   = innerᵗ a
-  innerᵗ (strmᵗ e)     = shellSizeᵉ e ∷ innerᵉ e
-
-  innerᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → List (Tm Γ Δᵍ Δ Θ t) → List ℕ
-  innerᵗˢ []       = []
-  innerᵗˢ (y ∷ ys) = innerᵗ y ++ innerᵗˢ ys
--- THE DE BRUIJN POSITION of a Θ variable.  Rx.Hop-Depth's plug
--- multiplier is the consumer: its coefficients ask "is this the
--- variable THIS binder binds", which is a question about the index,
--- not about how many variables a term mentions.
---
--- `occsᵗ` above is index-BLIND on purpose — it bounds the copying a
--- WHOLE-environment substitution does, which is exactly what
--- plugs-lenᵉ needs, and exactly what a per-binder coefficient must not
--- use.  Two refutations pinned that down, and then a
--- third showed that no occurrence count of any kind is the right
--- quantity for such a coefficient; see the Rx.Hop-Depth header.
-varIx : ∀ {t} {Θ : List Ty} → t ∈ Θ → ℕ
-varIx (here _)  = 0
-varIx (there p) = suc (varIx p)
-
 ------------------------------------------------------------------
 -- STRATIFICATION of the slot telescope: every `input j` an
 -- expression mentions has j < k.  A shared slot's def carries this
@@ -662,10 +578,10 @@ varIx (there p) = suc (varIx p)
 -- JS `const` telescope — a def can read only strictly-earlier
 -- bindings, exactly what the TS generator already builds and what a
 -- JS const can reference without a TDZ error.  It exists so that a
--- per-slot hop depth (Rx.Hop-Depth's η environment) is computable by
--- recursion on the slot index: slot k's hop reads only hops j < k.
+-- per-slot measure is computable by recursion on the slot index:
+-- slot k reads only slots j < k.
 --
--- deferᵉ is NOT cut, unlike hopD's recursion: a deferred subtree
+-- deferᵉ is NOT cut: a deferred subtree
 -- subscribes later, but its `input` references are just as real
 -- when it does.  The check is about which slots a def can EVER
 -- reach, not about when.
@@ -706,26 +622,3 @@ mutual
   inputsBelowᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → ℕ → List (Tm Γ Δᵍ Δ Θ t) → Bool
   inputsBelowᵗˢ k []       = true
   inputsBelowᵗˢ k (y ∷ ys) = inputsBelowᵗ k y ∧ inputsBelowᵗˢ k ys
-
--- AND THE SAME READING ON A RUNTIME VALUE, WHICH IS NOT THE SAME
--- QUESTION AS ON A DEF.  A slot's def is stratified once, at the
--- telescope, and that check sees the def's whole syntax.  A VALUE of
--- `obs` type is an arbitrary closed expression assembled while the
--- program runs, so nothing about the telescope constrains which inputs
--- it names -- which is why an observable that arrives as a payload and
--- is then subscribed can register against inputs the def it came from
--- never mentioned.
---
--- The recursion is structural on the TYPE, following `Val` itself, and
--- the data arms are `true` rather than absent: a `natᵗ` payload names
--- no input because it has no syntax, not because the question is
--- inapplicable.  Only the `obs` arm carries content, and it is the
--- expression reading above, unchanged.
-inputsBelowᵛ : ∀ {n} {Γ : Ctx n} → ℕ → (t : Ty) → Val Γ t → Bool
-inputsBelowᵛ k unitᵗ    _        = true
-inputsBelowᵛ k boolᵗ    _        = true
-inputsBelowᵛ k natᵗ     _        = true
-inputsBelowᵛ k (s ×ᵗ t) (a , b)  = inputsBelowᵛ k s a ∧ inputsBelowᵛ k t b
-inputsBelowᵛ k (s +ᵗ t) (inj₁ a) = inputsBelowᵛ k s a
-inputsBelowᵛ k (s +ᵗ t) (inj₂ b) = inputsBelowᵛ k t b
-inputsBelowᵛ k (obs t)  e        = inputsBelowᵉ k e

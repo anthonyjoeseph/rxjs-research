@@ -12,9 +12,9 @@
 --      properly hypothesised — no known-false placeholders): the
 --      step lemmas
 --      (subscribeE-wf, mid-step — the per-clause preservation
---      grind), mid-init, mid-skip, mid-final.  Budget sufficiency
---      is no longer assumed here: it is imported, proven, from
---      Verify-Budget-Sufficient.
+--      grind), mid-init, mid-skip, mid-final.  Stuck-freedom
+--      is not assumed here: it is imported as `rank-sufficient`,
+--      the one statement the descent discipline costs.
 --   3. The compositions — the subscribe frame, the chain fold, the
 --      fuel loop, and the theorem — are all DEFINED, glued by
 --      runProtocol's distribution over ++.
@@ -35,13 +35,10 @@ open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong; subst)
 
 
--- from .Caps-Bridge, not from the top module: the top module is the
--- active caps grind, and importing it here would put this file on that
--- clock.
-open import Verify-Budget-Sufficient.Node-Fresh using (mint-install-survives)
-open import Verify-Budget-Sufficient.Queue-Dead using (QDeadC; emptyQueue?;
+open import Verify-Support.Node-Fresh using (mint-install-survives)
+open import Verify-Support.Queue-Dead using (QDeadC; emptyQueue?;
   pushBurst-qd; subscribeE-qd)
-open import Rx.Prim      using (Gas; g0; Tick; Id; Source; init; value; close; complete; subscribe; exhausted; Timed; hot;
+open import Rx.Prim      using (Tick; Id; Source; init; value; close; complete; subscribe; exhausted; Timed; hot;
   cold; _at_from_as_)
 open import Rx.Exp       using (Ctx; Closed; Ty; Val; Fn; obs; mapᵉ; natᵗ; _×ᵗ_; Tm; scanᵉ; takeᵉ; evalTm; input; emptyᵉ;
   deferᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ)
@@ -63,6 +60,12 @@ open import Verify-Well-Formed.Part2 using (BurstInv; countRegs-snoc; hotSlot?;
                                            oneShotBurst-wf; settleInstant-nothing)
 open import Verify-Well-Formed.Part1 using (closeCount; countRegs; liveTypeOK?; regTyped?)
 open import Decide using (true≢false; ∧-intro; ∧-trueʳ; ∧-trueˡ; ≡ᵇ-refl; ≤ᵇ-true)
+
+open import Induction.WellFounded using (Acc)
+open import Rx.Strat-Order using (Tri; _≺_; ≺-wellFounded)
+
+variable
+  τ : Tri
 
 regTyped?-snoc : ∀ {n} {Γ : Ctx n} {t}
   (r : List (RegId × Source × Chain Γ t))
@@ -182,9 +185,9 @@ initReg-wf {Γ = Γ} {u = u} src κ id st sched S binv ltok =
 -- stepFrame-wf-inner-mergeAll/outer residues are blocked on mergeAll-cert, the
 -- SKETCH in Part8's establishment block rather than a Part4 postulate.
 --
--- TERMINATION: lexicographic (Gas, Closed Γ u) — μ drops Gas, every other
--- recursion drops Closed structurally; Agda sees it inline, mirroring
--- subscribeE itself.
+-- TERMINATION: lexicographic (Acc _≺_ τ, Closed Γ u) — the three guarded
+-- peels drop the accessibility witness, every other recursion drops Closed
+-- structurally; Agda sees it inline, mirroring subscribeE itself.
 --
 -- A `→ Set` return type asserts nothing the typechecker can check, which is
 -- why there is no pushBurst-wf or stepFrame-burst here.
@@ -280,7 +283,7 @@ postulate
   -- in Walk-Level.agda, which Part3 does not import.  They could be proven inline
   -- in the body or added to a Part5 lemma accessible here.  No conceptual barrier.
   map-nodry-push : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (fuel : Gas) (f : Fn Γ [] [] [] s u) (b : Closed Γ s) (κ : Path Γ u t)
+    (fuel : Acc _≺_ τ) (f : Fn Γ [] [] [] s u) (b : Closed Γ s) (κ : Path Γ u t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     hasDry (proj₁ (subscribeE fuel (mapᵉ f b) κ id now sched st)) ≡ false →
     hasDry (proj₁ (subscribeE fuel b (map-f f ↠ κ) id now sched st)) ≡ false
@@ -289,7 +292,7 @@ postulate
   -- REAL SHAPE MISMATCH: subscribeE-map-wf does NOT return valsLast?;
   -- subscribeE-wf's conclusion REQUIRES it.
   map-valsLast-push : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (fuel : Gas) (f : Fn Γ [] [] [] s u) (b : Closed Γ s) (κ : Path Γ u t)
+    (fuel : Acc _≺_ τ) (f : Fn Γ [] [] [] s u) (b : Closed Γ s) (κ : Path Γ u t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     valsLast? (proj₁ (subscribeE fuel b (map-f f ↠ κ) id now sched st)) ≡ true →
     valsLast? (proj₁ (subscribeE fuel (mapᵉ f b) κ id now sched st)) ≡ true
@@ -310,7 +313,7 @@ postulate
   -- (all Walk-Level.agda — not currently imported by Part3).  Twin of
   -- map-nodry-push and has the same import obstacle; no conceptual barrier.
   scan-nodry-push : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (fuel : Gas) (f : Fn Γ [] [] [] (u ×ᵗ s) u) (seed : Tm Γ [] [] [] u)
+    (fuel : Acc _≺_ τ) (f : Fn Γ [] [] [] (u ×ᵗ s) u) (seed : Tm Γ [] [] [] u)
     (b : Closed Γ s) (κ : Path Γ u t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     hasDry (proj₁ (subscribeE fuel (scanᵉ f seed b) κ id now sched st)) ≡ false →
@@ -322,7 +325,7 @@ postulate
   -- REAL SHAPE MISMATCH: subscribeE-scan-wf does NOT return valsLast?;
   -- subscribeE-wf's conclusion REQUIRES it.
   scan-valsLast-push : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (fuel : Gas) (f : Fn Γ [] [] [] (u ×ᵗ s) u) (seed : Tm Γ [] [] [] u)
+    (fuel : Acc _≺_ τ) (f : Fn Γ [] [] [] (u ×ᵗ s) u) (seed : Tm Γ [] [] [] u)
     (b : Closed Γ s) (κ : Path Γ u t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     valsLast? (proj₁ (subscribeE fuel b (scan-f f (proj₁ (mintNode sched)) ↠ κ) id now
@@ -355,7 +358,7 @@ postulate
   -- case-splits on `evalTm count` (Rx.Evaluator) before the takeᵉ clause
   -- reduces.  Without it the outer hasDry does not reduce to the inner hasDry.
   take-nodry-push : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-    (fuel : Gas) (count : Tm Γ [] [] [] natᵗ) (k : ℕ) (b : Closed Γ s) (κ : Path Γ s t)
+    (fuel : Acc _≺_ τ) (count : Tm Γ [] [] [] natᵗ) (k : ℕ) (b : Closed Γ s) (κ : Path Γ s t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     evalTm count ≡ suc k →
     hasDry (proj₁ (subscribeE fuel (takeᵉ count b) κ id now sched st)) ≡ false →
@@ -376,7 +379,7 @@ postulate
 -- subscribe, read the node back — which is PROVEN there, over a ring on the
 -- whole of `subscribeE`; `take-node` below spends it in the same line.
 scan-node : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-  (fuel : Gas) (f : Fn Γ [] [] [] (u ×ᵗ s) u) (seed : Tm Γ [] [] [] u)
+  (fuel : Acc _≺_ τ) (f : Fn Γ [] [] [] (u ×ᵗ s) u) (seed : Tm Γ [] [] [] u)
   (b : Closed Γ s) (κ : Path Γ u t)
   (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
   let nid = proj₁ (mintNode sched)
@@ -393,7 +396,7 @@ scan-node fuel f seed b κ id now sched st =
 -- — a take node's count is spent by the take FRAME, which runs above this
 -- subscription rather than inside it, so `suc k` comes back exactly.
 take-node : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-  (fuel : Gas) (k : ℕ) (b : Closed Γ s) (κ : Path Γ s t)
+  (fuel : Acc _≺_ τ) (k : ℕ) (b : Closed Γ s) (κ : Path Γ s t)
   (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
   let nid = proj₁ (mintNode sched)
       r₀  = subscribeE fuel b (take-f nid ↠ κ) id now (proj₂ (mintNode sched))
@@ -410,7 +413,7 @@ take-node fuel k b κ id now sched st =
 -- `Sched.live` are unchanged and all four fields transport by record eta with
 -- no rewrites.  Verified in ``git show 1f1730e^:agda/probe/Battery-VWF-Prop.agda``.
 scan-binv-adapt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-  (fuel : Gas) (f : Fn Γ [] [] [] (u ×ᵗ s) u) (seed : Tm Γ [] [] [] u)
+  (fuel : Acc _≺_ τ) (f : Fn Γ [] [] [] (u ×ᵗ s) u) (seed : Tm Γ [] [] [] u)
   (b : Closed Γ s) (κ : Path Γ u t)
   (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
   BurstInv id sched st S →
@@ -467,7 +470,7 @@ postulate
   -- discharging it needs subscribeE-wf, which is mutual with it and
   -- lives two files down.
   subscribeSharedSlot-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (fuel : Gas) (i : Fin n) (d : Closed Γ (lookup Γ i))
+    (fuel : Acc _≺_ τ) (i : Fin n) (d : Closed Γ (lookup Γ i))
     (κ : Path Γ (lookup Γ i) t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
     BurstInv id sched st S →
@@ -579,7 +582,7 @@ postulate
   -- `liveTypeOK?-sweepLive`, `liveTypeOK?-swap`; no existing lemma certifies
   -- that a freshly-minted live entry is self-typing.
   subscribeE-defer-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (fuel : Gas) (body : Closed Γ u) (κ : Path Γ u t)
+    (fuel : Acc _≺_ τ) (body : Closed Γ u) (κ : Path Γ u t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
     BurstInv id sched st S →
     ProtocolSt.done S ≡ false →
@@ -625,7 +628,7 @@ postulate
   --   it installs.
   mergeAll-binv-adapt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (lim : Maybe ℕ)
-    (fuel : Gas) (b : Closed Γ (obs u)) (κ : Path Γ u t)
+    (fuel : Acc _≺_ τ) (b : Closed Γ (obs u)) (κ : Path Γ u t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
     BurstInv id sched st S →
     BurstInv id (proj₂ (mintNode sched))
@@ -633,7 +636,7 @@ postulate
 
   mergeAll-nodry-push : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (lim : Maybe ℕ)
-    (fuel : Gas) (b : Closed Γ (obs u)) (κ : Path Γ u t)
+    (fuel : Acc _≺_ τ) (b : Closed Γ (obs u)) (κ : Path Γ u t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     hasDry (proj₁ (subscribeE fuel (mergeAllᵉ lim b) κ id now sched st)) ≡ false →
     hasDry (proj₁ (subscribeE fuel b (thru-outer mergeAllᵒ (proj₁ (mintNode sched)) ↠ κ)
@@ -644,7 +647,7 @@ postulate
 
   mergeAll-valsLast-push : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (lim : Maybe ℕ)
-    (fuel : Gas) (b : Closed Γ (obs u)) (κ : Path Γ u t)
+    (fuel : Acc _≺_ τ) (b : Closed Γ (obs u)) (κ : Path Γ u t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     valsLast? (proj₁ (subscribeE fuel b (thru-outer mergeAllᵒ (proj₁ (mintNode sched)) ↠ κ)
                         id now (proj₂ (mintNode sched))
@@ -665,7 +668,7 @@ postulate
   --   `subscribeE` that never reads which state was installed.
   mergeAll-node-shape : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (lim : Maybe ℕ)
-    (fuel : Gas) (b : Closed Γ (obs u)) (κ : Path Γ u t)
+    (fuel : Acc _≺_ τ) (b : Closed Γ (obs u)) (κ : Path Γ u t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     let nid = proj₁ (mintNode sched)
         r   = subscribeE fuel (mergeAllᵉ lim b) κ id now sched st
@@ -691,7 +694,7 @@ postulate
   --   frame, invariant back in.
   subscribeE-mergeAll-push : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (lim : Maybe ℕ)
-    (fuel : Gas) (b : Closed Γ (obs u)) (κ : Path Γ u t)
+    (fuel : Acc _≺_ τ) (b : Closed Γ (obs u)) (κ : Path Γ u t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
     BurstInv id sched st S →
     (let nid = proj₁ (mintNode sched)
@@ -713,7 +716,7 @@ postulate
          × BurstInv id (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) S″
 
   subscribeE-switchAll-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (fuel : Gas) (b : Closed Γ (obs u)) (κ : Path Γ u t)
+    (fuel : Acc _≺_ τ) (b : Closed Γ (obs u)) (κ : Path Γ u t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
     BurstInv id sched st S →
     ProtocolSt.done S ≡ false →
@@ -725,7 +728,7 @@ postulate
          × (valsLast? (proj₁ r) ≡ true)
 
   subscribeE-exhaustAll-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (fuel : Gas) (b : Closed Γ (obs u)) (κ : Path Γ u t)
+    (fuel : Acc _≺_ τ) (b : Closed Γ (obs u)) (κ : Path Γ u t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
     BurstInv id sched st S →
     ProtocolSt.done S ≡ false →
@@ -738,9 +741,9 @@ postulate
 
 -- THE NODE THE INNER BURST LEFT, shape and queue together, which is the
 -- form the wrap clause consumes.  The queue half is claimed only at an
--- unbounded limit, where it is `Rx.MergeAll-Laws.unbounded-never-parks`
--- and nothing else; a bounded run yields the shape and no promise about
--- the queue, because at a bounded limit the burst legitimately parks.
+-- unbounded limit, where it is the drain gate's own walk and nothing
+-- else; a bounded run yields the shape and no promise about the queue,
+-- because at a bounded limit the burst legitimately parks.
 --
 -- THE PREDICATE COSTS THE CONSUMER NOTHING, which was the open question
 -- about the law's shape.  `emptyQueue?` cannot be an equation --
@@ -770,7 +773,7 @@ postulate
 --   The theorem says more than the rows ever did, so it expired with
 --   its target; what survives being worth a pointer is the corpus.
 unbounded-never-parks : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (fuel : Gas) (b : Closed Γ (obs u)) (κ : Path Γ u t)
+  (fuel : Acc _≺_ τ) (b : Closed Γ (obs u)) (κ : Path Γ u t)
   (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
   let nid = proj₁ (mintNode sched)
       r   = subscribeE fuel (mergeAllᵉ nothing b) κ id now sched st
@@ -797,7 +800,7 @@ unbounded-never-parks {u = u} fuel b κ id now sched st =
 
 mergeAll-node : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (lim : Maybe ℕ)
-  (fuel : Gas) (b : Closed Γ (obs u)) (κ : Path Γ u t)
+  (fuel : Acc _≺_ τ) (b : Closed Γ (obs u)) (κ : Path Γ u t)
   (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
   let nid = proj₁ (mintNode sched)
       r   = subscribeE fuel (mergeAllᵉ lim b) κ id now sched st
@@ -878,8 +881,8 @@ mergeAll-node lim fuel b κ id now sched st
 -- ANONYMOUS by the bug-cache idiom: a named pin is a proven definition with
 -- no consumer, and `make wiring-gate` would rightly orphan it.
 _ : ∀ {n} {Γ : Ctx n} → Sched Γ →
-    (∀ {n′} {Γ′ : Ctx n′} {t} {e : Closed Γ′ t} {s}
-      (fuel : Gas) (b : Closed Γ′ s) (κ : Path Γ′ s t)
+    (∀ {n′} {Γ′ : Ctx n′} {t} {e : Closed Γ′ t} {s} {τ′ : Tri}
+      (fuel : Acc _≺_ τ′) (b : Closed Γ′ s) (κ : Path Γ′ s t)
       (id : Id) (now : Tick) (sched : Sched Γ′) (st : EvalSt e) (k : ℕ) →
       (let nid = proj₁ (mintNode sched)
            r₀  = subscribeE fuel b (take-f nid ↠ κ) id now (proj₂ (mintNode sched))
@@ -888,7 +891,7 @@ _ : ∀ {n} {Γ : Ctx n} → Sched Γ →
     → ⊥
 _ = λ sched dyF →
       true≢false
-        (dyF g0 (emptyᵉ {t = natᵗ}) root 0 0 sched
+        (dyF (≺-wellFounded (0 , 0 , 0)) (emptyᵉ {t = natᵗ}) root 0 0 sched
              (record (st-init (emptyᵉ {t = natᵗ})) { dying = 0 ∷ [] }) 0
              0)
 
@@ -963,7 +966,7 @@ _ = λ n Γ bal → 1+n≢0 (bal {Γ′ = Γ} {t = natᵗ} 0 0 (0 ∷ []) 0 (0 �
 -- `oneShotBurst-wf` (.Part2) closes it outright.  Two of four arms are
 -- discharged; the leaves are the other two plus the shared slot.
 subscribeE-input-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (fuel : Gas) (i : Fin n) (κ : Path Γ (lookup Γ i) t)
+  (fuel : Acc _≺_ τ) (i : Fin n) (κ : Path Γ (lookup Γ i) t)
   (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
   BurstInv id sched st S →
   ProtocolSt.done S ≡ false →

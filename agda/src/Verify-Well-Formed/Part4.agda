@@ -12,9 +12,9 @@
 --      properly hypothesised — no known-false placeholders): the
 --      step lemmas
 --      (subscribeE-wf, mid-step — the per-clause preservation
---      grind), mid-init, mid-skip, mid-final.  Budget sufficiency
---      is no longer assumed here: it is imported, proven, from
---      Verify-Budget-Sufficient.
+--      grind), mid-init, mid-skip, mid-final.  Stuck-freedom
+--      is not assumed here: it is imported as `rank-sufficient`,
+--      the one statement the descent discipline costs.
 --   3. The compositions — the subscribe frame, the chain fold, the
 --      fuel loop, and the theorem — are all DEFINED, glued by
 --      runProtocol's distribution over ++.
@@ -35,15 +35,12 @@ open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong; subst)
 
 
--- from .Caps-Bridge, not from the top module: the top module is the
--- active caps grind, and importing it here would put this file on that
--- clock.
 open import Rx.Prim      using (Id; Source; InstEvent; init; value; close; handoff; complete; EmitKind; exhausted; dried;
   cut; cutPending; _at_from_as_)
 open import Rx.Exp       using (Ctx; Closed; Ty)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; RegId; Chain; Path; root; memberSource; NodeId; NodeState; scan-st;
   take-st; mergeAll-st; switch-st; exhaust-st; sched-init; st-init; arrTy; arrSource;
-  cascadeGo; subscribeE; sameSource; hasDry; dropSource; budgetAt)
+  cascadeGo; subscribeE; sameSource; hasDry; dropSource; rootWitness)
 open import Rx.Slots using (Slots)
 open import Rx.Protocol  using (ProtocolSt; Owed; countIn; allZero; protocol-init; stepProtocol; runProtocol; paidUp; settle;
   paidOff; applyEvents; removeOne; cancelOwed; bumpOwed; settleInstant)
@@ -183,7 +180,7 @@ burst-final sched st S binv dyF dp cv = inv , paid (BurstInv.current-frame binv)
 -- is the only state at which either is claimed.
 rootExitSt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) → EvalSt e
 rootExitSt e ins =
-  proj₂ (proj₂ (subscribeE (budgetAt e ins 0) e root 0 0
+  proj₂ (proj₂ (subscribeE (rootWitness e ins) e root 0 0
                            (sched-init e ins) (st-init e)))
 
 -- ROOT-EXIT done-plumbed, migrated out of BurstInv (see the fork note).  The
@@ -222,7 +219,7 @@ postulate
   root-entry-sunk : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
     (S : ProtocolSt) →
     runProtocol protocol-init
-      (proj₁ (subscribeE (budgetAt e ins 0) e root 0 0
+      (proj₁ (subscribeE (rootWitness e ins) e root 0 0
                          (sched-init e ins) (st-init e))) ≡ just S →
     ProtocolSt.done S ≡ true →
     (rid : RegId) (src : Source) (u : Ty) (p : Path Γ u t) →
@@ -307,11 +304,11 @@ root-nodeCache e ins nid (mergeAll-st lim k q od) m =
 root-done-plumbed : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
   (S : ProtocolSt) →
   runProtocol protocol-init
-    (proj₁ (subscribeE (budgetAt e ins 0) e root 0 0
+    (proj₁ (subscribeE (rootWitness e ins) e root 0 0
                        (sched-init e ins) (st-init e))) ≡ just S →
   ProtocolSt.done S ≡ true →
   allShareSunk (EvalSt.registry
-    (proj₂ (proj₂ (subscribeE (budgetAt e ins 0) e root 0 0
+    (proj₂ (proj₂ (subscribeE (rootWitness e ins) e root 0 0
                               (sched-init e ins) (st-init e))))) ≡ true
 root-done-plumbed {n} {Γ} {t} e ins S req deq =
   go (EvalSt.registry (rootExitSt e ins))
@@ -328,9 +325,9 @@ root-done-plumbed {n} {Γ} {t} e ins S req deq =
 
 root-caches : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
   cachesValid
-    (EvalSt.nodes (proj₂ (proj₂ (subscribeE (budgetAt e ins 0) e root 0 0
+    (EvalSt.nodes (proj₂ (proj₂ (subscribeE (rootWitness e ins) e root 0 0
                                             (sched-init e ins) (st-init e)))))
-    (EvalSt.registry (proj₂ (proj₂ (subscribeE (budgetAt e ins 0) e root 0 0
+    (EvalSt.registry (proj₂ (proj₂ (subscribeE (rootWitness e ins) e root 0 0
                                                (sched-init e ins) (st-init e))))) ≡ true
 root-caches {n} {Γ} {t} e ins =
   go (EvalSt.nodes (rootExitSt e ins))

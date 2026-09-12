@@ -190,365 +190,67 @@ the row is DIFFICULTY.
 ```
 formal-verification-batchSimultaneous    The-Proof.agda — REAL, module postulate-free
  ├─ batch-agreement                      proven
- └─ evaluate-well-formed                 Verify-Well-Formed/ — tier 2
-     ├─ budget-sufficient                Caps-Bridge.agda — a REAL BODY over:
-     │   ├─ burst-dry/-bounded ┐ all three are projections of ONE
-     │   ├─ burst-caps         ┘ subscribeE-wet-via-caps call (burst-all)
-     │   │                                ← subscribeE-wet ← wet-landing-lift
-     │   │                                  ← subscribeE-walk-level   proven
-     │   └─ drain-dry   ← cascade-wet-via-caps     proven
+ └─ evaluate-well-formed                 Verify-Well-Formed/Part13 — tier 2
+     ├─ rank-sufficient                  Verify-Rank-Sufficient.agda — tier 1
      └─ the well-formedness branch       its own postulates — tier 2
 
-  every tier above is stated over Rx.Exp's syntax  MergeAll-Laws.agda — closed
+  every tier above is stated over Rx.Exp's syntax
 ```
 
-The caps route does not replace the wet contract — it rests on it: both
-branches of `budget-sufficient` read `subscribeE-wet`'s `hasDry`/`INV?`
-conjuncts, and both of those routes are real definitions — `subscribeE-wet`,
-`wet-landing-lift`, `subscribeE-walk-level` and `cascade-wet-via-caps` all the
-way down, with the `walkFace` family ground on every clause and the whole
-Walk-Level tree holding no live postulate.
+The descent `rank-sufficient` guards is the evaluator's own and is stated
+nowhere else: `Acc _≺_` over a lexicographic triple — unconnected shares, hop
+rank, `syncSizeᵉ` — seeded by `rootWitness` and dropped at three guarded peels,
+each a proven body. No quantity above `Rx.Evaluator` mentions it, which is what
+lets one statement close the whole descent.
 
 A row's class must agree with its postulate's header, which is where the
 research lives; where they disagree, the header wins.
 
-## Tier 1 — `budget-sufficient`
+## Tier 1 — `rank-sufficient`
 
-**The tier is ONE statement, not a directory.** `budget-sufficient`
-(Caps-Bridge) says `hasDry (evaluate fuel e ins) ≡ false` and is the only CLAIM
-this tree exports; every module sits in its import cone, bar a corpus reaching
-Main through `Harness.Main`, and its one door inward is `mint-install-survives`
-(Node-Fresh).
+**THE TIER IS ONE STATEMENT, AND IT IS THE WHOLE COST OF THE DESCENT.**
+`rank-sufficient` (Verify-Rank-Sufficient) says no run of any program emits the
+dry marker. Its type names no witness, no triple and no order: `evaluate` seeds
+its own entry, so every consumer sees a total function on `Fuel` and this is the
+only place that seeding is shown adequate.
 
-**IT IS BEING DISSOLVED, NOT GROUND.** Gas is peeled at three edges and held
-fixed elsewhere, and a lexicographic triple — `unconn`, rank, `syncSizeᵉ` —
-drops strictly at each, all three drops being proven bodies. Caps live only in
-the arithmetic FLATTENING that triple into one number, which a lexicographic
-order does not need. One survives: the rank's fold clause, whose refold count
-the store bounds and the program does not. That bound is the tier's whole risk.
+**WHAT IS OWED IS THREE READINGS, NOT ONE ARITHMETIC** — the μ guard's subterm
+monotonicity, the connect guard's one-way count, and THE RANK GUARD, which is
+this development's nesting face restated where it is spent. Only the third is
+open.
 
-**THE `subscribeE-nest-*` ROWS ARE ONE STATEMENT, NOT ONE PER HEAD.** They all
-instantiate `NestAt`; a head that does not fit is a finding about the shared
-statement, not about the head.
-
-
+**A FAILING GUARD IS NOT AN ERROR, AND THAT IS WHY THE TIER IS PROBEABLE.** Each
+guarded clause returns a `dry` emit and the run continues, so both sides of the
+statement compute at every program with nothing sealed between them.
 
 ### Big picture tier roadmap
 
-- **THE EMITTED-VALUE INVARIANT, STATED WITHOUT THE SPINE.** The hop
-  edge's `≺` form takes ONE premise — every emitted value's rank is
-  strictly under its emitter's — and the toy proves exactly that in
-  three congruences and a sub-induction, reading no size bound and no
-  cap. The tree states it spine-indexed instead,
-  carrying a `(2 + P) ^ spn` factor, because one clause needs a count
-  and the statement was widened for it. This commit states the
-  spine-free form over the real term language, proves every clause the
-  toy's proof covers, and returns the residue. The fold clause alone
-  means the tier's risk is one clause; anything else names what the
-  fragment could not write. Narrows DOES DESCENT SURVIVE THE REAL TERM
-  LANGUAGE?
-
-- **WHAT THE CONVERSION RETIRES, ROW BY ROW.** A census already sorted
-  the ledger by what funds each row and found forty-seven funded by a
-  cap and nothing else — so the conversion's real size is what falls
-  out under it, and reading that off after the fact is how a tier comes
-  to be ground twice. The three edge lemmas are proven and cap-free
-  already, so the measure is against THEM rather than against a
-  contract nobody can state: each cap-funded row goes into one of three
-  lists — gone with the flattening, surviving re-denominated, and
-  surviving unchanged because the cap was never what it was about. The
-  store face is where the answer bites. Narrows WHAT DOES AN
-  INTRA-INSTANT RE-ENTRY LEAVE SMALLER?
-
-- **THE GRANT THAT STEPS WITH THE FRAME.** A slots-denominated COUNT
-  ceiling was this slot's plan and that route is DISCARDED: the arm
-  split it was to be wired at is refuted at a burst of ONE value. A
-  substituting arm emits its step function's own body — a term chosen
-  after the grant was — and no number fixed along a path dominates
-  one. The answering shape is
-  already PROVEN, one face over: `valsΦ?` reads the payload at the
-  factor and summand of the path STILL TO BE WALKED, and
-  `stepFrame-nest-Φ` transports it across all five arms. This commit
-  restates the arrival face's fit predicate against it, deletes the
-  four superseded arm leaves, and returns what the walk still owes. Narrows WHAT BOUNDS A BURST INSIDE ONE INSTANT?
-
-### Open questions
-
-- **DOES DESCENT SURVIVE THE REAL TERM LANGUAGE?** Every caps-denominated
-  route to a ceiling is closed — entry cap, exit cap, the recurrence's
-  own fuel — and so is the syntactic half: no affine plug law exists at
-  a template plugging into an `allᵉ` that feeds a `scanᵉ`, which is
-  ordinary rxjs. That leaves DESCENT, where a depth read off the
-  emission in hand predicts nothing. It is asked against the REAL tree,
-  because both refutations so far were silences of the fragment read as
-  greens. The UNIT is settled and it is the
-  evaluator's SIGNATURE, not any contract over it, recorded on the one
-  the attempt died against. So it is asked clause by clause: which the
-  toy's proof covers, and which it could not write.
-  relevant: `fan-regsSzL-mint`, `walk-share-valsNest`, `subscribeE-sz`
-
-- **WHAT DOES AN INTRA-INSTANT RE-ENTRY LEAVE SMALLER?** The CONTROL
-  half is settled and gone: every such re-entry descends on an argument
-  it already carries, the merge join's drain on its own queue, and
-  `make recursion-cover` goes red the day one stops. What is left is the
-  STORE half, and it is not a descent question at all but a
-  PRESERVATION one — a step is asked to hold a reading the cascade door
-  takes at entry, and cannot, since inside the instant the store grows
-  toward the NEXT cap by design. So the region is a bound sighted at the
-  wrong end, and what decides it is whether a motive can carry what the
-  entry cap was standing in for.
-  relevant: `walk-share-nestOK`, `step-frame-store≤`,
-  `subscribeSharedSlot-sz-store`
-
-- **WHAT BOUNDS A BURST INSIDE ONE INSTANT?** Rows on two faces fail on one
-  absence: nothing ties the values a frame hands ON to the program's
-  syntax. The quantity is real and not an artefact of the accounting — a
-  count field threaded for it died to measurement at the first hop. And the
-  ties that DO exist are not missing but MISPLACED: `burst-out`, and the
-  SLOTS-denominated ceiling the count's own dynamics point at, both price
-  the SUBSCRIBE frame, whose one width-towering family emits nothing at
-  every length measured. So they constrain none of the instants that carry
-  a width, and what has never been asked is either tie on what a THREADING
-  frame hands on.
-  relevant: `pushBurst-sz-store-outer`, `subscribeE-sz`, `walk-share-valsNest`
+- **INSTANTIATE THE GUARDS BEFORE PROVING ANY OF THEM.** `rank-sufficient` is
+  the only row and nothing has ever been run against it — which is why the class
+  is FALSITY, and not a doubt about the statement's shape. Both sides compute at
+  every program, so the receipt is cheap: run the canonical programs, then the
+  nesting families the deleted evidence tree was built to reach, and report per
+  row WHICH of the three guards it exercises. A green names the covered guards
+  and never the statement; a red on the RANK guard is the finding this campaign
+  has been walking toward, and it lands in the postulate's header before a
+  clause is ground.
 
 ### The ledger
 
-- **`fan-regsSzL-mint`** (Part7/Depth-Fit) — FALSITY,
-  `REFUTED×4, DEAD ROUTE×7`: the registry read at the ENTRY cap in the PACKED
-  form, which only the terminal leaves now ask for. Both conjuncts refuted at
-  its generic form, at separate witnesses, so no budget and no split repairs
-  it.
-- **`walk-share-nestOK`** (Part7/Depth-Fit) — FALSITY, `DEAD ROUTE×4`: the
-  instant's nest predicate at the state the fan reads the registry. The door
-  has it and the walk carries no nest conjunct at all; threading it down is
-  refused by the store's own growth toward the NEXT cap.
-- **`walk-share-valsNest`** (Part7/Depth-Fit) — FALSITY, `DEAD ROUTE×2`: the
-  values a dispatch hands on are under the instant's nest cap. The headroom
-  closed, so this is what the fan's terminal was; nothing in the store mentions
-  a list the walk carried in, so it is owed at whatever frame emitted it.
-- **`share-fold-store≤`** (Part7/Arrival-Caps) — FALSITY, `REFUTED, TWIN`: the
-  store across one `foldPath`, PRICED against the round's grant rather than
-  preserved. A `scan-f` at an obs-typed accumulator crossed the preservation,
-  and the grant is sealed — so the repair closes the region to instantiation on
-  both sides at once.
-- **`step-frame-store≤`** (Part7/Arrival-Caps) — FALSITY, `REFUTED, TWIN`: the
-  store half of that step, carried APART from the values half so that no
-  ceiling has to cross a step at all; the position's ceiling is rebuilt from
-  the two ingredients where it is spent.
-- **`subscribeInner-strat`** (Part7/Strat-Leaves) — FALSITY, `PROBED`: one
-  subscribe's burst read below the floor, which both subscribing heads reduce
-  to. The slot read is the only arm emitting syntax the source does not carry,
-  and the telescope's own receipt covers it, so what is open is the induction.
-- **`pop-head-strat-sink`** (Caps-Bridge) — FALSITY, `REFUTED`: where the
-  arrival's own value sits against every chain that will receive it, asked only
-  below the root. It wants a fact relating a source's pending values to the
-  floors registered against it, and only where a floor drops.
-- **`walk-frame-drain-entries`** (Part7/Walk-Sink) — FALSITY,
-  `REFUTED×2, DEAD ROUTE, TWIN, PROBED×2`: the per-entry tuple the `from-inner`
-  drain owes, the wrapper's ceiling now minted from the frame's own room. Both
-  denominations stay closed to instantiation — the cap does not return, the
-  climb bound is sealed — so evidence can raise this class, never lower it.
-- **`subscribeE-sz`** (Regs-Nest-Walk) — FALSITY, `REFUTED, PROBED`: what ONE
-  subscription delivers, in its charge plus its telescope. The WHOLE value side
-  is a body over it. A max is refuted at a chain of eleven; a slot named twice
-  is free; the delivery block clears ONE nesting and no deeper level computes.
-- **`pushBurst-sz-store-outer`** (Regs-Nest-Walk) — FALSITY,
-  `REFUTED, DEAD ROUTE, PROBED, RECOVERY`: the burst a crossing door pushes
-  back through itself, keyed on the source program since an arbitrary burst is
-  unbounded. A duplication chain buys no rung; the climb rows say no second
-  block is owed, read in rungs rather than through the charge.
-- **`subscribeSharedSlot-sz-store`** (Regs-Nest-Walk) — FALSITY,
-  `DEAD ROUTE, PROBED×2`: the definition behind a reference, whose entire climb
-  is the telescope summand — `input` charges nought, so no program reading
-  reaches it. The summand is owed the connect's TRANSITIVE reach; sum against
-  maximum is closed to instantiation.
-- **`shareAdmit-strat`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: what a
-  share hands the chains it admitted, and THE ONE PLACE THE REGISTRY READING IS
-  SPENT rather than established. The chain half rides the admission filter,
-  which drops entries and rewrites none; the value half widens off the slot.
-- **`chainsOf-strat`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: that same
-  chain reading arriving from the CASCADE's face. The two filters are keyed by
-  a slot and by an arrival's source, so neither rearranges into the other and
-  the entry reading is owed once per face.
-- **`subscribeE-burstStrat`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`:
-  what a subscribe EMITS, read at the chain it was subscribed under. Every push
-  in this development pushes a burst whose payloads the frame will subscribe
-  again, and the caps receipt carries no reading of them.
-- **`stepFrame-valsStrat`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: what
-  a frame hands the rest of its chain. The walk re-enters on the tail with an
-  output the caps receipt prices but does not read; the floor does not move
-  across a frame, which is what lets one statement cover the walk.
-- **`foldPath-park`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the park
-  reading once a SIBLING chain has folded. It is about a state the walk
-  PRODUCED rather than one it was handed, and it TAKES the reading as a
-  premise, which is what keeps it off the four refuted forms.
-- **`chainStep-park`** (Part7/Strat-Leaves) — FALSITY, `NO EVIDENCE`: the
-  cascade's fold-through, where the tail's chains are read at the state the
-  HEAD chain's step produced. The chains that must survive are not the one that
-  stepped, which is what keeps it off the share's form.
-- **`switchKill-readings`** (Part6) — FALSITY, `PROBED`: the order and park
-  readings carried across a kill. The kill retires registrations and may bump
-  the registry counter, so it writes exactly what both readings read, and
-  nothing yet says the pair survives it.
-- **`subscribeInner-readings`** (Part6) — FALSITY, `PROBED`: the same triple
-  across one drained inner, the writer the drain's recursion spends. The mint
-  moves here — the instance node is allocated and the counter the ordering is
-  read against is raised — so the ordering half is an obligation, not a
-  transport.
-- **`chain-frame-ΦHyp`** (Part7/Frame-Vals) — FALSITY, `REFUTED, TWIN`: the
-  walk's per-frame obligation, out of what an arrival position holds. The four
-  arm grants it replaces die at a burst of ONE, so what is left is the
-  position's size, strat, park and order readings — and nothing says the
-  arrival door carries them.
-- **`pushBurst-sz-store-scan`** (Regs-Nest-Walk) — SHAPE,
-  `REFUTED, DEAD ROUTE×2, PROBED×4`: the cell each arrival rewrites, short two
-  ways. The entering premise levels that cell with the ambient table at the
-  very `M` the conclusion demands; and the block's rate is log-linear where the
-  fold spends the source's width times the step's size.
-- **`mergeAllDrain-ownerQueue`** (Part7/Strat-Leaves) — SHAPE, `REFUTED`: what
-  the drain leaves in the owner's cell. Its premise is read off the POST-state,
-  which the no-room arm never builds, so it is vacuously satisfiable. The
-  reading must be taken across the call, not after it.
-- **`thruConsume-readings`** (Part6) — SHAPE, `PROBED`: REFUTED as written. The
-  no-room branch parks the arrival onto the cell the third conjunct reads, and
-  no hypothesis prices the arrival, so a `share-sink` chain falsifies it. The
-  restatement is the arrival's own floor premise.
-- **`scanΦ-burst-count`** (Part7/Depth-Fit) — SHAPE, `DEAD ROUTE`: the count
-  the fold's charge is a power in, read at the instant's SIZE cap. THE
-  MECHANISM IS DEAD, NOT A DENOMINATION: the value ledger bounds by the WIDTH
-  cap, the crossing needs the size one, and no conjunct on the values names it.
-- **`scanΦ-store-charge`** (Part7/Depth-Fit) — SHAPE, `REFUTED`: the fold's
-  node ceiling under the potential, stated premise-free because nothing the arm
-  around it reads `EvalSt.nodes`. Owed as a carried store predicate, with the
-  two inner arms.
-- **`innerΦ-quiet-fit`** (Part7/Depth-Fit) — SHAPE, `REFUTED×2`: the charge at
-  width zero, refuted at one installed cell — it reads the node table and no
-  premise of it bounds the table. Owed as a carried store predicate, with the
-  drain arm.
-- **`innerΦ-drain-fit`** (Part7/Depth-Fit) — SHAPE, `DEAD ROUTE`: the same
-  charge at the queue's own `drainW`. Its extra premise pins the cell's
-  CONSTRUCTOR, not its depth, so a parked program runs the store term away here
-  too; the width is walk-denominated besides.
-- **`frameParked-step`** (Part7/Strat-Leaves) — DIFFICULTY, `PROBED`: the STORE
-  half of the frame-keyed park reading across one step. Every arm that WRITES
-  is instantiated, a floor below the width included; the two finishes left are
-  free of the reading by a quantified equation, not by a chosen state.
-- **`share-fold-fit`** (Part7/Arrival-Caps) — DIFFICULTY, `DEAD ROUTE, TWIN`:
-  one admitted registration's path, priced at the round's GRANT. The assembly
-  is the chain face's; the sink arm is a dispatch that now descends in its own
-  type, so what is left is an induction on the gas rather than a bound.
-- **`frame-depth-fit`** (Part7/Arrival-Caps) — DIFFICULTY, `PROBED`: one
-  frame's own spend under the position's ceiling. Map, scan and take charge
-  nothing, and BOTH arms that do are now instantiated — the react at a walked
-  edge, the walk at an assembled one. The residue is the state axis, not an
-  arm.
-- **`stepFrame-nest-nodes-inner`** (Nodes-Nest-Walk) — DIFFICULTY,
-  `PROBED, RECOVERY`: what the drain writes at the nodes map. The pop shrinks,
-  and the park its subscribe makes lands one layer under the term popped — so
-  the entry table covers it with the budget unspent, gate honoured.
-- **`stepFrame-nest-regs-inner`** (Regs-Nest-Walk) — DIFFICULTY,
-  `REFUTED, PROBED, RECOVERY`: what the drain registers. The premise alone was
-  refuted by an empty burst; the grant pays EXACTLY, the mint being the node's
-  own reading, at margin zero on three rungs.
-- **`stepFrame-nest-nodes-outer`** (Nodes-Nest-Walk) — DIFFICULTY, `PROBED`:
-  what the outer frame mints at the nodes map. NOT the fresh `*All` cell, which
-  the install is proven to price at zero — the write is a full merge PARKING an
-  arrival in its queue, so the grant owed is the arriving value itself.
-- **`stepFrame-nest-regs-outer`** (Regs-Nest-Walk) — DIFFICULTY, `PROBED`: what
-  the outer frame registers — the subscribed value's frames over the REST of
-  the path, which is the potential exactly. A ladder where the mint climbs and
-  the entry registry stands still clears the premise's own floor by a constant
-  one.
-- **`burst-out`** (Desc-Ceil) — DIFFICULTY, `PROBED`: one subscribe frame emits
-  no more payloads than its term syntactically carries. Seven tight rows tied,
-  the scan head and the share chain among them; every region a row could refute
-  in is now read, and the refold cannot.
-- **`sight-thru-val`** (Depth-Sighted) — DIFFICULTY, `REFUTED, PROBED`: what
-  ONE emitted inner costs the outer frame to subscribe. All three conjuncts are
-  now instantiated where they move — the store at the PARKING branch, tight to
-  equality — and the subscribing branch is blocked rather than uncovered.
-
-- **`subscribeE-fit`** (Sighted-Fit) — DIFFICULTY, `REFUTED×3, PROBED×2`: what
-  ANY subscription's emitted VALUES cost, in the `nestB` currency against a
-  `descW` bound. The family that kills the width-free form holds here at and
-  past its crossing; every head but the `scanᵉ` one is uncovered.
-- **`sight-all-walk`** (Depth-Sighted) — DIFFICULTY, `PROBED`: the drain's WALK
-  half, one leaf for all three `*All` heads — they delegate to the same family
-  and wrap the subject in one level each. It reads the fit the fold carries,
-  which is what a value list quantified freely could not give it.
-- **`subscribeE-burst-nestL`** (Nest-Walk) — DIFFICULTY,
-  `REFUTED×2, DEAD ROUTE×5, PROBED×2, RECOVERY×2`: the admissibility boolean
-  over any subscription's whole burst, reporting the level it needs as an
-  increment off the entry base. The increment is measured FLAT in substitution
-  depth, so what is left is the induction.
-- **`evalWith-nest-sync`** (Nest-Subst) — DIFFICULTY, `TWIN, PROBED`: the
-  substitution walk's sync-denominated charge at an arbitrary environment; the
-  one-entry instances are probed where the currencies split, the wider
-  environments and the closed seed are not.
-- **`thruFit-arr-merge`, `thruFit-arr-switch`, `thruFit-arr-exhaust`**
-  (Nest-Walk) — DIFFICULTY, `PROBED×6`: the emit-by-emit fit at the arr key,
-  all the three boundary heads still owe — the recursion and the push around it
-  are checked. The cap-keyed route to a fit does not transport to a key that is
-  not a `nestB`.
-- **`subscribeE-nest-arr-scan`** (Nest-Walk) — DIFFICULTY, `REFUTED, PROBED×2`:
-  the fold multiplies the depth per value while the key gains only the value's
-  written size, so the grant is read over `suc W` copies of the key; measured,
-  that puts the width in the exponent and the margin's sign comes right.
-- **`pushVals-caps-burstW`** (Nest-Walk) — DIFFICULTY, `PROBED`: the last
-  stream leaf — the walk over it is a proven body, so what remains per instant
-  is the frame widths, which are sealed and taken as a quantified premise
-  wherever a row reads them.
-- **`burst-regs-split`** (Caps-Bridge) — DIFFICULTY, `REFUTED, PROBED×3`: the
-  registry after the subscribe frame, split between the program's unit and the
-  node table. A chain SUMS its two kinds of frame, so neither source alone pays
-  and neither does their join; the sum is what is left, tight where they
-  compose.
-- **`subscribeE-nest-scan`** (Nest-Walk) — DIFFICULTY,
-  `REFUTED, DEAD ROUTE, PROBED`: `NestAt` now carries the pointwise store
-  conjunct this head's accumulator read demanded, so the shape is settled; what
-  remains is the fold arithmetic at the sync-keyed grant and the seed's
-  `evalTm-nest-sync` spend.
-- **`arr-chains-nest-syn`** (Part7/Cascade-Nest) — DIFFICULTY,
-  `REFUTED, PROBED`: the selection's paths and the arrival's payload land
-  inside one unit — the fact that ties the walk's charge back to the program.
-  Free-list form refuted; tied at the entry arrival, cap premises unasked.
-- **`cascadeGo-nest-regs`** (Part7/Cascade-Nest) — DIFFICULTY, `PROBED`: the
-  walk's registry paths under the same width. Registration adds the one frame
-  the path measure charges nothing for; the component reads zero, so the tie is
-  degenerate on the increment.
-- **`subscribeE-Ψ`** (Burst-Walk) — DIFFICULTY, `TWIN`, large: the Ψ reading of
-  the clique its header mirrors, clause for clause at a different measure. The
-  cost is that the induction covers every clause; nothing in it is undecided.
-- **`evalTm-strat`** (Part7/Strat-Leaves) — DIFFICULTY, `TWIN`: a closed term's
-  VALUE read below the floor, which the scan arm made load-bearing — the seed
-  arrives as a term and the cell is read as a value. The same induction is
-  walked at the hop measure; what does not transfer is the arithmetic.
-- **`subscribeE-regOwn`** (Part7/Strat-Leaves) — GRINDABLE, `TWIN, PROBED`:
-  what a subscribe does to the owner ledger. `register` APPENDS, so the reading
-  splits into the hypothesis and one conjunct about the entry chain — reflexive
-  at its own floor, hence free where the twin needs a bound handed to it.
-- **`map-strat-step`** (Part7/Strat-Leaves) — GRINDABLE, `TWIN`: one template
-  application read below the floor, lifted over the payload. The only hop head
-  whose statement names no state at all, and the induction behind it is walked
-  already at a hereditary value predicate of the same shape.
-- **`scanVals-strat`** (Part7/Strat-Leaves) — GRINDABLE, `TWIN`: the fold's own
-  transport, reporting the new accumulator as well as the outputs because the
-  cell it overwrote is what the next emit reads. The same shelf carries this
-  shape at another measure, nil clause and cons clause alike.
-- **`scanΦ-syn-charge`** (Part7/Depth-Fit) — GRINDABLE, `TWIN`: the syntax a
-  burst substitutes, landed under the potential. Four ceilings and no state at
-  all; the outer frame's own product of ceilings already lands under the same
-  split, and what is new is one burst power the same widening absorbs.
+- **`rank-sufficient`** (Verify-Rank-Sufficient) — FALSITY, `NO EVIDENCE`: the
+  three descent guards never fail at the triple the evaluator enters at. The μ
+  and connect readings are monotone counts; the RANK one is the nesting face,
+  and nothing has been instantiated at any of the three.
 
 ## Tier 2 — Verify-Well-Formed (parked behind tier 1)
 
-Built on `budget-sufficient`, so proving anything here while tier 1 is open
-bets on ground a `Verify-Budget-Sufficient` failure would move.
+Built on `rank-sufficient`, so proving anything here while tier 1 is open bets
+on ground a refutation of the descent would move.
 
 **THE TIER IS ONE STATEMENT.** `The-Proof` draws `evaluate-well-formed`
 (Part13) and nothing else from this tree, and every `Verify-Well-Formed` module
-sits in its cone.
+sits in its cone. `Verify-Support`'s three leaves are here rather than in a tier
+of their own: nothing but Part3 consumes any of them.
 
 **MERGE COHERENCE IS UNSTATED** — the branch's own design question. What a
 statement owes, and why it would inherit no evidence from the probe that is the
@@ -663,6 +365,13 @@ In rough order for when the tier opens — statement repairs first, then grinds:
   precedent `initReg-wf` is ruled out in the header — that lemma's emit is
   `init src ∷ []` while this ships the sync prefix in the same emit — and the
   `reg-typed` conjunct needs a self-typing certificate no hypothesis carries.
+- **`mint-install-survives`** (Node-Fresh) — DIFFICULTY, `RECOVERY`: a minted
+  node survives the body subscribing under it. The statement is unchanged from
+  the proven form its header recovers; what moved is the recursion the
+  freshness ring was matched against.
+- **`subscribeE-qd` / `pushBurst-qd`** (Queue-Dead) — DIFFICULTY, `RECOVERY×2`:
+  two members of that same ring — an empty queue below the watermark stays
+  empty across a subscribe and across a push. Same recovery, same blocker.
 - **`mergeAll-node-shape`** (Part3) — DIFFICULTY, `TWIN`: the wrap's node is
   still a `mergeAll-st` at the type it was installed at, whatever the burst did
   to it. Limit-blind, which is what lets the queue claim be a separate fact

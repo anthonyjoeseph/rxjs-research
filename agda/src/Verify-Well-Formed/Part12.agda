@@ -12,9 +12,9 @@
 --      properly hypothesised — no known-false placeholders): the
 --      step lemmas
 --      (subscribeE-wf, mid-step — the per-clause preservation
---      grind), mid-init, mid-skip, mid-final.  Budget sufficiency
---      is no longer assumed here: it is imported, proven, from
---      Verify-Budget-Sufficient.
+--      grind), mid-init, mid-skip, mid-final.  Stuck-freedom
+--      is not assumed here: it is imported as `rank-sufficient`,
+--      the one statement the descent discipline costs.
 --   3. The compositions — the subscribe frame, the chain fold, the
 --      fuel loop, and the theorem — are all DEFINED, glued by
 --      runProtocol's distribution over ++.
@@ -35,9 +35,6 @@ open import Relation.Binary.PropositionalEquality
 
 open import Relation.Nullary using (yes; no)
 
--- from .Caps-Bridge, not from the top module: the top module is the
--- active caps grind, and importing it here would put this file on that
--- clock.
 open import Rx.Prim      using (Id; Source)
 open import Rx.Exp       using (Ctx; Closed; _≟ᵗ_)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; RegId; Chain; Path; NodeId; LiveSource; arrTy; arrSource; chainsOf;

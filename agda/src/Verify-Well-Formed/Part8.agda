@@ -12,9 +12,9 @@
 --      properly hypothesised — no known-false placeholders): the
 --      step lemmas
 --      (subscribeE-wf, mid-step — the per-clause preservation
---      grind), mid-init, mid-skip, mid-final.  Budget sufficiency
---      is no longer assumed here: it is imported, proven, from
---      Verify-Budget-Sufficient.
+--      grind), mid-init, mid-skip, mid-final.  Stuck-freedom
+--      is not assumed here: it is imported as `rank-sufficient`,
+--      the one statement the descent discipline costs.
 --   3. The compositions — the subscribe frame, the chain fold, the
 --      fuel loop, and the theorem — are all DEFINED, glued by
 --      runProtocol's distribution over ++.
@@ -22,6 +22,8 @@ module Verify-Well-Formed.Part8 where
 
 open import Data.Bool    using (Bool; true; false; if_then_else_)
 open import Data.Nat     using (ℕ; zero; suc; _≤_; _+_)
+open import Data.Nat.Properties using (_<?_)
+open import Relation.Nullary using (yes; no)
 open import Data.List    using (List; []; _∷_; _++_; map)
 open import Data.Maybe   using (just; nothing)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
@@ -30,15 +32,12 @@ open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong; subst)
 
 
--- from .Caps-Bridge, not from the top module: the top module is the
--- active caps grind, and importing it here would put this file on that
--- clock.
-open import Rx.Prim      using (Gas; g0; gs; Tick; Id; Source; InstEvent; value; complete; EmitKind; delivery; _at_from_as_)
+open import Rx.Prim      using (Tick; Id; Source; InstEvent; value; complete; EmitKind; delivery; _at_from_as_)
 open import Rx.Exp       using (Ctx; Closed; Val; mapᵉ; natᵗ; Tm; scanᵉ; takeᵉ; evalTm; input; ofᵉ; emptyᵉ; varᵉ; deferᵉ;
-  mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; unfoldμ)
+  mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; unfoldμ; syncSizeᵉ)
 open import Rx.Evaluator using (Sched; EvalSt; Stream; Path; root; _↠_; map-f; scan-f; take-f; takeVals; setNode;
   memberSource; NodeId; lookupNode; scan-st; take-st; sched-init; st-init; foldPath;
-  subscribeE; splitEvents; pushBurst; installNode; mintNode; sameSource; hasDry; budgetAt; mergeAll-st; mergeAllᵒ; thru-outer)
+  subscribeE; splitEvents; pushBurst; installNode; mintNode; sameSource; hasDry; rootWitness; mergeAll-st; mergeAllᵒ; thru-outer)
 open import Rx.Slots using (Slots)
 open import Rx.Protocol  using (ProtocolSt; Owed; countIn; protocol-init; stepProtocol; runProtocol; paidUp; settle;
   applyEvents; valsLast?)
@@ -67,7 +66,7 @@ open import Verify-Well-Formed.Part3 using (map-nodry-push; map-valsLast-push;
                                             subscribeE-switchAll-wf;
                                             take-binv-adapt; take-node;
                                             take-nodry-push)
-open import Verify-Budget-Sufficient.Node-Table using
+open import Verify-Support.Node-Table using
   (lookupNode-setNode)
 open import Verify-Well-Formed.Part4 using (applyEvents-++just; applyEvents-vc; burst-final;
                                            enterInstant; root-caches; root-done-plumbed;
@@ -86,8 +85,14 @@ open import Verify-Well-Formed.Part2 using (burst-init; BurstInv; Inv;
                                             oneShotBurst-wf)
 open import Decide using (just-injᵂ; n≢jᵂ; true≢false)
 
+open import Induction.WellFounded using (Acc; acc)
+open import Rx.Strat-Order using (Tri; _≺_; ltS)
+
+variable
+  τ : Tri
+
 pushBurst-take-cut-joint : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-  (fuel : Gas) (id : Id) (now : Tick) (nid : NodeId) (κ : Path Γ s t)
+  (fuel : Acc _≺_ τ) (id : Id) (now : Tick) (nid : NodeId) (κ : Path Γ s t)
   (es : List (InstEvent (Val Γ s))) (i : Id) (src : Source) (ek : EmitKind)
   (sched : Sched Γ) (st : EvalSt e) (kCount : ℕ) (S S₁ : ProtocolSt) →
   lookupNode nid (EvalSt.nodes st) ≡ just (take-st kCount) →
@@ -136,7 +141,7 @@ pushBurst-take-cut-joint {Γ = Γ} {t = t} {e = e} {s = s}
 -- residue, and valsLast? makes it the burst's LAST emit (cut-tail-nil), so the
 -- residue is a single step rather than a step plus a re-run tail.
 pushBurst-take-joint : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-  (fuel : Gas) (id : Id) (now : Tick) (nid : NodeId) (κ : Path Γ s t)
+  (fuel : Acc _≺_ τ) (id : Id) (now : Tick) (nid : NodeId) (κ : Path Γ s t)
   (burst : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) (kCount : ℕ)
   (S S′ : ProtocolSt) →
   lookupNode nid (EvalSt.nodes st) ≡ just (take-st kCount) →
@@ -221,7 +226,7 @@ pushBurst-take-joint {Γ = Γ} {t = t} {e = e} {s = s}
 -- carries the payload discipline the next take up the tree will need.
 -- (The count ≡ zero branch is emptyᵉ-shaped, handled by oneShotBurst-wf.)
 subscribeE-take-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-  (fuel : Gas) (count : Tm Γ [] [] [] natᵗ) (b : Closed Γ s) (κ : Path Γ s t)
+  (fuel : Acc _≺_ τ) (count : Tm Γ [] [] [] natᵗ) (b : Closed Γ s) (κ : Path Γ s t)
   (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) (k : ℕ) →
   evalTm count ≡ suc k →
   BurstInv id sched st S →
@@ -270,7 +275,7 @@ subscribeE-take-wf fuel count b κ id now sched st S k ecEq binv
 -- `rewrite ecEq` is what lets it reduce: the evaluator's takeᵉ clause opens
 -- `with evalTm count`, so the goal is stuck until that scrutinee is known.
 subscribeE-take0-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-  (fuel : Gas) (count : Tm Γ [] [] [] natᵗ) (b : Closed Γ s) (κ : Path Γ s t)
+  (fuel : Acc _≺_ τ) (count : Tm Γ [] [] [] natᵗ) (b : Closed Γ s) (κ : Path Γ s t)
   (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
   BurstInv id sched st S →
   ProtocolSt.done S ≡ false →
@@ -286,7 +291,7 @@ subscribeE-take0-wf {Γ = Γ} {s = s} fuel count b κ id now sched st S binv deq
   in S′ , run , binv′ , refl
 
 subscribeE-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (fuel : Gas) (b : Closed Γ u) (κ : Path Γ u t) (id : Id) (now : Tick)
+  (fuel : Acc _≺_ τ) (b : Closed Γ u) (κ : Path Γ u t) (id : Id) (now : Tick)
   (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
   BurstInv id sched st S →
   ProtocolSt.done S ≡ false →
@@ -407,15 +412,17 @@ subscribeE-wf fuel (switchAllᵉ b)  κ id now sched st S binv deq nodry =
 subscribeE-wf fuel (exhaustAllᵉ b) κ id now sched st S binv deq nodry =
   subscribeE-exhaustAll-wf fuel b κ id now sched st S binv deq nodry
 
--- ── μᵉ g0: dryBurst → hasDry = true → ⊥ ─────────────────────────────────────
-subscribeE-wf g0 (μᵉ body) κ id now sched st S binv deq nodry =
-  ⊥-elim (true≢false nodry)
-
--- ── μᵉ (gs fuel): RECURSIVE CALL, Gas decreases ──────────────────────────────
--- subscribeE (gs fuel) (μᵉ body) κ ... reduces definitionally to
--- subscribeE fuel (unfoldμ body) κ ..., so nodry and output type pass through.
-subscribeE-wf (gs fuel) (μᵉ body) κ id now sched st S binv deq nodry =
-  subscribeE-wf fuel (unfoldμ body) κ id now sched st S binv deq nodry
+-- ── μᵉ: the guard the evaluator's own μ clause splits on ────────────────────
+-- A FAILING GUARD IS NOT AN ARM TO PROVE, and that is why the shape is
+-- worth mirroring exactly: the evaluator answers a failed μ guard with
+-- `dryBurst`, so the `nodry` hypothesis refutes that arm outright.  The
+-- passing arm reduces definitionally to the unfolded body at the
+-- smaller witness, so nodry and the output type pass through.
+subscribeE-wf {τ = _ , _ , sz} (acc rec) (μᵉ body) κ id now sched st S binv deq nodry
+  with syncSizeᵉ (unfoldμ body) <? sz
+... | no  _ = ⊥-elim (true≢false nodry)
+... | yes p =
+  subscribeE-wf (rec (ltS p)) (unfoldμ body) κ id now sched st S binv deq nodry
 
 -- ── varᵉ (): absurd ───────────────────────────────────────────────────────────
 subscribeE-wf fuel (varᵉ ()) κ id now sched st S binv deq nodry
@@ -451,7 +458,7 @@ subscribeE-wf fuel (deferᵉ body) κ id now sched st S binv deq nodry =
 -- cascade, exactly as the refutation says.
 postulate
   subscribeE-dying : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (fuel : Gas) (b : Closed Γ u) (κ : Path Γ u t) (id : Id) (now : Tick)
+    (fuel : Acc _≺_ τ) (b : Closed Γ u) (κ : Path Γ u t) (id : Id) (now : Tick)
     (sched : Sched Γ) (st : EvalSt e) →
     EvalSt.dying (proj₂ (proj₂ (subscribeE fuel b κ id now sched st)))
       ≡ EvalSt.dying st
@@ -460,25 +467,25 @@ postulate
 -- `burst-final` now takes (.Part4)
 root-dying-free : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
   ∀ s → memberSource s (EvalSt.dying (proj₂ (proj₂
-          (subscribeE (budgetAt e ins 0) e root 0 0 (sched-init e ins) (st-init e)))))
+          (subscribeE (rootWitness e ins) e root 0 0 (sched-init e ins) (st-init e)))))
         ≡ false
 root-dying-free e ins s
-  rewrite subscribeE-dying (budgetAt e ins 0) e root 0 0 (sched-init e ins) (st-init e)
+  rewrite subscribeE-dying (rootWitness e ins) e root 0 0 (sched-init e ins) (st-init e)
   = refl
 
 subscribe-wf :
   ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
-  hasDry (proj₁ (subscribeE (budgetAt e ins 0) e root 0 0
+  hasDry (proj₁ (subscribeE (rootWitness e ins) e root 0 0
                             (sched-init e ins) (st-init e))) ≡ false →
   Σ ProtocolSt λ S →
-    let r = subscribeE (budgetAt e ins 0) e root 0 0
+    let r = subscribeE (rootWitness e ins) e root 0 0
                        (sched-init e ins) (st-init e)
     in (runProtocol protocol-init (proj₁ r) ≡ just S)
        × Inv 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) S
        × (paidUp S ≡ true)
 
 subscribe-wf e ins nodry
-  with subscribeE-wf (budgetAt e ins 0) e root 0 0
+  with subscribeE-wf (rootWitness e ins) e root 0 0
                      (sched-init e ins) (st-init e)
                      protocol-init (burst-init e ins) refl nodry
 ... | S , run , binv , _
@@ -494,7 +501,7 @@ subscribe-wf e ins nodry
 -- the evs (which never touch `done`), and the values ride only if not
 -- already done (done-nil).  sched/st are untouched at root.
 foldPath-root-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
+  (sf : Acc _≺_ τ) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
   (vals : List (Val Γ t)) (evs : List (InstEvent (Val Γ t))) (fin : Bool)
   (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt)
   (ob : Owed) (hz : Id) (ob′ : Owed) (Lv : List Source) (Ov : Owed) →

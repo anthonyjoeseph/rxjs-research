@@ -12,9 +12,9 @@
 --      properly hypothesised — no known-false placeholders): the
 --      step lemmas
 --      (subscribeE-wf, mid-step — the per-clause preservation
---      grind), mid-init, mid-skip, mid-final.  Budget sufficiency
---      is no longer assumed here: it is imported, proven, from
---      Verify-Budget-Sufficient.
+--      grind), mid-init, mid-skip, mid-final.  Stuck-freedom
+--      is not assumed here: it is imported as `rank-sufficient`,
+--      the one statement the descent discipline costs.
 --   3. The compositions — the subscribe frame, the chain fold, the
 --      fuel loop, and the theorem — are all DEFINED, glued by
 --      runProtocol's distribution over ++.
@@ -33,9 +33,6 @@ open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong; subst)
 
 
--- from .Caps-Bridge, not from the top module: the top module is the
--- active caps grind, and importing it here would put this file on that
--- clock.
 open import Rx.Prim      using (Id; Source; InstEvent; init; value; close; handoff; complete; EmitKind; CloseReason;
   exhausted; dried; cut; cutPending; _at_from_as_)
 open import Rx.Exp       using (Ctx; Closed; Val)
@@ -461,9 +458,13 @@ cutThrough-no-init s nid dlv wm dying ((rid , src , c) ∷ r)
 -- It is deliberately NOT done here: this family is tier 2 and tier 1 is
 -- open, so the finding is recorded and the repair scheduled, not ground.
 
--- ⚠ REFUTED — BOTH LEAVES BELOW ARE FALSE AS STATED.
---   `Refuted.Cut-Through.cutThrough-close-bound-dying-absurd` and
---   `-live-dying-absurd` (agda/evidence/refuted/, `make refuted`).
+-- ⚠ REFUTED — BOTH LEAVES BELOW ARE FALSE AS STATED, at
+--   git show 919f115:agda/evidence/refuted/Refuted/Cut-Through.agda —
+--   `cutThrough-close-bound-dying-absurd` and `-live-dying-absurd`.  The
+--   witness is a dying source whose registrations outlive its close, so
+--   it is a fact about the protocol and not about the budget the rest of
+--   that tree was written against; it restates against the descent
+--   unchanged, and until it is restated the sha is the whole of it.
 postulate
   cutThrough-close-bound-dying : ∀ {A : Set} {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (nid : NodeId) (st : EvalSt e) (L₁ : List Source) →
