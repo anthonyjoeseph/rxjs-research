@@ -181,6 +181,21 @@ opShape _                = false
 --   below the peels left and the burst carries the dry close.  It kills
 --   a `suc` in the conjunct and a conjunct reading the state handed in,
 --   together, and the state is reached by running rather than written.
+-- PROBED: `Probed.Operator-Root` — the first coverage this statement has
+--   had inside the region `opShape` admits, every earlier row having sat
+--   at a root it does not answer for.  A merge over a fold that hands
+--   out layered values: the run reaches `subscribeInner`, peels the
+--   rank, and returns no dry close.  It sits at the family's SHALLOWEST
+--   root and cannot be moved up — subscribing a burst costs unlike
+--   measuring one, and the two-literal root stalls — so the conclusion's
+--   coverage stops far short of the depths the rate rows reach.
+--   What the family covers is the RATE and not the margin — four source
+--   lengths, depths 3, 12, 39, 120 against a seed that doubles per
+--   literal — so the conclusion is green where the seed still leads by
+--   twenty-seven symbols' worth, and nothing here reaches the crossing
+--   those two rates have.  Untouched: a flattener over a RECURSIVE
+--   inner, and the switch and exhaust arms, which the rows take at the
+--   merge alone.
 -- RECOVERY: `git show 919f115:agda/src/Rx/Clos-Size.agda` restores
 --   `syncSizeᵉ` with the slot telescope substituted in, also postulate-free
 --   — the μ guard reads the UNSUBSTITUTED size, and a slot reference is one
