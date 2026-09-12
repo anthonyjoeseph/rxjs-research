@@ -248,16 +248,6 @@ procedure rather than a pin.
   is the one part of this leg that makes the tree smaller. It answers the
   question's live half by fixing what the raised clause has to bound.
 
-- **MOVE THE BUG CACHE OFF THE TYPECHECKER (Anthony).** Every stored case pins a
-  whole run by `refl`, so the gate normalises the evaluator once per case and
-  the file is append-only: two cases already cost minutes, and the larger one
-  took the gate down twice. The two predicates a case pins — agreement and
-  well-formedness — are the two `QuickCheck.agda` already evaluates COMPILED, so
-  the leg is a corpus and a `main` reading it rather than new machinery; compare
-  the BOOLEANS, and hold every row to BOTH, which the per-case cost forbade.
-  This narrows no question. It is what makes the other two affordable to probe:
-  every rank measurement they need pays the cache's cost on the way to CI.
-
 - **CARRY THE READING PAST ONE SLOT AND INTO THE HUNDREDS.** Every receipt so
   far PICKS a stage rather than exercising the recursion that builds the slot
   environment, and every fold instantiated iterates in single or double digits
@@ -267,6 +257,17 @@ procedure rather than a pin.
   being obviously computable. Neither is a restatement, so
   the leg either pins the slack at one or refutes the bound the raise is written
   against, which is the question's remaining half either way.
+
+- **RESTATE THE OPERATOR LEAF AGAINST THE RAISED ENTRY READING.** Its defect is
+  the raise's defect one face over: the rank the three flatteners are entered
+  against was measured NOT to move with the source the run folds over, which is
+  a fold charged nothing for what it folds. So the raise is what makes the
+  restatement available, and it is a restatement rather than a transport — a
+  SHAPE row is repaired, never carried — which is why it is its own
+  commit. It narrows the question's `dry-operator` half: what
+  the entry invariant has to say at a flattener is decidable only once the rank
+  beneath it moves, and the first arm to resist says whether the raised clause
+  bounds a flattener at all or only the fold above one.
 
 ### The ledger
 
