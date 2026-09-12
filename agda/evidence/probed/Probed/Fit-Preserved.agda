@@ -106,9 +106,9 @@ open import Rx.Evaluator using (Sched; EvalSt; cascade;
   sched-next; subscribeE; rootWitness; root; sched-init; st-init)
 open import Rx.Slots using (Slots; shared)
 open import Verify-Rank-Sufficient using (drain-dry-free)
-open import Verify-Rank-Sufficient.Hop using (regsHopD; hopFits)
-open import Rx.Hop-Depth using (hopDᵉ)
-open import Rx.Slot-Hop using (slotHop)
+open import Verify-Rank-Sufficient.Hop using (regsDepth; hopFits)
+open import Rx.Hop-Depth using (depthᵉ)
+open import Rx.Slot-Read using (slotRd)
 open import Probed.Apparatus using (Confirms; Below)
 
 ----------------------------------------------------------------------
@@ -136,7 +136,7 @@ entry : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
   Sched Γ × EvalSt e
 entry e ins =
   let (_ , sched , st) =
-        subscribeE (rootWitness FUEL e ins) e root 0 0 (sched-init FUEL e ins)
+        subscribeE (rootWitness e ins) e root 0 0 (sched-init e ins)
           (st-init e)
   in sched , st
 
@@ -145,16 +145,13 @@ at : ∀ {n} {Γ : Ctx n} {t} → ℕ → (e : Closed Γ t) (ins : Slots Γ) →
 at k e ins = after k 1 (entry e ins)
 
 -- THE TWO SIDES, READ OFF THE SCHEDULE RATHER THAN OFF A CHOICE.  Both
--- take their store bound from `Sched.storeBound`, which is what the fit
--- itself reads, so neither can be taken at a bound the run was not
--- built at — and the environment is `slotHop` at that same bound, which
--- `Rx.Slot-Hop` records as the one honest reading.
+-- take their environment from the schedule's own telescope, which is
+-- what the fit itself reads, so neither can be taken at a reading the
+-- run was not built at.  There is no second parameter left to pick.
 carriedAt : ∀ {n} {Γ : Ctx n} {t} → ℕ → (e : Closed Γ t) (ins : Slots Γ) → ℕ
 carriedAt k e ins =
-  let sched = proj₁ (at k e ins)
-      V     = Sched.storeBound sched
-      η     = slotHop V (Sched.slots sched) in
-  regsHopD V η (EvalSt.registry (proj₂ (at k e ins)))
+  let sched = proj₁ (at k e ins) in
+  regsDepth (slotRd (Sched.slots sched)) (EvalSt.registry (proj₂ (at k e ins)))
 
 -- WHAT THE CARRIED AMOUNT IS MEASURED AGAINST, and it is now the
 -- program's own reading rather than a counter seeded off its SIZE.  The
@@ -162,9 +159,8 @@ carriedAt k e ins =
 -- is one currency, which is exactly what deleting the seed bought.
 rankAt : ∀ {n} {Γ : Ctx n} {t} → ℕ → (e : Closed Γ t) (ins : Slots Γ) → ℕ
 rankAt k e ins =
-  let sched = proj₁ (at k e ins)
-      V     = Sched.storeBound sched in
-  hopDᵉ V (slotHop V (Sched.slots sched)) e
+  let sched = proj₁ (at k e ins) in
+  depthᵉ (slotRd (Sched.slots sched)) e
 
 mintAt : ∀ {n} {Γ : Ctx n} {t} → ℕ → (e : Closed Γ t) (ins : Slots Γ) → ℕ
 mintAt k e ins = EvalSt.nextReg (proj₂ (at k e ins))

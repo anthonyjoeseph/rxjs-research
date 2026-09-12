@@ -46,7 +46,7 @@ open import Data.Bool using (true; false)
 open import Data.Empty using (⊥)
 open import Data.List using ([]; _∷_)
 open import Data.Maybe using (nothing)
-open import Data.Nat using (ℕ; z≤n)
+open import Data.Nat using (z≤n)
 open import Data.Product using (_,_)
 open import Data.Unit using (tt)
 open import Data.Vec using () renaming ([] to []ⱽ)
@@ -80,15 +80,6 @@ DrainDryFree = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 -- source zero, so the payload's own nesting is zero.
 ----------------------------------------------------------------------
 
--- THE STORE BOUND the schedule below is built at.  `evaluate` builds
--- its schedule at the fuel it then hands the drain, so a witness is
--- about a RUN only when the two agree.  A larger bound raises what the
--- ROOT term would read, and this witness's crossing is manufactured by
--- the chain rather than read off the program — which is the finding —
--- so the bound is picked generously rather than tightly.
-SB : ℕ
-SB = 30
-
 Γ₀ : Ctx 0
 Γ₀ = []ⱽ
 
@@ -114,7 +105,7 @@ chain₀ : Path Γ₀ natᵗ natᵗ
 chain₀ = map-f deep ↠ (thru-outer mergeAllᵒ 0 ↠ root)
 
 sched₀ : Sched Γ₀
-sched₀ = record (sched-init SB e₀ ins₀)
+sched₀ = record (sched-init e₀ ins₀)
   { live = record { source = 0 ; ordinal = 0 ; elemTy = natᵗ
                   ; pending = (0 , 1) ∷ [] } ∷ [] }
 

@@ -2,51 +2,99 @@
 -- THE REMAINING-HOP DEPTH: an upper bound on how many more *All
 -- frames a subscription can still enter.
 --
--- The descent's rank is currently seeded from the PROGRAM, and every
--- reading of that kind is refuted: the hop edge subscribes a runtime
--- VALUE, structurally unrelated to the caller, so no quantity read off
--- the term, the store or the arrival bounds what comes after it.  This
--- measure is the other direction — it is a quantity a value CARRIES,
--- so a bound on it can be threaded as a strengthened postcondition
--- through the very induction that builds the value, instead of being
--- asserted about the value from outside.
+-- Every reading SEEDED from the program is refuted: the hop edge
+-- subscribes a runtime VALUE, structurally unrelated to the caller, so
+-- no quantity read off the term, the store or the arrival bounds what
+-- comes after it.  This measure is the other direction — it is a
+-- quantity a value CARRIES, so a bound on it can be threaded as a
+-- strengthened postcondition through the very induction that builds
+-- the value, instead of being asserted about the value from outside.
 ------------------------------------------------------------------
 
 ------------------------------------------------------------------
--- TWO DESIGN POINTS, each forced by a counterexample rather than
--- chosen.
+-- AN EXPRESSION READS AS A TRIPLE AND A TERM AS A PAIR, and the odd
+-- component is what every earlier reading was missing.  An expression
+-- is a stream: what it delivers at the TOP of its own burst, what ONE
+-- delivered value itself delivers, and how deep it is.  A term of
+-- observable type stands for a stream a binder will be handed, so what
+-- a plug has to report is the outer two and no more.
 --
---   · `+` AT mapᵉ, NOT `⊔`.  A template is applied to the source's
---     values, so the two chains CONCATENATE.  Under `⊔` the measure is
---     already false at a leaf lifted from a plain observable to a
---     flattener over a reified one: the first hop reads two against an
---     allowance of two.
---
---   · THE COEFFICIENT IS A MULTIPLIER, NOT A COUNT.  A substitution
---     plugs its value wherever the bound variable occurs, and the
---     measure can read that value's depth more than once — so the
---     source's depth enters SCALED, and `⊔′ 1` keeps the scale at least
---     one so a template that DROPS its argument still dominates the
---     source's own walk.
+-- The middle component is the one a fold consumes.  A fold refolds once
+-- per delivery of its SOURCE, so the top count is the refold count; what
+-- the accumulator is built out of is what one delivered value carries.
+-- Collapsing the two is what made a reference report its def as
+-- delivering one value of one.
 ------------------------------------------------------------------
 
 ------------------------------------------------------------------
--- THE MAXIMUM IS THE PRIMITIVE ONE, AND THAT IS FORCED TOO.  The
--- library's ordinary maximum is unary-recursive with no builtin
--- behind it, so it costs one step — and one allocated cell — per unit
--- of its SMALLER operand.  Every maximum in this module is taken
--- between two READINGS, and a reading at a scan is a V-th power, so
--- at a store bound in the thirties both operands are of the order of
--- a billion and a single maximum is a billion-step recursion.  That
--- is not a slow check, it is an out-of-memory kill, and it lands on
--- anything that evaluates a program at all: the entry rank is read
--- off this measure, so computing the rank ALONE, with no run under
--- it, is enough to trigger it.  The primitive variant decides by the
--- builtin comparison instead and is free at any magnitude, and the
--- library proves the two equal — so every statement here means
--- exactly what it meant, and the one site that spends a maximum
--- LEMMA transports across that equality
--- (`Verify-Rank-Sufficient.Entry`).
+-- A FOLD ITERATES; IT DOES NOT EXPONENTIATE, AND THE WHOLE SHAPE OF
+-- THIS MODULE FOLLOWS FROM THAT.  A closed form is what a reading
+-- carries when the plug's own reading is unavailable; at a fold it IS
+-- available, because the fold knows its accumulator — that starts at
+-- the seed, and each refold is the step read against the previous one.
+-- So the scan clause ITERATES over its refold count, and every variable
+-- is read off an ENVIRONMENT the descent through the term extends at
+-- each binder rather than scaled by a slope.
+--
+-- WHAT THAT BUYS is not a larger bound but an EXACT one, which is the
+-- part worth having: a bound dominating by a growing margin is unusable
+-- as a descent measure however true it is.  The same program that reads
+-- exactly here prices a closed form twelve orders of magnitude above
+-- its own run.
+--
+-- AND WHAT IT COSTS is the closed form itself: a fold's contribution
+-- stops being a power a proof can rewrite and becomes a recursion over
+-- the refold count, so every arithmetic fact about this measure is a
+-- fact about that recursion.  Against that, a multiplicity family has
+-- no job left — a slope exists to price a variable, and an environment
+-- prices it exactly.
+--
+-- DEAD ROUTE: a reading whose fold clause charges a power of the STORE
+--   BOUND, where `evaluate` sets that bound from the FUEL.  Fuel counts
+--   ARRIVALS and a refold happens per DELIVERY, so a cascade delivering
+--   entirely inside one subscribe frame refolds as many times as its
+--   source has literals while consuming no fuel at all, and the run then
+--   goes dry.  It was machine-refuted at four cascade programs and two
+--   fuels while that reading stood; the environment reading below is
+--   what closed it, and the same programs now come back dry-free, so
+--   there is no ⊥ left to state and the finding is prose.
+-- DEAD ROUTE: swapping that exponent for a delivery count, which fixes
+--   the refutation's own family and dies one clause across.  A step
+--   whose emission is itself a FOLD hands out a term the entry never
+--   read, since a fold builds its accumulator at RUN time; the entry
+--   sees the accumulator as a VARIABLE, prices the emitted fold's
+--   exponent at one, and the run pays it in full once per refold.  Two
+--   families separate it decisively: one crosses by a constant, the
+--   other doubles the emitted fold's exponent per refold on the same
+--   reading, so no coefficient reaches it.
+-- DEAD ROUTE: an OCCURRENCE COUNT as the coefficient of a slope, in
+--   either of its forms, and the two failures point opposite ways.  An
+--   index-blind count OVER-prices the join clauses, where mentioning a
+--   value twice deepens nothing, and inflates further under a
+--   substitution that duplicates nothing, because the plug arrives
+--   carrying its own binders' variables.  Restricting the count to the
+--   binder's own index fixes the phantom inflation and is still wrong,
+--   because it is still a count: a plug in an inner map's source is
+--   scaled by that inner template's coefficient, a factor no count of
+--   outer mentions can see.
+-- RECOVERY: git show f205085 restores the size invariant and the
+--   id-growing budget an earlier route's refold premise fell out of.
+------------------------------------------------------------------
+
+------------------------------------------------------------------
+-- THE MAXIMUM IS THE PRIMITIVE ONE, AND THAT IS FORCED.  The library's
+-- ordinary maximum is unary-recursive with no builtin behind it, so it
+-- costs one step — and one allocated cell — per unit of its SMALLER
+-- operand.  Every maximum here is taken between two READINGS, and a
+-- delivery count is a PRODUCT at each flattener, so both operands grow
+-- with the nesting and a single maximum becomes a recursion long enough
+-- to be an out-of-memory kill rather than a slow check.  It lands on
+-- anything that evaluates a program at all, since the entry rank is
+-- read off this measure.  The primitive variant decides by the builtin
+-- comparison instead and is free at any magnitude, and the library
+-- proves the two equal — so every statement here means exactly what it
+-- meant, and the one site that spends a maximum LEMMA transports across
+-- that equality.
 --
 -- The maxima elsewhere in the evaluator are deliberately left as they
 -- are: they combine NESTINGS, which are bounded by the syntax, and a
@@ -54,291 +102,90 @@
 ------------------------------------------------------------------
 
 ------------------------------------------------------------------
--- WHY IT IS V-PARAMETERISED.  At a scan the accumulator is REFOLDED,
--- so its depth compounds once per folded value: after k folded values
--- the accumulator nests k deep.  k is bounded by the STORE bound and
--- not by the program, so the measure takes that bound as V and the
--- scan clause pays a V-th power.  Solving the recurrence for the
--- accumulator's depth against a per-fold constant and a per-fold
--- coefficient gives exactly that clause, with k at most V.
+-- WHY IT IS ψ-PARAMETERISED, AND WHY ψ CARRIES A TRIPLE.  ψ assigns a
+-- reading to each slot of the telescope, and the `input` clause reports
+-- it.  A constant-zero reading there is false: an obs-typed shared
+-- slot's def emits values of positive hop, and a subscription
+-- connecting to that slot receives them, so zeroing the share boundary
+-- breaks at the first flattener over an input.  The honest
+-- instantiation recurses on the slot index, which terminates because
+-- the telescope is stratified — a shared def reads only earlier inputs.
 --
--- k ≤ V is not an extra assumption: a scan accumulator is a STORED
--- value, so whatever bounds the store bounds it.
+-- A SLOT IS PRICED BY THE DEF'S WHOLE READING, NOT BY THE PAIR A PLUG
+-- TAKES.  A reference stands for the def, so the middle component is
+-- precisely what it has to report; an environment built at the pair
+-- rebuilds that middle from the top count, and a def delivering one
+-- observable of three values then reads as delivering one value of one.
+-- The fold above it iterates once where the run refolds three times —
+-- a crossing and not a coarseness, since a fold takes its refold count
+-- off its source.
 --
--- AND THAT LAST SENTENCE IS THE ONE THING HERE NOTHING PAYS FOR, which
--- is worth saying where the premise is made rather than where it is
--- spent.  A run's bound is the FUEL its caller hands `evaluate`, and
--- fuel counts ARRIVALS — so a cascade delivering entirely inside one
--- subscribe frame refolds as many times as its source has literals
--- while consuming no fuel at all.  Measured in `Probed.Operator-Root`:
--- a fold over four sources differing in literals alone reads the SAME
--- at every length, 532899 at a bound of six, while the depth its own
--- run hands out multiplies by three per literal — so the two meet at
--- twelve literals, and the root there is a flattener that subscribes
--- every layer.  Whether k really is under V is therefore a question
--- about what the store counts, not a corollary of the accumulator
--- being stored, and the arithmetic above is only sound once something
--- answers it.
+-- AND IT BOUNDS RATHER THAN EQUALS THE RUN WHERE A DEF'S ARMS DIFFER IN
+-- WIDTH, since one per-value figure is joined over all of them.  That is
+-- an instantiated boundary and not a reading of the clauses: the staged
+-- environment was computed both ways over a def delivering one
+-- observable of three values, and at a share holding a recursion.
+-- `git show 8c6fc8d:agda/evidence/probed/Probed/Slot-Priced.agda` holds
+-- those rows.
 ------------------------------------------------------------------
 
 ------------------------------------------------------------------
--- AND THE PREMISE HAS BEEN PAID BEFORE, BY A QUANTITY OF ANOTHER
--- KIND — which is the shape of the repair, and the reason the current
--- reading cannot be patched into one.  The earlier route never counted
--- arrivals at all: the store invariant bounded a stored value's SIZE
--- against a budget that GREW with the instant id, so a refold inside
--- one instant was covered by the same instant's allowance and the
--- accumulator's nesting fell out of the size bound without anything
--- having to know how the refold was reached.  Today's `storeBound` is
--- one field serving two jobs at once — the drain's arrival allowance
--- and the measure's refold bound — and the counterexample above is
--- exactly the gap between them, so no reading of that single field can
--- close it.  What has to come back is the SECOND quantity, not a
--- better bound on the first.
+-- AND EXACTNESS STOPS AT A SOURCE THAT CARRIES HOP.  The iteration
+-- joins the SOURCE's reading into the accumulator at every refold, and
+-- an accumulator is not a source — a step's inner flattener is over what
+-- the fold has built.  Every family swept before sources from literals,
+-- whose hop is zero, so the join cost nothing and the rows read as
+-- exact; a flattened input is the first source with a hop to contribute,
+-- and there the reading sits one above its run.  The slack does not grow
+-- with the refolds, which is what says it is the join and not the rate,
+-- so the reading is still a bound tight enough to descend against.
+------------------------------------------------------------------
+
+------------------------------------------------------------------
+-- THE CLAUSES NO FOLD FAMILY TOUCHES READ CORRECTLY TOO, and that is
+-- the risk rather than a caveat: both dead readings above were exact at
+-- the families THEY were tried on and each died at the first shape
+-- nobody had instantiated, so a reading whose whole receipt was one
+-- operator would stand exactly where those two stood before their
+-- refutations.
 --
--- REFUTED: `Refuted.Rank-Cross` — the premise is not merely unpaid, it
---   is false, and the run goes dry where it fails.
--- RECOVERY: git show f205085 restores the size invariant and the
---   id-growing budget the premise used to fall out of.
+-- WHAT HAS BEEN INSTANTIATED AGAINST THAT RISK, and where it stops.  A
+-- template that reads its plug, one that drops it, a case binder at both
+-- tags, a switch and an exhaust root beside a merge, and a recursion
+-- through the defer gate: the door equals the run at every one
+-- (`git show 8c6fc8d:agda/evidence/probed/Probed/Clause-Sweep.agda`).  So
+-- do the refutation's own inner family and both emitted-fold families
+-- that killed the swap, at every length
+-- (`git show 8c6fc8d:agda/evidence/probed/Probed/Plug-Priced.agda`).  The
+-- boundary of both is sources of hop ZERO — where the join above is free
+-- — and refold counts in single and double digits.
 ------------------------------------------------------------------
 
 ------------------------------------------------------------------
--- AND THE SECOND QUANTITY IS A READING OF THE TERM, WHICH IS WHY THE
--- REPAIR BELONGS AT THIS CLAUSE RATHER THAN IN THE STORE.  A source's
--- synchronous delivery count is recoverable from the syntax, and
--- `Probed.Delivery-Count` separates it from the store bound on one
--- signature: six against three hundred and twenty-four, at the inner
--- fold of the very family whose crossing is measured above.  That
--- count dominates the depth the run hands out at four source lengths
--- and is TIGHT at the shortest, so the domination is earned rather
--- than bought with slack, and it MOVES with the source where the
--- reading here is flat.
-------------------------------------------------------------------
-
-------------------------------------------------------------------
--- WHAT THE SWAP COSTS, AND IT IS NOT ONE EXPONENT.  A delivery count
--- is NOT affine, so the section below does not apply to it: a
--- flattener delivers the PRODUCT of how many inners arrive and how
--- much each of them delivers, and a product's slope needs BOTH
--- factors' slopes — three readings and two slopes where this measure
--- has two and one.  And a fold's own contribution has to be SOLVED
--- rather than bounded by a power: a step that re-wraps once deepens
--- linearly in the refolds, and charging a base of two for that is free
--- while the exponent is a single-digit store bound and unreachable
--- once it is a delivery count.
-------------------------------------------------------------------
-
-------------------------------------------------------------------
--- AND THE TWO SHAPES THE READING IS COARSE AT BOTH HOLD, which is
--- what makes the swap a candidate rather than a direction.  An
--- `input` reports an ENVIRONMENT rather than the term, so the clause
--- is only as good as the environment is; `Probed.Slot-Defer` builds
--- the delivery environment the way the one below is built — a
--- scripted slot reports its script's synchronous prefix, a shared one
--- its def's own reading at the def's own stage — and takes it against
--- a run.  The reading is TIGHT at a single reference to a shared def,
--- and the constant zero is refuted at that same point, so the
--- parameterisation buys here what it buys for hop.
+-- THE INVARIANCE that makes the reading usable under the μ edge: a
+-- substitution plugs Δᵍ-closed expressions, and Δᵍ-variables are
+-- reachable only under a `deferᵉ`, which every recursion here cuts.  So
+-- an unfolding reads EQUAL to its redex, and the μ guard pays with the
+-- sync component alone.
 --
--- A `deferᵉ` is the sharper of the two, because its clause reads ZERO
--- and zero is what lets a count survive an unfolding at all — so the
--- clause's whole content is an ABSENCE, and it is instantiated at a
--- program whose only arm is the recursive one: the reading is zero
--- and the subscribe burst is measured delivering nothing, with no
--- slack for one value to hide in.  A gate that leaked would put a
--- whole unfolding's output in the frame, which is also why the two
--- looser rows beside it — a recursion next to a literal source, and
--- one next to a slot reference — could still have failed.
---
--- WHAT NEITHER REACHES: a hot scripted input, read as zero and
--- indistinguishable at a subscribe frame from a cold one whose script
--- is empty; and the staged recursion past ONE slot, since the
--- telescope is stratified, so a second stage is this clause again and
--- the rows pick the stage rather than exercise it.
-------------------------------------------------------------------
-
-------------------------------------------------------------------
--- AND THE SWAP STOPS THE CROSSING, WHICH IS THE ONE THING THE COUNT
--- BEING SOUND DID NOT SAY.  `Probed.Swapped-Exponent` mirrors this
--- family and the multiplicity below it clause for clause with the fold
--- exponent read off its source's own delivery count, and takes the
--- result to the terms that refute the live reading.  The store bound
--- then leaves the reading ENTIRELY, at both families: once the refolds
--- are paid for in deliveries there is nothing left for it to bound.
--- At the refutation's four source lengths the swapped reading climbs
--- where this one is flat, and the depths the runs hand out sit under it
--- at every length and at both bounds — including the pair the
--- refutation pins, where this reading is three and the run carries
--- four.
-------------------------------------------------------------------
-
-------------------------------------------------------------------
--- AND THE SWAP IS FALSE ANYWAY, ONE CLAUSE ACROSS FROM WHERE THIS ONE
--- IS.  `Probed.Step-Fold` gives the step an emission that is itself a
--- FOLD, and the crossing comes straight back.  A frame's emissions are
--- not subterms of the term it was entered on: the emitted fold's own
--- exponent is read off ITS source, and that source is the accumulator,
--- which the entry sees only as a VARIABLE.  A variable delivers zero,
--- so the door prices at one an exponent the run then pays in full, once
--- per refold.  Two families settle that this is not an off-by-one: a
--- single reference to the accumulator leaves the reading tight at one
--- refold and crossed at two, which a coefficient could repair, and a
--- second reference doubles the emitted exponent per refold on a reading
--- that does not move at all — the same numeral, and a depth ninety
--- times it one refold later.
---
--- SO NEITHER READING OF THE TERM SURVIVES, AND WHAT SEPARATES THEM IS
--- NOT THE EXPONENT.  Both die on a quantity that exists only after the
--- plug: this clause is blind to what the step folds over, the swapped
--- one is blind to what the step's OWN fold folds over, and the second
--- blindness is the first one level in.  A reading a door can take has
--- to price a variable at what will be plugged into it — which is
--- exactly what the delivery count's slope families already do for
--- deliveries and what no depth family here does for depth.
-------------------------------------------------------------------
-
-------------------------------------------------------------------
--- AND IT CAN, BUT NOT WITH A SLOPE.  A slope is what a reading
--- carries when the plug's own reading is unavailable; at a fold it IS
--- available, because the fold knows its accumulator — that starts at
--- the seed, and each refold is the step read against the previous one.
--- So the clause ITERATES where this one exponentiates, and every
--- variable is read off an ENVIRONMENT the descent through the term
--- extends at each binder.  `Probed.Plug-Priced` carries that reading
--- to every term either dead reading crosses at — the refutation's own
--- inner family and both emitted-fold families that killed the swap —
--- and the door equals the run at all three, at every length.  What
--- replaces the power is therefore not a larger bound but an EXACT one,
--- which is the part worth having: a bound dominating by a growing
--- margin is unusable as a descent measure however true it is.
-------------------------------------------------------------------
-
-------------------------------------------------------------------
--- WHAT THAT COSTS AND WHAT IT REMOVES.  The closed form goes: a fold's
--- contribution stops being a power a proof can rewrite and becomes a
--- recursion over the refold count, so every arithmetic fact about the
--- measure becomes a fact about that recursion.  Against it, the
--- multiplicity family below and both of the count's delivery slopes
--- have no job left — a slope exists to price a variable, and an
--- environment prices it exactly.
---
--- WHAT IS UNTOUCHED: the second STAGE of the telescope, since every
--- receipt picks a slot rather than exercising the recursion that builds
--- the environment, and the refold counts a delivery count can reach,
--- which run to the hundreds while every fold instantiated so far
--- iterates in single or double digits.
-------------------------------------------------------------------
-
-------------------------------------------------------------------
--- AND A SLOT IS PRICED BY THE DEF'S WHOLE READING, NOT BY THE PAIR A
--- PLUG TAKES.  An expression reads as a triple — what it delivers, what
--- one delivered value itself delivers, how deep it is — while a plug
--- needs only the outer two, so the environment was built at the pair and
--- a reference rebuilt the missing middle from the top count.  A slot is
--- not a plug: a reference stands for the def, so the middle is precisely
--- what it has to report.  `Probed.Slot-Priced` stages the environment
--- both ways over a def delivering one observable of three values, and
--- the pair reads UNDER the run at the first fold above it — a crossing
--- and not a coarseness, since a fold takes its refold count off its
--- source.  The two agree, and both bound rather than equal the run,
--- where a def's arms differ in width: one per-value figure is joined
--- over all of them.
---
--- AND EXACTNESS STOPS AT A SOURCE THAT CARRIES HOP.  The iteration joins
--- the SOURCE's reading into the accumulator at every refold, and an
--- accumulator is not a source — a step's inner flattener is over what
--- the fold has built.  Every family swept before this one sources from
--- literals, whose hop is zero, so the join cost nothing and the rows
--- read as exact; a flattened input is the first source with a hop to
--- contribute, and there the reading sits one above its run.  The slack
--- does not grow with the refolds, which is what says it is the join and
--- not the rate — so the reading is still a bound tight enough to descend
--- against, and the exactness receipt is about sources of hop zero.
-------------------------------------------------------------------
-
-------------------------------------------------------------------
--- AND THE CLAUSES NO FOLD FAMILY TOUCHED READ CORRECTLY TOO.
--- `Probed.Clause-Sweep` takes the reading to a template that reads its
--- plug, one that drops it, a case binder at both tags, a switch and an
--- exhaust root beside a merge, and a recursion through the defer gate;
--- the door equals the run at every one.  That is the risk and not a
--- caveat, because both dead readings were exact at the families THEY
--- were tried on and each died at the first shape nobody had
--- instantiated — so a reading whose whole receipt was one operator
--- stood exactly where those two stood before their refutations.
---
--- AND IT REDUCES WHERE THE COUNT GROWS.  A delivery count is a PRODUCT
--- at every flattener, so a five-by-five merge reaches twenty-five and
--- the clause iterates twenty-five times; it reduces, and it lands on
--- the number the run reaches, because a step that re-wraps its
--- accumulator genuinely deepens it once per refold.  The same program
--- prices the closed form twelve orders of magnitude above that run,
--- which is the second half of why the power had to go: a bound that
--- large is true and nothing descends against it.
-------------------------------------------------------------------
-
-------------------------------------------------------------------
--- WHY IT IS η-PARAMETERISED.  η assigns a hop depth to each slot of
--- the telescope, and the `input` clause reports it.  A constant-zero
--- reading there is false: an obs-typed shared slot's def emits values
--- of positive hop, and a subscription connecting to that slot receives
--- them, so zeroing the share boundary breaks at the first flattener
--- over an input.  The honest instantiation recurses on the slot index,
--- which terminates because the telescope is stratified — a shared def
--- reads only earlier inputs.  η at constant zero recovers the naive
--- measure, so nothing downstream has to care until it meets an input.
-------------------------------------------------------------------
-
-------------------------------------------------------------------
--- THE AFFINE READING, which is what makes the coefficient's shape
--- decidable rather than a matter of taste.  Read the measure as a
--- function of ONE substituted value's depth: it is affine in that
--- depth, and `pm` at the plugged index is the slope — the factor the
--- measure's own arithmetic applies along every path from the root to
--- an occurrence of that variable.
---
--- So `pm` is the same recursion with two changes and nothing else: a
--- variable at the index contributes one where the measure contributes
--- zero, and the flatteners drop their `suc`, because an operator's own
--- hop is ADDED to the plug's depth rather than multiplied by it.  Same
--- tree, a different semiring at the leaves.  `pm` is defined first and
--- never mentions the measure, so the two are not mutual.
---
--- THE INVARIANCE that makes it usable: the index at a clause's binder
--- is LOCAL, and a substitution plugs Θ-closed values, so every
--- variable a plug brings is compared against an index already bumped
--- past it and contributes zero.  A clause's coefficient therefore
--- cannot move under substitution, which is the property a strengthened
--- postcondition on emitted values needs.
---
--- DEAD ROUTE: an OCCURRENCE COUNT cannot be the coefficient, in either
---   of its two forms, and the two failures point opposite ways.  An
---   index-blind count OVER-prices the `⊔′` clauses, where mentioning a
---   value twice deepens nothing, and it inflates further under a
---   substitution that duplicates nothing, because the plug arrives
---   carrying its own binders' variables.  Restricting the count to the
---   binder's own index fixes the phantom inflation and is still wrong,
---   because it is still a count: a plug in an inner map's source is
---   scaled by that inner template's coefficient, a factor no count of
---   outer mentions can see.
 -- RECOVERY: `git show 919f115:agda/src/Verify-Budget-Sufficient/Walk-Level.agda`
 --   restores the walk these congruences were first proven against, whose
 --   evaluator this development has replaced.
 ------------------------------------------------------------------
 module Rx.Hop-Depth where
 
-open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _^_; _⊔′_; _≡ᵇ_)
+open import Data.Nat  using (ℕ; zero; suc; _*_; _⊔′_)
 open import Data.Fin  using (Fin)
-open import Data.Bool using (if_then_else_)
-open import Data.List using (List; []; _∷_)
-open import Data.Product using (_,_)
+open import Data.List using (List; []; _∷_; length)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (inj₁; inj₂)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any       using (here; there)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; cong₂)
+open import Relation.Binary.PropositionalEquality
+  using (_≡_; refl; cong; cong₂; trans)
 
 open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs;
-                          Ctx; Exp; Tm; Val;
+                          Ctx; Exp; Tm; Fn; Val;
                           input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ;
                           mergeAllᵉ; switchAllᵉ; exhaustAllᵉ;
                           μᵉ; varᵉ; deferᵉ;
@@ -347,255 +194,270 @@ open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs;
                           elimGExp; elimGTm; elimGTms; unfoldμ)
 
 -- the de Bruijn index a Θ-variable stands at.  It has exactly one
--- consumer, `pmᵗ`'s leaf clause, so it lives here rather than beside
--- the syntax it reads
+-- consumer, the term reading's leaf clause, so it lives here rather
+-- than beside the syntax it reads
 varIx : ∀ {t} {Θ : List Ty} → t ∈ Θ → ℕ
 varIx (here _)  = zero
 varIx (there p) = suc (varIx p)
 
 ------------------------------------------------------------------
--- THE PLUG MULTIPLIER: the slope of the measure in a plugged value's
--- depth, at the variable standing at de Bruijn index k.
+-- THE TWO SHAPES, and the four changes between them, each named so no
+-- clause below needs a `with` and no reading is computed twice.
+------------------------------------------------------------------
+
+Rd : Set
+Rd = ℕ × ℕ
+
+Rd₃ : Set
+Rd₃ = ℕ × ℕ × ℕ
+
+_⊔ᴿ_ : Rd → Rd → Rd
+(a , b) ⊔ᴿ (c , d) = a ⊔′ c , b ⊔′ d
+
+-- the Θ environment, indexed by de Bruijn index
+Env : Set
+Env = ℕ → Rd
+
+-- a Θ-variable with nothing plugged into it
+ε : Env
+ε _ = 0 , 0
+
+_▸_ : Env → Rd → Env
+(ρ ▸ p) zero    = p
+(ρ ▸ p) (suc k) = ρ k
+
+-- a literal source delivers as many values as it has terms, each
+-- reading what the terms read
+litOf : ℕ → Rd → Rd₃
+litOf k (ev , h) = k , ev , h
+
+-- THE HOP EDGE: entering an inner costs exactly one, and what the frame
+-- then delivers is what one arriving inner delivers
+flatten : Rd₃ → Rd₃
+flatten (d , ev , h) = d * ev , ev , suc h
+
+topOf : Rd₃ → Rd
+topOf (d , _ , h) = d , h
+
+hopOf : Rd₃ → ℕ
+hopOf (_ , _ , h) = h
+
+------------------------------------------------------------------
+-- THE READING.
 ------------------------------------------------------------------
 
 mutual
-  pmᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (V k : ℕ) → Exp Γ Δᵍ Δ Θ t → ℕ
-  pmᵉ V k (input i)       = 0
-  pmᵉ V k (ofᵉ ts)        = pmᵗˢ V k ts
-  pmᵉ V k emptyᵉ          = 0
-  pmᵉ V k (mapᵉ f e)      = pmᵗ V (suc k) f + (pmᵗ V 0 f ⊔′ 1) * pmᵉ V k e
-  pmᵉ V k (takeᵉ c e)     = pmᵉ V k e
-  pmᵉ V k (scanᵉ f z e)   =
-    (2 + pmᵗ V 0 f) ^ V * (pmᵗ V (suc k) f + pmᵗ V k z + pmᵉ V k e)
-  -- the frame's own hop is a `suc` in the measure: added, so it is not
-  -- part of the slope
-  pmᵉ V k (mergeAllᵉ lim e)   = pmᵉ V k e
-  pmᵉ V k (switchAllᵉ e)  = pmᵉ V k e
-  pmᵉ V k (exhaustAllᵉ e) = pmᵉ V k e
-  pmᵉ V k (μᵉ e)          = pmᵉ V k e
-  pmᵉ V k (varᵉ x)        = 0
-  pmᵉ V k (deferᵉ e)      = 0
-
-  pmᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (V k : ℕ) → Tm Γ Δᵍ Δ Θ t → ℕ
-  -- THE LEAF, and the only place the slope and the measure differ in
-  -- kind
-  pmᵗ V k (varᵗ x)      = if varIx x ≡ᵇ k then 1 else 0
-  pmᵗ V k unit̂          = 0
-  pmᵗ V k (bool̂ _)      = 0
-  pmᵗ V k (nat̂ _)       = 0
-  pmᵗ V k (pairᵗ a b)   = pmᵗ V k a ⊔′ pmᵗ V k b
-  pmᵗ V k (fstᵗ p)      = pmᵗ V k p
-  pmᵗ V k (sndᵗ p)      = pmᵗ V k p
-  pmᵗ V k (inlᵗ a)      = pmᵗ V k a
-  pmᵗ V k (inrᵗ a)      = pmᵗ V k a
-  pmᵗ V k (caseᵗ s l r) =
-    (pmᵗ V (suc k) l ⊔′ pmᵗ V (suc k) r)
-      + (pmᵗ V 0 l ⊔′ pmᵗ V 0 r ⊔′ 1) * pmᵗ V k s
-  pmᵗ V k (ifᵗ c a b)   = pmᵗ V k a ⊔′ pmᵗ V k b
-  -- a PrimOp lands in natᵗ or boolᵗ, so nothing plugged into it can
-  -- reach a hop: the measure reads this as zero and so must its slope
-  pmᵗ V k (primᵗ _ a)   = 0
-  pmᵗ V k (strmᵗ e)     = pmᵉ V k e
-
-  pmᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (V k : ℕ) → List (Tm Γ Δᵍ Δ Θ t) → ℕ
-  pmᵗˢ V k []       = 0
-  pmᵗˢ V k (y ∷ ys) = pmᵗ V k y ⊔′ pmᵗˢ V k ys
-
-------------------------------------------------------------------
--- THE MEASURE.
-------------------------------------------------------------------
-
-mutual
-  hopDᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (V : ℕ) (η : Fin n → ℕ) →
-          Exp Γ Δᵍ Δ Θ t → ℕ
-  -- THE SLOT: a connect delivers the def's emissions, so the input
-  -- reads the slot's own hop off the environment
-  hopDᵉ V η (input i)       = η i
-  hopDᵉ V η (ofᵉ ts)        = hopDᵗˢ V η ts
-  hopDᵉ V η emptyᵉ          = 0
-  -- the template's chain concatenates with the source's, and the
-  -- source's depth lands at every Θ-var occurrence
-  hopDᵉ V η (mapᵉ f e)      = hopDᵗ V η f + (pmᵗ V 0 f ⊔′ 1) * hopDᵉ V η e
+  rdᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (ψ : Fin n → Rd₃) (ρ : Env) →
+        Exp Γ Δᵍ Δ Θ t → Rd₃
+  -- THE SLOT: a connect delivers the def's emissions, all three
+  -- components of them
+  rdᵉ ψ ρ (input i)         = ψ i
+  rdᵉ ψ ρ (ofᵉ ts)          = litOf (length ts) (rdᵗˢ ψ ρ ts)
+  rdᵉ ψ ρ emptyᵉ            = 0 , 0 , 0
+  rdᵉ ψ ρ (mapᵉ f e)        = mapStep ψ ρ (rdᵉ ψ ρ e) f
   -- the count is a natᵗ term: its value carries no observable
-  hopDᵉ V η (takeᵉ c e)     = hopDᵉ V η e
-  hopDᵉ V η (scanᵉ f z e)   =
-    (2 + pmᵗ V 0 f) ^ V * (hopDᵗ V η f + hopDᵗ V η z + hopDᵉ V η e)
-  -- THE HOP EDGE: entering an inner costs exactly one
-  hopDᵉ V η (mergeAllᵉ lim e)   = suc (hopDᵉ V η e)
-  hopDᵉ V η (switchAllᵉ e)  = suc (hopDᵉ V η e)
-  hopDᵉ V η (exhaustAllᵉ e) = suc (hopDᵉ V η e)
-  -- an unfold substitutes the original closed μ for a Δᵍ var, and Δᵍ
-  -- vars are reachable only under a defer, which this measure cuts, so
-  -- an unfold cannot change it
-  hopDᵉ V η (μᵉ e)          = hopDᵉ V η e
-  hopDᵉ V η (varᵉ x)        = 0
-  hopDᵉ V η (deferᵉ e)      = 0
+  rdᵉ ψ ρ (takeᵉ c e)       = rdᵉ ψ ρ e
+  rdᵉ ψ ρ (scanᵉ f z e)     = scanStep ψ ρ (rdᵉ ψ ρ e) z f
+  rdᵉ ψ ρ (mergeAllᵉ lim e) = flatten (rdᵉ ψ ρ e)
+  rdᵉ ψ ρ (switchAllᵉ e)    = flatten (rdᵉ ψ ρ e)
+  rdᵉ ψ ρ (exhaustAllᵉ e)   = flatten (rdᵉ ψ ρ e)
+  rdᵉ ψ ρ (μᵉ e)            = rdᵉ ψ ρ e
+  rdᵉ ψ ρ (varᵉ x)          = 0 , 0 , 0
+  rdᵉ ψ ρ (deferᵉ e)        = 0 , 0 , 0
 
-  hopDᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (V : ℕ) (η : Fin n → ℕ) →
-          Tm Γ Δᵍ Δ Θ t → ℕ
-  hopDᵗ V η (varᵗ x)      = 0
-  hopDᵗ V η unit̂          = 0
-  hopDᵗ V η (bool̂ _)      = 0
-  hopDᵗ V η (nat̂ _)       = 0
-  hopDᵗ V η (pairᵗ a b)   = hopDᵗ V η a ⊔′ hopDᵗ V η b
-  hopDᵗ V η (fstᵗ p)      = hopDᵗ V η p
-  hopDᵗ V η (sndᵗ p)      = hopDᵗ V η p
-  hopDᵗ V η (inlᵗ a)      = hopDᵗ V η a
-  hopDᵗ V η (inrᵗ a)      = hopDᵗ V η a
-  -- a case BINDS, so it plugs like a template: the scrutinee's depth
+  -- A TEMPLATE IS READ AGAINST ITS ARGUMENT, not scaled by a slope.  A
+  -- map delivers one value per source value, so the top count is the
+  -- source's; the join with the source's own depth is what a template
+  -- that DROPS its argument needs, since the source is still subscribed
+  mapStep : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ s t} (ψ : Fin n → Rd₃) (ρ : Env) →
+            Rd₃ → Fn Γ Δᵍ Δ Θ s t → Rd₃
+  mapStep ψ ρ (d , ev , h) f = d , proj₁ r , proj₂ r ⊔′ h
+    where r = rdᵗ ψ (ρ ▸ (ev , h)) f
+
+  -- THE CLAUSE THE MODULE IS ABOUT.  The accumulator starts at the
+  -- seed's own reading and each refold reads the step against the
+  -- previous one, so an emitted fold is read at the accumulator it will
+  -- actually be handed.  The source's top count is how many refolds
+  -- there are
+  scanStep : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ s t} (ψ : Fin n → Rd₃) (ρ : Env) →
+             Rd₃ → Tm Γ Δᵍ Δ Θ t → Fn Γ Δᵍ Δ Θ s t → Rd₃
+  scanStep ψ ρ (d , ev , h) z f = d , proj₁ a , proj₂ a ⊔′ h
+    where a = foldGo ψ ρ (rdᵗ ψ ρ z) (ev , h) d f
+
+  -- the accumulator's reading after each refold, joined over all of
+  -- them because the fold EMITS every one and the claim is about the
+  -- deepest
+  foldGo : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ s t} (ψ : Fin n → Rd₃) (ρ : Env)
+           (acc src : Rd) (R : ℕ) → Fn Γ Δᵍ Δ Θ s t → Rd
+  foldGo ψ ρ acc src zero    f = acc
+  foldGo ψ ρ acc src (suc R) f =
+    acc ⊔ᴿ foldGo ψ ρ (rdᵗ ψ (ρ ▸ (acc ⊔ᴿ src)) f) src R f
+
+  rdᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (ψ : Fin n → Rd₃) (ρ : Env) →
+        Tm Γ Δᵍ Δ Θ t → Rd
+  -- THE LEAF: what is plugged here is READ, not assumed absent
+  rdᵗ ψ ρ (varᵗ x)      = ρ (varIx x)
+  rdᵗ ψ ρ unit̂          = 0 , 0
+  rdᵗ ψ ρ (bool̂ _)      = 0 , 0
+  rdᵗ ψ ρ (nat̂ _)       = 0 , 0
+  rdᵗ ψ ρ (pairᵗ a b)   = rdᵗ ψ ρ a ⊔ᴿ rdᵗ ψ ρ b
+  rdᵗ ψ ρ (fstᵗ p)      = rdᵗ ψ ρ p
+  rdᵗ ψ ρ (sndᵗ p)      = rdᵗ ψ ρ p
+  rdᵗ ψ ρ (inlᵗ a)      = rdᵗ ψ ρ a
+  rdᵗ ψ ρ (inrᵗ a)      = rdᵗ ψ ρ a
+  rdᵗ ψ ρ (caseᵗ s l r) = caseStep ψ ρ (rdᵗ ψ ρ s) l r
+  rdᵗ ψ ρ (ifᵗ c a b)   = rdᵗ ψ ρ a ⊔ᴿ rdᵗ ψ ρ b
+  -- a PrimOp lands in natᵗ or boolᵗ: nothing plugged into it reaches a
+  -- hop
+  rdᵗ ψ ρ (primᵗ _ a)   = 0 , 0
+  rdᵗ ψ ρ (strmᵗ e)     = topOf (rdᵉ ψ ρ e)
+
+  -- a case BINDS, so it plugs like a template: the scrutinee's reading
   -- lands at every occurrence of the branch's bound variable
-  hopDᵗ V η (caseᵗ s l r) =
-    (hopDᵗ V η l ⊔′ hopDᵗ V η r) + (pmᵗ V 0 l ⊔′ pmᵗ V 0 r ⊔′ 1) * hopDᵗ V η s
-  hopDᵗ V η (ifᵗ c a b)   = hopDᵗ V η a ⊔′ hopDᵗ V η b
-  hopDᵗ V η (primᵗ _ a)   = 0
-  hopDᵗ V η (strmᵗ e)     = hopDᵉ V η e
+  caseStep : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ s u t} (ψ : Fin n → Rd₃) (ρ : Env) →
+             Rd → Fn Γ Δᵍ Δ Θ s t → Fn Γ Δᵍ Δ Θ u t → Rd
+  caseStep ψ ρ p l r = rdᵗ ψ (ρ ▸ p) l ⊔ᴿ rdᵗ ψ (ρ ▸ p) r
 
-  hopDᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (V : ℕ) (η : Fin n → ℕ) →
-           List (Tm Γ Δᵍ Δ Θ t) → ℕ
-  hopDᵗˢ V η []       = 0
-  hopDᵗˢ V η (y ∷ ys) = hopDᵗ V η y ⊔′ hopDᵗˢ V η ys
+  rdᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (ψ : Fin n → Rd₃) (ρ : Env) →
+         List (Tm Γ Δᵍ Δ Θ t) → Rd
+  rdᵗˢ ψ ρ []       = 0 , 0
+  rdᵗˢ ψ ρ (y ∷ ys) = rdᵗ ψ ρ y ⊔ᴿ rdᵗˢ ψ ρ ys
 
 -- the same reading on a runtime value: an embedded observable is its
 -- expression's, a ground payload carries no hops
-hopDᵛ : ∀ {n} {Γ : Ctx n} (V : ℕ) (η : Fin n → ℕ) (t : Ty) → Val Γ t → ℕ
-hopDᵛ V η unitᵗ    _        = 0
-hopDᵛ V η boolᵗ    _        = 0
-hopDᵛ V η natᵗ     _        = 0
-hopDᵛ V η (s ×ᵗ t) (a , b)  = hopDᵛ V η s a ⊔′ hopDᵛ V η t b
-hopDᵛ V η (s +ᵗ t) (inj₁ a) = hopDᵛ V η s a
-hopDᵛ V η (s +ᵗ t) (inj₂ b) = hopDᵛ V η t b
-hopDᵛ V η (obs t)  e        = hopDᵉ V η e
+rdᵛ : ∀ {n} {Γ : Ctx n} (ψ : Fin n → Rd₃) (t : Ty) → Val Γ t → Rd
+rdᵛ ψ unitᵗ    _        = 0 , 0
+rdᵛ ψ boolᵗ    _        = 0 , 0
+rdᵛ ψ natᵗ     _        = 0 , 0
+rdᵛ ψ (s ×ᵗ t) (a , b)  = rdᵛ ψ s a ⊔ᴿ rdᵛ ψ t b
+rdᵛ ψ (s +ᵗ t) (inj₁ a) = rdᵛ ψ s a
+rdᵛ ψ (s +ᵗ t) (inj₂ b) = rdᵛ ψ t b
+rdᵛ ψ (obs t)  e        = topOf (rdᵉ ψ ε e)
+
+-- THE NUMBER the descent compares.  A reading taken at the top of a
+-- term has nothing plugged into it, so the environment is empty there
+-- and only the hop component is the rank's business
+depthᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (ψ : Fin n → Rd₃) →
+         Exp Γ Δᵍ Δ Θ t → ℕ
+depthᵉ ψ e = hopOf (rdᵉ ψ ε e)
+
+depthᵛ : ∀ {n} {Γ : Ctx n} (ψ : Fin n → Rd₃) (t : Ty) → Val Γ t → ℕ
+depthᵛ ψ t v = proj₂ (rdᵛ ψ t v)
 
 ------------------------------------------------------------------
--- THE MEASURE AND ITS SLOPE ARE INVARIANT UNDER Δᵍ-ELIMINATION, which
--- is what makes the μ edge free.  A `μᵉ` unfolding substitutes the
--- ORIGINAL closed redex for a Δᵍ-variable, and Δᵍ-variables are
--- reachable only under a `deferᵉ`, which both recursions cut — so
--- every clause is either a congruence over subterms or an outright
--- `refl` at the two leaves that could have seen the plug.
---
--- The slope's congruence is proven first and separately because the
--- measure reads it for its coefficients: the measure's `mapᵉ`, `scanᵉ`
--- and `caseᵗ` clauses each need the slope's invariance at the same
--- subterm, and the two families are not mutual.
+-- THE READING IS INVARIANT UNDER Δᵍ-ELIMINATION, which is what makes
+-- the μ edge free.  Every clause is either a congruence over subterms
+-- or an outright `refl` at the two leaves that could have seen the
+-- substitution.  The binders need their own congruences because their
+-- clauses consume a reading and a term TOGETHER, so neither `cong` nor
+-- `cong₂` reaches them: the term is not equal to its image, only its
+-- reading is.
 ------------------------------------------------------------------
 
-mutual
-  pm-elimGᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (V k : ℕ) (x : t ∈ Δᵍ)
-    (cl : Exp Γ [] [] [] t) (b : Exp Γ Δᵍ Δ Θ u) →
-    pmᵉ V k (elimGExp x cl b) ≡ pmᵉ V k b
-  pm-elimGᵉ V k x cl (input i)       = refl
-  pm-elimGᵉ V k x cl (ofᵉ ts)        = pm-elimGᵗˢ V k x cl ts
-  pm-elimGᵉ V k x cl emptyᵉ          = refl
-  pm-elimGᵉ V k x cl (mapᵉ f b)      =
-    cong₂ _+_ (pm-elimGᵗ V (suc k) x cl f)
-              (cong₂ _*_ (cong (_⊔′ 1) (pm-elimGᵗ V 0 x cl f))
-                         (pm-elimGᵉ V k x cl b))
-  pm-elimGᵉ V k x cl (takeᵉ c b)     = pm-elimGᵉ V k x cl b
-  pm-elimGᵉ V k x cl (scanᵉ f z b)   =
-    cong₂ _*_ (cong (λ y → (2 + y) ^ V) (pm-elimGᵗ V 0 x cl f))
-              (cong₂ _+_ (cong₂ _+_ (pm-elimGᵗ V (suc k) x cl f)
-                                    (pm-elimGᵗ V k x cl z))
-                         (pm-elimGᵉ V k x cl b))
-  pm-elimGᵉ V k x cl (mergeAllᵉ lim b)   = pm-elimGᵉ V k x cl b
-  pm-elimGᵉ V k x cl (switchAllᵉ b)  = pm-elimGᵉ V k x cl b
-  pm-elimGᵉ V k x cl (exhaustAllᵉ b) = pm-elimGᵉ V k x cl b
-  pm-elimGᵉ V k x cl (μᵉ b)          = pm-elimGᵉ V k (there x) cl b
-  pm-elimGᵉ V k x cl (varᵉ y)        = refl
-  pm-elimGᵉ V k x cl (deferᵉ b)      = refl
-
-  pm-elimGᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (V k : ℕ) (x : t ∈ Δᵍ)
-    (cl : Exp Γ [] [] [] t) (f : Tm Γ Δᵍ Δ Θ u) →
-    pmᵗ V k (elimGTm x cl f) ≡ pmᵗ V k f
-  pm-elimGᵗ V k x cl (varᵗ y)      = refl
-  pm-elimGᵗ V k x cl unit̂          = refl
-  pm-elimGᵗ V k x cl (bool̂ b)      = refl
-  pm-elimGᵗ V k x cl (nat̂ m)       = refl
-  pm-elimGᵗ V k x cl (pairᵗ a b)   =
-    cong₂ _⊔′_ (pm-elimGᵗ V k x cl a) (pm-elimGᵗ V k x cl b)
-  pm-elimGᵗ V k x cl (fstᵗ p)      = pm-elimGᵗ V k x cl p
-  pm-elimGᵗ V k x cl (sndᵗ p)      = pm-elimGᵗ V k x cl p
-  pm-elimGᵗ V k x cl (inlᵗ a)      = pm-elimGᵗ V k x cl a
-  pm-elimGᵗ V k x cl (inrᵗ a)      = pm-elimGᵗ V k x cl a
-  pm-elimGᵗ V k x cl (caseᵗ s l r) =
-    cong₂ _+_ (cong₂ _⊔′_ (pm-elimGᵗ V (suc k) x cl l)
-                         (pm-elimGᵗ V (suc k) x cl r))
-              (cong₂ _*_ (cong₂ _⊔′_ (cong₂ _⊔′_ (pm-elimGᵗ V 0 x cl l)
-                                               (pm-elimGᵗ V 0 x cl r))
-                                    (refl {x = 1}))
-                         (pm-elimGᵗ V k x cl s))
-  pm-elimGᵗ V k x cl (ifᵗ c a b)   =
-    cong₂ _⊔′_ (pm-elimGᵗ V k x cl a) (pm-elimGᵗ V k x cl b)
-  pm-elimGᵗ V k x cl (primᵗ op a)  = refl
-  pm-elimGᵗ V k x cl (strmᵗ b)     = pm-elimGᵉ V k x cl b
-
-  pm-elimGᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (V k : ℕ) (x : t ∈ Δᵍ)
-    (cl : Exp Γ [] [] [] t) (ts : List (Tm Γ Δᵍ Δ Θ u)) →
-    pmᵗˢ V k (elimGTms x cl ts) ≡ pmᵗˢ V k ts
-  pm-elimGᵗˢ V k x cl []       = refl
-  pm-elimGᵗˢ V k x cl (y ∷ ys) =
-    cong₂ _⊔′_ (pm-elimGᵗ V k x cl y) (pm-elimGᵗˢ V k x cl ys)
+-- a substitution rewrites terms in place, so a literal source keeps
+-- its length — needed because the literal clause reads that length
+length-elimG : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δᵍ)
+  (cl : Exp Γ [] [] [] t) (ts : List (Tm Γ Δᵍ Δ Θ u)) →
+  length (elimGTms x cl ts) ≡ length ts
+length-elimG x cl []       = refl
+length-elimG x cl (y ∷ ys) = cong suc (length-elimG x cl ys)
 
 mutual
-  hopD-elimGᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (V : ℕ) (η : Fin n → ℕ)
+  rd-elimGᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (ψ : Fin n → Rd₃) (ρ : Env)
     (x : t ∈ Δᵍ) (cl : Exp Γ [] [] [] t) (b : Exp Γ Δᵍ Δ Θ u) →
-    hopDᵉ V η (elimGExp x cl b) ≡ hopDᵉ V η b
-  hopD-elimGᵉ V η x cl (input i)       = refl
-  hopD-elimGᵉ V η x cl (ofᵉ ts)        = hopD-elimGᵗˢ V η x cl ts
-  hopD-elimGᵉ V η x cl emptyᵉ          = refl
-  hopD-elimGᵉ V η x cl (mapᵉ f b)      =
-    cong₂ _+_ (hopD-elimGᵗ V η x cl f)
-              (cong₂ _*_ (cong (_⊔′ 1) (pm-elimGᵗ V 0 x cl f))
-                         (hopD-elimGᵉ V η x cl b))
-  hopD-elimGᵉ V η x cl (takeᵉ c b)     = hopD-elimGᵉ V η x cl b
-  hopD-elimGᵉ V η x cl (scanᵉ f z b)   =
-    cong₂ _*_ (cong (λ y → (2 + y) ^ V) (pm-elimGᵗ V 0 x cl f))
-              (cong₂ _+_ (cong₂ _+_ (hopD-elimGᵗ V η x cl f)
-                                    (hopD-elimGᵗ V η x cl z))
-                         (hopD-elimGᵉ V η x cl b))
-  hopD-elimGᵉ V η x cl (mergeAllᵉ lim b)   = cong suc (hopD-elimGᵉ V η x cl b)
-  hopD-elimGᵉ V η x cl (switchAllᵉ b)  = cong suc (hopD-elimGᵉ V η x cl b)
-  hopD-elimGᵉ V η x cl (exhaustAllᵉ b) = cong suc (hopD-elimGᵉ V η x cl b)
-  hopD-elimGᵉ V η x cl (μᵉ b)          = hopD-elimGᵉ V η (there x) cl b
-  hopD-elimGᵉ V η x cl (varᵉ y)        = refl
-  hopD-elimGᵉ V η x cl (deferᵉ b)      = refl
+    rdᵉ ψ ρ (elimGExp x cl b) ≡ rdᵉ ψ ρ b
+  rd-elimGᵉ ψ ρ x cl (input i)       = refl
+  rd-elimGᵉ ψ ρ x cl (ofᵉ ts)        =
+    cong₂ litOf (length-elimG x cl ts) (rd-elimGᵗˢ ψ ρ x cl ts)
+  rd-elimGᵉ ψ ρ x cl emptyᵉ          = refl
+  rd-elimGᵉ ψ ρ x cl (mapᵉ f b)      =
+    trans (cong (λ p → mapStep ψ ρ p (elimGTm x cl f))
+                (rd-elimGᵉ ψ ρ x cl b))
+          (mapStep-elimG ψ ρ (rdᵉ ψ ρ b) x cl f)
+  rd-elimGᵉ ψ ρ x cl (takeᵉ c b)     = rd-elimGᵉ ψ ρ x cl b
+  rd-elimGᵉ ψ ρ x cl (scanᵉ f z b)   =
+    trans (cong (λ p → scanStep ψ ρ p (elimGTm x cl z) (elimGTm x cl f))
+                (rd-elimGᵉ ψ ρ x cl b))
+          (scanStep-elimG ψ ρ (rdᵉ ψ ρ b) x cl z f)
+  rd-elimGᵉ ψ ρ x cl (mergeAllᵉ lim b) = cong flatten (rd-elimGᵉ ψ ρ x cl b)
+  rd-elimGᵉ ψ ρ x cl (switchAllᵉ b)  = cong flatten (rd-elimGᵉ ψ ρ x cl b)
+  rd-elimGᵉ ψ ρ x cl (exhaustAllᵉ b) = cong flatten (rd-elimGᵉ ψ ρ x cl b)
+  rd-elimGᵉ ψ ρ x cl (μᵉ b)          = rd-elimGᵉ ψ ρ (there x) cl b
+  rd-elimGᵉ ψ ρ x cl (varᵉ y)        = refl
+  rd-elimGᵉ ψ ρ x cl (deferᵉ b)      = refl
 
-  hopD-elimGᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (V : ℕ) (η : Fin n → ℕ)
+  mapStep-elimG : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ s u t} (ψ : Fin n → Rd₃)
+    (ρ : Env) (p : Rd₃) (x : t ∈ Δᵍ) (cl : Exp Γ [] [] [] t)
+    (f : Fn Γ Δᵍ Δ Θ s u) →
+    mapStep ψ ρ p (elimGTm x cl f) ≡ mapStep ψ ρ p f
+  mapStep-elimG ψ ρ (d , ev , h) x cl f =
+    cong (λ r → d , proj₁ r , proj₂ r ⊔′ h)
+         (rd-elimGᵗ ψ (ρ ▸ (ev , h)) x cl f)
+
+  scanStep-elimG : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ s u} {t} (ψ : Fin n → Rd₃)
+    (ρ : Env) (p : Rd₃) (x : t ∈ Δᵍ) (cl : Exp Γ [] [] [] t)
+    (z : Tm Γ Δᵍ Δ Θ u) (f : Fn Γ Δᵍ Δ Θ s u) →
+    scanStep ψ ρ p (elimGTm x cl z) (elimGTm x cl f) ≡ scanStep ψ ρ p z f
+  scanStep-elimG ψ ρ (d , ev , h) x cl z f =
+    cong (λ a → d , proj₁ a , proj₂ a ⊔′ h)
+      (trans (cong (λ s → foldGo ψ ρ s (ev , h) d (elimGTm x cl f))
+                   (rd-elimGᵗ ψ ρ x cl z))
+             (foldGo-elimG ψ ρ (rdᵗ ψ ρ z) (ev , h) d x cl f))
+
+  -- the fold's own congruence, by induction on the refold count.  It is
+  -- general in the accumulator because the step changes it, so the
+  -- inductive call is at a reading the previous line just rewrote
+  foldGo-elimG : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ s u t} (ψ : Fin n → Rd₃)
+    (ρ : Env) (acc src : Rd) (R : ℕ) (x : t ∈ Δᵍ)
+    (cl : Exp Γ [] [] [] t) (f : Fn Γ Δᵍ Δ Θ s u) →
+    foldGo ψ ρ acc src R (elimGTm x cl f) ≡ foldGo ψ ρ acc src R f
+  foldGo-elimG ψ ρ acc src zero    x cl f = refl
+  foldGo-elimG ψ ρ acc src (suc R) x cl f =
+    cong (acc ⊔ᴿ_)
+      (trans (cong (λ a → foldGo ψ ρ a src R (elimGTm x cl f))
+                   (rd-elimGᵗ ψ (ρ ▸ (acc ⊔ᴿ src)) x cl f))
+             (foldGo-elimG ψ ρ (rdᵗ ψ (ρ ▸ (acc ⊔ᴿ src)) f) src R x cl f))
+
+  rd-elimGᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (ψ : Fin n → Rd₃) (ρ : Env)
     (x : t ∈ Δᵍ) (cl : Exp Γ [] [] [] t) (f : Tm Γ Δᵍ Δ Θ u) →
-    hopDᵗ V η (elimGTm x cl f) ≡ hopDᵗ V η f
-  hopD-elimGᵗ V η x cl (varᵗ y)      = refl
-  hopD-elimGᵗ V η x cl unit̂          = refl
-  hopD-elimGᵗ V η x cl (bool̂ b)      = refl
-  hopD-elimGᵗ V η x cl (nat̂ m)       = refl
-  hopD-elimGᵗ V η x cl (pairᵗ a b)   =
-    cong₂ _⊔′_ (hopD-elimGᵗ V η x cl a) (hopD-elimGᵗ V η x cl b)
-  hopD-elimGᵗ V η x cl (fstᵗ p)      = hopD-elimGᵗ V η x cl p
-  hopD-elimGᵗ V η x cl (sndᵗ p)      = hopD-elimGᵗ V η x cl p
-  hopD-elimGᵗ V η x cl (inlᵗ a)      = hopD-elimGᵗ V η x cl a
-  hopD-elimGᵗ V η x cl (inrᵗ a)      = hopD-elimGᵗ V η x cl a
-  hopD-elimGᵗ V η x cl (caseᵗ s l r) =
-    cong₂ _+_ (cong₂ _⊔′_ (hopD-elimGᵗ V η x cl l) (hopD-elimGᵗ V η x cl r))
-              (cong₂ _*_ (cong₂ _⊔′_ (cong₂ _⊔′_ (pm-elimGᵗ V 0 x cl l)
-                                               (pm-elimGᵗ V 0 x cl r))
-                                    (refl {x = 1}))
-                         (hopD-elimGᵗ V η x cl s))
-  hopD-elimGᵗ V η x cl (ifᵗ c a b)   =
-    cong₂ _⊔′_ (hopD-elimGᵗ V η x cl a) (hopD-elimGᵗ V η x cl b)
-  hopD-elimGᵗ V η x cl (primᵗ op a)  = refl
-  hopD-elimGᵗ V η x cl (strmᵗ b)     = hopD-elimGᵉ V η x cl b
+    rdᵗ ψ ρ (elimGTm x cl f) ≡ rdᵗ ψ ρ f
+  rd-elimGᵗ ψ ρ x cl (varᵗ y)      = refl
+  rd-elimGᵗ ψ ρ x cl unit̂          = refl
+  rd-elimGᵗ ψ ρ x cl (bool̂ b)      = refl
+  rd-elimGᵗ ψ ρ x cl (nat̂ m)       = refl
+  rd-elimGᵗ ψ ρ x cl (pairᵗ a b)   =
+    cong₂ _⊔ᴿ_ (rd-elimGᵗ ψ ρ x cl a) (rd-elimGᵗ ψ ρ x cl b)
+  rd-elimGᵗ ψ ρ x cl (fstᵗ p)      = rd-elimGᵗ ψ ρ x cl p
+  rd-elimGᵗ ψ ρ x cl (sndᵗ p)      = rd-elimGᵗ ψ ρ x cl p
+  rd-elimGᵗ ψ ρ x cl (inlᵗ a)      = rd-elimGᵗ ψ ρ x cl a
+  rd-elimGᵗ ψ ρ x cl (inrᵗ a)      = rd-elimGᵗ ψ ρ x cl a
+  rd-elimGᵗ ψ ρ x cl (caseᵗ s l r) =
+    trans (cong (λ p → caseStep ψ ρ p (elimGTm x cl l) (elimGTm x cl r))
+                (rd-elimGᵗ ψ ρ x cl s))
+          (caseStep-elimG ψ ρ (rdᵗ ψ ρ s) x cl l r)
+  rd-elimGᵗ ψ ρ x cl (ifᵗ c a b)   =
+    cong₂ _⊔ᴿ_ (rd-elimGᵗ ψ ρ x cl a) (rd-elimGᵗ ψ ρ x cl b)
+  rd-elimGᵗ ψ ρ x cl (primᵗ op a)  = refl
+  rd-elimGᵗ ψ ρ x cl (strmᵗ b)     = cong topOf (rd-elimGᵉ ψ ρ x cl b)
 
-  hopD-elimGᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (V : ℕ) (η : Fin n → ℕ)
+  caseStep-elimG : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ s u v t} (ψ : Fin n → Rd₃)
+    (ρ : Env) (p : Rd) (x : t ∈ Δᵍ) (cl : Exp Γ [] [] [] t)
+    (l : Fn Γ Δᵍ Δ Θ s v) (r : Fn Γ Δᵍ Δ Θ u v) →
+    caseStep ψ ρ p (elimGTm x cl l) (elimGTm x cl r) ≡ caseStep ψ ρ p l r
+  caseStep-elimG ψ ρ p x cl l r =
+    cong₂ _⊔ᴿ_ (rd-elimGᵗ ψ (ρ ▸ p) x cl l) (rd-elimGᵗ ψ (ρ ▸ p) x cl r)
+
+  rd-elimGᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (ψ : Fin n → Rd₃) (ρ : Env)
     (x : t ∈ Δᵍ) (cl : Exp Γ [] [] [] t) (ts : List (Tm Γ Δᵍ Δ Θ u)) →
-    hopDᵗˢ V η (elimGTms x cl ts) ≡ hopDᵗˢ V η ts
-  hopD-elimGᵗˢ V η x cl []       = refl
-  hopD-elimGᵗˢ V η x cl (y ∷ ys) =
-    cong₂ _⊔′_ (hopD-elimGᵗ V η x cl y) (hopD-elimGᵗˢ V η x cl ys)
+    rdᵗˢ ψ ρ (elimGTms x cl ts) ≡ rdᵗˢ ψ ρ ts
+  rd-elimGᵗˢ ψ ρ x cl []       = refl
+  rd-elimGᵗˢ ψ ρ x cl (y ∷ ys) =
+    cong₂ _⊔ᴿ_ (rd-elimGᵗ ψ ρ x cl y) (rd-elimGᵗˢ ψ ρ x cl ys)
 
 -- THE μ EDGE, in one line: the redex and its unfolding read EQUAL, so
 -- the rank component survives the step at no cost and the μ guard pays
 -- with the sync component alone.
-hopD-unfoldμ : ∀ {n} {Γ : Ctx n} {t} (V : ℕ) (η : Fin n → ℕ)
+rd-unfoldμ : ∀ {n} {Γ : Ctx n} {t} (ψ : Fin n → Rd₃) (ρ : Env)
   (body : Exp Γ (t ∷ []) [] [] t) →
-  hopDᵉ V η (unfoldμ body) ≡ hopDᵉ V η (μᵉ body)
-hopD-unfoldμ V η body = hopD-elimGᵉ V η (here refl) (μᵉ body) body
-
+  rdᵉ ψ ρ (unfoldμ body) ≡ rdᵉ ψ ρ (μᵉ body)
+rd-unfoldμ ψ ρ body = rd-elimGᵉ ψ ρ (here refl) (μᵉ body) body

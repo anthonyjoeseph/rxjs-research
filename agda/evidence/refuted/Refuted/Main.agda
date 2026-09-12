@@ -15,8 +15,7 @@ module Refuted.Main where
 
 open import Refuted.Drain-Reachable using (drain-dry-free-false;
   drain-dry-free-inv-false)
-open import Refuted.Rank-Cross using (rank-sufficient-false)
+open import Refuted.Entry-Fit using (entry-hop-fits-false;
+  regs₆; term₆; burst₆; grow₁; grow₂; term₂₄; grow₂₄; dry₂₄)
 open import Refuted.Rank-Entry using (dry-operator-false)
 open import Refuted.Sync-Count using (sync-count-bounded-false)
-open import Refuted.Root-Refold using (dry-operator-root-false;
-  walk-carry-false)

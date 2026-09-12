@@ -1,5 +1,5 @@
--- THE RANK THE MACHINE ENTERS AT IS BLIND TO SOURCE LENGTH, AND THE
--- DEPTH A CASCADE REACHES MULTIPLIES WITH IT.
+-- THE RANK THE MACHINE ENTERS AT NOW MOVES WITH SOURCE LENGTH, AND IT
+-- OUTRUNS THE DEPTH THE CASCADE REACHES.
 --
 -- EVIDENCE, not a claim: `src` cannot import this file and nothing in
 -- the proof may rest on it.  Checked by `make probed`, claimed by
@@ -20,52 +20,41 @@
 -- sees, which turns that count into a DEPTH — so the values the family
 -- hands out read as deep as the inner fold delivers wide, and the root
 -- flattener subscribes every one of them.
+--
+-- BOTH RATES MOVE, AND THE READING'S IS THE FASTER — WHICH IS THE
+-- FINDING.  Four programs differing in literals alone give an entry
+-- reading of 5, 21, 85, 329 against a carried depth of 3, 12, 39, 120.
+-- The reading dominates at every length and the margin WIDENS with the
+-- source, from a factor under two at one literal to nearly three at
+-- four.  Every row is load-bearing in both directions: a reading that
+-- stalled would say the clause is still blind to what it folds over,
+-- and a carried depth overtaking it at any length would refute the
+-- entry conjunct outright at the one root shape the leaf answers for.
+--
+-- IT IS THE SAME FAMILY THAT EXHIBITED THE CROSSING, WHICH IS WHY THE
+-- COVERAGE COUNTS.  These four programs used to read a FLAT 532899 —
+-- a function of the store bound and the templates, with source length
+-- among the inputs of neither — so the two rates met at twelve literals
+-- and the conjunct was false beyond it.  The iterating clause takes its
+-- refold count off the source's own delivery component, so what was a
+-- constant is now the faster of two exponentials: the crossing is not
+-- pushed out, it is the wrong way round.
 
--- ONE RATE MOVES AND THE OTHER DOES NOT, WHICH IS WHAT THE ROWS BUY.
--- Each literal multiplies the depth by three while the rank the machine
--- enters at reads the SAME at every source length — four programs,
--- differing in literals alone, all reading 532899.  So this is not two
--- exponentials racing: the reading is a function of the STORE BOUND and
--- the term's templates, and source length is not among its inputs,
--- while source length is exactly what moves the deliveries a fold
--- compounds over.
---
--- WHERE THEY CROSS, AND THIS IS ARITHMETIC ON THE RATE RATHER THAN A
--- ROW.  The rows give depth `(3 ^ suc ℓ ∸ 3) / 2` against a flat
--- 532899, and those meet at TWELVE literals — a run reading about
--- 800000 layers deep at a bound of six.  NOTHING BELOW INSTANTIATES
--- THAT.  It is an extrapolation of the measured recurrence and is
--- recorded as one.
---
--- AND THIS IS THE SHAPE THE SIBLING RECEIPTS COULD NOT REACH.  A grown
--- value handed out of the ROOT is subscribed by nobody, so its depth
--- costs the guard nothing however far it passes the term's reading;
--- here the root IS a flattener, so every layer the fold builds is a
--- layer the run enters.  What the rate then says is that the store
--- bound has to cover the deliveries a cascade makes SYNCHRONOUSLY, and
--- a synchronous cascade consumes no fuel — which is where the reading's
--- `k ≤ V` premise sits, and `Refuted.Rank-Cross` since settled that it
--- is not merely unpaid but FALSE at the bound `evaluate` seeds itself
--- with.
---
 -- THE COVERAGE BOUNDARY, and it is an infrastructure limit rather than
--- a choice.  MEASURING a burst and SUBSCRIBING one cost differently: at
--- two literals the leaf row stalled for eleven minutes with the
--- resident set FLAT — so not a normalisation still making progress —
--- against a whole probe root that checks in fourteen seconds.  The
--- crossing above is therefore six orders of magnitude past anything a
--- checker will normalise, and the rate is the whole of what a probe can
--- buy here.
+-- a choice.  MEASURING a burst and SUBSCRIBING one cost differently, so
+-- the leaf row below sits at the ONE literal root while the rate rows
+-- reach four; a leaf row at two literals stalled for eleven minutes
+-- with the resident set FLAT, against a whole probe root that checks in
+-- seconds.  So what is instantiated is the rate at four lengths and the
+-- subscribe at one, and no row here reaches the twelve literals the old
+-- crossing sat at.
 --
--- THE LEAF ROW IS GREEN AND THAT IS NOT COMFORT.  It sits at the ONE
--- literal root, three layers against 532899, so the margin there is
--- enormous — which is precisely what the rate says it would be, and
--- precisely why no row at this end can decide the statement.  What the
--- row does buy is the first coverage the leaf has ever had at a root it
--- answers for: the run really does reach `subscribeInner`, really does
--- peel the rank, and really does come back without a dry close.
+-- WHAT THE LEAF ROW BUYS BESIDE THE RATE: the first coverage this leaf
+-- has ever had at a root it answers for.  The run really does reach
+-- `subscribeInner`, really does peel the rank, and really does come
+-- back without a dry close.
 --
--- TARGET: dry-operator @474d33
+-- TARGET: dry-operator @27b615
 module Probed.Operator-Root where
 
 open import Data.List using (List; []; _∷_)
@@ -81,8 +70,8 @@ open import Rx.Prim using (InstEvent; value; InstEmit)
 open import Rx.Exp using (Ctx; Closed; Fn; Tm; natᵗ; obs; _×ᵗ_;
   ofᵉ; emptyᵉ; scanᵉ; mergeAllᵉ; strmᵗ; nat̂; fstᵗ; varᵗ)
 open import Rx.Slots using (Slots)
-open import Rx.Hop-Depth using (hopDᵉ)
-open import Rx.Slot-Hop using (slotHop)
+open import Rx.Hop-Depth using (Rd₃; depthᵉ)
+open import Rx.Slot-Read using (slotRd)
 open import Rx.Evaluator using (Stream; subscribeE; rootWitness; root;
   sched-init; st-init)
 open import Verify-Rank-Sufficient.Dry using (dry-operator)
@@ -98,16 +87,16 @@ open import Probed.Apparatus using (Confirms)
 -- `deferᵉ` gate.
 ----------------------------------------------------------------------
 
-evHop : ∀ {n} {Γ : Ctx n} {u} (V : ℕ) (η : Fin n → ℕ) →
+evHop : ∀ {n} {Γ : Ctx n} {u} (ψ : Fin n → Rd₃) →
         List (InstEvent (Closed Γ u)) → ℕ
-evHop V η []             = 0
-evHop V η (value v ∷ es) = hopDᵉ V η v ⊔ evHop V η es
-evHop V η (_ ∷ es)       = evHop V η es
+evHop ψ []             = 0
+evHop ψ (value v ∷ es) = depthᵉ ψ v ⊔ evHop ψ es
+evHop ψ (_ ∷ es)       = evHop ψ es
 
-carried : ∀ {n} {Γ : Ctx n} {u} (V : ℕ) (η : Fin n → ℕ) →
+carried : ∀ {n} {Γ : Ctx n} {u} (ψ : Fin n → Rd₃) →
           Stream Γ (obs u) → ℕ
-carried V η []         = 0
-carried V η (em ∷ ems) = evHop V η (InstEmit.events em) ⊔ carried V η ems
+carried ψ []         = 0
+carried ψ (em ∷ ems) = evHop ψ (InstEmit.events em) ⊔ carried ψ ems
 
 Γ₀ : Ctx 0
 Γ₀ = []ⱽ
@@ -115,16 +104,9 @@ carried V η (em ∷ ems) = evHop V η (InstEmit.events em) ⊔ carried V η ems
 ins₀ : Slots Γ₀
 ins₀ = λ ()
 
--- THE STORE BOUND every reading here is taken at.  `evaluate` builds
--- its schedule at the fuel it then hands the drain, so a row is about a
--- RUN only when the two agree.  A row free to pick the bound separately
--- would be picking how tight the statement it instantiates is.
-SB : ℕ
-SB = 6
-
 burstOf : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) → Stream Γ t
 burstOf e ins =
-  proj₁ (subscribeE (rootWitness SB e ins) e root 0 0 (sched-init SB e ins)
+  proj₁ (subscribeE (rootWitness e ins) e root 0 0 (sched-init e ins)
            (st-init e))
 
 ----------------------------------------------------------------------
@@ -159,43 +141,52 @@ e3 = emitter (nat̂ 0 ∷ nat̂ 1 ∷ nat̂ 2 ∷ [])
 e4 = emitter (nat̂ 0 ∷ nat̂ 1 ∷ nat̂ 2 ∷ nat̂ 3 ∷ [])
 
 ----------------------------------------------------------------------
--- THE RANK THE MACHINE ACTUALLY ENTERS AT, AND IT DOES NOT MOVE.  The
--- entry reads `hopDᵉ` at the run's own store bound; the four programs
--- differ in source length alone and all four read the SAME.  Each row
--- is LOAD-BEARING and could have failed in either direction — a reading
--- that grew with the literals would say the rank still tracks the
--- syntax, and one that shrank would say a literal costs the measure
--- something.  It does neither, which is what makes the depths below a
--- comparison rather than two unrelated numbers.
+-- THE RANK THE MACHINE ACTUALLY ENTERS AT, AND IT MOVES.  The entry
+-- reads `depthᵉ` off the slot telescope; the four programs differ in
+-- source length alone and every one reads higher than the last.  Each
+-- row is LOAD-BEARING and could have failed in either direction — a
+-- reading flat across the four would say the clause is still blind to
+-- what it folds over, which is the defect that refuted every earlier
+-- form of this conjunct, and one that shrank would say a literal costs
+-- the measure something.
 ----------------------------------------------------------------------
 
-η₀ : Fin 0 → ℕ
-η₀ = slotHop SB ins₀
+ψ₀ : Fin 0 → Rd₃
+ψ₀ = slotRd ins₀
 
-_ : hopDᵉ SB η₀ e1 ≡ 532899                            -- LOAD-BEARING
+_ : depthᵉ ψ₀ e1 ≡ 5                                   -- LOAD-BEARING
 _ = refl
 
-_ : hopDᵉ SB η₀ e4 ≡ 532899                            -- LOAD-BEARING
+_ : depthᵉ ψ₀ e2 ≡ 21                                  -- LOAD-BEARING
+_ = refl
+
+_ : depthᵉ ψ₀ e3 ≡ 85                                  -- LOAD-BEARING
+_ = refl
+
+_ : depthᵉ ψ₀ e4 ≡ 329                                 -- LOAD-BEARING
 _ = refl
 
 ----------------------------------------------------------------------
--- THE MOVING RATE, AND IT IS THE FINDING.  Each row is LOAD-BEARING and
--- each could have failed in either direction: a depth that stalled
--- would say the outer fold does not see the flattened tree, and a depth
--- that merely added would say the inner fold's re-wrapping does not
--- multiply.  It multiplies, by three, against a seed that doubles.
+-- THE RATE IT HAS TO DOMINATE, row for row against the four above.
+-- Each is LOAD-BEARING and each could have failed in either direction:
+-- a depth that stalled would say the outer fold does not see the
+-- flattened tree, and a depth OVERTAKING its row above would refute the
+-- entry conjunct at the one root shape this leaf answers for.  It does
+-- neither — three against five, twelve against twenty-one, thirty-nine
+-- against eighty-five, a hundred and twenty against three hundred and
+-- twenty-nine — so the gap widens rather than closing.
 ----------------------------------------------------------------------
 
-_ : carried SB η₀ (burstOf e1 ins₀) ≡ 3                      -- LOAD-BEARING
+_ : carried ψ₀ (burstOf e1 ins₀) ≡ 3                   -- LOAD-BEARING
 _ = refl
 
-_ : carried SB η₀ (burstOf e2 ins₀) ≡ 12                     -- LOAD-BEARING
+_ : carried ψ₀ (burstOf e2 ins₀) ≡ 12                  -- LOAD-BEARING
 _ = refl
 
-_ : carried SB η₀ (burstOf e3 ins₀) ≡ 39                     -- LOAD-BEARING
+_ : carried ψ₀ (burstOf e3 ins₀) ≡ 39                  -- LOAD-BEARING
 _ = refl
 
-_ : carried SB η₀ (burstOf e4 ins₀) ≡ 120                    -- LOAD-BEARING
+_ : carried ψ₀ (burstOf e4 ins₀) ≡ 120                 -- LOAD-BEARING
 _ = refl
 
 ----------------------------------------------------------------------
@@ -208,7 +199,7 @@ _ = refl
 flat1 : Closed Γ₀ natᵗ
 flat1 = mergeAllᵉ nothing e1
 
-opRoot : Confirms (dry-operator (rootWitness SB flat1 ins₀) flat1 root 0 0
-  (sched-init SB flat1 ins₀) (st-init flat1) refl
-  (rootTri-reads SB flat1 ins₀))
+opRoot : Confirms (dry-operator (rootWitness flat1 ins₀) flat1 root 0 0
+  (sched-init flat1 ins₀) (st-init flat1) refl
+  (rootTri-reads flat1 ins₀))
 opRoot = refl

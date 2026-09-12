@@ -208,85 +208,84 @@ research lives; where they disagree, the header wins.
 
 ## Tier 1 — the descent never goes dry
 
-**THE TIER IS ONE STATEMENT, AND AS STATED IT IS FALSE.** `rank-sufficient`
-(Verify-Rank-Sufficient) says no run emits the dry marker; `Refuted.Rank-Cross`
-exhibits two that do, each rescued one allowance higher. The scan clause charges
-a power of the STORE BOUND for its refolds, and `evaluate` sets that bound from
-the FUEL — which counts arrivals, where a refold happens per DELIVERY.
+**THE TIER IS ONE STATEMENT, AND ITS DOOR IS NOW REFUTED.** `rank-sufficient`
+(Verify-Rank-Sufficient) says no run emits the dry marker. Nothing witnesses
+against the headline, but the leaf feeding the descent its hypothesis has one:
+at a run whose slot is scripted, the registry reads two against a term reading
+one, so no root subscribe supplies what the drain demands.
 
-**AND THE CROSSING IS AT THE DOOR, WHICH ORDERS THE ROWS.** `Refuted.Root-Refold`
-finds the marker in the ROOT SUBSCRIBE BURST — no arrival, no registration, no
-drain step — so the only fact in scope is the one the door reads off the term,
-and every route carrying a number between cascades arrives too late.
+**AND IT RULES ON THE OBVIOUS REPAIR.** The same family is dry-free with the
+fit false throughout, so the comparison is not necessary for the conclusion and
+a weaker one that happens to hold repairs the wrong thing.
 
 **A FAILING GUARD IS NOT AN ERROR, AND THAT IS WHY THE TIER IS PROBEABLE.** A
 guarded clause returns a `dry` emit and the run continues, so both sides
 compute at every program — `hopFits` included, whose rows spend a decision
-procedure rather than a pin.
+procedure rather than a pin, and whose refusal is what turned this up.
 
 ### Open questions
 
-- **IS AN EXACT DOOR READING PAYABLE?** No — and the answer arrived from the
-  slot end. A reference reports its def's WHOLE reading, so the pair a plug
-  takes reads under the run at the first fold above an input; carrying the
-  triple fixes that and costs exactness, because the iteration joins the source
-  into the accumulator and an accumulator is not a source. Where a source has
-  hop the door sits ONE above its run. So the question is now a bound tight by a
-  CONSTANT, and what is open is whether that constant stays one as the telescope
-  stages and as the refolds reach the hundreds.
-  relevant: `drain-dry-free`, `dry-operator`
+- **WHAT DOES THE DOOR OWE THE DRAIN, IF NOT A COMPARISON?** The descent takes
+  its hypothesis as a bound on what the registry's chains can still reach,
+  measured against the program those chains were built from. That framing now
+  has a witness against it at the door and, in the same family, rows where the
+  conclusion holds with the hypothesis false — so the quantity the drain
+  actually needs is not known to be this one, and may not be a comparison
+  between two readings at all. Answering it decides whether the fit is
+  repriced, replaced by an obligation stated against the chain, or dropped for
+  a descent needing no entry hypothesis.
+  relevant: `entry-hop-fits`, `drain-dry-free`
 
 ### Big picture tier roadmap
 
-- **RAISE THE SCAN CLAUSE, AND THE CASCADE WITH IT.** The restatement itself,
-  now every clause of the reading is decided — the slot one carrying the def's
-  whole triple rather than the pair a plug takes. It cascades: every face is
-  stated in the reading, so the two peel lemmas, the fit and both drain halves
-  move together. And the affine section under the clause does not survive an
-  iterated fold at all — an environment prices a variable directly, so the
-  multiplicity family has no job left and goes rather than being restated, which
-  is the one part of this leg that makes the tree smaller. It answers the
-  question's live half by fixing what the raised clause has to bound.
+- **COUNT WHAT A SCRIPTED SOURCE ACTUALLY DELIVERS, AND SAY WHAT A HOT ONE
+  COSTS.** `syncOf` prices a cold slot at the LENGTH OF ITS SYNCHRONOUS PREFIX
+  and a hot one at zero, so a source whose values all arrive late reads as
+  delivering nothing — and `flatten` multiplies every downstream count through
+  that zero, which is why the door's term side reads one where its own chains
+  reach two. The cold half is a repair: count the scheduled tail. The hot half
+  may not be, since nothing static bounds what a hot source delivers, and then
+  the comparison cannot be stated over hot slots at all. The leg lands the cold
+  count and decides which of the two the hot case is — a repair or the reason
+  the fit goes.
 
-- **CARRY THE READING PAST ONE SLOT AND INTO THE HUNDREDS.** Every receipt so
-  far PICKS a stage rather than exercising the recursion that builds the slot
-  environment, and every fold instantiated iterates in single or double digits
-  while a delivery count is a PRODUCT at each flattener — one signature the
-  count's own probe measures reaches the hundreds. Those are the two ends where
-  a one-unit slack is least likely to hold and where an iterated clause stops
-  being obviously computable. Neither is a restatement, so
-  the leg either pins the slack at one or refutes the bound the raise is written
-  against, which is the question's remaining half either way.
+- **STATE THE CARRIED REPORT, NOW THE FAMILY THAT REFUTED IT AGREES.** The hop
+  edge holds downward by definition and NOT upward — a frame builds its
+  emissions at run time — so the only route out is the burst walk carrying its
+  emissions' reading beside them, invariant in the motive. That route was
+  refuted: the carried depth climbed one per source literal against a bound flat
+  in source length. The iterating clause tracks the refold, and on the same
+  doubling fold the two sides now agree at every length measured. The leg STATES
+  it, invariant in the motive, and lets the walk's arms say where exactness
+  stops — the one leg that can still REFUTE rather than measure.
 
-- **RESTATE THE OPERATOR LEAF AGAINST THE RAISED ENTRY READING.** Its defect is
-  the raise's defect one face over: the rank the three flatteners are entered
-  against was measured NOT to move with the source the run folds over, which is
-  a fold charged nothing for what it folds. So the raise is what makes the
-  restatement available, and it is a restatement rather than a transport — a
-  SHAPE row is repaired, never carried — which is why it is its own
-  commit. It narrows the question's `dry-operator` half: what
-  the entry invariant has to say at a flattener is decidable only once the rank
-  beneath it moves, and the first arm to resist says whether the raised clause
-  bounds a flattener at all or only the fold above one.
+- **SPEND THE CARRIED REPORT AT THE FLATTENER LEAF.** `dry-operator` is now a
+  comparison and not a measure: the rank the three flatteners are entered
+  against moves with the source and outruns what the burst carries, so what the
+  leaf is missing is a fact about an emitted inner that only the report above
+  supplies. The leg is the assembly — the leaf over the walk's own conclusion —
+  and the first arm to resist says whether the raised clause bounds a flattener
+  at all or only the fold above one. It is banked only once the leg above
+  settles `drain-dry-free`; blocked, it is rewritten from what that leg found.
 
 ### The ledger
 
 - **`drain-dry-free`** (Verify-Rank-Sufficient) — FALSITY,
-  `REFUTED×2, PROBED×4`: every arrival after the root frame, conditioned on
+  `REFUTED×2, PROBED×3`: every arrival after the root frame, conditioned on
   `hopFits` at the schedule's own slot reading and not one the caller picks.
   The fit holds flat across twelve drain states and is TIGHT at the plainest,
   so the rows sit where it is closest to false.
 
-- **`dry-operator`** (Verify-Rank-Sufficient.Dry) — SHAPE,
-  `REFUTED×2, DEAD ROUTE×2, PROBED, RECOVERY`: the THREE FLATTENERS'
-  dry-freedom under the entry invariant read at the schedule's own store bound.
-  First coverage at a root `opShape` admits, and the rank it is entered against
-  was measured there NOT to move with the source the run folds over.
+- **`entry-hop-fits`** (Verify-Rank-Sufficient) — FALSITY, `REFUTED, PROBED`:
+  the fit at the door. A scripted slot reads zero, so the chain built through
+  it outruns the term two against one; the probed shapes all took their depth
+  from the term's own recursion and never reached that region.
 
-- **`entry-hop-fits`** (Verify-Rank-Sufficient) — DIFFICULTY, `PROBED`: the fit
-  at the door, where the chain really is the one the root subscribe built out
-  of `e`. Probed at three shapes including a share holding a recursion, each
-  witnessed by the decision procedure rather than a pin.
+- **`dry-operator`** (Verify-Rank-Sufficient.Dry) — DIFFICULTY,
+  `REFUTED, DEAD ROUTE×3, PROBED, RECOVERY`: the THREE FLATTENERS' dry-freedom
+  under the entry invariant. At the family that exhibited the crossing the rank
+  now MOVES with the source and outruns what the burst carries, so what is owed
+  is the comparison, not a measure.
 
 ## Tier 2 — Verify-Well-Formed (parked behind tier 1)
 
