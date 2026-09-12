@@ -62,3 +62,6 @@ open import Probed.Slot-Defer
 
 open import Probed.Swapped-Exponent
   using (measure-fork)
+
+open import Probed.Step-Fold
+  using (step-fold-fork)
