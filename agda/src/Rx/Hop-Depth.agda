@@ -222,12 +222,32 @@
 -- have no job left — a slope exists to price a variable, and an
 -- environment prices it exactly.
 --
--- WHAT IS UNTOUCHED: whether the clause is COMPUTABLE at the refold
--- counts a real store reaches.  The iteration count is itself a
--- delivery count, and those run to the hundreds on one signature the
--- count's own probe measures, where these families run to single
--- digits.  Nothing here reaches that, and the rows say nothing about
--- it.
+-- WHAT IS UNTOUCHED: the SLOT clause, which every program either
+-- receipt reaches is closed against.  Pricing a slot needs a staged
+-- reading built the way the count's own defer probe builds its delivery
+-- one, and until one exists the environment prices every variable but
+-- that one.
+------------------------------------------------------------------
+
+------------------------------------------------------------------
+-- AND THE CLAUSES NO FOLD FAMILY TOUCHED READ CORRECTLY TOO.
+-- `Probed.Clause-Sweep` takes the reading to a template that reads its
+-- plug, one that drops it, a case binder at both tags, a switch and an
+-- exhaust root beside a merge, and a recursion through the defer gate;
+-- the door equals the run at every one.  That is the risk and not a
+-- caveat, because both dead readings were exact at the families THEY
+-- were tried on and each died at the first shape nobody had
+-- instantiated — so a reading whose whole receipt was one operator
+-- stood exactly where those two stood before their refutations.
+--
+-- AND IT REDUCES WHERE THE COUNT GROWS.  A delivery count is a PRODUCT
+-- at every flattener, so a five-by-five merge reaches twenty-five and
+-- the clause iterates twenty-five times; it reduces, and it lands on
+-- the number the run reaches, because a step that re-wraps its
+-- accumulator genuinely deepens it once per refold.  The same program
+-- prices the closed form twelve orders of magnitude above that run,
+-- which is the second half of why the power had to go: a bound that
+-- large is true and nothing descends against it.
 ------------------------------------------------------------------
 
 ------------------------------------------------------------------
