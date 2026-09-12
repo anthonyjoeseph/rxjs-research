@@ -140,13 +140,12 @@ open import Verify-Rank-Sufficient.Entry using (rootTri-reads)
 -- is the one this row could not put until a cascade had been
 -- instantiated rather than argued about.
 --
--- SO THE ROW IS STILL SHAPE AND THE RESTATEMENT IS NOT A FIELD.  An
--- invariant on `EvalSt` was the obvious repair while the seed read the
--- program alone; it would now oblige every producer and re-oblige every
--- consumer to say something the re-seed already says, and would leave the
--- growth INSIDE the cascade — the only growth still outrunning an entry —
--- exactly where it is.  What is owed is a bound on ONE burst's
--- deliveries, denominated in something the entry triple carries.
+-- SO THE ROW IS STILL SHAPE, AND WHAT IS OWED IS A BOUND ON ONE BURST'S
+-- DELIVERIES, denominated in something the entry triple carries.  A
+-- coherence field on `EvalSt` was the obvious repair while the seed read
+-- the program alone, and it is not one: the store's parts can agree with
+-- each other perfectly while a registration's own frames carry a
+-- function whose body is deeper than any quantity the entry reads.
 
 -- AND THE CASCADE DOES NOT OUTGROW ITS ENTRY, WHICH IS WHY THIS ROW IS
 -- NOT THE OPERATOR ROW UNDER ANOTHER NAME.  A cascade is ONE INSTANT,
@@ -161,6 +160,28 @@ open import Verify-Rank-Sufficient.Entry using (rootTri-reads)
 -- above asks for is the seed the machine already mints, and what is
 -- left in this row is the unconstrained schedule alone.
 --
+-- REFUTED: `Refuted.Drain-Reachable` — the form as written, at a store
+--   whose root term is the EMPTY observable.  A chain is a `Path` typed
+--   by the context and the root type alone, so it carries no index
+--   tying it to the program; a `map-f` frame applies whatever function
+--   the registry's author wrote, and `foldPath` threads ONE witness
+--   through every frame without re-seeding at any of them.  A plain
+--   numeral arrives at nesting zero, a store whose only node holds an
+--   empty queue adds zero, and the frame hands back a tower the
+--   `thru-outer` behind it then subscribes.  The gap is not a rate: it
+--   is unbounded at every seed, since the tower is written one level
+--   deeper at no cost to any quantity the entry reads.
+-- REFUTED: `Refuted.Drain-Reachable` — and the same witness kills the
+--   form CONDITIONED on the coherence record, which is what says the
+--   repair is not a hypothesis.  Every field is satisfied at that
+--   state: the counts agree, the element types gate the one entry in,
+--   the protocol sits at its initial watermark with no open instant,
+--   the merge node's counter matches a chain contributing no inner
+--   instance, and an empty context has no hot slot to keep live.  The
+--   record constrains the registry's COUNTS and TYPES, while the depth
+--   is a property of a chain's FRAMES — so what is missing is a tie
+--   between a registration's frames and the program being run, which
+--   has no home in the record as it stands.
 -- PROBED: `Probed.Descent` — twelve recursive programs, every one green,
 --   taken against the DRAIN of each run rather than the whole of it.  What
 --   they cover, guard by guard: the μ peel at every program, since all
