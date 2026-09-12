@@ -226,36 +226,34 @@ procedure rather than a pin.
 
 ### Open questions
 
-- **CAN A DOOR PRICE A VARIABLE AT WHAT WILL BE PLUGGED INTO IT?** Both term
-  readings are dead and neither died of its exponent. `Probed.Step-Fold` gives
-  the step an emission that is itself a fold: that fold's exponent is read off
-  the accumulator, which the entry sees as a VARIABLE reading zero, so the door
-  underprices by a rate no coefficient reaches. The live clause is blind to what
-  the step folds over and the swapped one to what the step's OWN fold folds
-  over — the same blindness one level in. The delivery count already prices a
-  plug, through a slope family; no depth family does.
+- **IS AN EXACT DOOR READING PAYABLE?** A door CAN price a variable — not with
+  the slope the count carries but with an environment, since a fold knows its
+  own accumulator — and `Probed.Plug-Priced` reads door equal to run at every
+  term either dead reading crossed at. The PRICE is what is unknown. Exactness
+  costs the closed form: a fold's contribution becomes a recursion over its
+  refold count, and that count is itself a delivery count, reaching the hundreds
+  where these families reach single digits. Both rows are stated IN the measure,
+  so the list does not shrink however the region moved.
   relevant: `drain-dry-free`, `dry-operator`
 
 ### Big picture tier roadmap
 
-- **PRICE THE PLUG: GIVE THE DEPTH READING THE SLOPE THE COUNT ALREADY HAS.**
-  The delivery count survives a variable because it carries a slope family —
-  how a reading scales in what is plugged at an index — and solves the fold's
-  recurrence in closed form out of it. The depth families carry a multiplicity
-  that is only ever a coefficient, never an exponent's argument, which is
-  precisely where both readings died. Mirror the count's shape: a depth slope, a
-  solved fold clause, and then the rows `Probed.Step-Fold` crosses at, whose
-  measured recurrences are the target: a candidate missing them is refuted
-  before it is stated.
+- **TAKE THE PLUG-PRICED READING TO WHAT IT HAS NOT SEEN, BEFORE ANY FACE IS
+  STATED IN IT.** Three fold families is the whole of its coverage: one
+  flattener, no input, no recursion, no dropping template, no case binder, no
+  switch or exhaust root. Both dead readings also passed at the shapes they were
+  tried on, so the coverage IS the risk. Sweep those clauses, and sweep the COST
+  with them — the iteration count is a delivery count, so a family whose count
+  reaches the hundreds is the row saying whether an exact clause evaluates at
+  all. A refutation here cancels the restatement below, so it goes first.
 
-- **RAISE THE SCAN CLAUSE TO WHATEVER FORM THAT LEG LEAVES STANDING.** The
-  restatement, and it waits on the leg above to say which form, since the two
-  candidates tried so far are both refuted and a third stated blind would be a
-  third refutation. It cascades: every face is stated in the reading, so the two
-  peel lemmas, the fit and both drain halves move together. And the affine
-  section under the clause does not survive a solved fold — the coefficient
-  becomes two slopes rather than one, and the exponent's argument is itself a
-  reading rather than a parameter the caller supplies.
+- **RAISE THE SCAN CLAUSE, AND THE CASCADE WITH IT.** The restatement, once the
+  sweep above leaves the reading standing. It cascades: every face is stated in
+  the reading, so the two peel lemmas, the fit and both drain halves move
+  together. And the affine section under the clause does not survive an iterated
+  fold at all — an environment prices a variable exactly, so the multiplicity
+  family has no job left and goes rather than being restated, which is the one
+  part of this leg that makes the tree smaller.
 
 - **MOVE THE BUG CACHE OFF THE TYPECHECKER (Anthony).** Every stored case pins a
   whole run by `refl`, so the gate normalises the evaluator once per case and

@@ -65,3 +65,6 @@ open import Probed.Swapped-Exponent
 
 open import Probed.Step-Fold
   using (step-fold-fork)
+
+open import Probed.Plug-Priced
+  using (plug-priced-fork)
