@@ -127,6 +127,17 @@ opShape _         = true
 --   arriving on a later tick is outside every one of them — which is the
 --   region the rank reading is actually about, and it is reached only
 --   through the drain leaf's rows.
+-- PROBED: `Probed.Seed` — five rows at a scan whose step re-wraps its own
+--   accumulator, the one shape known to grow a reading ALONG a run: one
+--   per flattening layer the step can be built from, one fed from a
+--   scripted slot, and one doubling the source.  They read the carried
+--   nesting against the SEED rather than against the emitter, which is
+--   what the machine compares, and the margin is measured widening —
+--   three against `2 ^ 14`, six against `2 ^ 17`, so a delivery costs one
+--   layer and buys one doubling.  THE BOUNDARY: flat scans at an operator
+--   root with no `μᵉ` anywhere, so the unfolding guard is untouched and
+--   nothing here reaches a run whose deliveries are not themselves
+--   counted in the seed's exponent.
 -- RECOVERY: `git show 919f115:agda/src/Rx/Clos-Size.agda` restores
 --   `syncSizeᵉ` with the slot telescope substituted in, also postulate-free
 --   — the μ guard reads the UNSUBSTITUTED size, and a slot reference is one

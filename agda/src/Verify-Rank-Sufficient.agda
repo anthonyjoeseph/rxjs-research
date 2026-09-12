@@ -100,6 +100,14 @@ open import Verify-Rank-Sufficient.Entry using (rootTri-reads)
 --   These rows are `refl` pins and buy exactly the twelve shapes they
 --   name, which is why the coverage past them is bought by an instrument
 --   that is not a pin.
+-- PROBED: `Probed.Seed` — one row past the subscribe frame, at a scan
+--   re-wrapping its accumulator over a scripted source with an async
+--   tail.  The burst carries a reading of one and the DRAIN carries
+--   three, against a seed of `2 ^ 14` that the slot's own data is counted
+--   into — the half a literal source cannot show, since it delivers
+--   entirely inside the frame.  THE BOUNDARY: one slot, one fold, and a
+--   state reached by RUNNING, so the arbitrary schedule and store this
+--   statement quantifies over are as uninstantiated as they were.
 
 postulate
   drain-dry-free : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
