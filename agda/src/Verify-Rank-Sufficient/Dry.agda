@@ -71,15 +71,27 @@ opShape _         = true
 -- — so nothing goes dry at the node itself and the leaf is about the
 -- pipeline underneath it.
 --
--- THE RANK CONJUNCT IS WHAT MAKES THE STATEMENT SURVIVABLE, and it was
--- bought rather than assumed.  Carrying only the unconnected count and
--- the syncSize, the leaf is quantified over a triple whose rank is ZERO
--- — and at rank zero the inner-subscribe clause subscribes nothing at
--- all: it returns the dry close outright.  The entry invariant now bounds
--- `nestDᵉ o` by the rank, which excludes that entry for every shape
--- `opShape` admits, since each carries at least the layer its own inner
--- is entered through.  Adding the conjunct is a RESTATEMENT and not a
--- weakening, which is the one thing a machine witness licenses.
+-- THE RANK CONJUNCT BOUGHT THE FLOOR AND NOT THE STATEMENT, and the
+-- distance between those two is the whole of what is known here.
+-- Carrying only the unconnected count and the syncSize, the leaf is
+-- quantified over a triple whose rank is ZERO — and at rank zero the
+-- inner-subscribe clause subscribes nothing at all: it returns the dry
+-- close outright.  Bounding `nestDᵉ o` by the rank refuses that entry
+-- for every shape `opShape` admits, since each carries at least the
+-- layer its own inner is entered through.  What the bound does not do is
+-- SCALE.  It reads the TERM; a term is charged for its step function
+-- once; a fold applies that step once per delivery — so two deliveries
+-- are already one more than the syntax knows about, and the leaf is
+-- false at three conjuncts exactly as it was at two.
+--
+-- SO THE REPAIR IS A CHANGE OF CURRENCY AND NOT A FOURTH CONJUNCT OF
+-- THE SAME KIND.  No measure of syntax can serve, and that is settled
+-- rather than suspected: the counterexample scales by lengthening the
+-- run, which moves the deliveries and leaves the term fixed.  What has
+-- to be carried down is that the rank still dominates what the run can
+-- DELIVER — and the deliveries are paid for out of FUEL, a quantity
+-- neither `sizeᵉ` nor `slotsSize` reads, so the seed is constant along
+-- the one axis the readings grow on.
 --
 -- A SIZE BOUND IS THE OBVIOUS CONJUNCT AND IT IS DEAD.
 -- `2 ^ (sizeᵉ o + slotsSize sl) ≤ r` holds at the root by reflexivity and
@@ -92,17 +104,13 @@ opShape _         = true
 -- between this leaf and the two peels proven below.
 --
 -- AND THE BURST DOES NOT READ UNDER ITS EMITTER, SO THE HOP IS NOT PAID
--- IN SYNTAX.  The reading the peel wants is that an inner a burst
--- carries reads STRICTLY under the expression that emitted it — one
--- layer, one peel — and it is false.  A `scanᵉ` threads its own output
--- back in, so a step function re-wrapping its accumulator in one layer
--- emits a value a layer deeper than the value before it, while the term
--- is charged for that layer once; no measure of the emitter repairs it,
+-- IN SYNTAX AT ALL.  A fold threads its own output back in, so what it
+-- hands out is deeper than the term it came from while the term is
+-- charged for that layer once; no measure of the emitter repairs it,
 -- because the fold count is not in the term.  What survives is that the
--- seed is EXPONENTIAL in program size, re-seeded at `2 ^ sizeᵉ d` on a
--- connect, against ONE peel per hop — so the conclusion owed is that the
--- count is never SPENT, priced against the deliveries a run can make,
--- and never a comparison between two readings of syntax.
+-- seed is EXPONENTIAL in program size against ONE peel per hop — so the
+-- conclusion owed is that the count is never SPENT, priced against the
+-- deliveries a run can make.
 --
 -- REFUTED: `Refuted.Burst-Nesting` — the inner-under-emitter reading, by
 --   a scan over a three-element synchronous source whose step re-wraps
@@ -116,6 +124,14 @@ opShape _         = true
 --   and the syncSize holds by reflexivity.  Its burst is one emit long
 --   and that emit is the dry close.  Its reading is one against the
 --   nesting, which is `suc 0` there.
+-- REFUTED: `Refuted.Rank-Fold` — the THREE-conjunct form, which the row
+--   above bought.  A scan whose step re-wraps its accumulator, under a
+--   flattener that subscribes what it emits: the program reads two, so
+--   the invariant is satisfied at a rank of two and gives away no slack
+--   at all, and the second accumulator is entered one peel down reading
+--   two.  Its own inner is then entered at zero and the burst carries
+--   the dry close.  Two deliveries, and the state is reached by running
+--   rather than written.
 -- PROBED: `Probed.Descent` — three rows, each at an operator ROOT, which
 --   is the only point this leaf can be instantiated at from outside: the
 --   walk reaches it elsewhere only under a witness a probe cannot write
@@ -138,6 +154,16 @@ opShape _         = true
 --   root with no `μᵉ` anywhere, so the unfolding guard is untouched and
 --   nothing here reaches a run whose deliveries are not themselves
 --   counted in the seed's exponent.
+-- PROBED: `Probed.Fuel-Growth` — six drains of ONE run differing in FUEL
+--   alone, at the same fold over a recursion rather than a literal.  The
+--   term reads two and the rank the machine seeds is `2 ^ 20` at every
+--   row; the carried nesting is the fuel plus one.  So the readings grow
+--   along an axis no seed read off the program contains, and the
+--   crossing the refutation above reaches by choosing a triple is
+--   reached by a long enough run at the triple the machine itself seeds.
+--   THE BOUNDARY: one recursion shape, one flattening layer in the step,
+--   and fuels small enough to establish the RATE rather than the
+--   crossing, since a row at the crossing is a `refl` at `2 ^ 20`.
 -- RECOVERY: `git show 919f115:agda/src/Rx/Clos-Size.agda` restores
 --   `syncSizeᵉ` with the slot telescope substituted in, also postulate-free
 --   — the μ guard reads the UNSUBSTITUTED size, and a slot reference is one

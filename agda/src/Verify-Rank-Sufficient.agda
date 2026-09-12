@@ -85,6 +85,16 @@ open import Verify-Rank-Sufficient.Entry using (rootTri-reads)
 -- fourth argument, since every producer must then supply it and every
 -- consumer re-establish it.
 --
+-- AND REACHABILITY ALONE WILL NOT BE ENOUGH, WHICH NARROWS THE FIELD
+-- BEFORE IT IS STATED.  The re-seed reads the PROGRAM at every arrival
+-- while the store's own readings grow by one PER arrival, so a state a
+-- run genuinely reached outruns the seed too, once the run is long
+-- enough — and how long a run may be is set by fuel, which this
+-- statement quantifies over with no relation to the seed at all.  So the
+-- field cannot say only that the state is reachable; it has to be
+-- denominated in a quantity the re-seed also reads, which today no
+-- quantity is.
+--
 -- PROBED: `Probed.Descent` — twelve recursive programs, every one green,
 --   taken against the DRAIN of each run rather than the whole of it.  What
 --   they cover, guard by guard: the μ peel at every program, since all
@@ -108,6 +118,13 @@ open import Verify-Rank-Sufficient.Entry using (rootTri-reads)
 --   entirely inside the frame.  THE BOUNDARY: one slot, one fold, and a
 --   state reached by RUNNING, so the arbitrary schedule and store this
 --   statement quantifies over are as uninstantiated as they were.
+-- PROBED: `Probed.Fuel-Growth` — six drains of ONE run, differing in
+--   FUEL alone, at a fold whose source is a recursion.  Every reading
+--   the seed is built from holds still — the term reads two, the rank is
+--   `2 ^ 20` — while the carried nesting is the fuel plus one.  THE
+--   BOUNDARY: the fuels are small, so what the rows establish is the
+--   RATE at which a reached state outgrows its re-seed and not the
+--   arrival at which it passes, which would be a `refl` at `2 ^ 20`.
 
 postulate
   drain-dry-free : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}

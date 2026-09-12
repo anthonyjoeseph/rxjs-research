@@ -213,12 +213,12 @@ research lives; where they disagree, the header wins.
 dry marker. It is now a real body: `evaluate` is a root subscribe followed by a
 drain, and the two leaves below are that split.
 
-**THE ENTRY HALF IS STATED AND THE WAY OUT IS PAID FROM THE SEED.** The rank is
-seeded from the PROGRAM, and each leaf ties what it quantifies over back to that
-seed. The entry invariant does the way IN. The way OUT is a burst's inners, and
-the reading that would have paid for it is REFUTED — but the growth is now
-measured against the seed rather than the emitter, at one layer and one doubling
-per delivery. Both rows stay SHAPE.
+**THE SEED READS THE PROGRAM AND A RUN OUTGROWS IT.** Both leaves are REFUTED at
+the invariant as it stands: an accumulator deepens by one per delivery, and
+deliveries are bought with FUEL, which appears in neither `sizeᵉ` nor
+`slotsSize`. The fault is the CURRENCY rather than a missing conjunct — no
+reading of syntax bounds a quantity that moves while the program holds still.
+Both rows stay SHAPE.
 
 **A FAILING GUARD IS NOT AN ERROR, AND THAT IS WHY THE TIER IS PROBEABLE.** A
 guarded clause returns a `dry` emit and the run continues, so both sides
@@ -226,37 +226,38 @@ compute at every program with nothing sealed between them.
 
 ### Big picture tier roadmap
 
-- **PRICE THE HOP AT THE VALUE, NOT AT THE EMITTER.** What `subscribeInner`
-  enters is a `Val`, and no reading of the emitter bounds it — so the conjunct
-  belongs at the value level, where a step function's application grows a
-  reading by the step's own nesting and nothing more. `nestDᵛ` and its bound by
-  `sizeᵛ` are proven in the attic and come back through the recovery pointer
-  the measure's own header carries. What gets stated is that every value a
-  burst carries and every accumulator the store holds reads under the rank,
-  which the seed rows now say is true at the shapes that grow it; the fold is
-  then a substitution lemma rather than a comparison.
+- **PUT THE FUEL IN THE RANK, AND CARRY THE TOTAL RATHER THAN WHAT IS LEFT.**
+  `evaluate` already takes the fuel, so the seed can read it: `rootTri` gains a
+  fuel term and the exponent becomes `sizeᵉ e + slotsSize sl + fuel`. Which
+  fuel is the whole leg — the readings grow as the remaining fuel shrinks, so a
+  re-seed off what is LEFT is outgrown exactly as the program-only one is,
+  while the run's TOTAL holds still across every arrival. So the total has to
+  be carried past the drain's decrement and past the connect's own re-seed,
+  which today drops even the slot telescope. `rank-sufficient`'s type does not
+  move; `rootTri-reads` and both peels restate around it.
 
-- **CONSTRAIN THE STATE THE DRAIN IS ENTERED AT.** `drain-dry-free` quantifies
-  over an arbitrary schedule and store, so the peel is reachable from a state
-  no run can produce and no argument about the seed reaches it — the value-level
-  conjunct is about what a burst hands OUT, while the drain's arrivals come from
-  the store instead. The repair is a field on the invariant record rather than a
-  hypothesis, since every producer then owes it and every consumer re-establishes
-  it. It waits on the leg above, because the field is stated in that reading; and
-  the scripted row is what says the two halves see different deliveries of one
-  fold, so the field cannot be read off the burst.
+- **CONSTRAIN THE STATE THE DRAIN IS ENTERED AT, IN THE NEW CURRENCY.**
+  `drain-dry-free` quantifies over an arbitrary schedule and store, so the peel
+  is reachable from a state no run can produce. Reachability alone will not
+  close it: the store's readings grow by one per arrival while a program-only
+  re-seed holds still, so a genuinely reached state outruns it too. The field
+  on the invariant record is therefore denominated in what the new seed reads —
+  a store's readings are under the arrivals already spent, which is the total
+  fuel less what remains. It waits on the leg above, which is what fixes that
+  quantity.
 
 ### The ledger
 
 - **`dry-operator`** (Verify-Rank-Sufficient.Dry) — SHAPE,
-  `REFUTED×2, PROBED×2, RECOVERY`: the operator shelf's dry-freedom, entered
-  under an invariant that bounds the nesting on the way in. The reading that
-  would re-establish it at a hop is refuted; the rows buy the seed's margin
-  instead, measured widening.
+  `REFUTED×3, PROBED×3, RECOVERY`: the operator shelf's dry-freedom, entered
+  under an invariant bounding the nesting on the way in. Refuted at the LIVE
+  three-conjunct form, at its own tightest triple: a fold under a flattener
+  reaches the dry close in two deliveries.
 
-- **`drain-dry-free`** (Verify-Rank-Sufficient) — SHAPE, `PROBED×2`: every
-  arrival after the root frame. Its schedule and state arrive unconstrained, so
-  the same peel is reachable from a state no run could produce.
+- **`drain-dry-free`** (Verify-Rank-Sufficient) — SHAPE, `PROBED×3`: every
+  arrival after the root frame. Schedule and state arrive unconstrained, and
+  the re-seed reads the program while a store's readings grow per arrival, so
+  even a reached state outruns it.
 
 ## Tier 2 — Verify-Well-Formed (parked behind tier 1)
 
