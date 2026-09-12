@@ -61,6 +61,60 @@ open import Verify-Rank-Sufficient.Dry using (subscribe-dry-free)
 open import Verify-Rank-Sufficient.Dry-Emits using (hasDry-++)
 open import Verify-Rank-Sufficient.Entry using (rootTri-reads)
 
+-- THE THREE PEELS ARE NOT THREE GRINDS OF ONE SIZE, AND THE ASYMMETRY IS
+-- THE SCHEDULE OF THIS TIER.  Two of them are one line over a fact about
+-- SYNTAX, and the evaluator's own guard is the statement: the μ peel wants
+-- the unfolded body's syncSize under the size it entered at, which is the
+-- order's μ constructor applied to an unfold equation; the connect peel
+-- wants the unconnected count to drop when a fresh share joins the
+-- connected list, which is the order's connect constructor applied to an
+-- insertion lemma, under a freshness premise the machine establishes for
+-- itself before the clause fires.  The RANK peel's own ≺-witness is the
+-- hop constructor handed its own hypothesis and so says NOTHING — every
+-- gram of that reading is establishing the hypothesis.  That prediction is
+-- now confirmed rather than argued: the two cheap peels landed as the
+-- walk's own arms, and what is left open is exactly the third.
+
+-- NOTHING HERE IS CIRCULAR, which was the standing doubt against replacing
+-- a counter with an order.  Of the three peels only the rank one asks what
+-- a RUN did.  The μ peel reads its own body, an equation on syntax; the
+-- connect peel reads the slot telescope, which is unchanged across a run,
+-- so its premise is an equation too rather than an invariant something has
+-- to preserve.  Neither settled peel needed the descent to have gone well
+-- in order to say that its own edge drops.  What both needed is the entry
+-- invariant — that the triple the evaluator stands at reads the term it is
+-- about to subscribe — and that is why the invariant was the thing to
+-- state first and the peels were its cheap arms.
+
+-- THE RANK READING'S SHAPE IS A STRENGTHENING RATHER THAN A FOURTH
+-- MEASURE, and that is the plan for the one leaf still open.  The inner is
+-- a runtime VALUE — an observable a sibling call emitted — structurally
+-- unrelated to the term the caller was subscribing, so no equation on
+-- syntax reaches it.  What does reach it is where it came FROM: it rode a
+-- burst some subscribe produced, so its nesting can travel as a
+-- strengthened RETURN TYPE on the burst-producing functions, invariant in
+-- the motive, rather than as a measure nobody has.  Ordinary induction,
+-- and the thing to get right is the strengthening and not arithmetic.
+--
+-- AND THE SEED IS EXPONENTIAL WHILE THE PEEL IS ONE PER HOP, so what is
+-- owed is that the count is never SPENT rather than any comparison of two
+-- quantities.  An entry is `2 ^ (sizeᵉ e + slotsSize sl + m)`, where `m` is
+-- zero at the root and the arriving value's nesting joined with the store's
+-- at every arrival after it — so one nesting layer costs one doubling, and
+-- a route is dead exactly when a single entry has to pay for growth it
+-- cannot see.  `Refuted.Sync-Count` is where the last additive candidate
+-- for that currency died.
+
+-- TWO CORRECTIONS AGAINST THE GENERATION THIS ARGUMENT WAS RECOVERED FROM,
+-- because its apparatus is the obvious thing to reach for and neither half
+-- transports.  The FLATTENING does not: a fold of the triple into one ℕ
+-- existed so that a counter could dominate the order structurally, and this
+-- evaluator descends on the order ITSELF, so the fold and every cap feeding
+-- it are apparatus for a machine that is gone.  And the CURRENCY moved —
+-- the generation before this one carried a hop DEPTH under its own cap,
+-- which answers a different question from a rank that peels one per hop.
+-- Its rows are a lead to read, never a statement to cite.
+
 -- THE DRAIN IS THE SECOND HALF OF A RUN AND THE HALF THAT RECURSES.  The
 -- root subscribe returns one burst and a schedule; everything after it is
 -- this loop pulling one arrival at a time and cascading it to quiescence,

@@ -83,7 +83,7 @@ opShape _         = true
 -- once; a fold applies that step once per delivery — so two deliveries
 -- are already one more than the syntax knows about, and the leaf is
 -- false at three conjuncts exactly as it was at two.
---
+
 -- SO THE REPAIR IS A CHANGE OF CURRENCY AND NOT A FOURTH CONJUNCT OF
 -- THE SAME KIND.  No measure of syntax can serve, and that is settled
 -- rather than suspected: the counterexample scales by lengthening the
@@ -98,9 +98,11 @@ opShape _         = true
 -- at the entry the statement is made at and deepens only afterwards.  A
 -- conjunct denominated in the state handed in is therefore dead for the
 -- same reason a `suc` is: both are read before the growth they would
--- have to pay for.  What is left is the quantity that bounds a burst's
--- deliveries and survives μ-unfolding — the SYNCHRONOUS size, which is
--- already the third component and already re-seeded at the μ guard.
+-- have to pay for.  The quantity that looked like it survived both was
+-- the SYNCHRONOUS size — already the third component, already re-seeded
+-- at the μ guard — and it does not: a burst's deliveries are exponential
+-- in the source length where that measure is linear in it, so no
+-- additive reading of the syntax bounds them.
 --
 -- A SIZE BOUND IS THE OBVIOUS CONJUNCT AND IT IS DEAD.
 -- `2 ^ (sizeᵉ o + slotsSize sl) ≤ r` holds at the root by reflexivity and
@@ -117,6 +119,24 @@ opShape _         = true
 -- came from, and no measure of the emitter repairs that, because the
 -- fold count is not in the term.
 --
+-- SO THE RESTATEMENT OWED HERE IS ABOUT THE WITNESS AND NOT THE
+-- CONJUNCT.  The triples this leaf is entered at are CHOSEN to satisfy
+-- the invariant rather than reached by a run, and `EntryReads` permits
+-- that because it reads the term alone.  The walk's two settled peels
+-- enjoy the opposite — they stand where the machine seeded them — which
+-- is why they landed as one-line arms.  Pinning this leaf to the
+-- witnesses the machine mints is what would put it in their position;
+-- what it waits on is a bound on what a burst CARRIES, since that is the
+-- quantity such a seeding would have to read, and it is a strengthened
+-- return type on the burst-producing functions rather than a conjunct
+-- anywhere.
+--
+-- REFUTED: `Refuted.Sync-Count` — the synchronous size as a bound on a
+--   burst's deliveries, which is the reading the paragraphs above left
+--   standing.  A doubling fold over a live seed delivers 2, 6, 14, 30 as
+--   the source lengthens by one literal, against a measure that gains
+--   one per literal: the first three rows HOLD the bound, so it is not
+--   an off-by-one that a tighter constant repairs.
 -- REFUTED: `Refuted.Burst-Nesting` — the inner-under-emitter reading, by
 --   a scan over a three-element synchronous source whose step re-wraps
 --   the accumulator in one merge layer: the program reads 1 and its

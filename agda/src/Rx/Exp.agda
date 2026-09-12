@@ -511,16 +511,18 @@ mutual
 -- which is what makes the μ peel's guard a real drop.
 --
 -- **`syncSizeᵉ` DOES NOT BOUND EMISSIONS PER INSTANT**, and the shape of the
--- failure is the part worth carrying: K = 1..3 all hold (2≤17, 6≤18, 14≤19),
--- so the bound looks true from small cases and fails only once the family is
--- pushed.  Nothing in src states it any more.
+-- failure is what makes it decisive rather than an off-by-one: the two rates
+-- are EXPONENTIAL against LINEAR in the same axis, so they cross once and
+-- never come back — while the first three members of the family hold the
+-- bound, which is why it reads true from small cases.  Nothing in src states
+-- it any more, and nothing should: a measure additive in the syntax cannot
+-- pay for a cascade that doubles per delivery.
 --
--- DEAD ROUTE: bounding emissions per instant by `syncSizeᵉ`.  The witness was
---   machine-checked but never lived in `agda/evidence/refuted`, so there is no
---   refutation to cite — at K = 4 a scripted source emits valueCount 30
---   against syncSizeᵉ 20, and
---   `git show 1f1730e^:agda/probe/Battery-Value-Count.agda` recovers the rows
---   and the `sync-count-bounded` postulate they killed.
+-- REFUTED: `Refuted.Sync-Count`
+-- DEAD ROUTE: bounding emissions per instant by `syncSizeᵉ`, and with it any
+--   route that pays for a burst's deliveries out of the entry triple's third
+--   component — which is the component the μ guard re-seeds, and so the last
+--   of the three a rank conjunct had left to spend.
 ------------------------------------------------------------------
 
 mutual
