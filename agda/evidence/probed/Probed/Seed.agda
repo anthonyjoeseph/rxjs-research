@@ -7,9 +7,12 @@
 -- TARGET: dry-operator @27b615
 -- TARGET: drain-dry-free @458c9c
 --
--- WHY THIS REGION.  The machine seeds the rank at `2 ^ (sizeᵉ e +
+-- WHY THIS REGION.  The machine seeds the ROOT's rank at `2 ^ (sizeᵉ e +
 -- slotsSize sl)` and peels ONE per inner-subscribe hop, so the guard
 -- holds exactly while the values a run produces stay under that count.
+-- An arrival re-enters at that exponent plus its own reading, so every
+-- row below reads against the SMALLER of the two entries and the margin
+-- it reports is the conservative one.
 -- Nothing had ever instantiated it: the claim that an emitted inner reads
 -- strictly under its emitter was doing the job, and `Refuted.Burst-Nesting`
 -- killed it at a scan whose step re-wraps its own accumulator.  These rows
@@ -74,7 +77,7 @@ open import Probed.Apparatus using (Confirms)
 
 ----------------------------------------------------------------------
 -- The two quantities the rows compare: how deep the values a run hands
--- out actually read, and what the machine seeded the rank at.
+-- out actually read, and what the ROOT is seeded at.
 ----------------------------------------------------------------------
 
 evNest : ∀ {n} {Γ : Ctx n} {u} → List (InstEvent (Closed Γ u)) → ℕ
