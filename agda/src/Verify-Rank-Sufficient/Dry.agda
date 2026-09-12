@@ -27,7 +27,7 @@ open import Data.Bool using (Bool; true; false; T)
 open import Data.Empty using (⊥-elim)
 open import Data.Fin using (Fin; toℕ)
 open import Data.List using ([]; _∷_; map)
-open import Data.Nat using (_≤_; _^_)
+open import Data.Nat using (ℕ; _+_; _≤_; _^_)
 open import Data.Nat.Properties using (_<?_; ≤-refl; ≤-trans; ≤-reflexive)
 open import Data.Product using (_,_; proj₁; proj₂)
 open import Data.Vec using (lookup)
@@ -39,14 +39,14 @@ open import Rx.Prim using (Tick; Id; hot; cold; init; close; exhausted)
 open import Rx.Exp using (Ctx; Exp; Closed; evalTm; inputsBelowᵉ; sizeᵉ; syncSizeᵉ;
   unfoldμ; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ;
   exhaustAllᵉ; μᵉ; varᵉ; deferᵉ)
-open import Rx.Slots using (shared; scripted)
+open import Rx.Slots using (shared; scripted; slotsSize)
 open import Rx.Strat-Order using (_≺_; ltS; ltU)
 open import Rx.Evaluator using (Stream; Path; Sched; EvalSt; subscribeE;
   subscribeSharedSlot; sharedConnect; register; share-sink; burstCompleted;
   mintSource;
-  hasDry; memberSource; unconn)
-open import Rx.Nest-Depth using (nestDᵉ≤sizeᵉ; nestD-unfoldμ)
-open import Verify-Rank-Sufficient.Entry using (EntryReads; n≤2^n)
+  hasDry; memberSource; unconn; stNest)
+open import Rx.Nest-Depth using (nestD-unfoldμ)
+open import Verify-Rank-Sufficient.Entry using (EntryReads; seed-reads)
 open import Verify-Rank-Sufficient.Sync-Edge using (mu-guard)
 open import Verify-Rank-Sufficient.Connect-Edge using (connect-guard)
 open import Verify-Rank-Sufficient.Dry-Emits using (hasDry-if; oneShotBurst-dry;
@@ -89,9 +89,18 @@ opShape _         = true
 -- rather than suspected: the counterexample scales by lengthening the
 -- run, which moves the deliveries and leaves the term fixed.  What has
 -- to be carried down is that the rank still dominates what the run can
--- DELIVER — and the deliveries are paid for out of FUEL, a quantity
--- neither `sizeᵉ` nor `slotsSize` reads, so the seed is constant along
--- the one axis the readings grow on.
+-- DELIVER.
+--
+-- AND THE DELIVERIES ARE NOT ALL BOUGHT WITH FUEL, WHICH IS WHAT RULES
+-- OUT READING THE STATE HANDED IN.  A recursive source buys them with
+-- fuel and a re-seed at each arrival would cover that; a LITERAL source
+-- makes every one of them inside ONE cascade, so the store reads zero
+-- at the entry the statement is made at and deepens only afterwards.  A
+-- conjunct denominated in the state handed in is therefore dead for the
+-- same reason a `suc` is: both are read before the growth they would
+-- have to pay for.  What is left is the quantity that bounds a burst's
+-- deliveries and survives μ-unfolding — the SYNCHRONOUS size, which is
+-- already the third component and already re-seeded at the μ guard.
 --
 -- A SIZE BOUND IS THE OBVIOUS CONJUNCT AND IT IS DEAD.
 -- `2 ^ (sizeᵉ o + slotsSize sl) ≤ r` holds at the root by reflexivity and
@@ -104,13 +113,9 @@ opShape _         = true
 -- between this leaf and the two peels proven below.
 --
 -- AND THE BURST DOES NOT READ UNDER ITS EMITTER, SO THE HOP IS NOT PAID
--- IN SYNTAX AT ALL.  A fold threads its own output back in, so what it
--- hands out is deeper than the term it came from while the term is
--- charged for that layer once; no measure of the emitter repairs it,
--- because the fold count is not in the term.  What survives is that the
--- seed is EXPONENTIAL in program size against ONE peel per hop — so the
--- conclusion owed is that the count is never SPENT, priced against the
--- deliveries a run can make.
+-- IN SYNTAX AT ALL.  What a fold hands out is deeper than the term it
+-- came from, and no measure of the emitter repairs that, because the
+-- fold count is not in the term.
 --
 -- REFUTED: `Refuted.Burst-Nesting` — the inner-under-emitter reading, by
 --   a scan over a three-element synchronous source whose step re-wraps
@@ -126,12 +131,14 @@ opShape _         = true
 --   nesting, which is `suc 0` there.
 -- REFUTED: `Refuted.Rank-Fold` — the THREE-conjunct form, which the row
 --   above bought.  A scan whose step re-wraps its accumulator, under a
---   flattener that subscribes what it emits: the program reads two, so
---   the invariant is satisfied at a rank of two and gives away no slack
---   at all, and the second accumulator is entered one peel down reading
---   two.  Its own inner is then entered at zero and the burst carries
---   the dry close.  Two deliveries, and the state is reached by running
---   rather than written.
+--   flattener that subscribes what it emits: the program reads two and
+--   the triple is entered at THREE, so the conjunct holds with a peel to
+--   spare and the crossing is not an off-by-one.  Three deliveries, all
+--   of them inside one cascade off a literal source, so the store reads
+--   zero where the statement is made; the third accumulator is entered
+--   below the peels left and the burst carries the dry close.  It kills
+--   a `suc` in the conjunct and a conjunct reading the state handed in,
+--   together, and the state is reached by running rather than written.
 -- PROBED: `Probed.Descent` — three rows, each at an operator ROOT, which
 --   is the only point this leaf can be instantiated at from outside: the
 --   walk reaches it elsewhere only under a witness a probe cannot write
@@ -280,10 +287,13 @@ mutual
             (record st { connectedShares = toℕ i ∷ EvalSt.connectedShares st })
 
     burst : Stream Γ (lookup Γ i)
-    burst = proj₁ (subscribeE (rec (ltU {r′ = 2 ^ sizeᵉ d} {s′ = syncSizeᵉ d} p))
+    seed : ℕ
+    seed = 2 ^ (sizeᵉ d + slotsSize (Sched.slots sched) + stNest st₁)
+
+    burst = proj₁ (subscribeE (rec (ltU {r′ = seed} {s′ = syncSizeᵉ d} p))
                      d (share-sink i) id now sched st₁)
 
     hb : hasDry burst ≡ false
-    hb = subscribe-dry-free (rec (ltU {r′ = 2 ^ sizeᵉ d} {s′ = syncSizeᵉ d} p))
+    hb = subscribe-dry-free (rec (ltU {r′ = seed} {s′ = syncSizeᵉ d} p))
            d (share-sink i) id now sched st₁
-           (≤-refl , ≤-trans (nestDᵉ≤sizeᵉ d) (n≤2^n (sizeᵉ d)) , ≤-refl)
+           (≤-refl , seed-reads d (Sched.slots sched) (stNest st₁) , ≤-refl)
