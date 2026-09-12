@@ -43,3 +43,6 @@ open import Probed.Descent
 
 open import Probed.Seed
   using (opM3; opM6; opS3; opX3; opA; drA)
+
+open import Probed.Fuel-Growth
+  using (opF; drF)

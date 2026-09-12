@@ -15,3 +15,4 @@ module Refuted.Main where
 
 open import Refuted.Burst-Nesting using (burst-under-emitter-false)
 open import Refuted.Rank-Entry using (dry-operator-false)
+open import Refuted.Rank-Fold using (dry-operator-fold-false)

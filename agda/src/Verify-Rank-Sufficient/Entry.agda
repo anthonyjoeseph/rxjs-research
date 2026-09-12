@@ -45,6 +45,23 @@
 -- REFUTED: `Refuted.Burst-Nesting` — the inner-under-emitter reading,
 --   at a scan whose step re-wraps its accumulator in one merge layer:
 --   the program reads 1 and its burst reads 3.
+
+-- AND THE SEED'S SLACK DOES NOT PAY FOR THE HOP EITHER, WHICH IS WHAT
+-- THIS PAIR OF CONJUNCTS IS NOW KNOWN NOT TO REACH.  The margin is
+-- exponential in the program and the readings grow with the DELIVERIES,
+-- so the question is what bounds the deliveries — and for a recursive
+-- source the answer is the drain's FUEL, which appears in neither
+-- `sizeᵉ` nor `slotsSize`.  A constant is then being outgrown by a
+-- quantity that moves without the program moving, and the invariant as
+-- stated is satisfied at triples from which a run reaches the dry close.
+-- The conclusion is not that a further conjunct in this currency is
+-- missing but that the currency is wrong: what the rank has to dominate
+-- is a count of deliveries, and no reading of syntax is one.
+--
+-- REFUTED: `Refuted.Rank-Fold` — the three-conjunct form at its own
+--   tightest triple, where the rank is the program's own reading and
+--   nothing is given away: a fold under a flattener reaches the dry
+--   close in two deliveries.
 ------------------------------------------------------------------
 module Verify-Rank-Sufficient.Entry where
 
