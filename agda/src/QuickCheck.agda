@@ -37,15 +37,14 @@ open import Data.Vec using () renaming (_∷_ to _∷ⱽ_; [] to []ⱽ)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong; subst)
 
-open import Rx.Prim using (Timed; after_,_; ObservableInput; hot; cold;
-                           InstEvent; init; value; close; handoff; complete;
-                           CloseReason; cut; cutPending; exhausted; EmitKind;
-                           subscribe; delivery; plumbing; InstEmit; _at_from_as_)
+open import Rx.Prim using (Timed; after_,_; ObservableInput; hot; cold; InstEvent; init; value; close; handoff;
+  complete; InstEmit; _at_from_as_)
 open import Rx.Exp using (Ty; natᵗ; obs; _×ᵗ_; Ctx; Exp; Tm; Fn; PrimOp; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ;
   mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ;
   unit̂; bool̂; nat̂; primᵗ; pairᵗ; fstᵗ; sndᵗ;
   strmᵗ; varᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; add; sub; mul; eqᵖ; ltᵖ; notᵖ)
 open import Data.List.Membership.Propositional using (_∈_)
+open import Rx.Emit-Eq using (eqBatched)
 open import Rx.Evaluator using (evaluate; hasDry)
 open import Rx.Slots using (scripted; shared; Slot; Slots)
 open import Rx.Protocol using (wellFormed?)
@@ -326,49 +325,6 @@ marksᵗˢ []       = noMarks
 marksᵗˢ (y ∷ ys) = marksᵗ y ⊕ marksᵗˢ ys
 
 ------------------------------------------------------------------------
--- comparison of two batched streams (impl vs spec fed the SAME evaluate
--- output, so ids match exactly — no renaming needed)
-
-eqKind : EmitKind → EmitKind → Bool
-eqKind subscribe subscribe = true
-eqKind delivery  delivery  = true
-eqKind plumbing  plumbing  = true
-eqKind _         _         = false
-
-eqReason : CloseReason → CloseReason → Bool
-eqReason cut        cut        = true
-eqReason cutPending cutPending = true
-eqReason exhausted  exhausted  = true
-eqReason _          _          = false
-
-eqListℕ : List ℕ → List ℕ → Bool
-eqListℕ []       []       = true
-eqListℕ (x ∷ xs) (y ∷ ys) = (x ≡ᵇ y) ∧ eqListℕ xs ys
-eqListℕ _        _        = false
-
-eqEvent : InstEvent (List ℕ) → InstEvent (List ℕ) → Bool
-eqEvent (init a)    (init b)    = a ≡ᵇ b
-eqEvent (value a)   (value b)   = eqListℕ a b
-eqEvent (close a p) (close b q) = (a ≡ᵇ b) ∧ eqReason p q
-eqEvent (handoff a) (handoff b) = a ≡ᵇ b
-eqEvent complete    complete    = true
-eqEvent _           _           = false
-
-eqEvents : List (InstEvent (List ℕ)) → List (InstEvent (List ℕ)) → Bool
-eqEvents []       []       = true
-eqEvents (x ∷ xs) (y ∷ ys) = eqEvent x y ∧ eqEvents xs ys
-eqEvents _        _        = false
-
-eqEmit : InstEmit (List ℕ) → InstEmit (List ℕ) → Bool
-eqEmit (es at i from s as k) (es′ at i′ from s′ as k′) =
-  eqEvents es es′ ∧ (i ≡ᵇ i′) ∧ (s ≡ᵇ s′) ∧ eqKind k k′
-
-eqBatched : List (InstEmit (List ℕ)) → List (InstEmit (List ℕ)) → Bool
-eqBatched []       []       = true
-eqBatched (x ∷ xs) (y ∷ ys) = eqEmit x y ∧ eqBatched xs ys
-eqBatched _        _        = false
-
-------------------------------------------------------------------------
 -- a compact dump of a batched stream (for failure reports)
 
 private
@@ -515,26 +471,33 @@ showSlots ins =
 FUEL : ℕ
 FUEL = 30
 
--- a paste-ready Unit-Test block for a failing program (Agree is defined in
--- the Unit-Test module). The program line is the dedup key for the script.
+-- A PASTE-READY BUG-CACHE ROW: the block IS a row of
+-- `Implementation.Unit-Test.cases`, trailing `∷` included, so the script
+-- that appends it neither builds nor parses Agda.  The name is written
+-- `"?"` rather than left blank, because a block pasted by hand has to
+-- typecheck as it stands; the script substitutes the seed.  Line 2 --
+-- the program -- is the dedup key.
+--
+-- ONE SHAPE FOR BOTH CHECKS, and that is what makes the key work: the
+-- cache holds every row to BOTH properties, so a program that fails
+-- either one wants the same row, and a program that fails both dedups
+-- to it instead of being cached twice.
+pasteRow : Exp Γ₂ [] [] [] natᵗ → Slots Γ₂ → String
+pasteRow e ins =
+  "\n-- <<<PASTE\n  cached \"?\" " ++ show FUEL ++ "\n          "
+       ++ showExp e ++ "\n          " ++ showSlots ins
+       ++ " ∷\n-- PASTE>>>\n"
+
 report : Exp Γ₂ [] [] [] natᵗ → Slots Γ₂
        → List (InstEmit (List ℕ)) → List (InstEmit (List ℕ)) → String
 report e ins impl spec =
   "  FAIL\n    impl = " ++ showBatched impl
-       ++ "\n    spec = " ++ showBatched spec
-       ++ "\n-- <<<PASTE\n_ : Agree " ++ show FUEL ++ "\n          "
-       ++ showExp e ++ "\n          " ++ showSlots ins
-       ++ "\n_ = refl\n-- PASTE>>>\n"
+       ++ "\n    spec = " ++ showBatched spec ++ pasteRow e ins
 
--- a WellFormed violation of the evaluator's raw output. The {- WF -}
--- prefix keeps this block's dedup key (line 2, the program line)
--- distinct from the Agree block of the same program.
+-- a WellFormed violation of the evaluator's raw output
 reportWF : Exp Γ₂ [] [] [] natᵗ → Slots Γ₂ → List (InstEmit ℕ) → String
 reportWF e ins s =
-  "  WF-FAIL\n    stream = " ++ showStream s
-       ++ "\n-- <<<PASTE\n_ : WellFormedOutput " ++ show FUEL
-       ++ "\n          {- WF -} " ++ showExp e ++ "\n          " ++ showSlots ins
-       ++ "\n_ = refl\n-- PASTE>>>\n"
+  "  WF-FAIL\n    stream = " ++ showStream s ++ pasteRow e ins
 
 -- A DESCENT GUARD WAS EXHAUSTED, which is `rank-sufficient` instantiated and
 -- found false.  It gets no PASTE markers on purpose: the bug cache's

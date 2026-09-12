@@ -70,7 +70,7 @@ help:
 	@echo "  agda-dev-selftest  falsification test for agda-dev: corrupt a real"
 	@echo "                  body in src, demand the fast check goes RED, restore."
 	@echo "                  Run whenever the stubbing logic changes"
-	@echo "  bug-cache     typecheck the type-level bug cache + the demand-probe rows"
+	@echo "  bug-cache     compile and run the cached counterexample corpus"
 	@echo "                  (NOT reached by src/Main.agda, so 'make gate-heavy' does not"
 	@echo "                  cover them — green here <=> no known counterexample remains)"
 	@echo "  unsafe-check  SOUNDNESS GUARD: the build is NOT --safe (it cannot be,"
@@ -218,8 +218,20 @@ agda-dev-selftest:
 # throwaway performance cache, deleted once Formal-Verification is discharged),
 # so nothing else in the build would ever notice it rotting.  This target is
 # what makes its invariant enforceable rather than remembered.
+#
+# THE CORPUS IS RUN, NOT TYPECHECKED, and the verdict comes back as text
+# because `CLI.IO` has no exit status to hand back -- stdin and stdout are its
+# whole FFI surface.  So this demands the summary line BEFORE refusing any FAIL
+# line: a binary that walked nothing prints nothing, and a grep for failures
+# alone would read that as green, which is the one way this target could lie.
 bug-cache: stripped
-	@$(call AGDA_RUN,src/Implementation/Unit-Test.agda)
+	@$(call AGDA_RUN,--compile --compile-dir=../_cli src/Implementation/Unit-Test/Bug-Cache.agda)
+	@out=$$(agda/_cli/Bug-Cache); printf '%s\n' "$$out"; \
+	 printf '%s\n' "$$out" | grep -q '^bug-cache: ran ' \
+	   || { echo "bug-cache: the runner printed no summary line" >&2; exit 1; }; \
+	 if printf '%s\n' "$$out" | grep -q '^bug-cache: FAIL '; then \
+	   echo "bug-cache: RED — a known counterexample is live again" >&2; exit 1; \
+	 fi
 
 # SOUNDNESS GUARD.  The build is NOT `--safe` — `make gate-heavy` runs a plain
 # `agda src/Main.agda`, there is no OPTIONS pragma in src/ and no flags in the

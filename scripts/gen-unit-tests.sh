@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Append newly-discovered QuickCheck counterexamples to the type-level bug
-# cache under agda/src/Implementation/Unit-Test/.
+# Append newly-discovered QuickCheck counterexamples to the bug cache's
+# corpus, agda/src/Implementation/Unit-Test.agda.
 #
 #   scripts/gen-unit-tests.sh [FIRST] [LAST] [RUNS] [DEPTH]
 #
@@ -13,17 +13,14 @@
 # has since been fixed simply stays on as a passing guard.  Nothing here
 # ever deletes or rewrites an existing entry.
 #
-# ONE MODULE PER CASE, which is what keeps the cache's cost flat.  A pin is a
-# `refl` over a whole `evaluate` run and costs minutes; in one file every case
-# is re-checked whenever any case is appended, so the gate's bill grows with
-# the cache.  Agda's interface cache is per module, so a case in its own
-# module is checked once and never again.  Unit-Test.agda is then the LEDGER:
-# one import-and-pin block per case, and the anonymous pin is what gives the
-# case module its reachability, since a MODULE_ROOTS file seeds from those.
+# THE BLOCK IS ALREADY A ROW, trailing `∷` included — QuickCheck prints the
+# corpus's own syntax, so this script never builds or parses Agda.  All it
+# does is name the row (the binary writes `"?"`, since a hand-pasted block
+# has to typecheck as it stands) and splice it in above the list's `[]`.
 #
-# Invariant the cache exists to enforce: the cache fully typechecks
-# <=> no known counterexample remains.  So after this appends anything,
-# `make gate-heavy` is expected to FAIL until the implementation is fixed.
+# Invariant the cache exists to enforce: every row holds <=> no known
+# counterexample remains.  So after this appends anything, `make bug-cache`
+# is expected to FAIL until the implementation is fixed.
 set -euo pipefail
 
 FIRST=${1:-1}
@@ -33,23 +30,22 @@ DEPTH=${4:-4}
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 QC="$ROOT/agda/_cli/QuickCheck"
-LEDGER="$ROOT/agda/src/Implementation/Unit-Test.agda"
-CASEDIR="$ROOT/agda/src/Implementation/Unit-Test"
+CORPUS="$ROOT/agda/src/Implementation/Unit-Test.agda"
 
 [ -x "$QC" ]     || { echo "gen-unit-tests: no $QC — run 'make qc-build' first" >&2; exit 1; }
-[ -f "$LEDGER" ] || { echo "gen-unit-tests: no $LEDGER" >&2; exit 1; }
-[ -d "$CASEDIR" ] || { echo "gen-unit-tests: no $CASEDIR" >&2; exit 1; }
+[ -f "$CORPUS" ] || { echo "gen-unit-tests: no $CORPUS" >&2; exit 1; }
+grep -qx '  \[\]' "$CORPUS" || {
+  echo "gen-unit-tests: $CORPUS does not end its list with a bare '  []'" >&2; exit 1; }
+grep -qx -- '-- <<<IMPORTS' "$CORPUS" || {
+  echo "gen-unit-tests: $CORPUS carries no '-- <<<IMPORTS' marker" >&2; exit 1; }
 
-# THE IMPORT BLOCK EVERY CASE MODULE GETS, a superset of what any generated
-# program can mention: nothing here knows which constructors a given program
-# uses, so the block is written wide and `make imports-fix` prunes it at the
-# end.  A dead import is an imports-check failure, so the prune is not
-# optional and this script runs it rather than leaving it to be remembered.
-read -r -d '' CASE_IMPORTS <<'AGDA' || true
-open import Data.List using ([]; _∷_)
+# THE WIDE IMPORT BLOCK, a superset of what any generated program can mention.
+# `make imports-fix` prunes it to what the corpus actually uses, which is what
+# makes the pruned file unable to accept the NEXT row — so the wide form is
+# restored here, before anything is appended, and pruned again at the end.
+read -r -d '' WIDE_IMPORTS <<'AGDA' || true
 open import Data.Fin using (zero; suc)
 open import Data.Maybe using (nothing; just)
-open import Data.Vec using () renaming (_∷_ to _∷ⱽ_; [] to []ⱽ)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Relation.Binary.PropositionalEquality using (refl)
 
@@ -57,8 +53,20 @@ open import Rx.Prim using (after_,_; hot; cold)
 open import Rx.Exp using (input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ;
   switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ;
   nat̂; primᵗ; pairᵗ; fstᵗ; sndᵗ; strmᵗ; varᵗ; add; mul)
-open import Rx.Slots using (scripted)
+open import Rx.Slots using (scripted; shared)
+
+open import Implementation.Unit-Test.Prelude using (Case; cached)
 AGDA
+
+widen () {
+  local t; t="$(mktemp)"
+  awk -v block="$WIDE_IMPORTS" '
+    /^-- <<<IMPORTS$/ { print; print block; skip = 1; next }
+    /^-- IMPORTS>>>$/ { skip = 0 }
+    !skip             { print }
+  ' "$CORPUS" > "$t"
+  mv "$t" "$CORPUS"
+}
 
 # the binary prints em-dashes, and the pasted blocks are full of Agda's
 # unicode identifiers — a C locale turns both into a commitBuffer crash
@@ -66,7 +74,11 @@ export LC_ALL="${LC_ALL:-C.UTF-8}"
 export LANG="${LANG:-C.UTF-8}"
 
 tmp="$(mktemp)"
-trap 'rm -f "$tmp"' EXIT
+row="$(mktemp)"
+spl="$(mktemp)"
+trap 'rm -f "$tmp" "$row" "$spl"' EXIT
+
+widen
 
 added=0
 for seed in $(seq "$FIRST" "$LAST"); do
@@ -79,63 +91,49 @@ for seed in $(seq "$FIRST" "$LAST"); do
   [ "${nblocks:-0}" -eq 0 ] && continue
 
   for k in $(seq 1 "$nblocks"); do
-    block="$(awk -v want="$k" '
+    awk -v want="$k" '
       /^-- <<<PASTE$/ { n++; if (n == want) inb = 1; next }
       /^-- PASTE>>>$/ { if (inb) exit; next }
       inb             { print }
-    ' "$tmp")"
+    ' "$tmp" > "$row"
 
-    # line 2 is the program; for a WellFormedOutput block it carries the
-    # {- WF -} prefix, which keeps its key distinct from the Agree block
-    # of the very same program
-    key="$(printf '%s\n' "$block" | sed -n '2p')"
-    if grep -Fqxr -- "$key" "$CASEDIR"; then
+    # line 2 is the program, and it is the whole key: every row is held to
+    # BOTH properties, so a program that fails agreement and well-formedness
+    # at once dedups to one row rather than being cached twice
+    key="$(sed -n '2p' "$row")"
+    if grep -Fqx -- "$key" "$CORPUS"; then
       continue
     fi
 
-    # WHICH OF THE TWO SHAPES this is, read off the block's own statement
-    # rather than guessed: both live in Unit-Test/Prelude.agda, and the pin's
-    # name is what the ledger will claim.
-    case "$(printf '%s\n' "$block" | sed -n '1p')" in
-      *Agree*)             stmt=Agree;             pfx=agree ;;
-      *WellFormedOutput*)  stmt=WellFormedOutput;  pfx=wf ;;
-      *) echo "gen-unit-tests: seed $seed block $k names no known statement" >&2; exit 1 ;;
-    esac
-
     # one seed can yield several blocks, and two seeds can find the same
-    # shape, so the module name is disambiguated rather than assumed unique
-    suffix="$seed"; n=1
-    while [ -e "$CASEDIR/Case-$suffix.agda" ]; do
-      n=$((n + 1)); suffix="$seed-$n"
+    # shape, so the label is disambiguated rather than assumed unique
+    label="$seed"; n=1
+    while grep -Fq -- "\"$label\" 30" "$CORPUS"; do
+      n=$((n + 1)); label="$seed-$n"
     done
-    mod="Case-$suffix"; pin="$pfx-$suffix"
+    sed -i "1s/\"?\"/\"$label\"/" "$row"
 
-    {
-      printf -- '-- One cached counterexample, seed %s.  Appended by\n' "$seed"
-      printf -- '-- `scripts/gen-unit-tests.sh`; the pin is what makes it a guard.\n'
-      printf -- 'module Implementation.Unit-Test.%s where\n\n' "$mod"
-      printf '%s\n\n' "$CASE_IMPORTS"
-      printf -- 'open import Implementation.Unit-Test.Prelude using (%s)\n\n' "$stmt"
-      printf '%s\n' "$block" \
-        | sed "1s/^_ :/$pin :/; \$s/^_ = refl/$pin = refl/"
-    } > "$CASEDIR/$mod.agda"
-
-    {
-      printf -- '\nopen import Implementation.Unit-Test.%s using (%s)\n' "$mod" "$pin"
-      printf -- '_ : _\n_ = %s\n' "$pin"
-    } >> "$LEDGER"
+    # splice above the list's terminator, which is the corpus's last line
+    sed '$d' "$CORPUS" > "$spl"
+    cat "$row" >> "$spl"
+    printf '  []\n' >> "$spl"
+    cp "$spl" "$CORPUS"
 
     added=$((added + 1))
-    echo "  + cached a new counterexample (seed $seed) as $mod"
+    echo "  + cached a new counterexample (seed $seed) as \"$label\""
   done
 done
 
-echo "gen-unit-tests: appended $added new case module(s) to ${CASEDIR#"$ROOT"/}"
+echo "gen-unit-tests: appended $added new row(s) to ${CORPUS#"$ROOT"/}"
+
+# UNCONDITIONAL, because `widen` ran unconditionally: a dead import is an
+# `imports-check` failure, so leaving the wide form behind on a run that found
+# nothing would break the gate for having found nothing.
+( cd "$ROOT" && make --no-print-directory imports-fix >/dev/null )
+echo "gen-unit-tests: pruned the corpus's imports"
+
 if [ "$added" -gt 0 ]; then
-  # the import block above is deliberately wide, so pruning is owed
-  ( cd "$ROOT" && make --no-print-directory imports-fix >/dev/null )
-  echo "gen-unit-tests: pruned the new modules' imports"
-  echo "gen-unit-tests: now run 'make gate-heavy' — the cache is green iff no"
-  echo "                known counterexample remains, so it should fail"
-  echo "                until the implementation is fixed."
+  echo "gen-unit-tests: now run 'make bug-cache' — it is green iff no known"
+  echo "                counterexample remains, so it should fail until the"
+  echo "                implementation is fixed."
 fi
