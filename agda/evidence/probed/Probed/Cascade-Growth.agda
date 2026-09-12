@@ -46,7 +46,7 @@
 -- either — a merge only — since what is being asked is whether a cascade
 -- can grow at all under one entry, not which registry clause carries it.
 --
--- TARGET: drain-dry-free @458c9c
+-- TARGET: drain-dry-free @140a87
 module Probed.Cascade-Growth where
 
 open import Data.Fin using (zero)
@@ -66,7 +66,7 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; drain; subscribeE;
   rootWitness; root; sched-init; st-init)
 open import Rx.Nest-Depth using (nestDᵉ)
 open import Verify-Rank-Sufficient using (drain-dry-free)
-open import Probed.Apparatus using (Confirms)
+open import Probed.Apparatus using (Confirms; Below)
 
 ----------------------------------------------------------------------
 -- The quantities, taken verbatim from the sibling probes so that a row
@@ -181,6 +181,6 @@ _ = refl
 -- carries the cascade, and it is the one this file is really about.
 ----------------------------------------------------------------------
 
-drC : Confirms (drain-dry-free 2 1
-  (proj₁ (proj₂ (entry casc6 insLate))) (proj₂ (proj₂ (entry casc6 insLate))))
+drC : Confirms (drain-dry-free 2 1 0 (λ _ → 0)
+  (proj₁ (proj₂ (entry casc6 insLate))) (proj₂ (proj₂ (entry casc6 insLate))) Below)
 drC = refl

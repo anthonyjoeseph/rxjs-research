@@ -210,46 +210,55 @@ research lives; where they disagree, the header wins.
 
 **THE TIER IS ONE STATEMENT, AND IT IS THE WHOLE COST OF THE DESCENT.**
 `rank-sufficient` (Verify-Rank-Sufficient) says no run of any program emits the
-dry marker. It is now a real body: `evaluate` is a root subscribe followed by a
-drain, and the two leaves below are that split.
+dry marker. It is a real body: `evaluate` is a root subscribe followed by a
+drain, and the rows below are that split plus the fit the drain half stands on.
 
-**NOTHING THE ENTRY READS BOUNDS WHAT COMES AFTER IT, AND BOTH ROWS ARE
-REFUTED ON THAT.** Every conjunct read off the term is dead, and so is the
-seed's rate — a run gains depth faster in the source length than the rank's
-exponential seed grows. The drain row falls the same way from the other side,
-at a registration whose own frames manufacture depth the entry never reads.
-Both rows stay SHAPE, and the repair is what the hop descends on.
+**WHAT ORDERS THE ROWS IS THE DIRECTION THE DEPTH TRAVELS.** Every route that
+seeded the rank from outside is refuted, because a value deepens on the way OUT
+and re-enters on the caller's witness. `Rx.Hop-Depth` reads the quantity off
+the value instead, so a bound on it is carried by the induction that builds the
+value rather than asserted about it.
 
 **A FAILING GUARD IS NOT AN ERROR, AND THAT IS WHY THE TIER IS PROBEABLE.** A
 guarded clause returns a `dry` emit and the run continues, so both sides
-compute at every program.
+compute at every program — `hopFits` included, which is why its rows spend a
+decision procedure rather than a pin.
 
 ### Big picture tier roadmap
 
-- **DECIDE WHAT THE HOP DESCENDS ON — no seeding of the rank survives.**
-  `Refuted.Burst-Nesting` kills every syntactic bound on what a burst carries,
-  and `Probed.Operator-Root` now puts the run's rate beside the seed's — 3, 12,
-  39, 120 layers at four source literals against a rank that doubles per
-  literal. Seeding from the entered VALUE dies the same way, and the shared
-  cause is the direction: a value deepens on the way OUT through the
-  continuation and re-enters at `stepFrame` on the CALLER's witness, so that
-  caller's rank has to dominate everything its own subtree will ever emit. The
-  leg is what carries the re-entry instead — the burst walk is structural, so a
-  hop free to re-seed needs the descent living somewhere the run cannot outrun.
+- **PROBE THE FIT ACROSS A CASCADE, BEFORE ANY OF IT IS GROUND.** The rows say
+  `hopFits` holds at the door; nothing says it holds at the state a drain step
+  hands its own recursive call, and that is the whole of whether this
+  invariant is the right one. `drain` computes, so the question is a row and
+  not an argument: take the fit at the state after one arrival, then after two.
+  A failure is the cheapest possible refutation of the new design and names a
+  strictly smaller region — which conjunct moved and at which frame — where
+  grinding first would spend the tier on an invariant that was never preserved.
 
-- **TIE A REGISTRATION'S FRAMES TO THE PROGRAM.** `Refuted.Drain-Reachable`
-  kills the drain leaf as written, and kills it again conditioned on the
-  coherence record — so the reachability premise the previous leg planned is
-  not the repair. A chain is a `Path` carrying no index to the program, and
-  `foldPath` threads ONE witness through every frame, so a `map-f` hands back a
-  tower of any depth while the record constrains only the registry's counts and
-  types. That NARROWS the region rather than moving it: from an arbitrary
-  schedule and store to one missing fact, and the leg states it. Every
-  registration's frames come from `e`, which puts a `map-f` body's depth under
-  `sizeᵉ e` and leaves the value it is applied to as the nesting the arrival
-  already reads.
+- **RESTATE THE OPERATOR LEAF ONTO THE SAME READING.** `dry-operator` is the
+  burst half and is refuted on the identical cause, one peel above its tightest
+  triple; the measure that repairs the drain half is now in `src`, so the
+  repair is the counterpart rather than new mathematics. `Push-Dry` already
+  proves three of the five frame shapes quiet outright, and the residue is
+  `from-inner` and `thru-outer` — which is exactly where `chainHopD` puts its
+  edge, so the leaf's hypothesis and the frame walk's are the same statement.
+
+- **CARRY THE BOUND OUT OF THE WALK RATHER THAN ASSERTING IT ABOUT THE VALUE.**
+  Every dead route asked the emitter's rank to dominate a value it had not
+  produced yet; the measure inverts that, since the three `*All` nodes each add
+  one, so a carrier's own reading already sits strictly under the rank its
+  emitter entered on. The leg is the strengthened return type: the burst walk
+  reports its emissions' hop content alongside them, invariant in the motive,
+  and the hop edge spends that report instead of a fact about an arbitrary
+  inner. Ordinary induction, and `entry-hop-fits` is its base case.
 
 ### The ledger
+
+- **`drain-dry-free`** (Verify-Rank-Sufficient) — FALSITY,
+  `REFUTED×2, PROBED×4`: every arrival after the root frame, now conditioned on
+  `hopFits`. Vacuous at the registry that refuted the unconditional form, and
+  instantiated at fifteen entry states — but at no state a cascade produced, so
+  whether the fit is PRESERVED is untested.
 
 - **`dry-operator`** (Verify-Rank-Sufficient.Dry) — SHAPE,
   `REFUTED×4, PROBED, RECOVERY`: the THREE FLATTENERS' dry-freedom under an
@@ -257,10 +266,10 @@ compute at every program.
   ABOVE its tightest triple — so no conjunct read off the term repairs it, the
   sync component included.
 
-- **`drain-dry-free`** (Verify-Rank-Sufficient) — SHAPE, `REFUTED×2, PROBED×4`:
-  every arrival after the root frame. Refuted as written and refuted again
-  under the coherence record, at a registration whose `map-f` carries a tower
-  no quantity the entry reads bounds.
+- **`entry-hop-fits`** (Verify-Rank-Sufficient) — DIFFICULTY, `PROBED`: the fit
+  at the door, where the chain really is the one the root subscribe built out
+  of `e`. Probed at three shapes including a share holding a recursion, each
+  witnessed by the decision procedure rather than a pin.
 
 ## Tier 2 — Verify-Well-Formed (parked behind tier 1)
 

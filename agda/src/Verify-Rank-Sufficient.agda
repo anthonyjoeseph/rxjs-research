@@ -49,6 +49,8 @@
 module Verify-Rank-Sufficient where
 
 open import Data.Bool using (false)
+open import Data.Fin using (Fin)
+open import Data.Nat using (ℕ)
 open import Data.Product using (_×_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 
@@ -60,6 +62,7 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; evaluate; drain; hasDry;
 open import Verify-Rank-Sufficient.Dry using (subscribe-dry-free)
 open import Verify-Rank-Sufficient.Dry-Emits using (hasDry-++)
 open import Verify-Rank-Sufficient.Entry using (rootTri-reads)
+open import Verify-Rank-Sufficient.Hop using (hopFits)
 
 -- THE THREE PEELS ARE NOT THREE GRINDS OF ONE SIZE, AND THE ASYMMETRY IS
 -- THE SCHEDULE OF THIS TIER.  Two of them are one line over a fact about
@@ -139,13 +142,6 @@ open import Verify-Rank-Sufficient.Entry using (rootTri-reads)
 -- question the operator leaf answers YES to from the other side, and it
 -- is the one this row could not put until a cascade had been
 -- instantiated rather than argued about.
---
--- SO THE ROW IS STILL SHAPE, AND WHAT IS OWED IS A BOUND ON ONE BURST'S
--- DELIVERIES, denominated in something the entry triple carries.  A
--- coherence field on `EvalSt` was the obvious repair while the seed read
--- the program alone, and it is not one: the store's parts can agree with
--- each other perfectly while a registration's own frames carry a
--- function whose body is deeper than any quantity the entry reads.
 
 -- AND THE CASCADE DOES NOT OUTGROW ITS ENTRY, WHICH IS WHY THIS ROW IS
 -- NOT THE OPERATOR ROW UNDER ANOTHER NAME.  A cascade is ONE INSTANT,
@@ -159,6 +155,18 @@ open import Verify-Rank-Sufficient.Entry using (rootTri-reads)
 -- arrival rows found ACROSS entries; so the denomination the paragraph
 -- above asks for is the seed the machine already mints, and what is
 -- left in this row is the unconstrained schedule alone.
+--
+-- AND WHAT LICENCES THE HYPOTHESIS IS THAT THE UNCONDITIONAL FORM IS
+-- FALSE, WHICH IS THE ONLY THING THAT DOES.  Adding one otherwise
+-- trades tracked debt for untracked debt, so a statement that might
+-- still hold outright may not acquire one — and the two witnesses below
+-- close that off, the second of them against the obvious weaker repair.
+-- `hopFits` is the quantity they say is absent:
+-- a chain's own remaining-hop content, read off the very frames the
+-- witness exploits, against the rank the entry seeds.  It is quantified
+-- over every V and η, so the statement is false if the fit at the naive
+-- reading does not already carry the run — which makes this refutable
+-- at a concrete registry rather than merely unproven.
 --
 -- REFUTED: `Refuted.Drain-Reachable` — the form as written, at a store
 --   whose root term is the EMPTY observable.  A chain is a `Path` typed
@@ -228,8 +236,36 @@ open import Verify-Rank-Sufficient.Entry using (rootTri-reads)
 
 postulate
   drain-dry-free : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (fuel : Fuel) (nextId : Id) (sched : Sched Γ) (st : EvalSt e) →
+    (fuel : Fuel) (nextId : Id) (V : ℕ) (η : Fin n → ℕ)
+    (sched : Sched Γ) (st : EvalSt e) →
+    hopFits V η sched st →
     hasDry (drain fuel nextId sched st) ≡ false
+
+-- THE FIT AT THE DOOR.  `evaluate` hands the drain the state its root
+-- subscribe left, so this is the one arrival-free instance the
+-- assembly needs, and it is a leaf rather than a hypothesis because
+-- nothing above it is free to choose the state.  It takes no fuel: the
+-- entry state is what the subscribe frame produced, and the drain has
+-- not run yet.
+--
+-- PROBED: `Probed.Descent` — the root entry of three recursive
+--   programs, each a `refl`-free row whose witness is the decision
+--   procedure on the comparison itself, so a premise FALSE at the
+--   point would leave the row's implicit unsolvable rather than let it
+--   pass.  The three are plain recursion, μ nested directly in μ, and a
+--   share holding a recursion referenced from inside a second one —
+--   which is the shape whose nesting the rank guard cannot read off the
+--   term it compares, and so the one a fit read off the term alone
+--   would be expected to miss.  THE BOUNDARY: entry states only, at the
+--   naive reading `V = 0` and `η` constantly zero; nothing here reaches
+--   a state the drain itself produced, and nothing instantiates a
+--   nonzero slot reading.
+postulate
+  entry-hop-fits : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t)
+    (ins : Slots Γ) →
+    let ent = subscribeE (rootWitness e ins) e root 0 0 (sched-init e ins)
+                (st-init e)
+    in hopFits 0 (λ _ → 0) (proj₁ (proj₂ ent)) (proj₂ (proj₂ ent))
 
 -- THE ASSEMBLY, AND THE ONLY THING IT ADDS IS THE SEEDING.  `evaluate`
 -- concatenates its root burst with its drain, so dryness of the run is
@@ -245,7 +281,8 @@ rank-sufficient {Γ = Γ} {t = t} fuel e ins =
   hasDry-++ (proj₁ ent) (drain fuel 1 (proj₁ (proj₂ ent)) (proj₂ (proj₂ ent)))
     (subscribe-dry-free (rootWitness e ins) e root 0 0 (sched-init e ins)
       (st-init e) (rootTri-reads e ins))
-    (drain-dry-free fuel 1 (proj₁ (proj₂ ent)) (proj₂ (proj₂ ent)))
+    (drain-dry-free fuel 1 0 (λ _ → 0) (proj₁ (proj₂ ent)) (proj₂ (proj₂ ent))
+      (entry-hop-fits e ins))
   where
   ent : Stream Γ t × Sched Γ × EvalSt e
   ent = subscribeE (rootWitness e ins) e root 0 0 (sched-init e ins) (st-init e)
