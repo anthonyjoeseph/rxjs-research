@@ -226,14 +226,15 @@ statement compute at every program with nothing sealed between them.
 ### Big picture tier roadmap
 
 - **REACH μ AT RANDOM — THE GENERATOR, NOT A THIRTEENTH HAND ROW.**
-  Twelve hand-written programs now instantiate all three guards, the rank one at
-  a share holding a recursion, so what is left is COVERAGE rather than a first
-  look and the class is DIFFICULTY. Hand rows have stopped paying: the next one
-  is the same shape picked by the same author, and depth two is where they all
-  stop. The generator is μ-FREE, so no seed ever swept has produced the
-  constructor the rank guard lives under; teaching it `μᵉ`, `varᵉ` and `deferᵉ`
-  puts the sweep on the region and closes the behavioural gap in the same edit.
-  A red there is the finding this campaign has been walking toward.
+  Twelve hand-written programs instantiate all three guards, the rank one at a
+  share holding a recursion, so what is left is COVERAGE. Hand rows have
+  stopped paying: the next is the same shape by the same author, and depth two
+  is where they all stop. The generator is μ-FREE, so no seed ever
+  swept produced the constructor the rank guard lives under; teaching it `μᵉ`,
+  `varᵉ` and `deferᵉ` puts the sweep on the region and closes the behavioural
+  gap in one edit. It goes first because the route is no longer the unknown —
+  what each reading costs, and the shape of the hard one, are in the
+  statement's header — so a red here is the last thing that moves ground.
 
 ### The ledger
 

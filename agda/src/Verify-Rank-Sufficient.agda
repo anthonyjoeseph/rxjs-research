@@ -40,6 +40,57 @@ open import Rx.Exp   using (Ctx; Closed)
 open import Rx.Slots using (Slots)
 open import Rx.Evaluator using (evaluate; hasDry)
 
+-- WHAT EACH READING ACTUALLY COSTS, which is what to know before picking
+-- this row up, because the three are not three grinds of one size.  TWO OF
+-- THEM ARE ONE LINE over a fact already proven, and the evaluator's own
+-- guard is the statement: the μ peel wants `syncSizeᵉ (unfoldμ body)` under
+-- the size it entered at, which is `ltS` applied to an unfold equation; the
+-- connect peel wants the unconnected count to drop when a fresh share joins
+-- the connected list, which is `ltU` applied to an insertion lemma, under a
+-- freshness premise the machine establishes for itself before the clause
+-- fires.  THE RANK PEEL'S OWN ≺-WITNESS IS `ltR` APPLIED TO ITS HYPOTHESIS
+-- AND SO SAYS NOTHING — every gram of that reading is establishing the
+-- hypothesis, and that asymmetry is the whole schedule of this tier.
+
+-- SO THE RISK IS ONE HYPOTHESIS, AND THAT IS A FINDING ABOUT THIS STATEMENT
+-- RATHER THAN A PLAN FOR IT.  Of the three peels only the rank one asks
+-- what a RUN did.  The μ peel reads its own body — an equation on syntax.
+-- The connect peel reads the slot telescope and the connected list, and the
+-- telescope is unchanged across a run, so its premise is an equation too
+-- rather than an invariant something must preserve.  NOTHING HERE IS
+-- CIRCULAR, which was the standing doubt against replacing a counter with
+-- an order: neither settled peel needs the descent to have gone well in
+-- order to say that its own edge drops.
+--
+-- What both DO need is the entry invariant — that the triple the evaluator
+-- stands at is the READING OF THE TERM it is about to subscribe, seeded at
+-- the root and re-seeded at a connect.  That is the motive to state first,
+-- and the two settled peels are its cheap arms.
+
+-- THE RANK READING, AND ITS SHAPE IS A STRENGTHENING RATHER THAN A MEASURE.
+-- The inner is a runtime VALUE — an observable a sibling call emitted —
+-- structurally unrelated to the term the caller was subscribing, so no
+-- equation on syntax reaches it.  What does reach it is where it came FROM:
+-- it rode a burst some subscribe produced, so its nesting can travel as a
+-- STRENGTHENED RETURN TYPE on the burst-producing functions, invariant in
+-- the motive, rather than as a fourth measure nobody has.  Ordinary
+-- induction; the thing to get right is the strengthening, not arithmetic.
+--
+-- AND THE SEED IS EXPONENTIAL IN PROGRAM SIZE, WHICH IS THE PART NO
+-- RECOVERED APPARATUS HANDS OVER.  This machine seeds the rank at
+-- `2 ^ (sizeᵉ e + slotsSize sl)`, re-seeds it at `2 ^ sizeᵉ d` on a
+-- connect, and peels ONE per nesting hop, so the conclusion owed is that
+-- the count is never spent — not a comparison.  The generation that
+-- measured nesting before this one carried a hop DEPTH under its own cap,
+-- a different currency answering a different question, so its rows are a
+-- lead to read rather than a statement to cite.
+--
+-- THE OTHER RECURSIONS OWE NOTHING AND THAT IS ALREADY WRITTEN DOWN, at the
+-- descent discipline in `Rx.Evaluator` for the routes that hold the witness
+-- fixed, and at `dispatchShare` for the cascade counter, whose real order is
+-- the telescope position and whose premise a shared slot carries in its own
+-- type.  Neither needs anything from here.
+
 -- TWO OF THE THREE GUARDS HAVE THEIR CURRENCY ALREADY PROVEN, and it is
 -- deleted rather than absent — a different starting position from the one
 -- this row's class describes, and the class is still right, because a
@@ -47,7 +98,12 @@ open import Rx.Evaluator using (evaluate; hasDry)
 -- and, for the μ guard, stated in this evaluator's own order rather than in
 -- the grant the tower spent it on, so it transports as a CLAIM and not
 -- merely as a harness.  The `≺` it is stated over is the live one,
--- constructor for constructor.  None of it needs this header to be FOUND:
+-- constructor for constructor, and both settled edges are there in that
+-- form.  WHAT DOES NOT TRANSPORT IS THE FLATTENING — a fold of the triple
+-- into one ℕ, which existed so a counter could dominate the order
+-- structurally; this evaluator descends on the order itself, so the fold
+-- and every cap that fed it are apparatus for a machine that is gone.
+-- None of it needs this header to be FOUND:
 -- the sha is in `scripts/attic.txt`, so `make find` and `make find-prose`
 -- already reach the statements and the dead routes on their own.
 --
@@ -65,11 +121,15 @@ open import Rx.Evaluator using (evaluate; hasDry)
 --   deeper.  Nothing random has ever reached here, because the generator this
 --   repo sweeps cannot produce `μᵉ` at all.
 -- RECOVERY: `git show 919f115:agda/src/Verify-Budget-Sufficient/Measures.agda`
---   restores the μ guard's whole reading: `unfoldμ-shrinks` is two lines over
---   `syncSize-unfoldμ`, which is one line over a `syncSize-elimG` whose
---   clauses run over the constructors this `Exp` still has.  The sibling
---   `Wet/Part6.agda` then carries `mu-edge≺`, which is that inequality under
---   `ltS` — the guard's obligation verbatim.
+--   restores BOTH settled readings, each postulate-free.  The μ guard's:
+--   `unfoldμ-shrinks` is two lines over `syncSize-unfoldμ`, which is one line
+--   over a `syncSize-elimG` whose clauses run over the constructors this
+--   `Exp` still has.  The connect guard's: `unconn-insert` drops the count
+--   when a fresh share joins, taking exactly the slot equation and the
+--   freshness the clause already tests.  The sibling `Wet/Part6.agda` then
+--   carries `mu-edge≺` and `connect-edge≺`, one line each, which are those
+--   two facts under `ltS` and `ltU` — the guards' obligations verbatim.  Its
+--   `hop-edge≺` is `ltR` handed its own hypothesis and buys nothing.
 -- RECOVERY: `git show 919f115:agda/src/Rx/Layer-Count.agda` restores a
 --   payload-blind layer count and a μ depth, BOTH POSTULATE-FREE, whose two
 --   unfold equations are the rank guard's currency proven at the operation
