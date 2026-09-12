@@ -1,17 +1,18 @@
 -- THE ENTRY INVARIANT DOES NOT REACH THE RANK, AND THE OPERATOR LEAF IS
 -- FALSE BECAUSE OF IT.
 --
--- `EntryReads` carries two conjuncts — the unconnected count under the
--- triple's first component, the expression's syncSize under its third —
--- and says nothing whatever about the second.  That was a deliberate
--- reading: the rank is about an emitted INNER, a runtime value
--- structurally unrelated to the term being subscribed, so no equation on
--- syntax reaches it.  What follows from the silence is that the operator
--- leaf quantifies over a triple whose rank is ZERO, and at rank zero the
--- inner-subscribe clause does not subscribe anything: it returns the dry
--- close outright.  So the leaf is refuted by the smallest operator that
--- subscribes an inner inside its own subscribe frame, entered at a
--- triple the invariant is perfectly happy with.
+-- An entry invariant carrying two conjuncts — the unconnected count
+-- under the triple's first component, the expression's syncSize under
+-- its third — says nothing whatever about the second.  The reading that
+-- licensed the silence is that the rank is about an emitted INNER, a
+-- runtime value taken to be structurally unrelated to the term being
+-- subscribed, so that no measure of syntax reaches it.  What follows
+-- from the silence is that the operator leaf quantifies over a triple
+-- whose rank is ZERO, and at rank zero the inner-subscribe clause does
+-- not subscribe anything: it returns the dry close outright.  So the
+-- leaf is refuted by the smallest operator that subscribes an inner
+-- inside its own subscribe frame, entered at a triple that invariant is
+-- perfectly happy with.
 --
 -- WHAT THIS KILLS IS THE STATEMENT, NOT THE READING.  Every run the
 -- evaluator actually performs enters at `rootTri`, whose rank is
@@ -33,37 +34,44 @@ module Refuted.Rank-Entry where
 
 open import Data.Bool using (true; false)
 open import Data.Empty using (⊥)
-open import Data.List using ([]; _∷_)
+open import Data.List using (List; []; _∷_)
 open import Data.Maybe using (nothing)
-open import Data.Nat using (z≤n)
+open import Data.Nat using (_≤_; z≤n)
 open import Data.Nat.Properties using (≤-refl)
-open import Data.Product using (_,_; proj₁)
+open import Data.Product using (_×_; _,_; proj₁)
 open import Data.Vec using () renaming ([] to []ⱽ)
 open import Induction.WellFounded using (Acc)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans)
 
-open import Rx.Prim using (Id; Tick)
+open import Rx.Prim using (Id; Tick; Source)
 open import Rx.Exp using (Ctx; Closed; natᵗ; strmᵗ; nat̂; ofᵉ; mergeAllᵉ; syncSizeᵉ)
 open import Rx.Slots using (Slots)
 open import Rx.Strat-Order using (Tri; _≺_; ≺-wellFounded)
 open import Rx.Evaluator using (Stream; Path; Sched; EvalSt; subscribeE; root;
-  sched-init; st-init; hasDry)
+  sched-init; st-init; hasDry; unconn)
 open import Verify-Rank-Sufficient.Dry using (opShape)
-open import Verify-Rank-Sufficient.Entry using (EntryReads)
 
 ----------------------------------------------------------------------
--- THE STATEMENT, RESTATED HERE RATHER THAN IMPORTED.  A refutation that
--- applies the postulate is evidence about whatever that postulate says
--- today; written out, this one is evidence about the form it was taken
--- against, and a restatement that adds the missing conjunct makes the
+-- THE STATEMENT, WRITTEN OUT HERE RATHER THAN IMPORTED — the invariant
+-- along with the leaf standing on it.  A refutation that applies the
+-- postulate is evidence about whatever that postulate says today;
+-- written out, this one is evidence about the form it was taken
+-- against, and an invariant that adds the missing conjunct makes the
 -- witness below fail to typecheck rather than quietly agree with it.
+-- Which is what happened: the shared invariant carries the rank
+-- conjunct this witness bought, and the two-conjunct form survives only
+-- here, as the thing refuted.
 ----------------------------------------------------------------------
+
+EntryReads₂ : ∀ {n} {Γ : Ctx n} {u} → Tri → Closed Γ u → Slots Γ → List Source → Set
+EntryReads₂ (U , R , s) o sl cs =
+  unconn sl cs ≤ U × syncSizeᵉ o ≤ s
 
 DryOperator : Set
 DryOperator = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} {τ : Tri}
   (ac : Acc _≺_ τ) (o : Closed Γ u) (κ : Path Γ u t) (id : Id) (now : Tick)
   (sched : Sched Γ) (st : EvalSt e) → opShape o ≡ true →
-  EntryReads τ o (Sched.slots sched) (EvalSt.connectedShares st) →
+  EntryReads₂ τ o (Sched.slots sched) (EvalSt.connectedShares st) →
   hasDry (proj₁ (subscribeE ac o κ id now sched st)) ≡ false
 
 ----------------------------------------------------------------------
@@ -95,8 +103,8 @@ opShape-prog = refl
 ac₀ : Acc _≺_ τ₀
 ac₀ = ≺-wellFounded τ₀
 
-reads₀ : EntryReads τ₀ prog (Sched.slots (sched-init prog ins₀))
-                            (EvalSt.connectedShares (st-init prog))
+reads₀ : EntryReads₂ τ₀ prog (Sched.slots (sched-init prog ins₀))
+                             (EvalSt.connectedShares (st-init prog))
 reads₀ = z≤n , ≤-refl
 
 burst₀ : Stream Γ₀ natᵗ

@@ -213,12 +213,12 @@ research lives; where they disagree, the header wins.
 dry marker. It is now a real body: `evaluate` is a root subscribe followed by a
 drain, and the two leaves below are that split.
 
-**BOTH LEAVES ARE SHORT OF THE SAME FACT, AND HALF OF IT IS MACHINE-KNOWN.**
-The rank is seeded from the PROGRAM, and neither leaf carries a hypothesis
-tying what it quantifies over back to that seed — the operator leaf takes an
-arbitrary triple, the drain leaf an arbitrary schedule and state.
-`Refuted.Rank-Entry` exhibits the first at rank zero. Both rows are SHAPE: the
-restatement is guaranteed and grinding either one is wasted.
+**BOTH LEAVES ARE SHORT OF THE SAME FACT, AND THE ENTRY HALF IS STATED.** The
+rank is seeded from the PROGRAM, and each leaf has to tie what it quantifies
+over back to that seed. The entry invariant does the way IN — it bounds
+`nestDᵉ` by the rank and the walk is re-proven under it. The way OUT is left:
+an inner a burst carries. Both rows stay SHAPE — each conclusion is too weak
+to carry its own induction.
 
 **A FAILING GUARD IS NOT AN ERROR, AND THAT IS WHY THE TIER IS PROBEABLE.** A
 guarded clause returns a `dry` emit and the run continues, so both sides
@@ -226,16 +226,16 @@ compute at every program with nothing sealed between them.
 
 ### Big picture tier roadmap
 
-- **PUT THE RANK INTO THE ENTRY INVARIANT AND RE-PROVE THE WALK UNDER IT.**
-  The operator leaf is refuted at rank zero, so the invariant gains a third
-  conjunct and every clause of the subscription walk is re-established against
-  it — the two settled peels included, since their `no` arms are refuted out
-  of the invariant and it is the invariant that moves. The cheap conjunct is
-  already known dead: a bound on `2 ^ (sizeᵉ o + slotsSize sl)` holds at the
-  root by reflexivity and cannot be restored across the μ clause, where
-  `unfoldμ` grows the size while the witness keeps its rank. What it must say
-  instead is where an emitted inner CAME FROM — a strengthened return type on
-  the burst-producing functions, not a fourth measure.
+- **MAKE THE BURST CARRY ITS INNERS' NESTING, WHICH IS WHAT THE RANK PEEL
+  SPENDS.** The entry invariant now bounds `nestDᵉ` by the rank and every
+  clause of the subscription walk is re-established under it — seeded at the
+  root, re-seeded at a connect, and carried across the μ peel by
+  `nestD-unfoldμ`, which reads the unfolding EQUAL. What the operator shelf
+  still owes is a conjunct on the way OUT: `subscribeInner` enters an emitted
+  inner at a rank peeled by one, so the burst pipeline's dry-freedom is
+  provable only together with the claim that an inner a burst carries reads
+  STRICTLY under its emitter's. So the leaf is restated as a conjunction over
+  the burst it returns rather than ground as it stands.
 
 - **SAY WHAT A REACHED STATE IS, AND MAKE THE DRAIN LEAF TAKE IT.**
   The drain quantifies over an arbitrary schedule and an arbitrary state while
@@ -249,9 +249,9 @@ compute at every program with nothing sealed between them.
 ### The ledger
 
 - **`dry-operator`** (Verify-Rank-Sufficient.Dry) — SHAPE,
-  `REFUTED, PROBED, RECOVERY×2`: the operator shelf's dry-freedom, stated over
-  a triple no hypothesis ties to the program. Refuted at rank zero; the repair
-  is a third conjunct on the entry invariant.
+  `REFUTED, PROBED, RECOVERY`: the operator shelf's dry-freedom, entered under
+  an invariant that now bounds the nesting. Its conclusion says nothing about
+  the burst it returns, so it cannot carry its own induction.
 
 - **`drain-dry-free`** (Verify-Rank-Sufficient) — SHAPE, `PROBED`: every
   arrival after the root frame. Its schedule and state arrive unconstrained, so

@@ -28,7 +28,7 @@ open import Data.Empty using (⊥-elim)
 open import Data.Fin using (Fin; toℕ)
 open import Data.List using ([]; _∷_; map)
 open import Data.Nat using (_≤_; _^_)
-open import Data.Nat.Properties using (_<?_; ≤-refl)
+open import Data.Nat.Properties using (_<?_; ≤-refl; ≤-trans; ≤-reflexive)
 open import Data.Product using (_,_; proj₁; proj₂)
 open import Data.Vec using (lookup)
 open import Induction.WellFounded using (Acc; acc)
@@ -45,7 +45,8 @@ open import Rx.Evaluator using (Stream; Path; Sched; EvalSt; subscribeE;
   subscribeSharedSlot; sharedConnect; register; share-sink; burstCompleted;
   mintSource;
   hasDry; memberSource; unconn)
-open import Verify-Rank-Sufficient.Entry using (EntryReads)
+open import Rx.Nest-Depth using (nestDᵉ≤sizeᵉ; nestD-unfoldμ)
+open import Verify-Rank-Sufficient.Entry using (EntryReads; n≤2^n)
 open import Verify-Rank-Sufficient.Sync-Edge using (mu-guard)
 open import Verify-Rank-Sufficient.Connect-Edge using (connect-guard)
 open import Verify-Rank-Sufficient.Dry-Emits using (hasDry-if; oneShotBurst-dry;
@@ -70,49 +71,44 @@ opShape _         = true
 -- — so nothing goes dry at the node itself and the leaf is about the
 -- pipeline underneath it.
 --
--- THE STATEMENT IS SHORT BY A CONJUNCT AND IS FALSE AS IT STANDS.  The
--- entry invariant bounds the unconnected count and the syncSize and says
--- nothing whatever about the RANK, so this leaf is quantified over a
--- triple whose rank is ZERO — and at rank zero the inner-subscribe clause
--- subscribes nothing at all: it returns the dry close outright.  Nothing
--- about the top-line claim moves, since every run the evaluator performs
--- enters at `rootTri`, whose rank is `2 ^ (sizeᵉ e + slotsSize sl)` and is
--- never zero.  What is dead is DERIVING that claim from a lemma
--- universally quantified over the triple: the seeding is the only thing
--- holding the rank off the floor, and the invariant is where seeding facts
--- are supposed to travel.  So the row is SHAPE, the restatement is
--- guaranteed, and the third conjunct is a hypothesis that has been EARNED
--- below rather than a weakening.
+-- THE RANK CONJUNCT IS WHAT MAKES THE STATEMENT SURVIVABLE, and it was
+-- bought rather than assumed.  Carrying only the unconnected count and
+-- the syncSize, the leaf is quantified over a triple whose rank is ZERO
+-- — and at rank zero the inner-subscribe clause subscribes nothing at
+-- all: it returns the dry close outright.  The entry invariant now bounds
+-- `nestDᵉ o` by the rank, which excludes that entry for every shape
+-- `opShape` admits, since each carries at least the layer its own inner
+-- is entered through.  Adding the conjunct is a RESTATEMENT and not a
+-- weakening, which is the one thing a machine witness licenses.
 --
--- AND THE CHEAP CONJUNCT DOES NOT SURVIVE THE WALK, WHICH IS WHY THE
--- REPAIR IS DESIGN WORK RATHER THAN A LINE.  `2 ^ (sizeᵉ o + slotsSize sl)
--- ≤ r` holds at the root by reflexivity and cannot be re-established
--- across the μ clause, since `unfoldμ body` is LARGER in `sizeᵉ` than
--- `μᵉ body` while the witness keeps the same rank.  The inner is a runtime
--- VALUE — an observable a sibling call emitted — structurally unrelated to
--- the term the caller was subscribing, so no equation on syntax reaches
--- it.  What does reach it is where it came FROM: it rode a burst some
--- subscribe produced, so its nesting can travel as a STRENGTHENED RETURN
--- TYPE on the burst-producing functions, invariant in the motive, rather
--- than as a fourth measure nobody has.  And the peel's own `≺`-witness is
--- `ltR` applied to its hypothesis and so says nothing — every gram of this
--- reading is establishing the hypothesis, which is the whole asymmetry
--- between this leaf and the two peels proven below.
+-- A SIZE BOUND IS THE OBVIOUS CONJUNCT AND IT IS DEAD.
+-- `2 ^ (sizeᵉ o + slotsSize sl) ≤ r` holds at the root by reflexivity and
+-- cannot be re-established across the μ clause, since `unfoldμ body` is
+-- LARGER in `sizeᵉ` than `μᵉ body` while the witness keeps the same rank.
+-- What survives is a measure the unfolding leaves EQUAL, which is why the
+-- conjunct is a nesting.  The emitted inner is reachable after all — a
+-- `Val` at `obs` IS a closed expression, so a measure of syntax does
+-- reach it — and what the walk still owes is that a burst's inner reads
+-- STRICTLY under its emitter's, which is one peel.  That travels as a
+-- STRENGTHENED RETURN TYPE on the burst-producing functions, invariant in
+-- the motive, rather than as a fourth measure nobody has.  And the peel's
+-- own `≺`-witness is `ltR` applied to its hypothesis and so says nothing
+-- — every gram of this reading is establishing the hypothesis, which is
+-- the whole asymmetry between this leaf and the two peels proven below.
 --
--- AND THE SEED IS EXPONENTIAL IN PROGRAM SIZE, WHICH IS THE PART NO
--- RECOVERED APPARATUS HANDS OVER.  The machine seeds the rank at
+-- AND THE SEED IS EXPONENTIAL IN PROGRAM SIZE, WHICH IS THE PART THE
+-- MEASURE DOES NOT HAND OVER.  The machine seeds the rank at
 -- `2 ^ (sizeᵉ e + slotsSize sl)`, re-seeds it at `2 ^ sizeᵉ d` on a
 -- connect, and peels ONE per nesting hop, so the conclusion owed is that
--- the count is never spent — not a comparison.  The generation that
--- measured nesting before this one carried a hop DEPTH under its own cap,
--- a different currency answering a different question, so its rows are a
--- lead to read rather than a statement to cite.
+-- the count is never spent — not a comparison.
 --
--- REFUTED: `Refuted.Rank-Entry` — the smallest merge over a synchronous
---   one-element outer, entered at a triple whose rank is zero with both
---   conjuncts satisfied at their tightest: the unconnected count is zero
---   over the empty context and the syncSize holds by reflexivity.  Its
---   burst is one emit long and that emit is the dry close.
+-- REFUTED: `Refuted.Rank-Entry` — the two-conjunct invariant, refuted by
+--   the smallest merge over a synchronous one-element outer, entered at a
+--   triple whose rank is zero with both of those conjuncts satisfied at
+--   their tightest: the unconnected count is zero over the empty context
+--   and the syncSize holds by reflexivity.  Its burst is one emit long
+--   and that emit is the dry close.  Its reading is one against the
+--   nesting, which is `suc 0` there.
 -- PROBED: `Probed.Descent` — three rows, each at an operator ROOT, which
 --   is the only point this leaf can be instantiated at from outside: the
 --   walk reaches it elsewhere only under a witness a probe cannot write
@@ -124,12 +120,6 @@ opShape _         = true
 --   arriving on a later tick is outside every one of them — which is the
 --   region the rank reading is actually about, and it is reached only
 --   through the drain leaf's rows.
--- RECOVERY: `git show 919f115:agda/src/Rx/Layer-Count.agda` restores a
---   payload-blind layer count and a μ depth, BOTH POSTULATE-FREE, whose two
---   unfold equations are this reading's currency proven at the operation
---   the guard is about: the layer count is INVARIANT under `unfoldμ`, and
---   the μ depth drops exactly one.  A measure surviving the unfold is the
---   half of a nesting descent that is not bookkeeping.
 -- RECOVERY: `git show 919f115:agda/src/Rx/Clos-Size.agda` restores
 --   `syncSizeᵉ` with the slot telescope substituted in, also postulate-free
 --   — the μ guard reads the UNSUBSTITUTED size, and a slot reference is one
@@ -153,12 +143,17 @@ mutual
   -- component it is standing at; the invariant says the redex already
   -- did, and `mu-guard` is the strict drop that composes with it.  The
   -- recursive call re-seeds the component at the unfolding's own
-  -- reading, so the invariant is restored by reflexivity.
+  -- reading, so the invariant is restored by reflexivity.  The rank is
+  -- untouched by the step, and `nestD-unfoldμ` is what says the nesting
+  -- conjunct survives the substitution: the measure reads the redex and
+  -- its unfolding EQUAL, so nothing is spent to re-establish it.
   subscribe-dry-free {τ = U , r , sz} (acc rec) (μᵉ body) κ id now sched st inv
     with syncSizeᵉ (unfoldμ body) <? sz
-  ... | no  ¬p = ⊥-elim (¬p (mu-guard body (proj₂ inv)))
+  ... | no  ¬p = ⊥-elim (¬p (mu-guard body (proj₂ (proj₂ inv))))
   ... | yes p  = subscribe-dry-free (rec (ltS p)) (unfoldμ body) κ id now sched st
-                   (proj₁ inv , ≤-refl)
+                   ( proj₁ inv
+                   , ≤-trans (≤-reflexive (nestD-unfoldμ body)) (proj₁ (proj₂ inv))
+                   , ≤-refl )
 
   subscribe-dry-free ac (ofᵉ ts) κ id now sched st inv =
     oneShotBurst-dry (map (λ tm → evalTm tm) ts) id sched
@@ -214,8 +209,9 @@ mutual
   -- keeps the unconnected count under the component it entered at; the
   -- invariant says the count already was, and `connect-guard` is the
   -- strict drop a fresh latch buys.  The connected branch re-seeds all
-  -- three components at the def's own reading, so its invariant is
-  -- reflexivity on both conjuncts.
+  -- three components at the def's own reading — two by reflexivity, the
+  -- rank through the size it is exponential in, exactly as the root
+  -- seeding does, since a connect IS a second root.
   sharedConnect-dry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {τ}
     (ac : Acc _≺_ τ) (i : Fin n) (d : Closed Γ (lookup Γ i))
     (κ : Path Γ (lookup Γ i) t) (id : Id) (now : Tick) (sched : Sched Γ)
@@ -245,4 +241,5 @@ mutual
 
     hb : hasDry burst ≡ false
     hb = subscribe-dry-free (rec (ltU {r′ = 2 ^ sizeᵉ d} {s′ = syncSizeᵉ d} p))
-           d (share-sink i) id now sched st₁ (≤-refl , ≤-refl)
+           d (share-sink i) id now sched st₁
+           (≤-refl , ≤-trans (nestDᵉ≤sizeᵉ d) (n≤2^n (sizeᵉ d)) , ≤-refl)
