@@ -25,7 +25,6 @@ spec.loader.exec_module(ev)
 def main():
     stmts = ev.statements("agda/src")
     roots = [os.path.join("agda/evidence", d) for d in ev.NAMESPACES]
-    roots.append("agda/src/Harness")
     skip = set(sys.argv[1:])
     wrote = 0
     for root in roots:

@@ -5,7 +5,7 @@
 -- proof may rest on it.  Checked by `make probed`, claimed by `Probed.Main`.
 -- Receipts live in the headers of `root-caches` / `root-done-plumbed`
 -- (.Part4), whose residues are the two leaves this file runs over.
--- TARGET: root-mergeAllCache @eb9c2d
+-- TARGET: root-mergeAllCache @cd3c15
 --
 -- ONE TARGET, TWO SUBJECTS, AND THE ASYMMETRY IS THE FINDING.  Both
 -- postulates' CONCLUSIONS are decidable Bool functions of a run —
@@ -39,7 +39,7 @@ open import Data.Maybe using (Maybe; just; nothing)
 open import Data.List using ([]; _∷_; null)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
-open import Data.Nat  using (ℕ; zero; suc)
+open import Data.Nat  using (zero; suc)
 open import Data.Product using (proj₁; proj₂; _×_; _,_)
 open import Data.Vec  using () renaming ([] to []ⱽ; _∷_ to _∷ⱽ_)
 open import Data.Fin  using (zero; suc)
@@ -116,16 +116,9 @@ mergeAllCertAt mnid st with lookupNode mnid (EvalSt.nodes st)
         not (any (hasAliveFromInner mnid st) (EvalSt.registry st))
 ... | _ = true
 
--- THE STORE BOUND every reading here is taken at.  These rows are
--- about the state a root subscribe leaves, so the bound is the one
--- `evaluate` would have built the schedule at; a row free to pick it
--- separately would be picking which run it is a row about.
-SB : ℕ
-SB = 6
-
 RUN : ∀ {t} (e : Closed Γ₀ t) → EvalSt e
-RUN e = proj₂ (proj₂ (subscribeE (rootWitness SB e ins₀) e root 0 0
-                                  (sched-init SB e ins₀) (st-init e)))
+RUN e = proj₂ (proj₂ (subscribeE (rootWitness e ins₀) e root 0 0
+                                  (sched-init e ins₀) (st-init e)))
 
 ----------------------------------------------------------------------
 -- Programs.  P0 is the calibration; the rest each mint at least one
@@ -252,8 +245,8 @@ sh zero      = shared (ofᵉ (nat̂ 1 ∷ [])) {ok = tt}
 sh (suc ())
 
 RUN₁ : (e : Closed Γ₁ natᵗ) → EvalSt e
-RUN₁ e = proj₂ (proj₂ (subscribeE (rootWitness SB e sh) e root 0 0
-                                   (sched-init SB e sh) (st-init e)))
+RUN₁ e = proj₂ (proj₂ (subscribeE (rootWitness e sh) e root 0 0
+                                   (sched-init e sh) (st-init e)))
 
 -- the README's own share program: an unbounded mergeAll of (shared, shared)
 S1 : Closed Γ₁ natᵗ
@@ -279,8 +272,8 @@ sh₂ (suc zero)       = shared (input zero) {ok = tt}
 sh₂ (suc (suc ()))
 
 RUN₂ : (e : Closed Γ₂ natᵗ) → EvalSt e
-RUN₂ e = proj₂ (proj₂ (subscribeE (rootWitness SB e sh₂) e root 0 0
-                                   (sched-init SB e sh₂) (st-init e)))
+RUN₂ e = proj₂ (proj₂ (subscribeE (rootWitness e sh₂) e root 0 0
+                                   (sched-init e sh₂) (st-init e)))
 
 S2 : Closed Γ₂ natᵗ
 S2 = mergeAllᵉ nothing (ofᵉ (strmᵗ (input (suc zero)) ∷ strmᵗ (input (suc zero)) ∷ []))
@@ -303,8 +296,8 @@ doneOf (just S) = ProtocolSt.done S
 doneOf nothing  = false
 
 STREAM₂ : (e : Closed Γ₂ natᵗ) → _
-STREAM₂ e = proj₁ (subscribeE (rootWitness SB e sh₂) e root 0 0
-                               (sched-init SB e sh₂) (st-init e))
+STREAM₂ e = proj₁ (subscribeE (rootWitness e sh₂) e root 0 0
+                               (sched-init e sh₂) (st-init e))
 
 _ : doneOf (runProtocol protocol-init (STREAM₂ S2)) ≡ false
 _ = refl
@@ -322,8 +315,8 @@ S4 : Closed Γ₂ natᵗ
 S4 = takeᵉ (nat̂ 1) (input (suc zero))
 
 STREAM : ∀ {t} (e : Closed Γ₀ t) → _
-STREAM e = proj₁ (subscribeE (rootWitness SB e ins₀) e root 0 0
-                              (sched-init SB e ins₀) (st-init e))
+STREAM e = proj₁ (subscribeE (rootWitness e ins₀) e root 0 0
+                              (sched-init e ins₀) (st-init e))
 
 _ : doneOf (runProtocol protocol-init (STREAM  P2))    -- CALIBRATION: the
   ∷ doneOf (runProtocol protocol-init (STREAM  P4))    -- guard IS satisfiable
@@ -406,33 +399,33 @@ _ = refl
 ----------------------------------------------------------------------
 
 cellP1 : (0 , mergeAll-st {t = natᵗ} nothing 0 [] true)
-           ∈ EvalSt.nodes (rootExitSt SB P1 ins₀)
+           ∈ EvalSt.nodes (rootExitSt P1 ins₀)
 cellP1 = here refl
 
 rowP1 : Confirms
-  (root-mergeAllCache {w = natᵗ} SB P1 ins₀ 0 nothing 0 [] true cellP1)
+  (root-mergeAllCache {w = natᵗ} P1 ins₀ 0 nothing 0 [] true cellP1)
 rowP1 = refl
 
 cellP4 : (0 , mergeAll-st {t = natᵗ} (just 1) 0 [] true)
-           ∈ EvalSt.nodes (rootExitSt SB P4 ins₀)
+           ∈ EvalSt.nodes (rootExitSt P4 ins₀)
 cellP4 = here refl
 
 rowP4 : Confirms
-  (root-mergeAllCache {w = natᵗ} SB P4 ins₀ 0 (just 1) 0 [] true cellP4)
+  (root-mergeAllCache {w = natᵗ} P4 ins₀ 0 (just 1) 0 [] true cellP4)
 rowP4 = refl
 
 cellP7 : (1 , mergeAll-st {t = natᵗ} nothing 0 [] true)
-           ∈ EvalSt.nodes (rootExitSt SB P7 ins₀)
+           ∈ EvalSt.nodes (rootExitSt P7 ins₀)
 cellP7 = there (here refl)
 
 rowP7 : Confirms
-  (root-mergeAllCache {w = natᵗ} SB P7 ins₀ 1 nothing 0 [] true cellP7)
+  (root-mergeAllCache {w = natᵗ} P7 ins₀ 1 nothing 0 [] true cellP7)
 rowP7 = refl
 
 cellS2 : (0 , mergeAll-st {t = natᵗ} nothing 2 [] true)
-           ∈ EvalSt.nodes (rootExitSt SB S2 sh₂)
+           ∈ EvalSt.nodes (rootExitSt S2 sh₂)
 cellS2 = here refl
 
 rowS2 : Confirms
-  (root-mergeAllCache {w = natᵗ} SB S2 sh₂ 0 nothing 2 [] true cellS2)
+  (root-mergeAllCache {w = natᵗ} S2 sh₂ 0 nothing 2 [] true cellS2)
 rowS2 = refl

@@ -39,8 +39,8 @@ variable
 -- checked by the generator/decoder, not by these types; a forward
 -- reference is rejected there.
 open import Rx.Slots using (scripted; shared; Slots)
-open import Rx.Hop-Depth using (hopDᵉ; hopDᵛ)
-open import Rx.Slot-Hop using (slotHop)
+open import Rx.Hop-Depth using (Rd₃; depthᵉ; depthᵛ)
+open import Rx.Slot-Read using (slotRd)
 
 Stream : ∀ {n} → Ctx n → Ty → Set          -- flat, canonical emission order
 Stream Γ t = List (InstEmit (Val Γ t))
@@ -59,22 +59,20 @@ record LiveSource {n} (Γ : Ctx n) : Set where
         elemTy  : Ty
         pending : List (Tick × Val Γ elemTy)   -- absolute ticks, strictly increasing
 
--- THE STORE BOUND RIDES ON THE SCHEDULE, AND IT IS A RUN PARAMETER
--- RATHER THAN A MEASURE.  `Rx.Hop-Depth` prices a scan by how many
--- times its accumulator can be refolded, so every reading of a term is
--- relative to that count — and the entry rank is now such a reading.
--- The count belongs to the RUN and not to the term, exactly as the slot
--- telescope does, so it is carried where the telescope is: threaded by
--- every function the machine has, re-seeded by nobody, and read at the
--- two places a witness is built.  A parameter on the subscription block
--- instead would put it in twenty-nine signatures to be read in two.
+-- THE SCHEDULE CARRIES NO REFOLD BOUND, AND THAT IS WHAT THE READING
+-- BOUGHT.  A reading whose fold clause names a refold COUNT has to be
+-- told that count by whoever runs the term, so the count rode here — and
+-- the run then had to be trusted about a number it takes from its
+-- ARRIVAL allowance while a refold happens per DELIVERY.  A fold that
+-- iterates over its own source's delivery count reads that number off
+-- the term, so there is nothing left for the schedule to carry and
+-- nothing left for a caller to pick wrong.
 record Sched {n} (Γ : Ctx n) : Set where
   field nextOrdinal : Ordinal          -- ordinals mint in subscription order
         nextSource  : Source           -- dynamic sources (colds, deferᵉ bodies) mint from n up
         nextNode    : ℕ                -- node instances mint in subscription order
         live        : List (LiveSource Γ)
         slots       : Slots Γ          -- scripts and shared defs, kept so subscribeE can anchor colds and connect shares
-        storeBound  : ℕ                -- the refold count every hop reading is relative to
 
 record Arrival {n} (Γ : Ctx n) : Set where
   field tick    : Tick
@@ -135,10 +133,10 @@ mkHot {Γ = Γ} ins i with ins i
 ... | scripted (cold _ _)  = []
 ... | shared _             = []
 
-sched-init : ∀ {n} {Γ : Ctx n} {t} → ℕ → Closed Γ t → Slots Γ → Sched Γ
-sched-init {n = n} {Γ = Γ} V e ins = record
+sched-init : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → Sched Γ
+sched-init {n = n} {Γ = Γ} e ins = record
   { nextOrdinal = n ; nextSource = n ; nextNode = 0
-  ; live = concat (tabulate (mkHot ins)) ; slots = ins ; storeBound = V }
+  ; live = concat (tabulate (mkHot ins)) ; slots = ins }
 
 -- pop the pending arrival minimal by (tick, ordinal), or report empty.
 -- The workers are TOP-LEVEL (not where-local of sched-next) so
@@ -388,28 +386,27 @@ installNode nid nodeState st =
 -- use: nesting counts a term's flattener layers, the rank counts what a
 -- subscription may still enter, and only the second is what a stored
 -- accumulator makes deep.  Taking the join in one currency is what puts
--- the depth a fold has ALREADY reached under the seed, so the reading's
--- own store bound is left covering one burst's refolds rather than a
--- whole run's.
-stHopᶜˢ : ∀ {n} {Γ : Ctx n} {t} (V : ℕ) (η : Fin n → ℕ) → List (Closed Γ t) → ℕ
-stHopᶜˢ V η []       = 0
-stHopᶜˢ V η (e ∷ es) = hopDᵉ V η e ⊔ stHopᶜˢ V η es
+-- the depth a fold has ALREADY reached under the seed, so what the
+-- term's own reading is left covering is the refolds still to come.
+stHopᶜˢ : ∀ {n} {Γ : Ctx n} {t} (ψ : Fin n → Rd₃) → List (Closed Γ t) → ℕ
+stHopᶜˢ ψ []       = 0
+stHopᶜˢ ψ (e ∷ es) = depthᵉ ψ e ⊔ stHopᶜˢ ψ es
 
-stHopⁿ : ∀ {n} {Γ : Ctx n} (V : ℕ) (η : Fin n → ℕ) → NodeState Γ → ℕ
-stHopⁿ V η (scan-st {t = t} v)         = hopDᵛ V η t v
-stHopⁿ V η (take-st _)                 = 0
-stHopⁿ V η (mergeAll-st _ _ queued _)  = stHopᶜˢ V η queued
-stHopⁿ V η (switch-st _ _)             = 0
-stHopⁿ V η (exhaust-st _ _)            = 0
+stHopⁿ : ∀ {n} {Γ : Ctx n} (ψ : Fin n → Rd₃) → NodeState Γ → ℕ
+stHopⁿ ψ (scan-st {t = t} v)         = depthᵛ ψ t v
+stHopⁿ ψ (take-st _)                 = 0
+stHopⁿ ψ (mergeAll-st _ _ queued _)  = stHopᶜˢ ψ queued
+stHopⁿ ψ (switch-st _ _)             = 0
+stHopⁿ ψ (exhaust-st _ _)            = 0
 
-stHopᴺ : ∀ {n} {Γ : Ctx n} (V : ℕ) (η : Fin n → ℕ) →
+stHopᴺ : ∀ {n} {Γ : Ctx n} (ψ : Fin n → Rd₃) →
          List (NodeId × NodeState Γ) → ℕ
-stHopᴺ V η []             = 0
-stHopᴺ V η ((_ , s) ∷ ns) = stHopⁿ V η s ⊔ stHopᴺ V η ns
+stHopᴺ ψ []             = 0
+stHopᴺ ψ ((_ , s) ∷ ns) = stHopⁿ ψ s ⊔ stHopᴺ ψ ns
 
-stHop : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (V : ℕ) (η : Fin n → ℕ) →
+stHop : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (ψ : Fin n → Rd₃) →
          EvalSt e → ℕ
-stHop V η st = stHopᴺ V η (EvalSt.nodes st)
+stHop ψ st = stHopᴺ ψ (EvalSt.nodes st)
 
 -- THE ENTRY WITNESS, NAMED RATHER THAN INLINED.  Every re-entry from
 -- OUTSIDE the subscription machine — the root subscribe, and each
@@ -434,10 +431,11 @@ stHop V η st = stHopᴺ V η (EvalSt.nodes st)
 -- rather than an obligation between a run and a budget.  Nothing here
 -- is exhaustible: what the component counts is how many flattener
 -- layers the term still has, and a run that keeps hopping is a run
--- walking down them.  The reading is taken at the schedule's own
+-- walking down them.  The reading is taken at the schedule's own slot
 -- environment, since a slot reference emits whatever its definition
--- emits, and at the run's store bound, since a fold's reuse of its
--- accumulator is what makes one layer many.
+-- emits; a fold's reuse of its accumulator is what makes one layer
+-- many, and the reading iterates over its own source's deliveries to
+-- price it, so nothing outside the term is consulted.
 --
 -- DEAD ROUTE: seeding the component off SYNTAX — a power of two in the
 --   program's size plus the slot telescope's was the seed, and the two
@@ -448,19 +446,19 @@ stHop V η st = stHopᴺ V η (EvalSt.nodes st)
 --   its subtree will ever emit; the run multiplies where the seed
 --   merely doubles.  Seeding from the entered VALUE fails identically,
 --   and a larger seed is the same answer with a larger constant.
-entryTri : ∀ {n} {Γ : Ctx n} {t} → ℕ → Closed Γ t → Slots Γ → ℕ → Tri
-entryTri V e sl m = unconn sl [] , hopDᵉ V (slotHop V sl) e + m , syncSizeᵉ e
+entryTri : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → ℕ → Tri
+entryTri e sl m = unconn sl [] , depthᵉ (slotRd sl) e + m , syncSizeᵉ e
 
-entryWitness : ∀ {n} {Γ : Ctx n} {t} (V : ℕ) (e : Closed Γ t) (sl : Slots Γ) (m : ℕ)
-             → Acc _≺_ (entryTri V e sl m)
-entryWitness V e sl m = ≺-wellFounded (entryTri V e sl m)
+entryWitness : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (m : ℕ)
+             → Acc _≺_ (entryTri e sl m)
+entryWitness e sl m = ≺-wellFounded (entryTri e sl m)
 
-rootTri : ∀ {n} {Γ : Ctx n} {t} → ℕ → Closed Γ t → Slots Γ → Tri
-rootTri V e sl = entryTri V e sl 0
+rootTri : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → Tri
+rootTri e sl = entryTri e sl 0
 
-rootWitness : ∀ {n} {Γ : Ctx n} {t} (V : ℕ) (e : Closed Γ t) (sl : Slots Γ)
-            → Acc _≺_ (rootTri V e sl)
-rootWitness V e sl = entryWitness V e sl 0
+rootWitness : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+            → Acc _≺_ (rootTri e sl)
+rootWitness e sl = entryWitness e sl 0
 
 -- AND THE ARRIVAL'S IS NAMED FOR THE SAME REASON THE ROOT'S IS.  A value
 -- delivered on a later tick reads deeper than any reading of the program
@@ -483,21 +481,14 @@ rootWitness V e sl = entryWitness V e sl 0
 -- is the half of the premise a bound taken per arrival can be about.
 arrivalWitness : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
                  (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e)
-               → Acc _≺_ (entryTri (Sched.storeBound sched) e (Sched.slots sched)
-                           (hopDᵛ (Sched.storeBound sched)
-                              (slotHop (Sched.storeBound sched) (Sched.slots sched))
+               → Acc _≺_ (entryTri e (Sched.slots sched)
+                           (depthᵛ (slotRd (Sched.slots sched))
                               (arrTy a) (arrVal a)
-                            ⊔ stHop (Sched.storeBound sched)
-                                (slotHop (Sched.storeBound sched) (Sched.slots sched))
-                                st))
+                            ⊔ stHop (slotRd (Sched.slots sched)) st))
 arrivalWitness a sched st =
-  entryWitness (Sched.storeBound sched) _ (Sched.slots sched)
-    (hopDᵛ (Sched.storeBound sched)
-       (slotHop (Sched.storeBound sched) (Sched.slots sched))
-       (arrTy a) (arrVal a)
-     ⊔ stHop (Sched.storeBound sched)
-         (slotHop (Sched.storeBound sched) (Sched.slots sched))
-         st)
+  entryWitness _ (Sched.slots sched)
+    (depthᵛ (slotRd (Sched.slots sched)) (arrTy a) (arrVal a)
+     ⊔ stHop (slotRd (Sched.slots sched)) st)
 
 -- a source that lives and dies inside its own subscription burst
 -- (ofᵉ, emptyᵉ, take 0, a cold with no async tail): init, values,
@@ -1416,24 +1407,16 @@ drain (suc k) nextId sched st with sched-next sched
   let (out , sched″ , st′) = cascade a nextId sched′ st
   in out ++ drain k (suc nextId) sched″ st′
 
--- THE FUEL IS HANDED ON AS THE STORE BOUND, so the run names the
--- reading it is measured against rather than taking one on trust, and
--- a caller cannot pick a reading its own run outgrows.
---
--- THAT IS ALL IT BUYS, AND THE STRONGER READING IS FALSE.  One field
--- serves two jobs here: the allowance `drain` spends and the refold
--- count a `scanᵉ`'s hop reading is parameterised by.  They are not the
--- same quantity — `drain` spends one unit per ARRIVAL and each
--- arrival's cascade runs to quiescence, while the root's burst runs
--- before any arrival at all, so a fold reached synchronously refolds
--- as often as its source is long against no fuel whatever.  The
--- consequence is a premise of the measure, and it is stated and left
--- unpaid where the measure is defined (`Rx.Hop-Depth`); nothing here
--- discharges it, and reading this field as a refold bound is the
--- mistake that makes it look discharged.
+-- THE FUEL IS AN ARRIVAL ALLOWANCE AND NOTHING ELSE.  It bounds how
+-- many arrivals `drain` will serve; the rank a subscription descends on
+-- is read off the term, so no reading anywhere is relative to it.  The
+-- two quantities were once one field, and they are not the same
+-- quantity: `drain` spends one unit per ARRIVAL while a fold refolds
+-- per DELIVERY, so a cascade delivering entirely inside one subscribe
+-- frame refolds as often as its source is long against no fuel at all.
 evaluate : ∀ {n} {Γ : Ctx n} {t} → Fuel → Closed Γ t → Slots Γ → Stream Γ t
 evaluate fuel e ins =
   let (burst , sched₀ , st₀) =
-        subscribeE (rootWitness fuel e ins) e root 0 0 (sched-init fuel e ins)
+        subscribeE (rootWitness e ins) e root 0 0 (sched-init e ins)
           (st-init e)
   in burst ++ drain fuel 1 sched₀ st₀

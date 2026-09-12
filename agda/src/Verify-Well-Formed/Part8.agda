@@ -465,32 +465,32 @@ postulate
 
 -- and so the root subscribe's output state is dying-free, which is the premise
 -- `burst-final` now takes (.Part4)
-root-dying-free : ∀ {n} {Γ : Ctx n} {t} (V : ℕ) (e : Closed Γ t) (ins : Slots Γ) →
+root-dying-free : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
   ∀ s → memberSource s (EvalSt.dying (proj₂ (proj₂
-          (subscribeE (rootWitness V e ins) e root 0 0 (sched-init V e ins) (st-init e)))))
+          (subscribeE (rootWitness e ins) e root 0 0 (sched-init e ins) (st-init e)))))
         ≡ false
-root-dying-free V e ins s
-  rewrite subscribeE-dying (rootWitness V e ins) e root 0 0 (sched-init V e ins) (st-init e)
+root-dying-free e ins s
+  rewrite subscribeE-dying (rootWitness e ins) e root 0 0 (sched-init e ins) (st-init e)
   = refl
 
 subscribe-wf :
-  ∀ {n} {Γ : Ctx n} {t} (V : ℕ) (e : Closed Γ t) (ins : Slots Γ) →
-  hasDry (proj₁ (subscribeE (rootWitness V e ins) e root 0 0
-                            (sched-init V e ins) (st-init e))) ≡ false →
+  ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+  hasDry (proj₁ (subscribeE (rootWitness e ins) e root 0 0
+                            (sched-init e ins) (st-init e))) ≡ false →
   Σ ProtocolSt λ S →
-    let r = subscribeE (rootWitness V e ins) e root 0 0
-                       (sched-init V e ins) (st-init e)
+    let r = subscribeE (rootWitness e ins) e root 0 0
+                       (sched-init e ins) (st-init e)
     in (runProtocol protocol-init (proj₁ r) ≡ just S)
        × Inv 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) S
        × (paidUp S ≡ true)
 
-subscribe-wf V e ins nodry
-  with subscribeE-wf (rootWitness V e ins) e root 0 0
-                     (sched-init V e ins) (st-init e)
-                     protocol-init (burst-init V e ins) refl nodry
+subscribe-wf e ins nodry
+  with subscribeE-wf (rootWitness e ins) e root 0 0
+                     (sched-init e ins) (st-init e)
+                     protocol-init (burst-init e ins) refl nodry
 ... | S , run , binv , _
-  with burst-final _ _ S binv (root-dying-free V e ins)
-                   (root-done-plumbed V e ins S run) (root-caches V e ins)
+  with burst-final _ _ S binv (root-dying-free e ins)
+                   (root-done-plumbed e ins S run) (root-caches e ins)
 ... | inv , paid = S , run , inv , paid
 
 

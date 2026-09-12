@@ -125,7 +125,7 @@ reason to spend those minutes only to fail on something a textual pass already k
 | `wiring-refuted` | same law over `agda/evidence/refuted`, rooted at `Refuted.Main` — every witness is claimed | [docs/wiring.md](docs/wiring.md), EVIDENCE.md |
 | `wiring-probed` | same law over `agda/evidence/probed`, rooted at `Probed.Main` — this is what replaced the probes' old self-granted reachability exemptions | [docs/evidence.md](docs/evidence.md), EVIDENCE.md |
 | `evidence-selftest` | every evidence law still fires, and the shapes that are LEGAL stay quiet | [docs/evidence.md](docs/evidence.md) |
-| `evidence-check` | E1: no `src` file imports the evidence trees — the `.agda-lib` layout already makes such an import UNRESOLVABLE, so this is the fast legible failure on top of the mechanism. E2: every probe declares a `-- TARGET:` and every target is a LIVE postulate, because a probe whose target is discharged stays green forever while being evidence for nothing. E3: the RECEIPT is held to the same discipline, since it outlives the probe and is usually the only trace left — it sits above a declaration, whose statement must still be a POSTULATE, so DISCHARGING one fails the gate until the receipt above it has been re-read and DELETED. A receipt has exactly one tense, and no dated variant of the marker: the theorem says more than the probe ever did, so on discharge the coverage claim is superseded rather than historicised, and whatever harness is worth keeping becomes a `RECOVERY:` pointer. Every NEAR MISS is a finding too, because a receipt a strict pattern walks past leaves the check reporting a tidy zero — which is what a requirement for a DATE in the marker did, silently, from the day its sibling check outlawed dates in source comments . E4 holds the HARNESS to the same expiry law, series by series, for a stronger reason than the probes have: nothing depends on a row and the gate never builds that tree. And the STATEMENT FINGERPRINT holds a receipt's rows to the statement they were taken against and not merely to the name: every `-- TARGET:` carries a hash of its target's type, and a target RESTATED under the same name is a build failure — the case the live-postulate check is blind to, since the name survives and the postulate is still live, so the probe goes on being green as evidence about text that is gone. The repair is never to restamp alone, which converts a false coverage claim into a certified one: re-run the rows against the statement as it now reads, or delete the probe. E6 splits the two products a probe can have and refuses a file claiming both — a receipt instantiates ONE statement and reports that it held, a FORK stands at a design choice between two candidate mechanisms and its product is a separation — because a receipt written from a file that also separates claims coverage the separating rows never bought; and a fork proves its separation in a TYPE whose apartness field is UNINHABITED when the candidates agree, so the marker decides only which law applies and Agda decides whether the claim is true. E7 closes the gap no comment convention could: a probe used to RESTATE its target's predicate by hand and pin THAT by `refl`, so a quietly weaker predicate stayed green and earned a receipt for a claim nobody had instantiated. Every target now carries at least one row whose type is the target APPLIED at the probe's own point — Agda generates it from the statement as it reads, so the probe chooses only the point and a restatement changes every row underneath. And the BODY may name NO POSTULATE, since ANY inhabitant would typecheck, the target handed back as its own proof included — and a row discharged out of a DIFFERENT postulate is evidence for one statement exactly as far as another is true. It is a LAUNDERING test and not a computation test, and the difference is what makes the rule satisfiable: a conclusion denominated in a family this tower SEALS for cost reduces at no point whatever, so a body held to a numeral could never be written against one at all, and a weakening through a PROVEN inequality is a stronger receipt than a numeral rather than a weaker one. And the head under the tie must be a declared target reached through the statement's own eliminators, because an arbitrary function applied to a postulate returns whatever type it likes and the tie is gone. E8 caps a live postulate's receipts at SEVEN, because past that the probes have stopped deciding anything: a probe AIMS a grind or REFUTES a statement, and a seventh receipt on one target has not told anyone something the sixth did not while the ledger row stays open — so what the evidence is then buying is more evidence to DELETE when the statement is discharged. Seven rather than three because a coverage LATTICE is legitimate, and rather than twelve because past seven the evidence has stopped converting into proof. The count is over `-- TARGET:` DECLARATIONS and not files, so a probe carrying three targets pays for three — and **the repair is to DISCHARGE the postulate or to DELETE the receipts that no longer earn their place, NEVER to merge probe files**, which satisfies a file count and changes nothing, the same laundering as trading a postulate for a hypothesis. A REFUTATION is uncapped, and that is not leniency: it kills a statement that is then GONE, so it cannot accumulate against a live row, and `make refuted` goes red the day `src` can no longer state it. A FORK is uncapped from the other side — it declares no target, and deciding between two mechanisms is the one job a single file does. And the cap is off a DISCHARGED target, whose receipts are E2's finding rather than a second one | [docs/evidence.md](docs/evidence.md), EVIDENCE.md |
+| `evidence-check` | E1: no `src` file imports the evidence trees — the `.agda-lib` layout already makes such an import UNRESOLVABLE, so this is the fast legible failure on top of the mechanism. E2: every probe declares a `-- TARGET:` and every target is a LIVE postulate, because a probe whose target is discharged stays green forever while being evidence for nothing. E3: the RECEIPT is held to the same discipline, since it outlives the probe and is usually the only trace left — it sits above a declaration, whose statement must still be a POSTULATE, so DISCHARGING one fails the gate until the receipt above it has been re-read and DELETED. A receipt has exactly one tense, and no dated variant of the marker: the theorem says more than the probe ever did, so on discharge the coverage claim is superseded rather than historicised, and whatever harness is worth keeping becomes a `RECOVERY:` pointer. Every NEAR MISS is a finding too, because a receipt a strict pattern walks past leaves the check reporting a tidy zero — which is what a requirement for a DATE in the marker did, silently, from the day its sibling check outlawed dates in source comments . And the STATEMENT FINGERPRINT holds a receipt's rows to the statement they were taken against and not merely to the name: every `-- TARGET:` carries a hash of its target's type, and a target RESTATED under the same name is a build failure — the case the live-postulate check is blind to, since the name survives and the postulate is still live, so the probe goes on being green as evidence about text that is gone. The repair is never to restamp alone, which converts a false coverage claim into a certified one: re-run the rows against the statement as it now reads, or delete the probe. E6 splits the two products a probe can have and refuses a file claiming both — a receipt instantiates ONE statement and reports that it held, a FORK stands at a design choice between two candidate mechanisms and its product is a separation — because a receipt written from a file that also separates claims coverage the separating rows never bought; and a fork proves its separation in a TYPE whose apartness field is UNINHABITED when the candidates agree, so the marker decides only which law applies and Agda decides whether the claim is true. E7 closes the gap no comment convention could: a probe used to RESTATE its target's predicate by hand and pin THAT by `refl`, so a quietly weaker predicate stayed green and earned a receipt for a claim nobody had instantiated. Every target now carries at least one row whose type is the target APPLIED at the probe's own point — Agda generates it from the statement as it reads, so the probe chooses only the point and a restatement changes every row underneath. And the BODY may name NO POSTULATE, since ANY inhabitant would typecheck, the target handed back as its own proof included — and a row discharged out of a DIFFERENT postulate is evidence for one statement exactly as far as another is true. It is a LAUNDERING test and not a computation test, and the difference is what makes the rule satisfiable: a conclusion denominated in a family this tower SEALS for cost reduces at no point whatever, so a body held to a numeral could never be written against one at all, and a weakening through a PROVEN inequality is a stronger receipt than a numeral rather than a weaker one. And the head under the tie must be a declared target reached through the statement's own eliminators, because an arbitrary function applied to a postulate returns whatever type it likes and the tie is gone. E8 caps a live postulate's receipts at SEVEN, because past that the probes have stopped deciding anything: a probe AIMS a grind or REFUTES a statement, and a seventh receipt on one target has not told anyone something the sixth did not while the ledger row stays open — so what the evidence is then buying is more evidence to DELETE when the statement is discharged. Seven rather than three because a coverage LATTICE is legitimate, and rather than twelve because past seven the evidence has stopped converting into proof. The count is over `-- TARGET:` DECLARATIONS and not files, so a probe carrying three targets pays for three — and **the repair is to DISCHARGE the postulate or to DELETE the receipts that no longer earn their place, NEVER to merge probe files**, which satisfies a file count and changes nothing, the same laundering as trading a postulate for a hypothesis. A REFUTATION is uncapped, and that is not leniency: it kills a statement that is then GONE, so it cannot accumulate against a live row, and `make refuted` goes red the day `src` can no longer state it. A FORK is uncapped from the other side — it declares no target, and deciding between two mechanisms is the one job a single file does. And the cap is off a DISCHARGED target, whose receipts are E2's finding rather than a second one | [docs/evidence.md](docs/evidence.md), EVIDENCE.md |
 | `unsafe-check` | no `TERMINATING` / `NO_POSITIVITY_CHECK` / `REWRITE` / `--type-in-type` etc. on the proof path. The build is not `--safe`, so this is the only thing stopping a soundness hole | [docs/unsafe-check.md](docs/unsafe-check.md) |
 | `dup-selftest` | the duplicate checker still fires | [docs/find.md](docs/find.md) |
 | `dup-check` | no two declarations proving the same fact, up to binder spelling and type synonyms | [docs/find.md](docs/find.md) |
@@ -589,36 +589,6 @@ carry before opening the doc:
 
 → [docs/agda-dev.md](docs/agda-dev.md) for the budget, `HOLES=1`, why there is no
 whole-project sweep, and the `NOT_DEV_CHECKABLE` policy.
-
-### `make harness` — the compiled calculator
-
-`agda/src/Harness/Main.agda` is a MODULE_ROOT that `make gate-heavy` never pays for. It exists
-because **the GHC backend ignores `abstract`**, so the binary runs the real bodies of
-families the checker refuses to unfold, and laughs at rungs that OOM the checker.
-
-**⚠ EVERY NUMBER IT PRINTS IS `measured-not-rechecked`, AND SAYING SO IS MANDATORY.** A
-harness row is not a `refl` pin: it cannot discharge a postulate, no proof may depend on
-it, and reporting one as "verified" is the same false-green failure as calling a dev run
-a gate. Its two legitimate uses are to **AIM the grind** and to **REFUTE** — and a row
-contradicting a postulate is a lead to chase back to a type-level witness, not itself
-the finding. → [docs/harness.md](docs/harness.md)
-
-**AND A SERIES EXPIRES LIKE A PROBE (Anthony).** Every `-- SERIES` declares a
-`-- TARGET:` and `make evidence-check` fails the moment that name leaves the postulate
-ledger; the series is then DELETED or retargeted, and the check is never relaxed. Its
-FINDINGS do not go with it — a coverage boundary, a blocked verdict or a dead route
-belongs in the header of the statement it CONSTRAINS, which is where it was owed in the
-first place.
-
-**AND IT DECAYS WORSE THAN THE PROBE TREE IT BORROWS THE LAW FROM, WHICH IS WHY THE LAW
-HAD TO BE BORROWED.** A probe at least sits in a tree the gate typechecks; nothing
-depends on a harness row, and the gate never builds this MODULE_ROOT, so a series
-measuring a statement that was proven months ago goes on printing numbers with nothing
-anywhere going red — the silent-decay failure of the probe tree, with the one check that
-would notice it absent as well. Measured on the sweep that set this rule: twenty-four
-series, ZERO target declarations, and TWELVE of them evidence about statements that were
-by then proven definitions or deleted outright. Half the file, and every line of it read
-as live.
 
 ## Module granularity: keep typechecks short
 
@@ -1688,17 +1658,24 @@ follow these phases in order:
    **phases** — leave middle steps as postulates and **commit in-between results**. Work
    until there are **no gaps**: no postulates, everything typechecks.
 
-## Bug cache: type-level unit tests
+## Bug cache: a compiled corpus of counterexamples
 
-When you discover an implementation bug, capture it immediately as a **type-level unit test**
-in `agda/src/Implementation/Unit-Test.agda` — a `_ : impl prog ≡ expected` that Agda checks by
-`refl` at compile time. Keep them dead simple: a wall of little `_ : … ≡ …` entries, no fancy
-names, no abstraction. They are a performance cache of discovered work, **not** meant to
-survive past the proof — delete the module once `The-Proof.agda` is discharged.
+When you discover an implementation bug, capture it immediately as a **row of the corpus**
+in `agda/src/Implementation/Unit-Test.agda` — a program, not a claim about one, since both
+properties the cache carries (well-formedness and impl≡spec) are checked of every row by a
+compiled runner. Keep them dead simple: a wall of little entries, no fancy names, no
+abstraction. They are a performance cache of discovered work, **not** meant to survive past
+the proof — delete the module once `The-Proof.agda` is discharged.
 
-The cache is **append-only**, and the invariant is that **`Unit-Test.agda` fully typechecks ⟺
-no known counterexample remains** — green there is the impl≡spec finish line. It is off Main,
-so `make bug-cache` is what enforces it. → [docs/bug-cache.md](docs/bug-cache.md)
+The cache is **append-only**, and the invariant is that **`make bug-cache` is green ⟺ no
+known counterexample remains** — green there is the impl≡spec finish line. The run happens in
+a BINARY rather than in the typechecker, and that is not an optimisation: a row used to be a
+`refl` over a whole `evaluate` run, so an append-only corpus charged the gate for every case
+on every run, forever. A cost per row the gate pays forever is the one property this file
+must not have. The corollary is the `measured-not-rechecked` law arriving here: a green row is
+checked by the GHC backend and the FFI rather than by Agda's kernel, so **no proof may ever
+depend on the cache** — which costs nothing, because it is off Main and slated for deletion.
+→ [docs/bug-cache.md](docs/bug-cache.md)
 
 In some cases it might make sense to add a new "naive rx" operator to fix an Agda-impl bug.
 This is allowed and encouraged when it's the best solution. But follow the port order: develop

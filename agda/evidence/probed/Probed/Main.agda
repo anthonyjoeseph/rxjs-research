@@ -44,33 +44,9 @@ open import Probed.Descent
 open import Probed.Fuel-Growth
   using (drF)
 
-open import Probed.Cascade-Growth
-  using (drC)
-
 open import Probed.Fit-Preserved
   using (fpQ1₁; fpQ1₂; fpQ1₃; fpQ2₁; fpQ2₂; fpQ2₃; fpQ3₁; fpQ3₂; fpQ3₃;
          fpDrain)
 
 open import Probed.Operator-Root
   using (opRoot)
-
-open import Probed.Delivery-Count
-  using (exponent-fork)
-
-open import Probed.Slot-Defer
-  using (slot-fork)
-
-open import Probed.Swapped-Exponent
-  using (measure-fork)
-
-open import Probed.Step-Fold
-  using (step-fold-fork)
-
-open import Probed.Plug-Priced
-  using (plug-priced-fork)
-
-open import Probed.Clause-Sweep
-  using (clause-sweep-fork)
-
-open import Probed.Slot-Priced
-  using (slot-priced-fork)

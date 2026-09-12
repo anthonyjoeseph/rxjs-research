@@ -37,7 +37,7 @@ open import Data.Bool using (true; false)
 open import Data.Empty using (⊥)
 open import Data.List using (List; []; _∷_)
 open import Data.Maybe using (nothing)
-open import Data.Nat using (ℕ; _≤_; z≤n)
+open import Data.Nat using (_≤_; z≤n)
 open import Data.Nat.Properties using (≤-refl)
 open import Data.Product using (_×_; _,_; proj₁)
 open import Data.Vec using () renaming ([] to []ⱽ)
@@ -83,16 +83,6 @@ DryOperator = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} {τ : Tri}
 -- that is the whole of the finding.
 ----------------------------------------------------------------------
 
--- THE STORE BOUND the schedule below is built at.  `evaluate` builds
--- its schedule at the fuel it then hands the drain, so a witness is
--- about a RUN only when the two agree; nothing here drains, so what the
--- bound has to be is one a run could carry rather than one chosen to
--- make the crossing easier.  A LARGER bound only enlarges the rank the
--- root would enter at, and the rank this witness picks is zero, so the
--- finding is independent of it.
-SB : ℕ
-SB = 30
-
 Γ₀ : Ctx 0
 Γ₀ = []ⱽ
 
@@ -114,12 +104,12 @@ opShape-prog = refl
 ac₀ : Acc _≺_ τ₀
 ac₀ = ≺-wellFounded τ₀
 
-reads₀ : EntryReads₂ τ₀ prog (Sched.slots (sched-init SB prog ins₀))
+reads₀ : EntryReads₂ τ₀ prog (Sched.slots (sched-init prog ins₀))
                              (EvalSt.connectedShares (st-init prog))
 reads₀ = z≤n , ≤-refl
 
 burst₀ : Stream Γ₀ natᵗ
-burst₀ = proj₁ (subscribeE ac₀ prog root 0 0 (sched-init SB prog ins₀) (st-init prog))
+burst₀ = proj₁ (subscribeE ac₀ prog root 0 0 (sched-init prog ins₀) (st-init prog))
 
 ----------------------------------------------------------------------
 -- THE CROSSING, PINNED BY `refl` RATHER THAN COMPUTED INSIDE THE ⊥.  The
@@ -134,7 +124,7 @@ dry₀ = refl
 
 dry-operator-false : DryOperator → ⊥
 dry-operator-false h
-  with trans (sym (h ac₀ prog root 0 0 (sched-init SB prog ins₀) (st-init prog)
+  with trans (sym (h ac₀ prog root 0 0 (sched-init prog ins₀) (st-init prog)
                      opShape-prog reads₀))
              dry₀
 ... | ()

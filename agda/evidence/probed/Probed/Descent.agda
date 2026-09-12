@@ -5,7 +5,7 @@
 -- EVIDENCE, not a claim: `src` cannot import this file and nothing in the
 -- proof may rest on it.  Checked by `make probed`, claimed by `Probed.Main`.
 -- TARGET: drain-dry-free @0b82eb
--- TARGET: entry-hop-fits @5c4463
+-- TARGET: entry-hop-fits @9f8beb
 --
 -- WHY THIS REGION AND NOT THE CANONICAL PROGRAMS.  `evaluate` descends on
 -- a triple and three of its clauses are guarded by a comparison that can
@@ -81,18 +81,19 @@ evs = sum ∘ map (length ∘ InstEmit.events)
 -- it drains, so `drainOf` is what `drain-dry-free` is about everywhere.
 ----------------------------------------------------------------------
 
--- THE STORE BOUND every reading here is taken at.  `evaluate` builds
--- its schedule at the fuel it then hands the drain, so a row is about a
--- RUN only when the two agree — and this is the fuel `drainOf` and
--- every row below spend.  A row free to pick the bound separately would
--- be picking how tight the statement it instantiates is.
+-- THE DRAIN'S STEP BUDGET, and it is no longer a reading of anything:
+-- the entry takes no parameter but the program and the telescope, so
+-- nothing here can be picked generously.  What `FUEL` buys is that the
+-- drain RUNS TO COMPLETION at every program below — a truncated drain
+-- emits nothing further and a row over one would be discharged by
+-- emptiness, which is the vacuity the event counts rule out.
 FUEL : Fuel
 FUEL = 30
 
 entry : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
   Stream Γ t × Sched Γ × EvalSt e
 entry e ins =
-  subscribeE (rootWitness FUEL e ins) e root 0 0 (sched-init FUEL e ins)
+  subscribeE (rootWitness e ins) e root 0 0 (sched-init e ins)
     (st-init e)
 
 ----------------------------------------------------------------------
@@ -378,11 +379,11 @@ _ = refl
 -- share holding a recursion referenced from inside a second one.
 ----------------------------------------------------------------------
 
-fitP1 : Confirms (entry-hop-fits FUEL progP1 ins₀)
+fitP1 : Confirms (entry-hop-fits progP1 ins₀)
 fitP1 = Below
 
-fitP3 : Confirms (entry-hop-fits FUEL progP3 ins₀)
+fitP3 : Confirms (entry-hop-fits progP3 ins₀)
 fitP3 = Below
 
-fitP12 : Confirms (entry-hop-fits FUEL progP12 insMu)
+fitP12 : Confirms (entry-hop-fits progP12 insMu)
 fitP12 = Below
