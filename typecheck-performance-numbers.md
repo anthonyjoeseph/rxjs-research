@@ -200,6 +200,7 @@ when nothing moved, so a build does not dirty the tree.
 | `agda-dev CLI/JSON.agda` | **3.5 s** | 3.5 s | 1 |
 | `agda-dev Implementation.agda` | **3.5 s** | 3.5 s | 1 |
 | `agda-dev Spec.agda` | **3.5 s** | 3.5 s | 1 |
+| `agda-dev ../evidence/probed/Probed/Apparatus.agda` | **3.5 s** | 3.5 s | 1 |
 | `agda-dev Decide.agda` | **3.4 s** | 3.4 s | 1 |
 | `agda-dev Verify-Batch-Simultaneous/The-Proof.agda` | **1.0 s** | >2 s | 83 |
 | `agda-dev Verify-Well-Formed/Part13.agda` | **1.0 s** | 9.1 s | 4 |
