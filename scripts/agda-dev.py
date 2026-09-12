@@ -306,25 +306,62 @@ def stale_cone(rel: str) -> list[str]:
     target = ci.module_of(os.path.join("agda", "src", rel))
     if target not in graph:
         return []
-    builds = glob.glob(os.path.join(MIRROR, "_build", "*", "agda"))
-    if not builds:
-        return []
     stale = []
     for m in sorted(ci.reachable(graph, [target])):
         src = by_mod.get(m)
         if m == target or src is None:
             continue
-        rest = os.path.relpath(src, "agda")
-        mir = os.path.join(MIRROR, rest)
+        mir = os.path.join(MIRROR, os.path.relpath(src, "agda"))
         if not os.path.exists(mir):
             continue
-        ifaces = [os.path.join(b, rest[:-5] + ".agdai") for b in builds]
+        ifaces = iface_paths(mir)
+        if ifaces is None:
+            continue
         fresh = [i for i in ifaces
                  if os.path.exists(i)
                  and os.path.getmtime(i) >= os.path.getmtime(mir)]
         if not fresh:
             stale.append(m)
     return stale
+
+
+def lib_root(mirror_path: str) -> str | None:
+    """The directory of the `.agda-lib` that OWNS a mirror file.
+
+    Agda writes `_build/<ver>/agda/<path relative to that directory>`, so a
+    tree carrying its own library keeps its interfaces beside its OWN
+    `.agda-lib` rather than beside the one at the top of the mirror.  This
+    repo has three, and a single hard-coded build root therefore names a path
+    no evidence interface has ever occupied — which reports every module of
+    that tree stale FOREVER, since a warm run cannot create a file at a path
+    Agda does not write.  Reading the owner off the filesystem is what makes
+    the answer right for a tree this function has never heard of.
+    """
+    d = os.path.dirname(os.path.abspath(mirror_path))
+    stop = os.path.dirname(os.path.abspath(MIRROR))
+    while d != stop and os.path.dirname(d) != d:
+        if glob.glob(os.path.join(d, "*.agda-lib")):
+            return d
+        d = os.path.dirname(d)
+    return None
+
+
+def iface_paths(mirror_path: str) -> list[str] | None:
+    """Every interface Agda could have written for one mirror source.
+
+    `None` means UNKNOWN — no owning library, or no build directory under it
+    — and every caller reads that as "report nothing", which is the safe
+    direction: an unknown layout charges the module rather than inventing a
+    cone.
+    """
+    lib = lib_root(mirror_path)
+    if lib is None:
+        return None
+    builds = glob.glob(os.path.join(lib, "_build", "*", "agda"))
+    if not builds:
+        return None
+    within = os.path.relpath(os.path.abspath(mirror_path), lib)
+    return [os.path.join(b, within[:-5] + ".agdai") for b in builds]
 
 # A top-level line opening a construct we keep VERBATIM and never stub.  Its
 # indented body comes along with it.  `mutual`/`private`/`abstract` blocks are
@@ -826,11 +863,50 @@ def warm_run(rel: str, args) -> int:
               "  bodies of its own, so this is a real error BELOW the file you are\n"
               "  editing, and no check of that file could have succeeded either.")
         return 1
+    warmed = reconcile(rel, cone)
     left = stale_cone(rel)
     print(f"\nagda-dev --warm: GREEN in {elapsed:.1f}s -- "
           f"{len(cone) - len(left)} module(s) warmed"
+          + (f" ({warmed} already current by Agda's own reckoning)" if warmed else "")
           + (f", {len(left)} still stale.\n" if left else ", the cone is clean.\n"))
     return 0
+
+
+def reconcile(rel: str, cone: list[str]) -> int:
+    """Make the mtime rule agree with the authority that just spoke.
+
+    AGDA DECIDES FRESHNESS BY HASH AND THIS FUNCTION BY MTIME, so a mirror
+    rewritten with content Agda has already hashed leaves an interface Agda
+    will happily reuse and this file calls stale.  A warm run then rebuilds
+    NOTHING, reports zero warmed, and the refusal above it becomes
+    unclearable: the one state in which a correct tool refuses to run and
+    offers a remedy that cannot work.
+
+    A GREEN warm run is Agda's own verdict that every module in the cone has
+    a usable interface, so stamping those interfaces is not papering over
+    staleness -- it is recording a verdict this function could not compute.
+    An interface that does not EXIST is untouched and stays stale, which is
+    the genuine failure and the one worth reporting.
+    """
+    ci = _load("check-imports")
+    files = []
+    for tree in ci.TREES:
+        for root, _, fs in os.walk(os.path.join(REPO, tree)):
+            files.extend(os.path.relpath(os.path.join(root, f), REPO)
+                         for f in fs if f.endswith(".agda"))
+    by_mod = {ci.module_of(p): p for p in files}
+    now = time.time()
+    stamped = 0
+    for m in cone:
+        src = by_mod.get(m)
+        if src is None:
+            continue
+        mir = os.path.join(MIRROR, os.path.relpath(src, "agda"))
+        for i in iface_paths(mir) or []:
+            if os.path.exists(i):
+                os.utime(i, (now, now))
+                stamped += 1
+    return stamped
 
 
 def using_names(block: list[str]) -> list[str]:
@@ -1524,9 +1600,20 @@ def falsify_cone() -> int:
     No Agda process: the whole mechanism is `os.path.getmtime`, which is why it
     can sit in a selftest that runs in a second.
     """
-    victim, consumer, stranger = "Rx.Exp", "Rx/Frame-Width.agda", "Rx/Prim.agda"
-    ifaces = glob.glob(os.path.join(
-        MIRROR, "_build", "*", "agda", "src", *victim.split(".")) + ".agdai")
+    victim, consumer, stranger = "Rx.Exp", "Rx/Hop-Depth.agda", "Rx/Prim.agda"
+    # AND THE NAMES ARE CHECKED BEFORE THE PROPERTY IS.  A consumer that has
+    # been DELETED leaves `stale_cone` returning the empty list for a reason
+    # having nothing to do with interfaces, which reads as the very failure
+    # this test exists to catch and sends the reader at the mechanism.  One
+    # of these three had been gone for a campaign.
+    for f in (consumer, stranger):
+        if not os.path.exists(os.path.join(SRC, f)):
+            print(f"agda-dev --falsify: FAILED — this test names {f}, which no "
+                  "longer exists; repoint it at a live module rather than "
+                  "reading its verdict.", file=sys.stderr)
+            return 1
+    ifaces = [i for i in iface_paths(os.path.join(
+        MIRROR, "src", *victim.split(".")) + ".agda") or [] if os.path.exists(i)]
     if not ifaces:
         print(f"agda-dev --falsify: no interface for {victim}; cone check "
               "UNTESTED (build the tree once, then re-run).", file=sys.stderr)
@@ -1553,6 +1640,55 @@ def falsify_cone() -> int:
         return 1
     print(f"agda-dev --falsify: PASSED — a missing {victim} interface is "
           f"charged to {consumer} and not to {stranger}.")
+    return falsify_lib_roots()
+
+
+def falsify_lib_roots() -> int:
+    """Prove the cone check finds an interface in EVERY library of the tree.
+
+    This is the direction the check above cannot reach, because its victim
+    and its consumer both live in `src`, where the mirror's top-level build
+    directory is the right answer by luck.  A tree with its own `.agda-lib`
+    keeps its interfaces elsewhere, so a lookup rooted at the top reports
+    every one of its modules stale forever — a permanent refusal whose
+    remedy is a warm run that cannot clear it, since nothing will ever write
+    the file being looked for.  The failure is silent in the worst way: it
+    reads exactly like a cold cache.
+
+    So the property is stated over the LIBRARIES rather than over a name:
+    every `.agda-lib` in the mirror that has been built at all must have at
+    least one module whose interface this function can locate.
+    """
+    libs = [os.path.dirname(p) for p in
+            glob.glob(os.path.join(MIRROR, "**", "*.agda-lib"), recursive=True)]
+    built = [d for d in libs if glob.glob(os.path.join(d, "_build", "*", "agda"))]
+    if not built:
+        print("agda-dev --falsify: no library in the mirror has been built; "
+              "library-root check UNTESTED.", file=sys.stderr)
+        return 2
+    blind = []
+    for d in built:
+        found = False
+        for root, _, fs in os.walk(d):
+            if "_build" in root.split(os.sep):
+                continue
+            for f in fs:
+                if f.endswith(".agda") and any(
+                        os.path.exists(i)
+                        for i in iface_paths(os.path.join(root, f)) or []):
+                    found = True
+                    break
+            if found:
+                break
+        if not found:
+            blind.append(os.path.relpath(d, REPO))
+    if blind:
+        print("agda-dev --falsify: FAILED — these built libraries have no "
+              "module whose interface the cone check can find, so every module "
+              "in them reports stale forever: " + ", ".join(blind), file=sys.stderr)
+        return 1
+    print(f"agda-dev --falsify: PASSED — the cone check locates interfaces in "
+          f"all {len(built)} built librar(y/ies) of the mirror.")
     return 0
 
 
@@ -1573,7 +1709,11 @@ def falsify_warm() -> int:
     back a warm run that goes red for a reason having nothing to do with the
     cone.
     """
-    victim, consumer = "Rx.Exp", "Rx/Frame-Width.agda"
+    victim, consumer = "Rx.Exp", "Rx/Hop-Depth.agda"
+    if not os.path.exists(os.path.join(SRC, consumer)):
+        print(f"agda-dev --falsify: FAILED — this test names {consumer}, which "
+              "no longer exists; repoint it at a live module.", file=sys.stderr)
+        return 1
     p = parse(os.path.join(SRC, consumer))
     text = render_warm(p, mangle(consumer) + "-Warm")
     imports = [p.lines[it.start] for it in p.items
@@ -1647,9 +1787,18 @@ def falsify(args) -> int:
         print(f"agda-dev --falsify: src/{rel} has no multi-member block.", file=sys.stderr)
         return 2
 
+    # ONLY A MEMBER THE CHECK WILL ACCEPT AS A FOCUS.  `dev_check` narrows a
+    # block to the members in a CYCLE, so corrupting one outside it makes the
+    # run fail by REFUSING the focus — and a test that reads any nonzero exit
+    # as "the corruption was caught" then passes without ever checking a
+    # corrupted body, which is precisely the green-by-construction outcome it
+    # exists to rule out.  Measured: the member this used to pick had left the
+    # cycle, so every run of this test had been vacuous.
+    cyclic = [m for bi in heavy for m in p.blocks[bi].members
+              if m in scc_of(p, p.blocks[bi].members)]
     original = open(path, encoding="utf-8").read()
     target, span = None, None
-    for f in p.blocks[heavy[0]].members:
+    for f in cyclic:
         for it in p.items:
             if it.kind == "clauses" and it.name == f:
                 body = "\n".join(p.lines[it.start : it.end])

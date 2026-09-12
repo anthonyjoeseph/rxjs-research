@@ -233,6 +233,22 @@ open import Verify-Rank-Sufficient.Hop using (hopFits)
 --   is a literal and the flattener a merge, so no row reaches a cascade
 --   whose inner is itself a recursion — which the gate above says
 --   cannot lengthen one, and which nothing here instantiates.
+-- PROBED: `Probed.Fit-Preserved` — the fit at states the DRAIN produced,
+--   which every receipt above is silent about.  `stepOnce` is the loop's
+--   own step with the emit stream dropped — the same pull, the same
+--   cascade, the same instant counter — so a row reads the pair the
+--   recursion would have been handed rather than one written by hand.
+--   Nine rows over three recursive programs at one, two and three
+--   arrivals, each spending the decision procedure on the comparison, so
+--   a fit the k-th arrival destroyed leaves its row unsolvable instead of
+--   letting it through.  The finding is stronger than preservation: the
+--   left side does not MOVE — two across the plain recursion, three
+--   across both nested ones, against rank exponents of eleven, nineteen
+--   and twenty-eight — while the registration counter climbs at every
+--   step on every program, which is what separates a flat reading from a
+--   stepper that had become a fixed point.  THE BOUNDARY: three arrivals,
+--   the naive reading, a merge only, and nothing here reaches the
+--   late-slot cascade the receipt above instantiates.
 
 postulate
   drain-dry-free : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}

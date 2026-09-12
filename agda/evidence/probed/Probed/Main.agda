@@ -50,5 +50,9 @@ open import Probed.Fuel-Growth
 open import Probed.Cascade-Growth
   using (drC)
 
+open import Probed.Fit-Preserved
+  using (fpQ1₁; fpQ1₂; fpQ1₃; fpQ2₁; fpQ2₂; fpQ2₃; fpQ3₁; fpQ3₂; fpQ3₃;
+         fpDrain)
+
 open import Probed.Operator-Root
   using (opRoot)
