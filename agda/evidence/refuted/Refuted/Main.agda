@@ -14,6 +14,8 @@
 module Refuted.Main where
 
 open import Refuted.Burst-Nesting using (burst-under-emitter-false)
+open import Refuted.Drain-Reachable using (drain-dry-free-false;
+  drain-dry-free-inv-false)
 open import Refuted.Rank-Entry using (dry-operator-false)
 open import Refuted.Rank-Fold using (dry-operator-fold-false)
 open import Refuted.Sync-Count using (sync-count-bounded-false)

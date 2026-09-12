@@ -213,13 +213,12 @@ research lives; where they disagree, the header wins.
 dry marker. It is now a real body: `evaluate` is a root subscribe followed by a
 drain, and the two leaves below are that split.
 
-**EVERY CONJUNCT READ OFF THE TERM IS REFUTED, AND NOW SO IS THE SEED'S RATE.**
-Four denominations are dead — a `suc`, a state-reading conjunct, the arrival
-re-seed, and the sync component, which `Refuted.Sync-Count` kills for every
-additive syntactic measure at once. `Probed.Operator-Root` closes the last route
-out: a run gains depth faster in the source length than the rank's exponential
-seed grows, so no bound read off the TERM is the fix and neither is a bigger
-seed. The repair is what the hop descends on. Both rows stay SHAPE.
+**NOTHING THE ENTRY READS BOUNDS WHAT COMES AFTER IT, AND BOTH ROWS ARE
+REFUTED ON THAT.** Every conjunct read off the term is dead, and so is the
+seed's rate — a run gains depth faster in the source length than the rank's
+exponential seed grows. The drain row falls the same way from the other side,
+at a registration whose own frames manufacture depth the entry never reads.
+Both rows stay SHAPE, and the repair is what the hop descends on.
 
 **A FAILING GUARD IS NOT AN ERROR, AND THAT IS WHY THE TIER IS PROBEABLE.** A
 guarded clause returns a `dry` emit and the run continues, so both sides
@@ -238,15 +237,17 @@ compute at every program.
   leg is what carries the re-entry instead — the burst walk is structural, so a
   hop free to re-seed needs the descent living somewhere the run cannot outrun.
 
-- **PIN THE DRAIN LEAF TO SCHEDULES A RUN CAN REACH.** The cascade question is
-  answered and the two leaves are different statements: `Probed.Cascade-Growth`
-  grows three then six layers under ONE entry apiece against seeds of `2 ^ 20`
-  and `2 ^ 23`, and the reason is structural — a cascade is one instant, an
-  arrival is a tick, and a recursion re-enters only through `deferᵉ`, pending at
-  `suc now`. So nothing a term does not read can lengthen a cascade. What is
-  left in this row is what it never shared with its sibling: `sched` and `st`
-  arrive unconstrained, so the leaf is quantified over states no run mints. The
-  leg is that reachability premise and the arms that establish it.
+- **TIE A REGISTRATION'S FRAMES TO THE PROGRAM.** `Refuted.Drain-Reachable`
+  kills the drain leaf as written, and kills it again conditioned on the
+  coherence record — so the reachability premise the previous leg planned is
+  not the repair. A chain is a `Path` carrying no index to the program, and
+  `foldPath` threads ONE witness through every frame, so a `map-f` hands back a
+  tower of any depth while the record constrains only the registry's counts and
+  types. That NARROWS the region rather than moving it: from an arbitrary
+  schedule and store to one missing fact, and the leg states it. Every
+  registration's frames come from `e`, which puts a `map-f` body's depth under
+  `sizeᵉ e` and leaves the value it is applied to as the nesting the arrival
+  already reads.
 
 ### The ledger
 
@@ -256,10 +257,10 @@ compute at every program.
   ABOVE its tightest triple — so no conjunct read off the term repairs it, the
   sync component included.
 
-- **`drain-dry-free`** (Verify-Rank-Sufficient) — SHAPE, `PROBED×4`: every
-  arrival after the root frame. The cascade's own growth is now instantiated
-  and the seed dominates it, so the residue is the unconstrained schedule and
-  state: the leaf is quantified over registries no run mints.
+- **`drain-dry-free`** (Verify-Rank-Sufficient) — SHAPE, `REFUTED×2, PROBED×4`:
+  every arrival after the root frame. Refuted as written and refuted again
+  under the coherence record, at a registration whose `map-f` carries a tower
+  no quantity the entry reads bounds.
 
 ## Tier 2 — Verify-Well-Formed (parked behind tier 1)
 
