@@ -5,7 +5,6 @@
 -- EVIDENCE, not a claim: `src` cannot import this file and nothing in the
 -- proof may rest on it.  Checked by `make probed`, claimed by `Probed.Main`.
 -- TARGET: drain-dry-free @458c9c
--- TARGET: dry-operator @27b615
 --
 -- WHY THIS REGION AND NOT THE CANONICAL PROGRAMS.  `evaluate` descends on
 -- a triple and three of its clauses are guarded by a comparison that can
@@ -17,16 +16,12 @@
 -- That is why these rows are hand-written and why they are recursion
 -- first: the behavioural gap and the proof gap are the same region.
 --
--- THE RUN SPLITS WHERE THE ASSEMBLY SPLITS IT, which is what changed here
--- and is the reason a row is no longer one per program.  `evaluate` is the
--- root subscribe followed by the drain, and dry-freedom of each half is
--- now a separate obligation: the drain's is `drain-dry-free`, and the
--- burst's is proven outright except at an OPERATOR root, where it is
--- `dry-operator`.  So the twelve recursive programs land on the drain
--- leaf, which is where every one of them does its recursion, and the
--- operator leaf is reached by rooting three of the same shapes under a
--- `takeᵉ` — the wrapper a user writes anyway, and the only one of the
--- twelve that already had one.
+-- THE RUN SPLITS WHERE THE ASSEMBLY SPLITS IT, which is why a row here is
+-- about a half rather than about a program.  `evaluate` is the root
+-- subscribe followed by the drain, and dry-freedom of each half is a
+-- separate obligation; the burst's is now proven outright at every shape
+-- but the three flatteners, so the twelve recursive programs land on the
+-- drain leaf — which is where every one of them does its recursion.
 --
 -- EVERY ROW IS LABELLED, because a row that could not have failed is not a
 -- row.  `hasDry` is `any` over the emit stream, so it is `false` outright
@@ -66,8 +61,6 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; drain; subscribeE;
   rootWitness; root; sched-init; st-init)
 open import Rx.Slots using (Slots; scripted)
 open import Verify-Rank-Sufficient using (drain-dry-free)
-open import Verify-Rank-Sufficient.Dry using (dry-operator)
-open import Verify-Rank-Sufficient.Entry using (rootTri-reads)
 open import Probed.Apparatus using (Confirms)
 
 ----------------------------------------------------------------------
@@ -84,16 +77,12 @@ evs = sum ∘ map (length ∘ InstEmit.events)
 ----------------------------------------------------------------------
 -- The two halves a run splits into, named once so a row can point at
 -- either.  `entry` is the root subscribe the evaluator performs before
--- it drains, so `burstOf` is what `dry-operator` is about at an operator
--- root and `drainOf` is what `drain-dry-free` is about everywhere.
+-- it drains, so `drainOf` is what `drain-dry-free` is about everywhere.
 ----------------------------------------------------------------------
 
 entry : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
   Stream Γ t × Sched Γ × EvalSt e
 entry e ins = subscribeE (rootWitness e ins) e root 0 0 (sched-init e ins) (st-init e)
-
-burstOf : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) → Stream Γ t
-burstOf e ins = proj₁ (entry e ins)
 
 ----------------------------------------------------------------------
 -- The empty context: these programs are pure recursion, with no slot to
@@ -139,8 +128,7 @@ _ = refl
 -- for a different reason than P1: the cut arrives from OUTSIDE the μ, so
 -- the unfolding is interrupted mid-descent rather than run out of fuel,
 -- and the count below is an order of magnitude smaller for exactly that
--- reason.  It is also the one program of the twelve whose ROOT is an
--- operator, so it carries the operator leaf's first row as well.
+-- reason.
 ----------------------------------------------------------------------
 
 progP2 : Closed Γ₀ natᵗ
@@ -151,13 +139,6 @@ descP2 : Confirms (drain-dry-free FUEL 1
 descP2 = refl
 
 _ : evs (drainOf progP2 ins₀) ≡ 16       -- LOAD-BEARING
-_ = refl
-
-opP2 : Confirms (dry-operator (rootWitness progP2 ins₀) progP2 root 0 0
-  (sched-init progP2 ins₀) (st-init progP2) refl (rootTri-reads progP2 ins₀))
-opP2 = refl
-
-_ : evs (burstOf progP2 ins₀) ≡ 6        -- LOAD-BEARING
 _ = refl
 
 ----------------------------------------------------------------------
@@ -369,35 +350,4 @@ descP12 : Confirms (drain-dry-free FUEL 1
 descP12 = refl
 
 _ : evs (drainOf progP12 insMu) ≡ 233     -- LOAD-BEARING
-_ = refl
-
-----------------------------------------------------------------------
--- THE OPERATOR ROOT, which is the other leaf and a different half of the
--- run: the subscribe FRAME rather than the drain.  A `takeᵉ` over each
--- of the three shapes above that carry something the burst has to walk —
--- plain recursion, a recursion reaching a share, and a share HOLDING a
--- recursion — so the leaf is reached with the connect peel live and with
--- the nesting the rank peel is about.  No drain runs here at all, which
--- is why these rows are cheap and why they say something the twelve
--- above cannot.
-----------------------------------------------------------------------
-
-progO7 : Closed Γ₁ natᵗ
-progO7 = takeᵉ (nat̂ 3) progP7
-
-opO7 : Confirms (dry-operator (rootWitness progO7 insShared) progO7 root 0 0
-  (sched-init progO7 insShared) (st-init progO7) refl (rootTri-reads progO7 insShared))
-opO7 = refl
-
-_ : evs (burstOf progO7 insShared) ≡ 9    -- LOAD-BEARING
-_ = refl
-
-progO11 : Closed Γ₁ natᵗ
-progO11 = takeᵉ (nat̂ 3) progP11
-
-opO11 : Confirms (dry-operator (rootWitness progO11 insMu) progO11 root 0 0
-  (sched-init progO11 insMu) (st-init progO11) refl (rootTri-reads progO11 insMu))
-opO11 = refl
-
-_ : evs (burstOf progO11 insMu) ≡ 10       -- LOAD-BEARING
 _ = refl

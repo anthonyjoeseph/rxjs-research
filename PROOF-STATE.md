@@ -214,28 +214,29 @@ dry marker. It is now a real body: `evaluate` is a root subscribe followed by a
 drain, and the two leaves below are that split.
 
 **EVERY CONJUNCT READ OFF THE TERM IS REFUTED, AND THE RESIDUE IS ONE
-HYPOTHESIS.** Four denominations are dead — a `suc`, a state-reading conjunct,
-the arrival re-seed that landed, and the sync component, which
-`Refuted.Sync-Count` kills for every additive syntactic measure at once. What
-is left is not a fifth: the whole weight is establishing that what a burst
-CARRIES reads under what emitted it. Both rows stay SHAPE.
+HYPOTHESIS AT THREE CLAUSES.** Four denominations are dead — a `suc`, a
+state-reading conjunct, the arrival re-seed that landed, and the sync
+component, which `Refuted.Sync-Count` kills for every additive syntactic
+measure at once. What is left is not a fifth: the weight is establishing that
+what a burst CARRIES reads under what emitted it, and only the three flatteners
+reach the hop that spends it. Both rows stay SHAPE.
 
 **A FAILING GUARD IS NOT AN ERROR, AND THAT IS WHY THE TIER IS PROBEABLE.** A
 guarded clause returns a `dry` emit and the run continues, so both sides
-compute at every program with nothing sealed between them.
+compute at every program.
 
 ### Big picture tier roadmap
 
-- **BOUND WHAT A BURST CARRIES, AS A STRENGTHENED RETURN TYPE.** Four
-  denominations are dead and a fifth is not the answer: the hop peel's own
-  ≺-witness is the order's constructor handed its hypothesis, so every gram goes
-  to that hypothesis. The inner is a runtime VALUE no equation on
-  syntax reaches, but it RODE a burst some subscribe produced — so its nesting
-  travels as a strengthened return type on the burst-producing functions,
-  invariant in the motive, rather than as a conjunct read off a term. The leg is
-  the strengthening and its walk arms; `Refuted.Burst-Nesting` fixes which
-  inequality is available, so it lands the strict form or restates that
-  refutation about the emitter.
+- **STRENGTHEN THE RETURN TYPE OF THE THREE FLATTENERS' WALK.** The shelf is no
+  longer every clause that re-enters through a burst: `subscribeInner`, reached
+  through `thru-outer` alone, is the pipeline's only rank drop, so the four
+  shapes that cannot reach it need no rank reading and are proven. What remains
+  is the strengthening itself, now owed at three clauses rather than seven: the
+  inner is a runtime VALUE no equation on syntax reaches, but it RODE a burst
+  some subscribe produced, so its nesting travels as a strengthened return type
+  on `subscribeAll` and the walk under it, invariant in the motive.
+  `Refuted.Burst-Nesting` fixes which inequality is available, so the leg lands
+  the strict form or restates that refutation about the emitter.
 
 - **PIN THE DRAIN LEAF TO SCHEDULES A RUN CAN REACH.** The cascade question is
   answered and the two leaves are different statements: `Probed.Cascade-Growth`
@@ -250,15 +251,15 @@ compute at every program with nothing sealed between them.
 ### The ledger
 
 - **`dry-operator`** (Verify-Rank-Sufficient.Dry) — SHAPE,
-  `REFUTED×4, PROBED×3, RECOVERY`: the operator shelf's dry-freedom under an
-  invariant bounding the nesting on entry. Refuted at the LIVE form one peel
-  ABOVE its tightest triple — so no conjunct read off the term repairs it, the
-  sync component included.
+  `REFUTED×4, RECOVERY`: the THREE FLATTENERS' dry-freedom under an invariant
+  bounding the nesting on entry. Refuted at the LIVE form one peel ABOVE its
+  tightest triple — so no conjunct read off the term repairs it, the sync
+  component included.
 
 - **`drain-dry-free`** (Verify-Rank-Sufficient) — SHAPE, `PROBED×4`: every
-  arrival after the root frame. The cascade's own growth is now instantiated and
-  the seed dominates it, so the residue is the unconstrained schedule and state:
-  the leaf is quantified over registries no run mints.
+  arrival after the root frame. The cascade's own growth is now instantiated
+  and the seed dominates it, so the residue is the unconstrained schedule and
+  state: the leaf is quantified over registries no run mints.
 
 ## Tier 2 — Verify-Well-Formed (parked behind tier 1)
 

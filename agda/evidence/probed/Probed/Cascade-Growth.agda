@@ -46,7 +46,6 @@
 -- either — a merge only — since what is being asked is whether a cascade
 -- can grow at all under one entry, not which registry clause carries it.
 --
--- TARGET: dry-operator @27b615
 -- TARGET: drain-dry-free @458c9c
 module Probed.Cascade-Growth where
 
@@ -67,8 +66,6 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; drain; subscribeE;
   rootWitness; root; sched-init; st-init)
 open import Rx.Nest-Depth using (nestDᵉ)
 open import Verify-Rank-Sufficient using (drain-dry-free)
-open import Verify-Rank-Sufficient.Dry using (dry-operator)
-open import Verify-Rank-Sufficient.Entry using (rootTri-reads)
 open import Probed.Apparatus using (Confirms)
 
 ----------------------------------------------------------------------
@@ -180,15 +177,9 @@ _ : seed casc6 insLate ≡ 8388608                       -- LOAD-BEARING
 _ = refl
 
 ----------------------------------------------------------------------
--- THE TWO LEAVES AT THE DEEPER OF THE PAIR.  The operator row sits at
--- the root, where the invariant is the reflexive one; the drain row is
--- the half that carries the cascade, and it is the one this file is
--- really about.
+-- THE LEAF AT THE DEEPER OF THE PAIR.  The drain row is the half that
+-- carries the cascade, and it is the one this file is really about.
 ----------------------------------------------------------------------
-
-opC : Confirms (dry-operator (rootWitness casc6 insLate) casc6 root 0 0
-  (sched-init casc6 insLate) (st-init casc6) refl (rootTri-reads casc6 insLate))
-opC = refl
 
 drC : Confirms (drain-dry-free 2 1
   (proj₁ (proj₂ (entry casc6 insLate))) (proj₂ (proj₂ (entry casc6 insLate))))

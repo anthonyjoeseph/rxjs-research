@@ -4,7 +4,6 @@
 -- EVIDENCE, not a claim: `src` cannot import this file and nothing in
 -- the proof may rest on it.  Checked by `make probed`, claimed by
 -- `Probed.Main`.
--- TARGET: dry-operator @27b615
 -- TARGET: drain-dry-free @458c9c
 --
 -- WHAT THE SIBLING ROWS LEFT OPEN.  The seed rows put a fold's carried
@@ -71,8 +70,6 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; drain; subscribeE;
   rootWitness; root; sched-init; st-init)
 open import Rx.Nest-Depth using (nestDᵉ)
 open import Verify-Rank-Sufficient using (drain-dry-free)
-open import Verify-Rank-Sufficient.Dry using (dry-operator)
-open import Verify-Rank-Sufficient.Entry using (rootTri-reads)
 open import Probed.Apparatus using (Confirms)
 
 ----------------------------------------------------------------------
@@ -175,16 +172,12 @@ _ : carried (drainAt 6 fold ins₀) ≡ 7                  -- LOAD-BEARING
 _ = refl
 
 ----------------------------------------------------------------------
--- THE TWO LEAVES, INSTANTIATED AT THIS RUN.  They are green, and the
--- rows above are why: the fuel a row can afford is six and the seed is
--- a million, so nothing here has reached the crossing.  What the pair
--- buys is that the growth is measured INSIDE the region the leaves
--- quantify over, rather than at a triple chosen to break them.
+-- THE LEAF, INSTANTIATED AT THIS RUN.  It is green, and the rows above
+-- are why: the fuel a row can afford is six and the seed is a million,
+-- so nothing here has reached the crossing.  What the row buys is that
+-- the growth is measured INSIDE the region the leaf quantifies over,
+-- rather than at a triple chosen to break it.
 ----------------------------------------------------------------------
-
-opF : Confirms (dry-operator (rootWitness fold ins₀) fold root 0 0
-  (sched-init fold ins₀) (st-init fold) refl (rootTri-reads fold ins₀))
-opF = refl
 
 drF : Confirms (drain-dry-free 6 1
   (proj₁ (proj₂ (entry fold ins₀))) (proj₂ (proj₂ (entry fold ins₀))))
