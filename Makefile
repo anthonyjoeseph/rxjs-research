@@ -498,9 +498,15 @@ dup-selftest:
 # both copies exist; this is the same law applied BEFORE the writing.  It walks
 # all of agda/src always — the 2026-08-19 failure was a search scoped to two
 # files, so there is deliberately no argument that narrows it.
-# Q is matched as ONE PHRASE against the type text, so `Q='≤ slotsSize'` means
-# what it looks like.  Search for the OPERATOR and the RELATION, not the name
-# you imagine — names here are idiosyncratic and a name-guess reliably misses.
+# Q's words are ANDed against the type text and the name, so `Q='syncSizeᵉ
+# unfoldμ'` finds the statements mentioning both, in either order.  Search for
+# the OPERATOR and the RELATION, not the name you imagine — names here are
+# idiosyncratic and a name-guess reliably misses.
+# AND IT SEARCHES THE ATTIC (scripts/attic.txt): a generation deleted wholesale
+# is invisible to a walk of the tree, so the command that exists to make "did we
+# already prove this?" a machine question would answer NO about work that is
+# merely not checked out.  Attic hits print in their own section — apparatus to
+# restate, never a fact to cite.
 #   make find Q='≤ slotsSize'      make find Q='1 ≤ sizeᵉ'
 find:
 	@scripts/find-lemma.py "$(Q)"
@@ -511,6 +517,10 @@ find:
 # line out of a forty-line header, which is a hit and not an answer.  This
 # returns the BLOCK, which is the unit a finding is written in, and for an
 # agda hit the declaration the block sits above.  Q is a REGEX, case-blind.
+# THE ATTIC TOO, and it matters more here than it does for `find`: a deleted
+# STATEMENT is still findable by name with `git log -S`, while a dead route
+# names nothing and a coverage boundary names a probe that went with it — so
+# this is the only search that can surface either at all.
 #   make find-prose Q='phantom'   make find-prose Q='never parks|unbounded'
 find-prose:
 	@scripts/find-prose.py "$(Q)"

@@ -2,7 +2,7 @@
 
 ```
 make find Q='≤ slotsSize'        every STATEMENT whose type mentions it
-make find Q='1 ≤ sizeᵉ'          the phrase, matched against the type text
+make find Q='syncSizeᵉ unfoldμ'  both words, in either order, type or name
 ```
 
 **Run it before you state a postulate, write a lemma, or commission a probe.** It
@@ -18,6 +18,38 @@ rewritten from scratch and collided on the name with copies that had been sittin
 it was scoped to two `grep` arguments instead of the tree. `make find` takes no
 argument that narrows it, so that mistake is not available. **A rule you can satisfy
 while still failing is a rule that needs a machine.**
+
+## The attic — the third way the search failed, and the one it took longest to see
+
+The two failures above are about SCOPE across the tree. The third is scope across
+TIME: a walk of `agda/src` answers about what is checked out, so a generation
+deleted wholesale reads as work that was never done. The bigger the removal, the
+bigger the blind spot — and a removal that big is exactly when someone is most
+likely to ask whether a fact used to exist.
+
+`scripts/attic.txt` names, one line each, the LAST COMMIT THAT STILL HELD such a
+generation. Both `make find` and `make find-prose` materialise those trees under
+`agda/_attic/<sha>/` (gitignored, cached, rebuilt on demand) and search them too.
+Hits print in their own trailing section and are never mixed into the live ones,
+because the two answer different questions: a live hit says the fact EXISTS, an
+attic hit says it existed under a mechanism that is gone. **An attic hit is a lead
+to read, not a name to cite** — read the SIGNATURE and check it against today's
+definitions, which is the same discipline a recovered probe needs.
+
+`find-prose` gains more from this than `find` does. A deleted STATEMENT is still
+reachable by name with `git log -S<name> --all`; a dead route names nothing and a
+coverage boundary names a probe that went with it, so a prose search of the attic
+is the only thing that surfaces either at all.
+
+**A sha that stops resolving is a hard failure, not a skip.** A shallow clone or a
+rewritten history would otherwise turn the attic into a silent all-clear, which is
+the worst possible answer to "has anyone already been here".
+
+**What earns a line.** A commit that removed a body of proof whose statements are
+about operations the SUCCESSOR STILL PERFORMS — a mechanism dying does not take its
+measures with it, and a module with no postulate in it measured something. Ordinary
+deletion of dead weight does not: that is what the wiring law is for, and listing it
+would make every search noisier for nothing.
 
 ## The judgement no command can do for you
 

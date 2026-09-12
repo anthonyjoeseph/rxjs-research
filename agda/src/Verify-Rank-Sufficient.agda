@@ -40,6 +40,34 @@ open import Rx.Exp   using (Ctx; Closed)
 open import Rx.Slots using (Slots)
 open import Rx.Evaluator using (evaluate; hasDry)
 
+-- TWO OF THE THREE GUARDS HAVE THEIR CURRENCY ALREADY PROVEN, and it is
+-- deleted rather than absent — a different starting position from the one
+-- this row's class describes, and the class is still right, because a
+-- measure is not an instantiation.  What is recoverable is postulate-free
+-- and, for the μ guard, stated in this evaluator's own order rather than in
+-- the grant the tower spent it on, so it transports as a CLAIM and not
+-- merely as a harness.  The `≺` it is stated over is the live one,
+-- constructor for constructor.  None of it needs this header to be FOUND:
+-- the sha is in `scripts/attic.txt`, so `make find` and `make find-prose`
+-- already reach the statements and the dead routes on their own.
+--
+-- RECOVERY: `git show 919f115:agda/src/Verify-Budget-Sufficient/Measures.agda`
+--   restores the μ guard's whole reading: `unfoldμ-shrinks` is two lines over
+--   `syncSize-unfoldμ`, which is one line over a `syncSize-elimG` whose
+--   clauses run over the constructors this `Exp` still has.  The sibling
+--   `Wet/Part6.agda` then carries `mu-edge≺`, which is that inequality under
+--   `ltS` — the guard's obligation verbatim.
+-- RECOVERY: `git show 919f115:agda/src/Rx/Layer-Count.agda` restores a
+--   payload-blind layer count and a μ depth, BOTH POSTULATE-FREE, whose two
+--   unfold equations are the rank guard's currency proven at the operation
+--   the guard is about: the layer count is INVARIANT under `unfoldμ`, and
+--   the μ depth drops exactly one.  A measure surviving the unfold is the
+--   half of a nesting descent that is not bookkeeping.
+-- RECOVERY: `git show 919f115:agda/src/Rx/Clos-Size.agda` restores
+--   `syncSizeᵉ` with the slot telescope substituted in, also postulate-free
+--   — the μ guard reads the UNSUBSTITUTED size, and a slot reference is one
+--   symbol standing for a definition of any size, so this is where that gap
+--   was already measured.
 postulate
   rank-sufficient :
     ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slots Γ) →

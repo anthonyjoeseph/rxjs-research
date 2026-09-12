@@ -225,19 +225,20 @@ statement compute at every program with nothing sealed between them.
 
 ### Big picture tier roadmap
 
-- **INSTANTIATE THE GUARDS BEFORE PROVING ANY OF THEM.** `rank-sufficient` is
-  the only row and nothing has ever been run against it — which is why the class
-  is FALSITY, and not a doubt about the statement's shape. Both sides compute at
-  every program, so the receipt is cheap: run the canonical programs, then the
-  nesting families the deleted evidence tree was built to reach, and report per
-  row WHICH of the three guards it exercises. A green names the covered guards
-  and never the statement; a red on the RANK guard is the finding this campaign
-  has been walking toward, and it lands in the postulate's header before a
-  clause is ground.
+- **INSTANTIATE THE GUARDS, AND REACH μ TO DO IT.**
+  `rank-sufficient` is the only row and nothing has ever been run against it —
+  which is why the class is FALSITY. Both sides compute at every program, so the
+  receipt would be cheap except that the one generator this repo has is μ-FREE,
+  and μ is where the rank guard lives — the behavioural gap and the proof gap
+  are the same region, which is what sets this leg's order. So the leg is the
+  apparatus and the rows together: μ, `varᵉ` and `deferᵉ` in the generator, plus
+  probe rows reporting WHICH of the three guards each exercises. A green names
+  the covered guards and never the statement; a red on the RANK guard is the
+  finding this campaign has been walking toward.
 
 ### The ledger
 
-- **`rank-sufficient`** (Verify-Rank-Sufficient) — FALSITY, `NO EVIDENCE`: the
+- **`rank-sufficient`** (Verify-Rank-Sufficient) — FALSITY, `RECOVERY×3`: the
   three descent guards never fail at the triple the evaluator enters at. The μ
   and connect readings are monotone counts; the RANK one is the nesting face,
   and nothing has been instantiated at any of the three.
