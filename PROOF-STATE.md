@@ -226,31 +226,31 @@ procedure rather than a pin.
 
 ### Open questions
 
-- **IS AN EXACT DOOR READING PAYABLE?** A door CAN price a variable — not with
-  the slope the count carries but with an environment, since a fold knows its
-  own accumulator — and `Probed.Plug-Priced` reads door equal to run at every
-  term either dead reading crossed at. The PRICE is what is unknown. Exactness
-  costs the closed form: a fold's contribution becomes a recursion over its
-  refold count, and that count is itself a delivery count, reaching the hundreds
-  where these families reach single digits. Both rows are stated IN the measure,
-  so the list does not shrink however the region moved.
+- **IS AN EXACT DOOR READING PAYABLE?** A door CAN price a variable — with an
+  environment rather than the slope the count carries, since a fold knows its
+  own accumulator — and the reading now equals the run at every clause a sweep
+  reaches, iterating twenty-five times against a count a flattener multiplied.
+  What is left of the price is the two ends that sweep did not touch: a SLOT,
+  which no closed program can even state, and a count in the hundreds, which one
+  signature the count's own probe measures does reach. Both rows are stated IN
+  the measure, so the list does not shrink however the region moved.
   relevant: `drain-dry-free`, `dry-operator`
 
 ### Big picture tier roadmap
 
-- **TAKE THE PLUG-PRICED READING TO WHAT IT HAS NOT SEEN, BEFORE ANY FACE IS
-  STATED IN IT.** Three fold families is the whole of its coverage: one
-  flattener, no input, no recursion, no dropping template, no case binder, no
-  switch or exhaust root. Both dead readings also passed at the shapes they were
-  tried on, so the coverage IS the risk. Sweep those clauses, and sweep the COST
-  with them — the iteration count is a delivery count, so a family whose count
-  reaches the hundreds is the row saying whether an exact clause evaluates at
-  all. A refutation here cancels the restatement below, so it goes first.
+- **PRICE THE SLOT, THE ONE CLAUSE NOTHING HAS INSTANTIATED.** Every program in
+  both receipts is CLOSED, so the `input` clause has only ever been read at the
+  empty environment — the position the whole reading stood in before the sweep,
+  now narrowed to one clause and no smaller a risk for it. A slot's def emits
+  values of positive hop and a subscription connecting to it receives them, so a
+  constant there is false at the first flattener over an input. Build the staged
+  reading the way the count's defer probe builds its delivery one, and enter it
+  at a share holding a recursion. Coverage, so it precedes any restatement.
 
-- **RAISE THE SCAN CLAUSE, AND THE CASCADE WITH IT.** The restatement, once the
-  sweep above leaves the reading standing. It cascades: every face is stated in
-  the reading, so the two peel lemmas, the fit and both drain halves move
-  together. And the affine section under the clause does not survive an iterated
+- **RAISE THE SCAN CLAUSE, AND THE CASCADE WITH IT.** The restatement itself,
+  now the sweep leaves the reading standing at every clause but the slot. It
+  cascades: every face is stated in the reading, so the two peel lemmas, the fit
+  and both drain halves move together. And the affine section under the clause does not survive an iterated
   fold at all — an environment prices a variable exactly, so the multiplicity
   family has no job left and goes rather than being restated, which is the one
   part of this leg that makes the tree smaller.

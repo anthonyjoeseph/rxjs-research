@@ -68,3 +68,6 @@ open import Probed.Step-Fold
 
 open import Probed.Plug-Priced
   using (plug-priced-fork)
+
+open import Probed.Clause-Sweep
+  using (clause-sweep-fork)
