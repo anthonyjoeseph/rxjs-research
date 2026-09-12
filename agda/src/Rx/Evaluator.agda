@@ -417,6 +417,20 @@ rootWitness : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
             → Acc _≺_ (rootTri e sl)
 rootWitness e sl = entryWitness e sl 0
 
+-- AND THE ARRIVAL'S IS NAMED FOR THE SAME REASON THE ROOT'S IS.  A value
+-- delivered on a later tick carries nesting no reading of the program
+-- contains, and the store it lands in carries more — so the chain fold
+-- enters at the ⊔ of the two rather than at zero.  Naming it is what
+-- keeps a well-formedness statement ABOUT the chain fold quantified over
+-- the witness the evaluator passes: spelled out at each site, the two
+-- drift the moment either summand moves, and the drift is a type error
+-- many minutes down the tower rather than here.
+arrivalWitness : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+                 (a : Arrival Γ) (sl : Slots Γ) (st : EvalSt e)
+               → Acc _≺_ (entryTri e sl (nestDᵛ (arrTy a) (arrVal a) ⊔ stNest st))
+arrivalWitness a sl st =
+  entryWitness _ sl (nestDᵛ (arrTy a) (arrVal a) ⊔ stNest st)
+
 -- a source that lives and dies inside its own subscription burst
 -- (ofᵉ, emptyᵉ, take 0, a cold with no async tail): init, values,
 -- close, complete — one emit, nothing registered, nothing scheduled
@@ -1243,8 +1257,7 @@ chainStep : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
           → Id → (a : Arrival Γ) → Path Γ (arrTy a) t → Sched Γ → EvalSt e
           → Stream Γ t × Sched Γ × EvalSt e
 chainStep {n = n} {e = e} id a path sched st =
-  foldPath (entryWitness e (Sched.slots sched)
-             (nestDᵛ (arrTy a) (arrVal a) ⊔ stNest st))
+  foldPath (arrivalWitness a (Sched.slots sched) st)
            n id (arrTick a) (arrSource a) path (arrVal a ∷ [])
            (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
            (Arrival.isLast a) sched st

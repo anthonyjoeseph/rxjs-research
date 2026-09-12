@@ -37,7 +37,7 @@ open import Relation.Binary.PropositionalEquality
 open import Rx.Prim      using (Tick; Id; Source; InstEvent; close; delivery; exhausted)
 open import Rx.Exp       using (Ctx; Closed; Val)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; RegId; Chain; Path; root; share-sink; _↠_; Frame; arrTy; arrSource;
-  arrVal; arrTick; chainStep; foldPath; cascadeGo; sameSource; hasDry; dropSource; rootWitness)
+  arrVal; arrTick; chainStep; foldPath; cascadeGo; sameSource; hasDry; dropSource; arrivalWitness)
 open import Rx.Protocol  using (ProtocolSt; Owed; countIn; allZero; runProtocol; paidUp; settle; payOwed; bumpOwed)
 
 ------------------------------------------------------------------
@@ -417,7 +417,9 @@ postulate
     (fi : FoldInv nextId (arrSource a)
             (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
             (Arrival.isLast a) sched (record st { delivered = rid ∷ EvalSt.delivered st }) S) →
-    FoldOut (rootWitness e (Sched.slots sched)) n nextId (arrTick a) (arrSource a)
+    FoldOut (arrivalWitness a (Sched.slots sched)
+               (record st { delivered = rid ∷ EvalSt.delivered st }))
+      n nextId (arrTick a) (arrSource a)
       p (arrVal a ∷ [])
       (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
       (Arrival.isLast a) sched (record st { delivered = rid ∷ EvalSt.delivered st })
@@ -441,7 +443,9 @@ mid-step {n = n} {e = e} {a = a} {nextId} {rid} {p} {ps} {sched} {st} {S} mid ce
   let fi    = mid-seed mid ceq
       certs = mid-fold-certs mid ceq
       (S′ , run , fo) =
-        foldPath-out (rootWitness e (Sched.slots sched)) n nextId
+        foldPath-out (arrivalWitness a (Sched.slots sched)
+                       (record st { delivered = rid ∷ EvalSt.delivered st }))
+          n nextId
           (arrTick a) (arrSource a) p (arrVal a ∷ [])
           (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
           (Arrival.isLast a) sched (record st { delivered = rid ∷ EvalSt.delivered st })
