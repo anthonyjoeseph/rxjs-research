@@ -206,43 +206,56 @@ lets one statement close the whole descent.
 A row's class must agree with its postulate's header, which is where the
 research lives; where they disagree, the header wins.
 
-## Tier 1 — `rank-sufficient`
+## Tier 1 — the descent never goes dry
 
 **THE TIER IS ONE STATEMENT, AND IT IS THE WHOLE COST OF THE DESCENT.**
 `rank-sufficient` (Verify-Rank-Sufficient) says no run of any program emits the
-dry marker. Its type names no witness, no triple and no order: `evaluate` seeds
-its own entry, so every consumer sees a total function on `Fuel` and this is the
-only place that seeding is shown adequate.
+dry marker. It is now a real body: `evaluate` is a root subscribe followed by a
+drain, and the two leaves below are that split.
 
-**WHAT IS OWED IS THREE READINGS, NOT ONE ARITHMETIC** — the μ guard's subterm
-monotonicity, the connect guard's one-way count, and THE RANK GUARD, which is
-this development's nesting face restated where it is spent. Only the third is
-open.
+**BOTH LEAVES ARE SHORT OF THE SAME FACT, AND HALF OF IT IS MACHINE-KNOWN.**
+The rank is seeded from the PROGRAM, and neither leaf carries a hypothesis
+tying what it quantifies over back to that seed — the operator leaf takes an
+arbitrary triple, the drain leaf an arbitrary schedule and state.
+`Refuted.Rank-Entry` exhibits the first at rank zero. Both rows are SHAPE: the
+restatement is guaranteed and grinding either one is wasted.
 
-**A FAILING GUARD IS NOT AN ERROR, AND THAT IS WHY THE TIER IS PROBEABLE.** Each
-guarded clause returns a `dry` emit and the run continues, so both sides of the
-statement compute at every program with nothing sealed between them.
+**A FAILING GUARD IS NOT AN ERROR, AND THAT IS WHY THE TIER IS PROBEABLE.** A
+guarded clause returns a `dry` emit and the run continues, so both sides
+compute at every program with nothing sealed between them.
 
 ### Big picture tier roadmap
 
-- **STATE THE ENTRY INVARIANT AND LAND ITS TWO CHEAP ARMS.**
-  The coverage question is spent: the sweep reaches the recursion region and
-  4500 programs report no dry run, so the doubt left is not behavioural.
-  What is left is the proof, and both settled peels wait on one
-  motive — that the triple the evaluator stands at is the READING OF THE TERM
-  it is about to subscribe, seeded at the root and re-seeded at a connect.
-  State that, then discharge the μ and connect arms off the recovered
-  `unfoldμ-shrinks` and `unconn-insert`, one line each under `ltS` and `ltU`.
-  It goes before the rank arm because that arm is a STRENGTHENING of the
-  burst-producing functions' return type, so its statement is written against
-  a motive that has to exist first.
+- **PUT THE RANK INTO THE ENTRY INVARIANT AND RE-PROVE THE WALK UNDER IT.**
+  The operator leaf is refuted at rank zero, so the invariant gains a third
+  conjunct and every clause of the subscription walk is re-established against
+  it — the two settled peels included, since their `no` arms are refuted out
+  of the invariant and it is the invariant that moves. The cheap conjunct is
+  already known dead: a bound on `2 ^ (sizeᵉ o + slotsSize sl)` holds at the
+  root by reflexivity and cannot be restored across the μ clause, where
+  `unfoldμ` grows the size while the witness keeps its rank. What it must say
+  instead is where an emitted inner CAME FROM — a strengthened return type on
+  the burst-producing functions, not a fourth measure.
+
+- **SAY WHAT A REACHED STATE IS, AND MAKE THE DRAIN LEAF TAKE IT.**
+  The drain quantifies over an arbitrary schedule and an arbitrary state while
+  re-seeding its rank off the program alone, so a registry holding a path
+  deeper than the seed peels the same clause from the other side. The repair
+  is a field on the invariant record rather than a hypothesis: every producer
+  must then supply it and every consumer re-establish it, which is the only
+  way the fact reaches the cascade sites that need it. It waits on the first
+  leg because the conjunct it has to preserve is the one that leg writes.
 
 ### The ledger
 
-- **`rank-sufficient`** (Verify-Rank-Sufficient) — DIFFICULTY,
-  `PROBED, RECOVERY×3`: the three descent guards never fail at the triple the
-  evaluator enters at. Twelve recursive programs reach all three and hold, and
-  4500 swept ones report no dry run; the rank reading is the one still open.
+- **`dry-operator`** (Verify-Rank-Sufficient.Dry) — SHAPE,
+  `REFUTED, PROBED, RECOVERY×2`: the operator shelf's dry-freedom, stated over
+  a triple no hypothesis ties to the program. Refuted at rank zero; the repair
+  is a third conjunct on the entry invariant.
+
+- **`drain-dry-free`** (Verify-Rank-Sufficient) — SHAPE, `PROBED`: every
+  arrival after the root frame. Its schedule and state arrive unconstrained, so
+  the same peel is reachable from a state no run could produce.
 
 ## Tier 2 — Verify-Well-Formed (parked behind tier 1)
 

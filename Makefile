@@ -738,7 +738,18 @@ roadmap-order-selftest:
 	      --ledger $$S/order-ledger-banked.txt --src-names $$S/order-src-names.txt \
 	      --headers $$S/order-headers-prereq.txt > /dev/null \
 	    || { echo "SELFTEST FAIL: a NAMED prerequisite was refused — the carve-out is dead"; fail=1; }; \
-	  if [ $$fail -eq 0 ]; then echo "roadmap-order-selftest: PASS (banking fires; deleting, reclassifying, another tier's risk and a named prerequisite do not)"; else exit 1; fi
+	  scripts/check-roadmap-order.py --file $$S/order-banked.md --baseline-file $$S/sorted.md \
+	      --ledger $$S/order-ledger-banked.txt --src-names $$S/order-src-names.txt \
+	      --headers $$S/order-headers-none.txt \
+	      --definitions $$S/order-defs-conversion.txt > /dev/null \
+	    || { echo "SELFTEST FAIL: a CONVERSION was read as a discharge — the repo's central move cannot be held"; fail=1; }; \
+	  if scripts/check-roadmap-order.py --file $$S/order-banked.md --baseline-file $$S/sorted.md \
+	       --ledger $$S/order-ledger-banked.txt --src-names $$S/order-src-names.txt \
+	       --headers $$S/order-headers-none.txt \
+	       --definitions $$S/order-defs-none.txt > /dev/null 2>&1; then \
+	    echo "SELFTEST FAIL: a body standing on NOTHING open was excused as a conversion — the exemption is blanket"; fail=1; \
+	  fi; \
+	  if [ $$fail -eq 0 ]; then echo "roadmap-order-selftest: PASS (banking fires, and so does a body standing on nothing open; deleting, reclassifying, another tier's risk, a named prerequisite and a conversion do not)"; else exit 1; fi
 
 # PROVES roadmap-check IS LOAD-BEARING, against fixtures outside PROOF-STATE.md.
 # Same reason dup-selftest exists: the real file is (and should stay) SORTED, so

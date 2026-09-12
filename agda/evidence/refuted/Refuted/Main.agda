@@ -5,15 +5,6 @@
 -- Naming each witness here is what keeps this tree honest: a refutation
 -- that is not listed is not checked, exactly as in src/Main.agda.
 --
--- THE TREE IS EMPTY, AND THAT IS THE EXPIRY LAW RATHER THAN A LAPSE.  A
--- refutation dies when `src` can no longer STATE it, and every witness
--- this root carried was written against the budget: a gas tower, a caps
--- arithmetic, a nesting currency, a walk that priced what it handed on.
--- None of those quantities exists, so there is no statement left to
--- refute and nothing here can go red.  The scaffolding stays because
--- de-risk mode will produce the next refutation against the descent,
--- and rebuilding a library boundary is not part of finding one.
---
 -- Read the recovered witnesses' STATEMENTS and not their verdicts: each
 -- killed a reading of a quantity the descent does not have, so what
 -- transfers is the adversarial state a family was built to reach, never
@@ -21,3 +12,5 @@
 --
 -- RECOVERY: git show 919f115:agda/evidence/refuted/Refuted/
 module Refuted.Main where
+
+open import Refuted.Rank-Entry using (dry-operator-false)
