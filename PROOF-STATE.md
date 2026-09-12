@@ -226,36 +226,39 @@ procedure rather than a pin.
 
 ### Open questions
 
-- **DOES A TERM-READ DELIVERY COUNT REACH A SLOT AND A DEFER?** The general half
-  is settled: `Probed.Delivery-Count` reads one off the syntax, separates it
-  from the store bound on one signature, and dominates the depths the fold that
-  crosses actually hands out at four source lengths, tight at the shortest. What
-  is left is the two shapes the reading is coarse at. An `input` takes its count
-  off the telescope, so it stands for a definition of any size; a `deferᵉ` is cut
-  to zero by the same gate that makes a reading survive unfolding. Either is
-  enough to make the clause false at a program neither probe reaches, and both
-  are the door's own business rather than the store's.
+- **IS THE EXPONENT THE WHOLE OF WHAT IS FALSE?** The reading exists and is sound
+  everywhere it has been taken — `Probed.Delivery-Count` over the fold family,
+  `Probed.Slot-Defer` at the two clauses that read something other than the
+  term. What none of it establishes
+  is that the CROSSING goes away once the exponent is swapped. The refutations
+  are programs and the swapped clause computes at them, so the marker either
+  stops appearing there or it does not; if it does not, the store bound was one
+  of several quantities read in the wrong currency and a restatement aimed at it
+  is aimed at a symptom.
   relevant: `drain-dry-free`, `dry-operator`
 
 ### Big picture tier roadmap
 
-- **INSTANTIATE THE NEW COUNT AT THE TWO SHAPES IT READS COARSELY.** It is
-  settled over the fold family and untested at a slot and a `deferᵉ`, which is
-  now the whole of the tier's question — and a restatement paid before this is
-  paid over a clause that may be false at a program the fold family cannot
-  reach. Build one cascade whose source is a SHARED def and one that recurses
-  through a defer, and take the same domination rows against what those runs
-  hand out: the telescope reading either covers a def of any size or it does
-  not, and the defer gate either survives an unfold with the count intact or the
-  clause is false at every recursion.
+- **TAKE THE SWAPPED CLAUSE TO THE PROGRAMS THAT REFUTE THE OLD ONE.** The
+  reading is now sound at every shape it has been taken at, and what nothing has
+  asked is whether swapping it in makes the crossing STOP — which is the tier's
+  question and the one thing a cascade cannot be walked back from. Build the
+  swapped depth in the probe tree, clause for clause with the one in `src` but
+  reading the scan exponent off its own source's count, and evaluate it at the
+  two witnesses of `Refuted.Rank-Cross` and at the root crossing of
+  `Refuted.Root-Refold`. Both sides compute, so the answer is rows rather than a
+  restatement: the marker stops appearing there or the exponent is not the whole
+  of what is false.
 
 - **RAISE THE SCAN CLAUSE TO ITS SOURCE'S OWN DELIVERY COUNT.** The exponent is
-  the store bound today and the refolds it pays for are deliveries, which is the
-  whole of what is false; the count the rows above dominate the family with is
-  what replaces it. This is the restatement, and it cascades: every face is
-  stated in the reading, so the two peel lemmas, the fit and both drain halves
-  move together. It is what converts the question the leg above narrows from a
-  doubt about a reading into an obligation the tower carries.
+  the store bound today and the refolds it pays for are deliveries; the count
+  the rows above dominate the family with is what replaces it. This is the
+  restatement, and it cascades: every face is stated in the reading, so the two
+  peel lemmas, the fit and both drain halves move together — which is why the
+  leg above is paid first. It converts the question from a doubt about a reading
+  into an obligation the tower carries, and the affine section under the clause
+  does not survive it: a delivery count takes a product at every flattener, so
+  the coefficient is two slopes rather than one.
 
 - **MOVE THE BUG CACHE OFF THE TYPECHECKER (Anthony).** Every stored case pins a
   whole run by `refl`, so the gate normalises the evaluator once per case and

@@ -56,3 +56,6 @@ open import Probed.Operator-Root
 
 open import Probed.Delivery-Count
   using (exponent-fork)
+
+open import Probed.Slot-Defer
+  using (slot-fork)

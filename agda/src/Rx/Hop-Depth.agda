@@ -126,11 +126,35 @@
 -- linearly in the refolds, and charging a base of two for that is free
 -- while the exponent is a single-digit store bound and unreachable
 -- once it is a delivery count.
+------------------------------------------------------------------
+
+------------------------------------------------------------------
+-- AND THE TWO SHAPES THE READING IS COARSE AT BOTH HOLD, which is
+-- what makes the swap a candidate rather than a direction.  An
+-- `input` reports an ENVIRONMENT rather than the term, so the clause
+-- is only as good as the environment is; `Probed.Slot-Defer` builds
+-- the delivery environment the way the one below is built — a
+-- scripted slot reports its script's synchronous prefix, a shared one
+-- its def's own reading at the def's own stage — and takes it against
+-- a run.  The reading is TIGHT at a single reference to a shared def,
+-- and the constant zero is refuted at that same point, so the
+-- parameterisation buys here what it buys for hop.
 --
--- THE REGION IT DOES NOT REACH is the two shapes a term reads
--- coarsely: an `input`, whose count comes off the telescope and so
--- stands for a definition of any size, and a `deferᵉ`, cut to zero by
--- the same gate that makes a reading survive unfolding.
+-- A `deferᵉ` is the sharper of the two, because its clause reads ZERO
+-- and zero is what lets a count survive an unfolding at all — so the
+-- clause's whole content is an ABSENCE, and it is instantiated at a
+-- program whose only arm is the recursive one: the reading is zero
+-- and the subscribe burst is measured delivering nothing, with no
+-- slack for one value to hide in.  A gate that leaked would put a
+-- whole unfolding's output in the frame, which is also why the two
+-- looser rows beside it — a recursion next to a literal source, and
+-- one next to a slot reference — could still have failed.
+--
+-- WHAT NEITHER REACHES: a hot scripted input, read as zero and
+-- indistinguishable at a subscribe frame from a cold one whose script
+-- is empty; and the staged recursion past ONE slot, since the
+-- telescope is stratified, so a second stage is this clause again and
+-- the rows pick the stage rather than exercise it.
 ------------------------------------------------------------------
 
 ------------------------------------------------------------------
