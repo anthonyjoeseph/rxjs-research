@@ -58,10 +58,20 @@
 -- missing but that the currency is wrong: what the rank has to dominate
 -- is a count of deliveries, and no reading of syntax is one.
 --
--- REFUTED: `Refuted.Rank-Fold` — the three-conjunct form at its own
---   tightest triple, where the rank is the program's own reading and
---   nothing is given away: a fold under a flattener reaches the dry
---   close in two deliveries.
+-- AND THE DELIVERIES ARE NOT ALL DRAINED, SO A CONJUNCT READING THE
+-- STATE HANDED IN IS DEAD TOO.  Fuel is the axis for a RECURSIVE source
+-- and a re-seed at each arrival would cover it; a literal source spends
+-- every delivery inside ONE cascade, where the store is empty at the
+-- entry and deepens only after.  Both a `suc` and a store-reading
+-- conjunct are read BEFORE the growth they would have to pay for, which
+-- is the property they share and the reason one witness kills both.
+-- What bounds a burst's deliveries and survives μ-unfolding is the
+-- SYNCHRONOUS size — already the third component, already guarded.
+--
+-- REFUTED: `Refuted.Rank-Fold` — the three-conjunct form entered one
+--   peel ABOVE its tightest triple, so the crossing is not an
+--   off-by-one: a fold under a flattener reaches the dry close in three
+--   deliveries off a literal source, with the store reading zero.
 ------------------------------------------------------------------
 module Verify-Rank-Sufficient.Entry where
 
@@ -97,14 +107,22 @@ n≤2^n (suc n) =
           (≤-trans (+-mono-≤ (m^n>0 2 n) (≤-refl {2 ^ n}))
                    (≤-reflexive (cong (2 ^ n +_) (sym (+-identityʳ (2 ^ n))))))
 
--- the root seeds all three components at the term's own reading — two
--- by reflexivity, the rank through the size it is exponential in.
--- This is the one place the seeding has to be shown adequate.
+-- THE SEED IS ADEQUATE WHATEVER THE RUN CONTRIBUTES, because the run's
+-- reading sits UNDER the exponent and only widens it.  That is what
+-- makes the seeding usable away from the root: the connect and the
+-- arrival both re-seed off the state they are handed, and neither has
+-- to re-argue adequacy — this is the one place it is argued, and it is
+-- the rank half alone, since the connect keeps its own first component.
+seed-reads : ∀ {n} {Γ : Ctx n} {u} (o : Closed Γ u) (sl : Slots Γ) (m : ℕ) →
+  nestDᵉ o ≤ 2 ^ (sizeᵉ o + slotsSize sl + m)
+seed-reads o sl m =
+  ≤-trans (nestDᵉ≤sizeᵉ o)
+          (≤-trans (m≤m+n (sizeᵉ o) (slotsSize sl))
+                   (≤-trans (m≤m+n (sizeᵉ o + slotsSize sl) m)
+                            (n≤2^n (sizeᵉ o + slotsSize sl + m))))
+
+-- the root contributes nothing, since nothing has been stored yet: the
+-- slot payloads a run starts from are already under `slotsSize`.
 rootTri-reads : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
   EntryReads (rootTri e ins) e ins []
-rootTri-reads e ins =
-  ≤-refl
-  , ≤-trans (nestDᵉ≤sizeᵉ e)
-            (≤-trans (m≤m+n (sizeᵉ e) (slotsSize ins))
-                     (n≤2^n (sizeᵉ e + slotsSize ins)))
-  , ≤-refl
+rootTri-reads e ins = ≤-refl , seed-reads e ins 0 , ≤-refl

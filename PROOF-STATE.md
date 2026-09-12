@@ -215,10 +215,10 @@ drain, and the two leaves below are that split.
 
 **THE SEED READS THE PROGRAM AND A RUN OUTGROWS IT.** Both leaves are REFUTED at
 the invariant as it stands: an accumulator deepens by one per delivery, and
-deliveries are bought with FUEL, which appears in neither `sizeᵉ` nor
-`slotsSize`. The fault is the CURRENCY rather than a missing conjunct — no
-reading of syntax bounds a quantity that moves while the program holds still.
-Both rows stay SHAPE.
+nothing the seed reads moves with the deliveries. The fault is the CURRENCY, and
+two candidate repairs die with it — a `suc`, and a conjunct reading the state
+handed in. What survives both edges is the triple's own SYNC component. Both
+rows stay SHAPE.
 
 **A FAILING GUARD IS NOT AN ERROR, AND THAT IS WHY THE TIER IS PROBEABLE.** A
 guarded clause returns a `dry` emit and the run continues, so both sides
@@ -226,38 +226,38 @@ compute at every program with nothing sealed between them.
 
 ### Big picture tier roadmap
 
-- **PUT THE FUEL IN THE RANK, AND CARRY THE TOTAL RATHER THAN WHAT IS LEFT.**
-  `evaluate` already takes the fuel, so the seed can read it: `rootTri` gains a
-  fuel term and the exponent becomes `sizeᵉ e + slotsSize sl + fuel`. Which
-  fuel is the whole leg — the readings grow as the remaining fuel shrinks, so a
-  re-seed off what is LEFT is outgrown exactly as the program-only one is,
-  while the run's TOTAL holds still across every arrival. So the total has to
-  be carried past the drain's decrement and past the connect's own re-seed,
-  which today drops even the slot telescope. `rank-sufficient`'s type does not
-  move; `rootTri-reads` and both peels restate around it.
+- **DENOMINATE THE RANK IN THE TRIPLE'S OWN SYNC COMPONENT.** The conjunct
+  becomes `nestDᵉ o + s ≤ R` against the triple's third component rather than
+  the term's own syncSize, which is what makes it survive the two edges that
+  killed every other candidate: the μ peel re-seeds `s` STRICTLY DOWNWARD under
+  its guard while `nestDᵉ` is equal across unfolding, so the sum drops and the
+  rank is untouched; and a burst's deliveries are bounded by the sync size, so
+  the accumulator a fold grows inside one cascade is paid for before it is
+  entered. The leg is the restatement plus the μ arm, which is the one arm that
+  is already proven and so the one that says immediately whether the currency
+  holds. The hop arm stays postulated.
 
-- **CONSTRAIN THE STATE THE DRAIN IS ENTERED AT, IN THE NEW CURRENCY.**
-  `drain-dry-free` quantifies over an arbitrary schedule and store, so the peel
-  is reachable from a state no run can produce. Reachability alone will not
-  close it: the store's readings grow by one per arrival while a program-only
-  re-seed holds still, so a genuinely reached state outruns it too. The field
-  on the invariant record is therefore denominated in what the new seed reads —
-  a store's readings are under the arrivals already spent, which is the total
-  fuel less what remains. It waits on the leg above, which is what fixes that
-  quantity.
+- **RE-ESTABLISH THE NEW CONJUNCT AT THE HOP, WHICH IS WHERE IT IS BOUGHT.**
+  `subscribeInner` peels the rank and re-seeds the sync component at the inner's
+  own reading, so the sum has to be shown to fall — and the inner is a runtime
+  VALUE, so the fact needed is that what a burst carries reads under the sync
+  size of what emitted it. That is the reading `Refuted.Burst-Nesting` kills in
+  its non-strict form, so this leg either finds the strict one or converts the
+  refutation into a second currency failure. It waits on the leg above for the
+  statement to be in the shape it re-establishes.
 
 ### The ledger
 
 - **`dry-operator`** (Verify-Rank-Sufficient.Dry) — SHAPE,
-  `REFUTED×3, PROBED×3, RECOVERY`: the operator shelf's dry-freedom, entered
-  under an invariant bounding the nesting on the way in. Refuted at the LIVE
-  three-conjunct form, at its own tightest triple: a fold under a flattener
-  reaches the dry close in two deliveries.
+  `REFUTED×3, PROBED×3, RECOVERY`: the operator shelf's dry-freedom under an
+  invariant bounding the nesting on entry. Refuted at the LIVE form one peel
+  ABOVE its tightest triple, off a literal source, store reading zero — so
+  neither a `suc` nor a state-reading conjunct repairs it.
 
 - **`drain-dry-free`** (Verify-Rank-Sufficient) — SHAPE, `PROBED×3`: every
-  arrival after the root frame. Schedule and state arrive unconstrained, and
-  the re-seed reads the program while a store's readings grow per arrival, so
-  even a reached state outruns it.
+  arrival after the root frame. Schedule and state arrive unconstrained; the
+  arrival's re-seed now reads the store it is handed, so what is left open is
+  the growth INSIDE a cascade, which no re-seed sees.
 
 ## Tier 2 — Verify-Well-Formed (parked behind tier 1)
 

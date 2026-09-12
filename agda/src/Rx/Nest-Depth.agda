@@ -82,25 +82,27 @@
 -- DEAD ROUTE: charging a slot's nesting by the number of slots.  The
 --   count is a variable in the consumer, so the descending clause
 --   never reduces and the child gets no less fuel than the parent.
--- RECOVERY: git show 919f115:agda/src/Rx/Nest-Depth.agda restores the
---   VALUE-level arm `nestDᵛ`, which charges a stored place through its
---   type and meets the term induction at `obs`; and git show
---   919f115:agda/src/Verify-Budget-Sufficient/Nest-Depth-Size.agda its
---   pointwise bound by `sizeᵛ`.  Both are proven and gas-free, and the
---   drain is what will consume them — a slot delivering an observable
---   is the one place a nesting arrives that no expression carries.
+-- RECOVERY: git show
+--   919f115:agda/src/Verify-Budget-Sufficient/Nest-Depth-Size.agda
+--   restores `nestDᵛ`'s pointwise bound by `sizeᵛ`, proven and gas-free.
+--   Nothing spends it while the run's reading is seeded from the store
+--   rather than compared against a size, which is what the value arm
+--   below is for.
 ------------------------------------------------------------------
 module Rx.Nest-Depth where
 
 open import Data.List using (List; []; _∷_)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
+open import Data.Product using (_,_)
+open import Data.Sum using (inj₁; inj₂)
 open import Data.Nat  using (ℕ; suc; _+_; _⊔_; _≤_; z≤n; s≤s)
 open import Data.Nat.Properties using
   (≤-trans; ≤-reflexive; m≤m+n; m≤n+m; m≤n⇒m≤1+n; +-assoc; +-comm; +-mono-≤; ⊔-lub)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong; cong₂)
 
-open import Rx.Exp using (Ctx; Closed;
+open import Rx.Exp using (Ctx; Closed; Ty; Val;
+  unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs;
   Exp; Tm; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ;
   scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ;
   varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ;
@@ -144,6 +146,25 @@ mutual
     List (Tm Γ Δᵍ Δ Θ t) → ℕ
   nestDᵗˢ []       = 0
   nestDᵗˢ (y ∷ ys) = nestDᵗ y ⊔ nestDᵗˢ ys
+
+-- A STORED VALUE IS CHARGED THROUGH ITS TYPE, exactly as its size is:
+-- `Val` is a computed family, so the only way in is to recurse on the
+-- `Ty`, and `obs` is where a value becomes syntax again.  A pair takes
+-- the MAX of its components for the same reason a payload list does —
+-- they are entered separately, from the same frame.
+--
+-- IT IS WHAT LETS A MEASURE READ THE RUN AND NOT THE PROGRAM.  A store
+-- holds values rather than terms, and an accumulator a fold hands back
+-- is a value that grows once per delivery; no reading of the program
+-- reaches it, and the arm at `obs` is the whole of the bridge.
+nestDᵛ : ∀ {n} {Γ : Ctx n} (t : Ty) → Val Γ t → ℕ
+nestDᵛ unitᵗ    _        = 0
+nestDᵛ boolᵗ    _        = 0
+nestDᵛ natᵗ     _        = 0
+nestDᵛ (s ×ᵗ t) (a , b)  = nestDᵛ s a ⊔ nestDᵛ t b
+nestDᵛ (s +ᵗ t) (inj₁ a) = nestDᵛ s a
+nestDᵛ (s +ᵗ t) (inj₂ b) = nestDᵛ t b
+nestDᵛ (obs t)  e        = nestDᵉ e
 
 ------------------------------------------------------------------
 -- EVERY NEST DEPTH IS UNDER A SIZE, over the whole term language at

@@ -3,7 +3,7 @@ module Rx.Evaluator where
 open import Data.Bool    using (Bool; true; false; if_then_else_; not; _∨_; _∧_)
 open import Data.Fin     using (Fin; toℕ)
 open import Data.Maybe   using (Maybe; just; nothing; is-nothing)
-open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _^_; _<ᵇ_; _≡ᵇ_; _≤ᵇ_)
+open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _^_; _⊔_; _<ᵇ_; _≡ᵇ_; _≤ᵇ_)
 open import Data.Nat.Properties using (_<?_; ≤-refl)
 open import Data.Nat.ListAction using (sum)
 open import Induction.WellFounded using (Acc; acc)
@@ -39,6 +39,7 @@ variable
 -- checked by the generator/decoder, not by these types; a forward
 -- reference is rejected there.
 open import Rx.Slots using (scripted; shared; Slots; slotsSize)
+open import Rx.Nest-Depth using (nestDᵉ; nestDᵛ)
 
 Stream : ∀ {n} → Ctx n → Ty → Set          -- flat, canonical emission order
 Stream Γ t = List (InstEmit (Val Γ t))
@@ -101,21 +102,6 @@ unconnAt sl cs i with sl i
 
 unconn : ∀ {n} {Γ : Ctx n} → Slots Γ → List Source → ℕ
 unconn sl cs = sum (tabulate (unconnAt sl cs))
-
--- THE ENTRY WITNESS, NAMED RATHER THAN INLINED.  Every re-entry from
--- OUTSIDE the subscription machine — the root subscribe, and each
--- arrival's chain fold — starts a fresh descent, so each supplies its
--- own accessibility at the point the program and the slots determine.
--- It is one definition because those points agree, and because every
--- well-formedness statement that quantifies over an entry has to name
--- the same triple: a statement entered at a triple nothing else uses is
--- a statement about a run the evaluator never makes.
-rootTri : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → Tri
-rootTri e sl = unconn sl [] , 2 ^ (sizeᵉ e + slotsSize sl) , syncSizeᵉ e
-
-rootWitness : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
-            → Acc _≺_ (rootTri e sl)
-rootWitness e sl = ≺-wellFounded (rootTri e sl)
 
 -- delta-encoded waits → absolute ticks (gap = suc wait, so a source's
 -- ticks are strictly increasing by construction)
@@ -362,6 +348,74 @@ installNode : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
             → NodeId → NodeState Γ → EvalSt e → EvalSt e
 installNode nid nodeState st =
   record st { nodes = setNode nid nodeState (EvalSt.nodes st) }
+
+-- THE STORE'S OWN READING, which is the half of the seeding a program
+-- cannot supply.  A fold hands its accumulator back one layer deeper at
+-- every delivery, so for a FIXED term the values a run enters are
+-- unbounded while every measure of syntax holds still.  What moves with
+-- them is the STORE — the accumulator a scan node holds and the inners
+-- a bounded merge has queued are the only places a value waits to be
+-- entered from — so the seeding reads those and the machine re-seeds at
+-- every arrival.
+--
+-- IT READS PLACES RATHER THAN A COUNT, and that is the whole of why it
+-- is a max.  Nothing here counts arrivals, so a state nothing reached
+-- is bounded by exactly the same expression as one a run produced —
+-- which is what lets the drain's own leaf be stated over the arbitrary
+-- store it already quantifies over, with no field on the record and no
+-- obligation on the producers.
+--
+-- THE SCHEDULE IS NOT READ, deliberately.  A pending payload is not
+-- entered where it waits; it is entered as an ARRIVAL, and the arrival
+-- re-seeds at its own value's reading — so charging the schedule here
+-- would put a payload under the seed of every entry that cannot reach
+-- it, and would cost the root its reading of zero for nothing.
+nestDᶜˢ : ∀ {n} {Γ : Ctx n} {t} → List (Closed Γ t) → ℕ
+nestDᶜˢ []       = 0
+nestDᶜˢ (e ∷ es) = nestDᵉ e ⊔ nestDᶜˢ es
+
+nestDⁿ : ∀ {n} {Γ : Ctx n} → NodeState Γ → ℕ
+nestDⁿ (scan-st {t = t} v)             = nestDᵛ t v
+nestDⁿ (take-st _)                     = 0
+nestDⁿ (mergeAll-st _ _ queued _)      = nestDᶜˢ queued
+nestDⁿ (switch-st _ _)                 = 0
+nestDⁿ (exhaust-st _ _)                = 0
+
+nestDᴺ : ∀ {n} {Γ : Ctx n} → List (NodeId × NodeState Γ) → ℕ
+nestDᴺ []             = 0
+nestDᴺ ((_ , s) ∷ ns) = nestDⁿ s ⊔ nestDᴺ ns
+
+stNest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → EvalSt e → ℕ
+stNest st = nestDᴺ (EvalSt.nodes st)
+
+-- THE ENTRY WITNESS, NAMED RATHER THAN INLINED.  Every re-entry from
+-- OUTSIDE the subscription machine — the root subscribe, and each
+-- arrival's chain fold — starts a fresh descent, so each supplies its
+-- own accessibility at the point the program, the slots and the run's
+-- own reading determine.  It is one definition because those points
+-- agree, and because every well-formedness statement that quantifies
+-- over an entry has to name the same triple: a statement entered at a
+-- triple nothing else uses is a statement about a run the evaluator
+-- never makes.
+--
+-- THE READING IS WHAT THE ROOT HAS NONE OF.  `st-init` holds nothing
+-- and a fresh schedule's pending values are the program's own, so the
+-- root enters at reading ZERO and `rootTri` is that specialisation
+-- rather than a second seeding — which keeps the one place the seed
+-- has to be shown adequate at the root, where it always was.
+entryTri : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → ℕ → Tri
+entryTri e sl m = unconn sl [] , 2 ^ (sizeᵉ e + slotsSize sl + m) , syncSizeᵉ e
+
+entryWitness : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (m : ℕ)
+             → Acc _≺_ (entryTri e sl m)
+entryWitness e sl m = ≺-wellFounded (entryTri e sl m)
+
+rootTri : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → Tri
+rootTri e sl = entryTri e sl 0
+
+rootWitness : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+            → Acc _≺_ (rootTri e sl)
+rootWitness e sl = entryWitness e sl 0
 
 -- a source that lives and dies inside its own subscription burst
 -- (ofᵉ, emptyᵉ, take 0, a cold with no async tail): init, values,
@@ -911,7 +965,9 @@ sharedConnect {τ = U , _ , _} (acc rec) i d κ id now sched st
   let st₁ = register (toℕ i) κ
               (record st { connectedShares = toℕ i ∷ EvalSt.connectedShares st })
       (burst , sched₁ , st₂) =
-        subscribeE (rec (ltU {r′ = 2 ^ sizeᵉ d} {s′ = syncSizeᵉ d} p))
+        subscribeE (rec (ltU {r′ = 2 ^ (sizeᵉ d + slotsSize (Sched.slots sched)
+                                          + stNest st₁)}
+                             {s′ = syncSizeᵉ d} p))
                    d (share-sink i) id now sched st₁
       -- the def's connect burst flows up the first subscriber's own
       -- frames (the returned burst); dispatch only serves arrivals
@@ -1187,7 +1243,9 @@ chainStep : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
           → Id → (a : Arrival Γ) → Path Γ (arrTy a) t → Sched Γ → EvalSt e
           → Stream Γ t × Sched Γ × EvalSt e
 chainStep {n = n} {e = e} id a path sched st =
-  foldPath (rootWitness e (Sched.slots sched)) n id (arrTick a) (arrSource a) path (arrVal a ∷ [])
+  foldPath (entryWitness e (Sched.slots sched)
+             (nestDᵛ (arrTy a) (arrVal a) ⊔ stNest st))
+           n id (arrTick a) (arrSource a) path (arrVal a ∷ [])
            (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
            (Arrival.isLast a) sched st
 
