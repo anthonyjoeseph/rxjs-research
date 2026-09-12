@@ -72,28 +72,26 @@ open import Verify-Rank-Sufficient.Entry using (rootTri-reads)
 -- re-enters through, and not the descent of either loop.
 --
 -- AND THE SCHEDULE AND THE STATE ARRIVE UNCONSTRAINED, WHICH IS A GAP AND
--- NOT A GENERALITY.  Both are universally quantified here, and the rank the
--- cascade descends on is re-seeded from the PROGRAM alone — the chain step
--- mints `rootWitness` off `e` and the schedule's slots, so the seed is
--- `2 ^ (sizeᵉ e + slotsSize sl)`.  Nothing in the hypotheses relates a
--- registry entry to `e`, so a state holding a path with more stacked `*All`
--- frames than that seed peels the inner-subscribe clause to zero and the
--- cascade emits the dry close, exactly as the operator leaf does from the
--- other side.  What the conclusion needs and no hypothesis carries is that
--- the state is one a run of `e` could have REACHED; the row is therefore
--- SHAPE, and the restatement is an invariant on `EvalSt` rather than a
--- fourth argument, since every producer must then supply it and every
--- consumer re-establish it.
+-- NOT A GENERALITY.  Both are universally quantified here and nothing in
+-- the hypotheses relates either to `e`.  The STORE half of that costs
+-- nothing now: the cascade re-seeds per ARRIVAL rather than off the root,
+-- and `arrivalWitness` enters at the value's nesting joined with
+-- `stNest`, so a registry no run could have built is bounded by the same
+-- expression as one a run produced, and the arbitrary store is a
+-- generality after all.  What no seed reads is what happens AFTER it is
+-- minted: one arrival's chain fold can deliver many times, a fold
+-- deepens its accumulator by the step's own reading per delivery, and the
+-- entry was taken once.  So a burst long enough peels the inner subscribe
+-- to zero and emits the dry close, exactly as the operator leaf does from
+-- the other side.
 --
--- AND REACHABILITY ALONE WILL NOT BE ENOUGH, WHICH NARROWS THE FIELD
--- BEFORE IT IS STATED.  The re-seed reads the PROGRAM at every arrival
--- while the store's own readings grow by one PER arrival, so a state a
--- run genuinely reached outruns the seed too, once the run is long
--- enough — and how long a run may be is set by fuel, which this
--- statement quantifies over with no relation to the seed at all.  So the
--- field cannot say only that the state is reachable; it has to be
--- denominated in a quantity the re-seed also reads, which today no
--- quantity is.
+-- SO THE ROW IS STILL SHAPE AND THE RESTATEMENT IS NOT A FIELD.  An
+-- invariant on `EvalSt` was the obvious repair while the seed read the
+-- program alone; it would now oblige every producer and re-oblige every
+-- consumer to say something the re-seed already says, and would leave the
+-- growth INSIDE the cascade — the only growth still outrunning an entry —
+-- exactly where it is.  What is owed is a bound on ONE burst's
+-- deliveries, denominated in something the entry triple carries.
 --
 -- PROBED: `Probed.Descent` — twelve recursive programs, every one green,
 --   taken against the DRAIN of each run rather than the whole of it.  What
@@ -119,12 +117,14 @@ open import Verify-Rank-Sufficient.Entry using (rootTri-reads)
 --   state reached by RUNNING, so the arbitrary schedule and store this
 --   statement quantifies over are as uninstantiated as they were.
 -- PROBED: `Probed.Fuel-Growth` — six drains of ONE run, differing in
---   FUEL alone, at a fold whose source is a recursion.  Every reading
---   the seed is built from holds still — the term reads two, the rank is
---   `2 ^ 20` — while the carried nesting is the fuel plus one.  THE
---   BOUNDARY: the fuels are small, so what the rows establish is the
---   RATE at which a reached state outgrows its re-seed and not the
---   arrival at which it passes, which would be a `refl` at `2 ^ 20`.
+--   FUEL alone, at a fold whose source is a recursion, so how many
+--   arrivals happen is the drain's business and not the term's.  Both
+--   readings of the term hold still across the six while the carried
+--   nesting is the fuel plus one: the rate is ONE per arrival, exactly,
+--   and it is the quantity an arrival's own entry reads.  THE BOUNDARY:
+--   one delivery lands per arrival, so every layer the rows count is
+--   paid for by a fresh entry and none of them reaches a burst
+--   delivering many times inside one cascade.
 
 postulate
   drain-dry-free : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}

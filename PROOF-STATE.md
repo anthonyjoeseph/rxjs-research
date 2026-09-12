@@ -199,8 +199,8 @@ formal-verification-batchSimultaneous    The-Proof.agda — REAL, module postula
 
 The descent `rank-sufficient` guards is the evaluator's own and is stated
 nowhere else: `Acc _≺_` over a lexicographic triple — unconnected shares, hop
-rank, `syncSizeᵉ` — seeded by `rootWitness` and dropped at three guarded peels,
-each a proven body. No quantity above `Rx.Evaluator` mentions it, which is what
+rank, `syncSizeᵉ` — seeded at every entry from outside the machine and dropped
+at three guarded peels, each a proven body. No quantity above `Rx.Evaluator` mentions it, which is what
 lets one statement close the whole descent.
 
 A row's class must agree with its postulate's header, which is where the
@@ -213,12 +213,12 @@ research lives; where they disagree, the header wins.
 dry marker. It is now a real body: `evaluate` is a root subscribe followed by a
 drain, and the two leaves below are that split.
 
-**THE SEED READS THE PROGRAM AND A RUN OUTGROWS IT.** Both leaves are REFUTED at
-the invariant as it stands: an accumulator deepens by one per delivery, and
-nothing the seed reads moves with the deliveries. The fault is the CURRENCY, and
-two candidate repairs die with it — a `suc`, and a conjunct reading the state
-handed in. What survives both edges is the triple's own SYNC component. Both
-rows stay SHAPE.
+**THE SEED IS TAKEN ONCE AND ONE CASCADE OUTGROWS IT.** The fault is the
+CURRENCY: an accumulator deepens per delivery while an entry is minted per
+arrival. Three repairs have been tried — a `suc`, a conjunct reading the state,
+and the arrival re-seed that landed, which answers the growth ACROSS arrivals
+and none inside one. What survives both edges is the triple's own SYNC
+component. Both rows stay SHAPE.
 
 **A FAILING GUARD IS NOT AN ERROR, AND THAT IS WHY THE TIER IS PROBEABLE.** A
 guarded clause returns a `dry` emit and the run continues, so both sides
