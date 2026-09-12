@@ -1,6 +1,9 @@
 ------------------------------------------------------------------
 -- THE EVALUATOR NEVER GETS STUCK: no run of any program emits the dry
--- marker.
+-- marker.  AS STATED BELOW THAT IS FALSE, and the reason is the store
+-- bound `evaluate` seeds itself with rather than anything the descent
+-- does; the statement's own header carries the witness and what the
+-- repair has to move.
 --
 -- `evaluate` descends on an accessibility witness, and three of its
 -- clauses are guarded by a decidable comparison that can fail — the
@@ -290,6 +293,23 @@ postulate
     let ent = subscribeE (rootWitness V e ins) e root 0 0 (sched-init V e ins)
                 (st-init e)
     in hopFits (proj₁ (proj₂ ent)) (proj₂ (proj₂ ent))
+
+-- THIS STATEMENT IS FALSE, AND WHAT IS FALSE ABOUT IT IS THE SEEDING
+-- AND NOTHING ELSE.  Everything below this line is generic in the store
+-- bound — the fit at the door takes V as a parameter, and both drain
+-- halves read it off the schedule — so no part of the descent picks the
+-- number.  `evaluate` does, by handing `sched-init` the FUEL, and fuel
+-- counts arrivals while the quantity the scan clause spends it on is
+-- refolds.  A source lengthened inside one subscribe frame refolds past
+-- any fuel without consuming any, and the run then emits `dried`.
+--
+-- SO THE REPAIR IS A CHOICE OF V, NOT A WEAKER CONCLUSION.  Conditioning
+-- this on a larger fuel is the reading the first dry row invites and the
+-- witness's rescue rows rule out: a bigger allowance fixes the program
+-- that crossed, and a longer source crosses the bigger allowance.  What
+-- has to change is what the bound COUNTS.
+--
+-- REFUTED: `Refuted.Rank-Cross`
 
 -- THE ASSEMBLY, AND THE ONLY THING IT ADDS IS THE SEEDING.  `evaluate`
 -- concatenates its root burst with its drain, so dryness of the run is

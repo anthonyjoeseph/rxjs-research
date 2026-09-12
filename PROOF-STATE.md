@@ -208,47 +208,49 @@ research lives; where they disagree, the header wins.
 
 ## Tier 1 — the descent never goes dry
 
-**THE TIER IS ONE STATEMENT, AND IT IS THE WHOLE COST OF THE DESCENT.**
-`rank-sufficient` (Verify-Rank-Sufficient) says no run of any program emits the
-dry marker. It is a real body: `evaluate` is a root subscribe followed by a
-drain, and the rows below are that split plus the fit the drain half stands on.
+**THE TIER IS ONE STATEMENT, AND AS STATED IT IS FALSE.** `rank-sufficient`
+(Verify-Rank-Sufficient) says no run emits the dry marker; `Refuted.Rank-Cross`
+exhibits two that do, each rescued one allowance higher. The falsity is the
+SEEDING and nothing under it: the door's fit and both drain halves take the
+store bound as given, while `evaluate` picks it by handing `sched-init` the
+FUEL — and fuel counts ARRIVALS where the scan clause spends it on REFOLDS.
 
 **WHAT ORDERS THE ROWS IS THE DIRECTION THE DEPTH TRAVELS.** Every route that
-seeded the rank from outside is refuted, because a value deepens on the way OUT
-and re-enters on the caller's witness. `Rx.Hop-Depth` reads the quantity off
-the value instead, so a bound on it is carried by the induction that builds the
-value rather than asserted about it.
+seeded the rank from outside is refuted: a value deepens on the way OUT and
+re-enters on the caller's witness. `Rx.Hop-Depth` reads it off the value
+instead, so a bound rides the induction that builds it.
 
 **A FAILING GUARD IS NOT AN ERROR, AND THAT IS WHY THE TIER IS PROBEABLE.** A
 guarded clause returns a `dry` emit and the run continues, so both sides
-compute at every program — `hopFits` included, which is why its rows spend a
-decision procedure rather than a pin.
+compute at every program — `hopFits` included, whose rows spend a decision
+procedure rather than a pin.
 
 ### Open questions
 
-- **WHAT BOUNDS THE REFOLD COUNT, NOW THAT NOTHING ELSE IS UNTIED?** The
-  two-currency half is settled: the entry's rank IS the hop reading, each
-  flattener's drop is a definitional `suc`, and no counter is left to exhaust.
-  What the reading buys that in exchange for is one premise — that a scan
-  refolds at most STORE-BOUND times — argued from the accumulator being stored.
-  A run's bound is the fuel it was given and fuel counts ARRIVALS, so a cascade
-  landing entirely inside one subscribe frame refolds once per literal and
-  consumes none. Measured: four programs differing in literals alone read the
-  SAME rank while their depth multiplies by three per literal. Both rows are
-  open on exactly that region.
+- **WHICH SIDE PAYS THE REFOLD COUNT, NOW THAT THE FUEL CANNOT?** The
+  two-currency half is settled: the entry's rank IS the hop reading, and no
+  counter is left to exhaust. What it buys that in exchange for is one premise —
+  that a scan refolds at most STORE-BOUND times — and `Refuted.Rank-Cross`
+  refutes it: a cascade inside one subscribe frame refolds per literal and
+  consumes no arrival, so a longer source walks past any allowance and the run
+  emits `dried`. Two sides remain. A number chosen at SUBSCRIBE time has to
+  grow like the deliveries do, which is the shape that was torn out; or nothing
+  is bounded ahead of the run and the count is read off the entry that stores
+  the accumulator. Both rows are open on exactly that choice.
   relevant: `drain-dry-free`, `dry-operator`
 
 ### Big picture tier roadmap
 
-- **RESTORE THE SECOND QUANTITY THE SCAN CLAUSE IS OWED.** `k ≤ V` cannot be
-  paid off the store bound at all: one field serves both the drain's arrival
-  allowance and the reading's refold count, and `Probed.Operator-Root` separates
-  them — a cascade inside one subscribe frame refolds per literal and spends no
-  arrival. The premise did fall out once, of a store-SIZE invariant against an
-  allowance growing per instant, which never counted arrivals; `Rx.Hop-Depth`
-  carries the recovery. So the leg is that second quantity restated over the
-  current state, not a tighter reading of the first, and what it narrows is what
-  the store counts.
+- **READ THE REFOLD COUNT OFF THE STORE INSTEAD OF ALLOWING FOR IT.** The
+  previous leg's route is dead: `Refuted.Rank-Cross` makes `k ≤ V` false rather
+  than unpaid, and its rescue rows kill the obvious repair — a bigger
+  allowance fixes the program that crossed, a longer source defeats it. The
+  sibling witness already put the delivery count in the STORE rather than the
+  term, and the scan clause is the one place the measure still asserts it a
+  priori, as a V-th power. So the leg is to make the entry carry
+  its accumulator's hop content as a field of the invariant record and have the
+  clause read what the drain established. The premise then has nothing to be
+  about, which settles the question rather than re-asking it a budget up.
 
 - **CARRY THE BOUND OUT OF THE WALK RATHER THAN ASSERTING IT ABOUT THE VALUE.**
   Every dead route asked the emitter's rank to dominate a value it had not

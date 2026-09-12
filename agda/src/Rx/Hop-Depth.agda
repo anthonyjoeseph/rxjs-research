@@ -96,6 +96,8 @@
 -- close it.  What has to come back is the SECOND quantity, not a
 -- better bound on the first.
 --
+-- REFUTED: `Refuted.Rank-Cross` — the premise is not merely unpaid, it
+--   is false, and the run goes dry where it fails.
 -- RECOVERY: git show f205085 restores the size invariant and the
 --   id-growing budget the premise used to fall out of.
 ------------------------------------------------------------------
