@@ -142,7 +142,7 @@ open import Verify-Rank-Sufficient.Hop using (hopFits)
 -- the hypotheses relates either to `e`.  The STORE half of that costs
 -- nothing now: the cascade re-seeds per ARRIVAL rather than off the root,
 -- and `arrivalWitness` enters at the value's nesting joined with
--- `stNest`, so a registry no run could have built is bounded by the same
+-- `stHop`, so a registry no run could have built is bounded by the same
 -- expression as one a run produced, and the arbitrary store is a
 -- generality after all.  What no seed reads is what happens AFTER it is
 -- minted: one arrival's chain fold can deliver many times, a fold

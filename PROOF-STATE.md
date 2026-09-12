@@ -241,16 +241,16 @@ procedure rather than a pin.
 
 ### Big picture tier roadmap
 
-- **READ THE REFOLD COUNT OFF THE STORE INSTEAD OF ALLOWING FOR IT.** The
-  previous leg's route is dead: `Refuted.Rank-Cross` makes `k ≤ V` false rather
-  than unpaid, and its rescue rows kill the obvious repair — a bigger
-  allowance fixes the program that crossed, a longer source defeats it. The
-  sibling witness already put the delivery count in the STORE rather than the
-  term, and the scan clause is the one place the measure still asserts it a
-  priori, as a V-th power. So the leg is to make the entry carry
-  its accumulator's hop content as a field of the invariant record and have the
-  clause read what the drain established. The premise then has nothing to be
-  about, which settles the question rather than re-asking it a budget up.
+- **PUT THE ACCUMULATOR'S DEPTH IN THE INVARIANT RECORD.** The currency half of
+  this leg landed and the rest is what remains. An arrival re-seeds off a store
+  read in `hopDᵉ` now, so both halves of the join are the quantity the entry
+  invariant is stated in and the seed carries the depth a fold has already
+  REACHED; `Rx.Nest-Depth` went with it, a superseded predecessor whose order
+  disagreed at the `deferᵉ` gate. What is left retires the premise. The scan
+  clause still asserts its refold count a priori, as a V-th power, and
+  `Refuted.Rank-Cross` says that number is wrong rather than unpaid. So give the
+  entry a field for its accumulator's reading, oblige every producer to
+  establish it, and have the clause spend what the drain proved.
 
 - **CARRY THE BOUND OUT OF THE WALK RATHER THAN ASSERTING IT ABOUT THE VALUE.**
   Every dead route asked the emitter's rank to dominate a value it had not
@@ -280,7 +280,7 @@ procedure rather than a pin.
   so the rows sit where it is closest to false.
 
 - **`dry-operator`** (Verify-Rank-Sufficient.Dry) — SHAPE,
-  `REFUTED×2, DEAD ROUTE, PROBED, RECOVERY`: the THREE FLATTENERS' dry-freedom
+  `REFUTED, DEAD ROUTE×2, PROBED, RECOVERY`: the THREE FLATTENERS' dry-freedom
   under the entry invariant read at the schedule's own store bound. First
   coverage at a root `opShape` admits, and the rank it is entered against was
   measured there NOT to move with the source the run folds over.

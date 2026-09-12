@@ -39,7 +39,6 @@ variable
 -- checked by the generator/decoder, not by these types; a forward
 -- reference is rejected there.
 open import Rx.Slots using (scripted; shared; Slots)
-open import Rx.Nest-Depth using (nestDᵉ; nestDᵛ)
 open import Rx.Hop-Depth using (hopDᵉ; hopDᵛ)
 open import Rx.Slot-Hop using (slotHop)
 
@@ -382,23 +381,35 @@ installNode nid nodeState st =
 -- re-seeds at its own value's reading — so charging the schedule here
 -- would put a payload under the seed of every entry that cannot reach
 -- it, and would cost the root its reading of zero for nothing.
-nestDᶜˢ : ∀ {n} {Γ : Ctx n} {t} → List (Closed Γ t) → ℕ
-nestDᶜˢ []       = 0
-nestDᶜˢ (e ∷ es) = nestDᵉ e ⊔ nestDᶜˢ es
+--
+-- AND IT IS READ IN THE RANK'S OWN CURRENCY, WHICH IS WHAT THE ENTRY
+-- INVARIANT CAN SPEND.  A re-seed that joined a NESTING to a reading
+-- named a number the rank was larger than and the invariant could not
+-- use: nesting counts a term's flattener layers, the rank counts what a
+-- subscription may still enter, and only the second is what a stored
+-- accumulator makes deep.  Taking the join in one currency is what puts
+-- the depth a fold has ALREADY reached under the seed, so the reading's
+-- own store bound is left covering one burst's refolds rather than a
+-- whole run's.
+stHopᶜˢ : ∀ {n} {Γ : Ctx n} {t} (V : ℕ) (η : Fin n → ℕ) → List (Closed Γ t) → ℕ
+stHopᶜˢ V η []       = 0
+stHopᶜˢ V η (e ∷ es) = hopDᵉ V η e ⊔ stHopᶜˢ V η es
 
-nestDⁿ : ∀ {n} {Γ : Ctx n} → NodeState Γ → ℕ
-nestDⁿ (scan-st {t = t} v)             = nestDᵛ t v
-nestDⁿ (take-st _)                     = 0
-nestDⁿ (mergeAll-st _ _ queued _)      = nestDᶜˢ queued
-nestDⁿ (switch-st _ _)                 = 0
-nestDⁿ (exhaust-st _ _)                = 0
+stHopⁿ : ∀ {n} {Γ : Ctx n} (V : ℕ) (η : Fin n → ℕ) → NodeState Γ → ℕ
+stHopⁿ V η (scan-st {t = t} v)         = hopDᵛ V η t v
+stHopⁿ V η (take-st _)                 = 0
+stHopⁿ V η (mergeAll-st _ _ queued _)  = stHopᶜˢ V η queued
+stHopⁿ V η (switch-st _ _)             = 0
+stHopⁿ V η (exhaust-st _ _)            = 0
 
-nestDᴺ : ∀ {n} {Γ : Ctx n} → List (NodeId × NodeState Γ) → ℕ
-nestDᴺ []             = 0
-nestDᴺ ((_ , s) ∷ ns) = nestDⁿ s ⊔ nestDᴺ ns
+stHopᴺ : ∀ {n} {Γ : Ctx n} (V : ℕ) (η : Fin n → ℕ) →
+         List (NodeId × NodeState Γ) → ℕ
+stHopᴺ V η []             = 0
+stHopᴺ V η ((_ , s) ∷ ns) = stHopⁿ V η s ⊔ stHopᴺ V η ns
 
-stNest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → EvalSt e → ℕ
-stNest st = nestDᴺ (EvalSt.nodes st)
+stHop : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (V : ℕ) (η : Fin n → ℕ) →
+         EvalSt e → ℕ
+stHop V η st = stHopᴺ V η (EvalSt.nodes st)
 
 -- THE ENTRY WITNESS, NAMED RATHER THAN INLINED.  Every re-entry from
 -- OUTSIDE the subscription machine — the root subscribe, and each
@@ -461,27 +472,32 @@ rootWitness V e sl = entryWitness V e sl 0
 -- out at each site, the two drift the moment either summand moves, and
 -- the drift is a type error many minutes down the tower rather than here.
 --
--- THE STORE'S HALF IS STILL A NESTING AND THE PAYLOAD'S IS A READING,
--- AND THAT SEAM IS WHAT THIS RE-SEED LEAVES OWED.  A ⊔ of the two is
--- SLACK in the safe direction — the rank is larger than either alone —
--- but the entry invariant can only spend the half denominated in its own
--- currency, so what a stored chain can still do has to be read off the
--- registry rather than off its nodes' nesting.  The registry's reading
--- exists (`Verify-Rank-Sufficient.Hop`) and cannot be named here: it is
--- stated over this module's own types, so it sits above it.
+-- BOTH HALVES ARE NOW THE SAME QUANTITY, AND THAT IS WHAT LETS THE
+-- INVARIANT SPEND EITHER.  A ⊔ of a nesting and a reading was SLACK in
+-- the safe direction and still unusable: the entry invariant is stated
+-- in the reading, so a store measured in layers bounded nothing it could
+-- cite, and what a stored chain can still do had to be recovered from
+-- the registry instead.  Read in one currency, the seed carries the
+-- depth a fold has ALREADY reached, so the reading's store bound is left
+-- covering the refolds of ONE burst rather than of a whole run — which
+-- is the half of the premise a bound taken per arrival can be about.
 arrivalWitness : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
                  (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e)
                → Acc _≺_ (entryTri (Sched.storeBound sched) e (Sched.slots sched)
                            (hopDᵛ (Sched.storeBound sched)
                               (slotHop (Sched.storeBound sched) (Sched.slots sched))
                               (arrTy a) (arrVal a)
-                            ⊔ stNest st))
+                            ⊔ stHop (Sched.storeBound sched)
+                                (slotHop (Sched.storeBound sched) (Sched.slots sched))
+                                st))
 arrivalWitness a sched st =
   entryWitness (Sched.storeBound sched) _ (Sched.slots sched)
     (hopDᵛ (Sched.storeBound sched)
        (slotHop (Sched.storeBound sched) (Sched.slots sched))
        (arrTy a) (arrVal a)
-     ⊔ stNest st)
+     ⊔ stHop (Sched.storeBound sched)
+         (slotHop (Sched.storeBound sched) (Sched.slots sched))
+         st)
 
 -- a source that lives and dies inside its own subscription burst
 -- (ofᵉ, emptyᵉ, take 0, a cold with no async tail): init, values,
