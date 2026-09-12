@@ -37,6 +37,7 @@ open import Verify-Budget-Sufficient.Nest-Walk using (nestDᵛˢ)
 open import Verify-Budget-Sufficient.Keeps-Ring using (stepFrame-slots)
 open import Verify-Budget-Sufficient.Caps-Face.Nest-Arith using (nestΦAt)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Depth-Join using (fold-le; disp-le; latch-sync)
+open import Verify-Budget-Sufficient.Caps-Face.Part7.Frame-Vals using (step-frame-vals≤)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; arrVal; RegId; cascadeLatch; arrSource; chainsOf; cascadeGo; Path;
   Frame; stepFrame; foldPath; arrTy; regAt; dCapᶜ; lvls; iterL; chainStep; budgetAt; arrTick)
 open import Rx.Slots using (Slots; slotsSize)
@@ -1178,16 +1179,6 @@ disp-depth-fit {e = e} sl id sf gas bid now S i vals fin sched st hsl hsf hΦ hv
 -- TWIN: `chainStep-store≤` -- the store axis of this, priced in the
 --   same currency at the granularity of a whole chain, and proven.
 postulate
-  step-frame-vals≤ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (sl : Slots Γ) (id : ℕ) (sf : Gas) (bid : Id) (now : Tick) (S : ℕ)
-    (f : Frame Γ s u) (p : Path Γ u t) (vals : List (Val Γ s)) (fin : Bool)
-    (sched : Sched Γ) (st : EvalSt e) →
-    Sched.slots sched ≡ sl → sf ≡ budgetAt e sl bid →
-    nestΦAt e sl id ≤ S →
-    nestDᵛˢ vals ≤ S →
-    storeSyncMax sched st ≤ S →
-    nestDᵛˢ (proj₁ (stepFrame sf bid now f p vals fin sched st)) ≤ S
-
   step-frame-store≤ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sl : Slots Γ) (id : ℕ) (sf : Gas) (bid : Id) (now : Tick) (S : ℕ)
     (f : Frame Γ s u) (p : Path Γ u t) (vals : List (Val Γ s)) (fin : Bool)

@@ -235,17 +235,6 @@ statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE FOLD'S COUNT, READ OFF THE STATE RATHER THAN PREDICTED.** The
-  one survivor, and where the nesting face's refutations all live: the
-  count is sighted at an instant's ENTRY cap while what it prices
-  happens later, and every local repair of that is recorded dead. Under
-  the order there is no entry to sight from, since the recursion
-  carries what it needs in its own motive. The commit states the fold's
-  depth bound against the cell in hand and puts the refuted witnesses
-  to it, returning the first that survives — which is a third FALSITY
-  on this region and so a stop — or the form that admits none of them.
-  Narrows WHAT BOUNDS A BURST INSIDE ONE INSTANT?
-
 - **THE EMITTED-VALUE INVARIANT, STATED WITHOUT THE SPINE.** The hop
   edge's `≺` form takes ONE premise — every emitted value's rank is
   strictly under its emitter's — and the toy proves exactly that in
@@ -270,6 +259,18 @@ statement, not about the head.
   surviving unchanged because the cap was never what it was about. The
   store face is where the answer bites. Narrows WHAT DOES AN
   INTRA-INSTANT RE-ENTRY LEAVE SMALLER?
+
+- **ASK THE SLOTS FOR THE BURST CEILING.** Every denomination of the
+  potential is dead and the last is the recorded spiral stop, so a
+  sixth is that route renamed — the width rider this slot used to name
+  included. But all six price the CHARGE, and what is missing is a
+  ceiling on the COUNT. The measurements that killed the others say
+  where one lives: the count moves with the SLOT SCRIPT and with
+  nothing the program names, and `budgetAt` already takes the slots
+  beside the program, so every site owing the count can read one. The
+  commit states that ceiling, wires it at the arm split just landed,
+  and probes it where the program-denominated attempts died. Narrows
+  WHAT BOUNDS A BURST INSIDE ONE INSTANT?
 
 ### Open questions
 
@@ -301,14 +302,14 @@ statement, not about the head.
 
 - **WHAT BOUNDS A BURST INSIDE ONE INSTANT?** Rows on two faces fail on one
   absence: nothing ties the values a frame hands ON to the program's
-  syntax. `burst-out` is the only such tie and it prices the SUBSCRIBE
-  frame, whose one width-towering family emits nothing at every length
-  measured — so it constrains none of the instants that carry a width. The
-  quantity is real and not an artefact of the accounting: a count field
-  threaded for it died to measurement at the first hop. What is NOT settled
-  is that it is unreachable — it moves with the SLOT SCRIPT, which
-  `budgetAt` already takes beside the program, so a slots-denominated
-  ceiling is in bounds and has never been asked for.
+  syntax. The quantity is real and not an artefact of the accounting — a
+  count field threaded for it died to measurement at the first hop. And the
+  ties that DO exist are not missing but MISPLACED: `burst-out`, and the
+  SLOTS-denominated ceiling the count's own dynamics point at, both price
+  the SUBSCRIBE frame, whose one width-towering family emits nothing at
+  every length measured. So they constrain none of the instants that carry
+  a width, and what has never been asked is either tie on what a THREADING
+  frame hands on.
   relevant: `pushBurst-sz-store-outer`, `subscribeE-sz`, `walk-share-valsNest`
 
 ### The ledger
@@ -331,10 +332,6 @@ statement, not about the head.
   preserved. A `scan-f` at an obs-typed accumulator crossed the preservation,
   and the grant is sealed — so the repair closes the region to instantiation on
   both sides at once.
-- **`step-frame-vals≤`** (Part7/Arrival-Caps) — FALSITY, `REFUTED, TWIN`: what
-  one `stepFrame` leaves in the delivered values, at that same grant. This is
-  the axis the frame moves and the fold does not — a scan emits the accumulator
-  it just wrote — so the trade the old ceiling permitted ran one way only.
 - **`step-frame-store≤`** (Part7/Arrival-Caps) — FALSITY, `REFUTED, TWIN`: the
   store half of that step, carried APART from the values half so that no
   ceiling has to cross a step at all; the position's ceiling is rebuilt from
@@ -401,9 +398,9 @@ statement, not about the head.
   transport.
 - **`pushBurst-sz-store-scan`** (Regs-Nest-Walk) — SHAPE,
   `REFUTED, DEAD ROUTE×2, PROBED×4`: the cell each arrival rewrites, short two
-  ways. The entering premise levels that cell with the ambient table at the very
-  `M` the conclusion demands; and the block's rate is log-linear where the fold
-  spends the source's width times the step's size.
+  ways. The entering premise levels that cell with the ambient table at the
+  very `M` the conclusion demands; and the block's rate is log-linear where the
+  fold spends the source's width times the step's size.
 - **`mergeAllDrain-ownerQueue`** (Part7/Strat-Leaves) — SHAPE, `REFUTED`: what
   the drain leaves in the owner's cell. Its premise is read off the POST-state,
   which the no-room arm never builds, so it is vacuously satisfiable. The
@@ -428,6 +425,22 @@ statement, not about the head.
   charge at the queue's own `drainW`. Its extra premise pins the cell's
   CONSTRUCTOR, not its depth, so a parked program runs the store term away here
   too; the width is walk-denominated besides.
+- **`step-frame-vals-scan`** (Part7/Frame-Vals) — SHAPE, `NO EVIDENCE`: what
+  the scan arm leaves in the delivered values, at the position's grant. The
+  fold threads, so its charge is a POWER in a burst count no hypothesis here
+  names — the gap the row four above carries, inherited rather than repeated.
+- **`step-frame-vals-inner`** (Part7/Frame-Vals) — SHAPE, `NO EVIDENCE`: the
+  same axis at the arm that grafts an inner's burst. What it hands on is the
+  inner's own emission, so the count is the walk's and the grant is sighted an
+  instant below where it is bounded.
+- **`step-frame-vals-outer`** (Part7/Frame-Vals) — SHAPE, `NO EVIDENCE`: the
+  same at the outer arm, whose payload is an obs and whose graft is a subscribe
+  — so the grant is asked to cover a value the position has not yet seen, at a
+  count it also does not carry.
+- **`step-frame-vals-map`** (Part7/Frame-Vals) — SHAPE, `NO EVIDENCE`: the
+  substituting arm alone, the one that carries a factor and no burst of its
+  own. Its twin still takes the count into an exponent, so the arm is short by
+  the same number as its siblings.
 - **`frameParked-step`** (Part7/Strat-Leaves) — DIFFICULTY, `PROBED`: the STORE
   half of the frame-keyed park reading across one step. Every arm that WRITES
   is instantiated, a floor below the width included; the two finishes left are
