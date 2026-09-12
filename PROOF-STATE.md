@@ -213,12 +213,12 @@ research lives; where they disagree, the header wins.
 dry marker. It is now a real body: `evaluate` is a root subscribe followed by a
 drain, and the two leaves below are that split.
 
-**BOTH LEAVES ARE SHORT OF THE SAME FACT, AND THE ENTRY HALF IS STATED.** The
-rank is seeded from the PROGRAM, and each leaf has to tie what it quantifies
-over back to that seed. The entry invariant does the way IN — it bounds
-`nestDᵉ` by the rank and the walk is re-proven under it. The way OUT is left:
-an inner a burst carries. Both rows stay SHAPE — each conclusion is too weak
-to carry its own induction.
+**THE ENTRY HALF IS STATED AND THE WAY OUT IS NOT SAYABLE IN SYNTAX.** The rank
+is seeded from the PROGRAM, and each leaf ties what it quantifies over back to
+that seed. The entry invariant does the way IN — it bounds `nestDᵉ` by the rank
+and the walk is re-proven under it. The way OUT is a burst's inners, and the
+reading that would have paid for it is REFUTED: a scan's accumulator gains a
+layer per delivery. Both rows stay SHAPE.
 
 **A FAILING GUARD IS NOT AN ERROR, AND THAT IS WHY THE TIER IS PROBEABLE.** A
 guarded clause returns a `dry` emit and the run continues, so both sides
@@ -226,32 +226,34 @@ compute at every program with nothing sealed between them.
 
 ### Big picture tier roadmap
 
-- **MAKE THE BURST CARRY ITS INNERS' NESTING, WHICH IS WHAT THE RANK PEEL
-  SPENDS.** The entry invariant now bounds `nestDᵉ` by the rank and every
-  clause of the subscription walk is re-established under it — seeded at the
-  root, re-seeded at a connect, and carried across the μ peel by
-  `nestD-unfoldμ`, which reads the unfolding EQUAL. What the operator shelf
-  still owes is a conjunct on the way OUT: `subscribeInner` enters an emitted
-  inner at a rank peeled by one, so the burst pipeline's dry-freedom is
-  provable only together with the claim that an inner a burst carries reads
-  STRICTLY under its emitter's. So the leaf is restated as a conjunction over
-  the burst it returns rather than ground as it stands.
+- **INSTANTIATE THE SEED BEFORE RESTATING ANYTHING.** The machine seeds the
+  rank at `2 ^ (sizeᵉ e + slotsSize sl)` and peels ONE per hop, and nothing has
+  ever asked whether a run's own values stay under it — the refuted reading was
+  doing that job by proxy. So run the shapes the refutation opened: a scan
+  whose step re-wraps its accumulator, the same under `switchAllᵉ` and
+  `exhaustAllᵉ`, and one fed from scripted slot data rather than a literal
+  source, since only the last puts deliveries where the seed counts them
+  differently. A row over the seed is a finding in the EVALUATOR and not in
+  either leaf, and it is the one outcome that makes restating them wasted work.
 
-- **SAY WHAT A REACHED STATE IS, AND MAKE THE DRAIN LEAF TAKE IT.**
-  The drain quantifies over an arbitrary schedule and an arbitrary state while
-  re-seeding its rank off the program alone, so a registry holding a path
-  deeper than the seed peels the same clause from the other side. The repair
-  is a field on the invariant record rather than a hypothesis: every producer
-  must then supply it and every consumer re-establish it, which is the only
-  way the fact reaches the cascade sites that need it. It waits on the first
-  leg because the conjunct it has to preserve is the one that leg writes.
+- **PRICE THE HOP AT THE VALUE, NOT AT THE EMITTER.** What `subscribeInner`
+  enters is a `Val`, and no reading of the emitter bounds it — so the conjunct
+  belongs at the value level, where a step function's application grows a
+  reading by the step's own nesting and nothing more. `nestDᵛ` and its bound by
+  `sizeᵛ` are proven in the attic and come back through the recovery pointer
+  the measure's own header carries. What gets stated is that every value a
+  burst carries and every accumulator the store holds reads under the rank;
+  the fold is then a substitution lemma rather than a comparison. The drain
+  leaf's own repair — a reached-state field on the invariant record — waits
+  on this, because that field is what it would be stated in.
 
 ### The ledger
 
 - **`dry-operator`** (Verify-Rank-Sufficient.Dry) — SHAPE,
-  `REFUTED, PROBED, RECOVERY`: the operator shelf's dry-freedom, entered under
-  an invariant that now bounds the nesting. Its conclusion says nothing about
-  the burst it returns, so it cannot carry its own induction.
+  `REFUTED×2, PROBED, RECOVERY`: the operator shelf's dry-freedom, entered
+  under an invariant that bounds the nesting on the way in. It says nothing
+  about the burst it returns, and the reading that would have supplied that is
+  refuted.
 
 - **`drain-dry-free`** (Verify-Rank-Sufficient) — SHAPE, `PROBED`: every
   arrival after the root frame. Its schedule and state arrive unconstrained, so
