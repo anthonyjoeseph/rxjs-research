@@ -248,3 +248,14 @@ open import Probed.Exit-Frame using (counts₁-is; counts₂-is; counts₃-is)
 -- predicate that can reject rather than tidy greens over a statement
 -- nothing could falsify
 open import Probed.Unfold-Bound using (ground; carriesLow; carriesBoth)
+
+-- the MANUFACTURED-VALUE rows, claimed with the read-backs that make
+-- them readings at all: the target is false over an arbitrary floor, so
+-- what stands here is only what a RUN produces — each queue pinned to
+-- the value the machine left in it, each control one floor below what
+-- the share connect supplies, and the closure that says a script can
+-- never hand the machine an observable in the first place
+open import Probed.Inner-Bound using
+  (tightQueued; looseQueued; builtQueued;
+   tightGround; builtGround; looseGround; looseSurvives;
+   tightRow; looseRow; builtRow; scriptShut)

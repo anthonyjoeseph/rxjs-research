@@ -194,8 +194,38 @@ postulate
 -- the context size and the only descent is to `suc i`, so the bound
 -- arrives with a unit of slack — and nothing in the type says so.
 --
+-- AND THE DEMAND ORIGINATES AT A REGISTRATION, WHICH IS WHAT OPENS A
+-- SECOND EXIT.  Nothing in the walk wants this bound for itself: the
+-- one clause that spends it is the input arm, and it spends it to lower
+-- a chain onto a slot row, whose type fixes the floor at one above the
+-- index.  So the premise is proof apparatus the machine carries in
+-- order to be well-typed, not a quantity the machine computes with —
+-- and a premise of that kind can be met by WEAKENING THE DEMAND rather
+-- than by supplying the proof.  Let the registration DECIDE its own
+-- floor test and drop the row when it fails, and the bound stops being
+-- a hypothesis the evaluator needs and becomes a theorem about a branch
+-- nothing reaches, which is where the invariant can actually be proven.
+-- The degenerate arm is the one the store already takes for a mistyped
+-- node, so the shape is not new; what it costs is a decision with no
+-- counterpart in the TS, over a floor that has none either.  NOT
+-- WALKED: both exits are stated here and neither is instantiated.
+--
 -- REFUTED: `Refuted.Inner-Floor` — a floor of zero against a context
 --   that has a slot, at the value `input 0`.  The predicate computes to
 --   `false`, so the statement returns an inhabitant of the empty type
 --   with no crossing to pin and no figure a repair could leave intact.
+--
+-- PROBED: `Probed.Inner-Bound` — the pairs a RUN produces, which is the
+--   question that refutation leaves open and that both exits rest on.
+--   Three shares connected at a floor of two inside a context of three,
+--   each value read back out of a bounded merge's own queue and pinned
+--   to what the machine left there.  One inner names the slot directly
+--   beneath the share and one reaches two down, so the controls a floor
+--   lower reject the first and pass the second; the third is a
+--   substitution instance a `map` builds around an arriving number,
+--   existing nowhere in the program text, which is the manufacture the
+--   arm is about.  Every row holds at the floor the connect supplies.
+--   NOT covered: a value built under a μ-unfold, and a connect reached
+--   through a second share rather than through the root.
+postulate
   below-inner : ∀ {t} (k : ℕ) (o : Val Γ (obs t)) → T (inputsBelowᵉ k o)
