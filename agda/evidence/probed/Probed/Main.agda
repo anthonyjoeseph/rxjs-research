@@ -40,9 +40,6 @@
 -- RECOVERY: git show 919f115:agda/evidence/probed/Probed/
 module Probed.Main where
 
-open import Probed.Root
-  using (cellP1; rowP1; cellP4; rowP4; cellP7; rowP7; cellS2; rowS2)
-
 open import Probed.Operator-Root
   using (opRoot)
 

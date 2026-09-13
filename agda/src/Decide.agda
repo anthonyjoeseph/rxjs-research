@@ -1,9 +1,9 @@
 -- DECIDER↔PROPOSITION ADAPTERS: the little facts that move between a
 -- `Bool`-valued decision procedure and a proposition about it — `≡ true`,
--- `T b`, `_≡ᵇ_`, `_≤ᵇ_`, `if_then_else_`, `Maybe` injectivity, and the
--- eliminations of an absurd equation.  Nothing here mentions a type of the
--- rxjs model or of the proof; it imports the standard library and nothing
--- else, which is what lets it sit below every tree.
+-- `T b`, `_≡ᵇ_`, `Maybe` injectivity, and the elimination of an absurd
+-- equation.  Nothing here mentions a type of the rxjs model or of the
+-- proof; it imports the standard library and nothing else, which is what
+-- lets it sit below every tree.
 --
 -- WHY IT EXISTS, and it is a wiring finding rather than a tidy-up.  This
 -- class had no home, so it accreted A COPY PER TREE: at the time this
@@ -14,13 +14,11 @@
 -- (`a ∧ b ≡ true` against `(a ∧ b) ≡ true`), so the compiler could not
 -- see it either — neither copy was ever in scope with the other.
 --
--- AND IT IS WHAT CLOSES THE TIER-2 DOOR.  `The-Proof` used to reach into
--- `Verify-Well-Formed.Part12`, `.Part4` and a support module of the
--- budget tree for five of these, so utility lemmas crossed two tier
--- boundaries and a reader counting the doors into either tree counted
--- them as claims on the tier.  They are not claims on anything; they are
--- arithmetic.  With one home below both trees, `The-Proof` names this
--- module and the tier exports exactly the statements it proves.
+-- AND IT IS WHAT KEEPS THE TIER DOORS NARROW.  A utility lemma reached
+-- for across a tier boundary reads as a claim on that tier to anyone
+-- counting the doors into it.  These are not claims on anything; they
+-- are arithmetic.  With one home below every tree, each tier exports
+-- exactly the statements it proves.
 --
 -- ONE MODULE, DELIBERATELY, AND NOT A `utils/` DIRECTORY (Anthony's
 -- proposal, narrowed here).  The standing rule is ONE naming convention
@@ -32,52 +30,42 @@
 -- cost of checking it is nil.
 --
 -- THE NAMES ARE NOT NORMALISED, AND THAT IS A RULING, NOT AN OVERSIGHT.
--- The class arrived with several conventions at once (`∧-trueˡ`, `T-to`,
--- `T⇒≡true`, `f≡t-absurd`, `true≢false`, `≡ᵇ→≡`, `≢ᵇ-from-<`, `not-out`,
--- `ifNeq`), and renaming to one of them would have rewritten roughly 1900
--- call sites for no proof content.  The duplicate-generating mechanism is
--- LOCALITY, not spelling: with every such fact in one file, the check
--- before adding one is reading this file.  Match a neighbour's convention
--- when you add to it; do not launch a rename.
+-- The class arrived with several conventions at once (`∧ˡ`, `true≢false`,
+-- `≡ᵇ→≡`, `just-injᵂ`), and renaming to one of them rewrites call sites
+-- for no proof content.  The duplicate-generating mechanism is LOCALITY,
+-- not spelling: with every such fact in one file, the check before
+-- adding one is reading this file.  Match a neighbour's convention when
+-- you add to it; do not launch a rename.
+--
+-- RECOVERY: git show 9a72dff:agda/src/Decide.agda restores the fifteen
+--   adapters that went with the protocol face — the ∧/∨/not/if shelf,
+--   the `≤ᵇ`/`≢ᵇ` order adapters, and `f≡t-absurd`.  Every one of them
+--   was consumed by that face and by nothing else.
 module Decide where
 
-open import Data.Bool using (Bool; true; false; not; _∧_; _∨_; if_then_else_; T)
+open import Data.Bool using (Bool; true; false; _∧_; T)
 open import Data.Unit using (tt)
-open import Data.Bool.Properties using (∨-assoc; ∨-comm)
-open import Data.Nat using (ℕ; zero; suc; _≤_; z≤n; s≤s; _≡ᵇ_; _≤ᵇ_)
-open import Data.Nat.Properties using (≤⇒≤ᵇ)
+open import Data.Nat using (ℕ; zero; suc; _≡ᵇ_)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Empty using (⊥)
 open import Relation.Binary.PropositionalEquality
-  using (_≡_; refl; cong; sym; trans)
+  using (_≡_; refl; cong)
 
 ------------------------------------------------------------------
--- eliminating an absurd equation.  Both directions land in an arbitrary
--- `Set` rather than in `⊥`, which is strictly stronger: a consumer
--- wanting `⊥` gets it by instantiation, and the two `→ ⊥` variants this
--- module replaced were exactly that instantiation written out.
+-- eliminating an absurd equation.  It lands in an arbitrary `Set`
+-- rather than in `⊥`, which is strictly stronger: a consumer wanting
+-- `⊥` gets it by instantiation, and the `→ ⊥` variants this module
+-- replaced were exactly that instantiation written out.
 ------------------------------------------------------------------
 
 true≢false : {A : Set} → true ≡ false → A
 true≢false ()
 
-f≡t-absurd : ∀ {A : Set} → false ≡ true → A
-f≡t-absurd ()
-
 ------------------------------------------------------------------
--- Bool: ∧, ∨, not, if
+-- Bool: ∧
 ------------------------------------------------------------------
 
-∧-trueˡ : ∀ {a b : Bool} → (a ∧ b) ≡ true → a ≡ true
-∧-trueˡ {true} _ = refl
-
-∧-trueʳ : ∀ {a b : Bool} → (a ∧ b) ≡ true → b ≡ true
-∧-trueʳ {true} h = h
-
-∧-intro : ∀ {a b : Bool} → a ≡ true → b ≡ true → (a ∧ b) ≡ true
-∧-intro refl refl = refl
-
--- the same two projections in `T` form, and THE BOOLS ARE EXPLICIT ON
+-- the two ∧ projections in `T` form, and THE BOOLS ARE EXPLICIT ON
 -- PURPOSE.  `T` is a FUNCTION on `Bool`, not a datatype, so
 -- `T ?a =?= T (f k x)` cannot be inverted while the argument is stuck
 -- on a variable — which it always is at the recursive call sites these
@@ -93,45 +81,8 @@ f≡t-absurd ()
 ∧ʳ true  b h = h
 ∧ʳ false b ()
 
-∨-fˡ : ∀ (b c : Bool) → (b ∨ c) ≡ false → b ≡ false
-∨-fˡ false c h = refl
-∨-fˡ true  c h = h
-
-∨-fʳ : ∀ (b c : Bool) → (b ∨ c) ≡ false → c ≡ false
-∨-fʳ false c h = h
-∨-fʳ true  c ()
-
-∨-trueʳ : ∀ (x : Bool) → (x ∨ true) ≡ true
-∨-trueʳ false = refl
-∨-trueʳ true  = refl
-
-∨-swap : ∀ (a b c : Bool) → (a ∨ (b ∨ c)) ≡ (b ∨ (a ∨ c))
-∨-swap a b c = trans (sym (∨-assoc a b c))
-                     (trans (cong (_∨ c) (∨-comm a b)) (∨-assoc b a c))
-
--- `not x ≡ true → x ≡ false` and its converse.  The implicit-`x` form is
--- the one kept; an explicit-argument twin (`not-true b h`) stood in
--- Verify-Well-Formed and its call sites now pass nothing.
-not-out : ∀ {x : Bool} → not x ≡ true → x ≡ false
-not-out {false} _ = refl
-
-force-false : (b : Bool) → (b ≡ true → false ≡ true) → b ≡ false
-force-false false _ = refl
-force-false true  d with d refl
-... | ()
-
-if-false : ∀ {A : Set} {x y : A} (b : Bool) → b ≡ false → (if b then x else y) ≡ y
-if-false b eq rewrite eq = refl
-
-if-true : ∀ {A : Set} {x y : A} (b : Bool) → b ≡ true → (if b then x else y) ≡ x
-if-true b eq rewrite eq = refl
-
 ------------------------------------------------------------------
--- T and `≡ true`, in both directions
-------------------------------------------------------------------
-
-------------------------------------------------------------------
--- ℕ's Bool-valued equality and order
+-- ℕ's Bool-valued equality
 ------------------------------------------------------------------
 
 ≡ᵇ-refl : ∀ (m : ℕ) → (m ≡ᵇ m) ≡ true
@@ -147,17 +98,6 @@ if-true b eq rewrite eq = refl
 ≡ᵇ→≡ : ∀ (m k : ℕ) → (m ≡ᵇ k) ≡ true → m ≡ k
 ≡ᵇ→≡ zero    zero    _ = refl
 ≡ᵇ→≡ (suc m) (suc k) h = cong suc (≡ᵇ→≡ m k h)
-
-≢ᵇ-from-< : ∀ {j i : ℕ} → j ≤ i → (suc i ≡ᵇ j) ≡ false
-≢ᵇ-from-< z≤n     = refl
-≢ᵇ-from-< (s≤s q) = ≢ᵇ-from-< q
-
-sucle→≢ᵇ : ∀ {j nextId : ℕ} → suc j ≤ nextId → (nextId ≡ᵇ j) ≡ false
-sucle→≢ᵇ (s≤s q) = ≢ᵇ-from-< q
-
-≤ᵇ-true : ∀ (a b : ℕ) → a ≤ b → (a ≤ᵇ b) ≡ true
-≤ᵇ-true a b p with a ≤ᵇ b | ≤⇒≤ᵇ p
-... | true | _ = refl
 
 ------------------------------------------------------------------
 -- Maybe

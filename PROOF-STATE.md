@@ -192,9 +192,9 @@ the row is DIFFICULTY.
 ```
 formal-verification-batchSimultaneous    The-Proof.agda — REAL, module postulate-free
  ├─ batch-agreement                      proven
- └─ evaluate-well-formed                 Verify-Well-Formed/Part13 — tier 2
+ └─ evaluate-well-formed                 Verify-Well-Formed.agda — tier 2
      ├─ rank-sufficient                  Verify-Rank-Sufficient.agda — tier 1
-     └─ the well-formedness branch       its own postulates — tier 2
+     └─ burst-drain-well-formed          one postulate — tier 2
 
   every tier above is stated over Rx.Exp's syntax
 ```
@@ -340,148 +340,36 @@ now at the door and at the templates the door's chains are built from.
 Built on `rank-sufficient`, so proving anything here while tier 1 is open bets
 on ground a refutation of the descent would move.
 
-**THE TIER IS ONE STATEMENT.** `The-Proof` draws `evaluate-well-formed`
-(Part13) and nothing else from this tree, and every `Verify-Well-Formed` module
-sits in its cone. `Verify-Support`'s three leaves are here rather than in a tier
-of their own: nothing but Part3 consumes any of them.
+**THE TIER IS ONE STATEMENT OVER ONE LEAF.** `The-Proof` draws
+`evaluate-well-formed` and nothing else from this face. That name is a real
+body: it splits the descent's dry-freeness across the subscribe frame and the
+drain, and hands the two halves to the leaf. The split is what CONSUMES tier 1
+— a leaf handed `rank-sufficient` directly would assert its sufficiency without
+ever checking it, which is the shape the leaf law refuses.
 
-**MERGE COHERENCE IS UNSTATED** — the branch's own design question. What a
-statement owes, and why it would inherit no evidence from the probe that is the
-predicate's only consumer, is recorded on `Part4.root-mergeAllCache`.
-
-In rough order for when the tier opens — statement repairs first, then grinds:
+**AND THE BOOKKEEPING IS DELIBERATELY UNCARVED.** The protocol argument's shape
+is a function of a recursion tier 1 may still restate, so pieces cut against
+today's machine are inventory and not progress. One leaf at full strength; carve
+it when the descent under it settles.
 
 ### Big picture tier roadmap
 
-- **instantiate FoldOut before any arm is ground** — `mid-readoff`. FoldOut is
-  a six-field record validated at exactly one clause and five further rows are
-  readoffs from it, so the risk is the record and not the arms: if it is
-  wrong, all six are. This commit is the probe alone — the record at canonical
-  programs, saying which fields the rows reach and which they do not — and
-  whatever the probe forces on the record's own statement.
-- **the map push, as an ASSEMBLY** — `map-nodry-push`. Every ingredient is
-  already PROVEN and the route is complete, so this is a body over leaves
-  rather than a grind, and it is one commit. It is taken before its six
-  siblings because assembling it tests the shape they will all be written to,
-  and a shape found wrong here costs one row instead of seven.
-- **the two frame readoffs the record's probe unblocks** —
-  `foldPath-frame-out`, `foldPath-share-out`. They share the record, the
-  clause it is validated at and the fold they are read off, so once the first
-  commit says what the record actually carries they are one shelf of
-  mechanical work. Held behind that commit deliberately: a readoff ground
-  against a record that then moves is ground twice.
+- **instantiate the leaf before carving it** — `burst-drain-well-formed`. Both
+  its hypotheses and its conclusion compute at a closed program, so the whole
+  statement is decidable by `refl` at canonical shapes — and nothing has ever
+  run the protocol automaton over an evaluator emit stream, at any program. The
+  commit is the probe alone: which operators the rows reach, which they do not,
+  and whatever a red row forces on the statement. It is taken first because
+  every way of carving this face into pieces is a bet on the leaf being true,
+  and a leaf refuted after the carve costs the carve as well.
 
 ### The ledger
 
-- **`root-entry-sunk`** (Part4) — FALSITY, `NO EVIDENCE`: the per-entry residue
-  of `root-done-plumbed`. Its load-bearing region was NOT reached by probe, so
-  the class stands — but it is a statement about ONE surviving entry, a size a
-  counterexample can be built at. Coverage boundary in its header.
-- **`mid-readoff`** (Part11) — FALSITY, `NO EVIDENCE`: the FoldOut readoff, and
-  FoldOut is a 6-field invariant validated at exactly one clause.
-- **`dispatchShare-wf`** (Part9) — FALSITY, `NO EVIDENCE`: the share arm's run
-  equation, `foldPath-wf`'s third clause. Nothing has been instantiated at the
-  diamond's owed accounting — a handoff bump repaid across a per-registration
-  fan-out — and its FoldOut half belongs to `foldPath-share-out`.
-- **`foldPath-frame-out` / `foldPath-share-out`** (Part11) — FALSITY,
-  `NO EVIDENCE`: `foldPath-out`'s two undischarged arms, each the FoldOut
-  readoff only. FoldOut is a new record and nothing has been instantiated at
-  either arm — the frame arm's shadow fields under a `stepFrame` call, the
-  share arm's net-zero owed across the diamond.
-- **`mid-fold-certs`** (Part11) — FALSITY, `NO EVIDENCE`: one case split on
-  `Arrival.isLast a` off `Mid.done-plumbed`, which is a record field and not a
-  precedent. The unreached corner is the flip: `allShareSunk` after the source
-  is dropped, from a conditional hypothesis.
-- **`scan-nodry-push`** (Part3) — FALSITY, `NO EVIDENCE`: no
-  `pushBurst-scan-char` counterpart of the map characterisation exists, so the
-  route is a direct induction and the twin its header names is itself a
-  postulate. Nothing in the dry family has been instantiated at a scan push.
-- **`subscribeSharedSlot-wf`** (Part3) — FALSITY, `NO EVIDENCE`, blocked:
-  `sharedConnect` recurses into `subscribeE`, so this arm cannot close outside
-  the mutual block holding `subscribeE-wf`, two files down — and the connect
-  branch, which grows both registry and shares, is unreached.
-- **`subscribeE-defer-wf`** (Part3) — FALSITY, `NO EVIDENCE`, well-scoped:
-  three BurstInv conjuncts fall out at once; the whole residue is `liveTypeOK?`
-  at the minted source, whose tail needs a mintSource-freshness lemma the repo
-  does not have and nothing has instantiated.
-- **`cut-owed`** (Part9) — FALSITY, `NO EVIDENCE`: independent of every
-  blocker, but its own header calls the owed-shape obligation "genuinely
-  semantic" and names no precedent. The unreached region is the ledger after
-  `cutThrough`'s close list is applied — zeroExcept and UniqueOwed out.
-- **`stepFrame-wf-inner-mergeAll`** (Part9) — FALSITY, `NO EVIDENCE`: the drain
-  grows the registry; re-establish FoldInv. It is the ONE `stepFrame` clause
-  that is not registry-monotone, and nothing has been instantiated there.
-  Independent of the cert.
-- **`mergeAll-nodry-push` / `mergeAll-valsLast-push`** (Part3) — FALSITY,
-  `TWIN×2`: carry the dry premise in and `valsLast?` out through the wrap
-  frame. The map and scan pushes they read against are postulates too, so the
-  whole push family stands on nothing at any operator.
-- **`map-nodry-push`** (Part3) — FALSITY, `NO EVIDENCE`: every ingredient is
-  PROVEN — `pushBurst-map-char` (.Part5) and the dry family `splitEvents-nodry`
-  / `retagEvents-dry` / `mapValue-dry` / `any-dry-++` (.Walk-Level) — so the
-  ROUTE is complete and the STATEMENT is still uninstantiated. Assemble it:
-  Part3 already reaches that cone through Caps-Bridge.
-- **`input-hot-spent-wf`** (Part3) — FALSITY, `NO EVIDENCE`: `oneShotBurst-wf`
-  is the same balance at a FRESHLY MINTED source and its own header says it
-  does not donate this arm — a spent source re-emitting init is the unreached
-  case, and `live-matches` there is what nothing has checked.
-- **`take-nodry-push`** (Part3) — FALSITY, `NO EVIDENCE`, and NOT by the scan
-  twin its header names, which is a postulate: `cutThrough` emits only `close
-  src cut`/`cutPending` while `dryEvent` fires on `dried` alone, so the route
-  is structural — and the cut case is what nothing has instantiated.
-- **`subscribeE-dying`** (Part8) — FALSITY, `NO EVIDENCE`, large: `subscribeE`
-  never writes `dying` — two writers, neither reachable from it, both named in
-  its header. The claim rests on that enumeration being exhaustive, which is
-  exactly what no instantiation has tested.
-- **`HotLive`'s preservation leaves** (Part2) — FALSITY, `NO EVIDENCE`, four of
-  the five: `sched-init-hot-live`, `mintSource-hot-live`,
-  `subscribeE-hot-live`, `cascadeFinish-hot-live`. Each header states a
-  slots-untouched / prepend-only route and no more; the family's one worked
-  body sweeps where these three build, prepend and split.
-- **`subscribeE-{switch,exhaust}All-wf`** (Part3) — SHAPE, `TWIN×2`: written
-  against a coherence whose statement is still open (the cert sketch in Part8's
-  establishment block). The mergeAll face is no longer among them: it is a real
-  clause, and its leaves are the five rows below.
-- **`stepFrame-wf-outer`** (Part9) — SHAPE, `NO EVIDENCE`, on a ROUTE claim
-  rather than the statement: discharging it means enriching `stepFrame-wf` to
-  carry FoldOut out, restating this family. GRIND it after
-  `stepFrame-wf-inner-mergeAll`, which it strictly contains — a work-order
-  dependency only.
-- **`map-valsLast-push` / `scan-valsLast-push`** (Part3) — SHAPE,
-  `NO EVIDENCE`: each papers over a recorded mismatch (the proven sub-lemmas
-  don't return `valsLast?`).
-- **`cutThrough-close-bound-dying` / `cutThrough-live-dying`** (Part7) — SHAPE,
-  `REFUTED`: both REFUTED (`Refuted.Cut-Through`), `L₁` free at exactly the
-  sources the conclusions speak about. Restate over the (LAG) ledger; header
-  carries the repair and why it was not ground here.
-- **`input-cold-async-wf`** (Part3) — SHAPE, `NO EVIDENCE`: its one named
-  precedent `initReg-wf` is ruled out in the header — that lemma's emit is
-  `init src ∷ []` while this ships the sync prefix in the same emit — and the
-  `reg-typed` conjunct needs a self-typing certificate no hypothesis carries.
-- **`mint-install-survives`** (Node-Fresh) — DIFFICULTY, `RECOVERY`: a minted
-  node survives the body subscribing under it. The statement is unchanged from
-  the proven form its header recovers; what moved is the recursion the
-  freshness ring was matched against.
-- **`subscribeE-qd` / `pushBurst-qd`** (Queue-Dead) — DIFFICULTY, `RECOVERY×2`:
-  two members of that same ring — an empty queue below the watermark stays
-  empty across a subscribe and across a push. Same recovery, same blocker.
-- **`mergeAll-node-shape`** (Part3) — DIFFICULTY, `TWIN`: the wrap's node is
-  still a `mergeAll-st` at the type it was installed at, whatever the burst did
-  to it. Limit-blind, which is what lets the queue claim be a separate fact
-  rather than a conjunct only one limit can honour.
-- **`subscribeE-mergeAll-push`** (Part3) — DIFFICULTY, `TWIN`: the wrap's push
-  half, protocol run and invariant back out through `thru-outer`, over the
-  inner's receipt plus the FINISHED wrap's node.
-- **`root-mergeAllCache`** (Part4) — DIFFICULTY, `DEAD ROUTE, PROBED`: the
-  per-node residue of `root-caches`, split to the mergeAll clause alone and
-  probed non-vacuously in assembled form. Header carries the DEAD ROUTE through
-  `mergeAllCertAt` and the MISSING INVARIANT it leaves owed.
-- **`mergeAll-binv-adapt`** (Part3) — DIFFICULTY, `TWIN`: mint and install
-  touch neither registry nor live, so every BurstInv field survives, and the
-  mirror's argument never reads which node state is installed.
-- **`sched-next-hot-live`** (Part2) — DIFFICULTY, `TWIN`: the fifth leaf, split
-  out because it is the only one with a mirror — a per-entry `liveTypeOK?`
-  carried across this very pop, proven.
+- **`burst-drain-well-formed`** (Verify-Well-Formed) — FALSITY, `NO EVIDENCE`:
+  everything the protocol argument owes about a run whose subscribe frame and
+  whose drain are each dry-free. Never instantiated at any program, and the
+  automaton it asserts acceptance under is defined, so the whole statement
+  computes.
 
 ## Tier 3 — the top-line semantic claims (parked behind tier 2)
 

@@ -13,8 +13,7 @@
 -- RECOVERY: git show 919f115:agda/evidence/refuted/Refuted/
 module Refuted.Main where
 
-open import Refuted.Drain-Reachable using (drain-dry-free-false;
-  drain-dry-free-inv-false)
+open import Refuted.Drain-Reachable using (drain-dry-free-false)
 -- the two figures are claimed beside the witness on purpose: an
 -- inequality refutation dies quietly when a repair enlarges the right
 -- side, and a pinned crossing fails by name instead

@@ -33,34 +33,36 @@
 -- That is what the fit hypothesis is for, and it is a hypothesis about
 -- the REGISTRY rather than about the program precisely because of this.
 --
--- AND THE INVARIANT DOES NOT CLOSE IT EITHER, which is the half worth
--- having: the coherence record carried between cascades constrains the
--- registry's COUNTS and its element TYPES, and says nothing about the
--- frames a chain is built from.  A statement conditioned on it is
--- refuted by the same witness, so conditioning is not the repair; what
--- is missing is a fact tying a registration's frames to the program,
--- and that fact has no home in the record as it stands.
+-- AND CONDITIONING ON A COHERENCE RECORD IS NOT THE REPAIR, which is
+-- the half worth having: such a record constrains the registry's COUNTS
+-- and its element TYPES, and the depth this witness manufactures is a
+-- property of a chain's FRAMES.  What is missing is a fact tying a
+-- registration's frames to the program being run.
+--
+-- DEAD ROUTE: demanding the between-cascades coherence record as a
+--   hypothesis.  Every field of it was satisfied at the same
+--   adversarial state, so the conditioned statement was refuted by the
+--   witness below unchanged.
+-- RECOVERY: git show 9a72dff:agda/evidence/refuted/Refuted/Drain-Reachable.agda
+--   restores the machine form of that second witness, which is gone
+--   because `src` no longer states the record it was conditioned on.
 module Refuted.Drain-Reachable where
 
 open import Data.Bool using (true; false)
 open import Data.Empty using (⊥)
 open import Data.List using ([]; _∷_)
 open import Data.Maybe using (nothing)
-open import Data.Nat using (z≤n)
 open import Data.Product using (_,_)
-open import Data.Unit using (tt)
 open import Data.Vec using () renaming ([] to []ⱽ)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans)
 
 open import Rx.Prim using (Fuel; Id)
-open import Rx.Protocol using (ProtocolSt; paidUp)
 open import Rx.Exp using (Ctx; Closed; Fn; natᵗ; obs; strmᵗ; nat̂; ofᵉ;
   emptyᵉ; mergeAllᵉ)
 open import Rx.Slots using (Slots)
 open import Rx.Evaluator using (Sched; EvalSt; Path; root; _↠_; map-f;
   thru-outer; mergeAllᵒ; mergeAll-st; drain; hasDry; sched-init; st-init;
   atDyn)
-open import Verify-Well-Formed.Part2 using (Inv)
 
 ----------------------------------------------------------------------
 -- THE STATEMENT, WRITTEN OUT HERE RATHER THAN IMPORTED, so that this is
@@ -126,59 +128,4 @@ dry₀ = refl
 
 drain-dry-free-false : DrainDryFree → ⊥
 drain-dry-free-false h with trans (sym (h 1 1 sched₀ st₀)) dry₀
-... | ()
-
-----------------------------------------------------------------------
--- AND CONDITIONING ON THE COHERENCE RECORD DOES NOT REPAIR IT.  The
--- obvious reading of the witness above is that it is a store no run
--- mints, so the repair is to demand the invariant every run carries.
--- The invariant is imported rather than restated, precisely so that a
--- field added to it makes this second witness fail to typecheck — which
--- is the answer this half is here to give, and it is currently no.
---
--- EVERY FIELD IS SATISFIED AT THE SAME STATE.  The registry holds one
--- entry, so the automaton's multiset is one entry and the counts agree;
--- the entry's element type is the live source's, so the type gate
--- admits it; the protocol is at its initial watermark with no open
--- instant; nothing is done, so the share-plumbing obligation is
--- vacuous; the merge node's counter is zero and the chain contributes
--- no inner instance, so the cache agrees; and the context is empty, so
--- there is no hot slot to keep live.
---
--- WHAT THAT LOCATES.  The record constrains the registry's COUNTS and
--- its element TYPES, and the depth the witness manufactures is a
--- property of a chain's FRAMES — of which function a `map-f` carries,
--- a quantity no field mentions.  So the missing fact is not coherence
--- between the store's parts: it is a tie between a registration's
--- frames and the program being run, and adding the record as a
--- hypothesis buys a statement that is false at exactly the same point.
-----------------------------------------------------------------------
-
-DrainDryFreeInv : Set
-DrainDryFreeInv = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (fuel : Fuel) (nextId : Id) (sched : Sched Γ) (st : EvalSt e)
-  (S : ProtocolSt) →
-  Inv nextId sched st S → paidUp S ≡ true →
-  hasDry (drain fuel nextId sched st) ≡ false
-
-S₀ : ProtocolSt
-S₀ = record { live = 0 ∷ [] ; horizon = 0 ; current = nothing ; done = false }
-
-inv₀ : Inv 1 sched₀ st₀ S₀
-inv₀ = record
-  { live-matches = λ s → refl
-  ; reg-typed    = refl
-  ; horizon-low  = z≤n
-  ; current-past = tt
-  ; done-plumbed = λ ()
-  ; caches       = refl
-  ; hot-live     = λ ()
-  }
-
-paid₀ : paidUp S₀ ≡ true                               -- LOAD-BEARING
-paid₀ = refl
-
-drain-dry-free-inv-false : DrainDryFreeInv → ⊥
-drain-dry-free-inv-false h
-  with trans (sym (h 1 1 sched₀ st₀ S₀ inv₀ paid₀)) dry₀
 ... | ()

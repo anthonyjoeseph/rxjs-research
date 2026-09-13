@@ -32,11 +32,12 @@
 -- own `through` carries the tail's bound, so there is no point at
 -- which a number has to be guessed.
 --
--- TWIN: `Verify-Well-Formed.Part9.foldPath-wf` — the same fold, the
---   same three arms, the same threading of the witness; and
---   `Verify-Well-Formed.Part12.cascadeGo-wf` for the chain list.  Both
---   are proven, and the correspondence is clause for clause, which is
---   what says the induction below is the one the machine performs.
+-- RECOVERY: git show 9a72dff:agda/src/Verify-Well-Formed/Part9.agda
+--   restores `foldPath-wf` — the same fold, the same three arms, the
+--   same threading of the witness, proven clause for clause against the
+--   induction below; `…/Part12.agda` holds `cascadeGo-wf` for the chain
+--   list.  Both went with the protocol face when it collapsed to one
+--   leaf, and they are the worked instance for the shape here.
 ------------------------------------------------------------------
 module Verify-Rank-Sufficient.Fold-Path where
 
