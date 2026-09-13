@@ -224,26 +224,31 @@ guarded clause returns a `dry` emit and the run continues, so both sides
 compute at every program — `hopFits` included, whose rows spend a decision
 procedure rather than a pin, and whose refusal is what turned this up.
 
+### Open questions
+
+- **DOES A TERM-RELATIVE READING BOUND WHAT THE TERM DID NOT BUILD?** The
+  report the walk now carries prices a burst against the reading of the term
+  being walked, and that reading is a function of the SOURCE. Three places
+  produce a subscription the source does not contain: a flattener re-enters
+  through an emitted VALUE, an arrival delivers into a frame the loop reached
+  after the walk was over, and a fold's accumulator is rebuilt at run time out
+  of what it just emitted. None of the three is inside the induction that
+  proves the report, so each is bounded today by a leaf rather than by an arm —
+  and the tier's whole remaining risk is whether any of them can outrun a
+  quantity the term fixes.
+  relevant: `operator-carried`, `drain-dry-free`, `scan-frame-carried`
+
 ### Big picture tier roadmap
 
-- **STATE THE CARRIED REPORT, NOW THE FAMILY THAT REFUTED IT AGREES.** The hop
-  edge holds downward by definition and NOT upward — a frame builds its
-  emissions at run time — so the only route out is the burst walk carrying its
-  emissions' reading beside them, invariant in the motive. That route was
-  refuted: the carried depth climbed one per source literal against a bound flat
-  in source length. The iterating clause tracks the refold, and on the same
-  doubling fold the two sides now agree at every length measured. The leg STATES
-  it, invariant in the motive, and lets the walk's arms say where exactness
-  stops — the one leg that can still REFUTE rather than measure.
-
-- **SPEND THE CARRIED REPORT AT THE FLATTENER LEAF.** `dry-operator` is now a
-  comparison and not a measure: the rank the three flatteners are entered
-  against moves with the source and outruns what the burst carries, so what the
-  leaf is missing is a fact about an emitted inner that only the report above
-  supplies. The leg is the assembly — the leaf over the walk's own conclusion —
-  and the first arm to resist says whether the raised clause bounds a flattener
-  at all or only the fold above one. It is banked only once the leg above
-  settles `drain-dry-free`; blocked, it is rewritten from what that leg found.
+- **SPEND THE CARRIED REPORT AT THE FLATTENER LEAF.** The report now exists and
+  is invariant in the walk's motive, so the leaf that was waiting on it is
+  writable: `operator-carried` is the residue the three flatteners left, and
+  `dry-operator` sits beside it unrestated so the rows and the refutation taken
+  against it keep their subject. The leg is the assembly — the flattener arm
+  over the walk's own conclusion at the emitted inner — and the first arm to
+  resist says whether what a flattener re-enters is bounded by the term at all
+  or only by the fold above one. A refutation here is the cheap half of the
+  question above, since the same witness reaches the drain row's arithmetic.
 
 - **CARRY THE REPAIRED READING PAST AN ARRIVAL.** The slot count now holds at
   the DOOR and the rows reach twenty-four deliveries under one arrival there,
@@ -255,6 +260,16 @@ procedure rather than a pin, and whose refusal is what turned this up.
   risk arriving at the one uncovered shape; a receipt retires the last coverage
   boundary both drain rows name.
 
+- **CLOSE THE THREE FRAMES, WORST FIRST.** The walk's four non-flattening
+  operators all run on one hypothesis, and it is three leaves: a map's outputs
+  are a template evaluated at the payload, a take's are a prefix under a node
+  that reads zero, and a scan's ARE the accumulator it is rewriting — which is
+  the one place the two currencies meet, and the only one of the three handed
+  the ordering between them rather than assuming it. The leg takes the scan
+  first, because a witness there is a witness against the question above and
+  the other two are a shelf behind it. It is the mechanical leg of the three,
+  and it is third for that reason.
+
 ### The ledger
 
 - **`drain-dry-free`** (Verify-Rank-Sufficient) — FALSITY,
@@ -262,6 +277,23 @@ procedure rather than a pin, and whose refusal is what turned this up.
   `hopFits` at the schedule's own slot reading and not one the caller picks.
   The fit holds flat across twelve drain states and is TIGHT at the plainest,
   so the rows sit where it is closest to false.
+
+- **`operator-carried`** (Verify-Rank-Sufficient.Dry) — FALSITY,
+  `NO EVIDENCE`: what the three flatteners carry, the residue `dry-operator`
+  was split away from so neither claim restates the other. A flattener
+  subscribes an emitted VALUE, so the induction the walk runs does not reach
+  it and nothing has instantiated it.
+
+- **`scan-frame-carried`** (Verify-Rank-Sufficient.Push-Carried) — FALSITY,
+  `NO EVIDENCE`: the fold's step, and the one frame whose emission IS its
+  stored accumulator. It is the only leaf handed the ordering between the two
+  currencies, and both halves move at once under it.
+
+- **`map-frame-carried` / `take-frame-carried`**
+  (Verify-Rank-Sufficient.Push-Carried) — FALSITY, `NO EVIDENCE`: the other two
+  frames the walk runs on. A map evaluates a template at the payload, which is
+  where the reading's plug clause has to be met; a take hands back a prefix
+  under a node that reads zero by construction.
 
 - **`entry-hop-fits`** (Verify-Rank-Sufficient) — DIFFICULTY, `PROBED×2`: the
   fit at the door. The scripted slot that once refuted it now reads 7 against a
@@ -273,6 +305,12 @@ procedure rather than a pin, and whose refusal is what turned this up.
   under the entry invariant. At the family that exhibited the crossing the rank
   now MOVES with the source and outruns what the burst carries, so what is owed
   is the comparison, not a measure.
+
+- **`ofᵉ-carried` / `scan-seed-carried`**
+  (Verify-Rank-Sufficient.Leaf-Carried) — DIFFICULTY, `PROBED×2`: the two
+  places a subscribe turns a term into a value. Both are hypothesis-free and
+  both sides compute, and the rows are taken at points where neither side is
+  zero; a literal mentioning an input is not covered by either.
 
 ## Tier 2 — Verify-Well-Formed (parked behind tier 1)
 
