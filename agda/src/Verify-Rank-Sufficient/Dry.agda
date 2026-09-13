@@ -35,7 +35,7 @@ open import Data.Vec using (lookup)
 open import Induction.WellFounded using (Acc; acc)
 open import Relation.Nullary using (yes; no)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans;
-  cong)
+  cong; cong₂)
 
 open import Rx.Prim using (Tick; Id; hot; cold; init; close; exhausted)
 open import Rx.Exp using (Ctx; Exp; Closed; evalTm; inputsBelowᵉ; syncSizeᵉ;
@@ -50,7 +50,7 @@ open import Rx.Evaluator using (Stream; Path; Sched; EvalSt; subscribeE;
   map-f; scan-f; take-f; thru-outer; mergeAllᵒ; switchᵒ; exhaustᵒ;
   _↠_;
   hasDry; memberSource; unconn; stHop)
-open import Rx.Hop-Depth using (depthᵉ; hopOf; ε; rd-unfoldμ)
+open import Rx.Hop-Depth using (depthᵉ; hopOf; rdᵉ; ε; rd-unfoldμ)
 open import Rx.Slot-Read using (slotRd; slotRd-fix)
 open import Verify-Rank-Sufficient.Entry using (EntryReads; hop-mapᵉ; hop-scanᵉ)
 open import Verify-Rank-Sufficient.Sync-Edge using (mu-guard)
@@ -59,11 +59,10 @@ open import Verify-Rank-Sufficient.Dry-Emits using (hasDry-if; oneShotBurst-dry;
   cold-tail-dry; connect-emit-dry)
 open import Verify-Rank-Sufficient.Push-Dry using (pushBurst-dry;
   map-frame-dry; scan-frame-dry; take-frame-dry)
-open import Verify-Rank-Sufficient.Carried using (emitHop-map;
-  oneShotBurst-hop; installNode-hop; burstHop-plumb; valsHop-data;
-  WalkCarries; burstHop-if; stHop-if)
+open import Verify-Rank-Sufficient.Carried using (emitAt-map; oneShotBurst-rd; installNode-hop; burstRd-plumb; valsAt-data; valsRd-data;
+  WalkCarries; burstRd-if; stHop-if; ≡-⊑; ⊑-≡)
 open import Verify-Rank-Sufficient.Push-Carried using (pushBurst-carried;
-  map-frame-carried; scan-burst-carried; take-frame-carried;
+  mapRd; map-frame-carried; scan-burst-carried; take-frame-carried;
   thru-outer-frame-carried)
 open import Verify-Rank-Sufficient.Leaf-Carried using (ofᵉ-carried;
   scan-seed-carried)
@@ -191,7 +190,7 @@ mutual
     stHop (slotRd (Sched.slots sched)) st ≤ proj₁ (proj₂ τ) →
     WalkCarries (slotRd (Sched.slots sched)) u
       (subscribeE ac o κ id now sched st)
-      (depthᵉ (slotRd (Sched.slots sched)) o) (proj₁ (proj₂ τ))
+      (proj₂ (rdᵉ (slotRd (Sched.slots sched)) ε o)) (proj₁ (proj₂ τ))
 
   -- THE μ PEEL.  The machine asks whether the unfolding fits under the
   -- component it is standing at; the invariant says the redex already
@@ -208,8 +207,7 @@ mutual
   ... | no  ¬p = ⊥-elim (¬p (mu-guard body (proj₂ (proj₂ inv))))
   ... | yes p  =
         proj₁ ih
-        , ≤-trans (proj₁ (proj₂ ih))
-                  (≤-reflexive (cong hopOf (rd-unfoldμ _ ε body)))
+        , ⊑-≡ (proj₁ (proj₂ ih)) (cong proj₂ (rd-unfoldμ _ ε body))
         , proj₂ (proj₂ ih)
     where
     ih = subscribe-dry-free (rec (ltS p)) (unfoldμ body) κ id now sched st
@@ -221,12 +219,11 @@ mutual
 
   subscribe-dry-free ac (ofᵉ ts) κ id now sched st inv hst =
     oneShotBurst-dry (map (λ tm → evalTm tm) ts) id sched
-    , ≤-trans (≤-reflexive
-                (oneShotBurst-hop _ _ (map (λ tm → evalTm tm) ts) id sched))
-              (ofᵉ-carried _ ts)
+    , ≡-⊑ (oneShotBurst-rd _ _ (map (λ tm → evalTm tm) ts) id sched)
+          (ofᵉ-carried _ ts)
     , hst
   subscribe-dry-free {u = u} ac emptyᵉ κ id now sched st inv hst =
-    oneShotBurst-dry {u = u} [] id sched , z≤n , hst
+    oneShotBurst-dry {u = u} [] id sched , (z≤n , z≤n) , hst
   subscribe-dry-free ac (varᵉ ()) κ id now sched st inv hst
 
   -- THE THREE NON-FLATTENING FRAMES, and a defer that subscribes
@@ -252,21 +249,29 @@ mutual
 
     -- THE INCOMING BOUND IS THE SOURCE'S OWN READING AND IS NOT WIDENED
     -- HERE.  What the recursion returns about the inner burst is already
-    -- stated at `depthᵉ ψ b`, and pushing it up to the map expression's
-    -- reading before handing it to the frame is what
+    -- stated at the source's reading, and pushing it up to the map
+    -- expression's before handing it to the frame is what
     -- `Refuted.Map-Pinned` kills — the frame would then be admitting a
     -- payload this source cannot emit, and the template's layer lands on
     -- top of it.
+    --
+    -- AND THE RESIDUE MEETS THE WALK'S OWN CONCLUSION BY COMPUTATION.
+    -- The shelf's residue is the per-value half of the reading's map
+    -- clause, so at this arm's bound it IS the map expression's reading
+    -- — the arm spends no arithmetic, and a change to either side is a
+    -- type error here rather than a drift.
     pc = pushBurst-carried ac id now (map-f f) κ
            (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
-           ψ (depthᵉ ψ b) (depthᵉ ψ (mapᵉ f b)) (proj₁ (proj₂ τ))
-           (map-frame-carried ac id now f b κ ψ (proj₁ (proj₂ τ)))
+           ψ (proj₂ (rdᵉ ψ ε b)) (mapRd ψ (proj₂ (rdᵉ ψ ε b)) f)
+           (proj₁ (proj₂ τ))
+           (map-frame-carried ac id now f κ ψ (proj₂ (rdᵉ ψ ε b))
+             (proj₁ (proj₂ τ)))
            (proj₁ (proj₂ ih))
            (proj₂ (proj₂ ih))
 
   subscribe-dry-free {u = u} {τ = τ} ac (takeᵉ c b) κ id now sched st inv hst
     with evalTm c
-  ... | zero  = oneShotBurst-dry {u = u} [] id sched , z≤n , hst
+  ... | zero  = oneShotBurst-dry {u = u} [] id sched , (z≤n , z≤n) , hst
   ... | suc k =
     pushBurst-dry ac id now (take-f nid) κ
       (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
@@ -292,9 +297,9 @@ mutual
 
     pc = pushBurst-carried ac id now (take-f nid) κ
            (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
-           ψ (depthᵉ ψ (takeᵉ c b)) (depthᵉ ψ (takeᵉ c b)) (proj₁ (proj₂ τ))
+           ψ (proj₂ (rdᵉ ψ ε b)) (proj₂ (rdᵉ ψ ε b)) (proj₁ (proj₂ τ))
            (take-frame-carried ac id now nid κ ψ
-             (depthᵉ ψ (takeᵉ c b)) (proj₁ (proj₂ τ)))
+             (proj₂ (rdᵉ ψ ε b)) (proj₁ (proj₂ τ)))
            (proj₁ (proj₂ ih))
            (proj₂ (proj₂ ih))
 
@@ -328,14 +333,14 @@ mutual
     -- the leaf is taken at the burst and at this arm's own seed
     pc = scan-burst-carried ac id now f z b nid κ sched₁ st ψ
            (proj₁ (proj₂ τ)) (proj₁ (proj₂ inv))
-           (≤-trans (proj₁ (proj₂ ih)) (hop-scanᵉ ψ f z b))
+           (proj₁ (proj₂ ih))
            (proj₂ (proj₂ ih))
 
   -- a defer subscribes nothing at all: it mints the hop and announces
   -- it, so its burst is one `init` and there is nothing to read; the
   -- node it installs holds an empty queue, which reads zero
   subscribe-dry-free {u = u} {τ = τ} ac (deferᵉ b) κ id now sched st inv hst =
-    refl , z≤n
+    refl , (z≤n , z≤n)
     , installNode-hop (slotRd (Sched.slots sched)) (proj₁ (mintNode sched))
         (mergeAll-st {t = u} nothing 0 [] false) st (proj₁ (proj₂ τ)) z≤n hst
 
@@ -345,10 +350,12 @@ mutual
   -- the walk's own conclusion at `b` supplies the burst bound and the
   -- residue is one FRAME leaf.  What separates them from the arms
   -- above is the currency the frame changes: the source delivers
-  -- OBSERVABLES read at `depthᵉ ψ b`, and what the frame hands back is
-  -- read one `suc` higher, which is exactly the flattener's own clause
-  -- of the reading.  The entry invariant pays for that `suc`, and the
-  -- `suc` is what the rank descent inside `subscribeInner` spends.
+  -- OBSERVABLES read at the source's own payload pair, and what the
+  -- frame hands back keeps that pair's count while raising its hop by
+  -- one — which is exactly `flatten`, the flattener's own clause of the
+  -- reading, so the residue is spelled rather than computed.  The entry
+  -- invariant pays for that `suc`, and the `suc` is what the rank
+  -- descent inside `subscribeInner` spends.
   subscribe-dry-free {u = u} {τ = τ} ac (mergeAllᵉ lim b) κ id now sched st
                      inv hst =
     dry-operator ac (mergeAllᵉ lim b) κ id now sched st refl inv
@@ -359,6 +366,7 @@ mutual
     sched₁ = proj₂ (mintNode sched)
     st₁    = installNode nid (mergeAll-st {t = u} lim 0 [] false) st
     r      = subscribeE ac b (thru-outer mergeAllᵒ nid ↠ κ) id now sched₁ st₁
+    Rin    = proj₂ (rdᵉ ψ ε b)
 
     hst₁ = installNode-hop ψ nid (mergeAll-st {t = u} lim 0 [] false) st
              (proj₁ (proj₂ τ)) z≤n hst
@@ -372,9 +380,9 @@ mutual
 
     pc = pushBurst-carried ac id now (thru-outer mergeAllᵒ nid) κ
            (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
-           ψ (depthᵉ ψ b) (depthᵉ ψ (mergeAllᵉ lim b)) (proj₁ (proj₂ τ))
+           ψ Rin (proj₁ Rin , suc (proj₂ Rin)) (proj₁ (proj₂ τ))
            (thru-outer-frame-carried ac id now mergeAllᵒ nid κ ψ
-             (depthᵉ ψ b) (proj₁ (proj₂ τ)) (proj₁ (proj₂ inv)))
+             Rin (proj₁ (proj₂ τ)) (proj₁ (proj₂ inv)))
            (proj₁ (proj₂ ih))
            (proj₂ (proj₂ ih))
 
@@ -387,6 +395,7 @@ mutual
     sched₁ = proj₂ (mintNode sched)
     st₁    = installNode nid (switch-st nothing false) st
     r      = subscribeE ac b (thru-outer switchᵒ nid ↠ κ) id now sched₁ st₁
+    Rin    = proj₂ (rdᵉ ψ ε b)
 
     hst₁ = installNode-hop ψ nid (switch-st nothing false) st
              (proj₁ (proj₂ τ)) z≤n hst
@@ -400,9 +409,9 @@ mutual
 
     pc = pushBurst-carried ac id now (thru-outer switchᵒ nid) κ
            (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
-           ψ (depthᵉ ψ b) (depthᵉ ψ (switchAllᵉ b)) (proj₁ (proj₂ τ))
+           ψ Rin (proj₁ Rin , suc (proj₂ Rin)) (proj₁ (proj₂ τ))
            (thru-outer-frame-carried ac id now switchᵒ nid κ ψ
-             (depthᵉ ψ b) (proj₁ (proj₂ τ)) (proj₁ (proj₂ inv)))
+             Rin (proj₁ (proj₂ τ)) (proj₁ (proj₂ inv)))
            (proj₁ (proj₂ ih))
            (proj₂ (proj₂ ih))
 
@@ -415,6 +424,7 @@ mutual
     sched₁ = proj₂ (mintNode sched)
     st₁    = installNode nid (exhaust-st false false) st
     r      = subscribeE ac b (thru-outer exhaustᵒ nid ↠ κ) id now sched₁ st₁
+    Rin    = proj₂ (rdᵉ ψ ε b)
 
     hst₁ = installNode-hop ψ nid (exhaust-st false false) st
              (proj₁ (proj₂ τ)) z≤n hst
@@ -428,9 +438,9 @@ mutual
 
     pc = pushBurst-carried ac id now (thru-outer exhaustᵒ nid) κ
            (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
-           ψ (depthᵉ ψ b) (depthᵉ ψ (exhaustAllᵉ b)) (proj₁ (proj₂ τ))
+           ψ Rin (proj₁ Rin , suc (proj₂ Rin)) (proj₁ (proj₂ τ))
            (thru-outer-frame-carried ac id now exhaustᵒ nid κ ψ
-             (depthᵉ ψ b) (proj₁ (proj₂ τ)) (proj₁ (proj₂ inv)))
+             Rin (proj₁ (proj₂ τ)) (proj₁ (proj₂ inv)))
            (proj₁ (proj₂ ih))
            (proj₂ (proj₂ ih))
 
@@ -442,9 +452,8 @@ mutual
   -- the bound crosses the slot boundary in both directions
   ... | shared d {ok} =
         proj₁ w
-        , ≤-trans (proj₁ (proj₂ w))
-                  (≤-reflexive (sym (cong hopOf
-                    (slotRd-fix (Sched.slots sched) i d ok))))
+        , ⊑-≡ (proj₁ (proj₂ w))
+              (sym (cong proj₂ (slotRd-fix (Sched.slots sched) i d ok)))
         , proj₂ (proj₂ w)
         where
         w = sharedSlot-dry ac i d κ id now sched st eqi (proj₁ inv)
@@ -455,22 +464,23 @@ mutual
               hst
   ... | scripted {ok = ok} (cold sync [])       =
         oneShotBurst-dry sync id sched
-        , ≤-trans (≤-reflexive
-                    (trans (oneShotBurst-hop _ _ sync id sched)
-                           (valsHop-data _ _ sync ok)))
-                  z≤n
+        , ≡-⊑ (trans (oneShotBurst-rd _ _ sync id sched)
+                     (valsRd-data _ _ sync ok))
+              (z≤n , z≤n)
         , hst
   ... | scripted {ok = ok} (cold sync (x ∷ xs)) =
         cold-tail-dry sync id (proj₁ (mintSource sched))
-        , ≤-trans (≤-reflexive
-                    (trans (trans (⊔-identityʳ _) (emitHop-map _ _ sync))
-                           (valsHop-data _ _ sync ok)))
-                  z≤n
+        , ≡-⊑ (cong₂ _,_
+                (trans (trans (⊔-identityʳ _) (emitAt-map proj₁ _ _ sync))
+                       (valsAt-data proj₁ _ _ sync ok refl))
+                (trans (trans (⊔-identityʳ _) (emitAt-map proj₂ _ _ sync))
+                       (valsAt-data proj₂ _ _ sync ok refl)))
+              (z≤n , z≤n)
         , hst
   ... | scripted (hot as)
         with memberSource (toℕ i) (EvalSt.completedSources st)
-  ...   | true  = refl , z≤n , hst
-  ...   | false = refl , z≤n , hst
+  ...   | true  = refl , (z≤n , z≤n) , hst
+  ...   | false = refl , (z≤n , z≤n) , hst
 
   -- joining a live or a spent share announces and returns; only the
   -- first subscriber connects, and that is the guarded clause
@@ -484,12 +494,12 @@ mutual
     stHop (slotRd (Sched.slots sched)) st ≤ proj₁ (proj₂ τ) →
     WalkCarries (slotRd (Sched.slots sched)) (lookup Γ i)
       (subscribeSharedSlot ac i d κ id now sched st)
-      (depthᵉ (slotRd (Sched.slots sched)) d) (proj₁ (proj₂ τ))
+      (proj₂ (rdᵉ (slotRd (Sched.slots sched)) ε d)) (proj₁ (proj₂ τ))
   sharedSlot-dry ac i d κ id now sched st eqi ule hle hst
     with memberSource (toℕ i) (EvalSt.completedSources st)
-  ... | true = refl , z≤n , hst
+  ... | true = refl , (z≤n , z≤n) , hst
   ... | false with memberSource (toℕ i) (EvalSt.connectedShares st) in fresh
-  ...   | true  = refl , z≤n , hst
+  ...   | true  = refl , (z≤n , z≤n) , hst
   ...   | false =
           sharedConnect-dry ac i d κ id now sched st eqi fresh ule hle hst
 
@@ -514,7 +524,7 @@ mutual
     stHop (slotRd (Sched.slots sched)) st ≤ proj₁ (proj₂ τ) →
     WalkCarries (slotRd (Sched.slots sched)) (lookup Γ i)
       (sharedConnect ac i d κ id now sched st)
-      (depthᵉ (slotRd (Sched.slots sched)) d) (proj₁ (proj₂ τ))
+      (proj₂ (rdᵉ (slotRd (Sched.slots sched)) ε d)) (proj₁ (proj₂ τ))
   sharedConnect-dry {Γ = Γ} {e = e} {τ = U , r , s}
                     (acc rec) i d κ id now sched st eqi fresh ule hle hst
     with unconn (Sched.slots sched) (toℕ i ∷ EvalSt.connectedShares st) <? U
@@ -525,7 +535,7 @@ mutual
       (connect-emit-dry (init (toℕ i) ∷ close (toℕ i) exhausted ∷ [])
         id (toℕ i) burst refl hb)
       (connect-emit-dry (init (toℕ i) ∷ []) id (toℕ i) burst refl hb)
-    , burstHop-if ψ (burstCompleted burst) _ _ (depthᵉ ψ d) bh bh
+    , burstRd-if ψ (burstCompleted burst) _ _ (proj₂ (rdᵉ ψ ε d)) bh bh
     , stHop-if ψ (burstCompleted burst) _ _ r
         (proj₂ (proj₂ w)) (proj₂ (proj₂ w))
     where
@@ -551,5 +561,4 @@ mutual
 
     -- plumbing retags and nothing else, and the bookkeeping emit in
     -- front of it carries no value at all
-    bh = ≤-trans (≤-reflexive (burstHop-plumb ψ (lookup Γ i) burst))
-                 (proj₁ (proj₂ w))
+    bh = ≡-⊑ (burstRd-plumb ψ (lookup Γ i) burst) (proj₁ (proj₂ w))

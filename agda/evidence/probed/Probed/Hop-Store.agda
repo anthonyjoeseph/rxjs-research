@@ -41,7 +41,7 @@
 -- with a whole `suc` to spare.  A queue holding something deeper than
 -- the source that emitted it does not exist to be built.
 --
--- TARGET: thru-outer-frame-carried @2de90d
+-- TARGET: thru-outer-frame-carried @260099
 module Probed.Hop-Store where
 
 open import Data.Bool using (Bool; false)
@@ -60,12 +60,12 @@ open import Rx.Exp using (Ctx; Closed; Tm; Fn; Val; natᵗ; obs; _×ᵗ_;
   ofᵉ; scanᵉ; mergeAllᵉ; strmᵗ; nat̂; fstᵗ; varᵗ)
 open import Rx.Slots using (Slots)
 open import Rx.Strat-Order using (_≺_)
-open import Rx.Hop-Depth using (Rd₃; depthᵉ; depthᵛ)
+open import Rx.Hop-Depth using (Rd; Rd₃; depthᵉ; depthᵛ; rdᵉ; ε)
 open import Rx.Slot-Read using (slotRd)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; NodeId; NodeState; subscribeE; rootWitness; rootTri; root; _↠_;
   sched-init; st-init; mintNode; installNode; mergeAll-st; thru-outer; mergeAllᵒ; splitBurst;
   stepFrame; stHop)
-open import Verify-Rank-Sufficient.Carried using (valsHop)
+open import Verify-Rank-Sufficient.Carried using (valsRd)
 open import Verify-Rank-Sufficient.Push-Carried
   using (thru-outer-frame-carried)
 open import Probed.Apparatus using (Confirms; Below)
@@ -119,7 +119,11 @@ module Ap {n} {Γ : Ctx n} (ins : Slots Γ)
      × Bool × Sched Γ × EvalSt prog
   sf = stepFrame ac 0 0 (thru-outer mergeAllᵒ nid) root vals fin sd st
 
-  -- the bound the arriving observables are held to
+  -- the bound the arriving observables are held to — the source's own
+  -- payload PAIR, which is what the walk enters this frame at
+  Rin : Rd
+  Rin = proj₂ (rdᵉ ψ ε src)
+
   bound : ℕ
   bound = depthᵉ ψ src
 
@@ -138,10 +142,16 @@ module Ap {n} {Γ : Ctx n} (ins : Slots Γ)
   -- the payload is held to, what it gave back, what the store read
   -- going in, what it reads coming out, and the bound the store half is
   -- held to
+  -- and the DELIVERY side of the same pair: handed, the bound, returned
+  counts : ℕ
+  counts = proj₁ (valsRd ψ (obs (obs natᵗ)) vals)
+         + 1000 * proj₁ Rin
+         + 1000000 * proj₁ (valsRd ψ (obs natᵗ) (proj₁ sf))
+
   packed : ℕ
-  packed = valsHop ψ (obs (obs natᵗ)) vals
+  packed = proj₂ (valsRd ψ (obs (obs natᵗ)) vals)
          + 1000 * bound
-         + 1000000 * valsHop ψ (obs natᵗ) (proj₁ sf)
+         + 1000000 * proj₂ (valsRd ψ (obs natᵗ) (proj₁ sf))
          + 1000000000 * stIn
          + 1000000000000 * stHop ψ (proj₂ (proj₂ (proj₂ (proj₂ sf))))
          + 1000000000000000 * Rst
@@ -231,6 +241,21 @@ q1-is = refl
 q2-is : Q2.packed ≡ 4003002003003003
 q2-is = refl
 
+-- AND THE DELIVERY SIDE, which the hop figures project away.  Read low
+-- first: handed, bound, returned.  The hypothesis is SATURATED at every
+-- row and the conclusion has a delivery of margin, which the queue's
+-- depth does not move — this family varies the STORE and the count side
+-- sits where the outer's own reading puts it.
+counts₀-is : Q0.counts ≡ 1002002
+counts₀-is = refl
+
+counts₁-is : Q1.counts ≡ 1002002
+counts₁-is = refl
+
+counts₂-is : Q2.counts ≡ 1002002
+counts₂-is = refl
+
+
 ----------------------------------------------------------------------
 -- WHAT THE THREE FIGURES SAY.  What the frame is handed equals the
 -- source's own reading at every row, so the payload hypothesis is
@@ -265,13 +290,16 @@ q2-is = refl
 ----------------------------------------------------------------------
 
 stRow₀ : Confirms (thru-outer-frame-carried Q0.ac 0 0 mergeAllᵒ Q0.nid root
-  Q0.ψ Q0.bound Q0.Rst Below Q0.vals Q0.fin Q0.sd Q0.st Below Below)
-stRow₀ = Below , Below
+  Q0.ψ Q0.Rin Q0.Rst Below Q0.vals Q0.fin Q0.sd Q0.st
+  (Below , Below) Below)
+stRow₀ = (Below , Below) , Below
 
 stRow₁ : Confirms (thru-outer-frame-carried Q1.ac 0 0 mergeAllᵒ Q1.nid root
-  Q1.ψ Q1.bound Q1.Rst Below Q1.vals Q1.fin Q1.sd Q1.st Below Below)
-stRow₁ = Below , Below
+  Q1.ψ Q1.Rin Q1.Rst Below Q1.vals Q1.fin Q1.sd Q1.st
+  (Below , Below) Below)
+stRow₁ = (Below , Below) , Below
 
 stRow₂ : Confirms (thru-outer-frame-carried Q2.ac 0 0 mergeAllᵒ Q2.nid root
-  Q2.ψ Q2.bound Q2.Rst Below Q2.vals Q2.fin Q2.sd Q2.st Below Below)
-stRow₂ = Below , Below
+  Q2.ψ Q2.Rin Q2.Rst Below Q2.vals Q2.fin Q2.sd Q2.st
+  (Below , Below) Below)
+stRow₂ = (Below , Below) , Below

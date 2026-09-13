@@ -46,7 +46,7 @@ open import Data.Fin using (Fin)
 open import Data.List using (List; []; _∷_)
 open import Data.Maybe using (nothing)
 open import Data.Nat using (ℕ; _≤_; z≤n)
-open import Data.Product using (proj₁)
+open import Data.Product using (_,_; proj₁; proj₂)
 open import Data.Vec using () renaming ([] to []ⱽ)
 open import Induction.WellFounded using (Acc)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
@@ -56,12 +56,12 @@ open import Rx.Exp using (Ctx; Closed; Val; Fn; natᵗ; obs; _×ᵗ_;
   ofᵉ; emptyᵉ; mergeAllᵉ; strmᵗ; nat̂)
 open import Rx.Slots using (Slots)
 open import Rx.Strat-Order using (_≺_)
-open import Rx.Hop-Depth using (Rd₃)
+open import Rx.Hop-Depth using (Rd; Rd₃)
 open import Rx.Slot-Read using (slotRd)
 open import Rx.Evaluator using (Frame; Path; root; scan-f; scan-st; NodeId;
   Sched; EvalSt; stepFrame; stHop; installNode; rootWitness; sched-init;
   st-init)
-open import Verify-Rank-Sufficient.Carried using (valsHop)
+open import Verify-Rank-Sufficient.Carried using (valsRd)
 open import Verify-Rank-Sufficient.Push-Carried using (FrameCarries)
 
 ----------------------------------------------------------------------
@@ -75,7 +75,8 @@ ScanFrameCarried : Set
 ScanFrameCarried = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {τ}
   (ac : Acc _≺_ τ) (id : Id) (now : Tick)
   (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
-  (κ : Path Γ u t) (ψ : Fin n → Rd₃) (Rv Rst : ℕ) → Rv ≤ Rst →
+  (κ : Path Γ u t) (ψ : Fin n → Rd₃) (Rv : Rd) (Rst : ℕ) →
+  proj₂ Rv ≤ Rst →
   FrameCarries {e = e} ac id now (scan-f fn nid) κ ψ Rv Rv Rst
 
 ----------------------------------------------------------------------
@@ -134,17 +135,25 @@ outs = proj₁ (stepFrame (rootWitness root₀ ins₀) 0 0 frame₀ root vals₀
 
 -- `Val Γ natᵗ` is `ℕ` whatever the context, so the payload cannot say
 -- which one it belongs to and the measure is told
-payload-is : valsHop {Γ = Γ₀} ψ₀ natᵗ vals₀ ≡ 0        -- LOAD-BEARING
+payload-is : proj₂ (valsRd {Γ = Γ₀} ψ₀ natᵗ vals₀) ≡ 0        -- LOAD-BEARING
 payload-is = refl
+
+-- and the count half, claimed for the opposite reason: it enters at the
+-- FLOOR too, so the bound the witness is taken at is nought on both
+-- halves and the whole gap is attributed to the hop rather than shared
+-- with a delivery count the step never spends
+count-is : proj₁ (valsRd {Γ = Γ₀} ψ₀ natᵗ vals₀) ≡ 0           -- LOAD-BEARING
+count-is = refl
 
 store-is : stHop ψ₀ st₀ ≡ 0                            -- LOAD-BEARING
 store-is = refl
 
-out-is : valsHop ψ₀ (obs natᵗ) outs ≡ 1                -- LOAD-BEARING
+out-is : proj₂ (valsRd ψ₀ (obs natᵗ) outs) ≡ 1                -- LOAD-BEARING
 out-is = refl
 
 scan-frame-carried-false : ScanFrameCarried → ⊥
 scan-frame-carried-false h
-  with proj₁ (h (rootWitness root₀ ins₀) 0 0 step 0 root ψ₀ 0 5 z≤n
-                vals₀ false sd₀ st₀ z≤n z≤n)
+  with proj₂ (proj₁ (h (rootWitness root₀ ins₀) 0 0 step 0 root ψ₀
+                       (0 , 0) 5 z≤n vals₀ false sd₀ st₀
+                       (z≤n , z≤n) z≤n))
 ... | ()

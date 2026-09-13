@@ -32,7 +32,7 @@ module Verify-Rank-Sufficient.Carried where
 open import Data.Bool using (Bool; true; false; T; if_then_else_)
 open import Data.Fin using (Fin)
 open import Data.List using (List; []; _∷_; _++_; map)
-open import Data.Nat using (ℕ; _⊔_; _⊔′_; _≡ᵇ_; _≤_; z≤n)
+open import Data.Nat using (ℕ; _⊔_; _≡ᵇ_; _≤_; z≤n)
 open import Data.Nat.Properties using (⊔-assoc; ⊔-identityʳ; ⊔-lub; ≤-trans;
   m≤m⊔n; m≤n⊔m)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
@@ -45,7 +45,7 @@ open import Rx.Prim using (Id; InstEvent; init; value; close; handoff;
   complete; InstEmit)
 open import Rx.Exp using (Ty; Ctx; Closed; Val; isData; unitᵗ; boolᵗ; natᵗ;
   _×ᵗ_; _+ᵗ_; obs)
-open import Rx.Hop-Depth using (Rd₃; depthᵛ)
+open import Rx.Hop-Depth using (Rd; Rd₃; rdᵛ; _⊔ᴿ_)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; NodeId; NodeState;
   splitEvents; retagEvents; oneShotBurst; setNode; installNode; sharedPlumb;
   hasDry; stHopⁿ; stHopᴺ; stHop)
@@ -53,21 +53,58 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; NodeId; NodeState;
 ----------------------------------------------------------------------
 -- THE MEASURE, at the three shapes the pipeline hands around: a run of
 -- values, one emit's event list, and a whole burst.
+--
+-- IT IS TAKEN AT A PROJECTION OF THE READING RATHER THAN AT THE DEPTH,
+-- AND THAT IS WHAT MAKES THE COUNT HALF FREE.  A value reads as a PAIR
+-- — how many it delivers, and how deep it is — and a bound stated in
+-- the depth alone cannot separate two payloads that differ only in the
+-- first, which is what the frame shelf's refutations turn on.  Every ⊔
+-- these measures take is pointwise in that pair, so one induction
+-- proven at an ARBITRARY component is proven at both, and the shelf
+-- pays for the wider currency in statements rather than in arithmetic.
 ----------------------------------------------------------------------
 
-valsHop : ∀ {n} {Γ : Ctx n} (ψ : Fin n → Rd₃) (u : Ty) → List (Val Γ u) → ℕ
-valsHop ψ u []       = 0
-valsHop ψ u (v ∷ vs) = depthᵛ ψ u v ⊔ valsHop ψ u vs
+valsAt : ∀ {n} {Γ : Ctx n} (p : Rd → ℕ) (ψ : Fin n → Rd₃) (u : Ty)
+       → List (Val Γ u) → ℕ
+valsAt p ψ u []       = 0
+valsAt p ψ u (v ∷ vs) = p (rdᵛ ψ u v) ⊔ valsAt p ψ u vs
 
-emitHop : ∀ {n} {Γ : Ctx n} (ψ : Fin n → Rd₃) (u : Ty)
-        → List (InstEvent (Val Γ u)) → ℕ
-emitHop ψ u []             = 0
-emitHop ψ u (value v ∷ es) = depthᵛ ψ u v ⊔ emitHop ψ u es
-emitHop ψ u (_       ∷ es) = emitHop ψ u es
+emitAt : ∀ {n} {Γ : Ctx n} (p : Rd → ℕ) (ψ : Fin n → Rd₃) (u : Ty)
+       → List (InstEvent (Val Γ u)) → ℕ
+emitAt p ψ u []             = 0
+emitAt p ψ u (value v ∷ es) = p (rdᵛ ψ u v) ⊔ emitAt p ψ u es
+emitAt p ψ u (_       ∷ es) = emitAt p ψ u es
 
-burstHop : ∀ {n} {Γ : Ctx n} (ψ : Fin n → Rd₃) (u : Ty) → Stream Γ u → ℕ
-burstHop ψ u []         = 0
-burstHop ψ u (em ∷ ems) = emitHop ψ u (InstEmit.events em) ⊔ burstHop ψ u ems
+burstAt : ∀ {n} {Γ : Ctx n} (p : Rd → ℕ) (ψ : Fin n → Rd₃) (u : Ty)
+        → Stream Γ u → ℕ
+burstAt p ψ u []         = 0
+burstAt p ψ u (em ∷ ems) =
+  emitAt p ψ u (InstEmit.events em) ⊔ burstAt p ψ u ems
+
+-- the reading in full, which is what a frame is entered under.  The
+-- HOP alone is `proj₂` of it rather than a definition of its own, so a
+-- statement wanting the depth and a statement wanting the pair cannot
+-- drift apart into two currencies the way they once did.
+valsRd : ∀ {n} {Γ : Ctx n} (ψ : Fin n → Rd₃) (u : Ty) → List (Val Γ u) → Rd
+valsRd ψ u vs = valsAt proj₁ ψ u vs , valsAt proj₂ ψ u vs
+
+burstRd : ∀ {n} {Γ : Ctx n} (ψ : Fin n → Rd₃) (u : Ty) → Stream Γ u → Rd
+burstRd ψ u b = burstAt proj₁ ψ u b , burstAt proj₂ ψ u b
+
+-- the order on readings is POINTWISE, and it has to be: the two
+-- components are independent quantities and a lexicographic or summed
+-- order would let a payload trade depth for deliveries
+_⊑_ : Rd → Rd → Set
+r ⊑ q = proj₁ r ≤ proj₁ q × proj₂ r ≤ proj₂ q
+
+-- rewriting either end of a comparison, which is what every arm of the
+-- walk does with the reading's own clause: the machine's reading and
+-- the term's are EQUAL there, and only the direction differs
+≡-⊑ : ∀ {a b c : Rd} → a ≡ b → b ⊑ c → a ⊑ c
+≡-⊑ refl h = h
+
+⊑-≡ : ∀ {a b c : Rd} → a ⊑ b → b ≡ c → a ⊑ c
+⊑-≡ h refl = h
 
 ----------------------------------------------------------------------
 -- THE ARITHMETIC.  Every one of these is a ⊔ being reassociated across
@@ -75,35 +112,35 @@ burstHop ψ u (em ∷ ems) = emitHop ψ u (InstEmit.events em) ⊔ burstHop ψ u
 -- spends and never what it has to think about.
 ----------------------------------------------------------------------
 
-emitHop-++ : ∀ {n} {Γ : Ctx n} (ψ : Fin n → Rd₃) (u : Ty)
+emitAt-++ : ∀ {n} {Γ : Ctx n} (p : Rd → ℕ) (ψ : Fin n → Rd₃) (u : Ty)
   (xs ys : List (InstEvent (Val Γ u))) →
-  emitHop ψ u (xs ++ ys) ≡ emitHop ψ u xs ⊔ emitHop ψ u ys
-emitHop-++ ψ u []               ys = refl
-emitHop-++ ψ u (value v   ∷ es) ys =
-  trans (cong (depthᵛ ψ u v ⊔_) (emitHop-++ ψ u es ys))
-        (sym (⊔-assoc (depthᵛ ψ u v) (emitHop ψ u es) (emitHop ψ u ys)))
-emitHop-++ ψ u (init s    ∷ es) ys = emitHop-++ ψ u es ys
-emitHop-++ ψ u (close s r ∷ es) ys = emitHop-++ ψ u es ys
-emitHop-++ ψ u (handoff s ∷ es) ys = emitHop-++ ψ u es ys
-emitHop-++ ψ u (complete  ∷ es) ys = emitHop-++ ψ u es ys
+  emitAt p ψ u (xs ++ ys) ≡ emitAt p ψ u xs ⊔ emitAt p ψ u ys
+emitAt-++ p ψ u []               ys = refl
+emitAt-++ p ψ u (value v   ∷ es) ys =
+  trans (cong (p (rdᵛ ψ u v) ⊔_) (emitAt-++ p ψ u es ys))
+        (sym (⊔-assoc (p (rdᵛ ψ u v)) (emitAt p ψ u es) (emitAt p ψ u ys)))
+emitAt-++ p ψ u (init s    ∷ es) ys = emitAt-++ p ψ u es ys
+emitAt-++ p ψ u (close s r ∷ es) ys = emitAt-++ p ψ u es ys
+emitAt-++ p ψ u (handoff s ∷ es) ys = emitAt-++ p ψ u es ys
+emitAt-++ p ψ u (complete  ∷ es) ys = emitAt-++ p ψ u es ys
 
-emitHop-map : ∀ {n} {Γ : Ctx n} (ψ : Fin n → Rd₃) (u : Ty)
-  (vs : List (Val Γ u)) → emitHop ψ u (map value vs) ≡ valsHop ψ u vs
-emitHop-map ψ u []       = refl
-emitHop-map ψ u (v ∷ vs) = cong (depthᵛ ψ u v ⊔_) (emitHop-map ψ u vs)
+emitAt-map : ∀ {n} {Γ : Ctx n} (p : Rd → ℕ) (ψ : Fin n → Rd₃) (u : Ty)
+  (vs : List (Val Γ u)) → emitAt p ψ u (map value vs) ≡ valsAt p ψ u vs
+emitAt-map p ψ u []       = refl
+emitAt-map p ψ u (v ∷ vs) = cong (p (rdᵛ ψ u v) ⊔_) (emitAt-map p ψ u vs)
 
 -- a payload run plus the completion the split saw: the completion is
 -- bookkeeping, so the reading is exactly the run's
-emitHop-values : ∀ {n} {Γ : Ctx n} (ψ : Fin n → Rd₃) (u : Ty)
+emitAt-values : ∀ {n} {Γ : Ctx n} (p : Rd → ℕ) (ψ : Fin n → Rd₃) (u : Ty)
   (vs : List (Val Γ u)) (fin : Bool) →
-  emitHop ψ u (map value vs ++ (if fin then complete ∷ [] else []))
-    ≡ valsHop ψ u vs
-emitHop-values ψ u vs true =
-  trans (emitHop-++ ψ u (map value vs) (complete ∷ []))
-        (trans (⊔-identityʳ _) (emitHop-map ψ u vs))
-emitHop-values ψ u vs false =
-  trans (emitHop-++ ψ u (map value vs) [])
-        (trans (⊔-identityʳ _) (emitHop-map ψ u vs))
+  emitAt p ψ u (map value vs ++ (if fin then complete ∷ [] else []))
+    ≡ valsAt p ψ u vs
+emitAt-values p ψ u vs true =
+  trans (emitAt-++ p ψ u (map value vs) (complete ∷ []))
+        (trans (⊔-identityʳ _) (emitAt-map p ψ u vs))
+emitAt-values p ψ u vs false =
+  trans (emitAt-++ p ψ u (map value vs) [])
+        (trans (⊔-identityʳ _) (emitAt-map p ψ u vs))
 
 ----------------------------------------------------------------------
 -- THE TWO PARTS THE PIPELINE STRIPS.  A split pulls the payload out
@@ -112,38 +149,38 @@ emitHop-values ψ u vs false =
 -- re-emitted burst reading exactly what the FRAME produced.
 ----------------------------------------------------------------------
 
-emitHop-bk : ∀ {n} {Γ : Ctx n} (ψ : Fin n → Rd₃) (u w : Ty)
+emitAt-bk : ∀ {n} {Γ : Ctx n} (p : Rd → ℕ) (ψ : Fin n → Rd₃) (u w : Ty)
   (es : List (InstEvent (Val Γ u))) →
-  emitHop ψ w (proj₁ (proj₂ (splitEvents {A = Val Γ w} es))) ≡ 0
-emitHop-bk ψ u w []               = refl
-emitHop-bk ψ u w (value v   ∷ es) = emitHop-bk ψ u w es
-emitHop-bk ψ u w (init s    ∷ es) = emitHop-bk ψ u w es
-emitHop-bk ψ u w (close s r ∷ es) = emitHop-bk ψ u w es
-emitHop-bk ψ u w (handoff s ∷ es) = emitHop-bk ψ u w es
-emitHop-bk ψ u w (complete  ∷ es) = emitHop-bk ψ u w es
+  emitAt p ψ w (proj₁ (proj₂ (splitEvents {A = Val Γ w} es))) ≡ 0
+emitAt-bk p ψ u w []               = refl
+emitAt-bk p ψ u w (value v   ∷ es) = emitAt-bk p ψ u w es
+emitAt-bk p ψ u w (init s    ∷ es) = emitAt-bk p ψ u w es
+emitAt-bk p ψ u w (close s r ∷ es) = emitAt-bk p ψ u w es
+emitAt-bk p ψ u w (handoff s ∷ es) = emitAt-bk p ψ u w es
+emitAt-bk p ψ u w (complete  ∷ es) = emitAt-bk p ψ u w es
 
-emitHop-retag : ∀ {n} {Γ : Ctx n} (ψ : Fin n → Rd₃) (u w : Ty)
+emitAt-retag : ∀ {n} {Γ : Ctx n} (p : Rd → ℕ) (ψ : Fin n → Rd₃) (u w : Ty)
   (es : List (InstEvent (Val Γ u))) →
-  emitHop ψ w (retagEvents {Val Γ u} {Val Γ w} es) ≡ 0
-emitHop-retag ψ u w []               = refl
-emitHop-retag ψ u w (value v   ∷ es) = emitHop-retag ψ u w es
-emitHop-retag ψ u w (init s    ∷ es) = emitHop-retag ψ u w es
-emitHop-retag ψ u w (close s r ∷ es) = emitHop-retag ψ u w es
-emitHop-retag ψ u w (handoff s ∷ es) = emitHop-retag ψ u w es
-emitHop-retag ψ u w (complete  ∷ es) = emitHop-retag ψ u w es
+  emitAt p ψ w (retagEvents {Val Γ u} {Val Γ w} es) ≡ 0
+emitAt-retag p ψ u w []               = refl
+emitAt-retag p ψ u w (value v   ∷ es) = emitAt-retag p ψ u w es
+emitAt-retag p ψ u w (init s    ∷ es) = emitAt-retag p ψ u w es
+emitAt-retag p ψ u w (close s r ∷ es) = emitAt-retag p ψ u w es
+emitAt-retag p ψ u w (handoff s ∷ es) = emitAt-retag p ψ u w es
+emitAt-retag p ψ u w (complete  ∷ es) = emitAt-retag p ψ u w es
 
 -- and what it strips out reads exactly what the emit did: the split is
 -- a partition, so nothing deep is lost on the way to the frame
-splitEvents-vals : ∀ {n} {Γ : Ctx n} (ψ : Fin n → Rd₃) (u : Ty) {A : Set}
-  (es : List (InstEvent (Val Γ u))) →
-  valsHop ψ u (proj₁ (splitEvents {A = A} es)) ≡ emitHop ψ u es
-splitEvents-vals ψ u []               = refl
-splitEvents-vals ψ u (value v   ∷ es) =
-  cong (depthᵛ ψ u v ⊔_) (splitEvents-vals ψ u es)
-splitEvents-vals ψ u (init s    ∷ es) = splitEvents-vals ψ u es
-splitEvents-vals ψ u (close s r ∷ es) = splitEvents-vals ψ u es
-splitEvents-vals ψ u (handoff s ∷ es) = splitEvents-vals ψ u es
-splitEvents-vals ψ u (complete  ∷ es) = splitEvents-vals ψ u es
+splitEvents-valsAt : ∀ {n} {Γ : Ctx n} (p : Rd → ℕ) (ψ : Fin n → Rd₃)
+  (u : Ty) {A : Set} (es : List (InstEvent (Val Γ u))) →
+  valsAt p ψ u (proj₁ (splitEvents {A = A} es)) ≡ emitAt p ψ u es
+splitEvents-valsAt p ψ u []               = refl
+splitEvents-valsAt p ψ u (value v   ∷ es) =
+  cong (p (rdᵛ ψ u v) ⊔_) (splitEvents-valsAt p ψ u es)
+splitEvents-valsAt p ψ u (init s    ∷ es) = splitEvents-valsAt p ψ u es
+splitEvents-valsAt p ψ u (close s r ∷ es) = splitEvents-valsAt p ψ u es
+splitEvents-valsAt p ψ u (handoff s ∷ es) = splitEvents-valsAt p ψ u es
+splitEvents-valsAt p ψ u (complete  ∷ es) = splitEvents-valsAt p ψ u es
 
 ----------------------------------------------------------------------
 -- THE ONE-SHOT SOURCE reads exactly its payload: the three shapes that
@@ -151,13 +188,20 @@ splitEvents-vals ψ u (complete  ∷ es) = splitEvents-vals ψ u es
 -- close, and only the middle part carries anything.
 ----------------------------------------------------------------------
 
-oneShotBurst-hop : ∀ {n} {Γ : Ctx n} (ψ : Fin n → Rd₃) (u : Ty)
-  (vals : List (Val Γ u)) (id : Id) (sched : Sched Γ) →
-  burstHop ψ u (proj₁ (oneShotBurst vals id sched)) ≡ valsHop ψ u vals
-oneShotBurst-hop ψ u vals id sched =
+oneShotBurst-at : ∀ {n} {Γ : Ctx n} (p : Rd → ℕ) (ψ : Fin n → Rd₃)
+  (u : Ty) (vals : List (Val Γ u)) (id : Id) (sched : Sched Γ) →
+  burstAt p ψ u (proj₁ (oneShotBurst vals id sched)) ≡ valsAt p ψ u vals
+oneShotBurst-at p ψ u vals id sched =
   trans (⊔-identityʳ _)
-    (trans (emitHop-++ ψ u (map value vals) _)
-           (trans (⊔-identityʳ _) (emitHop-map ψ u vals)))
+    (trans (emitAt-++ p ψ u (map value vals) _)
+           (trans (⊔-identityʳ _) (emitAt-map p ψ u vals)))
+
+oneShotBurst-rd : ∀ {n} {Γ : Ctx n} (ψ : Fin n → Rd₃) (u : Ty)
+  (vals : List (Val Γ u)) (id : Id) (sched : Sched Γ) →
+  burstRd ψ u (proj₁ (oneShotBurst vals id sched)) ≡ valsRd ψ u vals
+oneShotBurst-rd ψ u vals id sched =
+  cong₂ _,_ (oneShotBurst-at proj₁ ψ u vals id sched)
+            (oneShotBurst-at proj₂ ψ u vals id sched)
 
 ----------------------------------------------------------------------
 -- THE STORE, UNDER ONE BOUND.  Every write the walk makes goes through
@@ -186,11 +230,16 @@ installNode-hop ψ nid s st R hs hst =
 -- same on the far side of a share boundary as it did on the near one.
 ----------------------------------------------------------------------
 
-burstHop-plumb : ∀ {n} {Γ : Ctx n} (ψ : Fin n → Rd₃) (u : Ty)
-  (b : Stream Γ u) → burstHop ψ u (sharedPlumb b) ≡ burstHop ψ u b
-burstHop-plumb ψ u []         = refl
-burstHop-plumb ψ u (em ∷ ems) =
-  cong (emitHop ψ u (InstEmit.events em) ⊔_) (burstHop-plumb ψ u ems)
+burstAt-plumb : ∀ {n} {Γ : Ctx n} (p : Rd → ℕ) (ψ : Fin n → Rd₃) (u : Ty)
+  (b : Stream Γ u) → burstAt p ψ u (sharedPlumb b) ≡ burstAt p ψ u b
+burstAt-plumb p ψ u []         = refl
+burstAt-plumb p ψ u (em ∷ ems) =
+  cong (emitAt p ψ u (InstEmit.events em) ⊔_) (burstAt-plumb p ψ u ems)
+
+burstRd-plumb : ∀ {n} {Γ : Ctx n} (ψ : Fin n → Rd₃) (u : Ty)
+  (b : Stream Γ u) → burstRd ψ u (sharedPlumb b) ≡ burstRd ψ u b
+burstRd-plumb ψ u b =
+  cong₂ _,_ (burstAt-plumb proj₁ ψ u b) (burstAt-plumb proj₂ ψ u b)
 
 ----------------------------------------------------------------------
 -- A DATA-TYPED VALUE READS ZERO, and that is the whole of what a
@@ -205,25 +254,37 @@ andT : (b c : Bool) → T (if b then c else false) → T b × T c
 andT true  c ok = tt , ok
 andT false c ()
 
-data-hop : ∀ {n} {Γ : Ctx n} (ψ : Fin n → Rd₃) (t : Ty) (v : Val Γ t) →
-  T (isData t) → depthᵛ ψ t v ≡ 0
-data-hop ψ unitᵗ    v        ok = refl
-data-hop ψ boolᵗ    v        ok = refl
-data-hop ψ natᵗ     v        ok = refl
-data-hop ψ (s ×ᵗ t) (a , b)  ok =
-  cong₂ _⊔′_ (data-hop ψ s a (proj₁ (andT (isData s) (isData t) ok)))
-             (data-hop ψ t b (proj₂ (andT (isData s) (isData t) ok)))
-data-hop ψ (s +ᵗ t) (inj₁ a) ok =
-  data-hop ψ s a (proj₁ (andT (isData s) (isData t) ok))
-data-hop ψ (s +ᵗ t) (inj₂ b) ok =
-  data-hop ψ t b (proj₂ (andT (isData s) (isData t) ok))
-data-hop ψ (obs t)  v        ()
+data-rd : ∀ {n} {Γ : Ctx n} (ψ : Fin n → Rd₃) (t : Ty) (v : Val Γ t) →
+  T (isData t) → rdᵛ ψ t v ≡ (0 , 0)
+data-rd ψ unitᵗ    v        ok = refl
+data-rd ψ boolᵗ    v        ok = refl
+data-rd ψ natᵗ     v        ok = refl
+data-rd ψ (s ×ᵗ t) (a , b)  ok =
+  cong₂ _⊔ᴿ_ (data-rd ψ s a (proj₁ (andT (isData s) (isData t) ok)))
+             (data-rd ψ t b (proj₂ (andT (isData s) (isData t) ok)))
+data-rd ψ (s +ᵗ t) (inj₁ a) ok =
+  data-rd ψ s a (proj₁ (andT (isData s) (isData t) ok))
+data-rd ψ (s +ᵗ t) (inj₂ b) ok =
+  data-rd ψ t b (proj₂ (andT (isData s) (isData t) ok))
+data-rd ψ (obs t)  v        ()
 
-valsHop-data : ∀ {n} {Γ : Ctx n} (ψ : Fin n → Rd₃) (t : Ty)
-  (vs : List (Val Γ t)) → T (isData t) → valsHop ψ t vs ≡ 0
-valsHop-data ψ t []       ok = refl
-valsHop-data ψ t (v ∷ vs) ok =
-  cong₂ _⊔_ (data-hop ψ t v ok) (valsHop-data ψ t vs ok)
+-- AND THE COMPONENT HAS TO SAY WHAT IT READS AT THE ORIGIN, because a
+-- projection is arbitrary here and the value reading is only known to
+-- BE the origin.  Both projections this development takes satisfy it by
+-- computation, so the premise costs a `refl` at every call.
+valsAt-data : ∀ {n} {Γ : Ctx n} (p : Rd → ℕ) (ψ : Fin n → Rd₃) (t : Ty)
+  (vs : List (Val Γ t)) → T (isData t) → p (0 , 0) ≡ 0 →
+  valsAt p ψ t vs ≡ 0
+valsAt-data p ψ t []       ok pz = refl
+valsAt-data p ψ t (v ∷ vs) ok pz =
+  cong₂ _⊔_ (trans (cong p (data-rd ψ t v ok)) pz)
+            (valsAt-data p ψ t vs ok pz)
+
+valsRd-data : ∀ {n} {Γ : Ctx n} (ψ : Fin n → Rd₃) (t : Ty)
+  (vs : List (Val Γ t)) → T (isData t) → valsRd ψ t vs ≡ (0 , 0)
+valsRd-data ψ t vs ok =
+  cong₂ _,_ (valsAt-data proj₁ ψ t vs ok refl)
+            (valsAt-data proj₂ ψ t vs ok refl)
 
 ----------------------------------------------------------------------
 -- THE REPORT ITSELF, as a walk's strengthened postcondition: the burst
@@ -253,21 +314,21 @@ valsHop-data ψ t (v ∷ vs) ok =
 ----------------------------------------------------------------------
 
 WalkCarries : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (ψ : Fin n → Rd₃)
-  (u : Ty) → Stream Γ u × Sched Γ × EvalSt e → ℕ → ℕ → Set
+  (u : Ty) → Stream Γ u × Sched Γ × EvalSt e → Rd → ℕ → Set
 WalkCarries ψ u r Rv Rst =
   hasDry (proj₁ r) ≡ false
-  × burstHop ψ u (proj₁ r) ≤ Rv
+  × burstRd ψ u (proj₁ r) ⊑ Rv
   × stHop ψ (proj₂ (proj₂ r)) ≤ Rst
 
 -- the machine's own branch, one half of the report at a time: a connect
 -- decides between two shapes that differ in their bookkeeping and in a
 -- registry the reading does not look at, so each half holds of both
-burstHop-if : ∀ {n} {Γ : Ctx n} {u} {B C : Set} (ψ : Fin n → Rd₃) (b : Bool)
-  (x y : Stream Γ u × B × C) (R : ℕ) →
-  burstHop ψ u (proj₁ x) ≤ R → burstHop ψ u (proj₁ y) ≤ R →
-  burstHop ψ u (proj₁ (if b then x else y)) ≤ R
-burstHop-if ψ true  x y R hx hy = hx
-burstHop-if ψ false x y R hx hy = hy
+burstRd-if : ∀ {n} {Γ : Ctx n} {u} {B C : Set} (ψ : Fin n → Rd₃) (b : Bool)
+  (x y : Stream Γ u × B × C) (R : Rd) →
+  burstRd ψ u (proj₁ x) ⊑ R → burstRd ψ u (proj₁ y) ⊑ R →
+  burstRd ψ u (proj₁ (if b then x else y)) ⊑ R
+burstRd-if ψ true  x y R hx hy = hx
+burstRd-if ψ false x y R hx hy = hy
 
 stHop-if : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {A B : Set}
   (ψ : Fin n → Rd₃) (b : Bool) (x y : A × B × EvalSt e) (R : ℕ) →

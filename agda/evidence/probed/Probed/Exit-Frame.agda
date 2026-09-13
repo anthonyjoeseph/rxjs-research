@@ -13,19 +13,20 @@
 -- when true it checks whether any registration is alive-through before
 -- deciding to drain.  Every row below takes `fin = false`, which is the
 -- path the exit frame occupies between the inner source's first arrival
--- and its completion.  Both conjuncts of the carried row compare zero
--- against zero: the element type is `natᵗ`, whose values carry no hop
--- depth, so the payload figure is zero by construction and the rows are
--- DEGENERATE there.  The dry row holds by the identity of `any` on an
+-- and its completion.  All three conjuncts of the carried row compare
+-- zero against zero -- both halves of the payload pair and the store:
+-- the element type is `natᵗ`, whose values carry neither deliveries nor
+-- hop depth, so the payload is the origin by construction and the rows
+-- are DEGENERATE there.  The dry row holds by the identity of `any` on an
 -- empty list, which the `fin = false` arm always returns.  What these
 -- two rows buy is the statement being instantiable at a real program
 -- point, not a coverage claim on its argument space.
 
 -- THRU-OUTER DRY: THE PREMISE IS WHAT SAYS NO DRY EVENT IS POSSIBLE.
 -- `subscribeInner` branches on the rank of the `Acc` witness: rank zero
--- returns a dry event, rank `suc r` descends.  The premise `suc Rin ≤
--- Rst` is the entry invariant's rank conjunct — the same one
--- `thru-outer-frame-carried` already carries — and it implies the rank
+-- returns a dry event, rank `suc r` descends.  The premise reads the HOP
+-- half of the payload pair — the entry invariant's rank conjunct, the
+-- same one `thru-outer-frame-carried` carries — and it implies the rank
 -- at which each arriving observable is subscribed is at least one, so
 -- the dry branch is unreachable.  The rows use the same programs and
 -- the same points as the `Probed.Hop-Edge` carried rows: the dry check
@@ -34,6 +35,10 @@
 -- same points.  Both figures are LOAD-BEARING: the handed reading being
 -- positive says the outer source did emit, and the rank being strictly
 -- above it says the dry branch would not have fired even if it could.
+-- The COUNT half is read separately and is saturated at every point --
+-- handed equals held, so the delivery conjunct of the `⊑` premise is
+-- decided rather than afforded, which is the axis the predecessor
+-- currency had no column for at all.
 
 -- THE BOUNDARY: no row below runs `thru-outer` over a stored STATE
 -- where the rank is already spent — the dry branch is unreachable from
@@ -41,9 +46,9 @@
 -- nothing here says what the frame does when it subscribes an inner
 -- whose rank is zero.
 --
--- TARGET: from-inner-carried @84c9e1
--- TARGET: from-inner-dry @cb8c4f
--- TARGET: thru-outer-frame-dry @3208b7
+-- TARGET: from-inner-carried @c53537
+-- TARGET: from-inner-dry @16a4ef
+-- TARGET: thru-outer-frame-dry @42ee6f
 module Probed.Exit-Frame where
 
 open import Data.Bool using (Bool; false; if_then_else_)
@@ -63,13 +68,13 @@ open import Rx.Exp using (Ctx; Closed; Tm; Fn; Val; natᵗ; obs; _×ᵗ_;
   ofᵉ; scanᵉ; mergeAllᵉ; strmᵗ; nat̂; fstᵗ; varᵗ)
 open import Rx.Slots using (Slots)
 open import Rx.Strat-Order using (_≺_)
-open import Rx.Hop-Depth using (Rd₃; depthᵉ)
+open import Rx.Hop-Depth using (Rd; Rd₃; depthᵉ; rdᵉ; ε)
 open import Rx.Slot-Read using (slotRd)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; NodeId; NodeState;
   AllOp; subscribeE; rootWitness; rootTri; root; _↠_; sched-init; st-init;
   mintNode; installNode; mergeAll-st; from-inner; thru-outer; mergeAllᵒ;
   splitBurst; stepFrame; stHop; dryEvent)
-open import Verify-Rank-Sufficient.Carried using (valsHop)
+open import Verify-Rank-Sufficient.Carried using (valsRd)
 open import Verify-Rank-Sufficient.Path-Fits
   using (from-inner-carried; from-inner-dry; thru-outer-frame-dry)
 open import Probed.Apparatus using (Confirms; Below)
@@ -123,6 +128,12 @@ module Ap {n} {Γ : Ctx n} (ins : Slots Γ) (op : AllOp)
   bound : ℕ
   bound = depthᵉ ψ src
 
+  -- the payload the frame is held to: the outer's own reading, whose
+  -- hop half is `bound` definitionally and whose count half is the
+  -- axis the predecessor currency projected away
+  Rin : Rd
+  Rin = proj₂ (rdᵉ ψ ε src)
+
   rank : ℕ
   rank = proj₁ (proj₂ (rootTri prog ins))
 
@@ -134,10 +145,16 @@ module Ap {n} {Γ : Ctx n} (ins : Slots Γ) (op : AllOp)
   -- radix 1000, low digit first: what the frame was handed, the
   -- bound it is held to, the rank, and the dry flag (last)
   packed : ℕ
-  packed = valsHop ψ (obs (obs natᵗ)) vals
+  packed = proj₂ (valsRd ψ (obs (obs natᵗ)) vals)
          + 1000 * bound
          + 1000000 * rank
          + 1000000000 * (if dry then 1 else 0)
+
+  -- radix 1000, low digit first: the count the frame was handed, and
+  -- the count half of the payload it is held to
+  counts : ℕ
+  counts = proj₁ (valsRd ψ (obs (obs natᵗ)) vals)
+         + 1000 * proj₁ Rin
 
 ----------------------------------------------------------------------
 -- THE CLOSED CONTEXT
@@ -203,6 +220,20 @@ packed₂-is = refl
 packed₃-is : A₃.packed ≡ 6005005
 packed₃-is = refl
 
+-- THE COUNT AXIS, read low digit first at radix 1000: what the frame
+-- was handed, and the count half of the payload it is held to.  Both
+-- are positive at every point and EQUAL at every point, so the `⊑`
+-- premise is SATURATED on this half — decided rather than afforded, and
+-- a reading that undercharged the outer by one delivery crosses here.
+counts₁-is : A₁.counts ≡ 1001
+counts₁-is = refl
+
+counts₂-is : A₂.counts ≡ 2002
+counts₂-is = refl
+
+counts₃-is : A₃.counts ≡ 2002
+counts₃-is = refl
+
 ----------------------------------------------------------------------
 -- THE TARGET AT THREE POINTS, one per outer source.  The premise is
 -- `suc A.bound ≤ A.rank`, which is DECIDED at each point and holds
@@ -212,15 +243,15 @@ packed₃-is = refl
 ----------------------------------------------------------------------
 
 dryRow₁ : Confirms (thru-outer-frame-dry A₁.ac 0 0 mergeAllᵒ A₁.nid root
-  A₁.ψ A₁.bound A₁.rank Below A₁.vals A₁.fin A₁.sd A₁.st Below Below)
+  A₁.ψ A₁.Rin A₁.rank Below A₁.vals A₁.fin A₁.sd A₁.st (Below , Below) Below)
 dryRow₁ = refl
 
 dryRow₂ : Confirms (thru-outer-frame-dry A₂.ac 0 0 mergeAllᵒ A₂.nid root
-  A₂.ψ A₂.bound A₂.rank Below A₂.vals A₂.fin A₂.sd A₂.st Below Below)
+  A₂.ψ A₂.Rin A₂.rank Below A₂.vals A₂.fin A₂.sd A₂.st (Below , Below) Below)
 dryRow₂ = refl
 
 dryRow₃ : Confirms (thru-outer-frame-dry A₃.ac 0 0 mergeAllᵒ A₃.nid root
-  A₃.ψ A₃.bound A₃.rank Below A₃.vals A₃.fin A₃.sd A₃.st Below Below)
+  A₃.ψ A₃.Rin A₃.rank Below A₃.vals A₃.fin A₃.sd A₃.st (Below , Below) Below)
 dryRow₃ = refl
 
 ----------------------------------------------------------------------
@@ -259,12 +290,12 @@ module Fi where
   sf = stepFrame ac 0 0 (from-inner {s = natᵗ} mergeAllᵒ 0 1) root
          vals₀ false sd st
 
-  -- handed: valsHop ψ natᵗ vals₀ = 0 (nat values carry no depth)
+  -- handed: the hop half at `vals₀` is 0 (nat values carry no depth)
   -- returned: same list = 0; store in and out: 0
   -- dry: any dryEvent [] = false (event list is empty)
   packed : ℕ
-  packed = valsHop {Γ = Γ₀} ψ natᵗ vals₀
-         + 1000 * valsHop {Γ = Γ₀} ψ natᵗ (proj₁ sf)
+  packed = proj₂ (valsRd {Γ = Γ₀} ψ natᵗ vals₀)
+         + 1000 * proj₂ (valsRd {Γ = Γ₀} ψ natᵗ (proj₁ sf))
          + 1000000 * stHop {Γ = Γ₀} ψ st
          + 1000000000 * stHop {Γ = Γ₀} ψ (proj₂ (proj₂ (proj₂ (proj₂ sf))))
 
@@ -279,9 +310,9 @@ fi-packed-is = refl
 ----------------------------------------------------------------------
 
 fromInnerCarried : Confirms (from-inner-carried Fi.ac 0 0 mergeAllᵒ 0 1 root
-  Fi.ψ 0 0 vals₀ false Fi.sd Fi.st Below Below)
-fromInnerCarried = Below , Below
+  Fi.ψ (0 , 0) 0 vals₀ false Fi.sd Fi.st (Below , Below) Below)
+fromInnerCarried = (Below , Below) , Below
 
 fromInnerDry : Confirms (from-inner-dry Fi.ac 0 0 mergeAllᵒ 0 1 root
-  Fi.ψ 0 0 vals₀ false Fi.sd Fi.st Below Below)
+  Fi.ψ (0 , 0) 0 vals₀ false Fi.sd Fi.st (Below , Below) Below)
 fromInnerDry = refl

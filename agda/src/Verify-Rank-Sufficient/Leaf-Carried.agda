@@ -34,9 +34,9 @@ open import Data.Fin using (Fin)
 open import Data.List using (List; []; map)
 open import Data.Nat using (_≤_)
 
-open import Rx.Exp using (Ctx; Tm; Fn; Exp; _×ᵗ_; evalTm; ofᵉ; scanᵉ)
-open import Rx.Hop-Depth using (Rd₃; depthᵉ; depthᵛ)
-open import Verify-Rank-Sufficient.Carried using (valsHop)
+open import Rx.Exp using (Ctx; Tm; Fn; Exp; _×ᵗ_; evalTm; scanᵉ)
+open import Rx.Hop-Depth using (Rd₃; depthᵉ; depthᵛ; rdᵗˢ; ε)
+open import Verify-Rank-Sufficient.Carried using (valsRd; _⊑_)
 
 postulate
   -- a one-shot source delivers its literals, and the reading prices
@@ -46,11 +46,14 @@ postulate
   --   with OBSERVABLE literals, since a data payload reads zero on the
   --   left and a row taken there could not have failed.  One flat list
   --   and one whose first literal nests a flattener, which is where the
-  --   reading's own `suc` enters.  Not covered: a literal mentioning an
-  --   INPUT, so nothing here reaches the slot telescope.
+  --   reading's own `suc` enters.  BOTH components are decided, and the
+  --   count half is tight at each — two against two and three against
+  --   three — so a literal list the reading undercharged by one delivery
+  --   crosses.  Not covered: a literal mentioning an INPUT, so nothing
+  --   here reaches the slot telescope.
   ofᵉ-carried : ∀ {n} {Γ : Ctx n} {u} (ψ : Fin n → Rd₃)
     (ts : List (Tm Γ [] [] [] u)) →
-    valsHop ψ u (map (λ tm → evalTm tm) ts) ≤ depthᵉ ψ (ofᵉ ts)
+    valsRd ψ u (map (λ tm → evalTm tm) ts) ⊑ rdᵗˢ ψ ε ts
 
   -- a fold installs its seed, and the reading's fold clause starts its
   -- accumulator at that seed's own reading
