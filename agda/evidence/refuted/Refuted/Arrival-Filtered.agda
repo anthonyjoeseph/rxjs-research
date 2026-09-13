@@ -48,7 +48,7 @@ open import Data.Fin using (Fin; zero)
 open import Data.List using (List; []; _∷_; length)
 open import Data.Maybe using (nothing)
 open import Data.Nat using (ℕ; _⊔_; _+_; _≤_; s≤s; z≤n)
-open import Data.Product using (_×_; _,_)
+open import Data.Product using (_×_; _,_; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Vec using () renaming ([] to []ⱽ; _∷_ to _∷ⱽ_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
@@ -225,6 +225,19 @@ reached-s₁ = refl
 -- repair that read the payload differently would move this row
 payload-s₁ : payRd s₁ ≡ 0
 payload-s₁ = refl
+
+-- LOAD-BEARING, AND IT IS ABOUT THE OTHER SIDE.  The grant already
+-- carries the store — the arrival's witness is seeded at the JOIN of
+-- the payload's reading with it — and here it reads NOUGHT, so the
+-- right side has collapsed onto the term's own figure and there is
+-- nothing for a state-carried quantity to have covered.  A repair that
+-- widened the grant with anything the state holds would move this row;
+-- nothing that reprices the LEFT can.
+store-s₁ : stHop (slotRd insLate) (proj₂ s₁) ≡ 0
+store-s₁ = refl
+
+term-q₁ : depthᵉ (slotRd insLate) q₁ ≡ 1
+term-q₁ = refl
 
 filtered-preserved-false : FilteredPreserved → ⊥
 filtered-preserved-false h with h q₁ 1 e₁ fit-e₁

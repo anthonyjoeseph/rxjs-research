@@ -305,6 +305,16 @@ open import Verify-Rank-Sufficient.Hop using (hopFits)
 --   fourth reading of the registry is not the repair, and the premise is
 --   owed to the frame shelf that already states its obligations per
 --   template, against the payload each one is given.
+-- DEAD ROUTE: AND SO IS WIDENING THE PREMISE WITH WHAT THE STATE CARRIES
+--   FORWARD, which is the one repair the route above leaves looking open.
+--   An arrival is seeded at the term's reading PLUS the join of the value
+--   it carries with the store, so a quantity the state carries forward is
+--   already INSIDE the grant rather than missing from it — and at the
+--   crossing both summands of that join read NOUGHT, pinned beside the
+--   grant in `Refuted.Arrival-Filtered`, so the grant has collapsed onto
+--   the term's own figure and there is nothing a carried quantity could
+--   have covered.  What moves is the LEFT: the spend climbs one per
+--   flattener while the grant holds still.
 -- PROBED: `Probed.Descent` — twelve recursive programs, every one green,
 --   taken against the DRAIN of each run rather than the whole of it.  What
 --   they cover, guard by guard: the μ peel at every program, since all
