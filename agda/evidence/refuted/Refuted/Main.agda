@@ -20,6 +20,14 @@ open import Refuted.Drain-Reachable using (drain-dry-free-false;
 -- side, and a pinned crossing fails by name instead
 open import Refuted.Hop-Sum using (entry-hop-fits-false; carried-is; term-is)
 
+-- the two dry rows travel with this witness for the opposite reason to
+-- the figures below: they are what stops the crossings being read one
+-- statement too high, since the leaf's conclusion survives both
+open import Refuted.Fit-Cascade using (fit-preserved-false;
+  carried-e₁; term-e₁; carried-s₁; term-s₁;
+  carried-e₃; term-e₃; carried-s₃; term-s₃;
+  carried-u₁; term-u₁; carried-u₃; term-u₃; dry₁; dry₃)
+
 open import Refuted.Rank-Entry using (dry-operator-false)
 -- the three figures travel with the witness for the same reason: the
 -- payload and the store both enter at the floor here, so a repair that

@@ -208,12 +208,12 @@ research lives; where they disagree, the header wins.
 
 ## Tier 1 — the descent never goes dry
 
-**THE TIER IS ONE STATEMENT AND ITS DOOR IS NO LONGER REFUTED.**
-`rank-sufficient` (Verify-Rank-Sufficient) says no run emits the dry marker. The
-carried side's addition is repaired — it replays the term reading along the
-chain — and the gate crossing that reopened the door is repaired too: the
-reading charges a defer one flattening, which is what the door actually
-registers.
+**THE TIER IS ONE STATEMENT, ITS DOOR HOLDS, AND ITS PREMISE DOES NOT SURVIVE AN
+ARRIVAL.** `rank-sufficient` (Verify-Rank-Sufficient) says no run emits the dry
+marker. The carried side's addition is repaired and the door's gate crossing with
+it, so the fit holds at entry and TIGHTLY. One cascade destroys it: a gate's own
+opening registers a flattening frame, and the reading declines to descend into a
+defer.
 
 **AND THE FOLD IS NOT A FRAME, BUT ITS BURST IS PRICED.** A scan emits its own
 accumulator, so nothing a frame is handed bounds what it returns; taken at the
@@ -226,26 +226,28 @@ procedure rather than a pin, and whose refusal is what turned this up.
 
 ### Open questions
 
-- **CAN ONE READING PRICE WHAT NO FRAME HANDS THE NEXT ONE?** The reading is a
-  triple of counts over the SYNTAX, and it is asked to bound quantities that are
-  not all syntactic. Two halves are now answered: the gate's, and the fold's,
-  where naming the seed recovered the tie between a node and the term that
-  installed it. What is left is the half no naming reaches — a flattener's QUEUE
-  holds observables the RUN chose rather than a term any statement mentions —
-  and whether the store must be read alongside the term wherever that is so.
+- **CAN ONE READING PRICE WHAT THE RUN HOLDS AND THE TERM DOES NOT?** The reading
+  is a triple of counts over the SYNTAX, and the question was which non-syntactic
+  quantities it must still bound. It now has ONE subject rather than several: the
+  RUN's own holdings. Two instances are known and they are the same shape — the
+  schedule's PENDING bodies, which a gate's constant clause declines to read, and
+  a flattener's QUEUE, which holds observables the run chose. The fold's half is
+  settled and is what shows the shape: naming the seed tied a node to the term
+  that installed it, and nothing names either of these.
   relevant: `drain-dry-free`, `entry-hop-fits`
 
 ### Big picture tier roadmap
 
-- **A FRAME NO TERM PRODUCED, WHICH IS THE DRAIN ROW'S REMAINING WITNESS.**
-  Every figure the drain probes pin came back unchanged under both repairs, so
-  what is left of `drain-dry-free`'s risk is exactly the region those rows
-  cannot reach: a frame the drain itself installed, whose shape no subscribe
-  ever walked. The gate is now a live source of such frames — a defer's body is
-  subscribed at a door the entry never saw — so the leg is instantiable in a way
-  it was not before the repair landed. Refute first: run a gate under a
-  recursion past the tick its body is scheduled on, and read the fit at the
-  state the DRAIN produced rather than at the one the entry did.
+- **THE PREMISE READ OVER WHAT THE RUN HOLDS, WHICH IS THE ONLY REPAIR THE
+  WITNESS LEAVES.** `hopFits` compares the registry against the TERM, and a
+  cascade beats it because a gate registers a flattening frame while the reading
+  prices that gate at one without descending. Charging the body instead is the
+  move the descent's constant clause exists to forbid, so the repair is on the
+  other side: the schedule's PENDING bodies are the run's own record of what a
+  gate will subscribe, and joining their reading with the term's is what could
+  make the comparison an invariant. Restate `hopFits` that way and refute first,
+  at the two witnesses that killed the present form and at a fold, whose seed the
+  join must not double-count.
 
 - **THE STORE HALF THAT NAMING A SEED CANNOT REACH: A FLATTENER'S QUEUE.** The
   fold's node holds what a named term installed, which is what settled its half
@@ -266,12 +268,6 @@ procedure rather than a pin, and whose refusal is what turned this up.
 
 ### The ledger
 
-- **`drain-dry-free`** (Verify-Rank-Sufficient) — FALSITY,
-  `REFUTED×2, PROBED×4`: every arrival after the root frame, conditioned on
-  `hopFits`. Every figure the drain rows pin came back UNCHANGED under the
-  repaired measure, so the region is narrowed rather than re-opened: a witness
-  must now be a frame no term produced.
-
 - **`map-frame-carried` / `take-frame-carried`**
   (Verify-Rank-Sufficient.Push-Carried) — FALSITY, `NO EVIDENCE`: the other two
   frames the walk runs on. A map evaluates a template at the payload, which is
@@ -282,6 +278,12 @@ procedure rather than a pin, and whose refusal is what turned this up.
   PROBED×3`: the fit at the door, with both known crossings repaired. Two rows
   are TIGHT — 2 against 2 on a chain, 1 against 1 at a gate — so the margin is
   instantiated, not argued; no constructor is covered under a μ.
+
+- **`drain-dry-free`** (Verify-Rank-Sufficient) — SHAPE,
+  `REFUTED×3, PROBED×4`: every arrival after the root frame, conditioned on
+  `hopFits` — which one cascade destroys from a TIGHT entry, so nothing can
+  supply the premise where the statement is used. The conclusion survives every
+  witness; the restatement is owed on the premise.
 
 - **`scan-burst-carried`** (Verify-Rank-Sufficient.Push-Carried) — DIFFICULTY,
   `REFUTED, PROBED`: the fold, at the burst and at the seed rather than at the
