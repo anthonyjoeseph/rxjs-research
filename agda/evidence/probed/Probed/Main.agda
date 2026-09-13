@@ -107,3 +107,12 @@ open import Probed.Defer-Blind
 open import Probed.Arrival-Spend
   using (deepFork; packed₁-is; packed₃-is; packed₄-is; packed₅-is;
          packed₆-is; packed₇-is; packed₈-is; flat-reads)
+
+-- the three counts are claimed beside the fit because each is a way the
+-- fit could have been green having asked for nothing — no arrival, an
+-- arrival reaching no chain, or a chain carrying a frame — and the
+-- boundary's counts are claimed for the opposite reason: they are what
+-- says the second family is unreachable rather than untried
+open import Probed.Door-Fits
+  using (bareArrived; bareReached; bareFrames; doorBare;
+         flatArrived; flatReached; flatFrames)

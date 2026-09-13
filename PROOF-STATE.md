@@ -258,7 +258,7 @@ per-frame conjuncts and to the chains a run installs.
   and the two arms that can go dry — the flattener and the share fan-out — are
   exactly the two the shelf has not composed.
 
-- **`entry-drain-fits`** (Verify-Rank-Sufficient) — FALSITY, `NO EVIDENCE`: the
+- **`entry-drain-fits`** (Verify-Rank-Sufficient) — FALSITY, `PROBED`: the
   premise at the door, for every arrival the allowance serves. Hereditary by
   construction, so a single cascade installing a frame the root subscribe never
   built refutes it.

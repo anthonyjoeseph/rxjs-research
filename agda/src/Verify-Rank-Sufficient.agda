@@ -301,6 +301,23 @@ drain-dry-free (suc k) nextId sched st fits with sched-next sched | fits
 -- one place where the state is not arbitrary — the entry the machine
 -- itself minted out of the program and the telescope.
 --
+-- PROBED: `Probed.Door-Fits` — the statement itself, applied, at one
+--   allowance over a bare slot whose single value lands after the
+--   subscribe frame.  The conjunction it reduces to there is written
+--   out of constructors and nothing else, and all three ways it could
+--   have asked for nothing are pinned against it separately: the
+--   allowance serves one arrival, that arrival reaches one chain, and
+--   that chain carries no frame.
+--   NOT COVERED, and the boundary is the finding rather than the gap.
+--   Of `PathFits`'s three constructors only `at-root` stands on
+--   something proven — `through` wants the frame shelf and `at-sink` a
+--   fan-out, both still postulated — so the region a row can reach at
+--   all is exactly the chains with no frame on them.  Everything else
+--   is pinned instead of fitted: one flattener over a map of the
+--   arriving value builds a chain two frames deep at the same slot and
+--   the same arrival, which is where a row would be handing a
+--   postulate back as its own evidence.  Nothing here reaches a second
+--   arrival, a share, or a registry holding more than one chain.
 postulate
   entry-drain-fits : ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t)
     (ins : Slots Γ) →
