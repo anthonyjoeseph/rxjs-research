@@ -49,6 +49,7 @@
 module Verify-Rank-Sufficient where
 
 open import Data.Bool using (false)
+open import Data.Nat using (z≤n)
 open import Data.Product using (_×_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 
@@ -331,8 +332,8 @@ rank-sufficient :
   hasDry (evaluate fuel e ins) ≡ false
 rank-sufficient {Γ = Γ} {t = t} fuel e ins =
   hasDry-++ (proj₁ ent) (drain fuel 1 (proj₁ (proj₂ ent)) (proj₂ (proj₂ ent)))
-    (subscribe-dry-free (rootWitness e ins) e root 0 0
-      (sched-init e ins) (st-init e) (rootTri-reads e ins))
+    (proj₁ (subscribe-dry-free (rootWitness e ins) e root 0 0
+      (sched-init e ins) (st-init e) (rootTri-reads e ins) z≤n))
     (drain-dry-free fuel 1 (proj₁ (proj₂ ent)) (proj₂ (proj₂ ent))
       (entry-hop-fits e ins))
   where

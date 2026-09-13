@@ -53,3 +53,7 @@ open import Probed.Fit-Preserved
 
 open import Probed.Operator-Root
   using (opRoot)
+
+open import Probed.Carried-Leaf
+  using (ofFlat; ofNest; scanFlat; scanNest; rate; packed-is; packed2L-is;
+         recurRow)
