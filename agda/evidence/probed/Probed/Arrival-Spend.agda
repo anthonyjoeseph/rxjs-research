@@ -55,7 +55,7 @@
 -- not over the store, which is nought at every point reached: what a
 -- deep store does to the same comparison is untouched.
 
--- FORK: cascade-dry-free
+-- FORK: entry-drain-fits
 module Probed.Arrival-Spend where
 
 open import Data.Bool using (Bool; true; false; if_then_else_)

@@ -213,56 +213,51 @@ research lives; where they disagree, the header wins.
 Every reading of a registry against the program is dead — the term's, the widest
 state-readable join, the arrival's own seed, the step's filtered spend — so the
 premise is now the frame shelf's own obligation at each template the run
-installed, against the payload that template is handed, and the allowance loop
-above it is a real body over one cascade leaf.
+installed, against the payload that template is handed, and everything from the
+allowance down to one chain's fold is a real body over those obligations.
 
-**AND NOTHING IS ASKED ABOUT THE STEP BETWEEN TWO ARRIVALS**, which is where
-all six witnesses killed their readings: the premise recurses on the allowance
-and takes each conjunct at the pair that arrival's cascade returns. It
-quantifies over states rather than fixing one, so instantiation now goes to its
-per-frame conjuncts and to the chains a run installs.
+**AND NOTHING IS ASKED ABOUT THE STEP BETWEEN TWO ARRIVALS, NOR BETWEEN TWO
+CHAINS**, which is where all six witnesses killed their readings: the premise
+recurses on the allowance and then on the chain list, taking each conjunct at
+the pair that cascade or that chain fold returns. So the whole of the debt is
+now at the door and at the templates the door's chains are built from.
 
 ### Big picture tier roadmap
 
-- **GIVE THE EXIT FRAME ITS SHELF ENTRY, WHICH IS THE ARM EVERY CHAIN IS MADE OF.**
+- **GIVE THE EXIT FRAME ITS SHELF ENTRY, WHICH NOW HAS SOMEWHERE TO PLUG IN.**
   A flattener's own frame is consumed when its value is subscribed, so the arm
   the shelf prices sits on no registered chain and the arm every chain is built
-  from has no statement at all. Two rules are possible — an exit frame threads
-  what it was handed, or it costs one as the frame above it does — and they are
-  now separated rather than argued: they agree wherever the reading tracks the
-  chain and come apart behind a gate, so one of them refutes the tier. Decide it
-  by reading the completion branch, which is the only branch that does not hand
-  the payload straight back, and state the arm at full strength.
-
-- **THEN FOLD A CHAIN, BECAUSE THE ARM HAS NOWHERE TO PLUG IN UNTIL IT EXISTS.**
-  There is no chain-level assembly anywhere in the rank development: the subscribe
-  direction has one and the delivery direction has only the bare leaf. So the arm
-  above cannot be wired, and stating it first would be inventory. Convert the leaf
-  into a real body over a fold of the registered path, one conjunct per frame, and
-  let the four arms be its leaves — then the arm's fit is tested by the
-  typechecker rather than asserted, and the share sink becomes the one place a
-  fan-out is still owed.
+  from has no statement at all. Two rules for what it costs are separated rather
+  than argued, and they come apart behind a gate, so one of them refutes the
+  tier. Decide it by reading the completion branch, the only branch that does
+  not hand the payload straight back, and state the arm at full strength — the
+  fold will then test the fit rather than asserting it. What that branch adds
+  rides the STORE bound, so the shelf's existing shape does not extend.
 
 - **AND THE STORE SIDE, WHICH NOTHING HAS YET MOVED.** Every payload instantiated
   so far reads nought and every state reads nought, so the rank has been the
   term's figure alone at every point and neither half of the join has been
   separated by anything. A run whose values are themselves observables moves both
-  at once. Instantiate that before the fold is assembled, since a store that can
-  outrun the term's reading changes what the fold has to thread rather than how it
-  threads it.
+  at once. Instantiate that before the arm above is stated, since a store that can
+  outrun the term's reading changes which bound the arm has to thread rather than
+  how it threads it — and the fold now fixes one store bound for a whole chain,
+  so a store that grows mid-chain is a refutation of the fold's shape and not
+  merely of an arm.
+
+- **THEN THE SHARE SINK, WHICH THE FOLD HAS JUST MADE A REAL GAP.** A sink ends
+  its chain and hands the values to every chain registered on the share, and the
+  fold's sink arm consumes an obligation over that fan-out which nothing anywhere
+  produces. It is not a fourth frame arm: the fan-out re-enters the chain fold,
+  so the obligation and the fold are mutually recursive and the measure that
+  makes them terminate is a design decision rather than a grind. Settle the
+  measure first and state the obligation to fit it.
 
 ### The ledger
 
-- **`cascade-dry-free`** (Verify-Rank-Sufficient) — FALSITY,
-  `REFUTED×6, DEAD ROUTE×2, RECOVERY`: one arrival's cascade under the
-  obligations its own chains carry. The chains it folds are built from the one
-  frame arm the shelf never states, and the two rules for what that arm costs
-  are separated on a run this evaluator performs.
-
 - **`entry-drain-fits`** (Verify-Rank-Sufficient) — FALSITY, `PROBED`: the
-  premise at the door, for every arrival the allowance serves. Hereditary by
-  construction, so a single cascade installing a frame the root subscribe never
-  built refutes it.
+  premise at the door, for every arrival the allowance serves and every chain
+  each one reaches. Hereditary in both, so a single cascade installing a frame
+  the root subscribe never built refutes it.
 
 - **`map-frame-carried`** (Verify-Rank-Sufficient.Push-Carried) — DIFFICULTY,
   `REFUTED×2, PROBED`: the two ends read DIFFERENT expressions, apart by the
