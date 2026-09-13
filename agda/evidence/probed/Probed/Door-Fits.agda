@@ -54,6 +54,20 @@
 -- whose bodies do not.  That is the distinction the predecessor's
 -- single end-of-chain comparison could not draw at all.
 
+-- AND THE SINK ROWS MEASURE THE HALF THE DOOR HANDS ON, WHICH IS WHERE
+-- THE REMAINING RISK OF THIS FACE SITS.  What a chain has made of its
+-- payload by the time it reaches its own sink is not a function of what
+-- entered the dispatch — that is the refuted reading — so the three
+-- rows below read the sink's own figure and the admitted registry's
+-- beside the rank the door supplies.  At the three points the sink
+-- payload and the widest admitted chain sum to one BELOW the rank, and
+-- the two halves move independently of each other: the payload goes
+-- nought, one, one while the registry figure goes one, one, two.  A
+-- margin that were an artifact of one axis would not survive the other
+-- moving, and a bound denominated in the store rather than the rank
+-- crosses at the first row, where the store reads one against a rank of
+-- two.
+
 -- NOT COVERED, AND ONE ENTRY OF THIS LIST IS NOW A BOUNDARY RATHER
 -- THAN A GAP.  Every row stands at ONE arrival and at the allowance's
 -- FIRST step, so nothing here reaches a second arrival or the
@@ -62,14 +76,17 @@
 -- where they were shown to.  The recursion's cons case is not missing
 -- coverage — the two forked rows are the evidence that it is not
 -- reachable at this point at all, and a probe cannot be written for it
--- here.
+-- here.  The sink rows stand at two telescopes and three programs, so
+-- the constant margin is where the two currencies were seen to keep
+-- step and not where they were shown to; and nothing here reaches a
+-- registry admitting more than two chains.
 -- TARGET: entry-drain-hop @5b9789
 module Probed.Door-Fits where
 
-open import Data.Fin using (zero; suc)
-open import Data.List using (List; []; _∷_; length)
+open import Data.Fin using (Fin; zero; suc)
+open import Data.List using (List; []; _∷_; length; map; foldr)
 open import Data.Maybe using (nothing)
-open import Data.Nat using (ℕ; zero; suc; _+_; _*_)
+open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _⊔_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (tt)
@@ -80,14 +97,15 @@ open import Rx.Prim using (cold; after_,_)
 open import Rx.Exp using (Ctx; Closed; Fn; natᵗ; obs; strmᵗ; nat̂;
   ofᵉ; mapᵉ; mergeAllᵉ; deferᵉ; input)
 open import Rx.Slots using (Slots; scripted; shared)
-open import Rx.Hop-Depth using (depthᵛ; depthᵉ)
+open import Rx.Hop-Depth using (Rd; Rd₃; rdᵛ; depthᵛ; depthᵉ)
 open import Rx.Slot-Read using (slotRd)
 open import Rx.Evaluator using (Sched; EvalSt; Path; root; share-sink;
-  _↠_; thru-outer; subscribeE;
+  _↠_; map-f; scan-f; take-f; from-inner; thru-outer; subscribeE;
   rootWitness; sched-init; st-init; sched-next; chainsOf; cascadeLatch;
-  arrTy; arrVal; RegId)
+  shareAdmit; arrTy; arrVal; RegId)
 open import Verify-Rank-Sufficient using (entry-drain-hop)
 open import Verify-Rank-Sufficient.Fits using (arrivalRank)
+open import Verify-Rank-Sufficient.Push-Carried using (mapRd)
 open import Probed.Apparatus using (Below; Confirms)
 
 ----------------------------------------------------------------------
@@ -158,19 +176,31 @@ forkedRaw : Closed Γ₁ natᵗ
 forkedRaw = mergeAllᵉ nothing
               (ofᵉ (strmᵗ bare ∷ strmᵗ (mergeAllᵉ nothing (mapᵉ lit bare)) ∷ []))
 
+-- THE SECOND TELESCOPE, WHERE THE SHARE'S OWN SOURCE FLATTENS.  Under
+-- `insLate` the share reads the slot itself, so an arrival meets the
+-- sink with nothing above it and the sink's conjunct is taken at the
+-- floor.  Here the share reads a FLATTENED slot, so the chain carries
+-- a frame BEFORE the sink while the consumers registered on the share
+-- carry frames after it — the one shape where both halves of the
+-- sink's comparison are positive, and the shape the refutation stands
+-- at with the door's own rank removed
+insDeep : Slots Γ₁
+insDeep zero       = scripted (cold [] (after 0 , 9 ∷ []))
+insDeep (suc zero) = shared (mergeAllᵉ nothing (mapᵉ lit (input zero)))
+
 ----------------------------------------------------------------------
 -- THE ENTRY, AND IT IS THE STATEMENT'S OWN.  `entry-drain-hop` names
 -- the pair `subscribeE` returns at the root; nothing here is written by
 -- hand, which is what makes the figures below about a REACHED state.
 ----------------------------------------------------------------------
 
-entOf : (e : Closed Γ₁ natᵗ) → Sched Γ₁
-entOf e = proj₁ (proj₂ (subscribeE (rootWitness e insLate) e root 0 0
-            (sched-init e insLate) (st-init e)))
+entOf : (ins : Slots Γ₁) (e : Closed Γ₁ natᵗ) → Sched Γ₁
+entOf ins e = proj₁ (proj₂ (subscribeE (rootWitness e ins) e root 0 0
+                (sched-init e ins) (st-init e)))
 
-stOf : (e : Closed Γ₁ natᵗ) → EvalSt e
-stOf e = proj₂ (proj₂ (subscribeE (rootWitness e insLate) e root 0 0
-           (sched-init e insLate) (st-init e)))
+stOf : (ins : Slots Γ₁) (e : Closed Γ₁ natᵗ) → EvalSt e
+stOf ins e = proj₂ (proj₂ (subscribeE (rootWitness e ins) e root 0 0
+               (sched-init e ins) (st-init e)))
 
 ----------------------------------------------------------------------
 -- THE FIGURES, TAKEN AT THE OBLIGATION'S OWN POINT.  The state is the
@@ -180,13 +210,13 @@ stOf e = proj₂ (proj₂ (subscribeE (rootWitness e insLate) e root 0 0
 -- statement never mentions.
 ----------------------------------------------------------------------
 
-atArrival : (e : Closed Γ₁ natᵗ) → ℕ × ℕ × ℕ × ℕ × ℕ × ℕ
-atArrival e with sched-next (entOf e)
+atArrival : (ins : Slots Γ₁) (e : Closed Γ₁ natᵗ) → ℕ × ℕ × ℕ × ℕ × ℕ × ℕ
+atArrival ins e with sched-next (entOf ins e)
 ... | inj₁ _        = 0 , 0 , 0 , 0 , 0 , 0
-... | inj₂ (a , sd) = go (chainsOf a (stOf e))
+... | inj₂ (a , sd) = go (chainsOf a (stOf ins e))
   where
   lat : EvalSt e
-  lat = cascadeLatch a (stOf e)
+  lat = cascadeLatch a (stOf ins e)
 
   tailHops : List (RegId × Path Γ₁ (arrTy a) natᵗ) → ℕ
   tailHops []             = 0
@@ -200,13 +230,13 @@ atArrival e with sched-next (entOf e)
     in depthᵛ ψ (arrTy a) (arrVal a) , chainHops c , arrivalRank a sd st′
      , depthᵉ ψ e , suc (length cs) , tailHops cs
 
-pay hops rank term reach hops₂ : (e : Closed Γ₁ natᵗ) → ℕ
-pay   e = proj₁ (atArrival e)
-hops  e = proj₁ (proj₂ (atArrival e))
-rank  e = proj₁ (proj₂ (proj₂ (atArrival e)))
-term  e = proj₁ (proj₂ (proj₂ (proj₂ (atArrival e))))
-reach e = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (atArrival e)))))
-hops₂ e = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (atArrival e)))))
+pay hops rank term reach hops₂ : (ins : Slots Γ₁) (e : Closed Γ₁ natᵗ) → ℕ
+pay   ins e = proj₁ (atArrival ins e)
+hops  ins e = proj₁ (proj₂ (atArrival ins e))
+rank  ins e = proj₁ (proj₂ (proj₂ (atArrival ins e)))
+term  ins e = proj₁ (proj₂ (proj₂ (proj₂ (atArrival ins e))))
+reach ins e = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (atArrival ins e)))))
+hops₂ ins e = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (atArrival ins e)))))
 
 ----------------------------------------------------------------------
 -- THE ROWS.  Six figures per program, packed so one error reports all
@@ -216,50 +246,132 @@ hops₂ e = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (atArrival e)))))
 -- ladder's does not stay under ten.
 ----------------------------------------------------------------------
 
-packOf : Closed Γ₁ natᵗ → ℕ
-packOf e = pay e + 10 * hops e + 100 * rank e
-         + 10000 * term e + 1000000 * reach e + 10000000 * hops₂ e
+packOf : Slots Γ₁ → Closed Γ₁ natᵗ → ℕ
+packOf ins e = pay ins e + 10 * hops ins e + 100 * rank ins e
+             + 10000 * term ins e + 1000000 * reach ins e
+             + 10000000 * hops₂ ins e
 
 -- DEGENERATE in all four of its comparing components, and pinned so
 -- that the rows below cannot be read as covering what this one does
 -- not: the arrival is served and reaches one chain, and everything the
 -- premise compares there is nought
-bareRow : packOf bare ≡ 1000000
+bareRow : packOf insLate bare ≡ 1000000
 bareRow = refl
 
 -- LOAD-BEARING, and TIGHT: the chain's one flattener is paid by the
 -- program's reading of one, with the payload contributing nothing, so
 -- the premise holds by equality.  A flattener priced at more than one,
 -- or a program reading that did not charge for its own, crosses here
-flatRow : packOf flat ≡ 1010110
+flatRow : packOf insLate flat ≡ 1010110
 flatRow = refl
 
 -- LOAD-BEARING, and the first rung where a per-ladder reading would
 -- differ from a per-rung one: two flatteners on the chain against a
 -- reading that has to have grown twice
-flat₂Row : packOf flat₂ ≡ 1020220
+flat₂Row : packOf insLate flat₂ ≡ 1020220
 flat₂Row = refl
 
 -- LOAD-BEARING: the third rung says the margin is CONSTANT rather than
 -- merely non-negative, which two rows cannot distinguish
-flat₃Row : packOf flat₃ ≡ 1030330
+flat₃Row : packOf insLate flat₃ ≡ 1030330
 flat₃Row = refl
 
 -- LOAD-BEARING, and the only row where the PAYLOAD carries weight: the
 -- gate's body is subscribed a tick out, so what the arrival hands over
 -- is itself an observable and reads two.  Two and one against a rank of
 -- three is tight in all three terms at once, which no row above it is
-gatedRow : packOf gated ≡ 1010312
+gatedRow : packOf insLate gated ≡ 1010312
 gatedRow = refl
 
 -- THE FINDING, and it is a NEGATIVE one: the arrival reaches ONE
 -- chain, carrying nought flatteners, however the fan-out was built.
 -- The two rows are byte-identical, so the share is not what is missing
-forkedRow : packOf forked ≡ 1020200
+forkedRow : packOf insLate forked ≡ 1020200
 forkedRow = refl
 
-forkedRawRow : packOf forkedRaw ≡ 1020200
+forkedRawRow : packOf insLate forkedRaw ≡ 1020200
 forkedRawRow = refl
+
+----------------------------------------------------------------------
+-- THE SINK'S OWN TWO QUANTITIES, WHICH ARE WHAT THE FAN-OUT'S PREMISE
+-- COMPARES AND WHAT NO ROW ABOVE REPORTS.  `sinkRd` carries the payload
+-- rootward by the SAME `mapRd` the walk itself steps with, so what it
+-- reports is where the walk stands when it reaches the sink; it is a
+-- reporting figure like `chainHops`, and the rows that instantiate the
+-- target are still generated by Agda from `entry-drain-hop`.
+--
+-- AND THE REGISTERED COUNT IS TAKEN OFF `shareAdmit`, which is the list
+-- the fan-out's own premise walks — not `chainsOf`, which is the door's.
+-- The two being different lists is the whole distinction between the
+-- door's claim and the sink's, so reading the sink's figure off the
+-- door's list would report agreement that nothing had checked.
+----------------------------------------------------------------------
+
+sinkRd : ∀ {n} {Γ : Ctx n} {s t} → (Fin n → Rd₃) → Path Γ s t → Rd → Rd
+sinkRd ψ root                    Rin = Rin
+sinkRd ψ (share-sink _)          Rin = Rin
+sinkRd ψ (map-f fn ↠ κ)          Rin = sinkRd ψ κ (mapRd ψ Rin fn)
+sinkRd ψ (scan-f fn nid ↠ κ)     Rin = sinkRd ψ κ (mapRd ψ Rin fn)
+sinkRd ψ (take-f nid ↠ κ)        Rin = sinkRd ψ κ Rin
+sinkRd ψ (from-inner o a i ↠ κ)  Rin = sinkRd ψ κ Rin
+sinkRd ψ (thru-outer op nid ↠ κ) Rin = sinkRd ψ κ (proj₁ Rin , suc (proj₂ Rin))
+
+atSink : (ins : Slots Γ₁) (e : Closed Γ₁ natᵗ) → ℕ × ℕ × ℕ
+atSink ins e with sched-next (entOf ins e)
+... | inj₁ _        = 0 , 0 , 0
+... | inj₂ (a , sd) = go (chainsOf a (stOf ins e))
+  where
+  regs : List ℕ
+  regs = map (λ p → chainHops (proj₂ p))
+             (shareAdmit (suc zero) (EvalSt.registry (stOf ins e)))
+
+  go : List (RegId × Path Γ₁ (arrTy a) natᵗ) → ℕ × ℕ × ℕ
+  go []              = 0 , 0 , 0
+  go ((rid , c) ∷ _) =
+    let ψ = slotRd (Sched.slots sd)
+    in proj₂ (sinkRd ψ c (rdᵛ ψ (arrTy a) (arrVal a)))
+     , foldr _⊔_ 0 regs , length regs
+
+sinkPay regMax regLen : (ins : Slots Γ₁) (e : Closed Γ₁ natᵗ) → ℕ
+sinkPay ins e = proj₁ (atSink ins e)
+regMax  ins e = proj₁ (proj₂ (atSink ins e))
+regLen  ins e = proj₂ (proj₂ (atSink ins e))
+
+-- payload AT the sink, the deepest registered chain, how many chains
+-- are registered, and the rank the whole dispatch is entered under —
+-- the four the restatement has to be denominated in
+sinkPack : Slots Γ₁ → Closed Γ₁ natᵗ → ℕ
+sinkPack ins e = sinkPay ins e + 10 * regMax ins e + 100 * regLen ins e
+               + 1000 * rank ins e + 100000 * term ins e
+
+-- THE CONTROL, and it is the refutation's own shape: the share reads
+-- the slot, so the payload reaches the sink at the FLOOR and the two
+-- registered chains are the fan-out's.  This is where the free-standing
+-- leaf is false, and the row says why it is not false here — the rank
+-- the dispatch is entered under is two, not the store's one
+shallowRow : sinkPack insLate forked ≡ 202210
+shallowRow = refl
+
+-- LOAD-BEARING, and the one row where both halves are positive: a
+-- frame above the sink and a flattener below it, so the sum the
+-- restatement needs is compared against a rank that had to grow with
+-- both
+deepRow : sinkPack insDeep forked ≡ 303211
+deepRow = refl
+
+-- AND THE THIRD POINT MOVES THE REGISTERED HALF ON ITS OWN, which is
+-- what makes the pair a DIRECTION rather than a height: the share's
+-- source is unchanged and the deepest consumer gains a flattener, so a
+-- rank that tracked only the chain above the sink would stand still
+-- here while the sum it has to cover went up
+forked₂ : Closed Γ₁ natᵗ
+forked₂ = mergeAllᵉ nothing
+            (ofᵉ (strmᵗ shd
+                ∷ strmᵗ (mergeAllᵉ nothing (mapᵉ lit
+                          (mergeAllᵉ nothing (mapᵉ lit shd)))) ∷ []))
+
+widerRow : sinkPack insDeep forked₂ ≡ 404221
+widerRow = refl
 
 ----------------------------------------------------------------------
 -- AND THE STATEMENT ITSELF, at both points.  The type is generated by
@@ -288,3 +400,12 @@ doorForked = (Below , tt) , tt
 
 doorForkedRaw : Confirms (entry-drain-hop 1 forkedRaw insLate)
 doorForkedRaw = (tt , tt) , tt
+
+-- and at the SECOND telescope, where the arrival's own chain carries a
+-- frame before it sinks: the door's walk has a conjunct to discharge
+-- above the share, which is the half no row at the first telescope has
+doorDeep : Confirms (entry-drain-hop 1 forked insDeep)
+doorDeep = ((Below , Below) , tt) , tt
+
+doorDeep₂ : Confirms (entry-drain-hop 1 forked₂ insDeep)
+doorDeep₂ = ((Below , Below) , tt) , tt

@@ -179,6 +179,17 @@ open import Probed.Door-Fits
          gatedRow; doorGated;
          forkedRow; forkedRawRow; doorForked; doorForkedRaw)
 
+-- and the SINK side, claimed as a triple because no one of them says
+-- anything: the finding is a margin that stays at one while the two
+-- halves under it move independently, so a row dropped from this list
+-- would leave the other two reading as a constant nobody had varied.
+-- The two fits are claimed beside them for the reason the forked pair
+-- is — they stand at the second telescope, where the arrival's own
+-- chain carries a frame before it sinks, which is the shape the first
+-- telescope has no row for
+open import Probed.Door-Fits
+  using (shallowRow; deepRow; widerRow; doorDeep; doorDeep₂)
+
 -- the agreement rows are claimed beside the fork because a separation
 -- between two rules that differ everywhere says nothing about the shape
 -- it stands at, and the counts because each is a way both rules could
@@ -229,3 +240,16 @@ open import Probed.Exit-Frame
 -- SATURATED rather than slack, and a repair that lowered the bound on
 -- the count side would cross at all three at once
 open import Probed.Exit-Frame using (counts₁-is; counts₂-is; counts₃-is)
+
+-- the three saturation rows are claimed with FIVE figures because the
+-- statement is an equality between two runs of the same machine, and an
+-- equality is exactly the shape that goes green over a machine ignoring
+-- the parameter being varied.  The two admitted lengths say the dispatch
+-- meets a registry at all; the emit pair at counters of one and two say
+-- the counter is READ at this program, which is the only thing that
+-- makes an agreement further up a finding; and the third says where the
+-- agreement begins, so the seed is claimed as sufficient rather than as
+-- tight
+open import Probed.Dispatch-Saturates
+  using (admits₁-is; admits₂-is; short-is; long-is; seed-is;
+         satSeed; satAbove; satDeep)

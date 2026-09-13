@@ -56,7 +56,7 @@ Tri = ℕ × ℕ × ℕ
 
 ------------------------------------------------------------------
 -- THE ORDER.  Lexicographic, outermost component first.  One
--- constructor per gas edge, and that correspondence is the whole
+-- constructor per RE-ENTRY edge, and that correspondence is the whole
 -- design: `ltU` is the connect edge, `ltR` the hop edge, `ltS` the μ
 -- edge.  Read the other way it is a coverage claim — a fourth
 -- constructor here would mean a fourth edge in the evaluator, and a

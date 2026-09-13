@@ -28,7 +28,7 @@ open import Rx.Exp  using (Ty; Ctx; Val; Closed; isData; inputsBelowᵉ)
 -- descent order: `Val Γ (obs u) = Closed Γ u`, so its script could emit
 -- the very program being walked, and the *All hop off it would be asked
 -- for `measureE V e ≺ᵛ measureE V e`.  The regress is real, not merely
--- undescending — such a program re-enters itself at every finite gas —
+-- undescending — such a program re-enters itself unboundedly —
 -- so no edge can pay for it and the restriction is by construction.
 -- Higher-order pipelines are unaffected: an observable-typed slot is a
 -- `shared` def, which IS walked, so its emissions are syntactically
