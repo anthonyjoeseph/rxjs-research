@@ -19,25 +19,30 @@
 -- non-empty list rather than landing on its `⊤` arm — which is the one
 -- way a row here could read green having asserted nothing at all.
 
--- WIDTH AND WRITING CANNOT BE CARRIED BY ONE PROGRAM HERE, AND THAT IS
--- A PROPERTY OF THE STATEMENT RATHER THAN OF THIS HARNESS.  The
--- premise's conjunct is cheap — it reads the store at the state the
--- chain is ENTERED under — but its recursive tail is taken at the
--- state that chain's `foldPath` RETURNS, so deciding the next chain's
--- cancellation test forces the evaluator to normalise inside the type,
--- once per chain and compounding.  A fan-out of one never pays it, the
--- tail being the `⊤` arm, which matches without inspecting the state.
--- So the two properties are split across the two points below: writing
--- at width one, threading at width three over chains that write
--- nothing.
+-- WIDTH IS WHAT THIS STATEMENT COSTS, AND THE COST IS THE PREMISE'S
+-- SHAPE RATHER THAN THIS HARNESS'S.  The conjunct is cheap — it reads
+-- the store at the state a chain is ENTERED under — but the recursive
+-- TAIL is taken at the state that chain's `foldPath` RETURNS, so
+-- deciding the next chain's cancellation test normalises the evaluator
+-- inside the type, once per chain and compounding.  A fan-out of one
+-- never pays it at all: the tail is the `⊤` arm, which matches without
+-- inspecting the state.  So instantiating this premise costs what
+-- RUNNING the program costs, and pays it in a type.
 --
--- THE COMBINATION — THREADING ACROSS CHAINS THAT WRITE — IS NOT
--- INSTANTIABLE.  Three observable-accumulator consumers exhausted
--- sixteen gigabytes without finishing, at a fold wrapping once; the
--- same shape wrapping three times did too.  This is a coverage
--- BOUNDARY and not an untried row: the region where a chain's own
--- write changes the store the NEXT chain is read against is exactly
--- where a false join would hide, and nothing here reaches it.
+-- MEASURED, AND THE WRITING IS NOT THE VARIABLE.  Three chains folding
+-- into observable accumulators exhausted sixteen gigabytes without
+-- finishing, at a fold wrapping three times and again at one.  Three
+-- chains writing NOTHING did the same.  Two is what fits.  So the axis
+-- is the width the tail recurses on, not the depth a chain writes —
+-- which is why the width row below carries flat consumers and the
+-- writing row carries exactly one.
+--
+-- AND THE BOUNDARY IS WIDTH THREE, NOT ANY SHAPE OF CHAIN.  What no
+-- row here reaches is a SECOND hand-off — the state one chain returns
+-- being read by a chain that is not the last — which is where a join
+-- that drifts per chain would first show.  One hand-off is reached and
+-- says the tail recursion is entered; it cannot say the recursion
+-- stays true as the threaded state moves.
 
 -- THE `valsHop ψ natᵗ vals` CONJUNCT IS ALWAYS ZERO here, because the
 -- dispatched values are natural numbers and `rdᵛ ψ natᵗ _ = 0 , 0` by
@@ -45,7 +50,7 @@
 -- bare flattener count against the join.  A fan-out over
 -- observable-valued slots would put a positive figure on the left.
 
--- THE WIDTH ROW is `quietProg`, whose three consumers are plain-number
+-- THE WIDTH ROW is `quietProg`, whose two consumers are plain-number
 -- scans: `Rst = 0` at subscribe and `stOut = 0` after dispatch, so the
 -- join is nought and a chain carrying ANY flattener would refute
 -- there.  It is the degenerate control for the store reading and the
@@ -129,7 +134,7 @@ flatCons = strmᵗ (scanᵉ (fstᵗ (varᵗ (here refl))) (nat̂ 0) (input (suc 
 
 oneProg quietProg : Closed Γ₂ natᵗ
 oneProg   = mergeAllᵉ nothing (ofᵉ (cons3 ∷ []))
-quietProg = mergeAllᵉ nothing (ofᵉ (flatCons ∷ flatCons ∷ flatCons ∷ []))
+quietProg = mergeAllᵉ nothing (ofᵉ (flatCons ∷ flatCons ∷ []))
 
 ----------------------------------------------------------------------
 -- THE INSTRUMENT.  The subscribe state, where the chains have
@@ -197,9 +202,9 @@ module Ap (e : Closed Γ₂ natᵗ) (v : ℕ) where
 -- THE TWO POINTS, WHICH SPLIT THE TWO PROPERTIES A SINGLE PROGRAM
 -- CANNOT AFFORD TOGETHER.  `One3` carries the WRITING: its store reads
 -- positive at subscribe and the dispatch's write lands deeper, at a
--- fan-out of one.  `Quiet3` carries the WIDTH: three chains, so the
--- premise's own recursion threads state from each into the next, at a
--- store that stays nought throughout — which also makes it the
+-- fan-out of one.  `Quiet3` carries the WIDTH: two chains, so the
+-- premise's own recursion threads the state one returns into the next,
+-- at a store that stays nought throughout — which also makes it the
 -- degenerate control, since a chain carrying any flattener refutes
 -- against a join of nought.
 ----------------------------------------------------------------------
@@ -219,7 +224,7 @@ module Quiet3 = Ap quietProg 3
 one3-is : One3.packed ≡ 2001001
 one3-is = refl
 
-quiet3-is : Quiet3.packed ≡ 3
+quiet3-is : Quiet3.packed ≡ 2
 quiet3-is = refl
 
 ----------------------------------------------------------------------
@@ -237,4 +242,4 @@ sinkOne3 = Below , tt
 sinkQuiet3 : Confirms
   (share-chain-hop Quiet3.ac Quiet3.gas 0 0 (suc zero) Quiet3.ψ
      Quiet3.Rin Quiet3.Rst Below Quiet3.vals Quiet3.fin Quiet3.sd Quiet3.st)
-sinkQuiet3 = Below , Below , Below , tt
+sinkQuiet3 = Below , Below , tt
