@@ -5,7 +5,7 @@ FIRST, so a stale row misdirects the next session's whole leg. One already did, 
 two postulates that had become real definitions. This target makes the parts a machine
 can see into build failures.
 
-## Sixteen checks
+## Seventeen checks
 
 1. **Sort** — each tier is ordered riskiest-class-first (FALSITY, SHAPE, VACUITY,
    DIFFICULTY, GRINDABLE). Priority that lives only in prose gets spent on whatever is
@@ -34,22 +34,27 @@ can see into build failures.
    marker at all fails. The class claims the statement is true and correctly stated, and
    that is a claim about evidence; absent one the row is SHAPE or FALSITY.
 
-10. **The leg count** — each tier opens with a `### Big picture tier roadmap` naming
+10. **A row of the tier being WORKED that nothing has ever instantiated** — every
+    classed row of the LOWEST OPEN TIER must carry at least one durable marker, in
+    every class including the three check 9 exempts. This is the only check here that
+    is scoped to one tier, and the only one that binds on FALSITY.
+
+11. **The leg count** — each tier opens with a `### Big picture tier roadmap` naming
     exactly three legs, dropping below three only when the tier has fewer live
     postulates than that to plan over.
-11. **The leg budget** — each leg's prose is within `LEG_BUDGET`, which is several times
+12. **The leg budget** — each leg's prose is within `LEG_BUDGET`, which is several times
     `ROW_BUDGET`.
-12. **The row's receipt cap** — no row carries more `PROBED` receipts than
+13. **The row's receipt cap** — no row carries more `PROBED` receipts than
     `make evidence-check` allows one postulate. The number is imported from that
     checker, so the two cannot drift apart.
 
-13. **The open-question cap** — a tier's `### Open questions` section names at most
+14. **The open-question cap** — a tier's `### Open questions` section names at most
     `QUESTIONS_MAX`. The section is optional; the cap is not a quota.
-14. **The open-question budget** — each question's prose is within `QUESTION_BUDGET`.
+15. **The open-question budget** — each question's prose is within `QUESTION_BUDGET`.
     Its `relevant:` line is free, on the same asymmetry as a row's names.
-15. **A question naming too few postulates** — under `QUESTION_NAMES_MIN`, it is one
+16. **A question naming too few postulates** — under `QUESTION_NAMES_MIN`, it is one
     row given a heading, and that row's research already has a home.
-16. **A stale relevant list** — every name a question names is still a live postulate,
+17. **A stale relevant list** — every name a question names is still a live postulate,
     is a row of that same tier, and is still FALSITY.
 
 ## The roadmap is the schedule; the rows are the ledger
@@ -275,9 +280,45 @@ is correct where the row really is one statement and wrong where it is a bag. Wh
 census answers a family row with a single marker, the question to ask is whether the row
 should be SPLIT, and the answer is usually yes.
 
+## The birth floor — why check 10 is wider than check 9 and narrower than every other
+
+Check 10 is the one check here that came out of a COUNT rather than out of a reading.
+Every refutation this campaign has landed — nine of them, across the drain, the hop sum,
+the fit cascade, the map template, the scan store, the rank entry and the sync count —
+killed a row that was carrying no durable marker at the moment it fell. Not one landed
+on a statement somebody had already instantiated. Nine for nine is not a claim about
+which statements are hard; it is a claim about which have been LOOKED at.
+
+What makes that expensive rather than merely embarrassing is WHEN the falsity surfaces.
+A statement found false at birth costs a restatement. The same statement found under a
+tower costs the tower, because everything ground above it was proving something false.
+So the floor is placed where the restatement is still cheap.
+
+**It is wider than check 9, and the width is the entire point.** Check 9 exempts FALSITY,
+SHAPE and VACUITY on the reasoning that those classes assert nothing about the statement
+being right — which is true, and is exactly why the exemption misses. FALSITY is the
+class a never-instantiated row is BORN into: CLAUDE.md rules that "may be false" is a
+claim about what is KNOWN, and nothing is known about an unprobed row. So a floor that
+exempted FALSITY would exempt precisely the nine.
+
+**It is narrower than every other check, and that is not a concession.** A parked tier's
+rows stand on ground the tier below them can still move: a statement restated out from
+under by its own prerequisites takes its receipts with it, so instantiating one buys
+coverage against a form that may not survive. Tier order is already law — lower tiers
+finish first — so scoping the floor to the lowest open tier binds it exactly where work
+is allowed to happen. Measured when the check was written: 24 rows carried `NO EVIDENCE`
+and 1 of them was in the tier being worked.
+
+**The repair is to PROBE, never to reclassify.** Check 9's repair is a reclassification
+because the finding there is that a class claims more than its evidence supports. Here
+there is no class to fall back to — the floor binds on the worst class there is — so the
+only move that clears it is to instantiate the statement, at concrete programs, in
+`agda/evidence/probed/`. The better outcome is a refutation, which is what this check is
+trying to buy earlier.
+
 ## The receipt cap has two units, and the row is the one that was missing
 
-`make evidence-check` caps receipts at seven per POSTULATE. Check 12 caps the same
+`make evidence-check` caps receipts at seven per POSTULATE. Check 13 caps the same
 number per ROW, and the second unit is not a stricter version of the first — it is the
 one that matches what the cap is FOR. A probe aims a grind or refutes a statement; past
 the cap the receipts have stopped deciding anything while the item stays open, so what

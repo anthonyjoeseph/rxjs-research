@@ -76,6 +76,14 @@ open import Probed.Fold-Burst
 open import Probed.Drain-Arrival
   using (daM6₁; daM6₂; daM24₁; daM24₂; daL₁; daL₂; daL₃; daDrain)
 
+-- the four pinned figures are claimed beside the rows because the
+-- payload half and the store half are what make either conjunct
+-- comparable at all: a repair that sent either to zero would leave
+-- every row green having compared nothing
+open import Probed.Take-Frame
+  using (takeCut₁; takeEdge₂; takePass; takeDeep;
+         cut₁-is; edge₂-is; pass-is; deep-is)
+
 open import Probed.Hop-Edge
   using (hopRow₁; hopRow₂; hopRow₃; hopRowP; hopRowS; hopRowE;
          packed₁-is; packed₂-is; packed₃-is; packedP-is; packedS-is;

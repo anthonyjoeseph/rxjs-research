@@ -118,6 +118,21 @@ postulate
 -- nothing here evaluates anything, and the equal-bounds form is the
 -- right one for this frame even though it is the wrong one for its
 -- neighbour.
+--
+-- PROBED: `Probed.Take-Frame` — four frames reached by RUNNING the
+--   take arm's own subscription, each held to the TIGHTEST bounds the
+--   predicate admits: the reading the frame was handed and the reading
+--   the store carried in.  Both conjuncts compare something, which the
+--   source is built for — a fold whose accumulator is an observable, so
+--   the payload reads positive where a stream of nats would read zero,
+--   and whose node the store can read where the take's own is priced at
+--   zero.  The store half comes back TIGHT at every point, which is the
+--   cutting arm dropping entries and installing nothing.  Counts below,
+--   at and above what the burst supplies, at two fold rates; the two
+--   below hand back strictly less.  No row reaches an arrival, a drain
+--   step, or a take whose node an earlier burst already spent — every
+--   point sits at a burst that finishes, and the finish flag is pinned
+--   rather than assumed.
 postulate
   take-frame-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s} {τ}
     (ac : Acc _≺_ τ) (id : Id) (now : Tick) (nid : NodeId)

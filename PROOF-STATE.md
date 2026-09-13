@@ -235,14 +235,15 @@ procedure rather than a pin, and whose refusal is what turned this up.
 
 ### Big picture tier roadmap
 
-- **PIN THE FRAME'S OUTPUT BOUND AT THE POINT THE WALK SUPPLIES.** The frame
-  predicate quantifies its bound over every natural and the walk hands over
-  exactly one — the reading of the whole operator expression — so a map is
-  refuted at a payload reading ZERO while the same module pins the walk's own
-  bound at that template and the output fitting under it. The residue is a
-  missing CONSTRAINT, not a missing quantity. Restate the map at the supplied
-  point, re-check the other three against the pin, and instantiate the pinned
-  form at templates the one witness did not reach.
+- **RESTATE THE MAP AT THE SUPPLIED POINT.** The frame predicate quantifies its
+  bound over every natural while the walk hands over exactly one, and the
+  witness that killed the equal-bounds form pins that one beside it — so the
+  residue is a missing CONSTRAINT, not a missing quantity. Its shelf-mate is
+  instantiated now and no longer inherits the doubt, which leaves the map alone
+  in it. Write the pinned form, and refute first at a template returning a
+  flattener over a term that is itself an observable, where the two bounds are
+  grown by DIFFERENT clauses of the reading — the narrowed question being
+  whether one instantiation of a free bound constrains or coincides.
 
 - **DELETE THE PREMISE AND LET THE ARRIVAL CARRY ITS OWN ADEQUACY.** Two
   witnesses now say the registry cannot be fitted against anything a STATE
@@ -266,14 +267,9 @@ procedure rather than a pin, and whose refusal is what turned this up.
 
 ### The ledger
 
-- **`take-frame-carried`** (Verify-Rank-Sufficient.Push-Carried) — FALSITY,
-  `NO EVIDENCE`: a prefix of what it was handed, under a node reading zero by
-  construction, and the cutting arm only DROPS registry entries. Nothing here
-  evaluates anything; the witness beside it does not reach this frame.
-
-- **`entry-hop-fits`** (Verify-Rank-Sufficient) — FALSITY, `REFUTED,
-  PROBED×3`: the fit at the door, with both known crossings repaired. Two rows
-  are TIGHT — 2 against 2 on a chain, 1 against 1 at a gate — so the margin is
+- **`entry-hop-fits`** (Verify-Rank-Sufficient) — FALSITY, `REFUTED, PROBED×3`:
+  the fit at the door, with both known crossings repaired. Two rows are TIGHT —
+  2 against 2 on a chain, 1 against 1 at a gate — so the margin is
   instantiated, not argued; no constructor is covered under a μ.
 
 - **`map-frame-carried`** (Verify-Rank-Sufficient.Push-Carried) — SHAPE,
@@ -282,16 +278,21 @@ procedure rather than a pin, and whose refusal is what turned this up.
   zero. The restatement is the reading's own map step, which the chain measure
   already spends here.
 
-- **`drain-dry-free`** (Verify-Rank-Sufficient) — SHAPE,
-  `REFUTED×4, PROBED×4`: every arrival after the root frame, conditioned on
-  `hopFits` — which one cascade destroys from a TIGHT entry, and which no
-  reading of a state repairs. The conclusion survives every witness; the
-  restatement is owed on the premise.
+- **`drain-dry-free`** (Verify-Rank-Sufficient) — SHAPE, `REFUTED×4, PROBED×4`:
+  every arrival after the root frame, conditioned on `hopFits` — which one
+  cascade destroys from a TIGHT entry, and which no reading of a state repairs.
+  The conclusion survives every witness; the restatement is owed on the
+  premise.
+
+- **`take-frame-carried`** (Verify-Rank-Sufficient.Push-Carried) — DIFFICULTY,
+  `PROBED`: a prefix of what it was handed, under a node reading zero. Four
+  frames reached by RUNNING, at the TIGHTEST bounds the predicate admits and
+  counts either side of the burst; no row reaches an arrival.
 
 - **`scan-burst-carried`** (Verify-Rank-Sufficient.Push-Carried) — DIFFICULTY,
   `REFUTED, PROBED`: the fold, at the burst and at the seed rather than at the
-  frame. The margin is constant in step depth and in source length, and both the
-  continuation and the store's other nodes are INERT rather than unswept.
+  frame. The margin is constant in step depth and in source length, and both
+  the continuation and the store's other nodes are INERT rather than unswept.
 
 - **`thru-outer-frame-carried`** (Verify-Rank-Sufficient.Push-Carried) —
   DIFFICULTY, `PROBED`: the HOP EDGE, where the two currencies are exchanged.

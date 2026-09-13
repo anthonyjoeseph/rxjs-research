@@ -15,7 +15,6 @@
 ### The ledger
 
 - **`a-falsity`** — FALSITY, `PROBED`: worst class goes first.
-- **`b-shape`** — SHAPE, `NO EVIDENCE`: a restatement is owed.
 - **`c-difficulty`** — DIFFICULTY, `NO EVIDENCE`: true, correctly stated, hard.
 - **`d-grindable`** — GRINDABLE, `TWIN`: the shape is already known.
 
@@ -33,6 +32,7 @@
 
 ### The ledger
 
+- **`b-shape`** — SHAPE, `NO EVIDENCE`: a restatement is owed.
 - **`e-difficulty`** — DIFFICULTY, `REFUTED×2`: mentions the word GRINDABLE
   later in its own prose, which must NOT be read as its class.
 - **`fam-{alpha,beta}`** — DIFFICULTY, `DEAD ROUTE`: brace expansion counts as
