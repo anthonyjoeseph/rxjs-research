@@ -263,6 +263,18 @@ mutual
   rdᵉ ψ ρ (exhaustAllᵉ e)   = flatten (rdᵉ ψ ρ e)
   rdᵉ ψ ρ (μᵉ e)            = rdᵉ ψ ρ e
   rdᵉ ψ ρ (varᵉ x)          = 0 , 0 , 0
+  -- THE GATE READS NOTHING, AND THAT IS WHAT THE INVARIANCE BELOW
+  -- COSTS.  A recursion's variable is reachable only under a defer, so
+  -- an unfolding puts the whole μ there; a clause that read the body
+  -- would read more after unfolding than before and the μ edge would
+  -- lose its equation.  The run does not agree: a defer IS a mergeAll
+  -- of a one-shot scheduled outer, so subscribing one registers a
+  -- flattener frame, and a chain measure that prices that frame
+  -- honestly crosses this reading at the DOOR on a one-constructor
+  -- program (`Refuted.Defer-Hop`).  The quantity a defer is owed is a
+  -- schedule TICK, which no component of this triple counts — so the
+  -- disagreement is not repairable by moving either measure, and it is
+  -- the open finding rather than a clause to fix in place.
   rdᵉ ψ ρ (deferᵉ e)        = 0 , 0 , 0
 
   -- A TEMPLATE IS READ AGAINST ITS ARGUMENT, not scaled by a slope.  A

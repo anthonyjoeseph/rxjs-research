@@ -20,5 +20,12 @@ open import Refuted.Drain-Reachable using (drain-dry-free-false;
 -- side, and a pinned crossing fails by name instead
 open import Refuted.Hop-Sum using (entry-hop-fits-false; carried-is; term-is)
 
+-- the second half is claimed separately because it is a different
+-- claim, not a restatement: the crossing above kills the FIT, and the
+-- three names below kill the tier's TOP LINE at the same witness
+open import Refuted.Defer-Hop
+  using (entry-hop-fits-defer-false; deferCarried-is; deferTerm-is;
+         rank-sufficient-defer-false; deferDry-6; deferDry-50)
+
 open import Refuted.Rank-Entry using (dry-operator-false)
 open import Refuted.Sync-Count using (sync-count-bounded-false)
