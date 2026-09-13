@@ -21,7 +21,7 @@
 module Verify-Well-Formed.Part10 where
 
 open import Data.Bool    using (Bool; true; false; if_then_else_; _∧_; not)
-open import Data.Nat     using (ℕ; zero; suc; _≤_; s≤s; _≡ᵇ_; _≤ᵇ_; _+_; _∸_)
+open import Data.Nat     using (ℕ; zero; suc; _≤_; _<_; s≤s; _≡ᵇ_; _≤ᵇ_; _+_; _∸_)
 open import Data.Nat.Properties using (+-suc; +-identityʳ; +-cancelʳ-≡; m+n∸n≡m)
 open import Data.List    using (List; []; _∷_)
 open import Data.Bool.ListAction using (any)
@@ -225,7 +225,7 @@ readoff-cancel s evs liveS Lv ob′ Ov dn d′ R apEq shEq =
 -- aliveThrough certificate) and a thru-outer node↔registry coherence field will
 -- discharge.  This VALIDATES the FoldOut field statements (all inhabited).
 foldPath-root-out : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo : ℕ}
-  (sf : Acc _≺_ τ) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
+  (sf : Acc _≺_ τ) (acl : Acc _<_ (n ∸ lo)) (id : Id) (now : Tick) (envSrc : Source)
   (vals : List (Val Γ t)) (evs : List (InstEvent (Val Γ t)))
   (fin : Bool) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt)
   (fi : FoldInv id envSrc evs fin sched st S) →
@@ -234,11 +234,11 @@ foldPath-root-out : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo : ℕ}
      allShareSunk (dropSource envSrc (EvalSt.registry st)) ≡ true) →
   -- STEADY: an already-done registry is fully plumbed
   (ProtocolSt.done S ≡ true → allShareSunk (EvalSt.registry st) ≡ true) →
-  FoldOut sf gas id now envSrc (root {lo = lo}) vals evs fin sched st (FoldInv.ob′ fi) S
+  FoldOut sf acl id now envSrc (root {lo = lo}) vals evs fin sched st (FoldInv.ob′ fi) S
     (record { live = FoldInv.Lv fi ; horizon = FoldInv.hz fi
             ; current = just (id , FoldInv.Ov fi)
             ; done = if fin then true else ProtocolSt.done S })
-foldPath-root-out sf gas id now envSrc vals evs fin sched st S fi flip-cert steady = record
+foldPath-root-out sf acl id now envSrc vals evs fin sched st S fi flip-cert steady = record
   { live-others-out = λ s neq →
       readoff-cancel s evs (ProtocolSt.live S) (FoldInv.Lv fi) (FoldInv.ob′ fi) (FoldInv.Ov fi)
         (ProtocolSt.done S) (ProtocolSt.done S) (countRegs s (EvalSt.registry st))

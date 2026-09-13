@@ -46,12 +46,13 @@ open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.Bool.ListAction using (any)
 open import Data.Fin using (Fin; toℕ)
 open import Data.List using (List; []; _∷_)
-open import Data.Nat using (ℕ; zero; suc; _+_; _⊔_; _≤_; _≡ᵇ_)
+open import Data.Nat using (ℕ; zero; suc; _+_; _∸_; _⊔_; _≤_; _<_; _≡ᵇ_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (⊤)
 open import Data.Vec using (lookup)
-open import Induction.WellFounded using (Acc)
+open import Data.Nat.Induction using (<-wellFounded-fast)
+open import Induction.WellFounded using (Acc; acc)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 
 open import Rx.Prim using (Fuel; Tick; Id; close; exhausted)
@@ -61,7 +62,7 @@ open import Rx.Hop-Depth using (Rd; Rd₃; depthᵉ; depthᵛ; rdᵛ)
 open import Rx.Slot-Read using (slotRd)
 open import Rx.Evaluator using (Frame; Path; root; share-sink; _↠_; Sched;
   EvalSt; Arrival; arrTy; arrVal; arrTick; arrivalWitness; chainsOf; RegId; AtFloor;
-  chainStep; cascadeLatch; foldPath; shareAdmit; shareLatch;
+  chainStep; cascadeLatch; foldPath; shareAdmit; shareLatch; floorFalls;
   sched-next; cascade; stepFrame; dispatchShare; dryEvent; hasDry; stHop)
 open import Verify-Rank-Sufficient.Carried using (valsRd; _⊑_)
 open import Verify-Rank-Sufficient.Push-Carried using (FrameCarries)
@@ -128,21 +129,22 @@ FrameDryUnder {Γ = Γ} {e = e} {s = s} ac id now f κ ψ Rin Rst =
 -- observables carries a reading IN as well, and no row stands there.
 ----------------------------------------------------------------------
 
--- AND THE DISPATCH COUNTER IS AN INDEX HERE RATHER THAN QUANTIFIED,
--- WHICH IS WHAT MAKES THE SINK ARM WRITEABLE AT ALL.  The counter peels
--- at every share boundary, so it is the order the fan-out's own
--- recursion descends on; a clause promising dry-freedom at EVERY
--- counter has to be produced before any of them is spent, and the walk
--- building it re-enters the fan-out, so nothing decreases across the
--- cycle and the arm can only be asserted.  Indexing hands the walk the
--- one counter it stands at and the sink's body the next one down.
-ShareDryUnder : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {τ} →
-  Acc _≺_ τ → ℕ → Id → Tick → (i : Fin n) → (Fin n → Rd₃) → Rd → ℕ → Set
-ShareDryUnder {Γ = Γ} {e = e} ac gas id now i ψ Rin Rst =
+-- AND THE DESCENT IS AN INDEX HERE RATHER THAN QUANTIFIED, WHICH IS
+-- WHAT MAKES THE SINK ARM WRITEABLE AT ALL.  The witness peels at every
+-- share boundary, so it is the order the fan-out's own recursion
+-- descends on; a clause promising dry-freedom at EVERY accessibility
+-- has to be produced before any of them is spent, and the walk building
+-- it re-enters the fan-out, so nothing decreases across the cycle and
+-- the arm can only be asserted.  Indexing hands the walk the one
+-- witness it stands at and the sink's body the peel of it.
+ShareDryUnder : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {τ} {lo} →
+  Acc _≺_ τ → Acc _<_ (n ∸ lo) → Id → Tick → (i : Fin n) → lo ≤ toℕ i →
+  (Fin n → Rd₃) → Rd → ℕ → Set
+ShareDryUnder {Γ = Γ} {e = e} ac acl id now i below ψ Rin Rst =
   ∀ (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
     (sd : Sched Γ) (st : EvalSt e) →
     valsRd ψ (lookup Γ i) vals ⊑ Rin → stHop ψ st ≤ Rst →
-    hasDry (proj₁ (dispatchShare ac gas id now i vals fin sd st)) ≡ false
+    hasDry (proj₁ (dispatchShare ac acl id now i below vals fin sd st)) ≡ false
 
 ----------------------------------------------------------------------
 -- ONE CHAIN'S OBLIGATION: the shelf at every template, threaded.
@@ -162,22 +164,28 @@ ShareDryUnder {Γ = Γ} {e = e} ac gas id now i ψ Rin Rst =
 --   straight back, and nothing in the type would say so.
 ----------------------------------------------------------------------
 
-data PathFits {n} {Γ : Ctx n} {t} {e : Closed Γ t} {τ}
-       (ac : Acc _≺_ τ) (gas : ℕ) (id : Id) (now : Tick) (ψ : Fin n → Rd₃)
-       (Rst : ℕ)
-       : ∀ {lo u} → Path Γ lo u t → Rd → Set where
+-- THE FLOOR IS A PARAMETER AND NOT AN INDEX, which is what lets the
+-- descent sit beside it: every arm of this family stands at ONE floor —
+-- a frame does not move it and the sink does not cross it, the fan-out
+-- past a sink being a separate walk — so nothing is lost by fixing it,
+-- and an accessibility whose quantity mentions an INDEX could not be a
+-- parameter at all.
+data PathFits {n} {Γ : Ctx n} {t} {e : Closed Γ t} {τ} {lo}
+       (ac : Acc _≺_ τ) (acl : Acc _<_ (n ∸ lo)) (id : Id) (now : Tick)
+       (ψ : Fin n → Rd₃) (Rst : ℕ)
+       : ∀ {u} → Path Γ lo u t → Rd → Set where
 
-  at-root : ∀ {lo R} → PathFits {e = e} ac gas id now ψ Rst (root {lo = lo}) R
+  at-root : ∀ {R} → PathFits {e = e} ac acl id now ψ Rst root R
 
-  at-sink : ∀ {lo i R} {below : lo ≤ toℕ i} →
-            ShareDryUnder {e = e} ac gas id now i ψ R Rst →
-            PathFits {e = e} ac gas id now ψ Rst (share-sink i below) R
+  at-sink : ∀ {i R} {below : lo ≤ toℕ i} →
+            ShareDryUnder {e = e} ac acl id now i below ψ R Rst →
+            PathFits {e = e} ac acl id now ψ Rst (share-sink i below) R
 
-  through : ∀ {lo s u R Rv} {f : Frame Γ s u} {κ : Path Γ lo u t} →
+  through : ∀ {s u R Rv} {f : Frame Γ s u} {κ : Path Γ lo u t} →
             FrameCarries {e = e} ac id now f κ ψ R Rv Rst →
             FrameDryUnder {e = e} ac id now f κ ψ R Rst →
-            PathFits {e = e} ac gas id now ψ Rst κ Rv →
-            PathFits {e = e} ac gas id now ψ Rst (f ↠ κ) R
+            PathFits {e = e} ac acl id now ψ Rst κ Rv →
+            PathFits {e = e} ac acl id now ψ Rst (f ↠ κ) R
 
 ----------------------------------------------------------------------
 -- THE RANK AN ARRIVAL ENTERS AT, spelled once.  It is the middle
@@ -235,22 +243,23 @@ arrivalRank {e = e} a sched st =
 ----------------------------------------------------------------------
 
 ShareChainsFit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {τ} {lo} →
-  Acc _≺_ τ → ℕ → Id → Tick → (i : Fin n) → (Fin n → Rd₃) → Rd → ℕ →
+  Acc _≺_ τ → Acc _<_ (n ∸ lo) → Id → Tick → (i : Fin n) →
+  (Fin n → Rd₃) → Rd → ℕ →
   List (Val Γ (lookup Γ i)) → Bool →
   List (RegId × Path Γ lo (lookup Γ i) t) → Sched Γ → EvalSt e → Set
-ShareChainsFit ac gas id now i ψ Rin Rst vals fin [] sd st = ⊤
-ShareChainsFit {e = e} ac gas id now i ψ Rin Rst vals fin
+ShareChainsFit ac acl id now i ψ Rin Rst vals fin [] sd st = ⊤
+ShareChainsFit {e = e} ac acl id now i ψ Rin Rst vals fin
   ((rid , p) ∷ ps) sd st
   with any (_≡ᵇ rid) (EvalSt.cancelled st)
-... | true  = ShareChainsFit {e = e} ac gas id now i ψ Rin Rst vals fin
+... | true  = ShareChainsFit {e = e} ac acl id now i ψ Rin Rst vals fin
                 ps sd st
 ... | false =
       let st′ = record st { delivered = rid ∷ EvalSt.delivered st }
-          out = foldPath ac gas id now (toℕ i) p vals
+          out = foldPath ac acl id now (toℕ i) p vals
                   (if fin then close (toℕ i) exhausted ∷ [] else [])
                   fin sd st′
-      in PathFits {e = e} ac gas id now ψ (stHop ψ st′ ⊔ Rst) p Rin
-         × ShareChainsFit {e = e} ac gas id now i ψ Rin Rst vals fin ps
+      in PathFits {e = e} ac acl id now ψ (stHop ψ st′ ⊔ Rst) p Rin
+         × ShareChainsFit {e = e} ac acl id now i ψ Rin Rst vals fin ps
              (proj₁ (proj₂ out)) (proj₂ (proj₂ out))
 
 ----------------------------------------------------------------------
@@ -261,11 +270,17 @@ ShareChainsFit {e = e} ac gas id now i ψ Rin Rst vals fin
 -- registry someone chose.
 ----------------------------------------------------------------------
 
-ShareFits : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {τ} →
-  Acc _≺_ τ → ℕ → Id → Tick → (i : Fin n) → (Fin n → Rd₃) → Rd → ℕ →
+-- AND THE WITNESS IS PEELED BY MATCHING, exactly as the dispatch peels
+-- it: the admitted rows stand a floor higher than the chain that
+-- reached them, so a statement about them is a statement at the peel,
+-- and an applied peel would leave the two out of step wherever the
+-- accessibility is not yet in constructor form.
+ShareFits : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {τ} {lo} →
+  Acc _≺_ τ → Acc _<_ (n ∸ lo) → Id → Tick → (i : Fin n) → lo ≤ toℕ i →
+  (Fin n → Rd₃) → Rd → ℕ →
   List (Val Γ (lookup Γ i)) → Bool → Sched Γ → EvalSt e → Set
-ShareFits {e = e} ac gas id now i ψ Rin Rst vals fin sd st =
-  ShareChainsFit {e = e} ac gas id now i ψ Rin Rst vals fin
+ShareFits {e = e} ac (acc rs) id now i below ψ Rin Rst vals fin sd st =
+  ShareChainsFit {e = e} ac (rs (floorFalls i below)) id now i ψ Rin Rst vals fin
     (shareAdmit i (EvalSt.registry st)) sd (shareLatch i fin st)
 
 ----------------------------------------------------------------------
@@ -308,7 +323,8 @@ ChainsFit {n = n} {e = e} a id ((rid , c) ∷ cs) sched st
       let st′ = record st { delivered = rid ∷ EvalSt.delivered st }
           ψ   = slotRd (Sched.slots sched)
           out = chainStep id a c sched st′
-      in PathFits {e = e} (arrivalWitness a sched st′) n id (arrTick a) ψ
+      in PathFits {e = e} (arrivalWitness a sched st′)
+           (<-wellFounded-fast (n ∸ proj₁ c)) id (arrTick a) ψ
            (arrivalRank a sched st′) (proj₂ c) (rdᵛ ψ (arrTy a) (arrVal a))
          × ChainsFit a id cs (proj₁ (proj₂ out)) (proj₂ (proj₂ out))
 

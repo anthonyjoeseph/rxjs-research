@@ -21,7 +21,7 @@
 module Verify-Well-Formed.Part8 where
 
 open import Data.Bool    using (Bool; true; false; if_then_else_; T)
-open import Data.Nat     using (ℕ; zero; suc; _≤_; _+_)
+open import Data.Nat     using (ℕ; zero; suc; _≤_; _<_; _+_; _∸_)
 open import Data.Nat.Properties using (_<?_)
 open import Relation.Nullary using (yes; no)
 open import Data.List    using (List; []; _∷_; _++_; map)
@@ -508,7 +508,7 @@ subscribe-wf {n = n} e ins nodry
 -- the evs (which never touch `done`), and the values ride only if not
 -- already done (done-nil).  sched/st are untouched at root.
 foldPath-root-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo : ℕ}
-  (sf : Acc _≺_ τ) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
+  (sf : Acc _≺_ τ) (acl : Acc _<_ (n ∸ lo)) (id : Id) (now : Tick) (envSrc : Source)
   (vals : List (Val Γ t)) (evs : List (InstEvent (Val Γ t))) (fin : Bool)
   (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt)
   (ob : Owed) (hz : Id) (ob′ : Owed) (Lv : List Source) (Ov : Owed) →
@@ -517,10 +517,10 @@ foldPath-root-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo : ℕ}
   applyEvents evs (ProtocolSt.live S) ob′ (ProtocolSt.done S)
     ≡ just (Lv , Ov , ProtocolSt.done S) →
   (ProtocolSt.done S ≡ true → vals ≡ []) →
-  runProtocol S (proj₁ (foldPath {lo = lo} sf gas id now envSrc root vals evs fin sched st))
+  runProtocol S (proj₁ (foldPath {lo = lo} sf acl id now envSrc root vals evs fin sched st))
     ≡ just (record { live = Lv ; horizon = hz ; current = just (id , Ov)
                    ; done = (if fin then true else ProtocolSt.done S) })
-foldPath-root-wf sf gas id now envSrc vals evs fin sched st S ob hz ob′ Lv Ov
+foldPath-root-wf sf acl id now envSrc vals evs fin sched st S ob hz ob′ Lv Ov
   entEq payEq apEq dn =
   trans (runProtocol-one S _) stepEq
   where

@@ -53,11 +53,12 @@ module Refuted.Share-Chain where
 
 open import Data.Bool using (Bool; false)
 open import Data.Empty using (⊥)
-open import Data.Fin using (Fin; zero; suc)
+open import Data.Fin using (Fin; zero; suc; toℕ)
 open import Data.List using (List; []; _∷_; length)
 open import Data.List.Relation.Unary.Any using (here)
 open import Data.Maybe using (nothing)
-open import Data.Nat using (ℕ; _≤_; z≤n; s≤s)
+open import Data.Nat using (ℕ; _≤_; _<_; _∸_; z≤n; s≤s)
+open import Data.Nat.Induction using (<-wellFounded-fast)
 open import Data.Product using (_,_; proj₁; proj₂)
 open import Data.Vec using (lookup) renaming ([] to []ⱽ; _∷_ to _∷ⱽ_)
 open import Induction.WellFounded using (Acc)
@@ -84,12 +85,13 @@ open import Verify-Rank-Sufficient.Path-Fits using (ShareHop)
 ----------------------------------------------------------------------
 
 ShareChainHop : Set
-ShareChainHop = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {τ}
-  (ac : Acc _≺_ τ) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
+ShareChainHop = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {τ} {lo}
+  (ac : Acc _≺_ τ) (acl : Acc _<_ (n ∸ lo)) (id : Id) (now : Tick)
+  (i : Fin n) (below : lo ≤ toℕ i)
   (ψ : Fin n → Rd₃) (Rin : Rd) (Rst : ℕ) → proj₂ Rin ≤ Rst →
   (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
   (sd : Sched Γ) (st : EvalSt e) →
-  ShareHop {e = e} ac gas id now i ψ Rin Rst vals fin sd st
+  ShareHop {e = e} ac acl id now i below ψ Rin Rst vals fin sd st
 
 ----------------------------------------------------------------------
 -- THE HARNESS.  Slot zero is a cold script; slot one is a SHARE over
@@ -168,8 +170,14 @@ termFig = depthᵉ ψ₀ prog
 termFig-is : termFig ≡ 5                               -- LOAD-BEARING
 termFig-is = refl
 
+-- THE CHAIN IS TAKEN AT THE BOTTOM FLOOR, which is where a share's own
+-- consumer stands: the descent the dispatch peels is the distance from
+-- that floor to the top of the telescope, and the sink at index one
+-- cuts it.  Nothing here turns on the choice — the crossing is the
+-- store against the chain's reading, and the floor moves neither.
 share-chain-hop-false : ShareChainHop → ⊥
 share-chain-hop-false h
-  with proj₁ (proj₁ (h ac₀ 2 0 0 (suc zero) ψ₀ (0 , 0) (stHop ψ₀ st₀)
+  with proj₁ (proj₁ (h {lo = 0} ac₀ (<-wellFounded-fast 2) 0 0 (suc zero) z≤n
+                       ψ₀ (0 , 0) (stHop ψ₀ st₀)
                        z≤n vals₀ false sd₀ st₀))
 ... | s≤s ()

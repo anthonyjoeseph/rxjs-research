@@ -75,6 +75,22 @@ DELIBERATE = {
         "dispatcher and its connect arm: one calls the other, and the "
         "arm is lifted out of a where block so the budget proof can "
         "name it.  The shared type is a premise, not a claim.",
+    # NOT TWO PROOFS OF ONE FACT — two different PREDICATES over one
+    # telescope.  Each returns `Set`: the `Fits` half is the certificate
+    # a chain's fold consumes, the `Hop` half the obligation its producer
+    # is owed, and they are stated in different currencies.  The RELATION
+    # gate reads them as propositional only because the fan-out's descent
+    # is an ACCESSIBILITY, so a `<` appears in an argument's type; that
+    # is a measure being passed, not content being claimed.  A generic
+    # exemption for `→ Set` formers would be worse than these two
+    # entries, since two modules genuinely restating one invariant is a
+    # shape this check is meant to catch.
+    frozenset(("ShareFits", "ShareHop")):
+        "certificate and obligation over one telescope, both `Set`-"
+        "valued; the shared `<` is the fan-out's accessibility argument.",
+    frozenset(("ShareChainsFit", "ShareChainsHop")):
+        "the same pair one level down, walked over the admitted list "
+        "rather than over the share.",
 }
 
 KEYWORDS = {"module", "open", "import", "postulate", "mutual", "opaque",

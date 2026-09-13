@@ -224,16 +224,24 @@ now at the door and at the templates the door's chains are built from.
 
 ### Big picture tier roadmap
 
-- **THE FLOOR IS AN INDEX ON THE PATH, AND WHAT REMAINS OF THE LEG IS THE
-  MEASURE.** The index has landed across `src` and both evidence trees: a
-  registry row's chain is typed by the floor its own source dictates and a sink
-  constructor demands its position be at least that floor, so the lift the
-  counter stood in for is discharged by construction rather than asserted about
-  a run object. What is not done is the descent. `dispatchShare` still recurses
-  on a number, so its clamp arm is still writable and `dispatch-saturates` still
-  live; swapping the counter for an accessibility on `n ∸ lo` is what leaves
-  that arm with no type, and only then do the counter's references go. The
-  residue is `below-unfoldμ` and `below-inner`.
+- **THE SUBSTITUTION RESIDUE IS THE TRUNK, AND IT IS WHY IT OUTRANKS TWO FALSITY
+  ROWS.** `below-inner` bounds an observable MANUFACTURED at runtime, and over an
+  arbitrary floor it is refuted outright. Its repair is not a cleverer proof but a
+  fact the run state does not carry: what ties a value to the chain it arrived on.
+  A field on the run state obliges every producer and every consumer, so the
+  cascade reaches the evaluator itself — which is exactly why it goes first. A
+  restatement landing later would move the ground under every leaf above it, and
+  those leaves are where the tier's remaining grind is. Settle the statement, then
+  grind under it.
+
+- **AND THE THREE RE-ENTRANT LEAVES ARE THE FALSITY NOTHING HAS NARROWED.**
+  `from-inner-dry`, `thru-outer-frame-dry` and `from-inner-carried` are the only
+  arms that re-enter the evaluator, and all three are instantiated only where
+  `innerReact` returns its payload untouched. The branch none of them reaches is
+  the same one in each case — a completing node whose queue is drained and whose
+  fresh bursts are appended — so one harness that reaches a completion under a
+  live flattener decides all three at once, and it is the one region where these
+  statements could still be false rather than merely hard.
 
 - **AND THE FOLD'S FRAME IS MISSING AN AXIS THE SHELF ALREADY STATES ELSEWHERE.**
   `scan-frame-carried` prices a scan's residue at ONE application of its
@@ -244,15 +252,6 @@ now at the door and at the templates the door's chains are built from.
   the predicate quantifies over unboundedly. `scan-burst-carried` is the same
   fold stated AT THE BURST, where that length is in scope; either route the
   shelf's scan arm through it or give the frame leaf the third axis outright.
-
-- **AND THE THREE RE-ENTRANT LEAVES ARE THE FALSITY NOTHING HAS NARROWED.**
-  `from-inner-dry`, `thru-outer-frame-dry` and `from-inner-carried` are the only
-  arms that re-enter the evaluator, and all three are instantiated only where
-  `innerReact` returns its payload untouched. The branch none of them reaches is
-  the same one in each case — a completing node whose queue is drained and whose
-  fresh bursts are appended — so one harness that reaches a completion under a
-  live flattener decides all three at once, and it is the one region where these
-  statements could still be false rather than merely hard.
 
 ### Open questions
 
@@ -266,8 +265,7 @@ now at the door and at the templates the door's chains are built from.
   longer whether the bound survives but what the run state must CARRY for it to
   be stateable at all — whether a value's provenance is recoverable from the
   chain it arrived on.
-  relevant: `below-inner`, `entry-drain-hop`, `share-chain-hop`,
-  `dispatch-saturates`
+  relevant: `below-inner`, `entry-drain-hop`, `share-chain-hop`
 
 ### The ledger
 
@@ -275,11 +273,6 @@ now at the door and at the templates the door's chains are built from.
   door's whole premise, in a currency that mentions no run — a chain's
   flattener count against the program's own reading. Tight at three ladder
   rungs and at a gate; an arrival there reaches exactly ONE chain.
-
-- **`dispatch-saturates`** (Rx.Evaluator-Theorems) — FALSITY, `PROBED×2`: the
-  share fan-out's re-entry counter, clamped to an EMPTY fan-out when spent, so
-  this tier's export holds vacuously over the truncation. Filed here and not
-  beside its module's siblings because that vacuity IS the dependence.
 
 - **`from-inner-dry` / `thru-outer-frame-dry`**
   (Verify-Rank-Sufficient.Path-Fits) — FALSITY, `PROBED×2`: dry-freedom of the
