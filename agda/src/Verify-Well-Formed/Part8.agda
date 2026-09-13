@@ -248,10 +248,10 @@ subscribeE-take-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
         -- `BurstInv.live-matches` instead (.Part2's field note, .Part7's split).
         × (valsLast? (proj₁ r₀) ≡ true)) →
   Σ ProtocolSt λ S″ →
-    (runProtocol S (proj₁ (subscribeE fuel (takeᵉ count b) {ok} κ id now sched st)) ≡ just S″)
-    × BurstInv id (proj₁ (proj₂ (subscribeE fuel (takeᵉ count b) {ok} κ id now sched st)))
-               (proj₂ (proj₂ (subscribeE fuel (takeᵉ count b) {ok} κ id now sched st))) S″
-    × (valsLast? (proj₁ (subscribeE fuel (takeᵉ count b) {ok} κ id now sched st)) ≡ true)
+    (runProtocol S (proj₁ (subscribeE fuel (takeᵉ count b) κ id now sched st)) ≡ just S″)
+    × BurstInv id (proj₁ (proj₂ (subscribeE fuel (takeᵉ count b) κ id now sched st)))
+               (proj₂ (proj₂ (subscribeE fuel (takeᵉ count b) κ id now sched st))) S″
+    × (valsLast? (proj₁ (subscribeE fuel (takeᵉ count b) κ id now sched st)) ≡ true)
 subscribeE-take-wf {lo = lo} fuel count b ok κ id now sched st S k ecEq binv
   (S′ , run₀ , binv₀ , nodeP , vl₀)
   rewrite ecEq =
@@ -285,7 +285,7 @@ subscribeE-take0-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   ProtocolSt.done S ≡ false →
   evalTm count ≡ zero →
   Σ ProtocolSt λ S′ →
-    let r = subscribeE fuel (takeᵉ count b) {ok} κ id now sched st
+    let r = subscribeE fuel (takeᵉ count b) κ id now sched st
     in (runProtocol S (proj₁ r) ≡ just S′)
        × BurstInv id (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) S′
        × (valsLast? (proj₁ r) ≡ true)
@@ -300,9 +300,9 @@ subscribeE-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
   BurstInv id sched st S →
   ProtocolSt.done S ≡ false →
-  hasDry (proj₁ (subscribeE fuel b {ok} κ id now sched st)) ≡ false →
+  hasDry (proj₁ (subscribeE fuel b κ id now sched st)) ≡ false →
   Σ ProtocolSt λ S′ →
-    let r = subscribeE fuel b {ok} κ id now sched st
+    let r = subscribeE fuel b κ id now sched st
     in (runProtocol S (proj₁ r) ≡ just S′)
        × BurstInv id (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) S′
        -- the PAYLOAD DISCIPLINE, carried alongside the state relation: a burst
@@ -359,7 +359,7 @@ subscribeE-wf {lo = lo} {Γ = Γ} {e = e} {u = u}
   where
   take-go : (ec : ℕ) → evalTm count ≡ ec →
     Σ ProtocolSt λ S′ →
-      let r = subscribeE fuel (takeᵉ count b) {ok} κ id now sched st
+      let r = subscribeE fuel (takeᵉ count b) κ id now sched st
       in (runProtocol S (proj₁ r) ≡ just S′)
          × BurstInv id (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) S′
          × (valsLast? (proj₁ r) ≡ true)
@@ -467,7 +467,7 @@ postulate
     (fuel : Acc _≺_ τ) (b : Closed Γ u) (ok : T (inputsBelowᵉ lo b)) (κ : Path Γ lo u t)
     (id : Id) (now : Tick)
     (sched : Sched Γ) (st : EvalSt e) →
-    EvalSt.dying (proj₂ (proj₂ (subscribeE fuel b {ok} κ id now sched st)))
+    EvalSt.dying (proj₂ (proj₂ (subscribeE fuel b κ id now sched st)))
       ≡ EvalSt.dying st
 
 -- and so the root subscribe's output state is dying-free, which is the premise

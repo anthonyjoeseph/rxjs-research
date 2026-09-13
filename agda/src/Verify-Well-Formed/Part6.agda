@@ -101,9 +101,9 @@ subscribeE-scan-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
         × BurstInv id (proj₁ (proj₂ r₀)) (proj₂ (proj₂ r₀)) S′
         × (Σ (Val Γ u) λ acc → lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r₀))) ≡ just (scan-st acc))) →
   Σ ProtocolSt λ S″ →
-    (runProtocol S (proj₁ (subscribeE fuel (scanᵉ f seed b) {ok} κ id now sched st)) ≡ just S″)
-    × BurstInv id (proj₁ (proj₂ (subscribeE fuel (scanᵉ f seed b) {ok} κ id now sched st)))
-               (proj₂ (proj₂ (subscribeE fuel (scanᵉ f seed b) {ok} κ id now sched st))) S″
+    (runProtocol S (proj₁ (subscribeE fuel (scanᵉ f seed b) κ id now sched st)) ≡ just S″)
+    × BurstInv id (proj₁ (proj₂ (subscribeE fuel (scanᵉ f seed b) κ id now sched st)))
+               (proj₂ (proj₂ (subscribeE fuel (scanᵉ f seed b) κ id now sched st))) S″
 subscribeE-scan-wf {lo = lo} fuel f seed b ok κ id now sched st S binv (S′ , run₀ , binv₀ , acc , nodeP) =
   S′ , run″ , binv″
   where
@@ -119,10 +119,10 @@ subscribeE-scan-wf {lo = lo} fuel f seed b ok κ id now sched st S binv (S′ , 
   schEq  = proj₁ (proj₂ cRes)
   dyEq   = proj₂ (proj₂ cRes)
 
-  stF  = proj₂ (proj₂ (subscribeE fuel (scanᵉ f seed b) {ok} κ id now sched st))
-  schF = proj₁ (proj₂ (subscribeE fuel (scanᵉ f seed b) {ok} κ id now sched st))
+  stF  = proj₂ (proj₂ (subscribeE fuel (scanᵉ f seed b) κ id now sched st))
+  schF = proj₁ (proj₂ (subscribeE fuel (scanᵉ f seed b) κ id now sched st))
 
-  run″ : runProtocol S (proj₁ (subscribeE fuel (scanᵉ f seed b) {ok} κ id now sched st)) ≡ just S′
+  run″ : runProtocol S (proj₁ (subscribeE fuel (scanᵉ f seed b) κ id now sched st)) ≡ just S′
   run″ = pushBurst-scan-run fuel id now f nid κ burst sched₂ st₁ acc S S′ nodeP run₀
 
   lmF : ∀ s → memberSource s (EvalSt.dying stF) ≡ false →

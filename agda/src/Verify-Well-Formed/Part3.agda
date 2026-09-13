@@ -25,7 +25,8 @@ open import Data.Bool.Properties using (∨-identityʳ)
 open import Data.Fin     using (Fin; toℕ)
 open import Data.Vec     using (lookup)
 open import Data.Nat     using (ℕ; suc; _≤_; _<_; _≡ᵇ_; _+_)
-open import Data.Nat.Properties using (1+n≢0; +-comm; +-identityʳ)
+open import Data.Nat.Properties using (1+n≢0; +-comm; +-identityʳ; _<?_)
+open import Relation.Nullary   using (yes; no)
 open import Data.List    using (List; []; _∷_; _++_; map)
 open import Data.Maybe   using (Maybe; just; nothing)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
@@ -289,7 +290,7 @@ postulate
     (fuel : Acc _≺_ τ) (f : Fn Γ [] [] [] s u) (b : Closed Γ s)
     (ok : T (inputsBelowᵉ lo (mapᵉ f b))) (κ : Path Γ lo u t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
-    hasDry (proj₁ (subscribeE fuel (mapᵉ f b) {ok} κ id now sched st)) ≡ false →
+    hasDry (proj₁ (subscribeE fuel (mapᵉ f b) κ id now sched st)) ≡ false →
     hasDry (proj₁ (subscribeE fuel b (map-f f ↠ κ) id now sched st)) ≡ false
 
   -- mapᵉ GAP 2: pushBurst map frame preserves valsLast?.
@@ -300,7 +301,7 @@ postulate
     (ok : T (inputsBelowᵉ lo (mapᵉ f b))) (κ : Path Γ lo u t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     valsLast? (proj₁ (subscribeE fuel b (map-f f ↠ κ) id now sched st)) ≡ true →
-    valsLast? (proj₁ (subscribeE fuel (mapᵉ f b) {ok} κ id now sched st)) ≡ true
+    valsLast? (proj₁ (subscribeE fuel (mapᵉ f b) κ id now sched st)) ≡ true
 
   -- scanᵉ GAP 1: hasDry propagates inward through the scan push.
   --
@@ -321,7 +322,7 @@ postulate
     (fuel : Acc _≺_ τ) (f : Fn Γ [] [] [] (u ×ᵗ s) u) (seed : Tm Γ [] [] [] u)
     (b : Closed Γ s) (ok : T (inputsBelowᵉ lo (scanᵉ f seed b))) (κ : Path Γ lo u t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
-    hasDry (proj₁ (subscribeE fuel (scanᵉ f seed b) {ok} κ id now sched st)) ≡ false →
+    hasDry (proj₁ (subscribeE fuel (scanᵉ f seed b) κ id now sched st)) ≡ false →
     hasDry (proj₁ (subscribeE fuel b (scan-f f (proj₁ (mintNode sched)) ↠ κ) id now
                   (proj₂ (mintNode sched)) (installNode (proj₁ (mintNode sched)) (scan-st (evalTm seed)) st)))
            ≡ false
@@ -336,7 +337,7 @@ postulate
     valsLast? (proj₁ (subscribeE fuel b (scan-f f (proj₁ (mintNode sched)) ↠ κ) id now
                      (proj₂ (mintNode sched)) (installNode (proj₁ (mintNode sched)) (scan-st (evalTm seed)) st)))
               ≡ true →
-    valsLast? (proj₁ (subscribeE fuel (scanᵉ f seed b) {ok} κ id now sched st)) ≡ true
+    valsLast? (proj₁ (subscribeE fuel (scanᵉ f seed b) κ id now sched st)) ≡ true
 
   -- BurstInv ADAPTATION (scan): mintNode / installNode don't touch registry or
   -- Sched.live, so all four BurstInv fields are preserved at the FIELD TYPE level.
@@ -367,7 +368,7 @@ postulate
     (ok : T (inputsBelowᵉ lo (takeᵉ count b))) (κ : Path Γ lo s t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     evalTm count ≡ suc k →
-    hasDry (proj₁ (subscribeE fuel (takeᵉ count b) {ok} κ id now sched st)) ≡ false →
+    hasDry (proj₁ (subscribeE fuel (takeᵉ count b) κ id now sched st)) ≡ false →
     hasDry (proj₁ (subscribeE fuel b (take-f (proj₁ (mintNode sched)) ↠ κ) id now
                   (proj₂ (mintNode sched))
                   (installNode (proj₁ (mintNode sched)) (take-st (suc k)) st)))
@@ -389,7 +390,7 @@ scan-node : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   (b : Closed Γ s) (ok : T (inputsBelowᵉ lo b)) (κ : Path Γ lo u t)
   (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
   let nid = proj₁ (mintNode sched)
-      r₀  = subscribeE fuel b {ok} (scan-f f nid ↠ κ) id now (proj₂ (mintNode sched))
+      r₀  = subscribeE fuel b (scan-f f nid ↠ κ) id now (proj₂ (mintNode sched))
               (installNode nid (scan-st (evalTm seed)) st)
   in Σ (Val Γ u) λ acc →
        lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r₀))) ≡ just (scan-st acc)
@@ -405,7 +406,7 @@ take-node : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (fuel : Acc _≺_ τ) (k : ℕ) (b : Closed Γ s) (ok : T (inputsBelowᵉ lo b)) (κ : Path Γ lo s t)
   (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
   let nid = proj₁ (mintNode sched)
-      r₀  = subscribeE fuel b {ok} (take-f nid ↠ κ) id now (proj₂ (mintNode sched))
+      r₀  = subscribeE fuel b (take-f nid ↠ κ) id now (proj₂ (mintNode sched))
               (installNode nid (take-st (suc k)) st)
   in lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r₀))) ≡ just (take-st (suc k))
 take-node fuel k b ok κ id now sched st =
@@ -483,9 +484,9 @@ postulate
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
     BurstInv id sched st S →
     ProtocolSt.done S ≡ false →
-    hasDry (proj₁ (subscribeSharedSlot fuel i d {ok} κ below id now sched st)) ≡ false →
+    hasDry (proj₁ (subscribeSharedSlot fuel i d κ below id now sched st)) ≡ false →
     Σ ProtocolSt λ S′ →
-      let r = subscribeSharedSlot fuel i d {ok} κ below id now sched st
+      let r = subscribeSharedSlot fuel i d κ below id now sched st
       in (runProtocol S (proj₁ r) ≡ just S′)
          × BurstInv id (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) S′
          × (valsLast? (proj₁ r) ≡ true)
@@ -595,9 +596,9 @@ postulate
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
     BurstInv id sched st S →
     ProtocolSt.done S ≡ false →
-    hasDry (proj₁ (subscribeE fuel (deferᵉ body) {ok} κ id now sched st)) ≡ false →
+    hasDry (proj₁ (subscribeE fuel (deferᵉ body) κ id now sched st)) ≡ false →
     Σ ProtocolSt λ S′ →
-      let r = subscribeE fuel (deferᵉ body) {ok} κ id now sched st
+      let r = subscribeE fuel (deferᵉ body) κ id now sched st
       in (runProtocol S (proj₁ r) ≡ just S′)
          × BurstInv id (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) S′
          × (valsLast? (proj₁ r) ≡ true)
@@ -648,7 +649,7 @@ postulate
     (fuel : Acc _≺_ τ) (b : Closed Γ (obs u))
     (ok : T (inputsBelowᵉ lo (mergeAllᵉ lim b))) (κ : Path Γ lo u t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
-    hasDry (proj₁ (subscribeE fuel (mergeAllᵉ lim b) {ok} κ id now sched st)) ≡ false →
+    hasDry (proj₁ (subscribeE fuel (mergeAllᵉ lim b) κ id now sched st)) ≡ false →
     hasDry (proj₁ (subscribeE fuel b (thru-outer mergeAllᵒ (proj₁ (mintNode sched)) ↠ κ)
                      id now (proj₂ (mintNode sched))
                      (installNode (proj₁ (mintNode sched))
@@ -665,7 +666,7 @@ postulate
                         (installNode (proj₁ (mintNode sched))
                            (mergeAll-st {t = u} lim 0 [] false) st)))
               ≡ true →
-    valsLast? (proj₁ (subscribeE fuel (mergeAllᵉ lim b) {ok} κ id now sched st)) ≡ true
+    valsLast? (proj₁ (subscribeE fuel (mergeAllᵉ lim b) κ id now sched st)) ≡ true
 
   -- THE NODE THE INNER BURST LEFT, as a SHAPE and nothing more: the
   -- wrap's node is still a `mergeAll-st` at the type it was installed
@@ -683,7 +684,7 @@ postulate
     (ok : T (inputsBelowᵉ lo (mergeAllᵉ lim b))) (κ : Path Γ lo u t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     let nid = proj₁ (mintNode sched)
-        r   = subscribeE fuel (mergeAllᵉ lim b) {ok} κ id now sched st
+        r   = subscribeE fuel (mergeAllᵉ lim b) κ id now sched st
     in Σ ℕ λ act → Σ (List (Closed Γ u)) λ q → Σ Bool λ od →
          lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r)))
            ≡ just (mergeAll-st {t = u} lim act q od)
@@ -718,13 +719,13 @@ postulate
           (runProtocol S (proj₁ r₀) ≡ just S′)
           × BurstInv id (proj₁ (proj₂ r₀)) (proj₂ (proj₂ r₀)) S′) →
     (let nid = proj₁ (mintNode sched)
-         r   = subscribeE fuel (mergeAllᵉ lim b) {ok} κ id now sched st
+         r   = subscribeE fuel (mergeAllᵉ lim b) κ id now sched st
      in Σ ℕ λ act → Σ (List (Closed Γ u)) λ q → Σ Bool λ od →
           (lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r)))
              ≡ just (mergeAll-st {t = u} lim act q od))
           × (lim ≡ nothing → q ≡ [])) →
     Σ ProtocolSt λ S″ →
-      let r = subscribeE fuel (mergeAllᵉ lim b) {ok} κ id now sched st
+      let r = subscribeE fuel (mergeAllᵉ lim b) κ id now sched st
       in (runProtocol S (proj₁ r) ≡ just S″)
          × BurstInv id (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) S″
 
@@ -734,9 +735,9 @@ postulate
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
     BurstInv id sched st S →
     ProtocolSt.done S ≡ false →
-    hasDry (proj₁ (subscribeE fuel (switchAllᵉ b) {ok} κ id now sched st)) ≡ false →
+    hasDry (proj₁ (subscribeE fuel (switchAllᵉ b) κ id now sched st)) ≡ false →
     Σ ProtocolSt λ S′ →
-      let r = subscribeE fuel (switchAllᵉ b) {ok} κ id now sched st
+      let r = subscribeE fuel (switchAllᵉ b) κ id now sched st
       in (runProtocol S (proj₁ r) ≡ just S′)
          × BurstInv id (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) S′
          × (valsLast? (proj₁ r) ≡ true)
@@ -747,9 +748,9 @@ postulate
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
     BurstInv id sched st S →
     ProtocolSt.done S ≡ false →
-    hasDry (proj₁ (subscribeE fuel (exhaustAllᵉ b) {ok} κ id now sched st)) ≡ false →
+    hasDry (proj₁ (subscribeE fuel (exhaustAllᵉ b) κ id now sched st)) ≡ false →
     Σ ProtocolSt λ S′ →
-      let r = subscribeE fuel (exhaustAllᵉ b) {ok} κ id now sched st
+      let r = subscribeE fuel (exhaustAllᵉ b) κ id now sched st
       in (runProtocol S (proj₁ r) ≡ just S′)
          × BurstInv id (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) S′
          × (valsLast? (proj₁ r) ≡ true)
@@ -792,7 +793,7 @@ unbounded-never-parks : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (ok : T (inputsBelowᵉ lo (mergeAllᵉ nothing b))) (κ : Path Γ lo u t)
   (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
   let nid = proj₁ (mintNode sched)
-      r   = subscribeE fuel (mergeAllᵉ nothing b) {ok} κ id now sched st
+      r   = subscribeE fuel (mergeAllᵉ nothing b) κ id now sched st
   in emptyQueue? (lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r))))
 unbounded-never-parks {lo = lo} {u = u} fuel b ok κ id now sched st =
   QDeadC.keep (pushBurst-qd nid fuel id now (thru-outer mergeAllᵒ nid) κ
@@ -805,7 +806,7 @@ unbounded-never-parks {lo = lo} {u = u} fuel b ok κ id now sched st =
 
   okb = below-mergeAll lo nothing b ok
 
-  inner = subscribeE fuel b {okb} (thru-outer mergeAllᵒ nid ↠ κ) id now
+  inner = subscribeE fuel b (thru-outer mergeAllᵒ nid ↠ κ) id now
             (proj₂ (mintNode sched))
             (installNode nid (mergeAll-st {t = u} nothing 0 [] false) st)
 
@@ -822,7 +823,7 @@ mergeAll-node : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (ok : T (inputsBelowᵉ lo (mergeAllᵉ lim b))) (κ : Path Γ lo u t)
   (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
   let nid = proj₁ (mintNode sched)
-      r   = subscribeE fuel (mergeAllᵉ lim b) {ok} κ id now sched st
+      r   = subscribeE fuel (mergeAllᵉ lim b) κ id now sched st
   in Σ ℕ λ act → Σ (List (Closed Γ u)) λ q → Σ Bool λ od →
        (lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r)))
           ≡ just (mergeAll-st {t = u} lim act q od))
@@ -905,7 +906,7 @@ _ : ∀ {n} {Γ : Ctx n} → Sched Γ →
       {ok : T (inputsBelowᵉ lo′ b)} (κ : Path Γ′ lo′ s t)
       (id : Id) (now : Tick) (sched : Sched Γ′) (st : EvalSt e) (k : ℕ) →
       (let nid = proj₁ (mintNode sched)
-           r₀  = subscribeE fuel b {ok} (take-f nid ↠ κ) id now (proj₂ (mintNode sched))
+           r₀  = subscribeE fuel b (take-f nid ↠ κ) id now (proj₂ (mintNode sched))
                    (installNode nid (take-st (suc k)) st)
        in ∀ s → memberSource s (EvalSt.dying (proj₂ (proj₂ r₀))) ≡ false))
     → ⊥
@@ -992,31 +993,35 @@ subscribeE-input-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
   BurstInv id sched st S →
   ProtocolSt.done S ≡ false →
-  hasDry (proj₁ (subscribeE fuel (input i) {ok} κ id now sched st)) ≡ false →
+  hasDry (proj₁ (subscribeE fuel (input i) κ id now sched st)) ≡ false →
   Σ ProtocolSt λ S′ →
-    let r = subscribeE fuel (input i) {ok} κ id now sched st
+    let r = subscribeE fuel (input i) κ id now sched st
     in (runProtocol S (proj₁ r) ≡ just S′)
        × BurstInv id (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) S′
        × (valsLast? (proj₁ r) ≡ true)
 subscribeE-input-wf {lo = lo} {Γ = Γ} fuel i ok κ id now sched st S binv deq nodry
-  with Sched.slots sched i in slotEq
-... | shared d {okd} =
-      subscribeSharedSlot-wf fuel i d okd κ (below-input {Γ = Γ} lo i ok)
-                             id now sched st S binv deq nodry
-... | scripted (cold sync []) =
-      let (S′ , run , binv′) = oneShotBurst-wf sync id sched st S binv deq
+  with toℕ i <? lo
+... | no _ =
+      let (S′ , run , binv′) = input-hot-spent-wf i id sched st S binv deq
       in S′ , run , binv′ , refl
-... | scripted (cold sync (d ∷ ds)) =
-      let (S′ , run , binv′) =
-            input-cold-async-wf i sync d ds κ id now sched st S binv deq
-      in S′ , run , binv′ , refl
-... | scripted (hot h) with memberSource (toℕ i) (EvalSt.completedSources st)
-...   | true =
-        let (S′ , run , binv′) = input-hot-spent-wf i id sched st S binv deq
+... | yes below with Sched.slots sched i in slotEq
+...   | shared d {okd} =
+        subscribeSharedSlot-wf fuel i d okd κ below
+                               id now sched st S binv deq nodry
+...   | scripted (cold sync []) =
+        let (S′ , run , binv′) = oneShotBurst-wf sync id sched st S binv deq
         in S′ , run , binv′ , refl
-...   | false =
+...   | scripted (cold sync (d ∷ ds)) =
         let (S′ , run , binv′) =
-              initReg-wf (atSlot i) (lowerFloor (below-input {Γ = Γ} lo i ok) κ)
-                id st sched S binv
-                (BurstInv.hot-live binv i (cong hotSlot? slotEq))
+              input-cold-async-wf i sync d ds κ id now sched st S binv deq
         in S′ , run , binv′ , refl
+...   | scripted (hot h) with memberSource (toℕ i) (EvalSt.completedSources st)
+...     | true =
+          let (S′ , run , binv′) = input-hot-spent-wf i id sched st S binv deq
+          in S′ , run , binv′ , refl
+...     | false =
+          let (S′ , run , binv′) =
+                initReg-wf (atSlot i) (lowerFloor below κ)
+                  id st sched S binv
+                  (BurstInv.hot-live binv i (cong hotSlot? slotEq))
+          in S′ , run , binv′ , refl

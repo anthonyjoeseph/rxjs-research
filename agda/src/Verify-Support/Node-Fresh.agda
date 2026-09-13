@@ -52,6 +52,6 @@ postulate
     (κ : Path Γ lo u t) (id : Id) (now : Tick)
     (ns : NodeState Γ) (sched : Sched Γ) (st : EvalSt e) →
     lookupNode (proj₁ (mintNode sched))
-      (EvalSt.nodes (proj₂ (proj₂ (subscribeE g b {ok} κ id now (proj₂ (mintNode sched))
+      (EvalSt.nodes (proj₂ (proj₂ (subscribeE g b κ id now (proj₂ (mintNode sched))
         (installNode (proj₁ (mintNode sched)) ns st)))))
       ≡ just ns

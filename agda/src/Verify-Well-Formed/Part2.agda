@@ -306,7 +306,7 @@ postulate
     (κ : Path Γ lo u t) (id : Id) (now : Tick)
     (sched : Sched Γ) (st : EvalSt e) →
     HotLive sched →
-    HotLive (proj₁ (proj₂ (subscribeE g b {ok} κ id now sched st)))
+    HotLive (proj₁ (proj₂ (subscribeE g b κ id now sched st)))
 
   -- STEP, cascade exit.  `cascadeFinish` is the identity unless the
   -- arrival isLast, in which case it sweeps the arrival's source out of

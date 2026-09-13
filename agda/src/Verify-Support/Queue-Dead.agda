@@ -94,8 +94,8 @@ postulate
     (κ : Path Γ lo u t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     QDead k sched st
-      (proj₁ (proj₂ (subscribeE g b {ok} κ id now sched st)))
-      (proj₂ (proj₂ (subscribeE g b {ok} κ id now sched st)))
+      (proj₁ (proj₂ (subscribeE g b κ id now sched st)))
+      (proj₂ (proj₂ (subscribeE g b κ id now sched st)))
 
   pushBurst-qd : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {τ : Tri}
     (k : NodeId) (g : Acc _≺_ τ) (id : Id) (now : Tick)

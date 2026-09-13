@@ -184,7 +184,7 @@ postulate
     (sched : Sched Γ) (st : EvalSt e) → opShape o ≡ true →
     EntryReads τ o
       (Sched.slots sched) (EvalSt.connectedShares st) →
-    hasDry (proj₁ (subscribeE ac o {ok} κ id now sched st)) ≡ false
+    hasDry (proj₁ (subscribeE ac o κ id now sched st)) ≡ false
 
 mutual
   subscribe-dry-free : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} {τ} {lo}
@@ -195,7 +195,7 @@ mutual
       (Sched.slots sched) (EvalSt.connectedShares st) →
     stHop (slotRd (Sched.slots sched)) st ≤ proj₁ (proj₂ τ) →
     WalkCarries (slotRd (Sched.slots sched)) u
-      (subscribeE ac o {ok} κ id now sched st)
+      (subscribeE ac o κ id now sched st)
       (proj₂ (rdᵉ (slotRd (Sched.slots sched)) ε o)) (proj₁ (proj₂ τ))
 
   -- THE μ PEEL.  The machine asks whether the unfolding fits under the
@@ -460,42 +460,44 @@ mutual
   -- A SLOT REFERENCE IS WHERE THE CONNECT PEEL LIVES, and three of its
   -- four outcomes announce and register without subscribing anything.
   subscribe-dry-free {Γ = Γ} {lo = lo} ac (input i) okᵢ κ id now sched st inv hst
-    with Sched.slots sched i in eqi
+    with toℕ i <? lo
+  ... | no _ = refl , (z≤n , z≤n) , hst
+  ... | yes below with Sched.slots sched i in eqi
   -- the reference and the definition it stands for read the same, so
   -- the bound crosses the slot boundary in both directions
-  ... | shared d {ok} =
-        proj₁ w
-        , ⊑-≡ (proj₁ (proj₂ w))
-              (sym (cong proj₂ (slotRd-fix (Sched.slots sched) i d ok)))
-        , proj₂ (proj₂ w)
-        where
-        w = sharedSlot-dry ac i d κ (below-input {Γ = Γ} lo i okᵢ) id now sched
-              st eqi
-              (proj₁ inv)
-              (≤-trans (≤-reflexive
-                         (sym (cong hopOf
-                           (slotRd-fix (Sched.slots sched) i d ok))))
-                       (proj₁ (proj₂ inv)))
-              hst
-  ... | scripted {ok = ok} (cold sync [])       =
-        oneShotBurst-dry sync id sched
-        , ≡-⊑ (trans (oneShotBurst-rd _ _ sync id sched)
-                     (valsRd-data _ _ sync ok))
-              (z≤n , z≤n)
-        , hst
-  ... | scripted {ok = ok} (cold sync (x ∷ xs)) =
-        cold-tail-dry sync id (proj₁ (mintSource sched))
-        , ≡-⊑ (cong₂ _,_
-                (trans (trans (⊔-identityʳ _) (emitAt-map proj₁ _ _ sync))
-                       (valsAt-data proj₁ _ _ sync ok refl))
-                (trans (trans (⊔-identityʳ _) (emitAt-map proj₂ _ _ sync))
-                       (valsAt-data proj₂ _ _ sync ok refl)))
-              (z≤n , z≤n)
-        , hst
-  ... | scripted (hot as)
-        with memberSource (toℕ i) (EvalSt.completedSources st)
-  ...   | true  = refl , (z≤n , z≤n) , hst
-  ...   | false = refl , (z≤n , z≤n) , hst
+  ...   | shared d {ok} =
+          proj₁ w
+          , ⊑-≡ (proj₁ (proj₂ w))
+                (sym (cong proj₂ (slotRd-fix (Sched.slots sched) i d ok)))
+          , proj₂ (proj₂ w)
+          where
+          w = sharedSlot-dry ac i d κ below id now sched
+                st eqi
+                (proj₁ inv)
+                (≤-trans (≤-reflexive
+                           (sym (cong hopOf
+                             (slotRd-fix (Sched.slots sched) i d ok))))
+                         (proj₁ (proj₂ inv)))
+                hst
+  ...   | scripted {ok = ok} (cold sync [])       =
+          oneShotBurst-dry sync id sched
+          , ≡-⊑ (trans (oneShotBurst-rd _ _ sync id sched)
+                       (valsRd-data _ _ sync ok))
+                (z≤n , z≤n)
+          , hst
+  ...   | scripted {ok = ok} (cold sync (x ∷ xs)) =
+          cold-tail-dry sync id (proj₁ (mintSource sched))
+          , ≡-⊑ (cong₂ _,_
+                  (trans (trans (⊔-identityʳ _) (emitAt-map proj₁ _ _ sync))
+                         (valsAt-data proj₁ _ _ sync ok refl))
+                  (trans (trans (⊔-identityʳ _) (emitAt-map proj₂ _ _ sync))
+                         (valsAt-data proj₂ _ _ sync ok refl)))
+                (z≤n , z≤n)
+          , hst
+  ...   | scripted (hot as)
+          with memberSource (toℕ i) (EvalSt.completedSources st)
+  ...     | true  = refl , (z≤n , z≤n) , hst
+  ...     | false = refl , (z≤n , z≤n) , hst
 
   -- joining a live or a spent share announces and returns; only the
   -- first subscriber connects, and that is the guarded clause
@@ -509,7 +511,7 @@ mutual
     depthᵉ (slotRd (Sched.slots sched)) d ≤ proj₁ (proj₂ τ) →
     stHop (slotRd (Sched.slots sched)) st ≤ proj₁ (proj₂ τ) →
     WalkCarries (slotRd (Sched.slots sched)) (lookup Γ i)
-      (subscribeSharedSlot ac i d {ok} κ below id now sched st)
+      (subscribeSharedSlot ac i d κ below id now sched st)
       (proj₂ (rdᵉ (slotRd (Sched.slots sched)) ε d)) (proj₁ (proj₂ τ))
   sharedSlot-dry ac i d κ below id now sched st eqi ule hle hst
     with memberSource (toℕ i) (EvalSt.completedSources st)
@@ -540,7 +542,7 @@ mutual
     depthᵉ (slotRd (Sched.slots sched)) d ≤ proj₁ (proj₂ τ) →
     stHop (slotRd (Sched.slots sched)) st ≤ proj₁ (proj₂ τ) →
     WalkCarries (slotRd (Sched.slots sched)) (lookup Γ i)
-      (sharedConnect ac i d {ok} κ below id now sched st)
+      (sharedConnect ac i d κ below id now sched st)
       (proj₂ (rdᵉ (slotRd (Sched.slots sched)) ε d)) (proj₁ (proj₂ τ))
   sharedConnect-dry {Γ = Γ} {e = e} {τ = U , r , s}
                     (acc rec) i d κ below id now sched st {ok = ok} eqi fresh
@@ -565,7 +567,7 @@ mutual
 
     burst : Stream Γ (lookup Γ i)
     burst = proj₁ (subscribeE (rec (ltU {r′ = r} {s′ = syncSizeᵉ d} p))
-                     d {ok} (share-sink i ≤-refl) id now sched st₁)
+                     d (share-sink i ≤-refl) id now sched st₁)
 
     -- neither the latch nor the registration touches a node, so the
     -- store bound the caller came in with is the one the definition is
