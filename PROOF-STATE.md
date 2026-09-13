@@ -224,39 +224,40 @@ per-frame conjuncts and to the chains a run installs.
 
 ### Big picture tier roadmap
 
-- **COMPOSE THE SHELF ALONG A CHAIN, WHICH IS THE CASCADE LEAF'S WHOLE CONTENT.**
-  A per-frame obligation is not yet a per-step one: a chain folds its frames
-  sinkward and a cascade walks a list of chains off one arrival, and those are
-  the two places a bound has to compose. The flattener is the only arm that grows
-  what it hands back, so a rule that joins where it should accumulate stays green
-  on every chain without one. Instantiate a chain carrying two flatteners and a
-  registry holding chains of different lengths before stating anything — the
-  per-frame conjuncts compute even though the premise does not, so this is where
-  the tier can still be refuted cheaply.
+- **GIVE THE EXIT FRAME ITS SHELF ENTRY, WHICH IS THE ARM EVERY CHAIN IS MADE OF.**
+  A flattener's own frame is consumed when its value is subscribed, so the arm
+  the shelf prices sits on no registered chain and the arm every chain is built
+  from has no statement at all. Two rules are possible — an exit frame threads
+  what it was handed, or it costs one as the frame above it does — and they are
+  now separated rather than argued: they agree wherever the reading tracks the
+  chain and come apart behind a gate, so one of them refutes the tier. Decide it
+  by reading the completion branch, which is the only branch that does not hand
+  the payload straight back, and state the arm at full strength.
 
-- **COMPOSE THE CONSTANTS, WHICH IS THE ONE REGION LEFT UNREACHED.** The payload
-  reading is EXACT behind one gate — dry a unit below, green at it. A gate behind
-  a gate is where it could stop being: each is cut to a constant, so a body two
-  gates down is read at one twice over while what it eventually delivers is as
-  deep as it is. Instantiate that, and a deep store beside it, since the sweep
-  that settled the single gate held the store at nought throughout and nothing
-  yet says the two quantities do not interact. Refute first.
+- **THEN FOLD A CHAIN, BECAUSE THE ARM HAS NOWHERE TO PLUG IN UNTIL IT EXISTS.**
+  There is no chain-level assembly anywhere in the rank development: the subscribe
+  direction has one and the delivery direction has only the bare leaf. So the arm
+  above cannot be wired, and stating it first would be inventory. Convert the leaf
+  into a real body over a fold of the registered path, one conjunct per frame, and
+  let the four arms be its leaves — then the arm's fit is tested by the
+  typechecker rather than asserted, and the share sink becomes the one place a
+  fan-out is still owed.
 
-- **THEN THE DOOR, WHICH NOW OWES THE WHOLE ALLOWANCE.** The hereditary premise
-  moved the cost rather than removing it: the entry statement carries one
-  conjunct per arrival the fuel serves, so it cannot be established without
-  walking the loop its consumer walks. What makes that payable rather than
-  circular is that the state is the machine's own at every step — and what would
-  refute it is a program whose first cascade installs a frame the root subscribe
-  never built. Look for that before assembling anything.
+- **AND THE STORE SIDE, WHICH NOTHING HAS YET MOVED.** Every payload instantiated
+  so far reads nought and every state reads nought, so the rank has been the
+  term's figure alone at every point and neither half of the join has been
+  separated by anything. A run whose values are themselves observables moves both
+  at once. Instantiate that before the fold is assembled, since a store that can
+  outrun the term's reading changes what the fold has to thread rather than how it
+  threads it.
 
 ### The ledger
 
 - **`cascade-dry-free`** (Verify-Rank-Sufficient) — FALSITY,
   `REFUTED×6, DEAD ROUTE×2, RECOVERY`: one arrival's cascade under the
-  obligations its own chains carry. Nothing has instantiated the conjunction,
-  and the two arms that can go dry — the flattener and the share fan-out — are
-  exactly the two the shelf has not composed.
+  obligations its own chains carry. The chains it folds are built from the one
+  frame arm the shelf never states, and the two rules for what that arm costs
+  are separated on a run this evaluator performs.
 
 - **`entry-drain-fits`** (Verify-Rank-Sufficient) — FALSITY, `PROBED`: the
   premise at the door, for every arrival the allowance serves. Hereditary by

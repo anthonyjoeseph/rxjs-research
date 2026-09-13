@@ -182,6 +182,32 @@ postulate
     FrameCarries {e = e} ac id now (take-f {s = s} nid) κ ψ Rv Rv Rst
 
 ----------------------------------------------------------------------
+-- THE SHELF HAS NO ENTRY FOR THE EXIT FRAME, AND THAT IS THE ARM EVERY
+-- REGISTERED CHAIN IS MADE OF.  A flattener's own frame is CONSUMED the
+-- moment its value is subscribed — the inner goes on under an exit
+-- frame carrying the flattener's node, and the continuation below is
+-- the one the outer already had.  So the arm priced directly below
+-- appears on no registered chain at all: instantiated over flattener
+-- stacks one to three deep, the same stacks behind a gate, and a capped
+-- flattener across the steps of its own queue drain, the count of it on
+-- the chains an arrival reaches is nought at every point, while the
+-- exit frame's is the chain's whole length (`Probed.Chain-Compose`).
+--
+-- WHICH MAKES THE ABSENCE A CHOICE RATHER THAN AN OVERSIGHT, and the
+-- two candidates are separated rather than argued.  `innerReact` hands
+-- its payload back untouched on every branch but the completion one,
+-- where the node's queue is drained and freshly subscribed inners'
+-- bursts are appended — so an exit frame either threads what it was
+-- handed or costs one as the frame above it does, and the two rules
+-- disagree on a run this evaluator performs.  They agree wherever the
+-- reading tracks the chain, and come apart behind a gate, whose figure
+-- is a constant while the chain its body registers is as deep as the
+-- body.  A rule chosen here therefore decides whether the tier's
+-- premise holds at all, and no row can be written for this arm until
+-- the assembly that folds a chain exists to consume it.
+----------------------------------------------------------------------
+
+----------------------------------------------------------------------
 -- THE HOP EDGE, AND IT IS ONE LEAF.  A flattener's frame is the only
 -- one that re-enters the evaluator: `thruConsume` hands each emitted
 -- observable to `subscribeInner`, which is where the RANK descends and
