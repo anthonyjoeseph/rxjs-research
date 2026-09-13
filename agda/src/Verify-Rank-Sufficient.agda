@@ -149,6 +149,33 @@ open import Verify-Rank-Sufficient.Hop using (hopFits)
 -- is the one this row could not put until a cascade had been
 -- instantiated rather than argued about.
 
+-- AND THE PREMISE IS NOT AN INVARIANT, WHICH CONSTRAINS THE TICK-GATING
+-- ARGUMENT ABOVE RATHER THAN THE CONCLUSION BELOW.  That argument says a
+-- single entry need only cover what a term produces SYNCHRONOUSLY, since
+-- a recursion re-enters through a gate whose body is pending at the next
+-- tick.  What it misses is that a GATE'S OWN OPENING IS A REGISTRATION: a
+-- defer installs a flattening frame and leaves its body pending, so the
+-- frame outlives the subscribe that made it, and a chain carries one
+-- flattening edge for each flattener whose OUTER SOURCE is still live
+-- along it.  Nesting flatteners over DATA stacks nothing — an inner
+-- attaches BELOW the frame, which the chain measure passes through at
+-- zero — so the one shape that stacks them is a flattener whose outer is
+-- a gate.  And the reading cannot see that stack, because its gate clause
+-- is CONSTANT: it prices a defer at one without descending, which is the
+-- clause that buys the descent its recursion edge.  Tick-gating is
+-- therefore what OPENS the gap rather than what closes it, and one more
+-- turn of the same crank adds one to the chain and nothing to the term.
+--
+-- SO WHAT IS DEAD IS THE ROUTE AND NOT THE STATEMENT.  Every program
+-- exhibiting this runs dry-free, so the leaf may well be true; what
+-- cannot be done is to reach it by an induction that carries this
+-- premise, since the premise holds TIGHTLY at entry and is destroyed by
+-- the FIRST arrival.  Nor is the repair local: charging a gate's body
+-- would close it and would cost the descent the edge the constant clause
+-- exists to buy, so this is the tier's open question — whether one
+-- reading can price what no frame hands the next one — arriving at the
+-- premise rather than at the conclusion.
+
 -- AND THE CASCADE DOES NOT OUTGROW ITS ENTRY, WHICH IS WHY THIS ROW IS
 -- NOT THE OPERATOR ROW UNDER ANOTHER NAME.  A cascade is ONE INSTANT,
 -- and both axes a term does not read are tick-gated: an arrival is a
@@ -207,6 +234,19 @@ open import Verify-Rank-Sufficient.Hop using (hopFits)
 --   is a property of a chain's FRAMES — so what is missing is a tie
 --   between a registration's frames and the program being run, which
 --   has no home in the record as it stands.
+-- REFUTED: `Refuted.Fit-Cascade` — the fit's PRESERVATION across one
+--   cascade, taken through the drain's own step so the pair is the one
+--   the recursion would have been handed.  A flattener over a gate,
+--   behind a second gate, over a slot whose values all arrive late:
+--   carried one against a term reading of one at the door, carried TWO
+--   against the same one after a single arrival.  Strip the outer gate
+--   and the reading is EXACT at the same states — two against two, three
+--   against three — which rules out the chain manufacturing depth and
+--   rules out the arithmetic being wrong, and leaves the one clause that
+--   declines to look.  The deeper witness reads three against one, so the
+--   gap is a rate in the program's own size rather than an off-by-one,
+--   and both programs' dry rows are pinned beside the crossings so the
+--   finding cannot be read one statement too high.
 -- PROBED: `Probed.Descent` — twelve recursive programs, every one green,
 --   taken against the DRAIN of each run rather than the whole of it.  What
 --   they cover, guard by guard: the μ peel at every program, since all
