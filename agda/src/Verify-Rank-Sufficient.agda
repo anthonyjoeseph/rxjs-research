@@ -271,6 +271,28 @@ open import Verify-Rank-Sufficient.Hop using (hopFits)
 --   on both the store and the pending read ZERO against a registry
 --   still carrying the frame.  So the quantity is historical rather
 --   than a property of any state, and a wider join cannot recover it.
+-- REFUTED: `Refuted.Arrival-Seed` — the third candidate, and the one with
+--   the best claim: the rank an ARRIVAL enters at, which is a SUM rather
+--   than a join, so the arithmetic killing the join does not touch it and
+--   it is what the chain fold actually descends on.  It has room at the
+--   door on both programs — three against one, four against one, because
+--   the payload about to arrive reads deep — and one arrival later BOTH
+--   variable summands read ZERO, the payload spent and the flattener's
+--   queue empty, so the seed collapses onto the term's own reading while
+--   the registry keeps the frame the arrival installed.  The deeper
+--   program reads three against the same one, so this gap is a rate too.
+-- DEAD ROUTE: BOUNDING THE REGISTRY IS THE DEAD MECHANISM, NOT ANY ONE OF
+--   THE THREE STATEMENTS ABOVE.  Three successive candidates for what
+--   holds at a drain step — the term's reading, the widest state-readable
+--   join, the arrival's own seed — are each refuted at the same two
+--   programs, and none is a sub-case of the one before, which is the
+--   convergence test failing rather than a hard proof.  The mechanism is
+--   wrong because the registry prices what a chain COULD spend given an
+--   arbitrarily deep value, and no state carries what value will arrive;
+--   a fold spends what the value it is HANDED makes it spend.  So a
+--   fourth reading of the registry is not the repair, and the premise is
+--   owed to the frame shelf that already states its obligations per
+--   template, against the payload each one is given.
 -- PROBED: `Probed.Descent` — twelve recursive programs, every one green,
 --   taken against the DRAIN of each run rather than the whole of it.  What
 --   they cover, guard by guard: the μ peel at every program, since all

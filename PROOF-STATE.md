@@ -223,27 +223,18 @@ procedure rather than a pin, and whose refusal is what turned this up.
 
 ### Open questions
 
-- **MUST THE BOUND BE CARRIED, OR IS THE REGISTRY THE WRONG OBJECT?** The reading
+- **MUST THE BOUND BE CARRIED, OR IS NO STATE PREMISE OWED AT ALL?** The reading
   is a triple of counts over the SYNTAX, and the question was which non-syntactic
-  quantities it must still bound. That half is settled and negatively — no
-  reading of a state bounds the registry, the widest join included — so the
-  quantity is HISTORICAL, and what is open is which way that cuts: whether a
-  maximum over the run so far must be CARRIED, the shape this tower exists to
-  have left behind, or whether the registry is not what has to fit at all and
-  the adequate thing is the rank each ARRIVAL enters at.
+  quantity it must still bound. Every candidate naming one is now refuted — a
+  state's reading, the widest join, an arrival's own seed — and no two are
+  nested, so what is dead is bounding the registry rather than any one of them.
+  What is open is which way that cuts: whether a maximum over the run so far
+  must be CARRIED, the shape this tower exists to have left behind, or whether
+  nothing about a STATE is owed and the obligation belongs entirely to the frame
+  shelf, stated per template against the payload each frame is handed.
   relevant: `drain-dry-free`, `entry-hop-fits`
 
 ### Big picture tier roadmap
-
-- **DELETE THE PREMISE AND LET THE ARRIVAL CARRY ITS OWN ADEQUACY.** Two
-  witnesses now say the registry cannot be fitted against anything a STATE
-  holds, the widest join included, so a third restatement of `hopFits` is the
-  subdivision the convergence test rules out. What the drain consumes is
-  smaller: every arrival RE-SEEDS, at the payload's reading joined with the
-  store's, and that seed is a property of the arrival rather than a maximum the
-  cascade grew. Restate `drain-dry-free` with no fit premise at all, over that
-  seed, and refute first at the two programs that killed the present form — if
-  the seed is adequate there, the registry never had to be.
 
 - **INSTANTIATE THE MAP FRAME AS IT NOW READS.** Its two ends are pinned apart
   and nothing has run the statement itself: what each witness carries is a row
@@ -265,6 +256,15 @@ procedure rather than a pin, and whose refusal is what turned this up.
   limit low enough that inners back up. Refute first, at a queue holding an
   observable deeper than the source that emitted it.
 
+- **MEASURE THE TWO SURVIVING MECHANISMS BEFORE EITHER IS ADOPTED.** The
+  question above has two halves left and nothing separating them, which is why
+  a fourth reading of the registry is not the next move. Instrument both at the
+  two programs that killed all three candidates: does a maximum CARRIED across
+  the cascade hold there, or climb with the registry it tracks — and does the
+  frame shelf discharge the arm with no state premise at all, at a frame whose
+  payload is deeper than its source's own reading admits. Refute first on both.
+  The product is a separation, not a proof.
+
 ### The ledger
 
 - **`entry-hop-fits`** (Verify-Rank-Sufficient) — FALSITY, `REFUTED, PROBED×3`:
@@ -277,11 +277,11 @@ procedure rather than a pin, and whose refusal is what turned this up.
   layer a template adds. Both witnesses carry a row where this form survives at
   the program killing the collapsed one; the form itself is uninstantiated.
 
-- **`drain-dry-free`** (Verify-Rank-Sufficient) — SHAPE, `REFUTED×4, PROBED×4`:
-  every arrival after the root frame, conditioned on `hopFits` — which one
-  cascade destroys from a TIGHT entry, and which no reading of a state repairs.
-  The conclusion survives every witness; the restatement is owed on the
-  premise.
+- **`drain-dry-free`** (Verify-Rank-Sufficient) — SHAPE,
+  `REFUTED×5, DEAD ROUTE, PROBED×4`: every arrival after the root frame,
+  conditioned on `hopFits` — which one cascade destroys from a TIGHT entry and
+  which nothing bounding the registry repairs. The conclusion survives every
+  witness; the restatement is owed on the premise.
 
 - **`take-frame-carried`** (Verify-Rank-Sufficient.Push-Carried) — DIFFICULTY,
   `PROBED`: a prefix of what it was handed, under a node reading zero. Four

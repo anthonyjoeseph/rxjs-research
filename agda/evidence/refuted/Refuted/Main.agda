@@ -52,6 +52,19 @@ open import Refuted.Map-Pinned using (map-frame-pinned-false;
   pin-bound-is; pin-in-is; pin-out-is; pin-store-is)
 open import Refuted.Map-Pinned using (pin-source-is; pin-asym-fits)
 
+-- and the third candidate for what bounds the registry, the arrival's
+-- own seed.  Its figures are claimed in pairs across the step, because
+-- the finding is a CROSSING and not a height: the seed falls while the
+-- registry rises, so a repair that moved only one end would leave a
+-- witness reporting two numbers that no longer meet
+open import Refuted.Arrival-Seed using (seed-preserved-false;
+  seed-e₁; seed-s₁; pay-s₁; seed-store-s₁; reg-e₁; reg-s₁)
+-- and the deeper program's four, which are what say the gap is a RATE:
+-- same seed, registry one higher per flattener, so no constant slack
+-- repairs it
+open import Refuted.Arrival-Seed using (seed-e₃; seed-s₃; pay-s₃;
+  seed-store-s₃; reg-e₃; reg-s₃)
+
 open import Refuted.Rank-Entry using (dry-operator-false)
 -- the three figures travel with the witness for the same reason: the
 -- payload and the store both enter at the floor here, so a repair that
