@@ -244,6 +244,23 @@ open import Verify-Rank-Sufficient.Hop using (hopFits)
 --   the statement is closest to false.  THE BOUNDARY: three arrivals, a
 --   merge only, and nothing here reaches the late-slot cascade the
 --   receipt above instantiates.
+-- PROBED: `Probed.Drain-Arrival` — the boundary both receipts above name,
+--   which is the same one from opposite sides: many deliveries inside ONE
+--   cascade, carried PAST the arrival rather than read at the door.  Six
+--   and twenty-four deliveries per arrival, plus a family where every one
+--   of them installs a registration still live when the cascade ends.  The
+--   fit holds at all seven reached states and the carried side does not
+--   MOVE — two, two, two; two, two, two; three at all four — while the node
+--   counter climbs 2, 3, 4, 5 and the registration counter 1, 7, 13, so a
+--   stepper gone quiet is ruled out separately.  The finding is which side
+--   the region's own axis moves: lengthening the burst takes the TERM
+--   reading from 19 to 73 and leaves the registry at two, because a fold
+--   reads its source's delivery count as its refold count.  Delivery count
+--   inflates the bound rather than the quantity bounded, so this region is
+--   not where the risk is.  THE BOUNDARY: no row is TIGHT and none can be,
+--   the parameter defining the region being the one widening the margin —
+--   a tight row has to hold the deliveries fixed and deepen the registry
+--   instead.  Three arrivals, one slot, one flattening strategy.
 
 postulate
   drain-dry-free : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}

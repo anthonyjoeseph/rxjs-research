@@ -229,25 +229,26 @@ procedure rather than a pin, and whose refusal is what turned this up.
 - **DOES A TERM-RELATIVE READING BOUND WHAT THE TERM DID NOT BUILD?** The
   report the walk carries prices a burst against the reading of the term being
   walked, and that reading is a function of the SOURCE. Three places produce a
-  subscription the source does not contain, and the flattener's is now
-  MEASURED. What is left is the two the walk cannot see — an arrival delivering
-  into a frame the loop reached after the walk was over, and a fold's
-  accumulator rebuilt at run time out of what it just emitted. Neither is
-  inside the induction that proves the report, so each is bounded by a leaf
-  rather than by an arm.
+  subscription the source does not contain, and two of the three are now
+  MEASURED. A frame re-entered at an emitted VALUE hands back what it was
+  handed; and how many times one cascade delivers inflates the TERM side rather
+  than the carried one. What is left is a cascade that DEEPENS a chain without
+  lengthening the source that fixes the reading, and a fold's accumulator
+  rebuilt at run time out of what it just emitted. Neither is inside the
+  induction that proves the report.
   relevant: `drain-dry-free`, `scan-frame-carried`
 
 ### Big picture tier roadmap
 
-- **CARRY THE REPAIRED READING PAST AN ARRIVAL.** The slot count now holds at
-  the DOOR and the rows reach twenty-four deliveries under one arrival there,
-  but every drain receipt in the tier lands one delivery per arrival — so the
-  region where a cascade delivers many times is instantiated on one side of the
-  drain only, and that is precisely the region no entry sees. The leg takes the
-  many-deliveries family through the loop's own step and asks whether the fit
-  still holds once the arrival has run. A refutation here is the tier's whole
-  risk arriving at the one uncovered shape; a receipt retires the last coverage
-  boundary both drain rows name.
+- **DEEPEN A CHAIN WITHOUT LENGTHENING ITS SOURCE.** The arrival rows just
+  taken are FLAT and not one of them is tight, and the reason is structural:
+  the axis they sweep — how many times one cascade delivers — is read by a fold
+  as its refold count, so it moves the bound rather than the quantity bounded.
+  A witness has to come from the other axis, a cascade that adds a `thru-outer`
+  frame to a live chain while the term's reading holds still. The leg builds
+  that family and steps it. It is the shape both refutations of this leaf take
+  — a chain carrying frames the program does not fix — arriving at the
+  CONDITIONED statement, so a witness here kills the repair too.
 
 - **CLOSE THE THREE FRAMES, WORST FIRST.** The walk's four non-flattening
   operators all run on one hypothesis, and it is three leaves: a map's outputs
@@ -256,8 +257,8 @@ procedure rather than a pin, and whose refusal is what turned this up.
   the one place the two currencies meet, and the only one of the three handed
   the ordering between them rather than assuming it. The leg takes the scan
   first, because a witness there is a witness against the question above and
-  the other two are a shelf behind it. It is the leg that takes the fold third
-  of the question, which is the half of it the arrival leg does not touch.
+  the other two are a shelf behind it. It takes the fold third of the question,
+  which is the half of it the leg above does not touch.
 
 - **FUSE THE DRY CLAIM INTO THE REPORT'S OWN WALK.** The flattener third of the
   question above is measured at its edge, and the measurement does not touch
@@ -272,10 +273,10 @@ procedure rather than a pin, and whose refusal is what turned this up.
 ### The ledger
 
 - **`drain-dry-free`** (Verify-Rank-Sufficient) — FALSITY,
-  `REFUTED×2, PROBED×3`: every arrival after the root frame, conditioned on
-  `hopFits` at the schedule's own slot reading and not one the caller picks.
-  The fit holds flat across twelve drain states and is TIGHT at the plainest,
-  so the rows sit where it is closest to false.
+  `REFUTED×2, PROBED×4`: every arrival after the root frame, conditioned on
+  `hopFits` at the schedule's own slot reading, not one the caller picks. The
+  fit holds flat across nineteen drain states, TIGHT at the plainest; delivery
+  count is ruled out as the axis that breaks it.
 
 - **`scan-frame-carried`** (Verify-Rank-Sufficient.Push-Carried) — FALSITY,
   `NO EVIDENCE`: the fold's step, and the one frame whose emission IS its
