@@ -90,6 +90,20 @@ postulate
   --   — the peel is once per BOUNDARY and every admitted chain is handed
   --   the counter the fan-out itself entered at — so depth is the only
   --   axis that can outrun the seed.
+  --
+  -- PROBED: `Probed.Sink-Floor` — the same machine at the DEEPEST nest a
+  --   context of four admits, which is the half the receipt above says it
+  --   did not reach.  The staircase runs one, two, three and then three
+  --   again, so the counter is read all the way down and STOPS one below
+  --   the seed, and the statement holds at the seed, above it, and at the
+  --   middle rung.  It also reads the registry's own floor off that run:
+  --   every slot-sourced chain sinks strictly above its source, on two
+  --   rows first shown to be rows the claim binds on, since a floor stated
+  --   as an `all` is true of a registry carrying no such chain at all.
+  --   NOT covered: one arrival, shares reading their predecessor
+  --   directly, and a registry one chain wide at every rung — so nothing
+  --   here reaches a cancelled registration, a completing share, or a
+  --   fan-out of breadth two.
   dispatch-saturates :
     ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {τ} (ac : Acc _≺_ τ)
       (g : ℕ) → n ≤ g →
