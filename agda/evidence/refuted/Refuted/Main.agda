@@ -44,6 +44,14 @@ open import Refuted.Map-Template using (map-frame-carried-false;
 -- refutation standing and these two agreeing, which is the finding
 open import Refuted.Map-Template using (caller-is; caller-fits)
 
+-- and the repair that finding was read as licensing, refuted in turn:
+-- the four figures are claimed because the crossing is their ORDER, and
+-- the two below them because a witness that killed the asymmetric form
+-- as well would be saying something else entirely
+open import Refuted.Map-Pinned using (map-frame-pinned-false;
+  pin-bound-is; pin-in-is; pin-out-is; pin-store-is)
+open import Refuted.Map-Pinned using (pin-source-is; pin-asym-fits)
+
 open import Refuted.Rank-Entry using (dry-operator-false)
 -- the three figures travel with the witness for the same reason: the
 -- payload and the store both enter at the floor here, so a repair that

@@ -33,7 +33,8 @@ open import Induction.WellFounded using (Acc)
 open import Relation.Binary.PropositionalEquality using (_≡_; trans; cong₂)
 
 open import Rx.Prim using (Tick; Id; value; complete; InstEmit)
-open import Rx.Exp using (Ctx; Closed; Tm; Val; Fn; _×ᵗ_; scanᵉ; evalTm)
+open import Rx.Exp using (Ctx; Closed; Exp; Tm; Val; Fn; _×ᵗ_; mapᵉ; scanᵉ;
+  evalTm)
 open import Rx.Strat-Order using (_≺_)
 open import Rx.Hop-Depth using (Rd₃; depthᵉ)
 open import Rx.Evaluator using (Stream; Frame; Path; Sched; EvalSt; NodeId;
@@ -85,31 +86,44 @@ FrameCarries {Γ = Γ} {e = e} {s = s} {u = u} ac id now f κ ψ Rin Rv Rst =
 -- hands back is that step APPLIED to the bound it was handed, never the
 -- bound itself.
 --
--- BUT THE BOUND IS FREELY QUANTIFIED AND THE WALK HANDS OVER EXACTLY
--- ONE, WHICH IS WHAT NARROWS THE REPAIR TO A PIN.  The only
--- instantiation is the reading of the WHOLE map expression, and that
--- reading's map clause already joins the template's own reading in —
--- so the template's depth is inside the bound before the frame is
--- reached, and the crossing below stands at a bound the caller cannot
--- produce.  The residue is therefore not a missing quantity but a
--- missing CONSTRAINT: state the output bound at the point the walk
--- supplies instead of over every natural, and the second source of
--- depth is already paid for.  What is NOT yet established is that the
--- pinned form holds in general; one template is one point.
+-- SO THE TWO ENDS ARE READINGS OF DIFFERENT EXPRESSIONS, AND THAT IS
+-- THE WHOLE OF THE REPAIR.  The frame is handed what the SOURCE emits
+-- and gives back what the TEMPLATE makes of it, so the incoming bound
+-- is the source's reading and the outgoing one the map expression's.
+-- Those differ by exactly the layer the reading's map clause charges,
+-- which is exactly the layer one application of the template can add —
+-- so the statement is pinned at both ends and neither end is the other.
+-- Collapsing them to the larger is available at the call site and is
+-- what the witnesses below kill: it hands the frame a payload the
+-- source could never emit, and the template then adds its layer to
+-- that.  The source expression is a parameter because the incoming
+-- bound names it; nothing else in the statement reads `b`.
 --
--- REFUTED: `Refuted.Map-Template` — the form as written, at a template
---   that drops a numeral and returns a flattener over a literal.  The
---   payload reads ZERO, so the frame is held to the strongest bound the
---   predicate can impose, and the output reads ONE; the store is
---   untouched, so the second conjunct is satisfied and the crossing is
---   the payload one alone.  The same module pins the walk's own bound
---   at this template at ONE and the output fitting under it, which is
---   what keeps the witness from being read as reaching the call site.
+-- REFUTED: `Refuted.Map-Template` — the freely-quantified form, at a
+--   template that drops a numeral and returns a flattener over a
+--   literal.  The payload reads ZERO, so the frame is held to the
+--   strongest bound the predicate can impose, and the output reads ONE;
+--   the store is untouched, so the second conjunct is satisfied and the
+--   crossing is the payload one alone.  The same module pins the walk's
+--   own bound at this template at ONE and the output fitting under it,
+--   which is what keeps the witness from being read as reaching the
+--   call site.
+-- REFUTED: `Refuted.Map-Pinned` — and the symmetric PIN that finding was
+--   read as licensing, at a template that WRAPS its argument instead of
+--   dropping it.  Both ends pinned at the map expression's reading, the
+--   payload reached by RUNNING that expression: it reads exactly the
+--   pinned bound, so the hypothesis is met with no margin, and one more
+--   application puts the output a layer past it.  The same module pins
+--   the source's reading at ZERO and the template applied to what the
+--   source ACTUALLY emits fitting under the map's reading — which is
+--   the form below, standing at the very program that kills the
+--   symmetric one.
 postulate
   map-frame-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {τ}
     (ac : Acc _≺_ τ) (id : Id) (now : Tick) (fn : Fn Γ [] [] [] s u)
-    (κ : Path Γ u t) (ψ : Fin n → Rd₃) (Rv Rst : ℕ) →
-    FrameCarries {e = e} ac id now (map-f fn) κ ψ Rv Rv Rst
+    (b : Exp Γ [] [] [] s) (κ : Path Γ u t) (ψ : Fin n → Rd₃) (Rst : ℕ) →
+    FrameCarries {e = e} ac id now (map-f fn) κ ψ
+      (depthᵉ ψ b) (depthᵉ ψ (mapᵉ fn b)) Rst
 
 -- THE PREFIX FRAME, WHICH THE WITNESS ABOVE DOES NOT REACH.  A take
 -- hands back `takeVals`' prefix of the list it was given and writes a
