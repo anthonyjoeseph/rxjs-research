@@ -223,39 +223,39 @@ procedure rather than a pin, and whose refusal is what turned this up.
 
 ### Big picture tier roadmap
 
-- **RESTATE THE DRAIN'S PREMISE ONTO WHAT THE ARRIVAL SUPPLIES.** The two legs
-  that stood here are retired together: one measurement answered both, and it
-  says no repair of the registry bound could have worked, because the quantity a
-  cascade spends is read off the arriving VALUE and the premise names the other
-  side of the run. So `drain-dry-free`'s restatement is owed and its shape is no
-  longer open — state the obligation at the arrival, where the evaluator already
-  stands, and leave the registry out of it. Assembly first: the conditioned
-  statement over postulated leaves, then the leaves.
+- **CLOSE THE SHELF'S TWO NAMED ARMS — THE RESTATEMENT WILL BE DENOMINATED
+  THERE.** The leg that stood here proposed a premise read off the arrival and
+  is discarded: narrowing the registry to the chains one arrival reaches, priced
+  at the value it carries, is refuted at the same two programs and is a sub-case
+  of the candidate above it, so the sequence has stopped subdividing. What a step
+  spends is what each FRAME gives back on the payload it is handed — a
+  per-template obligation. That is the shelf, and two of its four arms have a
+  gap where the restatement will put weight: no map row reaches a nonzero store,
+  no take row reaches an ARRIVAL. Instantiate both; refute before grinding.
 
-- **COMPOSE THE CONSTANTS, WHICH IS THE ONE REGION LEFT.** The payload reading is
-  EXACT behind one gate — dry a unit below, green at it. A gate behind a gate is
-  where it could stop being: each is cut to a constant, so a body two gates down
-  is read at one twice over while what it eventually delivers is as deep as it
-  is. Instantiate that, and a deep store beside it, since the sweep that settled
-  the single gate held the store at nought throughout and nothing yet says the
-  two quantities do not interact. Refute first.
+- **THEN STATE THE DRAIN'S PREMISE IN THE SHELF'S CURRENCY.** With the arms
+  reached, the premise is a claim about what the frames on a chain give back
+  rather than about what a registry holds, so it no longer names a quantity the
+  state cannot carry. Assembly first, as always: the conditioned statement over
+  postulated leaves, wired so the fit is CHECKED when a leaf lands, then the
+  leaves. Two things this must not do — read the registry a fifth time, and
+  launder the gap into a hypothesis the one call site happens to supply.
 
-- **THE SHELF IS WHAT THE RESTATEMENT WILL BE SPENT THROUGH.** The four carried
-  rows are one family — each says a frame gives back no more than it was handed,
-  in the currency the restated drain premise will be denominated in — and the
-  restatement lands on top of them, so a shape wrong here is a shape wrong twice.
-  Two of the four have a named gap in their own rows: no row of the map arm
-  reaches a nonzero store, and no row of the take arm reaches an ARRIVAL, which
-  is precisely the frame the leg above puts weight on. Close those two arms
-  first, then take the assembly.
+- **COMPOSE THE CONSTANTS, WHICH IS THE ONE REGION LEFT UNREACHED.** The payload
+  reading is EXACT behind one gate — dry a unit below, green at it. A gate behind
+  a gate is where it could stop being: each is cut to a constant, so a body two
+  gates down is read at one twice over while what it eventually delivers is as
+  deep as it is. Instantiate that, and a deep store beside it, since the sweep
+  that settled the single gate held the store at nought throughout and nothing
+  yet says the two quantities do not interact. Refute first.
 
 ### The ledger
 
 - **`drain-dry-free`** (Verify-Rank-Sufficient) — SHAPE,
-  `REFUTED×5, DEAD ROUTE, PROBED×4`: every arrival after the root frame,
+  `REFUTED×6, DEAD ROUTE, PROBED×4`: every arrival after the root frame,
   conditioned on `hopFits` — a registry bound one cascade destroys from a TIGHT
-  entry. A fork now says the cascade spends what the ARRIVING VALUE reads, to
-  the unit, so the premise names the wrong side of the run.
+  entry. The narrowest reading a step could justify dies there too, so the
+  premise is owed per FRAME and not as any reading of the registry.
 
 - **`entry-hop-fits`** (Verify-Rank-Sufficient) — DIFFICULTY,
   `REFUTED, PROBED×3`: the fit at the door, with both known crossings repaired
