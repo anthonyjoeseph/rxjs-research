@@ -34,7 +34,7 @@
 -- `arrivalRank` is separated by anything below.  A run whose values are
 -- themselves observables would move both, and no row here is one.
 --
--- FORK: entry-drain-fits
+-- FORK: entry-drain-hop
 module Probed.Chain-Compose where
 
 open import Data.Bool using (Bool)

@@ -43,7 +43,7 @@
 -- own dispatch.  The residual risk is therefore not in the chain fold,
 -- and the statement carrying it is the sink's.
 
--- FORK: entry-drain-fits
+-- FORK: entry-drain-hop
 module Probed.Store-Rank where
 
 open import Data.Fin using (zero; suc)

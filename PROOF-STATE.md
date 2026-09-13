@@ -224,41 +224,63 @@ now at the door and at the templates the door's chains are built from.
 
 ### Big picture tier roadmap
 
-- **SETTLE THE MEASURE, WHICH IS THE DESIGN DECISION THE SINK IS WAITING ON.**
-  The sink's obligation is stated and the fold's sink arm already consumes it;
-  nothing produces one, and producing one means folding the fan-out's chains,
-  which re-enters the chain fold. So the obligation and the fold are mutually
-  recursive and what makes them terminate is chosen rather than ground. The
-  dispatch's own counter is not it: exhausting it mints no dry event, so this
-  whole face passes over it for free. Settle the measure against the store,
-  since one that lets the dispatch re-enter at a LARGER store refutes the fold's
-  shape rather than the sink's arm.
+- **INSTANTIATE THE DOOR'S PREMISE IN ITS NEW CURRENCY, BECAUSE IT IS NOW THE
+  WHOLE TIER AND IT IS REACHABLE.** The walk is built, so what the door asks is
+  no longer a claim about what a run emits but a COUNT of flatteners on a
+  registered chain against what the program itself reads. That computes at every
+  chain, and the first instantiation came back holding by EQUALITY. So the
+  region to reach is depth: two and three flatteners, a gate over a ladder, and
+  an arrival serving several chains. A refutation here restates the premise; a
+  green at depth is the first thing that has ever bounded the door.
 
-- **THEN THE OBLIGATION'S OWN FORM, NOW THAT THE DISPATCH HAS BEEN MEASURED.** The
+- **THEN THE SINK'S OWN FORM, NOW THAT THE DISPATCH HAS BEEN MEASURED.** The
   fan-out's chains are folded threading ONE state, so a later chain is entered
   at what an earlier one left — but the figure the dispatch leaves is the
   DEEPEST chain's write and nothing else, the same for three registrations as
-  for one and the same for three rates as for the deepest of them. So the clause
-  owes a join with one chain's own reach rather than a bound indexed by the
+  for one and the same for three rates as for the deepest of them. So the sink
+  leaf owes a join with one chain's own reach rather than a bound indexed by the
   share's width — a residue the chain fold can hand itself rather than one it
-  could never produce. Write that form and let the fold's sink arm consume it.
+  could never produce. Write that form and let the walk's sink arm consume it.
 
-- **AND THE EXIT FRAME, WHOSE BLOCKER IS NOT THE ONE THIS LEG WAS WRITTEN FOR.**
-  The route it described is dead: the chain fold it was waiting for is written
-  and reaches Main, and the arm STILL cannot be stated, because the shelf's only
-  consumer is the subscribe walk, which descends a term and never stands at an
-  exit frame. What is missing is a PRODUCER of a chain's fits certificate, and
-  two arms block building one — the fold's burst arm is not a frame-carrying
-  statement, and the map arm is pinned at the readings of a source EXPRESSION,
-  which a chain step does not carry. Both are restatements of arms the shelf
-  already holds, so this leg is now those two restatements and not a new leaf.
+- **AND THE TWO HEADS THE SHELF CANNOT SUPPLY, WHICH ARE NOW STATED AT THE PATH
+  AND SHOULD NOT STAY THERE.** The walk composes its own steps out of frame
+  statements everywhere except the map and scan heads, which it mints whole: the
+  fold's burst arm is not a frame-carrying statement, and the map arm is pinned
+  at the readings of a source EXPRESSION, which a chain step does not carry — a
+  chain records the frame, not what it was built from. So each head currently
+  asserts a whole path fit off a hop count, which is the widest thing in the
+  tier. Restate the shelf's two arms in what a chain step carries, and the heads
+  become steps like the other three.
 
 ### The ledger
 
-- **`entry-drain-fits`** (Verify-Rank-Sufficient) — FALSITY, `PROBED`: the
-  premise at the door, for every arrival the allowance serves and every chain
-  each one reaches. Hereditary in both, so a single cascade installing a frame
-  the root subscribe never built refutes it.
+- **`entry-drain-hop`** (Verify-Rank-Sufficient) — FALSITY, `PROBED`: the
+  door's whole premise, in a currency that mentions no run — a chain's
+  flattener count against the program's own reading. Hereditary in arrivals and
+  in chains, and the one row reaching a flattener holds by EQUALITY.
+
+- **`map-head-carried` / `scan-head-carried`**
+  (Verify-Rank-Sufficient.Path-Fits) — FALSITY, `REFUTED×2`: the two frames
+  whose residue is read off the SOURCE EXPRESSION, pinned instead at the
+  headroom the tail leaves. A fold refolds once per DELIVERY, which a hop bound
+  does not count.
+
+- **`share-sink-dry`** (Verify-Rank-Sufficient.Path-Fits) — FALSITY, `PROBED`:
+  the sink ends its chain and fans its values out to every chain on the share,
+  folded threading ONE state. The leaf is stated at the store the dispatch was
+  ENTERED at, and the fan-out's own writes are measured to move it.
+
+- **`from-inner-dry` / `thru-outer-frame-dry`**
+  (Verify-Rank-Sufficient.Path-Fits) — FALSITY, `PROBED×2`: dry-freedom of the
+  only two frames that re-enter the evaluator, each over every payload its
+  incoming bound admits. The other three are discharged outright, which is what
+  says these two are where the risk actually is.
+
+- **`from-inner-carried`** (Verify-Rank-Sufficient.Path-Fits) — FALSITY,
+  `PROBED`: the exit frame threads what it was handed unchanged. `innerReact`
+  returns its payload untouched on every branch but the completion one, where a
+  node's queue is drained and fresh bursts appended — the branch nothing has
+  reached.
 
 - **`map-frame-carried`** (Verify-Rank-Sufficient.Push-Carried) — DIFFICULTY,
   `REFUTED×2, PROBED`: the two ends read DIFFERENT expressions, apart by the

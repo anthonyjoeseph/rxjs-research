@@ -108,14 +108,13 @@ open import Probed.Arrival-Spend
   using (deepFork; packed₁-is; packed₃-is; packed₄-is; packed₅-is;
          packed₆-is; packed₇-is; packed₈-is; flat-reads)
 
--- the three counts are claimed beside the fit because each is a way the
--- fit could have been green having asked for nothing — no arrival, an
--- arrival reaching no chain, or a chain carrying a frame — and the
--- boundary's counts are claimed for the opposite reason: they are what
--- says the second family is unreachable rather than untried
+-- the packed rows are claimed beside the two fits because each is a way
+-- a fit could have been green having asked for nothing — no arrival, an
+-- arrival reaching no chain, or a chain the premise compares at nought
+-- against a reading of nought — and the flattened row is claimed for
+-- the opposite reason: it holds by equality, so it is the finding
 open import Probed.Door-Fits
-  using (bareArrived; bareReached; bareFrames; doorBare;
-         flatArrived; flatReached; flatFrames)
+  using (bareRow; doorBare; flatRow; doorFlat)
 
 -- the agreement rows are claimed beside the fork because a separation
 -- between two rules that differ everywhere says nothing about the shape
@@ -149,3 +148,26 @@ open import Probed.Store-Rank
 open import Probed.Share-Fanout
   using (fanoutFork; oneRow; thriceRow; mixedRow; payRow;
          quietRow; quietAgree)
+
+-- the store figures are claimed beside the three dry rows because each
+-- is a way a dry-free reading could have been green having dispatched
+-- nothing — an empty registration list, a store that was nought going
+-- in, or one the dispatch never wrote — and the quiet row is claimed
+-- for the opposite reason: it is nought at both ends, which is what
+-- separates the dry property from the writing rather than controlling
+-- for it
+open import Probed.Sink-Dry
+  using (one3-is; three3-is; quiet3-is;
+         sinkOne3; sinkThree3; sinkQuiet3)
+
+-- the three packed figures are claimed beside the dry rows because the
+-- dry flag reading false says nothing on its own — it is false at a
+-- point nothing emitted too — so what makes those rows evidence is the
+-- handed reading being positive and the rank standing strictly above
+-- the bound.  The exit-frame figure is claimed for the opposite
+-- reason: it is nought in every column, which is the row's own
+-- statement that it buys instantiability and not coverage
+open import Probed.Exit-Frame
+  using (packed₁-is; packed₂-is; packed₃-is; fi-packed-is;
+         dryRow₁; dryRow₂; dryRow₃;
+         fromInnerCarried; fromInnerDry)

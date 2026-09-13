@@ -61,7 +61,7 @@
 -- only thing separating that reading from this one.
 ----------------------------------------------------------------------
 
--- FORK: entry-drain-fits
+-- FORK: share-sink-dry
 module Probed.Share-Fanout where
 
 open import Data.Fin using (zero; suc)
