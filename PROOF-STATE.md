@@ -224,15 +224,24 @@ now at the door and at the templates the door's chains are built from.
 
 ### Big picture tier roadmap
 
-- **THE SUBSTITUTION RESIDUE IS THE TRUNK, AND IT NOW HAS TWO EXITS RATHER THAN
-  ONE.** `below-inner` is refuted over an arbitrary floor, but every pair a RUN
-  supplies is now instantiated and holds, the manufacture route included. So the
-  repair is no longer forced to be a carried fact: the demand originates at a
-  REGISTRATION, and letting that registration decide its own floor test turns the
-  premise into a theorem about a branch nothing reaches. What remains is to build
-  both exits thinly against the one consumer and let them collide — the carried
-  field cascades into the evaluator's own types, the decided test costs a branch
-  the TS has no counterpart for, and nothing yet says which is cheaper.
+- **THE SUBSTITUTION RESIDUE IS THE TRUNK, AND THE EXIT IS DECIDED — WHAT
+  REMAINS IS THE CUTOVER.** Carrying the tie is not thinly instantiable: the node
+  state the value arrives through carries no floor, and both index-free ways of
+  storing the witness are vacuous. So the registration decides its own floor test
+  and takes a SPENT arm — not a dry one, which would falsify the tier's own
+  statement — when it fails. The evaluator is cut over and the descent arguments
+  are off the call sites; what is left is the two proofs that now split on that
+  test, then the subtraction: the bound's whole module goes, its probe expires
+  with it, and its refutation can no longer be stated.
+
+- **AND THE FOLD'S FRAME IS MISSING TWO AXES, WHICH IS A FACT ABOUT THE WALK'S
+  CURRENCY AND NOT ABOUT ONE LEAF.** A frame is handed exactly two scalars, and a
+  fold needs a quantity from outside each — the payload bound is a POINTWISE join
+  carrying no cardinality, the store bound reads a scan node through the hop half
+  of its accumulator alone. So no right-hand side repairs `scan-frame-carried`,
+  and the arm cannot be retired in favour of the burst-and-seed form either. The
+  leg is a restatement of the PREDICATE, uniform for the four frames that read
+  neither quantity; the argument is in the leaf's own header.
 
 - **AND THE THREE RE-ENTRANT LEAVES ARE THE FALSITY NOTHING HAS NARROWED.**
   `from-inner-dry`, `thru-outer-frame-dry` and `from-inner-carried` are the only
@@ -240,18 +249,8 @@ now at the door and at the templates the door's chains are built from.
   `innerReact` returns its payload untouched. The branch none of them reaches is
   the same one in each case — a completing node whose queue is drained and whose
   fresh bursts are appended — so one harness that reaches a completion under a
-  live flattener decides all three at once, and it is the one region where these
-  statements could still be false rather than merely hard.
-
-- **AND THE FOLD'S FRAME IS MISSING AN AXIS THE SHELF ALREADY STATES ELSEWHERE.**
-  `scan-frame-carried` prices a scan's residue at ONE application of its
-  template, where the machine iterates the template once per delivery from the
-  accumulator the seed installed — so it is exactly right on a burst of one and
-  falls a layer short per delivery after that. The quantity it lacks is neither
-  half of the payload pair but the LENGTH of the list the frame is handed, which
-  the predicate quantifies over unboundedly. `scan-burst-carried` is the same
-  fold stated AT THE BURST, where that length is in scope; either route the
-  shelf's scan arm through it or give the frame leaf the third axis outright.
+  live flattener decides all three at once. It is ranked below the currency
+  because a leaf restated under a widened predicate is a leaf probed twice.
 
 ### Open questions
 
