@@ -60,9 +60,22 @@ SRC = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                    "agda", "src")
 
 # Pairs kept apart on purpose.  A frozenset of the two names -> why.
-# ADDING AN ENTRY IS A RULING, so it carries a reason and a date; an
-# entry without one is indistinguishable from an unexamined failure.
-DELIBERATE = {}
+# ADDING AN ENTRY IS A RULING, so it carries a REASON; an entry without
+# one is indistinguishable from an unexamined failure.
+DELIBERATE = {
+    # NOT TWO PROOFS OF ONE FACT — a three-way dispatcher and the one arm
+    # of it that costs a descent.  They return a stream and a state, not a
+    # proposition, and the only reason the RELATION gate reads them as
+    # propositional at all is the floor premise `toℕ i < lo` the sink
+    # constructor now demands: a HYPOTHESIS carrying a `<`, not content.
+    # Merging them would inline the arm back into a where block, which is
+    # exactly the shape the budget proof cannot name — the arm is lifted
+    # for the same reason `takeVals` and `mergeAllDrain` are.
+    frozenset(("sharedConnect", "subscribeSharedSlot")):
+        "dispatcher and its connect arm: one calls the other, and the "
+        "arm is lifted out of a where block so the budget proof can "
+        "name it.  The shared type is a premise, not a claim.",
+}
 
 KEYWORDS = {"module", "open", "import", "postulate", "mutual", "opaque",
             "private", "abstract", "where", "data", "record", "field",

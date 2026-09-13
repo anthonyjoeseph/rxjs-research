@@ -73,6 +73,7 @@ open import Rx.Slot-Read using (slotRd)
 open import Rx.Evaluator using (Sched; EvalSt; root; shareAdmit;
   subscribeE; rootWitness; rootTri; sched-init; st-init; stHop)
 open import Verify-Rank-Sufficient.Push-Carried using (mapRd)
+open import Rx.Inputs-Below using (below-ctx)
 open import Verify-Rank-Sufficient.Path-Fits using (ShareHop)
 
 ----------------------------------------------------------------------
@@ -126,12 +127,12 @@ ac₀ = rootWitness prog ins
 -- the subscribe state: the fold has installed its seed and no arrival
 -- has yet run, which is the state a dispatch is taken at
 sd₀ : Sched Γ₂
-sd₀ = proj₁ (proj₂ (subscribeE ac₀ prog root 0 0 (sched-init prog ins)
-                     (st-init prog)))
+sd₀ = proj₁ (proj₂ (subscribeE {lo = 2} ac₀ prog {below-ctx prog} root 0 0
+                     (sched-init prog ins) (st-init prog)))
 
 st₀ : EvalSt prog
-st₀ = proj₂ (proj₂ (subscribeE ac₀ prog root 0 0 (sched-init prog ins)
-                     (st-init prog)))
+st₀ = proj₂ (proj₂ (subscribeE {lo = 2} ac₀ prog {below-ctx prog} root 0 0
+                     (sched-init prog ins) (st-init prog)))
 
 vals₀ : List ℕ
 vals₀ = 3 ∷ []

@@ -20,10 +20,10 @@
 --      runProtocol's distribution over ++.
 module Verify-Well-Formed.Part2 where
 
-open import Data.Bool    using (Bool; true; false; if_then_else_; _∧_; _∨_)
+open import Data.Bool    using (Bool; true; false; if_then_else_; _∧_; _∨_; T)
 open import Data.Fin     using (Fin; toℕ)
 open import Data.Vec     using (lookup)
-open import Data.Nat     using (suc; _≤_; z≤n; _≡ᵇ_; _<ᵇ_; _+_)
+open import Data.Nat     using (ℕ; suc; _≤_; z≤n; _≡ᵇ_; _<ᵇ_; _+_)
 open import Data.List    using (List; []; _∷_; _++_; length; map)
 open import Data.Bool.ListAction using (any)
 open import Data.Maybe   using (Maybe; just; nothing)
@@ -38,8 +38,8 @@ open import Relation.Nullary using (yes; no)
 
 open import Rx.Prim      using (Tick; Id; Source; hot; cold; InstEvent; init; value; close; complete; subscribe;
   exhausted; _at_from_as_)
-open import Rx.Exp       using (Ctx; Closed; Ty; _≟ᵗ_; Val)
-open import Rx.Evaluator using (Sched; EvalSt; Arrival; RegId; Chain; Path; cutThrough; pathHasNode; memberSource; NodeId;
+open import Rx.Exp       using (Ctx; Closed; Ty; _≟ᵗ_; Val; inputsBelowᵉ)
+open import Rx.Evaluator using (Sched; EvalSt; Arrival; RegId; RegRow; RegSrc; regSource; regFloor; Path; cutThrough; pathHasNode; memberSource; NodeId;
   sched-init; st-init; sched-next; LiveSource; schedGo; schedHeadOf; schedEarlier; arrTy;
   arrSource; chainsOf; chainsGo; cascadeFinish; subscribeE; oneShotBurst; mintSource;
   sameSource; dropSource; sweepLive)
@@ -62,6 +62,7 @@ open import Rx.Strat-Order using (Tri; _≺_)
 
 variable
   τ : Tri
+  lo : ℕ
 
 
 sameTy-sound : ∀ (a b : Ty) → sameTy a b ≡ true → a ≡ b
@@ -124,19 +125,19 @@ liveTypeOK?-extract s u τ (l ∷ ls) ok has with LiveSource.source l ≡ᵇ s
 -- the registry induction: every entry of a's source is a's-typed (else
 -- regTyped? + the live source would contradict), so no chainsGo drop
 count-eq : ∀ {n} {Γ : Ctx n} {t} (a : Arrival Γ)
-  (reg : List (RegId × Source × Chain Γ t)) (live : List (LiveSource Γ)) →
+  (reg : List (RegRow Γ t)) (live : List (LiveSource Γ)) →
   regTyped? reg live ≡ true → liveHas (arrSource a) (arrTy a) live ≡ true →
   countRegs (arrSource a) reg ≡ length (chainsGo a reg)
 count-eq a []                      live rt lh = refl
 count-eq a ((rid , s , (u , p)) ∷ r) live rt lh
-  with sameSource (arrSource a) s in sseq
+  with sameSource (arrSource a) (regSource s) in sseq
 ... | false = count-eq a r live (∧-trueʳ rt) lh
 ... | true  with u ≟ᵗ arrTy a
 ...   | yes refl = cong suc (count-eq a r live (∧-trueʳ rt) lh)
 ...   | no ¬p    = ⊥-elim (¬p (sameTy-sound u (arrTy a)
                     (liveTypeOK?-extract (arrSource a) u (arrTy a) live
                       (subst (λ z → liveTypeOK? z u live ≡ true)
-                             (sym (≡ᵇ→≡ (arrSource a) s sseq)) (∧-trueˡ rt))
+                             (sym (≡ᵇ→≡ (arrSource a) (regSource s) sseq)) (∧-trueˡ rt))
                       lh)))
 
 -- THE derived fact, recovering the old one-lookahead chains-count from
@@ -189,16 +190,16 @@ schedGo-liveTypeOK (l ∷ ls) eq s u | inj₂ (a₀ , l′) | inj₂ (a′ , ls�
                                   then sameTy u (LiveSource.elemTy l) else true))
                             (schedGo-liveTypeOK ls geq s u)
 
-regTyped?-pop : ∀ {n} {Γ : Ctx n} {t} (reg : List (RegId × Source × Chain Γ t))
+regTyped?-pop : ∀ {n} {Γ : Ctx n} {t} (reg : List (RegRow Γ t))
   (live : List (LiveSource Γ)) {a : Arrival Γ} {ls} →
   schedGo live ≡ inj₂ (a , ls) → regTyped? reg live ≡ true → regTyped? reg ls ≡ true
 regTyped?-pop []                      live sgeq rt = refl
 regTyped?-pop ((_ , s , (u , _)) ∷ r) live sgeq rt =
-  ∧-intro (trans (schedGo-liveTypeOK live sgeq s u) (∧-trueˡ rt))
+  ∧-intro (trans (schedGo-liveTypeOK live sgeq (regSource s) u) (∧-trueˡ rt))
           (regTyped?-pop r live sgeq (∧-trueʳ rt))
 
 regTyped?-pop-sched : ∀ {n} {Γ : Ctx n} {t} (sched sched′ : Sched Γ)
-  (reg : List (RegId × Source × Chain Γ t)) {a : Arrival Γ} →
+  (reg : List (RegRow Γ t)) {a : Arrival Γ} →
   sched-next sched ≡ inj₂ (a , sched′) →
   regTyped? reg (Sched.live sched) ≡ true → regTyped? reg (Sched.live sched′) ≡ true
 regTyped?-pop-sched sched sched′ reg eq rt with schedGo (Sched.live sched) in geq
@@ -211,37 +212,37 @@ regTyped?-pop-sched sched sched′ reg eq rt | inj₂ (a₀ , ls) with eq
 -- registrations, sweepLive only removes live sources — both loosen
 -- regTyped?, never tighten it
 regTyped?-dropReg : ∀ {n} {Γ : Ctx n} {t} (src : Source)
-  (reg : List (RegId × Source × Chain Γ t)) (live : List (LiveSource Γ)) →
+  (reg : List (RegRow Γ t)) (live : List (LiveSource Γ)) →
   regTyped? reg live ≡ true → regTyped? (dropSource src reg) live ≡ true
 regTyped?-dropReg src []                      live rt = refl
-regTyped?-dropReg src ((rid , s , (u , p)) ∷ r) live rt with sameSource src s
+regTyped?-dropReg src ((rid , s , (u , p)) ∷ r) live rt with sameSource src (regSource s)
 ... | true  = regTyped?-dropReg src r live (∧-trueʳ rt)
 ... | false = ∧-intro (∧-trueˡ rt) (regTyped?-dropReg src r live (∧-trueʳ rt))
 
 liveTypeOK?-sweepLive : ∀ {n} {Γ : Ctx n} {t}
-  (sweepReg : List (RegId × Source × Chain Γ t)) (s : Source) (u : Ty)
+  (sweepReg : List (RegRow Γ t)) (s : Source) (u : Ty)
   (live : List (LiveSource Γ)) →
   liveTypeOK? s u live ≡ true → liveTypeOK? s u (sweepLive sweepReg live) ≡ true
 liveTypeOK?-sweepLive sweepReg s u []       ok = refl
 liveTypeOK?-sweepLive {n = n} sweepReg s u (l ∷ ls) ok
   with (LiveSource.source l <ᵇ n)
-       ∨ any (λ p → sameSource (LiveSource.source l) (proj₁ (proj₂ p))) sweepReg
+       ∨ any (λ p → sameSource (LiveSource.source l) (regSource (proj₁ (proj₂ p)))) sweepReg
 ... | true  = ∧-intro (∧-trueˡ ok) (liveTypeOK?-sweepLive sweepReg s u ls (∧-trueʳ ok))
 ... | false = liveTypeOK?-sweepLive sweepReg s u ls (∧-trueʳ ok)
 
 regTyped?-sweepLive : ∀ {n} {Γ : Ctx n} {t}
-  (sweepReg reg : List (RegId × Source × Chain Γ t)) (live : List (LiveSource Γ)) →
+  (sweepReg reg : List (RegRow Γ t)) (live : List (LiveSource Γ)) →
   regTyped? reg live ≡ true → regTyped? reg (sweepLive sweepReg live) ≡ true
 regTyped?-sweepLive sweepReg []                      live rt = refl
 regTyped?-sweepLive sweepReg ((_ , s , (u , _)) ∷ r) live rt =
-  ∧-intro (liveTypeOK?-sweepLive sweepReg s u live (∧-trueˡ rt))
+  ∧-intro (liveTypeOK?-sweepLive sweepReg (regSource s) u live (∧-trueˡ rt))
           (regTyped?-sweepLive sweepReg r live (∧-trueʳ rt))
 
 -- cutThrough's `kept` is a sublist of the registry (it only drops victims), so
 -- registry well-typedness is preserved through it
 regTyped?-cutThrough : ∀ {n} {Γ : Ctx n} {t}
   (nid : NodeId) (dlv : List RegId) (wm : RegId) (dying : List Source)
-  (reg : List (RegId × Source × Chain Γ t)) (live : List (LiveSource Γ)) →
+  (reg : List (RegRow Γ t)) (live : List (LiveSource Γ)) →
   regTyped? reg live ≡ true →
   regTyped? (proj₁ (cutThrough nid dlv wm dying reg)) live ≡ true
 regTyped?-cutThrough nid dlv wm dying []                        live rt = refl
@@ -252,7 +253,7 @@ regTyped?-cutThrough nid dlv wm dying ((rid , src , (u , p)) ∷ r) live rt
 ... | true  | kept , closes , rids | ih = ih
 
 reg-typed-finish : ∀ {n} {Γ : Ctx n} {t} (src : Source)
-  (reg : List (RegId × Source × Chain Γ t)) (live : List (LiveSource Γ)) →
+  (reg : List (RegRow Γ t)) (live : List (LiveSource Γ)) →
   regTyped? reg live ≡ true →
   regTyped? (dropSource src reg) (sweepLive (dropSource src reg) live) ≡ true
 reg-typed-finish src reg live rt =
@@ -301,10 +302,11 @@ postulate
   -- the cold arm, the anchored cold tail); nothing in subscribeE removes
   -- a live source.  So a hot slot's entry is still there afterwards.
   subscribeE-hot-live : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (g : Acc _≺_ τ) (b : Closed Γ u) (κ : Path Γ u t) (id : Id) (now : Tick)
+    (g : Acc _≺_ τ) (b : Closed Γ u) (ok : T (inputsBelowᵉ lo b))
+    (κ : Path Γ lo u t) (id : Id) (now : Tick)
     (sched : Sched Γ) (st : EvalSt e) →
     HotLive sched →
-    HotLive (proj₁ (proj₂ (subscribeE g b κ id now sched st)))
+    HotLive (proj₁ (proj₂ (subscribeE g b {ok} κ id now sched st)))
 
   -- STEP, cascade exit.  `cascadeFinish` is the identity unless the
   -- arrival isLast, in which case it sweeps the arrival's source out of
@@ -546,14 +548,14 @@ oneShotBurst-wf vals id sched st S binv deq =
 
 -- countRegs over a tail-append: the new entry adds 1 iff it is s's source
 countRegs-snoc : ∀ {n} {Γ : Ctx n} {t}
-  (s : Source) (r : List (RegId × Source × Chain Γ t))
-  (rid : RegId) (x : Source) (u : Ty) (p : Path Γ u t) →
+  (s : Source) (r : List (RegRow Γ t))
+  (rid : RegId) (x : RegSrc Γ) (u : Ty) (p : Path Γ (regFloor x) u t) →
   countRegs s (r ++ (rid , x , u , p) ∷ [])
-    ≡ countRegs s r + (if s ≡ᵇ x then 1 else 0)
-countRegs-snoc s []                        rid x u p with s ≡ᵇ x
+    ≡ countRegs s r + (if s ≡ᵇ regSource x then 1 else 0)
+countRegs-snoc s []                        rid x u p with s ≡ᵇ regSource x
 ... | true  = refl
 ... | false = refl
-countRegs-snoc s ((rid′ , x′ , u′ , p′) ∷ r) rid x u p with s ≡ᵇ x′
+countRegs-snoc s ((rid′ , x′ , u′ , p′) ∷ r) rid x u p with s ≡ᵇ regSource x′
 ... | true  = cong suc (countRegs-snoc s r rid x u p)
 ... | false = countRegs-snoc s r rid x u p
 

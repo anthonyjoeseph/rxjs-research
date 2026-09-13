@@ -1,23 +1,19 @@
--- THE DISPATCH NEST AT ITS DEEPEST, and the registry's own floor read
--- off the same run.  The counter bounding the share fan-out is seeded at
--- the context size on a reading about the PROGRAM — a chain registered
--- on share i sinks only into the root or a strictly later share — and
--- the sibling probe exercised that seed where it is slack.  These rows
--- stand at the deepest nest a context of four admits, and they read the
--- floor directly rather than inferring it: every slot-sourced
--- registration is printed as the pair (source, the share it sinks into).
+-- THE DISPATCH NEST AT ITS DEEPEST, walked one rung at a time.  The
+-- counter bounding the share fan-out is seeded at the context size, and
+-- the sibling probe exercised that seed where it is slack; these rows
+-- stand at the deepest nest a context of four admits and spend the
+-- counter on DEPTH alone, which is the axis that can outrun the seed.
 
 -- EVIDENCE, not a claim: `src` cannot import this file and nothing in
 -- the proof may rest on it.  Checked by `make probed`, claimed by
 -- `Probed.Main`.
 
--- THE FLOOR IS THE SLOT LAW READ ROOTWARD, which is why the pairs are
--- the interesting rows.  A shared slot's definition may name only inputs
--- strictly BELOW it, so whoever reads share i is the root or a share
--- above i — and the chain registered on share i is exactly that reader's
--- rootward path.  The pairs say whether the run still has that property
--- after it has built the registry, which is the half nothing states:
--- the slot law is carried in a type, the registry is a run object.
+-- THE FLOOR IS NOT MEASURED HERE, BECAUSE IT IS NOW CARRIED IN A TYPE.
+-- A registry row's chain is indexed by the floor its source dictates and
+-- a sink constructor demands its own index be at least that floor, so
+-- "a chain registered on share i sinks only into a strictly later
+-- share" is what the row's type says rather than something a run could
+-- fail.  A row asserting it could not have failed and so is not a row.
 
 -- AND INDEX ZERO IS NEVER A DISPATCH TARGET, which is what makes the
 -- seed slack by construction rather than by luck.  Asynchrony enters
@@ -31,29 +27,29 @@
 -- their predecessor DIRECTLY — a nest whose rungs carry flatteners or
 -- takes would spend frames these rows never build.  Nothing here reaches
 -- a cancelled registration, a completing share, or a registry admitting
--- two chains at one source, so the pairs are a floor over a registry
--- that is one chain wide at every rung.
+-- two chains at one source, so the staircase is a reading over a
+-- registry that is one chain wide at every rung.
 -- TARGET: dispatch-saturates @51e075
 module Probed.Sink-Floor where
 
-open import Data.Bool using (Bool; true; false; _∧_; if_then_else_)
-open import Data.Fin using (zero; suc; toℕ)
+open import Data.Bool using (false)
+open import Data.Fin using (zero; suc)
 open import Data.List using (List; []; _∷_; length)
-open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; _+_; _<ᵇ_)
-open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Data.Maybe using (nothing)
+open import Data.Nat using (ℕ)
+open import Data.Product using (_,_; proj₁; proj₂)
 open import Data.Vec using () renaming ([] to []ⱽ; _∷_ to _∷ⱽ_)
 open import Induction.WellFounded using (Acc)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import Rx.Prim using (cold; after_,_; Source)
+open import Rx.Prim using (cold; after_,_)
 open import Rx.Exp using (Ctx; Closed; Fn; natᵗ; obs; strmᵗ; nat̂; ofᵉ;
   mapᵉ; mergeAllᵉ; input)
 open import Rx.Slots using (Slots; scripted; shared)
 open import Rx.Strat-Order using (_≺_)
-open import Rx.Evaluator using (Sched; EvalSt; Path; root; share-sink;
-  _↠_; Chain; RegId; rootTri; subscribeE; rootWitness; sched-init;
-  st-init; dispatchShare; shareAdmit)
+open import Rx.Evaluator using (Sched; EvalSt; root; rootTri; subscribeE;
+  rootWitness; sched-init; st-init; dispatchShare; shareAdmit)
+open import Rx.Inputs-Below using (below-ctx)
 open import Rx.Evaluator-Theorems using (dispatch-saturates)
 
 open import Probed.Apparatus using (Below; Confirms)
@@ -90,55 +86,15 @@ ac₀ : Acc _≺_ (rootTri prog ins)
 ac₀ = rootWitness prog ins
 
 sd₀ : Sched Γ₄
-sd₀ = proj₁ (proj₂ (subscribeE ac₀ prog root 0 0 (sched-init prog ins)
-                     (st-init prog)))
+sd₀ = proj₁ (proj₂ (subscribeE {lo = 4} ac₀ prog {below-ctx prog} root 0 0
+                     (sched-init prog ins) (st-init prog)))
 
 st₀ : EvalSt prog
-st₀ = proj₂ (proj₂ (subscribeE ac₀ prog root 0 0 (sched-init prog ins)
-                     (st-init prog)))
+st₀ = proj₂ (proj₂ (subscribeE {lo = 4} ac₀ prog {below-ctx prog} root 0 0
+                     (sched-init prog ins) (st-init prog)))
 
 vals₀ : List ℕ
 vals₀ = 7 ∷ []
-
-----------------------------------------------------------------------
--- THE FLOOR, READ OFF THE REGISTRY.  A path ends at the root or at one
--- share, so the share a chain sinks into is a partial function of it;
--- the pair is that index beside the source the chain is registered on.
--- The claim is that the second strictly exceeds the first at every row.
-----------------------------------------------------------------------
-
-sinkOf : ∀ {s t} → Path Γ₄ s t → Maybe ℕ
-sinkOf root           = nothing
-sinkOf (share-sink j) = just (toℕ j)
-sinkOf (f ↠ p)        = sinkOf p
-
--- the claim, per row: a chain registered on a SLOT source sinks into a
--- strictly higher share.  Dynamically minted sources are exempt because
--- no dispatch admits them — `shareAdmit i` filters on `toℕ i` — and
--- their numbering is an allocation artifact the rows must not pin
-okRow : ℕ → Maybe ℕ → Bool
-okRow s nothing  = true
-okRow s (just j) = if s <ᵇ 4 then s <ᵇ j else true
-
-floorOK : List (RegId × Source × Chain Γ₄ natᵗ) → Bool
-floorOK []                       = true
-floorOK ((_ , s , (_ , p)) ∷ rest) = okRow s (sinkOf p) ∧ floorOK rest
-
--- HOW MANY ROWS THE CLAIM ACTUALLY BINDS ON, pinned first: `floorOK`
--- is an `all` over a list, so it is TRUE of a registry holding no
--- slot-sourced sink at all and would report a tidy green having checked
--- nothing.  This counts the rows that could have refuted it
-bound : List (RegId × Source × Chain Γ₄ natᵗ) → ℕ
-bound []                       = 0
-bound ((_ , s , (_ , p)) ∷ rest) with sinkOf p
-... | nothing = bound rest
-... | just _  = (if s <ᵇ 4 then 1 else 0) + bound rest
-
-binds-is : bound (EvalSt.registry st₀) ≡ 2
-binds-is = refl                                         -- LOAD-BEARING
-
-floor-is : floorOK (EvalSt.registry st₀) ≡ true
-floor-is = refl                                         -- LOAD-BEARING
 
 ----------------------------------------------------------------------
 -- THE NEST THE DISPATCH ACTUALLY WALKS.  One chain per rung, so the

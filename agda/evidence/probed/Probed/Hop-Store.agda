@@ -41,7 +41,7 @@
 -- with a whole `suc` to spare.  A queue holding something deeper than
 -- the source that emitted it does not exist to be built.
 --
--- TARGET: thru-outer-frame-carried @260099
+-- TARGET: thru-outer-frame-carried @134c89
 module Probed.Hop-Store where
 
 open import Data.Bool using (Bool; false)
@@ -65,6 +65,7 @@ open import Rx.Slot-Read using (slotRd)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; NodeId; NodeState; subscribeE; rootWitness; rootTri; root; _↠_;
   sched-init; st-init; mintNode; installNode; mergeAll-st; thru-outer; mergeAllᵒ; splitBurst;
   stepFrame; stHop)
+open import Rx.Inputs-Below using (below-ctx)
 open import Verify-Rank-Sufficient.Carried using (valsRd)
 open import Verify-Rank-Sufficient.Push-Carried
   using (thru-outer-frame-carried)
@@ -95,7 +96,8 @@ module Ap {n} {Γ : Ctx n} (ins : Slots Γ)
   nid = proj₁ (mintNode (sched-init prog ins))
 
   r : Stream Γ (obs (obs natᵗ)) × Sched Γ × EvalSt prog
-  r = subscribeE ac src (thru-outer mergeAllᵒ nid ↠ root) 0 0
+  r = subscribeE {lo = n} ac src {below-ctx src}
+        (thru-outer mergeAllᵒ nid ↠ root) 0 0
         (proj₂ (mintNode (sched-init prog ins)))
         (installNode nid node (st-init prog))
 
@@ -117,7 +119,7 @@ module Ap {n} {Γ : Ctx n} (ins : Slots Γ)
 
   sf : List (Val Γ (obs natᵗ)) × List (InstEvent (Val Γ (obs natᵗ)))
      × Bool × Sched Γ × EvalSt prog
-  sf = stepFrame ac 0 0 (thru-outer mergeAllᵒ nid) root vals fin sd st
+  sf = stepFrame {lo = n} ac 0 0 (thru-outer mergeAllᵒ nid) root vals fin sd st
 
   -- the bound the arriving observables are held to — the source's own
   -- payload PAIR, which is what the walk enters this frame at
@@ -289,17 +291,17 @@ counts₂-is = refl
 -- handed leaves the row unsolvable rather than passing quietly.
 ----------------------------------------------------------------------
 
-stRow₀ : Confirms (thru-outer-frame-carried Q0.ac 0 0 mergeAllᵒ Q0.nid root
+stRow₀ : Confirms (thru-outer-frame-carried {lo = 0} Q0.ac 0 0 mergeAllᵒ Q0.nid root
   Q0.ψ Q0.Rin Q0.Rst Below Q0.vals Q0.fin Q0.sd Q0.st
   (Below , Below) Below)
 stRow₀ = (Below , Below) , Below
 
-stRow₁ : Confirms (thru-outer-frame-carried Q1.ac 0 0 mergeAllᵒ Q1.nid root
+stRow₁ : Confirms (thru-outer-frame-carried {lo = 0} Q1.ac 0 0 mergeAllᵒ Q1.nid root
   Q1.ψ Q1.Rin Q1.Rst Below Q1.vals Q1.fin Q1.sd Q1.st
   (Below , Below) Below)
 stRow₁ = (Below , Below) , Below
 
-stRow₂ : Confirms (thru-outer-frame-carried Q2.ac 0 0 mergeAllᵒ Q2.nid root
+stRow₂ : Confirms (thru-outer-frame-carried {lo = 0} Q2.ac 0 0 mergeAllᵒ Q2.nid root
   Q2.ψ Q2.Rin Q2.Rst Below Q2.vals Q2.fin Q2.sd Q2.st
   (Below , Below) Below)
 stRow₂ = (Below , Below) , Below

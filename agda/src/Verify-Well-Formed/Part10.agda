@@ -34,7 +34,7 @@ open import Relation.Binary.PropositionalEquality
 open import Rx.Prim      using (Tick; Id; Source; InstEvent; init; value; close; handoff; complete; delivery; exhausted;
   dried; cut; cutPending)
 open import Rx.Exp       using (Ctx; Closed; Val)
-open import Rx.Evaluator using (Sched; EvalSt; Arrival; RegId; Path; root; arrTy; arrSource; dropSource)
+open import Rx.Evaluator using (Sched; EvalSt; Arrival; RegId; AtFloor; root; arrTy; arrSource; dropSource)
 open import Rx.Protocol  using (ProtocolSt; Owed; countIn; allZero; paidUp; settle; hasOwed; payOwed; paidOff; applyEvents;
   removeOne; cancelOwed; bumpOwed)
 
@@ -224,7 +224,7 @@ readoff-cancel s evs liveS Lv ob′ Ov dn d′ R apEq shEq =
 -- hypotheses — the residual obligations the frame recursion (from-inner's
 -- aliveThrough certificate) and a thru-outer node↔registry coherence field will
 -- discharge.  This VALIDATES the FoldOut field statements (all inhabited).
-foldPath-root-out : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+foldPath-root-out : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo : ℕ}
   (sf : Acc _≺_ τ) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
   (vals : List (Val Γ t)) (evs : List (InstEvent (Val Γ t)))
   (fin : Bool) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt)
@@ -234,7 +234,7 @@ foldPath-root-out : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
      allShareSunk (dropSource envSrc (EvalSt.registry st)) ≡ true) →
   -- STEADY: an already-done registry is fully plumbed
   (ProtocolSt.done S ≡ true → allShareSunk (EvalSt.registry st) ≡ true) →
-  FoldOut sf gas id now envSrc root vals evs fin sched st (FoldInv.ob′ fi) S
+  FoldOut sf gas id now envSrc (root {lo = lo}) vals evs fin sched st (FoldInv.ob′ fi) S
     (record { live = FoldInv.Lv fi ; horizon = FoldInv.hz fi
             ; current = just (id , FoldInv.Ov fi)
             ; done = if fin then true else ProtocolSt.done S })
@@ -372,8 +372,8 @@ applyEvents-close-exh x live live′ owed done ro rewrite ro = refl
 -- live-source counts it: countIn = the uncancelled snapshot remainder,
 -- ≥ 1 for a non-cancelled head).
 seed-applies : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {a : Arrival Γ}
-  {nextId : Id} {rid : RegId} {p : Path Γ (arrTy a) t}
-  {ps : List (RegId × Path Γ (arrTy a) t)} {sched : Sched Γ} {st : EvalSt e}
+  {nextId : Id} {rid : RegId} {p : AtFloor Γ (arrTy a) t}
+  {ps : List (RegId × AtFloor Γ (arrTy a) t)} {sched : Sched Γ} {st : EvalSt e}
   {S : ProtocolSt} (ob′ : Owed) →
   Mid a nextId ((rid , p) ∷ ps) sched st S →
   any (_≡ᵇ rid) (EvalSt.cancelled st) ≡ false →
@@ -412,8 +412,8 @@ payOwed-seed s k rewrite ≡ᵇ-refl s = refl
 -- registry carries ≥ 1 entry.  (The isLast gate is now vacuous — reg-bound
 -- holds unconditionally — but kept so seed-live-pos's call site is unchanged.)
 countRegs-arrSrc-pos : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {a : Arrival Γ}
-  {nextId : Id} {rid : RegId} {p : Path Γ (arrTy a) t}
-  {ps : List (RegId × Path Γ (arrTy a) t)} {sched : Sched Γ} {st : EvalSt e}
+  {nextId : Id} {rid : RegId} {p : AtFloor Γ (arrTy a) t}
+  {ps : List (RegId × AtFloor Γ (arrTy a) t)} {sched : Sched Γ} {st : EvalSt e}
   {S : ProtocolSt} →
   Mid a nextId ((rid , p) ∷ ps) sched st S →
   any (_≡ᵇ rid) (EvalSt.cancelled st) ≡ false →

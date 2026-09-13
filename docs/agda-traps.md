@@ -161,3 +161,33 @@ error message actively misdirects. Read the entry before reasoning from the erro
   same trap seen from the other end. `in` names the proof and adds no pattern position,
   so the arms themselves need no change; the whole cost of this is finding it, four
   sites at a time.
+
+- **AN INDEX THAT REACHES THE GOAL ONLY THROUGH `T` IS UNSOLVABLE, AND A CONSTRUCTOR
+  THAT LEAVES THAT INDEX FREE IS WHERE IT BITES.** `T : Bool → Set` is not injective —
+  it computes to `⊤` or `⊥` and forgets which boolean produced it — so a statement whose
+  conclusion is `T (p k x)` determines nothing about `k`. That alone is survivable while
+  some OTHER argument mentions the index. The trap is a constructor that mentions it
+  vacuously: a path family indexed by a floor whose root constructor reads
+  `root : ∀ {lo t} → Path Γ lo t t` puts no constraint on `lo` at all, so a row whose
+  only floor-carrying argument is `root` leaves the index a meta with nothing anywhere to
+  pin it. Agda reports `Unsolved metas` at the APPLICATION, which reads as the statement
+  being ill-formed or the harness being wrong; both are fine. **The repair is one
+  explicit pin at the application site** — `f {lo = 1} …`, at whatever value the harness
+  actually ran — and the value is read off the run's own entry point rather than guessed.
+  Two properties make this worth a doc: it fires per row, so a probe file goes from
+  seventeen metas to none on one pass; and it is textually decidable, so **census every
+  application of the floor-carrying statement in one `grep` and pin them together**
+  rather than paying a build per reveal. Measured at thirty-four pins across six probe
+  files, found in two passes after the first was driven one error at a time.
+
+- **A `variable` BLOCK GENERALISES THE TELESCOPE IN DECLARATION ORDER, AND A REUSED NAME
+  BECOMES A PROJECTION OUT OF SOMETHING ELSE.** Two failures with one cause. Generalised
+  binders are inserted in the order the block declares them, not the order the statement
+  mentions them, so a signature depending on two of them can be generated with the
+  dependency backwards and reports an out-of-scope variable in a type you can see is
+  well-formed. And a block generalising both a size and a context over that size lets
+  Agda reconstruct the size as a FIELD of the generalised context, so a statement that
+  separately mentions the bare size fails with `Γ.n != n of type ℕ` — two names for one
+  number, neither of which you wrote. **Write the telescope explicitly whenever a
+  statement mentions more than one generalised name**; the block is a convenience for
+  single-binder signatures and stops paying past that.

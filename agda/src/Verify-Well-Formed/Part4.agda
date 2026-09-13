@@ -38,9 +38,10 @@ open import Relation.Binary.PropositionalEquality
 open import Rx.Prim      using (Id; Source; InstEvent; init; value; close; handoff; complete; EmitKind; exhausted; dried;
   cut; cutPending; _at_from_as_)
 open import Rx.Exp       using (Ctx; Closed; Ty)
-open import Rx.Evaluator using (Sched; EvalSt; Arrival; RegId; Chain; Path; root; memberSource; NodeId; NodeState; scan-st;
-  take-st; mergeAll-st; switch-st; exhaust-st; sched-init; st-init; arrTy; arrSource;
-  cascadeGo; subscribeE; sameSource; hasDry; dropSource; rootWitness)
+open import Rx.Evaluator using (Sched; EvalSt; Arrival; RegId; RegRow; RegSrc; regFloor; AtFloor; Path; root; memberSource;
+  NodeId; NodeState; scan-st; take-st; mergeAll-st; switch-st; exhaust-st; sched-init; st-init;
+  arrTy; arrSource; cascadeGo; subscribeE; sameSource; hasDry; dropSource; rootWitness)
+open import Rx.Inputs-Below using (below-ctx)
 open import Rx.Slots using (Slots)
 open import Rx.Protocol  using (ProtocolSt; Owed; countIn; allZero; protocol-init; stepProtocol; runProtocol; paidUp; settle;
   paidOff; applyEvents; removeOne; cancelOwed; bumpOwed; settleInstant)
@@ -179,8 +180,8 @@ burst-final sched st S binv dyF dp cv = inv , paid (BurstInv.current-frame binv)
 -- burst leaves behind.  Both root-exit facts below are stated at it, and it
 -- is the only state at which either is claimed.
 rootExitSt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) → EvalSt e
-rootExitSt e ins =
-  proj₂ (proj₂ (subscribeE (rootWitness e ins) e root 0 0
+rootExitSt {n} e ins =
+  proj₂ (proj₂ (subscribeE {lo = n} (rootWitness e ins) e {below-ctx e} root 0 0
                            (sched-init e ins) (st-init e)))
 
 -- ROOT-EXIT done-plumbed, migrated out of BurstInv (see the fork note).  The
@@ -219,10 +220,10 @@ postulate
   root-entry-sunk : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
     (S : ProtocolSt) →
     runProtocol protocol-init
-      (proj₁ (subscribeE (rootWitness e ins) e root 0 0
+      (proj₁ (subscribeE {lo = n} (rootWitness e ins) e {below-ctx e} root 0 0
                          (sched-init e ins) (st-init e))) ≡ just S →
     ProtocolSt.done S ≡ true →
-    (rid : RegId) (src : Source) (u : Ty) (p : Path Γ u t) →
+    (rid : RegId) (src : RegSrc Γ) (u : Ty) (p : Path Γ (regFloor src) u t) →
     (rid , src , (u , p)) ∈ EvalSt.registry (rootExitSt e ins) →
     sinksToShare p ≡ true
 
@@ -304,18 +305,18 @@ root-nodeCache e ins nid (mergeAll-st lim k q od) m =
 root-done-plumbed : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
   (S : ProtocolSt) →
   runProtocol protocol-init
-    (proj₁ (subscribeE (rootWitness e ins) e root 0 0
+    (proj₁ (subscribeE {lo = n} (rootWitness e ins) e {below-ctx e} root 0 0
                        (sched-init e ins) (st-init e))) ≡ just S →
   ProtocolSt.done S ≡ true →
   allShareSunk (EvalSt.registry
-    (proj₂ (proj₂ (subscribeE (rootWitness e ins) e root 0 0
+    (proj₂ (proj₂ (subscribeE {lo = n} (rootWitness e ins) e {below-ctx e} root 0 0
                               (sched-init e ins) (st-init e))))) ≡ true
 root-done-plumbed {n} {Γ} {t} e ins S req deq =
   go (EvalSt.registry (rootExitSt e ins))
      (λ rid src u p m → root-entry-sunk e ins S req deq rid src u p m)
   where
-  go : (r : List (RegId × Source × Chain Γ t)) →
-       (∀ rid src u (p : Path Γ u t) →
+  go : (r : List (RegRow Γ t)) →
+       (∀ rid (src : RegSrc Γ) u (p : Path Γ (regFloor src) u t) →
           (rid , src , (u , p)) ∈ r → sinksToShare p ≡ true) →
        allShareSunk r ≡ true
   go []                          h = refl
@@ -325,9 +326,9 @@ root-done-plumbed {n} {Γ} {t} e ins S req deq =
 
 root-caches : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
   cachesValid
-    (EvalSt.nodes (proj₂ (proj₂ (subscribeE (rootWitness e ins) e root 0 0
+    (EvalSt.nodes (proj₂ (proj₂ (subscribeE {lo = n} (rootWitness e ins) e {below-ctx e} root 0 0
                                             (sched-init e ins) (st-init e)))))
-    (EvalSt.registry (proj₂ (proj₂ (subscribeE (rootWitness e ins) e root 0 0
+    (EvalSt.registry (proj₂ (proj₂ (subscribeE {lo = n} (rootWitness e ins) e {below-ctx e} root 0 0
                                                (sched-init e ins) (st-init e))))) ≡ true
 root-caches {n} {Γ} {t} e ins =
   go (EvalSt.nodes (rootExitSt e ins))
@@ -367,7 +368,7 @@ root-caches {n} {Γ} {t} e ins =
 -- here instead of infecting every step statement
 record Mid {n} {Γ : Ctx n} {t} {e : Closed Γ t}
            (a : Arrival Γ) (nextId : Id)
-           (ps : List (RegId × Path Γ (arrTy a) t))
+           (ps : List (RegId × AtFloor Γ (arrTy a) t))
            (sched : Sched Γ) (st : EvalSt e)
            (S : ProtocolSt) : Set where
   field

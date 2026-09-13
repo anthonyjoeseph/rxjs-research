@@ -224,16 +224,16 @@ now at the door and at the templates the door's chains are built from.
 
 ### Big picture tier roadmap
 
-- **THE FLOOR IS AN INDEX ON THE PATH, AND THAT IS WHAT RETIRES THE COUNTER.** A
-  chain registered on share `i` sinks only into a share strictly above `i` — the
-  slot law read rootward — so a path carrying that floor makes the fan-out's
-  re-entry a strict descent and `dispatchShare`'s clamp arm has no type to be
-  written at. The registry's two filters select by SOURCE, so the floor lands in
-  the type of the list the fan-out already takes rather than as a predicate
-  threaded through the five walk modules, which is where the counter's own 123
-  references live. The run preserves it: measured at the deepest nest a context
-  of four admits. The residue is the arm construction cannot reach, postulated
-  at full strength; see below.
+- **THE FLOOR IS AN INDEX ON THE PATH, AND WHAT REMAINS OF THE LEG IS THE
+  MEASURE.** The index has landed across `src` and both evidence trees: a
+  registry row's chain is typed by the floor its own source dictates and a sink
+  constructor demands its position be at least that floor, so the lift the
+  counter stood in for is discharged by construction rather than asserted about
+  a run object. What is not done is the descent. `dispatchShare` still recurses
+  on a number, so its clamp arm is still writable and `dispatch-saturates` still
+  live; swapping the counter for an accessibility on `n ∸ lo` is what leaves
+  that arm with no type, and only then do the counter's references go. The
+  residue is `below-unfoldμ` and `below-inner`.
 
 - **AND THE FOLD'S FRAME IS MISSING AN AXIS THE SHELF ALREADY STATES ELSEWHERE.**
   `scan-frame-carried` prices a scan's residue at ONE application of its
@@ -256,17 +256,18 @@ now at the door and at the templates the door's chains are built from.
 
 ### Open questions
 
-- **Does SUBSTITUTION preserve the telescope's stratification?** Two of the three
-  ways a subscription is entered now answer themselves: at the root the bound
-  holds of every closed term, since its inputs are drawn from the context; at a
-  share's definition the slot constructor already stores it. The arm neither
-  reaches is an observable
-  manufactured at RUNTIME — a value of observable type IS a closed expression,
-  produced by applying a function rather than sitting in the program — so the
-  slot law never saw it and nothing about it is syntactic. Either substitution
-  carries the bound or the inner subscription is where every reading of a
-  registry against the program goes wrong.
-  relevant: `entry-drain-hop`, `share-chain-hop`, `dispatch-saturates`
+- **Does SUBSTITUTION preserve the telescope's stratification?** The SYNTACTIC
+  half is settled: the root's bound holds of every closed term, a share's
+  definition has it stored by the slot constructor, and the graft entering a
+  term at a μ-unfold is instantiated where it could have failed. The arm none
+  of them reaches is an observable manufactured at RUNTIME, which is a closed
+  expression produced by applying a function rather than one sitting in the
+  program. Over an arbitrary floor that arm is FALSE, so what is open is no
+  longer whether the bound survives but what the run state must CARRY for it to
+  be stateable at all — whether a value's provenance is recoverable from the
+  chain it arrived on.
+  relevant: `below-inner`, `entry-drain-hop`, `share-chain-hop`,
+  `dispatch-saturates`
 
 ### The ledger
 
@@ -292,6 +293,11 @@ now at the door and at the templates the door's chains are built from.
   node's queue is drained and fresh bursts appended — the branch nothing has
   reached.
 
+- **`below-inner`** (Rx.Inputs-Below) — SHAPE, `REFUTED`: the bound on an
+  observable manufactured at RUNTIME. False over an arbitrary floor, and sound
+  only once it relates the value to the chain it arrived on — which no
+  hypothesis carries, so the restatement wants a run-state proof field.
+
 - **`share-chain-hop`** (Verify-Rank-Sufficient.Path-Fits) — SHAPE,
   `REFUTED, RECOVERY`: the sink's claim at the share's registry, whose one
   hypothesis bounds what ENTERS the dispatch while the walk is read along the
@@ -302,6 +308,11 @@ now at the door and at the templates the door's chains are built from.
   `REFUTED`: the fold's residue priced at ONE application of its template,
   where the machine iterates it once per delivery. The missing quantity is
   neither half of the payload but the LENGTH of the burst.
+
+- **`below-unfoldμ`** (Rx.Inputs-Below) — DIFFICULTY, `PROBED`: the input
+  bound's closure under the μ-unfold, the one place a term ENTERS another
+  rather than being walked into. Instantiated at floors strictly inside the
+  context, so what is left is the induction over the graft elimination.
 
 - **`map-frame-carried`** (Verify-Rank-Sufficient.Push-Carried) — DIFFICULTY,
   `REFUTED×2, DEAD ROUTE, PROBED`: both ends now read the payload PAIR, and the

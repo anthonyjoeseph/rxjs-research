@@ -7,7 +7,7 @@
 --
 -- The sibling witness one door along left this open deliberately,
 -- reading the drain-side hole as needing a REACHED state.  It does not.
--- A registration's chain is a `Path Γ s t`, typed by the context and
+-- A registration's chain is a `Path Γ lo s t`, typed by the context and
 -- the root type alone — it carries no index tying it to the program
 -- being run — so an adversarial registry is WRITTEN, and the arithmetic
 -- that kills the leaf is arithmetic about what a written chain can do.
@@ -58,7 +58,8 @@ open import Rx.Exp using (Ctx; Closed; Fn; natᵗ; obs; strmᵗ; nat̂; ofᵉ;
   emptyᵉ; mergeAllᵉ)
 open import Rx.Slots using (Slots)
 open import Rx.Evaluator using (Sched; EvalSt; Path; root; _↠_; map-f;
-  thru-outer; mergeAllᵒ; mergeAll-st; drain; hasDry; sched-init; st-init)
+  thru-outer; mergeAllᵒ; mergeAll-st; drain; hasDry; sched-init; st-init;
+  atDyn)
 open import Verify-Well-Formed.Part2 using (Inv)
 
 ----------------------------------------------------------------------
@@ -101,7 +102,7 @@ deep = strmᵗ (mergeAllᵉ nothing (ofᵉ (strmᵗ
            ∷ [])))
          ∷ [])))
 
-chain₀ : Path Γ₀ natᵗ natᵗ
+chain₀ : Path Γ₀ 0 natᵗ natᵗ
 chain₀ = map-f deep ↠ (thru-outer mergeAllᵒ 0 ↠ root)
 
 sched₀ : Sched Γ₀
@@ -111,7 +112,7 @@ sched₀ = record (sched-init e₀ ins₀)
 
 st₀ : EvalSt e₀
 st₀ = record (st-init e₀)
-  { registry = (0 , 0 , (natᵗ , chain₀)) ∷ []
+  { registry = (0 , atDyn 0 0 , (natᵗ , chain₀)) ∷ []
   ; nextReg  = 1
   ; nodes    = (0 , mergeAll-st {t = natᵗ} nothing 0 [] false) ∷ [] }
 

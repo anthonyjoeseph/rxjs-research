@@ -66,6 +66,7 @@ open import Rx.Slot-Read using (slotRd)
 open import Rx.Evaluator using (Sched; EvalSt; Path; root; share-sink; _↠_;
   thru-outer; from-inner; chainsOf; sched-next; cascade; subscribeE;
   rootWitness; sched-init; st-init; arrTy; arrVal; stHop)
+open import Rx.Inputs-Below using (below-ctx)
 open import Verify-Rank-Sufficient.Fits using (arrivalRank)
 open import Probed.Apparatus using (Separates; separates-at)
 
@@ -125,7 +126,7 @@ manyProg = mergeAllᵉ nothing
 entry : (e : Closed Γ₁ natᵗ) → Sched Γ₁ × EvalSt e
 entry e =
   let (_ , sched , st) =
-        subscribeE (rootWitness e insLate) e root 0 0
+        subscribeE {lo = 1} (rootWitness e insLate) e {below-ctx e} root 0 0
           (sched-init e insLate) (st-init e)
   in sched , st
 
@@ -307,7 +308,8 @@ sharedProg = mergeAllᵉ nothing (ofᵉ (sFold ∷ sFold ∷ sFold ∷ []))
 sEntry : Sched Γ₂ × EvalSt sharedProg
 sEntry =
   let (_ , sched , st) =
-        subscribeE (rootWitness sharedProg insShared) sharedProg root 0 0
+        subscribeE {lo = 2} (rootWitness sharedProg insShared) sharedProg
+          {below-ctx sharedProg} root 0 0
           (sched-init sharedProg insShared) (st-init sharedProg)
   in sched , st
 
@@ -337,28 +339,28 @@ sRank k with sAt k
 ...   | inj₁ _            = 0
 ...   | inj₂ (a , sched′) = arrivalRank a sched′ st
 
-sinks : ∀ {s t} → Path Γ₂ s t → ℕ
-sinks root           = 0
-sinks (share-sink _) = 1
-sinks (_ ↠ p)        = sinks p
+sinks : ∀ {lo s t} → Path Γ₂ lo s t → ℕ
+sinks root             = 0
+sinks (share-sink _ _) = 1
+sinks (_ ↠ p)          = sinks p
 
-souters : ∀ {s t} → Path Γ₂ s t → ℕ
+souters : ∀ {lo s t} → Path Γ₂ lo s t → ℕ
 souters root                 = 0
-souters (share-sink _)       = 0
+souters (share-sink _ _)     = 0
 souters (thru-outer _ _ ↠ p) = suc (souters p)
 souters (_ ↠ p)              = souters p
 
-sinners : ∀ {s t} → Path Γ₂ s t → ℕ
+sinners : ∀ {lo s t} → Path Γ₂ lo s t → ℕ
 sinners root                   = 0
-sinners (share-sink _)         = 0
+sinners (share-sink _ _)       = 0
 sinners (from-inner _ _ _ ↠ p) = suc (sinners p)
 sinners (_ ↠ p)                = sinners p
 
-sOver : (∀ {s t} → Path Γ₂ s t → ℕ) → ℕ → ℕ
+sOver : (∀ {lo s t} → Path Γ₂ lo s t → ℕ) → ℕ → ℕ
 sOver f k with sAt k
 ... | (sched , st) with sched-next sched
 ...   | inj₁ _       = 0
-...   | inj₂ (a , _) = sum (map (λ rp → f (proj₂ rp)) (chainsOf a st))
+...   | inj₂ (a , _) = sum (map (λ rp → f (proj₂ (proj₂ rp))) (chainsOf a st))
 
 ----------------------------------------------------------------------
 -- AND THE SHARED ARRIVAL REACHES ONE CHAIN TOO, carrying one sink and

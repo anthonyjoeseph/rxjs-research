@@ -58,7 +58,7 @@ open import Rx.Exp using (Ctx; Closed; Val)
 open import Rx.Strat-Order using (_≺_)
 open import Rx.Hop-Depth using (Rd; Rd₃; depthᵉ; depthᵛ; rdᵛ)
 open import Rx.Slot-Read using (slotRd)
-open import Rx.Evaluator using (Path; Sched; EvalSt; RegId; Arrival;
+open import Rx.Evaluator using (Path; AtFloor; Sched; EvalSt; RegId; Arrival;
   arrTy; arrVal; arrTick; arrSource; arrivalWitness;
   foldPath; shareGo; shareAdmit; shareLatch;
   chainStep; cascadeGo; dispatchShare; stepFrame; dryEvent; hasDry;
@@ -77,7 +77,7 @@ open import Verify-Rank-Sufficient.Fits using (PathFits; at-root; at-sink;
 
 foldPath-dry-free : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} {τ}
   (ac : Acc _≺_ τ) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
-  {ψ : Fin n → Rd₃} {R : Rd} {Rst : ℕ} {κ : Path Γ u t}
+  {ψ : Fin n → Rd₃} {R : Rd} {Rst : ℕ} {lo} {κ : Path Γ lo u t}
   (vals : List (Val Γ u)) (evs : List (InstEvent (Val Γ t))) (fin : Bool)
   (sd : Sched Γ) (st : EvalSt e) →
   PathFits {e = e} ac gas id now ψ Rst κ R →
@@ -125,11 +125,11 @@ foldPath-dry-free {Γ = Γ} {t = t} {e = e} ac gas id now envSrc vals evs fin sd
 -- died on.
 ----------------------------------------------------------------------
 
-shareGo-dry-free : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {τ}
+shareGo-dry-free : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {τ} {lo}
   (ac : Acc _≺_ τ) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
   {ψ : Fin n → Rd₃} {Rin : Rd} {Rst : ℕ}
   (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
-  (ps : List (RegId × Path Γ (lookup Γ i) t))
+  (ps : List (RegId × Path Γ lo (lookup Γ i) t))
   (sd : Sched Γ) (st : EvalSt e) →
   valsRd ψ (lookup Γ i) vals ⊑ Rin →
   ShareChainsFit {e = e} ac gas id now i ψ Rin Rst vals fin ps sd st →
@@ -200,10 +200,10 @@ dispatchShare-dry-free {e = e} ac gas id now i vals true sd st hv fits =
 ----------------------------------------------------------------------
 
 chainStep-dry-free : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (id : Id) (a : Arrival Γ) (c : Path Γ (arrTy a) t)
+  (id : Id) (a : Arrival Γ) (c : AtFloor Γ (arrTy a) t)
   (sched : Sched Γ) (st : EvalSt e) →
   PathFits {e = e} (arrivalWitness a sched st) n id (arrTick a)
-    (slotRd (Sched.slots sched)) (arrivalRank a sched st) c
+    (slotRd (Sched.slots sched)) (arrivalRank a sched st) (proj₂ c)
     (rdᵛ (slotRd (Sched.slots sched)) (arrTy a) (arrVal a)) →
   hasDry (proj₁ (chainStep id a c sched st)) ≡ false
 chainStep-dry-free {n = n} {Γ = Γ} {t = t} {e = e} id a c sched st fit =
@@ -234,7 +234,7 @@ chainStep-dry-free {n = n} {Γ = Γ} {t = t} {e = e} id a c sched st fit =
 ----------------------------------------------------------------------
 
 cascadeGo-dry-free : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (a : Arrival Γ) (id : Id) (cs : List (RegId × Path Γ (arrTy a) t))
+  (a : Arrival Γ) (id : Id) (cs : List (RegId × AtFloor Γ (arrTy a) t))
   (sched : Sched Γ) (st : EvalSt e) →
   ChainsFit a id cs sched st →
   hasDry (proj₁ (cascadeGo a id cs sched st)) ≡ false

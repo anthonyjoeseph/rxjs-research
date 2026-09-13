@@ -80,7 +80,7 @@
 -- the constant margin is where the two currencies were seen to keep
 -- step and not where they were shown to; and nothing here reaches a
 -- registry admitting more than two chains.
--- TARGET: entry-drain-hop @5b9789
+-- TARGET: entry-drain-hop @79bb43
 module Probed.Door-Fits where
 
 open import Data.Fin using (Fin; zero; suc)
@@ -102,7 +102,8 @@ open import Rx.Slot-Read using (slotRd)
 open import Rx.Evaluator using (Sched; EvalSt; Path; root; share-sink;
   _↠_; map-f; scan-f; take-f; from-inner; thru-outer; subscribeE;
   rootWitness; sched-init; st-init; sched-next; chainsOf; cascadeLatch;
-  shareAdmit; arrTy; arrVal; RegId)
+  shareAdmit; arrTy; arrVal; RegId; AtFloor)
+open import Rx.Inputs-Below using (below-ctx)
 open import Verify-Rank-Sufficient using (entry-drain-hop)
 open import Verify-Rank-Sufficient.Fits using (arrivalRank)
 open import Verify-Rank-Sufficient.Push-Carried using (mapRd)
@@ -116,9 +117,9 @@ open import Probed.Apparatus using (Below; Confirms)
 -- is what makes a rank figure beside it readable as tight or slack.
 ----------------------------------------------------------------------
 
-chainHops : ∀ {n} {Γ : Ctx n} {s t} → Path Γ s t → ℕ
+chainHops : ∀ {n} {Γ : Ctx n} {lo s t} → Path Γ lo s t → ℕ
 chainHops root             = 0
-chainHops (share-sink _)   = 0
+chainHops (share-sink _ _) = 0
 chainHops (thru-outer _ _ ↠ κ) = suc (chainHops κ)
 chainHops (_ ↠ κ)          = chainHops κ
 
@@ -195,12 +196,12 @@ insDeep (suc zero) = shared (mergeAllᵉ nothing (mapᵉ lit (input zero)))
 ----------------------------------------------------------------------
 
 entOf : (ins : Slots Γ₁) (e : Closed Γ₁ natᵗ) → Sched Γ₁
-entOf ins e = proj₁ (proj₂ (subscribeE (rootWitness e ins) e root 0 0
-                (sched-init e ins) (st-init e)))
+entOf ins e = proj₁ (proj₂ (subscribeE {lo = 2} (rootWitness e ins) e
+                {below-ctx e} root 0 0 (sched-init e ins) (st-init e)))
 
 stOf : (ins : Slots Γ₁) (e : Closed Γ₁ natᵗ) → EvalSt e
-stOf ins e = proj₂ (proj₂ (subscribeE (rootWitness e ins) e root 0 0
-               (sched-init e ins) (st-init e)))
+stOf ins e = proj₂ (proj₂ (subscribeE {lo = 2} (rootWitness e ins) e
+               {below-ctx e} root 0 0 (sched-init e ins) (st-init e)))
 
 ----------------------------------------------------------------------
 -- THE FIGURES, TAKEN AT THE OBLIGATION'S OWN POINT.  The state is the
@@ -218,13 +219,13 @@ atArrival ins e with sched-next (entOf ins e)
   lat : EvalSt e
   lat = cascadeLatch a (stOf ins e)
 
-  tailHops : List (RegId × Path Γ₁ (arrTy a) natᵗ) → ℕ
-  tailHops []             = 0
-  tailHops ((_ , c) ∷ _)  = chainHops c
+  tailHops : List (RegId × AtFloor Γ₁ (arrTy a) natᵗ) → ℕ
+  tailHops []                = 0
+  tailHops ((_ , _ , c) ∷ _) = chainHops c
 
-  go : List (RegId × Path Γ₁ (arrTy a) natᵗ) → ℕ × ℕ × ℕ × ℕ × ℕ × ℕ
-  go []               = 0 , 0 , 0 , 0 , 0 , 0
-  go ((rid , c) ∷ cs) =
+  go : List (RegId × AtFloor Γ₁ (arrTy a) natᵗ) → ℕ × ℕ × ℕ × ℕ × ℕ × ℕ
+  go []                   = 0 , 0 , 0 , 0 , 0 , 0
+  go ((rid , _ , c) ∷ cs) =
     let st′ = record lat { delivered = rid ∷ EvalSt.delivered lat }
         ψ   = slotRd (Sched.slots sd)
     in depthᵛ ψ (arrTy a) (arrVal a) , chainHops c , arrivalRank a sd st′
@@ -307,9 +308,9 @@ forkedRawRow = refl
 -- door's list would report agreement that nothing had checked.
 ----------------------------------------------------------------------
 
-sinkRd : ∀ {n} {Γ : Ctx n} {s t} → (Fin n → Rd₃) → Path Γ s t → Rd → Rd
+sinkRd : ∀ {n} {Γ : Ctx n} {lo s t} → (Fin n → Rd₃) → Path Γ lo s t → Rd → Rd
 sinkRd ψ root                    Rin = Rin
-sinkRd ψ (share-sink _)          Rin = Rin
+sinkRd ψ (share-sink _ _)        Rin = Rin
 sinkRd ψ (map-f fn ↠ κ)          Rin = sinkRd ψ κ (mapRd ψ Rin fn)
 sinkRd ψ (scan-f fn nid ↠ κ)     Rin = sinkRd ψ κ (mapRd ψ Rin fn)
 sinkRd ψ (take-f nid ↠ κ)        Rin = sinkRd ψ κ Rin
@@ -325,9 +326,9 @@ atSink ins e with sched-next (entOf ins e)
   regs = map (λ p → chainHops (proj₂ p))
              (shareAdmit (suc zero) (EvalSt.registry (stOf ins e)))
 
-  go : List (RegId × Path Γ₁ (arrTy a) natᵗ) → ℕ × ℕ × ℕ
-  go []              = 0 , 0 , 0
-  go ((rid , c) ∷ _) =
+  go : List (RegId × AtFloor Γ₁ (arrTy a) natᵗ) → ℕ × ℕ × ℕ
+  go []                  = 0 , 0 , 0
+  go ((rid , _ , c) ∷ _) =
     let ψ = slotRd (Sched.slots sd)
     in proj₂ (sinkRd ψ c (rdᵛ ψ (arrTy a) (arrVal a)))
      , foldr _⊔_ 0 regs , length regs

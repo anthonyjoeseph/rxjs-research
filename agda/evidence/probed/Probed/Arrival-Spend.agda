@@ -76,10 +76,11 @@ open import Rx.Exp using (Ctx; Closed; Exp; natᵗ; obs; strmᵗ; ofᵉ;
 open import Rx.Slots using (Slots; scripted)
 open import Rx.Hop-Depth using (depthᵉ; depthᵛ)
 open import Rx.Slot-Read using (slotRd)
-open import Rx.Evaluator using (Path; RegId; Sched; EvalSt; Stream; Arrival;
+open import Rx.Evaluator using (AtFloor; RegId; Sched; EvalSt; Stream; Arrival;
   root; subscribeE; rootWitness; sched-init; st-init; sched-next; cascade;
   cascadeLatch; chainsOf; foldPath; entryWitness; stHop; hasDry;
   arrTick; arrSource; arrTy; arrVal)
+open import Rx.Inputs-Below using (below-ctx)
 
 ----------------------------------------------------------------------
 -- THE HARNESS, recovered from `Refuted.Fit-Cascade` — the two programs
@@ -118,9 +119,10 @@ qDeep = deferᵉ (mergeAllᵉ nothing (deferᵉ d4))
 
 entry : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
   Sched Γ × EvalSt e
-entry e ins =
+entry {n = n} e ins =
   let (_ , sched , st) =
-        subscribeE (rootWitness e ins) e root 0 0 (sched-init e ins) (st-init e)
+        subscribeE {lo = n} (rootWitness e ins) e {below-ctx e} root 0 0
+          (sched-init e ins) (st-init e)
   in sched , st
 
 stepOnce : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} →
@@ -142,9 +144,9 @@ stepOnce nextId (sched , st) with sched-next sched
 -- the same cascade at a rank the program's own reading does not supply
 foldAllWith : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {t′} →
   Closed Γ t′ → ℕ → (a : Arrival Γ) → Id →
-  List (RegId × Path Γ (arrTy a) t) → Sched Γ → EvalSt e → Stream Γ t
-foldAllWith rk m a id []              sched st = []
-foldAllWith {n = n} rk m a id ((_ , c) ∷ cs) sched st =
+  List (RegId × AtFloor Γ (arrTy a) t) → Sched Γ → EvalSt e → Stream Γ t
+foldAllWith rk m a id []                  sched st = []
+foldAllWith {n = n} rk m a id ((_ , _ , c) ∷ cs) sched st =
   let (emits , sched₁ , st₁) =
         foldPath (entryWitness rk (Sched.slots sched) m)
                  n id (arrTick a) (arrSource a) c (arrVal a ∷ [])
@@ -154,7 +156,7 @@ foldAllWith {n = n} rk m a id ((_ , c) ∷ cs) sched st =
   in emits ++ foldAllWith rk m a id cs sched₁ st₁
 
 foldAllAt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} →
-  ℕ → (a : Arrival Γ) → Id → List (RegId × Path Γ (arrTy a) t) →
+  ℕ → (a : Arrival Γ) → Id → List (RegId × AtFloor Γ (arrTy a) t) →
   Sched Γ → EvalSt e → Stream Γ t
 foldAllAt {e = e} m = foldAllWith e m
 

@@ -63,7 +63,7 @@
 -- a template whose own body maps again.  The FINISH flag is whatever the
 -- source's burst carried and is not varied.
 --
--- TARGET: map-frame-carried @e715bd
+-- TARGET: map-frame-carried @5c8de1
 module Probed.Map-Frame where
 
 open import Data.Bool using (Bool)
@@ -87,6 +87,7 @@ open import Rx.Slot-Read using (slotRd)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; subscribeE;
   rootWitness; rootTri; root; _↠_; sched-init; st-init; map-f;
   splitBurst; stepFrame; stHop)
+open import Rx.Inputs-Below using (below-ctx)
 open import Verify-Rank-Sufficient.Carried using (valsRd)
 open import Verify-Rank-Sufficient.Push-Carried using (map-frame-carried;
   mapRd)
@@ -117,8 +118,8 @@ module Ap {n} {Γ : Ctx n} (ins : Slots Γ)
   ac = rootWitness prog ins
 
   r : Stream Γ (obs natᵗ) × Sched Γ × EvalSt prog
-  r = subscribeE ac b (map-f fn ↠ root) 0 0 (sched-init prog ins)
-        (st-init prog)
+  r = subscribeE {lo = n} ac b {below-ctx b} (map-f fn ↠ root) 0 0
+        (sched-init prog ins) (st-init prog)
 
   sp : List (Val Γ (obs natᵗ))
      × List (InstEvent (Val Γ (obs natᵗ))) × Bool
@@ -138,7 +139,7 @@ module Ap {n} {Γ : Ctx n} (ins : Slots Γ)
 
   sf : List (Val Γ (obs natᵗ)) × List (InstEvent (Val Γ (obs natᵗ)))
      × Bool × Sched Γ × EvalSt prog
-  sf = stepFrame ac 0 0 (map-f fn) root vals fin sd st
+  sf = stepFrame {lo = n} ac 0 0 (map-f fn) root vals fin sd st
 
   -- the incoming bound is not ours to choose: the walk enters this frame
   -- at the source's own payload pair, and the outgoing one is the
@@ -431,62 +432,62 @@ fold₅-hops = refl
 -- fixes.
 ----------------------------------------------------------------------
 
-mapGrow₀ : Confirms (map-frame-carried Grow₀.ac 0 0 grow root
+mapGrow₀ : Confirms (map-frame-carried {lo = 0} Grow₀.ac 0 0 grow root
   Grow₀.ψ Grow₀.Rin Grow₀.Rst Grow₀.vals Grow₀.fin Grow₀.sd Grow₀.st
   (Below , Below) Below)
 mapGrow₀ = (Below , Below) , Below
 
-mapShed₀ : Confirms (map-frame-carried Shed₀.ac 0 0 shed root
+mapShed₀ : Confirms (map-frame-carried {lo = 0} Shed₀.ac 0 0 shed root
   Shed₀.ψ Shed₀.Rin Shed₀.Rst Shed₀.vals Shed₀.fin Shed₀.sd Shed₀.st
   (Below , Below) Below)
 mapShed₀ = (Below , Below) , Below
 
-mapKeep₀ : Confirms (map-frame-carried Keep₀.ac 0 0 keep root
+mapKeep₀ : Confirms (map-frame-carried {lo = 0} Keep₀.ac 0 0 keep root
   Keep₀.ψ Keep₀.Rin Keep₀.Rst Keep₀.vals Keep₀.fin Keep₀.sd Keep₀.st
   (Below , Below) Below)
 mapKeep₀ = (Below , Below) , Below
 
-mapGrow₁ : Confirms (map-frame-carried Grow₁.ac 0 0 grow root
+mapGrow₁ : Confirms (map-frame-carried {lo = 0} Grow₁.ac 0 0 grow root
   Grow₁.ψ Grow₁.Rin Grow₁.Rst Grow₁.vals Grow₁.fin Grow₁.sd Grow₁.st
   (Below , Below) Below)
 mapGrow₁ = (Below , Below) , Below
 
-mapShed₁ : Confirms (map-frame-carried Shed₁.ac 0 0 shed root
+mapShed₁ : Confirms (map-frame-carried {lo = 0} Shed₁.ac 0 0 shed root
   Shed₁.ψ Shed₁.Rin Shed₁.Rst Shed₁.vals Shed₁.fin Shed₁.sd Shed₁.st
   (Below , Below) Below)
 mapShed₁ = (Below , Below) , Below
 
-mapKeep₁ : Confirms (map-frame-carried Keep₁.ac 0 0 keep root
+mapKeep₁ : Confirms (map-frame-carried {lo = 0} Keep₁.ac 0 0 keep root
   Keep₁.ψ Keep₁.Rin Keep₁.Rst Keep₁.vals Keep₁.fin Keep₁.sd Keep₁.st
   (Below , Below) Below)
 mapKeep₁ = (Below , Below) , Below
 
-mapGrowS : Confirms (map-frame-carried GrowS.ac 0 0 grow root
+mapGrowS : Confirms (map-frame-carried {lo = 0} GrowS.ac 0 0 grow root
   GrowS.ψ GrowS.Rin GrowS.Rst GrowS.vals GrowS.fin GrowS.sd GrowS.st
   (Below , Below) Below)
 mapGrowS = (Below , Below) , Below
 
-mapShedS : Confirms (map-frame-carried ShedS.ac 0 0 shed root
+mapShedS : Confirms (map-frame-carried {lo = 0} ShedS.ac 0 0 shed root
   ShedS.ψ ShedS.Rin ShedS.Rst ShedS.vals ShedS.fin ShedS.sd ShedS.st
   (Below , Below) Below)
 mapShedS = (Below , Below) , Below
 
-mapKeepS : Confirms (map-frame-carried KeepS.ac 0 0 keep root
+mapKeepS : Confirms (map-frame-carried {lo = 0} KeepS.ac 0 0 keep root
   KeepS.ψ KeepS.Rin KeepS.Rst KeepS.vals KeepS.fin KeepS.sd KeepS.st
   (Below , Below) Below)
 mapKeepS = (Below , Below) , Below
 
-mapFold₁ : Confirms (map-frame-carried Fold₁.ac 0 0 fold root
+mapFold₁ : Confirms (map-frame-carried {lo = 0} Fold₁.ac 0 0 fold root
   Fold₁.ψ Fold₁.Rin Fold₁.Rst Fold₁.vals Fold₁.fin Fold₁.sd Fold₁.st
   (Below , Below) Below)
 mapFold₁ = (Below , Below) , Below
 
-mapFold₃ : Confirms (map-frame-carried Fold₃.ac 0 0 fold root
+mapFold₃ : Confirms (map-frame-carried {lo = 0} Fold₃.ac 0 0 fold root
   Fold₃.ψ Fold₃.Rin Fold₃.Rst Fold₃.vals Fold₃.fin Fold₃.sd Fold₃.st
   (Below , Below) Below)
 mapFold₃ = (Below , Below) , Below
 
-mapFold₅ : Confirms (map-frame-carried Fold₅.ac 0 0 fold root
+mapFold₅ : Confirms (map-frame-carried {lo = 0} Fold₅.ac 0 0 fold root
   Fold₅.ψ Fold₅.Rin Fold₅.Rst Fold₅.vals Fold₅.fin Fold₅.sd Fold₅.st
   (Below , Below) Below)
 mapFold₅ = (Below , Below) , Below

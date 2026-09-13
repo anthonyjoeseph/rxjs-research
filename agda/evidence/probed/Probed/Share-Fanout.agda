@@ -83,6 +83,7 @@ open import Rx.Slot-Read using (slotRd)
 open import Rx.Evaluator using (Sched; EvalSt; root; shareAdmit;
   sched-next; cascade; subscribeE; rootWitness; sched-init; st-init;
   arrTy; arrVal; stHop)
+open import Rx.Inputs-Below using (below-ctx)
 open import Verify-Rank-Sufficient.Fits using (arrivalRank)
 open import Probed.Apparatus using (Separates; separates-at)
 
@@ -150,7 +151,7 @@ quietProg  = mergeAllᵉ nothing (ofᵉ (flatCons ∷ flatCons ∷ flatCons ∷ 
 entry : (e : Closed Γ₂ natᵗ) → Sched Γ₂ × EvalSt e
 entry e =
   let (_ , sched , st) =
-        subscribeE (rootWitness e ins) e root 0 0
+        subscribeE {lo = 2} (rootWitness e ins) e {below-ctx e} root 0 0
           (sched-init e ins) (st-init e)
   in sched , st
 

@@ -21,7 +21,7 @@
 module Verify-Well-Formed.Part9 where
 
 open import Data.Bool    using (Bool; true; false)
-open import Data.Fin     using (Fin)
+open import Data.Fin     using (Fin; toℕ)
 open import Data.Vec     using (lookup)
 open import Data.Nat     using (ℕ; zero; suc; _≤_; _≡ᵇ_; _+_; _∸_)
 open import Data.Nat.Properties using (+-comm; +-assoc; +-identityʳ)
@@ -65,16 +65,17 @@ open import Rx.Strat-Order using (Tri; _≺_)
 
 variable
   τ : Tri
+  lo : ℕ
 
 foldSt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (sf : Acc _≺_ τ) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source) (path : Path Γ u t)
+  (sf : Acc _≺_ τ) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source) (path : Path Γ lo u t)
   (vals : List (Val Γ u)) (evs : List (InstEvent (Val Γ t))) (fin : Bool)
   (sched : Sched Γ) (st : EvalSt e) → EvalSt e
 foldSt sf gas id now envSrc path vals evs fin sched st =
   proj₂ (proj₂ (foldPath sf gas id now envSrc path vals evs fin sched st))
 
 foldSched : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (sf : Acc _≺_ τ) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source) (path : Path Γ u t)
+  (sf : Acc _≺_ τ) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source) (path : Path Γ lo u t)
   (vals : List (Val Γ u)) (evs : List (InstEvent (Val Γ t))) (fin : Bool)
   (sched : Sched Γ) (st : EvalSt e) → Sched Γ
 foldSched sf gas id now envSrc path vals evs fin sched st =
@@ -86,7 +87,7 @@ foldSched sf gas id now envSrc path vals evs fin sched st =
 -- recursion; envSrc live/registry are output deltas (see the blueprint above).
 record FoldOut {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
        (sf : Acc _≺_ τ) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
-       (path : Path Γ u t) (vals : List (Val Γ u)) (evs : List (InstEvent (Val Γ t)))
+       (path : Path Γ lo u t) (vals : List (Val Γ u)) (evs : List (InstEvent (Val Γ t)))
        (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
        (ob′ : Owed) (S S′ : ProtocolSt) : Set where
   field
@@ -239,7 +240,7 @@ postulate
   -- in between, which neither old face could express.
   stepFrame-wf-inner-mergeAll : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (sf : Acc _≺_ τ) (id : Id) (now : Tick) (envSrc : Source)
-    (allNid inst : NodeId) (path′ : Path Γ s t)
+    (allNid inst : NodeId) (path′ : Path Γ lo s t)
     (vals : List (Val Γ s)) (evs : List (InstEvent (Val Γ t)))
     (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
     FoldInv id envSrc evs true sched st S →
@@ -269,7 +270,7 @@ postulate
   -- first means proving that one inline.
   stepFrame-wf-outer : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (sf : Acc _≺_ τ) (id : Id) (now : Tick) (envSrc : Source)
-    (op : AllOp) (nid : NodeId) (path′ : Path Γ u t)
+    (op : AllOp) (nid : NodeId) (path′ : Path Γ lo u t)
     (vals : List (Val Γ (obs u))) (evs : List (InstEvent (Val Γ t))) (fin : Bool)
     (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
     FoldInv id envSrc evs fin sched st S →
@@ -281,12 +282,13 @@ postulate
   -- foldPath-wf.  The handoff's owed bump is repaid across the fan-out.
   dispatchShare-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sf : Acc _≺_ τ) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source) (i : Fin n)
+    (below : lo ≤ toℕ i)
     (vals : List (Val Γ (lookup Γ i)))
     (evs : List (InstEvent (Val Γ t))) (fin : Bool)
     (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
     FoldInv id envSrc evs fin sched st S →
     Σ ProtocolSt λ S′ →
-      runProtocol S (proj₁ (foldPath sf gas id now envSrc (share-sink i) vals evs fin sched st))
+      runProtocol S (proj₁ (foldPath sf gas id now envSrc (share-sink i below) vals evs fin sched st))
         ≡ just S′
 
 -- take-cut, PROVEN: assemble the cut result's FoldInv from cutThrough-balance
@@ -355,7 +357,7 @@ stepFrame-wf-take-cut id envSrc nid evs fin sched st S fi = record
 -- a time as the wrap clauses land.
 stepFrame-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {w u}
   (sf : Acc _≺_ τ) (id : Id) (now : Tick) (envSrc : Source)
-  (f : Frame Γ w u) (path′ : Path Γ u t)
+  (f : Frame Γ w u) (path′ : Path Γ lo u t)
   (vals : List (Val Γ w)) (evs : List (InstEvent (Val Γ t))) (fin : Bool)
   (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
   FoldInv id envSrc evs fin sched st S →
@@ -439,15 +441,15 @@ stepFrame-wf sf id now envSrc (thru-outer op nid) path′ vals evs fin sched st 
 
 foldPath-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (sf : Acc _≺_ τ) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
-  (path : Path Γ u t) (vals : List (Val Γ u)) (evs : List (InstEvent (Val Γ t)))
+  (path : Path Γ lo u t) (vals : List (Val Γ u)) (evs : List (InstEvent (Val Γ t)))
   (fin : Bool) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
   FoldInv id envSrc evs fin sched st S →
   (ProtocolSt.done S ≡ true → sinksToShare path ≡ true) →
   Σ ProtocolSt λ S′ →
     runProtocol S (proj₁ (foldPath sf gas id now envSrc path vals evs fin sched st))
       ≡ just S′
-foldPath-wf sf gas id now envSrc root vals evs fin sched st S fi ds =
-  _ , foldPath-root-wf sf gas id now envSrc vals evs fin sched st S
+foldPath-wf {lo = lo} sf gas id now envSrc root vals evs fin sched st S fi ds =
+  _ , foldPath-root-wf {lo = lo} sf gas id now envSrc vals evs fin sched st S
         (FoldInv.ob fi) (FoldInv.hz fi) (FoldInv.ob′ fi) (FoldInv.Lv fi) (FoldInv.Ov fi)
         (FoldInv.enters fi) (FoldInv.pays fi) (FoldInv.applies fi) done-nil
   where
@@ -464,8 +466,8 @@ foldPath-wf sf gas id now envSrc (f ↠ path′) vals evs fin sched st S fi ds =
     (proj₁ (proj₂ (proj₂ (proj₂ (stepFrame sf id now f path′ vals fin sched st)))))
     (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame sf id now f path′ vals fin sched st)))))
     S (stepFrame-wf sf id now envSrc f path′ vals evs fin sched st S fi) ds
-foldPath-wf sf gas id now envSrc (share-sink i) vals evs fin sched st S fi ds =
-  dispatchShare-wf sf gas id now envSrc i vals evs fin sched st S fi
+foldPath-wf sf gas id now envSrc (share-sink i below) vals evs fin sched st S fi ds =
+  dispatchShare-wf sf gas id now envSrc i below vals evs fin sched st S fi
 
 ------------------------------------------------------------------
 -- The seed: Mid (head ∷ ps) ⇒ FoldInv at the chainStep seed.  The

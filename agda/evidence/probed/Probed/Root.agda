@@ -40,17 +40,18 @@ open import Data.List using ([]; _∷_; null)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Nat  using (zero; suc)
-open import Data.Product using (proj₁; proj₂; _×_; _,_)
+open import Data.Product using (proj₁; proj₂; _,_)
 open import Data.Vec  using () renaming ([] to []ⱽ; _∷_ to _∷ⱽ_)
 open import Data.Fin  using (zero; suc)
 open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import Rx.Prim using (hot; Source)
+open import Rx.Prim using (hot)
 open import Rx.Exp  using (Ctx; Closed; natᵗ; strmᵗ; nat̂; input; ofᵉ; takeᵉ; mergeAllᵉ; switchAllᵉ;
   exhaustAllᵉ)
-open import Rx.Evaluator using (subscribeE; sched-init; st-init; rootWitness; root; EvalSt; NodeId; Chain; RegId; lookupNode;
+open import Rx.Evaluator using (subscribeE; sched-init; st-init; rootWitness; root; EvalSt; NodeId; RegRow; lookupNode;
   mergeAll-st; aliveThroughᶠ)
+open import Rx.Inputs-Below using (below-ctx)
 open import Rx.Slots using (scripted; shared; Slots)
 open import Verify-Well-Formed.Part1 using (cachesValid; allShareSunk; innerInstsP)
 open import Verify-Well-Formed.Part4 using (rootExitSt; root-mergeAllCache)
@@ -102,7 +103,7 @@ ins₀ = λ ()
 -- path mentions some inst via a `from-inner _ mnid inst` frame, and
 -- that inst is alive (aliveThroughᶠ)
 hasAliveFromInner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  → NodeId → EvalSt e → RegId × Source × Chain Γ t → Bool
+  → NodeId → EvalSt e → RegRow Γ t → Bool
 hasAliveFromInner mnid st c@(_ , _ , (_ , p)) =
   any (λ inst → aliveThroughᶠ inst st c) (innerInstsP mnid p)
 
@@ -117,8 +118,8 @@ mergeAllCertAt mnid st with lookupNode mnid (EvalSt.nodes st)
 ... | _ = true
 
 RUN : ∀ {t} (e : Closed Γ₀ t) → EvalSt e
-RUN e = proj₂ (proj₂ (subscribeE (rootWitness e ins₀) e root 0 0
-                                  (sched-init e ins₀) (st-init e)))
+RUN e = proj₂ (proj₂ (subscribeE {lo = 0} (rootWitness e ins₀) e {below-ctx e}
+                                  root 0 0 (sched-init e ins₀) (st-init e)))
 
 ----------------------------------------------------------------------
 -- Programs.  P0 is the calibration; the rest each mint at least one
@@ -245,8 +246,8 @@ sh zero      = shared (ofᵉ (nat̂ 1 ∷ [])) {ok = tt}
 sh (suc ())
 
 RUN₁ : (e : Closed Γ₁ natᵗ) → EvalSt e
-RUN₁ e = proj₂ (proj₂ (subscribeE (rootWitness e sh) e root 0 0
-                                   (sched-init e sh) (st-init e)))
+RUN₁ e = proj₂ (proj₂ (subscribeE {lo = 1} (rootWitness e sh) e {below-ctx e}
+                                   root 0 0 (sched-init e sh) (st-init e)))
 
 -- the README's own share program: an unbounded mergeAll of (shared, shared)
 S1 : Closed Γ₁ natᵗ
@@ -272,8 +273,8 @@ sh₂ (suc zero)       = shared (input zero) {ok = tt}
 sh₂ (suc (suc ()))
 
 RUN₂ : (e : Closed Γ₂ natᵗ) → EvalSt e
-RUN₂ e = proj₂ (proj₂ (subscribeE (rootWitness e sh₂) e root 0 0
-                                   (sched-init e sh₂) (st-init e)))
+RUN₂ e = proj₂ (proj₂ (subscribeE {lo = 2} (rootWitness e sh₂) e {below-ctx e}
+                                   root 0 0 (sched-init e sh₂) (st-init e)))
 
 S2 : Closed Γ₂ natᵗ
 S2 = mergeAllᵉ nothing (ofᵉ (strmᵗ (input (suc zero)) ∷ strmᵗ (input (suc zero)) ∷ []))
@@ -296,8 +297,8 @@ doneOf (just S) = ProtocolSt.done S
 doneOf nothing  = false
 
 STREAM₂ : (e : Closed Γ₂ natᵗ) → _
-STREAM₂ e = proj₁ (subscribeE (rootWitness e sh₂) e root 0 0
-                               (sched-init e sh₂) (st-init e))
+STREAM₂ e = proj₁ (subscribeE {lo = 2} (rootWitness e sh₂) e {below-ctx e}
+                               root 0 0 (sched-init e sh₂) (st-init e))
 
 _ : doneOf (runProtocol protocol-init (STREAM₂ S2)) ≡ false
 _ = refl
@@ -315,8 +316,8 @@ S4 : Closed Γ₂ natᵗ
 S4 = takeᵉ (nat̂ 1) (input (suc zero))
 
 STREAM : ∀ {t} (e : Closed Γ₀ t) → _
-STREAM e = proj₁ (subscribeE (rootWitness e ins₀) e root 0 0
-                              (sched-init e ins₀) (st-init e))
+STREAM e = proj₁ (subscribeE {lo = 0} (rootWitness e ins₀) e {below-ctx e}
+                              root 0 0 (sched-init e ins₀) (st-init e))
 
 _ : doneOf (runProtocol protocol-init (STREAM  P2))    -- CALIBRATION: the
   ∷ doneOf (runProtocol protocol-init (STREAM  P4))    -- guard IS satisfiable

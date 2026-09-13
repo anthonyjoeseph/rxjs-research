@@ -46,9 +46,9 @@
 -- nothing here says what the frame does when it subscribes an inner
 -- whose rank is zero.
 --
--- TARGET: from-inner-carried @c53537
--- TARGET: from-inner-dry @16a4ef
--- TARGET: thru-outer-frame-dry @42ee6f
+-- TARGET: from-inner-carried @1711f4
+-- TARGET: from-inner-dry @fb061b
+-- TARGET: thru-outer-frame-dry @7d9469
 module Probed.Exit-Frame where
 
 open import Data.Bool using (Bool; false; if_then_else_)
@@ -74,6 +74,7 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; NodeId; NodeState;
   AllOp; subscribeE; rootWitness; rootTri; root; _↠_; sched-init; st-init;
   mintNode; installNode; mergeAll-st; from-inner; thru-outer; mergeAllᵒ;
   splitBurst; stepFrame; stHop; dryEvent)
+open import Rx.Inputs-Below using (below-ctx)
 open import Verify-Rank-Sufficient.Carried using (valsRd)
 open import Verify-Rank-Sufficient.Path-Fits
   using (from-inner-carried; from-inner-dry; thru-outer-frame-dry)
@@ -101,7 +102,7 @@ module Ap {n} {Γ : Ctx n} (ins : Slots Γ) (op : AllOp)
   nid = proj₁ (mintNode (sched-init prog ins))
 
   r : Stream Γ (obs (obs natᵗ)) × Sched Γ × EvalSt prog
-  r = subscribeE ac src (thru-outer op nid ↠ root) 0 0
+  r = subscribeE {lo = n} ac src {below-ctx src} (thru-outer op nid ↠ root) 0 0
         (proj₂ (mintNode (sched-init prog ins)))
         (installNode nid node (st-init prog))
 
@@ -123,7 +124,7 @@ module Ap {n} {Γ : Ctx n} (ins : Slots Γ) (op : AllOp)
 
   sf : List (Val Γ (obs natᵗ)) × List (InstEvent (Val Γ (obs natᵗ)))
      × Bool × Sched Γ × EvalSt prog
-  sf = stepFrame ac 0 0 (thru-outer op nid) root vals fin sd st
+  sf = stepFrame {lo = n} ac 0 0 (thru-outer op nid) root vals fin sd st
 
   bound : ℕ
   bound = depthᵉ ψ src
@@ -242,15 +243,15 @@ counts₃-is = refl
 -- The rows prove by `refl` because the dry flag computed false.
 ----------------------------------------------------------------------
 
-dryRow₁ : Confirms (thru-outer-frame-dry A₁.ac 0 0 mergeAllᵒ A₁.nid root
+dryRow₁ : Confirms (thru-outer-frame-dry {lo = 0} A₁.ac 0 0 mergeAllᵒ A₁.nid root
   A₁.ψ A₁.Rin A₁.rank Below A₁.vals A₁.fin A₁.sd A₁.st (Below , Below) Below)
 dryRow₁ = refl
 
-dryRow₂ : Confirms (thru-outer-frame-dry A₂.ac 0 0 mergeAllᵒ A₂.nid root
+dryRow₂ : Confirms (thru-outer-frame-dry {lo = 0} A₂.ac 0 0 mergeAllᵒ A₂.nid root
   A₂.ψ A₂.Rin A₂.rank Below A₂.vals A₂.fin A₂.sd A₂.st (Below , Below) Below)
 dryRow₂ = refl
 
-dryRow₃ : Confirms (thru-outer-frame-dry A₃.ac 0 0 mergeAllᵒ A₃.nid root
+dryRow₃ : Confirms (thru-outer-frame-dry {lo = 0} A₃.ac 0 0 mergeAllᵒ A₃.nid root
   A₃.ψ A₃.Rin A₃.rank Below A₃.vals A₃.fin A₃.sd A₃.st (Below , Below) Below)
 dryRow₃ = refl
 
@@ -287,7 +288,7 @@ module Fi where
   -- fin = false: innerReact is identity; event list is empty
   sf : List (Val Γ₀ natᵗ) × List (InstEvent (Val Γ₀ natᵗ))
      × Bool × Sched Γ₀ × EvalSt prog₀
-  sf = stepFrame ac 0 0 (from-inner {s = natᵗ} mergeAllᵒ 0 1) root
+  sf = stepFrame {lo = 0} ac 0 0 (from-inner {s = natᵗ} mergeAllᵒ 0 1) root
          vals₀ false sd st
 
   -- handed: the hop half at `vals₀` is 0 (nat values carry no depth)
@@ -309,10 +310,10 @@ fi-packed-is = refl
 -- because the event list the identity arm returns is empty.
 ----------------------------------------------------------------------
 
-fromInnerCarried : Confirms (from-inner-carried Fi.ac 0 0 mergeAllᵒ 0 1 root
+fromInnerCarried : Confirms (from-inner-carried {lo = 0} Fi.ac 0 0 mergeAllᵒ 0 1 root
   Fi.ψ (0 , 0) 0 vals₀ false Fi.sd Fi.st (Below , Below) Below)
 fromInnerCarried = (Below , Below) , Below
 
-fromInnerDry : Confirms (from-inner-dry Fi.ac 0 0 mergeAllᵒ 0 1 root
+fromInnerDry : Confirms (from-inner-dry {lo = 0} Fi.ac 0 0 mergeAllᵒ 0 1 root
   Fi.ψ (0 , 0) 0 vals₀ false Fi.sd Fi.st (Below , Below) Below)
 fromInnerDry = refl

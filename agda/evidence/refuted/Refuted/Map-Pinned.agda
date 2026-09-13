@@ -65,8 +65,8 @@ valsHop′ : ∀ {n} {Γ : Ctx n} (ψ : Fin n → Rd₃) (u : Ty) → List (Val 
 valsHop′ ψ u []       = 0
 valsHop′ ψ u (v ∷ vs) = depthᵛ ψ u v ⊔ valsHop′ ψ u vs
 
-FrameCarries′ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {τ} →
-  Acc _≺_ τ → Id → Tick → Frame Γ s u → Path Γ u t →
+FrameCarries′ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {τ} {lo} →
+  Acc _≺_ τ → Id → Tick → Frame Γ s u → Path Γ lo u t →
   (Fin n → Rd₃) → ℕ → ℕ → ℕ → Set
 FrameCarries′ {Γ = Γ} {e = e} {s = s} {u = u} ac id now f κ ψ Rin Rv Rst =
   ∀ (vals : List (Val Γ s)) (fin : Bool) (sd : Sched Γ) (st : EvalSt e) →
@@ -79,9 +79,9 @@ FrameCarries′ {Γ = Γ} {e = e} {s = s} {u = u} ac id now f κ ψ Rin Rv Rst =
 -- walk supplies today and what the previous witness's finding was read
 -- as licensing
 MapFramePinned : Set
-MapFramePinned = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {τ}
+MapFramePinned = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {τ} {lo}
   (ac : Acc _≺_ τ) (id : Id) (now : Tick) (fn : Fn Γ [] [] [] s u)
-  (b : Exp Γ [] [] [] s) (κ : Path Γ u t) (ψ : Fin n → Rd₃) (Rst : ℕ) →
+  (b : Exp Γ [] [] [] s) (κ : Path Γ lo u t) (ψ : Fin n → Rd₃) (Rst : ℕ) →
   FrameCarries′ {e = e} ac id now (map-f fn) κ ψ
     (depthᵉ ψ (mapᵉ fn b)) (depthᵉ ψ (mapᵉ fn b)) Rst
 
@@ -123,7 +123,7 @@ ac₀ = rootWitness prog ins₀
 ----------------------------------------------------------------------
 
 r : Stream Γ₀ (obs natᵗ) × Sched Γ₀ × EvalSt prog
-r = subscribeE ac₀ prog root 0 0 (sched-init prog ins₀) (st-init prog)
+r = subscribeE {lo = 0} ac₀ prog root 0 0 (sched-init prog ins₀) (st-init prog)
 
 sp : List (Val Γ₀ (obs natᵗ))
    × List (InstEvent (Val Γ₀ (obs natᵗ))) × Bool
@@ -133,7 +133,7 @@ vals : List (Val Γ₀ (obs natᵗ))
 vals = proj₁ sp
 
 out : List (Val Γ₀ (obs natᵗ))
-out = proj₁ (stepFrame {e = prog} ac₀ 0 0 (map-f grow) root vals
+out = proj₁ (stepFrame {lo = 0} {e = prog} ac₀ 0 0 (map-f grow) root vals
                false (sched-init prog ins₀) (st-init prog))
 
 ----------------------------------------------------------------------
@@ -166,7 +166,7 @@ pin-store-is = refl
 
 map-frame-pinned-false : MapFramePinned → ⊥
 map-frame-pinned-false h
-  with proj₁ (h {e = prog} ac₀ 0 0 grow src₀ root ψ₀ 0 vals false
+  with proj₁ (h {e = prog} {lo = 0} ac₀ 0 0 grow src₀ root ψ₀ 0 vals false
                 (sched-init prog ins₀) (st-init prog)
                 ≤-refl _≤_.z≤n)
 ... | _≤_.s≤s ()
@@ -184,14 +184,14 @@ ac₀′ : Acc _≺_ _
 ac₀′ = rootWitness src₀ ins₀
 
 r′ : Stream Γ₀ (obs natᵗ) × Sched Γ₀ × EvalSt src₀
-r′ = subscribeE ac₀′ src₀ root 0 0 (sched-init src₀ ins₀) (st-init src₀)
+r′ = subscribeE {lo = 0} ac₀′ src₀ root 0 0 (sched-init src₀ ins₀) (st-init src₀)
 
 sp′ : List (Val Γ₀ (obs natᵗ))
     × List (InstEvent (Val Γ₀ (obs natᵗ))) × Bool
 sp′ = splitBurst (proj₁ r′)
 
 srcOut : List (Val Γ₀ (obs natᵗ))
-srcOut = proj₁ (stepFrame {e = src₀} ac₀′ 0 0 (map-f grow) root
+srcOut = proj₁ (stepFrame {lo = 0} {e = src₀} ac₀′ 0 0 (map-f grow) root
                   (proj₁ sp′) false
                   (sched-init src₀ ins₀) (st-init src₀))
 

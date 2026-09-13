@@ -57,6 +57,7 @@ open import Rx.Slot-Read using (slotRd)
 open import Rx.Evaluator using (Sched; EvalSt; Path; root; share-sink; _↠_;
   thru-outer; from-inner; chainsOf; sched-next; cascade; subscribeE; rootWitness;
   sched-init; st-init; arrTy; arrVal; stHop)
+open import Rx.Inputs-Below using (below-ctx)
 open import Verify-Rank-Sufficient.Fits using (arrivalRank)
 open import Probed.Apparatus using (Separates; separates-at)
 
@@ -110,7 +111,7 @@ cap₂ = mergeAllᵉ (just 1)
 entry : (e : Closed Γ₁ natᵗ) → Sched Γ₁ × EvalSt e
 entry e =
   let (_ , sched , st) =
-        subscribeE (rootWitness e insLate) e root 0 0
+        subscribeE {lo = 1} (rootWitness e insLate) e {below-ctx e} root 0 0
           (sched-init e insLate) (st-init e)
   in sched , st
 
@@ -131,21 +132,21 @@ stateAt e (suc k) = stepOnce (suc k) (stateAt e k)
 -- says nothing at all about one of them.
 ----------------------------------------------------------------------
 
-outers : ∀ {s t} → Path Γ₁ s t → ℕ
+outers : ∀ {lo s t} → Path Γ₁ lo s t → ℕ
 outers root                 = 0
-outers (share-sink _)       = 0
+outers (share-sink _ _)     = 0
 outers (thru-outer _ _ ↠ p) = suc (outers p)
 outers (_ ↠ p)              = outers p
 
-inners : ∀ {s t} → Path Γ₁ s t → ℕ
+inners : ∀ {lo s t} → Path Γ₁ lo s t → ℕ
 inners root                   = 0
-inners (share-sink _)         = 0
+inners (share-sink _ _)       = 0
 inners (from-inner _ _ _ ↠ p) = suc (inners p)
 inners (_ ↠ p)                = inners p
 
-total : ∀ {s t} → Path Γ₁ s t → ℕ
-total root           = 0
-total (share-sink _) = 0
+total : ∀ {lo s t} → Path Γ₁ lo s t → ℕ
+total root             = 0
+total (share-sink _ _) = 0
 total (_ ↠ p)        = suc (total p)
 
 ----------------------------------------------------------------------
@@ -180,11 +181,11 @@ reach e k with stateAt e k
 ...   | inj₁ _       = 0
 ...   | inj₂ (a , _) = length (chainsOf a st)
 
-over : ((∀ {s t} → Path Γ₁ s t → ℕ)) → (e : Closed Γ₁ natᵗ) → ℕ → ℕ
+over : ((∀ {lo s t} → Path Γ₁ lo s t → ℕ)) → (e : Closed Γ₁ natᵗ) → ℕ → ℕ
 over f e k with stateAt e k
 ... | (sched , st) with sched-next sched
 ...   | inj₁ _       = 0
-...   | inj₂ (a , _) = sum (map (λ rp → f (proj₂ rp)) (chainsOf a st))
+...   | inj₂ (a , _) = sum (map (λ rp → f (proj₂ (proj₂ rp))) (chainsOf a st))
 
 ----------------------------------------------------------------------
 -- THE TWO CANDIDATE RULES, as two definitions of one signature over

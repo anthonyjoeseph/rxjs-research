@@ -254,19 +254,29 @@ open import Probed.Dispatch-Saturates
   using (admits₁-is; admits₂-is; short-is; long-is; seed-is;
          satSeed; satAbove; satDeep)
 
--- the FLOOR row is the one this file is for, and the four beside it are
--- what stop it reading as a tidy green over nothing.  A floor stated as
--- an `all` over a registry holds of a registry carrying no slot-sourced
--- sink whatever, so the count of rows it BINDS on is claimed first; the
--- two admitted lengths say the nest is one chain wide at each rung, so
--- the counter is spent on depth; and the staircase — one, two, three,
--- then three again — says the counter is read all the way down and
--- STOPS one below the seed, which is the shape that makes the
--- saturation rows a statement about the seed rather than about a
--- machine ignoring it.  The three saturation rows stand at the deepest
--- nest a context of four admits, which is where the sibling probe's own
--- receipt says it did not reach
+-- THE DEPTH ROWS, which is what is left once the floor stopped being
+-- measurable.  A registry row's chain is indexed by the floor its source
+-- dictates and the sink constructor demands its own index be at least
+-- that floor, so the stratification this file once read off a run is now
+-- what the row's TYPE says — a row asserting it could not have failed,
+-- which is why the two that did are gone rather than restated.  The
+-- counter is therefore spent on DEPTH alone: the two admitted lengths
+-- say the nest is one chain wide at each rung, and the staircase — one,
+-- two, three, then three again — says the counter is read all the way
+-- down and STOPS one below the seed, which is the shape that makes the
+-- saturation rows a statement about the seed rather than about a machine
+-- ignoring it.  The three saturation rows stand at the deepest nest a
+-- context of four admits, which is where the sibling probe's own receipt
+-- says it did not reach
 open import Probed.Sink-Floor
-  using (binds-is; floor-is; floorAdmits₁-is; floorAdmits₃-is;
+  using (floorAdmits₁-is; floorAdmits₃-is;
          one-is; two-is; three-is; four-is;
          floorSatSeed; floorSatAbove; satMid)
+
+-- the UNFOLD row, claimed beside its own negative control because the
+-- conclusion it instantiates is free at the context's own size: the
+-- control fixes the same unfolded term at floor zero and the predicate
+-- computes to `false`, so the two positive rows are readings of a
+-- predicate that can reject rather than tidy greens over a statement
+-- nothing could falsify
+open import Probed.Unfold-Bound using (ground; carriesLow; carriesBoth)

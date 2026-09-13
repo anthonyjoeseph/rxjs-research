@@ -54,7 +54,7 @@
 -- does any row compound the delivery count and the hop at once: the two
 -- wide steps are one layer deep, so nothing here says what a step that
 -- both deepens and multiplies costs.
--- TARGET: scan-burst-carried @b028e7
+-- TARGET: scan-burst-carried @11b51c
 module Probed.Fold-Burst where
 
 open import Data.Fin using (zero)
@@ -75,6 +75,7 @@ open import Rx.Slot-Read using (slotRd)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; NodeId; root; scan-f;
   scan-st; _↠_; mintNode; installNode; subscribeE; pushBurst; stHop;
   rootWitness; sched-init; st-init)
+open import Rx.Inputs-Below using (below-ctx)
 open import Verify-Rank-Sufficient.Carried using (burstRd)
 open import Verify-Rank-Sufficient.Push-Carried using (scan-burst-carried)
 open import Probed.Apparatus using (Confirms; Below)
@@ -192,7 +193,7 @@ stOf f z b = st-init (prog f z b)
 inner : (f : Step) (z : Seed) (b : Src) (xs : List ℕ)
       → Stream Γ₁ natᵗ × Sched Γ₁ × EvalSt (prog f z b)
 inner f z b xs =
-  subscribeE (rootWitness (prog f z b) (insAt xs)) b
+  subscribeE {lo = 1} (rootWitness (prog f z b) (insAt xs)) b {below-ctx b}
     (scan-f f (nidOf f z b xs) ↠ root) 0 0 (sdOf f z b xs)
     (installNode (nidOf f z b xs) (scan-st {t = obs natᵗ} (evalTm z))
       (stOf f z b))
@@ -200,7 +201,7 @@ inner f z b xs =
 out : (f : Step) (z : Seed) (b : Src) (xs : List ℕ)
     → Stream Γ₁ (obs natᵗ) × Sched Γ₁ × EvalSt (prog f z b)
 out f z b xs =
-  pushBurst (rootWitness (prog f z b) (insAt xs)) 0 0
+  pushBurst {lo = 1} (rootWitness (prog f z b) (insAt xs)) 0 0
     (scan-f f (nidOf f z b xs)) root
     (proj₁ (inner f z b xs)) (proj₁ (proj₂ (inner f z b xs)))
     (proj₂ (proj₂ (inner f z b xs)))
@@ -224,50 +225,56 @@ term f z b xs = depthᵉ (slotRd (insAt xs)) (prog f z b)
 -- would cross at the second row of the first family.
 ----------------------------------------------------------------------
 
-rate₁ : Confirms (scan-burst-carried
+rate₁ : Confirms (scan-burst-carried {lo = 1}
   (rootWitness (prog step1 seed0 src) (insAt (7 ∷ []))) 0 0
-  step1 seed0 src (nidOf step1 seed0 src (7 ∷ [])) root
+  step1 seed0 src (below-ctx (prog step1 seed0 src))
+  (nidOf step1 seed0 src (7 ∷ [])) root
   (sdOf step1 seed0 src (7 ∷ [])) (stOf step1 seed0 src)
   (slotRd (insAt (7 ∷ []))) (term step1 seed0 src (7 ∷ []))
   Below (Below , Below) Below)
 rate₁ = (Below , Below) , Below
 
-rate₄ : Confirms (scan-burst-carried
+rate₄ : Confirms (scan-burst-carried {lo = 1}
   (rootWitness (prog step1 seed0 src) (insAt (7 ∷ 8 ∷ 9 ∷ 10 ∷ []))) 0 0
-  step1 seed0 src (nidOf step1 seed0 src (7 ∷ 8 ∷ 9 ∷ 10 ∷ [])) root
+  step1 seed0 src (below-ctx (prog step1 seed0 src))
+  (nidOf step1 seed0 src (7 ∷ 8 ∷ 9 ∷ 10 ∷ [])) root
   (sdOf step1 seed0 src (7 ∷ 8 ∷ 9 ∷ 10 ∷ [])) (stOf step1 seed0 src)
   (slotRd (insAt (7 ∷ 8 ∷ 9 ∷ 10 ∷ [])))
   (term step1 seed0 src (7 ∷ 8 ∷ 9 ∷ 10 ∷ []))
   Below (Below , Below) Below)
 rate₄ = (Below , Below) , Below
 
-layers₃ : Confirms (scan-burst-carried
+layers₃ : Confirms (scan-burst-carried {lo = 1}
   (rootWitness (prog step3 seed0 src) (insAt (7 ∷ 8 ∷ []))) 0 0
-  step3 seed0 src (nidOf step3 seed0 src (7 ∷ 8 ∷ [])) root
+  step3 seed0 src (below-ctx (prog step3 seed0 src))
+  (nidOf step3 seed0 src (7 ∷ 8 ∷ [])) root
   (sdOf step3 seed0 src (7 ∷ 8 ∷ [])) (stOf step3 seed0 src)
   (slotRd (insAt (7 ∷ 8 ∷ []))) (term step3 seed0 src (7 ∷ 8 ∷ []))
   Below (Below , Below) Below)
 layers₃ = (Below , Below) , Below
 
-product : Confirms (scan-burst-carried
+product : Confirms (scan-burst-carried {lo = 1}
   (rootWitness (prog step2 seed0 srcDeep) (insAt (7 ∷ 8 ∷ []))) 0 0
-  step2 seed0 srcDeep (nidOf step2 seed0 srcDeep (7 ∷ 8 ∷ [])) root
+  step2 seed0 srcDeep (below-ctx (prog step2 seed0 srcDeep))
+  (nidOf step2 seed0 srcDeep (7 ∷ 8 ∷ [])) root
   (sdOf step2 seed0 srcDeep (7 ∷ 8 ∷ [])) (stOf step2 seed0 srcDeep)
   (slotRd (insAt (7 ∷ 8 ∷ []))) (term step2 seed0 srcDeep (7 ∷ 8 ∷ []))
   Below (Below , Below) Below)
 product = (Below , Below) , Below
 
-queued : Confirms (scan-burst-carried
+queued : Confirms (scan-burst-carried {lo = 1}
   (rootWitness (prog step2 seed0 srcLim) (insAt (7 ∷ 8 ∷ []))) 0 0
-  step2 seed0 srcLim (nidOf step2 seed0 srcLim (7 ∷ 8 ∷ [])) root
+  step2 seed0 srcLim (below-ctx (prog step2 seed0 srcLim))
+  (nidOf step2 seed0 srcLim (7 ∷ 8 ∷ [])) root
   (sdOf step2 seed0 srcLim (7 ∷ 8 ∷ [])) (stOf step2 seed0 srcLim)
   (slotRd (insAt (7 ∷ 8 ∷ []))) (term step2 seed0 srcLim (7 ∷ 8 ∷ []))
   Below (Below , Below) Below)
 queued = (Below , Below) , Below
 
-nested : Confirms (scan-burst-carried
+nested : Confirms (scan-burst-carried {lo = 1}
   (rootWitness (prog step2 seedLive srcScan) (insAt (7 ∷ 8 ∷ []))) 0 0
-  step2 seedLive srcScan (nidOf step2 seedLive srcScan (7 ∷ 8 ∷ [])) root
+  step2 seedLive srcScan (below-ctx (prog step2 seedLive srcScan))
+  (nidOf step2 seedLive srcScan (7 ∷ 8 ∷ [])) root
   (sdOf step2 seedLive srcScan (7 ∷ 8 ∷ [])) (stOf step2 seedLive srcScan)
   (slotRd (insAt (7 ∷ 8 ∷ [])))
   (term step2 seedLive srcScan (7 ∷ 8 ∷ []))
@@ -313,17 +320,19 @@ countAt f z b xs =
   proj₁ (burstRd (slotRd (insAt xs)) (obs natᵗ) (proj₁ (out f z b xs)))
   + 1000 * proj₁ (proj₂ (rdᵉ (slotRd (insAt xs)) ε (prog f z b)))
 
-widened : Confirms (scan-burst-carried
+widened : Confirms (scan-burst-carried {lo = 1}
   (rootWitness (prog stepWide seedLive src) (insAt (7 ∷ []))) 0 0
-  stepWide seedLive src (nidOf stepWide seedLive src (7 ∷ [])) root
+  stepWide seedLive src (below-ctx (prog stepWide seedLive src))
+  (nidOf stepWide seedLive src (7 ∷ [])) root
   (sdOf stepWide seedLive src (7 ∷ [])) (stOf stepWide seedLive src)
   (slotRd (insAt (7 ∷ []))) (term stepWide seedLive src (7 ∷ []))
   Below (Below , Below) Below)
 widened = (Below , Below) , Below
 
-widened3 : Confirms (scan-burst-carried
+widened3 : Confirms (scan-burst-carried {lo = 1}
   (rootWitness (prog stepWide3 seedLive src) (insAt (7 ∷ []))) 0 0
-  stepWide3 seedLive src (nidOf stepWide3 seedLive src (7 ∷ [])) root
+  stepWide3 seedLive src (below-ctx (prog stepWide3 seedLive src))
+  (nidOf stepWide3 seedLive src (7 ∷ [])) root
   (sdOf stepWide3 seedLive src (7 ∷ [])) (stOf stepWide3 seedLive src)
   (slotRd (insAt (7 ∷ []))) (term stepWide3 seedLive src (7 ∷ []))
   Below (Below , Below) Below)

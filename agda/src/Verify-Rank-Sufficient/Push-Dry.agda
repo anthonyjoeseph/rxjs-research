@@ -43,7 +43,7 @@ open import Rx.Prim using (Tick; Id; Source; InstEvent; init; value; close;
 open import Rx.Exp using (Ctx; Closed; Val; Fn; _×ᵗ_; _≟ᵗ_)
 open import Rx.Strat-Order using (_≺_)
 open import Rx.Evaluator using (Stream; Frame; Path; Sched; EvalSt; NodeId;
-  NodeState; RegId; Chain; scan-st; take-st; mergeAll-st; switch-st;
+  NodeState; RegId; RegRow; regSource; scan-st; take-st; mergeAll-st; switch-st;
   exhaust-st; map-f; scan-f; take-f; lookupNode; takeVals; cutThrough;
   takeDispatch; pathHasNode; memberSource; stepFrame; splitEvents; retagEvents; pushBurst;
   hasDry; dryEvent)
@@ -127,8 +127,8 @@ emitEvents-dry bs es vs fin hb he =
 -- walk's four non-flattening operators need no arithmetic.
 ----------------------------------------------------------------------
 
-FrameDry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {τ} →
-  Acc _≺_ τ → Id → Tick → Frame Γ s u → Path Γ u t → Set
+FrameDry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {τ} {lo} →
+  Acc _≺_ τ → Id → Tick → Frame Γ s u → Path Γ lo u t → Set
 FrameDry {Γ = Γ} {e = e} {s = s} ac id now f κ =
   ∀ (vals : List (Val Γ s)) (fin : Bool) (sd : Sched Γ) (st : EvalSt e) →
     any dryEvent (proj₁ (proj₂ (stepFrame ac id now f κ vals fin sd st))) ≡ false
@@ -137,7 +137,7 @@ FrameDry {Γ = Γ} {e = e} {s = s} ac id now f κ =
 -- `cutPending`; neither is the evaluator's own marker, and no other
 -- reason is reachable from here
 cutThrough-dry : ∀ {n} {Γ : Ctx n} {t} (nid : NodeId) (dl : List RegId)
-  (wm : RegId) (dy : List Source) (r : List (RegId × Source × Chain Γ t)) →
+  (wm : RegId) (dy : List Source) (r : List (RegRow Γ t)) →
   any dryEvent (proj₁ (proj₂ (cutThrough nid dl wm dy r))) ≡ false
 cutThrough-dry nid dl wm dy [] = refl
 cutThrough-dry nid dl wm dy ((rid , src , c) ∷ r)
@@ -145,7 +145,7 @@ cutThrough-dry nid dl wm dy ((rid , src , c) ∷ r)
      | cutThrough nid dl wm dy r | cutThrough-dry nid dl wm dy r
 ... | false | kept , closes , rids | ih = ih
 ... | true  | kept , closes , rids | ih
-      with any (_≡ᵇ rid) dl ∧ memberSource src dy
+      with any (_≡ᵇ rid) dl ∧ memberSource (regSource src) dy
 ...     | true  = ih
 ...     | false with any (_≡ᵇ rid) dl ∨ (wm ≤ᵇ rid)
 ...       | true  = ih
@@ -175,15 +175,15 @@ takeDispatch-dry nid vals fin sd st (just (exhaust-st a o))      = refl
 -- one of them.
 ----------------------------------------------------------------------
 
-map-frame-dry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {τ}
+map-frame-dry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {τ} {lo}
   (ac : Acc _≺_ τ) (id : Id) (now : Tick) (fn : Fn Γ [] [] [] s u)
-  (κ : Path Γ u t) → FrameDry {e = e} ac id now (map-f fn) κ
+  (κ : Path Γ lo u t) → FrameDry {e = e} ac id now (map-f fn) κ
 map-frame-dry ac id now fn κ vals fin sd st = refl
 
-scan-frame-dry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {τ}
+scan-frame-dry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {τ} {lo}
   (ac : Acc _≺_ τ) (id : Id) (now : Tick)
   (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
-  (κ : Path Γ u t) → FrameDry {e = e} ac id now (scan-f fn nid) κ
+  (κ : Path Γ lo u t) → FrameDry {e = e} ac id now (scan-f fn nid) κ
 scan-frame-dry {u = u} ac id now fn nid κ vals fin sd st
   with lookupNode nid (EvalSt.nodes st)
 ... | nothing                      = refl
@@ -195,9 +195,9 @@ scan-frame-dry {u = u} ac id now fn nid κ vals fin sd st
 ...   | yes refl = refl
 ...   | no  _    = refl
 
-take-frame-dry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s} {τ}
+take-frame-dry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s} {τ} {lo}
   (ac : Acc _≺_ τ) (id : Id) (now : Tick) (nid : NodeId)
-  (κ : Path Γ s t) → FrameDry {e = e} ac id now (take-f {s = s} nid) κ
+  (κ : Path Γ lo s t) → FrameDry {e = e} ac id now (take-f {s = s} nid) κ
 take-frame-dry ac id now nid κ vals fin sd st =
   takeDispatch-dry nid vals fin sd st (lookupNode nid (EvalSt.nodes st))
 
@@ -207,8 +207,8 @@ take-frame-dry ac id now nid κ vals fin sd st =
 -- first of those is the only one the child could have made dry.
 ----------------------------------------------------------------------
 
-pushBurst-dry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {τ}
-  (ac : Acc _≺_ τ) (id : Id) (now : Tick) (f : Frame Γ s u) (κ : Path Γ u t)
+pushBurst-dry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {τ} {lo}
+  (ac : Acc _≺_ τ) (id : Id) (now : Tick) (f : Frame Γ s u) (κ : Path Γ lo u t)
   (burst : Stream Γ s) (sd : Sched Γ) (st : EvalSt e) →
   FrameDry {e = e} ac id now f κ → hasDry burst ≡ false →
   hasDry (proj₁ (pushBurst ac id now f κ burst sd st)) ≡ false

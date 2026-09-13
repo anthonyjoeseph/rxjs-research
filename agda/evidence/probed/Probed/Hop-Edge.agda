@@ -65,7 +65,7 @@
 -- slot rather than through the program, so the queue is reached at one
 -- shape and one limit.
 --
--- TARGET: thru-outer-frame-carried @260099
+-- TARGET: thru-outer-frame-carried @134c89
 module Probed.Hop-Edge where
 
 open import Data.Bool using (Bool; false)
@@ -91,6 +91,7 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; NodeId; NodeState;
   AllOp; subscribeE; rootWitness; rootTri; root; _↠_; sched-init; st-init;
   mintNode; installNode; mergeAll-st; switch-st; exhaust-st; thru-outer;
   mergeAllᵒ; switchᵒ; exhaustᵒ; splitBurst; stepFrame; stHop)
+open import Rx.Inputs-Below using (below-ctx)
 open import Verify-Rank-Sufficient.Carried using (valsRd)
 open import Verify-Rank-Sufficient.Push-Carried
   using (thru-outer-frame-carried)
@@ -122,7 +123,7 @@ module Ap {n} {Γ : Ctx n} (ins : Slots Γ) (op : AllOp)
   nid = proj₁ (mintNode (sched-init prog ins))
 
   r : Stream Γ (obs (obs natᵗ)) × Sched Γ × EvalSt prog
-  r = subscribeE ac src (thru-outer op nid ↠ root) 0 0
+  r = subscribeE {lo = n} ac src {below-ctx src} (thru-outer op nid ↠ root) 0 0
         (proj₂ (mintNode (sched-init prog ins)))
         (installNode nid node (st-init prog))
 
@@ -144,7 +145,7 @@ module Ap {n} {Γ : Ctx n} (ins : Slots Γ) (op : AllOp)
 
   sf : List (Val Γ (obs natᵗ)) × List (InstEvent (Val Γ (obs natᵗ)))
      × Bool × Sched Γ × EvalSt prog
-  sf = stepFrame ac 0 0 (thru-outer op nid) root vals fin sd st
+  sf = stepFrame {lo = n} ac 0 0 (thru-outer op nid) root vals fin sd st
 
   -- the bound the arriving observables are held to — the source's own
   -- payload PAIR, which is what the walk enters this frame at — and the
@@ -333,32 +334,32 @@ countsE-is = refl
 -- passing quietly.
 ----------------------------------------------------------------------
 
-hopRow₁ : Confirms (thru-outer-frame-carried A₁.ac 0 0 mergeAllᵒ A₁.nid root
+hopRow₁ : Confirms (thru-outer-frame-carried {lo = 0} A₁.ac 0 0 mergeAllᵒ A₁.nid root
   A₁.ψ A₁.Rin A₁.rank Below A₁.vals A₁.fin A₁.sd A₁.st
   (Below , Below) Below)
 hopRow₁ = (Below , Below) , Below
 
-hopRow₂ : Confirms (thru-outer-frame-carried A₂.ac 0 0 mergeAllᵒ A₂.nid root
+hopRow₂ : Confirms (thru-outer-frame-carried {lo = 0} A₂.ac 0 0 mergeAllᵒ A₂.nid root
   A₂.ψ A₂.Rin A₂.rank Below A₂.vals A₂.fin A₂.sd A₂.st
   (Below , Below) Below)
 hopRow₂ = (Below , Below) , Below
 
-hopRow₃ : Confirms (thru-outer-frame-carried A₃.ac 0 0 mergeAllᵒ A₃.nid root
+hopRow₃ : Confirms (thru-outer-frame-carried {lo = 0} A₃.ac 0 0 mergeAllᵒ A₃.nid root
   A₃.ψ A₃.Rin A₃.rank Below A₃.vals A₃.fin A₃.sd A₃.st
   (Below , Below) Below)
 hopRow₃ = (Below , Below) , Below
 
-hopRowP : Confirms (thru-outer-frame-carried AP.ac 0 0 mergeAllᵒ AP.nid root
+hopRowP : Confirms (thru-outer-frame-carried {lo = 1} AP.ac 0 0 mergeAllᵒ AP.nid root
   AP.ψ AP.Rin AP.rank Below AP.vals AP.fin AP.sd AP.st
   (Below , Below) Below)
 hopRowP = (Below , Below) , Below
 
-hopRowS : Confirms (thru-outer-frame-carried AS.ac 0 0 switchᵒ AS.nid root
+hopRowS : Confirms (thru-outer-frame-carried {lo = 0} AS.ac 0 0 switchᵒ AS.nid root
   AS.ψ AS.Rin AS.rank Below AS.vals AS.fin AS.sd AS.st
   (Below , Below) Below)
 hopRowS = (Below , Below) , Below
 
-hopRowE : Confirms (thru-outer-frame-carried AE.ac 0 0 exhaustᵒ AE.nid root
+hopRowE : Confirms (thru-outer-frame-carried {lo = 0} AE.ac 0 0 exhaustᵒ AE.nid root
   AE.ψ AE.Rin AE.rank Below AE.vals AE.fin AE.sd AE.st
   (Below , Below) Below)
 hopRowE = (Below , Below) , Below
