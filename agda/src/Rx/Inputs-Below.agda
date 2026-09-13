@@ -214,4 +214,18 @@ postulate
 --   that has a slot, at the value `input 0`.  The predicate computes to
 --   `false`, so the statement returns an inhabitant of the empty type
 --   with no crossing to pin and no figure a repair could leave intact.
+--
+-- PROBED: `Probed.Inner-Bound` — the pairs a RUN produces, which is the
+--   question that refutation leaves open and that both exits rest on.
+--   Three shares connected at a floor of two inside a context of three,
+--   each value read back out of a bounded merge's own queue and pinned
+--   to what the machine left there.  One inner names the slot directly
+--   beneath the share and one reaches two down, so the controls a floor
+--   lower reject the first and pass the second; the third is a
+--   substitution instance a `map` builds around an arriving number,
+--   existing nowhere in the program text, which is the manufacture the
+--   arm is about.  Every row holds at the floor the connect supplies.
+--   NOT covered: a value built under a μ-unfold, and a connect reached
+--   through a second share rather than through the root.
+postulate
   below-inner : ∀ {t} (k : ℕ) (o : Val Γ (obs t)) → T (inputsBelowᵉ k o)

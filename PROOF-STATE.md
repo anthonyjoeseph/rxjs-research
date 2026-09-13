@@ -224,15 +224,15 @@ now at the door and at the templates the door's chains are built from.
 
 ### Big picture tier roadmap
 
-- **THE SUBSTITUTION RESIDUE IS THE TRUNK, AND IT IS WHY IT OUTRANKS TWO FALSITY
-  ROWS.** `below-inner` bounds an observable MANUFACTURED at runtime, and over an
-  arbitrary floor it is refuted outright. Its repair is not a cleverer proof but a
-  fact the run state does not carry: what ties a value to the chain it arrived on.
-  A field on the run state obliges every producer and every consumer, so the
-  cascade reaches the evaluator itself — which is exactly why it goes first. A
-  restatement landing later would move the ground under every leaf above it, and
-  those leaves are where the tier's remaining grind is. Settle the statement, then
-  grind under it.
+- **THE SUBSTITUTION RESIDUE IS THE TRUNK, AND IT NOW HAS TWO EXITS RATHER THAN
+  ONE.** `below-inner` is refuted over an arbitrary floor, but every pair a RUN
+  supplies is now instantiated and holds, the manufacture route included. So the
+  repair is no longer forced to be a carried fact: the demand originates at a
+  REGISTRATION, and letting that registration decide its own floor test turns the
+  premise into a theorem about a branch nothing reaches. What remains is to build
+  both exits thinly against the one consumer and let them collide — the carried
+  field cascades into the evaluator's own types, the decided test costs a branch
+  the TS has no counterpart for, and nothing yet says which is cheaper.
 
 - **AND THE THREE RE-ENTRANT LEAVES ARE THE FALSITY NOTHING HAS NARROWED.**
   `from-inner-dry`, `thru-outer-frame-dry` and `from-inner-carried` are the only
@@ -257,14 +257,13 @@ now at the door and at the templates the door's chains are built from.
 
 - **Does SUBSTITUTION preserve the telescope's stratification?** The SYNTACTIC
   half is settled: the root's bound holds of every closed term, a share's
-  definition has it stored by the slot constructor, and the graft entering a
-  term at a μ-unfold is instantiated where it could have failed. The arm none
-  of them reaches is an observable manufactured at RUNTIME, which is a closed
-  expression produced by applying a function rather than one sitting in the
-  program. Over an arbitrary floor that arm is FALSE, so what is open is no
-  longer whether the bound survives but what the run state must CARRY for it to
-  be stateable at all — whether a value's provenance is recoverable from the
-  chain it arrived on.
+  definition has it stored by the slot constructor, and the μ-unfold graft is
+  instantiated where it could have failed. The arm none of them reaches is an
+  observable manufactured at RUNTIME by applying a function, and it is now
+  instantiated too — holding at every pair a run supplies. So the doubt has
+  moved off the fact and onto its statement: must the machine CARRY the tie
+  between a value and the chain it arrived on, or can the registration decide
+  the floor for itself and leave the tie to a proof above it?
   relevant: `below-inner`, `entry-drain-hop`, `share-chain-hop`
 
 ### The ledger
@@ -286,10 +285,10 @@ now at the door and at the templates the door's chains are built from.
   node's queue is drained and fresh bursts appended — the branch nothing has
   reached.
 
-- **`below-inner`** (Rx.Inputs-Below) — SHAPE, `REFUTED`: the bound on an
-  observable manufactured at RUNTIME. False over an arbitrary floor, and sound
-  only once it relates the value to the chain it arrived on — which no
-  hypothesis carries, so the restatement wants a run-state proof field.
+- **`below-inner`** (Rx.Inputs-Below) — SHAPE, `REFUTED, PROBED`: the bound on
+  an observable manufactured at RUNTIME. False over an arbitrary floor, true at
+  every pair a run supplies; the restatement is a choice between carrying the
+  tie to the arriving chain and deciding the floor at the registration.
 
 - **`share-chain-hop`** (Verify-Rank-Sufficient.Path-Fits) — SHAPE,
   `REFUTED, RECOVERY`: the sink's claim at the share's registry, whose one
