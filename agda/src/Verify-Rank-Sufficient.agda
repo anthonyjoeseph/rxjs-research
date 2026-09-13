@@ -281,13 +281,25 @@ open import Verify-Rank-Sufficient.Hop using (hopFits)
 --   queue empty, so the seed collapses onto the term's own reading while
 --   the registry keeps the frame the arrival installed.  The deeper
 --   program reads three against the same one, so this gap is a rate too.
+-- REFUTED: `Refuted.Arrival-Filtered` — and the narrowing the dead route
+--   below was read as forbidding, tested rather than assumed: the chains
+--   ONE arrival reaches, priced against the value that arrival actually
+--   carries, which is the smallest left side a drain step could justify
+--   and is strictly under the one above.  It holds EXACTLY at both doors —
+--   three against three, four against four — and crosses one arrival later
+--   at the same two states, because neither narrowing does any work there.
+--   The filter reaches ONE chain and it is the deep one; the arriving value
+--   reads ZERO, so the seed is the floor.  Those two rows are the content:
+--   they say the information a step has over a state is not the missing
+--   information, which no reading of the registry could have shown.
 -- DEAD ROUTE: BOUNDING THE REGISTRY IS THE DEAD MECHANISM, NOT ANY ONE OF
---   THE THREE STATEMENTS ABOVE.  Three successive candidates for what
---   holds at a drain step — the term's reading, the widest state-readable
---   join, the arrival's own seed — are each refuted at the same two
---   programs, and none is a sub-case of the one before, which is the
---   convergence test failing rather than a hard proof.  The mechanism is
---   wrong because the registry prices what a chain COULD spend given an
+--   THE STATEMENTS ABOVE.  Four successive candidates for what holds at a
+--   drain step — the term's reading, the widest state-readable join, the
+--   arrival's own seed, and the step's own filtered spend — are each
+--   refuted at the same two programs, and the fourth is a sub-case of the
+--   third rather than a smaller region, so the sequence has stopped
+--   subdividing and started confirming.  The mechanism is wrong because
+--   the registry prices what a chain COULD spend given an
 --   arbitrarily deep value, and no state carries what value will arrive;
 --   a fold spends what the value it is HANDED makes it spend.  So a
 --   fourth reading of the registry is not the repair, and the premise is
