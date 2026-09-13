@@ -224,25 +224,24 @@ now at the door and at the templates the door's chains are built from.
 
 ### Big picture tier roadmap
 
-- **THE SHARE SINK, WHICH IS NOW KNOWN TO CARRY THE WHOLE OF THE FAN-OUT.** A
-  sink ends its chain and hands the values to every chain registered on the
-  share, and the fold's sink arm consumes an obligation over that fan-out which
-  nothing anywhere produces. The store side has just made this the tier's
-  remaining risk rather than one gap among three: neither slot kind puts a
-  second chain under the bound the fold fixes, so a store that compounds across
-  consumers can only compound HERE. Instantiate the fan-out at a reached share
-  before stating anything, since what the obligation has to carry is decided by
-  what the dispatch does to the store.
+- **SETTLE THE MEASURE, WHICH IS THE DESIGN DECISION THE SINK IS WAITING ON.**
+  The sink's obligation is stated and the fold's sink arm already consumes it;
+  nothing produces one, and producing one means folding the fan-out's chains,
+  which re-enters the chain fold. So the obligation and the fold are mutually
+  recursive and what makes them terminate is chosen rather than ground. The
+  dispatch's own counter is not it: exhausting it mints no dry event, so this
+  whole face passes over it for free. Settle the measure against the store,
+  since one that lets the dispatch re-enter at a LARGER store refutes the fold's
+  shape rather than the sink's arm.
 
-- **THEN STATE IT, AND THE MEASURE IS THE DESIGN DECISION IN IT.** It is not a
-  fourth frame arm: the fan-out re-enters the chain fold, so the obligation and
-  the fold are mutually recursive and what makes them terminate is chosen rather
-  than ground. Settle the measure first and state the obligation to fit it, then
-  let the fold's sink arm consume it — the arm exists and asserts the fit today,
-  so landing a producer is what turns the assertion into a check. The store
-  bound is the one the fold fixes for the whole chain, so a measure that lets
-  the dispatch re-enter at a LARGER store is a refutation of the fold's shape
-  and not merely of the sink's arm.
+- **THEN THE OBLIGATION'S OWN FORM, NOW THAT THE DISPATCH HAS BEEN MEASURED.** The
+  fan-out's chains are folded threading ONE state, so a later chain is entered
+  at what an earlier one left — but the figure the dispatch leaves is the
+  DEEPEST chain's write and nothing else, the same for three registrations as
+  for one and the same for three rates as for the deepest of them. So the clause
+  owes a join with one chain's own reach rather than a bound indexed by the
+  share's width — a residue the chain fold can hand itself rather than one it
+  could never produce. Write that form and let the fold's sink arm consume it.
 
 - **AND THE EXIT FRAME, WHOSE BLOCKER IS NOT THE ONE THIS LEG WAS WRITTEN FOR.**
   The route it described is dead: the chain fold it was waiting for is written
