@@ -148,3 +148,14 @@ open import Probed.Store-Rank
 open import Probed.Share-Fanout
   using (fanoutFork; oneRow; thriceRow; mixedRow; payRow;
          quietRow; quietAgree)
+
+-- the store figures are claimed beside the three dry rows because each
+-- is a way a dry-free reading could have been green having dispatched
+-- nothing — an empty registration list, a store that was nought going
+-- in, or one the dispatch never wrote — and the quiet row is claimed
+-- for the opposite reason: it is nought at both ends, which is what
+-- separates the dry property from the writing rather than controlling
+-- for it
+open import Probed.Sink-Dry
+  using (one3-is; three3-is; quiet3-is;
+         sinkOne3; sinkThree3; sinkQuiet3)

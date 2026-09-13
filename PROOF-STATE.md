@@ -265,11 +265,10 @@ now at the door and at the templates the door's chains are built from.
   headroom the tail leaves. A fold refolds once per DELIVERY, which a hop bound
   does not count.
 
-- **`share-sink-dry`** (Verify-Rank-Sufficient.Path-Fits) — FALSITY,
-  `NO EVIDENCE`: the sink ends its chain and fans its values out to every chain
-  on the share, folded threading ONE state. The leaf is stated at the store the
-  dispatch was ENTERED at, and the fan-out's own writes are measured to move
-  it.
+- **`share-sink-dry`** (Verify-Rank-Sufficient.Path-Fits) — FALSITY, `PROBED`:
+  the sink ends its chain and fans its values out to every chain on the share,
+  folded threading ONE state. The leaf is stated at the store the dispatch was
+  ENTERED at, and the fan-out's own writes are measured to move it.
 
 - **`from-inner-dry` / `thru-outer-frame-dry`**
   (Verify-Rank-Sufficient.Path-Fits) — FALSITY, `NO EVIDENCE`: dry-freedom of

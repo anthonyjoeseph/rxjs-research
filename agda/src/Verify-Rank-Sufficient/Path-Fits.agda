@@ -158,6 +158,17 @@ postulate
 -- a frame.  It is a leaf of this walk and not a step of it: the chains
 -- the dispatch enters are registered on the share and are not steps of
 -- the path standing here, so nothing this recursion has reaches them.
+--
+-- PROBED: `Probed.Sink-Dry` — a dispatch at a share serving one and
+--   then three fold consumers whose accumulators are OBSERVABLES, so
+--   the store reads positive going in and deeper coming out and the
+--   store bound constrains rather than holding vacuously, against a
+--   control of three plain-number folds reading nought at both ends.
+--   Both premises are DECIDED at the point rather than supposed, so a
+--   premise false there would have left the row red.  NOT covered: an
+--   observable-valued slot, which is the only way the vals bound stops
+--   being nought; a completing dispatch; gas exhaustion; and a store
+--   an earlier instant has already deepened.
 postulate
   share-sink-dry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {τ}
     (ac : Acc _≺_ τ) (id : Id) (now : Tick) (i : Fin n)
