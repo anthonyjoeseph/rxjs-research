@@ -194,6 +194,22 @@ postulate
 -- the context size and the only descent is to `suc i`, so the bound
 -- arrives with a unit of slack — and nothing in the type says so.
 --
+-- AND THE DEMAND ORIGINATES AT A REGISTRATION, WHICH IS WHAT OPENS A
+-- SECOND EXIT.  Nothing in the walk wants this bound for itself: the
+-- one clause that spends it is the input arm, and it spends it to lower
+-- a chain onto a slot row, whose type fixes the floor at one above the
+-- index.  So the premise is proof apparatus the machine carries in
+-- order to be well-typed, not a quantity the machine computes with —
+-- and a premise of that kind can be met by WEAKENING THE DEMAND rather
+-- than by supplying the proof.  Let the registration DECIDE its own
+-- floor test and drop the row when it fails, and the bound stops being
+-- a hypothesis the evaluator needs and becomes a theorem about a branch
+-- nothing reaches, which is where the invariant can actually be proven.
+-- The degenerate arm is the one the store already takes for a mistyped
+-- node, so the shape is not new; what it costs is a decision with no
+-- counterpart in the TS, over a floor that has none either.  NOT
+-- WALKED: both exits are stated here and neither is instantiated.
+--
 -- REFUTED: `Refuted.Inner-Floor` — a floor of zero against a context
 --   that has a slot, at the value `input 0`.  The predicate computes to
 --   `false`, so the statement returns an inhabitant of the empty type
