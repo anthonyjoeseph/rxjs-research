@@ -293,14 +293,13 @@ open import Verify-Rank-Sufficient.Hop using (hopFits)
 --   they say the information a step has over a state is not the missing
 --   information, which no reading of the registry could have shown.
 -- DEAD ROUTE: BOUNDING THE REGISTRY IS THE DEAD MECHANISM, NOT ANY ONE OF
---   THE STATEMENTS ABOVE.  Four successive candidates for what
---   holds at a drain step — the term's reading, the widest state-readable
---   join, the arrival's own seed, and the step's own filtered spend — are
---   each refuted at the same two
---   programs, and the fourth is a sub-case of the third rather than a
---   smaller region, so the sequence has stopped subdividing and started
---   confirming.  The mechanism is
---   wrong because the registry prices what a chain COULD spend given an
+--   THE STATEMENTS ABOVE.  Four successive candidates for what holds at a
+--   drain step — the term's reading, the widest state-readable join, the
+--   arrival's own seed, and the step's own filtered spend — are each
+--   refuted at the same two programs, and the fourth is a sub-case of the
+--   third rather than a smaller region, so the sequence has stopped
+--   subdividing and started confirming.  The mechanism is wrong because
+--   the registry prices what a chain COULD spend given an
 --   arbitrarily deep value, and no state carries what value will arrive;
 --   a fold spends what the value it is HANDED makes it spend.  So a
 --   fourth reading of the registry is not the repair, and the premise is
