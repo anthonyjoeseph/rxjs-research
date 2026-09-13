@@ -224,27 +224,17 @@ procedure rather than a pin, and whose refusal is what turned this up.
 ### Open questions
 
 - **MUST THE BOUND BE CARRIED, OR IS NO STATE PREMISE OWED AT ALL?** The reading
-  is a triple of counts over the SYNTAX, and the question was which non-syntactic
-  quantity it must still bound. Every candidate naming one is now refuted — a
-  state's reading, the widest join, an arrival's own seed — and no two are
-  nested, so what is dead is bounding the registry rather than any one of them.
-  What is open is which way that cuts: whether a maximum over the run so far
-  must be CARRIED, the shape this tower exists to have left behind, or whether
-  nothing about a STATE is owed and the obligation belongs entirely to the frame
-  shelf, stated per template against the payload each frame is handed.
+  is a triple of counts over the SYNTAX, and the question is which non-syntactic
+  quantity it must still bound. Bounding the registry is dead: every candidate
+  naming one is refuted and no two are nested. What is open is which way that
+  cuts — whether a maximum over the run must be CARRIED, or whether nothing
+  about a STATE is owed and the obligation belongs to the frame shelf, per
+  template against the payload each frame is handed. It now leans the second
+  way: the one thing the run stores that no term names is BOUND-SIDE, so it
+  cannot carry an obligation however deep it goes.
   relevant: `drain-dry-free`, `entry-hop-fits`
 
 ### Big picture tier roadmap
-
-- **THE STORE HALF THAT NAMING A SEED CANNOT REACH: A FLATTENER'S QUEUE.** The
-  fold's node holds what a named term installed, which is what settled its half
-  of the question above. A limited flattener's node holds observables the RUN
-  chose, and no clause of the reading mentions them — so this is that question
-  in its narrowed form, and it is where the hop edge and the door meet.
-  `thru-outer-frame-carried` is the only row whose evidence reached a flattener
-  at all, and it reached one with nothing queued. Run the flattener arm at a
-  limit low enough that inners back up. Refute first, at a queue holding an
-  observable deeper than the source that emitted it.
 
 - **MEASURE THE TWO SURVIVING MECHANISMS BEFORE EITHER IS ADOPTED.** The
   question above has two halves left and nothing separating them, which is why
@@ -255,14 +245,22 @@ procedure rather than a pin, and whose refusal is what turned this up.
   payload is deeper than its source's own reading admits. Refute first on both.
   The product is a separation, not a proof.
 
-- **THE STORE CONJUNCT IS UNRUN ACROSS THE WHOLE SHELF.** Every frame row on
-  record is a fresh subscribe at the root, so each one's store reads zero both
-  ways and the conjunct has only ever said a frame leaves an EMPTY store alone.
-  If no state premise is owed, this conjunct is what carries the obligation
-  instead — so it has to hold at a store an earlier frame wrote. Reach one by
-  running a second frame on the first's output, at the templates whose bodies
-  mint nodes. Refute first: a frame handed a store deeper than its payload is
-  the shape that would kill it.
+- **THE STORE CONJUNCT'S ONLY FALSIFIABLE HALF IS WHAT A FRAME WRITES.** Going
+  IN is now run and settled — the queue is bound-side, so it cannot fail. Coming
+  out is not: the hop edge installs the inner it subscribes, and the one shelf of
+  rows that reaches a nonzero store has the write and the payload COINCIDING, so
+  nothing yet says which of the two the bound is actually holding. Separate them:
+  a frame whose payload is shallow and whose installation is deep, reached by
+  running a second frame over the store the first wrote, at the templates whose
+  bodies mint nodes. Refute first, at a write above the premise's own successor.
+
+- **THE DOOR'S RISK IS A CONSTRUCTOR NOTHING HAS ENTERED.** `entry-hop-fits` is
+  the tier's only FALSITY and its rows are TIGHT at two crossings, which is what
+  makes the uncovered arm worth more than another margin: no row reaches a `μ`,
+  where the reading's own clause looks through the binder and the fit at the door
+  has nothing spare. Instantiate the door under a recursive source, guarded and
+  through a defer, and run it — the tightness already on record says a repair
+  costing one is a repair that does not fit.
 
 ### The ledger
 
@@ -294,9 +292,9 @@ procedure rather than a pin, and whose refusal is what turned this up.
   the continuation and the store's other nodes are INERT rather than unswept.
 
 - **`thru-outer-frame-carried`** (Verify-Rank-Sufficient.Push-Carried) —
-  DIFFICULTY, `PROBED`: the HOP EDGE, where the two currencies are exchanged.
-  Six frames reached by RUNNING the flattener arm's own subscription hand back
-  exactly what they were handed, so the `suc` is afforded and never spent.
+  DIFFICULTY, `DEAD ROUTE, PROBED×2`: the HOP EDGE, where the two currencies are
+  exchanged. Nine frames reached by RUNNING; the `suc` is afforded and never
+  spent. Three enter at a deep store, and the queue axis cannot refute.
 
 - **`dry-operator`** (Verify-Rank-Sufficient.Dry) — DIFFICULTY,
   `REFUTED, DEAD ROUTE×3, PROBED, RECOVERY`: the THREE FLATTENERS' dry-freedom

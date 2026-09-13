@@ -97,3 +97,13 @@ open import Probed.Hop-Edge
 open import Probed.Map-Frame
   using (mapGrow₀; mapShed₀; mapKeep₀; mapGrow₁; mapShed₁; mapKeep₁;
          grow₀-is; shed₀-is; keep₀-is; grow₁-is; shed₁-is; keep₁-is)
+
+-- the two-readings identities are claimed alongside the rows because
+-- they are what the rows rest on rather than what the rows show: they
+-- say a queue cannot hold something deeper than the source that emitted
+-- it, so the only falsifiable half left is the frame's own write, and a
+-- repair separating the two readings would leave these rows green over
+-- a park branch nobody had checked again
+open import Probed.Hop-Store
+  using (stRow₀; stRow₁; stRow₂; q0-is; q1-is; q2-is;
+         same₀; same₁; same₂)

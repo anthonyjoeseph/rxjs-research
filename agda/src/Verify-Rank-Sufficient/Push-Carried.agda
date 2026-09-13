@@ -197,6 +197,18 @@ postulate
 -- statement is the easier one to prove; if that proof stalls, the
 -- stronger form is the thing to reach for rather than a new hypothesis.
 --
+-- DEAD ROUTE: refuting the store conjunct at a PARKED inner deeper
+--   than the source that emitted it.  There is no such queue to build.
+--   A value of observable type IS a closed expression, and the value
+--   reading at that type is the same projection of the same triple the
+--   expression reading is, so a parked inner reads exactly what the
+--   frame was handed; the park clause appends it to a queue the store
+--   reading takes a `⊔` over, and the premise already affords a whole
+--   successor above that.  The axis is bound-side twice over — the
+--   queue's depth enters the bound and the outgoing reading through the
+--   same `⊔` — so no instantiation of it can fail, however deep.  What
+--   is left falsifiable at this frame is the WRITE, not the queue.
+--
 -- PROBED: `Probed.Hop-Edge` — six frames reached by RUNNING the
 --   subscription the flattener arm builds, over all three operators, at
 --   a fold that deepens its accumulator once and twice per delivery, at
@@ -205,6 +217,19 @@ postulate
 --   and the margin is a constant one.  NOT reached: a frame whose rank
 --   is spent, which no root can exhibit since a flattener's own reading
 --   is a successor.
+--
+-- PROBED: `Probed.Hop-Store` — the same frame at a store that is
+--   already deep, which is the configuration no other row on this shelf
+--   reaches: the flattener's own node is installed holding parked
+--   inners reading nought, one and two before the frame runs, and the
+--   store bound is taken at the LEAST value the premise and the
+--   incoming hypothesis admit, so nothing absorbs an over-deep write.
+--   The payload hypothesis is decided at EQUALITY at every row.  What
+--   the three buy is the outgoing store: the frame installs the
+--   arriving inner and leaves a store reading one below its bound, the
+--   first nonzero store reading anywhere on the shelf.  NOT covered: no
+--   row runs a frame over a store a DIFFERENT frame wrote, and here the
+--   write and the payload coincide, so nothing separates them.
 postulate
   thru-outer-frame-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} {τ}
     (ac : Acc _≺_ τ) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
