@@ -280,9 +280,11 @@ mutual
   -- CHOICE.  A door subscribes the OUTER gate only; the body is the
   -- pending payload of a fresh source and is subscribed later, at its
   -- own door, off its own reading.  So the registry a door returns
-  -- holds one chain of one hop however deeply the gates nest — pinned
-  -- at one, two and three in `Probed.Gate-Constant` — and `flatten` at
-  -- the cancellation is the term for it rather than a numeral.
+  -- holds one chain of one hop however deeply the gates nest — measured
+  -- at one, two and three, both sides on the nose, so a clause leaving
+  -- the gate free fails one column and a clause walking the body fails
+  -- the other — and `flatten` at the cancellation is the term for it
+  -- rather than a numeral.
   rdᵉ ψ ρ (deferᵉ e)        = flatten (0 , 0 , 0)
 
   -- A TEMPLATE IS READ AGAINST ITS ARGUMENT, not scaled by a slope.  A

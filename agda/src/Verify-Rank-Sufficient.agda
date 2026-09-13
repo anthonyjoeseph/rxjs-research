@@ -49,19 +49,21 @@
 module Verify-Rank-Sufficient where
 
 open import Data.Bool using (false)
-open import Data.Nat using (z≤n)
-open import Data.Product using (_×_; proj₁; proj₂)
-open import Relation.Binary.PropositionalEquality using (_≡_)
+open import Data.Nat using (zero; suc; z≤n)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Data.Sum using (inj₁; inj₂)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim  using (Fuel; Id)
 open import Rx.Exp   using (Ctx; Closed)
 open import Rx.Slots using (Slots)
-open import Rx.Evaluator using (Stream; Sched; EvalSt; evaluate; drain; hasDry;
-  subscribeE; rootWitness; root; sched-init; st-init)
+open import Rx.Evaluator using (Stream; Sched; EvalSt; Arrival; evaluate; drain;
+  hasDry; cascade; sched-next; subscribeE; rootWitness; root; sched-init;
+  st-init)
 open import Verify-Rank-Sufficient.Dry using (subscribe-dry-free)
 open import Verify-Rank-Sufficient.Dry-Emits using (hasDry-++)
 open import Verify-Rank-Sufficient.Entry using (rootTri-reads)
-open import Verify-Rank-Sufficient.Hop using (hopFits)
+open import Verify-Rank-Sufficient.Fits using (ArrivalFits; DrainFits)
 
 -- THE THREE PEELS ARE NOT THREE GRINDS OF ONE SIZE, AND THE ASYMMETRY IS
 -- THE SCHEDULE OF THIS TIER.  Two of them are one line over a fact about
@@ -124,108 +126,39 @@ open import Verify-Rank-Sufficient.Hop using (hopFits)
 --   carrying a hop DEPTH under its own cap, which answers a different
 --   question from a rank that peels one per hop.
 
--- THE DRAIN IS THE SECOND HALF OF A RUN AND THE HALF THAT RECURSES.  The
--- root subscribe returns one burst and a schedule; everything after it is
--- this loop pulling one arrival at a time and cascading it to quiescence,
--- so every unfolding past the first, every later connect, and every
--- emitted inner is reached from in here.  The loop's OWN recursion owes
--- nothing — it descends on `Fuel`, and the cascade underneath it descends
--- on the telescope position, a premise a shared slot carries in its own
--- type — so what this leaf is about is the guarded peels a cascade
--- re-enters through, and not the descent of either loop.
+-- ONE ARRIVAL'S CASCADE, UNDER THE OBLIGATIONS ITS OWN CHAINS CARRY.
+-- The loop above owes nothing — it descends on `Fuel` and hands each
+-- arrival the conjunct the premise already holds for it — so this is
+-- where the guarded peels a cascade re-enters through are paid for, and
+-- it is the only place a drain step can go dry.
 --
--- AND THE SCHEDULE AND THE STATE ARRIVE UNCONSTRAINED, WHICH IS A GAP AND
--- NOT A GENERALITY.  Both are universally quantified here and nothing in
--- the hypotheses relates either to `e`.  The STORE half of that costs
--- nothing now: the cascade re-seeds per ARRIVAL rather than off the root,
--- and `arrivalWitness` enters at the value's nesting joined with
--- `stHop`, so a registry no run could have built is bounded by the same
--- expression as one a run produced, and the arbitrary store is a
--- generality after all.  What no seed reads is what happens AFTER it is
--- minted: one arrival's chain fold can deliver many times, a fold
--- deepens its accumulator by the step's own reading per delivery, and the
--- entry was taken once.  Whether that ever reaches the dry close is the
--- question the operator leaf answers YES to from the other side, and it
--- is the one this row could not put until a cascade had been
--- instantiated rather than argued about.
-
--- AND THE PREMISE IS NOT AN INVARIANT, WHICH CONSTRAINS THE TICK-GATING
--- ARGUMENT ABOVE RATHER THAN THE CONCLUSION BELOW.  That argument says a
--- single entry need only cover what a term produces SYNCHRONOUSLY, since
--- a recursion re-enters through a gate whose body is pending at the next
--- tick.  What it misses is that a GATE'S OWN OPENING IS A REGISTRATION: a
--- defer installs a flattening frame and leaves its body pending, so the
--- frame outlives the subscribe that made it, and a chain carries one
--- flattening edge for each flattener whose OUTER SOURCE is still live
--- along it.  Nesting flatteners over DATA stacks nothing — an inner
--- attaches BELOW the frame, which the chain measure passes through at
--- zero — so the one shape that stacks them is a flattener whose outer is
--- a gate.  And the reading cannot see that stack, because its gate clause
--- is CONSTANT: it prices a defer at one without descending, which is the
--- clause that buys the descent its recursion edge.  Tick-gating is
--- therefore what OPENS the gap rather than what closes it, and one more
--- turn of the same crank adds one to the chain and nothing to the term.
+-- THE PREMISE IS PER TEMPLATE AND NAMES NO STATE QUANTITY, WHICH IS
+-- WHAT THE WITNESSES BELOW COST.  Four successive readings of a
+-- registry against the program each died at the same two programs, and
+-- the fourth is a sub-case of the third rather than a smaller region —
+-- the sequence had stopped subdividing and started confirming.  So what
+-- is asked here is not that some quantity the state holds be large
+-- enough; it is that every frame the run installed satisfy the shelf's
+-- own obligation at the payload that frame is handed.  `ArrivalFits` is
+-- that conjunction, and nothing in it reads a registry's depth.
 --
--- SO WHAT IS DEAD IS THE ROUTE AND NOT THE STATEMENT.  Every program
--- exhibiting this runs dry-free, so the leaf may well be true; what
--- cannot be done is to reach it by an induction that carries this
--- premise, since the premise holds TIGHTLY at entry and is destroyed by
--- the FIRST arrival.  Nor is the repair local: charging a gate's body
--- would close it and would cost the descent the edge the constant clause
--- exists to buy, so this is the tier's open question — whether one
--- reading can price what no frame hands the next one — arriving at the
--- premise rather than at the conclusion.
+-- AND THE STEP BETWEEN TWO ARRIVALS IS ASKED OF NOBODY, WHICH IS THE
+-- WHOLE OF WHY THIS SHAPE IS AVAILABLE WHERE SIX OTHERS WERE NOT.
+-- Every dead reading needed a fit PRESERVED across a cascade, and each
+-- died proving it.  `DrainFits` recurses on the allowance instead,
+-- taking each arrival's conjunct at the very pair that arrival's
+-- cascade returns, so what a cascade does to the registry is the door's
+-- problem and never this leaf's.
 --
--- AND THE RIGHT-HAND SIDE CANNOT BE WIDENED TO REACH IT, WHICH IS WHAT
--- NARROWS THE QUESTION.  The run does hold the missing reading, for
--- exactly as long as it is useless: a gate's body waits in the
--- schedule's pending list, and its reading there IS the figure the
--- registry reaches one arrival later, at both witnesses.  The arrival
--- that installs the frame is the arrival that consumes the entry
--- predicting it, so the join of the term, the store and the schedule
--- reads the same as the term alone one step on.  The quantity is
--- HISTORICAL: no reading of any single state is preserved, so the
--- repair is not a bigger bound.  Either it is CARRIED — a maximum over
--- the run so far, which is the shape this tower exists to have left
--- behind — or this premise should not exist and what must be adequate
--- is the rank each ARRIVAL enters at, which the machine already
--- re-seeds and which is a different statement.
-
--- AND THE CASCADE DOES NOT OUTGROW ITS ENTRY, WHICH IS WHY THIS ROW IS
--- NOT THE OPERATOR ROW UNDER ANOTHER NAME.  A cascade is ONE INSTANT,
--- and both axes a term does not read are tick-gated: an arrival is a
--- tick by construction, and a recursion re-enters only through
--- `deferᵉ`, whose body is pending at `suc now`.  So what a single entry
--- has to cover is the deliveries a term can produce SYNCHRONOUSLY — and
--- a fold's reading gains one layer per delivery while the seed doubles
--- per symbol of the term producing them.  Linear against exponential in
--- the one parameter that moves both, which is the same shape the
--- arrival rows found ACROSS entries; so the denomination the paragraph
--- above asks for is the seed the machine already mints, and what is
--- left in this row is the unconstrained schedule alone.
---
--- AND WHAT LICENCES THE HYPOTHESIS IS THAT THE UNCONDITIONAL FORM IS
--- FALSE, WHICH IS THE ONLY THING THAT DOES.  Adding one otherwise
--- trades tracked debt for untracked debt, so a statement that might
--- still hold outright may not acquire one — and the two witnesses below
--- close that off, the second of them against the obvious weaker repair.
--- `hopFits` is the quantity they say is absent:
--- a chain's own remaining-hop content, read off the very frames the
--- witness exploits, against the reading of the program those frames
--- belong to.  Its environment is the schedule's OWN — `slotRd` at the
--- schedule's telescope — so no caller may soften it by choosing a
--- reading nobody runs; and both sides compute, which makes this
--- refutable at a concrete registry rather than merely unproven.
---
--- AND THE PREMISE'S LEFT SIDE REPLAYS THE RIGHT ONE ALONG THE CHAIN,
--- WHICH IS WHAT LEAVES THIS ROW WITH EXACTLY ONE SUBJECT.  The chain
--- measure hands each frame the reading the frame above it produced and
--- spends the term reading's own step at every one, so the two sides
--- cannot part on a chain the entry built — they are the same
--- arithmetic walked in the same order.  What can part them is a frame
--- the term never produced, which is precisely a chain a cascade has
--- lengthened past the program that built it, and that is the region
--- this leaf is about.
+-- WHAT IS LEFT UNPAID IS THE FLATTENER AND THE FAN-OUT, AND THE
+-- PREMISE SAYS WHICH.  Three of the frame obligations collapse to the
+-- unconditional form the shelf already proves, since a map, a scan and
+-- a take read neither bound.  What survives is `thru-outer`, whose walk
+-- ends in the rank peel, and `share-sink`, where a chain hands its
+-- values to registrations no frame above it can see — which is why the
+-- sink carries an obligation of its own rather than a trivially true
+-- clause that would have made the composition false at the first
+-- diamond.
 --
 -- REFUTED: `Refuted.Drain-Reachable` — the form as written, at a store
 --   whose root term is the EMPTY observable.  A chain is a `Path` typed
@@ -315,169 +248,82 @@ open import Verify-Rank-Sufficient.Hop using (hopFits)
 --   the term's own figure and there is nothing a carried quantity could
 --   have covered.  What moves is the LEFT: the spend climbs one per
 --   flattener while the grant holds still.
--- PROBED: `Probed.Descent` — twelve recursive programs, every one green,
---   taken against the DRAIN of each run rather than the whole of it.  What
---   they cover, guard by guard: the μ peel at every program, since all
---   twelve are `μᵉ` and the drain is where the unfolding repeats; the
---   connect peel at the five carrying a slot, `shared` and `scripted`
---   both, one of them a diamond reaching the share twice in an instant;
---   and the RANK peel at the recursive self-reference, which is an emitted
---   inner that unfolds to its own emitter, at μ nested directly in μ, and
---   at a share holding a recursion — the shape whose nesting the guard
---   cannot read off the term it compares.  Each row pins its drain's EVENT
---   COUNT beside it, so none is `false` by an empty stream.  THE BOUNDARY:
---   one fuel, hand-written programs, μ nested two deep and no deeper.
---   These rows are `refl` pins and buy exactly the twelve shapes they
---   name, which is why the coverage past them is bought by an instrument
---   that is not a pin.
--- PROBED: `Probed.Fuel-Growth` — six drains of ONE run, differing in
---   FUEL alone, at a fold whose source is a recursion, so how many
---   arrivals happen is the drain's business and not the term's.  Both
---   readings of the term hold still across the six while the carried
---   hop reading is the fuel plus one: the rate is ONE per arrival,
---   exactly, and it is the quantity an arrival's own entry reads.  The
---   term reads 3 there, so the rows OVERTAKE it at three units and the
---   leaf is still green at six, where the run's output reads more than
---   twice what any reading of its program could give.  THE
---   BOUNDARY: one delivery lands per arrival, so every layer the rows
---   count is paid for by a fresh entry and none of them reaches a burst
---   delivering many times inside one cascade — a region `Probed.Entry-Fit`
---   reaches for the DOOR, at twenty-four deliveries under one arrival,
---   but which no row here or there carries into this leaf's own drain.
--- PROBED: `Probed.Fit-Preserved` — the fit at states the DRAIN produced,
---   which every receipt above is silent about.  `stepOnce` is the loop's
---   own step with the emit stream dropped — the same pull, the same
---   cascade, the same instant counter — so a row reads the pair the
---   recursion would have been handed rather than one written by hand.
---   Nine rows over three recursive programs at one, two and three
---   arrivals, each spending the decision procedure on the comparison, so
---   a fit the k-th arrival destroyed leaves its row unsolvable instead of
---   letting it through.  The finding is stronger than preservation: the
---   carried reading does not MOVE — one at all twelve states, against
---   term readings of one, two and three — while the registration counter
---   climbs at every step on every program, which is what separates a flat
---   reading from a stepper that had become a fixed point.  And the
---   plainest program is TIGHT, one against one, so a registry carrying a
---   single hop more would fail outright and the flat rows are taken where
---   the statement is closest to false.  THE BOUNDARY: three arrivals, a
---   merge only, and nothing here reaches the late-slot cascade the
---   receipt above instantiates.
--- PROBED: `Probed.Drain-Arrival` — the boundary both receipts above name,
---   which is the same one from opposite sides: many deliveries inside ONE
---   cascade, carried PAST the arrival rather than read at the door.  Six
---   and twenty-four deliveries per arrival, plus a family where every one
---   of them installs a registration still live when the cascade ends.  The
---   fit holds at all seven reached states and the carried side does not
---   MOVE — two, two, two; two, two, two; three at all four — while the node
---   counter climbs 2, 3, 4, 5 and the registration counter 1, 7, 13, so a
---   stepper gone quiet is ruled out separately.  The finding is which side
---   the region's own axis moves: lengthening the burst takes the TERM
---   reading from 19 to 73 and leaves the registry at two, because a fold
---   reads its source's delivery count as its refold count.  Delivery count
---   inflates the bound rather than the quantity bounded, so this region is
---   not where the risk is.  THE BOUNDARY: no row is TIGHT and none can be,
---   the parameter defining the region being the one widening the margin —
---   a tight row has to hold the deliveries fixed and deepen the registry
---   instead.  Three arrivals, one slot, one flattening strategy.
+-- RECOVERY: git show 8085eed:agda/evidence/probed/Probed/ restores the
+--   six probes this restatement expired.  The HARNESS is what is worth
+--   having back and the verdicts are not: `stepOnce` is the drain's own
+--   step with the emit stream dropped, which is how a row reaches a
+--   state the loop itself produced rather than one written by hand, and
+--   `cascLive` is a family every one of whose deliveries leaves a
+--   registration live when the cascade ends.  Their rows priced a
+--   registry at a state, and a premise quantifying over states has no
+--   such row.
 
 postulate
-  drain-dry-free : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (fuel : Fuel) (nextId : Id)
-    (sched : Sched Γ) (st : EvalSt e) →
-    hopFits sched st →
-    hasDry (drain fuel nextId sched st) ≡ false
+  cascade-dry-free : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (a : Arrival Γ) (nextId : Id) (sched : Sched Γ) (st : EvalSt e) →
+    ArrivalFits nextId a sched st →
+    hasDry (proj₁ (cascade a nextId sched st)) ≡ false
+
+-- AND THE ALLOWANCE LOOP IS A BODY, WHICH IS WHAT THE PER-TEMPLATE
+-- PREMISE BOUGHT.  The premise recurses on the allowance exactly as the
+-- loop does, so each arrival's conjunct is handed to the leaf that
+-- serves that arrival and the tail is handed to the recursive call.
+-- Nothing here re-establishes anything: the step between two arrivals
+-- is where every refuted reading died, and it is not stated.
+drain-dry-free : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (fuel : Fuel) (nextId : Id)
+  (sched : Sched Γ) (st : EvalSt e) →
+  DrainFits fuel nextId sched st →
+  hasDry (drain fuel nextId sched st) ≡ false
+drain-dry-free zero    nextId sched st fits = refl
+drain-dry-free (suc k) nextId sched st fits with sched-next sched | fits
+... | inj₁ _            | _            = refl
+... | inj₂ (a , sched′) | (hd , tl) =
+      hasDry-++ (proj₁ (cascade a nextId sched′ st))
+        (drain k (suc nextId) (proj₁ (proj₂ (cascade a nextId sched′ st)))
+          (proj₂ (proj₂ (cascade a nextId sched′ st))))
+        (cascade-dry-free a nextId sched′ st hd)
+        (drain-dry-free k (suc nextId)
+          (proj₁ (proj₂ (cascade a nextId sched′ st)))
+          (proj₂ (proj₂ (cascade a nextId sched′ st))) tl)
 
 -- THE FIT AT THE DOOR.  `evaluate` hands the drain the state its root
--- subscribe left, so this is the one arrival-free instance the
--- assembly needs, and it is a leaf rather than a hypothesis because
--- nothing above it is free to choose the state.  It takes no fuel: the
--- entry state is what the subscribe frame produced, and the drain has
--- not run yet.
+-- subscribe left, so this is the one instance the assembly needs, and
+-- it is a leaf rather than a hypothesis because nothing above it is
+-- free to choose the state.
 --
--- REFUTED: `Refuted.Hop-Sum` — the predecessor CHAIN measure, which
---   read every frame's template apart and added.  The repair was on the
---   measure's own side — a reading threaded down the chain — and every
---   row below survived it, which is what the witness is named here for:
---   it pins WHICH measure this statement is about, and a return to the
---   summing one puts the crossing straight back.
--- PROBED: `Probed.Entry-Fit` — the SCRIPTED slot, which is where this
---   statement was once false: a slot's reading has three components,
---   two of them forced to zero by `isData`, so the count is the only
---   one that can be got wrong and it is the one that reaches the hop —
---   through the flattener's product and then through a fold, which
---   spends the product as its refold count.  A count taken at the
---   subscribe frame reads zero at a source whose values all arrive
---   late, and the chain above it collapses with it.  The rows sit at
---   exactly that slot and the term side now reads 7 against a registry
---   of 2, with the margin WIDENING out to twenty-four deliveries under
---   one arrival.  And they do not stop at programs whose deliveries the
---   term counts, which would be circular: six cascades of a fold over a
---   RECURSION, stepped by the loop's own step, at the one program whose
---   output is known to outgrow every reading of itself.  THE BOUNDARY:
---   one slot, and no HOT one — a hot source is anchored at tick zero
---   rather than at the subscription, so its clause over-approximates
---   and a row there would instantiate something weaker than these do.
---   AND ONE ROW IS TIGHT, which none of those can be made: two
---   templates that never mention what they are handed, each an
---   observable one flattener deep, under a third.  That is the shape a
---   chain measure reading its frames APART crosses the term at, and it
---   lands on the nose — 2 against 2 — so the region where the two
---   sides can disagree at all is instantiated rather than argued.  The
---   figures every other row here pins were taken against the summing
---   predecessor and came back UNCHANGED, which is what says the
---   coverage above is about the measure as it now reads.
--- PROBED: `Probed.Descent` — the root entry of three recursive
---   programs, each a `refl`-free row whose witness is the decision
---   procedure on the comparison itself, so a premise FALSE at the
---   point would leave the row's implicit unsolvable rather than let it
---   pass.  The three are plain recursion, μ nested directly in μ, and a
---   share holding a recursion referenced from inside a second one —
---   which is the shape whose nesting the rank guard cannot read off the
---   term it compares, and so the one a fit read off the term alone
---   would be expected to miss.  THE BOUNDARY: entry states only, with
---   `ψ` the schedule's own `slotRd` rather than a reading chosen for
---   them; nothing here reaches a state the drain itself produced.  And
---   all three take their depth from the TERM's own recursion — the one
---   that has a slot at all has a SHARED one.  THREE MORE ROWS CLOSE
---   THAT ARM, which is where this statement's two histories meet: the
---   same recursion over a SCRIPTED slot, the switching strategy over
---   it, and the recursion over a slot delivering NOTHING in its
---   subscribe frame — the refuting shape itself rather than a
---   neighbour, since a count read at the frame is nought there.  The
---   guard is then comparing a term whose nesting is fixed outside its
---   own syntax against exactly that count, and the fit holds at all
---   three.  TWO MORE ENTER THE LAST FLAVOUR, a HOT slot, at the same
---   recursion and at a defer over it, so all three flavours are now
---   reached under a μ.  THE SECOND BOUNDARY is what that arm cannot
---   say: a hot slot is anchored at tick ZERO rather than at the
---   subscription, and every row here is an entry, so the two anchors
---   coincide at every one of them and nothing separates them.
--- PROBED: `Probed.Gate-Constant` — the GATE at its own door, which is
---   the shape this statement was false at: a defer registers a chain
---   the reading gave nothing, so the crossing read one against zero.
---   The rows pin BOTH sides separately at one, two and three nested
---   gates and both read ONE at every depth, so the fit lands on the
---   nose — a reading that leaves the gate free fails the term column
---   and one that walks the body fails the carried column, which is
---   what makes the region instantiated rather than argued.  That the
---   figure does not climb with nesting is the finding underneath: a
---   door subscribes the OUTER gate only and the body becomes a fresh
---   source's pending payload, subscribed later at its own door, so the
---   debt a door returns is one chain of one hop whatever sits beneath
---   it.  And the assembly's own conclusion is read back at each depth
---   off a real run at eight times the fuel the door needs, since
---   `hasDry` is what the fit is ultimately for and it was observed
---   wrong at this very shape.  THE BOUNDARY: gates over a literal and
---   no recursion — a gate under a μ is where the reading's invariance
---   is load-bearing rather than merely preserved, and that axis is the
---   fold rows of the first receipt above; a gate whose body is itself
---   scheduled late is reached by nothing here.
+-- AND IT TAKES THE ALLOWANCE, WHICH IS WHAT A HEREDITARY PREMISE
+-- COSTS.  `DrainFits` carries one conjunct per arrival the fuel serves,
+-- each at the pair that arrival's cascade returns, so the door cannot
+-- discharge it without walking the loop the conclusion walks.  That is
+-- the obligation the refuted readings were trying to buy off with a
+-- single preservation step; it has not gone away, it has moved to the
+-- one place where the state is not arbitrary — the entry the machine
+-- itself minted out of the program and the telescope.
+--
+-- PROBED: `Probed.Door-Fits` — the statement itself, applied, at one
+--   allowance over a bare slot whose single value lands after the
+--   subscribe frame.  The conjunction it reduces to there is written
+--   out of constructors and nothing else, and all three ways it could
+--   have asked for nothing are pinned against it separately: the
+--   allowance serves one arrival, that arrival reaches one chain, and
+--   that chain carries no frame.
+--   NOT COVERED, and the boundary is the finding rather than the gap.
+--   Of `PathFits`'s three constructors only `at-root` stands on
+--   something proven — `through` wants the frame shelf and `at-sink` a
+--   fan-out, both still postulated — so the region a row can reach at
+--   all is exactly the chains with no frame on them.  Everything else
+--   is pinned instead of fitted: one flattener over a map of the
+--   arriving value builds a chain two frames deep at the same slot and
+--   the same arrival, which is where a row would be handing a
+--   postulate back as its own evidence.  Nothing here reaches a second
+--   arrival, a share, or a registry holding more than one chain.
 postulate
-  entry-hop-fits : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t)
+  entry-drain-fits : ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t)
     (ins : Slots Γ) →
     let ent = subscribeE (rootWitness e ins) e root 0 0 (sched-init e ins)
                 (st-init e)
-    in hopFits (proj₁ (proj₂ ent)) (proj₂ (proj₂ ent))
+    in DrainFits fuel 1 (proj₁ (proj₂ ent)) (proj₂ (proj₂ ent))
 
 -- NOTHING BELOW THIS LINE IS THE MACHINE'S TO CHOOSE, AND THAT IS WHAT
 -- THE ITERATED FOLD CLAUSE BOUGHT.  The fit at the door takes the
@@ -516,7 +362,7 @@ rank-sufficient {Γ = Γ} {t = t} fuel e ins =
     (proj₁ (subscribe-dry-free (rootWitness e ins) e root 0 0
       (sched-init e ins) (st-init e) (rootTri-reads e ins) z≤n))
     (drain-dry-free fuel 1 (proj₁ (proj₂ ent)) (proj₂ (proj₂ ent))
-      (entry-hop-fits e ins))
+      (entry-drain-fits fuel e ins))
   where
   ent : Stream Γ t × Sched Γ × EvalSt e
   ent = subscribeE (rootWitness e ins) e root 0 0 (sched-init e ins)

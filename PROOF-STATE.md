@@ -208,31 +208,31 @@ research lives; where they disagree, the header wins.
 
 ## Tier 1 — the descent never goes dry
 
-**THE TIER IS ONE STATEMENT, ITS DOOR HOLDS, AND ITS PREMISE DOES NOT SURVIVE AN
-ARRIVAL.** `rank-sufficient` (Verify-Rank-Sufficient) says no run emits the dry
-marker. The carried side's addition is repaired and the door's gate crossing with
-it, so the fit holds at entry and TIGHTLY. One cascade destroys it: a gate's own
-opening registers a flattening frame, and the reading declines to descend into a
-defer. Nor does joining what the run holds: the pending body IS the crossing,
-and the arrival that installs the frame consumes it.
+**THE TIER IS ONE STATEMENT, AND ITS PREMISE NO LONGER READS A STATE AT ALL.**
+`rank-sufficient` (Verify-Rank-Sufficient) says no run emits the dry marker.
+Every reading of a registry against the program is dead — the term's, the widest
+state-readable join, the arrival's own seed, the step's filtered spend — so the
+premise is now the frame shelf's own obligation at each template the run
+installed, against the payload that template is handed, and the allowance loop
+above it is a real body over one cascade leaf.
 
-**A FAILING GUARD IS NOT AN ERROR, AND THAT IS WHY THE TIER IS PROBEABLE.** A
-guarded clause returns a `dry` emit and the run continues, so both sides
-compute at every program — `hopFits` included, whose rows spend a decision
-procedure rather than a pin, and whose refusal is what turned this up.
+**AND NOTHING IS ASKED ABOUT THE STEP BETWEEN TWO ARRIVALS**, which is where
+all six witnesses killed their readings: the premise recurses on the allowance
+and takes each conjunct at the pair that arrival's cascade returns. It
+quantifies over states rather than fixing one, so instantiation now goes to its
+per-frame conjuncts and to the chains a run installs.
 
 ### Big picture tier roadmap
 
-- **STATE THE DRAIN'S PREMISE PER TEMPLATE, NAMING NO STATE.** The leg that stood
-  here would have named a quantity the state carries forward.  Now refuted: an
-  arrival is seeded at the term's reading PLUS a join of the value it
-  carries with the store, so such a quantity is already INSIDE the grant — and at
-  the crossing both summands read NOUGHT, leaving the grant at the term's own
-  figure and nothing to cover. What climbs is the LEFT,
-  one per flattener. So the premise is the shelf's obligation at each template the
-  run installs, against the payload that template is handed. Assembly first: the
-  conditioned statement over postulated leaves, so the fit is CHECKED when a leaf
-  lands.
+- **COMPOSE THE SHELF ALONG A CHAIN, WHICH IS THE CASCADE LEAF'S WHOLE CONTENT.**
+  A per-frame obligation is not yet a per-step one: a chain folds its frames
+  sinkward and a cascade walks a list of chains off one arrival, and those are
+  the two places a bound has to compose. The flattener is the only arm that grows
+  what it hands back, so a rule that joins where it should accumulate stays green
+  on every chain without one. Instantiate a chain carrying two flatteners and a
+  registry holding chains of different lengths before stating anything — the
+  per-frame conjuncts compute even though the premise does not, so this is where
+  the tier can still be refuted cheaply.
 
 - **COMPOSE THE CONSTANTS, WHICH IS THE ONE REGION LEFT UNREACHED.** The payload
   reading is EXACT behind one gate — dry a unit below, green at it. A gate behind
@@ -242,26 +242,26 @@ procedure rather than a pin, and whose refusal is what turned this up.
   that settled the single gate held the store at nought throughout and nothing
   yet says the two quantities do not interact. Refute first.
 
-- **THEN COMPOSE THE SHELF ALONG A CHAIN AND ACROSS A CASCADE.** A per-frame
-  obligation is not yet a per-step one: a chain folds its frames sinkward and a
-  cascade walks a list of chains off one arrival, and those are the two places a
-  bound has to compose. The flattener is the only arm that grows what it hands
-  back, so a rule that joins where it should accumulate stays green on every
-  chain without one. Instantiate a chain carrying two flatteners, and a registry
-  holding chains of different lengths, before stating anything.
+- **THEN THE DOOR, WHICH NOW OWES THE WHOLE ALLOWANCE.** The hereditary premise
+  moved the cost rather than removing it: the entry statement carries one
+  conjunct per arrival the fuel serves, so it cannot be established without
+  walking the loop its consumer walks. What makes that payable rather than
+  circular is that the state is the machine's own at every step — and what would
+  refute it is a program whose first cascade installs a frame the root subscribe
+  never built. Look for that before assembling anything.
 
 ### The ledger
 
-- **`drain-dry-free`** (Verify-Rank-Sufficient) — SHAPE,
-  `REFUTED×6, DEAD ROUTE×2, PROBED×4`: every arrival after the root frame,
-  conditioned on `hopFits` — a registry bound one cascade destroys from a TIGHT
-  entry. No registry reading survives, nor does widening the premise with what
-  the state carries: the grant joins it and it reads nought.
+- **`cascade-dry-free`** (Verify-Rank-Sufficient) — FALSITY,
+  `REFUTED×6, DEAD ROUTE×2, RECOVERY`: one arrival's cascade under the
+  obligations its own chains carry. Nothing has instantiated the conjunction,
+  and the two arms that can go dry — the flattener and the share fan-out — are
+  exactly the two the shelf has not composed.
 
-- **`entry-hop-fits`** (Verify-Rank-Sufficient) — DIFFICULTY,
-  `REFUTED, PROBED×3`: the fit at the door, with both known crossings repaired
-  and TIGHT at each. Every slot flavour is now entered under a μ, the
-  late-scripted one that refuted the statement included.
+- **`entry-drain-fits`** (Verify-Rank-Sufficient) — FALSITY, `PROBED`: the
+  premise at the door, for every arrival the allowance serves. Hereditary by
+  construction, so a single cascade installing a frame the root subscribe never
+  built refutes it.
 
 - **`map-frame-carried`** (Verify-Rank-Sufficient.Push-Carried) — DIFFICULTY,
   `REFUTED×2, PROBED`: the two ends read DIFFERENT expressions, apart by the

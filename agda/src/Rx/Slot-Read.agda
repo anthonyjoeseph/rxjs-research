@@ -75,10 +75,11 @@ open import Rx.Rd-Slot-Cong using (rd-ψ-congᵉ)
 -- nothing, and the zero does not stay local: `flatten` multiplies the
 -- chain's count through it, and a fold above reads the product as how
 -- many times it refolds — so a term over such a slot is read as if the
--- arriving values were never going to come.  `Probed.Entry-Fit` stands
--- at exactly that slot — an empty prefix and one late value — where the
--- frame-only count made the fit at the door FALSE and this one leaves
--- it holding by a margin that widens with the deliveries.
+-- arriving values were never going to come.  That slot — an empty
+-- prefix and one late value — is where the frame-only count was
+-- refuted outright, and it is the only component of the three that can
+-- be got wrong: a scripted payload satisfies `isData`, so no emission
+-- of its can hold an observable and the other two are forced to zero.
 --
 -- A HOT SOURCE IS COUNTED THE SAME WAY AND THE ANSWER IS AN UPPER
 -- BOUND, WHICH IS THE DIRECTION EVERY CONSUMER NEEDS.  It is anchored
