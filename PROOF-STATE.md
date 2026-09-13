@@ -213,11 +213,8 @@ ARRIVAL.** `rank-sufficient` (Verify-Rank-Sufficient) says no run emits the dry
 marker. The carried side's addition is repaired and the door's gate crossing with
 it, so the fit holds at entry and TIGHTLY. One cascade destroys it: a gate's own
 opening registers a flattening frame, and the reading declines to descend into a
-defer.
-
-**AND THE FOLD IS NOT A FRAME, BUT ITS BURST IS PRICED.** A scan emits its own
-accumulator, so nothing a frame is handed bounds what it returns; taken at the
-burst and at the seed the walk installs, the reading prices every refold.
+defer. Nor does joining what the run holds: the pending body IS the crossing,
+and the arrival that installs the frame consumes it.
 
 **A FAILING GUARD IS NOT AN ERROR, AND THAT IS WHY THE TIER IS PROBEABLE.** A
 guarded clause returns a `dry` emit and the run continues, so both sides
@@ -226,28 +223,27 @@ procedure rather than a pin, and whose refusal is what turned this up.
 
 ### Open questions
 
-- **CAN ONE READING PRICE WHAT THE RUN HOLDS AND THE TERM DOES NOT?** The reading
+- **MUST THE BOUND BE CARRIED, OR IS THE REGISTRY THE WRONG OBJECT?** The reading
   is a triple of counts over the SYNTAX, and the question was which non-syntactic
-  quantities it must still bound. It now has ONE subject rather than several: the
-  RUN's own holdings. Two instances are known and they are the same shape — the
-  schedule's PENDING bodies, which a gate's constant clause declines to read, and
-  a flattener's QUEUE, which holds observables the run chose. The fold's half is
-  settled and is what shows the shape: naming the seed tied a node to the term
-  that installed it, and nothing names either of these.
+  quantities it must still bound. That half is settled and negatively — no
+  reading of a state bounds the registry, the widest join included — so the
+  quantity is HISTORICAL, and what is open is which way that cuts: whether a
+  maximum over the run so far must be CARRIED, the shape this tower exists to
+  have left behind, or whether the registry is not what has to fit at all and
+  the adequate thing is the rank each ARRIVAL enters at.
   relevant: `drain-dry-free`, `entry-hop-fits`
 
 ### Big picture tier roadmap
 
-- **THE PREMISE READ OVER WHAT THE RUN HOLDS, WHICH IS THE ONLY REPAIR THE
-  WITNESS LEAVES.** `hopFits` compares the registry against the TERM, and a
-  cascade beats it because a gate registers a flattening frame while the reading
-  prices that gate at one without descending. Charging the body instead is the
-  move the descent's constant clause exists to forbid, so the repair is on the
-  other side: the schedule's PENDING bodies are the run's own record of what a
-  gate will subscribe, and joining their reading with the term's is what could
-  make the comparison an invariant. Restate `hopFits` that way and refute first,
-  at the two witnesses that killed the present form and at a fold, whose seed the
-  join must not double-count.
+- **DELETE THE PREMISE AND LET THE ARRIVAL CARRY ITS OWN ADEQUACY.** Two
+  witnesses now say the registry cannot be fitted against anything a STATE
+  holds, the widest join included, so a third restatement of `hopFits` is the
+  subdivision the convergence test rules out. What the drain consumes is
+  smaller: every arrival RE-SEEDS, at the payload's reading joined with the
+  store's, and that seed is a property of the arrival rather than a maximum the
+  cascade grew. Restate `drain-dry-free` with no fit premise at all, over that
+  seed, and refute first at the two programs that killed the present form — if
+  the seed is adequate there, the registry never had to be.
 
 - **THE STORE HALF THAT NAMING A SEED CANNOT REACH: A FLATTENER'S QUEUE.** The
   fold's node holds what a named term installed, which is what settled its half
@@ -280,10 +276,10 @@ procedure rather than a pin, and whose refusal is what turned this up.
   instantiated, not argued; no constructor is covered under a μ.
 
 - **`drain-dry-free`** (Verify-Rank-Sufficient) — SHAPE,
-  `REFUTED×3, PROBED×4`: every arrival after the root frame, conditioned on
-  `hopFits` — which one cascade destroys from a TIGHT entry, so nothing can
-  supply the premise where the statement is used. The conclusion survives every
-  witness; the restatement is owed on the premise.
+  `REFUTED×4, PROBED×4`: every arrival after the root frame, conditioned on
+  `hopFits` — which one cascade destroys from a TIGHT entry, and which no
+  reading of a state repairs. The conclusion survives every witness; the
+  restatement is owed on the premise.
 
 - **`scan-burst-carried`** (Verify-Rank-Sufficient.Push-Carried) — DIFFICULTY,
   `REFUTED, PROBED`: the fold, at the burst and at the seed rather than at the
