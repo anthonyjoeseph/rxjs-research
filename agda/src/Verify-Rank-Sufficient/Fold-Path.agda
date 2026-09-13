@@ -44,12 +44,13 @@ open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.Bool.ListAction using (any)
 open import Data.Fin using (Fin; toℕ)
 open import Data.List using (List; []; _∷_; _++_; map)
-open import Data.Nat using (ℕ; suc; _≡ᵇ_; _≤_; _⊔_)
+open import Data.Nat using (ℕ; _∸_; _≡ᵇ_; _≤_; _<_; _⊔_)
+open import Data.Nat.Induction using (<-wellFounded-fast)
 open import Data.Nat.Properties using (≤-trans; ≤-reflexive; ⊔-identityʳ;
   m≤m⊔n; m≤n⊔m; m≤n+m)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Vec using (lookup)
-open import Induction.WellFounded using (Acc)
+open import Induction.WellFounded using (Acc; acc)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (Tick; Id; Source; InstEvent; value;
@@ -62,7 +63,7 @@ open import Rx.Evaluator using (Path; AtFloor; Sched; EvalSt; RegId; Arrival;
   arrTy; arrVal; arrTick; arrSource; arrivalWitness;
   foldPath; shareGo; shareAdmit; shareLatch;
   chainStep; cascadeGo; dispatchShare; stepFrame; dryEvent; hasDry;
-  stHop)
+  stHop; floorFalls)
 open import Verify-Rank-Sufficient.Carried using (valsRd; _⊑_)
 open import Verify-Rank-Sufficient.Dry-Emits using (hasDry-++; hasDry-single)
 open import Verify-Rank-Sufficient.Push-Dry using (any-dry-++; tailPart-dry)
@@ -75,33 +76,34 @@ open import Verify-Rank-Sufficient.Fits using (PathFits; at-root; at-sink;
 -- exactly where the path does.
 ----------------------------------------------------------------------
 
-foldPath-dry-free : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} {τ}
-  (ac : Acc _≺_ τ) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
-  {ψ : Fin n → Rd₃} {R : Rd} {Rst : ℕ} {lo} {κ : Path Γ lo u t}
+foldPath-dry-free : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} {τ} {lo}
+  (ac : Acc _≺_ τ) (acl : Acc _<_ (n ∸ lo)) (id : Id) (now : Tick)
+  (envSrc : Source)
+  {ψ : Fin n → Rd₃} {R : Rd} {Rst : ℕ} {κ : Path Γ lo u t}
   (vals : List (Val Γ u)) (evs : List (InstEvent (Val Γ t))) (fin : Bool)
   (sd : Sched Γ) (st : EvalSt e) →
-  PathFits {e = e} ac gas id now ψ Rst κ R →
+  PathFits {e = e} ac acl id now ψ Rst κ R →
   valsRd ψ u vals ⊑ R → stHop ψ st ≤ Rst →
   any dryEvent evs ≡ false →
-  hasDry (proj₁ (foldPath ac gas id now envSrc κ vals evs fin sd st)) ≡ false
+  hasDry (proj₁ (foldPath ac acl id now envSrc κ vals evs fin sd st)) ≡ false
 
-foldPath-dry-free ac gas id now envSrc vals evs fin sd st at-root hv hs he =
+foldPath-dry-free ac acl id now envSrc vals evs fin sd st at-root hv hs he =
   hasDry-single (evs ++ map value vals ++ (if fin then complete ∷ [] else []))
     id envSrc delivery
     (any-dry-++ evs (map value vals ++ (if fin then complete ∷ [] else []))
       he (tailPart-dry vals fin))
 
-foldPath-dry-free ac gas id now envSrc vals evs fin sd st
-  (at-sink {i = i} sdu) hv hs he =
+foldPath-dry-free ac acl id now envSrc vals evs fin sd st
+  (at-sink {i = i} {below = below} sdu) hv hs he =
   hasDry-++ (((evs ++ handoff (toℕ i) ∷ []) at id from envSrc as delivery) ∷ [])
-    (proj₁ (dispatchShare ac gas id now i vals fin sd st))
+    (proj₁ (dispatchShare ac acl id now i below vals fin sd st))
     (hasDry-single (evs ++ handoff (toℕ i) ∷ []) id envSrc delivery
       (any-dry-++ evs (handoff (toℕ i) ∷ []) he refl))
     (sdu vals fin sd st hv hs)
 
-foldPath-dry-free {Γ = Γ} {t = t} {e = e} ac gas id now envSrc vals evs fin sd st
+foldPath-dry-free {Γ = Γ} {t = t} {e = e} ac acl id now envSrc vals evs fin sd st
   (through {u = w} {f = f} {κ = κ′} carr fdry fits) hv hs he =
-  foldPath-dry-free ac gas id now envSrc
+  foldPath-dry-free ac acl id now envSrc
     (proj₁ sf) (evs ++ proj₁ (proj₂ sf)) (proj₁ (proj₂ (proj₂ sf)))
     (proj₁ (proj₂ (proj₂ (proj₂ sf)))) (proj₂ (proj₂ (proj₂ (proj₂ sf))))
     fits (proj₁ (carr vals fin sd st hv hs)) (proj₂ (carr vals fin sd st hv hs))
@@ -126,27 +128,27 @@ foldPath-dry-free {Γ = Γ} {t = t} {e = e} ac gas id now envSrc vals evs fin sd
 ----------------------------------------------------------------------
 
 shareGo-dry-free : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {τ} {lo}
-  (ac : Acc _≺_ τ) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
+  (ac : Acc _≺_ τ) (acl : Acc _<_ (n ∸ lo)) (id : Id) (now : Tick) (i : Fin n)
   {ψ : Fin n → Rd₃} {Rin : Rd} {Rst : ℕ}
   (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
   (ps : List (RegId × Path Γ lo (lookup Γ i) t))
   (sd : Sched Γ) (st : EvalSt e) →
   valsRd ψ (lookup Γ i) vals ⊑ Rin →
-  ShareChainsFit {e = e} ac gas id now i ψ Rin Rst vals fin ps sd st →
-  hasDry (proj₁ (shareGo ac gas id now i vals fin ps sd st)) ≡ false
-shareGo-dry-free ac gas id now i vals fin []              sd st hv fits = refl
-shareGo-dry-free {Γ = Γ} {t = t} {e = e} ac gas id now i {ψ = ψ}
+  ShareChainsFit {e = e} ac acl id now i ψ Rin Rst vals fin ps sd st →
+  hasDry (proj₁ (shareGo ac acl id now i vals fin ps sd st)) ≡ false
+shareGo-dry-free ac acl id now i vals fin []              sd st hv fits = refl
+shareGo-dry-free {Γ = Γ} {t = t} {e = e} ac acl id now i {ψ = ψ}
   vals fin ((rid , p) ∷ ps) sd st hv fits
   with any (_≡ᵇ rid) (EvalSt.cancelled st) | fits
 ... | true  | tl =
-      shareGo-dry-free ac gas id now i vals fin ps sd st hv tl
+      shareGo-dry-free ac acl id now i vals fin ps sd st hv tl
 ... | false | (hc , tl) =
       hasDry-++ (proj₁ fp)
-        (proj₁ (shareGo ac gas id now i vals fin ps
+        (proj₁ (shareGo ac acl id now i vals fin ps
                  (proj₁ (proj₂ fp)) (proj₂ (proj₂ fp))))
-        (foldPath-dry-free ac gas id now (toℕ i) vals seed fin sd st′
+        (foldPath-dry-free ac acl id now (toℕ i) vals seed fin sd st′
           hc hv (m≤m⊔n (stHop ψ st′) _) (seed-dry fin))
-        (shareGo-dry-free ac gas id now i vals fin ps
+        (shareGo-dry-free ac acl id now i vals fin ps
           (proj₁ (proj₂ fp)) (proj₂ (proj₂ fp)) hv tl)
   where
   st′ : EvalSt e
@@ -155,7 +157,7 @@ shareGo-dry-free {Γ = Γ} {t = t} {e = e} ac gas id now i {ψ = ψ}
   seed : List (InstEvent (Val Γ t))
   seed = if fin then close (toℕ i) exhausted ∷ [] else []
 
-  fp = foldPath ac gas id now (toℕ i) p vals seed fin sd st′
+  fp = foldPath ac acl id now (toℕ i) p vals seed fin sd st′
 
   seed-dry : ∀ (b : Bool) →
     any (dryEvent {A = Val Γ t})
@@ -167,23 +169,24 @@ shareGo-dry-free {Γ = Γ} {t = t} {e = e} ac gas id now i {ψ = ψ}
 -- THE DISPATCH ITSELF, which is that fold at the list the share admits
 -- and at the state its latch leaves.  The finish step rewrites the
 -- registry and the live set and hands the emits through untouched, so
--- there is nothing here for the dry claim to do but peel the gas.
+-- there is nothing here for the dry claim to do but peel the witness.
 ----------------------------------------------------------------------
 
-dispatchShare-dry-free : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {τ}
-  (ac : Acc _≺_ τ) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
+dispatchShare-dry-free : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {τ} {lo}
+  (ac : Acc _≺_ τ) (acl : Acc _<_ (n ∸ lo)) (id : Id) (now : Tick)
+  (i : Fin n) (below : lo ≤ toℕ i)
   {ψ : Fin n → Rd₃} {Rin : Rd} {Rst : ℕ}
   (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
   (sd : Sched Γ) (st : EvalSt e) →
   valsRd ψ (lookup Γ i) vals ⊑ Rin →
-  ShareFits {e = e} ac gas id now i ψ Rin Rst vals fin sd st →
-  hasDry (proj₁ (dispatchShare ac (suc gas) id now i vals fin sd st))
+  ShareFits {e = e} ac acl id now i below ψ Rin Rst vals fin sd st →
+  hasDry (proj₁ (dispatchShare ac acl id now i below vals fin sd st))
     ≡ false
-dispatchShare-dry-free {e = e} ac gas id now i vals false sd st hv fits =
-  shareGo-dry-free {e = e} ac gas id now i vals false
+dispatchShare-dry-free {e = e} ac (acc rs) id now i below vals false sd st hv fits =
+  shareGo-dry-free {e = e} ac (rs (floorFalls i below)) id now i vals false
     (shareAdmit i (EvalSt.registry st)) sd (shareLatch i false st) hv fits
-dispatchShare-dry-free {e = e} ac gas id now i vals true sd st hv fits =
-  shareGo-dry-free {e = e} ac gas id now i vals true
+dispatchShare-dry-free {e = e} ac (acc rs) id now i below vals true sd st hv fits =
+  shareGo-dry-free {e = e} ac (rs (floorFalls i below)) id now i vals true
     (shareAdmit i (EvalSt.registry st)) sd (shareLatch i true st) hv fits
 
 ----------------------------------------------------------------------
@@ -202,12 +205,14 @@ dispatchShare-dry-free {e = e} ac gas id now i vals true sd st hv fits =
 chainStep-dry-free : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (id : Id) (a : Arrival Γ) (c : AtFloor Γ (arrTy a) t)
   (sched : Sched Γ) (st : EvalSt e) →
-  PathFits {e = e} (arrivalWitness a sched st) n id (arrTick a)
+  PathFits {e = e} (arrivalWitness a sched st)
+    (<-wellFounded-fast (n ∸ proj₁ c)) id (arrTick a)
     (slotRd (Sched.slots sched)) (arrivalRank a sched st) (proj₂ c)
     (rdᵛ (slotRd (Sched.slots sched)) (arrTy a) (arrVal a)) →
   hasDry (proj₁ (chainStep id a c sched st)) ≡ false
 chainStep-dry-free {n = n} {Γ = Γ} {t = t} {e = e} id a c sched st fit =
-  foldPath-dry-free (arrivalWitness a sched st) n id (arrTick a) (arrSource a)
+  foldPath-dry-free (arrivalWitness a sched st)
+    (<-wellFounded-fast (n ∸ proj₁ c)) id (arrTick a) (arrSource a)
     (arrVal a ∷ [])
     (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
     (Arrival.isLast a) sched st fit

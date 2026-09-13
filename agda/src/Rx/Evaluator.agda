@@ -2,10 +2,11 @@ module Rx.Evaluator where
 
 open import Data.Bool    using (Bool; true; false; if_then_else_; not; _∨_; _∧_; T)
 open import Data.Fin     using (Fin; toℕ)
-open import Data.Fin.Properties using () renaming (_≟_ to _≟ᶠ_)
+open import Data.Fin.Properties using (toℕ<n) renaming (_≟_ to _≟ᶠ_)
 open import Data.Maybe   using (Maybe; just; nothing; is-nothing)
-open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _⊔_; _<ᵇ_; _≡ᵇ_; _≤ᵇ_; _≤_; _<_)
-open import Data.Nat.Properties using (_<?_; ≤-refl; ≤-trans)
+open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _∸_; _⊔_; _<ᵇ_; _≡ᵇ_; _≤ᵇ_; _≤_; _<_; s≤s)
+open import Data.Nat.Properties using (_<?_; ≤-refl; ≤-trans; ∸-monoʳ-<)
+open import Data.Nat.Induction using (<-wellFounded-fast)
 open import Data.Nat.ListAction using (sum)
 open import Induction.WellFounded using (Acc; acc)
 open import Data.List    using (List; []; _∷_; _++_; map; concat; tabulate; null)
@@ -1281,24 +1282,24 @@ subscribeE {u = u} fuel (deferᵉ body) κ id now sched st =
               (installNode nid (mergeAll-st {t = u} nothing 0 [] false) st)
 
 -- delivery at a share boundary re-enters chain evaluation: foldPath
--- and dispatchShare are mutually recursive.  The recursion is bounded
--- by the share telescope — a chain registered on share i sinks only
--- into the root or a strictly later share — so dispatch depth never
--- exceeds n.  `gas` makes that bound structural: every dispatch
--- consumes one unit and chainStep seeds n, so the zero clamp is
--- unreachable on real registries (the telescope invariant, Inv-phase
--- work) and termination needs no pragma
-
--- AND THAT MAKES THIS COUNTER THE SECOND PROXY IN THE FAMILY, WITH THE
--- SAME SHAPE AS THE DESCENT AND A CHEAPER ORDER BEHIND IT.  What really
--- descends here is the telescope position: a chain on share i sinks
--- only into the root or a strictly later share, so `n - toℕ i` falls
--- at every dispatch, and the premise is `inputsBelowᵉ`, which a shared
--- slot already carries in its OWN TYPE rather than as a run fact.  So
--- this edge asks less than the subscribe edges do — those spend
--- `dBound`, whose hop half is a fact about what a run emits, while
--- this one is discharged by the syntax's well-formedness.  Both
--- counters are structural stand-ins for orders the tree already has.
+-- and dispatchShare are mutually recursive, and what falls across that
+-- cycle is the DISTANCE FROM THE FLOOR TO THE TOP OF THE TELESCOPE.  A
+-- chain indexed at floor `lo` sinks only into the root or a share whose
+-- own index is at least `lo`, and the sink constructor carries that as
+-- a premise; dispatching at share i re-enters at floor `suc (toℕ i)`,
+-- which is strictly above `lo`, so `n ∸ lo` strictly falls.  The
+-- accessibility on `_<_` at that quantity is what the three functions
+-- recurse on.
+--
+-- SO THE ORDER IS THE TREE'S OWN AND NOT A STAND-IN FOR IT.  This edge
+-- used to spend a counter seeded at the context size, whose clamp arm
+-- was reachable in the TYPE and unreachable only on a registry
+-- invariant no postulate carried — a bound asserted in prose at the
+-- clause that fires when it fails, and nowhere else.  Indexing the path
+-- by its floor turns that invariant into the sink constructor's
+-- premise, so the descent is discharged by what the registry's rows
+-- ARE rather than by a fact about what a run put in them, and the clamp
+-- arm has no type to be written at.
 
 -- latch completion AND mark the share dying: a delivered fan-out
 -- registration's exhausted close rides its own emit, so a cut during
@@ -1338,26 +1339,24 @@ shareFinish i true  (emits , sched′ , st′) =
      record sched′ { live = sweepLive kept (Sched.live sched′) } ,
      record st′ { registry = kept }
 
--- THE DISPATCH COUNTER IS THE ONE RE-ENTRY WHOSE SUFFICIENCY NOTHING
--- STATES, and that is a gap rather than a convention.  `chainStep`
--- seeds it at the context size and every share boundary peels it, on
--- the reading that a chain registered on a share can only meet shares
--- of strictly higher index — the slot telescope's own stratification,
--- lifted through the registry.  That reading is a runtime invariant
--- about what the registry holds, not a syntactic fact about the
--- program, and it is asserted in prose at the clause that fires when it
--- fails and nowhere else: no postulate carries it, so the remaining-work
--- ledger cannot see it.
---
--- AND IT IS NOT OWED TO THE DRY FACE, which is why it has stayed
--- invisible.  Exhausting this counter mints no dry event — the clause
--- returns an empty fan-out — so every statement about dryness passes
--- over it for free, and the face that would catch a silently truncated
--- delivery is the one comparing this machine to the spec.
+-- THE DESCENT, SPELLED WHERE THE PREMISE LIVES.  A chain whose floor is
+-- at or below share i re-enters the fan-out at floor `suc (toℕ i)`,
+-- strictly above it, so the distance to the top of the telescope
+-- strictly falls.  The proof is stated apart from the dispatch because
+-- the dispatch must peel its own witness by MATCHING, and a witness
+-- peeled through an application is one the termination checker cannot
+-- follow.
+floorFalls : ∀ {n lo} (i : Fin n) → lo ≤ toℕ i → n ∸ suc (toℕ i) < n ∸ lo
+floorFalls i below = ∸-monoʳ-< (s≤s below) (toℕ<n i)
+
+-- THE DISPATCH STANDS AT THE CHAIN'S FLOOR AND PEELS TO THE FAN-OUT'S,
+-- which is why the sink's own premise is an argument here.  A dependent
+-- function type binds left to right, so a premise mentioning `i` cannot
+-- precede it; everything else keeps the position the counter held.
 dispatchShare : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
               → Acc _≺_ τ  -- the witness, handed to stepFrame's re-entries
-              → ℕ       -- dispatch gas, the telescope bound
-              → Id → Tick → (i : Fin n)
+              → Acc _<_ (n ∸ lo)  -- the descent, at the chain's own floor
+              → Id → Tick → (i : Fin n) → lo ≤ toℕ i
               → List (Val Γ (lookup Γ i)) → Bool
               → Sched Γ → EvalSt e
               → Stream Γ t × Sched Γ × EvalSt e
@@ -1368,7 +1367,7 @@ dispatchShare : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 -- Lifted out of dispatchShare's where block so the budget proof can
 -- name it (as with takeVals / thruConsume / sharedConnect)
 shareGo : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-        → Acc _≺_ τ → ℕ → Id → Tick → (i : Fin n)
+        → Acc _≺_ τ → Acc _<_ (n ∸ lo) → Id → Tick → (i : Fin n)
         → List (Val Γ (lookup Γ i)) → Bool
         → List (RegId × Path Γ lo (lookup Γ i) t) → Sched Γ → EvalSt e
         → Stream Γ t × Sched Γ × EvalSt e
@@ -1379,25 +1378,29 @@ shareGo : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 -- running on an empty value list, so the emit is emptied, never
 -- swallowed.  The envelope is assembled here and nowhere else
 foldPath : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-         → Acc _≺_ τ → ℕ → Id → Tick → Source → Path Γ lo u t
+         → Acc _≺_ τ → Acc _<_ (n ∸ lo) → Id → Tick → Source → Path Γ lo u t
          → List (Val Γ u) → List (InstEvent (Val Γ t)) → Bool
          → Sched Γ → EvalSt e
          → Stream Γ t × Sched Γ × EvalSt e
-foldPath sf gas id now envSrc root vals evs fin sched st =
+foldPath sf ac id now envSrc root vals evs fin sched st =
   ((evs ++ map value vals ++ (if fin then complete ∷ [] else []))
     at id from envSrc as delivery) ∷ [] , sched , st
-foldPath sf gas id now envSrc (share-sink i _) vals evs fin sched st =
+-- THE SINK HANDS ITS OWN PREMISE DOWN, and that premise is the whole
+-- descent: the dispatch peels the witness by it rather than being
+-- trusted to stay inside a count.
+foldPath sf ac id now envSrc (share-sink i below) vals evs fin sched st =
   -- the chain's own (valueless) emit first — announcing the handoff:
   -- share i fans out next, still inside this instant.  The share
   -- delivers vals to every chain registered on it — the diamond
   -- case, batched by construction
-  let (fanout , sched₁ , st₁) = dispatchShare sf gas id now i vals fin sched st
+  let (fanout , sched₁ , st₁) =
+        dispatchShare sf ac id now i below vals fin sched st
   in (((evs ++ handoff (toℕ i) ∷ []) at id from envSrc as delivery) ∷ fanout)
      , sched₁ , st₁
-foldPath sf gas id now envSrc (f ↠ path′) vals evs fin sched st =
+foldPath sf ac id now envSrc (f ↠ path′) vals evs fin sched st =
   let (vals′ , evs′ , fin′ , sched₁ , st₁) =
         stepFrame sf id now f path′ vals fin sched st
-  in foldPath sf gas id now envSrc path′ vals′ (evs ++ evs′) fin′ sched₁ st₁
+  in foldPath sf ac id now envSrc path′ vals′ (evs ++ evs′) fin′ sched₁ st₁
 
 -- deliver to the chains of share i, one emit per registration from
 -- source toℕ i (the share's owed count), in subscription order.  A
@@ -1407,23 +1410,26 @@ foldPath sf gas id now envSrc (f ↠ path′) vals evs fin sched st =
 -- never registers only to be dropped silently; then every snapshot
 -- registration closes and the sweep collects whatever the share kept
 -- alive
-dispatchShare sf zero _ _ _ _ _ sched st = [] , sched , st  -- see above: unreachable
-dispatchShare sf (suc gas) id now i vals fin sched st =
+-- `shareAdmit` hands back rows indexed at `suc (toℕ i)`, so the witness
+-- the fan-out is handed is this one peeled by the sink's own premise —
+-- matched here rather than applied, since that is the only form the
+-- termination checker reads as a descent.
+dispatchShare sf (acc rs) id now i below vals fin sched st =
   shareFinish i fin
-    (shareGo sf gas id now i vals fin
+    (shareGo sf (rs (floorFalls i below)) id now i vals fin
       (shareAdmit i (EvalSt.registry st)) sched (shareLatch i fin st))
 
-shareGo sf gas id now i vals fin []               sched₀ st₀ = [] , sched₀ , st₀
-shareGo sf gas id now i vals fin ((rid , p) ∷ ps) sched₀ st₀
+shareGo sf ac id now i vals fin []               sched₀ st₀ = [] , sched₀ , st₀
+shareGo sf ac id now i vals fin ((rid , p) ∷ ps) sched₀ st₀
   with any (_≡ᵇ rid) (EvalSt.cancelled st₀)
-... | true  = shareGo sf gas id now i vals fin ps sched₀ st₀
+... | true  = shareGo sf ac id now i vals fin ps sched₀ st₀
 ... | false =
   let (emits , sched₁ , st₁) =
-        foldPath sf gas id now (toℕ i) p vals
+        foldPath sf ac id now (toℕ i) p vals
                  (if fin then close (toℕ i) exhausted ∷ [] else [])
                  fin sched₀
                  (record st₀ { delivered = rid ∷ EvalSt.delivered st₀ })
-      (rest , sched₂ , st₂) = shareGo sf gas id now i vals fin ps sched₁ st₁
+      (rest , sched₂ , st₂) = shareGo sf ac id now i vals fin ps sched₁ st₁
   in emits ++ rest , sched₂ , st₂
 
 -- seed one arrival into one chain: the value, plus fin and this
@@ -1433,7 +1439,8 @@ chainStep : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
           → Stream Γ t × Sched Γ × EvalSt e
 chainStep {n = n} {e = e} id a (lo , path) sched st =
   foldPath (arrivalWitness a sched st)
-           n id (arrTick a) (arrSource a) path (arrVal a ∷ [])
+           (<-wellFounded-fast (n ∸ lo))
+           id (arrTick a) (arrSource a) path (arrVal a ∷ [])
            (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
            (Arrival.isLast a) sched st
 

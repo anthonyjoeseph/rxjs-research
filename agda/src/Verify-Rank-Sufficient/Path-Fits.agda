@@ -40,13 +40,13 @@ open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.Bool.ListAction using (any)
 open import Data.Fin using (Fin; toℕ)
 open import Data.List using (List; []; _∷_)
-open import Data.Nat using (ℕ; zero; suc; _≤_; _≡ᵇ_; _⊔_)
+open import Data.Nat using (ℕ; zero; suc; _∸_; _≤_; _<_; _≡ᵇ_; _⊔_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
 open import Data.Vec using (lookup)
-open import Induction.WellFounded using (Acc)
-open import Relation.Binary.PropositionalEquality using (refl)
+open import Data.Nat.Induction using (<-wellFounded-fast)
+open import Induction.WellFounded using (Acc; acc)
 
 open import Rx.Prim using (Fuel; Tick; Id; close; exhausted)
 open import Rx.Exp using (Ctx; Closed; Val)
@@ -57,7 +57,7 @@ open import Rx.Evaluator using (Frame; Path; root; share-sink; _↠_;
   map-f; scan-f; take-f; from-inner; thru-outer; NodeId; AllOp;
   Sched; EvalSt; Arrival; arrTy; arrVal; arrTick; arrivalWitness;
   RegId; AtFloor; chainsOf; chainStep; cascadeLatch; sched-next; cascade;
-  foldPath; shareAdmit; shareLatch; stHop)
+  foldPath; shareAdmit; shareLatch; stHop; floorFalls)
 open import Verify-Rank-Sufficient.Fits using (PathFits; at-root; at-sink;
   through; FrameDryUnder; ShareDryUnder; arrivalRank;
   ChainsFit; ArrivalFits; DrainFits; ShareChainsFit)
@@ -192,29 +192,31 @@ postulate
 ----------------------------------------------------------------------
 
 ShareChainsHop : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {τ} {lo} →
-  Acc _≺_ τ → ℕ → Id → Tick → (i : Fin n) → (Fin n → Rd₃) → Rd → ℕ →
+  Acc _≺_ τ → Acc _<_ (n ∸ lo) → Id → Tick → (i : Fin n) →
+  (Fin n → Rd₃) → Rd → ℕ →
   List (Val Γ (lookup Γ i)) → Bool →
   List (RegId × Path Γ lo (lookup Γ i) t) → Sched Γ → EvalSt e → Set
-ShareChainsHop ac gas id now i ψ Rin Rst vals fin [] sd st = ⊤
-ShareChainsHop {e = e} ac gas id now i ψ Rin Rst vals fin
+ShareChainsHop ac acl id now i ψ Rin Rst vals fin [] sd st = ⊤
+ShareChainsHop {e = e} ac acl id now i ψ Rin Rst vals fin
   ((rid , p) ∷ ps) sd st
   with any (_≡ᵇ rid) (EvalSt.cancelled st)
-... | true  = ShareChainsHop {e = e} ac gas id now i ψ Rin Rst vals fin
+... | true  = ShareChainsHop {e = e} ac acl id now i ψ Rin Rst vals fin
                 ps sd st
 ... | false =
       let st′ = record st { delivered = rid ∷ EvalSt.delivered st }
-          out = foldPath ac gas id now (toℕ i) p vals
+          out = foldPath ac acl id now (toℕ i) p vals
                   (if fin then close (toℕ i) exhausted ∷ [] else [])
                   fin sd st′
       in PathUnder ψ (stHop ψ st′ ⊔ Rst) p Rin
-         × ShareChainsHop {e = e} ac gas id now i ψ Rin Rst vals fin ps
+         × ShareChainsHop {e = e} ac acl id now i ψ Rin Rst vals fin ps
              (proj₁ (proj₂ out)) (proj₂ (proj₂ out))
 
-ShareHop : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {τ} →
-  Acc _≺_ τ → ℕ → Id → Tick → (i : Fin n) → (Fin n → Rd₃) → Rd → ℕ →
+ShareHop : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {τ} {lo} →
+  Acc _≺_ τ → Acc _<_ (n ∸ lo) → Id → Tick → (i : Fin n) → lo ≤ toℕ i →
+  (Fin n → Rd₃) → Rd → ℕ →
   List (Val Γ (lookup Γ i)) → Bool → Sched Γ → EvalSt e → Set
-ShareHop {e = e} ac gas id now i ψ Rin Rst vals fin sd st =
-  ShareChainsHop {e = e} ac gas id now i ψ Rin Rst vals fin
+ShareHop {e = e} ac (acc rs) id now i below ψ Rin Rst vals fin sd st =
+  ShareChainsHop {e = e} ac (rs (floorFalls i below)) id now i ψ Rin Rst vals fin
     (shareAdmit i (EvalSt.registry st)) sd (shareLatch i fin st)
 
 -- AND THE LEAF ITSELF, WHICH SAYS A REGISTERED CHAIN CARRIES NO MORE
@@ -255,12 +257,13 @@ ShareHop {e = e} ac gas id now i ψ Rin Rst vals fin sd st =
 --   whatever the restatement turns out to be.  Its rows are not: one is
 --   the refuted point above and the rest are the `⊤` arm.
 postulate
-  share-chain-hop : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {τ}
-    (ac : Acc _≺_ τ) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
+  share-chain-hop : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {τ} {lo}
+    (ac : Acc _≺_ τ) (acl : Acc _<_ (n ∸ lo)) (id : Id) (now : Tick)
+    (i : Fin n) (below : lo ≤ toℕ i)
     (ψ : Fin n → Rd₃) (Rin : Rd) (Rst : ℕ) → proj₂ Rin ≤ Rst →
     (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
     (sd : Sched Γ) (st : EvalSt e) →
-    ShareHop {e = e} ac gas id now i ψ Rin Rst vals fin sd st
+    ShareHop {e = e} ac acl id now i below ψ Rin Rst vals fin sd st
 
 ----------------------------------------------------------------------
 -- THE WALK.  One clause per path constructor, and one per frame under
@@ -278,83 +281,89 @@ postulate
 ----------------------------------------------------------------------
 
 pathFits : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} {τ} {lo}
-  (ac : Acc _≺_ τ) (gas : ℕ) (id : Id) (now : Tick) (ψ : Fin n → Rd₃)
+  (ac : Acc _≺_ τ) (acl : Acc _<_ (n ∸ lo)) (id : Id) (now : Tick)
+  (ψ : Fin n → Rd₃)
   (Rst : ℕ) (κ : Path Γ lo u t) (Rin : Rd) → PathUnder ψ Rst κ Rin →
-  PathFits {e = e} ac gas id now ψ Rst κ Rin
+  PathFits {e = e} ac acl id now ψ Rst κ Rin
 
-share-sink-dry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {τ}
-  (ac : Acc _≺_ τ) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
+share-sink-dry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {τ} {lo}
+  (ac : Acc _≺_ τ) (acl : Acc _<_ (n ∸ lo)) (id : Id) (now : Tick)
+  (i : Fin n) (below : lo ≤ toℕ i)
   (ψ : Fin n → Rd₃) (Rin : Rd) (Rst : ℕ) → proj₂ Rin ≤ Rst →
-  ShareDryUnder {e = e} ac gas id now i ψ Rin Rst
+  ShareDryUnder {e = e} ac acl id now i below ψ Rin Rst
 
 shareChainsFit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {τ} {lo}
-  (ac : Acc _≺_ τ) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
+  (ac : Acc _≺_ τ) (acl : Acc _<_ (n ∸ lo)) (id : Id) (now : Tick)
+  (i : Fin n)
   (ψ : Fin n → Rd₃) (Rin : Rd) (Rst : ℕ)
   (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
   (ps : List (RegId × Path Γ lo (lookup Γ i) t))
   (sd : Sched Γ) (st : EvalSt e) →
-  ShareChainsHop {e = e} ac gas id now i ψ Rin Rst vals fin ps sd st →
-  ShareChainsFit {e = e} ac gas id now i ψ Rin Rst vals fin ps sd st
+  ShareChainsHop {e = e} ac acl id now i ψ Rin Rst vals fin ps sd st →
+  ShareChainsFit {e = e} ac acl id now i ψ Rin Rst vals fin ps sd st
 
-pathFits ac gas id now ψ Rst root Rin h = at-root
+pathFits ac acl id now ψ Rst root Rin h = at-root
 
-pathFits ac gas id now ψ Rst (share-sink i below) Rin h =
-  at-sink (share-sink-dry ac gas id now i ψ Rin Rst h)
+pathFits ac acl id now ψ Rst (share-sink i below) Rin h =
+  at-sink (share-sink-dry ac acl id now i below ψ Rin Rst h)
 
-pathFits ac gas id now ψ Rst (map-f fn ↠ κ) Rin h =
+pathFits ac acl id now ψ Rst (map-f fn ↠ κ) Rin h =
   through (map-frame-carried ac id now fn κ ψ Rin Rst)
           (dry-under ac id now (map-f fn) κ ψ Rin Rst
             (map-frame-dry ac id now fn κ))
-          (pathFits ac gas id now ψ Rst κ (mapRd ψ Rin fn) h)
+          (pathFits ac acl id now ψ Rst κ (mapRd ψ Rin fn) h)
 
-pathFits ac gas id now ψ Rst (scan-f fn nid ↠ κ) Rin h =
+pathFits ac acl id now ψ Rst (scan-f fn nid ↠ κ) Rin h =
   through (scan-frame-carried ac id now fn nid κ ψ Rin Rst)
           (dry-under ac id now (scan-f fn nid) κ ψ Rin Rst
             (scan-frame-dry ac id now fn nid κ))
-          (pathFits ac gas id now ψ Rst κ (mapRd ψ Rin fn) h)
+          (pathFits ac acl id now ψ Rst κ (mapRd ψ Rin fn) h)
 
-pathFits ac gas id now ψ Rst (take-f nid ↠ κ) Rin h =
+pathFits ac acl id now ψ Rst (take-f nid ↠ κ) Rin h =
   through (take-frame-carried ac id now nid κ ψ Rin Rst)
           (dry-under ac id now (take-f nid) κ ψ Rin Rst
             (take-frame-dry ac id now nid κ))
-          (pathFits ac gas id now ψ Rst κ Rin h)
+          (pathFits ac acl id now ψ Rst κ Rin h)
 
-pathFits ac gas id now ψ Rst (from-inner op k j ↠ κ) Rin h =
+pathFits ac acl id now ψ Rst (from-inner op k j ↠ κ) Rin h =
   through (from-inner-carried ac id now op k j κ ψ Rin Rst)
           (from-inner-dry ac id now op k j κ ψ Rin Rst)
-          (pathFits ac gas id now ψ Rst κ Rin h)
+          (pathFits ac acl id now ψ Rst κ Rin h)
 
-pathFits ac gas id now ψ Rst (thru-outer op nid ↠ κ) Rin h =
+pathFits ac acl id now ψ Rst (thru-outer op nid ↠ κ) Rin h =
   through (thru-outer-frame-carried ac id now op nid κ ψ Rin Rst
             (proj₁ h))
           (thru-outer-frame-dry ac id now op nid κ ψ Rin Rst (proj₁ h))
-          (pathFits ac gas id now ψ Rst κ
+          (pathFits ac acl id now ψ Rst κ
             (proj₁ Rin , suc (proj₂ Rin)) (proj₂ h))
 
--- THE SINK'S BODY.  A spent counter reaches the dispatch's clamp, which
--- emits nothing at all; every other reaches the fan-out's fold, and
--- what that fold needs is the walk applied at each admitted chain.
-share-sink-dry ac zero id now i ψ Rin Rst h vals fin sd st hv hs = refl
-share-sink-dry {e = e} ac (suc gas) id now i ψ Rin Rst h vals fin sd st
+-- THE SINK'S BODY, AND THE PEEL IS MATCHED HERE FOR THE SAME REASON THE
+-- DISPATCH MATCHES IT.  The fan-out stands a floor above the chain that
+-- reached it, so what the fold needs is the walk applied at each
+-- admitted chain under the peeled witness — and matching is what makes
+-- the descent one the termination checker can follow.  There is no
+-- spent-counter arm to write: the clamp it answered for has no type.
+share-sink-dry {e = e} ac (acc rs) id now i below ψ Rin Rst h vals fin sd st
   hv hs =
-  dispatchShare-dry-free {e = e} ac gas id now i vals fin sd st hv
-    (shareChainsFit {e = e} ac gas id now i ψ Rin Rst vals fin
+  dispatchShare-dry-free {e = e} ac (acc rs) id now i below vals fin sd st hv
+    (shareChainsFit {e = e} ac (rs (floorFalls i below)) id now i ψ Rin Rst
+      vals fin
       (shareAdmit i (EvalSt.registry st)) sd (shareLatch i fin st)
-      (share-chain-hop ac gas id now i ψ Rin Rst h vals fin sd st))
+      (share-chain-hop ac (acc rs) id now i below ψ Rin Rst h vals fin sd st))
 
-shareChainsFit ac gas id now i ψ Rin Rst vals fin []       sd st hp = tt
-shareChainsFit {e = e} ac gas id now i ψ Rin Rst vals fin
+shareChainsFit ac acl id now i ψ Rin Rst vals fin []       sd st hp = tt
+shareChainsFit {e = e} ac acl id now i ψ Rin Rst vals fin
   ((rid , p) ∷ ps) sd st hp
   with any (_≡ᵇ rid) (EvalSt.cancelled st)
-... | true  = shareChainsFit {e = e} ac gas id now i ψ Rin Rst vals fin
+... | true  = shareChainsFit {e = e} ac acl id now i ψ Rin Rst vals fin
                 ps sd st hp
 ... | false =
-      pathFits ac gas id now ψ (stHop ψ st′ ⊔ Rst) p Rin (proj₁ hp)
-      , shareChainsFit {e = e} ac gas id now i ψ Rin Rst vals fin ps
+      pathFits ac acl id now ψ (stHop ψ st′ ⊔ Rst) p Rin (proj₁ hp)
+      , shareChainsFit {e = e} ac acl id now i ψ Rin Rst vals fin ps
           (proj₁ (proj₂ out)) (proj₂ (proj₂ out)) (proj₂ hp)
   where
   st′ = record st { delivered = rid ∷ EvalSt.delivered st }
-  out = foldPath ac gas id now (toℕ i) p vals
+  out = foldPath ac acl id now (toℕ i) p vals
           (if fin then close (toℕ i) exhausted ∷ [] else []) fin sd st′
 
 ----------------------------------------------------------------------
@@ -431,7 +440,8 @@ chainsFit {n = n} {e = e} a id ((rid , c) ∷ cs) sched st hp
   with any (_≡ᵇ rid) (EvalSt.cancelled st)
 ... | true  = chainsFit {e = e} a id cs sched st hp
 ... | false =
-      pathFits (arrivalWitness a sched st′) n id (arrTick a)
+      pathFits (arrivalWitness a sched st′) (<-wellFounded-fast (n ∸ proj₁ c))
+        id (arrTick a)
         (slotRd (Sched.slots sched)) (arrivalRank a sched st′) (proj₂ c)
         (rdᵛ (slotRd (Sched.slots sched)) (arrTy a) (arrVal a))
         (proj₁ hp)

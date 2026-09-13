@@ -62,7 +62,8 @@ open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.Fin using (zero)
 open import Data.List using (List; []; _∷_; _++_)
 open import Data.Maybe using (nothing)
-open import Data.Nat using (ℕ; _⊔_; _+_; _*_)
+open import Data.Nat using (ℕ; _⊔_; _+_; _*_; _∸_)
+open import Data.Nat.Induction using (<-wellFounded-fast)
 open import Data.Product using (_×_; _,_)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Vec using () renaming ([] to []ⱽ; _∷_ to _∷ⱽ_)
@@ -146,10 +147,11 @@ foldAllWith : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {t′} →
   Closed Γ t′ → ℕ → (a : Arrival Γ) → Id →
   List (RegId × AtFloor Γ (arrTy a) t) → Sched Γ → EvalSt e → Stream Γ t
 foldAllWith rk m a id []                  sched st = []
-foldAllWith {n = n} rk m a id ((_ , _ , c) ∷ cs) sched st =
+foldAllWith {n = n} rk m a id ((_ , lo , c) ∷ cs) sched st =
   let (emits , sched₁ , st₁) =
         foldPath (entryWitness rk (Sched.slots sched) m)
-                 n id (arrTick a) (arrSource a) c (arrVal a ∷ [])
+                 (<-wellFounded-fast (n ∸ lo))
+                 id (arrTick a) (arrSource a) c (arrVal a ∷ [])
                  (if Arrival.isLast a then close (arrSource a) exhausted ∷ []
                   else [])
                  (Arrival.isLast a) sched st

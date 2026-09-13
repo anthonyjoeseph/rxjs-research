@@ -23,7 +23,7 @@ module Verify-Well-Formed.Part11 where
 open import Data.Bool    using (Bool; true; false; if_then_else_)
 open import Data.Fin     using (Fin; toℕ)
 open import Data.Vec     using (lookup)
-open import Data.Nat     using (ℕ; suc; _≤_; _≡ᵇ_; _+_)
+open import Data.Nat     using (ℕ; suc; _≤_; _<_; _≡ᵇ_; _+_; _∸_)
 open import Data.List    using (List; []; _∷_)
 open import Data.Bool.ListAction using (any)
 open import Data.Maybe   using (Maybe; just; nothing)
@@ -64,6 +64,7 @@ open import Verify-Well-Formed.Part4 using (enterInstant; Mid; ≤-up)
 open import Verify-Well-Formed.Part2 using (CurrentPast)
 open import Decide using (force-false; true≢false; ∧-trueʳ; ∧-trueˡ; ≡ᵇ-refl; ≡ᵇ→≡)
 
+open import Data.Nat.Induction using (<-wellFounded-fast)
 open import Induction.WellFounded using (Acc)
 open import Rx.Strat-Order using (Tri; _≺_)
 
@@ -201,7 +202,10 @@ mid-seed {a = a} {nextId} {rid} {p} {ps} {sched} {st} {S} mid ceq = record
 --                │                  induction (map/scan/take/*All)
 --                └─ share-sink i : one handoff emit, then dispatchShare-wf
 --                                   (MUTUALLY RECURSIVE with foldPath-wf,
---                                   gas-structural) fans out to share i's
+--                                   structural on the chain's distance to
+--                                   the top of the telescope, which the
+--                                   sink's own floor premise strictly cuts)
+--                                   fans out to share i's
 --                                   registrations — the handoff's owed
 --                                   bump is repaid one-per-fan-out, so the
 --                                   share subtree nets owed back to zero
@@ -293,7 +297,7 @@ postulate
   -- `foldSched` at the OUTER path, and the flip/steady certificates
   -- speak of the CURRENT (fin, st) which stepFrame rewrites.
   foldPath-frame-out : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {w u}
-    (sf : Acc _≺_ τ) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
+    (sf : Acc _≺_ τ) (acl : Acc _<_ (n ∸ lo)) (id : Id) (now : Tick) (envSrc : Source)
     (f : Frame Γ w u) (path′ : Path Γ lo u t)
     (vals : List (Val Γ w)) (evs : List (InstEvent (Val Γ t)))
     (fin : Bool) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt)
@@ -303,9 +307,9 @@ postulate
        allShareSunk (dropSource envSrc (EvalSt.registry st)) ≡ true) →
     (ProtocolSt.done S ≡ true → allShareSunk (EvalSt.registry st) ≡ true) →
     (S′ : ProtocolSt) →
-    runProtocol S (proj₁ (foldPath sf gas id now envSrc (f ↠ path′) vals evs fin sched st))
+    runProtocol S (proj₁ (foldPath sf acl id now envSrc (f ↠ path′) vals evs fin sched st))
       ≡ just S′ →
-    FoldOut sf gas id now envSrc (f ↠ path′) vals evs fin sched st (FoldInv.ob′ fi) S S′
+    FoldOut sf acl id now envSrc (f ↠ path′) vals evs fin sched st (FoldInv.ob′ fi) S S′
 
   -- SHARE arm, NOW THE FoldOut ONLY.  The handoff emit plus
   -- one delivery per registration of share i, each its own foldPath.  As
@@ -314,7 +318,7 @@ postulate
   -- now takes S′ and the equation from `foldPath-wf` and owes only the
   -- FoldOut, the diamond's net-zero owed statement.
   foldPath-share-out : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sf : Acc _≺_ τ) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source) (i : Fin n)
+    (sf : Acc _≺_ τ) (acl : Acc _<_ (n ∸ lo)) (id : Id) (now : Tick) (envSrc : Source) (i : Fin n)
     (below : lo ≤ toℕ i)
     (vals : List (Val Γ (lookup Γ i))) (evs : List (InstEvent (Val Γ t)))
     (fin : Bool) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt)
@@ -323,12 +327,12 @@ postulate
        allShareSunk (dropSource envSrc (EvalSt.registry st)) ≡ true) →
     (ProtocolSt.done S ≡ true → allShareSunk (EvalSt.registry st) ≡ true) →
     (S′ : ProtocolSt) →
-    runProtocol S (proj₁ (foldPath sf gas id now envSrc (share-sink i below) vals evs fin sched st))
+    runProtocol S (proj₁ (foldPath sf acl id now envSrc (share-sink i below) vals evs fin sched st))
       ≡ just S′ →
-    FoldOut sf gas id now envSrc (share-sink i below) vals evs fin sched st (FoldInv.ob′ fi) S S′
+    FoldOut sf acl id now envSrc (share-sink i below) vals evs fin sched st (FoldInv.ob′ fi) S S′
 
 foldPath-out : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (sf : Acc _≺_ τ) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
+  (sf : Acc _≺_ τ) (acl : Acc _<_ (n ∸ lo)) (id : Id) (now : Tick) (envSrc : Source)
   (path : Path Γ lo u t) (vals : List (Val Γ u)) (evs : List (InstEvent (Val Γ t)))
   (fin : Bool) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt)
   (fi : FoldInv id envSrc evs fin sched st S) →
@@ -337,14 +341,14 @@ foldPath-out : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
      allShareSunk (dropSource envSrc (EvalSt.registry st)) ≡ true) →
   (ProtocolSt.done S ≡ true → allShareSunk (EvalSt.registry st) ≡ true) →
   Σ ProtocolSt λ S′ →
-    (runProtocol S (proj₁ (foldPath sf gas id now envSrc path vals evs fin sched st))
+    (runProtocol S (proj₁ (foldPath sf acl id now envSrc path vals evs fin sched st))
        ≡ just S′)
-    × FoldOut sf gas id now envSrc path vals evs fin sched st (FoldInv.ob′ fi) S S′
-foldPath-out {lo = lo} sf gas id now envSrc root vals evs fin sched st S fi ds flip steady =
-  _ , foldPath-root-wf {lo = lo} sf gas id now envSrc vals evs fin sched st S
+    × FoldOut sf acl id now envSrc path vals evs fin sched st (FoldInv.ob′ fi) S S′
+foldPath-out {lo = lo} sf acl id now envSrc root vals evs fin sched st S fi ds flip steady =
+  _ , foldPath-root-wf {lo = lo} sf acl id now envSrc vals evs fin sched st S
         (FoldInv.ob fi) (FoldInv.hz fi) (FoldInv.ob′ fi) (FoldInv.Lv fi) (FoldInv.Ov fi)
         (FoldInv.enters fi) (FoldInv.pays fi) (FoldInv.applies fi) done-nil
-    , foldPath-root-out {lo = lo} sf gas id now envSrc vals evs fin sched st S fi flip steady
+    , foldPath-root-out {lo = lo} sf acl id now envSrc vals evs fin sched st S fi flip steady
   where
   -- root does not sink to a share, so `ds` forces the automaton not-done
   -- and the value list rides (foldPath-wf's own root argument)
@@ -353,18 +357,18 @@ foldPath-out {lo = lo} sf gas id now envSrc root vals evs fin sched st S fi ds f
   done-nil : ProtocolSt.done S ≡ true → vals ≡ []
   done-nil deq with trans (sym df) deq
   ... | ()
-foldPath-out sf gas id now envSrc (f ↠ path′) vals evs fin sched st S fi ds flip steady =
+foldPath-out sf acl id now envSrc (f ↠ path′) vals evs fin sched st S fi ds flip steady =
   proj₁ W , proj₂ W
-  , foldPath-frame-out sf gas id now envSrc f path′ vals evs fin sched st S fi
+  , foldPath-frame-out sf acl id now envSrc f path′ vals evs fin sched st S fi
       ds flip steady (proj₁ W) (proj₂ W)
   where
-  W = foldPath-wf sf gas id now envSrc (f ↠ path′) vals evs fin sched st S fi ds
-foldPath-out sf gas id now envSrc (share-sink i below) vals evs fin sched st S fi ds flip steady =
+  W = foldPath-wf sf acl id now envSrc (f ↠ path′) vals evs fin sched st S fi ds
+foldPath-out sf acl id now envSrc (share-sink i below) vals evs fin sched st S fi ds flip steady =
   proj₁ W , proj₂ W
-  , foldPath-share-out sf gas id now envSrc i below vals evs fin sched st S fi
+  , foldPath-share-out sf acl id now envSrc i below vals evs fin sched st S fi
       flip steady (proj₁ W) (proj₂ W)
   where
-  W = foldPath-wf sf gas id now envSrc (share-sink i below) vals evs fin sched st S fi ds
+  W = foldPath-wf sf acl id now envSrc (share-sink i below) vals evs fin sched st S fi ds
 
 -- ════════════════════════════════════════════════════════════════
 -- THE Mid TRANSITION, ASSEMBLED — a real body over three leaves
@@ -421,7 +425,7 @@ postulate
             (Arrival.isLast a) sched (record st { delivered = rid ∷ EvalSt.delivered st }) S) →
     FoldOut (arrivalWitness a sched
                (record st { delivered = rid ∷ EvalSt.delivered st }))
-      n nextId (arrTick a) (arrSource a)
+      (<-wellFounded-fast (n ∸ proj₁ p)) nextId (arrTick a) (arrSource a)
       (proj₂ p) (arrVal a ∷ [])
       (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
       (Arrival.isLast a) sched (record st { delivered = rid ∷ EvalSt.delivered st })
@@ -447,7 +451,7 @@ mid-step {n = n} {e = e} {a = a} {nextId} {rid} {p} {ps} {sched} {st} {S} mid ce
       (S′ , run , fo) =
         foldPath-out (arrivalWitness a sched
                        (record st { delivered = rid ∷ EvalSt.delivered st }))
-          n nextId
+          (<-wellFounded-fast (n ∸ proj₁ p)) nextId
           (arrTick a) (arrSource a) (proj₂ p) (arrVal a ∷ [])
           (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
           (Arrival.isLast a) sched (record st { delivered = rid ∷ EvalSt.delivered st })
