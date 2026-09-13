@@ -123,6 +123,13 @@ dry-under ac id now f κ ψ Rin Rst d vals fin sd st _ _ =
 -- paid for: the values are the inner's and cross unchanged, so both the
 -- bound and the store come back where they were
 --
+-- DEAD ROUTE: closing the dry half as an unreachable branch under the
+--   registration's own floor test.  The test sits inside the SLOT arm of
+--   the subscribe, downstream of the inner's subscription rather than a
+--   gate on it, so the frame fires whatever the test decides — and the
+--   arm it guards is denominated in the FLOOR while every dry close on
+--   this face is minted at RANK zero.  A floor decision cannot reach a
+--   rank obligation, so nothing about the exits below narrows this.
 -- PROBED: `Probed.Exit-Frame` — both statements instantiated at one
 --   flat program on the `fin = false` arm, where the frame is the
 --   identity.  What that buys is INSTANTIABILITY and not coverage, and
