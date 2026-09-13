@@ -416,9 +416,20 @@ postulate
 --   `ψ` the schedule's own `slotRd` rather than a reading chosen for
 --   them; nothing here reaches a state the drain itself produced.  And
 --   all three take their depth from the TERM's own recursion — the one
---   that has a slot at all has a SHARED one — so nothing here reaches a
---   chain built through a SCRIPTED slot, which is the region the
---   receipt above is taken in.
+--   that has a slot at all has a SHARED one.  THREE MORE ROWS CLOSE
+--   THAT ARM, which is where this statement's two histories meet: the
+--   same recursion over a SCRIPTED slot, the switching strategy over
+--   it, and the recursion over a slot delivering NOTHING in its
+--   subscribe frame — the refuting shape itself rather than a
+--   neighbour, since a count read at the frame is nought there.  The
+--   guard is then comparing a term whose nesting is fixed outside its
+--   own syntax against exactly that count, and the fit holds at all
+--   three.  TWO MORE ENTER THE LAST FLAVOUR, a HOT slot, at the same
+--   recursion and at a defer over it, so all three flavours are now
+--   reached under a μ.  THE SECOND BOUNDARY is what that arm cannot
+--   say: a hot slot is anchored at tick ZERO rather than at the
+--   subscription, and every row here is an entry, so the two anchors
+--   coincide at every one of them and nothing separates them.
 -- PROBED: `Probed.Gate-Constant` — the GATE at its own door, which is
 --   the shape this statement was false at: a defer registers a chain
 --   the reading gave nothing, so the crossing read one against zero.

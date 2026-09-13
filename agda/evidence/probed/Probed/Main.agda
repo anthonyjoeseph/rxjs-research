@@ -39,7 +39,8 @@ open import Probed.Root
 open import Probed.Descent
   using (descP1; descP2; descP3; descP4; descP5;
          descP6; descP7; descP8; descP9; descP10;
-         descP11; descP12; fitP1; fitP3; fitP12)
+         descP11; descP12; fitP1; fitP3; fitP12;
+         fitP9; fitP10; fitP9L; fitP9H; fitP13H)
 
 open import Probed.Fuel-Growth
   using (drF)
