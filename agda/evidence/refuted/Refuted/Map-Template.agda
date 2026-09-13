@@ -37,6 +37,7 @@ open import Data.Fin using (Fin)
 open import Data.List using (List; []; _∷_)
 open import Data.Maybe using (nothing)
 open import Data.Nat using (ℕ; _⊔_; _≤_)
+open import Data.Nat.Properties using (≤-refl)
 open import Data.Product using (_×_; proj₁; proj₂)
 open import Data.Vec using () renaming ([] to []ⱽ)
 open import Induction.WellFounded using (Acc)
@@ -44,10 +45,10 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (Id; Tick)
 open import Rx.Exp using (Ctx; Closed; Exp; Ty; Val; Fn; natᵗ; obs; strmᵗ;
-  ofᵉ; emptyᵉ; mergeAllᵉ; nat̂)
+  ofᵉ; emptyᵉ; mergeAllᵉ; mapᵉ; nat̂)
 open import Rx.Slots using (Slots)
 open import Rx.Strat-Order using (_≺_)
-open import Rx.Hop-Depth using (Rd₃; depthᵛ)
+open import Rx.Hop-Depth using (Rd₃; depthᵛ; depthᵉ)
 open import Rx.Evaluator using (Path; Frame; Sched; EvalSt; root; map-f;
   stepFrame; rootWitness; sched-init; st-init; stHop)
 
@@ -141,3 +142,30 @@ map-frame-carried-false h
                 (sched-init root₀ ins₀) (st-init root₀)
                 (_≤_.z≤n) (_≤_.z≤n))
 ... | ()
+
+----------------------------------------------------------------------
+-- AND THE ONE THING THAT NARROWS IT, PINNED SO IT CANNOT BE READ AS
+-- WIDER THAN IT IS.  The walk instantiates this statement at exactly
+-- one bound — the reading of the WHOLE map expression — and the map
+-- clause of that reading already joins the template's own reading in.
+-- So the witness above stands at a bound the caller cannot hand over,
+-- and the repair is to PIN the output bound rather than to go looking
+-- for a quantity nobody is tracking.  These rows are what stops the
+-- next reader budgeting for the second job.
+----------------------------------------------------------------------
+
+src₀ : Exp Γ₀ [] [] [] natᵗ
+src₀ = ofᵉ (nat̂ 0 ∷ [])
+
+-- LOAD-BEARING: the caller's bound at this very template, which is ONE
+-- where the freely-quantified bound above was zero.  A repair that
+-- stopped reading the template here would send this to zero and take
+-- the row below with it
+caller-is : depthᵉ ψ₀ (mapᵉ tmpl src₀) ≡ 1
+caller-is = refl
+
+-- LOAD-BEARING: and the output the frame produced fits under that
+-- bound, so the refuted point is OFF the walk's path — the statement
+-- narrows to its own call site rather than being false where it is used
+caller-fits : valsHop′ ψ₀ (obs natᵗ) out ≤ depthᵉ ψ₀ (mapᵉ tmpl src₀)
+caller-fits = ≤-refl

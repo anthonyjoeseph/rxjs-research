@@ -83,19 +83,28 @@ FrameCarries {Γ = Γ} {e = e} {s = s} {u = u} ac id now f κ ψ Rin Rv Rst =
 -- term reading exists for exactly this: it reads the template under an
 -- environment binding the payload's reading, so what a `map-f` frame
 -- hands back is that step APPLIED to the bound it was handed, never the
--- bound itself.  The restatement is therefore fixed rather than open,
--- and it is the same arithmetic the chain measure already spends at
--- this frame — which is why the repair points back at a bound that
--- TRANSFORMS along a chain rather than one that is preserved by it.
+-- bound itself.
+--
+-- BUT THE BOUND IS FREELY QUANTIFIED AND THE WALK HANDS OVER EXACTLY
+-- ONE, WHICH IS WHAT NARROWS THE REPAIR TO A PIN.  The only
+-- instantiation is the reading of the WHOLE map expression, and that
+-- reading's map clause already joins the template's own reading in —
+-- so the template's depth is inside the bound before the frame is
+-- reached, and the crossing below stands at a bound the caller cannot
+-- produce.  The residue is therefore not a missing quantity but a
+-- missing CONSTRAINT: state the output bound at the point the walk
+-- supplies instead of over every natural, and the second source of
+-- depth is already paid for.  What is NOT yet established is that the
+-- pinned form holds in general; one template is one point.
 --
 -- REFUTED: `Refuted.Map-Template` — the form as written, at a template
 --   that drops a numeral and returns a flattener over a literal.  The
 --   payload reads ZERO, so the frame is held to the strongest bound the
 --   predicate can impose, and the output reads ONE; the store is
 --   untouched, so the second conjunct is satisfied and the crossing is
---   the payload one alone.  The gap is not a rate in anything the
---   statement quantifies over — it is whatever the template writes, and
---   a template is part of the frame.
+--   the payload one alone.  The same module pins the walk's own bound
+--   at this template at ONE and the output fitting under it, which is
+--   what keeps the witness from being read as reaching the call site.
 postulate
   map-frame-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {τ}
     (ac : Acc _≺_ τ) (id : Id) (now : Tick) (fn : Fn Γ [] [] [] s u)

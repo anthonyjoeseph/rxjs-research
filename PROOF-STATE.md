@@ -235,15 +235,14 @@ procedure rather than a pin, and whose refusal is what turned this up.
 
 ### Big picture tier roadmap
 
-- **THE FRAME BOUND MUST TRANSFORM ALONG A CHAIN, NOT BE PRESERVED BY IT.** The
-  walk's frame predicate holds four operators to handing back the bound they
-  were handed, and a map is now refuted against that at a payload reading ZERO,
-  because a template is a second source of depth and may ignore its argument.
-  The restatement is fixed rather than open: the reading's own map step, applied
-  to the bound the frame received, which is the arithmetic the chain measure
-  already spends at this very frame. So the repair is the predicate catching up
-  with the measure. Restate it with an output bound the frame COMPUTES, re-check
-  the four operators against it, and read what the flattener's `suc` becomes.
+- **PIN THE FRAME'S OUTPUT BOUND AT THE POINT THE WALK SUPPLIES.** The frame
+  predicate quantifies its bound over every natural and the walk hands over
+  exactly one — the reading of the whole operator expression — so a map is
+  refuted at a payload reading ZERO while the same module pins the walk's own
+  bound at that template and the output fitting under it. The residue is a
+  missing CONSTRAINT, not a missing quantity. Restate the map at the supplied
+  point, re-check the other three against the pin, and instantiate the pinned
+  form at templates the one witness did not reach.
 
 - **DELETE THE PREMISE AND LET THE ARRIVAL CARRY ITS OWN ADEQUACY.** Two
   witnesses now say the registry cannot be fitted against anything a STATE
