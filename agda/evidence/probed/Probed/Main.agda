@@ -88,3 +88,12 @@ open import Probed.Hop-Edge
   using (hopRow₁; hopRow₂; hopRow₃; hopRowP; hopRowS; hopRowE;
          packed₁-is; packed₂-is; packed₃-is; packedP-is; packedS-is;
          packedE-is)
+
+-- the six figures are claimed beside the rows because two independent
+-- tightnesses are what make the rows mean anything: the GROWING rows
+-- return exactly their bound, and what every row is HANDED equals the
+-- source's own reading, so a repair loosening either end would leave the
+-- rows green over a comparison with margin nobody had checked
+open import Probed.Map-Frame
+  using (mapGrow₀; mapShed₀; mapKeep₀; mapGrow₁; mapShed₁; mapKeep₁;
+         grow₀-is; shed₀-is; keep₀-is; grow₁-is; shed₁-is; keep₁-is)

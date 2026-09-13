@@ -118,6 +118,19 @@ FrameCarries {Γ = Γ} {e = e} {s = s} {u = u} ac id now f κ ψ Rin Rv Rst =
 --   source ACTUALLY emits fitting under the map's reading — which is
 --   the form below, standing at the very program that kills the
 --   symmetric one.
+-- PROBED: `Probed.Map-Frame` — the statement itself, applied, at six
+--   points: three templates that ADD a layer, DROP their argument and
+--   PRESERVE it, each at a source reading zero and at one reading one.
+--   Every payload is reached by SUBSCRIBING the source under this very
+--   frame, so the incoming hypothesis is decided rather than granted —
+--   and it is decided at EQUALITY, since what the frame is handed equals
+--   the source's reading at both sources.  The growing rows are tight,
+--   returning exactly the map expression's reading; the dropping row has
+--   a layer of slack at the deeper source, which is the reading tracking
+--   the source rather than the template body.  NOT covered: no row
+--   reaches an arrival, a drain step, or a store an earlier frame wrote,
+--   so the store conjunct is tight at zero throughout and says only that
+--   a map leaves the store alone; and no template's own body maps again.
 postulate
   map-frame-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {τ}
     (ac : Acc _≺_ τ) (id : Id) (now : Tick) (fn : Fn Γ [] [] [] s u)

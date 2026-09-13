@@ -236,16 +236,6 @@ procedure rather than a pin, and whose refusal is what turned this up.
 
 ### Big picture tier roadmap
 
-- **INSTANTIATE THE MAP FRAME AS IT NOW READS.** Its two ends are pinned apart
-  and nothing has run the statement itself: what each witness carries is a row
-  in the refutation's OWN currency, at one template, and a locally restated
-  predicate agreeing with a postulate is not the postulate holding. Probe
-  `map-frame-carried` applied, where the row is generated from the statement so
-  a restatement moves every row under it — at templates that ADD, DROP and
-  PRESERVE their argument's depth, and at a payload the source can actually
-  emit rather than the strongest the incoming bound admits, since the gap
-  between those two is what the collapsed form got wrong.
-
 - **THE STORE HALF THAT NAMING A SEED CANNOT REACH: A FLATTENER'S QUEUE.** The
   fold's node holds what a named term installed, which is what settled its half
   of the question above. A limited flattener's node holds observables the RUN
@@ -265,6 +255,15 @@ procedure rather than a pin, and whose refusal is what turned this up.
   payload is deeper than its source's own reading admits. Refute first on both.
   The product is a separation, not a proof.
 
+- **THE STORE CONJUNCT IS UNRUN ACROSS THE WHOLE SHELF.** Every frame row on
+  record is a fresh subscribe at the root, so each one's store reads zero both
+  ways and the conjunct has only ever said a frame leaves an EMPTY store alone.
+  If no state premise is owed, this conjunct is what carries the obligation
+  instead — so it has to hold at a store an earlier frame wrote. Reach one by
+  running a second frame on the first's output, at the templates whose bodies
+  mint nodes. Refute first: a frame handed a store deeper than its payload is
+  the shape that would kill it.
+
 ### The ledger
 
 - **`entry-hop-fits`** (Verify-Rank-Sufficient) — FALSITY, `REFUTED, PROBED×3`:
@@ -272,16 +271,17 @@ procedure rather than a pin, and whose refusal is what turned this up.
   2 against 2 on a chain, 1 against 1 at a gate — so the margin is
   instantiated, not argued; no constructor is covered under a μ.
 
-- **`map-frame-carried`** (Verify-Rank-Sufficient.Push-Carried) — FALSITY,
-  `REFUTED×2`: the two ends are readings of DIFFERENT expressions, apart by the
-  layer a template adds. Both witnesses carry a row where this form survives at
-  the program killing the collapsed one; the form itself is uninstantiated.
-
 - **`drain-dry-free`** (Verify-Rank-Sufficient) — SHAPE,
   `REFUTED×5, DEAD ROUTE, PROBED×4`: every arrival after the root frame,
   conditioned on `hopFits` — which one cascade destroys from a TIGHT entry and
   which nothing bounding the registry repairs. The conclusion survives every
   witness; the restatement is owed on the premise.
+
+- **`map-frame-carried`** (Verify-Rank-Sufficient.Push-Carried) — DIFFICULTY,
+  `REFUTED×2, PROBED`: the two ends are readings of DIFFERENT expressions, apart
+  by the layer a template adds. Six applied rows over three templates; the
+  growing ones are TIGHT and every bound is met at equality. No row reaches a
+  nonzero store.
 
 - **`take-frame-carried`** (Verify-Rank-Sufficient.Push-Carried) — DIFFICULTY,
   `PROBED`: a prefix of what it was handed, under a node reading zero. Four
