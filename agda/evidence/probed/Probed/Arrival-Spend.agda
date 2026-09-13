@@ -81,7 +81,6 @@ open import Rx.Evaluator using (AtFloor; RegId; Sched; EvalSt; Stream; Arrival;
   root; subscribeE; rootWitness; sched-init; st-init; sched-next; cascade;
   cascadeLatch; chainsOf; foldPath; entryWitness; stHop; hasDry;
   arrTick; arrSource; arrTy; arrVal)
-open import Rx.Inputs-Below using (below-ctx)
 
 ----------------------------------------------------------------------
 -- THE HARNESS, recovered from `Refuted.Fit-Cascade` — the two programs

@@ -55,7 +55,6 @@ open import Rx.Exp using (Ctx; Closed; Tm; Fn; natᵗ; obs; _×ᵗ_;
 open import Rx.Slots using (Slots; scripted)
 open import Rx.Hop-Depth using (Rd₃; depthᵉ; rdᵗˢ; ε)
 open import Rx.Slot-Read using (slotRd)
-open import Rx.Inputs-Below using (below-ctx)
 open import Rx.Evaluator using (subscribeE; rootWitness; root; sched-init;
   st-init)
 open import Verify-Rank-Sufficient.Carried using (burstRd; valsRd)

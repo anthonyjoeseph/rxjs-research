@@ -51,7 +51,6 @@ open import Rx.Exp  using (Ctx; Closed; natᵗ; strmᵗ; nat̂; input; ofᵉ; ta
   exhaustAllᵉ)
 open import Rx.Evaluator using (subscribeE; sched-init; st-init; rootWitness; root; EvalSt; NodeId; RegRow; lookupNode;
   mergeAll-st; aliveThroughᶠ)
-open import Rx.Inputs-Below using (below-ctx)
 open import Rx.Slots using (scripted; shared; Slots)
 open import Verify-Well-Formed.Part1 using (cachesValid; allShareSunk; innerInstsP)
 open import Verify-Well-Formed.Part4 using (rootExitSt; root-mergeAllCache)

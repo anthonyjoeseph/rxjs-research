@@ -16,19 +16,18 @@ module Rx.Inputs-Below where
 
 open import Data.Bool using (Bool; T)
 open import Data.Bool.Properties using (T-∧)
-open import Data.Fin using (Fin; toℕ)
 open import Data.Fin.Properties using (toℕ<n)
 open import Data.List using (List; []; _∷_)
 open import Data.Maybe using (Maybe)
-open import Data.Nat using (ℕ; _<_)
-open import Data.Nat.Properties using (<ᵇ⇒<; <⇒<ᵇ)
+open import Data.Nat using (ℕ)
+open import Data.Nat.Properties using (<⇒<ᵇ)
 open import Data.Product using (_,_; proj₂)
 open import Data.Unit using (tt)
 open import Function using (Equivalence)
 
-open import Rx.Exp using (Ctx; Exp; Tm; Fn; Val; obs; natᵗ; _×ᵗ_; inputsBelowᵉ; inputsBelowᵗ; inputsBelowᵗˢ; unfoldμ;
-  input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ;
-  varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ)
+open import Rx.Exp using (Ctx; Exp; Tm; Fn; obs; natᵗ; _×ᵗ_; inputsBelowᵉ; inputsBelowᵗ; inputsBelowᵗˢ; unfoldμ; input;
+  ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; varᵗ;
+  unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ)
 
 private
   variable
@@ -43,10 +42,9 @@ private
 ∧ʳ : ∀ {a b : Bool} → T (a Data.Bool.∧ b) → T b
 ∧ʳ {a} {b} p = proj₂ (Equivalence.to (T-∧ {a} {b}) p)
 
--- THE ONE ARM THAT SAYS SOMETHING, and it is the whole point of the
--- bound: a subscription reading slot `i` under floor `k` learns that
--- `i` is strictly below the floor, which is exactly what lets the
--- caller's continuation be registered at a floor above `i`.
+-- THE DESCENT ARMS, one per clause of the predicate that has a
+-- subexpression a subscription steps into.
+--
 -- AND EVERY ARM TAKES ITS FLOOR AND ITS SUBTERM EXPLICITLY, which is
 -- not a style choice: `T` is defined by matching on a Bool, so `T x`
 -- against `T y` cannot be decomposed while both sides are stuck, and an
@@ -54,12 +52,6 @@ private
 -- Written out, every arm's result COMPUTES to the type the clause wants
 -- and nothing is left to guess.  The binders go the same way for the
 -- one arm whose conclusion mentions neither of them.
-below-input : ∀ (k : ℕ) (i : Fin n)
-            → T (inputsBelowᵉ {Γ = Γ} {[]} {[]} {[]} k (input i)) → toℕ i < k
-below-input k i p = <ᵇ⇒< (toℕ i) k p
-
--- and the descent arms, one per clause of the predicate that has a
--- subexpression a subscription steps into
 below-map : ∀ {Δᵍ Δ Θ s t} (k : ℕ) (f : Fn Γ Δᵍ Δ Θ s t) (b : Exp Γ Δᵍ Δ Θ s)
           → T (inputsBelowᵉ k (mapᵉ f b)) → T (inputsBelowᵉ k b)
 below-map k f b = ∧ʳ {inputsBelowᵗ k f}
@@ -103,8 +95,10 @@ below-μ k b p = p
 --
 -- THE FLOOR IS THE CONTEXT SIZE AND CANNOT BE GENERALISED, which is
 -- what makes this the ROOT's witness rather than a lemma about terms:
--- at any smaller floor the `input` clause is exactly the statement the
--- runtime arm below is refuted at.
+-- the `input` clause is the whole content, and it is FALSE at every
+-- smaller floor, since a slot the term names may sit above it.  So a
+-- step that needs a smaller floor gets nothing from here and must
+-- DECIDE the test for itself — which is what the registration does.
 ∧ᵢ : ∀ {a b : Bool} → T a → T b → T (a Data.Bool.∧ b)
 ∧ᵢ {a} {b} x y = Equivalence.from (T-∧ {a} {b}) (x , y)
 
@@ -165,67 +159,3 @@ mutual
 postulate
   below-unfoldμ : ∀ {t} (k : ℕ) (b : Exp Γ (t ∷ []) [] [] t)
                 → T (inputsBelowᵉ k b) → T (inputsBelowᵉ k (unfoldμ b))
-
--- THE ARM THE SYNTAX CANNOT REACH.  A value of observable type IS a
--- closed expression, manufactured by applying a function rather than
--- sitting anywhere in the program, so the bound on it is a fact about
--- the RUN and not about the term the subscription is walking.  What
--- makes it true where the evaluator uses it: a value carried on a chain
--- registered at slot `i` was emitted by that slot, whose definition
--- names only inputs below `i`, while the chain's own floor is `suc i` —
--- so the bound arrives with a unit of slack, and substitution is
--- monotone in the floor, so every hop rootward only weakens it.
---
--- AND STATED OVER AN ARBITRARY FLOOR IT IS FALSE, SO THIS IS A HOLE AND
--- NOT A GAP.  ⊥ follows from it directly, which means every statement
--- proven anywhere above it currently stands on a false hypothesis — the
--- one shape of debt this development treats as outranking the work it
--- was incurred for.  The sound form carries the bound on the VALUE and
--- relates it to the chain the value arrived on, which is a proof field
--- on the run state; that is the same per-emission cost the batching
--- design declined once, and the reason the restatement is a design
--- question rather than a signature edit.
---
--- AND DELETING IT IS NOT THE REPAIR, because the EVALUATOR consumes it:
--- the inner-subscription clause needs an inhabitant to hand the walk it
--- re-enters, so the leaf is load-bearing for the machine to be
--- well-typed and not merely for a proof above it.  The floors a run
--- actually produces are the ones the claim wants — the root enters at
--- the context size and the only descent is to `suc i`, so the bound
--- arrives with a unit of slack — and nothing in the type says so.
---
--- AND THE DEMAND ORIGINATES AT A REGISTRATION, WHICH IS WHAT OPENS A
--- SECOND EXIT.  Nothing in the walk wants this bound for itself: the
--- one clause that spends it is the input arm, and it spends it to lower
--- a chain onto a slot row, whose type fixes the floor at one above the
--- index.  So the premise is proof apparatus the machine carries in
--- order to be well-typed, not a quantity the machine computes with —
--- and a premise of that kind can be met by WEAKENING THE DEMAND rather
--- than by supplying the proof.  Let the registration DECIDE its own
--- floor test and drop the row when it fails, and the bound stops being
--- a hypothesis the evaluator needs and becomes a theorem about a branch
--- nothing reaches, which is where the invariant can actually be proven.
--- The degenerate arm is the one the store already takes for a mistyped
--- node, so the shape is not new; what it costs is a decision with no
--- counterpart in the TS, over a floor that has none either.  NOT
--- WALKED: both exits are stated here and neither is instantiated.
---
--- REFUTED: `Refuted.Inner-Floor` — a floor of zero against a context
---   that has a slot, at the value `input 0`.  The predicate computes to
---   `false`, so the statement returns an inhabitant of the empty type
---   with no crossing to pin and no figure a repair could leave intact.
---
--- PROBED: `Probed.Inner-Bound` — the pairs a RUN produces, which is the
---   question that refutation leaves open and that both exits rest on.
---   Three shares connected at a floor of two inside a context of three,
---   each value read back out of a bounded merge's own queue and pinned
---   to what the machine left there.  One inner names the slot directly
---   beneath the share and one reaches two down, so the controls a floor
---   lower reject the first and pass the second; the third is a
---   substitution instance a `map` builds around an arriving number,
---   existing nowhere in the program text, which is the manufacture the
---   arm is about.  Every row holds at the floor the connect supplies.
---   NOT covered: a value built under a μ-unfold, and a connect reached
---   through a second share rather than through the root.
-postulate
-  below-inner : ∀ {t} (k : ℕ) (o : Val Γ (obs t)) → T (inputsBelowᵉ k o)

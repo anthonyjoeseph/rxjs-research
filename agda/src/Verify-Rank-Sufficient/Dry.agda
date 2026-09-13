@@ -51,7 +51,7 @@ open import Rx.Evaluator using (Stream; Path; Sched; EvalSt; subscribeE;
   map-f; scan-f; take-f; thru-outer; mergeAllᵒ; switchᵒ; exhaustᵒ;
   _↠_;
   hasDry; memberSource; unconn; stHop)
-open import Rx.Inputs-Below using (below-input; below-map; below-take;
+open import Rx.Inputs-Below using (below-map; below-take;
   below-scan; below-mergeAll; below-switchAll; below-exhaustAll; below-μ;
   below-unfoldμ)
 open import Rx.Hop-Depth using (depthᵉ; hopOf; rdᵉ; ε; rd-unfoldμ)

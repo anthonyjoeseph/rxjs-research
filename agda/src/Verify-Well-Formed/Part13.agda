@@ -39,7 +39,6 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; root; memberSource; Node
   switch-st; exhaust-st; sched-init; st-init; sched-next; schedGo; arrSource;
   chainsOf; cascadeLatch; cascadeGo; subscribeE; cascade; drain; evaluate; sameSource; hasDry;
   dropSource; rootWitness)
-open import Rx.Inputs-Below using (below-ctx)
 open import Rx.Slots using (Slots)
 open import Rx.Protocol  using (ProtocolSt; countIn; protocol-init; runProtocol; paidUp; checkFinal; Accepted; WellFormed)
 

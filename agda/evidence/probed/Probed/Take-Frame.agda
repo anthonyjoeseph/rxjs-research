@@ -97,7 +97,6 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; NodeId; Arrival;
   mintNode; installNode; take-st; take-f; map-f; scan-f; splitBurst;
   stepFrame; stHop; arrTy; arrVal; arrTick; sched-next; cascade;
   arrivalWitness)
-open import Rx.Inputs-Below using (below-ctx)
 open import Verify-Rank-Sufficient.Carried using (valsRd)
 open import Verify-Rank-Sufficient.Push-Carried using (take-frame-carried)
 open import Probed.Apparatus using (Confirms; Below)

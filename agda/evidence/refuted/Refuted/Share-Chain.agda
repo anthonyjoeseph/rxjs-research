@@ -74,7 +74,6 @@ open import Rx.Slot-Read using (slotRd)
 open import Rx.Evaluator using (Sched; EvalSt; root; shareAdmit;
   subscribeE; rootWitness; rootTri; sched-init; st-init; stHop)
 open import Verify-Rank-Sufficient.Push-Carried using (mapRd)
-open import Rx.Inputs-Below using (below-ctx)
 open import Verify-Rank-Sufficient.Path-Fits using (ShareHop)
 
 ----------------------------------------------------------------------

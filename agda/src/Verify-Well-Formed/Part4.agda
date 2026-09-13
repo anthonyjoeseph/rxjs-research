@@ -41,7 +41,6 @@ open import Rx.Exp       using (Ctx; Closed; Ty)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; RegId; RegRow; RegSrc; regFloor; AtFloor; Path; root; memberSource;
   NodeId; NodeState; scan-st; take-st; mergeAll-st; switch-st; exhaust-st; sched-init; st-init;
   arrTy; arrSource; cascadeGo; subscribeE; sameSource; hasDry; dropSource; rootWitness)
-open import Rx.Inputs-Below using (below-ctx)
 open import Rx.Slots using (Slots)
 open import Rx.Protocol  using (ProtocolSt; Owed; countIn; allZero; protocol-init; stepProtocol; runProtocol; paidUp; settle;
   paidOff; applyEvents; removeOne; cancelOwed; bumpOwed; settleInstant)

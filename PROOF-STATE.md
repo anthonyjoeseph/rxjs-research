@@ -97,11 +97,13 @@ LEDGER of one-line hooks; everything else lives in the code.
   and filler here is worse than blank because it reads as research.
   **WHAT IS HELD INSTEAD IS THE `relevant:` LINE, and `make roadmap-check`
   enforces it.** Every name on it must still be a LIVE postulate, must be a
-  row of that same tier, and must still be FALSITY. Nothing else would
-  notice this section aging, so that list is the one thing kept current: a
-  name off the ledger means the question is answered or its row was
-  restated, and a row that has come down out of FALSITY means the
-  uncertainty is settled there. When nothing risky is left under a question,
+  row of that same tier, and must still be FALSITY or SHAPE. Nothing else
+  would notice this section aging, so that list is the one thing kept
+  current: a name off the ledger means the question is answered or its row
+  was restated. SHAPE counts because a question's rows convert FALSITY →
+  SHAPE as it is ANSWERED — that is what a half-answer leaves behind, and
+  holding the list to FALSITY retired a question at the very moment the
+  narrowing it exists to record had happened. When nothing risky is left,
   the question goes. The list is FREE of the prose budget, so a question is
   never shortened by dropping a postulate from it — the same asymmetry the
   rows carry, for the same reason.
@@ -224,17 +226,7 @@ now at the door and at the templates the door's chains are built from.
 
 ### Big picture tier roadmap
 
-- **THE SUBSTITUTION RESIDUE IS THE TRUNK, AND THE EXIT IS DECIDED — WHAT
-  REMAINS IS THE CUTOVER.** Carrying the tie is not thinly instantiable: the node
-  state the value arrives through carries no floor, and both index-free ways of
-  storing the witness are vacuous. So the registration decides its own floor test
-  and takes a SPENT arm — not a dry one, which would falsify the tier's own
-  statement. The evaluator is cut over and the descent arguments are off the call
-  sites; what is left is the two proofs that now split on that test, then the
-  subtraction: the row goes, its probe expires with it, and its refutation can no
-  longer be stated. Its module STAYS — the μ half is consumed elsewhere.
-
-- **AND THE FOLD'S FRAME IS MISSING TWO AXES, WHICH IS A FACT ABOUT THE WALK'S
+- **THE FOLD'S FRAME IS MISSING TWO AXES, WHICH IS A FACT ABOUT THE WALK'S
   CURRENCY AND NOT ABOUT ONE LEAF.** A frame is handed exactly two scalars, and a
   fold needs a quantity from outside each — the payload bound is a POINTWISE join
   carrying no cardinality, the store bound reads a scan node through the hop half
@@ -252,18 +244,27 @@ now at the door and at the templates the door's chains are built from.
   live flattener decides all three at once. It is ranked below the currency
   because a leaf restated under a widened predicate is a leaf probed twice.
 
+- **AND THE DOOR IS WHERE THE SUBTRACTION IS NOT AVAILABLE.** The exit above
+  retired a carried tie by letting the step DECIDE its own test; neither door row
+  can be repaired that way. `entry-drain-hop` prices a chain's flattener count
+  against the program's reading, and `share-chain-hop` bounds what ENTERS a
+  dispatch while the walk is read along the chain — both quantities a step cannot
+  recompute from what it holds, so each is a premise threaded in or a call made at
+  the wrong index. Take the pair together: they are the same missing carry read
+  from the two ends, and one decision about the currency settles which.
+
 ### Open questions
 
-- **Does SUBSTITUTION preserve the telescope's stratification?** The SYNTACTIC
-  half is settled: the root's bound holds of every closed term, a share's
-  definition has it stored by the slot constructor, and the μ-unfold graft is
-  instantiated where it could have failed. The arm none of them reaches is an
-  observable manufactured at RUNTIME by applying a function, and it is now
-  instantiated too — holding at every pair a run supplies. So the doubt has
-  moved off the fact and onto its statement: must the machine CARRY the tie
-  between a value and the chain it arrived on, or can the registration decide
-  the floor for itself and leave the tie to a proof above it?
-  relevant: `below-inner`, `entry-drain-hop`, `share-chain-hop`
+- **WHAT MUST A STEP CARRY IN, AND WHAT MAY IT DECIDE FOR ITSELF?** The
+  stratification half is SETTLED and by subtraction rather than by proof: the
+  registration decides its own floor, so no statement carries the tie between a
+  value and the chain it arrived on and the manufactured-value arm is gone
+  rather than restated. What survives is the same question one currency over,
+  where the subtraction is NOT available: a chain's reading and a registry's
+  admission are quantities a step cannot recompute from what it holds, so each
+  is either threaded in as a premise or the statement is made at the wrong
+  index. Which of the two, per row, is what the remaining rows are waiting on.
+  relevant: `entry-drain-hop`, `share-chain-hop`
 
 ### The ledger
 
@@ -273,21 +274,16 @@ now at the door and at the templates the door's chains are built from.
   rungs and at a gate; an arrival there reaches exactly ONE chain.
 
 - **`from-inner-dry` / `thru-outer-frame-dry`**
-  (Verify-Rank-Sufficient.Path-Fits) — FALSITY, `PROBED×2`: dry-freedom of the
-  only two frames that re-enter the evaluator, each over every payload its
-  incoming bound admits. The other three are discharged outright, which is what
-  says these two are where the risk actually is.
+  (Verify-Rank-Sufficient.Path-Fits) — FALSITY, `DEAD ROUTE, PROBED×2`:
+  dry-freedom of the only two frames that re-enter the evaluator, each over
+  every payload its incoming bound admits. The other three are discharged
+  outright, which is what says these two are where the risk actually is.
 
 - **`from-inner-carried`** (Verify-Rank-Sufficient.Path-Fits) — FALSITY,
-  `PROBED`: the exit frame threads what it was handed unchanged. `innerReact`
-  returns its payload untouched on every branch but the completion one, where a
-  node's queue is drained and fresh bursts appended — the branch nothing has
-  reached.
-
-- **`below-inner`** (Rx.Inputs-Below) — SHAPE, `REFUTED, PROBED`: the bound on
-  an observable manufactured at RUNTIME. False over an arbitrary floor, true at
-  every pair a run supplies; the restatement is a choice between carrying the
-  tie to the arriving chain and deciding the floor at the registration.
+  `DEAD ROUTE, PROBED`: the exit frame threads what it was handed unchanged.
+  `innerReact` returns its payload untouched on every branch but the completion
+  one, where a node's queue is drained and fresh bursts appended — the branch
+  nothing has reached.
 
 - **`share-chain-hop`** (Verify-Rank-Sufficient.Path-Fits) — SHAPE,
   `REFUTED, RECOVERY`: the sink's claim at the share's registry, whose one

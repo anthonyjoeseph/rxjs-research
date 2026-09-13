@@ -74,7 +74,6 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; NodeId; NodeState;
   AllOp; subscribeE; rootWitness; rootTri; root; _↠_; sched-init; st-init;
   mintNode; installNode; mergeAll-st; from-inner; thru-outer; mergeAllᵒ;
   splitBurst; stepFrame; stHop; dryEvent)
-open import Rx.Inputs-Below using (below-ctx)
 open import Verify-Rank-Sufficient.Carried using (valsRd)
 open import Verify-Rank-Sufficient.Path-Fits
   using (from-inner-carried; from-inner-dry; thru-outer-frame-dry)

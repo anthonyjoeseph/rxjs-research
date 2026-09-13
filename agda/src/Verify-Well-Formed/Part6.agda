@@ -34,7 +34,6 @@ open import Relation.Binary.PropositionalEquality
 open import Rx.Prim      using (Tick; Id; Source; InstEmit; InstEvent; init; value; close; handoff; complete; EmitKind;
   _at_from_as_)
 open import Rx.Exp       using (Ctx; Closed; Val; Fn; _×ᵗ_; Tm; scanᵉ; evalTm; inputsBelowᵉ)
-open import Rx.Inputs-Below using (below-scan)
 open import Rx.Evaluator using (Sched; EvalSt; Stream; Path; _↠_; scan-f; take-f; takeVals; takeDispatch; cutThrough;
   setNode; memberSource; NodeId; lookupNode; scan-st; take-st; subscribeE; splitEvents;
   pushBurst; scanVals; installNode; mintNode; retagEvents; sweepLive)

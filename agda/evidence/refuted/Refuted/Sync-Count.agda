@@ -65,7 +65,6 @@ open import Rx.Exp using (Ctx; Closed; Fn; Tm; natᵗ; obs; _×ᵗ_; nat̂; strm
   varᵗ; fstᵗ; ofᵉ; scanᵉ; mergeAllᵉ; syncSizeᵉ)
 open import Rx.Slots using (Slots)
 open import Rx.Evaluator using (Stream; subscribeE; rootWitness; root; sched-init; st-init)
-open import Rx.Inputs-Below using (below-ctx)
 
 ----------------------------------------------------------------------
 -- THE MEASURE.  Generic in the payload rather than indexed, because

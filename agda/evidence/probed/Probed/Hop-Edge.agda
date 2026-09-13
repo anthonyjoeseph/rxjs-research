@@ -91,7 +91,6 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; NodeId; NodeState;
   AllOp; subscribeE; rootWitness; rootTri; root; _↠_; sched-init; st-init;
   mintNode; installNode; mergeAll-st; switch-st; exhaust-st; thru-outer;
   mergeAllᵒ; switchᵒ; exhaustᵒ; splitBurst; stepFrame; stHop)
-open import Rx.Inputs-Below using (below-ctx)
 open import Verify-Rank-Sufficient.Carried using (valsRd)
 open import Verify-Rank-Sufficient.Push-Carried
   using (thru-outer-frame-carried)

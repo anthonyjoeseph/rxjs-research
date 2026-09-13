@@ -34,7 +34,6 @@ open import Relation.Binary.PropositionalEquality using (_≡_; trans; cong₂)
 
 open import Rx.Prim using (Tick; Id; value; complete; InstEmit)
 open import Rx.Exp using (Ctx; Closed; Tm; Val; Fn; _×ᵗ_; scanᵉ; evalTm; inputsBelowᵉ)
-open import Rx.Inputs-Below using (below-scan)
 open import Rx.Strat-Order using (_≺_)
 open import Rx.Hop-Depth using (Rd; Rd₃; depthᵉ; rdᵉ; rdᵗ; ε; _▸_)
 open import Rx.Evaluator using (Stream; Frame; Path; Sched; EvalSt; NodeId;

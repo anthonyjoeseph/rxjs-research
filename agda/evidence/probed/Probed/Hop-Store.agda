@@ -65,7 +65,6 @@ open import Rx.Slot-Read using (slotRd)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; NodeId; NodeState; subscribeE; rootWitness; rootTri; root; _↠_;
   sched-init; st-init; mintNode; installNode; mergeAll-st; thru-outer; mergeAllᵒ; splitBurst;
   stepFrame; stHop)
-open import Rx.Inputs-Below using (below-ctx)
 open import Verify-Rank-Sufficient.Carried using (valsRd)
 open import Verify-Rank-Sufficient.Push-Carried
   using (thru-outer-frame-carried)

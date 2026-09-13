@@ -103,7 +103,6 @@ open import Rx.Evaluator using (Sched; EvalSt; Path; root; share-sink;
   _↠_; map-f; scan-f; take-f; from-inner; thru-outer; subscribeE;
   rootWitness; sched-init; st-init; sched-next; chainsOf; cascadeLatch;
   shareAdmit; arrTy; arrVal; RegId; AtFloor)
-open import Rx.Inputs-Below using (below-ctx)
 open import Verify-Rank-Sufficient using (entry-drain-hop)
 open import Verify-Rank-Sufficient.Fits using (arrivalRank)
 open import Verify-Rank-Sufficient.Push-Carried using (mapRd)

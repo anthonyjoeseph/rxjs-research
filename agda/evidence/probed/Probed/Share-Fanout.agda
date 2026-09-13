@@ -83,7 +83,6 @@ open import Rx.Slot-Read using (slotRd)
 open import Rx.Evaluator using (Sched; EvalSt; root; shareAdmit;
   sched-next; cascade; subscribeE; rootWitness; sched-init; st-init;
   arrTy; arrVal; stHop)
-open import Rx.Inputs-Below using (below-ctx)
 open import Verify-Rank-Sufficient.Fits using (arrivalRank)
 open import Probed.Apparatus using (Separates; separates-at)
 

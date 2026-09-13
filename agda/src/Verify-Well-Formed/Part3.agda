@@ -50,7 +50,7 @@ open import Rx.Evaluator using (Sched; EvalSt; RegId; RegRow; RegSrc; regSource;
   mergeAll-st; mergeAllᵒ; thru-outer;
   mintOrdinal; resolve)
 open import Rx.Slots using (scripted; shared)
-open import Rx.Inputs-Below using (below-input; below-map; below-take; below-scan; below-mergeAll)
+open import Rx.Inputs-Below using (below-mergeAll)
 
 open import Rx.Protocol  using (ProtocolSt; countIn; runProtocol; valsLast?)
 
