@@ -258,27 +258,40 @@ postulate
     (sd : Sched Γ) (st : EvalSt e) →
     ShareHop {e = e} ac gas id now i ψ Rin Rst vals fin sd st
 
--- THE TWO ARMS WHOSE RESIDUE IS NOT READ OFF THE FRAME, pinned at the
--- HEADROOM THE TAIL LEAVES rather than at a figure of their own.  What
--- a map or a scan hands on is read off the SOURCE EXPRESSION — an
--- event count for one, a seed and a delivery count for the other — and
--- a chain records the frame, not what it was built from, so the walk
--- can supply neither.  What it CAN supply is the largest bound the rest
--- of the path can still afford: everything below this frame has to fit
--- under `Rst` after its own flatteners are paid for, so `Rst ∸ pathHops
--- κ` is exactly that and the tail's premise holds by subtraction.  The
--- claim is therefore that these two frames stay inside the headroom,
--- which is what a frame-shaped statement can say and an existential
--- residue cannot.
+-- THE TWO ARMS WHOSE RESIDUE IS NOT READ OFF THE FRAME, AND BOTH ARE
+-- FALSE AS STATED.  What a map or a scan hands on is read off the
+-- SOURCE EXPRESSION — an event count for one, a seed and a delivery
+-- count for the other — and a chain records the frame, not what it was
+-- built from, so the walk can supply neither.  The HEADROOM the tail
+-- leaves is what was reached for instead: everything below the frame
+-- has to fit under `Rst` once its own flatteners are paid for, so the
+-- tail's premise holds by subtraction.  It is also NOUGHT on the
+-- commonest chain there is — neither of these frames is charged a
+-- flattener, so a chain carrying none has a headroom equal to its whole
+-- store bound, and a store bound of nought leaves both heads no room
+-- while either frame's own function writes what it likes.
 --
--- AND THE ASYMMETRY IS FORCED FOR THE FOLD, NOT CHOSEN.  Its outputs
--- are the successive ACCUMULATORS, so what it hands back is a function
--- of the store and the step and the payload enters only as the step's
--- second argument — a step ignoring that argument cuts the payload out
--- of the answer, and then no bound on the payload bounds the output.
--- The headroom pin is what survives that: it is read off the STORE
--- bound, which is the side the accumulator comes from.
+-- AND THE REPAIR THAT POINTS AT — a residue read off the frame's own
+-- function, which is the one thing a chain step does carry — IS NOT
+-- AVAILABLE EITHER, WHICH IS WHY THE FINDING IS THE CURRENCY RATHER
+-- THAN THE PIN.  It answers a function that DROPS its argument and not
+-- one that FOLDS over it: what such a template hands back rises a layer
+-- per DELIVERY, and the delivery count is the half of a payload's
+-- reading that `valsHop` projects away.  So no ℕ computed from the
+-- frame and the incoming HOP bounds a map frame at all, and the shelf's
+-- own leaf is false the same way.  Until the payload currency carries
+-- the count, every statement of this family is stated in something that
+-- cannot separate its own witnesses — so what is owed is a restatement
+-- of `FrameCarries` and of everything pinned against it, not of these
+-- two heads.
 --
+-- AND THE FOLD'S ASYMMETRY IS STILL FORCED, so no repair may simply pin
+-- it at `Rin`: its outputs are the successive ACCUMULATORS, a function
+-- of the store and the step, and a step ignoring its second argument
+-- cuts the payload out of the answer entirely.
+--
+-- REFUTED: `Refuted.Path-Heads` — both heads at the walk's own
+--   instantiation, and the count axis that kills the repair.
 -- REFUTED: `Refuted.Scan-Store` — the symmetric form, where the fold's
 --   residue is its own incoming bound.
 postulate

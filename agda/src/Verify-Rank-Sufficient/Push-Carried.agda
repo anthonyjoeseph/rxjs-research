@@ -86,19 +86,34 @@ FrameCarries {Γ = Γ} {e = e} {s = s} {u = u} ac id now f κ ψ Rin Rv Rst =
 -- hands back is that step APPLIED to the bound it was handed, never the
 -- bound itself.
 --
--- SO THE TWO ENDS ARE READINGS OF DIFFERENT EXPRESSIONS, AND THAT IS
--- THE WHOLE OF THE REPAIR.  The frame is handed what the SOURCE emits
--- and gives back what the TEMPLATE makes of it, so the incoming bound
--- is the source's reading and the outgoing one the map expression's.
--- Those differ by exactly the layer the reading's map clause charges,
--- which is exactly the layer one application of the template can add —
--- so the statement is pinned at both ends and neither end is the other.
--- Collapsing them to the larger is available at the call site and is
--- what the witnesses below kill: it hands the frame a payload the
--- source could never emit, and the template then adds its layer to
--- that.  The source expression is a parameter because the incoming
--- bound names it; nothing else in the statement reads `b`.
+-- SO THE TWO ENDS ARE READINGS OF DIFFERENT EXPRESSIONS.  The frame is
+-- handed what the SOURCE emits and gives back what the TEMPLATE makes
+-- of it, so the incoming bound is the source's reading and the outgoing
+-- one the map expression's.  Collapsing them to the larger hands the
+-- frame a payload the source could never emit and lets the template add
+-- its layer to that, which is what two of the witnesses below kill.
+-- The source expression is a parameter because the incoming bound names
+-- it; nothing else in the statement reads `b`.
 --
+-- AND THE FORM THAT LEAVES IS STILL FALSE, BECAUSE THE TWO ENDS ARE NOT
+-- READ IN THE SAME CURRENCY.  The outgoing bound is a reading of the
+-- map EXPRESSION, which sees the source's delivery count; the incoming
+-- one is admitted through `valsHop`, which projects the HOP half of a
+-- payload's reading and drops the count.  So a source delivering once
+-- fixes a finite bound while a payload delivering five times is
+-- admitted at nought beside it, and a template that FOLDS over its
+-- argument hands back a layer per delivery — a gap with no ceiling
+-- between two quantities the statement believes it has related.  This
+-- is not a defect of the pinning: it is the payload currency, and it
+-- costs a restatement of `FrameCarries` itself and of every bound
+-- stated against it.
+--
+-- REFUTED: `Refuted.Path-Heads` — the form below, at a template whose
+--   own body FOLDS: the source fixes a bound of two and three payloads
+--   admitted at nought drive the frame to three, five and seven.  The
+--   same module refutes the two heads the walk mints when this shelf
+--   cannot supply them, which is what says the currency is the subject
+--   rather than this statement.
 -- REFUTED: `Refuted.Map-Template` — the freely-quantified form, at a
 --   template that drops a numeral and returns a flattener over a
 --   literal.  The payload reads ZERO, so the frame is held to the

@@ -86,3 +86,35 @@ open import Refuted.Rank-Entry using (dry-operator-false)
 open import Refuted.Scan-Store using (scan-frame-carried-false;
   payload-is; store-is; out-is)
 open import Refuted.Sync-Count using (sync-count-bounded-false)
+
+-- and the pin the walk reached for once the shelf could supply neither
+-- head, refuted at both.  The chain figure is claimed ahead of the two
+-- witnesses because it is what says the refuted point is the walk's
+-- own: a chain carrying no flattener has a headroom equal to its whole
+-- store bound, so a bound of nought pins both heads at nought.  The
+-- three figures per head are claimed because each crossing is an ORDER
+-- and an inequality refutation dies quietly when a repair enlarges the
+-- right side — and the store rows for the opposite reason again, being
+-- at the floor on both sides, which is what attributes the whole gap to
+-- the frame's own function
+open import Refuted.Path-Heads using (chain-is;
+  map-head-carried-false; map-in-is; map-store-is; map-out-is;
+  scan-head-carried-false; scan-in-is; scan-store-is; scan-out-is)
+-- and the three rows that say the repair those two witnesses point at
+-- does not reach: a residue read off the frame's own function still
+-- cannot bound a template that FOLDS, because the deliveries move the
+-- output while every reading the predicate takes stays at nought.  The
+-- output figures are claimed as a TRIPLE, since one is a height and two
+-- are a direction, and the two floor rows beside them because they are
+-- what say a single bound admits all three
+open import Refuted.Path-Heads using (fold-packed-is; fold-in-packed-is;
+  fold-store-is)
+-- and the shelf's own leaf, which the same axis kills: its bound does
+-- see a delivery count, but the SOURCE's, while its hypothesis admits
+-- any payload whose hop fits.  The two source figures are claimed
+-- together because the finding is their GAP against the outputs above —
+-- a bound fixed by one delivery against payloads carrying five, all
+-- admitted at nought — so a repair moving either end would leave the
+-- witness reporting figures that no longer meet
+open import Refuted.Path-Heads using (map-frame-carried-count-false;
+  src-packed-is)

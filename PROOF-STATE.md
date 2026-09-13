@@ -224,23 +224,24 @@ now at the door and at the templates the door's chains are built from.
 
 ### Big picture tier roadmap
 
-- **THE TWO HEADS THE SHELF CANNOT SUPPLY, WHICH ARE NOW STATED AT THE PATH
-  AND SHOULD NOT STAY THERE.** The walk composes its own steps out of frame
-  statements everywhere except the map and scan heads, which it mints whole: the
-  fold's burst arm is not a frame-carrying statement, and the map arm is pinned
-  at the readings of a source EXPRESSION, which a chain step does not carry — a
-  chain records the frame, not what it was built from. So each head currently
-  asserts a whole path fit off a hop count, which is the widest thing in the
-  tier. Restate the shelf's two arms in what a chain step carries, and the heads
-  become steps like the other three.
+- **THE PAYLOAD CURRENCY CANNOT SEPARATE ITS OWN WITNESSES, AND EVERY FRAME
+  STATEMENT IS DENOMINATED IN IT.** `FrameCarries` admits a payload through
+  `valsHop`, which projects the HOP half of a value's reading and drops the
+  DELIVERY COUNT — while what a frame hands back depends on both, since a
+  template may FOLD over its argument and deepen once per delivery. So no ℕ
+  computed from the frame and the incoming hop bounds a map frame at all, and
+  the shelf's own leaf is refuted beside the two heads that lean on it. The
+  reading machinery already carries the count, so the repair is to state the
+  payload bound in the full reading rather than in its hop — and it cascades
+  through every arm and every statement pinned against one.
 
-- **AND THE COMPLETION ARM OF THE TWO RE-ENTERING FRAMES, WHICH IS WHERE THE
-  DOOR'S RISK WENT.** `from-inner-carried` and `from-inner-dry` are instantiated
-  only at `fin = false`, where the payload is threaded untouched and the emit
-  list is empty — instantiability rather than coverage, as their own receipt
-  says. The completing branch drains a node's queue and appends fresh bursts,
-  and nothing has reached it. Reach a completing inner, or establish it cannot
-  be reached and restate both at the arm that can.
+- **AND THE WALK'S TWO HEADS BECOME STEPS ONCE THE SHELF CAN SPEAK.** They exist
+  only because the shelf had no frame-local figure to hand a map or a fold: what
+  either produces was read off a source EXPRESSION, which a chain step does not
+  carry, so the walk minted whole path fits off a hop count instead and both are
+  refuted at its own instantiation. A shelf arm stated in the payload's full
+  reading has a residue the chain step does carry, so the heads retire into
+  ordinary steps rather than being restated.
 
 - **AND THE TIER'S HOP DEBT IS NOW TWO PREMISES OVER TWO REGISTRIES, WHICH MAY
   BE ONE.** `entry-drain-hop` walks what an arrival's source registered and
@@ -248,9 +249,9 @@ now at the door and at the templates the door's chains are built from.
   registered chain carries no more flatteners than the bound it is entered
   under affords. The bounds differ — the door's is the program's own reading,
   the sink's a join with the chain's own state — and nothing yet says the two
-  lists hold different chains. State it once over a registration list and let
-  both sites instantiate it, or find the point where the two bounds cannot be
-  reconciled and say which of them is the wrong one.
+  lists hold different chains. State it once over a registration list, in
+  whatever currency the first leg lands, or find the point where the two bounds
+  cannot be reconciled and say which of them is the wrong one.
 
 ### The ledger
 
@@ -258,12 +259,6 @@ now at the door and at the templates the door's chains are built from.
   door's whole premise, in a currency that mentions no run — a chain's
   flattener count against the program's own reading. Tight at three ladder
   rungs and at a gate; an arrival there reaches exactly ONE chain.
-
-- **`map-head-carried` / `scan-head-carried`**
-  (Verify-Rank-Sufficient.Path-Fits) — FALSITY, `REFUTED×2`: the two frames
-  whose residue is read off the SOURCE EXPRESSION, pinned instead at the
-  headroom the tail leaves. A fold refolds once per DELIVERY, which a hop bound
-  does not count.
 
 - **`share-chain-hop`** (Verify-Rank-Sufficient.Path-Fits) — FALSITY, `PROBED`:
   the door's own claim at the share's registry — one flattener count per
@@ -282,10 +277,17 @@ now at the door and at the templates the door's chains are built from.
   node's queue is drained and fresh bursts appended — the branch nothing has
   reached.
 
-- **`map-frame-carried`** (Verify-Rank-Sufficient.Push-Carried) — DIFFICULTY,
-  `REFUTED×2, PROBED`: the two ends read DIFFERENT expressions, apart by the
-  layer a template adds. Nine rows, three templates × three sources; the
-  growing ones TIGHT, and a fold's node makes the store a real comparison.
+- **`map-head-carried` / `scan-head-carried`**
+  (Verify-Rank-Sufficient.Path-Fits) — SHAPE, `REFUTED×4`: the two frames whose
+  residue is read off the SOURCE EXPRESSION, pinned instead at the headroom the
+  tail leaves — which is nought on a chain carrying no flattener, where the
+  walk's own hypothesis holds.
+
+- **`map-frame-carried`** (Verify-Rank-Sufficient.Push-Carried) — SHAPE,
+  `REFUTED×3, PROBED`: the two ends read DIFFERENT expressions, and in
+  different CURRENCIES — the bound sees the source's delivery count, the
+  hypothesis admits any payload whose hop fits, and a folding template lives in
+  the gap.
 
 - **`take-frame-carried`** (Verify-Rank-Sufficient.Push-Carried) — DIFFICULTY,
   `PROBED`: a prefix of what it was handed, under a node reading zero. Six
