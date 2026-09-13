@@ -63,7 +63,7 @@ open import Verify-Rank-Sufficient.Carried using (emitHop-map;
   oneShotBurst-hop; installNode-hop; burstHop-plumb; valsHop-data;
   WalkCarries; burstHop-if; stHop-if)
 open import Verify-Rank-Sufficient.Push-Carried using (pushBurst-carried;
-  map-frame-carried; scan-frame-carried; take-frame-carried;
+  map-frame-carried; scan-burst-carried; take-frame-carried;
   thru-outer-frame-carried)
 open import Verify-Rank-Sufficient.Leaf-Carried using (ofᵉ-carried;
   scan-seed-carried)
@@ -316,13 +316,12 @@ mutual
            , ≤-trans (m≤n⇒m≤1+n (m≤n+m _ _)) (proj₂ (proj₂ inv)) )
            hst₁
 
-    pc = pushBurst-carried ac id now (scan-f f nid) κ
-           (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
-           ψ (depthᵉ ψ (scanᵉ f z b)) (depthᵉ ψ (scanᵉ f z b))
-           (proj₁ (proj₂ τ))
-           (scan-frame-carried ac id now f nid κ ψ
-             (depthᵉ ψ (scanᵉ f z b)) (proj₁ (proj₂ τ))
-             (proj₁ (proj₂ inv)))
+    -- the fold's report is NOT `pushBurst-carried` over a frame leaf:
+    -- a scan's outputs are the accumulator it is rewriting, so no
+    -- bound on what the frame is handed bounds what it returns, and
+    -- the leaf is taken at the burst and at this arm's own seed
+    pc = scan-burst-carried ac id now f z b nid κ sched₁ st ψ
+           (proj₁ (proj₂ τ)) (proj₁ (proj₂ inv))
            (≤-trans (proj₁ (proj₂ ih)) (hop-scanᵉ ψ f z b))
            (proj₂ (proj₂ ih))
 

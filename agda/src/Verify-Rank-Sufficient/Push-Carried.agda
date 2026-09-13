@@ -33,12 +33,12 @@ open import Induction.WellFounded using (Acc)
 open import Relation.Binary.PropositionalEquality using (_≡_; trans; cong₂)
 
 open import Rx.Prim using (Tick; Id; value; complete; InstEmit)
-open import Rx.Exp using (Ctx; Closed; Val; Fn; _×ᵗ_)
+open import Rx.Exp using (Ctx; Closed; Tm; Val; Fn; _×ᵗ_; scanᵉ; evalTm)
 open import Rx.Strat-Order using (_≺_)
-open import Rx.Hop-Depth using (Rd₃)
+open import Rx.Hop-Depth using (Rd₃; depthᵉ)
 open import Rx.Evaluator using (Stream; Frame; Path; Sched; EvalSt; NodeId;
-  AllOp; map-f; scan-f; take-f; thru-outer; stepFrame; splitEvents;
-  retagEvents; pushBurst; stHop)
+  AllOp; map-f; scan-f; take-f; thru-outer; _↠_; scan-st; installNode;
+  subscribeE; stepFrame; splitEvents; retagEvents; pushBurst; stHop)
 open import Verify-Rank-Sufficient.Carried using (valsHop; emitHop; burstHop;
   emitHop-++; emitHop-values; emitHop-bk; emitHop-retag; splitEvents-vals)
 
@@ -70,13 +70,13 @@ FrameCarries {Γ = Γ} {e = e} {s = s} {u = u} ac id now f κ ψ Rin Rv Rst =
         (stepFrame ac id now f κ vals fin sd st))))) ≤ Rst
 
 ----------------------------------------------------------------------
--- THE THREE NON-FLATTENING FRAMES.  Each is a leaf rather than a body,
--- and for three different reasons the assembly above cannot supply: a
--- map's outputs are a TEMPLATE evaluated at the payload, which is the
--- one place the term reading's own plug clause has to be met; a scan's
--- outputs are the accumulator it is simultaneously rewriting, so both
--- halves move at once; and a take's are a prefix of what it was handed
--- under a node whose reading is zero by construction.
+-- THE TWO NON-FLATTENING FRAMES THAT HAND BACK WHAT THEY WERE HANDED.
+-- Each is a leaf rather than a body, and for two different reasons the
+-- assembly above cannot supply: a map's outputs are a TEMPLATE
+-- evaluated at the payload, which is the one place the term reading's
+-- own plug clause has to be met; and a take's are a prefix of what it
+-- was handed under a node whose reading is zero by construction.  The
+-- fold is not among them and cannot be — see below.
 ----------------------------------------------------------------------
 
 postulate
@@ -84,12 +84,6 @@ postulate
     (ac : Acc _≺_ τ) (id : Id) (now : Tick) (fn : Fn Γ [] [] [] s u)
     (κ : Path Γ u t) (ψ : Fin n → Rd₃) (Rv Rst : ℕ) →
     FrameCarries {e = e} ac id now (map-f fn) κ ψ Rv Rv Rst
-
-  scan-frame-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {τ}
-    (ac : Acc _≺_ τ) (id : Id) (now : Tick)
-    (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
-    (κ : Path Γ u t) (ψ : Fin n → Rd₃) (Rv Rst : ℕ) → Rv ≤ Rst →
-    FrameCarries {e = e} ac id now (scan-f fn nid) κ ψ Rv Rv Rst
 
   take-frame-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s} {τ}
     (ac : Acc _≺_ τ) (id : Id) (now : Tick) (nid : NodeId)
@@ -191,3 +185,56 @@ pushBurst-carried {Γ = Γ} {t = t} {e = e} {s = s} {u = u}
      × stHop ψ (proj₂ (proj₂ (pushBurst ac id now f κ ems sd₁ st₁))) ≤ Rst
   ih = pushBurst-carried ac id now f κ ems sd₁ st₁ ψ Rin Rv Rst fc
          (≤-trans (m≤n⊔m _ _) hb) (proj₂ step)
+
+----------------------------------------------------------------------
+-- THE FOLD, AND IT IS NOT A FRAME LEAF AT ALL.
+--
+-- A scan's outputs are the successive ACCUMULATORS, so what the frame
+-- hands back is a function of the STORE and the step and the payload
+-- enters only as the step's second argument.  A step that discards that
+-- argument cuts the payload out of the answer entirely, and then no
+-- bound on what the frame was handed can bound what it returns.  The
+-- frame predicate above compares the two against one number and the
+-- number is the payload's, which is why the fold cannot sit beside its
+-- two siblings however the bound is chosen.
+--
+-- AND THE STORE BOUND CANNOT ABSORB IT EITHER.  The state a fold writes
+-- is the state it was handed with one node replaced by the LAST of its
+-- outputs, so a frame predicate holding the store bound FIXED across the
+-- step asserts the accumulator does not deepen — which is the one thing
+-- a fold does.  Widening it to a separate bound out is no repair: a
+-- burst refolds once per value, so the bound would have to move once per
+-- emit and the predicate would be a recurrence rather than a bound.
+--
+-- SO THE STATEMENT IS TAKEN AT THE BURST AND AT THE MACHINE'S OWN SEED.
+-- The reading's scan clause ITERATES the step over the source's top
+-- count from the seed's own reading, so the term reading already prices
+-- every refold this burst can perform — but only for the accumulator
+-- THIS term installed, and a node handed over abstractly carries no tie
+-- to any term.  Naming the seed is what supplies the tie: the store the
+-- burst is pushed into is the one `subscribeE` returns off
+-- `installNode nid (scan-st (evalTm z))`, which is exactly what the
+-- walk's own scan arm builds.  That makes this coarser than a frame
+-- leaf, and the coarseness is the finding rather than a shortcut —
+-- nothing weaker has a true form.
+--
+-- REFUTED: `Refuted.Scan-Store` — the frame-local statement, at the
+--   smallest step that deepens: a numeral arrives reading zero against
+--   a payload bound of zero, the step discards it, and one accumulator
+--   comes back reading one.  The store bound is left slack there so the
+--   row cannot be read as a store bound that was merely too tight.
+postulate
+  scan-burst-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {τ}
+    (ac : Acc _≺_ τ) (id : Id) (now : Tick)
+    (f : Fn Γ [] [] [] (u ×ᵗ s) u) (z : Tm Γ [] [] [] u) (b : Closed Γ s)
+    (nid : NodeId) (κ : Path Γ u t) (sd : Sched Γ) (st : EvalSt e)
+    (ψ : Fin n → Rd₃) (Rst : ℕ) →
+    depthᵉ ψ (scanᵉ f z b) ≤ Rst →
+    let r  = subscribeE ac b (scan-f f nid ↠ κ) id now sd
+               (installNode nid (scan-st {t = u} (evalTm z)) st)
+        pb = pushBurst ac id now (scan-f f nid) κ
+               (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+    in burstHop ψ s (proj₁ r) ≤ depthᵉ ψ (scanᵉ f z b) →
+       stHop ψ (proj₂ (proj₂ r)) ≤ Rst →
+       burstHop ψ u (proj₁ pb) ≤ depthᵉ ψ (scanᵉ f z b)
+       × stHop ψ (proj₂ (proj₂ pb)) ≤ Rst
