@@ -27,6 +27,11 @@ open import Refuted.Fit-Cascade using (fit-preserved-false;
   carried-e₁; term-e₁; carried-s₁; term-s₁;
   carried-e₃; term-e₃; carried-s₃; term-s₃;
   carried-u₁; term-u₁; carried-u₃; term-u₃; dry₁; dry₃)
+-- and the widest state-readable bound, whose own figures are claimed
+-- because the pending reading at the door IS the crossing one arrival
+-- later: a repair that kept it would leave this witness quiet
+open import Refuted.Fit-Cascade using (fit-held-preserved-false;
+  pend-e₁; pend-e₃; pend-s₁; store-s₁)
 
 open import Refuted.Rank-Entry using (dry-operator-false)
 -- the three figures travel with the witness for the same reason: the

@@ -4,7 +4,7 @@
 -- EVIDENCE, not a claim: `src` cannot import this file and nothing in
 -- the proof may rest on it.  Checked by `make refuted`, claimed by
 -- `Refuted.Main`.
---
+
 -- WHY PRESERVATION IS THE QUESTION AND NOT THE DOOR.  The door is
 -- witnessed elsewhere and was repaired; what a proof of the drain leaf
 -- needs is the fit at the state the drain hands its own recursive call,
@@ -12,7 +12,7 @@
 -- produced.  An invariant that holds at entry and is destroyed by one
 -- arrival is not an invariant, and that is what these rows establish:
 -- the crossing here happens at the FIRST arrival, from a tight entry.
---
+
 -- THE STRUCTURAL LAW UNDERNEATH, which is what makes the witness small.
 -- A `thru-outer` frame hands the inner the path BELOW itself, so an
 -- inner attaches by `from-inner` — which the chain measure passes
@@ -31,7 +31,7 @@
 -- chain the run reaches reads two, and each further turn of the same
 -- crank adds one to the chain and nothing to the term.  The second
 -- witness below is that crank turned once more: three against one.
---
+
 -- WHAT THIS KILLS AND WHAT IT LEAVES.  The conclusion is untouched —
 -- every program here runs dry-free, and the row pinning that is claimed
 -- beside the crossings on purpose.  What is dead is the ROUTE: an
@@ -47,6 +47,29 @@
 -- slip with a local fix: it is the tier's open question — whether one
 -- reading can price what no frame hands the next one — arriving at the
 -- premise rather than at the conclusion.
+
+-- AND THE RUN'S OWN HOLDINGS DO NOT SUPPLY IT EITHER, WHICH IS THE
+-- SECOND HALF AND THE MORE USEFUL ONE.  The obvious answer to a term
+-- that cannot see a gate's body is that the RUN can: the body waits in
+-- the schedule's pending list between the subscribe that registered its
+-- frame and the arrival that opens it, and the store's nodes are read
+-- alongside the term elsewhere for exactly this kind of reason.  Joining
+-- both readings does hold at the door, and it holds for the right
+-- reason — the pending body's reading is the crossing, EXACTLY, at both
+-- programs.  It still fails one arrival in, because the arrival that
+-- installs the frame is the SAME arrival that consumes the pending entry
+-- predicting it.  The registry keeps the frame; nothing keeps the
+-- reading.
+--
+-- SO THE QUANTITY IS HISTORICAL AND NOT A PROPERTY OF ANY STATE.  That
+-- is what makes this worth a second witness rather than a wider join:
+-- no reading of the term, the store and the schedule together is
+-- preserved, so the repair cannot be a bigger right-hand side.  Either
+-- the bound is CARRIED — a maximum over the run so far, which is the
+-- shape this tower exists to have left behind — or the premise is not
+-- about the registry at all, and what has to be adequate is the rank
+-- each ARRIVAL enters at, which is already re-seeded per arrival and is
+-- a different statement from this one.
 module Refuted.Fit-Cascade where
 
 open import Data.Bool using (false)
@@ -54,23 +77,23 @@ open import Data.Empty using (⊥)
 open import Data.Fin using (Fin; zero)
 open import Data.List using (List; []; _∷_)
 open import Data.Maybe using (nothing)
-open import Data.Nat using (ℕ; _⊔_; _≤_; s≤s)
+open import Data.Nat using (ℕ; _⊔_; _≤_; s≤s; z≤n)
 open import Data.Nat.Properties using (≤-refl)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Vec using () renaming ([] to []ⱽ; _∷_ to _∷ⱽ_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import Rx.Prim using (Id; Source; cold; after_,_)
-open import Rx.Exp using (Ctx; Closed; Exp; natᵗ; obs; strmᵗ; ofᵉ;
+open import Rx.Prim using (Id; Tick; Source; cold; after_,_)
+open import Rx.Exp using (Ctx; Closed; Exp; Ty; Val; natᵗ; obs; strmᵗ; ofᵉ;
   mergeAllᵉ; deferᵉ; input)
 open import Rx.Slots using (Slots; scripted)
-open import Rx.Hop-Depth using (Rd₃; ε; mapStep; flatten; hopOf; depthᵉ)
+open import Rx.Hop-Depth using (Rd₃; ε; mapStep; flatten; hopOf; depthᵉ; depthᵛ)
 open import Rx.Slot-Read using (slotRd)
-open import Rx.Evaluator using (Path; Chain; RegId; Sched; EvalSt; root;
-  share-sink; _↠_; map-f; scan-f; take-f; from-inner; thru-outer;
+open import Rx.Evaluator using (Path; Chain; RegId; Sched; EvalSt; LiveSource;
+  root; share-sink; _↠_; map-f; scan-f; take-f; from-inner; thru-outer;
   cascade; sched-next; subscribeE; rootWitness; sched-init; st-init;
-  evaluate; hasDry)
+  stHop; evaluate; hasDry)
 
 ----------------------------------------------------------------------
 -- THE CURRENCY, WRITTEN OUT HERE RATHER THAN IMPORTED.  This is the
@@ -270,3 +293,73 @@ dry₁ = refl
 
 dry₃ : hasDry (evaluate 50 q₃ insLate) ≡ false         -- LOAD-BEARING
 dry₃ = refl
+
+----------------------------------------------------------------------
+-- AND WIDENING THE RIGHT-HAND SIDE TO THE RUN'S OWN HOLDINGS DOES NOT
+-- REPAIR IT.  The schedule's pending list is where a gate's body waits
+-- between the subscribe that registered its frame and the arrival that
+-- opens it, so it is the run's own record of what a gate will
+-- subscribe; the store is read alongside the term elsewhere for the
+-- same kind of reason and is joined here too, so that the witness below
+-- kills the WIDEST state-readable bound rather than one candidate.
+----------------------------------------------------------------------
+
+pendHopᵛ : ∀ {n} {Γ : Ctx n} (ψ : Fin n → Rd₃) (u : Ty) →
+           List (Tick × Val Γ u) → ℕ
+pendHopᵛ ψ u []             = 0
+pendHopᵛ ψ u ((_ , v) ∷ ps) = depthᵛ ψ u v ⊔ pendHopᵛ ψ u ps
+
+pendHopᴸ : ∀ {n} {Γ : Ctx n} (ψ : Fin n → Rd₃) → List (LiveSource Γ) → ℕ
+pendHopᴸ ψ []       = 0
+pendHopᴸ ψ (l ∷ ls) =
+  pendHopᵛ ψ (LiveSource.elemTy l) (LiveSource.pending l) ⊔ pendHopᴸ ψ ls
+
+HopFitsHeld : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} →
+              Sched Γ → EvalSt e → Set
+HopFitsHeld {e = e} sched st =
+  let ψ = slotRd (Sched.slots sched) in
+  regsDepth′ ψ (EvalSt.registry st)
+    ≤ depthᵉ ψ e ⊔ stHop ψ st ⊔ pendHopᴸ ψ (Sched.live sched)
+
+FitHeldPreserved : Set
+FitHeldPreserved = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (nextId : Id) (sched : Sched Γ) (st : EvalSt e) →
+  HopFitsHeld sched st →
+  HopFitsHeld (proj₁ (stepOnce {e = e} nextId (sched , st)))
+              (proj₂ (stepOnce {e = e} nextId (sched , st)))
+
+----------------------------------------------------------------------
+-- AND THE ENTRY ROWS ARE WHY THIS IS A FINDING RATHER THAN A SECOND
+-- CROSSING.  The pending reading at the door is TWO at the first
+-- program and THREE at the second — exactly the figure the registry
+-- reaches one arrival later, at both.  So the join is not merely big
+-- enough at the door, it is right for the right reason, and the reading
+-- that would have closed the gap is present until the arrival that
+-- needs it consumes it.  One step on, both the store and the pending
+-- read ZERO against a registry carrying the frame.
+----------------------------------------------------------------------
+
+pend : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → Sched Γ × EvalSt e → ℕ
+pend (sched , _) = pendHopᴸ (slotRd (Sched.slots sched)) (Sched.live sched)
+
+store : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → Sched Γ × EvalSt e → ℕ
+store (sched , st) = stHop (slotRd (Sched.slots sched)) st
+
+pend-e₁ : pend e₁ ≡ 2                                  -- LOAD-BEARING
+pend-e₁ = refl
+
+pend-e₃ : pend e₃ ≡ 3                                  -- LOAD-BEARING
+pend-e₃ = refl
+
+pend-s₁ : pend s₁ ≡ 0                                  -- LOAD-BEARING
+pend-s₁ = refl
+
+store-s₁ : store s₁ ≡ 0                                -- LOAD-BEARING
+store-s₁ = refl
+
+held-e₁ : HopFitsHeld (proj₁ e₁) (proj₂ e₁)
+held-e₁ = s≤s z≤n
+
+fit-held-preserved-false : FitHeldPreserved → ⊥
+fit-held-preserved-false h with h 1 (proj₁ e₁) (proj₂ e₁) held-e₁
+... | s≤s ()

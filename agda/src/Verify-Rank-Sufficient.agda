@@ -175,6 +175,21 @@ open import Verify-Rank-Sufficient.Hop using (hopFits)
 -- exists to buy, so this is the tier's open question — whether one
 -- reading can price what no frame hands the next one — arriving at the
 -- premise rather than at the conclusion.
+--
+-- AND THE RIGHT-HAND SIDE CANNOT BE WIDENED TO REACH IT, WHICH IS WHAT
+-- NARROWS THE QUESTION.  The run does hold the missing reading, for
+-- exactly as long as it is useless: a gate's body waits in the
+-- schedule's pending list, and its reading there IS the figure the
+-- registry reaches one arrival later, at both witnesses.  The arrival
+-- that installs the frame is the arrival that consumes the entry
+-- predicting it, so the join of the term, the store and the schedule
+-- reads the same as the term alone one step on.  The quantity is
+-- HISTORICAL: no reading of any single state is preserved, so the
+-- repair is not a bigger bound.  Either it is CARRIED — a maximum over
+-- the run so far, which is the shape this tower exists to have left
+-- behind — or this premise should not exist and what must be adequate
+-- is the rank each ARRIVAL enters at, which the machine already
+-- re-seeds and which is a different statement.
 
 -- AND THE CASCADE DOES NOT OUTGROW ITS ENTRY, WHICH IS WHY THIS ROW IS
 -- NOT THE OPERATOR ROW UNDER ANOTHER NAME.  A cascade is ONE INSTANT,
@@ -247,6 +262,15 @@ open import Verify-Rank-Sufficient.Hop using (hopFits)
 --   gap is a rate in the program's own size rather than an off-by-one,
 --   and both programs' dry rows are pinned beside the crossings so the
 --   finding cannot be read one statement too high.
+-- REFUTED: `Refuted.Fit-Cascade` — and the same witness kills the
+--   WIDEST state-readable bound, which is what says the repair is not a
+--   larger right-hand side.  Joining the store and the schedule's
+--   pending bodies to the term holds at the door and holds for the
+--   right reason — the pending reading is two and three there, exactly
+--   the figures the registry reaches one arrival later — and one step
+--   on both the store and the pending read ZERO against a registry
+--   still carrying the frame.  So the quantity is historical rather
+--   than a property of any state, and a wider join cannot recover it.
 -- PROBED: `Probed.Descent` — twelve recursive programs, every one green,
 --   taken against the DRAIN of each run rather than the whole of it.  What
 --   they cover, guard by guard: the μ peel at every program, since all
