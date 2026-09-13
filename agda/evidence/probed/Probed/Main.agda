@@ -138,3 +138,14 @@ open import Probed.Chain-Compose
 open import Probed.Store-Rank
   using (storeFork; liveA; fastA; fasterC; liveB; manyD;
          sharedE; sharedF)
+
+-- the quiet fan-out is claimed beside the fork for the reason the
+-- agreement rows elsewhere are: a separation between two rules that
+-- differ everywhere says nothing about the shape it stands at, and
+-- this one agrees at the same width with the writing removed.  The
+-- payload row is claimed for the opposite reason again — it is nought
+-- at every point, which is what attributes the store's whole figure to
+-- the folds rather than to what crossed the share
+open import Probed.Share-Fanout
+  using (fanoutFork; oneRow; thriceRow; mixedRow; payRow;
+         quietRow; quietAgree)

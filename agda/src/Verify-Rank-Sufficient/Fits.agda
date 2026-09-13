@@ -105,6 +105,29 @@ FrameDryUnder {Γ = Γ} {e = e} {s = s} ac id now f κ ψ Rin Rst =
 -- therefore leave the compounding case spoken for by nothing.
 ----------------------------------------------------------------------
 
+----------------------------------------------------------------------
+-- AND THE WRITE IS A JOIN RATHER THAN A SUM, WHICH IS WHAT SAYS THE
+-- SINGLE BOUND ABOVE CAN SURVIVE.  The chains here are folded THREADING
+-- ONE STATE, so the second is entered at whatever the first left and a
+-- clause reading its bound at the ENTRY store is a different claim from
+-- one reading it at what the dispatch reaches — the two are separated
+-- at a run this evaluator performs, and they agree again at the same
+-- fan-out width with the chains' writes removed (`Probed.Share-Fanout`).
+-- But the store reading is a MAXIMUM over nodes, and the figure the
+-- dispatch leaves is the same whether one chain or three are registered
+-- and the same for three equal rates as for three different ones: it is
+-- the DEEPEST chain's write and nothing else.  So what this clause owes
+-- is a join with one chain's own reach, not a bound indexed by how many
+-- registrations the share carries — the first is a residue the chain
+-- fold can hand itself, the second is one it could never produce.
+--
+-- WHAT IS NOT REACHED, and it is the case where the two would be summed
+-- instead of joined: every value crossing that share is a NUMBER, so
+-- the entire figure measured there is the consumers' own re-wrapping of
+-- their accumulators.  A fan-out whose values are themselves
+-- observables carries a reading IN as well, and no row stands there.
+----------------------------------------------------------------------
+
 ShareDryUnder : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {τ} →
   Acc _≺_ τ → Id → Tick → (i : Fin n) → (Fin n → Rd₃) → ℕ → ℕ → Set
 ShareDryUnder {Γ = Γ} {e = e} ac id now i ψ Rin Rst =
