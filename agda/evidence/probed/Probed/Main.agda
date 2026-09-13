@@ -82,8 +82,8 @@ open import Probed.Drain-Arrival
 -- comparable at all: a repair that sent either to zero would leave
 -- every row green having compared nothing
 open import Probed.Take-Frame
-  using (takeCut₁; takeEdge₂; takePass; takeDeep;
-         cut₁-is; edge₂-is; pass-is; deep-is)
+  using (takeCut₁; takeEdge₂; takePass; takeDeep; takeMid; takeCut;
+         cut₁-is; edge₂-is; pass-is; deep-is; mid-is; cut-is)
 
 open import Probed.Hop-Edge
   using (hopRow₁; hopRow₂; hopRow₃; hopRowP; hopRowS; hopRowE;
@@ -97,7 +97,9 @@ open import Probed.Hop-Edge
 -- rows green over a comparison with margin nobody had checked
 open import Probed.Map-Frame
   using (mapGrow₀; mapShed₀; mapKeep₀; mapGrow₁; mapShed₁; mapKeep₁;
-         grow₀-is; shed₀-is; keep₀-is; grow₁-is; shed₁-is; keep₁-is)
+         mapGrowS; mapShedS; mapKeepS;
+         grow₀-is; shed₀-is; keep₀-is; grow₁-is; shed₁-is; keep₁-is;
+         growS-is; shedS-is; keepS-is)
 
 -- the two-readings identities are claimed alongside the rows because
 -- they are what the rows rest on rather than what the rows show: they

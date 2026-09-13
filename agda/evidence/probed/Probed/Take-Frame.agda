@@ -43,43 +43,58 @@
 -- outruns it.  The fold's rate is varied across two sources as well, so
 -- no row is green because the values it compared had stopped moving.
 
--- THE BOUNDARY, and it is what these rows do NOT buy.  Every row is a
--- SUBSCRIBE at the root: no row reaches an arrival, a drain step, or a
--- take whose node was already spent by an earlier burst, so nothing
--- here says what the frame does to a store some later frame has already
--- written.  The FINISH digit records exactly that and is constant true
--- across all four — every point sits at a burst that completes — so it
--- pins the flag surviving the frame and buys no mid-stream coverage.
--- Which BRANCH of the arm ran is not separated by the figures either:
--- a count that exactly exhausts the burst closes the take while handing
--- back everything, and is indistinguishable here from one that merely
--- decrements.  Source lengths run to three literals, because a row
--- costs a whole walk.
+-- AND THE SECOND FAMILY IS THE FRAME AT A DRAIN STEP, which is what
+-- the first is built on top of a subscribe and therefore cannot be.
+-- There the store is whatever the frame's own source has just
+-- installed and the take's count is whole; here whole cascades run
+-- first, so the node is one an earlier instant already charged and the
+-- store is one an earlier instant's frames wrote — and it READS
+-- deeper for it, three after one instant and four after two, which no
+-- subscribe row reaches.  The depth into the run is the axis, at the
+-- arm's two branches: a step that merely decrements the count and the
+-- step that exhausts it.
+
+-- THE BOUNDARY, and it is what these rows do NOT buy.  A take's node
+-- at ZERO is unreachable at an arrival and that is a fact about the
+-- machine rather than a hole in the family — the cut that empties the
+-- count also severs the registry, and the sweep then drops the only
+-- source that could have delivered again.  Which BRANCH of the arm ran
+-- is separated by no hop figure in either family: a count that exactly
+-- exhausts the burst closes the take while handing back everything,
+-- and reads identically to one that merely decrements, so the FINISH
+-- digit carries it.  Nothing here runs the frame over a store written
+-- by a chain it is not itself part of, and nothing reaches a take
+-- whose own source is a second arrival's.  Source lengths run to three
+-- literals, because a row costs a whole walk.
 --
 -- TARGET: take-frame-carried @d01324
 module Probed.Take-Frame where
 
-open import Data.Bool using (Bool; if_then_else_)
-open import Data.Fin using (Fin)
+open import Data.Bool using (Bool; false; if_then_else_)
+open import Data.Fin using (Fin; zero)
 open import Data.List using (List; []; _∷_)
 open import Data.List.Relation.Unary.Any using (here)
 open import Data.Maybe using (nothing)
 open import Data.Nat using (ℕ; _+_; _*_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
-open import Data.Vec using () renaming ([] to []ⱽ)
+open import Data.Sum using (inj₁; inj₂)
+open import Data.Vec using () renaming ([] to []ⱽ; _∷_ to _∷ⱽ_)
 open import Induction.WellFounded using (Acc)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
+open import Relation.Nullary using (yes; no)
 
-open import Rx.Prim using (InstEvent)
-open import Rx.Exp using (Ctx; Closed; Tm; Fn; Val; natᵗ; obs; _×ᵗ_;
-  ofᵉ; takeᵉ; scanᵉ; mergeAllᵉ; strmᵗ; nat̂; fstᵗ; varᵗ)
-open import Rx.Slots using (Slots)
+open import Rx.Prim using (Id; InstEvent; cold; after_,_)
+open import Rx.Exp using (Ctx; Closed; Tm; Fn; Val; natᵗ; obs; _×ᵗ_; _≟ᵗ_;
+  ofᵉ; takeᵉ; scanᵉ; mapᵉ; mergeAllᵉ; input; strmᵗ; nat̂; fstᵗ; varᵗ)
+open import Rx.Slots using (Slots; scripted)
 open import Rx.Strat-Order using (_≺_)
 open import Rx.Hop-Depth using (Rd₃)
 open import Rx.Slot-Read using (slotRd)
-open import Rx.Evaluator using (Stream; Sched; EvalSt; NodeId;
+open import Rx.Evaluator using (Stream; Sched; EvalSt; NodeId; Arrival;
   subscribeE; rootWitness; rootTri; root; _↠_; sched-init; st-init;
-  mintNode; installNode; take-st; take-f; splitBurst; stepFrame; stHop)
+  mintNode; installNode; take-st; take-f; map-f; scan-f; splitBurst;
+  stepFrame; stHop; arrTy; arrVal; arrTick; sched-next; cascade;
+  arrivalWitness)
 open import Verify-Rank-Sufficient.Carried using (valsHop)
 open import Verify-Rank-Sufficient.Push-Carried using (take-frame-carried)
 open import Probed.Apparatus using (Confirms; Below)
@@ -259,3 +274,207 @@ takePass = Below , Below
 takeDeep : Confirms (take-frame-carried Deep.ac 0 0 Deep.nid root
   Deep.ψ Deep.Rv Deep.Rst Deep.vals Deep.fin Deep.sd Deep.st Below Below)
 takeDeep = Below , Below
+
+----------------------------------------------------------------------
+-- THE SAME FRAME AT A DRAIN STEP, which is the one configuration the
+-- four rows above are built to miss.  Each of them subscribes at the
+-- root, so the store the frame reads is the one its own source just
+-- installed and the take's count is untouched.  Here whole cascades
+-- run first: each deepens the fold's accumulator and charges the
+-- take's count, and hands the state on — so the frame below runs over
+-- a store an EARLIER instant's frames wrote, and over a node those
+-- instants already charged.
+--
+-- AN ARRIVAL'S PAYLOAD READS ZERO BY CONSTRUCTION, and that is why the
+-- take cannot be put straight onto the source.  Every `LiveSource`
+-- takes its element type from a SLOT, and a scripted slot is data-typed
+-- by the telescope's own side condition, so the value a drain step
+-- hands the top of a chain carries no observable and reads nought.  A
+-- take reached directly at an arrival would therefore compare zero
+-- against zero on the payload half.  What makes it a comparison is
+-- depth ADDED below the take by the chain itself, which is why the
+-- frames are walked in `foldPath`'s own order — fold, then template,
+-- then take — with each step's output the next one's input.
+----------------------------------------------------------------------
+
+Γ₁ : Ctx 1
+Γ₁ = natᵗ ∷ⱽ []ⱽ
+
+-- nothing synchronous, so the subscribe burst is EMPTY and the take's
+-- count is still whole when the first cascade reaches it
+lateScript : Slots Γ₁
+lateScript zero =
+  scripted (cold [] (after 0 , 5 ∷ after 0 , 6 ∷ after 0 , 7 ∷ []))
+
+-- the accumulator is an observable and the step re-wraps it, so the
+-- node the scan installs reads positive and CLIMBS as the run proceeds
+foldA : Fn Γ₁ [] [] [] (obs natᵗ ×ᵗ natᵗ) (obs natᵗ)
+foldA = strmᵗ (mergeAllᵉ nothing (ofᵉ (fstᵗ (varᵗ (here refl)) ∷ [])))
+
+seedA : Tm Γ₁ [] [] [] (obs natᵗ)
+seedA = strmᵗ (mergeAllᵉ nothing
+          (ofᵉ (strmᵗ (ofᵉ (nat̂ 0 ∷ [])) ∷ [])))
+
+growA : Fn Γ₁ [] [] [] (obs natᵗ) (obs natᵗ)
+growA = strmᵗ (mergeAllᵉ nothing (ofᵉ (varᵗ (here refl) ∷ [])))
+
+-- the root subscription and one drain step, spelled as the evaluator
+-- spells them: the same `sched-next` and the same `cascade`, in the
+-- same order, so the pair handed on is the pair the drain recurses on
+entry : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+  Sched Γ × EvalSt e
+entry e ins =
+  let (_ , sched , st) =
+        subscribeE (rootWitness e ins) e root 0 0 (sched-init e ins)
+          (st-init e)
+  in sched , st
+
+stepOnce : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} →
+  Id → Sched Γ × EvalSt e → Sched Γ × EvalSt e
+stepOnce nextId (sched , st) with sched-next sched
+... | inj₁ _            = sched , st
+... | inj₂ (a , sched′) =
+  let (_ , sched″ , st′) = cascade a nextId sched′ st in sched″ , st′
+
+runN : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} →
+  ℕ → Sched Γ × EvalSt e → Sched Γ × EvalSt e
+runN ℕ.zero    p = p
+runN (ℕ.suc k) p = runN k (stepOnce 1 p)
+
+module At (c : ℕ) (steps : ℕ) where
+
+  prog : Closed Γ₁ (obs natᵗ)
+  prog = takeᵉ (nat̂ c) (mapᵉ growA (scanᵉ foldA seedA (input zero)))
+
+  ψ : Fin 1 → Rd₃
+  ψ = slotRd lateScript
+
+  ac : Acc _≺_ (rootTri prog lateScript)
+  ac = rootWitness prog lateScript
+
+  -- the two nodes the root subscription mints, in the order it mints
+  -- them: the take is outermost and goes first
+  nid : NodeId
+  nid = proj₁ (mintNode (sched-init prog lateScript))
+
+  snid : NodeId
+  snid = proj₁ (mintNode (proj₂ (mintNode (sched-init prog lateScript))))
+
+  -- the chain's frames above the take, run in `foldPath`'s order on
+  -- what the schedule hands next.  The element-type test is the
+  -- registry's own, so an arrival the chain does not take contributes
+  -- nothing and the payload figure below reports the floor
+  atArr : Sched Γ₁ × EvalSt prog →
+          List (Val Γ₁ (obs natᵗ)) × Bool × Sched Γ₁ × EvalSt prog
+  atArr (sched , st) with sched-next sched
+  ... | inj₁ _          = [] , false , sched , st
+  ... | inj₂ (a , sd′) with arrTy a ≟ᵗ natᵗ
+  ...   | no _     = [] , false , sd′ , st
+  ...   | yes refl =
+    let (v₁ , _ , f₁ , sd₁ , st₁) =
+          stepFrame (arrivalWitness a sd′ st) 1 (arrTick a)
+            (scan-f foldA snid) (map-f growA ↠ (take-f nid ↠ root))
+            (arrVal a ∷ []) (Arrival.isLast a) sd′ st
+        (v₂ , _ , f₂ , sd₂ , st₂) =
+          stepFrame (arrivalWitness a sd′ st) 1 (arrTick a)
+            (map-f growA) (take-f nid ↠ root) v₁ f₁ sd₁ st₁
+    in v₂ , f₂ , sd₂ , st₂
+
+  -- subscribe, run whole cascades, then stand at the next arrival
+  pt : List (Val Γ₁ (obs natᵗ)) × Bool × Sched Γ₁ × EvalSt prog
+  pt = atArr (runN steps (entry prog lateScript))
+
+  vals : List (Val Γ₁ (obs natᵗ))
+  vals = proj₁ pt
+
+  fin : Bool
+  fin = proj₁ (proj₂ pt)
+
+  sd : Sched Γ₁
+  sd = proj₁ (proj₂ (proj₂ pt))
+
+  st : EvalSt prog
+  st = proj₂ (proj₂ (proj₂ pt))
+
+  Rv : ℕ
+  Rv = valsHop ψ (obs natᵗ) vals
+
+  Rst : ℕ
+  Rst = stHop ψ st
+
+  -- same radix and same order as the four rows above, so the two
+  -- families are read against each other without re-deriving anything
+  packed : ℕ
+  packed = Rv
+         + 1000 * valsHop ψ (obs natᵗ) (proj₁ sf)
+         + 1000000 * Rst
+         + 1000000000 * stHop ψ (proj₂ (proj₂ (proj₂ (proj₂ sf))))
+         + 1000000000000 * (if proj₁ (proj₂ (proj₂ sf)) then 1 else 0)
+    where
+    sf : List (Val Γ₁ (obs natᵗ))
+       × List (InstEvent (Val Γ₁ (obs natᵗ))) × Bool × Sched Γ₁
+       × EvalSt prog
+    sf = stepFrame ac 0 0 (take-f nid) root vals fin sd st
+
+----------------------------------------------------------------------
+-- TWO DEPTHS INTO THE RUN, WHICH ARE THE TWO BRANCHES THE ARM CAN TAKE
+-- AT AN ARRIVAL.  Both give the take a count of three against a script
+-- of three, so the node is whole at subscribe and every charge against
+-- it is a drain step's.  `Mid` stands after ONE cascade, where the
+-- count is down to two and the frame merely decrements it.  `Cut`
+-- stands after TWO, where the count is at one and this arrival — the
+-- script's last — exhausts it, so the cutting arm runs over a store
+-- two earlier instants wrote and a node they already charged.
+--
+-- AND A SPENT NODE IS NOT REACHABLE AT AN ARRIVAL AT ALL, which is a
+-- finding rather than a gap in the family.  A cut severs the registry
+-- and `sweepLive` then drops the source that had no registration left,
+-- so the very step that empties the count also removes the only thing
+-- that could deliver again.  A count of one over this script was tried
+-- and stood at NO arrival: the schedule was empty one instant later
+-- and the walk returned its floor.
+--
+-- THE HANDED FIGURE IS WHAT SAYS THE ARRIVAL WAS REACHED, and that is
+-- how the above was found.  Both fallback arms of the walk return an
+-- empty list, whose reading is nought; a positive handed digit is
+-- therefore the row's own proof that a real arrival of the chain's
+-- element type came through, and not a default standing in for one.
+--
+-- Read low digit first at radix 1000: handed, returned, store in,
+-- store out, finished.
+----------------------------------------------------------------------
+
+module Mid = At 3 1
+module Cut = At 3 2
+
+-- WHAT THE TWO SAY.  Both payload halves are TIGHT — four against four
+-- one instant in, five against five two instants in — so a take that
+-- invented anything at a drain step crosses at once, and the figures
+-- CLIMB with the run rather than sitting where the subscribe rows left
+-- them.  The store does the same, three then four, which is the fold's
+-- accumulator carrying an instant's work forward: it is the first
+-- store on this shelf that no subscription could have produced, and it
+-- comes back tight at both.  The finish digit separates the branches
+-- the hop figures cannot, false where the count is merely decremented
+-- and true where this arrival exhausts it.
+mid-is : Mid.packed ≡ 3003004004
+mid-is = refl
+
+cut-is : Cut.packed ≡ 1004004005005
+cut-is = refl
+
+----------------------------------------------------------------------
+-- THE TARGET AT BOTH, at the same tightest bounds the four rows above
+-- take.  The witness is the root's rather than the arrival's: a take's
+-- arm of `stepFrame` reads neither the witness nor the tick, so the
+-- two agree by the definition, and the arrival's own witness is what
+-- produced the payload one frame up.
+----------------------------------------------------------------------
+
+takeMid : Confirms (take-frame-carried Mid.ac 0 0 Mid.nid root
+  Mid.ψ Mid.Rv Mid.Rst Mid.vals Mid.fin Mid.sd Mid.st Below Below)
+takeMid = Below , Below
+
+takeCut : Confirms (take-frame-carried Cut.ac 0 0 Cut.nid root
+  Cut.ψ Cut.Rv Cut.Rst Cut.vals Cut.fin Cut.sd Cut.st Below Below)
+takeCut = Below , Below
