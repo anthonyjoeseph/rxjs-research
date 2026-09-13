@@ -208,46 +208,23 @@ research lives; where they disagree, the header wins.
 
 ## Tier 1 — the descent never goes dry
 
-**THE TIER IS ONE STATEMENT, AND ITS DOOR IS NOW REFUTED.** `rank-sufficient`
-(Verify-Rank-Sufficient) says no run emits the dry marker. Nothing witnesses
-against the headline, but the leaf feeding the descent its hypothesis has one:
-at a run whose slot is scripted, the registry reads two against a term reading
-one, so no root subscribe supplies what the drain demands.
+**THE TIER IS ONE STATEMENT, AND ITS DOOR IS REPAIRED.** `rank-sufficient`
+(Verify-Rank-Sufficient) says no run emits the dry marker. The leaf feeding the
+descent its hypothesis had a witness against it — a scripted slot priced at its
+subscribe frame reads zero deliveries, and a fold above spends that zero as its
+refold count — and pricing the slot at everything it is scheduled to deliver
+turns that same run from `2 ≤ 1` into `2 ≤ 7`.
 
-**AND IT RULES ON THE OBVIOUS REPAIR.** The same family is dry-free with the
-fit false throughout, so the comparison is not necessary for the conclusion and
-a weaker one that happens to hold repairs the wrong thing.
+**WHAT THE REPAIR DID NOT BUY IS THE DRAIN.** The fit is instantiated at the
+door only; what an arrival owes it is still open, and the family that reaches
+many deliveries inside ONE cascade reaches no drain state.
 
 **A FAILING GUARD IS NOT AN ERROR, AND THAT IS WHY THE TIER IS PROBEABLE.** A
 guarded clause returns a `dry` emit and the run continues, so both sides
 compute at every program — `hopFits` included, whose rows spend a decision
 procedure rather than a pin, and whose refusal is what turned this up.
 
-### Open questions
-
-- **WHAT DOES THE DOOR OWE THE DRAIN, IF NOT A COMPARISON?** The descent takes
-  its hypothesis as a bound on what the registry's chains can still reach,
-  measured against the program those chains were built from. That framing now
-  has a witness against it at the door and, in the same family, rows where the
-  conclusion holds with the hypothesis false — so the quantity the drain
-  actually needs is not known to be this one, and may not be a comparison
-  between two readings at all. Answering it decides whether the fit is
-  repriced, replaced by an obligation stated against the chain, or dropped for
-  a descent needing no entry hypothesis.
-  relevant: `entry-hop-fits`, `drain-dry-free`
-
 ### Big picture tier roadmap
-
-- **COUNT WHAT A SCRIPTED SOURCE ACTUALLY DELIVERS, AND SAY WHAT A HOT ONE
-  COSTS.** `syncOf` prices a cold slot at the LENGTH OF ITS SYNCHRONOUS PREFIX
-  and a hot one at zero, so a source whose values all arrive late reads as
-  delivering nothing — and `flatten` multiplies every downstream count through
-  that zero, which is why the door's term side reads one where its own chains
-  reach two. The cold half is a repair: count the scheduled tail. The hot half
-  may not be, since nothing static bounds what a hot source delivers, and then
-  the comparison cannot be stated over hot slots at all. The leg lands the cold
-  count and decides which of the two the hot case is — a repair or the reason
-  the fit goes.
 
 - **STATE THE CARRIED REPORT, NOW THE FAMILY THAT REFUTED IT AGREES.** The hop
   edge holds downward by definition and NOT upward — a frame builds its
@@ -268,6 +245,16 @@ procedure rather than a pin, and whose refusal is what turned this up.
   at all or only the fold above one. It is banked only once the leg above
   settles `drain-dry-free`; blocked, it is rewritten from what that leg found.
 
+- **CARRY THE REPAIRED READING PAST AN ARRIVAL.** The slot count now holds at
+  the DOOR and the rows reach twenty-four deliveries under one arrival there,
+  but every drain receipt in the tier lands one delivery per arrival — so the
+  region where a cascade delivers many times is instantiated on one side of the
+  drain only, and that is precisely the region no entry sees. The leg takes the
+  many-deliveries family through the loop's own step and asks whether the fit
+  still holds once the arrival has run. A refutation here is the tier's whole
+  risk arriving at the one uncovered shape; a receipt retires the last coverage
+  boundary both drain rows name.
+
 ### The ledger
 
 - **`drain-dry-free`** (Verify-Rank-Sufficient) — FALSITY,
@@ -276,10 +263,10 @@ procedure rather than a pin, and whose refusal is what turned this up.
   The fit holds flat across twelve drain states and is TIGHT at the plainest,
   so the rows sit where it is closest to false.
 
-- **`entry-hop-fits`** (Verify-Rank-Sufficient) — FALSITY, `REFUTED, PROBED`:
-  the fit at the door. A scripted slot reads zero, so the chain built through
-  it outruns the term two against one; the probed shapes all took their depth
-  from the term's own recursion and never reached that region.
+- **`entry-hop-fits`** (Verify-Rank-Sufficient) — DIFFICULTY, `PROBED×2`: the
+  fit at the door. The scripted slot that once refuted it now reads 7 against a
+  registry of 2, with the margin widening in the deliveries; a HOT slot's count
+  over-approximates and is uninstantiated.
 
 - **`dry-operator`** (Verify-Rank-Sufficient.Dry) — DIFFICULTY,
   `REFUTED, DEAD ROUTE×3, PROBED, RECOVERY`: the THREE FLATTENERS' dry-freedom

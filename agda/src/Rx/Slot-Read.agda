@@ -17,12 +17,14 @@
 -- as delivering one value of one — a fold above the flattener iterates
 -- once where the run refolds three times.
 --
--- A SCRIPTED SLOT IS PRICED BY ITS SYNCHRONOUS PREFIX AND NOTHING ELSE.
--- Its payload type satisfies `isData`, so no emission of its can hold
--- an observable: the per-value count and the hop are zero for a reason
--- the syntax carries rather than by a choice.  What it does deliver is
--- its cold prefix, which is what a fold sourcing from it refolds over;
--- a hot input delivers nothing inside the subscribe frame.
+-- A SCRIPTED SLOT'S OTHER TWO COMPONENTS ARE ZERO BY THE SYNTAX, AND
+-- ONLY THE COUNT IS A CHOICE.  Its payload type satisfies `isData`, so
+-- no emission of its can hold an observable and the per-value count and
+-- the hop are forced rather than picked.  The count is what a fold
+-- sourcing from the slot refolds over, so it is the one component that
+-- reaches the hop at all — through the flattener's product and the
+-- fold's refold count — which is why it is priced at everything the
+-- source is scheduled to deliver and not at the subscribe frame alone.
 --
 -- IT IS WELL DEFINED BECAUSE THE TELESCOPE IS STRATIFIED.  `Rx.Slots`
 -- carries a side condition saying a shared def reads only inputs at
@@ -48,7 +50,7 @@
 ------------------------------------------------------------------
 module Rx.Slot-Read where
 
-open import Data.Nat  using (ℕ; zero; suc; _≡ᵇ_; _<ᵇ_)
+open import Data.Nat  using (ℕ; zero; suc; _+_; _≡ᵇ_; _<ᵇ_)
 open import Data.Nat.Properties using (≡ᵇ⇒≡; ≡⇒≡ᵇ; <ᵇ⇒<; <⇒<ᵇ; ≤∧≢⇒<; ≤-pred)
 open import Data.Fin  using (Fin; toℕ)
 open import Data.List using (length)
@@ -65,31 +67,35 @@ open import Rx.Slots      using (Slot; Slots; scripted; shared)
 open import Rx.Hop-Depth  using (Rd₃; ε; rdᵉ)
 open import Rx.Rd-Slot-Cong using (rd-ψ-congᵉ)
 
--- what an input hands out inside the subscribe frame
+-- how many values an input can ever hand a subscription
 --
--- AND THAT IS NARROWER THAN WHAT IT DELIVERS, WHICH IS THE QUANTITY
--- EVERY COUNT DOWNSTREAM WANTS.  A cold source is priced at the length
--- of its SYNCHRONOUS prefix and a hot one at zero, so a source whose
--- values all arrive late reads as handing out nothing — and `flatten`
--- multiplies the whole chain's count through that zero.  Instantiated
--- rather than argued: `Refuted.Entry-Fit` runs a slot of an empty
--- prefix and one late value, and the door's term side reads one while
--- the chains the root built out of it reach two.
+-- IT COUNTS THE SCHEDULED TAIL, AND THE SUBSCRIBE FRAME IS NOT THE
+-- QUANTITY DOWNSTREAM WANTS.  A count priced at the SYNCHRONOUS prefix
+-- alone reads a source whose values all arrive late as delivering
+-- nothing, and the zero does not stay local: `flatten` multiplies the
+-- chain's count through it, and a fold above reads the product as how
+-- many times it refolds — so a term over such a slot is read as if the
+-- arriving values were never going to come.  `Probed.Entry-Fit` stands
+-- at exactly that slot — an empty prefix and one late value — where the
+-- frame-only count made the fit at the door FALSE and this one leaves
+-- it holding by a margin that widens with the deliveries.
 --
--- THE TWO HALVES OF THE REPAIR ARE NOT ONE REPAIR.  Counting a cold
--- source's scheduled tail is arithmetic and closes that witness.  A HOT
--- source has no static count to give — nothing about the term bounds
--- what it delivers — so a comparison denominated in deliveries cannot
--- be stated over a hot slot at all, and that half is a question about
--- the fit rather than about this function.
-syncOf : ∀ {A : Set} → ObservableInput A → ℕ
-syncOf (hot _)       = 0
-syncOf (cold sync _) = length sync
+-- A HOT SOURCE IS COUNTED THE SAME WAY AND THE ANSWER IS AN UPPER
+-- BOUND, WHICH IS THE DIRECTION EVERY CONSUMER NEEDS.  It is anchored
+-- at tick zero rather than at the subscription, so a subscription
+-- joining late receives a SUFFIX of this list and never more than it;
+-- a cold one is re-anchored per subscribe and receives all of it.  So
+-- one clause is exact and the other over-approximates, and no consumer
+-- can tell the difference, because the reading stands on the right of
+-- every comparison that spends it.
+emitsOf : ∀ {A : Set} → ObservableInput A → ℕ
+emitsOf (hot async)        = length async
+emitsOf (cold sync async)  = length sync + length async
 
 -- one slot's reading, given an environment for the inputs its def may
 -- read
 slotRdD : ∀ {n} {Γ : Ctx n} {k t} (ψ : Fin n → Rd₃) → Slot Γ k t → Rd₃
-slotRdD ψ (scripted src) = syncOf src , 0 , 0
+slotRdD ψ (scripted src) = emitsOf src , 0 , 0
 slotRdD ψ (shared d)     = rdᵉ ψ ε d
 
 -- the stage-k environment: the true readings at indices < k, zero

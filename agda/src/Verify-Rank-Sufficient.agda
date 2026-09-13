@@ -222,10 +222,9 @@ open import Verify-Rank-Sufficient.Hop using (hopFits)
 --   twice what any reading of its program could give.  THE
 --   BOUNDARY: one delivery lands per arrival, so every layer the rows
 --   count is paid for by a fresh entry and none of them reaches a burst
---   delivering many times inside one cascade — a region now instantiated
---   only in `Refuted.Entry-Fit`, whose closing rows put twenty-four
---   deliveries under ONE arrival and find the run dry-free at every one,
---   with this leaf's own hypothesis FALSE throughout.
+--   delivering many times inside one cascade — a region `Probed.Entry-Fit`
+--   reaches for the DOOR, at twenty-four deliveries under one arrival,
+--   but which no row here or there carries into this leaf's own drain.
 -- PROBED: `Probed.Fit-Preserved` — the fit at states the DRAIN produced,
 --   which every receipt above is silent about.  `stepOnce` is the loop's
 --   own step with the emit stream dropped — the same pull, the same
@@ -259,17 +258,23 @@ postulate
 -- entry state is what the subscribe frame produced, and the drain has
 -- not run yet.
 --
--- REFUTED: `Refuted.Entry-Fit` — at a door the machine itself built,
---   off a run whose one slot is SCRIPTED with an empty synchronous
---   part: the registry's chains read two against a term reading one.
---   The deficit is structural rather than a matter of degree — the
---   syntax forces a scripted slot's components to zero, so the right
---   side is blind by construction to the layers the left is counting,
---   and no larger program closes it.  Its closing rows carry the same
---   family out to twenty-four deliveries under ONE arrival: the fit is
---   false at every one and the drain comes back dry-free regardless,
---   so what the door owes the drain is not this comparison made
---   satisfiable.
+-- PROBED: `Probed.Entry-Fit` — the SCRIPTED slot, which is where this
+--   statement was once false: a slot's reading has three components,
+--   two of them forced to zero by `isData`, so the count is the only
+--   one that can be got wrong and it is the one that reaches the hop —
+--   through the flattener's product and then through a fold, which
+--   spends the product as its refold count.  A count taken at the
+--   subscribe frame reads zero at a source whose values all arrive
+--   late, and the chain above it collapses with it.  The rows sit at
+--   exactly that slot and the term side now reads 7 against a registry
+--   of 2, with the margin WIDENING out to twenty-four deliveries under
+--   one arrival.  And they do not stop at programs whose deliveries the
+--   term counts, which would be circular: six cascades of a fold over a
+--   RECURSION, stepped by the loop's own step, at the one program whose
+--   output is known to outgrow every reading of itself.  THE BOUNDARY:
+--   one slot, and no HOT one — a hot source is anchored at tick zero
+--   rather than at the subscription, so its clause over-approximates
+--   and a row there would instantiate something weaker than these do.
 -- PROBED: `Probed.Descent` — the root entry of three recursive
 --   programs, each a `refl`-free row whose witness is the decision
 --   procedure on the comparison itself, so a premise FALSE at the
@@ -282,10 +287,9 @@ postulate
 --   `ψ` the schedule's own `slotRd` rather than a reading chosen for
 --   them; nothing here reaches a state the drain itself produced.  And
 --   all three take their depth from the TERM's own recursion — the one
---   that has a slot at all has a SHARED one, which `slotRd` reads at
---   its real components — so nothing here reaches a chain built through
---   a slot the syntax reads as zero, which is where the refutation
---   above stands.
+--   that has a slot at all has a SHARED one — so nothing here reaches a
+--   chain built through a SCRIPTED slot, which is the region the
+--   receipt above is taken in.
 postulate
   entry-hop-fits : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t)
     (ins : Slots Γ) →
