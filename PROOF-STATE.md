@@ -223,15 +223,15 @@ procedure rather than a pin, and whose refusal is what turned this up.
 
 ### Open questions
 
-- **MUST THE BOUND BE CARRIED, OR IS NO STATE PREMISE OWED AT ALL?** The reading
-  is a triple of counts over the SYNTAX, and the question is which non-syntactic
-  quantity it must still bound. Bounding the registry is dead: every candidate
-  naming one is refuted and no two are nested. What is open is which way that
-  cuts — whether a maximum over the run must be CARRIED, or whether nothing
-  about a STATE is owed and the obligation belongs to the frame shelf, per
-  template against the payload each frame is handed. It now leans the second
-  way: the one thing the run stores that no term names is BOUND-SIDE, so it
-  cannot carry an obligation however deep it goes.
+- **WHICH NON-SYNTACTIC QUANTITY MUST THE READING BOUND?** The reading counts
+  SYNTAX, so something must bound what a run holds that no term names. The
+  registry is dead — every candidate naming one is refuted. The STORE is now
+  dead too, from both sides: a parked inner cannot exceed the frame that parked
+  it, and no install site writes above the payload, so the axis is bound-side.
+  What is left is the SCHEDULE, the one place a value outlives the term that
+  produced it: a frame putting a body there is charged a constant, and the
+  arrival taking it back out has no term under it to draw a bound from. Whether
+  that owes a carried maximum or a premise the arrival supplies is open.
   relevant: `drain-dry-free`, `entry-hop-fits`
 
 ### Big picture tier roadmap
@@ -245,14 +245,16 @@ procedure rather than a pin, and whose refusal is what turned this up.
   payload is deeper than its source's own reading admits. Refute first on both.
   The product is a separation, not a proof.
 
-- **THE STORE CONJUNCT'S ONLY FALSIFIABLE HALF IS WHAT A FRAME WRITES.** Going
-  IN is now run and settled — the queue is bound-side, so it cannot fail. Coming
-  out is not: the hop edge installs the inner it subscribes, and the one shelf of
-  rows that reaches a nonzero store has the write and the payload COINCIDING, so
-  nothing yet says which of the two the bound is actually holding. Separate them:
-  a frame whose payload is shallow and whose installation is deep, reached by
-  running a second frame over the store the first wrote, at the templates whose
-  bodies mint nodes. Refute first, at a write above the premise's own successor.
+- **RUN THE ARRIVAL FRAME, WHERE THE PAYLOAD BOUND HAS NO TERM UNDER IT.** The
+  leg that was going to separate the store conjunct's two halves is DISCARDED:
+  an install-site census says no frame writes above what it was handed, so there
+  is nothing to separate. What the census found instead is where the question
+  lives. A defer's body goes into
+  the schedule priced at a constant and comes back as an ARRIVAL whose frame is
+  charged the full reading — correctly, but off a value no subterm bounds. So
+  instantiate that frame, reaching it by running a defer to its delivery, and
+  ask what its premise is supplied from. Refute first, at an arrival deeper
+  than every term the run has descended.
 
 - **THE DOOR'S RISK IS A CONSTRUCTOR NOTHING HAS ENTERED.** `entry-hop-fits` is
   the tier's only FALSITY and its rows are TIGHT at two crossings, which is what
@@ -292,9 +294,10 @@ procedure rather than a pin, and whose refusal is what turned this up.
   the continuation and the store's other nodes are INERT rather than unswept.
 
 - **`thru-outer-frame-carried`** (Verify-Rank-Sufficient.Push-Carried) —
-  DIFFICULTY, `DEAD ROUTE, PROBED×2`: the HOP EDGE, where the two currencies are
-  exchanged. Nine frames reached by RUNNING; the `suc` is afforded and never
-  spent. Three enter at a deep store, and the queue axis cannot refute.
+  DIFFICULTY, `DEAD ROUTE, PROBED×3`: the HOP EDGE, where the two currencies are
+  exchanged. Eleven frames reached by RUNNING; the `suc` is never spent. The
+  store axis cannot refute from either side; a gated source is held to a quarter
+  of what the run then carries.
 
 - **`dry-operator`** (Verify-Rank-Sufficient.Dry) — DIFFICULTY,
   `REFUTED, DEAD ROUTE×3, PROBED, RECOVERY`: the THREE FLATTENERS' dry-freedom

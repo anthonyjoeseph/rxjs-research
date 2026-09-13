@@ -230,6 +230,19 @@ postulate
 --   first nonzero store reading anywhere on the shelf.  NOT covered: no
 --   row runs a frame over a store a DIFFERENT frame wrote, and here the
 --   write and the payload coincide, so nothing separates them.
+--
+-- PROBED: `Probed.Defer-Blind` — the same frame at the one source whose
+--   emitted inner is GATED, against a control emitting the same body
+--   openly.  Both rows are DEGENERATE in their conjuncts and that is
+--   stated at the probe: a source emitting one inner returns nothing and
+--   installs nothing either reading reaches, so the payload out and both
+--   store figures are nought at both points and neither conjunct could
+--   have failed.  What the two buy is the pair of pinned readings — the
+--   body reads four, the open frame is held to four and the gated frame
+--   to one — which is a finding about where an arrival's bound comes
+--   from and is owed at the store reading's own definition.  NOT
+--   covered: the arrival frame itself, which is the frame the finding
+--   points at and which no row here runs.
 postulate
   thru-outer-frame-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} {τ}
     (ac : Acc _≺_ τ) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
