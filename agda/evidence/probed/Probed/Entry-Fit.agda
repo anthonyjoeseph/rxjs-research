@@ -135,6 +135,49 @@ fit24 : Confirms (entry-hop-fits casc24 insLate)
 fit24 = Below
 
 ----------------------------------------------------------------------
+-- THE ROW WITH NO MARGIN, AND IT IS THE PROGRAM THAT KILLED THE
+-- PREDECESSOR MEASURE.  Two maps whose templates never mention what
+-- they are handed, each returning an observable one flattener deep,
+-- under a third.  A measure reading each template APART charges one,
+-- one and the edge and crosses the term's reading at the door;
+-- threaded, the two ones are joined where the term joins them and this
+-- lands on the nose.
+--
+-- It is the one row here that is TIGHT, and the literal families above
+-- cannot be made so at any length: their axis is the delivery count,
+-- which a fold reads as its refold count, so lengthening a burst moves
+-- the term side and leaves the registry where it was.  A discarded
+-- template moves neither and is the only shape that closes the gap.
+----------------------------------------------------------------------
+
+discard₁ : Fn Γ₁ [] [] [] natᵗ (obs natᵗ)
+discard₁ = strmᵗ (mergeAllᵉ nothing (ofᵉ (strmᵗ (ofᵉ (nat̂ 1 ∷ [])) ∷ [])))
+
+discard₂ : Fn Γ₁ [] [] [] (obs natᵗ) (obs natᵗ)
+discard₂ = strmᵗ (mergeAllᵉ nothing (ofᵉ (strmᵗ (ofᵉ (nat̂ 2 ∷ [])) ∷ [])))
+
+twoDiscards : Closed Γ₁ natᵗ
+twoDiscards = mergeAllᵉ nothing (mapᵉ discard₂ (mapᵉ discard₁ (input zero)))
+
+ent₂ : Sched Γ₁ × EvalSt twoDiscards
+ent₂ =
+  let r = subscribeE (rootWitness twoDiscards insLate) twoDiscards root 0 0
+            (sched-init twoDiscards insLate) (st-init twoDiscards)
+  in proj₁ (proj₂ r) , proj₂ (proj₂ r)
+
+ψ₂ : Fin 1 → Rd₃
+ψ₂ = slotRd (Sched.slots (proj₁ ent₂))
+
+regs₂ : regsDepth ψ₂ (EvalSt.registry (proj₂ ent₂)) ≡ 2
+regs₂ = refl
+
+term₂ : depthᵉ ψ₂ twoDiscards ≡ 2
+term₂ = refl
+
+fitDiscards : Confirms (entry-hop-fits twoDiscards insLate)
+fitDiscards = Below
+
+----------------------------------------------------------------------
 -- THE AXIS THE TERM DOES NOT CARRY.  The source is a recursion, so how
 -- many arrivals happen is the DRAIN's business; `stepOnce` is the
 -- loop's own step with the emit stream dropped, so each row reads the
