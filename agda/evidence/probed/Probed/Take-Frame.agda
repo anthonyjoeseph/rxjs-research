@@ -127,7 +127,7 @@ module Ap {n} {Γ : Ctx n} (ins : Slots Γ) (k : ℕ)
   nid = proj₁ (mintNode (sched-init prog ins))
 
   r : Stream Γ (obs natᵗ) × Sched Γ × EvalSt prog
-  r = subscribeE {lo = n} ac src {below-ctx src} (take-f nid ↠ root) 0 0
+  r = subscribeE {lo = n} ac src (take-f nid ↠ root) 0 0
         (proj₂ (mintNode (sched-init prog ins)))
         (installNode nid (take-st k) (st-init prog))
 
@@ -378,7 +378,7 @@ entry : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
   Sched Γ × EvalSt e
 entry {n = n} e ins =
   let (_ , sched , st) =
-        subscribeE {lo = n} (rootWitness e ins) e {below-ctx e} root 0 0
+        subscribeE {lo = n} (rootWitness e ins) e root 0 0
           (sched-init e ins) (st-init e)
   in sched , st
 

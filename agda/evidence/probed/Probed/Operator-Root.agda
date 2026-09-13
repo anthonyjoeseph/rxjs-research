@@ -107,7 +107,7 @@ ins₀ = λ ()
 
 burstOf : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) → Stream Γ t
 burstOf {n = n} e ins =
-  proj₁ (subscribeE {lo = n} (rootWitness e ins) e {below-ctx e} root 0 0
+  proj₁ (subscribeE {lo = n} (rootWitness e ins) e root 0 0
            (sched-init e ins) (st-init e))
 
 ----------------------------------------------------------------------

@@ -290,7 +290,7 @@ postulate
     (ok : T (inputsBelowᵉ lo (mapᵉ f b))) (κ : Path Γ lo u t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     hasDry (proj₁ (subscribeE fuel (mapᵉ f b) {ok} κ id now sched st)) ≡ false →
-    hasDry (proj₁ (subscribeE fuel b {below-map lo f b ok} (map-f f ↠ κ) id now sched st)) ≡ false
+    hasDry (proj₁ (subscribeE fuel b (map-f f ↠ κ) id now sched st)) ≡ false
 
   -- mapᵉ GAP 2: pushBurst map frame preserves valsLast?.
   -- REAL SHAPE MISMATCH: subscribeE-map-wf does NOT return valsLast?;
@@ -299,7 +299,7 @@ postulate
     (fuel : Acc _≺_ τ) (f : Fn Γ [] [] [] s u) (b : Closed Γ s)
     (ok : T (inputsBelowᵉ lo (mapᵉ f b))) (κ : Path Γ lo u t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
-    valsLast? (proj₁ (subscribeE fuel b {below-map lo f b ok} (map-f f ↠ κ) id now sched st)) ≡ true →
+    valsLast? (proj₁ (subscribeE fuel b (map-f f ↠ κ) id now sched st)) ≡ true →
     valsLast? (proj₁ (subscribeE fuel (mapᵉ f b) {ok} κ id now sched st)) ≡ true
 
   -- scanᵉ GAP 1: hasDry propagates inward through the scan push.
@@ -322,7 +322,7 @@ postulate
     (b : Closed Γ s) (ok : T (inputsBelowᵉ lo (scanᵉ f seed b))) (κ : Path Γ lo u t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     hasDry (proj₁ (subscribeE fuel (scanᵉ f seed b) {ok} κ id now sched st)) ≡ false →
-    hasDry (proj₁ (subscribeE fuel b {below-scan lo f seed b ok} (scan-f f (proj₁ (mintNode sched)) ↠ κ) id now
+    hasDry (proj₁ (subscribeE fuel b (scan-f f (proj₁ (mintNode sched)) ↠ κ) id now
                   (proj₂ (mintNode sched)) (installNode (proj₁ (mintNode sched)) (scan-st (evalTm seed)) st)))
            ≡ false
 
@@ -333,7 +333,7 @@ postulate
     (fuel : Acc _≺_ τ) (f : Fn Γ [] [] [] (u ×ᵗ s) u) (seed : Tm Γ [] [] [] u)
     (b : Closed Γ s) (ok : T (inputsBelowᵉ lo (scanᵉ f seed b))) (κ : Path Γ lo u t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
-    valsLast? (proj₁ (subscribeE fuel b {below-scan lo f seed b ok} (scan-f f (proj₁ (mintNode sched)) ↠ κ) id now
+    valsLast? (proj₁ (subscribeE fuel b (scan-f f (proj₁ (mintNode sched)) ↠ κ) id now
                      (proj₂ (mintNode sched)) (installNode (proj₁ (mintNode sched)) (scan-st (evalTm seed)) st)))
               ≡ true →
     valsLast? (proj₁ (subscribeE fuel (scanᵉ f seed b) {ok} κ id now sched st)) ≡ true
@@ -368,7 +368,7 @@ postulate
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     evalTm count ≡ suc k →
     hasDry (proj₁ (subscribeE fuel (takeᵉ count b) {ok} κ id now sched st)) ≡ false →
-    hasDry (proj₁ (subscribeE fuel b {below-take lo count b ok} (take-f (proj₁ (mintNode sched)) ↠ κ) id now
+    hasDry (proj₁ (subscribeE fuel b (take-f (proj₁ (mintNode sched)) ↠ κ) id now
                   (proj₂ (mintNode sched))
                   (installNode (proj₁ (mintNode sched)) (take-st (suc k)) st)))
            ≡ false
@@ -649,7 +649,7 @@ postulate
     (ok : T (inputsBelowᵉ lo (mergeAllᵉ lim b))) (κ : Path Γ lo u t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     hasDry (proj₁ (subscribeE fuel (mergeAllᵉ lim b) {ok} κ id now sched st)) ≡ false →
-    hasDry (proj₁ (subscribeE fuel b {below-mergeAll lo lim b ok} (thru-outer mergeAllᵒ (proj₁ (mintNode sched)) ↠ κ)
+    hasDry (proj₁ (subscribeE fuel b (thru-outer mergeAllᵒ (proj₁ (mintNode sched)) ↠ κ)
                      id now (proj₂ (mintNode sched))
                      (installNode (proj₁ (mintNode sched))
                         (mergeAll-st {t = u} lim 0 [] false) st)))
@@ -660,7 +660,7 @@ postulate
     (fuel : Acc _≺_ τ) (b : Closed Γ (obs u))
     (ok : T (inputsBelowᵉ lo (mergeAllᵉ lim b))) (κ : Path Γ lo u t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
-    valsLast? (proj₁ (subscribeE fuel b {below-mergeAll lo lim b ok} (thru-outer mergeAllᵒ (proj₁ (mintNode sched)) ↠ κ)
+    valsLast? (proj₁ (subscribeE fuel b (thru-outer mergeAllᵒ (proj₁ (mintNode sched)) ↠ κ)
                         id now (proj₂ (mintNode sched))
                         (installNode (proj₁ (mintNode sched))
                            (mergeAll-st {t = u} lim 0 [] false) st)))
@@ -711,7 +711,7 @@ postulate
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
     BurstInv id sched st S →
     (let nid = proj₁ (mintNode sched)
-         r₀  = subscribeE fuel b {below-mergeAll lo lim b ok} (thru-outer mergeAllᵒ nid ↠ κ) id now
+         r₀  = subscribeE fuel b (thru-outer mergeAllᵒ nid ↠ κ) id now
                  (proj₂ (mintNode sched))
                  (installNode nid (mergeAll-st {t = u} lim 0 [] false) st)
      in Σ ProtocolSt λ S′ →

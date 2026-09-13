@@ -118,7 +118,7 @@ mergeAllCertAt mnid st with lookupNode mnid (EvalSt.nodes st)
 ... | _ = true
 
 RUN : ∀ {t} (e : Closed Γ₀ t) → EvalSt e
-RUN e = proj₂ (proj₂ (subscribeE {lo = 0} (rootWitness e ins₀) e {below-ctx e}
+RUN e = proj₂ (proj₂ (subscribeE {lo = 0} (rootWitness e ins₀) e
                                   root 0 0 (sched-init e ins₀) (st-init e)))
 
 ----------------------------------------------------------------------
@@ -246,7 +246,7 @@ sh zero      = shared (ofᵉ (nat̂ 1 ∷ [])) {ok = tt}
 sh (suc ())
 
 RUN₁ : (e : Closed Γ₁ natᵗ) → EvalSt e
-RUN₁ e = proj₂ (proj₂ (subscribeE {lo = 1} (rootWitness e sh) e {below-ctx e}
+RUN₁ e = proj₂ (proj₂ (subscribeE {lo = 1} (rootWitness e sh) e
                                    root 0 0 (sched-init e sh) (st-init e)))
 
 -- the README's own share program: an unbounded mergeAll of (shared, shared)
@@ -273,7 +273,7 @@ sh₂ (suc zero)       = shared (input zero) {ok = tt}
 sh₂ (suc (suc ()))
 
 RUN₂ : (e : Closed Γ₂ natᵗ) → EvalSt e
-RUN₂ e = proj₂ (proj₂ (subscribeE {lo = 2} (rootWitness e sh₂) e {below-ctx e}
+RUN₂ e = proj₂ (proj₂ (subscribeE {lo = 2} (rootWitness e sh₂) e
                                    root 0 0 (sched-init e sh₂) (st-init e)))
 
 S2 : Closed Γ₂ natᵗ
@@ -297,7 +297,7 @@ doneOf (just S) = ProtocolSt.done S
 doneOf nothing  = false
 
 STREAM₂ : (e : Closed Γ₂ natᵗ) → _
-STREAM₂ e = proj₁ (subscribeE {lo = 2} (rootWitness e sh₂) e {below-ctx e}
+STREAM₂ e = proj₁ (subscribeE {lo = 2} (rootWitness e sh₂) e
                                root 0 0 (sched-init e sh₂) (st-init e))
 
 _ : doneOf (runProtocol protocol-init (STREAM₂ S2)) ≡ false
@@ -316,7 +316,7 @@ S4 : Closed Γ₂ natᵗ
 S4 = takeᵉ (nat̂ 1) (input (suc zero))
 
 STREAM : ∀ {t} (e : Closed Γ₀ t) → _
-STREAM e = proj₁ (subscribeE {lo = 0} (rootWitness e ins₀) e {below-ctx e}
+STREAM e = proj₁ (subscribeE {lo = 0} (rootWitness e ins₀) e
                               root 0 0 (sched-init e ins₀) (st-init e))
 
 _ : doneOf (runProtocol protocol-init (STREAM  P2))    -- CALIBRATION: the

@@ -424,9 +424,9 @@ subscribeE-map-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
   BurstInv id sched st S →
   (Σ ProtocolSt λ S′ →
-    (runProtocol S (proj₁ (subscribeE fuel b {below-map lo f b ok} (map-f f ↠ κ) id now sched st)) ≡ just S′)
-    × BurstInv id (proj₁ (proj₂ (subscribeE fuel b {below-map lo f b ok} (map-f f ↠ κ) id now sched st)))
-               (proj₂ (proj₂ (subscribeE fuel b {below-map lo f b ok} (map-f f ↠ κ) id now sched st))) S′) →
+    (runProtocol S (proj₁ (subscribeE fuel b (map-f f ↠ κ) id now sched st)) ≡ just S′)
+    × BurstInv id (proj₁ (proj₂ (subscribeE fuel b (map-f f ↠ κ) id now sched st)))
+               (proj₂ (proj₂ (subscribeE fuel b (map-f f ↠ κ) id now sched st))) S′) →
   Σ ProtocolSt λ S″ →
     (runProtocol S (proj₁ (subscribeE fuel (mapᵉ f b) {ok} κ id now sched st)) ≡ just S″)
     × BurstInv id (proj₁ (proj₂ (subscribeE fuel (mapᵉ f b) {ok} κ id now sched st)))
@@ -434,7 +434,7 @@ subscribeE-map-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
 subscribeE-map-wf {lo = lo} fuel f b ok κ id now sched st S binv (S′ , run₀ , binv₀) =
   S′ , run″ , binv″
   where
-  r₀ = subscribeE fuel b {below-map lo f b ok} (map-f f ↠ κ) id now sched st
+  r₀ = subscribeE fuel b (map-f f ↠ κ) id now sched st
   char : subscribeE fuel (mapᵉ f b) {ok} κ id now sched st
          ≡ (map (reEmit (map (applyFn f))) (proj₁ r₀) , proj₁ (proj₂ r₀) , proj₂ (proj₂ r₀))
   char = pushBurst-map-char fuel id now f κ (proj₁ r₀) (proj₁ (proj₂ r₀)) (proj₂ (proj₂ r₀))

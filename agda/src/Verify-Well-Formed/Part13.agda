@@ -287,7 +287,7 @@ evaluate-well-formed {n = n} fuel e ins =
        (sym (run-++-just protocol-init burst rest run₀ run₁))
        (acceptPaid S₁ paid₁)
   where
-  r      = subscribeE {lo = n} (rootWitness e ins) e {below-ctx e} root 0 0
+  r      = subscribeE {lo = n} (rootWitness e ins) e root 0 0
              (sched-init e ins) (st-init e)
   burst  = proj₁ r
   sched₀ = proj₁ (proj₂ r)

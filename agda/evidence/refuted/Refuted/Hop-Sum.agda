@@ -87,7 +87,7 @@ HopFitsSum {e = e} sched st =
 
 EntryHopFits : Set
 EntryHopFits = ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
-  let ent = subscribeE {lo = n} (rootWitness e ins) e {below-ctx e} root 0 0
+  let ent = subscribeE {lo = n} (rootWitness e ins) e root 0 0
               (sched-init e ins) (st-init e)
   in HopFitsSum (proj₁ (proj₂ ent)) (proj₂ (proj₂ ent))
 

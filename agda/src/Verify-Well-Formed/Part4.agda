@@ -181,7 +181,7 @@ burst-final sched st S binv dyF dp cv = inv , paid (BurstInv.current-frame binv)
 -- is the only state at which either is claimed.
 rootExitSt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) → EvalSt e
 rootExitSt {n} e ins =
-  proj₂ (proj₂ (subscribeE {lo = n} (rootWitness e ins) e {below-ctx e} root 0 0
+  proj₂ (proj₂ (subscribeE {lo = n} (rootWitness e ins) e root 0 0
                            (sched-init e ins) (st-init e)))
 
 -- ROOT-EXIT done-plumbed, migrated out of BurstInv (see the fork note).  The
@@ -220,7 +220,7 @@ postulate
   root-entry-sunk : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
     (S : ProtocolSt) →
     runProtocol protocol-init
-      (proj₁ (subscribeE {lo = n} (rootWitness e ins) e {below-ctx e} root 0 0
+      (proj₁ (subscribeE {lo = n} (rootWitness e ins) e root 0 0
                          (sched-init e ins) (st-init e))) ≡ just S →
     ProtocolSt.done S ≡ true →
     (rid : RegId) (src : RegSrc Γ) (u : Ty) (p : Path Γ (regFloor src) u t) →
@@ -305,11 +305,11 @@ root-nodeCache e ins nid (mergeAll-st lim k q od) m =
 root-done-plumbed : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
   (S : ProtocolSt) →
   runProtocol protocol-init
-    (proj₁ (subscribeE {lo = n} (rootWitness e ins) e {below-ctx e} root 0 0
+    (proj₁ (subscribeE {lo = n} (rootWitness e ins) e root 0 0
                        (sched-init e ins) (st-init e))) ≡ just S →
   ProtocolSt.done S ≡ true →
   allShareSunk (EvalSt.registry
-    (proj₂ (proj₂ (subscribeE {lo = n} (rootWitness e ins) e {below-ctx e} root 0 0
+    (proj₂ (proj₂ (subscribeE {lo = n} (rootWitness e ins) e root 0 0
                               (sched-init e ins) (st-init e))))) ≡ true
 root-done-plumbed {n} {Γ} {t} e ins S req deq =
   go (EvalSt.registry (rootExitSt e ins))
@@ -326,9 +326,9 @@ root-done-plumbed {n} {Γ} {t} e ins S req deq =
 
 root-caches : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
   cachesValid
-    (EvalSt.nodes (proj₂ (proj₂ (subscribeE {lo = n} (rootWitness e ins) e {below-ctx e} root 0 0
+    (EvalSt.nodes (proj₂ (proj₂ (subscribeE {lo = n} (rootWitness e ins) e root 0 0
                                             (sched-init e ins) (st-init e)))))
-    (EvalSt.registry (proj₂ (proj₂ (subscribeE {lo = n} (rootWitness e ins) e {below-ctx e} root 0 0
+    (EvalSt.registry (proj₂ (proj₂ (subscribeE {lo = n} (rootWitness e ins) e root 0 0
                                                (sched-init e ins) (st-init e))))) ≡ true
 root-caches {n} {Γ} {t} e ins =
   go (EvalSt.nodes (rootExitSt e ins))

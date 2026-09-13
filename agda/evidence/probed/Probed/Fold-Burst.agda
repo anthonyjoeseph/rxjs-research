@@ -193,7 +193,7 @@ stOf f z b = st-init (prog f z b)
 inner : (f : Step) (z : Seed) (b : Src) (xs : List ℕ)
       → Stream Γ₁ natᵗ × Sched Γ₁ × EvalSt (prog f z b)
 inner f z b xs =
-  subscribeE {lo = 1} (rootWitness (prog f z b) (insAt xs)) b {below-ctx b}
+  subscribeE {lo = 1} (rootWitness (prog f z b) (insAt xs)) b
     (scan-f f (nidOf f z b xs) ↠ root) 0 0 (sdOf f z b xs)
     (installNode (nidOf f z b xs) (scan-st {t = obs natᵗ} (evalTm z))
       (stOf f z b))

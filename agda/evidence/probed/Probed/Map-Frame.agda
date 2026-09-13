@@ -118,7 +118,7 @@ module Ap {n} {Γ : Ctx n} (ins : Slots Γ)
   ac = rootWitness prog ins
 
   r : Stream Γ (obs natᵗ) × Sched Γ × EvalSt prog
-  r = subscribeE {lo = n} ac b {below-ctx b} (map-f fn ↠ root) 0 0
+  r = subscribeE {lo = n} ac b (map-f fn ↠ root) 0 0
         (sched-init prog ins) (st-init prog)
 
   sp : List (Val Γ (obs natᵗ))

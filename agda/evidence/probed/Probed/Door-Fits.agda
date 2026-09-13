@@ -197,11 +197,11 @@ insDeep (suc zero) = shared (mergeAllᵉ nothing (mapᵉ lit (input zero)))
 
 entOf : (ins : Slots Γ₁) (e : Closed Γ₁ natᵗ) → Sched Γ₁
 entOf ins e = proj₁ (proj₂ (subscribeE {lo = 2} (rootWitness e ins) e
-                {below-ctx e} root 0 0 (sched-init e ins) (st-init e)))
+                root 0 0 (sched-init e ins) (st-init e)))
 
 stOf : (ins : Slots Γ₁) (e : Closed Γ₁ natᵗ) → EvalSt e
 stOf ins e = proj₂ (proj₂ (subscribeE {lo = 2} (rootWitness e ins) e
-               {below-ctx e} root 0 0 (sched-init e ins) (st-init e)))
+               root 0 0 (sched-init e ins) (st-init e)))
 
 ----------------------------------------------------------------------
 -- THE FIGURES, TAKEN AT THE OBLIGATION'S OWN POINT.  The state is the

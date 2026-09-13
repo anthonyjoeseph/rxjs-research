@@ -126,7 +126,7 @@ manyProg = mergeAllᵉ nothing
 entry : (e : Closed Γ₁ natᵗ) → Sched Γ₁ × EvalSt e
 entry e =
   let (_ , sched , st) =
-        subscribeE {lo = 1} (rootWitness e insLate) e {below-ctx e} root 0 0
+        subscribeE {lo = 1} (rootWitness e insLate) e root 0 0
           (sched-init e insLate) (st-init e)
   in sched , st
 
@@ -309,7 +309,7 @@ sEntry : Sched Γ₂ × EvalSt sharedProg
 sEntry =
   let (_ , sched , st) =
         subscribeE {lo = 2} (rootWitness sharedProg insShared) sharedProg
-          {below-ctx sharedProg} root 0 0
+          root 0 0
           (sched-init sharedProg insShared) (st-init sharedProg)
   in sched , st
 

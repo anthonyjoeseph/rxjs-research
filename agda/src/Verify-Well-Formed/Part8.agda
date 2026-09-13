@@ -234,7 +234,7 @@ subscribeE-take-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   evalTm count ≡ suc k →
   BurstInv id sched st S →
   (let nid = proj₁ (mintNode sched)
-       r₀  = subscribeE fuel b {below-take lo count b ok} (take-f nid ↠ κ) id now (proj₂ (mintNode sched))
+       r₀  = subscribeE fuel b (take-f nid ↠ κ) id now (proj₂ (mintNode sched))
                (installNode nid (take-st (suc k)) st)
    in Σ ProtocolSt λ S′ →
         (runProtocol S (proj₁ r₀) ≡ just S′)
@@ -262,7 +262,7 @@ subscribeE-take-wf {lo = lo} fuel count b ok κ id now sched st S k ecEq binv
    , pushBurst-take-valsLast fuel id now nid κ burst sched₂ st₁ (suc k) nodeP vl₀
   where
   nid    = proj₁ (mintNode sched)
-  r₀     = subscribeE fuel b {below-take lo count b ok} (take-f nid ↠ κ) id now (proj₂ (mintNode sched))
+  r₀     = subscribeE fuel b (take-f nid ↠ κ) id now (proj₂ (mintNode sched))
              (installNode nid (take-st (suc k)) st)
   burst  = proj₁ r₀
   sched₂ = proj₁ (proj₂ r₀)
@@ -474,7 +474,7 @@ postulate
 -- `burst-final` now takes (.Part4)
 root-dying-free : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
   ∀ s → memberSource s (EvalSt.dying (proj₂ (proj₂
-          (subscribeE {lo = n} (rootWitness e ins) e {below-ctx e} root 0 0 (sched-init e ins) (st-init e)))))
+          (subscribeE {lo = n} (rootWitness e ins) e root 0 0 (sched-init e ins) (st-init e)))))
         ≡ false
 root-dying-free {n = n} e ins s
   rewrite subscribeE-dying {lo = n} (rootWitness e ins) e (below-ctx e) root 0 0 (sched-init e ins) (st-init e)
@@ -482,10 +482,10 @@ root-dying-free {n = n} e ins s
 
 subscribe-wf :
   ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
-  hasDry (proj₁ (subscribeE {lo = n} (rootWitness e ins) e {below-ctx e} root 0 0
+  hasDry (proj₁ (subscribeE {lo = n} (rootWitness e ins) e root 0 0
                             (sched-init e ins) (st-init e))) ≡ false →
   Σ ProtocolSt λ S →
-    let r = subscribeE {lo = n} (rootWitness e ins) e {below-ctx e} root 0 0
+    let r = subscribeE {lo = n} (rootWitness e ins) e root 0 0
                        (sched-init e ins) (st-init e)
     in (runProtocol protocol-init (proj₁ r) ≡ just S)
        × Inv 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) S

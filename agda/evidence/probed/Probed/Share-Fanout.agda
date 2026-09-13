@@ -151,7 +151,7 @@ quietProg  = mergeAllᵉ nothing (ofᵉ (flatCons ∷ flatCons ∷ flatCons ∷ 
 entry : (e : Closed Γ₂ natᵗ) → Sched Γ₂ × EvalSt e
 entry e =
   let (_ , sched , st) =
-        subscribeE {lo = 2} (rootWitness e ins) e {below-ctx e} root 0 0
+        subscribeE {lo = 2} (rootWitness e ins) e root 0 0
           (sched-init e ins) (st-init e)
   in sched , st
 

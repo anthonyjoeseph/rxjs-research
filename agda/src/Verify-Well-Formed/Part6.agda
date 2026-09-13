@@ -94,7 +94,7 @@ subscribeE-scan-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   (κ : Path Γ lo u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
   BurstInv id sched st S →
   (let nid = proj₁ (mintNode sched)
-       r₀  = subscribeE fuel b {below-scan lo f seed b ok} (scan-f f nid ↠ κ) id now (proj₂ (mintNode sched))
+       r₀  = subscribeE fuel b (scan-f f nid ↠ κ) id now (proj₂ (mintNode sched))
                (installNode nid (scan-st (evalTm seed)) st)
    in Σ ProtocolSt λ S′ →
         (runProtocol S (proj₁ r₀) ≡ just S′)
@@ -108,7 +108,7 @@ subscribeE-scan-wf {lo = lo} fuel f seed b ok κ id now sched st S binv (S′ , 
   S′ , run″ , binv″
   where
   nid    = proj₁ (mintNode sched)
-  r₀     = subscribeE fuel b {below-scan lo f seed b ok} (scan-f f nid ↠ κ) id now (proj₂ (mintNode sched))
+  r₀     = subscribeE fuel b (scan-f f nid ↠ κ) id now (proj₂ (mintNode sched))
              (installNode nid (scan-st (evalTm seed)) st)
   burst  = proj₁ r₀
   sched₂ = proj₁ (proj₂ r₀)

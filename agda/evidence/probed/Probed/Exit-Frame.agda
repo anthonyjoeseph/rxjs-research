@@ -102,7 +102,7 @@ module Ap {n} {Γ : Ctx n} (ins : Slots Γ) (op : AllOp)
   nid = proj₁ (mintNode (sched-init prog ins))
 
   r : Stream Γ (obs (obs natᵗ)) × Sched Γ × EvalSt prog
-  r = subscribeE {lo = n} ac src {below-ctx src} (thru-outer op nid ↠ root) 0 0
+  r = subscribeE {lo = n} ac src (thru-outer op nid ↠ root) 0 0
         (proj₂ (mintNode (sched-init prog ins)))
         (installNode nid node (st-init prog))
 

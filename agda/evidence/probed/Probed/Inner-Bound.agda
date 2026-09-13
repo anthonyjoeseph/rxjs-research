@@ -128,7 +128,7 @@ prog = input (suc (suc zero))
 
 runSt : (d : Closed Γ₃ natᵗ) → T (inputsBelowᵉ 2 d) → EvalSt prog
 runSt d ok with subscribeE {lo = 3} (rootWitness prog (insOf d ok)) prog
-                 {below-ctx prog} root 0 0
+                 root 0 0
                  (sched-init prog (insOf d ok)) (st-init prog)
 ... | (_ , _ , st) = st
 

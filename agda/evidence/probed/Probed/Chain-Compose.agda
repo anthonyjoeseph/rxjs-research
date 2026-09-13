@@ -111,7 +111,7 @@ cap₂ = mergeAllᵉ (just 1)
 entry : (e : Closed Γ₁ natᵗ) → Sched Γ₁ × EvalSt e
 entry e =
   let (_ , sched , st) =
-        subscribeE {lo = 1} (rootWitness e insLate) e {below-ctx e} root 0 0
+        subscribeE {lo = 1} (rootWitness e insLate) e root 0 0
           (sched-init e insLate) (st-init e)
   in sched , st
 

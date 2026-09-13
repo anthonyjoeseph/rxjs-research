@@ -182,7 +182,7 @@ entry : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
   Sched Γ × EvalSt e
 entry {n = n} e ins =
   let (_ , sched , st) =
-        subscribeE {lo = n} (rootWitness e ins) e {below-ctx e} root 0 0
+        subscribeE {lo = n} (rootWitness e ins) e root 0 0
           (sched-init e ins) (st-init e)
   in sched , st
 

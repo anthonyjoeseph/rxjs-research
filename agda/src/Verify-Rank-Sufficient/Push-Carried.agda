@@ -538,7 +538,7 @@ postulate
     (nid : NodeId) (κ : Path Γ lo u t) (sd : Sched Γ) (st : EvalSt e)
     (ψ : Fin n → Rd₃) (Rst : ℕ) →
     depthᵉ ψ (scanᵉ f z b) ≤ Rst →
-    let r  = subscribeE ac b {below-scan lo f z b ok} (scan-f f nid ↠ κ) id now sd
+    let r  = subscribeE ac b (scan-f f nid ↠ κ) id now sd
                (installNode nid (scan-st {t = u} (evalTm z)) st)
         pb = pushBurst ac id now (scan-f f nid) κ
                (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))

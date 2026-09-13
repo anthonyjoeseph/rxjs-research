@@ -246,7 +246,7 @@ mutual
     , proj₁ pc , proj₂ pc
     where
     ψ = slotRd (Sched.slots sched)
-    r = subscribeE ac b {below-map lo f b ok} (map-f f ↠ κ) id now sched st
+    r = subscribeE ac b (map-f f ↠ κ) id now sched st
 
     ih = subscribe-dry-free ac b (below-map lo f b ok) (map-f f ↠ κ)
            id now sched st
@@ -290,7 +290,7 @@ mutual
     nid    = proj₁ (mintNode sched)
     sched₁ = proj₂ (mintNode sched)
     st₁    = installNode nid (take-st (suc k)) st
-    r      = subscribeE ac b {below-take lo c b ok} (take-f nid ↠ κ) id now sched₁ st₁
+    r      = subscribeE ac b (take-f nid ↠ κ) id now sched₁ st₁
 
     -- a take node reads zero by construction, so the store bound is
     -- untouched by the install
@@ -322,7 +322,7 @@ mutual
     nid    = proj₁ (mintNode sched)
     sched₁ = proj₂ (mintNode sched)
     st₁    = installNode nid (scan-st (evalTm z)) st
-    r      = subscribeE ac b {below-scan lo f z b ok} (scan-f f nid ↠ κ) id now sched₁ st₁
+    r      = subscribeE ac b (scan-f f nid ↠ κ) id now sched₁ st₁
 
     -- the seed is the one thing a subscribe writes that can read at
     -- all, and the entry invariant already puts the scan term under
@@ -375,7 +375,7 @@ mutual
     nid    = proj₁ (mintNode sched)
     sched₁ = proj₂ (mintNode sched)
     st₁    = installNode nid (mergeAll-st {t = u} lim 0 [] false) st
-    r      = subscribeE ac b {below-mergeAll lo lim b ok}
+    r      = subscribeE ac b
                (thru-outer mergeAllᵒ nid ↠ κ) id now sched₁ st₁
     Rin    = proj₂ (rdᵉ ψ ε b)
 
@@ -405,7 +405,7 @@ mutual
     nid    = proj₁ (mintNode sched)
     sched₁ = proj₂ (mintNode sched)
     st₁    = installNode nid (switch-st nothing false) st
-    r      = subscribeE ac b {below-switchAll lo b ok}
+    r      = subscribeE ac b
                (thru-outer switchᵒ nid ↠ κ) id now sched₁ st₁
     Rin    = proj₂ (rdᵉ ψ ε b)
 
@@ -435,7 +435,7 @@ mutual
     nid    = proj₁ (mintNode sched)
     sched₁ = proj₂ (mintNode sched)
     st₁    = installNode nid (exhaust-st false false) st
-    r      = subscribeE ac b {below-exhaustAll lo b ok}
+    r      = subscribeE ac b
                (thru-outer exhaustᵒ nid ↠ κ) id now sched₁ st₁
     Rin    = proj₂ (rdᵉ ψ ε b)
 

@@ -129,11 +129,11 @@ ac₀ = rootWitness prog ins
 -- the subscribe state: the fold has installed its seed and no arrival
 -- has yet run, which is the state a dispatch is taken at
 sd₀ : Sched Γ₂
-sd₀ = proj₁ (proj₂ (subscribeE {lo = 2} ac₀ prog {below-ctx prog} root 0 0
+sd₀ = proj₁ (proj₂ (subscribeE {lo = 2} ac₀ prog root 0 0
                      (sched-init prog ins) (st-init prog)))
 
 st₀ : EvalSt prog
-st₀ = proj₂ (proj₂ (subscribeE {lo = 2} ac₀ prog {below-ctx prog} root 0 0
+st₀ = proj₂ (proj₂ (subscribeE {lo = 2} ac₀ prog root 0 0
                      (sched-init prog ins) (st-init prog)))
 
 vals₀ : List ℕ
