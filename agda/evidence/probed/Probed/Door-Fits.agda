@@ -22,7 +22,7 @@
 -- conjunct in it.  All three figures are pinned separately below,
 -- because each is a way this row could have been green having asked for
 -- nothing: no arrival at all sends `DrainFits` to `⊤`, an arrival
--- reaching no chain sends `ArrivalFits` to the empty `All`, and a chain
+-- reaching no chain sends `ArrivalFits` to `⊤` as well, and a chain
 -- carrying a frame would not have admitted `at-root` in the first
 -- place.
 --
@@ -40,7 +40,6 @@ module Probed.Door-Fits where
 
 open import Data.Fin using (zero)
 open import Data.List using ([]; _∷_; length; map)
-open import Data.List.Relation.Unary.All using ([]; _∷_)
 open import Data.Maybe using (nothing)
 open import Data.Nat using (ℕ; suc)
 open import Data.Nat.ListAction using (sum)
@@ -137,7 +136,7 @@ bareFrames : frames bare ≡ 0
 bareFrames = refl
 
 doorBare : Confirms (entry-drain-fits 1 bare insLate)
-doorBare = (at-root ∷ []) , tt
+doorBare = (at-root , tt) , tt
 
 ----------------------------------------------------------------------
 -- AND THE BOUNDARY, PINNED RATHER THAN CLAIMED.  Same slot, same

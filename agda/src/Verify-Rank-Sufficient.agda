@@ -59,11 +59,12 @@ open import Rx.Exp   using (Ctx; Closed)
 open import Rx.Slots using (Slots)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Arrival; evaluate; drain;
   hasDry; cascade; sched-next; subscribeE; rootWitness; root; sched-init;
-  st-init)
+  st-init; chainsOf; cascadeLatch)
 open import Verify-Rank-Sufficient.Dry using (subscribe-dry-free)
 open import Verify-Rank-Sufficient.Dry-Emits using (hasDry-++)
 open import Verify-Rank-Sufficient.Entry using (rootTri-reads)
 open import Verify-Rank-Sufficient.Fits using (ArrivalFits; DrainFits)
+open import Verify-Rank-Sufficient.Fold-Path using (cascadeGo-dry-free)
 
 -- THE THREE PEELS ARE NOT THREE GRINDS OF ONE SIZE, AND THE ASYMMETRY IS
 -- THE SCHEDULE OF THIS TIER.  Two of them are one line over a fact about
@@ -258,11 +259,17 @@ open import Verify-Rank-Sufficient.Fits using (ArrivalFits; DrainFits)
 --   registry at a state, and a premise quantifying over states has no
 --   such row.
 
-postulate
-  cascade-dry-free : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (a : Arrival Γ) (nextId : Id) (sched : Sched Γ) (st : EvalSt e) →
-    ArrivalFits nextId a sched st →
-    hasDry (proj₁ (cascade a nextId sched st)) ≡ false
+-- AND THE CASCADE IS A BODY NOW, WHICH IS WHERE THE DEAD MECHANISM
+-- ABOVE ENDS.  Everything the four refuted readings were trying to buy
+-- is bought by the chain fold instead: the finish touches no emit, so
+-- the whole of the conclusion is the chain list's, and the premise is
+-- the fold's own recursion over that list.
+cascade-dry-free : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (a : Arrival Γ) (nextId : Id) (sched : Sched Γ) (st : EvalSt e) →
+  ArrivalFits nextId a sched st →
+  hasDry (proj₁ (cascade a nextId sched st)) ≡ false
+cascade-dry-free a nextId sched st fits =
+  cascadeGo-dry-free a nextId (chainsOf a st) sched (cascadeLatch a st) fits
 
 -- AND THE ALLOWANCE LOOP IS A BODY, WHICH IS WHAT THE PER-TEMPLATE
 -- PREMISE BOUGHT.  The premise recurses on the allowance exactly as the

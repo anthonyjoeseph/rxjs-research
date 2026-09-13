@@ -42,12 +42,11 @@
 ------------------------------------------------------------------
 module Verify-Rank-Sufficient.Fits where
 
-open import Data.Bool using (Bool; false)
+open import Data.Bool using (Bool; true; false)
 open import Data.Bool.ListAction using (any)
 open import Data.Fin using (Fin)
-open import Data.List using (List)
-open import Data.List.Relation.Unary.All using (All)
-open import Data.Nat using (ℕ; zero; suc; _+_; _⊔_; _≤_)
+open import Data.List using (List; []; _∷_)
+open import Data.Nat using (ℕ; zero; suc; _+_; _⊔_; _≤_; _≡ᵇ_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (⊤)
@@ -61,7 +60,8 @@ open import Rx.Strat-Order using (_≺_)
 open import Rx.Hop-Depth using (Rd₃; depthᵉ; depthᵛ)
 open import Rx.Slot-Read using (slotRd)
 open import Rx.Evaluator using (Frame; Path; root; share-sink; _↠_; Sched;
-  EvalSt; Arrival; arrTy; arrVal; arrTick; arrivalWitness; chainsOf;
+  EvalSt; Arrival; arrTy; arrVal; arrTick; arrivalWitness; chainsOf; RegId;
+  chainStep; cascadeLatch;
   sched-next; cascade; stepFrame; dispatchShare; dryEvent; hasDry; stHop)
 open import Verify-Rank-Sufficient.Carried using (valsHop)
 open import Verify-Rank-Sufficient.Push-Carried using (FrameCarries)
@@ -168,17 +168,53 @@ arrivalRank {e = e} a sched st =
   depthᵉ ψ e + (depthᵛ ψ (arrTy a) (arrVal a) ⊔ stHop ψ st)
 
 ----------------------------------------------------------------------
--- EVERY CHAIN THE ARRIVAL REACHES, at the payload it actually carries.
+-- EVERY CHAIN THE ARRIVAL REACHES, AT THE STATE ITS OWN FOLD STANDS
+-- AT — which is a recursion over the chain list and not a conjunction
+-- over it, for the same reason the allowance premise below is a
+-- recursion over arrivals.
+--
+-- THE CONJUNCTION FORM CANNOT BE SPENT, AND THAT IS A PROPERTY OF THE
+-- WITNESS RATHER THAN OF THE BOUNDS.  Every obligation here is stated
+-- against an accessibility witness, and the witness the fold is handed
+-- is minted from the state the fold stands at — so a premise fixing
+-- ONE witness for all chains is about a run the machine does not
+-- perform.  It mismatches at the very first chain, where the latch
+-- blocks reduction, and genuinely differs at every later one, since a
+-- frame that writes a node moves the store reading the witness is taken
+-- at.  Nothing about the payload repairs it: the mismatch is in the
+-- allowance, which is what decides whether a flattener goes dry.
+--
+-- AND THE TRANSPORT THAT WOULD HAVE REPAIRED IT IS FALSE.  Carrying a
+-- fit from one witness to another asks for dry-freedom at an allowance
+-- the fit was never taken against, and a spent allowance sends the
+-- inner subscribe to its zero clause, which emits the marker outright.
+-- Conditioning the transport on the later allowance being no smaller
+-- fails the other way: the store can SHRINK across a chain, so the
+-- later witness is the smaller one exactly where a transport would be
+-- needed.  Recursing asks for each chain's fit at that chain's own
+-- state and asks nothing about the step between two chains, which is
+-- the shape that has survived on the arrival side.
 ----------------------------------------------------------------------
+
+ChainsFit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} →
+  (a : Arrival Γ) → Id → List (RegId × Path Γ (arrTy a) t) →
+  Sched Γ → EvalSt e → Set
+ChainsFit a id []               sched st = ⊤
+ChainsFit {e = e} a id ((rid , c) ∷ cs) sched st
+  with any (_≡ᵇ rid) (EvalSt.cancelled st)
+... | true  = ChainsFit a id cs sched st
+... | false =
+      let st′ = record st { delivered = rid ∷ EvalSt.delivered st }
+          ψ   = slotRd (Sched.slots sched)
+          out = chainStep id a c sched st′
+      in PathFits {e = e} (arrivalWitness a sched st′) id (arrTick a) ψ
+           (arrivalRank a sched st′) c (depthᵛ ψ (arrTy a) (arrVal a))
+         × ChainsFit a id cs (proj₁ (proj₂ out)) (proj₂ (proj₂ out))
 
 ArrivalFits : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} →
   Id → Arrival Γ → Sched Γ → EvalSt e → Set
-ArrivalFits {e = e} id a sched st =
-  let ψ = slotRd (Sched.slots sched) in
-  All (λ rp → PathFits {e = e} (arrivalWitness a sched st) id (arrTick a) ψ
-                (arrivalRank a sched st) (proj₂ rp)
-                (depthᵛ ψ (arrTy a) (arrVal a)))
-      (chainsOf a st)
+ArrivalFits id a sched st =
+  ChainsFit a id (chainsOf a st) sched (cascadeLatch a st)
 
 ----------------------------------------------------------------------
 -- AND THE PREMISE THE DRAIN'S OWN RECURSION IS STATED OVER, WHICH IS
