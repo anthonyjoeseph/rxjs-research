@@ -465,7 +465,8 @@ postulate
 
   -- SHARED slot.  `subscribeSharedSlot` (Rx.Evaluator) is its own
   -- three-way split — spent share, live share, and `sharedConnect`,
-  -- which RECURSES into subscribeE on the stored def at one less gas.
+  -- which RECURSES into subscribeE on the stored def under the
+  -- stratification witness's own connect edge.
   -- That recursion is why this arm is a leaf and not an application:
   -- discharging it needs subscribeE-wf, which is mutual with it and
   -- lives two files down.

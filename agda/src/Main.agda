@@ -66,8 +66,14 @@ open import Readme-Theorems
 -- claims we intend to make, and hiding them would shrink the ledger
 -- without shrinking the debt.
 ------------------------------------------------------------------
+-- `dispatch-saturates` is claimed here and consumed by no body, and
+-- that is the finding rather than an omission: the clause it is about
+-- returns an EMPTY fan-out, so every obligation the tower states is
+-- already true there and no proof can need it to reduce.  Claiming it
+-- is what puts the truncation on the ledger at all.
 open import Rx.Evaluator-Theorems
-  using (fuel-coherent; causality; μ-unfold; μ-guarded; defer-shift)
+  using (fuel-coherent; causality; μ-unfold; μ-guarded; defer-shift;
+         dispatch-saturates)
 
 open import Rx.Provenance-Theorems
   using (id-inheritance)

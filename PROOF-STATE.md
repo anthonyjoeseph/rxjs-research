@@ -224,15 +224,15 @@ now at the door and at the templates the door's chains are built from.
 
 ### Big picture tier roadmap
 
-- **THE TIER'S HOP DEBT IS TWO PREMISES OVER TWO REGISTRIES, AND THE MACHINE NOW
-  SAYS WHICH OF THE TWO IS WRONG.** `entry-drain-hop` walks what an arrival's
-  source registered against the program's own reading; `share-chain-hop` walks
-  what a share admits against a join with that chain's own state. The sink's
-  form is refuted at the smallest share that folds: its only hypothesis bounds
-  what ENTERS the dispatch, while the walk is read ALONG the chain, so a chain
-  admitted at the FLOOR asks for a rank of two against a bound of one. The door
-  supplies five there, so the premise is what is too weak. Carry the registry's
-  reading inward and state both over one registration list.
+- **THE TIER'S TWO HOP PREMISES AND THE DISPATCH COUNTER ARE ONE LIFT, AND THE
+  COUNTER IS THE HALF NOTHING WAS TRACKING.** `entry-drain-hop` and
+  `share-chain-hop` both read a registry against the program; the sink's form is
+  refuted because its hypothesis bounds what ENTERS the dispatch while the walk
+  is read ALONG the chain. `dispatch-saturates` is the same gap one level under:
+  the counter bounding the fan-out is seeded at the context size on the reading
+  that a chain sinks strictly above its own share, which is a fact about the
+  PROGRAM that nothing says the RUN preserves into the registry. Carry that
+  reading inward once and all three are stated against it.
 
 - **AND THE FOLD'S FRAME IS MISSING AN AXIS THE SHELF ALREADY STATES ELSEWHERE.**
   `scan-frame-carried` prices a scan's residue at ONE application of its
@@ -253,12 +253,29 @@ now at the door and at the templates the door's chains are built from.
   live flattener decides all three at once, and it is the one region where these
   statements could still be false rather than merely hard.
 
+### Open questions
+
+- **Does the RUN preserve the telescope's stratification into the registry?**
+  A shared slot's definition may name only inputs strictly below it, and that
+  is a fact about the PROGRAM, carried in the slot's own type. Every reading of
+  a registry against the program below assumes the run lifts it: the door's
+  chain count, the sink's walk along a chain, and the fan-out's own seed each
+  bound a run object by a syntactic order nothing states is preserved. Either
+  one invariant carries it inward and all three are stated against that, or it
+  is false at some arm and each of them is separately wrong.
+  relevant: `entry-drain-hop`, `share-chain-hop`, `dispatch-saturates`
+
 ### The ledger
 
 - **`entry-drain-hop`** (Verify-Rank-Sufficient) — FALSITY, `PROBED`: the
   door's whole premise, in a currency that mentions no run — a chain's
   flattener count against the program's own reading. Tight at three ladder
   rungs and at a gate; an arrival there reaches exactly ONE chain.
+
+- **`dispatch-saturates`** (Rx.Evaluator-Theorems) — FALSITY, `PROBED`: the
+  share fan-out's re-entry counter, clamped to an EMPTY fan-out when spent, so
+  this tier's export holds vacuously over the truncation. Filed here and not
+  beside its module's siblings because that vacuity IS the dependence.
 
 - **`from-inner-dry` / `thru-outer-frame-dry`**
   (Verify-Rank-Sufficient.Path-Fits) — FALSITY, `PROBED×2`: dry-freedom of the
