@@ -11,14 +11,14 @@
 -- than merely true.  A postulate over the whole walk would typecheck
 -- and instantiate neither.
 --
--- WHAT IS STILL OWED is the three FLATTENERS, and nothing else.  The
--- shelf used to be every clause that re-enters through a burst; four
--- of those never hop, so `Push-Dry` settles them outright and the
--- residue is exactly the clauses that reach `subscribeInner` — which
--- is where the rank peel is spent and so is the tier's reading rather
--- than this module's.  `opShape` is what keeps the leaf honest: it
--- answers for the flatteners alone, so no clause proven below can be
--- quietly supplied by it.
+-- WHAT IS STILL OWED is the DRY half of the three FLATTENERS, and
+-- nothing else.  Every clause of the walk now carries its report as a
+-- real body — the flatteners included, whose arms stand on the walk's
+-- own conclusion at the source plus one frame leaf — so what is left is
+-- the single claim that the pipeline under a flattener builds no dry
+-- close.  `opShape` is what keeps that leaf honest: it answers for the
+-- flatteners alone, so no clause proven below can be quietly supplied
+-- by it.
 ------------------------------------------------------------------
 module Verify-Rank-Sufficient.Dry where
 
@@ -29,8 +29,8 @@ open import Data.List using ([]; _∷_; map)
 open import Data.Maybe using (nothing)
 open import Data.Nat using (zero; suc; _≤_; z≤n)
 open import Data.Nat.Properties using (_<?_; ≤-refl; ≤-trans; ≤-reflexive;
-  ⊔-identityʳ; m≤n+m; m≤n⇒m≤1+n)
-open import Data.Product using (_×_; _,_; proj₁; proj₂)
+  ⊔-identityʳ; m≤n+m; m≤n⇒m≤1+n; n≤1+n)
+open import Data.Product using (_,_; proj₁; proj₂)
 open import Data.Vec using (lookup)
 open import Induction.WellFounded using (Acc; acc)
 open import Relation.Nullary using (yes; no)
@@ -46,7 +46,8 @@ open import Rx.Strat-Order using (_≺_; ltS; ltU)
 open import Rx.Evaluator using (Stream; Path; Sched; EvalSt; subscribeE;
   subscribeSharedSlot; sharedConnect; register; share-sink; burstCompleted;
   mintSource; mintNode; installNode; take-st; scan-st; mergeAll-st;
-  map-f; scan-f; take-f;
+  switch-st; exhaust-st;
+  map-f; scan-f; take-f; thru-outer; mergeAllᵒ; switchᵒ; exhaustᵒ;
   _↠_;
   hasDry; memberSource; unconn; stHop)
 open import Rx.Hop-Depth using (depthᵉ; hopOf; ε; rd-unfoldμ)
@@ -58,11 +59,12 @@ open import Verify-Rank-Sufficient.Dry-Emits using (hasDry-if; oneShotBurst-dry;
   cold-tail-dry; connect-emit-dry)
 open import Verify-Rank-Sufficient.Push-Dry using (pushBurst-dry;
   map-frame-dry; scan-frame-dry; take-frame-dry)
-open import Verify-Rank-Sufficient.Carried using (burstHop; emitHop-map;
+open import Verify-Rank-Sufficient.Carried using (emitHop-map;
   oneShotBurst-hop; installNode-hop; burstHop-plumb; valsHop-data;
   WalkCarries; burstHop-if; stHop-if)
 open import Verify-Rank-Sufficient.Push-Carried using (pushBurst-carried;
-  map-frame-carried; scan-frame-carried; take-frame-carried)
+  map-frame-carried; scan-frame-carried; take-frame-carried;
+  thru-outer-frame-carried)
 open import Verify-Rank-Sufficient.Leaf-Carried using (ofᵉ-carried;
   scan-seed-carried)
 
@@ -100,19 +102,19 @@ opShape _                = false
 -- its source.  So the zero case is closed, and what remains is the
 -- clause's own peel.
 --
--- AND WHAT REMAINS IS A FACT ABOUT WHAT A BURST CARRIES, WHICH IS WHERE
--- THIS LEAF WAS ALWAYS EXPECTED TO GO.  `subscribeInner` steps from
--- `suc r` to `r` and subscribes an emitted VALUE, structurally unrelated
--- to the term the caller was walking, so the residue is the inner's own
--- reading sitting under its emitter's — a strengthened return type on
--- the burst-producing functions.  That comparison was false while the
--- clause reading a fold was charged nothing for what it folds over: a
--- fold builds its accumulator at RUN time, one fresh layer per refold,
--- so a longer source crossed any bound flat in source length.  The
--- iterating clause takes its refold count off the source's own delivery
--- component, and at the family that exhibited the crossing the reading
--- now OUTRUNS what the burst carries at every length instantiated.  So
--- what is owed here is the comparison itself, not another measure.
+-- AND WHY THIS HALF IS STILL A LEAF WHILE THE REPORT HALF IS A BODY.
+-- The arms below assemble the flatteners' CARRIED report out of the
+-- walk's own conclusion at the source plus one frame leaf, and the same
+-- route is not available here: `FrameDry` is unconditional in the values
+-- the frame is handed, and `thru-outer` at rank ZERO genuinely emits a
+-- dry close, so no frame-level dry lemma about it can be true.  What
+-- refuses that entry is the rank conjunct of the entry invariant, which
+-- is a hypothesis about the frame's INPUTS — a quantity `FrameDry` has
+-- nowhere to put.  So the assembly wanted here is not a fourth dry
+-- frame lemma but a JOINT walk, the dry claim and the report proven in
+-- one induction so the dry arm can spend the bound the report arm
+-- carries.  That is a restatement of `pushBurst-dry`'s own shelf, not of
+-- this statement, which is why the row stands unchanged.
 --
 -- DEAD ROUTE: a rank SEEDED off the term, which is what every earlier
 --   form of this conjunct compared against — a power of two in the
@@ -179,36 +181,6 @@ postulate
     EntryReads τ o
       (Sched.slots sched) (EvalSt.connectedShares st) →
     hasDry (proj₁ (subscribeE ac o κ id now sched st)) ≡ false
-
--- THE SAME REGION, SAYING WHAT THE FLATTENERS CARRY.  A separate leaf
--- and not a strengthening of the one above, for a reason that is about
--- evidence rather than about tidiness: the statement above is the one
--- the rows in `Probed.Operator-Root` were taken against and the one
--- `Refuted.Rank-Entry` refutes a variant of, so restating it would
--- expire both and buy nothing — the residue is genuinely a second
--- claim, and it gets its own row.
---
--- WHY IT IS A LEAF AT ALL, given that the walk below proves the same
--- report everywhere else.  A flattener re-enters through
--- `subscribeInner`, which subscribes an emitted VALUE rather than a
--- subterm of the term being walked, so the induction the arms below run
--- on does not reach it and the comparison there is between the inner's
--- reading and its emitter's.  That is exactly the `flatten` edge — the
--- one clause of the reading that takes `suc` — and what it costs is the
--- tier's own remaining reading.
-postulate
-  operator-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} {τ}
-    (ac : Acc _≺_ τ) (o : Closed Γ u) (κ : Path Γ u t) (id : Id) (now : Tick)
-    (sched : Sched Γ) (st : EvalSt e) → opShape o ≡ true →
-    EntryReads τ o
-      (Sched.slots sched) (EvalSt.connectedShares st) →
-    stHop (slotRd (Sched.slots sched)) st ≤ proj₁ (proj₂ τ) →
-    burstHop (slotRd (Sched.slots sched)) u
-      (proj₁ (subscribeE ac o κ id now sched st))
-      ≤ depthᵉ (slotRd (Sched.slots sched)) o
-    × stHop (slotRd (Sched.slots sched))
-        (proj₂ (proj₂ (subscribeE ac o κ id now sched st)))
-      ≤ proj₁ (proj₂ τ)
 
 mutual
   subscribe-dry-free : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} {τ}
@@ -280,7 +252,7 @@ mutual
 
     pc = pushBurst-carried ac id now (map-f f) κ
            (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
-           ψ (depthᵉ ψ (mapᵉ f b)) (proj₁ (proj₂ τ))
+           ψ (depthᵉ ψ (mapᵉ f b)) (depthᵉ ψ (mapᵉ f b)) (proj₁ (proj₂ τ))
            (map-frame-carried ac id now f κ ψ
              (depthᵉ ψ (mapᵉ f b)) (proj₁ (proj₂ τ)))
            (≤-trans (proj₁ (proj₂ ih)) (hop-mapᵉ ψ f b))
@@ -314,7 +286,7 @@ mutual
 
     pc = pushBurst-carried ac id now (take-f nid) κ
            (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
-           ψ (depthᵉ ψ (takeᵉ c b)) (proj₁ (proj₂ τ))
+           ψ (depthᵉ ψ (takeᵉ c b)) (depthᵉ ψ (takeᵉ c b)) (proj₁ (proj₂ τ))
            (take-frame-carried ac id now nid κ ψ
              (depthᵉ ψ (takeᵉ c b)) (proj₁ (proj₂ τ)))
            (proj₁ (proj₂ ih))
@@ -346,7 +318,8 @@ mutual
 
     pc = pushBurst-carried ac id now (scan-f f nid) κ
            (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
-           ψ (depthᵉ ψ (scanᵉ f z b)) (proj₁ (proj₂ τ))
+           ψ (depthᵉ ψ (scanᵉ f z b)) (depthᵉ ψ (scanᵉ f z b))
+           (proj₁ (proj₂ τ))
            (scan-frame-carried ac id now f nid κ ψ
              (depthᵉ ψ (scanᵉ f z b)) (proj₁ (proj₂ τ))
              (proj₁ (proj₂ inv)))
@@ -361,21 +334,100 @@ mutual
     , installNode-hop (slotRd (Sched.slots sched)) (proj₁ (mintNode sched))
         (mergeAll-st {t = u} nothing 0 [] false) st (proj₁ (proj₂ τ)) z≤n hst
 
-  subscribe-dry-free ac (mergeAllᵉ lim b) κ id now sched st inv hst =
+  -- THE THREE FLATTENERS, and the report half is now an assembly.
+  -- `subscribeAll` has the same shape as the three arms above — mint,
+  -- install, subscribe the source under a frame, push the burst — so
+  -- the walk's own conclusion at `b` supplies the burst bound and the
+  -- residue is one FRAME leaf.  What separates them from the arms
+  -- above is the currency the frame changes: the source delivers
+  -- OBSERVABLES read at `depthᵉ ψ b`, and what the frame hands back is
+  -- read one `suc` higher, which is exactly the flattener's own clause
+  -- of the reading.  The entry invariant pays for that `suc`, and the
+  -- `suc` is what the rank descent inside `subscribeInner` spends.
+  subscribe-dry-free {u = u} {τ = τ} ac (mergeAllᵉ lim b) κ id now sched st
+                     inv hst =
     dry-operator ac (mergeAllᵉ lim b) κ id now sched st refl inv
-    , proj₁ oc , proj₂ oc
+    , proj₁ pc , proj₂ pc
     where
-    oc = operator-carried ac (mergeAllᵉ lim b) κ id now sched st refl inv hst
-  subscribe-dry-free ac (switchAllᵉ b) κ id now sched st inv hst =
+    ψ      = slotRd (Sched.slots sched)
+    nid    = proj₁ (mintNode sched)
+    sched₁ = proj₂ (mintNode sched)
+    st₁    = installNode nid (mergeAll-st {t = u} lim 0 [] false) st
+    r      = subscribeE ac b (thru-outer mergeAllᵒ nid ↠ κ) id now sched₁ st₁
+
+    hst₁ = installNode-hop ψ nid (mergeAll-st {t = u} lim 0 [] false) st
+             (proj₁ (proj₂ τ)) z≤n hst
+
+    ih = subscribe-dry-free ac b (thru-outer mergeAllᵒ nid ↠ κ) id now
+           sched₁ st₁
+           ( proj₁ inv
+           , ≤-trans (n≤1+n _) (proj₁ (proj₂ inv))
+           , ≤-trans (n≤1+n _) (proj₂ (proj₂ inv)) )
+           hst₁
+
+    pc = pushBurst-carried ac id now (thru-outer mergeAllᵒ nid) κ
+           (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+           ψ (depthᵉ ψ b) (depthᵉ ψ (mergeAllᵉ lim b)) (proj₁ (proj₂ τ))
+           (thru-outer-frame-carried ac id now mergeAllᵒ nid κ ψ
+             (depthᵉ ψ b) (proj₁ (proj₂ τ)) (proj₁ (proj₂ inv)))
+           (proj₁ (proj₂ ih))
+           (proj₂ (proj₂ ih))
+
+  subscribe-dry-free {τ = τ} ac (switchAllᵉ b) κ id now sched st inv hst =
     dry-operator ac (switchAllᵉ b) κ id now sched st refl inv
-    , proj₁ oc , proj₂ oc
+    , proj₁ pc , proj₂ pc
     where
-    oc = operator-carried ac (switchAllᵉ b) κ id now sched st refl inv hst
-  subscribe-dry-free ac (exhaustAllᵉ b) κ id now sched st inv hst =
+    ψ      = slotRd (Sched.slots sched)
+    nid    = proj₁ (mintNode sched)
+    sched₁ = proj₂ (mintNode sched)
+    st₁    = installNode nid (switch-st nothing false) st
+    r      = subscribeE ac b (thru-outer switchᵒ nid ↠ κ) id now sched₁ st₁
+
+    hst₁ = installNode-hop ψ nid (switch-st nothing false) st
+             (proj₁ (proj₂ τ)) z≤n hst
+
+    ih = subscribe-dry-free ac b (thru-outer switchᵒ nid ↠ κ) id now
+           sched₁ st₁
+           ( proj₁ inv
+           , ≤-trans (n≤1+n _) (proj₁ (proj₂ inv))
+           , ≤-trans (n≤1+n _) (proj₂ (proj₂ inv)) )
+           hst₁
+
+    pc = pushBurst-carried ac id now (thru-outer switchᵒ nid) κ
+           (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+           ψ (depthᵉ ψ b) (depthᵉ ψ (switchAllᵉ b)) (proj₁ (proj₂ τ))
+           (thru-outer-frame-carried ac id now switchᵒ nid κ ψ
+             (depthᵉ ψ b) (proj₁ (proj₂ τ)) (proj₁ (proj₂ inv)))
+           (proj₁ (proj₂ ih))
+           (proj₂ (proj₂ ih))
+
+  subscribe-dry-free {τ = τ} ac (exhaustAllᵉ b) κ id now sched st inv hst =
     dry-operator ac (exhaustAllᵉ b) κ id now sched st refl inv
-    , proj₁ oc , proj₂ oc
+    , proj₁ pc , proj₂ pc
     where
-    oc = operator-carried ac (exhaustAllᵉ b) κ id now sched st refl inv hst
+    ψ      = slotRd (Sched.slots sched)
+    nid    = proj₁ (mintNode sched)
+    sched₁ = proj₂ (mintNode sched)
+    st₁    = installNode nid (exhaust-st false false) st
+    r      = subscribeE ac b (thru-outer exhaustᵒ nid ↠ κ) id now sched₁ st₁
+
+    hst₁ = installNode-hop ψ nid (exhaust-st false false) st
+             (proj₁ (proj₂ τ)) z≤n hst
+
+    ih = subscribe-dry-free ac b (thru-outer exhaustᵒ nid ↠ κ) id now
+           sched₁ st₁
+           ( proj₁ inv
+           , ≤-trans (n≤1+n _) (proj₁ (proj₂ inv))
+           , ≤-trans (n≤1+n _) (proj₂ (proj₂ inv)) )
+           hst₁
+
+    pc = pushBurst-carried ac id now (thru-outer exhaustᵒ nid) κ
+           (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+           ψ (depthᵉ ψ b) (depthᵉ ψ (exhaustAllᵉ b)) (proj₁ (proj₂ τ))
+           (thru-outer-frame-carried ac id now exhaustᵒ nid κ ψ
+             (depthᵉ ψ b) (proj₁ (proj₂ τ)) (proj₁ (proj₂ inv)))
+           (proj₁ (proj₂ ih))
+           (proj₂ (proj₂ ih))
 
   -- A SLOT REFERENCE IS WHERE THE CONNECT PEEL LIVES, and three of its
   -- four outcomes announce and register without subscribing anything.
