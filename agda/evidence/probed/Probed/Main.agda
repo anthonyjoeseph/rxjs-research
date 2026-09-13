@@ -19,10 +19,17 @@
 -- statements this tree was written against were the budget's: a grant,
 -- a nest store, a walk maximum, a caps arithmetic priced in gas.  None
 -- of them is stateable now, so the rows are evidence about a machine
--- that is gone and E2 expires every one of them.  What survived that
--- was the one probe whose target is a live well-formedness postulate;
--- `Probed.Descent` is the first written against the machine that
--- replaced them.
+-- that is gone and E2 expires every one of them.
+--
+-- AND A SECOND GENERATION EXPIRED THE SAME WAY, WHICH IS WHAT SAYS THE
+-- MECHANISM IS THE RIGHT ONE RATHER THAN AN OVERHEAD.  Six files were
+-- written against a drain premise that READ a registry against the
+-- program, and the reading is now refuted in every form it was tried;
+-- the statement they instantiated is stated per TEMPLATE instead, and
+-- it quantifies over states rather than fixing one, so no `refl` row
+-- can reach its hypotheses at all.  Their rows were green to the last
+-- day and said nothing about the statement that replaced them — which
+-- is exactly the silent death E2 exists to make loud.
 --
 -- What is worth recovering from the forty-two expired files is the
 -- HARNESS rather than any verdict — the real-evaluator plumbing, the
@@ -35,30 +42,6 @@ module Probed.Main where
 
 open import Probed.Root
   using (cellP1; rowP1; cellP4; rowP4; cellP7; rowP7; cellS2; rowS2)
-
-open import Probed.Descent
-  using (descP1; descP2; descP3; descP4; descP5;
-         descP6; descP7; descP8; descP9; descP10;
-         descP11; descP12; fitP1; fitP3; fitP12;
-         fitP9; fitP10; fitP9L; fitP9H; fitP13H)
-
-open import Probed.Fuel-Growth
-  using (drF)
-
-open import Probed.Entry-Fit
-  using (regs₆; term₆; fitLate; fit24; survives; fitFold;
-         regs₂; term₂; fitDiscards)
-
--- the dry rows are claimed beside the fit rows on purpose: they are the
--- ASSEMBLY's conclusion rather than the leaf's, and the leaf held at
--- this shape once while the conclusion did not
-open import Probed.Gate-Constant
-  using (carried₁; carried₂; carried₃; term₁; term₂; term₃;
-         fitGate₁; fitGate₂; fitGate₃; dry₁; dry₂; dry₃)
-
-open import Probed.Fit-Preserved
-  using (fpQ1₁; fpQ1₂; fpQ1₃; fpQ2₁; fpQ2₂; fpQ2₃; fpQ3₁; fpQ3₂; fpQ3₃;
-         fpDrain)
 
 open import Probed.Operator-Root
   using (opRoot)
@@ -73,9 +56,6 @@ open import Probed.Carried-Leaf
 open import Probed.Fold-Burst
   using (rate₁; rate₄; layers₃; product; queued; nested;
          oneLayer-is; twoLayer-is)
-
-open import Probed.Drain-Arrival
-  using (daM6₁; daM6₂; daM24₁; daM24₂; daL₁; daL₂; daL₃; daDrain)
 
 -- the four pinned figures are claimed beside the rows because the
 -- payload half and the store half are what make either conjunct
