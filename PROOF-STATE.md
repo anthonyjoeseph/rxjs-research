@@ -223,38 +223,18 @@ procedure rather than a pin, and whose refusal is what turned this up.
 
 ### Open questions
 
-- **WHICH NON-SYNTACTIC QUANTITY MUST THE READING BOUND?** The reading counts
-  SYNTAX, so something must bound what a run holds that no term names. The
-  registry is dead — every candidate naming one is refuted. The STORE is now
-  dead too, from both sides: a parked inner cannot exceed the frame that parked
-  it, and no install site writes above the payload, so the axis is bound-side.
-  What is left is the SCHEDULE, the one place a value outlives the term that
-  produced it: a frame putting a body there is charged a constant, and the
-  arrival taking it back out has no term under it to draw a bound from. Whether
-  that owes a carried maximum or a premise the arrival supplies is open.
+- **DOES THE ARRIVING VALUE'S OWN READING ALWAYS SUFFICE?** The reading counts
+  SYNTAX, so something must bound what a run holds that no term names, and that
+  is now answered at one shape rather than in general. The registry is dead and
+  the store is bound-side dead. The schedule is dead too, but for a better
+  reason than either: a value delivered off it carries its own depth, so no
+  figure has to survive the journey and nothing need be carried. A gated
+  ladder's arrival needs exactly what is read there, to the unit. Open is
+  whether that stays exact where the constants COMPOSE — a gate behind a gate —
+  and where the store is not nought.
   relevant: `drain-dry-free`, `entry-hop-fits`
 
 ### Big picture tier roadmap
-
-- **MEASURE THE TWO SURVIVING MECHANISMS BEFORE EITHER IS ADOPTED.** The
-  question above has two halves left and nothing separating them, which is why
-  a fourth reading of the registry is not the next move. Instrument both at the
-  two programs that killed all three candidates: does a maximum CARRIED across
-  the cascade hold there, or climb with the registry it tracks — and does the
-  frame shelf discharge the arm with no state premise at all, at a frame whose
-  payload is deeper than its source's own reading admits. Refute first on both.
-  The product is a separation, not a proof.
-
-- **RUN THE ARRIVAL FRAME, WHERE THE PAYLOAD BOUND HAS NO TERM UNDER IT.** The
-  leg that was going to separate the store conjunct's two halves is DISCARDED:
-  an install-site census says no frame writes above what it was handed, so there
-  is nothing to separate. What the census found instead is where the question
-  lives. A defer's body goes into
-  the schedule priced at a constant and comes back as an ARRIVAL whose frame is
-  charged the full reading — correctly, but off a value no subterm bounds. So
-  instantiate that frame, reaching it by running a defer to its delivery, and
-  ask what its premise is supplied from. Refute first, at an arrival deeper
-  than every term the run has descended.
 
 - **THE DOOR'S RISK IS A CONSTRUCTOR NOTHING HAS ENTERED.** `entry-hop-fits` is
   the tier's only FALSITY and its rows are TIGHT at two crossings, which is what
@@ -263,6 +243,23 @@ procedure rather than a pin, and whose refusal is what turned this up.
   has nothing spare. Instantiate the door under a recursive source, guarded and
   through a defer, and run it — the tightness already on record says a repair
   costing one is a repair that does not fit.
+
+- **RESTATE THE DRAIN'S PREMISE ONTO WHAT THE ARRIVAL SUPPLIES.** The two legs
+  that stood here are retired together: one measurement answered both, and it
+  says no repair of the registry bound could have worked, because the quantity a
+  cascade spends is read off the arriving VALUE and the premise names the other
+  side of the run. So `drain-dry-free`'s restatement is owed and its shape is no
+  longer open — state the obligation at the arrival, where the evaluator already
+  stands, and leave the registry out of it. Assembly first: the conditioned
+  statement over postulated leaves, then the leaves.
+
+- **COMPOSE THE CONSTANTS, WHICH IS THE ONE REGION LEFT.** The payload reading is
+  EXACT behind one gate — dry a unit below, green at it. A gate behind a gate is
+  where it could stop being: each is cut to a constant, so a body two gates down
+  is read at one twice over while what it eventually delivers is as deep as it
+  is. Instantiate that, and a deep store beside it, since the sweep that settled
+  the single gate held the store at nought throughout and nothing yet says the
+  two quantities do not interact. Refute first.
 
 ### The ledger
 
@@ -273,15 +270,15 @@ procedure rather than a pin, and whose refusal is what turned this up.
 
 - **`drain-dry-free`** (Verify-Rank-Sufficient) — SHAPE,
   `REFUTED×5, DEAD ROUTE, PROBED×4`: every arrival after the root frame,
-  conditioned on `hopFits` — which one cascade destroys from a TIGHT entry and
-  which nothing bounding the registry repairs. The conclusion survives every
-  witness; the restatement is owed on the premise.
+  conditioned on `hopFits` — a registry bound one cascade destroys from a TIGHT
+  entry. A fork now says the cascade spends what the ARRIVING VALUE reads, to
+  the unit, so the premise names the wrong side of the run.
 
 - **`map-frame-carried`** (Verify-Rank-Sufficient.Push-Carried) — DIFFICULTY,
-  `REFUTED×2, PROBED`: the two ends are readings of DIFFERENT expressions, apart
-  by the layer a template adds. Six applied rows over three templates; the
-  growing ones are TIGHT and every bound is met at equality. No row reaches a
-  nonzero store.
+  `REFUTED×2, PROBED`: the two ends are readings of DIFFERENT expressions,
+  apart by the layer a template adds. Six applied rows over three templates;
+  the growing ones are TIGHT and every bound is met at equality. No row reaches
+  a nonzero store.
 
 - **`take-frame-carried`** (Verify-Rank-Sufficient.Push-Carried) — DIFFICULTY,
   `PROBED`: a prefix of what it was handed, under a node reading zero. Four
@@ -294,10 +291,10 @@ procedure rather than a pin, and whose refusal is what turned this up.
   the continuation and the store's other nodes are INERT rather than unswept.
 
 - **`thru-outer-frame-carried`** (Verify-Rank-Sufficient.Push-Carried) —
-  DIFFICULTY, `DEAD ROUTE, PROBED×3`: the HOP EDGE, where the two currencies are
-  exchanged. Eleven frames reached by RUNNING; the `suc` is never spent. The
-  store axis cannot refute from either side; a gated source is held to a quarter
-  of what the run then carries.
+  DIFFICULTY, `DEAD ROUTE, PROBED×3`: the HOP EDGE, where the two currencies
+  are exchanged. Eleven frames reached by RUNNING; the `suc` is never spent.
+  The store axis cannot refute from either side; a gated source is held to a
+  quarter of what the run then carries.
 
 - **`dry-operator`** (Verify-Rank-Sufficient.Dry) — DIFFICULTY,
   `REFUTED, DEAD ROUTE×3, PROBED, RECOVERY`: the THREE FLATTENERS' dry-freedom

@@ -380,20 +380,21 @@ installNode nid nodeState st =
 -- would put a payload under the seed of every entry that cannot reach
 -- it, and would cost the root its reading of zero for nothing.
 --
--- AND WHAT THAT LEAVES OWED IS A BOUND AND NOT A SEED, WHICH IS A
--- DIFFERENT DEBT AND FALLS DUE SOMEWHERE ELSE.  Re-seeding at the
--- arrival is what keeps the reading honest, and it says nothing about
--- what BOUNDS the value that arrives.  Every frame reached by descending
--- a term draws its payload bound from a subterm of that term; an arrival
--- off the schedule has no such term, because the frame that put the
--- value there was charged a constant for it and nothing relates the two
--- figures.  `Probed.Defer-Blind` runs both halves at one body: the same
--- body reads four, the frame that meets it openly is held to four, and
--- the frame that meets it through a gate is held to one.  So a per-frame
--- obligation is consistent and its arrival frames are where a premise
--- with no term under it would have to come from — a maximum over the
--- SCHEDULE, which is the one place a value outlives the term that
--- produced it, and which nothing in this development names.
+-- AND WHAT THAT LEAVES OWED IS A BOUND AND NOT A SEED, WHICH FALLS DUE
+-- ON THE ARRIVAL AND IS PAID THERE.  Re-seeding at the arrival is what
+-- keeps the reading honest, and it says nothing about what BOUNDS the
+-- value that arrives.  Every frame reached by descending a term draws
+-- its payload bound from a subterm of that term; an arrival off the
+-- schedule has no such term, because the frame that put the value there
+-- was charged a constant for it and nothing relates the two figures.
+-- `Probed.Defer-Blind` pins that gap at one body — the body reads four,
+-- the frame meeting it openly is held to four and the frame meeting it
+-- through a gate is held to one.  What closes it is that the arrival
+-- holds a VALUE and not a name for one, so `depthᵛ` reads the figure
+-- where it lands and nothing has to carry it: `Probed.Arrival-Spend`
+-- sweeps that arrival's rank by hand and finds the least sufficient one
+-- EQUAL to what the arrival witness supplies, so the schedule is not a
+-- quantity this development is missing.
 --
 -- AND IT IS READ IN THE RANK'S OWN CURRENCY, WHICH IS WHAT THE ENTRY
 -- INVARIANT CAN SPEND.  A re-seed that joined a NESTING to a reading

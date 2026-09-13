@@ -25,18 +25,20 @@
 -- premise is supplied by the syntax the frame descended through.  An
 -- arrival off the schedule has no such term: the value it is handed was
 -- put there by a frame that was charged one for it, and nothing relates
--- the two.  So the bound at that frame can only come from a maximum over
--- the SCHEDULE, and there is no such quantity.
+-- the two figures.
 
--- WHICH HALF OF THE TIER'S QUESTION THAT SETTLES.  The question is
--- whether a maximum over the run must be CARRIED or whether nothing
--- about a state is owed and the frame shelf carries it per template.
--- These rows say the second answer is not free: a per-frame shelf is
--- consistent, and its arrival frames are where an unsourced premise
--- would have to be supplied.  That is a different quantity from the one
--- the refuted candidates named — not the registry and not the store, but
--- the schedule, which is the one place a value outlives the term that
--- produced it.
+-- AND THE ARRIVAL SUPPLIES IT ITSELF, WHICH IS WHERE THESE ROWS STOP.
+-- The obvious reading of the paragraph above is that a bound with no
+-- term under it has to be CARRIED to the frame, and that reading is
+-- wrong: what arrives is a VALUE rather than a name for one, so it can
+-- be read where it lands and the figure does not have to survive the
+-- journey.  `Probed.Arrival-Spend` runs this same gated ladder to its
+-- arrival and sweeps the rank by hand — dry at nought through four,
+-- green at five, against a term reading one and a payload reading four —
+-- so the quantity is the payload's and the code already computes it at
+-- the only place it is wanted.  These two rows say what the FRAME is
+-- charged; they say nothing about what the arrival is owed, and it was
+-- the arrival that owed nothing.
 
 -- AND THE ROWS ARE GREEN, WHICH IS THE POINT RATHER THAN A CAVEAT.  A
 -- refutation would say the statement is false; these say it is TRUE at
