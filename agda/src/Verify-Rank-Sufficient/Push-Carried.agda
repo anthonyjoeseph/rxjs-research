@@ -118,6 +118,23 @@ postulate
 -- structurally unrelated to the term the walk is inducting on, so no
 -- arm of the walk reaches it and the report about it cannot be an
 -- induction hypothesis.  It is a genuine leaf and not a missing wire.
+--
+-- AND THE ROOM IN IT IS MEASURED RATHER THAN GUESSED.  Every point
+-- instantiated so far hands back EXACTLY what it was handed, so the
+-- `suc` is afforded and never spent, and the form holding the frame to
+-- `Rin` would have done at all of them.  It is stated at `suc Rin`
+-- because that is what the flattening arms consume and the weaker
+-- statement is the easier one to prove; if that proof stalls, the
+-- stronger form is the thing to reach for rather than a new hypothesis.
+--
+-- PROBED: `Probed.Hop-Edge` — six frames reached by RUNNING the
+--   subscription the flattener arm builds, over all three operators, at
+--   a fold that deepens its accumulator once and twice per delivery, at
+--   two source lengths, and at one whose limit forces the PARK branch.
+--   Every conjunct is positive at every row (the pins carry both sides)
+--   and the margin is a constant one.  NOT reached: a frame whose rank
+--   is spent, which no root can exhibit since a flattener's own reading
+--   is a successor.
 postulate
   thru-outer-frame-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} {τ}
     (ac : Acc _≺_ τ) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
