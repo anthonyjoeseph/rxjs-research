@@ -116,3 +116,15 @@ open import Probed.Arrival-Spend
 open import Probed.Door-Fits
   using (bareArrived; bareReached; bareFrames; doorBare;
          flatArrived; flatReached; flatFrames)
+
+-- the agreement rows are claimed beside the fork because a separation
+-- between two rules that differ everywhere says nothing about the shape
+-- it stands at, and the counts because each is a way both rules could
+-- have been evaluated over nothing — and the `thru-outer` counts are
+-- claimed for the opposite reason again: they are nought at every point
+-- measured, which is the finding rather than a control
+open import Probed.Chain-Compose
+  using (agree₁; agree₂; agree₃; agreeCap; exitFork;
+         uTerm; uReach; uInners; uOuters; uRank;
+         gTerm; gReach; gInners; gOuters; gRank;
+         capReach; capInners; capOuters; uStore; gStore)
