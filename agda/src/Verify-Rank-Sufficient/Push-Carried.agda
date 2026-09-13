@@ -70,21 +70,46 @@ FrameCarries {Γ = Γ} {e = e} {s = s} {u = u} ac id now f κ ψ Rin Rv Rst =
         (stepFrame ac id now f κ vals fin sd st))))) ≤ Rst
 
 ----------------------------------------------------------------------
--- THE TWO NON-FLATTENING FRAMES THAT HAND BACK WHAT THEY WERE HANDED.
--- Each is a leaf rather than a body, and for two different reasons the
--- assembly above cannot supply: a map's outputs are a TEMPLATE
--- evaluated at the payload, which is the one place the term reading's
--- own plug clause has to be met; and a take's are a prefix of what it
--- was handed under a node whose reading is zero by construction.  The
+-- THE TWO NON-FLATTENING FRAMES, WHICH ARE NOT ONE SHELF.  Both are
+-- leaves rather than bodies, and the reason differs: a take's outputs
+-- are a prefix of what it was handed under a node whose reading is zero
+-- by construction, while a map's are a TEMPLATE evaluated at the
+-- payload, which is a second source of depth neither bound reads.  The
 -- fold is not among them and cannot be — see below.
 ----------------------------------------------------------------------
 
+-- A TEMPLATE IS READ AGAINST ITS ARGUMENT AND MAY IGNORE IT, SO THE
+-- EQUAL-BOUNDS FORM IS WRONG HERE AND ONLY HERE.  The map step of the
+-- term reading exists for exactly this: it reads the template under an
+-- environment binding the payload's reading, so what a `map-f` frame
+-- hands back is that step APPLIED to the bound it was handed, never the
+-- bound itself.  The restatement is therefore fixed rather than open,
+-- and it is the same arithmetic the chain measure already spends at
+-- this frame — which is why the repair points back at a bound that
+-- TRANSFORMS along a chain rather than one that is preserved by it.
+--
+-- REFUTED: `Refuted.Map-Template` — the form as written, at a template
+--   that drops a numeral and returns a flattener over a literal.  The
+--   payload reads ZERO, so the frame is held to the strongest bound the
+--   predicate can impose, and the output reads ONE; the store is
+--   untouched, so the second conjunct is satisfied and the crossing is
+--   the payload one alone.  The gap is not a rate in anything the
+--   statement quantifies over — it is whatever the template writes, and
+--   a template is part of the frame.
 postulate
   map-frame-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {τ}
     (ac : Acc _≺_ τ) (id : Id) (now : Tick) (fn : Fn Γ [] [] [] s u)
     (κ : Path Γ u t) (ψ : Fin n → Rd₃) (Rv Rst : ℕ) →
     FrameCarries {e = e} ac id now (map-f fn) κ ψ Rv Rv Rst
 
+-- THE PREFIX FRAME, WHICH THE WITNESS ABOVE DOES NOT REACH.  A take
+-- hands back `takeVals`' prefix of the list it was given and writes a
+-- node the reading prices at zero; the cutting arm additionally DROPS
+-- registry entries, which can only lower the store's reading.  So
+-- nothing here evaluates anything, and the equal-bounds form is the
+-- right one for this frame even though it is the wrong one for its
+-- neighbour.
+postulate
   take-frame-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s} {τ}
     (ac : Acc _≺_ τ) (id : Id) (now : Tick) (nid : NodeId)
     (κ : Path Γ s t) (ψ : Fin n → Rd₃) (Rv Rst : ℕ) →

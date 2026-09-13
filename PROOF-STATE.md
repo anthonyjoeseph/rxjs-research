@@ -235,6 +235,16 @@ procedure rather than a pin, and whose refusal is what turned this up.
 
 ### Big picture tier roadmap
 
+- **THE FRAME BOUND MUST TRANSFORM ALONG A CHAIN, NOT BE PRESERVED BY IT.** The
+  walk's frame predicate holds four operators to handing back the bound they
+  were handed, and a map is now refuted against that at a payload reading ZERO,
+  because a template is a second source of depth and may ignore its argument.
+  The restatement is fixed rather than open: the reading's own map step, applied
+  to the bound the frame received, which is the arithmetic the chain measure
+  already spends at this very frame. So the repair is the predicate catching up
+  with the measure. Restate it with an output bound the frame COMPUTES, re-check
+  the four operators against it, and read what the flattener's `suc` becomes.
+
 - **DELETE THE PREMISE AND LET THE ARRIVAL CARRY ITS OWN ADEQUACY.** Two
   witnesses now say the registry cannot be fitted against anything a STATE
   holds, the widest join included, so a third restatement of `hopFits` is the
@@ -255,25 +265,23 @@ procedure rather than a pin, and whose refusal is what turned this up.
   limit low enough that inners back up. Refute first, at a queue holding an
   observable deeper than the source that emitted it.
 
-- **THE OTHER TWO FRAMES, AS A SHELF.** A map's outputs are a template
-  evaluated at the payload, which is exactly the plug clause the repaired walk
-  now spends at every frame; a take's are a prefix under a node that reads zero
-  by construction. Neither carries a design decision now the fold is fixed,
-  which is why they are one leg and not two, and why they are last: both are
-  stated over the carried quantity, and neither can move a question.
-
 ### The ledger
 
-- **`map-frame-carried` / `take-frame-carried`**
-  (Verify-Rank-Sufficient.Push-Carried) — FALSITY, `NO EVIDENCE`: the other two
-  frames the walk runs on. A map evaluates a template at the payload, which is
-  where the reading's plug clause has to be met; a take hands back a prefix
-  under a node that reads zero by construction.
+- **`take-frame-carried`** (Verify-Rank-Sufficient.Push-Carried) — FALSITY,
+  `NO EVIDENCE`: a prefix of what it was handed, under a node reading zero by
+  construction, and the cutting arm only DROPS registry entries. Nothing here
+  evaluates anything; the witness beside it does not reach this frame.
 
 - **`entry-hop-fits`** (Verify-Rank-Sufficient) — FALSITY, `REFUTED,
   PROBED×3`: the fit at the door, with both known crossings repaired. Two rows
   are TIGHT — 2 against 2 on a chain, 1 against 1 at a gate — so the margin is
   instantiated, not argued; no constructor is covered under a μ.
+
+- **`map-frame-carried`** (Verify-Rank-Sufficient.Push-Carried) — SHAPE,
+  `REFUTED`: a template is a second source of depth and may ignore its
+  argument, so the equal-bounds form is false by a hop at a payload reading
+  zero. The restatement is the reading's own map step, which the chain measure
+  already spends here.
 
 - **`drain-dry-free`** (Verify-Rank-Sufficient) — SHAPE,
   `REFUTED×4, PROBED×4`: every arrival after the root frame, conditioned on

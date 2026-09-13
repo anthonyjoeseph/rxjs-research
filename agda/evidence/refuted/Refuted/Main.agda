@@ -33,6 +33,12 @@ open import Refuted.Fit-Cascade using (fit-preserved-false;
 open import Refuted.Fit-Cascade using (fit-held-preserved-false;
   pend-e₁; pend-e₃; pend-s₁; store-s₁)
 
+-- the two payload figures are claimed because the crossing is their
+-- ORDER and nothing else: a repair that reads the template would move
+-- the output one and leave the witness agreeing with itself
+open import Refuted.Map-Template using (map-frame-carried-false;
+  in-is; out-is; store-is)
+
 open import Refuted.Rank-Entry using (dry-operator-false)
 -- the three figures travel with the witness for the same reason: the
 -- payload and the store both enter at the floor here, so a repair that
