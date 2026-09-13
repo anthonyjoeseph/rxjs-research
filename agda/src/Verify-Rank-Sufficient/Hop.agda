@@ -19,20 +19,31 @@
 ------------------------------------------------------------------
 
 ------------------------------------------------------------------
--- WHY THE CHAIN'S READING IS ADDITIVE WHERE THE TERM READING JOINS.
--- A chain is a CONTINUATION, walked once per value, so its frames
--- compose rather than nest: each contributes what its own template can
--- reach, and only a flattener contributes an edge.  The expression
--- measure joins a template's depth onto its source's because a
--- SUBSTITUTION has already happened there — one template's body
--- plugged into another's — and a frame is what is left after that, so
--- what the chain still has to walk is the sum of what each frame can
--- still reach.
+-- THE CHAIN'S READING IS ADDITIVE WHERE THE TERM READING JOINS, AND
+-- THAT IS THE DEFECT RATHER THAN THE DESIGN.  A chain is a
+-- CONTINUATION, walked once per value, so its frames compose rather
+-- than nest, and only a flattener contributes an edge; what does not
+-- follow is that a template's reading may be taken INDEPENDENTLY of
+-- the frame above it and the readings then summed.  The expression
+-- measure plugs a source's reading into the template it feeds, so a
+-- body that never mentions its bound variable never reads it — the
+-- measure SEES a discard.  A chain has already forgotten which frame
+-- fed which, so it charges a discarded template in full.
+--
+-- Two maps that ignore what they are given, each returning an
+-- observable one level deep, under one flattener: the sum charges one,
+-- one and the edge, the term reading joins the two ones and adds the
+-- same edge, and the fit is `3 ≤ 2` at the door.  The repair is on
+-- THIS side — a reading carried THROUGH the frames, each template
+-- plugged at what the frame above it produces, with the addition
+-- surviving only at the flattener's edge.
 --
 -- `thru-outer` is the one frame that pays, because it is the one that
 -- subscribes what it is handed, and a `from-inner` is its counterpart
 -- LEAVING an inner rather than entering one — which is why the edge
 -- sits on exactly one of the two.
+--
+-- REFUTED: `Refuted.Hop-Sum`
 ------------------------------------------------------------------
 
 ------------------------------------------------------------------
@@ -80,12 +91,15 @@ open import Rx.Evaluator using (Path; root; share-sink; _↠_; map-f; scan-f;
 -- A CHAIN'S OWN HOP CONTENT.
 ------------------------------------------------------------------
 
--- A FRAME'S TEMPLATE IS READ AT THE EMPTY ENVIRONMENT, and that is
--- the honest reading rather than a convenience.  The variable a
--- template binds stands for the value about to arrive, whose own
--- reading the fit charges on the other side and which therefore
--- cancels; reading it as zero here is what makes that cancellation
--- exact instead of leaving the payload counted twice.
+-- THE EMPTY ENVIRONMENT IS RIGHT FOR THE FIRST FRAME AND FOR NO
+-- OTHER.  The variable the first frame's template binds stands for the
+-- value about to arrive, whose own reading the fit charges on the
+-- other side and which therefore cancels; reading it as zero there is
+-- what makes that cancellation exact instead of leaving the payload
+-- counted twice.  Every frame BELOW the first binds what the frame
+-- above it produced, which is a reading this measure has and discards —
+-- and that discard is what the block at the head of the module
+-- reports.
 chainDepth : ∀ {n} {Γ : Ctx n} {s t} (ψ : Fin n → Rd₃) →
              Path Γ s t → ℕ
 chainDepth ψ root                    = 0

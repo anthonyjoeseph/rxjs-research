@@ -175,6 +175,13 @@ open import Verify-Rank-Sufficient.Hop using (hopFits)
 -- reading nobody runs; and both sides compute, which makes this
 -- refutable at a concrete registry rather than merely unproven.
 --
+-- AND THAT PREMISE'S LEFT SIDE IS ITSELF UNDER REPAIR — the chain
+-- measure sums a template's reading where the term measure joins it,
+-- and that form is false at the door, where the fit's own header
+-- carries the witness.  The shape of this statement is untouched by
+-- it, but every figure the receipts below report is denominated in the
+-- summing measure, so none of them transfers to the repaired one.
+--
 -- REFUTED: `Refuted.Drain-Reachable` — the form as written, at a store
 --   whose root term is the EMPTY observable.  A chain is a `Path` typed
 --   by the context and the root type alone, so it carries no index
@@ -276,6 +283,19 @@ postulate
 -- entry state is what the subscribe frame produced, and the drain has
 -- not run yet.
 --
+-- REFUTED: `Refuted.Hop-Sum` — FALSE AS WRITTEN, and what is wrong is
+--   the left side rather than anything about the door.  The chain
+--   measure reads each frame's template at the empty environment and
+--   ADDS along the path; the term measure plugs a source's reading into
+--   the template it feeds and JOINS, so it sees a template that
+--   DISCARDS what it is handed and the chain cannot.  Two such maps,
+--   each returning an observable one level deep, under one flattener:
+--   the registration the subscribe frame itself installs reads three
+--   against a term reading of two.  The repair is the measure, and it
+--   is stated where the measure is; the statement here is expected to
+--   survive it unchanged in shape.  SO THE RECEIPTS BELOW DO NOT
+--   TRANSFER: they are evidence about the summing measure, and every
+--   figure in them is denominated in it.
 -- PROBED: `Probed.Entry-Fit` — the SCRIPTED slot, which is where this
 --   statement was once false: a slot's reading has three components,
 --   two of them forced to zero by `isData`, so the count is the only
