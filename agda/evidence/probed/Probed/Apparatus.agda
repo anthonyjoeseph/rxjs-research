@@ -41,17 +41,16 @@
 --
 -- RECOVERY: git show 919f115:agda/evidence/probed/Probed/Apparatus.agda
 -- RECOVERY: git show 8c6fc8d:agda/evidence/probed/Probed/Apparatus.agda
---   restores `Separates`, the type a `-- FORK:` probe proves its
---   separation in — its apartness field is uninhabited when the two
---   candidate mechanisms agree, so the marker decides only which law
---   applies and Agda decides whether the claim is true.  The same sha
---   holds the seven forks that spent it, all of which chose the
---   environment reading `Rx.Hop-Depth` now carries.
+--   holds the seven forks that spent `Separates` before this tree was
+--   cut back, all of which chose the environment reading
+--   `Rx.Hop-Depth` now carries.
 module Probed.Apparatus where
 
 open import Data.Nat using (_≤_)
 open import Data.Nat.Properties using (_≤?_)
 open import Relation.Nullary.Decidable using (True; toWitness)
+open import Relation.Nullary.Negation using (¬_)
+open import Relation.Binary.PropositionalEquality using (_≡_)
 
 -- A CONDITIONED TARGET'S PREMISE, DECIDED RATHER THAN ASSERTED.  A
 -- statement restated onto a hypothesis can only be applied at a point
@@ -69,3 +68,20 @@ Below {t = t} = toWitness t
 Confirms : {A : Set} → .(claim : A) → Set
 Confirms {A} _ = A
 
+-- THE FORK'S PRODUCT, AND IT IS A TYPE RATHER THAN A MARKER.  A
+-- `-- FORK:` probe stands between two candidate MECHANISMS, and what it
+-- earns is that they DISAGREE -- prose saying so is a claim no machine
+-- reads, and a `-- TARGET:` receipt written from such a file would
+-- report coverage the separating rows never bought.
+--
+-- The candidates are two definitions of ONE signature, so the
+-- disagreement is a value: `at` names the point and `apart` carries it
+-- there.  When the two agree, `apart` is uninhabited at every point and
+-- the record cannot be written at all -- which is what makes the marker
+-- decide only WHICH law applies and leaves Agda to decide whether the
+-- claim is true.
+record Separates {A : Set} {B : A → Set} (f g : (x : A) → B x) : Set where
+  constructor separates-at
+  field
+    at    : A
+    apart : ¬ (f at ≡ g at)

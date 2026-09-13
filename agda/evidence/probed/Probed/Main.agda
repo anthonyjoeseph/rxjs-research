@@ -115,3 +115,12 @@ open import Probed.Hop-Store
 -- its body would leave both rows green with nothing separating them
 open import Probed.Defer-Blind
   using (body-reads; gate-reads; open-is; gated-is; openRow; gatedRow)
+
+-- the sweep figures are claimed beside the fork because the separation
+-- alone would not say the margin is nil: the fork says the two rules
+-- disagree at one arrival, and the sweep says the winning rank is the
+-- least one that works there, so a rule supplying more than it needs
+-- could not hide behind the same green
+open import Probed.Arrival-Spend
+  using (deepFork; packed₁-is; packed₃-is; packed₄-is; packed₅-is;
+         packed₆-is; packed₇-is; packed₈-is; flat-reads)
