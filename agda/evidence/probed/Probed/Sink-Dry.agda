@@ -29,13 +29,13 @@
 -- inspecting the state.  So instantiating this premise costs what
 -- RUNNING the program costs, and pays it in a type.
 --
--- MEASURED, AND THE WRITING IS NOT THE VARIABLE.  Three chains folding
--- into observable accumulators exhausted sixteen gigabytes without
--- finishing, at a fold wrapping three times and again at one.  Three
--- chains writing NOTHING did the same.  Two is what fits.  So the axis
--- is the width the tail recurses on, not the depth a chain writes —
--- which is why the width row below carries flat consumers and the
--- writing row carries exactly one.
+-- AND THE WRITING IS NOT THE VARIABLE.  Three chains folding into
+-- observable accumulators exhaust sixteen gigabytes without finishing,
+-- at a fold wrapping three times and again at one; three chains
+-- writing NOTHING do the same, and two is what fits.  So the axis is
+-- the width the tail recurses on, not the depth a chain writes — which
+-- is why the width row below carries flat consumers and the writing
+-- row carries exactly one.
 --
 -- AND THE BOUNDARY IS WIDTH THREE, NOT ANY SHAPE OF CHAIN.  What no
 -- row here reaches is a SECOND hand-off — the state one chain returns

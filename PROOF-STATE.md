@@ -265,10 +265,10 @@ now at the door and at the templates the door's chains are built from.
   headroom the tail leaves. A fold refolds once per DELIVERY, which a hop bound
   does not count.
 
-- **`share-chain-hop`** (Verify-Rank-Sufficient.Path-Fits) — FALSITY,
-  `NO EVIDENCE`: the door's own claim at the share's registry — one flattener
-  count per admitted chain, each against a join with that chain's own state.
-  What the sink arm reduces to now the dispatch's fold is a body.
+- **`share-chain-hop`** (Verify-Rank-Sufficient.Path-Fits) — FALSITY, `PROBED`:
+  the door's own claim at the share's registry — one flattener count per
+  admitted chain, each against a join with that chain's own state. What the
+  sink arm reduces to now the dispatch's fold is a body.
 
 - **`from-inner-dry` / `thru-outer-frame-dry`**
   (Verify-Rank-Sufficient.Path-Fits) — FALSITY, `PROBED×2`: dry-freedom of the

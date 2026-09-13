@@ -227,6 +227,29 @@ ShareHop {e = e} ac gas id now i ψ Rin Rst vals fin sd st =
 -- door's own claim at the fan-out's registry rather than at the
 -- arrival's, and the two are separated by which list is walked: the
 -- door reads `chainsOf`, this reads what the share admits.
+--
+-- AND INSTANTIATING IT COSTS WHAT RUNNING THE PROGRAM COSTS, PAID IN A
+-- TYPE.  Each conjunct is cheap, reading the store at the state its
+-- chain is ENTERED under; the recursive TAIL is taken at the state
+-- that chain's `foldPath` RETURNS, so deciding the next chain's
+-- cancellation test normalises the evaluator inside the type, once per
+-- chain and compounding.  That is a property of this shape and not of
+-- any harness, and it is what bounds the coverage below.
+--
+-- PROBED: `Probed.Sink-Dry` — one WRITING chain, where the store reads
+--   one at subscribe, the dispatch's write lands, and the admitted list
+--   is non-empty, so the premise recursed rather than meeting its `⊤`
+--   arm; and TWO non-writing chains, which reach one hand-off of the
+--   tail's threaded state against a join of nought, where a chain
+--   carrying any flattener refutes.  NOT reached: a SECOND hand-off —
+--   the state one chain returns being read by a chain that is not the
+--   last, which is where a join drifting per chain would first show.
+--   Three chains exhausted sixteen gigabytes without finishing, writing
+--   and non-writing alike, so the axis is the width the tail recurses
+--   on rather than the depth a chain writes.  Also unreached:
+--   observable-valued share slots, whose left side would read positive
+--   where every row here reads nought; completing dispatches; a spent
+--   counter; and stores deepened by an earlier cascade step.
 postulate
   share-chain-hop : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {τ}
     (ac : Acc _≺_ τ) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
