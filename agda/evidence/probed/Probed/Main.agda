@@ -253,3 +253,20 @@ open import Probed.Exit-Frame using (counts₁-is; counts₂-is; counts₃-is)
 open import Probed.Dispatch-Saturates
   using (admits₁-is; admits₂-is; short-is; long-is; seed-is;
          satSeed; satAbove; satDeep)
+
+-- the FLOOR row is the one this file is for, and the four beside it are
+-- what stop it reading as a tidy green over nothing.  A floor stated as
+-- an `all` over a registry holds of a registry carrying no slot-sourced
+-- sink whatever, so the count of rows it BINDS on is claimed first; the
+-- two admitted lengths say the nest is one chain wide at each rung, so
+-- the counter is spent on depth; and the staircase — one, two, three,
+-- then three again — says the counter is read all the way down and
+-- STOPS one below the seed, which is the shape that makes the
+-- saturation rows a statement about the seed rather than about a
+-- machine ignoring it.  The three saturation rows stand at the deepest
+-- nest a context of four admits, which is where the sibling probe's own
+-- receipt says it did not reach
+open import Probed.Sink-Floor
+  using (binds-is; floor-is; floorAdmits₁-is; floorAdmits₃-is;
+         one-is; two-is; three-is; four-is;
+         floorSatSeed; floorSatAbove; satMid)

@@ -224,15 +224,16 @@ now at the door and at the templates the door's chains are built from.
 
 ### Big picture tier roadmap
 
-- **THE TIER'S TWO HOP PREMISES AND THE DISPATCH COUNTER ARE ONE LIFT, AND THE
-  COUNTER IS THE HALF NOTHING WAS TRACKING.** `entry-drain-hop` and
-  `share-chain-hop` both read a registry against the program; the sink's form is
-  refuted because its hypothesis bounds what ENTERS the dispatch while the walk
-  is read ALONG the chain. `dispatch-saturates` is the same gap one level under:
-  the counter bounding the fan-out is seeded at the context size on the reading
-  that a chain sinks strictly above its own share, which is a fact about the
-  PROGRAM that nothing says the RUN preserves into the registry. Carry that
-  reading inward once and all three are stated against it.
+- **THE FLOOR IS AN INDEX ON THE PATH, AND THAT IS WHAT RETIRES THE COUNTER.** A
+  chain registered on share `i` sinks only into a share strictly above `i` — the
+  slot law read rootward — so a path carrying that floor makes the fan-out's
+  re-entry a strict descent and `dispatchShare`'s clamp arm has no type to be
+  written at. The registry's two filters select by SOURCE, so the floor lands in
+  the type of the list the fan-out already takes rather than as a predicate
+  threaded through the five walk modules, which is where the counter's own 123
+  references live. The run preserves it: measured at the deepest nest a context
+  of four admits. The residue is the arm construction cannot reach, postulated
+  at full strength; see below.
 
 - **AND THE FOLD'S FRAME IS MISSING AN AXIS THE SHELF ALREADY STATES ELSEWHERE.**
   `scan-frame-carried` prices a scan's residue at ONE application of its
@@ -255,14 +256,16 @@ now at the door and at the templates the door's chains are built from.
 
 ### Open questions
 
-- **Does the RUN preserve the telescope's stratification into the registry?**
-  A shared slot's definition may name only inputs strictly below it, and that
-  is a fact about the PROGRAM, carried in the slot's own type. Every reading of
-  a registry against the program below assumes the run lifts it: the door's
-  chain count, the sink's walk along a chain, and the fan-out's own seed each
-  bound a run object by a syntactic order nothing states is preserved. Either
-  one invariant carries it inward and all three are stated against that, or it
-  is false at some arm and each of them is separately wrong.
+- **Does SUBSTITUTION preserve the telescope's stratification?** Two of the three
+  ways a subscription is entered now answer themselves: at the root the bound
+  holds of every closed term, since its inputs are drawn from the context; at a
+  share's definition the slot constructor already stores it. The arm neither
+  reaches is an observable
+  manufactured at RUNTIME — a value of observable type IS a closed expression,
+  produced by applying a function rather than sitting in the program — so the
+  slot law never saw it and nothing about it is syntactic. Either substitution
+  carries the bound or the inner subscription is where every reading of a
+  registry against the program goes wrong.
   relevant: `entry-drain-hop`, `share-chain-hop`, `dispatch-saturates`
 
 ### The ledger
@@ -272,7 +275,7 @@ now at the door and at the templates the door's chains are built from.
   flattener count against the program's own reading. Tight at three ladder
   rungs and at a gate; an arrival there reaches exactly ONE chain.
 
-- **`dispatch-saturates`** (Rx.Evaluator-Theorems) — FALSITY, `PROBED`: the
+- **`dispatch-saturates`** (Rx.Evaluator-Theorems) — FALSITY, `PROBED×2`: the
   share fan-out's re-entry counter, clamped to an EMPTY fan-out when spent, so
   this tier's export holds vacuously over the truncation. Filed here and not
   beside its module's siblings because that vacuity IS the dependence.
@@ -296,9 +299,9 @@ now at the door and at the templates the door's chains are built from.
   door's reading in.
 
 - **`scan-frame-carried`** (Verify-Rank-Sufficient.Push-Carried) — SHAPE,
-  `REFUTED`: the fold's residue priced at ONE application of its template, where
-  the machine iterates it once per delivery. The missing quantity is neither
-  half of the payload but the LENGTH of the burst.
+  `REFUTED`: the fold's residue priced at ONE application of its template,
+  where the machine iterates it once per delivery. The missing quantity is
+  neither half of the payload but the LENGTH of the burst.
 
 - **`map-frame-carried`** (Verify-Rank-Sufficient.Push-Carried) — DIFFICULTY,
   `REFUTED×2, DEAD ROUTE, PROBED`: both ends now read the payload PAIR, and the
