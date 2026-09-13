@@ -203,8 +203,31 @@ postulate
 -- reading tracks the chain, and come apart behind a gate, whose figure
 -- is a constant while the chain its body registers is as deep as the
 -- body.  A rule chosen here therefore decides whether the tier's
--- premise holds at all, and no row can be written for this arm until
--- the assembly that folds a chain exists to consume it.
+-- premise holds at all, and the arm has no consumer for such a rule to
+-- be chosen for, which is the finding directly below.
+----------------------------------------------------------------------
+
+----------------------------------------------------------------------
+-- AND THE CONSUMER IS MISSING FOR A REASON THAT IS NOT WAITING.  The
+-- assembly that folds a chain is written and reaches Main, so the arm
+-- is not held up by an absent consumer; it is held up by an absent
+-- PRODUCER.  The fold consumes a fits certificate for a chain and
+-- nothing in this tree builds one, so a shelf entry for the exit frame
+-- would reach Main through no route and fail the wiring law on the day
+-- it was stated.  The shelf's only consumer is the subscribe walk,
+-- which descends a TERM and therefore never stands at an exit frame at
+-- all — so the entry would be unreachable however the rule above were
+-- decided.
+--
+-- TWO THINGS BLOCK BUILDING THAT PRODUCER, and both are restatements
+-- of arms this shelf already carries rather than new leaves.  The
+-- burst arm of a fold is not a frame-carrying statement, so a chain's
+-- steps cannot be assembled out of the shelf as it stands.  And the
+-- map arm is pinned at the readings of a SOURCE EXPRESSION and of its
+-- wrapping, which a chain step does not carry: a chain records the
+-- frame, not the expression the frame was built from.  So the repair
+-- is upstream of this block, and reaching for a new leaf here would
+-- state a third arm nothing could consume either.
 ----------------------------------------------------------------------
 
 ----------------------------------------------------------------------
