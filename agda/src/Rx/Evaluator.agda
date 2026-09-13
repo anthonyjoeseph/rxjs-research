@@ -380,6 +380,21 @@ installNode nid nodeState st =
 -- would put a payload under the seed of every entry that cannot reach
 -- it, and would cost the root its reading of zero for nothing.
 --
+-- AND WHAT THAT LEAVES OWED IS A BOUND AND NOT A SEED, WHICH IS A
+-- DIFFERENT DEBT AND FALLS DUE SOMEWHERE ELSE.  Re-seeding at the
+-- arrival is what keeps the reading honest, and it says nothing about
+-- what BOUNDS the value that arrives.  Every frame reached by descending
+-- a term draws its payload bound from a subterm of that term; an arrival
+-- off the schedule has no such term, because the frame that put the
+-- value there was charged a constant for it and nothing relates the two
+-- figures.  `Probed.Defer-Blind` runs both halves at one body: the same
+-- body reads four, the frame that meets it openly is held to four, and
+-- the frame that meets it through a gate is held to one.  So a per-frame
+-- obligation is consistent and its arrival frames are where a premise
+-- with no term under it would have to come from — a maximum over the
+-- SCHEDULE, which is the one place a value outlives the term that
+-- produced it, and which nothing in this development names.
+--
 -- AND IT IS READ IN THE RANK'S OWN CURRENCY, WHICH IS WHAT THE ENTRY
 -- INVARIANT CAN SPEND.  A re-seed that joined a NESTING to a reading
 -- named a number the rank was larger than and the invariant could not

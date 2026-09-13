@@ -107,3 +107,11 @@ open import Probed.Map-Frame
 open import Probed.Hop-Store
   using (stRow₀; stRow₁; stRow₂; q0-is; q1-is; q2-is;
          same₀; same₁; same₂)
+
+-- the two readings are claimed AHEAD of the rows here, inverting the
+-- usual order, because the rows are degenerate in their conjuncts and
+-- say so: what could have failed is the gate's reading being a constant
+-- while the body under it is not, and a repair that made the gate track
+-- its body would leave both rows green with nothing separating them
+open import Probed.Defer-Blind
+  using (body-reads; gate-reads; open-is; gated-is; openRow; gatedRow)
