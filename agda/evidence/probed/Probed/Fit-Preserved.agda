@@ -35,14 +35,16 @@
 -- flattener, so it adds no hop, and the three `*All` nodes that do add
 -- one are already in the term when the entry reads it.
 
--- AND THE PLAIN RECURSION IS TIGHT, WHICH IS WHERE THE COVERAGE IS.  Q1
--- reads one against one, so the fit has no slack whatever on the
--- simplest program run here: a registry carrying one hop more than the
--- term does would fail it outright, and the deeper two only widen it.
--- That is what makes flat rows evidence rather than comfort — the
--- statement is being instantiated at the point it is closest to false,
--- and a preservation claim bought only where there was room to spare
--- would say nothing about the clause a proof actually has to walk.
+-- AND NO ROW HERE IS TIGHT, WHICH IS A BOUNDARY AND NOT AN OVERSIGHT.
+-- Every program run here is a RECURSION, and a recursion reaches its
+-- variable through a defer — which the term reading charges one hop
+-- for, against a registry that has not installed it yet.  So the margin
+-- is exactly one on the simplest of them and wider on the deeper two,
+-- and it is the gate's own charge in every case rather than slack the
+-- program happened to leave.  A tight row has to be taken where no
+-- defer sits between the two sides, which is `Probed.Gate-Constant` at
+-- the door and `Probed.Entry-Fit` on a chain; what these rows buy is
+-- PRESERVATION across arrivals, which neither of those reaches.
 
 -- WHAT MAKES A FIT ROW LOAD-BEARING.  It spends `Below` — the decision
 -- procedure on the comparison — so its implicit is inhabited exactly
@@ -220,8 +222,9 @@ progQ3 = μᵉ (mergeAllᵉ nothing
 -- registered.  The carried reading is flat across all of them while the
 -- registry returns to length one each time — a `repeat` drops the spent
 -- inner as it registers the next — and it sits at ONE against a term
--- reading of one, which is the tight case: there is no margin here to
--- absorb a step that added a hop.
+-- reading of two.  The margin is the gate's own charge and nothing
+-- else: a recursion reaches its variable through a defer, so the term
+-- reads one hop the registry has not yet installed.
 ----------------------------------------------------------------------
 
 _ : mintAt 0 progQ1 ins₀ ≡ 1          -- LOAD-BEARING
@@ -253,7 +256,7 @@ _ = refl
 _ : carriedAt 3 progQ1 ins₀ ≡ 1       -- LOAD-BEARING
 _ = refl
 
-_ : rankAt 0 progQ1 ins₀ ≡ 1          -- LOAD-BEARING
+_ : rankAt 0 progQ1 ins₀ ≡ 2          -- LOAD-BEARING
 _ = refl
 
 fpQ1₁ : fitAt 1 progQ1 ins₀
@@ -270,7 +273,7 @@ fpQ1₃ = Below
 -- one, so a step here grows the registry along the axis the rank guard
 -- is stated over rather than merely along its length — and the mint
 -- counter does climb, two to six, while the carried reading stays at
--- one against a term reading of two.
+-- one against a term reading of three.
 ----------------------------------------------------------------------
 
 _ : mintAt 0 progQ2 ins₀ ≡ 2          -- LOAD-BEARING
@@ -297,7 +300,7 @@ _ = refl
 _ : carriedAt 3 progQ2 ins₀ ≡ 1       -- LOAD-BEARING
 _ = refl
 
-_ : rankAt 0 progQ2 ins₀ ≡ 2          -- LOAD-BEARING
+_ : rankAt 0 progQ2 ins₀ ≡ 3          -- LOAD-BEARING
 _ = refl
 
 
@@ -317,7 +320,7 @@ fpQ2₃ = Below
 -- off the term alone would be expected to fail — a slot reference is one
 -- symbol standing for a definition of any size.  It is also the one
 -- whose registry grows fastest, four to ten across three steps, and its
--- carried reading is flat at one against a term reading of three.
+-- carried reading is flat at one against a term reading of four.
 ----------------------------------------------------------------------
 
 _ : mintAt 0 progQ3 insMu ≡ 4          -- LOAD-BEARING
@@ -344,7 +347,7 @@ _ = refl
 _ : carriedAt 3 progQ3 insMu ≡ 1      -- LOAD-BEARING
 _ = refl
 
-_ : rankAt 0 progQ3 insMu ≡ 3         -- LOAD-BEARING
+_ : rankAt 0 progQ3 insMu ≡ 4         -- LOAD-BEARING
 _ = refl
 
 

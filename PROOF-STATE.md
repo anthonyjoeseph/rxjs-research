@@ -208,15 +208,15 @@ research lives; where they disagree, the header wins.
 
 ## Tier 1 — the descent never goes dry
 
-**THE TIER IS ONE STATEMENT AND ITS DOOR IS FALSE AGAIN, FOR A SECOND REASON.**
+**THE TIER IS ONE STATEMENT AND ITS DOOR IS NO LONGER REFUTED.**
 `rank-sufficient` (Verify-Rank-Sufficient) says no run emits the dry marker. The
 carried side's addition is repaired — it replays the term reading along the
-chain, so a chain the entry built walks one arithmetic — and the fit is still
-refuted, now at the defer gate.
+chain — and the gate crossing that reopened the door is repaired too: the
+reading charges a defer one flattening, which is what the door actually
+registers.
 
-**AND THIS ONE IS A CURRENCY MISMATCH, NOT AN ARITHMETIC.** The gate reads as
-nothing and registers a flattener, and what it is owed is a schedule TICK —
-which neither measure counts, so neither is repairable alone.
+**AND THE GATE WANTED NO NEW CURRENCY.** A door subscribes the outer gate only,
+so its debt is ONE however deeply gates nest, and a constant clause pays it.
 
 **A FAILING GUARD IS NOT AN ERROR, AND THAT IS WHY THE TIER IS PROBEABLE.** A
 guarded clause returns a `dry` emit and the run continues, so both sides
@@ -225,27 +225,18 @@ procedure rather than a pin, and whose refusal is what turned this up.
 
 ### Open questions
 
-- **CAN ONE READING PRICE BOTH THE TERM AND THE GATE?** The reading is a triple
-  of counts over the SYNTAX, and the two things it has been asked to bound are
-  not both syntactic. A defer's hop is real, is performed, and is paid for by a
-  schedule tick rather than by anything the program spells — and the clause that
-  gives it zero is exactly what makes the reading survive an unfolding, so the
-  two demands are in direct tension rather than merely unreconciled. The fold is
-  the same question from the store's side: an accumulator is rebuilt out of what
-  the fold just emitted, so it too is a quantity no frame hands the next one.
-  relevant: `entry-hop-fits`, `drain-dry-free`, `scan-frame-carried`
+- **CAN ONE READING PRICE WHAT NO FRAME HANDS THE NEXT ONE?** The reading is a
+  triple of counts over the SYNTAX, and it has been asked to bound quantities
+  that are not all syntactic. The gate half is ANSWERED: the demand a defer
+  makes is constant, so a clause paying it without descending pays it in full
+  and the unfolding invariance survives. What is left is the STORE's half, which
+  has no such escape — a fold's accumulator is rebuilt out of what the fold just
+  emitted, so the quantity is not constant, not syntactic, and not carried
+  across the frame boundary either. The question is now whether the store must
+  be read ALONGSIDE the term rather than instead of it.
+  relevant: `scan-frame-carried`, `drain-dry-free`, `entry-hop-fits`
 
 ### Big picture tier roadmap
-
-- **DECIDE WHERE THE GATE IS PAID FOR.** Three candidates and each is
-  instantiable before anything is proven, which is what makes this the leg
-  rather than a design note. The reading could charge the defer and lose the μ
-  equation — so instantiate the loss: unfold a recursion and read both sides.
-  The chain measure could stop charging a gate-installed flattener, telling it
-  apart from a term-built one — so instantiate the under-read: run a gate whose
-  body nests, and see what the registry then misses. Or the fit could name the
-  tick, which is a third currency the comparison does not have today. Refute
-  before grind, and the first two are cheap enough to refute in an afternoon.
 
 - **PLUG THE FOLD AT ITS ACCUMULATOR.** The carried walk reads a `scan-f` at
   what the frame above it produced and NOT at the accumulator the fold is
@@ -264,6 +255,16 @@ procedure rather than a pin, and whose refusal is what turned this up.
   fixed the fold, which is why they are one leg and not two, and why they are
   third: both are stated over the carried quantity, and the fold is the only
   thing left that can still move it.
+
+- **A FRAME NO TERM PRODUCED, WHICH IS THE DRAIN ROW'S REMAINING WITNESS.**
+  Every figure the drain probes pin came back unchanged under both repairs, so
+  what is left of `drain-dry-free`'s risk is exactly the region those rows
+  cannot reach: a frame the drain itself installed, whose shape no subscribe
+  ever walked. The gate is now a live source of such frames — a defer's body is
+  subscribed at a door the entry never saw — so the leg is instantiable in a way
+  it was not before the repair landed. Refute first: run a gate under a
+  recursion past the tick its body is scheduled on, and read the fit at the
+  state the DRAIN produced rather than at the one the entry did.
 
 ### The ledger
 
@@ -284,10 +285,10 @@ procedure rather than a pin, and whose refusal is what turned this up.
   where the reading's plug clause has to be met; a take hands back a prefix
   under a node that reads zero by construction.
 
-- **`entry-hop-fits`** (Verify-Rank-Sufficient) — FALSITY, `REFUTED×2,
-  PROBED×2`: the fit at the door, and false there at one constructor. The
-  threaded measure holds on every chain a term built — one row is TIGHT, landing
-  2 against 2 — and the gate is not one of those.
+- **`entry-hop-fits`** (Verify-Rank-Sufficient) — FALSITY, `REFUTED,
+  PROBED×3`: the fit at the door, with both known crossings repaired. Two rows
+  are TIGHT — 2 against 2 on a chain, 1 against 1 at a gate — so the margin is
+  instantiated, not argued; no constructor is covered under a μ.
 
 - **`thru-outer-frame-carried`** (Verify-Rank-Sufficient.Push-Carried) —
   DIFFICULTY, `PROBED`: the HOP EDGE, where the two currencies are exchanged.
