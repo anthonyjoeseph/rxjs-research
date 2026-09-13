@@ -227,29 +227,17 @@ procedure rather than a pin, and whose refusal is what turned this up.
 ### Open questions
 
 - **DOES A TERM-RELATIVE READING BOUND WHAT THE TERM DID NOT BUILD?** The
-  report the walk now carries prices a burst against the reading of the term
-  being walked, and that reading is a function of the SOURCE. Three places
-  produce a subscription the source does not contain: a flattener re-enters
-  through an emitted VALUE, an arrival delivers into a frame the loop reached
-  after the walk was over, and a fold's accumulator is rebuilt at run time out
-  of what it just emitted. None of the three is inside the induction that
-  proves the report, so each is bounded today by a leaf rather than by an arm —
-  and the tier's whole remaining risk is whether any of them can outrun a
-  quantity the term fixes.
-  relevant: `thru-outer-frame-carried`, `drain-dry-free`, `scan-frame-carried`
+  report the walk carries prices a burst against the reading of the term being
+  walked, and that reading is a function of the SOURCE. Three places produce a
+  subscription the source does not contain, and the flattener's is now
+  MEASURED. What is left is the two the walk cannot see — an arrival delivering
+  into a frame the loop reached after the walk was over, and a fold's
+  accumulator rebuilt at run time out of what it just emitted. Neither is
+  inside the induction that proves the report, so each is bounded by a leaf
+  rather than by an arm.
+  relevant: `drain-dry-free`, `scan-frame-carried`
 
 ### Big picture tier roadmap
-
-- **INSTANTIATE THE HOP EDGE.** The flattener arms are bodies now and their
-  whole residue is one frame-level statement: what `thru-outer` hands back,
-  read one `suc` above what it was handed. That is the first form of the
-  flattener's claim small enough to instantiate — a frame at a concrete inner
-  rather than a clause of the walk — and no form of it has ever been
-  instantiated. The leg builds the rows: an inner that is itself flattened, one
-  parked behind a limit, and one at the rank the descent reaches. A refutation
-  says the exchange between the two currencies costs more than the `suc` the
-  entry invariant pays; a receipt is the first evidence the flattener third of
-  the question above has carried.
 
 - **CARRY THE REPAIRED READING PAST AN ARRIVAL.** The slot count now holds at
   the DOOR and the rows reach twenty-four deliveries under one arrival there,
@@ -268,8 +256,18 @@ procedure rather than a pin, and whose refusal is what turned this up.
   the one place the two currencies meet, and the only one of the three handed
   the ordering between them rather than assuming it. The leg takes the scan
   first, because a witness there is a witness against the question above and
-  the other two are a shelf behind it. It is the mechanical leg of the three,
-  and it is third for that reason.
+  the other two are a shelf behind it. It is the leg that takes the fold third
+  of the question, which is the half of it the arrival leg does not touch.
+
+- **FUSE THE DRY CLAIM INTO THE REPORT'S OWN WALK.** The flattener third of the
+  question above is measured at its edge, and the measurement does not touch
+  the fact that the claim is still made by a LEAF: `dry-operator` asserts the
+  three flatteners' dry-freedom outright, beside a report proven by induction
+  over the same walk. Its own header records why the two want proving together,
+  and that is the question's own complaint — a place the source does not build,
+  bounded by a leaf rather than by an arm. The leg is the reassembly and not
+  the grind: one walk carrying both conclusions. It is third because either leg
+  above it can still move the ground it would be built on.
 
 ### The ledger
 
@@ -278,12 +276,6 @@ procedure rather than a pin, and whose refusal is what turned this up.
   `hopFits` at the schedule's own slot reading and not one the caller picks.
   The fit holds flat across twelve drain states and is TIGHT at the plainest,
   so the rows sit where it is closest to false.
-
-- **`thru-outer-frame-carried`** (Verify-Rank-Sufficient.Push-Carried) —
-  FALSITY, `NO EVIDENCE`: the HOP EDGE, where the two currencies are
-  exchanged. A flattener's frame re-enters the evaluator at an emitted VALUE
-  and hands its deliveries back one `suc` above what it was handed; nothing
-  has instantiated the exchange.
 
 - **`scan-frame-carried`** (Verify-Rank-Sufficient.Push-Carried) — FALSITY,
   `NO EVIDENCE`: the fold's step, and the one frame whose emission IS its
@@ -295,6 +287,11 @@ procedure rather than a pin, and whose refusal is what turned this up.
   frames the walk runs on. A map evaluates a template at the payload, which is
   where the reading's plug clause has to be met; a take hands back a prefix
   under a node that reads zero by construction.
+
+- **`thru-outer-frame-carried`** (Verify-Rank-Sufficient.Push-Carried) —
+  DIFFICULTY, `PROBED`: the HOP EDGE, where the two currencies are exchanged.
+  Six frames reached by RUNNING the flattener arm's own subscription hand back
+  exactly what they were handed, so the `suc` is afforded and never spent.
 
 - **`entry-hop-fits`** (Verify-Rank-Sufficient) — DIFFICULTY, `PROBED×2`: the
   fit at the door. The scripted slot that once refuted it now reads 7 against a
