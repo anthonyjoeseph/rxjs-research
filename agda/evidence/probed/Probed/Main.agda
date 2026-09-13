@@ -48,6 +48,13 @@ open import Probed.Entry-Fit
   using (regs₆; term₆; fitLate; fit24; survives; fitFold;
          regs₂; term₂; fitDiscards)
 
+-- the dry rows are claimed beside the fit rows on purpose: they are the
+-- ASSEMBLY's conclusion rather than the leaf's, and the leaf held at
+-- this shape once while the conclusion did not
+open import Probed.Gate-Constant
+  using (carried₁; carried₂; carried₃; term₁; term₂; term₃;
+         fitGate₁; fitGate₂; fitGate₃; dry₁; dry₂; dry₃)
+
 open import Probed.Fit-Preserved
   using (fpQ1₁; fpQ1₂; fpQ1₃; fpQ2₁; fpQ2₂; fpQ2₃; fpQ3₁; fpQ3₂; fpQ3₃;
          fpDrain)

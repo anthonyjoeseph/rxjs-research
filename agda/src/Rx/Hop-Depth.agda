@@ -263,19 +263,27 @@ mutual
   rdᵉ ψ ρ (exhaustAllᵉ e)   = flatten (rdᵉ ψ ρ e)
   rdᵉ ψ ρ (μᵉ e)            = rdᵉ ψ ρ e
   rdᵉ ψ ρ (varᵉ x)          = 0 , 0 , 0
-  -- THE GATE READS NOTHING, AND THAT IS WHAT THE INVARIANCE BELOW
-  -- COSTS.  A recursion's variable is reachable only under a defer, so
-  -- an unfolding puts the whole μ there; a clause that read the body
-  -- would read more after unfolding than before and the μ edge would
-  -- lose its equation.  The run does not agree: a defer IS a mergeAll
-  -- of a one-shot scheduled outer, so subscribing one registers a
-  -- flattener frame, and a chain measure that prices that frame
-  -- honestly crosses this reading at the DOOR on a one-constructor
-  -- program (`Refuted.Defer-Hop`).  The quantity a defer is owed is a
-  -- schedule TICK, which no component of this triple counts — so the
-  -- disagreement is not repairable by moving either measure, and it is
-  -- the open finding rather than a clause to fix in place.
-  rdᵉ ψ ρ (deferᵉ e)        = 0 , 0 , 0
+  -- THE GATE READS ITS OWN FRAME AND NOT ITS BODY, AND THE TWO HALVES
+  -- OF THAT ARE OWED TO DIFFERENT THINGS.  It reads a frame because a
+  -- defer IS a mergeAll of a one-shot scheduled outer: subscribing one
+  -- registers `thru-outer ↠ κ`, and the chain measure prices that the
+  -- hop it will really perform.  It does not read the BODY because the
+  -- invariance below is what the descent's μ edge rests on — a
+  -- recursion's variable is reachable only under a defer, so an
+  -- unfolding puts the whole μ there, and a clause that recursed would
+  -- read more after unfolding than before.  A CONSTANT clause pays the
+  -- frame and keeps the equation, which is why the repair is available
+  -- at all: the two demands look opposed and are not, because what the
+  -- door owes is independent of what sits under it.
+  --
+  -- AND THE CONSTANT IS EXACTLY ONE, WHICH IS A MEASUREMENT AND NOT A
+  -- CHOICE.  A door subscribes the OUTER gate only; the body is the
+  -- pending payload of a fresh source and is subscribed later, at its
+  -- own door, off its own reading.  So the registry a door returns
+  -- holds one chain of one hop however deeply the gates nest — pinned
+  -- at one, two and three in `Probed.Gate-Constant` — and `flatten` at
+  -- the cancellation is the term for it rather than a numeral.
+  rdᵉ ψ ρ (deferᵉ e)        = flatten (0 , 0 , 0)
 
   -- A TEMPLATE IS READ AGAINST ITS ARGUMENT, not scaled by a slope.  A
   -- map delivers one value per source value, so the top count is the

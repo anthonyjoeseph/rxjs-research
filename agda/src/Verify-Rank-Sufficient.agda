@@ -286,22 +286,12 @@ postulate
 -- entry state is what the subscribe frame produced, and the drain has
 -- not run yet.
 --
--- REFUTED: `Refuted.Defer-Hop` — `deferᵉ (ofᵉ (nat̂ 1 ∷ []))`, and the
---   crossing is `1 ≤ 0`.  The reading gives a defer NOTHING while the
---   door registers a flattener for it, so the two sides disagree about
---   what one constructor does and no program shape is needed to reach
---   it.  Neither side is repairable alone: charging the defer in the
---   reading costs the μ edge its invariance under unfolding, since a
---   recursion's variable sits under a defer and an unfolding puts the
---   whole μ there; dropping the frame from the chain measure
---   under-reads a hop the run really takes.  What a defer is owed is a
---   SCHEDULE TICK, which is the one currency neither side of this
---   comparison is denominated in.
 -- REFUTED: `Refuted.Hop-Sum` — the predecessor CHAIN measure, which
---   read every frame's template apart and added; that one was repaired
---   on the measure's own side and the rows below survived it.  It is
---   named here because the two witnesses are independent: the sum is
---   dead, and the fit is still false without it.
+--   read every frame's template apart and added.  The repair was on the
+--   measure's own side — a reading threaded down the chain — and every
+--   row below survived it, which is what the witness is named here for:
+--   it pins WHICH measure this statement is about, and a return to the
+--   summing one puts the crossing straight back.
 -- PROBED: `Probed.Entry-Fit` — the SCRIPTED slot, which is where this
 --   statement was once false: a slot's reading has three components,
 --   two of them forced to zero by `isData`, so the count is the only
@@ -343,6 +333,26 @@ postulate
 --   that has a slot at all has a SHARED one — so nothing here reaches a
 --   chain built through a SCRIPTED slot, which is the region the
 --   receipt above is taken in.
+-- PROBED: `Probed.Gate-Constant` — the GATE at its own door, which is
+--   the shape this statement was false at: a defer registers a chain
+--   the reading gave nothing, so the crossing read one against zero.
+--   The rows pin BOTH sides separately at one, two and three nested
+--   gates and both read ONE at every depth, so the fit lands on the
+--   nose — a reading that leaves the gate free fails the term column
+--   and one that walks the body fails the carried column, which is
+--   what makes the region instantiated rather than argued.  That the
+--   figure does not climb with nesting is the finding underneath: a
+--   door subscribes the OUTER gate only and the body becomes a fresh
+--   source's pending payload, subscribed later at its own door, so the
+--   debt a door returns is one chain of one hop whatever sits beneath
+--   it.  And the assembly's own conclusion is read back at each depth
+--   off a real run at eight times the fuel the door needs, since
+--   `hasDry` is what the fit is ultimately for and it was observed
+--   wrong at this very shape.  THE BOUNDARY: gates over a literal and
+--   no recursion — a gate under a μ is where the reading's invariance
+--   is load-bearing rather than merely preserved, and that axis is the
+--   fold rows of the first receipt above; a gate whose body is itself
+--   scheduled late is reached by nothing here.
 postulate
   entry-hop-fits : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t)
     (ins : Slots Γ) →

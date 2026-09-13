@@ -8,7 +8,7 @@
 -- ONE PROGRAM, SIX FUELS, AND THE ONE AXIS THAT IS NOT SYNTAX.  The
 -- source here is a recursion rather than a literal, so how many
 -- deliveries happen is set by the DRAIN and not by the term: the
--- program holds still at a hop reading of 3 across every row below,
+-- program holds still at a hop reading of 4 across every row below,
 -- while what the run hands out reads the fuel plus one.  One hop per
 -- unit of fuel, against a term reading constant in it.
 --
@@ -17,9 +17,9 @@
 -- accumulator is stored across arrivals and deepened by one flattener
 -- at each, the arrivals are paid for out of fuel, and fuel is not a
 -- property of the term — so for a fixed program the readings are
--- unbounded while a term-only rank stands still.  THREE units is where
--- that stops being a rate argument: the run's output reads 4 against
--- the term's 3, and at six it reads more than twice it.
+-- unbounded while a term-only rank stands still.  FOUR units is where
+-- that stops being a rate argument: the run's output reads 5 against
+-- the term's 4, and by six it is ahead by three.
 --
 -- WHICH IS WHY AN ENTRY IS NOT TAKEN OFF THE PROGRAM ALONE.  A cascade
 -- re-seeds per arrival, at the value it carries joined with the store's
@@ -135,7 +135,7 @@ fold = scanᵉ step (strmᵗ emptyᵉ) recur
 ψ₀ : Fin 0 → Rd₃
 ψ₀ = slotRd ins₀
 
-_ : depthᵉ ψ₀ fold ≡ 3                               -- LOAD-BEARING
+_ : depthᵉ ψ₀ fold ≡ 4                               -- LOAD-BEARING
 _ = refl
 
 ----------------------------------------------------------------------
@@ -167,7 +167,7 @@ _ = refl
 
 ----------------------------------------------------------------------
 -- THE LEAF, INSTANTIATED PAST THE CROSSING.  It is green at fuel six,
--- where the run's output reads 7 against the term's 3 — so the row does
+-- where the run's output reads 7 against the term's 4 — so the row does
 -- not merely sit inside the region the leaf quantifies over, it sits in
 -- the part of that region a term-only rank has already lost.  What it
 -- still cannot reach is a burst: one delivery per arrival is what keeps
