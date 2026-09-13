@@ -236,19 +236,20 @@ procedure rather than a pin, and whose refusal is what turned this up.
   proves the report, so each is bounded today by a leaf rather than by an arm —
   and the tier's whole remaining risk is whether any of them can outrun a
   quantity the term fixes.
-  relevant: `operator-carried`, `drain-dry-free`, `scan-frame-carried`
+  relevant: `thru-outer-frame-carried`, `drain-dry-free`, `scan-frame-carried`
 
 ### Big picture tier roadmap
 
-- **SPEND THE CARRIED REPORT AT THE FLATTENER LEAF.** The report now exists and
-  is invariant in the walk's motive, so the leaf that was waiting on it is
-  writable: `operator-carried` is the residue the three flatteners left, and
-  `dry-operator` sits beside it unrestated so the rows and the refutation taken
-  against it keep their subject. The leg is the assembly — the flattener arm
-  over the walk's own conclusion at the emitted inner — and the first arm to
-  resist says whether what a flattener re-enters is bounded by the term at all
-  or only by the fold above one. A refutation here is the cheap half of the
-  question above, since the same witness reaches the drain row's arithmetic.
+- **INSTANTIATE THE HOP EDGE.** The flattener arms are bodies now and their
+  whole residue is one frame-level statement: what `thru-outer` hands back,
+  read one `suc` above what it was handed. That is the first form of the
+  flattener's claim small enough to instantiate — a frame at a concrete inner
+  rather than a clause of the walk — and no form of it has ever been
+  instantiated. The leg builds the rows: an inner that is itself flattened, one
+  parked behind a limit, and one at the rank the descent reaches. A refutation
+  says the exchange between the two currencies costs more than the `suc` the
+  entry invariant pays; a receipt is the first evidence the flattener third of
+  the question above has carried.
 
 - **CARRY THE REPAIRED READING PAST AN ARRIVAL.** The slot count now holds at
   the DOOR and the rows reach twenty-four deliveries under one arrival there,
@@ -278,11 +279,11 @@ procedure rather than a pin, and whose refusal is what turned this up.
   The fit holds flat across twelve drain states and is TIGHT at the plainest,
   so the rows sit where it is closest to false.
 
-- **`operator-carried`** (Verify-Rank-Sufficient.Dry) — FALSITY,
-  `NO EVIDENCE`: what the three flatteners carry, the residue `dry-operator`
-  was split away from so neither claim restates the other. A flattener
-  subscribes an emitted VALUE, so the induction the walk runs does not reach
-  it and nothing has instantiated it.
+- **`thru-outer-frame-carried`** (Verify-Rank-Sufficient.Push-Carried) —
+  FALSITY, `NO EVIDENCE`: the HOP EDGE, where the two currencies are
+  exchanged. A flattener's frame re-enters the evaluator at an emitted VALUE
+  and hands its deliveries back one `suc` above what it was handed; nothing
+  has instantiated the exchange.
 
 - **`scan-frame-carried`** (Verify-Rank-Sufficient.Push-Carried) — FALSITY,
   `NO EVIDENCE`: the fold's step, and the one frame whose emission IS its
@@ -302,9 +303,9 @@ procedure rather than a pin, and whose refusal is what turned this up.
 
 - **`dry-operator`** (Verify-Rank-Sufficient.Dry) — DIFFICULTY,
   `REFUTED, DEAD ROUTE×3, PROBED, RECOVERY`: the THREE FLATTENERS' dry-freedom
-  under the entry invariant. At the family that exhibited the crossing the rank
-  now MOVES with the source and outruns what the burst carries, so what is owed
-  is the comparison, not a measure.
+  under the entry invariant, and the only half of them still a leaf. The dry
+  shelf is unconditional in what a frame is handed, so the assembly wants the
+  dry claim and the report proven in ONE walk.
 
 - **`ofᵉ-carried` / `scan-seed-carried`**
   (Verify-Rank-Sufficient.Leaf-Carried) — DIFFICULTY, `PROBED×2`: the two

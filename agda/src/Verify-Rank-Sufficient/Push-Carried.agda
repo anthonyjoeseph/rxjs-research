@@ -25,7 +25,7 @@ module Verify-Rank-Sufficient.Push-Carried where
 open import Data.Bool using (Bool; if_then_else_)
 open import Data.Fin using (Fin)
 open import Data.List using (List; []; _∷_; _++_; map)
-open import Data.Nat using (ℕ; _⊔_; _≤_; z≤n)
+open import Data.Nat using (ℕ; suc; _⊔_; _≤_; z≤n)
 open import Data.Nat.Properties using (≤-trans; ≤-reflexive; ⊔-lub; m≤m⊔n;
   m≤n⊔m)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
@@ -37,7 +37,8 @@ open import Rx.Exp using (Ctx; Closed; Val; Fn; _×ᵗ_)
 open import Rx.Strat-Order using (_≺_)
 open import Rx.Hop-Depth using (Rd₃)
 open import Rx.Evaluator using (Stream; Frame; Path; Sched; EvalSt; NodeId;
-  map-f; scan-f; take-f; stepFrame; splitEvents; retagEvents; pushBurst; stHop)
+  AllOp; map-f; scan-f; take-f; thru-outer; stepFrame; splitEvents;
+  retagEvents; pushBurst; stHop)
 open import Verify-Rank-Sufficient.Carried using (valsHop; emitHop; burstHop;
   emitHop-++; emitHop-values; emitHop-bk; emitHop-retag; splitEvents-vals)
 
@@ -48,12 +49,22 @@ open import Verify-Rank-Sufficient.Carried using (valsHop; emitHop; burstHop;
 -- non-flattening operators run on.
 ----------------------------------------------------------------------
 
+-- TWO PAYLOAD BOUNDS AND NOT ONE, WHICH IS THE WHOLE OF WHAT A
+-- FLATTENER NEEDS.  Four of the walk's operators hand their frame the
+-- bound they hand back, and for those the two are the same number.  A
+-- flattener cannot: what it receives is an emitted OBSERVABLE read under
+-- its source's own reading, and what it hands back is that observable's
+-- deliveries read under the flattener's — which is one `suc` higher.
+-- Collapsing the two costs exactly that `suc`, and the `suc` is the
+-- rank the inner subscription descends by, so a single-bound frame
+-- predicate is weaker than the truth by precisely the amount the descent
+-- has to spend.
 FrameCarries : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {τ} →
   Acc _≺_ τ → Id → Tick → Frame Γ s u → Path Γ u t →
-  (Fin n → Rd₃) → ℕ → ℕ → Set
-FrameCarries {Γ = Γ} {e = e} {s = s} {u = u} ac id now f κ ψ Rv Rst =
+  (Fin n → Rd₃) → ℕ → ℕ → ℕ → Set
+FrameCarries {Γ = Γ} {e = e} {s = s} {u = u} ac id now f κ ψ Rin Rv Rst =
   ∀ (vals : List (Val Γ s)) (fin : Bool) (sd : Sched Γ) (st : EvalSt e) →
-    valsHop ψ s vals ≤ Rv → stHop ψ st ≤ Rst →
+    valsHop ψ s vals ≤ Rin → stHop ψ st ≤ Rst →
     valsHop ψ u (proj₁ (stepFrame ac id now f κ vals fin sd st)) ≤ Rv
     × stHop ψ (proj₂ (proj₂ (proj₂ (proj₂
         (stepFrame ac id now f κ vals fin sd st))))) ≤ Rst
@@ -72,18 +83,46 @@ postulate
   map-frame-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {τ}
     (ac : Acc _≺_ τ) (id : Id) (now : Tick) (fn : Fn Γ [] [] [] s u)
     (κ : Path Γ u t) (ψ : Fin n → Rd₃) (Rv Rst : ℕ) →
-    FrameCarries {e = e} ac id now (map-f fn) κ ψ Rv Rst
+    FrameCarries {e = e} ac id now (map-f fn) κ ψ Rv Rv Rst
 
   scan-frame-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {τ}
     (ac : Acc _≺_ τ) (id : Id) (now : Tick)
     (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
     (κ : Path Γ u t) (ψ : Fin n → Rd₃) (Rv Rst : ℕ) → Rv ≤ Rst →
-    FrameCarries {e = e} ac id now (scan-f fn nid) κ ψ Rv Rst
+    FrameCarries {e = e} ac id now (scan-f fn nid) κ ψ Rv Rv Rst
 
   take-frame-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s} {τ}
     (ac : Acc _≺_ τ) (id : Id) (now : Tick) (nid : NodeId)
     (κ : Path Γ s t) (ψ : Fin n → Rd₃) (Rv Rst : ℕ) →
-    FrameCarries {e = e} ac id now (take-f {s = s} nid) κ ψ Rv Rst
+    FrameCarries {e = e} ac id now (take-f {s = s} nid) κ ψ Rv Rv Rst
+
+----------------------------------------------------------------------
+-- THE HOP EDGE, AND IT IS ONE LEAF.  A flattener's frame is the only
+-- one that re-enters the evaluator: `thruConsume` hands each emitted
+-- observable to `subscribeInner`, which is where the RANK descends and
+-- where a run that has exhausted it returns the dry marker instead of a
+-- burst.  Every other clause of that frame parks, drops or forwards.
+--
+-- WHAT THE PREMISE BUYS, and why it is `suc Rin` rather than `Rin`.
+-- The values arriving here are observables read under the SOURCE's
+-- reading; `subscribeInner` subscribes one of them at the rank one
+-- below the caller's, so what it needs is a rank strictly above what an
+-- arriving observable reads.  The flattener arm supplies exactly that
+-- from the entry invariant, because the reading's own clause for a
+-- flattener is `suc` of its source's and the invariant already puts the
+-- flattener's reading under the rank.  So the descent is paid for by
+-- the one clause of the reading that takes `suc`, which is what the
+-- edge was always supposed to buy.
+--
+-- WHY IT IS NOT A `-core` OVER THE WALK.  The inner is a runtime VALUE,
+-- structurally unrelated to the term the walk is inducting on, so no
+-- arm of the walk reaches it and the report about it cannot be an
+-- induction hypothesis.  It is a genuine leaf and not a missing wire.
+postulate
+  thru-outer-frame-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} {τ}
+    (ac : Acc _≺_ τ) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
+    (κ : Path Γ u t) (ψ : Fin n → Rd₃) (Rin Rst : ℕ) → suc Rin ≤ Rst →
+    FrameCarries {e = e} ac id now (thru-outer op nid) κ ψ Rin (suc Rin) Rst
 
 ----------------------------------------------------------------------
 -- THE WALK, on the burst's spine.  Every emit contributes the frame's
@@ -93,14 +132,14 @@ postulate
 pushBurst-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {τ}
   (ac : Acc _≺_ τ) (id : Id) (now : Tick) (f : Frame Γ s u) (κ : Path Γ u t)
   (burst : Stream Γ s) (sd : Sched Γ) (st : EvalSt e)
-  (ψ : Fin n → Rd₃) (Rv Rst : ℕ) →
-  FrameCarries {e = e} ac id now f κ ψ Rv Rst →
-  burstHop ψ s burst ≤ Rv → stHop ψ st ≤ Rst →
+  (ψ : Fin n → Rd₃) (Rin Rv Rst : ℕ) →
+  FrameCarries {e = e} ac id now f κ ψ Rin Rv Rst →
+  burstHop ψ s burst ≤ Rin → stHop ψ st ≤ Rst →
   burstHop ψ u (proj₁ (pushBurst ac id now f κ burst sd st)) ≤ Rv
   × stHop ψ (proj₂ (proj₂ (pushBurst ac id now f κ burst sd st))) ≤ Rst
-pushBurst-carried ac id now f κ []  sd st ψ Rv Rst fc hb hs = z≤n , hs
+pushBurst-carried ac id now f κ []  sd st ψ Rin Rv Rst fc hb hs = z≤n , hs
 pushBurst-carried {Γ = Γ} {t = t} {e = e} {s = s} {u = u}
-                  ac id now f κ (em ∷ ems) sd st ψ Rv Rst fc hb hs =
+                  ac id now f κ (em ∷ ems) sd st ψ Rin Rv Rst fc hb hs =
   ⊔-lub (≤-trans (≤-reflexive eq) (proj₁ step)) (proj₁ ih) , proj₂ ih
   where
   sp = splitEvents {A = Val Γ u} (InstEmit.events em)
@@ -114,7 +153,7 @@ pushBurst-carried {Γ = Γ} {t = t} {e = e} {s = s} {u = u}
   st₁   = proj₂ (proj₂ (proj₂ (proj₂ sf)))
 
   -- what this emit was handed, off the burst bound it entered with
-  hvals : valsHop ψ s (proj₁ sp) ≤ Rv
+  hvals : valsHop ψ s (proj₁ sp) ≤ Rin
   hvals = ≤-trans (≤-reflexive (splitEvents-vals ψ s (InstEmit.events em)))
                   (≤-trans (m≤m⊔n _ _) hb)
 
@@ -133,5 +172,5 @@ pushBurst-carried {Γ = Γ} {t = t} {e = e} {s = s} {u = u}
 
   ih : burstHop ψ u (proj₁ (pushBurst ac id now f κ ems sd₁ st₁)) ≤ Rv
      × stHop ψ (proj₂ (proj₂ (pushBurst ac id now f κ ems sd₁ st₁))) ≤ Rst
-  ih = pushBurst-carried ac id now f κ ems sd₁ st₁ ψ Rv Rst fc
+  ih = pushBurst-carried ac id now f κ ems sd₁ st₁ ψ Rin Rv Rst fc
          (≤-trans (m≤n⊔m _ _) hb) (proj₂ step)
