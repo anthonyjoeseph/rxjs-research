@@ -224,33 +224,35 @@ now at the door and at the templates the door's chains are built from.
 
 ### Big picture tier roadmap
 
-- **GIVE THE EXIT FRAME ITS SHELF ENTRY, WHICH NOW HAS SOMEWHERE TO PLUG IN.**
-  A flattener's own frame is consumed when its value is subscribed, so the arm
-  the shelf prices sits on no registered chain and the arm every chain is built
-  from has no statement at all. Two rules for what it costs are separated rather
-  than argued, and they come apart behind a gate, so one of them refutes the
-  tier. Decide it by reading the completion branch, the only branch that does
-  not hand the payload straight back, and state the arm at full strength — the
-  fold will then test the fit rather than asserting it. What that branch adds
-  rides the STORE bound, so the shelf's existing shape does not extend.
+- **THE SHARE SINK, WHICH IS NOW KNOWN TO CARRY THE WHOLE OF THE FAN-OUT.** A
+  sink ends its chain and hands the values to every chain registered on the
+  share, and the fold's sink arm consumes an obligation over that fan-out which
+  nothing anywhere produces. The store side has just made this the tier's
+  remaining risk rather than one gap among three: neither slot kind puts a
+  second chain under the bound the fold fixes, so a store that compounds across
+  consumers can only compound HERE. Instantiate the fan-out at a reached share
+  before stating anything, since what the obligation has to carry is decided by
+  what the dispatch does to the store.
 
-- **AND THE STORE SIDE, WHICH NOTHING HAS YET MOVED.** Every payload instantiated
-  so far reads nought and every state reads nought, so the rank has been the
-  term's figure alone at every point and neither half of the join has been
-  separated by anything. A run whose values are themselves observables moves both
-  at once. Instantiate that before the arm above is stated, since a store that can
-  outrun the term's reading changes which bound the arm has to thread rather than
-  how it threads it — and the fold now fixes one store bound for a whole chain,
-  so a store that grows mid-chain is a refutation of the fold's shape and not
-  merely of an arm.
+- **THEN STATE IT, AND THE MEASURE IS THE DESIGN DECISION IN IT.** It is not a
+  fourth frame arm: the fan-out re-enters the chain fold, so the obligation and
+  the fold are mutually recursive and what makes them terminate is chosen rather
+  than ground. Settle the measure first and state the obligation to fit it, then
+  let the fold's sink arm consume it — the arm exists and asserts the fit today,
+  so landing a producer is what turns the assertion into a check. The store
+  bound is the one the fold fixes for the whole chain, so a measure that lets
+  the dispatch re-enter at a LARGER store is a refutation of the fold's shape
+  and not merely of the sink's arm.
 
-- **THEN THE SHARE SINK, WHICH THE FOLD HAS JUST MADE A REAL GAP.** A sink ends
-  its chain and hands the values to every chain registered on the share, and the
-  fold's sink arm consumes an obligation over that fan-out which nothing anywhere
-  produces. It is not a fourth frame arm: the fan-out re-enters the chain fold,
-  so the obligation and the fold are mutually recursive and the measure that
-  makes them terminate is a design decision rather than a grind. Settle the
-  measure first and state the obligation to fit it.
+- **AND THE EXIT FRAME, WHOSE BLOCKER IS NOT THE ONE THIS LEG WAS WRITTEN FOR.**
+  The route it described is dead: the chain fold it was waiting for is written
+  and reaches Main, and the arm STILL cannot be stated, because the shelf's only
+  consumer is the subscribe walk, which descends a term and never stands at an
+  exit frame. What is missing is a PRODUCER of a chain's fits certificate, and
+  two arms block building one — the fold's burst arm is not a frame-carrying
+  statement, and the map arm is pinned at the readings of a source EXPRESSION,
+  which a chain step does not carry. Both are restatements of arms the shelf
+  already holds, so this leg is now those two restatements and not a new leaf.
 
 ### The ledger
 

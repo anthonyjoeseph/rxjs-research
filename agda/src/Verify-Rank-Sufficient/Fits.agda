@@ -91,6 +91,18 @@ FrameDryUnder {Γ = Γ} {e = e} {s = s} ac id now f κ ψ Rin Rst =
 -- over a frame: nothing else in the path can reach those chains, and a
 -- trivially-true sink clause would make the composition below false at
 -- the first diamond.
+--
+-- AND THE WHOLE OF THE FAN-OUT IS HERE, WHICH IS WHAT MAKES THIS THE
+-- STATEMENT THE STORE'S REMAINING RISK RESTS ON.  The chain fold holds
+-- a chain list under ONE store bound, so writes that compounded across
+-- chains would outrun it — and neither slot kind reaches that
+-- configuration through the list.  A cold slot mints a fresh source per
+-- subscriber, so several consumers of one script are several arrivals;
+-- and a SHARED slot's arrival reaches a single chain carrying one sink
+-- and no frame at all, so every consumer behind the share is entered by
+-- the dispatch this obligation is about (`Probed.Store-Rank`).  A sink
+-- clause that did not carry the fan-out's own store write would
+-- therefore leave the compounding case spoken for by nothing.
 ----------------------------------------------------------------------
 
 ShareDryUnder : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {τ} →

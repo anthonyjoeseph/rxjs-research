@@ -128,3 +128,13 @@ open import Probed.Chain-Compose
          uTerm; uReach; uInners; uOuters; uRank;
          gTerm; gReach; gInners; gOuters; gRank;
          capReach; capInners; capOuters; uStore; gStore)
+
+-- the sweeps are claimed beside the fork because the separation says
+-- only that the store half is read, and what the rows add is the two
+-- things a separation cannot: that a cascade's write stays under the
+-- bound the fold fixes, at three rates, and that neither slot kind puts
+-- a second chain under that bound at all — the second being what says
+-- the residue is the sink's rather than untried here
+open import Probed.Store-Rank
+  using (storeFork; liveA; fastA; fasterC; liveB; manyD;
+         sharedE; sharedF)
