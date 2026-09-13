@@ -223,14 +223,16 @@ procedure rather than a pin, and whose refusal is what turned this up.
 
 ### Big picture tier roadmap
 
-- **STATE THE DRAIN'S PREMISE IN THE SHELF'S CURRENCY.** Both named arms are
-  reached and what they showed aims this. A take at a drain step is tight on
-  both halves and its store CLIMBS with the run — three after one instant, four
-  after two — so the quantity a premise names has to be one the state carries
-  forward rather than one an entry fixes. Assembly first: the conditioned
-  statement over postulated leaves, wired so the fit is CHECKED when a leaf
-  lands, then the leaves. Two things it must not do — read the registry a fifth
-  time, and launder the gap into a hypothesis the one call site supplies.
+- **STATE THE DRAIN'S PREMISE PER TEMPLATE, NAMING NO STATE.** The leg that stood
+  here would have named a quantity the state carries forward.  Now refuted: an
+  arrival is seeded at the term's reading PLUS a join of the value it
+  carries with the store, so such a quantity is already INSIDE the grant — and at
+  the crossing both summands read NOUGHT, leaving the grant at the term's own
+  figure and nothing to cover. What climbs is the LEFT,
+  one per flattener. So the premise is the shelf's obligation at each template the
+  run installs, against the payload that template is handed. Assembly first: the
+  conditioned statement over postulated leaves, so the fit is CHECKED when a leaf
+  lands.
 
 - **COMPOSE THE CONSTANTS, WHICH IS THE ONE REGION LEFT UNREACHED.** The payload
   reading is EXACT behind one gate — dry a unit below, green at it. A gate behind
@@ -251,10 +253,10 @@ procedure rather than a pin, and whose refusal is what turned this up.
 ### The ledger
 
 - **`drain-dry-free`** (Verify-Rank-Sufficient) — SHAPE,
-  `REFUTED×6, DEAD ROUTE, PROBED×4`: every arrival after the root frame,
+  `REFUTED×6, DEAD ROUTE×2, PROBED×4`: every arrival after the root frame,
   conditioned on `hopFits` — a registry bound one cascade destroys from a TIGHT
-  entry. The narrowest reading a step could justify dies there too, so the
-  premise is owed per FRAME and not as any reading of the registry.
+  entry. No registry reading survives, nor does widening the premise with what
+  the state carries: the grant joins it and it reads nought.
 
 - **`entry-hop-fits`** (Verify-Rank-Sufficient) — DIFFICULTY,
   `REFUTED, PROBED×3`: the fit at the door, with both known crossings repaired

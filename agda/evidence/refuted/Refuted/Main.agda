@@ -72,7 +72,8 @@ open import Refuted.Arrival-Seed using (seed-e₃; seed-s₃; pay-s₃;
 -- narrowing did NO work — one chain reached and a payload at the floor,
 -- so a repair that moved either would leave the witness silent
 open import Refuted.Arrival-Filtered using (filtered-preserved-false;
-  spend-e₁; grant-e₁; spend-s₁; grant-s₁; reached-s₁; payload-s₁)
+  spend-e₁; grant-e₁; spend-s₁; grant-s₁; reached-s₁; payload-s₁;
+  store-s₁; term-q₁)
 -- and the deeper program's, which are what say the gap is a RATE here
 -- too: same grant, spend one higher per flattener
 open import Refuted.Arrival-Filtered using (spend-e₃; grant-e₃;
