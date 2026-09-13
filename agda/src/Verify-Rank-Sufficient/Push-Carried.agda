@@ -118,19 +118,25 @@ FrameCarries {Γ = Γ} {e = e} {s = s} {u = u} ac id now f κ ψ Rin Rv Rst =
 --   source ACTUALLY emits fitting under the map's reading — which is
 --   the form below, standing at the very program that kills the
 --   symmetric one.
--- PROBED: `Probed.Map-Frame` — the statement itself, applied, at six
+-- PROBED: `Probed.Map-Frame` — the statement itself, applied, at nine
 --   points: three templates that ADD a layer, DROP their argument and
---   PRESERVE it, each at a source reading zero and at one reading one.
+--   PRESERVE it, each at a source reading zero, at one reading one, and
+--   at a FOLD reading three.
 --   Every payload is reached by SUBSCRIBING the source under this very
 --   frame, so the incoming hypothesis is decided rather than granted —
 --   and it is decided at EQUALITY, since what the frame is handed equals
---   the source's reading at both sources.  The growing rows are tight,
+--   the source's reading at every source.  The growing rows are tight,
 --   returning exactly the map expression's reading; the dropping row has
---   a layer of slack at the deeper source, which is the reading tracking
---   the source rather than the template body.  NOT covered: no row
---   reaches an arrival, a drain step, or a store an earlier frame wrote,
---   so the store conjunct is tight at zero throughout and says only that
---   a map leaves the store alone; and no template's own body maps again.
+--   a layer of slack at the middle source and THREE at the fold, so the
+--   slack tracks the source's depth rather than the template body, which
+--   one source could not have shown.  The fold is what makes the STORE
+--   conjunct a comparison: a map mints no node, so the store reads
+--   positive only where the source installed one, and it comes back
+--   TIGHT at three against three — a map that deepened any node would
+--   overrun a bound taken at what it was handed, which a tight zero
+--   could not have said.  NOT covered: no row reaches an arrival or a
+--   drain step, so nothing says what the frame does to a store a LATER
+--   frame wrote; and no template's own body maps again.
 postulate
   map-frame-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {τ}
     (ac : Acc _≺_ τ) (id : Id) (now : Tick) (fn : Fn Γ [] [] [] s u)
@@ -146,20 +152,29 @@ postulate
 -- right one for this frame even though it is the wrong one for its
 -- neighbour.
 --
--- PROBED: `Probed.Take-Frame` — four frames reached by RUNNING the
---   take arm's own subscription, each held to the TIGHTEST bounds the
---   predicate admits: the reading the frame was handed and the reading
---   the store carried in.  Both conjuncts compare something, which the
---   source is built for — a fold whose accumulator is an observable, so
---   the payload reads positive where a stream of nats would read zero,
---   and whose node the store can read where the take's own is priced at
---   zero.  The store half comes back TIGHT at every point, which is the
---   cutting arm dropping entries and installing nothing.  Counts below,
---   at and above what the burst supplies, at two fold rates; the two
---   below hand back strictly less.  No row reaches an arrival, a drain
---   step, or a take whose node an earlier burst already spent — every
---   point sits at a burst that finishes, and the finish flag is pinned
---   rather than assumed.
+-- PROBED: `Probed.Take-Frame` — six frames reached by RUNNING, each
+--   held to the TIGHTEST bounds the predicate admits: the reading the
+--   frame was handed and the reading the store carried in.  Both
+--   conjuncts compare something, which the source is built for — a fold
+--   whose accumulator is an observable, so the payload reads positive
+--   where a stream of nats would read zero, and whose node the store can
+--   read where the take's own is priced at zero.  Four points are the
+--   take arm's own subscription, at counts below, at and above what the
+--   burst supplies and at two fold rates; the two below hand back
+--   strictly less.
+--   Two more stand at a DRAIN STEP, after whole cascades have run, so
+--   the node is one an earlier instant already charged and the store is
+--   one an earlier instant's frames wrote — it reads three after one
+--   instant and four after two, deeper than any subscription reaches,
+--   and comes back tight at both.  The payload is tight there too and
+--   climbs with the run, and the finish flag separates the arm's two
+--   branches where no hop figure can.  A take is reached at an arrival
+--   only BELOW a frame that adds depth, since every arrival's payload
+--   is a slot's and a scripted slot is data-typed; and a node at ZERO
+--   is not reachable at an arrival at all, because the cut that empties
+--   the count severs the registry and the sweep drops the source.  NOT
+--   covered: no row runs the frame over a store written by a chain it is
+--   not part of.
 postulate
   take-frame-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s} {τ}
     (ac : Acc _≺_ τ) (id : Id) (now : Tick) (nid : NodeId)

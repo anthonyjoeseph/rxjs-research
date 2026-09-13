@@ -34,17 +34,25 @@
 -- argument for something shallower, and PRESERVE it.  The two ends of
 -- the statement coincide at the middle two and come apart at the first,
 -- so a bound quietly collapsed onto its neighbour would still pass the
--- preserving rows and fail the growing ones.  The source is varied
--- across two depths as well, so no row is green because the reading it
+-- preserving rows and fail the growing ones.  The source is the second
+-- axis, at three depths, so no row is green because the reading it
 -- compared was zero on both sides.
+
+-- AND THE STORE IS THE THIRD, WHICH IS WHAT THE DEEPEST SOURCE IS FOR.
+-- The statement's store conjunct compares against a bound quantified
+-- over every natural, so a row must take it TIGHT to say anything — and
+-- a tight bound at ZERO is still nothing being compared.  A map mints no
+-- node, so the only way the store reads positive at this frame is for
+-- the SOURCE to have installed one, which a literal never does.  The
+-- fold below does, and holds an accumulator the reading prices at three.
 
 -- THE BOUNDARY, and it is what these rows do NOT buy.  Every row is a
 -- SUBSCRIBE at the root under an empty context: no row reaches an
--- arrival, a drain step, or a store some earlier frame has written, so
--- the store conjunct is tight at zero everywhere and buys nothing but
--- the frame leaving the store alone.  One template application per row,
--- so nothing here reaches a template whose own body maps again.  The
--- FINISH flag is whatever the source's burst carried and is not varied.
+-- arrival or a drain step, so nothing here says what the frame does to a
+-- store a LATER frame wrote — only that it leaves alone one its own
+-- source did.  One template application per row, so nothing here reaches
+-- a template whose own body maps again.  The FINISH flag is whatever the
+-- source's burst carried and is not varied.
 --
 -- TARGET: map-frame-carried @fbcf9c
 module Probed.Map-Frame where
@@ -61,8 +69,8 @@ open import Induction.WellFounded using (Acc)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (InstEvent)
-open import Rx.Exp using (Ctx; Closed; Val; Fn; natᵗ; obs; strmᵗ; ofᵉ;
-  mergeAllᵉ; mapᵉ; nat̂; varᵗ)
+open import Rx.Exp using (Ctx; Closed; Tm; Val; Fn; natᵗ; obs; _×ᵗ_;
+  strmᵗ; ofᵉ; mergeAllᵉ; mapᵉ; scanᵉ; nat̂; fstᵗ; varᵗ)
 open import Rx.Slots using (Slots)
 open import Rx.Strat-Order using (_≺_)
 open import Rx.Hop-Depth using (Rd₃; depthᵉ)
@@ -171,8 +179,9 @@ keep : Fn Γ₀ [] [] [] (obs natᵗ) (obs natᵗ)
 keep = varᵗ (here refl)
 
 ----------------------------------------------------------------------
--- THE TWO SOURCES, so no row compares zero against zero on both sides.
--- `src₀` emits an observable as shallow as the type allows; `src₁`
+-- THE SHALLOW SOURCES, so no row compares zero against zero on both
+-- sides.  `src₀` emits an observable as shallow as the type allows;
+-- `src₁`
 -- emits one already carrying a flattener, so its own reading is
 -- positive and the incoming bound is a real bound rather than a floor.
 ----------------------------------------------------------------------
@@ -185,7 +194,28 @@ src₁ = ofᵉ (strmᵗ (mergeAllᵉ nothing
          (ofᵉ (strmᵗ (ofᵉ (nat̂ 0 ∷ [])) ∷ []))) ∷ [])
 
 ----------------------------------------------------------------------
--- THE SIX POINTS — every template at every source, because which rows
+-- AND A THIRD SOURCE WHOSE SUBSCRIPTION LEAVES SOMETHING IN THE STORE,
+-- which is what the two above cannot do.  A map mints no node, so the
+-- store the frame is handed is whatever its SOURCE installed — and a
+-- literal installs nothing, which is why the store conjunct reads zero
+-- on both sides at every point above and compares nothing.  A fold does
+-- install one, and an accumulator that is an OBSERVABLE is what the
+-- reading prices above zero, so `srcS` is the shape in which the store
+-- half of this statement is a comparison at all.
+----------------------------------------------------------------------
+
+deepen : Fn Γ₀ [] [] [] (obs natᵗ ×ᵗ natᵗ) (obs natᵗ)
+deepen = strmᵗ (mergeAllᵉ nothing (ofᵉ (fstᵗ (varᵗ (here refl)) ∷ [])))
+
+liveSeed : Tm Γ₀ [] [] [] (obs natᵗ)
+liveSeed = strmᵗ (mergeAllᵉ nothing
+             (ofᵉ (strmᵗ (ofᵉ (nat̂ 0 ∷ [])) ∷ [])))
+
+srcS : Closed Γ₀ (obs natᵗ)
+srcS = scanᵉ deepen liveSeed (ofᵉ (nat̂ 0 ∷ nat̂ 1 ∷ []))
+
+----------------------------------------------------------------------
+-- THE NINE POINTS — every template at every source, because which rows
 -- can fail is not decidable from the template alone: a template that
 -- DROPS depth is unfalsifiable at a source reading zero and load-bearing
 -- one layer up, where it must return a payload under a bound its own
@@ -198,6 +228,10 @@ module Keep₀ = Ap ins₀ keep src₀
 module Grow₁ = Ap ins₀ grow src₁
 module Shed₁ = Ap ins₀ shed src₁
 module Keep₁ = Ap ins₀ keep src₁
+
+module GrowS = Ap ins₀ grow srcS
+module ShedS = Ap ins₀ shed srcS
+module KeepS = Ap ins₀ keep srcS
 
 ----------------------------------------------------------------------
 -- BOTH SIDES PINNED, so the rows below are green with a margin someone
@@ -247,6 +281,32 @@ keep₁-is : Keep₁.packed ≡ 1001001001
 keep₁-is = refl
 
 ----------------------------------------------------------------------
+-- AND THE THREE OVER A STORE THAT READS POSITIVE, which is where the
+-- second conjunct stops being a comparison of nothing.  The store reads
+-- THREE going in and three coming out at all three templates, so it is
+-- TIGHT at a figure that could have moved: a map that deepened any node
+-- would overrun a bound taken at exactly what it was handed, and the
+-- rows above could not have said so at zero.
+--
+-- The payload digits repeat the finding the shallow rows already carry,
+-- at a source three layers deep rather than one: the GROWING row is
+-- tight at four against four, the PRESERVING row tight at three against
+-- three, and the DROPPING row returns ZERO under a bound of three —
+-- which is the same slack in the reading's own map clause, now three
+-- layers wide instead of one.  So the slack tracks the SOURCE's depth,
+-- which one source could not have shown.
+----------------------------------------------------------------------
+
+growS-is : GrowS.packed ≡ 3003004004003003
+growS-is = refl
+
+shedS-is : ShedS.packed ≡ 3003000003003003
+shedS-is = refl
+
+keepS-is : KeepS.packed ≡ 3003003003003003
+keepS-is = refl
+
+----------------------------------------------------------------------
 -- THE TARGET, AT THE POINTS THE RUNS REACHED.  The hypotheses are
 -- DECIDED rather than assumed, so a point where the source overruns its
 -- own reading leaves the row unsolvable; what remains is the conclusion
@@ -276,3 +336,15 @@ mapShed₁ = Below , Below
 mapKeep₁ : Confirms (map-frame-carried Keep₁.ac 0 0 keep src₁ root
   Keep₁.ψ Keep₁.Rst Keep₁.vals Keep₁.fin Keep₁.sd Keep₁.st Below Below)
 mapKeep₁ = Below , Below
+
+mapGrowS : Confirms (map-frame-carried GrowS.ac 0 0 grow srcS root
+  GrowS.ψ GrowS.Rst GrowS.vals GrowS.fin GrowS.sd GrowS.st Below Below)
+mapGrowS = Below , Below
+
+mapShedS : Confirms (map-frame-carried ShedS.ac 0 0 shed srcS root
+  ShedS.ψ ShedS.Rst ShedS.vals ShedS.fin ShedS.sd ShedS.st Below Below)
+mapShedS = Below , Below
+
+mapKeepS : Confirms (map-frame-carried KeepS.ac 0 0 keep srcS root
+  KeepS.ψ KeepS.Rst KeepS.vals KeepS.fin KeepS.sd KeepS.st Below Below)
+mapKeepS = Below , Below

@@ -223,23 +223,14 @@ procedure rather than a pin, and whose refusal is what turned this up.
 
 ### Big picture tier roadmap
 
-- **CLOSE THE SHELF'S TWO NAMED ARMS — THE RESTATEMENT WILL BE DENOMINATED
-  THERE.** The leg that stood here proposed a premise read off the arrival and
-  is discarded: narrowing the registry to the chains one arrival reaches, priced
-  at the value it carries, is refuted at the same two programs and is a sub-case
-  of the candidate above it, so the sequence has stopped subdividing. What a step
-  spends is what each FRAME gives back on the payload it is handed — a
-  per-template obligation. That is the shelf, and two of its four arms have a
-  gap where the restatement will put weight: no map row reaches a nonzero store,
-  no take row reaches an ARRIVAL. Instantiate both; refute before grinding.
-
-- **THEN STATE THE DRAIN'S PREMISE IN THE SHELF'S CURRENCY.** With the arms
-  reached, the premise is a claim about what the frames on a chain give back
-  rather than about what a registry holds, so it no longer names a quantity the
-  state cannot carry. Assembly first, as always: the conditioned statement over
-  postulated leaves, wired so the fit is CHECKED when a leaf lands, then the
-  leaves. Two things this must not do — read the registry a fifth time, and
-  launder the gap into a hypothesis the one call site happens to supply.
+- **STATE THE DRAIN'S PREMISE IN THE SHELF'S CURRENCY.** Both named arms are
+  reached and what they showed aims this. A take at a drain step is tight on
+  both halves and its store CLIMBS with the run — three after one instant, four
+  after two — so the quantity a premise names has to be one the state carries
+  forward rather than one an entry fixes. Assembly first: the conditioned
+  statement over postulated leaves, wired so the fit is CHECKED when a leaf
+  lands, then the leaves. Two things it must not do — read the registry a fifth
+  time, and launder the gap into a hypothesis the one call site supplies.
 
 - **COMPOSE THE CONSTANTS, WHICH IS THE ONE REGION LEFT UNREACHED.** The payload
   reading is EXACT behind one gate — dry a unit below, green at it. A gate behind
@@ -248,6 +239,14 @@ procedure rather than a pin, and whose refusal is what turned this up.
   deep as it is. Instantiate that, and a deep store beside it, since the sweep
   that settled the single gate held the store at nought throughout and nothing
   yet says the two quantities do not interact. Refute first.
+
+- **THEN COMPOSE THE SHELF ALONG A CHAIN AND ACROSS A CASCADE.** A per-frame
+  obligation is not yet a per-step one: a chain folds its frames sinkward and a
+  cascade walks a list of chains off one arrival, and those are the two places a
+  bound has to compose. The flattener is the only arm that grows what it hands
+  back, so a rule that joins where it should accumulate stays green on every
+  chain without one. Instantiate a chain carrying two flatteners, and a registry
+  holding chains of different lengths, before stating anything.
 
 ### The ledger
 
@@ -263,15 +262,15 @@ procedure rather than a pin, and whose refusal is what turned this up.
   late-scripted one that refuted the statement included.
 
 - **`map-frame-carried`** (Verify-Rank-Sufficient.Push-Carried) — DIFFICULTY,
-  `REFUTED×2, PROBED`: the two ends are readings of DIFFERENT expressions,
-  apart by the layer a template adds. Six applied rows over three templates;
-  the growing ones are TIGHT and every bound is met at equality. No row reaches
-  a nonzero store.
+  `REFUTED×2, PROBED`: the two ends read DIFFERENT expressions, apart by the
+  layer a template adds. Nine rows, three templates × three sources; the
+  growing ones TIGHT, and a fold's node makes the store a real comparison.
 
 - **`take-frame-carried`** (Verify-Rank-Sufficient.Push-Carried) — DIFFICULTY,
-  `PROBED`: a prefix of what it was handed, under a node reading zero. Four
-  frames reached by RUNNING, at the TIGHTEST bounds the predicate admits and
-  counts either side of the burst; no row reaches an arrival.
+  `PROBED`: a prefix of what it was handed, under a node reading zero. Six
+  frames reached by RUNNING at the TIGHTEST bounds admitted: four at a
+  subscribe, either side of the burst; two at a DRAIN STEP, over a store
+  earlier instants wrote.
 
 - **`scan-burst-carried`** (Verify-Rank-Sufficient.Push-Carried) — DIFFICULTY,
   `REFUTED, PROBED`: the fold, at the burst and at the seed rather than at the
