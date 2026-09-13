@@ -215,9 +215,9 @@ chain — and the gate crossing that reopened the door is repaired too: the
 reading charges a defer one flattening, which is what the door actually
 registers.
 
-**AND THE FOLD IS NOT A FRAME.** A scan emits its own accumulator, so no bound
-on what a frame is handed bounds what it returns; that leaf is now taken at the
-burst and at the seed the walk's own arm installs.
+**AND THE FOLD IS NOT A FRAME, BUT ITS BURST IS PRICED.** A scan emits its own
+accumulator, so nothing a frame is handed bounds what it returns; taken at the
+burst and at the seed the walk installs, the reading prices every refold.
 
 **A FAILING GUARD IS NOT AN ERROR, AND THAT IS WHY THE TIER IS PROBEABLE.** A
 guarded clause returns a `dry` emit and the run continues, so both sides
@@ -228,32 +228,14 @@ procedure rather than a pin, and whose refusal is what turned this up.
 
 - **CAN ONE READING PRICE WHAT NO FRAME HANDS THE NEXT ONE?** The reading is a
   triple of counts over the SYNTAX, and it is asked to bound quantities that are
-  not all syntactic. The gate half is answered. The store's half is not, and the
-  FRAME is no longer where it can be asked. What is open is whether naming the
-  seed recovers the tie between a node and the term that installed it, or
-  whether the store has to be read alongside the term everywhere a node is
-  handed over abstractly.
-  relevant: `scan-burst-carried`, `drain-dry-free`, `entry-hop-fits`
+  not all syntactic. Two halves are now answered: the gate's, and the fold's,
+  where naming the seed recovered the tie between a node and the term that
+  installed it. What is left is the half no naming reaches — a flattener's QUEUE
+  holds observables the RUN chose rather than a term any statement mentions —
+  and whether the store must be read alongside the term wherever that is so.
+  relevant: `drain-dry-free`, `entry-hop-fits`
 
 ### Big picture tier roadmap
-
-- **INSTANTIATE THE FOLD'S NEW LEAF, WHICH NOTHING HAS EVER REACHED.** The
-  statement is taken at the BURST and at the machine's own seed now, so no
-  coverage transfers: every probe of this face reads a subscribe at the ROOT,
-  and this leaf is about what a burst does to a node an arm just installed. Run
-  the walk's scan arm at a fold deepening once and twice per delivery, at a
-  source long enough that the refold count is what is spent, and read both
-  sides. A crossing says the seed is not the missing tie and the question above
-  stays open at the store; agreement at every length says it is, and the row
-  becomes a grind. Refute first, at a node already deeper than its own seed.
-
-- **THE OTHER TWO FRAMES, AS A SHELF.** A map's outputs are a template
-  evaluated at the payload, which is exactly the plug clause the repaired walk
-  now spends at every frame; a take's are a prefix under a node that reads zero
-  by construction. Neither carries a design decision once the leg above has
-  fixed the fold, which is why they are one leg and not two, and why they are
-  third: both are stated over the carried quantity, and the fold is the only
-  thing left that can still move it.
 
 - **A FRAME NO TERM PRODUCED, WHICH IS THE DRAIN ROW'S REMAINING WITNESS.**
   Every figure the drain probes pin came back unchanged under both repairs, so
@@ -265,6 +247,23 @@ procedure rather than a pin, and whose refusal is what turned this up.
   recursion past the tick its body is scheduled on, and read the fit at the
   state the DRAIN produced rather than at the one the entry did.
 
+- **THE STORE HALF THAT NAMING A SEED CANNOT REACH: A FLATTENER'S QUEUE.** The
+  fold's node holds what a named term installed, which is what settled its half
+  of the question above. A limited flattener's node holds observables the RUN
+  chose, and no clause of the reading mentions them — so this is that question
+  in its narrowed form, and it is where the hop edge and the door meet.
+  `thru-outer-frame-carried` is the only row whose evidence reached a flattener
+  at all, and it reached one with nothing queued. Run the flattener arm at a
+  limit low enough that inners back up. Refute first, at a queue holding an
+  observable deeper than the source that emitted it.
+
+- **THE OTHER TWO FRAMES, AS A SHELF.** A map's outputs are a template
+  evaluated at the payload, which is exactly the plug clause the repaired walk
+  now spends at every frame; a take's are a prefix under a node that reads zero
+  by construction. Neither carries a design decision now the fold is fixed,
+  which is why they are one leg and not two, and why they are last: both are
+  stated over the carried quantity, and neither can move a question.
+
 ### The ledger
 
 - **`drain-dry-free`** (Verify-Rank-Sufficient) — FALSITY,
@@ -272,11 +271,6 @@ procedure rather than a pin, and whose refusal is what turned this up.
   `hopFits`. Every figure the drain rows pin came back UNCHANGED under the
   repaired measure, so the region is narrowed rather than re-opened: a witness
   must now be a frame no term produced.
-
-- **`scan-burst-carried`** (Verify-Rank-Sufficient.Push-Carried) — FALSITY,
-  `REFUTED`: the fold, at the burst rather than the frame — the frame-local form
-  is dead, since a scan's output is the accumulator it is rewriting and no
-  payload bound reaches it. Nothing has instantiated the replacement.
 
 - **`map-frame-carried` / `take-frame-carried`**
   (Verify-Rank-Sufficient.Push-Carried) — FALSITY, `NO EVIDENCE`: the other two
@@ -288,6 +282,11 @@ procedure rather than a pin, and whose refusal is what turned this up.
   PROBED×3`: the fit at the door, with both known crossings repaired. Two rows
   are TIGHT — 2 against 2 on a chain, 1 against 1 at a gate — so the margin is
   instantiated, not argued; no constructor is covered under a μ.
+
+- **`scan-burst-carried`** (Verify-Rank-Sufficient.Push-Carried) — DIFFICULTY,
+  `REFUTED, PROBED`: the fold, at the burst and at the seed rather than at the
+  frame. The margin is constant in step depth and in source length, and both the
+  continuation and the store's other nodes are INERT rather than unswept.
 
 - **`thru-outer-frame-carried`** (Verify-Rank-Sufficient.Push-Carried) —
   DIFFICULTY, `PROBED`: the HOP EDGE, where the two currencies are exchanged.

@@ -66,6 +66,13 @@ open import Probed.Carried-Leaf
   using (ofFlat; ofNest; scanFlat; scanNest; rate; packed-is; packed2L-is;
          recurRow)
 
+-- the two pinned figures are claimed beside the rows because the store
+-- half and the payload half come back EQUAL at every point, and a
+-- repair that separated them would leave the rows green saying nothing
+open import Probed.Fold-Burst
+  using (rate₁; rate₄; layers₃; product; queued; nested;
+         oneLayer-is; twoLayer-is)
+
 open import Probed.Drain-Arrival
   using (daM6₁; daM6₂; daM24₁; daM24₂; daL₁; daL₂; daL₃; daDrain)
 

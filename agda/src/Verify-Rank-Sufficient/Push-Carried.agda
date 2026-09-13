@@ -223,6 +223,19 @@ pushBurst-carried {Γ = Γ} {t = t} {e = e} {s = s} {u = u}
 --   a payload bound of zero, the step discards it, and one accumulator
 --   comes back reading one.  The store bound is left slack there so the
 --   row cannot be read as a store bound that was merely too tight.
+-- PROBED: `Probed.Fold-Burst` — the fold's only measure-side quantity
+--   is the accumulator it writes, and the rows move everything feeding
+--   its refold count: one, two and three layers per refold; source
+--   length to four; a source whose every delivery is a flattened pair,
+--   where the reading spends a product rather than a count; a limited
+--   flattener, which queues inners into a node the run mints; a fold
+--   under a fold; a seed above the floor.  The margin is constant along
+--   every family.  Two axes are shown INERT rather than left unswept:
+--   the continuation, since the fold's step names neither it nor the
+--   clock, so every row is evidence at every continuation; and the
+--   store's other nodes, since a fold carries them through untouched
+--   and a deeper one raises the premise's reading by what it raises the
+--   conclusion's.  No row reaches an arrival or a drain step.
 postulate
   scan-burst-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {τ}
     (ac : Acc _≺_ τ) (id : Id) (now : Tick)
