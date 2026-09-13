@@ -65,6 +65,7 @@ open import Verify-Rank-Sufficient.Dry-Emits using (hasDry-++)
 open import Verify-Rank-Sufficient.Entry using (rootTri-reads)
 open import Verify-Rank-Sufficient.Fits using (ArrivalFits; DrainFits)
 open import Verify-Rank-Sufficient.Fold-Path using (cascadeGo-dry-free)
+open import Verify-Rank-Sufficient.Path-Fits using (DrainHop; drainFits)
 
 -- THE THREE PEELS ARE NOT THREE GRINDS OF ONE SIZE, AND THE ASYMMETRY IS
 -- THE SCHEDULE OF THIS TIER.  Two of them are one line over a fact about
@@ -308,29 +309,41 @@ drain-dry-free (suc k) nextId sched st fits with sched-next sched | fits
 -- one place where the state is not arbitrary — the entry the machine
 -- itself minted out of the program and the telescope.
 --
--- PROBED: `Probed.Door-Fits` — the statement itself, applied, at one
---   allowance over a bare slot whose single value lands after the
---   subscribe frame.  The conjunction it reduces to there is written
---   out of constructors and nothing else, and all three ways it could
---   have asked for nothing are pinned against it separately: the
---   allowance serves one arrival, that arrival reaches one chain, and
---   that chain carries no frame.
---   NOT COVERED, and the boundary is the finding rather than the gap.
---   Of `PathFits`'s three constructors only `at-root` stands on
---   something proven — `through` wants the frame shelf and `at-sink` a
---   fan-out, both still postulated — so the region a row can reach at
---   all is exactly the chains with no frame on them.  Everything else
---   is pinned instead of fitted: one flattener over a map of the
---   arriving value builds a chain two frames deep at the same slot and
---   the same arrival, which is where a row would be handing a
---   postulate back as its own evidence.  Nothing here reaches a second
---   arrival, a share, or a registry holding more than one chain.
+-- AND IT IS NO LONGER A LEAF, WHICH IS WHAT THE CHAIN WALK BOUGHT.
+-- The whole of the fit is now built: the allowance recursion, the
+-- arrival's chain list and each chain's own certificate are bodies, so
+-- what is left is a premise in a DIFFERENT CURRENCY — how many
+-- flatteners a registered chain carries, against what the program
+-- reads.  Dryness is not mentioned in it at all, which is the point of
+-- the trade: the statement that remains is arithmetic over a count the
+-- path itself computes rather than a claim about what a run emits.
+--
+-- PROBED: `Probed.Door-Fits` — one arrival over one cold slot, at a
+--   chain with no frame and at a chain carrying ONE flattener over a
+--   template.  The flattened row holds by EQUALITY, so a reading that
+--   charged a flattener more than the chain counts, or a count that
+--   charged more than the reading supplies, crosses at the first row
+--   that reaches a frame at all.  NOT covered: two flatteners, a share,
+--   an arrival reaching more than one chain, or the allowance beyond
+--   its first step.
 postulate
-  entry-drain-fits : ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t)
+  entry-drain-hop : ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t)
     (ins : Slots Γ) →
     let ent = subscribeE (rootWitness e ins) e root 0 0 (sched-init e ins)
                 (st-init e)
-    in DrainFits fuel 1 (proj₁ (proj₂ ent)) (proj₂ (proj₂ ent))
+    in DrainHop fuel 1 (proj₁ (proj₂ ent)) (proj₂ (proj₂ ent))
+
+entry-drain-fits : ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t)
+  (ins : Slots Γ) →
+  let ent = subscribeE (rootWitness e ins) e root 0 0 (sched-init e ins)
+              (st-init e)
+  in DrainFits fuel 1 (proj₁ (proj₂ ent)) (proj₂ (proj₂ ent))
+entry-drain-fits fuel e ins =
+  drainFits fuel 1 (proj₁ (proj₂ ent)) (proj₂ (proj₂ ent))
+    (entry-drain-hop fuel e ins)
+  where
+  ent = subscribeE (rootWitness e ins) e root 0 0 (sched-init e ins)
+          (st-init e)
 
 -- NOTHING BELOW THIS LINE IS THE MACHINE'S TO CHOOSE, AND THAT IS WHAT
 -- THE ITERATED FOLD CLAUSE BOUGHT.  The fit at the door takes the
