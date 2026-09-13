@@ -70,21 +70,70 @@ FrameCarries {Γ = Γ} {e = e} {s = s} {u = u} ac id now f κ ψ Rin Rv Rst =
         (stepFrame ac id now f κ vals fin sd st))))) ≤ Rst
 
 ----------------------------------------------------------------------
--- THE TWO NON-FLATTENING FRAMES THAT HAND BACK WHAT THEY WERE HANDED.
--- Each is a leaf rather than a body, and for two different reasons the
--- assembly above cannot supply: a map's outputs are a TEMPLATE
--- evaluated at the payload, which is the one place the term reading's
--- own plug clause has to be met; and a take's are a prefix of what it
--- was handed under a node whose reading is zero by construction.  The
+-- THE TWO NON-FLATTENING FRAMES, WHICH ARE NOT ONE SHELF.  Both are
+-- leaves rather than bodies, and the reason differs: a take's outputs
+-- are a prefix of what it was handed under a node whose reading is zero
+-- by construction, while a map's are a TEMPLATE evaluated at the
+-- payload, which is a second source of depth neither bound reads.  The
 -- fold is not among them and cannot be — see below.
 ----------------------------------------------------------------------
 
+-- A TEMPLATE IS READ AGAINST ITS ARGUMENT AND MAY IGNORE IT, SO THE
+-- EQUAL-BOUNDS FORM IS WRONG HERE AND ONLY HERE.  The map step of the
+-- term reading exists for exactly this: it reads the template under an
+-- environment binding the payload's reading, so what a `map-f` frame
+-- hands back is that step APPLIED to the bound it was handed, never the
+-- bound itself.
+--
+-- BUT THE BOUND IS FREELY QUANTIFIED AND THE WALK HANDS OVER EXACTLY
+-- ONE, WHICH IS WHAT NARROWS THE REPAIR TO A PIN.  The only
+-- instantiation is the reading of the WHOLE map expression, and that
+-- reading's map clause already joins the template's own reading in —
+-- so the template's depth is inside the bound before the frame is
+-- reached, and the crossing below stands at a bound the caller cannot
+-- produce.  The residue is therefore not a missing quantity but a
+-- missing CONSTRAINT: state the output bound at the point the walk
+-- supplies instead of over every natural, and the second source of
+-- depth is already paid for.  What is NOT yet established is that the
+-- pinned form holds in general; one template is one point.
+--
+-- REFUTED: `Refuted.Map-Template` — the form as written, at a template
+--   that drops a numeral and returns a flattener over a literal.  The
+--   payload reads ZERO, so the frame is held to the strongest bound the
+--   predicate can impose, and the output reads ONE; the store is
+--   untouched, so the second conjunct is satisfied and the crossing is
+--   the payload one alone.  The same module pins the walk's own bound
+--   at this template at ONE and the output fitting under it, which is
+--   what keeps the witness from being read as reaching the call site.
 postulate
   map-frame-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {τ}
     (ac : Acc _≺_ τ) (id : Id) (now : Tick) (fn : Fn Γ [] [] [] s u)
     (κ : Path Γ u t) (ψ : Fin n → Rd₃) (Rv Rst : ℕ) →
     FrameCarries {e = e} ac id now (map-f fn) κ ψ Rv Rv Rst
 
+-- THE PREFIX FRAME, WHICH THE WITNESS ABOVE DOES NOT REACH.  A take
+-- hands back `takeVals`' prefix of the list it was given and writes a
+-- node the reading prices at zero; the cutting arm additionally DROPS
+-- registry entries, which can only lower the store's reading.  So
+-- nothing here evaluates anything, and the equal-bounds form is the
+-- right one for this frame even though it is the wrong one for its
+-- neighbour.
+--
+-- PROBED: `Probed.Take-Frame` — four frames reached by RUNNING the
+--   take arm's own subscription, each held to the TIGHTEST bounds the
+--   predicate admits: the reading the frame was handed and the reading
+--   the store carried in.  Both conjuncts compare something, which the
+--   source is built for — a fold whose accumulator is an observable, so
+--   the payload reads positive where a stream of nats would read zero,
+--   and whose node the store can read where the take's own is priced at
+--   zero.  The store half comes back TIGHT at every point, which is the
+--   cutting arm dropping entries and installing nothing.  Counts below,
+--   at and above what the burst supplies, at two fold rates; the two
+--   below hand back strictly less.  No row reaches an arrival, a drain
+--   step, or a take whose node an earlier burst already spent — every
+--   point sits at a burst that finishes, and the finish flag is pinned
+--   rather than assumed.
+postulate
   take-frame-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s} {τ}
     (ac : Acc _≺_ τ) (id : Id) (now : Tick) (nid : NodeId)
     (κ : Path Γ s t) (ψ : Fin n → Rd₃) (Rv Rst : ℕ) →

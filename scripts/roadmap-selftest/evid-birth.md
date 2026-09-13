@@ -1,4 +1,4 @@
-# fixture — a DIFFICULTY row whose postulates carry no marker: must FAIL
+# fixture — the tier being WORKED holds a row nothing has ever instantiated: must FAIL
 
 ## Tier 0 — anchor
 
@@ -14,8 +14,10 @@
 
 ### The ledger
 
-- **`a-falsity`** — FALSITY, `REFUTED, PROBED`: worst class goes first.
-- **`c-difficulty`** — DIFFICULTY, `NO EVIDENCE`: true, correctly stated, hard.
+- **`a-falsity`** — FALSITY, `NO EVIDENCE`: worst class goes first, and this
+  one has never been instantiated — which is what every refutation this
+  campaign landed was standing on.
+- **`c-difficulty`** — DIFFICULTY, `PROBED`: true, correctly stated, hard.
 - **`d-grindable`** — GRINDABLE, `TWIN`: the shape is already known.
 
 ## Tier 1 — parked

@@ -111,12 +111,25 @@ inputNat (suc (suc ()))
 genNat : Gen ℕ
 genNat = genB 10
 
--- value functions (natᵗ → natᵗ): identity, +k, *k
+-- value functions (natᵗ → natᵗ): identity, +k, *k, and a CONSTANT.
+--
+-- THE FOURTH ARM DROPS ITS ARGUMENT, AND ITS ABSENCE WAS A COVERAGE
+-- HOLE RATHER THAN A CHOICE.  `Fn` is a term with the argument pushed
+-- onto the scope, so a template is free to ignore it — and an
+-- argument-dropping template is what breaks a frame bound denominated
+-- in what the frame was HANDED, since the input's reading cannot bound
+-- an output the input never contributed to.  The three arms above all
+-- USE the argument, so no seed could reach the shape however many
+-- programs it drew.  That is the general trap and not a local one: a
+-- generator built to produce interesting terms systematically
+-- under-samples degenerate ones, and the degenerate ones are where this
+-- campaign's counterexamples have been.
 genFn : ∀ {Δᵍ Δ Θ} → Gen (Fn Γ₂ Δᵍ Δ Θ natᵗ natᵗ)
-genFn = genB 3 >>=G λ c → genNat >>=G λ k →
+genFn = genB 4 >>=G λ c → genNat >>=G λ k →
   pureG (if c ≡ᵇ 0 then varᵗ (here refl)
     else if c ≡ᵇ 1 then primᵗ add (pairᵗ (varᵗ (here refl)) (nat̂ k))
-    else primᵗ mul (pairᵗ (varᵗ (here refl)) (nat̂ k)))
+    else if c ≡ᵇ 2 then primᵗ mul (pairᵗ (varᵗ (here refl)) (nat̂ k))
+    else nat̂ k)
 
 -- scan step (acc, cur) → acc + cur
 genScanFn : ∀ {Δᵍ Δ Θ} → Gen (Fn Γ₂ Δᵍ Δ Θ (natᵗ ×ᵗ natᵗ) natᵗ)
