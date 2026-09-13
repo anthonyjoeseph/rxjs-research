@@ -250,12 +250,18 @@ mutual
            , ≤-trans (m≤n⇒m≤1+n (m≤n+m _ _)) (proj₂ (proj₂ inv)) )
            hst
 
+    -- THE INCOMING BOUND IS THE SOURCE'S OWN READING AND IS NOT WIDENED
+    -- HERE.  What the recursion returns about the inner burst is already
+    -- stated at `depthᵉ ψ b`, and pushing it up to the map expression's
+    -- reading before handing it to the frame is what
+    -- `Refuted.Map-Pinned` kills — the frame would then be admitting a
+    -- payload this source cannot emit, and the template's layer lands on
+    -- top of it.
     pc = pushBurst-carried ac id now (map-f f) κ
            (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
-           ψ (depthᵉ ψ (mapᵉ f b)) (depthᵉ ψ (mapᵉ f b)) (proj₁ (proj₂ τ))
-           (map-frame-carried ac id now f κ ψ
-             (depthᵉ ψ (mapᵉ f b)) (proj₁ (proj₂ τ)))
-           (≤-trans (proj₁ (proj₂ ih)) (hop-mapᵉ ψ f b))
+           ψ (depthᵉ ψ b) (depthᵉ ψ (mapᵉ f b)) (proj₁ (proj₂ τ))
+           (map-frame-carried ac id now f b κ ψ (proj₁ (proj₂ τ)))
+           (proj₁ (proj₂ ih))
            (proj₂ (proj₂ ih))
 
   subscribe-dry-free {u = u} {τ = τ} ac (takeᵉ c b) κ id now sched st inv hst

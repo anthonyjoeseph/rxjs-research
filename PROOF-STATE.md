@@ -235,16 +235,6 @@ procedure rather than a pin, and whose refusal is what turned this up.
 
 ### Big picture tier roadmap
 
-- **RESTATE THE MAP AT THE SUPPLIED POINT.** The frame predicate quantifies its
-  bound over every natural while the walk hands over exactly one, and the
-  witness that killed the equal-bounds form pins that one beside it — so the
-  residue is a missing CONSTRAINT, not a missing quantity. Its shelf-mate is
-  instantiated now and no longer inherits the doubt, which leaves the map alone
-  in it. Write the pinned form, and refute first at a template returning a
-  flattener over a term that is itself an observable, where the two bounds are
-  grown by DIFFERENT clauses of the reading — the narrowed question being
-  whether one instantiation of a free bound constrains or coincides.
-
 - **DELETE THE PREMISE AND LET THE ARRIVAL CARRY ITS OWN ADEQUACY.** Two
   witnesses now say the registry cannot be fitted against anything a STATE
   holds, the widest join included, so a third restatement of `hopFits` is the
@@ -254,6 +244,16 @@ procedure rather than a pin, and whose refusal is what turned this up.
   cascade grew. Restate `drain-dry-free` with no fit premise at all, over that
   seed, and refute first at the two programs that killed the present form — if
   the seed is adequate there, the registry never had to be.
+
+- **INSTANTIATE THE MAP FRAME AS IT NOW READS.** Its two ends are pinned apart
+  and nothing has run the statement itself: what each witness carries is a row
+  in the refutation's OWN currency, at one template, and a locally restated
+  predicate agreeing with a postulate is not the postulate holding. Probe
+  `map-frame-carried` applied, where the row is generated from the statement so
+  a restatement moves every row under it — at templates that ADD, DROP and
+  PRESERVE their argument's depth, and at a payload the source can actually
+  emit rather than the strongest the incoming bound admits, since the gap
+  between those two is what the collapsed form got wrong.
 
 - **THE STORE HALF THAT NAMING A SEED CANNOT REACH: A FLATTENER'S QUEUE.** The
   fold's node holds what a named term installed, which is what settled its half
@@ -272,11 +272,10 @@ procedure rather than a pin, and whose refusal is what turned this up.
   2 against 2 on a chain, 1 against 1 at a gate — so the margin is
   instantiated, not argued; no constructor is covered under a μ.
 
-- **`map-frame-carried`** (Verify-Rank-Sufficient.Push-Carried) — SHAPE,
-  `REFUTED`: a template is a second source of depth and may ignore its
-  argument, so the equal-bounds form is false by a hop at a payload reading
-  zero. The restatement is the reading's own map step, which the chain measure
-  already spends here.
+- **`map-frame-carried`** (Verify-Rank-Sufficient.Push-Carried) — FALSITY,
+  `REFUTED×2`: the two ends are readings of DIFFERENT expressions, apart by the
+  layer a template adds. Both witnesses carry a row where this form survives at
+  the program killing the collapsed one; the form itself is uninstantiated.
 
 - **`drain-dry-free`** (Verify-Rank-Sufficient) — SHAPE, `REFUTED×4, PROBED×4`:
   every arrival after the root frame, conditioned on `hopFits` — which one
