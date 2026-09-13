@@ -45,7 +45,8 @@ open import Probed.Fuel-Growth
   using (drF)
 
 open import Probed.Entry-Fit
-  using (regs₆; term₆; fitLate; fit24; survives; fitFold)
+  using (regs₆; term₆; fitLate; fit24; survives; fitFold;
+         regs₂; term₂; fitDiscards)
 
 open import Probed.Fit-Preserved
   using (fpQ1₁; fpQ1₂; fpQ1₃; fpQ2₁; fpQ2₂; fpQ2₃; fpQ3₁; fpQ3₂; fpQ3₃;

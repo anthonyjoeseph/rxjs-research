@@ -175,12 +175,15 @@ open import Verify-Rank-Sufficient.Hop using (hopFits)
 -- reading nobody runs; and both sides compute, which makes this
 -- refutable at a concrete registry rather than merely unproven.
 --
--- AND THAT PREMISE'S LEFT SIDE IS ITSELF UNDER REPAIR — the chain
--- measure sums a template's reading where the term measure joins it,
--- and that form is false at the door, where the fit's own header
--- carries the witness.  The shape of this statement is untouched by
--- it, but every figure the receipts below report is denominated in the
--- summing measure, so none of them transfers to the repaired one.
+-- AND THE PREMISE'S LEFT SIDE REPLAYS THE RIGHT ONE ALONG THE CHAIN,
+-- WHICH IS WHAT LEAVES THIS ROW WITH EXACTLY ONE SUBJECT.  The chain
+-- measure hands each frame the reading the frame above it produced and
+-- spends the term reading's own step at every one, so the two sides
+-- cannot part on a chain the entry built — they are the same
+-- arithmetic walked in the same order.  What can part them is a frame
+-- the term never produced, which is precisely a chain a cascade has
+-- lengthened past the program that built it, and that is the region
+-- this leaf is about.
 --
 -- REFUTED: `Refuted.Drain-Reachable` — the form as written, at a store
 --   whose root term is the EMPTY observable.  A chain is a `Path` typed
@@ -283,19 +286,6 @@ postulate
 -- entry state is what the subscribe frame produced, and the drain has
 -- not run yet.
 --
--- REFUTED: `Refuted.Hop-Sum` — FALSE AS WRITTEN, and what is wrong is
---   the left side rather than anything about the door.  The chain
---   measure reads each frame's template at the empty environment and
---   ADDS along the path; the term measure plugs a source's reading into
---   the template it feeds and JOINS, so it sees a template that
---   DISCARDS what it is handed and the chain cannot.  Two such maps,
---   each returning an observable one level deep, under one flattener:
---   the registration the subscribe frame itself installs reads three
---   against a term reading of two.  The repair is the measure, and it
---   is stated where the measure is; the statement here is expected to
---   survive it unchanged in shape.  SO THE RECEIPTS BELOW DO NOT
---   TRANSFER: they are evidence about the summing measure, and every
---   figure in them is denominated in it.
 -- PROBED: `Probed.Entry-Fit` — the SCRIPTED slot, which is where this
 --   statement was once false: a slot's reading has three components,
 --   two of them forced to zero by `isData`, so the count is the only
@@ -313,6 +303,15 @@ postulate
 --   one slot, and no HOT one — a hot source is anchored at tick zero
 --   rather than at the subscription, so its clause over-approximates
 --   and a row there would instantiate something weaker than these do.
+--   AND ONE ROW IS TIGHT, which none of those can be made: two
+--   templates that never mention what they are handed, each an
+--   observable one flattener deep, under a third.  That is the shape a
+--   chain measure reading its frames APART crosses the term at, and it
+--   lands on the nose — 2 against 2 — so the region where the two
+--   sides can disagree at all is instantiated rather than argued.  The
+--   figures every other row here pins were taken against the summing
+--   predecessor and came back UNCHANGED, which is what says the
+--   coverage above is about the measure as it now reads.
 -- PROBED: `Probed.Descent` — the root entry of three recursive
 --   programs, each a `refl`-free row whose witness is the decision
 --   procedure on the comparison itself, so a premise FALSE at the

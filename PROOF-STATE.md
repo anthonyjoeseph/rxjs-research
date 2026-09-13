@@ -208,16 +208,16 @@ research lives; where they disagree, the header wins.
 
 ## Tier 1 — the descent never goes dry
 
-**THE TIER IS ONE STATEMENT, AND ITS DOOR IS FALSE.** `rank-sufficient`
-(Verify-Rank-Sufficient) says no run emits the dry marker, and the leaf feeding
-the descent its hypothesis is refuted at the state the root subscribe returns.
-Neither the door nor the reading is what failed: the CARRIED side reads every
-frame's template in isolation and adds, where the term side plugs each template
-at its source and joins.
+**THE TIER IS ONE STATEMENT, AND THE MEASURE UNDER IT NOW HOLDS AT THE DOOR.**
+`rank-sufficient` (Verify-Rank-Sufficient) says no run emits the dry marker. The
+carried side used to read every frame's template in isolation and ADD; it now
+replays the term reading along the chain, so on a chain the entry built the two
+sides are one arithmetic walked in one order.
 
-**SO THE MEASURE IS WHAT MOVES, AND IT IS UNDER EVERYTHING HERE.** Both faces
-of the fit and all five frame leaves are stated over it, and every receipt in
-the tree is denominated in it — so the repair comes first.
+**SO WHAT IS LEFT IS WHAT THE TERM DID NOT BUILD.** The two can part only at a
+frame no term produced — a chain a cascade lengthened — or at a FOLD, whose
+accumulator lives in the store and is therefore the one reading a frame cannot
+hand the next one.
 
 **A FAILING GUARD IS NOT AN ERROR, AND THAT IS WHY THE TIER IS PROBEABLE.** A
 guarded clause returns a `dry` emit and the run continues, so both sides
@@ -226,53 +226,54 @@ procedure rather than a pin, and whose refusal is what turned this up.
 
 ### Open questions
 
-- **DOES A TERM-RELATIVE READING BOUND WHAT THE TERM DID NOT BUILD?** ANSWERED
-  NO, and the counterexample is not at run time at all: the carried side reads
-  each frame's template in isolation and ADDS, so two templates that discard
-  what they are handed are charged twice where the term joins them once, and
-  the door itself hands back `3 ≤ 2`. The reading is not what failed — the
-  chain's arithmetic is. What is left of the question is whether the same
-  reading bounds a chain once that arithmetic is threaded: a fold's accumulator
-  rebuilt out of what it just emitted is the one place a plugged reading has
-  nothing to plug.
-  relevant: `entry-hop-fits`, `drain-dry-free`, `scan-frame-carried`
+- **DOES A TERM-RELATIVE READING BOUND WHAT THE TERM DID NOT BUILD?** HALF
+  ANSWERED, and the answered half was arithmetic rather than run time: a carried
+  side reading each frame's template APART charged two discarded templates twice
+  where the term joins them once, and the door handed back `3 ≤ 2`. Threaded,
+  that same program lands on the nose. What is LEFT is the fold — an accumulator
+  is rebuilt out of what the fold just emitted and lives in the store, so it is
+  the one reading no frame can hand the next one, and a chain a cascade
+  lengthened is where a shortfall there would show.
+  relevant: `drain-dry-free`, `scan-frame-carried`
 
 ### Big picture tier roadmap
 
-- **THREAD THE READING THROUGH THE FRAMES.** The chain measure is refuted and
-  the repair is on its own side: carry a reading ALONG the path the way the
-  term measure carries one through a term, plugging each template at what the
-  frame above it produced, so a discard is seen rather than charged. Only the
-  flattener's edge stays additive. The leg is the restatement and the door's
-  re-instantiation together, because a measure that is not instantiated at the
-  door is a second guess rather than a repair — and everything in this tier is
-  stated over it, so nothing below it can be settled first.
+- **DEEPEN A CHAIN WITHOUT LENGTHENING ITS SOURCE.** The repair narrows where a
+  witness can live rather than removing the risk: the two sides are now one
+  arithmetic on any chain the entry built, so a counterexample has to be a frame
+  no term produced — a cascade that adds a `thru-outer` to a live chain while the
+  term's reading holds still. The axis every arrival row sweeps is the wrong one:
+  a fold reads a delivery count as its refold count, so it moves the bound rather
+  than the quantity bounded. The leg builds
+  that family and steps it. Refute before grind: it is the same shape both
+  standing refutations of this leaf take, arriving at the CONDITIONED statement,
+  so a witness here kills the repair too.
 
-- **RE-TAKE THE EVIDENCE THE REPAIR EXPIRES.** Every fit row in the tree — the
-  door's, the drain's, the arrivals' — is denominated in the summing measure,
-  so the receipts are evidence about text that will be gone and their figures
-  do not transfer. The leg re-runs them against the threaded measure and
-  reports which survive. It is where the question above gets its second half
-  tested: the families already built are exactly the ones that deepen a chain,
-  and a row that was flat under the sum is not guaranteed flat under a join.
+- **PLUG THE FOLD AT ITS ACCUMULATOR.** The carried walk reads a `scan-f` at
+  what the frame above it produced and NOT at the accumulator the fold is
+  rewriting, because a frame carries no seed — the accumulator is in the store.
+  That is a known under-read on the left of a `≤`, so it cannot refute the door;
+  what it can do is make the drain leaf false while the fit stays satisfiable,
+  which is the worst shape available and the remaining half of the question
+  above. The leg states the store's own reading and closes `scan-frame-carried`
+  against it — the one leaf handed the ordering between the two currencies
+  rather than assuming it.
 
-- **CLOSE THE THREE FRAMES, WORST FIRST.** The walk's four non-flattening
-  operators all run on one hypothesis, and it is three leaves: a map's outputs
-  are a template evaluated at the payload, a take's are a prefix under a node
-  that reads zero, and a scan's ARE the accumulator it is rewriting — which is
-  the one place the two currencies meet, and the only one of the three handed
-  the ordering between them rather than assuming it. The leg takes the scan
-  first, because it is the fold half of the question above and the other two
-  are a shelf behind it. It is third because the frames are stated over the
-  carried quantity, which the two legs above it move.
+- **THE OTHER TWO FRAMES, AS A SHELF.** A map's outputs are a template
+  evaluated at the payload, which is exactly the plug clause the repaired walk
+  now spends at every frame; a take's are a prefix under a node that reads zero
+  by construction. Neither carries a design decision once the leg above has
+  fixed the fold, which is why they are one leg and not two, and why they are
+  third: both are stated over the carried quantity, and the fold is the only
+  thing left that can still move it.
 
 ### The ledger
 
 - **`drain-dry-free`** (Verify-Rank-Sufficient) — FALSITY,
   `REFUTED×2, PROBED×4`: every arrival after the root frame, conditioned on
-  `hopFits`, whose left side is the refuted one. The shape survives the repair;
-  the nineteen flat drain states do not, every figure in them being denominated
-  in the summing measure.
+  `hopFits`. Every figure the drain rows pin came back UNCHANGED under the
+  repaired measure, so the region is narrowed rather than re-opened: a witness
+  must now be a frame no term produced.
 
 - **`scan-frame-carried`** (Verify-Rank-Sufficient.Push-Carried) — FALSITY,
   `NO EVIDENCE`: the fold's step, and the one frame whose emission IS its
@@ -285,10 +286,10 @@ procedure rather than a pin, and whose refusal is what turned this up.
   where the reading's plug clause has to be met; a take hands back a prefix
   under a node that reads zero by construction.
 
-- **`entry-hop-fits`** (Verify-Rank-Sufficient) — SHAPE, `REFUTED, PROBED×2`:
-  the fit at the door, and FALSE there. Two templates that discard what they
-  are handed are charged twice by the chain and once by the term, so the repair
-  is the measure and not this statement; its receipts do not transfer.
+- **`entry-hop-fits`** (Verify-Rank-Sufficient) — DIFFICULTY, `PROBED×2`: the
+  fit at the door, where the entry is the only thing that built the chain and
+  so the two sides walk one arithmetic. One row is TIGHT — the program that
+  killed the summing measure, landing 2 against 2.
 
 - **`thru-outer-frame-carried`** (Verify-Rank-Sufficient.Push-Carried) —
   DIFFICULTY, `PROBED`: the HOP EDGE, where the two currencies are exchanged.
@@ -301,11 +302,11 @@ procedure rather than a pin, and whose refusal is what turned this up.
   shelf is unconditional in what a frame is handed, so the assembly wants the
   dry claim and the report proven in ONE walk.
 
-- **`ofᵉ-carried` / `scan-seed-carried`**
-  (Verify-Rank-Sufficient.Leaf-Carried) — DIFFICULTY, `PROBED×2`: the two
-  places a subscribe turns a term into a value. Both are hypothesis-free and
-  both sides compute, and the rows are taken at points where neither side is
-  zero; a literal mentioning an input is not covered by either.
+- **`ofᵉ-carried` / `scan-seed-carried`** (Verify-Rank-Sufficient.Leaf-Carried)
+  — DIFFICULTY, `PROBED×2`: the two places a subscribe turns a term into a
+  value. Both are hypothesis-free and both sides compute, and the rows are
+  taken at points where neither side is zero; a literal mentioning an input is
+  not covered by either.
 
 ## Tier 2 — Verify-Well-Formed (parked behind tier 1)
 

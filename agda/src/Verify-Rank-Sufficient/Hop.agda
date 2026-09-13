@@ -19,31 +19,38 @@
 ------------------------------------------------------------------
 
 ------------------------------------------------------------------
--- THE CHAIN'S READING IS ADDITIVE WHERE THE TERM READING JOINS, AND
--- THAT IS THE DEFECT RATHER THAN THE DESIGN.  A chain is a
--- CONTINUATION, walked once per value, so its frames compose rather
--- than nest, and only a flattener contributes an edge; what does not
--- follow is that a template's reading may be taken INDEPENDENTLY of
--- the frame above it and the readings then summed.  The expression
--- measure plugs a source's reading into the template it feeds, so a
--- body that never mentions its bound variable never reads it — the
--- measure SEES a discard.  A chain has already forgotten which frame
--- fed which, so it charges a discarded template in full.
+-- THE CHAIN IS READ BY REPLAYING THE TERM READING ALONG IT, AND THAT
+-- IS WHAT MAKES THE TWO SIDES ONE QUANTITY RATHER THAN TWO.  A chain
+-- is a CONTINUATION, walked once per value, so its frames compose
+-- rather than nest; but composing them is not the same as reading them
+-- APART.  The expression measure plugs a source's reading into the
+-- template it feeds, so a body that never mentions its bound variable
+-- never reads it — the measure SEES a discard.  A measure that reads
+-- each template in isolation cannot, and charges a discarded template
+-- in full.
 --
--- Two maps that ignore what they are given, each returning an
--- observable one level deep, under one flattener: the sum charges one,
--- one and the edge, the term reading joins the two ones and adds the
--- same edge, and the fit is `3 ≤ 2` at the door.  The repair is on
--- THIS side — a reading carried THROUGH the frames, each template
--- plugged at what the frame above it produces, with the addition
--- surviving only at the flattener's edge.
+-- So the walk here carries a reading and hands each frame what the
+-- frame above it produced, spending the TERM READING'S OWN step at
+-- every frame rather than a second arithmetic beside it: a `map-f` and
+-- a `scan-f` plug, a `thru-outer` flattens, and nothing else moves the
+-- quantity.  A frame the term measure would never have produced is
+-- then the only way the two can part, which is exactly the content the
+-- statements below want — they are about chains a cascade has
+-- lengthened, not about chains the entry built.
 --
 -- `thru-outer` is the one frame that pays, because it is the one that
 -- subscribes what it is handed, and a `from-inner` is its counterpart
 -- LEAVING an inner rather than entering one — which is why the edge
 -- sits on exactly one of the two.
 --
--- REFUTED: `Refuted.Hop-Sum`
+-- REFUTED: `Refuted.Hop-Sum` — the predecessor measure read every
+--   frame's template at the EMPTY environment and ADDED along the
+--   path.  Two maps that ignore what they are given, each returning an
+--   observable one level deep, under one flattener: the sum charged
+--   one, one and the edge against a term reading of two, and the fit
+--   was `3 ≤ 2` at the door.  The witness states that arithmetic
+--   locally, so it goes on saying which form is dead whatever is
+--   carried here.
 ------------------------------------------------------------------
 
 ------------------------------------------------------------------
@@ -77,12 +84,12 @@ module Verify-Rank-Sufficient.Hop where
 
 open import Data.Fin using (Fin)
 open import Data.List using (List; []; _∷_)
-open import Data.Nat using (ℕ; suc; _+_; _⊔_; _≤_)
+open import Data.Nat using (ℕ; _⊔_; _≤_)
 open import Data.Product using (_×_; _,_; proj₂)
 
 open import Rx.Prim using (Source)
 open import Rx.Exp using (Ctx; Closed)
-open import Rx.Hop-Depth using (Rd₃; ε; rdᵗ; depthᵉ)
+open import Rx.Hop-Depth using (Rd₃; ε; mapStep; flatten; hopOf; depthᵉ)
 open import Rx.Slot-Read using (slotRd)
 open import Rx.Evaluator using (Path; root; share-sink; _↠_; map-f; scan-f;
   take-f; from-inner; thru-outer; Chain; RegId; Sched; EvalSt)
@@ -91,25 +98,36 @@ open import Rx.Evaluator using (Path; root; share-sink; _↠_; map-f; scan-f;
 -- A CHAIN'S OWN HOP CONTENT.
 ------------------------------------------------------------------
 
--- THE EMPTY ENVIRONMENT IS RIGHT FOR THE FIRST FRAME AND FOR NO
--- OTHER.  The variable the first frame's template binds stands for the
--- value about to arrive, whose own reading the fit charges on the
--- other side and which therefore cancels; reading it as zero there is
--- what makes that cancellation exact instead of leaving the payload
--- counted twice.  Every frame BELOW the first binds what the frame
--- above it produced, which is a reading this measure has and discards —
--- and that discard is what the block at the head of the module
--- reports.
+-- THE PAYLOAD ENTERS AT ZERO, AND ONLY THE PAYLOAD DOES.  The variable
+-- the FIRST frame's template binds stands for the value about to
+-- arrive, whose own reading the fit charges on the other side and which
+-- therefore cancels; entering the walk at zero is what makes that
+-- cancellation exact instead of leaving the payload counted twice.
+-- Every frame below the first is handed what the frame above it
+-- produced, which is the whole difference from the summing measure the
+-- module header records.
+--
+-- A `scan-f` IS PLUGGED AT ITS SOURCE AND NOT AT ITS ACCUMULATOR, which
+-- is a gap and is named here rather than hidden.  The term reading
+-- binds a fold's step variable to the JOIN of the accumulator's reading
+-- and the source's, and a frame carries no seed — the accumulator lives
+-- in the store.  That is the store obligation the block below already
+-- owes, arriving one level down: what is read here is one refold
+-- against the arriving value, which is what the frame itself fixes.
+chainRd : ∀ {n} {Γ : Ctx n} {s t} (ψ : Fin n → Rd₃) →
+          Path Γ s t → Rd₃ → Rd₃
+chainRd ψ root                    p = p
+chainRd ψ (share-sink i)          p = p
+chainRd ψ (map-f fn ↠ κ)          p = chainRd ψ κ (mapStep ψ ε p fn)
+chainRd ψ (scan-f fn nid ↠ κ)     p = chainRd ψ κ (mapStep ψ ε p fn)
+chainRd ψ (take-f nid ↠ κ)        p = chainRd ψ κ p
+chainRd ψ (from-inner op a i ↠ κ) p = chainRd ψ κ p
+-- THE EDGE: this frame subscribes what it is handed
+chainRd ψ (thru-outer op nid ↠ κ) p = chainRd ψ κ (flatten p)
+
 chainDepth : ∀ {n} {Γ : Ctx n} {s t} (ψ : Fin n → Rd₃) →
              Path Γ s t → ℕ
-chainDepth ψ root                    = 0
-chainDepth ψ (share-sink i)          = 0
-chainDepth ψ (map-f fn ↠ κ)          = proj₂ (rdᵗ ψ ε fn) + chainDepth ψ κ
-chainDepth ψ (scan-f fn nid ↠ κ)     = proj₂ (rdᵗ ψ ε fn) + chainDepth ψ κ
-chainDepth ψ (take-f nid ↠ κ)        = chainDepth ψ κ
-chainDepth ψ (from-inner op a i ↠ κ) = chainDepth ψ κ
--- THE EDGE: this frame subscribes what it is handed
-chainDepth ψ (thru-outer op nid ↠ κ) = suc (chainDepth ψ κ)
+chainDepth ψ c = hopOf (chainRd ψ c (0 , 0 , 0))
 
 -- the worst chain the registry holds
 regsDepth : ∀ {n} {Γ : Ctx n} {t} (ψ : Fin n → Rd₃) →
