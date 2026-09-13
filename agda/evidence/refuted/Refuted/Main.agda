@@ -15,5 +15,10 @@ module Refuted.Main where
 
 open import Refuted.Drain-Reachable using (drain-dry-free-false;
   drain-dry-free-inv-false)
+-- the two figures are claimed beside the witness on purpose: an
+-- inequality refutation dies quietly when a repair enlarges the right
+-- side, and a pinned crossing fails by name instead
+open import Refuted.Hop-Sum using (entry-hop-fits-false; carried-is; term-is)
+
 open import Refuted.Rank-Entry using (dry-operator-false)
 open import Refuted.Sync-Count using (sync-count-bounded-false)
