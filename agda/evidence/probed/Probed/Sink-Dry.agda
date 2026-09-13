@@ -1,47 +1,46 @@
--- THE SINK'S DRY OBLIGATION AT A SHARE — `share-sink-dry` says that
--- `dispatchShare` never emits a dry event given the store and vals
--- bounds, at any gas and any state satisfying those bounds.  The fan-
--- out folds chains THREADING ONE STATE, so a later chain is entered at
--- whatever an earlier one left, and the store the dispatch WAS ENTERED
--- AT is what the bound is stated over.  These rows instantiate the
--- predicate at the subscribe state, where the store carries the fold
--- accumulators the chains just installed, and ask whether the dispatch
--- over those chains avoids dry events.
+-- THE FAN-OUT'S HOP OBLIGATION AT A SHARE — `share-chain-hop` says
+-- that every chain the share admits carries no more flatteners than
+-- the bound it is entered under affords, one conjunct per admitted
+-- registration, each read at the state the fold threads into it.  It
+-- is the arrival door's own claim moved to the share's registry, and
+-- it is what the sink arm reduces to now that the dispatch's fold is a
+-- body.
 
 -- EVIDENCE, not a claim: `src` cannot import this file and nothing in
 -- the proof may rest on it.  Checked by `make probed`, claimed by
 -- `Probed.Main`.
 
 -- THE LOAD-BEARING ROWS instantiate at programs where `Rst = stHop ψ
--- st > 0`: `oneProg` (one `deepen3`-style scan consumer) and
+-- st > 0`: `oneProg` (one observable-accumulator scan consumer) and
 -- `thriceProg` (three identical ones).  Both have `Rst = 1` at the
--- subscribe state, so the store bound is genuinely constraining rather
--- than vacuous.  The `stOut` digit records the store depth AFTER the
--- dispatch, confirming the fan-out's write happened and was priced, and
--- the `nRegs` digit confirms the dispatch delivered to a non-empty list
--- rather than vacuously folding the empty case.
+-- subscribe state, so the join the chains are held under is genuinely
+-- read off the store rather than handed in.  The `stOut` digit records
+-- the store depth AFTER the dispatch, confirming the fan-out's write
+-- happened and was priced, and the `nRegs` digit confirms the premise
+-- recursed over a non-empty list rather than landing on its `⊤` arm —
+-- which is the one way a row here could read green having asserted
+-- nothing at all.
 
 -- THE `valsHop ψ natᵗ vals` CONJUNCT IS ALWAYS ZERO here, because the
 -- dispatched values are natural numbers and `rdᵛ ψ natᵗ _ = 0 , 0` by
--- definition.  So `Rin = 0` everywhere and the `valsHop ≤ Rin`
--- hypothesis is `0 ≤ 0`, which is degenerate as a vals conjunct.  A
--- fan-out over observable-valued slots would vary this axis.
+-- definition.  So `Rin = 0` everywhere and each conjunct reads as a
+-- bare flattener count against the join.  A fan-out over
+-- observable-valued slots would put a positive figure on the left.
 
 -- THE DEGENERATE CONTROL is `quietProg`, whose three consumers are
 -- plain-number scans: `Rst = 0` at subscribe and `stOut = 0` after
--- dispatch, so the bound is vacuous as an `Rst` conjunct there.  The
--- row confirms that the dispatch is dry-free even at zero store depth,
--- separating the dry property from the writing.
+-- dispatch, so the join is nought and a chain carrying ANY flattener
+-- would refute there.  It separates the hop count from the writing.
 
 -- WHAT IS NOT COVERED: observable-valued share slots (where `Rin > 0`);
--- completing dispatches (`fin = true`); gas exhaustion (the
--- `dispatchShare sf zero` base case, which is unreachable on real
--- registries per the comment above that clause); and store writes from
+-- completing dispatches (`fin = true`); a spent counter (the
+-- `dispatchShare sf zero` clamp, which the sink's body closes by
+-- reduction and which no hop premise is read at); and store writes from
 -- EARLIER cascade steps — the dispatch here is at the fresh-subscribe
 -- state, so `Rst` equals what the subscription left and no prior
 -- instant has deepened it.
 
--- TARGET: share-sink-dry @244d40
+-- TARGET: share-chain-hop @0d85b2
 module Probed.Sink-Dry where
 
 open import Data.Bool using (Bool; false)
@@ -51,6 +50,7 @@ open import Data.List.Relation.Unary.Any using (here)
 open import Data.Maybe using (nothing)
 open import Data.Nat using (ℕ; _+_; _*_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Data.Unit using (tt)
 open import Data.Vec using () renaming ([] to []ⱽ; _∷_ to _∷ⱽ_)
 open import Induction.WellFounded using (Acc)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
@@ -64,7 +64,7 @@ open import Rx.Hop-Depth using (Rd₃)
 open import Rx.Slot-Read using (slotRd)
 open import Rx.Evaluator using (EvalSt; Sched; root; shareAdmit; subscribeE; rootWitness; rootTri; sched-init; st-init;
   dispatchShare; stHop)
-open import Verify-Rank-Sufficient.Path-Fits using (share-sink-dry)
+open import Verify-Rank-Sufficient.Path-Fits using (share-chain-hop)
 open import Probed.Apparatus using (Confirms; Below)
 
 ----------------------------------------------------------------------
@@ -81,30 +81,27 @@ ins zero       = scripted (cold [] (after 0 , 9 ∷ after 0 , 8 ∷ []))
 ins (suc zero) = shared (input zero)
 
 ----------------------------------------------------------------------
--- THREE CONSUMERS AT INCREASING WRAPPING RATES.  Each is a fold whose
--- accumulator is an OBSERVABLE, so the node its subscribe installs
--- reads positive.  `deepen3` wraps three times, giving the deepest
--- per-delivery write.
+-- THE WRITING CONSUMER.  A fold whose accumulator is an OBSERVABLE, so
+-- the node its subscribe installs reads positive and the fan-out's
+-- per-delivery write lands somewhere the store reading can see.
+--
+-- AND THE WRAPPING RATE IS ONE, WHICH IS NOT A WEAKENING.  What makes
+-- a row here load-bearing is that the store reads POSITIVE before the
+-- dispatch and that the dispatch's write lands, and the entering
+-- reading comes off the SEED rather than off the fold function — so a
+-- deeper fold raises only `stOut`, at a normalisation cost the
+-- dispatch pays in full at every one of the admitted chains.
 ----------------------------------------------------------------------
 
 deepen : Fn Γ₂ [] [] [] (obs natᵗ ×ᵗ natᵗ) (obs natᵗ)
 deepen = strmᵗ (mergeAllᵉ nothing (ofᵉ (fstᵗ (varᵗ (here refl)) ∷ [])))
-
-deepen2 : Fn Γ₂ [] [] [] (obs natᵗ ×ᵗ natᵗ) (obs natᵗ)
-deepen2 = strmᵗ (mergeAllᵉ nothing (ofᵉ (strmᵗ (mergeAllᵉ nothing
-            (ofᵉ (fstᵗ (varᵗ (here refl)) ∷ []))) ∷ [])))
-
-deepen3 : Fn Γ₂ [] [] [] (obs natᵗ ×ᵗ natᵗ) (obs natᵗ)
-deepen3 = strmᵗ (mergeAllᵉ nothing (ofᵉ (strmᵗ (mergeAllᵉ nothing
-            (ofᵉ (strmᵗ (mergeAllᵉ nothing
-              (ofᵉ (fstᵗ (varᵗ (here refl)) ∷ []))) ∷ []))) ∷ [])))
 
 seed : Tm Γ₂ [] [] [] (obs natᵗ)
 seed = strmᵗ (mergeAllᵉ nothing
          (ofᵉ (strmᵗ (ofᵉ (nat̂ 0 ∷ [])) ∷ [])))
 
 cons3 : Tm Γ₂ [] [] [] (obs natᵗ)
-cons3 = strmᵗ (mergeAllᵉ nothing (scanᵉ deepen3 seed (input (suc zero))))
+cons3 = strmᵗ (mergeAllᵉ nothing (scanᵉ deepen seed (input (suc zero))))
 
 -- a consumer that fans out WITHOUT WRITING: the node its subscribe
 -- installs reads nought and stays there however many values arrive
@@ -198,35 +195,33 @@ module Quiet3 = Ap quietProg 3
 -- three read nought says nothing about the fan-out.
 ----------------------------------------------------------------------
 
-one3-is : One3.packed ≡ 4001001
+one3-is : One3.packed ≡ 2001001
 one3-is = refl
 
-three3-is : Three3.packed ≡ 4001003
+three3-is : Three3.packed ≡ 2001003
 three3-is = refl
 
 quiet3-is : Quiet3.packed ≡ 3
 quiet3-is = refl
 
 ----------------------------------------------------------------------
--- THE TARGET AT THE THREE POINTS.  Both hypotheses are decided rather
--- than assumed: the `valsHop` premise is `0 ≤ 0` (nat depth is nought
--- by definition) and the `stHop` premise is `Rst ≤ Rst` (tightest
--- bound).  What remains is the conclusion alone.
+-- THE TARGET AT THE THREE POINTS.  The one hypothesis is decided
+-- rather than assumed — `Rin ≤ Rst` is `0 ≤ Rst` — so what remains is
+-- the recursion over the admitted list, one flattener count per
+-- registration read against the join with that chain's own state.
 ----------------------------------------------------------------------
 
 sinkOne3 : Confirms
-  ((share-sink-dry One3.ac 0 0 (suc zero) One3.ψ One3.Rin One3.Rst Below)
-   One3.gas One3.vals One3.fin One3.sd One3.st Below Below)
-sinkOne3 = refl
+  (share-chain-hop One3.ac One3.gas 0 0 (suc zero) One3.ψ
+     One3.Rin One3.Rst Below One3.vals One3.fin One3.sd One3.st)
+sinkOne3 = Below , tt
 
 sinkThree3 : Confirms
-  ((share-sink-dry Three3.ac 0 0 (suc zero) Three3.ψ Three3.Rin Three3.Rst
-     Below)
-   Three3.gas Three3.vals Three3.fin Three3.sd Three3.st Below Below)
-sinkThree3 = refl
+  (share-chain-hop Three3.ac Three3.gas 0 0 (suc zero) Three3.ψ
+     Three3.Rin Three3.Rst Below Three3.vals Three3.fin Three3.sd Three3.st)
+sinkThree3 = Below , Below , Below , tt
 
 sinkQuiet3 : Confirms
-  ((share-sink-dry Quiet3.ac 0 0 (suc zero) Quiet3.ψ Quiet3.Rin Quiet3.Rst
-     Below)
-   Quiet3.gas Quiet3.vals Quiet3.fin Quiet3.sd Quiet3.st Below Below)
-sinkQuiet3 = refl
+  (share-chain-hop Quiet3.ac Quiet3.gas 0 0 (suc zero) Quiet3.ψ
+     Quiet3.Rin Quiet3.Rst Below Quiet3.vals Quiet3.fin Quiet3.sd Quiet3.st)
+sinkQuiet3 = Below , Below , Below , tt

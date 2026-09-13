@@ -42,9 +42,9 @@
 ------------------------------------------------------------------
 module Verify-Rank-Sufficient.Fits where
 
-open import Data.Bool using (Bool; true; false)
+open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.Bool.ListAction using (any)
-open import Data.Fin using (Fin)
+open import Data.Fin using (Fin; toℕ)
 open import Data.List using (List; []; _∷_)
 open import Data.Nat using (ℕ; zero; suc; _+_; _⊔_; _≤_; _≡ᵇ_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
@@ -54,14 +54,14 @@ open import Data.Vec using (lookup)
 open import Induction.WellFounded using (Acc)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 
-open import Rx.Prim using (Fuel; Tick; Id)
+open import Rx.Prim using (Fuel; Tick; Id; close; exhausted)
 open import Rx.Exp using (Ctx; Closed; Val)
 open import Rx.Strat-Order using (_≺_)
 open import Rx.Hop-Depth using (Rd₃; depthᵉ; depthᵛ)
 open import Rx.Slot-Read using (slotRd)
 open import Rx.Evaluator using (Frame; Path; root; share-sink; _↠_; Sched;
   EvalSt; Arrival; arrTy; arrVal; arrTick; arrivalWitness; chainsOf; RegId;
-  chainStep; cascadeLatch;
+  chainStep; cascadeLatch; foldPath; shareAdmit; shareLatch;
   sched-next; cascade; stepFrame; dispatchShare; dryEvent; hasDry; stHop)
 open import Verify-Rank-Sufficient.Carried using (valsHop)
 open import Verify-Rank-Sufficient.Push-Carried using (FrameCarries)
@@ -128,10 +128,18 @@ FrameDryUnder {Γ = Γ} {e = e} {s = s} ac id now f κ ψ Rin Rst =
 -- observables carries a reading IN as well, and no row stands there.
 ----------------------------------------------------------------------
 
+-- AND THE DISPATCH COUNTER IS AN INDEX HERE RATHER THAN QUANTIFIED,
+-- WHICH IS WHAT MAKES THE SINK ARM WRITEABLE AT ALL.  The counter peels
+-- at every share boundary, so it is the order the fan-out's own
+-- recursion descends on; a clause promising dry-freedom at EVERY
+-- counter has to be produced before any of them is spent, and the walk
+-- building it re-enters the fan-out, so nothing decreases across the
+-- cycle and the arm can only be asserted.  Indexing hands the walk the
+-- one counter it stands at and the sink's body the next one down.
 ShareDryUnder : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {τ} →
-  Acc _≺_ τ → Id → Tick → (i : Fin n) → (Fin n → Rd₃) → ℕ → ℕ → Set
-ShareDryUnder {Γ = Γ} {e = e} ac id now i ψ Rin Rst =
-  ∀ (gas : ℕ) (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
+  Acc _≺_ τ → ℕ → Id → Tick → (i : Fin n) → (Fin n → Rd₃) → ℕ → ℕ → Set
+ShareDryUnder {Γ = Γ} {e = e} ac gas id now i ψ Rin Rst =
+  ∀ (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
     (sd : Sched Γ) (st : EvalSt e) →
     valsHop ψ (lookup Γ i) vals ≤ Rin → stHop ψ st ≤ Rst →
     hasDry (proj₁ (dispatchShare ac gas id now i vals fin sd st)) ≡ false
@@ -155,19 +163,20 @@ ShareDryUnder {Γ = Γ} {e = e} ac id now i ψ Rin Rst =
 ----------------------------------------------------------------------
 
 data PathFits {n} {Γ : Ctx n} {t} {e : Closed Γ t} {τ}
-       (ac : Acc _≺_ τ) (id : Id) (now : Tick) (ψ : Fin n → Rd₃) (Rst : ℕ)
+       (ac : Acc _≺_ τ) (gas : ℕ) (id : Id) (now : Tick) (ψ : Fin n → Rd₃)
+       (Rst : ℕ)
        : ∀ {u} → Path Γ u t → ℕ → Set where
 
-  at-root : ∀ {R} → PathFits {e = e} ac id now ψ Rst root R
+  at-root : ∀ {R} → PathFits {e = e} ac gas id now ψ Rst root R
 
-  at-sink : ∀ {i R} → ShareDryUnder {e = e} ac id now i ψ R Rst →
-            PathFits {e = e} ac id now ψ Rst (share-sink i) R
+  at-sink : ∀ {i R} → ShareDryUnder {e = e} ac gas id now i ψ R Rst →
+            PathFits {e = e} ac gas id now ψ Rst (share-sink i) R
 
   through : ∀ {s u R Rv} {f : Frame Γ s u} {κ : Path Γ u t} →
             FrameCarries {e = e} ac id now f κ ψ R Rv Rst →
             FrameDryUnder {e = e} ac id now f κ ψ R Rst →
-            PathFits {e = e} ac id now ψ Rst κ Rv →
-            PathFits {e = e} ac id now ψ Rst (f ↠ κ) R
+            PathFits {e = e} ac gas id now ψ Rst κ Rv →
+            PathFits {e = e} ac gas id now ψ Rst (f ↠ κ) R
 
 ----------------------------------------------------------------------
 -- THE RANK AN ARRIVAL ENTERS AT, spelled once.  It is the middle
@@ -203,6 +212,62 @@ arrivalRank {e = e} a sched st =
   depthᵉ ψ e + (depthᵛ ψ (arrTy a) (arrVal a) ⊔ stHop ψ st)
 
 ----------------------------------------------------------------------
+-- AND EVERY CHAIN A SHARE'S DISPATCH REACHES, WHICH IS THE SAME
+-- RECURSION ONE LEVEL IN.  The fan-out folds its admitted chains
+-- threading ONE state, exactly as an arrival folds its own, so the
+-- premise recurses over the admitted list and hands the tail the pair
+-- the head's fold returned.  A registration cancelled earlier in this
+-- cascade delivers nothing and is skipped here for the same reason it
+-- is skipped there.
+--
+-- THE BOUND EACH CHAIN IS STATED AT IS A JOIN WITH ITS OWN STATE, AND
+-- THAT IS WHAT MAKES THE THREADING SURVIVABLE.  A later chain is
+-- entered at whatever an earlier one left, so a premise fixing the
+-- entering bound for all of them is a claim about a run where the
+-- fan-out writes nothing.  Joining each chain's own store reading onto
+-- the entering bound asks instead for a fit at a bound the chain
+-- demonstrably sits under — which is STRONGER than the entering form
+-- rather than weaker, since a larger store bound quantifies the
+-- obligations underneath it over more states, and it is a residue the
+-- fold can hand itself rather than one indexed by how many
+-- registrations the share carries.
+----------------------------------------------------------------------
+
+ShareChainsFit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {τ} →
+  Acc _≺_ τ → ℕ → Id → Tick → (i : Fin n) → (Fin n → Rd₃) → ℕ → ℕ →
+  List (Val Γ (lookup Γ i)) → Bool →
+  List (RegId × Path Γ (lookup Γ i) t) → Sched Γ → EvalSt e → Set
+ShareChainsFit ac gas id now i ψ Rin Rst vals fin [] sd st = ⊤
+ShareChainsFit {e = e} ac gas id now i ψ Rin Rst vals fin
+  ((rid , p) ∷ ps) sd st
+  with any (_≡ᵇ rid) (EvalSt.cancelled st)
+... | true  = ShareChainsFit {e = e} ac gas id now i ψ Rin Rst vals fin
+                ps sd st
+... | false =
+      let st′ = record st { delivered = rid ∷ EvalSt.delivered st }
+          out = foldPath ac gas id now (toℕ i) p vals
+                  (if fin then close (toℕ i) exhausted ∷ [] else [])
+                  fin sd st′
+      in PathFits {e = e} ac gas id now ψ (stHop ψ st′ ⊔ Rst) p Rin
+         × ShareChainsFit {e = e} ac gas id now i ψ Rin Rst vals fin ps
+             (proj₁ (proj₂ out)) (proj₂ (proj₂ out))
+
+----------------------------------------------------------------------
+-- AND THE WHOLE DISPATCH, WHICH IS THAT RECURSION AT THE LIST THE
+-- SHARE ADMITS AND AT THE STATE THE LATCH LEAVES.  Both are the
+-- dispatch's own, read out of the machine rather than supplied, which
+-- is what makes this a premise about the run rather than about a
+-- registry someone chose.
+----------------------------------------------------------------------
+
+ShareFits : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {τ} →
+  Acc _≺_ τ → ℕ → Id → Tick → (i : Fin n) → (Fin n → Rd₃) → ℕ → ℕ →
+  List (Val Γ (lookup Γ i)) → Bool → Sched Γ → EvalSt e → Set
+ShareFits {e = e} ac gas id now i ψ Rin Rst vals fin sd st =
+  ShareChainsFit {e = e} ac gas id now i ψ Rin Rst vals fin
+    (shareAdmit i (EvalSt.registry st)) sd (shareLatch i fin st)
+
+----------------------------------------------------------------------
 -- EVERY CHAIN THE ARRIVAL REACHES, AT THE STATE ITS OWN FOLD STANDS
 -- AT — which is a recursion over the chain list and not a conjunction
 -- over it, for the same reason the allowance premise below is a
@@ -235,14 +300,14 @@ ChainsFit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} →
   (a : Arrival Γ) → Id → List (RegId × Path Γ (arrTy a) t) →
   Sched Γ → EvalSt e → Set
 ChainsFit a id []               sched st = ⊤
-ChainsFit {e = e} a id ((rid , c) ∷ cs) sched st
+ChainsFit {n = n} {e = e} a id ((rid , c) ∷ cs) sched st
   with any (_≡ᵇ rid) (EvalSt.cancelled st)
 ... | true  = ChainsFit a id cs sched st
 ... | false =
       let st′ = record st { delivered = rid ∷ EvalSt.delivered st }
           ψ   = slotRd (Sched.slots sched)
           out = chainStep id a c sched st′
-      in PathFits {e = e} (arrivalWitness a sched st′) id (arrTick a) ψ
+      in PathFits {e = e} (arrivalWitness a sched st′) n id (arrTick a) ψ
            (arrivalRank a sched st′) c (depthᵛ ψ (arrTy a) (arrVal a))
          × ChainsFit a id cs (proj₁ (proj₂ out)) (proj₂ (proj₂ out))
 

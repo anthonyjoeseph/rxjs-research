@@ -224,16 +224,7 @@ now at the door and at the templates the door's chains are built from.
 
 ### Big picture tier roadmap
 
-- **THE SINK'S OWN FORM, NOW THAT THE DISPATCH HAS BEEN MEASURED.** The
-  fan-out's chains are folded threading ONE state, so a later chain is entered
-  at what an earlier one left — but the figure the dispatch leaves is the
-  DEEPEST chain's write and nothing else, the same for three registrations as
-  for one and the same for three rates as for the deepest of them. So the sink
-  leaf owes a join with one chain's own reach rather than a bound indexed by the
-  share's width — a residue the chain fold can hand itself rather than one it
-  could never produce. Write that form and let the walk's sink arm consume it.
-
-- **AND THE TWO HEADS THE SHELF CANNOT SUPPLY, WHICH ARE NOW STATED AT THE PATH
+- **THE TWO HEADS THE SHELF CANNOT SUPPLY, WHICH ARE NOW STATED AT THE PATH
   AND SHOULD NOT STAY THERE.** The walk composes its own steps out of frame
   statements everywhere except the map and scan heads, which it mints whole: the
   fold's burst arm is not a frame-carrying statement, and the map arm is pinned
@@ -251,6 +242,16 @@ now at the door and at the templates the door's chains are built from.
   and nothing has reached it. Reach a completing inner, or establish it cannot
   be reached and restate both at the arm that can.
 
+- **AND THE TIER'S HOP DEBT IS NOW TWO PREMISES OVER TWO REGISTRIES, WHICH MAY
+  BE ONE.** `entry-drain-hop` walks what an arrival's source registered and
+  `share-chain-hop` walks what a share admits, and both say the same thing: a
+  registered chain carries no more flatteners than the bound it is entered
+  under affords. The bounds differ — the door's is the program's own reading,
+  the sink's a join with the chain's own state — and nothing yet says the two
+  lists hold different chains. State it once over a registration list and let
+  both sites instantiate it, or find the point where the two bounds cannot be
+  reconciled and say which of them is the wrong one.
+
 ### The ledger
 
 - **`entry-drain-hop`** (Verify-Rank-Sufficient) — FALSITY, `PROBED`: the
@@ -264,10 +265,10 @@ now at the door and at the templates the door's chains are built from.
   headroom the tail leaves. A fold refolds once per DELIVERY, which a hop bound
   does not count.
 
-- **`share-sink-dry`** (Verify-Rank-Sufficient.Path-Fits) — FALSITY, `PROBED`:
-  the sink ends its chain and fans its values out to every chain on the share,
-  folded threading ONE state. The leaf is stated at the store the dispatch was
-  ENTERED at, and the fan-out's own writes are measured to move it.
+- **`share-chain-hop`** (Verify-Rank-Sufficient.Path-Fits) — FALSITY,
+  `NO EVIDENCE`: the door's own claim at the share's registry — one flattener
+  count per admitted chain, each against a join with that chain's own state.
+  What the sink arm reduces to now the dispatch's fold is a body.
 
 - **`from-inner-dry` / `thru-outer-frame-dry`**
   (Verify-Rank-Sufficient.Path-Fits) — FALSITY, `PROBED×2`: dry-freedom of the
