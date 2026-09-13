@@ -224,16 +224,7 @@ now at the door and at the templates the door's chains are built from.
 
 ### Big picture tier roadmap
 
-- **INSTANTIATE THE DOOR'S PREMISE IN ITS NEW CURRENCY, BECAUSE IT IS NOW THE
-  WHOLE TIER AND IT IS REACHABLE.** The walk is built, so what the door asks is
-  no longer a claim about what a run emits but a COUNT of flatteners on a
-  registered chain against what the program itself reads. That computes at every
-  chain, and the first instantiation came back holding by EQUALITY. So the
-  region to reach is depth: two and three flatteners, a gate over a ladder, and
-  an arrival serving several chains. A refutation here restates the premise; a
-  green at depth is the first thing that has ever bounded the door.
-
-- **THEN THE SINK'S OWN FORM, NOW THAT THE DISPATCH HAS BEEN MEASURED.** The
+- **THE SINK'S OWN FORM, NOW THAT THE DISPATCH HAS BEEN MEASURED.** The
   fan-out's chains are folded threading ONE state, so a later chain is entered
   at what an earlier one left — but the figure the dispatch leaves is the
   DEEPEST chain's write and nothing else, the same for three registrations as
@@ -252,12 +243,20 @@ now at the door and at the templates the door's chains are built from.
   tier. Restate the shelf's two arms in what a chain step carries, and the heads
   become steps like the other three.
 
+- **AND THE COMPLETION ARM OF THE TWO RE-ENTERING FRAMES, WHICH IS WHERE THE
+  DOOR'S RISK WENT.** `from-inner-carried` and `from-inner-dry` are instantiated
+  only at `fin = false`, where the payload is threaded untouched and the emit
+  list is empty — instantiability rather than coverage, as their own receipt
+  says. The completing branch drains a node's queue and appends fresh bursts,
+  and nothing has reached it. Reach a completing inner, or establish it cannot
+  be reached and restate both at the arm that can.
+
 ### The ledger
 
 - **`entry-drain-hop`** (Verify-Rank-Sufficient) — FALSITY, `PROBED`: the
   door's whole premise, in a currency that mentions no run — a chain's
-  flattener count against the program's own reading. Hereditary in arrivals and
-  in chains, and the one row reaching a flattener holds by EQUALITY.
+  flattener count against the program's own reading. Tight at three ladder
+  rungs and at a gate; an arrival there reaches exactly ONE chain.
 
 - **`map-head-carried` / `scan-head-carried`**
   (Verify-Rank-Sufficient.Path-Fits) — FALSITY, `REFUTED×2`: the two frames

@@ -318,14 +318,27 @@ drain-dry-free (suc k) nextId sched st fits with sched-next sched | fits
 -- the trade: the statement that remains is arithmetic over a count the
 -- path itself computes rather than a claim about what a run emits.
 --
--- PROBED: `Probed.Door-Fits` — one arrival over one cold slot, at a
---   chain with no frame and at a chain carrying ONE flattener over a
---   template.  The flattened row holds by EQUALITY, so a reading that
---   charged a flattener more than the chain counts, or a count that
---   charged more than the reading supplies, crosses at the first row
---   that reaches a frame at all.  NOT covered: two flatteners, a share,
---   an arrival reaching more than one chain, or the allowance beyond
+-- PROBED: `Probed.Door-Fits` — one arrival, at a chain with no frame,
+--   at chains carrying ONE, TWO and THREE flatteners over a template,
+--   and at a GATE whose body is subscribed a tick out.  Every counting
+--   row holds by EQUALITY, and the margin stays nil across the three
+--   rungs rather than merely non-negative, so a reading that charged a
+--   flattener once for a ladder against a count charging per rung
+--   crosses at the third.  The gate's row is tight in all three terms
+--   at once — a payload reading two, one flattener, a rank of three —
+--   which is the only point where the payload half constrains
+--   anything.  NOT covered: a second arrival, or the allowance beyond
 --   its first step.
+--
+--   AND ONE SHAPE IS UNREACHABLE RATHER THAN UNCOVERED, WHICH IS THE
+--   PROBE'S OWN FINDING: an arrival AT THIS POINT reaches exactly ONE
+--   chain.  A fan-out over a SHARE and the same fan-out over a
+--   SCRIPTED slot give byte-identical figures, both reporting one
+--   chain carrying nought flatteners, so the chain recursion's cons
+--   case is not a shape the door has — whatever fan-out a program
+--   carries is registered on the sink and entered from there.  No
+--   probe can reach that arm here, and a repair that let a second
+--   chain through would move both rows at once.
 postulate
   entry-drain-hop : ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t)
     (ins : Slots Γ) →
