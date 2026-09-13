@@ -140,6 +140,12 @@ dry-under ac id now f κ ψ Rin Rst d vals fin sd st _ _ =
 --   identity arm returns.  NOT covered, and it is where the whole risk
 --   sits: the `fin = true` arm, which is the one that inspects the
 --   registrations and decides whether to drain.
+-- RECOVERY: git show 873c905:agda/evidence/probed/Probed/Inner-Bound.agda
+--   restores a harness that reaches a flattener INSIDE a share's def and
+--   reads the queued value back out of the machine's own node table by
+--   `refl`.  That is the plumbing the `fin = true` arm wants and the
+--   reason the file is worth naming after its own target went: its rows
+--   expired with the input bound, its programs did not.
 postulate
   from-inner-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s} {τ} {lo}
     (ac : Acc _≺_ τ) (id : Id) (now : Tick) (op : AllOp)

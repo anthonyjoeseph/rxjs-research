@@ -274,16 +274,17 @@ now at the door and at the templates the door's chains are built from.
   rungs and at a gate; an arrival there reaches exactly ONE chain.
 
 - **`from-inner-dry` / `thru-outer-frame-dry`**
-  (Verify-Rank-Sufficient.Path-Fits) — FALSITY, `DEAD ROUTE, PROBED×2`:
-  dry-freedom of the only two frames that re-enter the evaluator, each over
-  every payload its incoming bound admits. The other three are discharged
-  outright, which is what says these two are where the risk actually is.
+  (Verify-Rank-Sufficient.Path-Fits) — FALSITY,
+  `DEAD ROUTE, PROBED×2, RECOVERY`: dry-freedom of the only two frames that
+  re-enter the evaluator, each over every payload its incoming bound admits.
+  The other three are discharged outright, which is what says these two are
+  where the risk actually is.
 
 - **`from-inner-carried`** (Verify-Rank-Sufficient.Path-Fits) — FALSITY,
-  `DEAD ROUTE, PROBED`: the exit frame threads what it was handed unchanged.
-  `innerReact` returns its payload untouched on every branch but the completion
-  one, where a node's queue is drained and fresh bursts appended — the branch
-  nothing has reached.
+  `DEAD ROUTE, PROBED, RECOVERY`: the exit frame threads what it was handed
+  unchanged. `innerReact` returns its payload untouched on every branch but the
+  completion one, where a node's queue is drained and fresh bursts appended —
+  the branch nothing has reached.
 
 - **`share-chain-hop`** (Verify-Rank-Sufficient.Path-Fits) — SHAPE,
   `REFUTED, RECOVERY`: the sink's claim at the share's registry, whose one
