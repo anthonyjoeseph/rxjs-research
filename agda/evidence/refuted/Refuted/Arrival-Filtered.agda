@@ -62,7 +62,6 @@ open import Rx.Evaluator using (Path; RegId; AtFloor; Sched; EvalSt; Arrival;
   root; share-sink; _↠_; map-f; scan-f; take-f; from-inner; thru-outer;
   arrTy; arrVal; chainsOf; cascade; sched-next; subscribeE; rootWitness;
   sched-init; st-init; stHop)
-open import Rx.Inputs-Below using (below-ctx)
 
 ----------------------------------------------------------------------
 -- THE CURRENCY, WRITTEN OUT HERE RATHER THAN IMPORTED.  A repair that
@@ -168,7 +167,7 @@ entry : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
   Sched Γ × EvalSt e
 entry {n = n} e ins =
   let (_ , sched , st) =
-        subscribeE {lo = n} (rootWitness e ins) e {below-ctx e} root 0 0
+        subscribeE {lo = n} (rootWitness e ins) e root 0 0
           (sched-init e ins) (st-init e)
   in sched , st
 

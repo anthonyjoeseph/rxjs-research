@@ -81,7 +81,6 @@ open import Rx.Evaluator using (AtFloor; RegId; Sched; EvalSt; Stream; Arrival;
   root; subscribeE; rootWitness; sched-init; st-init; sched-next; cascade;
   cascadeLatch; chainsOf; foldPath; entryWitness; stHop; hasDry;
   arrTick; arrSource; arrTy; arrVal)
-open import Rx.Inputs-Below using (below-ctx)
 
 ----------------------------------------------------------------------
 -- THE HARNESS, recovered from `Refuted.Fit-Cascade` — the two programs
@@ -122,7 +121,7 @@ entry : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
   Sched Γ × EvalSt e
 entry {n = n} e ins =
   let (_ , sched , st) =
-        subscribeE {lo = n} (rootWitness e ins) e {below-ctx e} root 0 0
+        subscribeE {lo = n} (rootWitness e ins) e root 0 0
           (sched-init e ins) (st-init e)
   in sched , st
 

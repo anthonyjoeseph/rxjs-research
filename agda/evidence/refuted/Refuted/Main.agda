@@ -13,8 +13,7 @@
 -- RECOVERY: git show 919f115:agda/evidence/refuted/Refuted/
 module Refuted.Main where
 
-open import Refuted.Drain-Reachable using (drain-dry-free-false;
-  drain-dry-free-inv-false)
+open import Refuted.Drain-Reachable using (drain-dry-free-false)
 -- the two figures are claimed beside the witness on purpose: an
 -- inequality refutation dies quietly when a repair enlarges the right
 -- side, and a pinned crossing fails by name instead
@@ -98,9 +97,3 @@ open import Refuted.Sync-Count using (sync-count-bounded-false)
 -- unreachable at every call site
 open import Refuted.Share-Chain using (share-chain-hop-false;
   regs-is; store-is; chain-is; termFig-is)
-
--- and the input bound's runtime arm, refuted at the smallest instance
--- the syntax admits.  Nothing is claimed beside the witness: the
--- crossing is a predicate that computes to `false`, so there is no
--- figure a repair could leave intact
-open import Refuted.Inner-Floor using (inner-below-false)

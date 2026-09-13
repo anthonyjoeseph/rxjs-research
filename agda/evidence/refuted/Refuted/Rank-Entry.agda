@@ -75,7 +75,7 @@ DryOperator = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} {τ : Tri} {lo}
   (κ : Path Γ lo u t) (id : Id) (now : Tick)
   (sched : Sched Γ) (st : EvalSt e) → opShape o ≡ true →
   EntryReads₂ τ o (Sched.slots sched) (EvalSt.connectedShares st) →
-  hasDry (proj₁ (subscribeE ac o {ok} κ id now sched st)) ≡ false
+  hasDry (proj₁ (subscribeE ac o κ id now sched st)) ≡ false
 
 ----------------------------------------------------------------------
 -- THE ADVERSARIAL ENTRY.  The context is empty, so the unconnected

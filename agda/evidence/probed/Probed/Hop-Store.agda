@@ -65,7 +65,6 @@ open import Rx.Slot-Read using (slotRd)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; NodeId; NodeState; subscribeE; rootWitness; rootTri; root; _↠_;
   sched-init; st-init; mintNode; installNode; mergeAll-st; thru-outer; mergeAllᵒ; splitBurst;
   stepFrame; stHop)
-open import Rx.Inputs-Below using (below-ctx)
 open import Verify-Rank-Sufficient.Carried using (valsRd)
 open import Verify-Rank-Sufficient.Push-Carried
   using (thru-outer-frame-carried)
@@ -96,7 +95,7 @@ module Ap {n} {Γ : Ctx n} (ins : Slots Γ)
   nid = proj₁ (mintNode (sched-init prog ins))
 
   r : Stream Γ (obs (obs natᵗ)) × Sched Γ × EvalSt prog
-  r = subscribeE {lo = n} ac src {below-ctx src}
+  r = subscribeE {lo = n} ac src
         (thru-outer mergeAllᵒ nid ↠ root) 0 0
         (proj₂ (mintNode (sched-init prog ins)))
         (installNode nid node (st-init prog))

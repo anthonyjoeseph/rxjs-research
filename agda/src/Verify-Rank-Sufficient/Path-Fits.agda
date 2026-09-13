@@ -123,6 +123,13 @@ dry-under ac id now f κ ψ Rin Rst d vals fin sd st _ _ =
 -- paid for: the values are the inner's and cross unchanged, so both the
 -- bound and the store come back where they were
 --
+-- DEAD ROUTE: closing the dry half as an unreachable branch under the
+--   registration's own floor test.  The test sits inside the SLOT arm of
+--   the subscribe, downstream of the inner's subscription rather than a
+--   gate on it, so the frame fires whatever the test decides — and the
+--   arm it guards is denominated in the FLOOR while every dry close on
+--   this face is minted at RANK zero.  A floor decision cannot reach a
+--   rank obligation, so nothing about the exits below narrows this.
 -- PROBED: `Probed.Exit-Frame` — both statements instantiated at one
 --   flat program on the `fin = false` arm, where the frame is the
 --   identity.  What that buys is INSTANTIABILITY and not coverage, and
@@ -133,6 +140,12 @@ dry-under ac id now f κ ψ Rin Rst d vals fin sd st _ _ =
 --   identity arm returns.  NOT covered, and it is where the whole risk
 --   sits: the `fin = true` arm, which is the one that inspects the
 --   registrations and decides whether to drain.
+-- RECOVERY: git show 873c905:agda/evidence/probed/Probed/Inner-Bound.agda
+--   restores a harness that reaches a flattener INSIDE a share's def and
+--   reads the queued value back out of the machine's own node table by
+--   `refl`.  That is the plumbing the `fin = true` arm wants and the
+--   reason the file is worth naming after its own target went: its rows
+--   expired with the input bound, its programs did not.
 postulate
   from-inner-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s} {τ} {lo}
     (ac : Acc _≺_ τ) (id : Id) (now : Tick) (op : AllOp)

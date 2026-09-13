@@ -34,7 +34,6 @@ open import Relation.Binary.PropositionalEquality using (_≡_; trans; cong₂)
 
 open import Rx.Prim using (Tick; Id; value; complete; InstEmit)
 open import Rx.Exp using (Ctx; Closed; Tm; Val; Fn; _×ᵗ_; scanᵉ; evalTm; inputsBelowᵉ)
-open import Rx.Inputs-Below using (below-scan)
 open import Rx.Strat-Order using (_≺_)
 open import Rx.Hop-Depth using (Rd; Rd₃; depthᵉ; rdᵉ; rdᵗ; ε; _▸_)
 open import Rx.Evaluator using (Stream; Frame; Path; Sched; EvalSt; NodeId;
@@ -204,6 +203,27 @@ postulate
 -- can refute it was the whole of the payload currency; it is now bursts
 -- of length above one at a template that folds, which is small enough to
 -- instantiate and small enough to say what the repair has to carry.
+--
+-- AND THE MISSING AXIS IS NOT ONE QUANTITY BUT TWO, WHICH IS WHY NO
+-- CHOICE OF THE OUTPUT BOUND REPAIRS THIS IN PLACE.  `FrameCarries`
+-- hands a frame exactly two scalars: the payload bound, which is a
+-- POINTWISE join over the list and so carries no cardinality at all,
+-- and the store bound, which reads a scan node through the hop half of
+-- that node's value alone.  A fold needs both halves back — how many
+-- refolds, and what the accumulator it is refolding DELIVERS — and the
+-- term reading already computes each: the refold count is the source's
+-- own top component, and the accumulator is read as a full pair before
+-- the store projects it away.  So the gap is in the walk's currency and
+-- not in this statement's right-hand side, and that is what says the
+-- repair is a restatement of the PREDICATE rather than of the leaf.
+--
+-- AND THE FRAME CANNOT BE RETIRED INSTEAD, which is the cheaper repair
+-- one would reach for first: the fold is already stated at the burst
+-- and at the seed where both quantities are in scope, so the walk's arm
+-- looks redundant.  It is not.  A subscription over a slot REGISTERS
+-- its whole path, this frame included, so a later arrival walks the
+-- fold with no term anywhere in reach — the burst-and-seed form is
+-- unavailable at exactly the point this arm is entered.
 --
 -- REFUTED: `Refuted.Scan-Store` — the symmetric form, pinning the fold's
 --   residue at its own incoming bound.  It dies on the other side of the
@@ -538,7 +558,7 @@ postulate
     (nid : NodeId) (κ : Path Γ lo u t) (sd : Sched Γ) (st : EvalSt e)
     (ψ : Fin n → Rd₃) (Rst : ℕ) →
     depthᵉ ψ (scanᵉ f z b) ≤ Rst →
-    let r  = subscribeE ac b {below-scan lo f z b ok} (scan-f f nid ↠ κ) id now sd
+    let r  = subscribeE ac b (scan-f f nid ↠ κ) id now sd
                (installNode nid (scan-st {t = u} (evalTm z)) st)
         pb = pushBurst ac id now (scan-f f nid) κ
                (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))

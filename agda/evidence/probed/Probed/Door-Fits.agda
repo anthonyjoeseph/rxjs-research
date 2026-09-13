@@ -80,7 +80,7 @@
 -- the constant margin is where the two currencies were seen to keep
 -- step and not where they were shown to; and nothing here reaches a
 -- registry admitting more than two chains.
--- TARGET: entry-drain-hop @79bb43
+-- TARGET: entry-drain-hop @c75169
 module Probed.Door-Fits where
 
 open import Data.Fin using (Fin; zero; suc)
@@ -103,7 +103,6 @@ open import Rx.Evaluator using (Sched; EvalSt; Path; root; share-sink;
   _↠_; map-f; scan-f; take-f; from-inner; thru-outer; subscribeE;
   rootWitness; sched-init; st-init; sched-next; chainsOf; cascadeLatch;
   shareAdmit; arrTy; arrVal; RegId; AtFloor)
-open import Rx.Inputs-Below using (below-ctx)
 open import Verify-Rank-Sufficient using (entry-drain-hop)
 open import Verify-Rank-Sufficient.Fits using (arrivalRank)
 open import Verify-Rank-Sufficient.Push-Carried using (mapRd)
@@ -197,11 +196,11 @@ insDeep (suc zero) = shared (mergeAllᵉ nothing (mapᵉ lit (input zero)))
 
 entOf : (ins : Slots Γ₁) (e : Closed Γ₁ natᵗ) → Sched Γ₁
 entOf ins e = proj₁ (proj₂ (subscribeE {lo = 2} (rootWitness e ins) e
-                {below-ctx e} root 0 0 (sched-init e ins) (st-init e)))
+                root 0 0 (sched-init e ins) (st-init e)))
 
 stOf : (ins : Slots Γ₁) (e : Closed Γ₁ natᵗ) → EvalSt e
 stOf ins e = proj₂ (proj₂ (subscribeE {lo = 2} (rootWitness e ins) e
-               {below-ctx e} root 0 0 (sched-init e ins) (st-init e)))
+               root 0 0 (sched-init e ins) (st-init e)))
 
 ----------------------------------------------------------------------
 -- THE FIGURES, TAKEN AT THE OBLIGATION'S OWN POINT.  The state is the

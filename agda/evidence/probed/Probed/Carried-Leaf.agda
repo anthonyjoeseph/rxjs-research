@@ -55,7 +55,6 @@ open import Rx.Exp using (Ctx; Closed; Tm; Fn; natᵗ; obs; _×ᵗ_;
 open import Rx.Slots using (Slots; scripted)
 open import Rx.Hop-Depth using (Rd₃; depthᵉ; rdᵗˢ; ε)
 open import Rx.Slot-Read using (slotRd)
-open import Rx.Inputs-Below using (below-ctx)
 open import Rx.Evaluator using (subscribeE; rootWitness; root; sched-init;
   st-init)
 open import Verify-Rank-Sufficient.Carried using (burstRd; valsRd)
@@ -181,7 +180,7 @@ casc2L = scanᵉ step2 (strmᵗ emptyᵉ)
 carriedAt : Closed Γ₁ (obs natᵗ) → List ℕ → ℕ
 carriedAt o xs =
   proj₂ (burstRd (slotRd (insAt xs)) (obs natᵗ)
-    (proj₁ (subscribeE {lo = 1} (rootWitness o (insAt xs)) o {below-ctx o}
+    (proj₁ (subscribeE {lo = 1} (rootWitness o (insAt xs)) o
              root 0 0 (sched-init o (insAt xs)) (st-init o))))
 
 termAt : Closed Γ₁ (obs natᵗ) → List ℕ → ℕ
@@ -241,7 +240,7 @@ foldR = scanᵉ stepG (strmᵗ emptyᵉ) recur
 carried₀ : Closed Γ₀ (obs natᵗ) → ℕ
 carried₀ o =
   proj₂ (burstRd ψ₀ (obs natᵗ)
-    (proj₁ (subscribeE {lo = 0} (rootWitness o ins₀) o {below-ctx o} root 0 0
+    (proj₁ (subscribeE {lo = 0} (rootWitness o ins₀) o root 0 0
              (sched-init o ins₀) (st-init o))))
 
 recurRow : (carried₀ foldR ≤ᵇ depthᵉ ψ₀ foldR) ≡ true

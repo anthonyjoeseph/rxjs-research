@@ -65,7 +65,6 @@ open import Rx.Exp using (Ctx; Closed; Fn; Tm; natᵗ; obs; _×ᵗ_; nat̂; strm
   varᵗ; fstᵗ; ofᵉ; scanᵉ; mergeAllᵉ; syncSizeᵉ)
 open import Rx.Slots using (Slots)
 open import Rx.Evaluator using (Stream; subscribeE; rootWitness; root; sched-init; st-init)
-open import Rx.Inputs-Below using (below-ctx)
 
 ----------------------------------------------------------------------
 -- THE MEASURE.  Generic in the payload rather than indexed, because
@@ -106,7 +105,7 @@ ins₀ = λ ()
 
 burstOf : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) → Stream Γ t
 burstOf {n = n} e ins =
-  proj₁ (subscribeE {lo = n} (rootWitness e ins) e {below-ctx e} root 0 0
+  proj₁ (subscribeE {lo = n} (rootWitness e ins) e root 0 0
            (sched-init e ins) (st-init e))
 
 SyncCountBounded : Set

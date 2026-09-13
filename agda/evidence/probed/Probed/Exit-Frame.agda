@@ -74,7 +74,6 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; NodeId; NodeState;
   AllOp; subscribeE; rootWitness; rootTri; root; _↠_; sched-init; st-init;
   mintNode; installNode; mergeAll-st; from-inner; thru-outer; mergeAllᵒ;
   splitBurst; stepFrame; stHop; dryEvent)
-open import Rx.Inputs-Below using (below-ctx)
 open import Verify-Rank-Sufficient.Carried using (valsRd)
 open import Verify-Rank-Sufficient.Path-Fits
   using (from-inner-carried; from-inner-dry; thru-outer-frame-dry)
@@ -102,7 +101,7 @@ module Ap {n} {Γ : Ctx n} (ins : Slots Γ) (op : AllOp)
   nid = proj₁ (mintNode (sched-init prog ins))
 
   r : Stream Γ (obs (obs natᵗ)) × Sched Γ × EvalSt prog
-  r = subscribeE {lo = n} ac src {below-ctx src} (thru-outer op nid ↠ root) 0 0
+  r = subscribeE {lo = n} ac src (thru-outer op nid ↠ root) 0 0
         (proj₂ (mintNode (sched-init prog ins)))
         (installNode nid node (st-init prog))
 

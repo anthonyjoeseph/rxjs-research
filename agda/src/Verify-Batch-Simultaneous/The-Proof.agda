@@ -22,12 +22,11 @@ open import Rx.Slots using (Slots)
 open import Rx.Protocol           using (ProtocolSt; Owed; protocol-init; runProtocol; stepProtocol; checkFinal; paidOff; allZero;
   Accepted; accepted; WellFormed; settle; applyEvents; hasOwed; bumpOwed; cancelOwed;
   removeOne; countIn)
--- `just-injᵂ`/`n≢jᵂ` are imported rather than re-proven: this module had
--- its own `just-inj`/`n≢j`, the same two Maybe facts .Part4 already
--- proves for the rest of the Well-Formed tree.  The import surface here
--- is a CLAIM, so it stays minimal — but re-proving a fact to keep a
--- using-list short is the trade `make dup-check` exists to refuse.
-open import Verify-Well-Formed.Part13 using (evaluate-well-formed)
+-- `just-injᵂ`/`n≢jᵂ` are imported rather than re-proven: this module
+-- had its own copies of the same two Maybe facts.  The import surface
+-- here is a CLAIM, so it stays minimal — but re-proving a fact to keep
+-- a using-list short is the trade `make dup-check` exists to refuse.
+open import Verify-Well-Formed using (evaluate-well-formed)
 open import Spec                  using (spec-batchSimultaneous; specGo;
                                          batchOf; valuesAt; valuesOf; seenBefore)
 open import Implementation        using (impl-batchSimultaneous; foldBatch;
@@ -193,8 +192,7 @@ apply-agree (close x dried ∷ es) live owed done vs eq with removeOne x live | 
 -- already seen, so it's unseen and extends SeenBelow.
 ------------------------------------------------------------------
 
--- `≡ᵇ→≡`, `≡ᵇ-refl` and `≡ᵇ-sym` come from .Verify-Well-Formed (Part1
--- and Part12).
+-- `≡ᵇ→≡`, `≡ᵇ-refl` and `≡ᵇ-sym` come from `Decide`.
 
 -- an id is always seen in a list it heads
 seenBefore-hit : ∀ (i : Id) (seen : List Id) → seenBefore i (i ∷ seen) ≡ true

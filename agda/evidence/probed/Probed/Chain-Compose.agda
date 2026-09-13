@@ -57,7 +57,6 @@ open import Rx.Slot-Read using (slotRd)
 open import Rx.Evaluator using (Sched; EvalSt; Path; root; share-sink; _↠_;
   thru-outer; from-inner; chainsOf; sched-next; cascade; subscribeE; rootWitness;
   sched-init; st-init; arrTy; arrVal; stHop)
-open import Rx.Inputs-Below using (below-ctx)
 open import Verify-Rank-Sufficient.Fits using (arrivalRank)
 open import Probed.Apparatus using (Separates; separates-at)
 
@@ -111,7 +110,7 @@ cap₂ = mergeAllᵉ (just 1)
 entry : (e : Closed Γ₁ natᵗ) → Sched Γ₁ × EvalSt e
 entry e =
   let (_ , sched , st) =
-        subscribeE {lo = 1} (rootWitness e insLate) e {below-ctx e} root 0 0
+        subscribeE {lo = 1} (rootWitness e insLate) e root 0 0
           (sched-init e insLate) (st-init e)
   in sched , st
 

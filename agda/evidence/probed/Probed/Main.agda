@@ -40,9 +40,6 @@
 -- RECOVERY: git show 919f115:agda/evidence/probed/Probed/
 module Probed.Main where
 
-open import Probed.Root
-  using (cellP1; rowP1; cellP4; rowP4; cellP7; rowP7; cellS2; rowS2)
-
 open import Probed.Operator-Root
   using (opRoot)
 
@@ -249,13 +246,3 @@ open import Probed.Exit-Frame using (counts₁-is; counts₂-is; counts₃-is)
 -- nothing could falsify
 open import Probed.Unfold-Bound using (ground; carriesLow; carriesBoth)
 
--- the MANUFACTURED-VALUE rows, claimed with the read-backs that make
--- them readings at all: the target is false over an arbitrary floor, so
--- what stands here is only what a RUN produces — each queue pinned to
--- the value the machine left in it, each control one floor below what
--- the share connect supplies, and the closure that says a script can
--- never hand the machine an observable in the first place
-open import Probed.Inner-Bound using
-  (tightQueued; looseQueued; builtQueued;
-   tightGround; builtGround; looseGround; looseSurvives;
-   tightRow; looseRow; builtRow; scriptShut)

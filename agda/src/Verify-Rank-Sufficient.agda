@@ -343,20 +343,20 @@ drain-dry-free (suc k) nextId sched st fits with sched-next sched | fits
 postulate
   entry-drain-hop : ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t)
     (ins : Slots Γ) →
-    let ent = subscribeE {lo = n} (rootWitness e ins) e {below-ctx e} root 0 0
+    let ent = subscribeE {lo = n} (rootWitness e ins) e root 0 0
                 (sched-init e ins) (st-init e)
     in DrainHop fuel 1 (proj₁ (proj₂ ent)) (proj₂ (proj₂ ent))
 
 entry-drain-fits : ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t)
   (ins : Slots Γ) →
-  let ent = subscribeE {lo = n} (rootWitness e ins) e {below-ctx e} root 0 0
+  let ent = subscribeE {lo = n} (rootWitness e ins) e root 0 0
               (sched-init e ins) (st-init e)
   in DrainFits fuel 1 (proj₁ (proj₂ ent)) (proj₂ (proj₂ ent))
 entry-drain-fits {n = n} fuel e ins =
   drainFits fuel 1 (proj₁ (proj₂ ent)) (proj₂ (proj₂ ent))
     (entry-drain-hop fuel e ins)
   where
-  ent = subscribeE {lo = n} (rootWitness e ins) e {below-ctx e} root 0 0
+  ent = subscribeE {lo = n} (rootWitness e ins) e root 0 0
           (sched-init e ins) (st-init e)
 
 -- NOTHING BELOW THIS LINE IS THE MACHINE'S TO CHOOSE, AND THAT IS WHAT
@@ -399,5 +399,5 @@ rank-sufficient {n = n} {Γ = Γ} {t = t} fuel e ins =
       (entry-drain-fits fuel e ins))
   where
   ent : Stream Γ t × Sched Γ × EvalSt e
-  ent = subscribeE {lo = n} (rootWitness e ins) e {below-ctx e} root 0 0
+  ent = subscribeE {lo = n} (rootWitness e ins) e root 0 0
           (sched-init e ins) (st-init e)

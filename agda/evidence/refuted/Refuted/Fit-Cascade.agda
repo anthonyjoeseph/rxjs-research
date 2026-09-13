@@ -93,7 +93,6 @@ open import Rx.Slot-Read using (slotRd)
 open import Rx.Evaluator using (Path; RegRow; Sched; EvalSt; LiveSource; root; share-sink; _↠_; map-f; scan-f; take-f;
   from-inner; thru-outer; cascade; sched-next; subscribeE; rootWitness; sched-init; st-init;
   stHop; evaluate; hasDry)
-open import Rx.Inputs-Below using (below-ctx)
 
 ----------------------------------------------------------------------
 -- THE CURRENCY, WRITTEN OUT HERE RATHER THAN IMPORTED.  This is the
@@ -182,7 +181,7 @@ entry : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
   Sched Γ × EvalSt e
 entry {n = n} e ins =
   let (_ , sched , st) =
-        subscribeE {lo = n} (rootWitness e ins) e {below-ctx e} root 0 0
+        subscribeE {lo = n} (rootWitness e ins) e root 0 0
           (sched-init e ins) (st-init e)
   in sched , st
 

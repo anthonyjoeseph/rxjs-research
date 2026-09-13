@@ -1,6 +1,6 @@
 module Rx.Protocol where
 
-open import Data.Bool    using (Bool; true; false; if_then_else_; _∧_; not)
+open import Data.Bool    using (Bool; true; false; if_then_else_)
 open import Data.Nat     using (ℕ; zero; suc; _+_; _≡ᵇ_; _≤ᵇ_)
 open import Data.List    using (List; []; _∷_)
 open import Data.Maybe   using (Maybe; just; nothing)
@@ -290,33 +290,3 @@ frameFresh? acc (em ∷ ems) with frameFreshEmit acc em
 ... | just acc′ = frameFresh? acc′ ems
 ... | nothing   = false
 
-------------------------------------------------------------------
--- valsLast: the SUBSCRIPTION-BURST payload discipline.
--- A burst carries its values in its LAST emit or not at all — every
--- earlier emit is bookkeeping only.  That is how the evaluator builds
--- bursts: values enter a burst at a leaf (a cold's sync prefix, an
--- `ofᵉ`), which is one emit; `sharedConnect` only ever PREPENDS a
--- value-free `init` emit to its def's burst; `pushBurst` is 1:1 on
--- emits and an inner subscription's whole burst is flattened into one
--- emit by splitBurst.  So no construction puts a payload ahead of a
--- later emit.
---
--- It is the invariant that collapses the take cut: a cut happens on an
--- emit that ADMITTED values, so under valsLast? that emit is the last
--- one and the burst tail pushBurst would re-run at the post-cut state
--- is empty.  Asserted, and measured, on every burst the evaluator mints.
-------------------------------------------------------------------
-
-hasValue : ∀ {A : Set} → List (InstEvent A) → Bool
-hasValue []               = false
-hasValue (value _   ∷ es) = true
-hasValue (init _    ∷ es) = hasValue es
-hasValue (close _ _ ∷ es) = hasValue es
-hasValue (handoff _ ∷ es) = hasValue es
-hasValue (complete  ∷ es) = hasValue es
-
-valsLast? : ∀ {A : Set} → List (InstEmit A) → Bool
-valsLast? []               = true
-valsLast? (em ∷ [])        = true
-valsLast? (em ∷ em′ ∷ ems) =
-  not (hasValue (InstEmit.events em)) ∧ valsLast? (em′ ∷ ems)
