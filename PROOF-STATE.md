@@ -221,28 +221,7 @@ guarded clause returns a `dry` emit and the run continues, so both sides
 compute at every program — `hopFits` included, whose rows spend a decision
 procedure rather than a pin, and whose refusal is what turned this up.
 
-### Open questions
-
-- **DOES THE ARRIVING VALUE'S OWN READING ALWAYS SUFFICE?** The reading counts
-  SYNTAX, so something must bound what a run holds that no term names, and that
-  is now answered at one shape rather than in general. The registry is dead and
-  the store is bound-side dead. The schedule is dead too, but for a better
-  reason than either: a value delivered off it carries its own depth, so no
-  figure has to survive the journey and nothing need be carried. A gated
-  ladder's arrival needs exactly what is read there, to the unit. Open is
-  whether that stays exact where the constants COMPOSE — a gate behind a gate —
-  and where the store is not nought.
-  relevant: `drain-dry-free`, `entry-hop-fits`
-
 ### Big picture tier roadmap
-
-- **THE DOOR'S RISK IS A CONSTRUCTOR NOTHING HAS ENTERED.** `entry-hop-fits` is
-  the tier's only FALSITY and its rows are TIGHT at two crossings, which is what
-  makes the uncovered arm worth more than another margin: no row reaches a `μ`,
-  where the reading's own clause looks through the binder and the fit at the door
-  has nothing spare. Instantiate the door under a recursive source, guarded and
-  through a defer, and run it — the tightness already on record says a repair
-  costing one is a repair that does not fit.
 
 - **RESTATE THE DRAIN'S PREMISE ONTO WHAT THE ARRIVAL SUPPLIES.** The two legs
   that stood here are retired together: one measurement answered both, and it
@@ -261,18 +240,27 @@ procedure rather than a pin, and whose refusal is what turned this up.
   the single gate held the store at nought throughout and nothing yet says the
   two quantities do not interact. Refute first.
 
-### The ledger
+- **THE SHELF IS WHAT THE RESTATEMENT WILL BE SPENT THROUGH.** The four carried
+  rows are one family — each says a frame gives back no more than it was handed,
+  in the currency the restated drain premise will be denominated in — and the
+  restatement lands on top of them, so a shape wrong here is a shape wrong twice.
+  Two of the four have a named gap in their own rows: no row of the map arm
+  reaches a nonzero store, and no row of the take arm reaches an ARRIVAL, which
+  is precisely the frame the leg above puts weight on. Close those two arms
+  first, then take the assembly.
 
-- **`entry-hop-fits`** (Verify-Rank-Sufficient) — FALSITY, `REFUTED, PROBED×3`:
-  the fit at the door, with both known crossings repaired. Two rows are TIGHT —
-  2 against 2 on a chain, 1 against 1 at a gate — so the margin is
-  instantiated, not argued; no constructor is covered under a μ.
+### The ledger
 
 - **`drain-dry-free`** (Verify-Rank-Sufficient) — SHAPE,
   `REFUTED×5, DEAD ROUTE, PROBED×4`: every arrival after the root frame,
   conditioned on `hopFits` — a registry bound one cascade destroys from a TIGHT
   entry. A fork now says the cascade spends what the ARRIVING VALUE reads, to
   the unit, so the premise names the wrong side of the run.
+
+- **`entry-hop-fits`** (Verify-Rank-Sufficient) — DIFFICULTY,
+  `REFUTED, PROBED×3`: the fit at the door, with both known crossings repaired
+  and TIGHT at each. Every slot flavour is now entered under a μ, the
+  late-scripted one that refuted the statement included.
 
 - **`map-frame-carried`** (Verify-Rank-Sufficient.Push-Carried) — DIFFICULTY,
   `REFUTED×2, PROBED`: the two ends are readings of DIFFERENT expressions,

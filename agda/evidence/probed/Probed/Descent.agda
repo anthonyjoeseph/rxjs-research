@@ -55,7 +55,7 @@ open import Data.Vec using () renaming ([] to []ⱽ; _∷_ to _∷ⱽ_)
 open import Function using (_∘_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import Rx.Prim using (Fuel; InstEmit; cold; after_,_)
+open import Rx.Prim using (Fuel; InstEmit; cold; hot; after_,_)
 open import Rx.Exp using (Ctx; Closed; natᵗ; nat̂; strmᵗ; ofᵉ; takeᵉ;
   mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; drain; subscribeE;
@@ -303,6 +303,15 @@ descP9 = refl
 _ : evs (drainOf progP9 insAsync) ≡ 94    -- LOAD-BEARING
 _ = refl
 
+-- AND THE SLOT WHOSE VALUES ALL ARRIVE LATE, which is not a fourth
+-- flavour but the refuting one.  The fit was FALSE at a scripted slot
+-- because a count taken at the subscribe frame reads nought when
+-- nothing is delivered in it, and the slot above delivers one value
+-- synchronously, so it is on the safe side of exactly that boundary.
+-- This one delivers nothing at all until after the frame.
+insLate : Slots Γ₁
+insLate zero = scripted (cold [] (after 3 , 5 ∷ after 4 , 6 ∷ after 5 , 7 ∷ []))
+
 progP10 : Closed Γ₁ natᵗ
 progP10 = μᵉ (switchAllᵉ
   (ofᵉ ( strmᵗ (input zero)
@@ -387,3 +396,64 @@ fitP3 = Below
 
 fitP12 : Confirms (entry-hop-fits progP12 insMu)
 fitP12 = Below
+
+----------------------------------------------------------------------
+-- AND THE ARM THE THREE ABOVE LEAVE OVER, which is where the two halves
+-- of this statement's history MEET.  The rows above take their depth
+-- from the term's own recursion and reach a slot only as a SHARE; the
+-- scripted slot is the other region entirely, and it is the one the fit
+-- was once FALSE in.  Neither half alone is the risk — a share is read
+-- off a definition the guard can see, and a scripted slot without
+-- recursion is the region a sibling receipt already covers at width.
+-- Together the guard is comparing a term whose nesting is fixed outside
+-- its own syntax against a count that a subscribe frame can read as
+-- nought, and nothing had put the two in one program.
+--
+-- The three points are the same recursion over the partly-synchronous
+-- slot, the switching strategy over it, and the recursion over the slot
+-- that delivers NOTHING in its subscribe frame — which is the refuting
+-- shape itself rather than a neighbour of it.  Each spends the decision
+-- procedure, so a fit that failed at the point would leave the row
+-- unsolvable rather than pass.
+----------------------------------------------------------------------
+
+fitP9 : Confirms (entry-hop-fits progP9 insAsync)
+fitP9 = Below
+
+fitP10 : Confirms (entry-hop-fits progP10 insAsync)
+fitP10 = Below
+
+fitP9L : Confirms (entry-hop-fits progP9 insLate)
+fitP9L = Below
+
+-- AND THE LAST FLAVOUR, which is the one every margin on record is
+-- taken where it cannot arise.  A HOT source is anchored at tick ZERO
+-- rather than at the subscription, so a subscription made after that
+-- anchor misses whatever the anchor has already passed and the clause
+-- reading it over-approximates.  Under a recursion the anchor is fixed
+-- once while the inner subscriptions are not, which is the only place
+-- that over-approximation can be asked to cover a count it did not
+-- take.  Two points: the recursion straight over it, and the same one
+-- behind a gate, where the door subscribes later still.
+insHot : Slots Γ₁
+insHot zero = scripted (hot (after 1 , 2 ∷ after 2 , 3 ∷ after 3 , 4 ∷ []))
+
+progP13 : Closed Γ₁ natᵗ
+progP13 = deferᵉ progP9
+
+fitP9H : Confirms (entry-hop-fits progP9 insHot)
+fitP9H = Below
+
+fitP13H : Confirms (entry-hop-fits progP13 insHot)
+fitP13H = Below
+
+_ : evs (drainOf progP9 insHot) ≡ 179    -- LOAD-BEARING
+_ = refl
+
+_ : evs (drainOf progP13 insHot) ≡ 175   -- LOAD-BEARING
+_ = refl
+
+-- and the run over that slot is not empty, so the point is one the
+-- evaluator reaches rather than one the fit is vacuous at
+_ : evs (drainOf progP9 insLate) ≡ 82     -- LOAD-BEARING
+_ = refl
