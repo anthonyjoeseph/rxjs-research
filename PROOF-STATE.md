@@ -215,8 +215,9 @@ chain — and the gate crossing that reopened the door is repaired too: the
 reading charges a defer one flattening, which is what the door actually
 registers.
 
-**AND THE GATE WANTED NO NEW CURRENCY.** A door subscribes the outer gate only,
-so its debt is ONE however deeply gates nest, and a constant clause pays it.
+**AND THE FOLD IS NOT A FRAME.** A scan emits its own accumulator, so no bound
+on what a frame is handed bounds what it returns; that leaf is now taken at the
+burst and at the seed the walk's own arm installs.
 
 **A FAILING GUARD IS NOT AN ERROR, AND THAT IS WHY THE TIER IS PROBEABLE.** A
 guarded clause returns a `dry` emit and the run continues, so both sides
@@ -226,27 +227,25 @@ procedure rather than a pin, and whose refusal is what turned this up.
 ### Open questions
 
 - **CAN ONE READING PRICE WHAT NO FRAME HANDS THE NEXT ONE?** The reading is a
-  triple of counts over the SYNTAX, and it has been asked to bound quantities
-  that are not all syntactic. The gate half is ANSWERED: the demand a defer
-  makes is constant, so a clause paying it without descending pays it in full
-  and the unfolding invariance survives. What is left is the STORE's half, which
-  has no such escape — a fold's accumulator is rebuilt out of what the fold just
-  emitted, so the quantity is not constant, not syntactic, and not carried
-  across the frame boundary either. The question is now whether the store must
-  be read ALONGSIDE the term rather than instead of it.
-  relevant: `scan-frame-carried`, `drain-dry-free`, `entry-hop-fits`
+  triple of counts over the SYNTAX, and it is asked to bound quantities that are
+  not all syntactic. The gate half is answered. The store's half is not, and the
+  FRAME is no longer where it can be asked. What is open is whether naming the
+  seed recovers the tie between a node and the term that installed it, or
+  whether the store has to be read alongside the term everywhere a node is
+  handed over abstractly.
+  relevant: `scan-burst-carried`, `drain-dry-free`, `entry-hop-fits`
 
 ### Big picture tier roadmap
 
-- **PLUG THE FOLD AT ITS ACCUMULATOR.** The carried walk reads a `scan-f` at
-  what the frame above it produced and NOT at the accumulator the fold is
-  rewriting, because a frame carries no seed — the accumulator is in the store.
-  That is a known under-read on the left of a `≤`, so it cannot refute the door;
-  what it can do is make the drain leaf false while the fit stays satisfiable,
-  which is the worst shape available and the remaining half of the question
-  above. The leg states the store's own reading and closes `scan-frame-carried`
-  against it — the one leaf handed the ordering between the two currencies
-  rather than assuming it.
+- **INSTANTIATE THE FOLD'S NEW LEAF, WHICH NOTHING HAS EVER REACHED.** The
+  statement is taken at the BURST and at the machine's own seed now, so no
+  coverage transfers: every probe of this face reads a subscribe at the ROOT,
+  and this leaf is about what a burst does to a node an arm just installed. Run
+  the walk's scan arm at a fold deepening once and twice per delivery, at a
+  source long enough that the refold count is what is spent, and read both
+  sides. A crossing says the seed is not the missing tie and the question above
+  stays open at the store; agreement at every length says it is, and the row
+  becomes a grind. Refute first, at a node already deeper than its own seed.
 
 - **THE OTHER TWO FRAMES, AS A SHELF.** A map's outputs are a template
   evaluated at the payload, which is exactly the plug clause the repaired walk
@@ -274,10 +273,10 @@ procedure rather than a pin, and whose refusal is what turned this up.
   repaired measure, so the region is narrowed rather than re-opened: a witness
   must now be a frame no term produced.
 
-- **`scan-frame-carried`** (Verify-Rank-Sufficient.Push-Carried) — FALSITY,
-  `NO EVIDENCE`: the fold's step, and the one frame whose emission IS its
-  stored accumulator. It is the only leaf handed the ordering between the two
-  currencies, and both halves move at once under it.
+- **`scan-burst-carried`** (Verify-Rank-Sufficient.Push-Carried) — FALSITY,
+  `REFUTED`: the fold, at the burst rather than the frame — the frame-local form
+  is dead, since a scan's output is the accumulator it is rewriting and no
+  payload bound reaches it. Nothing has instantiated the replacement.
 
 - **`map-frame-carried` / `take-frame-carried`**
   (Verify-Rank-Sufficient.Push-Carried) — FALSITY, `NO EVIDENCE`: the other two

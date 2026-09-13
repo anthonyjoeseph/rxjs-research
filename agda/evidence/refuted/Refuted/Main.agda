@@ -21,4 +21,9 @@ open import Refuted.Drain-Reachable using (drain-dry-free-false;
 open import Refuted.Hop-Sum using (entry-hop-fits-false; carried-is; term-is)
 
 open import Refuted.Rank-Entry using (dry-operator-false)
+-- the three figures travel with the witness for the same reason: the
+-- payload and the store both enter at the floor here, so a repair that
+-- moved either would leave the crossing intact and say nothing
+open import Refuted.Scan-Store using (scan-frame-carried-false;
+  payload-is; store-is; out-is)
 open import Refuted.Sync-Count using (sync-count-bounded-false)
