@@ -54,7 +54,7 @@
 -- `subscribeInner`, really does peel the rank, and really does come
 -- back without a dry close.
 --
--- TARGET: dry-operator @95578e
+-- TARGET: dry-operator @6c873d
 module Probed.Operator-Root where
 
 open import Data.List using (List; []; _∷_)

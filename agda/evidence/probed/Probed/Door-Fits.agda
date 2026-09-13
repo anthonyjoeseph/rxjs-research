@@ -80,7 +80,7 @@
 -- the constant margin is where the two currencies were seen to keep
 -- step and not where they were shown to; and nothing here reaches a
 -- registry admitting more than two chains.
--- TARGET: entry-drain-hop @79bb43
+-- TARGET: entry-drain-hop @c75169
 module Probed.Door-Fits where
 
 open import Data.Fin using (Fin; zero; suc)

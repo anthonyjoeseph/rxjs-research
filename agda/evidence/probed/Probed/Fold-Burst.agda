@@ -54,7 +54,7 @@
 -- does any row compound the delivery count and the hop at once: the two
 -- wide steps are one layer deep, so nothing here says what a step that
 -- both deepens and multiplies costs.
--- TARGET: scan-burst-carried @11b51c
+-- TARGET: scan-burst-carried @4f0dfe
 module Probed.Fold-Burst where
 
 open import Data.Fin using (zero)
