@@ -286,6 +286,22 @@ postulate
 -- entry state is what the subscribe frame produced, and the drain has
 -- not run yet.
 --
+-- REFUTED: `Refuted.Defer-Hop` — `deferᵉ (ofᵉ (nat̂ 1 ∷ []))`, and the
+--   crossing is `1 ≤ 0`.  The reading gives a defer NOTHING while the
+--   door registers a flattener for it, so the two sides disagree about
+--   what one constructor does and no program shape is needed to reach
+--   it.  Neither side is repairable alone: charging the defer in the
+--   reading costs the μ edge its invariance under unfolding, since a
+--   recursion's variable sits under a defer and an unfolding puts the
+--   whole μ there; dropping the frame from the chain measure
+--   under-reads a hop the run really takes.  What a defer is owed is a
+--   SCHEDULE TICK, which is the one currency neither side of this
+--   comparison is denominated in.
+-- REFUTED: `Refuted.Hop-Sum` — the predecessor CHAIN measure, which
+--   read every frame's template apart and added; that one was repaired
+--   on the measure's own side and the rows below survived it.  It is
+--   named here because the two witnesses are independent: the sum is
+--   dead, and the fit is still false without it.
 -- PROBED: `Probed.Entry-Fit` — the SCRIPTED slot, which is where this
 --   statement was once false: a slot's reading has three components,
 --   two of them forced to zero by `isData`, so the count is the only

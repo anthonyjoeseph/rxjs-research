@@ -208,16 +208,15 @@ research lives; where they disagree, the header wins.
 
 ## Tier 1 — the descent never goes dry
 
-**THE TIER IS ONE STATEMENT, AND THE MEASURE UNDER IT NOW HOLDS AT THE DOOR.**
+**THE TIER IS ONE STATEMENT AND ITS DOOR IS FALSE AGAIN, FOR A SECOND REASON.**
 `rank-sufficient` (Verify-Rank-Sufficient) says no run emits the dry marker. The
-carried side used to read every frame's template in isolation and ADD; it now
-replays the term reading along the chain, so on a chain the entry built the two
-sides are one arithmetic walked in one order.
+carried side's addition is repaired — it replays the term reading along the
+chain, so a chain the entry built walks one arithmetic — and the fit is still
+refuted, now at the defer gate.
 
-**SO WHAT IS LEFT IS WHAT THE TERM DID NOT BUILD.** The two can part only at a
-frame no term produced — a chain a cascade lengthened — or at a FOLD, whose
-accumulator lives in the store and is therefore the one reading a frame cannot
-hand the next one.
+**AND THIS ONE IS A CURRENCY MISMATCH, NOT AN ARITHMETIC.** The gate reads as
+nothing and registers a flattener, and what it is owed is a schedule TICK —
+which neither measure counts, so neither is repairable alone.
 
 **A FAILING GUARD IS NOT AN ERROR, AND THAT IS WHY THE TIER IS PROBEABLE.** A
 guarded clause returns a `dry` emit and the run continues, so both sides
@@ -226,28 +225,27 @@ procedure rather than a pin, and whose refusal is what turned this up.
 
 ### Open questions
 
-- **DOES A TERM-RELATIVE READING BOUND WHAT THE TERM DID NOT BUILD?** HALF
-  ANSWERED, and the answered half was arithmetic rather than run time: a carried
-  side reading each frame's template APART charged two discarded templates twice
-  where the term joins them once, and the door handed back `3 ≤ 2`. Threaded,
-  that same program lands on the nose. What is LEFT is the fold — an accumulator
-  is rebuilt out of what the fold just emitted and lives in the store, so it is
-  the one reading no frame can hand the next one, and a chain a cascade
-  lengthened is where a shortfall there would show.
-  relevant: `drain-dry-free`, `scan-frame-carried`
+- **CAN ONE READING PRICE BOTH THE TERM AND THE GATE?** The reading is a triple
+  of counts over the SYNTAX, and the two things it has been asked to bound are
+  not both syntactic. A defer's hop is real, is performed, and is paid for by a
+  schedule tick rather than by anything the program spells — and the clause that
+  gives it zero is exactly what makes the reading survive an unfolding, so the
+  two demands are in direct tension rather than merely unreconciled. The fold is
+  the same question from the store's side: an accumulator is rebuilt out of what
+  the fold just emitted, so it too is a quantity no frame hands the next one.
+  relevant: `entry-hop-fits`, `drain-dry-free`, `scan-frame-carried`
 
 ### Big picture tier roadmap
 
-- **DEEPEN A CHAIN WITHOUT LENGTHENING ITS SOURCE.** The repair narrows where a
-  witness can live rather than removing the risk: the two sides are now one
-  arithmetic on any chain the entry built, so a counterexample has to be a frame
-  no term produced — a cascade that adds a `thru-outer` to a live chain while the
-  term's reading holds still. The axis every arrival row sweeps is the wrong one:
-  a fold reads a delivery count as its refold count, so it moves the bound rather
-  than the quantity bounded. The leg builds
-  that family and steps it. Refute before grind: it is the same shape both
-  standing refutations of this leaf take, arriving at the CONDITIONED statement,
-  so a witness here kills the repair too.
+- **DECIDE WHERE THE GATE IS PAID FOR.** Three candidates and each is
+  instantiable before anything is proven, which is what makes this the leg
+  rather than a design note. The reading could charge the defer and lose the μ
+  equation — so instantiate the loss: unfold a recursion and read both sides.
+  The chain measure could stop charging a gate-installed flattener, telling it
+  apart from a term-built one — so instantiate the under-read: run a gate whose
+  body nests, and see what the registry then misses. Or the fit could name the
+  tick, which is a third currency the comparison does not have today. Refute
+  before grind, and the first two are cheap enough to refute in an afternoon.
 
 - **PLUG THE FOLD AT ITS ACCUMULATOR.** The carried walk reads a `scan-f` at
   what the frame above it produced and NOT at the accumulator the fold is
@@ -286,10 +284,10 @@ procedure rather than a pin, and whose refusal is what turned this up.
   where the reading's plug clause has to be met; a take hands back a prefix
   under a node that reads zero by construction.
 
-- **`entry-hop-fits`** (Verify-Rank-Sufficient) — DIFFICULTY, `PROBED×2`: the
-  fit at the door, where the entry is the only thing that built the chain and
-  so the two sides walk one arithmetic. One row is TIGHT — the program that
-  killed the summing measure, landing 2 against 2.
+- **`entry-hop-fits`** (Verify-Rank-Sufficient) — FALSITY, `REFUTED×2,
+  PROBED×2`: the fit at the door, and false there at one constructor. The
+  threaded measure holds on every chain a term built — one row is TIGHT, landing
+  2 against 2 — and the gate is not one of those.
 
 - **`thru-outer-frame-carried`** (Verify-Rank-Sufficient.Push-Carried) —
   DIFFICULTY, `PROBED`: the HOP EDGE, where the two currencies are exchanged.
