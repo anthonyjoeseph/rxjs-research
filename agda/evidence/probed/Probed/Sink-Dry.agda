@@ -10,16 +10,34 @@
 -- the proof may rest on it.  Checked by `make probed`, claimed by
 -- `Probed.Main`.
 
--- THE LOAD-BEARING ROWS instantiate at programs where `Rst = stHop ψ
--- st > 0`: `oneProg` (one observable-accumulator scan consumer) and
--- `thriceProg` (three identical ones).  Both have `Rst = 1` at the
--- subscribe state, so the join the chains are held under is genuinely
--- read off the store rather than handed in.  The `stOut` digit records
--- the store depth AFTER the dispatch, confirming the fan-out's write
--- happened and was priced, and the `nRegs` digit confirms the premise
--- recursed over a non-empty list rather than landing on its `⊤` arm —
--- which is the one way a row here could read green having asserted
--- nothing at all.
+-- THE LOAD-BEARING ROW is `oneProg`, whose single scan consumer folds
+-- into an observable accumulator: `Rst = 1` at the subscribe state, so
+-- the join the chain is held under is genuinely read off the store
+-- rather than handed in.  The `stOut` digit records the store depth
+-- AFTER the dispatch, confirming the fan-out's write happened and was
+-- priced, and the `nRegs` digit confirms the premise recursed over a
+-- non-empty list rather than landing on its `⊤` arm — which is the one
+-- way a row here could read green having asserted nothing at all.
+
+-- WIDTH AND WRITING CANNOT BE CARRIED BY ONE PROGRAM HERE, AND THAT IS
+-- A PROPERTY OF THE STATEMENT RATHER THAN OF THIS HARNESS.  The
+-- premise's conjunct is cheap — it reads the store at the state the
+-- chain is ENTERED under — but its recursive tail is taken at the
+-- state that chain's `foldPath` RETURNS, so deciding the next chain's
+-- cancellation test forces the evaluator to normalise inside the type,
+-- once per chain and compounding.  A fan-out of one never pays it, the
+-- tail being the `⊤` arm, which matches without inspecting the state.
+-- So the two properties are split across the two points below: writing
+-- at width one, threading at width three over chains that write
+-- nothing.
+--
+-- THE COMBINATION — THREADING ACROSS CHAINS THAT WRITE — IS NOT
+-- INSTANTIABLE.  Three observable-accumulator consumers exhausted
+-- sixteen gigabytes without finishing, at a fold wrapping once; the
+-- same shape wrapping three times did too.  This is a coverage
+-- BOUNDARY and not an untried row: the region where a chain's own
+-- write changes the store the NEXT chain is read against is exactly
+-- where a false join would hide, and nothing here reaches it.
 
 -- THE `valsHop ψ natᵗ vals` CONJUNCT IS ALWAYS ZERO here, because the
 -- dispatched values are natural numbers and `rdᵛ ψ natᵗ _ = 0 , 0` by
@@ -27,10 +45,11 @@
 -- bare flattener count against the join.  A fan-out over
 -- observable-valued slots would put a positive figure on the left.
 
--- THE DEGENERATE CONTROL is `quietProg`, whose three consumers are
--- plain-number scans: `Rst = 0` at subscribe and `stOut = 0` after
--- dispatch, so the join is nought and a chain carrying ANY flattener
--- would refute there.  It separates the hop count from the writing.
+-- THE WIDTH ROW is `quietProg`, whose three consumers are plain-number
+-- scans: `Rst = 0` at subscribe and `stOut = 0` after dispatch, so the
+-- join is nought and a chain carrying ANY flattener would refute
+-- there.  It is the degenerate control for the store reading and the
+-- only row that reaches the premise's threading at all.
 
 -- WHAT IS NOT COVERED: observable-valued share slots (where `Rin > 0`);
 -- completing dispatches (`fin = true`); a spent counter (the
@@ -108,10 +127,9 @@ cons3 = strmᵗ (mergeAllᵉ nothing (scanᵉ deepen seed (input (suc zero))))
 flatCons : Tm Γ₂ [] [] [] (obs natᵗ)
 flatCons = strmᵗ (scanᵉ (fstᵗ (varᵗ (here refl))) (nat̂ 0) (input (suc zero)))
 
-oneProg thriceProg quietProg : Closed Γ₂ natᵗ
-oneProg    = mergeAllᵉ nothing (ofᵉ (cons3 ∷ []))
-thriceProg = mergeAllᵉ nothing (ofᵉ (cons3 ∷ cons3 ∷ cons3 ∷ []))
-quietProg  = mergeAllᵉ nothing (ofᵉ (flatCons ∷ flatCons ∷ flatCons ∷ []))
+oneProg quietProg : Closed Γ₂ natᵗ
+oneProg   = mergeAllᵉ nothing (ofᵉ (cons3 ∷ []))
+quietProg = mergeAllᵉ nothing (ofᵉ (flatCons ∷ flatCons ∷ flatCons ∷ []))
 
 ----------------------------------------------------------------------
 -- THE INSTRUMENT.  The subscribe state, where the chains have
@@ -176,14 +194,17 @@ module Ap (e : Closed Γ₂ natᵗ) (v : ℕ) where
   packed = nRegs + 1000 * Rst + 1000000 * stOut
 
 ----------------------------------------------------------------------
--- THE THREE POINTS.  `One3` and `Three3` are LOAD-BEARING: their store
--- depth is positive at subscribe and the dispatch writes the fold
--- accumulators deeper.  `Quiet3` is the DEGENERATE CONTROL: its store
--- depth is zero at subscribe and the flat consumers never write.
+-- THE TWO POINTS, WHICH SPLIT THE TWO PROPERTIES A SINGLE PROGRAM
+-- CANNOT AFFORD TOGETHER.  `One3` carries the WRITING: its store reads
+-- positive at subscribe and the dispatch's write lands deeper, at a
+-- fan-out of one.  `Quiet3` carries the WIDTH: three chains, so the
+-- premise's own recursion threads state from each into the next, at a
+-- store that stays nought throughout — which also makes it the
+-- degenerate control, since a chain carrying any flattener refutes
+-- against a join of nought.
 ----------------------------------------------------------------------
 
 module One3   = Ap oneProg 3
-module Three3 = Ap thriceProg 3
 module Quiet3 = Ap quietProg 3
 
 ----------------------------------------------------------------------
@@ -198,14 +219,11 @@ module Quiet3 = Ap quietProg 3
 one3-is : One3.packed ≡ 2001001
 one3-is = refl
 
-three3-is : Three3.packed ≡ 2001003
-three3-is = refl
-
 quiet3-is : Quiet3.packed ≡ 3
 quiet3-is = refl
 
 ----------------------------------------------------------------------
--- THE TARGET AT THE THREE POINTS.  The one hypothesis is decided
+-- THE TARGET AT THE TWO POINTS.  The one hypothesis is decided
 -- rather than assumed — `Rin ≤ Rst` is `0 ≤ Rst` — so what remains is
 -- the recursion over the admitted list, one flattener count per
 -- registration read against the join with that chain's own state.
@@ -215,11 +233,6 @@ sinkOne3 : Confirms
   (share-chain-hop One3.ac One3.gas 0 0 (suc zero) One3.ψ
      One3.Rin One3.Rst Below One3.vals One3.fin One3.sd One3.st)
 sinkOne3 = Below , tt
-
-sinkThree3 : Confirms
-  (share-chain-hop Three3.ac Three3.gas 0 0 (suc zero) Three3.ψ
-     Three3.Rin Three3.Rst Below Three3.vals Three3.fin Three3.sd Three3.st)
-sinkThree3 = Below , Below , Below , tt
 
 sinkQuiet3 : Confirms
   (share-chain-hop Quiet3.ac Quiet3.gas 0 0 (suc zero) Quiet3.ψ
