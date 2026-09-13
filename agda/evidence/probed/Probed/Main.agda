@@ -58,6 +58,9 @@ open import Probed.Carried-Leaf
   using (ofFlat; ofNest; scanFlat; scanNest; rate; packed-is; packed2L-is;
          recurRow)
 
+open import Probed.Drain-Arrival
+  using (daM6₁; daM6₂; daM24₁; daM24₂; daL₁; daL₂; daL₃; daDrain)
+
 open import Probed.Hop-Edge
   using (hopRow₁; hopRow₂; hopRow₃; hopRowP; hopRowS; hopRowE;
          packed₁-is; packed₂-is; packed₃-is; packedP-is; packedS-is;
