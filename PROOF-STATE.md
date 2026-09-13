@@ -229,10 +229,10 @@ now at the door and at the templates the door's chains are built from.
   state the value arrives through carries no floor, and both index-free ways of
   storing the witness are vacuous. So the registration decides its own floor test
   and takes a SPENT arm — not a dry one, which would falsify the tier's own
-  statement — when it fails. The evaluator is cut over and the descent arguments
-  are off the call sites; what is left is the two proofs that now split on that
-  test, then the subtraction: the bound's whole module goes, its probe expires
-  with it, and its refutation can no longer be stated.
+  statement. The evaluator is cut over and the descent arguments are off the call
+  sites; what is left is the two proofs that now split on that test, then the
+  subtraction: the row goes, its probe expires with it, and its refutation can no
+  longer be stated. Its module STAYS — the μ half is consumed elsewhere.
 
 - **AND THE FOLD'S FRAME IS MISSING TWO AXES, WHICH IS A FACT ABOUT THE WALK'S
   CURRENCY AND NOT ABOUT ONE LEAF.** A frame is handed exactly two scalars, and a
