@@ -37,9 +37,9 @@ open import Relation.Nullary using (yes; no)
 
 open import Rx.Prim      using (Id; Source)
 open import Rx.Exp       using (Ctx; Closed; _≟ᵗ_)
-open import Rx.Evaluator using (Sched; EvalSt; Arrival; RegId; Chain; Path; NodeId; LiveSource; arrTy; arrSource; chainsOf;
+open import Rx.Evaluator using (Sched; EvalSt; Arrival; RegId; AtFloor; NodeId; LiveSource; arrTy; arrSource; chainsOf;
   chainsGo; chainStep; cascadeLatch; cascadeGo; cascadeFinish; sameSource; dropSource;
-  sweepLive)
+  sweepLive; RegRow; regSource)
 open import Rx.Protocol  using (ProtocolSt; countIn; runProtocol; paidUp)
 
 ------------------------------------------------------------------
@@ -63,13 +63,14 @@ open import Decide using (f≡t-absurd; if-false; if-true; true≢false; ∧-int
                           ∧-trueˡ; ∨-fʳ; ∨-fˡ; ∨-swap; ∨-trueʳ; ≡ᵇ-refl; ≡ᵇ-sym; ≡ᵇ→≡)
 
 dropSource-other : ∀ {n} {Γ : Ctx n} {t}
-  (s s′ : Source) (reg : List (RegId × Source × Chain Γ t)) →
+  (s s′ : Source) (reg : List (RegRow Γ t)) →
   (s ≡ᵇ s′) ≡ false →
   countRegs s (dropSource s′ reg) ≡ countRegs s reg
 dropSource-other s s′ []                  neq = refl
-dropSource-other s s′ ((rid , x , c) ∷ r) neq with s ≡ᵇ x in sx | s′ ≡ᵇ x in s′x
+dropSource-other s s′ ((rid , x , c) ∷ r) neq
+  with s ≡ᵇ regSource x in sx | s′ ≡ᵇ regSource x in s′x
 ... | true  | true  =
-      let s≡s′ = trans (≡ᵇ→≡ s x sx) (sym (≡ᵇ→≡ s′ x s′x))
+      let s≡s′ = trans (≡ᵇ→≡ s (regSource x) sx) (sym (≡ᵇ→≡ s′ (regSource x) s′x))
           p    = trans (sym (cong (s ≡ᵇ_) s≡s′)) (≡ᵇ-refl s)
       in true≢false (trans (sym p) neq)
 ... | true  | false rewrite sx = cong suc (dropSource-other s s′ r neq)
@@ -78,17 +79,17 @@ dropSource-other s s′ ((rid , x , c) ∷ r) neq with s ≡ᵇ x in sx | s′ �
 
 -- dropping preserves "every registration is share-sunk"
 allShareSunk-drop : ∀ {n} {Γ : Ctx n} {t}
-  (s : Source) (reg : List (RegId × Source × Chain Γ t)) →
+  (s : Source) (reg : List (RegRow Γ t)) →
   allShareSunk reg ≡ true → allShareSunk (dropSource s reg) ≡ true
 allShareSunk-drop s []                        h = refl
-allShareSunk-drop s ((rid , x , (u , p)) ∷ r) h with s ≡ᵇ x
+allShareSunk-drop s ((rid , x , (u , p)) ∷ r) h with s ≡ᵇ regSource x
 ... | true  = allShareSunk-drop s r (∧-trueʳ h)
 ... | false = ∧-intro (∧-trueˡ h) (allShareSunk-drop s r (∧-trueʳ h))
 
 -- the conditional form of done-plumbed, established from the full-registry
 -- form: identity when the guard is false, allShareSunk-drop when true
 allShareSunk-if : ∀ {n} {Γ : Ctx n} {t}
-  (b : Bool) (s : Source) (reg : List (RegId × Source × Chain Γ t)) →
+  (b : Bool) (s : Source) (reg : List (RegRow Γ t)) →
   allShareSunk reg ≡ true →
   allShareSunk (if b then dropSource s reg else reg) ≡ true
 allShareSunk-if false s reg h = h
@@ -248,7 +249,7 @@ mid-final {a = a} {nextId} {sched} {st} {S} mid = inv , paidUp-S
 -- structural on the snapshot, no termination debt at this level)
 cascadeGo-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (a : Arrival Γ) (nextId : Id)
-  (chains : List (RegId × Path Γ (arrTy a) t))
+  (chains : List (RegId × AtFloor Γ (arrTy a) t))
   (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
   Mid a nextId chains sched st S →
   Σ ProtocolSt λ S′ →
@@ -421,10 +422,11 @@ nubLen-same-elems (x ∷ xs) ys h with elemℕ x xs in eqX
 -- guard monotone: dropping a source cannot create thru-outer reachability,
 -- so ¬reachable is preserved (the cut case stays vacuous under dropSource)
 mergeReachable-drop-false : ∀ {n} {Γ : Ctx n} {t}
-  (nid : NodeId) (s : Source) (reg : List (RegId × Source × Chain Γ t)) →
+  (nid : NodeId) (s : Source) (reg : List (RegRow Γ t)) →
   mergeReachable nid reg ≡ false → mergeReachable nid (dropSource s reg) ≡ false
 mergeReachable-drop-false nid s []                    h = refl
-mergeReachable-drop-false nid s ((rid , x , (u , p)) ∷ r) h with sameSource s x
+mergeReachable-drop-false nid s ((rid , x , (u , p)) ∷ r) h
+  with sameSource s (regSource x)
 ... | true  = mergeReachable-drop-false nid s r (∨-fʳ (pathThruOuter nid p) (mergeReachable nid r) h)
 ... | false rewrite ∨-fˡ (pathThruOuter nid p) (mergeReachable nid r) h =
       mergeReachable-drop-false nid s r (∨-fʳ (pathThruOuter nid p) (mergeReachable nid r) h)
@@ -452,7 +454,7 @@ mergeAdjustSt nid a st =
 -- entry (dropSource).  Mirrors count-eq: the mistyped arrSource case is ruled
 -- out by regTyped? + the live source (liveTypeOK?-extract / sameTy-sound).
 memб-split : ∀ {n} {Γ : Ctx n} {t} (nid : NodeId) (a : Arrival Γ)
-  (reg : List (RegId × Source × Chain Γ t)) (live : List (LiveSource Γ)) →
+  (reg : List (RegRow Γ t)) (live : List (LiveSource Γ)) →
   regTyped? reg live ≡ true → liveHas (arrSource a) (arrTy a) live ≡ true →
   ∀ (z : NodeId) →
   elemℕ z (innerInstsR nid reg)
@@ -460,7 +462,7 @@ memб-split : ∀ {n} {Γ : Ctx n} {t} (nid : NodeId) (a : Arrival Γ)
         ∨ elemℕ z (innerInstsR nid (dropSource (arrSource a) reg)))
 memб-split nid a []                      live rt lh z = refl
 memб-split nid a ((rid , s , (u , p)) ∷ r) live rt lh z
-  with sameSource (arrSource a) s in sseq
+  with sameSource (arrSource a) (regSource s) in sseq
 ... | false =
       trans (elemℕ-++ z (innerInstsP nid p) (innerInstsR nid r))
         (trans (cong (elemℕ z (innerInstsP nid p) ∨_)
@@ -485,7 +487,8 @@ memб-split nid a ((rid , s , (u , p)) ∷ r) live rt lh z
 ...   | no ¬p = ⊥-elim (¬p (sameTy-sound u (arrTy a)
                   (liveTypeOK?-extract (arrSource a) u (arrTy a) live
                     (subst (λ w → liveTypeOK? w u live ≡ true)
-                           (sym (≡ᵇ→≡ (arrSource a) s sseq)) (∧-trueˡ rt))
+                           (sym (≡ᵇ→≡ (arrSource a) (regSource s) sseq))
+                           (∧-trueˡ rt))
                     lh)))
 
 -- countLiveInners of the full registry SPLITS into the adjustment plus

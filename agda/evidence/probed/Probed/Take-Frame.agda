@@ -69,7 +69,7 @@
 -- whose own source is a second arrival's.  Source lengths run to three
 -- literals, because a row costs a whole walk.
 --
--- TARGET: take-frame-carried @9bee53
+-- TARGET: take-frame-carried @c8d5e8
 module Probed.Take-Frame where
 
 open import Data.Bool using (Bool; false; if_then_else_)
@@ -97,6 +97,7 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; NodeId; Arrival;
   mintNode; installNode; take-st; take-f; map-f; scan-f; splitBurst;
   stepFrame; stHop; arrTy; arrVal; arrTick; sched-next; cascade;
   arrivalWitness)
+open import Rx.Inputs-Below using (below-ctx)
 open import Verify-Rank-Sufficient.Carried using (valsRd)
 open import Verify-Rank-Sufficient.Push-Carried using (take-frame-carried)
 open import Probed.Apparatus using (Confirms; Below)
@@ -126,7 +127,7 @@ module Ap {n} {Γ : Ctx n} (ins : Slots Γ) (k : ℕ)
   nid = proj₁ (mintNode (sched-init prog ins))
 
   r : Stream Γ (obs natᵗ) × Sched Γ × EvalSt prog
-  r = subscribeE ac src (take-f nid ↠ root) 0 0
+  r = subscribeE {lo = n} ac src {below-ctx src} (take-f nid ↠ root) 0 0
         (proj₂ (mintNode (sched-init prog ins)))
         (installNode nid (take-st k) (st-init prog))
 
@@ -148,7 +149,7 @@ module Ap {n} {Γ : Ctx n} (ins : Slots Γ) (k : ℕ)
 
   sf : List (Val Γ (obs natᵗ)) × List (InstEvent (Val Γ (obs natᵗ)))
      × Bool × Sched Γ × EvalSt prog
-  sf = stepFrame ac 0 0 (take-f nid) root vals fin sd st
+  sf = stepFrame {lo = n} ac 0 0 (take-f nid) root vals fin sd st
 
   -- the two bounds, each the TIGHTEST the predicate admits: what the
   -- frame was handed, and what the store read on the way in
@@ -305,24 +306,24 @@ wide-counts = refl
 -- conclusion alone, taken where the predicate is strongest.
 ----------------------------------------------------------------------
 
-takeCut₁ : Confirms (take-frame-carried Cut₁.ac 0 0 Cut₁.nid root
+takeCut₁ : Confirms (take-frame-carried {lo = 0} Cut₁.ac 0 0 Cut₁.nid root
   Cut₁.ψ Cut₁.Rv Cut₁.Rst Cut₁.vals Cut₁.fin Cut₁.sd Cut₁.st (Below , Below) Below)
 takeCut₁ = (Below , Below) , Below
 
-takeEdge₂ : Confirms (take-frame-carried Edge₂.ac 0 0 Edge₂.nid root
+takeEdge₂ : Confirms (take-frame-carried {lo = 0} Edge₂.ac 0 0 Edge₂.nid root
   Edge₂.ψ Edge₂.Rv Edge₂.Rst Edge₂.vals Edge₂.fin Edge₂.sd Edge₂.st
   (Below , Below) Below)
 takeEdge₂ = (Below , Below) , Below
 
-takePass : Confirms (take-frame-carried Pass.ac 0 0 Pass.nid root
+takePass : Confirms (take-frame-carried {lo = 0} Pass.ac 0 0 Pass.nid root
   Pass.ψ Pass.Rv Pass.Rst Pass.vals Pass.fin Pass.sd Pass.st (Below , Below) Below)
 takePass = (Below , Below) , Below
 
-takeDeep : Confirms (take-frame-carried Deep.ac 0 0 Deep.nid root
+takeDeep : Confirms (take-frame-carried {lo = 0} Deep.ac 0 0 Deep.nid root
   Deep.ψ Deep.Rv Deep.Rst Deep.vals Deep.fin Deep.sd Deep.st (Below , Below) Below)
 takeDeep = (Below , Below) , Below
 
-takeWide : Confirms (take-frame-carried Wide.ac 0 0 Wide.nid root
+takeWide : Confirms (take-frame-carried {lo = 0} Wide.ac 0 0 Wide.nid root
   Wide.ψ Wide.Rv Wide.Rst Wide.vals Wide.fin Wide.sd Wide.st
   (Below , Below) Below)
 takeWide = (Below , Below) , Below
@@ -375,10 +376,10 @@ growA = strmᵗ (mergeAllᵉ nothing (ofᵉ (varᵗ (here refl) ∷ [])))
 -- same order, so the pair handed on is the pair the drain recurses on
 entry : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
   Sched Γ × EvalSt e
-entry e ins =
+entry {n = n} e ins =
   let (_ , sched , st) =
-        subscribeE (rootWitness e ins) e root 0 0 (sched-init e ins)
-          (st-init e)
+        subscribeE {lo = n} (rootWitness e ins) e {below-ctx e} root 0 0
+          (sched-init e ins) (st-init e)
   in sched , st
 
 stepOnce : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} →
@@ -424,11 +425,11 @@ module At (c : ℕ) (steps : ℕ) where
   ...   | no _     = [] , false , sd′ , st
   ...   | yes refl =
     let (v₁ , _ , f₁ , sd₁ , st₁) =
-          stepFrame (arrivalWitness a sd′ st) 1 (arrTick a)
+          stepFrame {lo = 1} (arrivalWitness a sd′ st) 1 (arrTick a)
             (scan-f foldA snid) (map-f growA ↠ (take-f nid ↠ root))
             (arrVal a ∷ []) (Arrival.isLast a) sd′ st
         (v₂ , _ , f₂ , sd₂ , st₂) =
-          stepFrame (arrivalWitness a sd′ st) 1 (arrTick a)
+          stepFrame {lo = 1} (arrivalWitness a sd′ st) 1 (arrTick a)
             (map-f growA) (take-f nid ↠ root) v₁ f₁ sd₁ st₁
     in v₂ , f₂ , sd₂ , st₂
 
@@ -457,7 +458,7 @@ module At (c : ℕ) (steps : ℕ) where
   sf : List (Val Γ₁ (obs natᵗ))
      × List (InstEvent (Val Γ₁ (obs natᵗ))) × Bool × Sched Γ₁
      × EvalSt prog
-  sf = stepFrame ac 0 0 (take-f nid) root vals fin sd st
+  sf = stepFrame {lo = 1} ac 0 0 (take-f nid) root vals fin sd st
 
   -- same radix and same order as the four rows above, so the two
   -- families are read against each other without re-deriving anything
@@ -533,11 +534,11 @@ cut-counts = refl
 -- produced the payload one frame up.
 ----------------------------------------------------------------------
 
-takeMid : Confirms (take-frame-carried Mid.ac 0 0 Mid.nid root
+takeMid : Confirms (take-frame-carried {lo = 1} Mid.ac 0 0 Mid.nid root
   Mid.ψ Mid.Rv Mid.Rst Mid.vals Mid.fin Mid.sd Mid.st (Below , Below) Below)
 takeMid = (Below , Below) , Below
 
-takeCut : Confirms (take-frame-carried Cut.ac 0 0 Cut.nid root
+takeCut : Confirms (take-frame-carried {lo = 1} Cut.ac 0 0 Cut.nid root
   Cut.ψ Cut.Rv Cut.Rst Cut.vals Cut.fin Cut.sd Cut.st (Below , Below) Below)
 takeCut = (Below , Below) , Below
 

@@ -84,16 +84,16 @@ open import Data.Sum using (inj₁; inj₂)
 open import Data.Vec using () renaming ([] to []ⱽ; _∷_ to _∷ⱽ_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import Rx.Prim using (Id; Tick; Source; cold; after_,_)
+open import Rx.Prim using (Id; Tick; cold; after_,_)
 open import Rx.Exp using (Ctx; Closed; Exp; Ty; Val; natᵗ; obs; strmᵗ; ofᵉ;
   mergeAllᵉ; deferᵉ; input)
 open import Rx.Slots using (Slots; scripted)
 open import Rx.Hop-Depth using (Rd₃; ε; mapStep; flatten; hopOf; depthᵉ; depthᵛ)
 open import Rx.Slot-Read using (slotRd)
-open import Rx.Evaluator using (Path; Chain; RegId; Sched; EvalSt; LiveSource;
-  root; share-sink; _↠_; map-f; scan-f; take-f; from-inner; thru-outer;
-  cascade; sched-next; subscribeE; rootWitness; sched-init; st-init;
+open import Rx.Evaluator using (Path; RegRow; Sched; EvalSt; LiveSource; root; share-sink; _↠_; map-f; scan-f; take-f;
+  from-inner; thru-outer; cascade; sched-next; subscribeE; rootWitness; sched-init; st-init;
   stHop; evaluate; hasDry)
+open import Rx.Inputs-Below using (below-ctx)
 
 ----------------------------------------------------------------------
 -- THE CURRENCY, WRITTEN OUT HERE RATHER THAN IMPORTED.  This is the
@@ -103,10 +103,10 @@ open import Rx.Evaluator using (Path; Chain; RegId; Sched; EvalSt; LiveSource;
 -- rows below fail by name instead of quietly agreeing.
 ----------------------------------------------------------------------
 
-chainRd′ : ∀ {n} {Γ : Ctx n} {s t} (ψ : Fin n → Rd₃) →
-           Path Γ s t → Rd₃ → Rd₃
+chainRd′ : ∀ {n} {Γ : Ctx n} {lo s t} (ψ : Fin n → Rd₃) →
+           Path Γ lo s t → Rd₃ → Rd₃
 chainRd′ ψ root                    p = p
-chainRd′ ψ (share-sink i)          p = p
+chainRd′ ψ (share-sink i _)        p = p
 chainRd′ ψ (map-f fn ↠ κ)          p = chainRd′ ψ κ (mapStep ψ ε p fn)
 chainRd′ ψ (scan-f fn nid ↠ κ)     p = chainRd′ ψ κ (mapStep ψ ε p fn)
 chainRd′ ψ (take-f nid ↠ κ)        p = chainRd′ ψ κ p
@@ -114,7 +114,7 @@ chainRd′ ψ (from-inner op a i ↠ κ) p = chainRd′ ψ κ p
 chainRd′ ψ (thru-outer op nid ↠ κ) p = chainRd′ ψ κ (flatten p)
 
 regsDepth′ : ∀ {n} {Γ : Ctx n} {t} (ψ : Fin n → Rd₃) →
-             List (RegId × Source × Chain Γ t) → ℕ
+             List (RegRow Γ t) → ℕ
 regsDepth′ ψ []                   = 0
 regsDepth′ ψ ((rid , src , c) ∷ r) =
   hopOf (chainRd′ ψ (proj₂ c) (0 , 0 , 0)) ⊔ regsDepth′ ψ r
@@ -180,10 +180,10 @@ q₃ = deferᵉ (mergeAllᵉ nothing (mergeAllᵉ nothing (deferᵉ obsSlot²)))
 
 entry : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
   Sched Γ × EvalSt e
-entry e ins =
+entry {n = n} e ins =
   let (_ , sched , st) =
-        subscribeE (rootWitness e ins) e root 0 0 (sched-init e ins)
-          (st-init e)
+        subscribeE {lo = n} (rootWitness e ins) e {below-ctx e} root 0 0
+          (sched-init e ins) (st-init e)
   in sched , st
 
 carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → Sched Γ × EvalSt e → ℕ

@@ -60,7 +60,7 @@ open import Rx.Strat-Order using (_≺_)
 open import Rx.Hop-Depth using (Rd; Rd₃; depthᵉ; depthᵛ; rdᵛ)
 open import Rx.Slot-Read using (slotRd)
 open import Rx.Evaluator using (Frame; Path; root; share-sink; _↠_; Sched;
-  EvalSt; Arrival; arrTy; arrVal; arrTick; arrivalWitness; chainsOf; RegId;
+  EvalSt; Arrival; arrTy; arrVal; arrTick; arrivalWitness; chainsOf; RegId; AtFloor;
   chainStep; cascadeLatch; foldPath; shareAdmit; shareLatch;
   sched-next; cascade; stepFrame; dispatchShare; dryEvent; hasDry; stHop)
 open import Verify-Rank-Sufficient.Carried using (valsRd; _⊑_)
@@ -75,8 +75,8 @@ open import Verify-Rank-Sufficient.Push-Carried using (FrameCarries)
 -- wherever the bounds are not read.
 ----------------------------------------------------------------------
 
-FrameDryUnder : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {τ} →
-  Acc _≺_ τ → Id → Tick → Frame Γ s u → Path Γ u t →
+FrameDryUnder : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {τ} {lo} →
+  Acc _≺_ τ → Id → Tick → Frame Γ s u → Path Γ lo u t →
   (Fin n → Rd₃) → Rd → ℕ → Set
 FrameDryUnder {Γ = Γ} {e = e} {s = s} ac id now f κ ψ Rin Rst =
   ∀ (vals : List (Val Γ s)) (fin : Bool) (sd : Sched Γ) (st : EvalSt e) →
@@ -165,14 +165,15 @@ ShareDryUnder {Γ = Γ} {e = e} ac gas id now i ψ Rin Rst =
 data PathFits {n} {Γ : Ctx n} {t} {e : Closed Γ t} {τ}
        (ac : Acc _≺_ τ) (gas : ℕ) (id : Id) (now : Tick) (ψ : Fin n → Rd₃)
        (Rst : ℕ)
-       : ∀ {u} → Path Γ u t → Rd → Set where
+       : ∀ {lo u} → Path Γ lo u t → Rd → Set where
 
-  at-root : ∀ {R} → PathFits {e = e} ac gas id now ψ Rst root R
+  at-root : ∀ {lo R} → PathFits {e = e} ac gas id now ψ Rst (root {lo = lo}) R
 
-  at-sink : ∀ {i R} → ShareDryUnder {e = e} ac gas id now i ψ R Rst →
-            PathFits {e = e} ac gas id now ψ Rst (share-sink i) R
+  at-sink : ∀ {lo i R} {below : lo ≤ toℕ i} →
+            ShareDryUnder {e = e} ac gas id now i ψ R Rst →
+            PathFits {e = e} ac gas id now ψ Rst (share-sink i below) R
 
-  through : ∀ {s u R Rv} {f : Frame Γ s u} {κ : Path Γ u t} →
+  through : ∀ {lo s u R Rv} {f : Frame Γ s u} {κ : Path Γ lo u t} →
             FrameCarries {e = e} ac id now f κ ψ R Rv Rst →
             FrameDryUnder {e = e} ac id now f κ ψ R Rst →
             PathFits {e = e} ac gas id now ψ Rst κ Rv →
@@ -233,10 +234,10 @@ arrivalRank {e = e} a sched st =
 -- registrations the share carries.
 ----------------------------------------------------------------------
 
-ShareChainsFit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {τ} →
+ShareChainsFit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {τ} {lo} →
   Acc _≺_ τ → ℕ → Id → Tick → (i : Fin n) → (Fin n → Rd₃) → Rd → ℕ →
   List (Val Γ (lookup Γ i)) → Bool →
-  List (RegId × Path Γ (lookup Γ i) t) → Sched Γ → EvalSt e → Set
+  List (RegId × Path Γ lo (lookup Γ i) t) → Sched Γ → EvalSt e → Set
 ShareChainsFit ac gas id now i ψ Rin Rst vals fin [] sd st = ⊤
 ShareChainsFit {e = e} ac gas id now i ψ Rin Rst vals fin
   ((rid , p) ∷ ps) sd st
@@ -297,7 +298,7 @@ ShareFits {e = e} ac gas id now i ψ Rin Rst vals fin sd st =
 ----------------------------------------------------------------------
 
 ChainsFit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} →
-  (a : Arrival Γ) → Id → List (RegId × Path Γ (arrTy a) t) →
+  (a : Arrival Γ) → Id → List (RegId × AtFloor Γ (arrTy a) t) →
   Sched Γ → EvalSt e → Set
 ChainsFit a id []               sched st = ⊤
 ChainsFit {n = n} {e = e} a id ((rid , c) ∷ cs) sched st
@@ -308,7 +309,7 @@ ChainsFit {n = n} {e = e} a id ((rid , c) ∷ cs) sched st
           ψ   = slotRd (Sched.slots sched)
           out = chainStep id a c sched st′
       in PathFits {e = e} (arrivalWitness a sched st′) n id (arrTick a) ψ
-           (arrivalRank a sched st′) c (rdᵛ ψ (arrTy a) (arrVal a))
+           (arrivalRank a sched st′) (proj₂ c) (rdᵛ ψ (arrTy a) (arrVal a))
          × ChainsFit a id cs (proj₁ (proj₂ out)) (proj₂ (proj₂ out))
 
 ArrivalFits : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} →

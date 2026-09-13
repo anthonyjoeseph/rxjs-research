@@ -33,7 +33,7 @@
 -- hypothesis was added to answer.
 module Refuted.Rank-Entry where
 
-open import Data.Bool using (true; false)
+open import Data.Bool using (true; false; T)
 open import Data.Empty using (⊥)
 open import Data.List using (List; []; _∷_)
 open import Data.Maybe using (nothing)
@@ -45,7 +45,8 @@ open import Induction.WellFounded using (Acc)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans)
 
 open import Rx.Prim using (Id; Tick; Source)
-open import Rx.Exp using (Ctx; Closed; natᵗ; strmᵗ; nat̂; ofᵉ; mergeAllᵉ; syncSizeᵉ)
+open import Rx.Exp using (Ctx; Closed; natᵗ; strmᵗ; nat̂; ofᵉ; mergeAllᵉ; syncSizeᵉ;
+  inputsBelowᵉ)
 open import Rx.Slots using (Slots)
 open import Rx.Strat-Order using (Tri; _≺_; ≺-wellFounded)
 open import Rx.Evaluator using (Stream; Path; Sched; EvalSt; subscribeE; root;
@@ -69,11 +70,12 @@ EntryReads₂ (U , R , s) o sl cs =
   unconn sl cs ≤ U × syncSizeᵉ o ≤ s
 
 DryOperator : Set
-DryOperator = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} {τ : Tri}
-  (ac : Acc _≺_ τ) (o : Closed Γ u) (κ : Path Γ u t) (id : Id) (now : Tick)
+DryOperator = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} {τ : Tri} {lo}
+  (ac : Acc _≺_ τ) (o : Closed Γ u) (ok : T (inputsBelowᵉ lo o))
+  (κ : Path Γ lo u t) (id : Id) (now : Tick)
   (sched : Sched Γ) (st : EvalSt e) → opShape o ≡ true →
   EntryReads₂ τ o (Sched.slots sched) (EvalSt.connectedShares st) →
-  hasDry (proj₁ (subscribeE ac o κ id now sched st)) ≡ false
+  hasDry (proj₁ (subscribeE ac o {ok} κ id now sched st)) ≡ false
 
 ----------------------------------------------------------------------
 -- THE ADVERSARIAL ENTRY.  The context is empty, so the unconnected
@@ -109,7 +111,8 @@ reads₀ : EntryReads₂ τ₀ prog (Sched.slots (sched-init prog ins₀))
 reads₀ = z≤n , ≤-refl
 
 burst₀ : Stream Γ₀ natᵗ
-burst₀ = proj₁ (subscribeE ac₀ prog root 0 0 (sched-init prog ins₀) (st-init prog))
+burst₀ = proj₁ (subscribeE {lo = 0} ac₀ prog root 0 0 (sched-init prog ins₀)
+                  (st-init prog))
 
 ----------------------------------------------------------------------
 -- THE CROSSING, PINNED BY `refl` RATHER THAN COMPUTED INSIDE THE ⊥.  The
@@ -124,7 +127,7 @@ dry₀ = refl
 
 dry-operator-false : DryOperator → ⊥
 dry-operator-false h
-  with trans (sym (h ac₀ prog root 0 0 (sched-init prog ins₀) (st-init prog)
-                     opShape-prog reads₀))
+  with trans (sym (h {lo = 0} ac₀ prog _ root 0 0 (sched-init prog ins₀)
+                     (st-init prog) opShape-prog reads₀))
              dry₀
 ... | ()

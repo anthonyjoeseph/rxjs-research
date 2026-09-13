@@ -22,7 +22,7 @@
 ------------------------------------------------------------------
 module Verify-Rank-Sufficient.Push-Carried where
 
-open import Data.Bool using (Bool; if_then_else_)
+open import Data.Bool using (Bool; if_then_else_; T)
 open import Data.Fin using (Fin)
 open import Data.List using (List; []; _∷_; _++_; map)
 open import Data.Nat using (ℕ; suc; _⊔_; _⊔′_; _≤_; z≤n)
@@ -33,7 +33,8 @@ open import Induction.WellFounded using (Acc)
 open import Relation.Binary.PropositionalEquality using (_≡_; trans; cong₂)
 
 open import Rx.Prim using (Tick; Id; value; complete; InstEmit)
-open import Rx.Exp using (Ctx; Closed; Tm; Val; Fn; _×ᵗ_; scanᵉ; evalTm)
+open import Rx.Exp using (Ctx; Closed; Tm; Val; Fn; _×ᵗ_; scanᵉ; evalTm; inputsBelowᵉ)
+open import Rx.Inputs-Below using (below-scan)
 open import Rx.Strat-Order using (_≺_)
 open import Rx.Hop-Depth using (Rd; Rd₃; depthᵉ; rdᵉ; rdᵗ; ε; _▸_)
 open import Rx.Evaluator using (Stream; Frame; Path; Sched; EvalSt; NodeId;
@@ -85,8 +86,8 @@ open import Verify-Rank-Sufficient.Carried using (valsAt; emitAt; valsRd; burstR
 --   was deleted because `src` can no longer state it: the pins it
 --   refutes were spelled in the depth-only currency the paragraph above
 --   is the repair for.
-FrameCarries : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {τ} →
-  Acc _≺_ τ → Id → Tick → Frame Γ s u → Path Γ u t →
+FrameCarries : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {τ} {lo} →
+  Acc _≺_ τ → Id → Tick → Frame Γ s u → Path Γ lo u t →
   (Fin n → Rd₃) → Rd → Rd → ℕ → Set
 FrameCarries {Γ = Γ} {e = e} {s = s} {u = u} ac id now f κ ψ Rin Rv Rst =
   ∀ (vals : List (Val Γ s)) (fin : Bool) (sd : Sched Γ) (st : EvalSt e) →
@@ -182,9 +183,9 @@ mapRd ψ Rin fn = proj₁ r , proj₂ r ⊔′ proj₂ Rin
 --   finish flag is whatever the source's burst carried and is not varied;
 --   and the context is closed, so no row reaches the slot telescope.
 postulate
-  map-frame-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {τ}
+  map-frame-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {τ} {lo}
     (ac : Acc _≺_ τ) (id : Id) (now : Tick) (fn : Fn Γ [] [] [] s u)
-    (κ : Path Γ u t) (ψ : Fin n → Rd₃) (Rin : Rd) (Rst : ℕ) →
+    (κ : Path Γ lo u t) (ψ : Fin n → Rd₃) (Rin : Rd) (Rst : ℕ) →
     FrameCarries {e = e} ac id now (map-f fn) κ ψ
       Rin (mapRd ψ Rin fn) Rst
 
@@ -210,10 +211,10 @@ postulate
 --   before the first refold, so neither the incoming pair nor one
 --   application of the template is what a fold hands back.
 postulate
-  scan-frame-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {τ}
+  scan-frame-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {τ} {lo}
     (ac : Acc _≺_ τ) (id : Id) (now : Tick)
     (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
-    (κ : Path Γ u t) (ψ : Fin n → Rd₃) (Rin : Rd) (Rst : ℕ) →
+    (κ : Path Γ lo u t) (ψ : Fin n → Rd₃) (Rin : Rd) (Rst : ℕ) →
     FrameCarries {e = e} ac id now (scan-f fn nid) κ ψ
       Rin (mapRd ψ Rin fn) Rst
 
@@ -253,9 +254,9 @@ postulate
 --   covered: no row runs the frame over a store written by a chain it is
 --   not part of.
 postulate
-  take-frame-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s} {τ}
+  take-frame-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s} {τ} {lo}
     (ac : Acc _≺_ τ) (id : Id) (now : Tick) (nid : NodeId)
-    (κ : Path Γ s t) (ψ : Fin n → Rd₃) (Rv : Rd) (Rst : ℕ) →
+    (κ : Path Γ lo s t) (ψ : Fin n → Rd₃) (Rv : Rd) (Rst : ℕ) →
     FrameCarries {e = e} ac id now (take-f {s = s} nid) κ ψ Rv Rv Rst
 
 ----------------------------------------------------------------------
@@ -403,9 +404,9 @@ postulate
 --   covered: the arrival frame itself, which is the frame the finding
 --   points at and which no row here runs.
 postulate
-  thru-outer-frame-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} {τ}
+  thru-outer-frame-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} {τ} {lo}
     (ac : Acc _≺_ τ) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
-    (κ : Path Γ u t) (ψ : Fin n → Rd₃) (Rin : Rd) (Rst : ℕ) →
+    (κ : Path Γ lo u t) (ψ : Fin n → Rd₃) (Rin : Rd) (Rst : ℕ) →
     suc (proj₂ Rin) ≤ Rst →
     FrameCarries {e = e} ac id now (thru-outer op nid) κ ψ
       Rin (proj₁ Rin , suc (proj₂ Rin)) Rst
@@ -415,8 +416,8 @@ postulate
 -- outputs and nothing else, and the store is threaded emit by emit.
 ----------------------------------------------------------------------
 
-pushBurst-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {τ}
-  (ac : Acc _≺_ τ) (id : Id) (now : Tick) (f : Frame Γ s u) (κ : Path Γ u t)
+pushBurst-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {τ} {lo}
+  (ac : Acc _≺_ τ) (id : Id) (now : Tick) (f : Frame Γ s u) (κ : Path Γ lo u t)
   (burst : Stream Γ s) (sd : Sched Γ) (st : EvalSt e)
   (ψ : Fin n → Rd₃) (Rin Rv : Rd) (Rst : ℕ) →
   FrameCarries {e = e} ac id now f κ ψ Rin Rv Rst →
@@ -530,13 +531,14 @@ pushBurst-carried {Γ = Γ} {t = t} {e = e} {s = s} {u = u}
 --   conclusion's.  No row reaches an arrival or a drain step, and no
 --   row both deepens and multiplies at once.
 postulate
-  scan-burst-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {τ}
+  scan-burst-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {τ} {lo}
     (ac : Acc _≺_ τ) (id : Id) (now : Tick)
     (f : Fn Γ [] [] [] (u ×ᵗ s) u) (z : Tm Γ [] [] [] u) (b : Closed Γ s)
-    (nid : NodeId) (κ : Path Γ u t) (sd : Sched Γ) (st : EvalSt e)
+    (ok : T (inputsBelowᵉ lo (scanᵉ f z b)))
+    (nid : NodeId) (κ : Path Γ lo u t) (sd : Sched Γ) (st : EvalSt e)
     (ψ : Fin n → Rd₃) (Rst : ℕ) →
     depthᵉ ψ (scanᵉ f z b) ≤ Rst →
-    let r  = subscribeE ac b (scan-f f nid ↠ κ) id now sd
+    let r  = subscribeE ac b {below-scan lo f z b ok} (scan-f f nid ↠ κ) id now sd
                (installNode nid (scan-st {t = u} (evalTm z)) st)
         pb = pushBurst ac id now (scan-f f nid) κ
                (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))

@@ -21,7 +21,7 @@
 module Verify-Well-Formed.Part11 where
 
 open import Data.Bool    using (Bool; true; false; if_then_else_)
-open import Data.Fin     using (Fin)
+open import Data.Fin     using (Fin; toℕ)
 open import Data.Vec     using (lookup)
 open import Data.Nat     using (ℕ; suc; _≤_; _≡ᵇ_; _+_)
 open import Data.List    using (List; []; _∷_)
@@ -36,8 +36,8 @@ open import Relation.Binary.PropositionalEquality
 
 open import Rx.Prim      using (Tick; Id; Source; InstEvent; close; delivery; exhausted)
 open import Rx.Exp       using (Ctx; Closed; Val)
-open import Rx.Evaluator using (Sched; EvalSt; Arrival; RegId; Chain; Path; root; share-sink; _↠_; Frame; arrTy; arrSource;
-  arrVal; arrTick; chainStep; foldPath; cascadeGo; sameSource; hasDry; dropSource; arrivalWitness)
+open import Rx.Evaluator using (Sched; EvalSt; Arrival; RegId; AtFloor; RegRow; Path; root; share-sink; _↠_; Frame; arrTy; arrSource;
+  arrVal; arrTick; chainStep; foldPath; cascadeGo; sameSource; hasDry; dropSource; regSource; arrivalWitness)
 open import Rx.Protocol  using (ProtocolSt; Owed; countIn; allZero; runProtocol; paidUp; settle; payOwed; bumpOwed)
 
 ------------------------------------------------------------------
@@ -69,10 +69,11 @@ open import Rx.Strat-Order using (Tri; _≺_)
 
 variable
   τ : Tri
+  lo : ℕ
 
 seed-live-pos : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {a : Arrival Γ}
-  {nextId : Id} {rid : RegId} {p : Path Γ (arrTy a) t}
-  {ps : List (RegId × Path Γ (arrTy a) t)} {sched : Sched Γ} {st : EvalSt e}
+  {nextId : Id} {rid : RegId} {p : AtFloor Γ (arrTy a) t}
+  {ps : List (RegId × AtFloor Γ (arrTy a) t)} {sched : Sched Γ} {st : EvalSt e}
   {S : ProtocolSt} →
   Mid a nextId ((rid , p) ∷ ps) sched st S →
   any (_≡ᵇ rid) (EvalSt.cancelled st) ≡ false →
@@ -89,8 +90,8 @@ seed-live-pos {a = a} {rid = rid} {p = p} {ps = ps} {st = st} mid ceq
 -- delivery pays arrSource — continuing the open owed (inj₂), or opening
 -- fresh and seeding owed[arrSource] from the live count (inj₁)
 seed-enter-pay : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {a : Arrival Γ}
-  {nextId : Id} {rid : RegId} {p : Path Γ (arrTy a) t}
-  {ps : List (RegId × Path Γ (arrTy a) t)} {sched : Sched Γ} {st : EvalSt e}
+  {nextId : Id} {rid : RegId} {p : AtFloor Γ (arrTy a) t}
+  {ps : List (RegId × AtFloor Γ (arrTy a) t)} {sched : Sched Γ} {st : EvalSt e}
   {S : ProtocolSt} →
   Mid a nextId ((rid , p) ∷ ps) sched st S →
   any (_≡ᵇ rid) (EvalSt.cancelled st) ≡ false →
@@ -135,8 +136,8 @@ seed-enter-pay {a = a} {nextId} {rid} {p} {ps} {sched} {st} {S} mid ceq
 
 -- THE seed: Mid (head ∷ ps) ⇒ FoldInv at the chainStep seed
 mid-seed : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {a : Arrival Γ}
-  {nextId : Id} {rid : RegId} {p : Path Γ (arrTy a) t}
-  {ps : List (RegId × Path Γ (arrTy a) t)} {sched : Sched Γ} {st : EvalSt e}
+  {nextId : Id} {rid : RegId} {p : AtFloor Γ (arrTy a) t}
+  {ps : List (RegId × AtFloor Γ (arrTy a) t)} {sched : Sched Γ} {st : EvalSt e}
   {S : ProtocolSt} →
   Mid a nextId ((rid , p) ∷ ps) sched st S →
   any (_≡ᵇ rid) (EvalSt.cancelled st) ≡ false →
@@ -293,7 +294,7 @@ postulate
   -- speak of the CURRENT (fin, st) which stepFrame rewrites.
   foldPath-frame-out : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {w u}
     (sf : Acc _≺_ τ) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
-    (f : Frame Γ w u) (path′ : Path Γ u t)
+    (f : Frame Γ w u) (path′ : Path Γ lo u t)
     (vals : List (Val Γ w)) (evs : List (InstEvent (Val Γ t)))
     (fin : Bool) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt)
     (fi : FoldInv id envSrc evs fin sched st S) →
@@ -314,6 +315,7 @@ postulate
   -- FoldOut, the diamond's net-zero owed statement.
   foldPath-share-out : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sf : Acc _≺_ τ) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source) (i : Fin n)
+    (below : lo ≤ toℕ i)
     (vals : List (Val Γ (lookup Γ i))) (evs : List (InstEvent (Val Γ t)))
     (fin : Bool) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt)
     (fi : FoldInv id envSrc evs fin sched st S) →
@@ -321,13 +323,13 @@ postulate
        allShareSunk (dropSource envSrc (EvalSt.registry st)) ≡ true) →
     (ProtocolSt.done S ≡ true → allShareSunk (EvalSt.registry st) ≡ true) →
     (S′ : ProtocolSt) →
-    runProtocol S (proj₁ (foldPath sf gas id now envSrc (share-sink i) vals evs fin sched st))
+    runProtocol S (proj₁ (foldPath sf gas id now envSrc (share-sink i below) vals evs fin sched st))
       ≡ just S′ →
-    FoldOut sf gas id now envSrc (share-sink i) vals evs fin sched st (FoldInv.ob′ fi) S S′
+    FoldOut sf gas id now envSrc (share-sink i below) vals evs fin sched st (FoldInv.ob′ fi) S S′
 
 foldPath-out : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (sf : Acc _≺_ τ) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
-  (path : Path Γ u t) (vals : List (Val Γ u)) (evs : List (InstEvent (Val Γ t)))
+  (path : Path Γ lo u t) (vals : List (Val Γ u)) (evs : List (InstEvent (Val Γ t)))
   (fin : Bool) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt)
   (fi : FoldInv id envSrc evs fin sched st S) →
   (ProtocolSt.done S ≡ true → sinksToShare path ≡ true) →
@@ -338,11 +340,11 @@ foldPath-out : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (runProtocol S (proj₁ (foldPath sf gas id now envSrc path vals evs fin sched st))
        ≡ just S′)
     × FoldOut sf gas id now envSrc path vals evs fin sched st (FoldInv.ob′ fi) S S′
-foldPath-out sf gas id now envSrc root vals evs fin sched st S fi ds flip steady =
-  _ , foldPath-root-wf sf gas id now envSrc vals evs fin sched st S
+foldPath-out {lo = lo} sf gas id now envSrc root vals evs fin sched st S fi ds flip steady =
+  _ , foldPath-root-wf {lo = lo} sf gas id now envSrc vals evs fin sched st S
         (FoldInv.ob fi) (FoldInv.hz fi) (FoldInv.ob′ fi) (FoldInv.Lv fi) (FoldInv.Ov fi)
         (FoldInv.enters fi) (FoldInv.pays fi) (FoldInv.applies fi) done-nil
-    , foldPath-root-out sf gas id now envSrc vals evs fin sched st S fi flip steady
+    , foldPath-root-out {lo = lo} sf gas id now envSrc vals evs fin sched st S fi flip steady
   where
   -- root does not sink to a share, so `ds` forces the automaton not-done
   -- and the value list rides (foldPath-wf's own root argument)
@@ -357,12 +359,12 @@ foldPath-out sf gas id now envSrc (f ↠ path′) vals evs fin sched st S fi ds 
       ds flip steady (proj₁ W) (proj₂ W)
   where
   W = foldPath-wf sf gas id now envSrc (f ↠ path′) vals evs fin sched st S fi ds
-foldPath-out sf gas id now envSrc (share-sink i) vals evs fin sched st S fi ds flip steady =
+foldPath-out sf gas id now envSrc (share-sink i below) vals evs fin sched st S fi ds flip steady =
   proj₁ W , proj₂ W
-  , foldPath-share-out sf gas id now envSrc i vals evs fin sched st S fi
+  , foldPath-share-out sf gas id now envSrc i below vals evs fin sched st S fi
       flip steady (proj₁ W) (proj₂ W)
   where
-  W = foldPath-wf sf gas id now envSrc (share-sink i) vals evs fin sched st S fi ds
+  W = foldPath-wf sf gas id now envSrc (share-sink i below) vals evs fin sched st S fi ds
 
 -- ════════════════════════════════════════════════════════════════
 -- THE Mid TRANSITION, ASSEMBLED — a real body over three leaves
@@ -392,12 +394,12 @@ postulate
   -- root-sinking registration falsifies Inv.done-plumbed itself — an
   -- evaluator bug, to surface rather than patch around.
   mid-fold-certs : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {a : Arrival Γ}
-    {nextId : Id} {rid : RegId} {p : Path Γ (arrTy a) t}
-    {ps : List (RegId × Path Γ (arrTy a) t)} {sched : Sched Γ} {st : EvalSt e}
+    {nextId : Id} {rid : RegId} {p : AtFloor Γ (arrTy a) t}
+    {ps : List (RegId × AtFloor Γ (arrTy a) t)} {sched : Sched Γ} {st : EvalSt e}
     {S : ProtocolSt} →
     Mid a nextId ((rid , p) ∷ ps) sched st S →
     any (_≡ᵇ rid) (EvalSt.cancelled st) ≡ false →
-    (ProtocolSt.done S ≡ true → sinksToShare p ≡ true)
+    (ProtocolSt.done S ≡ true → sinksToShare (proj₂ p) ≡ true)
     × ((if Arrival.isLast a then true else ProtocolSt.done S) ≡ true →
          ProtocolSt.done S ≡ false →
          allShareSunk (dropSource (arrSource a) (EvalSt.registry st)) ≡ true)
@@ -409,8 +411,8 @@ postulate
   -- is field-by-field bookkeeping over a FoldOut now in hand, not the
   -- path induction (that is foldPath-out's).
   mid-readoff : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {a : Arrival Γ}
-    {nextId : Id} {rid : RegId} {p : Path Γ (arrTy a) t}
-    {ps : List (RegId × Path Γ (arrTy a) t)} {sched : Sched Γ} {st : EvalSt e}
+    {nextId : Id} {rid : RegId} {p : AtFloor Γ (arrTy a) t}
+    {ps : List (RegId × AtFloor Γ (arrTy a) t)} {sched : Sched Γ} {st : EvalSt e}
     {S S′ : ProtocolSt} →
     Mid a nextId ((rid , p) ∷ ps) sched st S →
     any (_≡ᵇ rid) (EvalSt.cancelled st) ≡ false →
@@ -420,7 +422,7 @@ postulate
     FoldOut (arrivalWitness a sched
                (record st { delivered = rid ∷ EvalSt.delivered st }))
       n nextId (arrTick a) (arrSource a)
-      p (arrVal a ∷ [])
+      (proj₂ p) (arrVal a ∷ [])
       (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
       (Arrival.isLast a) sched (record st { delivered = rid ∷ EvalSt.delivered st })
       (FoldInv.ob′ fi) S S′ →
@@ -430,7 +432,7 @@ postulate
 
 mid-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   {a : Arrival Γ} {nextId : Id} {rid : RegId}
-  {p : Path Γ (arrTy a) t} {ps : List (RegId × Path Γ (arrTy a) t)}
+  {p : AtFloor Γ (arrTy a) t} {ps : List (RegId × AtFloor Γ (arrTy a) t)}
   {sched : Sched Γ} {st : EvalSt e} {S : ProtocolSt} →
   Mid a nextId ((rid , p) ∷ ps) sched st S →
   any (_≡ᵇ rid) (EvalSt.cancelled st) ≡ false →
@@ -446,7 +448,7 @@ mid-step {n = n} {e = e} {a = a} {nextId} {rid} {p} {ps} {sched} {st} {S} mid ce
         foldPath-out (arrivalWitness a sched
                        (record st { delivered = rid ∷ EvalSt.delivered st }))
           n nextId
-          (arrTick a) (arrSource a) p (arrVal a ∷ [])
+          (arrTick a) (arrSource a) (proj₂ p) (arrVal a ∷ [])
           (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
           (Arrival.isLast a) sched (record st { delivered = rid ∷ EvalSt.delivered st })
           S fi (proj₁ certs) (proj₁ (proj₂ certs)) (proj₂ (proj₂ certs))
@@ -465,7 +467,7 @@ cr-skip rid x ps c h rewrite h = refl
 -- cascadeGo's `with` won't unfold under rewrite)
 cascadeGo-skip : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (a : Arrival Γ) (nextId : Id) (rid : RegId)
-  (p : Path Γ (arrTy a) t) (ps : List (RegId × Path Γ (arrTy a) t))
+  (p : AtFloor Γ (arrTy a) t) (ps : List (RegId × AtFloor Γ (arrTy a) t))
   (sched : Sched Γ) (st : EvalSt e) →
   any (_≡ᵇ rid) (EvalSt.cancelled st) ≡ true →
   cascadeGo {e = e} a nextId ((rid , p) ∷ ps) sched st
@@ -479,7 +481,7 @@ cascadeGo-skip a nextId rid p ps sched st ceq
 -- stable when the snapshot head drops, given the head is cancelled
 mid-skip : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   {a : Arrival Γ} {nextId : Id} {rid : RegId}
-  {p : Path Γ (arrTy a) t} {ps : List (RegId × Path Γ (arrTy a) t)}
+  {p : AtFloor Γ (arrTy a) t} {ps : List (RegId × AtFloor Γ (arrTy a) t)}
   {sched : Sched Γ} {st : EvalSt e} {S : ProtocolSt} →
   Mid a nextId ((rid , p) ∷ ps) sched st S →
   any (_≡ᵇ rid) (EvalSt.cancelled st) ≡ true →
@@ -568,9 +570,9 @@ currentPast-up (just (j , _)) N cp = ≤-up cp
 
 -- registry sweep: dropping s zeroes s's own count and leaves others'
 dropSource-self : ∀ {n} {Γ : Ctx n} {t}
-  (s : Source) (reg : List (RegId × Source × Chain Γ t)) →
+  (s : Source) (reg : List (RegRow Γ t)) →
   countRegs s (dropSource s reg) ≡ 0
 dropSource-self s []                  = refl
-dropSource-self s ((rid , x , c) ∷ r) with s ≡ᵇ x in eq
+dropSource-self s ((rid , x , c) ∷ r) with s ≡ᵇ regSource x in eq
 ... | true             = dropSource-self s r
 ... | false rewrite eq = dropSource-self s r

@@ -56,7 +56,7 @@ open import Rx.Slot-Read using (slotRd)
 open import Rx.Evaluator using (Frame; Path; root; share-sink; _↠_;
   map-f; scan-f; take-f; from-inner; thru-outer; NodeId; AllOp;
   Sched; EvalSt; Arrival; arrTy; arrVal; arrTick; arrivalWitness;
-  RegId; chainsOf; chainStep; cascadeLatch; sched-next; cascade;
+  RegId; AtFloor; chainsOf; chainStep; cascadeLatch; sched-next; cascade;
   foldPath; shareAdmit; shareLatch; stHop)
 open import Verify-Rank-Sufficient.Fits using (PathFits; at-root; at-sink;
   through; FrameDryUnder; ShareDryUnder; arrivalRank;
@@ -82,10 +82,10 @@ open import Verify-Rank-Sufficient.Push-Dry using (FrameDry;
 -- do the three frames whose residue is a transport.
 ----------------------------------------------------------------------
 
-PathUnder : ∀ {n} {Γ : Ctx n} {s t} → (Fin n → Rd₃) → ℕ →
-  Path Γ s t → Rd → Set
+PathUnder : ∀ {n} {Γ : Ctx n} {lo s t} → (Fin n → Rd₃) → ℕ →
+  Path Γ lo s t → Rd → Set
 PathUnder ψ Rst root                    Rin = ⊤
-PathUnder ψ Rst (share-sink i)          Rin = proj₂ Rin ≤ Rst
+PathUnder ψ Rst (share-sink i _)        Rin = proj₂ Rin ≤ Rst
 PathUnder ψ Rst (map-f fn ↠ κ)          Rin = PathUnder ψ Rst κ
                                                 (mapRd ψ Rin fn)
 PathUnder ψ Rst (scan-f fn nid ↠ κ)     Rin = PathUnder ψ Rst κ
@@ -111,9 +111,9 @@ PathUnder ψ Rst (thru-outer op nid ↠ κ) Rin =
 -- unconditional one with two hypotheses it does not read, so the
 -- adapter below is the whole of the work, and no leaf is owed for any
 -- of the three.
-dry-under : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {τ}
+dry-under : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {τ} {lo}
   (ac : Acc _≺_ τ) (id : Id) (now : Tick) (f : Frame Γ s u)
-  (κ : Path Γ u t) (ψ : Fin n → Rd₃) (Rin : Rd) (Rst : ℕ) →
+  (κ : Path Γ lo u t) (ψ : Fin n → Rd₃) (Rin : Rd) (Rst : ℕ) →
   FrameDry {e = e} ac id now f κ →
   FrameDryUnder {e = e} ac id now f κ ψ Rin Rst
 dry-under ac id now f κ ψ Rin Rst d vals fin sd st _ _ =
@@ -134,16 +134,16 @@ dry-under ac id now f κ ψ Rin Rst d vals fin sd st _ _ =
 --   sits: the `fin = true` arm, which is the one that inspects the
 --   registrations and decides whether to drain.
 postulate
-  from-inner-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s} {τ}
+  from-inner-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s} {τ} {lo}
     (ac : Acc _≺_ τ) (id : Id) (now : Tick) (op : AllOp)
-    (allNode innerInstance : NodeId) (κ : Path Γ s t) (ψ : Fin n → Rd₃)
+    (allNode innerInstance : NodeId) (κ : Path Γ lo s t) (ψ : Fin n → Rd₃)
     (Rin : Rd) (Rst : ℕ) →
     FrameCarries {e = e} ac id now
       (from-inner {s = s} op allNode innerInstance) κ ψ Rin Rin Rst
 
-  from-inner-dry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s} {τ}
+  from-inner-dry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s} {τ} {lo}
     (ac : Acc _≺_ τ) (id : Id) (now : Tick) (op : AllOp)
-    (allNode innerInstance : NodeId) (κ : Path Γ s t) (ψ : Fin n → Rd₃)
+    (allNode innerInstance : NodeId) (κ : Path Γ lo s t) (ψ : Fin n → Rd₃)
     (Rin : Rd) (Rst : ℕ) →
     FrameDryUnder {e = e} ac id now
       (from-inner {s = s} op allNode innerInstance) κ ψ Rin Rst
@@ -167,9 +167,9 @@ postulate
 --   shape the dry branch is reachable from and is not reachable from a
 --   root at all.
 postulate
-  thru-outer-frame-dry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} {τ}
+  thru-outer-frame-dry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} {τ} {lo}
     (ac : Acc _≺_ τ) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
-    (κ : Path Γ u t) (ψ : Fin n → Rd₃) (Rin : Rd) (Rst : ℕ) →
+    (κ : Path Γ lo u t) (ψ : Fin n → Rd₃) (Rin : Rd) (Rst : ℕ) →
     suc (proj₂ Rin) ≤ Rst →
     FrameDryUnder {e = e} ac id now (thru-outer op nid) κ ψ Rin Rst
 
@@ -191,10 +191,10 @@ postulate
 -- registrations the share carries.
 ----------------------------------------------------------------------
 
-ShareChainsHop : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {τ} →
+ShareChainsHop : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {τ} {lo} →
   Acc _≺_ τ → ℕ → Id → Tick → (i : Fin n) → (Fin n → Rd₃) → Rd → ℕ →
   List (Val Γ (lookup Γ i)) → Bool →
-  List (RegId × Path Γ (lookup Γ i) t) → Sched Γ → EvalSt e → Set
+  List (RegId × Path Γ lo (lookup Γ i) t) → Sched Γ → EvalSt e → Set
 ShareChainsHop ac gas id now i ψ Rin Rst vals fin [] sd st = ⊤
 ShareChainsHop {e = e} ac gas id now i ψ Rin Rst vals fin
   ((rid , p) ∷ ps) sd st
@@ -277,9 +277,9 @@ postulate
 -- fan-out on the admitted list.
 ----------------------------------------------------------------------
 
-pathFits : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} {τ}
+pathFits : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} {τ} {lo}
   (ac : Acc _≺_ τ) (gas : ℕ) (id : Id) (now : Tick) (ψ : Fin n → Rd₃)
-  (Rst : ℕ) (κ : Path Γ u t) (Rin : Rd) → PathUnder ψ Rst κ Rin →
+  (Rst : ℕ) (κ : Path Γ lo u t) (Rin : Rd) → PathUnder ψ Rst κ Rin →
   PathFits {e = e} ac gas id now ψ Rst κ Rin
 
 share-sink-dry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {τ}
@@ -287,18 +287,18 @@ share-sink-dry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {τ}
   (ψ : Fin n → Rd₃) (Rin : Rd) (Rst : ℕ) → proj₂ Rin ≤ Rst →
   ShareDryUnder {e = e} ac gas id now i ψ Rin Rst
 
-shareChainsFit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {τ}
+shareChainsFit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {τ} {lo}
   (ac : Acc _≺_ τ) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
   (ψ : Fin n → Rd₃) (Rin : Rd) (Rst : ℕ)
   (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
-  (ps : List (RegId × Path Γ (lookup Γ i) t))
+  (ps : List (RegId × Path Γ lo (lookup Γ i) t))
   (sd : Sched Γ) (st : EvalSt e) →
   ShareChainsHop {e = e} ac gas id now i ψ Rin Rst vals fin ps sd st →
   ShareChainsFit {e = e} ac gas id now i ψ Rin Rst vals fin ps sd st
 
 pathFits ac gas id now ψ Rst root Rin h = at-root
 
-pathFits ac gas id now ψ Rst (share-sink i) Rin h =
+pathFits ac gas id now ψ Rst (share-sink i below) Rin h =
   at-sink (share-sink-dry ac gas id now i ψ Rin Rst h)
 
 pathFits ac gas id now ψ Rst (map-f fn ↠ κ) Rin h =
@@ -380,13 +380,14 @@ shareChainsFit {e = e} ac gas id now i ψ Rin Rst vals fin
 -- and dropping it here would put the walk back where its two heads were
 -- unstatable.
 HopsFitAt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} →
-  (a : Arrival Γ) → Sched Γ → EvalSt e → Path Γ (arrTy a) t → Set
+  (a : Arrival Γ) → Sched Γ → EvalSt e → AtFloor Γ (arrTy a) t → Set
 HopsFitAt a sched st c =
   let ψ = slotRd (Sched.slots sched) in
-  PathUnder ψ (arrivalRank a sched st) c (rdᵛ ψ (arrTy a) (arrVal a))
+  PathUnder ψ (arrivalRank a sched st) (proj₂ c)
+    (rdᵛ ψ (arrTy a) (arrVal a))
 
 ChainsHop : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} →
-  (a : Arrival Γ) → Id → List (RegId × Path Γ (arrTy a) t) →
+  (a : Arrival Γ) → Id → List (RegId × AtFloor Γ (arrTy a) t) →
   Sched Γ → EvalSt e → Set
 ChainsHop a id []               sched st = ⊤
 ChainsHop {e = e} a id ((rid , c) ∷ cs) sched st
@@ -422,7 +423,7 @@ DrainHop (suc k) id sched st with sched-next sched
 ----------------------------------------------------------------------
 
 chainsFit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (a : Arrival Γ) (id : Id) (cs : List (RegId × Path Γ (arrTy a) t))
+  (a : Arrival Γ) (id : Id) (cs : List (RegId × AtFloor Γ (arrTy a) t))
   (sched : Sched Γ) (st : EvalSt e) →
   ChainsHop {e = e} a id cs sched st → ChainsFit {e = e} a id cs sched st
 chainsFit a id []               sched st hp = tt
@@ -431,7 +432,7 @@ chainsFit {n = n} {e = e} a id ((rid , c) ∷ cs) sched st hp
 ... | true  = chainsFit {e = e} a id cs sched st hp
 ... | false =
       pathFits (arrivalWitness a sched st′) n id (arrTick a)
-        (slotRd (Sched.slots sched)) (arrivalRank a sched st′) c
+        (slotRd (Sched.slots sched)) (arrivalRank a sched st′) (proj₂ c)
         (rdᵛ (slotRd (Sched.slots sched)) (arrTy a) (arrVal a))
         (proj₁ hp)
       , chainsFit {e = e} a id cs (proj₁ (proj₂ out)) (proj₂ (proj₂ out))

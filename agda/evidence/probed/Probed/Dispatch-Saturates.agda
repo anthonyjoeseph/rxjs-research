@@ -68,6 +68,7 @@ open import Rx.Strat-Order using (_≺_)
 open import Rx.Evaluator using (Sched; EvalSt; root; rootTri;
   subscribeE; rootWitness; sched-init; st-init; dispatchShare;
   shareAdmit)
+open import Rx.Inputs-Below using (below-ctx)
 open import Rx.Evaluator-Theorems using (dispatch-saturates)
 
 open import Probed.Apparatus using (Below; Confirms)
@@ -98,12 +99,12 @@ ac₀ : Acc _≺_ (rootTri prog ins)
 ac₀ = rootWitness prog ins
 
 sd₀ : Sched Γ₃
-sd₀ = proj₁ (proj₂ (subscribeE ac₀ prog root 0 0 (sched-init prog ins)
-                     (st-init prog)))
+sd₀ = proj₁ (proj₂ (subscribeE {lo = 3} ac₀ prog {below-ctx prog} root 0 0
+                     (sched-init prog ins) (st-init prog)))
 
 st₀ : EvalSt prog
-st₀ = proj₂ (proj₂ (subscribeE ac₀ prog root 0 0 (sched-init prog ins)
-                     (st-init prog)))
+st₀ = proj₂ (proj₂ (subscribeE {lo = 3} ac₀ prog {below-ctx prog} root 0 0
+                     (sched-init prog ins) (st-init prog)))
 
 vals₀ : List ℕ
 vals₀ = 7 ∷ []

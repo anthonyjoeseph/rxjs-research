@@ -60,6 +60,7 @@ open import Rx.Slots using (Slots)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Arrival; evaluate; drain;
   hasDry; cascade; sched-next; subscribeE; rootWitness; root; sched-init;
   st-init; chainsOf; cascadeLatch)
+open import Rx.Inputs-Below using (below-ctx)
 open import Verify-Rank-Sufficient.Dry using (subscribe-dry-free)
 open import Verify-Rank-Sufficient.Dry-Emits using (hasDry-++)
 open import Verify-Rank-Sufficient.Entry using (rootTri-reads)
@@ -342,21 +343,21 @@ drain-dry-free (suc k) nextId sched st fits with sched-next sched | fits
 postulate
   entry-drain-hop : ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t)
     (ins : Slots Γ) →
-    let ent = subscribeE (rootWitness e ins) e root 0 0 (sched-init e ins)
-                (st-init e)
+    let ent = subscribeE {lo = n} (rootWitness e ins) e {below-ctx e} root 0 0
+                (sched-init e ins) (st-init e)
     in DrainHop fuel 1 (proj₁ (proj₂ ent)) (proj₂ (proj₂ ent))
 
 entry-drain-fits : ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t)
   (ins : Slots Γ) →
-  let ent = subscribeE (rootWitness e ins) e root 0 0 (sched-init e ins)
-              (st-init e)
+  let ent = subscribeE {lo = n} (rootWitness e ins) e {below-ctx e} root 0 0
+              (sched-init e ins) (st-init e)
   in DrainFits fuel 1 (proj₁ (proj₂ ent)) (proj₂ (proj₂ ent))
-entry-drain-fits fuel e ins =
+entry-drain-fits {n = n} fuel e ins =
   drainFits fuel 1 (proj₁ (proj₂ ent)) (proj₂ (proj₂ ent))
     (entry-drain-hop fuel e ins)
   where
-  ent = subscribeE (rootWitness e ins) e root 0 0 (sched-init e ins)
-          (st-init e)
+  ent = subscribeE {lo = n} (rootWitness e ins) e {below-ctx e} root 0 0
+          (sched-init e ins) (st-init e)
 
 -- NOTHING BELOW THIS LINE IS THE MACHINE'S TO CHOOSE, AND THAT IS WHAT
 -- THE ITERATED FOLD CLAUSE BOUGHT.  The fit at the door takes the
@@ -390,13 +391,13 @@ entry-drain-fits fuel e ins =
 rank-sufficient :
   ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slots Γ) →
   hasDry (evaluate fuel e ins) ≡ false
-rank-sufficient {Γ = Γ} {t = t} fuel e ins =
+rank-sufficient {n = n} {Γ = Γ} {t = t} fuel e ins =
   hasDry-++ (proj₁ ent) (drain fuel 1 (proj₁ (proj₂ ent)) (proj₂ (proj₂ ent)))
-    (proj₁ (subscribe-dry-free (rootWitness e ins) e root 0 0
+    (proj₁ (subscribe-dry-free (rootWitness e ins) e (below-ctx e) root 0 0
       (sched-init e ins) (st-init e) (rootTri-reads e ins) z≤n))
     (drain-dry-free fuel 1 (proj₁ (proj₂ ent)) (proj₂ (proj₂ ent))
       (entry-drain-fits fuel e ins))
   where
   ent : Stream Γ t × Sched Γ × EvalSt e
-  ent = subscribeE (rootWitness e ins) e root 0 0 (sched-init e ins)
-          (st-init e)
+  ent = subscribeE {lo = n} (rootWitness e ins) e {below-ctx e} root 0 0
+          (sched-init e ins) (st-init e)

@@ -60,7 +60,7 @@
 -- finding — had the gate's reading tracked its body, the two bounds
 -- would have come back equal and there would be no blindness to report.
 --
--- TARGET: thru-outer-frame-carried @260099
+-- TARGET: thru-outer-frame-carried @134c89
 module Probed.Defer-Blind where
 
 open import Data.Bool using (Bool)
@@ -83,6 +83,7 @@ open import Rx.Slot-Read using (slotRd)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; NodeId; subscribeE;
   rootWitness; rootTri; root; _↠_; sched-init; st-init; mintNode;
   thru-outer; mergeAllᵒ; splitBurst; stepFrame; stHop)
+open import Rx.Inputs-Below using (below-ctx)
 open import Verify-Rank-Sufficient.Carried using (valsRd)
 open import Verify-Rank-Sufficient.Push-Carried
   using (thru-outer-frame-carried)
@@ -111,7 +112,8 @@ module Ap {n} {Γ : Ctx n} (ins : Slots Γ) (prog : Closed Γ (obs natᵗ))
   nid = proj₁ (mintNode (sched-init prog ins))
 
   r : Stream Γ (obs (obs natᵗ)) × Sched Γ × EvalSt prog
-  r = subscribeE ac src (thru-outer mergeAllᵒ nid ↠ root) 0 0
+  r = subscribeE {lo = n} ac src {below-ctx src}
+        (thru-outer mergeAllᵒ nid ↠ root) 0 0
         (proj₂ (mintNode (sched-init prog ins))) (st-init prog)
 
   sp : List (Val Γ (obs (obs natᵗ)))
@@ -132,7 +134,7 @@ module Ap {n} {Γ : Ctx n} (ins : Slots Γ) (prog : Closed Γ (obs natᵗ))
 
   sf : List (Val Γ (obs natᵗ)) × List (InstEvent (Val Γ (obs natᵗ)))
      × Bool × Sched Γ × EvalSt prog
-  sf = stepFrame ac 0 0 (thru-outer mergeAllᵒ nid) root vals fin sd st
+  sf = stepFrame {lo = n} ac 0 0 (thru-outer mergeAllᵒ nid) root vals fin sd st
 
   -- the source's own payload PAIR, which is what the walk enters this
   -- frame at
@@ -253,12 +255,12 @@ gated-counts = refl
 -- to carry.
 ----------------------------------------------------------------------
 
-openRow : Confirms (thru-outer-frame-carried Open.ac 0 0 mergeAllᵒ Open.nid
+openRow : Confirms (thru-outer-frame-carried {lo = 0} Open.ac 0 0 mergeAllᵒ Open.nid
   root Open.ψ Open.Rin Open.Rst Below Open.vals Open.fin Open.sd Open.st
   (Below , Below) Below)
 openRow = (Below , Below) , Below
 
-gatedRow : Confirms (thru-outer-frame-carried Gated.ac 0 0 mergeAllᵒ
+gatedRow : Confirms (thru-outer-frame-carried {lo = 0} Gated.ac 0 0 mergeAllᵒ
   Gated.nid root Gated.ψ Gated.Rin Gated.Rst Below Gated.vals Gated.fin
   Gated.sd Gated.st (Below , Below) Below)
 gatedRow = (Below , Below) , Below

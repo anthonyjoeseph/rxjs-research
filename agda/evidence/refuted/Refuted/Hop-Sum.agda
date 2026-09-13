@@ -45,15 +45,15 @@ open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Vec using () renaming ([] to []ⱽ; _∷_ to _∷ⱽ_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import Rx.Prim using (Source; cold; after_,_)
+open import Rx.Prim using (cold; after_,_)
 open import Rx.Exp using (Ctx; Closed; Fn; natᵗ; obs;
   ofᵉ; mapᵉ; mergeAllᵉ; strmᵗ; nat̂; input)
 open import Rx.Slots using (Slots; scripted)
 open import Rx.Hop-Depth using (Rd₃; ε; rdᵗ; depthᵉ)
 open import Rx.Slot-Read using (slotRd)
-open import Rx.Evaluator using (Path; root; share-sink; _↠_; map-f; scan-f;
-  take-f; from-inner; thru-outer; Chain; RegId; Sched; EvalSt;
-  subscribeE; rootWitness; sched-init; st-init)
+open import Rx.Evaluator using (Path; root; share-sink; _↠_; map-f; scan-f; take-f; from-inner; thru-outer; Sched; EvalSt;
+  RegRow; subscribeE; rootWitness; sched-init; st-init)
+open import Rx.Inputs-Below using (below-ctx)
 
 ----------------------------------------------------------------------
 -- THE MEASURE, WRITTEN OUT RATHER THAN IMPORTED.  This is the summing
@@ -63,10 +63,10 @@ open import Rx.Evaluator using (Path; root; share-sink; _↠_; map-f; scan-f;
 -- goes on saying which form is false whatever `src` now carries.
 ----------------------------------------------------------------------
 
-chainDepthSum : ∀ {n} {Γ : Ctx n} {s t} (ψ : Fin n → Rd₃) →
-                Path Γ s t → ℕ
+chainDepthSum : ∀ {n} {Γ : Ctx n} {lo s t} (ψ : Fin n → Rd₃) →
+                Path Γ lo s t → ℕ
 chainDepthSum ψ root                    = 0
-chainDepthSum ψ (share-sink i)          = 0
+chainDepthSum ψ (share-sink i _)        = 0
 chainDepthSum ψ (map-f fn ↠ κ)          = proj₂ (rdᵗ ψ ε fn) + chainDepthSum ψ κ
 chainDepthSum ψ (scan-f fn nid ↠ κ)     = proj₂ (rdᵗ ψ ε fn) + chainDepthSum ψ κ
 chainDepthSum ψ (take-f nid ↠ κ)        = chainDepthSum ψ κ
@@ -74,7 +74,7 @@ chainDepthSum ψ (from-inner op a i ↠ κ) = chainDepthSum ψ κ
 chainDepthSum ψ (thru-outer op nid ↠ κ) = suc (chainDepthSum ψ κ)
 
 regsDepthSum : ∀ {n} {Γ : Ctx n} {t} (ψ : Fin n → Rd₃) →
-               List (RegId × Source × Chain Γ t) → ℕ
+               List (RegRow Γ t) → ℕ
 regsDepthSum ψ []                  = 0
 regsDepthSum ψ ((rid , src , c) ∷ r) =
   chainDepthSum ψ (proj₂ c) ⊔ regsDepthSum ψ r
@@ -87,8 +87,8 @@ HopFitsSum {e = e} sched st =
 
 EntryHopFits : Set
 EntryHopFits = ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
-  let ent = subscribeE (rootWitness e ins) e root 0 0 (sched-init e ins)
-              (st-init e)
+  let ent = subscribeE {lo = n} (rootWitness e ins) e {below-ctx e} root 0 0
+              (sched-init e ins) (st-init e)
   in HopFitsSum (proj₁ (proj₂ ent)) (proj₂ (proj₂ ent))
 
 ----------------------------------------------------------------------
@@ -119,7 +119,7 @@ twoMaps = mergeAllᵉ nothing (mapᵉ f₂ (mapᵉ f₁ (input zero)))
 entry : Sched Γ₁ × EvalSt twoMaps
 entry =
   let (_ , sched , st) =
-        subscribeE (rootWitness twoMaps insMany) twoMaps root 0 0
+        subscribeE {lo = 1} (rootWitness twoMaps insMany) twoMaps root 0 0
           (sched-init twoMaps insMany) (st-init twoMaps)
   in sched , st
 

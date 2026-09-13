@@ -58,10 +58,11 @@ open import Rx.Exp using (Ctx; Closed; Exp; natᵗ; obs; strmᵗ; ofᵉ; mergeAl
 open import Rx.Slots using (Slots; scripted)
 open import Rx.Hop-Depth using (Rd₃; ε; mapStep; flatten; hopOf; depthᵉ; depthᵛ; rdᵛ)
 open import Rx.Slot-Read using (slotRd)
-open import Rx.Evaluator using (Path; RegId; Sched; EvalSt; Arrival;
+open import Rx.Evaluator using (Path; RegId; AtFloor; Sched; EvalSt; Arrival;
   root; share-sink; _↠_; map-f; scan-f; take-f; from-inner; thru-outer;
   arrTy; arrVal; chainsOf; cascade; sched-next; subscribeE; rootWitness;
   sched-init; st-init; stHop)
+open import Rx.Inputs-Below using (below-ctx)
 
 ----------------------------------------------------------------------
 -- THE CURRENCY, WRITTEN OUT HERE RATHER THAN IMPORTED.  A repair that
@@ -71,10 +72,10 @@ open import Rx.Evaluator using (Path; RegId; Sched; EvalSt; Arrival;
 -- value's own reading.
 ----------------------------------------------------------------------
 
-chainRd′ : ∀ {n} {Γ : Ctx n} {s t} (ψ : Fin n → Rd₃) →
-           Path Γ s t → Rd₃ → Rd₃
+chainRd′ : ∀ {n} {Γ : Ctx n} {lo s t} (ψ : Fin n → Rd₃) →
+           Path Γ lo s t → Rd₃ → Rd₃
 chainRd′ ψ root                    p = p
-chainRd′ ψ (share-sink i)          p = p
+chainRd′ ψ (share-sink i _)        p = p
 chainRd′ ψ (map-f fn ↠ κ)          p = chainRd′ ψ κ (mapStep ψ ε p fn)
 chainRd′ ψ (scan-f fn nid ↠ κ)     p = chainRd′ ψ κ (mapStep ψ ε p fn)
 chainRd′ ψ (take-f nid ↠ κ)        p = chainRd′ ψ κ p
@@ -85,9 +86,9 @@ arrRd′ : ∀ {n} {Γ : Ctx n} (ψ : Fin n → Rd₃) → Arrival Γ → Rd₃
 arrRd′ ψ a = 1 , rdᵛ ψ (arrTy a) (arrVal a)
 
 pathsSpend′ : ∀ {n} {Γ : Ctx n} {t} (ψ : Fin n → Rd₃) →
-              (a : Arrival Γ) → List (RegId × Path Γ (arrTy a) t) → ℕ
-pathsSpend′ ψ a []             = 0
-pathsSpend′ ψ a ((_ , c) ∷ cs) =
+              (a : Arrival Γ) → List (RegId × AtFloor Γ (arrTy a) t) → ℕ
+pathsSpend′ ψ a []                 = 0
+pathsSpend′ ψ a ((_ , _ , c) ∷ cs) =
   hopOf (chainRd′ ψ c (arrRd′ ψ a)) ⊔ pathsSpend′ ψ a cs
 
 ----------------------------------------------------------------------
@@ -165,10 +166,10 @@ q₃ = deferᵉ (mergeAllᵉ nothing (mergeAllᵉ nothing (deferᵉ obsSlot²)))
 
 entry : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
   Sched Γ × EvalSt e
-entry e ins =
+entry {n = n} e ins =
   let (_ , sched , st) =
-        subscribeE (rootWitness e ins) e root 0 0 (sched-init e ins)
-          (st-init e)
+        subscribeE {lo = n} (rootWitness e ins) e {below-ctx e} root 0 0
+          (sched-init e ins) (st-init e)
   in sched , st
 
 payRd : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → Sched Γ × EvalSt e → ℕ

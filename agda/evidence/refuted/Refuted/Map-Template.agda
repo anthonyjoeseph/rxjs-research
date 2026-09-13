@@ -63,8 +63,8 @@ valsHop′ : ∀ {n} {Γ : Ctx n} (ψ : Fin n → Rd₃) (u : Ty) → List (Val 
 valsHop′ ψ u []       = 0
 valsHop′ ψ u (v ∷ vs) = depthᵛ ψ u v ⊔ valsHop′ ψ u vs
 
-FrameCarries′ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {τ} →
-  Acc _≺_ τ → Id → Tick → Frame Γ s u → Path Γ u t →
+FrameCarries′ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {τ} {lo} →
+  Acc _≺_ τ → Id → Tick → Frame Γ s u → Path Γ lo u t →
   (Fin n → Rd₃) → ℕ → ℕ → ℕ → Set
 FrameCarries′ {Γ = Γ} {e = e} {s = s} {u = u} ac id now f κ ψ Rin Rv Rst =
   ∀ (vals : List (Val Γ s)) (fin : Bool) (sd : Sched Γ) (st : EvalSt e) →
@@ -74,9 +74,9 @@ FrameCarries′ {Γ = Γ} {e = e} {s = s} {u = u} ac id now f κ ψ Rin Rv Rst =
         (stepFrame ac id now f κ vals fin sd st))))) ≤ Rst
 
 MapFrameCarried : Set
-MapFrameCarried = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {τ}
+MapFrameCarried = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {τ} {lo}
   (ac : Acc _≺_ τ) (id : Id) (now : Tick) (fn : Fn Γ [] [] [] s u)
-  (κ : Path Γ u t) (ψ : Fin n → Rd₃) (Rv Rst : ℕ) →
+  (κ : Path Γ lo u t) (ψ : Fin n → Rd₃) (Rv Rst : ℕ) →
   FrameCarries′ {e = e} ac id now (map-f fn) κ ψ Rv Rv Rst
 
 ----------------------------------------------------------------------
@@ -112,7 +112,7 @@ ac₀ : Acc _≺_ _
 ac₀ = rootWitness root₀ ins₀
 
 out : List (Val Γ₀ (obs natᵗ))
-out = proj₁ (stepFrame {e = root₀} ac₀ 0 0 (map-f tmpl) root (0 ∷ [])
+out = proj₁ (stepFrame {lo = 0} {e = root₀} ac₀ 0 0 (map-f tmpl) root (0 ∷ [])
                false (sched-init root₀ ins₀) (st-init root₀))
 
 ----------------------------------------------------------------------
@@ -138,7 +138,7 @@ store-is = refl
 
 map-frame-carried-false : MapFrameCarried → ⊥
 map-frame-carried-false h
-  with proj₁ (h {e = root₀} ac₀ 0 0 tmpl root ψ₀ 0 0 (0 ∷ []) false
+  with proj₁ (h {e = root₀} {lo = 0} ac₀ 0 0 tmpl root ψ₀ 0 0 (0 ∷ []) false
                 (sched-init root₀ ins₀) (st-init root₀)
                 (_≤_.z≤n) (_≤_.z≤n))
 ... | ()

@@ -71,10 +71,15 @@ postulate
   -- TELESCOPE POSITION, which is a fact about the PROGRAM: a shared
   -- slot's definition may name only inputs below it, so a chain
   -- registered on a share sinks only into the root or a strictly later
-  -- share.  The counter is a proxy for that order, and the gap is the
-  -- LIFT — the program fact is carried in a shared slot's own type,
-  -- while the registry it has to hold of is a run object and nothing
-  -- says the run preserves it.
+  -- share.  The registry CARRIES that order in a type — a row's chain
+  -- is indexed by the floor its own source dictates, and a sink
+  -- constructor demands its index be at least that floor — so the lift
+  -- the counter used to stand in for is discharged by construction and
+  -- the run cannot mint a row that violates it.  What is left is the
+  -- DESCENT: the counter falls by one per boundary while the floor
+  -- rises to the sink's own position, and nothing yet ties the two, so
+  -- the clamp is unreachable only once the recursion is measured on the
+  -- floor rather than on the number.
   --
   -- PROBED: `Probed.Dispatch-Saturates` — a three-slot telescope whose
   --   every share reads the one below it, so a dispatch at the middle
@@ -96,10 +101,7 @@ postulate
   --   did not reach.  The staircase runs one, two, three and then three
   --   again, so the counter is read all the way down and STOPS one below
   --   the seed, and the statement holds at the seed, above it, and at the
-  --   middle rung.  It also reads the registry's own floor off that run:
-  --   every slot-sourced chain sinks strictly above its source, on two
-  --   rows first shown to be rows the claim binds on, since a floor stated
-  --   as an `all` is true of a registry carrying no such chain at all.
+  --   middle rung.
   --   NOT covered: one arrival, shares reading their predecessor
   --   directly, and a registry one chain wide at every rung — so nothing
   --   here reaches a cancelled registration, a completing share, or a

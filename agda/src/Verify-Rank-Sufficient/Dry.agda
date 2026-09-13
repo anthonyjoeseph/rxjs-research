@@ -45,11 +45,15 @@ open import Rx.Slots using (shared; scripted)
 open import Rx.Strat-Order using (_≺_; ltS; ltU)
 open import Rx.Evaluator using (Stream; Path; Sched; EvalSt; subscribeE;
   subscribeSharedSlot; sharedConnect; register; share-sink; burstCompleted;
+  atSlot; lowerFloor;
   mintSource; mintNode; installNode; take-st; scan-st; mergeAll-st;
   switch-st; exhaust-st;
   map-f; scan-f; take-f; thru-outer; mergeAllᵒ; switchᵒ; exhaustᵒ;
   _↠_;
   hasDry; memberSource; unconn; stHop)
+open import Rx.Inputs-Below using (below-input; below-map; below-take;
+  below-scan; below-mergeAll; below-switchAll; below-exhaustAll; below-μ;
+  below-unfoldμ)
 open import Rx.Hop-Depth using (depthᵉ; hopOf; rdᵉ; ε; rd-unfoldμ)
 open import Rx.Slot-Read using (slotRd; slotRd-fix)
 open import Verify-Rank-Sufficient.Entry using (EntryReads; hop-mapᵉ; hop-scanᵉ)
@@ -174,22 +178,24 @@ opShape _                = false
 --   symbol standing for a definition of any size, so this is where that gap
 --   was already measured.
 postulate
-  dry-operator : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} {τ}
-    (ac : Acc _≺_ τ) (o : Closed Γ u) (κ : Path Γ u t) (id : Id) (now : Tick)
+  dry-operator : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} {τ} {lo}
+    (ac : Acc _≺_ τ) (o : Closed Γ u) (ok : T (inputsBelowᵉ lo o))
+    (κ : Path Γ lo u t) (id : Id) (now : Tick)
     (sched : Sched Γ) (st : EvalSt e) → opShape o ≡ true →
     EntryReads τ o
       (Sched.slots sched) (EvalSt.connectedShares st) →
-    hasDry (proj₁ (subscribeE ac o κ id now sched st)) ≡ false
+    hasDry (proj₁ (subscribeE ac o {ok} κ id now sched st)) ≡ false
 
 mutual
-  subscribe-dry-free : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} {τ}
-    (ac : Acc _≺_ τ) (o : Closed Γ u) (κ : Path Γ u t) (id : Id) (now : Tick)
+  subscribe-dry-free : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} {τ} {lo}
+    (ac : Acc _≺_ τ) (o : Closed Γ u) (ok : T (inputsBelowᵉ lo o))
+    (κ : Path Γ lo u t) (id : Id) (now : Tick)
     (sched : Sched Γ) (st : EvalSt e) →
     EntryReads τ o
       (Sched.slots sched) (EvalSt.connectedShares st) →
     stHop (slotRd (Sched.slots sched)) st ≤ proj₁ (proj₂ τ) →
     WalkCarries (slotRd (Sched.slots sched)) u
-      (subscribeE ac o κ id now sched st)
+      (subscribeE ac o {ok} κ id now sched st)
       (proj₂ (rdᵉ (slotRd (Sched.slots sched)) ε o)) (proj₁ (proj₂ τ))
 
   -- THE μ PEEL.  The machine asks whether the unfolding fits under the
@@ -201,8 +207,8 @@ mutual
   -- reading of the redex and of its unfolding are EQUAL, so nothing is
   -- spent to re-establish that conjunct.  A measure that GREW here is
   -- what ruled out every seeded form.
-  subscribe-dry-free {τ = U , r , sz} (acc rec) (μᵉ body) κ id now sched st
-                     inv hst
+  subscribe-dry-free {τ = U , r , sz} {lo = lo} (acc rec) (μᵉ body) ok κ
+                     id now sched st inv hst
     with syncSizeᵉ (unfoldμ body) <? sz
   ... | no  ¬p = ⊥-elim (¬p (mu-guard body (proj₂ (proj₂ inv))))
   ... | yes p  =
@@ -210,21 +216,22 @@ mutual
         , ⊑-≡ (proj₁ (proj₂ ih)) (cong proj₂ (rd-unfoldμ _ ε body))
         , proj₂ (proj₂ ih)
     where
-    ih = subscribe-dry-free (rec (ltS p)) (unfoldμ body) κ id now sched st
+    ih = subscribe-dry-free (rec (ltS p)) (unfoldμ body)
+           (below-unfoldμ lo body (below-μ lo body ok)) κ id now sched st
            ( proj₁ inv
            , ≤-trans (≤-reflexive (cong hopOf (rd-unfoldμ _ ε body)))
                      (proj₁ (proj₂ inv))
            , ≤-refl )
            hst
 
-  subscribe-dry-free ac (ofᵉ ts) κ id now sched st inv hst =
+  subscribe-dry-free ac (ofᵉ ts) ok κ id now sched st inv hst =
     oneShotBurst-dry (map (λ tm → evalTm tm) ts) id sched
     , ≡-⊑ (oneShotBurst-rd _ _ (map (λ tm → evalTm tm) ts) id sched)
           (ofᵉ-carried _ ts)
     , hst
-  subscribe-dry-free {u = u} ac emptyᵉ κ id now sched st inv hst =
+  subscribe-dry-free {u = u} ac emptyᵉ ok κ id now sched st inv hst =
     oneShotBurst-dry {u = u} [] id sched , (z≤n , z≤n) , hst
-  subscribe-dry-free ac (varᵉ ()) κ id now sched st inv hst
+  subscribe-dry-free ac (varᵉ ()) ok κ id now sched st inv hst
 
   -- THE THREE NON-FLATTENING FRAMES, and a defer that subscribes
   -- nothing.  Each is `pushBurst` over a frame that cannot build a dry
@@ -232,16 +239,17 @@ mutual
   -- the source's, transported through the measure clause the operator
   -- contributes.  The rank is never spent: none of these frames reaches
   -- `subscribeInner`, which is the only hop in the pipeline.
-  subscribe-dry-free {τ = τ} ac (mapᵉ f b) κ id now sched st inv hst =
+  subscribe-dry-free {τ = τ} {lo = lo} ac (mapᵉ f b) ok κ id now sched st inv hst =
     pushBurst-dry ac id now (map-f f) κ
       (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
       (map-frame-dry ac id now f κ) (proj₁ ih)
     , proj₁ pc , proj₂ pc
     where
     ψ = slotRd (Sched.slots sched)
-    r = subscribeE ac b (map-f f ↠ κ) id now sched st
+    r = subscribeE ac b {below-map lo f b ok} (map-f f ↠ κ) id now sched st
 
-    ih = subscribe-dry-free ac b (map-f f ↠ κ) id now sched st
+    ih = subscribe-dry-free ac b (below-map lo f b ok) (map-f f ↠ κ)
+           id now sched st
            ( proj₁ inv
            , ≤-trans (hop-mapᵉ _ f b) (proj₁ (proj₂ inv))
            , ≤-trans (m≤n⇒m≤1+n (m≤n+m _ _)) (proj₂ (proj₂ inv)) )
@@ -269,7 +277,7 @@ mutual
            (proj₁ (proj₂ ih))
            (proj₂ (proj₂ ih))
 
-  subscribe-dry-free {u = u} {τ = τ} ac (takeᵉ c b) κ id now sched st inv hst
+  subscribe-dry-free {u = u} {τ = τ} {lo = lo} ac (takeᵉ c b) ok κ id now sched st inv hst
     with evalTm c
   ... | zero  = oneShotBurst-dry {u = u} [] id sched , (z≤n , z≤n) , hst
   ... | suc k =
@@ -282,14 +290,15 @@ mutual
     nid    = proj₁ (mintNode sched)
     sched₁ = proj₂ (mintNode sched)
     st₁    = installNode nid (take-st (suc k)) st
-    r      = subscribeE ac b (take-f nid ↠ κ) id now sched₁ st₁
+    r      = subscribeE ac b {below-take lo c b ok} (take-f nid ↠ κ) id now sched₁ st₁
 
     -- a take node reads zero by construction, so the store bound is
     -- untouched by the install
     hst₁ = installNode-hop ψ nid (take-st (suc k)) st
              (proj₁ (proj₂ τ)) z≤n hst
 
-    ih = subscribe-dry-free ac b (take-f nid ↠ κ) id now sched₁ st₁
+    ih = subscribe-dry-free ac b (below-take lo c b ok) (take-f nid ↠ κ)
+           id now sched₁ st₁
            ( proj₁ inv
            , proj₁ (proj₂ inv)
            , ≤-trans (m≤n⇒m≤1+n (m≤n+m _ _)) (proj₂ (proj₂ inv)) )
@@ -303,7 +312,7 @@ mutual
            (proj₁ (proj₂ ih))
            (proj₂ (proj₂ ih))
 
-  subscribe-dry-free {τ = τ} ac (scanᵉ f z b) κ id now sched st inv hst =
+  subscribe-dry-free {τ = τ} {lo = lo} ac (scanᵉ f z b) ok κ id now sched st inv hst =
     pushBurst-dry ac id now (scan-f f nid) κ
       (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
       (scan-frame-dry ac id now f nid κ) (proj₁ ih)
@@ -313,7 +322,7 @@ mutual
     nid    = proj₁ (mintNode sched)
     sched₁ = proj₂ (mintNode sched)
     st₁    = installNode nid (scan-st (evalTm z)) st
-    r      = subscribeE ac b (scan-f f nid ↠ κ) id now sched₁ st₁
+    r      = subscribeE ac b {below-scan lo f z b ok} (scan-f f nid ↠ κ) id now sched₁ st₁
 
     -- the seed is the one thing a subscribe writes that can read at
     -- all, and the entry invariant already puts the scan term under
@@ -321,7 +330,8 @@ mutual
     hst₁ = installNode-hop ψ nid (scan-st (evalTm z)) st (proj₁ (proj₂ τ))
              (≤-trans (scan-seed-carried ψ f z b) (proj₁ (proj₂ inv))) hst
 
-    ih = subscribe-dry-free ac b (scan-f f nid ↠ κ) id now sched₁ st₁
+    ih = subscribe-dry-free ac b (below-scan lo f z b ok) (scan-f f nid ↠ κ)
+           id now sched₁ st₁
            ( proj₁ inv
            , ≤-trans (hop-scanᵉ _ f z b) (proj₁ (proj₂ inv))
            , ≤-trans (m≤n⇒m≤1+n (m≤n+m _ _)) (proj₂ (proj₂ inv)) )
@@ -331,7 +341,7 @@ mutual
     -- a scan's outputs are the accumulator it is rewriting, so no
     -- bound on what the frame is handed bounds what it returns, and
     -- the leaf is taken at the burst and at this arm's own seed
-    pc = scan-burst-carried ac id now f z b nid κ sched₁ st ψ
+    pc = scan-burst-carried ac id now f z b ok nid κ sched₁ st ψ
            (proj₁ (proj₂ τ)) (proj₁ (proj₂ inv))
            (proj₁ (proj₂ ih))
            (proj₂ (proj₂ ih))
@@ -339,7 +349,7 @@ mutual
   -- a defer subscribes nothing at all: it mints the hop and announces
   -- it, so its burst is one `init` and there is nothing to read; the
   -- node it installs holds an empty queue, which reads zero
-  subscribe-dry-free {u = u} {τ = τ} ac (deferᵉ b) κ id now sched st inv hst =
+  subscribe-dry-free {u = u} {τ = τ} ac (deferᵉ b) ok κ id now sched st inv hst =
     refl , (z≤n , z≤n)
     , installNode-hop (slotRd (Sched.slots sched)) (proj₁ (mintNode sched))
         (mergeAll-st {t = u} nothing 0 [] false) st (proj₁ (proj₂ τ)) z≤n hst
@@ -356,23 +366,24 @@ mutual
   -- reading, so the residue is spelled rather than computed.  The entry
   -- invariant pays for that `suc`, and the `suc` is what the rank
   -- descent inside `subscribeInner` spends.
-  subscribe-dry-free {u = u} {τ = τ} ac (mergeAllᵉ lim b) κ id now sched st
-                     inv hst =
-    dry-operator ac (mergeAllᵉ lim b) κ id now sched st refl inv
+  subscribe-dry-free {u = u} {τ = τ} {lo = lo} ac (mergeAllᵉ lim b) ok κ
+                     id now sched st inv hst =
+    dry-operator ac (mergeAllᵉ lim b) ok κ id now sched st refl inv
     , proj₁ pc , proj₂ pc
     where
     ψ      = slotRd (Sched.slots sched)
     nid    = proj₁ (mintNode sched)
     sched₁ = proj₂ (mintNode sched)
     st₁    = installNode nid (mergeAll-st {t = u} lim 0 [] false) st
-    r      = subscribeE ac b (thru-outer mergeAllᵒ nid ↠ κ) id now sched₁ st₁
+    r      = subscribeE ac b {below-mergeAll lo lim b ok}
+               (thru-outer mergeAllᵒ nid ↠ κ) id now sched₁ st₁
     Rin    = proj₂ (rdᵉ ψ ε b)
 
     hst₁ = installNode-hop ψ nid (mergeAll-st {t = u} lim 0 [] false) st
              (proj₁ (proj₂ τ)) z≤n hst
 
-    ih = subscribe-dry-free ac b (thru-outer mergeAllᵒ nid ↠ κ) id now
-           sched₁ st₁
+    ih = subscribe-dry-free ac b (below-mergeAll lo lim b ok)
+           (thru-outer mergeAllᵒ nid ↠ κ) id now sched₁ st₁
            ( proj₁ inv
            , ≤-trans (n≤1+n _) (proj₁ (proj₂ inv))
            , ≤-trans (n≤1+n _) (proj₂ (proj₂ inv)) )
@@ -386,22 +397,23 @@ mutual
            (proj₁ (proj₂ ih))
            (proj₂ (proj₂ ih))
 
-  subscribe-dry-free {τ = τ} ac (switchAllᵉ b) κ id now sched st inv hst =
-    dry-operator ac (switchAllᵉ b) κ id now sched st refl inv
+  subscribe-dry-free {τ = τ} {lo = lo} ac (switchAllᵉ b) ok κ id now sched st inv hst =
+    dry-operator ac (switchAllᵉ b) ok κ id now sched st refl inv
     , proj₁ pc , proj₂ pc
     where
     ψ      = slotRd (Sched.slots sched)
     nid    = proj₁ (mintNode sched)
     sched₁ = proj₂ (mintNode sched)
     st₁    = installNode nid (switch-st nothing false) st
-    r      = subscribeE ac b (thru-outer switchᵒ nid ↠ κ) id now sched₁ st₁
+    r      = subscribeE ac b {below-switchAll lo b ok}
+               (thru-outer switchᵒ nid ↠ κ) id now sched₁ st₁
     Rin    = proj₂ (rdᵉ ψ ε b)
 
     hst₁ = installNode-hop ψ nid (switch-st nothing false) st
              (proj₁ (proj₂ τ)) z≤n hst
 
-    ih = subscribe-dry-free ac b (thru-outer switchᵒ nid ↠ κ) id now
-           sched₁ st₁
+    ih = subscribe-dry-free ac b (below-switchAll lo b ok)
+           (thru-outer switchᵒ nid ↠ κ) id now sched₁ st₁
            ( proj₁ inv
            , ≤-trans (n≤1+n _) (proj₁ (proj₂ inv))
            , ≤-trans (n≤1+n _) (proj₂ (proj₂ inv)) )
@@ -415,22 +427,23 @@ mutual
            (proj₁ (proj₂ ih))
            (proj₂ (proj₂ ih))
 
-  subscribe-dry-free {τ = τ} ac (exhaustAllᵉ b) κ id now sched st inv hst =
-    dry-operator ac (exhaustAllᵉ b) κ id now sched st refl inv
+  subscribe-dry-free {τ = τ} {lo = lo} ac (exhaustAllᵉ b) ok κ id now sched st inv hst =
+    dry-operator ac (exhaustAllᵉ b) ok κ id now sched st refl inv
     , proj₁ pc , proj₂ pc
     where
     ψ      = slotRd (Sched.slots sched)
     nid    = proj₁ (mintNode sched)
     sched₁ = proj₂ (mintNode sched)
     st₁    = installNode nid (exhaust-st false false) st
-    r      = subscribeE ac b (thru-outer exhaustᵒ nid ↠ κ) id now sched₁ st₁
+    r      = subscribeE ac b {below-exhaustAll lo b ok}
+               (thru-outer exhaustᵒ nid ↠ κ) id now sched₁ st₁
     Rin    = proj₂ (rdᵉ ψ ε b)
 
     hst₁ = installNode-hop ψ nid (exhaust-st false false) st
              (proj₁ (proj₂ τ)) z≤n hst
 
-    ih = subscribe-dry-free ac b (thru-outer exhaustᵒ nid ↠ κ) id now
-           sched₁ st₁
+    ih = subscribe-dry-free ac b (below-exhaustAll lo b ok)
+           (thru-outer exhaustᵒ nid ↠ κ) id now sched₁ st₁
            ( proj₁ inv
            , ≤-trans (n≤1+n _) (proj₁ (proj₂ inv))
            , ≤-trans (n≤1+n _) (proj₂ (proj₂ inv)) )
@@ -446,7 +459,7 @@ mutual
 
   -- A SLOT REFERENCE IS WHERE THE CONNECT PEEL LIVES, and three of its
   -- four outcomes announce and register without subscribing anything.
-  subscribe-dry-free ac (input i) κ id now sched st inv hst
+  subscribe-dry-free {Γ = Γ} {lo = lo} ac (input i) okᵢ κ id now sched st inv hst
     with Sched.slots sched i in eqi
   -- the reference and the definition it stands for read the same, so
   -- the bound crosses the slot boundary in both directions
@@ -456,7 +469,9 @@ mutual
               (sym (cong proj₂ (slotRd-fix (Sched.slots sched) i d ok)))
         , proj₂ (proj₂ w)
         where
-        w = sharedSlot-dry ac i d κ id now sched st eqi (proj₁ inv)
+        w = sharedSlot-dry ac i d κ (below-input {Γ = Γ} lo i okᵢ) id now sched
+              st eqi
+              (proj₁ inv)
               (≤-trans (≤-reflexive
                          (sym (cong hopOf
                            (slotRd-fix (Sched.slots sched) i d ok))))
@@ -484,24 +499,25 @@ mutual
 
   -- joining a live or a spent share announces and returns; only the
   -- first subscriber connects, and that is the guarded clause
-  sharedSlot-dry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {τ}
+  sharedSlot-dry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {τ} {lo}
     (ac : Acc _≺_ τ) (i : Fin n) (d : Closed Γ (lookup Γ i))
-    (κ : Path Γ (lookup Γ i) t) (id : Id) (now : Tick) (sched : Sched Γ)
+    (κ : Path Γ lo (lookup Γ i) t) (below : suc (toℕ i) ≤ lo)
+    (id : Id) (now : Tick) (sched : Sched Γ)
     (st : EvalSt e) {ok : T (inputsBelowᵉ (toℕ i) d)} →
     Sched.slots sched i ≡ shared d {ok = ok} →
     unconn (Sched.slots sched) (EvalSt.connectedShares st) ≤ proj₁ τ →
     depthᵉ (slotRd (Sched.slots sched)) d ≤ proj₁ (proj₂ τ) →
     stHop (slotRd (Sched.slots sched)) st ≤ proj₁ (proj₂ τ) →
     WalkCarries (slotRd (Sched.slots sched)) (lookup Γ i)
-      (subscribeSharedSlot ac i d κ id now sched st)
+      (subscribeSharedSlot ac i d {ok} κ below id now sched st)
       (proj₂ (rdᵉ (slotRd (Sched.slots sched)) ε d)) (proj₁ (proj₂ τ))
-  sharedSlot-dry ac i d κ id now sched st eqi ule hle hst
+  sharedSlot-dry ac i d κ below id now sched st eqi ule hle hst
     with memberSource (toℕ i) (EvalSt.completedSources st)
   ... | true = refl , (z≤n , z≤n) , hst
   ... | false with memberSource (toℕ i) (EvalSt.connectedShares st) in fresh
   ...   | true  = refl , (z≤n , z≤n) , hst
   ...   | false =
-          sharedConnect-dry ac i d κ id now sched st eqi fresh ule hle hst
+          sharedConnect-dry ac i d κ below id now sched st eqi fresh ule hle hst
 
   -- THE CONNECT PEEL.  The machine asks whether latching this slot
   -- keeps the unconnected count under the component it entered at; the
@@ -513,9 +529,10 @@ mutual
   -- reflexivity, and the rank arrives as a premise — transferred from
   -- the reference to the definition it stands for at the slot clause
   -- above, which is the one place the telescope has been matched.
-  sharedConnect-dry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {τ}
+  sharedConnect-dry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {τ} {lo}
     (ac : Acc _≺_ τ) (i : Fin n) (d : Closed Γ (lookup Γ i))
-    (κ : Path Γ (lookup Γ i) t) (id : Id) (now : Tick) (sched : Sched Γ)
+    (κ : Path Γ lo (lookup Γ i) t) (below : suc (toℕ i) ≤ lo)
+    (id : Id) (now : Tick) (sched : Sched Γ)
     (st : EvalSt e) {ok : T (inputsBelowᵉ (toℕ i) d)} →
     Sched.slots sched i ≡ shared d {ok = ok} →
     memberSource (toℕ i) (EvalSt.connectedShares st) ≡ false →
@@ -523,10 +540,11 @@ mutual
     depthᵉ (slotRd (Sched.slots sched)) d ≤ proj₁ (proj₂ τ) →
     stHop (slotRd (Sched.slots sched)) st ≤ proj₁ (proj₂ τ) →
     WalkCarries (slotRd (Sched.slots sched)) (lookup Γ i)
-      (sharedConnect ac i d κ id now sched st)
+      (sharedConnect ac i d {ok} κ below id now sched st)
       (proj₂ (rdᵉ (slotRd (Sched.slots sched)) ε d)) (proj₁ (proj₂ τ))
   sharedConnect-dry {Γ = Γ} {e = e} {τ = U , r , s}
-                    (acc rec) i d κ id now sched st eqi fresh ule hle hst
+                    (acc rec) i d κ below id now sched st {ok = ok} eqi fresh
+                    ule hle hst
     with unconn (Sched.slots sched) (toℕ i ∷ EvalSt.connectedShares st) <? U
   ... | no  ¬p = ⊥-elim (¬p (connect-guard (Sched.slots sched)
                               (EvalSt.connectedShares st) i eqi fresh ule))
@@ -542,18 +560,18 @@ mutual
     ψ = slotRd (Sched.slots sched)
 
     st₁ : EvalSt e
-    st₁ = register (toℕ i) κ
+    st₁ = register (atSlot i) (lowerFloor below κ)
             (record st { connectedShares = toℕ i ∷ EvalSt.connectedShares st })
 
     burst : Stream Γ (lookup Γ i)
     burst = proj₁ (subscribeE (rec (ltU {r′ = r} {s′ = syncSizeᵉ d} p))
-                     d (share-sink i) id now sched st₁)
+                     d {ok} (share-sink i ≤-refl) id now sched st₁)
 
     -- neither the latch nor the registration touches a node, so the
     -- store bound the caller came in with is the one the definition is
     -- subscribed under
     w = subscribe-dry-free (rec (ltU {r′ = r} {s′ = syncSizeᵉ d} p))
-          d (share-sink i) id now sched st₁
+          d ok (share-sink i ≤-refl) id now sched st₁
           (≤-refl , hle , ≤-refl) hst
 
     hb : hasDry burst ≡ false

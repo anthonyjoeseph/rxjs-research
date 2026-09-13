@@ -20,7 +20,7 @@
 --      runProtocol's distribution over ++.
 module Verify-Well-Formed.Part6 where
 
-open import Data.Bool    using (Bool; true; false; if_then_else_; _∧_; not)
+open import Data.Bool    using (Bool; true; false; if_then_else_; _∧_; not; T)
 open import Data.Fin     using (toℕ)
 open import Data.Vec     using (lookup)
 open import Data.Nat     using (ℕ; zero; suc)
@@ -33,7 +33,8 @@ open import Relation.Binary.PropositionalEquality
 
 open import Rx.Prim      using (Tick; Id; Source; InstEmit; InstEvent; init; value; close; handoff; complete; EmitKind;
   _at_from_as_)
-open import Rx.Exp       using (Ctx; Closed; Val; Fn; _×ᵗ_; Tm; scanᵉ; evalTm)
+open import Rx.Exp       using (Ctx; Closed; Val; Fn; _×ᵗ_; Tm; scanᵉ; evalTm; inputsBelowᵉ)
+open import Rx.Inputs-Below using (below-scan)
 open import Rx.Evaluator using (Sched; EvalSt; Stream; Path; _↠_; scan-f; take-f; takeVals; takeDispatch; cutThrough;
   setNode; memberSource; NodeId; lookupNode; scan-st; take-st; subscribeE; splitEvents;
   pushBurst; scanVals; installNode; mintNode; retagEvents; sweepLive)
@@ -58,10 +59,11 @@ open import Rx.Strat-Order using (Tri; _≺_)
 
 variable
   τ : Tri
+  lo : ℕ
 
 pushBurst-scan-fixed : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   (fuel : Acc _≺_ τ) (id : Id) (now : Tick) (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
-  (κ : Path Γ u t) (burst : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) (acc : Val Γ u) →
+  (κ : Path Γ lo u t) (burst : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) (acc : Val Γ u) →
   lookupNode nid (EvalSt.nodes st) ≡ just (scan-st acc) →
   (EvalSt.registry (proj₂ (proj₂ (pushBurst fuel id now (scan-f fn nid) κ burst sched st)))
      ≡ EvalSt.registry st)
@@ -88,24 +90,25 @@ pushBurst-scan-fixed {u = u} fuel id now fn nid κ ((es at i from s as k) ∷ em
 -- still owed from the walk's fresh-node discipline.
 subscribeE-scan-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   (fuel : Acc _≺_ τ) (f : Fn Γ [] [] [] (u ×ᵗ s) u) (seed : Tm Γ [] [] [] u) (b : Closed Γ s)
-  (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
+  (ok : T (inputsBelowᵉ lo (scanᵉ f seed b)))
+  (κ : Path Γ lo u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
   BurstInv id sched st S →
   (let nid = proj₁ (mintNode sched)
-       r₀  = subscribeE fuel b (scan-f f nid ↠ κ) id now (proj₂ (mintNode sched))
+       r₀  = subscribeE fuel b {below-scan lo f seed b ok} (scan-f f nid ↠ κ) id now (proj₂ (mintNode sched))
                (installNode nid (scan-st (evalTm seed)) st)
    in Σ ProtocolSt λ S′ →
         (runProtocol S (proj₁ r₀) ≡ just S′)
         × BurstInv id (proj₁ (proj₂ r₀)) (proj₂ (proj₂ r₀)) S′
         × (Σ (Val Γ u) λ acc → lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r₀))) ≡ just (scan-st acc))) →
   Σ ProtocolSt λ S″ →
-    (runProtocol S (proj₁ (subscribeE fuel (scanᵉ f seed b) κ id now sched st)) ≡ just S″)
-    × BurstInv id (proj₁ (proj₂ (subscribeE fuel (scanᵉ f seed b) κ id now sched st)))
-               (proj₂ (proj₂ (subscribeE fuel (scanᵉ f seed b) κ id now sched st))) S″
-subscribeE-scan-wf fuel f seed b κ id now sched st S binv (S′ , run₀ , binv₀ , acc , nodeP) =
+    (runProtocol S (proj₁ (subscribeE fuel (scanᵉ f seed b) {ok} κ id now sched st)) ≡ just S″)
+    × BurstInv id (proj₁ (proj₂ (subscribeE fuel (scanᵉ f seed b) {ok} κ id now sched st)))
+               (proj₂ (proj₂ (subscribeE fuel (scanᵉ f seed b) {ok} κ id now sched st))) S″
+subscribeE-scan-wf {lo = lo} fuel f seed b ok κ id now sched st S binv (S′ , run₀ , binv₀ , acc , nodeP) =
   S′ , run″ , binv″
   where
   nid    = proj₁ (mintNode sched)
-  r₀     = subscribeE fuel b (scan-f f nid ↠ κ) id now (proj₂ (mintNode sched))
+  r₀     = subscribeE fuel b {below-scan lo f seed b ok} (scan-f f nid ↠ κ) id now (proj₂ (mintNode sched))
              (installNode nid (scan-st (evalTm seed)) st)
   burst  = proj₁ r₀
   sched₂ = proj₁ (proj₂ r₀)
@@ -116,10 +119,10 @@ subscribeE-scan-wf fuel f seed b κ id now sched st S binv (S′ , run₀ , binv
   schEq  = proj₁ (proj₂ cRes)
   dyEq   = proj₂ (proj₂ cRes)
 
-  stF  = proj₂ (proj₂ (subscribeE fuel (scanᵉ f seed b) κ id now sched st))
-  schF = proj₁ (proj₂ (subscribeE fuel (scanᵉ f seed b) κ id now sched st))
+  stF  = proj₂ (proj₂ (subscribeE fuel (scanᵉ f seed b) {ok} κ id now sched st))
+  schF = proj₁ (proj₂ (subscribeE fuel (scanᵉ f seed b) {ok} κ id now sched st))
 
-  run″ : runProtocol S (proj₁ (subscribeE fuel (scanᵉ f seed b) κ id now sched st)) ≡ just S′
+  run″ : runProtocol S (proj₁ (subscribeE fuel (scanᵉ f seed b) {ok} κ id now sched st)) ≡ just S′
   run″ = pushBurst-scan-run fuel id now f nid κ burst sched₂ st₁ acc S S′ nodeP run₀
 
   lmF : ∀ s → memberSource s (EvalSt.dying stF) ≡ false →
@@ -138,7 +141,7 @@ subscribeE-scan-wf fuel f seed b κ id now sched st S binv (S′ , run₀ , binv
     ; current-frame = BurstInv.current-frame binv₀
       -- straight off the OUTER binv: schF IS this subscribeE's schedule,
       -- so the leaf applies directly and neither regEq nor schEq is needed
-    ; hot-live      = subscribeE-hot-live fuel (scanᵉ f seed b) κ id now sched st
+    ; hot-live      = subscribeE-hot-live fuel (scanᵉ f seed b) ok κ id now sched st
                         (BurstInv.hot-live binv)
     }
 
@@ -227,7 +230,7 @@ takeDispatch-cut nid vals fin sched st k lk dc rewrite lk | dc = refl
 -- goal.  A non-exhausted budget re-emits proj₁ (takeVals kCount vals) with no
 -- bookkeeping of its own, threading the remaining count into the node.
 pushBurst-take-noncut-cons : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-  (fuel : Acc _≺_ τ) (id : Id) (now : Tick) (nid : NodeId) (κ : Path Γ s t)
+  (fuel : Acc _≺_ τ) (id : Id) (now : Tick) (nid : NodeId) (κ : Path Γ lo s t)
   (es : List (InstEvent (Val Γ s))) (i : Id) (src : Source) (ek : EmitKind)
   (ems : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) (kCount : ℕ) →
   lookupNode nid (EvalSt.nodes st) ≡ just (take-st kCount) →
@@ -262,7 +265,7 @@ pushBurst-take-noncut-cons {Γ = Γ} {t = t} {e = e} {s = s}
 -- followed by the tail pushed through the severed state (registry = kept,
 -- live swept, node reset to take-st zero).
 pushBurst-take-cut-cons : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-  (fuel : Acc _≺_ τ) (id : Id) (now : Tick) (nid : NodeId) (κ : Path Γ s t)
+  (fuel : Acc _≺_ τ) (id : Id) (now : Tick) (nid : NodeId) (κ : Path Γ lo s t)
   (es : List (InstEvent (Val Γ s))) (i : Id) (src : Source) (ek : EmitKind)
   (ems : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) (kCount : ℕ) →
   lookupNode nid (EvalSt.nodes st) ≡ just (take-st kCount) →
@@ -394,7 +397,7 @@ cut-tail-nil {Γ = Γ} {s = s} kCount es i src ek ems dc vl
 -- last emit is pushed to a burst whose payload rides its last emit.  This is
 -- what lets subscribeE-wf's Σ-conclusion carry valsLast? through takeᵉ.
 pushBurst-take-valsLast : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-  (fuel : Acc _≺_ τ) (id : Id) (now : Tick) (nid : NodeId) (κ : Path Γ s t)
+  (fuel : Acc _≺_ τ) (id : Id) (now : Tick) (nid : NodeId) (κ : Path Γ lo s t)
   (burst : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) (kCount : ℕ) →
   lookupNode nid (EvalSt.nodes st) ≡ just (take-st kCount) →
   valsLast? burst ≡ true →

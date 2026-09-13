@@ -26,14 +26,16 @@
 ------------------------------------------------------------------
 module Verify-Support.Node-Fresh where
 
+open import Data.Bool using (T)
 open import Data.Maybe using (just)
+open import Data.Nat using (ℕ)
 open import Data.Product using (proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 
 open import Induction.WellFounded using (Acc)
 
 open import Rx.Prim   using (Tick; Id)
-open import Rx.Exp    using (Ctx; Closed)
+open import Rx.Exp    using (Ctx; Closed; inputsBelowᵉ)
 open import Rx.Strat-Order using (Tri; _≺_)
 open import Rx.Evaluator using (Sched; EvalSt; NodeState; Path;
   lookupNode; mintNode; installNode; subscribeE)
@@ -45,9 +47,11 @@ open import Rx.Evaluator using (Sched; EvalSt; NodeState; Path;
 -- RECOVERY: git show 919f115:agda/src/Verify-Budget-Sufficient/Node-Fresh.agda
 postulate
   mint-install-survives : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} {τ : Tri}
-    (g : Acc _≺_ τ) (b : Closed Γ u) (κ : Path Γ u t) (id : Id) (now : Tick)
+    {lo : ℕ}
+    (g : Acc _≺_ τ) (b : Closed Γ u) (ok : T (inputsBelowᵉ lo b))
+    (κ : Path Γ lo u t) (id : Id) (now : Tick)
     (ns : NodeState Γ) (sched : Sched Γ) (st : EvalSt e) →
     lookupNode (proj₁ (mintNode sched))
-      (EvalSt.nodes (proj₂ (proj₂ (subscribeE g b κ id now (proj₂ (mintNode sched))
+      (EvalSt.nodes (proj₂ (proj₂ (subscribeE g b {ok} κ id now (proj₂ (mintNode sched))
         (installNode (proj₁ (mintNode sched)) ns st)))))
       ≡ just ns

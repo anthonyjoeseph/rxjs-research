@@ -61,6 +61,14 @@ would make every search noisier for nothing.
   what sits AROUND it — related facts cluster in one file.
 - **Read the SIGNATURE, never the header prose.** A header saying a route is dead is
   a claim about an attempt; the signature is a fact.
+- **A HAND-ROLLED `grep` FOR A SUBSCRIPTED NAME DIES ON THE LOCALE, AND THE ERROR IS
+  ABOUT COLLATION RATHER THAN ABOUT THE PATTERN.** Names here routinely carry `₀`, `₁`,
+  `ᵉ`, `ᵗ`, and under a UTF-8 locale `grep` can reject a bracket expression containing
+  one with `Invalid collation character` — so a sweep for `Γ₀` reports a failure that
+  reads like a bad regex and, piped into anything, reads like a clean miss. Prefix the
+  command with `export LC_ALL=C`, which compares bytes and matches these names exactly.
+  This is one more reason the search you actually run is `make find`, which takes a
+  statement shape and never a locale.
 
 ## `make dup-check` — the after-the-fact net
 

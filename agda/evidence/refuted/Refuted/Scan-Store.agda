@@ -72,10 +72,10 @@ open import Verify-Rank-Sufficient.Push-Carried using (FrameCarries)
 ----------------------------------------------------------------------
 
 ScanFrameCarried : Set
-ScanFrameCarried = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {τ}
+ScanFrameCarried = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {τ} {lo}
   (ac : Acc _≺_ τ) (id : Id) (now : Tick)
   (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
-  (κ : Path Γ u t) (ψ : Fin n → Rd₃) (Rv : Rd) (Rst : ℕ) →
+  (κ : Path Γ lo u t) (ψ : Fin n → Rd₃) (Rv : Rd) (Rst : ℕ) →
   proj₂ Rv ≤ Rst →
   FrameCarries {e = e} ac id now (scan-f fn nid) κ ψ Rv Rv Rst
 
@@ -123,7 +123,7 @@ frame₀ : Frame Γ₀ natᵗ (obs natᵗ)
 frame₀ = scan-f step 0
 
 outs : List (Val Γ₀ (obs natᵗ))
-outs = proj₁ (stepFrame (rootWitness root₀ ins₀) 0 0 frame₀ root vals₀ false
+outs = proj₁ (stepFrame {lo = 0} (rootWitness root₀ ins₀) 0 0 frame₀ root vals₀ false
                 sd₀ st₀)
 
 ----------------------------------------------------------------------
@@ -153,7 +153,7 @@ out-is = refl
 
 scan-frame-carried-false : ScanFrameCarried → ⊥
 scan-frame-carried-false h
-  with proj₂ (proj₁ (h (rootWitness root₀ ins₀) 0 0 step 0 root ψ₀
+  with proj₂ (proj₁ (h {lo = 0} (rootWitness root₀ ins₀) 0 0 step 0 root ψ₀
                        (0 , 0) 5 z≤n vals₀ false sd₀ st₀
                        (z≤n , z≤n) z≤n))
 ... | ()

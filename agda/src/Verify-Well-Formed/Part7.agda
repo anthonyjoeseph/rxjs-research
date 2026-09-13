@@ -36,7 +36,7 @@ open import Relation.Binary.PropositionalEquality
 open import Rx.Prim      using (Id; Source; InstEvent; init; value; close; handoff; complete; EmitKind; CloseReason;
   exhausted; dried; cut; cutPending; _at_from_as_)
 open import Rx.Exp       using (Ctx; Closed; Val)
-open import Rx.Evaluator using (Sched; EvalSt; RegId; Chain; takeVals; cutThrough; pathHasNode; memberSource; NodeId;
+open import Rx.Evaluator using (Sched; EvalSt; RegId; RegRow; regSource; takeVals; cutThrough; pathHasNode; memberSource; NodeId;
   lookupNode; take-st; splitEvents; retagEvents; sweepLive)
 open import Rx.Protocol  using (ProtocolSt; Owed; countIn; stepProtocol; applyEvents; removeOne; cancelOwed; bumpOwed;
   hasValue)
@@ -321,7 +321,7 @@ closes-apply (close x cr ∷ cs) lv (ac-∷ ac) h
 -- cutThrough's event output is all closes, and retagging keeps it that way
 cutThrough-allCloses : ∀ {A : Set} {n} {Γ : Ctx n} {t}
   (nid : NodeId) (dlv : List RegId) (wm : RegId) (dying : List Source)
-  (reg : List (RegId × Source × Chain Γ t)) →
+  (reg : List (RegRow Γ t)) →
   AllCloses {A} (retagEvents (proj₁ (proj₂ (cutThrough nid dlv wm dying reg))))
 cutThrough-allCloses nid dlv wm dying [] = ac-[]
 cutThrough-allCloses {A} nid dlv wm dying ((rid , src , c) ∷ r)
@@ -329,7 +329,7 @@ cutThrough-allCloses {A} nid dlv wm dying ((rid , src , c) ∷ r)
      | cutThrough nid dlv wm dying r
      | cutThrough-allCloses {A} nid dlv wm dying r
 ... | false | kept , closes , rids | ih = ih
-... | true  | kept , closes , rids | ih with any (_≡ᵇ rid) dlv ∧ memberSource src dying
+... | true  | kept , closes , rids | ih with any (_≡ᵇ rid) dlv ∧ memberSource (regSource src) dying
 ...   | true  = ih
 ...   | false = ac-∷ ih
 
@@ -348,7 +348,7 @@ retag-closeCount s (close x r ∷ es) with s ≡ᵇ x
 -- the cut's registry/close balance, and the fact that it emits no inits
 cutThrough-balance : ∀ {n} {Γ : Ctx n} {t}
   (s : Source) (nid : NodeId) (dlv : List RegId) (wm : RegId)
-  (dying : List Source) (reg : List (RegId × Source × Chain Γ t)) →
+  (dying : List Source) (reg : List (RegRow Γ t)) →
   memberSource s dying ≡ false →
   countRegs s reg
     ≡ countRegs s (proj₁ (cutThrough nid dlv wm dying reg))
@@ -359,20 +359,20 @@ cutThrough-balance s nid dlv wm dying ((rid , src , c) ∷ r) mem
      | cutThrough nid dlv wm dying r
      | cutThrough-balance s nid dlv wm dying r mem
 -- survivor: kept keeps (rid,src,c); closes unchanged
-... | false | kept , closes , rids | ih with s ≡ᵇ src
+... | false | kept , closes , rids | ih with s ≡ᵇ regSource src
 ...   | true  = cong suc ih
 ...   | false = ih
 -- victim: removed from registry; a close for src is emitted unless delivered∧dying
 cutThrough-balance s nid dlv wm dying ((rid , src , c) ∷ r) mem
-    | true | kept , closes , rids | ih with s ≡ᵇ src in seq
+    | true | kept , closes , rids | ih with s ≡ᵇ regSource src in seq
 -- s ≢ src: this victim is not an s-reg; the (src-tagged) close, emitted or not,
 -- contributes nothing to closeCount s, and countRegs s is unchanged
-...   | false with any (_≡ᵇ rid) dlv ∧ memberSource src dying
+...   | false with any (_≡ᵇ rid) dlv ∧ memberSource (regSource src) dying
 ...     | true              = ih
 ...     | false rewrite seq = ih
--- s ≡ src: src ≡ s, so memberSource src dying ≡ mem ≡ false ⇒ close ALWAYS emitted
+-- s ≡ src: src ≡ s, so memberSource (regSource src) dying ≡ mem ≡ false ⇒ close ALWAYS emitted
 cutThrough-balance s nid dlv wm dying ((rid , src , c) ∷ r) mem
-    | true | kept , closes , rids | ih | true rewrite sym (≡ᵇ→≡ s src seq)
+    | true | kept , closes , rids | ih | true rewrite sym (≡ᵇ→≡ s (regSource src) seq)
   with any (_≡ᵇ rid) dlv
 ...   | false rewrite ≡ᵇ-refl s =
         trans (cong suc ih) (sym (+-suc (countRegs s kept) (closeCount s closes)))
@@ -383,7 +383,7 @@ cutThrough-balance s nid dlv wm dying ((rid , src , c) ∷ r) mem
 -- nothing to any source's init count (take-cut sub-obligation, feeds shadow/env-init).
 cutThrough-no-init : ∀ {n} {Γ : Ctx n} {t}
   (s : Source) (nid : NodeId) (dlv : List RegId) (wm : RegId)
-  (dying : List Source) (reg : List (RegId × Source × Chain Γ t)) →
+  (dying : List Source) (reg : List (RegRow Γ t)) →
   initCount s (proj₁ (proj₂ (cutThrough nid dlv wm dying reg))) ≡ 0
 cutThrough-no-init s nid dlv wm dying [] = refl
 cutThrough-no-init s nid dlv wm dying ((rid , src , c) ∷ r)
@@ -391,7 +391,7 @@ cutThrough-no-init s nid dlv wm dying ((rid , src , c) ∷ r)
      | cutThrough nid dlv wm dying r
      | cutThrough-no-init s nid dlv wm dying r
 ... | false | kept , closes , rids | ih = ih
-... | true  | kept , closes , rids | ih with any (_≡ᵇ rid) dlv ∧ memberSource src dying
+... | true  | kept , closes , rids | ih with any (_≡ᵇ rid) dlv ∧ memberSource (regSource src) dying
 ...   | true  = ih
 ...   | false = ih
 
@@ -412,7 +412,7 @@ cutThrough-no-init s nid dlv wm dying ((rid , src , c) ∷ r)
 
 -- Split the registry by the cut: reg = victims ++ kept, victims =
 -- delivVictims ++ nonDelivVictims, and cutThrough emits a close for exactly
--- the nonDelivVictims (its `delivered ∧ memberSource src dying` guard skips
+-- the nonDelivVictims (its `delivered ∧ memberSource (regSource src) dying` guard skips
 -- the rest).  Then
 --
 --     countIn s live = nonDelivVictims + (kept − dlv(kept))

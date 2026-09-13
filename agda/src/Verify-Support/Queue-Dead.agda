@@ -26,6 +26,7 @@
 module Verify-Support.Queue-Dead where
 
 open import Data.Empty using (⊥)
+open import Data.Bool  using (T)
 open import Data.Nat   using (ℕ; suc; _≤_)
 open import Data.List  using (List; [])
 open import Data.Maybe using (Maybe; just; nothing)
@@ -35,7 +36,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_)
 open import Induction.WellFounded using (Acc)
 
 open import Rx.Prim   using (Tick; Id)
-open import Rx.Exp    using (Ctx; Closed)
+open import Rx.Exp    using (Ctx; Closed; inputsBelowᵉ)
 open import Rx.Strat-Order using (Tri; _≺_)
 open import Rx.Evaluator using (Sched; EvalSt; NodeId; NodeState; Stream; Path;
   Frame; lookupNode; mergeAll-st; subscribeE; pushBurst)
@@ -88,15 +89,17 @@ QDead k sched st sched′ st′ =
 
 postulate
   subscribeE-qd : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} {τ : Tri}
-    (k : NodeId) (g : Acc _≺_ τ) (b : Closed Γ u) (κ : Path Γ u t)
+    {lo : ℕ}
+    (k : NodeId) (g : Acc _≺_ τ) (b : Closed Γ u) (ok : T (inputsBelowᵉ lo b))
+    (κ : Path Γ lo u t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     QDead k sched st
-      (proj₁ (proj₂ (subscribeE g b κ id now sched st)))
-      (proj₂ (proj₂ (subscribeE g b κ id now sched st)))
+      (proj₁ (proj₂ (subscribeE g b {ok} κ id now sched st)))
+      (proj₂ (proj₂ (subscribeE g b {ok} κ id now sched st)))
 
   pushBurst-qd : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {τ : Tri}
     (k : NodeId) (g : Acc _≺_ τ) (id : Id) (now : Tick)
-    (f : Frame Γ s u) (κ : Path Γ u t)
+    {lo : ℕ} (f : Frame Γ s u) (κ : Path Γ lo u t)
     (ems : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) →
     QDead k sched st
       (proj₁ (proj₂ (pushBurst g id now f κ ems sched st)))

@@ -48,7 +48,7 @@ open import Relation.Nullary using (yes; no)
 
 open import Rx.Prim      using (Source; InstEmit; InstEvent; init; value; close; handoff; complete)
 open import Rx.Exp       using (Ctx; Closed; Ty; _≟ᵗ_)
-open import Rx.Evaluator using (EvalSt; Arrival; RegId; Chain; Path; root; share-sink; _↠_; Frame; from-inner; thru-outer;
+open import Rx.Evaluator using (EvalSt; Arrival; RegId; RegRow; regSource; AtFloor; Path; root; share-sink; _↠_; Frame; from-inner; thru-outer;
   NodeId; NodeState; scan-st; take-st; mergeAll-st; switch-st; exhaust-st; LiveSource;
   arrTy; arrSource; dryEvent; hasDry; dropSource)
 open import Rx.Protocol  using (ProtocolSt; Owed; stepProtocol; runProtocol; paidUp; checkFinal; Accepted; accepted)
@@ -101,10 +101,10 @@ hasDry-++ (em ∷ xs) ys h
 -- registrations of s, counted off the registry (the writer's ledger
 -- the automaton's live multiset must shadow)
 countRegs : ∀ {n} {Γ : Ctx n} {t}
-          → Source → List (RegId × Source × Chain Γ t) → ℕ
+          → Source → List (RegRow Γ t) → ℕ
 countRegs s [] = zero
 countRegs s ((_ , x , _) ∷ r) =
-  if s ≡ᵇ x then suc (countRegs s r) else countRegs s r
+  if s ≡ᵇ regSource x then suc (countRegs s r) else countRegs s r
 
 -- the pending-event ledger: how many init/close for source s sit in an
 -- accumulated evs (frames add registrations + init, cuts remove + close;
@@ -185,13 +185,13 @@ UniqueOwed []            = true
 UniqueOwed ((x , _) ∷ o) = notKeyOwed x o ∧ UniqueOwed o
 
 -- a path that never reaches the root delivers no values there
-sinksToShare : ∀ {n} {Γ : Ctx n} {u t} → Path Γ u t → Bool
-sinksToShare root           = false
-sinksToShare (share-sink i) = true
-sinksToShare (f ↠ p)        = sinksToShare p
+sinksToShare : ∀ {n} {Γ : Ctx n} {lo u t} → Path Γ lo u t → Bool
+sinksToShare root             = false
+sinksToShare (share-sink i _) = true
+sinksToShare (f ↠ p)          = sinksToShare p
 
 allShareSunk : ∀ {n} {Γ : Ctx n} {t}
-             → List (RegId × Source × Chain Γ t) → Bool
+             → List (RegRow Γ t) → Bool
 allShareSunk []                      = true
 allShareSunk ((_ , _ , (u , p)) ∷ r) = sinksToShare p ∧ allShareSunk r
 
@@ -238,18 +238,18 @@ innerInstsF : ∀ {n} {Γ : Ctx n} {s u} → NodeId → Frame Γ s u → List No
 innerInstsF nid (from-inner _ k j) = if k ≡ᵇ nid then j ∷ [] else []
 innerInstsF nid _                  = []
 
-innerInstsP : ∀ {n} {Γ : Ctx n} {s t} → NodeId → Path Γ s t → List NodeId
-innerInstsP nid root           = []
-innerInstsP nid (share-sink _) = []
-innerInstsP nid (f ↠ p)        = innerInstsF nid f ++ innerInstsP nid p
+innerInstsP : ∀ {n} {Γ : Ctx n} {lo s t} → NodeId → Path Γ lo s t → List NodeId
+innerInstsP nid root             = []
+innerInstsP nid (share-sink _ _) = []
+innerInstsP nid (f ↠ p)          = innerInstsF nid f ++ innerInstsP nid p
 
 innerInstsR : ∀ {n} {Γ : Ctx n} {t}
-            → NodeId → List (RegId × Source × Chain Γ t) → List NodeId
+            → NodeId → List (RegRow Γ t) → List NodeId
 innerInstsR nid []                    = []
 innerInstsR nid ((_ , _ , (_ , p)) ∷ r) = innerInstsP nid p ++ innerInstsR nid r
 
 countLiveInners : ∀ {n} {Γ : Ctx n} {t}
-                → NodeId → List (RegId × Source × Chain Γ t) → ℕ
+                → NodeId → List (RegRow Γ t) → ℕ
 countLiveInners nid reg = nubLen (innerInstsR nid reg)
 
 -- the reachability guard: does some live registration's path still pass
@@ -258,13 +258,13 @@ frameThruOuter : ∀ {n} {Γ : Ctx n} {s u} → NodeId → Frame Γ s u → Bool
 frameThruOuter nid (thru-outer _ k) = k ≡ᵇ nid
 frameThruOuter nid _                = false
 
-pathThruOuter : ∀ {n} {Γ : Ctx n} {s t} → NodeId → Path Γ s t → Bool
-pathThruOuter nid root           = false
-pathThruOuter nid (share-sink _) = false
-pathThruOuter nid (f ↠ p)        = frameThruOuter nid f ∨ pathThruOuter nid p
+pathThruOuter : ∀ {n} {Γ : Ctx n} {lo s t} → NodeId → Path Γ lo s t → Bool
+pathThruOuter nid root             = false
+pathThruOuter nid (share-sink _ _) = false
+pathThruOuter nid (f ↠ p)          = frameThruOuter nid f ∨ pathThruOuter nid p
 
 mergeReachable : ∀ {n} {Γ : Ctx n} {t}
-               → NodeId → List (RegId × Source × Chain Γ t) → Bool
+               → NodeId → List (RegRow Γ t) → Bool
 mergeReachable nid []                    = false
 mergeReachable nid ((_ , _ , (_ , p)) ∷ r) = pathThruOuter nid p ∨ mergeReachable nid r
 
@@ -282,7 +282,7 @@ mergeReachable nid ((_ , _ , (_ , p)) ∷ r) = pathThruOuter nid p ∨ mergeReac
 -- cache-validity story the placeholder was deferring is now literally the
 -- merge story, at every limit, and one clause states it.
 nodeCacheOK : ∀ {n} {Γ : Ctx n} {t}
-            → NodeId → NodeState Γ → List (RegId × Source × Chain Γ t) → Bool
+            → NodeId → NodeState Γ → List (RegRow Γ t) → Bool
 nodeCacheOK nid (mergeAll-st _ k _ _) reg = not (mergeReachable nid reg)
                                            ∨ (k ≡ᵇ countLiveInners nid reg)
 nodeCacheOK nid (scan-st _)       reg = true
@@ -291,7 +291,7 @@ nodeCacheOK nid (switch-st _ _)   reg = true
 nodeCacheOK nid (exhaust-st _ _)  reg = true
 
 cachesValid : ∀ {n} {Γ : Ctx n} {t}
-            → List (NodeId × NodeState Γ) → List (RegId × Source × Chain Γ t) → Bool
+            → List (NodeId × NodeState Γ) → List (RegRow Γ t) → Bool
 cachesValid []               reg = true
 cachesValid ((nid , s) ∷ ns) reg = nodeCacheOK nid s reg ∧ cachesValid ns reg
 
@@ -315,9 +315,9 @@ cachesValid ((nid , s) ∷ ns) reg = nodeCacheOK nid s reg ∧ cachesValid ns re
 -- inner insts of nid from the NOT-cancelled chains ps (W2: cancelled
 -- chains skipped, countRemaining-style — cutThrough dropped their regs)
 collectAdjInsts : ∀ {n} {Γ : Ctx n} {s t}
-                → NodeId → List RegId → List (RegId × Path Γ s t) → List NodeId
-collectAdjInsts nid cx []              = []
-collectAdjInsts nid cx ((rid , p) ∷ r) =
+                → NodeId → List RegId → List (RegId × AtFloor Γ s t) → List NodeId
+collectAdjInsts nid cx []                  = []
+collectAdjInsts nid cx ((rid , _ , p) ∷ r) =
   if any (_≡ᵇ rid) cx
   then collectAdjInsts nid cx r
   else innerInstsP nid p ++ collectAdjInsts nid cx r
@@ -330,7 +330,7 @@ keepAbsent surv (i ∷ is) = if elemℕ i surv then keepAbsent surv is else i �
 
 mergeAdjust : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   → NodeId → (a : Arrival Γ)
-  → List (RegId × Path Γ (arrTy a) t) → EvalSt e → ℕ
+  → List (RegId × AtFloor Γ (arrTy a) t) → EvalSt e → ℕ
 mergeAdjust nid a ps st =
   nubLen (keepAbsent (innerInstsR nid (dropSource (arrSource a) (EvalSt.registry st)))
                      (collectAdjInsts nid (EvalSt.cancelled st) ps))
@@ -340,7 +340,7 @@ mergeAdjust nid a ps st =
 -- inner, so k is unchanged and the plain form rides).  Adjustment written
 -- FIRST in the sum so ps≡[] reduces `0 + …` definitionally.
 nodeCacheMid : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  → NodeId → (a : Arrival Γ) → List (RegId × Path Γ (arrTy a) t)
+  → NodeId → (a : Arrival Γ) → List (RegId × AtFloor Γ (arrTy a) t)
   → NodeState Γ → EvalSt e → Bool
 nodeCacheMid nid a ps (mergeAll-st _ k _ _) st =
   not (mergeReachable nid
@@ -356,7 +356,7 @@ nodeCacheMid nid a ps (switch-st _ _)   st = true
 nodeCacheMid nid a ps (exhaust-st _ _)  st = true
 
 cachesValidMid : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  → (a : Arrival Γ) → List (RegId × Path Γ (arrTy a) t)
+  → (a : Arrival Γ) → List (RegId × AtFloor Γ (arrTy a) t)
   → List (NodeId × NodeState Γ) → EvalSt e → Bool
 cachesValidMid a ps []               st = true
 cachesValidMid a ps ((nid , s) ∷ ns) st = nodeCacheMid nid a ps s st ∧ cachesValidMid a ps ns st
@@ -364,15 +364,15 @@ cachesValidMid a ps ((nid , s) ∷ ns) st = nodeCacheMid nid a ps s st ∧ cache
 -- SKIP: a cancelled head contributes nothing to the adjustment (collectAdjInsts
 -- skips it), so the Mid shadow is stable when mid-skip drops it from ps.
 collectAdjInsts-skip : ∀ {n} {Γ : Ctx n} {s t}
-  (nid : NodeId) (cx : List RegId) (rid : RegId) (p : Path Γ s t)
-  (ps : List (RegId × Path Γ s t)) →
+  (nid : NodeId) (cx : List RegId) (rid : RegId) (p : AtFloor Γ s t)
+  (ps : List (RegId × AtFloor Γ s t)) →
   any (_≡ᵇ rid) cx ≡ true →
   collectAdjInsts nid cx ((rid , p) ∷ ps) ≡ collectAdjInsts nid cx ps
 collectAdjInsts-skip nid cx rid p ps h rewrite h = refl
 
 mergeAdjust-skip : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (nid : NodeId) (a : Arrival Γ) (rid : RegId) (p : Path Γ (arrTy a) t)
-  (ps : List (RegId × Path Γ (arrTy a) t)) (st : EvalSt e) →
+  (nid : NodeId) (a : Arrival Γ) (rid : RegId) (p : AtFloor Γ (arrTy a) t)
+  (ps : List (RegId × AtFloor Γ (arrTy a) t)) (st : EvalSt e) →
   any (_≡ᵇ rid) (EvalSt.cancelled st) ≡ true →
   mergeAdjust nid a ((rid , p) ∷ ps) st ≡ mergeAdjust nid a ps st
 mergeAdjust-skip nid a rid p ps st h =
@@ -380,8 +380,8 @@ mergeAdjust-skip nid a rid p ps st h =
        (collectAdjInsts-skip nid (EvalSt.cancelled st) rid p ps h)
 
 cachesValidMid-skip : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (a : Arrival Γ) (rid : RegId) (p : Path Γ (arrTy a) t)
-  (ps : List (RegId × Path Γ (arrTy a) t))
+  (a : Arrival Γ) (rid : RegId) (p : AtFloor Γ (arrTy a) t)
+  (ps : List (RegId × AtFloor Γ (arrTy a) t))
   (nodes : List (NodeId × NodeState Γ)) (st : EvalSt e) →
   any (_≡ᵇ rid) (EvalSt.cancelled st) ≡ true →
   cachesValidMid a ((rid , p) ∷ ps) nodes st ≡ cachesValidMid a ps nodes st
@@ -446,10 +446,10 @@ liveTypeOK? s u (l ∷ ls) =
   (if LiveSource.source l ≡ᵇ s then sameTy u (LiveSource.elemTy l) else true)
     ∧ liveTypeOK? s u ls
 
-regTyped? : ∀ {n} {Γ : Ctx n} {t} → List (RegId × Source × Chain Γ t)
+regTyped? : ∀ {n} {Γ : Ctx n} {t} → List (RegRow Γ t)
           → List (LiveSource Γ) → Bool
 regTyped? []                      live = true
-regTyped? ((_ , s , (u , _)) ∷ r) live = liveTypeOK? s u live ∧ regTyped? r live
+regTyped? ((_ , s , (u , _)) ∷ r) live = liveTypeOK? (regSource s) u live ∧ regTyped? r live
 
 -- the node table's reduction facts moved DOWN to .Node-Table when the hop
 -- ledger's scan push face needed the identical pair from below this tree;

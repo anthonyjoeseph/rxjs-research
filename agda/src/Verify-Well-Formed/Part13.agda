@@ -39,6 +39,7 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; root; memberSource; Node
   switch-st; exhaust-st; sched-init; st-init; sched-next; schedGo; arrSource;
   chainsOf; cascadeLatch; cascadeGo; subscribeE; cascade; drain; evaluate; sameSource; hasDry;
   dropSource; rootWitness)
+open import Rx.Inputs-Below using (below-ctx)
 open import Rx.Slots using (Slots)
 open import Rx.Protocol  using (ProtocolSt; countIn; protocol-init; runProtocol; paidUp; checkFinal; Accepted; WellFormed)
 
@@ -278,7 +279,7 @@ drain-wf (suc k) nextId sched st S inv paid hd with sched-next sched in eq
 evaluate-well-formed :
   ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slots Γ) →
   WellFormed (evaluate fuel e ins)
-evaluate-well-formed fuel e ins =
+evaluate-well-formed {n = n} fuel e ins =
   let (nodry₀ , nodry₁)          = hasDry-++ burst rest (rank-sufficient fuel e ins)
       (S₀ , run₀ , inv₀ , paid₀) = subscribe-wf e ins nodry₀
       (S₁ , run₁ , paid₁)        = drain-wf fuel 1 sched₀ st₀ S₀ inv₀ paid₀ nodry₁
@@ -286,7 +287,8 @@ evaluate-well-formed fuel e ins =
        (sym (run-++-just protocol-init burst rest run₀ run₁))
        (acceptPaid S₁ paid₁)
   where
-  r      = subscribeE (rootWitness e ins) e root 0 0 (sched-init e ins) (st-init e)
+  r      = subscribeE {lo = n} (rootWitness e ins) e {below-ctx e} root 0 0
+             (sched-init e ins) (st-init e)
   burst  = proj₁ r
   sched₀ = proj₁ (proj₂ r)
   st₀    = proj₂ (proj₂ r)

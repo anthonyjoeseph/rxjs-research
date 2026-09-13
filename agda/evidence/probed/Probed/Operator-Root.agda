@@ -54,7 +54,7 @@
 -- `subscribeInner`, really does peel the rank, and really does come
 -- back without a dry close.
 --
--- TARGET: dry-operator @27b615
+-- TARGET: dry-operator @95578e
 module Probed.Operator-Root where
 
 open import Data.List using (List; []; _∷_)
@@ -74,6 +74,7 @@ open import Rx.Hop-Depth using (Rd₃; depthᵉ)
 open import Rx.Slot-Read using (slotRd)
 open import Rx.Evaluator using (Stream; subscribeE; rootWitness; root;
   sched-init; st-init)
+open import Rx.Inputs-Below using (below-ctx)
 open import Verify-Rank-Sufficient.Dry using (dry-operator)
 open import Verify-Rank-Sufficient.Entry using (rootTri-reads)
 open import Probed.Apparatus using (Confirms)
@@ -105,9 +106,9 @@ ins₀ : Slots Γ₀
 ins₀ = λ ()
 
 burstOf : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) → Stream Γ t
-burstOf e ins =
-  proj₁ (subscribeE (rootWitness e ins) e root 0 0 (sched-init e ins)
-           (st-init e))
+burstOf {n = n} e ins =
+  proj₁ (subscribeE {lo = n} (rootWitness e ins) e {below-ctx e} root 0 0
+           (sched-init e ins) (st-init e))
 
 ----------------------------------------------------------------------
 -- THE TWO FOLDS.  `spread` re-wraps its accumulator three times, so its
@@ -199,7 +200,8 @@ _ = refl
 flat1 : Closed Γ₀ natᵗ
 flat1 = mergeAllᵉ nothing e1
 
-opRoot : Confirms (dry-operator (rootWitness flat1 ins₀) flat1 root 0 0
+opRoot : Confirms (dry-operator {lo = 0} (rootWitness flat1 ins₀) flat1
+  (below-ctx flat1) root 0 0
   (sched-init flat1 ins₀) (st-init flat1) refl
   (rootTri-reads flat1 ins₀))
 opRoot = refl
