@@ -108,13 +108,20 @@ open import Probed.Arrival-Spend
   using (deepFork; packed₁-is; packed₃-is; packed₄-is; packed₅-is;
          packed₆-is; packed₇-is; packed₈-is; flat-reads)
 
--- the packed rows are claimed beside the two fits because each is a way
--- a fit could have been green having asked for nothing — no arrival, an
+-- the packed rows are claimed beside the fits because each is a way a
+-- fit could have been green having asked for nothing — no arrival, an
 -- arrival reaching no chain, or a chain the premise compares at nought
--- against a reading of nought — and the flattened row is claimed for
--- the opposite reason: it holds by equality, so it is the finding
+-- against a reading of nought — and the ladder's rows are claimed for
+-- the opposite reason: they hold by equality at three rungs, so the
+-- constant margin is the finding rather than a control.  The two forked
+-- rows are claimed as a PAIR, since what either says alone is a figure
+-- and what they say together is that the fan-out never reaches the
+-- door: a repair letting a second chain through would move both
 open import Probed.Door-Fits
-  using (bareRow; doorBare; flatRow; doorFlat)
+  using (bareRow; doorBare; flatRow; doorFlat;
+         flat₂Row; flat₃Row; doorFlat₂; doorFlat₃;
+         gatedRow; doorGated;
+         forkedRow; forkedRawRow; doorForked; doorForkedRaw)
 
 -- the agreement rows are claimed beside the fork because a separation
 -- between two rules that differ everywhere says nothing about the shape
