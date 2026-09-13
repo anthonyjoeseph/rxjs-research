@@ -271,16 +271,16 @@ now at the door and at the templates the door's chains are built from.
   ENTERED at, and the fan-out's own writes are measured to move it.
 
 - **`from-inner-dry` / `thru-outer-frame-dry`**
-  (Verify-Rank-Sufficient.Path-Fits) — FALSITY, `NO EVIDENCE`: dry-freedom of
-  the only two frames that re-enter the evaluator, each over every payload its
+  (Verify-Rank-Sufficient.Path-Fits) — FALSITY, `PROBED×2`: dry-freedom of the
+  only two frames that re-enter the evaluator, each over every payload its
   incoming bound admits. The other three are discharged outright, which is what
   says these two are where the risk actually is.
 
 - **`from-inner-carried`** (Verify-Rank-Sufficient.Path-Fits) — FALSITY,
-  `NO EVIDENCE`: the exit frame threads what it was handed unchanged.
-  `innerReact` returns its payload untouched on every branch but the completion
-  one, where a node's queue is drained and fresh bursts appended — the branch
-  nothing has reached.
+  `PROBED`: the exit frame threads what it was handed unchanged. `innerReact`
+  returns its payload untouched on every branch but the completion one, where a
+  node's queue is drained and fresh bursts appended — the branch nothing has
+  reached.
 
 - **`map-frame-carried`** (Verify-Rank-Sufficient.Push-Carried) — DIFFICULTY,
   `REFUTED×2, PROBED`: the two ends read DIFFERENT expressions, apart by the

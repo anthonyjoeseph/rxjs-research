@@ -129,6 +129,16 @@ dry-under ac id now f κ ψ Rin Rst d vals fin sd st _ _ =
 -- LEAVING an inner, which is the edge the flattener's own entry already
 -- paid for: the values are the inner's and cross unchanged, so both the
 -- bound and the store come back where they were
+--
+-- PROBED: `Probed.Exit-Frame` — both statements instantiated at one
+--   flat program on the `fin = false` arm, where the frame is the
+--   identity.  What that buys is INSTANTIABILITY and not coverage, and
+--   the rows say so themselves: the element type carries no hop depth,
+--   so both conjuncts of the carried row compare nought against nought,
+--   and the dry row holds by `any` on the empty list the identity arm
+--   returns.  NOT covered, and it is where the whole risk sits: the
+--   `fin = true` arm, which is the one that inspects the registrations
+--   and decides whether to drain.
 postulate
   from-inner-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s} {τ}
     (ac : Acc _≺_ τ) (id : Id) (now : Tick) (op : AllOp)
@@ -148,6 +158,17 @@ postulate
 -- only one of the three where dryness is reachable at all.  It is held
 -- under the same headroom its carried entry is: one above the incoming
 -- bound has to fit under the store's
+--
+-- PROBED: `Probed.Exit-Frame` — three outer sources at wrapping rates
+--   one, two and three, taken at the points the carried rows already
+--   stand at, with the dry channel read.  LOAD-BEARING on both halves:
+--   the handed reading is positive, so the outer did emit, and the rank
+--   exceeds the bound by exactly one at every point, so the premise is
+--   decided rather than afforded — a rank equal to the bound is the
+--   refutation this would have reported.  NOT covered: a frame
+--   subscribing an inner whose rank is already spent, which is the only
+--   shape the dry branch is reachable from and is not reachable from a
+--   root at all.
 postulate
   thru-outer-frame-dry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} {τ}
     (ac : Acc _≺_ τ) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)

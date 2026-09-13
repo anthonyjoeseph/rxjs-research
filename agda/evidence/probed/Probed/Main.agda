@@ -159,3 +159,15 @@ open import Probed.Share-Fanout
 open import Probed.Sink-Dry
   using (one3-is; three3-is; quiet3-is;
          sinkOne3; sinkThree3; sinkQuiet3)
+
+-- the three packed figures are claimed beside the dry rows because the
+-- dry flag reading false says nothing on its own — it is false at a
+-- point nothing emitted too — so what makes those rows evidence is the
+-- handed reading being positive and the rank standing strictly above
+-- the bound.  The exit-frame figure is claimed for the opposite
+-- reason: it is nought in every column, which is the row's own
+-- statement that it buys instantiability and not coverage
+open import Probed.Exit-Frame
+  using (packed₁-is; packed₂-is; packed₃-is; fi-packed-is;
+         dryRow₁; dryRow₂; dryRow₃;
+         fromInnerCarried; fromInnerDry)
