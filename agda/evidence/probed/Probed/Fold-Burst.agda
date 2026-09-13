@@ -1,10 +1,10 @@
 -- WHAT A FOLD'S BURST LEAVES BEHIND, INSTANTIATED — the statement that
 -- replaced the frame-local one, at the machine's own seed.
---
+
 -- EVIDENCE, not a claim: `src` cannot import this file and nothing in
 -- the proof may rest on it.  Checked by `make probed`, claimed by
 -- `Probed.Main`.
---
+
 -- WHY THIS ONE IS PROBEABLE despite being stated over a store: every
 -- quantity in it computes.  The seed is NAMED by the statement, so the
 -- store the burst is pushed into is built here exactly as the walk's
@@ -12,7 +12,7 @@
 -- the source under `scan-f … ↠ κ`, push.  Nothing is a record written
 -- by hand, and the two premises are arithmetic comparisons the decision
 -- procedure discharges at each point.
---
+
 -- THE AXES THAT COULD HAVE CROSSED, AND THE TWO THAT COULD NOT.  A
 -- fold's only measure-side quantity is the accumulator it writes: the
 -- step iterated once per delivered value, against a reading whose fold
@@ -25,7 +25,17 @@
 -- fold under a fold; and a seed that reads above the floor.  The margin
 -- is CONSTANT along every family and never closes, which is the shape a
 -- crossing would have shown up in.
---
+
+-- AND THE PAYLOAD IS A PAIR, SO THE DELIVERY HALF IS ITS OWN AXIS — the
+-- one the hop alone had no column for.  Six of the eight rows are
+-- DEGENERATE there and the figures say which: a step that re-wraps ONE
+-- copy of the accumulator leaves its delivery count where the seed put
+-- it, so those rows compare nought or one against six.  The two rows
+-- that are not take a step re-wrapping two copies and three, where the
+-- count compounds once per refold — sixty-four and seven hundred and
+-- twenty-nine out of six refolds — and there the conjunct is load
+-- bearing: a reading flat in the rate reads six at both, and crosses.
+
 -- AND THE CONTINUATION IS INERT, which is a finding rather than a gap:
 -- `stepFrame` at a `scan-f` dispatches on the stored node and names
 -- neither `κ` nor the witness nor the clock, and the only events a fold
@@ -36,13 +46,15 @@
 -- foreign node raises the incoming reading the premise already bounds
 -- by exactly what it raises the outgoing one, and no instantiation of
 -- that axis could have refuted anything.
---
+
 -- THE BOUNDARY.  Every row is a SUBSCRIBE burst; no row reaches an
 -- arrival or a drain step, so nothing here says what the loop preserves
 -- once the fold is live — that is the drain row's subject.  Lengths run
--- to four and layers to three, because a row costs a whole walk.
---
--- TARGET: scan-burst-carried @c66599
+-- to four and layers to three, because a row costs a whole walk.  Nor
+-- does any row compound the delivery count and the hop at once: the two
+-- wide steps are one layer deep, so nothing here says what a step that
+-- both deepens and multiplies costs.
+-- TARGET: scan-burst-carried @b028e7
 module Probed.Fold-Burst where
 
 open import Data.Fin using (zero)
@@ -58,12 +70,12 @@ open import Rx.Prim using (cold; after_,_)
 open import Rx.Exp using (Ctx; Closed; Tm; Fn; natᵗ; obs; _×ᵗ_;
   ofᵉ; emptyᵉ; mapᵉ; scanᵉ; mergeAllᵉ; strmᵗ; nat̂; fstᵗ; varᵗ; input; evalTm)
 open import Rx.Slots using (Slots; scripted)
-open import Rx.Hop-Depth using (depthᵉ)
+open import Rx.Hop-Depth using (depthᵉ; rdᵉ; ε)
 open import Rx.Slot-Read using (slotRd)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; NodeId; root; scan-f;
   scan-st; _↠_; mintNode; installNode; subscribeE; pushBurst; stHop;
   rootWitness; sched-init; st-init)
-open import Verify-Rank-Sufficient.Carried using (burstHop)
+open import Verify-Rank-Sufficient.Carried using (burstRd)
 open import Verify-Rank-Sufficient.Push-Carried using (scan-burst-carried)
 open import Probed.Apparatus using (Confirms; Below)
 
@@ -104,6 +116,21 @@ step3 : Step
 step3 = strmᵗ (mergeAllᵉ nothing (ofᵉ (strmᵗ (mergeAllᵉ nothing
           (ofᵉ (strmᵗ (mergeAllᵉ nothing
             (ofᵉ (fstᵗ (varᵗ (here refl)) ∷ []))) ∷ []))) ∷ [])))
+
+-- a step that DOUBLES the accumulator's deliveries at every refold,
+-- which is the one shape that moves the count half of the payload: the
+-- steps above re-wrap a single copy, so an accumulator seeded at nought
+-- or at one stays there however many times it is refolded.
+stepWide : Step
+stepWide = strmᵗ (mergeAllᵉ nothing
+  (ofᵉ (fstᵗ (varᵗ (here refl)) ∷ fstᵗ (varᵗ (here refl)) ∷ [])))
+
+-- and one that TRIPLES, so the family has two rates and the margin can
+-- be read for whether it closes as the count grows
+stepWide3 : Step
+stepWide3 = strmᵗ (mergeAllᵉ nothing
+  (ofᵉ (fstᵗ (varᵗ (here refl)) ∷ fstᵗ (varᵗ (here refl))
+      ∷ fstᵗ (varᵗ (here refl)) ∷ [])))
 
 ----------------------------------------------------------------------
 -- THE SOURCES, each feeding the refold count a different way.
@@ -180,7 +207,7 @@ out f z b xs =
 
 outHop : (f : Step) (z : Seed) (b : Src) (xs : List ℕ) → ℕ
 outHop f z b xs =
-  burstHop (slotRd (insAt xs)) (obs natᵗ) (proj₁ (out f z b xs))
+  proj₂ (burstRd (slotRd (insAt xs)) (obs natᵗ) (proj₁ (out f z b xs)))
 
 outSt : (f : Step) (z : Seed) (b : Src) (xs : List ℕ) → ℕ
 outSt f z b xs = stHop (slotRd (insAt xs)) (proj₂ (proj₂ (out f z b xs)))
@@ -202,8 +229,8 @@ rate₁ : Confirms (scan-burst-carried
   step1 seed0 src (nidOf step1 seed0 src (7 ∷ [])) root
   (sdOf step1 seed0 src (7 ∷ [])) (stOf step1 seed0 src)
   (slotRd (insAt (7 ∷ []))) (term step1 seed0 src (7 ∷ []))
-  Below Below Below)
-rate₁ = Below , Below
+  Below (Below , Below) Below)
+rate₁ = (Below , Below) , Below
 
 rate₄ : Confirms (scan-burst-carried
   (rootWitness (prog step1 seed0 src) (insAt (7 ∷ 8 ∷ 9 ∷ 10 ∷ []))) 0 0
@@ -211,32 +238,32 @@ rate₄ : Confirms (scan-burst-carried
   (sdOf step1 seed0 src (7 ∷ 8 ∷ 9 ∷ 10 ∷ [])) (stOf step1 seed0 src)
   (slotRd (insAt (7 ∷ 8 ∷ 9 ∷ 10 ∷ [])))
   (term step1 seed0 src (7 ∷ 8 ∷ 9 ∷ 10 ∷ []))
-  Below Below Below)
-rate₄ = Below , Below
+  Below (Below , Below) Below)
+rate₄ = (Below , Below) , Below
 
 layers₃ : Confirms (scan-burst-carried
   (rootWitness (prog step3 seed0 src) (insAt (7 ∷ 8 ∷ []))) 0 0
   step3 seed0 src (nidOf step3 seed0 src (7 ∷ 8 ∷ [])) root
   (sdOf step3 seed0 src (7 ∷ 8 ∷ [])) (stOf step3 seed0 src)
   (slotRd (insAt (7 ∷ 8 ∷ []))) (term step3 seed0 src (7 ∷ 8 ∷ []))
-  Below Below Below)
-layers₃ = Below , Below
+  Below (Below , Below) Below)
+layers₃ = (Below , Below) , Below
 
 product : Confirms (scan-burst-carried
   (rootWitness (prog step2 seed0 srcDeep) (insAt (7 ∷ 8 ∷ []))) 0 0
   step2 seed0 srcDeep (nidOf step2 seed0 srcDeep (7 ∷ 8 ∷ [])) root
   (sdOf step2 seed0 srcDeep (7 ∷ 8 ∷ [])) (stOf step2 seed0 srcDeep)
   (slotRd (insAt (7 ∷ 8 ∷ []))) (term step2 seed0 srcDeep (7 ∷ 8 ∷ []))
-  Below Below Below)
-product = Below , Below
+  Below (Below , Below) Below)
+product = (Below , Below) , Below
 
 queued : Confirms (scan-burst-carried
   (rootWitness (prog step2 seed0 srcLim) (insAt (7 ∷ 8 ∷ []))) 0 0
   step2 seed0 srcLim (nidOf step2 seed0 srcLim (7 ∷ 8 ∷ [])) root
   (sdOf step2 seed0 srcLim (7 ∷ 8 ∷ [])) (stOf step2 seed0 srcLim)
   (slotRd (insAt (7 ∷ 8 ∷ []))) (term step2 seed0 srcLim (7 ∷ 8 ∷ []))
-  Below Below Below)
-queued = Below , Below
+  Below (Below , Below) Below)
+queued = (Below , Below) , Below
 
 nested : Confirms (scan-burst-carried
   (rootWitness (prog step2 seedLive srcScan) (insAt (7 ∷ 8 ∷ []))) 0 0
@@ -244,8 +271,8 @@ nested : Confirms (scan-burst-carried
   (sdOf step2 seedLive srcScan (7 ∷ 8 ∷ [])) (stOf step2 seedLive srcScan)
   (slotRd (insAt (7 ∷ 8 ∷ [])))
   (term step2 seedLive srcScan (7 ∷ 8 ∷ []))
-  Below Below Below)
-nested = Below , Below
+  Below (Below , Below) Below)
+nested = (Below , Below) , Below
 
 ----------------------------------------------------------------------
 -- BOTH SIDES PINNED, so the rows above are green with a margin someone
@@ -273,3 +300,72 @@ twoLayer = packedAt step2 seed0 src (7 ∷ [])
 
 twoLayer-is : twoLayer ≡ 372424251212
 twoLayer-is = refl
+
+----------------------------------------------------------------------
+-- THE DELIVERY AXIS, which the predecessor currency had no column for.
+-- Radix 1000, low digit first: the count the pushed burst carries, and
+-- the count half of the reading it is held under, at each of the six
+-- row points in row order.
+----------------------------------------------------------------------
+
+countAt : (f : Step) (z : Seed) (b : Src) (xs : List ℕ) → ℕ
+countAt f z b xs =
+  proj₁ (burstRd (slotRd (insAt xs)) (obs natᵗ) (proj₁ (out f z b xs)))
+  + 1000 * proj₁ (proj₂ (rdᵉ (slotRd (insAt xs)) ε (prog f z b)))
+
+widened : Confirms (scan-burst-carried
+  (rootWitness (prog stepWide seedLive src) (insAt (7 ∷ []))) 0 0
+  stepWide seedLive src (nidOf stepWide seedLive src (7 ∷ [])) root
+  (sdOf stepWide seedLive src (7 ∷ [])) (stOf stepWide seedLive src)
+  (slotRd (insAt (7 ∷ []))) (term stepWide seedLive src (7 ∷ []))
+  Below (Below , Below) Below)
+widened = (Below , Below) , Below
+
+widened3 : Confirms (scan-burst-carried
+  (rootWitness (prog stepWide3 seedLive src) (insAt (7 ∷ []))) 0 0
+  stepWide3 seedLive src (nidOf stepWide3 seedLive src (7 ∷ [])) root
+  (sdOf stepWide3 seedLive src (7 ∷ [])) (stOf stepWide3 seedLive src)
+  (slotRd (insAt (7 ∷ []))) (term stepWide3 seedLive src (7 ∷ []))
+  Below (Below , Below) Below)
+widened3 = (Below , Below) , Below
+
+-- THE SIX ROWS ABOVE ARE DEGENERATE ON THIS HALF AND THE FIGURE SAYS
+-- SO: every step among them re-wraps a SINGLE copy of the accumulator,
+-- so an accumulator seeded at nought stays at nought however often it
+-- is refolded, and the one seeded live stays at one.  Nought and one
+-- against six is not a row the count conjunct could have failed at.
+sixCounts : ℕ
+sixCounts = countAt step1 seed0 src (7 ∷ [])
+  + 1000000 * (countAt step1 seed0 src (7 ∷ 8 ∷ 9 ∷ 10 ∷ [])
+  + 1000000 * (countAt step3 seed0 src (7 ∷ 8 ∷ [])
+  + 1000000 * (countAt step2 seed0 srcDeep (7 ∷ 8 ∷ [])
+  + 1000000 * (countAt step2 seed0 srcLim (7 ∷ 8 ∷ [])
+  + 1000000 * countAt step2 seedLive srcScan (7 ∷ 8 ∷ [])))))
+
+sixCounts-is : sixCounts ≡ 6001006000006000006000006000006000
+sixCounts-is = refl
+
+-- AND THE TWO WIDE ROWS ARE WHERE IT BITES.  Read as burst then bound.
+-- The doubling step carries sixty-four deliveries out of six refolds
+-- under a reading of twenty-four thousand; the tripling step carries
+-- seven hundred and twenty-nine under three million.  So the count the
+-- burst spends is EXPONENTIAL in the refold count, and a reading that
+-- priced a fold flat in its source's own count -- six at every one of
+-- these points -- crosses at the first of them.  The margin WIDENS from
+-- three-hundredfold to four-thousandfold as the rate rises, which is
+-- the shape that says the two sides are not racing.
+wideCount : ℕ
+wideCount = countAt stepWide seedLive src (7 ∷ [])
+
+wideCount-is : wideCount ≡ 24576064
+wideCount-is = refl
+
+wide3Count : ℕ
+wide3Count =
+  proj₁ (burstRd (slotRd (insAt (7 ∷ []))) (obs natᵗ)
+          (proj₁ (out stepWide3 seedLive src (7 ∷ []))))
+  + 1000000 * proj₁ (proj₂ (rdᵉ (slotRd (insAt (7 ∷ []))) ε
+                             (prog stepWide3 seedLive src)))
+
+wide3Count-is : wide3Count ≡ 3188646000729
+wide3Count-is = refl

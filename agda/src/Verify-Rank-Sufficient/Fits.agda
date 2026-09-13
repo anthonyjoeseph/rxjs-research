@@ -57,13 +57,13 @@ open import Relation.Binary.PropositionalEquality using (_≡_)
 open import Rx.Prim using (Fuel; Tick; Id; close; exhausted)
 open import Rx.Exp using (Ctx; Closed; Val)
 open import Rx.Strat-Order using (_≺_)
-open import Rx.Hop-Depth using (Rd₃; depthᵉ; depthᵛ)
+open import Rx.Hop-Depth using (Rd; Rd₃; depthᵉ; depthᵛ; rdᵛ)
 open import Rx.Slot-Read using (slotRd)
 open import Rx.Evaluator using (Frame; Path; root; share-sink; _↠_; Sched;
   EvalSt; Arrival; arrTy; arrVal; arrTick; arrivalWitness; chainsOf; RegId;
   chainStep; cascadeLatch; foldPath; shareAdmit; shareLatch;
   sched-next; cascade; stepFrame; dispatchShare; dryEvent; hasDry; stHop)
-open import Verify-Rank-Sufficient.Carried using (valsHop)
+open import Verify-Rank-Sufficient.Carried using (valsRd; _⊑_)
 open import Verify-Rank-Sufficient.Push-Carried using (FrameCarries)
 
 ----------------------------------------------------------------------
@@ -77,10 +77,10 @@ open import Verify-Rank-Sufficient.Push-Carried using (FrameCarries)
 
 FrameDryUnder : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {τ} →
   Acc _≺_ τ → Id → Tick → Frame Γ s u → Path Γ u t →
-  (Fin n → Rd₃) → ℕ → ℕ → Set
+  (Fin n → Rd₃) → Rd → ℕ → Set
 FrameDryUnder {Γ = Γ} {e = e} {s = s} ac id now f κ ψ Rin Rst =
   ∀ (vals : List (Val Γ s)) (fin : Bool) (sd : Sched Γ) (st : EvalSt e) →
-    valsHop ψ s vals ≤ Rin → stHop ψ st ≤ Rst →
+    valsRd ψ s vals ⊑ Rin → stHop ψ st ≤ Rst →
     any dryEvent (proj₁ (proj₂ (stepFrame ac id now f κ vals fin sd st)))
       ≡ false
 
@@ -137,11 +137,11 @@ FrameDryUnder {Γ = Γ} {e = e} {s = s} ac id now f κ ψ Rin Rst =
 -- cycle and the arm can only be asserted.  Indexing hands the walk the
 -- one counter it stands at and the sink's body the next one down.
 ShareDryUnder : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {τ} →
-  Acc _≺_ τ → ℕ → Id → Tick → (i : Fin n) → (Fin n → Rd₃) → ℕ → ℕ → Set
+  Acc _≺_ τ → ℕ → Id → Tick → (i : Fin n) → (Fin n → Rd₃) → Rd → ℕ → Set
 ShareDryUnder {Γ = Γ} {e = e} ac gas id now i ψ Rin Rst =
   ∀ (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
     (sd : Sched Γ) (st : EvalSt e) →
-    valsHop ψ (lookup Γ i) vals ≤ Rin → stHop ψ st ≤ Rst →
+    valsRd ψ (lookup Γ i) vals ⊑ Rin → stHop ψ st ≤ Rst →
     hasDry (proj₁ (dispatchShare ac gas id now i vals fin sd st)) ≡ false
 
 ----------------------------------------------------------------------
@@ -165,7 +165,7 @@ ShareDryUnder {Γ = Γ} {e = e} ac gas id now i ψ Rin Rst =
 data PathFits {n} {Γ : Ctx n} {t} {e : Closed Γ t} {τ}
        (ac : Acc _≺_ τ) (gas : ℕ) (id : Id) (now : Tick) (ψ : Fin n → Rd₃)
        (Rst : ℕ)
-       : ∀ {u} → Path Γ u t → ℕ → Set where
+       : ∀ {u} → Path Γ u t → Rd → Set where
 
   at-root : ∀ {R} → PathFits {e = e} ac gas id now ψ Rst root R
 
@@ -234,7 +234,7 @@ arrivalRank {e = e} a sched st =
 ----------------------------------------------------------------------
 
 ShareChainsFit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {τ} →
-  Acc _≺_ τ → ℕ → Id → Tick → (i : Fin n) → (Fin n → Rd₃) → ℕ → ℕ →
+  Acc _≺_ τ → ℕ → Id → Tick → (i : Fin n) → (Fin n → Rd₃) → Rd → ℕ →
   List (Val Γ (lookup Γ i)) → Bool →
   List (RegId × Path Γ (lookup Γ i) t) → Sched Γ → EvalSt e → Set
 ShareChainsFit ac gas id now i ψ Rin Rst vals fin [] sd st = ⊤
@@ -261,7 +261,7 @@ ShareChainsFit {e = e} ac gas id now i ψ Rin Rst vals fin
 ----------------------------------------------------------------------
 
 ShareFits : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {τ} →
-  Acc _≺_ τ → ℕ → Id → Tick → (i : Fin n) → (Fin n → Rd₃) → ℕ → ℕ →
+  Acc _≺_ τ → ℕ → Id → Tick → (i : Fin n) → (Fin n → Rd₃) → Rd → ℕ →
   List (Val Γ (lookup Γ i)) → Bool → Sched Γ → EvalSt e → Set
 ShareFits {e = e} ac gas id now i ψ Rin Rst vals fin sd st =
   ShareChainsFit {e = e} ac gas id now i ψ Rin Rst vals fin
@@ -308,7 +308,7 @@ ChainsFit {n = n} {e = e} a id ((rid , c) ∷ cs) sched st
           ψ   = slotRd (Sched.slots sched)
           out = chainStep id a c sched st′
       in PathFits {e = e} (arrivalWitness a sched st′) n id (arrTick a) ψ
-           (arrivalRank a sched st′) c (depthᵛ ψ (arrTy a) (arrVal a))
+           (arrivalRank a sched st′) c (rdᵛ ψ (arrTy a) (arrVal a))
          × ChainsFit a id cs (proj₁ (proj₂ out)) (proj₂ (proj₂ out))
 
 ArrivalFits : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} →

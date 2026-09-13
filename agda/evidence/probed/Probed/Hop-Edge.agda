@@ -65,7 +65,7 @@
 -- slot rather than through the program, so the queue is reached at one
 -- shape and one limit.
 --
--- TARGET: thru-outer-frame-carried @2de90d
+-- TARGET: thru-outer-frame-carried @260099
 module Probed.Hop-Edge where
 
 open import Data.Bool using (Bool; false)
@@ -85,13 +85,13 @@ open import Rx.Exp using (Ctx; Closed; Tm; Fn; Val; natᵗ; obs; _×ᵗ_;
   varᵗ; input)
 open import Rx.Slots using (Slots; scripted)
 open import Rx.Strat-Order using (_≺_)
-open import Rx.Hop-Depth using (Rd₃; depthᵉ)
+open import Rx.Hop-Depth using (Rd; Rd₃; depthᵉ; rdᵉ; ε)
 open import Rx.Slot-Read using (slotRd)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; NodeId; NodeState;
   AllOp; subscribeE; rootWitness; rootTri; root; _↠_; sched-init; st-init;
   mintNode; installNode; mergeAll-st; switch-st; exhaust-st; thru-outer;
   mergeAllᵒ; switchᵒ; exhaustᵒ; splitBurst; stepFrame; stHop)
-open import Verify-Rank-Sufficient.Carried using (valsHop)
+open import Verify-Rank-Sufficient.Carried using (valsRd)
 open import Verify-Rank-Sufficient.Push-Carried
   using (thru-outer-frame-carried)
 open import Probed.Apparatus using (Confirms; Below)
@@ -146,8 +146,12 @@ module Ap {n} {Γ : Ctx n} (ins : Slots Γ) (op : AllOp)
      × Bool × Sched Γ × EvalSt prog
   sf = stepFrame ac 0 0 (thru-outer op nid) root vals fin sd st
 
-  -- the bound the arriving observables are held to, and the rank the
-  -- machine entered at
+  -- the bound the arriving observables are held to — the source's own
+  -- payload PAIR, which is what the walk enters this frame at — and the
+  -- rank the machine entered at
+  Rin : Rd
+  Rin = proj₂ (rdᵉ ψ ε src)
+
   bound : ℕ
   bound = depthᵉ ψ src
 
@@ -157,11 +161,18 @@ module Ap {n} {Γ : Ctx n} (ins : Slots Γ) (op : AllOp)
   -- radix 1000, low digit first: what the frame was handed, the bound,
   -- what it gave back, what its store reads afterwards, the rank
   packed : ℕ
-  packed = valsHop ψ (obs (obs natᵗ)) vals
+  packed = proj₂ (valsRd ψ (obs (obs natᵗ)) vals)
          + 1000 * bound
-         + 1000000 * valsHop ψ (obs natᵗ) (proj₁ sf)
+         + 1000000 * proj₂ (valsRd ψ (obs natᵗ) (proj₁ sf))
          + 1000000000 * stHop ψ (proj₂ (proj₂ (proj₂ (proj₂ sf))))
          + 1000000000000 * rank
+
+  -- and the DELIVERY side of the same pair, which the hop figure
+  -- projects away: handed, the bound, returned
+  counts : ℕ
+  counts = proj₁ (valsRd ψ (obs (obs natᵗ)) vals)
+         + 1000 * proj₁ Rin
+         + 1000000 * proj₁ (valsRd ψ (obs natᵗ) (proj₁ sf))
 
 ----------------------------------------------------------------------
 -- THE CLOSED CONTEXT, where the reading of an input cannot enter and
@@ -289,6 +300,31 @@ packedS-is = refl
 packedE-is : AE.packed ≡ 4003003003003
 packedE-is = refl
 
+-- AND THE DELIVERY SIDE, which the hop figures project away.  Read low
+-- first: handed, bound, returned.  The hypothesis is SATURATED at every
+-- row — what the frame is handed equals the source's own count exactly,
+-- so a source delivering one more than its reading admits leaves the row
+-- unsolvable — and the conclusion has margin, the flattener handing back
+-- a single delivery under a bound of two wherever the outer carries two.
+counts₁-is : A₁.counts ≡ 1001001
+counts₁-is = refl
+
+counts₂-is : A₂.counts ≡ 1002002
+counts₂-is = refl
+
+counts₃-is : A₃.counts ≡ 1002002
+counts₃-is = refl
+
+countsP-is : AP.counts ≡ 1002002
+countsP-is = refl
+
+countsS-is : AS.counts ≡ 1002002
+countsS-is = refl
+
+countsE-is : AE.counts ≡ 1002002
+countsE-is = refl
+
+
 ----------------------------------------------------------------------
 -- THE TARGET, AT THE POINTS THE RUNS REACHED.  The premise is the entry
 -- invariant's rank conjunct and the two hypotheses are the walk's own
@@ -298,25 +334,31 @@ packedE-is = refl
 ----------------------------------------------------------------------
 
 hopRow₁ : Confirms (thru-outer-frame-carried A₁.ac 0 0 mergeAllᵒ A₁.nid root
-  A₁.ψ A₁.bound A₁.rank Below A₁.vals A₁.fin A₁.sd A₁.st Below Below)
-hopRow₁ = Below , Below
+  A₁.ψ A₁.Rin A₁.rank Below A₁.vals A₁.fin A₁.sd A₁.st
+  (Below , Below) Below)
+hopRow₁ = (Below , Below) , Below
 
 hopRow₂ : Confirms (thru-outer-frame-carried A₂.ac 0 0 mergeAllᵒ A₂.nid root
-  A₂.ψ A₂.bound A₂.rank Below A₂.vals A₂.fin A₂.sd A₂.st Below Below)
-hopRow₂ = Below , Below
+  A₂.ψ A₂.Rin A₂.rank Below A₂.vals A₂.fin A₂.sd A₂.st
+  (Below , Below) Below)
+hopRow₂ = (Below , Below) , Below
 
 hopRow₃ : Confirms (thru-outer-frame-carried A₃.ac 0 0 mergeAllᵒ A₃.nid root
-  A₃.ψ A₃.bound A₃.rank Below A₃.vals A₃.fin A₃.sd A₃.st Below Below)
-hopRow₃ = Below , Below
+  A₃.ψ A₃.Rin A₃.rank Below A₃.vals A₃.fin A₃.sd A₃.st
+  (Below , Below) Below)
+hopRow₃ = (Below , Below) , Below
 
 hopRowP : Confirms (thru-outer-frame-carried AP.ac 0 0 mergeAllᵒ AP.nid root
-  AP.ψ AP.bound AP.rank Below AP.vals AP.fin AP.sd AP.st Below Below)
-hopRowP = Below , Below
+  AP.ψ AP.Rin AP.rank Below AP.vals AP.fin AP.sd AP.st
+  (Below , Below) Below)
+hopRowP = (Below , Below) , Below
 
 hopRowS : Confirms (thru-outer-frame-carried AS.ac 0 0 switchᵒ AS.nid root
-  AS.ψ AS.bound AS.rank Below AS.vals AS.fin AS.sd AS.st Below Below)
-hopRowS = Below , Below
+  AS.ψ AS.Rin AS.rank Below AS.vals AS.fin AS.sd AS.st
+  (Below , Below) Below)
+hopRowS = (Below , Below) , Below
 
 hopRowE : Confirms (thru-outer-frame-carried AE.ac 0 0 exhaustᵒ AE.nid root
-  AE.ψ AE.bound AE.rank Below AE.vals AE.fin AE.sd AE.st Below Below)
-hopRowE = Below , Below
+  AE.ψ AE.Rin AE.rank Below AE.vals AE.fin AE.sd AE.st
+  (Below , Below) Below)
+hopRowE = (Below , Below) , Below

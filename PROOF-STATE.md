@@ -224,34 +224,34 @@ now at the door and at the templates the door's chains are built from.
 
 ### Big picture tier roadmap
 
-- **THE PAYLOAD CURRENCY CANNOT SEPARATE ITS OWN WITNESSES, AND EVERY FRAME
-  STATEMENT IS DENOMINATED IN IT.** `FrameCarries` admits a payload through
-  `valsHop`, which projects the HOP half of a value's reading and drops the
-  DELIVERY COUNT — while what a frame hands back depends on both, since a
-  template may FOLD over its argument and deepen once per delivery. So no ℕ
-  computed from the frame and the incoming hop bounds a map frame at all, and
-  the shelf's own leaf is refuted beside the two heads that lean on it. The
-  reading machinery already carries the count, so the repair is to state the
-  payload bound in the full reading rather than in its hop — and it cascades
-  through every arm and every statement pinned against one.
+- **THE TIER'S HOP DEBT IS TWO PREMISES OVER TWO REGISTRIES, AND THE MACHINE NOW
+  SAYS WHICH OF THE TWO IS WRONG.** `entry-drain-hop` walks what an arrival's
+  source registered against the program's own reading; `share-chain-hop` walks
+  what a share admits against a join with that chain's own state. The sink's
+  form is refuted at the smallest share that folds: its only hypothesis bounds
+  what ENTERS the dispatch, while the walk is read ALONG the chain, so a chain
+  admitted at the FLOOR asks for a rank of two against a bound of one. The door
+  supplies five there, so the premise is what is too weak. Carry the registry's
+  reading inward and state both over one registration list.
 
-- **AND THE WALK'S TWO HEADS BECOME STEPS ONCE THE SHELF CAN SPEAK.** They exist
-  only because the shelf had no frame-local figure to hand a map or a fold: what
-  either produces was read off a source EXPRESSION, which a chain step does not
-  carry, so the walk minted whole path fits off a hop count instead and both are
-  refuted at its own instantiation. A shelf arm stated in the payload's full
-  reading has a residue the chain step does carry, so the heads retire into
-  ordinary steps rather than being restated.
+- **AND THE FOLD'S FRAME IS MISSING AN AXIS THE SHELF ALREADY STATES ELSEWHERE.**
+  `scan-frame-carried` prices a scan's residue at ONE application of its
+  template, where the machine iterates the template once per delivery from the
+  accumulator the seed installed — so it is exactly right on a burst of one and
+  falls a layer short per delivery after that. The quantity it lacks is neither
+  half of the payload pair but the LENGTH of the list the frame is handed, which
+  the predicate quantifies over unboundedly. `scan-burst-carried` is the same
+  fold stated AT THE BURST, where that length is in scope; either route the
+  shelf's scan arm through it or give the frame leaf the third axis outright.
 
-- **AND THE TIER'S HOP DEBT IS NOW TWO PREMISES OVER TWO REGISTRIES, WHICH MAY
-  BE ONE.** `entry-drain-hop` walks what an arrival's source registered and
-  `share-chain-hop` walks what a share admits, and both say the same thing: a
-  registered chain carries no more flatteners than the bound it is entered
-  under affords. The bounds differ — the door's is the program's own reading,
-  the sink's a join with the chain's own state — and nothing yet says the two
-  lists hold different chains. State it once over a registration list, in
-  whatever currency the first leg lands, or find the point where the two bounds
-  cannot be reconciled and say which of them is the wrong one.
+- **AND THE THREE RE-ENTRANT LEAVES ARE THE FALSITY NOTHING HAS NARROWED.**
+  `from-inner-dry`, `thru-outer-frame-dry` and `from-inner-carried` are the only
+  arms that re-enter the evaluator, and all three are instantiated only where
+  `innerReact` returns its payload untouched. The branch none of them reaches is
+  the same one in each case — a completing node whose queue is drained and whose
+  fresh bursts are appended — so one harness that reaches a completion under a
+  live flattener decides all three at once, and it is the one region where these
+  statements could still be false rather than merely hard.
 
 ### The ledger
 
@@ -259,11 +259,6 @@ now at the door and at the templates the door's chains are built from.
   door's whole premise, in a currency that mentions no run — a chain's
   flattener count against the program's own reading. Tight at three ladder
   rungs and at a gate; an arrival there reaches exactly ONE chain.
-
-- **`share-chain-hop`** (Verify-Rank-Sufficient.Path-Fits) — FALSITY, `PROBED`:
-  the door's own claim at the share's registry — one flattener count per
-  admitted chain, each against a join with that chain's own state. What the
-  sink arm reduces to now the dispatch's fold is a body.
 
 - **`from-inner-dry` / `thru-outer-frame-dry`**
   (Verify-Rank-Sufficient.Path-Fits) — FALSITY, `PROBED×2`: dry-freedom of the
@@ -277,17 +272,21 @@ now at the door and at the templates the door's chains are built from.
   node's queue is drained and fresh bursts appended — the branch nothing has
   reached.
 
-- **`map-head-carried` / `scan-head-carried`**
-  (Verify-Rank-Sufficient.Path-Fits) — SHAPE, `REFUTED×4`: the two frames whose
-  residue is read off the SOURCE EXPRESSION, pinned instead at the headroom the
-  tail leaves — which is nought on a chain carrying no flattener, where the
-  walk's own hypothesis holds.
+- **`share-chain-hop`** (Verify-Rank-Sufficient.Path-Fits) — SHAPE,
+  `REFUTED, RECOVERY`: the sink's claim at the share's registry, whose one
+  hypothesis bounds what ENTERS the dispatch while the walk is read along the
+  chain. A fold re-wraps its accumulator, so the restatement must carry the
+  door's reading in.
 
-- **`map-frame-carried`** (Verify-Rank-Sufficient.Push-Carried) — SHAPE,
-  `REFUTED×3, PROBED`: the two ends read DIFFERENT expressions, and in
-  different CURRENCIES — the bound sees the source's delivery count, the
-  hypothesis admits any payload whose hop fits, and a folding template lives in
-  the gap.
+- **`scan-frame-carried`** (Verify-Rank-Sufficient.Push-Carried) — SHAPE,
+  `REFUTED`: the fold's residue priced at ONE application of its template, where
+  the machine iterates it once per delivery. The missing quantity is neither
+  half of the payload but the LENGTH of the burst.
+
+- **`map-frame-carried`** (Verify-Rank-Sufficient.Push-Carried) — DIFFICULTY,
+  `REFUTED×2, DEAD ROUTE, PROBED`: both ends now read the payload PAIR, and the
+  delivery axis that killed the predecessor currency is tight at three rates —
+  one, three, five in against one, nine, twenty-five out.
 
 - **`take-frame-carried`** (Verify-Rank-Sufficient.Push-Carried) — DIFFICULTY,
   `PROBED`: a prefix of what it was handed, under a node reading zero. Six

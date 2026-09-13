@@ -14,7 +14,9 @@
 -- The points are chosen so neither side is zero: a literal list of
 -- OBSERVABLES and a fold seeded with one, since a data payload reads
 -- zero on the left by construction and a row taken there could not
--- have failed.
+-- have failed.  The source arm now compares a PAIR, and its literals
+-- deliver two and three times, so the count half is a comparison rather
+-- than one against one.
 --
 -- AND THE WALK ROWS BELOW ARE ABOUT SOMETHING ELSE, deliberately: they
 -- instantiate the CONCLUSION the two leaves serve, which is a real body
@@ -32,30 +34,30 @@
 -- loop preserves.  Lengths run to four literals and layers to two,
 -- because a row costs a whole walk.
 --
--- TARGET: ofᵉ-carried @cf8da2
+-- TARGET: ofᵉ-carried @975fea
 -- TARGET: scan-seed-carried @44379b
 module Probed.Carried-Leaf where
 
 open import Data.Bool using (Bool; true; _∧_)
 open import Data.Fin using (Fin; zero)
-open import Data.List using (List; []; _∷_)
+open import Data.List using (List; []; _∷_; map)
 open import Data.List.Relation.Unary.Any using (here)
 open import Data.Maybe using (nothing)
 open import Data.Nat using (ℕ; _≤ᵇ_; _+_; _*_)
-open import Data.Product using (_,_; proj₁)
+open import Data.Product using (_,_; proj₁; proj₂)
 open import Data.Vec using () renaming ([] to []ⱽ; _∷_ to _∷ⱽ_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (cold; after_,_)
 open import Rx.Exp using (Ctx; Closed; Tm; Fn; natᵗ; obs; _×ᵗ_;
   ofᵉ; emptyᵉ; mapᵉ; scanᵉ; mergeAllᵉ; μᵉ; varᵉ; deferᵉ;
-  strmᵗ; nat̂; fstᵗ; varᵗ; input)
+  strmᵗ; nat̂; fstᵗ; varᵗ; input; evalTm)
 open import Rx.Slots using (Slots; scripted)
-open import Rx.Hop-Depth using (Rd₃; depthᵉ)
+open import Rx.Hop-Depth using (Rd₃; depthᵉ; rdᵗˢ; ε)
 open import Rx.Slot-Read using (slotRd)
 open import Rx.Evaluator using (subscribeE; rootWitness; root; sched-init;
   st-init)
-open import Verify-Rank-Sufficient.Carried using (burstHop)
+open import Verify-Rank-Sufficient.Carried using (burstRd; valsRd)
 open import Verify-Rank-Sufficient.Leaf-Carried using (ofᵉ-carried;
   scan-seed-carried)
 open import Probed.Apparatus using (Confirms; Below)
@@ -94,10 +96,26 @@ litsNest = strmᵗ (mergeAllᵉ nothing
          ∷ []
 
 ofFlat : Confirms (ofᵉ-carried ψ₀ litsFlat)
-ofFlat = Below
+ofFlat = Below , Below
 
 ofNest : Confirms (ofᵉ-carried ψ₀ litsNest)
-ofNest = Below
+ofNest = Below , Below
+
+-- BOTH COMPONENTS PINNED, since the statement now compares a PAIR and a
+-- row green on the hop side alone would say nothing about the other.
+-- Radix 1000, low first: delivered count and its bound at the flat
+-- point, then at the nested one.  Both are TIGHT — two against two and
+-- three against three — so a literal list the reading undercharged by a
+-- single delivery would cross here.
+ofPacked : ℕ
+ofPacked = proj₁ (valsRd ψ₀ (obs natᵗ) (map (λ tm → evalTm tm) litsFlat))
+         + 1000 * proj₁ (rdᵗˢ ψ₀ ε litsFlat)
+         + 1000000 * proj₁ (valsRd ψ₀ (obs natᵗ)
+             (map (λ tm → evalTm tm) litsNest))
+         + 1000000000 * proj₁ (rdᵗˢ ψ₀ ε litsNest)
+
+ofPacked-is : ofPacked ≡ 3003002002
+ofPacked-is = refl
 
 ----------------------------------------------------------------------
 -- THE SEED ARM, which is the one the store half rides on.  A seed that
@@ -161,9 +179,9 @@ casc2L = scanᵉ step2 (strmᵗ emptyᵉ)
 
 carriedAt : Closed Γ₁ (obs natᵗ) → List ℕ → ℕ
 carriedAt o xs =
-  burstHop (slotRd (insAt xs)) (obs natᵗ)
+  proj₂ (burstRd (slotRd (insAt xs)) (obs natᵗ)
     (proj₁ (subscribeE (rootWitness o (insAt xs)) o root 0 0
-             (sched-init o (insAt xs)) (st-init o)))
+             (sched-init o (insAt xs)) (st-init o))))
 
 termAt : Closed Γ₁ (obs natᵗ) → List ℕ → ℕ
 termAt o xs = depthᵉ (slotRd (insAt xs)) o
@@ -221,9 +239,9 @@ foldR = scanᵉ stepG (strmᵗ emptyᵉ) recur
 
 carried₀ : Closed Γ₀ (obs natᵗ) → ℕ
 carried₀ o =
-  burstHop ψ₀ (obs natᵗ)
+  proj₂ (burstRd ψ₀ (obs natᵗ)
     (proj₁ (subscribeE (rootWitness o ins₀) o root 0 0
-             (sched-init o ins₀) (st-init o)))
+             (sched-init o ins₀) (st-init o))))
 
 recurRow : (carried₀ foldR ≤ᵇ depthᵉ ψ₀ foldR) ≡ true
 recurRow = refl

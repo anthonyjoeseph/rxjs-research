@@ -42,6 +42,8 @@
 -- has a count that exactly exhausts the burst and one a count that
 -- outruns it.  The fold's rate is varied across two sources as well, so
 -- no row is green because the values it compared had stopped moving.
+-- And a third source varies the accumulator's DELIVERY count instead of
+-- its depth, which is the half of the pair the other rows leave at one.
 
 -- AND THE SECOND FAMILY IS THE FRAME AT A DRAIN STEP, which is what
 -- the first is built on top of a subscribe and therefore cannot be.
@@ -67,7 +69,7 @@
 -- whose own source is a second arrival's.  Source lengths run to three
 -- literals, because a row costs a whole walk.
 --
--- TARGET: take-frame-carried @d01324
+-- TARGET: take-frame-carried @9bee53
 module Probed.Take-Frame where
 
 open import Data.Bool using (Bool; false; if_then_else_)
@@ -88,14 +90,14 @@ open import Rx.Exp using (Ctx; Closed; Tm; Fn; Val; natᵗ; obs; _×ᵗ_; _≟�
   ofᵉ; takeᵉ; scanᵉ; mapᵉ; mergeAllᵉ; input; strmᵗ; nat̂; fstᵗ; varᵗ)
 open import Rx.Slots using (Slots; scripted)
 open import Rx.Strat-Order using (_≺_)
-open import Rx.Hop-Depth using (Rd₃)
+open import Rx.Hop-Depth using (Rd; Rd₃)
 open import Rx.Slot-Read using (slotRd)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; NodeId; Arrival;
   subscribeE; rootWitness; rootTri; root; _↠_; sched-init; st-init;
   mintNode; installNode; take-st; take-f; map-f; scan-f; splitBurst;
   stepFrame; stHop; arrTy; arrVal; arrTick; sched-next; cascade;
   arrivalWitness)
-open import Verify-Rank-Sufficient.Carried using (valsHop)
+open import Verify-Rank-Sufficient.Carried using (valsRd)
 open import Verify-Rank-Sufficient.Push-Carried using (take-frame-carried)
 open import Probed.Apparatus using (Confirms; Below)
 
@@ -150,8 +152,8 @@ module Ap {n} {Γ : Ctx n} (ins : Slots Γ) (k : ℕ)
 
   -- the two bounds, each the TIGHTEST the predicate admits: what the
   -- frame was handed, and what the store read on the way in
-  Rv : ℕ
-  Rv = valsHop ψ (obs natᵗ) vals
+  Rv : Rd
+  Rv = valsRd ψ (obs natᵗ) vals
 
   Rst : ℕ
   Rst = stHop ψ st
@@ -163,11 +165,17 @@ module Ap {n} {Γ : Ctx n} (ins : Slots Γ) (k : ℕ)
   -- at the cutting branch that was silently on the passing one is a
   -- row the header lies about
   packed : ℕ
-  packed = Rv
-         + 1000 * valsHop ψ (obs natᵗ) (proj₁ sf)
+  packed = proj₂ (valsRd ψ (obs natᵗ) vals)
+         + 1000 * proj₂ (valsRd ψ (obs natᵗ) (proj₁ sf))
          + 1000000 * Rst
          + 1000000000 * stHop ψ (proj₂ (proj₂ (proj₂ (proj₂ sf))))
          + 1000000000000 * (if proj₁ (proj₂ (proj₂ sf)) then 1 else 0)
+
+  -- and the DELIVERY side of the same pair, which the hop figure
+  -- projects away: handed, then given back
+  counts : ℕ
+  counts = proj₁ Rv
+         + 1000 * proj₁ (valsRd ψ (obs natᵗ) (proj₁ sf))
 
 ----------------------------------------------------------------------
 -- THE CLOSED CONTEXT, where the reading of an input cannot enter and
@@ -202,9 +210,17 @@ folded : Fn Γ₀ [] [] [] (obs natᵗ ×ᵗ natᵗ) (obs natᵗ) →
          List (Tm Γ₀ [] [] [] natᵗ) → Closed Γ₀ (obs natᵗ)
 folded f xs = scanᵉ f liveSeed (ofᵉ xs)
 
-src₂ src₃ : Closed Γ₀ (obs natᵗ)
+-- and one whose accumulator DELIVERS three times per re-wrap, so the
+-- count half of the payload pair reads above one and the rows below
+-- vary the axis the earlier currency projected away
+deepen3 : Fn Γ₀ [] [] [] (obs natᵗ ×ᵗ natᵗ) (obs natᵗ)
+deepen3 = strmᵗ (mergeAllᵉ nothing (ofᵉ (fstᵗ (varᵗ (here refl))
+            ∷ fstᵗ (varᵗ (here refl)) ∷ fstᵗ (varᵗ (here refl)) ∷ [])))
+
+src₂ src₃ src₄ : Closed Γ₀ (obs natᵗ)
 src₂ = folded deepen (nat̂ 0 ∷ nat̂ 1 ∷ [])
 src₃ = folded deepen2 (nat̂ 0 ∷ nat̂ 1 ∷ nat̂ 2 ∷ [])
+src₄ = folded deepen3 (nat̂ 0 ∷ nat̂ 1 ∷ [])
 
 tk : ℕ → Closed Γ₀ (obs natᵗ) → Closed Γ₀ (obs natᵗ)
 tk c b = takeᵉ (nat̂ c) b
@@ -223,6 +239,7 @@ module Cut₁ = Ap ins₀ 1 (tk 1 src₂) src₂
 module Edge₂ = Ap ins₀ 2 (tk 2 src₂) src₂
 module Pass = Ap ins₀ 5 (tk 5 src₂) src₂
 module Deep = Ap ins₀ 2 (tk 2 src₃) src₃
+module Wide = Ap ins₀ 1 (tk 1 src₄) src₄
 
 ----------------------------------------------------------------------
 -- BOTH SIDES PINNED, so the rows below are green with a margin someone
@@ -236,7 +253,10 @@ module Deep = Ap ins₀ 2 (tk 2 src₃) src₃
 -- Read low digit first at radix 1000: handed, returned, store in,
 -- store out, finished.  The STORE half is tight at every point — what
 -- the frame read going in it reads coming out — which is the cutting
--- arm dropping registry entries and installing nothing.
+-- arm dropping registry entries and installing nothing.  `Wide` reads
+-- the same hop figures as `Cut₁` by construction: its fold widens the
+-- DELIVERIES and not the layers, so it is the row that separates the
+-- two halves of the pair rather than a fifth depth.
 ----------------------------------------------------------------------
 
 cut₁-is : Cut₁.packed ≡ 1003003002003
@@ -251,6 +271,33 @@ pass-is = refl
 deep-is : Deep.packed ≡ 1007007005007
 deep-is = refl
 
+wide-is : Wide.packed ≡ 1003003002003
+wide-is = refl
+
+-- AND THE DELIVERY SIDE, which the hop digits above project away and
+-- which is the half the frame's bound now carries.  Read low first:
+-- handed, returned.  The four rows over a source whose accumulator
+-- delivers ONCE read one against one and could not have moved; they are
+-- DEGENERATE on this axis and kept as the floor.  `Wide` is where the
+-- axis is a comparison: its fold delivers three times per re-wrap, so
+-- what the frame is handed reads NINE and the prefix it returns reads
+-- three — a cut on the count side, under a bound the take does not get
+-- to lower.
+cut₁-counts : Cut₁.counts ≡ 1001
+cut₁-counts = refl
+
+edge₂-counts : Edge₂.counts ≡ 1001
+edge₂-counts = refl
+
+pass-counts : Pass.counts ≡ 1001
+pass-counts = refl
+
+deep-counts : Deep.counts ≡ 1001
+deep-counts = refl
+
+wide-counts : Wide.counts ≡ 3009
+wide-counts = refl
+
 ----------------------------------------------------------------------
 -- THE TARGET, AT THE POINTS THE RUNS REACHED.  Both hypotheses are
 -- DECIDED rather than assumed, and at these bounds they hold by
@@ -259,21 +306,26 @@ deep-is = refl
 ----------------------------------------------------------------------
 
 takeCut₁ : Confirms (take-frame-carried Cut₁.ac 0 0 Cut₁.nid root
-  Cut₁.ψ Cut₁.Rv Cut₁.Rst Cut₁.vals Cut₁.fin Cut₁.sd Cut₁.st Below Below)
-takeCut₁ = Below , Below
+  Cut₁.ψ Cut₁.Rv Cut₁.Rst Cut₁.vals Cut₁.fin Cut₁.sd Cut₁.st (Below , Below) Below)
+takeCut₁ = (Below , Below) , Below
 
 takeEdge₂ : Confirms (take-frame-carried Edge₂.ac 0 0 Edge₂.nid root
   Edge₂.ψ Edge₂.Rv Edge₂.Rst Edge₂.vals Edge₂.fin Edge₂.sd Edge₂.st
-  Below Below)
-takeEdge₂ = Below , Below
+  (Below , Below) Below)
+takeEdge₂ = (Below , Below) , Below
 
 takePass : Confirms (take-frame-carried Pass.ac 0 0 Pass.nid root
-  Pass.ψ Pass.Rv Pass.Rst Pass.vals Pass.fin Pass.sd Pass.st Below Below)
-takePass = Below , Below
+  Pass.ψ Pass.Rv Pass.Rst Pass.vals Pass.fin Pass.sd Pass.st (Below , Below) Below)
+takePass = (Below , Below) , Below
 
 takeDeep : Confirms (take-frame-carried Deep.ac 0 0 Deep.nid root
-  Deep.ψ Deep.Rv Deep.Rst Deep.vals Deep.fin Deep.sd Deep.st Below Below)
-takeDeep = Below , Below
+  Deep.ψ Deep.Rv Deep.Rst Deep.vals Deep.fin Deep.sd Deep.st (Below , Below) Below)
+takeDeep = (Below , Below) , Below
+
+takeWide : Confirms (take-frame-carried Wide.ac 0 0 Wide.nid root
+  Wide.ψ Wide.Rv Wide.Rst Wide.vals Wide.fin Wide.sd Wide.st
+  (Below , Below) Below)
+takeWide = (Below , Below) , Below
 
 ----------------------------------------------------------------------
 -- THE SAME FRAME AT A DRAIN STEP, which is the one configuration the
@@ -396,25 +448,29 @@ module At (c : ℕ) (steps : ℕ) where
   st : EvalSt prog
   st = proj₂ (proj₂ (proj₂ pt))
 
-  Rv : ℕ
-  Rv = valsHop ψ (obs natᵗ) vals
+  Rv : Rd
+  Rv = valsRd ψ (obs natᵗ) vals
 
   Rst : ℕ
   Rst = stHop ψ st
 
+  sf : List (Val Γ₁ (obs natᵗ))
+     × List (InstEvent (Val Γ₁ (obs natᵗ))) × Bool × Sched Γ₁
+     × EvalSt prog
+  sf = stepFrame ac 0 0 (take-f nid) root vals fin sd st
+
   -- same radix and same order as the four rows above, so the two
   -- families are read against each other without re-deriving anything
   packed : ℕ
-  packed = Rv
-         + 1000 * valsHop ψ (obs natᵗ) (proj₁ sf)
+  packed = proj₂ (valsRd ψ (obs natᵗ) vals)
+         + 1000 * proj₂ (valsRd ψ (obs natᵗ) (proj₁ sf))
          + 1000000 * Rst
          + 1000000000 * stHop ψ (proj₂ (proj₂ (proj₂ (proj₂ sf))))
          + 1000000000000 * (if proj₁ (proj₂ (proj₂ sf)) then 1 else 0)
-    where
-    sf : List (Val Γ₁ (obs natᵗ))
-       × List (InstEvent (Val Γ₁ (obs natᵗ))) × Bool × Sched Γ₁
-       × EvalSt prog
-    sf = stepFrame ac 0 0 (take-f nid) root vals fin sd st
+
+  counts : ℕ
+  counts = proj₁ Rv
+         + 1000 * proj₁ (valsRd ψ (obs natᵗ) (proj₁ sf))
 
 ----------------------------------------------------------------------
 -- TWO DEPTHS INTO THE RUN, WHICH ARE THE TWO BRANCHES THE ARM CAN TAKE
@@ -463,6 +519,12 @@ mid-is = refl
 cut-is : Cut.packed ≡ 1004004005005
 cut-is = refl
 
+mid-counts : Mid.counts ≡ 1001
+mid-counts = refl
+
+cut-counts : Cut.counts ≡ 1001
+cut-counts = refl
+
 ----------------------------------------------------------------------
 -- THE TARGET AT BOTH, at the same tightest bounds the four rows above
 -- take.  The witness is the root's rather than the arrival's: a take's
@@ -472,9 +534,10 @@ cut-is = refl
 ----------------------------------------------------------------------
 
 takeMid : Confirms (take-frame-carried Mid.ac 0 0 Mid.nid root
-  Mid.ψ Mid.Rv Mid.Rst Mid.vals Mid.fin Mid.sd Mid.st Below Below)
-takeMid = Below , Below
+  Mid.ψ Mid.Rv Mid.Rst Mid.vals Mid.fin Mid.sd Mid.st (Below , Below) Below)
+takeMid = (Below , Below) , Below
 
 takeCut : Confirms (take-frame-carried Cut.ac 0 0 Cut.nid root
-  Cut.ψ Cut.Rv Cut.Rst Cut.vals Cut.fin Cut.sd Cut.st Below Below)
-takeCut = Below , Below
+  Cut.ψ Cut.Rv Cut.Rst Cut.vals Cut.fin Cut.sd Cut.st (Below , Below) Below)
+takeCut = (Below , Below) , Below
+

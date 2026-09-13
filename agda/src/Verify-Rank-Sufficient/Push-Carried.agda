@@ -25,7 +25,7 @@ module Verify-Rank-Sufficient.Push-Carried where
 open import Data.Bool using (Bool; if_then_else_)
 open import Data.Fin using (Fin)
 open import Data.List using (List; []; _∷_; _++_; map)
-open import Data.Nat using (ℕ; suc; _⊔_; _≤_; z≤n)
+open import Data.Nat using (ℕ; suc; _⊔_; _⊔′_; _≤_; z≤n)
 open import Data.Nat.Properties using (≤-trans; ≤-reflexive; ⊔-lub; m≤m⊔n;
   m≤n⊔m)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
@@ -33,15 +33,14 @@ open import Induction.WellFounded using (Acc)
 open import Relation.Binary.PropositionalEquality using (_≡_; trans; cong₂)
 
 open import Rx.Prim using (Tick; Id; value; complete; InstEmit)
-open import Rx.Exp using (Ctx; Closed; Exp; Tm; Val; Fn; _×ᵗ_; mapᵉ; scanᵉ;
-  evalTm)
+open import Rx.Exp using (Ctx; Closed; Tm; Val; Fn; _×ᵗ_; scanᵉ; evalTm)
 open import Rx.Strat-Order using (_≺_)
-open import Rx.Hop-Depth using (Rd₃; depthᵉ)
+open import Rx.Hop-Depth using (Rd; Rd₃; depthᵉ; rdᵉ; rdᵗ; ε; _▸_)
 open import Rx.Evaluator using (Stream; Frame; Path; Sched; EvalSt; NodeId;
   AllOp; map-f; scan-f; take-f; thru-outer; _↠_; scan-st; installNode;
   subscribeE; stepFrame; splitEvents; retagEvents; pushBurst; stHop)
-open import Verify-Rank-Sufficient.Carried using (valsHop; emitHop; burstHop;
-  emitHop-++; emitHop-values; emitHop-bk; emitHop-retag; splitEvents-vals)
+open import Verify-Rank-Sufficient.Carried using (valsAt; emitAt; valsRd; burstRd; _⊑_; emitAt-++; emitAt-values; emitAt-bk; emitAt-retag;
+  splitEvents-valsAt)
 
 ----------------------------------------------------------------------
 -- A FRAME THAT DEEPENS NOTHING: its outputs read under the payload
@@ -52,7 +51,7 @@ open import Verify-Rank-Sufficient.Carried using (valsHop; emitHop; burstHop;
 
 -- TWO PAYLOAD BOUNDS AND NOT ONE, WHICH IS THE WHOLE OF WHAT A
 -- FLATTENER NEEDS.  Four of the walk's operators hand their frame the
--- bound they hand back, and for those the two are the same number.  A
+-- bound they hand back, and for those the two are the same reading.  A
 -- flattener cannot: what it receives is an emitted OBSERVABLE read under
 -- its source's own reading, and what it hands back is that observable's
 -- deliveries read under the flattener's — which is one `suc` higher.
@@ -60,13 +59,39 @@ open import Verify-Rank-Sufficient.Carried using (valsHop; emitHop; burstHop;
 -- rank the inner subscription descends by, so a single-bound frame
 -- predicate is weaker than the truth by precisely the amount the descent
 -- has to spend.
+--
+-- AND BOTH BOUNDS ARE WHOLE READINGS RATHER THAN DEPTHS, WHICH IS WHAT
+-- LETS THE SHELF SPEAK ABOUT A TEMPLATE AT ALL.  A payload admitted by
+-- its depth alone is a payload whose DELIVERY COUNT is unconstrained,
+-- and a template that folds over its argument deepens once per
+-- delivery — so a frame's output is a function of a quantity the
+-- depth-only predicate could not see, and no figure computed from the
+-- frame and the incoming depth bounds it.  The reading carries the
+-- count beside the depth and the template step consumes exactly that
+-- pair, so the residue below is the frame's own function read against
+-- the bound it was entered under.
+--
+-- DEAD ROUTE: admitting the payload by its HOP ALONE and pinning the
+--   outgoing bound at any ℕ read off the frame, the path or the source
+--   expression.  Three such pins were separated by one program: a
+--   template whose body folds returns three, five and seven layers at
+--   three payloads that read nought apart, so a single admitted bound
+--   answers all three and no choice of the outgoing figure holds.  The
+--   currency is the defect and not the pin, which is why the repair is
+--   here rather than at any of them.
+-- RECOVERY: git show 19ce2c6:agda/evidence/refuted/Refuted/Path-Heads.agda
+--   restores the machine form of that separation — the folding template
+--   and the three payloads, plus the two head statements it killed.  It
+--   was deleted because `src` can no longer state it: the pins it
+--   refutes were spelled in the depth-only currency the paragraph above
+--   is the repair for.
 FrameCarries : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {τ} →
   Acc _≺_ τ → Id → Tick → Frame Γ s u → Path Γ u t →
-  (Fin n → Rd₃) → ℕ → ℕ → ℕ → Set
+  (Fin n → Rd₃) → Rd → Rd → ℕ → Set
 FrameCarries {Γ = Γ} {e = e} {s = s} {u = u} ac id now f κ ψ Rin Rv Rst =
   ∀ (vals : List (Val Γ s)) (fin : Bool) (sd : Sched Γ) (st : EvalSt e) →
-    valsHop ψ s vals ≤ Rin → stHop ψ st ≤ Rst →
-    valsHop ψ u (proj₁ (stepFrame ac id now f κ vals fin sd st)) ≤ Rv
+    valsRd ψ s vals ⊑ Rin → stHop ψ st ≤ Rst →
+    valsRd ψ u (proj₁ (stepFrame ac id now f κ vals fin sd st)) ⊑ Rv
     × stHop ψ (proj₂ (proj₂ (proj₂ (proj₂
         (stepFrame ac id now f κ vals fin sd st))))) ≤ Rst
 
@@ -79,6 +104,19 @@ FrameCarries {Γ = Γ} {e = e} {s = s} {u = u} ac id now f κ ψ Rin Rv Rst =
 -- fold is not among them and cannot be — see below.
 ----------------------------------------------------------------------
 
+-- THE RESIDUE ITSELF, SPELLED ONCE BECAUSE THREE FACES READ IT.  It is
+-- the per-value half of the reading's own map clause, character for
+-- character: the template read under an environment binding the
+-- incoming pair, joined at the hop with the incoming hop because the
+-- source stays subscribed under a template that drops its argument.
+-- Both walks and the shelf spend the same expression, so a change to
+-- the reading's map clause is a type error at all three rather than a
+-- silent disagreement between them.
+mapRd : ∀ {n} {Γ : Ctx n} {s u} (ψ : Fin n → Rd₃) →
+  Rd → Fn Γ [] [] [] s u → Rd
+mapRd ψ Rin fn = proj₁ r , proj₂ r ⊔′ proj₂ Rin
+  where r = rdᵗ ψ (ε ▸ Rin) fn
+
 -- A TEMPLATE IS READ AGAINST ITS ARGUMENT AND MAY IGNORE IT, SO THE
 -- EQUAL-BOUNDS FORM IS WRONG HERE AND ONLY HERE.  The map step of the
 -- term reading exists for exactly this: it reads the template under an
@@ -86,37 +124,26 @@ FrameCarries {Γ = Γ} {e = e} {s = s} {u = u} ac id now f κ ψ Rin Rv Rst =
 -- hands back is that step APPLIED to the bound it was handed, never the
 -- bound itself.
 --
--- SO THE TWO ENDS ARE READINGS OF DIFFERENT EXPRESSIONS.  The frame is
--- handed what the SOURCE emits and gives back what the TEMPLATE makes
--- of it, so the incoming bound is the source's reading and the outgoing
--- one the map expression's.  Collapsing them to the larger hands the
--- frame a payload the source could never emit and lets the template add
--- its layer to that, which is what two of the witnesses below kill.
--- The source expression is a parameter because the incoming bound names
--- it; nothing else in the statement reads `b`.
+-- AND THE RESIDUE IS FRAME-LOCAL, WHICH IS WHAT THE WIDER CURRENCY
+-- BOUGHT.  The bound the frame is entered under IS an environment
+-- entry, so the template can be read against it directly and no source
+-- expression appears in the statement at all.  That matters beyond
+-- tidiness: a chain step records the frame and not the expression the
+-- frame was built from, so the earlier form — pinned at the readings of
+-- a source and of its wrapping — was unavailable to the chain walk and
+-- forced a separate leaf there.  This form is the leaf, and the walk
+-- spends it directly.
 --
--- AND THE FORM THAT LEAVES IS STILL FALSE, BECAUSE THE TWO ENDS ARE NOT
--- READ IN THE SAME CURRENCY.  The outgoing bound is a reading of the
--- map EXPRESSION, which sees the source's delivery count; the incoming
--- one is admitted through `valsHop`, which projects the HOP half of a
--- payload's reading and drops the count.  So a source delivering once
--- fixes a finite bound while a payload delivering five times is
--- admitted at nought beside it, and a template that FOLDS over its
--- argument hands back a layer per delivery — a gap with no ceiling
--- between two quantities the statement believes it has related.  This
--- is not a defect of the pinning: it is the payload currency, and it
--- costs a restatement of `FrameCarries` itself and of every bound
--- stated against it.
---
--- REFUTED: `Refuted.Path-Heads` — the form below, at a template whose
---   own body FOLDS: the source fixes a bound of two and three payloads
---   admitted at nought drive the frame to three, five and seven.  The
---   same module refutes the two heads the walk mints when this shelf
---   cannot supply them, which is what says the currency is the subject
---   rather than this statement.
--- REFUTED: `Refuted.Map-Template` — the freely-quantified form, at a
---   template that drops a numeral and returns a flattener over a
---   literal.  The payload reads ZERO, so the frame is held to the
+-- DEAD ROUTE: pinning the two ends at a SOURCE expression and its
+--   wrapping, with the payload admitted by depth.  It relates two
+--   quantities in different currencies — the outgoing one sees the
+--   source's delivery count, the incoming one drops the payload's — so
+--   a source delivering once fixes a finite bound while payloads
+--   delivering three and five times are admitted beside it at nought,
+--   and a folding template hands back a layer per delivery.
+-- REFUTED: `Refuted.Map-Template` — the freely-quantified equal-bounds
+--   form, at a template that drops a numeral and returns a flattener
+--   over a literal.  The payload reads ZERO, so the frame is held to the
 --   strongest bound the predicate can impose, and the output reads ONE;
 --   the store is untouched, so the second conjunct is satisfied and the
 --   crossing is the payload one alone.  The same module pins the walk's
@@ -130,34 +157,65 @@ FrameCarries {Γ = Γ} {e = e} {s = s} {u = u} ac id now f κ ψ Rin Rv Rst =
 --   pinned bound, so the hypothesis is met with no margin, and one more
 --   application puts the output a layer past it.  The same module pins
 --   the source's reading at ZERO and the template applied to what the
---   source ACTUALLY emits fitting under the map's reading — which is
---   the form below, standing at the very program that kills the
---   symmetric one.
--- PROBED: `Probed.Map-Frame` — the statement itself, applied, at nine
---   points: three templates that ADD a layer, DROP their argument and
---   PRESERVE it, each at a source reading zero, at one reading one, and
---   at a FOLD reading three.
---   Every payload is reached by SUBSCRIBING the source under this very
---   frame, so the incoming hypothesis is decided rather than granted —
---   and it is decided at EQUALITY, since what the frame is handed equals
---   the source's reading at every source.  The growing rows are tight,
---   returning exactly the map expression's reading; the dropping row has
---   a layer of slack at the middle source and THREE at the fold, so the
---   slack tracks the source's depth rather than the template body, which
---   one source could not have shown.  The fold is what makes the STORE
---   conjunct a comparison: a map mints no node, so the store reads
---   positive only where the source installed one, and it comes back
---   TIGHT at three against three — a map that deepened any node would
---   overrun a bound taken at what it was handed, which a tight zero
---   could not have said.  NOT covered: no row reaches an arrival or a
---   drain step, so nothing says what the frame does to a store a LATER
---   frame wrote; and no template's own body maps again.
+--   source ACTUALLY emits fitting under the map's reading, which is the
+--   comparison this form makes pointwise.
+-- PROBED: `Probed.Map-Frame` — twelve frames reached by RUNNING: each row
+--   subscribes the source under a `map-f` frame, splits the burst the
+--   subscription produced and hands the frame that, so the incoming
+--   values are ones the source can emit rather than the strongest the
+--   bound admits.  Both halves of the payload hypothesis are DECIDED, so
+--   a source overrunning its own reading on either component leaves the
+--   row unsolvable.  Four templates — wrapping, dropping for a literal,
+--   the identity, and one that FOLDS over its argument's deliveries — at
+--   three source depths, plus three sources differing only in how many
+--   values the delivered observable carries.  The wrapping rows are tight
+--   at every source, so one extra layer in a template's body would take
+--   the conclusion out; the dropping rows are load-bearing at the two
+--   deeper sources, where the payload falls to zero under a bound that
+--   stays where the source left it.  The delivery triple is the one that
+--   reaches what killed the predecessor currency: counts one, three, five
+--   in and one, nine, twenty-five out, hops three, five, seven, tight at
+--   each — the residue tracks the deliveries rather than saturating.
+--   Not covered: every row is a SUBSCRIBE at the root, so nothing here
+--   says what the frame does to a store a LATER frame wrote; one template
+--   application per row, so no template whose own body maps again; the
+--   finish flag is whatever the source's burst carried and is not varied;
+--   and the context is closed, so no row reaches the slot telescope.
 postulate
   map-frame-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {τ}
     (ac : Acc _≺_ τ) (id : Id) (now : Tick) (fn : Fn Γ [] [] [] s u)
-    (b : Exp Γ [] [] [] s) (κ : Path Γ u t) (ψ : Fin n → Rd₃) (Rst : ℕ) →
+    (κ : Path Γ u t) (ψ : Fin n → Rd₃) (Rin : Rd) (Rst : ℕ) →
     FrameCarries {e = e} ac id now (map-f fn) κ ψ
-      (depthᵉ ψ b) (depthᵉ ψ (mapᵉ fn b)) Rst
+      Rin (mapRd ψ Rin fn) Rst
+
+-- THE FOLD'S FRAME AT THE SAME RESIDUE, AND IT IS WRONG AS WRITTEN —
+-- WHICH IS THE POINT OF WRITING IT.  A scan's per-value output is the
+-- reading's own fold ITERATED once per delivery of the source, from the
+-- accumulator the seed installed; the expression below is that
+-- iteration run ONCE.  So the statement is exactly right on a burst of
+-- one delivery and falls a layer short per delivery after that, and the
+-- quantity it is missing is the REFOLD COUNT — neither the payload's
+-- reading nor the store's hop, but the LENGTH of the list the frame is
+-- handed, a third axis this predicate quantifies over unboundedly.
+--
+-- THE NARROWING IS WHAT THIS BUYS, and it is why the wrong statement is
+-- worth standing here rather than a weaker true one.  The region that
+-- can refute it was the whole of the payload currency; it is now bursts
+-- of length above one at a template that folds, which is small enough to
+-- instantiate and small enough to say what the repair has to carry.
+--
+-- REFUTED: `Refuted.Scan-Store` — the symmetric form, pinning the fold's
+--   residue at its own incoming bound.  It dies on the other side of the
+--   same axis: a step that WRAPS its accumulator outruns any bound fixed
+--   before the first refold, so neither the incoming pair nor one
+--   application of the template is what a fold hands back.
+postulate
+  scan-frame-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {τ}
+    (ac : Acc _≺_ τ) (id : Id) (now : Tick)
+    (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
+    (κ : Path Γ u t) (ψ : Fin n → Rd₃) (Rin : Rd) (Rst : ℕ) →
+    FrameCarries {e = e} ac id now (scan-f fn nid) κ ψ
+      Rin (mapRd ψ Rin fn) Rst
 
 -- THE PREFIX FRAME, WHICH THE WITNESS ABOVE DOES NOT REACH.  A take
 -- hands back `takeVals`' prefix of the list it was given and writes a
@@ -167,16 +225,20 @@ postulate
 -- right one for this frame even though it is the wrong one for its
 -- neighbour.
 --
--- PROBED: `Probed.Take-Frame` — six frames reached by RUNNING, each
---   held to the TIGHTEST bounds the predicate admits: the reading the
---   frame was handed and the reading the store carried in.  Both
+-- PROBED: `Probed.Take-Frame` — seven frames reached by RUNNING, each
+--   held to the TIGHTEST bounds the predicate admits: the payload PAIR
+--   the frame was handed and the reading the store carried in.  Both
 --   conjuncts compare something, which the source is built for — a fold
 --   whose accumulator is an observable, so the payload reads positive
 --   where a stream of nats would read zero, and whose node the store can
---   read where the take's own is priced at zero.  Four points are the
+--   read where the take's own is priced at zero.  Five points are the
 --   take arm's own subscription, at counts below, at and above what the
 --   burst supplies and at two fold rates; the two below hand back
---   strictly less.
+--   strictly less.  The fifth varies the accumulator's DELIVERY count
+--   rather than its depth, which is the half of the pair the others
+--   leave at one: what it is handed reads nine deliveries and the prefix
+--   it returns reads three, so the count side is a cut rather than a
+--   comparison of one against one.
 --   Two more stand at a DRAIN STEP, after whole cascades have run, so
 --   the node is one an earlier instant already charged and the store is
 --   one an earlier instant's frames wrote — it reads three after one
@@ -193,7 +255,7 @@ postulate
 postulate
   take-frame-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s} {τ}
     (ac : Acc _≺_ τ) (id : Id) (now : Tick) (nid : NodeId)
-    (κ : Path Γ s t) (ψ : Fin n → Rd₃) (Rv Rst : ℕ) →
+    (κ : Path Γ s t) (ψ : Fin n → Rd₃) (Rv : Rd) (Rst : ℕ) →
     FrameCarries {e = e} ac id now (take-f {s = s} nid) κ ψ Rv Rv Rst
 
 ----------------------------------------------------------------------
@@ -275,6 +337,18 @@ postulate
 -- statement is the easier one to prove; if that proof stalls, the
 -- stronger form is the thing to reach for rather than a new hypothesis.
 --
+-- AND THE COUNT HALF IS A CLAIM THE WIDER CURRENCY NEWLY MAKES, WHICH
+-- NOTHING HAS INSTANTIATED.  The outgoing reading is the incoming one
+-- with its DEPTH raised and its DELIVERY COUNT left where it was, which
+-- is what the reading's own flattening clause says: that clause carries
+-- the source's middle component through untouched and takes `suc` of
+-- the depth alone.  So the count half is not a weakening chosen here —
+-- it is the machinery's answer read off — but the machinery's answer is
+-- APPROXIMATE at this clause by construction, pricing what an arriving
+-- inner delivers as what one of ITS deliveries delivers, and no row
+-- anywhere stands at a payload whose two components differ.  Until one
+-- does, this half of the statement is asserted and not evidenced.
+--
 -- DEAD ROUTE: refuting the store conjunct at a PARKED inner deeper
 --   than the source that emitted it.  There is no such queue to build.
 --   A value of observable type IS a closed expression, and the value
@@ -292,9 +366,13 @@ postulate
 --   a fold that deepens its accumulator once and twice per delivery, at
 --   two source lengths, and at one whose limit forces the PARK branch.
 --   Every conjunct is positive at every row (the pins carry both sides)
---   and the margin is a constant one.  NOT reached: a frame whose rank
---   is spent, which no root can exhibit since a flattener's own reading
---   is a successor.
+--   and the margin is a constant one.  The DELIVERY half of the pair is
+--   decided too: the hypothesis saturates at every row, so a source
+--   delivering one more than its reading admits leaves the row
+--   unsolvable, and the conclusion keeps a delivery of margin wherever
+--   the outer carries two.  NOT reached: a frame whose rank is spent,
+--   which no root can exhibit since a flattener's own reading is a
+--   successor.
 --
 -- PROBED: `Probed.Hop-Store` — the same frame at a store that is
 --   already deep, which is the configuration no other row on this shelf
@@ -302,7 +380,9 @@ postulate
 --   inners reading nought, one and two before the frame runs, and the
 --   store bound is taken at the LEAST value the premise and the
 --   incoming hypothesis admit, so nothing absorbs an over-deep write.
---   The payload hypothesis is decided at EQUALITY at every row.  What
+--   The payload hypothesis is decided at EQUALITY on BOTH components at
+--   every row, and the count side does not move with the queue, which is
+--   what says this family varies the store and nothing else.  What
 --   the three buy is the outgoing store: the frame installs the
 --   arriving inner and leaves a store reading one below its bound, the
 --   first nonzero store reading anywhere on the shelf.  NOT covered: no
@@ -315,7 +395,8 @@ postulate
 --   stated at the probe: a source emitting one inner returns nothing and
 --   installs nothing either reading reaches, so the payload out and both
 --   store figures are nought at both points and neither conjunct could
---   have failed.  What the two buy is the pair of pinned readings — the
+--   have failed — the delivery half reads nought throughout at the gated
+--   point and returns nothing under a bound of one at the open one.  What the two buy is the pair of pinned readings — the
 --   body reads four, the open frame is held to four and the gated frame
 --   to one — which is a finding about where an arrival's bound comes
 --   from and is owed at the store reading's own definition.  NOT
@@ -324,8 +405,10 @@ postulate
 postulate
   thru-outer-frame-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} {τ}
     (ac : Acc _≺_ τ) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
-    (κ : Path Γ u t) (ψ : Fin n → Rd₃) (Rin Rst : ℕ) → suc Rin ≤ Rst →
-    FrameCarries {e = e} ac id now (thru-outer op nid) κ ψ Rin (suc Rin) Rst
+    (κ : Path Γ u t) (ψ : Fin n → Rd₃) (Rin : Rd) (Rst : ℕ) →
+    suc (proj₂ Rin) ≤ Rst →
+    FrameCarries {e = e} ac id now (thru-outer op nid) κ ψ
+      Rin (proj₁ Rin , suc (proj₂ Rin)) Rst
 
 ----------------------------------------------------------------------
 -- THE WALK, on the burst's spine.  Every emit contributes the frame's
@@ -335,15 +418,19 @@ postulate
 pushBurst-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {τ}
   (ac : Acc _≺_ τ) (id : Id) (now : Tick) (f : Frame Γ s u) (κ : Path Γ u t)
   (burst : Stream Γ s) (sd : Sched Γ) (st : EvalSt e)
-  (ψ : Fin n → Rd₃) (Rin Rv Rst : ℕ) →
+  (ψ : Fin n → Rd₃) (Rin Rv : Rd) (Rst : ℕ) →
   FrameCarries {e = e} ac id now f κ ψ Rin Rv Rst →
-  burstHop ψ s burst ≤ Rin → stHop ψ st ≤ Rst →
-  burstHop ψ u (proj₁ (pushBurst ac id now f κ burst sd st)) ≤ Rv
+  burstRd ψ s burst ⊑ Rin → stHop ψ st ≤ Rst →
+  burstRd ψ u (proj₁ (pushBurst ac id now f κ burst sd st)) ⊑ Rv
   × stHop ψ (proj₂ (proj₂ (pushBurst ac id now f κ burst sd st))) ≤ Rst
-pushBurst-carried ac id now f κ []  sd st ψ Rin Rv Rst fc hb hs = z≤n , hs
+pushBurst-carried ac id now f κ []  sd st ψ Rin Rv Rst fc hb hs =
+  (z≤n , z≤n) , hs
 pushBurst-carried {Γ = Γ} {t = t} {e = e} {s = s} {u = u}
                   ac id now f κ (em ∷ ems) sd st ψ Rin Rv Rst fc hb hs =
-  ⊔-lub (≤-trans (≤-reflexive eq) (proj₁ step)) (proj₁ ih) , proj₂ ih
+  ( ⊔-lub (≤-trans (≤-reflexive (eq proj₁)) (proj₁ (proj₁ step)))
+          (proj₁ (proj₁ ih))
+  , ⊔-lub (≤-trans (≤-reflexive (eq proj₂)) (proj₂ (proj₁ step)))
+          (proj₂ (proj₁ ih)) ) , proj₂ ih
   where
   sp = splitEvents {A = Val Γ u} (InstEmit.events em)
 
@@ -355,28 +442,35 @@ pushBurst-carried {Γ = Γ} {t = t} {e = e} {s = s} {u = u}
   sd₁   = proj₁ (proj₂ (proj₂ (proj₂ sf)))
   st₁   = proj₂ (proj₂ (proj₂ (proj₂ sf)))
 
-  -- what this emit was handed, off the burst bound it entered with
-  hvals : valsHop ψ s (proj₁ sp) ≤ Rin
-  hvals = ≤-trans (≤-reflexive (splitEvents-vals ψ s (InstEmit.events em)))
-                  (≤-trans (m≤m⊔n _ _) hb)
+  -- what this emit was handed, off the burst bound it entered with, at
+  -- either component: the split is a partition and the join is
+  -- pointwise, so one argument serves both
+  hvals : valsRd ψ s (proj₁ sp) ⊑ Rin
+  hvals =
+    ≤-trans (≤-reflexive (splitEvents-valsAt proj₁ ψ s (InstEmit.events em)))
+            (≤-trans (m≤m⊔n _ _) (proj₁ hb))
+    , ≤-trans (≤-reflexive (splitEvents-valsAt proj₂ ψ s (InstEmit.events em)))
+              (≤-trans (m≤m⊔n _ _) (proj₂ hb))
 
-  step : valsHop ψ u vals′ ≤ Rv × stHop ψ st₁ ≤ Rst
+  step : valsRd ψ u vals′ ⊑ Rv × stHop ψ st₁ ≤ Rst
   step = fc (proj₁ sp) (proj₂ (proj₂ sp)) sd st hvals hs
 
   -- three of the four parts hold no payload at all
-  eq : emitHop ψ u (proj₁ (proj₂ sp) ++ retagEvents evs ++ map value vals′
+  eq : (p : Rd → ℕ) →
+       emitAt p ψ u (proj₁ (proj₂ sp) ++ retagEvents evs ++ map value vals′
          ++ (if fin′ then complete ∷ [] else []))
-       ≡ valsHop ψ u vals′
-  eq = trans (emitHop-++ ψ u (proj₁ (proj₂ sp)) _)
-             (cong₂ _⊔_ (emitHop-bk ψ s u (InstEmit.events em))
-               (trans (emitHop-++ ψ u (retagEvents evs) _)
-                      (cong₂ _⊔_ (emitHop-retag ψ t u evs)
-                                  (emitHop-values ψ u vals′ fin′))))
+       ≡ valsAt p ψ u vals′
+  eq p = trans (emitAt-++ p ψ u (proj₁ (proj₂ sp)) _)
+               (cong₂ _⊔_ (emitAt-bk p ψ s u (InstEmit.events em))
+                 (trans (emitAt-++ p ψ u (retagEvents evs) _)
+                        (cong₂ _⊔_ (emitAt-retag p ψ t u evs)
+                                    (emitAt-values p ψ u vals′ fin′))))
 
-  ih : burstHop ψ u (proj₁ (pushBurst ac id now f κ ems sd₁ st₁)) ≤ Rv
+  ih : burstRd ψ u (proj₁ (pushBurst ac id now f κ ems sd₁ st₁)) ⊑ Rv
      × stHop ψ (proj₂ (proj₂ (pushBurst ac id now f κ ems sd₁ st₁))) ≤ Rst
   ih = pushBurst-carried ac id now f κ ems sd₁ st₁ ψ Rin Rv Rst fc
-         (≤-trans (m≤n⊔m _ _) hb) (proj₂ step)
+         (≤-trans (m≤n⊔m _ _) (proj₁ hb) , ≤-trans (m≤n⊔m _ _) (proj₂ hb))
+         (proj₂ step)
 
 ----------------------------------------------------------------------
 -- THE FOLD, AND IT IS NOT A FRAME LEAF AT ALL.
@@ -422,12 +516,19 @@ pushBurst-carried {Γ = Γ} {t = t} {e = e} {s = s} {u = u}
 --   where the reading spends a product rather than a count; a limited
 --   flattener, which queues inners into a node the run mints; a fold
 --   under a fold; a seed above the floor.  The margin is constant along
---   every family.  Two axes are shown INERT rather than left unswept:
+--   every family.  The DELIVERY half of the payload is its own axis and
+--   six of the eight rows are degenerate there — a step re-wrapping one
+--   copy leaves the count where the seed put it — so two rows re-wrap
+--   two copies and three, where the count compounds once per refold to
+--   sixty-four and to seven hundred and twenty-nine against six
+--   refolds, and a reading flat in that rate crosses at the first.
+--   Two axes are shown INERT rather than left unswept:
 --   the continuation, since the fold's step names neither it nor the
 --   clock, so every row is evidence at every continuation; and the
 --   store's other nodes, since a fold carries them through untouched
 --   and a deeper one raises the premise's reading by what it raises the
---   conclusion's.  No row reaches an arrival or a drain step.
+--   conclusion's.  No row reaches an arrival or a drain step, and no
+--   row both deepens and multiplies at once.
 postulate
   scan-burst-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {τ}
     (ac : Acc _≺_ τ) (id : Id) (now : Tick)
@@ -439,7 +540,7 @@ postulate
                (installNode nid (scan-st {t = u} (evalTm z)) st)
         pb = pushBurst ac id now (scan-f f nid) κ
                (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
-    in burstHop ψ s (proj₁ r) ≤ depthᵉ ψ (scanᵉ f z b) →
+    in burstRd ψ s (proj₁ r) ⊑ proj₂ (rdᵉ ψ ε b) →
        stHop ψ (proj₂ (proj₂ r)) ≤ Rst →
-       burstHop ψ u (proj₁ pb) ≤ depthᵉ ψ (scanᵉ f z b)
+       burstRd ψ u (proj₁ pb) ⊑ proj₂ (rdᵉ ψ ε (scanᵉ f z b))
        × stHop ψ (proj₂ (proj₂ pb)) ≤ Rst

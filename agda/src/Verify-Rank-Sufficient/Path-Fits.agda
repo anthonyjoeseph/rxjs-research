@@ -14,53 +14,44 @@
 -- certificate is therefore not vacuous, and a producer has to choose
 -- the residue tightly or fail further down.
 
--- WHICH SPLITS THE FIVE FRAMES INTO TWO GROUPS, AND THE SPLIT IS NOT A
--- MATTER OF EFFORT.  Three of them price their own output out of what
--- they were handed: a prefix and an inner's exit hand back what came
--- in, and a flattener hands back one more.  Those are path-local, so
--- the walk below recurses through them.  A TEMPLATE and a FOLD are not:
--- what a template emits is its body evaluated at the payload, and what
--- a fold emits is an accumulator refolded once per DELIVERY of its
--- source — and a payload bound reads hops, not deliveries, so two
--- payloads admitted by the same bound drive a fold a different number
--- of times.  No function of the frame and the incoming bound can price
--- either, and the shelf says the same thing from its side: its template
--- entry is pinned at the readings of a source EXPRESSION, which a chain
--- step does not carry.  So those two are pinned at the HEADROOM the
--- tail leaves instead of at a figure read off the frame — the largest
--- bound the rest of the path can still afford, which is a function of
--- what the walk does hold.
+-- AND ALL FIVE FRAMES ARE PATH-LOCAL NOW, WHICH IS WHAT THE WIDER
+-- PAYLOAD CURRENCY BOUGHT AND THE WHOLE REASON THIS MODULE LOST A
+-- SHELF.  A bound in the per-value reading carries the DELIVERY COUNT
+-- beside the hop, and the delivery count is exactly what a template
+-- applied to a bound needs to be read against — so what a `map-f` or a
+-- `scan-f` hands on is now a function of the frame and the bound it was
+-- entered under, spelled once on the shelf and spent here.  A prefix
+-- and an inner's exit hand back what came in; a flattener hands back
+-- one more hop at the same count.  Five arms, five residues, no head.
 
--- AND THE PREMISE IS THE PATH'S OWN FLATTENER COUNT, which is the one
--- quantity the recursion needs and the only one it can compute.  Each
--- flattener spends one of the store bound's headroom, so a path with k
--- of them needs k to spare — and the rank an arrival enters at supplies
--- exactly the program's own reading above the payload, which is where
--- the leaf below sends the remaining risk.  The count charges a
--- template and a fold NOTHING, so the headroom those two are pinned at
--- is the whole of what is left rather than a share of it: that makes
--- each of them a stronger statement, which is the safe direction for a
--- gap.
+-- SO THE PREMISE IS THREADED RATHER THAN COUNTED.  The old one summed
+-- the path's flatteners and asked the total to fit, which is the only
+-- premise a walk whose two heads were pinned at a HEADROOM could state;
+-- the residue now being computable frame by frame, the premise is the
+-- same recursion as the walk itself — carry the bound through each
+-- frame's own residue and ask each flattener for its one hop where the
+-- flattener stands.  That is strictly stronger where a template shrinks
+-- a reading and strictly weaker nowhere, and it is stated in the
+-- currency the shelf is stated in, so every arm discharges by handing
+-- the shelf entry its own hypothesis.
 module Verify-Rank-Sufficient.Path-Fits where
 
 open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.Bool.ListAction using (any)
 open import Data.Fin using (Fin; toℕ)
 open import Data.List using (List; []; _∷_)
-open import Data.Nat using (ℕ; zero; suc; _+_; _∸_; _≤_; _≡ᵇ_; _⊔_)
-open import Data.Nat.Properties using (≤-trans; ≤-reflexive; m≤m+n;
-  m≤n+m; m∸n+n≡m; +-suc)
+open import Data.Nat using (ℕ; zero; suc; _≤_; _≡ᵇ_; _⊔_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
 open import Data.Vec using (lookup)
 open import Induction.WellFounded using (Acc)
-open import Relation.Binary.PropositionalEquality using (refl; sym)
+open import Relation.Binary.PropositionalEquality using (refl)
 
 open import Rx.Prim using (Fuel; Tick; Id; close; exhausted)
-open import Rx.Exp using (Ctx; Closed; Val; Fn; _×ᵗ_)
+open import Rx.Exp using (Ctx; Closed; Val)
 open import Rx.Strat-Order using (_≺_)
-open import Rx.Hop-Depth using (Rd₃; depthᵛ)
+open import Rx.Hop-Depth using (Rd; Rd₃; rdᵛ)
 open import Rx.Slot-Read using (slotRd)
 open import Rx.Evaluator using (Frame; Path; root; share-sink; _↠_;
   map-f; scan-f; take-f; from-inner; thru-outer; NodeId; AllOp;
@@ -72,39 +63,38 @@ open import Verify-Rank-Sufficient.Fits using (PathFits; at-root; at-sink;
   ChainsFit; ArrivalFits; DrainFits; ShareChainsFit)
 open import Verify-Rank-Sufficient.Fold-Path using (dispatchShare-dry-free)
 open import Verify-Rank-Sufficient.Push-Carried using (FrameCarries;
-  take-frame-carried; thru-outer-frame-carried)
+  mapRd; map-frame-carried; scan-frame-carried; take-frame-carried;
+  thru-outer-frame-carried)
 open import Verify-Rank-Sufficient.Push-Dry using (FrameDry;
   map-frame-dry; scan-frame-dry; take-frame-dry)
 
 ----------------------------------------------------------------------
--- WHAT A STEP COSTS THE STORE BOUND.  Only the flattener spends, and it
--- spends one: entering an inner is the hop edge and the residue it
--- hands back is one above what it was given.  Everything else hands
--- back a bound no larger, so it costs nothing.
+-- WHAT THE WALK IS OWED, THREADED.  One clause per constructor, each
+-- carrying the bound forward through that frame's own residue — the
+-- same residues the shelf's entries hand back, so every arm of the walk
+-- below meets its entry at a bound that is already the right one.
+--
+-- ONLY TWO CLAUSES ASK FOR ANYTHING.  A flattener asks for its one hop
+-- of store headroom WHERE IT STANDS, which is what makes the premise
+-- sensitive to a template above it shrinking the reading; and a sink
+-- asks that the payload's hop sit under the store's, which is the
+-- dispatch's own entry condition.  The root asks nothing, and neither
+-- do the three frames whose residue is a transport.
 ----------------------------------------------------------------------
 
-frameHop : ∀ {n} {Γ : Ctx n} {s u} → Frame Γ s u → ℕ
-frameHop (map-f _)          = 0
-frameHop (scan-f _ _)       = 0
-frameHop (take-f _)         = 0
-frameHop (from-inner _ _ _) = 0
-frameHop (thru-outer _ _)   = 1
-
-pathHops : ∀ {n} {Γ : Ctx n} {s t} → Path Γ s t → ℕ
-pathHops root           = 0
-pathHops (share-sink i) = 0
-pathHops (f ↠ κ)        = frameHop f + pathHops κ
-
--- THE HEADROOM A TAIL LEAVES, and why the subtraction is total rather
--- than a truncation to be checked.  The walk's premise already puts the
--- tail's own flatteners under the store's figure, so the difference is
--- real at every point the recursion reaches and the tail's premise
--- holds by equality rather than by a bound.
-headroom-fits : ∀ {n} {Γ : Ctx n} {s t} (Rin : ℕ) (κ : Path Γ s t)
-  (Rst : ℕ) → Rin + pathHops κ ≤ Rst →
-  (Rst ∸ pathHops κ) + pathHops κ ≤ Rst
-headroom-fits Rin κ Rst h =
-  ≤-reflexive (m∸n+n≡m (≤-trans (m≤n+m (pathHops κ) Rin) h))
+PathUnder : ∀ {n} {Γ : Ctx n} {s t} → (Fin n → Rd₃) → ℕ →
+  Path Γ s t → Rd → Set
+PathUnder ψ Rst root                    Rin = ⊤
+PathUnder ψ Rst (share-sink i)          Rin = proj₂ Rin ≤ Rst
+PathUnder ψ Rst (map-f fn ↠ κ)          Rin = PathUnder ψ Rst κ
+                                                (mapRd ψ Rin fn)
+PathUnder ψ Rst (scan-f fn nid ↠ κ)     Rin = PathUnder ψ Rst κ
+                                                (mapRd ψ Rin fn)
+PathUnder ψ Rst (take-f nid ↠ κ)        Rin = PathUnder ψ Rst κ Rin
+PathUnder ψ Rst (from-inner o a i ↠ κ)  Rin = PathUnder ψ Rst κ Rin
+PathUnder ψ Rst (thru-outer op nid ↠ κ) Rin =
+  suc (proj₂ Rin) ≤ Rst
+  × PathUnder ψ Rst κ (proj₁ Rin , suc (proj₂ Rin))
 
 ----------------------------------------------------------------------
 -- THE LEAVES OF THE WALK, and there are fewer than the five arms
@@ -123,7 +113,7 @@ headroom-fits Rin κ Rst h =
 -- of the three.
 dry-under : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {τ}
   (ac : Acc _≺_ τ) (id : Id) (now : Tick) (f : Frame Γ s u)
-  (κ : Path Γ u t) (ψ : Fin n → Rd₃) (Rin Rst : ℕ) →
+  (κ : Path Γ u t) (ψ : Fin n → Rd₃) (Rin : Rd) (Rst : ℕ) →
   FrameDry {e = e} ac id now f κ →
   FrameDryUnder {e = e} ac id now f κ ψ Rin Rst
 dry-under ac id now f κ ψ Rin Rst d vals fin sd st _ _ =
@@ -136,24 +126,25 @@ dry-under ac id now f κ ψ Rin Rst d vals fin sd st _ _ =
 -- PROBED: `Probed.Exit-Frame` — both statements instantiated at one
 --   flat program on the `fin = false` arm, where the frame is the
 --   identity.  What that buys is INSTANTIABILITY and not coverage, and
---   the rows say so themselves: the element type carries no hop depth,
---   so both conjuncts of the carried row compare nought against nought,
---   and the dry row holds by `any` on the empty list the identity arm
---   returns.  NOT covered, and it is where the whole risk sits: the
---   `fin = true` arm, which is the one that inspects the registrations
---   and decides whether to drain.
+--   the rows say so themselves: the element type carries neither
+--   deliveries nor hop depth, so all three conjuncts of the carried row
+--   compare nought against nought — both halves of the payload pair and
+--   the store — and the dry row holds by `any` on the empty list the
+--   identity arm returns.  NOT covered, and it is where the whole risk
+--   sits: the `fin = true` arm, which is the one that inspects the
+--   registrations and decides whether to drain.
 postulate
   from-inner-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s} {τ}
     (ac : Acc _≺_ τ) (id : Id) (now : Tick) (op : AllOp)
     (allNode innerInstance : NodeId) (κ : Path Γ s t) (ψ : Fin n → Rd₃)
-    (Rin Rst : ℕ) →
+    (Rin : Rd) (Rst : ℕ) →
     FrameCarries {e = e} ac id now
       (from-inner {s = s} op allNode innerInstance) κ ψ Rin Rin Rst
 
   from-inner-dry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s} {τ}
     (ac : Acc _≺_ τ) (id : Id) (now : Tick) (op : AllOp)
     (allNode innerInstance : NodeId) (κ : Path Γ s t) (ψ : Fin n → Rd₃)
-    (Rin Rst : ℕ) →
+    (Rin : Rd) (Rst : ℕ) →
     FrameDryUnder {e = e} ac id now
       (from-inner {s = s} op allNode innerInstance) κ ψ Rin Rst
 
@@ -164,18 +155,22 @@ postulate
 --
 -- PROBED: `Probed.Exit-Frame` — three outer sources at wrapping rates
 --   one, two and three, taken at the points the carried rows already
---   stand at, with the dry channel read.  LOAD-BEARING on both halves:
---   the handed reading is positive, so the outer did emit, and the rank
---   exceeds the bound by exactly one at every point, so the premise is
---   decided rather than afforded — a rank equal to the bound is the
---   refutation this would have reported.  NOT covered: a frame
+--   stand at, with the dry channel read.  LOAD-BEARING on every half:
+--   the handed reading is positive, so the outer did emit; the rank
+--   exceeds the HOP half by exactly one at every point, so the premise
+--   is decided rather than afforded — a rank equal to the bound is the
+--   refutation this would have reported; and the DELIVERY half is
+--   saturated, handed equal to held at one, two and two, so a reading
+--   that undercharged the outer by a single delivery crosses.  NOT
+--   covered: a frame
 --   subscribing an inner whose rank is already spent, which is the only
 --   shape the dry branch is reachable from and is not reachable from a
 --   root at all.
 postulate
   thru-outer-frame-dry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} {τ}
     (ac : Acc _≺_ τ) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
-    (κ : Path Γ u t) (ψ : Fin n → Rd₃) (Rin Rst : ℕ) → suc Rin ≤ Rst →
+    (κ : Path Γ u t) (ψ : Fin n → Rd₃) (Rin : Rd) (Rst : ℕ) →
+    suc (proj₂ Rin) ≤ Rst →
     FrameDryUnder {e = e} ac id now (thru-outer op nid) κ ψ Rin Rst
 
 ----------------------------------------------------------------------
@@ -197,7 +192,7 @@ postulate
 ----------------------------------------------------------------------
 
 ShareChainsHop : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {τ} →
-  Acc _≺_ τ → ℕ → Id → Tick → (i : Fin n) → (Fin n → Rd₃) → ℕ → ℕ →
+  Acc _≺_ τ → ℕ → Id → Tick → (i : Fin n) → (Fin n → Rd₃) → Rd → ℕ →
   List (Val Γ (lookup Γ i)) → Bool →
   List (RegId × Path Γ (lookup Γ i) t) → Sched Γ → EvalSt e → Set
 ShareChainsHop ac gas id now i ψ Rin Rst vals fin [] sd st = ⊤
@@ -211,12 +206,12 @@ ShareChainsHop {e = e} ac gas id now i ψ Rin Rst vals fin
           out = foldPath ac gas id now (toℕ i) p vals
                   (if fin then close (toℕ i) exhausted ∷ [] else [])
                   fin sd st′
-      in (Rin + pathHops p ≤ stHop ψ st′ ⊔ Rst)
+      in PathUnder ψ (stHop ψ st′ ⊔ Rst) p Rin
          × ShareChainsHop {e = e} ac gas id now i ψ Rin Rst vals fin ps
              (proj₁ (proj₂ out)) (proj₂ (proj₂ out))
 
 ShareHop : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {τ} →
-  Acc _≺_ τ → ℕ → Id → Tick → (i : Fin n) → (Fin n → Rd₃) → ℕ → ℕ →
+  Acc _≺_ τ → ℕ → Id → Tick → (i : Fin n) → (Fin n → Rd₃) → Rd → ℕ →
   List (Val Γ (lookup Γ i)) → Bool → Sched Γ → EvalSt e → Set
 ShareHop {e = e} ac gas id now i ψ Rin Rst vals fin sd st =
   ShareChainsHop {e = e} ac gas id now i ψ Rin Rst vals fin
@@ -236,77 +231,36 @@ ShareHop {e = e} ac gas id now i ψ Rin Rst vals fin sd st =
 -- chain and compounding.  That is a property of this shape and not of
 -- any harness, and it is what bounds the coverage below.
 --
--- PROBED: `Probed.Sink-Dry` — one WRITING chain, where the store reads
---   one at subscribe, the dispatch's write lands, and the admitted list
---   is non-empty, so the premise recursed rather than meeting its `⊤`
---   arm; and TWO non-writing chains, which reach one hand-off of the
---   tail's threaded state against a join of nought, where a chain
---   carrying any flattener refutes.  NOT reached: a SECOND hand-off —
---   the state one chain returns being read by a chain that is not the
---   last, which is where a join drifting per chain would first show.
---   Three chains exhausted sixteen gigabytes without finishing, writing
---   and non-writing alike, so the axis is the width the tail recurses
---   on rather than the depth a chain writes.  Also unreached:
---   observable-valued share slots, whose left side would read positive
---   where every row here reads nought; completing dispatches; a spent
---   counter; and stores deepened by an earlier cascade step.
+-- AND AS WRITTEN IT IS FALSE, WHICH IS A GAP BETWEEN WHAT THE PREMISE
+-- CARRIES AND WHAT THE WALK READS.  The one hypothesis bounds the
+-- payload that ENTERS the dispatch; the walk is read along each
+-- admitted chain, and a chain's own frames move the payload before its
+-- flattener is reached — a fold re-wraps its accumulator, so the
+-- reading after the fold is the fold's and not the dispatched value's.
+-- No bound on what enters can bound what the chain has made of it.
+--
+-- AND THE MACHINE IS NOT DRY WHERE THE WITNESS STANDS, WHICH IS WHAT
+-- MAKES THIS A RESTATEMENT RATHER THAN A LOSS.  The rank a dispatch is
+-- actually entered under is `arrivalRank`, a SUM whose term-depth
+-- summand alone clears the crossing by a wide margin at the witness.
+-- So the point is legal under the premise as written and unreachable at
+-- every call site: a true form carries the registry's own reading — the
+-- fact the entry invariant already knows about the chains a share
+-- admits — inward, rather than deriving it from the entering payload.
+--
+-- REFUTED: `Refuted.Share-Chain`
+-- RECOVERY: git show 19ce2c6:agda/evidence/probed/Probed/Sink-Dry.agda
+--   restores the three-chain share harness and its store figures — the
+--   expensive half of instantiating this leaf, and reusable against
+--   whatever the restatement turns out to be.  Its rows are not: one is
+--   the refuted point above and the rest are the `⊤` arm.
 postulate
   share-chain-hop : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {τ}
     (ac : Acc _≺_ τ) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
-    (ψ : Fin n → Rd₃) (Rin Rst : ℕ) → Rin ≤ Rst →
+    (ψ : Fin n → Rd₃) (Rin : Rd) (Rst : ℕ) → proj₂ Rin ≤ Rst →
     (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
     (sd : Sched Γ) (st : EvalSt e) →
     ShareHop {e = e} ac gas id now i ψ Rin Rst vals fin sd st
-
--- THE TWO ARMS WHOSE RESIDUE IS NOT READ OFF THE FRAME, AND BOTH ARE
--- FALSE AS STATED.  What a map or a scan hands on is read off the
--- SOURCE EXPRESSION — an event count for one, a seed and a delivery
--- count for the other — and a chain records the frame, not what it was
--- built from, so the walk can supply neither.  The HEADROOM the tail
--- leaves is what was reached for instead: everything below the frame
--- has to fit under `Rst` once its own flatteners are paid for, so the
--- tail's premise holds by subtraction.  It is also NOUGHT on the
--- commonest chain there is — neither of these frames is charged a
--- flattener, so a chain carrying none has a headroom equal to its whole
--- store bound, and a store bound of nought leaves both heads no room
--- while either frame's own function writes what it likes.
---
--- AND THE REPAIR THAT POINTS AT — a residue read off the frame's own
--- function, which is the one thing a chain step does carry — IS NOT
--- AVAILABLE EITHER, WHICH IS WHY THE FINDING IS THE CURRENCY RATHER
--- THAN THE PIN.  It answers a function that DROPS its argument and not
--- one that FOLDS over it: what such a template hands back rises a layer
--- per DELIVERY, and the delivery count is the half of a payload's
--- reading that `valsHop` projects away.  So no ℕ computed from the
--- frame and the incoming HOP bounds a map frame at all, and the shelf's
--- own leaf is false the same way.  Until the payload currency carries
--- the count, every statement of this family is stated in something that
--- cannot separate its own witnesses — so what is owed is a restatement
--- of `FrameCarries` and of everything pinned against it, not of these
--- two heads.
---
--- AND THE FOLD'S ASYMMETRY IS STILL FORCED, so no repair may simply pin
--- it at `Rin`: its outputs are the successive ACCUMULATORS, a function
--- of the store and the step, and a step ignoring its second argument
--- cuts the payload out of the answer entirely.
---
--- REFUTED: `Refuted.Path-Heads` — both heads at the walk's own
---   instantiation, and the count axis that kills the repair.
--- REFUTED: `Refuted.Scan-Store` — the symmetric form, where the fold's
---   residue is its own incoming bound.
-postulate
-  map-head-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {τ}
-    (ac : Acc _≺_ τ) (id : Id) (now : Tick) (fn : Fn Γ [] [] [] s u)
-    (κ : Path Γ u t) (ψ : Fin n → Rd₃) (Rin Rst : ℕ) →
-    FrameCarries {e = e} ac id now (map-f fn) κ ψ
-      Rin (Rst ∸ pathHops κ) Rst
-
-  scan-head-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {τ}
-    (ac : Acc _≺_ τ) (id : Id) (now : Tick)
-    (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
-    (κ : Path Γ u t) (ψ : Fin n → Rd₃) (Rin Rst : ℕ) →
-    FrameCarries {e = e} ac id now (scan-f fn nid) κ ψ
-      Rin (Rst ∸ pathHops κ) Rst
 
 ----------------------------------------------------------------------
 -- THE WALK.  One clause per path constructor, and one per frame under
@@ -325,17 +279,17 @@ postulate
 
 pathFits : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} {τ}
   (ac : Acc _≺_ τ) (gas : ℕ) (id : Id) (now : Tick) (ψ : Fin n → Rd₃)
-  (Rst : ℕ) (κ : Path Γ u t) (Rin : ℕ) → Rin + pathHops κ ≤ Rst →
+  (Rst : ℕ) (κ : Path Γ u t) (Rin : Rd) → PathUnder ψ Rst κ Rin →
   PathFits {e = e} ac gas id now ψ Rst κ Rin
 
 share-sink-dry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {τ}
   (ac : Acc _≺_ τ) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
-  (ψ : Fin n → Rd₃) (Rin Rst : ℕ) → Rin ≤ Rst →
+  (ψ : Fin n → Rd₃) (Rin : Rd) (Rst : ℕ) → proj₂ Rin ≤ Rst →
   ShareDryUnder {e = e} ac gas id now i ψ Rin Rst
 
 shareChainsFit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {τ}
   (ac : Acc _≺_ τ) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
-  (ψ : Fin n → Rd₃) (Rin Rst : ℕ)
+  (ψ : Fin n → Rd₃) (Rin : Rd) (Rst : ℕ)
   (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
   (ps : List (RegId × Path Γ (lookup Γ i) t))
   (sd : Sched Γ) (st : EvalSt e) →
@@ -345,22 +299,19 @@ shareChainsFit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {τ}
 pathFits ac gas id now ψ Rst root Rin h = at-root
 
 pathFits ac gas id now ψ Rst (share-sink i) Rin h =
-  at-sink (share-sink-dry ac gas id now i ψ Rin Rst
-            (≤-trans (m≤m+n Rin 0) h))
+  at-sink (share-sink-dry ac gas id now i ψ Rin Rst h)
 
 pathFits ac gas id now ψ Rst (map-f fn ↠ κ) Rin h =
-  through (map-head-carried ac id now fn κ ψ Rin Rst)
+  through (map-frame-carried ac id now fn κ ψ Rin Rst)
           (dry-under ac id now (map-f fn) κ ψ Rin Rst
             (map-frame-dry ac id now fn κ))
-          (pathFits ac gas id now ψ Rst κ (Rst ∸ pathHops κ)
-            (headroom-fits Rin κ Rst h))
+          (pathFits ac gas id now ψ Rst κ (mapRd ψ Rin fn) h)
 
 pathFits ac gas id now ψ Rst (scan-f fn nid ↠ κ) Rin h =
-  through (scan-head-carried ac id now fn nid κ ψ Rin Rst)
+  through (scan-frame-carried ac id now fn nid κ ψ Rin Rst)
           (dry-under ac id now (scan-f fn nid) κ ψ Rin Rst
             (scan-frame-dry ac id now fn nid κ))
-          (pathFits ac gas id now ψ Rst κ (Rst ∸ pathHops κ)
-            (headroom-fits Rin κ Rst h))
+          (pathFits ac gas id now ψ Rst κ (mapRd ψ Rin fn) h)
 
 pathFits ac gas id now ψ Rst (take-f nid ↠ κ) Rin h =
   through (take-frame-carried ac id now nid κ ψ Rin Rst)
@@ -374,15 +325,11 @@ pathFits ac gas id now ψ Rst (from-inner op k j ↠ κ) Rin h =
           (pathFits ac gas id now ψ Rst κ Rin h)
 
 pathFits ac gas id now ψ Rst (thru-outer op nid ↠ κ) Rin h =
-  through (thru-outer-frame-carried ac id now op nid κ ψ Rin Rst fit)
-          (thru-outer-frame-dry ac id now op nid κ ψ Rin Rst fit)
-          (pathFits ac gas id now ψ Rst κ (suc Rin) h′)
-  where
-  h′ : suc Rin + pathHops κ ≤ Rst
-  h′ = ≤-trans (≤-reflexive (sym (+-suc Rin (pathHops κ)))) h
-
-  fit : suc Rin ≤ Rst
-  fit = ≤-trans (m≤m+n (suc Rin) (pathHops κ)) h′
+  through (thru-outer-frame-carried ac id now op nid κ ψ Rin Rst
+            (proj₁ h))
+          (thru-outer-frame-dry ac id now op nid κ ψ Rin Rst (proj₁ h))
+          (pathFits ac gas id now ψ Rst κ
+            (proj₁ Rin , suc (proj₂ Rin)) (proj₂ h))
 
 -- THE SINK'S BODY.  A spent counter reaches the dispatch's clamp, which
 -- emits nothing at all; every other reaches the fan-out's fold, and
@@ -420,17 +367,23 @@ shareChainsFit {e = e} ac gas id now i ψ Rin Rst vals fin
 -- proof.
 ----------------------------------------------------------------------
 
--- ONE CHAIN'S HEADROOM.  The walk needs the arriving payload plus the
--- chain's flatteners to fit under the rank the arrival enters at, and
--- that rank is the program's own reading ABOVE the join the payload
--- sits in — so what this really asks is that a registered chain carry
--- no more flatteners than the program reads, which is the form the
--- remaining risk of this face is now stated in.
+-- ONE CHAIN'S HEADROOM.  The walk needs the ARRIVING VALUE'S OWN
+-- READING, threaded down the chain, to keep each flattener under the
+-- rank the arrival enters at — and that rank is the program's own
+-- reading ABOVE the join the payload sits in, so what this really asks
+-- is that a registered chain not flatten past what the program reads.
+-- That is the form the remaining risk of this face is now stated in.
+--
+-- AND THE PAYLOAD ENTERS IN FULL RATHER THAN AT ITS HOP, which is the
+-- one place the widening is visible from outside this module: a value's
+-- reading carries the delivery count a template has to be read against,
+-- and dropping it here would put the walk back where its two heads were
+-- unstatable.
 HopsFitAt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} →
   (a : Arrival Γ) → Sched Γ → EvalSt e → Path Γ (arrTy a) t → Set
 HopsFitAt a sched st c =
   let ψ = slotRd (Sched.slots sched) in
-  depthᵛ ψ (arrTy a) (arrVal a) + pathHops c ≤ arrivalRank a sched st
+  PathUnder ψ (arrivalRank a sched st) c (rdᵛ ψ (arrTy a) (arrVal a))
 
 ChainsHop : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} →
   (a : Arrival Γ) → Id → List (RegId × Path Γ (arrTy a) t) →
@@ -479,7 +432,7 @@ chainsFit {n = n} {e = e} a id ((rid , c) ∷ cs) sched st hp
 ... | false =
       pathFits (arrivalWitness a sched st′) n id (arrTick a)
         (slotRd (Sched.slots sched)) (arrivalRank a sched st′) c
-        (depthᵛ (slotRd (Sched.slots sched)) (arrTy a) (arrVal a))
+        (rdᵛ (slotRd (Sched.slots sched)) (arrTy a) (arrVal a))
         (proj₁ hp)
       , chainsFit {e = e} a id cs (proj₁ (proj₂ out)) (proj₂ (proj₂ out))
           (proj₂ hp)

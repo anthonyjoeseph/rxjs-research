@@ -56,14 +56,14 @@ open import Rx.Prim using (Tick; Id; Source; InstEvent; value;
   close; complete; handoff; exhausted; delivery; _at_from_as_)
 open import Rx.Exp using (Ctx; Closed; Val)
 open import Rx.Strat-Order using (_≺_)
-open import Rx.Hop-Depth using (Rd₃; depthᵉ; depthᵛ)
+open import Rx.Hop-Depth using (Rd; Rd₃; depthᵉ; depthᵛ; rdᵛ)
 open import Rx.Slot-Read using (slotRd)
 open import Rx.Evaluator using (Path; Sched; EvalSt; RegId; Arrival;
   arrTy; arrVal; arrTick; arrSource; arrivalWitness;
   foldPath; shareGo; shareAdmit; shareLatch;
   chainStep; cascadeGo; dispatchShare; stepFrame; dryEvent; hasDry;
   stHop)
-open import Verify-Rank-Sufficient.Carried using (valsHop)
+open import Verify-Rank-Sufficient.Carried using (valsRd; _⊑_)
 open import Verify-Rank-Sufficient.Dry-Emits using (hasDry-++; hasDry-single)
 open import Verify-Rank-Sufficient.Push-Dry using (any-dry-++; tailPart-dry)
 open import Verify-Rank-Sufficient.Fits using (PathFits; at-root; at-sink;
@@ -77,11 +77,11 @@ open import Verify-Rank-Sufficient.Fits using (PathFits; at-root; at-sink;
 
 foldPath-dry-free : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} {τ}
   (ac : Acc _≺_ τ) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
-  {ψ : Fin n → Rd₃} {R Rst : ℕ} {κ : Path Γ u t}
+  {ψ : Fin n → Rd₃} {R : Rd} {Rst : ℕ} {κ : Path Γ u t}
   (vals : List (Val Γ u)) (evs : List (InstEvent (Val Γ t))) (fin : Bool)
   (sd : Sched Γ) (st : EvalSt e) →
   PathFits {e = e} ac gas id now ψ Rst κ R →
-  valsHop ψ u vals ≤ R → stHop ψ st ≤ Rst →
+  valsRd ψ u vals ⊑ R → stHop ψ st ≤ Rst →
   any dryEvent evs ≡ false →
   hasDry (proj₁ (foldPath ac gas id now envSrc κ vals evs fin sd st)) ≡ false
 
@@ -127,11 +127,11 @@ foldPath-dry-free {Γ = Γ} {t = t} {e = e} ac gas id now envSrc vals evs fin sd
 
 shareGo-dry-free : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {τ}
   (ac : Acc _≺_ τ) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
-  {ψ : Fin n → Rd₃} {Rin Rst : ℕ}
+  {ψ : Fin n → Rd₃} {Rin : Rd} {Rst : ℕ}
   (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
   (ps : List (RegId × Path Γ (lookup Γ i) t))
   (sd : Sched Γ) (st : EvalSt e) →
-  valsHop ψ (lookup Γ i) vals ≤ Rin →
+  valsRd ψ (lookup Γ i) vals ⊑ Rin →
   ShareChainsFit {e = e} ac gas id now i ψ Rin Rst vals fin ps sd st →
   hasDry (proj₁ (shareGo ac gas id now i vals fin ps sd st)) ≡ false
 shareGo-dry-free ac gas id now i vals fin []              sd st hv fits = refl
@@ -172,10 +172,10 @@ shareGo-dry-free {Γ = Γ} {t = t} {e = e} ac gas id now i {ψ = ψ}
 
 dispatchShare-dry-free : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {τ}
   (ac : Acc _≺_ τ) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
-  {ψ : Fin n → Rd₃} {Rin Rst : ℕ}
+  {ψ : Fin n → Rd₃} {Rin : Rd} {Rst : ℕ}
   (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
   (sd : Sched Γ) (st : EvalSt e) →
-  valsHop ψ (lookup Γ i) vals ≤ Rin →
+  valsRd ψ (lookup Γ i) vals ⊑ Rin →
   ShareFits {e = e} ac gas id now i ψ Rin Rst vals fin sd st →
   hasDry (proj₁ (dispatchShare ac (suc gas) id now i vals fin sd st))
     ≡ false
@@ -204,14 +204,14 @@ chainStep-dry-free : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sched : Sched Γ) (st : EvalSt e) →
   PathFits {e = e} (arrivalWitness a sched st) n id (arrTick a)
     (slotRd (Sched.slots sched)) (arrivalRank a sched st) c
-    (depthᵛ (slotRd (Sched.slots sched)) (arrTy a) (arrVal a)) →
+    (rdᵛ (slotRd (Sched.slots sched)) (arrTy a) (arrVal a)) →
   hasDry (proj₁ (chainStep id a c sched st)) ≡ false
 chainStep-dry-free {n = n} {Γ = Γ} {t = t} {e = e} id a c sched st fit =
   foldPath-dry-free (arrivalWitness a sched st) n id (arrTick a) (arrSource a)
     (arrVal a ∷ [])
     (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
     (Arrival.isLast a) sched st fit
-    (≤-reflexive (⊔-identityʳ _))
+    (≤-reflexive (⊔-identityʳ _) , ≤-reflexive (⊔-identityʳ _))
     (≤-trans (m≤n⊔m (depthᵛ ψ (arrTy a) (arrVal a)) (stHop ψ st))
              (m≤n+m (depthᵛ ψ (arrTy a) (arrVal a) ⊔ stHop ψ st) (depthᵉ ψ e)))
     (seed-dry (Arrival.isLast a))

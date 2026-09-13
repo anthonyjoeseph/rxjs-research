@@ -60,7 +60,7 @@
 -- finding — had the gate's reading tracked its body, the two bounds
 -- would have come back equal and there would be no blindness to report.
 --
--- TARGET: thru-outer-frame-carried @2de90d
+-- TARGET: thru-outer-frame-carried @260099
 module Probed.Defer-Blind where
 
 open import Data.Bool using (Bool)
@@ -78,12 +78,12 @@ open import Rx.Exp using (Ctx; Closed; Val; natᵗ; obs;
   ofᵉ; mergeAllᵉ; deferᵉ; strmᵗ; nat̂)
 open import Rx.Slots using (Slots)
 open import Rx.Strat-Order using (_≺_)
-open import Rx.Hop-Depth using (Rd₃; depthᵉ)
+open import Rx.Hop-Depth using (Rd; Rd₃; depthᵉ; rdᵉ; ε)
 open import Rx.Slot-Read using (slotRd)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; NodeId; subscribeE;
   rootWitness; rootTri; root; _↠_; sched-init; st-init; mintNode;
   thru-outer; mergeAllᵒ; splitBurst; stepFrame; stHop)
-open import Verify-Rank-Sufficient.Carried using (valsHop)
+open import Verify-Rank-Sufficient.Carried using (valsRd)
 open import Verify-Rank-Sufficient.Push-Carried
   using (thru-outer-frame-carried)
 open import Probed.Apparatus using (Confirms; Below)
@@ -134,6 +134,11 @@ module Ap {n} {Γ : Ctx n} (ins : Slots Γ) (prog : Closed Γ (obs natᵗ))
      × Bool × Sched Γ × EvalSt prog
   sf = stepFrame ac 0 0 (thru-outer mergeAllᵒ nid) root vals fin sd st
 
+  -- the source's own payload PAIR, which is what the walk enters this
+  -- frame at
+  Rin : Rd
+  Rin = proj₂ (rdᵉ ψ ε src)
+
   bound : ℕ
   bound = depthᵉ ψ src
 
@@ -148,10 +153,16 @@ module Ap {n} {Γ : Ctx n} (ins : Slots Γ) (prog : Closed Γ (obs natᵗ))
   -- the payload is held to, what it gave back, what the store read going
   -- in, what it reads coming out, and the bound the store half is held
   -- to
+  -- and the DELIVERY side of the same pair: handed, the bound, returned
+  counts : ℕ
+  counts = proj₁ (valsRd ψ (obs (obs natᵗ)) vals)
+         + 1000 * proj₁ Rin
+         + 1000000 * proj₁ (valsRd ψ (obs natᵗ) (proj₁ sf))
+
   packed : ℕ
-  packed = valsHop ψ (obs (obs natᵗ)) vals
+  packed = proj₂ (valsRd ψ (obs (obs natᵗ)) vals)
          + 1000 * bound
-         + 1000000 * valsHop ψ (obs natᵗ) (proj₁ sf)
+         + 1000000 * proj₂ (valsRd ψ (obs natᵗ) (proj₁ sf))
          + 1000000000 * stIn
          + 1000000000000 * stHop ψ (proj₂ (proj₂ (proj₂ (proj₂ sf))))
          + 1000000000000000 * Rst
@@ -222,6 +233,18 @@ open-is = refl
 gated-is : Gated.packed ≡ 2000000000001001
 gated-is = refl
 
+-- AND THE DELIVERY SIDE, which the hop figures project away.  Read low
+-- first: handed, bound, returned.  Both rows are DEGENERATE here as they
+-- are in the conjuncts above — the open point returns nothing under a
+-- bound of one and the gated point reads nought throughout, since a
+-- source emitting a single inner hands the frame back an empty burst.
+open-counts : Open.counts ≡ 1001
+open-counts = refl
+
+gated-counts : Gated.counts ≡ 0
+gated-counts = refl
+
+
 ----------------------------------------------------------------------
 -- THE TARGET, AT BOTH POINTS.  The premise and both hypotheses are
 -- DECIDED rather than assumed, and the store bound is the least one they
@@ -231,11 +254,11 @@ gated-is = refl
 ----------------------------------------------------------------------
 
 openRow : Confirms (thru-outer-frame-carried Open.ac 0 0 mergeAllᵒ Open.nid
-  root Open.ψ Open.bound Open.Rst Below Open.vals Open.fin Open.sd Open.st
-  Below Below)
-openRow = Below , Below
+  root Open.ψ Open.Rin Open.Rst Below Open.vals Open.fin Open.sd Open.st
+  (Below , Below) Below)
+openRow = (Below , Below) , Below
 
 gatedRow : Confirms (thru-outer-frame-carried Gated.ac 0 0 mergeAllᵒ
-  Gated.nid root Gated.ψ Gated.bound Gated.Rst Below Gated.vals Gated.fin
-  Gated.sd Gated.st Below Below)
-gatedRow = Below , Below
+  Gated.nid root Gated.ψ Gated.Rin Gated.Rst Below Gated.vals Gated.fin
+  Gated.sd Gated.st (Below , Below) Below)
+gatedRow = (Below , Below) , Below

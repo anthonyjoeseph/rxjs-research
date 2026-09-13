@@ -49,6 +49,11 @@ open import Probed.Operator-Root
 open import Probed.Carried-Leaf
   using (ofFlat; ofNest; scanFlat; scanNest; rate; packed-is; packed2L-is;
          recurRow)
+-- and the delivery figure, claimed because it is TIGHT at both points —
+-- two against two and three against three — so a reading that
+-- undercharged a literal list by one delivery crosses here, where every
+-- hop figure beside it would stay where it is
+open import Probed.Carried-Leaf using (ofPacked-is)
 
 -- the two pinned figures are claimed beside the rows because the store
 -- half and the payload half come back EQUAL at every point, and a
@@ -56,6 +61,15 @@ open import Probed.Carried-Leaf
 open import Probed.Fold-Burst
   using (rate₁; rate₄; layers₃; product; queued; nested;
          oneLayer-is; twoLayer-is)
+
+-- and the two WIDE rows, whose steps re-wrap two copies of the
+-- accumulator and three: they are claimed with the count figures rather
+-- than alone because the six rows above are degenerate on the delivery
+-- axis and these are not, and the figures are what say so — sixty-four
+-- and seven hundred and twenty-nine out of six refolds, against a
+-- reading flat in the rate that would read six at both
+open import Probed.Fold-Burst
+  using (widened; widened3; sixCounts-is; wideCount-is; wide3Count-is)
 
 -- the four pinned figures are claimed beside the rows because the
 -- payload half and the store half are what make either conjunct
@@ -65,21 +79,53 @@ open import Probed.Take-Frame
   using (takeCut₁; takeEdge₂; takePass; takeDeep; takeMid; takeCut;
          cut₁-is; edge₂-is; pass-is; deep-is; mid-is; cut-is)
 
+-- and the delivery side, where one row is a comparison and the rest are
+-- the floor.  The five degenerate counts are claimed BECAUSE they are
+-- degenerate: a source delivering once reads one against one, so the
+-- wide row — nine handed against three returned, a cut the take does
+-- not get to lower — is the only place this axis could have crossed,
+-- and its own row is claimed beside it
+open import Probed.Take-Frame
+  using (takeWide; wide-is; wide-counts;
+         cut₁-counts; edge₂-counts; pass-counts; deep-counts;
+         mid-counts; cut-counts)
+
 open import Probed.Hop-Edge
   using (hopRow₁; hopRow₂; hopRow₃; hopRowP; hopRowS; hopRowE;
          packed₁-is; packed₂-is; packed₃-is; packedP-is; packedS-is;
          packedE-is)
+-- and the delivery digits the packed hop figures project away, claimed
+-- at the three shapes the hop family could not separate on that axis
+open import Probed.Hop-Edge using (countsP-is; countsS-is; countsE-is)
 
--- the six figures are claimed beside the rows because two independent
+-- the figures are claimed beside the rows because two independent
 -- tightnesses are what make the rows mean anything: the GROWING rows
 -- return exactly their bound, and what every row is HANDED equals the
 -- source's own reading, so a repair loosening either end would leave the
--- rows green over a comparison with margin nobody had checked
+-- rows green over a comparison with margin nobody had checked.  They
+-- come in PAIRS because the payload does: a count figure and a hop
+-- figure per point, so a repair that read only one half would leave the
+-- other standing unexamined
 open import Probed.Map-Frame
   using (mapGrow₀; mapShed₀; mapKeep₀; mapGrow₁; mapShed₁; mapKeep₁;
          mapGrowS; mapShedS; mapKeepS;
-         grow₀-is; shed₀-is; keep₀-is; grow₁-is; shed₁-is; keep₁-is;
-         growS-is; shedS-is; keepS-is)
+         grow₀-counts; grow₀-hops; grow₀-stores;
+         shed₀-counts; shed₀-hops; keep₀-counts; keep₀-hops;
+         grow₁-counts; grow₁-hops; shed₁-counts; shed₁-hops;
+         keep₁-counts; keep₁-hops;
+         growS-counts; growS-hops; growS-stores;
+         shedS-counts; shedS-hops; keepS-counts; keepS-hops)
+
+-- and the delivery family, whose three rows are claimed with SIX
+-- figures because the finding is a DIRECTION and not a height: counts
+-- one, three and five in against one, nine and twenty-five out, hops
+-- three, five and seven — so a bound that merely saturated would show
+-- as a figure standing still across the triple, which no single row
+-- could report
+open import Probed.Map-Frame
+  using (mapFold₁; mapFold₃; mapFold₅;
+         fold₁-counts; fold₁-hops; fold₃-counts; fold₃-hops;
+         fold₅-counts; fold₅-hops)
 
 -- the two-readings identities are claimed alongside the rows because
 -- they are what the rows rest on rather than what the rows show: they
@@ -90,6 +136,11 @@ open import Probed.Map-Frame
 open import Probed.Hop-Store
   using (stRow₀; stRow₁; stRow₂; q0-is; q1-is; q2-is;
          same₀; same₁; same₂)
+-- and the delivery digit at the shallowest queue, claimed because the
+-- hypothesis is SATURATED there: this family varies the store, so the
+-- count side sitting where the outer's reading puts it is what says the
+-- store axis is the one being moved
+open import Probed.Hop-Store using (counts₀-is)
 
 -- the two readings are claimed AHEAD of the rows here, inverting the
 -- usual order, because the rows are degenerate in their conjuncts and
@@ -98,6 +149,11 @@ open import Probed.Hop-Store
 -- its body would leave both rows green with nothing separating them
 open import Probed.Defer-Blind
   using (body-reads; gate-reads; open-is; gated-is; openRow; gatedRow)
+-- and the delivery digits, claimed as degenerate for the same reason
+-- the rows above them are: a source emitting a single inner hands the
+-- frame back an empty burst, so nothing on this axis could have failed
+-- and saying so is what stops the rows being read as coverage
+open import Probed.Defer-Blind using (open-counts; gated-counts)
 
 -- the sweep figures are claimed beside the fork because the separation
 -- alone would not say the margin is nil: the fork says the two rules
@@ -156,16 +212,6 @@ open import Probed.Share-Fanout
   using (fanoutFork; oneRow; thriceRow; mixedRow; payRow;
          quietRow; quietAgree)
 
--- the store figures are claimed beside the three dry rows because each
--- is a way a dry-free reading could have been green having dispatched
--- nothing — an empty registration list, a store that was nought going
--- in, or one the dispatch never wrote — and the quiet row is claimed
--- for the opposite reason: it is nought at both ends, which is what
--- separates the dry property from the writing rather than controlling
--- for it
-open import Probed.Sink-Dry
-  using (one3-is; quiet3-is; sinkOne3; sinkQuiet3)
-
 -- the three packed figures are claimed beside the dry rows because the
 -- dry flag reading false says nothing on its own — it is false at a
 -- point nothing emitted too — so what makes those rows evidence is the
@@ -177,3 +223,9 @@ open import Probed.Exit-Frame
   using (packed₁-is; packed₂-is; packed₃-is; fi-packed-is;
          dryRow₁; dryRow₂; dryRow₃;
          fromInnerCarried; fromInnerDry)
+
+-- and the delivery figures, claimed for the third reason again: handed
+-- equals held at every one of the three, so that half of the premise is
+-- SATURATED rather than slack, and a repair that lowered the bound on
+-- the count side would cross at all three at once
+open import Probed.Exit-Frame using (counts₁-is; counts₂-is; counts₃-is)
