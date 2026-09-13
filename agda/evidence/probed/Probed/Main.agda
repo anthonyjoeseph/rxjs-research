@@ -164,8 +164,7 @@ open import Probed.Share-Fanout
 -- separates the dry property from the writing rather than controlling
 -- for it
 open import Probed.Sink-Dry
-  using (one3-is; three3-is; quiet3-is;
-         sinkOne3; sinkThree3; sinkQuiet3)
+  using (one3-is; quiet3-is; sinkOne3; sinkQuiet3)
 
 -- the three packed figures are claimed beside the dry rows because the
 -- dry flag reading false says nothing on its own — it is false at a
