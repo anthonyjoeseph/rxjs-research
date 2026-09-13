@@ -1,6 +1,6 @@
 module Rx.Evaluator where
 
-open import Data.Bool    using (Bool; true; false; if_then_else_; not; _∨_; _∧_; T)
+open import Data.Bool    using (Bool; true; false; if_then_else_; not; _∨_; _∧_)
 open import Data.Fin     using (Fin; toℕ)
 open import Data.Fin.Properties using (toℕ<n) renaming (_≟_ to _≟ᶠ_)
 open import Data.Maybe   using (Maybe; just; nothing; is-nothing)
@@ -22,11 +22,7 @@ open import Rx.Prim using (Tick; Fuel; Ordinal; Id; Source; Timed; after_,_; hot
   cold; InstEvent; init; value; close; handoff; complete; cut; cutPending; exhausted; dried;
   subscribe; delivery; plumbing; InstEmit; _at_from_as_)
 open import Rx.Exp  using (Ty; obs; _×ᵗ_; _≟ᵗ_; Ctx; Val; Closed; Fn; applyFn; evalTm; unfoldμ; syncSizeᵉ; input; ofᵉ;
-  emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ;
-  inputsBelowᵉ)
-open import Rx.Inputs-Below using (below-input; below-map; below-take; below-scan;
-  below-mergeAll; below-switchAll; below-exhaustAll; below-μ; below-unfoldμ;
-  below-ctx; below-inner)
+  emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ)
 -- the order the subscription machine recurses on, in place of a
 -- counter: one constructor per non-structural edge, and nothing
 -- packed, so no edge owes a ceiling on the components it leaves alone
@@ -583,6 +579,18 @@ oneShotBurst vals id sched =
   in ((init src ∷ map value vals ++ close src exhausted ∷ complete ∷ [])
        at id from src as subscribe) ∷ [] , sched₁
 
+-- a source that was already spent before this subscription reached it
+-- — a completed Subject, a share whose def has closed, or a slot the
+-- registration's own floor test refuses.  Same shape as a one-shot with
+-- no values, but the source is GIVEN rather than minted, because the
+-- point is that this subscriber joins something that already has an
+-- identity.  Distinguished from `dryBurst` by the close reason, which
+-- is what `hasDry` reads: a spent source is an ordinary exhausted
+-- close, so a run that takes this arm is still wet.
+spentBurst : ∀ {A : Set} → Source → Id → List (InstEmit A)
+spentBurst src id =
+  ((init src ∷ close src exhausted ∷ complete ∷ []) at id from src as subscribe) ∷ []
+
 -- THE STUCK MARKER.  The subscription machine recurses on an
 -- accessibility witness for `Rx.Strat-Order`'s lexicographic triple,
 -- dropping one component at each of its three non-structural edges — a
@@ -692,7 +700,7 @@ hasDry (em ∷ ems) = any dryEvent (InstEmit.events em) ∨ hasDry ems
 -- expression carries it, which is the content.  `Rx.Inputs-Below` holds
 -- the descent arm each clause spends.
 subscribeE : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-           → Acc _≺_ τ → (b : Closed Γ u) → {ok : T (inputsBelowᵉ lo b)}
+           → Acc _≺_ τ → (b : Closed Γ u)
            → Path Γ lo u t → Id → Tick
            → Sched Γ → EvalSt e
            → Stream Γ u × Sched Γ × EvalSt e
@@ -774,7 +782,7 @@ subscribeInner {τ = _ , suc r , _} {lo = lo} (acc rec) op allNid κ id now o sc
   let inst = Sched.nextNode sched
       (burst , sched′ , st′) =
         subscribeE (rec (ltR {r′ = r} {s′ = syncSizeᵉ o} ≤-refl))
-                   o {below-inner lo o} (from-inner op allNid inst ↠ κ) id now
+                   o (from-inner op allNid inst ↠ κ) id now
                    (record sched { nextNode = suc inst }) st
       (vs , bs , done) = splitBurst burst
   in inst , vs , bs , done , sched′ , st′
@@ -1093,13 +1101,13 @@ pushBurst fuel id now f κ (em ∷ ems) sched st =
 -- subscribe the outer under a thru-outer frame, push the burst through
 subscribeAll : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
              → Acc _≺_ τ → AllOp → NodeState Γ → (b : Closed Γ (obs u))
-             → {ok : T (inputsBelowᵉ lo b)} → Path Γ lo u t
+             → Path Γ lo u t
              → Id → Tick → Sched Γ → EvalSt e
              → Stream Γ u × Sched Γ × EvalSt e
-subscribeAll fuel op initialState b {ok} κ id now sched st =
+subscribeAll fuel op initialState b κ id now sched st =
   let (nid , sched₁) = mintNode sched
       (burst , sched₂ , st₁) =
-        subscribeE fuel b {ok} (thru-outer op nid ↠ κ) id now sched₁
+        subscribeE fuel b (thru-outer op nid ↠ κ) id now sched₁
                    (installNode nid initialState st)
   in pushBurst fuel id now (thru-outer op nid) κ burst sched₂ st₁
 
@@ -1126,7 +1134,6 @@ sharedPlumb = map (λ em → record em { kind = plumbing })
 -- proof can name it (as with takeVals / thruConsume / mergeAllDrain)
 sharedConnect : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
               → Acc _≺_ τ → (i : Fin n) → (d : Closed Γ (lookup Γ i))
-              → {ok : T (inputsBelowᵉ (toℕ i) d)}
               → Path Γ lo (lookup Γ i) t → toℕ i < lo → Id → Tick
               → Sched Γ → EvalSt e
               → Stream Γ (lookup Γ i) × Sched Γ × EvalSt e
@@ -1138,7 +1145,7 @@ sharedConnect : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 -- walking a term whose `input i` clause reads η at i, and η at i IS the
 -- definition's own reading, so the rank the caller already stands at
 -- dominates the definition by the environment's defining equation.
-sharedConnect {τ = U , r , _} (acc rec) i d {ok} κ below id now sched st
+sharedConnect {τ = U , r , _} (acc rec) i d κ below id now sched st
   with unconn (Sched.slots sched) (toℕ i ∷ EvalSt.connectedShares st) <? U
 ... | no  _ = dryBurst id , sched , st
 ... | yes p =
@@ -1146,7 +1153,7 @@ sharedConnect {τ = U , r , _} (acc rec) i d {ok} κ below id now sched st
               (record st { connectedShares = toℕ i ∷ EvalSt.connectedShares st })
       (burst , sched₁ , st₂) =
         subscribeE (rec (ltU {r′ = r} {s′ = syncSizeᵉ d} p))
-                   d {ok} (share-sink i ≤-refl) id now sched st₁
+                   d (share-sink i ≤-refl) id now sched st₁
       -- the def's connect burst flows up the first subscriber's own
       -- frames (the returned burst); dispatch only serves arrivals
   in if burstCompleted burst
@@ -1162,39 +1169,36 @@ sharedConnect {τ = U , r , _} (acc rec) i d {ok} κ below id now sched st
 
 subscribeSharedSlot : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
                     → Acc _≺_ τ → (i : Fin n) → (d : Closed Γ (lookup Γ i))
-                    → {ok : T (inputsBelowᵉ (toℕ i) d)}
                     → Path Γ lo (lookup Γ i) t → toℕ i < lo → Id → Tick
                     → Sched Γ → EvalSt e
                     → Stream Γ (lookup Γ i) × Sched Γ × EvalSt e
-subscribeSharedSlot {Γ = Γ} {e = e} fuel i d {ok} κ below id now sched st =
+subscribeSharedSlot {Γ = Γ} {e = e} fuel i d κ below id now sched st =
   if memberSource (toℕ i) (EvalSt.completedSources st)
-  then ((init (toℕ i) ∷ close (toℕ i) exhausted ∷ complete ∷ [])
-         at id from toℕ i as subscribe) ∷ []
-       , sched , st
+  then spentBurst (toℕ i) id , sched , st
   else if memberSource (toℕ i) (EvalSt.connectedShares st)
   then -- live: join mid-flight, future values only
        ((init (toℕ i) ∷ []) at id from toℕ i as subscribe) ∷ []
        , sched , register (atSlot i) (lowerFloor below κ) st
-  else sharedConnect fuel i d {ok} κ below id now sched st
+  else sharedConnect fuel i d κ below id now sched st
 
-subscribeE {lo = lo} {Γ = Γ} fuel (input i) {ok} κ id now sched st with Sched.slots sched i
-... | shared d {okd} =
-      subscribeSharedSlot fuel i d {okd} κ (below-input {Γ = Γ} lo i ok) id now sched st
-... | scripted (hot _) =
+subscribeE {lo = lo} {Γ = Γ} fuel (input i) κ id now sched st with toℕ i <? lo
+... | no _ = spentBurst (toℕ i) id , sched , st
+... | yes below with Sched.slots sched i
+...   | shared d =
+      subscribeSharedSlot fuel i d κ below id now sched st
+...   | scripted (hot _) =
       if memberSource (toℕ i) (EvalSt.completedSources st)
       then -- spent script: a completed Subject — immediate
            -- close/complete, nothing registered
-           ((init (toℕ i) ∷ close (toℕ i) exhausted ∷ complete ∷ [])
-             at id from toℕ i as subscribe) ∷ []
-           , sched , st
+           spentBurst (toℕ i) id , sched , st
       else -- already live (sched-init, source = ordinal = toℕ i); just
            -- another registration — fan-out IS this multiplicity
            ((init (toℕ i) ∷ []) at id from toℕ i as subscribe) ∷ []
-           , sched , register (atSlot i) (lowerFloor (below-input {Γ = Γ} lo i ok) κ) st
-... | scripted (cold sync []) =
+           , sched , register (atSlot i) (lowerFloor below κ) st
+...   | scripted (cold sync []) =
       let (burst , sched₁) = oneShotBurst sync id sched
       in burst , sched₁ , st
-... | scripted (cold sync (d ∷ ds)) =
+...   | scripted (cold sync (d ∷ ds)) =
       -- per-subscription anchoring: a fresh source per subscribe, the
       -- async tail resolved against the subscription tick
       let (src , sched₁) = mintSource sched
@@ -1215,12 +1219,12 @@ subscribeE fuel emptyᵉ κ id now sched st =
   let (burst , sched₁) = oneShotBurst [] id sched
   in burst , sched₁ , st
 
-subscribeE {lo = lo} fuel (mapᵉ f b) {ok} κ id now sched st =
+subscribeE fuel (mapᵉ f b) κ id now sched st =
   let (burst , sched₁ , st₁) =
-        subscribeE fuel b {below-map lo f b ok} (map-f f ↠ κ) id now sched st
+        subscribeE fuel b (map-f f ↠ κ) id now sched st
   in pushBurst fuel id now (map-f f) κ burst sched₁ st₁
 
-subscribeE {lo = lo} fuel (takeᵉ count b) {ok} κ id now sched st with evalTm count
+subscribeE fuel (takeᵉ count b) κ id now sched st with evalTm count
 ... | zero =
       -- take 0 never subscribes its source (as in rxjs): a spent
       -- one-shot, exactly emptyᵉ
@@ -1229,36 +1233,33 @@ subscribeE {lo = lo} fuel (takeᵉ count b) {ok} κ id now sched st with evalTm 
 ... | suc k =
       let (nid , sched₁) = mintNode sched
           (burst , sched₂ , st₁) =
-            subscribeE fuel b {below-take lo count b ok} (take-f nid ↠ κ) id now sched₁
+            subscribeE fuel b (take-f nid ↠ κ) id now sched₁
                        (installNode nid (take-st (suc k)) st)
       in pushBurst fuel id now (take-f nid) κ burst sched₂ st₁
 
-subscribeE {lo = lo} fuel (scanᵉ f seed b) {ok} κ id now sched st =
+subscribeE fuel (scanᵉ f seed b) κ id now sched st =
   let (nid , sched₁) = mintNode sched
       (burst , sched₂ , st₁) =
-        subscribeE fuel b {below-scan lo f seed b ok} (scan-f f nid ↠ κ) id now sched₁
+        subscribeE fuel b (scan-f f nid ↠ κ) id now sched₁
                    (installNode nid (scan-st (evalTm seed)) st)
   in pushBurst fuel id now (scan-f f nid) κ burst sched₂ st₁
 
-subscribeE {lo = lo} {u = u} fuel (mergeAllᵉ lim b) {ok} κ id now sched st =
+subscribeE {u = u} fuel (mergeAllᵉ lim b) κ id now sched st =
   subscribeAll fuel mergeAllᵒ (mergeAll-st {t = u} lim 0 [] false) b
-               {below-mergeAll lo lim b ok} κ id now sched st
-subscribeE {lo = lo} fuel (switchAllᵉ b) {ok} κ id now sched st =
-  subscribeAll fuel switchᵒ (switch-st nothing false) b
-               {below-switchAll lo b ok} κ id now sched st
-subscribeE {lo = lo} fuel (exhaustAllᵉ b) {ok} κ id now sched st =
-  subscribeAll fuel exhaustᵒ (exhaust-st false false) b
-               {below-exhaustAll lo b ok} κ id now sched st
+               κ id now sched st
+subscribeE fuel (switchAllᵉ b) κ id now sched st =
+  subscribeAll fuel switchᵒ (switch-st nothing false) b κ id now sched st
+subscribeE fuel (exhaustAllᵉ b) κ id now sched st =
+  subscribeAll fuel exhaustᵒ (exhaust-st false false) b κ id now sched st
 
 -- one unfold per subscription; the recursive occurrences inside the
 -- unfolding are deferᵉ-gated, so each re-entry costs a schedule hop —
 -- no synchronous loop.  A fuel decrement edge: the unfolding is
 -- larger than the μ, not a subterm
-subscribeE {τ = _ , _ , sz} {lo = lo} (acc rec) (μᵉ body) {ok} κ id now sched st
+subscribeE {τ = _ , _ , sz} (acc rec) (μᵉ body) κ id now sched st
   with syncSizeᵉ (unfoldμ body) <? sz
 ... | no  _ = dryBurst id , sched , st
-... | yes p = subscribeE (rec (ltS p)) (unfoldμ body)
-                         {below-unfoldμ lo body (below-μ lo body ok)} κ id now sched st
+... | yes p = subscribeE (rec (ltS p)) (unfoldμ body) κ id now sched st
 
 subscribeE fuel (varᵉ ()) κ id now sched st
 
@@ -1539,6 +1540,6 @@ drain (suc k) nextId sched st with sched-next sched
 evaluate : ∀ {n} {Γ : Ctx n} {t} → Fuel → Closed Γ t → Slots Γ → Stream Γ t
 evaluate {n = n} fuel e ins =
   let (burst , sched₀ , st₀) =
-        subscribeE {lo = n} (rootWitness e ins) e {below-ctx e} root 0 0 (sched-init e ins)
+        subscribeE {lo = n} (rootWitness e ins) e root 0 0 (sched-init e ins)
           (st-init e)
   in burst ++ drain fuel 1 sched₀ st₀
