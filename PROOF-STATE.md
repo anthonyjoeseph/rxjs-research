@@ -217,9 +217,10 @@ research lives; where they disagree, the header wins.
 **THE TIER IS ONE STATEMENT AND IT IS CURRENTLY FALSE.** `rank-sufficient`
 (Verify-Rank-Sufficient) says no run emits the dry marker; `Refuted.Dry-Wrap`
 kills it three times against the evaluator as it stands. It is now three bodies
-over four leaves, and the falsity sits in the two TOTALITY leaves — a derivation
-at each cycle's own output. Both are false exactly as long as the three guarded
-arms are, and both come true at the cutover.
+over four leaves, and the risk sits in the two TOTALITY leaves — a derivation at
+each cycle's own output. Both are false as long as the three guarded arms are,
+and the subscribe half is additionally wrong AS WRITTEN — it now carries an
+`EntryOK` premise.
 
 **AND THE MEASURE IS HELD BY SOMETHING NO STATEMENT MENTIONS: THE RUN HAS TO
 COMPUTE IT.** Three non-structural edges TEST a reading and emit dry on the
@@ -267,16 +268,26 @@ cannot compute — and the other two leaves carry no arithmetic at all.
   not a sequel to it: building a derivation at a hop IS discharging that guard's
   positive branch.
 
+- **GROW `EntryOK` TO ITS SECOND AND THIRD CONJUNCTS, EACH FORCED BY ITS OWN
+  WITNESS.** `Refuted.Totality-Entry` killed the unquantified totality claim at
+  a `μ` over a one-shot source entered at the zero triple, and the premise it
+  forced — `syncSizeᵉ b ≤ sz` — is one of three, one per component the machine
+  reads against the term. The other two are the hop's rank and the share
+  connect's unconnected count, so this leg is where legs one to three are
+  SPENT: `EntryOK b (U , r , sz)` becomes a product whose rank conjunct is the
+  carried report, roughly `allUnder r (storedOf b st) × unconn (Sched.slots sched) [] ≤ U`.
+  Write the refutation FIRST in each case — the unconditional form of each
+  conjunct is what says the conjunct is not a guess.
+
 - **THEN GROUND `subscribeE⇓-total`, WHICH IS THE TERMINATION ARGUMENT.** The
   first of the two leaves the totality assembly now stands on. It goes clause
   by clause over the twelve subscribe-cycle families, each arm building the
-  matching constructor of `subscribeE⇓` out of sub-derivations at the
-  recursive calls. The two guards the relation does not
-  index are discharged HERE and nowhere else: the unfold's
-  `syncSizeᵉ (unfoldμ body) <? sz` and the share connect's, neither of which is
-  a function of the relation's own arguments. What is left is an induction free
-  to use any measure a PROOF may use, including quantities the machine cannot
-  compute — the constraint every dead candidate died under.
+  matching constructor of `subscribeE⇓` out of sub-derivations at the recursive
+  calls, and re-establishing `EntryOK` at each of them — which is the real work,
+  since the three non-structural edges are exactly where it has to be rebuilt
+  rather than carried. What is left is an induction free to use any measure a
+  PROOF may use, including quantities the machine cannot compute — the
+  constraint every dead candidate died under.
 
 - **AND `drain⇓-total`, WHICH IS ORDINARY FUEL INDUCTION ONCE ITS SIBLING
   EXISTS.** `drain⇓ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (fuel : Fuel) (id : Id) (sched : Sched Γ) (st : EvalSt e) → drain⇓ {e = e} fuel id sched st (drain fuel id sched st)`,
@@ -295,19 +306,7 @@ cannot compute — and the other two leaves carry no arithmetic at all.
   no rank and no order appears anywhere in it, which is exactly what the
   relation bought — an arithmetic obligation became a list induction.
 
-- **`drain⇓-nodry` AS A BODY, THE SAME SHELF OVER THE OTHER CYCLE.** The drain
-  and cascade families, plus the arrival path that re-enters a subscribe, so it
-  takes leg five's result as a premise rather than repeating it. Separated from
-  leg five because the two cycles are genuinely separate inductions — the
-  relation splits them in `eval-run` — and because a single leg over both is one
-  commit nobody can review.
-
 ### The ledger
-
-- **`subscribeE⇓-total`** (Verify-Rank-Sufficient) — FALSITY, `PROBED`: a
-  derivation exists at the subscribe cycle's own output, at the triple
-  `evaluate` enters at. Carries the two guards the relation does not index —
-  the μ unfold's and the share connect's — and comes true at the cutover.
 
 - **`drain⇓-total`** (Verify-Rank-Sufficient) — FALSITY, `PROBED`: the same
   over the arrival cycle. It carries no guard itself; its cascade arm re-enters
@@ -323,6 +322,12 @@ cannot compute — and the other two leaves carry no arithmetic at all.
   over the drain and cascade families. One arrival reaches it, at the state the
   root subscribe actually left; the cancelled arm and every chain carrying a
   frame are uncovered.
+
+- **`subscribeE⇓-total`** (Verify-Rank-Sufficient) — SHAPE, `PROBED`: a
+  derivation at the subscribe cycle's own output, now under `EntryOK`. The
+  unconditional form is refuted at a starved entry; the premise that forced
+  covers one of the three components read against the term, so two more
+  conjuncts are guaranteed.
 
 ## Tier 2 — Verify-Well-Formed (parked behind tier 1)
 

@@ -34,12 +34,14 @@
 module Verify-Rank-Sufficient where
 
 open import Data.Bool using (false)
+open import Data.Nat using (_≤_)
+open import Data.Nat.Properties using (≤-refl)
 open import Data.Product using (_,_)
 open import Induction.WellFounded using (Acc)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 
 open import Rx.Prim  using (Fuel; Id; Tick)
-open import Rx.Exp   using (Ctx; Closed)
+open import Rx.Exp   using (Ctx; Closed; syncSizeᵉ)
 open import Rx.Slots using (Slots)
 open import Rx.Strat-Order using (Tri; _≺_)
 open import Rx.Evaluator using (Stream; Path; root; Sched; EvalSt;
@@ -76,6 +78,34 @@ open import Verify-Rank-Sufficient.Dry-Emits using (hasDry-++)
 --   breaks nothing — so this is a constraint on ORDER: the relation
 --   lands first and the arms come out against it.
 
+-- THE ENTRY INVARIANT, AND THE ONLY THING IT STANDS ON IS THAT THE
+-- UNCONDITIONAL FORM IS DEAD.  A totality claim quantified freely
+-- over the witness says a derivation exists at every entry, and three
+-- of the machine's clauses read a component of that entry against the
+-- TERM — so a caller free to pick the triple can starve a guard at a
+-- program with nothing hard in it.  This is what relates the two ends,
+-- and it is the one shape of hypothesis this repo admits without a
+-- restatement's cost being a laundering: the conditioned statement is
+-- the true one replacing a false one.
+--
+-- IT CARRIES ONE CONJUNCT AND IS EXPECTED TO GROW TO THREE, WHICH IS
+-- THE CONVERGENCE RATHER THAN AN OMISSION.  One guard per component:
+-- the μ unfold reads the synchronous size, the hop reads the rank, the
+-- share connect reads the unconnected count.  Only the first is
+-- stateable today — the other two are readings the carried report is
+-- being written to supply — and each lands the day its own witness
+-- forces it, so the predicate grows against a `⊥` rather than by
+-- guess.  The root satisfies this one definitionally: `evaluate` seeds
+-- the third component from the program's own size.
+--
+-- REFUTED: `Refuted.Totality-Entry` — the statement below WITHOUT this
+--   premise, at a `μ` over a one-shot source entered at the zero
+--   triple.  The witness claims the unfolding's size beside the run's
+--   dryness, so it reports the one number the guard reads against the
+--   one the caller chose.
+EntryOK : ∀ {n} {Γ : Ctx n} {u} → Closed Γ u → Tri → Set
+EntryOK b (_ , _ , sz) = syncSizeᵉ b ≤ sz
+
 -- THE SUBSCRIBE CYCLE'S HALF, AND IT CARRIES THE TWO GUARDS THE
 -- RELATION DOES NOT INDEX.  The hop's test became a sub-derivation and
 -- so is answered by whoever builds one; the μ unfold's `syncSize`
@@ -96,7 +126,8 @@ open import Verify-Rank-Sufficient.Dry-Emits using (hasDry-++)
 --   unfold, so neither guard this statement carries is covered.
 postulate
   subscribeE⇓-total : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
-    {τ : Tri} (ac : Acc _≺_ τ) (b : Closed Γ u) (κ : Path Γ lo u t)
+    {τ : Tri} (ac : Acc _≺_ τ) (b : Closed Γ u) → EntryOK b τ →
+    (κ : Path Γ lo u t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     subscribeE⇓ {e = e} b κ id now sched st
       (subscribeE {e = e} ac b κ id now sched st)
@@ -130,7 +161,7 @@ postulate
 evaluate⇓-total : ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t)
   (ins : Slots Γ) → evaluate⇓ fuel e ins (evaluate fuel e ins)
 evaluate⇓-total {n = n} fuel e ins =
-  eval-run (subscribeE⇓-total {lo = n} (rootWitness e ins) e root 0 0
+  eval-run (subscribeE⇓-total {lo = n} (rootWitness e ins) e ≤-refl root 0 0
               (sched-init e ins) (st-init e))
            (drain⇓-total fuel 1 _ _)
 
