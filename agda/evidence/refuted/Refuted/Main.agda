@@ -13,6 +13,14 @@
 -- RECOVERY: git show 919f115:agda/evidence/refuted/Refuted/
 module Refuted.Main where
 
+-- the widest of them, and the only one taken against a statement `src`
+-- declares a real BODY for: the two readings are claimed beside the two
+-- dry rows because the finding is their order, and the two witnesses
+-- beside each other because they die to different repairs — a summing
+-- map clause closes the first and leaves the fold exactly where it was
+open import Refuted.Dry-Wrap using (rank-sufficient-false;
+  rank-sufficient-false-fold; nest-p; dry-p; nest-q; dry-q)
+
 open import Refuted.Drain-Reachable using (drain-dry-free-false)
 -- the two figures are claimed beside the witness on purpose: an
 -- inequality refutation dies quietly when a repair enlarges the right

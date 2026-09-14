@@ -210,51 +210,48 @@ research lives; where they disagree, the header wins.
 
 ## Tier 1 — the descent never goes dry
 
-**THE TIER IS ONE STATEMENT, AND ITS PREMISE NO LONGER READS A STATE AT ALL.**
-`rank-sufficient` (Verify-Rank-Sufficient) says no run emits the dry marker.
-Every reading of a registry against the program is dead — the term's, the widest
-state-readable join, the arrival's own seed, the step's filtered spend — so the
-premise is now the frame shelf's own obligation at each template the run
-installed, against the payload that template is handed, and everything from the
-allowance down to one chain's fold is a real body over those obligations.
+**THE TIER IS ONE STATEMENT AND IT IS CURRENTLY FALSE.** `rank-sufficient`
+(Verify-Rank-Sufficient) says no run emits the dry marker, and
+`Refuted.Dry-Wrap` kills it at four lines of ordinary rxjs: a template wrapping
+its own argument hands a flattener a value written one `strmᵗ` deeper than the
+program shows, because `reify` at observable type IS `strmᵗ` while every clause
+of the nesting measure joins.
 
-**AND NOTHING IS ASKED ABOUT THE STEP BETWEEN TWO ARRIVALS, NOR BETWEEN TWO
-CHAINS**, which is where all six witnesses killed their readings: the premise
-recurses on the allowance and then on the chain list, taking each conjunct at
-the pair that cascade or that chain fold returns. So the whole of the debt is
-now at the door and at the templates the door's chains are built from.
+**SO WHAT MOVES IS THE MACHINE, NOT THE STATEMENT.** The claim is the tier's
+whole point and stays at full strength; what has to go is the guard comparing
+an emitted value against a figure read off the TERM. The store's nesting is
+already read and the arrival seed already joins it, so the missing re-seed is
+INSIDE one subscribe frame — which is where every remaining row now sits.
 
 ### Big picture tier roadmap
 
-- **THE MACHINE DECIDES THE RANK PEEL NOW AND THE DRY FACE STILL ARGUES FROM A
-  READING, WHICH IS THE CUTOVER'S WHOLE RESIDUE.** The peel tests the delivered
-  observable's nesting at the site it hops, so the dry arm is refused by a fact
-  about SYNTAX — while `FrameDryUnder` quantifies the frame's values freely and
-  `thru-outer-frame-dry` is held under a reading premise that cannot reach that
-  arm. Thread the nesting bound from the walk that knows which burst those
-  values came out of, through the path fold, to the frame; the edge fact then
-  has an assembly to be a leaf of instead of sitting outside the claim graph.
-  It asks the tier's open question of the one arm the machine already answers
-  for itself.
+- **THE SEED IS REFUTED AND THE REPAIR IS ASYMMETRIC, WHICH IS WHAT DECIDES THE
+  CURRENCY.** Summing the map clause where it joins closes the first witness
+  strictly — a template is applied once per value and `reify` costs exactly one
+  `strmᵗ` — and leaves the second exactly where it was, since a step re-applied
+  to its own accumulator deepens once per DELIVERY and no reading of syntax
+  counts deliveries. So a syntactic figure cannot be what a frame's output is
+  held to, and the leg that lands is the one saying what is: the store's
+  nesting is read already and the arrival seed already joins it, so what is
+  missing is a re-seed INSIDE one subscribe frame rather than a clause missing
+  from a measure.
 
-- **AND THE THREE RE-ENTRANT LEAVES ARE THE FALSITY NOTHING HAS NARROWED.**
-  `from-inner-dry`, `thru-outer-frame-dry` and `from-inner-carried` are the only
-  arms that re-enter the evaluator, and all three are instantiated only where
-  `innerReact` returns its payload untouched. The branch none of them reaches is
-  the same one in each case — a completing node whose queue is drained and whose
-  fresh bursts are appended — so one harness that reaches a completion under a
-  live flattener decides all three at once. It is ranked below the thread
-  because a leaf restated under a widened predicate is a leaf probed twice.
+- **AND THEN ALL FIVE FRAMES IN ONE PASS, BECAUSE THE RANK STOPPED
+  DISTINGUISHING THEM.** The five carried leaves were five because each paid
+  differently out of the one component that ordered the recursion; under the
+  split that component is definitional at every constructor and only the
+  reading is charged. What is left is one statement quantified over the frame
+  with a single case split, whose clauses differ only where the reading grows.
+  Proving them apart and unifying afterwards restates a family, which is the
+  move this campaign pays most for.
 
-- **AND THE FOLD'S FRAME IS MISSING TWO AXES, WHICH MAY BE ONE AXIS SHORTER
-  THAN IT WAS.** A frame is handed exactly two scalars, and a fold needs a
-  quantity from outside each — the payload bound is a POINTWISE join carrying
-  no cardinality, the store bound reads a scan node through the hop half of its
-  accumulator alone. So no right-hand side repairs `scan-frame-carried`. What
-  changed is that the carried face now takes a bound quantified where the walk
-  is stated rather than read off the machine's triple, which is an outside
-  quantity of exactly the missing kind; check whether it reaches the fold
-  before restating anything.
+- **AND THE DOOR DIES LAST, BECAUSE IT IS WHAT THE OTHER TWO ARE FOR.** With a
+  frame's output held to a bound the machine carries, the refusing arm of the
+  hop guard is unreachable rather than merely unreached, and `rank-sufficient`
+  is true by construction instead of by argument — no entry seeding left to be
+  shown adequate, because nothing is pre-paid. It is ranked last and not first
+  because a door killed against the current seed would be killed against the
+  very figure these witnesses refuted.
 
 ### Open questions
 
@@ -268,6 +265,16 @@ now at the door and at the templates the door's chains are built from.
   is either threaded in as a premise or the statement is made at the wrong
   index. Which of the two, per row, is what the remaining rows are waiting on.
   relevant: `entry-drain-hop`, `share-chain-hop`
+
+- **WHAT BOUNDS WHAT A FRAME HANDS OUT?** The descent's own figure is refuted
+  for that job, so nothing prices a frame's emissions at all: a fold builds its
+  accumulator at run time, one fresh layer per refold, and the arms that
+  re-enter the evaluator are exactly the ones whose outputs nobody has bounded.
+  Whether the bound is threaded in as a premise, carried on the burst beside
+  the values it prices, or read off a state the machine already keeps is what
+  these rows are jointly waiting on — and the three answers differ in who owes
+  the re-establishment, not merely in spelling.
+  relevant: `from-inner-dry`, `from-inner-carried`, `thru-outer-frame-dry`
 
 ### The ledger
 

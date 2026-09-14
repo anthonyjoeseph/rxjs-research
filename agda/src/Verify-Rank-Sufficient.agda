@@ -389,6 +389,20 @@ entry-drain-fits {n = n} fuel e ins =
 -- triple reads the program it is about to subscribe.  That reflexivity is
 -- the one place the entry seeding has to be shown adequate, and it is
 -- here rather than in the walk because the walk never sees it.
+--
+-- AND IT IS NOT ADEQUATE, WHICH IS WHY THIS BODY STANDS ON A LEAF THAT IS
+-- FALSE RATHER THAN MERELY UNPROVEN.  The seed reads the program, the
+-- guard spends it against an inner the run HANDS OUT, and substituting a
+-- value of observable type into a template goes through `reify` — which
+-- at that type is `strmᵗ`, so an instance is written one deeper than its
+-- template while every clause of the measure joins.  The repair is not
+-- available from this end: a summing map clause closes the wrapping
+-- template and not the fold, whose step deepens once per DELIVERY, so
+-- what a frame emits has to be priced by something the machine carries.
+-- Until it is, the burst half of this concatenation is the false one.
+--
+-- REFUTED: `Refuted.Dry-Wrap` — this statement, at two four-line
+--   programs, one per half of the repair.
 rank-sufficient :
   ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slots Γ) →
   hasDry (evaluate fuel e ins) ≡ false
