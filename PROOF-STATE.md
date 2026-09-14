@@ -245,12 +245,12 @@ first match, which is why `bug-cache` is off the gate for the duration and
   nought, where there is nothing to be strict about — is the leaf `eval-silent`.
   What is still unreached from Main is one shelf: `dep-eval-open`, `dep-fn-pos`,
   `dataSize`, `syncSize-applyFn`, `envDepth`, `applyFn-strict`. Their only
-  nameable consumer is `push-carries`, and the walk is BLOCKED one question
-  short: the shelf prices `applyFn` in a SUM while the measure reads a map as a
-  JOIN, and no premise about the frame closes that — the argument is the other
-  addend. Every shelf statement carries `isData`, where the sum collapses.
-  The leg asks whether a `map-f` frame stands at a non-data payload;
-  if it cannot, the restriction is the statement's.
+  nameable consumer is `push-carries`, which is FALSE: the shelf prices
+  `applyFn` in a SUM and the measure JOINS at a map, so a map over a stream of
+  streams goes deeper than either side — already witnessed, at
+  the shelf's own statement. `isData` is where the sum collapses, and the map
+  constructor takes any payload, so that restriction is the language's. This leg
+  is the measure's map clause: join to sum.
 
 - **THE TWO ENDS OF THE RUN, WHICH IS WHAT MAKES A ROW REDUCE.** `drain!` is
   fuel induction over the schedule and carries no guard at all; `mergeAllDrain!`
@@ -290,9 +290,9 @@ first match, which is why `bug-cache` is off the gate for the duration and
   the walk carries only the caller's. Where the field on the record is owed.
 
 - **`push-carries`** (Rx/Evaluator/Burst-Report) — FALSITY,
-  `DEAD ROUTE, RECOVERY`: the cycle rewrites the payload frame by frame, so the
-  burst coming out is not the one going in and the report is re-established
-  rather than transported.
+  `REFUTED, DEAD ROUTE, RECOVERY`: the cycle rewrites the payload frame by
+  frame, so the burst coming out is not the one going in and the report is
+  re-established rather than transported.
 
 - **`eval-silent`** (Rx/Evaluator/Burst-Report) — FALSITY, `PROBED`: the
   residue the strict drop cannot reach — a closed term reading nought, whose

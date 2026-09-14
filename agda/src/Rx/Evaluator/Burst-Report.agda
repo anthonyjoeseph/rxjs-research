@@ -232,15 +232,25 @@ of-handed η (tm ∷ ts) dep =
 -- premise bounding the FRAME can close the gap -- the argument is the
 -- other addend.
 --
--- WHERE THE SUM IS NOT A SUM.  Every statement of the substitution
--- shelf carries `isData s ≡ true`, and that is why: at a data argument
--- the environment reads nought, the sum collapses onto `depᵗ fn`, and
--- the join is exact.  So the question this arm actually asks is
--- whether a `map-f` frame can stand at a NON-data payload -- the
--- higher-order arrivals reach their consumers through the inner and
--- outer frames rather than through a map, and if that is a property of
--- the syntax rather than of today's clauses then the restriction is
--- the statement's, not a hypothesis smuggled in at a call site.
+-- AND THE DATA RESTRICTION IS NOT AVAILABLE, WHICH IS WHAT MAKES THIS
+-- THE MEASURE'S FINDING RATHER THAN THIS STATEMENT'S.  Every statement
+-- of the substitution shelf carries `isData s ≡ true`, and that is why:
+-- at a data argument the environment reads nought, the sum collapses
+-- onto `depᵗ fn`, and the join is exact.  But the map constructor is
+-- typed at an ARBITRARY payload, so a map over a stream of streams is
+-- ordinary syntax and an ordinary rxjs pipeline, and restricting this
+-- arm to data would be restricting the language rather than the lemma.
+-- What is left is that the measure's own map clause under-counts: it
+-- JOINS where the run ADDS, and the gap is unbounded rather than off by
+-- one.  Repairing it is a change to the reading every tier is
+-- denominated in, which is why it is not made in passing.
+--
+-- REFUTED: `Refuted.Template-Passes` — the same crossing at the shelf's
+--   own statement, which is where it was found first: a template that
+--   merely passes its argument through reifies it under a `strmᵗ` the
+--   template never wrote, so the emission is as deep as whatever was
+--   handed in.  Its rows are the witness for this arm too, since the
+--   quantity that fails here is the one it reads.
 --
 -- DEAD ROUTE: bounding the output rank instead of restricting the
 --   payload -- state the cycle as carrying `τ` in and a larger `τ` out.
