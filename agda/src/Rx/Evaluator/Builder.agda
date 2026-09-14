@@ -36,11 +36,12 @@
 -- in seconds.
 module Rx.Evaluator.Builder where
 
-open import Data.Bool using (Bool; true; false)
+open import Data.Bool using (Bool; true; false; if_then_else_)
+open import Data.Bool.ListAction using (any)
 open import Data.Fin using (Fin)
 open import Data.List using (List; []; _∷_; _++_)
-open import Data.Maybe using (nothing; just)
-open import Data.Nat using (zero; suc)
+open import Data.Maybe using (Maybe; nothing; just)
+open import Data.Nat using (ℕ; zero; suc; pred; _≡ᵇ_)
 open import Data.Nat.Properties using (≤-refl; m≤m⊔n)
 open import Data.Product using (∃; _,_; proj₁; proj₂)
 open import Data.Vec using (lookup)
@@ -55,9 +56,12 @@ open import Rx.Slots using (Slots)
 open import Rx.Strat-Order using (Tri; _≺_)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; AllOp; NodeId; NodeState; Frame; root; _↠_; map-f; take-f; scan-f;
   thru-outer; from-inner; mergeAllᵒ; switchᵒ; exhaustᵒ; mergeAll-st; switch-st; exhaust-st; take-st;
-  scan-st; installNode; lookupNode; hasRoom; switchKill; splitEvents; sched-init; st-init)
+  scan-st; installNode; lookupNode; hasRoom; switchKill; aliveThroughᶠ; splitEvents; sched-init; st-init)
 open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeAll⇓; pushBurst⇓;
-  stepFrame⇓; innerReact⇓; thruWalk⇓; thruConsume⇓; subscribeInner⇓;
+  stepFrame⇓; innerReact⇓; innerFinish⇓; mergeAllDrain⇓; thruWalk⇓;
+  thruConsume⇓; subscribeInner⇓;
+  drain-nil; drain-no-room; drain-room; finish-all-drain; finish-switch-clear;
+  finish-exhaust-clear; finish-nil; react-false; react-alive; react-dead;
   push-nil; push-cons; step-map; step-scan;
   step-scan-nil; step-take; step-from-inner; step-thru-outer;
   walk-nil; walk-cons; consume-all-sub; consume-all-enqueue; consume-all-nil;
@@ -122,6 +126,18 @@ InnerSubRuns : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
 InnerSubRuns {e = e} op allNid κ id now o sched st =
   ∃ λ r → subscribeInner⇓ {e = e} op allNid κ id now o sched st r
 
+FinishRuns : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo}
+           → AllOp → NodeId → NodeId → Path Γ lo s t → Id → Tick
+           → List (Val Γ s) → Sched Γ → EvalSt e → Maybe (NodeState Γ) → Set
+FinishRuns {e = e} op allNid inst κ id now vals sched st ns =
+  ∃ λ r → innerFinish⇓ {e = e} op allNid inst κ id now vals sched st ns r
+
+DrainsQ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo}
+        → NodeId → Path Γ lo s t → Id → Tick
+        → Maybe ℕ → ℕ → List (Closed Γ s) → Sched Γ → EvalSt e → Set
+DrainsQ {e = e} allNid κ id now lim act q sched st =
+  ∃ λ r → mergeAllDrain⇓ {e = e} allNid κ id now lim act q sched st r
+
 ------------------------------------------------------------------
 -- THE LEAVES, WHICH ARE WHAT MAKE THE ASSEMBLY CHECKABLE TODAY.
 ------------------------------------------------------------------
@@ -145,16 +161,68 @@ postulate
     (sched : Sched Γ) (st : EvalSt e) →
     InnerSubRuns {e = e} op allNid κ id now o sched st
 
--- AND THE INNER REACTION, WHOSE FINISHING ARM DRAINS A QUEUE THAT CAN
--- SUBSCRIBE FROM IT.  A leaf for the same reason and not the same
--- shape: what sits under it is the merge drain and the three
--- operators' completion arms, none of which the walk below reaches.
-postulate
-  innerReact! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo} {τ : Tri}
-    (ac : Acc _≺_ τ) (op : AllOp) (allNid inst : NodeId)
-    (κ : Path Γ lo s t) (id : Id) (now : Tick) (vals : List (Val Γ s))
-    (sched : Sched Γ) (st : EvalSt e) (fin : Bool) →
-    InnerRuns {e = e} op allNid inst κ id now vals sched st fin
+------------------------------------------------------------------
+-- THE INNER REACTION, WHICH IS THE OTHER SIDE OF THE SAME HOP.
+------------------------------------------------------------------
+
+-- A FIN ONLY COMPLETES AN INNER ONCE NOTHING UNDER ITS EXIT FRAME CAN
+-- DELIVER AGAIN, so the reaction reads the registry before it reads
+-- the node: a live registration through this instance absorbs the
+-- completion and the frame reports unfinished.  Only when nothing is
+-- left does the operator's own finish run, and only a merge's finish
+-- subscribes anything — it drains the queue the lane limit had held
+-- back, which is the second place a value becomes a subscription.
+mergeAllDrain! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo} {τ : Tri}
+  (ac : Acc _≺_ τ) (allNid : NodeId) (κ : Path Γ lo s t) (id : Id) (now : Tick)
+  (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ s))
+  (sched : Sched Γ) (st : EvalSt e) →
+  DrainsQ {e = e} allNid κ id now lim act q sched st
+
+mergeAllDrain! ac allNid κ id now lim act []      sched st = _ , drain-nil
+mergeAllDrain! ac allNid κ id now lim act (o ∷ q) sched st
+  with hasRoom lim act in eqr
+... | false = _ , drain-no-room eqr
+... | true  =
+      let ((_ , _ , _ , done , sched₁ , st₁) , i) =
+            subscribeInner! ac mergeAllᵒ allNid κ id now o sched st
+          (_ , d) = mergeAllDrain! ac allNid κ id now lim
+                      (if done then act else suc act) q sched₁ st₁
+      in _ , drain-room eqr i d
+
+innerFinish! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo} {τ : Tri}
+  (ac : Acc _≺_ τ) (op : AllOp) (allNid inst : NodeId)
+  (κ : Path Γ lo s t) (id : Id) (now : Tick) (vals : List (Val Γ s))
+  (sched : Sched Γ) (st : EvalSt e) (ns : Maybe (NodeState Γ)) →
+  FinishRuns {e = e} op allNid inst κ id now vals sched st ns
+
+innerFinish! {s = s} ac mergeAllᵒ allNid inst κ id now vals sched st
+             (just (mergeAll-st {w} lim act q od)) with w ≟ᵗ s
+... | no  _    = _ , finish-nil
+... | yes refl =
+      let (_ , d) = mergeAllDrain! ac allNid κ id now lim (pred act) q sched st
+      in _ , finish-all-drain d
+innerFinish! ac switchᵒ allNid inst κ id now vals sched st
+             (just (switch-st (just c) od)) with (c ≡ᵇ inst) in eqc
+... | true  = _ , finish-switch-clear eqc
+... | false = _ , finish-nil
+innerFinish! ac exhaustᵒ allNid inst κ id now vals sched st
+             (just (exhaust-st act od)) = _ , finish-exhaust-clear
+innerFinish! ac op allNid inst κ id now vals sched st ns = _ , finish-nil
+
+innerReact! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo} {τ : Tri}
+  (ac : Acc _≺_ τ) (op : AllOp) (allNid inst : NodeId)
+  (κ : Path Γ lo s t) (id : Id) (now : Tick) (vals : List (Val Γ s))
+  (sched : Sched Γ) (st : EvalSt e) (fin : Bool) →
+  InnerRuns {e = e} op allNid inst κ id now vals sched st fin
+
+innerReact! ac op allNid inst κ id now vals sched st false = _ , react-false
+innerReact! ac op allNid inst κ id now vals sched st true
+  with any (aliveThroughᶠ inst st) (EvalSt.registry st) in eqa
+... | true  = _ , react-alive eqa
+... | false =
+      let (_ , f) = innerFinish! ac op allNid inst κ id now vals sched st
+                      (lookupNode allNid (EvalSt.nodes st))
+      in _ , react-dead eqa f
 
 ------------------------------------------------------------------
 -- THE OUTER WALK, THE FRAME STEP AND THE BURST PUSH, WHICH ARE NOW
