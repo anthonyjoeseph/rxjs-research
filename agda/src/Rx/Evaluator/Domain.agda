@@ -39,7 +39,7 @@ open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.Fin using (Fin; toℕ)
 open import Data.List using (List; []; _∷_; _++_; map)
 open import Data.Bool.ListAction using (any)
-open import Data.Maybe using (Maybe)
+open import Data.Maybe using (Maybe; nothing)
 open import Data.Nat using (ℕ; zero; suc; _<_; _≤_; _≡ᵇ_)
 open import Data.Product using (_×_; _,_)
 open import Data.Sum using (inj₁; inj₂)
@@ -48,15 +48,22 @@ open import Data.Vec using (lookup)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 
 open import Rx.Prim using (Tick; Fuel; Id; Source; InstEvent; value; close;
-  handoff; complete; exhausted; delivery; _at_from_as_)
-open import Rx.Exp using (Ty; obs; Ctx; Val; Closed)
-open import Rx.Slots using (Slots)
+  handoff; complete; exhausted; delivery; _at_from_as_;
+  init; subscribe; hot; cold)
+open import Rx.Exp using (obs; Ctx; Val; Closed; evalTm; unfoldμ; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ;
+  switchAllᵉ; exhaustAllᵉ; μᵉ; deferᵉ)
+open import Rx.Slots using (Slots; scripted; shared)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; NodeId;
   root; share-sink; _↠_; shareAdmit; shareLatch; shareFinish;
   from-inner; splitBurst;
   arrTick; arrSource; arrVal; chainsOf; cascadeLatch; cascadeFinish;
   sched-next; sched-init; st-init;
-  NodeState; AllOp; RegId; Arrival; AtFloor; arrTy)
+  NodeState; AllOp; RegId; Arrival; AtFloor; arrTy;
+  spentBurst; oneShotBurst; memberSource; register; installNode; resolve;
+  atSlot; atDyn; lowerFloor;
+  map-f; scan-f; take-f; thru-outer;
+  scan-st; take-st; mergeAll-st; switch-st; exhaust-st;
+  mergeAllᵒ; switchᵒ; exhaustᵒ)
 
 ------------------------------------------------------------------
 -- THE SUBSCRIBE CYCLE.  Twelve families, exactly the members of the
@@ -196,7 +203,167 @@ data evaluate⇓ {n} {Γ : Ctx n} {t} :
 -- mirrors, every recursive call appearing as a sub-derivation.
 ----------------------------------------------------------------------
 
+-- THE SLOT TESTS STAY PREMISES AND THE SCRIPT'S OWN WELL-FORMEDNESS
+-- WITNESS IS BOUND RATHER THAN LEFT TO INFERENCE.  A slot's constructor
+-- carries a proof that the element type is data, or that a shared def's
+-- inputs sit below the slot; at a variable type neither reduces, so an
+-- unwritten one is an unsolved meta and a build failure.  Binding it
+-- costs a name and asserts nothing, which is the right trade: the
+-- relation is about which arm ran, never about why the slot is legal.
 data subscribeE⇓ {n} {Γ} {t} {e} where
+
+  subs-floor : ∀ {lo} {i : Fin n} {κ : Path Γ lo (lookup Γ i) t}
+                 {id now sched st}
+             → lo ≤ toℕ i
+             → subscribeE⇓ (input i) κ id now sched st
+                 (spentBurst (toℕ i) id , sched , st)
+
+  subs-shared : ∀ {lo} {i : Fin n} {d} {κ : Path Γ lo (lookup Γ i) t}
+                  {below : toℕ i < lo} {ok} {id now sched st r}
+              → Sched.slots sched i ≡ shared d {ok = ok}
+              → subscribeSharedSlot⇓ i d κ below id now sched st r
+              → subscribeE⇓ (input i) κ id now sched st r
+
+  subs-hot-done : ∀ {lo} {i : Fin n} {κ : Path Γ lo (lookup Γ i) t}
+                    {ok async} {id now sched st}
+                → toℕ i < lo
+                → Sched.slots sched i ≡ scripted {ok = ok} (hot async)
+                → memberSource (toℕ i) (EvalSt.completedSources st) ≡ true
+                → subscribeE⇓ (input i) κ id now sched st
+                    (spentBurst (toℕ i) id , sched , st)
+
+  subs-hot-live : ∀ {lo} {i : Fin n} {κ : Path Γ lo (lookup Γ i) t}
+                    {ok async} {id now sched st}
+                → (below : toℕ i < lo)
+                → Sched.slots sched i ≡ scripted {ok = ok} (hot async)
+                → memberSource (toℕ i) (EvalSt.completedSources st) ≡ false
+                → subscribeE⇓ (input i) κ id now sched st
+                    ( ((init (toℕ i) ∷ []) at id from toℕ i as subscribe) ∷ []
+                    , sched
+                    , register (atSlot i) (lowerFloor below κ) st )
+
+  subs-cold-sync : ∀ {lo} {i : Fin n} {κ : Path Γ lo (lookup Γ i) t}
+                     {ok sync} {id now sched st burst sched₁}
+                 → toℕ i < lo
+                 → Sched.slots sched i ≡ scripted {ok = ok} (cold sync [])
+                 → oneShotBurst sync id sched ≡ (burst , sched₁)
+                 → subscribeE⇓ (input i) κ id now sched st
+                     (burst , sched₁ , st)
+
+  subs-cold-async : ∀ {lo} {i : Fin n} {κ : Path Γ lo (lookup Γ i) t}
+                      {ok sync d ds} {id now sched st src ord}
+                  → toℕ i < lo
+                  → Sched.slots sched i ≡ scripted {ok = ok} (cold sync (d ∷ ds))
+                  → Sched.nextSource sched ≡ src
+                  → Sched.nextOrdinal sched ≡ ord
+                  → subscribeE⇓ (input i) κ id now sched st
+                      ( ((init src ∷ map value sync)
+                           at id from src as subscribe) ∷ []
+                      , record sched
+                          { nextSource = suc src
+                          ; nextOrdinal = suc ord
+                          ; live = record { source = src ; ordinal = ord
+                                          ; elemTy = lookup Γ i
+                                          ; pending = resolve now (d ∷ ds) }
+                                   ∷ Sched.live sched }
+                      , register (atDyn src lo) κ st )
+
+  subs-of : ∀ {lo u} {ts} {κ : Path Γ lo u t} {id now sched st burst sched₁}
+          → oneShotBurst (map (λ tm → evalTm tm) ts) id sched ≡ (burst , sched₁)
+          → subscribeE⇓ (ofᵉ ts) κ id now sched st (burst , sched₁ , st)
+
+  subs-empty : ∀ {lo u} {κ : Path Γ lo u t} {id now sched st burst sched₁}
+             → oneShotBurst [] id sched ≡ (burst , sched₁)
+             → subscribeE⇓ emptyᵉ κ id now sched st (burst , sched₁ , st)
+
+  subs-map : ∀ {lo s u} {f} {b : Closed Γ s} {κ : Path Γ lo u t}
+               {id now sched st burst sched₁ st₁ r}
+           → subscribeE⇓ b (map-f f ↠ κ) id now sched st (burst , sched₁ , st₁)
+           → pushBurst⇓ id now (map-f f) κ burst sched₁ st₁ r
+           → subscribeE⇓ (mapᵉ f b) κ id now sched st r
+
+  subs-take-zero : ∀ {lo u} {count} {b : Closed Γ u} {κ : Path Γ lo u t}
+                     {id now sched st burst sched₁}
+                 → evalTm count ≡ zero
+                 → oneShotBurst [] id sched ≡ (burst , sched₁)
+                 → subscribeE⇓ (takeᵉ count b) κ id now sched st
+                     (burst , sched₁ , st)
+
+  subs-take-suc : ∀ {lo u} {count k} {b : Closed Γ u} {κ : Path Γ lo u t}
+                    {id now sched st nid burst sched₂ st₁ r}
+                → evalTm count ≡ suc k
+                → Sched.nextNode sched ≡ nid
+                → subscribeE⇓ b (take-f nid ↠ κ) id now
+                    (record sched { nextNode = suc nid })
+                    (installNode nid (take-st (suc k)) st)
+                    (burst , sched₂ , st₁)
+                → pushBurst⇓ id now (take-f nid) κ burst sched₂ st₁ r
+                → subscribeE⇓ (takeᵉ count b) κ id now sched st r
+
+  subs-scan : ∀ {lo s u} {f seed} {b : Closed Γ s} {κ : Path Γ lo u t}
+                {id now sched st nid burst sched₂ st₁ r}
+            → Sched.nextNode sched ≡ nid
+            → subscribeE⇓ b (scan-f f nid ↠ κ) id now
+                (record sched { nextNode = suc nid })
+                (installNode nid (scan-st (evalTm seed)) st)
+                (burst , sched₂ , st₁)
+            → pushBurst⇓ id now (scan-f f nid) κ burst sched₂ st₁ r
+            → subscribeE⇓ (scanᵉ f seed b) κ id now sched st r
+
+  subs-merge-all : ∀ {lo u} {lim} {b : Closed Γ (obs u)} {κ : Path Γ lo u t}
+                     {id now sched st r}
+                 → subscribeAll⇓ mergeAllᵒ (mergeAll-st {t = u} lim 0 [] false)
+                     b κ id now sched st r
+                 → subscribeE⇓ (mergeAllᵉ lim b) κ id now sched st r
+
+  subs-switch-all : ∀ {lo u} {b : Closed Γ (obs u)} {κ : Path Γ lo u t}
+                      {id now sched st r}
+                  → subscribeAll⇓ switchᵒ (switch-st nothing false)
+                      b κ id now sched st r
+                  → subscribeE⇓ (switchAllᵉ b) κ id now sched st r
+
+  subs-exhaust-all : ∀ {lo u} {b : Closed Γ (obs u)} {κ : Path Γ lo u t}
+                       {id now sched st r}
+                   → subscribeAll⇓ exhaustᵒ (exhaust-st false false)
+                       b κ id now sched st r
+                   → subscribeE⇓ (exhaustAllᵉ b) κ id now sched st r
+
+  -- THE SECOND DRY ARM, AND THE ONE THE RELATION CANNOT EVEN ASK ABOUT.
+  -- The machine compares the unfolding's synchronous size against a
+  -- number it was handed by its caller, and answers the negative case
+  -- dry.  That number is threaded alongside every argument and is a
+  -- function of none of them, so it is not among this relation's
+  -- indices and no premise here could pin it.  The constructor is
+  -- therefore unconditional, and that concedes nothing: the relation is
+  -- spent only in the direction that builds a derivation AT THE
+  -- MACHINE'S OWN RESULT, and at a run that answered dry the result is
+  -- a dry burst, which no constructor of this family produces.  So the
+  -- comparison is still owed — it is owed by the inhabitation proof,
+  -- which is where the measure belongs, since the unfolding is larger
+  -- than the term it replaces and nothing here is structural in it.
+  subs-μ : ∀ {lo u} {body} {κ : Path Γ lo u t} {id now sched st r}
+         → subscribeE⇓ (unfoldμ body) κ id now sched st r
+         → subscribeE⇓ (μᵉ body) κ id now sched st r
+
+  subs-defer : ∀ {lo u} {body} {κ : Path Γ lo u t}
+                 {id now sched st nid src ord}
+             → Sched.nextNode sched ≡ nid
+             → Sched.nextSource sched ≡ src
+             → Sched.nextOrdinal sched ≡ ord
+             → subscribeE⇓ (deferᵉ body) κ id now sched st
+                 ( ((init src ∷ []) at id from src as subscribe) ∷ []
+                 , record sched
+                     { nextNode = suc nid
+                     ; nextSource = suc src
+                     ; nextOrdinal = suc ord
+                     ; live = record { source = src ; ordinal = ord
+                                     ; elemTy = obs u
+                                     ; pending = (suc now , body) ∷ [] }
+                              ∷ Sched.live sched }
+                 , register (atDyn src lo)
+                            (thru-outer mergeAllᵒ nid ↠ κ)
+                            (installNode nid
+                              (mergeAll-st {t = u} nothing 0 [] false) st) )
 
 -- ONE CONSTRUCTOR WHERE THE EVALUATOR HAS TWO, AND THE MISSING ONE IS
 -- THE POINT.  The machine asks whether what arrived is written
