@@ -23,3 +23,11 @@ module Refuted.Main where
 open import Refuted.Dry-Wrap using (rank-sufficient-false;
   rank-sufficient-false-fold; rank-sufficient-false-gate;
   nest-p; dry-p; nest-q; dry-q; nest-g; dry-g)
+
+-- and the shape a frame shelf was about to be written in, taken before
+-- the statement existed.  No figure is claimed beside it and that is the
+-- difference from every witness above: the crossing is not a pair of
+-- numerals that could drift apart under a repair, it is a RATE proven
+-- for every burst length, so the witness cannot go quiet while the
+-- mechanism under it stands
+open import Refuted.Scan-Deepens using (scan-bounded-false)
