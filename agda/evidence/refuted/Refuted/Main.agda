@@ -64,20 +64,6 @@ open import Refuted.Arrival-Seed using (seed-preserved-false;
 open import Refuted.Arrival-Seed using (seed-e₃; seed-s₃; pay-s₃;
   seed-store-s₃; reg-e₃; reg-s₃)
 
--- and the narrowing that reading licensed, refuted in turn: the chains
--- ONE arrival reaches, priced against the value it actually carries.
--- The two figures per state are claimed because the crossing is their
--- ORDER; the reach and payload rows because they are what say each
--- narrowing did NO work — one chain reached and a payload at the floor,
--- so a repair that moved either would leave the witness silent
-open import Refuted.Arrival-Filtered using (filtered-preserved-false;
-  spend-e₁; grant-e₁; spend-s₁; grant-s₁; reached-s₁; payload-s₁;
-  store-s₁; term-q₁)
--- and the deeper program's, which are what say the gap is a RATE here
--- too: same grant, spend one higher per flattener
-open import Refuted.Arrival-Filtered using (spend-e₃; grant-e₃;
-  spend-s₃; grant-s₃; reached-s₃; payload-s₃)
-
 open import Refuted.Rank-Entry using (dry-operator-false)
 -- the three figures travel with the witness for the same reason: the
 -- payload and the store both enter at the floor here, so a repair that

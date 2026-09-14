@@ -218,17 +218,16 @@ open import Verify-Rank-Sufficient.Path-Fits using (DrainHop; drainFits)
 --   queue empty, so the seed collapses onto the term's own reading while
 --   the registry keeps the frame the arrival installed.  The deeper
 --   program reads three against the same one, so this gap is a rate too.
--- REFUTED: `Refuted.Arrival-Filtered` — and the narrowing the dead route
---   below was read as forbidding, tested rather than assumed: the chains
---   ONE arrival reaches, priced against the value that arrival actually
---   carries, which is the smallest left side a drain step could justify
---   and is strictly under the one above.  It holds EXACTLY at both doors —
---   three against three, four against four — and crosses one arrival later
---   at the same two states, because neither narrowing does any work there.
---   The filter reaches ONE chain and it is the deep one; the arriving value
---   reads ZERO, so the seed is the floor.  Those two rows are the content:
---   they say the information a step has over a state is not the missing
---   information, which no reading of the registry could have shown.
+-- DEAD ROUTE: THE NARROWEST READING A STEP COULD JUSTIFY — the chains ONE
+--   arrival reaches, priced against the value that arrival actually
+--   carries — was refuted at the same two programs as the three above,
+--   and its witness did NOT survive this cutover: the peels no longer
+--   spend a seed, so the state one arrival in is a different state and the
+--   crossing the rows pinned is not there to read.  What the witness said
+--   is the part that transfers and is recorded here rather than restamped:
+--   neither narrowing did any work, because the filter reached ONE chain
+--   and it was the deep one, and the arriving value read ZERO.  The
+--   information a step has over a state is not the missing information.
 -- DEAD ROUTE: BOUNDING THE REGISTRY IS THE DEAD MECHANISM, NOT ANY ONE OF
 --   THE STATEMENTS ABOVE.  Four successive candidates for what holds at a
 --   drain step — the term's reading, the widest state-readable join, the
@@ -247,11 +246,10 @@ open import Verify-Rank-Sufficient.Path-Fits using (DrainHop; drainFits)
 --   An arrival is seeded at the term's reading PLUS the join of the value
 --   it carries with the store, so a quantity the state carries forward is
 --   already INSIDE the grant rather than missing from it — and at the
---   crossing both summands of that join read NOUGHT, pinned beside the
---   grant in `Refuted.Arrival-Filtered`, so the grant has collapsed onto
---   the term's own figure and there is nothing a carried quantity could
---   have covered.  What moves is the LEFT: the spend climbs one per
---   flattener while the grant holds still.
+--   crossing both summands of that join read NOUGHT, so the grant has
+--   collapsed onto the term's own figure and there is nothing a carried
+--   quantity could have covered.  What moves is the LEFT: the spend
+--   climbs one per flattener while the grant holds still.
 -- RECOVERY: git show 8085eed:agda/evidence/probed/Probed/ restores the
 --   six probes this restatement expired.  The HARNESS is what is worth
 --   having back and the verdicts are not: `stepOnce` is the drain's own
