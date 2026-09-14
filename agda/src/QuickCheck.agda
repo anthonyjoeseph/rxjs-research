@@ -45,7 +45,7 @@ open import Rx.Exp using (Ty; natᵗ; obs; _×ᵗ_; Ctx; Exp; Tm; Fn; PrimOp; in
   strmᵗ; varᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; add; sub; mul; eqᵖ; ltᵖ; notᵖ)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Rx.Emit-Eq using (eqBatched)
-open import Rx.Evaluator using (evaluate; hasDry)
+open import Rx.Evaluator using (evaluate)
 open import Rx.Slots using (scripted; shared; Slot; Slots)
 open import Rx.Protocol using (wellFormed?)
 open import Implementation using (impl-batchSimultaneous)
@@ -512,21 +512,18 @@ reportWF : Exp Γ₂ [] [] [] natᵗ → Slots Γ₂ → List (InstEmit ℕ) →
 reportWF e ins s =
   "  WF-FAIL\n    stream = " ++ showStream s ++ pasteRow e ins
 
--- A DESCENT GUARD WAS EXHAUSTED, which is `rank-sufficient` instantiated and
--- found false.  It gets no PASTE markers on purpose: the bug cache's
--- invariant is impl ≡ spec, and a dry run is a counterexample to a POSTULATE
--- rather than a disagreement between two implementations of one batching.
--- The WF check catches it too — a `dried` close names a source nothing
--- inited — but only as a protocol violation, which is the wrong name for it.
-reportDry : Exp Γ₂ [] [] [] natᵗ → Slots Γ₂ → String
-reportDry e ins =
-  "  DRY-FAIL — a descent guard was exhausted: a counterexample to\n"
-       ++ "  rank-sufficient, NOT a bug-cache entry.\n    prog  = " ++ showExp e
-       ++ "\n    slots = " ++ showSlots ins ++ "\n"
-
--- three checks on one generated program: impl ≡ spec on the batched stream,
--- the raw stream satisfies the protocol automaton (evaluate-well-formed,
--- sampled), and the run never went dry (rank-sufficient, instantiated)
+-- two checks on one generated program: impl ≡ spec on the batched stream,
+-- and the raw stream satisfies the protocol automaton
+-- (evaluate-well-formed, sampled).
+--
+-- THE THIRD CHECK WENT WITH THE THING IT SAMPLED, AND ITS COVERAGE IS
+-- NOT LOST.  It reported a run that gave up at a descent guard, which
+-- was the cheapest instantiation of the claim that no run does — and
+-- the sweep's verdict over 4500 programs is recorded where that claim
+-- was, since the guards it sampled are gone and the statement it
+-- sampled is not stateable.  What it would have to sample now is a
+-- proof obligation rather than an output, and nothing a generator
+-- produces can fail one.
 Tally : Set
 Tally = ℕ × ℕ × ℕ                     -- programs carrying μᵉ · varᵉ · deferᵉ
 
@@ -541,8 +538,7 @@ oneCase d = genSlots >>=G λ ins → genExp d >>=G λ e →
       spec = spec-batchSimultaneous s
       agreeFails = if eqBatched impl spec then [] else report e ins impl spec ∷ []
       wfFails    = if wellFormed? s then [] else reportWF e ins s ∷ []
-      dryFails   = if hasDry s then reportDry e ins ∷ [] else []
-  in pureG (marksᵉ e , agreeFails ++ᴸ wfFails ++ᴸ dryFails)
+  in pureG (marksᵉ e , agreeFails ++ᴸ wfFails)
 
 -- accumulate EVERY failing case's reports, in generation order, and tally
 -- which recursion constructors the corpus actually reached
