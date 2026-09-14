@@ -26,7 +26,7 @@ open import Rx.Exp  using (Ty; obs; _×ᵗ_; _≟ᵗ_; Ctx; Val; Closed; Fn; app
 -- the order the subscription machine recurses on, in place of a
 -- counter: one constructor per non-structural edge, and nothing
 -- packed, so no edge owes a ceiling on the components it leaves alone
-open import Rx.Strat-Order using (Tri; _≺_; ltU; ltR; ltS; ≺-wellFounded)
+open import Rx.Strat-Order using (Tri; _≺_; ≺-wellFounded)
 
 variable
   τ  : Tri
@@ -663,7 +663,7 @@ hasDry (em ∷ ems) = any dryEvent (InstEmit.events em) ∨ hasDry ems
 -- expression carries it, which is the content.  `Rx.Inputs-Below` holds
 -- the descent arm each clause spends.
 subscribeE : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-           → Acc _≺_ τ → (b : Closed Γ u)
+           → (b : Closed Γ u)
            → Path Γ lo u t → Id → Tick
            → Sched Γ → EvalSt e
            → Stream Γ u × Sched Γ × EvalSt e
@@ -728,30 +728,26 @@ burstCompleted : ∀ {n} {Γ : Ctx n} {u} → Stream Γ u → Bool
 burstCompleted = any (λ em → hasComplete (InstEmit.events em))
 
 -- mint the inner's exit-frame instance, subscribe it inside the
--- current instant, split its burst.  THE HOP EDGE: the inner is a
--- runtime VALUE, structurally unrelated to the caller, so nothing about
--- the caller's TERM makes it smaller — and the machine therefore ASKS,
--- exactly as the μ and connect peels do, whether what arrived is
--- written shallower than the component it is standing at.  The dry arm
--- is the negative answer, and it is what the guard has to rule out.
+-- current instant, split its burst.  THE HOP EDGE, AND IT NO LONGER
+-- ASKS ANYTHING.  The inner is a runtime VALUE, structurally unrelated
+-- to the caller, so nothing about the caller's TERM makes it smaller —
+-- which is why this clause used to compare what arrived against the
+-- component it stands at and emit a marker on the negative answer.  The
+-- comparison is a PREMISE now and it is owed by the derivation rather
+-- than by the run: `Verify-Rank-Sufficient.Doorless.subscribeInner!`
+-- spends the report where the value was produced, so there is no
+-- question here to answer and no arm to answer it with.
 subscribeInner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-               → Acc _≺_ τ → AllOp → NodeId → Path Γ lo u t → Id → Tick
+               → AllOp → NodeId → Path Γ lo u t → Id → Tick
                → Val Γ (obs u) → Sched Γ → EvalSt e
                → NodeId × List (Val Γ u) × List (InstEvent (Val Γ t)) × Bool × Sched Γ × EvalSt e
-subscribeInner {τ = _ , r , _} {lo = lo} (acc rec) op allNid κ id now o sched st
-  with obsDepthᵉ o <? r
-... | no  _ =
-      let inst = Sched.nextNode sched
-      in inst , [] , close drySource dried ∷ [] , false
-         , record sched { nextNode = suc inst } , st
-... | yes p =
-      let inst = Sched.nextNode sched
-          (burst , sched′ , st′) =
-            subscribeE (rec (ltR {r′ = obsDepthᵉ o} {s′ = syncSizeᵉ o} p))
-                       o (from-inner op allNid inst ↠ κ) id now
-                       (record sched { nextNode = suc inst }) st
-          (vs , bs , done) = splitBurst burst
-      in inst , vs , bs , done , sched′ , st′
+subscribeInner {lo = lo} op allNid κ id now o sched st =
+  let inst = Sched.nextNode sched
+      (burst , sched′ , st′) =
+        subscribeE o (from-inner op allNid inst ↠ κ) id now
+                   (record sched { nextNode = suc inst }) st
+      (vs , bs , done) = splitBurst burst
+  in inst , vs , bs , done , sched′ , st′
 
 -- the per-frame semantics.  All recursion here is structural — the
 -- deep recursion (a subscription's sync burst re-entering the
@@ -855,52 +851,52 @@ switchKill (just v) sched₀ st₀ =
                 ; cancelled = cutRids ++ EvalSt.cancelled st₀ }
 
 thruConsume : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-            → Acc _≺_ τ → AllOp → NodeId → Path Γ lo u t → Id → Tick
+            → AllOp → NodeId → Path Γ lo u t → Id → Tick
             → Val Γ (obs u) → Sched Γ → EvalSt e
             → List (Val Γ u) × List (InstEvent (Val Γ t)) × Sched Γ × EvalSt e
-thruConsume {u = u} fuel mergeAllᵒ nid κ id now o sched₀ st₀
+thruConsume {u = u} mergeAllᵒ nid κ id now o sched₀ st₀
   with lookupNode nid (EvalSt.nodes st₀)
 ... | just (mergeAll-st {w} lim act q od) with w ≟ᵗ u
 ...   | no _ = [] , [] , sched₀ , st₀
 ...   | yes refl with hasRoom lim act
 ...     | true =
           let (_ , vs , bs , done , sched₁ , st₁) =
-                subscribeInner fuel mergeAllᵒ nid κ id now o sched₀ st₀
+                subscribeInner mergeAllᵒ nid κ id now o sched₀ st₀
           in vs , bs , sched₁ ,
              record st₁ { nodes = mergeAllBump nid done (EvalSt.nodes st₁) }
 ...     | false =
           [] , [] , sched₀ ,
           record st₀ { nodes = setNode nid (mergeAll-st lim act (q ++ o ∷ []) od)
                                  (EvalSt.nodes st₀) }
-thruConsume fuel mergeAllᵒ nid κ id now o sched₀ st₀ | _ = [] , [] , sched₀ , st₀
-thruConsume fuel switchᵒ nid κ id now o sched₀ st₀
+thruConsume mergeAllᵒ nid κ id now o sched₀ st₀ | _ = [] , [] , sched₀ , st₀
+thruConsume switchᵒ nid κ id now o sched₀ st₀
   with lookupNode nid (EvalSt.nodes st₀)
 ... | just (switch-st cur od) =
       let (closes , sched₁ , st₁) = switchKill cur sched₀ st₀
           (inst , vs , bs , done , sched₂ , st₂) =
-            subscribeInner fuel switchᵒ nid κ id now o sched₁ st₁
+            subscribeInner switchᵒ nid κ id now o sched₁ st₁
       in vs , closes ++ bs , sched₂ ,
          record st₂ { nodes = setNode nid
            (switch-st (if done then nothing else just inst) od) (EvalSt.nodes st₂) }
 ... | _ = [] , [] , sched₀ , st₀
-thruConsume fuel exhaustᵒ nid κ id now o sched₀ st₀
+thruConsume exhaustᵒ nid κ id now o sched₀ st₀
   with lookupNode nid (EvalSt.nodes st₀)
 ... | just (exhaust-st true od)  = [] , [] , sched₀ , st₀   -- busy: drop
 ... | just (exhaust-st false od) =
       let (_ , vs , bs , done , sched₁ , st₁) =
-            subscribeInner fuel exhaustᵒ nid κ id now o sched₀ st₀
+            subscribeInner exhaustᵒ nid κ id now o sched₀ st₀
       in vs , bs , sched₁ ,
          record st₁ { nodes = setNode nid (exhaust-st (not done) od) (EvalSt.nodes st₁) }
 ... | _ = [] , [] , sched₀ , st₀
 
 thruWalk : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-         → Acc _≺_ τ → AllOp → NodeId → Path Γ lo u t → Id → Tick
+         → AllOp → NodeId → Path Γ lo u t → Id → Tick
          → List (Val Γ (obs u)) → Sched Γ → EvalSt e
          → List (Val Γ u) × List (InstEvent (Val Γ t)) × Sched Γ × EvalSt e
-thruWalk fuel op nid κ id now []       sched₀ st₀ = [] , [] , sched₀ , st₀
-thruWalk fuel op nid κ id now (o ∷ os) sched₀ st₀ =
-  let (vs  , bs  , sched₁ , st₁) = thruConsume fuel op nid κ id now o sched₀ st₀
-      (vs′ , bs′ , sched₂ , st₂) = thruWalk fuel op nid κ id now os sched₁ st₁
+thruWalk op nid κ id now []       sched₀ st₀ = [] , [] , sched₀ , st₀
+thruWalk op nid κ id now (o ∷ os) sched₀ st₀ =
+  let (vs  , bs  , sched₁ , st₁) = thruConsume op nid κ id now o sched₀ st₀
+      (vs′ , bs′ , sched₂ , st₂) = thruWalk op nid κ id now os sched₁ st₁
   in vs ++ vs′ , bs ++ bs′ , sched₂ , st₂
 
 thruWrap : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
@@ -947,44 +943,44 @@ thruWrap exhaustᵒ nid true (vs , bs , sched′ , st′)
 -- a missed self-finish costs the drain its only lane, at limit k it
 -- can cost several, and the two do not fail the same way
 mergeAllDrain : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-             → Acc _≺_ τ → NodeId → Path Γ lo s t → Id → Tick
+             → NodeId → Path Γ lo s t → Id → Tick
              → Maybe ℕ → ℕ → List (Closed Γ s) → Sched Γ → EvalSt e
              → List (Val Γ s) × List (InstEvent (Val Γ t)) × ℕ
                × List (Closed Γ s) × Sched Γ × EvalSt e
-mergeAllDrain fuel allNid κ id now lim act []      sched₀ st₀ =
+mergeAllDrain allNid κ id now lim act []      sched₀ st₀ =
   [] , [] , act , [] , sched₀ , st₀
-mergeAllDrain fuel allNid κ id now lim act (o ∷ q) sched₀ st₀
+mergeAllDrain allNid κ id now lim act (o ∷ q) sched₀ st₀
   with hasRoom lim act
 ... | false = [] , [] , act , o ∷ q , sched₀ , st₀
 ... | true =
       let (_ , vs , bs , done , sched₁ , st₁) =
-            subscribeInner fuel mergeAllᵒ allNid κ id now o sched₀ st₀
+            subscribeInner mergeAllᵒ allNid κ id now o sched₀ st₀
           (vs′ , bs′ , act′ , q′ , sched₂ , st₂) =
-            mergeAllDrain fuel allNid κ id now lim
+            mergeAllDrain allNid κ id now lim
               (if done then act else suc act) q sched₁ st₁
       in vs ++ vs′ , bs ++ bs′ , act′ , q′ , sched₂ , st₂
 
 innerFinish : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-            → Acc _≺_ τ → AllOp → NodeId → NodeId → Path Γ lo s t → Id → Tick
+            → AllOp → NodeId → NodeId → Path Γ lo s t → Id → Tick
             → List (Val Γ s) → Sched Γ → EvalSt e → Maybe (NodeState Γ)
             → List (Val Γ s) × List (InstEvent (Val Γ t)) × Bool × Sched Γ × EvalSt e
-innerFinish {s = s} fuel mergeAllᵒ allNid inst κ id now vals sched st
+innerFinish {s = s} mergeAllᵒ allNid inst κ id now vals sched st
             (just (mergeAll-st {w} lim act q od)) with w ≟ᵗ s
 ... | yes refl =
       let (vs , bs , act′ , q′ , sched′ , st′) =
-            mergeAllDrain fuel allNid κ id now lim (pred act) q sched st
+            mergeAllDrain allNid κ id now lim (pred act) q sched st
       in vals ++ vs , bs , od ∧ (act′ ≡ᵇ 0) ∧ null q′ , sched′ ,
          record st′ { nodes = setNode allNid (mergeAll-st lim act′ q′ od) (EvalSt.nodes st′) }
 ... | no _ = vals , [] , false , sched , st
-innerFinish fuel switchᵒ allNid inst κ id now vals sched st (just (switch-st (just c) od)) =
+innerFinish switchᵒ allNid inst κ id now vals sched st (just (switch-st (just c) od)) =
   if c ≡ᵇ inst
   then (vals , [] , od , sched ,
         record st { nodes = setNode allNid (switch-st nothing od) (EvalSt.nodes st) })
   else (vals , [] , false , sched , st)
-innerFinish fuel exhaustᵒ allNid inst κ id now vals sched st (just (exhaust-st act od)) =
+innerFinish exhaustᵒ allNid inst κ id now vals sched st (just (exhaust-st act od)) =
   vals , [] , od , sched ,
   record st { nodes = setNode allNid (exhaust-st false od) (EvalSt.nodes st) }
-innerFinish fuel _ allNid inst κ id now vals sched st _ = vals , [] , false , sched , st
+innerFinish _ allNid inst κ id now vals sched st _ = vals , [] , false , sched , st
 
 -- a fin only completes THIS INNER once nothing under its exit frame
 -- can ever deliver again: a sibling registration of the dying source
@@ -992,26 +988,26 @@ innerFinish fuel _ allNid inst κ id now vals sched st _ = vals , [] , false , s
 -- it (the TS join's open-multiset, read off the registry) — one
 -- chain's exhaustion is not a multi-registration subtree's completion
 innerReact : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-           → Acc _≺_ τ → AllOp → NodeId → NodeId → Path Γ lo s t → Id → Tick
+           → AllOp → NodeId → NodeId → Path Γ lo s t → Id → Tick
            → List (Val Γ s) → Sched Γ → EvalSt e → Bool
            → List (Val Γ s) × List (InstEvent (Val Γ t)) × Bool × Sched Γ × EvalSt e
-innerReact fuel op allNid inst κ id now vals sched st false =
+innerReact op allNid inst κ id now vals sched st false =
   vals , [] , false , sched , st
-innerReact fuel op allNid inst κ id now vals sched st true =
+innerReact op allNid inst κ id now vals sched st true =
   if any (aliveThroughᶠ inst st) (EvalSt.registry st)
   then vals , [] , false , sched , st
-  else innerFinish fuel op allNid inst κ id now vals sched st
+  else innerFinish op allNid inst κ id now vals sched st
          (lookupNode allNid (EvalSt.nodes st))
 
 stepFrame : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-          → Acc _≺_ τ → Id → Tick → Frame Γ s u → Path Γ lo u t
+          → Id → Tick → Frame Γ s u → Path Γ lo u t
           → List (Val Γ s) → Bool → Sched Γ → EvalSt e
           → List (Val Γ u) × List (InstEvent (Val Γ t)) × Bool × Sched Γ × EvalSt e
 
-stepFrame fuel id now (map-f fn) κ vals fin sched st =
+stepFrame id now (map-f fn) κ vals fin sched st =
   map (applyFn fn) vals , [] , fin , sched , st
 
-stepFrame {Γ = Γ} {t = t} {e = e} {s = s} {u = u} fuel id now (scan-f fn nid) κ vals fin sched st
+stepFrame {Γ = Γ} {t = t} {e = e} {s = s} {u = u} id now (scan-f fn nid) κ vals fin sched st
   = dispatch (lookupNode nid (EvalSt.nodes st))
   where
   dispatch : Maybe (NodeState Γ)
@@ -1024,14 +1020,14 @@ stepFrame {Γ = Γ} {t = t} {e = e} {s = s} {u = u} fuel id now (scan-f fn nid) 
   ... | no _ = [] , [] , fin , sched , st
   dispatch _ = [] , [] , fin , sched , st
 
-stepFrame {Γ = Γ} {t = t} {e = e} {s = s} fuel id now (take-f nid) κ vals fin sched st
+stepFrame {Γ = Γ} {t = t} {e = e} {s = s} id now (take-f nid) κ vals fin sched st
   = takeDispatch nid vals fin sched st (lookupNode nid (EvalSt.nodes st))
 
-stepFrame fuel id now (from-inner op allNid inst) κ vals fin sched st
-  = innerReact fuel op allNid inst κ id now vals sched st fin
+stepFrame id now (from-inner op allNid inst) κ vals fin sched st
+  = innerReact op allNid inst κ id now vals sched st fin
 
-stepFrame fuel id now (thru-outer op nid) κ vals fin sched st
-  = thruWrap op nid fin (thruWalk fuel op nid κ id now vals sched st)
+stepFrame id now (thru-outer op nid) κ vals fin sched st
+  = thruWrap op nid fin (thruWalk op nid κ id now vals sched st)
 
 -- bookkeeping crosses payload types freely — init/close/complete
 -- carry none.  A value cannot cross and is dropped; the callers only
@@ -1049,15 +1045,15 @@ retagEvents (value _   ∷ es) = retagEvents es
 -- envelope — the burst leaves each subscription level already shaped
 -- like any later emit of its source
 pushBurst : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-          → Acc _≺_ τ → Id → Tick → Frame Γ s u → Path Γ lo u t
+          → Id → Tick → Frame Γ s u → Path Γ lo u t
           → Stream Γ s → Sched Γ → EvalSt e
           → Stream Γ u × Sched Γ × EvalSt e
-pushBurst fuel id now f κ []         sched st = [] , sched , st
-pushBurst fuel id now f κ (em ∷ ems) sched st =
+pushBurst id now f κ []         sched st = [] , sched , st
+pushBurst id now f κ (em ∷ ems) sched st =
   let sp   = splitEvents (InstEmit.events em)
       (vals′ , evs , fin′ , sched₁ , st₁) =
-        stepFrame fuel id now f κ (proj₁ sp) (proj₂ (proj₂ sp)) sched st
-      (rest , sched₂ , st₂) = pushBurst fuel id now f κ ems sched₁ st₁
+        stepFrame id now f κ (proj₁ sp) (proj₂ (proj₂ sp)) sched st
+      (rest , sched₂ , st₂) = pushBurst id now f κ ems sched₁ st₁
   in ((proj₁ (proj₂ sp) ++ retagEvents evs ++ map value vals′
         ++ (if fin′ then complete ∷ [] else []))
        at InstEmit.instant em from InstEmit.source em as InstEmit.kind em)
@@ -1066,16 +1062,16 @@ pushBurst fuel id now f κ (em ∷ ems) sched st =
 -- the shared *All shape: mint the node, install its initial state,
 -- subscribe the outer under a thru-outer frame, push the burst through
 subscribeAll : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-             → Acc _≺_ τ → AllOp → NodeState Γ → (b : Closed Γ (obs u))
+             → AllOp → NodeState Γ → (b : Closed Γ (obs u))
              → Path Γ lo u t
              → Id → Tick → Sched Γ → EvalSt e
              → Stream Γ u × Sched Γ × EvalSt e
-subscribeAll fuel op initialState b κ id now sched st =
+subscribeAll op initialState b κ id now sched st =
   let (nid , sched₁) = mintNode sched
       (burst , sched₂ , st₁) =
-        subscribeE fuel b (thru-outer op nid ↠ κ) id now sched₁
+        subscribeE b (thru-outer op nid ↠ κ) id now sched₁
                    (installNode nid initialState st)
-  in pushBurst fuel id now (thru-outer op nid) κ burst sched₂ st₁
+  in pushBurst id now (thru-outer op nid) κ burst sched₂ st₁
 
 -- a shared slot: identity IS the index, source toℕ i (a hot's
 -- convention).  All reset options are false by definition: connect at
@@ -1092,35 +1088,30 @@ subscribeAll fuel op initialState b κ id now sched st =
 sharedPlumb : ∀ {n} {Γ : Ctx n} {u} → Stream Γ u → Stream Γ u
 sharedPlumb = map (λ em → record em { kind = plumbing })
 
--- the connect is a fuel decrement edge: the def d is a stored
+-- the connect is a non-structural edge: the def d is a stored
 -- expression, structurally unrelated to the `input i` being
--- subscribed.  Fuel is matched here, not at subscribeSharedSlot's
--- branches: joining an already-connected share costs nothing.
--- Lifted out of subscribeSharedSlot's where block so the budget
--- proof can name it (as with takeVals / thruConsume / mergeAllDrain)
+-- subscribed, so nothing about the term being walked shrinks here.
+-- It is separated from `subscribeSharedSlot`'s other branches because
+-- joining an already-connected share takes no edge at all, and lifted
+-- out of its where block so the derivation can name it (as with
+-- takeVals / thruConsume / mergeAllDrain)
 sharedConnect : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-              → Acc _≺_ τ → (i : Fin n) → (d : Closed Γ (lookup Γ i))
+              → (i : Fin n) → (d : Closed Γ (lookup Γ i))
               → Path Γ lo (lookup Γ i) t → toℕ i < lo → Id → Tick
               → Sched Γ → EvalSt e
               → Stream Γ (lookup Γ i) × Sched Γ × EvalSt e
--- THE CONNECT RE-SEEDS THE RANK AT THE DEFINITION'S OWN NESTING, AND
--- `ltU` IS WHAT LETS IT.  The edge descends the unconnected count and
--- leaves the other two components free, so a connect owes nothing about
--- how the definition compares to the term that referenced it — which is
--- the one place the measure would otherwise need a slot environment,
--- since a reference is one symbol standing for a definition of any
--- nesting and reads zero.  Re-seeding buys that back for a `refl`: the
--- caller hands over the definition and the component it hands over is
--- the definition's.
-sharedConnect {τ = U , _ , _} (acc rec) i d κ below id now sched st
-  with unconn (Sched.slots sched) (toℕ i ∷ EvalSt.connectedShares st) <? U
-... | no  _ = dryBurst id , sched , st
-... | yes p =
+-- THE CONNECT'S DESCENT IS A COUNT AND IT IS OWED ELSEWHERE NOW.
+-- Connecting slot `i` puts `i` into the connected set, so the reading
+-- over the slots NOT in that set drops by exactly one — provided `i`
+-- was not already there, which is the branch `subscribeSharedSlot` took
+-- to reach this clause.  That proviso is why the fact cannot be stated
+-- free, and it is `Rx.Evaluator.Doorless.connect-edge`; the clause
+-- itself reads nothing.
+sharedConnect i d κ below id now sched st =
   let st₁ = register (atSlot i) (lowerFloor below κ)
               (record st { connectedShares = toℕ i ∷ EvalSt.connectedShares st })
       (burst , sched₁ , st₂) =
-        subscribeE (rec (ltU {r′ = obsDepthᵉ d} {s′ = syncSizeᵉ d} p))
-                   d (share-sink i ≤-refl) id now sched st₁
+        subscribeE d (share-sink i ≤-refl) id now sched st₁
       -- the def's connect burst flows up the first subscriber's own
       -- frames (the returned burst); dispatch only serves arrivals
   in if burstCompleted burst
@@ -1135,24 +1126,24 @@ sharedConnect {τ = U , _ , _} (acc rec) i d κ below id now sched st
           , sched₁ , st₂
 
 subscribeSharedSlot : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-                    → Acc _≺_ τ → (i : Fin n) → (d : Closed Γ (lookup Γ i))
+                    → (i : Fin n) → (d : Closed Γ (lookup Γ i))
                     → Path Γ lo (lookup Γ i) t → toℕ i < lo → Id → Tick
                     → Sched Γ → EvalSt e
                     → Stream Γ (lookup Γ i) × Sched Γ × EvalSt e
-subscribeSharedSlot {Γ = Γ} {e = e} fuel i d κ below id now sched st =
+subscribeSharedSlot {Γ = Γ} {e = e} i d κ below id now sched st =
   if memberSource (toℕ i) (EvalSt.completedSources st)
   then spentBurst (toℕ i) id , sched , st
   else if memberSource (toℕ i) (EvalSt.connectedShares st)
   then -- live: join mid-flight, future values only
        ((init (toℕ i) ∷ []) at id from toℕ i as subscribe) ∷ []
        , sched , register (atSlot i) (lowerFloor below κ) st
-  else sharedConnect fuel i d κ below id now sched st
+  else sharedConnect i d κ below id now sched st
 
-subscribeE {lo = lo} {Γ = Γ} fuel (input i) κ id now sched st with toℕ i <? lo
+subscribeE {lo = lo} {Γ = Γ} (input i) κ id now sched st with toℕ i <? lo
 ... | no _ = spentBurst (toℕ i) id , sched , st
 ... | yes below with Sched.slots sched i
 ...   | shared d =
-      subscribeSharedSlot fuel i d κ below id now sched st
+      subscribeSharedSlot i d κ below id now sched st
 ...   | scripted (hot _) =
       if memberSource (toℕ i) (EvalSt.completedSources st)
       then -- spent script: a completed Subject — immediate
@@ -1178,20 +1169,20 @@ subscribeE {lo = lo} {Γ = Γ} fuel (input i) κ id now sched st with toℕ i <?
       in ((init src ∷ map value sync) at id from src as subscribe) ∷ []
          , sched₃ , register (atDyn src _) κ st
 
-subscribeE fuel (ofᵉ ts) κ id now sched st =
+subscribeE (ofᵉ ts) κ id now sched st =
   let (burst , sched₁) = oneShotBurst (map (λ tm → evalTm tm) ts) id sched
   in burst , sched₁ , st
 
-subscribeE fuel emptyᵉ κ id now sched st =
+subscribeE emptyᵉ κ id now sched st =
   let (burst , sched₁) = oneShotBurst [] id sched
   in burst , sched₁ , st
 
-subscribeE fuel (mapᵉ f b) κ id now sched st =
+subscribeE (mapᵉ f b) κ id now sched st =
   let (burst , sched₁ , st₁) =
-        subscribeE fuel b (map-f f ↠ κ) id now sched st
-  in pushBurst fuel id now (map-f f) κ burst sched₁ st₁
+        subscribeE b (map-f f ↠ κ) id now sched st
+  in pushBurst id now (map-f f) κ burst sched₁ st₁
 
-subscribeE fuel (takeᵉ count b) κ id now sched st with evalTm count
+subscribeE (takeᵉ count b) κ id now sched st with evalTm count
 ... | zero =
       -- take 0 never subscribes its source (as in rxjs): a spent
       -- one-shot, exactly emptyᵉ
@@ -1200,35 +1191,35 @@ subscribeE fuel (takeᵉ count b) κ id now sched st with evalTm count
 ... | suc k =
       let (nid , sched₁) = mintNode sched
           (burst , sched₂ , st₁) =
-            subscribeE fuel b (take-f nid ↠ κ) id now sched₁
+            subscribeE b (take-f nid ↠ κ) id now sched₁
                        (installNode nid (take-st (suc k)) st)
-      in pushBurst fuel id now (take-f nid) κ burst sched₂ st₁
+      in pushBurst id now (take-f nid) κ burst sched₂ st₁
 
-subscribeE fuel (scanᵉ f seed b) κ id now sched st =
+subscribeE (scanᵉ f seed b) κ id now sched st =
   let (nid , sched₁) = mintNode sched
       (burst , sched₂ , st₁) =
-        subscribeE fuel b (scan-f f nid ↠ κ) id now sched₁
+        subscribeE b (scan-f f nid ↠ κ) id now sched₁
                    (installNode nid (scan-st (evalTm seed)) st)
-  in pushBurst fuel id now (scan-f f nid) κ burst sched₂ st₁
+  in pushBurst id now (scan-f f nid) κ burst sched₂ st₁
 
-subscribeE {u = u} fuel (mergeAllᵉ lim b) κ id now sched st =
-  subscribeAll fuel mergeAllᵒ (mergeAll-st {t = u} lim 0 [] false) b
+subscribeE {u = u} (mergeAllᵉ lim b) κ id now sched st =
+  subscribeAll mergeAllᵒ (mergeAll-st {t = u} lim 0 [] false) b
                κ id now sched st
-subscribeE fuel (switchAllᵉ b) κ id now sched st =
-  subscribeAll fuel switchᵒ (switch-st nothing false) b κ id now sched st
-subscribeE fuel (exhaustAllᵉ b) κ id now sched st =
-  subscribeAll fuel exhaustᵒ (exhaust-st false false) b κ id now sched st
+subscribeE (switchAllᵉ b) κ id now sched st =
+  subscribeAll switchᵒ (switch-st nothing false) b κ id now sched st
+subscribeE (exhaustAllᵉ b) κ id now sched st =
+  subscribeAll exhaustᵒ (exhaust-st false false) b κ id now sched st
 
 -- one unfold per subscription; the recursive occurrences inside the
 -- unfolding are deferᵉ-gated, so each re-entry costs a schedule hop —
--- no synchronous loop.  A fuel decrement edge: the unfolding is
--- larger than the μ, not a subterm
-subscribeE {τ = _ , _ , sz} (acc rec) (μᵉ body) κ id now sched st
-  with syncSizeᵉ (unfoldμ body) <? sz
-... | no  _ = dryBurst id , sched , st
-... | yes p = subscribeE (rec (ltS p)) (unfoldμ body) κ id now sched st
+-- no synchronous loop.  A non-structural edge: the unfolding is larger
+-- than the μ, not a subterm — and the only one of the three whose fact
+-- was already proven, since `Rx.Sync-Size.unfoldμ-shrinks` speaks of
+-- the term rather than of anything the run was handed.
+subscribeE (μᵉ body) κ id now sched st =
+  subscribeE (unfoldμ body) κ id now sched st
 
-subscribeE fuel (varᵉ ()) κ id now sched st
+subscribeE (varᵉ ()) κ id now sched st
 
 -- deferᵉ is mergeAll of a one-shot scheduled outer: the body itself is
 -- the pending payload (Val Γ (obs u) IS Closed Γ u), delivered at
@@ -1236,7 +1227,7 @@ subscribeE fuel (varᵉ ()) κ id now sched st
 -- under that arrival's fresh instant, wrap marks the outer done, and
 -- the node completes when the body does.  Cancellation is free:
 -- cutting the registration lets sweepLive collect the pending hop
-subscribeE {u = u} fuel (deferᵉ body) κ id now sched st =
+subscribeE {u = u} (deferᵉ body) κ id now sched st =
   let (nid , sched₁) = mintNode sched
       (src , sched₂) = mintSource sched₁
       (ord , sched₃) = mintOrdinal sched₂
@@ -1322,7 +1313,6 @@ floorFalls i below = ∸-monoʳ-< (s≤s below) (toℕ<n i)
 -- function type binds left to right, so a premise mentioning `i` cannot
 -- precede it; everything else keeps the position the counter held.
 dispatchShare : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-              → Acc _≺_ τ  -- the witness, handed to stepFrame's re-entries
               → Acc _<_ (n ∸ lo)  -- the descent, at the chain's own floor
               → Id → Tick → (i : Fin n) → lo ≤ toℕ i
               → List (Val Γ (lookup Γ i)) → Bool
@@ -1335,7 +1325,7 @@ dispatchShare : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 -- Lifted out of dispatchShare's where block so the budget proof can
 -- name it (as with takeVals / thruConsume / sharedConnect)
 shareGo : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-        → Acc _≺_ τ → Acc _<_ (n ∸ lo) → Id → Tick → (i : Fin n)
+        → Acc _<_ (n ∸ lo) → Id → Tick → (i : Fin n)
         → List (Val Γ (lookup Γ i)) → Bool
         → List (RegId × Path Γ lo (lookup Γ i) t) → Sched Γ → EvalSt e
         → Stream Γ t × Sched Γ × EvalSt e
@@ -1346,29 +1336,29 @@ shareGo : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 -- running on an empty value list, so the emit is emptied, never
 -- swallowed.  The envelope is assembled here and nowhere else
 foldPath : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-         → Acc _≺_ τ → Acc _<_ (n ∸ lo) → Id → Tick → Source → Path Γ lo u t
+         → Acc _<_ (n ∸ lo) → Id → Tick → Source → Path Γ lo u t
          → List (Val Γ u) → List (InstEvent (Val Γ t)) → Bool
          → Sched Γ → EvalSt e
          → Stream Γ t × Sched Γ × EvalSt e
-foldPath sf ac id now envSrc root vals evs fin sched st =
+foldPath ac id now envSrc root vals evs fin sched st =
   ((evs ++ map value vals ++ (if fin then complete ∷ [] else []))
     at id from envSrc as delivery) ∷ [] , sched , st
 -- THE SINK HANDS ITS OWN PREMISE DOWN, and that premise is the whole
 -- descent: the dispatch peels the witness by it rather than being
 -- trusted to stay inside a count.
-foldPath sf ac id now envSrc (share-sink i below) vals evs fin sched st =
+foldPath ac id now envSrc (share-sink i below) vals evs fin sched st =
   -- the chain's own (valueless) emit first — announcing the handoff:
   -- share i fans out next, still inside this instant.  The share
   -- delivers vals to every chain registered on it — the diamond
   -- case, batched by construction
   let (fanout , sched₁ , st₁) =
-        dispatchShare sf ac id now i below vals fin sched st
+        dispatchShare ac id now i below vals fin sched st
   in (((evs ++ handoff (toℕ i) ∷ []) at id from envSrc as delivery) ∷ fanout)
      , sched₁ , st₁
-foldPath sf ac id now envSrc (f ↠ path′) vals evs fin sched st =
+foldPath ac id now envSrc (f ↠ path′) vals evs fin sched st =
   let (vals′ , evs′ , fin′ , sched₁ , st₁) =
-        stepFrame sf id now f path′ vals fin sched st
-  in foldPath sf ac id now envSrc path′ vals′ (evs ++ evs′) fin′ sched₁ st₁
+        stepFrame id now f path′ vals fin sched st
+  in foldPath ac id now envSrc path′ vals′ (evs ++ evs′) fin′ sched₁ st₁
 
 -- deliver to the chains of share i, one emit per registration from
 -- source toℕ i (the share's owed count), in subscription order.  A
@@ -1382,22 +1372,22 @@ foldPath sf ac id now envSrc (f ↠ path′) vals evs fin sched st =
 -- the fan-out is handed is this one peeled by the sink's own premise —
 -- matched here rather than applied, since that is the only form the
 -- termination checker reads as a descent.
-dispatchShare sf (acc rs) id now i below vals fin sched st =
+dispatchShare (acc rs) id now i below vals fin sched st =
   shareFinish i fin
-    (shareGo sf (rs (floorFalls i below)) id now i vals fin
+    (shareGo (rs (floorFalls i below)) id now i vals fin
       (shareAdmit i (EvalSt.registry st)) sched (shareLatch i fin st))
 
-shareGo sf ac id now i vals fin []               sched₀ st₀ = [] , sched₀ , st₀
-shareGo sf ac id now i vals fin ((rid , p) ∷ ps) sched₀ st₀
+shareGo ac id now i vals fin []               sched₀ st₀ = [] , sched₀ , st₀
+shareGo ac id now i vals fin ((rid , p) ∷ ps) sched₀ st₀
   with any (_≡ᵇ rid) (EvalSt.cancelled st₀)
-... | true  = shareGo sf ac id now i vals fin ps sched₀ st₀
+... | true  = shareGo ac id now i vals fin ps sched₀ st₀
 ... | false =
   let (emits , sched₁ , st₁) =
-        foldPath sf ac id now (toℕ i) p vals
+        foldPath ac id now (toℕ i) p vals
                  (if fin then close (toℕ i) exhausted ∷ [] else [])
                  fin sched₀
                  (record st₀ { delivered = rid ∷ EvalSt.delivered st₀ })
-      (rest , sched₂ , st₂) = shareGo sf ac id now i vals fin ps sched₁ st₁
+      (rest , sched₂ , st₂) = shareGo ac id now i vals fin ps sched₁ st₁
   in emits ++ rest , sched₂ , st₂
 
 -- seed one arrival into one chain: the value, plus fin and this
@@ -1406,8 +1396,7 @@ chainStep : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
           → Id → (a : Arrival Γ) → AtFloor Γ (arrTy a) t → Sched Γ → EvalSt e
           → Stream Γ t × Sched Γ × EvalSt e
 chainStep {n = n} {e = e} id a (lo , path) sched st =
-  foldPath (arrivalWitness a sched st)
-           (<-wellFounded-fast (n ∸ lo))
+  foldPath (<-wellFounded-fast (n ∸ lo))
            id (arrTick a) (arrSource a) path (arrVal a ∷ [])
            (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
            (Arrival.isLast a) sched st
@@ -1507,6 +1496,6 @@ drain (suc k) nextId sched st with sched-next sched
 evaluate : ∀ {n} {Γ : Ctx n} {t} → Fuel → Closed Γ t → Slots Γ → Stream Γ t
 evaluate {n = n} fuel e ins =
   let (burst , sched₀ , st₀) =
-        subscribeE {lo = n} (rootWitness e ins) e root 0 0 (sched-init e ins)
+        subscribeE {lo = n} e root 0 0 (sched-init e ins)
           (st-init e)
   in burst ++ drain fuel 1 sched₀ st₀
