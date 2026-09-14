@@ -425,9 +425,21 @@ entry-drain-fits {n = n} fuel e ins =
 -- carried with the store's reading and mentions no body still pending,
 -- so nothing anywhere in the run holds that figure.  What terminates
 -- here is not in doubt: all three programs run to completion in ordinary
--- rxjs, so what is refuted is this MEASURE and never the totality it was
--- introduced to witness.
+-- rxjs, so what the witnesses below kill is this MEASURE and never the
+-- totality it was introduced to witness.
 --
+-- DEAD ROUTE: moving the debt to a leaf — postulating the descent's
+--   domain, or the accessibility itself, and deleting the three arms
+--   that test a reading and emit the marker on the negative answer.  It
+--   is the obvious repair once the reading is refuted, and it is dead
+--   for a reason nothing about the measure shows: the root witness is
+--   well-foundedness APPLIED to the triple, a real proof, and the
+--   evaluator REDUCES through it.  Every probe's `refl`, the bug cache
+--   and the oracle all compute through that witness, so a postulated
+--   domain gets stuck at the first pattern match and takes the whole
+--   evidence apparatus with it.  The arms are what buy computation, so
+--   they come out only once the domain is PROVEN — which is the
+--   totality argument itself and not a cutover ahead of it.
 -- REFUTED: `Refuted.Dry-Wrap` — this statement, at three programs: one
 --   per half of the substitution repair, and one behind a gate that
 --   neither half reaches.

@@ -226,24 +226,23 @@ statement naming no reading these witnesses killed.
 
 ### Big picture tier roadmap
 
-- **DELETE THE THREE ARMS AND POSTULATE TOTALITY AT THE TOP.** The accessibility
-  witness is threaded through every frame already; what is not landed is the
-  DOMAIN. Each non-structural edge — the inner-value hop, the μ peel, the share
-  connect — compares a runtime reading against the component it stands at and
-  emits dry on the negative answer. A derivation taking each sub-call's own
-  witness as a premise has no negative answer to give, so the arms go and the
-  debt becomes one leaf quantified over programs, mentioning no reading these
-  three witnesses killed. Killing the arm is available where PROVING it
-  unreachable is not, because the arm is reachable and that is the finding.
+- **THE ARMS CANNOT BE DELETED, AND WHY IS THE LEG: THEY ARE WHAT MAKES THE
+  EVALUATOR REDUCE.** The root witness is well-foundedness APPLIED to the
+  triple — a real proof — so every probe's `refl`, the bug cache and the oracle
+  all compute THROUGH it. A postulated domain or accessibility gets stuck at
+  the first pattern match and takes the whole evidence apparatus with it, so
+  the debt cannot be moved to a leaf and the door dies only once its domain is
+  PROVEN. What is available now is an adequate COMPUTABLE seed; the leg is to
+  find one or to establish that none exists.
 
 - **THEN RE-RUN WHAT THE DOOR WAS SILENCING.** FOUR refutations measure states
   the run stopped reaching — three registry candidates and the per-instant
   delivery count — so each reports agreement rather than the crossing it was
-  taken for: an empty burst is under every bound. With no arm each is reachable
-  again, and what bounds a frame's output is asked of a machine that answers
-  instead of refusing. Ranked second because it is the cheapest check on the
-  first: if the crossings come back unchanged, the deletion moved who owes the
-  proof and nothing else.
+  taken for: an empty burst is under every bound. Under a seed the guard stops
+  refusing on, each is reachable again and what bounds a frame's output is
+  asked of a machine that answers instead of refusing. Ranked second because it
+  is the cheapest check on the first: a seed that merely moved the refusal
+  leaves these four still silent, which no proof about the seed would say.
 
 - **AND THEN THE REAL THEOREM: INHABIT THE DOMAIN.** Totality stops being a
   numeric sufficiency claim and becomes an induction over the evaluator's own
@@ -339,10 +338,10 @@ statement naming no reading these witnesses killed.
   quarter of what the run then carries.
 
 - **`dry-operator`** (Verify-Rank-Sufficient.Dry) — DIFFICULTY,
-  `REFUTED, DEAD ROUTE×3, PROBED, RECOVERY×2`: the THREE FLATTENERS'
-  dry-freedom under the entry invariant, and the only half of them still a
-  leaf. The dry shelf is unconditional in what a frame is handed, so the
-  assembly wants the dry claim and the report proven in ONE walk.
+  `DEAD ROUTE×4, PROBED, RECOVERY×3`: the THREE FLATTENERS' dry-freedom under
+  the entry invariant, and the only half of them still a leaf. The dry shelf is
+  unconditional in what a frame is handed, so the assembly wants the dry claim
+  and the report proven in ONE walk.
 
 - **`ofᵉ-carried` / `scan-seed-carried`** (Verify-Rank-Sufficient.Leaf-Carried)
   — DIFFICULTY, `PROBED×2`: the two places a subscribe turns a term into a
