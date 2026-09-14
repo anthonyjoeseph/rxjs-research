@@ -35,7 +35,8 @@ open import Data.Fin using (Fin; toℕ)
 open import Data.List using (List; []; _∷_)
 open import Data.List.Relation.Unary.All using (All) renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
 open import Data.Nat using (ℕ; suc; _+_; _<_; _≤_; _⊔_)
-open import Data.Nat.Properties using (≤-trans; ≤-refl; ≤-reflexive; n≤1+n; m≤n+m; m≤n⊔m)
+open import Data.Nat.Properties using (≤-trans; ≤-refl; ≤-reflexive; n≤1+n; m≤n+m; m≤n⊔m;
+  <-≤-trans)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (⊤)
@@ -330,16 +331,31 @@ postulate
                 → memberSource (toℕ i) cs ≡ false
                 → unconn sl (toℕ i ∷ cs) < unconn sl cs
 
--- and the edge, which needs the triple's own `U` to BE that count.  It
--- is at the connect that the triple is re-seeded, so the equation is
--- the clause's own `refl` rather than something carried: the caller
--- hands over the definition and the component it hands over is the
--- definition's.
-connect-edge : ∀ {r s r′ s′} {Γ : Ctx n} (sl : Slots Γ) (cs : List Source)
+-- AND THE EDGE, WHICH TAKES SLACK RATHER THAN AN EQUATION — WHICH IS
+-- WHAT WRITING THE ARM'S BODY FOUND.  Stated with the triple's own `U`
+-- fixed to BE the count, it is usable only where the caller's rank was
+-- seeded at exactly `unconn sl cs`, and no caller can promise that:
+-- every connect the run has already performed dropped the count while
+-- the triple the builder was entered at stayed put, so by the second
+-- one the two have separated.  The count is MONOTONE against the rank
+-- rather than equal to it, so the premise is `≤` and the edge composes
+-- the drop through it — the equation is the `≤-refl` instance, which is
+-- what the root supplies and nothing below it does.
+--
+-- WHAT THE RESIDUE IS, AND IT IS A PREMISE THE BUILDER DOES NOT CARRY
+-- YET.  The slack has to arrive at the connect arm, so every builder
+-- signature owes `unconn sl (EvalSt.connectedShares st) ≤ proj₁ τ`
+-- alongside the agreement it already carries for the slot table — and
+-- every clause handing a LATER state onward owes that connecting only
+-- shrinks the count, which is a statement over the ⇓ families rather
+-- than over any function.  That is the same shape the slot-table
+-- agreement takes, and it is why the arm is not a body today.
+connect-edge : ∀ {U r s r′ s′} {Γ : Ctx n} (sl : Slots Γ) (cs : List Source)
                  (i : Fin n)
              → memberSource (toℕ i) cs ≡ false
-             → (unconn sl (toℕ i ∷ cs) , r′ , s′) ≺ (unconn sl cs , r , s)
-connect-edge sl cs i fresh = ltU (connect-drops sl cs i fresh)
+             → unconn sl cs ≤ U
+             → (unconn sl (toℕ i ∷ cs) , r′ , s′) ≺ (U , r , s)
+connect-edge sl cs i fresh le = ltU (<-≤-trans (connect-drops sl cs i fresh) le)
 
 -- AND THE CONNECT'S OTHER COMPONENT, WHICH IS THE ONE THE ENVIRONMENT
 -- WAS BUILT FOR.  The edge drops the count and leaves the rank free, so

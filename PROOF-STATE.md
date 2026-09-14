@@ -228,16 +228,17 @@ first match, which is why `bug-cache` is off the gate for the duration and
 
 ### Big picture tier roadmap
 
-- **THE SLOT SUBSCRIBE AS AN ASSEMBLY, WHICH IS ALSO WHAT RE-WIRES THE CONNECT
-  FACE.** `subscribeE!-input` is six arms over the slot table, and the share
-  one's connect is the other place an entry component is read against the
-  program — refutable exactly as its predecessor was, which is why it is first.
-  Convert it into a real body over per-arm leaves so the connect arm SPENDS
-  `connect-drops`, `connect-edge`, `connect-entry` and `slotDepth-fix`: today
-  those four have no consumer but this postulate, a name handed to a postulate
-  earns no reachability, and `make wiring-gate` is red on exactly that cone. So
-  the leg buys the arm's fit being checked rather than asserted, and the wiring
-  law back, in the same commit.
+- **CARRY THE UNCONNECTED COUNT, WHICH IS WHAT THE SLOT SUBSCRIBE'S BODY TURNED
+  OUT TO COST.** Writing the connect arm found the descent unsuppliable:
+  `connect-edge` drops the count from `unconn sl cs`, and no caller can promise
+  the triple it was entered at still IS that count, since every connect already
+  performed dropped one while the triple stayed put. The edge now takes the
+  slack as a premise and composes the drop through it, so the residue is
+  exactly one more agreement on every builder signature —
+  `unconn sl (EvalSt.connectedShares st) ≤ proj₁ τ`, beside the slot-table one
+  — plus the fact that connecting only shrinks the count, stated over the ⇓
+  families. Land that and `subscribeE!-input` is six arms over the slot table
+  with nothing left to decide.
 
 - **THE TWO ENDS OF THE RUN, WHICH IS WHAT MAKES A ROW REDUCE.** `drain!` is
   fuel induction over the schedule and carries no guard at all; `mergeAllDrain!`
