@@ -36,7 +36,7 @@ open import Data.List using (List; []; _∷_)
 open import Data.List.Relation.Unary.All using (All) renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
 open import Data.Nat using (ℕ; suc; _+_; _<_; _≤_; _⊔_)
 open import Data.Nat.Properties using (≤-trans; n≤1+n; m≤n+m; m≤n⊔m)
-open import Data.Product using (_×_; _,_; proj₁)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (⊤)
 open import Induction.WellFounded using (Acc)
@@ -275,13 +275,21 @@ hop-edge : ∀ {U r s} {Γ : Ctx n} {u} (o : Val Γ (obs u))
 hop-edge o drop = ltR drop
 
 -- THE EXTRACTION, WRITTEN OUT BECAUSE IT IS THE WHOLE OF THE ARGUMENT
--- AND READS AS A TRIVIALITY.  It is what the leaf above will `with` on
--- to refute the guard, and stating it separately is what keeps the
--- refutation from being reargued at each of the three consume families.
-hop-guard : ∀ {n} {Γ : Ctx n} {u} {U r sz} (o : Val Γ (obs u))
-          → HandedOK {Γ = Γ} (o ∷ []) (U , r , sz)
-          → obsDepthᵉ o < r
-hop-guard o (h ∷ᵃ []ᵃ) = h
+-- AND READS AS A TRIVIALITY.  Stating it separately is what keeps the
+-- one-element `All` from being taken apart again at each of the three
+-- consume families that reach the hop.
+--
+-- AND τ IS EXPLICIT HERE, WHICH IS FORCED RATHER THAN A STYLE.  `ValOK`
+-- at an observable type reads the middle component and nothing else, so
+-- both sides of this statement mention τ only under a projection — and a
+-- projection is not a pattern, so no argument can ever solve it.  Left
+-- implicit, in either the whole-τ or the split-triple spelling, every
+-- call reports unsolved metas against the APPLICATION rather than
+-- against the statement that cannot determine them.
+hop-guard : ∀ {n} {Γ : Ctx n} {u} (τ : Tri) (o : Val Γ (obs u))
+          → HandedOK {Γ = Γ} (o ∷ []) τ
+          → obsDepthᵉ o < proj₁ (proj₂ τ)
+hop-guard _ o (h ∷ᵃ []ᵃ) = h
 
 -- THE CONNECT'S FACT IS THE ONE GENUINELY NEW STATEMENT, AND IT IS
 -- COUNTING RATHER THAN DEPTH.  Connecting slot `i` puts `i` into the

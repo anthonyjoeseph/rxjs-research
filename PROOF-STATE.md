@@ -231,16 +231,16 @@ cannot compute — and the other two leaves carry no arithmetic at all.
 
 ### Big picture tier roadmap
 
-- **CLOSE THE HOP, WHICH IS NOW THE WHOLE OF THE RECURSION.** Both sides of it
-  are bodies — the outer walk with every consume clause, and the inner reaction
-  with the merge drain under it — so `subscribeInner!` is the single leaf left
-  in the cycle and the only descent here that MOVES τ. Its body is a call back
-  into `subscribeE!`, so writing it joins the mutual block, and the entry
-  invariant the operator clauses carry untouched has to be re-established from
-  the handed observable rather than inherited: that is where the deleted door's
-  question comes back as a proof obligation. `subscribeE!-input` and `drain!`
-  are the two remaining leaves outside it, and nothing is re-pointed until
-  every one is a body — a projection through a postulate computes at no input.
+- **MAKE THE HOP'S PREMISE TRUE: `burst-carries`, STATED OVER THE RELATION.**
+  The hop is closed: `subscribeInner!` is a body, the cycle's seven members are
+  one mutual block, and the descent it spends is `hop-guard` applied to a report
+  that travels with the value from the burst that produced it. That report is
+  `burst-carries` — a subscribe entered at τ hands back a burst whose every
+  observable is shallower than τ's rank. Stated over `subscribeE⇓` and over no
+  function, which keeps it out of the cycle it is about, and it REPLACED a
+  five-frame carried shelf: the push cycle splits one `All` emit by emit rather
+  than re-deriving a bound per frame. Riskiest because everything above it is
+  now a body — if it is false the door comes back.
 
 - **PRICE THE TEMPLATE, NOT THE INPUT: STATE THE SUBSTITUTION LEMMA (Anthony).**
   Six refutations stand at the door and every one of them refutes a price stated
@@ -254,17 +254,15 @@ cannot compute — and the other two leaves carry no arithmetic at all.
   which REFUTES the unconditioned form. It is the hop's own premise, so the leg
   above hands it its only remaining customer.
 
-- **STATE THE WHOLE CARRIED FAMILY AT THE FULL AXIS SET IN ONE PASS — ALL FIVE
-  FRAMES, NOT ONE PER REFUTATION (Anthony).** `stepFrame⇓-total` is handed
-  `HandedOK vals τ` and nothing says what the frame HANDS BACK is bounded; that
-  missing shelf is the whole of what the door waits on. Its predecessor was
-  discovered a frame at a time, re-learning one lesson five times, so all five
-  land together in `Verify-Rank-Sufficient.Push-Carried`. THE LEG ABOVE
-  NARROWS IT RATHER THAN REPLACING IT: four of the five stop mentioning the
-  input bound at all, and what still needs a carried figure is two shapes — an
-  observable a SOURCE delivered, and a FOLD's, fed back through an environment
-  that is not data. `subscribe-carried` is then a real
-  BODY over `pushBurst-carried`, naming three residues for the first time.
+- **THE THREE LEAVES OUTSIDE THE CYCLE, AND ONLY THEN THE RE-POINTING.**
+  `subscribeE!-input` is the slot subscribe — six arms and the share connect's
+  `unconn` guard, the other place an entry component is read against the
+  program. `drain!` is fuel induction and carries no guard. `mergeAllDrain!` is
+  the leg above's finding: the ONE subscription site a burst never reaches,
+  since its observables were queued when the lane limit was full and come back
+  out of the STORE, so what it is owed is a field on the invariant record and
+  not a premise. Nothing is re-pointed until all three are bodies — a
+  projection through a postulate computes at no input.
 
 - **THEN THE LEAVES BOTH CYCLES LEFT, AND REFUTE EACH BEFORE GRINDING IT.**
   Both cycles are bodies now and their list plumbing is closed, so what is open
@@ -317,7 +315,8 @@ cannot compute — and the other two leaves carry no arithmetic at all.
 - **`innerReact⇓-total`** (Verify-Rank-Sufficient) — FALSITY, `PROBED`: the
   same edge reached through the flattener's own bookkeeping rather than a fresh
   value, so it carries no rank test and inherits the store the walk left.
-  Nothing instantiates it yet.
+  Builder leaf `mergeAllDrain!`, whose queue comes out of the store and not out
+  of a burst.
 
 - **`subscribeAll⇓-total`** (Verify-Rank-Sufficient) — FALSITY, `PROBED`: the
   flatteners' wrapper, a node install between the two cycles above. It adds no
@@ -339,7 +338,7 @@ cannot compute — and the other two leaves carry no arithmetic at all.
   `applyFn-ok-+`, `map-frame-carried-obs`, `scan-frame-carried`,
   `take-frame-carried`, `thru-outer-frame-carried`, `from-inner-carried`,
   `subscribe-carried-schedule`, `burst-handed`, `burst-widen`, `payOf`,
-  `rankOf`, `source-carried`, `of-carried`, `all-carried`.
+  `rankOf`, `source-carried`, `of-carried`, `all-carried`, `burst-carries`.
 
 ## Tier 2 — Verify-Well-Formed (parked behind tier 1)
 
