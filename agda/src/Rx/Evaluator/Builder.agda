@@ -42,8 +42,8 @@ open import Data.List using (List; []; _∷_; _++_)
 open import Data.List.Relation.Unary.All using (All)
   renaming ([] to []ᵃ; _∷_ to _∷ᵃ_; head to headᵃ; tail to tailᵃ)
 open import Data.Maybe using (Maybe; nothing; just)
-open import Data.Nat using (ℕ; zero; suc; pred; _≡ᵇ_)
-open import Data.Nat.Properties using (≤-refl; m≤m⊔n)
+open import Data.Nat using (ℕ; zero; suc; pred; _≤_; _≡ᵇ_)
+open import Data.Nat.Properties using (≤-refl; ≤-trans; m≤m⊔n)
 open import Data.Product using (∃; _,_; proj₁; proj₂)
 open import Data.Vec using (lookup)
 open import Induction.WellFounded using (Acc; acc)
@@ -58,7 +58,8 @@ open import Rx.Slot-Depth using (slotDepth)
 open import Rx.Strat-Order using (Tri; _≺_)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; AllOp; NodeId; NodeState; Frame; root; _↠_; map-f; take-f; scan-f;
   thru-outer; from-inner; mergeAllᵒ; switchᵒ; exhaustᵒ; mergeAll-st; switch-st; exhaust-st; take-st;
-  scan-st; installNode; lookupNode; hasRoom; switchKill; aliveThroughᶠ; splitEvents; splitBurst; sched-init; st-init)
+  scan-st; installNode; lookupNode; hasRoom; switchKill; aliveThroughᶠ; splitEvents; splitBurst; sched-init; st-init;
+  unconn)
 open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeAll⇓; pushBurst⇓;
   stepFrame⇓; innerReact⇓; innerFinish⇓; mergeAllDrain⇓; thruWalk⇓;
   thruConsume⇓; subscribeInner⇓;
@@ -73,7 +74,7 @@ open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeAll⇓; pushBurst
   subs-take-suc; subs-scan; subs-merge-all; subs-switch-all; subs-exhaust-all;
   subs-μ; subs-defer; sub-all; eval-run)
 open import Rx.Evaluator.Doorless using (μ-edge; μ-entry; rootWitness;
-  EntryOK; inner-ok; under-ok; HandedOK; BurstOK; split-handed;
+  EntryOK; SharesUnder; inner-ok; under-ok; HandedOK; BurstOK; split-handed;
   hop-edge; hop-guard)
 
 ------------------------------------------------------------------
@@ -185,6 +186,7 @@ postulate
     EntryOK {Γ = Γ} (slotDepth sl) (input i) τ →
     (κ : Path Γ lo (lookup Γ i) t) (id : Id) (now : Tick)
     (sched : Sched Γ) → Sched.slots sched ≡ sl → (st : EvalSt e) →
+    SharesUnder sl τ st →
     Runs {e = e} (input i) κ id now sched st
 
   drain! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
@@ -299,6 +301,52 @@ postulate
       (vals′ , evs , sched′ , st′) →
     Sched.slots sched′ ≡ Sched.slots sched
 
+-- AND THE SAME THREE SITES OWE THE OTHER AGREEMENT, WHICH IS THE ONE
+-- THE CONNECT'S EDGE READS.  A clause handing a LATER state onward is
+-- standing at the triple it entered with, so what it must re-establish
+-- is that the later state's unconnected count still sits under that
+-- triple — and it does, because the connected set only ever GAINS an
+-- index: no clause of any family removes one, so the count is
+-- monotone down the run and the gap the caller was handed only widens.
+-- Stated at an arbitrary slot table rather than at the run's own,
+-- because the table is what the count is denominated in and every
+-- consumer already holds the agreement fixing it.
+--
+-- AND IT IS THREE STATEMENTS RATHER THAN ONE OVER THE STORE, WHICH IS
+-- FORCED BY WHERE THE STATES COME FROM.  Each is a claim about what a
+-- DERIVATION produced, so it is stated over the ⇓ family whose clause
+-- produced it; a single claim about `EvalSt` would have to quantify
+-- over states no run reaches, which is the shape three refutations on
+-- this face have already killed.
+postulate
+  subs-unconn-drops : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
+    {b : Closed Γ u} {κ : Path Γ lo u t} {id : Id} {now : Tick}
+    {sched : Sched Γ} {st : EvalSt e} {burst : Stream Γ u}
+    {sched′ : Sched Γ} {st′ : EvalSt e} (sl : Slots Γ) →
+    subscribeE⇓ {e = e} b κ id now sched st (burst , sched′ , st′) →
+    unconn sl (EvalSt.connectedShares st′)
+      ≤ unconn sl (EvalSt.connectedShares st)
+
+  step-unconn-drops : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
+    {id : Id} {now : Tick} {fr : Frame Γ s u} {κ : Path Γ lo u t}
+    {vals : List (Val Γ s)} {fin : Bool} {sched : Sched Γ} {st : EvalSt e}
+    {vals′ : List (Val Γ u)} {evs : List (InstEvent (Val Γ t))} {fin′ : Bool}
+    {sched′ : Sched Γ} {st′ : EvalSt e} (sl : Slots Γ) →
+    stepFrame⇓ {e = e} id now fr κ vals fin sched st
+      (vals′ , evs , fin′ , sched′ , st′) →
+    unconn sl (EvalSt.connectedShares st′)
+      ≤ unconn sl (EvalSt.connectedShares st)
+
+  consume-unconn-drops : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
+    {op : AllOp} {nid : NodeId} {κ : Path Γ lo u t} {id : Id} {now : Tick}
+    {o : Val Γ (obs u)} {sched : Sched Γ} {st : EvalSt e}
+    {vals′ : List (Val Γ u)} {evs : List (InstEvent (Val Γ t))}
+    {sched′ : Sched Γ} {st′ : EvalSt e} (sl : Slots Γ) →
+    thruConsume⇓ {e = e} op nid κ id now o sched st
+      (vals′ , evs , sched′ , st′) →
+    unconn sl (EvalSt.connectedShares st′)
+      ≤ unconn sl (EvalSt.connectedShares st)
+
 -- THE SWITCH'S KILL IS THE ONE OF THE FOUR THAT IS NOT A RELATION, so it
 -- is a function and the fact is two clauses of `refl`.  It is stated
 -- over the whole triple rather than over a named schedule because the
@@ -310,6 +358,17 @@ switchKill-slots : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   Sched.slots (proj₁ (proj₂ res)) ≡ Sched.slots sched
 switchKill-slots nothing  sched st refl = refl
 switchKill-slots (just v) sched st refl = refl
+
+-- and its share set, which it does not touch at all: the kill closes an
+-- inner and drops a registration, so the count is the same number and
+-- the agreement passes through by `≤-refl` under the same two clauses.
+switchKill-unconn : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (cur : Maybe NodeId) (sched : Sched Γ) (st : EvalSt e) {res} →
+  switchKill cur sched st ≡ res →
+  unconn sl (EvalSt.connectedShares (proj₂ (proj₂ res)))
+    ≤ unconn sl (EvalSt.connectedShares st)
+switchKill-unconn sl nothing  sched st refl = ≤-refl
+switchKill-unconn sl (just v) sched st refl = ≤-refl
 
 ------------------------------------------------------------------
 -- THE INNER REACTION, WHICH IS THE OTHER SIDE OF THE SAME HOP.
@@ -387,6 +446,7 @@ subscribeE! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo} {τ : Tri}
   (ac : Acc _≺_ τ) (sl : Slots Γ) (b : Closed Γ u) → EntryOK (slotDepth sl) b τ →
   (κ : Path Γ lo u t) (id : Id) (now : Tick)
   (sched : Sched Γ) → Sched.slots sched ≡ sl → (st : EvalSt e) →
+  SharesUnder sl τ st →
   Runs {e = e} b κ id now sched st
 
 subscribeAll! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo} {τ : Tri}
@@ -394,18 +454,21 @@ subscribeAll! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo} {τ : Tri}
   (b : Closed Γ (obs u)) →
   EntryOK (slotDepth sl) b τ → (κ : Path Γ lo u t) (id : Id) (now : Tick)
   (sched : Sched Γ) → Sched.slots sched ≡ sl → (st : EvalSt e) →
+  SharesUnder sl τ st →
   AllRuns {e = e} op ns b κ id now sched st
 
 pushBurst! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo} {τ : Tri}
   (ac : Acc _≺_ τ) (sl : Slots Γ) (id : Id) (now : Tick) (fr : Frame Γ s u)
   (κ : Path Γ lo u t) (bs : Stream Γ s) → BurstOK (slotDepth sl) bs τ →
   (sched : Sched Γ) → Sched.slots sched ≡ sl → (st : EvalSt e) →
+  SharesUnder sl τ st →
   PushRuns {e = e} id now fr κ bs sched st
 
 stepFrame! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo} {τ : Tri}
   (ac : Acc _≺_ τ) (sl : Slots Γ) (id : Id) (now : Tick) (fr : Frame Γ s u)
   (κ : Path Γ lo u t) (vals : List (Val Γ s)) → HandedOK (slotDepth sl) vals τ →
   (fin : Bool) (sched : Sched Γ) → Sched.slots sched ≡ sl → (st : EvalSt e) →
+  SharesUnder sl τ st →
   StepRuns {e = e} id now fr κ vals fin sched st
 
 thruWalk! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo} {τ : Tri}
@@ -413,6 +476,7 @@ thruWalk! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo} {τ : Tri}
   (id : Id) (now : Tick) (os : List (Val Γ (obs u))) →
   HandedOK (slotDepth sl) os τ →
   (sched : Sched Γ) → Sched.slots sched ≡ sl → (st : EvalSt e) →
+  SharesUnder sl τ st →
   WalkRuns {e = e} op nid κ id now os sched st
 
 thruConsume! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo} {τ : Tri}
@@ -420,6 +484,7 @@ thruConsume! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo} {τ : Tri}
   (id : Id) (now : Tick) (o : Val Γ (obs u)) →
   HandedOK (slotDepth sl) (o ∷ []) τ →
   (sched : Sched Γ) → Sched.slots sched ≡ sl → (st : EvalSt e) →
+  SharesUnder sl τ st →
   ConsumeRuns {e = e} op nid κ id now o sched st
 
 subscribeInner! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo} {τ : Tri}
@@ -428,6 +493,7 @@ subscribeInner! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo} {τ : Tri}
   (id : Id) (now : Tick) (o : Val Γ (obs u)) →
   HandedOK (slotDepth sl) (o ∷ []) τ →
   (sched : Sched Γ) → Sched.slots sched ≡ sl → (st : EvalSt e) →
+  SharesUnder sl τ st →
   InnerSubRuns {e = e} op allNid κ id now o sched st
 
 -- EVERY OPERATOR CLAUSE DESCENDS ON THE TERM AND CARRIES THE SAME τ,
@@ -437,20 +503,21 @@ subscribeInner! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo} {τ : Tri}
 -- source)` and `template ⊔ source` respectively, and what the source
 -- needs is the right half of each.  The one clause that moves τ is the
 -- μ peel below, and it is the only place a witness is spent on a TERM.
-subscribeE! ac sl (input i) ok κ id now sched ag st =
-  subscribeE!-input ac sl i ok κ id now sched ag st
-subscribeE! ac sl (ofᵉ ts)  ok κ id now sched ag st = _ , subs-of refl
-subscribeE! ac sl emptyᵉ    ok κ id now sched ag st = _ , subs-empty refl
+subscribeE! ac sl (input i) ok κ id now sched ag st ub =
+  subscribeE!-input ac sl i ok κ id now sched ag st ub
+subscribeE! ac sl (ofᵉ ts)  ok κ id now sched ag st ub = _ , subs-of refl
+subscribeE! ac sl emptyᵉ    ok κ id now sched ag st ub = _ , subs-empty refl
 
-subscribeE! ac sl (mapᵉ f b) ok κ id now sched ag st =
+subscribeE! ac sl (mapᵉ f b) ok κ id now sched ag st ub =
   let ((burst , sched₁ , st₁) , d) =
-        subscribeE! ac sl b (inner-ok ok) (map-f f ↠ κ) id now sched ag st
+        subscribeE! ac sl b (inner-ok ok) (map-f f ↠ κ) id now sched ag st ub
       (r , p) = pushBurst! ac sl id now (map-f f) κ burst
                   (burst-carries sl (inner-ok ok) d) sched₁
                   (trans (subs-keeps-slots d) ag) st₁
+                  (≤-trans (subs-unconn-drops sl d) ub)
   in r , subs-map d p
 
-subscribeE! ac sl (takeᵉ c b) ok κ id now sched ag st
+subscribeE! ac sl (takeᵉ c b) ok κ id now sched ag st ub
   with evalTm c in eq
 ... | zero  = _ , subs-take-zero eq refl
 ... | suc k =
@@ -458,34 +525,36 @@ subscribeE! ac sl (takeᵉ c b) ok κ id now sched ag st
       ((burst , sched₂ , st₁) , d) =
         subscribeE! ac sl b (inner-ok ok) (take-f nid ↠ κ) id now
                     (record sched { nextNode = suc nid }) ag
-                    (installNode nid (take-st (suc k)) st)
+                    (installNode nid (take-st (suc k)) st) ub
       (r , p) = pushBurst! ac sl id now (take-f nid) κ burst
                   (burst-carries sl (inner-ok ok) d) sched₂
                   (trans (subs-keeps-slots d) ag) st₁
+                  (≤-trans (subs-unconn-drops sl d) ub)
   in r , subs-take-suc eq refl d p
 
-subscribeE! ac sl (scanᵉ f z b) ok κ id now sched ag st =
+subscribeE! ac sl (scanᵉ f z b) ok κ id now sched ag st ub =
   let nid = Sched.nextNode sched
       ((burst , sched₂ , st₁) , d) =
         subscribeE! ac sl b (inner-ok ok) (scan-f f nid ↠ κ) id now
                     (record sched { nextNode = suc nid }) ag
-                    (installNode nid (scan-st (evalTm z)) st)
+                    (installNode nid (scan-st (evalTm z)) st) ub
       (r , p) = pushBurst! ac sl id now (scan-f f nid) κ burst
                   (burst-carries sl (inner-ok ok) d) sched₂
                   (trans (subs-keeps-slots d) ag) st₁
+                  (≤-trans (subs-unconn-drops sl d) ub)
   in r , subs-scan refl d p
 
-subscribeE! ac sl (mergeAllᵉ lim b) ok κ id now sched ag st =
+subscribeE! ac sl (mergeAllᵉ lim b) ok κ id now sched ag st ub =
   let (r , a) = subscribeAll! ac sl mergeAllᵒ (mergeAll-st lim 0 [] false)
-                              b (under-ok ok) κ id now sched ag st
+                              b (under-ok ok) κ id now sched ag st ub
   in r , subs-merge-all a
-subscribeE! ac sl (switchAllᵉ b) ok κ id now sched ag st =
+subscribeE! ac sl (switchAllᵉ b) ok κ id now sched ag st ub =
   let (r , a) = subscribeAll! ac sl switchᵒ (switch-st nothing false)
-                              b (under-ok ok) κ id now sched ag st
+                              b (under-ok ok) κ id now sched ag st ub
   in r , subs-switch-all a
-subscribeE! ac sl (exhaustAllᵉ b) ok κ id now sched ag st =
+subscribeE! ac sl (exhaustAllᵉ b) ok κ id now sched ag st ub =
   let (r , a) = subscribeAll! ac sl exhaustᵒ (exhaust-st false false)
-                              b (under-ok ok) κ id now sched ag st
+                              b (under-ok ok) κ id now sched ag st ub
   in r , subs-exhaust-all a
 
 -- THE μ PEEL.  Against the machine the deletion is the whole clause's
@@ -493,29 +562,30 @@ subscribeE! ac sl (exhaustAllᵉ b) ok κ id now sched ag st =
 -- number handed in, so `μ-edge` is the descent outright.  The entry
 -- invariant travels with it through `μ-entry`, which is the same
 -- composition the old totality proof wrote under `⊥-elim`.
-subscribeE! (acc rec) sl (μᵉ body) (sz≤ , r≤) κ id now sched ag st =
+subscribeE! (acc rec) sl (μᵉ body) (sz≤ , r≤) κ id now sched ag st ub =
   let (r , d) = subscribeE! (rec (μ-edge (slotDepth sl) body sz≤ r≤)) sl
                             (unfoldμ body)
                             (≤-refl , μ-entry (slotDepth sl) body r≤)
-                            κ id now sched ag st
+                            κ id now sched ag st ub
   in r , subs-μ d
 
-subscribeE! ac sl (varᵉ ()) ok κ id now sched ag st
-subscribeE! ac sl (deferᵉ body) ok κ id now sched ag st = _ , subs-defer refl refl refl
+subscribeE! ac sl (varᵉ ()) ok κ id now sched ag st ub
+subscribeE! ac sl (deferᵉ body) ok κ id now sched ag st ub = _ , subs-defer refl refl refl
 
 -- THE FLATTENER'S OUTER SUBSCRIBE, WHICH HAS EXACTLY ONE CLAUSE.  All
 -- three `*All` operators install their own node state and then run the
 -- same outer subscribe through a `thru-outer` frame, so the operator is
 -- carried as a value and the shape is shared.
-subscribeAll! ac sl op ns b ok κ id now sched ag st =
+subscribeAll! ac sl op ns b ok κ id now sched ag st ub =
   let nid = Sched.nextNode sched
       ((burst , sched₂ , st₁) , d) =
         subscribeE! ac sl b ok (thru-outer op nid ↠ κ) id now
                     (record sched { nextNode = suc nid }) ag
-                    (installNode nid ns st)
+                    (installNode nid ns st) ub
       (r , p) = pushBurst! ac sl id now (thru-outer op nid) κ burst
                   (burst-carries sl ok d) sched₂
                   (trans (subs-keeps-slots d) ag) st₁
+                  (≤-trans (subs-unconn-drops sl d) ub)
   in r , sub-all refl d p
 
 -- THE PUSH CYCLE SPLITS THE REPORT EXACTLY WHERE IT SPLITS THE BURST.
@@ -534,15 +604,16 @@ subscribeAll! ac sl op ns b ok κ id now sched ag st =
 -- accessibility witness underneath reads nothing, so every clause on
 -- both routes to the hop still reduces at a concrete program.  The same
 -- rule binds the walk below, and every carried premise added after.
-pushBurst! ac sl id now fr κ []         bk sched ag st = _ , push-nil
-pushBurst! ac sl id now fr κ (em ∷ ems) bk sched ag st =
+pushBurst! ac sl id now fr κ []         bk sched ag st ub = _ , push-nil
+pushBurst! ac sl id now fr κ (em ∷ ems) bk sched ag st ub =
   let sp = splitEvents (InstEmit.events em)
       ((vals′ , evs , fin′ , sched₁ , st₁) , sf) =
         stepFrame! ac sl id now fr κ (proj₁ sp)
           (split-handed (slotDepth sl) (InstEmit.events em) (headᵃ bk))
-          (proj₂ (proj₂ sp)) sched ag st
+          (proj₂ (proj₂ sp)) sched ag st ub
       (_ , pb) = pushBurst! ac sl id now fr κ ems (tailᵃ bk) sched₁
                    (trans (step-keeps-slots sf) ag) st₁
+                   (≤-trans (step-unconn-drops sl sf) ub)
   in _ , push-cons refl sf pb
 
 -- THE SCAN CLAUSE IS THE ONLY ONE THAT LOOKS AT THE STORE, AND THE
@@ -553,10 +624,10 @@ pushBurst! ac sl id now fr κ (em ∷ ems) bk sched ag st =
 -- by its `dispatch`.  Nothing is owed here — the relation offers a
 -- constructor at every reading, so the builder chooses rather than
 -- having to prove a branch unreachable.
-stepFrame! ac sl id now (map-f fn) κ vals hk fin sched ag st = _ , step-map
-stepFrame! ac sl id now (take-f nid) κ vals hk fin sched ag st = _ , step-take
+stepFrame! ac sl id now (map-f fn) κ vals hk fin sched ag st ub = _ , step-map
+stepFrame! ac sl id now (take-f nid) κ vals hk fin sched ag st ub = _ , step-take
 
-stepFrame! {u = u} ac sl id now (scan-f fn nid) κ vals hk fin sched ag st
+stepFrame! {u = u} ac sl id now (scan-f fn nid) κ vals hk fin sched ag st ub
   with lookupNode nid (EvalSt.nodes st) in eq
 ... | nothing                    = _ , step-scan-nil
 ... | just (take-st _)           = _ , step-scan-nil
@@ -567,21 +638,22 @@ stepFrame! {u = u} ac sl id now (scan-f fn nid) κ vals hk fin sched ag st
 ...   | no  _    = _ , step-scan-nil
 ...   | yes refl = _ , step-scan eq refl
 
-stepFrame! ac sl id now (from-inner op allNid inst) κ vals hk fin sched ag st =
+stepFrame! ac sl id now (from-inner op allNid inst) κ vals hk fin sched ag st ub =
   let (r , ir) = innerReact! op allNid inst κ id now vals sched st fin
   in r , step-from-inner ir
 
-stepFrame! ac sl id now (thru-outer op nid) κ vals hk fin sched ag st =
+stepFrame! ac sl id now (thru-outer op nid) κ vals hk fin sched ag st ub =
   let ((vs , bs , sched′ , st′) , w) =
-        thruWalk! ac sl op nid κ id now vals hk sched ag st
+        thruWalk! ac sl op nid κ id now vals hk sched ag st ub
   in _ , step-thru-outer w
 
-thruWalk! ac sl op nid κ id now []       hk sched ag st = _ , walk-nil
-thruWalk! ac sl op nid κ id now (o ∷ os) hk sched ag st =
+thruWalk! ac sl op nid κ id now []       hk sched ag st ub = _ , walk-nil
+thruWalk! ac sl op nid κ id now (o ∷ os) hk sched ag st ub =
   let ((vs , bs , sched₁ , st₁) , c) =
-        thruConsume! ac sl op nid κ id now o (headᵃ hk ∷ᵃ []ᵃ) sched ag st
+        thruConsume! ac sl op nid κ id now o (headᵃ hk ∷ᵃ []ᵃ) sched ag st ub
       (_ , w) = thruWalk! ac sl op nid κ id now os (tailᵃ hk) sched₁
                   (trans (consume-keeps-slots c) ag) st₁
+                  (≤-trans (consume-unconn-drops sl c) ub)
   in _ , walk-cons c w
 
 -- WHAT A CONSUME CLAUSE DECIDES IS WHETHER THE OBSERVABLE IS TAKEN AT
@@ -592,7 +664,7 @@ thruWalk! ac sl op nid κ id now (o ∷ os) hk sched ag st =
 -- node — the wrong operator's state, the wrong accumulator type, no
 -- node at all — collapses to the operator's own nil clause, which is
 -- the same collapse the machine reaches through its catch-all.
-thruConsume! {u = u} ac sl mergeAllᵒ nid κ id now o hk sched ag st
+thruConsume! {u = u} ac sl mergeAllᵒ nid κ id now o hk sched ag st ub
   with lookupNode nid (EvalSt.nodes st) in eq
 ... | nothing              = _ , consume-all-nil
 ... | just (scan-st _)     = _ , consume-all-nil
@@ -605,10 +677,10 @@ thruConsume! {u = u} ac sl mergeAllᵒ nid κ id now o hk sched ag st
 ...     | false = _ , consume-all-enqueue eq eqr
 ...     | true  =
           let (_ , i) = subscribeInner! ac sl mergeAllᵒ nid κ id now o hk
-                          sched ag st
+                          sched ag st ub
           in _ , consume-all-sub eq eqr i
 
-thruConsume! ac sl switchᵒ nid κ id now o hk sched ag st
+thruConsume! ac sl switchᵒ nid κ id now o hk sched ag st ub
   with lookupNode nid (EvalSt.nodes st) in eq
 ... | nothing                    = _ , consume-switch-nil
 ... | just (scan-st _)           = _ , consume-switch-nil
@@ -619,9 +691,10 @@ thruConsume! ac sl switchᵒ nid κ id now o hk sched ag st
 ...   | (closes , sched₁ , st₁) =
         let (_ , i) = subscribeInner! ac sl switchᵒ nid κ id now o hk sched₁
                         (trans (switchKill-slots cur sched st eqk) ag) st₁
+                        (≤-trans (switchKill-unconn sl cur sched st eqk) ub)
         in _ , consume-switch-sub eq eqk i
 
-thruConsume! ac sl exhaustᵒ nid κ id now o hk sched ag st
+thruConsume! ac sl exhaustᵒ nid κ id now o hk sched ag st ub
   with lookupNode nid (EvalSt.nodes st) in eq
 ... | nothing                    = _ , consume-exhaust-nil
 ... | just (scan-st _)           = _ , consume-exhaust-nil
@@ -630,7 +703,7 @@ thruConsume! ac sl exhaustᵒ nid κ id now o hk sched ag st
 ... | just (switch-st _ _)       = _ , consume-exhaust-nil
 ... | just (exhaust-st true _)   = _ , consume-exhaust-nil
 ... | just (exhaust-st false od) =
-      let (_ , i) = subscribeInner! ac sl exhaustᵒ nid κ id now o hk sched ag st
+      let (_ , i) = subscribeInner! ac sl exhaustᵒ nid κ id now o hk sched ag st ub
       in _ , consume-exhaust-sub eq i
 
 -- THE HOP, WHICH IS WHERE THE DELETED DOOR USED TO ASK ITS QUESTION AND
@@ -641,14 +714,14 @@ thruConsume! ac sl exhaustᵒ nid κ id now o hk sched ag st
 -- `hop-guard` reads it out and `hop-edge` turns it into the descent, so
 -- the recursive subscribe re-enters at the observable's own rank with
 -- `≤-refl` on both halves of the entry invariant.
-subscribeInner! {τ = τ} (acc rec) sl op allNid κ id now o hk sched ag st =
+subscribeInner! {τ = τ} (acc rec) sl op allNid κ id now o hk sched ag st ub =
   let inst = Sched.nextNode sched
       ((burst , sched′ , st′) , d) =
         subscribeE! (rec (hop-edge (slotDepth sl) o
                            (hop-guard (slotDepth sl) τ o hk)))
                     sl o (≤-refl , ≤-refl)
                     (from-inner op allNid inst ↠ κ) id now
-                    (record sched { nextNode = suc inst }) ag st
+                    (record sched { nextNode = suc inst }) ag st ub
       (vs , bs , done) = splitBurst burst
   in (inst , vs , bs , done , sched′ , st′) , inner refl d refl
 
@@ -665,7 +738,7 @@ evaluate! : ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t)
 evaluate! {n = n} fuel e ins =
   let ((burst , sched₀ , st₀) , s) =
         subscribeE! {lo = n} (rootWitness e ins) ins e (≤-refl , m≤m⊔n _ _)
-                    root 0 0 (sched-init e ins) refl (st-init e)
+                    root 0 0 (sched-init e ins) refl (st-init e) ≤-refl
       (rest , d) = drain! fuel 1 sched₀ st₀
   in (burst ++ rest) , eval-run s d
 

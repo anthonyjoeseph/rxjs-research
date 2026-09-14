@@ -52,7 +52,7 @@ open import Rx.Slot-Depth using (slotDepth; slotDepth-fix)
 open import Rx.Sync-Size using (unfoldμ-shrinks)
 open import Rx.Slots using (Slots; shared)
 open import Rx.Strat-Order using (Tri; _≺_; ltU; ltR; ltS; ≺-wellFounded)
-open import Rx.Evaluator using (unconn; memberSource; Stream; splitEvents)
+open import Rx.Evaluator using (unconn; memberSource; Stream; splitEvents; EvalSt)
 
 variable
   n : ℕ
@@ -99,6 +99,21 @@ variable
 --   neither number the witness put side by side still exists.
 EntryOK : ∀ {n} {Γ : Ctx n} {u} (η : Fin n → ℕ) → Closed Γ u → Tri → Set
 EntryOK η b (_ , r , sz) = syncSizeᵉ b ≤ sz × depᵉ η b ≤ r
+
+-- AND THE OTHER AGREEMENT A BUILDER CARRIES, WHICH IS ABOUT THE STORE
+-- RATHER THAN ABOUT THE TERM.  The connect's edge drops the unconnected
+-- count, so a clause reaching it has to know the triple it is standing
+-- at still dominates that count — and the count only ever falls, since
+-- connecting adds to the set and nothing removes from it.  So this is
+-- `≤` and not an equation: the root enters at the count itself, every
+-- connect below it widens the gap, and no clause ever has to restore
+-- one.  It sits beside the slot-table agreement for the same reason
+-- that one exists — a premise fixed by the caller is a constant, where
+-- a reading taken off the state in hand would be re-denominated at
+-- every recursive call and owe a transport at each.
+SharesUnder : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+            → Slots Γ → Tri → EvalSt e → Set
+SharesUnder sl τ st = unconn sl (EvalSt.connectedShares st) ≤ proj₁ τ
 
 -- CARRYING THE ENTRY INVARIANT DOWN A FRAME, WHICH IS THE WHOLE OF THE
 -- ARITHMETIC THE SUBSCRIBE INDUCTION NEEDS.  `syncSizeᵉ` counts the

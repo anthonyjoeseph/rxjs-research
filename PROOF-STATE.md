@@ -305,10 +305,12 @@ first match, which is why `bug-cache` is off the gate for the duration and
   against growth that is per OCCURRENCE; the repair is a restatement, and the
   present shape admits no `⊥`.
 
-- **`subs-keeps-slots`, `step-keeps-slots`, `consume-keeps-slots`**
-  (Rx/Evaluator/Builder) — SHAPE, `DEAD ROUTE×3`: stated as inductions over the
-  ⇓ family's mutual block; the route is to carry the equation in the RESULT
-  type, so a restatement is guaranteed and grinding these as written is wasted.
+- **`subs-keeps-slots`, `step-keeps-slots`, `consume-keeps-slots`,
+  `subs-unconn-drops`, `step-unconn-drops`, `consume-unconn-drops`**
+  (Rx/Evaluator/Builder) — SHAPE, `DEAD ROUTE×3`: what a derivation left the
+  state at three ⇓ families — slot table unchanged, unconnected count only
+  falling. Stated as inductions over the mutual block; the route carries both
+  in the RESULT type, so a restatement is guaranteed.
 
 - **`dep-fn-pos`** (Rx/Obs-Depth/Substitution) — DIFFICULTY, `PROBED`: pure
   syntax — a template at an observable result must WRITE one, since the only
