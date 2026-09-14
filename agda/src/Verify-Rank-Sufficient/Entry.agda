@@ -99,7 +99,7 @@
 module Verify-Rank-Sufficient.Entry where
 
 open import Data.List using (List; [])
-open import Data.Nat using (_≤_; _⊔_; _⊔′_)
+open import Data.Nat using (_≤_; _⊔′_)
 open import Data.Nat.Properties using (≤-refl; ≤-trans; ≤-reflexive; m≤m⊔n; m≤n⊔m; ⊔≡⊔′)
 open import Data.Product using (_×_; _,_)
 open import Data.Fin using (Fin)

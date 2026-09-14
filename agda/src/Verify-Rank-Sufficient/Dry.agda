@@ -184,6 +184,16 @@ opShape _                = false
 --   — the μ guard reads the UNSUBSTITUTED size, and a slot reference is one
 --   symbol standing for a definition of any size, so this is where that gap
 --   was already measured.
+-- RECOVERY: `git show 73cd313:agda/src/Verify-Rank-Sufficient/Hop-Edge.agda`
+--   restores the hop edge stated and its guard assembled — a burst's
+--   deliveries as a flat list, the drop as a leaf over an emission
+--   hypothesis rather than over an arbitrary inner, and the composition
+--   with the entry invariant that turns a bound on the SOURCE into a
+--   strict bound on the INNER.  It lives there and not here because this
+--   body is the only thing that could spend it and this body is not
+--   written: a leaf minted ahead of its assembly is a hypothesis about the
+--   route, and the thread that would reach it has to cross a shelf whose
+--   values are quantified freely.
 postulate
   dry-operator : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} {τ} {lo}
     (ac : Acc _≺_ τ) (o : Closed Γ u) (ok : T (inputsBelowᵉ lo o))

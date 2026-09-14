@@ -290,8 +290,8 @@ now at the door and at the templates the door's chains are built from.
 - **`thru-outer-frame-dry`** (Verify-Rank-Sufficient.Path-Fits) — SHAPE,
   `PROBED`: the flattener's dry-freedom, held under a headroom in the READING
   while the arm it refuses is now decided on the NESTING. The restatement is
-  guaranteed; its cost is the thread, since the values it bounds are
-  quantified freely one level down.
+  guaranteed; its cost is the thread, since the values it bounds are quantified
+  freely below.
 
 - **`share-chain-hop`** (Verify-Rank-Sufficient.Path-Fits) — SHAPE,
   `REFUTED, RECOVERY`: the sink's claim at the share's registry, whose one
@@ -332,10 +332,10 @@ now at the door and at the templates the door's chains are built from.
   quarter of what the run then carries.
 
 - **`dry-operator`** (Verify-Rank-Sufficient.Dry) — DIFFICULTY,
-  `REFUTED, DEAD ROUTE×3, PROBED, RECOVERY`: the THREE FLATTENERS' dry-freedom
-  under the entry invariant, and the only half of them still a leaf. The dry
-  shelf is unconditional in what a frame is handed, so the assembly wants the
-  dry claim and the report proven in ONE walk.
+  `REFUTED, DEAD ROUTE×3, PROBED, RECOVERY×2`: the THREE FLATTENERS'
+  dry-freedom under the entry invariant, and the only half of them still a
+  leaf. The dry shelf is unconditional in what a frame is handed, so the
+  assembly wants the dry claim and the report proven in ONE walk.
 
 - **`ofᵉ-carried` / `scan-seed-carried`** (Verify-Rank-Sufficient.Leaf-Carried)
   — DIFFICULTY, `PROBED×2`: the two places a subscribe turns a term into a

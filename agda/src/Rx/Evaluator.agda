@@ -44,7 +44,6 @@ variable
 open import Rx.Slots using (scripted; shared; Slots)
 open import Rx.Hop-Depth using (Rd₃; depthᵉ; depthᵛ)
 open import Rx.Obs-Depth using (obsDepthᵉ; obsDepthᵛ)
-open import Rx.Slot-Read using (slotRd)
 
 Stream : ∀ {n} → Ctx n → Ty → Set          -- flat, canonical emission order
 Stream Γ t = List (InstEmit (Val Γ t))

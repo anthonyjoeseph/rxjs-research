@@ -35,7 +35,7 @@ module Rx.Obs-Depth where
 open import Data.List using (List; []; _∷_)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
-open import Data.Nat using (ℕ; zero; suc; _⊔_)
+open import Data.Nat using (ℕ; suc; _⊔_)
 open import Data.Product using (_,_)
 open import Data.Sum using (inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; cong₂)
