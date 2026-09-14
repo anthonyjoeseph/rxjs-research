@@ -37,29 +37,29 @@ module Rx.Evaluator.Builder where
 
 open import Data.Bool using (Bool; true; false)
 open import Data.Bool.ListAction using (any)
-open import Data.Fin using (Fin)
+open import Data.Fin using (Fin; toℕ)
 open import Data.List using (List; []; _∷_; _++_)
 open import Data.List.Relation.Unary.All using (All)
   renaming ([] to []ᵃ; _∷_ to _∷ᵃ_; head to headᵃ; tail to tailᵃ)
 open import Data.Maybe using (Maybe; nothing; just)
-open import Data.Nat using (ℕ; zero; suc; pred; _≤_; _≡ᵇ_)
-open import Data.Nat.Properties using (≤-refl; ≤-trans; m≤m⊔n)
+open import Data.Nat using (ℕ; zero; suc; pred; _≤_; _≡ᵇ_; _<?_)
+open import Data.Nat.Properties using (≤-refl; ≤-trans; m≤m⊔n; ≮⇒≥)
 open import Data.Product using (∃; _,_; proj₁; proj₂)
 open import Data.Vec using (lookup)
 open import Induction.WellFounded using (Acc; acc)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; cong)
 open import Relation.Nullary using (yes; no)
 
-open import Rx.Prim using (Fuel; Id; Tick; InstEmit; InstEvent)
+open import Rx.Prim using (Fuel; Id; Tick; InstEmit; InstEvent; hot; cold)
 open import Rx.Exp using (Ctx; Closed; Val; _≟ᵗ_; obs; unfoldμ; evalTm; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ;
   switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ)
-open import Rx.Slots using (Slots)
+open import Rx.Slots using (Slots; shared; scripted)
 open import Rx.Slot-Depth using (slotDepth)
 open import Rx.Strat-Order using (Tri; _≺_)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; AllOp; NodeId; NodeState; Frame; root; _↠_; map-f; take-f; scan-f;
   thru-outer; from-inner; mergeAllᵒ; switchᵒ; exhaustᵒ; mergeAll-st; switch-st; exhaust-st; take-st;
   scan-st; installNode; lookupNode; hasRoom; switchKill; aliveThroughᶠ; splitEvents; splitBurst; sched-init; st-init;
-  unconn)
+  unconn; memberSource; share-sink; lowerFloor; register; atSlot; burstCompleted)
 open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeAll⇓; pushBurst⇓;
   stepFrame⇓; innerReact⇓; innerFinish⇓; mergeAllDrain⇓; thruWalk⇓;
   thruConsume⇓; subscribeInner⇓;
@@ -72,10 +72,13 @@ open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeAll⇓; pushBurst
   consume-exhaust-nil; inner;
   drain⇓; evaluate⇓; subs-of; subs-empty; subs-map; subs-take-zero;
   subs-take-suc; subs-scan; subs-merge-all; subs-switch-all; subs-exhaust-all;
-  subs-μ; subs-defer; sub-all; eval-run)
+  subs-μ; subs-defer; sub-all; eval-run;
+  subs-floor; subs-shared; subs-hot-done; subs-hot-live; subs-cold-sync;
+  subs-cold-async; slot-spent; slot-join; slot-connect; connect-live;
+  connect-died)
 open import Rx.Evaluator.Doorless using (μ-edge; μ-entry; rootWitness;
   EntryOK; SharesUnder; inner-ok; under-ok; HandedOK; BurstOK; split-handed;
-  hop-edge; hop-guard)
+  hop-edge; hop-guard; connect-edge; connect-entry)
 
 ------------------------------------------------------------------
 -- WHAT A BUILDER RETURNS.  The result and the derivation together, so
@@ -168,27 +171,15 @@ postulate
     (sched : Sched Γ) (st : EvalSt e) →
     DrainsQ {e = e} allNid κ id now lim act q sched st
 
--- AND THE TWO ENDS OF THE RUN.  An input's subscribe reads the slot
--- table and branches on what is registered there, and the drain spends
--- fuel over the schedule; neither is in the recursion this module is
--- for, so neither is written here.
+-- AND THE FAR END OF THE RUN, which spends fuel over the schedule
+-- rather than descending on a term, so it is not in the recursion this
+-- module is for.
 --
 -- RECOVERY: git show 80e527f9:agda/src/Rx/Evaluator/Run.agda restores the
---   predecessor's own `subscribeE` at `input i` — the slot lookup, the
---   telescope test, and the share connect's five branches worked out as
---   a function — together with its `drain`, three arms over the
---   schedule. Both are the shape these two leaves' bodies take; what
---   does not transport is the guard each of them tested, since the
---   obligation those answered is now the derivation's.
+--   predecessor's own `drain`, three arms over the schedule — the shape
+--   this leaf's body takes; what does not transport is the guard it
+--   tested, since the obligation that answered is now the derivation's.
 postulate
-  subscribeE!-input : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo} {τ : Tri}
-    (ac : Acc _≺_ τ) (sl : Slots Γ) (i : Fin n) →
-    EntryOK {Γ = Γ} (slotDepth sl) (input i) τ →
-    (κ : Path Γ lo (lookup Γ i) t) (id : Id) (now : Tick)
-    (sched : Sched Γ) → Sched.slots sched ≡ sl → (st : EvalSt e) →
-    SharesUnder sl τ st →
-    Runs {e = e} (input i) κ id now sched st
-
   drain! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (fuel : Fuel) (id : Id) (sched : Sched Γ) (st : EvalSt e) →
     ∃ λ rest → drain⇓ {e = e} fuel id sched st rest
@@ -370,6 +361,18 @@ switchKill-unconn : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 switchKill-unconn sl nothing  sched st refl = ≤-refl
 switchKill-unconn sl (just v) sched st refl = ≤-refl
 
+-- AND THE AGREEMENT READ AT ONE INDEX.  Every builder is handed the
+-- table as a premise so its measure is denominated in a constant, while
+-- the relation's slot arms speak of the schedule's own table; at a
+-- single index the two are the same reading, and this is that step.  It
+-- exists because the arms below select on `sl i`, which is what
+-- `connect-entry` wants, and then owe the constructor a statement about
+-- `Sched.slots sched i`, which is what the relation wants.
+slot-agree : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (sched : Sched Γ) (i : Fin n)
+           → Sched.slots sched ≡ sl
+           → ∀ {s} → sl i ≡ s → Sched.slots sched i ≡ s
+slot-agree sl sched i ag eq = trans (cong (λ f → f i) ag) eq
+
 ------------------------------------------------------------------
 -- THE INNER REACTION, WHICH IS THE OTHER SIDE OF THE SAME HOP.
 ------------------------------------------------------------------
@@ -440,7 +443,7 @@ innerReact! op allNid inst κ id now vals sched st true
 -- word for it.  The line stays because a future edge re-entering the
 -- block from outside would still be a site the order does not cover.
 --
--- STRUCTURAL SCC: pushBurst! stepFrame! subscribeAll! subscribeE! subscribeInner! thruConsume! thruWalk!
+-- STRUCTURAL SCC: pushBurst! stepFrame! subscribeAll! subscribeE! subscribeE!-input subscribeInner! thruConsume! thruWalk!
 
 subscribeE! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo} {τ : Tri}
   (ac : Acc _≺_ τ) (sl : Slots Γ) (b : Closed Γ u) → EntryOK (slotDepth sl) b τ →
@@ -448,6 +451,14 @@ subscribeE! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo} {τ : Tri}
   (sched : Sched Γ) → Sched.slots sched ≡ sl → (st : EvalSt e) →
   SharesUnder sl τ st →
   Runs {e = e} b κ id now sched st
+
+subscribeE!-input : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo} {τ : Tri}
+  (ac : Acc _≺_ τ) (sl : Slots Γ) (i : Fin n) →
+  EntryOK {Γ = Γ} (slotDepth sl) (input i) τ →
+  (κ : Path Γ lo (lookup Γ i) t) (id : Id) (now : Tick)
+  (sched : Sched Γ) → Sched.slots sched ≡ sl → (st : EvalSt e) →
+  SharesUnder sl τ st →
+  Runs {e = e} (input i) κ id now sched st
 
 subscribeAll! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo} {τ : Tri}
   (ac : Acc _≺_ τ) (sl : Slots Γ) (op : AllOp) (ns : NodeState Γ)
@@ -724,6 +735,73 @@ subscribeInner! {τ = τ} (acc rec) sl op allNid κ id now o hk sched ag st ub =
                     (record sched { nextNode = suc inst }) ag st ub
       (vs , bs , done) = splitBurst burst
   in (inst , vs , bs , done , sched′ , st′) , inner refl d refl
+
+-- THE SLOT TABLE'S SIX ARMS, AND THE ONE OF THEM THAT RECURSES — WHICH
+-- IS WHY THIS SITS IN THE CYCLE RATHER THAN BESIDE IT.  Five arms read
+-- the table and hand back a burst the relation already names, so they
+-- are the agreement transported and a constructor; the sixth CONNECTS a
+-- share, and connecting subscribes the slot's own definition, which is
+-- an arbitrary term.  That is the edge no term measure can pay for, so
+-- it is paid in the count instead: the connected set gains this index,
+-- the unconnected count strictly falls, and `ltU` is the drop.
+--
+-- AND THE RECURSIVE CALL RE-ENTERS AT THE SLOT'S OWN READING RATHER
+-- THAN AT THE CALLER'S.  `connect-entry` supplies both halves — the
+-- size is the definition's own and the rank is the fixpoint's value at
+-- this index — so the triple is rebuilt here and only its first
+-- component is tied to what came in.  The share agreement goes back to
+-- `≤-refl` for the same reason: the new triple's count IS the state's,
+-- since the state handed down is the one that just gained the index.
+subscribeE!-input {lo = lo} ac sl i ok κ id now sched ag st ub
+  with toℕ i <? lo
+... | no  ¬below = _ , subs-floor (≮⇒≥ ¬below)
+... | yes below  with sl i in slEq
+...   | scripted (hot async)
+        with memberSource (toℕ i) (EvalSt.completedSources st) in doneEq
+...     | true  = _ , subs-hot-done below (slot-agree sl sched i ag slEq) doneEq
+...     | false = _ , subs-hot-live below (slot-agree sl sched i ag slEq) doneEq
+subscribeE!-input {lo = lo} ac sl i ok κ id now sched ag st ub
+    | yes below | scripted (cold sync []) =
+      _ , subs-cold-sync below (slot-agree sl sched i ag slEq) refl
+subscribeE!-input {lo = lo} ac sl i ok κ id now sched ag st ub
+    | yes below | scripted (cold sync (d ∷ ds)) =
+      _ , subs-cold-async below (slot-agree sl sched i ag slEq) refl refl
+subscribeE!-input {lo = lo} (acc rec) sl i ok κ id now sched ag st ub
+    | yes below | shared d
+        with memberSource (toℕ i) (EvalSt.completedSources st) in doneEq
+...     | true  =
+          _ , subs-shared {κ = κ} {below = below} (slot-agree sl sched i ag slEq)
+                (slot-spent {κ = κ} {below = below} doneEq)
+...     | false
+          with memberSource (toℕ i) (EvalSt.connectedShares st) in connEq
+...       | true  =
+            _ , subs-shared {κ = κ} {below = below}
+                  (slot-agree sl sched i ag slEq)
+                  (slot-join {κ = κ} {below = below} doneEq connEq)
+...       | false
+            with subscribeE!
+                   (rec (connect-edge sl (EvalSt.connectedShares st) i connEq ub))
+                   sl d
+                   (connect-entry
+                     {U = unconn sl (toℕ i ∷ EvalSt.connectedShares st)}
+                     sl i slEq)
+                   (share-sink i ≤-refl) id now
+                   sched ag
+                   (register (atSlot i) (lowerFloor below κ)
+                     (record st
+                       { connectedShares = toℕ i ∷ EvalSt.connectedShares st }))
+                   ≤-refl
+...         | ((burst , sched₁ , st₂) , dv) with burstCompleted burst in compEq
+...           | false =
+                _ , subs-shared {κ = κ} {below = below}
+                      (slot-agree sl sched i ag slEq)
+                      (slot-connect doneEq connEq
+                        (connect-live {κ = κ} {below = below} dv compEq))
+...           | true  =
+                _ , subs-shared {κ = κ} {below = below}
+                      (slot-agree sl sched i ag slEq)
+                      (slot-connect doneEq connEq
+                        (connect-died {κ = κ} {below = below} dv compEq))
 
 ------------------------------------------------------------------
 -- THE TOP LINE, AND WHAT IT STOPS SAYING.

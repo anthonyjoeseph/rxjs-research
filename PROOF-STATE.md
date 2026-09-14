@@ -199,7 +199,7 @@ formal-verification-batchSimultaneous    The-Proof.agda — REAL, module postula
      └─ burst-drain-well-formed          one postulate — tier 2
 
   evaluate↓ = proj₁ ∘ evaluate!           Rx/Evaluator/Builder.agda — tier 1
-     └─ subscribeE!-input, drain!, mergeAllDrain!   the three leaves a run steps through
+     └─ drain!, mergeAllDrain!         the two leaves a run still steps through
 
   every tier above is stated over Rx.Exp's syntax
 ```
@@ -228,17 +228,23 @@ first match, which is why `bug-cache` is off the gate for the duration and
 
 ### Big picture tier roadmap
 
-- **CARRY THE UNCONNECTED COUNT, WHICH IS WHAT THE SLOT SUBSCRIBE'S BODY TURNED
-  OUT TO COST.** Writing the connect arm found the descent unsuppliable:
-  `connect-edge` drops the count from `unconn sl cs`, and no caller can promise
-  the triple it was entered at still IS that count, since every connect already
-  performed dropped one while the triple stayed put. The edge now takes the
-  slack as a premise and composes the drop through it, so the residue is
-  exactly one more agreement on every builder signature —
-  `unconn sl (EvalSt.connectedShares st) ≤ proj₁ τ`, beside the slot-table one
-  — plus the fact that connecting only shrinks the count, stated over the ⇓
-  families. Land that and `subscribeE!-input` is six arms over the slot table
-  with nothing left to decide.
+- **PUT THE BURST'S REPORT WHERE A QUEUED OBSERVABLE CAN READ IT, WHICH IS THE
+  TIER'S OPEN QUESTION AND THE ONLY LEG THAT CAN STILL MOVE THE GROUND.**
+  `burst-carries` says the observables a subscribe hands back sit under the rank
+  it entered at; every attempt to state that over the TERM has been refuted, and
+  the one site a burst never reaches reads its observables out of the store
+  instants later. So the two are one question, and its answer is a field on the
+  invariant record rather than a premise — which obliges every producer and
+  cascades through every consumer. The leg is the field and its producers;
+  whether it suffices for the queue is what it settles.
+
+- **AND THE PREDECESSOR'S SUPPORT CONE, WHICH THE SLOT SUBSCRIBE'S BODY LEFT
+  STANDING.** The connect arm now names what it does through the relation's own
+  constructors, so the machine's minting helpers, its store readings and its
+  floor arithmetic have zero consumers — `mintNode`, `mintOrdinal`, `obsSt`,
+  `floorFalls` and the rest. Each is either a missing wire or dead weight and
+  the diff of the arms decides which; the gate cannot go green either way while
+  they stand.
 
 - **THE TWO ENDS OF THE RUN, WHICH IS WHAT MAKES A ROW REDUCE.** `drain!` is
   fuel induction over the schedule and carries no guard at all; `mergeAllDrain!`
@@ -268,14 +274,9 @@ first match, which is why `bug-cache` is off the gate for the duration and
   splits a burst emit by emit — but a queued observable carries no burst at all.
   Every attempt to say it over the TERM has been refuted, which is what points
   the answer at the invariant record; nothing has yet written the field.
-  relevant: `mergeAllDrain!`, `burst-carries`, `subscribeE!-input`
+  relevant: `mergeAllDrain!`, `burst-carries`
 
 ### The ledger
-
-- **`subscribeE!-input`** (Rx/Evaluator/Builder) — FALSITY, `RECOVERY`: the
-  slot subscribe, six arms, never instantiated. The share arm's connect reads
-  the unconnected count against the entry's first component. Connect arithmetic
-  `connect-drops`, `connect-edge`, `connect-entry`; telescope `slotDepth-fix`.
 
 - **`burst-carries`** (Rx/Evaluator/Builder) — FALSITY, `REFUTED, RECOVERY`:
   what a subscribe hands back about its own burst, which is what makes the
