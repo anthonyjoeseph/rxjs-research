@@ -34,7 +34,7 @@ open import Data.String using (String)
 open import Data.Vec using () renaming (_∷_ to _∷ⱽ_; [] to []ⱽ)
 
 open import Rx.Exp using (Ctx; Closed; natᵗ)
-open import Rx.Evaluator using (evaluate)
+open import Rx.Evaluator.Run using (evaluate)
 open import Rx.Slots using (Slots)
 open import Rx.Protocol using (wellFormed?)
 open import Rx.Emit-Eq using (eqBatched)

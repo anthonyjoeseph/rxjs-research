@@ -30,32 +30,25 @@
 -- re-pointed, and until then both machines exist side by side.
 module Verify-Rank-Sufficient.Doorless where
 
-open import Data.Fin using (Fin; toℕ)
-open import Data.List using (List; []; _∷_; _++_)
-open import Data.Nat using (ℕ; suc; _<_; _≤_)
-open import Data.Nat.Properties using (≤-refl; ≤-trans; m≤m⊔n)
-open import Data.Product using (Σ; Σ-syntax; _×_; _,_; proj₁; proj₂)
+open import Data.Fin using (Fin)
+open import Data.List using ([]; _∷_; _++_)
+open import Data.Nat using (suc)
+open import Data.Nat.Properties using (≤-refl; m≤m⊔n)
+open import Data.Product using (_,_; proj₁)
 open import Data.Vec using (lookup)
 open import Induction.WellFounded using (Acc; acc)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl)
+open import Relation.Binary.PropositionalEquality using (refl)
 
-open import Rx.Prim using (Fuel; Id; Tick; InstEvent)
-open import Rx.Exp using (Ctx; Closed; Val; obs; syncSizeᵉ; unfoldμ;
-  input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ;
-  exhaustAllᵉ; μᵉ; varᵉ; deferᵉ)
-open import Rx.Obs-Depth using (obsDepthᵉ)
+open import Rx.Prim using (Fuel; Id; Tick)
+open import Rx.Exp using (Ctx; Closed; Val; obs; unfoldμ; input; ofᵉ; emptyᵉ; μᵉ; varᵉ; deferᵉ)
 open import Rx.Slots using (Slots)
 open import Rx.Strat-Order using (Tri; _≺_)
-open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; NodeId; AllOp;
-  root; map-f; take-f; scan-f; from-inner; _↠_; splitBurst;
-  rootWitness; sched-init; st-init)
-open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeInner⇓;
-  subscribeSharedSlot⇓; sharedConnect⇓; drain⇓; evaluate⇓;
-  subs-of; subs-empty; subs-map; subs-μ; subs-defer; inner; eval-run)
-open import Rx.Evaluator.Doorless using (μ-edge; μ-entry; hop-edge;
-  connect-edge)
-open import Verify-Rank-Sufficient using (EntryOK; inner-ok; under-ok;
-  HandedOK; hop-guard)
+open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; NodeId; AllOp; root; from-inner; _↠_; splitBurst; sched-init;
+  st-init)
+open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeInner⇓; drain⇓; evaluate⇓; subs-of; subs-empty; subs-μ; subs-defer;
+  inner; eval-run)
+open import Rx.Evaluator.Doorless using (μ-edge; μ-entry; hop-edge; rootWitness)
+open import Verify-Rank-Sufficient using (EntryOK; HandedOK; hop-guard)
 
 ------------------------------------------------------------------
 -- WHAT A BUILDER RETURNS.  The result and the derivation together, so

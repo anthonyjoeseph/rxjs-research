@@ -35,11 +35,12 @@ open import Data.Fin using (Fin; toℕ)
 open import Data.List using (List; []; _∷_)
 open import Data.Nat using (ℕ; _<_; _≤_; _⊔_)
 open import Data.Nat.Properties using (≤-trans)
+open import Data.Product using (_,_)
 open import Induction.WellFounded using (Acc)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 
 open import Rx.Prim using (Source)
-open import Rx.Exp using (obs; Ctx; Val; Closed; syncSizeᵉ; unfoldμ; μᵉ)
+open import Rx.Exp using (obs; Ctx; Exp; Val; Closed; syncSizeᵉ; unfoldμ; μᵉ)
 open import Rx.Obs-Depth using (obsDepthᵉ; unfoldμ-no-deeper)
 open import Rx.Sync-Size using (unfoldμ-shrinks)
 open import Rx.Slots using (Slots)
@@ -63,7 +64,7 @@ variable
 -- right to be asked without carrying `EntryOK` — and carrying
 -- `EntryOK` is what a builder does and what a plain rxjs pipeline
 -- cannot, which is why the invariant is here and not there.
-μ-edge : ∀ {U r sz} {Γ : Ctx n} {u} (body : Closed (u ∷ Γ) u)
+μ-edge : ∀ {U r sz} {Γ : Ctx n} {u} (body : Exp Γ (u ∷ []) [] [] u)
        → syncSizeᵉ (μᵉ body) ≤ sz
        → obsDepthᵉ (μᵉ body) ≤ r
        → (U , r , syncSizeᵉ (unfoldμ body)) ≺ (U , r , sz)
@@ -71,7 +72,7 @@ variable
 
 -- and the peel's other component, which is not part of the edge but is
 -- what keeps the invariant true at the unfolding
-μ-entry : ∀ {r} {Γ : Ctx n} {u} (body : Closed (u ∷ Γ) u)
+μ-entry : ∀ {r} {Γ : Ctx n} {u} (body : Exp Γ (u ∷ []) [] [] u)
         → obsDepthᵉ (μᵉ body) ≤ r → obsDepthᵉ (unfoldμ body) ≤ r
 μ-entry body = ≤-trans (unfoldμ-no-deeper body)
 

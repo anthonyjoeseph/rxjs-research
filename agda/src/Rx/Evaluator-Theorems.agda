@@ -8,7 +8,8 @@ open import Relation.Binary.PropositionalEquality using (_≡_)
 
 open import Rx.Prim      using (Tick; Fuel)
 open import Rx.Exp       using (Ctx; Closed; Exp; μᵉ; unfoldμ)
-open import Rx.Evaluator using (Stream; evaluate)
+open import Rx.Evaluator using (Stream)
+open import Rx.Evaluator.Run using (evaluate)
 open import Rx.Slots using (Slot; Slots)
 
 

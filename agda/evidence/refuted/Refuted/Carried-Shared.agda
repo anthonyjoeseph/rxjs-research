@@ -43,8 +43,9 @@ open import Rx.Exp using (Ctx; Closed; Val; Ty; natᵗ; obs; nat̂; ofᵉ; strm�
 open import Rx.Obs-Depth using (obsDepthᵉ)
 open import Rx.Slots using (Slots; shared)
 open import Rx.Strat-Order using (Tri)
-open import Rx.Evaluator using (Stream; Path; root; Sched; EvalSt; subscribeE;
+open import Rx.Evaluator using (Stream; Path; root; Sched; EvalSt;
   sched-init; st-init)
+open import Rx.Evaluator.Run using (subscribeE)
 
 ----------------------------------------------------------------------
 -- THE STATEMENT AND ITS PREDICATES, WRITTEN OUT as every sibling is —

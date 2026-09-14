@@ -45,7 +45,7 @@ open import Rx.Exp using (Ty; natᵗ; obs; _×ᵗ_; Ctx; Exp; Tm; Fn; PrimOp; in
   strmᵗ; varᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; add; sub; mul; eqᵖ; ltᵖ; notᵖ)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Rx.Emit-Eq using (eqBatched)
-open import Rx.Evaluator using (evaluate)
+open import Rx.Evaluator.Run using (evaluate)
 open import Rx.Slots using (scripted; shared; Slot; Slots)
 open import Rx.Protocol using (wellFormed?)
 open import Implementation using (impl-batchSimultaneous)

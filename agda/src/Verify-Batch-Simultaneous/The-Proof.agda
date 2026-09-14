@@ -17,7 +17,7 @@ open import Relation.Binary.PropositionalEquality
 open import Rx.Prim               using (InstEmit; Fuel; Id; Source; _at_from_as_; InstEvent; init; value; close; handoff; complete;
   EmitKind; subscribe; delivery; plumbing; cut; cutPending; exhausted; dried)
 open import Rx.Exp                using (Ctx; Closed)
-open import Rx.Evaluator          using (evaluate)
+open import Rx.Evaluator.Run      using (evaluate)
 open import Rx.Slots using (Slots)
 open import Rx.Protocol           using (ProtocolSt; Owed; protocol-init; runProtocol; stepProtocol; checkFinal; paidOff; allZero;
   Accepted; accepted; WellFormed; settle; applyEvents; hasOwed; bumpOwed; cancelOwed;

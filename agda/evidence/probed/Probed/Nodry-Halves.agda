@@ -45,7 +45,9 @@ open import Rx.Prim using (hot; after_,_)
 open import Rx.Exp using (Ctx; Closed; Fn; obs; natᵗ; nat̂; varᵗ; strmᵗ; ofᵉ;
   emptyᵉ; mapᵉ; takeᵉ; mergeAllᵉ; input)
 open import Rx.Slots using (Slots; scripted)
-open import Rx.Evaluator using (Sched; EvalSt; root; rootWitness; subscribeE; sched-init; st-init; mergeAllᵒ; mergeAll-st)
+open import Rx.Evaluator using (Sched; EvalSt; root; sched-init; st-init; mergeAllᵒ; mergeAll-st)
+open import Rx.Evaluator.Doorless using (rootWitness)
+open import Rx.Evaluator.Run using (subscribeE)
 open import Rx.Evaluator.Domain using (subs-of; subs-empty; subs-map;
   subs-take-zero; subs-hot-live; push-cons; push-nil; step-map;
   step-thru-outer; walk-nil; sub-all; consume-all-nil; react-false;

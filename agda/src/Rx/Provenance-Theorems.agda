@@ -7,7 +7,8 @@ open import Data.Nat                              using (suc)
 
 open import Rx.Prim      using (Fuel; Id; InstEmit)
 open import Rx.Exp       using (Ctx; Closed)
-open import Rx.Evaluator using (Stream; evaluate)
+open import Rx.Evaluator using (Stream)
+open import Rx.Evaluator.Run using (evaluate)
 open import Rx.Slots using (Slots)
 
 ------------------------------------------------------------------

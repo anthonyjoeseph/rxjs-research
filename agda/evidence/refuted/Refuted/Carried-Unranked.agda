@@ -41,8 +41,9 @@ open import Rx.Exp using (Ctx; Closed; Val; natᵗ; nat̂; ofᵉ; syncSizeᵉ)
 open import Rx.Obs-Depth using (obsDepthᵉ; obsDepthᵛ)
 open import Rx.Slots using (Slots)
 open import Rx.Strat-Order using (Tri)
-open import Rx.Evaluator using (Stream; Path; root; Sched; EvalSt; subscribeE;
+open import Rx.Evaluator using (Stream; Path; root; Sched; EvalSt;
   sched-init; st-init)
+open import Rx.Evaluator.Run using (subscribeE)
 
 ----------------------------------------------------------------------
 -- THE STATEMENT AND BOTH ITS PREDICATES, WRITTEN OUT HERE RATHER THAN

@@ -38,15 +38,12 @@
 module Probed.Template-Depth where
 
 open import Data.List using ([]; _∷_)
-open import Data.Nat using (ℕ; zero; suc)
-open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here)
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
 open import Data.Vec using () renaming ([] to []ⱽ)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import Rx.Exp using (Ctx; Ty; Val; Fn; natᵗ; obs; nat̂; varᵗ; strmᵗ; ofᵉ;
-  applyFn)
+open import Rx.Exp using (Ctx; Val; Fn; natᵗ; obs; nat̂; varᵗ; strmᵗ; ofᵉ; applyFn)
 open import Rx.Obs-Depth using (obsDepthᵉ; obsDepthᵗ)
 
 Γ₀ : Ctx 0

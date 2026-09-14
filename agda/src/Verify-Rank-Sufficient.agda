@@ -66,9 +66,9 @@ open import Rx.Sync-Size using (unfoldμ-shrinks)
 open import Rx.Evaluator using (Stream; Path; root; Sched; EvalSt; Frame; AllOp; NodeId; NodeState;
   map-f; take-f; scan-f; from-inner; thru-outer; _↠_;
   scan-st; take-st; mergeAll-st; switch-st; exhaust-st; lookupNode; splitEvents;
-  subscribeE; pushBurst; stepFrame; thruWalk; thruConsume; innerReact;
-  subscribeAll; drain; evaluate; sched-init; st-init;
-  subscribeInner)
+  sched-init; st-init)
+open import Rx.Evaluator.Run using (subscribeE; pushBurst; stepFrame; thruWalk;
+  thruConsume; innerReact; subscribeAll; drain; evaluate; subscribeInner)
 open import Rx.Evaluator.Doorless using (rootWitness)
 open import Rx.Evaluator.Domain using (evaluate⇓; eval-run; subscribeE⇓;
   pushBurst⇓; stepFrame⇓; thruWalk⇓; thruConsume⇓; innerReact⇓;

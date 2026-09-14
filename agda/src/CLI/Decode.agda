@@ -25,7 +25,7 @@ open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; _�
   input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ;
   varᵉ; deferᵉ; varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ;
   strmᵗ; add; sub; mul; eqᵖ; ltᵖ; notᵖ)
-open import Rx.Evaluator using (evaluate)
+open import Rx.Evaluator.Run using (evaluate)
 open import Rx.Slots using (scripted; shared; Slot; Slots)
 open import Implementation using (impl-batchSimultaneous)
 open import CLI.JSON using (jarr; jbool; jnum; jobj; JSON; jstr)

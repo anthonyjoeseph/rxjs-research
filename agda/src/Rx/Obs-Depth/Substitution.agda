@@ -42,17 +42,17 @@
 --   both hold is the same: neither substitution introduces a `strmᵗ`.
 module Rx.Obs-Depth.Substitution where
 
-open import Data.Bool using (Bool; true; false)
+open import Data.Bool using (true)
 open import Data.List using (List; []; _∷_; _++_)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁻)
 open import Data.List.Relation.Unary.All using (All) renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
-open import Data.Nat using (ℕ; zero; suc; _≤_; _<_; _+_; _⊔_; z≤n; s≤s)
-open import Data.Nat.Properties using (≤-refl; ≤-trans; n≤1+n; ⊔-mono-≤; m≤m⊔n; m≤n⊔m)
-open import Data.Product using (_,_; proj₁; proj₂)
+open import Data.Nat using (ℕ; suc; _≤_; _<_; _+_; _⊔_; z≤n)
+open import Data.Nat.Properties using (≤-trans; n≤1+n; ⊔-mono-≤; m≤m⊔n; m≤n⊔m)
+open import Data.Product using (_,_)
 open import Data.Sum using (inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality
-  using (_≡_; refl; sym; trans; cong; cong₂; subst)
+  using (_≡_; refl; trans; cong; cong₂)
 
 open import Rx.Exp using (Ty; Ctx; Exp; Tm; Val; Fn; isData;
   unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs;

@@ -67,7 +67,6 @@ open import Data.Bool.Properties using (_≟_)
 open import Data.List using (List; []; _∷_; map; length)
 open import Data.List.Relation.Unary.All using (All) renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
 open import Data.Nat using (ℕ; zero; suc; _≤_; _<_; _+_; _⊔_)
-open import Data.Nat.Properties using (≤-refl; ≤-trans)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
@@ -75,7 +74,7 @@ open import Relation.Nullary using (yes; no)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 open import Induction.WellFounded using (Acc)
 
-open import Rx.Prim using (Id; Tick; InstEvent; InstEmit)
+open import Rx.Prim using (Id; Tick; InstEmit)
 open import Rx.Exp using (Ctx; Closed; Ty; Val; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs;
   Fn; isData; applyFn; syncSizeᵉ; syncSizeᵗ)
 open import Rx.Obs-Depth using (obsDepthᵉ; obsDepthᵗ)
@@ -83,7 +82,8 @@ open import Rx.Obs-Depth.Substitution using (obsDepth-applyFn; syncSize-applyFn;
   dataSize)
 open import Rx.Strat-Order using (Tri; _≺_)
 open import Rx.Evaluator using (Stream; Path; Sched; EvalSt; Frame; AllOp; NodeId;
-  map-f; scan-f; take-f; from-inner; thru-outer; stepFrame; pushBurst; obsSt)
+  map-f; scan-f; take-f; from-inner; thru-outer; obsSt)
+open import Rx.Evaluator.Run using (stepFrame; pushBurst)
 
 ------------------------------------------------------------------
 -- 1.  THE PAYLOAD PAIR, WHICH REPLACES THE SCALAR `ValOK` READS.

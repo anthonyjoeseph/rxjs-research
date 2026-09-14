@@ -148,7 +148,7 @@ def multi_sccs(edges, nodes):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--file", default="agda/src/Rx/Evaluator.agda")
+    ap.add_argument("--file", default="agda/src/Rx/Evaluator/Run.agda")
     args = ap.parse_args()
 
     names, edges, peels, declared = parse(args.file)
