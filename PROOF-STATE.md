@@ -217,40 +217,41 @@ measure cuts a `deferᵉ` to ZERO without reading its body — the clause that m
 it survive μ-unfolding, and so the one the recursion edge is bought with — so a
 program behind a gate reads zero and the first hop under it refuses.
 
-**AND THE REFUSAL IS DESTROYING EVIDENCE, WHICH REORDERS THE TIER.** Three
-non-structural edges each TEST the measure and emit dry on the negative answer,
-so an inadequate reading is a WRONG ANSWER and not an open obligation: two
-registry refutations have gone unrunnable because the states they measure are no
-longer reached. So the arms go first, and the totality debt moves to one
-statement naming no reading these witnesses killed.
+**AND THE MEASURE IS HELD BY SOMETHING NO STATEMENT MENTIONS: THE RUN HAS TO
+COMPUTE IT.** Three non-structural edges TEST a reading and emit dry on the
+negative answer, so an inadequate figure is a WRONG ANSWER and not an open
+obligation — four refutations and five probes are unrunnable because of it. Every
+candidate was killed as a figure the EVALUATOR evaluates, which is why each is
+syntactic and each is short. A domain derivation lifts that constraint, so the
+tier is staged around building one.
 
 ### Big picture tier roadmap
 
-- **THE ARMS CANNOT BE DELETED, AND WHY IS THE LEG: THEY ARE WHAT MAKES THE
-  EVALUATOR REDUCE.** The root witness is well-foundedness APPLIED to the
-  triple — a real proof — so every probe's `refl`, the bug cache and the oracle
-  all compute THROUGH it. A postulated domain or accessibility gets stuck at
-  the first pattern match and takes the whole evidence apparatus with it, so
-  the debt cannot be moved to a leaf and the door dies only once its domain is
-  PROVEN. What is available now is an adequate COMPUTABLE seed; the leg is to
-  find one or to establish that none exists.
+- **DEFINE THE DOMAIN, AGAINST AN EVALUATOR THAT DOES NOT YET USE IT.** One
+  family per frame function, one constructor per clause, every recursive call a
+  sub-derivation — mirroring the recursion instead of measuring it. It lands
+  beside the current evaluator and nothing computes through it, so the bug
+  cache, the oracle and every probe are untouched while it is built. The
+  staging is the content: a domain POSTULATED gets stuck at the first pattern
+  match, because the root witness is well-foundedness APPLIED and the evaluator
+  REDUCES through it, while a domain defined-and-unused breaks nothing.
 
-- **THEN RE-RUN WHAT THE DOOR WAS SILENCING.** FOUR refutations measure states
-  the run stopped reaching — three registry candidates and the per-instant
-  delivery count — so each reports agreement rather than the crossing it was
-  taken for: an empty burst is under every bound. Under a seed the guard stops
-  refusing on, each is reachable again and what bounds a frame's output is
-  asked of a machine that answers instead of refusing. Ranked second because it
-  is the cheapest check on the first: a seed that merely moved the refusal
-  leaves these four still silent, which no proof about the seed would say.
+- **THEN PROVE IT INHABITED, WHICH IS THE TERMINATION ARGUMENT AND THE POINT OF
+  ALL OF IT.** A run's derivation is built by an induction free to use any
+  measure a PROOF may use, including quantities the machine cannot compute —
+  and that is exactly the constraint every dead candidate died under. Each was
+  killed as a figure the EVALUATOR evaluates; none was killed as a proof-level
+  measure, so the four refutations bound what this leg may assume and not what
+  it may prove. Leaves are postulated at full strength and ground one at a
+  time, and nothing reduces through them until the third leg.
 
-- **AND THEN THE REAL THEOREM: INHABIT THE DOMAIN.** Totality stops being a
-  numeric sufficiency claim and becomes an induction over the evaluator's own
-  recursion, which is where it belonged — every program these witnesses kill
-  terminates in ordinary rxjs, so what they refuted is a MEASURE and never the
-  statement. Ranked last because its shape is decided by the second leg: a
-  domain whose hop constructor needs a bound is a different induction from one
-  whose premises are all sub-derivations.
+- **AND ONLY THEN CUT OVER, WHICH DELETES THE THREE ARMS AND RESTORES NINE
+  FILES.** The evaluator recurses on the derivation, the guards and the marker
+  go, and `hasDry` is false by construction rather than by argument. It is last
+  because reduction is preserved only when the inhabitation proof is COMPLETE —
+  a cutover over postulated leaves is the stuck pattern match leg one exists to
+  avoid. Four refutations and five probes come back with it, and whether their
+  crossings return unchanged is the check on the whole route.
 
 ### Open questions
 

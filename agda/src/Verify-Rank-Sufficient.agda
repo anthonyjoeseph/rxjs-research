@@ -437,9 +437,12 @@ entry-drain-fits {n = n} fuel e ins =
 --   evaluator REDUCES through it.  Every probe's `refl`, the bug cache
 --   and the oracle all compute through that witness, so a postulated
 --   domain gets stuck at the first pattern match and takes the whole
---   evidence apparatus with it.  The arms are what buy computation, so
---   they come out only once the domain is PROVEN — which is the
---   totality argument itself and not a cutover ahead of it.
+--   evidence apparatus with it.  What is dead is the LEAF, and only the
+--   leaf: a domain DEFINED beside the current evaluator computes nothing
+--   and breaks nothing, and one PROVEN inhabited reduces exactly as the
+--   root witness does today.  So the arms come out at the cutover and
+--   not before it, and the dead route is a constraint on ORDER rather
+--   than a verdict on the apparatus.
 -- REFUTED: `Refuted.Dry-Wrap` — this statement, at three programs: one
 --   per half of the substitution repair, and one behind a gate that
 --   neither half reaches.
