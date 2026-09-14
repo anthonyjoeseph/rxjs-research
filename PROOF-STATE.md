@@ -231,17 +231,16 @@ cannot compute — and the other two leaves carry no arithmetic at all.
 
 ### Big picture tier roadmap
 
-- **TIE THE KNOT ABOVE THE MACHINE, SO `evaluate` IS THE BUILDER'S PROJECTION
-  (Anthony).** The door is deleted and the evaluator's termination went with
-  it: three of the twelve recursive edges are non-structural, and no witness may
-  enter `evaluate`'s TYPE — a proof-carrying pipeline is the one line this repo
-  does not cross, recorded at `hop-edge`. Nor can the argument arrive from
-  above, since every builder imports the machine and a module graph cannot hand
-  a definition its own descent. So the knot LEAVES `Rx.Evaluator`, which keeps
-  only what terminates; `Rx.Evaluator.Domain` indexes by RESULT and already
-  mirrors exactly the twenty that move. The builder above it returns each result
-  WITH its derivation, so `evaluate` is `proj₁`, `evaluate⇓-total` is `proj₂`,
-  and `Main` still imports a pipeline's type.
+- **CHIP `pushBurst!` DOWN TO BODIES, WHICH IS THE WHOLE OF WHAT THE CUTOVER
+  NOW WAITS ON.** The knot has left `Rx.Evaluator` and `Rx.Evaluator.Builder`
+  stands below the machine over three leaves — every operator clause is a real
+  body and the μ peel spends `μ-edge` outright, so what is left of the recursion
+  is the frame walk. It swallows the hop, which is why the hop clause is not
+  written yet: its only consumer sits inside the postulate, and a proof handed
+  to one earns no reachability. Split it by frame, and the hop last, since it
+  alone moves τ. Nothing is re-pointed until all three are bodies — a projection
+  through a postulate computes at no input, and the bug cache, the oracle and
+  every probe's `refl` are what would notice.
 
 - **PRICE THE TEMPLATE, NOT THE INPUT: STATE THE SUBSTITUTION LEMMA (Anthony).**
   Six refutations stand at the door and every one of them refutes a price stated
@@ -331,9 +330,9 @@ cannot compute — and the other two leaves carry no arithmetic at all.
   one. Its builder half is `drain!`.
 
 - **`thruConsume⇓-total`** (Verify-Rank-Sufficient) — FALSITY,
-  `REFUTED, PROBED`: the one clause that takes a value and subscribes it,
-  customer of both shelves below. Open: the enqueue arm, two operators on a
-  different node state, and the hop `subscribeInner⇓-total`.
+  `REFUTED, PROBED`: the one clause taking a value and subscribing it,
+  customer of both shelves. Builder half `pushBurst!`. Open: the enqueue arm,
+  two operators on another node state, and the hop `subscribeInner⇓-total`.
   Substitution: `obsDepth-eval-open`, `obsDepth-wkTm`, `applyFn-strict`,
   `syncSize-applyFn`, `eval-case`, `eval-if`, `data-of`, `dataSize`,
   `+-dataˡ`, `+-dataʳ`, `×-dataˡ`, `×-dataʳ`. Carried: `applyFn-ok-×`,
