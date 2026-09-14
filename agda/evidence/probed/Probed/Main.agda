@@ -61,3 +61,13 @@ open import Probed.Nodry-Halves using (row-of; row-empty; row-take-zero;
 -- wrapper, the slot subscribe, and the drain.
 open import Probed.Nodry-Halves using (row-total-all;
   row-total-input; row-total-drain; row-total-consume; row-total-react)
+
+-- AND THE TEMPLATE ROWS, which are a SKETCH and say so: the statement
+-- they instantiate is not yet stateable, so the target carries no
+-- fingerprint and this tree does not check until it does.  They are
+-- claimed from here anyway because the third row is a refutation, and a
+-- refutation parked outside every claim graph is the one thing this
+-- repo has repeatedly paid to re-derive.
+open import Probed.Template-Depth using (row-drops-emitted; row-drops-template;
+  row-wraps-emitted; row-wraps-template; row-deep-handed;
+  row-passes-template; row-passes-emitted)

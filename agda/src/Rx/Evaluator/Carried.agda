@@ -9,15 +9,21 @@
 -- `no` arm is what makes `hasDry` true, which is what makes
 -- `rank-sufficient` false, which is Tier 1.
 
--- THE PREMISE THAT KILLS IT IS NOT A NEW MECHANISM — IT IS THE CARRIED
--- FAMILY, SPENT.  `o` is a value a `thru-outer` frame was handed, and
--- `Verify-Rank-Sufficient.Push-Carried.thru-outer-frame-carried` is
--- exactly the statement that such a value is written strictly shallower
--- than the bound the frame was entered under.  So the arm is unreachable
--- the moment that shelf holds, the clause can be deleted, and
--- `Refuted.Dry-Wrap` goes red — which is what the tier's close looks
--- like as a machine event.  Nothing has to be INVENTED here; the axis
--- set the family needs is already known and stated in one pass.
+-- THE PREMISE THAT KILLS IT IS A FACT ABOUT THE PROGRAM, AND IT IS
+-- CHEAPER THAN ANY CARRIED BOUND.  `o` is a value a frame handed on,
+-- and where that frame was a `map-f` the value is `applyFn fn v` — a
+-- substitution instance of a subterm of `fn`.  Substituting DATA moves
+-- no `strmᵗ`, so `Rx.Obs-Depth.Substitution.obsDepth-applyFn` gives
+-- `obsDepthᵉ (applyFn fn v) < obsDepthᵗ fn` outright, with no bound
+-- carried in from anywhere.  The door's guard IS that comparison.
+--
+-- SO THE PREMISE ARRIVES ONE FRAME LOWER THAN THE WHOLE FAMILY WAS
+-- AIMED.  `thru-outer-frame-carried` was supposed to be what said an
+-- emitted inner is shallow; it is not needed for that — the map below
+-- it already established it, and the hop's job is to pass the reading
+-- along rather than to establish it.  The carried family is still what
+-- the SOURCE-delivered observable needs, and it is now the only thing
+-- that needs it.
 
 -- DEAD ROUTE: giving `thru-outer` a rank FIELD ρ, set at install, so
 --   the hop re-seeds at a figure the machine owns and its drop is
@@ -94,20 +100,30 @@ subscribeInner′ (acc rec) op allNid κ id now o hop sched st =
 -- THE ORDER OF OPERATIONS, WHICH IS THE PART WORTH HANDING FORWARD.
 ------------------------------------------------------------------
 
--- 1.  State the five frames at the full axis set — done, in
---     `Verify-Rank-Sufficient.Push-Carried`.  Until that block holds,
---     nothing below it is worth starting.
--- 2.  Discharge `thru-outer-frame-carried` first of the five.  It is the
---     only one the door needs, and it is the one whose region the two
---     `Refuted.Carried-*` witnesses already map.
--- 3.  `subscribeInner⇓-total` then has its premise from the call site,
+-- 1.  PROBE `applyFn-strict`, which is the cheapest thing on this face
+--     and the only one that could kill the route in an afternoon.
+--     `Probed.Template-Depth` holds the rows, including the one that
+--     refutes the UNCONDITIONED form — the data hypothesis is the
+--     statement, not a convenience.
+-- 2.  Prove `Rx.Obs-Depth.Substitution.obsDepth-subΘ`, which is a
+--     clause-for-clause copy of `Rx.Obs-Depth.obsDepth-elimG` with one
+--     content-bearing arm.  Then `obsDepth-applyFn` falls out.
+-- 3.  Spend it at `map-frame-carried`, which becomes a real body — and
+--     the input bound `Pin` leaves four of the five leaves.
+-- 4.  `subscribeInner⇓-total` then has its premise from the call site,
 --     and the `no` arm dies by `⊥-elim` — the kill, in the relation.
--- 4.  ONLY THEN delete the clause from `Rx.Evaluator`, which is what
+-- 5.  ONLY THEN delete the clause from `Rx.Evaluator`, which is what
 --     makes `hasDry` false of the machine rather than of the relation.
 --     `Refuted.Dry-Wrap` goes red in that same commit and is deleted
 --     with it; `make refuted` going red is the signal, not a problem.
 --
--- Steps 3 and 4 are the two halves people conflate, and the order
+-- Steps 4 and 5 are the two halves people conflate, and the order
 -- matters: deleting the clause first leaves the evaluator with a hole
 -- where the descent witness was, and the premise is the only thing that
 -- fills it.
+--
+-- WHAT STAYS OPEN AFTER ALL FIVE, AND IT IS SMALLER THAN THE TIER WAS.
+-- A template's output is priced by the program; a SOURCE's output is
+-- not, and neither is a FOLD's, whose accumulator is fed back through a
+-- non-data environment.  Those two are the residue, and they are the
+-- two the carried family was always genuinely for.

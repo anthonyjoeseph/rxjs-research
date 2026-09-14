@@ -231,49 +231,42 @@ cannot compute — and the other two leaves carry no arithmetic at all.
 
 ### Big picture tier roadmap
 
+- **PRICE THE TEMPLATE, NOT THE INPUT: STATE THE SUBSTITUTION LEMMA (Anthony).**
+  Six refutations stand at the door and every one of them refutes a price stated
+  in what a frame was HANDED — which is the convergence test's spiral signal,
+  whose prescribed response is to change the mechanism. The change is a change
+  of CURRENCY: what a template emits is a substitution instance of a subterm of
+  it, and substituting DATA moves no `strmᵗ`, so
+  `obsDepthᵉ (applyFn fn v) < obsDepthᵗ fn` strictly, read off the program with
+  no machine state in it. `Rx.Obs-Depth.Substitution` sketches it against its
+  proven twin `obsDepth-elimG`; `Probed.Template-Depth` holds the rows, one of
+  which REFUTES the unconditioned form. PROBE FIRST — cheapest test on this
+  face, and the largest blast radius on it.
+
 - **KILL THE DOOR: SPEND THE PREMISE AT THE HOP SITE (Anthony).** THE DOOR is
   `subscribeInner`'s `obsDepthᵉ o <? r`, the one guard in the subscribe cycle
   that answers a rank with the dry marker, and KILLING IT is proving that `no`
-  arm UNREACHABLE — every syntactic figure that tried to PRICE the comparison
-  died, so the premise assumes it instead. `subscribeInner⇓` has one
-  constructor, demanding a real sub-derivation, so a derivation at the machine's
-  result cannot exist unless the guard passed: `subscribeInner⇓-total` IS the
-  kill, not a statement about it. Near-DEFINITIONAL, since `ValOK (obs u)`
-  unfolds to that same inequality and the arm dies by `⊥-elim`. Four coarse
-  statements are landed unchecked in the module — `subscribeInner⇓-total`,
-  `hop-guard`, `inner-nodry`, `burst-handed` — for the shapes to be argued with.
-  But the kill is not the CLOSE: `evaluate` still holds the arm, so
-  `Refuted.Dry-Wrap` stays green until the clause goes, and deleting it costs
-  the descent witness the `yes` branch supplies. `subscribeInner-nodoor` states
-  that residue. THE PREMISE IS NOT A NEW MECHANISM AND THE LEG BELOW IS WHERE IT
-  COMES FROM — `o` is a value a `thru-outer` frame handed on, so
-  `thru-outer-frame-carried` IS the premise. `Rx.Evaluator.Carried` holds the
-  clause after the change plus the four-step order (state the family, discharge
-  the hop's frame, kill the arm in the relation, THEN delete the clause), and
-  records two dead routes: a rank FIELD on the frame, and threading the premise
-  as an argument.
+  arm UNREACHABLE. `subscribeInner⇓` has one constructor, demanding a real
+  sub-derivation, so `subscribeInner⇓-total` IS the kill rather than a statement
+  about it, and the arm dies by `⊥-elim`. But the kill is not the CLOSE:
+  `evaluate` still holds the arm, so `Refuted.Dry-Wrap` stays green until the
+  clause goes, and deleting it costs the descent witness the `yes` branch
+  supplies — `subscribeInner-nodoor` states that residue. AND THE PREMISE
+  ARRIVES ONE FRAME LOWER THAN THE CARRIED FAMILY WAS AIMED: where `o` came from
+  a `map-f` it was already true of the TEMPLATE. `Rx.Evaluator.Carried` holds
+  the clause after the change and the order it lands in.
 
 - **STATE THE WHOLE CARRIED FAMILY AT THE FULL AXIS SET IN ONE PASS — ALL FIVE
   FRAMES, NOT ONE PER REFUTATION (Anthony).** `stepFrame⇓-total` is handed
   `HandedOK vals τ` and nothing says what the frame HANDS BACK is bounded; that
   missing shelf is the whole of what the door waits on. Its predecessor was
-  discovered a frame at a time over weeks — equal-bounds refuted by a template
-  that DROPS its argument, the pinned form by one that WRAPS, the fold then
-  SHAPE for a third axis — converging, but re-learning one lesson five times.
-  The axis set is now known and is three: the PAYLOAD PAIR (`Pay = syncSize ×
-  obsDepth`, the triple's own lower half, since the hop re-seeds at both and a
-  wrapping template moves only one), the STORE reading, and the ITERATION
-  LENGTH (a fold refolds and a walk subscribes once per delivery). All five land
-  together in `Verify-Rank-Sufficient.Push-Carried` — `map-`, `scan-`, `take-`,
-  `thru-outer-frame-carried` and `from-inner-carried` — each differing only in
-  its transformer, so a fourth axis is a restatement of the block rather than an
-  addition to a shelf. `subscribe-carried` is then a real BODY over
-  `pushBurst-carried`, one clause per `subscribeE` clause, and its three
-  residues are separately named for the first time: `source-carried` (the slot
-  conjunct `Refuted.Carried-Shared` sends to the SCHEDULE — `EntryOK`'s expected
-  third conjunct, `SlotsOK` beside the unconnected count), `of-carried`
-  (arithmetic, no risk), and `all-carried` (the flattener's walk, which is where
-  the door's premise is actually paid).
+  discovered a frame at a time, re-learning one lesson five times, so all five
+  land together in `Verify-Rank-Sufficient.Push-Carried`. THE LEG ABOVE
+  NARROWS IT RATHER THAN REPLACING IT: four of the five stop mentioning the
+  input bound at all, and what still needs a carried figure is two shapes — an
+  observable a SOURCE delivered, and a FOLD's, fed back through an environment
+  that is not data. `subscribe-carried` is then a real
+  BODY over `pushBurst-carried`, naming three residues for the first time.
 
 - **THEN THE LEAVES BOTH CYCLES LEFT, AND REFUTE EACH BEFORE GRINDING IT.**
   Both cycles are bodies now and their list plumbing is closed, so what is open
