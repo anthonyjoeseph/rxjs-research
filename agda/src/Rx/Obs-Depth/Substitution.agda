@@ -30,9 +30,14 @@
 -- whose accumulator is an observable feeds its own output back into the
 -- environment, so the environment stops being data and the substitution
 -- grows by one wrap per refold; a `caseᵗ` scrutinising a sum containing
--- an observable re-binds one the same way.  Both are the OPEN form
--- below, whose growth is per-iteration and bounded by the script
--- length — dynamic, and the only thing that is.
+-- an observable re-binds one the same way.  Both need the OPEN form —
+-- the ADDITIVE reading, denominated in an environment rather than in
+-- closed syntax — and this module does not carry it: every lemma here
+-- is gated on `AllData`, so the case where the environment stops being
+-- data has no statement in `src` at all.  Where it is owed is
+-- `map-open` and `scan-handed`, whose headers hold the route back to
+-- it.  The growth it prices is per-iteration and bounded by the script
+-- length — dynamic, and the only thing in this reading that is.
 --
 -- TWIN: `Rx.Obs-Depth.dep-elimG` — the same commutation for the
 --   guarded substitution, clause for clause, equality and not a bound.
