@@ -40,8 +40,10 @@ open import Data.Fin using (Fin; toℕ)
 open import Data.List using (List; []; _∷_; _++_; map)
 open import Data.Bool.ListAction using (any)
 open import Data.Maybe using (Maybe)
-open import Data.Nat using (ℕ; suc; _<_; _≤_; _≡ᵇ_)
+open import Data.Nat using (ℕ; zero; suc; _<_; _≤_; _≡ᵇ_)
 open import Data.Product using (_×_; _,_)
+open import Data.Sum using (inj₁; inj₂)
+open import Data.Unit using (tt)
 open import Data.Vec using (lookup)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 
@@ -52,6 +54,8 @@ open import Rx.Slots using (Slots)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; NodeId;
   root; share-sink; _↠_; shareAdmit; shareLatch; shareFinish;
   from-inner; splitBurst;
+  arrTick; arrSource; arrVal; chainsOf; cascadeLatch; cascadeFinish;
+  sched-next; sched-init; st-init;
   NodeState; AllOp; RegId; Arrival; AtFloor; arrTy)
 
 ------------------------------------------------------------------
@@ -307,11 +311,54 @@ data foldPath⇓ {n} {Γ} {t} {e} where
             → foldPath⇓ id now envSrc (f ↠ path′) vals evs fin sched st r
 
 data chainStep⇓ {n} {Γ} {t} {e} where
+  chain-step : ∀ {id} {a : Arrival Γ} {lo} {path : Path Γ lo (arrTy a) t}
+                 {sched st r}
+             → foldPath⇓ id (arrTick a) (arrSource a) path (arrVal a ∷ [])
+                 (if Arrival.isLast a
+                    then close (arrSource a) exhausted ∷ [] else [])
+                 (Arrival.isLast a) sched st r
+             → chainStep⇓ id a (lo , path) sched st r
 
 data cascadeGo⇓ {n} {Γ} {t} {e} where
+  casc-nil : ∀ {a id sched₀ st₀}
+           → cascadeGo⇓ a id [] sched₀ st₀ ([] , sched₀ , st₀)
+  casc-cut : ∀ {a id rid} {c : AtFloor Γ (arrTy a) t} {chains sched₀ st₀ r}
+           → any (_≡ᵇ rid) (EvalSt.cancelled st₀) ≡ true
+           → cascadeGo⇓ a id chains sched₀ st₀ r
+           → cascadeGo⇓ a id ((rid , c) ∷ chains) sched₀ st₀ r
+  casc-live : ∀ {a id rid} {c : AtFloor Γ (arrTy a) t} {chains sched₀ st₀}
+                {emits sched₁ st₁ rest sched₂ st₂}
+            → any (_≡ᵇ rid) (EvalSt.cancelled st₀) ≡ false
+            → chainStep⇓ id a c sched₀
+                (record st₀ { delivered = rid ∷ EvalSt.delivered st₀ })
+                (emits , sched₁ , st₁)
+            → cascadeGo⇓ a id chains sched₁ st₁ (rest , sched₂ , st₂)
+            → cascadeGo⇓ a id ((rid , c) ∷ chains) sched₀ st₀
+                (emits ++ rest , sched₂ , st₂)
 
 data cascade⇓ {n} {Γ} {t} {e} where
+  casc-run : ∀ {a id sched st} {emits sched′ st′}
+           → cascadeGo⇓ a id (chainsOf a st) sched (cascadeLatch a st)
+               (emits , sched′ , st′)
+           → cascade⇓ a id sched st (emits , cascadeFinish a sched′ st′)
 
 data drain⇓ {n} {Γ} {t} {e} where
+  drain-done : ∀ {nextId sched st}
+             → drain⇓ zero nextId sched st []
+  drain-empty : ∀ {k nextId sched st}
+              → sched-next sched ≡ inj₁ tt
+              → drain⇓ (suc k) nextId sched st []
+  drain-step : ∀ {k nextId sched st} {a : Arrival Γ}
+                 {sched′ out sched″ st′ rest}
+             → sched-next sched ≡ inj₂ (a , sched′)
+             → cascade⇓ a nextId sched′ st (out , sched″ , st′)
+             → drain⇓ k (suc nextId) sched″ st′ rest
+             → drain⇓ (suc k) nextId sched st (out ++ rest)
 
 data evaluate⇓ {n} {Γ} {t} where
+  eval-run : ∀ {fuel} {e : Closed Γ t} {ins : Slots Γ}
+               {burst sched₀ st₀ rest}
+           → subscribeE⇓ {e = e} {lo = n} e root 0 0
+               (sched-init e ins) (st-init e) (burst , sched₀ , st₀)
+           → drain⇓ {e = e} fuel 1 sched₀ st₀ rest
+           → evaluate⇓ fuel e ins (burst ++ rest)
