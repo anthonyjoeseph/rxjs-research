@@ -373,7 +373,6 @@ landing on main is still held. Five details:
 - **`--baseline-file F`** replaces the git lookup with a plain file, which is how
   the selftest drives both directions without touching the repo's history.
   `--ref R` compares against another commit; `--file F` picks another roadmap.
-  `--base-ref B` picks the branch this one is measured against (default `main`).
   The merge-base reading, the HEAD~1 fallback and the exemption below only apply
   at the default `--ref` — an explicit one is a deliberate comparison point and
   is read literally.
