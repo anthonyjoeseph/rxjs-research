@@ -37,20 +37,22 @@
 -- the premises do not move, and the schedules only have to AGREE.
 module Rx.Evaluator.Burst-Report where
 
-open import Data.Bool using (T)
+open import Data.Bool using (Bool; true; false; if_then_else_; T)
 open import Data.Fin using (Fin; toℕ)
 open import Data.List using (List; []; _∷_; map; _++_)
 open import Data.List.Relation.Unary.All using (All)
   renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
+open import Data.List.Relation.Unary.All.Properties using (++⁺)
 open import Data.Nat using (ℕ; zero; suc; _≤_; _<_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤-trans; <⇒≤; m≤m⊔n; m≤n⊔m)
-open import Data.Product using (_,_)
+open import Data.Product using (_,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (tt)
 open import Data.Vec using (lookup)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong; subst)
 
-open import Rx.Prim using (Id; Source; Tick; init; value; close; complete; exhausted; subscribe; _at_from_as_)
+open import Rx.Prim using (Id; Source; Tick; InstEvent; InstEmit; init; value; close;
+  handoff; complete; exhausted; subscribe; _at_from_as_)
 open import Rx.Exp using (Ty; Ctx; Closed; Val; Tm; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_;
   obs; input; isData; evalTm)
 open import Rx.Obs-Depth using (depᵗ; depᵗˢ; depᵛ)
@@ -59,16 +61,16 @@ open import Rx.Slots using (Slots)
 open import Rx.Slot-Depth using (slotDepth)
 open import Rx.Strat-Order using (Tri)
 open import Rx.Sync-Size using (unfoldμ-shrinks)
-open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; oneShotBurst;
-  spentBurst)
+open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; oneShotBurst;
+  spentBurst; splitEvents; retagEvents)
 open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeAll⇓; pushBurst⇓;
-  subscribeSharedSlot⇓;
+  subscribeSharedSlot⇓; stepFrame⇓; push-nil; push-cons;
   subs-floor; subs-shared; subs-hot-done; subs-hot-live; subs-cold-sync;
   subs-cold-async; subs-of; subs-empty; subs-map; subs-take-zero;
   subs-take-suc; subs-scan; subs-merge-all; subs-switch-all;
   subs-exhaust-all; subs-μ; subs-defer; sub-all)
 open import Rx.Evaluator.Doorless using (EntryOK; ValOK; HandedOK; BurstOK; EventOK;
-  inner-ok; under-ok; μ-entry)
+  split-handed; inner-ok; under-ok; μ-entry)
 
 ------------------------------------------------------------------
 -- THE SHAPES THAT CARRY NOTHING.  Several of the burst shapes a
@@ -222,8 +224,66 @@ of-handed η (tm ∷ ts) dep =
 -- transported.  Stated over the relation for the same reason the parent
 -- is: it is a claim about what a run produced.
 --
--- AND IT IS FALSE AS STATED, WHICH THE FRAME PREDICATE ALONE DOES NOT
--- REPAIR.  The map arm is `map (applyFn fn) vals`, and `applyFn` is
+-- AND IT IS A BODY OVER ONE LEAF, WHICH IS WHERE THE CONTENT TURNED
+-- OUT TO BE.  The cycle's relation has two constructors and the empty
+-- one closes by construction; the other emits one concatenation, and
+-- three of its four segments carry nothing -- the split's bookkeeping
+-- half and the retagged events both DROP `value`, so the predicate
+-- holds of them whatever the frame did, and a terminal `complete` is
+-- ⊤.  What is left is the segment the frame WROTE, which is the leaf
+-- below.  Walking it is what says the risk sits at the frame step and
+-- not at the cycle.
+private
+  -- the bookkeeping half of a split holds no `value` at all, so the
+  -- predicate holds of it at every triple and at whatever type the
+  -- retag is pinned to by the call
+  split-book : ∀ {n} {Γ : Ctx n} {s u} {τ : Tri} (η : Fin n → ℕ)
+             → (es : List (InstEvent (Val Γ s)))
+             → All (EventOK {u = u} η τ)
+                 (proj₁ (proj₂ (splitEvents {A = Val Γ u} es)))
+  split-book η []               = []ᵃ
+  split-book η (value _   ∷ es) = split-book η es
+  split-book η (init _    ∷ es) = tt ∷ᵃ split-book η es
+  split-book η (close _ _ ∷ es) = tt ∷ᵃ split-book η es
+  split-book η (handoff _ ∷ es) = tt ∷ᵃ split-book η es
+  split-book η (complete  ∷ es) = split-book η es
+
+  -- and the retag, which drops `value` for the same reason
+  retag-book : ∀ {n} {Γ : Ctx n} {A : Set} {u} {τ : Tri} (η : Fin n → ℕ)
+             → (es : List (InstEvent A))
+             → All (EventOK {Γ = Γ} {u = u} η τ) (retagEvents es)
+  retag-book η []               = []ᵃ
+  retag-book η (value _   ∷ es) = retag-book η es
+  retag-book η (init _    ∷ es) = tt ∷ᵃ retag-book η es
+  retag-book η (close _ _ ∷ es) = tt ∷ᵃ retag-book η es
+  retag-book η (handoff _ ∷ es) = tt ∷ᵃ retag-book η es
+  retag-book η (complete  ∷ es) = tt ∷ᵃ retag-book η es
+
+  -- the handed values read back as the events they are delivered as
+  handed-events : ∀ {n} {Γ : Ctx n} {u} {τ : Tri} (η : Fin n → ℕ)
+                → (vs : List (Val Γ u)) → HandedOK η vs τ
+                → All (EventOK η τ) (map value vs)
+  handed-events η []       []ᵃ        = []ᵃ
+  handed-events η (v ∷ vs) (p ∷ᵃ ps) = p ∷ᵃ handed-events η vs ps
+
+  -- the terminal marker, which carries no payload either way
+  fin-events : ∀ {n} {Γ : Ctx n} {u} {τ : Tri} (η : Fin n → ℕ) (b : Bool)
+             → All (EventOK {Γ = Γ} {u = u} η τ)
+                 (if b then complete ∷ [] else [])
+  fin-events η true  = tt ∷ᵃ []ᵃ
+  fin-events η false = []ᵃ
+
+-- WHAT THE FRAME WROTE, WHICH IS THE ONE SEGMENT AT RISK.  A step is
+-- handed the emit's own values and returns the values it delivers
+-- onward, and the six heads it can take do genuinely different things:
+-- one returns nothing, one filters what it was given, two REWRITE the
+-- payload through a template, and two follow the run into another
+-- family.  So this is where the claim has to be split next, and the
+-- split is what the arms below say it is.
+--
+-- AND IT IS FALSE AT TWO OF THOSE HEADS, WHICH IS THE CYCLE'S OWN
+-- FINDING LOCALISED RATHER THAN A NEW ONE.  The map arm is
+-- `map (applyFn fn) vals`, and `applyFn` is
 -- `evalWith` at a one-value environment, so what bounds its reading is
 -- `dep-eval-open`: `depᵗ fn + m`, a SUM.  The measure the entry
 -- invariant is denominated in reads a map as `depᵗ f ⊔ depᵉ e`, a JOIN.
@@ -267,13 +327,38 @@ of-handed η (tm ∷ ts) dep =
 --   the denomination, since the statement it carries is the
 --   unenvironmented one the two retired witnesses killed.
 postulate
-  push-carries : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo} {τ : Tri}
-    (η : Fin n → ℕ) {id : Id} {now : Tick} {fr : _} {κ : Path Γ lo u t}
-    {bs : Stream Γ s} {sched : Sched Γ} {st : EvalSt e}
-    {burst : Stream Γ u} {sched′ : Sched Γ} {st′ : EvalSt e} →
-    BurstOK η bs τ →
-    pushBurst⇓ {e = e} id now fr κ bs sched st (burst , sched′ , st′) →
-    BurstOK η burst τ
+  step-handed : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo} {τ : Tri}
+    (η : Fin n → ℕ) {id : Id} {now : Tick} {fr : Frame Γ s u}
+    {κ : Path Γ lo u t} {vs : List (Val Γ s)} {c : Bool}
+    {sched : Sched Γ} {st : EvalSt e}
+    {vals : List (Val Γ u)} {evs : List (InstEvent (Val Γ t))} {fin : Bool}
+    {sched′ : Sched Γ} {st′ : EvalSt e} →
+    HandedOK η vs τ →
+    stepFrame⇓ {e = e} id now fr κ vs c sched st
+      (vals , evs , fin , sched′ , st′) →
+    HandedOK η vals τ
+
+push-carries : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo} {τ : Tri}
+  (η : Fin n → ℕ) {id : Id} {now : Tick} {fr : Frame Γ s u} {κ : Path Γ lo u t}
+  {bs : Stream Γ s} {sched : Sched Γ} {st : EvalSt e}
+  {burst : Stream Γ u} {sched′ : Sched Γ} {st′ : EvalSt e} →
+  BurstOK η bs τ →
+  pushBurst⇓ {e = e} id now fr κ bs sched st (burst , sched′ , st′) →
+  BurstOK η burst τ
+push-carries η ok push-nil = []ᵃ
+push-carries {u = u} {τ = τ} η (okem ∷ᵃ okrest)
+             (push-cons {em = em} {evs = evs} {fin′ = fin′} sp step rest) =
+    ++⁺ (subst (All (EventOK η τ))
+               (cong (λ z → proj₁ (proj₂ z)) sp)
+               (split-book {u = u} η (InstEmit.events em)))
+        (++⁺ (retag-book η evs)
+             (++⁺ (handed-events η _
+                     (step-handed η
+                       (subst (λ ws → HandedOK η ws τ) (cong proj₁ sp)
+                              (split-handed η (InstEmit.events em) okem))
+                       step))
+                  (fin-events η fin′)))
+  ∷ᵃ push-carries η okrest rest
 
 -- AND THE ONE FAMILY THIS MODULE DOES NOT WALK: the shared slot, whose
 -- connect re-enters the subscribe at the SLOT'S own reading rather than
