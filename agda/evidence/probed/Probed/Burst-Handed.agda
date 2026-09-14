@@ -40,7 +40,6 @@ open import Data.List.Relation.Unary.Any using (here)
 open import Rx.Exp using (Ctx; Tm; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; nat̂; inlᵗ; varᵗ)
 open import Rx.Obs-Depth.Substitution using ([]ᵈ; _∷ᵈ_)
 open import Rx.Evaluator.Burst-Report using (data-handed; eval-silent)
-open import Rx.Strat-Order using (emptyHold)
 
 open import Probed.Apparatus using (Confirms)
 
@@ -57,17 +56,17 @@ open import Probed.Apparatus using (Confirms)
 ----------------------------------------------------------------------
 
 -- flat: degenerate, and it is here to say the premise is inhabited
-row-data-flat : Confirms (data-handed {Γ = Γ₀} {u = natᵗ} η₀ (0 , emptyHold 0 , 0 , 0)
+row-data-flat : Confirms (data-handed {Γ = Γ₀} {u = natᵗ} η₀ (0 , 0 , 0)
                            (3 ∷ 5 ∷ []) tt)
 row-data-flat = tt ∷ᵃ tt ∷ᵃ []ᵃ
 
 -- a product, where the reading recurses into both components
-row-data-pair : Confirms (data-handed {Γ = Γ₀} {u = natᵗ ×ᵗ boolᵗ} η₀ (0 , emptyHold 0 , 0 , 0)
+row-data-pair : Confirms (data-handed {Γ = Γ₀} {u = natᵗ ×ᵗ boolᵗ} η₀ (0 , 0 , 0)
                            ((3 , true) ∷ []) tt)
 row-data-pair = (tt , tt) ∷ᵃ []ᵃ
 
 -- a sum, where it selects on the injection
-row-data-sum : Confirms (data-handed {Γ = Γ₀} {u = natᵗ +ᵗ boolᵗ} η₀ (0 , emptyHold 0 , 0 , 0)
+row-data-sum : Confirms (data-handed {Γ = Γ₀} {u = natᵗ +ᵗ boolᵗ} η₀ (0 , 0 , 0)
                           (inj₁ 3 ∷ inj₂ false ∷ []) tt)
 row-data-sum = tt ∷ᵃ tt ∷ᵃ []ᵃ
 
@@ -82,20 +81,20 @@ row-data-sum = tt ∷ᵃ tt ∷ᵃ []ᵃ
 ----------------------------------------------------------------------
 
 row-silent-flat : Confirms
-  (eval-silent {Γ = Γ₀} {Θ = []} {τ = 0 , emptyHold 0 , 0 , 0} η₀ []ᵈ (nat̂ 7) []ᵃ refl)
+  (eval-silent {Γ = Γ₀} {Θ = []} {τ = 0 , 0 , 0} η₀ []ᵈ (nat̂ 7) []ᵃ refl)
 row-silent-flat = tt
 
 t-left : Tm Γ₀ [] [] [] (natᵗ +ᵗ obs natᵗ)
 t-left = inlᵗ (nat̂ 3)
 
 row-silent-sum : Confirms
-  (eval-silent {Γ = Γ₀} {Θ = []} {τ = 0 , emptyHold 0 , 0 , 0} η₀ []ᵈ t-left []ᵃ refl)
+  (eval-silent {Γ = Γ₀} {Θ = []} {τ = 0 , 0 , 0} η₀ []ᵈ t-left []ᵃ refl)
 row-silent-sum = tt
 
 t-binder : Tm Γ₀ [] [] (natᵗ ∷ []) natᵗ
 t-binder = varᵗ (here refl)
 
 row-silent-binder : Confirms
-  (eval-silent {Γ = Γ₀} {Θ = natᵗ ∷ []} {τ = 0 , emptyHold 0 , 0 , 0} η₀ (refl ∷ᵈ []ᵈ)
+  (eval-silent {Γ = Γ₀} {Θ = natᵗ ∷ []} {τ = 0 , 0 , 0} η₀ (refl ∷ᵈ []ᵈ)
     t-binder (7 ∷ᵃ []ᵃ) refl)
 row-silent-binder = tt

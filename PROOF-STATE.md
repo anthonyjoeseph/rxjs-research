@@ -199,7 +199,7 @@ formal-verification-batchSimultaneous    The-Proof.agda — REAL, module postula
      └─ burst-drain-well-formed          one postulate — tier 2
 
   evaluate↓ = proj₁ ∘ evaluate!           Rx/Evaluator/Builder.agda — tier 1
-     └─ queuedInner!                   the one leaf a run still steps through
+     └─ every value-path leaf is a body; the corpus runs
 
   every tier above is stated over Rx.Exp's syntax
 ```
@@ -216,29 +216,36 @@ research lives; where they disagree, the header wins.
 
 ## Tier 1 — the evaluator runs again
 
-**THE TIER IS A PROJECTION OVER ONE LEAF.** `evaluate↓` is `proj₁` of
-`evaluate!`, which hands back a run TOGETHER with its `evaluate⇓` derivation, so
-the descent is a proof obligation rather than a reading the machine computes and
-the dry marker is unemittable — no constructor of the relation builds one. What
-that costs is reduction: a projection computes only if the thing projected is a
-real body, so a run reduces exactly as far as the leaves allow. It now reduces
-through the whole arrival cycle and through a merge drain that finds an empty
-queue or a full lane; what it does not reduce through is a queued subscription,
-and every row of the corpus reaches one. So `bug-cache` is off the gate for the
-duration and `make bug-cache` is a target to TYPE. The tier ends when a row
-runs, which is now one leaf away.
+**THE TIER IS A PROJECTION, AND THE PROJECTION NOW COMPUTES.** `evaluate↓` is
+`proj₁` of `evaluate!`, which hands back a run TOGETHER with its `evaluate⇓`
+derivation, so the descent is a proof obligation rather than a reading the
+machine computes and the dry marker is unemittable — no constructor of the
+relation builds one. What that cost was reduction: a projection computes only if
+the thing projected is a real body. Every leaf on the VALUE path is now one, and
+the corpus runs end to end. What is left is the REPORT the builder carries
+beside the run — premise-only statements a row never forces — so the tier's
+remaining risk is entirely in what the report READS, not in what the machine
+does.
 
 ### Big picture tier roadmap
 
-- **THE MEASURE THE DRAIN DROPS, NOW THAT THE ORDER HOLDS A PLACE FOR IT.** The
-  order carries a fourth component: a census of queued depths by level, under
-  the share count because a connect can fill a store, and over the rank because
-  a drain enters deeper than the rank in force. What remains is the READING —
-  the census taken over what the stores hold TOGETHER WITH the burst still
-  pending, so the merge's one enqueue is a move and not a growth — and
-  `queuedInner!`'s body over it. That is the tier's ending condition: it is the
-  one site a run cannot step through, so the evaluator does not run until it
-  lands, and with it the corpus and the birth floor come back.
+- **PUT THE CORPUS BACK ON THE GATE, AND THE BIRTH FLOOR WITH IT.** The
+  evaluator runs, so both checks that were suspended for the duration can be
+  live again in one commit: `bug-cache` into the cheap gate, and the
+  unevidenced-birth check restored with its selftest. This leg narrows no
+  question and is taken first because none of them can be WORKED while it is
+  open — every risky row left here is a reading over a run, so instantiating
+  one means running a program, and a floor nothing enforces is why several rows
+  below still name no evidence at all.
+
+- **MOVE THE READING'S CURRENCY FROM A JOIN TO A SUM.** The reading JOINS where
+  a run ADDS, which is the single fact behind both refutations on the frame
+  heads: a template wrapping its own argument hands back a value deeper than
+  either side, and a fold re-entering its own template climbs once per delivery.
+  Restoring the open-term depth and the substitution lemma under it denominates
+  the reading in `+`, which discharges `map-open` outright and leaves
+  `scan-handed` a restatement rather than a refutation. It is the answer to the
+  question below, so it is taken before the arms that spend it.
 
 - **WIDEN WHAT A BUILDER RETURNS, WHICH TURNS OUT TO GATE THE WALK.** Every
   premise is denominated at one `slotDepth sl` the caller fixes, and each clause
@@ -270,14 +277,15 @@ runs, which is now one leaf away.
 
 ### Open questions
 
-- **How many edges does the order owe a component of its own?** It was built for
-  the term, and every edge the term cannot pay for has had to be answered in a
-  component instead — the share connect already was. The merge drain is the
-  second, found by writing its entry and watching the rank fall away from it.
-  The question is whether that is the last: an edge qualifies exactly when it
-  reaches a value the store has held rather than one a caller built, and nothing
-  has yet enumerated those sites.
-  relevant: `queuedInner!`, `connect-drops`
+- **Is the depth a run climbs a JOIN or a SUM?** Every risky row left in this
+  tier is one claim at different heads: that what a frame writes stays under the
+  rank the frame entered at. The reading takes a join, and a template that wraps
+  its own argument already refutes that — the wrapper's own depth is paid
+  nowhere. A sum is the obvious repair and it is not free: it must still be
+  bounded for the descent, and a fold re-entering its own template climbs once
+  per delivery, so the length of a burst appears in a reading that carries no
+  length. The question is which of those two the bound is stated in.
+  relevant: `map-open`, `scan-handed`, `inner-handed`, `thru-handed`
 
 ### The ledger
 
@@ -311,12 +319,6 @@ runs, which is now one leaf away.
   slot's payload is data, and the rank is read only at `obs`, so this is an
   induction on the TYPE with no arithmetic in it. A leaf only because it is
   unwritten.
-
-- **`queuedInner!`** (Rx/Evaluator/Builder) — FALSITY, `DEAD ROUTE, RECOVERY`:
-  ONE queued subscription, read back out of the store by a completion carrying
-  no burst. The drain around it is a body, so this is the whole of what a run
-  still cannot step through. It is owed a component of the order, not a
-  premise.
 
 - **`connect-drops`** (Rx/Evaluator/Doorless) — FALSITY, `PROBED`: the share
   connect's drop in the unconnected component, the arithmetic the arm above
