@@ -231,16 +231,16 @@ cannot compute — and the other two leaves carry no arithmetic at all.
 
 ### Big picture tier roadmap
 
-- **MAKE THE HOP'S PREMISE TRUE: `burst-carries`, STATED OVER THE RELATION.**
-  The hop is closed: `subscribeInner!` is a body, the cycle's seven members are
-  one mutual block, and the descent it spends is `hop-guard` applied to a report
-  that travels with the value from the burst that produced it. That report is
-  `burst-carries` — a subscribe entered at τ hands back a burst whose every
-  observable is shallower than τ's rank. Stated over `subscribeE⇓` and over no
-  function, which keeps it out of the cycle it is about, and it REPLACED a
-  five-frame carried shelf: the push cycle splits one `All` emit by emit rather
-  than re-deriving a bound per frame. Riskiest because everything above it is
-  now a body — if it is false the door comes back.
+- **PRICE A SLOT REFERENCE BY ITS DEFINITION: THE STAGED READING.**
+  `burst-carries` is refuted, at the ordinary run and over the relation the
+  builder actually spends: a reference is one symbol the reading prices at
+  nought, and the connect plumbs the DEFINITION's burst out through that
+  reference's own entry. A conjunct over the schedule cannot repair it — the
+  bound it adds is a constant of the program while the rank strictly drops at
+  every hop — so what must dominate the definition is the reference's own
+  price. The telescope is stratified, so a reading recursing on the slot index
+  is total, and the attic holds that construction proven. Riskiest: everything
+  above the hop is now a body.
 
 - **PRICE THE TEMPLATE, NOT THE INPUT: STATE THE SUBSTITUTION LEMMA (Anthony).**
   Six refutations stand at the door and every one of them refutes a price stated
@@ -330,14 +330,14 @@ cannot compute — and the other two leaves carry no arithmetic at all.
   one. Its builder half is `drain!`.
 
 - **`thruConsume⇓-total`** (Verify-Rank-Sufficient) — FALSITY,
-  `REFUTED, PROBED`: the one clause taking a value and subscribing it,
-  customer of both shelves. Builder `subscribeInner!`. Open: the enqueue arm,
-  two operators on another node state, and the hop `subscribeInner⇓-total`.
+  `REFUTED, PROBED`: the one clause taking a value and subscribing it, customer
+  of both shelves. Builder `subscribeInner!`. Open: the enqueue arm, two
+  operators on another node state, and the hop `subscribeInner⇓-total`.
   Substitution: `obsDepth-eval-open`, `obsDepth-wkTm`, `applyFn-strict`,
-  `syncSize-applyFn`, `eval-case`, `eval-if`, `data-of`, `dataSize`,
-  `+-dataˡ`, `+-dataʳ`, `×-dataˡ`, `×-dataʳ`. Carried: `applyFn-ok-×`,
-  `applyFn-ok-+`, `map-frame-carried-obs`, `scan-frame-carried`,
-  `take-frame-carried`, `thru-outer-frame-carried`, `from-inner-carried`,
+  `syncSize-applyFn`, `eval-case`, `eval-if`, `data-of`, `dataSize`, `+-dataˡ`,
+  `+-dataʳ`, `×-dataˡ`, `×-dataʳ`. Carried: `applyFn-ok-×`, `applyFn-ok-+`,
+  `map-frame-carried-obs`, `scan-frame-carried`, `take-frame-carried`,
+  `thru-outer-frame-carried`, `from-inner-carried`,
   `subscribe-carried-schedule`, `burst-handed`, `burst-widen`, `payOf`,
   `rankOf`, `source-carried`, `of-carried`, `all-carried`, `burst-carries`.
 

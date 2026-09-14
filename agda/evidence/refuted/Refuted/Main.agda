@@ -69,3 +69,12 @@ open import Refuted.Carried-Unranked using (carried-false; root-rank)
 -- what says the conjunct owed is over the SCHEDULE
 open import Refuted.Carried-Shared using (carried-shared-false;
   def-depth; ref-depth)
+
+-- and the same crossing asked of a DERIVATION, which is the statement
+-- the builder actually spends.  Its two figures are the sibling's, and
+-- it is beside that witness rather than replacing it because the two
+-- die to different events: the sibling expires when the cutover deletes
+-- the machine it reads, and this one goes on holding against whatever
+-- the relation is restated to say
+open import Refuted.Carried-Derived using (carried-derived-false;
+  derived-def-depth; derived-ref-depth)

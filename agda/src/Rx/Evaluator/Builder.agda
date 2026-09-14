@@ -201,6 +201,32 @@ postulate
 -- cutover genuinely waits on are the three that a run must STEP
 -- THROUGH.  Take the projections back out and that stops being true at
 -- the first emit of the first operator.
+
+-- AND AS WRITTEN IT IS FALSE, AT THE ONE CLAUSE WHERE THE ENTRY
+-- INVARIANT SPEAKS ABOUT A SYMBOL RATHER THAN ABOUT A PROGRAM.  A slot
+-- REFERENCE is one symbol standing for a definition of any nesting, and
+-- the reading prices it at nought; the connect then plumbs the
+-- DEFINITION's burst out through the reference's own entry, so a burst
+-- carrying an observable arrives at an entry that promised none.  The
+-- witness is the ordinary run — a fresh share, a one-shot definition,
+-- the entry the root itself builds — so this is the first thing that
+-- happens rather than a case a run avoids.
+--
+-- THE REPAIR IS THE STAGED READING, AND IT IS FORCED RATHER THAN
+-- CHOSEN.  A conjunct over the schedule cannot carry it: the bound it
+-- would add is a constant of the program, while the rank strictly drops
+-- at every hop, so the two can only be reconciled where the reference's
+-- own price already dominates its definition.  That price is computable
+-- because the telescope is STRATIFIED — slot k's definition reads only
+-- slots below k — so a reading that recurses on the slot index is total,
+-- and under it the connect re-seeds at a rank the caller's own entry
+-- already dominates.  Nothing else in the entry invariant moves.
+--
+-- REFUTED: `Refuted.Carried-Derived` — this statement, at that run.
+-- RECOVERY: git show 919f115:agda/src/Rx/Slot-Hop.agda restores the
+--   staged environment and its fixpoint, built for the deleted budget's
+--   hop measure and proven there; the construction transfers, the
+--   quantity it is taken over does not.
 postulate
   burst-carries : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo} {τ : Tri}
     {b : Closed Γ u} {κ : Path Γ lo u t} {id : Id} {now : Tick}
