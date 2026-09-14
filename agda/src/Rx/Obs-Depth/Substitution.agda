@@ -288,8 +288,12 @@ private
   pred-⊔ (suc m) zero    = sym (⊔-identityʳ m)
   pred-⊔ (suc m) (suc n) = refl
 
-  ≤pred⇒< : ∀ {a m} → 0 < m → a ≤ pred m → a < m
-  ≤pred⇒< {m = suc m} _ a≤ = s≤s a≤
+-- the positivity's one spender, and it is exported because every
+-- consumer of the drop below has to pay it: the weak form carries a
+-- `pred`, and turning that into a strict comparison is the whole of
+-- what a caller owes.
+≤pred⇒< : ∀ {a m} → 0 < m → a ≤ pred m → a < m
+≤pred⇒< {m = suc m} _ a≤ = s≤s a≤
 
 -- A value evaluated out of a term reads no deeper than the term's own
 -- predecessor — so at an OBSERVABLE result type, where the only head

@@ -6,35 +6,37 @@
 -- condition at a type where it recurses.  Flat at `natᵗ` that is
 -- degenerate; at a pair and at a sum it is load-bearing, since either
 -- component could carry the head the reading charges for and the row
--- would then be unclosable.  `of-handed` is the opposite: its conclusion
--- is a strict inequality at every element, so a row at a term the
--- premise prices EXACTLY is what a wrong reading fails.
+-- would then be unclosable.  `eval-silent` is the other side of the
+-- same reading: a term reading nought wrote no observable, so the
+-- predicate holds at every rank — and what could fail it is a TYPE that
+-- reaches an observable while the value does not, which is the shape
+-- the row below stands at.
 --
 -- COVERAGE: the data leaf at a flat type, at a product and at a sum, at
--- a list of two so the fold is exercised; the evaluation leaf at a term
--- carrying an observable, at the tightest rank its own premise admits,
--- and at a list of two whose readings differ so the join is spent.
--- NOT reached: a data type nested under a sum under a product, and any
--- evaluation at a term whose observable is not written by the term
--- itself — that second gap is the whole of what `slot-carries` is for,
--- and it is not instantiable here because no burst reaches this file.
+-- lists of two so the fold is exercised; the silent leaf at a flat type
+-- and at a sum whose other arm is an observable, so the reading has to
+-- select on the injection rather than on the type.  NOT reached: a data
+-- type nested under a sum under a product, and a silent term at a
+-- binding head, since a closed term has no binder to read.
 --
 -- TARGET: data-handed @42a356
--- TARGET: of-handed @b97e64
+-- TARGET: eval-silent @16c604
 module Probed.Burst-Handed where
 
 open import Data.Bool using (true; false)
 open import Data.List using ([]; _∷_)
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
 open import Data.Fin using (Fin)
-open import Data.Nat using (ℕ; z≤n; s≤s)
+open import Data.Nat using (ℕ)
 open import Data.Product using (_,_)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (tt)
 open import Data.Vec using () renaming ([] to []ⱽ)
 
-open import Rx.Exp using (Ctx; Tm; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; nat̂; strmᵗ; ofᵉ; emptyᵉ)
-open import Rx.Evaluator.Burst-Report using (data-handed; of-handed)
+open import Relation.Binary.PropositionalEquality using (refl)
+
+open import Rx.Exp using (Ctx; Tm; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; nat̂; inlᵗ)
+open import Rx.Evaluator.Burst-Report using (data-handed; eval-silent)
 
 open import Probed.Apparatus using (Confirms)
 
@@ -66,26 +68,18 @@ row-data-sum : Confirms (data-handed {Γ = Γ₀} {u = natᵗ +ᵗ boolᵗ} η�
 row-data-sum = tt ∷ᵃ tt ∷ᵃ []ᵃ
 
 ----------------------------------------------------------------------
--- 2.  THE EVALUATION LEAF.  A `strmᵗ` evaluates to the expression it
--- wraps, so the value is an observable and the conclusion is a strict
--- comparison of that observable's reading against the rank.  The rank
--- here is the SMALLEST the premise admits, which is what makes the row
--- fail under any reading that prices the term lower than it delivers.
+-- 2.  THE SILENT LEAF.  A closed term whose reading is nought carries
+-- no observable at all, so the predicate holds at EVERY rank -- the
+-- rank nought included, which is the case the strict drop cannot reach.
+-- The second row is the load-bearing one: its TYPE reaches an
+-- observable while its value takes the other arm.
 ----------------------------------------------------------------------
 
-t-empty : Tm Γ₀ [] [] [] (obs natᵗ)
-t-empty = strmᵗ emptyᵉ
+row-silent-flat : Confirms (eval-silent {Γ = Γ₀} {τ = 0 , 0 , 0} η₀ (nat̂ 7) refl)
+row-silent-flat = tt
 
-t-of : Tm Γ₀ [] [] [] (obs natᵗ)
-t-of = strmᵗ (ofᵉ (nat̂ 7 ∷ []))
+t-left : Tm Γ₀ [] [] [] (natᵗ +ᵗ obs natᵗ)
+t-left = inlᵗ (nat̂ 3)
 
--- one term, at the rank its own reading forces
-row-of-one : Confirms (of-handed {Γ = Γ₀} {U = 0} {r = 1} {sz = 0} η₀
-                        (t-of ∷ []) (s≤s z≤n))
-row-of-one = s≤s z≤n ∷ᵃ []ᵃ
-
--- two terms whose readings differ, so the premise is a join and the
--- shallower element is carried by the deeper one's bound
-row-of-join : Confirms (of-handed {Γ = Γ₀} {U = 0} {r = 1} {sz = 0} η₀
-                         (t-empty ∷ t-of ∷ []) (s≤s z≤n))
-row-of-join = s≤s z≤n ∷ᵃ s≤s z≤n ∷ᵃ []ᵃ
+row-silent-sum : Confirms (eval-silent {Γ = Γ₀} {τ = 0 , 0 , 0} η₀ t-left refl)
+row-silent-sum = tt

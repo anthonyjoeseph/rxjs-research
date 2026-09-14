@@ -42,16 +42,19 @@ open import Data.Fin using (Fin; toℕ)
 open import Data.List using (List; []; _∷_; map; _++_)
 open import Data.List.Relation.Unary.All using (All)
   renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
-open import Data.Nat using (ℕ; _≤_; _<_)
-open import Data.Nat.Properties using (≤-trans; <⇒≤)
+open import Data.Nat using (ℕ; zero; suc; _≤_; _<_; z≤n; s≤s)
+open import Data.Nat.Properties using (≤-trans; <⇒≤; m≤m⊔n; m≤n⊔m)
 open import Data.Product using (_,_)
+open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (tt)
 open import Data.Vec using (lookup)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
 
 open import Rx.Prim using (Id; Source; Tick; init; value; close; complete; exhausted; subscribe; _at_from_as_)
-open import Rx.Exp using (Ctx; Closed; Val; Tm; obs; input; isData; evalTm)
-open import Rx.Obs-Depth using (depᵗˢ)
+open import Rx.Exp using (Ty; Ctx; Closed; Val; Tm; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_;
+  obs; input; isData; evalTm)
+open import Rx.Obs-Depth using (depᵗ; depᵗˢ; depᵛ)
+open import Rx.Obs-Depth.Substitution using ([]ᵈ; ≤pred⇒<; dep-eval-strict)
 open import Rx.Slots using (Slots)
 open import Rx.Slot-Depth using (slotDepth)
 open import Rx.Strat-Order using (Tri)
@@ -64,7 +67,7 @@ open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeAll⇓; pushBurst
   subs-cold-async; subs-of; subs-empty; subs-map; subs-take-zero;
   subs-take-suc; subs-scan; subs-merge-all; subs-switch-all;
   subs-exhaust-all; subs-μ; subs-defer; sub-all)
-open import Rx.Evaluator.Doorless using (EntryOK; HandedOK; BurstOK; EventOK;
+open import Rx.Evaluator.Doorless using (EntryOK; ValOK; HandedOK; BurstOK; EventOK;
   inner-ok; under-ok; μ-entry)
 
 ------------------------------------------------------------------
@@ -156,15 +159,62 @@ postulate
 -- evaluating a term does not deepen it past its own reading — which is
 -- the substitution shelf's subject, and the reason that shelf exists.
 --
--- PROBED: `Probed.Burst-Handed` — a term carrying an observable, at the
---   tightest rank its own premise admits, and a list of two whose
---   readings differ so the join is spent.  Not reached: a term whose
---   observable it did not itself write, which no row here can reach.
+-- AND WHAT IS LEFT AS A LEAF IS THE SILENT TERM, WHOSE READING IS
+-- NOUGHT.  A closed term reading nothing wrote no `strmᵗ`, and the only
+-- other way to hold an observable is to read one from a binder — of
+-- which a closed term has none.  So its value carries no observable at
+-- all and the predicate holds at EVERY rank, the rank nought included,
+-- which is the one case the drop cannot reach: there is nothing to drop
+-- below.  It is a leaf because the induction saying so is over the type
+-- and the term together, the same split `dep-fn-pos` names.
+--
+-- PROBED: `Probed.Burst-Handed` — at a flat payload, and at a sum whose
+--   other arm is an observable, which is the shape that could fail it:
+--   the TYPE reaches an observable while the value takes the other arm,
+--   so the reading has to select on the injection rather than on the
+--   type.  NOT reached: a silent term at a binding head, since a closed
+--   term has no binder to read.
 postulate
-  of-handed : ∀ {n} {Γ : Ctx n} {u} {U r sz} (η : Fin n → ℕ)
-              (ts : List (Tm Γ [] [] [] u))
-            → depᵗˢ η ts ≤ r
-            → HandedOK η (map (λ tm → evalTm tm) ts) (U , r , sz)
+  eval-silent : ∀ {n} {Γ : Ctx n} {u} {τ : Tri} (η : Fin n → ℕ)
+                (tm : Tm Γ [] [] [] u)
+              → depᵗ η tm ≡ 0 → ValOK η u τ (evalTm tm)
+
+private
+  -- a value read under the rank satisfies the entry predicate at every
+  -- type: the rank enters only at `obs`, and the join a compound is
+  -- read by dominates each component's own reading
+  valOK-below : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) {U r sz} (u : Ty)
+                (v : Val Γ u) → depᵛ η u v < r → ValOK η u (U , r , sz) v
+  valOK-below η unitᵗ    _        lt = tt
+  valOK-below η boolᵗ    _        lt = tt
+  valOK-below η natᵗ     _        lt = tt
+  valOK-below η (s ×ᵗ t) (a , b)  lt =
+      valOK-below η s a (≤-trans (s≤s (m≤m⊔n (depᵛ η s a) (depᵛ η t b))) lt)
+    , valOK-below η t b (≤-trans (s≤s (m≤n⊔m (depᵛ η s a) (depᵛ η t b))) lt)
+  valOK-below η (s +ᵗ t) (inj₁ a) lt = valOK-below η s a lt
+  valOK-below η (s +ᵗ t) (inj₂ b) lt = valOK-below η t b lt
+  valOK-below η (obs t)  _        lt = lt
+
+  -- one element: the term's own reading bounds its value's, strictly
+  -- wherever there is anything to be strict about
+  handed-one : ∀ {n} {Γ : Ctx n} {u} {U r sz} (η : Fin n → ℕ)
+               (tm : Tm Γ [] [] [] u) → depᵗ η tm ≤ r
+             → ValOK η u (U , r , sz) (evalTm tm)
+  handed-one {u = u} η tm le with depᵗ η tm in eq
+  ... | zero  = eval-silent η tm eq
+  ... | suc k = valOK-below η u (evalTm tm)
+                  (≤-trans (≤pred⇒< (subst (0 <_) (sym eq) (s≤s z≤n))
+                                    (dep-eval-strict η []ᵈ tm []ᵃ))
+                           (subst (_≤ _) (sym eq) le))
+
+of-handed : ∀ {n} {Γ : Ctx n} {u} {U r sz} (η : Fin n → ℕ)
+            (ts : List (Tm Γ [] [] [] u))
+          → depᵗˢ η ts ≤ r
+          → HandedOK η (map (λ tm → evalTm tm) ts) (U , r , sz)
+of-handed η []        dep = []ᵃ
+of-handed η (tm ∷ ts) dep =
+    handed-one η tm (≤-trans (m≤m⊔n (depᵗ η tm) (depᵗˢ η ts)) dep)
+  ∷ᵃ of-handed η ts (≤-trans (m≤n⊔m (depᵗ η tm) (depᵗˢ η ts)) dep)
 
 -- WHAT A PUSH CYCLE HANDS ON.  The cycle steps one frame per emit and
 -- the frame REWRITES the payload, so the burst coming out is not the

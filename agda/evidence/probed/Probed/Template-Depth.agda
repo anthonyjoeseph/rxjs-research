@@ -31,9 +31,8 @@ open import Data.Vec using () renaming ([] to []ⱽ)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Exp using (Ctx; Fn; natᵗ; obs; nat̂; varᵗ; strmᵗ; ofᵉ)
-open import Rx.Obs-Depth using (zeroη; obsDepthᵗ)
 open import Rx.Obs-Depth.Substitution using (dep-fn-pos)
-open import Probed.Apparatus using (Confirms)
+open import Probed.Apparatus using (Confirms; zeroη; obsDepthᵗ)
 
 Γ₀ : Ctx 0
 Γ₀ = []ⱽ

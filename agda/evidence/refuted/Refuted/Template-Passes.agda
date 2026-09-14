@@ -26,7 +26,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Exp using (Ctx; Val; Fn; natᵗ; obs; nat̂; varᵗ; strmᵗ; ofᵉ;
   applyFn)
-open import Rx.Obs-Depth using (obsDepthᵉ; obsDepthᵗ)
+open import Refuted.Apparatus using (obsDepthᵉ; obsDepthᵗ)
 
 Γ₀ : Ctx 0
 Γ₀ = []ⱽ

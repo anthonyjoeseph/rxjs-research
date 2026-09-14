@@ -62,7 +62,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Exp using (Ty; Ctx; Val; Fn; natᵗ; boolᵗ; obs; _×ᵗ_; ofᵉ; emptyᵉ;
   mergeAllᵉ; varᵗ; fstᵗ; sndᵗ; ifᵗ; strmᵗ; applyFn)
-open import Rx.Obs-Depth using (obsDepthᵗ; obsDepthᵛ)
+open import Refuted.Apparatus using (obsDepthᵗ; obsDepthᵛ)
 open import Rx.Evaluator using (scanVals)
 
 Γ₀ : Ctx 0

@@ -239,16 +239,16 @@ first match, which is why `bug-cache` is off the gate for the duration and
   through every consumer. The leg is the field and its producers; whether it
   suffices for the queue is what it settles.
 
-- **AND THE DEPTH FACE, WHICH IS THE HALF OF THAT FINDING THAT SPLITS.** The
-  machine's minting helpers, its store readings and its floor arithmetic are
-  gone, each superseded by a derivation carrying the equation the helper hid.
-  What stands gets opposite verdicts. `zeroη` and the `obsDepth` specialisations
-  are the reading with NO environment — the currency six refutations killed — so
-  they go the same way. `Rx.Obs-Depth.Substitution` is the reverse: it is the
-  change of currency that ANSWERED those six, pricing a template off the term
-  rather than off what the term was handed, and it has a nameable consumer. The
-  leg is that deletion and that wire; the gate cannot go green while either
-  stands.
+- **AND THE FRAME FACE, WHICH IS WHERE THE LAST SIX ORPHANS WIRE.** The depth
+  face's shelf now has a consumer: `of-handed` is a body spending
+  `dep-eval-strict`, and what it could not reach — a term whose reading is
+  nought, where there is nothing to be strict about — is the leaf `eval-silent`.
+  What is still unreached from Main is one shelf: `dep-eval-open`, `dep-fn-pos`,
+  `dataSize`, `syncSize-applyFn`, `envDepth`, `applyFn-strict`. Their only
+  nameable consumer is `push-carries` walked as a body over the push cycle's two
+  clauses and the frame step's six arms. The leg is that walk; reading `step-map`
+  says it cannot close without the frame carrying the template's own reading,
+  which is the field the leg above owes.
 
 - **THE TWO ENDS OF THE RUN, WHICH IS WHAT MAKES A ROW REDUCE.** `drain!` is
   fuel induction over the schedule and carries no guard at all; `mergeAllDrain!`
@@ -291,10 +291,10 @@ first match, which is why `bug-cache` is off the gate for the duration and
   cycle rewrites the payload frame by frame, so the burst coming out is not the
   one going in and the report is re-established rather than transported.
 
-- **`of-handed`** (Rx/Evaluator/Burst-Report) — FALSITY, `PROBED`: the one
-  place a term becomes a value, where the claim is genuinely arithmetic —
-  evaluation may not deepen a term past its own reading. The substitution
-  shelf's subject.
+- **`eval-silent`** (Rx/Evaluator/Burst-Report) — FALSITY, `PROBED`: the
+  residue the strict drop cannot reach — a closed term reading nought, whose
+  value must satisfy the predicate at EVERY rank because it carries no
+  observable to price.
 
 - **`data-handed`** (Rx/Evaluator/Burst-Report) — FALSITY, `PROBED`: a scripted
   slot's payload is data, and the rank is read only at `obs`, so this is an

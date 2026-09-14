@@ -52,8 +52,13 @@
 --   knowing is that the shape was wanted once.
 module Probed.Apparatus where
 
+open import Data.Fin using (Fin)
+open import Data.Nat using (ℕ)
 open import Relation.Nullary.Negation using (¬_)
 open import Relation.Binary.PropositionalEquality using (_≡_)
+
+open import Rx.Exp using (Ctx; Tm)
+open import Rx.Obs-Depth using (depᵗ)
 
 Confirms : {A : Set} → .(claim : A) → Set
 Confirms {A} _ = A
@@ -75,3 +80,17 @@ record Separates {A : Set} {B : A → Set} (f g : (x : A) → B x) : Set where
   field
     at    : A
     apart : ¬ (f at ≡ g at)
+
+-- THE ZERO ENVIRONMENT, WHICH LIVES OUT HERE BECAUSE `src` NO LONGER
+-- OFFERS ONE.  The measure is generic in what a slot reference is
+-- worth, and the reading that prices every reference at nought is
+-- exactly what `Refuted.Carried-Derived` killed as an entry rank -- so
+-- `src` states the measure and nothing else.  A probe still wants it:
+-- these rows run at a context with no inputs at all, where the two
+-- readings cannot differ, and pricing the reference is not what any of
+-- them is evidence about.
+zeroη : ∀ {n} → Fin n → ℕ
+zeroη _ = 0
+
+obsDepthᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → Tm Γ Δᵍ Δ Θ t → ℕ
+obsDepthᵗ = depᵗ zeroη

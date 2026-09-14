@@ -59,7 +59,7 @@ open import Rx.Exp using (Ty; Ctx; Exp; Tm; Val; Fn; Ren∈; ext∈; renExp; ren
   natᵗ; obs; _×ᵗ_; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ;
   exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ;
   inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ; applyFn)
-open import Rx.Obs-Depth using (obsDepthᵉ; obsDepthᵗ; obsDepthᵗˢ; obsDepthᵛ)
+open import Refuted.Apparatus using (obsDepthᵉ; obsDepthᵗ; obsDepthᵗˢ; obsDepthᵛ)
 open import Rx.Evaluator using (scanVals)
 
 Γ₀ : Ctx 0

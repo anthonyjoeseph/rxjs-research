@@ -49,11 +49,11 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Exp using (Ctx; Tm; Val; unitᵗ; natᵗ; _+ᵗ_; obs; varᵗ; unit̂; bool̂; nat̂; inlᵗ; caseᵗ; strmᵗ; ofᵉ;
   evalWith)
-open import Rx.Obs-Depth using (zeroη; depᵗ; depᵛ)
+open import Rx.Obs-Depth using (depᵗ; depᵛ)
 open import Rx.Obs-Depth.Substitution using (AllData; []ᵈ; envDepth;
   eval-case; eval-if; dep-eval-open)
 
-open import Probed.Apparatus using (Confirms)
+open import Probed.Apparatus using (Confirms; zeroη)
 
 Γ₀ : Ctx 0
 Γ₀ = []ⱽ

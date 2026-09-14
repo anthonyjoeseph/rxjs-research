@@ -26,9 +26,10 @@
 --
 -- REFUTED: `Refuted.Carried-Derived` — the ZERO environment, read as
 --   the entry invariant's rank at a fresh share whose definition writes
---   an observable.  That witness is why `η` is here at all, and why the
---   specialisation below is named for the one thing it is still good
---   for rather than left as the measure.
+--   an observable.  That witness is why `η` is here at all, and why no
+--   reading without one is stated here: the zero environment is now
+--   apparatus of the trees that refute it, not a measure this one
+--   offers.
 ------------------------------------------------------------------
 module Rx.Obs-Depth where
 
@@ -177,29 +178,3 @@ dep-unfoldμ-no-deeper : ∀ {n} {Γ : Ctx n} {t} (η : Fin n → ℕ)
   (body : Exp Γ (t ∷ []) [] [] t) →
   depᵉ η (unfoldμ body) ≤ depᵉ η (μᵉ body)
 dep-unfoldμ-no-deeper η body rewrite dep-unfoldμ η body = ≤-refl
-
--- THE ZERO ENVIRONMENT, WHICH IS WHAT A FACE PRICING NO CONNECT READS.
--- The refutation above says this is not the entry invariant's rank; it
--- says nothing against a face that never crosses a share boundary, and
--- the carried family is one — it walks a burst already produced, where
--- a reference has been replaced by what it stood for.  Naming it
--- separately is what keeps that face from silently acquiring the
--- environment's obligations.
-zeroη : ∀ {n} → Fin n → ℕ
-zeroη _ = 0
-
-obsDepthᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → Exp Γ Δᵍ Δ Θ t → ℕ
-obsDepthᵉ = depᵉ zeroη
-
-obsDepthᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → Tm Γ Δᵍ Δ Θ t → ℕ
-obsDepthᵗ = depᵗ zeroη
-
-obsDepthᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → List (Tm Γ Δᵍ Δ Θ t) → ℕ
-obsDepthᵗˢ = depᵗˢ zeroη
-
-obsDepthᵛ : ∀ {n} {Γ : Ctx n} (t : Ty) → Val Γ t → ℕ
-obsDepthᵛ = depᵛ zeroη
-
-unfoldμ-no-deeper : ∀ {n} {Γ : Ctx n} {t} (body : Exp Γ (t ∷ []) [] [] t) →
-  obsDepthᵉ (unfoldμ body) ≤ obsDepthᵉ (μᵉ body)
-unfoldμ-no-deeper = dep-unfoldμ-no-deeper zeroη
