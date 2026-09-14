@@ -52,3 +52,14 @@ open import Refuted.Exit-Store using (exit-bounded-false;
 -- reads
 open import Refuted.Exit-Store using (both-ends-false;
   rise-tmpl-is; rise-entry-is; rise-store-is; interior-is)
+
+-- and the one witness here that is not about a bound at all.  The
+-- others kill a reading the descent does not have; this kills a
+-- QUANTIFIER — the subscribe cycle's totality leaf claims a derivation
+-- at every entry triple, and one clause of the machine reads that
+-- triple against the term.  Its two figures are claimed because the
+-- finding is that they never meet: the size the guard reads is fixed
+-- by the program, the component it is read against is chosen by the
+-- caller, and nothing in the statement relates them
+open import Refuted.Totality-Entry using (subscribe-total-false;
+  unfold-size; dry-entry)

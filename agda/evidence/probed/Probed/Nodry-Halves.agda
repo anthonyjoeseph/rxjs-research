@@ -30,6 +30,7 @@
 module Probed.Nodry-Halves where
 
 open import Data.Fin using (zero)
+open import Data.Nat.Properties using (≤-refl)
 open import Data.List using ([]; _∷_)
 open import Data.List.Relation.Unary.Any using (here)
 open import Data.Product using (proj₁; proj₂)
@@ -54,7 +55,7 @@ open import Probed.Apparatus using (Confirms)
 -- different helper.
 --
 -- TARGET: subscribeE⇓-nodry @c66df9
--- TARGET: subscribeE⇓-total @dc2849
+-- TARGET: subscribeE⇓-total @b26a2b
 ----------------------------------------------------------------------
 
 Γ₀ : Ctx 0
@@ -128,7 +129,7 @@ row-map = refl
 -- was emitted, on the schedule left behind and on the state written.
 row-total-of :
   Confirms (subscribeE⇓-total {e = three} (rootWitness three ins₀)
-             three (root {lo = 0}) 0 0 (S three) (st-init three))
+             three ≤-refl (root {lo = 0}) 0 0 (S three) (st-init three))
 row-total-of = subs-of refl
 
 -- LOAD-BEARING and the widest of the pair, for `row-map`'s reason: the
@@ -137,7 +138,7 @@ row-total-of = subs-of refl
 -- clause.
 row-total-map :
   Confirms (subscribeE⇓-total {e = mapped} (rootWitness mapped ins₀)
-             mapped (root {lo = 0}) 0 0 (S mapped) (st-init mapped))
+             mapped ≤-refl (root {lo = 0}) 0 0 (S mapped) (st-init mapped))
 row-total-map = subs-map (subs-of refl) (push-cons refl step-map push-nil)
 
 ----------------------------------------------------------------------
