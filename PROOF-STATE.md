@@ -266,16 +266,15 @@ does.
   relations, and what it decides is whether the rank an inner subscription
   enters at is one this walk carries or one the record has to.
 
-- **A SUBSCRIBE HARNESS FOR THE EVIDENCE TREE, WHICH IS WHAT THE FIRST PASS AT
-  THE HEADS ABOVE TURNED OUT TO NEED.** Instantiating `inner-handed` and
-  `thru-handed` reached every arm that passes a payload THROUGH and none that
-  mints one, because each minting arm runs a `subscribeInner⇓` and the tree has
-  no way to build one. So the whole risky half of both statements — a value the
-  drain produced, an inner alive through its instance — is unreachable by
-  construction, not by choice of point. The leg builds the missing piece: a
-  state and a derivation reached by RUNNING a small program rather than
-  written by hand, which is the same apparatus every other reading-over-a-run
-  row in this tier will want.
+- **SAMPLE THE HEADS ABOVE FROM A RUN, THE WAY THE LAWS WERE SAMPLED.** Hand
+  instantiation reached every arm of `innerReact⇓` and `thruWalk⇓` that passes
+  a payload THROUGH and none that MINTS one, because each minting arm runs a
+  subscription and no hand-built state has one. Nothing needs building to fix
+  that: `evaluate!` hands back the run's own derivation, and the generator
+  already produces programs that reach `μᵉ`. The leg is the decidable twin of
+  `HandedOK` plus a walk of that derivation, swept the way the protocol
+  automaton already is — which reaches the minting arms because a real run
+  subscribes, and is the apparatus every reading-over-a-run row here wants.
 
 ### Open questions
 
@@ -373,11 +372,11 @@ it when the descent under it settles.
 
 ### The ledger
 
-- **`burst-drain-well-formed`** (Verify-Well-Formed) — FALSITY, `NO EVIDENCE`:
+- **`burst-drain-well-formed`** (Verify-Well-Formed) — FALSITY, `PROBED`:
   everything the protocol argument owes about a run whose subscribe frame and
-  whose drain are each dry-free. Never instantiated at any program, and the
-  automaton it asserts acceptance under is defined, so the whole statement
-  computes.
+  whose drain are each dry-free. The sweep decides its conclusion at every
+  program it runs, so what is open is the fragment the generator cannot
+  write.
 
 ## Tier 3 — the top-line semantic claims (parked behind tier 2)
 
