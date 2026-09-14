@@ -236,6 +236,24 @@ DrainsQ {e = e} allNid κ id now lim act q sched st =
 -- most-significant-first — the existing order widened rather than a new
 -- kind of one.
 
+-- AND THE HOLDING IS READ TOGETHER WITH THE BURST STILL TO BE WALKED,
+-- WHICH IS WHAT MAKES THE ENQUEUE A MOVE RATHER THAN A GROWTH.  Read
+-- over the store alone the measure rises at the write, and the write is
+-- a structural step of the burst walk, where the order may not be
+-- re-entered at all.  But the walk is holding the burst as a LIST: what
+-- the enqueue does is take an observable out of the pending half and
+-- put it into the store, which leaves the two halves together
+-- unchanged.  The drain then removes from the store and adds nothing,
+-- and a subscribe removes from the pending half and adds whatever the
+-- new subscription emits — strictly shallower, since it is emitted
+-- under the rank the hop just dropped to.
+--
+-- THAT IS ALSO WHY THE COUNT REFUTATION DOES NOT REACH IT.  What the
+-- doubling fold outruns is a bound SEEDED FROM THE SYNTAX, and nothing
+-- here is seeded: the pending half is a list the walk already has in
+-- hand, so the measure is as big as the run actually made it and never
+-- has to have been predicted.
+
 -- DEAD ROUTE: a conjunct on the invariant record beside the share
 --   bound, re-established where the merge's enqueue writes and spent
 --   where the drain reads.  Dead structurally and not merely unproven:
@@ -243,7 +261,14 @@ DrainsQ {e = e} allNid κ id now lim act q sched st =
 --   hop chain below it lowers that rank strictly and leaves the queue
 --   alone, so the conjunct is FALSE at the triple the drain stands at.
 --   Stated against a constant instead it survives every hop and buys no
---   descent, which is the same wall reached from the other side.
+--   descent, which is the same wall reached from the other side.  The
+--   witness is small and wants no machinery: a merge of lane limit one
+--   over a pair of observables whose SECOND is the deeper.  The first is
+--   subscribed and the second queued; the first completes at once, and
+--   the drain then stands at a rank read off that completion while the
+--   observable it must subscribe is deeper than anything in scope.  So
+--   a drain can enter DEEPER than the rank in force, and no
+--   depth-denominated premise can be the thing it descends on.
 --
 -- RECOVERY: `git show 1b7698e7:agda/src/Rx/Evaluator/Builder.agda` holds
 --   the step written out over `subscribeInner!`, which is the whole of

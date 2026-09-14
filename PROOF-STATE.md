@@ -232,13 +232,13 @@ runs, which is now one leaf away.
 
 - **THE COMPONENT THE MERGE DRAIN DROPS, WHICH IS THE TIER'S ENDING CONDITION.**
   `queuedInner!` is the one site a run cannot step through: the entry
-  subscribes a term the caller has no reading of, so no report about the queue
-  makes it a descent. The share connect is the precedent, answered in the order
-  rather than in a premise. What this component counts is not items, which
+  subscribes a term deeper than the rank in force. The share connect is the
+  precedent, answered in the order. What it counts is not items, which
   `syncSizeᵉ`'s dead route refutes — a doubling fold outruns any seeding — but
-  the MULTISET OF DEPTHS held queued. A drained observable queues only under
-  the rank the hop just dropped to, so the step vacates a level and adds
-  strictly below it, however many. The leg is that order and the leaf's body.
+  the MULTISET OF DEPTHS held queued AND still pending in the burst being
+  walked. Read over the store alone it rises at the write; read with the
+  pending half the write is a move, the drain a removal, and a subscribe adds
+  only under the rank the hop dropped to. The leg is that order and the body.
 
 - **WIDEN WHAT A BUILDER RETURNS, WHICH TURNS OUT TO GATE THE WALK.** Every
   premise is denominated at one `slotDepth sl` the caller fixes, and each clause
