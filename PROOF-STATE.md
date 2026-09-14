@@ -216,11 +216,10 @@ research lives; where they disagree, the header wins.
 
 **THE TIER IS ONE STATEMENT AND IT IS CURRENTLY FALSE.** `rank-sufficient`
 (Verify-Rank-Sufficient) says no run emits the dry marker; `Refuted.Dry-Wrap`
-kills it three times against the evaluator as it stands. It is now a two-line
-body over three leaves, and the falsity sits in one: `evaluate⇓-total`, a
-derivation at a run's own output. No constructor of the domain relation returns
-a dry burst, so that leaf is false exactly as long as the three guarded arms
-are, and it comes true at the cutover.
+kills it three times against the evaluator as it stands. It is now three bodies
+over four leaves, and the falsity sits in the two TOTALITY leaves — a derivation
+at each cycle's own output. Both are false exactly as long as the three guarded
+arms are, and both come true at the cutover.
 
 **AND THE MEASURE IS HELD BY SOMETHING NO STATEMENT MENTIONS: THE RUN HAS TO
 COMPUTE IT.** Three non-structural edges TEST a reading and emit dry on the
@@ -232,18 +231,18 @@ cannot compute — and the other two leaves carry no arithmetic at all.
 ### Big picture tier roadmap
 
 - **STATE THE STRENGTHENED RETURN TYPE, AND THE BURST'S LENGTH IS IN IT
-  (Anthony).** Everything below consumes it, so it comes before any frame is
-  touched. Every shape reading a FIXED number of stored values is now refuted —
-  off the frame and the incoming bound in `Refuted.Scan-Deepens`, off the store
-  the step LEAVES and off BOTH ends with the template added, in
-  `Refuted.Exit-Store` — so what survives reads the ENTRY store and carries a
-  factor in the burst's length, in a new
+  (Anthony).** Everything below consumes it, and the socket it plugs into
+  exists now that totality is an assembly. Every shape reading a FIXED number
+  of stored values is refuted — off the frame and the incoming bound in
+  `Refuted.Scan-Deepens`, off the store the step LEAVES and off BOTH ends with
+  the template added, in `Refuted.Exit-Store` — so what survives reads the
+  ENTRY store and carries a factor in the burst's length, in a new
   `agda/src/Verify-Rank-Sufficient/Frame-Carried.agda`:
   `allUnder : ∀ {n} {Γ : Ctx n} {u} → ℕ → List (Val Γ u) → Set` as
-  `All (λ v → obsDepthᵛ _ v ≤ m)`, the measure taking its type explicitly, and
+  `All (λ v → obsDepthᵛ _ v ≤ m)`, and
   `frame-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo} (id : Id) (now : Tick) (fr : Frame Γ s u) (κ : Path Γ lo u t) (m : ℕ) {vals fin sched st outs evs done sched′ st′} → stepFrame⇓ {e = e} id now fr κ vals fin sched st (outs , evs , done , sched′ , st′) → allUnder m vals → allUnder (length vals * frameTm fr + (frameRd fr st ⊔ m)) outs`,
-  over a postulated substitution leaf `obsDepthᵛ _ (applyFn fn (a , v)) ≤ obsDepthᵗ fn + (obsDepthᵛ _ a ⊔ obsDepthᵛ _ v)` — which is what the
-  three witnesses leave, and is the question this leg hands to the next.
+  over a postulated substitution leaf `obsDepthᵛ _ (applyFn fn (a , v)) ≤ obsDepthᵗ fn + (obsDepthᵛ _ a ⊔ obsDepthᵛ _ v)` — the question this
+  leg hands to the next.
 
 - **DISCHARGE IT ACROSS ALL FIVE FRAMES IN ONE PASS (Anthony).** One statement,
   one case split on `fr` — the rank no longer differentiates them, which is what
@@ -268,15 +267,24 @@ cannot compute — and the other two leaves carry no arithmetic at all.
   not a sequel to it: building a derivation at a hop IS discharging that guard's
   positive branch.
 
-- **THEN PROVE `evaluate⇓-total` INHABITED, WHICH IS THE TERMINATION ARGUMENT.**
-  Split one totality lemma per family and ground leafward-first —
-  `subscribeE⇓-total : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo τ} (ac : Acc _≺_ τ) (b : Closed Γ u) (κ : Path Γ lo u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) → subscribeE⇓ b κ id now sched st (subscribeE {e = e} ac b κ id now sched st)`
-  and its siblings. The two guards the relation does not index are discharged
-  HERE and nowhere else: the unfold's `syncSizeᵉ (unfoldμ body) <? sz` and the
-  connect's, neither of which is a function of the relation's own arguments.
-  What is left is an induction free to use any measure a PROOF may use,
-  including quantities the machine cannot compute — the constraint every dead
-  candidate died under. Nothing reduces through the leaves until the cutover.
+- **THEN GROUND `subscribeE⇓-total`, WHICH IS THE TERMINATION ARGUMENT.** The
+  first of the two leaves the totality assembly now stands on. It goes clause
+  by clause over the twelve subscribe-cycle families, each arm building the
+  matching constructor of `subscribeE⇓` out of sub-derivations at the
+  recursive calls. The two guards the relation does not
+  index are discharged HERE and nowhere else: the unfold's
+  `syncSizeᵉ (unfoldμ body) <? sz` and the share connect's, neither of which is
+  a function of the relation's own arguments. What is left is an induction free
+  to use any measure a PROOF may use, including quantities the machine cannot
+  compute — the constraint every dead candidate died under.
+
+- **AND `drain⇓-total`, WHICH IS ORDINARY FUEL INDUCTION ONCE ITS SIBLING
+  EXISTS.** `drain⇓ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (fuel : Fuel) (id : Id) (sched : Sched Γ) (st : EvalSt e) → drain⇓ {e = e} fuel id sched st (drain fuel id sched st)`,
+  three arms matching `drain`'s own — out of fuel, empty schedule, and a
+  cascade followed by the recursive call at `suc nextId`. It carries no guard
+  at all; what it needs is the cascade's own totality, which re-enters the
+  subscribe cycle and so takes the leg above as a premise rather than
+  repeating it. Separated for that reason and not by size.
 
 - **`subscribeE⇓-nodry` AS A BODY, WHICH IS A SHELF AND NOT A DESIGN.** Twelve
   subscribe-cycle families, one arm per constructor, each reading dryness off
@@ -294,23 +302,17 @@ cannot compute — and the other two leaves carry no arithmetic at all.
   relation splits them in `eval-run` — and because a single leg over both is one
   commit nobody can review.
 
-- **AND ONLY THEN CUT OVER, WHICH DELETES THE THREE ARMS AND THE MARKER.** The
-  evaluator takes a `subscribeE⇓` derivation where it takes `Acc _≺_ τ` today and
-  recurses on it, the three `with` guards and `dryBurst` go, and `hasDry` is
-  false by construction rather than by argument — which is what makes
-  `evaluate⇓-total` true and the top-line claim sound, since
-  `formal-verification-batchSimultaneous` reaches `rank-sufficient` and has all
-  along. It is last because reduction is preserved only when inhabitation is
-  COMPLETE: a cutover over postulated leaves is the stuck pattern match the
-  DEAD ROUTE on that leaf records. `Refuted.Dry-Wrap` dies with it, and whether
-  it dies by becoming unstateable or by going green is the check.
-
 ### The ledger
 
-- **`evaluate⇓-total`** (Verify-Rank-Sufficient) — FALSITY, `DEAD ROUTE`: a
-  derivation exists at every run's own output. The whole of the known falsity
-  now sits here and nowhere else, since no constructor of the relation returns
-  a dry burst; it comes true at the cutover and cannot be proven before it.
+- **`subscribeE⇓-total`** (Verify-Rank-Sufficient) — FALSITY, `PROBED`: a
+  derivation exists at the subscribe cycle's own output, at the triple
+  `evaluate` enters at. Carries the two guards the relation does not index —
+  the μ unfold's and the share connect's — and comes true at the cutover.
+
+- **`drain⇓-total`** (Verify-Rank-Sufficient) — FALSITY, `PROBED`: the same
+  over the arrival cycle. It carries no guard itself; its cascade arm re-enters
+  the subscribe cycle, so it inherits that leaf's falsity rather than adding
+  one.
 
 - **`subscribeE⇓-nodry`** (Verify-Rank-Sufficient) — FALSITY, `PROBED`: the
   subscribe half's output carries no dry event, by induction over the twelve
@@ -318,9 +320,9 @@ cannot compute — and the other two leaves carry no arithmetic at all.
   different helper; no share, flattener or node store is covered.
 
 - **`drain⇓-nodry`** (Verify-Rank-Sufficient) — FALSITY, `PROBED`: the same
-  over the drain and cascade families. One arrival reaches it, at the state
-  the root subscribe actually left; the cancelled arm and every chain carrying
-  a frame are uncovered.
+  over the drain and cascade families. One arrival reaches it, at the state the
+  root subscribe actually left; the cancelled arm and every chain carrying a
+  frame are uncovered.
 
 ## Tier 2 — Verify-Well-Formed (parked behind tier 1)
 

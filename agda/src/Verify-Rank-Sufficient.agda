@@ -35,12 +35,15 @@ module Verify-Rank-Sufficient where
 
 open import Data.Bool using (false)
 open import Data.Product using (_,_)
+open import Induction.WellFounded using (Acc)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 
-open import Rx.Prim  using (Fuel)
+open import Rx.Prim  using (Fuel; Id; Tick)
 open import Rx.Exp   using (Ctx; Closed)
 open import Rx.Slots using (Slots)
-open import Rx.Evaluator using (Stream; Path; evaluate; hasDry)
+open import Rx.Strat-Order using (Tri; _≺_)
+open import Rx.Evaluator using (Stream; Path; root; Sched; EvalSt;
+  subscribeE; drain; evaluate; rootWitness; sched-init; st-init; hasDry)
 open import Rx.Evaluator.Domain using (evaluate⇓; eval-run; subscribeE⇓; drain⇓)
 open import Verify-Rank-Sufficient.Dry-Emits using (hasDry-++)
 
@@ -49,16 +52,16 @@ open import Verify-Rank-Sufficient.Dry-Emits using (hasDry-++)
 -- any of its twenty families returns a dry burst — the relation
 -- mirrors the clauses that DESCEND and says nothing about the arms
 -- that give up — so an inhabitant at a run's own output is exactly a
--- certificate that no guard refused.  Every other leaf under this
--- module is then an ordinary induction over a relation, provable
--- today, and this one statement carries the risk alone.
+-- certificate that no guard refused.  The two leaves below carry that
+-- risk between them and nothing else under this module does: every
+-- other leaf is an ordinary induction over a relation, provable today.
 --
--- SO IT IS FALSE AS LONG AS THE ARMS ARE THERE, AND THAT IS THE
+-- SO THEY ARE FALSE AS LONG AS THE ARMS ARE THERE, AND THAT IS THE
 -- SCHEDULE RATHER THAN A DEFECT.  A program behind a gate runs dry at
 -- the current evaluator, so today no derivation exists at its output
--- and this leaf cannot be proven at all.  It comes true at the cutover
+-- and neither can be proven at all.  They come true at the cutover
 -- — the arms deleted, the guards replaced by the relation's own
--- premises — and until then what it measures is exactly how much of
+-- premises — and until then what they measure is exactly how much of
 -- the top line the door is costing.
 --
 -- DEAD ROUTE: postulating the descent's domain — the accessibility
@@ -72,9 +75,64 @@ open import Verify-Rank-Sufficient.Dry-Emits using (hasDry-++)
 --   leaf — a domain DEFINED beside the evaluator computes nothing and
 --   breaks nothing — so this is a constraint on ORDER: the relation
 --   lands first and the arms come out against it.
+
+-- THE SUBSCRIBE CYCLE'S HALF, AND IT CARRIES THE TWO GUARDS THE
+-- RELATION DOES NOT INDEX.  The hop's test became a sub-derivation and
+-- so is answered by whoever builds one; the μ unfold's `syncSize`
+-- comparison and the share connect's unconnected count are not
+-- functions of any argument this statement takes, so they are
+-- discharged here and nowhere above.  It takes the accessibility
+-- witness explicitly because the evaluator still descends on one, and
+-- the statement is about THAT machine rather than about the one the
+-- cutover leaves.
+--
+-- PROBED: `Probed.Nodry-Halves` — two sources, a one-shot and a mapped
+--   one, each derivation built by hand and held to the triple the
+--   evaluator itself returns, so what the rows decide is whether the
+--   relation MIRRORS the clause: the burst, the schedule left behind
+--   and the state written must all be the ones the helpers compute.
+--   The mapped row reaches through the event split and the retag.
+--   Nothing here reaches a share, a flattener, a node store or the μ
+--   unfold, so neither guard this statement carries is covered.
 postulate
-  evaluate⇓-total : ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t)
-    (ins : Slots Γ) → evaluate⇓ fuel e ins (evaluate fuel e ins)
+  subscribeE⇓-total : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
+    {τ : Tri} (ac : Acc _≺_ τ) (b : Closed Γ u) (κ : Path Γ lo u t)
+    (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    subscribeE⇓ {e = e} b κ id now sched st
+      (subscribeE {e = e} ac b κ id now sched st)
+
+-- THE ARRIVAL CYCLE'S HALF, WHICH DESCENDS ON THE FUEL AND SO CARRIES
+-- NO GUARD AT ALL.  Its two base clauses are unconditional and its step
+-- re-enters the subscribe cycle through a cascade, so what this leaf is
+-- really waiting on is its sibling — which is why the two are separate
+-- postulates rather than one: a derivation for the drain is an ordinary
+-- fuel induction the moment the subscribe half exists.
+--
+-- PROBED: `Probed.Nodry-Halves` — one arrival, at the schedule and
+--   registry the root subscribe actually left rather than at a state
+--   written by hand, and held to the stream `drain` itself returns. It
+--   covers the step arm over a root chain and the out-of-fuel tail; the
+--   cancelled cascade and every chain carrying a frame are not reached.
+postulate
+  drain⇓-total : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (fuel : Fuel) (id : Id) (sched : Sched Γ) (st : EvalSt e) →
+    drain⇓ {e = e} fuel id sched st (drain {e = e} fuel id sched st)
+
+-- AND THE TOTALITY CLAIM IS AN ASSEMBLY, WHICH IS WHAT UNBLOCKS EVERY
+-- SOCKET UNDER IT.  A run is its root subscribe followed by its drain
+-- and `eval-run` is exactly that shape, so the composition is CHECKED
+-- rather than asserted: the two leaves' arguments are the ones
+-- `evaluate` itself passes, and a leaf restated at a different entry
+-- stops fitting here instead of months later.  Held as a bare postulate
+-- it was also a wiring wall — a lemma whose only use is being handed to
+-- a postulate earns no route home, so nothing proven about a frame's
+-- emissions could land until this body existed to spend it.
+evaluate⇓-total : ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t)
+  (ins : Slots Γ) → evaluate⇓ fuel e ins (evaluate fuel e ins)
+evaluate⇓-total {n = n} fuel e ins =
+  eval-run (subscribeE⇓-total {lo = n} (rootWitness e ins) e root 0 0
+              (sched-init e ins) (st-init e))
+           (drain⇓-total fuel 1 _ _)
 
 -- THE SUBSCRIBE HALF, AN INDUCTION OVER THE RELATION AND NOT OVER THE
 -- DESCENT.  A derivation is a finite tree whose constructors are the

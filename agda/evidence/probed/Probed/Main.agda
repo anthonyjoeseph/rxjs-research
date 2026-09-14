@@ -52,3 +52,10 @@ open import Probed.Apparatus using (Confirms; Separates)
 -- helpers rather than assumed to mirror them.
 open import Probed.Nodry-Halves using (row-of; row-empty; row-take-zero;
   row-map; row-drain)
+
+-- AND THE TOTALITY ROWS, which are the same derivations read the other
+-- way round: the triple is no longer chosen by unification but taken
+-- from the evaluator's own result, so a constructor relating the wrong
+-- stream is a type error here and is invisible above.
+open import Probed.Nodry-Halves using (row-total-of; row-total-map;
+  row-total-drain)
