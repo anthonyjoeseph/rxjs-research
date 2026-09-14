@@ -30,7 +30,7 @@
 -- cost of checking it is nil.
 --
 -- THE NAMES ARE NOT NORMALISED, AND THAT IS A RULING, NOT AN OVERSIGHT.
--- The class arrived with several conventions at once (`true≢false`,
+-- The class arrived with several conventions at once (`≡ᵇ-refl`,
 -- `≡ᵇ→≡`, `just-injᵂ`), and renaming to one of them rewrites call sites
 -- for no proof content.  The duplicate-generating mechanism is LOCALITY,
 -- not spelling: with every such fact in one file, the check before
@@ -43,22 +43,12 @@
 --   was consumed by that face and by nothing else.
 module Decide where
 
-open import Data.Bool using (true; false)
+open import Data.Bool using (true)
 open import Data.Nat using (ℕ; zero; suc; _≡ᵇ_)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Empty using (⊥)
 open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; cong)
-
-------------------------------------------------------------------
--- eliminating an absurd equation.  It lands in an arbitrary `Set`
--- rather than in `⊥`, which is strictly stronger: a consumer wanting
--- `⊥` gets it by instantiation, and the `→ ⊥` variants this module
--- replaced were exactly that instantiation written out.
-------------------------------------------------------------------
-
-true≢false : {A : Set} → true ≡ false → A
-true≢false ()
 
 ------------------------------------------------------------------
 -- ℕ's Bool-valued equality
