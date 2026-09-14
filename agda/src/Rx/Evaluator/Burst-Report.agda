@@ -222,6 +222,35 @@ of-handed η (tm ∷ ts) dep =
 -- transported.  Stated over the relation for the same reason the parent
 -- is: it is a claim about what a run produced.
 --
+-- AND IT IS FALSE AS STATED, WHICH THE FRAME PREDICATE ALONE DOES NOT
+-- REPAIR.  The map arm is `map (applyFn fn) vals`, and `applyFn` is
+-- `evalWith` at a one-value environment, so what bounds its reading is
+-- `dep-eval-open`: `depᵗ fn + m`, a SUM.  The measure the entry
+-- invariant is denominated in reads a map as `depᵗ f ⊔ depᵉ e`, a JOIN.
+-- So a frame whose body wraps its own argument under a stream
+-- constructor hands back a value deeper than either side, and no
+-- premise bounding the FRAME can close the gap -- the argument is the
+-- other addend.
+--
+-- WHERE THE SUM IS NOT A SUM.  Every statement of the substitution
+-- shelf carries `isData s ≡ true`, and that is why: at a data argument
+-- the environment reads nought, the sum collapses onto `depᵗ fn`, and
+-- the join is exact.  So the question this arm actually asks is
+-- whether a `map-f` frame can stand at a NON-data payload -- the
+-- higher-order arrivals reach their consumers through the inner and
+-- outer frames rather than through a map, and if that is a property of
+-- the syntax rather than of today's clauses then the restriction is
+-- the statement's, not a hypothesis smuggled in at a call site.
+--
+-- DEAD ROUTE: bounding the output rank instead of restricting the
+--   payload -- state the cycle as carrying `τ` in and a larger `τ` out.
+--   It is STRUCTURALLY DEAD at the walk above rather than here: the
+--   entry invariant that feeds this is fixed by the caller at one
+--   `slotDepth sl`, and the walk re-enters at that same rank through
+--   every recursive arm, so a rank that grows per frame has nowhere to
+--   be recorded and the `subs-μ` arm, which re-enters at the unfolded
+--   body, would have to grow it without bound.
+--
 -- RECOVERY: git show 80e527f9:agda/src/Verify-Rank-Sufficient/Push-Carried.agda
 --   restores the predecessor's proof of exactly this over the machine,
 --   with the five frame clauses worked out; what does not transport is
