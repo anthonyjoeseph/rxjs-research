@@ -1,15 +1,23 @@
 -- THE SAME CROSSING, ASKED OF A DERIVATION RATHER THAN OF THE MACHINE,
 -- BECAUSE THAT IS THE STATEMENT THAT IS NOW LIVE.
 --
--- `burst-carries` says a subscribe entered at a triple hands back a
--- burst whose every observable value is shallower than that triple's
--- rank, and it says it over `subscribeE⇓` — so the machine's totality
--- is not in the way and the claim can be asked of a run built by hand.
--- Nothing about the crossing changed in the move: a slot REFERENCE is
--- one symbol standing for a definition of any nesting, the reading
--- gives it nought, and the connect plumbs the DEFINITION's burst out
--- through the reference's own entry.  The witness below is that run,
--- written out constructor by constructor.
+-- The claim is that a subscribe entered at a triple hands back a burst
+-- whose every observable value is shallower than that triple's rank,
+-- asked over `subscribeE⇓` — so the machine's totality is not in the
+-- way and it can be put to a run built by hand.  What it kills is the
+-- reading with NO SLOT ENVIRONMENT: a slot REFERENCE is one symbol
+-- standing for a definition of any nesting, such a reading gives it
+-- nought, and the connect plumbs the DEFINITION's burst out through the
+-- reference's own entry.  The witness below is that run, written out
+-- constructor by constructor.
+--
+-- AND THAT IS WHY THE MEASURE IT INSTANTIATES AT IS WRITTEN HERE RATHER
+-- THAN IMPORTED.  `Rx.Obs-Depth` is parameterised over an environment
+-- now, and `src` carries a nought specialisation of its own; reading
+-- THAT would make this witness track whatever the specialisation comes
+-- to mean, when what it is evidence about is the environment-free
+-- reading as such.  `zero-env` below is the localisation, and the two
+-- figures pinned by `refl` are what would fail loudly if it moved.
 --
 -- AND STATING IT RELATIONALLY IS WHY THIS ONE IS WORTH HAVING SEPARATELY
 -- FROM ITS MACHINE-SIDE SIBLING.  A witness here dies when `src` can no
@@ -35,10 +43,10 @@
 module Refuted.Carried-Derived where
 
 open import Data.Empty using (⊥)
-open import Data.Fin using (zero; suc)
+open import Data.Fin using (Fin; zero; suc)
 open import Data.List using ([]; _∷_)
 open import Data.List.Relation.Unary.All using () renaming (_∷_ to _∷ᵃ_)
-open import Data.Nat using (_<_; z≤n; s≤s)
+open import Data.Nat using (ℕ; _<_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤-refl)
 open import Data.Product using (_,_)
 open import Data.Vec using (_∷_; [])
@@ -47,7 +55,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Rx.Prim using (Id; Tick)
 open import Rx.Exp using (Ctx; Closed; natᵗ; obs; nat̂; strmᵗ; ofᵉ; input;
   syncSizeᵉ)
-open import Rx.Obs-Depth using (obsDepthᵉ)
+open import Rx.Obs-Depth using (depᵉ)
 open import Rx.Slots using (Slots; shared)
 open import Rx.Strat-Order using (Tri)
 open import Rx.Evaluator using (Stream; Path; root; Sched; EvalSt;
@@ -60,8 +68,12 @@ open import Rx.Evaluator.Doorless using (EntryOK; BurstOK)
 -- THE STATEMENT, IMPORTED RATHER THAN RESTATED.  `EntryOK` and
 -- `BurstOK` are the builder's own, so a repair that weakens either one
 -- weakens this witness in the same edit instead of leaving it green
--- against a predicate nothing uses.
+-- against a predicate nothing uses.  Only the ENVIRONMENT they are
+-- read at is local, which is the one thing the repair moved.
 ----------------------------------------------------------------------
+
+zero-env : ∀ {n} → Fin n → ℕ
+zero-env _ = 0
 
 BurstCarried : Set
 BurstCarried =
@@ -69,9 +81,9 @@ BurstCarried =
     {b : Closed Γ u} {κ : Path Γ lo u t} {id : Id} {now : Tick}
     {sched : Sched Γ} {st : EvalSt e} {burst : Stream Γ u}
     {sched′ : Sched Γ} {st′ : EvalSt e} →
-    EntryOK b τ →
+    EntryOK zero-env b τ →
     subscribeE⇓ {e = e} b κ id now sched st (burst , sched′ , st′) →
-    BurstOK burst τ
+    BurstOK zero-env burst τ
 
 ----------------------------------------------------------------------
 -- ONE SLOT, HOLDING A DEFINITION THAT WRITES AN OBSERVABLE, and a
@@ -95,16 +107,16 @@ ref₁ = input zero
 -- level of observable while the reference standing for it reads nought,
 -- so the entry invariant holds at EVERY rank including the one that
 -- cannot dominate what the connect plumbs out.
-derived-def-depth : obsDepthᵉ d₁ ≡ 1
+derived-def-depth : depᵉ zero-env d₁ ≡ 1
 derived-def-depth = refl
 
-derived-ref-depth : obsDepthᵉ ref₁ ≡ 0
+derived-ref-depth : depᵉ zero-env ref₁ ≡ 0
 derived-ref-depth = refl
 
 τ₁ : Tri
 τ₁ = 1 , 0 , syncSizeᵉ ref₁
 
-entry₁ : EntryOK ref₁ τ₁
+entry₁ : EntryOK zero-env ref₁ τ₁
 entry₁ = ≤-refl , ≤-refl
 
 below₁ : 0 < 1

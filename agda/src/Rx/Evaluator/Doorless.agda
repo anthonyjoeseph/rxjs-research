@@ -30,24 +30,26 @@
 -- marker, and only one of them is hard.
 module Rx.Evaluator.Doorless where
 
-open import Data.Bool using (false)
+open import Data.Bool using (T; false)
 open import Data.Fin using (Fin; toℕ)
 open import Data.List using (List; []; _∷_)
 open import Data.List.Relation.Unary.All using (All) renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
 open import Data.Nat using (ℕ; suc; _+_; _<_; _≤_; _⊔_)
-open import Data.Nat.Properties using (≤-trans; n≤1+n; m≤n+m; m≤n⊔m)
+open import Data.Nat.Properties using (≤-trans; ≤-refl; ≤-reflexive; n≤1+n; m≤n+m; m≤n⊔m)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (⊤)
+open import Data.Vec using (lookup)
 open import Induction.WellFounded using (Acc)
-open import Relation.Binary.PropositionalEquality using (_≡_)
+open import Relation.Binary.PropositionalEquality using (_≡_; sym)
 
 open import Rx.Prim using (Source; InstEmit; InstEvent; init; value; close; handoff; complete)
 open import Rx.Exp using (obs; Ctx; Exp; Ty; Val; Closed; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_;
-  syncSizeᵉ; unfoldμ; μᵉ)
-open import Rx.Obs-Depth using (obsDepthᵉ; unfoldμ-no-deeper)
+  syncSizeᵉ; unfoldμ; μᵉ; inputsBelowᵉ)
+open import Rx.Obs-Depth using (depᵉ; dep-unfoldμ-no-deeper)
+open import Rx.Slot-Depth using (slotDepth; slotDepth-fix)
 open import Rx.Sync-Size using (unfoldμ-shrinks)
-open import Rx.Slots using (Slots)
+open import Rx.Slots using (Slots; shared)
 open import Rx.Strat-Order using (Tri; _≺_; ltU; ltR; ltS; ≺-wellFounded)
 open import Rx.Evaluator using (unconn; memberSource; Stream; splitEvents)
 
@@ -64,14 +66,22 @@ variable
 -- restatement's cost being a laundering: the conditioned statement is
 -- the true one replacing a false one.
 --
--- IT CARRIES TWO CONJUNCTS AND IS EXPECTED TO GROW TO THREE, WHICH IS
--- THE CONVERGENCE RATHER THAN AN OMISSION.  One guard per component:
--- the μ unfold reads the synchronous size, the hop reads the rank, the
--- share connect reads the unconnected count.  The third is a reading
--- nothing has forced a shape for yet, and each lands the day its own
--- witness forces it, so the predicate grows against a `⊥` rather than
--- by guess.  The root satisfies both of these out of its own seeding:
--- `evaluate` builds the entry from the program's size and depth.
+-- IT CARRIES TWO CONJUNCTS AND NOT THREE, AND THE THIRD COMPONENT IS
+-- WHY.  One guard per component would be the tidy shape: the μ unfold
+-- reads the synchronous size, the hop reads the rank, the share connect
+-- reads the unconnected count.  The connect asks for no conjunct
+-- because what it needs is not a demand on the ENTRY at all — it needs
+-- the reference's own reading to dominate the definition's, and the
+-- environment makes that an equation rather than a premise.  The root
+-- satisfies both conjuncts out of its own seeding: `evaluate` builds
+-- the entry from the program's size and its reading.
+--
+-- AND THE READING IS TAKEN IN AN ENVIRONMENT, WHICH IS WHAT THE THIRD
+-- CONJUNCT WOULD HAVE BEEN FOR AND COULD NOT HAVE DONE.  A conjunct
+-- bounding the slot telescope adds a figure that is CONSTANT in the
+-- program, while the rank strictly drops at every hop — so the two
+-- reconcile only where a reference's own price already dominates its
+-- definition, which is the environment's whole content.
 --
 -- AND THE RANK CONJUNCT IS WHAT MAKES THE HOP'S PREMISE PAYABLE, which
 -- is why it is here rather than threaded into a signature.  A value a
@@ -86,8 +96,8 @@ variable
 --   beside the run's dryness.  It is at a sha because `src` can no
 --   longer state it: the run reads no triple and emits no marker, so
 --   neither number the witness put side by side still exists.
-EntryOK : ∀ {n} {Γ : Ctx n} {u} → Closed Γ u → Tri → Set
-EntryOK b (_ , r , sz) = syncSizeᵉ b ≤ sz × obsDepthᵉ b ≤ r
+EntryOK : ∀ {n} {Γ : Ctx n} {u} (η : Fin n → ℕ) → Closed Γ u → Tri → Set
+EntryOK η b (_ , r , sz) = syncSizeᵉ b ≤ sz × depᵉ η b ≤ r
 
 -- CARRYING THE ENTRY INVARIANT DOWN A FRAME, WHICH IS THE WHOLE OF THE
 -- ARITHMETIC THE SUBSCRIBE INDUCTION NEEDS.  `syncSizeᵉ` counts the
@@ -156,17 +166,17 @@ under-ok (s , p) = entry-under s , p
 --   the rank the root itself builds. That witness is as far from the
 --   risky region as a program gets, which is what says the repair is the
 --   type split rather than a hypothesis about the program.
-ValOK : ∀ {n} {Γ : Ctx n} (u : Ty) → Tri → Val Γ u → Set
-ValOK unitᵗ    _ _           = ⊤
-ValOK boolᵗ    _ _           = ⊤
-ValOK natᵗ     _ _           = ⊤
-ValOK (s ×ᵗ t) τ (a , b)     = ValOK s τ a × ValOK t τ b
-ValOK (s +ᵗ t) τ (inj₁ a)    = ValOK s τ a
-ValOK (s +ᵗ t) τ (inj₂ b)    = ValOK t τ b
-ValOK (obs t)  (_ , r , _) o = obsDepthᵉ o < r
+ValOK : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) (u : Ty) → Tri → Val Γ u → Set
+ValOK η unitᵗ    _ _           = ⊤
+ValOK η boolᵗ    _ _           = ⊤
+ValOK η natᵗ     _ _           = ⊤
+ValOK η (s ×ᵗ t) τ (a , b)     = ValOK η s τ a × ValOK η t τ b
+ValOK η (s +ᵗ t) τ (inj₁ a)    = ValOK η s τ a
+ValOK η (s +ᵗ t) τ (inj₂ b)    = ValOK η t τ b
+ValOK η (obs t)  (_ , r , _) o = depᵉ η o < r
 
-HandedOK : ∀ {n} {Γ : Ctx n} {u} → List (Val Γ u) → Tri → Set
-HandedOK {u = u} vs τ = All (ValOK u τ) vs
+HandedOK : ∀ {n} {Γ : Ctx n} {u} (η : Fin n → ℕ) → List (Val Γ u) → Tri → Set
+HandedOK {u = u} η vs τ = All (ValOK η u τ) vs
 
 -- AND THE SAME OVER A BURST, WHICH IS WHERE THOSE VALUES COME FROM.  A
 -- push cycle steps one frame per emit and hands that frame the emit's
@@ -183,30 +193,30 @@ HandedOK {u = u} vs τ = All (ValOK u τ) vs
 -- longer agree on an open list.  Reading the events directly names no
 -- such parameter, and `split-handed` below carries the property across
 -- the splitter at whatever type the call site pins.
-EventOK : ∀ {n} {Γ : Ctx n} {u} → Tri → InstEvent (Val Γ u) → Set
-EventOK {u = u} τ (value v) = ValOK u τ v
-EventOK _ (init _)    = ⊤
-EventOK _ (close _ _) = ⊤
-EventOK _ (handoff _) = ⊤
-EventOK _ complete    = ⊤
+EventOK : ∀ {n} {Γ : Ctx n} {u} (η : Fin n → ℕ) → Tri → InstEvent (Val Γ u) → Set
+EventOK {u = u} η τ (value v) = ValOK η u τ v
+EventOK η _ (init _)    = ⊤
+EventOK η _ (close _ _) = ⊤
+EventOK η _ (handoff _) = ⊤
+EventOK η _ complete    = ⊤
 
-BurstOK : ∀ {n} {Γ : Ctx n} {s} → Stream Γ s → Tri → Set
-BurstOK bs τ = All (λ em → All (EventOK τ) (InstEmit.events em)) bs
+BurstOK : ∀ {n} {Γ : Ctx n} {s} (η : Fin n → ℕ) → Stream Γ s → Tri → Set
+BurstOK η bs τ = All (λ em → All (EventOK η τ) (InstEmit.events em)) bs
 
 -- the splitter keeps every `value` payload and drops the rest, so a
 -- property of the events is a property of the values it grafts — proven
 -- over the retag type the call site pins rather than over a chosen one,
 -- since the two halves are independent and only the first is read here
-split-handed : ∀ {n} {Γ : Ctx n} {u} {A : Set} {τ}
+split-handed : ∀ {n} {Γ : Ctx n} {u} {A : Set} {τ} (η : Fin n → ℕ)
              → (es : List (InstEvent (Val Γ u)))
-             → All (EventOK τ) es
-             → HandedOK {Γ = Γ} (proj₁ (splitEvents {A = A} es)) τ
-split-handed []              []ᵃ        = []ᵃ
-split-handed (value v  ∷ es) (p ∷ᵃ ps) = p ∷ᵃ split-handed es ps
-split-handed (init _   ∷ es) (_ ∷ᵃ ps) = split-handed es ps
-split-handed (close _ _ ∷ es) (_ ∷ᵃ ps) = split-handed es ps
-split-handed (handoff _ ∷ es) (_ ∷ᵃ ps) = split-handed es ps
-split-handed (complete ∷ es) (_ ∷ᵃ ps) = split-handed es ps
+             → All (EventOK η τ) es
+             → HandedOK {Γ = Γ} η (proj₁ (splitEvents {A = A} es)) τ
+split-handed η []              []ᵃ        = []ᵃ
+split-handed η (value v  ∷ es) (p ∷ᵃ ps) = p ∷ᵃ split-handed η es ps
+split-handed η (init _   ∷ es) (_ ∷ᵃ ps) = split-handed η es ps
+split-handed η (close _ _ ∷ es) (_ ∷ᵃ ps) = split-handed η es ps
+split-handed η (handoff _ ∷ es) (_ ∷ᵃ ps) = split-handed η es ps
+split-handed η (complete ∷ es) (_ ∷ᵃ ps) = split-handed η es ps
 
 ------------------------------------------------------------------
 -- THE THREE FACTS.  One per edge, each stated as the descent step the
@@ -222,17 +232,19 @@ split-handed (complete ∷ es) (_ ∷ᵃ ps) = split-handed es ps
 -- right to be asked without carrying `EntryOK` — and carrying
 -- `EntryOK` is what a builder does and what a plain rxjs pipeline
 -- cannot, which is why the invariant is here and not there.
-μ-edge : ∀ {U r sz} {Γ : Ctx n} {u} (body : Exp Γ (u ∷ []) [] [] u)
+μ-edge : ∀ {U r sz} {Γ : Ctx n} {u} (η : Fin n → ℕ)
+         (body : Exp Γ (u ∷ []) [] [] u)
        → syncSizeᵉ (μᵉ body) ≤ sz
-       → obsDepthᵉ (μᵉ body) ≤ r
+       → depᵉ η (μᵉ body) ≤ r
        → (U , r , syncSizeᵉ (unfoldμ body)) ≺ (U , r , sz)
-μ-edge body sz≤ _ = ltS (≤-trans (unfoldμ-shrinks body) sz≤)
+μ-edge η body sz≤ _ = ltS (≤-trans (unfoldμ-shrinks body) sz≤)
 
 -- and the peel's other component, which is not part of the edge but is
 -- what keeps the invariant true at the unfolding
-μ-entry : ∀ {r} {Γ : Ctx n} {u} (body : Exp Γ (u ∷ []) [] [] u)
-        → obsDepthᵉ (μᵉ body) ≤ r → obsDepthᵉ (unfoldμ body) ≤ r
-μ-entry body = ≤-trans (unfoldμ-no-deeper body)
+μ-entry : ∀ {r} {Γ : Ctx n} {u} (η : Fin n → ℕ)
+          (body : Exp Γ (u ∷ []) [] [] u)
+        → depᵉ η (μᵉ body) ≤ r → depᵉ η (unfoldμ body) ≤ r
+μ-entry η body = ≤-trans (dep-unfoldμ-no-deeper η body)
 
 -- THE HOP'S FACT IS THE SUBSTITUTION REPORT, AND IT IS THE ONE THE
 -- WHOLE TIER IS ABOUT.  What arrives at the hop is a runtime VALUE,
@@ -269,10 +281,10 @@ split-handed (complete ∷ es) (_ ∷ᵃ ps) = split-handed es ps
 --   it is what fixes the SHAPE of the totality cutover: the knot is tied
 --   ABOVE this module, where a premise costs a proof obligation rather
 --   than an argument, so `evaluate` keeps the type a pipeline has.
-hop-edge : ∀ {U r s} {Γ : Ctx n} {u} (o : Val Γ (obs u))
-         → obsDepthᵉ o < r
-         → (U , obsDepthᵉ o , syncSizeᵉ o) ≺ (U , r , s)
-hop-edge o drop = ltR drop
+hop-edge : ∀ {U r s} {Γ : Ctx n} {u} (η : Fin n → ℕ) (o : Val Γ (obs u))
+         → depᵉ η o < r
+         → (U , depᵉ η o , syncSizeᵉ o) ≺ (U , r , s)
+hop-edge η o drop = ltR drop
 
 -- THE EXTRACTION, WRITTEN OUT BECAUSE IT IS THE WHOLE OF THE ARGUMENT
 -- AND READS AS A TRIVIALITY.  Stating it separately is what keeps the
@@ -286,10 +298,10 @@ hop-edge o drop = ltR drop
 -- implicit, in either the whole-τ or the split-triple spelling, every
 -- call reports unsolved metas against the APPLICATION rather than
 -- against the statement that cannot determine them.
-hop-guard : ∀ {n} {Γ : Ctx n} {u} (τ : Tri) (o : Val Γ (obs u))
-          → HandedOK {Γ = Γ} (o ∷ []) τ
-          → obsDepthᵉ o < proj₁ (proj₂ τ)
-hop-guard _ o (h ∷ᵃ []ᵃ) = h
+hop-guard : ∀ {n} {Γ : Ctx n} {u} (η : Fin n → ℕ) (τ : Tri) (o : Val Γ (obs u))
+          → HandedOK {Γ = Γ} η (o ∷ []) τ
+          → depᵉ η o < proj₁ (proj₂ τ)
+hop-guard η _ o (h ∷ᵃ []ᵃ) = h
 
 -- THE CONNECT'S FACT IS THE ONE GENUINELY NEW STATEMENT, AND IT IS
 -- COUNTING RATHER THAN DEPTH.  Connecting slot `i` puts `i` into the
@@ -322,6 +334,26 @@ connect-edge : ∀ {r s r′ s′} {Γ : Ctx n} (sl : Slots Γ) (cs : List Sourc
              → (unconn sl (toℕ i ∷ cs) , r′ , s′) ≺ (unconn sl cs , r , s)
 connect-edge sl cs i fresh = ltU (connect-drops sl cs i fresh)
 
+-- AND THE CONNECT'S OTHER COMPONENT, WHICH IS THE ONE THE ENVIRONMENT
+-- WAS BUILT FOR.  The edge drops the count and leaves the rank free, so
+-- what has to be shown at the definition is the ENTRY invariant — and it
+-- was shown against a reading that priced a reference at nought, which
+-- is a claim about a symbol rather than about what the connect plumbs out
+-- through it.  Read in the environment there is nothing to carry: the
+-- reference's number IS the definition's, so the size is the
+-- definition's own and the rank is reached by the fixpoint alone.
+--
+-- REFUTED: `Refuted.Carried-Derived` — the same connect, with the
+--   reference priced at nought instead, at a fresh share whose
+--   definition writes one level of observable.
+connect-entry : ∀ {U} {Γ : Ctx n} (sl : Slots Γ) (i : Fin n)
+                {d : Closed Γ (lookup Γ i)}
+                {ok : T (inputsBelowᵉ (toℕ i) d)}
+              → sl i ≡ shared d {ok = ok}
+              → EntryOK (slotDepth sl) d
+                  (U , slotDepth sl i , syncSizeᵉ d)
+connect-entry sl i eq = ≤-refl , ≤-reflexive (sym (slotDepth-fix sl i eq))
+
 ------------------------------------------------------------------
 -- WHERE A DESCENT STARTS.  Every re-entry from OUTSIDE the
 -- subscription machine begins a fresh one, so each supplies its own
@@ -337,13 +369,16 @@ connect-edge sl cs i fresh = ltU (connect-drops sl cs i fresh)
 -- program's own — so the root enters at reading ZERO and `rootTri` is
 -- that specialisation rather than a second seeding.
 --
--- THE RANK IS THE TERM'S `strmᵗ` NESTING, AND NOTHING IS PRE-PAID.  The
--- hop used to descend on a BUDGET: a figure large enough at entry that
--- every hop the run would ever take could be charged against it, with a
--- bailout standing where the budget ran out.  It descends on
--- `obsDepthᵉ` instead, which the builder compares at the site it hops —
--- so the entry owes a figure dominating the TERM rather than the run,
--- and a subterm satisfies that by construction.
+-- THE RANK IS THE TERM'S `strmᵗ` NESTING READ THROUGH THE TELESCOPE,
+-- AND NOTHING IS PRE-PAID.  The hop used to descend on a BUDGET: a
+-- figure large enough at entry that every hop the run would ever take
+-- could be charged against it, with a bailout standing where the budget
+-- ran out.  It descends on the reading instead, which the builder
+-- compares at the site it hops — so the entry owes a figure dominating
+-- the TERM rather than the run, and a subterm satisfies that by
+-- construction.  What the environment adds is that a slot reference
+-- counts as its definition, so "the term" means the program a connect
+-- can actually reach rather than the symbols written in it.
 --
 -- THE STORE IS JOINED IN BECAUSE AN ARRIVAL CAN SUBSCRIBE WHAT A NODE
 -- IS HOLDING.  The term alone does not bound a parked inner or a
@@ -362,7 +397,7 @@ connect-edge sl cs i fresh = ltU (connect-drops sl cs i fresh)
 --   is dead and not the syntax: a figure compared at the hop is never
 --   asked to dominate an emission, only to be dropped by one.
 entryTri : ∀ {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → ℕ → Tri
-entryTri e sl m = unconn sl [] , obsDepthᵉ e ⊔ m , syncSizeᵉ e
+entryTri e sl m = unconn sl [] , depᵉ (slotDepth sl) e ⊔ m , syncSizeᵉ e
 
 entryWitness : ∀ {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (m : ℕ)
              → Acc _≺_ (entryTri e sl m)

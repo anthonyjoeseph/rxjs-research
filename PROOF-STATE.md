@@ -231,16 +231,16 @@ cannot compute — and the other two leaves carry no arithmetic at all.
 
 ### Big picture tier roadmap
 
-- **PRICE A SLOT REFERENCE BY ITS DEFINITION: THE STAGED READING.**
-  `burst-carries` is refuted, at the ordinary run and over the relation the
-  builder actually spends: a reference is one symbol the reading prices at
-  nought, and the connect plumbs the DEFINITION's burst out through that
-  reference's own entry. A conjunct over the schedule cannot repair it — the
-  bound it adds is a constant of the program while the rank strictly drops at
-  every hop — so what must dominate the definition is the reference's own
-  price. The telescope is stratified, so a reading recursing on the slot index
-  is total, and the attic holds that construction proven. Riskiest: everything
-  above the hop is now a body.
+- **WIDEN WHAT A BUILDER RETURNS, SO THE TELESCOPE COSTS NOTHING.** The staged
+  reading is built and threaded: every premise is denominated at one
+  `slotDepth sl` fixed by the caller, and each clause carries an agreement
+  `Sched.slots sched ≡ sl` instead of a transport. Four sites cannot pass it
+  along — the schedules handed back by the subscribe, the step, the consume and
+  `switchKill` — and only the last is provable where it stands. The other three
+  are postulated, and the route is to carry the equation in the RESULT type
+  rather than to induct over the ⇓ family: every clause already holds it where
+  it would have to prove it, so one widening closes all three and leaves the
+  obligation on the two leaves alone. Riskiest: it moves every clause's return.
 
 - **PRICE THE TEMPLATE, NOT THE INPUT: STATE THE SUBSTITUTION LEMMA (Anthony).**
   Six refutations stand at the door and every one of them refutes a price stated
@@ -308,10 +308,11 @@ cannot compute — and the other two leaves carry no arithmetic at all.
 ### The ledger
 
 - **`subscribeE⇓-input-total`** (Verify-Rank-Sufficient) — FALSITY, `PROBED`: a
-  derivation at a slot subscription's own output. Six arms, and the share one's
+  derivation at a slot subscription's output. Six arms; the share one's
   connect reads the unconnected count against the entry's first component, so
-  this is refutable exactly as its parent was. Builder half
-  `subscribeE!-input`; connect arithmetic `connect-drops`.
+  it is refutable as its parent was. Builder `subscribeE!-input`; connect
+  arithmetic `connect-drops`. Telescope: `subs-keeps-slots`,
+  `step-keeps-slots`, `consume-keeps-slots`.
 
 - **`innerReact⇓-total`** (Verify-Rank-Sufficient) — FALSITY, `PROBED`: the
   same edge reached through the flattener's own bookkeeping rather than a fresh
