@@ -47,8 +47,8 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; NodeId; AllOp; root
   st-init)
 open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeInner⇓; drain⇓; evaluate⇓; subs-of; subs-empty; subs-μ; subs-defer;
   inner; eval-run)
-open import Rx.Evaluator.Doorless using (μ-edge; μ-entry; hop-edge; rootWitness)
-open import Verify-Rank-Sufficient using (EntryOK; HandedOK; hop-guard)
+open import Rx.Evaluator.Doorless using (μ-edge; μ-entry; hop-edge; rootWitness;
+  EntryOK; HandedOK; hop-guard)
 
 ------------------------------------------------------------------
 -- WHAT A BUILDER RETURNS.  The result and the derivation together, so

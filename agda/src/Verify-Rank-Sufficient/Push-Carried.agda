@@ -78,7 +78,7 @@ open import Rx.Prim using (Id; Tick; InstEmit)
 open import Rx.Exp using (Ctx; Closed; Ty; Val; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs;
   Fn; isData; applyFn; syncSizeᵉ; syncSizeᵗ)
 open import Rx.Obs-Depth using (obsDepthᵉ; obsDepthᵗ)
-open import Rx.Obs-Depth.Substitution using (obsDepth-applyFn; syncSize-applyFn;
+open import Rx.Obs-Depth.Substitution using (applyFn-strict; syncSize-applyFn;
   dataSize)
 open import Rx.Strat-Order using (Tri; _≺_)
 open import Rx.Evaluator using (Stream; Path; Sched; EvalSt; Frame; AllOp; NodeId;
@@ -241,9 +241,9 @@ applyFn-ok {u = natᵗ}    fn ds v = tt
 applyFn-ok {u = a ×ᵗ b}  fn ds v = applyFn-ok-× fn ds v
 applyFn-ok {u = a +ᵗ b}  fn ds v = applyFn-ok-+ fn ds v
 applyFn-ok {u = obs w}   fn ds v =
-  syncSize-applyFn ds fn v , obsDepth-applyFn ds fn v
-  -- the second component IS the door's guard, discharged from the
-  -- program with no bound carried in
+  syncSize-applyFn ds fn v , applyFn-strict ds fn v
+  -- the second component is the hop's own comparison, discharged from
+  -- the program with no bound carried in
 
 postulate
   -- the two structural arms, which push the corollary under a pair or

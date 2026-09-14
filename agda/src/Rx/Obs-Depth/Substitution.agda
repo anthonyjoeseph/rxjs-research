@@ -1,7 +1,6 @@
 ------------------------------------------------------------------
 -- THE SUBSTITUTION LEMMA: WHAT A TEMPLATE EMITS IS READ OFF THE
--- TEMPLATE, NOT OFF WHAT IT WAS HANDED.  A sketch — nothing here
--- typechecks yet.
+-- TEMPLATE, NOT OFF WHAT IT WAS HANDED.
 --
 -- `applyFn fn v` is `evalWith fn (v ∷ᵃ []ᵃ)`, and at an observable
 -- result type the only head that can produce one is `strmᵗ e`, whose
@@ -45,6 +44,7 @@ module Rx.Obs-Depth.Substitution where
 open import Data.Bool using (true)
 open import Data.List using (List; []; _∷_; _++_)
 open import Data.List.Membership.Propositional using (_∈_)
+open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁻)
 open import Data.List.Relation.Unary.All using (All) renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
 open import Data.Nat using (ℕ; suc; _≤_; _<_; _+_; _⊔_; z≤n)
@@ -59,6 +59,7 @@ open import Rx.Exp using (Ty; Ctx; Exp; Tm; Val; Fn; isData;
   input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ;
   μᵉ; varᵉ; deferᵉ;
   varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ;
+  add; sub; mul; eqᵖ; ltᵖ; notᵖ;
   reify; wkTm; lookupEnv; subΘExp; subΘTm; subΘTms; closeUnderFn;
   evalWith; applyFn; syncSizeᵉ; syncSizeᵗ)
 open import Rx.Obs-Depth using (obsDepthᵉ; obsDepthᵗ; obsDepthᵗˢ; obsDepthᵛ)
@@ -73,6 +74,17 @@ open import Rx.Obs-Depth using (obsDepthᵉ; obsDepthᵗ; obsDepthᵗˢ; obsDept
 data AllData : List Ty → Set where
   []ᵈ  : AllData []
   _∷ᵈ_ : ∀ {t Θ} → isData t ≡ true → AllData Θ → AllData (t ∷ Θ)
+
+-- the four projections the two clauses below need out of `isData`'s
+-- `if`-shaped definition.  Mechanical: `isData (s ×ᵗ t)` is
+-- `if isData s then isData t else false`, so a `true` there decides
+-- both sides, and the `with` that reads it is the whole proof.
+postulate
+  ×-dataˡ : ∀ s t → isData (s ×ᵗ t) ≡ true → isData s ≡ true
+  ×-dataʳ : ∀ s t → isData (s ×ᵗ t) ≡ true → isData t ≡ true
+  +-dataˡ : ∀ s t → isData (s +ᵗ t) ≡ true → isData s ≡ true
+  +-dataʳ : ∀ s t → isData (s +ᵗ t) ≡ true → isData t ≡ true
+  data-of : ∀ {Θ t} → AllData Θ → t ∈ Θ → isData t ≡ true
 
 -- a data value reads zero, both as a value and as the term `reify`
 -- writes for it.  These are the two clauses the substitution's `varᵗ`
@@ -103,16 +115,6 @@ obsDepth-reify-data (s +ᵗ t) dt (inj₁ a) = obsDepth-reify-data s (+-dataˡ s
 obsDepth-reify-data (s +ᵗ t) dt (inj₂ b) = obsDepth-reify-data t (+-dataʳ s t dt) b
 obsDepth-reify-data (obs t)  ()  _
 
--- the four projections the two clauses above need out of `isData`'s
--- `if`-shaped definition.  Mechanical: `isData (s ×ᵗ t)` is
--- `if isData s then isData t else false`, so a `true` there decides
--- both sides, and the `with` that reads it is the whole proof.
-postulate
-  ×-dataˡ : ∀ s t → isData (s ×ᵗ t) ≡ true → isData s ≡ true
-  ×-dataʳ : ∀ s t → isData (s ×ᵗ t) ≡ true → isData t ≡ true
-  +-dataˡ : ∀ s t → isData (s +ᵗ t) ≡ true → isData s ≡ true
-  +-dataʳ : ∀ s t → isData (s +ᵗ t) ≡ true → isData t ≡ true
-
 lookup-data : ∀ {n} {Γ : Ctx n} {Θ t} → AllData Θ →
   (σ : All (Val Γ) Θ) (x : t ∈ Θ) → obsDepthᵗ (reify (lookupEnv σ x)) ≡ 0
 lookup-data (d ∷ᵈ _)  (v ∷ᵃ _)  (here refl) = obsDepth-reify-data _ d v
@@ -128,6 +130,26 @@ postulate
 ------------------------------------------------------------------
 -- 2.  THE LEMMA, CLAUSE FOR CLAUSE AGAINST ITS TWIN.
 ------------------------------------------------------------------
+
+-- THE ONE ARM WHERE THE ENVIRONMENT STOPS BEING DATA, and it is the
+-- same arm the fold has.  A `caseᵗ` on a sum containing an observable
+-- binds one into the branch environment, so the branch is evaluated
+-- under an environment this lemma's hypothesis does not cover.  The
+-- bound is not lost — the bound value came OUT of the scrutinee, whose
+-- own reading is a program quantity — but recovering it needs the open
+-- form below rather than this one.
+--
+-- `ifᵗ` is separate only because Agda cannot see through the `if` that
+-- selects the branch; nothing about it is open.
+postulate
+  eval-case : ∀ {n} {Γ : Ctx n} {Θ s t u} → AllData Θ →
+    (sc : Tm Γ [] [] Θ (s +ᵗ t)) (l : Tm Γ [] [] (s ∷ Θ) u)
+    (r : Tm Γ [] [] (t ∷ Θ) u) (env : All (Val Γ) Θ) →
+    obsDepthᵛ u (evalWith (caseᵗ sc l r) env) ≤ obsDepthᵗ (caseᵗ sc l r)
+
+  eval-if : ∀ {n} {Γ : Ctx n} {Θ t} → AllData Θ →
+    (c : Tm Γ [] [] Θ boolᵗ) (a b : Tm Γ [] [] Θ t) (env : All (Val Γ) Θ) →
+    obsDepthᵛ t (evalWith (ifᵗ c a b) env) ≤ obsDepthᵗ (ifᵗ c a b)
 
 -- Every clause but one is `cong` over the sub-derivations, exactly as
 -- `obsDepth-elimG`'s are.  The one that carries content is `varᵗ`, and
@@ -229,32 +251,22 @@ obsDepth-eval dd (inlᵗ a)      env = obsDepth-eval dd a env
 obsDepth-eval dd (inrᵗ a)      env = obsDepth-eval dd a env
 obsDepth-eval dd (caseᵗ sc l r) env = eval-case dd sc l r env
 obsDepth-eval dd (ifᵗ c a b)   env = eval-if dd c a b env
-obsDepth-eval dd (primᵗ op a)  env = z≤n
+obsDepth-eval dd (primᵗ add  a)  env = z≤n
+obsDepth-eval dd (primᵗ sub  a)  env = z≤n
+obsDepth-eval dd (primᵗ mul  a)  env = z≤n
+obsDepth-eval dd (primᵗ eqᵖ  a)  env = z≤n
+obsDepth-eval dd (primᵗ ltᵖ  a)  env = z≤n
+obsDepth-eval dd (primᵗ notᵖ a)  env = z≤n
 obsDepth-eval dd (strmᵗ e)     []ᵃ = n≤1+n _
 obsDepth-eval dd (strmᵗ e)     (v ∷ᵃ vs)
   rewrite obsDepth-closeUnderFn dd e (v ∷ᵃ vs) = n≤1+n _
 
--- THE ONE ARM WHERE THE ENVIRONMENT STOPS BEING DATA, and it is the
--- same arm the fold has.  A `caseᵗ` on a sum containing an observable
--- binds one into the branch environment, so the branch is evaluated
--- under an environment this lemma's hypothesis does not cover.  The
--- bound is not lost — the bound value came OUT of the scrutinee, whose
--- own reading is a program quantity — but recovering it needs the open
--- form below rather than this one.
---
--- `ifᵗ` is separate only because Agda cannot see through the `if` that
--- selects the branch; nothing about it is open.
-postulate
-  eval-case : ∀ {n} {Γ : Ctx n} {Θ s t u} → AllData Θ →
-    (sc : Tm Γ [] [] Θ (s +ᵗ t)) (l : Tm Γ [] [] (s ∷ Θ) u)
-    (r : Tm Γ [] [] (t ∷ Θ) u) (env : All (Val Γ) Θ) →
-    obsDepthᵛ u (evalWith (caseᵗ sc l r) env) ≤ obsDepthᵗ (caseᵗ sc l r)
 
-  eval-if : ∀ {n} {Γ : Ctx n} {Θ t} → AllData Θ →
-    (c : Tm Γ [] [] Θ boolᵗ) (a b : Tm Γ [] [] Θ t) (env : All (Val Γ) Θ) →
-    obsDepthᵛ t (evalWith (ifᵗ c a b) env) ≤ obsDepthᵗ (ifᵗ c a b)
-
-  data-of : ∀ {Θ t} → AllData Θ → t ∈ Θ → isData t ≡ true
+-- the reading of an environment, which is what the open form is
+-- denominated in.
+envDepth : ∀ {n} {Γ : Ctx n} {Θ} → All (Val Γ) Θ → ℕ
+envDepth []ᵃ       = 0
+envDepth (v ∷ᵃ vs) = obsDepthᵗ (reify v) ⊔ envDepth vs
 
 -- THE OPEN FORM: what an environment carrying observables costs, which
 -- is one wrap per binder crossed and NOT a function of the machine.
@@ -266,26 +278,15 @@ postulate
     (tm : Tm Γ [] [] Θ t) (env : All (Val Γ) Θ) (m : ℕ) →
     envDepth env ≤ m → obsDepthᵛ t (evalWith tm env) ≤ obsDepthᵗ tm + m
 
-envDepth : ∀ {n} {Γ : Ctx n} {Θ} → All (Val Γ) Θ → ℕ
-envDepth []ᵃ       = 0
-envDepth (v ∷ᵃ vs) = obsDepthᵗ (reify v) ⊔ envDepth vs
-
--- THE COROLLARY THE DOOR ASKS FOR, AND IT IS THE WHOLE POINT.  An
--- observable emitted by a template is written strictly below the
--- template — with no hypothesis about the run, the store, or the bound
--- the frame was entered under.  `subscribeInner`'s guard is exactly
--- this comparison, so where its argument came from a template the guard
--- can never fail.
-obsDepth-applyFn : ∀ {n} {Γ : Ctx n} {s u} → isData s ≡ true →
-  (fn : Fn Γ [] [] [] s (obs u)) (v : Val Γ s) →
-  obsDepthᵉ (applyFn fn v) < obsDepthᵗ fn
-obsDepth-applyFn ds fn v = applyFn-strict ds fn v
-
--- the strictness, which the weak lemma above does not give directly:
--- at an observable result type `tm` cannot be a `varᵗ` (its type would
--- have to be data), so every head is either a successor or an
--- eliminator whose own reading dominates.  One case split away from the
--- weak form and postulated only because that split is mechanical.
+-- THE STRICT READING, AND IT IS THE WHOLE POINT.  An observable
+-- emitted by a template is written strictly below the template — with
+-- no hypothesis about the run, the store, or the bound the frame was
+-- entered under, so a hop whose argument came from a template is priced
+-- by the program text alone.  The weak lemma above does not give it
+-- directly: at an observable result type `tm` cannot be a `varᵗ` (its
+-- type would have to be data), so every head is either a successor or
+-- an eliminator whose own reading dominates.  One case split away from
+-- the weak form and postulated only because that split is mechanical.
 postulate
   applyFn-strict : ∀ {n} {Γ : Ctx n} {s u} → isData s ≡ true →
     (fn : Fn Γ [] [] [] s (obs u)) (v : Val Γ s) →
@@ -298,8 +299,8 @@ postulate
 -- the substitution lemma collapses is the DEPTH axis, which is the one
 -- the door reads.
 postulate
+  dataSize : Ty → ℕ
+
   syncSize-applyFn : ∀ {n} {Γ : Ctx n} {s u} → isData s ≡ true →
     (fn : Fn Γ [] [] [] s (obs u)) (v : Val Γ s) →
     syncSizeᵉ (applyFn fn v) ≤ syncSizeᵗ fn + dataSize s
-
-  dataSize : Ty → ℕ

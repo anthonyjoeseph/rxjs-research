@@ -33,22 +33,180 @@ module Rx.Evaluator.Doorless where
 open import Data.Bool using (false)
 open import Data.Fin using (Fin; toℕ)
 open import Data.List using (List; []; _∷_)
-open import Data.Nat using (ℕ; _<_; _≤_; _⊔_)
-open import Data.Nat.Properties using (≤-trans)
-open import Data.Product using (_,_)
+open import Data.List.Relation.Unary.All using (All) renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
+open import Data.Nat using (ℕ; suc; _+_; _<_; _≤_; _⊔_)
+open import Data.Nat.Properties using (≤-trans; n≤1+n; m≤n+m; m≤n⊔m)
+open import Data.Product using (_×_; _,_; proj₁)
+open import Data.Sum using (inj₁; inj₂)
+open import Data.Unit using (⊤)
 open import Induction.WellFounded using (Acc)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 
-open import Rx.Prim using (Source)
-open import Rx.Exp using (obs; Ctx; Exp; Val; Closed; syncSizeᵉ; unfoldμ; μᵉ)
+open import Rx.Prim using (Source; InstEmit; InstEvent; init; value; close; handoff; complete)
+open import Rx.Exp using (obs; Ctx; Exp; Ty; Val; Closed; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_;
+  syncSizeᵉ; unfoldμ; μᵉ)
 open import Rx.Obs-Depth using (obsDepthᵉ; unfoldμ-no-deeper)
 open import Rx.Sync-Size using (unfoldμ-shrinks)
 open import Rx.Slots using (Slots)
 open import Rx.Strat-Order using (Tri; _≺_; ltU; ltR; ltS; ≺-wellFounded)
-open import Rx.Evaluator using (unconn; memberSource)
+open import Rx.Evaluator using (unconn; memberSource; Stream; splitEvents)
 
 variable
   n : ℕ
+
+-- THE ENTRY INVARIANT, AND THE ONLY THING IT STANDS ON IS THAT THE
+-- UNCONDITIONAL FORM IS DEAD.  A totality claim quantified freely
+-- over the witness says a derivation exists at every entry, and three
+-- of the machine's clauses read a component of that entry against the
+-- TERM — so a caller free to pick the triple can starve a guard at a
+-- program with nothing hard in it.  This is what relates the two ends,
+-- and it is the one shape of hypothesis this repo admits without a
+-- restatement's cost being a laundering: the conditioned statement is
+-- the true one replacing a false one.
+--
+-- IT CARRIES TWO CONJUNCTS AND IS EXPECTED TO GROW TO THREE, WHICH IS
+-- THE CONVERGENCE RATHER THAN AN OMISSION.  One guard per component:
+-- the μ unfold reads the synchronous size, the hop reads the rank, the
+-- share connect reads the unconnected count.  The third is a reading
+-- nothing has forced a shape for yet, and each lands the day its own
+-- witness forces it, so the predicate grows against a `⊥` rather than
+-- by guess.  The root satisfies both of these out of its own seeding:
+-- `evaluate` builds the entry from the program's size and depth.
+--
+-- AND THE RANK CONJUNCT IS WHAT MAKES THE HOP'S PREMISE PAYABLE, which
+-- is why it is here rather than threaded into a signature.  A value a
+-- frame hands on is bounded by the depth of the TERM the burst came
+-- from, so the statement that pays `HandedOK` needs the entry to bound
+-- that depth — and the hop's own re-entry satisfies the conjunct
+-- definitionally, since it drops the rank to the inner's own reading.
+--
+-- REFUTED: git show ba1285b:agda/evidence/refuted/Refuted/Totality-Entry.agda
+--   — the statement below WITHOUT this premise, at a `μ` over a one-shot
+--   source entered at the zero triple, claiming the unfolding's size
+--   beside the run's dryness.  It is at a sha because `src` can no
+--   longer state it: the run reads no triple and emits no marker, so
+--   neither number the witness put side by side still exists.
+EntryOK : ∀ {n} {Γ : Ctx n} {u} → Closed Γ u → Tri → Set
+EntryOK b (_ , r , sz) = syncSizeᵉ b ≤ sz × obsDepthᵉ b ≤ r
+
+-- CARRYING THE ENTRY INVARIANT DOWN A FRAME, WHICH IS THE WHOLE OF THE
+-- ARITHMETIC THE SUBSCRIBE INDUCTION NEEDS.  `syncSizeᵉ` counts the
+-- constructor and the frame's own term before it reaches the source,
+-- so a term's inner expression measures strictly below it and the
+-- invariant survives every structural descent with room to spare.  The
+-- only place a step is not structural is the μ peel, and that one is
+-- paid by the unfolding's own measure rather than here.
+entry-under : ∀ {c sz} → suc c ≤ sz → c ≤ sz
+entry-under le = ≤-trans (n≤1+n _) le
+
+entry-inner : ∀ {a b sz} → suc (a + b) ≤ sz → b ≤ sz
+entry-inner {a} {b} le = ≤-trans (m≤n+m b a) (entry-under le)
+
+-- and the rank's own descent, which is a join rather than a successor:
+-- every structural clause reads its frame's term BESIDE the source's
+-- depth, so the source is a summand and the bound passes through
+entry-depth : ∀ {a c r} → a ⊔ c ≤ r → c ≤ r
+entry-depth {a} {c} le = ≤-trans (m≤n⊔m a c) le
+
+-- and the two shapes every structural clause takes, so a call site
+-- spends one name rather than splitting the pair by hand.  A framed
+-- clause carries its frame's term in BOTH components — summed in the
+-- size, joined in the depth — while a flattener carries none, so its
+-- rank passes through untouched.
+inner-ok : ∀ {a b c d sz r} → (suc (a + b) ≤ sz) × (c ⊔ d ≤ r) → (b ≤ sz) × (d ≤ r)
+inner-ok (s , p) = entry-inner s , entry-depth p
+
+under-ok : ∀ {b c sz r} → (suc b ≤ sz) × (c ≤ r) → (b ≤ sz) × (c ≤ r)
+under-ok (s , p) = entry-under s , p
+
+-- WHAT A CLAUSE IS HANDED, WHICH IS A SEPARATE PREDICATE AND NOT A
+-- FOURTH CONJUNCT UP THERE.  The entry invariant speaks about the TERM
+-- a subscribe enters at; the hop reads a runtime VALUE that arrives
+-- later and is structurally unrelated to that term, so no reading of
+-- the program can supply it.  This says exactly what the guard reads —
+-- every value the clause receives is written shallower than the rank it
+-- is standing at — and it is the one shape of hypothesis this repo
+-- admits without a restatement being a laundering.
+--
+-- AND IT READS THE VALUE'S TYPE, WHICH IS THE DIFFERENCE BETWEEN A
+-- PROPERTY OF BURSTS AND A DEMAND ON THE ENTRY.  The bound exists to pay
+-- ONE guard — the hop's, which compares an OBSERVABLE against the rank —
+-- and an observable reaches a frame as the payload of a `strmᵗ`, the one
+-- head the reading charges a successor for.  So the strictness is real
+-- exactly where it is spent.  Asked flat, of every value at every type,
+-- it reads a numeral at nought and demands nought be strictly below the
+-- rank, which is a claim about the caller and not about the burst.
+--
+-- SO THE CLAUSES MIRROR THE READING'S OWN, RATHER THAN STOPPING AT THE
+-- OBSERVABLE HEAD.  A pair or an injection can carry an observable a
+-- later projection hands to a hop, so ⊤ at those types would weaken the
+-- premise exactly where a frame is free to recover the value — and
+-- recursing costs nothing, since the reading already recurses there and
+-- the two then correspond clause for clause.
+--
+-- REFUTED: git show ba1285b:agda/evidence/refuted/Refuted/Hop-Unconditioned.agda
+--   — the hop leaf below WITHOUT this premise, at the emptiest inner
+--   there is entered at a rank of nought.  What it established survives
+--   the cutover and is why this premise is here: the repair relates the
+--   two ends rather than reading either more carefully.  It is at a sha
+--   because the guard it was strict against is gone.
+--
+-- REFUTED: `Refuted.Carried-Unranked` — the FLAT reading, asked of every
+--   value at every type, at a one-shot source of one numeral entered at
+--   the rank the root itself builds. That witness is as far from the
+--   risky region as a program gets, which is what says the repair is the
+--   type split rather than a hypothesis about the program.
+ValOK : ∀ {n} {Γ : Ctx n} (u : Ty) → Tri → Val Γ u → Set
+ValOK unitᵗ    _ _           = ⊤
+ValOK boolᵗ    _ _           = ⊤
+ValOK natᵗ     _ _           = ⊤
+ValOK (s ×ᵗ t) τ (a , b)     = ValOK s τ a × ValOK t τ b
+ValOK (s +ᵗ t) τ (inj₁ a)    = ValOK s τ a
+ValOK (s +ᵗ t) τ (inj₂ b)    = ValOK t τ b
+ValOK (obs t)  (_ , r , _) o = obsDepthᵉ o < r
+
+HandedOK : ∀ {n} {Γ : Ctx n} {u} → List (Val Γ u) → Tri → Set
+HandedOK {u = u} vs τ = All (ValOK u τ) vs
+
+-- AND THE SAME OVER A BURST, WHICH IS WHERE THOSE VALUES COME FROM.  A
+-- push cycle steps one frame per emit and hands that frame the emit's
+-- own values, so the premise travels as a property of the whole burst
+-- and is split, emit by emit, by the induction that walks it.  Nothing
+-- here reads the schedule or the store: the burst is already built when
+-- the cycle starts, which is what makes a single `All` sufficient.
+--
+-- AND IT IS STATED OVER THE EVENTS RATHER THAN OVER THE SPLIT, WHICH IS
+-- FORCED AND NOT A PREFERENCE.  The splitter is polymorphic in the type
+-- of the bookkeeping half it retags into, and a predicate reading only
+-- its first component leaves that parameter free — an unsolved meta at
+-- the definition, and two applications at DIFFERENT retag types that no
+-- longer agree on an open list.  Reading the events directly names no
+-- such parameter, and `split-handed` below carries the property across
+-- the splitter at whatever type the call site pins.
+EventOK : ∀ {n} {Γ : Ctx n} {u} → Tri → InstEvent (Val Γ u) → Set
+EventOK {u = u} τ (value v) = ValOK u τ v
+EventOK _ (init _)    = ⊤
+EventOK _ (close _ _) = ⊤
+EventOK _ (handoff _) = ⊤
+EventOK _ complete    = ⊤
+
+BurstOK : ∀ {n} {Γ : Ctx n} {s} → Stream Γ s → Tri → Set
+BurstOK bs τ = All (λ em → All (EventOK τ) (InstEmit.events em)) bs
+
+-- the splitter keeps every `value` payload and drops the rest, so a
+-- property of the events is a property of the values it grafts — proven
+-- over the retag type the call site pins rather than over a chosen one,
+-- since the two halves are independent and only the first is read here
+split-handed : ∀ {n} {Γ : Ctx n} {u} {A : Set} {τ}
+             → (es : List (InstEvent (Val Γ u)))
+             → All (EventOK τ) es
+             → HandedOK {Γ = Γ} (proj₁ (splitEvents {A = A} es)) τ
+split-handed []              []ᵃ        = []ᵃ
+split-handed (value v  ∷ es) (p ∷ᵃ ps) = p ∷ᵃ split-handed es ps
+split-handed (init _   ∷ es) (_ ∷ᵃ ps) = split-handed es ps
+split-handed (close _ _ ∷ es) (_ ∷ᵃ ps) = split-handed es ps
+split-handed (handoff _ ∷ es) (_ ∷ᵃ ps) = split-handed es ps
+split-handed (complete ∷ es) (_ ∷ᵃ ps) = split-handed es ps
 
 ------------------------------------------------------------------
 -- THE THREE FACTS.  One per edge, each stated as the descent step the
@@ -81,7 +239,7 @@ variable
 -- structurally unrelated to the term the clause stands at, so no
 -- reading of the program supplies it directly — but where the value was
 -- handed on by a `map-f` it is `applyFn fn v`, and
--- `Rx.Obs-Depth.Substitution.obsDepth-applyFn` prices that by the
+-- `Rx.Obs-Depth.Substitution.applyFn-strict` prices that by the
 -- TEMPLATE with nothing carried in.  The residue is a source's output
 -- and a fold's, which is what the carried family is for and now the
 -- only thing that needs it.
@@ -115,6 +273,15 @@ hop-edge : ∀ {U r s} {Γ : Ctx n} {u} (o : Val Γ (obs u))
          → obsDepthᵉ o < r
          → (U , obsDepthᵉ o , syncSizeᵉ o) ≺ (U , r , s)
 hop-edge o drop = ltR drop
+
+-- THE EXTRACTION, WRITTEN OUT BECAUSE IT IS THE WHOLE OF THE ARGUMENT
+-- AND READS AS A TRIVIALITY.  It is what the leaf above will `with` on
+-- to refute the guard, and stating it separately is what keeps the
+-- refutation from being reargued at each of the three consume families.
+hop-guard : ∀ {n} {Γ : Ctx n} {u} {U r sz} (o : Val Γ (obs u))
+          → HandedOK {Γ = Γ} (o ∷ []) (U , r , sz)
+          → obsDepthᵉ o < r
+hop-guard o (h ∷ᵃ []ᵃ) = h
 
 -- THE CONNECT'S FACT IS THE ONE GENUINELY NEW STATEMENT, AND IT IS
 -- COUNTING RATHER THAN DEPTH.  Connecting slot `i` puts `i` into the
