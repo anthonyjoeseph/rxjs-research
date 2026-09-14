@@ -63,3 +63,12 @@ open import Refuted.Exit-Store using (both-ends-false;
 -- caller, and nothing in the statement relates them
 open import Refuted.Totality-Entry using (subscribe-total-false;
   unfold-size; dry-entry)
+
+-- and the same quantifier one cycle over, where the answer is not a
+-- restatement of the entry but a premise about what a frame HANDS ON.
+-- The two figures are claimed because the finding is that no program
+-- can be shallow enough to escape: the inner is the emptiest there is
+-- and the guard is strict, so a repair has to relate the two ends
+-- rather than read either more carefully
+open import Refuted.Hop-Unconditioned using (consume-total-false;
+  inner-depth; dry-out)
