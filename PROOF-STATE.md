@@ -261,8 +261,9 @@ cannot compute — and the other two leaves carry no arithmetic at all.
   the leg above's finding: the ONE subscription site a burst never reaches,
   since its observables were queued when the lane limit was full and come back
   out of the STORE, so what it is owed is a field on the invariant record and
-  not a premise. Nothing is re-pointed until all three are bodies — a
-  projection through a postulate computes at no input.
+  not a premise. These three and NOT the leg above's leaf are what the
+  re-pointing waits on: a run steps through them, while the carried report is
+  only ever projected and handed to a constructor.
 
 - **THEN THE LEAVES BOTH CYCLES LEFT, AND REFUTE EACH BEFORE GRINDING IT.**
   Both cycles are bodies now and their list plumbing is closed, so what is open

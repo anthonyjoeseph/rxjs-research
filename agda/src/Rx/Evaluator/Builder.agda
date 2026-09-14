@@ -40,7 +40,8 @@ open import Data.Bool using (Bool; true; false)
 open import Data.Bool.ListAction using (any)
 open import Data.Fin using (Fin)
 open import Data.List using (List; []; _∷_; _++_)
-open import Data.List.Relation.Unary.All using (All) renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
+open import Data.List.Relation.Unary.All using (All)
+  renaming ([] to []ᵃ; _∷_ to _∷ᵃ_; head to headᵃ; tail to tailᵃ)
 open import Data.Maybe using (Maybe; nothing; just)
 open import Data.Nat using (ℕ; zero; suc; pred; _≡ᵇ_)
 open import Data.Nat.Properties using (≤-refl; m≤m⊔n)
@@ -189,6 +190,17 @@ postulate
 -- over any function — which is also what keeps it out of the cycle
 -- below, since a statement about a derivation needs no builder to exist
 -- before it can be written.
+--
+-- AND IT IS THE ONE LEAF HERE THE RE-POINTING DOES NOT WAIT ON, WHICH IS
+-- A PROPERTY OF HOW IT IS SPENT RATHER THAN OF WHAT IT SAYS.  Nothing
+-- downstream selects a clause on it: the cycle projects rather than
+-- patterns, the only thing that consumes the extracted drop is `ltR`,
+-- and the accessibility witness under the hop is the SKIPPING one, whose
+-- accessor reads its edge's proof not at all.  So a run normalises to
+-- the same burst whether this is a body or an axiom, and the leaves the
+-- cutover genuinely waits on are the three that a run must STEP
+-- THROUGH.  Take the projections back out and that stops being true at
+-- the first emit of the first operator.
 postulate
   burst-carries : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo} {τ : Tri}
     {b : Closed Γ u} {κ : Path Γ lo u t} {id : Id} {now : Tick}
@@ -387,13 +399,25 @@ subscribeAll! ac op ns b ok κ id now sched st =
 -- own values, so the `All` over the burst peels into the head's events
 -- and the tail's emits, and `split-handed` carries the head across the
 -- splitter at whatever retag type the frame pins.
-pushBurst! ac id now fr κ []         bk         sched st = _ , push-nil
-pushBurst! ac id now fr κ (em ∷ ems) (h ∷ᵃ hs) sched st =
+--
+-- AND IT PEELS BY PROJECTION RATHER THAN BY PATTERN, WHICH IS WHAT KEEPS
+-- THE REPORT OFF THE COMPUTATIONAL PATH.  A clause selected on the `All`
+-- is a clause that cannot fire while the report is a postulate, and the
+-- report's own leaf is the last thing in this module that will become a
+-- body — so matching it here would hold the whole cutover hostage to a
+-- proof obligation the run does not need.  Projected instead, a stuck
+-- report reaches only `ltR`, which is a constructor, and the skipping
+-- accessibility witness underneath reads nothing, so every clause on
+-- both routes to the hop still reduces at a concrete program.  The same
+-- rule binds the walk below, and every carried premise added after.
+pushBurst! ac id now fr κ []         bk sched st = _ , push-nil
+pushBurst! ac id now fr κ (em ∷ ems) bk sched st =
   let sp = splitEvents (InstEmit.events em)
       ((vals′ , evs , fin′ , sched₁ , st₁) , sf) =
         stepFrame! ac id now fr κ (proj₁ sp)
-          (split-handed (InstEmit.events em) h) (proj₂ (proj₂ sp)) sched st
-      (_ , pb) = pushBurst! ac id now fr κ ems hs sched₁ st₁
+          (split-handed (InstEmit.events em) (headᵃ bk))
+          (proj₂ (proj₂ sp)) sched st
+      (_ , pb) = pushBurst! ac id now fr κ ems (tailᵃ bk) sched₁ st₁
   in _ , push-cons refl sf pb
 
 -- THE SCAN CLAUSE IS THE ONLY ONE THAT LOOKS AT THE STORE, AND THE
@@ -427,11 +451,11 @@ stepFrame! ac id now (thru-outer op nid) κ vals hk fin sched st =
         thruWalk! ac op nid κ id now vals hk sched st
   in _ , step-thru-outer w
 
-thruWalk! ac op nid κ id now []       bk         sched st = _ , walk-nil
-thruWalk! ac op nid κ id now (o ∷ os) (h ∷ᵃ hs) sched st =
+thruWalk! ac op nid κ id now []       hk sched st = _ , walk-nil
+thruWalk! ac op nid κ id now (o ∷ os) hk sched st =
   let ((vs , bs , sched₁ , st₁) , c) =
-        thruConsume! ac op nid κ id now o (h ∷ᵃ []ᵃ) sched st
-      (_ , w) = thruWalk! ac op nid κ id now os hs sched₁ st₁
+        thruConsume! ac op nid κ id now o (headᵃ hk ∷ᵃ []ᵃ) sched st
+      (_ , w) = thruWalk! ac op nid κ id now os (tailᵃ hk) sched₁ st₁
   in _ , walk-cons c w
 
 -- WHAT A CONSUME CLAUSE DECIDES IS WHETHER THE OBSERVABLE IS TAKEN AT
