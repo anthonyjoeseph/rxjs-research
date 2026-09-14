@@ -181,6 +181,19 @@ DrainsQ {e = e} allNid κ id now lim act q sched st =
 -- report would name, and that report is what the store does not yet
 -- carry.  Shrinking the leaf to that step is what makes a run with an
 -- empty or blocked queue REDUCE, which is every run the corpus holds.
+
+-- AND IT IS NOT A RANK THE SITE MUST INVENT, WHICH NARROWS WHAT IS OWED
+-- TO ONE CONJUNCT.  The room arm of the merge's consume hands the walk's
+-- own `ac`, its handed report and its share bound STRAIGHT THROUGH to
+-- the inner subscribe: entering there takes the caller's triple rather
+-- than a smaller one, so the descent is the callee's business and every
+-- premise but one threads down the chain from the frame step unchanged.
+-- The exception is the handed report, because a queued observable came
+-- out of the STORE and not out of the caller's list — and the enqueue
+-- arm is the single site that writes one, holding exactly that report at
+-- the moment it drops it.  So what is owed is a conjunct of the state
+-- invariant beside the share bound, re-established where the enqueue
+-- writes and spent where the drain reads.
 --
 -- RECOVERY: `git show 1b7698e7:agda/src/Rx/Evaluator/Builder.agda` holds
 --   the step written out over `subscribeInner!`, which is the whole of
