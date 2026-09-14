@@ -4,8 +4,8 @@ open import Data.Bool    using (Bool; true; false; if_then_else_; not; _∨_; _�
 open import Data.Fin     using (Fin; toℕ)
 open import Data.Fin.Properties using (toℕ<n) renaming (_≟_ to _≟ᶠ_)
 open import Data.Maybe   using (Maybe; just; nothing; is-nothing)
-open import Data.Nat     using (ℕ; zero; suc; _+_; _∸_; _⊔_; _<ᵇ_; _≡ᵇ_; _≤ᵇ_; _≤_; _<_; s≤s)
-open import Data.Nat.Properties using (≤-trans; ∸-monoʳ-<)
+open import Data.Nat     using (ℕ; zero; suc; _+_; _<ᵇ_; _≡ᵇ_; _≤ᵇ_; _≤_)
+open import Data.Nat.Properties using (≤-trans)
 open import Data.Nat.ListAction using (sum)
 open import Data.List    using (List; []; _∷_; _++_; map; concat; tabulate; null)
 open import Data.Bool.ListAction using (any)
@@ -33,7 +33,6 @@ variable
 -- checked by the generator/decoder, not by these types; a forward
 -- reference is rejected there.
 open import Rx.Slots using (scripted; shared; Slots)
-open import Rx.Obs-Depth using (obsDepthᵉ; obsDepthᵛ)
 
 Stream : ∀ {n} → Ctx n → Ty → Set          -- flat, canonical emission order
 Stream Γ t = List (InstEmit (Val Γ t))
@@ -390,14 +389,6 @@ mintSource : ∀ {n} {Γ : Ctx n} → Sched Γ → Source × Sched Γ
 mintSource sched =
   Sched.nextSource sched , record sched { nextSource = suc (Sched.nextSource sched) }
 
-mintOrdinal : ∀ {n} {Γ : Ctx n} → Sched Γ → Ordinal × Sched Γ
-mintOrdinal sched =
-  Sched.nextOrdinal sched , record sched { nextOrdinal = suc (Sched.nextOrdinal sched) }
-
-mintNode : ∀ {n} {Γ : Ctx n} → Sched Γ → NodeId × Sched Γ
-mintNode sched =
-  Sched.nextNode sched , record sched { nextNode = suc (Sched.nextNode sched) }
-
 -- append: the registry stays in subscription order; the id is minted here
 register : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
          → (rs : RegSrc Γ) → Path Γ (regFloor rs) u t → EvalSt e → EvalSt e
@@ -410,31 +401,6 @@ installNode : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
             → NodeId → NodeState Γ → EvalSt e → EvalSt e
 installNode nid nodeState st =
   record st { nodes = setNode nid nodeState (EvalSt.nodes st) }
-
--- WHAT A STORE STILL HOLDS, READ IN THE MEASURE'S OWN CURRENCY, WHICH
--- IS WHAT THE ENTRY TAKES ITS JOIN AGAINST.  A store can hold
--- observables — a parked inner in a merge queue, an accumulator a fold
--- deepened — and those are terms an arrival may still subscribe, so an
--- entry seeded off the program alone would be standing below something
--- already written down.  Reading the store in one currency is what lets
--- the entry take a join rather than owe a transfer between two.
-obsStᶜˢ : ∀ {n} {Γ : Ctx n} {t} → List (Closed Γ t) → ℕ
-obsStᶜˢ []       = 0
-obsStᶜˢ (e ∷ es) = obsDepthᵉ e ⊔ obsStᶜˢ es
-
-obsStⁿ : ∀ {n} {Γ : Ctx n} → NodeState Γ → ℕ
-obsStⁿ (scan-st {t = t} v)         = obsDepthᵛ t v
-obsStⁿ (take-st _)                 = 0
-obsStⁿ (mergeAll-st _ _ queued _)  = obsStᶜˢ queued
-obsStⁿ (switch-st _ _)             = 0
-obsStⁿ (exhaust-st _ _)            = 0
-
-obsStᴺ : ∀ {n} {Γ : Ctx n} → List (NodeId × NodeState Γ) → ℕ
-obsStᴺ []             = 0
-obsStᴺ ((_ , s) ∷ ns) = obsStⁿ s ⊔ obsStᴺ ns
-
-obsSt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → EvalSt e → ℕ
-obsSt st = obsStᴺ (EvalSt.nodes st)
 
 -- a source that lives and dies inside its own subscription burst
 -- (ofᵉ, emptyᵉ, take 0, a cold with no async tail): init, values,
@@ -714,16 +680,6 @@ shareFinish i true  (emits , sched′ , st′) =
   in emits ,
      record sched′ { live = sweepLive kept (Sched.live sched′) } ,
      record st′ { registry = kept }
-
--- THE DESCENT, SPELLED WHERE THE PREMISE LIVES.  A chain whose floor is
--- at or below share i re-enters the fan-out at floor `suc (toℕ i)`,
--- strictly above it, so the distance to the top of the telescope
--- strictly falls.  The proof is stated apart from the dispatch because
--- the dispatch must peel its own witness by MATCHING, and a witness
--- peeled through an application is one the termination checker cannot
--- follow.
-floorFalls : ∀ {n lo} (i : Fin n) → lo ≤ toℕ i → n ∸ suc (toℕ i) < n ∸ lo
-floorFalls i below = ∸-monoʳ-< (s≤s below) (toℕ<n i)
 
 -- one arrival, count(source) emits: every live registration chain of
 -- the arrival's source forwards EXACTLY ONE emit (possibly valueless),

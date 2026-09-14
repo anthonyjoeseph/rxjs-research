@@ -238,13 +238,16 @@ first match, which is why `bug-cache` is off the gate for the duration and
   cascades through every consumer. The leg is the field and its producers;
   whether it suffices for the queue is what it settles.
 
-- **AND THE PREDECESSOR'S SUPPORT CONE, WHICH THE SLOT SUBSCRIBE'S BODY LEFT
-  STANDING.** The connect arm now names what it does through the relation's own
-  constructors, so the machine's minting helpers, its store readings and its
-  floor arithmetic have zero consumers — `mintNode`, `mintOrdinal`, `obsSt`,
-  `floorFalls` and the rest. Each is either a missing wire or dead weight and
-  the diff of the arms decides which; the gate cannot go green either way while
-  they stand.
+- **AND THE DEPTH FACE, WHICH IS THE HALF OF THAT FINDING THAT SPLITS.** The
+  machine's minting helpers, its store readings and its floor arithmetic are
+  gone, each superseded by a derivation carrying the equation the helper hid.
+  What stands gets opposite verdicts. `zeroη` and the `obsDepth` specialisations
+  are the reading with NO environment — the currency six refutations killed — so
+  they go the same way. `Rx.Obs-Depth.Substitution` is the reverse: it is the
+  change of currency that ANSWERED those six, pricing a template off the term
+  rather than off what the term was handed, and it has a nameable consumer. The
+  leg is that deletion and that wire; the gate cannot go green while either
+  stands.
 
 - **THE TWO ENDS OF THE RUN, WHICH IS WHAT MAKES A ROW REDUCE.** `drain!` is
   fuel induction over the schedule and carries no guard at all; `mergeAllDrain!`
