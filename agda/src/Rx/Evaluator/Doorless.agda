@@ -41,12 +41,14 @@
 -- marker, and only one of them is hard.
 module Rx.Evaluator.Doorless where
 
+open import Data.Bool using (false)
 open import Data.Fin using (Fin; toℕ)
 open import Data.List using (List; _∷_)
 open import Data.Nat using (ℕ; suc; _<_; _≤_)
 open import Data.Nat.Properties using (≤-trans)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Vec using (lookup)
+open import Relation.Binary.PropositionalEquality using (_≡_)
 
 open import Rx.Prim using (Tick; Id; Source; InstEvent)
 open import Rx.Exp using (Ty; obs; Ctx; Val; Closed; syncSizeᵉ; unfoldμ; μᵉ)
@@ -55,7 +57,7 @@ open import Rx.Sync-Size using (unfoldμ-shrinks)
 open import Rx.Slots using (Slots)
 open import Rx.Strat-Order using (Tri; _≺_; ltU; ltR; ltS)
 open import Rx.Evaluator using (AllOp; NodeId; Path; Sched; EvalSt;
-  unconn; atSlot)
+  unconn; memberSource; atSlot)
 
 variable
   n  : ℕ
@@ -117,8 +119,17 @@ hop-edge o drop = ltR drop
 -- `i` was not already there, which is the branch the caller took to
 -- reach this clause at all.  Nothing about the program is read: this is
 -- a fact about a list gaining an element it did not have.
+--
+-- AND THE MEMBERSHIP PREMISE IS THE STATEMENT RATHER THAN A
+-- CONVENIENCE, WHICH IS THE SAME SHAPE THE HOP'S REPORT TURNED OUT TO
+-- HAVE.  Unconditioned the claim is false at one line: connect a slot
+-- already in the set and the count does not move, so `<` fails on the
+-- nose.  The clause is reached only down the branch that tested the
+-- membership `false`, so the true statement is the conditioned one and
+-- the caller already holds its witness.
 postulate
   connect-drops : ∀ {Γ : Ctx n} (sl : Slots Γ) (cs : List Source) (i : Fin n)
+                → memberSource (toℕ i) cs ≡ false
                 → unconn sl (toℕ i ∷ cs) < unconn sl cs
 
 -- and the edge, which needs the machine's own `U` to BE that count.
@@ -128,5 +139,31 @@ postulate
 -- definition's.
 connect-edge : ∀ {r s r′ s′} {Γ : Ctx n} (sl : Slots Γ) (cs : List Source)
                  (i : Fin n)
+             → memberSource (toℕ i) cs ≡ false
              → (unconn sl (toℕ i ∷ cs) , r′ , s′) ≺ (unconn sl cs , r , s)
-connect-edge sl cs i = ltU (connect-drops sl cs i)
+connect-edge sl cs i fresh = ltU (connect-drops sl cs i fresh)
+
+------------------------------------------------------------------
+-- WHAT LEAVES `Rx.Evaluator` AT THE CUTOVER.  The list is the point:
+-- the marker becomes UNEMITTABLE because nothing that could emit it is
+-- still in the module, not because a number came out large enough.
+------------------------------------------------------------------
+
+-- `drySource`, `dryBurst`, `dried` at its one use, and the three
+--   clauses that build one.  `dryEvent` and `hasDry` go with them, and
+--   `rank-sufficient` stops being a theorem: there is no predicate
+--   left to state it over.
+-- `Acc _≺_ τ` and the `τ` implicit, from all sixteen frame
+--   signatures — so `Tri`, `_≺_`, `entryTri`, `rootTri`,
+--   `entryWitness` and `rootWitness` leave the machine too.  The order
+--   survives in the BUILDER, where a failed edge is an unproven
+--   obligation rather than an emitted marker.
+-- the three `with … <?` blocks and, with them, the last reason
+--   `Rx.Evaluator` imports a decision procedure over ℕ.
+--
+-- AND WHAT ARRIVES IS ONE FUNCTION, WHICH IS THE WHOLE OF THE DIFF ON
+-- THIS SIDE.  `evaluate` becomes `proj₁` of the builder's assembly,
+-- with the same type it has today: `Fuel → Closed Γ t → Slots Γ →
+-- Stream Γ t`.  Every consumer above — the oracle, the bug cache, the
+-- protocol theorems — sees no change at all, which is the test that
+-- the descent was never part of the semantics.
