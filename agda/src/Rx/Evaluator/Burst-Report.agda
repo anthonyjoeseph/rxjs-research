@@ -506,6 +506,18 @@ postulate
   -- widening is the same relating the queued observable needs, which is
   -- why this arm is where the record's field is owed.
   --
+  -- AND IT IS ORDERED BEHIND THE BUILDER AGREEMENT, WHICH IS WHAT STOPS
+  -- IT BEING WALKED TODAY.  The recursion itself is available: both of
+  -- `sharedConnect⇓`'s constructors prepend bookkeeping to a
+  -- `sharedPlumb` of a burst some `subscribeE⇓` produced, and that
+  -- derivation is a structural subterm — so this is a CLAUSE of the walk
+  -- below and not a family it cannot perform.  What it cannot supply is
+  -- `connect-entry`'s premise: the constructor carries the equation
+  -- against the SCHEDULE's table and `connect-entry` wants it against
+  -- `sl`, so the clause needs `Sched.slots sched ≡ sl` at a schedule
+  -- another clause built — which is what widening a builder's RETURN
+  -- type is for.
+  --
   -- REFUTED: `Refuted.Carried-Derived` — the reading with no environment
   --   at all, at that run.  It is this arm the witness stands at: a
   --   reference is one symbol standing for a definition of any nesting, so

@@ -228,16 +228,23 @@ first match, which is why `bug-cache` is off the gate for the duration and
 
 ### Big picture tier roadmap
 
-- **THE FIELD ON THE INVARIANT RECORD, WHICH IS WHERE THE SPLIT LEFT THE CLAIM
-  POINTING.** Walking `burst-carries` as a body settled which of its arms carry
-  content: the bookkeeping bursts hold no value at all and close by
-  construction, `all-carries` closed as a body over the one constructor its
-  relation has, and `slot-carries` walked too — two of its three constructors
-  are bookkeeping. What is left is `connect-carries`, the arm that follows the
-  run out of the store. Its premise already dominates the slot's rank, since
-  `depᵉ (slotDepth sl) (input i)` IS `slotDepth sl i`; what nothing states is
-  that `BurstOK` widens along that domination. The leg is that widening and the
-  field it needs; whether it suffices for the queue is what it settles.
+- **WIDEN WHAT A BUILDER RETURNS, WHICH TURNS OUT TO GATE THE WALK.** Every
+  premise is denominated at one `slotDepth sl` the caller fixes, and each clause
+  carries an agreement `Sched.slots sched ≡ sl`. Three sites are handed a
+  schedule some other clause built — `subs-keeps-slots`, `step-keeps-slots`,
+  `consume-keeps-slots` — all stated as inductions over the ⇓ family they cannot
+  perform; carrying the equation in the RESULT type discharges all three. It
+  moves every clause's return, which is why it was last; it is first because
+  `connect-carries` cannot be walked without it, per the leg below.
+
+- **THE ARM THAT FOLLOWS THE RUN OUT OF THE STORE.** `burst-carries`,
+  `all-carries` and `slot-carries` all walked; what is left is
+  `connect-carries`. Three pieces: `BurstOK` widening along a rank domination
+  the caller's premise already supplies, `sharedPlumb` preservation (it rewrites
+  only `kind`, and the predicate reads only `events`), and a recursion at the
+  slot's own triple — structural on the derivation, so a clause of the existing
+  block rather than a leaf. It needs the agreement at a schedule it did not
+  build, which is the leg above.
 
 - **THE TWO ENDS OF THE RUN, WHICH IS WHAT MAKES A ROW REDUCE.** `drain!` is
   fuel induction over the schedule and carries no guard at all; `mergeAllDrain!`
@@ -248,17 +255,6 @@ first match, which is why `bug-cache` is off the gate for the duration and
   over the queue is the statement `hop-edge`'s own header refutes. With these
   and the leg above landed the evaluator reduces, the cache goes back on the
   gate, and the corpus says whether the doorless run agrees with the spec.
-
-- **WIDEN WHAT A BUILDER RETURNS, SO THE TELESCOPE COSTS NOTHING.** Every
-  premise is denominated at one `slotDepth sl` fixed by the caller, and each
-  clause carries an agreement `Sched.slots sched ≡ sl` rather than a transport.
-  Three sites are handed a schedule some other clause built —
-  `subs-keeps-slots`, `step-keeps-slots`, `consume-keeps-slots` — and all three
-  are stated as inductions over the ⇓ family they cannot perform. Every builder
-  clause already holds the equation where it would have to prove it, so carrying
-  it in the RESULT type discharges all three at once and leaves the obligation
-  on the two leaves that return a schedule nothing here built. It moves every
-  clause's return, which is why it is not first.
 
 - **AND THE TWO FRAME HEADS THAT LEAVE THE MODULE, WHICH ARE NOT THE MEASURE'S
   QUESTION.** The frame walk landed and put four leaves where one statement
