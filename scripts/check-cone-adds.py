@@ -126,7 +126,6 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--threshold", type=int, default=DEFAULT_THRESHOLD,
                     help="reverse-cone size at which a module is 'deep'")
-    ap.add_argument("--base-ref", default="main")
     ap.add_argument("--src", default=SRC)
     ap.add_argument("--root", default=ROOT,
                     help="repository to check (the selftest drives a scratch one)")
@@ -150,7 +149,7 @@ def main():
     moved = _load("check_roadmap_moved", "check-roadmap-moved.py")
     strip_text = _load("strip_comments_mod", "strip-comments.py").strip_text
 
-    base = moved.merge_base(args.base_ref)
+    base = moved.merge_base()
     if base is None or base == moved.head_sha():
         base = "HEAD"
     changed = moved.changed_paths(base)

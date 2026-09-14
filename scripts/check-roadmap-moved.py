@@ -99,16 +99,16 @@ def head_sha():
     return p.stdout.strip() if p.returncode == 0 else None
 
 
-def merge_base(base_ref):
-    """The commit this branch diverged from, or None when there isn't one.
+def merge_base():
+    """The commit this branch diverged from main, or None when there isn't one.
 
-    Tries `origin/<name>` before the bare name so a checkout that has the
+    Tries `origin/main` before the bare name so a checkout that has the
     remote ref (CI, with fetch-depth 0) uses it, while a local clone with only
     a tracking branch still resolves. None on every git failure — a shallow
     clone, an unrelated history, a repo with no main — and every caller treats
     that as 'fall back to the per-commit reading' rather than as a pass.
     """
-    for ref in (f"origin/{base_ref}", base_ref):
+    for ref in ("origin/main", "main"):
         p = subprocess.run(["git", "merge-base", ref, "HEAD"],
                            capture_output=True, text=True)
         if p.returncode == 0 and p.stdout.strip():
@@ -166,7 +166,7 @@ class NoBaseline(Exception):
     """No comparison point exists at the requested ref — every caller passes."""
 
 
-def resolve_endpoints(file, ref, baseline_file=None, base_ref="main"):
+def resolve_endpoints(file, ref, baseline_file=None):
     """-> (cur, base, against, exempt_from, exempt_to)
 
     WHICH TWO VERSIONS OF THE ROADMAP A CHECK IS COMPARING, resolved once
@@ -204,14 +204,14 @@ def resolve_endpoints(file, ref, baseline_file=None, base_ref="main"):
     # — an explicit --ref is a deliberate comparison point, not to be
     # second-guessed — and only when the branch has actually diverged.
     if ref == "HEAD":
-        mb = merge_base(base_ref)
+        mb = merge_base()
         if mb is not None and mb != head_sha():
             base = baseline_from_git(file, mb)
             if base is None:
                 raise NoBaseline(
-                    f"no {file} at the merge-base with {base_ref} — "
+                    f"no {file} at the merge-base with main — "
                     "nothing to compare against")
-            return cur, base, f"the merge-base with {base_ref}", mb, None
+            return cur, base, "the merge-base with main", mb, None
 
     base = baseline_from_git(file, ref)
     if base is None:
@@ -247,13 +247,11 @@ def main():
     ap.add_argument("--baseline-file", default=None,
                     help="compare against this file instead of git (selftest)")
     ap.add_argument("--ref", default="HEAD")
-    ap.add_argument("--base-ref", default="main",
-                    help="branch this one is measured against (default main)")
     args = ap.parse_args()
 
     try:
         cur, base, against, exempt_from, exempt_to = resolve_endpoints(
-            args.file, args.ref, args.baseline_file, args.base_ref)
+            args.file, args.ref, args.baseline_file)
     except Unreadable as e:
         print(f"roadmap-moved: {e}")
         return 1
