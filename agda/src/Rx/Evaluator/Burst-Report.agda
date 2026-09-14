@@ -200,8 +200,8 @@ private
   -- a value read under the rank satisfies the entry predicate at every
   -- type: the rank enters only at `obs`, and the join a compound is
   -- read by dominates each component's own reading
-  valOK-below : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) {U r sz} (u : Ty)
-                (v : Val Γ u) → depᵛ η u v < r → ValOK η u (U , r , sz) v
+  valOK-below : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) {U q r sz} (u : Ty)
+                (v : Val Γ u) → depᵛ η u v < r → ValOK η u (U , q , r , sz) v
   valOK-below η unitᵗ    _        lt = tt
   valOK-below η boolᵗ    _        lt = tt
   valOK-below η natᵗ     _        lt = tt
@@ -216,10 +216,10 @@ private
   -- wherever there is anything to be strict about.  Open at a data
   -- environment, since a frame's template is open at exactly one
   -- binder and a source's terms are this at the empty one
-  handed-open : ∀ {n} {Γ : Ctx n} {Θ u} {U r sz} (η : Fin n → ℕ)
+  handed-open : ∀ {n} {Γ : Ctx n} {Θ u} {U q r sz} (η : Fin n → ℕ)
                 (dd : AllData Θ) (tm : Tm Γ [] [] Θ u)
                 (env : All (Val Γ) Θ) → depᵗ η tm ≤ r
-              → ValOK η u (U , r , sz) (evalWith tm env)
+              → ValOK η u (U , q , r , sz) (evalWith tm env)
   handed-open {u = u} η dd tm env le with depᵗ η tm in eq
   ... | zero  = eval-silent η dd tm env eq
   ... | suc k = valOK-below η u (evalWith tm env)
@@ -227,10 +227,10 @@ private
                                     (dep-eval-strict η dd tm env))
                            (subst (_≤ _) (sym eq) le))
 
-of-handed : ∀ {n} {Γ : Ctx n} {u} {U r sz} (η : Fin n → ℕ)
+of-handed : ∀ {n} {Γ : Ctx n} {u} {U q r sz} (η : Fin n → ℕ)
             (ts : List (Tm Γ [] [] [] u))
           → depᵗˢ η ts ≤ r
-          → HandedOK η (map (λ tm → evalTm tm) ts) (U , r , sz)
+          → HandedOK η (map (λ tm → evalTm tm) ts) (U , q , r , sz)
 of-handed η []        dep = []ᵃ
 of-handed η (tm ∷ ts) dep =
     handed-open η []ᵈ tm []ᵃ (≤-trans (m≤m⊔n (depᵗ η tm) (depᵗˢ η ts)) dep)
@@ -248,9 +248,9 @@ depᵛˢ : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) (u : Ty) → List (Val Γ u
 depᵛˢ η u []       = 0
 depᵛˢ η u (v ∷ vs) = depᵛ η u v ⊔ depᵛˢ η u vs
 
-handed-below : ∀ {n} {Γ : Ctx n} {U r sz} (η : Fin n → ℕ) (u : Ty)
+handed-below : ∀ {n} {Γ : Ctx n} {U q r sz} (η : Fin n → ℕ) (u : Ty)
                (vs : List (Val Γ u)) → depᵛˢ η u vs < r
-             → HandedOK η vs (U , r , sz)
+             → HandedOK η vs (U , q , r , sz)
 handed-below η u []       lt = []ᵃ
 handed-below η u (v ∷ vs) lt =
     valOK-below η u v (≤-trans (s≤s (m≤m⊔n (depᵛ η u v) (depᵛˢ η u vs))) lt)
@@ -319,8 +319,8 @@ private
 -- so the caller already has this and hands it down rather than
 -- proving it.  The other three hold no term at all.
 FrameOK : ∀ {n} {Γ : Ctx n} {s u} (η : Fin n → ℕ) → Frame Γ s u → Tri → Set
-FrameOK η (map-f fn)          (_ , r , _) = depᵗ η fn ≤ r
-FrameOK η (scan-f fn nid)     (_ , r , _) = depᵗ η fn ≤ r
+FrameOK η (map-f fn)          (_ , _ , r , _) = depᵗ η fn ≤ r
+FrameOK η (scan-f fn nid)     (_ , _ , r , _) = depᵗ η fn ≤ r
 FrameOK η (take-f nid)        _           = ⊤
 FrameOK η (from-inner _ _ _)  _           = ⊤
 FrameOK η (thru-outer _ _)    _           = ⊤
@@ -362,7 +362,7 @@ private
 -- the binder being the observable the drop assumes is not there.
 map-data : ∀ {n} {Γ : Ctx n} {s u} {τ : Tri} (η : Fin n → ℕ)
            → isData s ≡ true → (fn : Fn Γ [] [] [] s u)
-             (vs : List (Val Γ s)) → depᵗ η fn ≤ proj₁ (proj₂ τ)
+             (vs : List (Val Γ s)) → depᵗ η fn ≤ proj₁ (proj₂ (proj₂ τ))
            → HandedOK η vs τ → HandedOK η (map (applyFn fn) vs) τ
 map-data {τ = _ , _ , _} η ds fn []       le []ᵃ        = []ᵃ
 map-data {τ = _ , _ , _} η ds fn (v ∷ vs) le (_ ∷ᵃ ps) =
@@ -392,7 +392,7 @@ map-data {τ = _ , _ , _} η ds fn (v ∷ vs) le (_ ∷ᵃ ps) =
 postulate
   map-open : ∀ {n} {Γ : Ctx n} {s u} {τ : Tri} (η : Fin n → ℕ)
            → isData s ≡ false → (fn : Fn Γ [] [] [] s u)
-             (vs : List (Val Γ s)) → depᵗ η fn ≤ proj₁ (proj₂ τ)
+             (vs : List (Val Γ s)) → depᵗ η fn ≤ proj₁ (proj₂ (proj₂ τ))
            → HandedOK η vs τ → HandedOK η (map (applyFn fn) vs) τ
 
 -- AND THE FOLD, WHICH THE SAME REPAIR DOES NOT REACH.  A scan re-enters
@@ -409,7 +409,7 @@ postulate
   scan-handed : ∀ {n} {Γ : Ctx n} {s u} {τ : Tri} (η : Fin n → ℕ)
     (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (ac : Val Γ u) (vs : List (Val Γ s))
     {outs : List (Val Γ u)} {ac′ : Val Γ u} →
-    depᵗ η fn ≤ proj₁ (proj₂ τ) → HandedOK η vs τ →
+    depᵗ η fn ≤ proj₁ (proj₂ (proj₂ τ)) → HandedOK η vs τ →
     scanVals fn ac vs ≡ (outs , ac′) → HandedOK η outs τ
 
 -- AND THE TWO HEADS THAT LEAVE THIS MODULE.  An `*All` frame does not
@@ -599,8 +599,8 @@ mutual
  burst-carries {τ = τ} sl ok (subs-shared _ s)        = slot-carries sl ok s
  burst-carries {τ = τ} sl ok (subs-empty eq)          = oneshot-ok _ τ [] _ _ eq []ᵃ
  burst-carries {τ = τ} sl ok (subs-take-zero _ eq)    = oneshot-ok _ τ [] _ _ eq []ᵃ
- burst-carries {τ = U , r , sz} sl (_ , dep) (subs-of eq) =
-   oneshot-ok _ (U , r , sz) _ _ _ eq (of-handed (slotDepth sl) _ dep)
+ burst-carries {τ = U , q , r , sz} sl (_ , dep) (subs-of eq) =
+   oneshot-ok _ (U , q , r , sz) _ _ _ eq (of-handed (slotDepth sl) _ dep)
  burst-carries {τ = τ} sl ok (subs-cold-sync {ok = okd} _ _ eq) =
    oneshot-ok _ τ _ _ _ eq (data-handed _ τ _ okd)
  burst-carries {τ = τ} sl ok (subs-cold-async {ok = okd} _ _ _ _) =

@@ -230,15 +230,15 @@ runs, which is now one leaf away.
 
 ### Big picture tier roadmap
 
-- **THE COMPONENT THE MERGE DRAIN DROPS, WHICH IS THE TIER'S ENDING CONDITION.**
-  `queuedInner!` is the one site a run cannot step through: the entry
-  subscribes a term deeper than the rank in force. The share connect is the
-  precedent, answered in the order. What it counts is not items, which
-  `syncSizeᵉ`'s dead route refutes — a doubling fold outruns any seeding — but
-  the MULTISET OF DEPTHS held queued AND still pending in the burst being
-  walked. Read over the store alone it rises at the write; read with the
-  pending half the write is a move, the drain a removal, and a subscribe adds
-  only under the rank the hop dropped to. The leg is that order and the body.
+- **THE MEASURE THE DRAIN DROPS, NOW THAT THE ORDER HOLDS A PLACE FOR IT.** The
+  order carries a fourth component: a census of queued depths by level, under
+  the share count because a connect can fill a store, and over the rank because
+  a drain enters deeper than the rank in force. What remains is the READING —
+  the census taken over what the stores hold TOGETHER WITH the burst still
+  pending, so the merge's one enqueue is a move and not a growth — and
+  `queuedInner!`'s body over it. That is the tier's ending condition: it is the
+  one site a run cannot step through, so the evaluator does not run until it
+  lands, and with it the corpus and the birth floor come back.
 
 - **WIDEN WHAT A BUILDER RETURNS, WHICH TURNS OUT TO GATE THE WALK.** Every
   premise is denominated at one `slotDepth sl` the caller fixes, and each clause
