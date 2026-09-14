@@ -386,6 +386,41 @@ postulate
     (sched : Sched Γ) (st : EvalSt e) →
     BurstOK {Γ = Γ} (proj₁ (subscribeE {e = e} ac b κ id now sched st)) τ
 
+-- AND THE MOVE THAT ACTUALLY CLOSES THE TIER, WHICH IS NOT ANY OF THE
+-- FOUR ABOVE.  Killing the door makes the `no` arm unreachable IN THE
+-- PROOF; `evaluate` still contains it, so `Refuted.Dry-Wrap` stays green
+-- and `rank-sufficient` stays false until the CLAUSE ITSELF GOES.  What
+-- the premise buys is the licence to delete it — and the deletion has a
+-- cost the statements above hide: the `yes` branch is where the
+-- recursive `Acc` step comes from (`rec (ltR p)`), so removing the test
+-- removes the descent witness with it.  Two ways out, and choosing
+-- between them is the design decision this leg hands forward:
+--
+--   · PROOF-CARRYING — `subscribeInner` takes `HandedOK (o ∷ []) τ` as an
+--     argument and spends it for `ltR`.  The guard goes, the marker goes,
+--     and the obligation propagates to every caller up to `evaluate`,
+--     which must supply it at the root from `rootTri`.  Honest, and it
+--     makes the evaluator's type carry the invariant — but the impl then
+--     stops mirroring anything a plain rxjs pipeline does, which is the
+--     one line this repo does not cross.
+--   · CARRIED BOUND — the rank is not READ off the term at the hop but
+--     held in the state and re-seeded at entry, so the comparison is
+--     against a figure the machine already owns and cannot fail.  This is
+--     what `Refuted.Dry-Wrap`'s own header names as the repair: a bound
+--     the machine CARRIES, quantified beside the rank rather than read
+--     off it.  It leaves the evaluator a plain function.
+--
+-- The second is almost certainly right, and neither is sketched further
+-- here because the choice wants the burst statement settled first: the
+-- shape of what the machine carries IS whatever `subscribe-carried` ends
+-- up quantifying over.
+postulate
+  subscribeInner-nodoor : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
+    {τ : Tri} (ac : Acc _≺_ τ) (op : AllOp) (allNid : NodeId)
+    (κ : Path Γ lo u t) (id : Id) (now : Tick) (o : Val Γ (obs u)) →
+    HandedOK {Γ = Γ} (o ∷ []) τ → (sched : Sched Γ) (st : EvalSt e) →
+    Acc _≺_ (proj₁ τ , obsDepthᵉ o , syncSizeᵉ o)
+
 -- THE SAME EDGE FROM THE OTHER SIDE: an inner subscription that has
 -- already been made, reacting to what it delivers.  It reaches the
 -- subscribe cycle through the flattener's own bookkeeping rather than

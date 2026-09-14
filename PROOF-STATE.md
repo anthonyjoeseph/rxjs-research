@@ -242,6 +242,11 @@ cannot compute — and the other two leaves carry no arithmetic at all.
   unfolds to that same inequality and the arm dies by `⊥-elim`. Four coarse
   statements are landed unchecked in the module — `subscribeInner⇓-total`,
   `hop-guard`, `inner-nodry`, `burst-handed` — for the shapes to be argued with.
+  But the kill is not the CLOSE: `evaluate` still holds the arm, so
+  `Refuted.Dry-Wrap` stays green until the clause goes, and deleting it costs
+  the descent witness the `yes` branch supplies. `subscribeInner-nodoor` sketches
+  that residue, and its two routes — proof-carrying evaluator, or a bound the
+  machine CARRIES — are the choice this leg hands to the one below.
 
 - **THEN RESTATE `subscribe-carried` OVER THE SCHEDULE, GROWING `EntryOK` TO THE
   THIRD CONJUNCT IN THE SAME EDIT — IT IS WHAT PAYS THE DOOR'S PREMISE.**
