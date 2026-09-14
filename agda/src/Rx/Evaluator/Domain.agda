@@ -102,7 +102,7 @@ data thruWalk⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
 data mergeAllDrain⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
      ∀ {s lo} →
      NodeId → Path Γ lo s t → Id → Tick
-   → Maybe ℕ → ℕ → List (Closed Γ s) → Sched Γ → EvalSt e
+   → Maybe ℕ → ℕ → Bool → List (Closed Γ s) → Sched Γ → EvalSt e
    → List (Val Γ s) × List (InstEvent (Val Γ t)) × ℕ
      × List (Closed Γ s) × Sched Γ × EvalSt e → Set
 
@@ -480,26 +480,37 @@ data thruWalk⇓ {n} {Γ} {t} {e} where
 
 data mergeAllDrain⇓ {n} {Γ} {t} {e} where
 
-  drain-nil : ∀ {s lo allNid} {κ : Path Γ lo s t} {id now} {lim act sched₀ st₀}
-            → mergeAllDrain⇓ allNid κ id now lim act [] sched₀ st₀
+  drain-nil : ∀ {s lo allNid} {κ : Path Γ lo s t} {id now} {lim act od sched₀ st₀}
+            → mergeAllDrain⇓ allNid κ id now lim act od [] sched₀ st₀
                 ([] , [] , act , [] , sched₀ , st₀)
 
   drain-no-room : ∀ {s lo allNid} {κ : Path Γ lo s t} {id now}
-                    {lim act} {o : Closed Γ s} {q sched₀ st₀}
+                    {lim act od} {o : Closed Γ s} {q sched₀ st₀}
                 → hasRoom lim act ≡ false
-                → mergeAllDrain⇓ allNid κ id now lim act (o ∷ q) sched₀ st₀
+                → mergeAllDrain⇓ allNid κ id now lim act od (o ∷ q) sched₀ st₀
                     ([] , [] , act , o ∷ q , sched₀ , st₀)
 
+  -- THE SHORTENED QUEUE IS WRITTEN BEFORE THE SUBSCRIBE, NOT AFTER THE
+  -- WHOLE DRAIN.  A batch write-back leaves the node holding the items
+  -- already spent, so anything re-entering this node mid-drain reads a
+  -- queue that is no longer true — and rxjs takes the item OUT of the
+  -- buffer before it subscribes it, so the batch form was the one that
+  -- diverged.  It is also what lets the store be read as a census: a
+  -- reading over a stale queue cannot fall as the drain proceeds, so no
+  -- measure denominated in it can order this edge.
   drain-room : ∀ {s lo allNid} {κ : Path Γ lo s t} {id now}
-                 {lim act} {o : Closed Γ s} {q sched₀ st₀}
+                 {lim act od} {o : Closed Γ s} {q sched₀ st₀}
                  {inst vs bs done sched₁ st₁} {vs′ bs′ act′ q′ sched₂ st₂}
              → hasRoom lim act ≡ true
-             → subscribeInner⇓ mergeAllᵒ allNid κ id now o sched₀ st₀
+             → subscribeInner⇓ mergeAllᵒ allNid κ id now o sched₀
+                 (record st₀
+                    { nodes = setNode allNid (mergeAll-st {t = s} lim act q od)
+                        (EvalSt.nodes st₀) })
                  (inst , vs , bs , done , sched₁ , st₁)
              → mergeAllDrain⇓ allNid κ id now lim
-                 (if done then act else suc act) q sched₁ st₁
+                 (if done then act else suc act) od q sched₁ st₁
                  (vs′ , bs′ , act′ , q′ , sched₂ , st₂)
-             → mergeAllDrain⇓ allNid κ id now lim act (o ∷ q) sched₀ st₀
+             → mergeAllDrain⇓ allNid κ id now lim act od (o ∷ q) sched₀ st₀
                  (vs ++ vs′ , bs ++ bs′ , act′ , q′ , sched₂ , st₂)
 
 data innerFinish⇓ {n} {Γ} {t} {e} where
@@ -507,7 +518,7 @@ data innerFinish⇓ {n} {Γ} {t} {e} where
   finish-all-drain : ∀ {s lo allNid inst} {κ : Path Γ lo s t} {id now}
                        {vals : List (Val Γ s)} {sched st} {lim act q od}
                        {vs bs act′ q′ sched′ st′}
-                   → mergeAllDrain⇓ allNid κ id now lim (pred act) q sched st
+                   → mergeAllDrain⇓ allNid κ id now lim (pred act) od q sched st
                        (vs , bs , act′ , q′ , sched′ , st′)
                    → innerFinish⇓ mergeAllᵒ allNid inst κ id now vals sched st
                        (just (mergeAll-st {t = s} lim act q od))

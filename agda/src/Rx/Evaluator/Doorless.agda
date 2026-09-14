@@ -40,7 +40,7 @@ open import Data.Nat.Properties using (≤-trans; ≤-refl; ≤-reflexive; n≤1
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (⊤)
-open import Data.Vec using (lookup)
+open import Data.Vec using (lookup; []; _∷_)
 open import Induction.WellFounded using (Acc)
 open import Relation.Binary.PropositionalEquality using (_≡_; sym)
 
@@ -51,7 +51,7 @@ open import Rx.Obs-Depth using (depᵉ; dep-unfoldμ-no-deeper)
 open import Rx.Slot-Depth using (slotDepth; slotDepth-fix)
 open import Rx.Sync-Size using (unfoldμ-shrinks)
 open import Rx.Slots using (Slots; shared)
-open import Rx.Strat-Order using (Tri; _≺_; ltU; ltR; ltS; ≺-wellFounded; emptyHold)
+open import Rx.Strat-Order using (Tri; _≺_; ltU; ltR; ltS; ≺-wellFounded)
 open import Rx.Evaluator using (unconn; memberSource; Stream; splitEvents; EvalSt)
 
 variable
@@ -98,7 +98,7 @@ variable
 --   longer state it: the run reads no triple and emits no marker, so
 --   neither number the witness put side by side still exists.
 EntryOK : ∀ {n} {Γ : Ctx n} {u} (η : Fin n → ℕ) → Closed Γ u → Tri → Set
-EntryOK η b (_ , _ , r , sz) = syncSizeᵉ b ≤ sz × depᵉ η b ≤ r
+EntryOK η b (_ , r , sz) = syncSizeᵉ b ≤ sz × depᵉ η b ≤ r
 
 -- AND THE OTHER AGREEMENT A BUILDER CARRIES, WHICH IS ABOUT THE STORE
 -- RATHER THAN ABOUT THE TERM.  The connect's edge drops the unconnected
@@ -114,6 +114,7 @@ EntryOK η b (_ , _ , r , sz) = syncSizeᵉ b ≤ sz × depᵉ η b ≤ r
 SharesUnder : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
             → Slots Γ → Tri → EvalSt e → Set
 SharesUnder sl τ st = unconn sl (EvalSt.connectedShares st) ≤ proj₁ τ
+
 
 -- CARRYING THE ENTRY INVARIANT DOWN A FRAME, WHICH IS THE WHOLE OF THE
 -- ARITHMETIC THE SUBSCRIBE INDUCTION NEEDS.  `syncSizeᵉ` counts the
@@ -191,7 +192,7 @@ ValOK η natᵗ     _ _           = ⊤
 ValOK η (s ×ᵗ t) τ (a , b)     = ValOK η s τ a × ValOK η t τ b
 ValOK η (s +ᵗ t) τ (inj₁ a)    = ValOK η s τ a
 ValOK η (s +ᵗ t) τ (inj₂ b)    = ValOK η t τ b
-ValOK η (obs t)  (_ , _ , r , _) o = depᵉ η o < r
+ValOK η (obs t)  (_ , r , _) o = depᵉ η o < r
 
 HandedOK : ∀ {n} {Γ : Ctx n} {u} (η : Fin n → ℕ) → List (Val Γ u) → Tri → Set
 HandedOK {u = u} η vs τ = All (ValOK η u τ) vs
@@ -250,11 +251,11 @@ split-handed η (complete ∷ es) (_ ∷ᵃ ps) = split-handed η es ps
 -- right to be asked without carrying `EntryOK` — and carrying
 -- `EntryOK` is what a builder does and what a plain rxjs pipeline
 -- cannot, which is why the invariant is here and not there.
-μ-edge : ∀ {U q r sz} {Γ : Ctx n} {u} (η : Fin n → ℕ)
+μ-edge : ∀ {U r sz} {Γ : Ctx n} {u} (η : Fin n → ℕ)
          (body : Exp Γ (u ∷ []) [] [] u)
        → syncSizeᵉ (μᵉ body) ≤ sz
        → depᵉ η (μᵉ body) ≤ r
-       → (U , q , r , syncSizeᵉ (unfoldμ body)) ≺ (U , q , r , sz)
+       → (U , r , syncSizeᵉ (unfoldμ body)) ≺ (U , r , sz)
 μ-edge η body sz≤ _ = ltS (≤-trans (unfoldμ-shrinks body) sz≤)
 
 -- and the peel's other component, which is not part of the edge but is
@@ -298,9 +299,9 @@ split-handed η (complete ∷ es) (_ ∷ᵃ ps) = split-handed η es ps
 --   it is what fixes the SHAPE of the totality cutover: the knot is tied
 --   ABOVE this module, where a premise costs a proof obligation rather
 --   than an argument, so `evaluate` keeps the type a pipeline has.
-hop-edge : ∀ {U q r s} {Γ : Ctx n} {u} (η : Fin n → ℕ) (o : Val Γ (obs u))
+hop-edge : ∀ {U r s} {Γ : Ctx n} {u} (η : Fin n → ℕ) (o : Val Γ (obs u))
          → depᵉ η o < r
-         → (U , q , depᵉ η o , syncSizeᵉ o) ≺ (U , q , r , s)
+         → (U , depᵉ η o , syncSizeᵉ o) ≺ (U , r , s)
 hop-edge η o drop = ltR drop
 
 -- THE EXTRACTION, WRITTEN OUT BECAUSE IT IS THE WHOLE OF THE ARGUMENT
@@ -317,7 +318,7 @@ hop-edge η o drop = ltR drop
 -- against the statement that cannot determine them.
 hop-guard : ∀ {n} {Γ : Ctx n} {u} (η : Fin n → ℕ) (τ : Tri) (o : Val Γ (obs u))
           → HandedOK {Γ = Γ} η (o ∷ []) τ
-          → depᵉ η o < proj₁ (proj₂ (proj₂ τ))
+          → depᵉ η o < proj₁ (proj₂ τ)
 hop-guard η _ o (h ∷ᵃ []ᵃ) = h
 
 -- THE CONNECT'S FACT IS THE ONE GENUINELY NEW STATEMENT, AND IT IS
@@ -364,11 +365,11 @@ postulate
 -- shrinks the count, which is a statement over the ⇓ families rather
 -- than over any function.  That is the same shape the slot-table
 -- agreement takes, and it is why the arm is not a body today.
-connect-edge : ∀ {U q q′ r s r′ s′} {Γ : Ctx n} (sl : Slots Γ) (cs : List Source)
+connect-edge : ∀ {U r s r′ s′} {Γ : Ctx n} (sl : Slots Γ) (cs : List Source)
                  (i : Fin n)
              → memberSource (toℕ i) cs ≡ false
              → unconn sl cs ≤ U
-             → (unconn sl (toℕ i ∷ cs) , q′ , r′ , s′) ≺ (U , q , r , s)
+             → (unconn sl (toℕ i ∷ cs) , r′ , s′) ≺ (U , r , s)
 connect-edge sl cs i fresh le = ltU (<-≤-trans (connect-drops sl cs i fresh) le)
 
 -- AND THE CONNECT'S OTHER COMPONENT, WHICH IS THE ONE THE ENVIRONMENT
@@ -384,29 +385,12 @@ connect-edge sl cs i fresh le = ltU (<-≤-trans (connect-drops sl cs i fresh) l
 --   reference priced at nought instead, at a fresh share whose
 --   definition writes one level of observable.
 
--- AND THE CONNECT RESETS THE HOLDING RATHER THAN CARRYING IT, WHICH THE
--- ORDER PERMITS AND THE WIDTH REQUIRES.  Connecting drops the outermost
--- component, so every component under it is free to be named afresh —
--- and the descent below this point is a subscription of the slot's own
--- definition, whose stores are its own.  What an enclosing merge is
--- holding is compared against the triple that enclosing subscription
--- descends on, never against this one.  The width is the successor of
--- the rank here for the same reason it is at an entry: the rank is what
--- a queued observable below this point is written under.
---
--- AND THE CALL SITE NAMES IT TOO, WHICH IS FORCED BY THE SAME SHAPE
--- `hop-guard` RUNS INTO ONE SECTION UP.  `EntryOK` reads the rank and
--- the size and DISCARDS the holding, so an application of it can never
--- determine one — the component has to be named where the connect's
--- edge is built, or every such call reports unsolved metas against the
--- application rather than against the statement that cannot fix them.
 connect-entry : ∀ {U} {Γ : Ctx n} (sl : Slots Γ) (i : Fin n)
                 {d : Closed Γ (lookup Γ i)}
                 {ok : T (inputsBelowᵉ (toℕ i) d)}
               → sl i ≡ shared d {ok = ok}
               → EntryOK (slotDepth sl) d
-                  ( U , emptyHold (suc (slotDepth sl i))
-                  , slotDepth sl i , syncSizeᵉ d )
+                  ( U , slotDepth sl i , syncSizeᵉ d )
 connect-entry sl i eq = ≤-refl , ≤-reflexive (sym (slotDepth-fix sl i eq))
 
 ------------------------------------------------------------------
@@ -416,7 +400,6 @@ connect-entry sl i eq = ≤-refl , ≤-reflexive (sym (slotDepth-fix sl i eq))
 -- reading determine.
 ------------------------------------------------------------------
 
--- THE HOLDING ENTERS EMPTY, AND ITS WIDTH IS THE ENTRY'S OWN RANK.
 -- A run entering from outside the subscription machine has put nothing
 -- into any store yet — that is the same fact `rootTri` reads off
 -- `st-init`, one component over — so the census is all zeros and the
@@ -466,7 +449,6 @@ connect-entry sl i eq = ≤-refl , ≤-reflexive (sym (slotDepth-fix sl i eq))
 --   asked to dominate an emission, only to be dropped by one.
 entryTri : ∀ {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → ℕ → Tri
 entryTri e sl m = unconn sl []
-                , emptyHold (suc (depᵉ (slotDepth sl) e ⊔ m))
                 , depᵉ (slotDepth sl) e ⊔ m
                 , syncSizeᵉ e
 
