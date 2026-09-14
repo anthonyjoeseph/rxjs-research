@@ -192,7 +192,7 @@ DrainsQ {e = e} allNid κ id now lim act q sched st =
 -- rank stood when it was put there, and nothing below shrinks it to
 -- meet a later one.  So the drain is not a rank question at all, and no
 -- report about the queue can make it one.
---
+
 -- THE SHARE CONNECT IS THE PRECEDENT, AND IT SAYS WHAT SHAPE THE REPAIR
 -- HAS.  That was the other edge no reading of the TERM could pay for,
 -- and it was answered with a component of the order rather than with a
@@ -215,15 +215,27 @@ DrainsQ {e = e} allNid κ id now lim act q sched st =
 -- queue, so the component is an upper bound on that holding, dropped by
 -- the drain and covered at the single site that fills it.
 --
--- THE COVER IS A SYNCHRONOUS SIZE, WHICH THE ORDER ALREADY COUNTS.  The
--- enqueue is a structural step of the burst walk, so it cannot re-enter
--- at a larger bound — the bound has to be seeded high enough at the
--- cascade's entry to cover every write the walk can still perform.  That
--- quantity is how much the terms in hand can still emit synchronously,
--- which is the third component's own subject; so the candidate is a
--- bound denominated against it rather than a fourth independent number,
--- and what the leg decides is whether the seeding survives the peel.
+-- AND THE COMPONENT COUNTS DEPTHS RATHER THAN ITEMS, WHICH IS FORCED BY
+-- A REFUTATION ALREADY IN THE TREE.  A bound on HOW MANY the walk can
+-- still write would have to be seeded at the cascade's entry, since the
+-- enqueue is a structural step and cannot re-enter at a larger one —
+-- and `syncSizeᵉ` carries the dead route for exactly that, measured at a
+-- doubling fold: deliveries go exponential where a syntactic measure
+-- goes linear, so no seeding out of the entry triple survives.  Counting
+-- is therefore the wrong reading of the holding.
 --
+-- WHAT SURVIVES IT IS THE MULTISET OF THE DEPTHS, BECAUSE THE DRAIN'S
+-- OWN STEP IS DOWNWARD IN THEM.  Subscribing a drained observable opens
+-- nodes inside it, and what those nodes queue is emitted under the rank
+-- the hop just dropped to — so every item the step adds is STRICTLY
+-- SHALLOWER than the one it removed, however many of them there are.
+-- That is what makes the exponential irrelevant: the order never has to
+-- know the count at a level, only that a level was vacated and nothing
+-- was added at or above it.  Depths are bounded by the program's own
+-- reading, so the multiset is a fixed-width vector of counts read
+-- most-significant-first — the existing order widened rather than a new
+-- kind of one.
+
 -- DEAD ROUTE: a conjunct on the invariant record beside the share
 --   bound, re-established where the merge's enqueue writes and spent
 --   where the drain reads.  Dead structurally and not merely unproven:

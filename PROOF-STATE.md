@@ -231,15 +231,14 @@ runs, which is now one leaf away.
 ### Big picture tier roadmap
 
 - **THE COMPONENT THE MERGE DRAIN DROPS, WHICH IS THE TIER'S ENDING CONDITION.**
-  `queuedInner!` is the one site a run cannot step through, and working it said
-  why: the entry subscribes a term the caller has no reading of, so no report
-  about the queue can make it a descent. The share connect is the precedent,
-  answered in the order rather than in a premise. The census says what this one
-  counts: the merge's consume has ONE arm writing a queue, so
-  the component is a bound on the store's holding, dropped by the drain and
-  covered at that site by how much the terms in hand can still emit
-  synchronously — the third component's own subject. The leg is that seeding
-  and the leaf's body; it puts the cache back on the gate.
+  `queuedInner!` is the one site a run cannot step through: the entry
+  subscribes a term the caller has no reading of, so no report about the queue
+  makes it a descent. The share connect is the precedent, answered in the order
+  rather than in a premise. What this component counts is not items, which
+  `syncSizeᵉ`'s dead route refutes — a doubling fold outruns any seeding — but
+  the MULTISET OF DEPTHS held queued. A drained observable queues only under
+  the rank the hop just dropped to, so the step vacates a level and adds
+  strictly below it, however many. The leg is that order and the leaf's body.
 
 - **WIDEN WHAT A BUILDER RETURNS, WHICH TURNS OUT TO GATE THE WALK.** Every
   premise is denominated at one `slotDepth sl` the caller fixes, and each clause
