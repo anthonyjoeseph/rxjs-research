@@ -231,20 +231,19 @@ cannot compute — and the other two leaves carry no arithmetic at all.
 
 ### Big picture tier roadmap
 
-- **STATE THE STRENGTHENED RETURN TYPE, AND IT MUST READ THE EXIT STORE
+- **STATE THE STRENGTHENED RETURN TYPE, AND THE BURST'S LENGTH IS IN IT
   (Anthony).** Everything below consumes it, so it comes before any frame is
-  touched. The shape that read the bound off the FRAME and the incoming
-  bound — `allUnder m vals → allUnder (frameObs m fr) outs` — is refuted in
-  `Refuted.Scan-Deepens`, whose header carries the mechanism and why the
-  currency cutover did not retire it. What survives reads the store the step
-  LEAVES rather than the one it entered, in a new
+  touched. Every shape reading a FIXED number of stored values is now refuted —
+  off the frame and the incoming bound in `Refuted.Scan-Deepens`, off the store
+  the step LEAVES and off BOTH ends with the template added, in
+  `Refuted.Exit-Store` — so what survives reads the ENTRY store and carries a
+  factor in the burst's length, in a new
   `agda/src/Verify-Rank-Sufficient/Frame-Carried.agda`:
   `allUnder : ∀ {n} {Γ : Ctx n} {u} → ℕ → List (Val Γ u) → Set` as
   `All (λ v → obsDepthᵛ _ v ≤ m)`, the measure taking its type explicitly, and
-  `frame-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo} (id : Id) (now : Tick) (fr : Frame Γ s u) (κ : Path Γ lo u t) (m : ℕ) {vals fin sched st outs evs done sched′ st′} → stepFrame⇓ {e = e} id now fr κ vals fin sched st (outs , evs , done , sched′ , st′) → allUnder m vals → allUnder (m ⊔ frameRd fr st′) outs`,
-  paired with a second conjunct bounding `frameRd` at the exit against the
-  entry — which is where the burst's length enters, and is the question this
-  leg hands to the next.
+  `frame-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo} (id : Id) (now : Tick) (fr : Frame Γ s u) (κ : Path Γ lo u t) (m : ℕ) {vals fin sched st outs evs done sched′ st′} → stepFrame⇓ {e = e} id now fr κ vals fin sched st (outs , evs , done , sched′ , st′) → allUnder m vals → allUnder (length vals * frameTm fr + (frameRd fr st ⊔ m)) outs`,
+  over a postulated substitution leaf `obsDepthᵛ _ (applyFn fn (a , v)) ≤ obsDepthᵗ fn + (obsDepthᵛ _ a ⊔ obsDepthᵛ _ v)` — which is what the
+  three witnesses leave, and is the question this leg hands to the next.
 
 - **DISCHARGE IT ACROSS ALL FIVE FRAMES IN ONE PASS (Anthony).** One statement,
   one case split on `fr` — the rank no longer differentiates them, which is what
