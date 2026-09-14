@@ -2,7 +2,7 @@
 
 **What this file is.** The ordered worklist for the one goal: discharging
 `agda/src/Verify-Batch-Simultaneous/The-Proof.agda` — no postulates, everything
-typechecks. This file holds the SCHEDULE — each tier's next three legs — over a
+typechecks. This file holds the SCHEDULE — each tier's next legs — over a
 LEDGER of one-line hooks; everything else lives in the code.
 
 **Hygiene — the rules this file lives by:**
@@ -55,33 +55,36 @@ LEDGER of one-line hooks; everything else lives in the code.
   rows. Group where the grouping is real and fall back on the risk classes
   where it is not; a leg naming a single row is still a leg.
   **AND A LEG IS ONE COMMIT OF WORK (Anthony).** That is the unit — not a theme
-  and not a region, but the chunk this session intends to land next. So the
-  three are the next three COMMITS, and legs two and three may aim at the very
-  same postulates as the first; what the trio owes is a coherent vision for
-  reducing the most risk, cut at commit boundaries. Pick the risk order first,
-  then cut — never pick three topics and hope each is commit-sized.
+  and not a region, but the chunk this session intends to land next. So the legs
+  are the next COMMITS, and every leg after the first may aim at the very same
+  postulates as the first; what the set owes is a coherent vision for reducing
+  the most risk, cut at commit boundaries. Pick the risk order first, then cut —
+  never pick topics and hope each is commit-sized.
   **SO THE FILE MOVES WITH EVERY COMMIT, and `make roadmap-moved` fails when it
-  does not.** Three outcomes. The leg landed: retire it, promote the other two,
-  write a new third. It did not finish: **rewrite the first leg as the work that
+  does not.** Three outcomes. The leg landed: retire it, promote the rest, write
+  a new last one. It did not finish: **rewrite the first leg as the work that
   remains**, the only record of what it turned out to cost. Or its ROUTE DIED:
   **discard it** — a refuted framing rewritten smaller is still steering, so the
   finding goes to the header of the statement it constrains and the leg that
   replaces it is written from the risk as it now stands.
-  **THE THREE LEGS DO NOT HAVE TO COVER THE TIER (Anthony).** They are the NEXT
-  three, not a partition of the remaining work — the coverage rule is the
-  LEDGER's job, and the rows already discharge it. Work beyond the third leg is
-  left unnamed on purpose: it will be re-grouped by what the first three find,
-  so naming it now writes a plan that ages before it is read.
+  **THE LEGS DO NOT HAVE TO COVER THE TIER (Anthony).** They are the NEXT ones,
+  not a partition of the remaining work — the coverage rule is the LEDGER's job,
+  and the rows already discharge it. Work beyond the last leg is left unnamed on
+  purpose: it will be re-grouped by what the earlier ones find, so naming it now
+  writes a plan that ages before it is read.
   **Pick up the top LEG, not the top row.** Reading straight down the ledger
   works exactly one postulate at a time, and the expensive part of this
   campaign is never the clause — it is discovering, after the clause is ground,
   that the statement's neighbours had to move with it.
-  **`make roadmap-check` ENFORCES THE COUNT AND A PROSE BUDGET PER LEG.** Three,
-  unless the tier has fewer than three live postulates to plan over — fewer is a
-  tier planning one leg ahead, more is a backlog, and the rows already are the
-  backlog. The budget is several times a row's, because a leg carries its own
-  reasoning and a group has no header to send research to; past it, the leg has
-  stopped saying why this group is next and started proving it.
+  **`make roadmap-check` ENFORCES THE COUNT AND A PROSE BUDGET PER LEG.** At
+  least three — unless the tier has fewer live postulates than that to plan over
+  — and at most seven. Fewer than three is a tier planning one leg ahead; more
+  than seven is a backlog, and the rows already are the backlog. Between them
+  the schedule is free, because a route already decided and cut into commits is
+  written down rather than displaced by the next one. The budget is several
+  times a row's, because a leg carries its own reasoning and a group has no
+  header to send research to; past it, the leg has stopped saying why this group
+  is next and started proving it.
 - **A TIER MAY OPEN AN `### Open questions` SECTION, AND IT IS NOT A SECOND
   ROADMAP (Anthony).** A question is what the tier does not yet KNOW that
   several of its FALSITY rows are all waiting on — the thing a row cannot
@@ -200,141 +203,125 @@ formal-verification-batchSimultaneous    The-Proof.agda — REAL, module postula
 ```
 
 The descent `rank-sufficient` guards is the evaluator's own and is stated
-nowhere else: `Acc _≺_` over a lexicographic triple — unconnected shares, hop
-rank, `syncSizeᵉ` — seeded at every entry from outside the machine and dropped
-at three guarded peels, each a proven body. No quantity above `Rx.Evaluator` mentions it, which is what
-lets one statement close the whole descent.
+nowhere else: `Acc _≺_` over a lexicographic triple — unconnected shares,
+`obsDepthᵉ` joined with what the store holds, `syncSizeᵉ` — seeded at every entry
+from outside the machine and dropped at three guarded peels, each a proven body.
+No quantity above `Rx.Evaluator` mentions it, which is what lets one statement
+close the whole descent.
 
 A row's class must agree with its postulate's header, which is where the
 research lives; where they disagree, the header wins.
 
 ## Tier 1 — the descent never goes dry
 
-**THE TIER IS ONE STATEMENT, AND ITS PREMISE NO LONGER READS A STATE AT ALL.**
-`rank-sufficient` (Verify-Rank-Sufficient) says no run emits the dry marker.
-Every reading of a registry against the program is dead — the term's, the widest
-state-readable join, the arrival's own seed, the step's filtered spend — so the
-premise is now the frame shelf's own obligation at each template the run
-installed, against the payload that template is handed, and everything from the
-allowance down to one chain's fold is a real body over those obligations.
+**THE TIER IS ONE STATEMENT AND IT IS CURRENTLY FALSE.** `rank-sufficient`
+(Verify-Rank-Sufficient) says no run emits the dry marker; `Refuted.Dry-Wrap`
+kills it three times against the evaluator as it stands. It is now a two-line
+body over three leaves, and the falsity sits in one: `evaluate⇓-total`, a
+derivation at a run's own output. No constructor of the domain relation returns
+a dry burst, so that leaf is false exactly as long as the three guarded arms
+are, and it comes true at the cutover.
 
-**AND NOTHING IS ASKED ABOUT THE STEP BETWEEN TWO ARRIVALS, NOR BETWEEN TWO
-CHAINS**, which is where all six witnesses killed their readings: the premise
-recurses on the allowance and then on the chain list, taking each conjunct at
-the pair that cascade or that chain fold returns. So the whole of the debt is
-now at the door and at the templates the door's chains are built from.
+**AND THE MEASURE IS HELD BY SOMETHING NO STATEMENT MENTIONS: THE RUN HAS TO
+COMPUTE IT.** Three non-structural edges TEST a reading and emit dry on the
+negative answer, so an inadequate figure is a WRONG ANSWER rather than an open
+obligation, and every syntactic candidate died that way. The relation lifts
+that — inhabitation is a PROOF obligation, free to use a measure the machine
+cannot compute — and the other two leaves carry no arithmetic at all.
 
 ### Big picture tier roadmap
 
-- **THE FOLD'S FRAME IS MISSING TWO AXES, WHICH IS A FACT ABOUT THE WALK'S
-  CURRENCY AND NOT ABOUT ONE LEAF.** A frame is handed exactly two scalars, and a
-  fold needs a quantity from outside each — the payload bound is a POINTWISE join
-  carrying no cardinality, the store bound reads a scan node through the hop half
-  of its accumulator alone. So no right-hand side repairs `scan-frame-carried`,
-  and the arm cannot be retired in favour of the burst-and-seed form either. The
-  leg is a restatement of the PREDICATE, uniform for the four frames that read
-  neither quantity; the argument is in the leaf's own header.
+- **STATE THE STRENGTHENED RETURN TYPE, AND IT MUST READ THE EXIT STORE
+  (Anthony).** Everything below consumes it, so it comes before any frame is
+  touched. The shape that read the bound off the FRAME and the incoming
+  bound — `allUnder m vals → allUnder (frameObs m fr) outs` — is refuted in
+  `Refuted.Scan-Deepens`, whose header carries the mechanism and why the
+  currency cutover did not retire it. What survives reads the store the step
+  LEAVES rather than the one it entered, in a new
+  `agda/src/Verify-Rank-Sufficient/Frame-Carried.agda`:
+  `allUnder : ∀ {n} {Γ : Ctx n} {u} → ℕ → List (Val Γ u) → Set` as
+  `All (λ v → obsDepthᵛ _ v ≤ m)`, the measure taking its type explicitly, and
+  `frame-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo} (id : Id) (now : Tick) (fr : Frame Γ s u) (κ : Path Γ lo u t) (m : ℕ) {vals fin sched st outs evs done sched′ st′} → stepFrame⇓ {e = e} id now fr κ vals fin sched st (outs , evs , done , sched′ , st′) → allUnder m vals → allUnder (m ⊔ frameRd fr st′) outs`,
+  paired with a second conjunct bounding `frameRd` at the exit against the
+  entry — which is where the burst's length enters, and is the question this
+  leg hands to the next.
 
-- **AND THE THREE RE-ENTRANT LEAVES ARE THE FALSITY NOTHING HAS NARROWED.**
-  `from-inner-dry`, `thru-outer-frame-dry` and `from-inner-carried` are the only
-  arms that re-enter the evaluator, and all three are instantiated only where
-  `innerReact` returns its payload untouched. The branch none of them reaches is
-  the same one in each case — a completing node whose queue is drained and whose
-  fresh bursts are appended — so one harness that reaches a completion under a
-  live flattener decides all three at once. It is ranked below the currency
-  because a leaf restated under a widened predicate is a leaf probed twice.
+- **DISCHARGE IT ACROSS ALL FIVE FRAMES IN ONE PASS (Anthony).** One statement,
+  one case split on `fr` — the rank no longer differentiates them, which is what
+  collapses five shelves into a single induction and is the whole saving. Taken
+  as one leg because a per-frame grind re-decides the statement four times over,
+  and the second decision is the one that drifts. The five arms are `map-f fn`,
+  `scan-f fn nid`, `take-f nid`, `thru-outer op nid` and
+  `from-inner op allNid inst`, each closing under the matching constructor of
+  `stepFrame⇓`. The three quiet frames were discharged once already against the
+  dead currency, so what this leg re-decides is `frameObs` and not the walk.
 
-- **AND THE DOOR IS WHERE THE SUBTRACTION IS NOT AVAILABLE.** The exit above
-  retired a carried tie by letting the step DECIDE its own test; neither door row
-  can be repaired that way. `entry-drain-hop` prices a chain's flattener count
-  against the program's reading, and `share-chain-hop` bounds what ENTERS a
-  dispatch while the walk is read along the chain — both quantities a step cannot
-  recompute from what it holds, so each is a premise threaded in or a call made at
-  the wrong index. Take the pair together: they are the same missing carry read
-  from the two ends, and one decision about the currency settles which.
+- **KILL THE DOOR: SPEND THE REPORT AT THE HOP SITE (Anthony).** The
+  strengthened return is a REPORT the caller holds, so at the hop the no branch
+  is refuted from what it carries — the marker becomes unemittable rather than
+  merely unobserved. The guard is `subscribeInner`'s `obsDepthᵉ o <? r` in
+  `agda/src/Rx/Evaluator.agda`, and the obligation is roughly
+  `hop-fits : ∀ {n} {Γ : Ctx n} {u} {o : Val Γ (obs u)} {m r} → allUnder m (o ∷ []) → m < r → obsDepthᵉ o < r`,
+  which is near-DEFINITIONAL now that both sides are one currency —
+  `obsDepthᵛ (obs t) e` is `obsDepthᵉ e` — so what the leg really buys is the
+  second premise: that the entry's own join dominates whatever a frame handed
+  out. It sits HERE and not last because it is the inhabitation proof's crux and
+  not a sequel to it: building a derivation at a hop IS discharging that guard's
+  positive branch.
 
-### Open questions
+- **THEN PROVE `evaluate⇓-total` INHABITED, WHICH IS THE TERMINATION ARGUMENT.**
+  Split one totality lemma per family and ground leafward-first —
+  `subscribeE⇓-total : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo τ} (ac : Acc _≺_ τ) (b : Closed Γ u) (κ : Path Γ lo u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) → subscribeE⇓ b κ id now sched st (subscribeE {e = e} ac b κ id now sched st)`
+  and its siblings. The two guards the relation does not index are discharged
+  HERE and nowhere else: the unfold's `syncSizeᵉ (unfoldμ body) <? sz` and the
+  connect's, neither of which is a function of the relation's own arguments.
+  What is left is an induction free to use any measure a PROOF may use,
+  including quantities the machine cannot compute — the constraint every dead
+  candidate died under. Nothing reduces through the leaves until the cutover.
 
-- **WHAT MUST A STEP CARRY IN, AND WHAT MAY IT DECIDE FOR ITSELF?** The
-  stratification half is SETTLED and by subtraction rather than by proof: the
-  registration decides its own floor, so no statement carries the tie between a
-  value and the chain it arrived on and the manufactured-value arm is gone
-  rather than restated. What survives is the same question one currency over,
-  where the subtraction is NOT available: a chain's reading and a registry's
-  admission are quantities a step cannot recompute from what it holds, so each
-  is either threaded in as a premise or the statement is made at the wrong
-  index. Which of the two, per row, is what the remaining rows are waiting on.
-  relevant: `entry-drain-hop`, `share-chain-hop`
+- **`subscribeE⇓-nodry` AS A BODY, WHICH IS A SHELF AND NOT A DESIGN.** Twelve
+  subscribe-cycle families, one arm per constructor, each reading dryness off
+  the emit that clause BUILDS — `init`, a value, a `close … exhausted`, a
+  plumbing retag. The shelf this consumes was cut back to `hasDry-++` when the
+  tower went and comes back a lemma at a time, one per shape:
+  `git show 234074e:agda/src/Verify-Rank-Sufficient/Dry-Emits.agda`. No triple,
+  no rank and no order appears anywhere in it, which is exactly what the
+  relation bought — an arithmetic obligation became a list induction.
+
+- **`drain⇓-nodry` AS A BODY, THE SAME SHELF OVER THE OTHER CYCLE.** The drain
+  and cascade families, plus the arrival path that re-enters a subscribe, so it
+  takes leg five's result as a premise rather than repeating it. Separated from
+  leg five because the two cycles are genuinely separate inductions — the
+  relation splits them in `eval-run` — and because a single leg over both is one
+  commit nobody can review.
+
+- **AND ONLY THEN CUT OVER, WHICH DELETES THE THREE ARMS AND THE MARKER.** The
+  evaluator takes a `subscribeE⇓` derivation where it takes `Acc _≺_ τ` today and
+  recurses on it, the three `with` guards and `dryBurst` go, and `hasDry` is
+  false by construction rather than by argument — which is what makes
+  `evaluate⇓-total` true and the top-line claim sound, since
+  `formal-verification-batchSimultaneous` reaches `rank-sufficient` and has all
+  along. It is last because reduction is preserved only when inhabitation is
+  COMPLETE: a cutover over postulated leaves is the stuck pattern match the
+  DEAD ROUTE on that leaf records. `Refuted.Dry-Wrap` dies with it, and whether
+  it dies by becoming unstateable or by going green is the check.
 
 ### The ledger
 
-- **`entry-drain-hop`** (Verify-Rank-Sufficient) — FALSITY, `PROBED`: the
-  door's whole premise, in a currency that mentions no run — a chain's
-  flattener count against the program's own reading. Tight at three ladder
-  rungs and at a gate; an arrival there reaches exactly ONE chain.
+- **`evaluate⇓-total`** (Verify-Rank-Sufficient) — FALSITY, `DEAD ROUTE`: a
+  derivation exists at every run's own output. The whole of the known falsity
+  now sits here and nowhere else, since no constructor of the relation returns
+  a dry burst; it comes true at the cutover and cannot be proven before it.
 
-- **`from-inner-dry` / `thru-outer-frame-dry`**
-  (Verify-Rank-Sufficient.Path-Fits) — FALSITY,
-  `DEAD ROUTE, PROBED×2, RECOVERY`: dry-freedom of the only two frames that
-  re-enter the evaluator, each over every payload its incoming bound admits.
-  The other three are discharged outright, which is what says these two are
-  where the risk actually is.
+- **`subscribeE⇓-nodry`** (Verify-Rank-Sufficient) — FALSITY, `PROBED`: the
+  subscribe half's output carries no dry event, by induction over the twelve
+  subscribe-cycle families. Four sources reach it, each closing through a
+  different helper; no share, flattener or node store is covered.
 
-- **`from-inner-carried`** (Verify-Rank-Sufficient.Path-Fits) — FALSITY,
-  `DEAD ROUTE, PROBED, RECOVERY`: the exit frame threads what it was handed
-  unchanged. `innerReact` returns its payload untouched on every branch but the
-  completion one, where a node's queue is drained and fresh bursts appended —
-  the branch nothing has reached.
-
-- **`share-chain-hop`** (Verify-Rank-Sufficient.Path-Fits) — SHAPE,
-  `REFUTED, RECOVERY`: the sink's claim at the share's registry, whose one
-  hypothesis bounds what ENTERS the dispatch while the walk is read along the
-  chain. A fold re-wraps its accumulator, so the restatement must carry the
-  door's reading in.
-
-- **`scan-frame-carried`** (Verify-Rank-Sufficient.Push-Carried) — SHAPE,
-  `REFUTED`: the fold's residue priced at ONE application of its template,
-  where the machine iterates it once per delivery. The missing quantity is
-  neither half of the payload but the LENGTH of the burst.
-
-- **`below-unfoldμ`** (Rx.Inputs-Below) — DIFFICULTY, `PROBED`: the input
-  bound's closure under the μ-unfold, the one place a term ENTERS another
-  rather than being walked into. Instantiated at floors strictly inside the
-  context, so what is left is the induction over the graft elimination.
-
-- **`map-frame-carried`** (Verify-Rank-Sufficient.Push-Carried) — DIFFICULTY,
-  `REFUTED×2, DEAD ROUTE, PROBED`: both ends now read the payload PAIR, and the
-  delivery axis that killed the predecessor currency is tight at three rates —
-  one, three, five in against one, nine, twenty-five out.
-
-- **`take-frame-carried`** (Verify-Rank-Sufficient.Push-Carried) — DIFFICULTY,
-  `PROBED`: a prefix of what it was handed, under a node reading zero. Six
-  frames reached by RUNNING at the TIGHTEST bounds admitted: four at a
-  subscribe, either side of the burst; two at a DRAIN STEP, over a store
-  earlier instants wrote.
-
-- **`scan-burst-carried`** (Verify-Rank-Sufficient.Push-Carried) — DIFFICULTY,
-  `REFUTED, PROBED`: the fold, at the burst and at the seed rather than at the
-  frame. The margin is constant in step depth and in source length, and both
-  the continuation and the store's other nodes are INERT rather than unswept.
-
-- **`thru-outer-frame-carried`** (Verify-Rank-Sufficient.Push-Carried) —
-  DIFFICULTY, `DEAD ROUTE, PROBED×3`: the HOP EDGE, where the two currencies
-  are exchanged. Eleven frames reached by RUNNING; the `suc` is never spent.
-  The store axis cannot refute from either side; a gated source is held to a
-  quarter of what the run then carries.
-
-- **`dry-operator`** (Verify-Rank-Sufficient.Dry) — DIFFICULTY,
-  `REFUTED, DEAD ROUTE×3, PROBED, RECOVERY`: the THREE FLATTENERS' dry-freedom
-  under the entry invariant, and the only half of them still a leaf. The dry
-  shelf is unconditional in what a frame is handed, so the assembly wants the
-  dry claim and the report proven in ONE walk.
-
-- **`ofᵉ-carried` / `scan-seed-carried`** (Verify-Rank-Sufficient.Leaf-Carried)
-  — DIFFICULTY, `PROBED×2`: the two places a subscribe turns a term into a
-  value. Both are hypothesis-free and both sides compute, and the rows are
-  taken at points where neither side is zero; a literal mentioning an input is
-  not covered by either.
+- **`drain⇓-nodry`** (Verify-Rank-Sufficient) — FALSITY, `PROBED`: the same
+  over the drain and cascade families. One arrival reaches it, at the state
+  the root subscribe actually left; the cancelled arm and every chain carrying
+  a frame are uncovered.
 
 ## Tier 2 — Verify-Well-Formed (parked behind tier 1)
 

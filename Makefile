@@ -810,12 +810,20 @@ roadmap-selftest:
 	  if scripts/check-roadmap.py --file scripts/roadmap-selftest/legs-count.md > /dev/null 2>&1; then \
 	    echo "SELFTEST FAIL: a tier planning TWO legs where it has rows for three PASSED — the leg count is dead"; fail=1; \
 	  fi; \
-	  echo "$$lgc" | grep -q "^  Tier 0  legs-count.md  names 2 leg(s), wants 3" \
+	  echo "$$lgc" | grep -q "^  Tier 0  legs-count.md  names 2 leg(s), wants at least 3" \
 	    || { echo "SELFTEST FAIL: the short-count tier was not NAMED with its found and wanted counts"; fail=1; }; \
 	  echo "$$lgc" | grep -q "^  Tier 1  legs-count.md  names" \
 	    && { echo "SELFTEST FAIL: a correctly-planned tier was reported — the count is not being read per tier"; fail=1; }; \
 	  echo "$$lgc" | grep -q "OVER BUDGET" \
 	    && { echo "SELFTEST FAIL: a budget check fired on legs-count.md, so it does not isolate the COUNT"; fail=1; }; \
+	  lgm=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/legs-many.md 2>&1); \
+	  if scripts/check-roadmap.py --file scripts/roadmap-selftest/legs-many.md > /dev/null 2>&1; then \
+	    echo "SELFTEST FAIL: a tier planning EIGHT legs PASSED — the leg ceiling is dead"; fail=1; \
+	  fi; \
+	  echo "$$lgm" | grep -q "^  Tier 0  legs-many.md  names 8 leg(s), wants at most 7" \
+	    || { echo "SELFTEST FAIL: the over-count tier was not NAMED with its found and wanted counts"; fail=1; }; \
+	  echo "$$lgm" | grep -q "^  Tier 1  legs-many.md  names" \
+	    && { echo "SELFTEST FAIL: a tier planning SEVEN legs was reported — the ceiling is off by one"; fail=1; }; \
 	  lgf=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/legs-fat.md 2>&1); \
 	  if scripts/check-roadmap.py --file scripts/roadmap-selftest/legs-fat.md > /dev/null 2>&1; then \
 	    echo "SELFTEST FAIL: a leg carrying its own proof PASSED — the leg budget is dead"; fail=1; \

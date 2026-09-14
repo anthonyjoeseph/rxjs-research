@@ -477,11 +477,14 @@ applyFn fn v = evalWith fn (v ∷ᵃ []ᵃ)
 -- it any more, and nothing should: a measure additive in the syntax cannot
 -- pay for a cascade that doubles per delivery.
 --
--- REFUTED: `Refuted.Sync-Count`
 -- DEAD ROUTE: bounding emissions per instant by `syncSizeᵉ`, and with it any
 --   route that pays for a burst's deliveries out of the entry triple's third
 --   component — which is the component the μ guard re-seeds, and so the last
---   of the three a rank conjunct had left to spend.
+--   of the three a rank conjunct had left to spend.  Measured by machine at
+--   a doubling fold over a live seed: 2, 6, 14 and 30 deliveries as the
+--   source gains one literal at a time, against a measure gaining one per
+--   literal and reading 20 where the run delivers 30 — and the first three
+--   rows HOLD, which is why it reads true from small cases.
 ------------------------------------------------------------------
 
 mutual
