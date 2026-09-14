@@ -132,7 +132,7 @@ reason to spend those minutes only to fail on something a textual pass already k
 | `imports-selftest` | the import checker still fires, in both directions | [docs/imports-check.md](docs/imports-check.md) |
 | `imports-check` | **NO UNUSED IMPORT, AND NO UNUSED NAME IN A SURVIVING CLAUSE (Anthony: "no unused imports, either")** — an import is a module-graph EDGE, fixing what must be built BEFORE this file and what an edit to the imported module INVALIDATES, and Agda has no warning for a dead one so `-W error` cannot see it. `make imports-fix` deletes them, but never a **claim root**'s imports (one file per tree — they ARE the claim, so unused is the design) nor a **sole-route** edge, which is a wiring finding rather than dead weight. AND no import may put names in a file's SCOPE without naming them: a missing `using` list is a finding in every file, claim roots included (`using ()` and a qualified `import M as Q` are fine). AND **no `public` re-exports** — a name is imported from where it is DEFINED, so that `grep` and `make find` point at its real home. AND no `using` clause may ask a module of this tree for a name that module does not have — a definition MOVES, one consumer's clause is repaired and its sibling's is not, and Agda reports that only as a scope warning `-W error` promotes MANY MINUTES down the tower, one instance per build, naming the importer and not the name's new home. What makes the cheap check sound is the `public` ban directly above: with no re-exports, a module can only export what its own text mentions. AND every file DECLARES its own module name, matching its path: a missing header is not a syntax error, so Agda checks such a file as a target and then crashes every IMPORTER with an internal error naming neither end — and a dev check cannot see it, because it checks a generated copy carrying its own header. Every part of this buys LEGIBILITY, not time: `using` filters scope rather than the build, a re-export removes no edge since a ladder's name-level dependencies are genuine, and a clause with one live name holds its edge open however many dead names sit beside it — which is why the name-level half was once argued to be optional, and is the wrong measure. A list naming thirty things the file never touches is not a record of what the file depends on | [docs/imports-check.md](docs/imports-check.md) |
 | `roadmap-selftest` | the roadmap checker still fires | [docs/roadmap-check.md](docs/roadmap-check.md) |
-| `roadmap-check` | PROOF-STATE is sorted riskiest-first, names every live postulate AND NOTHING ELSE in a row head, keeps rows AND TIER PREAMBLES within a character budget — the second because holding every row to a line and writing the finding into the section text above them satisfies the first exactly — carries no date, and neither does this file or `docs/`; opens every tier with a BIG PICTURE ROADMAP of exactly three legs, each within a prose budget several times a row's, because the legs are the schedule and the rows are only the ledger it is drawn from; and every classed row carries the DERIVED evidence field its postulates' headers dictate, which is why a field may be mandatory where the `TWIN:` section it summarises is not — a derived field cannot be filled with filler, so the blank is the product. `make roadmap-evidence` writes it; and no DIFFICULTY row stands on nothing, which is the same law the GRINDABLE half already carried — and a tier's OPEN QUESTIONS, which are the one thing here held to a LEDGER rather than to movement (Anthony). A question is what SEVERAL RISKY rows are jointly waiting on, so it outlives many commits by construction and demanding it move would buy a question REWRITTEN rather than one answered — the failure the roadmap's second outcome already names one level down. The section is OPTIONAL for the same reason a `TWIN:` is, since a mandatory question produces a filler question and filler that reads as research is worse than silence. What IS held is the `relevant:` list, which is the only part that rots invisibly — a question's prose stays readable while every row under it is discharged — so every name must still be LIVE, still a row of THAT tier, and still FALSITY OR SHAPE, each condition naming a different way the question stopped being true. SHAPE counts, and holding the list to FALSITY was wrong: a question's rows convert FALSITY → SHAPE as it is ANSWERED, since SHAPE is precisely the statement being wrong with the restatement guaranteed, which is what a half-answer leaves behind — so the narrower rule retired a question at the moment the narrowing it exists to record had happened. VACUITY is not admitted, because nothing WAITS on a statement that asserts nothing; when the list empties the question GOES, which is how one is meant to die rather than by being edited into a different question. And it names at least two, because a question over one row is that row given a heading and its research already has a home | [docs/roadmap-check.md](docs/roadmap-check.md) |
+| `roadmap-check` | PROOF-STATE is sorted riskiest-first, names every live postulate AND NOTHING ELSE in a row head, keeps rows AND TIER PREAMBLES within a character budget — the second because holding every row to a line and writing the finding into the section text above them satisfies the first exactly — carries no date, and neither does this file or `docs/`; opens every tier with a BIG PICTURE ROADMAP of at least three legs and at most seven, each within a prose budget several times a row's, because the legs are the schedule and the rows are only the ledger it is drawn from — the floor so a tier cannot plan one leg ahead, the ceiling so a schedule cannot become a second copy of the ledger, and the gap between them because a route already decided is written down rather than displaced; and every classed row carries the DERIVED evidence field its postulates' headers dictate, which is why a field may be mandatory where the `TWIN:` section it summarises is not — a derived field cannot be filled with filler, so the blank is the product. `make roadmap-evidence` writes it; and no DIFFICULTY row stands on nothing, which is the same law the GRINDABLE half already carried — and a tier's OPEN QUESTIONS, which are the one thing here held to a LEDGER rather than to movement (Anthony). A question is what SEVERAL RISKY rows are jointly waiting on, so it outlives many commits by construction and demanding it move would buy a question REWRITTEN rather than one answered — the failure the roadmap's second outcome already names one level down. The section is OPTIONAL for the same reason a `TWIN:` is, since a mandatory question produces a filler question and filler that reads as research is worse than silence. What IS held is the `relevant:` list, which is the only part that rots invisibly — a question's prose stays readable while every row under it is discharged — so every name must still be LIVE, still a row of THAT tier, and still FALSITY OR SHAPE, each condition naming a different way the question stopped being true. SHAPE counts, and holding the list to FALSITY was wrong: a question's rows convert FALSITY → SHAPE as it is ANSWERED, since SHAPE is precisely the statement being wrong with the restatement guaranteed, which is what a half-answer leaves behind — so the narrower rule retired a question at the moment the narrowing it exists to record had happened. VACUITY is not admitted, because nothing WAITS on a statement that asserts nothing; when the list empties the question GOES, which is how one is meant to die rather than by being edited into a different question. And it names at least two, because a question over one row is that row given a heading and its research already has a home | [docs/roadmap-check.md](docs/roadmap-check.md) |
 | `roadmap-moved-selftest` | the movement checker still fires, in both directions — and that a trailing-whitespace edit does NOT count as movement | [docs/roadmap-check.md](docs/roadmap-check.md) |
 | `roadmap-order` | no GRINDABLE or DIFFICULTY row was DISCHARGED while its tier holds an open FALSITY or SHAPE row. A discharge is the one banking move — the name left the postulate ledger and is still declared in `agda/src` — so deleting, renaming, splitting, restating and reclassifying stay free, and a PREREQUISITE the risky statement names in its own header or type is exempt | [docs/roadmap-check.md](docs/roadmap-check.md) |
 | `roadmap-order-selftest` | the ordering checker still fires — and stays QUIET on the four shapes the proof must remain free to take, since a check that held a deletion or a reclassification would be worse than the failure it prevents | [docs/roadmap-check.md](docs/roadmap-check.md) |
@@ -1157,7 +1157,7 @@ prose gets spent on whatever is nearest — measured once at five days of discha
 all went to non-anchor rows while the anchor sat untouched.
 
 **AND WITHIN THE TIER, THE BIG PICTURE ROADMAP IS THE THING FOLLOWED — NOT THE NEXT ROW
-DOWN (Anthony).** Every tier there opens with its next three LEGS, ranked riskiest-first,
+DOWN (Anthony).** Every tier there opens with its next LEGS, ranked riskiest-first,
 each a GROUP of postulates aggregated across the whole ledger: statements sharing a
 currency, a claim and the sites that consume it, one shelf of mechanical work. Take the
 top leg and work it end to end. The rows are the ledger the legs are drawn from, and
@@ -1165,21 +1165,31 @@ reading straight down them proves one postulate at a time — which is the wrong
 because the expensive discovery in this campaign is never the clause but the neighbours a
 restatement drags with it, and a row cannot show you those. Where the grouping is not
 real, a leg falls back on the risk classes and may name a single row; that is a leg too.
-`make roadmap-check` holds each tier to exactly three legs, and each leg to a prose budget
-several times a row's, since a group has no header to send its reasoning to.
+`make roadmap-check` holds each tier to AT LEAST THREE legs and AT MOST SEVEN, and each
+leg to a prose budget several times a row's, since a group has no header to send its
+reasoning to.
 
-**AND THE THREE DO NOT COVER THE TIER (Anthony).** They are the NEXT three legs, not a
+**THREE IS A FLOOR, NOT A QUOTA — WRITE THE FOURTH DOWN (Anthony).** The bound was once
+three at both ends, on the argument that a fourth leg forces a judgement about which of
+the three it displaces. That argument holds for a leg being INVENTED and fails for one
+already DECIDED: a route worked out and cut into commit-sized pieces is the single most
+expensive thing here to rediscover and the cheapest to type, and the displaced leg is not
+reconsidered, it is forgotten. So when the session knows the next five commits, it names
+five. Seven is the ceiling because past that the list has stopped being the next few
+commits and become a second copy of the ledger — and the ledger is what the ROWS are.
+
+**AND THE LEGS DO NOT COVER THE TIER (Anthony).** They are the NEXT legs, not a
 partition of what is left — covering the ledger is the ROWS' job and they already do it.
-What comes after the third leg is left unnamed deliberately: it will be re-grouped by
-whatever the first three turn up, so naming it now writes a schedule that ages before
+What comes after the last leg is left unnamed deliberately: it will be re-grouped by
+whatever the earlier ones turn up, so naming it now writes a schedule that ages before
 anyone reads it. A leg enumerating every remaining row has stopped being a plan.
 
-**AND THE THREE LEGS ARE AIMED AT THE TIER'S OPEN QUESTIONS (Anthony).** The rows are
+**AND THE LEGS ARE AIMED AT THE TIER'S OPEN QUESTIONS (Anthony).** The rows are
 the ledger and the legs are the schedule; the QUESTIONS are what the schedule is FOR. A
 tier's open questions are what several FALSITY rows are jointly waiting on, so they are
-the only thing in the file that names the risk ABOVE any single statement — and a trio of
-legs that moves none of them is three commits of work with nothing underneath it that got
-smaller. Write each leg so its own prose says which question it narrows; where the
+the only thing in the file that names the risk ABOVE any single statement — and a set of
+legs that moves none of them is that many commits of work with nothing underneath it that
+got smaller. Write each leg so its own prose says which question it narrows; where the
 grouping is real this costs nothing, because a leg is already a group of rows sharing a
 currency and a claim, and a question is already a group of rows sharing a doubt.
 
@@ -1197,7 +1207,8 @@ that removes such a cost — a loop that is no longer a loop, a check that canno
 apparatus a whole face needs before any of it can be instantiated — narrows nothing on its
 own and is still the right leg, because the questions are unreachable until it lands. It
 justifies itself in its own prose, saying what it unblocks; and it is never more than one
-of the three, since a trio that is all tooling is a tier that has stopped being worked.
+leg of the set, since a schedule that is all tooling is a tier that has stopped being
+worked.
 
 **A RISING POSTULATE COUNT IS THE MECHANISM WORKING, NOT A REGRESSION.** This needs saying
 because every instinct — and every subagent's default — runs the other way. Anthony, in
@@ -1532,12 +1543,12 @@ not from what is left of the old plan. None of the three leaves the roadmap
 untouched, so an unchanged file means a leg was finished without being retired,
 abandoned without being restated, or refuted without being dropped.
 
-**Legs two and three may aim at the SAME postulates as the first.** The three
-are not three subjects — they are the next three commits, and a single group of
-statements routinely takes three. What the trio owes is a coherent vision for
-reducing the most risk, cut into pieces each of which is a reasonable single
-commit. Parcel the work that way: pick the risk order first, then cut it at
-commit boundaries, rather than picking three topics and hoping each is
+**Every leg after the first may aim at the SAME postulates as the first.** The
+legs are not that many subjects — they are the next that many commits, and a
+single group of statements routinely takes several. What the set owes is a
+coherent vision for reducing the most risk, cut into pieces each of which is a
+reasonable single commit. Parcel the work that way: pick the risk order first,
+then cut it at commit boundaries, rather than picking topics and hoping each is
 commit-sized.
 
 And update it **to the hygiene rules in its own header, which are also part of the gate**:

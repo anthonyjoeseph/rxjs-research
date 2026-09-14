@@ -2,7 +2,7 @@
 
 **What this file is.** The ordered worklist for the one goal: discharging
 `agda/src/Verify-Batch-Simultaneous/The-Proof.agda` — no postulates, everything
-typechecks. This file holds the SCHEDULE — each tier's next three legs — over a
+typechecks. This file holds the SCHEDULE — each tier's next legs — over a
 LEDGER of one-line hooks; everything else lives in the code.
 
 **Hygiene — the rules this file lives by:**
@@ -55,33 +55,36 @@ LEDGER of one-line hooks; everything else lives in the code.
   rows. Group where the grouping is real and fall back on the risk classes
   where it is not; a leg naming a single row is still a leg.
   **AND A LEG IS ONE COMMIT OF WORK (Anthony).** That is the unit — not a theme
-  and not a region, but the chunk this session intends to land next. So the
-  three are the next three COMMITS, and legs two and three may aim at the very
-  same postulates as the first; what the trio owes is a coherent vision for
-  reducing the most risk, cut at commit boundaries. Pick the risk order first,
-  then cut — never pick three topics and hope each is commit-sized.
+  and not a region, but the chunk this session intends to land next. So the legs
+  are the next COMMITS, and every leg after the first may aim at the very same
+  postulates as the first; what the set owes is a coherent vision for reducing
+  the most risk, cut at commit boundaries. Pick the risk order first, then cut —
+  never pick topics and hope each is commit-sized.
   **SO THE FILE MOVES WITH EVERY COMMIT, and `make roadmap-moved` fails when it
-  does not.** Three outcomes. The leg landed: retire it, promote the other two,
-  write a new third. It did not finish: **rewrite the first leg as the work that
+  does not.** Three outcomes. The leg landed: retire it, promote the rest, write
+  a new last one. It did not finish: **rewrite the first leg as the work that
   remains**, the only record of what it turned out to cost. Or its ROUTE DIED:
   **discard it** — a refuted framing rewritten smaller is still steering, so the
   finding goes to the header of the statement it constrains and the leg that
   replaces it is written from the risk as it now stands.
-  **THE THREE LEGS DO NOT HAVE TO COVER THE TIER (Anthony).** They are the NEXT
-  three, not a partition of the remaining work — the coverage rule is the
-  LEDGER's job, and the rows already discharge it. Work beyond the third leg is
-  left unnamed on purpose: it will be re-grouped by what the first three find,
-  so naming it now writes a plan that ages before it is read.
+  **THE LEGS DO NOT HAVE TO COVER THE TIER (Anthony).** They are the NEXT ones,
+  not a partition of the remaining work — the coverage rule is the LEDGER's job,
+  and the rows already discharge it. Work beyond the last leg is left unnamed on
+  purpose: it will be re-grouped by what the earlier ones find, so naming it now
+  writes a plan that ages before it is read.
   **Pick up the top LEG, not the top row.** Reading straight down the ledger
   works exactly one postulate at a time, and the expensive part of this
   campaign is never the clause — it is discovering, after the clause is ground,
   that the statement's neighbours had to move with it.
-  **`make roadmap-check` ENFORCES THE COUNT AND A PROSE BUDGET PER LEG.** Three,
-  unless the tier has fewer than three live postulates to plan over — fewer is a
-  tier planning one leg ahead, more is a backlog, and the rows already are the
-  backlog. The budget is several times a row's, because a leg carries its own
-  reasoning and a group has no header to send research to; past it, the leg has
-  stopped saying why this group is next and started proving it.
+  **`make roadmap-check` ENFORCES THE COUNT AND A PROSE BUDGET PER LEG.** At
+  least three — unless the tier has fewer live postulates than that to plan over
+  — and at most seven. Fewer than three is a tier planning one leg ahead; more
+  than seven is a backlog, and the rows already are the backlog. Between them
+  the schedule is free, because a route already decided and cut into commits is
+  written down rather than displaced by the next one. The budget is several
+  times a row's, because a leg carries its own reasoning and a group has no
+  header to send research to; past it, the leg has stopped saying why this group
+  is next and started proving it.
 - **A TIER MAY OPEN AN `### Open questions` SECTION, AND IT IS NOT A SECOND
   ROADMAP (Anthony).** A question is what the tier does not yet KNOW that
   several of its FALSITY rows are all waiting on — the thing a row cannot
@@ -238,23 +241,49 @@ tier is staged around building one.
   A domain POSTULATED is still the stuck pattern match, so the families are
   DEFINED here and only inhabitation is deferred.
 
-- **THEN PROVE IT INHABITED, WHICH IS THE TERMINATION ARGUMENT AND THE POINT OF
-  ALL OF IT.** A run's derivation is built by an induction free to use any
-  measure a PROOF may use, including quantities the machine cannot compute —
-  and that is exactly the constraint every dead candidate died under. Each was
-  killed as a figure the EVALUATOR evaluates; none was killed as a proof-level
-  measure, so the four refutations bound what this leg may assume and not what
-  it may prove. Leaves are postulated at full strength and ground one at a
-  time, and nothing reduces through them until the third leg.
+- **STATE THE STRENGTHENED RETURN TYPE: A FRAME'S EMISSIONS ARE DOMINATED BY
+  THE CARRIED BOUND (Anthony).** Everything below consumes it and nothing under
+  it can be proven without it, which is why it comes before any frame is
+  touched. It answers the frame question by CHOOSING among its three answers —
+  the bound rides the RETURN rather than being threaded in or read off a state —
+  so the re-establishment is owed by whoever emits, once, in a type. The domain
+  removes the guard that HIDES an unbounded emission; this is what makes the
+  emission bounded, and neither substitutes for the other.
+
+- **DISCHARGE IT ACROSS ALL FIVE FRAMES IN ONE PASS (Anthony).** One statement,
+  one case split on the frame — the rank no longer differentiates them, which
+  is what collapses five shelves into a single induction and is the whole
+  saving. Taken as one leg because a per-frame grind re-decides the statement
+  four times over, and the second decision is the one that drifts. Rows:
+  `map-frame-carried`, `take-frame-carried`, `scan-frame-carried`,
+  `scan-burst-carried`, `thru-outer-frame-carried`.
+
+- **KILL THE DOOR: SPEND THE REPORT AT THE HOP SITE (Anthony).** The
+  strengthened return is a REPORT the caller holds, so at the hop the no branch
+  is refuted from what it carries — the marker becomes unemittable rather than
+  merely unobserved. It sits HERE and not last because it is the inhabitation
+  proof's crux and not a sequel to it: building a derivation at a hop is exactly
+  discharging that guard's positive branch, so the two are one obligation and
+  the door's route is the only one on offer for it. It ANSWERS the frame
+  question — `from-inner-dry` and `thru-outer-frame-dry` become arithmetic.
+
+- **THEN PROVE THE REST INHABITED, WHICH IS THE TERMINATION ARGUMENT.** With the
+  hop discharged, what is left is an induction free to use any measure a PROOF
+  may use, including quantities the machine cannot compute — exactly the
+  constraint every dead candidate died under. Each was killed as a figure the
+  EVALUATOR evaluates; none as a proof-level measure, so the four refutations
+  bound what this leg may assume and not what it may prove. Leaves are
+  postulated at full strength and ground one at a time; nothing reduces through
+  them until the cutover.
 
 - **AND ONLY THEN CUT OVER, WHICH DELETES THE THREE ARMS AND THE MARKER.** The
   evaluator recurses on the derivation, the guards go, and `hasDry` is false by
   construction rather than by argument — which is what makes leg one's named
   leaf true and the top-line claim sound, since `formal-verification-batchSimultaneous`
   reaches `rank-sufficient` and has all along. It is last because reduction is
-  preserved only when the inhabitation proof is COMPLETE: a cutover over
-  postulated leaves is the stuck pattern match leg one avoids. Four refutations
-  come back with it, and whether their crossings return unchanged is the check.
+  preserved only when inhabitation is COMPLETE: a cutover over postulated leaves
+  is the stuck pattern match leg one avoids. Four refutations come back with it,
+  and whether their crossings return unchanged is the check.
 
 ### Open questions
 

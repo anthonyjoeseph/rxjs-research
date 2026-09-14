@@ -40,8 +40,8 @@ can see into build failures.
     is scoped to one tier, and the only one that binds on FALSITY.
 
 11. **The leg count** — each tier opens with a `### Big picture tier roadmap` naming
-    exactly three legs, dropping below three only when the tier has fewer live
-    postulates than that to plan over.
+    at least three legs and at most seven, the floor dropping only when the tier has
+    fewer live postulates than that to plan over.
 12. **The leg budget** — each leg's prose is within `LEG_BUDGET`, which is several times
     `ROW_BUDGET`.
 13. **The row's receipt cap** — no row carries more `PROBED` receipts than
@@ -158,7 +158,10 @@ also pins the must-NOT direction, since the blank stays legal on a SHAPE row. Tw
 pin the legs, and each is built to isolate ONE of them: `legs-count.md` plans two legs in
 a tier with the rows for three while every leg is inside budget, and `legs-fat.md` names
 three legs of which one carries an argument instead of a reason, with the ROW budget
-silent — so neither can pass by tripping the other's check.
+silent — so neither can pass by tripping the other's check. A third, `legs-many.md`,
+pins the CEILING in both directions at once: a tier of eight legs must fire and its
+sibling of seven must stay quiet, since a ceiling off by one reads exactly like a
+ceiling that works.
 
 Four more pin the open questions, on the same isolate-one-check discipline:
 `questions-many.md` names a fourth question with everything else well formed,
@@ -216,8 +219,8 @@ is what gives it its own markers, and why siblings in one block share a header's
 ## Open questions — the one section held to its LEDGER and not to its movement
 
 Checks 13-16 have a shape none of the others do, and the shape is the point. Every
-other thing this checker holds is either required (a row per postulate, three legs per
-tier) or bounded (a budget). A question is neither: the section may be absent, and when
+other thing this checker holds is either required (a row per postulate, a floor of three
+legs per tier) or bounded (a budget). A question is neither: the section may be absent, and when
 present it is never required to change.
 
 That follows from what a question IS. A leg is one commit, so `make roadmap-moved` can
@@ -399,7 +402,7 @@ the remainder). Both write to the file. What a machine cannot check is the part
 that matters: `check-roadmap.py` resolves a row's NAME against the ledger, and
 nothing resolves whether the plan a leg describes is still the plan. Forcing the
 file to change is the only hold available, and it works by making the author
-read the three legs before each commit — which is when the question "is this
+read the legs before each commit — which is when the question "is this
 still what we are doing?" actually gets asked.
 
 

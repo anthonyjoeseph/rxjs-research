@@ -222,18 +222,26 @@ TIER_BUDGET = 900
 # riskiest-first names the next row but not the next PIECE OF WORK: risk is a
 # property of one statement, while the work is usually a GROUP of them that
 # stand or fall together, and taking the top row over and over walks the group
-# in an order nobody chose.  So a tier carries exactly three legs, ranked
+# in an order nobody chose.  So a tier carries AT LEAST three legs, ranked
 # riskiest-first, each free to cut across the classes where a group is the
 # better unit and to fall back on the classes where it is not.
 #
-# EXACTLY THREE, and the bound is what makes it a plan rather than a wish
-# list: three is short enough that writing a fourth forces a judgement about
-# which of the three it displaces.  The one exemption is arithmetic — a tier
-# with fewer than three live postulates cannot name three legs, so it names
-# one per postulate.
+# THREE IS THE FLOOR AND SEVEN THE CEILING (Anthony).  The floor is what makes
+# it a plan rather than a next step: a tier naming two is planning one leg
+# ahead.  The ceiling was once the same number, on the reasoning that a fourth
+# leg forces a judgement about which of the three it displaces — and that
+# reasoning costs something the floor does not, because the displaced leg is
+# not reconsidered, it is FORGOTTEN.  A route already decided and cut into
+# commit-sized pieces is the one thing here expensive to rediscover and cheap
+# to write down, so a session holding four or five of them writes them.  Seven
+# rather than unbounded because past that the list has stopped being the next
+# few commits and become the backlog, and the backlog is what the ROWS are.
+# The one exemption is arithmetic — a tier with fewer than three live
+# postulates cannot name three legs, so it names one per postulate.
 ROADMAP_RE = re.compile(r"^###\s+Big picture tier roadmap\s*$")
 SUBHEAD_RE = re.compile(r"^###\s+\S")
-LEGS_WANTED = 3
+LEGS_MIN = 3
+LEGS_MAX = 7
 
 # Prose per LEG, names free.  Deliberately far above ROW_BUDGET: a row says
 # WHERE the risk lives and defers the story to a header, while a leg has to
@@ -1066,11 +1074,14 @@ def main():
                 elif row_class[nm] not in QUESTION_CLASSES:
                     stale_qs.append((tier, q_label, q_line, nm,
                                      f"its row is {row_class[nm]}, not FALSITY or SHAPE"))
-        # THE COUNT.  Three, unless the tier has fewer postulates than that to
-        # plan over -- in which case naming three would mean inventing work.
-        want = min(LEGS_WANTED, len(rows))
-        if len(legs) != want:
-            bad_legs.append((tier, len(legs), want))
+        # THE COUNT.  At least three and at most seven, the floor dropping to
+        # the row count when the tier has fewer postulates than that to plan
+        # over -- naming three there would mean inventing work.
+        want = min(LEGS_MIN, len(rows))
+        if len(legs) < want:
+            bad_legs.append((tier, len(legs), f"at least {want}"))
+        elif len(legs) > LEGS_MAX:
+            bad_legs.append((tier, len(legs), f"at most {LEGS_MAX}"))
         for leg_label, leg_line, leg_cost in legs:
             if leg_cost > LEG_BUDGET:
                 fat_legs.append((tier, leg_label, leg_line, leg_cost))
@@ -1263,12 +1274,15 @@ def main():
         for tier, found, want in bad_legs:
             print(f"  Tier {tier}  {path.name}  names {found} leg(s), wants {want}")
         print("\nThe roadmap is the SCHEDULE and the rows are the LEDGER. A tier's")
-        print("next three legs are what the session actually works, grouped across")
-        print("the whole ledger rather than read off the top of it — so the count is")
-        print("fixed at three, and drops below three only when the tier has fewer")
-        print("live postulates than that to plan over. Fewer than three is a tier")
-        print("planning one leg ahead; more is a backlog, and a backlog is what the")
-        print("rows already are. Write each leg as  - **<name>** — <reasoning>  under")
+        print("next legs are what the session actually works, grouped across")
+        print("the whole ledger rather than read off the top of it — so the count")
+        print("runs from three to seven, the floor dropping only when the tier has")
+        print("fewer live postulates than that to plan over. Fewer than three is a")
+        print("tier planning one leg ahead; more than seven is a backlog, and a")
+        print("backlog is what the rows already are. A route already decided and cut")
+        print("into commit-sized pieces is written down rather than displaced, which")
+        print("is why the ceiling is not the floor.")
+        print("Write each leg as  - **<name>** — <reasoning>  under")
         print("a  ### Big picture tier roadmap  heading, riskiest leg first.")
         failures.append(None)
 
