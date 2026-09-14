@@ -134,11 +134,12 @@ open import Verify-Rank-Sufficient.Push-Carried using (Pay; Pout-of;
 -- that depth — and the hop's own re-entry satisfies the conjunct
 -- definitionally, since it drops the rank to the inner's own reading.
 --
--- REFUTED: `Refuted.Totality-Entry` — the statement below WITHOUT this
---   premise, at a `μ` over a one-shot source entered at the zero
---   triple.  The witness claims the unfolding's size beside the run's
---   dryness, so it reports the one number the guard reads against the
---   one the caller chose.
+-- REFUTED: git show ba1285b:agda/evidence/refuted/Refuted/Totality-Entry.agda
+--   — the statement below WITHOUT this premise, at a `μ` over a one-shot
+--   source entered at the zero triple, claiming the unfolding's size
+--   beside the run's dryness.  It is at a sha because `src` can no
+--   longer state it: the run reads no triple and emits no marker, so
+--   neither number the witness put side by side still exists.
 EntryOK : ∀ {n} {Γ : Ctx n} {u} → Closed Γ u → Tri → Set
 EntryOK b (_ , r , sz) = syncSizeᵉ b ≤ sz × obsDepthᵉ b ≤ r
 
@@ -197,12 +198,12 @@ under-ok (s , p) = entry-under s , p
 -- recursing costs nothing, since the reading already recurses there and
 -- the two then correspond clause for clause.
 --
--- REFUTED: `Refuted.Hop-Unconditioned` — the hop leaf below WITHOUT
---   this premise, at the emptiest inner there is entered at a rank of
---   nought.  The guard is strict, so nothing is shallow enough to pass
---   it and no arm of the relation builds the burst the machine hands
---   back, which is what says the repair relates the two ends rather
---   than reading either more carefully.
+-- REFUTED: git show ba1285b:agda/evidence/refuted/Refuted/Hop-Unconditioned.agda
+--   — the hop leaf below WITHOUT this premise, at the emptiest inner
+--   there is entered at a rank of nought.  What it established survives
+--   the cutover and is why this premise is here: the repair relates the
+--   two ends rather than reading either more carefully.  It is at a sha
+--   because the guard it was strict against is gone.
 --
 -- REFUTED: `Refuted.Carried-Unranked` — the FLAT reading, asked of every
 --   value at every type, at a one-shot source of one numeral entered at
@@ -303,11 +304,11 @@ postulate
 -- succeeds; what the statement still owes is the arm that ENQUEUES and
 -- the two operators that read a different node state.
 --
--- REFUTED: `Refuted.Hop-Unconditioned` — this statement WITHOUT the
---   premise, at the emptiest inner there is entered at a rank of nought.
---   The guard is strict, so nothing is shallow enough to pass it and the
---   machine answers dry; the relation has no arm building that marker,
---   since its one constructor demands a real inner derivation.
+-- REFUTED: git show ba1285b:agda/evidence/refuted/Refuted/Hop-Unconditioned.agda
+--   — this statement WITHOUT the premise, at the emptiest inner there is
+--   entered at a rank of nought.  The relation never had an arm building
+--   the marker the machine answered with, which is the half of the
+--   finding the cutover kept; the machine's half is at the sha.
 --
 -- PROBED: `Probed.Nodry-Halves` — the DROP arm only, entered at a node
 --   id nothing installed, so the row pins that the clause hands its
@@ -562,6 +563,16 @@ postulate
 -- statement stays at full strength rather than being conditioned on
 -- whatever today's callers happen to supply.
 --
+-- AND IT IS NO LONGER A LEAF, WHICH IS THE LEG.  A subscribe's burst is
+-- its SOURCE's burst pushed through the frames its own term installs, so
+-- every structural clause is `pushBurst-carried` at that clause's frame
+-- and nothing about the frames is asserted here.  What is left over is
+-- the three things no frame answers — a source's own burst, a
+-- flattener's walk, and the slot conjunct the second witness below
+-- names — and those are the leaves.  The five frames themselves are
+-- `Verify-Rank-Sufficient.Push-Carried`, stated together at the full
+-- axis set rather than one axis at a time as each one fell.
+--
 -- REFUTED: `Refuted.Carried-Unranked` — the FLAT reading of the
 --   conclusion, asked of every value at every type, at a one-shot source
 --   of one numeral entered at the rank the root itself builds. Answered
@@ -572,15 +583,6 @@ postulate
 --   claimed there are the gap: the definition reads one, the reference
 --   standing for it reads nought, so no repair reading the term can
 --   close it.
--- AND IT IS NO LONGER A LEAF, WHICH IS THE LEG.  A subscribe's burst is
--- its SOURCE's burst pushed through the frames its own term installs, so
--- every structural clause is `pushBurst-carried` at that clause's frame
--- and nothing about the frames is asserted here.  What is left over is
--- the three things no frame answers — a source's own burst, a
--- flattener's walk, and the slot conjunct `Refuted.Carried-Shared`
--- names — and those are the leaves.  The five frames themselves are
--- `Verify-Rank-Sufficient.Push-Carried`, stated together at the full
--- axis set rather than discovered one refutation at a time.
 subscribe-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
   {τ : Tri} (ac : Acc _≺_ τ) (b : Closed Γ u) → EntryOK b τ →
   (κ : Path Γ lo u t) (id : Id) (now : Tick)
@@ -820,12 +822,12 @@ evaluate⇓-nodry (eval-run {burst = b} {rest = r} s d) =
 -- constructor IS the machine's entry, and a derivation at the output
 -- is a claim about the run rather than about a number the door minted.
 --
--- REFUTED: `Refuted.Dry-Wrap` — this statement, at three programs: one
---   per half of the substitution repair, and one behind a gate that
---   neither half reaches.  The witness pins `hasDry ≡ true` by `refl`
---   against the evaluator as it stands, so it is a refutation of the
---   CURRENT machine and not of the claim being aimed at — which is
---   what makes deleting the arms the repair and a cleverer measure
+-- REFUTED: git show ba1285b:agda/evidence/refuted/Refuted/Dry-Wrap.agda
+--   — this statement, at three programs: one per half of the
+--   substitution repair, and one behind a gate that neither half
+--   reaches.  It pinned `hasDry ≡ true` by `refl` against the machine as
+--   it then stood, so it refuted the MACHINE and not the claim aimed at
+--   — which is what made deleting the arms the repair and a measure
 --   not one.
 rank-sufficient :
   ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slots Γ) →

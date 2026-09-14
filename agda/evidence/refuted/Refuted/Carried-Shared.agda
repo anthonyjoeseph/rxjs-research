@@ -35,7 +35,6 @@ open import Data.Nat using (_≤_; _<_)
 open import Data.Nat.Properties using (≤-refl)
 open import Data.Product using (_×_; _,_; proj₁)
 open import Data.Vec using (_∷_; [])
-open import Induction.WellFounded using (Acc)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (Id; Tick; InstEmit; InstEvent; value)
@@ -43,7 +42,7 @@ open import Rx.Exp using (Ctx; Closed; Val; Ty; natᵗ; obs; nat̂; ofᵉ; strm�
   input; syncSizeᵉ)
 open import Rx.Obs-Depth using (obsDepthᵉ)
 open import Rx.Slots using (Slots; shared)
-open import Rx.Strat-Order using (Tri; _≺_; ≺-wellFounded)
+open import Rx.Strat-Order using (Tri)
 open import Rx.Evaluator using (Stream; Path; root; Sched; EvalSt; subscribeE;
   sched-init; st-init)
 
@@ -73,10 +72,10 @@ BurstOK bs τ = All (λ em → All (EventOK τ) (InstEmit.events em)) bs
 SubscribeCarried : Set
 SubscribeCarried =
   ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
-    {τ : Tri} (ac : Acc _≺_ τ) (b : Closed Γ u) → EntryOK b τ →
+    {τ : Tri} (b : Closed Γ u) → EntryOK b τ →
     (κ : Path Γ lo u t) (id : Id) (now : Tick)
     (sched : Sched Γ) (st : EvalSt e) →
-    BurstOK {Γ = Γ} (proj₁ (subscribeE {e = e} ac b κ id now sched st)) τ
+    BurstOK {Γ = Γ} (proj₁ (subscribeE {e = e} b κ id now sched st)) τ
 
 ----------------------------------------------------------------------
 -- ONE SLOT, HOLDING A DEFINITION THAT WRITES AN OBSERVABLE.  The
@@ -114,9 +113,6 @@ ref-depth = refl
 τ₁ : Tri
 τ₁ = 1 , 0 , syncSizeᵉ ref₁
 
-ac₁ : Acc _≺_ τ₁
-ac₁ = ≺-wellFounded τ₁
-
 entry₁ : EntryOK ref₁ τ₁
 entry₁ = ≤-refl , ≤-refl
 
@@ -129,6 +125,6 @@ entry₁ = ≤-refl , ≤-refl
 
 carried-shared-false : SubscribeCarried → ⊥
 carried-shared-false h
-  with h {e = ref₁} ac₁ ref₁ entry₁ (root {lo = 1}) 0 0
+  with h {e = ref₁} ref₁ entry₁ (root {lo = 1}) 0 0
          (sched-init ref₁ ins₁) (st-init ref₁)
 ... | _ ∷ᵃ (_ ∷ᵃ () ∷ᵃ _) ∷ᵃ _

@@ -34,14 +34,13 @@ open import Data.Nat using (_≤_; _<_)
 open import Data.Nat.Properties using (≤-refl)
 open import Data.Product using (_×_; _,_; proj₁)
 open import Data.Vec using () renaming ([] to []ⱽ)
-open import Induction.WellFounded using (Acc)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (Id; Tick; InstEmit; InstEvent; value)
 open import Rx.Exp using (Ctx; Closed; Val; natᵗ; nat̂; ofᵉ; syncSizeᵉ)
 open import Rx.Obs-Depth using (obsDepthᵉ; obsDepthᵛ)
 open import Rx.Slots using (Slots)
-open import Rx.Strat-Order using (Tri; _≺_; ≺-wellFounded)
+open import Rx.Strat-Order using (Tri)
 open import Rx.Evaluator using (Stream; Path; root; Sched; EvalSt; subscribeE;
   sched-init; st-init)
 
@@ -69,10 +68,10 @@ FlatBurstOK bs τ = All (λ em → All (FlatEventOK τ) (InstEmit.events em)) bs
 SubscribeCarried : Set
 SubscribeCarried =
   ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
-    {τ : Tri} (ac : Acc _≺_ τ) (b : Closed Γ u) → FlatEntryOK b τ →
+    {τ : Tri} (b : Closed Γ u) → FlatEntryOK b τ →
     (κ : Path Γ lo u t) (id : Id) (now : Tick)
     (sched : Sched Γ) (st : EvalSt e) →
-    FlatBurstOK {Γ = Γ} (proj₁ (subscribeE {e = e} ac b κ id now sched st)) τ
+    FlatBurstOK {Γ = Γ} (proj₁ (subscribeE {e = e} b κ id now sched st)) τ
 
 ----------------------------------------------------------------------
 -- THE PROGRAM AND THE ENTRY, AND BOTH ARE THE MACHINE'S OWN.  The
@@ -94,9 +93,6 @@ b₀ = ofᵉ (nat̂ 1 ∷ [])
 τ₀ : Tri
 τ₀ = 0 , 0 , syncSizeᵉ b₀
 
-ac₀ : Acc _≺_ τ₀
-ac₀ = ≺-wellFounded τ₀
-
 -- LOAD-BEARING, and it is the half a reader will not believe: the rank
 -- the root enters at is NOUGHT, because the program writes no
 -- observable anywhere and the reading counts nothing else.
@@ -117,6 +113,6 @@ entry₀ = ≤-refl , ≤-refl
 
 carried-false : SubscribeCarried → ⊥
 carried-false h
-  with h {e = b₀} ac₀ b₀ entry₀ (root {lo = 0}) 0 0
+  with h {e = b₀} b₀ entry₀ (root {lo = 0}) 0 0
          (sched-init b₀ ins₀) (st-init b₀)
 ... | (_ ∷ᵃ () ∷ᵃ _) ∷ᵃ _

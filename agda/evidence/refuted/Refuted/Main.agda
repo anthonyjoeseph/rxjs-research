@@ -10,23 +10,21 @@
 -- transfers is the adversarial state a family was built to reach, never
 -- the conclusion drawn from it.
 --
+-- AND THREE WITNESSES LEFT WITH THE ARM THEY REACHED, WHICH IS HOW A
+-- REFUTATION IS MEANT TO DIE.  They killed the top-line dry claim, the
+-- hop's unconditioned premise and the totality leaf's entry quantifier
+-- — three readings of a rank the run computed — and `src` can no longer
+-- STATE any of them, because the run computes no rank.  What they were
+-- evidence about is now a proof obligation rather than an answer the
+-- machine gives, so there is nothing left for them to be false of.
+--
 -- RECOVERY: git show 919f115:agda/evidence/refuted/Refuted/
+-- RECOVERY: git show ba1285b:agda/evidence/refuted/Refuted/Dry-Wrap.agda
 module Refuted.Main where
 
--- the widest of them, and the only one taken against a statement `src`
--- declares a real BODY for.  Each reading is claimed beside its own dry
--- row because the finding is their ORDER, and the three witnesses beside
--- each other because they die to different repairs: a summing map clause
--- closes the first, leaves the fold exactly where it was, and does not
--- reach the gate at all — whose reading is ZERO, which is the clause the
--- unfolding equation is bought with
-open import Refuted.Dry-Wrap using (rank-sufficient-false;
-  rank-sufficient-false-fold; rank-sufficient-false-gate;
-  nest-p; dry-p; nest-q; dry-q; nest-g; dry-g)
-
--- and the shape a frame shelf was about to be written in, taken before
--- the statement existed.  No figure is claimed beside it and that is the
--- difference from every witness above: the crossing is not a pair of
+-- the shape a frame shelf was about to be written in, taken before the
+-- statement existed.  No figure is claimed beside it, and that is what
+-- makes it the widest witness left here: the crossing is not a pair of
 -- numerals that could drift apart under a repair, it is a RATE proven
 -- for every burst length, so the witness cannot go quiet while the
 -- mechanism under it stands
@@ -53,30 +51,10 @@ open import Refuted.Exit-Store using (exit-bounded-false;
 open import Refuted.Exit-Store using (both-ends-false;
   rise-tmpl-is; rise-entry-is; rise-store-is; interior-is)
 
--- and the one witness here that is not about a bound at all.  The
--- others kill a reading the descent does not have; this kills a
--- QUANTIFIER — the subscribe cycle's totality leaf claims a derivation
--- at every entry triple, and one clause of the machine reads that
--- triple against the term.  Its two figures are claimed because the
--- finding is that they never meet: the size the guard reads is fixed
--- by the program, the component it is read against is chosen by the
--- caller, and nothing in the statement relates them
-open import Refuted.Totality-Entry using (subscribe-total-false;
-  unfold-size; dry-entry)
-
--- and the same quantifier one cycle over, where the answer is not a
--- restatement of the entry but a premise about what a frame HANDS ON.
--- The two figures are claimed because the finding is that no program
--- can be shallow enough to escape: the inner is the emptiest there is
--- and the guard is strict, so a repair has to relate the two ends
--- rather than read either more carefully
-open import Refuted.Hop-Unconditioned using (consume-total-false;
-  inner-depth; dry-out)
-
--- and the statement minted to PAY that premise, killed one move later
--- and at the other extreme: every witness above is adversarial in the
--- entry or in the program, and this one is neither.  Its one figure is
--- claimed because the finding is that the rank the root builds is
+-- the entry bound the door was going to be paid out of, killed at the
+-- other extreme from every witness the cutover retired: those were
+-- adversarial in the entry or in the program, and this is neither.  Its
+-- one figure is claimed because the rank the root builds is
 -- NOUGHT wherever a program writes no observable, so the bound is a
 -- demand on the entry rather than a property of the burst — and a
 -- repair reading the value's TYPE leaves this row failing rather than
