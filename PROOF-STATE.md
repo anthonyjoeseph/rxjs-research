@@ -231,25 +231,27 @@ cannot compute — and the other two leaves carry no arithmetic at all.
 
 ### Big picture tier roadmap
 
-- **RESTATE `subscribe-carried` OVER THE SCHEDULE, GROWING `EntryOK` TO THE
-  THIRD CONJUNCT IN THE SAME EDIT.** Both its refutations send the statement to
-  the same place, and `Refuted.Carried-Shared` says why no repair reading the
-  TERM can get there. So the entry quantifies over the TELESCOPE —
-  `SlotsOK : ∀ {n} {Γ : Ctx n} → Slots Γ → Tri → Set` holding every `shared d`
-  below the rank — beside the unconnected count `subscribeE⇓-input-total`'s
-  share arm already wanted:
-  `EntryOK b sched (U , r , sz) = syncSizeᵉ b ≤ sz × obsDepthᵉ b ≤ r × SlotsOK (Sched.slots sched) (U , r , sz) × unconn (Sched.slots sched) [] ≤ U`.
-  Two legs until now, split by which of the term and the schedule each
-  quantified over; one edit, because the signature moves once.
+- **KILL THE DOOR: SPEND THE PREMISE AT THE HOP SITE (Anthony).** THE DOOR is
+  `subscribeInner`'s `obsDepthᵉ o <? r`, the one guard in the subscribe cycle
+  that answers a rank with the dry marker, and KILLING IT is proving that `no`
+  arm UNREACHABLE — every syntactic figure that tried to PRICE the comparison
+  died, so the premise assumes it instead. `subscribeInner⇓` has one
+  constructor, demanding a real sub-derivation, so a derivation at the machine's
+  result cannot exist unless the guard passed: `subscribeInner⇓-total` IS the
+  kill, not a statement about it. Near-DEFINITIONAL, since `ValOK (obs u)`
+  unfolds to that same inequality and the arm dies by `⊥-elim`. Four coarse
+  statements are landed unchecked in the module — `subscribeInner⇓-total`,
+  `hop-guard`, `inner-nodry`, `burst-handed` — for the shapes to be argued with.
 
-- **KILL THE DOOR: SPEND THE PREMISE AT THE HOP SITE (Anthony).** `HandedOK` is
-  now a hypothesis the hop's own statement carries, so at `subscribeInner`'s rank
-  comparison the no branch is refuted from it — the marker becomes unemittable
-  rather than merely unobserved. The obligation is near-DEFINITIONAL now that
-  both sides are one currency, since `obsDepthᵛ (obs t) e` IS `obsDepthᵉ e`, so
-  what the leg buys is the arm DELETION: `thruConsume⇓-total`'s three surviving
-  arms become two, and `Refuted.Hop-Unconditioned` stops being satisfiable
-  because the guard can no longer refuse where the premise holds.
+- **THEN RESTATE `subscribe-carried` OVER THE SCHEDULE, GROWING `EntryOK` TO THE
+  THIRD CONJUNCT IN THE SAME EDIT — IT IS WHAT PAYS THE DOOR'S PREMISE.**
+  `burst-handed` above is the door's obligation and is this row under another
+  name: nothing else says a burst's values are shallower than the rank. Both
+  refutations send it to the same place and `Refuted.Carried-Shared` says why no
+  repair reading the TERM gets there, so the entry quantifies over the
+  TELESCOPE — `SlotsOK : ∀ {n} {Γ : Ctx n} → Slots Γ → Tri → Set` holding every
+  `shared d` below the rank — beside the unconnected count:
+  `EntryOK b sched (U , r , sz) = syncSizeᵉ b ≤ sz × obsDepthᵉ b ≤ r × SlotsOK (Sched.slots sched) (U , r , sz) × unconn (Sched.slots sched) [] ≤ U`.
 
 - **THEN THE LEAVES BOTH CYCLES LEFT, AND REFUTE EACH BEFORE GRINDING IT.**
   Both cycles are bodies now and their list plumbing is closed, so what is open

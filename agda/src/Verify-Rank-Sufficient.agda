@@ -36,7 +36,7 @@ module Verify-Rank-Sufficient where
 open import Data.Bool using (Bool; false)
 open import Data.Empty using (⊥-elim)
 open import Data.Fin using (Fin)
-open import Data.List using (List; []; _∷_)
+open import Data.List using (List; []; _∷_; any)
 open import Data.Maybe using (just; nothing)
 open import Data.List.Relation.Unary.All using (All) renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
 open import Data.Nat using (_≤_; _<_; suc; _+_; _⊔_; _<?_)
@@ -62,10 +62,10 @@ open import Rx.Evaluator using (Stream; Path; root; Sched; EvalSt; Frame; AllOp;
   scan-st; take-st; mergeAll-st; switch-st; exhaust-st; lookupNode; splitEvents;
   subscribeE; pushBurst; stepFrame; thruWalk; thruConsume; innerReact;
   subscribeAll; drain; evaluate; rootWitness; sched-init; st-init;
-  hasDry)
+  subscribeInner; dryEvent; hasDry)
 open import Rx.Evaluator.Domain using (evaluate⇓; eval-run; subscribeE⇓;
   pushBurst⇓; stepFrame⇓; thruWalk⇓; thruConsume⇓; innerReact⇓;
-  subscribeAll⇓; drain⇓;
+  subscribeAll⇓; drain⇓; subscribeInner⇓; inner;
   subs-of; subs-empty; subs-map; subs-take-zero; subs-take-suc; subs-scan;
   subs-merge-all; subs-switch-all; subs-exhaust-all; subs-μ; subs-defer;
   step-map; step-scan; step-scan-nil; step-take; step-from-inner; step-thru-outer;
@@ -314,6 +314,77 @@ postulate
     HandedOK {Γ = Γ} (o ∷ []) τ → (sched : Sched Γ) (st : EvalSt e) →
     thruConsume⇓ {e = e} op nid κ id now o sched st
       (thruConsume {e = e} ac op nid κ id now o sched st)
+
+-- ─────────────────────────────────────────────────────────────────────
+-- KILLING THE DOOR.  Coarse statements only — none of the four below is
+-- claimed to typecheck as written, and the shapes are what the next
+-- session should argue with rather than the syntax.
+-- ─────────────────────────────────────────────────────────────────────
+
+-- THE DOOR IS `subscribeInner`'s RANK TEST, AND KILLING IT IS PROVING
+-- ITS NEGATIVE ARM UNREACHABLE — not weakening it, not measuring it
+-- better.  The machine compares `obsDepthᵉ o <? r` and answers the `no`
+-- case by minting an instance and closing it `dried`.  That arm is the
+-- only site in the whole subscribe cycle that builds the marker from a
+-- rank, and `subscribeInner⇓` has exactly one constructor, which
+-- demands a real sub-derivation at the arriving value.  So a derivation
+-- at the machine's own result CANNOT EXIST unless the comparison
+-- succeeded: the leaf below is not a statement about the door, it is
+-- the statement that kills it.
+--
+-- AND THE PREMISE ALREADY IS THE COMPARISON, WHICH IS WHY THIS IS
+-- NEAR-DEFINITIONAL RATHER THAN ARITHMETIC.  `ValOK (obs u) (_ , r , _)`
+-- unfolds to `obsDepthᵉ o < r` and the guard tests `obsDepthᵉ o <? r`:
+-- one currency, one inequality, so the `no` arm dies by `⊥-elim`
+-- against the hypothesis and nothing about depth is owed.  Every
+-- syntactic candidate that died did so trying to PRICE this comparison;
+-- the premise route does not price it, it assumes it and pushes the
+-- obligation to whoever hands the value over.
+postulate
+  subscribeInner⇓-total : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
+    {τ : Tri} (ac : Acc _≺_ τ) (op : AllOp) (allNid : NodeId)
+    (κ : Path Γ lo u t) (id : Id) (now : Tick) (o : Val Γ (obs u)) →
+    HandedOK {Γ = Γ} (o ∷ []) τ → (sched : Sched Γ) (st : EvalSt e) →
+    subscribeInner⇓ {e = e} op allNid κ id now o sched st
+      (subscribeInner {e = e} ac op allNid κ id now o sched st)
+
+-- THE EXTRACTION, WRITTEN OUT BECAUSE IT IS THE WHOLE OF THE ARGUMENT
+-- AND READS AS A TRIVIALITY.  It is what the leaf above will `with` on
+-- to refute the guard, and stating it separately is what keeps the
+-- refutation from being reargued at each of the three consume families.
+hop-guard : ∀ {n} {Γ : Ctx n} {u} {U r sz} (o : Val Γ (obs u))
+          → HandedOK {Γ = Γ} (o ∷ []) (U , r , sz)
+          → obsDepthᵉ o < r
+hop-guard o (h ∷ᵃ []ᵃ) = h
+
+-- AND THIS IS WHAT THE ARM DELETION IS FOR, STATED SO IT CAN BE SPENT.
+-- `subscribeE⇓-nodry` is a shelf of twelve families whose dryness is
+-- `refl` at eleven of them; the hop is the one that is not, because the
+-- hop is the one family that can build the marker.  Discharging it here
+-- is what turns that shelf from a design into typing.
+postulate
+  inner-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
+    {τ : Tri} (ac : Acc _≺_ τ) (op : AllOp) (allNid : NodeId)
+    (κ : Path Γ lo u t) (id : Id) (now : Tick) (o : Val Γ (obs u)) →
+    HandedOK {Γ = Γ} (o ∷ []) τ → (sched : Sched Γ) (st : EvalSt e) →
+    any dryEvent
+      (proj₁ (proj₂ (proj₂
+        (subscribeInner {e = e} ac op allNid κ id now o sched st))))
+      ≡ false
+
+-- AND THE OBLIGATION THIS LEG CANNOT DISCHARGE ON ITS OWN, WHICH IS THE
+-- REASON THE NEXT LEG IS THE NEXT LEG.  Every call reaching the door
+-- arrives from a burst the subscribe cycle produced, so the premise is
+-- payable only where something says a burst's values are shallower than
+-- the rank — which is `subscribe-carried`, and its second refutation
+-- says that statement has to quantify over the SCHEDULE.  Stated here
+-- rather than proven here on purpose: assembly first, leaves second.
+postulate
+  burst-handed : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
+    {τ : Tri} (ac : Acc _≺_ τ) (b : Closed Γ u) → EntryOK b τ →
+    (κ : Path Γ lo u t) (id : Id) (now : Tick)
+    (sched : Sched Γ) (st : EvalSt e) →
+    BurstOK {Γ = Γ} (proj₁ (subscribeE {e = e} ac b κ id now sched st)) τ
 
 -- THE SAME EDGE FROM THE OTHER SIDE: an inner subscription that has
 -- already been made, reacting to what it delivers.  It reaches the
