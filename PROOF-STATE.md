@@ -243,18 +243,17 @@ cannot compute — and the other two leaves carry no arithmetic at all.
   which REFUTES the unconditioned form. PROBE FIRST — cheapest test on this
   face, and the largest blast radius on it.
 
-- **KILL THE DOOR: SPEND THE PREMISE AT THE HOP SITE (Anthony).** THE DOOR is
-  `subscribeInner`'s `obsDepthᵉ o <? r`, the one guard in the subscribe cycle
-  that answers a rank with the dry marker, and KILLING IT is proving that `no`
-  arm UNREACHABLE. `subscribeInner⇓` has one constructor, demanding a real
-  sub-derivation, so `subscribeInner⇓-total` IS the kill rather than a statement
-  about it, and the arm dies by `⊥-elim`. But the kill is not the CLOSE:
-  `evaluate` still holds the arm, so `Refuted.Dry-Wrap` stays green until the
-  clause goes, and deleting it costs the descent witness the `yes` branch
-  supplies — `subscribeInner-nodoor` states that residue. AND THE PREMISE
-  ARRIVES ONE FRAME LOWER THAN THE CARRIED FAMILY WAS AIMED: where `o` came from
-  a `map-f` it was already true of the TEMPLATE. `Rx.Evaluator.Carried` holds
-  the clause after the change and the order it lands in.
+- **DELETE THE ARM; PROVING IT UNREACHABLE IS A DIFFERENT JOB (Anthony).** THE
+  DOOR is `subscribeInner`'s `obsDepthᵉ o <? r`, and the two peels ask it of a
+  size and a count. Proving the `no` arm unreachable claims something about
+  the machine as it stands and comes LAST — it is reachable and three witnesses
+  reach it. Deleting it comes first and changes what the recursion is
+  over: the order is numeric, so every non-structural edge re-establishes it at
+  RUNTIME and can fail, while a derivation taking each sub-call's own witness as
+  a premise has none to give — no arm, no test, no seed. So killing the door and
+  inhabiting the relation are ONE obligation.
+  `Verify-Rank-Sufficient.Doorless` is the builder; `Rx.Evaluator.Doorless` the
+  three facts replacing the tests, of which the μ peel's is proven.
 
 - **STATE THE WHOLE CARRIED FAMILY AT THE FULL AXIS SET IN ONE PASS — ALL FIVE
   FRAMES, NOT ONE PER REFUTATION (Anthony).** `stepFrame⇓-total` is handed
