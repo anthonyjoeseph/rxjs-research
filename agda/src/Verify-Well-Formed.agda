@@ -32,14 +32,14 @@
 module Verify-Well-Formed where
 
 open import Data.List using (_++_)
+open import Data.Product using (∃; _,_; proj₁)
 open import Rx.Prim using (Fuel)
 open import Rx.Exp using (Ctx; Closed)
 open import Rx.Slots using (Slots)
 open import Rx.Evaluator using (Stream; root; sched-init; st-init)
-open import Rx.Evaluator.Run using (evaluate)
-open import Rx.Evaluator.Domain using (subscribeE⇓; drain⇓; eval-run)
+open import Rx.Evaluator.Builder using (evaluate↓; evaluate!)
+open import Rx.Evaluator.Domain using (evaluate⇓; subscribeE⇓; drain⇓; eval-run)
 open import Rx.Protocol using (WellFormed)
-open import Verify-Rank-Sufficient using (evaluate⇓-total)
 
 ------------------------------------------------------------------
 -- THE DEBT.  Everything the protocol argument needs about a run given
@@ -53,18 +53,26 @@ postulate
   burst-drain-well-formed :
     ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
       (fuel : Fuel) (ins : Slots Γ) {burst rest : Stream Γ t} {sched′ st′} →
-    subscribeE⇓ {e = e} e root 0 0 (sched-init e ins) (st-init e)
+    subscribeE⇓ {e = e} {lo = n} e root 0 0 (sched-init e ins) (st-init e)
       (burst , sched′ , st′) →
     drain⇓ {e = e} fuel 1 sched′ st′ rest →
     WellFormed (burst ++ rest)
 
--- and the assembly, which is one match.  `evaluate⇓-total` hands over a
--- derivation at the run's own output; `eval-run` is the only
--- constructor of that family, so matching it IS the seam, and the
--- output it reassembles is `evaluate`'s by the same equation the
--- constructor was stated at.
+-- and the assembly, which is one match.  The builder hands over a run
+-- TOGETHER WITH its derivation, and `eval-run` is the only constructor
+-- of that family, so matching it IS the seam — and the output the
+-- constructor reassembles is the one the evaluator returns, because the
+-- evaluator IS that pair's first projection.
+--
+-- THE MATCH GOES THROUGH A LOCAL RATHER THAN A `with`, and it is the
+-- projection that forces it: the goal names the evaluator, the
+-- derivation is about the pair, and `with` abstracts syntactic
+-- occurrences rather than unfolding to find them.  Naming the pair
+-- makes the goal mention it, which is all the refinement needs.
 evaluate-well-formed :
   ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slots Γ) →
-  WellFormed (evaluate fuel e ins)
-evaluate-well-formed fuel e ins with evaluate⇓-total fuel e ins
-... | eval-run s d = burst-drain-well-formed fuel ins s d
+  WellFormed (evaluate↓ fuel e ins)
+evaluate-well-formed fuel e ins = go (evaluate! fuel e ins)
+  where
+  go : (w : ∃ λ out → evaluate⇓ fuel e ins out) → WellFormed (proj₁ w)
+  go (_ , eval-run s d) = burst-drain-well-formed fuel ins s d

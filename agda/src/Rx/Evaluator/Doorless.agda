@@ -161,11 +161,13 @@ under-ok (s , p) = entry-under s , p
 --   two ends rather than reading either more carefully.  It is at a sha
 --   because the guard it was strict against is gone.
 --
--- REFUTED: `Refuted.Carried-Unranked` — the FLAT reading, asked of every
---   value at every type, at a one-shot source of one numeral entered at
---   the rank the root itself builds. That witness is as far from the
---   risky region as a program gets, which is what says the repair is the
---   type split rather than a hypothesis about the program.
+-- REFUTED: git show 80e527f9:agda/evidence/refuted/Refuted/Carried-Unranked.agda
+--   — the FLAT reading, asked of every value at every type, at a
+--   one-shot source of one numeral entered at the rank the root itself
+--   builds. That witness is as far from the risky region as a program
+--   gets, which is what says the repair is the type split rather than a
+--   hypothesis about the program.  It is at a sha because it read the
+--   machine's own subscribe, which `src` no longer has.
 ValOK : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) (u : Ty) → Tri → Val Γ u → Set
 ValOK η unitᵗ    _ _           = ⊤
 ValOK η boolᵗ    _ _           = ⊤
@@ -318,6 +320,11 @@ hop-guard η _ o (h ∷ᵃ []ᵃ) = h
 -- nose.  The clause is reached only down the branch where the
 -- membership reads `false`, so the true statement is the conditioned
 -- one and the caller already holds its witness.
+--
+-- PROBED: `Probed.Connect-Count` — tables of one and three `shared`
+--   slots, connected at the last unconnected one, with slack left
+--   over, and at an index that is not the head of the set.  Not
+--   reached: a `scripted` slot, which reads nought on both sides.
 postulate
   connect-drops : ∀ {Γ : Ctx n} (sl : Slots Γ) (cs : List Source) (i : Fin n)
                 → memberSource (toℕ i) cs ≡ false

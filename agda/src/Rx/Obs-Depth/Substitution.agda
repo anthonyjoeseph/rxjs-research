@@ -41,7 +41,7 @@
 --   both hold is the same: neither substitution introduces a `strmᵗ`.
 module Rx.Obs-Depth.Substitution where
 
-open import Data.Bool using (true)
+open import Data.Bool using (true; false; if_then_else_)
 open import Data.List using (List; []; _∷_; _++_)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
@@ -80,12 +80,37 @@ data AllData : List Ty → Set where
 -- the four projections the two clauses below need out of `isData`'s
 -- `if`-shaped definition.  Mechanical: `isData (s ×ᵗ t)` is
 -- `if isData s then isData t else false`, so a `true` there decides
--- both sides, and the `with` that reads it is the whole proof.
+-- both sides, and the `with` that reads it is the whole proof.  Both
+-- pairs read the SAME `if`, since the sum's clause and the product's
+-- clause are the same expression at different constructors, so one
+-- pair of helpers over two bare booleans closes all four.
+private
+  ifˡ : ∀ a b → (if a then b else false) ≡ true → a ≡ true
+  ifˡ true  b p = refl
+  ifˡ false b ()
+
+  ifʳ : ∀ a b → (if a then b else false) ≡ true → b ≡ true
+  ifʳ true  b p = p
+  ifʳ false b ()
+
+×-dataˡ : ∀ s t → isData (s ×ᵗ t) ≡ true → isData s ≡ true
+×-dataˡ s t = ifˡ (isData s) (isData t)
+
+×-dataʳ : ∀ s t → isData (s ×ᵗ t) ≡ true → isData t ≡ true
+×-dataʳ s t = ifʳ (isData s) (isData t)
+
++-dataˡ : ∀ s t → isData (s +ᵗ t) ≡ true → isData s ≡ true
++-dataˡ s t = ifˡ (isData s) (isData t)
+
++-dataʳ : ∀ s t → isData (s +ᵗ t) ≡ true → isData t ≡ true
++-dataʳ s t = ifʳ (isData s) (isData t)
+
+-- PROBED: `Probed.Data-Shelf` — a membership at the head of the
+--   telescope and past it.  The rows buy NON-VACUITY rather than an
+--   inequality: the conclusion is a `Bool` the type alone decides, so
+--   what is covered is that the premise is inhabited at a nested type
+--   at all.
 postulate
-  ×-dataˡ : ∀ s t → isData (s ×ᵗ t) ≡ true → isData s ≡ true
-  ×-dataʳ : ∀ s t → isData (s ×ᵗ t) ≡ true → isData t ≡ true
-  +-dataˡ : ∀ s t → isData (s +ᵗ t) ≡ true → isData s ≡ true
-  +-dataʳ : ∀ s t → isData (s +ᵗ t) ≡ true → isData t ≡ true
   data-of : ∀ {Θ t} → AllData Θ → t ∈ Θ → isData t ≡ true
 
 -- a data value reads zero, both as a value and as the term `reify`
@@ -125,6 +150,11 @@ lookup-data η (_ ∷ᵈ ds) (_ ∷ᵃ vs) (there p)   = lookup-data η ds vs p
 -- weakening writes no head, so it moves no reading.  Stated for the
 -- exact instance the substitution's `varᵗ` arm produces rather than for
 -- a general renaming, because that arm is the only consumer.
+--
+-- PROBED: `Probed.Data-Shelf` — a leaf, and a term whose head is
+--   `strmᵗ`, which is the only head the reading counts and so the only
+--   one a renaming could move.  Not reached: a term with a binder
+--   under the weakened context.
 postulate
   dep-wkTm : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) {Δᵍ Δ Θ t} (f : Tm Γ [] [] [] t) →
     depᵗ η (wkTm {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} f) ≡ depᵗ η f
@@ -143,6 +173,15 @@ postulate
 --
 -- `ifᵗ` is separate only because Agda cannot see through the `if` that
 -- selects the branch; nothing about it is open.
+--
+-- PROBED: `Probed.Eval-Binders` — a `caseᵗ` at a data payload with
+--   both arms writing, and at an OBSERVABLE payload handed straight
+--   back by the branch, which is the region that could make either
+--   statement false; the second row is TIGHT, the value's reading
+--   landing on the predecessor exactly.  An `ifᵗ` at a selected arm
+--   that sets the join and at one that does not.  Not reached: an
+--   arm whose reading differs from its sibling's with the observable
+--   one selected, where the join gives slack by construction.
 postulate
   eval-case : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) {Θ s t u} → AllData Θ →
     (sc : Tm Γ [] [] Θ (s +ᵗ t)) (l : Tm Γ [] [] (s ∷ Θ) u)
@@ -300,6 +339,20 @@ envDepth η (v ∷ᵃ vs) = depᵗ η (reify v) ⊔ envDepth η vs
 -- This is the statement the fold's arm needs, and the growth in it is
 -- the iteration axis the carried family already names — stated here so
 -- the two are the same fact rather than two.
+--
+-- AND NO ROW AT AN OBSERVABLE BINDER CAN SIT ON THIS BOUND, WHICH IS A
+-- PROPERTY OF `envDepth` RATHER THAN OF THE PROGRAMS.  It reads its
+-- values through `reify`, and reifying an observable writes a `strmᵗ`
+-- the value did not have — so the environment's measured reading is
+-- one above the reading of what is in it, and the slack is structural.
+-- Tightness would need the measure to read the value rather than its
+-- literal, which is a restatement and not a repair to the proof.
+--
+-- PROBED: `Probed.Eval-Binders` — an empty environment, a data one,
+--   and one carrying an observable both read straight back and wrapped
+--   again under a `strmᵗ`.  Not reached: the iteration axis, since one
+--   evaluation crosses one binder and the growth this prices is per
+--   refold.
 postulate
   dep-eval-open : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) {Θ t}
     (tm : Tm Γ [] [] Θ t) (env : All (Val Γ) Θ) (m : ℕ) →
@@ -356,6 +409,41 @@ applyFn-strict η ds fn v =
 -- the size axis keeps the pair the carried family states it at; what
 -- the substitution lemma collapses is the DEPTH axis, which is the one
 -- the door reads.
+
+-- AND THE FORM BELOW IS ALMOST CERTAINLY FALSE, WHICH IS WHAT COMES OF
+-- INSTANTIATING IT.  The correction term is a function of the argument
+-- TYPE, so at a fixed argument type it is ONE NUMBER however the
+-- template is written — while the growth substitution causes is per
+-- OCCURRENCE: each `varᵗ` the template reads is replaced by a literal
+-- larger than it, so a template reading its argument k times pays k
+-- times the difference.  Instantiated at a pair of numerals, one
+-- occurrence leaves a gap of one over the template's own size and
+-- three occurrences leave five, and nothing on the right moves with k.
+-- Whatever number the correction returns, a template reading its
+-- argument often enough exceeds it.
+--
+-- WHAT THE REPAIR IS, AND IT IS A RESTATEMENT RATHER THAN A PROOF.
+-- The true statement prices the growth where it happens — a term of
+-- size m reading a data argument grows by at most m times what a
+-- literal of that type costs — so the correction belongs MULTIPLIED by
+-- the template's size rather than added to it.  The row that closes
+-- today closes only because a numeral reifies to one node and the
+-- growth is nil; it is evidence that the shape is right at the floor,
+-- not that the arithmetic holds.
+--
+-- AND THE STATEMENT CANNOT BE REFUTED IN THE SHAPE IT HAS, which is
+-- the second half of the finding.  The correction is a postulate with
+-- no equations, so no concrete instantiation can contradict it: the
+-- witness has to be a FAMILY indexed by the occurrence count, carrying
+-- the two rates as an induction.  So the finding is carried as a pair
+-- of pins rather than as a `⊥` in the refuted tree.
+--
+-- PROBED: `Probed.Data-Shelf` — the bound at an argument whose
+--   literal is one node, where the correction goes unspent.  NOT
+--   reached, and not reachable: any argument whose literal is larger,
+--   since closing such a row needs a LOWER bound on a postulate that
+--   has no equations.  The two pins there carry the gap at one and at
+--   three occurrences of the same argument type.
 postulate
   dataSize : Ty → ℕ
 

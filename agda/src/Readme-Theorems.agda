@@ -21,7 +21,7 @@ open import Rx.Exp       using (Ty; Ctx; Closed; Val; Fn; Tm; nat̂; strmᵗ; is
                                 inputsBelowᵉ;
                                 input; ofᵉ; mapᵉ; takeᵉ; mergeAllᵉ;
                                 exhaustAllᵉ; evalTm; applyFn)
-open import Rx.Evaluator.Run using (evaluate)
+open import Rx.Evaluator.Builder using (evaluate↓)
 open import Rx.Slots using (scripted; shared; Slot; Slots)
 open import Data.Bool using (T)
 open import Spec         using (spec-batchSimultaneous; valuesOf)
@@ -70,8 +70,8 @@ postulate
   -- recovers the raw value stream, for every program and driver.
   readme-batch-order-is-delivery-order :
     ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slots Γ) →
-    concat (emitValues (spec-batchSimultaneous (evaluate fuel e ins)))
-      ≡ emitValues (evaluate fuel e ins)
+    concat (emitValues (spec-batchSimultaneous (evaluate↓ fuel e ins)))
+      ≡ emitValues (evaluate↓ fuel e ins)
 
   -- take counts values, even mid-batch: take k keeps the first k
   -- VALUES of the flat stream — never the first k batches — so it
@@ -80,9 +80,9 @@ postulate
     ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (k : ℕ)
       (e : Closed Γ t) (ins : Slots Γ) →
     concat (emitValues (spec-batchSimultaneous
-                          (evaluate fuel (takeᵉ (nat̂ k) e) ins)))
+                          (evaluate↓ fuel (takeᵉ (nat̂ k) e) ins)))
       ≡ take k (concat (emitValues (spec-batchSimultaneous
-                                      (evaluate fuel e ins))))
+                                      (evaluate↓ fuel e ins))))
 
   -- One subscribe() call is one batch.  Fuel 0 runs only the
   -- subscribe frame — a single instant — so ANY program, however
@@ -90,7 +90,7 @@ postulate
   -- source-free version: arrivals cost fuel, defers included.)
   readme-one-subscribe-one-batch :
     ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
-    length (spec-batchSimultaneous (evaluate 0 e ins)) ≤ 1
+    length (spec-batchSimultaneous (evaluate↓ 0 e ins)) ≤ 1
 
 ------------------------------------------------------------------
 -- SEVEN QUANTIFIED INSTANCES
@@ -169,25 +169,25 @@ postulate
   readme-diamond :
     ∀ {t} {ok : T (isData t)} (f : Fn (t ∷ []) [] [] [] t t) (v : Val (t ∷ []) t) →
     emitValues (spec-batchSimultaneous
-                 (evaluate 1 (diamondProgram f) (oneSlot (hotOnce {ok = ok} v))))
+                 (evaluate↓ 1 (diamondProgram f) (oneSlot (hotOnce {ok = ok} v))))
       ≡ (v ∷ applyFn f v ∷ []) ∷ []
 
   readme-each-next-own-instant :
     ∀ {t} {ok : T (isData t)} (f : Fn (t ∷ t ∷ []) [] [] [] t t) (u v : Val (t ∷ t ∷ []) t) →
     emitValues (spec-batchSimultaneous
-                 (evaluate 2 (eachNextProgram f) (twoHots {ok = ok} u v)))
+                 (evaluate↓ 2 (eachNextProgram f) (twoHots {ok = ok} u v)))
       ≡ (u ∷ applyFn f u ∷ []) ∷ (v ∷ []) ∷ []
 
   readme-cascades-inherit :
     ∀ {t} {ok : T (isData t)} (ws : List (Fn (t ∷ []) [] [] [] t t)) (v : Val (t ∷ []) t) →
     emitValues (spec-batchSimultaneous
-                 (evaluate 1 (cascadeProgram ws) (oneSlot (hotOnce {ok = ok} v))))
+                 (evaluate↓ 1 (cascadeProgram ws) (oneSlot (hotOnce {ok = ok} v))))
       ≡ (v ∷ map (λ w → applyFn w v) ws) ∷ []
 
   readme-completion-cascades :
     ∀ {t} {ok : T (isData t)} (w : Tm (t ∷ []) [] [] [] t) (u v : Val (t ∷ []) t) →
     emitValues (spec-batchSimultaneous
-                 (evaluate 2 (completionProgram w)
+                 (evaluate↓ 2 (completionProgram w)
                    (oneSlot (scripted {ok = ok} (hot ((after 0 , u) ∷ (after 0 , v) ∷ []))))))
       ≡ (u ∷ u ∷ evalTm w ∷ []) ∷ (v ∷ []) ∷ []
 
@@ -200,17 +200,17 @@ postulate
     ∀ {t} (v : Tm (t ∷ []) [] [] [] t)
       {okS : T (inputsBelowᵉ 0 (ofᵉ (v ∷ [])))} →
     emitValues (spec-batchSimultaneous
-                 (evaluate 0 shareProgram (oneSlot (shared (ofᵉ (v ∷ [])) {ok = okS}))))
+                 (evaluate↓ 0 shareProgram (oneSlot (shared (ofᵉ (v ∷ [])) {ok = okS}))))
       ≡ (evalTm v ∷ []) ∷ []
 
   readme-late-join-growth :
     ∀ {t} {ok : T (isData t)} (u v w x : Val (growthCtx t) t) →
     emitValues (spec-batchSimultaneous
-                 (evaluate 4 growthProgram (growthSlots {ok = ok} u v w x)))
+                 (evaluate↓ 4 growthProgram (growthSlots {ok = ok} u v w x)))
       ≡ (u ∷ u ∷ []) ∷ (v ∷ v ∷ v ∷ []) ∷ []
 
   readme-serial-joins-mirror-rxjs :
     ∀ {t} (g : Fn [] [] [] [] t t) (a b : Tm [] [] [] [] t) →
     emitValues (spec-batchSimultaneous
-                 (evaluate 0 (serialProgram g a b) noSlots))
+                 (evaluate↓ 0 (serialProgram g a b) noSlots))
       ≡ (applyFn g (evalTm a) ∷ applyFn g (evalTm b) ∷ []) ∷ []

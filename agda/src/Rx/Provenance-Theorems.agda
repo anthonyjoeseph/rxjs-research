@@ -8,7 +8,7 @@ open import Data.Nat                              using (suc)
 open import Rx.Prim      using (Fuel; Id; InstEmit)
 open import Rx.Exp       using (Ctx; Closed)
 open import Rx.Evaluator using (Stream)
-open import Rx.Evaluator.Run using (evaluate)
+open import Rx.Evaluator.Builder using (evaluate↓)
 open import Rx.Slots using (Slots)
 
 ------------------------------------------------------------------
@@ -42,7 +42,7 @@ postulate
   -- sync-spawned inners inherit, never mint
   id-inheritance :
     ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slots Γ) →
-    ids (evaluate fuel e ins) ⊆ᵢ horizon fuel
+    ids (evaluate↓ fuel e ins) ⊆ᵢ horizon fuel
 
 -- id-fresh became structural: instants mint from ARRIVAL POSITION
 -- (0 the subscribe frame, then the drain counter), so distinct

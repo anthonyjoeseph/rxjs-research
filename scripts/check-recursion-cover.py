@@ -41,7 +41,7 @@ import argparse
 import re
 import sys
 
-WORD = r"[A-Za-z][A-Za-z0-9'´ᵃ-ᵪ₀-₟′-]*"
+WORD = r"[A-Za-z][A-Za-z0-9'´ᵃ-ᵪ₀-₟′!↓⇓-]*"
 SIG = re.compile(r"^(" + WORD + r")\s*:\s")
 HEAD = re.compile(r"^(" + WORD + r")\s")
 TOK = re.compile(WORD)
@@ -148,7 +148,7 @@ def multi_sccs(edges, nodes):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--file", default="agda/src/Rx/Evaluator/Run.agda")
+    ap.add_argument("--file", default="agda/src/Rx/Evaluator/Builder.agda")
     args = ap.parse_args()
 
     names, edges, peels, declared = parse(args.file)

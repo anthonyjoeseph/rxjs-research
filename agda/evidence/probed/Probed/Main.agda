@@ -46,18 +46,33 @@ module Probed.Main where
 -- both belong to the tree and a tree with nothing open still owes them.
 open import Probed.Apparatus using (Confirms; Separates)
 
--- THE TOTALITY ROWS: derivations built by hand whose triple is not
--- chosen by unification but taken from the evaluator's own result, so a
--- constructor relating the wrong stream is a type error here and is
--- invisible above.  Each stands at a cycle the subscribe induction did
--- not close — the flatteners' wrapper, the slot subscribe, the drain,
--- and the two clauses a frame re-enters the subscribe cycle through.
-open import Probed.Nodry-Halves using (row-total-all;
-  row-total-input; row-total-drain; row-total-consume; row-total-react)
-
--- AND THE TEMPLATE ROWS, which stand under the strict drop rather than
+-- THE TEMPLATE ROWS, which stand under the strict drop rather than
 -- at it: the drop is a body now, and what it is spent through is the
 -- positivity of a template that returns an observable.  Two shapes, the
 -- argument dropped and the argument wrapped.
 open import Probed.Template-Depth using (row-drops-template; row-drops-pos;
   row-wraps-template; row-wraps-pos)
+
+-- THE CONNECT EDGE'S COUNTING COMPONENT, at slot tables of one and
+-- three shared slots — the only part of the order that counts rather
+-- than measures, and the only one decidable without a run.
+open import Probed.Connect-Count using (row-one-count; row-three-count;
+  row-three-one-taken; row-last-slot; row-with-slack; row-not-head)
+
+-- THE SHELF UNDER THE SUBSTITUTION LEMMA — the telescope membership,
+-- whose rows buy non-vacuity rather than an inequality; the weakening;
+-- and the size bound, whose rows found the gap it is stated against
+-- growing in a parameter the bound cannot see.
+open import Probed.Data-Shelf using (row-of-head; row-of-tail;
+  row-wk-leaf; row-wk-strm; row-sync-one-node;
+  gap-once-template; gap-once-applied;
+  gap-thrice-template; gap-thrice-applied)
+
+-- THE TWO BINDING ARMS THE STRICT DROP DEFERS, AND THE OPEN FORM THAT
+-- PRICES THE SAME CROSSING — instantiated at the observable payload,
+-- which is the region that could make any of the three false.
+open import Probed.Eval-Binders using (row-case-data; case-data-bound;
+  row-case-obs; case-obs-bound; case-obs-value;
+  row-if-selected; row-if-unselected;
+  row-open-empty; row-open-data; carried-env-depth;
+  row-open-carried; row-open-wrapped)

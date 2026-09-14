@@ -12,20 +12,19 @@
 -- clause it does not write is a run that does not exist.  The `⊥-elim`
 -- has nothing to eliminate because the `with` is gone.
 --
--- SO THE EVALUATOR BECOMES A PROJECTION, AND THAT IS THE CUTOVER.
--- `evaluate` today is a recursion carrying `Acc _≺_ τ`; after, it is
--- `proj₁` of this, and every reading of a rank, every `<?`, every
--- `dryBurst` and the marker `dried` itself leave the evaluator
--- entirely.  `hasDry` then reads `false` of every run because no
--- constructor of the relation builds a dry emit — not because a number
--- came out large enough.
+-- SO THE EVALUATOR IS A PROJECTION.  It is `proj₁` of this, and every
+-- reading of a rank, every `<?`, every `dryBurst` and the marker `dried`
+-- itself have left the evaluator entirely.  `hasDry` reads `false` of
+-- every run because no constructor of the relation builds a dry emit —
+-- not because a number came out large enough.
 --
--- AND THE ORDER THIS FORCES IS THE ONE CONSTRAINT THE DEAD ROUTE IN
--- `Verify-Rank-Sufficient` NAMES.  A projection computes only if the
--- thing projected is a real body: leave any of the leaves below a
--- postulate and the bug cache, the oracle and every probe's `refl` get
--- stuck at the first match.  So the leaves land before `evaluate` is
--- re-pointed, and until then both machines exist side by side.
+-- AND A PROJECTION COMPUTES ONLY IF THE THING PROJECTED IS A REAL BODY,
+-- WHICH IS WHAT THE EVALUATOR IS CURRENTLY TRADING.  While any leaf
+-- below is a postulate the run typechecks and does not reduce, so the
+-- bug cache, the oracle and every `refl` over a run are stuck at the
+-- first match — which is why the cache is off the gate and the corpus is
+-- a target to type rather than one the gate types for you.  Nothing
+-- about the claim changes: what is owed is the leaves.
 --
 -- WHY IT SITS BELOW THE MACHINE RATHER THAN BESIDE THE PROOF THAT
 -- CONSUMES IT.  Nothing here needs the recursion it replaces, and the
@@ -172,6 +171,14 @@ postulate
 -- table and branches on what is registered there, and the drain spends
 -- fuel over the schedule; neither is in the recursion this module is
 -- for, so neither is written here.
+--
+-- RECOVERY: git show 80e527f9:agda/src/Rx/Evaluator/Run.agda restores the
+--   predecessor's own `subscribeE` at `input i` — the slot lookup, the
+--   telescope test, and the share connect's five branches worked out as
+--   a function — together with its `drain`, three arms over the
+--   schedule. Both are the shape these two leaves' bodies take; what
+--   does not transport is the guard each of them tested, since the
+--   obligation those answered is now the derivation's.
 postulate
   subscribeE!-input : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo} {τ : Tri}
     (ac : Acc _≺_ τ) (sl : Slots Γ) (i : Fin n) →
@@ -222,6 +229,12 @@ postulate
 --
 -- REFUTED: `Refuted.Carried-Derived` — the reading with no environment
 --   at all, at that run.
+--
+-- RECOVERY: git show 80e527f9:agda/src/Verify-Rank-Sufficient/Push-Carried.agda
+--   restores the predecessor's proof of this fact over the machine, with
+--   the five frame clauses worked out; the statement it carries is the
+--   unenvironmented one the two retired witnesses killed, so the arms
+--   transport and the denomination does not.
 postulate
   burst-carries : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo} {τ : Tri}
     (sl : Slots Γ) {b : Closed Γ u} {κ : Path Γ lo u t} {id : Id} {now : Tick}
@@ -251,12 +264,15 @@ postulate
 -- the consume inside the walk.  Everywhere else the schedule is this
 -- clause's own record update, where the equation holds definitionally.
 --
--- AND THE ROUTE IS TO WIDEN WHAT A BUILDER RETURNS, NOT TO INDUCT.  As
--- stated each is an induction over the ⇓ family's own mutual block; but
--- every builder clause already holds the equation at the point it would
--- have to prove it, so carrying it out in the RESULT discharges all
--- three at once and leaves the obligation only on the two leaves that
--- return a schedule nothing here built.
+-- DEAD ROUTE: proving each of the three as an induction over the ⇓
+--   family, which is how all three are stated.  It is dead structurally
+--   rather than by being long: the family's mutual block is the
+--   builder's own, so the induction has to re-walk every clause of a
+--   recursion whose accessibility argument it does not carry, and the
+--   equation it would establish at each step is one that clause ALREADY
+--   holds.  The repair is to widen what a builder RETURNS, which closes
+--   all three at once and leaves the obligation on the two leaves that
+--   hand back a schedule nothing here built.
 postulate
   subs-keeps-slots : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
     {b : Closed Γ u} {κ : Path Γ lo u t} {id : Id} {now : Tick}
@@ -355,6 +371,17 @@ innerReact! op allNid inst κ id now vals sched st true
 -- it is why the entry invariant is not enough on its own — what arrives
 -- at the hop is a VALUE, so `EntryOK` says nothing about it and the
 -- report `HandedOK` threads from the burst that produced it does.
+--
+-- AND THE DESCENT IS DECLARED STRUCTURAL RATHER THAN PEELED, WHICH IS
+-- WHAT THE DOORLESS SHAPE BOUGHT.  The predecessor carried a counter
+-- Agda could not read, so which edges paid for the recursion was a
+-- claim only a declaration held; here the accessibility witness is an
+-- ARGUMENT, so every member descends on something it already carries
+-- and Agda checks that at each call site rather than taking this line's
+-- word for it.  The line stays because a future edge re-entering the
+-- block from outside would still be a site the order does not cover.
+--
+-- STRUCTURAL SCC: pushBurst! stepFrame! subscribeAll! subscribeE! subscribeInner! thruConsume! thruWalk!
 
 subscribeE! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo} {τ : Tri}
   (ac : Acc _≺_ τ) (sl : Slots Γ) (b : Closed Γ u) → EntryOK (slotDepth sl) b τ →

@@ -17,7 +17,7 @@ open import Relation.Binary.PropositionalEquality
 open import Rx.Prim               using (InstEmit; Fuel; Id; Source; _at_from_as_; InstEvent; init; value; close; handoff; complete;
   EmitKind; subscribe; delivery; plumbing; cut; cutPending; exhausted; dried)
 open import Rx.Exp                using (Ctx; Closed)
-open import Rx.Evaluator.Run      using (evaluate)
+open import Rx.Evaluator.Builder using (evaluate↓)
 open import Rx.Slots using (Slots)
 open import Rx.Protocol           using (ProtocolSt; Owed; protocol-init; runProtocol; stepProtocol; checkFinal; paidOff; allZero;
   Accepted; accepted; WellFormed; settle; applyEvents; hasOwed; bumpOwed; cancelOwed;
@@ -1081,7 +1081,7 @@ batch-agreement xs wf =
 -- IS the composition of the two lemmas.
 formal-verification-batchSimultaneous :
   ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slots Γ) →
-  spec-batchSimultaneous (evaluate fuel e ins)
-    ≡ impl-batchSimultaneous (evaluate fuel e ins)
+  spec-batchSimultaneous (evaluate↓ fuel e ins)
+    ≡ impl-batchSimultaneous (evaluate↓ fuel e ins)
 formal-verification-batchSimultaneous fuel e ins =
-  batch-agreement (evaluate fuel e ins) (evaluate-well-formed fuel e ins)
+  batch-agreement (evaluate↓ fuel e ins) (evaluate-well-formed fuel e ins)

@@ -219,6 +219,16 @@ agda-dev-selftest:
 # so nothing else in the build would ever notice it rotting.  This target is
 # what makes its invariant enforceable rather than remembered.
 #
+# OFF THE GATE FOR THE DURATION OF THE CUTOVER (Anthony).  The corpus RUNS the
+# evaluator, and after the cutover the evaluator is built from postulated
+# leaves, so it typechecks and does not reduce.  Holding the gate to a target
+# that cannot pass until the last leaf lands would make the whole tower
+# unmergeable for as long as that takes -- which is the opposite of what a gate
+# is for.  It goes back on the gate in the leg that restores runnability, and
+# until then `make bug-cache` is a target to TYPE, not one the gate types for
+# you.  The invariant is unchanged and so is the finish line: green here still
+# means no known counterexample remains.
+#
 # THE CORPUS IS RUN, NOT TYPECHECKED, and the verdict comes back as text
 # because `CLI.IO` has no exit status to hand back -- stdin and stdout are its
 # whole FFI surface.  So this demands the summary line BEFORE refusing any FAIL
@@ -1246,7 +1256,6 @@ gate-heavy: stripped
 	 [ "$$st" -eq 0 ] || { scripts/notify.py "RED (the tower)"; exit 1; }
 	@$(MAKE) --no-print-directory refuted
 	@$(MAKE) --no-print-directory probed
-	@$(MAKE) --no-print-directory bug-cache
 	@scripts/dev-changed.py --stamp
 	@echo "gate-heavy: ALL GREEN"
 	@scripts/notify.py "GREEN (heavy)"

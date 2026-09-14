@@ -34,7 +34,7 @@ open import Data.String using (String)
 open import Data.Vec using () renaming (_∷_ to _∷ⱽ_; [] to []ⱽ)
 
 open import Rx.Exp using (Ctx; Closed; natᵗ)
-open import Rx.Evaluator.Run using (evaluate)
+open import Rx.Evaluator.Builder using (evaluate↓)
 open import Rx.Slots using (Slots)
 open import Rx.Protocol using (wellFormed?)
 open import Rx.Emit-Eq using (eqBatched)
@@ -59,9 +59,9 @@ open Case using (name; fuel; prog; slots)
 -- the evaluator's raw output must satisfy the protocol automaton
 -- (evaluate-well-formed, cached case by case)
 wellFormed : Case → Bool
-wellFormed c = wellFormed? (evaluate (fuel c) (prog c) (slots c))
+wellFormed c = wellFormed? (evaluate↓ (fuel c) (prog c) (slots c))
 
 -- impl and spec, fed the SAME evaluate output, must batch it identically
 agrees : Case → Bool
 agrees c = eqBatched (impl-batchSimultaneous run) (spec-batchSimultaneous run)
-  where run = evaluate (fuel c) (prog c) (slots c)
+  where run = evaluate↓ (fuel c) (prog c) (slots c)

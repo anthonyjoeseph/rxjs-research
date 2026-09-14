@@ -38,8 +38,10 @@
 -- this program.  So the failure is not reachable only down a path a run
 -- avoids — it is the first thing that happens.
 --
--- REFUTED: `Refuted.Carried-Shared` — the machine-side sibling, whose
---   witness this is stated over the relation.
+-- REFUTED: git show 80e527f9:agda/evidence/refuted/Refuted/Carried-Shared.agda
+--   — the machine-side sibling, whose witness this is stated over the
+--   relation.  It is at a sha because it read the machine's own
+--   subscribe, which `src` no longer has.
 module Refuted.Carried-Derived where
 
 open import Data.Empty using (⊥)

@@ -51,31 +51,15 @@ open import Refuted.Exit-Store using (exit-bounded-false;
 open import Refuted.Exit-Store using (both-ends-false;
   rise-tmpl-is; rise-entry-is; rise-store-is; interior-is)
 
--- the entry bound the door was going to be paid out of, killed at the
--- other extreme from every witness the cutover retired: those were
--- adversarial in the entry or in the program, and this is neither.  Its
--- one figure is claimed because the rank the root builds is
--- NOUGHT wherever a program writes no observable, so the bound is a
--- demand on the entry rather than a property of the burst — and a
--- repair reading the value's TYPE leaves this row failing rather than
--- quietly agreeing
-open import Refuted.Carried-Unranked using (carried-false; root-rank)
-
--- and the reading that survived THAT, killed at the one clause where the
--- entry invariant speaks about a symbol rather than a program.  Its two
--- figures are claimed because the finding is the gap between them: the
--- definition writes an observable and the reference standing for it
+-- and the entry bound the door was going to be paid out of, asked of a
+-- DERIVATION, which is the statement the builder actually spends.  Its
+-- two figures are claimed because the finding is the gap between them:
+-- the definition writes an observable and the reference standing for it
 -- reads nought, so no repair reading the TERM can close this — which is
--- what says the conjunct owed is over the SCHEDULE
-open import Refuted.Carried-Shared using (carried-shared-false;
-  def-depth; ref-depth)
-
--- and the same crossing asked of a DERIVATION, which is the statement
--- the builder actually spends.  Its two figures are the sibling's, and
--- it is beside that witness rather than replacing it because the two
--- die to different events: the sibling expires when the cutover deletes
--- the machine it reads, and this one goes on holding against whatever
--- the relation is restated to say
+-- what says the conjunct owed is over the SCHEDULE.  Its two siblings
+-- asked the same thing of the MACHINE and went when the cutover deleted
+-- the machine they read; this one goes on holding against whatever the
+-- relation is restated to say
 open import Refuted.Carried-Derived using (carried-derived-false;
   derived-def-depth; derived-ref-depth)
 
