@@ -231,54 +231,25 @@ cannot compute — and the other two leaves carry no arithmetic at all.
 
 ### Big picture tier roadmap
 
-- **CONDITION THE HOP LEAF, AND THREAD THE PREMISE TO WHERE A CALLER CAN PAY
-  IT.** `Refuted.Hop-Unconditioned` kills `thruConsume⇓-total` as written, at the
-  emptiest inner there is entered at a rank of nought, so the conditioned form
-  is the true statement replacing a false one rather than a weakening. The
-  premise is a bound on the value the clause is HANDED — `allUnder r (o ∷ [])`
-  against the entry's rank component — and it threads up the three bodies that
-  read no guard of their own: `thruWalk⇓-total` over the walk's list,
-  `stepFrame⇓-total` at its `thru-outer` arm, `pushBurst⇓-total` over the burst.
-  Nothing is minted here and that is the finding this leg replaces its
-  predecessor with: a `frame-carried` has no consumer until a premise exists to
-  pay, and a name passed to a postulate earns no wiring credit.
+- **RESTATE `subscribe-carried` OVER THE SCHEDULE, GROWING `EntryOK` TO THE
+  THIRD CONJUNCT IN THE SAME EDIT.** Both its refutations send the statement to
+  the same place, and `Refuted.Carried-Shared` says why no repair reading the
+  TERM can get there. So the entry quantifies over the TELESCOPE —
+  `SlotsOK : ∀ {n} {Γ : Ctx n} → Slots Γ → Tri → Set` holding every `shared d`
+  below the rank — beside the unconnected count `subscribeE⇓-input-total`'s
+  share arm already wanted:
+  `EntryOK b sched (U , r , sz) = syncSizeᵉ b ≤ sz × obsDepthᵉ b ≤ r × SlotsOK (Sched.slots sched) (U , r , sz) × unconn (Sched.slots sched) [] ≤ U`.
+  Two legs until now, split by which of the term and the schedule each
+  quantified over; one edit, because the signature moves once.
 
-- **THEN MINT THE CARRIED BOUND, AT THE SPEND POINT THE LEG ABOVE BUILDS.** The
-  five frames in one pass (Anthony), one case split on `fr`, since the rank no
-  longer differentiates them — `map-f`, `scan-f`, `take-f`, `thru-outer`,
-  `from-inner`, each closing under the matching `stepFrame⇓` constructor. Every
-  shape reading a FIXED number of stored values is already refuted — off the
-  frame and the incoming bound in `Refuted.Scan-Deepens`, off the store the step
-  LEAVES and off BOTH ends with the template added, in `Refuted.Exit-Store` — so
-  what survives reads the ENTRY store and carries a factor in the burst's
-  length:
-  `frame-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo} (id : Id) (now : Tick) (fr : Frame Γ s u) (κ : Path Γ lo u t) (m : ℕ) {vals fin sched st outs evs done sched′ st′} → stepFrame⇓ {e = e} id now fr κ vals fin sched st (outs , evs , done , sched′ , st′) → allUnder m vals → allUnder (length vals * frameObs fr + (obsSt st ⊔ m)) outs`,
-  over a postulated substitution leaf. `obsSt` already IS the whole-store join,
-  so `frameObs` is the only quantity this leg invents.
-
-- **KILL THE DOOR: SPEND THE REPORT AT THE HOP SITE (Anthony).** The carried
-  bound is a REPORT the caller holds, so at the hop the no branch is refuted
-  from what it carries — the marker becomes unemittable rather than merely
-  unobserved. The guard is `subscribeInner`'s rank comparison in
-  `agda/src/Rx/Evaluator.agda`, and the obligation is roughly
-  `hop-fits : ∀ {n} {Γ : Ctx n} {u} {o : Val Γ (obs u)} {m r} → allUnder m (o ∷ []) → m < r → obsDepthᵉ o < r`,
-  which is near-DEFINITIONAL now that both sides are one currency —
-  `obsDepthᵛ (obs t) e` is `obsDepthᵉ e` — so what the leg really buys is the
-  second premise: that the entry's own join dominates whatever a frame handed
-  out. It is where leg one's threaded premise stops being a hypothesis.
-
-- **GROW `EntryOK` TO ITS SECOND AND THIRD CONJUNCTS, EACH FORCED BY ITS OWN
-  WITNESS.** `Refuted.Totality-Entry` killed the unquantified totality claim at
-  a `μ` over a one-shot source entered at the zero triple, and the premise it
-  forced — `syncSizeᵉ b ≤ sz` — is one of three, one per component the machine
-  reads against the term. The other two are the hop's rank and the share
-  connect's unconnected count, so this leg is where legs one to three are
-  SPENT, at `subscribeE⇓-total`'s map, take and scan arms, which hand
-  `pushBurst⇓-total` a burst the recursive subscribe produced:
-  `EntryOK b (U , r , sz)` becomes a product carrying that burst's bound and
-  `unconn (Sched.slots sched) [] ≤ U`. The rank conjunct may NOT be read off the
-  entry rank — `Refuted.Dry-Wrap`'s template witness kills that — so it is
-  quantified beside it.
+- **KILL THE DOOR: SPEND THE PREMISE AT THE HOP SITE (Anthony).** `HandedOK` is
+  now a hypothesis the hop's own statement carries, so at `subscribeInner`'s rank
+  comparison the no branch is refuted from it — the marker becomes unemittable
+  rather than merely unobserved. The obligation is near-DEFINITIONAL now that
+  both sides are one currency, since `obsDepthᵛ (obs t) e` IS `obsDepthᵉ e`, so
+  what the leg buys is the arm DELETION: `thruConsume⇓-total`'s three surviving
+  arms become two, and `Refuted.Hop-Unconditioned` stops being satisfiable
+  because the guard can no longer refuse where the premise holds.
 
 - **THEN THE LEAVES BOTH CYCLES LEFT, AND REFUTE EACH BEFORE GRINDING IT.**
   Both cycles are bodies now and their list plumbing is closed, so what is open
@@ -342,10 +313,16 @@ cannot compute — and the other two leaves carry no arithmetic at all.
   root subscribe actually left; the cancelled arm and every chain carrying a
   frame are uncovered.
 
-- **`thruConsume⇓-total`** (Verify-Rank-Sufficient) — SHAPE, `REFUTED, PROBED`: the one
-  clause that takes a value and subscribes it, killed unconditionally at the
-  emptiest inner entered at rank nought. The restatement is guaranteed and is a
-  premise relating the two ends, not a cleverer measure.
+- **`thruConsume⇓-total`** (Verify-Rank-Sufficient) — FALSITY,
+  `REFUTED, PROBED`: the one clause that takes a value and subscribes it. The
+  premise the refutation forced has landed, so what is open is the enqueue arm
+  and the two operators reading a different node state; nothing instantiates
+  the conditioned form.
+
+- **`subscribe-carried`** (Verify-Rank-Sufficient) — SHAPE, `REFUTED×2`: a
+  subscribe's own burst hands on nothing deeper than the entry rank. Refuted
+  twice, and the second says the entry has to speak about the SCHEDULE — a
+  reference is priced at nought while the definition it names is not.
 
 ## Tier 2 — Verify-Well-Formed (parked behind tier 1)
 
