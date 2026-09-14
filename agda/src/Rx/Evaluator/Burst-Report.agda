@@ -417,6 +417,15 @@ postulate
 -- subscription produced — so what is owed is the same claim about
 -- another family's run, and the rank it has to be made at is the one
 -- that family entered at rather than this frame's.
+--
+-- PROBED: `Probed.Frame-Heads` — the inner head at the pass-through arm
+--   and at the completion side reaching no node, over a payload of two;
+--   the thru head at the empty walk and at a walk of one over each of
+--   the three ops, with the input an observable read strictly under the
+--   rank and the wrap's flag both ways.  Not reached, and it is where
+--   either could fail: every arm that MINTS a value, since each one
+--   runs a subscription — so no row here has a conclusion its own
+--   hypothesis did not already carry.
 postulate
   inner-handed : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo} {τ : Tri}
     (η : Fin n → ℕ) {op allNid inst} {κ : Path Γ lo s t} {id now}

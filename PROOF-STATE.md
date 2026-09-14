@@ -229,15 +229,6 @@ does.
 
 ### Big picture tier roadmap
 
-- **PUT THE CORPUS BACK ON THE GATE, AND THE BIRTH FLOOR WITH IT.** The
-  evaluator runs, so both checks that were suspended for the duration can be
-  live again in one commit: `bug-cache` into the cheap gate, and the
-  unevidenced-birth check restored with its selftest. This leg narrows no
-  question and is taken first because none of them can be WORKED while it is
-  open — every risky row left here is a reading over a run, so instantiating
-  one means running a program, and a floor nothing enforces is why several rows
-  below still name no evidence at all.
-
 - **MOVE THE READING'S CURRENCY FROM A JOIN TO A SUM.** The reading JOINS where
   a run ADDS, which is the single fact behind both refutations on the frame
   heads: a template wrapping its own argument hands back a value deeper than
@@ -275,6 +266,16 @@ does.
   relations, and what it decides is whether the rank an inner subscription
   enters at is one this walk carries or one the record has to.
 
+- **SAMPLE THE HEADS ABOVE FROM A RUN, THE WAY THE LAWS WERE SAMPLED.** Hand
+  instantiation reached every arm of `innerReact⇓` and `thruWalk⇓` that passes
+  a payload THROUGH and none that MINTS one, because each minting arm runs a
+  subscription and no hand-built state has one. Nothing needs building to fix
+  that: `evaluate!` hands back the run's own derivation, and the generator
+  already produces programs that reach `μᵉ`. The leg is the decidable twin of
+  `HandedOK` plus a walk of that derivation, swept the way the protocol
+  automaton already is — which reaches the minting arms because a real run
+  subscribes, and is the apparatus every reading-over-a-run row here wants.
+
 ### Open questions
 
 - **Is the depth a run climbs a JOIN or a SUM?** Every risky row left in this
@@ -305,10 +306,10 @@ does.
   grow with the LENGTH of the burst and no static reading carries a length.
 
 - **`inner-handed`, `thru-handed`** (Rx/Evaluator/Burst-Report) — FALSITY,
-  `NO EVIDENCE`: the two `*All` heads, which rewrite no payload — they
-  subscribe one, or deliver what an inner subscription produced. So the claim
-  owed is this one about ANOTHER family's run, at the rank that family entered
-  at rather than this frame's.
+  `PROBED×2`: the two `*All` heads, which rewrite no payload — they subscribe
+  one, or deliver what an inner subscription produced. So the claim owed is
+  this one about ANOTHER family's run, at the rank that family entered at
+  rather than this frame's.
 
 - **`eval-silent`** (Rx/Evaluator/Burst-Report) — FALSITY, `PROBED`: the
   residue the strict drop cannot reach — a closed term reading nought, whose
@@ -371,11 +372,11 @@ it when the descent under it settles.
 
 ### The ledger
 
-- **`burst-drain-well-formed`** (Verify-Well-Formed) — FALSITY, `NO EVIDENCE`:
+- **`burst-drain-well-formed`** (Verify-Well-Formed) — FALSITY, `PROBED`:
   everything the protocol argument owes about a run whose subscribe frame and
-  whose drain are each dry-free. Never instantiated at any program, and the
-  automaton it asserts acceptance under is defined, so the whole statement
-  computes.
+  whose drain are each dry-free. The sweep decides its conclusion at every
+  program it runs, so what is open is the fragment the generator cannot
+  write.
 
 ## Tier 3 — the top-line semantic claims (parked behind tier 2)
 

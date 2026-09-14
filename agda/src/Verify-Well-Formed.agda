@@ -47,6 +47,19 @@ open import Rx.Protocol using (WellFormed)
 -- yet decided the shape the bookkeeping should take — a statement
 -- carved into pieces against a machine whose recursion may still be
 -- restated is inventory rather than progress.
+--
+-- PROBED: the QuickCheck sweep, which decides this leaf's own
+--   conclusion at every program it runs — `evaluate-well-formed` below
+--   feeds the leaf the two derivations that run produced, and
+--   `wellFormed?` is the same computation `WellFormed` is, so a sampled
+--   program is an instantiation rather than a twin of one.  6200
+--   programs over two depths, about a third of them carrying `μᵉ`, no
+--   refutation.  The sweep is pinned to the harness it was run against
+--   by `git show a0d882c6:agda/src/QuickCheck.agda`, since the
+--   generator's fragment IS the coverage boundary.  Not reached:
+--   anything off that fragment —
+--   a context other than its two nat slots, a function returning an
+--   observable, and any fuel but its own.
 ------------------------------------------------------------------
 
 postulate
