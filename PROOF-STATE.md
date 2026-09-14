@@ -220,21 +220,23 @@ program behind a gate reads zero and the first hop under it refuses.
 **AND THE MEASURE IS HELD BY SOMETHING NO STATEMENT MENTIONS: THE RUN HAS TO
 COMPUTE IT.** Three non-structural edges TEST a reading and emit dry on the
 negative answer, so an inadequate figure is a WRONG ANSWER and not an open
-obligation — four refutations and five probes are unrunnable because of it. Every
+obligation — four refutations are unrunnable and five probes emptied. Every
 candidate was killed as a figure the EVALUATOR evaluates, which is why each is
 syntactic and each is short. A domain derivation lifts that constraint, so the
 tier is staged around building one.
 
 ### Big picture tier roadmap
 
-- **DEFINE THE DOMAIN, AGAINST AN EVALUATOR THAT DOES NOT YET USE IT.** One
-  family per frame function, one constructor per clause, every recursive call a
-  sub-derivation — mirroring the recursion instead of measuring it. It lands
-  beside the current evaluator and nothing computes through it, so the bug
-  cache, the oracle and every probe are untouched while it is built. The
-  staging is the content: a domain POSTULATED gets stuck at the first pattern
-  match, because the root witness is well-foundedness APPLIED and the evaluator
-  REDUCES through it, while a domain defined-and-unused breaks nothing.
+- **REPLACE THE REFUTED TOWER WITH THE DOMAIN AND ONE NAMED LEAF.** One family
+  per frame function, one constructor per clause, every recursive call a
+  sub-derivation — mirroring the recursion instead of measuring it. It cannot
+  land beside the evaluator unclaimed: reachability seeds from Main alone, and
+  nothing true of the relation has a consumer while the arms stand. So the same
+  PR assembles `rank-sufficient` over it and DELETES the tower proving it — a
+  real body for a statement refuted three times, on leaves nobody classed. The
+  tier's falsity becomes one named row, which leg three discharges.
+  A domain POSTULATED is still the stuck pattern match, so the families are
+  DEFINED here and only inhabitation is deferred.
 
 - **THEN PROVE IT INHABITED, WHICH IS THE TERMINATION ARGUMENT AND THE POINT OF
   ALL OF IT.** A run's derivation is built by an induction free to use any
@@ -245,13 +247,14 @@ tier is staged around building one.
   it may prove. Leaves are postulated at full strength and ground one at a
   time, and nothing reduces through them until the third leg.
 
-- **AND ONLY THEN CUT OVER, WHICH DELETES THE THREE ARMS AND RESTORES NINE
-  FILES.** The evaluator recurses on the derivation, the guards and the marker
-  go, and `hasDry` is false by construction rather than by argument. It is last
-  because reduction is preserved only when the inhabitation proof is COMPLETE —
-  a cutover over postulated leaves is the stuck pattern match leg one exists to
-  avoid. Four refutations and five probes come back with it, and whether their
-  crossings return unchanged is the check on the whole route.
+- **AND ONLY THEN CUT OVER, WHICH DELETES THE THREE ARMS AND THE MARKER.** The
+  evaluator recurses on the derivation, the guards go, and `hasDry` is false by
+  construction rather than by argument — which is what makes leg one's named
+  leaf true and the top-line claim sound, since `formal-verification-batchSimultaneous`
+  reaches `rank-sufficient` and has all along. It is last because reduction is
+  preserved only when the inhabitation proof is COMPLETE: a cutover over
+  postulated leaves is the stuck pattern match leg one avoids. Four refutations
+  come back with it, and whether their crossings return unchanged is the check.
 
 ### Open questions
 
