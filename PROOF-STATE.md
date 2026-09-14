@@ -226,14 +226,16 @@ now at the door and at the templates the door's chains are built from.
 
 ### Big picture tier roadmap
 
-- **THE FOLD'S FRAME IS MISSING TWO AXES, WHICH IS A FACT ABOUT THE WALK'S
-  CURRENCY AND NOT ABOUT ONE LEAF.** A frame is handed exactly two scalars, and a
-  fold needs a quantity from outside each — the payload bound is a POINTWISE join
-  carrying no cardinality, the store bound reads a scan node through the hop half
-  of its accumulator alone. So no right-hand side repairs `scan-frame-carried`,
-  and the arm cannot be retired in favour of the burst-and-seed form either. The
-  leg is a restatement of the PREDICATE, uniform for the four frames that read
-  neither quantity; the argument is in the leaf's own header.
+- **THE MACHINE DECIDES THE RANK PEEL NOW AND THE DRY FACE STILL ARGUES FROM A
+  READING, WHICH IS THE CUTOVER'S WHOLE RESIDUE.** The peel tests the delivered
+  observable's nesting at the site it hops, so the dry arm is refused by a fact
+  about SYNTAX — while `FrameDryUnder` quantifies the frame's values freely and
+  `thru-outer-frame-dry` is held under a reading premise that cannot reach that
+  arm. Thread the nesting bound from the walk that knows which burst those
+  values came out of, through the path fold, to the frame; the edge fact then
+  has an assembly to be a leaf of instead of sitting outside the claim graph.
+  It asks the tier's open question of the one arm the machine already answers
+  for itself.
 
 - **AND THE THREE RE-ENTRANT LEAVES ARE THE FALSITY NOTHING HAS NARROWED.**
   `from-inner-dry`, `thru-outer-frame-dry` and `from-inner-carried` are the only
@@ -241,17 +243,18 @@ now at the door and at the templates the door's chains are built from.
   `innerReact` returns its payload untouched. The branch none of them reaches is
   the same one in each case — a completing node whose queue is drained and whose
   fresh bursts are appended — so one harness that reaches a completion under a
-  live flattener decides all three at once. It is ranked below the currency
+  live flattener decides all three at once. It is ranked below the thread
   because a leaf restated under a widened predicate is a leaf probed twice.
 
-- **AND THE DOOR IS WHERE THE SUBTRACTION IS NOT AVAILABLE.** The exit above
-  retired a carried tie by letting the step DECIDE its own test; neither door row
-  can be repaired that way. `entry-drain-hop` prices a chain's flattener count
-  against the program's reading, and `share-chain-hop` bounds what ENTERS a
-  dispatch while the walk is read along the chain — both quantities a step cannot
-  recompute from what it holds, so each is a premise threaded in or a call made at
-  the wrong index. Take the pair together: they are the same missing carry read
-  from the two ends, and one decision about the currency settles which.
+- **AND THE FOLD'S FRAME IS MISSING TWO AXES, WHICH MAY BE ONE AXIS SHORTER
+  THAN IT WAS.** A frame is handed exactly two scalars, and a fold needs a
+  quantity from outside each — the payload bound is a POINTWISE join carrying
+  no cardinality, the store bound reads a scan node through the hop half of its
+  accumulator alone. So no right-hand side repairs `scan-frame-carried`. What
+  changed is that the carried face now takes a bound quantified where the walk
+  is stated rather than read off the machine's triple, which is an outside
+  quantity of exactly the missing kind; check whether it reaches the fold
+  before restating anything.
 
 ### Open questions
 
@@ -273,18 +276,22 @@ now at the door and at the templates the door's chains are built from.
   flattener count against the program's own reading. Tight at three ladder
   rungs and at a gate; an arrival there reaches exactly ONE chain.
 
-- **`from-inner-dry` / `thru-outer-frame-dry`**
-  (Verify-Rank-Sufficient.Path-Fits) — FALSITY,
-  `DEAD ROUTE, PROBED×2, RECOVERY`: dry-freedom of the only two frames that
-  re-enter the evaluator, each over every payload its incoming bound admits.
-  The other three are discharged outright, which is what says these two are
-  where the risk actually is.
+- **`from-inner-dry`** (Verify-Rank-Sufficient.Path-Fits) — FALSITY,
+  `DEAD ROUTE, PROBED, RECOVERY`: the exit frame's dry-freedom over every
+  payload its incoming bound admits. The three quiet frames are discharged
+  outright, which is what says the two re-entrant ones carry the risk.
 
 - **`from-inner-carried`** (Verify-Rank-Sufficient.Path-Fits) — FALSITY,
   `DEAD ROUTE, PROBED, RECOVERY`: the exit frame threads what it was handed
   unchanged. `innerReact` returns its payload untouched on every branch but the
   completion one, where a node's queue is drained and fresh bursts appended —
   the branch nothing has reached.
+
+- **`thru-outer-frame-dry`** (Verify-Rank-Sufficient.Path-Fits) — SHAPE,
+  `PROBED`: the flattener's dry-freedom, held under a headroom in the READING
+  while the arm it refuses is now decided on the NESTING. The restatement is
+  guaranteed; its cost is the thread, since the values it bounds are
+  quantified freely one level down.
 
 - **`share-chain-hop`** (Verify-Rank-Sufficient.Path-Fits) — SHAPE,
   `REFUTED, RECOVERY`: the sink's claim at the share's registry, whose one

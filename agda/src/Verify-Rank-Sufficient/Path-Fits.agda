@@ -164,7 +164,22 @@ postulate
 -- THE FLATTENER, which is the only frame that subscribes, so it is the
 -- only one of the three where dryness is reachable at all.  It is held
 -- under the same headroom its carried entry is: one above the incoming
--- bound has to fit under the store's
+-- bound has to fit under the store's.
+--
+-- AND THAT HEADROOM IS NOW IN THE WRONG CURRENCY, WHICH PUTS THIS
+-- STATEMENT AT SHAPE.  The premise is a fact about the READING, while
+-- the arm it exists to refuse turns on the RANK — the machine tests the
+-- delivered inner's observable nesting against the component it stands
+-- at and takes the dry exit on the negative answer.  Those became two
+-- quantities when the rank stopped pricing what a run delivers, so no
+-- hypothesis this statement carries can decide that arm and a
+-- restatement is guaranteed rather than merely likely.  What it wants
+-- is a bound on the nesting of the values the frame is HANDED; what
+-- discharges that bound is that a subscription cannot deliver an
+-- observable written deeper than the one it was reading.  Neither is
+-- local to this row — the values are quantified freely one level down,
+-- so the premise has to be threaded to the walk that knows which burst
+-- they came out of, and that thread is the restatement's real cost.
 --
 -- PROBED: `Probed.Exit-Frame` — three outer sources at wrapping rates
 --   one, two and three, taken at the points the carried rows already

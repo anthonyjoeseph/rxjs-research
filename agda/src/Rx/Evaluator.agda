@@ -43,6 +43,7 @@ variable
 -- reference is rejected there.
 open import Rx.Slots using (scripted; shared; Slots)
 open import Rx.Hop-Depth using (Rd₃; depthᵉ; depthᵛ)
+open import Rx.Obs-Depth using (obsDepthᵉ; obsDepthᵛ)
 open import Rx.Slot-Read using (slotRd)
 
 Stream : ∀ {n} → Ctx n → Ty → Set          -- flat, canonical emission order
@@ -487,6 +488,31 @@ stHop : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (ψ : Fin n → Rd₃) →
          EvalSt e → ℕ
 stHop ψ st = stHopᴺ ψ (EvalSt.nodes st)
 
+-- THE SAME FIGURE IN THE SYNTACTIC CURRENCY, WHICH IS WHAT THE HOP PEEL
+-- NOW ENTERS AT.  A store can hold observables — a parked inner in a
+-- merge queue, an accumulator a fold deepened — and those are terms an
+-- arrival may still subscribe, so an entry seeded off the program alone
+-- would be standing below something already written down.  Reading the
+-- store in the peel's own currency is what lets the entry take a join
+-- rather than owe a transfer between two measures.
+obsStᶜˢ : ∀ {n} {Γ : Ctx n} {t} → List (Closed Γ t) → ℕ
+obsStᶜˢ []       = 0
+obsStᶜˢ (e ∷ es) = obsDepthᵉ e ⊔ obsStᶜˢ es
+
+obsStⁿ : ∀ {n} {Γ : Ctx n} → NodeState Γ → ℕ
+obsStⁿ (scan-st {t = t} v)         = obsDepthᵛ t v
+obsStⁿ (take-st _)                 = 0
+obsStⁿ (mergeAll-st _ _ queued _)  = obsStᶜˢ queued
+obsStⁿ (switch-st _ _)             = 0
+obsStⁿ (exhaust-st _ _)            = 0
+
+obsStᴺ : ∀ {n} {Γ : Ctx n} → List (NodeId × NodeState Γ) → ℕ
+obsStᴺ []             = 0
+obsStᴺ ((_ , s) ∷ ns) = obsStⁿ s ⊔ obsStᴺ ns
+
+obsSt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → EvalSt e → ℕ
+obsSt st = obsStᴺ (EvalSt.nodes st)
+
 -- THE ENTRY WITNESS, NAMED RATHER THAN INLINED.  Every re-entry from
 -- OUTSIDE the subscription machine — the root subscribe, and each
 -- arrival's chain fold — starts a fresh descent, so each supplies its
@@ -503,30 +529,40 @@ stHop ψ st = stHopᴺ ψ (EvalSt.nodes st)
 -- rather than a second seeding — which keeps the one place the seed
 -- has to be shown adequate at the root, where it always was.
 --
--- THE RANK IS THE TERM'S OWN HOP READING, NOT A COUNTER SEEDED OVER
--- IT.  A `*All` node's reading is a `suc` of its source's by
--- definition, and the inner a hop descends into came from that source —
--- so the descent the hop edge needs is an equation about the measure
--- rather than an obligation between a run and a budget.  Nothing here
--- is exhaustible: what the component counts is how many flattener
--- layers the term still has, and a run that keeps hopping is a run
--- walking down them.  The reading is taken at the schedule's own slot
--- environment, since a slot reference emits whatever its definition
--- emits; a fold's reuse of its accumulator is what makes one layer
--- many, and the reading iterates over its own source's deliveries to
--- price it, so nothing outside the term is consulted.
+-- THE RANK IS THE TERM'S `strmᵗ` NESTING, AND NOTHING IS PRE-PAID.
+-- The hop peel used to descend on a BUDGET: a figure large enough at
+-- entry that every hop the run would ever take could be charged against
+-- it, with a dry bailout standing where the budget ran out.  It now
+-- descends on `obsDepthᵉ`, which the peel TESTS at the site it hops —
+-- so the entry owes a figure dominating the TERM rather than the run,
+-- and a subterm satisfies that by construction.
 --
--- DEAD ROUTE: seeding the component off SYNTAX — a power of two in the
---   program's size plus the slot telescope's was the seed, and the two
---   currencies never met.
---   A value deepens on the way OUT, the frames above a flattener
---   re-wrap what it delivers, and it re-enters at the caller's own
---   witness, so whatever seeds that caller has to dominate everything
---   its subtree will ever emit; the run multiplies where the seed
---   merely doubles.  Seeding from the entered VALUE fails identically,
---   and a larger seed is the same answer with a larger constant.
+-- WHICH IS WHAT MAKES THE THREE PEELS ONE SHAPE.  The μ peel asks
+-- whether the unfolding's sync size fits and the connect peel whether
+-- the latched count does; the hop peel now asks whether the arriving
+-- inner is written shallower than what delivered it.  Each is a
+-- decidable test whose negative arm is closed by a guard rather than a
+-- budget, so what is owed at the hop is a DROP and no longer an
+-- inequality between a run and a number seeded before it began.
+--
+-- THE STORE IS JOINED IN BECAUSE AN ARRIVAL CAN SUBSCRIBE WHAT A NODE
+-- IS HOLDING.  The term alone does not bound a parked inner or a
+-- deepened accumulator, and both are subscribable at a later instant;
+-- the join is taken in ONE currency, which is the thing the reading
+-- could never do, since a nesting and a reading never met.
+--
+-- DEAD ROUTE: seeding the component off SYNTAX AS A BUDGET — a power of
+--   two in the program's size plus the slot telescope's.  A value
+--   deepens on the way OUT, the frames above a flattener re-wrap what
+--   it delivers, and it re-enters at the caller's own witness, so
+--   whatever seeds that caller has to dominate everything its subtree
+--   will ever emit; the run multiplies where the seed merely doubles.
+--   Seeding from the entered VALUE fails identically, and a larger seed
+--   is the same answer with a larger constant.  It is the BUDGET that
+--   is dead and not the syntax: a figure tested at the hop is never
+--   asked to dominate an emission, only to be dropped by one.
 entryTri : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → ℕ → Tri
-entryTri e sl m = unconn sl [] , depthᵉ (slotRd sl) e + m , syncSizeᵉ e
+entryTri e sl m = unconn sl [] , obsDepthᵉ e ⊔ m , syncSizeᵉ e
 
 entryWitness : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (m : ℕ)
              → Acc _≺_ (entryTri e sl m)
@@ -549,25 +585,20 @@ rootWitness e sl = entryWitness e sl 0
 -- out at each site, the two drift the moment either summand moves, and
 -- the drift is a type error many minutes down the tower rather than here.
 --
--- BOTH HALVES ARE NOW THE SAME QUANTITY, AND THAT IS WHAT LETS THE
--- INVARIANT SPEND EITHER.  A ⊔ of a nesting and a reading was SLACK in
--- the safe direction and still unusable: the entry invariant is stated
--- in the reading, so a store measured in layers bounded nothing it could
--- cite, and what a stored chain can still do had to be recovered from
--- the registry instead.  Read in one currency, the seed carries the
--- depth a fold has ALREADY reached, so the reading's store bound is left
--- covering the refolds of ONE burst rather than of a whole run — which
--- is the half of the premise a bound taken per arrival can be about.
+-- AND ALL THREE HALVES ARE ONE QUANTITY, WHICH IS WHAT THE ENTRY'S OWN
+-- JOIN NEEDS.  The value, the store and the program are read by the
+-- same function, so the seed is a `⊔` of three figures in one currency
+-- and the peel's test compares against it directly.  Nothing is
+-- transferred between measures anywhere on this path, which is the one
+-- thing the reading could not offer: its store figure counted refolds
+-- and its nesting counted layers, so a join of them bounded neither.
 arrivalWitness : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
                  (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e)
                → Acc _≺_ (entryTri e (Sched.slots sched)
-                           (depthᵛ (slotRd (Sched.slots sched))
-                              (arrTy a) (arrVal a)
-                            ⊔ stHop (slotRd (Sched.slots sched)) st))
+                           (obsDepthᵛ (arrTy a) (arrVal a) ⊔ obsSt st))
 arrivalWitness a sched st =
   entryWitness _ (Sched.slots sched)
-    (depthᵛ (slotRd (Sched.slots sched)) (arrTy a) (arrVal a)
-     ⊔ stHop (slotRd (Sched.slots sched)) st)
+    (obsDepthᵛ (arrTy a) (arrVal a) ⊔ obsSt st)
 
 -- a source that lives and dies inside its own subscription burst
 -- (ofᵉ, emptyᵉ, take 0, a cold with no async tail): init, values,
@@ -766,26 +797,29 @@ burstCompleted = any (λ em → hasComplete (InstEmit.events em))
 
 -- mint the inner's exit-frame instance, subscribe it inside the
 -- current instant, split its burst.  THE HOP EDGE: the inner is a
--- runtime VALUE, structurally unrelated to the caller, so the rank is
--- what descends here — and it is the one component of the triple a run
--- can exhaust, since nothing the syntax says bounds the nesting of what
--- a program emits.  The zero clause is where that shows.
+-- runtime VALUE, structurally unrelated to the caller, so nothing about
+-- the caller's TERM makes it smaller — and the machine therefore ASKS,
+-- exactly as the μ and connect peels do, whether what arrived is
+-- written shallower than the component it is standing at.  The dry arm
+-- is the negative answer, and it is what the guard has to rule out.
 subscribeInner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
                → Acc _≺_ τ → AllOp → NodeId → Path Γ lo u t → Id → Tick
                → Val Γ (obs u) → Sched Γ → EvalSt e
                → NodeId × List (Val Γ u) × List (InstEvent (Val Γ t)) × Bool × Sched Γ × EvalSt e
-subscribeInner {τ = _ , zero , _} _ op allNid κ id now o sched st =
-  let inst = Sched.nextNode sched
-  in inst , [] , close drySource dried ∷ [] , false
-     , record sched { nextNode = suc inst } , st
-subscribeInner {τ = _ , suc r , _} {lo = lo} (acc rec) op allNid κ id now o sched st =
-  let inst = Sched.nextNode sched
-      (burst , sched′ , st′) =
-        subscribeE (rec (ltR {r′ = r} {s′ = syncSizeᵉ o} ≤-refl))
-                   o (from-inner op allNid inst ↠ κ) id now
-                   (record sched { nextNode = suc inst }) st
-      (vs , bs , done) = splitBurst burst
-  in inst , vs , bs , done , sched′ , st′
+subscribeInner {τ = _ , r , _} {lo = lo} (acc rec) op allNid κ id now o sched st
+  with obsDepthᵉ o <? r
+... | no  _ =
+      let inst = Sched.nextNode sched
+      in inst , [] , close drySource dried ∷ [] , false
+         , record sched { nextNode = suc inst } , st
+... | yes p =
+      let inst = Sched.nextNode sched
+          (burst , sched′ , st′) =
+            subscribeE (rec (ltR {r′ = obsDepthᵉ o} {s′ = syncSizeᵉ o} p))
+                       o (from-inner op allNid inst ↠ κ) id now
+                       (record sched { nextNode = suc inst }) st
+          (vs , bs , done) = splitBurst burst
+      in inst , vs , bs , done , sched′ , st′
 
 -- the per-frame semantics.  All recursion here is structural — the
 -- deep recursion (a subscription's sync burst re-entering the
@@ -1137,22 +1171,23 @@ sharedConnect : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
               → Path Γ lo (lookup Γ i) t → toℕ i < lo → Id → Tick
               → Sched Γ → EvalSt e
               → Stream Γ (lookup Γ i) × Sched Γ × EvalSt e
--- THE CONNECT KEEPS THE RANK IT ENTERED AT, WHICH IS WHAT MAKES THE
--- RE-SEED FREE.  `ltU` descends the unconnected count and leaves the
--- other two components to be chosen, so the old face chose an
--- exponential of the definition's size and owed a bridge between two
--- currencies.  It does not have to choose anything: the caller was
--- walking a term whose `input i` clause reads η at i, and η at i IS the
--- definition's own reading, so the rank the caller already stands at
--- dominates the definition by the environment's defining equation.
-sharedConnect {τ = U , r , _} (acc rec) i d κ below id now sched st
+-- THE CONNECT RE-SEEDS THE RANK AT THE DEFINITION'S OWN NESTING, AND
+-- `ltU` IS WHAT LETS IT.  The edge descends the unconnected count and
+-- leaves the other two components free, so a connect owes nothing about
+-- how the definition compares to the term that referenced it — which is
+-- the one place the measure would otherwise need a slot environment,
+-- since a reference is one symbol standing for a definition of any
+-- nesting and reads zero.  Re-seeding buys that back for a `refl`: the
+-- caller hands over the definition and the component it hands over is
+-- the definition's.
+sharedConnect {τ = U , _ , _} (acc rec) i d κ below id now sched st
   with unconn (Sched.slots sched) (toℕ i ∷ EvalSt.connectedShares st) <? U
 ... | no  _ = dryBurst id , sched , st
 ... | yes p =
   let st₁ = register (atSlot i) (lowerFloor below κ)
               (record st { connectedShares = toℕ i ∷ EvalSt.connectedShares st })
       (burst , sched₁ , st₂) =
-        subscribeE (rec (ltU {r′ = r} {s′ = syncSizeᵉ d} p))
+        subscribeE (rec (ltU {r′ = obsDepthᵉ d} {s′ = syncSizeᵉ d} p))
                    d (share-sink i ≤-refl) id now sched st₁
       -- the def's connect burst flows up the first subscriber's own
       -- frames (the returned burst); dispatch only serves arrivals
