@@ -41,16 +41,17 @@ open import Data.List using (List; []; _∷_; _++_; map; null)
 open import Data.Bool.ListAction using (any)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc; pred; _<_; _≤_; _≡ᵇ_)
+open import Data.Nat.Properties using (≤-refl)
 open import Data.Product using (_×_; _,_)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (tt)
 open import Data.Vec using (lookup)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 
-open import Rx.Prim using (Tick; Fuel; Id; Source; InstEvent; value; close;
+open import Rx.Prim using (Tick; Fuel; Id; Source; InstEvent; InstEmit; value; close;
   handoff; complete; exhausted; delivery; _at_from_as_;
   init; subscribe; hot; cold)
-open import Rx.Exp using (obs; Ctx; Val; Closed; evalTm; unfoldμ; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ;
+open import Rx.Exp using (obs; Ctx; Val; Closed; evalTm; unfoldμ; applyFn; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ;
   switchAllᵉ; exhaustAllᵉ; μᵉ; deferᵉ)
 open import Rx.Slots using (Slots; scripted; shared)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; NodeId;
@@ -64,7 +65,9 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; NodeId;
   map-f; scan-f; take-f; thru-outer;
   scan-st; take-st; mergeAll-st; switch-st; exhaust-st;
   mergeAllᵒ; switchᵒ; exhaustᵒ;
-  lookupNode; setNode; hasRoom; mergeAllBump; switchKill; aliveThroughᶠ)
+  lookupNode; setNode; hasRoom; mergeAllBump; switchKill; aliveThroughᶠ;
+  splitEvents; retagEvents; scanVals; takeDispatch; thruWrap;
+  burstCompleted; sharedPlumb; dropSource)
 
 ------------------------------------------------------------------
 -- THE SUBSCRIBE CYCLE.  Twelve families, exactly the members of the
@@ -557,15 +560,157 @@ data innerReact⇓ {n} {Γ} {t} {e} where
                  (lookupNode allNid (EvalSt.nodes st)) r
              → innerReact⇓ op allNid inst κ id now vals sched st true r
 
+-- A HELPER OUTSIDE THE CYCLE IS NAMED IN THE RESULT INDEX RATHER THAN
+-- UNFOLDED INTO ARMS, AND THAT IS A CHOICE ABOUT WHAT THIS RELATION IS
+-- FOR.  The take dispatch and the outer wrap each branch on a node
+-- lookup, but neither re-enters the subscribe cycle, so relating their
+-- arms separately would add cases the induction never splits on.  What
+-- the relation must expose is exactly the recursive structure; a total
+-- function of the state is carried as itself.  The one place this would
+-- cost something is the dry proof, and it does not arise here: this
+-- family hands back EVENTS rather than emits, and the dry marker is an
+-- emit's, so no arm of it can carry one however the helper computes.
 data stepFrame⇓ {n} {Γ} {t} {e} where
+
+  step-map : ∀ {s u lo} {fn} {κ : Path Γ lo u t}
+               {id now} {vals : List (Val Γ s)} {fin sched st}
+           → stepFrame⇓ id now (map-f fn) κ vals fin sched st
+               (map (applyFn fn) vals , [] , fin , sched , st)
+
+  step-scan : ∀ {s u lo} {fn nid} {κ : Path Γ lo u t}
+                {id now} {vals : List (Val Γ s)} {fin sched st}
+                {ac : Val Γ u} {outs ac′}
+            → lookupNode nid (EvalSt.nodes st) ≡ just (scan-st {t = u} ac)
+            → scanVals fn ac vals ≡ (outs , ac′)
+            → stepFrame⇓ id now (scan-f fn nid) κ vals fin sched st
+                ( outs , [] , fin , sched
+                , record st
+                    { nodes = setNode nid (scan-st ac′) (EvalSt.nodes st) } )
+
+  step-scan-nil : ∀ {s u lo} {fn nid} {κ : Path Γ lo u t}
+                    {id now} {vals : List (Val Γ s)} {fin sched st}
+                → stepFrame⇓ id now (scan-f fn nid) κ vals fin sched st
+                    ([] , [] , fin , sched , st)
+
+  step-take : ∀ {s lo nid} {κ : Path Γ lo s t}
+                {id now} {vals : List (Val Γ s)} {fin sched st}
+            → stepFrame⇓ id now (take-f nid) κ vals fin sched st
+                (takeDispatch nid vals fin sched st
+                  (lookupNode nid (EvalSt.nodes st)))
+
+  step-from-inner : ∀ {s lo op allNid inst} {κ : Path Γ lo s t}
+                      {id now} {vals : List (Val Γ s)} {fin sched st r}
+                  → innerReact⇓ op allNid inst κ id now vals sched st fin r
+                  → stepFrame⇓ id now (from-inner op allNid inst) κ
+                      vals fin sched st r
+
+  step-thru-outer : ∀ {u lo op nid} {κ : Path Γ lo u t}
+                      {id now} {vals : List (Val Γ (obs u))} {fin sched st}
+                      {vs bs sched′ st′}
+                  → thruWalk⇓ op nid κ id now vals sched st
+                      (vs , bs , sched′ , st′)
+                  → stepFrame⇓ id now (thru-outer op nid) κ vals fin sched st
+                      (thruWrap op nid fin (vs , bs , sched′ , st′))
 
 data pushBurst⇓ {n} {Γ} {t} {e} where
 
+  push-nil : ∀ {s u lo} {f : Frame Γ s u} {κ : Path Γ lo u t} {id now sched st}
+           → pushBurst⇓ id now f κ [] sched st ([] , sched , st)
+
+  push-cons : ∀ {s u lo} {f : Frame Γ s u} {κ : Path Γ lo u t} {id now}
+                {em ems sched st} {vs bs c}
+                {vals′ evs fin′ sched₁ st₁} {rest sched₂ st₂}
+            → splitEvents {A = Val Γ u} (InstEmit.events em) ≡ (vs , bs , c)
+            → stepFrame⇓ id now f κ vs c sched st
+                (vals′ , evs , fin′ , sched₁ , st₁)
+            → pushBurst⇓ id now f κ ems sched₁ st₁ (rest , sched₂ , st₂)
+            → pushBurst⇓ id now f κ (em ∷ ems) sched st
+                ( ((bs ++ retagEvents evs ++ map value vals′
+                      ++ (if fin′ then complete ∷ [] else []))
+                    at InstEmit.instant em
+                    from InstEmit.source em
+                    as InstEmit.kind em)
+                  ∷ rest
+                , sched₂ , st₂ )
+
 data subscribeAll⇓ {n} {Γ} {t} {e} where
 
+  sub-all : ∀ {u lo op} {ns : NodeState Γ} {b : Closed Γ (obs u)}
+              {κ : Path Γ lo u t} {id now sched st nid burst sched₂ st₁ r}
+          → Sched.nextNode sched ≡ nid
+          → subscribeE⇓ b (thru-outer op nid ↠ κ) id now
+              (record sched { nextNode = suc nid })
+              (installNode nid ns st)
+              (burst , sched₂ , st₁)
+          → pushBurst⇓ id now (thru-outer op nid) κ burst sched₂ st₁ r
+          → subscribeAll⇓ op ns b κ id now sched st r
+
+-- THE THIRD GUARD THE RELATION DOES NOT INDEX, AND THE SAME RULING AS
+-- THE UNFOLD'S.  The connect compares the unconnected-share count
+-- against a component of the caller's own measure, which is threaded
+-- alongside every argument and is a function of none of them — so it is
+-- not among these indices and no premise could pin it.  Both
+-- constructors are therefore unconditional in it, and that concedes
+-- nothing: at a run that answered no, the result is a dry burst, which
+-- no constructor of this family produces, so the comparison stays owed
+-- by the inhabitation proof rather than being assumed away here.
 data sharedConnect⇓ {n} {Γ} {t} {e} where
 
+  connect-live : ∀ {lo} {i : Fin n} {d} {κ : Path Γ lo (lookup Γ i) t}
+                   {below : toℕ i < lo} {id now sched st burst sched₁ st₂}
+               → subscribeE⇓ d (share-sink i ≤-refl) id now sched
+                   (register (atSlot i) (lowerFloor below κ)
+                     (record st
+                       { connectedShares =
+                           toℕ i ∷ EvalSt.connectedShares st }))
+                   (burst , sched₁ , st₂)
+               → burstCompleted burst ≡ false
+               → sharedConnect⇓ i d κ below id now sched st
+                   ( ((init (toℕ i) ∷ []) at id from toℕ i as subscribe)
+                     ∷ sharedPlumb burst
+                   , sched₁ , st₂ )
+
+  connect-died : ∀ {lo} {i : Fin n} {d} {κ : Path Γ lo (lookup Γ i) t}
+                   {below : toℕ i < lo} {id now sched st burst sched₁ st₂}
+               → subscribeE⇓ d (share-sink i ≤-refl) id now sched
+                   (register (atSlot i) (lowerFloor below κ)
+                     (record st
+                       { connectedShares =
+                           toℕ i ∷ EvalSt.connectedShares st }))
+                   (burst , sched₁ , st₂)
+               → burstCompleted burst ≡ true
+               → sharedConnect⇓ i d κ below id now sched st
+                   ( ((init (toℕ i) ∷ close (toℕ i) exhausted ∷ [])
+                       at id from toℕ i as subscribe)
+                     ∷ sharedPlumb burst
+                   , sched₁
+                   , record st₂
+                       { registry = dropSource (toℕ i) (EvalSt.registry st₂)
+                       ; completedSources =
+                           toℕ i ∷ EvalSt.completedSources st₂ } )
+
 data subscribeSharedSlot⇓ {n} {Γ} {t} {e} where
+
+  slot-spent : ∀ {lo} {i : Fin n} {d} {κ : Path Γ lo (lookup Γ i) t}
+                 {below : toℕ i < lo} {id now sched st}
+             → memberSource (toℕ i) (EvalSt.completedSources st) ≡ true
+             → subscribeSharedSlot⇓ i d κ below id now sched st
+                 (spentBurst (toℕ i) id , sched , st)
+
+  slot-join : ∀ {lo} {i : Fin n} {d} {κ : Path Γ lo (lookup Γ i) t}
+                {below : toℕ i < lo} {id now sched st}
+            → memberSource (toℕ i) (EvalSt.completedSources st) ≡ false
+            → memberSource (toℕ i) (EvalSt.connectedShares st) ≡ true
+            → subscribeSharedSlot⇓ i d κ below id now sched st
+                ( ((init (toℕ i) ∷ []) at id from toℕ i as subscribe) ∷ []
+                , sched , register (atSlot i) (lowerFloor below κ) st )
+
+  slot-connect : ∀ {lo} {i : Fin n} {d} {κ : Path Γ lo (lookup Γ i) t}
+                   {below : toℕ i < lo} {id now sched st r}
+               → memberSource (toℕ i) (EvalSt.completedSources st) ≡ false
+               → memberSource (toℕ i) (EvalSt.connectedShares st) ≡ false
+               → sharedConnect⇓ i d κ below id now sched st r
+               → subscribeSharedSlot⇓ i d κ below id now sched st r
 
 -- THE ONE CLAUSE, and the whole reason the share cycle is separate: the
 -- fan-out re-enters at the floor the sink's own premise names, so the
