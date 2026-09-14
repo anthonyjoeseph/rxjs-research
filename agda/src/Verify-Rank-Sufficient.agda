@@ -274,8 +274,17 @@ open import Verify-Rank-Sufficient.Path-Fits using (DrainHop; drainFits)
 --   what the door's repair has to be checked against: each states its
 --   currency locally, so restoring one and re-running it says whether the
 --   crossing comes back or whether removing the refusing arm moved only
---   who owes the proof.  The harness already lives on in
---   `Probed.Arrival-Spend`; what the sha holds is the currencies.
+--   who owes the proof.  What the sha holds is the currencies, stated
+--   locally by each witness.
+-- RECOVERY: git show 11c6fcf:agda/evidence/probed/Probed/ restores the
+--   five probes the hop guard emptied, two of them FORKS at this very
+--   statement: one separating a payload reading from a state maximum
+--   over three gated ladders, the other composing a chain against the
+--   arrival's own figure.  Both stand between candidate MEASURES, so
+--   what they separate stops being a question the moment the arrival's
+--   own derivation is a premise rather than a figure — recover them for
+--   the real-evaluator plumbing, which is most of what they cost, and
+--   not for the separations.
 
 -- AND THE CASCADE IS A BODY NOW, WHICH IS WHERE THE DEAD MECHANISM
 -- ABOVE ENDS.  Everything the four refuted readings were trying to buy

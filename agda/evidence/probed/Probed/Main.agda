@@ -40,9 +40,6 @@
 -- RECOVERY: git show 919f115:agda/evidence/probed/Probed/
 module Probed.Main where
 
-open import Probed.Operator-Root
-  using (opRoot)
-
 open import Probed.Carried-Leaf
   using (ofFlat; ofNest; scanFlat; scanNest; rate; packed-is; packed2L-is;
          recurRow)
@@ -87,14 +84,6 @@ open import Probed.Take-Frame
          cut₁-counts; edge₂-counts; pass-counts; deep-counts;
          mid-counts; cut-counts)
 
-open import Probed.Hop-Edge
-  using (hopRow₁; hopRow₂; hopRow₃; hopRowP; hopRowS; hopRowE;
-         packed₁-is; packed₂-is; packed₃-is; packedP-is; packedS-is;
-         packedE-is)
--- and the delivery digits the packed hop figures project away, claimed
--- at the three shapes the hop family could not separate on that axis
-open import Probed.Hop-Edge using (countsP-is; countsS-is; countsE-is)
-
 -- the figures are claimed beside the rows because two independent
 -- tightnesses are what make the rows mean anything: the GROWING rows
 -- return exactly their bound, and what every row is HANDED equals the
@@ -133,11 +122,13 @@ open import Probed.Map-Frame
 open import Probed.Hop-Store
   using (stRow₀; stRow₁; stRow₂; q0-is; q1-is; q2-is;
          same₀; same₁; same₂)
--- and the delivery digit at the shallowest queue, claimed because the
--- hypothesis is SATURATED there: this family varies the store, so the
--- count side sitting where the outer's reading puts it is what says the
--- store axis is the one being moved
-open import Probed.Hop-Store using (counts₀-is)
+-- and the delivery digit at all three queues, claimed as a TRIPLE
+-- rather than one row: the hypothesis is saturated at each, and what
+-- says the store is the axis being moved is that the count side stands
+-- STILL across the three while the store enters at nought, one and
+-- two — a figure no single row reports, and one a repair that let the
+-- queue's depth leak into the delivery reading would break
+open import Probed.Hop-Store using (counts₀-is; counts₁-is; counts₂-is)
 
 -- the two readings are claimed AHEAD of the rows here, inverting the
 -- usual order, because the rows are degenerate in their conjuncts and
@@ -151,15 +142,6 @@ open import Probed.Defer-Blind
 -- frame back an empty burst, so nothing on this axis could have failed
 -- and saying so is what stops the rows being read as coverage
 open import Probed.Defer-Blind using (open-counts; gated-counts)
-
--- the sweep figures are claimed beside the fork because the separation
--- alone would not say the margin is nil: the fork says the two rules
--- disagree at one arrival, and the sweep says the winning rank is the
--- least one that works there, so a rule supplying more than it needs
--- could not hide behind the same green
-open import Probed.Arrival-Spend
-  using (deepFork; packed₁-is; packed₃-is; packed₄-is; packed₅-is;
-         packed₆-is; packed₇-is; packed₈-is; flat-reads)
 
 -- the packed rows are claimed beside the fits because each is a way a
 -- fit could have been green having asked for nothing — no arrival, an
@@ -187,18 +169,6 @@ open import Probed.Door-Fits
 open import Probed.Door-Fits
   using (shallowRow; deepRow; widerRow; doorDeep; doorDeep₂)
 
--- the agreement rows are claimed beside the fork because a separation
--- between two rules that differ everywhere says nothing about the shape
--- it stands at, and the counts because each is a way both rules could
--- have been evaluated over nothing — and the `thru-outer` counts are
--- claimed for the opposite reason again: they are nought at every point
--- measured, which is the finding rather than a control
-open import Probed.Chain-Compose
-  using (agree₁; agree₂; agree₃; agreeCap; exitFork;
-         uTerm; uReach; uInners; uOuters; uRank;
-         gTerm; gReach; gInners; gOuters; gRank;
-         capReach; capInners; capOuters; uStore; gStore)
-
 -- the sweeps are claimed beside the fork because the separation says
 -- only that the store half is read, and what the rows add is the two
 -- things a separation cannot: that a cascade's write stays under the
@@ -220,24 +190,6 @@ open import Probed.Share-Fanout
   using (fanoutFork; oneRow; thriceRow; mixedRow; payRow;
          quietRow; quietAgree)
 
--- the three packed figures are claimed beside the dry rows because the
--- dry flag reading false says nothing on its own — it is false at a
--- point nothing emitted too — so what makes those rows evidence is the
--- handed reading being positive and the rank standing strictly above
--- the bound.  The exit-frame figure is claimed for the opposite
--- reason: it is nought in every column, which is the row's own
--- statement that it buys instantiability and not coverage
-open import Probed.Exit-Frame
-  using (packed₁-is; packed₂-is; packed₃-is; fi-packed-is;
-         dryRow₁; dryRow₂; dryRow₃;
-         fromInnerCarried; fromInnerDry)
-
--- and the delivery figures, claimed for the third reason again: handed
--- equals held at every one of the three, so that half of the premise is
--- SATURATED rather than slack, and a repair that lowered the bound on
--- the count side would cross at all three at once
-open import Probed.Exit-Frame using (counts₁-is; counts₂-is; counts₃-is)
-
 -- the UNFOLD row, claimed beside its own negative control because the
 -- conclusion it instantiates is free at the context's own size: the
 -- control fixes the same unfolded term at floor zero and the predicate
@@ -245,4 +197,3 @@ open import Probed.Exit-Frame using (counts₁-is; counts₂-is; counts₃-is)
 -- predicate that can reject rather than tidy greens over a statement
 -- nothing could falsify
 open import Probed.Unfold-Bound using (ground; carriesLow; carriesBoth)
-

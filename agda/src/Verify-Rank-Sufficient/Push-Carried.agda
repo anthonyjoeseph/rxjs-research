@@ -79,6 +79,12 @@ open import Verify-Rank-Sufficient.Carried using (valsAt; emitAt; valsRd; burstR
 --   answers all three and no choice of the outgoing figure holds.  The
 --   currency is the defect and not the pin, which is why the repair is
 --   here rather than at any of them.
+-- RECOVERY: git show 11c6fcf:agda/evidence/probed/Probed/Hop-Edge.agda
+--   restores the six-frame corpus the dead route above was measured
+--   on — all three operators, a fold deepening its accumulator once
+--   and twice per delivery, two source lengths, and the limit that
+--   forces the park branch.  The park row is the part no surviving
+--   probe reaches.
 -- RECOVERY: git show 19ce2c6:agda/evidence/refuted/Refuted/Path-Heads.agda
 --   restores the machine form of that separation — the folding template
 --   and the three payloads, plus the two head statements it killed.  It
@@ -289,7 +295,7 @@ postulate
 -- stacks one to three deep, the same stacks behind a gate, and a capped
 -- flattener across the steps of its own queue drain, the count of it on
 -- the chains an arrival reaches is nought at every point, while the
--- exit frame's is the chain's whole length (`Probed.Chain-Compose`).
+-- exit frame's is the chain's whole length.
 --
 -- WHICH MAKES THE ABSENCE A CHOICE RATHER THAN AN OVERSIGHT, and the
 -- two candidates are separated rather than argued.  `innerReact` hands
@@ -382,18 +388,20 @@ postulate
 --   same `⊔` — so no instantiation of it can fail, however deep.  What
 --   is left falsifiable at this frame is the WRITE, not the queue.
 --
--- PROBED: `Probed.Hop-Edge` — six frames reached by RUNNING the
---   subscription the flattener arm builds, over all three operators, at
---   a fold that deepens its accumulator once and twice per delivery, at
---   two source lengths, and at one whose limit forces the PARK branch.
---   Every conjunct is positive at every row (the pins carry both sides)
---   and the margin is a constant one.  The DELIVERY half of the pair is
---   decided too: the hypothesis saturates at every row, so a source
---   delivering one more than its reading admits leaves the row
---   unsolvable, and the conclusion keeps a delivery of margin wherever
---   the outer carries two.  NOT reached: a frame whose rank is spent,
---   which no root can exhibit since a flattener's own reading is a
---   successor.
+-- DEAD ROUTE: reaching six frames by RUNNING the subscription the
+--   flattener arm builds — over all three operators, at a fold that
+--   deepens its accumulator once and twice per delivery, at two source
+--   lengths, and at one whose limit forces the PARK branch.  It was the
+--   widest coverage this frame ever had: every conjunct positive at
+--   every row with the pins carrying both sides, a constant margin of
+--   one, and the DELIVERY half decided by a hypothesis that saturates,
+--   so a source delivering one more than its reading admits left the
+--   row unsolvable.  The route died with the hop guard rather than with
+--   the statement: the subscription the arm builds is the very thing
+--   the guard now refuses, so every row runs to an empty burst and
+--   compares nothing.  The shape it never reached is unchanged — a
+--   frame whose rank is spent, which no root can exhibit since a
+--   flattener's own reading is a successor.
 --
 -- PROBED: `Probed.Hop-Store` — the same frame at a store that is
 --   already deep, which is the configuration no other row on this shelf

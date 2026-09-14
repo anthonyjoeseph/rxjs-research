@@ -284,21 +284,21 @@ tier is staged around building one.
   rungs and at a gate; an arrival there reaches exactly ONE chain.
 
 - **`from-inner-dry`** (Verify-Rank-Sufficient.Path-Fits) — FALSITY,
-  `DEAD ROUTE, PROBED, RECOVERY`: the exit frame's dry-freedom over every
-  payload its incoming bound admits. The three quiet frames are discharged
-  outright, which is what says the two re-entrant ones carry the risk.
+  `DEAD ROUTE×2, RECOVERY×2`: the exit frame's dry-freedom over every payload
+  its incoming bound admits. The three quiet frames are discharged outright,
+  which is what says the two re-entrant ones carry the risk.
 
 - **`from-inner-carried`** (Verify-Rank-Sufficient.Path-Fits) — FALSITY,
-  `DEAD ROUTE, PROBED, RECOVERY`: the exit frame threads what it was handed
+  `DEAD ROUTE×2, RECOVERY×2`: the exit frame threads what it was handed
   unchanged. `innerReact` returns its payload untouched on every branch but the
   completion one, where a node's queue is drained and fresh bursts appended —
   the branch nothing has reached.
 
 - **`thru-outer-frame-dry`** (Verify-Rank-Sufficient.Path-Fits) — SHAPE,
-  `PROBED`: the flattener's dry-freedom, held under a headroom in the READING
-  while the arm it refuses is now decided on the NESTING. The restatement is
-  guaranteed; its cost is the thread, since the values it bounds are quantified
-  freely below.
+  `DEAD ROUTE`: the flattener's dry-freedom, held under a headroom in the
+  READING while the arm it refuses is now decided on the NESTING. The
+  restatement is guaranteed; its cost is the thread, since the values it bounds
+  are quantified freely below.
 
 - **`share-chain-hop`** (Verify-Rank-Sufficient.Path-Fits) — SHAPE,
   `REFUTED, RECOVERY`: the sink's claim at the share's registry, whose one
@@ -333,14 +333,14 @@ tier is staged around building one.
   the continuation and the store's other nodes are INERT rather than unswept.
 
 - **`thru-outer-frame-carried`** (Verify-Rank-Sufficient.Push-Carried) —
-  DIFFICULTY, `DEAD ROUTE, PROBED×3`: the HOP EDGE, where the two currencies
+  DIFFICULTY, `DEAD ROUTE×2, PROBED×2`: the HOP EDGE, where the two currencies
   are exchanged. Eleven frames reached by RUNNING; the `suc` is never spent.
   The store axis cannot refute from either side; a gated source is held to a
   quarter of what the run then carries.
 
 - **`dry-operator`** (Verify-Rank-Sufficient.Dry) — DIFFICULTY,
-  `DEAD ROUTE×4, PROBED, RECOVERY×3`: the THREE FLATTENERS' dry-freedom under
-  the entry invariant, and the only half of them still a leaf. The dry shelf is
+  `DEAD ROUTE×5, RECOVERY×4`: the THREE FLATTENERS' dry-freedom under the entry
+  invariant, and the only half of them still a leaf. The dry shelf is
   unconditional in what a frame is handed, so the assembly wants the dry claim
   and the report proven in ONE walk.
 

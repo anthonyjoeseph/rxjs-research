@@ -130,16 +130,22 @@ dry-under ac id now f κ ψ Rin Rst d vals fin sd st _ _ =
 --   arm it guards is denominated in the FLOOR while every dry close on
 --   this face is minted at RANK zero.  A floor decision cannot reach a
 --   rank obligation, so nothing about the exits below narrows this.
--- PROBED: `Probed.Exit-Frame` — both statements instantiated at one
---   flat program on the `fin = false` arm, where the frame is the
---   identity.  What that buys is INSTANTIABILITY and not coverage, and
---   the rows say so themselves: the element type carries neither
---   deliveries nor hop depth, so all three conjuncts of the carried row
---   compare nought against nought — both halves of the payload pair and
---   the store — and the dry row holds by `any` on the empty list the
---   identity arm returns.  NOT covered, and it is where the whole risk
---   sits: the `fin = true` arm, which is the one that inspects the
---   registrations and decides whether to drain.
+-- DEAD ROUTE: instantiating either statement on the `fin = false` arm,
+--   where the frame is the identity.  It was the only arm ever reached
+--   and it buys INSTANTIABILITY rather than coverage: the element type
+--   carries neither deliveries nor hop depth, so all three conjuncts of
+--   the carried row compare nought against nought — both halves of the
+--   payload pair and the store — and the dry row holds by `any` on the
+--   empty list the identity arm returns.  Where the whole risk sits is
+--   the `fin = true` arm, which inspects the registrations and decides
+--   whether to drain, and no row on the false arm narrows it however
+--   many are added.
+-- RECOVERY: git show 11c6fcf:agda/evidence/probed/Probed/Exit-Frame.agda
+--   restores the wrapping-rate corpus both dead routes above were
+--   measured on, with the dry channel read beside the carried rows.
+--   The programs and the plumbing are what transfer; the rows have to
+--   be re-run, since they were taken against a reading this tier is
+--   replacing.
 -- RECOVERY: git show 873c905:agda/evidence/probed/Probed/Inner-Bound.agda
 --   restores a harness that reaches a flattener INSIDE a share's def and
 --   reads the queued value back out of the machine's own node table by
@@ -181,19 +187,20 @@ postulate
 -- so the premise has to be threaded to the walk that knows which burst
 -- they came out of, and that thread is the restatement's real cost.
 --
--- PROBED: `Probed.Exit-Frame` — three outer sources at wrapping rates
---   one, two and three, taken at the points the carried rows already
---   stand at, with the dry channel read.  LOAD-BEARING on every half:
---   the handed reading is positive, so the outer did emit; the rank
---   exceeds the HOP half by exactly one at every point, so the premise
---   is decided rather than afforded — a rank equal to the bound is the
---   refutation this would have reported; and the DELIVERY half is
---   saturated, handed equal to held at one, two and two, so a reading
---   that undercharged the outer by a single delivery crosses.  NOT
---   covered: a frame
---   subscribing an inner whose rank is already spent, which is the only
---   shape the dry branch is reachable from and is not reachable from a
---   root at all.
+-- DEAD ROUTE: reading the dry channel at three outer sources wrapping
+--   at rates one, two and three, taken at the points the carried rows
+--   already stand at.  Every half was load-bearing while it ran — the
+--   handed reading positive, so the outer did emit; the rank exceeding
+--   the HOP half by exactly one at every point, so the premise was
+--   decided rather than afforded; the DELIVERY half saturated, handed
+--   equal to held at one, two and two, so a reading that undercharged
+--   the outer by a single delivery would have crossed.  The rows are
+--   gone because the hop guard refuses before the outer emits at all,
+--   which empties every figure they compared and leaves them agreeing
+--   with themselves.  And the shape that was never reached is still
+--   never reached: a frame subscribing an inner whose rank is already
+--   spent is the only shape the dry branch is reachable from, and it is
+--   not reachable from a root.
 postulate
   thru-outer-frame-dry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} {τ} {lo}
     (ac : Acc _≺_ τ) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)

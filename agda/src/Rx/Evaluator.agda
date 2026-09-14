@@ -454,8 +454,8 @@ installNode nid nodeState st =
 -- the frame meeting it openly is held to four and the frame meeting it
 -- through a gate is held to one.  What closes it is that the arrival
 -- holds a VALUE and not a name for one, so `depthᵛ` reads the figure
--- where it lands and nothing has to carry it: `Probed.Arrival-Spend`
--- sweeps that arrival's rank by hand and finds the least sufficient one
+-- where it lands and nothing has to carry it.  Swept by hand over three
+-- gated ladders, the least sufficient rank at that arrival came out
 -- EQUAL to what the arrival witness supplies, so the schedule is not a
 -- quantity this development is missing.
 --

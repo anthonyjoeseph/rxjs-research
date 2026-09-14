@@ -169,19 +169,30 @@ opShape _                = false
 --   scan for what it folds over, so the same witness comes back TRUE in
 --   the hop reading and what it refuted was the nesting, which died
 --   with it.
--- PROBED: `Probed.Operator-Root` — the only rows this leaf has at a root
---   it ANSWERS for, since every earlier one sat at a root `opShape`
---   refuses.  A run whose inner fold triples its deliveries per literal
---   and whose outer fold turns that width into depth, flattened at the
---   root so every layer is entered: the leaf comes back dry-free at one
---   literal, and across four source lengths the entry reading reads 5,
---   21, 85, 329 against carried depths of 3, 12, 39, 120.  It dominates
---   at every length and the margin WIDENS, which is the same family that
---   used to read a flat figure and cross at twelve literals.  THE
---   BOUNDARY, and it is an infrastructure limit: subscribing a burst
---   costs unlike measuring one, so the rate is instantiated at four
---   lengths and the SUBSCRIBE at one — a leaf row at two literals
---   stalled for eleven minutes with the resident set flat.
+-- DEAD ROUTE: the only coverage this leaf ever had at a root it
+--   ANSWERS for, and it is gone rather than merely old.  A run whose
+--   inner fold triples its deliveries per literal and whose outer fold
+--   turns that width into depth, flattened at the root so every layer
+--   is entered: the leaf came back dry-free at one literal, and across
+--   four source lengths the entry reading read 5, 21, 85, 329 against
+--   carried depths of 3, 12, 39, 120 — dominating at every length with
+--   the margin WIDENING, the same family that used to read a flat
+--   figure and cross at twelve literals.  What killed it is the hop
+--   guard: the run no longer REACHES the inner subscribe, so the rows
+--   report a dry close instead of the crossing they were taken for, and
+--   a receipt standing on them would claim coverage nothing bought.
+--   THE BOUNDARY it hit is an infrastructure limit and survives the
+--   finding: subscribing a burst costs unlike measuring one, so the
+--   rate reached four lengths and the SUBSCRIBE exactly one — a leaf
+--   row at two literals stalled for eleven minutes with the resident
+--   set flat.
+-- RECOVERY: git show 11c6fcf:agda/evidence/probed/Probed/Operator-Root.agda
+--   restores the triple-fold corpus the dead route above was measured on,
+--   together with the real-evaluator plumbing that reaches a leaf row at
+--   all — which is most of what that probe cost and none of what it
+--   claimed.  Re-run it once the hop guard stops refusing, and read its
+--   STATEMENT rather than its verdict: the rows were taken against a
+--   reading this tier is replacing.
 -- RECOVERY: `git show 919f115:agda/src/Rx/Clos-Size.agda` restores
 --   `syncSizeᵉ` with the slot telescope substituted in, also postulate-free
 --   — the μ guard reads the UNSUBSTITUTED size, and a slot reference is one
