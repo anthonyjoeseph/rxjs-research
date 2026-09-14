@@ -1254,6 +1254,11 @@ gate-heavy: stripped
 # empty changed set, or a multi-member block it failed to notice.  Both
 # directions are pinned, against real modules whose block structure is a fact
 # rather than a fixture, and via --verdict-only so it costs no typecheck.
+# THE PRICE OF A REAL MODULE IS THAT ITS BLOCK STRUCTURE CAN CHANGE UNDER THE
+# CASE: a leg that dissolves $$m's mutual block turns the escalation case red
+# without anything being wrong with the router.  The repair is to repoint $$m
+# at another module the router itself reports as multi-member AND that appears
+# in $$n's cone, since the last case needs both; never to relax the assertion.
 # A SELFTEST MUST NOT DEPEND ON HOW LONG SINCE THE LAST HEAVY GATE.  Drift
 # is a SECOND escalation axis, orthogonal to every property the cases below
 # assert, and it is on by default -- so once it crosses its limit the cases
@@ -1266,7 +1271,7 @@ NODRIFT := --drift 1000000
 
 dev-changed-selftest:
 	@fail=0; \
-	  m=agda/src/Rx/Evaluator.agda; \
+	  m=agda/src/Rx/Evaluator/Builder.agda; \
 	  n=agda/src/Rx/Strat-Order.agda; \
 	  out=$$(scripts/dev-changed.py --verdict-only $(NODRIFT) --assume-stamp HEAD --files $$m 2>&1); ec=$$?; \
 	  echo "$$out" | grep -q 'FULL GATE REQUIRED' \
