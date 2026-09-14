@@ -570,6 +570,14 @@ data innerReact⇓ {n} {Γ} {t} {e} where
 -- cost something is the dry proof, and it does not arise here: this
 -- family hands back EVENTS rather than emits, and the dry marker is an
 -- emit's, so no arm of it can carry one however the helper computes.
+--
+-- RECOVERY: git show 234074e:agda/src/Verify-Rank-Sufficient/ restores
+--   the CARRIED tower, whose whole subject was this family: a bound a
+--   frame's emissions were held to, stated per template and pushed
+--   through a burst.  It is the apparatus to read if a strengthened
+--   return type is ever wanted here — what killed it is that the
+--   figure was seeded off SYNTAX, which is a property of that tower's
+--   currency and not of the per-frame statement it proved.
 data stepFrame⇓ {n} {Γ} {t} {e} where
 
   step-map : ∀ {s u lo} {fn} {κ : Path Γ lo u t}

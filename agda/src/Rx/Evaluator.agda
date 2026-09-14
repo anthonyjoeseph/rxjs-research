@@ -42,7 +42,6 @@ variable
 -- checked by the generator/decoder, not by these types; a forward
 -- reference is rejected there.
 open import Rx.Slots using (scripted; shared; Slots)
-open import Rx.Hop-Depth using (Rd₃; depthᵉ; depthᵛ)
 open import Rx.Obs-Depth using (obsDepthᵉ; obsDepthᵛ)
 
 Stream : ∀ {n} → Ctx n → Ty → Set          -- flat, canonical emission order
@@ -421,79 +420,13 @@ installNode : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 installNode nid nodeState st =
   record st { nodes = setNode nid nodeState (EvalSt.nodes st) }
 
--- THE STORE'S OWN READING, which is the half of the seeding a program
--- cannot supply.  A fold hands its accumulator back one layer deeper at
--- every delivery, so for a FIXED term the values a run enters are
--- unbounded while every measure of syntax holds still.  What moves with
--- them is the STORE — the accumulator a scan node holds and the inners
--- a bounded merge has queued are the only places a value waits to be
--- entered from — so the seeding reads those and the machine re-seeds at
--- every arrival.
---
--- IT READS PLACES RATHER THAN A COUNT, and that is the whole of why it
--- is a max.  Nothing here counts arrivals, so a state nothing reached
--- is bounded by exactly the same expression as one a run produced —
--- which is what lets the drain's own leaf be stated over the arbitrary
--- store it already quantifies over, with no field on the record and no
--- obligation on the producers.
---
--- THE SCHEDULE IS NOT READ, deliberately.  A pending payload is not
--- entered where it waits; it is entered as an ARRIVAL, and the arrival
--- re-seeds at its own value's reading — so charging the schedule here
--- would put a payload under the seed of every entry that cannot reach
--- it, and would cost the root its reading of zero for nothing.
---
--- AND WHAT THAT LEAVES OWED IS A BOUND AND NOT A SEED, WHICH FALLS DUE
--- ON THE ARRIVAL AND IS PAID THERE.  Re-seeding at the arrival is what
--- keeps the reading honest, and it says nothing about what BOUNDS the
--- value that arrives.  Every frame reached by descending a term draws
--- its payload bound from a subterm of that term; an arrival off the
--- schedule has no such term, because the frame that put the value there
--- was charged a constant for it and nothing relates the two figures.
--- `Probed.Defer-Blind` pins that gap at one body — the body reads four,
--- the frame meeting it openly is held to four and the frame meeting it
--- through a gate is held to one.  What closes it is that the arrival
--- holds a VALUE and not a name for one, so `depthᵛ` reads the figure
--- where it lands and nothing has to carry it.  Swept by hand over three
--- gated ladders, the least sufficient rank at that arrival came out
--- EQUAL to what the arrival witness supplies, so the schedule is not a
--- quantity this development is missing.
---
--- AND IT IS READ IN THE RANK'S OWN CURRENCY, WHICH IS WHAT THE ENTRY
--- INVARIANT CAN SPEND.  A re-seed that joined a NESTING to a reading
--- named a number the rank was larger than and the invariant could not
--- use: nesting counts a term's flattener layers, the rank counts what a
--- subscription may still enter, and only the second is what a stored
--- accumulator makes deep.  Taking the join in one currency is what puts
--- the depth a fold has ALREADY reached under the seed, so what the
--- term's own reading is left covering is the refolds still to come.
-stHopᶜˢ : ∀ {n} {Γ : Ctx n} {t} (ψ : Fin n → Rd₃) → List (Closed Γ t) → ℕ
-stHopᶜˢ ψ []       = 0
-stHopᶜˢ ψ (e ∷ es) = depthᵉ ψ e ⊔ stHopᶜˢ ψ es
-
-stHopⁿ : ∀ {n} {Γ : Ctx n} (ψ : Fin n → Rd₃) → NodeState Γ → ℕ
-stHopⁿ ψ (scan-st {t = t} v)         = depthᵛ ψ t v
-stHopⁿ ψ (take-st _)                 = 0
-stHopⁿ ψ (mergeAll-st _ _ queued _)  = stHopᶜˢ ψ queued
-stHopⁿ ψ (switch-st _ _)             = 0
-stHopⁿ ψ (exhaust-st _ _)            = 0
-
-stHopᴺ : ∀ {n} {Γ : Ctx n} (ψ : Fin n → Rd₃) →
-         List (NodeId × NodeState Γ) → ℕ
-stHopᴺ ψ []             = 0
-stHopᴺ ψ ((_ , s) ∷ ns) = stHopⁿ ψ s ⊔ stHopᴺ ψ ns
-
-stHop : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (ψ : Fin n → Rd₃) →
-         EvalSt e → ℕ
-stHop ψ st = stHopᴺ ψ (EvalSt.nodes st)
-
--- THE SAME FIGURE IN THE SYNTACTIC CURRENCY, WHICH IS WHAT THE HOP PEEL
--- NOW ENTERS AT.  A store can hold observables — a parked inner in a
--- merge queue, an accumulator a fold deepened — and those are terms an
--- arrival may still subscribe, so an entry seeded off the program alone
--- would be standing below something already written down.  Reading the
--- store in the peel's own currency is what lets the entry take a join
--- rather than owe a transfer between two measures.
+-- WHAT A STORE STILL HOLDS, READ IN THE MEASURE'S OWN CURRENCY, WHICH
+-- IS WHAT THE ENTRY TAKES ITS JOIN AGAINST.  A store can hold
+-- observables — a parked inner in a merge queue, an accumulator a fold
+-- deepened — and those are terms an arrival may still subscribe, so an
+-- entry seeded off the program alone would be standing below something
+-- already written down.  Reading the store in one currency is what lets
+-- the entry take a join rather than owe a transfer between two.
 obsStᶜˢ : ∀ {n} {Γ : Ctx n} {t} → List (Closed Γ t) → ℕ
 obsStᶜˢ []       = 0
 obsStᶜˢ (e ∷ es) = obsDepthᵉ e ⊔ obsStᶜˢ es

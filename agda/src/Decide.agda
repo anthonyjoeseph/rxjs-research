@@ -30,7 +30,7 @@
 -- cost of checking it is nil.
 --
 -- THE NAMES ARE NOT NORMALISED, AND THAT IS A RULING, NOT AN OVERSIGHT.
--- The class arrived with several conventions at once (`∧ˡ`, `true≢false`,
+-- The class arrived with several conventions at once (`true≢false`,
 -- `≡ᵇ→≡`, `just-injᵂ`), and renaming to one of them rewrites call sites
 -- for no proof content.  The duplicate-generating mechanism is LOCALITY,
 -- not spelling: with every such fact in one file, the check before
@@ -43,8 +43,7 @@
 --   was consumed by that face and by nothing else.
 module Decide where
 
-open import Data.Bool using (Bool; true; false; _∧_; T)
-open import Data.Unit using (tt)
+open import Data.Bool using (true; false)
 open import Data.Nat using (ℕ; zero; suc; _≡ᵇ_)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Empty using (⊥)
@@ -60,26 +59,6 @@ open import Relation.Binary.PropositionalEquality
 
 true≢false : {A : Set} → true ≡ false → A
 true≢false ()
-
-------------------------------------------------------------------
--- Bool: ∧
-------------------------------------------------------------------
-
--- the two ∧ projections in `T` form, and THE BOOLS ARE EXPLICIT ON
--- PURPOSE.  `T` is a FUNCTION on `Bool`, not a datatype, so
--- `T ?a =?= T (f k x)` cannot be inverted while the argument is stuck
--- on a variable — which it always is at the recursive call sites these
--- serve.  With the Bools implicit every one of those raises an unsolved
--- meta; passing them costs verbosity and buys independence from
--- inference.  `T-∧` in `Data.Bool.Properties` has the same problem
--- behind a ⇔.
-∧ˡ : ∀ (a b : Bool) → T (a ∧ b) → T a
-∧ˡ true  b _  = tt
-∧ˡ false b ()
-
-∧ʳ : ∀ (a b : Bool) → T (a ∧ b) → T b
-∧ʳ true  b h = h
-∧ʳ false b ()
 
 ------------------------------------------------------------------
 -- ℕ's Bool-valued equality

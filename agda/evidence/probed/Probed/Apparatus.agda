@@ -42,28 +42,18 @@
 -- RECOVERY: git show 919f115:agda/evidence/probed/Probed/Apparatus.agda
 -- RECOVERY: git show 8c6fc8d:agda/evidence/probed/Probed/Apparatus.agda
 --   holds the seven forks that spent `Separates` before this tree was
---   cut back, all of which chose the environment reading
---   `Rx.Hop-Depth` now carries.
+--   cut back, all of which chose an environment reading this
+--   development no longer carries.
+-- RECOVERY: git show 234074e:agda/evidence/probed/Probed/Apparatus.agda
+--   restores `Below`, which decided a conditioned target's arithmetic
+--   premise by `toWitness` so that a premise FALSE at the probe's own
+--   point left the implicit unsolvable.  It went with the last file
+--   that spent it, and it is two lines to rewrite; what is worth
+--   knowing is that the shape was wanted once.
 module Probed.Apparatus where
 
-open import Data.Nat using (_≤_)
-open import Data.Nat.Properties using (_≤?_)
-open import Relation.Nullary.Decidable using (True; toWitness)
 open import Relation.Nullary.Negation using (¬_)
 open import Relation.Binary.PropositionalEquality using (_≡_)
-
--- A CONDITIONED TARGET'S PREMISE, DECIDED RATHER THAN ASSERTED.  A
--- statement restated onto a hypothesis can only be applied at a point
--- that SATISFIES it, so a row instantiating one has to discharge the
--- premise — and discharging it is the half of the row worth having,
--- since it is what says the hypothesis is not vacuous over reachable
--- states.  Where the premise is an arithmetic comparison of two
--- computable readings, the decision procedure is the honest witness:
--- it reduces at the probe's own point, so a premise that is FALSE
--- there leaves the implicit unsolvable and the row goes red, which is
--- exactly the refutation the conditioning was supposed to expose.
-Below : ∀ {m n} → {t : True (m ≤? n)} → m ≤ n
-Below {t = t} = toWitness t
 
 Confirms : {A : Set} → .(claim : A) → Set
 Confirms {A} _ = A
