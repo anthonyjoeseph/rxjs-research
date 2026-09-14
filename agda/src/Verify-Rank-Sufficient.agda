@@ -71,6 +71,13 @@ open import Rx.Evaluator.Domain using (evaluate⇓; eval-run; subscribeE⇓;
   step-map; step-scan; step-scan-nil; step-take; step-from-inner; step-thru-outer;
   walk-nil; walk-cons; push-nil; push-cons)
 open import Verify-Rank-Sufficient.Dry-Emits using (hasDry-++)
+-- the five frames, stated together at the full axis set.  This module is
+-- the whole of what `subscribe-carried`'s structural clauses spend, and
+-- every one of them spends `pushBurst-carried` — so a frame that turns
+-- out to need a fourth axis is a type error HERE, at all five clauses,
+-- rather than a green statement that is quietly wrong at one of them.
+open import Verify-Rank-Sufficient.Push-Carried using (Pay; Pout-of;
+  pushBurst-carried; stepFrame-carried)
 
 -- THE DOMAIN IS WHERE THE WHOLE OF THE KNOWN FALSITY NOW SITS, AND
 -- THAT CONCENTRATION IS WHAT THE RELATION BOUGHT.  No constructor of
@@ -565,12 +572,97 @@ postulate
 --   claimed there are the gap: the definition reads one, the reference
 --   standing for it reads nought, so no repair reading the term can
 --   close it.
+-- AND IT IS NO LONGER A LEAF, WHICH IS THE LEG.  A subscribe's burst is
+-- its SOURCE's burst pushed through the frames its own term installs, so
+-- every structural clause is `pushBurst-carried` at that clause's frame
+-- and nothing about the frames is asserted here.  What is left over is
+-- the three things no frame answers — a source's own burst, a
+-- flattener's walk, and the slot conjunct `Refuted.Carried-Shared`
+-- names — and those are the leaves.  The five frames themselves are
+-- `Verify-Rank-Sufficient.Push-Carried`, stated together at the full
+-- axis set rather than discovered one refutation at a time.
+subscribe-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
+  {τ : Tri} (ac : Acc _≺_ τ) (b : Closed Γ u) → EntryOK b τ →
+  (κ : Path Γ lo u t) (id : Id) (now : Tick)
+  (sched : Sched Γ) (st : EvalSt e) →
+  BurstOK {Γ = Γ} (proj₁ (subscribeE {e = e} ac b κ id now sched st)) τ
+subscribe-carried ac (input i) ok κ id now sched st =
+  source-carried ac i ok κ id now sched st
+subscribe-carried ac (ofᵉ ts) ok κ id now sched st = of-carried ts ok
+subscribe-carried ac emptyᵉ ok κ id now sched st = []ᵃ
+subscribe-carried ac (mapᵉ f b) ok κ id now sched st =
+  burst-widen (pushBurst-carried ac id now (map-f f) κ _ (payOf τ) (rankOf τ)
+                 (subscribe-carried ac b (inner-ok ok) (map-f f ↠ κ) id now sched st)
+                 ≤-refl)
+subscribe-carried ac (takeᵉ count b) ok κ id now sched st =
+  burst-widen (pushBurst-carried ac id now (take-f _) κ _ (payOf τ) (rankOf τ)
+                 (subscribe-carried ac b (inner-ok ok) (take-f _ ↠ κ) id now _ _)
+                 ≤-refl)
+subscribe-carried ac (scanᵉ f seed b) ok κ id now sched st =
+  burst-widen (pushBurst-carried ac id now (scan-f f _) κ _ (payOf τ) (rankOf τ)
+                 (subscribe-carried ac b (inner-ok ok) (scan-f f _ ↠ κ) id now _ _)
+                 ≤-refl)
+subscribe-carried ac (mergeAllᵉ lim b) ok κ id now sched st =
+  all-carried ac mergeAllᵒ b (under-ok ok) κ id now sched st
+subscribe-carried ac (switchAllᵉ b) ok κ id now sched st =
+  all-carried ac switchᵒ b (under-ok ok) κ id now sched st
+subscribe-carried ac (exhaustAllᵉ b) ok κ id now sched st =
+  all-carried ac exhaustᵒ b (under-ok ok) κ id now sched st
+subscribe-carried {τ = _ , _ , sz} (acc rec) (μᵉ body) ok κ id now sched st
+  with syncSizeᵉ (unfoldμ body) <? sz
+... | no ¬p = ⊥-elim (¬p (≤-trans (unfoldμ-shrinks body) (proj₁ ok)))
+... | yes p =
+      subscribe-carried (rec (ltS p)) (unfoldμ body)
+        (≤-refl , ≤-trans (unfoldμ-no-deeper body) (proj₂ ok))
+        κ id now sched st
+subscribe-carried ac (varᵉ ()) ok κ id now sched st
+subscribe-carried ac (deferᵉ body) ok κ id now sched st = []ᵃ
+
+-- THE THREE RESIDUES, AND EACH IS A DIFFERENT KIND OF THING — which is
+-- the product of writing the body: before it, all three were inside one
+-- postulate and none of them was nameable.
+--
+--   `source-carried` is the one `Refuted.Carried-Shared` killed the term
+--   reading of: a slot reference is priced at nought while the burst the
+--   clause returns is the DEFINITION's, so what is owed is over the
+--   SCHEDULE — the slots the telescope holds are written below the rank.
+--   It is the conjunct `EntryOK` is expected to grow.
+--
+--   `of-carried` is a literal's own payloads against the rank the
+--   reading charges the `strmᵗ` a successor for.  Arithmetic, and the
+--   only one of the three with no risk in it.
+--
+--   `all-carried` is the flattener's walk, and it is where the DOOR's
+--   premise is actually paid: the values a `thru-outer` frame receives
+--   are inner observables, and `thru-outer-frame-carried` is the
+--   statement that they are written strictly shallower than the rank.
 postulate
-  subscribe-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
-    {τ : Tri} (ac : Acc _≺_ τ) (b : Closed Γ u) → EntryOK b τ →
-    (κ : Path Γ lo u t) (id : Id) (now : Tick)
+  source-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo}
+    {τ : Tri} (ac : Acc _≺_ τ) (i : Fin n) → EntryOK {Γ = Γ} (input i) τ →
+    (κ : Path Γ lo (lookup Γ i) t) (id : Id) (now : Tick)
     (sched : Sched Γ) (st : EvalSt e) →
-    BurstOK {Γ = Γ} (proj₁ (subscribeE {e = e} ac b κ id now sched st)) τ
+    BurstOK {Γ = Γ} (proj₁ (subscribeE {e = e} ac (input i) κ id now sched st)) τ
+
+  of-carried : ∀ {n} {Γ : Ctx n} {u} {τ : Tri} (ts : Timed Γ u) →
+    EntryOK {Γ = Γ} (ofᵉ ts) τ → BurstOK {Γ = Γ} (ofBurst ts) τ
+
+  all-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
+    {τ : Tri} (ac : Acc _≺_ τ) (op : AllOp) (b : Closed Γ (obs u)) →
+    EntryOK b τ → (κ : Path Γ lo u t) (id : Id) (now : Tick)
+    (sched : Sched Γ) (st : EvalSt e) →
+    BurstOK {Γ = Γ}
+      (proj₁ (subscribeAll {e = e} ac op _ b κ id now sched st)) τ
+
+-- the two adapters between this module's `Tri`-shaped bound and the
+-- family's PAIR-shaped one.  They exist because the family is stated at
+-- the pair — which is what the refutations bought — while the entry
+-- invariant is stated at the triple, and the triple's lower half IS the
+-- pair.  Widening is the join at the emit length, which is monotone.
+postulate
+  payOf : Tri → Pay
+  rankOf : Tri → ℕ
+  burst-widen : ∀ {n} {Γ : Ctx n} {s} {bs : Stream Γ s} {τ k} →
+    BurstOK bs (Pout-of τ k) → BurstOK {Γ = Γ} bs τ
 
 -- THE SUBSCRIBE CYCLE'S HALF, AND IT IS AN INDUCTION RATHER THAN A LEAF
 -- BECAUSE THE ENTRY INVARIANT IS WHAT MAKES ONE WRITEABLE.  Every

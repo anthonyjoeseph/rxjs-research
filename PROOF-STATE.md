@@ -245,25 +245,35 @@ cannot compute — and the other two leaves carry no arithmetic at all.
   But the kill is not the CLOSE: `evaluate` still holds the arm, so
   `Refuted.Dry-Wrap` stays green until the clause goes, and deleting it costs
   the descent witness the `yes` branch supplies. `subscribeInner-nodoor` states
-  that residue. THE ROUTE IS DECIDED (Anthony: "2 definitely sounds better"): the
-  CARRIED BOUND, not a proof-carrying evaluator — `Rx.Evaluator.Carried` sketches
-  it unchecked, as the three declarations the change touches. `thru-outer` grows a
-  rank field ρ set once at install; the hop READS ρ instead of measuring the
-  arriving value, so its drop is `ρ < suc ρ` and both the test and the dry arm go;
-  the residue moves to `subscribeE`'s three *All clauses, where it is a claim about
-  a TERM (`all-entry-pos-*`: a flattener is written at rank ≥ 1) and the entry
-  invariant pays it. `Refuted.Dry-Wrap` goes red in that same commit, which is what
-  closing looks like.
+  that residue. THE PREMISE IS NOT A NEW MECHANISM AND THE LEG BELOW IS WHERE IT
+  COMES FROM — `o` is a value a `thru-outer` frame handed on, so
+  `thru-outer-frame-carried` IS the premise. `Rx.Evaluator.Carried` holds the
+  clause after the change plus the four-step order (state the family, discharge
+  the hop's frame, kill the arm in the relation, THEN delete the clause), and
+  records two dead routes: a rank FIELD on the frame, and threading the premise
+  as an argument.
 
-- **THEN RESTATE `subscribe-carried` OVER THE SCHEDULE, GROWING `EntryOK` TO THE
-  THIRD CONJUNCT IN THE SAME EDIT — IT IS WHAT PAYS THE DOOR'S PREMISE.**
-  `burst-handed` above is the door's obligation and is this row under another
-  name: nothing else says a burst's values are shallower than the rank. Both
-  refutations send it to the same place and `Refuted.Carried-Shared` says why no
-  repair reading the TERM gets there, so the entry quantifies over the
-  TELESCOPE — `SlotsOK : ∀ {n} {Γ : Ctx n} → Slots Γ → Tri → Set` holding every
-  `shared d` below the rank — beside the unconnected count:
-  `EntryOK b sched (U , r , sz) = syncSizeᵉ b ≤ sz × obsDepthᵉ b ≤ r × SlotsOK (Sched.slots sched) (U , r , sz) × unconn (Sched.slots sched) [] ≤ U`.
+- **STATE THE WHOLE CARRIED FAMILY AT THE FULL AXIS SET IN ONE PASS — ALL FIVE
+  FRAMES, NOT ONE PER REFUTATION (Anthony).** `stepFrame⇓-total` is handed
+  `HandedOK vals τ` and nothing says what the frame HANDS BACK is bounded; that
+  missing shelf is the whole of what the door waits on. Its predecessor was
+  discovered a frame at a time over weeks — equal-bounds refuted by a template
+  that DROPS its argument, the pinned form by one that WRAPS, the fold then
+  SHAPE for a third axis — converging, but re-learning one lesson five times.
+  The axis set is now known and is three: the PAYLOAD PAIR (`Pay = syncSize ×
+  obsDepth`, the triple's own lower half, since the hop re-seeds at both and a
+  wrapping template moves only one), the STORE reading, and the ITERATION
+  LENGTH (a fold refolds and a walk subscribes once per delivery). All five land
+  together in `Verify-Rank-Sufficient.Push-Carried` — `map-`, `scan-`, `take-`,
+  `thru-outer-frame-carried` and `from-inner-carried` — each differing only in
+  its transformer, so a fourth axis is a restatement of the block rather than an
+  addition to a shelf. `subscribe-carried` is then a real BODY over
+  `pushBurst-carried`, one clause per `subscribeE` clause, and its three
+  residues are separately named for the first time: `source-carried` (the slot
+  conjunct `Refuted.Carried-Shared` sends to the SCHEDULE — `EntryOK`'s expected
+  third conjunct, `SlotsOK` beside the unconnected count), `of-carried`
+  (arithmetic, no risk), and `all-carried` (the flattener's walk, which is where
+  the door's premise is actually paid).
 
 - **THEN THE LEAVES BOTH CYCLES LEFT, AND REFUTE EACH BEFORE GRINDING IT.**
   Both cycles are bodies now and their list plumbing is closed, so what is open
