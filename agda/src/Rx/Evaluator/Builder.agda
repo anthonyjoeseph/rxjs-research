@@ -76,6 +76,7 @@ open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeAll⇓; pushBurst
   subs-floor; subs-shared; subs-hot-done; subs-hot-live; subs-cold-sync;
   subs-cold-async; slot-spent; slot-join; slot-connect; connect-live;
   connect-died)
+open import Rx.Evaluator.Burst-Report using (burst-carries)
 open import Rx.Evaluator.Doorless using (μ-edge; μ-entry; rootWitness;
   EntryOK; SharesUnder; inner-ok; under-ok; HandedOK; BurstOK; split-handed;
   hop-edge; hop-guard; connect-edge; connect-entry)
@@ -183,59 +184,6 @@ postulate
   drain! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (fuel : Fuel) (id : Id) (sched : Sched Γ) (st : EvalSt e) →
     ∃ λ rest → drain⇓ {e = e} fuel id sched st rest
-
--- WHAT A SUBSCRIBE HANDS BACK ABOUT ITS OWN BURST, WHICH IS WHAT MAKES
--- THE HOP'S PREMISE SUPPLIABLE AT EVERY CALL RATHER THAN AT THE ROOT.
--- The push cycle is handed a burst and has to know its observables are
--- shallower than the rank the subscribe entered at; that is a claim
--- about what a run PRODUCED, so it is stated over the relation and not
--- over any function — which is also what keeps it out of the cycle
--- below, since a statement about a derivation needs no builder to exist
--- before it can be written.
---
--- AND IT IS THE ONE LEAF HERE THE RE-POINTING DOES NOT WAIT ON, WHICH IS
--- A PROPERTY OF HOW IT IS SPENT RATHER THAN OF WHAT IT SAYS.  Nothing
--- downstream selects a clause on it: the cycle projects rather than
--- patterns, the only thing that consumes the extracted drop is `ltR`,
--- and the accessibility witness under the hop is the SKIPPING one, whose
--- accessor reads its edge's proof not at all.  So a run normalises to
--- the same burst whether this is a body or an axiom, and the leaves the
--- cutover genuinely waits on are the three that a run must STEP
--- THROUGH.  Take the projections back out and that stops being true at
--- the first emit of the first operator.
-
--- AND THE ENVIRONMENT IS NOT DECORATION: IT IS WHAT THE CLAIM IS
--- DENOMINATED IN AT A SLOT REFERENCE.  A reference is one symbol
--- standing for a definition of any nesting, and a connect plumbs the
--- DEFINITION's burst out through that reference's own entry — so a
--- reading that prices the SYMBOL promises less than the burst delivers,
--- at the ordinary run rather than at some case a run avoids.
--- `Rx.Slot-Depth.slotDepth` prices it at the definition's own reading
--- instead, and under that the connect re-seeds at a rank the caller's
--- entry already dominates.
---
--- AND IT IS A PARAMETER RATHER THAN A READING OF THE SCHEDULE IN HAND,
--- WHICH IS WHAT KEEPS EVERY PREMISE A CONSTANT.  Read off `sched`, the
--- claim would be denominated afresh at each of the builder's recursive
--- calls and every one of them would owe a transport; fixed by the caller
--- the premises do not move, and the schedules only have to AGREE.
---
--- REFUTED: `Refuted.Carried-Derived` — the reading with no environment
---   at all, at that run.
---
--- RECOVERY: git show 80e527f9:agda/src/Verify-Rank-Sufficient/Push-Carried.agda
---   restores the predecessor's proof of this fact over the machine, with
---   the five frame clauses worked out; the statement it carries is the
---   unenvironmented one the two retired witnesses killed, so the arms
---   transport and the denomination does not.
-postulate
-  burst-carries : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo} {τ : Tri}
-    (sl : Slots Γ) {b : Closed Γ u} {κ : Path Γ lo u t} {id : Id} {now : Tick}
-    {sched : Sched Γ} {st : EvalSt e} {burst : Stream Γ u}
-    {sched′ : Sched Γ} {st′ : EvalSt e} →
-    EntryOK (slotDepth sl) b τ →
-    subscribeE⇓ {e = e} b κ id now sched st (burst , sched′ , st′) →
-    BurstOK (slotDepth sl) burst τ
 
 ------------------------------------------------------------------
 -- WHAT A RUN DOES NOT TOUCH.

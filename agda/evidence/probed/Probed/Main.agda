@@ -76,3 +76,9 @@ open import Probed.Eval-Binders using (row-case-data; case-data-bound;
   row-if-selected; row-if-unselected;
   row-open-empty; row-open-data; carried-env-depth;
   row-open-carried; row-open-wrapped)
+
+-- THE BURST REPORT'S TWO PRICING LEAVES — the data payload, whose rows
+-- reach the two types at which the reading recurses, and the evaluated
+-- term, whose rows stand at the tightest rank its own premise admits.
+open import Probed.Burst-Handed using (row-data-flat; row-data-pair;
+  row-data-sum; row-of-one; row-of-join)

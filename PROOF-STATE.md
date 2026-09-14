@@ -228,15 +228,15 @@ first match, which is why `bug-cache` is off the gate for the duration and
 
 ### Big picture tier roadmap
 
-- **PUT THE BURST'S REPORT WHERE A QUEUED OBSERVABLE CAN READ IT, WHICH IS THE
-  TIER'S OPEN QUESTION AND THE ONLY LEG THAT CAN STILL MOVE THE GROUND.**
-  `burst-carries` says the observables a subscribe hands back sit under the rank
-  it entered at; every attempt to state that over the TERM has been refuted, and
-  the one site a burst never reaches reads its observables out of the store
-  instants later. So the two are one question, and its answer is a field on the
-  invariant record rather than a premise — which obliges every producer and
-  cascades through every consumer. The leg is the field and its producers;
-  whether it suffices for the queue is what it settles.
+- **THE FIELD ON THE INVARIANT RECORD, WHICH IS WHERE THE SPLIT LEFT THE CLAIM
+  POINTING.** Walking `burst-carries` as a body settled which of its arms carry
+  content: the bookkeeping bursts hold no value at all and close by
+  construction, and what is left are `all-carries` and `slot-carries` — the two
+  that follow the run into a family whose burst comes back through a node or out
+  of the store. That is the site `mergeAllDrain!` reads, so the two are one
+  question and its answer is a field rather than a premise, obliging every
+  producer and cascading through every consumer. The leg is the field and its
+  producers; whether it suffices for the queue is what it settles.
 
 - **AND THE PREDECESSOR'S SUPPORT CONE, WHICH THE SLOT SUBSCRIBE'S BODY LEFT
   STANDING.** The connect arm now names what it does through the relation's own
@@ -274,14 +274,28 @@ first match, which is why `bug-cache` is off the gate for the duration and
   splits a burst emit by emit — but a queued observable carries no burst at all.
   Every attempt to say it over the TERM has been refuted, which is what points
   the answer at the invariant record; nothing has yet written the field.
-  relevant: `mergeAllDrain!`, `burst-carries`
+  relevant: `mergeAllDrain!`, `slot-carries`
 
 ### The ledger
 
-- **`burst-carries`** (Rx/Evaluator/Builder) — FALSITY, `REFUTED, RECOVERY`:
-  what a subscribe hands back about its own burst, which is what makes the
-  hop's premise suppliable at every call rather than at the root. Stated over
-  the derivation, so no builder has to exist before it can be written.
+- **`slot-carries`** (Rx/Evaluator/Burst-Report) — FALSITY, `REFUTED`: the one
+  arm of the burst report that leaves this walk — the share connect, which
+  re-enters at the SLOT's own reading and so needs the two tables related where
+  the walk carries only the caller's. Where the field on the record is owed.
+
+- **`push-carries`** (Rx/Evaluator/Burst-Report) — FALSITY, `RECOVERY`: the
+  cycle rewrites the payload frame by frame, so the burst coming out is not the
+  one going in and the report is re-established rather than transported.
+
+- **`of-handed`** (Rx/Evaluator/Burst-Report) — FALSITY, `PROBED`: the one
+  place a term becomes a value, where the claim is genuinely arithmetic —
+  evaluation may not deepen a term past its own reading. The substitution
+  shelf's subject.
+
+- **`data-handed`** (Rx/Evaluator/Burst-Report) — FALSITY, `PROBED`: a scripted
+  slot's payload is data, and the rank is read only at `obs`, so this is an
+  induction on the TYPE with no arithmetic in it. A leaf only because it is
+  unwritten.
 
 - **`mergeAllDrain!`** (Rx/Evaluator/Builder) — FALSITY, `RECOVERY`: the queued
   subscription, read back out of the store by a completion carrying no burst.

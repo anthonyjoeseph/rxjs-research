@@ -1,0 +1,261 @@
+------------------------------------------------------------------
+-- WHAT A SUBSCRIBE HANDS BACK ABOUT ITS OWN BURST.
+------------------------------------------------------------------
+
+-- THE HOP'S PREMISE, MADE SUPPLIABLE AT EVERY CALL RATHER THAN AT THE
+-- ROOT.  The push cycle is handed a burst and has to know its
+-- observables are shallower than the rank the subscribe entered at.
+-- That is a claim about what a run PRODUCED, so it is stated over the
+-- relation and not over any function — which is what keeps it out of
+-- the builder's cycle, since a statement about a derivation needs no
+-- builder to exist before it can be written.
+--
+-- AND IT IS AN ASSEMBLY HERE RATHER THAN A LEAF, WHICH IS WHAT SPLITS
+-- THE CLAIM INTO THE PIECES ACTUALLY AT RISK.  Written as one postulate
+-- it asserted the whole induction at once, and nothing said which of its
+-- sixteen arms carried the content.  Walked as a body, most of them turn
+-- out to be shape: a burst holding no `value` event satisfies the
+-- predicate at every triple, and a one-shot's events are its values plus
+-- bookkeeping.  What is left are the leaves below — the two that must
+-- read a VALUE's depth against the rank, and the three that must follow
+-- the run into another family.
+--
+-- AND THE ENVIRONMENT IS NOT DECORATION: IT IS WHAT THE CLAIM IS
+-- DENOMINATED IN AT A SLOT REFERENCE.  A reference is one symbol
+-- standing for a definition of any nesting, and a connect plumbs the
+-- DEFINITION's burst out through that reference's own entry — so a
+-- reading that prices the SYMBOL promises less than the burst delivers,
+-- at the ordinary run rather than at some case a run avoids.
+-- `Rx.Slot-Depth.slotDepth` prices it at the definition's own reading
+-- instead, and under that the connect re-seeds at a rank the caller's
+-- entry already dominates.
+--
+-- AND IT IS A PARAMETER RATHER THAN A READING OF THE SCHEDULE IN HAND,
+-- WHICH IS WHAT KEEPS EVERY PREMISE A CONSTANT.  Read off `sched`, the
+-- claim would be denominated afresh at each of the builder's recursive
+-- calls and every one of them would owe a transport; fixed by the caller
+-- the premises do not move, and the schedules only have to AGREE.
+module Rx.Evaluator.Burst-Report where
+
+open import Data.Bool using (T)
+open import Data.Fin using (Fin; toℕ)
+open import Data.List using (List; []; _∷_; map; _++_)
+open import Data.List.Relation.Unary.All using (All)
+  renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
+open import Data.Nat using (ℕ; _≤_; _<_)
+open import Data.Nat.Properties using (≤-trans; <⇒≤)
+open import Data.Product using (_,_)
+open import Data.Unit using (tt)
+open import Data.Vec using (lookup)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl)
+
+open import Rx.Prim using (Id; Source; Tick; init; value; close; complete; exhausted; subscribe; _at_from_as_)
+open import Rx.Exp using (Ctx; Closed; Val; Tm; obs; input; isData; evalTm)
+open import Rx.Obs-Depth using (depᵗˢ)
+open import Rx.Slots using (Slots)
+open import Rx.Slot-Depth using (slotDepth)
+open import Rx.Strat-Order using (Tri)
+open import Rx.Sync-Size using (unfoldμ-shrinks)
+open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; oneShotBurst;
+  spentBurst)
+open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeAll⇓; pushBurst⇓;
+  subscribeSharedSlot⇓;
+  subs-floor; subs-shared; subs-hot-done; subs-hot-live; subs-cold-sync;
+  subs-cold-async; subs-of; subs-empty; subs-map; subs-take-zero;
+  subs-take-suc; subs-scan; subs-merge-all; subs-switch-all;
+  subs-exhaust-all; subs-μ; subs-defer; sub-all)
+open import Rx.Evaluator.Doorless using (EntryOK; HandedOK; BurstOK; EventOK;
+  inner-ok; under-ok; μ-entry)
+
+------------------------------------------------------------------
+-- THE SHAPES THAT CARRY NOTHING.  Several of the burst shapes a
+-- subscribe produces hold no `value` event at all, so the predicate
+-- holds of them at every triple and the arms returning one are closed
+-- by construction rather than by an argument.
+------------------------------------------------------------------
+
+-- a spent source's burst: an init, a close and a complete
+spent-ok : ∀ {n} {Γ : Ctx n} {u} (η : Fin n → ℕ) (τ : Tri)
+           (src : Source) (id : Id)
+         → BurstOK {Γ = Γ} {s = u} η (spentBurst src id) τ
+spent-ok η τ src id = (tt ∷ᵃ tt ∷ᵃ tt ∷ᵃ []ᵃ) ∷ᵃ []ᵃ
+
+-- a registration that joins something already live: one init, nothing
+-- else, since the values it will see are the FUTURE ones
+init-ok : ∀ {n} {Γ : Ctx n} {u} (η : Fin n → ℕ) (τ : Tri)
+          (src : Source) (id : Id)
+        → BurstOK {Γ = Γ} {s = u} η
+            (((init src ∷ []) at id from src as subscribe) ∷ []) τ
+init-ok η τ src id = (tt ∷ᵃ []ᵃ) ∷ᵃ []ᵃ
+
+------------------------------------------------------------------
+-- THE ONE-SHOT, WHICH IS ITS VALUES AND NOTHING ELSE.  Every remaining
+-- event of the emit is bookkeeping, so the whole burst reduces to the
+-- values' own property — and that is the only place a `value` can
+-- enter a burst without another family having produced it.
+------------------------------------------------------------------
+
+private
+  tail-ok : ∀ {n} {Γ : Ctx n} {u} (η : Fin n → ℕ) (τ : Tri)
+            (src : Source) (vs : List (Val Γ u))
+          → HandedOK η vs τ
+          → All (EventOK η τ) (map value vs ++ close src exhausted ∷ complete ∷ [])
+  tail-ok η τ src []       []ᵃ       = tt ∷ᵃ tt ∷ᵃ []ᵃ
+  tail-ok η τ src (v ∷ vs) (p ∷ᵃ ps) = p ∷ᵃ tail-ok η τ src vs ps
+
+  head-ok : ∀ {n} {Γ : Ctx n} {u} (η : Fin n → ℕ) (τ : Tri)
+            (src : Source) (vs : List (Val Γ u))
+          → HandedOK η vs τ → All (EventOK η τ) (init src ∷ map value vs)
+  head-ok η τ src vs ps = tt ∷ᵃ values-ok vs ps
+    where
+    values-ok : ∀ ws → HandedOK η ws τ → All (EventOK η τ) (map value ws)
+    values-ok []       []ᵃ       = []ᵃ
+    values-ok (w ∷ ws) (q ∷ᵃ qs) = q ∷ᵃ values-ok ws qs
+
+oneshot-ok : ∀ {n} {Γ : Ctx n} {u} (η : Fin n → ℕ) (τ : Tri)
+             (vs : List (Val Γ u)) (id : Id) (sched : Sched Γ)
+             {burst : Stream Γ u} {sched₁ : Sched Γ}
+           → oneShotBurst vs id sched ≡ (burst , sched₁)
+           → HandedOK η vs τ
+           → BurstOK η burst τ
+oneshot-ok η τ vs id sched refl ps =
+  (tt ∷ᵃ tail-ok η τ _ vs ps) ∷ᵃ []ᵃ
+
+-- and the cold source's, which has the same values under a different
+-- tail: the async half is still owed, so nothing closes here
+anchored-ok : ∀ {n} {Γ : Ctx n} {u} (η : Fin n → ℕ) (τ : Tri)
+              (vs : List (Val Γ u)) (id : Id) (src : Source)
+            → HandedOK η vs τ
+            → BurstOK η (((init src ∷ map value vs)
+                           at id from src as subscribe) ∷ []) τ
+anchored-ok η τ vs id src ps = head-ok η τ src vs ps ∷ᵃ []ᵃ
+
+------------------------------------------------------------------
+-- THE LEAVES.  What the walk cannot close, split by WHY: two that must
+-- price a value's own depth against the rank, three that must follow
+-- the run into a family this module does not walk.
+------------------------------------------------------------------
+
+-- A SCRIPTED SLOT'S PAYLOAD IS DATA, AND DATA IS UNCONDITIONALLY UNDER
+-- EVERY RANK.  `ValOK` reads a rank only at `obs`, and the slot's own
+-- side condition says the element type has no `obs` in it — so this is
+-- an induction on the TYPE with nothing arithmetic in it at all, and it
+-- is a leaf only because that induction has not been written.
+--
+-- PROBED: `Probed.Burst-Handed` — a flat type, a product and a sum, over
+--   lists of two so the fold is spent.  Not reached: a data type nested
+--   under a sum under a product.
+postulate
+  data-handed : ∀ {n} {Γ : Ctx n} {u} (η : Fin n → ℕ) (τ : Tri)
+                (vs : List (Val Γ u)) → T (isData u) → HandedOK η vs τ
+
+-- AND THE ONE PLACE A TERM BECOMES A VALUE, WHICH IS WHERE THE CLAIM IS
+-- ACTUALLY ARITHMETIC.  `ofᵉ` evaluates its terms and emits them, so a
+-- payload at `obs` is an expression the term WROTE, and the entry
+-- invariant prices the whole list at `depᵗˢ`.  What is owed is that
+-- evaluating a term does not deepen it past its own reading — which is
+-- the substitution shelf's subject, and the reason that shelf exists.
+--
+-- PROBED: `Probed.Burst-Handed` — a term carrying an observable, at the
+--   tightest rank its own premise admits, and a list of two whose
+--   readings differ so the join is spent.  Not reached: a term whose
+--   observable it did not itself write, which no row here can reach.
+postulate
+  of-handed : ∀ {n} {Γ : Ctx n} {u} {U r sz} (η : Fin n → ℕ)
+              (ts : List (Tm Γ [] [] [] u))
+            → depᵗˢ η ts ≤ r
+            → HandedOK η (map (λ tm → evalTm tm) ts) (U , r , sz)
+
+-- WHAT A PUSH CYCLE HANDS ON.  The cycle steps one frame per emit and
+-- the frame REWRITES the payload, so the burst coming out is not the
+-- burst going in and the property has to be re-established rather than
+-- transported.  Stated over the relation for the same reason the parent
+-- is: it is a claim about what a run produced.
+--
+-- RECOVERY: git show 80e527f9:agda/src/Verify-Rank-Sufficient/Push-Carried.agda
+--   restores the predecessor's proof of exactly this over the machine,
+--   with the five frame clauses worked out; what does not transport is
+--   the denomination, since the statement it carries is the
+--   unenvironmented one the two retired witnesses killed.
+postulate
+  push-carries : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo} {τ : Tri}
+    (η : Fin n → ℕ) {id : Id} {now : Tick} {fr : _} {κ : Path Γ lo u t}
+    {bs : Stream Γ s} {sched : Sched Γ} {st : EvalSt e}
+    {burst : Stream Γ u} {sched′ : Sched Γ} {st′ : EvalSt e} →
+    BurstOK η bs τ →
+    pushBurst⇓ {e = e} id now fr κ bs sched st (burst , sched′ , st′) →
+    BurstOK η burst τ
+
+-- AND THE ONE FAMILY THIS MODULE DOES NOT WALK: the shared slot, whose
+-- connect re-enters the subscribe at the SLOT'S own reading rather than
+-- at the caller's, and so needs the two schedules' tables related where
+-- this walk carries only the one the caller fixed.  That is the same
+-- relating the queued observable needs, which is why the arm is a leaf
+-- rather than a clause and why it is where the record's field is owed.
+--
+-- REFUTED: `Refuted.Carried-Derived` — the reading with no environment
+--   at all, at that run.  It is this arm the witness stands at: a
+--   reference is one symbol standing for a definition of any nesting, so
+--   a reading that prices the SYMBOL promises less than the connect
+--   delivers.
+postulate
+  slot-carries : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo} {τ : Tri}
+    (sl : Slots Γ) {i : Fin n} {d : Closed Γ (lookup Γ i)}
+    {κ : Path Γ lo (lookup Γ i) t} {below : toℕ i < lo}
+    {id : Id} {now : Tick}
+    {sched : Sched Γ} {st : EvalSt e} {burst : Stream Γ (lookup Γ i)}
+    {sched′ : Sched Γ} {st′ : EvalSt e} →
+    EntryOK {Γ = Γ} (slotDepth sl) (input i) τ →
+    subscribeSharedSlot⇓ {e = e} i d κ below id now sched st
+      (burst , sched′ , st′) →
+    BurstOK (slotDepth sl) burst τ
+
+------------------------------------------------------------------
+-- THE WALK.
+------------------------------------------------------------------
+
+-- STRUCTURAL SCC: burst-carries all-carries
+mutual
+
+ all-carries : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo} {τ : Tri}
+   (sl : Slots Γ) {op ns} {b : Closed Γ (obs u)} {κ : Path Γ lo u t}
+   {id : Id} {now : Tick} {sched : Sched Γ} {st : EvalSt e}
+   {burst : Stream Γ u} {sched′ : Sched Γ} {st′ : EvalSt e} →
+   EntryOK (slotDepth sl) b τ →
+   subscribeAll⇓ {e = e} op ns b κ id now sched st (burst , sched′ , st′) →
+   BurstOK (slotDepth sl) burst τ
+ all-carries sl ok (sub-all _ d p) = push-carries _ (burst-carries sl ok d) p
+
+ burst-carries : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo} {τ : Tri}
+   (sl : Slots Γ) {b : Closed Γ u} {κ : Path Γ lo u t} {id : Id} {now : Tick}
+   {sched : Sched Γ} {st : EvalSt e} {burst : Stream Γ u}
+   {sched′ : Sched Γ} {st′ : EvalSt e} →
+   EntryOK (slotDepth sl) b τ →
+   subscribeE⇓ {e = e} b κ id now sched st (burst , sched′ , st′) →
+   BurstOK (slotDepth sl) burst τ
+ burst-carries {τ = τ} sl ok (subs-floor _)           = spent-ok _ τ _ _
+ burst-carries {τ = τ} sl ok (subs-hot-done _ _ _)    = spent-ok _ τ _ _
+ burst-carries {τ = τ} sl ok (subs-hot-live _ _ _)    = init-ok _ τ _ _
+ burst-carries {τ = τ} sl ok (subs-defer _ _ _)       = init-ok _ τ _ _
+ burst-carries {τ = τ} sl ok (subs-shared _ s)        = slot-carries sl ok s
+ burst-carries {τ = τ} sl ok (subs-empty eq)          = oneshot-ok _ τ [] _ _ eq []ᵃ
+ burst-carries {τ = τ} sl ok (subs-take-zero _ eq)    = oneshot-ok _ τ [] _ _ eq []ᵃ
+ burst-carries {τ = U , r , sz} sl (_ , dep) (subs-of eq) =
+   oneshot-ok _ (U , r , sz) _ _ _ eq (of-handed (slotDepth sl) _ dep)
+ burst-carries {τ = τ} sl ok (subs-cold-sync {ok = okd} _ _ eq) =
+   oneshot-ok _ τ _ _ _ eq (data-handed _ τ _ okd)
+ burst-carries {τ = τ} sl ok (subs-cold-async {ok = okd} _ _ _ _) =
+   anchored-ok _ τ _ _ _ (data-handed _ τ _ okd)
+ burst-carries sl ok (subs-map d p) =
+   push-carries _ (burst-carries sl (inner-ok ok) d) p
+ burst-carries sl ok (subs-merge-all a)   = all-carries sl (under-ok ok) a
+ burst-carries sl ok (subs-switch-all a)  = all-carries sl (under-ok ok) a
+ burst-carries sl ok (subs-exhaust-all a) = all-carries sl (under-ok ok) a
+ burst-carries sl (sz≤ , r≤) (subs-μ {body = body} d) =
+   burst-carries sl
+     ( ≤-trans (<⇒≤ (unfoldμ-shrinks body)) sz≤
+     , μ-entry (slotDepth sl) body r≤ ) d
+ burst-carries sl ok (subs-take-suc _ _ d p) =
+   push-carries _ (burst-carries sl (inner-ok ok) d) p
+ burst-carries sl ok (subs-scan _ d p) =
+   push-carries _ (burst-carries sl (inner-ok ok) d) p
