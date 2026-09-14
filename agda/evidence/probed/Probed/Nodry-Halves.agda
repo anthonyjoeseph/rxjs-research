@@ -36,7 +36,7 @@ open import Data.List.Relation.Unary.Any using (here)
 open import Data.Maybe using (nothing)
 open import Data.Nat using (z≤n; s≤s)
 open import Data.Nat.Properties using (≤-refl; n≤1+n)
-open import Data.Product using (_×_; proj₁; proj₂)
+open import Data.Product using (proj₁; proj₂)
 open import Data.Vec using () renaming ([] to []ⱽ; _∷_ to _∷ⱽ_)
 open import Relation.Binary.PropositionalEquality using (refl)
 
@@ -44,15 +44,14 @@ open import Rx.Prim using (hot; after_,_)
 open import Rx.Exp using (Ctx; Closed; Fn; obs; natᵗ; nat̂; varᵗ; ofᵉ; emptyᵉ;
   mapᵉ; takeᵉ; mergeAllᵉ; input)
 open import Rx.Slots using (Slots; scripted)
-open import Rx.Evaluator using (Stream; Sched; EvalSt; root; rootWitness;
-  subscribeE; map-f; _↠_; sched-init; st-init; mergeAllᵒ; mergeAll-st)
+open import Rx.Evaluator using (Sched; EvalSt; root; rootWitness; subscribeE; sched-init; st-init; mergeAllᵒ; mergeAll-st)
 open import Rx.Evaluator.Domain using (subs-of; subs-empty; subs-map;
   subs-take-zero; subs-hot-live; push-cons; push-nil; step-map;
-  step-thru-outer; walk-nil; sub-all;
+  step-thru-outer; walk-nil; sub-all; consume-all-nil; react-false;
   drain-step; drain-done; casc-run; casc-live; casc-nil; chain-step; fold-root)
 open import Verify-Rank-Sufficient using (subscribeE⇓-nodry; drain⇓-nodry;
   subscribeE⇓-input-total; subscribeAll⇓-total;
-  pushBurst⇓-total; drain⇓-total)
+  thruConsume⇓-total; innerReact⇓-total; drain⇓-total)
 
 open import Probed.Apparatus using (Confirms)
 
@@ -61,7 +60,6 @@ open import Probed.Apparatus using (Confirms)
 -- different helper.
 --
 -- TARGET: subscribeE⇓-nodry @c66df9
--- TARGET: pushBurst⇓-total @6807c0
 -- TARGET: subscribeAll⇓-total @c07c6e
 ----------------------------------------------------------------------
 
@@ -127,28 +125,6 @@ row-map :
              {id = 0} {now = 0} {sched = S mapped} {st = st-init mapped}
              (subs-map (subs-of refl) (push-cons refl step-map push-nil)))
 row-map = refl
-
--- THE INNER RUN THE MAP CLAUSE PUSHES, REACHED BY RUNNING RATHER THAN
--- WRITTEN OUT.  The frame's source is subscribed under the frame's own
--- path, so the burst below is the one the machine hands its push cycle
--- — a burst assembled here by hand would be testing this file's
--- arithmetic instead of the evaluator's.
-mapInner : Stream Γ₀ natᵗ × Sched Γ₀ × EvalSt mapped
-mapInner = subscribeE {e = mapped} (rootWitness mapped ins₀) three
-             (map-f dbl ↠ root {lo = 0}) 0 0 (S mapped) (st-init mapped)
-
--- LOAD-BEARING ON THE OUTPUT INDEX, which is the one thing the rows
--- above cannot test: they hand a derivation in and let unification
--- choose the triple it is about, so a constructor relating the wrong
--- stream satisfies them.  Here the triple is `pushBurst`'s OWN result
--- over a burst three helpers computed, so the row fails unless the
--- clause and the constructor agree on the split, the retag and the
--- re-append — which is the widest of this file's mirrors.
-row-total-push :
-  Confirms (pushBurst⇓-total {e = mapped} (rootWitness mapped ins₀) 0 0
-             (map-f dbl) (root {lo = 0}) (proj₁ mapInner)
-             (proj₁ (proj₂ mapInner)) (proj₂ (proj₂ mapInner)))
-row-total-push = push-cons refl step-map push-nil
 
 -- THE FLATTENER OVER A SOURCE THAT HANDS IT NO OBSERVABLE, which is the
 -- arm that reaches the wrapper's own plumbing and nothing else: a node
@@ -235,3 +211,37 @@ row-total-input :
   Confirms (subscribeE⇓-input-total {e = src} (rootWitness src ins₁) zero
              ≤-refl (root {lo = 1}) 0 0 (sched-init src ins₁) (st-init src))
 row-total-input = subs-hot-live (s≤s z≤n) refl refl
+
+----------------------------------------------------------------------
+-- THE TWO CLAUSES THE PUSH CYCLE LOCALISED ITS HOP ONTO.  Everything
+-- between them and the burst is list plumbing and is proven, so these
+-- are the only places left where a frame re-enters the subscribe cycle.
+--
+-- TARGET: thruConsume⇓-total @319a79
+-- TARGET: innerReact⇓-total @4e00e5
+----------------------------------------------------------------------
+
+-- DEGENERATE IN THE GUARD AND LOAD-BEARING ON THE DROP: the walk is
+-- entered at a node id nothing installed, which is the arm that
+-- DISCARDS the observable rather than subscribing it.  The row fails if
+-- the clause hands back anything but the schedule and store it was
+-- given.  So it pins the drop and NOT the hop: `subscribeInner`'s rank
+-- test is not reached at all, nor is the enqueue arm, nor either other
+-- operator — and the hop is exactly where this leaf's falsity is
+-- expected.
+row-total-consume :
+  Confirms (thruConsume⇓-total {e = flat} (rootWitness flat ins₀) mergeAllᵒ
+             0 (root {lo = 0}) 0 0 three (sched-init flat ins₀)
+             (st-init flat))
+row-total-consume = consume-all-nil
+
+-- LOAD-BEARING ON THE HAND-BACK: an inner reaction whose burst did not
+-- finish returns its values untouched and reports the frame unfinished,
+-- so a clause dropping a value or carrying the incoming flag through
+-- fails the row.  NOT covered: the finishing arm, where the registry is
+-- read for a live subscription and `innerFinish` re-enters the cycle.
+row-total-react :
+  Confirms (innerReact⇓-total {e = flat} (rootWitness flat ins₀) mergeAllᵒ
+             0 0 (root {lo = 0}) 0 0 (1 ∷ []) (sched-init flat ins₀)
+             (st-init flat) false)
+row-total-react = react-false

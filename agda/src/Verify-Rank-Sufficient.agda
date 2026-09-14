@@ -33,31 +33,39 @@
 ------------------------------------------------------------------
 module Verify-Rank-Sufficient where
 
-open import Data.Bool using (false)
+open import Data.Bool using (Bool; false)
 open import Data.Empty using (⊥-elim)
 open import Data.Fin using (Fin)
+open import Data.List using (List; []; _∷_)
+open import Data.Maybe using (just; nothing)
 open import Data.Nat using (_≤_; suc; _+_; _<?_)
 open import Data.Nat.Properties using (≤-refl; ≤-trans; n≤1+n; m≤n+m)
-open import Data.Product using (_,_)
+open import Data.Product using (_,_; proj₁; proj₂)
 open import Data.Vec using (lookup)
 open import Induction.WellFounded using (Acc; acc)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Relation.Nullary using (yes; no)
 
-open import Rx.Prim  using (Fuel; Id; Tick)
-open import Rx.Exp   using (Ctx; Closed; obs; syncSizeᵉ; evalTm; unfoldμ;
+open import Rx.Prim  using (Fuel; Id; Tick; InstEmit)
+open import Rx.Exp   using (Ctx; Closed; Val; obs; _≟ᵗ_; syncSizeᵉ; evalTm; unfoldμ;
   input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ;
   μᵉ; varᵉ; deferᵉ)
 open import Rx.Slots using (Slots)
 open import Rx.Strat-Order using (Tri; _≺_; ltS)
 open import Rx.Sync-Size using (unfoldμ-shrinks)
-open import Rx.Evaluator using (Stream; Path; root; Sched; EvalSt; Frame; AllOp; NodeState; map-f; take-f; scan-f; _↠_;
-  subscribeE; pushBurst; subscribeAll; drain; evaluate; rootWitness; sched-init; st-init;
+open import Rx.Evaluator using (Stream; Path; root; Sched; EvalSt; Frame; AllOp; NodeId; NodeState;
+  map-f; take-f; scan-f; from-inner; thru-outer; _↠_;
+  scan-st; take-st; mergeAll-st; switch-st; exhaust-st; lookupNode; splitEvents;
+  subscribeE; pushBurst; stepFrame; thruWalk; thruConsume; innerReact;
+  subscribeAll; drain; evaluate; rootWitness; sched-init; st-init;
   hasDry)
 open import Rx.Evaluator.Domain using (evaluate⇓; eval-run; subscribeE⇓;
-  pushBurst⇓; subscribeAll⇓; drain⇓;
+  pushBurst⇓; stepFrame⇓; thruWalk⇓; thruConsume⇓; innerReact⇓;
+  subscribeAll⇓; drain⇓;
   subs-of; subs-empty; subs-map; subs-take-zero; subs-take-suc; subs-scan;
-  subs-merge-all; subs-switch-all; subs-exhaust-all; subs-μ; subs-defer)
+  subs-merge-all; subs-switch-all; subs-exhaust-all; subs-μ; subs-defer;
+  step-map; step-scan; step-scan-nil; step-take; step-from-inner; step-thru-outer;
+  walk-nil; walk-cons; push-nil; push-cons)
 open import Verify-Rank-Sufficient.Dry-Emits using (hasDry-++)
 
 -- THE DOMAIN IS WHERE THE WHOLE OF THE KNOWN FALSITY NOW SITS, AND
@@ -156,31 +164,112 @@ postulate
     subscribeE⇓ {e = e} (input i) κ id now sched st
       (subscribeE {e = e} ac (input i) κ id now sched st)
 
--- THE OTHER CYCLE THE SUBSCRIBE MACHINE IS MUTUAL WITH, AND THE ONE
--- THAT CARRIES THE HOP.  A burst reaching a frame is stepped event by
--- event, and a step may subscribe an inner observable — which re-enters
--- the subscribe cycle at a term this statement never sees, since a
--- burst carries values rather than programs.  That is why it takes no
--- entry invariant: there is no term here to state one about, and the
--- reading that would replace it is the rank the carried report is being
--- written to supply.  Whether that makes it refutable as written is the
--- next thing to test, not to assume.
+-- THE HOP, LOCALISED TO THE ONE CLAUSE THAT TAKES A VALUE AND
+-- SUBSCRIBES IT.  A `thru-outer` frame is handed values that ARE inner
+-- observables, and the walk consumes them one at a time; each consume
+-- re-enters the subscribe cycle at a term the caller never wrote down,
+-- which is why the machine tests a rank here and answers the negative
+-- case dry.  Everything above this in the push cycle is list plumbing —
+-- so this leaf and its sibling are where the whole of that cycle's
+-- falsity now sits, and the statement they are missing is a bound on
+-- what a frame's own outputs read.
 --
--- PROBED: `Probed.Nodry-Halves` — one burst, the map frame's, taken from
---   the machine's own inner subscribe rather than written out, so the
---   output index is the one `pushBurst` computes and a constructor
---   relating a different stream fails the row.  It covers the split, the
---   retag and the re-append over a `step-map` and the empty tail.  NOT
---   covered: any burst whose step SUBSCRIBES — no hop is reached, which
---   is the whole of what the statement is at risk over — and no frame
---   but the map one.
+-- PROBED: `Probed.Nodry-Halves` — the DROP arm only, entered at a node
+--   id nothing installed, so the row pins that the clause hands its
+--   schedule and store straight back.  NOT covered, and it is the whole
+--   risk: the subscribing arm, where the rank test lives; the enqueue
+--   arm; and both other operators.
 postulate
-  pushBurst⇓-total : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
-    {τ : Tri} (ac : Acc _≺_ τ) (id : Id) (now : Tick)
-    (f : Frame Γ s u) (κ : Path Γ lo u t) (burst : Stream Γ s)
+  thruConsume⇓-total : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
+    {τ : Tri} (ac : Acc _≺_ τ) (op : AllOp) (nid : NodeId)
+    (κ : Path Γ lo u t) (id : Id) (now : Tick) (o : Val Γ (obs u))
     (sched : Sched Γ) (st : EvalSt e) →
-    pushBurst⇓ {e = e} id now f κ burst sched st
-      (pushBurst {e = e} ac id now f κ burst sched st)
+    thruConsume⇓ {e = e} op nid κ id now o sched st
+      (thruConsume {e = e} ac op nid κ id now o sched st)
+
+-- THE SAME EDGE FROM THE OTHER SIDE: an inner subscription that has
+-- already been made, reacting to what it delivers.  It reaches the
+-- subscribe cycle through the flattener's own bookkeeping rather than
+-- through a fresh value, so it carries no rank test of its own — what
+-- it inherits is the store the walk left, which is the second half of
+-- the same missing statement.
+--
+-- PROBED: `Probed.Nodry-Halves` — the UNFINISHED arm only, where the
+--   values are handed back untouched and the frame is reported
+--   unfinished, so the row fails on a dropped value or a flag carried
+--   through.  NOT covered: the finishing arm, which reads the registry
+--   and re-enters the cycle through `innerFinish`.
+postulate
+  innerReact⇓-total : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo}
+    {τ : Tri} (ac : Acc _≺_ τ) (op : AllOp) (allNid inst : NodeId)
+    (κ : Path Γ lo s t) (id : Id) (now : Tick) (vals : List (Val Γ s))
+    (sched : Sched Γ) (st : EvalSt e) (fin : Bool) →
+    innerReact⇓ {e = e} op allNid inst κ id now vals sched st fin
+      (innerReact {e = e} ac op allNid inst κ id now vals sched st fin)
+
+-- THE WALK IS A LIST INDUCTION AND NOTHING ELSE, which is the point of
+-- separating it from the consume below it: the values a `thru-outer`
+-- frame receives are folded left to right, each consume threading the
+-- schedule and store into the next, and the outputs concatenate.  No
+-- guard is read here at all.
+thruWalk⇓-total : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
+  {τ : Tri} (ac : Acc _≺_ τ) (op : AllOp) (nid : NodeId)
+  (κ : Path Γ lo u t) (id : Id) (now : Tick) (os : List (Val Γ (obs u)))
+  (sched : Sched Γ) (st : EvalSt e) →
+  thruWalk⇓ {e = e} op nid κ id now os sched st
+    (thruWalk {e = e} ac op nid κ id now os sched st)
+thruWalk⇓-total ac op nid κ id now []       sched st = walk-nil
+thruWalk⇓-total ac op nid κ id now (o ∷ os) sched st =
+  walk-cons (thruConsume⇓-total ac op nid κ id now o sched st)
+            (thruWalk⇓-total ac op nid κ id now os _ _)
+
+-- THE FIVE FRAMES, THREE OF WHICH ANSWER OUT OF THEIR OWN CLAUSE.  Map
+-- applies its function to the list, take defers wholesale to the
+-- dispatcher the relation copies verbatim, and scan reads a node whose
+-- stored type is compared against the frame's — the arms where that
+-- read fails all return the empty step, which is one constructor.  The
+-- two that are not answered here are the two that subscribe.
+stepFrame⇓-total : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
+  {τ : Tri} (ac : Acc _≺_ τ) (id : Id) (now : Tick) (fr : Frame Γ s u)
+  (κ : Path Γ lo u t) (vals : List (Val Γ s)) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) →
+  stepFrame⇓ {e = e} id now fr κ vals fin sched st
+    (stepFrame {e = e} ac id now fr κ vals fin sched st)
+stepFrame⇓-total ac id now (map-f fn) κ vals fin sched st = step-map
+stepFrame⇓-total ac id now (take-f nid) κ vals fin sched st = step-take
+stepFrame⇓-total ac id now (from-inner op allNid inst) κ vals fin sched st =
+  step-from-inner (innerReact⇓-total ac op allNid inst κ id now vals sched st fin)
+stepFrame⇓-total ac id now (thru-outer op nid) κ vals fin sched st =
+  step-thru-outer (thruWalk⇓-total ac op nid κ id now vals sched st)
+stepFrame⇓-total {u = u} ac id now (scan-f fn nid) κ vals fin sched st
+  with lookupNode nid (EvalSt.nodes st) in eq
+... | nothing                    = step-scan-nil
+... | just (take-st _)           = step-scan-nil
+... | just (mergeAll-st _ _ _ _) = step-scan-nil
+... | just (switch-st _ _)       = step-scan-nil
+... | just (exhaust-st _ _)      = step-scan-nil
+... | just (scan-st {w} acv) with w ≟ᵗ u
+...   | yes refl = step-scan eq refl
+...   | no  _    = step-scan-nil
+
+-- AND THE CYCLE ITSELF IS THE OUTER LIST INDUCTION.  Each emit is
+-- split, stepped and reassembled under its own envelope, and the
+-- envelope is copied by the constructor rather than recomputed — so the
+-- only content is that the split the clause performs is the split the
+-- premise names, which is `refl`.
+pushBurst⇓-total : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
+  {τ : Tri} (ac : Acc _≺_ τ) (id : Id) (now : Tick)
+  (f : Frame Γ s u) (κ : Path Γ lo u t) (burst : Stream Γ s)
+  (sched : Sched Γ) (st : EvalSt e) →
+  pushBurst⇓ {e = e} id now f κ burst sched st
+    (pushBurst {e = e} ac id now f κ burst sched st)
+pushBurst⇓-total ac id now f κ []         sched st = push-nil
+pushBurst⇓-total ac id now f κ (em ∷ ems) sched st =
+  push-cons refl
+    (stepFrame⇓-total ac id now f κ
+      (proj₁ (splitEvents (InstEmit.events em)))
+      (proj₂ (proj₂ (splitEvents (InstEmit.events em)))) sched st)
+    (pushBurst⇓-total ac id now f κ ems _ _)
 
 -- THE FLATTENERS' SHARED WRAPPER, WHICH IS A NODE INSTALL FOLLOWED BY
 -- THE TWO CYCLES ABOVE.  It is a leaf rather than a body only because

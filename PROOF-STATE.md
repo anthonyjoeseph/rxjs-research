@@ -216,11 +216,11 @@ research lives; where they disagree, the header wins.
 
 **THE TIER IS ONE STATEMENT AND IT IS CURRENTLY FALSE.** `rank-sufficient`
 (Verify-Rank-Sufficient) says no run emits the dry marker; `Refuted.Dry-Wrap`
-kills it three times against the evaluator as it stands. It is four bodies over
-six leaves: the subscribe cycle's totality became a real induction once
-`EntryOK` was there to carry, and the risk it held split onto the two clauses
-that read a component of the entry against the term — the slot subscribe's
-share connect, and the push cycle's hop.
+kills it three times against the evaluator as it stands. It is seven bodies
+over seven leaves: both cycles' totality is a real induction now, and the risk
+each held fell onto the clauses that read a component of the entry against the
+term — the slot subscribe's share connect, and the walk's consume, where the
+hop lives.
 
 **AND THE MEASURE IS HELD BY SOMETHING NO STATEMENT MENTIONS: THE RUN HAS TO
 COMPUTE IT.** Three non-structural edges TEST a reading and emit dry on the
@@ -232,8 +232,9 @@ cannot compute — and the other two leaves carry no arithmetic at all.
 ### Big picture tier roadmap
 
 - **STATE THE STRENGTHENED RETURN TYPE, AND THE BURST'S LENGTH IS IN IT
-  (Anthony).** Everything below consumes it, and the socket it plugs into
-  exists now that totality is an assembly. Every shape reading a FIXED number
+  (Anthony).** Everything below consumes it, and the socket is `thruConsume⇓-total`'s
+  body, which the push cycle's opening made reachable — a `frame-carried` handed
+  to a postulate earns no wiring credit. Every shape reading a FIXED number
   of stored values is refuted — off the frame and the incoming bound in
   `Refuted.Scan-Deepens`, off the store the step LEAVES and off BOTH ends with
   the template added, in `Refuted.Exit-Store` — so what survives reads the
@@ -279,15 +280,18 @@ cannot compute — and the other two leaves carry no arithmetic at all.
   Write the refutation FIRST in each case — the unconditional form of each
   conjunct is what says the conjunct is not a guess.
 
-- **THEN THE THREE LEAVES THE SUBSCRIBE INDUCTION LEFT, AND REFUTE EACH BEFORE
-  GRINDING IT.** The body is written and its structural clauses are closed, so
-  what is open is `subscribeE⇓-input-total` (the slot subscribe, six arms, the
-  share connect's `unconn` guard), `pushBurst⇓-total`
-  (`∀ … (ac : Acc _≺_ τ) (id : Id) (now : Tick) (f : Frame Γ s u) (κ : Path Γ lo u t) (burst : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) → pushBurst⇓ id now f κ burst sched st (pushBurst ac id now f κ burst sched st)`,
-  which carries the hop through `stepFrame`), and `subscribeAll⇓-total`, which
-  is the first two composed and falls out of them. Each is stated
-  unconditionally on purpose: a witness is what says which conjunct `EntryOK`
-  grows, and the leg above is where the growing happens.
+- **THEN THE LEAVES BOTH CYCLES LEFT, AND REFUTE EACH BEFORE GRINDING IT.**
+  Both cycles are bodies now and their list plumbing is closed, so what is open
+  is `subscribeE⇓-input-total` (the slot subscribe, six arms, the share
+  connect's `unconn` guard), the two the push cycle localised the hop onto —
+  `thruConsume⇓-total`
+  (`∀ … (ac : Acc _≺_ τ) (op : AllOp) (nid : NodeId) (κ : Path Γ lo u t) (id : Id) (now : Tick) (o : Val Γ (obs u)) (sched : Sched Γ) (st : EvalSt e) → thruConsume⇓ op nid κ id now o sched st (thruConsume ac op nid κ id now o sched st)`,
+  where `subscribeInner`'s rank test lives) and `innerReact⇓-total`, which
+  reaches the same edge through the flattener's bookkeeping rather than a fresh
+  value — and `subscribeAll⇓-total`, which is the two cycles composed and falls
+  out of them. Each is stated unconditionally on purpose: a witness is what says
+  which conjunct `EntryOK` grows, and the leg above is where the growing
+  happens.
 
 - **AND `drain⇓-total`, WHICH IS ORDINARY FUEL INDUCTION ONCE ITS SIBLING
   EXISTS.** `drain⇓ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (fuel : Fuel) (id : Id) (sched : Sched Γ) (st : EvalSt e) → drain⇓ {e = e} fuel id sched st (drain fuel id sched st)`,
@@ -313,10 +317,15 @@ cannot compute — and the other two leaves carry no arithmetic at all.
   connect reads the unconnected count against the entry's first component, so
   this is refutable exactly as its parent was.
 
-- **`pushBurst⇓-total`** (Verify-Rank-Sufficient) — FALSITY, `PROBED`: a
-  derivation at the push cycle's own output. It carries the hop, which reads a
-  rank the statement never mentions. One burst reaches it, the map frame's, at
-  the stream the machine itself handed the cycle.
+- **`thruConsume⇓-total`** (Verify-Rank-Sufficient) — FALSITY, `PROBED`: the
+  one clause that takes a value and subscribes it, so it is where
+  `subscribeInner`'s rank test sits and where the push cycle's whole falsity
+  now is. Nothing instantiates it yet.
+
+- **`innerReact⇓-total`** (Verify-Rank-Sufficient) — FALSITY, `PROBED`: the
+  same edge reached through the flattener's own bookkeeping rather than a fresh
+  value, so it carries no rank test and inherits the store the walk left.
+  Nothing instantiates it yet.
 
 - **`subscribeAll⇓-total`** (Verify-Rank-Sufficient) — FALSITY, `PROBED`: the
   flatteners' wrapper, a node install between the two cycles above. It adds no
