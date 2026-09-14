@@ -239,18 +239,16 @@ first match, which is why `bug-cache` is off the gate for the duration and
   through every consumer. The leg is the field and its producers; whether it
   suffices for the queue is what it settles.
 
-- **AND THE FRAME FACE, WHICH IS WHERE THE LAST SIX ORPHANS WIRE.** The depth
-  face's shelf now has a consumer: `of-handed` is a body spending
-  `dep-eval-strict`, and what it could not reach — a term whose reading is
-  nought, where there is nothing to be strict about — is the leaf `eval-silent`.
-  What is still unreached from Main is one shelf: `dep-eval-open`, `dep-fn-pos`,
-  `dataSize`, `syncSize-applyFn`, `envDepth`, `applyFn-strict`. Their only
+- **AND THE FRAME FACE, WHERE THE MEASURE ITSELF IS WHAT IS WRONG.** One shelf
+  is unreached from Main — `dep-eval-open`, `dep-fn-pos`, `dataSize`,
+  `syncSize-applyFn`, `envDepth`, `applyFn-strict`. Its only
   nameable consumer is `push-carries`, which is FALSE: the shelf prices
   `applyFn` in a SUM and the measure JOINS at a map, so a map over a stream of
-  streams goes deeper than either side — already witnessed, at
-  the shelf's own statement. `isData` is where the sum collapses, and the map
-  constructor takes any payload, so that restriction is the language's. This leg
-  is the measure's map clause: join to sum.
+  streams goes deeper than either side — already witnessed. Join to sum repairs
+  the map clause, and NOT the scan one: a fold re-wrapping its accumulator
+  climbs with the burst's LENGTH, which no reading of the syntax carries. This
+  leg is the map clause and a verdict on whether the depth component can stay
+  static at all.
 
 - **THE TWO ENDS OF THE RUN, WHICH IS WHAT MAKES A ROW REDUCE.** `drain!` is
   fuel induction over the schedule and carries no guard at all; `mergeAllDrain!`
