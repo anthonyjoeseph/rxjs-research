@@ -36,7 +36,7 @@
 -- in seconds.
 module Rx.Evaluator.Builder where
 
-open import Data.Bool using (Bool; false)
+open import Data.Bool using (Bool; true; false)
 open import Data.Fin using (Fin)
 open import Data.List using (List; []; _∷_; _++_)
 open import Data.Maybe using (nothing; just)
@@ -55,10 +55,14 @@ open import Rx.Slots using (Slots)
 open import Rx.Strat-Order using (Tri; _≺_)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; AllOp; NodeId; NodeState; Frame; root; _↠_; map-f; take-f; scan-f;
   thru-outer; from-inner; mergeAllᵒ; switchᵒ; exhaustᵒ; mergeAll-st; switch-st; exhaust-st; take-st;
-  scan-st; installNode; lookupNode; splitEvents; sched-init; st-init)
+  scan-st; installNode; lookupNode; hasRoom; switchKill; splitEvents; sched-init; st-init)
 open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeAll⇓; pushBurst⇓;
-  stepFrame⇓; innerReact⇓; thruWalk⇓; push-nil; push-cons; step-map; step-scan;
+  stepFrame⇓; innerReact⇓; thruWalk⇓; thruConsume⇓; subscribeInner⇓;
+  push-nil; push-cons; step-map; step-scan;
   step-scan-nil; step-take; step-from-inner; step-thru-outer;
+  walk-nil; walk-cons; consume-all-sub; consume-all-enqueue; consume-all-nil;
+  consume-switch-sub; consume-switch-nil; consume-exhaust-sub;
+  consume-exhaust-nil;
   drain⇓; evaluate⇓; subs-of; subs-empty; subs-map; subs-take-zero;
   subs-take-suc; subs-scan; subs-merge-all; subs-switch-all; subs-exhaust-all;
   subs-μ; subs-defer; sub-all; eval-run)
@@ -106,32 +110,46 @@ WalkRuns : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
 WalkRuns {e = e} op nid κ id now os sched st =
   ∃ λ r → thruWalk⇓ {e = e} op nid κ id now os sched st r
 
+ConsumeRuns : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
+            → AllOp → NodeId → Path Γ lo u t → Id → Tick
+            → Val Γ (obs u) → Sched Γ → EvalSt e → Set
+ConsumeRuns {e = e} op nid κ id now o sched st =
+  ∃ λ r → thruConsume⇓ {e = e} op nid κ id now o sched st r
+
+InnerSubRuns : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
+             → AllOp → NodeId → Path Γ lo u t → Id → Tick
+             → Val Γ (obs u) → Sched Γ → EvalSt e → Set
+InnerSubRuns {e = e} op allNid κ id now o sched st =
+  ∃ λ r → subscribeInner⇓ {e = e} op allNid κ id now o sched st r
+
 ------------------------------------------------------------------
 -- THE LEAVES, WHICH ARE WHAT MAKE THE ASSEMBLY CHECKABLE TODAY.
 ------------------------------------------------------------------
 
--- THE TWO FRAMES THAT RE-ENTER THE SUBSCRIBE CYCLE, AND THEY ARE THE
--- ONLY TWO.  Four of the six frames a burst can meet are arithmetic on
--- the values in hand — a template applied, an accumulator folded, a
--- counter spent — and those are bodies below.  The remaining two hand
--- their values to an observable and subscribe it: the outer walk, whose
--- consume clause is where the deleted door used to ask its question,
--- and the inner reaction, which drains a queue that can subscribe from
--- it.  Both are leaves because the hop lives under them, and a hop
--- clause written above a postulate that is its only consumer earns no
--- reachability and checks nothing.
+-- THE HOP, WHICH IS THE ONE LEAF THAT RE-ENTERS THE SUBSCRIBE CYCLE
+-- AND THE ONE PLACE THE DELETED DOOR USED TO ASK ITS QUESTION.  Its
+-- single constructor subscribes the handed observable under a
+-- `from-inner` frame, so writing it is writing a call back into
+-- `subscribeE!` — and it is the only descent in this module that moves
+-- τ rather than carrying it, which is why it lands last and joins the
+-- mutual block when it does.
 --
 -- RECOVERY: `git show 0bfaccc:agda/src/Verify-Rank-Sufficient/Doorless.agda`
---   holds `subscribeInner!`, which is that hop clause written out — four
---   lines against the machine's, the `with obsDepthᵉ o <? r` and its dry
---   arm deleted and the descent witness taken from the report instead.
+--   holds `subscribeInner!` written out — four lines against the
+--   machine's, the `with obsDepthᵉ o <? r` and its dry arm deleted and
+--   the descent witness taken from the report instead.
 postulate
-  thruWalk! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo} {τ : Tri}
-    (ac : Acc _≺_ τ) (op : AllOp) (nid : NodeId) (κ : Path Γ lo u t)
-    (id : Id) (now : Tick) (os : List (Val Γ (obs u)))
+  subscribeInner! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo} {τ : Tri}
+    (ac : Acc _≺_ τ) (op : AllOp) (allNid : NodeId) (κ : Path Γ lo u t)
+    (id : Id) (now : Tick) (o : Val Γ (obs u))
     (sched : Sched Γ) (st : EvalSt e) →
-    WalkRuns {e = e} op nid κ id now os sched st
+    InnerSubRuns {e = e} op allNid κ id now o sched st
 
+-- AND THE INNER REACTION, WHOSE FINISHING ARM DRAINS A QUEUE THAT CAN
+-- SUBSCRIBE FROM IT.  A leaf for the same reason and not the same
+-- shape: what sits under it is the merge drain and the three
+-- operators' completion arms, none of which the walk below reaches.
+postulate
   innerReact! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo} {τ : Tri}
     (ac : Acc _≺_ τ) (op : AllOp) (allNid inst : NodeId)
     (κ : Path Γ lo s t) (id : Id) (now : Tick) (vals : List (Val Γ s))
@@ -139,8 +157,74 @@ postulate
     InnerRuns {e = e} op allNid inst κ id now vals sched st fin
 
 ------------------------------------------------------------------
--- THE FRAME STEP AND THE BURST PUSH, WHICH ARE NOW BODIES.
+-- THE OUTER WALK, THE FRAME STEP AND THE BURST PUSH, WHICH ARE NOW
+-- BODIES.
 ------------------------------------------------------------------
+
+-- WHAT A CONSUME CLAUSE DECIDES IS WHETHER THE OBSERVABLE IS TAKEN AT
+-- ALL, AND EVERY OPERATOR ANSWERS IT OFF THE STORE.  A merge takes it
+-- when the lane count leaves room and queues it otherwise, a switch
+-- always takes it and kills whatever was running first, an exhaust
+-- takes it only while nothing is running.  Every other reading of the
+-- node — the wrong operator's state, the wrong accumulator type, no
+-- node at all — collapses to the operator's own nil clause, which is
+-- the same collapse the machine reaches through its catch-all.
+thruConsume! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo} {τ : Tri}
+  (ac : Acc _≺_ τ) (op : AllOp) (nid : NodeId) (κ : Path Γ lo u t)
+  (id : Id) (now : Tick) (o : Val Γ (obs u))
+  (sched : Sched Γ) (st : EvalSt e) →
+  ConsumeRuns {e = e} op nid κ id now o sched st
+
+thruConsume! {u = u} ac mergeAllᵒ nid κ id now o sched st
+  with lookupNode nid (EvalSt.nodes st) in eq
+... | nothing              = _ , consume-all-nil
+... | just (scan-st _)     = _ , consume-all-nil
+... | just (take-st _)     = _ , consume-all-nil
+... | just (switch-st _ _) = _ , consume-all-nil
+... | just (exhaust-st _ _) = _ , consume-all-nil
+... | just (mergeAll-st {w} lim act q od) with w ≟ᵗ u
+...   | no  _    = _ , consume-all-nil
+...   | yes refl with hasRoom lim act in eqr
+...     | false = _ , consume-all-enqueue eq eqr
+...     | true  =
+          let (_ , i) = subscribeInner! ac mergeAllᵒ nid κ id now o sched st
+          in _ , consume-all-sub eq eqr i
+
+thruConsume! ac switchᵒ nid κ id now o sched st
+  with lookupNode nid (EvalSt.nodes st) in eq
+... | nothing                    = _ , consume-switch-nil
+... | just (scan-st _)           = _ , consume-switch-nil
+... | just (take-st _)           = _ , consume-switch-nil
+... | just (mergeAll-st _ _ _ _) = _ , consume-switch-nil
+... | just (exhaust-st _ _)      = _ , consume-switch-nil
+... | just (switch-st cur od) with switchKill cur sched st in eqk
+...   | (closes , sched₁ , st₁) =
+        let (_ , i) = subscribeInner! ac switchᵒ nid κ id now o sched₁ st₁
+        in _ , consume-switch-sub eq eqk i
+
+thruConsume! ac exhaustᵒ nid κ id now o sched st
+  with lookupNode nid (EvalSt.nodes st) in eq
+... | nothing                    = _ , consume-exhaust-nil
+... | just (scan-st _)           = _ , consume-exhaust-nil
+... | just (take-st _)           = _ , consume-exhaust-nil
+... | just (mergeAll-st _ _ _ _) = _ , consume-exhaust-nil
+... | just (switch-st _ _)       = _ , consume-exhaust-nil
+... | just (exhaust-st true _)   = _ , consume-exhaust-nil
+... | just (exhaust-st false od) =
+      let (_ , i) = subscribeInner! ac exhaustᵒ nid κ id now o sched st
+      in _ , consume-exhaust-sub eq i
+
+thruWalk! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo} {τ : Tri}
+  (ac : Acc _≺_ τ) (op : AllOp) (nid : NodeId) (κ : Path Γ lo u t)
+  (id : Id) (now : Tick) (os : List (Val Γ (obs u)))
+  (sched : Sched Γ) (st : EvalSt e) →
+  WalkRuns {e = e} op nid κ id now os sched st
+
+thruWalk! ac op nid κ id now []       sched st = _ , walk-nil
+thruWalk! ac op nid κ id now (o ∷ os) sched st =
+  let ((vs , bs , sched₁ , st₁) , c) = thruConsume! ac op nid κ id now o sched st
+      (_ , w) = thruWalk! ac op nid κ id now os sched₁ st₁
+  in _ , walk-cons c w
 
 -- THE SCAN CLAUSE IS THE ONLY ONE THAT LOOKS AT THE STORE, AND THE
 -- RELATION SAYS WHAT TO DO WHEN THE READING DISAGREES.  A node table
