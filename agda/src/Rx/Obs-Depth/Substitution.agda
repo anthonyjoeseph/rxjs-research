@@ -8,7 +8,7 @@
 -- subterm of `fn`.  Substituting DATA into an expression moves no
 -- `strmᵗ`, so the instance reads exactly what the subterm reads:
 --
---   obsDepthᵉ (applyFn fn v) ≡ obsDepthᵉ e < suc (obsDepthᵉ e) ≡ obsDepthᵗ fn
+--   depᵉ η (applyFn fn v) ≡ depᵉ η e < suc (depᵉ η e) ≡ depᵗ η fn
 --
 -- The inequality is STRICT and it mentions no machine state, no store,
 -- no bound the frame was entered under — only the program.
@@ -34,7 +34,7 @@
 -- below, whose growth is per-iteration and bounded by the script
 -- length — dynamic, and the only thing that is.
 --
--- TWIN: `Rx.Obs-Depth.obsDepth-elimG` — the same commutation for the
+-- TWIN: `Rx.Obs-Depth.dep-elimG` — the same commutation for the
 --   guarded substitution, clause for clause, equality and not a bound.
 --   That one substitutes a closed EXPRESSION for a μ-variable; this one
 --   substitutes a value environment for the Θ-variables, and the reason
@@ -47,12 +47,14 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁻)
 open import Data.List.Relation.Unary.All using (All) renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
-open import Data.Nat using (ℕ; suc; _≤_; _<_; _+_; _⊔_; z≤n)
-open import Data.Nat.Properties using (≤-trans; n≤1+n; ⊔-mono-≤; m≤m⊔n; m≤n⊔m)
+open import Data.Fin using (Fin)
+open import Data.Nat using (ℕ; zero; suc; pred; _≤_; _<_; _+_; _⊔_; z≤n; s≤s)
+open import Data.Nat.Properties using (≤-refl; ≤-trans; ⊔-mono-≤; m≤m⊔n; m≤n⊔m;
+  ⊔-identityʳ)
 open import Data.Product using (_,_)
 open import Data.Sum using (inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality
-  using (_≡_; refl; trans; cong; cong₂)
+  using (_≡_; refl; sym; trans; cong; cong₂)
 
 open import Rx.Exp using (Ty; Ctx; Exp; Tm; Val; Fn; isData;
   unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs;
@@ -62,7 +64,7 @@ open import Rx.Exp using (Ty; Ctx; Exp; Tm; Val; Fn; isData;
   add; sub; mul; eqᵖ; ltᵖ; notᵖ;
   reify; wkTm; lookupEnv; subΘExp; subΘTm; subΘTms; closeUnderFn;
   evalWith; applyFn; syncSizeᵉ; syncSizeᵗ)
-open import Rx.Obs-Depth using (obsDepthᵉ; obsDepthᵗ; obsDepthᵗˢ; obsDepthᵛ)
+open import Rx.Obs-Depth using (depᵉ; depᵗ; depᵗˢ; depᵛ)
 
 ------------------------------------------------------------------
 -- 1.  DATA ENVIRONMENTS, WHICH ARE WHAT MAKE THE READING STATIC.
@@ -91,41 +93,41 @@ postulate
 -- arm and the evaluation's `varᵗ` arm respectively spend, and they are
 -- the ONLY place the data hypothesis is used — everything else is
 -- structural.
-obsDepthᵛ-data : ∀ {n} {Γ : Ctx n} (t : Ty) → isData t ≡ true →
-  (v : Val Γ t) → obsDepthᵛ t v ≡ 0
-obsDepthᵛ-data unitᵗ    _  _        = refl
-obsDepthᵛ-data boolᵗ    _  _        = refl
-obsDepthᵛ-data natᵗ     _  _        = refl
-obsDepthᵛ-data (s ×ᵗ t) dt (a , b)  =
-  cong₂ _⊔_ (obsDepthᵛ-data s (×-dataˡ s t dt) a)
-            (obsDepthᵛ-data t (×-dataʳ s t dt) b)
-obsDepthᵛ-data (s +ᵗ t) dt (inj₁ a) = obsDepthᵛ-data s (+-dataˡ s t dt) a
-obsDepthᵛ-data (s +ᵗ t) dt (inj₂ b) = obsDepthᵛ-data t (+-dataʳ s t dt) b
-obsDepthᵛ-data (obs t)  ()  _
+dep-dataᵛ : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) (t : Ty) → isData t ≡ true →
+  (v : Val Γ t) → depᵛ η t v ≡ 0
+dep-dataᵛ η unitᵗ    _  _        = refl
+dep-dataᵛ η boolᵗ    _  _        = refl
+dep-dataᵛ η natᵗ     _  _        = refl
+dep-dataᵛ η (s ×ᵗ t) dt (a , b)  =
+  cong₂ _⊔_ (dep-dataᵛ η s (×-dataˡ s t dt) a)
+            (dep-dataᵛ η t (×-dataʳ s t dt) b)
+dep-dataᵛ η (s +ᵗ t) dt (inj₁ a) = dep-dataᵛ η s (+-dataˡ s t dt) a
+dep-dataᵛ η (s +ᵗ t) dt (inj₂ b) = dep-dataᵛ η t (+-dataʳ s t dt) b
+dep-dataᵛ η (obs t)  ()  _
 
-obsDepth-reify-data : ∀ {n} {Γ : Ctx n} (t : Ty) → isData t ≡ true →
-  (v : Val Γ t) → obsDepthᵗ (reify v) ≡ 0
-obsDepth-reify-data unitᵗ    _  _        = refl
-obsDepth-reify-data boolᵗ    _  _        = refl
-obsDepth-reify-data natᵗ     _  _        = refl
-obsDepth-reify-data (s ×ᵗ t) dt (a , b)  =
-  cong₂ _⊔_ (obsDepth-reify-data s (×-dataˡ s t dt) a)
-            (obsDepth-reify-data t (×-dataʳ s t dt) b)
-obsDepth-reify-data (s +ᵗ t) dt (inj₁ a) = obsDepth-reify-data s (+-dataˡ s t dt) a
-obsDepth-reify-data (s +ᵗ t) dt (inj₂ b) = obsDepth-reify-data t (+-dataʳ s t dt) b
-obsDepth-reify-data (obs t)  ()  _
+dep-reify-data : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) (t : Ty) → isData t ≡ true →
+  (v : Val Γ t) → depᵗ η (reify v) ≡ 0
+dep-reify-data η unitᵗ    _  _        = refl
+dep-reify-data η boolᵗ    _  _        = refl
+dep-reify-data η natᵗ     _  _        = refl
+dep-reify-data η (s ×ᵗ t) dt (a , b)  =
+  cong₂ _⊔_ (dep-reify-data η s (×-dataˡ s t dt) a)
+            (dep-reify-data η t (×-dataʳ s t dt) b)
+dep-reify-data η (s +ᵗ t) dt (inj₁ a) = dep-reify-data η s (+-dataˡ s t dt) a
+dep-reify-data η (s +ᵗ t) dt (inj₂ b) = dep-reify-data η t (+-dataʳ s t dt) b
+dep-reify-data η (obs t)  ()  _
 
-lookup-data : ∀ {n} {Γ : Ctx n} {Θ t} → AllData Θ →
-  (σ : All (Val Γ) Θ) (x : t ∈ Θ) → obsDepthᵗ (reify (lookupEnv σ x)) ≡ 0
-lookup-data (d ∷ᵈ _)  (v ∷ᵃ _)  (here refl) = obsDepth-reify-data _ d v
-lookup-data (_ ∷ᵈ ds) (_ ∷ᵃ vs) (there p)   = lookup-data ds vs p
+lookup-data : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) {Θ t} → AllData Θ →
+  (σ : All (Val Γ) Θ) (x : t ∈ Θ) → depᵗ η (reify (lookupEnv σ x)) ≡ 0
+lookup-data η (d ∷ᵈ _)  (v ∷ᵃ _)  (here refl) = dep-reify-data η _ d v
+lookup-data η (_ ∷ᵈ ds) (_ ∷ᵃ vs) (there p)   = lookup-data η ds vs p
 
 -- weakening writes no head, so it moves no reading.  Stated for the
 -- exact instance the substitution's `varᵗ` arm produces rather than for
 -- a general renaming, because that arm is the only consumer.
 postulate
-  obsDepth-wkTm : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (f : Tm Γ [] [] [] t) →
-    obsDepthᵗ (wkTm {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} f) ≡ obsDepthᵗ f
+  dep-wkTm : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) {Δᵍ Δ Θ t} (f : Tm Γ [] [] [] t) →
+    depᵗ η (wkTm {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} f) ≡ depᵗ η f
 
 ------------------------------------------------------------------
 -- 2.  THE LEMMA, CLAUSE FOR CLAUSE AGAINST ITS TWIN.
@@ -142,17 +144,17 @@ postulate
 -- `ifᵗ` is separate only because Agda cannot see through the `if` that
 -- selects the branch; nothing about it is open.
 postulate
-  eval-case : ∀ {n} {Γ : Ctx n} {Θ s t u} → AllData Θ →
+  eval-case : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) {Θ s t u} → AllData Θ →
     (sc : Tm Γ [] [] Θ (s +ᵗ t)) (l : Tm Γ [] [] (s ∷ Θ) u)
     (r : Tm Γ [] [] (t ∷ Θ) u) (env : All (Val Γ) Θ) →
-    obsDepthᵛ u (evalWith (caseᵗ sc l r) env) ≤ obsDepthᵗ (caseᵗ sc l r)
+    depᵛ η u (evalWith (caseᵗ sc l r) env) ≤ pred (depᵗ η (caseᵗ sc l r))
 
-  eval-if : ∀ {n} {Γ : Ctx n} {Θ t} → AllData Θ →
+  eval-if : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) {Θ t} → AllData Θ →
     (c : Tm Γ [] [] Θ boolᵗ) (a b : Tm Γ [] [] Θ t) (env : All (Val Γ) Θ) →
-    obsDepthᵛ t (evalWith (ifᵗ c a b) env) ≤ obsDepthᵗ (ifᵗ c a b)
+    depᵛ η t (evalWith (ifᵗ c a b) env) ≤ pred (depᵗ η (ifᵗ c a b))
 
 -- Every clause but one is `cong` over the sub-derivations, exactly as
--- `obsDepth-elimG`'s are.  The one that carries content is `varᵗ`, and
+-- `dep-elimG`'s are.  The one that carries content is `varᵗ`, and
 -- it splits the way `subΘTm` splits: a LOCAL binder survives as a
 -- `varᵗ` and reads zero on both sides, while a SUBSTITUTED binder
 -- becomes a reified data value and reads zero because it is data.  The
@@ -160,113 +162,138 @@ postulate
 -- environment, since that is the only head under which a substituted
 -- observable would be counted.
 mutual
-  obsDepth-subΘ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (Θloc : List Ty)
+  dep-subΘ : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) {Δᵍ Δ Θsub t} (Θloc : List Ty)
     (dd : AllData Θsub) (σ : All (Val Γ) Θsub)
     (e : Exp Γ Δᵍ Δ (Θloc ++ Θsub) t) →
-    obsDepthᵉ (subΘExp Θloc σ e) ≡ obsDepthᵉ e
-  obsDepth-subΘ Θloc dd σ (input i)       = refl
-  obsDepth-subΘ Θloc dd σ (ofᵉ ts)        = obsDepth-subΘᵗˢ Θloc dd σ ts
-  obsDepth-subΘ Θloc dd σ emptyᵉ          = refl
-  obsDepth-subΘ Θloc dd σ (mapᵉ {s = s} f e) =
-    cong₂ _⊔_ (obsDepth-subΘᵗ (s ∷ Θloc) dd σ f) (obsDepth-subΘ Θloc dd σ e)
-  obsDepth-subΘ Θloc dd σ (takeᵉ c e)     =
-    cong₂ _⊔_ (obsDepth-subΘᵗ Θloc dd σ c) (obsDepth-subΘ Θloc dd σ e)
-  obsDepth-subΘ Θloc dd σ (scanᵉ {s = s} {t = t} f z e) =
-    cong₂ _⊔_ (cong₂ _⊔_ (obsDepth-subΘᵗ ((t ×ᵗ s) ∷ Θloc) dd σ f)
-                         (obsDepth-subΘᵗ Θloc dd σ z))
-              (obsDepth-subΘ Θloc dd σ e)
-  obsDepth-subΘ Θloc dd σ (mergeAllᵉ _ e) = obsDepth-subΘ Θloc dd σ e
-  obsDepth-subΘ Θloc dd σ (switchAllᵉ e)  = obsDepth-subΘ Θloc dd σ e
-  obsDepth-subΘ Θloc dd σ (exhaustAllᵉ e) = obsDepth-subΘ Θloc dd σ e
-  obsDepth-subΘ Θloc dd σ (μᵉ e)          = obsDepth-subΘ Θloc dd σ e
-  obsDepth-subΘ Θloc dd σ (varᵉ x)        = refl
-  obsDepth-subΘ Θloc dd σ (deferᵉ e)      = refl
+    depᵉ η (subΘExp Θloc σ e) ≡ depᵉ η e
+  dep-subΘ η Θloc dd σ (input i)       = refl
+  dep-subΘ η Θloc dd σ (ofᵉ ts)        = dep-subΘᵗˢ η Θloc dd σ ts
+  dep-subΘ η Θloc dd σ emptyᵉ          = refl
+  dep-subΘ η Θloc dd σ (mapᵉ {s = s} f e) =
+    cong₂ _⊔_ (dep-subΘᵗ η (s ∷ Θloc) dd σ f) (dep-subΘ η Θloc dd σ e)
+  dep-subΘ η Θloc dd σ (takeᵉ c e)     =
+    cong₂ _⊔_ (dep-subΘᵗ η Θloc dd σ c) (dep-subΘ η Θloc dd σ e)
+  dep-subΘ η Θloc dd σ (scanᵉ {s = s} {t = t} f z e) =
+    cong₂ _⊔_ (cong₂ _⊔_ (dep-subΘᵗ η ((t ×ᵗ s) ∷ Θloc) dd σ f)
+                         (dep-subΘᵗ η Θloc dd σ z))
+              (dep-subΘ η Θloc dd σ e)
+  dep-subΘ η Θloc dd σ (mergeAllᵉ _ e) = dep-subΘ η Θloc dd σ e
+  dep-subΘ η Θloc dd σ (switchAllᵉ e)  = dep-subΘ η Θloc dd σ e
+  dep-subΘ η Θloc dd σ (exhaustAllᵉ e) = dep-subΘ η Θloc dd σ e
+  dep-subΘ η Θloc dd σ (μᵉ e)          = dep-subΘ η Θloc dd σ e
+  dep-subΘ η Θloc dd σ (varᵉ x)        = refl
+  dep-subΘ η Θloc dd σ (deferᵉ e)      = refl
 
-  obsDepth-subΘᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (Θloc : List Ty)
+  dep-subΘᵗ : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) {Δᵍ Δ Θsub t} (Θloc : List Ty)
     (dd : AllData Θsub) (σ : All (Val Γ) Θsub)
     (f : Tm Γ Δᵍ Δ (Θloc ++ Θsub) t) →
-    obsDepthᵗ (subΘTm Θloc σ f) ≡ obsDepthᵗ f
-  obsDepth-subΘᵗ Θloc dd σ (varᵗ x) with ∈-++⁻ Θloc x
+    depᵗ η (subΘTm Θloc σ f) ≡ depᵗ η f
+  dep-subΘᵗ η Θloc dd σ (varᵗ x) with ∈-++⁻ Θloc x
   ... | inj₁ y = refl
-  ... | inj₂ z = trans (obsDepth-wkTm (reify (lookupEnv σ z)))
-                       (lookup-data dd σ z)
-  obsDepth-subΘᵗ Θloc dd σ unit̂          = refl
-  obsDepth-subΘᵗ Θloc dd σ (bool̂ b)      = refl
-  obsDepth-subΘᵗ Θloc dd σ (nat̂ k)       = refl
-  obsDepth-subΘᵗ Θloc dd σ (pairᵗ a b)   =
-    cong₂ _⊔_ (obsDepth-subΘᵗ Θloc dd σ a) (obsDepth-subΘᵗ Θloc dd σ b)
-  obsDepth-subΘᵗ Θloc dd σ (fstᵗ p)      = obsDepth-subΘᵗ Θloc dd σ p
-  obsDepth-subΘᵗ Θloc dd σ (sndᵗ p)      = obsDepth-subΘᵗ Θloc dd σ p
-  obsDepth-subΘᵗ Θloc dd σ (inlᵗ a)      = obsDepth-subΘᵗ Θloc dd σ a
-  obsDepth-subΘᵗ Θloc dd σ (inrᵗ a)      = obsDepth-subΘᵗ Θloc dd σ a
-  obsDepth-subΘᵗ Θloc dd σ (caseᵗ {s = s} {t = t} sc l r) =
-    cong₂ _⊔_ (cong₂ _⊔_ (obsDepth-subΘᵗ Θloc dd σ sc)
-                         (obsDepth-subΘᵗ (s ∷ Θloc) dd σ l))
-              (obsDepth-subΘᵗ (t ∷ Θloc) dd σ r)
-  obsDepth-subΘᵗ Θloc dd σ (ifᵗ c a b)   =
-    cong₂ _⊔_ (cong₂ _⊔_ (obsDepth-subΘᵗ Θloc dd σ c)
-                         (obsDepth-subΘᵗ Θloc dd σ a))
-              (obsDepth-subΘᵗ Θloc dd σ b)
-  obsDepth-subΘᵗ Θloc dd σ (primᵗ op a)  = obsDepth-subΘᵗ Θloc dd σ a
-  obsDepth-subΘᵗ Θloc dd σ (strmᵗ e)     = cong suc (obsDepth-subΘ Θloc dd σ e)
+  ... | inj₂ z = trans (dep-wkTm η (reify (lookupEnv σ z)))
+                       (lookup-data η dd σ z)
+  dep-subΘᵗ η Θloc dd σ unit̂          = refl
+  dep-subΘᵗ η Θloc dd σ (bool̂ b)      = refl
+  dep-subΘᵗ η Θloc dd σ (nat̂ k)       = refl
+  dep-subΘᵗ η Θloc dd σ (pairᵗ a b)   =
+    cong₂ _⊔_ (dep-subΘᵗ η Θloc dd σ a) (dep-subΘᵗ η Θloc dd σ b)
+  dep-subΘᵗ η Θloc dd σ (fstᵗ p)      = dep-subΘᵗ η Θloc dd σ p
+  dep-subΘᵗ η Θloc dd σ (sndᵗ p)      = dep-subΘᵗ η Θloc dd σ p
+  dep-subΘᵗ η Θloc dd σ (inlᵗ a)      = dep-subΘᵗ η Θloc dd σ a
+  dep-subΘᵗ η Θloc dd σ (inrᵗ a)      = dep-subΘᵗ η Θloc dd σ a
+  dep-subΘᵗ η Θloc dd σ (caseᵗ {s = s} {t = t} sc l r) =
+    cong₂ _⊔_ (cong₂ _⊔_ (dep-subΘᵗ η Θloc dd σ sc)
+                         (dep-subΘᵗ η (s ∷ Θloc) dd σ l))
+              (dep-subΘᵗ η (t ∷ Θloc) dd σ r)
+  dep-subΘᵗ η Θloc dd σ (ifᵗ c a b)   =
+    cong₂ _⊔_ (cong₂ _⊔_ (dep-subΘᵗ η Θloc dd σ c)
+                         (dep-subΘᵗ η Θloc dd σ a))
+              (dep-subΘᵗ η Θloc dd σ b)
+  dep-subΘᵗ η Θloc dd σ (primᵗ op a)  = dep-subΘᵗ η Θloc dd σ a
+  dep-subΘᵗ η Θloc dd σ (strmᵗ e)     = cong suc (dep-subΘ η Θloc dd σ e)
 
-  obsDepth-subΘᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (Θloc : List Ty)
+  dep-subΘᵗˢ : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) {Δᵍ Δ Θsub t} (Θloc : List Ty)
     (dd : AllData Θsub) (σ : All (Val Γ) Θsub)
     (ts : List (Tm Γ Δᵍ Δ (Θloc ++ Θsub) t)) →
-    obsDepthᵗˢ (subΘTms Θloc σ ts) ≡ obsDepthᵗˢ ts
-  obsDepth-subΘᵗˢ Θloc dd σ []       = refl
-  obsDepth-subΘᵗˢ Θloc dd σ (y ∷ ys) =
-    cong₂ _⊔_ (obsDepth-subΘᵗ Θloc dd σ y) (obsDepth-subΘᵗˢ Θloc dd σ ys)
+    depᵗˢ η (subΘTms Θloc σ ts) ≡ depᵗˢ η ts
+  dep-subΘᵗˢ η Θloc dd σ []       = refl
+  dep-subΘᵗˢ η Θloc dd σ (y ∷ ys) =
+    cong₂ _⊔_ (dep-subΘᵗ η Θloc dd σ y) (dep-subΘᵗˢ η Θloc dd σ ys)
 
-obsDepth-closeUnderFn : ∀ {n} {Γ : Ctx n} {s Θ t} → AllData (s ∷ Θ) →
+dep-closeUnderFn : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) {s Θ t} → AllData (s ∷ Θ) →
   (e : Exp Γ [] [] (s ∷ Θ) t) (env : All (Val Γ) (s ∷ Θ)) →
-  obsDepthᵉ (closeUnderFn e env) ≡ obsDepthᵉ e
-obsDepth-closeUnderFn dd e env = obsDepth-subΘ [] dd env e
+  depᵉ η (closeUnderFn e env) ≡ depᵉ η e
+dep-closeUnderFn η dd e env = dep-subΘ η [] dd env e
 
 ------------------------------------------------------------------
 -- 3.  EVALUATION, AND THE STRICT DROP THAT IS THE DOOR'S PREMISE.
 ------------------------------------------------------------------
 
--- A value evaluated out of a term reads no deeper than the term, and
--- at an OBSERVABLE result type it reads strictly shallower — because
--- the only head that can produce one is `strmᵗ`, which is a successor,
--- and the substitution under it is depth-preserving by the lemma above.
-obsDepth-eval : ∀ {n} {Γ : Ctx n} {Θ t} → AllData Θ →
+-- THE PREDECESSOR IS WHAT MAKES THE STATEMENT UNCONDITIONAL, and that
+-- is the one design decision in this block.  The reading wanted at the
+-- door is STRICT, and a strict statement cannot be made at a term whose
+-- own reading is nought — so the obvious form carries a positivity
+-- premise, and then every clause has to case-split on which side of a
+-- join is the positive one before it can hand the premise down.  Stated
+-- against the predecessor there is no premise to hand down: it is
+-- nought where the term is nought, it is the strict drop everywhere
+-- else, and `pred` distributes over the join, so the whole induction is
+-- the weak one with a `pred` in front of it.
+--
+-- The positivity is then owed exactly once, by whoever wants the
+-- strictness, and at an observable result type it is a fact about the
+-- SYNTAX with no environment in it.
+private
+  pred-⊔ : ∀ m n → pred (m ⊔ n) ≡ pred m ⊔ pred n
+  pred-⊔ zero    n       = refl
+  pred-⊔ (suc m) zero    = sym (⊔-identityʳ m)
+  pred-⊔ (suc m) (suc n) = refl
+
+  ≤pred⇒< : ∀ {a m} → 0 < m → a ≤ pred m → a < m
+  ≤pred⇒< {m = suc m} _ a≤ = s≤s a≤
+
+-- A value evaluated out of a term reads no deeper than the term's own
+-- predecessor — so at an OBSERVABLE result type, where the only head
+-- that can produce one is the successor `strmᵗ`, it reads strictly
+-- shallower.  The substitution under that successor is depth-preserving
+-- by the lemma above, which is the whole content of the last clause.
+dep-eval-strict : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) {Θ t} → AllData Θ →
   (tm : Tm Γ [] [] Θ t) (env : All (Val Γ) Θ) →
-  obsDepthᵛ t (evalWith tm env) ≤ obsDepthᵗ tm
-obsDepth-eval dd (varᵗ x)      env
-  rewrite obsDepthᵛ-data _ (data-of dd x) (lookupEnv env x) = z≤n
-obsDepth-eval dd unit̂          env = z≤n
-obsDepth-eval dd (bool̂ b)      env = z≤n
-obsDepth-eval dd (nat̂ k)       env = z≤n
-obsDepth-eval dd (pairᵗ a b)   env =
-  ⊔-mono-≤ (obsDepth-eval dd a env) (obsDepth-eval dd b env)
-obsDepth-eval dd (fstᵗ p)      env =
-  ≤-trans (m≤m⊔n _ _) (obsDepth-eval dd p env)
+  depᵛ η t (evalWith tm env) ≤ pred (depᵗ η tm)
+dep-eval-strict η dd (varᵗ x)      env
+  rewrite dep-dataᵛ η _ (data-of dd x) (lookupEnv env x) = z≤n
+dep-eval-strict η dd unit̂          env = z≤n
+dep-eval-strict η dd (bool̂ b)      env = z≤n
+dep-eval-strict η dd (nat̂ k)       env = z≤n
+dep-eval-strict η dd (pairᵗ a b)   env
+  rewrite pred-⊔ (depᵗ η a) (depᵗ η b) =
+  ⊔-mono-≤ (dep-eval-strict η dd a env) (dep-eval-strict η dd b env)
+dep-eval-strict η dd (fstᵗ p)      env =
+  ≤-trans (m≤m⊔n _ _) (dep-eval-strict η dd p env)
     -- the pair's reading is the join of its components', so a
     -- projection reads no more than the pair
-obsDepth-eval dd (sndᵗ p)      env =
-  ≤-trans (m≤n⊔m _ _) (obsDepth-eval dd p env)
-obsDepth-eval dd (inlᵗ a)      env = obsDepth-eval dd a env
-obsDepth-eval dd (inrᵗ a)      env = obsDepth-eval dd a env
-obsDepth-eval dd (caseᵗ sc l r) env = eval-case dd sc l r env
-obsDepth-eval dd (ifᵗ c a b)   env = eval-if dd c a b env
-obsDepth-eval dd (primᵗ add  a)  env = z≤n
-obsDepth-eval dd (primᵗ sub  a)  env = z≤n
-obsDepth-eval dd (primᵗ mul  a)  env = z≤n
-obsDepth-eval dd (primᵗ eqᵖ  a)  env = z≤n
-obsDepth-eval dd (primᵗ ltᵖ  a)  env = z≤n
-obsDepth-eval dd (primᵗ notᵖ a)  env = z≤n
-obsDepth-eval dd (strmᵗ e)     []ᵃ = n≤1+n _
-obsDepth-eval dd (strmᵗ e)     (v ∷ᵃ vs)
-  rewrite obsDepth-closeUnderFn dd e (v ∷ᵃ vs) = n≤1+n _
+dep-eval-strict η dd (sndᵗ p)      env =
+  ≤-trans (m≤n⊔m _ _) (dep-eval-strict η dd p env)
+dep-eval-strict η dd (inlᵗ a)      env = dep-eval-strict η dd a env
+dep-eval-strict η dd (inrᵗ a)      env = dep-eval-strict η dd a env
+dep-eval-strict η dd (caseᵗ sc l r) env = eval-case η dd sc l r env
+dep-eval-strict η dd (ifᵗ c a b)   env = eval-if η dd c a b env
+dep-eval-strict η dd (primᵗ add  a)  env = z≤n
+dep-eval-strict η dd (primᵗ sub  a)  env = z≤n
+dep-eval-strict η dd (primᵗ mul  a)  env = z≤n
+dep-eval-strict η dd (primᵗ eqᵖ  a)  env = z≤n
+dep-eval-strict η dd (primᵗ ltᵖ  a)  env = z≤n
+dep-eval-strict η dd (primᵗ notᵖ a)  env = z≤n
+dep-eval-strict η dd (strmᵗ e)     []ᵃ = ≤-refl
+dep-eval-strict η dd (strmᵗ e)     (v ∷ᵃ vs)
+  rewrite dep-closeUnderFn η dd e (v ∷ᵃ vs) = ≤-refl
 
 
 -- the reading of an environment, which is what the open form is
 -- denominated in.
-envDepth : ∀ {n} {Γ : Ctx n} {Θ} → All (Val Γ) Θ → ℕ
-envDepth []ᵃ       = 0
-envDepth (v ∷ᵃ vs) = obsDepthᵗ (reify v) ⊔ envDepth vs
+envDepth : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) {Θ} → All (Val Γ) Θ → ℕ
+envDepth η []ᵃ       = 0
+envDepth η (v ∷ᵃ vs) = depᵗ η (reify v) ⊔ envDepth η vs
 
 -- THE OPEN FORM: what an environment carrying observables costs, which
 -- is one wrap per binder crossed and NOT a function of the machine.
@@ -274,23 +301,54 @@ envDepth (v ∷ᵃ vs) = obsDepthᵗ (reify v) ⊔ envDepth vs
 -- the iteration axis the carried family already names — stated here so
 -- the two are the same fact rather than two.
 postulate
-  obsDepth-eval-open : ∀ {n} {Γ : Ctx n} {Θ t}
+  dep-eval-open : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) {Θ t}
     (tm : Tm Γ [] [] Θ t) (env : All (Val Γ) Θ) (m : ℕ) →
-    envDepth env ≤ m → obsDepthᵛ t (evalWith tm env) ≤ obsDepthᵗ tm + m
+    envDepth η env ≤ m → depᵛ η t (evalWith tm env) ≤ depᵗ η tm + m
 
 -- THE STRICT READING, AND IT IS THE WHOLE POINT.  An observable
 -- emitted by a template is written strictly below the template — with
 -- no hypothesis about the run, the store, or the bound the frame was
 -- entered under, so a hop whose argument came from a template is priced
--- by the program text alone.  The weak lemma above does not give it
--- directly: at an observable result type `tm` cannot be a `varᵗ` (its
--- type would have to be data), so every head is either a successor or
--- an eliminator whose own reading dominates.  One case split away from
--- the weak form and postulated only because that split is mechanical.
+-- by the program text alone.  The lemma above gives the drop; what is
+-- left is that there is something to drop FROM, which is the leaf
+-- below.
+--
+-- AND THE DATA HYPOTHESIS IS THE STATEMENT, NOT A CONVENIENCE.  Where
+-- the argument is itself observable, reifying it writes a `strmᵗ` the
+-- template never wrote, so the substitution adds a level and the
+-- emission is as deep as whatever was handed in — unbounded, rather
+-- than off by one.  So the conditioned form is the true statement
+-- replacing a false one rather than a weakening of it.
+--
+-- REFUTED: `Refuted.Template-Passes` — the same drop with the
+--   hypothesis taken out, at a template that passes its argument
+--   through.
+
+-- THE LEAF IS SYNTAX, WITH NO ENVIRONMENT AND NO VALUE IN IT.  A
+-- template at an observable result type has to WRITE the observable it
+-- returns, because the one other way to have one is to read it from a
+-- binder and the only binder is data.  The induction that says so needs
+-- two predicates the type alone decides — one for a type every value of
+-- which contains an observable, one for a context no binder of which
+-- has such a type — because a `caseᵗ` at an observable result binds
+-- into its branches, and which of the three subterms carries the
+-- positivity is decided by whether those binder types are themselves
+-- reachable.  Stated at the specialisation the door spends, since that
+-- is the only shape any consumer asks for.
+--
+-- PROBED: `Probed.Template-Depth` — templates whose body is `ofᵉ` of a
+--   term, with the argument dropped and with it wrapped under a second
+--   `strmᵗ`.  Not reached: every head that BINDS, which is the arm the
+--   induction has to split on.
 postulate
-  applyFn-strict : ∀ {n} {Γ : Ctx n} {s u} → isData s ≡ true →
-    (fn : Fn Γ [] [] [] s (obs u)) (v : Val Γ s) →
-    obsDepthᵉ (applyFn fn v) < obsDepthᵗ fn
+  dep-fn-pos : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) {s u} → isData s ≡ true →
+    (fn : Fn Γ [] [] [] s (obs u)) → 0 < depᵗ η fn
+
+applyFn-strict : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) {s u} → isData s ≡ true →
+  (fn : Fn Γ [] [] [] s (obs u)) (v : Val Γ s) →
+  depᵉ η (applyFn fn v) < depᵗ η fn
+applyFn-strict η ds fn v =
+  ≤pred⇒< (dep-fn-pos η ds fn) (dep-eval-strict η (ds ∷ᵈ []ᵈ) fn (v ∷ᵃ []ᵃ))
 
 -- AND THE SIZE HALF, WHICH THIS ROUTE DOES NOT GIVE FOR FREE.  A
 -- substituted data value replaces a `varᵗ` of size one with a literal

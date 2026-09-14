@@ -242,17 +242,17 @@ cannot compute — and the other two leaves carry no arithmetic at all.
   it would have to prove it, so one widening closes all three and leaves the
   obligation on the two leaves alone. Riskiest: it moves every clause's return.
 
-- **PRICE THE TEMPLATE, NOT THE INPUT: STATE THE SUBSTITUTION LEMMA (Anthony).**
-  Six refutations stand at the door and every one of them refutes a price stated
-  in what a frame was HANDED — which is the convergence test's spiral signal,
-  whose prescribed response is to change the mechanism. The change is a change
-  of CURRENCY: what a template emits is a substitution instance of a subterm of
-  it, and substituting DATA moves no `strmᵗ`, so
-  `obsDepthᵉ (applyFn fn v) < obsDepthᵗ fn` strictly, read off the program with
-  no machine state in it. `Rx.Obs-Depth.Substitution` sketches it against its
-  proven twin `obsDepth-elimG`; `Probed.Template-Depth` holds the rows, one of
-  which REFUTES the unconditioned form. It is the hop's own premise, so the leg
-  above hands it its only remaining customer.
+- **FINISH THE SUBSTITUTION CURRENCY: THE BINDING ARMS AND THE SYNTAX LEAF.**
+  The change of currency is made and `applyFn-strict` is a body: a template's
+  emission is priced by the template, with no machine state in it. What is left
+  is what BINDS. `eval-case` and `eval-if` are the two arms where evaluation
+  enters a branch under a binder the data hypothesis does not cover, and
+  `dep-eval-open` is the same gap at the fold, where the accumulator is fed
+  back; those three are one question asked three times. Under them sits
+  `dep-fn-pos`, pure syntax — a template at an observable result must WRITE one,
+  since the only binder is data — and the shelf `dep-wkTm` with the four
+  `isData` projections. Riskiest first: the binding arms, since a refutation
+  there moves the currency again.
 
 - **THE THREE LEAVES OUTSIDE THE CYCLE, AND ONLY THEN THE RE-POINTING.**
   `subscribeE!-input` is the slot subscribe — six arms and the share connect's
@@ -334,7 +334,7 @@ cannot compute — and the other two leaves carry no arithmetic at all.
   `REFUTED, PROBED`: the one clause taking a value and subscribing it, customer
   of both shelves. Builder `subscribeInner!`. Open: the enqueue arm, two
   operators on another node state, and the hop `subscribeInner⇓-total`.
-  Substitution: `obsDepth-eval-open`, `obsDepth-wkTm`, `applyFn-strict`,
+  Substitution: `dep-eval-open`, `dep-wkTm`, `dep-fn-pos`,
   `syncSize-applyFn`, `eval-case`, `eval-if`, `data-of`, `dataSize`, `+-dataˡ`,
   `+-dataʳ`, `×-dataˡ`, `×-dataʳ`. Carried: `applyFn-ok-×`, `applyFn-ok-+`,
   `map-frame-carried-obs`, `scan-frame-carried`, `take-frame-carried`,

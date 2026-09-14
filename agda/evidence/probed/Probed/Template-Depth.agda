@@ -1,50 +1,39 @@
--- WHAT A TEMPLATE EMITS, INSTANTIATED — AND THE ROW THAT SAYS THE DATA
--- HYPOTHESIS IS LOAD-BEARING RATHER THAN DECORATIVE.
+-- WHAT A TEMPLATE MUST WRITE, INSTANTIATED — AND WHY THE DATA
+-- HYPOTHESIS UNDER IT IS THE STATEMENT RATHER THAN A CONVENIENCE.
 --
--- A SKETCH.  This file is not stamped and not typechecked: its
--- `-- TARGET:` carries no statement fingerprint, because the statement
--- it names lives in a module that does not yet typecheck either.  It is
--- here because the claim is CHEAP TO TEST and the campaign's rule is to
--- probe before proving — the rows below are what would refute the
--- substitution route in an afternoon if it were wrong.
---
--- WHAT IS AT RISK.  `applyFn-strict` says an observable a template
--- emits is written strictly shallower than the template.  That is a
--- statement about SUBSTITUTION, and the two ways it could be false are
--- the two ways the predecessor family was actually refuted: a template
--- that DROPS its argument (then the emitted observable owes nothing to
--- the input, and the claim should hold trivially — a degenerate row),
--- and a template that WRAPS it (then the input lands under a `strmᵗ`
--- the template wrote, and whether the reading still drops is the whole
--- question — the load-bearing row).
---
--- AND THE THIRD ROW IS A REFUTATION OF THE UNCONDITIONED FORM.  Where
--- the argument type is itself observable, `reify` writes a `strmᵗ` and
--- the substitution DOES add a level, without bound: the emitted
--- observable is as deep as whatever was handed in, plus the template's
--- own.  So the claim is false without `isData s ≡ true`, it is false by
--- an arbitrary margin rather than by one, and the hypothesis is not
--- there to make a proof go through.  That row is what turns the
--- conditioned statement from a weakening into the true statement
--- replacing a false one.
+-- WHAT IS AT RISK.  `dep-fn-pos` says a template returning an
+-- observable reads at least one: it has to WRITE the observable it
+-- returns, because the one other way to have one is to read it from a
+-- binder and the only binder is data.  It is the positivity the strict
+-- drop is spent through, and it is pure syntax — no environment, no
+-- value, nothing the run supplies — so the way it could be false is a
+-- template that gets an observable from somewhere the induction has not
+-- looked.
 --
 -- COVERAGE: templates whose body is `ofᵉ` of a term, at one and two
--- levels of `strmᵗ`.  NOT covered: a template writing a `μᵉ`, a
--- template writing a `deferᵉ` (the reading cuts both to zero, so they
--- are the shapes most likely to hide something), and every fold — the
--- accumulator is fed back, which is the open form and not this one.
+-- levels of `strmᵗ`, with the argument dropped and with the argument
+-- wrapped.  NOT covered: a template writing a `μᵉ`, a template writing
+-- a `deferᵉ` (the reading cuts both to zero, so they are the shapes
+-- most likely to hide something), and every head that BINDS — the
+-- `caseᵗ` whose branches carry the positivity is the arm the induction
+-- has to split on and no row here reaches it.
 --
--- TARGET: applyFn-strict @sketch
+-- TARGET: dep-fn-pos @c824be
+--
+-- REFUTED: `Refuted.Template-Passes` — the drop this positivity is
+--   spent through, asked without the data hypothesis.
 module Probed.Template-Depth where
 
 open import Data.List using ([]; _∷_)
 open import Data.List.Relation.Unary.Any using (here)
-open import Data.List.Relation.Unary.All using () renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
+open import Data.Nat using (z≤n; s≤s)
 open import Data.Vec using () renaming ([] to []ⱽ)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import Rx.Exp using (Ctx; Val; Fn; natᵗ; obs; nat̂; varᵗ; strmᵗ; ofᵉ; applyFn)
-open import Rx.Obs-Depth using (obsDepthᵉ; obsDepthᵗ)
+open import Rx.Exp using (Ctx; Fn; natᵗ; obs; nat̂; varᵗ; strmᵗ; ofᵉ)
+open import Rx.Obs-Depth using (zeroη; obsDepthᵗ)
+open import Rx.Obs-Depth.Substitution using (dep-fn-pos)
+open import Probed.Apparatus using (Confirms)
 
 Γ₀ : Ctx 0
 Γ₀ = []ⱽ
@@ -61,53 +50,26 @@ open import Rx.Obs-Depth using (obsDepthᵉ; obsDepthᵗ)
 drops : Fn Γ₀ [] [] [] natᵗ (obs natᵗ)
 drops = strmᵗ (ofᵉ (nat̂ 7 ∷ []))
 
-row-drops-emitted : obsDepthᵉ (applyFn drops 3) ≡ 0
-row-drops-emitted = refl
-
 row-drops-template : obsDepthᵗ drops ≡ 1
 row-drops-template = refl
+
+row-drops-pos : Confirms (dep-fn-pos zeroη refl drops)
+row-drops-pos = s≤s z≤n
 
 ------------------------------------------------------------------
 -- ROW 2 — LOAD-BEARING.  A template that WRAPS its argument.
 ------------------------------------------------------------------
 
 -- `nat → obs (obs nat)`: the argument is placed under TWO `strmᵗ`s the
--- template wrote.  This is the shape that refuted the symmetric pinned
--- form, and it is the one that would refute this statement too if
--- substitution moved the reading.  It fails if the emitted expression
--- reads 2 rather than 1 — i.e. if closing the environment left a level
--- behind.
+-- template wrote, so the head the positivity is read off is the outer
+-- one while the argument sits under the inner.  It fails if a template
+-- whose returned observable is not its own outermost construction is
+-- read at nought.
 wraps : Fn Γ₀ [] [] [] natᵗ (obs (obs natᵗ))
 wraps = strmᵗ (ofᵉ (strmᵗ (ofᵉ (varᵗ (here refl) ∷ [])) ∷ []))
-
-row-wraps-emitted : obsDepthᵉ (applyFn wraps 3) ≡ 1
-row-wraps-emitted = refl
 
 row-wraps-template : obsDepthᵗ wraps ≡ 2
 row-wraps-template = refl
 
-------------------------------------------------------------------
--- ROW 3 — LOAD-BEARING, AND IT IS A REFUTATION.
-------------------------------------------------------------------
-
--- The same template shape with an OBSERVABLE argument type.  `reify`
--- writes `strmᵗ` for an observable value, so the substitution inserts a
--- level the template never wrote, and the emitted reading is the
--- HANDED value's plus the template's rather than the template's alone.
--- Take the handed observable as deep as you like and the gap is that
--- deep: the unconditioned claim is not off by one, it is unbounded.
-deep : Val Γ₀ (obs natᵗ)
-deep = ofᵉ (strmᵗ (ofᵉ (strmᵗ (ofᵉ (nat̂ 1 ∷ [])) ∷ [])) ∷ [])
-
-row-deep-handed : obsDepthᵉ deep ≡ 2
-row-deep-handed = refl
-
-passes : Fn Γ₀ [] [] [] (obs natᵗ) (obs (obs natᵗ))
-passes = strmᵗ (ofᵉ (varᵗ (here refl) ∷ []))
-
-row-passes-template : obsDepthᵗ passes ≡ 1
-row-passes-template = refl
-
--- 3 is NOT below 1.  The conditioned statement is the true one.
-row-passes-emitted : obsDepthᵉ (applyFn passes deep) ≡ 3
-row-passes-emitted = refl
+row-wraps-pos : Confirms (dep-fn-pos zeroη refl wraps)
+row-wraps-pos = s≤s z≤n

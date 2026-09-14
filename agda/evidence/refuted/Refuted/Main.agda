@@ -78,3 +78,11 @@ open import Refuted.Carried-Shared using (carried-shared-false;
 -- the relation is restated to say
 open import Refuted.Carried-Derived using (carried-derived-false;
   derived-def-depth; derived-ref-depth)
+
+-- and the template drop asked WITHOUT the data hypothesis, which is
+-- what makes that hypothesis the statement rather than a convenience:
+-- reifying an observable argument writes a `strmᵗ` the template never
+-- wrote, so the emission is as deep as whatever was handed in and the
+-- margin is unbounded rather than off by one
+open import Refuted.Template-Passes using (template-strict-false;
+  row-deep-handed; row-passes-template; row-passes-emitted)
