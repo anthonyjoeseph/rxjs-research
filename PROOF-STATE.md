@@ -230,14 +230,21 @@ tier is staged around building one.
 
 ### Big picture tier roadmap
 
-- **REPLACE THE REFUTED TOWER WITH THE DOMAIN AND ONE NAMED LEAF.** One family
-  per frame function, one constructor per clause, every recursive call a
-  sub-derivation — mirroring the recursion instead of measuring it. It cannot
-  land beside the evaluator unclaimed: reachability seeds from Main alone, and
-  nothing true of the relation has a consumer while the arms stand. So the same
-  PR assembles `rank-sufficient` over it and DELETES the tower proving it — a
-  real body for a statement refuted three times, on leaves nobody classed. The
-  tier's falsity becomes one named row, which leg three discharges.
+- **REPLACE THE REFUTED TOWER WITH THE DOMAIN AND ONE NAMED LEAF.** Twenty
+  families in `agda/src/Rx/Evaluator/Domain.agda`, one per frame function of the
+  evaluator's two genuine cycles, one constructor per clause, every recursive
+  call a sub-derivation — and the three clauses that emit the marker simply
+  absent. It cannot land beside the evaluator unclaimed, since reachability
+  seeds from Main alone, so the same PR rewrites
+  `agda/src/Verify-Rank-Sufficient.agda` as an assembly and DELETES the tower
+  under it. The statement is unchanged,
+  `rank-sufficient : ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slots Γ) → hasDry (evaluate fuel e ins) ≡ false`,
+  and its body becomes
+  `rank-sufficient fuel e ins = evaluate⇓-nodry (evaluate⇓-total fuel e ins)`
+  over exactly one postulated leaf,
+  `evaluate⇓-total : ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slots Γ) → evaluate⇓ fuel e ins (evaluate fuel e ins)`,
+  and one proven induction over derivations,
+  `evaluate⇓-nodry : ∀ {n} {Γ : Ctx n} {t} {fuel} {e : Closed Γ t} {ins out} → evaluate⇓ fuel e ins out → hasDry out ≡ false`.
   A domain POSTULATED is still the stuck pattern match, so the families are
   DEFINED here and only inhabitation is deferred.
 
@@ -246,43 +253,56 @@ tier is staged around building one.
   it can be proven without it, which is why it comes before any frame is
   touched. It answers the frame question by CHOOSING among its three answers —
   the bound rides the RETURN rather than being threaded in or read off a state —
-  so the re-establishment is owed by whoever emits, once, in a type. The domain
-  removes the guard that HIDES an unbounded emission; this is what makes the
-  emission bounded, and neither substitutes for the other.
+  so the re-establishment is owed by whoever emits, once, in a type. Guessed
+  shape, replacing `FrameCarries` in
+  `agda/src/Verify-Rank-Sufficient/Push-Carried.agda`:
+  `frame-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo} (id : Id) (now : Tick) (fr : Frame Γ s u) (κ : Path Γ lo u t) (ψ : Fin n → Rd₃) (Rin : Rd) {vals fin sched st outs evs done sched′ st′} → stepFrame⇓ {e = e} id now fr κ vals fin sched st (outs , evs , done , sched′ , st′) → allUnder ψ Rin vals → allUnder ψ (frameRd ψ Rin fr) outs`,
+  where the domain premise supplies the emissions the old predicate had to
+  quantify over. The domain removes the guard HIDING an unbounded emission;
+  this is what bounds it, and neither substitutes for the other.
 
 - **DISCHARGE IT ACROSS ALL FIVE FRAMES IN ONE PASS (Anthony).** One statement,
-  one case split on the frame — the rank no longer differentiates them, which
-  is what collapses five shelves into a single induction and is the whole
-  saving. Taken as one leg because a per-frame grind re-decides the statement
-  four times over, and the second decision is the one that drifts. Rows:
-  `map-frame-carried`, `take-frame-carried`, `scan-frame-carried`,
-  `scan-burst-carried`, `thru-outer-frame-carried`.
+  one case split on `fr` — the rank no longer differentiates them, which is what
+  collapses five shelves into a single induction and is the whole saving. Taken
+  as one leg because a per-frame grind re-decides the statement four times over,
+  and the second decision is the one that drifts. The five arms are `map-f fn`,
+  `scan-f fn nid`, `take-f nid`, `thru-outer op nid` and
+  `from-inner op allNid inst`, each closing under the matching constructor of
+  `stepFrame⇓`. Rows: `map-frame-carried`, `take-frame-carried`,
+  `scan-frame-carried`, `scan-burst-carried`, `thru-outer-frame-carried`.
 
 - **KILL THE DOOR: SPEND THE REPORT AT THE HOP SITE (Anthony).** The
   strengthened return is a REPORT the caller holds, so at the hop the no branch
   is refuted from what it carries — the marker becomes unemittable rather than
-  merely unobserved. It sits HERE and not last because it is the inhabitation
-  proof's crux and not a sequel to it: building a derivation at a hop is exactly
-  discharging that guard's positive branch, so the two are one obligation and
-  the door's route is the only one on offer for it. It ANSWERS the frame
-  question — `from-inner-dry` and `thru-outer-frame-dry` become arithmetic.
+  merely unobserved. The guard is `subscribeInner`'s `obsDepthᵉ o <? r` in
+  `agda/src/Rx/Evaluator.agda`, and the obligation is roughly
+  `hop-fits : ∀ {n} {Γ : Ctx n} {u} {o : Val Γ (obs u)} {ψ Rin r} → allUnder ψ Rin (o ∷ []) → obsDepthᵉ o < r`.
+  It sits HERE and not last because it is the inhabitation proof's crux and not
+  a sequel to it: building a derivation at a hop is exactly discharging that
+  guard's positive branch, so the two are one obligation and the door's route is
+  the only one on offer for it. It ANSWERS the frame question —
+  `from-inner-dry` and `thru-outer-frame-dry` become arithmetic.
 
-- **THEN PROVE THE REST INHABITED, WHICH IS THE TERMINATION ARGUMENT.** With the
-  hop discharged, what is left is an induction free to use any measure a PROOF
-  may use, including quantities the machine cannot compute — exactly the
-  constraint every dead candidate died under. Each was killed as a figure the
-  EVALUATOR evaluates; none as a proof-level measure, so the four refutations
-  bound what this leg may assume and not what it may prove. Leaves are
-  postulated at full strength and ground one at a time; nothing reduces through
-  them until the cutover.
+- **THEN PROVE THE REST INHABITED, WHICH IS THE TERMINATION ARGUMENT.** Leg
+  one's leaf, split one totality lemma per family and ground leafward-first —
+  `subscribeE⇓-total : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo τ} (ac : Acc _≺_ τ) (b : Closed Γ u) (κ : Path Γ lo u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) → subscribeE⇓ b κ id now sched st (subscribeE {e = e} ac b κ id now sched st)`
+  and its siblings. The two guards the relation does not index are discharged
+  HERE and nowhere else: the unfold's `syncSizeᵉ (unfoldμ body) <? sz` and the
+  connect's, neither of which is a function of the relation's own arguments.
+  What is left is an induction free to use any measure a PROOF may use,
+  including quantities the machine cannot compute — the constraint every dead
+  candidate died under, each having been killed as a figure the EVALUATOR
+  evaluates. Nothing reduces through the leaves until the cutover.
 
 - **AND ONLY THEN CUT OVER, WHICH DELETES THE THREE ARMS AND THE MARKER.** The
-  evaluator recurses on the derivation, the guards go, and `hasDry` is false by
-  construction rather than by argument — which is what makes leg one's named
-  leaf true and the top-line claim sound, since `formal-verification-batchSimultaneous`
-  reaches `rank-sufficient` and has all along. It is last because reduction is
-  preserved only when inhabitation is COMPLETE: a cutover over postulated leaves
-  is the stuck pattern match leg one avoids. Four refutations come back with it,
+  evaluator takes a `subscribeE⇓` derivation where it takes `Acc _≺_ τ` today and
+  recurses on it, the three `with` guards and `dryBurst` go, and `hasDry` is
+  false by construction rather than by argument — which is what makes leg one's
+  named leaf true and the top-line claim sound, since
+  `formal-verification-batchSimultaneous` reaches `rank-sufficient` and has all
+  along. It is last because reduction is preserved only when inhabitation is
+  COMPLETE: a cutover over postulated leaves is the stuck pattern match leg one
+  avoids. `Refuted.Arrival-Filtered` and its three siblings come back with it,
   and whether their crossings return unchanged is the check.
 
 ### Open questions
