@@ -231,17 +231,17 @@ cannot compute — and the other two leaves carry no arithmetic at all.
 
 ### Big picture tier roadmap
 
-- **DELETE THE ARM; PROVING IT UNREACHABLE IS A DIFFERENT JOB (Anthony).** THE
-  DOOR is `subscribeInner`'s `obsDepthᵉ o <? r`, and the two peels ask it of a
-  size and a count. Proving the `no` arm unreachable claims something about
-  the machine as it stands and comes LAST — it is reachable and three witnesses
-  reach it. Deleting it comes first and changes what the recursion is
-  over: the order is numeric, so every non-structural edge re-establishes it at
-  RUNTIME and can fail, while a derivation taking each sub-call's own witness as
-  a premise has none to give — no arm, no test, no seed. So killing the door and
-  inhabiting the relation are ONE obligation.
-  `Verify-Rank-Sufficient.Doorless` is the builder; `Rx.Evaluator.Doorless` the
-  three facts replacing the tests, of which the μ peel's is proven.
+- **TIE THE KNOT ABOVE THE MACHINE, SO `evaluate` IS THE BUILDER'S PROJECTION
+  (Anthony).** The door is deleted and the evaluator's termination went with
+  it: three of the twelve recursive edges are non-structural, and no witness may
+  enter `evaluate`'s TYPE — a proof-carrying pipeline is the one line this repo
+  does not cross, recorded at `hop-edge`. Nor can the argument arrive from
+  above, since every builder imports the machine and a module graph cannot hand
+  a definition its own descent. So the knot LEAVES `Rx.Evaluator`, which keeps
+  only what terminates; `Rx.Evaluator.Domain` indexes by RESULT and already
+  mirrors exactly the twenty that move. The builder above it returns each result
+  WITH its derivation, so `evaluate` is `proj₁`, `evaluate⇓-total` is `proj₂`,
+  and `Main` still imports a pipeline's type.
 
 - **PRICE THE TEMPLATE, NOT THE INPUT: STATE THE SUBSTITUTION LEMMA (Anthony).**
   Six refutations stand at the door and every one of them refutes a price stated
@@ -312,7 +312,8 @@ cannot compute — and the other two leaves carry no arithmetic at all.
 - **`subscribeE⇓-input-total`** (Verify-Rank-Sufficient) — FALSITY, `PROBED`: a
   derivation at a slot subscription's own output. Six arms, and the share one's
   connect reads the unconnected count against the entry's first component, so
-  this is refutable exactly as its parent was.
+  this is refutable exactly as its parent was. Builder half
+  `subscribeE!-input`; connect arithmetic `connect-drops`.
 
 - **`innerReact⇓-total`** (Verify-Rank-Sufficient) — FALSITY, `PROBED`: the
   same edge reached through the flattener's own bookkeeping rather than a fresh
@@ -327,28 +328,19 @@ cannot compute — and the other two leaves carry no arithmetic at all.
 - **`drain⇓-total`** (Verify-Rank-Sufficient) — FALSITY, `PROBED`: the same
   over the arrival cycle. It carries no guard itself; its cascade arm re-enters
   the subscribe cycle, so it inherits that leaf's falsity rather than adding
-  one.
-
-- **`subscribeE⇓-nodry`** (Verify-Rank-Sufficient) — FALSITY, `PROBED`: the
-  subscribe half's output carries no dry event, by induction over the twelve
-  subscribe-cycle families. Four sources reach it, each closing through a
-  different helper; no share, flattener or node store is covered.
-
-- **`drain⇓-nodry`** (Verify-Rank-Sufficient) — FALSITY, `PROBED`: the same
-  over the drain and cascade families. One arrival reaches it, at the state the
-  root subscribe actually left; the cancelled arm and every chain carrying a
-  frame are uncovered.
+  one. Its builder half is `drain!`.
 
 - **`thruConsume⇓-total`** (Verify-Rank-Sufficient) — FALSITY,
-  `REFUTED, PROBED`: the one clause that takes a value and subscribes it. The
-  premise the refutation forced has landed, so what is open is the enqueue arm
-  and the two operators reading a different node state; nothing instantiates
-  the conditioned form.
-
-- **`subscribe-carried`** (Verify-Rank-Sufficient) — SHAPE, `REFUTED×2`: a
-  subscribe's own burst hands on nothing deeper than the entry rank. Refuted
-  twice, and the second says the entry has to speak about the SCHEDULE — a
-  reference is priced at nought while the definition it names is not.
+  `REFUTED, PROBED`: the one clause that takes a value and subscribes it,
+  customer of both shelves below. Open: the enqueue arm, two operators on a
+  different node state, and the hop `subscribeInner⇓-total`.
+  Substitution: `obsDepth-eval-open`, `obsDepth-wkTm`, `applyFn-strict`,
+  `syncSize-applyFn`, `eval-case`, `eval-if`, `data-of`, `dataSize`,
+  `+-dataˡ`, `+-dataʳ`, `×-dataˡ`, `×-dataʳ`. Carried: `applyFn-ok-×`,
+  `applyFn-ok-+`, `map-frame-carried-obs`, `scan-frame-carried`,
+  `take-frame-carried`, `thru-outer-frame-carried`, `from-inner-carried`,
+  `subscribe-carried-schedule`, `burst-handed`, `burst-widen`, `payOf`,
+  `rankOf`, `source-carried`, `of-carried`, `all-carried`.
 
 ## Tier 2 — Verify-Well-Formed (parked behind tier 1)
 
