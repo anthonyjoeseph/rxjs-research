@@ -110,17 +110,29 @@ subscribeInner′ (acc rec) op allNid κ id now o hop sched st =
 --     content-bearing arm.  Then `obsDepth-applyFn` falls out.
 -- 3.  Spend it at `map-frame-carried`, which becomes a real body — and
 --     the input bound `Pin` leaves four of the five leaves.
--- 4.  `subscribeInner⇓-total` then has its premise from the call site,
---     and the `no` arm dies by `⊥-elim` — the kill, in the relation.
--- 5.  ONLY THEN delete the clause from `Rx.Evaluator`, which is what
---     makes `hasDry` false of the machine rather than of the relation.
---     `Refuted.Dry-Wrap` goes red in that same commit and is deleted
---     with it; `make refuted` going red is the signal, not a problem.
+-- 4.  `subscribeInner!` then has its premise from the call site, and
+--     the clause is written with no `with` at all — the kill, in the
+--     builder.  `Refuted.Dry-Wrap` goes red at the cutover and is
+--     deleted with it; `make refuted` going red is the signal.
 --
--- Steps 4 and 5 are the two halves people conflate, and the order
--- matters: deleting the clause first leaves the evaluator with a hole
--- where the descent witness was, and the premise is the only thing that
--- fills it.
+-- AND STEPS 4 AND 5 ARE NOT THE TWO HALVES ANYONE THOUGHT (Anthony).
+-- Two different things are called killing the door and they schedule
+-- OPPOSITELY.  Proving the refusing arm UNREACHABLE is a claim about
+-- the machine as it stands, and it comes LAST — the arm is reachable
+-- today and three witnesses reach it, so proving otherwise now would be
+-- proving something false.  DELETING the arm comes first, and it is not
+-- a removal: it is a change of what the recursion is over.  The order
+-- is numeric, so every non-structural edge re-establishes it at
+-- runtime, and a runtime re-establishment has a negative answer.  A
+-- derivation taking each sub-call's own witness as a premise has none
+-- to give.
+--
+-- SO KILLING THE DOOR AND INHABITING THE RELATION ARE ONE OBLIGATION
+-- RATHER THAN CONSECUTIVE ONES, which is why this was in the wrong
+-- place for a structural reason and not by a priority call: to BUILD a
+-- derivation at a hop you must show the guard's positive branch is
+-- taken, and that is exactly spending the report at the hop site.
+-- `Verify-Rank-Sufficient.Doorless` is that builder.
 --
 -- WHAT STAYS OPEN AFTER ALL FIVE, AND IT IS SMALLER THAN THE TIER WAS.
 -- A template's output is priced by the program; a SOURCE's output is
