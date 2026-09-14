@@ -231,12 +231,13 @@ first match, which is why `bug-cache` is off the gate for the duration and
 - **THE FIELD ON THE INVARIANT RECORD, WHICH IS WHERE THE SPLIT LEFT THE CLAIM
   POINTING.** Walking `burst-carries` as a body settled which of its arms carry
   content: the bookkeeping bursts hold no value at all and close by
-  construction, and what is left are `all-carries` and `slot-carries` — the two
-  that follow the run into a family whose burst comes back through a node or out
-  of the store. That is the site `mergeAllDrain!` reads, so the two are one
-  question and its answer is a field rather than a premise, obliging every
-  producer and cascading through every consumer. The leg is the field and its
-  producers; whether it suffices for the queue is what it settles.
+  construction, `all-carries` closed as a body over the one constructor its
+  relation has, and what is left is `slot-carries` — the arm that follows the
+  run out of the store, where the burst comes back at the slot's own reading
+  rather than the caller's. That is the site `mergeAllDrain!` reads, so its
+  answer is a field rather than a premise, obliging every producer and cascading
+  through every consumer. The leg is the field and its producers; whether it
+  suffices for the queue is what it settles.
 
 - **AND THE PREDECESSOR'S SUPPORT CONE, WHICH THE SLOT SUBSCRIBE'S BODY LEFT
   STANDING.** The connect arm now names what it does through the relation's own
