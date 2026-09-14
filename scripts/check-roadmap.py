@@ -921,21 +921,7 @@ def unevidenced_birth(path, tiers, cen):
     The repair is to PROBE the row, never to reclassify it: the classes are a
     reading of the evidence and this check is about there being any.
 
-    SUSPENDED FOR THE DURATION, BY THE SAME FACT THAT TOOK THE BUG CACHE OFF THE
-    GATE (Anthony).  This floor was written with QuickCheck behind it: "probe the
-    row" means run the statement at generated programs and let the corpus decide.
-    Under the projection cutover a run does not REDUCE while any builder leaf is
-    a postulate, so `agda:qc`, the oracle and the cache are all stuck at the first
-    match, and the only instantiation left is a single point picked by hand and
-    pinned through `Confirms`.  A hand-picked point is real evidence and it is not
-    the evidence this check demands; leaving the check up would hold the tier to a
-    standard it has no machine for, and the rows it passes would be a receipt for
-    the checker rather than for the statement.  It comes back the day a row runs,
-    which is the tier's own ending condition -- the cache returns to the gate in
-    the same commit.
     """
-    return []
-
     low = lowest_open_tier(tiers)
     if low is None:
         return []
@@ -1434,9 +1420,8 @@ def main():
              else "; every live postulate is on the roadmap, and every row head "
                   "names one; every classed row's evidence field matches its "
                   "postulates' own headers, every GRINDABLE row names a "
-                  "proven twin, no DIFFICULTY row stands on none — and the "
-                  "birth floor is SUSPENDED, so nothing here says a row of "
-                  "the tier being worked has ever been instantiated"))
+                  "proven twin, no DIFFICULTY row stands on none, and every "
+                  "row of the tier being worked has been instantiated"))
     return 0
 
 

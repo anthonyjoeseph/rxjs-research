@@ -71,3 +71,9 @@ open import Probed.Eval-Binders using (row-case-data; case-data-bound;
 -- the value does not take.
 open import Probed.Burst-Handed using (row-data-flat; row-data-pair;
   row-data-sum; row-silent-flat; row-silent-sum; row-silent-binder)
+
+-- THE TWO HEADS THAT LEAVE THE BURST REPORT — instantiated on the arms
+-- that pass a payload through, which is every arm reachable without a
+-- subscription derivation.
+open import Probed.Frame-Heads using (row-inner-false; row-inner-dead;
+  row-thru-nil; row-thru-merge; row-thru-switch; row-thru-exhaust)

@@ -219,16 +219,6 @@ agda-dev-selftest:
 # so nothing else in the build would ever notice it rotting.  This target is
 # what makes its invariant enforceable rather than remembered.
 #
-# OFF THE GATE FOR THE DURATION OF THE CUTOVER (Anthony).  The corpus RUNS the
-# evaluator, and after the cutover the evaluator is built from postulated
-# leaves, so it typechecks and does not reduce.  Holding the gate to a target
-# that cannot pass until the last leaf lands would make the whole tower
-# unmergeable for as long as that takes -- which is the opposite of what a gate
-# is for.  It goes back on the gate in the leg that restores runnability, and
-# until then `make bug-cache` is a target to TYPE, not one the gate types for
-# you.  The invariant is unchanged and so is the finish line: green here still
-# means no known counterexample remains.
-#
 # THE CORPUS IS RUN, NOT TYPECHECKED, and the verdict comes back as text
 # because `CLI.IO` has no exit status to hand back -- stdin and stdout are its
 # whole FFI surface.  So this demands the summary line BEFORE refusing any FAIL
@@ -953,15 +943,25 @@ roadmap-selftest:
 	  fi; \
 	  echo "$$nof" | grep -q "b-shape" \
 	    && { echo "SELFTEST FAIL: the no-floor check fired on a SHAPE row — the blank is legal on the classes that claim nothing"; fail=1; }; \
-	  : "THE BIRTH FLOOR IS SUSPENDED, so its five properties are not pinned — the"; \
-	  : "fixtures and the assertions are in git and come back with the check.  Why"; \
-	  : "it is down is in check-roadmap.py's unevidenced_birth: the floor's repair"; \
-	  : "is to PROBE, and under the projection cutover a run does not reduce, so"; \
-	  : "there is no corpus to probe against.  It returns the day a row runs."; \
-	  scripts/check-roadmap.py --file scripts/roadmap-selftest/evid-birth.md \
+	  bir=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/evid-birth.md \
+	           --ledger scripts/roadmap-selftest/ledger.txt --census scripts/roadmap-selftest/census-birth.txt \
+	           --src-names scripts/roadmap-selftest/src-names.txt 2>&1); \
+	  if scripts/check-roadmap.py --file scripts/roadmap-selftest/evid-birth.md \
 	       --ledger scripts/roadmap-selftest/ledger.txt --census scripts/roadmap-selftest/census-birth.txt \
-	       --src-names scripts/roadmap-selftest/src-names.txt > /dev/null 2>&1 \
-	    || { echo "SELFTEST FAIL: evid-birth.md was rejected while the birth floor is suspended — the fixture has picked up a SECOND finding, so restoring the floor will not restore its selftest"; fail=1; }; \
+	       --src-names scripts/roadmap-selftest/src-names.txt > /dev/null 2>&1; then \
+	    echo "SELFTEST FAIL: a FALSITY row nothing has ever instantiated PASSED in the tier being worked — the birth floor is dead, and an unprobed FALSITY is what every refutation this campaign landed was standing on"; fail=1; \
+	  else \
+	    echo "$$bir" | grep -q "NOTHING HAS EVER INSTANTIATED" \
+	      || { echo "SELFTEST FAIL: an uninstantiated row was rejected for the wrong reason"; fail=1; }; \
+	  fi; \
+	  echo "$$bir" | grep -q "a-falsity" \
+	    || { echo "SELFTEST FAIL: the uninstantiated row was not NAMED"; fail=1; }; \
+	  echo "$$bir" | grep -q "DIFFICULTY ROWS WITH NO EVIDENCE" \
+	    && { echo "SELFTEST FAIL: the DIFFICULTY floor fired on evid-birth.md, so it does not isolate the birth floor — FALSITY is the class that floor exempts"; fail=1; }; \
+	  echo "$$bir" | grep -q "b-shape" \
+	    && { echo "SELFTEST FAIL: a PARKED tier's uninstantiated row was reported — the floor binds only where work happens, since a parked row can be restated out from under by the tier below it"; fail=1; }; \
+	  echo "$$cln" | grep -q "NOTHING HAS EVER INSTANTIATED" \
+	    && { echo "SELFTEST FAIL: the birth floor fired on a clean roadmap"; fail=1; }; \
 	  cap=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/evid-overcap.md \
 	           --ledger scripts/roadmap-selftest/ledger.txt --census scripts/roadmap-selftest/census-overcap.txt \
 	           --src-names scripts/roadmap-selftest/src-names.txt 2>&1); \
@@ -1242,6 +1242,7 @@ gate-heavy: stripped
 	 [ "$$st" -eq 0 ] || { scripts/notify.py "RED (the tower)"; exit 1; }
 	@$(MAKE) --no-print-directory refuted
 	@$(MAKE) --no-print-directory probed
+	@$(MAKE) --no-print-directory bug-cache
 	@scripts/dev-changed.py --stamp
 	@echo "gate-heavy: ALL GREEN"
 	@scripts/notify.py "GREEN (heavy)"

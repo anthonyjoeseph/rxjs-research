@@ -229,15 +229,6 @@ does.
 
 ### Big picture tier roadmap
 
-- **PUT THE CORPUS BACK ON THE GATE, AND THE BIRTH FLOOR WITH IT.** The
-  evaluator runs, so both checks that were suspended for the duration can be
-  live again in one commit: `bug-cache` into the cheap gate, and the
-  unevidenced-birth check restored with its selftest. This leg narrows no
-  question and is taken first because none of them can be WORKED while it is
-  open — every risky row left here is a reading over a run, so instantiating
-  one means running a program, and a floor nothing enforces is why several rows
-  below still name no evidence at all.
-
 - **MOVE THE READING'S CURRENCY FROM A JOIN TO A SUM.** The reading JOINS where
   a run ADDS, which is the single fact behind both refutations on the frame
   heads: a template wrapping its own argument hands back a value deeper than
@@ -275,6 +266,17 @@ does.
   relations, and what it decides is whether the rank an inner subscription
   enters at is one this walk carries or one the record has to.
 
+- **A SUBSCRIBE HARNESS FOR THE EVIDENCE TREE, WHICH IS WHAT THE FIRST PASS AT
+  THE HEADS ABOVE TURNED OUT TO NEED.** Instantiating `inner-handed` and
+  `thru-handed` reached every arm that passes a payload THROUGH and none that
+  mints one, because each minting arm runs a `subscribeInner⇓` and the tree has
+  no way to build one. So the whole risky half of both statements — a value the
+  drain produced, an inner alive through its instance — is unreachable by
+  construction, not by choice of point. The leg builds the missing piece: a
+  state and a derivation reached by RUNNING a small program rather than
+  written by hand, which is the same apparatus every other reading-over-a-run
+  row in this tier will want.
+
 ### Open questions
 
 - **Is the depth a run climbs a JOIN or a SUM?** Every risky row left in this
@@ -305,10 +307,10 @@ does.
   grow with the LENGTH of the burst and no static reading carries a length.
 
 - **`inner-handed`, `thru-handed`** (Rx/Evaluator/Burst-Report) — FALSITY,
-  `NO EVIDENCE`: the two `*All` heads, which rewrite no payload — they
-  subscribe one, or deliver what an inner subscription produced. So the claim
-  owed is this one about ANOTHER family's run, at the rank that family entered
-  at rather than this frame's.
+  `PROBED×2`: the two `*All` heads, which rewrite no payload — they subscribe
+  one, or deliver what an inner subscription produced. So the claim owed is
+  this one about ANOTHER family's run, at the rank that family entered at
+  rather than this frame's.
 
 - **`eval-silent`** (Rx/Evaluator/Burst-Report) — FALSITY, `PROBED`: the
   residue the strict drop cannot reach — a closed term reading nought, whose
