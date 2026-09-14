@@ -48,7 +48,7 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁻)
 open import Data.List.Relation.Unary.All using (All) renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
 open import Data.Fin using (Fin)
-open import Data.Nat using (ℕ; zero; suc; pred; _≤_; _<_; _+_; _⊔_; z≤n; s≤s)
+open import Data.Nat using (ℕ; zero; suc; pred; _≤_; _<_; _⊔_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤-refl; ≤-trans; ⊔-mono-≤; m≤m⊔n; m≤n⊔m;
   ⊔-identityʳ)
 open import Data.Product using (_,_)
@@ -56,14 +56,10 @@ open import Data.Sum using (inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong; cong₂)
 
-open import Rx.Exp using (Ty; Ctx; Exp; Tm; Val; Fn; isData;
-  unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs;
-  input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ;
-  μᵉ; varᵉ; deferᵉ;
-  varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ;
-  add; sub; mul; eqᵖ; ltᵖ; notᵖ;
-  reify; wkTm; lookupEnv; subΘExp; subΘTm; subΘTms; closeUnderFn;
-  evalWith; applyFn; syncSizeᵉ; syncSizeᵗ)
+open import Rx.Exp using (Ty; Ctx; Exp; Tm; Val; isData; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; input; ofᵉ; emptyᵉ; mapᵉ;
+  takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; varᵗ; unit̂; bool̂; nat̂;
+  pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ; add; sub; mul; eqᵖ; ltᵖ; notᵖ;
+  reify; wkTm; lookupEnv; subΘExp; subΘTm; subΘTms; closeUnderFn; evalWith)
 open import Rx.Obs-Depth using (depᵉ; depᵗ; depᵗˢ; depᵛ)
 
 ------------------------------------------------------------------
@@ -330,127 +326,3 @@ dep-eval-strict η dd (primᵗ notᵖ a)  env = z≤n
 dep-eval-strict η dd (strmᵗ e)     []ᵃ = ≤-refl
 dep-eval-strict η dd (strmᵗ e)     (v ∷ᵃ vs)
   rewrite dep-closeUnderFn η dd e (v ∷ᵃ vs) = ≤-refl
-
-
--- the reading of an environment, which is what the open form is
--- denominated in.
-envDepth : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) {Θ} → All (Val Γ) Θ → ℕ
-envDepth η []ᵃ       = 0
-envDepth η (v ∷ᵃ vs) = depᵗ η (reify v) ⊔ envDepth η vs
-
--- THE OPEN FORM: what an environment carrying observables costs, which
--- is one wrap per binder crossed and NOT a function of the machine.
--- This is the statement the fold's arm needs, and the growth in it is
--- the iteration axis the carried family already names — stated here so
--- the two are the same fact rather than two.
---
--- AND NO ROW AT AN OBSERVABLE BINDER CAN SIT ON THIS BOUND, WHICH IS A
--- PROPERTY OF `envDepth` RATHER THAN OF THE PROGRAMS.  It reads its
--- values through `reify`, and reifying an observable writes a `strmᵗ`
--- the value did not have — so the environment's measured reading is
--- one above the reading of what is in it, and the slack is structural.
--- Tightness would need the measure to read the value rather than its
--- literal, which is a restatement and not a repair to the proof.
---
--- PROBED: `Probed.Eval-Binders` — an empty environment, a data one,
---   and one carrying an observable both read straight back and wrapped
---   again under a `strmᵗ`.  Not reached: the iteration axis, since one
---   evaluation crosses one binder and the growth this prices is per
---   refold.
-postulate
-  dep-eval-open : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) {Θ t}
-    (tm : Tm Γ [] [] Θ t) (env : All (Val Γ) Θ) (m : ℕ) →
-    envDepth η env ≤ m → depᵛ η t (evalWith tm env) ≤ depᵗ η tm + m
-
--- THE STRICT READING, AND IT IS THE WHOLE POINT.  An observable
--- emitted by a template is written strictly below the template — with
--- no hypothesis about the run, the store, or the bound the frame was
--- entered under, so a hop whose argument came from a template is priced
--- by the program text alone.  The lemma above gives the drop; what is
--- left is that there is something to drop FROM, which is the leaf
--- below.
---
--- AND THE DATA HYPOTHESIS IS THE STATEMENT, NOT A CONVENIENCE.  Where
--- the argument is itself observable, reifying it writes a `strmᵗ` the
--- template never wrote, so the substitution adds a level and the
--- emission is as deep as whatever was handed in — unbounded, rather
--- than off by one.  So the conditioned form is the true statement
--- replacing a false one rather than a weakening of it.
---
--- REFUTED: `Refuted.Template-Passes` — the same drop with the
---   hypothesis taken out, at a template that passes its argument
---   through.
-
--- THE LEAF IS SYNTAX, WITH NO ENVIRONMENT AND NO VALUE IN IT.  A
--- template at an observable result type has to WRITE the observable it
--- returns, because the one other way to have one is to read it from a
--- binder and the only binder is data.  The induction that says so needs
--- two predicates the type alone decides — one for a type every value of
--- which contains an observable, one for a context no binder of which
--- has such a type — because a `caseᵗ` at an observable result binds
--- into its branches, and which of the three subterms carries the
--- positivity is decided by whether those binder types are themselves
--- reachable.  Stated at the specialisation the door spends, since that
--- is the only shape any consumer asks for.
---
--- PROBED: `Probed.Template-Depth` — templates whose body is `ofᵉ` of a
---   term, with the argument dropped and with it wrapped under a second
---   `strmᵗ`.  Not reached: every head that BINDS, which is the arm the
---   induction has to split on.
-postulate
-  dep-fn-pos : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) {s u} → isData s ≡ true →
-    (fn : Fn Γ [] [] [] s (obs u)) → 0 < depᵗ η fn
-
-applyFn-strict : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) {s u} → isData s ≡ true →
-  (fn : Fn Γ [] [] [] s (obs u)) (v : Val Γ s) →
-  depᵉ η (applyFn fn v) < depᵗ η fn
-applyFn-strict η ds fn v =
-  ≤pred⇒< (dep-fn-pos η ds fn) (dep-eval-strict η (ds ∷ᵈ []ᵈ) fn (v ∷ᵃ []ᵃ))
-
--- AND THE SIZE HALF, WHICH THIS ROUTE DOES NOT GIVE FOR FREE.  A
--- substituted data value replaces a `varᵗ` of size one with a literal
--- whose size is a function of its TYPE — bounded, but not by one.  So
--- the size axis keeps the pair the carried family states it at; what
--- the substitution lemma collapses is the DEPTH axis, which is the one
--- the door reads.
-
--- AND THE FORM BELOW IS ALMOST CERTAINLY FALSE, WHICH IS WHAT COMES OF
--- INSTANTIATING IT.  The correction term is a function of the argument
--- TYPE, so at a fixed argument type it is ONE NUMBER however the
--- template is written — while the growth substitution causes is per
--- OCCURRENCE: each `varᵗ` the template reads is replaced by a literal
--- larger than it, so a template reading its argument k times pays k
--- times the difference.  Instantiated at a pair of numerals, one
--- occurrence leaves a gap of one over the template's own size and
--- three occurrences leave five, and nothing on the right moves with k.
--- Whatever number the correction returns, a template reading its
--- argument often enough exceeds it.
---
--- WHAT THE REPAIR IS, AND IT IS A RESTATEMENT RATHER THAN A PROOF.
--- The true statement prices the growth where it happens — a term of
--- size m reading a data argument grows by at most m times what a
--- literal of that type costs — so the correction belongs MULTIPLIED by
--- the template's size rather than added to it.  The row that closes
--- today closes only because a numeral reifies to one node and the
--- growth is nil; it is evidence that the shape is right at the floor,
--- not that the arithmetic holds.
---
--- AND THE STATEMENT CANNOT BE REFUTED IN THE SHAPE IT HAS, which is
--- the second half of the finding.  The correction is a postulate with
--- no equations, so no concrete instantiation can contradict it: the
--- witness has to be a FAMILY indexed by the occurrence count, carrying
--- the two rates as an induction.  So the finding is carried as a pair
--- of pins rather than as a `⊥` in the refuted tree.
---
--- PROBED: `Probed.Data-Shelf` — the bound at an argument whose
---   literal is one node, where the correction goes unspent.  NOT
---   reached, and not reachable: any argument whose literal is larger,
---   since closing such a row needs a LOWER bound on a postulate that
---   has no equations.  The two pins there carry the gap at one and at
---   three occurrences of the same argument type.
-postulate
-  dataSize : Ty → ℕ
-
-  syncSize-applyFn : ∀ {n} {Γ : Ctx n} {s u} → isData s ≡ true →
-    (fn : Fn Γ [] [] [] s (obs u)) (v : Val Γ s) →
-    syncSizeᵉ (applyFn fn v) ≤ syncSizeᵗ fn + dataSize s

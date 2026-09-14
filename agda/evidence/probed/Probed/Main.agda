@@ -46,13 +46,6 @@ module Probed.Main where
 -- both belong to the tree and a tree with nothing open still owes them.
 open import Probed.Apparatus using (Confirms; Separates)
 
--- THE TEMPLATE ROWS, which stand under the strict drop rather than
--- at it: the drop is a body now, and what it is spent through is the
--- positivity of a template that returns an observable.  Two shapes, the
--- argument dropped and the argument wrapped.
-open import Probed.Template-Depth using (row-drops-template; row-drops-pos;
-  row-wraps-template; row-wraps-pos)
-
 -- THE CONNECT EDGE'S COUNTING COMPONENT, at slot tables of one and
 -- three shared slots — the only part of the order that counts rather
 -- than measures, and the only one decidable without a run.
@@ -60,26 +53,21 @@ open import Probed.Connect-Count using (row-one-count; row-three-count;
   row-three-one-taken; row-last-slot; row-with-slack; row-not-head)
 
 -- THE SHELF UNDER THE SUBSTITUTION LEMMA — the telescope membership,
--- whose rows buy non-vacuity rather than an inequality; the weakening;
--- and the size bound, whose rows found the gap it is stated against
--- growing in a parameter the bound cannot see.
+-- whose rows buy non-vacuity rather than an inequality, and the
+-- weakening, whose rows have content on both sides.
 open import Probed.Data-Shelf using (row-of-head; row-of-tail;
-  row-wk-leaf; row-wk-strm; row-sync-one-node;
-  gap-once-template; gap-once-applied;
-  gap-thrice-template; gap-thrice-applied)
+  row-wk-leaf; row-wk-strm)
 
--- THE TWO BINDING ARMS THE STRICT DROP DEFERS, AND THE OPEN FORM THAT
--- PRICES THE SAME CROSSING — instantiated at the observable payload,
--- which is the region that could make any of the three false.
+-- THE TWO BINDING ARMS THE STRICT DROP DEFERS — instantiated at the
+-- observable payload, which is the region that could make either
+-- false.
 open import Probed.Eval-Binders using (row-case-data; case-data-bound;
   row-case-obs; case-obs-bound; case-obs-value;
-  row-if-selected; row-if-unselected;
-  row-open-empty; row-open-data; carried-env-depth;
-  row-open-carried; row-open-wrapped)
+  row-if-selected; row-if-unselected)
 
 -- THE BURST REPORT'S TWO PRICING LEAVES — the data payload, whose rows
 -- reach the two types at which the reading recurses, and the silent
 -- term, whose load-bearing row stands at a type reaching an observable
 -- the value does not take.
 open import Probed.Burst-Handed using (row-data-flat; row-data-pair;
-  row-data-sum; row-silent-flat; row-silent-sum)
+  row-data-sum; row-silent-flat; row-silent-sum; row-silent-binder)

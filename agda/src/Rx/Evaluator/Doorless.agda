@@ -268,11 +268,10 @@ split-handed η (complete ∷ es) (_ ∷ᵃ ps) = split-handed η es ps
 -- WHOLE TIER IS ABOUT.  What arrives at the hop is a runtime VALUE,
 -- structurally unrelated to the term the clause stands at, so no
 -- reading of the program supplies it directly — but where the value was
--- handed on by a `map-f` it is `applyFn fn v`, and
--- `Rx.Obs-Depth.Substitution.applyFn-strict` prices that by the
--- TEMPLATE with nothing carried in.  The residue is a source's output
--- and a fold's, which is what the carried family is for and now the
--- only thing that needs it.
+-- handed on by a `map-f` it is `applyFn fn v`, which the burst report
+-- prices by the TEMPLATE at a data payload, with nothing carried in.
+-- The residue is a source's output and a fold's, which is what the
+-- carried family is for and now the only thing that needs it.
 -- IT IS A PREMISE HERE AND NOT A POSTULATE, AND THE DIFFERENCE IS THE
 -- WHOLE OF THE STATEMENT.  Quantified freely over the value and the
 -- rank the claim is false at a glance — hand the clause anything deep

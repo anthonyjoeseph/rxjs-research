@@ -239,17 +239,6 @@ first match, which is why `bug-cache` is off the gate for the duration and
   through every consumer. The leg is the field and its producers; whether it
   suffices for the queue is what it settles.
 
-- **AND THE FRAME FACE, NOW NARROWED ONTO THE TWO HEADS THAT REWRITE.**
-  `push-carries` is a body: the cycle's empty arm closes, and its other emits
-  one concatenation whose split half, retag half and terminal marker all DROP
-  `value`, so the whole claim fell onto `step-handed` — what the frame wrote.
-  That leaves six heads, four of which carry no template. The leg is the walk
-  over them, and it is where the unwired shelf plugs in: a map at a DATA
-  payload is the existing one-value drop generalised to an environment, which
-  is what `applyFn-strict` was stated for. The map at a non-data payload and
-  the scan stay leaves — both already witnessed, and the scan is the one no
-  static reading of the syntax can price.
-
 - **THE TWO ENDS OF THE RUN, WHICH IS WHAT MAKES A ROW REDUCE.** `drain!` is
   fuel induction over the schedule and carries no guard at all; `mergeAllDrain!`
   is the ONE subscription site a burst never reaches, since its observables were
@@ -271,6 +260,16 @@ first match, which is why `bug-cache` is off the gate for the duration and
   on the two leaves that return a schedule nothing here built. It moves every
   clause's return, which is why it is not first.
 
+- **AND THE TWO FRAME HEADS THAT LEAVE THE MODULE, WHICH ARE NOT THE MEASURE'S
+  QUESTION.** The frame walk landed and put four leaves where one statement
+  stood; two of them — `map-open` and `scan-handed` — are the reading itself
+  being wrong and wait on the question below. The other two are not:
+  `inner-handed` and `thru-handed` do not rewrite a payload at all, they follow
+  the run into `innerReact⇓` and `thruWalk⇓`, so what is owed is this same claim
+  at the rank THAT family entered at. The leg is the walk over those two
+  relations, and what it decides is whether the rank an inner subscription
+  enters at is one this walk carries or one the record has to.
+
 ### Open questions
 
 - **Is what a run PRODUCED sayable about a run that reads its own store?** The
@@ -287,10 +286,21 @@ first match, which is why `bug-cache` is off the gate for the duration and
   re-enters at the SLOT's own reading and so needs the two tables related where
   the walk carries only the caller's. Where the field on the record is owed.
 
-- **`step-handed`** (Rx/Evaluator/Burst-Report) — FALSITY,
-  `REFUTED, DEAD ROUTE, RECOVERY`: what ONE frame wrote, which is the only
-  segment of a push cycle's emit that is not bookkeeping. Six heads, and two
-  of them rewrite the payload through a template.
+- **`map-open`** (Rx/Evaluator/Burst-Report) — FALSITY, `REFUTED, RECOVERY`:
+  what a template writes at a payload that is NOT data. The reading JOINS where
+  the run ADDS, so a template wrapping its own argument hands back a value
+  deeper than either side and no premise about the frame can close it.
+
+- **`scan-handed`** (Rx/Evaluator/Burst-Report) — FALSITY, `REFUTED`: the fold,
+  which the map's repair does not reach. Re-entering its own template with the
+  accumulator, the reading climbs once per delivery, so one frame's outputs
+  grow with the LENGTH of the burst and no static reading carries a length.
+
+- **`inner-handed`, `thru-handed`** (Rx/Evaluator/Burst-Report) — FALSITY,
+  `NO EVIDENCE`: the two `*All` heads, which rewrite no payload — they
+  subscribe one, or deliver what an inner subscription produced. So the claim
+  owed is this one about ANOTHER family's run, at the rank that family entered
+  at rather than this frame's.
 
 - **`eval-silent`** (Rx/Evaluator/Burst-Report) — FALSITY, `PROBED`: the
   residue the strict drop cannot reach — a closed term reading nought, whose
@@ -314,16 +324,14 @@ first match, which is why `bug-cache` is off the gate for the duration and
   connect's drop in the unconnected component, the arithmetic the arm above
   spends. No consumer until that arm is a body.
 
-- **`dep-eval-open`, `eval-case`, `eval-if`** (Rx/Obs-Depth/Substitution) —
-  FALSITY, `PROBED×3`: the three places evaluation enters a branch under a
-  binder the data hypothesis does not cover — the two case arms and the fold,
-  where the accumulator is fed back. One question asked three times.
+- **`eval-case`, `eval-if`** (Rx/Obs-Depth/Substitution) — FALSITY, `PROBED×2`:
+  the two places evaluation enters a branch under a binder the data hypothesis
+  does not cover. One question asked twice.
 
-- **`dep-wkTm`, `data-of`, `dataSize`, `syncSize-applyFn`**
-  (Rx/Obs-Depth/Substitution) — FALSITY, `PROBED×4`: the shelf under the arms
-  above. Instantiating the size reading found its correction priced per TYPE
-  against growth that is per OCCURRENCE; the repair is a restatement, and the
-  present shape admits no `⊥`.
+- **`dep-wkTm`, `data-of`** (Rx/Obs-Depth/Substitution) — FALSITY, `PROBED×2`:
+  the shelf under the arms above — the telescope membership, whose rows buy
+  non-vacuity rather than an inequality, and the weakening, which has content
+  on both sides.
 
 - **`subs-keeps-slots`, `step-keeps-slots`, `consume-keeps-slots`,
   `subs-unconn-drops`, `step-unconn-drops`, `consume-unconn-drops`**
@@ -332,9 +340,6 @@ first match, which is why `bug-cache` is off the gate for the duration and
   falling. Stated as inductions over the mutual block; the route carries both
   in the RESULT type, so a restatement is guaranteed.
 
-- **`dep-fn-pos`** (Rx/Obs-Depth/Substitution) — DIFFICULTY, `PROBED`: pure
-  syntax — a template at an observable result must WRITE one, since the only
-  binder is data. Instantiated at both template shapes without refuting.
 
 ## Tier 2 — Verify-Well-Formed (parked behind tier 1)
 

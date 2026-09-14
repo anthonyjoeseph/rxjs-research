@@ -57,8 +57,6 @@ open import Data.Nat using (ℕ)
 open import Relation.Nullary.Negation using (¬_)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 
-open import Rx.Exp using (Ctx; Tm)
-open import Rx.Obs-Depth using (depᵗ)
 
 Confirms : {A : Set} → .(claim : A) → Set
 Confirms {A} _ = A
@@ -92,5 +90,3 @@ record Separates {A : Set} {B : A → Set} (f g : (x : A) → B x) : Set where
 zeroη : ∀ {n} → Fin n → ℕ
 zeroη _ = 0
 
-obsDepthᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → Tm Γ Δᵍ Δ Θ t → ℕ
-obsDepthᵗ = depᵗ zeroη

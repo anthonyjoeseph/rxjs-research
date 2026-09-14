@@ -15,12 +15,12 @@
 -- COVERAGE: the data leaf at a flat type, at a product and at a sum, at
 -- lists of two so the fold is exercised; the silent leaf at a flat type
 -- and at a sum whose other arm is an observable, so the reading has to
--- select on the injection rather than on the type.  NOT reached: a data
--- type nested under a sum under a product, and a silent term at a
--- binding head, since a closed term has no binder to read.
+-- select on the injection rather than on the type, and at a term
+-- reading a data binder.  NOT reached: a data type nested under a sum
+-- under a product, and a binder at a compound data type.
 --
 -- TARGET: data-handed @42a356
--- TARGET: eval-silent @16c604
+-- TARGET: eval-silent @07a37c
 module Probed.Burst-Handed where
 
 open import Data.Bool using (true; false)
@@ -35,7 +35,10 @@ open import Data.Vec using () renaming ([] to []ⱽ)
 
 open import Relation.Binary.PropositionalEquality using (refl)
 
-open import Rx.Exp using (Ctx; Tm; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; nat̂; inlᵗ)
+open import Data.List.Relation.Unary.Any using (here)
+
+open import Rx.Exp using (Ctx; Tm; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; nat̂; inlᵗ; varᵗ)
+open import Rx.Obs-Depth.Substitution using ([]ᵈ; _∷ᵈ_)
 open import Rx.Evaluator.Burst-Report using (data-handed; eval-silent)
 
 open import Probed.Apparatus using (Confirms)
@@ -68,18 +71,30 @@ row-data-sum : Confirms (data-handed {Γ = Γ₀} {u = natᵗ +ᵗ boolᵗ} η�
 row-data-sum = tt ∷ᵃ tt ∷ᵃ []ᵃ
 
 ----------------------------------------------------------------------
--- 2.  THE SILENT LEAF.  A closed term whose reading is nought carries
--- no observable at all, so the predicate holds at EVERY rank -- the
--- rank nought included, which is the case the strict drop cannot reach.
--- The second row is the load-bearing one: its TYPE reaches an
--- observable while its value takes the other arm.
+-- 2.  THE SILENT LEAF.  A term whose reading is nought carries no
+-- observable at all, so the predicate holds at EVERY rank -- the rank
+-- nought included, which is the case the strict drop cannot reach.  The
+-- second row is the load-bearing one: its TYPE reaches an observable
+-- while its value takes the other arm.  The third stands at the binder
+-- the statement is open for, where the data hypothesis is what keeps
+-- the reading nought.
 ----------------------------------------------------------------------
 
-row-silent-flat : Confirms (eval-silent {Γ = Γ₀} {τ = 0 , 0 , 0} η₀ (nat̂ 7) refl)
+row-silent-flat : Confirms
+  (eval-silent {Γ = Γ₀} {Θ = []} {τ = 0 , 0 , 0} η₀ []ᵈ (nat̂ 7) []ᵃ refl)
 row-silent-flat = tt
 
 t-left : Tm Γ₀ [] [] [] (natᵗ +ᵗ obs natᵗ)
 t-left = inlᵗ (nat̂ 3)
 
-row-silent-sum : Confirms (eval-silent {Γ = Γ₀} {τ = 0 , 0 , 0} η₀ t-left refl)
+row-silent-sum : Confirms
+  (eval-silent {Γ = Γ₀} {Θ = []} {τ = 0 , 0 , 0} η₀ []ᵈ t-left []ᵃ refl)
 row-silent-sum = tt
+
+t-binder : Tm Γ₀ [] [] (natᵗ ∷ []) natᵗ
+t-binder = varᵗ (here refl)
+
+row-silent-binder : Confirms
+  (eval-silent {Γ = Γ₀} {Θ = natᵗ ∷ []} {τ = 0 , 0 , 0} η₀ (refl ∷ᵈ []ᵈ)
+    t-binder (7 ∷ᵃ []ᵃ) refl)
+row-silent-binder = tt

@@ -43,32 +43,38 @@ open import Data.List using (List; []; _∷_; map; _++_)
 open import Data.List.Relation.Unary.All using (All)
   renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
 open import Data.List.Relation.Unary.All.Properties using (++⁺)
+open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _≤_; _<_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤-trans; <⇒≤; m≤m⊔n; m≤n⊔m)
-open import Data.Product using (_,_; proj₁; proj₂)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
-open import Data.Unit using (tt)
+open import Data.Unit using (⊤; tt)
 open import Data.Vec using (lookup)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong; subst)
 
 open import Rx.Prim using (Id; Source; Tick; InstEvent; InstEmit; init; value; close;
   handoff; complete; exhausted; subscribe; _at_from_as_)
 open import Rx.Exp using (Ty; Ctx; Closed; Val; Tm; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_;
-  obs; input; isData; evalTm)
+  obs; input; isData; evalTm; evalWith; Fn; applyFn)
 open import Rx.Obs-Depth using (depᵗ; depᵗˢ; depᵛ)
-open import Rx.Obs-Depth.Substitution using ([]ᵈ; ≤pred⇒<; dep-eval-strict)
+open import Rx.Obs-Depth.Substitution using (AllData; []ᵈ; _∷ᵈ_; ≤pred⇒<;
+  dep-eval-strict)
 open import Rx.Slots using (Slots)
 open import Rx.Slot-Depth using (slotDepth)
 open import Rx.Strat-Order using (Tri)
 open import Rx.Sync-Size using (unfoldμ-shrinks)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; oneShotBurst;
-  spentBurst; splitEvents; retagEvents)
+  spentBurst; splitEvents; retagEvents; NodeId; NodeState; scan-st; take-st;
+  mergeAll-st; switch-st; exhaust-st; takeVals; takeDispatch; scanVals; thruWrap;
+  map-f; scan-f; take-f; from-inner; thru-outer; lookupNode)
 open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeAll⇓; pushBurst⇓;
   subscribeSharedSlot⇓; stepFrame⇓; push-nil; push-cons;
   subs-floor; subs-shared; subs-hot-done; subs-hot-live; subs-cold-sync;
   subs-cold-async; subs-of; subs-empty; subs-map; subs-take-zero;
   subs-take-suc; subs-scan; subs-merge-all; subs-switch-all;
-  subs-exhaust-all; subs-μ; subs-defer; sub-all)
+  subs-exhaust-all; subs-μ; subs-defer; sub-all; innerReact⇓; thruWalk⇓;
+  step-map; step-scan; step-scan-nil; step-take; step-from-inner;
+  step-thru-outer)
 open import Rx.Evaluator.Doorless using (EntryOK; ValOK; HandedOK; BurstOK; EventOK;
   split-handed; inner-ok; under-ok; μ-entry)
 
@@ -162,24 +168,32 @@ postulate
 -- the substitution shelf's subject, and the reason that shelf exists.
 --
 -- AND WHAT IS LEFT AS A LEAF IS THE SILENT TERM, WHOSE READING IS
--- NOUGHT.  A closed term reading nothing wrote no `strmᵗ`, and the only
--- other way to hold an observable is to read one from a binder — of
--- which a closed term has none.  So its value carries no observable at
--- all and the predicate holds at EVERY rank, the rank nought included,
--- which is the one case the drop cannot reach: there is nothing to drop
--- below.  It is a leaf because the induction saying so is over the type
--- and the term together, the same split `dep-fn-pos` names.
+-- NOUGHT.  A term reading nothing wrote no `strmᵗ`, and the only other
+-- way to hold an observable is to read one from a binder — which under
+-- a data environment carries none.  So its value carries no observable
+-- at all and the predicate holds at EVERY rank, the rank nought
+-- included, which is the one case the drop cannot reach: there is
+-- nothing to drop below.  It is a leaf because the induction saying so
+-- is over the type and the term together rather than over either
+-- alone.
 --
--- PROBED: `Probed.Burst-Handed` — at a flat payload, and at a sum whose
---   other arm is an observable, which is the shape that could fail it:
---   the TYPE reaches an observable while the value takes the other arm,
---   so the reading has to select on the injection rather than on the
---   type.  NOT reached: a silent term at a binding head, since a closed
---   term has no binder to read.
+-- AND IT IS STATED OPEN, WHICH IS WHAT THE FRAME WALK ASKS FOR RATHER
+-- THAN A GENERALITY FOR ITS OWN SAKE.  A map frame applies a template
+-- to one value, so the term it evaluates is open at exactly one binder
+-- and the closed form is this one at the empty environment.  The data
+-- hypothesis is what keeps that binder from being the observable the
+-- statement says the term does not hold.
+--
+-- PROBED: `Probed.Burst-Handed` — at a flat payload, at a sum whose
+--   other arm is an observable, which is the shape that could fail it
+--   (the TYPE reaches an observable while the value takes the other
+--   arm, so the reading has to select on the injection rather than on
+--   the type), and at a term reading a data binder.  NOT reached: a
+--   binder at a compound data type.
 postulate
-  eval-silent : ∀ {n} {Γ : Ctx n} {u} {τ : Tri} (η : Fin n → ℕ)
-                (tm : Tm Γ [] [] [] u)
-              → depᵗ η tm ≡ 0 → ValOK η u τ (evalTm tm)
+  eval-silent : ∀ {n} {Γ : Ctx n} {Θ u} {τ : Tri} (η : Fin n → ℕ)
+                → AllData Θ → (tm : Tm Γ [] [] Θ u) (env : All (Val Γ) Θ)
+                → depᵗ η tm ≡ 0 → ValOK η u τ (evalWith tm env)
 
 private
   -- a value read under the rank satisfies the entry predicate at every
@@ -198,15 +212,18 @@ private
   valOK-below η (obs t)  _        lt = lt
 
   -- one element: the term's own reading bounds its value's, strictly
-  -- wherever there is anything to be strict about
-  handed-one : ∀ {n} {Γ : Ctx n} {u} {U r sz} (η : Fin n → ℕ)
-               (tm : Tm Γ [] [] [] u) → depᵗ η tm ≤ r
-             → ValOK η u (U , r , sz) (evalTm tm)
-  handed-one {u = u} η tm le with depᵗ η tm in eq
-  ... | zero  = eval-silent η tm eq
-  ... | suc k = valOK-below η u (evalTm tm)
+  -- wherever there is anything to be strict about.  Open at a data
+  -- environment, since a frame's template is open at exactly one
+  -- binder and a source's terms are this at the empty one
+  handed-open : ∀ {n} {Γ : Ctx n} {Θ u} {U r sz} (η : Fin n → ℕ)
+                (dd : AllData Θ) (tm : Tm Γ [] [] Θ u)
+                (env : All (Val Γ) Θ) → depᵗ η tm ≤ r
+              → ValOK η u (U , r , sz) (evalWith tm env)
+  handed-open {u = u} η dd tm env le with depᵗ η tm in eq
+  ... | zero  = eval-silent η dd tm env eq
+  ... | suc k = valOK-below η u (evalWith tm env)
                   (≤-trans (≤pred⇒< (subst (0 <_) (sym eq) (s≤s z≤n))
-                                    (dep-eval-strict η []ᵈ tm []ᵃ))
+                                    (dep-eval-strict η dd tm env))
                            (subst (_≤ _) (sym eq) le))
 
 of-handed : ∀ {n} {Γ : Ctx n} {u} {U r sz} (η : Fin n → ℕ)
@@ -215,7 +232,7 @@ of-handed : ∀ {n} {Γ : Ctx n} {u} {U r sz} (η : Fin n → ℕ)
           → HandedOK η (map (λ tm → evalTm tm) ts) (U , r , sz)
 of-handed η []        dep = []ᵃ
 of-handed η (tm ∷ ts) dep =
-    handed-one η tm (≤-trans (m≤m⊔n (depᵗ η tm) (depᵗˢ η ts)) dep)
+    handed-open η []ᵈ tm []ᵃ (≤-trans (m≤m⊔n (depᵗ η tm) (depᵗˢ η ts)) dep)
   ∷ᵃ of-handed η ts (≤-trans (m≤n⊔m (depᵗ η tm) (depᵗˢ η ts)) dep)
 
 -- WHAT A PUSH CYCLE HANDS ON.  The cycle steps one frame per emit and
@@ -273,48 +290,142 @@ private
   fin-events η true  = tt ∷ᵃ []ᵃ
   fin-events η false = []ᵃ
 
+-- WHAT THE ENTRY INVARIANT SAYS ABOUT THE FRAME ITSELF, which is the
+-- one thing the step needs and the cycle did not carry.  Two of the
+-- five heads hold a template, and the reading of the expression the
+-- subscribe entered at is a JOIN over that template and the inner --
+-- so the caller already has this and hands it down rather than
+-- proving it.  The other three hold no term at all.
+FrameOK : ∀ {n} {Γ : Ctx n} {s u} (η : Fin n → ℕ) → Frame Γ s u → Tri → Set
+FrameOK η (map-f fn)          (_ , r , _) = depᵗ η fn ≤ r
+FrameOK η (scan-f fn nid)     (_ , r , _) = depᵗ η fn ≤ r
+FrameOK η (take-f nid)        _           = ⊤
+FrameOK η (from-inner _ _ _)  _           = ⊤
+FrameOK η (thru-outer _ _)    _           = ⊤
+
+private
+  -- a take hands on a PREFIX of what it was given, so any property of
+  -- the values survives it whatever the budget was
+  take-vals-ok : ∀ {n} {Γ : Ctx n} {s} {τ : Tri} (η : Fin n → ℕ)
+                 (k : ℕ) (vs : List (Val Γ s)) → HandedOK η vs τ
+               → HandedOK η (proj₁ (takeVals k vs)) τ
+  take-vals-ok η zero          vs        _          = []ᵃ
+  take-vals-ok η (suc k)       []        _          = []ᵃ
+  take-vals-ok η (suc zero)    (v ∷ _)  (p ∷ᵃ _)   = p ∷ᵃ []ᵃ
+  take-vals-ok η (suc (suc k)) (v ∷ vs) (p ∷ᵃ ps) =
+    p ∷ᵃ take-vals-ok η (suc k) vs ps
+
+  -- and the dispatch around it: every arm either hands that prefix on
+  -- or hands nothing on, and the cut only changes the bookkeeping
+  take-arm : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s} {τ : Tri}
+             (η : Fin n → ℕ) (nid : NodeId) (vs : List (Val Γ s))
+             (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
+             (ns : Maybe (NodeState Γ)) → HandedOK η vs τ
+           → HandedOK η
+               (proj₁ (takeDispatch {e = e} nid vs fin sched st ns)) τ
+  take-arm η nid vs fin sched st (just (take-st k)) ps
+    with proj₂ (proj₂ (takeVals k vs))
+  ... | true  = take-vals-ok η k vs ps
+  ... | false = take-vals-ok η k vs ps
+  take-arm η nid vs fin sched st nothing                    ps = []ᵃ
+  take-arm η nid vs fin sched st (just (scan-st _))         ps = []ᵃ
+  take-arm η nid vs fin sched st (just (mergeAll-st _ _ _ _)) ps = []ᵃ
+  take-arm η nid vs fin sched st (just (switch-st _ _))     ps = []ᵃ
+  take-arm η nid vs fin sched st (just (exhaust-st _ _))    ps = []ᵃ
+
+-- THE MAP AT A DATA PAYLOAD, WHICH IS THE ONE-VALUE DROP AND NOTHING
+-- MORE.  `applyFn` is evaluation at a one-binder environment, so the
+-- arm is the source's own reading generalised from the empty
+-- environment to that binder -- and the data hypothesis is what stops
+-- the binder being the observable the drop assumes is not there.
+map-data : ∀ {n} {Γ : Ctx n} {s u} {τ : Tri} (η : Fin n → ℕ)
+           → isData s ≡ true → (fn : Fn Γ [] [] [] s u)
+             (vs : List (Val Γ s)) → depᵗ η fn ≤ proj₁ (proj₂ τ)
+           → HandedOK η vs τ → HandedOK η (map (applyFn fn) vs) τ
+map-data {τ = _ , _ , _} η ds fn []       le []ᵃ        = []ᵃ
+map-data {τ = _ , _ , _} η ds fn (v ∷ vs) le (_ ∷ᵃ ps) =
+    handed-open η (ds ∷ᵈ []ᵈ) fn (v ∷ᵃ []ᵃ) le
+  ∷ᵃ map-data η ds fn vs le ps
+
+-- AND THE MAP AT A PAYLOAD THAT IS NOT DATA, WHICH IS WHERE THE
+-- MEASURE RUNS OUT.  The bound on the frame is a JOIN and the run is a
+-- SUM: evaluation at an environment holding an observable costs the
+-- template's reading PLUS the environment's, so a template wrapping
+-- its own argument hands back a value deeper than either side and no
+-- premise about the FRAME can close it -- the argument is the other
+-- addend.  Repairing it is a change to the reading every tier is
+-- denominated in, which is why the arm is a leaf and not a weakening.
+--
+-- REFUTED: `Refuted.Template-Passes` — the crossing at the shelf's own
+--   statement, which is where it was found first: a template that
+--   merely passes its argument through reifies it under a `strmᵗ` the
+--   template never wrote, so the emission is as deep as whatever was
+--   handed in.  Its rows are the witness for this arm too, since the
+--   quantity that fails here is the one it reads.
+--
+-- RECOVERY: git show 9b538b5b:agda/src/Rx/Obs-Depth/Substitution.agda
+--   restores the shelf that prices this crossing — the open form and
+--   the environment reading it is denominated in, which are what a
+--   repaired map clause would be proven against.
+postulate
+  map-open : ∀ {n} {Γ : Ctx n} {s u} {τ : Tri} (η : Fin n → ℕ)
+           → isData s ≡ false → (fn : Fn Γ [] [] [] s u)
+             (vs : List (Val Γ s)) → depᵗ η fn ≤ proj₁ (proj₂ τ)
+           → HandedOK η vs τ → HandedOK η (map (applyFn fn) vs) τ
+
+-- AND THE FOLD, WHICH THE SAME REPAIR DOES NOT REACH.  A scan re-enters
+-- its own template with the accumulator it last produced, so the
+-- reading climbs once per delivery and the outputs of ONE frame,
+-- entered under ONE bound, grow with the LENGTH of the burst.  No
+-- static reading of the syntax carries a length, so this is not the map
+-- arm's gap at another head: it is a question about whether the depth
+-- component can be read off the program at all.
+--
+-- REFUTED: `Refuted.Scan-Deepens` — the fold whose template re-wraps its
+--   accumulator, at the constructor this arm stands over.
+postulate
+  scan-handed : ∀ {n} {Γ : Ctx n} {s u} {τ : Tri} (η : Fin n → ℕ)
+    (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (ac : Val Γ u) (vs : List (Val Γ s))
+    {outs : List (Val Γ u)} {ac′ : Val Γ u} →
+    depᵗ η fn ≤ proj₁ (proj₂ τ) → HandedOK η vs τ →
+    scanVals fn ac vs ≡ (outs , ac′) → HandedOK η outs τ
+
+-- AND THE TWO HEADS THAT LEAVE THIS MODULE.  An `*All` frame does not
+-- rewrite a payload: it SUBSCRIBES one, or it delivers what an inner
+-- subscription produced — so what is owed is the same claim about
+-- another family's run, and the rank it has to be made at is the one
+-- that family entered at rather than this frame's.
+postulate
+  inner-handed : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo} {τ : Tri}
+    (η : Fin n → ℕ) {op allNid inst} {κ : Path Γ lo s t} {id now}
+    {vs : List (Val Γ s)} {sched : Sched Γ} {st : EvalSt e} {fin}
+    {vals : List (Val Γ s)} {evs : List (InstEvent (Val Γ t))} {fin′}
+    {sched′ : Sched Γ} {st′ : EvalSt e} →
+    HandedOK η vs τ →
+    innerReact⇓ {e = e} op allNid inst κ id now vs sched st fin
+      (vals , evs , fin′ , sched′ , st′) →
+    HandedOK η vals τ
+
+  thru-handed : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo} {τ : Tri}
+    (η : Fin n → ℕ) {op nid} {κ : Path Γ lo u t} {id now}
+    {vs : List (Val Γ (obs u))} {sched : Sched Γ} {st : EvalSt e}
+    (fin : Bool)
+    (res : List (Val Γ u) × List (InstEvent (Val Γ t)) × Sched Γ × EvalSt e) →
+    HandedOK η vs τ →
+    thruWalk⇓ {e = e} op nid κ id now vs sched st res →
+    HandedOK η (proj₁ (thruWrap {e = e} op nid fin res)) τ
+
 -- WHAT THE FRAME WROTE, WHICH IS THE ONE SEGMENT AT RISK.  A step is
 -- handed the emit's own values and returns the values it delivers
 -- onward, and the six heads it can take do genuinely different things:
 -- one returns nothing, one filters what it was given, two REWRITE the
 -- payload through a template, and two follow the run into another
 -- family.  So this is where the claim has to be split next, and the
--- split is what the arms below say it is.
---
--- AND IT IS FALSE AT TWO OF THOSE HEADS, WHICH IS THE CYCLE'S OWN
--- FINDING LOCALISED RATHER THAN A NEW ONE.  The map arm is
--- `map (applyFn fn) vals`, and `applyFn` is
--- `evalWith` at a one-value environment, so what bounds its reading is
--- `dep-eval-open`: `depᵗ fn + m`, a SUM.  The measure the entry
--- invariant is denominated in reads a map as `depᵗ f ⊔ depᵉ e`, a JOIN.
--- So a frame whose body wraps its own argument under a stream
--- constructor hands back a value deeper than either side, and no
--- premise bounding the FRAME can close the gap -- the argument is the
--- other addend.
---
--- AND THE DATA RESTRICTION IS NOT AVAILABLE, WHICH IS WHAT MAKES THIS
--- THE MEASURE'S FINDING RATHER THAN THIS STATEMENT'S.  Every statement
--- of the substitution shelf carries `isData s ≡ true`, and that is why:
--- at a data argument the environment reads nought, the sum collapses
--- onto `depᵗ fn`, and the join is exact.  But the map constructor is
--- typed at an ARBITRARY payload, so a map over a stream of streams is
--- ordinary syntax and an ordinary rxjs pipeline, and restricting this
--- arm to data would be restricting the language rather than the lemma.
--- What is left is that the measure's own map clause under-counts: it
--- JOINS where the run ADDS, and the gap is unbounded rather than off by
--- one.  Repairing it is a change to the reading every tier is
--- denominated in, which is why it is not made in passing.
---
--- REFUTED: `Refuted.Template-Passes` — the same crossing at the shelf's
---   own statement, which is where it was found first: a template that
---   merely passes its argument through reifies it under a `strmᵗ` the
---   template never wrote, so the emission is as deep as whatever was
---   handed in.  Its rows are the witness for this arm too, since the
---   quantity that fails here is the one it reads.
+-- split is what the arms above say it is.
 --
 -- DEAD ROUTE: bounding the output rank instead of restricting the
 --   payload -- state the cycle as carrying `τ` in and a larger `τ` out.
---   It is STRUCTURALLY DEAD at the walk above rather than here: the
+--   It is STRUCTURALLY DEAD at the walk below rather than here: the
 --   entry invariant that feeds this is fixed by the caller at one
 --   `slotDepth sl`, and the walk re-enters at that same rank through
 --   every recursive arm, so a rank that grows per frame has nowhere to
@@ -326,39 +437,53 @@ private
 --   with the five frame clauses worked out; what does not transport is
 --   the denomination, since the statement it carries is the
 --   unenvironmented one the two retired witnesses killed.
-postulate
-  step-handed : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo} {τ : Tri}
-    (η : Fin n → ℕ) {id : Id} {now : Tick} {fr : Frame Γ s u}
-    {κ : Path Γ lo u t} {vs : List (Val Γ s)} {c : Bool}
-    {sched : Sched Γ} {st : EvalSt e}
-    {vals : List (Val Γ u)} {evs : List (InstEvent (Val Γ t))} {fin : Bool}
-    {sched′ : Sched Γ} {st′ : EvalSt e} →
-    HandedOK η vs τ →
-    stepFrame⇓ {e = e} id now fr κ vs c sched st
-      (vals , evs , fin , sched′ , st′) →
-    HandedOK η vals τ
+step-handed : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo} {τ : Tri}
+  (η : Fin n → ℕ) {id : Id} {now : Tick} {fr : Frame Γ s u}
+  {κ : Path Γ lo u t} {vs : List (Val Γ s)} {c : Bool}
+  {sched : Sched Γ} {st : EvalSt e}
+  {vals : List (Val Γ u)} {evs : List (InstEvent (Val Γ t))} {fin : Bool}
+  {sched′ : Sched Γ} {st′ : EvalSt e} →
+  FrameOK η fr τ → HandedOK η vs τ →
+  stepFrame⇓ {e = e} id now fr κ vs c sched st
+    (vals , evs , fin , sched′ , st′) →
+  HandedOK η vals τ
+step-handed {s = s} {τ = _ , _ , _} η {fr = map-f fn} le ps step-map
+  with isData s in ds
+... | true  = map-data η ds fn _ le ps
+... | false = map-open η ds fn _ le ps
+step-handed {τ = _ , _ , _} η {fr = scan-f fn nid} le ps (step-scan _ eq) =
+  scan-handed η fn _ _ le ps eq
+step-handed η le ps step-scan-nil = []ᵃ
+step-handed η {fr = take-f nid} le ps
+             (step-take {vals = vs} {fin = fin} {sched = sched} {st = st}) =
+  take-arm η nid vs fin sched st (lookupNode nid (EvalSt.nodes st)) ps
+step-handed η le ps (step-from-inner r)  = inner-handed η ps r
+step-handed η le ps
+            (step-thru-outer {fin = fin} {vs = vs} {bs = bs}
+                             {sched′ = sched′} {st′ = st′} w) =
+  thru-handed η fin (vs , bs , sched′ , st′) ps w
 
 push-carries : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo} {τ : Tri}
   (η : Fin n → ℕ) {id : Id} {now : Tick} {fr : Frame Γ s u} {κ : Path Γ lo u t}
   {bs : Stream Γ s} {sched : Sched Γ} {st : EvalSt e}
   {burst : Stream Γ u} {sched′ : Sched Γ} {st′ : EvalSt e} →
-  BurstOK η bs τ →
+  FrameOK η fr τ → BurstOK η bs τ →
   pushBurst⇓ {e = e} id now fr κ bs sched st (burst , sched′ , st′) →
   BurstOK η burst τ
-push-carries η ok push-nil = []ᵃ
-push-carries {u = u} {τ = τ} η (okem ∷ᵃ okrest)
+push-carries η fok ok push-nil = []ᵃ
+push-carries {u = u} {τ = τ} η fok (okem ∷ᵃ okrest)
              (push-cons {em = em} {evs = evs} {fin′ = fin′} sp step rest) =
     ++⁺ (subst (All (EventOK η τ))
                (cong (λ z → proj₁ (proj₂ z)) sp)
                (split-book {u = u} η (InstEmit.events em)))
         (++⁺ (retag-book η evs)
              (++⁺ (handed-events η _
-                     (step-handed η
+                     (step-handed η fok
                        (subst (λ ws → HandedOK η ws τ) (cong proj₁ sp)
                               (split-handed η (InstEmit.events em) okem))
                        step))
                   (fin-events η fin′)))
-  ∷ᵃ push-carries η okrest rest
+  ∷ᵃ push-carries η fok okrest rest
 
 -- AND THE ONE FAMILY THIS MODULE DOES NOT WALK: the shared slot, whose
 -- connect re-enters the subscribe at the SLOT'S own reading rather than
@@ -398,7 +523,7 @@ mutual
    EntryOK (slotDepth sl) b τ →
    subscribeAll⇓ {e = e} op ns b κ id now sched st (burst , sched′ , st′) →
    BurstOK (slotDepth sl) burst τ
- all-carries sl ok (sub-all _ d p) = push-carries _ (burst-carries sl ok d) p
+ all-carries sl ok (sub-all _ d p) = push-carries _ tt (burst-carries sl ok d) p
 
  burst-carries : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo} {τ : Tri}
    (sl : Slots Γ) {b : Closed Γ u} {κ : Path Γ lo u t} {id : Id} {now : Tick}
@@ -420,8 +545,9 @@ mutual
    oneshot-ok _ τ _ _ _ eq (data-handed _ τ _ okd)
  burst-carries {τ = τ} sl ok (subs-cold-async {ok = okd} _ _ _ _) =
    anchored-ok _ τ _ _ _ (data-handed _ τ _ okd)
- burst-carries sl ok (subs-map d p) =
-   push-carries _ (burst-carries sl (inner-ok ok) d) p
+ burst-carries {τ = _ , _ , _} sl ok (subs-map d p) =
+   push-carries _ (≤-trans (m≤m⊔n _ _) (proj₂ ok))
+     (burst-carries sl (inner-ok ok) d) p
  burst-carries sl ok (subs-merge-all a)   = all-carries sl (under-ok ok) a
  burst-carries sl ok (subs-switch-all a)  = all-carries sl (under-ok ok) a
  burst-carries sl ok (subs-exhaust-all a) = all-carries sl (under-ok ok) a
@@ -430,6 +556,7 @@ mutual
      ( ≤-trans (<⇒≤ (unfoldμ-shrinks body)) sz≤
      , μ-entry (slotDepth sl) body r≤ ) d
  burst-carries sl ok (subs-take-suc _ _ d p) =
-   push-carries _ (burst-carries sl (inner-ok ok) d) p
- burst-carries sl ok (subs-scan _ d p) =
-   push-carries _ (burst-carries sl (inner-ok ok) d) p
+   push-carries _ tt (burst-carries sl (inner-ok ok) d) p
+ burst-carries {τ = _ , _ , _} sl ok (subs-scan _ d p) =
+   push-carries _ (≤-trans (m≤m⊔n _ _) (≤-trans (m≤m⊔n _ _) (proj₂ ok)))
+     (burst-carries sl (inner-ok ok) d) p

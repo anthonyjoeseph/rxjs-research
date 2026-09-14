@@ -9,34 +9,20 @@
 -- OBSERVABLE the branch can hand it straight back, and then the
 -- value's reading comes from the scrutinee rather than from the head
 -- the bound is stated over — which is the way these two could be
--- false.  The open form is the same crossing priced rather than
--- excluded, so its risky region is an environment that carries one.
+-- false.
 --
 -- COVERAGE: a `caseᵗ` at a data payload with both branches writing,
 -- and at an OBSERVABLE payload handed back by the branch — the row
 -- that reaches the risk, and it is TIGHT, the value's reading landing
 -- exactly on the predecessor.  An `ifᵗ` at a selected branch that is
--- the deeper of the two and at one that is not.  The open form at an
--- empty environment, at a data one, and at one carrying an observable
--- both read straight back and wrapped again.
+-- the deeper of the two and at one that is not.
 --
 -- NOT reached: a `caseᵗ` whose branches differ in reading with the
 -- observable arm selected — the join takes the deeper, so such a row
--- has slack by construction and cannot fail; and the whole of the
--- iteration axis, since a single evaluation crosses one binder and the
--- growth these statements price is per refold.
---
--- AND THE OPEN FORM'S ROWS ALL CARRY ONE UNIT OF SLACK, WHICH IS A
--- PROPERTY OF THE STATEMENT RATHER THAN OF THE ROWS.  `envDepth` reads
--- its values through `reify`, and reifying an observable writes a
--- `strmᵗ` the value did not have — so an environment's measured
--- reading is one above the reading of what is in it, and no row at an
--- observable binder can sit on the bound.  Tightness there would need
--- the measure to read the value rather than its literal.
+-- has slack by construction and cannot fail.
 --
 -- TARGET: eval-case @64558a
 -- TARGET: eval-if @e9a512
--- TARGET: dep-eval-open @0f3824
 module Probed.Eval-Binders where
 
 open import Data.Bool using (true)
@@ -47,11 +33,10 @@ open import Data.Nat using (z≤n; s≤s)
 open import Data.Vec using () renaming ([] to []ⱽ)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import Rx.Exp using (Ctx; Tm; Val; unitᵗ; natᵗ; _+ᵗ_; obs; varᵗ; unit̂; bool̂; nat̂; inlᵗ; caseᵗ; strmᵗ; ofᵉ;
-  evalWith)
+open import Rx.Exp using (Ctx; Tm; unitᵗ; natᵗ; _+ᵗ_; obs; varᵗ; unit̂; bool̂; nat̂; inlᵗ; caseᵗ; strmᵗ; ofᵉ; evalWith)
 open import Rx.Obs-Depth using (depᵗ; depᵛ)
-open import Rx.Obs-Depth.Substitution using (AllData; []ᵈ; envDepth;
-  eval-case; eval-if; dep-eval-open)
+open import Rx.Obs-Depth.Substitution using (AllData; []ᵈ;
+  eval-case; eval-if)
 
 open import Probed.Apparatus using (Confirms; zeroη)
 
@@ -132,34 +117,3 @@ row-if-selected = z≤n
 row-if-unselected : Confirms
   (eval-if {Γ = Γ₀} zeroη dd₀ (bool̂ true) deep deep []ᵃ)
 row-if-unselected = s≤s z≤n
-
-----------------------------------------------------------------------
--- 4.  THE OPEN FORM.  The third row is the one that crosses: the
--- environment holds an observable and the term wraps it again, so the
--- value's reading is one the term alone does not account for.
-----------------------------------------------------------------------
-
-row-open-empty : Confirms
-  (dep-eval-open {Γ = Γ₀} zeroη {Θ = []} shallow []ᵃ 0 z≤n)
-row-open-empty = z≤n
-
-row-open-data : Confirms
-  (dep-eval-open {Γ = Γ₀} zeroη {Θ = natᵗ ∷ []}
-    (strmᵗ (ofᵉ (varᵗ (here refl) ∷ []))) (7 ∷ᵃ []ᵃ) 0 z≤n)
-row-open-data = z≤n
-
-carried : Val Γ₀ (obs natᵗ)
-carried = ofᵉ (nat̂ 7 ∷ [])
-
-carried-env-depth : envDepth {Γ = Γ₀} zeroη (carried ∷ᵃ []ᵃ) ≡ 1
-carried-env-depth = refl
-
-row-open-carried : Confirms
-  (dep-eval-open {Γ = Γ₀} zeroη {Θ = obs natᵗ ∷ []}
-    (varᵗ (here refl)) (carried ∷ᵃ []ᵃ) 1 (s≤s z≤n))
-row-open-carried = z≤n
-
-row-open-wrapped : Confirms
-  (dep-eval-open {Γ = Γ₀} zeroη {Θ = obs natᵗ ∷ []}
-    (strmᵗ (ofᵉ (varᵗ (here refl) ∷ []))) (carried ∷ᵃ []ᵃ) 1 (s≤s z≤n))
-row-open-wrapped = s≤s z≤n
