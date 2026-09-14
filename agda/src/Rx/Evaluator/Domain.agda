@@ -40,7 +40,7 @@ open import Data.Fin using (Fin; toℕ)
 open import Data.List using (List; []; _∷_; _++_; map)
 open import Data.Bool.ListAction using (any)
 open import Data.Maybe using (Maybe)
-open import Data.Nat using (ℕ; _<_; _≤_; _≡ᵇ_)
+open import Data.Nat using (ℕ; suc; _<_; _≤_; _≡ᵇ_)
 open import Data.Product using (_×_; _,_)
 open import Data.Vec using (lookup)
 open import Relation.Binary.PropositionalEquality using (_≡_)
@@ -51,6 +51,7 @@ open import Rx.Exp using (Ty; obs; Ctx; Val; Closed)
 open import Rx.Slots using (Slots)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; NodeId;
   root; share-sink; _↠_; shareAdmit; shareLatch; shareFinish;
+  from-inner; splitBurst;
   NodeState; AllOp; RegId; Arrival; AtFloor; arrTy)
 
 ------------------------------------------------------------------
@@ -193,7 +194,24 @@ data evaluate⇓ {n} {Γ : Ctx n} {t} :
 
 data subscribeE⇓ {n} {Γ} {t} {e} where
 
+-- ONE CONSTRUCTOR WHERE THE EVALUATOR HAS TWO, AND THE MISSING ONE IS
+-- THE POINT.  The machine asks whether what arrived is written
+-- shallower than the component it stands at, and answers the negative
+-- case by minting an instance and closing it dry.  Here the hop's
+-- premise IS a sub-derivation at the arriving value, so there is
+-- nothing to ask and no arm to answer: a relation with no dry
+-- constructor cannot relate a run to a dry stream, which is what makes
+-- `hasDry` false by construction once the evaluator recurses on this.
 data subscribeInner⇓ {n} {Γ} {t} {e} where
+  inner : ∀ {u lo op allNid} {κ : Path Γ lo u t} {id now}
+            {o : Val Γ (obs u)} {sched st inst burst sched′ st′ vs bs done}
+        → Sched.nextNode sched ≡ inst
+        → subscribeE⇓ o (from-inner op allNid inst ↠ κ) id now
+            (record sched { nextNode = suc inst }) st
+            (burst , sched′ , st′)
+        → splitBurst burst ≡ (vs , bs , done)
+        → subscribeInner⇓ op allNid κ id now o sched st
+            (inst , vs , bs , done , sched′ , st′)
 
 data thruConsume⇓ {n} {Γ} {t} {e} where
 
