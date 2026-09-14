@@ -62,7 +62,7 @@ open import Rx.Slot-Depth using (slotDepth)
 open import Rx.Strat-Order using (Tri; _≺_; ≺-wellFounded; emptyHold)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; AllOp; NodeId; NodeState; Frame; root; _↠_; map-f; take-f; scan-f;
   thru-outer; from-inner; mergeAllᵒ; switchᵒ; exhaustᵒ; mergeAll-st; switch-st; exhaust-st; take-st;
-  scan-st; installNode; lookupNode; hasRoom; switchKill; aliveThroughᶠ; splitEvents; splitBurst; sched-init; st-init;
+  scan-st; installNode; lookupNode; setNode; hasRoom; switchKill; aliveThroughᶠ; splitEvents; splitBurst; sched-init; st-init;
   unconn; memberSource; share-sink; lowerFloor; register; atSlot; burstCompleted;
   Arrival; arrTick; arrSource; arrTy; arrVal; AtFloor; RegId; chainsOf;
   cascadeLatch; sched-next; shareAdmit; shareLatch)
@@ -153,9 +153,9 @@ FinishRuns {e = e} op allNid inst κ id now vals sched st ns =
 
 DrainsQ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo}
         → NodeId → Path Γ lo s t → Id → Tick
-        → Maybe ℕ → ℕ → List (Closed Γ s) → Sched Γ → EvalSt e → Set
-DrainsQ {e = e} allNid κ id now lim act q sched st =
-  ∃ λ r → mergeAllDrain⇓ {e = e} allNid κ id now lim act q sched st r
+        → Maybe ℕ → ℕ → Bool → List (Closed Γ s) → Sched Γ → EvalSt e → Set
+DrainsQ {e = e} allNid κ id now lim act od q sched st =
+  ∃ λ r → mergeAllDrain⇓ {e = e} allNid κ id now lim act od q sched st r
 
 ------------------------------------------------------------------
 -- THE LEAVES, WHICH ARE WHAT MAKE THE ASSEMBLY CHECKABLE TODAY.
@@ -270,6 +270,27 @@ DrainsQ {e = e} allNid κ id now lim act q sched st =
 --   a drain can enter DEEPER than the rank in force, and no
 --   depth-denominated premise can be the thing it descends on.
 --
+-- DEAD ROUTE: a per-depth CENSUS of the observables the store holds,
+--   carried as an upper bound at fixed rank and dropped at the drain.
+--   The drop itself is proven and the store is read exactly, since the
+--   drain writes its shortened queue before each inner subscribe.  What
+--   kills it is the other side: a burst MANUFACTURES observables out of
+--   the term, since the term list a burst is built from may sit at an
+--   observable type and a stream former turns an expression into one.
+--   So the reading grows at a step that holds the rank fixed, and the
+--   census sits above both the rank and the size, so nothing drops
+--   there to pay for it.  A per-level count fares no better -- it is
+--   bounded by DELIVERIES rather than by syntax, which is the doubling
+--   fold that already refuted the synchronous-size reading.  Third
+--   subdivision of one region to come back FALSE, the other two being
+--   the depth-denominated conjunct above and that size reading; what
+--   the three share is denominating the edge in a reading over the
+--   WHOLE store, which a burst can grow for free.  The drain needs
+--   less: that THIS node's queue does not grow while THIS drain runs,
+--   which is a reachability claim about the enqueue constructor rather
+--   than an arithmetic one, and the share-connect component already
+--   orders the one re-entry that could falsify it.
+--
 -- RECOVERY: `git show 1b7698e7:agda/src/Rx/Evaluator/Builder.agda` holds
 --   the step written out over `subscribeInner!`, which is the whole of
 --   the leaf's body once the entry is a descent the order can see.
@@ -281,18 +302,21 @@ postulate
 
 mergeAllDrain! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo}
   (allNid : NodeId) (κ : Path Γ lo s t) (id : Id) (now : Tick)
-  (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ s))
+  (lim : Maybe ℕ) (act : ℕ) (od : Bool) (q : List (Closed Γ s))
   (sched : Sched Γ) (st : EvalSt e) →
-  DrainsQ {e = e} allNid κ id now lim act q sched st
-mergeAllDrain! allNid κ id now lim act []      sched st = _ , drain-nil
-mergeAllDrain! allNid κ id now lim act (o ∷ q) sched st
+  DrainsQ {e = e} allNid κ id now lim act od q sched st
+mergeAllDrain! allNid κ id now lim act od []      sched st = _ , drain-nil
+mergeAllDrain! allNid κ id now lim act od (o ∷ q) sched st
   with hasRoom lim act in eqr
 ... | false = _ , drain-no-room eqr
 ... | true  =
   let ((inst , vs , bs , done , sched₁ , st₁) , s) =
-        queuedInner! allNid κ id now o sched st
+        queuedInner! allNid κ id now o sched
+          (record st
+             { nodes = setNode allNid (mergeAll-st lim act q od)
+                 (EvalSt.nodes st) })
       (_ , d) = mergeAllDrain! allNid κ id now lim
-                  (if done then act else suc act) q sched₁ st₁
+                  (if done then act else suc act) od q sched₁ st₁
   in _ , drain-room eqr s d
 
 ------------------------------------------------------------------
@@ -453,7 +477,7 @@ innerFinish! {s = s} mergeAllᵒ allNid inst κ id now vals sched st
              (just (mergeAll-st {w} lim act q od)) with w ≟ᵗ s
 ... | no  _    = _ , finish-nil
 ... | yes refl =
-      let (_ , d) = mergeAllDrain! allNid κ id now lim (pred act) q sched st
+      let (_ , d) = mergeAllDrain! allNid κ id now lim (pred act) od q sched st
       in _ , finish-all-drain d
 innerFinish! switchᵒ allNid inst κ id now vals sched st
              (just (switch-st (just c) od)) with (c ≡ᵇ inst) in eqc
