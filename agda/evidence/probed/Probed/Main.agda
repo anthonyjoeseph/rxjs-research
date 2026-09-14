@@ -56,6 +56,8 @@ open import Probed.Nodry-Halves using (row-of; row-empty; row-take-zero;
 -- AND THE TOTALITY ROWS, which are the same derivations read the other
 -- way round: the triple is no longer chosen by unification but taken
 -- from the evaluator's own result, so a constructor relating the wrong
--- stream is a type error here and is invisible above.
-open import Probed.Nodry-Halves using (row-total-of; row-total-map;
-  row-total-drain)
+-- stream is a type error here and is invisible above.  Both stand at a
+-- cycle the subscribe induction did not close — the push half over a
+-- frame, the flatteners' wrapper, the slot subscribe, and the drain.
+open import Probed.Nodry-Halves using (row-total-push; row-total-all;
+  row-total-input; row-total-drain)

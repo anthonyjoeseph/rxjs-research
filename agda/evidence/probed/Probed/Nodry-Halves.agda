@@ -29,24 +29,30 @@
 -- it are NOT covered, which is the boundary to read this file against.
 module Probed.Nodry-Halves where
 
+open import Data.Bool using (false)
 open import Data.Fin using (zero)
-open import Data.Nat.Properties using (≤-refl)
 open import Data.List using ([]; _∷_)
 open import Data.List.Relation.Unary.Any using (here)
-open import Data.Product using (proj₁; proj₂)
+open import Data.Maybe using (nothing)
+open import Data.Nat using (z≤n; s≤s)
+open import Data.Nat.Properties using (≤-refl; n≤1+n)
+open import Data.Product using (_×_; proj₁; proj₂)
 open import Data.Vec using () renaming ([] to []ⱽ; _∷_ to _∷ⱽ_)
 open import Relation.Binary.PropositionalEquality using (refl)
 
 open import Rx.Prim using (hot; after_,_)
-open import Rx.Exp using (Ctx; Closed; Fn; natᵗ; nat̂; varᵗ; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; input)
+open import Rx.Exp using (Ctx; Closed; Fn; obs; natᵗ; nat̂; varᵗ; ofᵉ; emptyᵉ;
+  mapᵉ; takeᵉ; mergeAllᵉ; input)
 open import Rx.Slots using (Slots; scripted)
-open import Rx.Evaluator using (Sched; EvalSt; root; rootWitness; subscribeE;
-  sched-init; st-init)
+open import Rx.Evaluator using (Stream; Sched; EvalSt; root; rootWitness;
+  subscribeE; map-f; _↠_; sched-init; st-init; mergeAllᵒ; mergeAll-st)
 open import Rx.Evaluator.Domain using (subs-of; subs-empty; subs-map;
-  subs-take-zero; push-cons; push-nil; step-map;
+  subs-take-zero; subs-hot-live; push-cons; push-nil; step-map;
+  step-thru-outer; walk-nil; sub-all;
   drain-step; drain-done; casc-run; casc-live; casc-nil; chain-step; fold-root)
 open import Verify-Rank-Sufficient using (subscribeE⇓-nodry; drain⇓-nodry;
-  subscribeE⇓-total; drain⇓-total)
+  subscribeE⇓-input-total; subscribeAll⇓-total;
+  pushBurst⇓-total; drain⇓-total)
 
 open import Probed.Apparatus using (Confirms)
 
@@ -55,7 +61,8 @@ open import Probed.Apparatus using (Confirms)
 -- different helper.
 --
 -- TARGET: subscribeE⇓-nodry @c66df9
--- TARGET: subscribeE⇓-total @b26a2b
+-- TARGET: pushBurst⇓-total @6807c0
+-- TARGET: subscribeAll⇓-total @c07c6e
 ----------------------------------------------------------------------
 
 Γ₀ : Ctx 0
@@ -121,25 +128,46 @@ row-map :
              (subs-map (subs-of refl) (push-cons refl step-map push-nil)))
 row-map = refl
 
+-- THE INNER RUN THE MAP CLAUSE PUSHES, REACHED BY RUNNING RATHER THAN
+-- WRITTEN OUT.  The frame's source is subscribed under the frame's own
+-- path, so the burst below is the one the machine hands its push cycle
+-- — a burst assembled here by hand would be testing this file's
+-- arithmetic instead of the evaluator's.
+mapInner : Stream Γ₀ natᵗ × Sched Γ₀ × EvalSt mapped
+mapInner = subscribeE {e = mapped} (rootWitness mapped ins₀) three
+             (map-f dbl ↠ root {lo = 0}) 0 0 (S mapped) (st-init mapped)
+
 -- LOAD-BEARING ON THE OUTPUT INDEX, which is the one thing the rows
 -- above cannot test: they hand a derivation in and let unification
 -- choose the triple it is about, so a constructor relating the wrong
--- stream satisfies them.  Here the triple is `subscribeE`'s OWN result,
--- so the row fails unless the clause and the constructor agree on what
--- was emitted, on the schedule left behind and on the state written.
-row-total-of :
-  Confirms (subscribeE⇓-total {e = three} (rootWitness three ins₀)
-             three ≤-refl (root {lo = 0}) 0 0 (S three) (st-init three))
-row-total-of = subs-of refl
+-- stream satisfies them.  Here the triple is `pushBurst`'s OWN result
+-- over a burst three helpers computed, so the row fails unless the
+-- clause and the constructor agree on the split, the retag and the
+-- re-append — which is the widest of this file's mirrors.
+row-total-push :
+  Confirms (pushBurst⇓-total {e = mapped} (rootWitness mapped ins₀) 0 0
+             (map-f dbl) (root {lo = 0}) (proj₁ mapInner)
+             (proj₁ (proj₂ mapInner)) (proj₂ (proj₂ mapInner)))
+row-total-push = push-cons refl step-map push-nil
 
--- LOAD-BEARING and the widest of the pair, for `row-map`'s reason: the
--- burst reaches the caller through a split, a retag and a re-append, so
--- the index this row pins is one three helpers computed rather than one
--- clause.
-row-total-map :
-  Confirms (subscribeE⇓-total {e = mapped} (rootWitness mapped ins₀)
-             mapped ≤-refl (root {lo = 0}) 0 0 (S mapped) (st-init mapped))
-row-total-map = subs-map (subs-of refl) (push-cons refl step-map push-nil)
+-- THE FLATTENER OVER A SOURCE THAT HANDS IT NO OBSERVABLE, which is the
+-- arm that reaches the wrapper's own plumbing and nothing else: a node
+-- is installed, the outer runs, and the walk is entered on an empty
+-- value list, so the whole derivation is the install, the outer's close
+-- and a push carrying no consume.  DEGENERATE in the walk and
+-- LOAD-BEARING in the wrapper: the node id the install writes is the one
+-- the frame is built at, and a wrapper that minted it twice, or built
+-- the frame at the pre-mint counter, fails this row.
+flat : Closed Γ₀ natᵗ
+flat = mergeAllᵉ nothing (emptyᵉ {t = obs natᵗ})
+
+row-total-all :
+  Confirms (subscribeAll⇓-total {e = flat} (rootWitness flat ins₀) mergeAllᵒ
+             (mergeAll-st {t = natᵗ} nothing 0 [] false) emptyᵉ (n≤1+n 1)
+             (root {lo = 0}) 0 0 (sched-init flat ins₀) (st-init flat))
+row-total-all =
+  sub-all refl (subs-empty refl)
+    (push-cons refl (step-thru-outer walk-nil) push-nil)
 
 ----------------------------------------------------------------------
 -- THE DRAIN HALF, ENTERED AT THE STATE THE ROOT SUBSCRIBE LEFT.
@@ -187,3 +215,23 @@ row-total-drain =
   drain-step refl
     (casc-run (casc-live refl (chain-step fold-root) casc-nil))
     drain-done
+
+----------------------------------------------------------------------
+-- THE SLOT SUBSCRIBE, WHICH IS THE ONE LEAF WITH A GUARD OF ITS OWN.
+--
+-- TARGET: subscribeE⇓-input-total @b1fcd2
+----------------------------------------------------------------------
+
+-- LOAD-BEARING ON THE FLOOR TEST AND ON THE REGISTRATION, which are the
+-- two things this arm does that no other source arm does: the floor
+-- comparison decides between a spent burst and a live registration, and
+-- the registration lowers the path's floor by the very proof that
+-- comparison produced — so a clause lowering by a different witness, or
+-- registering under the unlowered path, fails here.  NOT covered: the
+-- share arm, whose connect reads the unconnected count against the
+-- entry's first component and is where this leaf's falsity is expected;
+-- nor the spent script, nor either cold arm.
+row-total-input :
+  Confirms (subscribeE⇓-input-total {e = src} (rootWitness src ins₁) zero
+             ≤-refl (root {lo = 1}) 0 0 (sched-init src ins₁) (st-init src))
+row-total-input = subs-hot-live (s≤s z≤n) refl refl
