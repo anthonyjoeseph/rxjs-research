@@ -5,7 +5,8 @@ open import Relation.Binary.PropositionalEquality using (_≡_)
 
 open import Rx.Prim      using (Fuel)
 open import Rx.Exp       using (Ctx; Closed)
-open import Rx.Evaluator using (Sched; Arrival; EvalSt; Stream; evaluate)
+open import Rx.Evaluator using (Sched; Arrival; EvalSt; Stream)
+open import Rx.Evaluator.Builder using (evaluate↓)
 open import Rx.Slots using (Slots)
 
 
@@ -57,7 +58,7 @@ postulate
   timing-invariance :
     ∀ {n} {Γ : Ctx n} {t} (ρ : Retiming) (fuel : Fuel)
       (e : Closed Γ t) (ins : Slots Γ) →
-    evaluate fuel e (retime ρ ins) ≡ evaluate fuel e ins
+    evaluate↓ fuel e (retime ρ ins) ≡ evaluate↓ fuel e ins
     -- ≡, not ≈: ids mint from ARRIVAL POSITION (the drain counter),
     -- so an arbitration-order-preserving retiming preserves the ids
     -- themselves — the recommendation this comment used to make is

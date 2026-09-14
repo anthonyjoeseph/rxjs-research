@@ -8,7 +8,8 @@ open import Relation.Binary.PropositionalEquality using (_≡_)
 
 open import Rx.Prim      using (Tick; Fuel)
 open import Rx.Exp       using (Ctx; Closed; Exp; μᵉ; unfoldμ)
-open import Rx.Evaluator using (Stream; evaluate)
+open import Rx.Evaluator using (Stream)
+open import Rx.Evaluator.Builder using (evaluate↓)
 open import Rx.Slots using (Slot; Slots)
 
 
@@ -41,7 +42,7 @@ postulate
   fuel-coherent :
     ∀ {n} {Γ : Ctx n} {t} (f₁ f₂ : Fuel) → f₁ ≤ f₂ →
     (e : Closed Γ t) (ins : Slots Γ) →
-    Prefix _≡_ (evaluate f₁ e ins) (evaluate f₂ e ins)
+    Prefix _≡_ (evaluate↓ f₁ e ins) (evaluate↓ f₂ e ins)
 
   -- causality: agreeing slot prefixes (scripted arrivals before tick
   -- k; shared defs, carrying no scripts, must agree outright) give
@@ -53,8 +54,8 @@ postulate
     ∀ {n} {Γ : Ctx n} {t} (k : Tick) (fuel : Fuel)
       (e : Closed Γ t) (ins₁ ins₂ : Slots Γ) →
     (∀ i → truncateIn k (ins₁ i) ≡ truncateIn k (ins₂ i)) →
-    emittedBefore k (evaluate fuel e ins₁)
-      ≡ emittedBefore k (evaluate fuel e ins₂)
+    emittedBefore k (evaluate↓ fuel e ins₁)
+      ≡ emittedBefore k (evaluate↓ fuel e ins₂)
 
   -- μ laws
   --
@@ -65,12 +66,12 @@ postulate
   μ-unfold :
     ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel)
       (e : Exp Γ (t ∷ []) [] [] t) (ins : Slots Γ) →
-    evaluate fuel (μᵉ e) ins ≡ evaluate fuel (unfoldμ e) ins
+    evaluate↓ fuel (μᵉ e) ins ≡ evaluate↓ fuel (unfoldμ e) ins
 
   μ-guarded :   -- k arrivals force ≤ k unfoldings (syntactic, via deferᵉ gate)
     ∀ {n} {Γ : Ctx n} {t} (k : Fuel)
       (e : Exp Γ (t ∷ []) [] [] t) (ins : Slots Γ) →
-    evaluate k (μᵉ e) ins ≡ evaluate k (unfoldμ e) ins
+    evaluate↓ k (μᵉ e) ins ≡ evaluate↓ k (unfoldμ e) ins
 
   -- deferᵉ's temporal law — NOT YET STATABLE, honestly.  The intent
   -- ("stream of (deferᵉ e) ≈ stream of e with ticks +1") needs two

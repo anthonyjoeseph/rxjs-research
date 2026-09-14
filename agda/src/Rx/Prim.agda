@@ -71,9 +71,10 @@ data CloseReason : Set where
                                     -- inner subscribe, the unconnected count at a shared
                                     -- connect, the sync size at a μ unfolding.  So a run
                                     -- free of this reason is one where the descent's
-                                    -- order never had to be argued about, which is why
-                                    -- the whole of `Verify-Rank-Sufficient` is stated as
-                                    -- its absence
+                                    -- order never had to be argued about.  No builder
+                                    -- constructs it, so after the cutover it is a reason
+                                    -- no run can carry — kept because the protocol's
+                                    -- vocabulary is what the spec reads
 
 data InstEvent (A : Set) : Set where
   init     : Source → InstEvent A   -- a registration chain of this source came alive

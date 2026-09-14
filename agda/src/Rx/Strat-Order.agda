@@ -64,31 +64,16 @@ Tri = ℕ × ℕ × ℕ
 -- not yet cover.
 
 -- AND THAT COVERAGE CLAIM IS HELD BY A MACHINE RATHER THAN BY THIS
--- PARAGRAPH: `make recursion-cover` cuts the evaluator's three declared
--- peels and fails on any cycle left standing the source does not declare
--- structural.  Today it cuts both of the evaluator's multi-member
--- recursions down to singletons and leaves exactly one pair, which walks
--- the expression — so the three constructors here are not a guess at
--- which sites matter, and a fourth site would go red rather than compile
--- quietly.  Two of that check's readings decided this type's shape: the
--- merge join's drain wants no component of its own, since it rides its
--- own queue and its one outward call peels inside the callee; and the
--- share hop's counter is a separate component reached one way, so it
--- composes without sharing a measure and buys no fourth field here.
-
--- AND THE RESIDUE OF THAT CENSUS IS EXACTLY ONE SITE, WHICH IS WHY THE
--- COVERAGE CLAIM ABOVE IS NARROWER THAN IT READS.  Three peels are
--- declared and only two of them are edges of this order — the
--- subscribe-inner peel is `ltR` and the shared-connect peel is `ltU`,
--- while the μ peel is a self-edge the component check cannot see and
--- `ltS` covers.  The third declared peel, the share fan-out's, inhabits
--- NONE of the three, and the reason it needs none is the one-way
--- composition: the fan-out's clique calls into the subscribe clique and
--- is never called back, so the two are separate strata rather than one
--- recursion, and a stratum above another is ordered by nothing they
--- share.  Read the constructor count that way and it is a claim about
--- ONE stratum: a fourth constructor would mean a fourth edge inside the
--- subscribe clique, and a fan-out edge is not one.
+-- PARAGRAPH, IN TWO PLACES.  The builder takes an `Acc` over this order
+-- as an ARGUMENT, so Agda's own termination check holds every member of
+-- its cycle to descending on something it carries -- per call site,
+-- rather than on a declaration's word.  What that cannot see is a cycle
+-- re-entering the block from OUTSIDE it, so `make recursion-cover` cuts
+-- the builder's call graph and fails on any cycle the source does not
+-- declare; today it leaves exactly the one the builder declares
+-- structural.  So the three constructors here are not a guess at which
+-- sites matter, and a fourth site goes red rather than compiling
+-- quietly.
 ------------------------------------------------------------------
 
 infix 4 _≺_

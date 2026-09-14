@@ -195,134 +195,151 @@ the row is DIFFICULTY.
 ```
 formal-verification-batchSimultaneous    The-Proof.agda — REAL, module postulate-free
  ├─ batch-agreement                      proven
- └─ evaluate-well-formed                 Verify-Well-Formed.agda — tier 2
-     ├─ rank-sufficient                  Verify-Rank-Sufficient.agda — tier 1
+ └─ evaluate-well-formed                 Verify-Well-Formed.agda — REAL, one match
      └─ burst-drain-well-formed          one postulate — tier 2
+
+  evaluate↓ = proj₁ ∘ evaluate!           Rx/Evaluator/Builder.agda — tier 1
+     └─ drain!, mergeAllDrain!         the two leaves a run still steps through
 
   every tier above is stated over Rx.Exp's syntax
 ```
 
-The descent `rank-sufficient` guards is the evaluator's own and is stated
-nowhere else: `Acc _≺_` over a lexicographic triple — unconnected shares,
-`obsDepthᵉ` joined with what the store holds, `syncSizeᵉ` — seeded at every entry
-from outside the machine and dropped at three guarded peels, each a proven body.
-No quantity above `Rx.Evaluator` mentions it, which is what lets one statement
-close the whole descent.
+The descent is the evaluator's own and is stated nowhere else: `Acc _≺_` over a
+lexicographic triple — unconnected shares, `depᵉ (slotDepth sl)` joined with
+what the store holds, `syncSizeᵉ` — taken as an ARGUMENT rather than computed,
+so Agda's termination checker verifies the cycle per call site. The evaluator is
+`proj₁` of a builder that returns a run together with its derivation, which is
+what let every guard, every `<?` and the dry marker leave the machine entirely.
 
 A row's class must agree with its postulate's header, which is where the
 research lives; where they disagree, the header wins.
 
-## Tier 1 — the descent never goes dry
+## Tier 1 — the evaluator runs again
 
-**THE TIER IS ONE STATEMENT AND IT IS CURRENTLY FALSE.** `rank-sufficient`
-(Verify-Rank-Sufficient) says no run emits the dry marker; `Refuted.Dry-Wrap`
-kills it three times against the evaluator as it stands. It is seven bodies
-over seven leaves: both cycles' totality is a real induction now, and the risk
-each held fell onto the clauses that read a component of the entry against the
-term — the slot subscribe's share connect, and the walk's consume, where the
-hop lives.
-
-**AND THE MEASURE IS HELD BY SOMETHING NO STATEMENT MENTIONS: THE RUN HAS TO
-COMPUTE IT.** Three non-structural edges TEST a reading and emit dry on the
-negative answer, so an inadequate figure is a WRONG ANSWER rather than an open
-obligation, and every syntactic candidate died that way. The relation lifts
-that — inhabitation is a PROOF obligation, free to use a measure the machine
-cannot compute — and the other two leaves carry no arithmetic at all.
+**THE TIER IS A PROJECTION OVER THREE LEAVES.** `evaluate↓` is `proj₁` of
+`evaluate!`, which hands back a run TOGETHER with its `evaluate⇓` derivation, so
+the descent is a proof obligation rather than a reading the machine computes and
+the dry marker is unemittable — no constructor of the relation builds one. What
+that costs is reduction: a projection computes only if the thing projected is a
+real body, so while any leaf is a postulate a run typechecks and does not
+reduce. The bug cache, the oracle and every `refl` over a run are stuck at the
+first match, which is why `bug-cache` is off the gate for the duration and
+`make bug-cache` is a target to TYPE. The tier ends when a row runs.
 
 ### Big picture tier roadmap
 
-- **RESTATE `subscribe-carried` OVER THE SCHEDULE, GROWING `EntryOK` TO THE
-  THIRD CONJUNCT IN THE SAME EDIT.** Both its refutations send the statement to
-  the same place, and `Refuted.Carried-Shared` says why no repair reading the
-  TERM can get there. So the entry quantifies over the TELESCOPE —
-  `SlotsOK : ∀ {n} {Γ : Ctx n} → Slots Γ → Tri → Set` holding every `shared d`
-  below the rank — beside the unconnected count `subscribeE⇓-input-total`'s
-  share arm already wanted:
-  `EntryOK b sched (U , r , sz) = syncSizeᵉ b ≤ sz × obsDepthᵉ b ≤ r × SlotsOK (Sched.slots sched) (U , r , sz) × unconn (Sched.slots sched) [] ≤ U`.
-  Two legs until now, split by which of the term and the schedule each
-  quantified over; one edit, because the signature moves once.
+- **THE FIELD ON THE INVARIANT RECORD, WHICH IS WHERE THE SPLIT LEFT THE CLAIM
+  POINTING.** Walking `burst-carries` as a body settled which of its arms carry
+  content: the bookkeeping bursts hold no value at all and close by
+  construction, `all-carries` closed as a body over the one constructor its
+  relation has, and what is left is `slot-carries` — the arm that follows the
+  run out of the store, where the burst comes back at the slot's own reading
+  rather than the caller's. That is the site `mergeAllDrain!` reads, so its
+  answer is a field rather than a premise, obliging every producer and cascading
+  through every consumer. The leg is the field and its producers; whether it
+  suffices for the queue is what it settles.
 
-- **KILL THE DOOR: SPEND THE PREMISE AT THE HOP SITE (Anthony).** `HandedOK` is
-  now a hypothesis the hop's own statement carries, so at `subscribeInner`'s rank
-  comparison the no branch is refuted from it — the marker becomes unemittable
-  rather than merely unobserved. The obligation is near-DEFINITIONAL now that
-  both sides are one currency, since `obsDepthᵛ (obs t) e` IS `obsDepthᵉ e`, so
-  what the leg buys is the arm DELETION: `thruConsume⇓-total`'s three surviving
-  arms become two, and `Refuted.Hop-Unconditioned` stops being satisfiable
-  because the guard can no longer refuse where the premise holds.
+- **THE TWO ENDS OF THE RUN, WHICH IS WHAT MAKES A ROW REDUCE.** `drain!` is
+  fuel induction over the schedule and carries no guard at all; `mergeAllDrain!`
+  is the ONE subscription site a burst never reaches, since its observables were
+  queued when the lane limit was full and come back out of the STORE an
+  arbitrary number of instants later. So what `mergeAllDrain!` is owed is a
+  field on the invariant record and not a premise — a premise quantified freely
+  over the queue is the statement `hop-edge`'s own header refutes. With these
+  and the leg above landed the evaluator reduces, the cache goes back on the
+  gate, and the corpus says whether the doorless run agrees with the spec.
 
-- **THEN THE LEAVES BOTH CYCLES LEFT, AND REFUTE EACH BEFORE GRINDING IT.**
-  Both cycles are bodies now and their list plumbing is closed, so what is open
-  is `subscribeE⇓-input-total` (the slot subscribe, six arms, the share
-  connect's `unconn` guard), the two the push cycle localised the hop onto —
-  `thruConsume⇓-total`
-  (`∀ … (ac : Acc _≺_ τ) (op : AllOp) (nid : NodeId) (κ : Path Γ lo u t) (id : Id) (now : Tick) (o : Val Γ (obs u)) (sched : Sched Γ) (st : EvalSt e) → thruConsume⇓ op nid κ id now o sched st (thruConsume ac op nid κ id now o sched st)`,
-  where `subscribeInner`'s rank test lives) and `innerReact⇓-total`, which
-  reaches the same edge through the flattener's bookkeeping rather than a fresh
-  value — and `subscribeAll⇓-total`, which is the two cycles composed and falls
-  out of them. Each is stated unconditionally on purpose: a witness is what says
-  which conjunct `EntryOK` grows, and the leg above is where the growing
-  happens.
+- **WIDEN WHAT A BUILDER RETURNS, SO THE TELESCOPE COSTS NOTHING.** Every
+  premise is denominated at one `slotDepth sl` fixed by the caller, and each
+  clause carries an agreement `Sched.slots sched ≡ sl` rather than a transport.
+  Three sites are handed a schedule some other clause built —
+  `subs-keeps-slots`, `step-keeps-slots`, `consume-keeps-slots` — and all three
+  are stated as inductions over the ⇓ family they cannot perform. Every builder
+  clause already holds the equation where it would have to prove it, so carrying
+  it in the RESULT type discharges all three at once and leaves the obligation
+  on the two leaves that return a schedule nothing here built. It moves every
+  clause's return, which is why it is not first.
 
-- **AND `drain⇓-total`, WHICH IS ORDINARY FUEL INDUCTION ONCE ITS SIBLING
-  EXISTS.** `drain⇓ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (fuel : Fuel) (id : Id) (sched : Sched Γ) (st : EvalSt e) → drain⇓ {e = e} fuel id sched st (drain fuel id sched st)`,
-  three arms matching `drain`'s own — out of fuel, empty schedule, and a
-  cascade followed by the recursive call at `suc nextId`. It carries no guard
-  at all; what it needs is the cascade's own totality, which re-enters the
-  subscribe cycle and so takes the leg above as a premise rather than
-  repeating it. Separated for that reason and not by size.
+- **AND THE TWO FRAME HEADS THAT LEAVE THE MODULE, WHICH ARE NOT THE MEASURE'S
+  QUESTION.** The frame walk landed and put four leaves where one statement
+  stood; two of them — `map-open` and `scan-handed` — are the reading itself
+  being wrong and wait on the question below. The other two are not:
+  `inner-handed` and `thru-handed` do not rewrite a payload at all, they follow
+  the run into `innerReact⇓` and `thruWalk⇓`, so what is owed is this same claim
+  at the rank THAT family entered at. The leg is the walk over those two
+  relations, and what it decides is whether the rank an inner subscription
+  enters at is one this walk carries or one the record has to.
 
-- **`subscribeE⇓-nodry` AS A BODY, WHICH IS A SHELF AND NOT A DESIGN.** Twelve
-  subscribe-cycle families, one arm per constructor, each reading dryness off
-  the emit that clause BUILDS — `init`, a value, a `close … exhausted`, a
-  plumbing retag. The shelf this consumes was cut back to `hasDry-++` when the
-  tower went and comes back a lemma at a time, one per shape:
-  `git show 234074e:agda/src/Verify-Rank-Sufficient/Dry-Emits.agda`. No triple,
-  no rank and no order appears anywhere in it, which is exactly what the
-  relation bought — an arithmetic obligation became a list induction.
+### Open questions
+
+- **Is what a run PRODUCED sayable about a run that reads its own store?** The
+  hop's premise arrives from the site that built the value, and the push cycle
+  splits a burst emit by emit — but a queued observable carries no burst at all.
+  Every attempt to say it over the TERM has been refuted, which is what points
+  the answer at the invariant record; nothing has yet written the field.
+  relevant: `mergeAllDrain!`, `slot-carries`
 
 ### The ledger
 
-- **`subscribeE⇓-input-total`** (Verify-Rank-Sufficient) — FALSITY, `PROBED`: a
-  derivation at a slot subscription's own output. Six arms, and the share one's
-  connect reads the unconnected count against the entry's first component, so
-  this is refutable exactly as its parent was.
+- **`slot-carries`** (Rx/Evaluator/Burst-Report) — FALSITY, `REFUTED`: the one
+  arm of the burst report that leaves this walk — the share connect, which
+  re-enters at the SLOT's own reading and so needs the two tables related where
+  the walk carries only the caller's. Where the field on the record is owed.
 
-- **`innerReact⇓-total`** (Verify-Rank-Sufficient) — FALSITY, `PROBED`: the
-  same edge reached through the flattener's own bookkeeping rather than a fresh
-  value, so it carries no rank test and inherits the store the walk left.
-  Nothing instantiates it yet.
+- **`map-open`** (Rx/Evaluator/Burst-Report) — FALSITY, `REFUTED, RECOVERY`:
+  what a template writes at a payload that is NOT data. The reading JOINS where
+  the run ADDS, so a template wrapping its own argument hands back a value
+  deeper than either side and no premise about the frame can close it.
 
-- **`subscribeAll⇓-total`** (Verify-Rank-Sufficient) — FALSITY, `PROBED`: the
-  flatteners' wrapper, a node install between the two cycles above. It adds no
-  guard of its own and inherits both halves' falsity; the three operators
-  differ only in a state no clause reads.
+- **`scan-handed`** (Rx/Evaluator/Burst-Report) — FALSITY, `REFUTED`: the fold,
+  which the map's repair does not reach. Re-entering its own template with the
+  accumulator, the reading climbs once per delivery, so one frame's outputs
+  grow with the LENGTH of the burst and no static reading carries a length.
 
-- **`drain⇓-total`** (Verify-Rank-Sufficient) — FALSITY, `PROBED`: the same
-  over the arrival cycle. It carries no guard itself; its cascade arm re-enters
-  the subscribe cycle, so it inherits that leaf's falsity rather than adding
-  one.
+- **`inner-handed`, `thru-handed`** (Rx/Evaluator/Burst-Report) — FALSITY,
+  `NO EVIDENCE`: the two `*All` heads, which rewrite no payload — they
+  subscribe one, or deliver what an inner subscription produced. So the claim
+  owed is this one about ANOTHER family's run, at the rank that family entered
+  at rather than this frame's.
 
-- **`subscribeE⇓-nodry`** (Verify-Rank-Sufficient) — FALSITY, `PROBED`: the
-  subscribe half's output carries no dry event, by induction over the twelve
-  subscribe-cycle families. Four sources reach it, each closing through a
-  different helper; no share, flattener or node store is covered.
+- **`eval-silent`** (Rx/Evaluator/Burst-Report) — FALSITY, `PROBED`: the
+  residue the strict drop cannot reach — a closed term reading nought, whose
+  value must satisfy the predicate at EVERY rank because it carries no
+  observable to price.
 
-- **`drain⇓-nodry`** (Verify-Rank-Sufficient) — FALSITY, `PROBED`: the same
-  over the drain and cascade families. One arrival reaches it, at the state the
-  root subscribe actually left; the cancelled arm and every chain carrying a
-  frame are uncovered.
+- **`data-handed`** (Rx/Evaluator/Burst-Report) — FALSITY, `PROBED`: a scripted
+  slot's payload is data, and the rank is read only at `obs`, so this is an
+  induction on the TYPE with no arithmetic in it. A leaf only because it is
+  unwritten.
 
-- **`thruConsume⇓-total`** (Verify-Rank-Sufficient) — FALSITY,
-  `REFUTED, PROBED`: the one clause that takes a value and subscribes it. The
-  premise the refutation forced has landed, so what is open is the enqueue arm
-  and the two operators reading a different node state; nothing instantiates
-  the conditioned form.
+- **`mergeAllDrain!`** (Rx/Evaluator/Builder) — FALSITY, `RECOVERY`: the queued
+  subscription, read back out of the store by a completion carrying no burst.
+  What it is owed is a field on the invariant record.
 
-- **`subscribe-carried`** (Verify-Rank-Sufficient) — SHAPE, `REFUTED×2`: a
-  subscribe's own burst hands on nothing deeper than the entry rank. Refuted
-  twice, and the second says the entry has to speak about the SCHEDULE — a
-  reference is priced at nought while the definition it names is not.
+- **`drain!`** (Rx/Evaluator/Builder) — FALSITY, `RECOVERY`: the arrival cycle,
+  fuel induction with no guard of its own. Its cascade arm re-enters the
+  subscribe cycle, so it inherits that leaf rather than adding one.
+
+- **`connect-drops`** (Rx/Evaluator/Doorless) — FALSITY, `PROBED`: the share
+  connect's drop in the unconnected component, the arithmetic the arm above
+  spends. No consumer until that arm is a body.
+
+- **`eval-case`, `eval-if`** (Rx/Obs-Depth/Substitution) — FALSITY, `PROBED×2`:
+  the two places evaluation enters a branch under a binder the data hypothesis
+  does not cover. One question asked twice.
+
+- **`dep-wkTm`, `data-of`** (Rx/Obs-Depth/Substitution) — FALSITY, `PROBED×2`:
+  the shelf under the arms above — the telescope membership, whose rows buy
+  non-vacuity rather than an inequality, and the weakening, which has content
+  on both sides.
+
+- **`subs-keeps-slots`, `step-keeps-slots`, `consume-keeps-slots`,
+  `subs-unconn-drops`, `step-unconn-drops`, `consume-unconn-drops`**
+  (Rx/Evaluator/Builder) — SHAPE, `DEAD ROUTE×3`: what a derivation left the
+  state at three ⇓ families — slot table unchanged, unconnected count only
+  falling. Stated as inductions over the mutual block; the route carries both
+  in the RESULT type, so a restatement is guaranteed.
+
 
 ## Tier 2 — Verify-Well-Formed (parked behind tier 1)
 

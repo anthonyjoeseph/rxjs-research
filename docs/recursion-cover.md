@@ -4,19 +4,19 @@
 
 ## What it is for
 
-The evaluator terminates because a counter — `Gas` — is peeled at a few edges
-and held fixed everywhere else, and every fixed-counter re-entry descends on an
-argument it already carries: a queue, an emit list, an operator chain. That
-reading is what the stratification rests on, because an order with one
-constructor per peel edge covers the whole recursion **exactly when no other
-cycle survives the peels**.
+The evaluator's recursion has one genuine cycle, and what stops it is an
+accessibility witness over `Rx.Strat-Order._≺_` threaded as an argument. The
+stratification rests on that order having **one constructor per re-entry
+edge**, which is a coverage claim: a re-entry site inhabiting none of the three
+is a site the order does not cover.
 
-Nothing checked it. Agda's own termination checker is satisfied by the counter
-and says nothing about *which* edges carry it, so a clause that routed a burst
-walk back through `subscribeE` at fixed gas, or a share hop that re-entered a
-frame, would open a cycle the order does not name and the tower would go on
-compiling. That is the silent failure this exists for: the code stays correct,
-and the argument written above it quietly stops being true.
+Agda holds most of that itself. Because the witness is an argument rather than
+a counter the machine reads, the termination checker verifies every member of
+the cycle descends on something it carries — per call site, not on a
+declaration's word. What it cannot see is a cycle re-entering the block from
+**outside**: a new operator routing a burst walk back into the subscribe, or a
+share hop reaching a frame, would compile quietly while the paragraph above the
+order quietly stopped being true. That is the silent failure this exists for.
 
 ## What it does
 
@@ -45,20 +45,19 @@ why it has to be said out loud rather than by being left off a list.
 
 ## The reading it currently certifies
 
-Cutting three edges collapses **both** of the evaluator's multi-member
-recursions: the twelve-member subscribe component and the three-member share
-component. Exactly one cycle survives, the pair that walks the expression.
+The target is `Rx/Evaluator/Builder.agda`, and it certifies one cycle: the
+seven-member block the hop closes, declared structural because the `Acc`
+argument is what each member descends on. No peel is declared at all, and that
+is the doorless shape's whole point — a peel is what a counter the machine
+reads needs, and there is no such counter.
 
-Two consequences worth having in hand, because they are the questions the
-stratification kept asking:
+Two members sit outside it and the reasons are worth having in hand:
 
-- **The merge join's drain needs no component of its own.** It is a singleton
-  the moment the peels are cut — it rides its own queue, and its one outward
-  call peels inside the callee.
-- **The share hop does not join the triple.** Its counter is a plain `ℕ`
-  bounding the slot telescope, it peels once per hop, and it reaches the frame
-  walk one way only. It composes by being a separate component, not by sharing
-  a measure.
+- **The merge join's drain needs no component of its own.** It rides its own
+  queue, and its one outward call descends inside the callee.
+- **The share hop does not join the triple.** It reaches the frame walk one way
+  only, so it composes by being a separate stratum rather than by sharing a
+  measure.
 
 ## The call graph is over-approximated, deliberately
 
@@ -71,7 +70,14 @@ anyway.
 
 ## Where it stops
 
-A self-edge is invisible to a component check, so the third peel — `subscribeE`
-at a `μᵉ` node, which unfolds its body rather than descending into it — is not
-one this can cut or see. That edge is covered by `unfoldμ-shrinks` instead, and
-the source says so where the declarations sit.
+A self-edge is invisible to a component check, so `subscribeE!` at a `μᵉ` node
+— which unfolds its body rather than descending into it — is not an edge this
+can cut or see. That one is covered by `unfoldμ-shrinks` and the `ltS`
+constructor instead.
+
+**And a name the tokeniser cannot spell is a name it cannot see.** The
+builder's members all end in `!`, and while that character was outside the word
+pattern the check read the module as having no recursion at all and reported a
+tidy zero. Any future naming convention reaching outside `WORD` fails the same
+way, silently — which is why the selftest fixtures pin the *firing*, not the
+passing.
