@@ -59,7 +59,7 @@ open import Rx.Exp using (Ctx; Closed; natᵗ; obs; nat̂; strmᵗ; ofᵉ; input
   syncSizeᵉ)
 open import Rx.Obs-Depth using (depᵉ)
 open import Rx.Slots using (Slots; shared)
-open import Rx.Strat-Order using (Tri)
+open import Rx.Strat-Order using (Tri; emptyHold)
 open import Rx.Evaluator using (Stream; Path; root; Sched; EvalSt;
   sched-init; st-init)
 open import Rx.Evaluator.Domain using (subscribeE⇓; subs-shared; subs-of;
@@ -116,7 +116,7 @@ derived-ref-depth : depᵉ zero-env ref₁ ≡ 0
 derived-ref-depth = refl
 
 τ₁ : Tri
-τ₁ = 1 , 0 , syncSizeᵉ ref₁
+τ₁ = 1 , emptyHold 1 , 0 , syncSizeᵉ ref₁
 
 entry₁ : EntryOK zero-env ref₁ τ₁
 entry₁ = ≤-refl , ≤-refl

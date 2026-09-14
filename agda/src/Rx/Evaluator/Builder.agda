@@ -59,7 +59,7 @@ open import Rx.Exp using (Ctx; Closed; Val; _≟ᵗ_; obs; unfoldμ; evalTm; inp
   switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ)
 open import Rx.Slots using (Slots; shared; scripted)
 open import Rx.Slot-Depth using (slotDepth)
-open import Rx.Strat-Order using (Tri; _≺_; ≺-wellFounded)
+open import Rx.Strat-Order using (Tri; _≺_; ≺-wellFounded; emptyHold)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; AllOp; NodeId; NodeState; Frame; root; _↠_; map-f; take-f; scan-f;
   thru-outer; from-inner; mergeAllᵒ; switchᵒ; exhaustᵒ; mergeAll-st; switch-st; exhaust-st; take-st;
   scan-st; installNode; lookupNode; hasRoom; switchKill; aliveThroughᶠ; splitEvents; splitBurst; sched-init; st-init;
@@ -838,7 +838,8 @@ subscribeE!-input {lo = lo} (acc rec) sl i ok κ id now sched ag st ub
                   (slot-join {κ = κ} {below = below} doneEq connEq)
 ...       | false
             with subscribeE!
-                   (rec (connect-edge sl (EvalSt.connectedShares st) i connEq ub))
+                   (rec (connect-edge {q′ = emptyHold (suc (slotDepth sl i))}
+                          sl (EvalSt.connectedShares st) i connEq ub))
                    sl d
                    (connect-entry
                      {U = unconn sl (toℕ i ∷ EvalSt.connectedShares st)}
@@ -920,6 +921,7 @@ mutual
         ((vals′ , evs′ , fin′ , sched₁ , st₁) , sf) =
           stepFrame!
             (≺-wellFounded ( unconn sl (EvalSt.connectedShares st)
+                           , emptyHold (suc (suc (depᵛˢ (slotDepth sl) u vals)))
                            , suc (depᵛˢ (slotDepth sl) u vals) , 0 ))
             sl id now fr κ vals
             (handed-below (slotDepth sl) u vals ≤-refl)
