@@ -91,6 +91,25 @@ variable
 -- produced the value, which is what `HandedOK` is and what the carried
 -- family delivers.  A free postulate here would be that refutation
 -- written down as an axiom.
+-- DEAD ROUTE: giving `thru-outer` a rank FIELD ρ, set at install, so
+--   the hop re-seeds at a figure the machine owns and its drop is
+--   `ρ < suc ρ`.  It does close the arm without a premise, and it
+--   relocates the residue to the *All install, where it is a claim about
+--   a TERM.  It is dead because it invents a fourth currency for a
+--   question three refutations have already priced: the family's axis
+--   set is settled, so a mechanism whose whole content is avoiding the
+--   family buys a new shelf of statements nothing has instantiated, in
+--   place of five whose regions are known.  It is also strictly weaker
+--   about the run — ρ is not claimed to dominate the inners, so a wrong
+--   ρ is a silent re-seeding rather than a failed obligation.
+-- DEAD ROUTE: threading `HandedOK (o ∷ [])` into `subscribeInner` as an
+--   ARGUMENT and spending it for `ltR`.  It makes the evaluator a
+--   proof-carrying function: every caller up to `evaluate` acquires an
+--   obligation, and the impl stops mirroring anything a plain rxjs
+--   pipeline can do.  That is the one line this repo does not cross, and
+--   it is what fixes the SHAPE of the totality cutover: the knot is tied
+--   ABOVE this module, where a premise costs a proof obligation rather
+--   than an argument, so `evaluate` keeps the type a pipeline has.
 hop-edge : ∀ {U r s} {Γ : Ctx n} {u} (o : Val Γ (obs u))
          → obsDepthᵉ o < r
          → (U , obsDepthᵉ o , syncSizeᵉ o) ≺ (U , r , s)
