@@ -203,6 +203,27 @@ DrainsQ {e = e} allNid κ id now lim act q sched st =
 -- observable opens nodes of its own and fills them, so the store's
 -- total holding can rise across exactly the step that must fall.
 --
+-- AND THE OBSTRUCTION IS THE DESCENT ITSELF, NOT THE REPORT — WHICH IS
+-- WHAT SAYS WHAT THE COMPONENT HAS TO COUNT.  Suppose the bound were
+-- available at the drain by whatever means: the entry still subscribes
+-- a term the caller has no reading of, so the order is being asked to
+-- go down at a value that is not smaller.  Depth cannot answer that
+-- however it is carried, and neither can a ceiling threaded beside the
+-- triple, since a constant survives every hop precisely by not moving.
+-- What falls at a drain is the STORE'S HOLDING, and the census says
+-- where it rises: the merge's consume has exactly ONE arm that writes a
+-- queue, so the component is an upper bound on that holding, dropped by
+-- the drain and covered at the single site that fills it.
+--
+-- THE COVER IS A SYNCHRONOUS SIZE, WHICH THE ORDER ALREADY COUNTS.  The
+-- enqueue is a structural step of the burst walk, so it cannot re-enter
+-- at a larger bound — the bound has to be seeded high enough at the
+-- cascade's entry to cover every write the walk can still perform.  That
+-- quantity is how much the terms in hand can still emit synchronously,
+-- which is the third component's own subject; so the candidate is a
+-- bound denominated against it rather than a fourth independent number,
+-- and what the leg decides is whether the seeding survives the peel.
+--
 -- DEAD ROUTE: a conjunct on the invariant record beside the share
 --   bound, re-established where the merge's enqueue writes and spent
 --   where the drain reads.  Dead structurally and not merely unproven:

@@ -232,13 +232,14 @@ runs, which is now one leaf away.
 
 - **THE COMPONENT THE MERGE DRAIN DROPS, WHICH IS THE TIER'S ENDING CONDITION.**
   `queuedInner!` is the one site a run cannot step through, and working it said
-  why. The drain enters the cycle at the rank in hand; that rank falls at every
-  hop and the queue is touched by none of them, so nothing said about what the
-  store holds can make the entry a descent. The share connect is the precedent,
-  answered with a component of the order rather than a premise. This leg decides
-  what the drain's component counts — not the store's holding, which rises
-  across the very step that must fall. The commit is that order and the leaf's
-  body, and it is what puts the cache back on the gate.
+  why: the entry subscribes a term the caller has no reading of, so no report
+  about the queue can make it a descent. The share connect is the precedent,
+  answered in the order rather than in a premise. The census says what this one
+  counts: the merge's consume has ONE arm writing a queue, so
+  the component is a bound on the store's holding, dropped by the drain and
+  covered at that site by how much the terms in hand can still emit
+  synchronously — the third component's own subject. The leg is that seeding
+  and the leaf's body; it puts the cache back on the gate.
 
 - **WIDEN WHAT A BUILDER RETURNS, WHICH TURNS OUT TO GATE THE WALK.** Every
   premise is denominated at one `slotDepth sl` the caller fixes, and each clause
