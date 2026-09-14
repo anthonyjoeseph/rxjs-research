@@ -34,19 +34,30 @@
 module Verify-Rank-Sufficient where
 
 open import Data.Bool using (false)
-open import Data.Nat using (_≤_)
-open import Data.Nat.Properties using (≤-refl)
+open import Data.Empty using (⊥-elim)
+open import Data.Fin using (Fin)
+open import Data.Nat using (_≤_; suc; _+_; _<?_)
+open import Data.Nat.Properties using (≤-refl; ≤-trans; n≤1+n; m≤n+m)
 open import Data.Product using (_,_)
-open import Induction.WellFounded using (Acc)
-open import Relation.Binary.PropositionalEquality using (_≡_)
+open import Data.Vec using (lookup)
+open import Induction.WellFounded using (Acc; acc)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl)
+open import Relation.Nullary using (yes; no)
 
 open import Rx.Prim  using (Fuel; Id; Tick)
-open import Rx.Exp   using (Ctx; Closed; syncSizeᵉ)
+open import Rx.Exp   using (Ctx; Closed; obs; syncSizeᵉ; evalTm; unfoldμ;
+  input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ;
+  μᵉ; varᵉ; deferᵉ)
 open import Rx.Slots using (Slots)
-open import Rx.Strat-Order using (Tri; _≺_)
-open import Rx.Evaluator using (Stream; Path; root; Sched; EvalSt;
-  subscribeE; drain; evaluate; rootWitness; sched-init; st-init; hasDry)
-open import Rx.Evaluator.Domain using (evaluate⇓; eval-run; subscribeE⇓; drain⇓)
+open import Rx.Strat-Order using (Tri; _≺_; ltS)
+open import Rx.Sync-Size using (unfoldμ-shrinks)
+open import Rx.Evaluator using (Stream; Path; root; Sched; EvalSt; Frame; AllOp; NodeState; map-f; take-f; scan-f; _↠_;
+  subscribeE; pushBurst; subscribeAll; drain; evaluate; rootWitness; sched-init; st-init;
+  hasDry)
+open import Rx.Evaluator.Domain using (evaluate⇓; eval-run; subscribeE⇓;
+  pushBurst⇓; subscribeAll⇓; drain⇓;
+  subs-of; subs-empty; subs-map; subs-take-zero; subs-take-suc; subs-scan;
+  subs-merge-all; subs-switch-all; subs-exhaust-all; subs-μ; subs-defer)
 open import Verify-Rank-Sufficient.Dry-Emits using (hasDry-++)
 
 -- THE DOMAIN IS WHERE THE WHOLE OF THE KNOWN FALSITY NOW SITS, AND
@@ -106,31 +117,150 @@ open import Verify-Rank-Sufficient.Dry-Emits using (hasDry-++)
 EntryOK : ∀ {n} {Γ : Ctx n} {u} → Closed Γ u → Tri → Set
 EntryOK b (_ , _ , sz) = syncSizeᵉ b ≤ sz
 
--- THE SUBSCRIBE CYCLE'S HALF, AND IT CARRIES THE TWO GUARDS THE
--- RELATION DOES NOT INDEX.  The hop's test became a sub-derivation and
--- so is answered by whoever builds one; the μ unfold's `syncSize`
--- comparison and the share connect's unconnected count are not
--- functions of any argument this statement takes, so they are
--- discharged here and nowhere above.  It takes the accessibility
--- witness explicitly because the evaluator still descends on one, and
--- the statement is about THAT machine rather than about the one the
--- cutover leaves.
+-- CARRYING THE ENTRY INVARIANT DOWN A FRAME, WHICH IS THE WHOLE OF THE
+-- ARITHMETIC THE SUBSCRIBE INDUCTION NEEDS.  `syncSizeᵉ` counts the
+-- constructor and the frame's own term before it reaches the source,
+-- so a term's inner expression measures strictly below it and the
+-- invariant survives every structural descent with room to spare.  The
+-- only place a step is not structural is the μ peel, and that one is
+-- paid by the unfolding's own measure rather than here.
+entry-under : ∀ {c sz} → suc c ≤ sz → c ≤ sz
+entry-under le = ≤-trans (n≤1+n _) le
+
+entry-inner : ∀ {a b sz} → suc (a + b) ≤ sz → b ≤ sz
+entry-inner {a} {b} le = ≤-trans (m≤n+m b a) (entry-under le)
+
+-- THE ONE CONSTRUCTOR WHOSE CLAUSE READS A COMPONENT THE ENTRY
+-- INVARIANT DOES NOT YET SPEAK ABOUT.  A slot subscription splits six
+-- ways — floor, share, spent script, live script, and a cold source
+-- with or without a tail — and the share arm's connect compares the
+-- UNCONNECTED COUNT against the triple's first component, answering the
+-- negative case dry.  So this leaf is refutable exactly as its parent
+-- was, and by a witness of the same shape: a program over a share,
+-- entered at a first component below what the slots hold.  It is stated
+-- unconditionally on purpose — the refutation is what says which
+-- conjunct `EntryOK` grows, and a conjunct guessed ahead of one would
+-- be a premise nothing forced.
 --
--- PROBED: `Probed.Nodry-Halves` — two sources, a one-shot and a mapped
---   one, each derivation built by hand and held to the triple the
---   evaluator itself returns, so what the rows decide is whether the
---   relation MIRRORS the clause: the burst, the schedule left behind
---   and the state written must all be the ones the helpers compute.
---   The mapped row reaches through the event split and the retag.
---   Nothing here reaches a share, a flattener, a node store or the μ
---   unfold, so neither guard this statement carries is covered.
+-- PROBED: `Probed.Nodry-Halves` — the live-script arm only, at a hot
+--   slot entered below the root's floor, so the row pins the floor
+--   comparison and the registration that lowers the path by that
+--   comparison's own witness.  NOT covered, and the gap is the whole
+--   risk: the SHARE arm, where the connect reads the unconnected count;
+--   nor the spent script, nor either cold arm.
 postulate
-  subscribeE⇓-total : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
-    {τ : Tri} (ac : Acc _≺_ τ) (b : Closed Γ u) → EntryOK b τ →
-    (κ : Path Γ lo u t)
+  subscribeE⇓-input-total : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo}
+    {τ : Tri} (ac : Acc _≺_ τ) (i : Fin n) → EntryOK {Γ = Γ} (input i) τ →
+    (κ : Path Γ lo (lookup Γ i) t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
-    subscribeE⇓ {e = e} b κ id now sched st
-      (subscribeE {e = e} ac b κ id now sched st)
+    subscribeE⇓ {e = e} (input i) κ id now sched st
+      (subscribeE {e = e} ac (input i) κ id now sched st)
+
+-- THE OTHER CYCLE THE SUBSCRIBE MACHINE IS MUTUAL WITH, AND THE ONE
+-- THAT CARRIES THE HOP.  A burst reaching a frame is stepped event by
+-- event, and a step may subscribe an inner observable — which re-enters
+-- the subscribe cycle at a term this statement never sees, since a
+-- burst carries values rather than programs.  That is why it takes no
+-- entry invariant: there is no term here to state one about, and the
+-- reading that would replace it is the rank the carried report is being
+-- written to supply.  Whether that makes it refutable as written is the
+-- next thing to test, not to assume.
+--
+-- PROBED: `Probed.Nodry-Halves` — one burst, the map frame's, taken from
+--   the machine's own inner subscribe rather than written out, so the
+--   output index is the one `pushBurst` computes and a constructor
+--   relating a different stream fails the row.  It covers the split, the
+--   retag and the re-append over a `step-map` and the empty tail.  NOT
+--   covered: any burst whose step SUBSCRIBES — no hop is reached, which
+--   is the whole of what the statement is at risk over — and no frame
+--   but the map one.
+postulate
+  pushBurst⇓-total : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
+    {τ : Tri} (ac : Acc _≺_ τ) (id : Id) (now : Tick)
+    (f : Frame Γ s u) (κ : Path Γ lo u t) (burst : Stream Γ s)
+    (sched : Sched Γ) (st : EvalSt e) →
+    pushBurst⇓ {e = e} id now f κ burst sched st
+      (pushBurst {e = e} ac id now f κ burst sched st)
+
+-- THE FLATTENERS' SHARED WRAPPER, WHICH IS A NODE INSTALL FOLLOWED BY
+-- THE TWO CYCLES ABOVE.  It is a leaf rather than a body only because
+-- its two halves are, and it takes the entry invariant at its own outer
+-- term because that is what its subscribe half will ask for.  Nothing
+-- distinguishes the three operators here — they differ in the state
+-- installed, which no clause of either cycle reads.
+--
+-- PROBED: `Probed.Nodry-Halves` — the merge flattener over an outer
+--   that hands it no observable, which reaches the wrapper's own
+--   plumbing and nothing beyond it: the node id the install writes is
+--   the one the frame is built at, so a second mint or a frame built at
+--   the pre-mint counter fails the row.  NOT covered: any walk with a
+--   value in it, hence no inner subscribe and no hop; and neither of
+--   the other two operators.
+postulate
+  subscribeAll⇓-total : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
+    {τ : Tri} (ac : Acc _≺_ τ) (op : AllOp) (ns : NodeState Γ)
+    (b : Closed Γ (obs u)) → EntryOK b τ → (κ : Path Γ lo u t)
+    (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    subscribeAll⇓ {e = e} op ns b κ id now sched st
+      (subscribeAll {e = e} ac op ns b κ id now sched st)
+
+-- THE SUBSCRIBE CYCLE'S HALF, AND IT IS AN INDUCTION RATHER THAN A LEAF
+-- BECAUSE THE ENTRY INVARIANT IS WHAT MAKES ONE WRITEABLE.  Every
+-- structural clause recurses at the same witness on a term the measure
+-- counts strictly below, and the μ peel — the one step that is not
+-- structural, since the unfolding is larger than the term it replaces —
+-- steps the witness instead and re-establishes the invariant at the
+-- unfolding's own size.  What the invariant buys at that clause is the
+-- guard: the evaluator compares the unfolding's measure against the
+-- entry's third component and answers dry when it fails, and the
+-- premise says it cannot.
+--
+-- SO THE RISK LEFT UNDER THIS BODY IS THREE LEAVES AND NO LONGER A
+-- GUARD.  Two of the machine's three non-indexed comparisons are now
+-- inside `subscribeE⇓-input-total` — the share connect's — and inside
+-- the push cycle — the hop's; the third is discharged here.  That is
+-- the convergence the entry invariant was minted for: the same risk,
+-- localised to the two clauses that actually read a component, at
+-- statements small enough to instantiate.
+subscribeE⇓-total : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
+  {τ : Tri} (ac : Acc _≺_ τ) (b : Closed Γ u) → EntryOK b τ →
+  (κ : Path Γ lo u t)
+  (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+  subscribeE⇓ {e = e} b κ id now sched st
+    (subscribeE {e = e} ac b κ id now sched st)
+subscribeE⇓-total ac (input i) ok κ id now sched st =
+  subscribeE⇓-input-total ac i ok κ id now sched st
+subscribeE⇓-total ac (ofᵉ ts) ok κ id now sched st = subs-of refl
+subscribeE⇓-total ac emptyᵉ ok κ id now sched st = subs-empty refl
+subscribeE⇓-total ac (mapᵉ f b) ok κ id now sched st =
+  subs-map (subscribeE⇓-total ac b (entry-inner ok) (map-f f ↠ κ) id now sched st)
+           (pushBurst⇓-total ac id now (map-f f) κ _ _ _)
+subscribeE⇓-total ac (takeᵉ count b) ok κ id now sched st
+  with evalTm count in eq
+... | 0     = subs-take-zero eq refl
+... | suc k =
+      subs-take-suc eq refl
+        (subscribeE⇓-total ac b (entry-inner ok) (take-f _ ↠ κ) id now _ _)
+        (pushBurst⇓-total ac id now (take-f _) κ _ _ _)
+subscribeE⇓-total ac (scanᵉ f seed b) ok κ id now sched st =
+  subs-scan refl
+    (subscribeE⇓-total ac b (entry-inner ok) (scan-f f _ ↠ κ) id now _ _)
+    (pushBurst⇓-total ac id now (scan-f f _) κ _ _ _)
+subscribeE⇓-total ac (mergeAllᵉ lim b) ok κ id now sched st =
+  subs-merge-all (subscribeAll⇓-total ac _ _ b (entry-under ok) κ id now sched st)
+subscribeE⇓-total ac (switchAllᵉ b) ok κ id now sched st =
+  subs-switch-all (subscribeAll⇓-total ac _ _ b (entry-under ok) κ id now sched st)
+subscribeE⇓-total ac (exhaustAllᵉ b) ok κ id now sched st =
+  subs-exhaust-all (subscribeAll⇓-total ac _ _ b (entry-under ok) κ id now sched st)
+subscribeE⇓-total {τ = _ , _ , sz} (acc rec) (μᵉ body) ok κ id now sched st
+  with syncSizeᵉ (unfoldμ body) <? sz
+... | no ¬p = ⊥-elim (¬p (≤-trans (unfoldμ-shrinks body) ok))
+... | yes p =
+      subs-μ (subscribeE⇓-total (rec (ltS p)) (unfoldμ body) ≤-refl
+                κ id now sched st)
+subscribeE⇓-total ac (varᵉ ()) ok κ id now sched st
+subscribeE⇓-total ac (deferᵉ body) ok κ id now sched st =
+  subs-defer refl refl refl
 
 -- THE ARRIVAL CYCLE'S HALF, WHICH DESCENDS ON THE FUEL AND SO CARRIES
 -- NO GUARD AT ALL.  Its two base clauses are unconditional and its step

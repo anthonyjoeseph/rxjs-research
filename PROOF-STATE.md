@@ -216,11 +216,11 @@ research lives; where they disagree, the header wins.
 
 **THE TIER IS ONE STATEMENT AND IT IS CURRENTLY FALSE.** `rank-sufficient`
 (Verify-Rank-Sufficient) says no run emits the dry marker; `Refuted.Dry-Wrap`
-kills it three times against the evaluator as it stands. It is now three bodies
-over four leaves, and the risk sits in the two TOTALITY leaves — a derivation at
-each cycle's own output. Both are false as long as the three guarded arms are,
-and the subscribe half is additionally wrong AS WRITTEN — it now carries an
-`EntryOK` premise.
+kills it three times against the evaluator as it stands. It is four bodies over
+six leaves: the subscribe cycle's totality became a real induction once
+`EntryOK` was there to carry, and the risk it held split onto the two clauses
+that read a component of the entry against the term — the slot subscribe's
+share connect, and the push cycle's hop.
 
 **AND THE MEASURE IS HELD BY SOMETHING NO STATEMENT MENTIONS: THE RUN HAS TO
 COMPUTE IT.** Three non-structural edges TEST a reading and emit dry on the
@@ -279,15 +279,15 @@ cannot compute — and the other two leaves carry no arithmetic at all.
   Write the refutation FIRST in each case — the unconditional form of each
   conjunct is what says the conjunct is not a guess.
 
-- **THEN GROUND `subscribeE⇓-total`, WHICH IS THE TERMINATION ARGUMENT.** The
-  first of the two leaves the totality assembly now stands on. It goes clause
-  by clause over the twelve subscribe-cycle families, each arm building the
-  matching constructor of `subscribeE⇓` out of sub-derivations at the recursive
-  calls, and re-establishing `EntryOK` at each of them — which is the real work,
-  since the three non-structural edges are exactly where it has to be rebuilt
-  rather than carried. What is left is an induction free to use any measure a
-  PROOF may use, including quantities the machine cannot compute — the
-  constraint every dead candidate died under.
+- **THEN THE THREE LEAVES THE SUBSCRIBE INDUCTION LEFT, AND REFUTE EACH BEFORE
+  GRINDING IT.** The body is written and its structural clauses are closed, so
+  what is open is `subscribeE⇓-input-total` (the slot subscribe, six arms, the
+  share connect's `unconn` guard), `pushBurst⇓-total`
+  (`∀ … (ac : Acc _≺_ τ) (id : Id) (now : Tick) (f : Frame Γ s u) (κ : Path Γ lo u t) (burst : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) → pushBurst⇓ id now f κ burst sched st (pushBurst ac id now f κ burst sched st)`,
+  which carries the hop through `stepFrame`), and `subscribeAll⇓-total`, which
+  is the first two composed and falls out of them. Each is stated
+  unconditionally on purpose: a witness is what says which conjunct `EntryOK`
+  grows, and the leg above is where the growing happens.
 
 - **AND `drain⇓-total`, WHICH IS ORDINARY FUEL INDUCTION ONCE ITS SIBLING
   EXISTS.** `drain⇓ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (fuel : Fuel) (id : Id) (sched : Sched Γ) (st : EvalSt e) → drain⇓ {e = e} fuel id sched st (drain fuel id sched st)`,
@@ -308,6 +308,21 @@ cannot compute — and the other two leaves carry no arithmetic at all.
 
 ### The ledger
 
+- **`subscribeE⇓-input-total`** (Verify-Rank-Sufficient) — FALSITY, `PROBED`: a
+  derivation at a slot subscription's own output. Six arms, and the share one's
+  connect reads the unconnected count against the entry's first component, so
+  this is refutable exactly as its parent was.
+
+- **`pushBurst⇓-total`** (Verify-Rank-Sufficient) — FALSITY, `PROBED`: a
+  derivation at the push cycle's own output. It carries the hop, which reads a
+  rank the statement never mentions. One burst reaches it, the map frame's, at
+  the stream the machine itself handed the cycle.
+
+- **`subscribeAll⇓-total`** (Verify-Rank-Sufficient) — FALSITY, `PROBED`: the
+  flatteners' wrapper, a node install between the two cycles above. It adds no
+  guard of its own and inherits both halves' falsity; the three operators
+  differ only in a state no clause reads.
+
 - **`drain⇓-total`** (Verify-Rank-Sufficient) — FALSITY, `PROBED`: the same
   over the arrival cycle. It carries no guard itself; its cascade arm re-enters
   the subscribe cycle, so it inherits that leaf's falsity rather than adding
@@ -322,12 +337,6 @@ cannot compute — and the other two leaves carry no arithmetic at all.
   over the drain and cascade families. One arrival reaches it, at the state the
   root subscribe actually left; the cancelled arm and every chain carrying a
   frame are uncovered.
-
-- **`subscribeE⇓-total`** (Verify-Rank-Sufficient) — SHAPE, `PROBED`: a
-  derivation at the subscribe cycle's own output, now under `EntryOK`. The
-  unconditional form is refuted at a starved entry; the premise that forced
-  covers one of the three components read against the term, so two more
-  conjuncts are guaranteed.
 
 ## Tier 2 — Verify-Well-Formed (parked behind tier 1)
 
