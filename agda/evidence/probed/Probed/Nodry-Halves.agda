@@ -44,7 +44,8 @@ open import Rx.Evaluator using (Sched; EvalSt; root; rootWitness; subscribeE;
 open import Rx.Evaluator.Domain using (subs-of; subs-empty; subs-map;
   subs-take-zero; push-cons; push-nil; step-map;
   drain-step; drain-done; casc-run; casc-live; casc-nil; chain-step; fold-root)
-open import Verify-Rank-Sufficient using (subscribeE⇓-nodry; drain⇓-nodry)
+open import Verify-Rank-Sufficient using (subscribeE⇓-nodry; drain⇓-nodry;
+  subscribeE⇓-total; drain⇓-total)
 
 open import Probed.Apparatus using (Confirms)
 
@@ -53,6 +54,7 @@ open import Probed.Apparatus using (Confirms)
 -- different helper.
 --
 -- TARGET: subscribeE⇓-nodry @c66df9
+-- TARGET: subscribeE⇓-total @dc2849
 ----------------------------------------------------------------------
 
 Γ₀ : Ctx 0
@@ -118,10 +120,31 @@ row-map :
              (subs-map (subs-of refl) (push-cons refl step-map push-nil)))
 row-map = refl
 
+-- LOAD-BEARING ON THE OUTPUT INDEX, which is the one thing the rows
+-- above cannot test: they hand a derivation in and let unification
+-- choose the triple it is about, so a constructor relating the wrong
+-- stream satisfies them.  Here the triple is `subscribeE`'s OWN result,
+-- so the row fails unless the clause and the constructor agree on what
+-- was emitted, on the schedule left behind and on the state written.
+row-total-of :
+  Confirms (subscribeE⇓-total {e = three} (rootWitness three ins₀)
+             three (root {lo = 0}) 0 0 (S three) (st-init three))
+row-total-of = subs-of refl
+
+-- LOAD-BEARING and the widest of the pair, for `row-map`'s reason: the
+-- burst reaches the caller through a split, a retag and a re-append, so
+-- the index this row pins is one three helpers computed rather than one
+-- clause.
+row-total-map :
+  Confirms (subscribeE⇓-total {e = mapped} (rootWitness mapped ins₀)
+             mapped (root {lo = 0}) 0 0 (S mapped) (st-init mapped))
+row-total-map = subs-map (subs-of refl) (push-cons refl step-map push-nil)
+
 ----------------------------------------------------------------------
 -- THE DRAIN HALF, ENTERED AT THE STATE THE ROOT SUBSCRIBE LEFT.
 --
 -- TARGET: drain⇓-nodry @29af89
+-- TARGET: drain⇓-total @abae59
 ----------------------------------------------------------------------
 
 Γ₁ : Ctx 1
@@ -151,3 +174,15 @@ row-drain :
                (casc-run (casc-live refl (chain-step fold-root) casc-nil))
                drain-done))
 row-drain = refl
+
+-- LOAD-BEARING ON THE OUTPUT INDEX, as its sibling above: the arrival
+-- cycle concatenates a cascade's emits with the rest of the drain, so
+-- the row fails unless the cascade's own output index is the one the
+-- helpers compute and the recursive call is entered at the id the
+-- clause threads.
+row-total-drain :
+  Confirms (drain⇓-total {e = src} 1 1 sched₀ st₀)
+row-total-drain =
+  drain-step refl
+    (casc-run (casc-live refl (chain-step fold-root) casc-nil))
+    drain-done

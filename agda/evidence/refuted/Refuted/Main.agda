@@ -31,3 +31,24 @@ open import Refuted.Dry-Wrap using (rank-sufficient-false;
 -- for every burst length, so the witness cannot go quiet while the
 -- mechanism under it stands
 open import Refuted.Scan-Deepens using (scan-bounded-false)
+
+-- and the shape that survived it, killed in turn.  The three figures
+-- are claimed because the crossing is their ORDER: the depth walks in
+-- on the entry store, survives one delivery, and is gone from the exit
+-- store — so a repair moving any single end would leave a witness
+-- reporting numbers that no longer meet.  It is beside the climb rather
+-- than folded into it because the two die to different repairs: a
+-- figure growing with the burst answers the climb and leaves this one
+-- open at a burst of two, where the template deepens nothing
+open import Refuted.Exit-Store using (exit-bounded-false;
+  entry-is; kept-is; store-is)
+
+-- and the repair that reads BOTH ends, refuted in turn at a template
+-- whose two arms are the other two witnesses'.  Its four figures are
+-- claimed because the finding is that the peak clears all of them at
+-- once: a repair moving any single one would leave a witness reporting
+-- numbers that no longer meet.  What is left after this is a factor in
+-- the burst's LENGTH, which is the only quantity none of the three
+-- reads
+open import Refuted.Exit-Store using (both-ends-false;
+  rise-tmpl-is; rise-entry-is; rise-store-is; interior-is)
