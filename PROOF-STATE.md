@@ -199,7 +199,7 @@ formal-verification-batchSimultaneous    The-Proof.agda — REAL, module postula
      └─ burst-drain-well-formed          one postulate — tier 2
 
   evaluate↓ = proj₁ ∘ evaluate!           Rx/Evaluator/Builder.agda — tier 1
-     └─ drain!, mergeAllDrain!         the two leaves a run still steps through
+     └─ queuedInner!                   the one leaf a run still steps through
 
   every tier above is stated over Rx.Exp's syntax
 ```
@@ -216,17 +216,29 @@ research lives; where they disagree, the header wins.
 
 ## Tier 1 — the evaluator runs again
 
-**THE TIER IS A PROJECTION OVER THREE LEAVES.** `evaluate↓` is `proj₁` of
+**THE TIER IS A PROJECTION OVER ONE LEAF.** `evaluate↓` is `proj₁` of
 `evaluate!`, which hands back a run TOGETHER with its `evaluate⇓` derivation, so
 the descent is a proof obligation rather than a reading the machine computes and
 the dry marker is unemittable — no constructor of the relation builds one. What
 that costs is reduction: a projection computes only if the thing projected is a
-real body, so while any leaf is a postulate a run typechecks and does not
-reduce. The bug cache, the oracle and every `refl` over a run are stuck at the
-first match, which is why `bug-cache` is off the gate for the duration and
-`make bug-cache` is a target to TYPE. The tier ends when a row runs.
+real body, so a run reduces exactly as far as the leaves allow. It now reduces
+through the whole arrival cycle and through a merge drain that finds an empty
+queue or a full lane; what it does not reduce through is a queued subscription,
+and every row of the corpus reaches one. So `bug-cache` is off the gate for the
+duration and `make bug-cache` is a target to TYPE. The tier ends when a row
+runs, which is now one leaf away.
 
 ### Big picture tier roadmap
+
+- **WHAT THE STORE OWES ABOUT WHAT IT HOLDS, WHICH IS THE TIER'S ENDING
+  CONDITION.** `queuedInner!` is the one site a run cannot step through: an
+  observable put into a merge's node when the lane limit was full, read back an
+  arbitrary number of instants later by a completion carrying no burst. Every
+  other entry into the subscribe cycle names its own rank; this one cannot,
+  because the rank is a property of a value the store has held. So the field
+  goes on the invariant record, obliging every producer that queues and every
+  consumer that drains. The commit is the field, its producers and the leaf's
+  body — and it is what puts the cache back on the gate.
 
 - **WIDEN WHAT A BUILDER RETURNS, WHICH TURNS OUT TO GATE THE WALK.** Every
   premise is denominated at one `slotDepth sl` the caller fixes, and each clause
@@ -246,16 +258,6 @@ first match, which is why `bug-cache` is off the gate for the duration and
   block rather than a leaf. It needs the agreement at a schedule it did not
   build, which is the leg above.
 
-- **THE TWO ENDS OF THE RUN, WHICH IS WHAT MAKES A ROW REDUCE.** `drain!` is
-  fuel induction over the schedule and carries no guard at all; `mergeAllDrain!`
-  is the ONE subscription site a burst never reaches, since its observables were
-  queued when the lane limit was full and come back out of the STORE an
-  arbitrary number of instants later. So what `mergeAllDrain!` is owed is a
-  field on the invariant record and not a premise — a premise quantified freely
-  over the queue is the statement `hop-edge`'s own header refutes. With these
-  and the leg above landed the evaluator reduces, the cache goes back on the
-  gate, and the corpus says whether the doorless run agrees with the spec.
-
 - **AND THE TWO FRAME HEADS THAT LEAVE THE MODULE, WHICH ARE NOT THE MEASURE'S
   QUESTION.** The frame walk landed and put four leaves where one statement
   stood; two of them — `map-open` and `scan-handed` — are the reading itself
@@ -273,14 +275,14 @@ first match, which is why `bug-cache` is off the gate for the duration and
   splits a burst emit by emit — but a queued observable carries no burst at all.
   Every attempt to say it over the TERM has been refuted, which is what points
   the answer at the invariant record; nothing has yet written the field.
-  relevant: `mergeAllDrain!`, `connect-carries`
+  relevant: `queuedInner!`, `connect-carries`
 
 ### The ledger
 
 - **`connect-carries`** (Rx/Evaluator/Burst-Report) — FALSITY, `REFUTED`: the
-  one arm of the burst report that re-enters the subscribe. The caller's premise
-  already dominates the slot's rank; what is missing between them is that
-  `BurstOK` may be WIDENED along that domination. Where the field is owed.
+  one arm of the burst report that re-enters the subscribe. The caller's
+  premise already dominates the slot's rank; what is missing between them is
+  that `BurstOK` may be WIDENED along that domination. Where the field is owed.
 
 - **`map-open`** (Rx/Evaluator/Burst-Report) — FALSITY, `REFUTED, RECOVERY`:
   what a template writes at a payload that is NOT data. The reading JOINS where
@@ -308,13 +310,10 @@ first match, which is why `bug-cache` is off the gate for the duration and
   induction on the TYPE with no arithmetic in it. A leaf only because it is
   unwritten.
 
-- **`mergeAllDrain!`** (Rx/Evaluator/Builder) — FALSITY, `RECOVERY`: the queued
+- **`queuedInner!`** (Rx/Evaluator/Builder) — FALSITY, `RECOVERY`: ONE queued
   subscription, read back out of the store by a completion carrying no burst.
-  What it is owed is a field on the invariant record.
-
-- **`drain!`** (Rx/Evaluator/Builder) — FALSITY, `RECOVERY`: the arrival cycle,
-  fuel induction with no guard of its own. Its cascade arm re-enters the
-  subscribe cycle, so it inherits that leaf rather than adding one.
+  The drain around it is a body, so this is the whole of what a run still
+  cannot step through. What it is owed is a field on the invariant record.
 
 - **`connect-drops`** (Rx/Evaluator/Doorless) — FALSITY, `PROBED`: the share
   connect's drop in the unconnected component, the arithmetic the arm above
