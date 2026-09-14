@@ -231,18 +231,6 @@ cannot compute — and the other two leaves carry no arithmetic at all.
 
 ### Big picture tier roadmap
 
-- **PRICE THE TEMPLATE, NOT THE INPUT: STATE THE SUBSTITUTION LEMMA (Anthony).**
-  Six refutations stand at the door and every one of them refutes a price stated
-  in what a frame was HANDED — which is the convergence test's spiral signal,
-  whose prescribed response is to change the mechanism. The change is a change
-  of CURRENCY: what a template emits is a substitution instance of a subterm of
-  it, and substituting DATA moves no `strmᵗ`, so
-  `obsDepthᵉ (applyFn fn v) < obsDepthᵗ fn` strictly, read off the program with
-  no machine state in it. `Rx.Obs-Depth.Substitution` sketches it against its
-  proven twin `obsDepth-elimG`; `Probed.Template-Depth` holds the rows, one of
-  which REFUTES the unconditioned form. PROBE FIRST — cheapest test on this
-  face, and the largest blast radius on it.
-
 - **DELETE THE ARM; PROVING IT UNREACHABLE IS A DIFFERENT JOB (Anthony).** THE
   DOOR is `subscribeInner`'s `obsDepthᵉ o <? r`, and the two peels ask it of a
   size and a count. Proving the `no` arm unreachable claims something about
@@ -254,6 +242,18 @@ cannot compute — and the other two leaves carry no arithmetic at all.
   inhabiting the relation are ONE obligation.
   `Verify-Rank-Sufficient.Doorless` is the builder; `Rx.Evaluator.Doorless` the
   three facts replacing the tests, of which the μ peel's is proven.
+
+- **PRICE THE TEMPLATE, NOT THE INPUT: STATE THE SUBSTITUTION LEMMA (Anthony).**
+  Six refutations stand at the door and every one of them refutes a price stated
+  in what a frame was HANDED — which is the convergence test's spiral signal,
+  whose prescribed response is to change the mechanism. The change is a change
+  of CURRENCY: what a template emits is a substitution instance of a subterm of
+  it, and substituting DATA moves no `strmᵗ`, so
+  `obsDepthᵉ (applyFn fn v) < obsDepthᵗ fn` strictly, read off the program with
+  no machine state in it. `Rx.Obs-Depth.Substitution` sketches it against its
+  proven twin `obsDepth-elimG`; `Probed.Template-Depth` holds the rows, one of
+  which REFUTES the unconditioned form. It is the hop's own premise, so the leg
+  above hands it its only remaining customer.
 
 - **STATE THE WHOLE CARRIED FAMILY AT THE FULL AXIS SET IN ONE PASS — ALL FIVE
   FRAMES, NOT ONE PER REFUTATION (Anthony).** `stepFrame⇓-total` is handed
@@ -296,6 +296,16 @@ cannot compute — and the other two leaves carry no arithmetic at all.
   `git show 234074e:agda/src/Verify-Rank-Sufficient/Dry-Emits.agda`. No triple,
   no rank and no order appears anywhere in it, which is exactly what the
   relation bought — an arithmetic obligation became a list induction.
+
+- **AND THE UNREACHABILITY CLAIM LAST, WHICH IS WHAT `rank-sufficient`
+  BECOMES.** With the arm gone the marker is unemittable because nothing that
+  could emit it is in the module — so the theorem stops being about numbers and
+  is the observation that no constructor of the relation builds a dry emit,
+  which `evaluate⇓-nodry` already proves of every derivation. `Refuted.Dry-Wrap`
+  goes red at that commit and is deleted with it: `make refuted` going red IS
+  the signal, and its three witnesses are what made the claim false until then.
+  Last because every leg above is what makes it true rather than something it
+  waits on.
 
 ### The ledger
 
