@@ -230,15 +230,15 @@ runs, which is now one leaf away.
 
 ### Big picture tier roadmap
 
-- **WHAT THE STORE OWES ABOUT WHAT IT HOLDS, WHICH IS THE TIER'S ENDING
-  CONDITION.** `queuedInner!` is the one site a run cannot step through: an
-  observable put into a merge's node when the lane limit was full, read back an
-  arbitrary number of instants later by a completion carrying no burst. Every
-  other entry into the subscribe cycle names its own rank; this one cannot,
-  because the rank is a property of a value the store has held. So the field
-  goes on the invariant record, obliging every producer that queues and every
-  consumer that drains. The commit is the field, its producers and the leaf's
-  body — and it is what puts the cache back on the gate.
+- **THE COMPONENT THE MERGE DRAIN DROPS, WHICH IS THE TIER'S ENDING CONDITION.**
+  `queuedInner!` is the one site a run cannot step through: the entry
+  subscribes a term deeper than the rank in force. The share connect is the
+  precedent, answered in the order. What it counts is not items, which
+  `syncSizeᵉ`'s dead route refutes — a doubling fold outruns any seeding — but
+  the MULTISET OF DEPTHS held queued AND still pending in the burst being
+  walked. Read over the store alone it rises at the write; read with the
+  pending half the write is a move, the drain a removal, and a subscribe adds
+  only under the rank the hop dropped to. The leg is that order and the body.
 
 - **WIDEN WHAT A BUILDER RETURNS, WHICH TURNS OUT TO GATE THE WALK.** Every
   premise is denominated at one `slotDepth sl` the caller fixes, and each clause
@@ -270,12 +270,14 @@ runs, which is now one leaf away.
 
 ### Open questions
 
-- **Is what a run PRODUCED sayable about a run that reads its own store?** The
-  hop's premise arrives from the site that built the value, and the push cycle
-  splits a burst emit by emit — but a queued observable carries no burst at all.
-  Every attempt to say it over the TERM has been refuted, which is what points
-  the answer at the invariant record; nothing has yet written the field.
-  relevant: `queuedInner!`, `connect-carries`
+- **How many edges does the order owe a component of its own?** It was built for
+  the term, and every edge the term cannot pay for has had to be answered in a
+  component instead — the share connect already was. The merge drain is the
+  second, found by writing its entry and watching the rank fall away from it.
+  The question is whether that is the last: an edge qualifies exactly when it
+  reaches a value the store has held rather than one a caller built, and nothing
+  has yet enumerated those sites.
+  relevant: `queuedInner!`, `connect-drops`
 
 ### The ledger
 
@@ -310,10 +312,11 @@ runs, which is now one leaf away.
   induction on the TYPE with no arithmetic in it. A leaf only because it is
   unwritten.
 
-- **`queuedInner!`** (Rx/Evaluator/Builder) — FALSITY, `RECOVERY`: ONE queued
-  subscription, read back out of the store by a completion carrying no burst.
-  The drain around it is a body, so this is the whole of what a run still
-  cannot step through. What it is owed is a field on the invariant record.
+- **`queuedInner!`** (Rx/Evaluator/Builder) — FALSITY, `DEAD ROUTE, RECOVERY`:
+  ONE queued subscription, read back out of the store by a completion carrying
+  no burst. The drain around it is a body, so this is the whole of what a run
+  still cannot step through. It is owed a component of the order, not a
+  premise.
 
 - **`connect-drops`** (Rx/Evaluator/Doorless) — FALSITY, `PROBED`: the share
   connect's drop in the unconnected component, the arithmetic the arm above

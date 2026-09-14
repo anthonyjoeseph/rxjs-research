@@ -168,36 +168,111 @@ DrainsQ {e = e} allNid κ id now lim act q sched st =
 -- push cycle splits it emit by emit.  A QUEUED one does not: it was put
 -- into the node when the lane limit was full and is read back out of the
 -- store an arbitrary number of instants later, by a completion that
--- carries no burst at all.  So the obligation here is a property of the
--- STORE, which is the invariant record's subject and not a signature's —
--- a premise quantified freely over the queue would be exactly the
--- statement `hop-edge`'s own header refutes, written down as an axiom.
+-- carries no burst at all.  So the obligation here is not one a caller
+-- can be asked for — a premise quantified freely over the queue would
+-- be exactly the statement `hop-edge`'s own header refutes, written
+-- down as an axiom.
 --
 -- SO THE LEAF IS THE ONE QUEUED SUBSCRIPTION AND NOT THE DRAIN AROUND
 -- IT.  The walk over the queue is structural on the queue and the two
 -- arms that stop — an empty queue, a full lane — carry no obligation at
--- all, so they are clauses.  What cannot be written is the single step:
--- entering the subscribe cycle needs a rank the queued observable's own
--- report would name, and that report is what the store does not yet
--- carry.  Shrinking the leaf to that step is what makes a run with an
--- empty or blocked queue REDUCE, which is every run the corpus holds.
+-- all, so they are clauses.  What cannot be written is the single step,
+-- because entering the subscribe cycle is an edge the order has no
+-- component for.  Shrinking the leaf to that step is still what makes a
+-- run with an empty or a blocked queue REDUCE, and the corpus reaches
+-- neither — every row of it steps through a queue that fills.
 
--- AND IT IS NOT A RANK THE SITE MUST INVENT, WHICH NARROWS WHAT IS OWED
--- TO ONE CONJUNCT.  The room arm of the merge's consume hands the walk's
--- own `ac`, its handed report and its share bound STRAIGHT THROUGH to
--- the inner subscribe: entering there takes the caller's triple rather
--- than a smaller one, so the descent is the callee's business and every
--- premise but one threads down the chain from the frame step unchanged.
--- The exception is the handed report, because a queued observable came
--- out of the STORE and not out of the caller's list — and the enqueue
--- arm is the single site that writes one, holding exactly that report at
--- the moment it drops it.  So what is owed is a conjunct of the state
--- invariant beside the share bound, re-established where the enqueue
--- writes and spent where the drain reads.
+-- AND THE EDGE IS ONE THE ORDER CANNOT PAY FOR, WHICH IS A STRONGER
+-- FINDING THAN A MISSING REPORT.  The room arm of the merge's consume
+-- hands the walk's own accessibility straight through, so the drain
+-- would enter the cycle at the CALLER's triple — and the descent that
+-- entry owes is against the rank in hand at the moment the completion
+-- arrives.  That rank FALLS at every hop, while the queue is touched by
+-- none of them: a value the store has been holding is under whatever
+-- rank stood when it was put there, and nothing below shrinks it to
+-- meet a later one.  So the drain is not a rank question at all, and no
+-- report about the queue can make it one.
+
+-- THE SHARE CONNECT IS THE PRECEDENT, AND IT SAYS WHAT SHAPE THE REPAIR
+-- HAS.  That was the other edge no reading of the TERM could pay for,
+-- and it was answered with a component of the order rather than with a
+-- premise — the counting one, which the term measures sit under.  The
+-- merge drain is the second such edge, so what it wants is a component
+-- of its own.  What that component COUNTS is the tier's open question,
+-- because the obvious reading is not monotone: subscribing a drained
+-- observable opens nodes of its own and fills them, so the store's
+-- total holding can rise across exactly the step that must fall.
+--
+-- AND THE OBSTRUCTION IS THE DESCENT ITSELF, NOT THE REPORT — WHICH IS
+-- WHAT SAYS WHAT THE COMPONENT HAS TO COUNT.  Suppose the bound were
+-- available at the drain by whatever means: the entry still subscribes
+-- a term the caller has no reading of, so the order is being asked to
+-- go down at a value that is not smaller.  Depth cannot answer that
+-- however it is carried, and neither can a ceiling threaded beside the
+-- triple, since a constant survives every hop precisely by not moving.
+-- What falls at a drain is the STORE'S HOLDING, and the census says
+-- where it rises: the merge's consume has exactly ONE arm that writes a
+-- queue, so the component is an upper bound on that holding, dropped by
+-- the drain and covered at the single site that fills it.
+--
+-- AND THE COMPONENT COUNTS DEPTHS RATHER THAN ITEMS, WHICH IS FORCED BY
+-- A REFUTATION ALREADY IN THE TREE.  A bound on HOW MANY the walk can
+-- still write would have to be seeded at the cascade's entry, since the
+-- enqueue is a structural step and cannot re-enter at a larger one —
+-- and `syncSizeᵉ` carries the dead route for exactly that, measured at a
+-- doubling fold: deliveries go exponential where a syntactic measure
+-- goes linear, so no seeding out of the entry triple survives.  Counting
+-- is therefore the wrong reading of the holding.
+--
+-- WHAT SURVIVES IT IS THE MULTISET OF THE DEPTHS, BECAUSE THE DRAIN'S
+-- OWN STEP IS DOWNWARD IN THEM.  Subscribing a drained observable opens
+-- nodes inside it, and what those nodes queue is emitted under the rank
+-- the hop just dropped to — so every item the step adds is STRICTLY
+-- SHALLOWER than the one it removed, however many of them there are.
+-- That is what makes the exponential irrelevant: the order never has to
+-- know the count at a level, only that a level was vacated and nothing
+-- was added at or above it.  Depths are bounded by the program's own
+-- reading, so the multiset is a fixed-width vector of counts read
+-- most-significant-first — the existing order widened rather than a new
+-- kind of one.
+
+-- AND THE HOLDING IS READ TOGETHER WITH THE BURST STILL TO BE WALKED,
+-- WHICH IS WHAT MAKES THE ENQUEUE A MOVE RATHER THAN A GROWTH.  Read
+-- over the store alone the measure rises at the write, and the write is
+-- a structural step of the burst walk, where the order may not be
+-- re-entered at all.  But the walk is holding the burst as a LIST: what
+-- the enqueue does is take an observable out of the pending half and
+-- put it into the store, which leaves the two halves together
+-- unchanged.  The drain then removes from the store and adds nothing,
+-- and a subscribe removes from the pending half and adds whatever the
+-- new subscription emits — strictly shallower, since it is emitted
+-- under the rank the hop just dropped to.
+--
+-- THAT IS ALSO WHY THE COUNT REFUTATION DOES NOT REACH IT.  What the
+-- doubling fold outruns is a bound SEEDED FROM THE SYNTAX, and nothing
+-- here is seeded: the pending half is a list the walk already has in
+-- hand, so the measure is as big as the run actually made it and never
+-- has to have been predicted.
+
+-- DEAD ROUTE: a conjunct on the invariant record beside the share
+--   bound, re-established where the merge's enqueue writes and spent
+--   where the drain reads.  Dead structurally and not merely unproven:
+--   the enqueue's report is taken at the rank its node stood at, the
+--   hop chain below it lowers that rank strictly and leaves the queue
+--   alone, so the conjunct is FALSE at the triple the drain stands at.
+--   Stated against a constant instead it survives every hop and buys no
+--   descent, which is the same wall reached from the other side.  The
+--   witness is small and wants no machinery: a merge of lane limit one
+--   over a pair of observables whose SECOND is the deeper.  The first is
+--   subscribed and the second queued; the first completes at once, and
+--   the drain then stands at a rank read off that completion while the
+--   observable it must subscribe is deeper than anything in scope.  So
+--   a drain can enter DEEPER than the rank in force, and no
+--   depth-denominated premise can be the thing it descends on.
 --
 -- RECOVERY: `git show 1b7698e7:agda/src/Rx/Evaluator/Builder.agda` holds
 --   the step written out over `subscribeInner!`, which is the whole of
---   the leaf's body once the queue's own report is available to spend.
+--   the leaf's body once the entry is a descent the order can see.
 postulate
   queuedInner! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo}
     (allNid : NodeId) (κ : Path Γ lo s t) (id : Id) (now : Tick)
