@@ -1,42 +1,48 @@
 ------------------------------------------------------------------
--- THE EVALUATOR NEVER GETS STUCK: no run of any program emits the dry
--- marker.
+-- EVERY RUN OF EVERY PROGRAM IS A DERIVATION.  `evaluate⇓-total` is
+-- this tower's top line, and it is what the machine's three deleted
+-- comparisons became: an obligation owed here rather than a question
+-- answered there.
 --
--- `evaluate` descends on an accessibility witness, and three of its
--- clauses are guarded by a decidable comparison that can fail — the
--- share connect's unconnected count, the inner subscribe's rank, the μ
--- unfold's syncSize.  A failing guard is not an error: the clause
--- returns a `dry` emit and the run continues, so exhaustion is VISIBLE
--- in the output rather than fatal.  This says the guards never fail at
--- the triple the evaluator actually enters at, which is what makes the
--- descent discipline invisible to every statement above it.
+-- WHAT IT REPLACES IS SMALLER THAN IT, WHICH IS WHY THE REPLACEMENT IS
+-- NOT A LOSS.  The claim this module used to make was that no run emits
+-- the stuck marker — a statement about one emit, provable only because
+-- no constructor of the relation builds that emit.  Totality is the
+-- general form: relate the run to a derivation and every such claim
+-- follows at once, for the marker and for anything else no clause
+-- writes.  It is also the only form still stateable, since the marker
+-- is not a term any more.
 --
--- IT IS THE WHOLE OF WHAT THE DESCENT COSTS, and stating it in one line
--- is the point.  Its type mentions no witness, no triple and no order:
--- `evaluate` builds its own entry out of the program and the telescope,
--- so every consumer sees a total function on `Fuel`, and this is the
--- only place that entry has to be shown adequate.  A statement anywhere
--- above that had to know which triple a subterm runs at would be a
--- statement the descent had leaked into.
+-- AND THE COST LANDS ON `evaluate` RATHER THAN HERE, WHICH IS THE PART
+-- TO CARRY BEFORE READING FURTHER.  The machine no longer re-establishes
+-- its own order, so it is not accepted on its own: the three edges are
+-- `Rx.Evaluator.Doorless`'s facts, and spending them is what a builder
+-- does.  Nothing below may reach for a pragma instead — that is a
+-- soundness hole this mandate does not authorise, and the whole point
+-- of moving the arithmetic was to put its failure somewhere a check can
+-- see it.
 --
--- THE RANDOM SWEEP REACHES THE REGION, and that is a number rather than a
--- claim.  `QuickCheck` emits `μᵉ`, `varᵉ` and `deferᵉ` with the binder
--- scopes carried as INDICES, so a synchronous self-reference is not a
--- program it can write down and be rejected for; and its recursion is
--- linear by grammar, since a body reading its own var twice respawns per
--- tick and real rxjs hangs on that program too.  Twenty seeds at depth
--- four and five at depth five — 4500 programs, a third of them carrying
--- a live recursion — report no dry run.  IT IS MEASURED, NOT RECHECKED:
--- a compiled binary's row discharges nothing, and what it buys is the
--- coverage doubt, which was that the three peels had been reached only
--- at shapes one author chose.
+-- THE RANDOM SWEEP REACHED THE REGION WHILE THE COMPARISONS WERE STILL
+-- THERE, and that is a number rather than a claim.  `QuickCheck` emits
+-- `μᵉ`, `varᵉ` and `deferᵉ` with the binder scopes carried as INDICES,
+-- so a synchronous self-reference is not a program it can write down and
+-- be rejected for; and its recursion is linear by grammar, since a body
+-- reading its own var twice respawns per tick and real rxjs hangs on
+-- that program too.  Twenty seeds at depth four and five at depth five —
+-- 4500 programs, a third of them carrying a live recursion — reported no
+-- stuck run.  IT IS MEASURED, NOT RECHECKED: a compiled binary's row
+-- discharges nothing, and what it bought was the coverage doubt, which
+-- was that the three peels had been reached only at shapes one author
+-- chose.  What it says now is that those peels take their positive
+-- branch on every program the sweep can write — so the premises the
+-- builder owes are not vacuously demanding.
 ------------------------------------------------------------------
 module Verify-Rank-Sufficient where
 
-open import Data.Bool using (Bool; false)
+open import Data.Bool using (Bool)
 open import Data.Empty using (⊥-elim)
 open import Data.Fin using (Fin)
-open import Data.List using (List; []; _∷_; any)
+open import Data.List using (List; []; _∷_)
 open import Data.Maybe using (just; nothing)
 open import Data.List.Relation.Unary.All using (All) renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
 open import Data.Nat using (_≤_; _<_; suc; _+_; _⊔_; _<?_)
@@ -46,7 +52,7 @@ open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (⊤)
 open import Data.Vec using (lookup)
 open import Induction.WellFounded using (Acc; acc)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl)
+open import Relation.Binary.PropositionalEquality using (refl)
 open import Relation.Nullary using (yes; no)
 
 open import Rx.Prim  using (Fuel; Id; Tick; InstEmit; InstEvent;
@@ -61,23 +67,23 @@ open import Rx.Evaluator using (Stream; Path; root; Sched; EvalSt; Frame; AllOp;
   map-f; take-f; scan-f; from-inner; thru-outer; _↠_;
   scan-st; take-st; mergeAll-st; switch-st; exhaust-st; lookupNode; splitEvents;
   subscribeE; pushBurst; stepFrame; thruWalk; thruConsume; innerReact;
-  subscribeAll; drain; evaluate; rootWitness; sched-init; st-init;
-  subscribeInner; dryEvent; hasDry)
+  subscribeAll; drain; evaluate; sched-init; st-init;
+  subscribeInner)
+open import Rx.Evaluator.Doorless using (rootWitness)
 open import Rx.Evaluator.Domain using (evaluate⇓; eval-run; subscribeE⇓;
   pushBurst⇓; stepFrame⇓; thruWalk⇓; thruConsume⇓; innerReact⇓;
-  subscribeAll⇓; drain⇓; subscribeInner⇓; inner;
+  subscribeAll⇓; drain⇓; subscribeInner⇓;
   subs-of; subs-empty; subs-map; subs-take-zero; subs-take-suc; subs-scan;
   subs-merge-all; subs-switch-all; subs-exhaust-all; subs-μ; subs-defer;
   step-map; step-scan; step-scan-nil; step-take; step-from-inner; step-thru-outer;
   walk-nil; walk-cons; push-nil; push-cons)
-open import Verify-Rank-Sufficient.Dry-Emits using (hasDry-++)
 -- the five frames, stated together at the full axis set.  This module is
 -- the whole of what `subscribe-carried`'s structural clauses spend, and
 -- every one of them spends `pushBurst-carried` — so a frame that turns
 -- out to need a fourth axis is a type error HERE, at all five clauses,
 -- rather than a green statement that is quietly wrong at one of them.
 open import Verify-Rank-Sufficient.Push-Carried using (Pay; Pout-of;
-  pushBurst-carried; stepFrame-carried)
+  pushBurst-carried)
 
 -- THE DOMAIN IS WHERE THE WHOLE OF THE KNOWN FALSITY NOW SITS, AND
 -- THAT CONCENTRATION IS WHAT THE RELATION BOUGHT.  No constructor of
@@ -88,13 +94,12 @@ open import Verify-Rank-Sufficient.Push-Carried using (Pay; Pout-of;
 -- risk between them and nothing else under this module does: every
 -- other leaf is an ordinary induction over a relation, provable today.
 --
--- SO THEY ARE FALSE AS LONG AS THE ARMS ARE THERE, AND THAT IS THE
--- SCHEDULE RATHER THAN A DEFECT.  A program behind a gate runs dry at
--- the current evaluator, so today no derivation exists at its output
--- and neither can be proven at all.  They come true at the cutover
--- — the arms deleted, the guards replaced by the relation's own
--- premises — and until then what they measure is exactly how much of
--- the top line the door is costing.
+-- AND THEY WERE FALSE WHILE THE ARMS STOOD, WHICH IS WHY THE DELETION
+-- CAME FIRST AND NOT AFTER THEM.  A program behind a guard ran dry, so
+-- no derivation existed at its output and no amount of grinding could
+-- have produced one — the leaves were not hard, they were untrue.  What
+-- the deletion changed is not their difficulty but their truth value,
+-- and it is the only change that could have.
 --
 -- DEAD ROUTE: postulating the descent's domain — the accessibility
 --   itself, or a `Dom` predicate the evaluator pattern-matches on —
@@ -286,7 +291,7 @@ postulate
     (κ : Path Γ lo (lookup Γ i) t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     subscribeE⇓ {e = e} (input i) κ id now sched st
-      (subscribeE {e = e} ac (input i) κ id now sched st)
+      (subscribeE {e = e} (input i) κ id now sched st)
 
 -- THE HOP, LOCALISED TO THE ONE CLAUSE THAT TAKES A VALUE AND
 -- SUBSCRIBES IT.  A `thru-outer` frame is handed values that ARE inner
@@ -321,7 +326,7 @@ postulate
     (κ : Path Γ lo u t) (id : Id) (now : Tick) (o : Val Γ (obs u)) →
     HandedOK {Γ = Γ} (o ∷ []) τ → (sched : Sched Γ) (st : EvalSt e) →
     thruConsume⇓ {e = e} op nid κ id now o sched st
-      (thruConsume {e = e} ac op nid κ id now o sched st)
+      (thruConsume {e = e} op nid κ id now o sched st)
 
 -- ─────────────────────────────────────────────────────────────────────
 -- KILLING THE DOOR.  Coarse statements only — none of the four below is
@@ -354,7 +359,7 @@ postulate
     (κ : Path Γ lo u t) (id : Id) (now : Tick) (o : Val Γ (obs u)) →
     HandedOK {Γ = Γ} (o ∷ []) τ → (sched : Sched Γ) (st : EvalSt e) →
     subscribeInner⇓ {e = e} op allNid κ id now o sched st
-      (subscribeInner {e = e} ac op allNid κ id now o sched st)
+      (subscribeInner {e = e} op allNid κ id now o sched st)
 
 -- THE EXTRACTION, WRITTEN OUT BECAUSE IT IS THE WHOLE OF THE ARGUMENT
 -- AND READS AS A TRIVIALITY.  It is what the leaf above will `with` on
@@ -364,21 +369,6 @@ hop-guard : ∀ {n} {Γ : Ctx n} {u} {U r sz} (o : Val Γ (obs u))
           → HandedOK {Γ = Γ} (o ∷ []) (U , r , sz)
           → obsDepthᵉ o < r
 hop-guard o (h ∷ᵃ []ᵃ) = h
-
--- AND THIS IS WHAT THE ARM DELETION IS FOR, STATED SO IT CAN BE SPENT.
--- `subscribeE⇓-nodry` is a shelf of twelve families whose dryness is
--- `refl` at eleven of them; the hop is the one that is not, because the
--- hop is the one family that can build the marker.  Discharging it here
--- is what turns that shelf from a design into typing.
-postulate
-  inner-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
-    {τ : Tri} (ac : Acc _≺_ τ) (op : AllOp) (allNid : NodeId)
-    (κ : Path Γ lo u t) (id : Id) (now : Tick) (o : Val Γ (obs u)) →
-    HandedOK {Γ = Γ} (o ∷ []) τ → (sched : Sched Γ) (st : EvalSt e) →
-    any dryEvent
-      (proj₁ (proj₂ (proj₂
-        (subscribeInner {e = e} ac op allNid κ id now o sched st))))
-      ≡ false
 
 -- AND THE OBLIGATION THIS LEG CANNOT DISCHARGE ON ITS OWN, WHICH IS THE
 -- REASON THE NEXT LEG IS THE NEXT LEG.  Every call reaching the door
@@ -392,42 +382,7 @@ postulate
     {τ : Tri} (ac : Acc _≺_ τ) (b : Closed Γ u) → EntryOK b τ →
     (κ : Path Γ lo u t) (id : Id) (now : Tick)
     (sched : Sched Γ) (st : EvalSt e) →
-    BurstOK {Γ = Γ} (proj₁ (subscribeE {e = e} ac b κ id now sched st)) τ
-
--- AND THE MOVE THAT ACTUALLY CLOSES THE TIER, WHICH IS NOT ANY OF THE
--- FOUR ABOVE.  Killing the door makes the `no` arm unreachable IN THE
--- PROOF; `evaluate` still contains it, so `Refuted.Dry-Wrap` stays green
--- and `rank-sufficient` stays false until the CLAUSE ITSELF GOES.  What
--- the premise buys is the licence to delete it — and the deletion has a
--- cost the statements above hide: the `yes` branch is where the
--- recursive `Acc` step comes from (`rec (ltR p)`), so removing the test
--- removes the descent witness with it.  Two ways out, and choosing
--- between them is the design decision this leg hands forward:
---
---   · PROOF-CARRYING — `subscribeInner` takes `HandedOK (o ∷ []) τ` as an
---     argument and spends it for `ltR`.  The guard goes, the marker goes,
---     and the obligation propagates to every caller up to `evaluate`,
---     which must supply it at the root from `rootTri`.  Honest, and it
---     makes the evaluator's type carry the invariant — but the impl then
---     stops mirroring anything a plain rxjs pipeline does, which is the
---     one line this repo does not cross.
---   · CARRIED BOUND — the rank is not READ off the term at the hop but
---     held in the state and re-seeded at entry, so the comparison is
---     against a figure the machine already owns and cannot fail.  This is
---     what `Refuted.Dry-Wrap`'s own header names as the repair: a bound
---     the machine CARRIES, quantified beside the rank rather than read
---     off it.  It leaves the evaluator a plain function.
---
--- The second is almost certainly right, and neither is sketched further
--- here because the choice wants the burst statement settled first: the
--- shape of what the machine carries IS whatever `subscribe-carried` ends
--- up quantifying over.
-postulate
-  subscribeInner-nodoor : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
-    {τ : Tri} (ac : Acc _≺_ τ) (op : AllOp) (allNid : NodeId)
-    (κ : Path Γ lo u t) (id : Id) (now : Tick) (o : Val Γ (obs u)) →
-    HandedOK {Γ = Γ} (o ∷ []) τ → (sched : Sched Γ) (st : EvalSt e) →
-    Acc _≺_ (proj₁ τ , obsDepthᵉ o , syncSizeᵉ o)
+    BurstOK {Γ = Γ} (proj₁ (subscribeE {e = e} b κ id now sched st)) τ
 
 -- THE SAME EDGE FROM THE OTHER SIDE: an inner subscription that has
 -- already been made, reacting to what it delivers.  It reaches the
@@ -447,7 +402,7 @@ postulate
     (κ : Path Γ lo s t) (id : Id) (now : Tick) (vals : List (Val Γ s))
     (sched : Sched Γ) (st : EvalSt e) (fin : Bool) →
     innerReact⇓ {e = e} op allNid inst κ id now vals sched st fin
-      (innerReact {e = e} ac op allNid inst κ id now vals sched st fin)
+      (innerReact {e = e} op allNid inst κ id now vals sched st fin)
 
 -- THE WALK IS A LIST INDUCTION AND NOTHING ELSE, which is the point of
 -- separating it from the consume below it: the values a `thru-outer`
@@ -459,7 +414,7 @@ thruWalk⇓-total : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
   (κ : Path Γ lo u t) (id : Id) (now : Tick) (os : List (Val Γ (obs u))) →
   HandedOK {Γ = Γ} os τ → (sched : Sched Γ) (st : EvalSt e) →
   thruWalk⇓ {e = e} op nid κ id now os sched st
-    (thruWalk {e = e} ac op nid κ id now os sched st)
+    (thruWalk {e = e} op nid κ id now os sched st)
 thruWalk⇓-total ac op nid κ id now []       hk        sched st = walk-nil
 thruWalk⇓-total ac op nid κ id now (o ∷ os) (h ∷ᵃ hs) sched st =
   walk-cons (thruConsume⇓-total ac op nid κ id now o (h ∷ᵃ []ᵃ) sched st)
@@ -477,7 +432,7 @@ stepFrame⇓-total : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
   HandedOK {Γ = Γ} vals τ → (fin : Bool)
   (sched : Sched Γ) (st : EvalSt e) →
   stepFrame⇓ {e = e} id now fr κ vals fin sched st
-    (stepFrame {e = e} ac id now fr κ vals fin sched st)
+    (stepFrame {e = e} id now fr κ vals fin sched st)
 stepFrame⇓-total ac id now (map-f fn) κ vals hk fin sched st = step-map
 stepFrame⇓-total ac id now (take-f nid) κ vals hk fin sched st = step-take
 stepFrame⇓-total ac id now (from-inner op allNid inst) κ vals hk fin sched st =
@@ -505,7 +460,7 @@ pushBurst⇓-total : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
   (f : Frame Γ s u) (κ : Path Γ lo u t) (burst : Stream Γ s) →
   BurstOK {Γ = Γ} burst τ → (sched : Sched Γ) (st : EvalSt e) →
   pushBurst⇓ {e = e} id now f κ burst sched st
-    (pushBurst {e = e} ac id now f κ burst sched st)
+    (pushBurst {e = e} id now f κ burst sched st)
 pushBurst⇓-total ac id now f κ []         bk        sched st = push-nil
 pushBurst⇓-total ac id now f κ (em ∷ ems) (b ∷ᵃ bs) sched st =
   push-cons refl
@@ -535,7 +490,7 @@ postulate
     (b : Closed Γ (obs u)) → EntryOK b τ → (κ : Path Γ lo u t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     subscribeAll⇓ {e = e} op ns b κ id now sched st
-      (subscribeAll {e = e} ac op ns b κ id now sched st)
+      (subscribeAll {e = e} op ns b κ id now sched st)
 
 -- WHAT A SUBSCRIBE HANDS ON, WHICH IS THE STATEMENT THAT PAYS THE HOP'S
 -- PREMISE AND THE ONE PLACE THE TWO CURRENCIES MEET.  A framed clause
@@ -587,7 +542,7 @@ subscribe-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
   {τ : Tri} (ac : Acc _≺_ τ) (b : Closed Γ u) → EntryOK b τ →
   (κ : Path Γ lo u t) (id : Id) (now : Tick)
   (sched : Sched Γ) (st : EvalSt e) →
-  BurstOK {Γ = Γ} (proj₁ (subscribeE {e = e} ac b κ id now sched st)) τ
+  BurstOK {Γ = Γ} (proj₁ (subscribeE {e = e} b κ id now sched st)) τ
 subscribe-carried ac (input i) ok κ id now sched st =
   source-carried ac i ok κ id now sched st
 subscribe-carried ac (ofᵉ ts) ok κ id now sched st = of-carried ts ok
@@ -643,7 +598,7 @@ postulate
     {τ : Tri} (ac : Acc _≺_ τ) (i : Fin n) → EntryOK {Γ = Γ} (input i) τ →
     (κ : Path Γ lo (lookup Γ i) t) (id : Id) (now : Tick)
     (sched : Sched Γ) (st : EvalSt e) →
-    BurstOK {Γ = Γ} (proj₁ (subscribeE {e = e} ac (input i) κ id now sched st)) τ
+    BurstOK {Γ = Γ} (proj₁ (subscribeE {e = e} (input i) κ id now sched st)) τ
 
   of-carried : ∀ {n} {Γ : Ctx n} {u} {τ : Tri} (ts : Timed Γ u) →
     EntryOK {Γ = Γ} (ofᵉ ts) τ → BurstOK {Γ = Γ} (ofBurst ts) τ
@@ -653,7 +608,7 @@ postulate
     EntryOK b τ → (κ : Path Γ lo u t) (id : Id) (now : Tick)
     (sched : Sched Γ) (st : EvalSt e) →
     BurstOK {Γ = Γ}
-      (proj₁ (subscribeAll {e = e} ac op _ b κ id now sched st)) τ
+      (proj₁ (subscribeAll {e = e} op _ b κ id now sched st)) τ
 
 -- the two adapters between this module's `Tri`-shaped bound and the
 -- family's PAIR-shaped one.  They exist because the family is stated at
@@ -689,7 +644,7 @@ subscribeE⇓-total : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
   (κ : Path Γ lo u t)
   (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
   subscribeE⇓ {e = e} b κ id now sched st
-    (subscribeE {e = e} ac b κ id now sched st)
+    (subscribeE {e = e} b κ id now sched st)
 subscribeE⇓-total ac (input i) ok κ id now sched st =
   subscribeE⇓-input-total ac i ok κ id now sched st
 subscribeE⇓-total ac (ofᵉ ts) ok κ id now sched st = subs-of refl
@@ -762,74 +717,29 @@ evaluate⇓-total {n = n} fuel e ins =
               (sched-init e ins) (st-init e))
            (drain⇓-total fuel 1 _ _)
 
--- THE SUBSCRIBE HALF, AN INDUCTION OVER THE RELATION AND NOT OVER THE
--- DESCENT.  A derivation is a finite tree whose constructors are the
--- clauses that emitted, so dryness of its output is a fact about which
--- emits those clauses BUILD — `init`, `value`, `close … exhausted`, a
--- plumbing retag — and the shelf next door proves each of those shapes
--- carries no dry event.  Nothing in the statement mentions a triple, a
--- rank or an order, which is why it is separated from the leaf above
--- rather than proven with it: the relation is what converted an
--- arithmetic obligation into a list induction.
+-- AND WHAT USED TO SIT BELOW THIS IS NOT A WEAKER THEOREM, IT IS NO
+-- THEOREM AT ALL, WHICH IS WHAT THE WHOLE TIER WAS FOR.  The claim was
+-- that the run emits no dry marker, and it was proven by induction over
+-- the relation: dryness of an output is a fact about which emits the
+-- constructors BUILD, and none of them builds that one.  The induction
+-- was sound and its conclusion is now unstateable, because the emit it
+-- quantified over cannot be written — the clause that built it, the
+-- burst helper it went through and the predicate that read it are all
+-- out of `Rx.Evaluator`.  A predicate with no inhabitant to exclude is
+-- not a fact about the run; the deletion is the fact about the run.
 --
--- PROBED: `Probed.Nodry-Halves` — four sources, each closing its burst
---   through a different helper: the one-shot, the empty, the refused
---   take, and a mapped source whose close reaches the caller through
---   the event split and retag.  Every row is load-bearing on the CLOSE
---   and none of them on the values, since `hasDry` reads only the
---   event.  The twelve families are otherwise uncovered — nothing here
---   reaches a share, a flattener or a node store.
-postulate
-  subscribeE⇓-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
-    {b : Closed Γ u} {κ : Path Γ lo u t} {id now sched st}
-    {burst : Stream Γ u} {sched′ st′} →
-    subscribeE⇓ {e = e} b κ id now sched st (burst , sched′ , st′) →
-    hasDry burst ≡ false
-
--- THE DRAIN HALF, THE SAME FACT OVER THE OTHER CYCLE.  An arrival is
--- dispatched down every chain the registry admits and the results are
--- concatenated, so again the question is which emits the clauses build
--- and never which triple they stood at.  It is stated beside its
--- sibling rather than with it because the two cycles are separate
--- inductions — `eval-run` is exactly the constructor that splits them.
+-- SO THE TOP LINE IS THE TOTALITY CLAIM ABOVE, AND THAT IS A STRICTLY
+-- LARGER STATEMENT THAN THE ONE IT REPLACES.  `evaluate⇓-total` says
+-- every run is a derivation — which subsumes every claim of the form
+-- "the run does not emit X" for every X no constructor builds, the
+-- marker included, without any of them being stated.  What it costs is
+-- that `evaluate` is no longer accepted on its own: the three edges it
+-- descends on are `Rx.Evaluator.Doorless`'s facts, and the obligation
+-- to spend them is this tower's.
 --
--- PROBED: `Probed.Nodry-Halves` — one arrival delivered down a root
---   chain, at the schedule and registry the root subscribe actually
---   left rather than at a state written out by hand.  It is the last
---   of its source, so the row covers the completion the cascade closes
---   on.  The cancelled arm and every chain carrying a frame are NOT
---   covered.
-postulate
-  drain⇓-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    {fuel id sched st} {rest : Stream Γ t} →
-    drain⇓ {e = e} fuel id sched st rest → hasDry rest ≡ false
-
--- A RUN IS ITS ROOT SUBSCRIBE FOLLOWED BY ITS DRAIN, AND THE RELATION
--- SAYS SO IN ONE CONSTRUCTOR.  The split the old tower spent a module
--- establishing is now the shape of `eval-run` itself, so this body is
--- the concatenation lemma applied to the two halves and nothing else.
-evaluate⇓-nodry : ∀ {n} {Γ : Ctx n} {t} {fuel} {e : Closed Γ t}
-  {ins : Slots Γ} {out : Stream Γ t} →
-  evaluate⇓ fuel e ins out → hasDry out ≡ false
-evaluate⇓-nodry (eval-run {burst = b} {rest = r} s d) =
-  hasDry-++ b r (subscribeE⇓-nodry s) (drain⇓-nodry d)
-
--- THE TOP LINE, AND THE ONLY THING IT ADDS IS THE INSTANTIATION.  The
--- totality leaf hands a derivation at the run's own output and the
--- induction above reads dryness off it, so the seeding argument that
--- used to live here — which triple the root stands at, and whether it
--- reads the program — is not stated anywhere: the relation's entry
--- constructor IS the machine's entry, and a derivation at the output
--- is a claim about the run rather than about a number the door minted.
---
--- REFUTED: git show ba1285b:agda/evidence/refuted/Refuted/Dry-Wrap.agda
---   — this statement, at three programs: one per half of the
---   substitution repair, and one behind a gate that neither half
---   reaches.  It pinned `hasDry ≡ true` by `refl` against the machine as
---   it then stood, so it refuted the MACHINE and not the claim aimed at
---   — which is what made deleting the arms the repair and a measure
---   not one.
-rank-sufficient :
-  ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slots Γ) →
-  hasDry (evaluate fuel e ins) ≡ false
-rank-sufficient fuel e ins = evaluate⇓-nodry (evaluate⇓-total fuel e ins)
+-- DEAD ROUTE: keeping the predicate and proving it `false` of every
+--   run, so that the theorem's STATEMENT survives the cutover.  It
+--   needs the marker's constructor kept in the evaluator to be
+--   mentionable at all, so the arm stays reachable and the refutation
+--   that reaches it stays green — the statement is preserved by
+--   preserving exactly the thing that makes it false.
