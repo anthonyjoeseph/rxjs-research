@@ -174,6 +174,14 @@ postulate
 -- falsity now sits, and the statement they are missing is a bound on
 -- what a frame's own outputs read.
 --
+-- REFUTED: `Refuted.Hop-Unconditioned` — the statement as written, at
+--   the emptiest inner there is entered at a rank of nought.  The guard
+--   is strict, so nothing is shallow enough to pass it and the machine
+--   answers dry; the relation has no arm building that marker, since its
+--   one constructor demands a real inner derivation.  The repair is
+--   therefore a premise RELATING the two ends, not a cleverer measure —
+--   and the quantifier is what is wrong, so the row is SHAPE.
+--
 -- PROBED: `Probed.Nodry-Halves` — the DROP arm only, entered at a node
 --   id nothing installed, so the row pins that the clause hands its
 --   schedule and store straight back.  NOT covered, and it is the whole
