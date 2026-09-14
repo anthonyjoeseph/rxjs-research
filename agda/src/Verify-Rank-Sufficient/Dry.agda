@@ -149,11 +149,14 @@ opShape _                = false
 --   marker at any length measured — so what is dead is the slope, not
 --   the leaf, and the strengthened return type it also killed is open
 --   again (`Verify-Rank-Sufficient.Entry` carries that half).
--- REFUTED: `Refuted.Sync-Count` — the synchronous size as a bound on a
---   burst's deliveries.  A doubling fold over a live seed delivers 2, 6,
---   14, 30 as the source lengthens by one literal, against a measure
---   that gains one per literal: the first three rows HOLD the bound, so
---   it is not an off-by-one that a tighter constant repairs.
+-- DEAD ROUTE: the synchronous size as a bound on a burst's deliveries.
+--   A doubling fold over a live seed delivered 2, 6, 14, 30 as the
+--   source lengthened by one literal, against a measure gaining one per
+--   literal: the first three rows HELD the bound, so it is not an
+--   off-by-one that a tighter constant repairs.  The witness is gone
+--   rather than re-run because that same fold is one the hop guard now
+--   refuses — its burst is EMPTY, so the bound holds vacuously and the
+--   crossing cannot be taken until the refusing arm is.
 -- DEAD ROUTE: the inner-under-emitter comparison taken in NESTING,
 --   killed by machine while `src` still had that measure — a scan over
 --   a three-element synchronous source whose step re-wraps the
@@ -184,6 +187,13 @@ opShape _                = false
 --   — the μ guard reads the UNSUBSTITUTED size, and a slot reference is one
 --   symbol standing for a definition of any size, so this is where that gap
 --   was already measured.
+-- RECOVERY: git show 3b82cd5:agda/evidence/refuted/Refuted/Sync-Count.agda
+--   restores the doubling-fold family the third dead route above was
+--   measured on — four source lengths, the per-instant row saying every
+--   delivery lands in one tick, and the measure beside them.  It is the
+--   first thing to re-run once the hop guard stops refusing, since its
+--   crossing is arithmetic rather than stateful and so comes back
+--   unchanged or not at all.
 -- RECOVERY: `git show 73cd313:agda/src/Verify-Rank-Sufficient/Hop-Edge.agda`
 --   restores the hop edge stated and its guard assembled — a burst's
 --   deliveries as a flat list, the drop as a leaf over an emission

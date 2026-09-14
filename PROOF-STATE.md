@@ -212,46 +212,46 @@ research lives; where they disagree, the header wins.
 
 **THE TIER IS ONE STATEMENT AND IT IS CURRENTLY FALSE.** `rank-sufficient`
 (Verify-Rank-Sufficient) says no run emits the dry marker, and
-`Refuted.Dry-Wrap` kills it at four lines of ordinary rxjs: a template wrapping
-its own argument hands a flattener a value written one `strmᵗ` deeper than the
-program shows, because `reify` at observable type IS `strmᵗ` while every clause
-of the nesting measure joins.
+`Refuted.Dry-Wrap` kills it three times. The widest substitutes nothing: the
+measure cuts a `deferᵉ` to ZERO without reading its body — the clause that makes
+it survive μ-unfolding, and so the one the recursion edge is bought with — so a
+program behind a gate reads zero and the first hop under it refuses.
 
-**SO WHAT MOVES IS THE MACHINE, NOT THE STATEMENT.** The claim is the tier's
-whole point and stays at full strength; what has to go is the guard comparing
-an emitted value against a figure read off the TERM. The store's nesting is
-already read and the arrival seed already joins it, so the missing re-seed is
-INSIDE one subscribe frame — which is where every remaining row now sits.
+**AND THE REFUSAL IS DESTROYING EVIDENCE, WHICH REORDERS THE TIER.** Three
+non-structural edges each TEST the measure and emit dry on the negative answer,
+so an inadequate reading is a WRONG ANSWER and not an open obligation: two
+registry refutations have gone unrunnable because the states they measure are no
+longer reached. So the arms go first, and the totality debt moves to one
+statement naming no reading these witnesses killed.
 
 ### Big picture tier roadmap
 
-- **THE SEED IS REFUTED AND THE REPAIR IS ASYMMETRIC, WHICH IS WHAT DECIDES THE
-  CURRENCY.** Summing the map clause where it joins closes the first witness
-  strictly — a template is applied once per value and `reify` costs exactly one
-  `strmᵗ` — and leaves the second exactly where it was, since a step re-applied
-  to its own accumulator deepens once per DELIVERY and no reading of syntax
-  counts deliveries. So a syntactic figure cannot be what a frame's output is
-  held to, and the leg that lands is the one saying what is: the store's
-  nesting is read already and the arrival seed already joins it, so what is
-  missing is a re-seed INSIDE one subscribe frame rather than a clause missing
-  from a measure.
+- **DELETE THE THREE ARMS AND POSTULATE TOTALITY AT THE TOP.** The accessibility
+  witness is threaded through every frame already; what is not landed is the
+  DOMAIN. Each non-structural edge — the inner-value hop, the μ peel, the share
+  connect — compares a runtime reading against the component it stands at and
+  emits dry on the negative answer. A derivation taking each sub-call's own
+  witness as a premise has no negative answer to give, so the arms go and the
+  debt becomes one leaf quantified over programs, mentioning no reading these
+  three witnesses killed. Killing the arm is available where PROVING it
+  unreachable is not, because the arm is reachable and that is the finding.
 
-- **AND THEN ALL FIVE FRAMES IN ONE PASS, BECAUSE THE RANK STOPPED
-  DISTINGUISHING THEM.** The five carried leaves were five because each paid
-  differently out of the one component that ordered the recursion; under the
-  split that component is definitional at every constructor and only the
-  reading is charged. What is left is one statement quantified over the frame
-  with a single case split, whose clauses differ only where the reading grows.
-  Proving them apart and unifying afterwards restates a family, which is the
-  move this campaign pays most for.
+- **THEN RE-RUN WHAT THE DOOR WAS SILENCING.** FOUR refutations measure states
+  the run stopped reaching — three registry candidates and the per-instant
+  delivery count — so each reports agreement rather than the crossing it was
+  taken for: an empty burst is under every bound. With no arm each is reachable
+  again, and what bounds a frame's output is asked of a machine that answers
+  instead of refusing. Ranked second because it is the cheapest check on the
+  first: if the crossings come back unchanged, the deletion moved who owes the
+  proof and nothing else.
 
-- **AND THE DOOR DIES LAST, BECAUSE IT IS WHAT THE OTHER TWO ARE FOR.** With a
-  frame's output held to a bound the machine carries, the refusing arm of the
-  hop guard is unreachable rather than merely unreached, and `rank-sufficient`
-  is true by construction instead of by argument — no entry seeding left to be
-  shown adequate, because nothing is pre-paid. It is ranked last and not first
-  because a door killed against the current seed would be killed against the
-  very figure these witnesses refuted.
+- **AND THEN THE REAL THEOREM: INHABIT THE DOMAIN.** Totality stops being a
+  numeric sufficiency claim and becomes an induction over the evaluator's own
+  recursion, which is where it belonged — every program these witnesses kill
+  terminates in ordinary rxjs, so what they refuted is a MEASURE and never the
+  statement. Ranked last because its shape is decided by the second leg: a
+  domain whose hop constructor needs a bound is a different induction from one
+  whose premises are all sub-derivations.
 
 ### Open questions
 

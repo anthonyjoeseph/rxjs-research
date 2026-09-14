@@ -186,47 +186,54 @@ open import Verify-Rank-Sufficient.Path-Fits using (DrainHop; drainFits)
 --   is a property of a chain's FRAMES — so what is missing is a tie
 --   between a registration's frames and the program being run, which
 --   has no home in the record as it stands.
--- REFUTED: `Refuted.Fit-Cascade` — the fit's PRESERVATION across one
---   cascade, taken through the drain's own step so the pair is the one
---   the recursion would have been handed.  A flattener over a gate,
---   behind a second gate, over a slot whose values all arrive late:
---   carried one against a term reading of one at the door, carried TWO
---   against the same one after a single arrival.  Strip the outer gate
---   and the reading is EXACT at the same states — two against two, three
---   against three — which rules out the chain manufacturing depth and
---   rules out the arithmetic being wrong, and leaves the one clause that
---   declines to look.  The deeper witness reads three against one, so the
---   gap is a rate in the program's own size rather than an off-by-one,
---   and both programs' dry rows are pinned beside the crossings so the
---   finding cannot be read one statement too high.
--- REFUTED: `Refuted.Fit-Cascade` — and the same witness kills the
---   WIDEST state-readable bound, which is what says the repair is not a
---   larger right-hand side.  Joining the store and the schedule's
---   pending bodies to the term holds at the door and holds for the
---   right reason — the pending reading is two and three there, exactly
---   the figures the registry reaches one arrival later — and one step
---   on both the store and the pending read ZERO against a registry
---   still carrying the frame.  So the quantity is historical rather
---   than a property of any state, and a wider join cannot recover it.
--- REFUTED: `Refuted.Arrival-Seed` — the third candidate, and the one with
---   the best claim: the rank an ARRIVAL enters at, which is a SUM rather
---   than a join, so the arithmetic killing the join does not touch it and
---   it is what the chain fold actually descends on.  It has room at the
---   door on both programs — three against one, four against one, because
---   the payload about to arrive reads deep — and one arrival later BOTH
---   variable summands read ZERO, the payload spent and the flattener's
---   queue empty, so the seed collapses onto the term's own reading while
---   the registry keeps the frame the arrival installed.  The deeper
---   program reads three against the same one, so this gap is a rate too.
--- REFUTED: `Refuted.Arrival-Filtered` — and the narrowing the dead route
---   below was read as forbidding, tested rather than assumed: the chains
---   ONE arrival reaches, priced against the value that arrival actually
---   carries, which is the smallest left side a drain step could justify
---   and is strictly under the one above.  It holds EXACTLY at both doors —
---   three against three, four against four — and crosses one arrival later
---   at the same two states, because neither narrowing does any work there.
---   The filter reaches ONE chain and it is the deep one; the arriving value
---   reads ZERO, so the seed is the floor.  Those two rows are the content:
+-- DEAD ROUTE: the fit's PRESERVATION across one cascade, and it is dead
+--   on both readings that were tried.  A flattener over a gate, behind a
+--   second gate, over a slot whose values all arrive late: carried one
+--   against a term reading of one at the door, carried TWO against the
+--   same one after a single arrival.  Strip the outer gate and the
+--   reading is EXACT at the same states — two against two, three against
+--   three — which rules out the chain manufacturing depth and rules out
+--   the arithmetic being wrong, and leaves the one clause that declines
+--   to look.  One more flattener reads three against one, so the gap is
+--   a rate in the program's own size rather than an off-by-one.  And the
+--   WIDEST state-readable bound does not repair it: joining the store
+--   and the schedule's pending bodies to the term holds at the door and
+--   holds for the right reason — the pending reading is two and three
+--   there, exactly the figures the registry reaches one arrival later —
+--   then reads ZERO one step on, against a registry still carrying the
+--   frame, because the arrival that installs the frame is the arrival
+--   that consumes the pending entry predicting it.  So the quantity is
+--   HISTORICAL rather than a property of any state, and no larger
+--   right-hand side recovers it.
+-- DEAD ROUTE: and the machine can no longer be asked, which is the
+--   second finding and the reason the witness that carried the first is
+--   gone rather than re-run.  Both programs are behind a gate, the
+--   nesting measure cuts a gate to zero, and the guard therefore enters
+--   at zero and refuses the first hop under it — so every one of those
+--   states is reached only after the run has gone dry, the registry is
+--   empty, and the crossings cannot be taken at all.  They are not
+--   repaired; they are unreachable until the seed is, and re-running
+--   them is work the seed's repair unblocks rather than work that is
+--   owed now.
+-- DEAD ROUTE: the third candidate, and the one with the best claim: the
+--   rank an ARRIVAL enters at, which is a SUM rather than a join, so the
+--   arithmetic killing the join does not touch it and it is what the
+--   chain fold actually descends on.  It had room at the door on both
+--   programs — three against one, four against one, because the payload
+--   about to arrive reads deep — and one arrival later BOTH variable
+--   summands read ZERO, the payload spent and the flattener's queue
+--   empty, so the seed collapsed onto the term's own reading while the
+--   registry kept the frame the arrival installed.  The deeper program
+--   read three against the same one, so this gap is a rate too.
+-- DEAD ROUTE: and the narrowing the route below was read as forbidding,
+--   tested rather than assumed: the chains ONE arrival reaches, priced
+--   against the value that arrival actually carries, which is the
+--   smallest left side a drain step could justify and is strictly under
+--   the one above.  It held EXACTLY at both doors — three against three,
+--   four against four — and crossed one arrival later at the same two
+--   states, because neither narrowing does any work there.  The filter
+--   reaches ONE chain and it is the deep one; the arriving value reads
+--   ZERO, so the seed is the floor.  Those two rows are the content:
 --   they say the information a step has over a state is not the missing
 --   information, which no reading of the registry could have shown.
 -- DEAD ROUTE: BOUNDING THE REGISTRY IS THE DEAD MECHANISM, NOT ANY ONE OF
@@ -248,7 +255,7 @@ open import Verify-Rank-Sufficient.Path-Fits using (DrainHop; drainFits)
 --   it carries with the store, so a quantity the state carries forward is
 --   already INSIDE the grant rather than missing from it — and at the
 --   crossing both summands of that join read NOUGHT, pinned beside the
---   grant in `Refuted.Arrival-Filtered`, so the grant has collapsed onto
+--   grant by the fourth candidate above, so the grant has collapsed onto
 --   the term's own figure and there is nothing a carried quantity could
 --   have covered.  What moves is the LEFT: the spend climbs one per
 --   flattener while the grant holds still.
@@ -261,6 +268,14 @@ open import Verify-Rank-Sufficient.Path-Fits using (DrainHop; drainFits)
 --   registration live when the cascade ends.  Their rows priced a
 --   registry at a state, and a premise quantifying over states has no
 --   such row.
+-- RECOVERY: git show 3b82cd5:agda/evidence/refuted/Refuted/ restores the
+--   three witnesses the dead routes above were taken from — the registry
+--   join, the arrival's seed, and the step's filtered spend.  They are
+--   what the door's repair has to be checked against: each states its
+--   currency locally, so restoring one and re-running it says whether the
+--   crossing comes back or whether removing the refusing arm moved only
+--   who owes the proof.  The harness already lives on in
+--   `Probed.Arrival-Spend`; what the sha holds is the currencies.
 
 -- AND THE CASCADE IS A BODY NOW, WHICH IS WHERE THE DEAD MECHANISM
 -- ABOVE ENDS.  Everything the four refuted readings were trying to buy
@@ -401,8 +416,21 @@ entry-drain-fits {n = n} fuel e ins =
 -- what a frame emits has to be priced by something the machine carries.
 -- Until it is, the burst half of this concatenation is the false one.
 --
--- REFUTED: `Refuted.Dry-Wrap` — this statement, at two four-line
---   programs, one per half of the repair.
+-- AND THE WIDEST WITNESS SUBSTITUTES NOTHING, WHICH IS WHAT SAYS THE
+-- MEASURE IS THE WRONG APPARATUS RATHER THAN A CLAUSE SHORT.  The
+-- nesting cuts a gate to ZERO without reading its body, and that is
+-- exactly the clause making it survive μ-unfolding — so the clause the
+-- recursion edge is bought with is the clause that starves the seed.  A
+-- gate's body is subscribed at an ARRIVAL, whose re-seed joins the value
+-- carried with the store's reading and mentions no body still pending,
+-- so nothing anywhere in the run holds that figure.  What terminates
+-- here is not in doubt: all three programs run to completion in ordinary
+-- rxjs, so what is refuted is this MEASURE and never the totality it was
+-- introduced to witness.
+--
+-- REFUTED: `Refuted.Dry-Wrap` — this statement, at three programs: one
+--   per half of the substitution repair, and one behind a gate that
+--   neither half reaches.
 rank-sufficient :
   ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slots Γ) →
   hasDry (evaluate fuel e ins) ≡ false

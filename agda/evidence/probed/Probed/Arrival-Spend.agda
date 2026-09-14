@@ -83,8 +83,8 @@ open import Rx.Evaluator using (AtFloor; RegId; Sched; EvalSt; Stream; Arrival;
   arrTick; arrSource; arrTy; arrVal)
 
 ----------------------------------------------------------------------
--- THE HARNESS, recovered from `Refuted.Fit-Cascade` — the two programs
--- at which all three registry candidates crossed.
+-- THE HARNESS — the two programs at which all three registry
+-- candidates crossed.
 ----------------------------------------------------------------------
 
 Γ₁ : Ctx 1
