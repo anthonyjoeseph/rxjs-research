@@ -19,17 +19,12 @@ open import Relation.Nullary using (yes; no)
 open import Relation.Binary.PropositionalEquality using (refl)
 
 open import Rx.Prim using (Tick; Fuel; Ordinal; Id; Source; Timed; after_,_; hot;
-  cold; InstEvent; init; value; close; handoff; complete; cut; cutPending; exhausted; dried;
+  cold; InstEvent; init; value; close; handoff; complete; cut; cutPending; exhausted;
   subscribe; delivery; plumbing; InstEmit; _at_from_as_)
-open import Rx.Exp  using (Ty; obs; _×ᵗ_; _≟ᵗ_; Ctx; Val; Closed; Fn; applyFn; evalTm; unfoldμ; syncSizeᵉ; input; ofᵉ;
+open import Rx.Exp  using (Ty; obs; _×ᵗ_; _≟ᵗ_; Ctx; Val; Closed; Fn; applyFn; evalTm; unfoldμ; input; ofᵉ;
   emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ)
--- the order the subscription machine recurses on, in place of a
--- counter: one constructor per non-structural edge, and nothing
--- packed, so no edge owes a ceiling on the components it leaves alone
-open import Rx.Strat-Order using (Tri; _≺_; ≺-wellFounded)
 
 variable
-  τ  : Tri
   lo : ℕ
 
 
@@ -445,93 +440,6 @@ obsStᴺ ((_ , s) ∷ ns) = obsStⁿ s ⊔ obsStᴺ ns
 obsSt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → EvalSt e → ℕ
 obsSt st = obsStᴺ (EvalSt.nodes st)
 
--- THE ENTRY WITNESS, NAMED RATHER THAN INLINED.  Every re-entry from
--- OUTSIDE the subscription machine — the root subscribe, and each
--- arrival's chain fold — starts a fresh descent, so each supplies its
--- own accessibility at the point the program, the slots and the run's
--- own reading determine.  It is one definition because those points
--- agree, and because every well-formedness statement that quantifies
--- over an entry has to name the same triple: a statement entered at a
--- triple nothing else uses is a statement about a run the evaluator
--- never makes.
---
--- THE READING IS WHAT THE ROOT HAS NONE OF.  `st-init` holds nothing
--- and a fresh schedule's pending values are the program's own, so the
--- root enters at reading ZERO and `rootTri` is that specialisation
--- rather than a second seeding — which keeps the one place the seed
--- has to be shown adequate at the root, where it always was.
---
--- THE RANK IS THE TERM'S `strmᵗ` NESTING, AND NOTHING IS PRE-PAID.
--- The hop peel used to descend on a BUDGET: a figure large enough at
--- entry that every hop the run would ever take could be charged against
--- it, with a dry bailout standing where the budget ran out.  It now
--- descends on `obsDepthᵉ`, which the peel TESTS at the site it hops —
--- so the entry owes a figure dominating the TERM rather than the run,
--- and a subterm satisfies that by construction.
---
--- WHICH IS WHAT MAKES THE THREE PEELS ONE SHAPE.  The μ peel asks
--- whether the unfolding's sync size fits and the connect peel whether
--- the latched count does; the hop peel now asks whether the arriving
--- inner is written shallower than what delivered it.  Each is a
--- decidable test whose negative arm is closed by a guard rather than a
--- budget, so what is owed at the hop is a DROP and no longer an
--- inequality between a run and a number seeded before it began.
---
--- THE STORE IS JOINED IN BECAUSE AN ARRIVAL CAN SUBSCRIBE WHAT A NODE
--- IS HOLDING.  The term alone does not bound a parked inner or a
--- deepened accumulator, and both are subscribable at a later instant;
--- the join is taken in ONE currency, which is the thing the reading
--- could never do, since a nesting and a reading never met.
---
--- DEAD ROUTE: seeding the component off SYNTAX AS A BUDGET — a power of
---   two in the program's size plus the slot telescope's.  A value
---   deepens on the way OUT, the frames above a flattener re-wrap what
---   it delivers, and it re-enters at the caller's own witness, so
---   whatever seeds that caller has to dominate everything its subtree
---   will ever emit; the run multiplies where the seed merely doubles.
---   Seeding from the entered VALUE fails identically, and a larger seed
---   is the same answer with a larger constant.  It is the BUDGET that
---   is dead and not the syntax: a figure tested at the hop is never
---   asked to dominate an emission, only to be dropped by one.
-entryTri : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → ℕ → Tri
-entryTri e sl m = unconn sl [] , obsDepthᵉ e ⊔ m , syncSizeᵉ e
-
-entryWitness : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (m : ℕ)
-             → Acc _≺_ (entryTri e sl m)
-entryWitness e sl m = ≺-wellFounded (entryTri e sl m)
-
-rootTri : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → Tri
-rootTri e sl = entryTri e sl 0
-
-rootWitness : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
-            → Acc _≺_ (rootTri e sl)
-rootWitness e sl = entryWitness e sl 0
-
--- AND THE ARRIVAL'S IS NAMED FOR THE SAME REASON THE ROOT'S IS.  A value
--- delivered on a later tick reads deeper than any reading of the program
--- does — a `deferᵉ` body is cut to zero by the measure precisely so that
--- unfolding cannot move it — and the store it lands in reads deeper
--- still, so the chain fold enters at the ⊔ of the two rather than at
--- zero.  Naming it is what keeps a well-formedness statement ABOUT the
--- chain fold quantified over the witness the evaluator passes: spelled
--- out at each site, the two drift the moment either summand moves, and
--- the drift is a type error many minutes down the tower rather than here.
---
--- AND ALL THREE HALVES ARE ONE QUANTITY, WHICH IS WHAT THE ENTRY'S OWN
--- JOIN NEEDS.  The value, the store and the program are read by the
--- same function, so the seed is a `⊔` of three figures in one currency
--- and the peel's test compares against it directly.  Nothing is
--- transferred between measures anywhere on this path, which is the one
--- thing the reading could not offer: its store figure counted refolds
--- and its nesting counted layers, so a join of them bounded neither.
-arrivalWitness : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-                 (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e)
-               → Acc _≺_ (entryTri e (Sched.slots sched)
-                           (obsDepthᵛ (arrTy a) (arrVal a) ⊔ obsSt st))
-arrivalWitness a sched st =
-  entryWitness _ (Sched.slots sched)
-    (obsDepthᵛ (arrTy a) (arrVal a) ⊔ obsSt st)
-
 -- a source that lives and dies inside its own subscription burst
 -- (ofᵉ, emptyᵉ, take 0, a cold with no async tail): init, values,
 -- close, complete — one emit, nothing registered, nothing scheduled
@@ -547,88 +455,51 @@ oneShotBurst vals id sched =
 -- registration's own floor test refuses.  Same shape as a one-shot with
 -- no values, but the source is GIVEN rather than minted, because the
 -- point is that this subscriber joins something that already has an
--- identity.  Distinguished from `dryBurst` by the close reason, which
--- is what `hasDry` reads: a spent source is an ordinary exhausted
--- close, so a run that takes this arm is still wet.
+-- identity.
 spentBurst : ∀ {A : Set} → Source → Id → List (InstEmit A)
 spentBurst src id =
   ((init src ∷ close src exhausted ∷ complete ∷ []) at id from src as subscribe) ∷ []
 
--- THE STUCK MARKER.  The subscription machine recurses on an
--- accessibility witness for `Rx.Strat-Order`'s lexicographic triple,
--- dropping one component at each of its three non-structural edges — a
--- share connect, an inner-value subscription, a μ unfold — while every
--- other recursion stays structural, so termination needs no pragma.
--- Two of the three drops are facts about measures the run cannot move
--- the wrong way; the third is a rank a run may exhaust, and exhausting
--- it is what this marker reports.  A dry run does NOT truncate silently: it emits a close
--- with reason `dried` — a CloseReason no machine rule ever emits —
--- so hasDry recognizes it EXACTLY, QuickCheck's WF check flags it at
--- runtime (the close's source is never inited, which the strict
--- protocol rejects on sight), and evaluate-well-formed itself demands
--- budget sufficiency (the old pragma's termination debt, reified as a
--- provable statement).  The marker is the REASON, not the source:
--- Source is an unbounded ℕ and mints are breadth-many (fuel is only
--- depth-consumed), so a burst can legally mint past any numeric
--- sentinel — a sentinel-source check would misfire on a wet run.
--- drySource survives only as the envelope's cosmetic source id.
-drySource : Source
-drySource = 18446744073709551615
-
-dryBurst : ∀ {A : Set} → Id → List (InstEmit A)
-dryBurst id =
-  ((close drySource dried ∷ []) at id from drySource as subscribe) ∷ []
-
--- did the run go dry anywhere?  Verify-Well-Formed's step lemmas are
--- conditioned on `hasDry … ≡ false`, and `rank-sufficient` asserts it
--- for the seeded descent — the totality debt as a provable statement
-dryEvent : ∀ {A : Set} → InstEvent A → Bool
-dryEvent (close _ dried) = true
-dryEvent _               = false
-
-hasDry : ∀ {A : Set} → List (InstEmit A) → Bool
-hasDry []         = false
-hasDry (em ∷ ems) = any dryEvent (InstEmit.events em) ∨ hasDry ems
-
--- THE DESCENT DISCIPLINE, read off the clauses below.  Each of the
--- three edges that reaches a deeper subscribe drops its OWN component
--- of the triple and leaves the other two free to be re-seeded, which is
--- what a lexicographic order buys and what a single counter could not:
--- packing the three into one number is exactly what made a budget owe a
--- ceiling on the two components it was not descending on.
+-- THE DESCENT DISCIPLINE, AND THE MACHINE NO LONGER CARRIES IT.  Three
+-- edges below reach a deeper subscribe without descending the term:
 --
---   · `sharedConnect → subscribeE` drops the unconnected-share count;
---   · `subscribeInner → subscribeE` drops the hop rank;
---   · `subscribeE (μᵉ body) → subscribeE (unfoldμ body)` drops syncSize.
+--   · `sharedConnect → subscribeE`, at the definition a slot stores;
+--   · `subscribeInner → subscribeE`, at a runtime observable;
+--   · `subscribeE (μᵉ body) → subscribeE (unfoldμ body)`.
 --
--- EVERY other route through the pipeline carries the witness unchanged
--- because it stays at ONE nesting level — `subscribeE` walking its own
--- operator chain (map / take / scan / the three *All), the `pushBurst →
--- stepFrame → thruWalk → thruConsume` re-entry of a burst,
--- `mergeAllDrain` off `innerFinish`, and `foldPath → dispatchShare →
--- shareGo → stepFrame`, which threads the witness unchanged through a
--- delivery.  So no path reaches `subscribeInner` at the witness it was
--- called with: the three `thruConsume` sites and the one
--- `mergeAllDrain` site are reached from a `stepFrame` running at the
--- caller's witness, and the drop happens INSIDE `subscribeInner` before
--- control reaches `subscribeE`.  `deferᵉ` is not a nesting edge at all
--- — it parks the body for `suc now`, a later instant seeded afresh.
+-- Each used to TEST a reading and emit a marker on the negative answer,
+-- which made an inadequate figure a wrong ANSWER rather than an open
+-- obligation — and so put the whole measure inside the run, where every
+-- syntactic candidate for it died.  The obligation is the DERIVATION's
+-- now: `Rx.Evaluator.Domain` relates a call to its result with a
+-- sub-derivation per edge, so an edge that cannot be justified is a
+-- proof that does not exist rather than a run that emits something.
+--
+-- SO THIS MODULE NO LONGER TERMINATES BY ITSELF, AND THAT IS THE TRADE.
+-- Agda's checker sees three non-structural calls and nothing decreasing;
+-- no pragma is admissible here, so what stands in its place is
+-- `Verify-Rank-Sufficient.Doorless`, whose builder returns a result
+-- together with its derivation and pays the three facts at the sites
+-- that hold them.  `deferᵉ` is not one of the three: it parks the body
+-- for `suc now`, a later instant entered afresh.
 
--- AND THAT READING IS CHECKED RATHER THAN READ OFF.  `make
--- recursion-cover` cuts the edges declared below and requires every
--- cycle still standing to be declared too: cutting three edges
--- collapses BOTH of this module's multi-member recursions and exactly
--- one cycle survives, the pair that walks the expression.  A clause
--- opening a fourth edge fails that check rather than going on
--- compiling, which is the one thing Agda's own termination checker
--- cannot say — it is satisfied by the witness and silent about which
--- edges carry it.
+-- AND THE EDGE SET IS CHECKED RATHER THAN READ OFF, WHICH MATTERS MORE
+-- NOW THAN IT DID.  `make recursion-cover` cuts the edges declared below
+-- and requires every cycle still standing to be declared too: cutting
+-- three edges collapses BOTH of this module's multi-member recursions
+-- and exactly one cycle survives, the pair that walks the expression.
+-- While a witness was threaded, Agda was satisfied and silent about
+-- which edges carried it; with no witness at all Agda is silent about
+-- the whole question, so this check is the only thing that fails when a
+-- clause opens a FOURTH edge — one the builder next door has no case
+-- for and would never be asked to write.
 
--- THE SHARE HOP IS ITS OWN RECURSION AND DOES NOT JOIN THE TRIPLE.  Its
--- counter is a plain `ℕ` bounding the slot telescope, it peels once per
--- hop, and it reaches the frame walk one way only — nothing in the
--- subscribe recursion calls back into it.  It composes by being a
--- separate component, not by sharing a measure.
+-- THE SHARE HOP KEEPS ITS OWN DESCENT, AND IT IS THE SHAPE THE OTHER
+-- THREE BECAME.  `Acc _<_ (n ∸ lo)` is peeled by MATCHING on
+-- `floorFalls`, a proof about the sink constructor's own premise — so it
+-- asks nothing, has no negative answer, and needs no arm.  It never had
+-- a door to kill.  It reaches the frame walk one way only: nothing in
+-- the subscribe recursion calls back into it.
 
 -- PEEL: subscribeInner -> subscribeE
 -- PEEL: sharedConnect -> subscribeE
@@ -1493,6 +1364,15 @@ drain (suc k) nextId sched st with sched-next sched
 -- inputs are drawn from `Fin n`, so every one of them is below `n` by
 -- construction; and the root path sinks into no share at all, so it
 -- meets the floor vacuously.  Everything below descends from here.
+--
+-- AND THE ROOT NO LONGER SEEDS A RANK, WHICH IS THE WHOLE OF THE DIFF
+-- AT THE TOP LINE.  The type is unchanged, so the oracle, the bug cache
+-- and every protocol theorem above see nothing — which is the test that
+-- the descent was never part of the semantics.  What it costs is that
+-- this definition is not accepted on its own: the three edges below
+-- descend on facts stated in `Rx.Evaluator.Doorless` and spent in
+-- `Verify-Rank-Sufficient.Doorless`, and no pragma may stand in for
+-- them here.
 evaluate : ∀ {n} {Γ : Ctx n} {t} → Fuel → Closed Γ t → Slots Γ → Stream Γ t
 evaluate {n = n} fuel e ins =
   let (burst , sched₀ , st₀) =
