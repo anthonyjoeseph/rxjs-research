@@ -44,7 +44,7 @@ open import Data.List.Relation.Unary.All using (All)
   renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
 open import Data.List.Relation.Unary.All.Properties using (++⁺)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; zero; suc; _≤_; _<_; z≤n; s≤s)
+open import Data.Nat using (ℕ; zero; suc; _≤_; _<_; _⊔_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤-trans; <⇒≤; m≤m⊔n; m≤n⊔m)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
@@ -235,6 +235,27 @@ of-handed η []        dep = []ᵃ
 of-handed η (tm ∷ ts) dep =
     handed-open η []ᵈ tm []ᵃ (≤-trans (m≤m⊔n (depᵗ η tm) (depᵗˢ η ts)) dep)
   ∷ᵃ of-handed η ts (≤-trans (m≤n⊔m (depᵗ η tm) (depᵗˢ η ts)) dep)
+
+-- THE LIST'S OWN READING, WHICH IS WHAT AN ENTRY POINT PAYS WITH.
+-- Every builder quantifies over the rank, so a site ENTERING the
+-- recursion is free to NAME one, and a rank set above the values it
+-- already holds satisfies the premise outright — no hypothesis, no
+-- field, and nothing carried in from the caller.  Only a site INSIDE
+-- the descent is denied that, because there the rank is the quantity
+-- the recursion is spending; the three entry points — the root, an
+-- arrival, and the drain of a merge's queue — are outside it.
+depᵛˢ : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) (u : Ty) → List (Val Γ u) → ℕ
+depᵛˢ η u []       = 0
+depᵛˢ η u (v ∷ vs) = depᵛ η u v ⊔ depᵛˢ η u vs
+
+handed-below : ∀ {n} {Γ : Ctx n} {U r sz} (η : Fin n → ℕ) (u : Ty)
+               (vs : List (Val Γ u)) → depᵛˢ η u vs < r
+             → HandedOK η vs (U , r , sz)
+handed-below η u []       lt = []ᵃ
+handed-below η u (v ∷ vs) lt =
+    valOK-below η u v (≤-trans (s≤s (m≤m⊔n (depᵛ η u v) (depᵛˢ η u vs))) lt)
+  ∷ᵃ handed-below η u vs
+       (≤-trans (s≤s (m≤n⊔m (depᵛ η u v) (depᵛˢ η u vs))) lt)
 
 -- WHAT A PUSH CYCLE HANDS ON.  The cycle steps one frame per emit and
 -- the frame REWRITES the payload, so the burst coming out is not the

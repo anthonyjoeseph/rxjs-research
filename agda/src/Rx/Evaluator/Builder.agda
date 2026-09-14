@@ -35,31 +35,37 @@
 -- in seconds.
 module Rx.Evaluator.Builder where
 
-open import Data.Bool using (Bool; true; false)
+open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.Bool.ListAction using (any)
 open import Data.Fin using (Fin; toℕ)
+open import Data.Fin.Properties using (toℕ<n)
 open import Data.List using (List; []; _∷_; _++_)
 open import Data.List.Relation.Unary.All using (All)
   renaming ([] to []ᵃ; _∷_ to _∷ᵃ_; head to headᵃ; tail to tailᵃ)
 open import Data.Maybe using (Maybe; nothing; just)
-open import Data.Nat using (ℕ; zero; suc; pred; _≤_; _≡ᵇ_; _<?_)
-open import Data.Nat.Properties using (≤-refl; ≤-trans; m≤m⊔n; ≮⇒≥)
-open import Data.Product using (∃; _,_; proj₁; proj₂)
+open import Data.Nat using (ℕ; zero; suc; pred; _≤_; _<_; _∸_; s≤s; _≡ᵇ_; _<?_)
+open import Data.Nat.Induction using (<-wellFounded-fast)
+open import Data.Nat.Properties using (≤-refl; ≤-trans; m≤m⊔n; ≮⇒≥; ∸-monoʳ-<)
+open import Data.Product using (∃; _×_; _,_; proj₁; proj₂)
+open import Data.Sum using (inj₁; inj₂)
 open import Data.Vec using (lookup)
 open import Induction.WellFounded using (Acc; acc)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; cong)
 open import Relation.Nullary using (yes; no)
 
-open import Rx.Prim using (Fuel; Id; Tick; InstEmit; InstEvent; hot; cold)
+open import Rx.Prim using (Fuel; Id; Source; Tick; InstEmit; InstEvent; close;
+  exhausted; hot; cold)
 open import Rx.Exp using (Ctx; Closed; Val; _≟ᵗ_; obs; unfoldμ; evalTm; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ;
   switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ)
 open import Rx.Slots using (Slots; shared; scripted)
 open import Rx.Slot-Depth using (slotDepth)
-open import Rx.Strat-Order using (Tri; _≺_)
+open import Rx.Strat-Order using (Tri; _≺_; ≺-wellFounded)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; AllOp; NodeId; NodeState; Frame; root; _↠_; map-f; take-f; scan-f;
   thru-outer; from-inner; mergeAllᵒ; switchᵒ; exhaustᵒ; mergeAll-st; switch-st; exhaust-st; take-st;
   scan-st; installNode; lookupNode; hasRoom; switchKill; aliveThroughᶠ; splitEvents; splitBurst; sched-init; st-init;
-  unconn; memberSource; share-sink; lowerFloor; register; atSlot; burstCompleted)
+  unconn; memberSource; share-sink; lowerFloor; register; atSlot; burstCompleted;
+  Arrival; arrTick; arrSource; arrTy; arrVal; AtFloor; RegId; chainsOf;
+  cascadeLatch; sched-next; shareAdmit; shareLatch)
 open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeAll⇓; pushBurst⇓;
   stepFrame⇓; innerReact⇓; innerFinish⇓; mergeAllDrain⇓; thruWalk⇓;
   thruConsume⇓; subscribeInner⇓;
@@ -70,13 +76,18 @@ open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeAll⇓; pushBurst
   walk-nil; walk-cons; consume-all-sub; consume-all-enqueue; consume-all-nil;
   consume-switch-sub; consume-switch-nil; consume-exhaust-sub;
   consume-exhaust-nil; inner;
+  foldPath⇓; shareGo⇓; dispatchShare⇓; chainStep⇓; cascadeGo⇓; cascade⇓;
+  fold-root; fold-sink; fold-step; go-nil; go-cut; go-live; disp;
+  chain-step; casc-nil; casc-cut; casc-live; casc-run;
+  drain-done; drain-empty; drain-step;
+  drain-nil; drain-no-room; drain-room;
   drain⇓; evaluate⇓; subs-of; subs-empty; subs-map; subs-take-zero;
   subs-take-suc; subs-scan; subs-merge-all; subs-switch-all; subs-exhaust-all;
   subs-μ; subs-defer; sub-all; eval-run;
   subs-floor; subs-shared; subs-hot-done; subs-hot-live; subs-cold-sync;
   subs-cold-async; slot-spent; slot-join; slot-connect; connect-live;
   connect-died)
-open import Rx.Evaluator.Burst-Report using (burst-carries)
+open import Rx.Evaluator.Burst-Report using (burst-carries; depᵛˢ; handed-below)
 open import Rx.Evaluator.Doorless using (μ-edge; μ-entry; rootWitness;
   EntryOK; SharesUnder; inner-ok; under-ok; HandedOK; BurstOK; split-handed;
   hop-edge; hop-guard; connect-edge; connect-entry)
@@ -162,28 +173,39 @@ DrainsQ {e = e} allNid κ id now lim act q sched st =
 -- a premise quantified freely over the queue would be exactly the
 -- statement `hop-edge`'s own header refutes, written down as an axiom.
 --
--- RECOVERY: `git show 1b7698e7:agda/src/Rx/Evaluator/Builder.agda` holds
---   the drain written out over `subscribeInner!`, which is the whole of
---   the body once the queue's own report is available to spend.
-postulate
-  mergeAllDrain! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo}
-    (allNid : NodeId) (κ : Path Γ lo s t) (id : Id) (now : Tick)
-    (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ s))
-    (sched : Sched Γ) (st : EvalSt e) →
-    DrainsQ {e = e} allNid κ id now lim act q sched st
-
--- AND THE FAR END OF THE RUN, which spends fuel over the schedule
--- rather than descending on a term, so it is not in the recursion this
--- module is for.
+-- SO THE LEAF IS THE ONE QUEUED SUBSCRIPTION AND NOT THE DRAIN AROUND
+-- IT.  The walk over the queue is structural on the queue and the two
+-- arms that stop — an empty queue, a full lane — carry no obligation at
+-- all, so they are clauses.  What cannot be written is the single step:
+-- entering the subscribe cycle needs a rank the queued observable's own
+-- report would name, and that report is what the store does not yet
+-- carry.  Shrinking the leaf to that step is what makes a run with an
+-- empty or blocked queue REDUCE, which is every run the corpus holds.
 --
--- RECOVERY: git show 80e527f9:agda/src/Rx/Evaluator/Run.agda restores the
---   predecessor's own `drain`, three arms over the schedule — the shape
---   this leaf's body takes; what does not transport is the guard it
---   tested, since the obligation that answered is now the derivation's.
+-- RECOVERY: `git show 1b7698e7:agda/src/Rx/Evaluator/Builder.agda` holds
+--   the step written out over `subscribeInner!`, which is the whole of
+--   the leaf's body once the queue's own report is available to spend.
 postulate
-  drain! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (fuel : Fuel) (id : Id) (sched : Sched Γ) (st : EvalSt e) →
-    ∃ λ rest → drain⇓ {e = e} fuel id sched st rest
+  queuedInner! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo}
+    (allNid : NodeId) (κ : Path Γ lo s t) (id : Id) (now : Tick)
+    (o : Closed Γ s) (sched : Sched Γ) (st : EvalSt e) →
+    InnerSubRuns {e = e} mergeAllᵒ allNid κ id now o sched st
+
+mergeAllDrain! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo}
+  (allNid : NodeId) (κ : Path Γ lo s t) (id : Id) (now : Tick)
+  (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ s))
+  (sched : Sched Γ) (st : EvalSt e) →
+  DrainsQ {e = e} allNid κ id now lim act q sched st
+mergeAllDrain! allNid κ id now lim act []      sched st = _ , drain-nil
+mergeAllDrain! allNid κ id now lim act (o ∷ q) sched st
+  with hasRoom lim act in eqr
+... | false = _ , drain-no-room eqr
+... | true  =
+  let ((inst , vs , bs , done , sched₁ , st₁) , s) =
+        queuedInner! allNid κ id now o sched st
+      (_ , d) = mergeAllDrain! allNid κ id now lim
+                  (if done then act else suc act) q sched₁ st₁
+  in _ , drain-room eqr s d
 
 ------------------------------------------------------------------
 -- WHAT A RUN DOES NOT TOUCH.
@@ -750,6 +772,143 @@ subscribeE!-input {lo = lo} (acc rec) sl i ok κ id now sched ag st ub
                       (slot-agree sl sched i ag slEq)
                       (slot-connect doneEq connEq
                         (connect-died {κ = κ} {below = below} dv compEq))
+
+------------------------------------------------------------------
+-- THE ARRIVAL CYCLE, WHICH IS A SECOND ENTRY AND NOT A CONTINUATION.
+------------------------------------------------------------------
+
+-- EVERY BUILDER OF THE SUBSCRIBE BLOCK QUANTIFIES OVER THE RANK, SO A
+-- SITE ENTERING FROM OUTSIDE NAMES ITS OWN AND PAYS ALL FOUR PREMISES
+-- ITSELF.  The slot agreement is `refl` because the table is read off
+-- the schedule handed in; the share bound is `≤-refl` because the count
+-- IS the state's; the rank is set one above the values being handed, so
+-- `handed-below` discharges it outright; and the accessibility comes
+-- from the order's own well-foundedness.  Nothing is carried in and no
+-- field is owed — only a site INSIDE the descent is denied this, because
+-- there the rank is the quantity the recursion is spending.
+--
+-- AND THE CYCLE'S OWN DESCENT IS THE FLOOR INDEX, READ OFF `share-sink`'s
+-- ARGUMENT.  A chain registered on a share sinks STRICTLY above that
+-- share, so the room left above the floor is what shrinks at every
+-- fan-out and the term itself never has to.
+--
+-- RECOVERY: git show 80e527f9:agda/src/Rx/Evaluator/Run.agda restores the
+--   predecessor's own `drain`, whose three arms over the schedule are the
+--   shape the far end takes; what does not transport is the guard it
+--   tested, since that obligation is now the derivation's.
+
+monus-sink : ∀ {n lo} (i : Fin n) → lo ≤ toℕ i → n ∸ suc (toℕ i) < n ∸ lo
+monus-sink i below = ∸-monoʳ-< (s≤s below) (toℕ<n i)
+
+mutual
+
+  foldPath! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
+    (ac : Acc _<_ (n ∸ lo)) (id : Id) (now : Tick) (envSrc : Source)
+    (κ : Path Γ lo u t) (vals : List (Val Γ u))
+    (evs : List (InstEvent (Val Γ t))) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) →
+    ∃ λ r → foldPath⇓ {e = e} id now envSrc κ vals evs fin sched st r
+
+  dispatchShare! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo} {i : Fin n}
+    (ac : Acc _<_ (n ∸ suc (toℕ i))) (below : lo ≤ toℕ i)
+    (id : Id) (now : Tick) (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) →
+    ∃ λ r → dispatchShare⇓ {e = e} id now i below vals fin sched st r
+
+  shareGo! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {i : Fin n}
+    (ac : Acc _<_ (n ∸ suc (toℕ i))) (id : Id) (now : Tick)
+    (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
+    (ps : List (RegId × Path Γ (suc (toℕ i)) (lookup Γ i) t))
+    (sched : Sched Γ) (st : EvalSt e) →
+    ∃ λ r → shareGo⇓ {e = e} id now i vals fin ps sched st r
+
+  foldPath! ac id now envSrc root vals evs fin sched st = _ , fold-root
+  foldPath! (acc rec) id now envSrc (share-sink i below) vals evs fin sched st =
+    let (_ , d) = dispatchShare! (rec (monus-sink i below)) below
+                    id now vals fin sched st
+    in _ , fold-sink d
+  foldPath! {u = u} ac id now envSrc (fr ↠ κ) vals evs fin sched st =
+    let sl = Sched.slots sched
+        ((vals′ , evs′ , fin′ , sched₁ , st₁) , sf) =
+          stepFrame!
+            (≺-wellFounded ( unconn sl (EvalSt.connectedShares st)
+                           , suc (depᵛˢ (slotDepth sl) u vals) , 0 ))
+            sl id now fr κ vals
+            (handed-below (slotDepth sl) u vals ≤-refl)
+            fin sched refl st ≤-refl
+        (_ , rest) =
+          foldPath! ac id now envSrc κ vals′ (evs ++ evs′) fin′ sched₁ st₁
+    in _ , fold-step sf rest
+
+  dispatchShare! {i = i} ac below id now vals fin sched st =
+    let (_ , g) = shareGo! ac id now vals fin
+                    (shareAdmit i (EvalSt.registry st))
+                    sched (shareLatch i fin st)
+    in _ , disp g
+
+  shareGo! ac id now vals fin [] sched st = _ , go-nil
+  shareGo! {i = i} ac id now vals fin ((rid , p) ∷ ps) sched st
+    with any (_≡ᵇ rid) (EvalSt.cancelled st) in eqc
+  ... | true  = let (_ , g) = shareGo! ac id now vals fin ps sched st
+                in _ , go-cut eqc g
+  ... | false =
+    let ((emits , sched₁ , st₁) , f) =
+          foldPath! ac id now (toℕ i) p vals
+            (if fin then close (toℕ i) exhausted ∷ [] else []) fin sched
+            (record st { delivered = rid ∷ EvalSt.delivered st })
+        (_ , g) = shareGo! ac id now vals fin ps sched₁ st₁
+    in _ , go-live eqc f g
+
+-- ONE ARRIVAL DOWN ONE REGISTERED CHAIN.
+chainStep! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (id : Id) (a : Arrival Γ) (c : AtFloor Γ (arrTy a) t)
+  (sched : Sched Γ) (st : EvalSt e) →
+  ∃ λ r → chainStep⇓ {e = e} id a c sched st r
+chainStep! {n = n} id a (lo , path) sched st =
+  let (_ , f) = foldPath! (<-wellFounded-fast (n ∸ lo)) id (arrTick a)
+                  (arrSource a) path (arrVal a ∷ [])
+                  (if Arrival.isLast a
+                     then close (arrSource a) exhausted ∷ [] else [])
+                  (Arrival.isLast a) sched st
+  in _ , chain-step f
+
+-- AND DOWN EVERY CHAIN THE ARRIVAL'S SOURCE IS REGISTERED ON, IN ORDER,
+-- THREADING THE SCHEDULE AND THE STATE.
+cascadeGo! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (a : Arrival Γ) (id : Id) (chains : List (RegId × AtFloor Γ (arrTy a) t))
+  (sched : Sched Γ) (st : EvalSt e) →
+  ∃ λ r → cascadeGo⇓ {e = e} a id chains sched st r
+cascadeGo! a id []               sched st = _ , casc-nil
+cascadeGo! a id ((rid , c) ∷ cs) sched st
+  with any (_≡ᵇ rid) (EvalSt.cancelled st) in eqc
+... | true  = let (_ , g) = cascadeGo! a id cs sched st in _ , casc-cut eqc g
+... | false =
+  let ((emits , sched₁ , st₁) , s) =
+        chainStep! id a c sched
+          (record st { delivered = rid ∷ EvalSt.delivered st })
+      (_ , g) = cascadeGo! a id cs sched₁ st₁
+  in _ , casc-live eqc s g
+
+cascade! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (a : Arrival Γ) (id : Id) (sched : Sched Γ) (st : EvalSt e) →
+  ∃ λ r → cascade⇓ {e = e} a id sched st r
+cascade! a id sched st =
+  let (_ , g) = cascadeGo! a id (chainsOf a st) sched (cascadeLatch a st)
+  in _ , casc-run g
+
+-- THE FAR END OF THE RUN, WHICH SPENDS FUEL OVER THE SCHEDULE RATHER
+-- THAN DESCENDING ON A TERM — so it is structural on the fuel and owes
+-- the cycle above it nothing but the arrival it just popped.
+drain! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (fuel : Fuel) (id : Id) (sched : Sched Γ) (st : EvalSt e) →
+  ∃ λ rest → drain⇓ {e = e} fuel id sched st rest
+drain! zero    id sched st = _ , drain-done
+drain! (suc k) id sched st with sched-next sched in eqn
+... | inj₁ _            = _ , drain-empty eqn
+... | inj₂ (a , sched′) =
+  let ((out , sched″ , st′) , c) = cascade! a id sched′ st
+      (_ , d) = drain! k (suc id) sched″ st′
+  in _ , drain-step eqn c d
 
 ------------------------------------------------------------------
 -- THE TOP LINE, AND WHAT IT STOPS SAYING.
