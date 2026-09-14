@@ -244,9 +244,16 @@ cannot compute — and the other two leaves carry no arithmetic at all.
   `hop-guard`, `inner-nodry`, `burst-handed` — for the shapes to be argued with.
   But the kill is not the CLOSE: `evaluate` still holds the arm, so
   `Refuted.Dry-Wrap` stays green until the clause goes, and deleting it costs
-  the descent witness the `yes` branch supplies. `subscribeInner-nodoor` sketches
-  that residue, and its two routes — proof-carrying evaluator, or a bound the
-  machine CARRIES — are the choice this leg hands to the one below.
+  the descent witness the `yes` branch supplies. `subscribeInner-nodoor` states
+  that residue. THE ROUTE IS DECIDED (Anthony: "2 definitely sounds better"): the
+  CARRIED BOUND, not a proof-carrying evaluator — `Rx.Evaluator.Carried` sketches
+  it unchecked, as the three declarations the change touches. `thru-outer` grows a
+  rank field ρ set once at install; the hop READS ρ instead of measuring the
+  arriving value, so its drop is `ρ < suc ρ` and both the test and the dry arm go;
+  the residue moves to `subscribeE`'s three *All clauses, where it is a claim about
+  a TERM (`all-entry-pos-*`: a flattener is written at rank ≥ 1) and the entry
+  invariant pays it. `Refuted.Dry-Wrap` goes red in that same commit, which is what
+  closing looks like.
 
 - **THEN RESTATE `subscribe-carried` OVER THE SCHEDULE, GROWING `EntryOK` TO THE
   THIRD CONJUNCT IN THE SAME EDIT — IT IS WHAT PAYS THE DOOR'S PREMISE.**
