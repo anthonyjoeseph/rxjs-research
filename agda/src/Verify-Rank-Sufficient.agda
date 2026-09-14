@@ -38,18 +38,22 @@ open import Data.Empty using (⊥-elim)
 open import Data.Fin using (Fin)
 open import Data.List using (List; []; _∷_)
 open import Data.Maybe using (just; nothing)
-open import Data.Nat using (_≤_; suc; _+_; _<?_)
-open import Data.Nat.Properties using (≤-refl; ≤-trans; n≤1+n; m≤n+m)
-open import Data.Product using (_,_; proj₁; proj₂)
+open import Data.List.Relation.Unary.All using (All) renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
+open import Data.Nat using (_≤_; _<_; suc; _+_; _⊔_; _<?_)
+open import Data.Nat.Properties using (≤-refl; ≤-trans; n≤1+n; m≤n+m; m≤m⊔n; m≤n⊔m)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Data.Sum using (inj₁; inj₂)
+open import Data.Unit using (⊤)
 open import Data.Vec using (lookup)
 open import Induction.WellFounded using (Acc; acc)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Relation.Nullary using (yes; no)
 
-open import Rx.Prim  using (Fuel; Id; Tick; InstEmit)
-open import Rx.Exp   using (Ctx; Closed; Val; obs; _≟ᵗ_; syncSizeᵉ; evalTm; unfoldμ;
-  input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ;
-  μᵉ; varᵉ; deferᵉ)
+open import Rx.Prim  using (Fuel; Id; Tick; InstEmit; InstEvent;
+  init; value; close; handoff; complete)
+open import Rx.Exp   using (Ctx; Closed; Ty; Val; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; _≟ᵗ_; syncSizeᵉ; evalTm; unfoldμ;
+  input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ)
+open import Rx.Obs-Depth using (obsDepthᵉ; unfoldμ-no-deeper)
 open import Rx.Slots using (Slots)
 open import Rx.Strat-Order using (Tri; _≺_; ltS)
 open import Rx.Sync-Size using (unfoldμ-shrinks)
@@ -107,15 +111,21 @@ open import Verify-Rank-Sufficient.Dry-Emits using (hasDry-++)
 -- restatement's cost being a laundering: the conditioned statement is
 -- the true one replacing a false one.
 --
--- IT CARRIES ONE CONJUNCT AND IS EXPECTED TO GROW TO THREE, WHICH IS
+-- IT CARRIES TWO CONJUNCTS AND IS EXPECTED TO GROW TO THREE, WHICH IS
 -- THE CONVERGENCE RATHER THAN AN OMISSION.  One guard per component:
 -- the μ unfold reads the synchronous size, the hop reads the rank, the
--- share connect reads the unconnected count.  Only the first is
--- stateable today — the other two are readings the carried report is
--- being written to supply — and each lands the day its own witness
--- forces it, so the predicate grows against a `⊥` rather than by
--- guess.  The root satisfies this one definitionally: `evaluate` seeds
--- the third component from the program's own size.
+-- share connect reads the unconnected count.  The third is a reading
+-- nothing has forced a shape for yet, and each lands the day its own
+-- witness forces it, so the predicate grows against a `⊥` rather than
+-- by guess.  The root satisfies both of these out of its own seeding:
+-- `evaluate` builds the entry from the program's size and depth.
+--
+-- AND THE RANK CONJUNCT IS WHAT MAKES THE HOP'S PREMISE PAYABLE, which
+-- is why it is here rather than threaded into a signature.  A value a
+-- frame hands on is bounded by the depth of the TERM the burst came
+-- from, so the statement that pays `HandedOK` needs the entry to bound
+-- that depth — and the hop's own re-entry satisfies the conjunct
+-- definitionally, since it drops the rank to the inner's own reading.
 --
 -- REFUTED: `Refuted.Totality-Entry` — the statement below WITHOUT this
 --   premise, at a `μ` over a one-shot source entered at the zero
@@ -123,7 +133,7 @@ open import Verify-Rank-Sufficient.Dry-Emits using (hasDry-++)
 --   dryness, so it reports the one number the guard reads against the
 --   one the caller chose.
 EntryOK : ∀ {n} {Γ : Ctx n} {u} → Closed Γ u → Tri → Set
-EntryOK b (_ , _ , sz) = syncSizeᵉ b ≤ sz
+EntryOK b (_ , r , sz) = syncSizeᵉ b ≤ sz × obsDepthᵉ b ≤ r
 
 -- CARRYING THE ENTRY INVARIANT DOWN A FRAME, WHICH IS THE WHOLE OF THE
 -- ARITHMETIC THE SUBSCRIBE INDUCTION NEEDS.  `syncSizeᵉ` counts the
@@ -137,6 +147,112 @@ entry-under le = ≤-trans (n≤1+n _) le
 
 entry-inner : ∀ {a b sz} → suc (a + b) ≤ sz → b ≤ sz
 entry-inner {a} {b} le = ≤-trans (m≤n+m b a) (entry-under le)
+
+-- and the rank's own descent, which is a join rather than a successor:
+-- every structural clause reads its frame's term BESIDE the source's
+-- depth, so the source is a summand and the bound passes through
+entry-depth : ∀ {a c r} → a ⊔ c ≤ r → c ≤ r
+entry-depth {a} {c} le = ≤-trans (m≤n⊔m a c) le
+
+-- and the two shapes every structural clause takes, so a call site
+-- spends one name rather than splitting the pair by hand.  A framed
+-- clause carries its frame's term in BOTH components — summed in the
+-- size, joined in the depth — while a flattener carries none, so its
+-- rank passes through untouched.
+inner-ok : ∀ {a b c d sz r} → (suc (a + b) ≤ sz) × (c ⊔ d ≤ r) → (b ≤ sz) × (d ≤ r)
+inner-ok (s , p) = entry-inner s , entry-depth p
+
+under-ok : ∀ {b c sz r} → (suc b ≤ sz) × (c ≤ r) → (b ≤ sz) × (c ≤ r)
+under-ok (s , p) = entry-under s , p
+
+-- WHAT A CLAUSE IS HANDED, WHICH IS A SEPARATE PREDICATE AND NOT A
+-- FOURTH CONJUNCT UP THERE.  The entry invariant speaks about the TERM
+-- a subscribe enters at; the hop reads a runtime VALUE that arrives
+-- later and is structurally unrelated to that term, so no reading of
+-- the program can supply it.  This says exactly what the guard reads —
+-- every value the clause receives is written shallower than the rank it
+-- is standing at — and it is the one shape of hypothesis this repo
+-- admits without a restatement being a laundering.
+--
+-- AND IT READS THE VALUE'S TYPE, WHICH IS THE DIFFERENCE BETWEEN A
+-- PROPERTY OF BURSTS AND A DEMAND ON THE ENTRY.  The bound exists to pay
+-- ONE guard — the hop's, which compares an OBSERVABLE against the rank —
+-- and an observable reaches a frame as the payload of a `strmᵗ`, the one
+-- head the reading charges a successor for.  So the strictness is real
+-- exactly where it is spent.  Asked flat, of every value at every type,
+-- it reads a numeral at nought and demands nought be strictly below the
+-- rank, which is a claim about the caller and not about the burst.
+--
+-- SO THE CLAUSES MIRROR THE READING'S OWN, RATHER THAN STOPPING AT THE
+-- OBSERVABLE HEAD.  A pair or an injection can carry an observable a
+-- later projection hands to a hop, so ⊤ at those types would weaken the
+-- premise exactly where a frame is free to recover the value — and
+-- recursing costs nothing, since the reading already recurses there and
+-- the two then correspond clause for clause.
+--
+-- REFUTED: `Refuted.Hop-Unconditioned` — the hop leaf below WITHOUT
+--   this premise, at the emptiest inner there is entered at a rank of
+--   nought.  The guard is strict, so nothing is shallow enough to pass
+--   it and no arm of the relation builds the burst the machine hands
+--   back, which is what says the repair relates the two ends rather
+--   than reading either more carefully.
+--
+-- REFUTED: `Refuted.Carried-Unranked` — the FLAT reading, asked of every
+--   value at every type, at a one-shot source of one numeral entered at
+--   the rank the root itself builds. That witness is as far from the
+--   risky region as a program gets, which is what says the repair is the
+--   type split rather than a hypothesis about the program.
+ValOK : ∀ {n} {Γ : Ctx n} (u : Ty) → Tri → Val Γ u → Set
+ValOK unitᵗ    _ _           = ⊤
+ValOK boolᵗ    _ _           = ⊤
+ValOK natᵗ     _ _           = ⊤
+ValOK (s ×ᵗ t) τ (a , b)     = ValOK s τ a × ValOK t τ b
+ValOK (s +ᵗ t) τ (inj₁ a)    = ValOK s τ a
+ValOK (s +ᵗ t) τ (inj₂ b)    = ValOK t τ b
+ValOK (obs t)  (_ , r , _) o = obsDepthᵉ o < r
+
+HandedOK : ∀ {n} {Γ : Ctx n} {u} → List (Val Γ u) → Tri → Set
+HandedOK {u = u} vs τ = All (ValOK u τ) vs
+
+-- AND THE SAME OVER A BURST, WHICH IS WHERE THOSE VALUES COME FROM.  A
+-- push cycle steps one frame per emit and hands that frame the emit's
+-- own values, so the premise travels as a property of the whole burst
+-- and is split, emit by emit, by the induction that walks it.  Nothing
+-- here reads the schedule or the store: the burst is already built when
+-- the cycle starts, which is what makes a single `All` sufficient.
+--
+-- AND IT IS STATED OVER THE EVENTS RATHER THAN OVER THE SPLIT, WHICH IS
+-- FORCED AND NOT A PREFERENCE.  The splitter is polymorphic in the type
+-- of the bookkeeping half it retags into, and a predicate reading only
+-- its first component leaves that parameter free — an unsolved meta at
+-- the definition, and two applications at DIFFERENT retag types that no
+-- longer agree on an open list.  Reading the events directly names no
+-- such parameter, and `split-handed` below carries the property across
+-- the splitter at whatever type the call site pins.
+EventOK : ∀ {n} {Γ : Ctx n} {u} → Tri → InstEvent (Val Γ u) → Set
+EventOK {u = u} τ (value v) = ValOK u τ v
+EventOK _ (init _)    = ⊤
+EventOK _ (close _ _) = ⊤
+EventOK _ (handoff _) = ⊤
+EventOK _ complete    = ⊤
+
+BurstOK : ∀ {n} {Γ : Ctx n} {s} → Stream Γ s → Tri → Set
+BurstOK bs τ = All (λ em → All (EventOK τ) (InstEmit.events em)) bs
+
+-- the splitter keeps every `value` payload and drops the rest, so a
+-- property of the events is a property of the values it grafts — proven
+-- over the retag type the call site pins rather than over a chosen one,
+-- since the two halves are independent and only the first is read here
+split-handed : ∀ {n} {Γ : Ctx n} {u} {A : Set} {τ}
+             → (es : List (InstEvent (Val Γ u)))
+             → All (EventOK τ) es
+             → HandedOK {Γ = Γ} (proj₁ (splitEvents {A = A} es)) τ
+split-handed []              []ᵃ        = []ᵃ
+split-handed (value v  ∷ es) (p ∷ᵃ ps) = p ∷ᵃ split-handed es ps
+split-handed (init _   ∷ es) (_ ∷ᵃ ps) = split-handed es ps
+split-handed (close _ _ ∷ es) (_ ∷ᵃ ps) = split-handed es ps
+split-handed (handoff _ ∷ es) (_ ∷ᵃ ps) = split-handed es ps
+split-handed (complete ∷ es) (_ ∷ᵃ ps) = split-handed es ps
 
 -- THE ONE CONSTRUCTOR WHOSE CLAUSE READS A COMPONENT THE ENTRY
 -- INVARIANT DOES NOT YET SPEAK ABOUT.  A slot subscription splits six
@@ -174,6 +290,18 @@ postulate
 -- falsity now sits, and the statement they are missing is a bound on
 -- what a frame's own outputs read.
 --
+-- AND THE PREMISE IS WHAT IS LEFT OF ITS FALSITY, SINCE THE GUARD CAN
+-- NOW ONLY REFUSE WHERE `HandedOK` IS UNPAYABLE.  The value is shallower
+-- than the rank by hypothesis, so the subscribing arm's comparison
+-- succeeds; what the statement still owes is the arm that ENQUEUES and
+-- the two operators that read a different node state.
+--
+-- REFUTED: `Refuted.Hop-Unconditioned` — this statement WITHOUT the
+--   premise, at the emptiest inner there is entered at a rank of nought.
+--   The guard is strict, so nothing is shallow enough to pass it and the
+--   machine answers dry; the relation has no arm building that marker,
+--   since its one constructor demands a real inner derivation.
+--
 -- PROBED: `Probed.Nodry-Halves` — the DROP arm only, entered at a node
 --   id nothing installed, so the row pins that the clause hands its
 --   schedule and store straight back.  NOT covered, and it is the whole
@@ -182,8 +310,8 @@ postulate
 postulate
   thruConsume⇓-total : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
     {τ : Tri} (ac : Acc _≺_ τ) (op : AllOp) (nid : NodeId)
-    (κ : Path Γ lo u t) (id : Id) (now : Tick) (o : Val Γ (obs u))
-    (sched : Sched Γ) (st : EvalSt e) →
+    (κ : Path Γ lo u t) (id : Id) (now : Tick) (o : Val Γ (obs u)) →
+    HandedOK {Γ = Γ} (o ∷ []) τ → (sched : Sched Γ) (st : EvalSt e) →
     thruConsume⇓ {e = e} op nid κ id now o sched st
       (thruConsume {e = e} ac op nid κ id now o sched st)
 
@@ -214,14 +342,14 @@ postulate
 -- guard is read here at all.
 thruWalk⇓-total : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
   {τ : Tri} (ac : Acc _≺_ τ) (op : AllOp) (nid : NodeId)
-  (κ : Path Γ lo u t) (id : Id) (now : Tick) (os : List (Val Γ (obs u)))
-  (sched : Sched Γ) (st : EvalSt e) →
+  (κ : Path Γ lo u t) (id : Id) (now : Tick) (os : List (Val Γ (obs u))) →
+  HandedOK {Γ = Γ} os τ → (sched : Sched Γ) (st : EvalSt e) →
   thruWalk⇓ {e = e} op nid κ id now os sched st
     (thruWalk {e = e} ac op nid κ id now os sched st)
-thruWalk⇓-total ac op nid κ id now []       sched st = walk-nil
-thruWalk⇓-total ac op nid κ id now (o ∷ os) sched st =
-  walk-cons (thruConsume⇓-total ac op nid κ id now o sched st)
-            (thruWalk⇓-total ac op nid κ id now os _ _)
+thruWalk⇓-total ac op nid κ id now []       hk        sched st = walk-nil
+thruWalk⇓-total ac op nid κ id now (o ∷ os) (h ∷ᵃ hs) sched st =
+  walk-cons (thruConsume⇓-total ac op nid κ id now o (h ∷ᵃ []ᵃ) sched st)
+            (thruWalk⇓-total ac op nid κ id now os hs _ _)
 
 -- THE FIVE FRAMES, THREE OF WHICH ANSWER OUT OF THEIR OWN CLAUSE.  Map
 -- applies its function to the list, take defers wholesale to the
@@ -231,17 +359,18 @@ thruWalk⇓-total ac op nid κ id now (o ∷ os) sched st =
 -- two that are not answered here are the two that subscribe.
 stepFrame⇓-total : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
   {τ : Tri} (ac : Acc _≺_ τ) (id : Id) (now : Tick) (fr : Frame Γ s u)
-  (κ : Path Γ lo u t) (vals : List (Val Γ s)) (fin : Bool)
+  (κ : Path Γ lo u t) (vals : List (Val Γ s)) →
+  HandedOK {Γ = Γ} vals τ → (fin : Bool)
   (sched : Sched Γ) (st : EvalSt e) →
   stepFrame⇓ {e = e} id now fr κ vals fin sched st
     (stepFrame {e = e} ac id now fr κ vals fin sched st)
-stepFrame⇓-total ac id now (map-f fn) κ vals fin sched st = step-map
-stepFrame⇓-total ac id now (take-f nid) κ vals fin sched st = step-take
-stepFrame⇓-total ac id now (from-inner op allNid inst) κ vals fin sched st =
+stepFrame⇓-total ac id now (map-f fn) κ vals hk fin sched st = step-map
+stepFrame⇓-total ac id now (take-f nid) κ vals hk fin sched st = step-take
+stepFrame⇓-total ac id now (from-inner op allNid inst) κ vals hk fin sched st =
   step-from-inner (innerReact⇓-total ac op allNid inst κ id now vals sched st fin)
-stepFrame⇓-total ac id now (thru-outer op nid) κ vals fin sched st =
-  step-thru-outer (thruWalk⇓-total ac op nid κ id now vals sched st)
-stepFrame⇓-total {u = u} ac id now (scan-f fn nid) κ vals fin sched st
+stepFrame⇓-total ac id now (thru-outer op nid) κ vals hk fin sched st =
+  step-thru-outer (thruWalk⇓-total ac op nid κ id now vals hk sched st)
+stepFrame⇓-total {u = u} ac id now (scan-f fn nid) κ vals hk fin sched st
   with lookupNode nid (EvalSt.nodes st) in eq
 ... | nothing                    = step-scan-nil
 ... | just (take-st _)           = step-scan-nil
@@ -259,17 +388,18 @@ stepFrame⇓-total {u = u} ac id now (scan-f fn nid) κ vals fin sched st
 -- premise names, which is `refl`.
 pushBurst⇓-total : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
   {τ : Tri} (ac : Acc _≺_ τ) (id : Id) (now : Tick)
-  (f : Frame Γ s u) (κ : Path Γ lo u t) (burst : Stream Γ s)
-  (sched : Sched Γ) (st : EvalSt e) →
+  (f : Frame Γ s u) (κ : Path Γ lo u t) (burst : Stream Γ s) →
+  BurstOK {Γ = Γ} burst τ → (sched : Sched Γ) (st : EvalSt e) →
   pushBurst⇓ {e = e} id now f κ burst sched st
     (pushBurst {e = e} ac id now f κ burst sched st)
-pushBurst⇓-total ac id now f κ []         sched st = push-nil
-pushBurst⇓-total ac id now f κ (em ∷ ems) sched st =
+pushBurst⇓-total ac id now f κ []         bk        sched st = push-nil
+pushBurst⇓-total ac id now f κ (em ∷ ems) (b ∷ᵃ bs) sched st =
   push-cons refl
     (stepFrame⇓-total ac id now f κ
       (proj₁ (splitEvents (InstEmit.events em)))
+      (split-handed (InstEmit.events em) b)
       (proj₂ (proj₂ (splitEvents (InstEmit.events em)))) sched st)
-    (pushBurst⇓-total ac id now f κ ems _ _)
+    (pushBurst⇓-total ac id now f κ ems bs _ _)
 
 -- THE FLATTENERS' SHARED WRAPPER, WHICH IS A NODE INSTALL FOLLOWED BY
 -- THE TWO CYCLES ABOVE.  It is a leaf rather than a body only because
@@ -292,6 +422,49 @@ postulate
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     subscribeAll⇓ {e = e} op ns b κ id now sched st
       (subscribeAll {e = e} ac op ns b κ id now sched st)
+
+-- WHAT A SUBSCRIBE HANDS ON, WHICH IS THE STATEMENT THAT PAYS THE HOP'S
+-- PREMISE AND THE ONE PLACE THE TWO CURRENCIES MEET.  A framed clause
+-- pushes the burst its SOURCE produced, so the values a frame receives
+-- are the source's emissions — and the entry invariant bounds the
+-- source's own depth, which is what makes the conclusion stateable from
+-- the hypotheses rather than from the call site.
+--
+-- THE INEQUALITY IS STRICT AND THAT IS THE MECHANISM, NOT A MARGIN.  An
+-- observable arrives in a burst as the value of a `strmᵗ`, which the
+-- reading charges a successor for — so an emitted observable is written
+-- STRICTLY below the term that emitted it, and the hop's strict guard is
+-- exactly the comparison this discharges.  A non-strict reading would
+-- make the statement false at a source that emits itself.
+--
+-- AND IT IS FALSE AS WRITTEN, AT THE ONE CLAUSE WHERE ITS HYPOTHESIS
+-- SPEAKS ABOUT A SYMBOL.  A slot reference is priced at nought on
+-- purpose — costing it would need the staged fixpoint a slot environment
+-- carries — so the entry invariant at a reference constrains nothing,
+-- while the burst the clause returns is the DEFINITION's.  The connect
+-- re-seeds the rank at that definition's own nesting and so never makes
+-- the comparison itself, which is why the descent is sound and this
+-- statement is not.  The conjunct owed is over the SCHEDULE: the slots
+-- the telescope holds are written below the rank.  Until that lands the
+-- statement stays at full strength rather than being conditioned on
+-- whatever today's callers happen to supply.
+--
+-- REFUTED: `Refuted.Carried-Unranked` — the FLAT reading of the
+--   conclusion, asked of every value at every type, at a one-shot source
+--   of one numeral entered at the rank the root itself builds. Answered
+--   by the type split `ValOK` now carries.
+--
+-- REFUTED: `Refuted.Carried-Shared` — the reading that survived it, at a
+--   slot whose shared definition writes an observable. The two figures
+--   claimed there are the gap: the definition reads one, the reference
+--   standing for it reads nought, so no repair reading the term can
+--   close it.
+postulate
+  subscribe-carried : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
+    {τ : Tri} (ac : Acc _≺_ τ) (b : Closed Γ u) → EntryOK b τ →
+    (κ : Path Γ lo u t) (id : Id) (now : Tick)
+    (sched : Sched Γ) (st : EvalSt e) →
+    BurstOK {Γ = Γ} (proj₁ (subscribeE {e = e} ac b κ id now sched st)) τ
 
 -- THE SUBSCRIBE CYCLE'S HALF, AND IT IS AN INDUCTION RATHER THAN A LEAF
 -- BECAUSE THE ENTRY INVARIANT IS WHAT MAKES ONE WRITEABLE.  Every
@@ -322,30 +495,34 @@ subscribeE⇓-total ac (input i) ok κ id now sched st =
 subscribeE⇓-total ac (ofᵉ ts) ok κ id now sched st = subs-of refl
 subscribeE⇓-total ac emptyᵉ ok κ id now sched st = subs-empty refl
 subscribeE⇓-total ac (mapᵉ f b) ok κ id now sched st =
-  subs-map (subscribeE⇓-total ac b (entry-inner ok) (map-f f ↠ κ) id now sched st)
-           (pushBurst⇓-total ac id now (map-f f) κ _ _ _)
+  subs-map (subscribeE⇓-total ac b (inner-ok ok) (map-f f ↠ κ) id now sched st)
+           (pushBurst⇓-total ac id now (map-f f) κ _
+              (subscribe-carried ac b (inner-ok ok) (map-f f ↠ κ) id now sched st) _ _)
 subscribeE⇓-total ac (takeᵉ count b) ok κ id now sched st
   with evalTm count in eq
 ... | 0     = subs-take-zero eq refl
 ... | suc k =
       subs-take-suc eq refl
-        (subscribeE⇓-total ac b (entry-inner ok) (take-f _ ↠ κ) id now _ _)
-        (pushBurst⇓-total ac id now (take-f _) κ _ _ _)
+        (subscribeE⇓-total ac b (inner-ok ok) (take-f _ ↠ κ) id now _ _)
+        (pushBurst⇓-total ac id now (take-f _) κ _
+           (subscribe-carried ac b (inner-ok ok) (take-f _ ↠ κ) id now _ _) _ _)
 subscribeE⇓-total ac (scanᵉ f seed b) ok κ id now sched st =
   subs-scan refl
-    (subscribeE⇓-total ac b (entry-inner ok) (scan-f f _ ↠ κ) id now _ _)
-    (pushBurst⇓-total ac id now (scan-f f _) κ _ _ _)
+    (subscribeE⇓-total ac b (inner-ok ok) (scan-f f _ ↠ κ) id now _ _)
+    (pushBurst⇓-total ac id now (scan-f f _) κ _
+       (subscribe-carried ac b (inner-ok ok) (scan-f f _ ↠ κ) id now _ _) _ _)
 subscribeE⇓-total ac (mergeAllᵉ lim b) ok κ id now sched st =
-  subs-merge-all (subscribeAll⇓-total ac _ _ b (entry-under ok) κ id now sched st)
+  subs-merge-all (subscribeAll⇓-total ac _ _ b (under-ok ok) κ id now sched st)
 subscribeE⇓-total ac (switchAllᵉ b) ok κ id now sched st =
-  subs-switch-all (subscribeAll⇓-total ac _ _ b (entry-under ok) κ id now sched st)
+  subs-switch-all (subscribeAll⇓-total ac _ _ b (under-ok ok) κ id now sched st)
 subscribeE⇓-total ac (exhaustAllᵉ b) ok κ id now sched st =
-  subs-exhaust-all (subscribeAll⇓-total ac _ _ b (entry-under ok) κ id now sched st)
+  subs-exhaust-all (subscribeAll⇓-total ac _ _ b (under-ok ok) κ id now sched st)
 subscribeE⇓-total {τ = _ , _ , sz} (acc rec) (μᵉ body) ok κ id now sched st
   with syncSizeᵉ (unfoldμ body) <? sz
-... | no ¬p = ⊥-elim (¬p (≤-trans (unfoldμ-shrinks body) ok))
+... | no ¬p = ⊥-elim (¬p (≤-trans (unfoldμ-shrinks body) (proj₁ ok)))
 ... | yes p =
-      subs-μ (subscribeE⇓-total (rec (ltS p)) (unfoldμ body) ≤-refl
+      subs-μ (subscribeE⇓-total (rec (ltS p)) (unfoldμ body)
+                (≤-refl , ≤-trans (unfoldμ-no-deeper body) (proj₂ ok))
                 κ id now sched st)
 subscribeE⇓-total ac (varᵉ ()) ok κ id now sched st
 subscribeE⇓-total ac (deferᵉ body) ok κ id now sched st =
@@ -380,7 +557,8 @@ postulate
 evaluate⇓-total : ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t)
   (ins : Slots Γ) → evaluate⇓ fuel e ins (evaluate fuel e ins)
 evaluate⇓-total {n = n} fuel e ins =
-  eval-run (subscribeE⇓-total {lo = n} (rootWitness e ins) e ≤-refl root 0 0
+  eval-run (subscribeE⇓-total {lo = n} (rootWitness e ins) e
+              (≤-refl , m≤m⊔n _ _) root 0 0
               (sched-init e ins) (st-init e))
            (drain⇓-total fuel 1 _ _)
 

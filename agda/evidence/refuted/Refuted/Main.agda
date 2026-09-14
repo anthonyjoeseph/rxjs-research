@@ -63,3 +63,31 @@ open import Refuted.Exit-Store using (both-ends-false;
 -- caller, and nothing in the statement relates them
 open import Refuted.Totality-Entry using (subscribe-total-false;
   unfold-size; dry-entry)
+
+-- and the same quantifier one cycle over, where the answer is not a
+-- restatement of the entry but a premise about what a frame HANDS ON.
+-- The two figures are claimed because the finding is that no program
+-- can be shallow enough to escape: the inner is the emptiest there is
+-- and the guard is strict, so a repair has to relate the two ends
+-- rather than read either more carefully
+open import Refuted.Hop-Unconditioned using (consume-total-false;
+  inner-depth; dry-out)
+
+-- and the statement minted to PAY that premise, killed one move later
+-- and at the other extreme: every witness above is adversarial in the
+-- entry or in the program, and this one is neither.  Its one figure is
+-- claimed because the finding is that the rank the root builds is
+-- NOUGHT wherever a program writes no observable, so the bound is a
+-- demand on the entry rather than a property of the burst — and a
+-- repair reading the value's TYPE leaves this row failing rather than
+-- quietly agreeing
+open import Refuted.Carried-Unranked using (carried-false; root-rank)
+
+-- and the reading that survived THAT, killed at the one clause where the
+-- entry invariant speaks about a symbol rather than a program.  Its two
+-- figures are claimed because the finding is the gap between them: the
+-- definition writes an observable and the reference standing for it
+-- reads nought, so no repair reading the TERM can close this — which is
+-- what says the conjunct owed is over the SCHEDULE
+open import Refuted.Carried-Shared using (carried-shared-false;
+  def-depth; ref-depth)

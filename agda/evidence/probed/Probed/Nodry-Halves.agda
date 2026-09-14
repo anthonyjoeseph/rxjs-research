@@ -32,17 +32,18 @@ module Probed.Nodry-Halves where
 open import Data.Bool using (false)
 open import Data.Fin using (zero)
 open import Data.List using ([]; _∷_)
+open import Data.List.Relation.Unary.All using () renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
 open import Data.List.Relation.Unary.Any using (here)
 open import Data.Maybe using (nothing)
 open import Data.Nat using (z≤n; s≤s)
 open import Data.Nat.Properties using (≤-refl; n≤1+n)
-open import Data.Product using (proj₁; proj₂)
+open import Data.Product using (_,_; proj₁; proj₂)
 open import Data.Vec using () renaming ([] to []ⱽ; _∷_ to _∷ⱽ_)
 open import Relation.Binary.PropositionalEquality using (refl)
 
 open import Rx.Prim using (hot; after_,_)
-open import Rx.Exp using (Ctx; Closed; Fn; obs; natᵗ; nat̂; varᵗ; ofᵉ; emptyᵉ;
-  mapᵉ; takeᵉ; mergeAllᵉ; input)
+open import Rx.Exp using (Ctx; Closed; Fn; obs; natᵗ; nat̂; varᵗ; strmᵗ; ofᵉ;
+  emptyᵉ; mapᵉ; takeᵉ; mergeAllᵉ; input)
 open import Rx.Slots using (Slots; scripted)
 open import Rx.Evaluator using (Sched; EvalSt; root; rootWitness; subscribeE; sched-init; st-init; mergeAllᵒ; mergeAll-st)
 open import Rx.Evaluator.Domain using (subs-of; subs-empty; subs-map;
@@ -139,7 +140,8 @@ flat = mergeAllᵉ nothing (emptyᵉ {t = obs natᵗ})
 
 row-total-all :
   Confirms (subscribeAll⇓-total {e = flat} (rootWitness flat ins₀) mergeAllᵒ
-             (mergeAll-st {t = natᵗ} nothing 0 [] false) emptyᵉ (n≤1+n 1)
+             (mergeAll-st {t = natᵗ} nothing 0 [] false) emptyᵉ
+             (n≤1+n 1 , z≤n)
              (root {lo = 0}) 0 0 (sched-init flat ins₀) (st-init flat))
 row-total-all =
   sub-all refl (subs-empty refl)
@@ -209,7 +211,8 @@ row-total-drain =
 -- nor the spent script, nor either cold arm.
 row-total-input :
   Confirms (subscribeE⇓-input-total {e = src} (rootWitness src ins₁) zero
-             ≤-refl (root {lo = 1}) 0 0 (sched-init src ins₁) (st-init src))
+             (≤-refl , ≤-refl) (root {lo = 1}) 0 0 (sched-init src ins₁)
+             (st-init src))
 row-total-input = subs-hot-live (s≤s z≤n) refl refl
 
 ----------------------------------------------------------------------
@@ -217,9 +220,20 @@ row-total-input = subs-hot-live (s≤s z≤n) refl refl
 -- between them and the burst is list plumbing and is proven, so these
 -- are the only places left where a frame re-enters the subscribe cycle.
 --
--- TARGET: thruConsume⇓-total @319a79
+-- TARGET: thruConsume⇓-total @0eb219
 -- TARGET: innerReact⇓-total @4e00e5
 ----------------------------------------------------------------------
+
+-- AND THE CONSUME ROW STANDS AT A DEEPER PROGRAM THAN ITS SIBLINGS, FOR
+-- A REASON THAT IS ITSELF THE FINDING.  The premise the statement now
+-- carries asks the handed observable to be written strictly below the
+-- rank, and the rank a root builds is the program's own nesting — so at
+-- the flattener over an EMPTY inner the rank is nought and no value
+-- whatever can clear it.  The point therefore has to give the outer one
+-- level of its own, which costs nothing here because the arm under test
+-- never reads the program: what it reads is a node id.
+flat-deep : Closed Γ₀ natᵗ
+flat-deep = mergeAllᵉ nothing (ofᵉ (strmᵗ three ∷ []))
 
 -- DEGENERATE IN THE GUARD AND LOAD-BEARING ON THE DROP: the walk is
 -- entered at a node id nothing installed, which is the arm that
@@ -230,9 +244,9 @@ row-total-input = subs-hot-live (s≤s z≤n) refl refl
 -- operator — and the hop is exactly where this leaf's falsity is
 -- expected.
 row-total-consume :
-  Confirms (thruConsume⇓-total {e = flat} (rootWitness flat ins₀) mergeAllᵒ
-             0 (root {lo = 0}) 0 0 three (sched-init flat ins₀)
-             (st-init flat))
+  Confirms (thruConsume⇓-total {e = flat-deep} (rootWitness flat-deep ins₀)
+             mergeAllᵒ 0 (root {lo = 0}) 0 0 three (≤-refl ∷ᵃ []ᵃ)
+             (sched-init flat-deep ins₀) (st-init flat-deep))
 row-total-consume = consume-all-nil
 
 -- LOAD-BEARING ON THE HAND-BACK: an inner reaction whose burst did not
