@@ -35,12 +35,12 @@
 --   it.
 module Rx.Evaluator.Domain where
 
-open import Data.Bool using (Bool; true; false; if_then_else_)
+open import Data.Bool using (Bool; true; false; not; _∧_; if_then_else_)
 open import Data.Fin using (Fin; toℕ)
-open import Data.List using (List; []; _∷_; _++_; map)
+open import Data.List using (List; []; _∷_; _++_; map; null)
 open import Data.Bool.ListAction using (any)
-open import Data.Maybe using (Maybe; nothing)
-open import Data.Nat using (ℕ; zero; suc; _<_; _≤_; _≡ᵇ_)
+open import Data.Maybe using (Maybe; just; nothing)
+open import Data.Nat using (ℕ; zero; suc; pred; _<_; _≤_; _≡ᵇ_)
 open import Data.Product using (_×_; _,_)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (tt)
@@ -63,7 +63,8 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; NodeId;
   atSlot; atDyn; lowerFloor;
   map-f; scan-f; take-f; thru-outer;
   scan-st; take-st; mergeAll-st; switch-st; exhaust-st;
-  mergeAllᵒ; switchᵒ; exhaustᵒ)
+  mergeAllᵒ; switchᵒ; exhaustᵒ;
+  lookupNode; setNode; hasRoom; mergeAllBump; switchKill; aliveThroughᶠ)
 
 ------------------------------------------------------------------
 -- THE SUBSCRIBE CYCLE.  Twelve families, exactly the members of the
@@ -384,15 +385,177 @@ data subscribeInner⇓ {n} {Γ} {t} {e} where
         → subscribeInner⇓ op allNid κ id now o sched st
             (inst , vs , bs , done , sched′ , st′)
 
+-- FOUR TYPE-MISMATCH ARMS COLLAPSE INTO THE CATCH-ALL BESIDE THEM, AND
+-- THAT IS A MERGE RATHER THAN A DROP.  Each returns exactly what the
+-- wildcard directly below it returns, so relating them separately would
+-- need a disequality premise to tell two constructors apart that agree
+-- on their result.  The catch-alls carry no premise for the same
+-- reason, and it costs nothing: a premise-free constructor whose RESULT
+-- INDEX is fixed admits no run it did not already admit, and the only
+-- direction spent here builds a derivation at the machine's own result.
 data thruConsume⇓ {n} {Γ} {t} {e} where
+
+  consume-all-sub : ∀ {u lo nid} {κ : Path Γ lo u t} {id now}
+                      {o : Val Γ (obs u)} {sched₀ st₀} {lim act q od}
+                      {inst vs bs done sched₁ st₁}
+                  → lookupNode nid (EvalSt.nodes st₀)
+                      ≡ just (mergeAll-st {t = u} lim act q od)
+                  → hasRoom lim act ≡ true
+                  → subscribeInner⇓ mergeAllᵒ nid κ id now o sched₀ st₀
+                      (inst , vs , bs , done , sched₁ , st₁)
+                  → thruConsume⇓ mergeAllᵒ nid κ id now o sched₀ st₀
+                      ( vs , bs , sched₁
+                      , record st₁
+                          { nodes = mergeAllBump nid done (EvalSt.nodes st₁) } )
+
+  consume-all-enqueue : ∀ {u lo nid} {κ : Path Γ lo u t} {id now}
+                          {o : Val Γ (obs u)} {sched₀ st₀} {lim act q od}
+                      → lookupNode nid (EvalSt.nodes st₀)
+                          ≡ just (mergeAll-st {t = u} lim act q od)
+                      → hasRoom lim act ≡ false
+                      → thruConsume⇓ mergeAllᵒ nid κ id now o sched₀ st₀
+                          ( [] , [] , sched₀
+                          , record st₀
+                              { nodes = setNode nid
+                                  (mergeAll-st lim act (q ++ o ∷ []) od)
+                                  (EvalSt.nodes st₀) } )
+
+  consume-all-nil : ∀ {u lo nid} {κ : Path Γ lo u t} {id now}
+                      {o : Val Γ (obs u)} {sched₀ st₀}
+                  → thruConsume⇓ mergeAllᵒ nid κ id now o sched₀ st₀
+                      ([] , [] , sched₀ , st₀)
+
+  consume-switch-sub : ∀ {u lo nid} {κ : Path Γ lo u t} {id now}
+                         {o : Val Γ (obs u)} {sched₀ st₀} {cur od}
+                         {closes sched₁ st₁} {inst vs bs done sched₂ st₂}
+                     → lookupNode nid (EvalSt.nodes st₀) ≡ just (switch-st cur od)
+                     → switchKill cur sched₀ st₀ ≡ (closes , sched₁ , st₁)
+                     → subscribeInner⇓ switchᵒ nid κ id now o sched₁ st₁
+                         (inst , vs , bs , done , sched₂ , st₂)
+                     → thruConsume⇓ switchᵒ nid κ id now o sched₀ st₀
+                         ( vs , closes ++ bs , sched₂
+                         , record st₂
+                             { nodes = setNode nid
+                                 (switch-st (if done then nothing else just inst) od)
+                                 (EvalSt.nodes st₂) } )
+
+  consume-switch-nil : ∀ {u lo nid} {κ : Path Γ lo u t} {id now}
+                         {o : Val Γ (obs u)} {sched₀ st₀}
+                     → thruConsume⇓ switchᵒ nid κ id now o sched₀ st₀
+                         ([] , [] , sched₀ , st₀)
+
+  consume-exhaust-sub : ∀ {u lo nid} {κ : Path Γ lo u t} {id now}
+                          {o : Val Γ (obs u)} {sched₀ st₀} {od}
+                          {inst vs bs done sched₁ st₁}
+                      → lookupNode nid (EvalSt.nodes st₀)
+                          ≡ just (exhaust-st false od)
+                      → subscribeInner⇓ exhaustᵒ nid κ id now o sched₀ st₀
+                          (inst , vs , bs , done , sched₁ , st₁)
+                      → thruConsume⇓ exhaustᵒ nid κ id now o sched₀ st₀
+                          ( vs , bs , sched₁
+                          , record st₁
+                              { nodes = setNode nid (exhaust-st (not done) od)
+                                  (EvalSt.nodes st₁) } )
+
+  consume-exhaust-nil : ∀ {u lo nid} {κ : Path Γ lo u t} {id now}
+                          {o : Val Γ (obs u)} {sched₀ st₀}
+                      → thruConsume⇓ exhaustᵒ nid κ id now o sched₀ st₀
+                          ([] , [] , sched₀ , st₀)
 
 data thruWalk⇓ {n} {Γ} {t} {e} where
 
+  walk-nil : ∀ {u lo op nid} {κ : Path Γ lo u t} {id now} {sched₀ st₀}
+           → thruWalk⇓ op nid κ id now [] sched₀ st₀ ([] , [] , sched₀ , st₀)
+
+  walk-cons : ∀ {u lo op nid} {κ : Path Γ lo u t} {id now}
+                {o : Val Γ (obs u)} {os sched₀ st₀}
+                {vs bs sched₁ st₁} {vs′ bs′ sched₂ st₂}
+            → thruConsume⇓ op nid κ id now o sched₀ st₀ (vs , bs , sched₁ , st₁)
+            → thruWalk⇓ op nid κ id now os sched₁ st₁ (vs′ , bs′ , sched₂ , st₂)
+            → thruWalk⇓ op nid κ id now (o ∷ os) sched₀ st₀
+                (vs ++ vs′ , bs ++ bs′ , sched₂ , st₂)
+
 data mergeAllDrain⇓ {n} {Γ} {t} {e} where
+
+  drain-nil : ∀ {s lo allNid} {κ : Path Γ lo s t} {id now} {lim act sched₀ st₀}
+            → mergeAllDrain⇓ allNid κ id now lim act [] sched₀ st₀
+                ([] , [] , act , [] , sched₀ , st₀)
+
+  drain-no-room : ∀ {s lo allNid} {κ : Path Γ lo s t} {id now}
+                    {lim act} {o : Closed Γ s} {q sched₀ st₀}
+                → hasRoom lim act ≡ false
+                → mergeAllDrain⇓ allNid κ id now lim act (o ∷ q) sched₀ st₀
+                    ([] , [] , act , o ∷ q , sched₀ , st₀)
+
+  drain-room : ∀ {s lo allNid} {κ : Path Γ lo s t} {id now}
+                 {lim act} {o : Closed Γ s} {q sched₀ st₀}
+                 {inst vs bs done sched₁ st₁} {vs′ bs′ act′ q′ sched₂ st₂}
+             → hasRoom lim act ≡ true
+             → subscribeInner⇓ mergeAllᵒ allNid κ id now o sched₀ st₀
+                 (inst , vs , bs , done , sched₁ , st₁)
+             → mergeAllDrain⇓ allNid κ id now lim
+                 (if done then act else suc act) q sched₁ st₁
+                 (vs′ , bs′ , act′ , q′ , sched₂ , st₂)
+             → mergeAllDrain⇓ allNid κ id now lim act (o ∷ q) sched₀ st₀
+                 (vs ++ vs′ , bs ++ bs′ , act′ , q′ , sched₂ , st₂)
 
 data innerFinish⇓ {n} {Γ} {t} {e} where
 
+  finish-all-drain : ∀ {s lo allNid inst} {κ : Path Γ lo s t} {id now}
+                       {vals : List (Val Γ s)} {sched st} {lim act q od}
+                       {vs bs act′ q′ sched′ st′}
+                   → mergeAllDrain⇓ allNid κ id now lim (pred act) q sched st
+                       (vs , bs , act′ , q′ , sched′ , st′)
+                   → innerFinish⇓ mergeAllᵒ allNid inst κ id now vals sched st
+                       (just (mergeAll-st {t = s} lim act q od))
+                       ( vals ++ vs , bs , od ∧ (act′ ≡ᵇ 0) ∧ null q′ , sched′
+                       , record st′
+                           { nodes = setNode allNid (mergeAll-st lim act′ q′ od)
+                               (EvalSt.nodes st′) } )
+
+  finish-switch-clear : ∀ {s lo allNid inst} {κ : Path Γ lo s t} {id now}
+                          {vals : List (Val Γ s)} {sched st} {c od}
+                      → (c ≡ᵇ inst) ≡ true
+                      → innerFinish⇓ switchᵒ allNid inst κ id now vals sched st
+                          (just (switch-st (just c) od))
+                          ( vals , [] , od , sched
+                          , record st
+                              { nodes = setNode allNid (switch-st nothing od)
+                                  (EvalSt.nodes st) } )
+
+  finish-exhaust-clear : ∀ {s lo allNid inst} {κ : Path Γ lo s t} {id now}
+                           {vals : List (Val Γ s)} {sched st} {act od}
+                       → innerFinish⇓ exhaustᵒ allNid inst κ id now vals sched st
+                           (just (exhaust-st act od))
+                           ( vals , [] , od , sched
+                           , record st
+                               { nodes = setNode allNid (exhaust-st false od)
+                                   (EvalSt.nodes st) } )
+
+  finish-nil : ∀ {s lo op allNid inst} {κ : Path Γ lo s t} {id now}
+                 {vals : List (Val Γ s)} {sched st ns}
+             → innerFinish⇓ op allNid inst κ id now vals sched st ns
+                 (vals , [] , false , sched , st)
+
 data innerReact⇓ {n} {Γ} {t} {e} where
+
+  react-false : ∀ {s lo op allNid inst} {κ : Path Γ lo s t} {id now}
+                  {vals : List (Val Γ s)} {sched st}
+              → innerReact⇓ op allNid inst κ id now vals sched st false
+                  (vals , [] , false , sched , st)
+
+  react-alive : ∀ {s lo op allNid inst} {κ : Path Γ lo s t} {id now}
+                  {vals : List (Val Γ s)} {sched st}
+              → any (aliveThroughᶠ inst st) (EvalSt.registry st) ≡ true
+              → innerReact⇓ op allNid inst κ id now vals sched st true
+                  (vals , [] , false , sched , st)
+
+  react-dead : ∀ {s lo op allNid inst} {κ : Path Γ lo s t} {id now}
+                 {vals : List (Val Γ s)} {sched st r}
+             → any (aliveThroughᶠ inst st) (EvalSt.registry st) ≡ false
+             → innerFinish⇓ op allNid inst κ id now vals sched st
+                 (lookupNode allNid (EvalSt.nodes st)) r
+             → innerReact⇓ op allNid inst κ id now vals sched st true r
 
 data stepFrame⇓ {n} {Γ} {t} {e} where
 
