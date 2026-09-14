@@ -36,26 +36,29 @@
 -- in seconds.
 module Rx.Evaluator.Builder where
 
-open import Data.Bool using (false)
+open import Data.Bool using (Bool; false)
 open import Data.Fin using (Fin)
-open import Data.List using ([]; _++_)
-open import Data.Maybe using (nothing)
+open import Data.List using (List; []; _∷_; _++_)
+open import Data.Maybe using (nothing; just)
 open import Data.Nat using (zero; suc)
 open import Data.Nat.Properties using (≤-refl; m≤m⊔n)
-open import Data.Product using (∃; _,_; proj₁)
+open import Data.Product using (∃; _,_; proj₁; proj₂)
 open import Data.Vec using (lookup)
 open import Induction.WellFounded using (Acc; acc)
 open import Relation.Binary.PropositionalEquality using (refl)
+open import Relation.Nullary using (yes; no)
 
-open import Rx.Prim using (Fuel; Id; Tick)
-open import Rx.Exp using (Ctx; Closed; obs; unfoldμ; evalTm; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ;
+open import Rx.Prim using (Fuel; Id; Tick; InstEmit)
+open import Rx.Exp using (Ctx; Closed; Val; _≟ᵗ_; obs; unfoldμ; evalTm; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ;
   switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ)
 open import Rx.Slots using (Slots)
 open import Rx.Strat-Order using (Tri; _≺_)
-open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; AllOp; NodeState; Frame; root; _↠_; map-f; take-f; scan-f;
-  thru-outer; mergeAllᵒ; switchᵒ; exhaustᵒ; mergeAll-st; switch-st; exhaust-st; take-st;
-  scan-st; installNode; sched-init; st-init)
+open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; AllOp; NodeId; NodeState; Frame; root; _↠_; map-f; take-f; scan-f;
+  thru-outer; from-inner; mergeAllᵒ; switchᵒ; exhaustᵒ; mergeAll-st; switch-st; exhaust-st; take-st;
+  scan-st; installNode; lookupNode; splitEvents; sched-init; st-init)
 open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeAll⇓; pushBurst⇓;
+  stepFrame⇓; innerReact⇓; thruWalk⇓; push-nil; push-cons; step-map; step-scan;
+  step-scan-nil; step-take; step-from-inner; step-thru-outer;
   drain⇓; evaluate⇓; subs-of; subs-empty; subs-map; subs-take-zero;
   subs-take-suc; subs-scan; subs-merge-all; subs-switch-all; subs-exhaust-all;
   subs-μ; subs-defer; sub-all; eval-run)
@@ -85,28 +88,108 @@ AllRuns : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
 AllRuns {e = e} op ns b κ id now sched st =
   ∃ λ r → subscribeAll⇓ {e = e} op ns b κ id now sched st r
 
+StepRuns : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
+         → Id → Tick → Frame Γ s u → Path Γ lo u t
+         → List (Val Γ s) → Bool → Sched Γ → EvalSt e → Set
+StepRuns {e = e} id now fr κ vals fin sched st =
+  ∃ λ r → stepFrame⇓ {e = e} id now fr κ vals fin sched st r
+
+InnerRuns : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo}
+          → AllOp → NodeId → NodeId → Path Γ lo s t → Id → Tick
+          → List (Val Γ s) → Sched Γ → EvalSt e → Bool → Set
+InnerRuns {e = e} op allNid inst κ id now vals sched st fin =
+  ∃ λ r → innerReact⇓ {e = e} op allNid inst κ id now vals sched st fin r
+
+WalkRuns : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
+         → AllOp → NodeId → Path Γ lo u t → Id → Tick
+         → List (Val Γ (obs u)) → Sched Γ → EvalSt e → Set
+WalkRuns {e = e} op nid κ id now os sched st =
+  ∃ λ r → thruWalk⇓ {e = e} op nid κ id now os sched st r
+
 ------------------------------------------------------------------
 -- THE LEAVES, WHICH ARE WHAT MAKE THE ASSEMBLY CHECKABLE TODAY.
 ------------------------------------------------------------------
 
--- THE FRAME WALK, STILL A LEAF, AND IT IS THE LARGEST OF THEM.  Every
--- clause of the machine that steps a burst through a frame lands under
--- this one name, the inner subscribe among them — which is why the hop
--- clause, the one place the deleted door used to ask its question, is
--- not written here yet: its only consumer is inside this leaf, and a
--- proof handed to a postulate as its only use earns no reachability and
--- checks nothing.  It comes back in the commit that turns this into a
--- body.
+-- THE TWO FRAMES THAT RE-ENTER THE SUBSCRIBE CYCLE, AND THEY ARE THE
+-- ONLY TWO.  Four of the six frames a burst can meet are arithmetic on
+-- the values in hand — a template applied, an accumulator folded, a
+-- counter spent — and those are bodies below.  The remaining two hand
+-- their values to an observable and subscribe it: the outer walk, whose
+-- consume clause is where the deleted door used to ask its question,
+-- and the inner reaction, which drains a queue that can subscribe from
+-- it.  Both are leaves because the hop lives under them, and a hop
+-- clause written above a postulate that is its only consumer earns no
+-- reachability and checks nothing.
 --
 -- RECOVERY: `git show 0bfaccc:agda/src/Verify-Rank-Sufficient/Doorless.agda`
 --   holds `subscribeInner!`, which is that hop clause written out — four
 --   lines against the machine's, the `with obsDepthᵉ o <? r` and its dry
 --   arm deleted and the descent witness taken from the report instead.
 postulate
-  pushBurst! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo} {τ : Tri}
-    (ac : Acc _≺_ τ) (id : Id) (now : Tick) (fr : Frame Γ s u)
-    (κ : Path Γ lo u t) (bs : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) →
-    PushRuns {e = e} id now fr κ bs sched st
+  thruWalk! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo} {τ : Tri}
+    (ac : Acc _≺_ τ) (op : AllOp) (nid : NodeId) (κ : Path Γ lo u t)
+    (id : Id) (now : Tick) (os : List (Val Γ (obs u)))
+    (sched : Sched Γ) (st : EvalSt e) →
+    WalkRuns {e = e} op nid κ id now os sched st
+
+  innerReact! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo} {τ : Tri}
+    (ac : Acc _≺_ τ) (op : AllOp) (allNid inst : NodeId)
+    (κ : Path Γ lo s t) (id : Id) (now : Tick) (vals : List (Val Γ s))
+    (sched : Sched Γ) (st : EvalSt e) (fin : Bool) →
+    InnerRuns {e = e} op allNid inst κ id now vals sched st fin
+
+------------------------------------------------------------------
+-- THE FRAME STEP AND THE BURST PUSH, WHICH ARE NOW BODIES.
+------------------------------------------------------------------
+
+-- THE SCAN CLAUSE IS THE ONLY ONE THAT LOOKS AT THE STORE, AND THE
+-- RELATION SAYS WHAT TO DO WHEN THE READING DISAGREES.  A node table
+-- carries its accumulator's type existentially, so the frame's own `u`
+-- has to be decided against what is installed; every answer but `yes`
+-- takes the nil clause, which is the same collapse the machine reaches
+-- by its `dispatch`.  Nothing is owed here — the relation offers a
+-- constructor at every reading, so the builder chooses rather than
+-- having to prove a branch unreachable.
+stepFrame! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo} {τ : Tri}
+  (ac : Acc _≺_ τ) (id : Id) (now : Tick) (fr : Frame Γ s u)
+  (κ : Path Γ lo u t) (vals : List (Val Γ s)) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) →
+  StepRuns {e = e} id now fr κ vals fin sched st
+
+stepFrame! ac id now (map-f fn) κ vals fin sched st = _ , step-map
+stepFrame! ac id now (take-f nid) κ vals fin sched st = _ , step-take
+
+stepFrame! {u = u} ac id now (scan-f fn nid) κ vals fin sched st
+  with lookupNode nid (EvalSt.nodes st) in eq
+... | nothing                    = _ , step-scan-nil
+... | just (take-st _)           = _ , step-scan-nil
+... | just (mergeAll-st _ _ _ _) = _ , step-scan-nil
+... | just (switch-st _ _)       = _ , step-scan-nil
+... | just (exhaust-st _ _)      = _ , step-scan-nil
+... | just (scan-st {w} a)       with w ≟ᵗ u
+...   | no  _    = _ , step-scan-nil
+...   | yes refl = _ , step-scan eq refl
+
+stepFrame! ac id now (from-inner op allNid inst) κ vals fin sched st =
+  let (r , ir) = innerReact! ac op allNid inst κ id now vals sched st fin
+  in r , step-from-inner ir
+
+stepFrame! ac id now (thru-outer op nid) κ vals fin sched st =
+  let ((vs , bs , sched′ , st′) , w) = thruWalk! ac op nid κ id now vals sched st
+  in _ , step-thru-outer w
+
+pushBurst! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo} {τ : Tri}
+  (ac : Acc _≺_ τ) (id : Id) (now : Tick) (fr : Frame Γ s u)
+  (κ : Path Γ lo u t) (bs : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) →
+  PushRuns {e = e} id now fr κ bs sched st
+
+pushBurst! ac id now fr κ []         sched st = _ , push-nil
+pushBurst! ac id now fr κ (em ∷ ems) sched st =
+  let sp = splitEvents (InstEmit.events em)
+      ((vals′ , evs , fin′ , sched₁ , st₁) , sf) =
+        stepFrame! ac id now fr κ (proj₁ sp) (proj₂ (proj₂ sp)) sched st
+      (_ , pb) = pushBurst! ac id now fr κ ems sched₁ st₁
+  in _ , push-cons refl sf pb
 
 -- AND THE TWO ENDS OF THE RUN.  An input's subscribe reads the slot
 -- table and branches on what is registered there, and the drain spends

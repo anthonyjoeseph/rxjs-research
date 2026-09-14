@@ -231,16 +231,16 @@ cannot compute — and the other two leaves carry no arithmetic at all.
 
 ### Big picture tier roadmap
 
-- **CHIP `pushBurst!` DOWN TO BODIES, WHICH IS THE WHOLE OF WHAT THE CUTOVER
-  NOW WAITS ON.** The knot has left `Rx.Evaluator` and `Rx.Evaluator.Builder`
-  stands below the machine over three leaves — every operator clause is a real
-  body and the μ peel spends `μ-edge` outright, so what is left of the recursion
-  is the frame walk. It swallows the hop, which is why the hop clause is not
-  written yet: its only consumer sits inside the postulate, and a proof handed
-  to one earns no reachability. Split it by frame, and the hop last, since it
-  alone moves τ. Nothing is re-pointed until all three are bodies — a projection
-  through a postulate computes at no input, and the bug cache, the oracle and
-  every probe's `refl` are what would notice.
+- **CHIP THE TWO RE-ENTERING FRAMES DOWN TO BODIES, WHICH IS THE WHOLE OF WHAT
+  THE CUTOVER NOW WAITS ON.** The burst push and the frame step are bodies, so
+  the four arithmetic frames are spent and what is left of the recursion is
+  exactly the two that hand a value to an observable: `thruWalk!` and
+  `innerReact!`. The hop sits under the first and is written last, since it
+  alone moves τ, and it cannot be written above its own consumer — a proof
+  handed to a postulate as its only use earns no reachability. Nothing is
+  re-pointed until every leaf is a body: a projection through a postulate
+  computes at no input, and the bug cache, the oracle and every probe's `refl`
+  are what would notice.
 
 - **PRICE THE TEMPLATE, NOT THE INPUT: STATE THE SUBSTITUTION LEMMA (Anthony).**
   Six refutations stand at the door and every one of them refutes a price stated
@@ -331,7 +331,7 @@ cannot compute — and the other two leaves carry no arithmetic at all.
 
 - **`thruConsume⇓-total`** (Verify-Rank-Sufficient) — FALSITY,
   `REFUTED, PROBED`: the one clause taking a value and subscribing it,
-  customer of both shelves. Builder half `pushBurst!`. Open: the enqueue arm,
+  customer of both shelves. Builders `thruWalk!`, `innerReact!`. Open: the enqueue arm,
   two operators on another node state, and the hop `subscribeInner⇓-total`.
   Substitution: `obsDepth-eval-open`, `obsDepth-wkTm`, `applyFn-strict`,
   `syncSize-applyFn`, `eval-case`, `eval-if`, `data-of`, `dataSize`,

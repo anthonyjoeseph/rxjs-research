@@ -46,19 +46,12 @@ module Probed.Main where
 -- both belong to the tree and a tree with nothing open still owes them.
 open import Probed.Apparatus using (Confirms; Separates)
 
--- THE ONE OPEN GENERATION: the two halves the run's dry-freedom now
--- splits into, each instantiated at a derivation built by hand so that
--- the RELATION's output index is pinned against the evaluator's own
--- helpers rather than assumed to mirror them.
-open import Probed.Nodry-Halves using (row-of; row-empty; row-take-zero;
-  row-map; row-drain)
-
--- AND THE TOTALITY ROWS, which are the same derivations read the other
--- way round: the triple is no longer chosen by unification but taken
--- from the evaluator's own result, so a constructor relating the wrong
--- stream is a type error here and is invisible above.  Both stand at a
--- cycle the subscribe induction did not close — the flatteners'
--- wrapper, the slot subscribe, and the drain.
+-- THE TOTALITY ROWS: derivations built by hand whose triple is not
+-- chosen by unification but taken from the evaluator's own result, so a
+-- constructor relating the wrong stream is a type error here and is
+-- invisible above.  Each stands at a cycle the subscribe induction did
+-- not close — the flatteners' wrapper, the slot subscribe, the drain,
+-- and the two clauses a frame re-enters the subscribe cycle through.
 open import Probed.Nodry-Halves using (row-total-all;
   row-total-input; row-total-drain; row-total-consume; row-total-react)
 
