@@ -68,7 +68,8 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; oneShotBurst
   mergeAll-st; switch-st; exhaust-st; takeVals; takeDispatch; scanVals; thruWrap;
   map-f; scan-f; take-f; from-inner; thru-outer; lookupNode)
 open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeAll⇓; pushBurst⇓;
-  subscribeSharedSlot⇓; stepFrame⇓; push-nil; push-cons;
+  subscribeSharedSlot⇓; sharedConnect⇓; slot-spent; slot-join; slot-connect;
+  stepFrame⇓; push-nil; push-cons;
   subs-floor; subs-shared; subs-hot-done; subs-hot-live; subs-cold-sync;
   subs-cold-async; subs-of; subs-empty; subs-map; subs-take-zero;
   subs-take-suc; subs-scan; subs-merge-all; subs-switch-all;
@@ -485,29 +486,55 @@ push-carries {u = u} {τ = τ} η fok (okem ∷ᵃ okrest)
                   (fin-events η fin′)))
   ∷ᵃ push-carries η fok okrest rest
 
--- AND THE ONE FAMILY THIS MODULE DOES NOT WALK: the shared slot, whose
--- connect re-enters the subscribe at the SLOT'S own reading rather than
--- at the caller's, and so needs the two schedules' tables related where
--- this walk carries only the one the caller fixed.  That is the same
--- relating the queued observable needs, which is why the arm is a leaf
--- rather than a clause and why it is where the record's field is owed.
---
--- REFUTED: `Refuted.Carried-Derived` — the reading with no environment
---   at all, at that run.  It is this arm the witness stands at: a
---   reference is one symbol standing for a definition of any nesting, so
---   a reading that prices the SYMBOL promises less than the connect
---   delivers.
+-- AND THE SHARED SLOT, WHICH IS A WALK AFTER ALL — OVER THREE
+-- CONSTRUCTORS OF WHICH TWO CARRY NOTHING.  A slot the run has already
+-- spent hands back the spent burst and a slot joining something already
+-- live hands back one init, so both close by the bookkeeping lemmas
+-- above at every triple.  What is left is the CONNECT, which is the only
+-- arm that re-enters the subscribe, and so the only one where the two
+-- readings can differ.
 postulate
-  slot-carries : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo} {τ : Tri}
+  -- THE CONNECT, WHERE THE SLOT'S OWN READING MEETS THE CALLER'S.  The
+  -- fan-out re-enters at `slotDepth sl i` rather than at the rank the
+  -- caller fixed, so the burst comes back reported against a triple this
+  -- statement's premise does not mention.  `Rx.Evaluator.Doorless.
+  -- connect-entry` already proves the re-entry invariant holds at the
+  -- slot's own triple, and `depᵉ (slotDepth sl) (input i)` IS
+  -- `slotDepth sl i`, so the caller's premise already dominates that
+  -- rank — what is missing between them is that `BurstOK` may be WIDENED
+  -- along that domination, which nothing in the tree yet states.  That
+  -- widening is the same relating the queued observable needs, which is
+  -- why this arm is where the record's field is owed.
+  --
+  -- REFUTED: `Refuted.Carried-Derived` — the reading with no environment
+  --   at all, at that run.  It is this arm the witness stands at: a
+  --   reference is one symbol standing for a definition of any nesting, so
+  --   a reading that prices the SYMBOL promises less than the connect
+  --   delivers.
+  connect-carries : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo} {τ : Tri}
     (sl : Slots Γ) {i : Fin n} {d : Closed Γ (lookup Γ i)}
     {κ : Path Γ lo (lookup Γ i) t} {below : toℕ i < lo}
     {id : Id} {now : Tick}
     {sched : Sched Γ} {st : EvalSt e} {burst : Stream Γ (lookup Γ i)}
     {sched′ : Sched Γ} {st′ : EvalSt e} →
     EntryOK {Γ = Γ} (slotDepth sl) (input i) τ →
-    subscribeSharedSlot⇓ {e = e} i d κ below id now sched st
+    sharedConnect⇓ {e = e} i d κ below id now sched st
       (burst , sched′ , st′) →
     BurstOK (slotDepth sl) burst τ
+
+slot-carries : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo} {τ : Tri}
+  (sl : Slots Γ) {i : Fin n} {d : Closed Γ (lookup Γ i)}
+  {κ : Path Γ lo (lookup Γ i) t} {below : toℕ i < lo}
+  {id : Id} {now : Tick}
+  {sched : Sched Γ} {st : EvalSt e} {burst : Stream Γ (lookup Γ i)}
+  {sched′ : Sched Γ} {st′ : EvalSt e} →
+  EntryOK {Γ = Γ} (slotDepth sl) (input i) τ →
+  subscribeSharedSlot⇓ {e = e} i d κ below id now sched st
+    (burst , sched′ , st′) →
+  BurstOK (slotDepth sl) burst τ
+slot-carries {τ = τ} sl ok (slot-spent _)       = spent-ok (slotDepth sl) τ _ _
+slot-carries {τ = τ} sl ok (slot-join _ _)      = init-ok (slotDepth sl) τ _ _
+slot-carries         sl ok (slot-connect _ _ c) = connect-carries sl ok c
 
 ------------------------------------------------------------------
 -- THE WALK.

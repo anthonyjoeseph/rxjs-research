@@ -232,12 +232,12 @@ first match, which is why `bug-cache` is off the gate for the duration and
   POINTING.** Walking `burst-carries` as a body settled which of its arms carry
   content: the bookkeeping bursts hold no value at all and close by
   construction, `all-carries` closed as a body over the one constructor its
-  relation has, and what is left is `slot-carries` — the arm that follows the
-  run out of the store, where the burst comes back at the slot's own reading
-  rather than the caller's. That is the site `mergeAllDrain!` reads, so its
-  answer is a field rather than a premise, obliging every producer and cascading
-  through every consumer. The leg is the field and its producers; whether it
-  suffices for the queue is what it settles.
+  relation has, and `slot-carries` walked too — two of its three constructors
+  are bookkeeping. What is left is `connect-carries`, the arm that follows the
+  run out of the store. Its premise already dominates the slot's rank, since
+  `depᵉ (slotDepth sl) (input i)` IS `slotDepth sl i`; what nothing states is
+  that `BurstOK` widens along that domination. The leg is that widening and the
+  field it needs; whether it suffices for the queue is what it settles.
 
 - **THE TWO ENDS OF THE RUN, WHICH IS WHAT MAKES A ROW REDUCE.** `drain!` is
   fuel induction over the schedule and carries no guard at all; `mergeAllDrain!`
@@ -277,14 +277,14 @@ first match, which is why `bug-cache` is off the gate for the duration and
   splits a burst emit by emit — but a queued observable carries no burst at all.
   Every attempt to say it over the TERM has been refuted, which is what points
   the answer at the invariant record; nothing has yet written the field.
-  relevant: `mergeAllDrain!`, `slot-carries`
+  relevant: `mergeAllDrain!`, `connect-carries`
 
 ### The ledger
 
-- **`slot-carries`** (Rx/Evaluator/Burst-Report) — FALSITY, `REFUTED`: the one
-  arm of the burst report that leaves this walk — the share connect, which
-  re-enters at the SLOT's own reading and so needs the two tables related where
-  the walk carries only the caller's. Where the field on the record is owed.
+- **`connect-carries`** (Rx/Evaluator/Burst-Report) — FALSITY, `REFUTED`: the
+  one arm of the burst report that re-enters the subscribe. The caller's premise
+  already dominates the slot's rank; what is missing between them is that
+  `BurstOK` may be WIDENED along that domination. Where the field is owed.
 
 - **`map-open`** (Rx/Evaluator/Burst-Report) — FALSITY, `REFUTED, RECOVERY`:
   what a template writes at a payload that is NOT data. The reading JOINS where
