@@ -156,6 +156,16 @@ postulate
   -- stated separately because the arm that spends it is the only one
   -- that needs a value rather than a subscription.
   --
+  -- REFUTED: `Refuted.Red-Env-Too-Strong` -- not as false, but as too
+  --   strong to be a leaf.  Reflection sends every runtime value into
+  --   a CLOSED term, whose environment hypothesis is trivial, so this
+  --   hands back the candidate at every value of every type and the
+  --   body's whole induction is redundant given it.  The leak is one
+  --   constructor: the term language embeds an arbitrary expression at
+  --   observable type, so "closed term" buys no smallness.  The repair
+  --   is a restatement recursing on the TERM, where that constructor
+  --   appeals to the expression induction under the guarded size.
+  --
   -- PROBED: `Probed.Reducible-Arms` at an observable-typed term, where
   --   the claim IS an expression's own reducibility and the body
   --   delivers it; at the same claim under a ONE-ENTRY environment,
@@ -215,20 +225,35 @@ postulate
   --   (`red-env` at two entries, the old accumulator and the arriving
   --   value, which the push already carries).  What has no home is the
   --   CARRIER between them, and three candidates are structurally
-  --   blocked.  A FIELD on the state record cannot be written: the
-  --   candidate is defined above that record and cannot move down,
-  --   since its observable arm mentions the subscription relation.  A
-  --   PRECONDITION on the candidate's own observable arm is mutual and
-  --   does not decrease: the arm recurses on the element type, while
-  --   the predicate over a store reaches the candidate at whatever
-  --   type a node happens to hold, which is unrelated.  And a
+  --   blocked -- by ONE obstruction wearing three faces, which is
+  --   worth saying because the first face reads as a module-order
+  --   accident and is not one.  A FIELD on the state record closes a
+  --   definitional cycle rather than an import cycle: the candidate's
+  --   observable arm is indexed by the subscription relation, which is
+  --   itself indexed by the state record, so a field of that record
+  --   naming the candidate is circular however the modules are cut.  A
+  --   PRECONDITION on the candidate's own observable arm is the same
+  --   cycle stated directly, and it does not decrease: the arm
+  --   recurses on the element type, while a predicate over a store
+  --   reaches the candidate at whatever type a node happens to hold,
+  --   which is unrelated to it.  And a
   --   HYPOTHESIS on this statement is laundering, since the
   --   unconditional form is not refuted -- every closed expression is
   --   reducible once the theorem lands, so there is no adversarial
-  --   store to point at.  What is left to price is a SYNTACTIC
-  --   invariant, one that says a stored value came from a term of the
-  --   run rather than saying it is reducible, so that the candidate
-  --   mentions it without recursing into itself.
+  --   store to point at.  Parameterising the state record over an
+  --   abstract node predicate is that same cycle DEFERRED: the
+  --   instantiation ties the knot, and the executable face pays a
+  --   threaded parameter it only ever meets at the trivial predicate.
+  --   And the fourth candidate, a SYNTACTIC invariant saying a stored
+  --   value is the denotation of a closed term, is VACUOUS: reflection
+  --   is total, so every value is one and the pairing carries no
+  --   information.  That vacuity is not a detail about this statement
+  --   -- it is the environment leaf being too strong, refuted below,
+  --   and until that leaf is restated no carrier decision here means
+  --   anything, since the leaf already hands back what a carrier would
+  --   deliver.
+  --
+  -- REFUTED: `Refuted.Red-Env-Too-Strong`
   --
   -- PROBED: `Probed.Reducible-Arms` at an accumulator of OBSERVABLE
   --   type folded by a projection, so the value that leaves the frame

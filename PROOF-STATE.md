@@ -233,16 +233,16 @@ deferred beside it.
 
 ### Big picture tier roadmap
 
-- **DECIDE WHAT THE STORE OWES THE CANDIDATE, BEFORE GRINDING ANY OF THE FOUR
-  STATEFUL FRAMES.** Each of `red-scan`, `red-take`, `red-from-inner` and
-  `red-thru` READS a node this face installed
-  earlier, and `Red` quantifies over every state with no precondition — strong
-  where it produces, silent where it consumes. So the fact each needs is in no
-  hypothesis and cannot be put in one without laundering the row. The census
-  says the invariant is small — an `All` over an assoc list, with three of five
-  node constructors holding no value. But it cannot be a FIELD: `Red` sits
-  above `EvalSt` and cannot move down. Decide what carries it instead, and
-  price the mergeAll dequeue. Four grinds hang off the answer.
+- **RESTATE THE ENVIRONMENT LEAF, WHICH IS THE THEOREM AND NOT A LEAF.**
+  `red-env` proves the candidate at every value of every type — machine
+  witness in `Refuted.Red-Env-Too-Strong` — so the body's induction is
+  redundant given it and the five statements beside it are gaps smaller than
+  a gap. The leak is one constructor: the term language embeds an arbitrary
+  expression at observable type, and reflection is total, so a CLOSED term
+  buys no smallness and its environment hypothesis is trivial. Restate it
+  recursing on the TERM, with that constructor appealing to the expression
+  induction under the guarded size. Nothing under it is worth grinding first,
+  and no carrier decision for the store means anything until it lands.
 
 - **THEN RUN A SELF-REFERENTIAL μ, IN THE CORPUS RATHER THAN IN A PROBE.** The
   peel is now paid for by a size the unfolding does not move, and what funds that
@@ -279,9 +279,10 @@ deferred beside it.
   `DEAD ROUTE, PROBED`: a share's slot is reducible. Its def is drawn from the
   table rather than the term, so no descent this module can see reaches it.
 
-- **`red-scan`** (Rx/Evaluator/Reducible) — FALSITY, `DEAD ROUTE, PROBED`: a
-  scan's accumulator is read back out of the node this face installed, and the
-  candidate carries no claim about what a node holds.
+- **`red-scan`** (Rx/Evaluator/Reducible) — FALSITY,
+  `REFUTED, DEAD ROUTE, PROBED`: a scan's accumulator is read back out of the
+  node this face installed, and the candidate carries no claim about what a
+  node holds.
 
 - **`red-take`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`: the same gap
   plus a truncation, which is where a burst can lose the value a satisfaction
@@ -295,8 +296,8 @@ deferred beside it.
   walk. Inhabited at every operator's reading of an EMPTY node; a node already
   holding something is unreached.
 
-- **`red-env`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`: every term's
-  value is reducible under a reducible environment. Mutual with the body
+- **`red-env`** (Rx/Evaluator/Reducible) — FALSITY, `REFUTED, PROBED`: every
+  term's value is reducible under a reducible environment. Mutual with the body
   through the expression embedding, so the route is known and nothing has
   walked it.
 
