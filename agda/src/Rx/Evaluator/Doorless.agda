@@ -437,6 +437,20 @@ connect-entry sl i eq = ≤-refl , ≤-reflexive (sym (slotDepth-fix sl i eq))
 -- the join is taken in ONE currency, which is the thing the reading
 -- could never do, since a nesting and a reading never met.
 --
+-- AND THE THIRD ARGUMENT IS WHERE A LENGTH RESERVATION WOULD GO, WHICH
+-- IS WORTH SAYING WHILE NOTHING SUPPLIES ONE.  It joins into the same
+-- component the hop is dropped in, and every caller passes nought, so
+-- the parameter is presently slack rather than a quantity.  The fold's
+-- leaf asks for exactly such a reservation while carrying no premise
+-- that relates it to a burst, and the frame's rank is seeded from the
+-- values in hand, where a count is free to read — so the two ends of
+-- the repair already exist and what is unsettled is the SIZE.  It is
+-- not the BUDGET the section below kills: a budget had to dominate
+-- every later emission, while a reservation re-seeded at each frame
+-- step covers one burst, and the run multiplies only across the steps
+-- it is re-seeded at.
+-- REFUTED: `Refuted.Scan-Length` — the leaf that would spend it, at a
+--   burst of five plain numbers
 -- DEAD ROUTE: seeding the component off SYNTAX AS A BUDGET — a power of
 --   two in the program's size plus the slot telescope's.  A value
 --   deepens on the way OUT, the frames above a flattener re-wrap what
