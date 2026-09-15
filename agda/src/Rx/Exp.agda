@@ -334,9 +334,6 @@ _⊟_ : ∀ {A : Set} (xs : List A) {x : A} → x ∈ xs → List A
 ⊟-++ʳ {Δᵍ = []}     x = refl
 ⊟-++ʳ {Δᵍ = g ∷ _}  x = cong (g ∷_) (⊟-++ʳ x)
 
-wkExp : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → Exp Γ [] [] [] t → Exp Γ Δᵍ Δ Θ t
-wkExp = renExp (λ ()) (λ ()) (λ ())
-
 -- compare two positions: inj₁ ⟺ the same position (types coincide);
 -- inj₂ ⟺ y sits at this position once x is removed
 compare∈ : ∀ {A : Set} {t u : A} {xs} (x : t ∈ xs) (y : u ∈ xs)
@@ -349,84 +346,96 @@ compare∈ (there x)   (there y)   with compare∈ x y
 ... | inj₂ y′ = inj₂ (there y′)
 
 mutual
-  elimGExp : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δᵍ)
-           → Exp Γ [] [] [] t → Exp Γ Δᵍ Δ Θ u → Exp Γ (Δᵍ ⊟ x) Δ Θ u
-  elimGExp x cl (input i)      = input i
-  elimGExp x cl (ofᵉ ts)       = ofᵉ (elimGTms x cl ts)
-  elimGExp x cl emptyᵉ         = emptyᵉ
-  elimGExp x cl (mapᵉ f e)     = mapᵉ (elimGTm x cl f) (elimGExp x cl e)
-  elimGExp x cl (takeᵉ n e)    = takeᵉ (elimGTm x cl n) (elimGExp x cl e)
-  elimGExp x cl (scanᵉ f i e)  = scanᵉ (elimGTm x cl f) (elimGTm x cl i) (elimGExp x cl e)
-  elimGExp x cl (mergeAllᵉ lim e) = mergeAllᵉ lim (elimGExp x cl e)
-  elimGExp x cl (switchAllᵉ e) = switchAllᵉ (elimGExp x cl e)
-  elimGExp x cl (exhaustAllᵉ e) = exhaustAllᵉ (elimGExp x cl e)
-  elimGExp x cl (μᵉ e)         = μᵉ (elimGExp (there x) cl e)
-  elimGExp x cl (varᵉ y)       = varᵉ y
-  elimGExp x cl (deferᵉ e)     =
-    deferᵉ (subst (λ ζ → Exp _ [] ζ _ _) (⊟-++ˡ x) (elimDExp (∈-++⁺ˡ x) cl e))
+  elimGExp : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub u t} (Θloc : List Ty) (x : t ∈ Δᵍ)
+           → Exp Γ [] [] Θsub t → Exp Γ Δᵍ Δ (Θloc ++ Θsub) u
+           → Exp Γ (Δᵍ ⊟ x) Δ (Θloc ++ Θsub) u
+  elimGExp Θl x cl (input i)      = input i
+  elimGExp Θl x cl (ofᵉ ts)       = ofᵉ (elimGTms Θl x cl ts)
+  elimGExp Θl x cl emptyᵉ         = emptyᵉ
+  elimGExp Θl x cl (mapᵉ f e)     = mapᵉ (elimGTm (_ ∷ Θl) x cl f) (elimGExp Θl x cl e)
+  elimGExp Θl x cl (takeᵉ n e)    = takeᵉ (elimGTm Θl x cl n) (elimGExp Θl x cl e)
+  elimGExp Θl x cl (scanᵉ f i e)  =
+    scanᵉ (elimGTm (_ ∷ Θl) x cl f) (elimGTm Θl x cl i) (elimGExp Θl x cl e)
+  elimGExp Θl x cl (mergeAllᵉ lim e) = mergeAllᵉ lim (elimGExp Θl x cl e)
+  elimGExp Θl x cl (switchAllᵉ e) = switchAllᵉ (elimGExp Θl x cl e)
+  elimGExp Θl x cl (exhaustAllᵉ e) = exhaustAllᵉ (elimGExp Θl x cl e)
+  elimGExp Θl x cl (μᵉ e)         = μᵉ (elimGExp Θl (there x) cl e)
+  elimGExp Θl x cl (varᵉ y)       = varᵉ y
+  elimGExp Θl x cl (deferᵉ e)     =
+    deferᵉ (subst (λ ζ → Exp _ [] ζ _ _) (⊟-++ˡ x) (elimDExp Θl (∈-++⁺ˡ x) cl e))
 
-  elimGTm : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δᵍ)
-          → Exp Γ [] [] [] t → Tm Γ Δᵍ Δ Θ u → Tm Γ (Δᵍ ⊟ x) Δ Θ u
-  elimGTm x cl (varᵗ y)     = varᵗ y
-  elimGTm x cl unit̂         = unit̂
-  elimGTm x cl (bool̂ b)     = bool̂ b
-  elimGTm x cl (nat̂ n)      = nat̂ n
-  elimGTm x cl (pairᵗ a b)  = pairᵗ (elimGTm x cl a) (elimGTm x cl b)
-  elimGTm x cl (fstᵗ p)     = fstᵗ (elimGTm x cl p)
-  elimGTm x cl (sndᵗ p)     = sndᵗ (elimGTm x cl p)
-  elimGTm x cl (inlᵗ a)     = inlᵗ (elimGTm x cl a)
-  elimGTm x cl (inrᵗ a)     = inrᵗ (elimGTm x cl a)
-  elimGTm x cl (caseᵗ s l r) = caseᵗ (elimGTm x cl s) (elimGTm x cl l) (elimGTm x cl r)
-  elimGTm x cl (ifᵗ c a b)  = ifᵗ (elimGTm x cl c) (elimGTm x cl a) (elimGTm x cl b)
-  elimGTm x cl (primᵗ op a) = primᵗ op (elimGTm x cl a)
-  elimGTm x cl (strmᵗ e)    = strmᵗ (elimGExp x cl e)
+  elimGTm : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub u t} (Θloc : List Ty) (x : t ∈ Δᵍ)
+          → Exp Γ [] [] Θsub t → Tm Γ Δᵍ Δ (Θloc ++ Θsub) u
+          → Tm Γ (Δᵍ ⊟ x) Δ (Θloc ++ Θsub) u
+  elimGTm Θl x cl (varᵗ y)     = varᵗ y
+  elimGTm Θl x cl unit̂         = unit̂
+  elimGTm Θl x cl (bool̂ b)     = bool̂ b
+  elimGTm Θl x cl (nat̂ n)      = nat̂ n
+  elimGTm Θl x cl (pairᵗ a b)  = pairᵗ (elimGTm Θl x cl a) (elimGTm Θl x cl b)
+  elimGTm Θl x cl (fstᵗ p)     = fstᵗ (elimGTm Θl x cl p)
+  elimGTm Θl x cl (sndᵗ p)     = sndᵗ (elimGTm Θl x cl p)
+  elimGTm Θl x cl (inlᵗ a)     = inlᵗ (elimGTm Θl x cl a)
+  elimGTm Θl x cl (inrᵗ a)     = inrᵗ (elimGTm Θl x cl a)
+  elimGTm Θl x cl (caseᵗ s l r) =
+    caseᵗ (elimGTm Θl x cl s) (elimGTm (_ ∷ Θl) x cl l) (elimGTm (_ ∷ Θl) x cl r)
+  elimGTm Θl x cl (ifᵗ c a b)  =
+    ifᵗ (elimGTm Θl x cl c) (elimGTm Θl x cl a) (elimGTm Θl x cl b)
+  elimGTm Θl x cl (primᵗ op a) = primᵗ op (elimGTm Θl x cl a)
+  elimGTm Θl x cl (strmᵗ e)    = strmᵗ (elimGExp Θl x cl e)
 
-  elimGTms : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δᵍ)
-           → Exp Γ [] [] [] t → List (Tm Γ Δᵍ Δ Θ u) → List (Tm Γ (Δᵍ ⊟ x) Δ Θ u)
-  elimGTms x cl []       = []
-  elimGTms x cl (y ∷ ys) = elimGTm x cl y ∷ elimGTms x cl ys
+  elimGTms : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub u t} (Θloc : List Ty) (x : t ∈ Δᵍ)
+           → Exp Γ [] [] Θsub t → List (Tm Γ Δᵍ Δ (Θloc ++ Θsub) u)
+           → List (Tm Γ (Δᵍ ⊟ x) Δ (Θloc ++ Θsub) u)
+  elimGTms Θl x cl []       = []
+  elimGTms Θl x cl (y ∷ ys) = elimGTm Θl x cl y ∷ elimGTms Θl x cl ys
 
-  elimDExp : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δ)
-           → Exp Γ [] [] [] t → Exp Γ Δᵍ Δ Θ u → Exp Γ Δᵍ (Δ ⊟ x) Θ u
-  elimDExp x cl (input i)      = input i
-  elimDExp x cl (ofᵉ ts)       = ofᵉ (elimDTms x cl ts)
-  elimDExp x cl emptyᵉ         = emptyᵉ
-  elimDExp x cl (mapᵉ f e)     = mapᵉ (elimDTm x cl f) (elimDExp x cl e)
-  elimDExp x cl (takeᵉ n e)    = takeᵉ (elimDTm x cl n) (elimDExp x cl e)
-  elimDExp x cl (scanᵉ f i e)  = scanᵉ (elimDTm x cl f) (elimDTm x cl i) (elimDExp x cl e)
-  elimDExp x cl (mergeAllᵉ lim e) = mergeAllᵉ lim (elimDExp x cl e)
-  elimDExp x cl (switchAllᵉ e) = switchAllᵉ (elimDExp x cl e)
-  elimDExp x cl (exhaustAllᵉ e) = exhaustAllᵉ (elimDExp x cl e)
-  elimDExp x cl (μᵉ e)         = μᵉ (elimDExp x cl e)
-  elimDExp x cl (varᵉ y)       with compare∈ x y
-  ... | inj₁ refl = wkExp cl
+  elimDExp : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub u t} (Θloc : List Ty) (x : t ∈ Δ)
+           → Exp Γ [] [] Θsub t → Exp Γ Δᵍ Δ (Θloc ++ Θsub) u
+           → Exp Γ Δᵍ (Δ ⊟ x) (Θloc ++ Θsub) u
+  elimDExp Θl x cl (input i)      = input i
+  elimDExp Θl x cl (ofᵉ ts)       = ofᵉ (elimDTms Θl x cl ts)
+  elimDExp Θl x cl emptyᵉ         = emptyᵉ
+  elimDExp Θl x cl (mapᵉ f e)     = mapᵉ (elimDTm (_ ∷ Θl) x cl f) (elimDExp Θl x cl e)
+  elimDExp Θl x cl (takeᵉ n e)    = takeᵉ (elimDTm Θl x cl n) (elimDExp Θl x cl e)
+  elimDExp Θl x cl (scanᵉ f i e)  =
+    scanᵉ (elimDTm (_ ∷ Θl) x cl f) (elimDTm Θl x cl i) (elimDExp Θl x cl e)
+  elimDExp Θl x cl (mergeAllᵉ lim e) = mergeAllᵉ lim (elimDExp Θl x cl e)
+  elimDExp Θl x cl (switchAllᵉ e) = switchAllᵉ (elimDExp Θl x cl e)
+  elimDExp Θl x cl (exhaustAllᵉ e) = exhaustAllᵉ (elimDExp Θl x cl e)
+  elimDExp Θl x cl (μᵉ e)         = μᵉ (elimDExp Θl x cl e)
+  elimDExp Θl x cl (varᵉ y)       with compare∈ x y
+  ... | inj₁ refl = renExp (λ ()) (λ ()) (∈-++⁺ʳ Θl) cl
   ... | inj₂ y′   = varᵉ y′
-  elimDExp x cl (deferᵉ e)     =
-    deferᵉ (subst (λ ζ → Exp _ [] ζ _ _) (⊟-++ʳ x) (elimDExp (∈-++⁺ʳ _ x) cl e))
+  elimDExp Θl x cl (deferᵉ e)     =
+    deferᵉ (subst (λ ζ → Exp _ [] ζ _ _) (⊟-++ʳ x) (elimDExp Θl (∈-++⁺ʳ _ x) cl e))
 
-  elimDTm : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δ)
-          → Exp Γ [] [] [] t → Tm Γ Δᵍ Δ Θ u → Tm Γ Δᵍ (Δ ⊟ x) Θ u
-  elimDTm x cl (varᵗ y)     = varᵗ y
-  elimDTm x cl unit̂         = unit̂
-  elimDTm x cl (bool̂ b)     = bool̂ b
-  elimDTm x cl (nat̂ n)      = nat̂ n
-  elimDTm x cl (pairᵗ a b)  = pairᵗ (elimDTm x cl a) (elimDTm x cl b)
-  elimDTm x cl (fstᵗ p)     = fstᵗ (elimDTm x cl p)
-  elimDTm x cl (sndᵗ p)     = sndᵗ (elimDTm x cl p)
-  elimDTm x cl (inlᵗ a)     = inlᵗ (elimDTm x cl a)
-  elimDTm x cl (inrᵗ a)     = inrᵗ (elimDTm x cl a)
-  elimDTm x cl (caseᵗ s l r) = caseᵗ (elimDTm x cl s) (elimDTm x cl l) (elimDTm x cl r)
-  elimDTm x cl (ifᵗ c a b)  = ifᵗ (elimDTm x cl c) (elimDTm x cl a) (elimDTm x cl b)
-  elimDTm x cl (primᵗ op a) = primᵗ op (elimDTm x cl a)
-  elimDTm x cl (strmᵗ e)    = strmᵗ (elimDExp x cl e)
+  elimDTm : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub u t} (Θloc : List Ty) (x : t ∈ Δ)
+          → Exp Γ [] [] Θsub t → Tm Γ Δᵍ Δ (Θloc ++ Θsub) u
+          → Tm Γ Δᵍ (Δ ⊟ x) (Θloc ++ Θsub) u
+  elimDTm Θl x cl (varᵗ y)     = varᵗ y
+  elimDTm Θl x cl unit̂         = unit̂
+  elimDTm Θl x cl (bool̂ b)     = bool̂ b
+  elimDTm Θl x cl (nat̂ n)      = nat̂ n
+  elimDTm Θl x cl (pairᵗ a b)  = pairᵗ (elimDTm Θl x cl a) (elimDTm Θl x cl b)
+  elimDTm Θl x cl (fstᵗ p)     = fstᵗ (elimDTm Θl x cl p)
+  elimDTm Θl x cl (sndᵗ p)     = sndᵗ (elimDTm Θl x cl p)
+  elimDTm Θl x cl (inlᵗ a)     = inlᵗ (elimDTm Θl x cl a)
+  elimDTm Θl x cl (inrᵗ a)     = inrᵗ (elimDTm Θl x cl a)
+  elimDTm Θl x cl (caseᵗ s l r) =
+    caseᵗ (elimDTm Θl x cl s) (elimDTm (_ ∷ Θl) x cl l) (elimDTm (_ ∷ Θl) x cl r)
+  elimDTm Θl x cl (ifᵗ c a b)  =
+    ifᵗ (elimDTm Θl x cl c) (elimDTm Θl x cl a) (elimDTm Θl x cl b)
+  elimDTm Θl x cl (primᵗ op a) = primᵗ op (elimDTm Θl x cl a)
+  elimDTm Θl x cl (strmᵗ e)    = strmᵗ (elimDExp Θl x cl e)
 
-  elimDTms : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δ)
-           → Exp Γ [] [] [] t → List (Tm Γ Δᵍ Δ Θ u) → List (Tm Γ Δᵍ (Δ ⊟ x) Θ u)
-  elimDTms x cl []       = []
-  elimDTms x cl (y ∷ ys) = elimDTm x cl y ∷ elimDTms x cl ys
+  elimDTms : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub u t} (Θloc : List Ty) (x : t ∈ Δ)
+           → Exp Γ [] [] Θsub t → List (Tm Γ Δᵍ Δ (Θloc ++ Θsub) u)
+           → List (Tm Γ Δᵍ (Δ ⊟ x) (Θloc ++ Θsub) u)
+  elimDTms Θl x cl []       = []
+  elimDTms Θl x cl (y ∷ ys) = elimDTm Θl x cl y ∷ elimDTms Θl x cl ys
 
-unfoldμ : ∀ {n} {Γ : Ctx n} {t} → Exp Γ (t ∷ []) [] [] t → Closed Γ t
-unfoldμ body = elimGExp (here refl) (μᵉ body) body
+unfoldμ : ∀ {n} {Γ : Ctx n} {Θ t} → Exp Γ (t ∷ []) [] Θ t → Exp Γ [] [] Θ t
+unfoldμ body = elimGExp [] (here refl) (μᵉ body) body
 
 -- the first-order evaluator, in a Θ value-environment; a closed strmᵗ IS
 -- its (closed) observable, so obs values built outside a fn need no

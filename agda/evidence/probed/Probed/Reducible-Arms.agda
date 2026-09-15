@@ -42,7 +42,6 @@
 -- asynchronous tail -- and the take and scan arms of the body, whose
 -- own recursion the body already checks.
 --
--- TARGET: red-env @c9af98
 -- TARGET: red-input-shared @21f529
 -- TARGET: red-scan @c288cd
 -- TARGET: red-take @4abb4a
@@ -65,11 +64,11 @@ open import Data.Vec using ([]; _∷_)
 open import Data.List.Relation.Unary.Any using (here)
 open import Relation.Binary.PropositionalEquality using (refl)
 
-open import Rx.Exp using (Ctx; Closed; natᵗ; obs; ofᵉ; nat̂; strmᵗ; varᵗ; Tm; input; _×ᵗ_; fstᵗ; Fn)
+open import Rx.Exp using (Ctx; Closed; natᵗ; obs; ofᵉ; nat̂; varᵗ; input; _×ᵗ_; fstᵗ; Fn)
 open import Rx.Slots using (Slots; shared)
 open import Rx.Evaluator using (Sched; EvalSt; Path; root; sched-init; st-init; mergeAllᵒ; switchᵒ; exhaustᵒ; AllOp;
   NodeState; from-inner; _↠_; map-f; mergeAll-st; switch-st; exhaust-st; installNode; scan-st; take-st)
-open import Rx.Evaluator.Reducible using (Red; reducible; red-input-shared; red-env; red-thru; red-scan; red-take; red-from-inner)
+open import Rx.Evaluator.Reducible using (Red; reducible; red-input-shared; red-thru; red-scan; red-take; red-from-inner)
 
 open import Rx.Evaluator.Domain using (subs-shared; slot-spent; slot-join; step-thru-outer; walk-nil; walk-cons; inner;
   step-scan; step-take; step-from-inner; react-false;
@@ -100,35 +99,6 @@ st₀ = st-init e₀
 -- the root of the chain, at the floor a run starts at
 κ₀ : Path Γ₀ 0 natᵗ natᵗ
 κ₀ = root
-
-----------------------------------------------------------------------
--- 1.  THE TERM ARM.  LOAD-BEARING at an observable payload, where the
--- claim IS an expression's reducibility; the numeral row is DEGENERATE
--- and is here only to say the data half asserts nothing.
-----------------------------------------------------------------------
-
-inner₀ : Tm Γ₀ [] [] [] (obs natᵗ)
-inner₀ = strmᵗ (ofᵉ (nat̂ 7 ∷ []))
-
-row-tm-obs : Confirms
-  (red-env {Γ = Γ₀} inner₀ {[]} tt {e = e₀} κ₀ 0 0 sch₀ st₀)
-row-tm-obs = reducible (ofᵉ (nat̂ 7 ∷ [])) {e = e₀} κ₀ 0 0 sch₀ st₀
-
-row-tm-nat : Confirms (red-env {Γ = Γ₀} (nat̂ 7) {[]} tt)
-row-tm-nat = tt
-
--- the same claim under a ONE-ENTRY environment, which is the shape a
--- mapping frame's function has and the only reason the statement is
--- open rather than closed.  LOAD-BEARING: the variable is read back
--- out of the environment, so the row fails if the entry's candidate
--- is not what the conclusion gets.
-varObs : Tm Γ₀ [] [] (obs natᵗ ∷ []) (obs natᵗ)
-varObs = varᵗ (here refl)
-
-row-tm-var : Confirms
-  (red-env {Γ = Γ₀} varObs {ofᵉ (nat̂ 7 ∷ []) ∷ []}
-     (reducible (ofᵉ (nat̂ 7 ∷ [])) , tt) {e = e₀} κ₀ 0 0 sch₀ st₀)
-row-tm-var = reducible (ofᵉ (nat̂ 7 ∷ [])) {e = e₀} κ₀ 0 0 sch₀ st₀
 
 ----------------------------------------------------------------------
 -- 3.  THE SLOT'S SHARE, at the two sub-arms that carry no payload.  A

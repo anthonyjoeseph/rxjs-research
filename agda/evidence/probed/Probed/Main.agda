@@ -50,9 +50,15 @@ module Probed.Main where
 -- both belong to the tree and a tree with nothing open still owes them.
 open import Probed.Apparatus using (Confirms; Separates)
 
--- THE SEVEN LEAVES OF THE REDUCIBILITY BODY.  Every row is NAMED and
--- claimed here rather than pinned anonymously: a `Confirms` row's type
--- is generated from its target, so the name is the only handle the
+-- THE REMAINING LEAVES OF THE REDUCIBILITY BODY.  Every row is NAMED
+-- and claimed here rather than pinned anonymously: a `Confirms` row's
+-- type is generated from its target, so the name is the only handle the
 -- reachability law has on it.
-open import Probed.Reducible-Arms using (row-tm-obs; row-tm-nat; row-share-spent; row-share-join; row-tm-var; row-scan-acc; row-take-pass; row-inner-carry;
+open import Probed.Reducible-Arms using (row-share-spent; row-share-join; row-scan-acc; row-take-pass; row-inner-carry;
   row-live-merge; row-live-queue; row-live-switch; row-live-exhaust)
+
+-- THE FOUR SUBSTITUTION LEAVES THE CARRIED ENVIRONMENT COSTS.  Claimed
+-- from the root for the same reason the arms are: a `Confirms` row's
+-- type is generated from its target, so the name is the only handle.
+open import Probed.Substitution-Leaves using
+  (row-unfoldμ; row-evalTm; row-applyFn; row-idExp)

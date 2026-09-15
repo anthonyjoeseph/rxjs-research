@@ -45,13 +45,3 @@ module Refuted.Main where
 open import Refuted.Domain-Predicate using
   (structural-domain-has-content-false; sub-total)
 
--- AND THE SHAPE THAT REPLACED THEM HAS ITS OWN LEAK, in the layer
--- above rather than in the descent: the fundamental theorem at terms
--- is stated as one leaf among six and proves all six, because the
--- term language can embed an arbitrary expression and reflection
--- sends every value back into a closed one.  `reify-eval` is claimed
--- beside it because it is the whole mechanism -- the round trip is
--- `refl` at the observable former, which is where the smallness was
--- supposed to come from.
-open import Refuted.Red-Env-Too-Strong using
-  (red-env-proves-everything; reify-eval)

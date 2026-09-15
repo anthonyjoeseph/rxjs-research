@@ -43,13 +43,13 @@
 -- funded by this size or by any other on the syntax.
 module Rx.Exp.Guarded where
 
-open import Data.List using ([]; _∷_; List)
+open import Data.List using ([]; _∷_; List; _++_)
 open import Data.Nat using (ℕ; zero; suc; _+_)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; cong₂)
 
-open import Rx.Exp using (Ctx; Closed; Exp; Tm; elimGExp; elimGTm; elimGTms; unfoldμ;
+open import Rx.Exp using (Ctx; Ty; Exp; Tm; elimGExp; elimGTm; elimGTms; unfoldμ;
   input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ;
   exhaustAllᵉ; μᵉ; varᵉ; deferᵉ;
   varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ)
@@ -98,56 +98,56 @@ mutual
 -- the term half included — a term's only way to reach an inserted copy
 -- is an expression it embeds, so it arrives at the same two clauses.
 mutual
-  gsize-elimG : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δᵍ)
-                (cl : Closed Γ t) (e : Exp Γ Δᵍ Δ Θ u)
-              → gsizeᵉ (elimGExp x cl e) ≡ gsizeᵉ e
-  gsize-elimG x cl (input i)         = refl
-  gsize-elimG x cl (ofᵉ ts)          = cong suc (gsize-elimGs x cl ts)
-  gsize-elimG x cl emptyᵉ            = refl
-  gsize-elimG x cl (mapᵉ f e)        =
-    cong suc (cong₂ _+_ (gsize-elimGt x cl f) (gsize-elimG x cl e))
-  gsize-elimG x cl (takeᵉ c e)       =
-    cong suc (cong₂ _+_ (gsize-elimGt x cl c) (gsize-elimG x cl e))
-  gsize-elimG x cl (scanᵉ f z e)     =
-    cong suc (cong₂ _+_ (gsize-elimGt x cl f)
-                        (cong₂ _+_ (gsize-elimGt x cl z) (gsize-elimG x cl e)))
-  gsize-elimG x cl (mergeAllᵉ lim e) = cong suc (gsize-elimG x cl e)
-  gsize-elimG x cl (switchAllᵉ e)    = cong suc (gsize-elimG x cl e)
-  gsize-elimG x cl (exhaustAllᵉ e)   = cong suc (gsize-elimG x cl e)
-  gsize-elimG x cl (μᵉ e)            = cong suc (gsize-elimG (there x) cl e)
-  gsize-elimG x cl (varᵉ y)          = refl
-  gsize-elimG x cl (deferᵉ e)        = refl
+  gsize-elimG : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub u t} (Θloc : List Ty) (x : t ∈ Δᵍ)
+                (cl : Exp Γ [] [] Θsub t) (e : Exp Γ Δᵍ Δ (Θloc ++ Θsub) u)
+              → gsizeᵉ (elimGExp Θloc x cl e) ≡ gsizeᵉ e
+  gsize-elimG Θl x cl (input i)         = refl
+  gsize-elimG Θl x cl (ofᵉ ts)          = cong suc (gsize-elimGs Θl x cl ts)
+  gsize-elimG Θl x cl emptyᵉ            = refl
+  gsize-elimG Θl x cl (mapᵉ f e)        =
+    cong suc (cong₂ _+_ (gsize-elimGt (_ ∷ Θl) x cl f) (gsize-elimG Θl x cl e))
+  gsize-elimG Θl x cl (takeᵉ c e)       =
+    cong suc (cong₂ _+_ (gsize-elimGt Θl x cl c) (gsize-elimG Θl x cl e))
+  gsize-elimG Θl x cl (scanᵉ f z e)     =
+    cong suc (cong₂ _+_ (gsize-elimGt (_ ∷ Θl) x cl f)
+                        (cong₂ _+_ (gsize-elimGt Θl x cl z) (gsize-elimG Θl x cl e)))
+  gsize-elimG Θl x cl (mergeAllᵉ lim e) = cong suc (gsize-elimG Θl x cl e)
+  gsize-elimG Θl x cl (switchAllᵉ e)    = cong suc (gsize-elimG Θl x cl e)
+  gsize-elimG Θl x cl (exhaustAllᵉ e)   = cong suc (gsize-elimG Θl x cl e)
+  gsize-elimG Θl x cl (μᵉ e)            = cong suc (gsize-elimG Θl (there x) cl e)
+  gsize-elimG Θl x cl (varᵉ y)          = refl
+  gsize-elimG Θl x cl (deferᵉ e)        = refl
 
-  gsize-elimGt : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δᵍ)
-                 (cl : Closed Γ t) (tm : Tm Γ Δᵍ Δ Θ u)
-               → gsizeᵗ (elimGTm x cl tm) ≡ gsizeᵗ tm
-  gsize-elimGt x cl (varᵗ y)      = refl
-  gsize-elimGt x cl unit̂          = refl
-  gsize-elimGt x cl (bool̂ b)      = refl
-  gsize-elimGt x cl (nat̂ k)       = refl
-  gsize-elimGt x cl (pairᵗ a b)   =
-    cong suc (cong₂ _+_ (gsize-elimGt x cl a) (gsize-elimGt x cl b))
-  gsize-elimGt x cl (fstᵗ p)      = cong suc (gsize-elimGt x cl p)
-  gsize-elimGt x cl (sndᵗ p)      = cong suc (gsize-elimGt x cl p)
-  gsize-elimGt x cl (inlᵗ a)      = cong suc (gsize-elimGt x cl a)
-  gsize-elimGt x cl (inrᵗ a)      = cong suc (gsize-elimGt x cl a)
-  gsize-elimGt x cl (caseᵗ s l r) =
-    cong suc (cong₂ _+_ (gsize-elimGt x cl s)
-                        (cong₂ _+_ (gsize-elimGt x cl l) (gsize-elimGt x cl r)))
-  gsize-elimGt x cl (ifᵗ c a b)   =
-    cong suc (cong₂ _+_ (gsize-elimGt x cl c)
-                        (cong₂ _+_ (gsize-elimGt x cl a) (gsize-elimGt x cl b)))
-  gsize-elimGt x cl (primᵗ op a)  = cong suc (gsize-elimGt x cl a)
-  gsize-elimGt x cl (strmᵗ e)     = cong suc (gsize-elimG x cl e)
+  gsize-elimGt : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub u t} (Θloc : List Ty) (x : t ∈ Δᵍ)
+                 (cl : Exp Γ [] [] Θsub t) (tm : Tm Γ Δᵍ Δ (Θloc ++ Θsub) u)
+               → gsizeᵗ (elimGTm Θloc x cl tm) ≡ gsizeᵗ tm
+  gsize-elimGt Θl x cl (varᵗ y)      = refl
+  gsize-elimGt Θl x cl unit̂          = refl
+  gsize-elimGt Θl x cl (bool̂ b)      = refl
+  gsize-elimGt Θl x cl (nat̂ k)       = refl
+  gsize-elimGt Θl x cl (pairᵗ a b)   =
+    cong suc (cong₂ _+_ (gsize-elimGt Θl x cl a) (gsize-elimGt Θl x cl b))
+  gsize-elimGt Θl x cl (fstᵗ p)      = cong suc (gsize-elimGt Θl x cl p)
+  gsize-elimGt Θl x cl (sndᵗ p)      = cong suc (gsize-elimGt Θl x cl p)
+  gsize-elimGt Θl x cl (inlᵗ a)      = cong suc (gsize-elimGt Θl x cl a)
+  gsize-elimGt Θl x cl (inrᵗ a)      = cong suc (gsize-elimGt Θl x cl a)
+  gsize-elimGt Θl x cl (caseᵗ s l r) =
+    cong suc (cong₂ _+_ (gsize-elimGt Θl x cl s)
+                        (cong₂ _+_ (gsize-elimGt (_ ∷ Θl) x cl l) (gsize-elimGt (_ ∷ Θl) x cl r)))
+  gsize-elimGt Θl x cl (ifᵗ c a b)   =
+    cong suc (cong₂ _+_ (gsize-elimGt Θl x cl c)
+                        (cong₂ _+_ (gsize-elimGt Θl x cl a) (gsize-elimGt Θl x cl b)))
+  gsize-elimGt Θl x cl (primᵗ op a)  = cong suc (gsize-elimGt Θl x cl a)
+  gsize-elimGt Θl x cl (strmᵗ e)     = cong suc (gsize-elimG Θl x cl e)
 
-  gsize-elimGs : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δᵍ)
-                 (cl : Closed Γ t) (ts : List (Tm Γ Δᵍ Δ Θ u))
-               → gsizeᵗˢ (elimGTms x cl ts) ≡ gsizeᵗˢ ts
-  gsize-elimGs x cl []       = refl
-  gsize-elimGs x cl (t ∷ ts) =
-    cong suc (cong₂ _+_ (gsize-elimGt x cl t) (gsize-elimGs x cl ts))
+  gsize-elimGs : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub u t} (Θloc : List Ty) (x : t ∈ Δᵍ)
+                 (cl : Exp Γ [] [] Θsub t) (ts : List (Tm Γ Δᵍ Δ (Θloc ++ Θsub) u))
+               → gsizeᵗˢ (elimGTms Θloc x cl ts) ≡ gsizeᵗˢ ts
+  gsize-elimGs Θl x cl []       = refl
+  gsize-elimGs Θl x cl (t ∷ ts) =
+    cong suc (cong₂ _+_ (gsize-elimGt Θl x cl t) (gsize-elimGs Θl x cl ts))
 
 -- THE PEEL, WHICH IS THE LEMMA ABOVE AT THE ONE POSITION THAT MATTERS.
-gsize-unfoldμ : ∀ {n} {Γ : Ctx n} {t} (body : Exp Γ (t ∷ []) [] [] t)
+gsize-unfoldμ : ∀ {n} {Γ : Ctx n} {Θ t} (body : Exp Γ (t ∷ []) [] Θ t)
               → gsizeᵉ (unfoldμ body) ≡ gsizeᵉ body
-gsize-unfoldμ body = gsize-elimG (here refl) (μᵉ body) body
+gsize-unfoldμ body = gsize-elimG [] (here refl) (μᵉ body) body

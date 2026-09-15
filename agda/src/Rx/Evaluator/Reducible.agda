@@ -35,11 +35,14 @@ open import Data.Bool using (Bool; true; false; if_then_else_; T)
 open import Data.Fin using (Fin; toℕ)
 open import Data.List using (List; []; _∷_; _++_; map)
 open import Data.List.Relation.Unary.All using (All; []; _∷_)
+open import Data.List.Relation.Unary.Any using (here; there)
+open import Data.List.Membership.Propositional using (_∈_)
+open import Data.Bool using (true; false)
 open import Data.List.Relation.Unary.All.Properties using (++⁺)
 open import Data.Maybe using (nothing)
 open import Data.Nat using (zero; suc; _<_; s≤s; _+_)
 open import Data.Nat.Induction using (<-wellFounded)
-open import Data.Nat.Properties using (_<?_; ≮⇒≥; ≤-refl; ≤-trans; m≤n+m)
+open import Data.Nat.Properties using (_<?_; ≮⇒≥; ≤-refl; ≤-trans; m≤n+m; m≤m+n)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
@@ -52,9 +55,11 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst
 open import Rx.Prim using (Id; Tick; InstEmit; InstEvent; init; value; close; handoff;
   complete; hot; cold)
 open import Rx.Slots using (scripted; shared)
-open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; Ctx; Closed; Val; Tm; Fn; evalTm; evalWith; applyFn; input; ofᵉ; emptyᵉ;
-  mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; isData; unfoldμ)
-open import Rx.Exp.Guarded using (gsizeᵉ; gsizeᵗ; gsize-unfoldμ)
+open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; Ctx; Closed; Val; Exp; Tm; Fn; evalTm; evalWith; applyFn; input; ofᵉ; emptyᵉ;
+  mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; isData; unfoldμ;
+  varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ;
+  add; sub; mul; eqᵖ; ltᵖ; notᵖ; subΘExp; subΘTm; subΘTms; lookupEnv)
+open import Rx.Exp.Guarded using (gsizeᵉ; gsizeᵗ; gsizeᵗˢ; gsize-unfoldμ)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; _↠_; map-f; take-f; scan-f; take-st; scan-st;
   thru-outer; mergeAllᵒ; switchᵒ; exhaustᵒ; mergeAll-st; switch-st; exhaust-st;
   installNode; oneShotBurst; memberSource; splitEvents; retagEvents; NodeId; AllOp; from-inner)
@@ -150,46 +155,39 @@ RedStep {Γ = Γ} {t = t} {e = e} {u = u} id now f κ vals fin sched st =
     stepFrame⇓ {e = e} id now f κ vals fin sched st r × All (Red u) (proj₁ r)
 
 postulate
-  -- THE FUNDAMENTAL THEOREM ONE LEVEL DOWN, AT TERMS.  `Tm` and `Exp`
-  -- are one mutual datatype and `strmᵗ` embeds an expression into a
-  -- term, so this and the body below are mutually structural; it is
-  -- stated separately because the arm that spends it is the only one
-  -- that needs a value rather than a subscription.
-  --
-  -- REFUTED: `Refuted.Red-Env-Too-Strong` -- not as false, but as too
-  --   strong to be a leaf.  Reflection sends every runtime value into
-  --   a CLOSED term, whose environment hypothesis is trivial, so this
-  --   hands back the candidate at every value of every type and the
-  --   body's whole induction is redundant given it.  The leak is one
-  --   constructor: the term language embeds an arbitrary expression at
-  --   observable type, so "closed term" buys no smallness.  Twelve of
-  --   the thirteen term formers are structural and close under the
-  --   candidate's own data arms; the embedding is the whole content.
-  --   So the repair is NOT to split a smaller leaf off the embedding
-  --   arm -- at the empty environment that arm IS the top-line
-  --   subscription result, so any leaf carrying it is this statement
-  --   again.  It has to stop being a leaf: the fundamental theorem at
-  --   terms is a MUTUAL PARTNER of the expression recursion, which is
-  --   what pulling it out as a postulate disguised.  What funds the
-  --   partner is the guarded size, once that size COUNTS TERMS -- and
-  --   the reason it may is that the partner recurses on RAW syntax
-  --   under a carried environment.  The measure is then never asked
-  --   about a substitution: an environment entry at observable type is
-  --   a whole expression, so a partner stated over the substituted
-  --   expression is unbounded against the term that binds it, and no
-  --   measure on the syntax reaches that form.  The gate argument
-  --   survives the counting untouched, since a term's only route to an
-  --   inserted copy is an expression it embeds.
-  --
-  -- PROBED: `Probed.Reducible-Arms` at an observable-typed term, where
-  --   the claim IS an expression's own reducibility and the body
-  --   delivers it; at the same claim under a ONE-ENTRY environment,
-  --   where the variable is read back out and the entry's candidate
-  --   has to be what the conclusion gets; and at a numeral, which is
-  --   DEGENERATE and is there to say the data half asserts nothing.
-  --   No term that BINDS is reached, and no environment past one entry.
-  red-env : ∀ {n} {Γ : Ctx n} {Θ u} (tm : Tm Γ [] [] Θ u)
-              {env : All (Val Γ) Θ} → RedEnv env → Red u (evalWith tm env)
+  -- SUBSTITUTION COMMUTES WITH THE THING IT IS CARRIED PAST, which is
+  -- the price of carrying the environment rather than applying it.
+  -- Each says that closing against the environment and then acting
+  -- agrees with acting under it, at the four points the recursion
+  -- below reaches one: the fixpoint peel, a one-shot's element, a
+  -- frame's function at an arriving value, and the whole telescope
+  -- being empty, where closing is the identity.
+  -- PROBED: `Probed.Substitution-Leaves`, at a body whose μ variable
+  --   is really referenced through the gate.
+
+  sub-unfoldμ : ∀ {n} {Γ : Ctx n} {Θ t} (body : Exp Γ (t ∷ []) [] Θ t)
+                (σ : All (Val Γ) Θ)
+              → subΘExp [] σ (unfoldμ body) ≡ unfoldμ (subΘExp [] σ body)
+
+  -- PROBED: `Probed.Substitution-Leaves`, at a term reading its
+  --   environment entry.
+
+  sub-evalTm : ∀ {n} {Γ : Ctx n} {Θ u} (tm : Tm Γ [] [] Θ u)
+               (σ : All (Val Γ) Θ)
+             → evalTm (subΘTm [] σ tm) ≡ evalWith tm σ
+
+  -- PROBED: `Probed.Substitution-Leaves`, at a function reading BOTH
+  --   its argument slot and the entry past it.
+
+  sub-applyFn : ∀ {n} {Γ : Ctx n} {Θ s u} (f : Fn Γ [] [] Θ s u)
+                (σ : All (Val Γ) Θ) (v : Val Γ s)
+              → applyFn (subΘTm (s ∷ []) σ f) v ≡ evalWith f (v ∷ σ)
+
+  -- PROBED: `Probed.Substitution-Leaves`, at a former carrying a
+  --   term, a list and a nested expression.
+
+  subΘ-idExp : ∀ {n} {Γ : Ctx n} {Δᵍ Δ t} (e : Exp Γ Δᵍ Δ [] t)
+             → subΘExp [] [] e ≡ e
 
   -- THE SIXTH SLOT SUB-ARM, WHICH IS THE ONE THE OTHER FIVE ARE NOT.
   -- A share's definition is an arbitrary term standing in no relation
@@ -262,13 +260,11 @@ postulate
   --   And the fourth candidate, a SYNTACTIC invariant saying a stored
   --   value is the denotation of a closed term, is VACUOUS: reflection
   --   is total, so every value is one and the pairing carries no
-  --   information.  That vacuity is not a detail about this statement
-  --   -- it is the environment leaf being too strong, refuted below,
-  --   and until that leaf is restated no carrier decision here means
-  --   anything, since the leaf already hands back what a carrier would
-  --   deliver.
-  --
-  -- REFUTED: `Refuted.Red-Env-Too-Strong`
+  --   information.  That vacuity is the same totality the environment
+  --   face already turns on: reflection sends every value back into a
+  --   closed term, so any invariant phrased as `is the denotation of a
+  --   closed term` is satisfied by everything and a carrier built on
+  --   one hands back what it was asked to establish.
   --
   -- PROBED: `Probed.Reducible-Arms` at an accumulator of OBSERVABLE
   --   type folded by a projection, so the value that leaves the frame
@@ -424,49 +420,53 @@ red-input {Γ = Γ} i {lo = lo} κ id now sched st
     | yes below | shared d {ok = ok} =
       red-input-shared i d κ below id now sched slEq st
 
--- THE FUNDAMENTAL THEOREM AT CLOSED TERMS is the leaf above at the
--- empty environment, which is the whole of the difference.
-red-tm : ∀ {n} {Γ : Ctx n} {u} (tm : Tm Γ [] [] [] u) → Red u (evalTm tm)
-red-tm tm = red-env tm tt
-
-redTms : ∀ {n} {Γ : Ctx n} {u} (ts : List (Tm Γ [] [] [] u))
-       → All (Red u) (map (λ tm → evalTm tm) ts)
-redTms []       = []
-redTms (x ∷ xs) = red-tm x ∷ redTms xs
-
 -- A MAPPING FRAME APPLIES ITS FUNCTION TO EVERY ARRIVING VALUE, so
--- what it produces is reducible exactly when the function is a term
--- under a one-entry reducible environment.
--- a frame's function binds exactly one entry, so this is the only
--- environment shape the body below ever builds.
-redEnv1 : ∀ {n} {Γ : Ctx n} (t : Ty) (v : Val Γ t) → Red t v → RedEnv (v ∷ [])
-redEnv1 t v r = r , tt
+-- what it produces is reducible exactly when the function sends
+-- reducible to reducible.  That is the only thing a frame wants from
+-- the term face, and it has to be stated as a HYPOTHESIS rather than
+-- reached by a call: the fundamental theorem at terms is a member of
+-- the recursion at the foot of this module, so a walk declared above
+-- it cannot name it.
+RedFn : ∀ {n} {Γ : Ctx n} {s u} → Fn Γ [] [] [] s u → Set
+RedFn {Γ = Γ} {s = s} {u = u} fn =
+  ∀ {v : Val Γ s} → Red s v → Red u (applyFn fn v)
 
-redMapVals : ∀ {n} {Γ : Ctx n} {s u} (fn : Fn Γ [] [] [] s u)
-             {vals : List (Val Γ s)} → All (Red s) vals
+-- AND A FRAME OWES IT ONLY WHERE IT APPLIES ONE.  The mapping frame is
+-- the whole of it: a scan applies a function too, and its leaf does not
+-- yet ask for this because what that leaf is missing is the accumulator
+-- it reads back out of a node rather than the fold it performs on it.
+RedFrame : ∀ {n} {Γ : Ctx n} {s u} → Frame Γ s u → Set
+RedFrame (map-f fn)                  = RedFn fn
+RedFrame (scan-f fn nid)             = ⊤
+RedFrame (take-f nid)                = ⊤
+RedFrame (from-inner op allNid inst) = ⊤
+RedFrame (thru-outer op nid)         = ⊤
+
+redMapVals : ∀ {n} {Γ : Ctx n} {s u} (fn : Fn Γ [] [] [] s u) → RedFn fn
+           → {vals : List (Val Γ s)} → All (Red s) vals
            → All (Red u) (map (applyFn fn) vals)
-redMapVals fn []       = []
-redMapVals {Γ = Γ} {s = s} fn {v ∷ vs} (p ∷ ps) =
-  red-env fn (redEnv1 {Γ = Γ} s v p) ∷ redMapVals fn ps
+redMapVals fn rf []       = []
+redMapVals fn rf (p ∷ ps) = rf p ∷ redMapVals fn rf ps
 
 -- STEPPING ONE FRAME, DISPATCHED ON THE FRAME.  The mapping arm is a
 -- body because nothing about it is stateful; the other four each read
 -- a node this face installed earlier, which is the one thing the
 -- candidate's quantification over every state does not hand back.
 red-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
-           (id : Id) (now : Tick) (f : Frame Γ s u) (κ : Path Γ lo u t)
+           (id : Id) (now : Tick) (f : Frame Γ s u) → RedFrame f
+         → (κ : Path Γ lo u t)
            {vals : List (Val Γ s)} → All (Red s) vals → (fin : Bool)
            (sched : Sched Γ) (st : EvalSt e)
          → RedStep {e = e} id now f κ vals fin sched st
-red-step id now (map-f fn) κ rv fin sched st =
-  _ , step-map , redMapVals fn rv
-red-step id now (scan-f fn nid) κ rv fin sched st =
+red-step id now (map-f fn) rf κ rv fin sched st =
+  _ , step-map , redMapVals fn rf rv
+red-step id now (scan-f fn nid) rf κ rv fin sched st =
   red-scan id now fn nid κ rv fin sched st
-red-step id now (take-f nid) κ rv fin sched st =
+red-step id now (take-f nid) rf κ rv fin sched st =
   red-take id now nid κ rv fin sched st
-red-step id now (from-inner op allNid inst) κ rv fin sched st =
+red-step id now (from-inner op allNid inst) rf κ rv fin sched st =
   red-from-inner id now op allNid inst κ rv fin sched st
-red-step id now (thru-outer op nid) κ rv fin sched st =
+red-step id now (thru-outer op nid) rf κ rv fin sched st =
   red-thru id now op nid κ rv fin sched st
 
 -- WALKING A BURST IS BOOKKEEPING, AND SEPARATING IT FROM THE STEP IS
@@ -517,100 +517,195 @@ satFin false = []
 -- on the values alone, which is why the reassembly costs three
 -- appends of protocol traffic and one real obligation.
 red-push : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
-           (id : Id) (now : Tick) (f : Frame Γ s u) (κ : Path Γ lo u t)
+           (id : Id) (now : Tick) (f : Frame Γ s u) → RedFrame f
+         → (κ : Path Γ lo u t)
            {burst : Stream Γ s} → StreamSat (Red s) burst
          → (sched : Sched Γ) (st : EvalSt e)
          → RedPush {e = e} id now f κ burst sched st
-red-push id now f κ {[]}      []       sched st = _ , push-nil , []
-red-push id now f κ {em ∷ ems} (p ∷ ps) sched st =
+red-push id now f rf κ {[]}      []       sched st = _ , push-nil , []
+red-push id now f rf κ {em ∷ ems} (p ∷ ps) sched st =
   let ((vals′ , evs , fin′ , sched₁ , st₁) , d , rv) =
-        red-step id now f κ (splitVals (InstEmit.events em) p)
+        red-step id now f rf κ (splitVals (InstEmit.events em) p)
           (proj₂ (proj₂ (splitEvents (InstEmit.events em)))) sched st
-      ((rest , sched₂ , st₂) , dr , sr) = red-push id now f κ ps sched₁ st₁
+      ((rest , sched₂ , st₂) , dr , sr) = red-push id now f rf κ ps sched₁ st₁
   in _ , push-cons refl d dr
        , ++⁺ (splitProt (InstEmit.events em))
              (++⁺ (satRetag evs) (satEvents rv (satFin fin′))) ∷ sr
 
--- THE BODY, AND WHAT PAYS FOR IT.  Its recursion is structural in the
--- TERM at every arm that has one, and every recursive call is made at
--- a schedule and a state the caller has already moved — a fresh node
--- installed, a counter bumped, a path extended.  That those calls are
--- free is exactly what the candidate's quantification over every state
--- buys.
+-- THE BODY, AND WHAT PAYS FOR IT.  The expression face and the term
+-- face are ONE recursion: a term embeds an expression and an operator
+-- carries terms, so neither can be a leaf beside the other without
+-- claiming the whole theorem.  Both recurse on the ACCESSIBILITY of
+-- the guarded size, which counts an operator's spine and the terms it
+-- carries and stops at the gate; every call below hands on a strictly
+-- smaller size, the fixpoint arm included.
+--
+-- AND THE ENVIRONMENT IS CARRIED, NOT APPLIED, WHICH IS WHAT THE SIZE
+-- COSTS.  An entry at observable type is a whole expression, so the
+-- substituted form is unbounded against the syntax that binds it and
+-- no measure reaches it.  So the expression face is stated at a raw
+-- body under a reducible substitution and concludes about the CLOSED
+-- form, and the measure is read off the raw body alone.
 --
 -- THE ONE ARM WITH NO SUBTERM IS THE μ, AND THE SYNTAX PAYS FOR IT.
 -- An unfolding is no subterm of its fixpoint and sits at the same
--- type, so neither the term nor the candidate's own type recursion
--- reaches it.  What does is `gsizeᵉ`: the μ former spends a unit, the
+-- type, so neither the syntax nor the candidate's own type recursion
+-- reaches it.  What does is the size: the μ former spends a unit, the
 -- gate the μ variable must sit behind is where the size stops looking,
--- and the unfolding therefore has exactly the size the body had.  So
--- the recursion is on the ACCESSIBILITY of that size rather than on
--- the term, and every other arm keeps its structural decrease because
--- the size counts the formers it descends through.
-reducibleAcc : ∀ {n} {Γ : Ctx n} {t} (b : Closed Γ t)
-             → Acc _<_ (gsizeᵉ b) → Red {Γ = Γ} (obs t) b
-reducibleAcc (input i) a κ id now sched st = red-input i κ id now sched st
-reducibleAcc (ofᵉ ts) a κ id now sched st =
-  _ , subs-of refl , satOneShot id sched (redTms ts)
-reducibleAcc emptyᵉ a κ id now sched st = _ , subs-empty refl , satOneShot id sched []
-reducibleAcc (mapᵉ f b) (acc rs) κ id now sched st =
-  let ((burst , sched₁ , st₁) , d , sat) =
-        reducibleAcc b (rs (s≤s (m≤n+m _ _))) (map-f f ↠ κ) id now sched st
-      (r , p , sat′) = red-push id now (map-f f) κ sat sched₁ st₁
-  in r , subs-map d p , sat′
-reducibleAcc (takeᵉ c b) (acc rs) κ id now sched st with evalTm c in ceq
-... | zero  = _ , subs-take-zero ceq refl , satOneShot id sched []
-... | suc k =
-  let nid = Sched.nextNode sched
-      ((burst , sched₂ , st₁) , d , sat) =
-        reducibleAcc b (rs (s≤s (m≤n+m _ _))) (take-f nid ↠ κ) id now
-          (record sched { nextNode = suc nid })
-          (installNode nid (take-st (suc k)) st)
-      (r , p , sat′) = red-push id now (take-f nid) κ sat sched₂ st₁
-  in r , subs-take-suc ceq refl d p , sat′
-reducibleAcc (scanᵉ f z b) (acc rs) κ id now sched st =
-  let nid = Sched.nextNode sched
-      ((burst , sched₂ , st₁) , d , sat) =
-        reducibleAcc b (rs (s≤s (≤-trans (m≤n+m (gsizeᵉ b) (gsizeᵗ z))
-                                 (m≤n+m (gsizeᵗ z + gsizeᵉ b) (gsizeᵗ f)))))
-          (scan-f f nid ↠ κ) id now
-          (record sched { nextNode = suc nid })
-          (installNode nid (scan-st (evalTm z)) st)
-      (r , p , sat′) = red-push id now (scan-f f nid) κ sat sched₂ st₁
-  in r , subs-scan refl d p , sat′
-reducibleAcc (mergeAllᵉ lim b) (acc rs) κ id now sched st =
-  let nid = Sched.nextNode sched
-      ((burst , sched₂ , st₁) , d , sat) =
-        reducibleAcc b (rs ≤-refl) (thru-outer mergeAllᵒ nid ↠ κ) id now
-          (record sched { nextNode = suc nid })
-          (installNode nid (mergeAll-st lim 0 [] false) st)
-      (r , p , sat′) = red-push id now (thru-outer mergeAllᵒ nid) κ sat sched₂ st₁
-  in r , subs-merge-all (sub-all refl d p) , sat′
-reducibleAcc (switchAllᵉ b) (acc rs) κ id now sched st =
-  let nid = Sched.nextNode sched
-      ((burst , sched₂ , st₁) , d , sat) =
-        reducibleAcc b (rs ≤-refl) (thru-outer switchᵒ nid ↠ κ) id now
-          (record sched { nextNode = suc nid })
-          (installNode nid (switch-st nothing false) st)
-      (r , p , sat′) = red-push id now (thru-outer switchᵒ nid) κ sat sched₂ st₁
-  in r , subs-switch-all (sub-all refl d p) , sat′
-reducibleAcc (exhaustAllᵉ b) (acc rs) κ id now sched st =
-  let nid = Sched.nextNode sched
-      ((burst , sched₂ , st₁) , d , sat) =
-        reducibleAcc b (rs ≤-refl) (thru-outer exhaustᵒ nid ↠ κ) id now
-          (record sched { nextNode = suc nid })
-          (installNode nid (exhaust-st false false) st)
-      (r , p , sat′) = red-push id now (thru-outer exhaustᵒ nid) κ sat sched₂ st₁
-  in r , subs-exhaust-all (sub-all refl d p) , sat′
-reducibleAcc (μᵉ body) (acc rs) κ id now sched st =
-  let (r , d , sat) =
-        reducibleAcc (unfoldμ body)
-          (rs (subst (_< suc (gsizeᵉ body)) (sym (gsize-unfoldμ body)) ≤-refl))
-          κ id now sched st
-  in r , subs-μ d , sat
-reducibleAcc (varᵉ ()) a
-reducibleAcc (deferᵉ body) a κ id now sched st =
-  _ , subs-defer refl refl refl , (tt ∷ []) ∷ []
+-- and the unfolding therefore has exactly the size the body had.
+redLookup : ∀ {n} {Γ : Ctx n} {Θ t} (σ : All (Val Γ) Θ) → RedEnv σ
+          → (x : t ∈ Θ) → Red t (lookupEnv σ x)
+redLookup (v ∷ vs) (p , ps) (here refl) = p
+redLookup (v ∷ vs) (p , ps) (there x)   = redLookup vs ps x
 
+mutual
+  redExpAcc : ∀ {n} {Γ : Ctx n} {Θ t} (b : Exp Γ [] [] Θ t)
+              (σ : All (Val Γ) Θ) → RedEnv σ
+            → Acc _<_ (gsizeᵉ b) → Red {Γ = Γ} (obs t) (subΘExp [] σ b)
+  redExpAcc (input i) σ rσ a κ id now sched st = red-input i κ id now sched st
+  redExpAcc (ofᵉ ts) σ rσ (acc rs) κ id now sched st =
+    _ , subs-of refl , satOneShot id sched (redTmsAcc ts σ rσ (rs ≤-refl))
+  redExpAcc emptyᵉ σ rσ a κ id now sched st =
+    _ , subs-empty refl , satOneShot id sched []
+  redExpAcc (mapᵉ {s = s} f b) σ rσ (acc rs) κ id now sched st =
+    let fn = subΘTm (s ∷ []) σ f
+        ((burst , sched₁ , st₁) , d , sat) =
+          redExpAcc b σ rσ (rs (s≤s (m≤n+m (gsizeᵉ b) (gsizeᵗ f))))
+            (map-f fn ↠ κ) id now sched st
+        (r , p , sat′) =
+          red-push id now (map-f fn)
+            (redFnAcc f σ rσ (rs (s≤s (m≤m+n (gsizeᵗ f) (gsizeᵉ b)))))
+            κ sat sched₁ st₁
+    in r , subs-map d p , sat′
+  redExpAcc (takeᵉ c b) σ rσ (acc rs) κ id now sched st
+    with evalTm (subΘTm [] σ c) in ceq
+  ... | zero  = _ , subs-take-zero ceq refl , satOneShot id sched []
+  ... | suc k =
+    let nid = Sched.nextNode sched
+        ((burst , sched₂ , st₁) , d , sat) =
+          redExpAcc b σ rσ (rs (s≤s (m≤n+m (gsizeᵉ b) (gsizeᵗ c))))
+            (take-f nid ↠ κ) id now
+            (record sched { nextNode = suc nid })
+            (installNode nid (take-st (suc k)) st)
+        (r , p , sat′) = red-push id now (take-f nid) tt κ sat sched₂ st₁
+    in r , subs-take-suc ceq refl d p , sat′
+  redExpAcc (scanᵉ {s = s} {t = u} f z b) σ rσ (acc rs) κ id now sched st =
+    let nid = Sched.nextNode sched
+        ((burst , sched₂ , st₁) , d , sat) =
+          redExpAcc b σ rσ
+            (rs (s≤s (≤-trans (m≤n+m (gsizeᵉ b) (gsizeᵗ z))
+                              (m≤n+m (gsizeᵗ z + gsizeᵉ b) (gsizeᵗ f)))))
+            (scan-f (subΘTm ((u ×ᵗ s) ∷ []) σ f) nid ↠ κ) id now
+            (record sched { nextNode = suc nid })
+            (installNode nid (scan-st (evalTm (subΘTm [] σ z))) st)
+        (r , p , sat′) =
+          red-push id now (scan-f (subΘTm ((u ×ᵗ s) ∷ []) σ f) nid) tt
+            κ sat sched₂ st₁
+    in r , subs-scan refl d p , sat′
+  redExpAcc (mergeAllᵉ lim b) σ rσ (acc rs) κ id now sched st =
+    let nid = Sched.nextNode sched
+        ((burst , sched₂ , st₁) , d , sat) =
+          redExpAcc b σ rσ (rs ≤-refl) (thru-outer mergeAllᵒ nid ↠ κ) id now
+            (record sched { nextNode = suc nid })
+            (installNode nid (mergeAll-st lim 0 [] false) st)
+        (r , p , sat′) =
+          red-push id now (thru-outer mergeAllᵒ nid) tt κ sat sched₂ st₁
+    in r , subs-merge-all (sub-all refl d p) , sat′
+  redExpAcc (switchAllᵉ b) σ rσ (acc rs) κ id now sched st =
+    let nid = Sched.nextNode sched
+        ((burst , sched₂ , st₁) , d , sat) =
+          redExpAcc b σ rσ (rs ≤-refl) (thru-outer switchᵒ nid ↠ κ) id now
+            (record sched { nextNode = suc nid })
+            (installNode nid (switch-st nothing false) st)
+        (r , p , sat′) =
+          red-push id now (thru-outer switchᵒ nid) tt κ sat sched₂ st₁
+    in r , subs-switch-all (sub-all refl d p) , sat′
+  redExpAcc (exhaustAllᵉ b) σ rσ (acc rs) κ id now sched st =
+    let nid = Sched.nextNode sched
+        ((burst , sched₂ , st₁) , d , sat) =
+          redExpAcc b σ rσ (rs ≤-refl) (thru-outer exhaustᵒ nid ↠ κ) id now
+            (record sched { nextNode = suc nid })
+            (installNode nid (exhaust-st false false) st)
+        (r , p , sat′) =
+          red-push id now (thru-outer exhaustᵒ nid) tt κ sat sched₂ st₁
+    in r , subs-exhaust-all (sub-all refl d p) , sat′
+  redExpAcc (μᵉ body) σ rσ (acc rs) κ id now sched st =
+    let ih = subst (Red (obs _)) (sub-unfoldμ body σ)
+               (redExpAcc (unfoldμ body) σ rσ
+                 (rs (subst (_< suc (gsizeᵉ body))
+                            (sym (gsize-unfoldμ body)) ≤-refl)))
+        (r , d , sat) = ih κ id now sched st
+    in r , subs-μ d , sat
+  redExpAcc (varᵉ ()) σ rσ a
+  redExpAcc (deferᵉ body) σ rσ a κ id now sched st =
+    _ , subs-defer refl refl refl , (tt ∷ []) ∷ []
+
+  -- THE FUNDAMENTAL THEOREM AT TERMS, which is where the embedding
+  -- former hands the recursion back to the expression face.
+  redTmAcc : ∀ {n} {Γ : Ctx n} {Θ u} (tm : Tm Γ [] [] Θ u)
+             (σ : All (Val Γ) Θ) → RedEnv σ
+           → Acc _<_ (gsizeᵗ tm) → Red u (evalWith tm σ)
+  redTmAcc (varᵗ x) σ rσ a = redLookup σ rσ x
+  redTmAcc unit̂     σ rσ a = tt
+  redTmAcc (bool̂ b) σ rσ a = tt
+  redTmAcc (nat̂ k)  σ rσ a = tt
+  redTmAcc (pairᵗ x y) σ rσ (acc rs) =
+      redTmAcc x σ rσ (rs (s≤s (m≤m+n (gsizeᵗ x) (gsizeᵗ y))))
+    , redTmAcc y σ rσ (rs (s≤s (m≤n+m (gsizeᵗ y) (gsizeᵗ x))))
+  redTmAcc (fstᵗ q) σ rσ (acc rs) = proj₁ (redTmAcc q σ rσ (rs ≤-refl))
+  redTmAcc (sndᵗ q) σ rσ (acc rs) = proj₂ (redTmAcc q σ rσ (rs ≤-refl))
+  redTmAcc (inlᵗ x) σ rσ (acc rs) = redTmAcc x σ rσ (rs ≤-refl)
+  redTmAcc (inrᵗ x) σ rσ (acc rs) = redTmAcc x σ rσ (rs ≤-refl)
+  redTmAcc (caseᵗ sc l r) σ rσ (acc rs)
+    with evalWith sc σ
+       | redTmAcc sc σ rσ (rs (s≤s (m≤m+n (gsizeᵗ sc) (gsizeᵗ l + gsizeᵗ r))))
+  ... | inj₁ x | q =
+    redTmAcc l (x ∷ σ) (q , rσ)
+      (rs (s≤s (≤-trans (m≤m+n (gsizeᵗ l) (gsizeᵗ r))
+                        (m≤n+m (gsizeᵗ l + gsizeᵗ r) (gsizeᵗ sc)))))
+  ... | inj₂ y | q =
+    redTmAcc r (y ∷ σ) (q , rσ)
+      (rs (s≤s (≤-trans (m≤n+m (gsizeᵗ r) (gsizeᵗ l))
+                        (m≤n+m (gsizeᵗ l + gsizeᵗ r) (gsizeᵗ sc)))))
+  redTmAcc (ifᵗ c x y) σ rσ (acc rs) with evalWith c σ
+  ... | true  =
+    redTmAcc x σ rσ
+      (rs (s≤s (≤-trans (m≤m+n (gsizeᵗ x) (gsizeᵗ y))
+                        (m≤n+m (gsizeᵗ x + gsizeᵗ y) (gsizeᵗ c)))))
+  ... | false =
+    redTmAcc y σ rσ
+      (rs (s≤s (≤-trans (m≤n+m (gsizeᵗ y) (gsizeᵗ x))
+                        (m≤n+m (gsizeᵗ x + gsizeᵗ y) (gsizeᵗ c)))))
+  redTmAcc (primᵗ add x) σ rσ a  = tt
+  redTmAcc (primᵗ sub x) σ rσ a  = tt
+  redTmAcc (primᵗ mul x) σ rσ a  = tt
+  redTmAcc (primᵗ eqᵖ x) σ rσ a  = tt
+  redTmAcc (primᵗ ltᵖ x) σ rσ a  = tt
+  redTmAcc (primᵗ notᵖ x) σ rσ a = tt
+  redTmAcc (strmᵗ e) []       rσ (acc rs) =
+    subst (Red (obs _)) (subΘ-idExp e) (redExpAcc e [] tt (rs ≤-refl))
+  redTmAcc (strmᵗ e) (v ∷ vs) rσ (acc rs) = redExpAcc e (v ∷ vs) rσ (rs ≤-refl)
+
+  redTmsAcc : ∀ {n} {Γ : Ctx n} {Θ u} (ts : List (Tm Γ [] [] Θ u))
+              (σ : All (Val Γ) Θ) → RedEnv σ
+            → Acc _<_ (gsizeᵗˢ ts)
+            → All (Red u) (map (λ tm → evalTm tm) (subΘTms [] σ ts))
+  redTmsAcc []       σ rσ a = []
+  redTmsAcc (x ∷ xs) σ rσ (acc rs) =
+      subst (Red _) (sym (sub-evalTm x σ))
+        (redTmAcc x σ rσ (rs (s≤s (m≤m+n (gsizeᵗ x) (gsizeᵗˢ xs)))))
+    ∷ redTmsAcc xs σ rσ (rs (s≤s (m≤n+m (gsizeᵗˢ xs) (gsizeᵗ x))))
+
+  -- A FRAME'S FUNCTION, CLOSED AGAINST THE AMBIENT ENVIRONMENT AND
+  -- THEN APPLIED, is the term face at one more entry.
+  redFnAcc : ∀ {n} {Γ : Ctx n} {Θ s u} (f : Fn Γ [] [] Θ s u)
+             (σ : All (Val Γ) Θ) → RedEnv σ
+           → Acc _<_ (gsizeᵗ f) → RedFn (subΘTm (s ∷ []) σ f)
+  redFnAcc {s = s} f σ rσ a {v} p =
+    subst (Red _) (sym (sub-applyFn f σ v)) (redTmAcc f (v ∷ σ) (p , rσ) a)
+
+-- THE TOP LINE: every closed expression is reducible, which is the
+-- face above at the empty environment, where closing is the identity.
 reducible : ∀ {n} {Γ : Ctx n} {t} (b : Closed Γ t) → Red {Γ = Γ} (obs t) b
-reducible b = reducibleAcc b (<-wellFounded (gsizeᵉ b))
+reducible b =
+  subst (Red (obs _)) (subΘ-idExp b) (redExpAcc b [] tt (<-wellFounded (gsizeᵉ b)))

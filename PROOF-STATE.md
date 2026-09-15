@@ -233,16 +233,15 @@ deferred beside it.
 
 ### Big picture tier roadmap
 
-- **RESTATE THE ENVIRONMENT LEAF, WHICH IS THE THEOREM AND NOT A LEAF.**
-  `red-env` proves the candidate at every value of every type — machine
-  witness in `Refuted.Red-Env-Too-Strong` — so the body's induction is
-  redundant given it and the five statements beside it are gaps smaller than
-  a gap. Reflection is total, so a CLOSED term buys no smallness. Restate it
-  as a MUTUAL PARTNER of the expression recursion, not as a smaller leaf: at
-  the empty environment the embedding arm is the top-line result itself. The
-  measure now COUNTS TERMS, which funds that partner; the price is that the
-  expression face grows a telescope and a reducible substitution, since the
-  partner may only be measured on RAW syntax.
+- **DISCHARGE THE SUBSTITUTION LEAVES THE PARTNER BOUGHT ITSELF WITH.** The
+  environment leaf is gone: the term face is now a mutual partner measured on
+  raw syntax under a carried environment, and the price it paid is six
+  statements about substitution rather than about reducibility. Three are the
+  μ arm, where the guarded elimination demands a Θ-CLOSED inserted expression
+  and the partner meets a Θ-open body; the honest repair is a `Θloc` telescope
+  threaded through the guarded and direct eliminations, weakening at the one
+  insertion site. Three are the ordinary commutations of substitution with
+  evaluation. None can move the ground, and none is instantiated yet.
 
 - **THEN RUN A SELF-REFERENTIAL μ, IN THE CORPUS RATHER THAN IN A PROBE.** The
   peel is now paid for by a size the unfolding does not move, and what funds that
@@ -279,10 +278,9 @@ deferred beside it.
   `DEAD ROUTE, PROBED`: a share's slot is reducible. Its def is drawn from the
   table rather than the term, so no descent this module can see reaches it.
 
-- **`red-scan`** (Rx/Evaluator/Reducible) — FALSITY,
-  `REFUTED, DEAD ROUTE, PROBED`: a scan's accumulator is read back out of the
-  node this face installed, and the candidate carries no claim about what a
-  node holds.
+- **`red-scan`** (Rx/Evaluator/Reducible) — FALSITY, `DEAD ROUTE, PROBED`: a
+  scan's accumulator is read back out of the node this face installed, and the
+  candidate carries no claim about what a node holds.
 
 - **`red-take`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`: the same gap
   plus a truncation, which is where a burst can lose the value a satisfaction
@@ -296,10 +294,21 @@ deferred beside it.
   walk. Inhabited at every operator's reading of an EMPTY node; a node already
   holding something is unreached.
 
-- **`red-env`** (Rx/Evaluator/Reducible) — FALSITY, `REFUTED, PROBED`: every
-  term's value is reducible under a reducible environment. Mutual with the body
-  through the expression embedding, so the route is known and nothing has
-  walked it.
+- **`sub-unfoldμ`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`: the fixpoint
+  peel commutes with the environment substitution. This is what the partner's μ
+  arm spends, and it is where a wrong telescope would show.
+
+- **`sub-evalTm`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`: evaluating a
+  substituted term is evaluating it under the environment. Ordinary, and stated
+  rather than assumed because nothing has instantiated it.
+
+- **`sub-applyFn`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`: the same for
+  a frame's function, where the substitution must skip the argument slot the
+  function binds.
+
+- **`subΘ-idExp`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`: the empty
+  substitution is the identity. It is what makes the top line a corollary of
+  the partner at the empty environment.
 
 
 ## Tier 2 — Verify-Well-Formed (parked behind tier 1)
