@@ -268,25 +268,27 @@ does.
   The leg is those rows, and what it buys is the only thing that moves the
   measure's own statements off the class they are born into.
 
-- **DECIDE WHETHER A RANK CAN BOUND AN EMISSION AT ALL — THE COUNT-CARRYING LEG
-  IS DISCARDED, NOT SHRUNK.** That leg asked where a fold's delivery count could
-  be read so the rank could reserve against it. `Refuted.Entry-Depth` removes the
-  side it would have been reserved against, and the entry is a ceiling on every
-  frame of the run it is taken against, so no rank in this tower is large enough
-  and a count would have nowhere to be spent. The leg is the mechanism question
-  the three refutations now jointly ask, and it is Anthony's to settle.
+- **FIND OUT WHETHER A VALUE CAN CARRY ITS PRODUCER — THE RANK-OR-PREDICATE LEG
+  IS RETIRED, ANSWERED BOTH WAYS.** No figure fixed before a run bounds an
+  emission, and dropping the number for a domain predicate is not the escape:
+  the only one this evaluator can case on holds of every closed term. The route
+  left is the one `Rx.Evaluator.Domain`'s header names and defers — make a value
+  carry the term that produced it, so the hop is structural. This leg is its
+  SCOPING commit: the index wants to run through `Val`, which is the spec's, so
+  whether it confines to the evaluator's own stream and frames decides whether
+  the route is ours or a question for Anthony.
 
 ### Open questions
 
-- **Can a figure fixed before a run bound what that run emits?** Every risky row
-  left in this tier is one claim at different heads: that what a frame writes
-  stays under the rank the frame entered at. The question used to be where the
-  burst LENGTH lives, on the reading that a count was the missing input to an
-  otherwise sound comparison. It is not: the comparison itself is refuted in its
-  own currency, with one side constant across a family whose other side doubles,
-  so no count repairs it. What is left is narrower and harder — whether the rank
-  is the wrong side of the comparison, and what a frame could be handed instead
-  that a run can supply and a descent can still spend.
+- **What must a value CARRY for a descent to spend it?** Every risky row left in
+  this tier is one claim at different heads: that what a frame writes stays under
+  the rank the frame entered at. The question was whether a figure fixed before a
+  run can bound what the run emits, and it is answered — no, with one side
+  constant across a family whose other side doubles. It is now a question about
+  the value rather than the comparison, and it has lost its other half too: a
+  domain predicate is not the escape, since the only one the machine can case on
+  holds of every term. What is left is whether an arriving observable can be
+  related to the one in hand at all, which nothing yet has tried.
   relevant: `scan-fits`, `inner-handed`, `thru-handed`
 
 ### The ledger
@@ -307,10 +309,11 @@ does.
   closed bound and at a positive one, which is where the bound being a
   parameter could have leaked.
 
-- **`scan-fits`** (Rx/Evaluator/Burst-Report) — FALSITY, `REFUTED×5`: refuted at
-  a five-element burst, the premise that would carry the count refuted at the
-  only channel able to hold one, and now the rank it reserves against refuted
-  too. No restatement over this tower's ranks is available.
+- **`scan-fits`** (Rx/Evaluator/Burst-Report) — FALSITY,
+  `REFUTED×6, DEAD ROUTE`: refuted at a five-element burst, the premise that
+  would carry the count refuted, the rank it reserves against refuted, and the
+  domain predicate that would replace the rank shown to be `⊤`. Neither a
+  number nor a predicate is available.
 
 
 ## Tier 2 — Verify-Well-Formed (parked behind tier 1)
