@@ -45,10 +45,11 @@ open import Data.List.Relation.Unary.All using (All)
 open import Data.List.Relation.Unary.All.Properties using (++⁺)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _≤_; _<_; _+_; _*_; _⊔_; z≤n; s≤s)
-open import Data.Nat.Properties using (≤-refl; ≤-trans; <⇒≤; m≤m⊔n; m≤n⊔m)
+open import Data.Nat.Properties using (≤-refl; ≤-trans; <⇒≤; m≤m⊔n; m≤n⊔m; ⊔-lub;
+  ⊔-identityʳ; ≤-reflexive)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
-open import Data.Unit using (⊤; tt)
+open import Data.Unit using (tt)
 open import Data.Vec using (lookup)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong; subst)
 
@@ -56,9 +57,8 @@ open import Rx.Prim using (Id; Source; Tick; InstEvent; InstEmit; init; value; c
   handoff; complete; exhausted; subscribe; _at_from_as_)
 open import Rx.Exp using (Ty; Ctx; Closed; Val; Tm; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_;
   obs; input; isData; evalTm; evalWith; Fn; applyFn; reify)
-open import Rx.Obs-Depth using (depᵗ; depᵗˢ; depᵛ)
-open import Rx.Obs-Depth.Substitution using (AllData; []ᵈ; _∷ᵈ_; ≤pred⇒<;
-  dep-eval-strict; envDepth; dep-eval-open; dep-below-reify)
+open import Rx.Obs-Depth using (depᵉ; depᵗ; depᵗˢ; depᵛ; bindᵃᵉ; bindˢᵗ)
+open import Rx.Obs-Depth.Substitution using (dep-eval; envDepth)
 open import Rx.Evaluator.Scan-Climb using (Rate; scan-climbs)
 open import Rx.Slots using (Slots)
 open import Rx.Slot-Depth using (slotDepth)
@@ -78,7 +78,7 @@ open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeAll⇓; pushBurst
   step-map; step-scan; step-scan-nil; step-take; step-from-inner;
   step-thru-outer)
 open import Rx.Evaluator.Doorless using (EntryOK; ValOK; HandedOK; BurstOK; EventOK;
-  split-handed; inner-ok; under-ok; μ-entry)
+  split-handed; inner-ok; under-ok; entry-inner; μ-entry)
 
 ------------------------------------------------------------------
 -- THE SHAPES THAT CARRY NOTHING.  Several of the burst shapes a
@@ -169,34 +169,6 @@ postulate
 -- evaluating a term does not deepen it past its own reading — which is
 -- the substitution shelf's subject, and the reason that shelf exists.
 --
--- AND WHAT IS LEFT AS A LEAF IS THE SILENT TERM, WHOSE READING IS
--- NOUGHT.  A term reading nothing wrote no `strmᵗ`, and the only other
--- way to hold an observable is to read one from a binder — which under
--- a data environment carries none.  So its value carries no observable
--- at all and the predicate holds at EVERY rank, the rank nought
--- included, which is the one case the drop cannot reach: there is
--- nothing to drop below.  It is a leaf because the induction saying so
--- is over the type and the term together rather than over either
--- alone.
---
--- AND IT IS STATED OPEN, WHICH IS WHAT THE FRAME WALK ASKS FOR RATHER
--- THAN A GENERALITY FOR ITS OWN SAKE.  A map frame applies a template
--- to one value, so the term it evaluates is open at exactly one binder
--- and the closed form is this one at the empty environment.  The data
--- hypothesis is what keeps that binder from being the observable the
--- statement says the term does not hold.
---
--- PROBED: `Probed.Burst-Handed` — at a flat payload, at a sum whose
---   other arm is an observable, which is the shape that could fail it
---   (the TYPE reaches an observable while the value takes the other
---   arm, so the reading has to select on the injection rather than on
---   the type), and at a term reading a data binder.  NOT reached: a
---   binder at a compound data type.
-postulate
-  eval-silent : ∀ {n} {Γ : Ctx n} {Θ u} {τ : Tri} (η : Fin n → ℕ)
-                → AllData Θ → (tm : Tm Γ [] [] Θ u) (env : All (Val Γ) Θ)
-                → depᵗ η tm ≡ 0 → ValOK η u τ (evalWith tm env)
-
 private
   -- a value read under the rank satisfies the entry predicate at every
   -- type: the rank enters only at `obs`, and the join a compound is
@@ -213,29 +185,76 @@ private
   valOK-below η (s +ᵗ t) (inj₂ b) lt = valOK-below η t b lt
   valOK-below η (obs t)  _        lt = lt
 
-  -- one element: the term's own reading bounds its value's, strictly
-  -- wherever there is anything to be strict about.  Open at a data
-  -- environment, since a frame's template is open at exactly one
-  -- binder and a source's terms are this at the empty one
+  -- AND THE SAME PREDICATE READ THROUGH `reify`, WHICH IS THE FORM
+  -- EVERYTHING ARITHMETIC HERE ARRIVES IN.  `ValOK` is strict at an
+  -- observable and vacuous everywhere else; `reify` writes one `strmᵗ`
+  -- at an observable and nothing anywhere else.  So one weak
+  -- inequality about the reification says exactly what the predicate
+  -- says, at every type at once, and the strictness is a reduction
+  -- rather than a premise anybody has to carry.
+  valOK-reify : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) {U r sz} (u : Ty)
+                (v : Val Γ u) → depᵗ η 0 (reify v) ≤ r
+              → ValOK η u (U , r , sz) v
+  valOK-reify η unitᵗ    _        le = tt
+  valOK-reify η boolᵗ    _        le = tt
+  valOK-reify η natᵗ     _        le = tt
+  valOK-reify η (s ×ᵗ t) (a , b)  le =
+      valOK-reify η s a (≤-trans (m≤m⊔n _ _) le)
+    , valOK-reify η t b (≤-trans (m≤n⊔m _ _) le)
+  valOK-reify η (s +ᵗ t) (inj₁ a) le = valOK-reify η s a le
+  valOK-reify η (s +ᵗ t) (inj₂ b) le = valOK-reify η t b le
+  valOK-reify η (obs t)  _        le = le
+
+  -- and back, which is what makes a value admissible as an ENVIRONMENT
+  valOK⇒reify : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) {U r sz} (u : Ty)
+                (v : Val Γ u) → ValOK η u (U , r , sz) v
+              → depᵗ η 0 (reify v) ≤ r
+  valOK⇒reify η unitᵗ    _        ok = z≤n
+  valOK⇒reify η boolᵗ    _        ok = z≤n
+  valOK⇒reify η natᵗ     _        ok = z≤n
+  valOK⇒reify η (s ×ᵗ t) (a , b)  (p , q) =
+    ⊔-lub (valOK⇒reify η s a p) (valOK⇒reify η t b q)
+  valOK⇒reify η (s +ᵗ t) (inj₁ a) ok = valOK⇒reify η s a ok
+  valOK⇒reify η (s +ᵗ t) (inj₂ b) ok = valOK⇒reify η t b ok
+  valOK⇒reify η (obs t)  _        ok = ok
+
+  -- a rank only ever rises along a frame, and the predicate follows it
+  valOK-mono : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) {U q sz U′ r sz′} (u : Ty)
+               (v : Val Γ u) → q ≤ r → ValOK η u (U , q , sz) v
+             → ValOK η u (U′ , r , sz′) v
+  valOK-mono η u v qr ok = valOK-reify η u v (≤-trans (valOK⇒reify η u v ok) qr)
+
+  handed-mono : ∀ {n} {Γ : Ctx n} {u} (η : Fin n → ℕ) {U q sz U′ r sz′}
+                (vs : List (Val Γ u)) → q ≤ r → HandedOK η vs (U , q , sz)
+              → HandedOK η vs (U′ , r , sz′)
+  handed-mono η []       qr []ᵃ       = []ᵃ
+  handed-mono {u = u} η (v ∷ vs) qr (p ∷ᵃ ps) =
+    valOK-mono η u v qr p ∷ᵃ handed-mono η vs qr ps
+
+  -- ONE ELEMENT, AND IT IS NOW A BODY RATHER THAN THREE LEAVES.  The
+  -- term's own reading bounds its value's, at the bound its
+  -- environment satisfies — which is the whole of the substitution
+  -- shelf's subject, and unconditional in what the binders hold.  The
+  -- data hypothesis the three predecessors carried was never about the
+  -- mathematics: it was how a reading with no bound argument excluded
+  -- the case it could not price.
   handed-open : ∀ {n} {Γ : Ctx n} {Θ u} {U r sz} (η : Fin n → ℕ)
-                (dd : AllData Θ) (tm : Tm Γ [] [] Θ u)
-                (env : All (Val Γ) Θ) → depᵗ η tm ≤ r
+                (tm : Tm Γ [] [] Θ u) (env : All (Val Γ) Θ) (m : ℕ)
+              → envDepth η env ≤ m → depᵗ η m tm ≤ r
               → ValOK η u (U , r , sz) (evalWith tm env)
-  handed-open {u = u} η dd tm env le with depᵗ η tm in eq
-  ... | zero  = eval-silent η dd tm env eq
-  ... | suc k = valOK-below η u (evalWith tm env)
-                  (≤-trans (≤pred⇒< (subst (0 <_) (sym eq) (s≤s z≤n))
-                                    (dep-eval-strict η dd tm env))
-                           (subst (_≤ _) (sym eq) le))
+  handed-open {u = u} η tm env m h le =
+    valOK-reify η u (evalWith tm env)
+      (≤-trans (dep-eval η tm env m h) le)
 
 of-handed : ∀ {n} {Γ : Ctx n} {u} {U r sz} (η : Fin n → ℕ)
             (ts : List (Tm Γ [] [] [] u))
-          → depᵗˢ η ts ≤ r
+          → depᵗˢ η 0 ts ≤ r
           → HandedOK η (map (λ tm → evalTm tm) ts) (U , r , sz)
 of-handed η []        dep = []ᵃ
 of-handed η (tm ∷ ts) dep =
-    handed-open η []ᵈ tm []ᵃ (≤-trans (m≤m⊔n (depᵗ η tm) (depᵗˢ η ts)) dep)
-  ∷ᵃ of-handed η ts (≤-trans (m≤n⊔m (depᵗ η tm) (depᵗˢ η ts)) dep)
+    handed-open η tm []ᵃ 0 ≤-refl
+      (≤-trans (m≤m⊔n (depᵗ η 0 tm) (depᵗˢ η 0 ts)) dep)
+  ∷ᵃ of-handed η ts (≤-trans (m≤n⊔m (depᵗ η 0 tm) (depᵗˢ η 0 ts)) dep)
 
 -- THE LIST'S OWN READING, WHICH IS WHAT AN ENTRY POINT PAYS WITH.
 -- Every builder quantifies over the rank, so a site ENTERING the
@@ -316,15 +335,26 @@ private
 -- WHAT THE ENTRY INVARIANT SAYS ABOUT THE FRAME ITSELF, which is the
 -- one thing the step needs and the cycle did not carry.  Two of the
 -- five heads hold a template, and the reading of the expression the
--- subscribe entered at is a JOIN over that template and the inner --
--- so the caller already has this and hands it down rather than
--- proving it.  The other three hold no term at all.
-FrameOK : ∀ {n} {Γ : Ctx n} {s u} (η : Fin n → ℕ) → Frame Γ s u → Tri → Set
-FrameOK η (map-f fn)          (_ , r , _) = depᵗ η fn ≤ r
-FrameOK η (scan-f fn nid)     (_ , r , _) = depᵗ η fn ≤ r
-FrameOK η (take-f nid)        _           = ⊤
-FrameOK η (from-inner _ _ _)  _           = ⊤
-FrameOK η (thru-outer _ _)    _           = ⊤
+-- subscribe entered at prices that template AT THE BOUND ITS SOURCE
+-- EMITS UNDER -- so the caller already has this and hands it down
+-- rather than proving it.  The other three hold no term at all, and
+-- what they owe instead is that the rank did not fall.
+--
+-- IT RELATES TWO RANKS AND NOT ONE, AND THAT IS THE WHOLE REPAIR.  A
+-- frame is handed what its source emitted and delivers onward what it
+-- wrote, and those are two different depths whenever the template
+-- WRAPS -- so a predicate denominated at a single rank asserts that a
+-- template which deepens its argument does not, which is false at a
+-- template as small as one that re-emits what it was given.  The
+-- source's rank is the bound the template is READ at; the frame's is
+-- the bound its output is CLAIMED under; and the reading's own
+-- composing clause is what makes the caller able to supply both.
+FrameOK : ∀ {n} {Γ : Ctx n} {s u} (η : Fin n → ℕ) → Frame Γ s u → Tri → Tri → Set
+FrameOK η (map-f fn)          (_ , q , _) (_ , r , _) = depᵗ η q fn ≤ r
+FrameOK η (scan-f fn nid)     (_ , q , _) (_ , r , _) = depᵗ η q fn ≤ r
+FrameOK η (take-f nid)        (_ , q , _) (_ , r , _) = q ≤ r
+FrameOK η (from-inner _ _ _)  (_ , q , _) (_ , r , _) = q ≤ r
+FrameOK η (thru-outer _ _)    (_ , q , _) (_ , r , _) = q ≤ r
 
 private
   -- a take hands on a PREFIX of what it was given, so any property of
@@ -356,60 +386,26 @@ private
   take-arm η nid vs fin sched st (just (switch-st _ _))     ps = []ᵃ
   take-arm η nid vs fin sched st (just (exhaust-st _ _))    ps = []ᵃ
 
--- THE MAP AT A DATA PAYLOAD, WHICH IS THE ONE-VALUE DROP AND NOTHING
--- MORE.  `applyFn` is evaluation at a one-binder environment, so the
--- arm is the source's own reading generalised from the empty
--- environment to that binder -- and the data hypothesis is what stops
--- the binder being the observable the drop assumes is not there.
-map-data : ∀ {n} {Γ : Ctx n} {s u} {τ : Tri} (η : Fin n → ℕ)
-           → isData s ≡ true → (fn : Fn Γ [] [] [] s u)
-             (vs : List (Val Γ s)) → depᵗ η fn ≤ proj₁ (proj₂ τ)
-           → HandedOK η vs τ → HandedOK η (map (applyFn fn) vs) τ
-map-data {τ = _ , _ , _} η ds fn []       le []ᵃ        = []ᵃ
-map-data {τ = _ , _ , _} η ds fn (v ∷ vs) le (_ ∷ᵃ ps) =
-    handed-open η (ds ∷ᵈ []ᵈ) fn (v ∷ᵃ []ᵃ) le
-  ∷ᵃ map-data η ds fn vs le ps
-
--- AND THE MAP AT A PAYLOAD THAT IS NOT DATA, WHICH IS WHERE THE
--- MEASURE RUNS OUT.  The bound on the frame is a JOIN and the run is a
--- SUM: evaluation at an environment holding an observable costs the
--- template's reading PLUS the environment's, so a template wrapping
--- its own argument hands back a value deeper than either side and no
--- premise about the FRAME can close it -- the argument is the other
--- addend.  What is left once the sum is spent is that arithmetic and
--- nothing else: the rank a frame ENTERS at has to reserve budget for
--- the frame's own template, and today it is a join that does not.
---
--- REFUTED: `Refuted.Template-Passes` — the crossing at the shelf's own
---   statement, which is where it was found first: a template that
---   merely passes its argument through reifies it under a `strmᵗ` the
---   template never wrote, so the emission is as deep as whatever was
---   handed in.  Its rows are the witness for this arm too, since the
---   quantity that fails here is the one it reads.
-postulate
-  map-fits : ∀ {n} {Γ : Ctx n} {s u} {U r sz} (η : Fin n → ℕ)
-           → isData s ≡ false → (fn : Fn Γ [] [] [] s u) (v : Val Γ s)
-           → depᵗ η fn ≤ r → ValOK η s (U , r , sz) v
-           → depᵗ η fn + envDepth η (v ∷ᵃ []ᵃ) < r
-
--- AND THE ARM ITSELF IS NOW A BODY OVER THAT LEAF, WHICH IS WHAT THE
--- SUM BOUGHT.  Evaluation at a one-binder environment is priced by
--- `dep-eval-open` whether or not the binder is data, so the half of
--- this arm that is about what a template WRITES is discharged here and
--- no longer asserted.  What the leaf above keeps is the arithmetic
--- alone, and stating it that way is what makes it instantiable: both
--- of its sides compute at a concrete template and a concrete value,
--- with no run and no evaluation between them.
-map-open : ∀ {n} {Γ : Ctx n} {s u} {τ : Tri} (η : Fin n → ℕ)
-         → isData s ≡ false → (fn : Fn Γ [] [] [] s u)
-           (vs : List (Val Γ s)) → depᵗ η fn ≤ proj₁ (proj₂ τ)
-         → HandedOK η vs τ → HandedOK η (map (applyFn fn) vs) τ
-map-open {τ = _ , _ , _} η ds fn []       le []ᵃ       = []ᵃ
-map-open {u = u} {τ = _ , _ , _} η ds fn (v ∷ vs) le (p ∷ᵃ ps) =
-    valOK-below η u (applyFn fn v)
-      (≤-trans (s≤s (dep-eval-open η fn (v ∷ᵃ []ᵃ) _ ≤-refl))
-               (map-fits η ds fn v le p))
-  ∷ᵃ map-open η ds fn vs le ps
+-- THE MAP, WHICH IS ONE EVALUATION PER VALUE AND NO ARITHMETIC AT ALL.
+-- `applyFn` is evaluation at a one-binder environment, so what the
+-- template hands back is priced by the template READ AT the bound that
+-- binder satisfies -- and the binder holds exactly what the source
+-- emitted, whose bound is the frame's incoming rank.  There is no
+-- case split on whether the payload is data: a binder carrying an
+-- observable is PRICED here rather than excluded, which is what the
+-- bound argument bought and what three of this arm's predecessors
+-- existed to work around.
+map-handed : ∀ {n} {Γ : Ctx n} {s u} {U q sz U′ r sz′} (η : Fin n → ℕ)
+             (fn : Fn Γ [] [] [] s u) (vs : List (Val Γ s))
+           → depᵗ η q fn ≤ r → HandedOK η vs (U , q , sz)
+           → HandedOK η (map (applyFn fn) vs) (U′ , r , sz′)
+map-handed η fn []       le []ᵃ       = []ᵃ
+map-handed {s = s} η fn (v ∷ vs) le (p ∷ᵃ ps) =
+    handed-open η fn (v ∷ᵃ []ᵃ) _
+      (≤-trans (≤-reflexive (⊔-identityʳ (depᵗ η 0 (reify v))))
+               (valOK⇒reify η s v p))
+      le
+  ∷ᵃ map-handed η fn vs le ps
 
 -- AND WHAT THE FOLD STILL OWES ONCE ITS ITERATION IS PRICED, WHICH IS
 -- A RESERVATION AND TWO UNKNOWNS.  The climb itself is no longer a
@@ -448,11 +444,11 @@ map-open {u = u} {τ = _ , _ , _} η ds fn (v ∷ vs) le (p ∷ᵃ ps) =
 --   premises, so the leaf is false as written and no figure repairs it:
 --   the repair is a premise carrying the count, not a cleverer witness.
 postulate
-  scan-fits : ∀ {n} {Γ : Ctx n} {s u} {U r sz} (η : Fin n → ℕ)
+  scan-fits : ∀ {n} {Γ : Ctx n} {s u} {U q sz r} (η : Fin n → ℕ)
     (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (ac : Val Γ u) (vs : List (Val Γ s))
-    → depᵗ η fn ≤ r → HandedOK η vs (U , r , sz)
-    → Σ ℕ (λ a → (depᵗ η (reify ac) ≤ a)
-               × All (λ v → depᵗ η (reify v) ≤ a) vs
+    → depᵗ η q fn ≤ r → HandedOK η vs (U , q , sz)
+    → Σ ℕ (λ a → (depᵗ η 0 (reify ac) ≤ a)
+               × All (λ v → depᵗ η 0 (reify v) ≤ a) vs
                × (a + length vs * Rate η fn < r))
 
 private
@@ -462,11 +458,11 @@ private
   -- never reads deeper than its reification
   handed-reify : ∀ {n} {Γ : Ctx n} {U r sz} (η : Fin n → ℕ) (u : Ty)
                  (vs : List (Val Γ u)) (a : ℕ) → a < r
-               → All (λ v → depᵗ η (reify v) ≤ a) vs
+               → All (λ v → depᵗ η 0 (reify v) ≤ a) vs
                → HandedOK η vs (U , r , sz)
   handed-reify η u []       a lt []ᵃ       = []ᵃ
   handed-reify η u (v ∷ vs) a lt (p ∷ᵃ ps) =
-      valOK-below η u v (≤-trans (s≤s (≤-trans (dep-below-reify η u v) p)) lt)
+      valOK-reify η u v (≤-trans p (<⇒≤ lt))
     ∷ᵃ handed-reify η u vs a lt ps
 
 -- AND THE FOLD'S ARM IS A BODY OVER THAT LEAF, ON THE MAP ARM'S OWN
@@ -477,12 +473,12 @@ private
 -- first statement in this tier to name the burst's LENGTH: the rank has
 -- to have been entered high enough to pay a rate per delivery, and
 -- `entryTri` reads a figure off the program, which has no length in it.
-scan-handed : ∀ {n} {Γ : Ctx n} {s u} {τ : Tri} (η : Fin n → ℕ)
+scan-handed : ∀ {n} {Γ : Ctx n} {s u} {U q sz U′ r sz′} (η : Fin n → ℕ)
   (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (ac : Val Γ u) (vs : List (Val Γ s))
   {outs : List (Val Γ u)} {ac′ : Val Γ u} →
-  depᵗ η fn ≤ proj₁ (proj₂ τ) → HandedOK η vs τ →
-  scanVals fn ac vs ≡ (outs , ac′) → HandedOK η outs τ
-scan-handed {u = u} {τ = _ , _ , _} η fn ac vs le ps eq
+  depᵗ η q fn ≤ r → HandedOK η vs (U , q , sz) →
+  scanVals fn ac vs ≡ (outs , ac′) → HandedOK η outs (U′ , r , sz′)
+scan-handed {u = u} η fn ac vs le ps eq
   with scan-fits η fn ac vs le ps
 ... | a , ac≤ , vs≤ , fits rewrite sym (cong proj₁ eq) =
   handed-reify η u _ _ fits (scan-climbs η fn ac vs a ac≤ vs≤)
@@ -543,41 +539,51 @@ postulate
 --   with the five frame clauses worked out; what does not transport is
 --   the denomination, since the statement it carries is the
 --   unenvironmented one the two retired witnesses killed.
-step-handed : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo} {τ : Tri}
+step-handed : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo} {τᵢ τ : Tri}
   (η : Fin n → ℕ) {id : Id} {now : Tick} {fr : Frame Γ s u}
   {κ : Path Γ lo u t} {vs : List (Val Γ s)} {c : Bool}
   {sched : Sched Γ} {st : EvalSt e}
   {vals : List (Val Γ u)} {evs : List (InstEvent (Val Γ t))} {fin : Bool}
   {sched′ : Sched Γ} {st′ : EvalSt e} →
-  FrameOK η fr τ → HandedOK η vs τ →
+  FrameOK η fr τᵢ τ → HandedOK η vs τᵢ →
   stepFrame⇓ {e = e} id now fr κ vs c sched st
     (vals , evs , fin , sched′ , st′) →
   HandedOK η vals τ
-step-handed {s = s} {τ = _ , _ , _} η {fr = map-f fn} le ps step-map
-  with isData s in ds
-... | true  = map-data η ds fn _ le ps
-... | false = map-open η ds fn _ le ps
-step-handed {τ = _ , _ , _} η {fr = scan-f fn nid} le ps (step-scan _ eq) =
+step-handed {τᵢ = _ , _ , _} {_ , _ , _} η {fr = map-f fn} le ps step-map =
+  map-handed η fn _ le ps
+step-handed {τᵢ = _ , _ , _} {_ , _ , _} η {fr = scan-f fn nid} le ps
+            (step-scan _ eq) =
   scan-handed η fn _ _ le ps eq
 step-handed η le ps step-scan-nil = []ᵃ
-step-handed η {fr = take-f nid} le ps
+step-handed {τᵢ = _ , _ , _} {_ , _ , _} η {fr = take-f nid} le ps
              (step-take {vals = vs} {fin = fin} {sched = sched} {st = st}) =
-  take-arm η nid vs fin sched st (lookupNode nid (EvalSt.nodes st)) ps
-step-handed η le ps (step-from-inner r)  = inner-handed η ps r
-step-handed η le ps
-            (step-thru-outer {fin = fin} {vs = vs} {bs = bs}
+  handed-mono η _ le
+    (take-arm η nid vs fin sched st (lookupNode nid (EvalSt.nodes st)) ps)
+step-handed {τᵢ = _ , _ , _} {_ , _ , _} η {fr = from-inner _ _ _} le ps
+            (step-from-inner r) =
+  handed-mono η _ le (inner-handed η ps r)
+step-handed {e = e} {τᵢ = Uᵢ , q , szᵢ} {U , r , sz} η
+            {fr = thru-outer op nid}
+            {κ = κ} {sched = sched} {st = st} le ps
+            (step-thru-outer {id = id} {now = now} {vals = vals} {fin = fin}
+                             {vs = vs} {bs = bs}
                              {sched′ = sched′} {st′ = st′} w) =
-  thru-handed η fin (vs , bs , sched′ , st′) ps w
+  handed-mono η {Uᵢ} {q} {szᵢ} {U} {r} {sz}
+    (proj₁ (thruWrap {e = e} op nid fin (vs , bs , sched′ , st′)))
+    le
+    (thru-handed {τ = Uᵢ , q , szᵢ} η {op = op} {nid = nid} {κ = κ}
+       {id = id} {now = now} {vs = vals} {sched = sched} {st = st}
+       fin (vs , bs , sched′ , st′) ps w)
 
-push-carries : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo} {τ : Tri}
+push-carries : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo} {τᵢ τ : Tri}
   (η : Fin n → ℕ) {id : Id} {now : Tick} {fr : Frame Γ s u} {κ : Path Γ lo u t}
   {bs : Stream Γ s} {sched : Sched Γ} {st : EvalSt e}
   {burst : Stream Γ u} {sched′ : Sched Γ} {st′ : EvalSt e} →
-  FrameOK η fr τ → BurstOK η bs τ →
+  FrameOK η fr τᵢ τ → BurstOK η bs τᵢ →
   pushBurst⇓ {e = e} id now fr κ bs sched st (burst , sched′ , st′) →
   BurstOK η burst τ
 push-carries η fok ok push-nil = []ᵃ
-push-carries {u = u} {τ = τ} η fok (okem ∷ᵃ okrest)
+push-carries {u = u} {τᵢ = τᵢ} {τ = τ} η fok (okem ∷ᵃ okrest)
              (push-cons {em = em} {evs = evs} {fin′ = fin′} sp step rest) =
     ++⁺ (subst (All (EventOK η τ))
                (cong (λ z → proj₁ (proj₂ z)) sp)
@@ -585,7 +591,7 @@ push-carries {u = u} {τ = τ} η fok (okem ∷ᵃ okrest)
         (++⁺ (retag-book η evs)
              (++⁺ (handed-events η _
                      (step-handed η fok
-                       (subst (λ ws → HandedOK η ws τ) (cong proj₁ sp)
+                       (subst (λ ws → HandedOK η ws τᵢ) (cong proj₁ sp)
                               (split-handed η (InstEmit.events em) okem))
                        step))
                   (fin-events η fin′)))
@@ -667,7 +673,8 @@ mutual
    EntryOK (slotDepth sl) b τ →
    subscribeAll⇓ {e = e} op ns b κ id now sched st (burst , sched′ , st′) →
    BurstOK (slotDepth sl) burst τ
- all-carries sl ok (sub-all _ d p) = push-carries _ tt (burst-carries sl ok d) p
+ all-carries {τ = U , r , sz} sl ok (sub-all _ d p) =
+   push-carries {τᵢ = U , r , sz} _ ≤-refl (burst-carries sl ok d) p
 
  burst-carries : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo} {τ : Tri}
    (sl : Slots Γ) {b : Closed Γ u} {κ : Path Γ lo u t} {id : Id} {now : Tick}
@@ -689,9 +696,13 @@ mutual
    oneshot-ok _ τ _ _ _ eq (data-handed _ τ _ okd)
  burst-carries {τ = τ} sl ok (subs-cold-async {ok = okd} _ _ _ _) =
    anchored-ok _ τ _ _ _ (data-handed _ τ _ okd)
- burst-carries {τ = _ , _ , _} sl ok (subs-map d p) =
-   push-carries _ (≤-trans (m≤m⊔n _ _) (proj₂ ok))
-     (burst-carries sl (inner-ok ok) d) p
+ burst-carries {τ = U , r , sz} sl ok (subs-map {f = f} {b = b} d p) =
+   push-carries {τᵢ = U , bindᵃᵉ (slotDepth sl) 0 b , sz}
+     _ (≤-trans (m≤m⊔n (depᵗ (slotDepth sl) (bindᵃᵉ (slotDepth sl) 0 b) f)
+                       (depᵉ (slotDepth sl) 0 b))
+                (proj₂ ok))
+     (burst-carries sl
+       (entry-inner (proj₁ ok) , m≤m⊔n (depᵉ (slotDepth sl) 0 b) 0) d) p
  burst-carries sl ok (subs-merge-all a)   = all-carries sl (under-ok ok) a
  burst-carries sl ok (subs-switch-all a)  = all-carries sl (under-ok ok) a
  burst-carries sl ok (subs-exhaust-all a) = all-carries sl (under-ok ok) a
@@ -699,8 +710,21 @@ mutual
    burst-carries sl
      ( ≤-trans (<⇒≤ (unfoldμ-shrinks body)) sz≤
      , μ-entry (slotDepth sl) body r≤ ) d
- burst-carries sl ok (subs-take-suc _ _ d p) =
-   push-carries _ tt (burst-carries sl (inner-ok ok) d) p
- burst-carries {τ = _ , _ , _} sl ok (subs-scan _ d p) =
-   push-carries _ (≤-trans (m≤m⊔n _ _) (≤-trans (m≤m⊔n _ _) (proj₂ ok)))
+ burst-carries {τ = U , r , sz} sl ok (subs-take-suc _ _ d p) =
+   push-carries {τᵢ = U , r , sz} _ ≤-refl
      (burst-carries sl (inner-ok ok) d) p
+ burst-carries {τ = U , r , sz} sl ok
+               (subs-scan {f = f} {seed = seed} {b = b} _ d p) =
+   push-carries {τᵢ = U , bindˢᵗ (slotDepth sl) 0 seed b , sz}
+     _ (≤-trans (m≤m⊔n (depᵗ (slotDepth sl) (bindˢᵗ (slotDepth sl) 0 seed b) f)
+                       (depᵗ (slotDepth sl) 0 seed))
+                (≤-trans (m≤m⊔n (depᵗ (slotDepth sl)
+                                   (bindˢᵗ (slotDepth sl) 0 seed b) f
+                                 ⊔ depᵗ (slotDepth sl) 0 seed)
+                                (depᵉ (slotDepth sl) 0 b))
+                         (proj₂ ok)))
+     (burst-carries sl
+       (entry-inner (proj₁ ok)
+       , ≤-trans (m≤m⊔n (depᵉ (slotDepth sl) 0 b) 0)
+                 (m≤m⊔n (bindᵃᵉ (slotDepth sl) 0 b)
+                        (depᵗ (slotDepth sl) 0 seed))) d) p

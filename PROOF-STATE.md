@@ -229,16 +229,6 @@ does.
 
 ### Big picture tier roadmap
 
-- **FIND THE CURRENCY THE REBINDING ARM IS ACTUALLY IN.** Two witnesses close
-  the open reading's `caseᵗ` arm from opposite sides and no clause answers
-  both: a JOIN over the three subterms is false at the empty environment, and
-  the ADDING clause that answers it breaks the sum instead, at an entry the
-  arm reads on both sides. So `depᵗ η tm + m` is the wrong SHAPE rather than a
-  clause away from true, and the leg decides what replaces it before anything
-  is stated over it — a bound multiplicative in the environment, or a reading
-  carrying the bound branch in the measure instead of in a premise.
-  `map-open` and `scan-handed` wait on whichever lands.
-
 - **GIVE THE BURST LENGTH A CARRIER.** `scan-fits` is REFUTED as written, at
   five plain numbers: it reserves one RATE per delivery under the entry rank
   while no premise relates the burst's LENGTH to that rank, so the two are
@@ -247,16 +237,6 @@ does.
   the seeding site already holds the burst it would be read from. What the
   reservation is sized from is the leg's own question; `entryTri`'s header
   carries where it would go.
-
-- **MAKE THE ENTRY RANK RESERVE WHAT A FRAME WILL SPEND.** With the sum in
-  `src`, what a map arm still asserts is arithmetic alone: the rank a frame
-  ENTERS at has to dominate the template PLUS what the template is handed, and
-  `entryTri` reads a join off the program that dominates neither sum. The static
-  half needs no length — a pipeline's reading becomes a sum down the operator
-  chain, and the entry then satisfies its own premise. The leg is that
-  restatement, and what it buys the carrier leg above is a smaller bill: it
-  separates the reservation a pipeline owes once from the one a fold owes per
-  delivery.
 
 - **WIDEN WHAT A BUILDER RETURNS, WHICH TURNS OUT TO GATE THE WALK.** Every
   premise is denominated at one `slotDepth sl` the caller fixes, and each clause
@@ -276,15 +256,13 @@ does.
   block rather than a leaf. It needs the agreement at a schedule it did not
   build, which is the leg above.
 
-- **AND THE TWO FRAME HEADS THAT LEAVE THE MODULE, WHICH ARE NOT THE MEASURE'S
-  QUESTION.** The frame walk landed and put four leaves where one statement
-  stood; two of them — `map-fits` and `scan-handed` — are the reading itself
-  being wrong and wait on the question below. The other two are not:
-  `inner-handed` and `thru-handed` do not rewrite a payload at all, they follow
-  the run into `innerReact⇓` and `thruWalk⇓`, so what is owed is this same claim
-  at the rank THAT family entered at. The leg is the walk over those two
-  relations, and what it decides is whether the rank an inner subscription
-  enters at is one this walk carries or one the record has to.
+- **AND THE TWO FRAME HEADS THAT LEAVE THE MODULE.** The frame walk is a body
+  at every head that rewrites a payload; what is left are the two that do not.
+  `inner-handed` and `thru-handed` follow the run into `innerReact⇓` and
+  `thruWalk⇓`, so what is owed is this same claim at the rank THAT family
+  entered at. The leg is the walk over those two relations, and what it decides
+  is whether the rank an inner subscription enters at is one this walk carries
+  or one the record has to.
 
 - **SAMPLE THE HEADS ABOVE FROM A RUN, THE WAY THE LAWS WERE SAMPLED.** Hand
   instantiation reached every arm of `innerReact⇓` and `thruWalk⇓` that passes
@@ -296,19 +274,28 @@ does.
   automaton already is — which reaches the minting arms because a real run
   subscribes, and is the apparatus every reading-over-a-run row here wants.
 
+- **INSTANTIATE THE COMPOSING READING AT THE SHAPES THAT KILLED ITS
+  PREDECESSORS.** The reading now takes the bound it is read at as a parameter
+  and composes at every binder, so the join and the sum that the two `caseᵗ`
+  witnesses killed are both gone — and nothing has instantiated what replaced
+  them. `Refuted.Case-Binds` still stands against the join and so pins the
+  clause from below, but a receipt for the clause itself needs rows: the
+  evaluation lemma in its `reify` form at a wrapping template, at a scrutinee
+  bound under a branch, and at a fold whose seed is deeper than its source.
+  The leg is those rows, and what it buys is the only thing that moves the
+  measure's own statements off the class they are born into.
+
 ### Open questions
 
 - **Where does the burst LENGTH live?** Every risky row left in this tier is one
   claim at different heads: that what a frame writes stays under the rank the
-  frame entered at. The sum landed, so the half of that claim about what
-  EVALUATION does is discharged, and what is left at every head is a
-  RESERVATION: the rank a frame enters at has to cover the frame's own spend as
-  well as what it was handed. That splits. A pipeline's spend is static; a
-  fold's is per DELIVERY — a run emits at the burst POSITION while the
-  program's reading holds still, at a shape a one-line rxjs pipeline reaches,
-  so it cannot be excluded as unreachable. The question is which carrier holds
-  that second half.
-  relevant: `map-fits`, `scan-fits`, `inner-handed`, `thru-handed`
+  frame entered at. The STATIC half is no longer a reservation at all — a
+  reading that composes at the binder makes a pipeline's own spend part of the
+  rank it is read at. What recurs is left: a fold spends per DELIVERY, a run
+  emitting at the burst POSITION while the program's reading holds still, at a
+  shape a one-line rxjs pipeline reaches. Which carrier holds that, for ONE
+  head rather than every head.
+  relevant: `scan-fits`, `inner-handed`, `thru-handed`
 
 ### The ledger
 
@@ -317,21 +304,11 @@ does.
   premise already dominates the slot's rank; what is missing between them is
   that `BurstOK` may be WIDENED along that domination. Where the field is owed.
 
-- **`map-fits`** (Rx/Evaluator/Burst-Report) — FALSITY, `REFUTED`: what the map
-  arm still asserts once the sum is spent, and it is arithmetic alone. The rank
-  a frame ENTERS at has to dominate the template PLUS what it was handed; a
-  join read off the program dominates neither addend's sum.
-
 - **`inner-handed`, `thru-handed`** (Rx/Evaluator/Burst-Report) — FALSITY,
   `PROBED×2`: the two `*All` heads, which rewrite no payload — they subscribe
   one, or deliver what an inner subscription produced. So the claim owed is
   this one about ANOTHER family's run, at the rank that family entered at
   rather than this frame's.
-
-- **`eval-silent`** (Rx/Evaluator/Burst-Report) — FALSITY, `PROBED`: the
-  residue the strict drop cannot reach — a closed term reading nought, whose
-  value must satisfy the predicate at EVERY rank because it carries no
-  observable to price.
 
 - **`data-handed`** (Rx/Evaluator/Burst-Report) — FALSITY, `PROBED`: a scripted
   slot's payload is data, and the rank is read only at `obs`, so this is an
@@ -342,24 +319,15 @@ does.
   connect's drop in the unconnected component, the arithmetic the arm above
   spends. No consumer until that arm is a body.
 
-- **`dep-eval-open`** (Rx/Obs-Depth/Substitution) — FALSITY,
-  `REFUTED×2, PROBED`: an instance of a template at an environment, priced as a
-  SUM — the shelf the map arm is now a body over. What could break it is
-  OCCURRENCE, a binder read twice or wrapped again, and the rows stand at both.
-
-- **`eval-case`, `eval-if`** (Rx/Obs-Depth/Substitution) — FALSITY,
-  `REFUTED×2, PROBED×2`: the two places evaluation enters a branch under a
-  binder the data hypothesis does not cover. One question asked twice.
-
-- **`dep-wkTm`, `data-of`** (Rx/Obs-Depth/Substitution) — FALSITY, `PROBED×2`:
-  the shelf under the arms above — the telescope membership, whose rows buy
-  non-vacuity rather than an inequality, and the weakening, which has content
-  on both sides.
+- **`dep-wkTm`** (Rx/Obs-Depth/Substitution) — FALSITY, `PROBED`: the shelf
+  under the substitution's variable arm — a weakening moves no reading, at the
+  closed bound and at a positive one, which is where the bound being a
+  parameter could have leaked.
 
 - **`scan-fits`** (Rx/Evaluator/Burst-Report) — SHAPE, `REFUTED×3`: refuted at
-  a five-element burst of plain numbers — the rank is asked for a length
-  reservation the premises never relate to it. The restatement is guaranteed
-  and is over the interface: the count must enter as a premise.
+  a five-element burst under a template that wraps once, and splitting the
+  arrival rank from the delivery rank did not reach it. The count must enter as
+  a premise.
 
 - **`subs-keeps-slots`, `step-keeps-slots`, `consume-keeps-slots`,
   `subs-unconn-drops`, `step-unconn-drops`, `consume-unconn-drops`**

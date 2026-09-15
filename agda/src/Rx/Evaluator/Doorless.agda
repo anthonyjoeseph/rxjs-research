@@ -91,6 +91,16 @@ variable
 -- that depth — and the hop's own re-entry satisfies the conjunct
 -- definitionally, since it drops the rank to the inner's own reading.
 --
+-- DEAD ROUTE: strengthening the rank conjunct to `depᵉ η r b ≤ r`, so
+--   that a frame's outgoing rank could be read off the entry rather than
+--   carried as a second rank.  It has no fixed point: a template that
+--   wraps its binder makes the reading of `mapᵉ f src` strictly
+--   increasing in the bound it is read at, so no `r` satisfies the
+--   conjunct at such a program and the invariant is unestablishable at
+--   the root rather than merely hard to preserve.  The rank a frame
+--   DELIVERS at is a second number, and that is why `FrameOK` carries
+--   two.
+--
 -- REFUTED: git show ba1285b:agda/evidence/refuted/Refuted/Totality-Entry.agda
 --   — the statement below WITHOUT this premise, at a `μ` over a one-shot
 --   source entered at the zero triple, claiming the unfolding's size
@@ -98,7 +108,7 @@ variable
 --   longer state it: the run reads no triple and emits no marker, so
 --   neither number the witness put side by side still exists.
 EntryOK : ∀ {n} {Γ : Ctx n} {u} (η : Fin n → ℕ) → Closed Γ u → Tri → Set
-EntryOK η b (_ , r , sz) = syncSizeᵉ b ≤ sz × depᵉ η b ≤ r
+EntryOK η b (_ , r , sz) = syncSizeᵉ b ≤ sz × depᵉ η 0 b ≤ r
 
 -- AND THE OTHER AGREEMENT A BUILDER CARRIES, WHICH IS ABOUT THE STORE
 -- RATHER THAN ABOUT THE TERM.  The connect's edge drops the unconnected
@@ -192,7 +202,7 @@ ValOK η natᵗ     _ _           = ⊤
 ValOK η (s ×ᵗ t) τ (a , b)     = ValOK η s τ a × ValOK η t τ b
 ValOK η (s +ᵗ t) τ (inj₁ a)    = ValOK η s τ a
 ValOK η (s +ᵗ t) τ (inj₂ b)    = ValOK η t τ b
-ValOK η (obs t)  (_ , r , _) o = depᵉ η o < r
+ValOK η (obs t)  (_ , r , _) o = depᵉ η 0 o < r
 
 HandedOK : ∀ {n} {Γ : Ctx n} {u} (η : Fin n → ℕ) → List (Val Γ u) → Tri → Set
 HandedOK {u = u} η vs τ = All (ValOK η u τ) vs
@@ -254,7 +264,7 @@ split-handed η (complete ∷ es) (_ ∷ᵃ ps) = split-handed η es ps
 μ-edge : ∀ {U r sz} {Γ : Ctx n} {u} (η : Fin n → ℕ)
          (body : Exp Γ (u ∷ []) [] [] u)
        → syncSizeᵉ (μᵉ body) ≤ sz
-       → depᵉ η (μᵉ body) ≤ r
+       → depᵉ η 0 (μᵉ body) ≤ r
        → (U , r , syncSizeᵉ (unfoldμ body)) ≺ (U , r , sz)
 μ-edge η body sz≤ _ = ltS (≤-trans (unfoldμ-shrinks body) sz≤)
 
@@ -262,8 +272,8 @@ split-handed η (complete ∷ es) (_ ∷ᵃ ps) = split-handed η es ps
 -- what keeps the invariant true at the unfolding
 μ-entry : ∀ {r} {Γ : Ctx n} {u} (η : Fin n → ℕ)
           (body : Exp Γ (u ∷ []) [] [] u)
-        → depᵉ η (μᵉ body) ≤ r → depᵉ η (unfoldμ body) ≤ r
-μ-entry η body = ≤-trans (dep-unfoldμ-no-deeper η body)
+        → depᵉ η 0 (μᵉ body) ≤ r → depᵉ η 0 (unfoldμ body) ≤ r
+μ-entry η body = ≤-trans (dep-unfoldμ-no-deeper η 0 body)
 
 -- THE HOP'S FACT IS THE SUBSTITUTION REPORT, AND IT IS THE ONE THE
 -- WHOLE TIER IS ABOUT.  What arrives at the hop is a runtime VALUE,
@@ -300,8 +310,8 @@ split-handed η (complete ∷ es) (_ ∷ᵃ ps) = split-handed η es ps
 --   ABOVE this module, where a premise costs a proof obligation rather
 --   than an argument, so `evaluate` keeps the type a pipeline has.
 hop-edge : ∀ {U r s} {Γ : Ctx n} {u} (η : Fin n → ℕ) (o : Val Γ (obs u))
-         → depᵉ η o < r
-         → (U , depᵉ η o , syncSizeᵉ o) ≺ (U , r , s)
+         → depᵉ η 0 o < r
+         → (U , depᵉ η 0 o , syncSizeᵉ o) ≺ (U , r , s)
 hop-edge η o drop = ltR drop
 
 -- THE EXTRACTION, WRITTEN OUT BECAUSE IT IS THE WHOLE OF THE ARGUMENT
@@ -318,7 +328,7 @@ hop-edge η o drop = ltR drop
 -- against the statement that cannot determine them.
 hop-guard : ∀ {n} {Γ : Ctx n} {u} (η : Fin n → ℕ) (τ : Tri) (o : Val Γ (obs u))
           → HandedOK {Γ = Γ} η (o ∷ []) τ
-          → depᵉ η o < proj₁ (proj₂ τ)
+          → depᵉ η 0 o < proj₁ (proj₂ τ)
 hop-guard η _ o (h ∷ᵃ []ᵃ) = h
 
 -- THE CONNECT'S FACT IS THE ONE GENUINELY NEW STATEMENT, AND IT IS
@@ -463,7 +473,7 @@ connect-entry sl i eq = ≤-refl , ≤-reflexive (sym (slotDepth-fix sl i eq))
 --   asked to dominate an emission, only to be dropped by one.
 entryTri : ∀ {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → ℕ → Tri
 entryTri e sl m = unconn sl []
-                , depᵉ (slotDepth sl) e ⊔ m
+                , depᵉ (slotDepth sl) 0 e ⊔ m
                 , syncSizeᵉ e
 
 entryWitness : ∀ {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (m : ℕ)
