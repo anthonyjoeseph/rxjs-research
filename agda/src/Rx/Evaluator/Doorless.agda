@@ -452,15 +452,28 @@ connect-entry sl i eq = ≤-refl , ≤-reflexive (sym (slotDepth-fix sl i eq))
 -- component the hop is dropped in, and every caller passes nought, so
 -- the parameter is presently slack rather than a quantity.  The fold's
 -- leaf asks for exactly such a reservation while carrying no premise
--- that relates it to a burst, and the frame's rank is seeded from the
--- values in hand, where a count is free to read — so the two ends of
--- the repair already exist and what is unsettled is the SIZE.  It is
--- not the BUDGET the section below kills: a budget had to dominate
--- every later emission, while a reservation re-seeded at each frame
--- step covers one burst, and the run multiplies only across the steps
--- it is re-seeded at.
+-- that relates it to a burst.
+--
+-- AND THE TWO ENDS OF THAT REPAIR DO NOT MEET, WHICH IS A FINDING AND
+-- NOT A SIZE LEFT UNSETTLED.  A count IS free to read where the walk
+-- seeds a frame's rank, since the values are the argument it seeds
+-- from — but that site BUILDS a derivation, while the leaf is owed
+-- OVER one, where the triple is fixed ahead of the run that produces
+-- the burst and one triple has to serve every instant of a stream.
+-- Between the two stands exactly one length-shaped channel, the
+-- component seeded off `syncSizeᵉ`, and one instant of a doubling
+-- cascade already outgrows it: a run re-subscribing its own accumulator
+-- doubles per delivery while a measure additive in the syntax gains
+-- one per symbol.  So the reservation is not merely unsized — there is
+-- nothing at this entry to size it FROM, and restating the leaf to
+-- demand one trades a false arithmetic for an unpayable premise, which
+-- is the laundering the ledger cannot see.  This is narrower than the
+-- BUDGET the section below kills, and dies anyway: a budget had to
+-- dominate every later emission, and one instant is already enough.
 -- REFUTED: `Refuted.Scan-Length` — the leaf that would spend it, at a
 --   burst of five plain numbers
+-- REFUTED: `Refuted.Burst-Length` — the channel that would carry it,
+--   at four programs whose instants outgrow the reading
 -- DEAD ROUTE: seeding the component off SYNTAX AS A BUDGET — a power of
 --   two in the program's size plus the slot telescope's.  A value
 --   deepens on the way OUT, the frames above a flattener re-wrap what

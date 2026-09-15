@@ -229,23 +229,17 @@ does.
 
 ### Big picture tier roadmap
 
-- **GIVE THE BURST LENGTH A CARRIER.** `scan-fits` is REFUTED as written, at
-  five plain numbers: it reserves one RATE per delivery under the entry rank
-  while no premise relates the burst's LENGTH to that rank, so the two are
-  independent and no choice of figure repairs it. The leg is therefore an
-  INTERFACE change and not a proof — the count has to arrive in a PREMISE, and
-  the seeding site already holds the burst it would be read from. What the
-  reservation is sized from is the leg's own question; `entryTri`'s header
-  carries where it would go.
-
-- **WIDEN WHAT A BUILDER RETURNS, WHICH TURNS OUT TO GATE THE WALK.** Every
+- **WIDEN WHAT A BUILDER RETURNS, WHICH NOW GATES THE COUNT AS WELL AS THE
+  WALK.** Every
   premise is denominated at one `slotDepth sl` the caller fixes, and each clause
   carries an agreement `Sched.slots sched ≡ sl`. Three sites are handed a
   schedule some other clause built — `subs-keeps-slots`, `step-keeps-slots`,
   `consume-keeps-slots` — all stated as inductions over the ⇓ family they cannot
   perform; carrying the equation in the RESULT type discharges all three. It
   moves every clause's return, which is why it was last; it is first because
-  `connect-carries` cannot be walked without it, per the leg below.
+  `connect-carries` cannot be walked without it, per the leg below — and
+  because the result type is now the only place a burst's LENGTH can arrive
+  from, the entry having been refuted as its carrier.
 
 - **THE ARM THAT FOLLOWS THE RUN OUT OF THE STORE.** `burst-carries`,
   `all-carries` and `slot-carries` all walked; what is left is
@@ -285,6 +279,15 @@ does.
   The leg is those rows, and what it buys is the only thing that moves the
   measure's own statements off the class they are born into.
 
+- **FIND THE QUANTITY AN INSTANT'S WIDTH IS BOUNDED BY, OR ESTABLISH THERE IS
+  NONE.** The entry's own reading is now refuted as that quantity, at four
+  programs whose peaks double while the reading gains one, so what a frame may
+  reserve per delivery is denominated in nothing the tier currently carries.
+  The leg is the census: which relations already hand back a figure that grows
+  with the run, whether a fold's own delivery count is one of them, and what a
+  bound in it would oblige every producer to re-establish. Its product is a
+  carrier or a second refutation, and either settles the question below.
+
 ### Open questions
 
 - **Where does the burst LENGTH live?** Every risky row left in this tier is one
@@ -293,8 +296,9 @@ does.
   reading that composes at the binder makes a pipeline's own spend part of the
   rank it is read at. What recurs is left: a fold spends per DELIVERY, a run
   emitting at the burst POSITION while the program's reading holds still, at a
-  shape a one-line rxjs pipeline reaches. Which carrier holds that, for ONE
-  head rather than every head.
+  shape a one-line rxjs pipeline reaches. The ENTRY is now settled as no answer
+  — its one length-shaped component is outgrown by a single instant — so what
+  is left is whether any quantity a builder RETURNS holds it.
   relevant: `scan-fits`, `inner-handed`, `thru-handed`
 
 ### The ledger
@@ -324,10 +328,9 @@ does.
   closed bound and at a positive one, which is where the bound being a
   parameter could have leaked.
 
-- **`scan-fits`** (Rx/Evaluator/Burst-Report) — SHAPE, `REFUTED×3`: refuted at
-  a five-element burst under a template that wraps once, and splitting the
-  arrival rank from the delivery rank did not reach it. The count must enter as
-  a premise.
+- **`scan-fits`** (Rx/Evaluator/Burst-Report) — SHAPE, `REFUTED×4`: refuted at
+  a five-element burst, and the premise that would carry the count refuted in
+  turn at the only channel able to hold one. The count is owed from the run.
 
 - **`subs-keeps-slots`, `step-keeps-slots`, `consume-keeps-slots`,
   `subs-unconn-drops`, `step-unconn-drops`, `consume-unconn-drops`**
