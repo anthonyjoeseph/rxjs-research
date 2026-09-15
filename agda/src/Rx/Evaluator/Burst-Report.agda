@@ -45,7 +45,7 @@ open import Data.List.Relation.Unary.All using (All)
 open import Data.List.Relation.Unary.All.Properties using (++⁺)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _≤_; _<_; _+_; _*_; _⊔_; z≤n; s≤s)
-open import Data.Nat.Properties using (≤-refl; ≤-trans; <⇒≤; m≤m⊔n; m≤n⊔m; ⊔-lub;
+open import Data.Nat.Properties using (≤-refl; ≤-trans; <⇒≤; <-≤-trans; m≤m⊔n; m≤n⊔m; ⊔-lub;
   ⊔-identityʳ; ≤-reflexive)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
@@ -79,6 +79,55 @@ open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeAll⇓; pushBurst
   step-thru-outer)
 open import Rx.Evaluator.Doorless using (EntryOK; ValOK; HandedOK; BurstOK; EventOK;
   split-handed; inner-ok; under-ok; entry-inner; μ-entry)
+
+------------------------------------------------------------------
+-- WIDENING THE REPORT ALONG A RANK, WHICH IS WHAT THE CONNECT ASKS
+-- FOR.  The share connect re-enters at the slot's own rank rather than
+-- the one the caller fixed, so the burst comes back reported against a
+-- triple the caller's premise dominates rather than names.  What
+-- carries it across is that the predicate is MONOTONE in that rank:
+-- every other component is phantom below the entry, and the one place
+-- a triple is read at all is an observable payload, where it stands on
+-- the right of a `<`.  So the widening is an induction over the value
+-- TYPE with a single arithmetic step at `obs`, and nothing about the
+-- burst, the store or the program is consulted.
+------------------------------------------------------------------
+
+valOK-wide : ∀ {n} {Γ : Ctx n} {U r sz U' r' sz'} (η : Fin n → ℕ)
+             (u : Ty) (v : Val Γ u) → r ≤ r'
+           → ValOK η u (U , r , sz) v → ValOK η u (U' , r' , sz') v
+valOK-wide η unitᵗ    v        le p = tt
+valOK-wide η boolᵗ    v        le p = tt
+valOK-wide η natᵗ     v        le p = tt
+valOK-wide η (s ×ᵗ t) (a , b)  le (pa , pb) =
+  valOK-wide η s a le pa , valOK-wide η t b le pb
+valOK-wide η (s +ᵗ t) (inj₁ a) le p = valOK-wide η s a le p
+valOK-wide η (s +ᵗ t) (inj₂ b) le p = valOK-wide η t b le p
+valOK-wide η (obs t)  o        le p = <-≤-trans p le
+
+eventOK-wide : ∀ {n} {Γ : Ctx n} {u} {U r sz U' r' sz'} (η : Fin n → ℕ)
+               (ev : InstEvent (Val Γ u)) → r ≤ r'
+             → EventOK η (U , r , sz) ev → EventOK η (U' , r' , sz') ev
+eventOK-wide {u = u} η (value v)   le p = valOK-wide η u v le p
+eventOK-wide          η (init _)   le p = tt
+eventOK-wide          η (close _ _) le p = tt
+eventOK-wide          η (handoff _) le p = tt
+eventOK-wide          η complete   le p = tt
+
+eventsOK-wide : ∀ {n} {Γ : Ctx n} {u} {U r sz U' r' sz'} (η : Fin n → ℕ)
+                (evs : List (InstEvent (Val Γ u))) → r ≤ r'
+              → All (EventOK η (U , r , sz)) evs
+              → All (EventOK η (U' , r' , sz')) evs
+eventsOK-wide η []         le []ᵃ       = []ᵃ
+eventsOK-wide η (ev ∷ evs) le (p ∷ᵃ ps) =
+  eventOK-wide η ev le p ∷ᵃ eventsOK-wide η evs le ps
+
+burstOK-wide : ∀ {n} {Γ : Ctx n} {s} {U r sz U' r' sz'} (η : Fin n → ℕ)
+               (bs : Stream Γ s) → r ≤ r'
+             → BurstOK η bs (U , r , sz) → BurstOK η bs (U' , r' , sz')
+burstOK-wide η []        le []ᵃ       = []ᵃ
+burstOK-wide η (em ∷ bs) le (p ∷ᵃ ps) =
+  eventsOK-wide η (InstEmit.events em) le p ∷ᵃ burstOK-wide η bs le ps
 
 ------------------------------------------------------------------
 -- THE SHAPES THAT CARRY NOTHING.  Several of the burst shapes a
