@@ -65,6 +65,13 @@ open import Probed.Eval-Binders using (row-case-data; case-data-bound;
   row-case-obs; case-obs-bound; case-obs-value;
   row-if-selected; row-if-unselected)
 
+-- THE OPEN FORM, WHOSE ROWS DECIDE THE CURRENCY — the binder read
+-- straight back, the binder wrapped again, and the binder read twice,
+-- which is where a price per occurrence would have shown.
+open import Probed.Eval-Open using (o-reading; o-entry; row-empty;
+  row-data; row-pass; pass-template; row-wrap; wrap-template; wrap-value;
+  row-twice; twice-value)
+
 -- THE BURST REPORT'S TWO PRICING LEAVES — the data payload, whose rows
 -- reach the two types at which the reading recurses, and the silent
 -- term, whose load-bearing row stands at a type reaching an observable
