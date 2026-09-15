@@ -416,7 +416,7 @@ subscribeE! ac sl (mapᵉ f b) ok κ id now sched ag st ub =
   let ((burst , sched₁ , st₁) , d) =
         subscribeE! ac sl b (inner-ok ok) (map-f f ↠ κ) id now sched ag st ub
       (r , p) = pushBurst! ac sl id now (map-f f) tt κ burst
-                  (burst-carries sl (inner-ok ok) d) sched₁
+                  (burst-carries sl ag (inner-ok ok) d) sched₁
                   (trans (subs-keeps-slots d) ag) st₁
                   (≤-trans (subs-unconn-drops sl d) ub)
   in r , subs-map d p
@@ -431,7 +431,7 @@ subscribeE! ac sl (takeᵉ c b) ok κ id now sched ag st ub
                     (record sched { nextNode = suc nid }) ag
                     (installNode nid (take-st (suc k)) st) ub
       (r , p) = pushBurst! ac sl id now (take-f nid) tt κ burst
-                  (burst-carries sl (inner-ok ok) d) sched₂
+                  (burst-carries sl ag (inner-ok ok) d) sched₂
                   (trans (subs-keeps-slots d) ag) st₁
                   (≤-trans (subs-unconn-drops sl d) ub)
   in r , subs-take-suc eq refl d p
@@ -443,7 +443,7 @@ subscribeE! ac sl (scanᵉ f z b) ok κ id now sched ag st ub =
                     (record sched { nextNode = suc nid }) ag
                     (installNode nid (scan-st (evalTm z)) st) ub
       (r , p) = pushBurst! ac sl id now (scan-f f nid) tt κ burst
-                  (burst-carries sl (inner-ok ok) d) sched₂
+                  (burst-carries sl ag (inner-ok ok) d) sched₂
                   (trans (subs-keeps-slots d) ag) st₁
                   (≤-trans (subs-unconn-drops sl d) ub)
   in r , subs-scan refl d p
@@ -487,7 +487,7 @@ subscribeAll! ac sl op ns b ok κ id now sched ag st ub =
                     (record sched { nextNode = suc nid }) ag
                     (installNode nid ns st) ub
       (r , p) = pushBurst! ac sl id now (thru-outer op nid) tt κ burst
-                  (burst-carries sl ok d) sched₂
+                  (burst-carries sl ag ok d) sched₂
                   (trans (subs-keeps-slots d) ag) st₁
                   (≤-trans (subs-unconn-drops sl d) ub)
   in r , sub-all refl d p

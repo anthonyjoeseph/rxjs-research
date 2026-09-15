@@ -45,40 +45,99 @@ open import Data.List.Relation.Unary.All using (All)
 open import Data.List.Relation.Unary.All.Properties using (++⁺)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _≤_; _<_; _+_; _*_; _⊔_; z≤n; s≤s)
-open import Data.Nat.Properties using (≤-refl; ≤-trans; <⇒≤; m≤m⊔n; m≤n⊔m; ⊔-lub;
+open import Data.Nat.Properties using (≤-refl; ≤-trans; <⇒≤; <-≤-trans; m≤m⊔n; m≤n⊔m; ⊔-lub;
   ⊔-identityʳ; ≤-reflexive)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (tt)
 open import Data.Vec using (lookup)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 
 open import Rx.Prim using (Id; Source; Tick; InstEvent; InstEmit; init; value; close;
   handoff; complete; exhausted; subscribe; _at_from_as_)
 open import Rx.Exp using (Ty; Ctx; Closed; Val; Tm; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_;
-  obs; input; isData; evalTm; evalWith; Fn; applyFn; reify)
+  obs; input; isData; inputsBelowᵉ; syncSizeᵉ; evalTm; evalWith; Fn; applyFn; reify)
 open import Rx.Obs-Depth using (depᵉ; depᵗ; depᵗˢ; depᵛ; bindᵃᵉ; bindˢᵗ)
 open import Rx.Obs-Depth.Substitution using (dep-eval; envDepth)
 open import Rx.Evaluator.Scan-Climb using (Rate; scan-climbs)
-open import Rx.Slots using (Slots)
+open import Rx.Slots using (Slots; shared)
 open import Rx.Slot-Depth using (slotDepth)
 open import Rx.Strat-Order using (Tri)
 open import Rx.Sync-Size using (unfoldμ-shrinks)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; oneShotBurst;
   spentBurst; splitEvents; retagEvents; NodeId; NodeState; scan-st; take-st;
   mergeAll-st; switch-st; exhaust-st; takeVals; takeDispatch; scanVals; thruWrap;
-  map-f; scan-f; take-f; from-inner; thru-outer; lookupNode)
+  map-f; scan-f; take-f; from-inner; thru-outer; lookupNode; sharedPlumb)
 open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeAll⇓; pushBurst⇓;
   subscribeSharedSlot⇓; sharedConnect⇓; slot-spent; slot-join; slot-connect;
   stepFrame⇓; push-nil; push-cons;
   subs-floor; subs-shared; subs-hot-done; subs-hot-live; subs-cold-sync;
   subs-cold-async; subs-of; subs-empty; subs-map; subs-take-zero;
-  subs-take-suc; subs-scan; subs-merge-all; subs-switch-all;
+  subs-take-suc; subs-scan; subs-merge-all; subs-switch-all; connect-live; connect-died;
   subs-exhaust-all; subs-μ; subs-defer; sub-all; innerReact⇓; thruWalk⇓;
   step-map; step-scan; step-scan-nil; step-take; step-from-inner;
   step-thru-outer)
 open import Rx.Evaluator.Doorless using (EntryOK; ValOK; HandedOK; BurstOK; EventOK;
-  split-handed; inner-ok; under-ok; entry-inner; μ-entry)
+  split-handed; inner-ok; under-ok; entry-inner; μ-entry; connect-entry)
+
+------------------------------------------------------------------
+-- WIDENING THE REPORT ALONG A RANK, WHICH IS WHAT THE CONNECT ASKS
+-- FOR.  The share connect re-enters at the slot's own rank rather than
+-- the one the caller fixed, so the burst comes back reported against a
+-- triple the caller's premise dominates rather than names.  What
+-- carries it across is that the predicate is MONOTONE in that rank:
+-- every other component is phantom below the entry, and the one place
+-- a triple is read at all is an observable payload, where it stands on
+-- the right of a `<`.  So the widening is an induction over the value
+-- TYPE with a single arithmetic step at `obs`, and nothing about the
+-- burst, the store or the program is consulted.
+------------------------------------------------------------------
+
+valOK-wide : ∀ {n} {Γ : Ctx n} {U r sz U' r' sz'} (η : Fin n → ℕ)
+             (u : Ty) (v : Val Γ u) → r ≤ r'
+           → ValOK η u (U , r , sz) v → ValOK η u (U' , r' , sz') v
+valOK-wide η unitᵗ    v        le p = tt
+valOK-wide η boolᵗ    v        le p = tt
+valOK-wide η natᵗ     v        le p = tt
+valOK-wide η (s ×ᵗ t) (a , b)  le (pa , pb) =
+  valOK-wide η s a le pa , valOK-wide η t b le pb
+valOK-wide η (s +ᵗ t) (inj₁ a) le p = valOK-wide η s a le p
+valOK-wide η (s +ᵗ t) (inj₂ b) le p = valOK-wide η t b le p
+valOK-wide η (obs t)  o        le p = <-≤-trans p le
+
+eventOK-wide : ∀ {n} {Γ : Ctx n} {u} {U r sz U' r' sz'} (η : Fin n → ℕ)
+               (ev : InstEvent (Val Γ u)) → r ≤ r'
+             → EventOK η (U , r , sz) ev → EventOK η (U' , r' , sz') ev
+eventOK-wide {u = u} η (value v)   le p = valOK-wide η u v le p
+eventOK-wide          η (init _)   le p = tt
+eventOK-wide          η (close _ _) le p = tt
+eventOK-wide          η (handoff _) le p = tt
+eventOK-wide          η complete   le p = tt
+
+eventsOK-wide : ∀ {n} {Γ : Ctx n} {u} {U r sz U' r' sz'} (η : Fin n → ℕ)
+                (evs : List (InstEvent (Val Γ u))) → r ≤ r'
+              → All (EventOK η (U , r , sz)) evs
+              → All (EventOK η (U' , r' , sz')) evs
+eventsOK-wide η []         le []ᵃ       = []ᵃ
+eventsOK-wide η (ev ∷ evs) le (p ∷ᵃ ps) =
+  eventOK-wide η ev le p ∷ᵃ eventsOK-wide η evs le ps
+
+burstOK-wide : ∀ {n} {Γ : Ctx n} {s} {U r sz U' r' sz'} (η : Fin n → ℕ)
+               (bs : Stream Γ s) → r ≤ r'
+             → BurstOK η bs (U , r , sz) → BurstOK η bs (U' , r' , sz')
+burstOK-wide η []        le []ᵃ       = []ᵃ
+burstOK-wide η (em ∷ bs) le (p ∷ᵃ ps) =
+  eventsOK-wide η (InstEmit.events em) le p ∷ᵃ burstOK-wide η bs le ps
+
+-- AND THE PLUMBING REWRITE CARRIES EVERYTHING, WHICH IS WHY THE CONNECT
+-- PAYS NOTHING FOR IT.  A share hands its subscriber's burst on with
+-- each instant's KIND rewritten and its events untouched, and the
+-- report reads events alone -- so the rewrite is invisible to it and
+-- the transport is the identity on the witness.
+plumb-ok : ∀ {n} {Γ : Ctx n} {s} {τ : Tri} (η : Fin n → ℕ) (bs : Stream Γ s)
+         → BurstOK η bs τ → BurstOK η (sharedPlumb bs) τ
+plumb-ok η []        []ᵃ       = []ᵃ
+plumb-ok η (em ∷ bs) (p ∷ᵃ ps) = p ∷ᵃ plumb-ok η bs ps
 
 ------------------------------------------------------------------
 -- THE SHAPES THAT CARRY NOTHING.  Several of the burst shapes a
@@ -619,123 +678,65 @@ push-carries {u = u} {τᵢ = τᵢ} {τ = τ} η fok (okem ∷ᵃ okrest)
                   (fin-events η fin′)))
   ∷ᵃ push-carries η fok okrest rest
 
--- AND THE SHARED SLOT, WHICH IS A WALK AFTER ALL — OVER THREE
--- CONSTRUCTORS OF WHICH TWO CARRY NOTHING.  A slot the run has already
--- spent hands back the spent burst and a slot joining something already
--- live hands back one init, so both close by the bookkeeping lemmas
--- above at every triple.  What is left is the CONNECT, which is the only
--- arm that re-enters the subscribe, and so the only one where the two
--- readings can differ.
-postulate
-  -- THE CONNECT, WHERE THE SLOT'S OWN READING MEETS THE CALLER'S.  The
-  -- fan-out re-enters at `slotDepth sl i` rather than at the rank the
-  -- caller fixed, so the burst comes back reported against a triple this
-  -- statement's premise does not mention.  `Rx.Evaluator.Doorless.
-  -- connect-entry` already proves the re-entry invariant holds at the
-  -- slot's own triple, and `depᵉ (slotDepth sl) (input i)` IS
-  -- `slotDepth sl i`, so the caller's premise already dominates that
-  -- rank — what is missing between them is that `BurstOK` may be WIDENED
-  -- along that domination, which nothing in the tree yet states.  That
-  -- widening is the same relating the queued observable needs, which is
-  -- why this arm is where the record's field is owed.
-  --
-  -- AND IT IS ORDERED BEHIND THE BUILDER AGREEMENT, WHICH IS WHAT STOPS
-  -- IT BEING WALKED TODAY.  The recursion itself is available: both of
-  -- `sharedConnect⇓`'s constructors prepend bookkeeping to a
-  -- `sharedPlumb` of a burst some `subscribeE⇓` produced, and that
-  -- derivation is a structural subterm — so this is a CLAUSE of the walk
-  -- below and not a family it cannot perform.  What it cannot supply is
-  -- `connect-entry`'s premise: the constructor carries the equation
-  -- against the SCHEDULE's table and `connect-entry` wants it against
-  -- `sl`, so the clause needs `Sched.slots sched ≡ sl` at a schedule
-  -- another clause built — which is what widening a builder's RETURN
-  -- type is for.
-  --
-  -- REFUTED: `Refuted.Carried-Derived` — the reading with no environment
-  --   at all, at that run.  It is this arm the witness stands at: a
-  --   reference is one symbol standing for a definition of any nesting, so
-  --   a reading that prices the SYMBOL promises less than the connect
-  --   delivers.
-  connect-carries : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo} {τ : Tri}
-    (sl : Slots Γ) {i : Fin n} {d : Closed Γ (lookup Γ i)}
-    {κ : Path Γ lo (lookup Γ i) t} {below : toℕ i < lo}
-    {id : Id} {now : Tick}
-    {sched : Sched Γ} {st : EvalSt e} {burst : Stream Γ (lookup Γ i)}
-    {sched′ : Sched Γ} {st′ : EvalSt e} →
-    EntryOK {Γ = Γ} (slotDepth sl) (input i) τ →
-    sharedConnect⇓ {e = e} i d κ below id now sched st
-      (burst , sched′ , st′) →
-    BurstOK (slotDepth sl) burst τ
-
-slot-carries : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo} {τ : Tri}
-  (sl : Slots Γ) {i : Fin n} {d : Closed Γ (lookup Γ i)}
-  {κ : Path Γ lo (lookup Γ i) t} {below : toℕ i < lo}
-  {id : Id} {now : Tick}
-  {sched : Sched Γ} {st : EvalSt e} {burst : Stream Γ (lookup Γ i)}
-  {sched′ : Sched Γ} {st′ : EvalSt e} →
-  EntryOK {Γ = Γ} (slotDepth sl) (input i) τ →
-  subscribeSharedSlot⇓ {e = e} i d κ below id now sched st
-    (burst , sched′ , st′) →
-  BurstOK (slotDepth sl) burst τ
-slot-carries {τ = τ} sl ok (slot-spent _)       = spent-ok (slotDepth sl) τ _ _
-slot-carries {τ = τ} sl ok (slot-join _ _)      = init-ok (slotDepth sl) τ _ _
-slot-carries         sl ok (slot-connect _ _ c) = connect-carries sl ok c
 
 ------------------------------------------------------------------
 -- THE WALK.
 ------------------------------------------------------------------
 
--- STRUCTURAL SCC: burst-carries all-carries
+-- STRUCTURAL SCC: burst-carries all-carries slot-carries connect-carries
 mutual
 
  all-carries : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo} {τ : Tri}
    (sl : Slots Γ) {op ns} {b : Closed Γ (obs u)} {κ : Path Γ lo u t}
    {id : Id} {now : Tick} {sched : Sched Γ} {st : EvalSt e}
    {burst : Stream Γ u} {sched′ : Sched Γ} {st′ : EvalSt e} →
+   Sched.slots sched ≡ sl →
    EntryOK (slotDepth sl) b τ →
    subscribeAll⇓ {e = e} op ns b κ id now sched st (burst , sched′ , st′) →
    BurstOK (slotDepth sl) burst τ
- all-carries {τ = U , r , sz} sl ok (sub-all _ d p) =
-   push-carries {τᵢ = U , r , sz} _ ≤-refl (burst-carries sl ok d) p
+ all-carries {τ = U , r , sz} sl ag ok (sub-all _ d p) =
+   push-carries {τᵢ = U , r , sz} _ ≤-refl (burst-carries sl ag ok d) p
 
  burst-carries : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo} {τ : Tri}
    (sl : Slots Γ) {b : Closed Γ u} {κ : Path Γ lo u t} {id : Id} {now : Tick}
    {sched : Sched Γ} {st : EvalSt e} {burst : Stream Γ u}
    {sched′ : Sched Γ} {st′ : EvalSt e} →
+   Sched.slots sched ≡ sl →
    EntryOK (slotDepth sl) b τ →
    subscribeE⇓ {e = e} b κ id now sched st (burst , sched′ , st′) →
    BurstOK (slotDepth sl) burst τ
- burst-carries {τ = τ} sl ok (subs-floor _)           = spent-ok _ τ _ _
- burst-carries {τ = τ} sl ok (subs-hot-done _ _ _)    = spent-ok _ τ _ _
- burst-carries {τ = τ} sl ok (subs-hot-live _ _ _)    = init-ok _ τ _ _
- burst-carries {τ = τ} sl ok (subs-defer _ _ _)       = init-ok _ τ _ _
- burst-carries {τ = τ} sl ok (subs-shared _ s)        = slot-carries sl ok s
- burst-carries {τ = τ} sl ok (subs-empty eq)          = oneshot-ok _ τ [] _ _ eq []ᵃ
- burst-carries {τ = τ} sl ok (subs-take-zero _ eq)    = oneshot-ok _ τ [] _ _ eq []ᵃ
- burst-carries {τ = U , r , sz} sl (_ , dep) (subs-of eq) =
+ burst-carries {τ = τ} sl ag ok (subs-floor _)           = spent-ok _ τ _ _
+ burst-carries {τ = τ} sl ag ok (subs-hot-done _ _ _)    = spent-ok _ τ _ _
+ burst-carries {τ = τ} sl ag ok (subs-hot-live _ _ _)    = init-ok _ τ _ _
+ burst-carries {τ = τ} sl ag ok (subs-defer _ _ _)       = init-ok _ τ _ _
+ burst-carries {τ = τ} sl ag ok (subs-shared {i = i} seq s) =
+   slot-carries sl ag (trans (sym (cong (λ f → f i) ag)) seq) ok s
+ burst-carries {τ = τ} sl ag ok (subs-empty eq)          = oneshot-ok _ τ [] _ _ eq []ᵃ
+ burst-carries {τ = τ} sl ag ok (subs-take-zero _ eq)    = oneshot-ok _ τ [] _ _ eq []ᵃ
+ burst-carries {τ = U , r , sz} sl ag (_ , dep) (subs-of eq) =
    oneshot-ok _ (U , r , sz) _ _ _ eq (of-handed (slotDepth sl) _ dep)
- burst-carries {τ = τ} sl ok (subs-cold-sync {ok = okd} _ _ eq) =
+ burst-carries {τ = τ} sl ag ok (subs-cold-sync {ok = okd} _ _ eq) =
    oneshot-ok _ τ _ _ _ eq (data-handed _ τ _ okd)
- burst-carries {τ = τ} sl ok (subs-cold-async {ok = okd} _ _ _ _) =
+ burst-carries {τ = τ} sl ag ok (subs-cold-async {ok = okd} _ _ _ _) =
    anchored-ok _ τ _ _ _ (data-handed _ τ _ okd)
- burst-carries {τ = U , r , sz} sl ok (subs-map {f = f} {b = b} d p) =
+ burst-carries {τ = U , r , sz} sl ag ok (subs-map {f = f} {b = b} d p) =
    push-carries {τᵢ = U , bindᵃᵉ (slotDepth sl) 0 b , sz}
      _ (≤-trans (m≤m⊔n (depᵗ (slotDepth sl) (bindᵃᵉ (slotDepth sl) 0 b) f)
                        (depᵉ (slotDepth sl) 0 b))
                 (proj₂ ok))
-     (burst-carries sl
+     (burst-carries sl ag
        (entry-inner (proj₁ ok) , m≤m⊔n (depᵉ (slotDepth sl) 0 b) 0) d) p
- burst-carries sl ok (subs-merge-all a)   = all-carries sl (under-ok ok) a
- burst-carries sl ok (subs-switch-all a)  = all-carries sl (under-ok ok) a
- burst-carries sl ok (subs-exhaust-all a) = all-carries sl (under-ok ok) a
- burst-carries sl (sz≤ , r≤) (subs-μ {body = body} d) =
-   burst-carries sl
+ burst-carries sl ag ok (subs-merge-all a)   = all-carries sl ag (under-ok ok) a
+ burst-carries sl ag ok (subs-switch-all a)  = all-carries sl ag (under-ok ok) a
+ burst-carries sl ag ok (subs-exhaust-all a) = all-carries sl ag (under-ok ok) a
+ burst-carries sl ag (sz≤ , r≤) (subs-μ {body = body} d) =
+   burst-carries sl ag
      ( ≤-trans (<⇒≤ (unfoldμ-shrinks body)) sz≤
      , μ-entry (slotDepth sl) body r≤ ) d
- burst-carries {τ = U , r , sz} sl ok (subs-take-suc _ _ d p) =
+ burst-carries {τ = U , r , sz} sl ag ok (subs-take-suc _ _ d p) =
    push-carries {τᵢ = U , r , sz} _ ≤-refl
-     (burst-carries sl (inner-ok ok) d) p
- burst-carries {τ = U , r , sz} sl ok
+     (burst-carries sl ag (inner-ok ok) d) p
+ burst-carries {τ = U , r , sz} sl ag ok
                (subs-scan {f = f} {seed = seed} {b = b} _ d p) =
    push-carries {τᵢ = U , bindˢᵗ (slotDepth sl) 0 seed b , sz}
      _ (≤-trans (m≤m⊔n (depᵗ (slotDepth sl) (bindˢᵗ (slotDepth sl) 0 seed b) f)
@@ -745,8 +746,76 @@ mutual
                                  ⊔ depᵗ (slotDepth sl) 0 seed)
                                 (depᵉ (slotDepth sl) 0 b))
                          (proj₂ ok)))
-     (burst-carries sl
+     (burst-carries sl ag
        (entry-inner (proj₁ ok)
        , ≤-trans (m≤m⊔n (depᵉ (slotDepth sl) 0 b) 0)
                  (m≤m⊔n (bindᵃᵉ (slotDepth sl) 0 b)
                         (depᵗ (slotDepth sl) 0 seed))) d) p
+
+ -- AND THE SHARED SLOT, WHICH IS A WALK AFTER ALL — OVER THREE
+ -- CONSTRUCTORS OF WHICH TWO CARRY NOTHING.  A slot the run has already
+ -- spent hands back the spent burst and a slot joining something already
+ -- live hands back one init, so both close by the bookkeeping lemmas
+ -- above at every triple.  What is left is the CONNECT, which is the only
+ -- arm that re-enters the subscribe, and so the only one where the two
+ -- readings can differ.
+ slot-carries : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo} {τ : Tri}
+   (sl : Slots Γ) {i : Fin n} {d : Closed Γ (lookup Γ i)}
+   {okd : T (inputsBelowᵉ (toℕ i) d)}
+   {κ : Path Γ lo (lookup Γ i) t} {below : toℕ i < lo}
+   {id : Id} {now : Tick}
+   {sched : Sched Γ} {st : EvalSt e} {burst : Stream Γ (lookup Γ i)}
+   {sched′ : Sched Γ} {st′ : EvalSt e} →
+   Sched.slots sched ≡ sl →
+   sl i ≡ shared d {ok = okd} →
+   EntryOK {Γ = Γ} (slotDepth sl) (input i) τ →
+   subscribeSharedSlot⇓ {e = e} i d κ below id now sched st
+     (burst , sched′ , st′) →
+   BurstOK (slotDepth sl) burst τ
+ slot-carries {τ = τ} sl ag seq ok (slot-spent _)  = spent-ok (slotDepth sl) τ _ _
+ slot-carries {τ = τ} sl ag seq ok (slot-join _ _) = init-ok (slotDepth sl) τ _ _
+ slot-carries sl ag seq ok (slot-connect _ _ c)    = connect-carries sl ag seq ok c
+
+ -- THE CONNECT, WHERE THE SLOT'S OWN READING MEETS THE CALLER'S.  The
+ -- fan-out re-enters at `slotDepth sl i` rather than at the rank the
+ -- caller fixed, so the burst comes back reported against the slot's own
+ -- triple — and `connect-entry` proves the re-entry invariant holds
+ -- there, while `depᵉ (slotDepth sl) (input i)` IS `slotDepth sl i`, so
+ -- the caller's own premise dominates that rank and `burstOK-wide`
+ -- carries the report up it.  Both constructors prepend bookkeeping
+ -- whose events are all ⊤ to a `sharedPlumb` of what the definition
+ -- emitted, so the arm is the widening, the plumbing transport, and one
+ -- structural recursion.
+ --
+ -- REFUTED: `Refuted.Carried-Derived` — the reading with no environment
+ --   at all, at that run.  It is this arm the witness stands at: a
+ --   reference is one symbol standing for a definition of any nesting, so
+ --   a reading that prices the SYMBOL promises less than the connect
+ --   delivers.
+ connect-carries : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo} {τ : Tri}
+   (sl : Slots Γ) {i : Fin n} {d : Closed Γ (lookup Γ i)}
+   {okd : T (inputsBelowᵉ (toℕ i) d)}
+   {κ : Path Γ lo (lookup Γ i) t} {below : toℕ i < lo}
+   {id : Id} {now : Tick}
+   {sched : Sched Γ} {st : EvalSt e} {burst : Stream Γ (lookup Γ i)}
+   {sched′ : Sched Γ} {st′ : EvalSt e} →
+   Sched.slots sched ≡ sl →
+   sl i ≡ shared d {ok = okd} →
+   EntryOK {Γ = Γ} (slotDepth sl) (input i) τ →
+   sharedConnect⇓ {e = e} i d κ below id now sched st
+     (burst , sched′ , st′) →
+   BurstOK (slotDepth sl) burst τ
+ connect-carries {τ = U , r , sz} sl {i = i} {d = def} ag seq ok
+                 (connect-live {burst = bs} sub _) =
+   (tt ∷ᵃ []ᵃ)
+   ∷ᵃ plumb-ok (slotDepth sl) bs
+        (burstOK-wide (slotDepth sl) bs (proj₂ ok)
+          (burst-carries {τ = U , slotDepth sl i , syncSizeᵉ def} sl ag
+            (connect-entry {U = U} sl i seq) sub))
+ connect-carries {τ = U , r , sz} sl {i = i} {d = def} ag seq ok
+                 (connect-died {burst = bs} sub _) =
+   (tt ∷ᵃ tt ∷ᵃ []ᵃ)
+   ∷ᵃ plumb-ok (slotDepth sl) bs
+        (burstOK-wide (slotDepth sl) bs (proj₂ ok)
+          (burst-carries {τ = U , slotDepth sl i , syncSizeᵉ def} sl ag
+            (connect-entry {U = U} sl i seq) sub))
