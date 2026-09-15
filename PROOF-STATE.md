@@ -279,8 +279,8 @@ deferred beside it.
   `DEAD ROUTE, PROBED`: a share's slot is reducible. Its def is drawn from the
   table rather than the term, so no descent this module can see reaches it.
 
-- **`red-scan`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`: a scan's
-  accumulator is read back out of the node this face installed, and the
+- **`red-scan`** (Rx/Evaluator/Reducible) — FALSITY, `DEAD ROUTE, PROBED`: a
+  scan's accumulator is read back out of the node this face installed, and the
   candidate carries no claim about what a node holds.
 
 - **`red-take`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`: the same gap

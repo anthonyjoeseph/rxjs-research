@@ -209,6 +209,27 @@ postulate
   -- what makes its recursive calls free and is exactly what leaves
   -- this conclusion with nothing under it.
   --
+  -- DEAD ROUTE: the fact this needs is `Red` of the stored value, and
+  --   it is establishable at the install (`red-env` at the empty
+  --   environment on the seed) and preserved at the writeback
+  --   (`red-env` at two entries, the old accumulator and the arriving
+  --   value, which the push already carries).  What has no home is the
+  --   CARRIER between them, and three candidates are structurally
+  --   blocked.  A FIELD on the state record cannot be written: the
+  --   candidate is defined above that record and cannot move down,
+  --   since its observable arm mentions the subscription relation.  A
+  --   PRECONDITION on the candidate's own observable arm is mutual and
+  --   does not decrease: the arm recurses on the element type, while
+  --   the predicate over a store reaches the candidate at whatever
+  --   type a node happens to hold, which is unrelated.  And a
+  --   HYPOTHESIS on this statement is laundering, since the
+  --   unconditional form is not refuted -- every closed expression is
+  --   reducible once the theorem lands, so there is no adversarial
+  --   store to point at.  What is left to price is a SYNTACTIC
+  --   invariant, one that says a stored value came from a term of the
+  --   run rather than saying it is reducible, so that the candidate
+  --   mentions it without recursing into itself.
+  --
   -- PROBED: `Probed.Reducible-Arms` at an accumulator of OBSERVABLE
   --   type folded by a projection, so the value that leaves the frame
   --   IS the one the node was holding and the row fails unless the
