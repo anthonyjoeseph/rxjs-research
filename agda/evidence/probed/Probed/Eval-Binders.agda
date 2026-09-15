@@ -6,20 +6,24 @@
 -- subterms: a `caseᵗ` puts the scrutinee's payload into the branch
 -- environment, so the branch is evaluated under an environment the
 -- data hypothesis does not cover.  Where that payload is an
--- OBSERVABLE the branch can hand it straight back, and then the
+-- OBSERVABLE the branch may hand it straight back, in which case the
 -- value's reading comes from the scrutinee rather than from the head
--- the bound is stated over — which is the way these two could be
--- false.
+-- the bound is stated over; or it may WRAP it, and then the two
+-- compose, which is the way these could be false and is the region
+-- the reading's own `caseᵗ` clause was repaired to pay for.
 --
--- COVERAGE: a `caseᵗ` at a data payload with both branches writing,
--- and at an OBSERVABLE payload handed back by the branch — the row
--- that reaches the risk, and it is TIGHT, the value's reading landing
--- exactly on the predecessor.  An `ifᵗ` at a selected branch that is
--- the deeper of the two and at one that is not.
+-- COVERAGE: a `caseᵗ` at a data payload with both branches writing;
+-- at an OBSERVABLE payload handed straight back; and at an observable
+-- payload the branch WRAPS with its sibling arm kept shallow, which is
+-- the row that decides — it fails outright if the scrutinee is joined
+-- with rather than added to, so no slack in a sibling can carry it.
+-- An `ifᵗ` at a selected branch that is the deeper of the two and at
+-- one that is not.
 --
--- NOT reached: a `caseᵗ` whose branches differ in reading with the
--- observable arm selected — the join takes the deeper, so such a row
--- has slack by construction and cannot fail.
+-- NOT reached: TIGHTNESS anywhere on the `caseᵗ` rows.  The clause
+-- routes the binding through `reify`, which writes a `strmᵗ` the
+-- scrutinee's own reading has already peeled, so every such row
+-- carries at least that wrap of slack and no program removes it.
 --
 -- TARGET: eval-case @64558a
 -- TARGET: eval-if @e9a512
@@ -29,11 +33,11 @@ open import Data.Bool using (true)
 open import Data.List using ([]; _∷_)
 open import Data.List.Relation.Unary.Any using (here)
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
-open import Data.Nat using (z≤n; s≤s)
+open import Data.Nat using (_⊔_; z≤n; s≤s)
 open import Data.Vec using () renaming ([] to []ⱽ)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import Rx.Exp using (Ctx; Tm; unitᵗ; natᵗ; _+ᵗ_; obs; varᵗ; unit̂; bool̂; nat̂; inlᵗ; caseᵗ; strmᵗ; ofᵉ; evalWith)
+open import Rx.Exp using (Ctx; Tm; unitᵗ; natᵗ; _+ᵗ_; obs; varᵗ; unit̂; bool̂; nat̂; inlᵗ; caseᵗ; strmᵗ; ofᵉ; emptyᵉ; evalWith)
 open import Rx.Obs-Depth using (depᵗ; depᵛ)
 open import Rx.Obs-Depth.Substitution using (AllData; []ᵈ;
   eval-case; eval-if)
@@ -62,7 +66,7 @@ row-case-data : Confirms
   (eval-case {Γ = Γ₀} zeroη dd₀ data-sc one-level one-level []ᵃ)
 row-case-data = z≤n
 
-case-data-bound : depᵗ {Γ = Γ₀} zeroη (caseᵗ data-sc one-level one-level) ≡ 1
+case-data-bound : depᵗ {Γ = Γ₀} zeroη (caseᵗ data-sc one-level one-level) ≡ 2
 case-data-bound = refl
 
 ----------------------------------------------------------------------
@@ -89,14 +93,49 @@ row-case-obs : Confirms
   (eval-case {Γ = Γ₀} zeroη dd₀ obs-sc hands-back other-arm []ᵃ)
 row-case-obs = s≤s z≤n
 
--- the two figures that make the row tight rather than slack: the
--- bound's predecessor and the value's own reading are the same number
-case-obs-bound : depᵗ {Γ = Γ₀} zeroη (caseᵗ obs-sc hands-back other-arm) ≡ 2
+-- the two figures the row meets at: the scrutinee's reading is what
+-- the clause adds, so the branch handing its binder straight back
+-- lands well under the predecessor rather than on it
+case-obs-bound : depᵗ {Γ = Γ₀} zeroη (caseᵗ obs-sc hands-back other-arm) ≡ 5
 case-obs-bound = refl
 
 case-obs-value : depᵛ {Γ = Γ₀} zeroη (obs Inner)
                    (evalWith (caseᵗ obs-sc hands-back other-arm) []ᵃ) ≡ 1
 case-obs-value = refl
+
+----------------------------------------------------------------------
+-- 2b.  THE BRANCH THAT WRAPS ITS BINDER, WITH THE SIBLING ARM KEPT
+-- SHALLOW SO NOTHING ELSE CAN CARRY THE BOUND.  This is the row that
+-- could not pass under a join: the value climbs the branch's one wrap
+-- on top of the scrutinee's own reading, so a bound taking the deeper
+-- of the three subterms is exceeded and only one that ADDS the
+-- scrutinee holds.
+----------------------------------------------------------------------
+
+wraps : Tm Γ₀ [] [] (obs Inner ∷ []) (obs (obs Inner))
+wraps = strmᵗ (ofᵉ (varᵗ (here refl) ∷ []))
+
+shallow-arm : Tm Γ₀ [] [] (unitᵗ ∷ []) (obs (obs Inner))
+shallow-arm = strmᵗ emptyᵉ
+
+row-case-wraps : Confirms
+  (eval-case {Γ = Γ₀} zeroη dd₀ obs-sc wraps shallow-arm []ᵃ)
+row-case-wraps = s≤s (s≤s z≤n)
+
+-- what makes it load-bearing, as three figures rather than a claim:
+-- the value clears the join of the three subterms, which is two, and
+-- sits under the predecessor of the reading that adds, which is three
+case-wraps-bound : depᵗ {Γ = Γ₀} zeroη (caseᵗ obs-sc wraps shallow-arm) ≡ 4
+case-wraps-bound = refl
+
+case-wraps-joined : depᵗ {Γ = Γ₀} zeroη obs-sc
+                  ⊔ depᵗ {Γ = Γ₀} zeroη wraps
+                  ⊔ depᵗ {Γ = Γ₀} zeroη shallow-arm ≡ 2
+case-wraps-joined = refl
+
+case-wraps-value : depᵛ {Γ = Γ₀} zeroη (obs (obs Inner))
+                     (evalWith (caseᵗ obs-sc wraps shallow-arm) []ᵃ) ≡ 2
+case-wraps-value = refl
 
 ----------------------------------------------------------------------
 -- 3.  THE CONDITIONAL, WHICH IS SEPARATE ONLY BECAUSE THE SELECTION IS

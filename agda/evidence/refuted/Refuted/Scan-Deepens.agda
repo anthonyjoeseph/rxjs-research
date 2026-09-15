@@ -148,9 +148,9 @@ mutual
   ren-depthᵗ ρg ρd ρt (inlᵗ a)      = ren-depthᵗ ρg ρd ρt a
   ren-depthᵗ ρg ρd ρt (inrᵗ a)      = ren-depthᵗ ρg ρd ρt a
   ren-depthᵗ ρg ρd ρt (caseᵗ s l r) =
-    cong₂ _⊔_ (cong₂ _⊔_ (ren-depthᵗ ρg ρd ρt s)
-                         (ren-depthᵗ ρg ρd (ext∈ ρt) l))
-              (ren-depthᵗ ρg ρd (ext∈ ρt) r)
+    cong suc (cong₂ _+_ (ren-depthᵗ ρg ρd ρt s)
+                        (cong₂ _⊔_ (ren-depthᵗ ρg ρd (ext∈ ρt) l)
+                                   (ren-depthᵗ ρg ρd (ext∈ ρt) r)))
   ren-depthᵗ ρg ρd ρt (ifᵗ c a b)   =
     cong₂ _⊔_ (cong₂ _⊔_ (ren-depthᵗ ρg ρd ρt c)
                          (ren-depthᵗ ρg ρd ρt a))
