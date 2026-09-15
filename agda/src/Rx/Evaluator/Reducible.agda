@@ -52,13 +52,13 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst
 open import Rx.Prim using (Id; Tick; InstEmit; InstEvent; init; value; close; handoff;
   complete; hot; cold)
 open import Rx.Slots using (scripted; shared)
-open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; Ctx; Closed; Val; Tm; evalTm; input; ofᵉ; emptyᵉ;
+open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; Ctx; Closed; Val; Tm; Fn; evalTm; evalWith; applyFn; input; ofᵉ; emptyᵉ;
   mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; isData; unfoldμ)
 open import Rx.Exp.Guarded using (gsizeᵉ; gsize-unfoldμ)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; _↠_; map-f; take-f; scan-f; take-st; scan-st;
   thru-outer; mergeAllᵒ; switchᵒ; exhaustᵒ; mergeAll-st; switch-st; exhaust-st;
-  installNode; oneShotBurst; memberSource; splitEvents; retagEvents)
-open import Rx.Evaluator.Domain using (subscribeE⇓; pushBurst⇓; stepFrame⇓; push-nil; push-cons; subs-of;
+  installNode; oneShotBurst; memberSource; splitEvents; retagEvents; NodeId; AllOp; from-inner)
+open import Rx.Evaluator.Domain using (subscribeE⇓; pushBurst⇓; stepFrame⇓; step-map; push-nil; push-cons; subs-of;
   subs-empty; subs-map; subs-take-zero; subs-take-suc; subs-scan; subs-defer;
   subs-floor; subs-hot-done; subs-hot-live; subs-cold-sync; subs-cold-async;
   subs-μ; sub-all; subs-merge-all; subs-switch-all; subs-exhaust-all)
@@ -129,6 +129,26 @@ RedPush {Γ = Γ} {e = e} {u = u} id now f κ burst sched st =
   Σ (Stream Γ u × Sched Γ × EvalSt e) λ r →
     pushBurst⇓ {e = e} id now f κ burst sched st r × StreamSat (Red u) (proj₁ r)
 
+-- A VALUE ENVIRONMENT IS REDUCIBLE WHEN EVERY ENTRY IS.  Terms are
+-- open in a Θ telescope and a frame's function is a term with one
+-- entry bound, so the fundamental theorem at terms has to be stated
+-- under a substitution rather than at closed terms alone.
+RedEnv : ∀ {n} {Γ : Ctx n} {Θ : List Ty} → All (Val Γ) Θ → Set
+RedEnv []                    = ⊤
+RedEnv (_∷_ {x = t} v vs)    = Red t v × RedEnv vs
+
+-- THE SAME CLAIM ONE BATCH DOWN: a frame, the values that arrived at
+-- it, and the candidate carried across to what leaves.  The push above
+-- walks a burst emit by emit, so it is stated over a stream while this
+-- is stated over one list, which is where every operator's own
+-- machinery sits.
+RedStep : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
+        → Id → Tick → Frame Γ s u → Path Γ lo u t
+        → List (Val Γ s) → Bool → Sched Γ → EvalSt e → Set
+RedStep {Γ = Γ} {t = t} {e = e} {u = u} id now f κ vals fin sched st =
+  Σ (List (Val Γ u) × List (InstEvent (Val Γ t)) × Bool × Sched Γ × EvalSt e) λ r →
+    stepFrame⇓ {e = e} id now f κ vals fin sched st r × All (Red u) (proj₁ r)
+
 postulate
   -- THE FUNDAMENTAL THEOREM ONE LEVEL DOWN, AT TERMS.  `Tm` and `Exp`
   -- are one mutual datatype and `strmᵗ` embeds an expression into a
@@ -138,9 +158,13 @@ postulate
   --
   -- PROBED: `Probed.Reducible-Arms` at an observable-typed term, where
   --   the claim IS an expression's own reducibility and the body
-  --   delivers it; and at a numeral, which is DEGENERATE and is there
-  --   to say the data half asserts nothing.  No binding term reached.
-  red-tm : ∀ {n} {Γ : Ctx n} {u} (tm : Tm Γ [] [] [] u) → Red u (evalTm tm)
+  --   delivers it; at the same claim under a ONE-ENTRY environment,
+  --   where the variable is read back out and the entry's candidate
+  --   has to be what the conclusion gets; and at a numeral, which is
+  --   DEGENERATE and is there to say the data half asserts nothing.
+  --   No term that BINDS is reached, and no environment past one entry.
+  red-env : ∀ {n} {Γ : Ctx n} {Θ u} (tm : Tm Γ [] [] Θ u)
+              {env : All (Val Γ) Θ} → RedEnv env → Red u (evalWith tm env)
 
   -- THE SIXTH SLOT SUB-ARM, WHICH IS THE ONE THE OTHER FIVE ARE NOT.
   -- A share's definition is an arbitrary term standing in no relation
@@ -176,39 +200,87 @@ postulate
         subscribeE⇓ {e = e} (input i) κ id now sched st r
           × StreamSat (Red (lookup Γ i)) (proj₁ r)
 
-  -- ONE FRAME, ONE ARRIVING BATCH, AND NOTHING ABOUT THE BURST.  The
-  -- push below walks a burst emit by emit and is a body; what it
-  -- cannot do is take a single step, because a step is where every
-  -- operator lives -- a scan's accumulator, a take's countdown, and
-  -- the whole flattening walk, whose queue, kill, refusal and
-  -- concurrency limit are clauses of THIS statement and of nothing
-  -- above it.  That is also why the candidate at the higher type
-  -- survives the descent for free: the hop is not in a flattener's
-  -- statement, and the state an inner is subscribed in is whatever
-  -- the walk has threaded by the time it reaches one.
+  -- A SCAN READS ITS ACCUMULATOR BACK OUT OF A NODE, AND EMITS IT.
+  -- That makes this the first statement here whose conclusion is about
+  -- a value the candidate never saw threaded: the accumulator was
+  -- installed by an earlier step and is folded with the arriving
+  -- batch, so what leaves the frame is a function of stored state.
+  -- `Red` quantifies over every state with no precondition, which is
+  -- what makes its recursive calls free and is exactly what leaves
+  -- this conclusion with nothing under it.
   --
-  -- PROBED: `Probed.Reducible-Arms` through a mapping frame whose
-  --   function returns an OBSERVABLE -- the one row in that file where
-  --   the satisfaction half is a real claim, since what the pushed
-  --   value must satisfy is another expression's reducibility rather
-  --   than a protocol event -- and through a FLATTENING frame at each
-  --   of the three operators, with the arriving batch carrying a real
-  --   observable: mergeAll subscribing it, mergeAll REFUSING it at a
-  --   zero concurrency limit and queueing instead, switch killing and
-  --   subscribing, exhaust subscribing with nothing active.  The
-  --   inner's own subscription derivation is what comes back, so the
-  --   candidate is SPENT at those rows rather than carried.  Not
-  --   reached: a node already holding something -- a queue with an
-  --   entry, a switch whose current inner is running, an exhaust
-  --   already active -- and no scan or take frame.
-  red-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
-             (id : Id) (now : Tick) (f : Frame Γ s u) (κ : Path Γ lo u t)
+  -- PROBED: `Probed.Reducible-Arms` at an accumulator of OBSERVABLE
+  --   type folded by a projection, so the value that leaves the frame
+  --   IS the one the node was holding and the row fails unless the
+  --   candidate holds of it.  The row can only be written by
+  --   INSTALLING a reducible accumulator, and that is the finding
+  --   rather than the coverage: nothing in the statement, in `Red` or
+  --   in `EvalSt` says an installed one ever is.  Not reached: an
+  --   accumulator a run itself produced, and the empty-batch arm.
+  red-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
+             (id : Id) (now : Tick) (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
+             (κ : Path Γ lo u t)
              {vals : List (Val Γ s)} → All (Red s) vals → (fin : Bool)
              (sched : Sched Γ) (st : EvalSt e)
-           → Σ (List (Val Γ u) × List (InstEvent (Val Γ t)) × Bool
-                 × Sched Γ × EvalSt e) λ r →
-               stepFrame⇓ {e = e} id now f κ vals fin sched st r
-                 × All (Red u) (proj₁ r)
+           → RedStep {e = e} id now (scan-f fn nid) κ vals fin sched st
+
+  -- A TAKE'S COUNTDOWN AND A SCAN'S ACCUMULATOR ARE THE SAME GAP.
+  -- Both dispatch on a node this face installed and has not looked at
+  -- since, so both are the first place the candidate must be read back
+  -- OUT of stored state rather than threaded through it.  They are
+  -- separate statements because the take also truncates, and a
+  -- truncation is where a burst can lose the very value a satisfaction
+  -- claim was taken at.
+  --
+  -- PROBED: `Probed.Reducible-Arms` at an observable payload with the
+  --   budget unexhausted, where the values pass through untouched and
+  --   the store decides only HOW MANY -- so this arm is store-reading
+  --   without being store-DEPENDENT, which is the contrast that pins
+  --   what the scan above is actually missing.  The CUT is not
+  --   reached, and neither is a stuck node lookup.
+  red-take : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo}
+             (id : Id) (now : Tick) (nid : NodeId) (κ : Path Γ lo s t)
+             {vals : List (Val Γ s)} → All (Red s) vals → (fin : Bool)
+             (sched : Sched Γ) (st : EvalSt e)
+           → RedStep {e = e} id now (take-f nid) κ vals fin sched st
+
+  -- WHAT AN INNER EMITS ON ITS WAY BACK UP, which is the other half of
+  -- a flattener and the half no row has reached.  The walk below
+  -- SUBSCRIBES an inner; this is what happens when that inner later
+  -- fires, and it is where a mergeAll drains its queue and a switch
+  -- decides whether the emission still belongs to anybody.
+  --
+  -- PROBED: `Probed.Reducible-Arms` at the arm that CARRIES rather
+  --   than spends -- an unfinished inner emit, whose values pass
+  --   through untouched, so an observable payload's candidate has to
+  --   arrive at the conclusion.  That arm reads no store at all.  The
+  --   drain and the kill, which are where this statement reads the
+  --   `*All` node, are not reached.
+  red-from-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo}
+             (id : Id) (now : Tick) (op : AllOp) (allNid inst : NodeId)
+             (κ : Path Γ lo s t)
+             {vals : List (Val Γ s)} → All (Red s) vals → (fin : Bool)
+             (sched : Sched Γ) (st : EvalSt e)
+           → RedStep {e = e} id now (from-inner op allNid inst) κ vals fin sched st
+
+  -- THE FLATTENING WALK, and the one leaf here with rows against it.
+  --
+  -- PROBED: `Probed.Reducible-Arms` at each of the three operators,
+  --   with the arriving batch carrying a real observable: mergeAll
+  --   subscribing it, mergeAll REFUSING it at a zero concurrency limit
+  --   and queueing instead, switch killing and subscribing, exhaust
+  --   subscribing with nothing active.  The inner's own subscription
+  --   derivation is what comes back, so the candidate is SPENT at
+  --   these rows rather than carried.  Not reached: a node already
+  --   holding something -- a queue with an entry, a switch whose
+  --   current inner is running, an exhaust already active -- and no
+  --   batch of more than one value.
+  red-thru : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
+             (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
+             (κ : Path Γ lo u t)
+             {vals : List (Val Γ (obs u))} → All (Red (obs u)) vals → (fin : Bool)
+             (sched : Sched Γ) (st : EvalSt e)
+           → RedStep {e = e} id now (thru-outer op nid) κ vals fin sched st
 
 
 -- Every protocol event carries no payload, so a burst's values are the
@@ -291,10 +363,50 @@ red-input {Γ = Γ} i {lo = lo} κ id now sched st
     | yes below | shared d {ok = ok} =
       red-input-shared i d κ below id now sched slEq st
 
+-- THE FUNDAMENTAL THEOREM AT CLOSED TERMS is the leaf above at the
+-- empty environment, which is the whole of the difference.
+red-tm : ∀ {n} {Γ : Ctx n} {u} (tm : Tm Γ [] [] [] u) → Red u (evalTm tm)
+red-tm tm = red-env tm tt
+
 redTms : ∀ {n} {Γ : Ctx n} {u} (ts : List (Tm Γ [] [] [] u))
        → All (Red u) (map (λ tm → evalTm tm) ts)
 redTms []       = []
 redTms (x ∷ xs) = red-tm x ∷ redTms xs
+
+-- A MAPPING FRAME APPLIES ITS FUNCTION TO EVERY ARRIVING VALUE, so
+-- what it produces is reducible exactly when the function is a term
+-- under a one-entry reducible environment.
+-- a frame's function binds exactly one entry, so this is the only
+-- environment shape the body below ever builds.
+redEnv1 : ∀ {n} {Γ : Ctx n} (t : Ty) (v : Val Γ t) → Red t v → RedEnv (v ∷ [])
+redEnv1 t v r = r , tt
+
+redMapVals : ∀ {n} {Γ : Ctx n} {s u} (fn : Fn Γ [] [] [] s u)
+             {vals : List (Val Γ s)} → All (Red s) vals
+           → All (Red u) (map (applyFn fn) vals)
+redMapVals fn []       = []
+redMapVals {Γ = Γ} {s = s} fn {v ∷ vs} (p ∷ ps) =
+  red-env fn (redEnv1 {Γ = Γ} s v p) ∷ redMapVals fn ps
+
+-- STEPPING ONE FRAME, DISPATCHED ON THE FRAME.  The mapping arm is a
+-- body because nothing about it is stateful; the other four each read
+-- a node this face installed earlier, which is the one thing the
+-- candidate's quantification over every state does not hand back.
+red-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
+           (id : Id) (now : Tick) (f : Frame Γ s u) (κ : Path Γ lo u t)
+           {vals : List (Val Γ s)} → All (Red s) vals → (fin : Bool)
+           (sched : Sched Γ) (st : EvalSt e)
+         → RedStep {e = e} id now f κ vals fin sched st
+red-step id now (map-f fn) κ rv fin sched st =
+  _ , step-map , redMapVals fn rv
+red-step id now (scan-f fn nid) κ rv fin sched st =
+  red-scan id now fn nid κ rv fin sched st
+red-step id now (take-f nid) κ rv fin sched st =
+  red-take id now nid κ rv fin sched st
+red-step id now (from-inner op allNid inst) κ rv fin sched st =
+  red-from-inner id now op allNid inst κ rv fin sched st
+red-step id now (thru-outer op nid) κ rv fin sched st =
+  red-thru id now op nid κ rv fin sched st
 
 -- WALKING A BURST IS BOOKKEEPING, AND SEPARATING IT FROM THE STEP IS
 -- WHAT MAKES THAT VISIBLE.  An emit splits into the values a frame

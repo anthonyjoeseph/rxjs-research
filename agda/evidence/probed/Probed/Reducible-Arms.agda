@@ -42,9 +42,12 @@
 -- asynchronous tail -- and the take and scan arms of the body, whose
 -- own recursion the body already checks.
 --
--- TARGET: red-tm @e1ae28
+-- TARGET: red-env @c9af98
 -- TARGET: red-input-shared @21f529
--- TARGET: red-step @1f6442
+-- TARGET: red-scan @c288cd
+-- TARGET: red-take @4abb4a
+-- TARGET: red-from-inner @de6e75
+-- TARGET: red-thru @f94cad
 module Probed.Reducible-Arms where
 
 open import Data.Fin using (zero)
@@ -62,15 +65,15 @@ open import Data.Vec using ([]; _∷_)
 open import Data.List.Relation.Unary.Any using (here)
 open import Relation.Binary.PropositionalEquality using (refl)
 
-open import Rx.Exp using (Ctx; Closed; natᵗ; obs; ofᵉ; nat̂; strmᵗ; varᵗ; Tm; input)
+open import Rx.Exp using (Ctx; Closed; natᵗ; obs; ofᵉ; nat̂; strmᵗ; varᵗ; Tm; input; _×ᵗ_; fstᵗ; Fn)
 open import Rx.Slots using (Slots; shared)
-open import Rx.Evaluator using (Sched; EvalSt; Path; root; map-f; sched-init; st-init; thru-outer; mergeAllᵒ; switchᵒ;
-  exhaustᵒ; AllOp; NodeState; from-inner; _↠_; mergeAll-st; switch-st; exhaust-st; installNode)
-open import Rx.Evaluator.Reducible using (Red; reducible; red-tm; red-input-shared; red-step)
+open import Rx.Evaluator using (Sched; EvalSt; Path; root; sched-init; st-init; mergeAllᵒ; switchᵒ; exhaustᵒ; AllOp;
+  NodeState; from-inner; _↠_; map-f; mergeAll-st; switch-st; exhaust-st; installNode; scan-st; take-st)
+open import Rx.Evaluator.Reducible using (Red; reducible; red-input-shared; red-env; red-thru; red-scan; red-take; red-from-inner)
 
-open import Rx.Evaluator.Domain using (subs-shared; slot-spent; slot-join; step-map;
-  step-thru-outer; walk-nil; walk-cons; inner; consume-all-sub; consume-all-enqueue;
-  consume-switch-sub; consume-exhaust-sub)
+open import Rx.Evaluator.Domain using (subs-shared; slot-spent; slot-join; step-thru-outer; walk-nil; walk-cons; inner;
+  step-scan; step-take; step-from-inner; react-false;
+  consume-all-sub; consume-all-enqueue; consume-switch-sub; consume-exhaust-sub)
 
 open import Probed.Apparatus using (Confirms)
 
@@ -107,11 +110,25 @@ st₀ = st-init e₀
 inner₀ : Tm Γ₀ [] [] [] (obs natᵗ)
 inner₀ = strmᵗ (ofᵉ (nat̂ 7 ∷ []))
 
-row-tm-obs : Confirms (red-tm {Γ = Γ₀} inner₀ {e = e₀} κ₀ 0 0 sch₀ st₀)
+row-tm-obs : Confirms
+  (red-env {Γ = Γ₀} inner₀ {[]} tt {e = e₀} κ₀ 0 0 sch₀ st₀)
 row-tm-obs = reducible (ofᵉ (nat̂ 7 ∷ [])) {e = e₀} κ₀ 0 0 sch₀ st₀
 
-row-tm-nat : Confirms (red-tm {Γ = Γ₀} (nat̂ 7))
+row-tm-nat : Confirms (red-env {Γ = Γ₀} (nat̂ 7) {[]} tt)
 row-tm-nat = tt
+
+-- the same claim under a ONE-ENTRY environment, which is the shape a
+-- mapping frame's function has and the only reason the statement is
+-- open rather than closed.  LOAD-BEARING: the variable is read back
+-- out of the environment, so the row fails if the entry's candidate
+-- is not what the conclusion gets.
+varObs : Tm Γ₀ [] [] (obs natᵗ ∷ []) (obs natᵗ)
+varObs = varᵗ (here refl)
+
+row-tm-var : Confirms
+  (red-env {Γ = Γ₀} varObs {ofᵉ (nat̂ 7 ∷ []) ∷ []}
+     (reducible (ofᵉ (nat̂ 7 ∷ [])) , tt) {e = e₀} κ₀ 0 0 sch₀ st₀)
+row-tm-var = reducible (ofᵉ (nat̂ 7 ∷ [])) {e = e₀} κ₀ 0 0 sch₀ st₀
 
 ----------------------------------------------------------------------
 -- 3.  THE SLOT'S SHARE, at the two sub-arms that carry no payload.  A
@@ -168,33 +185,69 @@ row-share-join =
 
 
 ----------------------------------------------------------------------
--- 4.  THE FRAME STEP, and the one place in this file where the
--- satisfaction half is a real claim.  The frame's function returns an
--- OBSERVABLE, so what the stepped value must satisfy is another
--- expression's own reducibility rather than a protocol event -- the
--- conjunct every other row here leaves at ⊤.
+-- 4.  THE TWO STORE-READING FRAMES THAT ARE NOT FLATTENERS.  Both are
+-- stated at an OBSERVABLE payload, which is the only shape in which
+-- either can fail: at a data payload the satisfaction half is `⊤` and
+-- the row asserts nothing about the candidate.
+--
+-- THE STATES ARE CONSTRUCTED, AND THAT IS THE FINDING RATHER THAN A
+-- WEAKNESS OF THE ROWS.  A scan reads its accumulator back out of the
+-- node and emits it, so the row can only be written by installing an
+-- accumulator that IS reducible -- and nothing in the statement, in
+-- `Red`, or in `EvalSt` says an installed one ever is.  The take arm
+-- is the contrast that makes the point precise: its values pass
+-- through untouched and the store only decides HOW MANY, so its row
+-- needs no such installation and the arm is store-reading without
+-- being store-DEPENDENT.  That split is what the leg above this tier
+-- is deciding.
 ----------------------------------------------------------------------
 
-fnObs : Tm Γ₀ [] [] (natᵗ ∷ []) (obs natᵗ)
-fnObs = strmᵗ (ofᵉ (varᵗ (here refl) ∷ []))
+fstFn : Fn Γ₀ [] [] [] (obs natᵗ ×ᵗ natᵗ) (obs natᵗ)
+fstFn = fstᵗ (varᵗ (here refl))
 
--- the step's root sits at the frame's OUTPUT type, so this row needs a
--- program whose own type is the observable the frame produces
-e₂ : Closed Γ₀ (obs natᵗ)
-e₂ = ofᵉ (strmᵗ (ofᵉ (nat̂ 7 ∷ [])) ∷ [])
+-- the frame's output is an observable, so the chain below it needs one
+-- more hop to reach the run's data root
+κ₂ : Path Γ₀ 0 (obs natᵗ) natᵗ
+κ₂ = map-f (nat̂ 0) ↠ κ₀
 
-sch₂ : Sched Γ₀
-sch₂ = sched-init e₂ ins₀
+nid₂ : _
+nid₂ = Sched.nextNode sch₀
 
-st₂ : EvalSt e₂
-st₂ = st-init e₂
+acc₂ : Closed Γ₀ natᵗ
+acc₂ = ofᵉ (nat̂ 7 ∷ [])
 
-κ₂ : Path Γ₀ 0 (obs natᵗ) (obs natᵗ)
-κ₂ = root
+stScan : EvalSt e₀
+stScan = installNode nid₂ (scan-st {t = obs natᵗ} acc₂) st₀
 
-row-step-obs : Confirms
-  (red-step {e = e₂} 0 0 (map-f fnObs) κ₂ {7 ∷ []} (tt ∷ []) false sch₂ st₂)
-row-step-obs = _ , step-map , reducible (ofᵉ (nat̂ 7 ∷ [])) ∷ []
+-- LOAD-BEARING: the emitted value IS the stored accumulator, so the
+-- row fails unless the candidate holds of what the node was holding.
+row-scan-acc : Confirms
+  (red-scan {e = e₀} 0 0 fstFn nid₂ κ₂ {3 ∷ []} (tt ∷ []) false sch₀ stScan)
+row-scan-acc =
+  _ , step-scan refl refl , reducible acc₂ ∷ []
+
+stTake : EvalSt e₀
+stTake = installNode nid₂ (take-st 2) st₀
+
+-- LOAD-BEARING on the pass-through: the budget is not exhausted, so
+-- the value leaves the frame and its candidate has to survive.
+row-take-pass : Confirms
+  (red-take {e = e₀} 0 0 nid₂ κ₂ {ofᵉ (nat̂ 7 ∷ []) ∷ []}
+     (reducible (ofᵉ (nat̂ 7 ∷ [])) ∷ []) false sch₀ stTake)
+row-take-pass =
+  _ , step-take , reducible (ofᵉ (nat̂ 7 ∷ [])) ∷ []
+
+-- THE INNER'S OWN FRAME, at the arm that carries rather than spends.
+-- An unfinished inner emit passes its values through untouched, so the
+-- row is LOAD-BEARING on the carry -- an observable payload leaves the
+-- frame and its candidate has to arrive at the conclusion -- and reads
+-- no store at all.  The drain and the kill, which are where this
+-- statement reads the `*All` node, are NOT reached by it.
+row-inner-carry : Confirms
+  (red-from-inner {e = e₀} 0 0 mergeAllᵒ nid₂ nid₂ κ₂
+     {ofᵉ (nat̂ 7 ∷ []) ∷ []} (reducible (ofᵉ (nat̂ 7 ∷ [])) ∷ []) false sch₀ st₀)
+row-inner-carry =
+  _ , step-from-inner react-false , reducible (ofᵉ (nat̂ 7 ∷ [])) ∷ []
 
 ----------------------------------------------------------------------
 -- 5.  THE SAME STEP THROUGH A FLATTENING FRAME, which is where the
@@ -245,7 +298,7 @@ st₃ : EvalSt e₀
 st₃ = installNode nid₃ (mergeAll-st {t = natᵗ} nothing 0 [] false) st₀
 
 row-live-merge : Confirms
-  (red-step {e = e₀} 0 0 (thru-outer mergeAllᵒ nid₃) κ₀ satLive false sched₃ st₃)
+  (red-thru {e = e₀} 0 0 mergeAllᵒ nid₃ κ₀ satLive false sched₃ st₃)
 row-live-merge =
   _ , step-thru-outer
         (walk-cons (consume-all-sub refl refl
@@ -257,7 +310,7 @@ stBound : EvalSt e₀
 stBound = installNode nid₃ (mergeAll-st {t = natᵗ} (just 0) 0 [] false) st₀
 
 row-live-queue : Confirms
-  (red-step {e = e₀} 0 0 (thru-outer mergeAllᵒ nid₃) κ₀ satLive false sched₃ stBound)
+  (red-thru {e = e₀} 0 0 mergeAllᵒ nid₃ κ₀ satLive false sched₃ stBound)
 row-live-queue =
   _ , step-thru-outer (walk-cons (consume-all-enqueue refl refl) walk-nil)
     , allTriv (λ _ → tt) _
@@ -266,7 +319,7 @@ stSwitch : EvalSt e₀
 stSwitch = installNode nid₃ (switch-st nothing false) st₀
 
 row-live-switch : Confirms
-  (red-step {e = e₀} 0 0 (thru-outer switchᵒ nid₃) κ₀ satLive false sched₃ stSwitch)
+  (red-thru {e = e₀} 0 0 switchᵒ nid₃ κ₀ satLive false sched₃ stSwitch)
 row-live-switch =
   _ , step-thru-outer
         (walk-cons (consume-switch-sub refl refl
@@ -278,7 +331,7 @@ stExhaust : EvalSt e₀
 stExhaust = installNode nid₃ (exhaust-st false false) st₀
 
 row-live-exhaust : Confirms
-  (red-step {e = e₀} 0 0 (thru-outer exhaustᵒ nid₃) κ₀ satLive false sched₃ stExhaust)
+  (red-thru {e = e₀} 0 0 exhaustᵒ nid₃ κ₀ satLive false sched₃ stExhaust)
 row-live-exhaust =
   _ , step-thru-outer
         (walk-cons (consume-exhaust-sub refl

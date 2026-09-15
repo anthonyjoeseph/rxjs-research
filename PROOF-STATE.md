@@ -233,14 +233,15 @@ deferred beside it.
 
 ### Big picture tier roadmap
 
-- **NOW DISCHARGE THE STEP, ONE FRAME AT A TIME.** The burst walk is a body
-  and the leaf under it is a single frame at a single arriving batch, which is
-  where every operator actually lives. `map-f` is an `applyFn` over the batch
-  and should fall to the term leaf; `scan-f` and `take-f` dispatch on a node
-  the rows above never made non-empty, and that dispatch is the first place
-  this face reads stored state it did not just install; the flattening walk is
-  already instantiated at all three operators and is a fold. Take them in that
-  order and postulate what each still owes rather than widening the step.
+- **DECIDE WHAT THE STORE OWES THE CANDIDATE, BEFORE GRINDING ANY OF THE FOUR
+  STATEFUL FRAMES.** The step split cleanly and the mapping frame fell out as a
+  body, which makes the remaining shape legible: each of `red-scan`,
+  `red-take`, `red-from-inner` and `red-thru` READS a node this face installed
+  earlier, and `Red` quantifies over every state with no precondition — strong
+  where it produces, silent where it consumes. So the fact each needs is in no
+  hypothesis and cannot be put in one without laundering the row. Decide
+  whether `EvalSt` gains a reducibility invariant over what its nodes hold,
+  preserved by every step. Four grinds hang off the answer.
 
 - **THEN RUN A SELF-REFERENTIAL μ, IN THE CORPUS RATHER THAN IN A PROBE.** The
   peel is now paid for by a size the unfolding does not move, and what funds that
@@ -277,13 +278,26 @@ deferred beside it.
   `DEAD ROUTE, PROBED`: a share's slot is reducible. Its def is drawn from the
   table rather than the term, so no descent this module can see reaches it.
 
-- **`red-step`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`: one frame, one
-  arriving batch. Inhabited at every operator's reading of an empty node; a node
-  already holding something is unreached, and so is scan and take.
+- **`red-scan`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`: a scan's
+  accumulator is read back out of the node this face installed, and the
+  candidate carries no claim about what a node holds.
 
-- **`red-tm`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`: every closed
-  term's value is reducible. Mutual with the body through the expression
-  embedding, so the route is known and nothing has walked it.
+- **`red-take`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`: the same gap
+  plus a truncation, which is where a burst can lose the value a satisfaction
+  claim was taken at.
+
+- **`red-from-inner`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`: what an
+  inner emits on its way back up, where a mergeAll drains its queue and a
+  switch decides whether the emission still belongs to anybody.
+
+- **`red-thru`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`: the flattening
+  walk. Inhabited at every operator's reading of an EMPTY node; a node already
+  holding something is unreached.
+
+- **`red-env`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`: every term's
+  value is reducible under a reducible environment. Mutual with the body
+  through the expression embedding, so the route is known and nothing has
+  walked it.
 
 
 ## Tier 2 — Verify-Well-Formed (parked behind tier 1)
