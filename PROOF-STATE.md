@@ -229,15 +229,14 @@ does.
 
 ### Big picture tier roadmap
 
-- **WALK THE OTHER HALF OF WHAT A RUN DOES NOT TOUCH.** The slot half is a
-  body: one structural induction over the subscribe family's SCC, `refl` at
-  every leaf, three function lemmas for the schedules a clause hands to
-  `oneShotBurst`, `takeDispatch` and `switchKill`. The count half —
-  `subs-unconn-drops`, `step-unconn-drops`, `consume-unconn-drops` — is the
-  same shape over the same block, and the only arms that move the set are the
-  two connects, which ADD an index and so drop the count. The leg is that walk,
-  and what it settles is whether the fall is monotone at every arm or whether
-  one of them re-opens a share the builder has already spent.
+- **WALK THE READING THE SAME WAY, NOW THAT THE WALK IS KNOWN TO BE CHEAP.**
+  Both halves of what a run does not touch fell to one structural induction over
+  the subscribe family's SCC, and the builder now carries no postulate at all.
+  What that settles is a METHOD: a claim about a derivation's endpoints is a walk
+  of the relation, whatever apparatus the builder producing it needs. The leg
+  tests that reading on the report's premise-only rows, and says which the walk
+  cannot close because the conclusion needs a quantity no arm carries — which is
+  `Where does the burst LENGTH live?` reached from the side that just worked.
 
 - **AND THE TWO FRAME HEADS THAT LEAVE THE MODULE.** The frame walk is a body
   at every head that rewrites a payload; what is left are the two that do not.
@@ -316,11 +315,6 @@ does.
 - **`scan-fits`** (Rx/Evaluator/Burst-Report) — SHAPE, `REFUTED×4`: refuted at
   a five-element burst, and the premise that would carry the count refuted in
   turn at the only channel able to hold one. The count is owed from the run.
-
-- **`subs-unconn-drops`, `step-unconn-drops`, `consume-unconn-drops`**
-  (Rx/Evaluator/Builder) — DIFFICULTY, `TWIN×3`: the unconnected count only
-  falls across three ⇓ families. Its slot twin is proven as a walk of the same
-  block.
 
 
 ## Tier 2 — Verify-Well-Formed (parked behind tier 1)
