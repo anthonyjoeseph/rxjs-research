@@ -533,6 +533,31 @@ map-handed {s = s} η fn (v ∷ vs) le (p ∷ᵃ ps) =
 --   reservation joined into the rank — the rank is the wrong side of
 --   the comparison, and what is owed above this leaf is a bound the
 --   entry cannot name at all.
+-- REFUTED: `Refuted.Domain-Predicate` — and the repair that would
+--   replace the number rather than repair it.  Carrying a domain
+--   predicate and descending on that instead needs one the evaluator
+--   can USE, which means invertible at a term head, since the machine
+--   cases on the term and must hand the recursive call a proof for
+--   that term's child; the structural predicate is the only candidate
+--   that is, and `sub-total` inhabits it for every closed term.  So it
+--   is `⊤`, and descending on it is descending on a copy of the term.
+-- DEAD ROUTE: the three predicates that WOULD carry the hop, each
+--   rejected by the compiler rather than by argument.  A template
+--   preserving the predicate as a premise
+--   (`∀ acc → Sub acc → Sub (applyFn f (acc , v))`) puts it left of an
+--   arrow: `NotStrictlyPositive`.  The same premise as a recursive
+--   predicate into `Set` escapes positivity and is rejected
+--   `TerminationIssue`, since the applied template is larger than the
+--   accumulator.  Minting — a constructor `Sub acc → Sub (applyFn f
+--   (acc , v))` with no quantifier, so the producing frame hands back
+--   the successor — is positive AND terminating, and dies at
+--   invertibility: `SplitError.UnificationStuck` on
+--   `applyFn f (acc , v) ≟ mergeAllᵉ lim b`.  One cause under all
+--   three and under the refutation above it: a fold's output is built
+--   by SUBSTITUTION, which is neither a constructor nor
+--   size-reducing, so the arriving observable is related to nothing in
+--   hand — and that is a fact about what a value CARRIES, not about
+--   how the descent is denominated.
 postulate
   scan-fits : ∀ {n} {Γ : Ctx n} {s u} {U q sz r} (η : Fin n → ℕ)
     (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (ac : Val Γ u) (vs : List (Val Γ s))

@@ -141,3 +141,15 @@ open import Refuted.Scripted-Connect using (connect-drops-false;
 -- why a syntactic rank reads true from small programs
 open import Refuted.Entry-Depth using (entry-depth-bounds-run-false;
   run-peaks-are; entry-reads-are; no-connect-edge)
+
+-- and the repair those three invite, killed in its own currency
+-- rather than in arithmetic.  If no number fixed before a run can
+-- bound what the run emits, the move is to stop denominating the
+-- descent in a number at all and carry a domain predicate -- and the
+-- only shape of one this evaluator could USE, since it cases on the
+-- term and needs the child's proof, is the structural one, which is
+-- `⊤`.  `sub-total` is claimed beside the refutation because it is
+-- the whole content: the predicate is inhabited by plain recursion on
+-- the term, so holding one is holding a copy of the term
+open import Refuted.Domain-Predicate using
+  (structural-domain-has-content-false; sub-total)
