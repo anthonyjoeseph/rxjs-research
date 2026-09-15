@@ -403,8 +403,24 @@ postulate
 -- arm's gap at another head: it is a question about whether the depth
 -- component can be read off the program at all.
 --
+-- AND THE CHEAP ESCAPE IS CLOSED.  The climb alone does not force a
+-- restatement: if no RUN could stand a configuration that deep beside a
+-- burst that long, the obligation dissolves by restricting the claim to
+-- reachable configurations, bounding nothing and costing no
+-- mathematics.  A run reaches it — at the shallowest input this
+-- language can write, on the first delivery, from the seed — so
+-- excluding the shape would cost rxjs parity.  What the same witness
+-- shows positively is the currency a repair has to be written in: the
+-- emitted depth is the burst POSITION while the program's own reading
+-- holds still, so the gap is a RATE in the burst length rather than an
+-- offset a wider margin absorbs, and a bound carrying that length
+-- beside the reading is what holds at the witness.  That is evidence
+-- about the restatement's SHAPE and not about its truth.
+--
 -- REFUTED: `Refuted.Scan-Deepens` — the fold whose template re-wraps its
 --   accumulator, at the constructor this arm stands over.
+-- REFUTED: `Refuted.Scan-Reachable` — the same template RUN, which is
+--   what kills the reachability escape and prices the repair.
 postulate
   scan-handed : ∀ {n} {Γ : Ctx n} {s u} {τ : Tri} (η : Fin n → ℕ)
     (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (ac : Val Γ u) (vs : List (Val Γ s))
