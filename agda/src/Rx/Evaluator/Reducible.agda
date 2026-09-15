@@ -35,8 +35,8 @@ open import Data.Bool using (Bool; true; false; if_then_else_; T)
 open import Data.Fin using (Fin; toℕ)
 open import Data.List using (List; []; _∷_; _++_; map)
 open import Data.List.Relation.Unary.All using (All; []; _∷_)
-open import Data.Maybe using (Maybe)
-open import Data.Nat using (ℕ; zero; suc; _<_)
+open import Data.Maybe using (nothing)
+open import Data.Nat using (zero; suc; _<_)
 open import Data.Nat.Induction using (<-wellFounded)
 open import Data.Nat.Properties using (_<?_; ≮⇒≥; ≤-refl)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
@@ -55,11 +55,12 @@ open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; Ct
   mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; isData; unfoldμ)
 open import Rx.Exp.Guarded using (gsizeᵉ; gsize-unfoldμ)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; _↠_; map-f; take-f; scan-f; take-st; scan-st;
+  thru-outer; mergeAllᵒ; switchᵒ; exhaustᵒ; mergeAll-st; switch-st; exhaust-st;
   installNode; oneShotBurst; memberSource)
 open import Rx.Evaluator.Domain using (subscribeE⇓; pushBurst⇓; subs-of;
   subs-empty; subs-map; subs-take-zero; subs-take-suc; subs-scan; subs-defer;
   subs-floor; subs-hot-done; subs-hot-live; subs-cold-sync; subs-cold-async;
-  subs-μ)
+  subs-μ; sub-all; subs-merge-all; subs-switch-all; subs-exhaust-all)
 
 -- An emitted EVENT carries a payload only in the `value` arm; every
 -- other arm is protocol traffic and constrains nothing.
@@ -174,36 +175,32 @@ postulate
         subscribeE⇓ {e = e} (input i) κ id now sched st r
           × StreamSat (Red (lookup Γ i)) (proj₁ r)
 
+  -- PUSHING A BURST THROUGH A FRAME, AND NOW THE WHOLE OF THE HOP.
+  -- The three transformer arms share a two-step shape -- run the
+  -- source, then push what it emitted -- so the second step is one
+  -- obligation rather than three.  The flatteners turn out to share
+  -- it too: each installs its node and runs its source through a
+  -- `thru-outer` frame, so an operator's queue, its kill, its refusal
+  -- and its concurrency limit are all clauses of THIS push and of
+  -- nothing above it.  That is why the candidate at the higher type
+  -- survives the descent for free -- the hop is not in the flattener's
+  -- statement, and the state the inner is subscribed in is whatever
+  -- the walk has threaded by the time it reaches one.
+  -- PROBED: `Probed.Reducible-Arms` through a mapping frame whose
+  --   function returns an OBSERVABLE -- the one row in that file where
+  --   the satisfaction half is a real claim, since what the pushed
+  --   value must satisfy is another expression's reducibility rather
+  --   than a protocol event -- and through a FLATTENING frame, at its
+  --   own step and a walk with nothing to consume.  The flattening row
+  --   is degenerate in the operator: the outer's burst carries no
+  --   value, so the walk hands the operator no observable and reads
+  --   the store at no concurrency limit.  No scan or take frame
+  --   reached, no burst of more than one emit, and no live inner.
   red-push : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
              (id : Id) (now : Tick) (f : Frame Γ s u) (κ : Path Γ lo u t)
              {burst : Stream Γ s} → StreamSat (Red s) burst
            → (sched : Sched Γ) (st : EvalSt e)
            → RedPush {e = e} id now f κ burst sched st
-  -- PROBED: `Probed.Reducible-Arms` through a mapping frame whose
-  --   function returns an OBSERVABLE -- the one row in that file where
-  --   the satisfaction half is a real claim, since what the pushed
-  --   value must satisfy is another expression's reducibility rather
-  --   than a protocol event.  No scan, take or flattening frame
-  --   reached, and no burst of more than one emit.
-
-  -- THE FLATTENERS, where the type genuinely descends.  Each takes the
-  -- outer's own candidate at `obs (obs u)`, which is where the inners
-  -- arrive already reducible at `obs u`.
-  --
-  -- PROBED: `Probed.Reducible-Arms` reaches all three at an outer that
-  --   emits no inner at all, so the node install, the outer's own
-  --   subscription and the push back through the frame are shown to
-  --   compose.  Nothing downstream of the HOP is reached: the queue
-  --   never fills, the switch never kills, the exhaust never refuses,
-  --   and the concurrency limit is untouched at every value.
-  red-merge-all : ∀ {n} {Γ : Ctx n} {u} (lim : Maybe ℕ) (b : Closed Γ (obs u))
-                → Red {Γ = Γ} (obs (obs u)) b → Red {Γ = Γ} (obs u) (mergeAllᵉ lim b)
-
-  red-switch-all : ∀ {n} {Γ : Ctx n} {u} (b : Closed Γ (obs u))
-                 → Red {Γ = Γ} (obs (obs u)) b → Red {Γ = Γ} (obs u) (switchAllᵉ b)
-
-  red-exhaust-all : ∀ {n} {Γ : Ctx n} {u} (b : Closed Γ (obs u))
-                  → Red {Γ = Γ} (obs (obs u)) b → Red {Γ = Γ} (obs u) (exhaustAllᵉ b)
 
 
 -- Every protocol event carries no payload, so a burst's values are the
@@ -336,12 +333,30 @@ reducibleAcc (scanᵉ f z b) (acc rs) κ id now sched st =
           (installNode nid (scan-st (evalTm z)) st)
       (r , p , sat′) = red-push id now (scan-f f nid) κ sat sched₂ st₁
   in r , subs-scan refl d p , sat′
-reducibleAcc (mergeAllᵉ lim b) (acc rs) =
-  red-merge-all lim b (λ {t} {e} {lo} κ → reducibleAcc b (rs ≤-refl) {t} {e} {lo} κ)
-reducibleAcc (switchAllᵉ b) (acc rs) =
-  red-switch-all b (λ {t} {e} {lo} κ → reducibleAcc b (rs ≤-refl) {t} {e} {lo} κ)
-reducibleAcc (exhaustAllᵉ b) (acc rs) =
-  red-exhaust-all b (λ {t} {e} {lo} κ → reducibleAcc b (rs ≤-refl) {t} {e} {lo} κ)
+reducibleAcc (mergeAllᵉ lim b) (acc rs) κ id now sched st =
+  let nid = Sched.nextNode sched
+      ((burst , sched₂ , st₁) , d , sat) =
+        reducibleAcc b (rs ≤-refl) (thru-outer mergeAllᵒ nid ↠ κ) id now
+          (record sched { nextNode = suc nid })
+          (installNode nid (mergeAll-st lim 0 [] false) st)
+      (r , p , sat′) = red-push id now (thru-outer mergeAllᵒ nid) κ sat sched₂ st₁
+  in r , subs-merge-all (sub-all refl d p) , sat′
+reducibleAcc (switchAllᵉ b) (acc rs) κ id now sched st =
+  let nid = Sched.nextNode sched
+      ((burst , sched₂ , st₁) , d , sat) =
+        reducibleAcc b (rs ≤-refl) (thru-outer switchᵒ nid ↠ κ) id now
+          (record sched { nextNode = suc nid })
+          (installNode nid (switch-st nothing false) st)
+      (r , p , sat′) = red-push id now (thru-outer switchᵒ nid) κ sat sched₂ st₁
+  in r , subs-switch-all (sub-all refl d p) , sat′
+reducibleAcc (exhaustAllᵉ b) (acc rs) κ id now sched st =
+  let nid = Sched.nextNode sched
+      ((burst , sched₂ , st₁) , d , sat) =
+        reducibleAcc b (rs ≤-refl) (thru-outer exhaustᵒ nid ↠ κ) id now
+          (record sched { nextNode = suc nid })
+          (installNode nid (exhaust-st false false) st)
+      (r , p , sat′) = red-push id now (thru-outer exhaustᵒ nid) κ sat sched₂ st₁
+  in r , subs-exhaust-all (sub-all refl d p) , sat′
 reducibleAcc (μᵉ body) (acc rs) κ id now sched st =
   let (r , d , sat) =
         reducibleAcc (unfoldμ body)

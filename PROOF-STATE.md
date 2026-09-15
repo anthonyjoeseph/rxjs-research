@@ -233,14 +233,14 @@ deferred beside it.
 
 ### Big picture tier roadmap
 
-- **THE THREE FLATTENERS, WHICH ARE NOW THE WHOLE OF THE RISK.** The hop, where the type
-  genuinely descends and where the inners arrive out of a burst standing in no
-  relation to the term that produced them. Each already takes the outer's
-  candidate at the higher type; whether that is still usable at the state the hop
-  reaches is the tier's open question, and answering it is this leg. It is first
-  because a refutation here moves the candidate's INTERFACE and not just these
-  three rows. The queue, the switch's kill, the exhaust's refusal and the
-  concurrency limit are all inside it.
+- **THE FRAME PUSH AT A LIVE INNER, WHICH IS NOW THE WHOLE OF THE RISK.**
+  `red-push` absorbed the hop: a flattener installs its node and runs its source
+  through a `thru-outer` frame, so the queue, the kill, the refusal and the
+  concurrency limit are clauses of the push and of nothing above it. One row
+  reaches that frame, and its walk finds nothing to consume — so every
+  operator-specific reading of the store is still uninstantiated. Instantiate it
+  at an outer carrying a live inner, at each operator and at a bounded limit,
+  before writing a line of the body.
 
 - **THEN RUN A SELF-REFERENTIAL μ, IN THE CORPUS RATHER THAN IN A PROBE.** The
   peel is now paid for by a size the unfolding does not move, and what funds that
@@ -252,13 +252,13 @@ deferred beside it.
   does refer to itself, run end to end. Cheap, and the one thing that would catch
   the guard being right on paper and wrong in the code.
 
-- **THEN THE MECHANICAL SHELF.** A frame push, a term's
-  own value and a share's connect. They are one leg because none of them can move
-  the ground, and they come after the risk because the flattener leg can still
-  change what they must be written against: its bodies CALL `red-push`, and
-  `red-push` reaches a term's value. Grinding them before the risk above settles
-  buys work that a restatement upstream would throw away, which is the whole
-  reason the ordering is stated rather than left to whatever is nearest.
+- **THEN THE MECHANICAL SHELF, WHICH IS NOW TWO ROWS.** A term's own value and a
+  share's connect. They are one leg because neither can move the ground, and they
+  come after the push because the push leg can still change what they must be
+  written against — a walk that reaches a live inner subscribes it, and that is
+  where a term's own value is asked for. Grinding them before the risk above
+  settles buys work that a restatement upstream would throw away, which is the
+  whole reason the ordering is stated rather than left to whatever is nearest.
 
 - **THEN WHATEVER DESIGN WORK REMAINS.** The candidate funds `Runs` and nothing
   else; the other eight `*Runs` families have no candidate and the bet is that
@@ -271,39 +271,16 @@ deferred beside it.
   once each has a settled shape and a named route. This is the delegation
   boundary and the first leg here that is not the design session's own work.
 
-### Open questions
-
-- **Does the outer's candidate survive the hop?** A flattener receives its
-  inners as VALUES inside the outer's burst, so what it holds is a satisfaction
-  claim over a stream rather than a candidate at a state — and the state the hop
-  subscribes in is whatever the outer's delivery reached, not the one the claim
-  was taken at. The candidate is quantified over every state precisely so that
-  gap costs nothing, and nothing has instantiated it.
-  relevant: `red-merge-all`, `red-switch-all`, `red-exhaust-all`
-
 ### The ledger
-
-- **`red-merge-all`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`: the
-  bounded-concurrency flattener is reducible given its outer's candidate. Runs
-  a queue and a live count, so it is the flattener whose state the hop threads
-  through most.
-
-- **`red-switch-all`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`:
-  `switchAll` is reducible given its outer's candidate. Kills a live inner, so
-  the hop subscribes in a state a cancellation has just moved.
-
-- **`red-exhaust-all`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`:
-  `exhaustAll` is reducible given its outer's candidate. Refuses a second
-  inner, so one arm carries no subscription at all.
 
 - **`red-input-shared`** (Rx/Evaluator/Reducible) — FALSITY,
   `DEAD ROUTE, PROBED`: a share's slot is reducible. Its def is drawn from the
   table rather than the term, so no descent this module can see reaches it.
 
-- **`red-push`** (Rx/Evaluator/Reducible) — FALSITY, `DEAD ROUTE, PROBED`:
-  pushing a satisfying burst through a frame yields a total derivation and a
-  satisfying result. Spent by all three transformer arms, so a restatement
-  moves each of them.
+- **`red-push`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`: pushing a
+  satisfying burst through a frame yields a total derivation and a satisfying
+  result. Spent by all three transformer arms, so a restatement moves each of
+  them.
 
 - **`red-tm`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`: every closed
   term's value is reducible. Mutual with the body through the expression

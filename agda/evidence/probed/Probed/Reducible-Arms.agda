@@ -1,6 +1,6 @@
--- THE SIX LEAVES OF THE REDUCIBILITY BODY, INSTANTIATED.
+-- THE THREE LEAVES OF THE REDUCIBILITY BODY, INSTANTIATED.
 --
--- WHAT IS AT RISK, AND IT IS THE SAME RISK IN ALL SIX.  The
+-- WHAT IS AT RISK, AND IT IS THE SAME RISK IN ALL THREE.  The
 -- candidate's observable arm demands a subscription derivation in
 -- EVERY schedule and EVERY state, together with a satisfaction claim
 -- over everything the derivation emits.  Nothing had ever produced one
@@ -33,42 +33,45 @@
 --
 -- NOT REACHED, and each is a region rather than a program.  A share's
 -- connect, which is the slot leaf's sixth sub-arm and the only one
--- whose def is an arbitrary term.  A flattener with a LIVE inner -- these reach the empty outer, where the queue
--- never fills, the switch never kills and the exhaust never refuses.
--- The bounded-concurrency axis is untouched at every limit.  Two of
--- the slot's five scripted sub-arms -- the spent hot and the cold with
--- an asynchronous tail -- and the take and scan arms of the body,
--- whose own recursion the body already checks.
+-- whose def is an arbitrary term.  A flattening frame handed a LIVE
+-- inner: the push row below reaches the frame's own step and a walk
+-- with nothing to consume, so the queue never fills, the switch never
+-- kills, the exhaust never refuses and no reading of the store is
+-- made at any concurrency limit.  Two of the slot's five scripted
+-- sub-arms -- the spent hot and the cold with an asynchronous tail --
+-- and the take and scan arms of the body, whose own recursion the
+-- body already checks.
 --
 -- TARGET: red-tm @e1ae28
 -- TARGET: red-input-shared @21f529
 -- TARGET: red-push @733369
--- TARGET: red-merge-all @76b1cd
--- TARGET: red-switch-all @e42657
--- TARGET: red-exhaust-all @98824b
 module Probed.Reducible-Arms where
 
 open import Data.Fin using (zero)
 open import Data.List using ([]; _∷_)
 open import Data.List.Relation.Unary.All using ([]; _∷_)
 open import Data.Maybe using (nothing)
+import Data.Nat
 open import Data.Nat using (zero; s≤s; z≤n)
-open import Data.Product using (_,_)
+open import Data.List using ([])
+open import Data.Maybe using (nothing)
+open import Data.Bool using (false)
+open import Data.Product using (_,_; proj₁)
 open import Data.Unit using (tt)
 open import Data.Vec using ([]; _∷_)
 open import Data.List.Relation.Unary.Any using (here)
 open import Relation.Binary.PropositionalEquality using (refl)
 
 open import Rx.Prim using (init; value; subscribe; _at_from_as_)
-open import Rx.Exp using (Ctx; Closed; natᵗ; obs; ofᵉ; emptyᵉ; nat̂; strmᵗ; varᵗ; Tm; input)
+open import Rx.Exp using (Ctx; Closed; natᵗ; obs; ofᵉ; nat̂; strmᵗ; varᵗ; Tm; input)
 open import Rx.Slots using (Slots; shared)
 open import Rx.Evaluator using (Sched; EvalSt; Stream; Path; root; map-f; sched-init;
-  st-init)
+  st-init; thru-outer; mergeAllᵒ; mergeAll-st; installNode; oneShotBurst)
 open import Rx.Evaluator.Reducible using (Red; StreamSat; reducible; red-tm;
-  red-input-shared; red-push; red-merge-all; red-switch-all; red-exhaust-all)
+  red-input-shared; red-push; satOneShot)
 
-open import Rx.Evaluator.Domain using (subs-shared; slot-spent; slot-join; subs-empty; push-cons; push-nil; step-map;
-  step-thru-outer; walk-nil; sub-all; subs-merge-all; subs-switch-all; subs-exhaust-all)
+open import Rx.Evaluator.Domain using (subs-shared; slot-spent; slot-join; push-cons; push-nil; step-map;
+  step-thru-outer; walk-nil)
 
 open import Probed.Apparatus using (Confirms)
 
@@ -202,37 +205,37 @@ row-push-obs =
     , (tt ∷ reducible (ofᵉ (nat̂ 7 ∷ [])) ∷ []) ∷ []
 
 ----------------------------------------------------------------------
--- 5.  THE THREE FLATTENERS, at an outer that emits no inner at all.
--- This is the arm each one takes when its walk has nothing to consume,
--- so the queue never fills, the switch never kills and the exhaust
--- never refuses: evidence that the node install, the outer's own
--- subscription and the push back through the frame compose, and
--- evidence about nothing downstream of the hop.
+-- 5.  THE SAME PUSH THROUGH A FLATTENING FRAME, which is where the
+-- hop now lives.  The three `*All` operators are not statements of
+-- their own: each runs its source through a `thru-outer` frame and
+-- pushes what came back, so everything an operator DOES -- the queue,
+-- the kill, the refusal, the concurrency limit -- is a clause of this
+-- push rather than of anything above it.  The row reaches the frame's
+-- own step and the walk that finds nothing to consume.
+--
+-- LOAD-BEARING for the frame clause and DEGENERATE for the operator:
+-- the outer's burst is protocol traffic with no value on it, so the
+-- walk has no observable to hand the operator and no reading of the
+-- store is made.  A live inner is not reached here.
 ----------------------------------------------------------------------
 
-outer₀ : Closed Γ₀ (obs natᵗ)
-outer₀ = emptyᵉ
+nid₃ : _
+nid₃ = Sched.nextNode sch₀
 
-redOuter : Red {Γ = Γ₀} (obs (obs natᵗ)) outer₀
-redOuter = reducible outer₀
+sched₃ : Sched Γ₀
+sched₃ = record sch₀ { nextNode = Data.Nat.suc nid₃ }
 
-row-merge-empty : Confirms
-  (red-merge-all {Γ = Γ₀} nothing outer₀ redOuter {e = e₀} κ₀ 0 0 sch₀ st₀)
-row-merge-empty =
-  _ , subs-merge-all (sub-all refl (subs-empty refl)
-        (push-cons refl (step-thru-outer walk-nil) push-nil))
-    , (tt ∷ tt ∷ tt ∷ []) ∷ []
+st₃ : EvalSt e₀
+st₃ = installNode nid₃ (mergeAll-st {t = natᵗ} nothing 0 [] false) st₀
 
-row-switch-empty : Confirms
-  (red-switch-all {Γ = Γ₀} outer₀ redOuter {e = e₀} κ₀ 0 0 sch₀ st₀)
-row-switch-empty =
-  _ , subs-switch-all (sub-all refl (subs-empty refl)
-        (push-cons refl (step-thru-outer walk-nil) push-nil))
-    , (tt ∷ tt ∷ tt ∷ []) ∷ []
+burstOuter : Stream Γ₀ (obs natᵗ)
+burstOuter = proj₁ (oneShotBurst [] 0 sched₃)
 
-row-exhaust-empty : Confirms
-  (red-exhaust-all {Γ = Γ₀} outer₀ redOuter {e = e₀} κ₀ 0 0 sch₀ st₀)
-row-exhaust-empty =
-  _ , subs-exhaust-all (sub-all refl (subs-empty refl)
-        (push-cons refl (step-thru-outer walk-nil) push-nil))
+satOuter : StreamSat (Red {Γ = Γ₀} (obs natᵗ)) burstOuter
+satOuter = satOneShot 0 sched₃ []
+
+row-push-thru : Confirms
+  (red-push {e = e₀} 0 0 (thru-outer mergeAllᵒ nid₃) κ₀ satOuter sched₃ st₃)
+row-push-thru =
+  _ , push-cons refl (step-thru-outer walk-nil) push-nil
     , (tt ∷ tt ∷ tt ∷ []) ∷ []
