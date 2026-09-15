@@ -229,6 +229,16 @@ does.
 
 ### Big picture tier roadmap
 
+- **FIND THE CURRENCY THE REBINDING ARM IS ACTUALLY IN.** Two witnesses close
+  the open reading's `caseᵗ` arm from opposite sides and no clause answers
+  both: a JOIN over the three subterms is false at the empty environment, and
+  the ADDING clause that answers it breaks the sum instead, at an entry the
+  arm reads on both sides. So `depᵗ η tm + m` is the wrong SHAPE rather than a
+  clause away from true, and the leg decides what replaces it before anything
+  is stated over it — a bound multiplicative in the environment, or a reading
+  carrying the bound branch in the measure instead of in a premise.
+  `map-open` and `scan-handed` wait on whichever lands.
+
 - **GIVE THE BURST LENGTH A CARRIER.** `scan-fits` is REFUTED as written, at
   five plain numbers: it reserves one RATE per delivery under the entry rank
   while no premise relates the burst's LENGTH to that rank, so the two are
@@ -332,14 +342,14 @@ does.
   connect's drop in the unconnected component, the arithmetic the arm above
   spends. No consumer until that arm is a body.
 
-- **`dep-eval-open`** (Rx/Obs-Depth/Substitution) — FALSITY, `PROBED`: an
-  instance of a template at an environment, priced as a SUM — the shelf the map
-  arm is now a body over. What could break it is OCCURRENCE, a binder read
-  twice or wrapped again, and the rows stand at both.
+- **`dep-eval-open`** (Rx/Obs-Depth/Substitution) — FALSITY,
+  `REFUTED×2, PROBED`: an instance of a template at an environment, priced as a
+  SUM — the shelf the map arm is now a body over. What could break it is
+  OCCURRENCE, a binder read twice or wrapped again, and the rows stand at both.
 
-- **`eval-case`, `eval-if`** (Rx/Obs-Depth/Substitution) — FALSITY, `PROBED×2`:
-  the two places evaluation enters a branch under a binder the data hypothesis
-  does not cover. One question asked twice.
+- **`eval-case`, `eval-if`** (Rx/Obs-Depth/Substitution) — FALSITY,
+  `REFUTED×2, PROBED×2`: the two places evaluation enters a branch under a
+  binder the data hypothesis does not cover. One question asked twice.
 
 - **`dep-wkTm`, `data-of`** (Rx/Obs-Depth/Substitution) — FALSITY, `PROBED×2`:
   the shelf under the arms above — the telescope membership, whose rows buy

@@ -172,8 +172,21 @@ postulate
 -- own reading is a program quantity — but recovering it needs the open
 -- form below rather than this one.
 --
+-- AND THE HYPOTHESIS DOES NOT ISOLATE THAT ARM, WHICH IS WHY THE
+-- READING AND NOT THIS PREMISE IS WHAT MOVED.  The data gate is over
+-- the ENVIRONMENT, and the empty environment is data, so a scrutinee
+-- the TEMPLATE writes walks straight through it — the observable never
+-- has to be handed in.  What pays for the arm is the reading's own
+-- `caseᵗ` clause, which adds the scrutinee where it used to join it;
+-- this premise then buys what it always bought, that nothing further
+-- arrives from outside.
+--
 -- `ifᵗ` is separate only because Agda cannot see through the `if` that
 -- selects the branch; nothing about it is open.
+--
+-- REFUTED: `Refuted.Case-Binds` — the join this arm was stated over,
+--   which made this statement false by TWICE the open form's margin,
+--   since a strict drop is demanded where the emission climbs.
 --
 -- PROBED: `Probed.Eval-Binders` — a `caseᵗ` at a data payload with
 --   both arms writing, and at an OBSERVABLE payload handed straight
@@ -242,9 +255,9 @@ mutual
   dep-subΘᵗ η Θloc dd σ (inlᵗ a)      = dep-subΘᵗ η Θloc dd σ a
   dep-subΘᵗ η Θloc dd σ (inrᵗ a)      = dep-subΘᵗ η Θloc dd σ a
   dep-subΘᵗ η Θloc dd σ (caseᵗ {s = s} {t = t} sc l r) =
-    cong₂ _⊔_ (cong₂ _⊔_ (dep-subΘᵗ η Θloc dd σ sc)
-                         (dep-subΘᵗ η (s ∷ Θloc) dd σ l))
-              (dep-subΘᵗ η (t ∷ Θloc) dd σ r)
+    cong suc (cong₂ _+_ (dep-subΘᵗ η Θloc dd σ sc)
+                        (cong₂ _⊔_ (dep-subΘᵗ η (s ∷ Θloc) dd σ l)
+                                   (dep-subΘᵗ η (t ∷ Θloc) dd σ r)))
   dep-subΘᵗ η Θloc dd σ (ifᵗ c a b)   =
     cong₂ _⊔_ (cong₂ _⊔_ (dep-subΘᵗ η Θloc dd σ c)
                          (dep-subΘᵗ η Θloc dd σ a))
@@ -361,12 +374,38 @@ envDepth η (v ∷ᵃ vs) = depᵗ η (reify v) ⊔ envDepth η vs
 -- tightest true statement rather than stronger.  Measuring the value
 -- rather than its literal is a restatement, not a repair.
 --
+-- AND THE ARM THAT MAKES ITS OWN ENVIRONMENT IS NOT PRICED BY A SUM AT
+-- ALL, WHICH IS WHAT IS KNOWN AND NOT A DOUBT.  A `caseᵗ` binds what
+-- its scrutinee evaluated to, so the branch runs under an environment
+-- `env` never held and `m` never bounded, and no premise over the
+-- environment handed in can reach it.  Making the reading ADD its
+-- scrutinee prices the branch's wrap; it does not rescue the SUM,
+-- because substitution pushes one environment into the scrutinee and
+-- the branch alike, so an entry occurring in both is written into both
+-- and the adding clause charges it twice while this statement has one
+-- addend for it.  The two escapes close in opposite directions, so
+-- what stands between them is the CURRENCY:
+-- the arm composes, and composition is not bounded by adding a
+-- constant to the template's reading.  The statement is left at full
+-- strength and is owed a restatement, not a premise — conditioning it
+-- on an environment no `caseᵗ` reads twice would make the shape of the
+-- lemma an artifact of today's call sites.
+--
+-- REFUTED: `Refuted.Case-Binds` — the join the reading used to take at
+--   that arm, which made this statement false at the EMPTY environment,
+--   where its premise is discharged by the least evidence there is.
+-- REFUTED: `Refuted.Case-Twice` — the sum itself, at an environment
+--   entry the template reads on both sides of one `caseᵗ`, which the
+--   adding clause that answers the join then pays for twice.
+--
 -- PROBED: `Probed.Eval-Open` — an empty environment, a data binder, an
 --   observable binder read straight back, the same binder wrapped under a
 --   `strmᵗ` the template writes, and the same binder read TWICE, which is the
 --   row the currency turns on: a price per occurrence would have shown there
 --   and does not.  Not reached: the ITERATION axis, since one evaluation
---   crosses one binder and the growth a fold pays is per refold.
+--   crosses one binder and the growth a fold pays is per refold.  Not
+--   reached either: the REBINDING arm, whose addend comes from the
+--   scrutinee rather than from the environment the rows vary.
 postulate
   dep-eval-open : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) {Θ t}
     (tm : Tm Γ [] [] Θ t) (env : All (Val Γ) Θ) (m : ℕ) →

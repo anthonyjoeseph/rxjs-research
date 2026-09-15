@@ -92,3 +92,23 @@ open import Refuted.Scan-Length using (scan-fits-false; tmpl-is; rate-is)
 -- margin is unbounded rather than off by one
 open import Refuted.Template-Passes using (template-strict-false;
   row-deep-handed; row-passes-template; row-passes-emitted)
+
+-- and the arm that makes its own environment, which is where the
+-- reading ITSELF was wrong rather than any statement over it.  A
+-- `caseᵗ` binds what its scrutinee evaluated to, so a branch wrapping
+-- that binder climbs on top of a nesting a join prices as an
+-- alternative.  Its figures are claimed because the finding is the gap
+-- between two of them and because the other three pin the candidate to
+-- the reading `src` carries everywhere else: a move underneath breaks a
+-- numeral rather than leaving this quiet
+open import Refuted.Case-Binds using (case-join-false;
+  scrut-is; left-is; right-is; joined-is; emission-is)
+
+--- AND THE SAME ARM FROM THE OTHER SIDE, WHICH IS WHY THE REPAIR FOR
+--- THE ONE ABOVE DOES NOT CLOSE IT.  Substitution reaches a `caseᵗ`'s
+--- scrutinee and its branch alike, so an environment entry occurring in
+--- both is written into both and an adding clause charges it twice —
+--- and a price stated as the template's reading PLUS a bound on the
+--- environment has no second addend to pay for the second copy
+open import Refuted.Case-Twice using (case-twice-false;
+  entry-is; template-is) renaming (emission-is to twice-emission-is)

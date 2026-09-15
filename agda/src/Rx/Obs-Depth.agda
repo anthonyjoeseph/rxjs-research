@@ -2,10 +2,21 @@
 -- THE HOP PEEL'S MEASURE, AND IT CONSULTS THE SYNTAX PLUS ONE READING
 -- OF THE SLOTS.  `strmᵗ` is the only head that writes an observable, so
 -- the nesting of those heads is a quantity the PROGRAM carries; every
--- other clause joins.  That is the whole difference from the reading
--- this replaces: a reading prices what a subtree will EMIT, which
--- multiplies as a flattener re-wraps, while this counts how deep
+-- clause that binds nothing joins.  That is the whole difference from
+-- the reading this replaces: a reading prices what a subtree will EMIT,
+-- which multiplies as a flattener re-wraps, while this counts how deep
 -- observables are WRITTEN, which a run can only walk down.
+--
+-- ONE CLAUSE ADDS, AND IT IS THE ONLY HEAD OF THE TERM LANGUAGE THAT
+-- MAKES ITS OWN ENVIRONMENT.  A `caseᵗ` evaluates its scrutinee and
+-- BINDS what came out, so a branch that wraps its binder writes on top
+-- of the scrutinee's nesting rather than beside it; a join over the
+-- three subterms prices the two as alternatives when the run composes
+-- them.  The `suc` is the `reify` the binding goes through, which
+-- writes a `strmᵗ` the scrutinee's own reading has already peeled, and
+-- it is OUTERMOST so that the strict drop the door is entered on
+-- reduces at this head rather than blocking on a sum.  `ifᵗ` binds
+-- nothing and still joins.
 --
 -- THE ENVIRONMENT IS WHAT A SLOT REFERENCE COSTS, AND IT IS FORCED.  A
 -- reference is ONE SYMBOL standing for a definition of any nesting, so a
@@ -24,6 +35,12 @@
 -- instead is a seed of its own, which is what the entry's third
 -- argument is for.
 --
+-- REFUTED: `Refuted.Case-Binds` — the JOIN this reading used to take
+--   at the rebinding arm, at a scrutinee written three deep under a
+--   branch that writes two.  It kills the reading itself and not merely
+--   a statement over it, which is why the repair is a clause here and
+--   not a premise anywhere above.
+--
 -- REFUTED: `Refuted.Carried-Derived` — the ZERO environment, read as
 --   the entry invariant's rank at a fresh share whose definition writes
 --   an observable.  That witness is why `η` is here at all, and why no
@@ -37,7 +54,7 @@ open import Data.Fin using (Fin)
 open import Data.List using (List; []; _∷_)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
-open import Data.Nat using (ℕ; suc; _⊔_; _≤_)
+open import Data.Nat using (ℕ; suc; _+_; _⊔_; _≤_)
 open import Data.Nat.Properties using (≤-refl)
 open import Data.Product using (_,_)
 open import Data.Sum using (inj₁; inj₂)
@@ -73,7 +90,7 @@ mutual
   depᵗ η (sndᵗ p)      = depᵗ η p
   depᵗ η (inlᵗ a)      = depᵗ η a
   depᵗ η (inrᵗ a)      = depᵗ η a
-  depᵗ η (caseᵗ s l r) = depᵗ η s ⊔ depᵗ η l ⊔ depᵗ η r
+  depᵗ η (caseᵗ s l r) = suc (depᵗ η s + (depᵗ η l ⊔ depᵗ η r))
   depᵗ η (ifᵗ c a b)   = depᵗ η c ⊔ depᵗ η a ⊔ depᵗ η b
   depᵗ η (primᵗ _ a)   = depᵗ η a
   depᵗ η (strmᵗ e)     = suc (depᵉ η e)
@@ -148,9 +165,9 @@ mutual
   dep-elimGᵗ η x cl (inlᵗ a)      = dep-elimGᵗ η x cl a
   dep-elimGᵗ η x cl (inrᵗ a)      = dep-elimGᵗ η x cl a
   dep-elimGᵗ η x cl (caseᵗ s l r) =
-    cong₂ _⊔_ (cong₂ _⊔_ (dep-elimGᵗ η x cl s)
-                         (dep-elimGᵗ η x cl l))
-              (dep-elimGᵗ η x cl r)
+    cong suc (cong₂ _+_ (dep-elimGᵗ η x cl s)
+                        (cong₂ _⊔_ (dep-elimGᵗ η x cl l)
+                                   (dep-elimGᵗ η x cl r)))
   dep-elimGᵗ η x cl (ifᵗ c a b)   =
     cong₂ _⊔_ (cong₂ _⊔_ (dep-elimGᵗ η x cl c)
                          (dep-elimGᵗ η x cl a))

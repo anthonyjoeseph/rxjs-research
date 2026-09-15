@@ -30,7 +30,7 @@ module Rx.Obs-Depth.Eta-Cong where
 open import Data.Bool using (true; false; T; _∧_)
 open import Data.Fin using (Fin; toℕ)
 open import Data.List using (List; []; _∷_)
-open import Data.Nat using (ℕ; suc; _⊔_; _<ᵇ_)
+open import Data.Nat using (ℕ; suc; _+_; _⊔_; _<ᵇ_)
 open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; cong₂)
 
@@ -105,11 +105,11 @@ mutual
   dep-η-congᵗ k ag (inlᵗ a)      ok = dep-η-congᵗ k ag a ok
   dep-η-congᵗ k ag (inrᵗ a)      ok = dep-η-congᵗ k ag a ok
   dep-η-congᵗ k ag (caseᵗ s l r) ok =
-    cong₂ _⊔_ (cong₂ _⊔_ (dep-η-congᵗ k ag s (∧ˡ (inputsBelowᵗ k s) lr ok))
-                         (dep-η-congᵗ k ag l
-                            (∧ˡ (inputsBelowᵗ k l) (inputsBelowᵗ k r) rest)))
-              (dep-η-congᵗ k ag r
-                 (∧ʳ (inputsBelowᵗ k l) (inputsBelowᵗ k r) rest))
+    cong suc (cong₂ _+_ (dep-η-congᵗ k ag s (∧ˡ (inputsBelowᵗ k s) lr ok))
+                        (cong₂ _⊔_ (dep-η-congᵗ k ag l
+                                      (∧ˡ (inputsBelowᵗ k l) (inputsBelowᵗ k r) rest))
+                                   (dep-η-congᵗ k ag r
+                                      (∧ʳ (inputsBelowᵗ k l) (inputsBelowᵗ k r) rest))))
     where
     lr   = inputsBelowᵗ k l ∧ inputsBelowᵗ k r
     rest = ∧ʳ (inputsBelowᵗ k s) lr ok

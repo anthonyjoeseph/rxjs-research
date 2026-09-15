@@ -60,9 +60,11 @@ open import Probed.Data-Shelf using (row-of-head; row-of-tail;
 
 -- THE TWO BINDING ARMS THE STRICT DROP DEFERS — instantiated at the
 -- observable payload, which is the region that could make either
--- false.
+-- false, and at the branch that WRAPS it with nothing else deep
+-- enough to carry the bound.
 open import Probed.Eval-Binders using (row-case-data; case-data-bound;
   row-case-obs; case-obs-bound; case-obs-value;
+  row-case-wraps; case-wraps-bound; case-wraps-joined; case-wraps-value;
   row-if-selected; row-if-unselected)
 
 -- THE OPEN FORM, WHOSE ROWS DECIDE THE CURRENCY — the binder read
