@@ -268,27 +268,28 @@ does.
   The leg is those rows, and what it buys is the only thing that moves the
   measure's own statements off the class they are born into.
 
-- **TAKE THE RANK OUT OF THE PROOF PATH AND FIND OUT WHAT BREAKS.** The
-  instant-local leg is DISCARDED rather than rewritten: it would have denominated
-  a descent afresh, and the census says no descent is owed to the theorem at all.
-  Nothing the top line proves reads a depth — the batching half is quantified
-  over the protocol automaton's verdict on an emit list, and the debt under it
-  takes the run's two derivations and nothing else — so the rank is owed to the
-  builder's TERMINATION and to nothing besides. The leg is that check, made
-  before any mechanism is chosen: strip the triple from what the protocol half
-  actually spends, and see whether one premise of it was load-bearing.
+- **DENOMINATE THE DESCENT IN THE TYPE, AND STATE THE FAMILIES OVER IT.** The
+  check the last leg asked for is made and its answer is a mechanism, not a
+  verdict: a reducibility predicate recursing on `Ty` lands on the runtime
+  value's own recursion, so the hop relates two indices the definition already
+  identifies and the fold, which moves no type, asks the descent for nothing.
+  Modelled end to end it closes over real substitution, collapses the three
+  flatteners to one case and reads no property of the threaded state. The leg
+  is the statement rather than the proof: the delivery and subscription
+  families over the real expressions, the totality claim above them, every leaf
+  postulated.
 
 ### Open questions
 
-- **What must a value CARRY for a descent to spend it?** Every risky row left in
-  this tier reads a payload's depth against the rank its frame entered at. Both
-  halves of the comparison are settled — no figure fixed before a run bounds what
-  the run emits, and no domain predicate this machine can case on asserts
-  anything — and the relation that would replace them descends at every former
-  but the fold. So the question has changed subject rather than closing: the
-  depth is read by no statement the theorem spends, and what is open is whether a
-  value must carry anything at all, or only whether a function must exist before
-  its own derivation does.
+- **What must a value CARRY for a descent to spend it?** Narrowed to one half. A
+  value carries its TYPE and nothing else: the descent recurses on the delivery
+  derivation, the type is what shrinks at a flattener, and a fold moves neither.
+  What is left is the half no model of the term language can see — the real
+  machine carries a slot telescope and a share table BESIDE the value, and every
+  row here reads a payload against the rank its frame entered at rather than
+  against anything a type fixes. So the question is now whether those are one
+  reading, or whether a frame's own bookkeeping is a second currency the type
+  descent never touches.
   relevant: `scan-fits`, `inner-handed`, `thru-handed`
 
 ### The ledger
