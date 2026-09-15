@@ -238,10 +238,11 @@ deferred beside it.
   witness in `Refuted.Red-Env-Too-Strong` — so the body's induction is
   redundant given it and the five statements beside it are gaps smaller than
   a gap. Reflection is total, so a CLOSED term buys no smallness. Restate it
-  as a MUTUAL PARTNER of the expression recursion under a shared measure, not
-  as a smaller leaf: at the empty environment the embedding arm is the
-  top-line result itself, so any leaf carrying it is this statement again.
-  Nothing under it is worth grinding first.
+  as a MUTUAL PARTNER of the expression recursion, not as a smaller leaf: at
+  the empty environment the embedding arm is the top-line result itself. And
+  fund it by the TYPE, never a size — the guarded size does not look inside a
+  term, so an expression under a frame's function is unbounded against the one
+  containing it, which is what refuted the rank this candidate replaced.
 
 - **THEN RUN A SELF-REFERENTIAL μ, IN THE CORPUS RATHER THAN IN A PROBE.** The
   peel is now paid for by a size the unfolding does not move, and what funds that

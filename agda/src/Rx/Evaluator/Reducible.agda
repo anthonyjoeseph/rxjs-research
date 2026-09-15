@@ -169,9 +169,18 @@ postulate
   --   arm -- at the empty environment that arm IS the top-line
   --   subscription result, so any leaf carrying it is this statement
   --   again.  It has to stop being a leaf: the fundamental theorem at
-  --   terms is a MUTUAL PARTNER of the expression recursion under a
-  --   shared measure, which is what pulling it out as a postulate
-  --   disguised.
+  --   terms is a MUTUAL PARTNER of the expression recursion, which is
+  --   what pulling it out as a postulate disguised.  And the partner
+  --   cannot be funded by a SIZE: the guarded size does not look
+  --   inside a term at all -- a transformer's clause is one `suc` over
+  --   its SOURCE and the frame's function contributes nothing -- so an
+  --   expression embedded in that function is unbounded against the
+  --   expression containing it, which is the shape that refuted the
+  --   rank this candidate replaced.  What funds it is the TYPE: a
+  --   function feeding a flattener produces at the element type, and
+  --   the candidate at the enclosing observable already mentions the
+  --   candidate there.  So the partner is stated at the type the
+  --   recursion is already spending, not at a measure.
   --
   -- PROBED: `Probed.Reducible-Arms` at an observable-typed term, where
   --   the claim IS an expression's own reducibility and the body
