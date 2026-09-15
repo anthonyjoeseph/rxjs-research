@@ -6,7 +6,6 @@ open import Data.Fin.Properties using (toℕ<n) renaming (_≟_ to _≟ᶠ_)
 open import Data.Maybe   using (Maybe; just; nothing; is-nothing)
 open import Data.Nat     using (ℕ; zero; suc; _+_; _<ᵇ_; _≡ᵇ_; _≤ᵇ_; _≤_)
 open import Data.Nat.Properties using (≤-trans)
-open import Data.Nat.ListAction using (sum)
 open import Data.List    using (List; []; _∷_; _++_; map; concat; tabulate; null)
 open import Data.Bool.ListAction using (any)
 open import Data.Vec     using (lookup)
@@ -91,18 +90,6 @@ sameSource = _≡ᵇ_
 
 memberSource : Source → List Source → Bool
 memberSource s = any (sameSource s)
-
--- THE UNCONNECTED-SHARE COUNT, outermost component of the order the
--- subscription machine descends on.  A connect moves one shared slot
--- out of the count and nothing puts one back, so that edge descends on
--- a quantity the telescope itself bounds and owes no budget.
-unconnAt : ∀ {n} {Γ : Ctx n} → Slots Γ → List Source → Fin n → ℕ
-unconnAt sl cs i with sl i
-... | shared _   = if memberSource (toℕ i) cs then 0 else 1
-... | scripted _ = 0
-
-unconn : ∀ {n} {Γ : Ctx n} → Slots Γ → List Source → ℕ
-unconn sl cs = sum (tabulate (unconnAt sl cs))
 
 -- delta-encoded waits → absolute ticks (gap = suc wait, so a source's
 -- ticks are strictly increasing by construction)

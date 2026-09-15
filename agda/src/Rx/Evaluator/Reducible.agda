@@ -31,17 +31,15 @@
 -- subscribe its inner in whatever state the outer delivery reached.
 module Rx.Evaluator.Reducible where
 
-open import Data.List using (List; []; _∷_)
+open import Data.List using (List)
 open import Data.List.Relation.Unary.All using (All)
-  renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
 open import Data.Product using (Σ; _×_; _,_; proj₁)
 open import Data.Sum using (inj₁; inj₂)
-open import Data.Unit using (⊤; tt)
+open import Data.Unit using (⊤)
 
-open import Rx.Prim using (Id; Source; Tick; InstEmit; InstEvent; init; value; close;
-  handoff; complete)
+open import Rx.Prim using (Id; Tick; InstEmit; InstEvent; init; value; close; handoff; complete)
 open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; Ctx; Closed; Val)
-open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; sharedPlumb; spentBurst)
+open import Rx.Evaluator using (Stream; Sched; EvalSt; Path)
 open import Rx.Evaluator.Domain using (subscribeE⇓)
 
 -- An emitted EVENT carries a payload only in the `value` arm; every
@@ -91,27 +89,13 @@ Red {Γ = Γ} (obs u) b =
 -- whose values are the def's, which is the induction hypothesis.  The
 -- semantic fact underneath is that this share does not replay, so there
 -- is nothing stored for the invariant to be about.
+--
+-- RECOVERY: git show 64c568e2:agda/src/Rx/Evaluator/Reducible.agda restores
+--   `StreamSat-spent` and `StreamSat-plumb`, the two arms of that
+--   argument discharged — the first at the spent slot's fixed burst,
+--   the second across the plumbing retag.  They are three lines each
+--   and belong in the body that replaces the leaf below, which is the
+--   consumer they were written ahead of.
 
--- A SPENT SLOT'S BURST is registration traffic and a completion, so
--- every predicate holds of it for want of anything to hold of.
-StreamSat-spent : ∀ {A : Set} {P : A → Set} (src : Source) (id : Id)
-                → StreamSat P (spentBurst {A} src id)
-StreamSat-spent src id = (tt ∷ᵃ tt ∷ᵃ tt ∷ᵃ []ᵃ) ∷ᵃ []ᵃ
-
--- AND THE FAN-OUT RETAGS ITS EMITS WITHOUT TOUCHING THEIR EVENTS, so
--- whatever held of the def's burst still holds of what the readers see.
-StreamSat-plumb : ∀ {n} {Γ : Ctx n} {u} {P : Val Γ u → Set} (str : Stream Γ u)
-                → StreamSat P str → StreamSat P (sharedPlumb str)
-StreamSat-plumb []       []ᵃ        = []ᵃ
-StreamSat-plumb (x ∷ xs) (p ∷ᵃ ps) = p ∷ᵃ StreamSat-plumb xs ps
-
--- THE FUNDAMENTAL LEMMA, WHICH IS THE WHOLE OF WHAT IS OWED.  Every
--- closed expression is reducible, and the builder's subscribe cluster
--- is its consumer rather than its competitor: the clauses that cluster
--- writes are the cases this induction has to take, and the rank they
--- used to thread is what the type's own descent replaces.  Stated
--- unconditionally because nothing narrows it — a slot telescope
--- carries its stratification in the slot record, so a scheduler that
--- typechecks is already one this can be instantiated at.
 postulate
   reducible : ∀ {n} {Γ : Ctx n} {t} (b : Closed Γ t) → Red {Γ = Γ} (obs t) b

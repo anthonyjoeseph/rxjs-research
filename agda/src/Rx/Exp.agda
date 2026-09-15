@@ -1,6 +1,6 @@
 module Rx.Exp where
 
-open import Data.Nat     using (ℕ; suc; _+_; _∸_; _*_; _≡ᵇ_; _<ᵇ_)
+open import Data.Nat     using (ℕ; _+_; _∸_; _*_; _≡ᵇ_; _<ᵇ_)
 open import Data.Bool    using (Bool; true; false; not; _∧_; if_then_else_)
 open import Data.List    using (List; []; _∷_; _++_)
 open import Data.List.Membership.Propositional using (_∈_)
@@ -459,67 +459,6 @@ evalTm t = evalWith t []ᵃ
 
 applyFn : ∀ {n} {Γ : Ctx n} {s t} → Fn Γ [] [] [] s t → Val Γ s → Val Γ t
 applyFn fn v = evalWith fn (v ∷ᵃ []ᵃ)
-
-------------------------------------------------------------------
--- Sync-reachable size: counts the syntax, except that a deferᵉ
--- subtree counts as a leaf — nothing under a defer is subscribed
--- within the current instant.  This is the size class the descent's third component
--- reads: unfoldμ substitutes (μᵉ body) only at defer-gated var
--- positions, so μ-unfolding PRESERVES syncSize while a measure
--- counting under the defer would grow, which is what makes the μ
--- peel's guard a real drop.
---
--- **`syncSizeᵉ` DOES NOT BOUND EMISSIONS PER INSTANT**, and the shape of the
--- failure is what makes it decisive rather than an off-by-one: the two rates
--- are EXPONENTIAL against LINEAR in the same axis, so they cross once and
--- never come back — while the first three members of the family hold the
--- bound, which is why it reads true from small cases.  Nothing in src states
--- it any more, and nothing should: a measure additive in the syntax cannot
--- pay for a cascade that doubles per delivery.
---
--- DEAD ROUTE: bounding emissions per instant by `syncSizeᵉ`, and with it any
---   route that pays for a burst's deliveries out of the entry triple's third
---   component — which is the component the μ guard re-seeds, and so the last
---   of the three a rank conjunct had left to spend.  Measured by machine at
---   a doubling fold over a live seed: 2, 6, 14 and 30 deliveries as the
---   source gains one literal at a time, against a measure gaining one per
---   literal and reading 20 where the run delivers 30 — and the first three
---   rows HOLD, which is why it reads true from small cases.
-------------------------------------------------------------------
-
-mutual
-  syncSizeᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → Exp Γ Δᵍ Δ Θ t → ℕ
-  syncSizeᵉ (input i)        = 1
-  syncSizeᵉ (ofᵉ ts)         = suc (syncSizeᵗˢ ts)
-  syncSizeᵉ emptyᵉ           = 1
-  syncSizeᵉ (mapᵉ f e)       = suc (syncSizeᵗ f + syncSizeᵉ e)
-  syncSizeᵉ (takeᵉ c e)      = suc (syncSizeᵗ c + syncSizeᵉ e)
-  syncSizeᵉ (scanᵉ f z e)    = suc (syncSizeᵗ f + syncSizeᵗ z + syncSizeᵉ e)
-  syncSizeᵉ (mergeAllᵉ lim e)   = suc (syncSizeᵉ e)
-  syncSizeᵉ (switchAllᵉ e)   = suc (syncSizeᵉ e)
-  syncSizeᵉ (exhaustAllᵉ e)  = suc (syncSizeᵉ e)
-  syncSizeᵉ (μᵉ e)           = suc (syncSizeᵉ e)
-  syncSizeᵉ (varᵉ x)         = 1
-  syncSizeᵉ (deferᵉ e)       = 1
-
-  syncSizeᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → Tm Γ Δᵍ Δ Θ t → ℕ
-  syncSizeᵗ (varᵗ x)      = 1
-  syncSizeᵗ unit̂          = 1
-  syncSizeᵗ (bool̂ _)      = 1
-  syncSizeᵗ (nat̂ _)       = 1
-  syncSizeᵗ (pairᵗ a b)   = suc (syncSizeᵗ a + syncSizeᵗ b)
-  syncSizeᵗ (fstᵗ p)      = suc (syncSizeᵗ p)
-  syncSizeᵗ (sndᵗ p)      = suc (syncSizeᵗ p)
-  syncSizeᵗ (inlᵗ a)      = suc (syncSizeᵗ a)
-  syncSizeᵗ (inrᵗ a)      = suc (syncSizeᵗ a)
-  syncSizeᵗ (caseᵗ s l r) = suc (syncSizeᵗ s + syncSizeᵗ l + syncSizeᵗ r)
-  syncSizeᵗ (ifᵗ c a b)   = suc (syncSizeᵗ c + syncSizeᵗ a + syncSizeᵗ b)
-  syncSizeᵗ (primᵗ _ a)   = suc (syncSizeᵗ a)
-  syncSizeᵗ (strmᵗ e)     = suc (syncSizeᵉ e)
-
-  syncSizeᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → List (Tm Γ Δᵍ Δ Θ t) → ℕ
-  syncSizeᵗˢ []       = 1
-  syncSizeᵗˢ (y ∷ ys) = syncSizeᵗ y + syncSizeᵗˢ ys
 
 ------------------------------------------------------------------
 -- STRATIFICATION of the slot telescope: every `input j` an
