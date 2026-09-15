@@ -275,19 +275,10 @@ does.
   accessibility witness, an entry invariant, a share bound — and every open
   row here is one of that mechanism's own decrease obligations, which is why
   they are refuted rather than hard. The leg is the type-denominated descent
-  put where the rank stands, leaf postulated.
+  put where the rank stands, leaf postulated — unblocked, since
+  the reading the rank produces has no customer outside the decrease.
 
 ### Open questions
-
-- **What must a value CARRY for a descent to spend it?** The half left open is
-  answered and the question narrows again: a frame's bookkeeping is NOT a second
-  currency, since the entry invariant and the handedness reading exist to make
-  the rank decrease and are read nowhere else along the value path. What is left
-  is the half no scratch model can see, because it carries no report — whether
-  anything OUTSIDE the decrease reads the handedness. The well-formedness face
-  consumes the burst report, and if it wants the READING rather than the
-  decrease, retiring the rank strands it rather than discharging it.
-  relevant: `scan-fits`, `inner-handed`, `thru-handed`, `data-handed`
 
 ### The ledger
 
