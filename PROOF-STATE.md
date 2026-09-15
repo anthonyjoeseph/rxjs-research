@@ -279,14 +279,15 @@ does.
   The leg is those rows, and what it buys is the only thing that moves the
   measure's own statements off the class they are born into.
 
-- **FIND THE QUANTITY AN INSTANT'S WIDTH IS BOUNDED BY, OR ESTABLISH THERE IS
-  NONE.** The entry's own reading is now refuted as that quantity, at four
-  programs whose peaks double while the reading gains one, so what a frame may
-  reserve per delivery is denominated in nothing the tier currently carries.
-  The leg is the census: which relations already hand back a figure that grows
-  with the run, whether a fold's own delivery count is one of them, and what a
-  bound in it would oblige every producer to re-establish. Its product is a
-  carrier or a second refutation, and either settles the question below.
+- **CARRY THE FOLD'S DELIVERY COUNT, WHICH IS THE ONLY PLACE A WIDTH
+  COMPOUNDS.** The entry's own reading is refuted as the carrier, at four
+  programs whose peaks double while the reading gains one. What replaces a
+  census of everything growing with a run is a narrowing: `scanᵉ` is the sole
+  former whose output at a delivery is built from its own output at the one
+  before, and the other self-reference is settled — an unfolding measures
+  exactly what its body did, so recursion buys instants and never width. The
+  leg is the count at the fold's own frame: where the walk can read one, what
+  the report must carry to see it, and what that obliges of every producer.
 
 ### Open questions
 
@@ -294,11 +295,11 @@ does.
   claim at different heads: that what a frame writes stays under the rank the
   frame entered at. The STATIC half is no longer a reservation at all — a
   reading that composes at the binder makes a pipeline's own spend part of the
-  rank it is read at. What recurs is left: a fold spends per DELIVERY, a run
-  emitting at the burst POSITION while the program's reading holds still, at a
-  shape a one-line rxjs pipeline reaches. The ENTRY is now settled as no answer
-  — its one length-shaped component is outgrown by a single instant — so what
-  is left is whether any quantity a builder RETURNS holds it.
+  rank it is read at. What recurs is left: a fold spends per DELIVERY, at a
+  shape a one-line rxjs pipeline reaches. The ENTRY is settled as no answer —
+  its one length-shaped component is outgrown by a single instant — and the
+  width is settled as compounding at the FOLD and nowhere else, so what is left
+  is whether the walk that seeds a fold's frame can hand its count to a report.
   relevant: `scan-fits`, `inner-handed`, `thru-handed`
 
 ### The ledger

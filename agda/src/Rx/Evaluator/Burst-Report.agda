@@ -431,6 +431,20 @@ map-handed {s = s} η fn (v ∷ vs) le (p ∷ᵃ ps) =
 -- inflated into a proof -- the statement is exactly as strong as the
 -- rank is generous.
 --
+-- AND THE COUNT IS OWED AT THE FOLD ALONE, WHICH NARROWS EVERY SEARCH
+-- FOR ITS CARRIER.  Of the expression formers, `scanᵉ` is the only one
+-- whose output at a delivery is built from its own output at the
+-- delivery before; every other is a fixed transformation of what it
+-- was handed, so an instant it produces is no wider than the instant it
+-- consumed.  The one other self-reference is `μᵉ`, and that one is
+-- settled rather than open: an occurrence of the bound var is
+-- reachable only past a `deferᵉ`, which ends the instant, so
+-- `unfoldμ-shrinks` proves an unfolding measures exactly what the body
+-- did.  Recursion buys more instants, never a wider one.  So whatever
+-- carries the count has to hold what a FOLD accumulates, and a census
+-- of everything that grows with a run looks in more places than an
+-- instant's width can come from.
+--
 -- REFUTED: `Refuted.Scan-Deepens` — the rate, proven over every burst
 --   length, which is why the figure below carries one at all.
 -- REFUTED: `Refuted.Scan-Reachable` — the same template RUN, which
