@@ -53,7 +53,7 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁻)
 open import Data.List.Relation.Unary.All using (All) renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
 open import Data.Fin using (Fin)
-open import Data.Nat using (ℕ; zero; suc; pred; _≤_; _<_; _⊔_; z≤n; s≤s)
+open import Data.Nat using (ℕ; zero; suc; pred; _≤_; _<_; _+_; _⊔_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤-refl; ≤-trans; ⊔-mono-≤; m≤m⊔n; m≤n⊔m;
   ⊔-identityʳ)
 open import Data.Product using (_,_)
@@ -331,3 +331,43 @@ dep-eval-strict η dd (primᵗ notᵖ a)  env = z≤n
 dep-eval-strict η dd (strmᵗ e)     []ᵃ = ≤-refl
 dep-eval-strict η dd (strmᵗ e)     (v ∷ᵃ vs)
   rewrite dep-closeUnderFn η dd e (v ∷ᵃ vs) = ≤-refl
+
+
+------------------------------------------------------------------
+-- 4.  THE OPEN FORM: WHAT THE ENVIRONMENT COSTS, AS A SUM.
+------------------------------------------------------------------
+
+-- the reading of an environment, which is what the open form is
+-- denominated in
+envDepth : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) {Θ} → All (Val Γ) Θ → ℕ
+envDepth η []ᵃ       = 0
+envDepth η (v ∷ᵃ vs) = depᵗ η (reify v) ⊔ envDepth η vs
+
+-- THE READING OF AN INSTANCE IS A SUM, AND EVERY LEMMA ABOVE IT IS THE
+-- CASE WHERE ONE ADDEND IS ZERO.  Substituting DATA moves no `strmᵗ`,
+-- so the environment contributes nothing and the drop is strict.  An
+-- environment holding an OBSERVABLE contributes its own reading, once
+-- per binder crossed, and the instance then costs the template PLUS
+-- what it was handed.  That is the whole of why a premise about the
+-- template alone cannot bound what the template writes -- the argument
+-- is the other addend, and a join over the two never sees it.
+--
+-- AND NO CONSUMER CAN SIT ON THIS BOUND TIGHTLY, WHICH IS A PROPERTY
+-- OF `envDepth` RATHER THAN OF THE PROGRAMS.  It reads its values
+-- through `reify`, and reifying an observable writes a `strmᵗ` the
+-- value did not have, so the environment's measured reading is one
+-- above the reading of what is in it.  The slack runs the safe way: a
+-- larger `envDepth` is a HARDER premise, so this is weaker than the
+-- tightest true statement rather than stronger.  Measuring the value
+-- rather than its literal is a restatement, not a repair.
+--
+-- PROBED: `Probed.Eval-Open` — an empty environment, a data binder, an
+--   observable binder read straight back, the same binder wrapped under a
+--   `strmᵗ` the template writes, and the same binder read TWICE, which is the
+--   row the currency turns on: a price per occurrence would have shown there
+--   and does not.  Not reached: the ITERATION axis, since one evaluation
+--   crosses one binder and the growth a fold pays is per refold.
+postulate
+  dep-eval-open : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) {Θ t}
+    (tm : Tm Γ [] [] Θ t) (env : All (Val Γ) Θ) (m : ℕ) →
+    envDepth η env ≤ m → depᵛ η t (evalWith tm env) ≤ depᵗ η tm + m

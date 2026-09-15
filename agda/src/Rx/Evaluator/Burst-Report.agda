@@ -44,8 +44,8 @@ open import Data.List.Relation.Unary.All using (All)
   renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
 open import Data.List.Relation.Unary.All.Properties using (++⁺)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; zero; suc; _≤_; _<_; _⊔_; z≤n; s≤s)
-open import Data.Nat.Properties using (≤-trans; <⇒≤; m≤m⊔n; m≤n⊔m)
+open import Data.Nat using (ℕ; zero; suc; _≤_; _<_; _+_; _⊔_; z≤n; s≤s)
+open import Data.Nat.Properties using (≤-refl; ≤-trans; <⇒≤; m≤m⊔n; m≤n⊔m)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
@@ -58,7 +58,7 @@ open import Rx.Exp using (Ty; Ctx; Closed; Val; Tm; unitᵗ; boolᵗ; natᵗ; _�
   obs; input; isData; evalTm; evalWith; Fn; applyFn)
 open import Rx.Obs-Depth using (depᵗ; depᵗˢ; depᵛ)
 open import Rx.Obs-Depth.Substitution using (AllData; []ᵈ; _∷ᵈ_; ≤pred⇒<;
-  dep-eval-strict)
+  dep-eval-strict; envDepth; dep-eval-open)
 open import Rx.Slots using (Slots)
 open import Rx.Slot-Depth using (slotDepth)
 open import Rx.Strat-Order using (Tri)
@@ -375,8 +375,9 @@ map-data {τ = _ , _ , _} η ds fn (v ∷ vs) le (_ ∷ᵃ ps) =
 -- template's reading PLUS the environment's, so a template wrapping
 -- its own argument hands back a value deeper than either side and no
 -- premise about the FRAME can close it -- the argument is the other
--- addend.  Repairing it is a change to the reading every tier is
--- denominated in, which is why the arm is a leaf and not a weakening.
+-- addend.  What is left once the sum is spent is that arithmetic and
+-- nothing else: the rank a frame ENTERS at has to reserve budget for
+-- the frame's own template, and today it is a join that does not.
 --
 -- REFUTED: `Refuted.Template-Passes` — the crossing at the shelf's own
 --   statement, which is where it was found first: a template that
@@ -384,16 +385,30 @@ map-data {τ = _ , _ , _} η ds fn (v ∷ vs) le (_ ∷ᵃ ps) =
 --   template never wrote, so the emission is as deep as whatever was
 --   handed in.  Its rows are the witness for this arm too, since the
 --   quantity that fails here is the one it reads.
---
--- RECOVERY: git show 9b538b5b:agda/src/Rx/Obs-Depth/Substitution.agda
---   restores the shelf that prices this crossing — the open form and
---   the environment reading it is denominated in, which are what a
---   repaired map clause would be proven against.
 postulate
-  map-open : ∀ {n} {Γ : Ctx n} {s u} {τ : Tri} (η : Fin n → ℕ)
-           → isData s ≡ false → (fn : Fn Γ [] [] [] s u)
-             (vs : List (Val Γ s)) → depᵗ η fn ≤ proj₁ (proj₂ τ)
-           → HandedOK η vs τ → HandedOK η (map (applyFn fn) vs) τ
+  map-fits : ∀ {n} {Γ : Ctx n} {s u} {U r sz} (η : Fin n → ℕ)
+           → isData s ≡ false → (fn : Fn Γ [] [] [] s u) (v : Val Γ s)
+           → depᵗ η fn ≤ r → ValOK η s (U , r , sz) v
+           → depᵗ η fn + envDepth η (v ∷ᵃ []ᵃ) < r
+
+-- AND THE ARM ITSELF IS NOW A BODY OVER THAT LEAF, WHICH IS WHAT THE
+-- SUM BOUGHT.  Evaluation at a one-binder environment is priced by
+-- `dep-eval-open` whether or not the binder is data, so the half of
+-- this arm that is about what a template WRITES is discharged here and
+-- no longer asserted.  What the leaf above keeps is the arithmetic
+-- alone, and stating it that way is what makes it instantiable: both
+-- of its sides compute at a concrete template and a concrete value,
+-- with no run and no evaluation between them.
+map-open : ∀ {n} {Γ : Ctx n} {s u} {τ : Tri} (η : Fin n → ℕ)
+         → isData s ≡ false → (fn : Fn Γ [] [] [] s u)
+           (vs : List (Val Γ s)) → depᵗ η fn ≤ proj₁ (proj₂ τ)
+         → HandedOK η vs τ → HandedOK η (map (applyFn fn) vs) τ
+map-open {τ = _ , _ , _} η ds fn []       le []ᵃ       = []ᵃ
+map-open {u = u} {τ = _ , _ , _} η ds fn (v ∷ vs) le (p ∷ᵃ ps) =
+    valOK-below η u (applyFn fn v)
+      (≤-trans (s≤s (dep-eval-open η fn (v ∷ᵃ []ᵃ) _ ≤-refl))
+               (map-fits η ds fn v le p))
+  ∷ᵃ map-open η ds fn vs le ps
 
 -- AND THE FOLD, WHICH THE SAME REPAIR DOES NOT REACH.  A scan re-enters
 -- its own template with the accumulator it last produced, so the

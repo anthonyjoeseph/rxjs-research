@@ -229,23 +229,24 @@ does.
 
 ### Big picture tier roadmap
 
-- **MOVE THE READING'S CURRENCY FROM A JOIN TO A SUM.** The reading JOINS where
-  a run ADDS, which is the single fact behind both refutations on the frame
-  heads: a template wrapping its own argument hands back a value deeper than
-  either side, and a fold re-entering its own template climbs once per delivery.
-  Restoring the open-term depth and the substitution lemma under it denominates
-  the reading in `+`, which discharges `map-open` outright and leaves
-  `scan-handed` a restatement rather than a refutation. It is the answer to the
-  question below, so it is taken before the arms that spend it.
+- **GIVE THE BURST LENGTH A CARRIER.** The currency change landed and left
+  `scan-handed` needing a quantity the syntax does not have: a run's emitted
+  depth is the burst POSITION, evidenced at two lengths against one static
+  reading that does not move. Three candidates, and deciding between them is the
+  leg — the length as a conjunct of the invariant record, the rank a frame
+  enters at growing per delivery, or the reading taken over the store rather
+  than the term. The reachable-only escape is not among them: a one-line rxjs
+  pipeline reaches the shape, so excluding it costs parity.
 
-- **GIVE THE BURST LENGTH A CARRIER.** The currency change discharges `map-open`
-  and leaves `scan-handed` needing a quantity the syntax does not have: a run's
-  emitted depth is the burst POSITION, evidenced at two lengths against one
-  static reading that does not move. Three candidates, and deciding between them
-  is the leg — the length as a conjunct of the invariant record, the rank a
-  frame enters at growing per delivery, or the reading taken over the store
-  rather than the term. The reachable-only escape is not among them: a one-line
-  rxjs pipeline reaches the shape, so excluding it costs parity.
+- **MAKE THE ENTRY RANK RESERVE WHAT A FRAME WILL SPEND.** With the sum in
+  `src`, what a map arm still asserts is arithmetic alone: the rank a frame
+  ENTERS at has to dominate the template PLUS what the template is handed, and
+  `entryTri` reads a join off the program that dominates neither sum. The static
+  half needs no length — a pipeline's reading becomes a sum down the operator
+  chain, and the entry then satisfies its own premise. The leg is that
+  restatement, and what it buys the carrier leg above is a smaller bill: it
+  separates the reservation a pipeline owes once from the one a fold owes per
+  delivery.
 
 - **WIDEN WHAT A BUILDER RETURNS, WHICH TURNS OUT TO GATE THE WALK.** Every
   premise is denominated at one `slotDepth sl` the caller fixes, and each clause
@@ -267,7 +268,7 @@ does.
 
 - **AND THE TWO FRAME HEADS THAT LEAVE THE MODULE, WHICH ARE NOT THE MEASURE'S
   QUESTION.** The frame walk landed and put four leaves where one statement
-  stood; two of them — `map-open` and `scan-handed` — are the reading itself
+  stood; two of them — `map-fits` and `scan-handed` — are the reading itself
   being wrong and wait on the question below. The other two are not:
   `inner-handed` and `thru-handed` do not rewrite a payload at all, they follow
   the run into `innerReact⇓` and `thruWalk⇓`, so what is owed is this same claim
@@ -289,15 +290,15 @@ does.
 
 - **Where does the burst LENGTH live?** Every risky row left in this tier is one
   claim at different heads: that what a frame writes stays under the rank the
-  frame entered at. The reading takes a join and the run adds, which a template
-  wrapping its own argument refutes; a sum is the repair for that half, and
-  `map-open` is what it discharges. What a sum does not reach is the fold, which
-  climbs once per DELIVERY — a run emits at the burst POSITION while the
-  program's own reading holds still, and that shape is reached by a one-line
-  rxjs pipeline, so it cannot be excluded as unreachable. So the question is no
-  longer which of join or sum, but which carrier holds a length the syntax does
-  not have.
-  relevant: `map-open`, `scan-handed`, `inner-handed`, `thru-handed`
+  frame entered at. The sum landed, so the half of that claim about what
+  EVALUATION does is discharged, and what is left at every head is a
+  RESERVATION: the rank a frame enters at has to cover the frame's own spend as
+  well as what it was handed. That splits. A pipeline's spend is static; a
+  fold's is per DELIVERY — a run emits at the burst POSITION while the
+  program's reading holds still, at a shape a one-line rxjs pipeline reaches,
+  so it cannot be excluded as unreachable. The question is which carrier holds
+  that second half.
+  relevant: `map-fits`, `scan-handed`, `inner-handed`, `thru-handed`
 
 ### The ledger
 
@@ -306,15 +307,16 @@ does.
   premise already dominates the slot's rank; what is missing between them is
   that `BurstOK` may be WIDENED along that domination. Where the field is owed.
 
-- **`map-open`** (Rx/Evaluator/Burst-Report) — FALSITY, `REFUTED, RECOVERY`:
-  what a template writes at a payload that is NOT data. The reading JOINS where
-  the run ADDS, so a template wrapping its own argument hands back a value
-  deeper than either side and no premise about the frame can close it.
+- **`map-fits`** (Rx/Evaluator/Burst-Report) — FALSITY, `REFUTED`: what the map
+  arm still asserts once the sum is spent, and it is arithmetic alone. The rank
+  a frame ENTERS at has to dominate the template PLUS what it was handed; a
+  join read off the program dominates neither addend's sum.
 
 - **`scan-handed`** (Rx/Evaluator/Burst-Report) — FALSITY, `REFUTED×2`: the
-  fold, which the map's repair misses. Re-entering its own template, the reading
-  climbs per delivery, so outputs grow with the burst LENGTH. A run reaches that
-  shape at a one-line rxjs pipeline, so the reachable-only escape is dead.
+  fold, which the map's repair misses. Re-entering its own template, the
+  reading climbs per delivery, so outputs grow with the burst LENGTH. A run
+  reaches that shape at a one-line rxjs pipeline, so the reachable-only escape
+  is dead.
 
 - **`inner-handed`, `thru-handed`** (Rx/Evaluator/Burst-Report) — FALSITY,
   `PROBED×2`: the two `*All` heads, which rewrite no payload — they subscribe
@@ -335,6 +337,11 @@ does.
 - **`connect-drops`** (Rx/Evaluator/Doorless) — FALSITY, `PROBED`: the share
   connect's drop in the unconnected component, the arithmetic the arm above
   spends. No consumer until that arm is a body.
+
+- **`dep-eval-open`** (Rx/Obs-Depth/Substitution) — FALSITY, `PROBED`: an
+  instance of a template at an environment, priced as a SUM — the shelf the map
+  arm is now a body over. What could break it is OCCURRENCE, a binder read
+  twice or wrapped again, and the rows stand at both.
 
 - **`eval-case`, `eval-if`** (Rx/Obs-Depth/Substitution) — FALSITY, `PROBED×2`:
   the two places evaluation enters a branch under a binder the data hypothesis
@@ -386,8 +393,7 @@ it when the descent under it settles.
 - **`burst-drain-well-formed`** (Verify-Well-Formed) — FALSITY, `PROBED`:
   everything the protocol argument owes about a run whose subscribe frame and
   whose drain are each dry-free. The sweep decides its conclusion at every
-  program it runs, so what is open is the fragment the generator cannot
-  write.
+  program it runs, so what is open is the fragment the generator cannot write.
 
 ## Tier 3 — the top-line semantic claims (parked behind tier 2)
 
