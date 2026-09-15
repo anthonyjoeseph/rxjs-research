@@ -20,12 +20,18 @@
 -- sufficiency proof -- the chain is unbounded ACROSS instants while every
 -- individual value's index is finite.
 --
--- WHAT IS STILL POSTULATED, and it is where a false green would hide:
--- `srcOf` returns at length zero, which claims a primitive source's
--- emission carries no accumulator chain, and `mapOf` preserves length,
--- which claims a mapping step mints no link.  Both are claims about the
--- real evaluator that this module asserts rather than checks.
-
+-- THE TWO POSTULATES ARE DISCHARGED IN `Spike.Text`, and one of them was
+-- FALSE.  Both are the same question, because a runtime observable value is
+-- closed text with the environment substituted in, so what they assert is a
+-- property of SUBSTITUTION.  It is additive, not flat -- the flat bound is
+-- machine-refuted there, since the substituted variable sits under a link
+-- and pays for it.  So a mapping step DOES mint a link, `mapOf` charges one
+-- here, and a source emits at the measure of its own static text rather
+-- than at zero, which `statOf` now carries.  The measure survives both
+-- repairs unchanged, which is the result.
+--
+-- STILL ASSERTED: that a node's emissions really are substitution instances
+-- of its text.  That is a claim about `Rx.Evaluator`, not about the measure.
 module Spike.Chain where
 
 open import Data.Nat using (ℕ; zero; suc; _<_; _≤_; z≤n; s≤s)
@@ -35,31 +41,31 @@ open import Data.List using (List; []; _∷_; _++_; map)
 open import Induction.WellFounded using (Acc; acc)
 open import Data.Nat.Induction using (<-wellFounded)
 
-module _ (n : ℕ) where
+module _ (n : ℕ) (statOf : Fin n → ℕ) where
 
   -- Val c ℓ : observed at count c, carrying an accumulator chain of
   -- length at most ℓ
   data Val : ℕ → ℕ → Set where
     natᵛ : ∀ {c ℓ} → ℕ → Val c ℓ
-    obsᵛ : ∀ {c ℓ} → Fin n → (d : ℕ) → d < c → Val c ℓ
-    accᴹ : ∀ {c ℓ} → Fin n → Val c ℓ → Val c ℓ          -- map step: no link
+    obsᵛ : ∀ {c ℓ} → (h : Fin n) → (d : ℕ) → d < c → statOf h ≤ ℓ → Val c ℓ
+    accᴹ : ∀ {c ℓ} → Fin n → Val c ℓ → Val c (suc ℓ)    -- map step: a link, and no hop
     accᴴ : ∀ {c ℓ} → Fin n → Val c ℓ → Val c (suc ℓ)    -- mergeMap step: one link
 
   postulate
-    -- STATIC text carries no chain
-    srcOf : (h : Fin n) → (d : ℕ) → List (Val d 0)
-    mapOf : ∀ {c ℓ} → Fin n → Val c ℓ → Val c ℓ
+    -- a source emits at the measure of its OWN STATIC TEXT
+    srcOf : (h : Fin n) → (d : ℕ) → List (Val d (statOf h))
+    mapOf : ∀ {c ℓ} → Fin n → Val c ℓ → Val c (suc ℓ)
 
   wkC : ∀ {c c′ ℓ} → c ≤ c′ → Val c ℓ → Val c′ ℓ
   wkC le (natᵛ x)      = natᵛ x
-  wkC le (obsᵛ h d lt) = obsᵛ h d (≤-trans lt le)
+  wkC le (obsᵛ h d lt sl) = obsᵛ h d (≤-trans lt le) sl
   wkC le (accᴹ h v)    = accᴹ h (wkC le v)
   wkC le (accᴴ h v)    = accᴴ h (wkC le v)
 
   wkℓ : ∀ {c ℓ ℓ′} → ℓ ≤ ℓ′ → Val c ℓ → Val c ℓ′
   wkℓ le      (natᵛ x)      = natᵛ x
-  wkℓ le      (obsᵛ h d lt) = obsᵛ h d lt
-  wkℓ le      (accᴹ h v)    = accᴹ h (wkℓ le v)
+  wkℓ le      (obsᵛ h d lt sl) = obsᵛ h d lt (≤-trans sl le)
+  wkℓ (s≤s le) (accᴹ h v)   = accᴹ h (wkℓ le v)
   wkℓ (s≤s le) (accᴴ h v)   = accᴴ h (wkℓ le v)
 
   wkLC : ∀ {c c′ ℓ} → c ≤ c′ → List (Val c ℓ) → List (Val c′ ℓ)
@@ -74,7 +80,7 @@ module _ (n : ℕ) where
   hopL : ∀ {c ℓ} → Acc _<_ c → List (Val c ℓ) → List (Val c ℓ)
 
   subV a         (natᵛ x)      = natᵛ x ∷ []
-  subV (acc rec) (obsᵛ h d lt) = wkLℓ z≤n (wkLC (<⇒≤ lt) (hopL (rec lt) (srcOf h d)))
+  subV (acc rec) (obsᵛ h d lt sl) = wkLℓ sl (wkLC (<⇒≤ lt) (hopL (rec lt) (srcOf h d)))
   subV a         (accᴹ h v)    = map (mapOf h) (subV a v)
   subV a         (accᴴ h v)    = wkLℓ (n≤1+n _) (hopL a (subV a v))
 
