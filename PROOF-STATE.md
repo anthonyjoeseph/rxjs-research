@@ -268,27 +268,26 @@ does.
   The leg is those rows, and what it buys is the only thing that moves the
   measure's own statements off the class they are born into.
 
-- **FIND OUT WHETHER A VALUE CAN CARRY ITS PRODUCER — THE RANK-OR-PREDICATE LEG
-  IS RETIRED, ANSWERED BOTH WAYS.** No figure fixed before a run bounds an
-  emission, and dropping the number for a domain predicate is not the escape:
-  the only one this evaluator can case on holds of every closed term. The route
-  left is the one `Rx.Evaluator.Domain`'s header names and defers — make a value
-  carry the term that produced it, so the hop is structural. This leg is its
-  SCOPING commit: the index wants to run through `Val`, which is the spec's, so
-  whether it confines to the evaluator's own stream and frames decides whether
-  the route is ours or a question for Anthony.
+- **MINT THE FIGURE WHERE THE COUNT IS KNOWN — PER INSTANT, NOT AT ENTRY.** The
+  value-carries-its-producer leg is retired: the index descends wherever an
+  arriving payload is a SUBTERM of the term that produced it, which is every
+  former but the fold, whose payload is its own previous payload re-wrapped, so
+  both sides carry the same index. That is the reason a pipeline's depth is a
+  sum along the program and a fold's a product with a count only the RUN knows.
+  So the currency left untried is one minted where that count is: the leg states
+  an instant-local figure and asks `Refuted.Burst-Length`, the witness that
+  doubles a peak across a cascade, whether the count is known at instant start.
 
 ### Open questions
 
 - **What must a value CARRY for a descent to spend it?** Every risky row left in
   this tier is one claim at different heads: that what a frame writes stays under
-  the rank the frame entered at. The question was whether a figure fixed before a
-  run can bound what the run emits, and it is answered — no, with one side
-  constant across a family whose other side doubles. It is now a question about
-  the value rather than the comparison, and it has lost its other half too: a
-  domain predicate is not the escape, since the only one the machine can case on
-  holds of every term. What is left is whether an arriving observable can be
-  related to the one in hand at all, which nothing yet has tried.
+  the rank the frame entered at. The comparison half is settled — no figure fixed
+  before a run bounds what the run emits, and no domain predicate this machine
+  can case on asserts anything — so what is open is about the VALUE. An arriving
+  payload can be related to the term that produced it, and that relation descends
+  at every former whose payload is a subterm, which is every one but the fold.
+  The region left is one former wide, and nothing yet says what pays for it.
   relevant: `scan-fits`, `inner-handed`, `thru-handed`
 
 ### The ledger

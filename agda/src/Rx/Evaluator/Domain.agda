@@ -31,8 +31,16 @@
 --   index has to run through `Stream`, `Val` and every frame that
 --   moves a value, which is a refactor of the evaluator's own
 --   vocabulary rather than an addition beside it, and it cannot be
---   abandoned halfway.  It stays available and nothing here forecloses
---   it.
+--   abandoned halfway.  AND IT IS NOW KNOWN TO STOP SHORT OF THE ONE
+--   FORMER IT WOULD BE BOUGHT FOR.  The index descends wherever an
+--   arriving payload is a SUBTERM of the term that produced it, which
+--   is every former but one; a FOLD's payload is its own previous
+--   payload re-wrapped, so both sides of the hop carry the same index
+--   and the descent is not there.  That is not an accident of the
+--   encoding: the fold is the only former whose output is fed back as
+--   its own input, which is why a pipeline's depth is a sum along the
+--   program and a fold's is a product with a count only the RUN
+--   knows.
 module Rx.Evaluator.Domain where
 
 open import Data.Bool using (Bool; true; false; not; _∧_; if_then_else_)
