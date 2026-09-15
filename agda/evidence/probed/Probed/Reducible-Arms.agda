@@ -1,6 +1,6 @@
--- THE SEVEN LEAVES OF THE REDUCIBILITY BODY, INSTANTIATED.
+-- THE SIX LEAVES OF THE REDUCIBILITY BODY, INSTANTIATED.
 --
--- WHAT IS AT RISK, AND IT IS THE SAME RISK IN ALL SEVEN.  The
+-- WHAT IS AT RISK, AND IT IS THE SAME RISK IN ALL SIX.  The
 -- candidate's observable arm demands a subscription derivation in
 -- EVERY schedule and EVERY state, together with a satisfaction claim
 -- over everything the derivation emits.  Nothing had ever produced one
@@ -33,10 +33,7 @@
 --
 -- NOT REACHED, and each is a region rather than a program.  A share's
 -- connect, which is the slot leaf's sixth sub-arm and the only one
--- whose def is an arbitrary term.  A mu whose body actually refers to
--- itself: the rows here peel a body with no self-reference, so they
--- exercise the peel and say nothing about the fixpoint.  A flattener
--- with a LIVE inner -- these reach the empty outer, where the queue
+-- whose def is an arbitrary term.  A flattener with a LIVE inner -- these reach the empty outer, where the queue
 -- never fills, the switch never kills and the exhaust never refuses.
 -- The bounded-concurrency axis is untouched at every limit.  Two of
 -- the slot's five scripted sub-arms -- the spent hot and the cold with
@@ -46,7 +43,6 @@
 -- TARGET: red-tm @e1ae28
 -- TARGET: red-input-shared @21f529
 -- TARGET: red-push @733369
--- TARGET: red-μ @2f6b5c
 -- TARGET: red-merge-all @76b1cd
 -- TARGET: red-switch-all @e42657
 -- TARGET: red-exhaust-all @98824b
@@ -64,16 +60,15 @@ open import Data.List.Relation.Unary.Any using (here)
 open import Relation.Binary.PropositionalEquality using (refl)
 
 open import Rx.Prim using (init; value; subscribe; _at_from_as_)
-open import Rx.Exp using (Ctx; Closed; natᵗ; obs; Exp; ofᵉ; emptyᵉ; unfoldμ; nat̂; strmᵗ; varᵗ; Tm; input)
+open import Rx.Exp using (Ctx; Closed; natᵗ; obs; ofᵉ; emptyᵉ; nat̂; strmᵗ; varᵗ; Tm; input)
 open import Rx.Slots using (Slots; shared)
 open import Rx.Evaluator using (Sched; EvalSt; Stream; Path; root; map-f; sched-init;
   st-init)
 open import Rx.Evaluator.Reducible using (Red; StreamSat; reducible; red-tm;
-  red-input-shared; red-push; red-μ; red-merge-all; red-switch-all; red-exhaust-all)
+  red-input-shared; red-push; red-merge-all; red-switch-all; red-exhaust-all)
 
-open import Rx.Evaluator.Domain using (subs-μ; subs-shared; slot-spent; slot-join;
-  subs-empty; push-cons; push-nil; step-map; step-thru-outer; walk-nil;
-  sub-all; subs-merge-all; subs-switch-all; subs-exhaust-all)
+open import Rx.Evaluator.Domain using (subs-shared; slot-spent; slot-join; subs-empty; push-cons; push-nil; step-map;
+  step-thru-outer; walk-nil; sub-all; subs-merge-all; subs-switch-all; subs-exhaust-all)
 
 open import Probed.Apparatus using (Confirms)
 
@@ -115,22 +110,6 @@ row-tm-obs = reducible (ofᵉ (nat̂ 7 ∷ [])) {e = e₀} κ₀ 0 0 sch₀ st�
 
 row-tm-nat : Confirms (red-tm {Γ = Γ₀} (nat̂ 7))
 row-tm-nat = tt
-
-----------------------------------------------------------------------
--- 2.  THE μ PEEL.  The body here does not refer to itself, so the row
--- exercises the PEEL -- the unfolding subscribed in the caller's own
--- state -- and says nothing about the fixpoint.  Load-bearing for the
--- conjunct that the peeled term's derivation IS the μ's: if the
--- unfolding landed in a different state, this would not typecheck.
-----------------------------------------------------------------------
-
-body₀ : Exp Γ₀ (natᵗ ∷ []) [] [] natᵗ
-body₀ = ofᵉ (nat̂ 7 ∷ [])
-
-row-μ-peel : Confirms (red-μ {Γ = Γ₀} body₀ {e = e₀} κ₀ 0 0 sch₀ st₀)
-row-μ-peel =
-  let (r , d , sat) = reducible (unfoldμ body₀) {e = e₀} κ₀ 0 0 sch₀ st₀
-  in r , subs-μ d , sat
 
 ----------------------------------------------------------------------
 -- 3.  THE SLOT'S SHARE, at the two sub-arms that carry no payload.  A

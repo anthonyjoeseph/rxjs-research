@@ -233,29 +233,29 @@ deferred beside it.
 
 ### Big picture tier roadmap
 
-- **SETTLE `red-μ` FIRST, BY DISCHARGE OR BY REFUTATION.** The one place the
-  candidate has no descent whatever: everywhere else `Red` either moves the type
-  strictly down or holds it while the TERM shrinks, and a μ does neither — the
-  unfolding sits at the same type and is no subterm of its own fixpoint. So
-  nothing in the body can reach it, and whether the candidate can be closed there
-  at all is a question about the candidate rather than about this statement. It
-  goes first because a refutation here reaches back into the candidate itself and
-  would cost every grind standing on it. Both outcomes retire the leg; what does
-  not is weakening the statement until it goes through.
-
-- **THEN THE THREE FLATTENERS, ON THE SAME TERMS.** The hop, where the type
+- **THE THREE FLATTENERS, WHICH ARE NOW THE WHOLE OF THE RISK.** The hop, where the type
   genuinely descends and where the inners arrive out of a burst standing in no
   relation to the term that produced them. Each already takes the outer's
   candidate at the higher type; whether that is still usable at the state the hop
-  reaches is the tier's open question, and answering it is this leg. Second for
-  the same reason `red-μ` is first — a refutation here moves the candidate's
-  interface, not just these three rows. The queue, the switch's kill, the
-  exhaust's refusal and the concurrency limit are all inside it.
+  reaches is the tier's open question, and answering it is this leg. It is first
+  because a refutation here moves the candidate's INTERFACE and not just these
+  three rows. The queue, the switch's kill, the exhaust's refusal and the
+  concurrency limit are all inside it.
 
-- **THEN THE MECHANICAL SHELF, LAST AND DELIBERATELY.** A frame push, a term's
+- **THEN RUN A SELF-REFERENTIAL μ, IN THE CORPUS RATHER THAN IN A PROBE.** The
+  peel is now paid for by a size the unfolding does not move, and what funds that
+  size is a SYNTACTIC claim: the μ variable is bound into the guarded context,
+  `varᵉ` reads only from the usable one, and the guarded elimination substitutes
+  nowhere except through its gate clause. Every leaf under it now rests on that.
+  The claim is about the ELIMINATOR rather than about any statement, so nothing
+  can carry a receipt for it and its home is the corpus — programs whose μ really
+  does refer to itself, run end to end. Cheap, and the one thing that would catch
+  the guard being right on paper and wrong in the code.
+
+- **THEN THE MECHANICAL SHELF.** A frame push, a term's
   own value and a share's connect. They are one leg because none of them can move
-  the ground, and they are last because the two legs above can still change what
-  they must be written against: the flatteners' bodies CALL `red-push`, and
+  the ground, and they come after the risk because the flattener leg can still
+  change what they must be written against: its bodies CALL `red-push`, and
   `red-push` reaches a term's value. Grinding them before the risk above settles
   buys work that a restatement upstream would throw away, which is the whole
   reason the ordering is stated rather than left to whatever is nearest.
@@ -295,10 +295,6 @@ deferred beside it.
 - **`red-exhaust-all`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`:
   `exhaustAll` is reducible given its outer's candidate. Refuses a second
   inner, so one arm carries no subscription at all.
-
-- **`red-μ`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`: a μ is reducible.
-  The unfolding is no subterm and sits at the same type, so this is a fixpoint
-  at one type and the body cannot reach it.
 
 - **`red-input-shared`** (Rx/Evaluator/Reducible) — FALSITY,
   `DEAD ROUTE, PROBED`: a share's slot is reducible. Its def is drawn from the

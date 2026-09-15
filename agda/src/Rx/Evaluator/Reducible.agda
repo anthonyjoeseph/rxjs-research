@@ -37,26 +37,29 @@ open import Data.List using (List; []; _∷_; _++_; map)
 open import Data.List.Relation.Unary.All using (All; []; _∷_)
 open import Data.Maybe using (Maybe)
 open import Data.Nat using (ℕ; zero; suc; _<_)
-open import Data.Nat.Properties using (_<?_; ≮⇒≥)
+open import Data.Nat.Induction using (<-wellFounded)
+open import Data.Nat.Properties using (_<?_; ≮⇒≥; ≤-refl)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
 open import Data.Vec using (lookup)
+open import Induction.WellFounded using (Acc; acc)
 open import Relation.Nullary using (yes; no)
 
-open import Relation.Binary.PropositionalEquality using (_≡_; refl)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
 
 open import Rx.Prim using (Id; Tick; InstEmit; InstEvent; init; value; close; handoff;
   complete; hot; cold)
 open import Rx.Slots using (scripted; shared)
-open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; Ctx; Closed; Val;
-  Exp; Tm; evalTm; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ;
-  exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; isData)
+open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; Ctx; Closed; Val; Tm; evalTm; input; ofᵉ; emptyᵉ;
+  mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; isData; unfoldμ)
+open import Rx.Exp.Guarded using (gsizeᵉ; gsize-unfoldμ)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; _↠_; map-f; take-f; scan-f; take-st; scan-st;
   installNode; oneShotBurst; memberSource)
 open import Rx.Evaluator.Domain using (subscribeE⇓; pushBurst⇓; subs-of;
   subs-empty; subs-map; subs-take-zero; subs-take-suc; subs-scan; subs-defer;
-  subs-floor; subs-hot-done; subs-hot-live; subs-cold-sync; subs-cold-async)
+  subs-floor; subs-hot-done; subs-hot-live; subs-cold-sync; subs-cold-async;
+  subs-μ)
 
 -- An emitted EVENT carries a payload only in the `value` arm; every
 -- other arm is protocol traffic and constrains nothing.
@@ -202,15 +205,6 @@ postulate
   red-exhaust-all : ∀ {n} {Γ : Ctx n} {u} (b : Closed Γ (obs u))
                   → Red {Γ = Γ} (obs (obs u)) b → Red {Γ = Γ} (obs u) (exhaustAllᵉ b)
 
-  -- THE μ PEEL.  The unfolding is no subterm, so the body below cannot
-  -- reach it; it sits at the SAME type, so this is a fixpoint at one
-  -- type rather than a descent.
-  --
-  -- PROBED: `Probed.Reducible-Arms` at a body with no self-reference,
-  --   which exercises the PEEL -- the unfolding subscribed in the
-  --   caller's own state -- and says nothing about the fixpoint.
-  red-μ : ∀ {n} {Γ : Ctx n} {u} (body : Exp Γ (u ∷ []) [] [] u)
-        → Red {Γ = Γ} (obs u) (μᵉ body)
 
 -- Every protocol event carries no payload, so a burst's values are the
 -- only thing to check and a burst with none is satisfied outright.
@@ -297,46 +291,66 @@ redTms : ∀ {n} {Γ : Ctx n} {u} (ts : List (Tm Γ [] [] [] u))
 redTms []       = []
 redTms (x ∷ xs) = red-tm x ∷ redTms xs
 
--- THE BODY, AND THE ONE THING IT IS EVIDENCE FOR.  Its recursion is
--- structural in the TERM at every arm that has one, and every
--- recursive call is made at a schedule and a state the caller has
--- already moved — a fresh node installed, a counter bumped, a path
--- extended.  That those calls are free is exactly what the candidate's
--- quantification over every state buys, and writing the arms is the
--- only way to find out.
-reducible : ∀ {n} {Γ : Ctx n} {t} (b : Closed Γ t) → Red {Γ = Γ} (obs t) b
-reducible (input i) κ id now sched st = red-input i κ id now sched st
-reducible (ofᵉ ts) κ id now sched st = _ , subs-of refl , satOneShot id sched (redTms ts)
-reducible emptyᵉ κ id now sched st = _ , subs-empty refl , satOneShot id sched []
-reducible (mapᵉ f b) κ id now sched st =
-  let ((burst , sched₁ , st₁) , d , sat) = reducible b (map-f f ↠ κ) id now sched st
+-- THE BODY, AND WHAT PAYS FOR IT.  Its recursion is structural in the
+-- TERM at every arm that has one, and every recursive call is made at
+-- a schedule and a state the caller has already moved — a fresh node
+-- installed, a counter bumped, a path extended.  That those calls are
+-- free is exactly what the candidate's quantification over every state
+-- buys.
+--
+-- THE ONE ARM WITH NO SUBTERM IS THE μ, AND THE SYNTAX PAYS FOR IT.
+-- An unfolding is no subterm of its fixpoint and sits at the same
+-- type, so neither the term nor the candidate's own type recursion
+-- reaches it.  What does is `gsizeᵉ`: the μ former spends a unit, the
+-- gate the μ variable must sit behind is where the size stops looking,
+-- and the unfolding therefore has exactly the size the body had.  So
+-- the recursion is on the ACCESSIBILITY of that size rather than on
+-- the term, and every other arm keeps its structural decrease because
+-- the size counts the formers it descends through.
+reducibleAcc : ∀ {n} {Γ : Ctx n} {t} (b : Closed Γ t)
+             → Acc _<_ (gsizeᵉ b) → Red {Γ = Γ} (obs t) b
+reducibleAcc (input i) a κ id now sched st = red-input i κ id now sched st
+reducibleAcc (ofᵉ ts) a κ id now sched st =
+  _ , subs-of refl , satOneShot id sched (redTms ts)
+reducibleAcc emptyᵉ a κ id now sched st = _ , subs-empty refl , satOneShot id sched []
+reducibleAcc (mapᵉ f b) (acc rs) κ id now sched st =
+  let ((burst , sched₁ , st₁) , d , sat) =
+        reducibleAcc b (rs ≤-refl) (map-f f ↠ κ) id now sched st
       (r , p , sat′) = red-push id now (map-f f) κ sat sched₁ st₁
   in r , subs-map d p , sat′
-reducible (takeᵉ c b) κ id now sched st with evalTm c in ceq
+reducibleAcc (takeᵉ c b) (acc rs) κ id now sched st with evalTm c in ceq
 ... | zero  = _ , subs-take-zero ceq refl , satOneShot id sched []
 ... | suc k =
   let nid = Sched.nextNode sched
       ((burst , sched₂ , st₁) , d , sat) =
-        reducible b (take-f nid ↠ κ) id now
+        reducibleAcc b (rs ≤-refl) (take-f nid ↠ κ) id now
           (record sched { nextNode = suc nid })
           (installNode nid (take-st (suc k)) st)
       (r , p , sat′) = red-push id now (take-f nid) κ sat sched₂ st₁
   in r , subs-take-suc ceq refl d p , sat′
-reducible (scanᵉ f z b) κ id now sched st =
+reducibleAcc (scanᵉ f z b) (acc rs) κ id now sched st =
   let nid = Sched.nextNode sched
       ((burst , sched₂ , st₁) , d , sat) =
-        reducible b (scan-f f nid ↠ κ) id now
+        reducibleAcc b (rs ≤-refl) (scan-f f nid ↠ κ) id now
           (record sched { nextNode = suc nid })
           (installNode nid (scan-st (evalTm z)) st)
       (r , p , sat′) = red-push id now (scan-f f nid) κ sat sched₂ st₁
   in r , subs-scan refl d p , sat′
-reducible (mergeAllᵉ lim b) =
-  red-merge-all lim b (λ {t} {e} {lo} κ → reducible b {t} {e} {lo} κ)
-reducible (switchAllᵉ b) =
-  red-switch-all b (λ {t} {e} {lo} κ → reducible b {t} {e} {lo} κ)
-reducible (exhaustAllᵉ b) =
-  red-exhaust-all b (λ {t} {e} {lo} κ → reducible b {t} {e} {lo} κ)
-reducible (μᵉ body) κ id now sched st = red-μ body κ id now sched st
-reducible (varᵉ ())
-reducible (deferᵉ body) κ id now sched st =
+reducibleAcc (mergeAllᵉ lim b) (acc rs) =
+  red-merge-all lim b (λ {t} {e} {lo} κ → reducibleAcc b (rs ≤-refl) {t} {e} {lo} κ)
+reducibleAcc (switchAllᵉ b) (acc rs) =
+  red-switch-all b (λ {t} {e} {lo} κ → reducibleAcc b (rs ≤-refl) {t} {e} {lo} κ)
+reducibleAcc (exhaustAllᵉ b) (acc rs) =
+  red-exhaust-all b (λ {t} {e} {lo} κ → reducibleAcc b (rs ≤-refl) {t} {e} {lo} κ)
+reducibleAcc (μᵉ body) (acc rs) κ id now sched st =
+  let (r , d , sat) =
+        reducibleAcc (unfoldμ body)
+          (rs (subst (_< suc (gsizeᵉ body)) (sym (gsize-unfoldμ body)) ≤-refl))
+          κ id now sched st
+  in r , subs-μ d , sat
+reducibleAcc (varᵉ ()) a
+reducibleAcc (deferᵉ body) a κ id now sched st =
   _ , subs-defer refl refl refl , (tt ∷ []) ∷ []
+
+reducible : ∀ {n} {Γ : Ctx n} {t} (b : Closed Γ t) → Red {Γ = Γ} (obs t) b
+reducible b = reducibleAcc b (<-wellFounded (gsizeᵉ b))
