@@ -38,6 +38,7 @@
 -- states says nothing about the descent that replaced it.
 --
 -- RECOVERY: git show 919f115:agda/evidence/probed/Probed/
+-- RECOVERY: git show 3a3bd405:agda/evidence/probed/Probed/Connect-Count.agda
 module Probed.Main where
 
 -- THE APPARATUS IS CLAIMED FROM THE ROOT rather than from whichever
@@ -45,12 +46,6 @@ module Probed.Main where
 -- row and E6 refuses a `-- FORK:` that does not inhabit `Separates`, so
 -- both belong to the tree and a tree with nothing open still owes them.
 open import Probed.Apparatus using (Confirms; Separates)
-
--- THE CONNECT EDGE'S COUNTING COMPONENT, at slot tables of one and
--- three shared slots — the only part of the order that counts rather
--- than measures, and the only one decidable without a run.
-open import Probed.Connect-Count using (row-one-count; row-three-count;
-  row-three-one-taken; row-last-slot; row-with-slack; row-not-head)
 
 -- THE SHELF UNDER THE SUBSTITUTION LEMMA — the weakening, whose rows
 -- have content on both sides, read at the closed bound and at a

@@ -70,6 +70,8 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; AllOp; NodeId; Node
   cascadeLatch; sched-next; shareAdmit; shareLatch)
 open import Rx.Evaluator.Keeps-Slots using (subs-keeps; step-keeps;
   consume-keeps; switchKill-slots)
+open import Rx.Evaluator.Drops-Unconn using (subs-drops; step-drops;
+  consume-drops; switchKill-unconn)
 open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeAll⇓; pushBurst⇓;
   stepFrame⇓; innerReact⇓; innerFinish⇓; mergeAllDrain⇓; thruWalk⇓;
   thruConsume⇓; subscribeInner⇓;
@@ -188,68 +190,11 @@ DrainsQ {e = e} allNid κ id now lim act od q sched st =
 -- the block is not this module's.
 
 -- AND THE SAME THREE SITES OWE THE OTHER AGREEMENT, WHICH IS THE ONE
--- THE CONNECT'S EDGE READS.  A clause handing a LATER state onward is
--- standing at the triple it entered with, so what it must re-establish
--- is that the later state's unconnected count still sits under that
--- triple — and it does, because the connected set only ever GAINS an
--- index: no clause of any family removes one, so the count is
--- monotone down the run and the gap the caller was handed only widens.
--- Stated at an arbitrary slot table rather than at the run's own,
--- because the table is what the count is denominated in and every
--- consumer already holds the agreement fixing it.
---
--- AND IT IS THREE STATEMENTS RATHER THAN ONE OVER THE STORE, WHICH IS
--- FORCED BY WHERE THE STATES COME FROM.  Each is a claim about what a
--- DERIVATION produced, so it is stated over the ⇓ family whose clause
--- produced it; a single claim about `EvalSt` would have to quantify
--- over states no run reaches, which is the shape three refutations on
--- this face have already killed.
---
--- TWIN: `Rx.Evaluator.Keeps-Slots.subs-keeps` and its block, which is
---   this same claim about the schedule's other half over this same SCC:
---   `refl` at every leaf, a recursion at every structural arm, and a
---   function lemma at each of the three schedules a clause does not
---   build itself.  The only arms that move the share set are the two
---   connects, and both ADD an index.
-postulate
-  subs-unconn-drops : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
-    {b : Closed Γ u} {κ : Path Γ lo u t} {id : Id} {now : Tick}
-    {sched : Sched Γ} {st : EvalSt e} {burst : Stream Γ u}
-    {sched′ : Sched Γ} {st′ : EvalSt e} (sl : Slots Γ) →
-    subscribeE⇓ {e = e} b κ id now sched st (burst , sched′ , st′) →
-    unconn sl (EvalSt.connectedShares st′)
-      ≤ unconn sl (EvalSt.connectedShares st)
-
-  step-unconn-drops : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
-    {id : Id} {now : Tick} {fr : Frame Γ s u} {κ : Path Γ lo u t}
-    {vals : List (Val Γ s)} {fin : Bool} {sched : Sched Γ} {st : EvalSt e}
-    {vals′ : List (Val Γ u)} {evs : List (InstEvent (Val Γ t))} {fin′ : Bool}
-    {sched′ : Sched Γ} {st′ : EvalSt e} (sl : Slots Γ) →
-    stepFrame⇓ {e = e} id now fr κ vals fin sched st
-      (vals′ , evs , fin′ , sched′ , st′) →
-    unconn sl (EvalSt.connectedShares st′)
-      ≤ unconn sl (EvalSt.connectedShares st)
-
-  consume-unconn-drops : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
-    {op : AllOp} {nid : NodeId} {κ : Path Γ lo u t} {id : Id} {now : Tick}
-    {o : Val Γ (obs u)} {sched : Sched Γ} {st : EvalSt e}
-    {vals′ : List (Val Γ u)} {evs : List (InstEvent (Val Γ t))}
-    {sched′ : Sched Γ} {st′ : EvalSt e} (sl : Slots Γ) →
-    thruConsume⇓ {e = e} op nid κ id now o sched st
-      (vals′ , evs , sched′ , st′) →
-    unconn sl (EvalSt.connectedShares st′)
-      ≤ unconn sl (EvalSt.connectedShares st)
-
--- and its share set, which it does not touch at all: the kill closes an
--- inner and drops a registration, so the count is the same number and
--- the agreement passes through by `≤-refl` under the same two clauses.
-switchKill-unconn : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (sl : Slots Γ) (cur : Maybe NodeId) (sched : Sched Γ) (st : EvalSt e) {res} →
-  switchKill cur sched st ≡ res →
-  unconn sl (EvalSt.connectedShares (proj₂ (proj₂ res)))
-    ≤ unconn sl (EvalSt.connectedShares st)
-switchKill-unconn sl nothing  sched st refl = ≤-refl
-switchKill-unconn sl (just v) sched st refl = ≤-refl
+-- THE CONNECT'S EDGE READS, and it is proven beside the first: a clause
+-- handing a LATER state onward is standing at the triple it entered
+-- with, and the count still sits under it because the connected set only
+-- ever GAINS an index.  Same SCC, same walk, `≤-refl` where that one had
+-- `refl`, and the cons lemma at the two connects.
 
 -- AND THE AGREEMENT READ AT ONE INDEX.  Every builder is handed the
 -- table as a premise so its measure is denominated in a constant, while
@@ -386,7 +331,7 @@ subscribeE! ac sl (mapᵉ f b) ok κ id now sched ag st ub =
       (r , p) = pushBurst! ac sl id now (map-f f) tt κ burst
                   (burst-carries sl ag (inner-ok ok) d) sched₁
                   (trans (subs-keeps d) ag) st₁
-                  (≤-trans (subs-unconn-drops sl d) ub)
+                  (≤-trans (subs-drops sl d) ub)
   in r , subs-map d p
 
 subscribeE! ac sl (takeᵉ c b) ok κ id now sched ag st ub
@@ -401,7 +346,7 @@ subscribeE! ac sl (takeᵉ c b) ok κ id now sched ag st ub
       (r , p) = pushBurst! ac sl id now (take-f nid) tt κ burst
                   (burst-carries sl ag (inner-ok ok) d) sched₂
                   (trans (subs-keeps d) ag) st₁
-                  (≤-trans (subs-unconn-drops sl d) ub)
+                  (≤-trans (subs-drops sl d) ub)
   in r , subs-take-suc eq refl d p
 
 subscribeE! ac sl (scanᵉ f z b) ok κ id now sched ag st ub =
@@ -413,7 +358,7 @@ subscribeE! ac sl (scanᵉ f z b) ok κ id now sched ag st ub =
       (r , p) = pushBurst! ac sl id now (scan-f f nid) tt κ burst
                   (burst-carries sl ag (inner-ok ok) d) sched₂
                   (trans (subs-keeps d) ag) st₁
-                  (≤-trans (subs-unconn-drops sl d) ub)
+                  (≤-trans (subs-drops sl d) ub)
   in r , subs-scan refl d p
 
 subscribeE! ac sl (mergeAllᵉ lim b) ok κ id now sched ag st ub =
@@ -457,7 +402,7 @@ subscribeAll! ac sl op ns b ok κ id now sched ag st ub =
       (r , p) = pushBurst! ac sl id now (thru-outer op nid) tt κ burst
                   (burst-carries sl ag ok d) sched₂
                   (trans (subs-keeps d) ag) st₁
-                  (≤-trans (subs-unconn-drops sl d) ub)
+                  (≤-trans (subs-drops sl d) ub)
   in r , sub-all refl d p
 
 -- THE PUSH CYCLE SPLITS THE REPORT EXACTLY WHERE IT SPLITS THE BURST.
@@ -485,7 +430,7 @@ pushBurst! ac sl id now fr sv κ (em ∷ ems) bk sched ag st ub =
           (proj₂ (proj₂ sp)) sched ag st ub
       (_ , pb) = pushBurst! ac sl id now fr sv κ ems (tailᵃ bk) sched₁
                    (trans (step-keeps sf) ag) st₁
-                   (≤-trans (step-unconn-drops sl sf) ub)
+                   (≤-trans (step-drops sl sf) ub)
   in _ , push-cons refl sf pb
 
 -- THE SCAN CLAUSE IS THE ONLY ONE THAT LOOKS AT THE STORE, AND THE
@@ -523,7 +468,7 @@ thruWalk! ac sl op nid κ id now (o ∷ os) hk sched ag st ub =
         thruConsume! ac sl op nid κ id now o (headᵃ hk ∷ᵃ []ᵃ) sched ag st ub
       (_ , w) = thruWalk! ac sl op nid κ id now os (tailᵃ hk) sched₁
                   (trans (consume-keeps c) ag) st₁
-                  (≤-trans (consume-unconn-drops sl c) ub)
+                  (≤-trans (consume-drops sl c) ub)
   in _ , walk-cons c w
 
 -- WHAT A CONSUME CLAUSE DECIDES IS WHETHER THE OBSERVABLE IS TAKEN AT
@@ -639,7 +584,7 @@ subscribeE!-input {lo = lo} (acc rec) sl i ok κ id now sched ag st ub
                   (slot-join {κ = κ} {below = below} doneEq connEq)
 ...       | false
             with subscribeE!
-                   (rec (connect-edge sl (EvalSt.connectedShares st) i connEq ub))
+                   (rec (connect-edge sl (EvalSt.connectedShares st) i slEq connEq ub))
                    sl d
                    (connect-entry
                      {U = unconn sl (toℕ i ∷ EvalSt.connectedShares st)}

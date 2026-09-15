@@ -229,15 +229,15 @@ does.
 
 ### Big picture tier roadmap
 
-- **WALK THE OTHER HALF OF WHAT A RUN DOES NOT TOUCH.** The slot half is a
-  body: one structural induction over the subscribe family's SCC, `refl` at
-  every leaf, three function lemmas for the schedules a clause hands to
-  `oneShotBurst`, `takeDispatch` and `switchKill`. The count half —
-  `subs-unconn-drops`, `step-unconn-drops`, `consume-unconn-drops` — is the
-  same shape over the same block, and the only arms that move the set are the
-  two connects, which ADD an index and so drop the count. The leg is that walk,
-  and what it settles is whether the fall is monotone at every arm or whether
-  one of them re-opens a share the builder has already spent.
+- **ASK EVERY REMAINING ROW WHAT ITS PREMISES LEAVE OUT, THE WAY THE CONNECT
+  ANSWERED.** The share connect's arithmetic was refuted at a table of one: the
+  count is over SHARED slots and the premise named only membership, so a
+  `scripted` slot read nought either side. Its own probe had written the gap
+  down and drawn the opposite conclusion from it. That is a shape, not an
+  accident — a premise copied from the branch a caller happens to take, rather
+  than from what the conclusion reads — and the rows left here are the ones most
+  exposed to it. The leg is that audit, refutation first, and each repair carried
+  to a body in the same pass rather than left as a note.
 
 - **AND THE TWO FRAME HEADS THAT LEAVE THE MODULE.** The frame walk is a body
   at every head that rewrites a payload; what is left are the two that do not.
@@ -268,27 +268,25 @@ does.
   The leg is those rows, and what it buys is the only thing that moves the
   measure's own statements off the class they are born into.
 
-- **CARRY THE FOLD'S DELIVERY COUNT, WHICH IS THE ONLY PLACE A WIDTH
-  COMPOUNDS.** The entry's own reading is refuted as the carrier, at four
-  programs whose peaks double while the reading gains one. What replaces a
-  census of everything growing with a run is a narrowing: `scanᵉ` is the sole
-  former whose output at a delivery is built from its own output at the one
-  before, and the other self-reference is settled — an unfolding measures
-  exactly what its body did, so recursion buys instants and never width. The
-  leg is the count at the fold's own frame: where the walk can read one, what
-  the report must carry to see it, and what that obliges of every producer.
+- **DECIDE WHETHER A RANK CAN BOUND AN EMISSION AT ALL — THE COUNT-CARRYING LEG
+  IS DISCARDED, NOT SHRUNK.** That leg asked where a fold's delivery count could
+  be read so the rank could reserve against it. `Refuted.Entry-Depth` removes the
+  side it would have been reserved against, and the entry is a ceiling on every
+  frame of the run it is taken against, so no rank in this tower is large enough
+  and a count would have nowhere to be spent. The leg is the mechanism question
+  the three refutations now jointly ask, and it is Anthony's to settle.
 
 ### Open questions
 
-- **Where does the burst LENGTH live?** Every risky row left in this tier is one
-  claim at different heads: that what a frame writes stays under the rank the
-  frame entered at. The STATIC half is no longer a reservation at all — a
-  reading that composes at the binder makes a pipeline's own spend part of the
-  rank it is read at. What recurs is left: a fold spends per DELIVERY, at a
-  shape a one-line rxjs pipeline reaches. The ENTRY is settled as no answer —
-  its one length-shaped component is outgrown by a single instant — and the
-  width is settled as compounding at the FOLD and nowhere else, so what is left
-  is whether the walk that seeds a fold's frame can hand its count to a report.
+- **Can a figure fixed before a run bound what that run emits?** Every risky row
+  left in this tier is one claim at different heads: that what a frame writes
+  stays under the rank the frame entered at. The question used to be where the
+  burst LENGTH lives, on the reading that a count was the missing input to an
+  otherwise sound comparison. It is not: the comparison itself is refuted in its
+  own currency, with one side constant across a family whose other side doubles,
+  so no count repairs it. What is left is narrower and harder — whether the rank
+  is the wrong side of the comparison, and what a frame could be handed instead
+  that a run can supply and a descent can still spend.
   relevant: `scan-fits`, `inner-handed`, `thru-handed`
 
 ### The ledger
@@ -304,23 +302,15 @@ does.
   induction on the TYPE with no arithmetic in it. A leaf only because it is
   unwritten.
 
-- **`connect-drops`** (Rx/Evaluator/Doorless) — FALSITY, `PROBED`: the share
-  connect's drop in the unconnected component, the arithmetic the arm above
-  spends. No consumer until that arm is a body.
-
 - **`dep-wkTm`** (Rx/Obs-Depth/Substitution) — FALSITY, `PROBED`: the shelf
   under the substitution's variable arm — a weakening moves no reading, at the
   closed bound and at a positive one, which is where the bound being a
   parameter could have leaked.
 
-- **`scan-fits`** (Rx/Evaluator/Burst-Report) — SHAPE, `REFUTED×4`: refuted at
-  a five-element burst, and the premise that would carry the count refuted in
-  turn at the only channel able to hold one. The count is owed from the run.
-
-- **`subs-unconn-drops`, `step-unconn-drops`, `consume-unconn-drops`**
-  (Rx/Evaluator/Builder) — DIFFICULTY, `TWIN×3`: the unconnected count only
-  falls across three ⇓ families. Its slot twin is proven as a walk of the same
-  block.
+- **`scan-fits`** (Rx/Evaluator/Burst-Report) — FALSITY, `REFUTED×5`: refuted at
+  a five-element burst, the premise that would carry the count refuted at the
+  only channel able to hold one, and now the rank it reserves against refuted
+  too. No restatement over this tower's ranks is available.
 
 
 ## Tier 2 — Verify-Well-Formed (parked behind tier 1)
