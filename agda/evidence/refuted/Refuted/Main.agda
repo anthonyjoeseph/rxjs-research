@@ -63,6 +63,18 @@ open import Refuted.Exit-Store using (both-ends-false;
 open import Refuted.Carried-Derived using (carried-derived-false;
   derived-def-depth; derived-ref-depth)
 
+-- and the escape the climb left open, closed from the other side: not
+-- whether the accumulator deepens, which is settled, but whether a RUN
+-- can stand that deep beside a burst that long.  It can, at a one-line
+-- plain rxjs pipeline, so the route that dissolved the obligation by
+-- restricting it to reachable configurations is dead.  Its three
+-- figures are claimed because the finding is their relationship — two
+-- burst lengths against one static reading that does not move — and the
+-- positive bound beside them names the currency a repair has to be
+-- written in, never that a repair in it is true
+open import Refuted.Scan-Reachable using (static-bounds-run-false;
+  rows₃; rows₅; static₃; static₅; length-bound)
+
 -- and the template drop asked WITHOUT the data hypothesis, which is
 -- what makes that hypothesis the statement rather than a convenience:
 -- reifying an observable argument writes a `strmᵗ` the template never

@@ -238,6 +238,15 @@ does.
   `scan-handed` a restatement rather than a refutation. It is the answer to the
   question below, so it is taken before the arms that spend it.
 
+- **GIVE THE BURST LENGTH A CARRIER.** The currency change discharges `map-open`
+  and leaves `scan-handed` needing a quantity the syntax does not have: a run's
+  emitted depth is the burst POSITION, evidenced at two lengths against one
+  static reading that does not move. Three candidates, and deciding between them
+  is the leg — the length as a conjunct of the invariant record, the rank a
+  frame enters at growing per delivery, or the reading taken over the store
+  rather than the term. The reachable-only escape is not among them: a one-line
+  rxjs pipeline reaches the shape, so excluding it costs parity.
+
 - **WIDEN WHAT A BUILDER RETURNS, WHICH TURNS OUT TO GATE THE WALK.** Every
   premise is denominated at one `slotDepth sl` the caller fixes, and each clause
   carries an agreement `Sched.slots sched ≡ sl`. Three sites are handed a
@@ -278,14 +287,16 @@ does.
 
 ### Open questions
 
-- **Is the depth a run climbs a JOIN or a SUM?** Every risky row left in this
-  tier is one claim at different heads: that what a frame writes stays under the
-  rank the frame entered at. The reading takes a join, and a template that wraps
-  its own argument already refutes that — the wrapper's own depth is paid
-  nowhere. A sum is the obvious repair and it is not free: it must still be
-  bounded for the descent, and a fold re-entering its own template climbs once
-  per delivery, so the length of a burst appears in a reading that carries no
-  length. The question is which of those two the bound is stated in.
+- **Where does the burst LENGTH live?** Every risky row left in this tier is one
+  claim at different heads: that what a frame writes stays under the rank the
+  frame entered at. The reading takes a join and the run adds, which a template
+  wrapping its own argument refutes; a sum is the repair for that half, and
+  `map-open` is what it discharges. What a sum does not reach is the fold, which
+  climbs once per DELIVERY — a run emits at the burst POSITION while the
+  program's own reading holds still, and that shape is reached by a one-line
+  rxjs pipeline, so it cannot be excluded as unreachable. So the question is no
+  longer which of join or sum, but which carrier holds a length the syntax does
+  not have.
   relevant: `map-open`, `scan-handed`, `inner-handed`, `thru-handed`
 
 ### The ledger
@@ -300,10 +311,10 @@ does.
   the run ADDS, so a template wrapping its own argument hands back a value
   deeper than either side and no premise about the frame can close it.
 
-- **`scan-handed`** (Rx/Evaluator/Burst-Report) — FALSITY, `REFUTED`: the fold,
-  which the map's repair does not reach. Re-entering its own template with the
-  accumulator, the reading climbs once per delivery, so one frame's outputs
-  grow with the LENGTH of the burst and no static reading carries a length.
+- **`scan-handed`** (Rx/Evaluator/Burst-Report) — FALSITY, `REFUTED×2`: the
+  fold, which the map's repair misses. Re-entering its own template, the reading
+  climbs per delivery, so outputs grow with the burst LENGTH. A run reaches that
+  shape at a one-line rxjs pipeline, so the reachable-only escape is dead.
 
 - **`inner-handed`, `thru-handed`** (Rx/Evaluator/Burst-Report) — FALSITY,
   `PROBED×2`: the two `*All` heads, which rewrite no payload — they subscribe

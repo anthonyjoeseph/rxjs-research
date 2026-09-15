@@ -32,11 +32,14 @@
 -- BACK rather than a stream it prices.
 
 -- THE BOUNDARY.  The rows are over `scanVals`, which is exactly the
--- second premise of the domain relation's `step-scan`, so the refutation
--- reaches the frame step through that constructor and no other.  What it
+-- second premise of the domain relation's `step-scan`, so the rows below
+-- reach the frame step through that constructor and no other.  What it
 -- does NOT establish is that a reachable store holds a shallow
--- accumulator beside a burst this long — a separate and much easier
--- question, and not one answered here.
+-- accumulator beside a burst this long — a separate question, answered
+-- elsewhere and in the affirmative, so the escape it left open is shut.
+--
+-- REFUTED: `Refuted.Scan-Reachable` — the same template RUN, reaching
+--   the configuration this one only constructs.
 module Refuted.Scan-Deepens where
 
 open import Data.Empty using (⊥)
