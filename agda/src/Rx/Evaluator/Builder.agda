@@ -584,7 +584,7 @@ subscribeE!-input {lo = lo} (acc rec) sl i ok κ id now sched ag st ub
                   (slot-join {κ = κ} {below = below} doneEq connEq)
 ...       | false
             with subscribeE!
-                   (rec (connect-edge sl (EvalSt.connectedShares st) i connEq ub))
+                   (rec (connect-edge sl (EvalSt.connectedShares st) i slEq connEq ub))
                    sl d
                    (connect-entry
                      {U = unconn sl (toℕ i ∷ EvalSt.connectedShares st)}

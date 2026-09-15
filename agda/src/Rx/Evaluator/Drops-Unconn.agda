@@ -16,25 +16,23 @@
 -- cons lemma closes the gap.
 module Rx.Evaluator.Drops-Unconn where
 
-open import Data.Bool using (Bool; true; false; _∨_)
-open import Data.Bool.Properties using (∨-zeroʳ)
+open import Data.Bool using (Bool; true; false)
 open import Data.Fin using (Fin; toℕ) renaming (zero to fzero; suc to fsuc)
-open import Data.List using (List; _∷_; tabulate)
+open import Data.List using (List)
 open import Data.Maybe using (Maybe; nothing; just)
-open import Data.Nat using (ℕ; zero; suc; _≤_; _<_; z≤n)
-open import Data.Nat.Properties using (≤-refl; ≤-trans; +-mono-≤)
+open import Data.Nat using (ℕ; _≤_; _<_)
+open import Data.Nat.Properties using (≤-refl; ≤-trans)
 open import Data.Product using (_×_; _,_; proj₂)
-open import Data.Nat.ListAction using (sum)
 open import Data.Vec using (lookup)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import Rx.Prim using (Id; Source; Tick)
+open import Rx.Prim using (Id; Tick)
 open import Rx.Exp using (Ctx; Closed; Val; obs)
-open import Rx.Slots using (Slots; shared; scripted)
-open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; AllOp; NodeId;
-  NodeState; Frame; take-st; scan-st; takeVals; takeDispatch; thruWrap;
-  switchKill; lookupNode; mergeAll-st; switch-st; exhaust-st;
-  mergeAllᵒ; switchᵒ; exhaustᵒ; unconn; unconnAt; memberSource; sameSource)
+open import Rx.Slots using (Slots)
+open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; AllOp; NodeId; NodeState; Frame; take-st; scan-st; takeVals;
+  takeDispatch; thruWrap; switchKill; lookupNode; mergeAll-st; switch-st; exhaust-st;
+  mergeAllᵒ; switchᵒ; exhaustᵒ; unconn)
+open import Rx.Evaluator.Unconn-Arith using (unconn-cons-≤)
 open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeAll⇓; pushBurst⇓;
   stepFrame⇓; innerReact⇓; innerFinish⇓; mergeAllDrain⇓; thruWalk⇓;
   thruConsume⇓; subscribeInner⇓; sharedConnect⇓; subscribeSharedSlot⇓;
@@ -50,33 +48,6 @@ open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeAll⇓; pushBurst
   step-map; step-scan; step-scan-nil; step-take; step-from-inner;
   step-thru-outer; push-nil; push-cons; sub-all;
   connect-live; connect-died; slot-spent; slot-join; slot-connect)
-
-------------------------------------------------------------------
--- THE ARITHMETIC LEAF.
-------------------------------------------------------------------
-
--- pointwise sums over the telescope
-sum-tab-mono : ∀ {m} (f g : Fin m → ℕ) → (∀ i → f i ≤ g i) →
-  sum (tabulate f) ≤ sum (tabulate g)
-sum-tab-mono {zero}  f g h = z≤n
-sum-tab-mono {suc m} f g h =
-  +-mono-≤ (h fzero) (sum-tab-mono _ _ (λ i → h (fsuc i)))
-
--- adding a member never raises any slot's contribution
-unconnAt-cons-≤ : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (cs : List Source)
-  (s : Source) (i : Fin n) → unconnAt sl (s ∷ cs) i ≤ unconnAt sl cs i
-unconnAt-cons-≤ sl cs s i with sl i
-... | scripted _ = z≤n
-... | shared _ with memberSource (toℕ i) cs
-...   | true  rewrite ∨-zeroʳ (sameSource (toℕ i) s) = z≤n
-...   | false with sameSource (toℕ i) s ∨ false
-...     | true  = z≤n
-...     | false = ≤-refl
-
--- and so the count itself only falls
-unconn-cons-≤ : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (cs : List Source)
-  (s : Source) → unconn sl (s ∷ cs) ≤ unconn sl cs
-unconn-cons-≤ sl cs s = sum-tab-mono _ _ (unconnAt-cons-≤ sl cs s)
 
 ------------------------------------------------------------------
 -- THE THREE FUNCTIONS A CLAUSE HANDS A STATE TO.

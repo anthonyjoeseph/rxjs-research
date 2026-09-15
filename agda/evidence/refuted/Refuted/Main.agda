@@ -115,3 +115,16 @@ open import Refuted.Case-Binds using (case-join-false;
 -- that no longer meet
 open import Refuted.Burst-Length using (sync-bounds-burst-false;
   peaks-are; sizes-are)
+
+-- and the share connect's own arithmetic, asked without knowing the
+-- slot is shared.  It is the shallowest witness in this tree and the
+-- only one that needs no program at all: the count is over SHARED
+-- slots, so a `scripted` one reads nought either side and the strict
+-- drop fails at a table of one with the set empty.  No figure is
+-- claimed because the finding is that they AGREE: the two readings
+-- are the same numeral, and the premise holds at its floor beside
+-- them, so there is no crossing to pin and nothing an arithmetic
+-- repair could sharpen.  A move under `unconn` breaks a numeral here
+-- rather than leaving the witness quiet
+open import Refuted.Scripted-Connect using (connect-drops-false;
+  row-before; row-after; row-absent)

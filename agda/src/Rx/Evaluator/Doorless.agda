@@ -53,6 +53,8 @@ open import Rx.Sync-Size using (unfoldμ-shrinks)
 open import Rx.Slots using (Slots; shared)
 open import Rx.Strat-Order using (Tri; _≺_; ltU; ltR; ltS; ≺-wellFounded)
 open import Rx.Evaluator using (unconn; memberSource; Stream; splitEvents; EvalSt)
+open import Rx.Evaluator.Unconn-Arith using (connect-count-drops;
+  unconnAt-shared-fresh)
 
 variable
   n : ℕ
@@ -331,31 +333,6 @@ hop-guard : ∀ {n} {Γ : Ctx n} {u} (η : Fin n → ℕ) (τ : Tri) (o : Val Γ
           → depᵉ η 0 o < proj₁ (proj₂ τ)
 hop-guard η _ o (h ∷ᵃ []ᵃ) = h
 
--- THE CONNECT'S FACT IS THE ONE GENUINELY NEW STATEMENT, AND IT IS
--- COUNTING RATHER THAN DEPTH.  Connecting slot `i` puts `i` into the
--- connected set, and the count is over the slots NOT in that set — so
--- it drops by exactly the one slot, provided `i` was not already
--- there, which is the branch the caller takes to reach the clause at
--- all.  Nothing about the program is read: this is a fact about a list
--- gaining an element it did not have.
---
--- AND THE MEMBERSHIP PREMISE IS THE STATEMENT RATHER THAN A
--- CONVENIENCE, WHICH IS THE SAME SHAPE THE HOP'S REPORT TURNED OUT TO
--- HAVE.  Unconditioned the claim is false at one line: connect a slot
--- already in the set and the count does not move, so `<` fails on the
--- nose.  The clause is reached only down the branch where the
--- membership reads `false`, so the true statement is the conditioned
--- one and the caller already holds its witness.
---
--- PROBED: `Probed.Connect-Count` — tables of one and three `shared`
---   slots, connected at the last unconnected one, with slack left
---   over, and at an index that is not the head of the set.  Not
---   reached: a `scripted` slot, which reads nought on both sides.
-postulate
-  connect-drops : ∀ {Γ : Ctx n} (sl : Slots Γ) (cs : List Source) (i : Fin n)
-                → memberSource (toℕ i) cs ≡ false
-                → unconn sl (toℕ i ∷ cs) < unconn sl cs
-
 -- AND THE EDGE, WHICH TAKES SLACK RATHER THAN AN EQUATION — WHICH IS
 -- WHAT WRITING THE ARM'S BODY FOUND.  Stated with the triple's own `U`
 -- fixed to BE the count, it is usable only where the caller's rank was
@@ -375,12 +352,26 @@ postulate
 -- shrinks the count, which is a statement over the ⇓ families rather
 -- than over any function.  That is the same shape the slot-table
 -- agreement takes, and it is why the arm is not a body today.
+--
+-- AND THE SLOT'S OWN SHAPE IS A PREMISE, WHICH IS WHERE A FALSE
+-- STATEMENT SAT.  The count is over SHARED slots, so membership alone
+-- says nothing: a `scripted` slot reads nought either side and the
+-- strict drop fails at a table of one.  The arm reaches its clause
+-- down both branches, so the true statement costs the caller nothing
+-- it does not already hold.
+--
+-- REFUTED: `Refuted.Scripted-Connect` — the membership-only form,
+--   which is what this carried before.
 connect-edge : ∀ {U r s r′ s′} {Γ : Ctx n} (sl : Slots Γ) (cs : List Source)
-                 (i : Fin n)
+                 (i : Fin n) {d : Closed Γ (lookup Γ i)}
+                 {ok : T (inputsBelowᵉ (toℕ i) d)}
+             → sl i ≡ shared d {ok = ok}
              → memberSource (toℕ i) cs ≡ false
              → unconn sl cs ≤ U
              → (unconn sl (toℕ i ∷ cs) , r′ , s′) ≺ (U , r , s)
-connect-edge sl cs i fresh le = ltU (<-≤-trans (connect-drops sl cs i fresh) le)
+connect-edge sl cs i eqs fresh le =
+  ltU (<-≤-trans (connect-count-drops sl cs i
+        (unconnAt-shared-fresh sl cs i eqs fresh)) le)
 
 -- AND THE CONNECT'S OTHER COMPONENT, WHICH IS THE ONE THE ENVIRONMENT
 -- WAS BUILT FOR.  The edge drops the count and leaves the rank free, so

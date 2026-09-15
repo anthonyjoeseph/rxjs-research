@@ -229,14 +229,15 @@ does.
 
 ### Big picture tier roadmap
 
-- **WALK THE READING THE SAME WAY, NOW THAT THE WALK IS KNOWN TO BE CHEAP.**
-  Both halves of what a run does not touch fell to one structural induction over
-  the subscribe family's SCC, and the builder now carries no postulate at all.
-  What that settles is a METHOD: a claim about a derivation's endpoints is a walk
-  of the relation, whatever apparatus the builder producing it needs. The leg
-  tests that reading on the report's premise-only rows, and says which the walk
-  cannot close because the conclusion needs a quantity no arm carries — which is
-  `Where does the burst LENGTH live?` reached from the side that just worked.
+- **ASK EVERY REMAINING ROW WHAT ITS PREMISES LEAVE OUT, THE WAY THE CONNECT
+  ANSWERED.** The share connect's arithmetic was refuted at a table of one: the
+  count is over SHARED slots and the premise named only membership, so a
+  `scripted` slot read nought either side. Its own probe had written the gap
+  down and drawn the opposite conclusion from it. That is a shape, not an
+  accident — a premise copied from the branch a caller happens to take, rather
+  than from what the conclusion reads — and the rows left here are the ones most
+  exposed to it. The leg is that audit, refutation first, and each repair carried
+  to a body in the same pass rather than left as a note.
 
 - **AND THE TWO FRAME HEADS THAT LEAVE THE MODULE.** The frame walk is a body
   at every head that rewrites a payload; what is left are the two that do not.
@@ -302,10 +303,6 @@ does.
   slot's payload is data, and the rank is read only at `obs`, so this is an
   induction on the TYPE with no arithmetic in it. A leaf only because it is
   unwritten.
-
-- **`connect-drops`** (Rx/Evaluator/Doorless) — FALSITY, `PROBED`: the share
-  connect's drop in the unconnected component, the arithmetic the arm above
-  spends. No consumer until that arm is a body.
 
 - **`dep-wkTm`** (Rx/Obs-Depth/Substitution) — FALSITY, `PROBED`: the shelf
   under the substitution's variable arm — a weakening moves no reading, at the
