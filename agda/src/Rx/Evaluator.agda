@@ -159,6 +159,19 @@ sched-next sched = schedFinish sched (schedGo (Sched.live sched))
 NodeId : Set          -- a node instance in the dynamic topology,
 NodeId = ℕ            -- numbered in subscription order
 
+-- TWO OF THE FIVE ARMS CARRY A PAYLOAD, AND THAT CENSUS IS WHAT THE
+-- REDUCIBILITY FACE IS ACTUALLY WAITING ON.  A candidate defined by
+-- recursion on the type says nothing about what a NODE HOLDS, so every
+-- arm of `Rx.Evaluator.Reducible` that reads a node back is owed a
+-- store invariant -- but only where the read produces a VALUE.  Here
+-- `scan-st` holds one outright and `mergeAll-st`'s queue holds closed
+-- expressions; `take-st`, `switch-st` and `exhaust-st` hold a count, an
+-- identifier and two flags, and nothing that leaves a frame dispatching
+-- on those came from anywhere but the burst that arrived.  So three of
+-- the four arms need no carrier at all, and the two that do differ in
+-- cost: a queue entry's reducibility arrives from the hypothesis that
+-- admitted it, while an accumulator's is folded by the operator's own
+-- function and has no such source.
 data NodeState {n} (Γ : Ctx n) : Set where
   scan-st    : ∀ {t} → Val Γ t → NodeState Γ    -- current accumulator
   take-st    : ℕ → NodeState Γ                  -- emissions remaining

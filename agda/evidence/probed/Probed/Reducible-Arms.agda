@@ -1,4 +1,4 @@
--- THE THREE LEAVES OF THE REDUCIBILITY BODY, INSTANTIATED.
+-- THE REMAINING LEAVES OF THE REDUCIBILITY BODY, INSTANTIATED.
 --
 -- WHAT IS AT RISK, AND IT IS THE SAME RISK IN ALL THREE.  The
 -- candidate's observable arm demands a subscription derivation in
@@ -44,7 +44,6 @@
 --
 -- TARGET: red-input-shared @21f529
 -- TARGET: red-scan @c288cd
--- TARGET: red-take @4abb4a
 -- TARGET: red-from-inner @de6e75
 -- TARGET: red-thru @f94cad
 module Probed.Reducible-Arms where
@@ -67,12 +66,12 @@ open import Relation.Binary.PropositionalEquality using (refl)
 open import Rx.Exp using (Ctx; Closed; natᵗ; obs; ofᵉ; nat̂; varᵗ; input; _×ᵗ_; fstᵗ; Fn)
 open import Rx.Slots using (Slots; shared)
 open import Rx.Evaluator using (Sched; EvalSt; Path; root; sched-init; st-init; mergeAllᵒ; switchᵒ; exhaustᵒ; AllOp;
-  NodeState; from-inner; _↠_; map-f; mergeAll-st; switch-st; exhaust-st; installNode; scan-st; take-st)
-open import Rx.Evaluator.Reducible using (Red; reducible; red-input-shared; red-thru; red-scan; red-take; red-from-inner)
+  NodeState; from-inner; _↠_; map-f; mergeAll-st; switch-st; exhaust-st; installNode; scan-st)
+open import Rx.Evaluator.Reducible using (Red; reducible; red-input-shared; red-thru; red-scan; red-from-inner)
 
-open import Rx.Evaluator.Domain using (subs-shared; slot-spent; slot-join; step-thru-outer; walk-nil; walk-cons; inner;
-  step-scan; step-take; step-from-inner; react-false;
-  consume-all-sub; consume-all-enqueue; consume-switch-sub; consume-exhaust-sub)
+open import Rx.Evaluator.Domain using (subs-shared; slot-spent; slot-join; step-thru-outer; walk-nil; walk-cons; inner; step-scan;
+  step-from-inner; react-false; consume-all-sub; consume-all-enqueue; consume-switch-sub;
+  consume-exhaust-sub)
 
 open import Probed.Apparatus using (Confirms)
 
@@ -195,17 +194,6 @@ row-scan-acc : Confirms
   (red-scan {e = e₀} 0 0 fstFn nid₂ κ₂ {3 ∷ []} (tt ∷ []) false sch₀ stScan)
 row-scan-acc =
   _ , step-scan refl refl , reducible acc₂ ∷ []
-
-stTake : EvalSt e₀
-stTake = installNode nid₂ (take-st 2) st₀
-
--- LOAD-BEARING on the pass-through: the budget is not exhausted, so
--- the value leaves the frame and its candidate has to survive.
-row-take-pass : Confirms
-  (red-take {e = e₀} 0 0 nid₂ κ₂ {ofᵉ (nat̂ 7 ∷ []) ∷ []}
-     (reducible (ofᵉ (nat̂ 7 ∷ [])) ∷ []) false sch₀ stTake)
-row-take-pass =
-  _ , step-take , reducible (ofᵉ (nat̂ 7 ∷ [])) ∷ []
 
 -- THE INNER'S OWN FRAME, at the arm that carries rather than spends.
 -- An unfinished inner emit passes its values through untouched, so the

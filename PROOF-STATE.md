@@ -233,15 +233,24 @@ deferred beside it.
 
 ### Big picture tier roadmap
 
-- **DISCHARGE THE SUBSTITUTION LEAVES THE PARTNER BOUGHT ITSELF WITH.** The
-  environment leaf is gone: the term face is now a mutual partner measured on
-  raw syntax under a carried environment, and the price it paid is six
-  statements about substitution rather than about reducibility. Three are the
-  μ arm, where the guarded elimination demands a Θ-CLOSED inserted expression
-  and the partner meets a Θ-open body; the honest repair is a `Θloc` telescope
-  threaded through the guarded and direct eliminations, weakening at the one
-  insertion site. Three are the ordinary commutations of substitution with
-  evaluation. None can move the ground, and none is instantiated yet.
+- **THE STORE CARRIER, NOW NARROWED TO ONE ARM BY THE NODE CENSUS.** `Red`
+  recurses on the type and so says nothing about what a NODE HOLDS — the
+  question four arms were jointly waiting on. The census at `NodeState` answers
+  most of it: only `scan-st` and `mergeAll-st`'s queue carry a payload, so the
+  take arm needed no carrier and is now a body, and switch and exhaust need
+  none either. The two that remain are not the same job — a queue entry's
+  candidate is a transport from the hypothesis that admitted it, an
+  accumulator's is the carrier problem proper. Next commit takes the queue
+  half.
+
+- **DISCHARGE THE FOUR SUBSTITUTION LEAVES THE PARTNER BOUGHT ITSELF WITH.**
+  The `Θloc` telescope landed and took three of the original six with it —
+  they were never gaps, only a missing generalisation of the guarded
+  elimination. Four remain, all probed green: the fixpoint peel commuting with
+  the environment, a term's evaluation, a frame's function at its argument
+  slot, and the empty substitution being the identity. The last wants a
+  transport along `Θloc ++ []`, which does not reduce for a variable telescope.
+  None can move the ground.
 
 - **THEN RUN A SELF-REFERENTIAL μ, IN THE CORPUS RATHER THAN IN A PROBE.** The
   peel is now paid for by a size the unfolding does not move, and what funds that
@@ -281,10 +290,6 @@ deferred beside it.
 - **`red-scan`** (Rx/Evaluator/Reducible) — FALSITY, `DEAD ROUTE, PROBED`: a
   scan's accumulator is read back out of the node this face installed, and the
   candidate carries no claim about what a node holds.
-
-- **`red-take`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`: the same gap
-  plus a truncation, which is where a burst can lose the value a satisfaction
-  claim was taken at.
 
 - **`red-from-inner`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`: what an
   inner emits on its way back up, where a mergeAll drains its queue and a

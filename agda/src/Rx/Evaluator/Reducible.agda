@@ -39,8 +39,8 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.Bool using (true; false)
 open import Data.List.Relation.Unary.All.Properties using (++⁺)
-open import Data.Maybe using (nothing)
-open import Data.Nat using (zero; suc; _<_; s≤s; _+_)
+open import Data.Maybe using (Maybe; just; nothing)
+open import Data.Nat using (ℕ; zero; suc; _<_; s≤s; _+_)
 open import Data.Nat.Induction using (<-wellFounded)
 open import Data.Nat.Properties using (_<?_; ≮⇒≥; ≤-refl; ≤-trans; m≤n+m; m≤m+n)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
@@ -62,8 +62,9 @@ open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; Ct
 open import Rx.Exp.Guarded using (gsizeᵉ; gsizeᵗ; gsizeᵗˢ; gsize-unfoldμ)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; _↠_; map-f; take-f; scan-f; take-st; scan-st;
   thru-outer; mergeAllᵒ; switchᵒ; exhaustᵒ; mergeAll-st; switch-st; exhaust-st;
+  takeVals; takeDispatch; lookupNode; NodeState;
   installNode; oneShotBurst; memberSource; splitEvents; retagEvents; NodeId; AllOp; from-inner)
-open import Rx.Evaluator.Domain using (subscribeE⇓; pushBurst⇓; stepFrame⇓; step-map; push-nil; push-cons; subs-of;
+open import Rx.Evaluator.Domain using (subscribeE⇓; pushBurst⇓; stepFrame⇓; step-map; step-take; push-nil; push-cons; subs-of;
   subs-empty; subs-map; subs-take-zero; subs-take-suc; subs-scan; subs-defer;
   subs-floor; subs-hot-done; subs-hot-live; subs-cold-sync; subs-cold-async;
   subs-μ; sub-all; subs-merge-all; subs-switch-all; subs-exhaust-all)
@@ -281,31 +282,15 @@ postulate
              (sched : Sched Γ) (st : EvalSt e)
            → RedStep {e = e} id now (scan-f fn nid) κ vals fin sched st
 
-  -- A TAKE'S COUNTDOWN AND A SCAN'S ACCUMULATOR ARE THE SAME GAP.
-  -- Both dispatch on a node this face installed and has not looked at
-  -- since, so both are the first place the candidate must be read back
-  -- OUT of stored state rather than threaded through it.  They are
-  -- separate statements because the take also truncates, and a
-  -- truncation is where a burst can lose the very value a satisfaction
-  -- claim was taken at.
-  --
-  -- PROBED: `Probed.Reducible-Arms` at an observable payload with the
-  --   budget unexhausted, where the values pass through untouched and
-  --   the store decides only HOW MANY -- so this arm is store-reading
-  --   without being store-DEPENDENT, which is the contrast that pins
-  --   what the scan above is actually missing.  The CUT is not
-  --   reached, and neither is a stuck node lookup.
-  red-take : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo}
-             (id : Id) (now : Tick) (nid : NodeId) (κ : Path Γ lo s t)
-             {vals : List (Val Γ s)} → All (Red s) vals → (fin : Bool)
-             (sched : Sched Γ) (st : EvalSt e)
-           → RedStep {e = e} id now (take-f nid) κ vals fin sched st
-
   -- WHAT AN INNER EMITS ON ITS WAY BACK UP, which is the other half of
   -- a flattener and the half no row has reached.  The walk below
   -- SUBSCRIBES an inner; this is what happens when that inner later
   -- fires, and it is where a mergeAll drains its queue and a switch
-  -- decides whether the emission still belongs to anybody.
+  -- decides whether the emission still belongs to anybody.  The node
+  -- census at `NodeState` narrows which of those owe anything: the
+  -- switch and exhaust faces hold a flag and an identifier, so their
+  -- values can only be the ones that arrived, and the DRAIN is the one
+  -- sub-arm here that reads a payload back out.
   --
   -- PROBED: `Probed.Reducible-Arms` at the arm that CARRIES rather
   --   than spends -- an unfinished inner emit, whose values pass
@@ -321,6 +306,11 @@ postulate
            → RedStep {e = e} id now (from-inner op allNid inst) κ vals fin sched st
 
   -- THE FLATTENING WALK, and the one leaf here with rows against it.
+  -- Every value it produces is an inner subscribed out of the arriving
+  -- batch, and the census at `NodeState` says the nodes it consults
+  -- carry no payload to confuse that -- so this arm owes a store
+  -- invariant only through the QUEUE it may push into, never through
+  -- what it reads.
   --
   -- PROBED: `Probed.Reducible-Arms` at each of the three operators,
   --   with the arriving batch carrying a real observable: mergeAll
@@ -447,6 +437,47 @@ redMapVals : ∀ {n} {Γ : Ctx n} {s u} (fn : Fn Γ [] [] [] s u) → RedFn fn
            → All (Red u) (map (applyFn fn) vals)
 redMapVals fn rf []       = []
 redMapVals fn rf (p ∷ ps) = rf p ∷ redMapVals fn rf ps
+
+-- A TRUNCATION CANNOT INVENT A VALUE, WHICH IS WHY THE TAKE ARM NEEDS
+-- NOTHING FROM THE STORE.  The node a take installs holds a COUNT, and
+-- the dispatch's value column is a prefix of the burst it was handed --
+-- on the cut path and the non-cut path alike, and at a stuck lookup the
+-- column is empty.  So the arriving candidates are the departing ones
+-- and the store decides only HOW MANY survive.  This is the contrast
+-- that pins what a scan's accumulator is actually missing: that node
+-- holds a VALUE, and no hypothesis here says anything about it.
+redTakeVals : ∀ {n} {Γ : Ctx n} {s} {P : Val Γ s → Set} (k : ℕ)
+              {vals : List (Val Γ s)} → All P vals
+            → All P (proj₁ (takeVals k vals))
+redTakeVals zero          rv        = []
+redTakeVals (suc k)       []        = []
+redTakeVals (suc zero)    (p ∷ ps)  = p ∷ []
+redTakeVals (suc (suc k)) (p ∷ ps)  = p ∷ redTakeVals (suc k) ps
+
+redTakeDispatch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+                  (nid : NodeId) {vals : List (Val Γ s)} (fin : Bool)
+                  (sched : Sched Γ) (st : EvalSt e) (m : Maybe (NodeState Γ))
+                → All (Red s) vals
+                → All (Red s)
+                    (proj₁ (takeDispatch {e = e} nid vals fin sched st m))
+redTakeDispatch nid {vals} fin sched st (just (take-st k)) rv
+  with proj₂ (proj₂ (takeVals k vals))
+... | true  = redTakeVals k rv
+... | false = redTakeVals k rv
+redTakeDispatch nid fin sched st (just (scan-st _))        rv = []
+redTakeDispatch nid fin sched st (just (mergeAll-st _ _ _ _)) rv = []
+redTakeDispatch nid fin sched st (just (switch-st _ _))    rv = []
+redTakeDispatch nid fin sched st (just (exhaust-st _ _))   rv = []
+redTakeDispatch nid fin sched st nothing                   rv = []
+
+red-take : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo}
+           (id : Id) (now : Tick) (nid : NodeId) (κ : Path Γ lo s t)
+           {vals : List (Val Γ s)} → All (Red s) vals → (fin : Bool)
+           (sched : Sched Γ) (st : EvalSt e)
+         → RedStep {e = e} id now (take-f nid) κ vals fin sched st
+red-take id now nid κ rv fin sched st =
+  _ , step-take
+    , redTakeDispatch nid fin sched st (lookupNode nid (EvalSt.nodes st)) rv
 
 -- STEPPING ONE FRAME, DISPATCHED ON THE FRAME.  The mapping arm is a
 -- body because nothing about it is stateful; the other four each read
