@@ -190,12 +190,17 @@ postulate
   --   function returns an OBSERVABLE -- the one row in that file where
   --   the satisfaction half is a real claim, since what the pushed
   --   value must satisfy is another expression's reducibility rather
-  --   than a protocol event -- and through a FLATTENING frame, at its
-  --   own step and a walk with nothing to consume.  The flattening row
-  --   is degenerate in the operator: the outer's burst carries no
-  --   value, so the walk hands the operator no observable and reads
-  --   the store at no concurrency limit.  No scan or take frame
-  --   reached, no burst of more than one emit, and no live inner.
+  --   than a protocol event -- and through a FLATTENING frame at each
+  --   of the three operators, with the outer's burst carrying a real
+  --   observable: mergeAll subscribing it, mergeAll REFUSING it at a
+  --   zero concurrency limit and queueing instead, switch killing and
+  --   subscribing, exhaust subscribing with nothing active.  The
+  --   inner's own subscription derivation is what comes back, so the
+  --   candidate is SPENT at these rows rather than carried.  Not
+  --   reached: a node already holding something -- a queue with an
+  --   entry, a switch whose current inner is running, an exhaust
+  --   already active -- and no scan or take frame, and no burst of
+  --   more than one emit.
   red-push : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
              (id : Id) (now : Tick) (f : Frame Γ s u) (κ : Path Γ lo u t)
              {burst : Stream Γ s} → StreamSat (Red s) burst

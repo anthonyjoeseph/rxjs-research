@@ -233,14 +233,15 @@ deferred beside it.
 
 ### Big picture tier roadmap
 
-- **THE FRAME PUSH AT A LIVE INNER, WHICH IS NOW THE WHOLE OF THE RISK.**
-  `red-push` absorbed the hop: a flattener installs its node and runs its source
-  through a `thru-outer` frame, so the queue, the kill, the refusal and the
-  concurrency limit are clauses of the push and of nothing above it. One row
-  reaches that frame, and its walk finds nothing to consume — so every
-  operator-specific reading of the store is still uninstantiated. Instantiate it
-  at an outer carrying a live inner, at each operator and at a bounded limit,
-  before writing a line of the body.
+- **NOW WRITE THE PUSH'S BODY, ONE FRAME AT A TIME.** The statement is
+  instantiated where it was doubted: an outer carrying a real observable, at all
+  three operators, with mergeAll refusing it at a zero limit and queueing
+  instead — and the inner's own subscription derivation coming back, so the
+  candidate is spent rather than merely carried. What that leaves is a proof,
+  not a question. Take the frames in the order the walk does — map, then the
+  flattening walk, then scan and take, whose dispatch reads a node the rows
+  above never made non-empty — and postulate whatever each frame's step still
+  owes rather than widening the push.
 
 - **THEN RUN A SELF-REFERENTIAL μ, IN THE CORPUS RATHER THAN IN A PROBE.** The
   peel is now paid for by a size the unfolding does not move, and what funds that
@@ -279,8 +280,8 @@ deferred beside it.
 
 - **`red-push`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`: pushing a
   satisfying burst through a frame yields a total derivation and a satisfying
-  result. Spent by all three transformer arms, so a restatement moves each of
-  them.
+  result. Inhabited now at every operator's reading of an empty node; a node
+  already holding something is unreached.
 
 - **`red-tm`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`: every closed
   term's value is reducible. Mutual with the body through the expression
