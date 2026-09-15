@@ -1,4 +1,4 @@
-.PHONY: find-prose gate cone-check cone-selftest roadmap-moved roadmap-moved-selftest roadmap-order roadmap-order-selftest roadmap-evidence gate-heavy gate-cheap gate-light dev-changed dev-changed-selftest stripped strip-selftest unmap-selftest postulates dup-check dup-selftest imports-check imports-fix imports-selftest find all help agda-dev agda-dev-selftest warm bg bg-check bg-wait bug-cache unsafe-check wiring wiring-selftest comments-check comments-selftest refuted ev ts-check cli-build oracle qc-build quickcheck
+.PHONY: find-prose gate cone-check cone-selftest roadmap-moved roadmap-moved-selftest roadmap-order roadmap-order-selftest roadmap-evidence gate-heavy gate-cheap gate-light dev-changed dev-changed-selftest stripped strip-selftest unmap-selftest postulates dup-check dup-selftest imports-check imports-fix imports-selftest find all help agda-dev agda-dev-selftest warm bg bg-check bg-wait bug-cache bug-cache-run unsafe-check wiring wiring-selftest comments-check comments-selftest refuted ev ts-check cli-build oracle qc-build quickcheck
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -224,7 +224,34 @@ agda-dev-selftest:
 # whole FFI surface.  So this demands the summary line BEFORE refusing any FAIL
 # line: a binary that walked nothing prints nothing, and a grep for failures
 # alone would read that as green, which is the one way this target could lie.
+#
+# SUSPENDED WHILE THE CANDIDATE HAS LIVE LEAVES (Anthony: "suspend,
+# self-expiring").  The Girard-Tait cutover made the evaluator extract a run's
+# burst FROM `reducible` -- the witness of its sigma IS the stream -- so the
+# binary is exactly as executable as the proof is complete, and MAlonzo turns a
+# reached postulate into a CRASH rather than a stuck term.  Measured: the first
+# corpus row exercising a higher-order operator aborts the binary outright, so
+# every row after it is unrun and the target reports a failure that is about the
+# proof's remaining work and not about the corpus.
+#
+# This is a CONDITION, not a skip list: it is keyed on the count of postulates
+# in the candidate's own module, so it lifts itself the day that count reaches
+# zero and there is nothing to remember to undo.  While it holds, the invariant
+# `green <=> no known counterexample remains` is NOT being enforced -- the
+# target says so on every run rather than printing a quiet pass.
 bug-cache: stripped
+	@leaves=$$(scripts/check-wiring.py --postulates 2>/dev/null \
+	   | grep -c '  Rx/Evaluator/Reducible.agda:' || true); \
+	 if [ "$$leaves" -gt 0 ]; then \
+	   echo "bug-cache: SUSPENDED — Rx/Evaluator/Reducible.agda holds $$leaves live postulate leaves,"; \
+	   echo "bug-cache: and the compiled runner extracts its stream from that candidate, so a reached"; \
+	   echo "bug-cache: leaf crashes MAlonzo.  'green ⟺ no known counterexample remains' is NOT"; \
+	   echo "bug-cache: enforced while this holds.  It resumes by itself when that count reaches zero."; \
+	   exit 0; \
+	 fi; \
+	 $(MAKE) --no-print-directory bug-cache-run
+
+bug-cache-run: stripped
 	@$(call AGDA_RUN,--compile --compile-dir=../_cli src/Implementation/Unit-Test/Bug-Cache.agda)
 	@out=$$(agda/_cli/Bug-Cache); printf '%s\n' "$$out"; \
 	 printf '%s\n' "$$out" | grep -q '^bug-cache: ran ' \
