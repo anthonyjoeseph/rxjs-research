@@ -21,10 +21,10 @@
 -- there to lose.
 --
 -- WHAT IS NOT HERE, DELIBERATELY: a predicate for a run that went DRY.
--- A dry run refutes `rank-sufficient`, which is a postulate rather than
--- a disagreement between two implementations of one batching, so the
--- QuickCheck binary reports it unpasteably and it stays out of a corpus
--- whose verdict gates the build.
+-- No builder constructs the marker, so a dry run is not a disagreement
+-- between two implementations of one batching — it is the descent
+-- refusing, which the QuickCheck binary reports unpasteably, and it
+-- stays out of a corpus whose verdict gates the build.
 ------------------------------------------------------------------
 module Implementation.Unit-Test.Prelude where
 

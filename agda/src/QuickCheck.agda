@@ -28,8 +28,8 @@
 --
 -- IT REACHES `μᵉ`, AND THAT IS WHAT PUTS THE SWEEP ON THE DESCENT. The
 -- rank guard lives under recursion, so a μ-free generator could never
--- produce the shape the one open reading of `rank-sufficient` is about,
--- however many seeds it ran. Recursion is generated with its binder
+-- produce the shape the descent's one open reading is about, however
+-- many seeds it ran. Recursion is generated with its binder
 -- scopes carried as indices rather than checked afterwards — the
 -- generator's type is `Exp` at the two μ contexts, so a synchronous
 -- self-reference is not a program it can emit and be rejected for; it is

@@ -35,6 +35,19 @@
 -- claim would be denominated afresh at each of the builder's recursive
 -- calls and every one of them would owe a transport; fixed by the caller
 -- the premises do not move, and the schedules only have to AGREE.
+
+-- AND THE WHOLE FACE HAS EXACTLY ONE CUSTOMER, WHICH IS WORTH KNOWING
+-- BEFORE ANY OF IT IS GROUND.  Nothing the top line proves reads a
+-- depth.  `batch-agreement` is quantified over `WellFormed`, which is
+-- the protocol automaton's verdict on an emit list and mentions no
+-- value at all; the debt under it takes the run's two DERIVATIONS and
+-- nothing else.  So the rank, the triple, the entry premise and the
+-- leaves below are not owed to the THEOREM — they are owed to the
+-- builder's TERMINATION, which is the one place a function has to
+-- exist before a derivation does.  The consequence is that a repair
+-- here is not confined to arithmetic: the obligation is removable by
+-- changing what justifies the recursion, and then this face is DELETED
+-- rather than restated.
 module Rx.Evaluator.Burst-Report where
 
 open import Data.Bool using (Bool; true; false; if_then_else_; T)
