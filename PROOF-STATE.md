@@ -229,14 +229,14 @@ does.
 
 ### Big picture tier roadmap
 
-- **GIVE THE BURST LENGTH A CARRIER.** The currency change landed and left
-  `scan-handed` needing a quantity the syntax does not have: a run's emitted
-  depth is the burst POSITION, evidenced at two lengths against one static
-  reading that does not move. Three candidates, and deciding between them is the
-  leg — the length as a conjunct of the invariant record, the rank a frame
-  enters at growing per delivery, or the reading taken over the store rather
-  than the term. The reachable-only escape is not among them: a one-line rxjs
-  pipeline reaches the shape, so excluding it costs parity.
+- **GIVE THE BURST LENGTH A CARRIER.** The fold's iteration is priced and the
+  arm is a body, so what the leg has left is `scan-fits` — a figure dominating
+  the stored SEED and leaving one RATE per delivery under the rank. The length
+  is now written in a statement rather than missing from one, and the three
+  candidates are unchanged: a conjunct of the invariant record, a rank growing
+  per delivery, or the reading taken over the store. What the assembly settled
+  is that the seed rides with the length rather than being a separate question:
+  both are pinned by the same figure, so one carrier pays for both.
 
 - **MAKE THE ENTRY RANK RESERVE WHAT A FRAME WILL SPEND.** With the sum in
   `src`, what a map arm still asserts is arithmetic alone: the rank a frame
@@ -298,7 +298,7 @@ does.
   program's reading holds still, at a shape a one-line rxjs pipeline reaches,
   so it cannot be excluded as unreachable. The question is which carrier holds
   that second half.
-  relevant: `map-fits`, `scan-handed`, `inner-handed`, `thru-handed`
+  relevant: `map-fits`, `scan-fits`, `inner-handed`, `thru-handed`
 
 ### The ledger
 
@@ -312,11 +312,10 @@ does.
   a frame ENTERS at has to dominate the template PLUS what it was handed; a
   join read off the program dominates neither addend's sum.
 
-- **`scan-handed`** (Rx/Evaluator/Burst-Report) — FALSITY, `REFUTED×2`: the
-  fold, which the map's repair misses. Re-entering its own template, the
-  reading climbs per delivery, so outputs grow with the burst LENGTH. A run
-  reaches that shape at a one-line rxjs pipeline, so the reachable-only escape
-  is dead.
+- **`scan-fits`** (Rx/Evaluator/Burst-Report) — FALSITY, `REFUTED×2`: what the
+  fold owes once its climb is proven — a figure over the stored seed leaving a
+  RATE per delivery under the rank. It is the tier's first statement naming the
+  burst LENGTH, and no rank read off the program carries one.
 
 - **`inner-handed`, `thru-handed`** (Rx/Evaluator/Burst-Report) — FALSITY,
   `PROBED×2`: the two `*All` heads, which rewrite no payload — they subscribe
