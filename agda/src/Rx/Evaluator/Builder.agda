@@ -206,7 +206,15 @@ slot-agree sl sched i ag eq = trans (cong (λ f → f i) ag) eq
 -- site are gone: what travels is the slot table, and it travels because
 -- the arms genuinely dispatch on it.
 --
--- STRUCTURAL SCC: pushBurst! stepFrame! subscribeAll! subscribeE! subscribeE!-input subscribeInner! thruConsume! thruWalk!
+-- AND ONLY ONE CYCLE SURVIVES THE THREE LEAVING, which is sharper than
+-- the block's size suggests: the flattener's outer subscribe re-enters
+-- the term subscribe at the operator's own argument, and that is the
+-- whole of the recursion here.  The other six members are in the block
+-- for DEFINITION ORDER rather than for mutuality -- the push cycle, the
+-- frame step and the burst walk are each entered once and reach nothing
+-- that reaches them, because what used to close their loop was the hop.
+--
+-- STRUCTURAL SCC: subscribeAll! subscribeE!
 
 -- THE FRAME A SUBSCRIBE CAN PUSH, WHICH IS EVERY FRAME BUT ONE, AND
 -- SAYING SO IN A TYPE IS WHAT TAKES THE DRAIN OUT OF THIS BLOCK.  A
