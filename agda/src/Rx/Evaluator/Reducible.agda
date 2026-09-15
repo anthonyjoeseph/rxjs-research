@@ -37,9 +37,9 @@ open import Data.List using (List; []; _∷_; _++_; map)
 open import Data.List.Relation.Unary.All using (All; []; _∷_)
 open import Data.List.Relation.Unary.All.Properties using (++⁺)
 open import Data.Maybe using (nothing)
-open import Data.Nat using (zero; suc; _<_)
+open import Data.Nat using (zero; suc; _<_; s≤s; _+_)
 open import Data.Nat.Induction using (<-wellFounded)
-open import Data.Nat.Properties using (_<?_; ≮⇒≥; ≤-refl)
+open import Data.Nat.Properties using (_<?_; ≮⇒≥; ≤-refl; ≤-trans; m≤n+m)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
@@ -54,7 +54,7 @@ open import Rx.Prim using (Id; Tick; InstEmit; InstEvent; init; value; close; ha
 open import Rx.Slots using (scripted; shared)
 open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; Ctx; Closed; Val; Tm; Fn; evalTm; evalWith; applyFn; input; ofᵉ; emptyᵉ;
   mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; isData; unfoldμ)
-open import Rx.Exp.Guarded using (gsizeᵉ; gsize-unfoldμ)
+open import Rx.Exp.Guarded using (gsizeᵉ; gsizeᵗ; gsize-unfoldμ)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; _↠_; map-f; take-f; scan-f; take-st; scan-st;
   thru-outer; mergeAllᵒ; switchᵒ; exhaustᵒ; mergeAll-st; switch-st; exhaust-st;
   installNode; oneShotBurst; memberSource; splitEvents; retagEvents; NodeId; AllOp; from-inner)
@@ -170,17 +170,16 @@ postulate
   --   subscription result, so any leaf carrying it is this statement
   --   again.  It has to stop being a leaf: the fundamental theorem at
   --   terms is a MUTUAL PARTNER of the expression recursion, which is
-  --   what pulling it out as a postulate disguised.  And the partner
-  --   cannot be funded by a SIZE: the guarded size does not look
-  --   inside a term at all -- a transformer's clause is one `suc` over
-  --   its SOURCE and the frame's function contributes nothing -- so an
-  --   expression embedded in that function is unbounded against the
-  --   expression containing it, which is the shape that refuted the
-  --   rank this candidate replaced.  What funds it is the TYPE: a
-  --   function feeding a flattener produces at the element type, and
-  --   the candidate at the enclosing observable already mentions the
-  --   candidate there.  So the partner is stated at the type the
-  --   recursion is already spending, not at a measure.
+  --   what pulling it out as a postulate disguised.  What funds the
+  --   partner is the guarded size, once that size COUNTS TERMS -- and
+  --   the reason it may is that the partner recurses on RAW syntax
+  --   under a carried environment.  The measure is then never asked
+  --   about a substitution: an environment entry at observable type is
+  --   a whole expression, so a partner stated over the substituted
+  --   expression is unbounded against the term that binds it, and no
+  --   measure on the syntax reaches that form.  The gate argument
+  --   survives the counting untouched, since a term's only route to an
+  --   inserted copy is an expression it embeds.
   --
   -- PROBED: `Probed.Reducible-Arms` at an observable-typed term, where
   --   the claim IS an expression's own reducibility and the body
@@ -556,7 +555,7 @@ reducibleAcc (ofᵉ ts) a κ id now sched st =
 reducibleAcc emptyᵉ a κ id now sched st = _ , subs-empty refl , satOneShot id sched []
 reducibleAcc (mapᵉ f b) (acc rs) κ id now sched st =
   let ((burst , sched₁ , st₁) , d , sat) =
-        reducibleAcc b (rs ≤-refl) (map-f f ↠ κ) id now sched st
+        reducibleAcc b (rs (s≤s (m≤n+m _ _))) (map-f f ↠ κ) id now sched st
       (r , p , sat′) = red-push id now (map-f f) κ sat sched₁ st₁
   in r , subs-map d p , sat′
 reducibleAcc (takeᵉ c b) (acc rs) κ id now sched st with evalTm c in ceq
@@ -564,7 +563,7 @@ reducibleAcc (takeᵉ c b) (acc rs) κ id now sched st with evalTm c in ceq
 ... | suc k =
   let nid = Sched.nextNode sched
       ((burst , sched₂ , st₁) , d , sat) =
-        reducibleAcc b (rs ≤-refl) (take-f nid ↠ κ) id now
+        reducibleAcc b (rs (s≤s (m≤n+m _ _))) (take-f nid ↠ κ) id now
           (record sched { nextNode = suc nid })
           (installNode nid (take-st (suc k)) st)
       (r , p , sat′) = red-push id now (take-f nid) κ sat sched₂ st₁
@@ -572,7 +571,9 @@ reducibleAcc (takeᵉ c b) (acc rs) κ id now sched st with evalTm c in ceq
 reducibleAcc (scanᵉ f z b) (acc rs) κ id now sched st =
   let nid = Sched.nextNode sched
       ((burst , sched₂ , st₁) , d , sat) =
-        reducibleAcc b (rs ≤-refl) (scan-f f nid ↠ κ) id now
+        reducibleAcc b (rs (s≤s (≤-trans (m≤n+m (gsizeᵉ b) (gsizeᵗ z))
+                                 (m≤n+m (gsizeᵗ z + gsizeᵉ b) (gsizeᵗ f)))))
+          (scan-f f nid ↠ κ) id now
           (record sched { nextNode = suc nid })
           (installNode nid (scan-st (evalTm z)) st)
       (r , p , sat′) = red-push id now (scan-f f nid) κ sat sched₂ st₁

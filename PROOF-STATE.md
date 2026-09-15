@@ -239,10 +239,10 @@ deferred beside it.
   redundant given it and the five statements beside it are gaps smaller than
   a gap. Reflection is total, so a CLOSED term buys no smallness. Restate it
   as a MUTUAL PARTNER of the expression recursion, not as a smaller leaf: at
-  the empty environment the embedding arm is the top-line result itself. And
-  fund it by the TYPE, never a size — the guarded size does not look inside a
-  term, so an expression under a frame's function is unbounded against the one
-  containing it, which is what refuted the rank this candidate replaced.
+  the empty environment the embedding arm is the top-line result itself. The
+  measure now COUNTS TERMS, which funds that partner; the price is that the
+  expression face grows a telescope and a reducible substitution, since the
+  partner may only be measured on RAW syntax.
 
 - **THEN RUN A SELF-REFERENTIAL μ, IN THE CORPUS RATHER THAN IN A PROBE.** The
   peel is now paid for by a size the unfolding does not move, and what funds that
