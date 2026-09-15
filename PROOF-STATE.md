@@ -237,12 +237,11 @@ deferred beside it.
   `red-env` proves the candidate at every value of every type — machine
   witness in `Refuted.Red-Env-Too-Strong` — so the body's induction is
   redundant given it and the five statements beside it are gaps smaller than
-  a gap. The leak is one constructor: the term language embeds an arbitrary
-  expression at observable type, and reflection is total, so a CLOSED term
-  buys no smallness and its environment hypothesis is trivial. Restate it
-  recursing on the TERM, with that constructor appealing to the expression
-  induction under the guarded size. Nothing under it is worth grinding first,
-  and no carrier decision for the store means anything until it lands.
+  a gap. Reflection is total, so a CLOSED term buys no smallness. Restate it
+  as a MUTUAL PARTNER of the expression recursion under a shared measure, not
+  as a smaller leaf: at the empty environment the embedding arm is the
+  top-line result itself, so any leaf carrying it is this statement again.
+  Nothing under it is worth grinding first.
 
 - **THEN RUN A SELF-REFERENTIAL μ, IN THE CORPUS RATHER THAN IN A PROBE.** The
   peel is now paid for by a size the unfolding does not move, and what funds that

@@ -162,9 +162,16 @@ postulate
   --   hands back the candidate at every value of every type and the
   --   body's whole induction is redundant given it.  The leak is one
   --   constructor: the term language embeds an arbitrary expression at
-  --   observable type, so "closed term" buys no smallness.  The repair
-  --   is a restatement recursing on the TERM, where that constructor
-  --   appeals to the expression induction under the guarded size.
+  --   observable type, so "closed term" buys no smallness.  Twelve of
+  --   the thirteen term formers are structural and close under the
+  --   candidate's own data arms; the embedding is the whole content.
+  --   So the repair is NOT to split a smaller leaf off the embedding
+  --   arm -- at the empty environment that arm IS the top-line
+  --   subscription result, so any leaf carrying it is this statement
+  --   again.  It has to stop being a leaf: the fundamental theorem at
+  --   terms is a MUTUAL PARTNER of the expression recursion under a
+  --   shared measure, which is what pulling it out as a postulate
+  --   disguised.
   --
   -- PROBED: `Probed.Reducible-Arms` at an observable-typed term, where
   --   the claim IS an expression's own reducibility and the body
