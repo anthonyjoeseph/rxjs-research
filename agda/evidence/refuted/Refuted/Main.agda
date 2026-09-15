@@ -77,13 +77,13 @@ open import Refuted.Scan-Reachable using (static-bounds-run-false;
 
 -- and the leaf that was going to pay for the climb, refuted in the one
 -- quantity none of the witnesses above reads: the burst's LENGTH.  Its
--- two figures are claimed because the finding is that neither moves —
--- the template's reading and its rate are constants, so the demand is
--- a count set against a rank the premises never relate it to, and an
--- ordinary five-element burst clears it.  The escape of a wider bound
--- is not available: the two quantities are independent, so any burst
--- longer than the rank does the same
-open import Refuted.Scan-Length using (scan-fits-false; tmpl-is; rate-is)
+-- the rate is claimed because the finding is that it does not move —
+-- one wrap per delivery, whatever the burst — so the demand is a count
+-- set against a rank the premises never relate it to, and an ordinary
+-- five-element burst clears it.  The escape of a wider bound is not
+-- available: the two quantities are independent, so any burst longer
+-- than the rank does the same
+open import Refuted.Scan-Length using (scan-fits-false; rate-is)
 
 -- and the template drop asked WITHOUT the data hypothesis, which is
 -- what makes that hypothesis the statement rather than a convenience:
@@ -104,11 +104,3 @@ open import Refuted.Template-Passes using (template-strict-false;
 open import Refuted.Case-Binds using (case-join-false;
   scrut-is; left-is; right-is; joined-is; emission-is)
 
---- AND THE SAME ARM FROM THE OTHER SIDE, WHICH IS WHY THE REPAIR FOR
---- THE ONE ABOVE DOES NOT CLOSE IT.  Substitution reaches a `caseᵗ`'s
---- scrutinee and its branch alike, so an environment entry occurring in
---- both is written into both and an adding clause charges it twice —
---- and a price stated as the template's reading PLUS a bound on the
---- environment has no second addend to pay for the second copy
-open import Refuted.Case-Twice using (case-twice-false;
-  entry-is; template-is) renaming (emission-is to twice-emission-is)

@@ -1,418 +1,234 @@
 ------------------------------------------------------------------
--- THE SUBSTITUTION LEMMA: WHAT A TEMPLATE EMITS IS READ OFF THE
--- TEMPLATE, NOT OFF WHAT IT WAS HANDED.
+-- WHAT A TEMPLATE EMITS IS READ OFF THE TEMPLATE AT THE BOUND ITS
+-- ENVIRONMENT WAS HANDED IN AT.
 --
--- `applyFn fn v` is `evalWith fn (v ∷ᵃ []ᵃ)`, and at an observable
--- result type the only head that can produce one is `strmᵗ e`, whose
--- value is `closeUnderFn e (v ∷ᵃ []ᵃ)` — a SUBSTITUTION INSTANCE of a
--- subterm of `fn`.  Substituting DATA into an expression moves no
--- `strmᵗ`, so the instance reads exactly what the subterm reads:
+-- `evalWith tm env` produces a value, and the reading of that value is
+-- bounded by the reading of `tm` — provided the reading of `tm` is
+-- taken at a bound the environment satisfies.  That proviso is the
+-- whole of what this module adds over a closed reading, and it is what
+-- makes the statement unconditional in the environment: there is no
+-- premise that the binders carry data, because a binder carrying an
+-- observable is priced rather than excluded.
 --
---   depᵉ η (applyFn fn v) ≡ depᵉ η e < suc (depᵉ η e) ≡ depᵗ η fn
+-- THE DROP IS STRICT AT AN OBSERVABLE AND WEAK EVERYWHERE ELSE, AND
+-- MEASURING THE RESULT THROUGH `reify` MAKES THOSE ONE INEQUALITY.
+-- The reading wanted at the door is strict, and a statement about the
+-- VALUE cannot say so without a `pred` and a positivity premise every
+-- caller then has to spend.  `reify` writes a `strmᵗ` at an observable
+-- and nothing anywhere else, so the wrap sits on the left exactly
+-- where the head that produced it sits on the right: the two cases
+-- become one statement, the strictness falls out by reduction at the
+-- only type that wants it, and no clause carries a premise at all.
+-- It also composes, which is the other half of why it is the right
+-- form: `envDepth` is denominated through `reify` too, so the
+-- rebinding arm's grown environment is this statement joined with the
+-- caller's premise.
 --
--- The inequality is STRICT and it mentions no machine state, no store,
--- no bound the frame was entered under — only the program.
---
--- AND THAT IS WHY IT ANSWERS SIX REFUTATIONS AT ONCE RATHER THAN A
--- SIXTH TIME.  Every one of them — the term's reading, the widest
--- state-readable join, the arrival's seed, the filtered spend, the map
--- template, the pinned template — refutes a PRICE stated in terms of
--- what the frame was HANDED.  A template that drops its argument and a
--- template that wraps it are both refutations of that form of statement
--- and neither is a refutation of this one, because a price denominated
--- in the TERM cannot be moved by any value handed to it.  Under
--- `CLAUDE.md`'s convergence test six FALSITY results over one region are
--- the spiral signal, and the prescribed response is to change the
--- mechanism: this is that change, and it is a change of CURRENCY.
---
--- THE ONE PLACE THE PREMISE GENUINELY FAILS IS A BINDER AT OBSERVABLE
--- TYPE, and it is the axis the carried family already found.  A `scanᵉ`
--- whose accumulator is an observable feeds its own output back into the
--- environment, so the environment stops being data and the substitution
--- grows by one wrap per refold; a `caseᵗ` scrutinising a sum containing
--- an observable re-binds one the same way.  Both need the OPEN form —
--- the ADDITIVE reading, denominated in an environment rather than in
--- closed syntax — and this module does not carry it: every lemma here
--- is gated on `AllData`, so the case where the environment stops being
--- data has no statement in `src` at all.  Where it is owed is
--- `map-open` and `scan-handed`, whose headers hold the route back to
--- it.  The growth it prices is per-iteration and bounded by the script
--- length — dynamic, and the only thing in this reading that is.
+-- THE TWO ARMS THAT MAKE THEIR OWN ENVIRONMENT PAY FOR IT IN THE BOUND
+-- AND NOT IN A PREMISE.  A `caseᵗ` binds what its scrutinee evaluated
+-- to, so its branches run under an environment the caller never held;
+-- a `strmᵗ` under a non-empty environment substitutes rather than
+-- evaluates, so its body is read after the environment has been pushed
+-- through it.  Neither is an exception here.  The first is the
+-- reading's own composing clause, which hands the branches the larger
+-- bound; the second is the substitution lemma below, whose whole
+-- content is that pushing an environment bounded by `m` into a term
+-- read at `m` cannot make it deeper.
 --
 -- TWIN: `Rx.Obs-Depth.dep-elimG` — the same commutation for the
 --   guarded substitution, clause for clause, equality and not a bound.
 --   That one substitutes a closed EXPRESSION for a μ-variable; this one
---   substitutes a value environment for the Θ-variables, and the reason
---   both hold is the same: neither substitution introduces a `strmᵗ`.
+--   substitutes a value environment for the Θ-variables, and it is an
+--   INEQUALITY because the environment's own reading is what it spends.
 module Rx.Obs-Depth.Substitution where
 
-open import Data.Bool using (true; false; if_then_else_)
+open import Data.Bool using (true; false)
 open import Data.List using (List; []; _∷_; _++_)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁻)
 open import Data.List.Relation.Unary.All using (All) renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
 open import Data.Fin using (Fin)
-open import Data.Nat using (ℕ; zero; suc; pred; _≤_; _<_; _+_; _⊔_; z≤n; s≤s)
-open import Data.Nat.Properties using (≤-refl; ≤-trans; ⊔-mono-≤; m≤m⊔n; m≤n⊔m;
-  ⊔-identityʳ; n≤1+n)
+open import Data.Nat using (ℕ; suc; _+_; _≤_; _⊔_; z≤n; s≤s)
+open import Data.Nat.Properties using (≤-refl; ≤-reflexive; ≤-trans; ⊔-mono-≤; m≤m⊔n; m≤n⊔m; m≤n+m; n≤1+n; +-suc; +-distribˡ-⊔)
 open import Data.Product using (_,_)
 open import Data.Sum using (inj₁; inj₂)
-open import Relation.Binary.PropositionalEquality
-  using (_≡_; refl; sym; trans; cong; cong₂)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong)
 
-open import Rx.Exp using (Ty; Ctx; Exp; Tm; Val; isData; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; input; ofᵉ; emptyᵉ; mapᵉ;
-  takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; varᵗ; unit̂; bool̂; nat̂;
-  pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ; add; sub; mul; eqᵖ; ltᵖ; notᵖ;
-  reify; wkTm; lookupEnv; subΘExp; subΘTm; subΘTms; closeUnderFn; evalWith)
-open import Rx.Obs-Depth using (depᵉ; depᵗ; depᵗˢ; depᵛ)
+open import Rx.Exp using (Ty; Ctx; Exp; Tm; Val; _×ᵗ_; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ;
+  exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ;
+  caseᵗ; ifᵗ; primᵗ; strmᵗ; add; sub; mul; eqᵖ; ltᵖ; notᵖ; reify; wkTm; lookupEnv; subΘExp;
+  subΘTm; subΘTms; evalWith)
+open import Rx.Obs-Depth using (depᵉ; depᵗ; depᵗˢ; bindᵃᵗ; bindᵃᵉ; bindˢᵗ)
 
 ------------------------------------------------------------------
--- 1.  DATA ENVIRONMENTS, WHICH ARE WHAT MAKE THE READING STATIC.
+-- 1.  THE READING IS MONOTONE IN ITS BOUND.
 ------------------------------------------------------------------
 
--- `isData (obs _)` is `false` and every other type is built from
--- types that are data, so this says exactly: no binder in Θ can be
--- instantiated with something the run could subscribe.
-data AllData : List Ty → Set where
-  []ᵈ  : AllData []
-  _∷ᵈ_ : ∀ {t Θ} → isData t ≡ true → AllData Θ → AllData (t ∷ Θ)
-
--- the four projections the two clauses below need out of `isData`'s
--- `if`-shaped definition.  Mechanical: `isData (s ×ᵗ t)` is
--- `if isData s then isData t else false`, so a `true` there decides
--- both sides, and the `with` that reads it is the whole proof.  Both
--- pairs read the SAME `if`, since the sum's clause and the product's
--- clause are the same expression at different constructors, so one
--- pair of helpers over two bare booleans closes all four.
+-- Every clause is either constant in the bound or hands it down, and
+-- the one clause that CHANGES it — the rebinding arm — builds the new
+-- bound monotonically out of the old.  So the whole induction is
+-- `⊔-mono-≤` over the clause shapes, and it is needed because a term
+-- read at nought and the same term read at a caller's bound are two
+-- different numbers wherever the term is closed.
 private
-  ifˡ : ∀ a b → (if a then b else false) ≡ true → a ≡ true
-  ifˡ true  b p = refl
-  ifˡ false b ()
+  -- a join under a common shift, which is how every non-leaf clause of
+  -- the shift below lands
+  ⊔-shift : ∀ d {p x y} → p ≤ (d + x) ⊔ (d + y) → p ≤ d + (x ⊔ y)
+  ⊔-shift d {x = x} {y = y} le =
+    ≤-trans le (≤-reflexive (sym (+-distribˡ-⊔ d x y)))
 
-  ifʳ : ∀ a b → (if a then b else false) ≡ true → b ≡ true
-  ifʳ true  b p = p
-  ifʳ false b ()
-
-×-dataˡ : ∀ s t → isData (s ×ᵗ t) ≡ true → isData s ≡ true
-×-dataˡ s t = ifˡ (isData s) (isData t)
-
-×-dataʳ : ∀ s t → isData (s ×ᵗ t) ≡ true → isData t ≡ true
-×-dataʳ s t = ifʳ (isData s) (isData t)
-
-+-dataˡ : ∀ s t → isData (s +ᵗ t) ≡ true → isData s ≡ true
-+-dataˡ s t = ifˡ (isData s) (isData t)
-
-+-dataʳ : ∀ s t → isData (s +ᵗ t) ≡ true → isData t ≡ true
-+-dataʳ s t = ifʳ (isData s) (isData t)
-
--- PROBED: `Probed.Data-Shelf` — a membership at the head of the
---   telescope and past it.  The rows buy NON-VACUITY rather than an
---   inequality: the conclusion is a `Bool` the type alone decides, so
---   what is covered is that the premise is inhabited at a nested type
---   at all.
-postulate
-  data-of : ∀ {Θ t} → AllData Θ → t ∈ Θ → isData t ≡ true
-
--- a data value reads zero, both as a value and as the term `reify`
--- writes for it.  These are the two clauses the substitution's `varᵗ`
--- arm and the evaluation's `varᵗ` arm respectively spend, and they are
--- the ONLY place the data hypothesis is used — everything else is
--- structural.
-dep-dataᵛ : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) (t : Ty) → isData t ≡ true →
-  (v : Val Γ t) → depᵛ η t v ≡ 0
-dep-dataᵛ η unitᵗ    _  _        = refl
-dep-dataᵛ η boolᵗ    _  _        = refl
-dep-dataᵛ η natᵗ     _  _        = refl
-dep-dataᵛ η (s ×ᵗ t) dt (a , b)  =
-  cong₂ _⊔_ (dep-dataᵛ η s (×-dataˡ s t dt) a)
-            (dep-dataᵛ η t (×-dataʳ s t dt) b)
-dep-dataᵛ η (s +ᵗ t) dt (inj₁ a) = dep-dataᵛ η s (+-dataˡ s t dt) a
-dep-dataᵛ η (s +ᵗ t) dt (inj₂ b) = dep-dataᵛ η t (+-dataʳ s t dt) b
-dep-dataᵛ η (obs t)  ()  _
-
-dep-reify-data : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) (t : Ty) → isData t ≡ true →
-  (v : Val Γ t) → depᵗ η (reify v) ≡ 0
-dep-reify-data η unitᵗ    _  _        = refl
-dep-reify-data η boolᵗ    _  _        = refl
-dep-reify-data η natᵗ     _  _        = refl
-dep-reify-data η (s ×ᵗ t) dt (a , b)  =
-  cong₂ _⊔_ (dep-reify-data η s (×-dataˡ s t dt) a)
-            (dep-reify-data η t (×-dataʳ s t dt) b)
-dep-reify-data η (s +ᵗ t) dt (inj₁ a) = dep-reify-data η s (+-dataˡ s t dt) a
-dep-reify-data η (s +ᵗ t) dt (inj₂ b) = dep-reify-data η t (+-dataʳ s t dt) b
-dep-reify-data η (obs t)  ()  _
-
-lookup-data : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) {Θ t} → AllData Θ →
-  (σ : All (Val Γ) Θ) (x : t ∈ Θ) → depᵗ η (reify (lookupEnv σ x)) ≡ 0
-lookup-data η (d ∷ᵈ _)  (v ∷ᵃ _)  (here refl) = dep-reify-data η _ d v
-lookup-data η (_ ∷ᵈ ds) (_ ∷ᵃ vs) (there p)   = lookup-data η ds vs p
-
--- weakening writes no head, so it moves no reading.  Stated for the
--- exact instance the substitution's `varᵗ` arm produces rather than for
--- a general renaming, because that arm is the only consumer.
---
--- PROBED: `Probed.Data-Shelf` — a leaf, and a term whose head is
---   `strmᵗ`, which is the only head the reading counts and so the only
---   one a renaming could move.  Not reached: a term with a binder
---   under the weakened context.
-postulate
-  dep-wkTm : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) {Δᵍ Δ Θ t} (f : Tm Γ [] [] [] t) →
-    depᵗ η (wkTm {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} f) ≡ depᵗ η f
-
-------------------------------------------------------------------
--- 2.  THE LEMMA, CLAUSE FOR CLAUSE AGAINST ITS TWIN.
-------------------------------------------------------------------
-
--- THE ONE ARM WHERE THE ENVIRONMENT STOPS BEING DATA, and it is the
--- same arm the fold has.  A `caseᵗ` on a sum containing an observable
--- binds one into the branch environment, so the branch is evaluated
--- under an environment this lemma's hypothesis does not cover.  The
--- bound is not lost — the bound value came OUT of the scrutinee, whose
--- own reading is a program quantity — but recovering it needs the open
--- form below rather than this one.
---
--- AND THE HYPOTHESIS DOES NOT ISOLATE THAT ARM, WHICH IS WHY THE
--- READING AND NOT THIS PREMISE IS WHAT MOVED.  The data gate is over
--- the ENVIRONMENT, and the empty environment is data, so a scrutinee
--- the TEMPLATE writes walks straight through it — the observable never
--- has to be handed in.  What pays for the arm is the reading's own
--- `caseᵗ` clause, which adds the scrutinee where it used to join it;
--- this premise then buys what it always bought, that nothing further
--- arrives from outside.
---
--- `ifᵗ` is separate only because Agda cannot see through the `if` that
--- selects the branch; nothing about it is open.
---
--- REFUTED: `Refuted.Case-Binds` — the join this arm was stated over,
---   which made this statement false by TWICE the open form's margin,
---   since a strict drop is demanded where the emission climbs.
---
--- PROBED: `Probed.Eval-Binders` — a `caseᵗ` at a data payload with
---   both arms writing, and at an OBSERVABLE payload handed straight
---   back by the branch, which is the region that could make either
---   statement false; the second row is TIGHT, the value's reading
---   landing on the predecessor exactly.  An `ifᵗ` at a selected arm
---   that sets the join and at one that does not.  Not reached: an
---   arm whose reading differs from its sibling's with the observable
---   one selected, where the join gives slack by construction.
-postulate
-  eval-case : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) {Θ s t u} → AllData Θ →
-    (sc : Tm Γ [] [] Θ (s +ᵗ t)) (l : Tm Γ [] [] (s ∷ Θ) u)
-    (r : Tm Γ [] [] (t ∷ Θ) u) (env : All (Val Γ) Θ) →
-    depᵛ η u (evalWith (caseᵗ sc l r) env) ≤ pred (depᵗ η (caseᵗ sc l r))
-
-  eval-if : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) {Θ t} → AllData Θ →
-    (c : Tm Γ [] [] Θ boolᵗ) (a b : Tm Γ [] [] Θ t) (env : All (Val Γ) Θ) →
-    depᵛ η t (evalWith (ifᵗ c a b) env) ≤ pred (depᵗ η (ifᵗ c a b))
-
--- Every clause but one is `cong` over the sub-derivations, exactly as
--- `dep-elimG`'s are.  The one that carries content is `varᵗ`, and
--- it splits the way `subΘTm` splits: a LOCAL binder survives as a
--- `varᵗ` and reads zero on both sides, while a SUBSTITUTED binder
--- becomes a reified data value and reads zero because it is data.  The
--- `strmᵗ` clause is where the equality would fail for a non-data
--- environment, since that is the only head under which a substituted
--- observable would be counted.
 mutual
-  dep-subΘ : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) {Δᵍ Δ Θsub t} (Θloc : List Ty)
-    (dd : AllData Θsub) (σ : All (Val Γ) Θsub)
-    (e : Exp Γ Δᵍ Δ (Θloc ++ Θsub) t) →
-    depᵉ η (subΘExp Θloc σ e) ≡ depᵉ η e
-  dep-subΘ η Θloc dd σ (input i)       = refl
-  dep-subΘ η Θloc dd σ (ofᵉ ts)        = dep-subΘᵗˢ η Θloc dd σ ts
-  dep-subΘ η Θloc dd σ emptyᵉ          = refl
-  dep-subΘ η Θloc dd σ (mapᵉ {s = s} f e) =
-    cong₂ _⊔_ (dep-subΘᵗ η (s ∷ Θloc) dd σ f) (dep-subΘ η Θloc dd σ e)
-  dep-subΘ η Θloc dd σ (takeᵉ c e)     =
-    cong₂ _⊔_ (dep-subΘᵗ η Θloc dd σ c) (dep-subΘ η Θloc dd σ e)
-  dep-subΘ η Θloc dd σ (scanᵉ {s = s} {t = t} f z e) =
-    cong₂ _⊔_ (cong₂ _⊔_ (dep-subΘᵗ η ((t ×ᵗ s) ∷ Θloc) dd σ f)
-                         (dep-subΘᵗ η Θloc dd σ z))
-              (dep-subΘ η Θloc dd σ e)
-  dep-subΘ η Θloc dd σ (mergeAllᵉ _ e) = dep-subΘ η Θloc dd σ e
-  dep-subΘ η Θloc dd σ (switchAllᵉ e)  = dep-subΘ η Θloc dd σ e
-  dep-subΘ η Θloc dd σ (exhaustAllᵉ e) = dep-subΘ η Θloc dd σ e
-  dep-subΘ η Θloc dd σ (μᵉ e)          = dep-subΘ η Θloc dd σ e
-  dep-subΘ η Θloc dd σ (varᵉ x)        = refl
-  dep-subΘ η Θloc dd σ (deferᵉ e)      = refl
+  dep-monoᵉ : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) {Δᵍ Δ Θ t} {k m : ℕ} → k ≤ m →
+    (e : Exp Γ Δᵍ Δ Θ t) → depᵉ η k e ≤ depᵉ η m e
+  dep-monoᵉ η km (input i)       = ≤-refl
+  dep-monoᵉ η km (ofᵉ ts)        = dep-monoᵗˢ η km ts
+  dep-monoᵉ η km emptyᵉ          = ≤-refl
+  dep-monoᵉ η km (mapᵉ f e)      =
+    ⊔-mono-≤ (dep-monoᵗ η (⊔-mono-≤ (dep-monoᵉ η km e) km) f) (dep-monoᵉ η km e)
+  dep-monoᵉ η km (takeᵉ c e)     =
+    ⊔-mono-≤ (dep-monoᵗ η (⊔-mono-≤ (dep-monoᵉ η km e) km) c) (dep-monoᵉ η km e)
+  dep-monoᵉ η km (scanᵉ f z e)   =
+    ⊔-mono-≤ (⊔-mono-≤ (dep-monoᵗ η (⊔-mono-≤ (⊔-mono-≤ (dep-monoᵉ η km e) km)
+                                              (dep-monoᵗ η km z)) f)
+                       (dep-monoᵗ η km z))
+             (dep-monoᵉ η km e)
+  dep-monoᵉ η km (mergeAllᵉ _ e) = dep-monoᵉ η km e
+  dep-monoᵉ η km (switchAllᵉ e)  = dep-monoᵉ η km e
+  dep-monoᵉ η km (exhaustAllᵉ e) = dep-monoᵉ η km e
+  dep-monoᵉ η km (μᵉ e)          = dep-monoᵉ η km e
+  dep-monoᵉ η km (varᵉ x)        = ≤-refl
+  dep-monoᵉ η km (deferᵉ e)      = ≤-refl
 
-  dep-subΘᵗ : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) {Δᵍ Δ Θsub t} (Θloc : List Ty)
-    (dd : AllData Θsub) (σ : All (Val Γ) Θsub)
-    (f : Tm Γ Δᵍ Δ (Θloc ++ Θsub) t) →
-    depᵗ η (subΘTm Θloc σ f) ≡ depᵗ η f
-  dep-subΘᵗ η Θloc dd σ (varᵗ x) with ∈-++⁻ Θloc x
-  ... | inj₁ y = refl
-  ... | inj₂ z = trans (dep-wkTm η (reify (lookupEnv σ z)))
-                       (lookup-data η dd σ z)
-  dep-subΘᵗ η Θloc dd σ unit̂          = refl
-  dep-subΘᵗ η Θloc dd σ (bool̂ b)      = refl
-  dep-subΘᵗ η Θloc dd σ (nat̂ k)       = refl
-  dep-subΘᵗ η Θloc dd σ (pairᵗ a b)   =
-    cong₂ _⊔_ (dep-subΘᵗ η Θloc dd σ a) (dep-subΘᵗ η Θloc dd σ b)
-  dep-subΘᵗ η Θloc dd σ (fstᵗ p)      = dep-subΘᵗ η Θloc dd σ p
-  dep-subΘᵗ η Θloc dd σ (sndᵗ p)      = dep-subΘᵗ η Θloc dd σ p
-  dep-subΘᵗ η Θloc dd σ (inlᵗ a)      = dep-subΘᵗ η Θloc dd σ a
-  dep-subΘᵗ η Θloc dd σ (inrᵗ a)      = dep-subΘᵗ η Θloc dd σ a
-  dep-subΘᵗ η Θloc dd σ (caseᵗ {s = s} {t = t} sc l r) =
-    cong suc (cong₂ _+_ (dep-subΘᵗ η Θloc dd σ sc)
-                        (cong₂ _⊔_ (dep-subΘᵗ η (s ∷ Θloc) dd σ l)
-                                   (dep-subΘᵗ η (t ∷ Θloc) dd σ r)))
-  dep-subΘᵗ η Θloc dd σ (ifᵗ c a b)   =
-    cong₂ _⊔_ (cong₂ _⊔_ (dep-subΘᵗ η Θloc dd σ c)
-                         (dep-subΘᵗ η Θloc dd σ a))
-              (dep-subΘᵗ η Θloc dd σ b)
-  dep-subΘᵗ η Θloc dd σ (primᵗ op a)  = dep-subΘᵗ η Θloc dd σ a
-  dep-subΘᵗ η Θloc dd σ (strmᵗ e)     = cong suc (dep-subΘ η Θloc dd σ e)
+  dep-monoᵗ : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) {Δᵍ Δ Θ t} {k m : ℕ} → k ≤ m →
+    (f : Tm Γ Δᵍ Δ Θ t) → depᵗ η k f ≤ depᵗ η m f
+  dep-monoᵗ η km (varᵗ x)      = km
+  dep-monoᵗ η km unit̂          = ≤-refl
+  dep-monoᵗ η km (bool̂ b)      = ≤-refl
+  dep-monoᵗ η km (nat̂ j)       = ≤-refl
+  dep-monoᵗ η km (pairᵗ a b)   = ⊔-mono-≤ (dep-monoᵗ η km a) (dep-monoᵗ η km b)
+  dep-monoᵗ η km (fstᵗ p)      = dep-monoᵗ η km p
+  dep-monoᵗ η km (sndᵗ p)      = dep-monoᵗ η km p
+  dep-monoᵗ η km (inlᵗ a)      = dep-monoᵗ η km a
+  dep-monoᵗ η km (inrᵗ a)      = dep-monoᵗ η km a
+  dep-monoᵗ η km (caseᵗ sc l r) =
+    ⊔-mono-≤ (dep-monoᵗ η b l) (dep-monoᵗ η b r)
+    where b = ⊔-mono-≤ (s≤s (dep-monoᵗ η km sc)) km
+  dep-monoᵗ η km (ifᵗ c a b)   =
+    ⊔-mono-≤ (⊔-mono-≤ (dep-monoᵗ η km c) (dep-monoᵗ η km a)) (dep-monoᵗ η km b)
+  dep-monoᵗ η km (primᵗ op a)  = dep-monoᵗ η km a
+  dep-monoᵗ η km (strmᵗ e)     = s≤s (dep-monoᵉ η km e)
 
-  dep-subΘᵗˢ : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) {Δᵍ Δ Θsub t} (Θloc : List Ty)
-    (dd : AllData Θsub) (σ : All (Val Γ) Θsub)
-    (ts : List (Tm Γ Δᵍ Δ (Θloc ++ Θsub) t)) →
-    depᵗˢ η (subΘTms Θloc σ ts) ≡ depᵗˢ η ts
-  dep-subΘᵗˢ η Θloc dd σ []       = refl
-  dep-subΘᵗˢ η Θloc dd σ (y ∷ ys) =
-    cong₂ _⊔_ (dep-subΘᵗ η Θloc dd σ y) (dep-subΘᵗˢ η Θloc dd σ ys)
+  dep-monoᵗˢ : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) {Δᵍ Δ Θ t} {k m : ℕ} → k ≤ m →
+    (ts : List (Tm Γ Δᵍ Δ Θ t)) → depᵗˢ η k ts ≤ depᵗˢ η m ts
+  dep-monoᵗˢ η km []       = ≤-refl
+  dep-monoᵗˢ η km (y ∷ ys) = ⊔-mono-≤ (dep-monoᵗ η km y) (dep-monoᵗˢ η km ys)
 
-dep-closeUnderFn : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) {s Θ t} → AllData (s ∷ Θ) →
-  (e : Exp Γ [] [] (s ∷ Θ) t) (env : All (Val Γ) (s ∷ Θ)) →
-  depᵉ η (closeUnderFn e env) ≡ depᵉ η e
-dep-closeUnderFn η dd e env = dep-subΘ η [] dd env e
 
-------------------------------------------------------------------
--- 3.  EVALUATION, AND THE STRICT DROP THAT IS THE DOOR'S PREMISE.
-------------------------------------------------------------------
+-- AND IT IS LIPSCHITZ IN THE BOUND, WHICH IS WHAT LINEARISES A FOLD.
+-- Monotonicity says a larger bound reads no smaller; this says by how
+-- much, and the answer is "by at most the increase".  Every clause
+-- either ignores the bound, returns it, or joins — and a join commutes
+-- with the shift — while the rebinding arm's own bound is built out of
+-- the old one by a successor and a join, both of which shift the same
+-- way.  A fold re-enters its template with what it last wrote, so
+-- without this the climb over a burst is a bound nested once per
+-- delivery rather than a rate times a length.
+mutual
+  dep-shiftᵉ : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) {Δᵍ Δ Θ t} (d k : ℕ)
+    (e : Exp Γ Δᵍ Δ Θ t) → depᵉ η (d + k) e ≤ d + depᵉ η k e
+  dep-shiftᵉ η d k (input i)       = m≤n+m (η i) d
+  dep-shiftᵉ η d k (ofᵉ ts)        = dep-shiftᵗˢ η d k ts
+  dep-shiftᵉ η d k emptyᵉ          = z≤n
+  dep-shiftᵉ η d k (mapᵉ f e)      =
+    ⊔-shift d (⊔-mono-≤ (≤-trans (dep-monoᵗ η (bindᵉ-shift η d k e) f)
+                                 (dep-shiftᵗ η d (bindᵃᵉ η k e) f))
+                        (dep-shiftᵉ η d k e))
+  dep-shiftᵉ η d k (takeᵉ c e)     =
+    ⊔-shift d (⊔-mono-≤ (≤-trans (dep-monoᵗ η (bindᵉ-shift η d k e) c)
+                                 (dep-shiftᵗ η d (bindᵃᵉ η k e) c))
+                        (dep-shiftᵉ η d k e))
+  dep-shiftᵉ η d k (scanᵉ f z e)   =
+    ⊔-shift d (⊔-mono-≤ (⊔-shift d (⊔-mono-≤ (≤-trans (dep-monoᵗ η bnd f)
+                                                (dep-shiftᵗ η d (bindˢᵗ η k z e) f))
+                                             (dep-shiftᵗ η d k z)))
+                        (dep-shiftᵉ η d k e))
+    where
+    bnd : bindˢᵗ η (d + k) z e ≤ d + bindˢᵗ η k z e
+    bnd = ≤-trans (⊔-mono-≤ (bindᵉ-shift η d k e) (dep-shiftᵗ η d k z))
+                  (≤-reflexive (sym (+-distribˡ-⊔ d (bindᵃᵉ η k e) (depᵗ η k z))))
+  dep-shiftᵉ η d k (mergeAllᵉ _ e) = dep-shiftᵉ η d k e
+  dep-shiftᵉ η d k (switchAllᵉ e)  = dep-shiftᵉ η d k e
+  dep-shiftᵉ η d k (exhaustAllᵉ e) = dep-shiftᵉ η d k e
+  dep-shiftᵉ η d k (μᵉ e)          = dep-shiftᵉ η d k e
+  dep-shiftᵉ η d k (varᵉ x)        = z≤n
+  dep-shiftᵉ η d k (deferᵉ e)      = z≤n
 
--- THE PREDECESSOR IS WHAT MAKES THE STATEMENT UNCONDITIONAL, and that
--- is the one design decision in this block.  The reading wanted at the
--- door is STRICT, and a strict statement cannot be made at a term whose
--- own reading is nought — so the obvious form carries a positivity
--- premise, and then every clause has to case-split on which side of a
--- join is the positive one before it can hand the premise down.  Stated
--- against the predecessor there is no premise to hand down: it is
--- nought where the term is nought, it is the strict drop everywhere
--- else, and `pred` distributes over the join, so the whole induction is
--- the weak one with a `pred` in front of it.
---
--- The positivity is then owed exactly once, by whoever wants the
--- strictness, and at an observable result type it is a fact about the
--- SYNTAX with no environment in it.
-private
-  pred-⊔ : ∀ m n → pred (m ⊔ n) ≡ pred m ⊔ pred n
-  pred-⊔ zero    n       = refl
-  pred-⊔ (suc m) zero    = sym (⊔-identityʳ m)
-  pred-⊔ (suc m) (suc n) = refl
+  dep-shiftᵗ : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) {Δᵍ Δ Θ t} (d k : ℕ)
+    (f : Tm Γ Δᵍ Δ Θ t) → depᵗ η (d + k) f ≤ d + depᵗ η k f
+  dep-shiftᵗ η d k (varᵗ x)      = ≤-refl
+  dep-shiftᵗ η d k unit̂          = z≤n
+  dep-shiftᵗ η d k (bool̂ b)      = z≤n
+  dep-shiftᵗ η d k (nat̂ j)       = z≤n
+  dep-shiftᵗ η d k (pairᵗ a b)   =
+    ⊔-shift d (⊔-mono-≤ (dep-shiftᵗ η d k a) (dep-shiftᵗ η d k b))
+  dep-shiftᵗ η d k (fstᵗ p)      = dep-shiftᵗ η d k p
+  dep-shiftᵗ η d k (sndᵗ p)      = dep-shiftᵗ η d k p
+  dep-shiftᵗ η d k (inlᵗ a)      = dep-shiftᵗ η d k a
+  dep-shiftᵗ η d k (inrᵗ a)      = dep-shiftᵗ η d k a
+  dep-shiftᵗ η d k (caseᵗ sc l r) =
+    ⊔-shift d
+      (⊔-mono-≤ (≤-trans (dep-monoᵗ η bnd l) (dep-shiftᵗ η d b l))
+                (≤-trans (dep-monoᵗ η bnd r) (dep-shiftᵗ η d b r)))
+    where
+    b = bindᵃᵗ η k sc
+    bnd : bindᵃᵗ η (d + k) sc ≤ d + b
+    bnd = ≤-trans (⊔-mono-≤ (s≤s (dep-shiftᵗ η d k sc)) (≤-refl {d + k}))
+                  (≤-reflexive (trans (cong (_⊔ (d + k))
+                                        (sym (+-suc d (depᵗ η k sc))))
+                                      (sym (+-distribˡ-⊔ d (suc (depᵗ η k sc)) k))))
+  dep-shiftᵗ η d k (ifᵗ c a b)   =
+    ⊔-shift d (⊔-mono-≤ (⊔-shift d (⊔-mono-≤ (dep-shiftᵗ η d k c)
+                                             (dep-shiftᵗ η d k a)))
+                        (dep-shiftᵗ η d k b))
+  dep-shiftᵗ η d k (primᵗ op a)  = dep-shiftᵗ η d k a
+  dep-shiftᵗ η d k (strmᵗ e)     =
+    ≤-trans (s≤s (dep-shiftᵉ η d k e)) (≤-reflexive (sym (+-suc d (depᵉ η k e))))
 
--- the positivity's one spender, and it is exported because every
--- consumer of the drop below has to pay it: the weak form carries a
--- `pred`, and turning that into a strict comparison is the whole of
--- what a caller owes.
-≤pred⇒< : ∀ {a m} → 0 < m → a ≤ pred m → a < m
-≤pred⇒< {m = suc m} _ a≤ = s≤s a≤
+  -- the template's bound shifts the way its two halves do
+  bindᵉ-shift : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) {Δᵍ Δ Θ t} (d k : ℕ)
+    (e : Exp Γ Δᵍ Δ Θ t) → bindᵃᵉ η (d + k) e ≤ d + bindᵃᵉ η k e
+  bindᵉ-shift η d k e =
+    ≤-trans (⊔-mono-≤ (dep-shiftᵉ η d k e) (≤-refl {d + k}))
+            (≤-reflexive (sym (+-distribˡ-⊔ d (depᵉ η k e) k)))
 
--- A value evaluated out of a term reads no deeper than the term's own
--- predecessor — so at an OBSERVABLE result type, where the only head
--- that can produce one is the successor `strmᵗ`, it reads strictly
--- shallower.  The substitution under that successor is depth-preserving
--- by the lemma above, which is the whole content of the last clause.
-dep-eval-strict : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) {Θ t} → AllData Θ →
-  (tm : Tm Γ [] [] Θ t) (env : All (Val Γ) Θ) →
-  depᵛ η t (evalWith tm env) ≤ pred (depᵗ η tm)
-dep-eval-strict η dd (varᵗ x)      env
-  rewrite dep-dataᵛ η _ (data-of dd x) (lookupEnv env x) = z≤n
-dep-eval-strict η dd unit̂          env = z≤n
-dep-eval-strict η dd (bool̂ b)      env = z≤n
-dep-eval-strict η dd (nat̂ k)       env = z≤n
-dep-eval-strict η dd (pairᵗ a b)   env
-  rewrite pred-⊔ (depᵗ η a) (depᵗ η b) =
-  ⊔-mono-≤ (dep-eval-strict η dd a env) (dep-eval-strict η dd b env)
-dep-eval-strict η dd (fstᵗ p)      env =
-  ≤-trans (m≤m⊔n _ _) (dep-eval-strict η dd p env)
-    -- the pair's reading is the join of its components', so a
-    -- projection reads no more than the pair
-dep-eval-strict η dd (sndᵗ p)      env =
-  ≤-trans (m≤n⊔m _ _) (dep-eval-strict η dd p env)
-dep-eval-strict η dd (inlᵗ a)      env = dep-eval-strict η dd a env
-dep-eval-strict η dd (inrᵗ a)      env = dep-eval-strict η dd a env
-dep-eval-strict η dd (caseᵗ sc l r) env = eval-case η dd sc l r env
-dep-eval-strict η dd (ifᵗ c a b)   env = eval-if η dd c a b env
-dep-eval-strict η dd (primᵗ add  a)  env = z≤n
-dep-eval-strict η dd (primᵗ sub  a)  env = z≤n
-dep-eval-strict η dd (primᵗ mul  a)  env = z≤n
-dep-eval-strict η dd (primᵗ eqᵖ  a)  env = z≤n
-dep-eval-strict η dd (primᵗ ltᵖ  a)  env = z≤n
-dep-eval-strict η dd (primᵗ notᵖ a)  env = z≤n
-dep-eval-strict η dd (strmᵗ e)     []ᵃ = ≤-refl
-dep-eval-strict η dd (strmᵗ e)     (v ∷ᵃ vs)
-  rewrite dep-closeUnderFn η dd e (v ∷ᵃ vs) = ≤-refl
-
+  dep-shiftᵗˢ : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) {Δᵍ Δ Θ t} (d k : ℕ)
+    (ts : List (Tm Γ Δᵍ Δ Θ t)) → depᵗˢ η (d + k) ts ≤ d + depᵗˢ η k ts
+  dep-shiftᵗˢ η d k []       = z≤n
+  dep-shiftᵗˢ η d k (y ∷ ys) =
+    ⊔-shift d (⊔-mono-≤ (dep-shiftᵗ η d k y) (dep-shiftᵗˢ η d k ys))
 
 ------------------------------------------------------------------
--- 4.  THE OPEN FORM: WHAT THE ENVIRONMENT COSTS, AS A SUM.
+-- 2.  WHAT AN ENVIRONMENT IS WORTH.
 ------------------------------------------------------------------
 
--- the reading of an environment, which is what the open form is
--- denominated in
+-- the reading of an environment, which is what every bound below is
+-- denominated in.  It measures each value through `reify`, so it sits
+-- one wrap above the reading of what is in it; the slack runs the safe
+-- way, since a larger `envDepth` is a HARDER premise everywhere it is
+-- one.
 envDepth : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) {Θ} → All (Val Γ) Θ → ℕ
 envDepth η []ᵃ       = 0
-envDepth η (v ∷ᵃ vs) = depᵗ η (reify v) ⊔ envDepth η vs
+envDepth η (v ∷ᵃ vs) = depᵗ η 0 (reify v) ⊔ envDepth η vs
 
--- THE READING OF AN INSTANCE IS A SUM, AND EVERY LEMMA ABOVE IT IS THE
--- CASE WHERE ONE ADDEND IS ZERO.  Substituting DATA moves no `strmᵗ`,
--- so the environment contributes nothing and the drop is strict.  An
--- environment holding an OBSERVABLE contributes its own reading, once
--- per binder crossed, and the instance then costs the template PLUS
--- what it was handed.  That is the whole of why a premise about the
--- template alone cannot bound what the template writes -- the argument
--- is the other addend, and a join over the two never sees it.
---
--- AND NO CONSUMER CAN SIT ON THIS BOUND TIGHTLY, WHICH IS A PROPERTY
--- OF `envDepth` RATHER THAN OF THE PROGRAMS.  It reads its values
--- through `reify`, and reifying an observable writes a `strmᵗ` the
--- value did not have, so the environment's measured reading is one
--- above the reading of what is in it.  The slack runs the safe way: a
--- larger `envDepth` is a HARDER premise, so this is weaker than the
--- tightest true statement rather than stronger.  Measuring the value
--- rather than its literal is a restatement, not a repair.
---
--- AND THE ARM THAT MAKES ITS OWN ENVIRONMENT IS NOT PRICED BY A SUM AT
--- ALL, WHICH IS WHAT IS KNOWN AND NOT A DOUBT.  A `caseᵗ` binds what
--- its scrutinee evaluated to, so the branch runs under an environment
--- `env` never held and `m` never bounded, and no premise over the
--- environment handed in can reach it.  Making the reading ADD its
--- scrutinee prices the branch's wrap; it does not rescue the SUM,
--- because substitution pushes one environment into the scrutinee and
--- the branch alike, so an entry occurring in both is written into both
--- and the adding clause charges it twice while this statement has one
--- addend for it.  The two escapes close in opposite directions, so
--- what stands between them is the CURRENCY:
--- the arm composes, and composition is not bounded by adding a
--- constant to the template's reading.  The statement is left at full
--- strength and is owed a restatement, not a premise — conditioning it
--- on an environment no `caseᵗ` reads twice would make the shape of the
--- lemma an artifact of today's call sites.
---
--- REFUTED: `Refuted.Case-Binds` — the join the reading used to take at
---   that arm, which made this statement false at the EMPTY environment,
---   where its premise is discharged by the least evidence there is.
--- REFUTED: `Refuted.Case-Twice` — the sum itself, at an environment
---   entry the template reads on both sides of one `caseᵗ`, which the
---   adding clause that answers the join then pays for twice.
---
--- PROBED: `Probed.Eval-Open` — an empty environment, a data binder, an
---   observable binder read straight back, the same binder wrapped under a
---   `strmᵗ` the template writes, and the same binder read TWICE, which is the
---   row the currency turns on: a price per occurrence would have shown there
---   and does not.  Not reached: the ITERATION axis, since one evaluation
---   crosses one binder and the growth a fold pays is per refold.  Not
---   reached either: the REBINDING arm, whose addend comes from the
---   scrutinee rather than from the environment the rows vary.
-postulate
-  dep-eval-open : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) {Θ t}
-    (tm : Tm Γ [] [] Θ t) (env : All (Val Γ) Θ) (m : ℕ) →
-    envDepth η env ≤ m → depᵛ η t (evalWith tm env) ≤ depᵗ η tm + m
+lookup-below : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) {Θ t}
+  (σ : All (Val Γ) Θ) (x : t ∈ Θ) →
+  depᵗ η 0 (reify (lookupEnv σ x)) ≤ envDepth η σ
+lookup-below η (v ∷ᵃ vs) (here refl) = m≤m⊔n _ _
+lookup-below η (v ∷ᵃ vs) (there p)   = ≤-trans (lookup-below η vs p) (m≤n⊔m _ _)
 
 ------------------------------------------------------------------
--- 5.  THE TWO SIDES OF `reify`, WHICH IS WHAT THE ENVIRONMENT
+-- 3.  THE TWO SIDES OF `reify`, WHICH IS WHAT THE ENVIRONMENT
 --     READING AND THE VALUE READING DIFFER BY.
 ------------------------------------------------------------------
 
@@ -421,29 +237,182 @@ postulate
 -- conclusion is a payload crosses between them twice -- once on the way
 -- in and once on the way out.  The gap is exactly one wrap and it is
 -- structural: `reify` at an observable writes a `strmᵗ` the value does
--- not have, and writes nothing at any other type.  So the pair below is
--- not two lemmas about `reify` but the two directions of one, and a
--- fold needs both, because the value it hands back becomes the
--- environment of the next delivery.
-dep-below-reify : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) (t : Ty) (v : Val Γ t) →
-  depᵛ η t v ≤ depᵗ η (reify v)
-dep-below-reify η unitᵗ    _        = z≤n
-dep-below-reify η boolᵗ    _        = z≤n
-dep-below-reify η natᵗ     _        = z≤n
-dep-below-reify η (s ×ᵗ t) (a , b)  =
-  ⊔-mono-≤ (dep-below-reify η s a) (dep-below-reify η t b)
-dep-below-reify η (s +ᵗ t) (inj₁ a) = dep-below-reify η s a
-dep-below-reify η (s +ᵗ t) (inj₂ b) = dep-below-reify η t b
-dep-below-reify η (obs t)  e        = n≤1+n (depᵉ η e)
+-- not have, and writes nothing at any other type.  So these are not
+-- separate lemmas about `reify` but the directions of one, and a fold
+-- needs both, because the value it hands back becomes the environment
+-- of the next delivery.
+------------------------------------------------------------------
+-- 4.  PUSHING AN ENVIRONMENT IN CANNOT MAKE A TERM DEEPER.
+------------------------------------------------------------------
 
--- and the other way, where the one wrap is spent rather than gained
-reify-below-suc : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) (t : Ty) (v : Val Γ t) →
-  depᵗ η (reify v) ≤ suc (depᵛ η t v)
-reify-below-suc η unitᵗ    _        = z≤n
-reify-below-suc η boolᵗ    _        = z≤n
-reify-below-suc η natᵗ     _        = z≤n
-reify-below-suc η (s ×ᵗ t) (a , b)  =
-  ⊔-mono-≤ (reify-below-suc η s a) (reify-below-suc η t b)
-reify-below-suc η (s +ᵗ t) (inj₁ a) = reify-below-suc η s a
-reify-below-suc η (s +ᵗ t) (inj₂ b) = reify-below-suc η t b
-reify-below-suc η (obs t)  e        = ≤-refl
+-- weakening writes no head, so it moves no reading — and a Θ-closed
+-- term reaches no variable clause, so the bound it is read at is
+-- irrelevant.  Stated for the exact instance the substitution's `varᵗ`
+-- arm produces rather than for a general renaming, because that arm is
+-- the only consumer.
+--
+-- PROBED: `Probed.Data-Shelf` — a leaf, and a term whose head is
+--   `strmᵗ`, which is the only head the reading counts and so the only
+--   one a renaming could move.  Not reached: a term with a binder
+--   under the weakened context.
+postulate
+  dep-wkTm : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) (k : ℕ) {Δᵍ Δ Θ t}
+    (f : Tm Γ [] [] [] t) →
+    depᵗ η k (wkTm {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} f) ≡ depᵗ η 0 f
+
+-- Every clause but two is `⊔-mono-≤` over the sub-derivations, exactly
+-- as `dep-elimG`'s are `cong`.  The `varᵗ` clause splits the way
+-- `subΘTm` splits: a LOCAL binder survives as a `varᵗ` and is read at
+-- `k` on the left against `m` on the right, while a SUBSTITUTED binder
+-- becomes a reified literal whose reading the environment's own bound
+-- already covers.  The `caseᵗ` clause is where the two bounds move
+-- together: substitution pushes the same environment into the
+-- scrutinee and both branches, so the branches' bound on the left is
+-- built from the SUBSTITUTED scrutinee and on the right from the
+-- original, and the scrutinee's own induction is what relates them.
+mutual
+  dep-subΘ : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) {Δᵍ Δ Θsub t} (Θloc : List Ty)
+    (σ : All (Val Γ) Θsub) (m k : ℕ) → envDepth η σ ≤ m → k ≤ m →
+    (e : Exp Γ Δᵍ Δ (Θloc ++ Θsub) t) →
+    depᵉ η k (subΘExp Θloc σ e) ≤ depᵉ η m e
+  dep-subΘ η Θloc σ m k h km (input i)       = ≤-refl
+  dep-subΘ η Θloc σ m k h km (ofᵉ ts)        = dep-subΘᵗˢ η Θloc σ m k h km ts
+  dep-subΘ η Θloc σ m k h km emptyᵉ          = ≤-refl
+  dep-subΘ η Θloc σ m k h km (mapᵉ {s = s} f e) =
+    ⊔-mono-≤ (dep-subΘᵗ η (s ∷ Θloc) σ (bindᵃᵉ η m e)
+                (bindᵃᵉ η k (subΘExp Θloc σ e))
+                (≤-trans h (m≤n⊔m (depᵉ η m e) m))
+                (⊔-mono-≤ (dep-subΘ η Θloc σ m k h km e) km) f)
+             (dep-subΘ η Θloc σ m k h km e)
+  dep-subΘ η Θloc σ m k h km (takeᵉ c e)     =
+    ⊔-mono-≤ (dep-subΘᵗ η Θloc σ (bindᵃᵉ η m e)
+                (bindᵃᵉ η k (subΘExp Θloc σ e))
+                (≤-trans h (m≤n⊔m (depᵉ η m e) m))
+                (⊔-mono-≤ (dep-subΘ η Θloc σ m k h km e) km) c)
+             (dep-subΘ η Θloc σ m k h km e)
+  dep-subΘ η Θloc σ m k h km (scanᵉ {s = s} {t = t} f z e) =
+    ⊔-mono-≤ (⊔-mono-≤ (dep-subΘᵗ η ((t ×ᵗ s) ∷ Θloc) σ (bindˢᵗ η m z e)
+                          (bindˢᵗ η k (subΘTm Θloc σ z) (subΘExp Θloc σ e))
+                          (≤-trans h (≤-trans (m≤n⊔m (depᵉ η m e) m)
+                                              (m≤m⊔n (bindᵃᵉ η m e) (depᵗ η m z))))
+                          (⊔-mono-≤ (⊔-mono-≤ (dep-subΘ η Θloc σ m k h km e) km)
+                                    (dep-subΘᵗ η Θloc σ m k h km z)) f)
+                       (dep-subΘᵗ η Θloc σ m k h km z))
+             (dep-subΘ η Θloc σ m k h km e)
+  dep-subΘ η Θloc σ m k h km (mergeAllᵉ _ e) = dep-subΘ η Θloc σ m k h km e
+  dep-subΘ η Θloc σ m k h km (switchAllᵉ e)  = dep-subΘ η Θloc σ m k h km e
+  dep-subΘ η Θloc σ m k h km (exhaustAllᵉ e) = dep-subΘ η Θloc σ m k h km e
+  dep-subΘ η Θloc σ m k h km (μᵉ e)          = dep-subΘ η Θloc σ m k h km e
+  dep-subΘ η Θloc σ m k h km (varᵉ x)        = ≤-refl
+  dep-subΘ η Θloc σ m k h km (deferᵉ e)      = ≤-refl
+
+  dep-subΘᵗ : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) {Δᵍ Δ Θsub t} (Θloc : List Ty)
+    (σ : All (Val Γ) Θsub) (m k : ℕ) → envDepth η σ ≤ m → k ≤ m →
+    (f : Tm Γ Δᵍ Δ (Θloc ++ Θsub) t) →
+    depᵗ η k (subΘTm Θloc σ f) ≤ depᵗ η m f
+  dep-subΘᵗ η Θloc σ m k h km (varᵗ x) with ∈-++⁻ Θloc x
+  ... | inj₁ y = km
+  ... | inj₂ z = ≤-trans (≤-reflexive (dep-wkTm η k (reify (lookupEnv σ z))))
+                         (≤-trans (lookup-below η σ z) h)
+  dep-subΘᵗ η Θloc σ m k h km unit̂          = ≤-refl
+  dep-subΘᵗ η Θloc σ m k h km (bool̂ b)      = ≤-refl
+  dep-subΘᵗ η Θloc σ m k h km (nat̂ j)       = ≤-refl
+  dep-subΘᵗ η Θloc σ m k h km (pairᵗ a b)   =
+    ⊔-mono-≤ (dep-subΘᵗ η Θloc σ m k h km a) (dep-subΘᵗ η Θloc σ m k h km b)
+  dep-subΘᵗ η Θloc σ m k h km (fstᵗ p)      = dep-subΘᵗ η Θloc σ m k h km p
+  dep-subΘᵗ η Θloc σ m k h km (sndᵗ p)      = dep-subΘᵗ η Θloc σ m k h km p
+  dep-subΘᵗ η Θloc σ m k h km (inlᵗ a)      = dep-subΘᵗ η Θloc σ m k h km a
+  dep-subΘᵗ η Θloc σ m k h km (inrᵗ a)      = dep-subΘᵗ η Θloc σ m k h km a
+  dep-subΘᵗ η Θloc σ m k h km (caseᵗ {s = s} {t = t} sc l r) =
+    ⊔-mono-≤ (dep-subΘᵗ η (s ∷ Θloc) σ (bindᵃᵗ η m sc)
+                (bindᵃᵗ η k (subΘTm Θloc σ sc)) h' b l)
+             (dep-subΘᵗ η (t ∷ Θloc) σ (bindᵃᵗ η m sc)
+                (bindᵃᵗ η k (subΘTm Θloc σ sc)) h' b r)
+    where
+    b : bindᵃᵗ η k (subΘTm Θloc σ sc) ≤ bindᵃᵗ η m sc
+    b = ⊔-mono-≤ (s≤s (dep-subΘᵗ η Θloc σ m k h km sc)) km
+    h' : envDepth η σ ≤ bindᵃᵗ η m sc
+    h' = ≤-trans h (m≤n⊔m _ _)
+  dep-subΘᵗ η Θloc σ m k h km (ifᵗ c a b)   =
+    ⊔-mono-≤ (⊔-mono-≤ (dep-subΘᵗ η Θloc σ m k h km c)
+                       (dep-subΘᵗ η Θloc σ m k h km a))
+             (dep-subΘᵗ η Θloc σ m k h km b)
+  dep-subΘᵗ η Θloc σ m k h km (primᵗ op a)  = dep-subΘᵗ η Θloc σ m k h km a
+  dep-subΘᵗ η Θloc σ m k h km (strmᵗ e)     =
+    s≤s (dep-subΘ η Θloc σ m k h km e)
+
+  dep-subΘᵗˢ : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) {Δᵍ Δ Θsub t} (Θloc : List Ty)
+    (σ : All (Val Γ) Θsub) (m k : ℕ) → envDepth η σ ≤ m → k ≤ m →
+    (ts : List (Tm Γ Δᵍ Δ (Θloc ++ Θsub) t)) →
+    depᵗˢ η k (subΘTms Θloc σ ts) ≤ depᵗˢ η m ts
+  dep-subΘᵗˢ η Θloc σ m k h km []       = ≤-refl
+  dep-subΘᵗˢ η Θloc σ m k h km (y ∷ ys) =
+    ⊔-mono-≤ (dep-subΘᵗ η Θloc σ m k h km y) (dep-subΘᵗˢ η Θloc σ m k h km ys)
+
+------------------------------------------------------------------
+-- 5.  EVALUATION, READ THROUGH `reify` SO THAT THE STRICT DROP AT AN
+--     OBSERVABLE IS THE SAME STATEMENT AS THE WEAK ONE ELSEWHERE.
+------------------------------------------------------------------
+
+-- WHY THE CONCLUSION IS ABOUT `reify (evalWith …)` AND NOT ABOUT THE
+-- VALUE.  A value read directly loses the one piece of information the
+-- door needs: at an observable the literal carries a `strmᵗ` the value
+-- does not, so the drop there is STRICT while it is weak everywhere
+-- else, and a statement about the value has to say that with a `pred`
+-- and then hand every caller a positivity premise to spend.  Measured
+-- through `reify` the two cases are one inequality — the wrap is on
+-- the left exactly where the head that produced it is on the right —
+-- and the strictness falls out by reduction at the only type that
+-- wants it.  It also composes: `envDepth` is itself denominated
+-- through `reify`, so the rebinding arm's grown environment is this
+-- statement joined with the caller's premise and nothing else.
+--
+-- Two clauses carry the content and the rest is `⊔` plumbing: the
+-- rebinding arm, where the branch's environment gains the scrutinee's
+-- value and the branch is read at the bound the measure's own clause
+-- hands it; and the `strmᵗ` arm under a non-empty environment, where
+-- the run SUBSTITUTES rather than evaluates and the lemma above pays.
+dep-eval : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) {Θ t}
+  (tm : Tm Γ [] [] Θ t) (env : All (Val Γ) Θ) (m : ℕ) →
+  envDepth η env ≤ m → depᵗ η 0 (reify (evalWith tm env)) ≤ depᵗ η m tm
+dep-eval η (varᵗ x)      env m h = ≤-trans (lookup-below η env x) h
+dep-eval η unit̂          env m h = z≤n
+dep-eval η (bool̂ b)      env m h = z≤n
+dep-eval η (nat̂ j)       env m h = z≤n
+dep-eval η (pairᵗ a b)   env m h =
+  ⊔-mono-≤ (dep-eval η a env m h) (dep-eval η b env m h)
+-- the pair's reading is the join of its components', so a projection
+-- reads no more than the pair
+dep-eval η (fstᵗ p)      env m h with evalWith p env | dep-eval η p env m h
+... | (a , b) | ih = ≤-trans (m≤m⊔n _ _) ih
+dep-eval η (sndᵗ p)      env m h with evalWith p env | dep-eval η p env m h
+... | (a , b) | ih = ≤-trans (m≤n⊔m _ _) ih
+dep-eval η (inlᵗ a)      env m h = dep-eval η a env m h
+dep-eval η (inrᵗ a)      env m h = dep-eval η a env m h
+dep-eval η (caseᵗ {s = s} {t = t} sc l r) env m h
+  with evalWith sc env | dep-eval η sc env m h
+... | inj₁ x | ih =
+  ≤-trans (dep-eval η l (x ∷ᵃ env) (bindᵃᵗ η m sc)
+             (⊔-mono-≤ (≤-trans ih (n≤1+n (depᵗ η m sc))) h))
+          (m≤m⊔n (depᵗ η (bindᵃᵗ η m sc) l) (depᵗ η (bindᵃᵗ η m sc) r))
+... | inj₂ y | ih =
+  ≤-trans (dep-eval η r (y ∷ᵃ env) (bindᵃᵗ η m sc)
+             (⊔-mono-≤ (≤-trans ih (n≤1+n (depᵗ η m sc))) h))
+          (m≤n⊔m (depᵗ η (bindᵃᵗ η m sc) l) (depᵗ η (bindᵃᵗ η m sc) r))
+dep-eval η (ifᵗ c a b)   env m h with evalWith c env
+... | true  =
+  ≤-trans (dep-eval η a env m h)
+          (≤-trans (m≤n⊔m (depᵗ η m c) (depᵗ η m a))
+                   (m≤m⊔n (depᵗ η m c ⊔ depᵗ η m a) (depᵗ η m b)))
+... | false =
+  ≤-trans (dep-eval η b env m h)
+          (m≤n⊔m (depᵗ η m c ⊔ depᵗ η m a) (depᵗ η m b))
+dep-eval η (primᵗ add  a)  env m h = z≤n
+dep-eval η (primᵗ sub  a)  env m h = z≤n
+dep-eval η (primᵗ mul  a)  env m h = z≤n
+dep-eval η (primᵗ eqᵖ  a)  env m h = z≤n
+dep-eval η (primᵗ ltᵖ  a)  env m h = z≤n
+dep-eval η (primᵗ notᵖ a)  env m h = z≤n
+dep-eval η (strmᵗ e)     []ᵃ       m h = s≤s (dep-monoᵉ η z≤n e)
+dep-eval η (strmᵗ e)     (v ∷ᵃ vs) m h =
+  s≤s (dep-subΘ η [] (v ∷ᵃ vs) m 0 h z≤n e)

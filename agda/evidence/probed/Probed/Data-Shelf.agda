@@ -1,32 +1,27 @@
 -- THE SHELF THE SUBSTITUTION LEMMA STANDS ON, INSTANTIATED.
 --
--- WHAT IS AT RISK AND WHAT IS NOT.  The membership reads a `Bool` the
--- type alone decides, so its conclusion is `true ≡ true` at every
--- point that satisfies its premise and no row can make it fail.  That
--- row is DEGENERATE as an inequality and LOAD-BEARING as non-vacuity:
--- what it buys is that the premise is satisfiable at a nested
--- telescope at all, which is how a projection off an `if`-shaped
--- predicate goes quietly empty.  The weakening row is the one with
--- content on both sides.
+-- WHAT IS AT RISK AND WHAT IS NOT.  The weakening equates a reading
+-- taken at an ARBITRARY bound with one taken at the closed bound, so
+-- both sides move: the left is read at `k` and the right at `0`, and a
+-- term reaching any variable clause would separate them.  That is
+-- exactly why the rows come in pairs — the same term read at `0` and
+-- at a positive bound — since a clause that leaked the bound would be
+-- invisible at `0` alone.
 --
--- COVERAGE: a membership at the head of the telescope and past it, and
--- a weakening of a term with no head and of one whose head is the only
--- head that carries a reading.
--- NOT reached: the size axis, which this shelf no longer prices.
+-- COVERAGE: a term with no head and a term whose head is `strmᵗ`, the
+-- only head the reading counts, each at the closed bound and at a
+-- positive one.
+-- NOT reached: a term with a binder under the weakened context.
 --
--- TARGET: data-of @6d56e8
--- TARGET: dep-wkTm @537866
+-- TARGET: dep-wkTm @594716
 module Probed.Data-Shelf where
 
-open import Data.List using (List; []; _∷_)
-open import Data.List.Relation.Unary.Any using (here; there)
-open import Data.List.Relation.Unary.All using () renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
+open import Data.List using ([]; _∷_)
 open import Data.Vec using () renaming ([] to []ⱽ)
 open import Relation.Binary.PropositionalEquality using (refl)
 
-open import Rx.Exp using (Ty; Ctx; boolᵗ; natᵗ; nat̂; strmᵗ; ofᵉ)
-open import Rx.Obs-Depth.Substitution using (AllData; []ᵈ; _∷ᵈ_;
-  data-of; dep-wkTm)
+open import Rx.Exp using (Ctx; natᵗ; nat̂; strmᵗ; ofᵉ)
+open import Rx.Obs-Depth.Substitution using (dep-wkTm)
 
 open import Probed.Apparatus using (Confirms; zeroη)
 
@@ -34,34 +29,33 @@ open import Probed.Apparatus using (Confirms; zeroη)
 Γ₀ = []ⱽ
 
 ----------------------------------------------------------------------
--- 1.  THE MEMBERSHIP.  The row is the target applied at a telescope
--- the premise actually admits, so what it pins is that the premise is
--- inhabited there.
+-- 1.  WEAKENING MOVES NO READING, AT THE CLOSED BOUND.  The second row
+-- is the load-bearing one: `strmᵗ` is the only head the reading
+-- counts, so a renaming that rebuilt it at a different index would
+-- fail here and nowhere above.
 ----------------------------------------------------------------------
 
-Θ₂ : List Ty
-Θ₂ = natᵗ ∷ boolᵗ ∷ []
-
-dd₂ : AllData Θ₂
-dd₂ = refl ∷ᵈ (refl ∷ᵈ []ᵈ)
-
-row-of-head : Confirms (data-of {Θ = Θ₂} dd₂ (here refl))
-row-of-head = refl
-
--- past the head, which is the clause that recurses
-row-of-tail : Confirms (data-of {Θ = Θ₂} dd₂ (there (here refl)))
-row-of-tail = refl
-
-----------------------------------------------------------------------
--- 2.  WEAKENING MOVES NO READING.  The second row is the load-bearing
--- one: `strmᵗ` is the only head the reading counts, so a renaming that
--- rebuilt it at a different index would fail here and nowhere above.
-----------------------------------------------------------------------
-
-row-wk-leaf : Confirms (dep-wkTm {Γ = Γ₀} zeroη {Δᵍ = []} {Δ = []} {Θ = []} (nat̂ 7))
+row-wk-leaf : Confirms (dep-wkTm {Γ = Γ₀} zeroη 0 {Δᵍ = []} {Δ = []} {Θ = []}
+                         (nat̂ 7))
 row-wk-leaf = refl
 
 row-wk-strm : Confirms
-  (dep-wkTm {Γ = Γ₀} zeroη {Δᵍ = []} {Δ = []} {Θ = natᵗ ∷ []}
+  (dep-wkTm {Γ = Γ₀} zeroη 0 {Δᵍ = []} {Δ = []} {Θ = natᵗ ∷ []}
     (strmᵗ (ofᵉ (nat̂ 7 ∷ []))))
 row-wk-strm = refl
+
+----------------------------------------------------------------------
+-- 2.  AND AT A POSITIVE BOUND, WHICH IS THE HALF THE CLOSED ROWS
+-- CANNOT SEE.  The bound is a parameter of the reading now, so the two
+-- sides are read at DIFFERENT bounds and a clause that let `k` through
+-- would separate them here while agreeing at zero.
+----------------------------------------------------------------------
+
+row-wk-leaf-open : Confirms
+  (dep-wkTm {Γ = Γ₀} zeroη 3 {Δᵍ = []} {Δ = []} {Θ = []} (nat̂ 7))
+row-wk-leaf-open = refl
+
+row-wk-strm-open : Confirms
+  (dep-wkTm {Γ = Γ₀} zeroη 3 {Δᵍ = []} {Δ = []} {Θ = natᵗ ∷ []}
+    (strmᵗ (ofᵉ (nat̂ 7 ∷ []))))
+row-wk-strm-open = refl

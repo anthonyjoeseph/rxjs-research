@@ -49,7 +49,7 @@ open import Rx.Obs-Depth.Eta-Cong using (dep-η-congᵉ)
 -- (`isData`), so no emission of its can hold an observable at all.
 slotDepthD : ∀ {n} {Γ : Ctx n} {k t} (η : Fin n → ℕ) → Slot Γ k t → ℕ
 slotDepthD η (scripted _) = 0
-slotDepthD η (shared d)   = depᵉ η d
+slotDepthD η (shared d)   = depᵉ η 0 d
 
 -- the stage-k environment: the true readings at indices < k, nought at
 -- and above.  Structural on k — this is the recursion stratification
@@ -87,7 +87,7 @@ slotDepth sl i = slotDepthD (ηAt sl (toℕ i)) (sl i)
 slotDepth-fix : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (i : Fin n)
   {d : Closed Γ (lookup Γ i)} {ok : T (inputsBelowᵉ (toℕ i) d)} →
   sl i ≡ shared d {ok = ok} →
-  slotDepth sl i ≡ depᵉ (slotDepth sl) d
+  slotDepth sl i ≡ depᵉ (slotDepth sl) 0 d
 slotDepth-fix sl i {d} {ok} eq =
   trans (cong (slotDepthD (ηAt sl (toℕ i))) eq)
-        (dep-η-congᵉ (toℕ i) (ηAt-agrees sl (toℕ i)) d ok)
+        (dep-η-congᵉ (toℕ i) 0 (ηAt-agrees sl (toℕ i)) d ok)

@@ -107,10 +107,10 @@ rows₅ : depths₅ ≡ 1 ∷ 2 ∷ 3 ∷ 4 ∷ 5 ∷ []
 rows₅ = refl
 
 -- and the reading taken off the program text, which does not move
-static₃ : obsDepthᵉ prog₃ ≡ 1
+static₃ : obsDepthᵉ prog₃ ≡ 2
 static₃ = refl
 
-static₅ : obsDepthᵉ prog₅ ≡ 1
+static₅ : obsDepthᵉ prog₅ ≡ 2
 static₅ = refl
 
 -- THE STATEMENT.  Every value a run emits is at most as deep as the
@@ -123,11 +123,12 @@ StaticBoundsRun = ∀ (fuel : ℕ) (e : Closed Γ₀ (obs natᵗ)) (ins : Slots 
 
 static-bounds-run-false : StaticBoundsRun → ⊥
 static-bounds-run-false claim with claim 100 prog₅ ins₀
-... | _ ∷ᴬ _ ∷ᴬ _ ∷ᴬ _ ∷ᴬ s≤s () ∷ᴬ []ᴬ
+... | _ ∷ᴬ _ ∷ᴬ _ ∷ᴬ _ ∷ᴬ s≤s (s≤s ()) ∷ᴬ []ᴬ
 
 -- THE REPAIR'S CURRENCY, at the same point.  A bound carrying the burst
 -- length beside the reading does hold here, and the peak is the last
--- element's position, so the margin is one rather than slack.
+-- element's position, so what the length buys is the whole of the
+-- climb rather than slack.
 length-bound : All (_≤ obsDepthᵉ prog₅ + length inputs₅) depths₅
 length-bound =
   s≤s z≤n ∷ᴬ

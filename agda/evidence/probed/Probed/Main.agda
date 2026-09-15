@@ -52,34 +52,17 @@ open import Probed.Apparatus using (Confirms; Separates)
 open import Probed.Connect-Count using (row-one-count; row-three-count;
   row-three-one-taken; row-last-slot; row-with-slack; row-not-head)
 
--- THE SHELF UNDER THE SUBSTITUTION LEMMA — the telescope membership,
--- whose rows buy non-vacuity rather than an inequality, and the
--- weakening, whose rows have content on both sides.
-open import Probed.Data-Shelf using (row-of-head; row-of-tail;
-  row-wk-leaf; row-wk-strm)
+-- THE SHELF UNDER THE SUBSTITUTION LEMMA — the weakening, whose rows
+-- have content on both sides, read at the closed bound and at a
+-- positive one, since the bound is now a parameter of the reading.
+open import Probed.Data-Shelf using (row-wk-leaf; row-wk-strm;
+  row-wk-leaf-open; row-wk-strm-open)
 
--- THE TWO BINDING ARMS THE STRICT DROP DEFERS — instantiated at the
--- observable payload, which is the region that could make either
--- false, and at the branch that WRAPS it with nothing else deep
--- enough to carry the bound.
-open import Probed.Eval-Binders using (row-case-data; case-data-bound;
-  row-case-obs; case-obs-bound; case-obs-value;
-  row-case-wraps; case-wraps-bound; case-wraps-joined; case-wraps-value;
-  row-if-selected; row-if-unselected)
 
--- THE OPEN FORM, WHOSE ROWS DECIDE THE CURRENCY — the binder read
--- straight back, the binder wrapped again, and the binder read twice,
--- which is where a price per occurrence would have shown.
-open import Probed.Eval-Open using (o-reading; o-entry; row-empty;
-  row-data; row-pass; pass-template; row-wrap; wrap-template; wrap-value;
-  row-twice; twice-value)
-
--- THE BURST REPORT'S TWO PRICING LEAVES — the data payload, whose rows
--- reach the two types at which the reading recurses, and the silent
--- term, whose load-bearing row stands at a type reaching an observable
--- the value does not take.
+-- THE BURST REPORT'S REMAINING PRICING LEAF — the data payload, whose
+-- rows reach the two types at which the reading recurses.
 open import Probed.Burst-Handed using (row-data-flat; row-data-pair;
-  row-data-sum; row-silent-flat; row-silent-sum; row-silent-binder)
+  row-data-sum)
 
 -- THE TWO HEADS THAT LEAVE THE BURST REPORT — instantiated on the arms
 -- that pass a payload through, which is every arm reachable without a

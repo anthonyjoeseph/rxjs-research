@@ -67,7 +67,7 @@ inner = ofᵉ (strmᵗ (ofᵉ (strmᵗ (ofᵉ (nat̂ 7 ∷ [])) ∷ [])) ∷ [])
 scrut : Tm Γ₀ [] [] [] (Deep +ᵗ unitᵗ)
 scrut = inlᵗ (strmᵗ inner)
 
-scrut-is : depᵗ {Γ = Γ₀} zeroη scrut ≡ 3
+scrut-is : depᵗ {Γ = Γ₀} zeroη 0 scrut ≡ 3
 scrut-is = refl
 
 ----------------------------------------------------------------------
@@ -82,10 +82,10 @@ left = strmᵗ (ofᵉ (strmᵗ (ofᵉ (varᵗ (here refl) ∷ [])) ∷ []))
 right : Tm Γ₀ [] [] (unitᵗ ∷ []) (obs (obs Deep))
 right = strmᵗ emptyᵉ
 
-left-is : depᵗ {Γ = Γ₀} zeroη left ≡ 2
+left-is : depᵗ {Γ = Γ₀} zeroη 0 left ≡ 2
 left-is = refl
 
-right-is : depᵗ {Γ = Γ₀} zeroη right ≡ 1
+right-is : depᵗ {Γ = Γ₀} zeroη 0 right ≡ 1
 right-is = refl
 
 ----------------------------------------------------------------------
@@ -97,9 +97,9 @@ right-is = refl
 ----------------------------------------------------------------------
 
 joined : ℕ
-joined = depᵗ {Γ = Γ₀} zeroη scrut
-       ⊔ depᵗ {Γ = Γ₀} zeroη left
-       ⊔ depᵗ {Γ = Γ₀} zeroη right
+joined = depᵗ {Γ = Γ₀} zeroη 0 scrut
+       ⊔ depᵗ {Γ = Γ₀} zeroη 0 left
+       ⊔ depᵗ {Γ = Γ₀} zeroη 0 right
 
 joined-is : joined ≡ 3
 joined-is = refl

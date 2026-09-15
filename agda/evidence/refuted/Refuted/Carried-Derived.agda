@@ -109,10 +109,10 @@ ref₁ = input zero
 -- level of observable while the reference standing for it reads nought,
 -- so the entry invariant holds at EVERY rank including the one that
 -- cannot dominate what the connect plumbs out.
-derived-def-depth : depᵉ zero-env d₁ ≡ 1
+derived-def-depth : depᵉ zero-env 0 d₁ ≡ 1
 derived-def-depth = refl
 
-derived-ref-depth : depᵉ zero-env ref₁ ≡ 0
+derived-ref-depth : depᵉ zero-env 0 ref₁ ≡ 0
 derived-ref-depth = refl
 
 τ₁ : Tri

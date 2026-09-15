@@ -62,7 +62,8 @@ open import Rx.Exp using (Ty; Ctx; Exp; Tm; Val; Fn; Ren∈; ext∈; renExp; ren
   natᵗ; obs; _×ᵗ_; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ;
   exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ;
   inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ; applyFn)
-open import Refuted.Apparatus using (obsDepthᵉ; obsDepthᵗ; obsDepthᵗˢ; obsDepthᵛ)
+open import Rx.Obs-Depth using (depᵉ; depᵗ; depᵗˢ; bindᵃᵗ; bindᵃᵉ; bindˢᵗ)
+open import Refuted.Apparatus using (zeroη; obsDepthᵛ)
 open import Rx.Evaluator using (scanVals)
 
 Γ₀ : Ctx 0
@@ -114,64 +115,81 @@ seed = emptyᵉ
 
 mutual
   ren-depthᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δᵍ′ Δ Δ′ Θ Θ′ t}
-    (ρg : Ren∈ Δᵍ Δᵍ′) (ρd : Ren∈ Δ Δ′) (ρt : Ren∈ Θ Θ′)
-    (e : Exp Γ Δᵍ Δ Θ t) → obsDepthᵉ (renExp ρg ρd ρt e) ≡ obsDepthᵉ e
-  ren-depthᵉ ρg ρd ρt (input i)       = refl
-  ren-depthᵉ ρg ρd ρt (ofᵉ ts)        = ren-depthᵗˢ ρg ρd ρt ts
-  ren-depthᵉ ρg ρd ρt emptyᵉ          = refl
-  ren-depthᵉ ρg ρd ρt (mapᵉ f e)      =
-    cong₂ _⊔_ (ren-depthᵗ ρg ρd (ext∈ ρt) f) (ren-depthᵉ ρg ρd ρt e)
-  ren-depthᵉ ρg ρd ρt (takeᵉ c e)     =
-    cong₂ _⊔_ (ren-depthᵗ ρg ρd ρt c) (ren-depthᵉ ρg ρd ρt e)
-  ren-depthᵉ ρg ρd ρt (scanᵉ f z e)   =
-    cong₂ _⊔_ (cong₂ _⊔_ (ren-depthᵗ ρg ρd (ext∈ ρt) f)
-                         (ren-depthᵗ ρg ρd ρt z))
-              (ren-depthᵉ ρg ρd ρt e)
-  ren-depthᵉ ρg ρd ρt (mergeAllᵉ _ e) = ren-depthᵉ ρg ρd ρt e
-  ren-depthᵉ ρg ρd ρt (switchAllᵉ e)  = ren-depthᵉ ρg ρd ρt e
-  ren-depthᵉ ρg ρd ρt (exhaustAllᵉ e) = ren-depthᵉ ρg ρd ρt e
-  ren-depthᵉ ρg ρd ρt (μᵉ e)          = ren-depthᵉ (ext∈ ρg) ρd ρt e
-  ren-depthᵉ ρg ρd ρt (varᵉ x)        = refl
-  ren-depthᵉ ρg ρd ρt (deferᵉ e)      = refl
+    (ρg : Ren∈ Δᵍ Δᵍ′) (ρd : Ren∈ Δ Δ′) (ρt : Ren∈ Θ Θ′) (m : ℕ)
+    (e : Exp Γ Δᵍ Δ Θ t) →
+    depᵉ zeroη m (renExp ρg ρd ρt e) ≡ depᵉ zeroη m e
+  ren-depthᵉ ρg ρd ρt m (input i)       = refl
+  ren-depthᵉ ρg ρd ρt m (ofᵉ ts)        = ren-depthᵗˢ ρg ρd ρt m ts
+  ren-depthᵉ ρg ρd ρt m emptyᵉ          = refl
+  ren-depthᵉ ρg ρd ρt m (mapᵉ f e)      =
+    cong₂ _⊔_ (trans (cong (λ k → depᵗ zeroη k (renTm ρg ρd (ext∈ ρt) f))
+                           (cong (_⊔ m) (ren-depthᵉ ρg ρd ρt m e)))
+                     (ren-depthᵗ ρg ρd (ext∈ ρt) (bindᵃᵉ zeroη m e) f))
+              (ren-depthᵉ ρg ρd ρt m e)
+  ren-depthᵉ ρg ρd ρt m (takeᵉ c e)     =
+    cong₂ _⊔_ (trans (cong (λ k → depᵗ zeroη k (renTm ρg ρd ρt c))
+                           (cong (_⊔ m) (ren-depthᵉ ρg ρd ρt m e)))
+                     (ren-depthᵗ ρg ρd ρt (bindᵃᵉ zeroη m e) c))
+              (ren-depthᵉ ρg ρd ρt m e)
+  ren-depthᵉ ρg ρd ρt m (scanᵉ f z e)   =
+    cong₂ _⊔_
+      (cong₂ _⊔_
+        (trans (cong (λ k → depᵗ zeroη k (renTm ρg ρd (ext∈ ρt) f))
+                     (cong₂ _⊔_ (cong (_⊔ m) (ren-depthᵉ ρg ρd ρt m e))
+                                (ren-depthᵗ ρg ρd ρt m z)))
+               (ren-depthᵗ ρg ρd (ext∈ ρt) (bindˢᵗ zeroη m z e) f))
+        (ren-depthᵗ ρg ρd ρt m z))
+      (ren-depthᵉ ρg ρd ρt m e)
+  ren-depthᵉ ρg ρd ρt m (mergeAllᵉ _ e) = ren-depthᵉ ρg ρd ρt m e
+  ren-depthᵉ ρg ρd ρt m (switchAllᵉ e)  = ren-depthᵉ ρg ρd ρt m e
+  ren-depthᵉ ρg ρd ρt m (exhaustAllᵉ e) = ren-depthᵉ ρg ρd ρt m e
+  ren-depthᵉ ρg ρd ρt m (μᵉ e)          = ren-depthᵉ (ext∈ ρg) ρd ρt m e
+  ren-depthᵉ ρg ρd ρt m (varᵉ x)        = refl
+  ren-depthᵉ ρg ρd ρt m (deferᵉ e)      = refl
 
   ren-depthᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δᵍ′ Δ Δ′ Θ Θ′ t}
-    (ρg : Ren∈ Δᵍ Δᵍ′) (ρd : Ren∈ Δ Δ′) (ρt : Ren∈ Θ Θ′)
-    (tm : Tm Γ Δᵍ Δ Θ t) → obsDepthᵗ (renTm ρg ρd ρt tm) ≡ obsDepthᵗ tm
-  ren-depthᵗ ρg ρd ρt (varᵗ x)      = refl
-  ren-depthᵗ ρg ρd ρt unit̂          = refl
-  ren-depthᵗ ρg ρd ρt (bool̂ _)      = refl
-  ren-depthᵗ ρg ρd ρt (nat̂ _)       = refl
-  ren-depthᵗ ρg ρd ρt (pairᵗ a b)   =
-    cong₂ _⊔_ (ren-depthᵗ ρg ρd ρt a) (ren-depthᵗ ρg ρd ρt b)
-  ren-depthᵗ ρg ρd ρt (fstᵗ p)      = ren-depthᵗ ρg ρd ρt p
-  ren-depthᵗ ρg ρd ρt (sndᵗ p)      = ren-depthᵗ ρg ρd ρt p
-  ren-depthᵗ ρg ρd ρt (inlᵗ a)      = ren-depthᵗ ρg ρd ρt a
-  ren-depthᵗ ρg ρd ρt (inrᵗ a)      = ren-depthᵗ ρg ρd ρt a
-  ren-depthᵗ ρg ρd ρt (caseᵗ s l r) =
-    cong suc (cong₂ _+_ (ren-depthᵗ ρg ρd ρt s)
-                        (cong₂ _⊔_ (ren-depthᵗ ρg ρd (ext∈ ρt) l)
-                                   (ren-depthᵗ ρg ρd (ext∈ ρt) r)))
-  ren-depthᵗ ρg ρd ρt (ifᵗ c a b)   =
-    cong₂ _⊔_ (cong₂ _⊔_ (ren-depthᵗ ρg ρd ρt c)
-                         (ren-depthᵗ ρg ρd ρt a))
-              (ren-depthᵗ ρg ρd ρt b)
-  ren-depthᵗ ρg ρd ρt (primᵗ _ a)   = ren-depthᵗ ρg ρd ρt a
-  ren-depthᵗ ρg ρd ρt (strmᵗ e)     = cong suc (ren-depthᵉ ρg ρd ρt e)
+    (ρg : Ren∈ Δᵍ Δᵍ′) (ρd : Ren∈ Δ Δ′) (ρt : Ren∈ Θ Θ′) (m : ℕ)
+    (tm : Tm Γ Δᵍ Δ Θ t) →
+    depᵗ zeroη m (renTm ρg ρd ρt tm) ≡ depᵗ zeroη m tm
+  ren-depthᵗ ρg ρd ρt m (varᵗ x)      = refl
+  ren-depthᵗ ρg ρd ρt m unit̂          = refl
+  ren-depthᵗ ρg ρd ρt m (bool̂ _)      = refl
+  ren-depthᵗ ρg ρd ρt m (nat̂ _)       = refl
+  ren-depthᵗ ρg ρd ρt m (pairᵗ a b)   =
+    cong₂ _⊔_ (ren-depthᵗ ρg ρd ρt m a) (ren-depthᵗ ρg ρd ρt m b)
+  ren-depthᵗ ρg ρd ρt m (fstᵗ p)      = ren-depthᵗ ρg ρd ρt m p
+  ren-depthᵗ ρg ρd ρt m (sndᵗ p)      = ren-depthᵗ ρg ρd ρt m p
+  ren-depthᵗ ρg ρd ρt m (inlᵗ a)      = ren-depthᵗ ρg ρd ρt m a
+  ren-depthᵗ ρg ρd ρt m (inrᵗ a)      = ren-depthᵗ ρg ρd ρt m a
+  ren-depthᵗ ρg ρd ρt m (caseᵗ s l r) =
+    cong₂ _⊔_
+      (trans (cong (λ k → depᵗ zeroη k (renTm ρg ρd (ext∈ ρt) l))
+                   (cong (λ k → suc k ⊔ m) (ren-depthᵗ ρg ρd ρt m s)))
+             (ren-depthᵗ ρg ρd (ext∈ ρt) (bindᵃᵗ zeroη m s) l))
+      (trans (cong (λ k → depᵗ zeroη k (renTm ρg ρd (ext∈ ρt) r))
+                   (cong (λ k → suc k ⊔ m) (ren-depthᵗ ρg ρd ρt m s)))
+             (ren-depthᵗ ρg ρd (ext∈ ρt) (bindᵃᵗ zeroη m s) r))
+  ren-depthᵗ ρg ρd ρt m (ifᵗ c a b)   =
+    cong₂ _⊔_ (cong₂ _⊔_ (ren-depthᵗ ρg ρd ρt m c)
+                         (ren-depthᵗ ρg ρd ρt m a))
+              (ren-depthᵗ ρg ρd ρt m b)
+  ren-depthᵗ ρg ρd ρt m (primᵗ _ a)   = ren-depthᵗ ρg ρd ρt m a
+  ren-depthᵗ ρg ρd ρt m (strmᵗ e)     = cong suc (ren-depthᵉ ρg ρd ρt m e)
 
   ren-depthᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δᵍ′ Δ Δ′ Θ Θ′ t}
-    (ρg : Ren∈ Δᵍ Δᵍ′) (ρd : Ren∈ Δ Δ′) (ρt : Ren∈ Θ Θ′)
+    (ρg : Ren∈ Δᵍ Δᵍ′) (ρd : Ren∈ Δ Δ′) (ρt : Ren∈ Θ Θ′) (m : ℕ)
     (ts : List (Tm Γ Δᵍ Δ Θ t)) →
-    obsDepthᵗˢ (renTms ρg ρd ρt ts) ≡ obsDepthᵗˢ ts
-  ren-depthᵗˢ ρg ρd ρt []       = refl
-  ren-depthᵗˢ ρg ρd ρt (y ∷ ys) =
-    cong₂ _⊔_ (ren-depthᵗ ρg ρd ρt y) (ren-depthᵗˢ ρg ρd ρt ys)
+    depᵗˢ zeroη m (renTms ρg ρd ρt ts) ≡ depᵗˢ zeroη m ts
+  ren-depthᵗˢ ρg ρd ρt m []       = refl
+  ren-depthᵗˢ ρg ρd ρt m (y ∷ ys) =
+    cong₂ _⊔_ (ren-depthᵗ ρg ρd ρt m y) (ren-depthᵗˢ ρg ρd ρt m ys)
 
 -- LOAD-BEARING, AND IT IS THE WHOLE MECHANISM: one application, one
 -- layer.  The row fails the moment substitution stops reifying an
 -- observable under `strmᵗ`, which is the only reason the climb exists
 step-deepens : ∀ (a : Val Γ₀ (obs natᵗ)) (v : Val Γ₀ natᵗ) →
   depth (obs natᵗ) (applyFn bump (a , v)) ≡ suc (depth (obs natᵗ) a)
-step-deepens a v = cong suc (ren-depthᵉ (λ ()) (λ ()) (λ ()) a)
+step-deepens a v = cong suc (ren-depthᵉ (λ ()) (λ ()) (λ ()) 0 a)
 
 ----------------------------------------------------------------------
 -- THE BURST, AND WHERE THE DEEPEST OUTPUT SITS IN IT.

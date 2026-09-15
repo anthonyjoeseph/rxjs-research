@@ -1,4 +1,4 @@
--- THE REFUTATION TREE'S APPARATUS: the zero environment and the four
+-- THE REFUTATION TREE'S APPARATUS: the zero environment and the three
 -- readings taken against it, which is what every witness here is
 -- written in.
 --
@@ -17,23 +17,19 @@
 module Refuted.Apparatus where
 
 open import Data.Fin using (Fin)
-open import Data.List using (List)
 open import Data.Nat using (ℕ)
 
 open import Rx.Exp using (Ty; Ctx; Exp; Tm; Val)
-open import Rx.Obs-Depth using (depᵉ; depᵗ; depᵗˢ; depᵛ)
+open import Rx.Obs-Depth using (depᵉ; depᵗ; depᵛ)
 
 zeroη : ∀ {n} → Fin n → ℕ
 zeroη _ = 0
 
 obsDepthᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → Exp Γ Δᵍ Δ Θ t → ℕ
-obsDepthᵉ = depᵉ zeroη
+obsDepthᵉ = depᵉ zeroη 0
 
 obsDepthᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → Tm Γ Δᵍ Δ Θ t → ℕ
-obsDepthᵗ = depᵗ zeroη
-
-obsDepthᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → List (Tm Γ Δᵍ Δ Θ t) → ℕ
-obsDepthᵗˢ = depᵗˢ zeroη
+obsDepthᵗ = depᵗ zeroη 0
 
 obsDepthᵛ : ∀ {n} {Γ : Ctx n} (t : Ty) → Val Γ t → ℕ
 obsDepthᵛ = depᵛ zeroη
