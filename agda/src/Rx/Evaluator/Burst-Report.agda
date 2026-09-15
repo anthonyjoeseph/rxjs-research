@@ -441,8 +441,16 @@ map-handed {s = s} η fn (v ∷ vs) le (p ∷ᵃ ps) =
 -- REFUTED: `Refuted.Scan-Length` — this statement, at an ordinary
 --   five-element burst of plain numbers.  The length reservation is
 --   asked of `r` by the conclusion and related to nothing by the
---   premises, so the leaf is false as written and no figure repairs it:
---   the repair is a premise carrying the count, not a cleverer witness.
+--   premises, so the leaf is false as written and no figure repairs it.
+-- REFUTED: `Refuted.Burst-Length` — and the premise that would carry
+--   the count, killed at the only channel able to hold one.  A count is
+--   readable where the walk seeds a frame's rank, but that site builds
+--   a derivation while this leaf is owed over one, and the single
+--   length-shaped component between them is outgrown by one instant of
+--   a doubling cascade.  So restating this with the count as a premise
+--   moves tracked debt into a hypothesis nothing can discharge; what
+--   the leaf is owed is a quantity read off the RUN, which is a change
+--   to what the entry carries rather than to what this states.
 postulate
   scan-fits : ∀ {n} {Γ : Ctx n} {s u} {U q sz r} (η : Fin n → ℕ)
     (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (ac : Val Γ u) (vs : List (Val Γ s))

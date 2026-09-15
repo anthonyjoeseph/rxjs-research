@@ -104,3 +104,14 @@ open import Refuted.Template-Passes using (template-strict-false;
 open import Refuted.Case-Binds using (case-join-false;
   scrut-is; left-is; right-is; joined-is; emission-is)
 
+
+-- and the same climb in the COUNT rather than the depth, which is what
+-- says the fold's leaf is owed in a currency the entry does not carry.
+-- Its two lists are claimed because the finding is their crossing: the
+-- run's peak doubles per delivery while the reading gains one per
+-- literal, so the rows meet once and part for good — and the three
+-- rows that HOLD are why the bound reads true from small cases.  A
+-- repair moving either end alone leaves a witness reporting numbers
+-- that no longer meet
+open import Refuted.Burst-Length using (sync-bounds-burst-false;
+  peaks-are; sizes-are)
