@@ -229,26 +229,17 @@ does.
 
 ### Big picture tier roadmap
 
-- **WIDEN WHAT A BUILDER RETURNS, WHICH NOW GATES THE COUNT AS WELL AS THE
-  WALK.** Every
-  premise is denominated at one `slotDepth sl` the caller fixes, and each clause
-  carries an agreement `Sched.slots sched ≡ sl`. Three sites are handed a
-  schedule some other clause built — `subs-keeps-slots`, `step-keeps-slots`,
-  `consume-keeps-slots` — all stated as inductions over the ⇓ family they cannot
-  perform; carrying the equation in the RESULT type discharges all three. It
-  moves every clause's return, which is why it was last; it is first because
-  `connect-carries` cannot be walked without it, per the leg below — and
-  because the result type is now the only place a burst's LENGTH can arrive
-  from, the entry having been refuted as its carrier.
-
-- **THE ARM THAT FOLLOWS THE RUN OUT OF THE STORE.** `burst-carries`,
-  `all-carries` and `slot-carries` all walked; what is left is
-  `connect-carries`. Three pieces: `BurstOK` widening along a rank domination
-  the caller's premise already supplies, `sharedPlumb` preservation (it rewrites
-  only `kind`, and the predicate reads only `events`), and a recursion at the
-  slot's own triple — structural on the derivation, so a clause of the existing
-  block rather than a leaf. It needs the agreement at a schedule it did not
-  build, which is the leg above.
+- **WIDEN WHAT A BUILDER RETURNS, WHICH IS NOW THE BUILDER'S OWN BOOKKEEPING
+  AND NOTHING ABOVE IT.** Every premise is denominated at one `slotDepth sl`
+  the caller fixes, and each clause carries an agreement `Sched.slots sched ≡
+  sl`. Three sites are handed a schedule some other clause built —
+  `subs-keeps-slots`, `step-keeps-slots`, `consume-keeps-slots` — all stated as
+  inductions over the ⇓ family they cannot perform; carrying the equation in
+  the RESULT type discharges all three. What it no longer gates is the REPORT:
+  the walk carries its own agreement across every recursion for free, because a
+  constructor hands its sub-derivation the schedule it was entered at, so the
+  widening was never what the share arm waited on. The leg answers to the
+  builder alone.
 
 - **AND THE TWO FRAME HEADS THAT LEAVE THE MODULE.** The frame walk is a body
   at every head that rewrites a payload; what is left are the two that do not.
@@ -303,11 +294,6 @@ does.
   relevant: `scan-fits`, `inner-handed`, `thru-handed`
 
 ### The ledger
-
-- **`connect-carries`** (Rx/Evaluator/Burst-Report) — FALSITY, `REFUTED`: the
-  one arm of the burst report that re-enters the subscribe. The caller's
-  premise already dominates the slot's rank; what is missing between them is
-  that `BurstOK` may be WIDENED along that domination. Where the field is owed.
 
 - **`inner-handed`, `thru-handed`** (Rx/Evaluator/Burst-Report) — FALSITY,
   `PROBED×2`: the two `*All` heads, which rewrite no payload — they subscribe
