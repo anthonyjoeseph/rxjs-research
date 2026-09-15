@@ -475,6 +475,34 @@ connect-entry sl i eq = ≤-refl , ≤-reflexive (sym (slotDepth-fix sl i eq))
 --   is the same answer with a larger constant.  It is the BUDGET that
 --   is dead and not the syntax: a figure compared at the hop is never
 --   asked to dominate an emission, only to be dropped by one.
+
+-- AND THE SECOND COMPONENT DOES NOT SURVIVE EITHER, WHICH IS WHAT THE
+-- SECTION ABOVE WAS RELYING ON.  Its last sentence keeps the
+-- syntax alive by saying the rank is only ever asked to be DROPPED BY
+-- ONE at the hop, never to dominate an emission -- but `ValOK` at `obs`
+-- is exactly a domination, every value a frame is handed has to read
+-- strictly under the rank, and a value read above the entry's figure
+-- can be dropped by one for ever without getting under it.  A fold that
+-- re-wraps its accumulator deepens it once per delivery and the number
+-- of deliveries one instant carries is not bounded by any reading, so
+-- composing the two puts a value above the entry at a program four
+-- symbols long.
+--
+-- AND THE ENTRY'S FIGURE IS A CEILING AND NOT A STARTING POINT, WHICH IS
+-- THE HALF THAT MAKES THE WITNESS DECISIVE.  Of the three edges only the
+-- connect leaves the rank free, and it fires on a drop in the
+-- unconnected-share count -- so with no slots on the table there is no
+-- edge that raises it, and no frame of that run is reachable at a rank
+-- the entry did not already name.  What the witness does NOT settle is
+-- a context that HAS shares, where a connect may re-enter higher; that
+-- is the one region left, and it is the share question rather than this
+-- one.
+--
+-- REFUTED: `Refuted.Entry-Depth` — the reading against a run, over four
+--   programs whose emitted depth doubles while the figure does not move
+--   at all.  One side CONSTANT is what says no multiple of the reading
+--   and no wider syntactic measure repairs it, and the first row holds,
+--   which is why a syntactic rank reads true from small programs.
 entryTri : ∀ {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → ℕ → Tri
 entryTri e sl m = unconn sl []
                 , depᵉ (slotDepth sl) 0 e ⊔ m

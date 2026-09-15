@@ -524,6 +524,15 @@ map-handed {s = s} η fn (v ∷ vs) le (p ∷ᵃ ps) =
 --   moves tracked debt into a hypothesis nothing can discharge; what
 --   the leaf is owed is a quantity read off the RUN, which is a change
 --   to what the entry carries rather than to what this states.
+-- REFUTED: `Refuted.Entry-Depth` — and the component such a change
+--   would be made against, killed in the same currency.  This leaf's
+--   two predecessors are its own halves: a fold deepens once per
+--   delivery, a cascade decides how many deliveries there are, and
+--   composing them puts an emitted value above the figure the entry
+--   fixed.  So the restatement this row is waiting for is not a
+--   reservation joined into the rank — the rank is the wrong side of
+--   the comparison, and what is owed above this leaf is a bound the
+--   entry cannot name at all.
 postulate
   scan-fits : ∀ {n} {Γ : Ctx n} {s u} {U q sz r} (η : Fin n → ℕ)
     (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (ac : Val Γ u) (vs : List (Val Γ s))

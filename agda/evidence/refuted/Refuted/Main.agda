@@ -128,3 +128,16 @@ open import Refuted.Burst-Length using (sync-bounds-burst-false;
 -- rather than leaving the witness quiet
 open import Refuted.Scripted-Connect using (connect-drops-false;
   row-before; row-after; row-absent)
+
+-- and the two above COMPOSED, which is the entry's own reading taken
+-- against a run rather than a leaf's.  A fold that re-wraps its
+-- accumulator deepens it once per delivery, and the cascade decides
+-- how many deliveries an instant carries, so the deepest value a run
+-- emits doubles across the family while the figure the caller fixed
+-- before the run existed does not move at all.  Both lists are claimed
+-- because the finding is again a crossing, and this one is the sharper
+-- kind: one side is CONSTANT, so no multiple of the reading and no
+-- wider syntactic measure closes it.  The first row HOLDS, which is
+-- why a syntactic rank reads true from small programs
+open import Refuted.Entry-Depth using (entry-depth-bounds-run-false;
+  run-peaks-are; entry-reads-are; no-connect-edge)
