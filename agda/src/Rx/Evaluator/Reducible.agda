@@ -231,15 +231,18 @@ satOneShot id sched ps = (tt ∷ satEvents ps (tt ∷ tt ∷ [])) ∷ []
 -- itself runs -- it just has to be SAID, because a slot's element type
 -- is `lookup Γ i` and no reduction fires on a neutral index.  What
 -- carries it is the side condition every scripted slot already holds.
-red-data : ∀ {n} {Γ : Ctx n} (u : Ty) → T (isData u) → (v : Val Γ u)
-         → Red {Γ = Γ} u v
-
 -- THE PRODUCT AND SUM ARMS OF `isData` GUARD ON THE LEFT FACTOR, so
 -- the witness has to be taken apart before either side can be used.
+-- It sits ABOVE rather than between the signature and the clauses
+-- because this module has NO multi-member block and that is worth
+-- keeping: the dev loop stubs such a block, so a module without one is
+-- checked for real, termination included.
 T-if : ∀ (b c : Bool) → T (if b then c else false) → T b × T c
 T-if true  c ok = tt , ok
 T-if false c ()
 
+red-data : ∀ {n} {Γ : Ctx n} (u : Ty) → T (isData u) → (v : Val Γ u)
+         → Red {Γ = Γ} u v
 red-data unitᵗ    _  _       = tt
 red-data natᵗ     _  _       = tt
 red-data boolᵗ    _  _       = tt

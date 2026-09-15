@@ -224,45 +224,41 @@ derivation, so the descent is a proof obligation rather than a reading the
 machine computes and the dry marker is unemittable — no constructor of the
 relation builds one.
 
-**AND THE TIER IS THE CANDIDATE'S OWN INDUCTION.** `reducible` is a body
-recursing structurally on the term; every arm with a subterm calls itself at a
-schedule and a state the arm has already moved, and the candidate's
-quantification over every state is what makes those calls free. What is left is
-the arms that have no subterm to recurse on — a slot, a frame push, a term's
-value, the flatteners' hop, the μ peel — each a leaf whose fit is checked by the
-body that spends it.
+**AND THE TIER RETIRES ON NO POSTULATE AT ALL (Anthony).** `reducible` is a
+body recursing structurally on the term, and its remaining leaves are the arms
+with no subterm to recurse on. This tier is done when that definition stands on
+NONE of them. The shape they end up taking is free — what is not free is leaving
+one postulated, which is risk carried under every tier above rather than work
+deferred beside it.
 
 ### Big picture tier roadmap
 
-- **THE μ PEEL, WHICH IS THE ONE PLACE THE CANDIDATE HAS NO DESCENT.** State
-  threading is answered and the slot's scripted half is proven, so what is left
-  here separates cleanly into two dangerous statements and a mechanical shelf,
-  and this is the sharper of the two. Everywhere else `Red` either moves the
-  type strictly down or does not move it while the TERM shrinks; a μ moves
-  neither — the unfolding sits at the same type and is no subterm of its own
-  fixpoint. So the leaf is a fixpoint at one type, nothing in the body can reach
-  it, and whether the candidate can be closed there at all is prior to every
-  grind under it. Refute it or find the shape; do not grind it.
+- **SETTLE `red-μ` FIRST, BY DISCHARGE OR BY REFUTATION.** The one place the
+  candidate has no descent whatever: everywhere else `Red` either moves the type
+  strictly down or holds it while the TERM shrinks, and a μ does neither — the
+  unfolding sits at the same type and is no subterm of its own fixpoint. So
+  nothing in the body can reach it, and whether the candidate can be closed there
+  at all is a question about the candidate rather than about this statement. It
+  goes first because a refutation here reaches back into the candidate itself and
+  would cost every grind standing on it. Both outcomes retire the leg; what does
+  not is weakening the statement until it goes through.
 
-- **THEN THE HOP — `switchAll` / `exhaustAll` / `mergeAll` TO A GRINDABLE
-  STATE.** The flatteners are
-  where the type genuinely descends — `obs (obs u)` becoming `obs u` — so they
-  are the arms the candidate was chosen for, and also the ones that run a node
-  store, kill a live inner, and refuse a second. Each already takes the outer's
-  candidate at the higher type, which is where the inners arrive reducible;
-  whether that delivers a usable candidate at the state the hop reaches is the
-  open question. Not a full proof: the leg's product is the assembly plus leaves
-  whose shapes are settled and whose routes are written down.
+- **THEN THE THREE FLATTENERS, ON THE SAME TERMS.** The hop, where the type
+  genuinely descends and where the inners arrive out of a burst standing in no
+  relation to the term that produced them. Each already takes the outer's
+  candidate at the higher type; whether that is still usable at the state the hop
+  reaches is the tier's open question, and answering it is this leg. Second for
+  the same reason `red-μ` is first — a refutation here moves the candidate's
+  interface, not just these three rows. The queue, the switch's kill, the
+  exhaust's refusal and the concurrency limit are all inside it.
 
-- **THEN THE MECHANICAL SHELF, WHICH IS THE REST OF THE LEDGER AND NONE OF THE
-  RISK.** Three statements, and the reason to name them as one leg is that none
-  of them can move the ground: a frame push consumes a burst it is handed and
-  threads the state on; a term's own value is the same theorem one level down,
-  mutual with the body through the expression embedding; and a share's connect
-  is the sub-arm the state quantification was chosen to answer, with two of its
-  three cases already value-free and proven. This is the delegation boundary —
-  the shelf is where the grind goes once the two legs above have decided the
-  shapes it must be written against.
+- **THEN THE MECHANICAL SHELF, LAST AND DELIBERATELY.** A frame push, a term's
+  own value and a share's connect. They are one leg because none of them can move
+  the ground, and they are last because the two legs above can still change what
+  they must be written against: the flatteners' bodies CALL `red-push`, and
+  `red-push` reaches a term's value. Grinding them before the risk above settles
+  buys work that a restatement upstream would throw away, which is the whole
+  reason the ordering is stated rather than left to whatever is nearest.
 
 - **THEN WHATEVER DESIGN WORK REMAINS.** The candidate funds `Runs` and nothing
   else; the other eight `*Runs` families have no candidate and the bet is that
