@@ -234,14 +234,15 @@ deferred beside it.
 ### Big picture tier roadmap
 
 - **DECIDE WHAT THE STORE OWES THE CANDIDATE, BEFORE GRINDING ANY OF THE FOUR
-  STATEFUL FRAMES.** The step split cleanly and the mapping frame fell out as a
-  body, which makes the remaining shape legible: each of `red-scan`,
-  `red-take`, `red-from-inner` and `red-thru` READS a node this face installed
+  STATEFUL FRAMES.** Each of `red-scan`, `red-take`, `red-from-inner` and
+  `red-thru` READS a node this face installed
   earlier, and `Red` quantifies over every state with no precondition — strong
   where it produces, silent where it consumes. So the fact each needs is in no
-  hypothesis and cannot be put in one without laundering the row. Decide
-  whether `EvalSt` gains a reducibility invariant over what its nodes hold,
-  preserved by every step. Four grinds hang off the answer.
+  hypothesis and cannot be put in one without laundering the row. The census
+  says the invariant is small — an `All` over an assoc list, with three of five
+  node constructors holding no value. But it cannot be a FIELD: `Red` sits
+  above `EvalSt` and cannot move down. Decide what carries it instead, and
+  price the mergeAll dequeue. Four grinds hang off the answer.
 
 - **THEN RUN A SELF-REFERENTIAL μ, IN THE CORPUS RATHER THAN IN A PROBE.** The
   peel is now paid for by a size the unfolding does not move, and what funds that
