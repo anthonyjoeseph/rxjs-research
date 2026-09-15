@@ -68,6 +68,8 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; AllOp; NodeId; Node
   unconn; memberSource; share-sink; lowerFloor; register; atSlot; burstCompleted;
   Arrival; arrTick; arrSource; arrTy; arrVal; AtFloor; RegId; chainsOf;
   cascadeLatch; sched-next; shareAdmit; shareLatch)
+open import Rx.Evaluator.Keeps-Slots using (subs-keeps; step-keeps;
+  consume-keeps; switchKill-slots)
 open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeAll⇓; pushBurst⇓;
   stepFrame⇓; innerReact⇓; innerFinish⇓; mergeAllDrain⇓; thruWalk⇓;
   thruConsume⇓; subscribeInner⇓;
@@ -179,40 +181,11 @@ DrainsQ {e = e} allNid κ id now lim act od q sched st =
 -- the consume inside the walk.  Everywhere else the schedule is this
 -- clause's own record update, where the equation holds definitionally.
 --
--- DEAD ROUTE: proving each of the three as an induction over the ⇓
---   family, which is how all three are stated.  It is dead structurally
---   rather than by being long: the family's mutual block is the
---   builder's own, so the induction has to re-walk every clause of a
---   recursion whose accessibility argument it does not carry, and the
---   equation it would establish at each step is one that clause ALREADY
---   holds.  The repair is to widen what a builder RETURNS, which closes
---   all three at once and leaves the obligation on the two leaves that
---   hand back a schedule nothing here built.
-postulate
-  subs-keeps-slots : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
-    {b : Closed Γ u} {κ : Path Γ lo u t} {id : Id} {now : Tick}
-    {sched : Sched Γ} {st : EvalSt e} {burst : Stream Γ u}
-    {sched′ : Sched Γ} {st′ : EvalSt e} →
-    subscribeE⇓ {e = e} b κ id now sched st (burst , sched′ , st′) →
-    Sched.slots sched′ ≡ Sched.slots sched
-
-  step-keeps-slots : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
-    {id : Id} {now : Tick} {fr : Frame Γ s u} {κ : Path Γ lo u t}
-    {vals : List (Val Γ s)} {fin : Bool} {sched : Sched Γ} {st : EvalSt e}
-    {vals′ : List (Val Γ u)} {evs : List (InstEvent (Val Γ t))} {fin′ : Bool}
-    {sched′ : Sched Γ} {st′ : EvalSt e} →
-    stepFrame⇓ {e = e} id now fr κ vals fin sched st
-      (vals′ , evs , fin′ , sched′ , st′) →
-    Sched.slots sched′ ≡ Sched.slots sched
-
-  consume-keeps-slots : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
-    {op : AllOp} {nid : NodeId} {κ : Path Γ lo u t} {id : Id} {now : Tick}
-    {o : Val Γ (obs u)} {sched : Sched Γ} {st : EvalSt e}
-    {vals′ : List (Val Γ u)} {evs : List (InstEvent (Val Γ t))}
-    {sched′ : Sched Γ} {st′ : EvalSt e} →
-    thruConsume⇓ {e = e} op nid κ id now o sched st
-      (vals′ , evs , sched′ , st′) →
-    Sched.slots sched′ ≡ Sched.slots sched
+-- AND ALL THREE ARE PROVEN NEXT DOOR, as one structural induction over
+-- the family's own SCC: no constructor writes the table, so each is
+-- `refl` at a leaf and a recursion elsewhere.  They are imported rather
+-- than restated because the walk needs every member of the block and
+-- the block is not this module's.
 
 -- AND THE SAME THREE SITES OWE THE OTHER AGREEMENT, WHICH IS THE ONE
 -- THE CONNECT'S EDGE READS.  A clause handing a LATER state onward is
@@ -231,6 +204,13 @@ postulate
 -- produced it; a single claim about `EvalSt` would have to quantify
 -- over states no run reaches, which is the shape three refutations on
 -- this face have already killed.
+--
+-- TWIN: `Rx.Evaluator.Keeps-Slots.subs-keeps` and its block, which is
+--   this same claim about the schedule's other half over this same SCC:
+--   `refl` at every leaf, a recursion at every structural arm, and a
+--   function lemma at each of the three schedules a clause does not
+--   build itself.  The only arms that move the share set are the two
+--   connects, and both ADD an index.
 postulate
   subs-unconn-drops : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
     {b : Closed Γ u} {κ : Path Γ lo u t} {id : Id} {now : Tick}
@@ -259,18 +239,6 @@ postulate
       (vals′ , evs , sched′ , st′) →
     unconn sl (EvalSt.connectedShares st′)
       ≤ unconn sl (EvalSt.connectedShares st)
-
--- THE SWITCH'S KILL IS THE ONE OF THE FOUR THAT IS NOT A RELATION, so it
--- is a function and the fact is two clauses of `refl`.  It is stated
--- over the whole triple rather than over a named schedule because the
--- consume clause reaches it through a `with … in`, which hands back the
--- equation at the tuple the pattern bound.
-switchKill-slots : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (cur : Maybe NodeId) (sched : Sched Γ) (st : EvalSt e) {res} →
-  switchKill cur sched st ≡ res →
-  Sched.slots (proj₁ (proj₂ res)) ≡ Sched.slots sched
-switchKill-slots nothing  sched st refl = refl
-switchKill-slots (just v) sched st refl = refl
 
 -- and its share set, which it does not touch at all: the kill closes an
 -- inner and drops a registration, so the count is the same number and
@@ -417,7 +385,7 @@ subscribeE! ac sl (mapᵉ f b) ok κ id now sched ag st ub =
         subscribeE! ac sl b (inner-ok ok) (map-f f ↠ κ) id now sched ag st ub
       (r , p) = pushBurst! ac sl id now (map-f f) tt κ burst
                   (burst-carries sl ag (inner-ok ok) d) sched₁
-                  (trans (subs-keeps-slots d) ag) st₁
+                  (trans (subs-keeps d) ag) st₁
                   (≤-trans (subs-unconn-drops sl d) ub)
   in r , subs-map d p
 
@@ -432,7 +400,7 @@ subscribeE! ac sl (takeᵉ c b) ok κ id now sched ag st ub
                     (installNode nid (take-st (suc k)) st) ub
       (r , p) = pushBurst! ac sl id now (take-f nid) tt κ burst
                   (burst-carries sl ag (inner-ok ok) d) sched₂
-                  (trans (subs-keeps-slots d) ag) st₁
+                  (trans (subs-keeps d) ag) st₁
                   (≤-trans (subs-unconn-drops sl d) ub)
   in r , subs-take-suc eq refl d p
 
@@ -444,7 +412,7 @@ subscribeE! ac sl (scanᵉ f z b) ok κ id now sched ag st ub =
                     (installNode nid (scan-st (evalTm z)) st) ub
       (r , p) = pushBurst! ac sl id now (scan-f f nid) tt κ burst
                   (burst-carries sl ag (inner-ok ok) d) sched₂
-                  (trans (subs-keeps-slots d) ag) st₁
+                  (trans (subs-keeps d) ag) st₁
                   (≤-trans (subs-unconn-drops sl d) ub)
   in r , subs-scan refl d p
 
@@ -488,7 +456,7 @@ subscribeAll! ac sl op ns b ok κ id now sched ag st ub =
                     (installNode nid ns st) ub
       (r , p) = pushBurst! ac sl id now (thru-outer op nid) tt κ burst
                   (burst-carries sl ag ok d) sched₂
-                  (trans (subs-keeps-slots d) ag) st₁
+                  (trans (subs-keeps d) ag) st₁
                   (≤-trans (subs-unconn-drops sl d) ub)
   in r , sub-all refl d p
 
@@ -516,7 +484,7 @@ pushBurst! ac sl id now fr sv κ (em ∷ ems) bk sched ag st ub =
           (split-handed (slotDepth sl) (InstEmit.events em) (headᵃ bk))
           (proj₂ (proj₂ sp)) sched ag st ub
       (_ , pb) = pushBurst! ac sl id now fr sv κ ems (tailᵃ bk) sched₁
-                   (trans (step-keeps-slots sf) ag) st₁
+                   (trans (step-keeps sf) ag) st₁
                    (≤-trans (step-unconn-drops sl sf) ub)
   in _ , push-cons refl sf pb
 
@@ -554,7 +522,7 @@ thruWalk! ac sl op nid κ id now (o ∷ os) hk sched ag st ub =
   let ((vs , bs , sched₁ , st₁) , c) =
         thruConsume! ac sl op nid κ id now o (headᵃ hk ∷ᵃ []ᵃ) sched ag st ub
       (_ , w) = thruWalk! ac sl op nid κ id now os (tailᵃ hk) sched₁
-                  (trans (consume-keeps-slots c) ag) st₁
+                  (trans (consume-keeps c) ag) st₁
                   (≤-trans (consume-unconn-drops sl c) ub)
   in _ , walk-cons c w
 

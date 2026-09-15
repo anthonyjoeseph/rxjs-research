@@ -229,17 +229,15 @@ does.
 
 ### Big picture tier roadmap
 
-- **WIDEN WHAT A BUILDER RETURNS, WHICH IS NOW THE BUILDER'S OWN BOOKKEEPING
-  AND NOTHING ABOVE IT.** Every premise is denominated at one `slotDepth sl`
-  the caller fixes, and each clause carries an agreement `Sched.slots sched ≡
-  sl`. Three sites are handed a schedule some other clause built —
-  `subs-keeps-slots`, `step-keeps-slots`, `consume-keeps-slots` — all stated as
-  inductions over the ⇓ family they cannot perform; carrying the equation in
-  the RESULT type discharges all three. What it no longer gates is the REPORT:
-  the walk carries its own agreement across every recursion for free, because a
-  constructor hands its sub-derivation the schedule it was entered at, so the
-  widening was never what the share arm waited on. The leg answers to the
-  builder alone.
+- **WALK THE OTHER HALF OF WHAT A RUN DOES NOT TOUCH.** The slot half is a
+  body: one structural induction over the subscribe family's SCC, `refl` at
+  every leaf, three function lemmas for the schedules a clause hands to
+  `oneShotBurst`, `takeDispatch` and `switchKill`. The count half —
+  `subs-unconn-drops`, `step-unconn-drops`, `consume-unconn-drops` — is the
+  same shape over the same block, and the only arms that move the set are the
+  two connects, which ADD an index and so drop the count. The leg is that walk,
+  and what it settles is whether the fall is monotone at every arm or whether
+  one of them re-opens a share the builder has already spent.
 
 - **AND THE TWO FRAME HEADS THAT LEAVE THE MODULE.** The frame walk is a body
   at every head that rewrites a payload; what is left are the two that do not.
@@ -319,12 +317,10 @@ does.
   a five-element burst, and the premise that would carry the count refuted in
   turn at the only channel able to hold one. The count is owed from the run.
 
-- **`subs-keeps-slots`, `step-keeps-slots`, `consume-keeps-slots`,
-  `subs-unconn-drops`, `step-unconn-drops`, `consume-unconn-drops`**
-  (Rx/Evaluator/Builder) — SHAPE, `DEAD ROUTE×3`: what a derivation left the
-  state at three ⇓ families — slot table unchanged, unconnected count only
-  falling. Stated as inductions over the mutual block; the route carries both
-  in the RESULT type, so a restatement is guaranteed.
+- **`subs-unconn-drops`, `step-unconn-drops`, `consume-unconn-drops`**
+  (Rx/Evaluator/Builder) — DIFFICULTY, `TWIN×3`: the unconnected count only
+  falls across three ⇓ families. Its slot twin is proven as a walk of the same
+  block.
 
 
 ## Tier 2 — Verify-Well-Formed (parked behind tier 1)
