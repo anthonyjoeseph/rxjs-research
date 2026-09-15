@@ -493,10 +493,13 @@ connect-entry sl i eq = ≤-refl , ≤-reflexive (sym (slotDepth-fix sl i eq))
 -- connect leaves the rank free, and it fires on a drop in the
 -- unconnected-share count -- so with no slots on the table there is no
 -- edge that raises it, and no frame of that run is reachable at a rank
--- the entry did not already name.  What the witness does NOT settle is
--- a context that HAS shares, where a connect may re-enter higher; that
--- is the one region left, and it is the share question rather than this
--- one.
+-- the entry did not already name.  A context that HAS shares does not
+-- rescue anything, and reading the coverage that way is the mistake to
+-- avoid: the claim is universal, so an empty-context program that fails
+-- it kills it outright.  What a share context could still hold is a
+-- different REPAIR, since a connect is the one edge free to re-enter
+-- higher -- which is a question about the mechanism and not about
+-- whether this one survives.
 --
 -- REFUTED: `Refuted.Entry-Depth` — the reading against a run, over four
 --   programs whose emitted depth doubles while the figure does not move
