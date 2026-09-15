@@ -104,3 +104,14 @@ StreamSat-plumb : ∀ {n} {Γ : Ctx n} {u} {P : Val Γ u → Set} (str : Stream 
                 → StreamSat P str → StreamSat P (sharedPlumb str)
 StreamSat-plumb []       []ᵃ        = []ᵃ
 StreamSat-plumb (x ∷ xs) (p ∷ᵃ ps) = p ∷ᵃ StreamSat-plumb xs ps
+
+-- THE FUNDAMENTAL LEMMA, WHICH IS THE WHOLE OF WHAT IS OWED.  Every
+-- closed expression is reducible, and the builder's subscribe cluster
+-- is its consumer rather than its competitor: the clauses that cluster
+-- writes are the cases this induction has to take, and the rank they
+-- used to thread is what the type's own descent replaces.  Stated
+-- unconditionally because nothing narrows it — a slot telescope
+-- carries its stratification in the slot record, so a scheduler that
+-- typechecks is already one this can be instantiated at.
+postulate
+  reducible : ∀ {n} {Γ : Ctx n} {t} (b : Closed Γ t) → Red {Γ = Γ} (obs t) b

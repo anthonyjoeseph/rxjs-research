@@ -94,6 +94,7 @@ open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeAll⇓; pushBurst
   subs-cold-async; slot-spent; slot-join; slot-connect; connect-live;
   connect-died)
 open import Rx.Evaluator.Burst-Report using (burst-carries; depᵛˢ; handed-below)
+open import Rx.Evaluator.Reducible using (reducible)
 open import Rx.Evaluator.Doorless using (μ-edge; μ-entry; rootWitness;
   EntryOK; SharesUnder; inner-ok; under-ok; HandedOK; BurstOK; split-handed;
   hop-edge; hop-guard; connect-edge; connect-entry)
@@ -875,9 +876,8 @@ drain! (suc k) id sched st with sched-next sched in eqn
 evaluate! : ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t)
   (ins : Slots Γ) → ∃ λ out → evaluate⇓ fuel e ins out
 evaluate! {n = n} fuel e ins =
-  let ((burst , sched₀ , st₀) , s) =
-        subscribeE! {lo = n} (rootWitness e ins) ins e (≤-refl , m≤m⊔n _ _)
-                    root 0 0 (sched-init e ins) refl (st-init e) ≤-refl
+  let ((burst , sched₀ , st₀) , s , _) =
+        reducible e root 0 0 (sched-init e ins) (st-init e)
       (rest , d) = drain! fuel 1 sched₀ st₀
   in (burst ++ rest) , eval-run s d
 
