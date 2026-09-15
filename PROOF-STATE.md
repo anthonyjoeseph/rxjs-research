@@ -233,15 +233,14 @@ deferred beside it.
 
 ### Big picture tier roadmap
 
-- **NOW WRITE THE PUSH'S BODY, ONE FRAME AT A TIME.** The statement is
-  instantiated where it was doubted: an outer carrying a real observable, at all
-  three operators, with mergeAll refusing it at a zero limit and queueing
-  instead — and the inner's own subscription derivation coming back, so the
-  candidate is spent rather than merely carried. What that leaves is a proof,
-  not a question. Take the frames in the order the walk does — map, then the
-  flattening walk, then scan and take, whose dispatch reads a node the rows
-  above never made non-empty — and postulate whatever each frame's step still
-  owes rather than widening the push.
+- **NOW DISCHARGE THE STEP, ONE FRAME AT A TIME.** The burst walk is a body
+  and the leaf under it is a single frame at a single arriving batch, which is
+  where every operator actually lives. `map-f` is an `applyFn` over the batch
+  and should fall to the term leaf; `scan-f` and `take-f` dispatch on a node
+  the rows above never made non-empty, and that dispatch is the first place
+  this face reads stored state it did not just install; the flattening walk is
+  already instantiated at all three operators and is a fold. Take them in that
+  order and postulate what each still owes rather than widening the step.
 
 - **THEN RUN A SELF-REFERENTIAL μ, IN THE CORPUS RATHER THAN IN A PROBE.** The
   peel is now paid for by a size the unfolding does not move, and what funds that
@@ -278,10 +277,9 @@ deferred beside it.
   `DEAD ROUTE, PROBED`: a share's slot is reducible. Its def is drawn from the
   table rather than the term, so no descent this module can see reaches it.
 
-- **`red-push`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`: pushing a
-  satisfying burst through a frame yields a total derivation and a satisfying
-  result. Inhabited now at every operator's reading of an empty node; a node
-  already holding something is unreached.
+- **`red-step`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`: one frame, one
+  arriving batch. Inhabited at every operator's reading of an empty node; a node
+  already holding something is unreached, and so is scan and take.
 
 - **`red-tm`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`: every closed
   term's value is reducible. Mutual with the body through the expression

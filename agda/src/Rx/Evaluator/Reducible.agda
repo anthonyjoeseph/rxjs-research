@@ -35,6 +35,7 @@ open import Data.Bool using (Bool; true; false; if_then_else_; T)
 open import Data.Fin using (Fin; toℕ)
 open import Data.List using (List; []; _∷_; _++_; map)
 open import Data.List.Relation.Unary.All using (All; []; _∷_)
+open import Data.List.Relation.Unary.All.Properties using (++⁺)
 open import Data.Maybe using (nothing)
 open import Data.Nat using (zero; suc; _<_)
 open import Data.Nat.Induction using (<-wellFounded)
@@ -56,8 +57,8 @@ open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; Ct
 open import Rx.Exp.Guarded using (gsizeᵉ; gsize-unfoldμ)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; _↠_; map-f; take-f; scan-f; take-st; scan-st;
   thru-outer; mergeAllᵒ; switchᵒ; exhaustᵒ; mergeAll-st; switch-st; exhaust-st;
-  installNode; oneShotBurst; memberSource)
-open import Rx.Evaluator.Domain using (subscribeE⇓; pushBurst⇓; subs-of;
+  installNode; oneShotBurst; memberSource; splitEvents; retagEvents)
+open import Rx.Evaluator.Domain using (subscribeE⇓; pushBurst⇓; stepFrame⇓; push-nil; push-cons; subs-of;
   subs-empty; subs-map; subs-take-zero; subs-take-suc; subs-scan; subs-defer;
   subs-floor; subs-hot-done; subs-hot-live; subs-cold-sync; subs-cold-async;
   subs-μ; sub-all; subs-merge-all; subs-switch-all; subs-exhaust-all)
@@ -175,37 +176,39 @@ postulate
         subscribeE⇓ {e = e} (input i) κ id now sched st r
           × StreamSat (Red (lookup Γ i)) (proj₁ r)
 
-  -- PUSHING A BURST THROUGH A FRAME, AND NOW THE WHOLE OF THE HOP.
-  -- The three transformer arms share a two-step shape -- run the
-  -- source, then push what it emitted -- so the second step is one
-  -- obligation rather than three.  The flatteners turn out to share
-  -- it too: each installs its node and runs its source through a
-  -- `thru-outer` frame, so an operator's queue, its kill, its refusal
-  -- and its concurrency limit are all clauses of THIS push and of
-  -- nothing above it.  That is why the candidate at the higher type
-  -- survives the descent for free -- the hop is not in the flattener's
-  -- statement, and the state the inner is subscribed in is whatever
+  -- ONE FRAME, ONE ARRIVING BATCH, AND NOTHING ABOUT THE BURST.  The
+  -- push below walks a burst emit by emit and is a body; what it
+  -- cannot do is take a single step, because a step is where every
+  -- operator lives -- a scan's accumulator, a take's countdown, and
+  -- the whole flattening walk, whose queue, kill, refusal and
+  -- concurrency limit are clauses of THIS statement and of nothing
+  -- above it.  That is also why the candidate at the higher type
+  -- survives the descent for free: the hop is not in a flattener's
+  -- statement, and the state an inner is subscribed in is whatever
   -- the walk has threaded by the time it reaches one.
+  --
   -- PROBED: `Probed.Reducible-Arms` through a mapping frame whose
   --   function returns an OBSERVABLE -- the one row in that file where
   --   the satisfaction half is a real claim, since what the pushed
   --   value must satisfy is another expression's reducibility rather
   --   than a protocol event -- and through a FLATTENING frame at each
-  --   of the three operators, with the outer's burst carrying a real
+  --   of the three operators, with the arriving batch carrying a real
   --   observable: mergeAll subscribing it, mergeAll REFUSING it at a
   --   zero concurrency limit and queueing instead, switch killing and
   --   subscribing, exhaust subscribing with nothing active.  The
   --   inner's own subscription derivation is what comes back, so the
-  --   candidate is SPENT at these rows rather than carried.  Not
+  --   candidate is SPENT at those rows rather than carried.  Not
   --   reached: a node already holding something -- a queue with an
   --   entry, a switch whose current inner is running, an exhaust
-  --   already active -- and no scan or take frame, and no burst of
-  --   more than one emit.
-  red-push : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
+  --   already active -- and no scan or take frame.
+  red-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
              (id : Id) (now : Tick) (f : Frame Γ s u) (κ : Path Γ lo u t)
-             {burst : Stream Γ s} → StreamSat (Red s) burst
-           → (sched : Sched Γ) (st : EvalSt e)
-           → RedPush {e = e} id now f κ burst sched st
+             {vals : List (Val Γ s)} → All (Red s) vals → (fin : Bool)
+             (sched : Sched Γ) (st : EvalSt e)
+           → Σ (List (Val Γ u) × List (InstEvent (Val Γ t)) × Bool
+                 × Sched Γ × EvalSt e) λ r →
+               stepFrame⇓ {e = e} id now f κ vals fin sched st r
+                 × All (Red u) (proj₁ r)
 
 
 -- Every protocol event carries no payload, so a burst's values are the
@@ -292,6 +295,68 @@ redTms : ∀ {n} {Γ : Ctx n} {u} (ts : List (Tm Γ [] [] [] u))
        → All (Red u) (map (λ tm → evalTm tm) ts)
 redTms []       = []
 redTms (x ∷ xs) = red-tm x ∷ redTms xs
+
+-- WALKING A BURST IS BOOKKEEPING, AND SEPARATING IT FROM THE STEP IS
+-- WHAT MAKES THAT VISIBLE.  An emit splits into the values a frame
+-- must act on and the protocol traffic that flows past it untouched,
+-- and what comes back out is the step's own values plus retagged
+-- plumbing.  Only the first of those can fail the candidate: the
+-- other three carry no payload, so their satisfaction is decided by
+-- the event former alone.
+satRetag : ∀ {A B : Set} {P : B → Set} (es : List (InstEvent A))
+         → All (EvSat P) (retagEvents {A = A} {B = B} es)
+satRetag []                = []
+satRetag (init _    ∷ es) = tt ∷ satRetag es
+satRetag (value _   ∷ es) = satRetag es
+satRetag (close _ _ ∷ es) = tt ∷ satRetag es
+satRetag (handoff _ ∷ es) = tt ∷ satRetag es
+satRetag (complete  ∷ es) = tt ∷ satRetag es
+
+splitVals : ∀ {n} {Γ : Ctx n} {u} {A : Set} {P : Val Γ u → Set}
+            (es : List (InstEvent (Val Γ u)))
+          → All (EvSat P) es
+          → All P (proj₁ (splitEvents {A = A} es))
+splitVals []                []       = []
+splitVals (init _    ∷ es) (_ ∷ ps) = splitVals es ps
+splitVals (value _   ∷ es) (p ∷ ps) = p ∷ splitVals es ps
+splitVals (close _ _ ∷ es) (_ ∷ ps) = splitVals es ps
+splitVals (handoff _ ∷ es) (_ ∷ ps) = splitVals es ps
+splitVals (complete  ∷ es) (_ ∷ ps) = splitVals es ps
+
+splitProt : ∀ {n} {Γ : Ctx n} {u} {A : Set} {P : A → Set}
+            (es : List (InstEvent (Val Γ u)))
+          → All (EvSat P) (proj₁ (proj₂ (splitEvents {A = A} es)))
+splitProt []                = []
+splitProt (init _    ∷ es) = tt ∷ splitProt es
+splitProt (value _   ∷ es) = splitProt es
+splitProt (close _ _ ∷ es) = tt ∷ splitProt es
+splitProt (handoff _ ∷ es) = tt ∷ splitProt es
+splitProt (complete  ∷ es) = splitProt es
+
+-- a frame's completion flag becomes at most one protocol event
+satFin : ∀ {A : Set} {P : A → Set} (b : Bool)
+       → All (EvSat P) (if b then complete ∷ [] else [])
+satFin true  = tt ∷ []
+satFin false = []
+
+-- PUSHING A BURST THROUGH A FRAME IS A WALK, AND THE WALK IS A BODY.
+-- Each emit is split, stepped and reassembled; the candidate travels
+-- on the values alone, which is why the reassembly costs three
+-- appends of protocol traffic and one real obligation.
+red-push : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
+           (id : Id) (now : Tick) (f : Frame Γ s u) (κ : Path Γ lo u t)
+           {burst : Stream Γ s} → StreamSat (Red s) burst
+         → (sched : Sched Γ) (st : EvalSt e)
+         → RedPush {e = e} id now f κ burst sched st
+red-push id now f κ {[]}      []       sched st = _ , push-nil , []
+red-push id now f κ {em ∷ ems} (p ∷ ps) sched st =
+  let ((vals′ , evs , fin′ , sched₁ , st₁) , d , rv) =
+        red-step id now f κ (splitVals (InstEmit.events em) p)
+          (proj₂ (proj₂ (splitEvents (InstEmit.events em)))) sched st
+      ((rest , sched₂ , st₂) , dr , sr) = red-push id now f κ ps sched₁ st₁
+  in _ , push-cons refl d dr
+       , ++⁺ (splitProt (InstEmit.events em))
+             (++⁺ (satRetag evs) (satEvents rv (satFin fin′))) ∷ sr
 
 -- THE BODY, AND WHAT PAYS FOR IT.  Its recursion is structural in the
 -- TERM at every arm that has one, and every recursive call is made at

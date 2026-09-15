@@ -44,7 +44,7 @@
 --
 -- TARGET: red-tm @e1ae28
 -- TARGET: red-input-shared @21f529
--- TARGET: red-push @733369
+-- TARGET: red-step @1f6442
 module Probed.Reducible-Arms where
 
 open import Data.Fin using (zero)
@@ -62,16 +62,13 @@ open import Data.Vec using ([]; _∷_)
 open import Data.List.Relation.Unary.Any using (here)
 open import Relation.Binary.PropositionalEquality using (refl)
 
-open import Rx.Prim using (InstEmit; InstEvent; init; value; close; handoff; complete; subscribe; _at_from_as_)
 open import Rx.Exp using (Ctx; Closed; natᵗ; obs; ofᵉ; nat̂; strmᵗ; varᵗ; Tm; input)
 open import Rx.Slots using (Slots; shared)
-open import Rx.Evaluator using (Sched; EvalSt; Stream; Path; root; map-f; sched-init;
-  st-init; thru-outer; mergeAllᵒ; switchᵒ; exhaustᵒ; AllOp; NodeState; from-inner; _↠_;
-  mergeAll-st; switch-st; exhaust-st; installNode; oneShotBurst)
-open import Rx.Evaluator.Reducible using (Red; EvSat; StreamSat; reducible; red-tm;
-  red-input-shared; red-push; satOneShot)
+open import Rx.Evaluator using (Sched; EvalSt; Path; root; map-f; sched-init; st-init; thru-outer; mergeAllᵒ; switchᵒ;
+  exhaustᵒ; AllOp; NodeState; from-inner; _↠_; mergeAll-st; switch-st; exhaust-st; installNode)
+open import Rx.Evaluator.Reducible using (Red; reducible; red-tm; red-input-shared; red-step)
 
-open import Rx.Evaluator.Domain using (subs-shared; slot-spent; slot-join; push-cons; push-nil; step-map;
+open import Rx.Evaluator.Domain using (subs-shared; slot-spent; slot-join; step-map;
   step-thru-outer; walk-nil; walk-cons; inner; consume-all-sub; consume-all-enqueue;
   consume-switch-sub; consume-exhaust-sub)
 
@@ -169,10 +166,11 @@ row-share-join : Confirms
 row-share-join =
   _ , subs-shared {d = d₁} {below = s≤s z≤n} {ok = tt} refl (slot-join refl refl) , (tt ∷ []) ∷ []
 
+
 ----------------------------------------------------------------------
--- 4.  THE FRAME PUSH, and the one place in this file where the
+-- 4.  THE FRAME STEP, and the one place in this file where the
 -- satisfaction half is a real claim.  The frame's function returns an
--- OBSERVABLE, so what the pushed burst must satisfy is another
+-- OBSERVABLE, so what the stepped value must satisfy is another
 -- expression's own reducibility rather than a protocol event -- the
 -- conjunct every other row here leaves at ⊤.
 ----------------------------------------------------------------------
@@ -180,13 +178,7 @@ row-share-join =
 fnObs : Tm Γ₀ [] [] (natᵗ ∷ []) (obs natᵗ)
 fnObs = strmᵗ (ofᵉ (varᵗ (here refl) ∷ []))
 
-burstVal : Stream Γ₀ natᵗ
-burstVal = ((init 0 ∷ value 7 ∷ []) at 0 from 0 as subscribe) ∷ []
-
-satVal : StreamSat (Red {Γ = Γ₀} natᵗ) burstVal
-satVal = (tt ∷ tt ∷ []) ∷ []
-
--- the push's root sits at the frame's OUTPUT type, so this row needs a
+-- the step's root sits at the frame's OUTPUT type, so this row needs a
 -- program whose own type is the observable the frame produces
 e₂ : Closed Γ₀ (obs natᵗ)
 e₂ = ofᵉ (strmᵗ (ofᵉ (nat̂ 7 ∷ [])) ∷ [])
@@ -200,26 +192,33 @@ st₂ = st-init e₂
 κ₂ : Path Γ₀ 0 (obs natᵗ) (obs natᵗ)
 κ₂ = root
 
-row-push-obs : Confirms
-  (red-push {e = e₂} 0 0 (map-f fnObs) κ₂ satVal sch₂ st₂)
-row-push-obs =
-  _ , push-cons refl step-map push-nil
-    , (tt ∷ reducible (ofᵉ (nat̂ 7 ∷ [])) ∷ []) ∷ []
+row-step-obs : Confirms
+  (red-step {e = e₂} 0 0 (map-f fnObs) κ₂ {7 ∷ []} (tt ∷ []) false sch₂ st₂)
+row-step-obs = _ , step-map , reducible (ofᵉ (nat̂ 7 ∷ [])) ∷ []
 
 ----------------------------------------------------------------------
--- 5.  THE SAME PUSH THROUGH A FLATTENING FRAME, which is where the
--- hop now lives.  The three `*All` operators are not statements of
--- their own: each runs its source through a `thru-outer` frame and
--- pushes what came back, so everything an operator DOES -- the queue,
--- the kill, the refusal, the concurrency limit -- is a clause of this
--- push rather than of anything above it.  The row reaches the frame's
--- own step and the walk that finds nothing to consume.
+-- 5.  THE SAME STEP THROUGH A FLATTENING FRAME, which is where the
+-- hop lives.  The three `*All` operators are not statements of their
+-- own: each runs its source through a `thru-outer` frame and pushes
+-- what came back, so everything an operator DOES -- the queue, the
+-- kill, the refusal, the concurrency limit -- is a clause of this
+-- step rather than of anything above it.
 --
--- LOAD-BEARING for the frame clause and DEGENERATE for the operator:
--- the outer's burst is protocol traffic with no value on it, so the
--- walk has no observable to hand the operator and no reading of the
--- store is made.  A live inner is not reached here.
+-- LOAD-BEARING at each operator's reading of the store, and at the
+-- bounded limit for mergeAll, where `hasRoom` answers false and the
+-- value is enqueued instead.  The batch carries a real observable, so
+-- the inner is actually subscribed and what comes back is the
+-- candidate's own derivation for it -- these rows SPEND the candidate
+-- rather than carrying it.  DEGENERATE on the satisfaction half: the
+-- frame's output type is the inner's element type, which is data
+-- here, so what comes back out is checked by computation.
 ----------------------------------------------------------------------
+
+-- the flattening rows' output type is data, so everything that comes
+-- back out satisfies the candidate by computation
+allTriv : ∀ {A : Set} {P : A → Set} → (∀ x → P x) → (vs : List A) → All P vs
+allTriv p []       = []
+allTriv p (v ∷ vs) = p v ∷ allTriv p vs
 
 nid₃ : _
 nid₃ = Sched.nextNode sch₀
@@ -227,65 +226,11 @@ nid₃ = Sched.nextNode sch₀
 sched₃ : Sched Γ₀
 sched₃ = record sch₀ { nextNode = Data.Nat.suc nid₃ }
 
-st₃ : EvalSt e₀
-st₃ = installNode nid₃ (mergeAll-st {t = natᵗ} nothing 0 [] false) st₀
-
-burstOuter : Stream Γ₀ (obs natᵗ)
-burstOuter = proj₁ (oneShotBurst [] 0 sched₃)
-
-satOuter : StreamSat (Red {Γ = Γ₀} (obs natᵗ)) burstOuter
-satOuter = satOneShot 0 sched₃ []
-
-row-push-thru : Confirms
-  (red-push {e = e₀} 0 0 (thru-outer mergeAllᵒ nid₃) κ₀ satOuter sched₃ st₃)
-row-push-thru =
-  _ , push-cons refl (step-thru-outer walk-nil) push-nil
-    , (tt ∷ tt ∷ tt ∷ []) ∷ []
-
-----------------------------------------------------------------------
--- 6.  THE SAME PUSH AT A LIVE INNER, which is the operator-specific
--- half.  The outer's burst now carries an actual observable, so the
--- walk hands it to the operator and the operator reads its own node:
--- mergeAll subscribes it or queues it depending on the concurrency
--- limit, switch kills whatever was current and subscribes, exhaust
--- subscribes because nothing is active.  The inner's own subscription
--- is the candidate at the value, which is what the push's hypothesis
--- hands over -- so these rows are also where the candidate is spent
--- rather than merely carried.
---
--- LOAD-BEARING at each operator's reading of the store, and at the
--- bounded limit for mergeAll, where `hasRoom` answers false and the
--- value is enqueued instead.  DEGENERATE on the satisfaction half:
--- the frame's output type is the inner's element type, which is data
--- here, so what comes back out is checked by computation.
-----------------------------------------------------------------------
-
--- The frame's output is the inner's element type, which is data here,
--- so every event of what comes back out satisfies the candidate by
--- computation.  Spelling that out once keeps the rows below to their
--- derivations.
-evsTriv : ∀ {A : Set} {P : A → Set} → (∀ x → P x)
-        → (es : List (InstEvent A)) → All (EvSat P) es
-evsTriv p []                = []
-evsTriv p (init _    ∷ es)  = tt ∷ evsTriv p es
-evsTriv p (value v   ∷ es)  = p v ∷ evsTriv p es
-evsTriv p (close _ _ ∷ es)  = tt ∷ evsTriv p es
-evsTriv p (handoff _ ∷ es)  = tt ∷ evsTriv p es
-evsTriv p (complete  ∷ es)  = tt ∷ evsTriv p es
-
-satTriv : ∀ {A : Set} {P : A → Set} → (∀ x → P x)
-        → (s : List (InstEmit A)) → StreamSat P s
-satTriv p []       = []
-satTriv p (em ∷ s) = evsTriv p (InstEmit.events em) ∷ satTriv p s
-
 oInner : Closed Γ₀ natᵗ
 oInner = ofᵉ (nat̂ 7 ∷ [])
 
-burstLive : Stream Γ₀ (obs natᵗ)
-burstLive = ((init 0 ∷ value oInner ∷ []) at 0 from 0 as subscribe) ∷ []
-
-satLive : StreamSat (Red {Γ = Γ₀} (obs natᵗ)) burstLive
-satLive = (tt ∷ reducible oInner ∷ []) ∷ []
+satLive : All (Red {Γ = Γ₀} (obs natᵗ)) (oInner ∷ [])
+satLive = reducible oInner ∷ []
 
 instL : _
 instL = Sched.nextNode sched₃
@@ -296,50 +241,47 @@ subLive op ns =
                   (record sched₃ { nextNode = Data.Nat.suc instL })
                   (installNode nid₃ ns st₀)))
 
+st₃ : EvalSt e₀
+st₃ = installNode nid₃ (mergeAll-st {t = natᵗ} nothing 0 [] false) st₀
+
 row-live-merge : Confirms
-  (red-push {e = e₀} 0 0 (thru-outer mergeAllᵒ nid₃) κ₀ satLive sched₃ st₃)
+  (red-step {e = e₀} 0 0 (thru-outer mergeAllᵒ nid₃) κ₀ satLive false sched₃ st₃)
 row-live-merge =
-  _ , push-cons refl
-        (step-thru-outer
-          (walk-cons (consume-all-sub refl refl
-                       (inner refl (subLive mergeAllᵒ (mergeAll-st nothing 0 [] false)) refl))
-                     walk-nil))
-        push-nil
-    , satTriv (λ _ → tt) _
+  _ , step-thru-outer
+        (walk-cons (consume-all-sub refl refl
+                     (inner refl (subLive mergeAllᵒ (mergeAll-st nothing 0 [] false)) refl))
+                   walk-nil)
+    , allTriv (λ _ → tt) _
 
 stBound : EvalSt e₀
 stBound = installNode nid₃ (mergeAll-st {t = natᵗ} (just 0) 0 [] false) st₀
 
 row-live-queue : Confirms
-  (red-push {e = e₀} 0 0 (thru-outer mergeAllᵒ nid₃) κ₀ satLive sched₃ stBound)
+  (red-step {e = e₀} 0 0 (thru-outer mergeAllᵒ nid₃) κ₀ satLive false sched₃ stBound)
 row-live-queue =
-  _ , push-cons refl (step-thru-outer (walk-cons (consume-all-enqueue refl refl) walk-nil)) push-nil
-    , satTriv (λ _ → tt) _
+  _ , step-thru-outer (walk-cons (consume-all-enqueue refl refl) walk-nil)
+    , allTriv (λ _ → tt) _
 
 stSwitch : EvalSt e₀
 stSwitch = installNode nid₃ (switch-st nothing false) st₀
 
 row-live-switch : Confirms
-  (red-push {e = e₀} 0 0 (thru-outer switchᵒ nid₃) κ₀ satLive sched₃ stSwitch)
+  (red-step {e = e₀} 0 0 (thru-outer switchᵒ nid₃) κ₀ satLive false sched₃ stSwitch)
 row-live-switch =
-  _ , push-cons refl
-        (step-thru-outer
-          (walk-cons (consume-switch-sub refl refl
-                       (inner refl (subLive switchᵒ (switch-st nothing false)) refl))
-                     walk-nil))
-        push-nil
-    , satTriv (λ _ → tt) _
+  _ , step-thru-outer
+        (walk-cons (consume-switch-sub refl refl
+                     (inner refl (subLive switchᵒ (switch-st nothing false)) refl))
+                   walk-nil)
+    , allTriv (λ _ → tt) _
 
 stExhaust : EvalSt e₀
 stExhaust = installNode nid₃ (exhaust-st false false) st₀
 
 row-live-exhaust : Confirms
-  (red-push {e = e₀} 0 0 (thru-outer exhaustᵒ nid₃) κ₀ satLive sched₃ stExhaust)
+  (red-step {e = e₀} 0 0 (thru-outer exhaustᵒ nid₃) κ₀ satLive false sched₃ stExhaust)
 row-live-exhaust =
-  _ , push-cons refl
-        (step-thru-outer
-          (walk-cons (consume-exhaust-sub refl
-                       (inner refl (subLive exhaustᵒ (exhaust-st false false)) refl))
-                     walk-nil))
-        push-nil
-    , satTriv (λ _ → tt) _
+  _ , step-thru-outer
+        (walk-cons (consume-exhaust-sub refl
+                     (inner refl (subLive exhaustᵒ (exhaust-st false false)) refl))
+                   walk-nil)
+    , allTriv (λ _ → tt) _
