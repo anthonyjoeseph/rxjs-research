@@ -39,14 +39,14 @@ module Rx.Evaluator.Burst-Report where
 
 open import Data.Bool using (Bool; true; false; if_then_else_; T)
 open import Data.Fin using (Fin; toℕ)
-open import Data.List using (List; []; _∷_; map; _++_)
+open import Data.List using (List; []; _∷_; map; _++_; length)
 open import Data.List.Relation.Unary.All using (All)
   renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
 open import Data.List.Relation.Unary.All.Properties using (++⁺)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; zero; suc; _≤_; _<_; _+_; _⊔_; z≤n; s≤s)
+open import Data.Nat using (ℕ; zero; suc; _≤_; _<_; _+_; _*_; _⊔_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤-refl; ≤-trans; <⇒≤; m≤m⊔n; m≤n⊔m)
-open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
 open import Data.Vec using (lookup)
@@ -55,10 +55,11 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong;
 open import Rx.Prim using (Id; Source; Tick; InstEvent; InstEmit; init; value; close;
   handoff; complete; exhausted; subscribe; _at_from_as_)
 open import Rx.Exp using (Ty; Ctx; Closed; Val; Tm; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_;
-  obs; input; isData; evalTm; evalWith; Fn; applyFn)
+  obs; input; isData; evalTm; evalWith; Fn; applyFn; reify)
 open import Rx.Obs-Depth using (depᵗ; depᵗˢ; depᵛ)
 open import Rx.Obs-Depth.Substitution using (AllData; []ᵈ; _∷ᵈ_; ≤pred⇒<;
-  dep-eval-strict; envDepth; dep-eval-open)
+  dep-eval-strict; envDepth; dep-eval-open; dep-below-reify)
+open import Rx.Evaluator.Scan-Climb using (Rate; scan-climbs)
 open import Rx.Slots using (Slots)
 open import Rx.Slot-Depth using (slotDepth)
 open import Rx.Strat-Order using (Tri)
@@ -410,38 +411,76 @@ map-open {u = u} {τ = _ , _ , _} η ds fn (v ∷ vs) le (p ∷ᵃ ps) =
                (map-fits η ds fn v le p))
   ∷ᵃ map-open η ds fn vs le ps
 
--- AND THE FOLD, WHICH THE SAME REPAIR DOES NOT REACH.  A scan re-enters
--- its own template with the accumulator it last produced, so the
--- reading climbs once per delivery and the outputs of ONE frame,
--- entered under ONE bound, grow with the LENGTH of the burst.  No
--- static reading of the syntax carries a length, so this is not the map
--- arm's gap at another head: it is a question about whether the depth
--- component can be read off the program at all.
+-- AND WHAT THE FOLD STILL OWES ONCE ITS ITERATION IS PRICED, WHICH IS
+-- A RESERVATION AND TWO UNKNOWNS.  The climb itself is no longer a
+-- claim -- `scan-climbs` proves the outputs sit one RATE per delivery
+-- above where the fold started -- so what is left is whether the rank
+-- the frame was ENTERED at can afford that, and the leaf below says it
+-- can by producing the figure the whole burst fits under.
 --
--- AND THE CHEAP ESCAPE IS CLOSED.  The climb alone does not force a
--- restatement: if no RUN could stand a configuration that deep beside a
--- burst that long, the obligation dissolves by restricting the claim to
--- reachable configurations, bounding nothing and costing no
--- mathematics.  A run reaches it — at the shallowest input this
--- language can write, on the first delivery, from the seed — so
--- excluding the shape would cost rxjs parity.  What the same witness
--- shows positively is the currency a repair has to be written in: the
--- emitted depth is the burst POSITION while the program's own reading
--- holds still, so the gap is a RATE in the burst length rather than an
--- offset a wider margin absorbs, and a bound carrying that length
--- beside the reading is what holds at the witness.  That is evidence
--- about the restatement's SHAPE and not about its truth.
+-- THE FIGURE HIDES TWO DIFFERENT GAPS, AND ONLY ONE OF THEM IS THE
+-- TIER'S QUESTION.  One is the LENGTH: a rate per delivery needs a
+-- count of deliveries, and every rank in this development is read off
+-- the program, where there is no count to read.  The other is the
+-- SEED, and it is a store question rather than an arithmetic one -- the
+-- accumulator a fold re-enters with is whatever its node last stored,
+-- and no premise here says anything about what that reads.  Both are
+-- pinned by the same witness, which is why they share a leaf: the
+-- figure has to dominate the seed AND leave a rate per element under
+-- the rank.
 --
--- REFUTED: `Refuted.Scan-Deepens` — the fold whose template re-wraps its
---   accumulator, at the constructor this arm stands over.
--- REFUTED: `Refuted.Scan-Reachable` — the same template RUN, which is
---   what kills the reachability escape and prices the repair.
+-- AND THE Σ IS PINNED FROM BELOW, WHICH IS WHAT KEEPS IT FROM BEING
+-- SATISFIABLE BY ENLARGEMENT.  Its first two conjuncts grow easier as
+-- the figure rises and the third grows harder, so the witness cannot be
+-- inflated into a proof -- the statement is exactly as strong as the
+-- rank is generous.
+--
+-- REFUTED: `Refuted.Scan-Deepens` — the rate, proven over every burst
+--   length, which is why the figure below carries one at all.
+-- REFUTED: `Refuted.Scan-Reachable` — the same template RUN, which
+--   kills the escape of restricting the claim to reachable
+--   configurations, and whose positive figure is in this leaf's own
+--   currency: a bound in the reading PLUS the length holds there, while
+--   the reading alone does not.
 postulate
-  scan-handed : ∀ {n} {Γ : Ctx n} {s u} {τ : Tri} (η : Fin n → ℕ)
+  scan-fits : ∀ {n} {Γ : Ctx n} {s u} {U r sz} (η : Fin n → ℕ)
     (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (ac : Val Γ u) (vs : List (Val Γ s))
-    {outs : List (Val Γ u)} {ac′ : Val Γ u} →
-    depᵗ η fn ≤ proj₁ (proj₂ τ) → HandedOK η vs τ →
-    scanVals fn ac vs ≡ (outs , ac′) → HandedOK η outs τ
+    → depᵗ η fn ≤ r → HandedOK η vs (U , r , sz)
+    → Σ ℕ (λ a → (depᵗ η (reify ac) ≤ a)
+               × All (λ v → depᵗ η (reify v) ≤ a) vs
+               × (a + length vs * Rate η fn < r))
+
+private
+  -- a payload read under a figure the rank exceeds, which is the shape
+  -- every length-carrying bound arrives in: the climb is stated through
+  -- `reify` because the fold's own induction has to be, and a value
+  -- never reads deeper than its reification
+  handed-reify : ∀ {n} {Γ : Ctx n} {U r sz} (η : Fin n → ℕ) (u : Ty)
+                 (vs : List (Val Γ u)) (a : ℕ) → a < r
+               → All (λ v → depᵗ η (reify v) ≤ a) vs
+               → HandedOK η vs (U , r , sz)
+  handed-reify η u []       a lt []ᵃ       = []ᵃ
+  handed-reify η u (v ∷ vs) a lt (p ∷ᵃ ps) =
+      valOK-below η u v (≤-trans (s≤s (≤-trans (dep-below-reify η u v) p)) lt)
+    ∷ᵃ handed-reify η u vs a lt ps
+
+-- AND THE FOLD'S ARM IS A BODY OVER THAT LEAF, ON THE MAP ARM'S OWN
+-- PATTERN.  `scan-climbs` performs the iteration -- every output is one
+-- of the accumulators the fold wrote, and each sits one RATE above the
+-- last -- so what a delivery costs is discharged here and no longer
+-- asserted.  What the leaf keeps is the reservation, and it is the
+-- first statement in this tier to name the burst's LENGTH: the rank has
+-- to have been entered high enough to pay a rate per delivery, and
+-- `entryTri` reads a figure off the program, which has no length in it.
+scan-handed : ∀ {n} {Γ : Ctx n} {s u} {τ : Tri} (η : Fin n → ℕ)
+  (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (ac : Val Γ u) (vs : List (Val Γ s))
+  {outs : List (Val Γ u)} {ac′ : Val Γ u} →
+  depᵗ η fn ≤ proj₁ (proj₂ τ) → HandedOK η vs τ →
+  scanVals fn ac vs ≡ (outs , ac′) → HandedOK η outs τ
+scan-handed {u = u} {τ = _ , _ , _} η fn ac vs le ps eq
+  with scan-fits η fn ac vs le ps
+... | a , ac≤ , vs≤ , fits rewrite sym (cong proj₁ eq) =
+  handed-reify η u _ _ fits (scan-climbs η fn ac vs a ac≤ vs≤)
 
 -- AND THE TWO HEADS THAT LEAVE THIS MODULE.  An `*All` frame does not
 -- rewrite a payload: it SUBSCRIBES one, or it delivers what an inner

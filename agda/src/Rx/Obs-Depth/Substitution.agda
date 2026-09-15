@@ -55,7 +55,7 @@ open import Data.List.Relation.Unary.All using (All) renaming ([] to []ᵃ; _∷
 open import Data.Fin using (Fin)
 open import Data.Nat using (ℕ; zero; suc; pred; _≤_; _<_; _+_; _⊔_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤-refl; ≤-trans; ⊔-mono-≤; m≤m⊔n; m≤n⊔m;
-  ⊔-identityʳ)
+  ⊔-identityʳ; n≤1+n)
 open import Data.Product using (_,_)
 open import Data.Sum using (inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality
@@ -371,3 +371,40 @@ postulate
   dep-eval-open : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) {Θ t}
     (tm : Tm Γ [] [] Θ t) (env : All (Val Γ) Θ) (m : ℕ) →
     envDepth η env ≤ m → depᵛ η t (evalWith tm env) ≤ depᵗ η tm + m
+
+------------------------------------------------------------------
+-- 5.  THE TWO SIDES OF `reify`, WHICH IS WHAT THE ENVIRONMENT
+--     READING AND THE VALUE READING DIFFER BY.
+------------------------------------------------------------------
+
+-- `envDepth` prices a value through `reify` and `ValOK` reads the value
+-- itself, so a statement whose premise is an environment and whose
+-- conclusion is a payload crosses between them twice -- once on the way
+-- in and once on the way out.  The gap is exactly one wrap and it is
+-- structural: `reify` at an observable writes a `strmᵗ` the value does
+-- not have, and writes nothing at any other type.  So the pair below is
+-- not two lemmas about `reify` but the two directions of one, and a
+-- fold needs both, because the value it hands back becomes the
+-- environment of the next delivery.
+dep-below-reify : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) (t : Ty) (v : Val Γ t) →
+  depᵛ η t v ≤ depᵗ η (reify v)
+dep-below-reify η unitᵗ    _        = z≤n
+dep-below-reify η boolᵗ    _        = z≤n
+dep-below-reify η natᵗ     _        = z≤n
+dep-below-reify η (s ×ᵗ t) (a , b)  =
+  ⊔-mono-≤ (dep-below-reify η s a) (dep-below-reify η t b)
+dep-below-reify η (s +ᵗ t) (inj₁ a) = dep-below-reify η s a
+dep-below-reify η (s +ᵗ t) (inj₂ b) = dep-below-reify η t b
+dep-below-reify η (obs t)  e        = n≤1+n (depᵉ η e)
+
+-- and the other way, where the one wrap is spent rather than gained
+reify-below-suc : ∀ {n} {Γ : Ctx n} (η : Fin n → ℕ) (t : Ty) (v : Val Γ t) →
+  depᵗ η (reify v) ≤ suc (depᵛ η t v)
+reify-below-suc η unitᵗ    _        = z≤n
+reify-below-suc η boolᵗ    _        = z≤n
+reify-below-suc η natᵗ     _        = z≤n
+reify-below-suc η (s ×ᵗ t) (a , b)  =
+  ⊔-mono-≤ (reify-below-suc η s a) (reify-below-suc η t b)
+reify-below-suc η (s +ᵗ t) (inj₁ a) = reify-below-suc η s a
+reify-below-suc η (s +ᵗ t) (inj₂ b) = reify-below-suc η t b
+reify-below-suc η (obs t)  e        = ≤-refl
