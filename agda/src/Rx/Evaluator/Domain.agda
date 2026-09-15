@@ -22,7 +22,49 @@
 -- sub-derivation at that very value, so the question is asked of the
 -- DERIVATION and never of the run: nothing is tested, and no
 -- constructor emits the marker.
---
+
+-- THE DESCENT IS DENOMINATED IN THE TYPE, AND THAT IS WHAT REACHES
+-- THE ONE FORMER A FIGURE AND A TERM PREDICATE BOTH MISS.  Every
+-- killed reading recursed on the TERM or on a quantity fixed before
+-- the run, and a fold's payload is its own previous payload rebuilt
+-- by substitution — neither a subterm of what produced it nor
+-- smaller than it, so nothing inverts and nothing descends.
+-- Recursion on the TYPE has nothing to invert: `Val` is already
+-- defined by recursion on `Ty`, and a runtime observable at an `obs`
+-- IS a closed expression, so a type-indexed reducibility predicate
+-- lands on that same recursion and the hop relates two indices the
+-- definition already identifies.  The fold does not move the type at
+-- all and so asks the descent for nothing; the flattener strictly
+-- shrinks it, and the flattener is exactly where the hop is.
+
+-- AND THE FIGURE THE OLD DESCENT READ IS NOT THE ONE THE RECURSION
+-- SPENDS.  At a doubling fold the accumulator's nesting grows without
+-- bound while the expression subscribed at each hop stays the same
+-- two-node flattener, so the quantity every numeric reading tried to
+-- bound is not the quantity the subscribe cycle consumes.  That gap
+-- is what the marker was emitted into.
+
+-- AND THE THREE FLATTENERS COST ONE CASE BETWEEN THEM, NOT THREE.
+-- Cancellation and refusal only REMOVE deliveries and add no
+-- subscription, so whatever really governs a switch's currency and an
+-- exhaust's acceptance enters as a premise the argument DISCARDS —
+-- the bounded and unbounded merges, the switch and the exhaust share
+-- one shape, and the exhaust's premise may be stated weaker still.
+-- The threaded state is the same story from the other side: quantify
+-- the predicate over every state rather than the one a frame
+-- subscribed in, and no property of the state is used at all, so
+-- nothing depends on a store growing, persisting or being ordered.
+
+-- THE CONSTRAINT TO CARRY BEFORE ANY OF THIS IS BUILT: the delivery
+-- family may NOT mention the subscription family.  "A value is only
+-- delivered by something that was subscribed" is true of every run
+-- and is fatal as a premise — the subscription family already stores
+-- a delivery-indexed continuation for its arriving inners, so naming
+-- it back puts each family to the left of an arrow in the other and
+-- the positivity checker refuses the pair outright, in both
+-- directions.  Operational truth about a run belongs in a statement
+-- ABOUT a derivation, never among a derivation's own constructors.
+
 -- DEAD ROUTE: threading the hop's provenance in the types instead —
 --   indexing a stream by the term whose pipeline produced it, so the
 --   arriving observable is structurally related to the subscribed term
