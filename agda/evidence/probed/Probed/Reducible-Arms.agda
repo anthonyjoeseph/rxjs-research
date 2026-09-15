@@ -44,7 +44,7 @@
 -- whose own recursion the body already checks.
 --
 -- TARGET: red-tm @e1ae28
--- TARGET: red-input @37e14d
+-- TARGET: red-input-shared @21f529
 -- TARGET: red-push @733369
 -- TARGET: red-μ @2f6b5c
 -- TARGET: red-merge-all @76b1cd
@@ -63,16 +63,16 @@ open import Data.Vec using ([]; _∷_)
 open import Data.List.Relation.Unary.Any using (here)
 open import Relation.Binary.PropositionalEquality using (refl)
 
-open import Rx.Prim using (init; value; subscribe; _at_from_as_; hot; cold)
+open import Rx.Prim using (init; value; subscribe; _at_from_as_)
 open import Rx.Exp using (Ctx; Closed; natᵗ; obs; Exp; ofᵉ; emptyᵉ; unfoldμ; nat̂; strmᵗ; varᵗ; Tm; input)
-open import Rx.Slots using (Slots; scripted)
+open import Rx.Slots using (Slots; shared)
 open import Rx.Evaluator using (Sched; EvalSt; Stream; Path; root; map-f; sched-init;
   st-init)
 open import Rx.Evaluator.Reducible using (Red; StreamSat; reducible; red-tm;
-  red-input; red-push; red-μ; red-merge-all; red-switch-all; red-exhaust-all)
+  red-input-shared; red-push; red-μ; red-merge-all; red-switch-all; red-exhaust-all)
 
-open import Rx.Evaluator.Domain using (subs-μ; subs-floor; subs-hot-live;
-  subs-cold-sync; subs-empty; push-cons; push-nil; step-map; step-thru-outer; walk-nil;
+open import Rx.Evaluator.Domain using (subs-μ; subs-shared; slot-spent; slot-join;
+  subs-empty; push-cons; push-nil; step-map; step-thru-outer; walk-nil;
   sub-all; subs-merge-all; subs-switch-all; subs-exhaust-all)
 
 open import Probed.Apparatus using (Confirms)
@@ -133,11 +133,19 @@ row-μ-peel =
   in r , subs-μ d , sat
 
 ----------------------------------------------------------------------
--- 3.  THE SLOT ARM.  Three of the five scripted sub-arms, at the three
--- states that distinguish them: below the floor, live above it, and a
--- cold script whose synchronous values are the one payload a slot
--- emits.  The cold row is the LOAD-BEARING one for satisfaction; the
--- other two are evidence about the derivation and the registration.
+-- 3.  THE SLOT'S SHARE, at the two sub-arms that carry no payload.  A
+-- share whose source has completed answers spent; one whose definition
+-- is already connected joins the existing fan-out.  Neither runs the
+-- definition, so neither reaches the connect -- which is the whole of
+-- what is left in this statement, and is why the rows are evidence
+-- about the SHAPE rather than about the hard sub-arm.
+--
+-- BOTH STATES ARE CONSTRUCTED RATHER THAN REACHED, and that is the
+-- coverage boundary: the flags these arms dispatch on are written into
+-- the state directly, so the rows say the arms compose at a state of
+-- that description and not that a run produces one.  They are stated
+-- anyway because the predicate HOLDS at them -- a constructed state
+-- where it FAILED would be a refutation candidate instead.
 ----------------------------------------------------------------------
 
 Γ₁ : Ctx 1
@@ -146,42 +154,36 @@ row-μ-peel =
 e₁ : Closed Γ₁ natᵗ
 e₁ = input zero
 
-insHot : Slots Γ₁
-insHot zero = scripted (hot [])
+d₁ : Closed Γ₁ natᵗ
+d₁ = ofᵉ (nat̂ 5 ∷ [])
 
-insCold : Slots Γ₁
-insCold zero = scripted (cold (3 ∷ 4 ∷ []) [])
+insShared : Slots Γ₁
+insShared zero = shared d₁ {ok = tt}
 
-schHot : Sched Γ₁
-schHot = sched-init e₁ insHot
+schShared : Sched Γ₁
+schShared = sched-init e₁ insShared
 
-schCold : Sched Γ₁
-schCold = sched-init e₁ insCold
+-- the share's own source has completed, so the subscription is handed
+-- the spent protocol burst and the state is threaded on untouched
+stSpent : EvalSt e₁
+stSpent = record (st-init e₁) { completedSources = 0 ∷ [] }
 
-stHot : EvalSt e₁
-stHot = st-init e₁
+row-share-spent : Confirms
+  (red-input-shared {Γ = Γ₁} zero d₁ {tt} (root {lo = 1}) (s≤s z≤n) 0 0
+     schShared refl stSpent)
+row-share-spent =
+  _ , subs-shared {d = d₁} {below = s≤s z≤n} {ok = tt} refl (slot-spent refl) , (tt ∷ tt ∷ tt ∷ []) ∷ []
 
--- BELOW THE FLOOR: the registration's own floor test refuses, and the
--- slot answers spent without touching the state.
-row-input-floor : Confirms
-  (red-input {Γ = Γ₁} zero {e = e₁} (root {lo = 0}) 0 0 schHot stHot)
-row-input-floor = _ , subs-floor z≤n , (tt ∷ tt ∷ tt ∷ []) ∷ []
+-- the definition is live and already connected, so this subscription
+-- only registers: the burst is one `init` and the state gains a row
+stJoin : EvalSt e₁
+stJoin = record (st-init e₁) { connectedShares = 0 ∷ [] }
 
--- ABOVE IT AND LIVE: the burst is one `init` and the state gains a
--- registration -- the threading conjunct, at a state the caller moved.
-row-input-hot-live : Confirms
-  (red-input {Γ = Γ₁} zero {e = e₁} (root {lo = 1}) 0 0 schHot stHot)
-row-input-hot-live =
-  _ , subs-hot-live (s≤s z≤n) refl refl , (tt ∷ []) ∷ []
-
--- A COLD SCRIPT'S SYNCHRONOUS VALUES ride out in the subscription
--- burst, so this row reaches the arm that emits a payload at all --
--- but the payload is data, so the satisfaction conjunct over it is
--- still trivial and the row is DEGENERATE on that half.
-row-input-cold-sync : Confirms
-  (red-input {Γ = Γ₁} zero {e = e₁} (root {lo = 1}) 0 0 schCold stHot)
-row-input-cold-sync =
-  _ , subs-cold-sync (s≤s z≤n) refl refl , (tt ∷ tt ∷ tt ∷ tt ∷ tt ∷ []) ∷ []
+row-share-join : Confirms
+  (red-input-shared {Γ = Γ₁} zero d₁ {tt} (root {lo = 1}) (s≤s z≤n) 0 0
+     schShared refl stJoin)
+row-share-join =
+  _ , subs-shared {d = d₁} {below = s≤s z≤n} {ok = tt} refl (slot-join refl refl) , (tt ∷ []) ∷ []
 
 ----------------------------------------------------------------------
 -- 4.  THE FRAME PUSH, and the one place in this file where the

@@ -31,26 +31,32 @@
 -- subscribe its inner in whatever state the outer delivery reached.
 module Rx.Evaluator.Reducible where
 
-open import Data.Fin using (Fin)
+open import Data.Bool using (Bool; true; false; if_then_else_; T)
+open import Data.Fin using (Fin; toℕ)
 open import Data.List using (List; []; _∷_; _++_; map)
 open import Data.List.Relation.Unary.All using (All; []; _∷_)
 open import Data.Maybe using (Maybe)
-open import Data.Nat using (ℕ; zero; suc)
-open import Data.Product using (Σ; _×_; _,_; proj₁)
+open import Data.Nat using (ℕ; zero; suc; _<_)
+open import Data.Nat.Properties using (_<?_; ≮⇒≥)
+open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
 open import Data.Vec using (lookup)
+open import Relation.Nullary using (yes; no)
 
-open import Relation.Binary.PropositionalEquality using (refl)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import Rx.Prim using (Id; Tick; InstEmit; InstEvent; init; value; close; handoff; complete)
+open import Rx.Prim using (Id; Tick; InstEmit; InstEvent; init; value; close; handoff;
+  complete; hot; cold)
+open import Rx.Slots using (scripted; shared)
 open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; Ctx; Closed; Val;
   Exp; Tm; evalTm; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ;
-  exhaustAllᵉ; μᵉ; varᵉ; deferᵉ)
-open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; _↠_; map-f;
-  take-f; scan-f; take-st; scan-st; installNode; oneShotBurst)
+  exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; isData)
+open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; _↠_; map-f; take-f; scan-f; take-st; scan-st;
+  installNode; oneShotBurst; memberSource)
 open import Rx.Evaluator.Domain using (subscribeE⇓; pushBurst⇓; subs-of;
-  subs-empty; subs-map; subs-take-zero; subs-take-suc; subs-scan; subs-defer)
+  subs-empty; subs-map; subs-take-zero; subs-take-suc; subs-scan; subs-defer;
+  subs-floor; subs-hot-done; subs-hot-live; subs-cold-sync; subs-cold-async)
 
 -- An emitted EVENT carries a payload only in the `value` arm; every
 -- other arm is protocol traffic and constrains nothing.
@@ -131,21 +137,39 @@ postulate
   --   to say the data half asserts nothing.  No binding term reached.
   red-tm : ∀ {n} {Γ : Ctx n} {u} (tm : Tm Γ [] [] [] u) → Red u (evalTm tm)
 
-  -- THE SLOT ARM.  Five of its six sub-arms emit a fixed protocol
-  -- burst and thread the state on untouched; the sixth is a share's
-  -- connect, whose def is an arbitrary term and whose candidate is the
-  -- one this development quantifies over state to obtain.
+  -- THE SIXTH SLOT SUB-ARM, WHICH IS THE ONE THE OTHER FIVE ARE NOT.
+  -- A share's definition is an arbitrary term standing in no relation
+  -- to `input i`, so the body below cannot reach its candidate by any
+  -- descent this module can see -- it is the connect edge, and it is
+  -- answered by the quantification over state rather than by a
+  -- measure.  The other five sub-arms are now a body: what they emit
+  -- is protocol, and what values they carry are DATA by the slot's own
+  -- side condition, so `red-data` closes their satisfaction outright.
   --
-  -- PROBED: `Probed.Reducible-Arms` at three of the five scripted
-  --   sub-arms -- below the floor, live above it, and a cold script
-  --   whose synchronous values ride out.  The satisfaction half is
-  --   UNREACHABLE here and that is a property of the statement: a
-  --   scripted slot's own side condition makes its element type data,
-  --   so the candidate over its values is trivial by construction.
-  --   The share's connect is not reached; nor is the spent hot arm,
-  --   nor a cold with an asynchronous tail.
-  red-input : ∀ {n} {Γ : Ctx n} (i : Fin n)
-            → Red {Γ = Γ} (obs (lookup Γ i)) (input i)
+  -- DEAD ROUTE: it cannot be a leaf taking the body's own induction
+  --   hypothesis at the definition, which is the shape every other leaf
+  --   here has.  The definition is drawn from the slot table rather
+  --   than from the term, so passing `reducible d` would make this
+  --   mutual with a call Agda reads as non-structural, and the block
+  --   would need a measure back.
+  --
+  -- PROBED: `Probed.Reducible-Arms` at both sub-arms that carry no
+  --   payload -- a share whose source has completed, and one whose
+  --   definition is already connected so this subscription only joins
+  --   the fan-out.  Neither runs the definition, so the CONNECT is not
+  --   reached and neither is anything the definition emits.  Both
+  --   states are CONSTRUCTED rather than reached by a run, which is
+  --   what the rows are bounded by: they say the arms compose at a
+  --   state of that description.
+  red-input-shared : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo}
+      (i : Fin n) (d : Closed Γ (lookup Γ i)) {ok}
+      (κ : Path Γ lo (lookup Γ i) t) (below : toℕ i < lo)
+      (id : Id) (now : Tick) (sched : Sched Γ)
+    → Sched.slots sched i ≡ shared d {ok = ok}
+    → (st : EvalSt e)
+    → Σ (Stream Γ (lookup Γ i) × Sched Γ × EvalSt e) λ r →
+        subscribeE⇓ {e = e} (input i) κ id now sched st r
+          × StreamSat (Red (lookup Γ i)) (proj₁ r)
 
   red-push : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
              (id : Id) (now : Tick) (f : Frame Γ s u) (κ : Path Γ lo u t)
@@ -200,6 +224,70 @@ satOneShot : ∀ {n} {Γ : Ctx n} {u} {P : Val Γ u → Set} {vals}
              (id : Id) (sched : Sched Γ)
            → All P vals → StreamSat P (proj₁ (oneShotBurst vals id sched))
 satOneShot id sched ps = (tt ∷ satEvents ps (tt ∷ tt ∷ [])) ∷ []
+
+-- EVERY VALUE OF A DATA TYPE IS REDUCIBLE, AND THAT IS WHY THE SLOT
+-- ARM IS SHORT.  The candidate is trivial at each data former and
+-- uninhabitable at `obs`, so the recursion here is the same one `Red`
+-- itself runs -- it just has to be SAID, because a slot's element type
+-- is `lookup Γ i` and no reduction fires on a neutral index.  What
+-- carries it is the side condition every scripted slot already holds.
+red-data : ∀ {n} {Γ : Ctx n} (u : Ty) → T (isData u) → (v : Val Γ u)
+         → Red {Γ = Γ} u v
+
+-- THE PRODUCT AND SUM ARMS OF `isData` GUARD ON THE LEFT FACTOR, so
+-- the witness has to be taken apart before either side can be used.
+T-if : ∀ (b c : Bool) → T (if b then c else false) → T b × T c
+T-if true  c ok = tt , ok
+T-if false c ()
+
+red-data unitᵗ    _  _       = tt
+red-data natᵗ     _  _       = tt
+red-data boolᵗ    _  _       = tt
+red-data (s ×ᵗ t) ok (a , b) =
+  let (o₁ , o₂) = T-if (isData s) (isData t) ok
+  in red-data s o₁ a , red-data t o₂ b
+red-data (s +ᵗ t) ok (inj₁ a) = red-data s (proj₁ (T-if (isData s) (isData t) ok)) a
+red-data (s +ᵗ t) ok (inj₂ b) = red-data t (proj₂ (T-if (isData s) (isData t) ok)) b
+red-data (obs u)  () _
+
+redDatas : ∀ {n} {Γ : Ctx n} (u : Ty) → T (isData u) → (vs : List (Val Γ u))
+         → All (Red {Γ = Γ} u) vs
+redDatas u ok []       = []
+redDatas u ok (v ∷ vs) = red-data u ok v ∷ redDatas u ok vs
+
+-- The cold-with-a-tail arm emits its synchronous values with nothing
+-- after them, so it wants the values alone rather than `satEvents`'
+-- append.
+satValues : ∀ {A : Set} {P : A → Set} {vals : List A}
+          → All P vals → All (EvSat P) (map value vals)
+satValues []       = []
+satValues (p ∷ ps) = p ∷ satValues ps
+
+-- THE SLOT ARM, WHICH IS FIVE SUB-ARMS OF PROTOCOL AND ONE LEAF.  It
+-- mirrors the builder's own case split on the slot exactly, because
+-- the derivation it must produce is the one the builder produces; what
+-- is new is the satisfaction beside it, and at a scripted slot that is
+-- `red-data` at every value the script carries.
+red-input : ∀ {n} {Γ : Ctx n} (i : Fin n)
+          → Red {Γ = Γ} (obs (lookup Γ i)) (input i)
+red-input {Γ = Γ} i {lo = lo} κ id now sched st with toℕ i <? lo
+... | no  ¬below = _ , subs-floor (≮⇒≥ ¬below) , (tt ∷ tt ∷ tt ∷ []) ∷ []
+... | yes below  with Sched.slots sched i in slEq
+...   | scripted {ok = ok} (hot async)
+        with memberSource (toℕ i) (EvalSt.completedSources st) in doneEq
+...     | true  = _ , subs-hot-done below slEq doneEq , (tt ∷ tt ∷ tt ∷ []) ∷ []
+...     | false = _ , subs-hot-live below slEq doneEq , (tt ∷ []) ∷ []
+red-input {Γ = Γ} i {lo = lo} κ id now sched st
+    | yes below | scripted {ok = ok} (cold sync []) =
+      _ , subs-cold-sync below slEq refl
+        , satOneShot id sched (redDatas _ ok sync)
+red-input {Γ = Γ} i {lo = lo} κ id now sched st
+    | yes below | scripted {ok = ok} (cold sync (d ∷ ds)) =
+      _ , subs-cold-async below slEq refl refl
+        , (tt ∷ satValues (redDatas _ ok sync)) ∷ []
+red-input {Γ = Γ} i {lo = lo} κ id now sched st
+    | yes below | shared d {ok = ok} =
+      red-input-shared i d κ below id now sched slEq st
 
 redTms : ∀ {n} {Γ : Ctx n} {u} (ts : List (Tm Γ [] [] [] u))
        → All (Red u) (map (λ tm → evalTm tm) ts)

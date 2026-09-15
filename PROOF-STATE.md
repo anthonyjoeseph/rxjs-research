@@ -234,17 +234,18 @@ body that spends it.
 
 ### Big picture tier roadmap
 
-- **FINISH THE STATE-THREADING FACE.** The split landed and the term-structural
-  arms are proven for real, termination included, so the Kripke shape is
-  answered rather than assumed. What the arms SPEND is still postulated: a
-  slot's five scripted sub-arms, which emit a fixed protocol burst and thread
-  the state on untouched; a frame push, which is the second half of all three
-  transformer arms; and a term's own value, which is the same theorem one level
-  down and mutual with the body through the expression embedding. All three are
-  the same kind of work the leg just proved works, which is why they come before
-  anything that descends.
+- **THE μ PEEL, WHICH IS THE ONE PLACE THE CANDIDATE HAS NO DESCENT.** State
+  threading is answered and the slot's scripted half is proven, so what is left
+  here separates cleanly into two dangerous statements and a mechanical shelf,
+  and this is the sharper of the two. Everywhere else `Red` either moves the
+  type strictly down or does not move it while the TERM shrinks; a μ moves
+  neither — the unfolding sits at the same type and is no subterm of its own
+  fixpoint. So the leaf is a fixpoint at one type, nothing in the body can reach
+  it, and whether the candidate can be closed there at all is prior to every
+  grind under it. Refute it or find the shape; do not grind it.
 
-- **REDUCE `switchAll` / `exhaustAll` TO A GRINDABLE STATE.** The flatteners are
+- **THEN THE HOP — `switchAll` / `exhaustAll` / `mergeAll` TO A GRINDABLE
+  STATE.** The flatteners are
   where the type genuinely descends — `obs (obs u)` becoming `obs u` — so they
   are the arms the candidate was chosen for, and also the ones that run a node
   store, kill a live inner, and refuse a second. Each already takes the outer's
@@ -253,14 +254,15 @@ body that spends it.
   open question. Not a full proof: the leg's product is the assembly plus leaves
   whose shapes are settled and whose routes are written down.
 
-- **THEN THE SAME FOR μ AND FOR `connect`.** Both are answered, and neither is
-  assembled. The μ arm stands on the unfolding sitting at the same type, so its
-  leaf is a fixpoint at one type rather than a descent; the connect arm stands
-  on the share's fan-out carrying no payload, so two of its three sub-arms are
-  value-free and the third is the definition's own induction hypothesis. The
-  connect arm is the slot leaf's sixth sub-arm, so this leg finishes what the
-  first one leaves open, and it is also what gives the two discharged share
-  lemmas somewhere to plug in.
+- **THEN THE MECHANICAL SHELF, WHICH IS THE REST OF THE LEDGER AND NONE OF THE
+  RISK.** Three statements, and the reason to name them as one leg is that none
+  of them can move the ground: a frame push consumes a burst it is handed and
+  threads the state on; a term's own value is the same theorem one level down,
+  mutual with the body through the expression embedding; and a share's connect
+  is the sub-arm the state quantification was chosen to answer, with two of its
+  three cases already value-free and proven. This is the delegation boundary —
+  the shelf is where the grind goes once the two legs above have decided the
+  shapes it must be written against.
 
 - **THEN WHATEVER DESIGN WORK REMAINS.** The candidate funds `Runs` and nothing
   else; the other eight `*Runs` families have no candidate and the bet is that
@@ -302,14 +304,14 @@ body that spends it.
   The unfolding is no subterm and sits at the same type, so this is a fixpoint
   at one type and the body cannot reach it.
 
-- **`red-input`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`: every slot is
-  reducible. Five sub-arms emit a fixed protocol burst; the sixth is a share's
-  connect, whose def is an arbitrary term.
+- **`red-input-shared`** (Rx/Evaluator/Reducible) — FALSITY,
+  `DEAD ROUTE, PROBED`: a share's slot is reducible. Its def is drawn from the
+  table rather than the term, so no descent this module can see reaches it.
 
-- **`red-push`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`: pushing a
-  satisfying burst through a frame yields a total derivation and a satisfying
-  result. Spent by all three transformer arms, so a restatement moves each of
-  them.
+- **`red-push`** (Rx/Evaluator/Reducible) — FALSITY, `DEAD ROUTE, PROBED`:
+  pushing a satisfying burst through a frame yields a total derivation and a
+  satisfying result. Spent by all three transformer arms, so a restatement
+  moves each of them.
 
 - **`red-tm`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`: every closed
   term's value is reducible. Mutual with the body through the expression

@@ -55,5 +55,5 @@ open import Probed.Apparatus using (Confirms; Separates)
 -- is generated from its target, so the name is the only handle the
 -- reachability law has on it.
 open import Probed.Reducible-Arms using (row-tm-obs; row-tm-nat; row-μ-peel;
-  row-input-floor; row-input-hot-live; row-input-cold-sync; row-push-obs;
+  row-share-spent; row-share-join; row-push-obs;
   row-merge-empty; row-switch-empty; row-exhaust-empty)
