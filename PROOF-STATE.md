@@ -248,15 +248,6 @@ does.
   separates the reservation a pipeline owes once from the one a fold owes per
   delivery.
 
-- **GIVE THE BURST LENGTH A CARRIER.** The currency change discharges `map-open`
-  and leaves `scan-handed` needing a quantity the syntax does not have: a run's
-  emitted depth is the burst POSITION, evidenced at two lengths against one
-  static reading that does not move. Three candidates, and deciding between them
-  is the leg — the length as a conjunct of the invariant record, the rank a
-  frame enters at growing per delivery, or the reading taken over the store
-  rather than the term. The reachable-only escape is not among them: a one-line
-  rxjs pipeline reaches the shape, so excluding it costs parity.
-
 - **WIDEN WHAT A BUILDER RETURNS, WHICH TURNS OUT TO GATE THE WALK.** Every
   premise is denominated at one `slotDepth sl` the caller fixes, and each clause
   carries an agreement `Sched.slots sched ≡ sl`. Three sites are handed a
