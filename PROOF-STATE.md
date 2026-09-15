@@ -224,56 +224,50 @@ derivation, so the descent is a proof obligation rather than a reading the
 machine computes and the dry marker is unemittable — no constructor of the
 relation builds one.
 
-**AND THE TIER IS NOW ONE ROW, WHICH IS THE WHOLE OF WHAT THE CUTOVER BOUGHT.**
-Every earlier row here was a decrease obligation of a NUMERIC descent — a depth
-read off the program text, a store, a burst length, an unconnected count — and
-every one of them was refuted rather than hard. `Red` is denominated in none of
-them, so the statements are gone along with the measures that stated them. What
-is left is a single leaf asserting that every closed term is reducible, and the
-tier's entire remaining risk is in whether its body can be written.
+**AND THE TIER IS THE CANDIDATE'S OWN INDUCTION.** `reducible` is a body
+recursing structurally on the term; every arm with a subterm calls itself at a
+schedule and a state the arm has already moved, and the candidate's
+quantification over every state is what makes those calls free. What is left is
+the arms that have no subterm to recurse on — a slot, a frame push, a term's
+value, the flatteners' hop, the μ peel — each a leaf whose fit is checked by the
+body that spends it.
 
 ### Big picture tier roadmap
 
-- **CUT OVER TO GIRARD–TAIT AND POSTULATE OUT EVERY HARD PART.** The candidate
-  goes in, the builder's three unpayable edges are re-routed through it, and the
-  rank mechanism is deleted outright rather than maintained beside its
-  replacement — the measures, their arithmetic, their refutations and their
-  probes. The body of `reducible` is not attempted: it is one bare leaf, minting
-  nothing, so the cutover is a shape decision that CI's termination check rules
-  on rather than a proof. What the leg buys is that the eight remaining
-  subscribe-cluster functions must now be structural, which is the one claim the
-  dev loop cannot see and the one the whole design rests on.
-
-- **PROVE STATE THREADING BEFORE TOUCHING ANYTHING ELSE.** `Red` quantifies over
-  EVERY schedule and EVERY state at the observable arm, which is what makes a
-  share's connect and a flattener's hop cost one call apiece rather than an
-  invariant cascade. That Kripke shape is the single assumption most likely to
-  blow the design up, and it is checkable now: the leaf splits into the
-  term-structural formers, which thread state and nothing else. The leg is that
-  split plus the arms that carry it, leaves postulated — de-risking first,
-  because everything below is ground that a failure here moves.
+- **FINISH THE STATE-THREADING FACE.** The split landed and the term-structural
+  arms are proven for real, termination included, so the Kripke shape is
+  answered rather than assumed. What the arms SPEND is still postulated: a
+  slot's five scripted sub-arms, which emit a fixed protocol burst and thread
+  the state on untouched; a frame push, which is the second half of all three
+  transformer arms; and a term's own value, which is the same theorem one level
+  down and mutual with the body through the expression embedding. All three are
+  the same kind of work the leg just proved works, which is why they come before
+  anything that descends.
 
 - **REDUCE `switchAll` / `exhaustAll` TO A GRINDABLE STATE.** The flatteners are
   where the type genuinely descends — `obs (obs u)` becoming `obs u` — so they
   are the arms the candidate was chosen for, and also the ones that run a node
-  store, kill a live inner, and refuse a second. Not a full proof: the leg's
-  product is the assembly plus leaves whose shapes are settled and whose routes
-  are written down, so that what remains is typing rather than deciding.
+  store, kill a live inner, and refuse a second. Each already takes the outer's
+  candidate at the higher type, which is where the inners arrive reducible;
+  whether that delivers a usable candidate at the state the hop reaches is the
+  open question. Not a full proof: the leg's product is the assembly plus leaves
+  whose shapes are settled and whose routes are written down.
 
 - **THEN THE SAME FOR μ AND FOR `connect`.** Both are answered, and neither is
   assembled. The μ arm stands on the unfolding sitting at the same type, so its
   leaf is a fixpoint at one type rather than a descent; the connect arm stands
   on the share's fan-out carrying no payload, so two of its three sub-arms are
-  value-free and the third is the definition's own induction hypothesis. The leg
-  is those two arms written as bodies over leaves, which is also what gives the
-  two discharged share lemmas somewhere to plug in.
+  value-free and the third is the definition's own induction hypothesis. The
+  connect arm is the slot leaf's sixth sub-arm, so this leg finishes what the
+  first one leaves open, and it is also what gives the two discharged share
+  lemmas somewhere to plug in.
 
 - **THEN WHATEVER DESIGN WORK REMAINS.** The candidate funds `Runs` and nothing
   else; the other eight `*Runs` families have no candidate and the bet is that
   once subscription is independently total their recursion is structural. That
   bet is decided by CI rather than by argument, and whatever it leaves open is
   this leg — it is named rather than planned because its content is exactly what
-  the four legs above turn up.
+  the three legs above turn up.
 
 - **THEN WHATEVER GRINDING REMAINS.** The leaves the legs above leave behind,
   once each has a settled shape and a named route. This is the delegation
@@ -281,12 +275,45 @@ tier's entire remaining risk is in whether its body can be written.
 
 ### Open questions
 
+- **Does the outer's candidate survive the hop?** A flattener receives its
+  inners as VALUES inside the outer's burst, so what it holds is a satisfaction
+  claim over a stream rather than a candidate at a state — and the state the hop
+  subscribes in is whatever the outer's delivery reached, not the one the claim
+  was taken at. The candidate is quantified over every state precisely so that
+  gap costs nothing, and nothing has instantiated it.
+  relevant: `red-merge-all`, `red-switch-all`, `red-exhaust-all`
+
 ### The ledger
 
-- **`reducible`** (Rx/Evaluator/Reducible) — FALSITY, `RECOVERY`: every closed
-  term is reducible at its own type. Nothing has instantiated it, and whether
-  the candidate's observable arm is provable at the flatteners is the tier's
-  entire risk.
+- **`red-merge-all`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`: the
+  bounded-concurrency flattener is reducible given its outer's candidate. Runs
+  a queue and a live count, so it is the flattener whose state the hop threads
+  through most.
+
+- **`red-switch-all`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`:
+  `switchAll` is reducible given its outer's candidate. Kills a live inner, so
+  the hop subscribes in a state a cancellation has just moved.
+
+- **`red-exhaust-all`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`:
+  `exhaustAll` is reducible given its outer's candidate. Refuses a second
+  inner, so one arm carries no subscription at all.
+
+- **`red-μ`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`: a μ is reducible.
+  The unfolding is no subterm and sits at the same type, so this is a fixpoint
+  at one type and the body cannot reach it.
+
+- **`red-input`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`: every slot is
+  reducible. Five sub-arms emit a fixed protocol burst; the sixth is a share's
+  connect, whose def is an arbitrary term.
+
+- **`red-push`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`: pushing a
+  satisfying burst through a frame yields a total derivation and a satisfying
+  result. Spent by all three transformer arms, so a restatement moves each of
+  them.
+
+- **`red-tm`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`: every closed
+  term's value is reducible. Mutual with the body through the expression
+  embedding, so the route is known and nothing has walked it.
 
 
 ## Tier 2 — Verify-Well-Formed (parked behind tier 1)

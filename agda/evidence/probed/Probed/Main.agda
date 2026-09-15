@@ -49,3 +49,11 @@ module Probed.Main where
 -- row and E6 refuses a `-- FORK:` that does not inhabit `Separates`, so
 -- both belong to the tree and a tree with nothing open still owes them.
 open import Probed.Apparatus using (Confirms; Separates)
+
+-- THE SEVEN LEAVES OF THE REDUCIBILITY BODY.  Every row is NAMED and
+-- claimed here rather than pinned anonymously: a `Confirms` row's type
+-- is generated from its target, so the name is the only handle the
+-- reachability law has on it.
+open import Probed.Reducible-Arms using (row-tm-obs; row-tm-nat; row-μ-peel;
+  row-input-floor; row-input-hot-live; row-input-cold-sync; row-push-obs;
+  row-merge-empty; row-switch-empty; row-exhaust-empty)
