@@ -571,6 +571,28 @@ map-handed {s = s} η fn (v ∷ vs) le (p ∷ᵃ ps) =
 --   size-reducing, so the arriving observable is related to nothing in
 --   hand — and that is a fact about what a value CARRIES, not about
 --   how the descent is denominated.
+
+-- AND WHAT THIS STATEMENT IS FUNDING IS A DESCENT THE TYPE FUNDS FOR
+-- FREE.  The builder's subscribe takes an accessibility witness, an
+-- entry invariant tying an expression to the rank, and a share bound;
+-- this inequality is one of that mechanism's decrease obligations and
+-- is read nowhere else along the value path.  So the six refutations
+-- are not evidence that a fold's arithmetic is hard — they are the
+-- mechanism saying it cannot pay, and a descent recursing on the TYPE
+-- never asks: a fold moves no type, so it owes the descent nothing at
+-- all, and the flatteners that do move one move it DOWNWARD.  The
+-- consequence for this row is that a repair which finds the missing
+-- number would still be funding apparatus nothing else reads.
+
+-- THE HALF THAT WOULD STRAND IT, AND IT IS THE REASON THE ROW IS NOT
+-- SIMPLY DELETED.  A rank retired from the descent is retired from the
+-- REPORT too, and the report has a consumer outside the decrease: the
+-- well-formedness face reads the burst's handedness rather than the
+-- fact that it shrank.  Whether that consumer wants the reading or
+-- only the decrease is undecided here, and it is the whole of what is
+-- left of this tier's open question — settle it before removing the
+-- quantity, since removing it first converts an unfunded obligation
+-- into an unstated one.
 postulate
   scan-fits : ∀ {n} {Γ : Ctx n} {s u} {U q sz r} (η : Fin n → ℕ)
     (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (ac : Val Γ u) (vs : List (Val Γ s))

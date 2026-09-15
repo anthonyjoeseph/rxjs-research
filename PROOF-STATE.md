@@ -268,29 +268,26 @@ does.
   The leg is those rows, and what it buys is the only thing that moves the
   measure's own statements off the class they are born into.
 
-- **DENOMINATE THE DESCENT IN THE TYPE, AND STATE THE FAMILIES OVER IT.** The
-  check the last leg asked for is made and its answer is a mechanism, not a
-  verdict: a reducibility predicate recursing on `Ty` lands on the runtime
-  value's own recursion, so the hop relates two indices the definition already
-  identifies and the fold, which moves no type, asks the descent for nothing.
-  Modelled end to end it closes over real substitution, collapses the three
-  flatteners to one case and reads no property of the threaded state. The leg
-  is the statement rather than the proof: the delivery and subscription
-  families over the real expressions, the totality claim above them, every leaf
-  postulated.
+- **RETIRE THE RANK FROM THE BUILDER, NOT THE FAMILIES FROM NOTHING.** The
+  previous wording of this leg is discarded rather than shrunk: it owed the
+  families, and the families are already the domain's twenty-one relations
+  with a real body above them. What the builder still spends is a RANK — an
+  accessibility witness, an entry invariant, a share bound — and every open
+  row here is one of that mechanism's own decrease obligations, which is why
+  they are refuted rather than hard. The leg is the type-denominated descent
+  put where the rank stands, leaf postulated.
 
 ### Open questions
 
-- **What must a value CARRY for a descent to spend it?** Narrowed to one half. A
-  value carries its TYPE and nothing else: the descent recurses on the delivery
-  derivation, the type is what shrinks at a flattener, and a fold moves neither.
-  What is left is the half no model of the term language can see — the real
-  machine carries a slot telescope and a share table BESIDE the value, and every
-  row here reads a payload against the rank its frame entered at rather than
-  against anything a type fixes. So the question is now whether those are one
-  reading, or whether a frame's own bookkeeping is a second currency the type
-  descent never touches.
-  relevant: `scan-fits`, `inner-handed`, `thru-handed`
+- **What must a value CARRY for a descent to spend it?** The half left open is
+  answered and the question narrows again: a frame's bookkeeping is NOT a second
+  currency, since the entry invariant and the handedness reading exist to make
+  the rank decrease and are read nowhere else along the value path. What is left
+  is the half no scratch model can see, because it carries no report — whether
+  anything OUTSIDE the decrease reads the handedness. The well-formedness face
+  consumes the burst report, and if it wants the READING rather than the
+  decrease, retiring the rank strands it rather than discharging it.
+  relevant: `scan-fits`, `inner-handed`, `thru-handed`, `data-handed`
 
 ### The ledger
 
