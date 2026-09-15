@@ -29,6 +29,17 @@
 -- and not for the statement — it says what currency a repair has to be
 -- written in, never that a repair in that currency is true.
 --
+-- AND THE REFERENCE IMPLEMENTATION RUNS IT, WHICH IS WHAT MAKES THE
+-- PARITY ARGUMENT ABOVE A FACT RATHER THAN A READING OF THE MODEL.
+-- The rxjs line at the head of this block was run against real rxjs at
+-- burst lengths doubling into the thousands: it completes, it emits
+-- nothing, and its cost grows with the SQUARE of the burst — which is
+-- the chain of nested subscriptions the climb describes, being walked
+-- once per delivery.  Past a couple of thousand elements it exhausts
+-- the default JS stack outright.  So the deepening is not an artifact
+-- of how this development models a fold; it is what the library does,
+-- and a bound that excluded it would be modelling something else.
+--
 -- The three figures are claimed because the finding is their
 -- relationship: two depth lists and one static reading, where a repair
 -- moving any single one would leave a witness reporting numbers that no

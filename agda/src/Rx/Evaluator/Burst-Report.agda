@@ -442,6 +442,11 @@ map-open {u = u} {τ = _ , _ , _} η ds fn (v ∷ vs) le (p ∷ᵃ ps) =
 --   configurations, and whose positive figure is in this leaf's own
 --   currency: a bound in the reading PLUS the length holds there, while
 --   the reading alone does not.
+-- REFUTED: `Refuted.Scan-Length` — this statement, at an ordinary
+--   five-element burst of plain numbers.  The length reservation is
+--   asked of `r` by the conclusion and related to nothing by the
+--   premises, so the leaf is false as written and no figure repairs it:
+--   the repair is a premise carrying the count, not a cleverer witness.
 postulate
   scan-fits : ∀ {n} {Γ : Ctx n} {s u} {U r sz} (η : Fin n → ℕ)
     (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (ac : Val Γ u) (vs : List (Val Γ s))

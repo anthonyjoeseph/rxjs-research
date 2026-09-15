@@ -229,14 +229,14 @@ does.
 
 ### Big picture tier roadmap
 
-- **GIVE THE BURST LENGTH A CARRIER.** The fold's iteration is priced and the
-  arm is a body, so what the leg has left is `scan-fits` — a figure dominating
-  the stored SEED and leaving one RATE per delivery under the rank. The length
-  is now written in a statement rather than missing from one, and the three
-  candidates are unchanged: a conjunct of the invariant record, a rank growing
-  per delivery, or the reading taken over the store. What the assembly settled
-  is that the seed rides with the length rather than being a separate question:
-  both are pinned by the same figure, so one carrier pays for both.
+- **GIVE THE BURST LENGTH A CARRIER.** `scan-fits` is REFUTED as written, at
+  five plain numbers: it reserves one RATE per delivery under the entry rank
+  while no premise relates the burst's LENGTH to that rank, so the two are
+  independent and no choice of figure repairs it. The leg is therefore an
+  INTERFACE change and not a proof — the count has to arrive in a PREMISE, and
+  the seeding site already holds the burst it would be read from. What the
+  reservation is sized from is the leg's own question; `entryTri`'s header
+  carries where it would go.
 
 - **MAKE THE ENTRY RANK RESERVE WHAT A FRAME WILL SPEND.** With the sum in
   `src`, what a map arm still asserts is arithmetic alone: the rank a frame
@@ -312,11 +312,6 @@ does.
   a frame ENTERS at has to dominate the template PLUS what it was handed; a
   join read off the program dominates neither addend's sum.
 
-- **`scan-fits`** (Rx/Evaluator/Burst-Report) — FALSITY, `REFUTED×2`: what the
-  fold owes once its climb is proven — a figure over the stored seed leaving a
-  RATE per delivery under the rank. It is the tier's first statement naming the
-  burst LENGTH, and no rank read off the program carries one.
-
 - **`inner-handed`, `thru-handed`** (Rx/Evaluator/Burst-Report) — FALSITY,
   `PROBED×2`: the two `*All` heads, which rewrite no payload — they subscribe
   one, or deliver what an inner subscription produced. So the claim owed is
@@ -350,6 +345,11 @@ does.
   the shelf under the arms above — the telescope membership, whose rows buy
   non-vacuity rather than an inequality, and the weakening, which has content
   on both sides.
+
+- **`scan-fits`** (Rx/Evaluator/Burst-Report) — SHAPE, `REFUTED×3`: refuted at
+  a five-element burst of plain numbers — the rank is asked for a length
+  reservation the premises never relate to it. The restatement is guaranteed
+  and is over the interface: the count must enter as a premise.
 
 - **`subs-keeps-slots`, `step-keeps-slots`, `consume-keeps-slots`,
   `subs-unconn-drops`, `step-unconn-drops`, `consume-unconn-drops`**

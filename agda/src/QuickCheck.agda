@@ -6,10 +6,25 @@
 --   agda --compile --compile-dir=_cli src/QuickCheck.agda
 --   echo "<seed> [runs] [depth]" | ./_cli/QuickCheck
 --
--- The fragment is monomorphic (all values ℕ — batching is value-agnostic)
--- and its map/scan fns never return observables (closeUnderFn never
--- forced). Repeated inner refs to a source inside an *All make diamonds —
+-- The fragment's payloads are ℕ, because batching is value-agnostic.
+-- Repeated inner refs to a source inside an *All make diamonds —
 -- multiple emits in one instant, the batcher's interesting case.
+--
+-- AND IT REACHES A FOLD AT OBSERVABLE TYPE, WHICH IS THE ONE BINDER THAT
+-- LEAVES THE STATIC READING.  Substituting a value of observable type
+-- reifies it under `strmᵗ`, so a template naming its own accumulator
+-- hands back one a wrap deeper: the environment stops being data, and
+-- the inners an *All hops onto stop being subterms of the program.  A
+-- generator that folds only at ℕ cannot write that shape down at all —
+-- not under-sample it, but fail to TYPE it — so its greens were silent
+-- about the one region where the substitution shelf has no statement.
+-- The summary line carries how many programs reached it, because that
+-- is the claim and it is a number.
+--
+-- WHAT IS STILL OUT OF REACH, and it is the SECOND binder of the same
+-- kind: a `caseᵗ` scrutinising a sum that contains an observable rebinds
+-- one exactly as the fold does.  The fragment has no sums at all, so
+-- that arm is unsampled and no seed changes it.
 --
 -- IT REACHES `μᵉ`, AND THAT IS WHAT PUTS THE SWEEP ON THE DESCENT. The
 -- rank guard lives under recursion, so a μ-free generator could never
@@ -23,7 +38,7 @@
 -- region is the claim and it is a number.
 module QuickCheck where
 
-open import Data.Bool using (Bool; true; false; if_then_else_; _∧_; _∨_)
+open import Data.Bool using (Bool; true; false; not; if_then_else_; _∧_; _∨_)
 open import Data.Char using (toℕ)
 open import Data.Fin using (Fin; zero; suc)
 open import Data.List using (List; []; _∷_; map; length)
@@ -39,7 +54,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong;
 
 open import Rx.Prim using (Timed; after_,_; ObservableInput; hot; cold; InstEvent; init; value; close; handoff;
   complete; InstEmit; _at_from_as_)
-open import Rx.Exp using (Ty; natᵗ; obs; _×ᵗ_; Ctx; Exp; Tm; Fn; PrimOp; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ;
+open import Rx.Exp using (Ty; natᵗ; obs; _×ᵗ_; isData; Ctx; Exp; Tm; Fn; PrimOp; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ;
   mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ;
   unit̂; bool̂; nat̂; primᵗ; pairᵗ; fstᵗ; sndᵗ;
   strmᵗ; varᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; add; sub; mul; eqᵖ; ltᵖ; notᵖ)
@@ -135,6 +150,41 @@ genFn = genB 4 >>=G λ c → genNat >>=G λ k →
 genScanFn : ∀ {Δᵍ Δ Θ} → Gen (Fn Γ₂ Δᵍ Δ Θ (natᵗ ×ᵗ natᵗ) natᵗ)
 genScanFn = pureG (primᵗ add (pairᵗ (fstᵗ (varᵗ (here refl)))
                                     (sndᵗ (varᵗ (here refl)))))
+
+-- THE ACCUMULATOR AT OBSERVABLE TYPE, WHICH IS THE ONE BINDER THAT
+-- BREAKS A DATA ENVIRONMENT.  Substituting a value of observable type
+-- for a variable REIFIES it under `strmᵗ`, so a template mentioning its
+-- own accumulator hands back one a wrap deeper and the fold feeds that
+-- straight in — the arms below are a coverage LATTICE over whether the
+-- template wraps, passes, resets or ignores, because the climb is a
+-- property of WHICH of those it does and of nothing else.
+--
+-- THE DEGENERATE ARMS ARE DELIBERATE AND ARE THE POINT.  `dropped`
+-- names neither component, so no seed reaching only the wrapping arms
+-- could produce a fold whose output is independent of everything handed
+-- to it — the same trap `genFn` records one declaration up, where three
+-- arms all USED the argument and the shape that mattered was the fourth.
+genObsScanFn : ∀ {Δᵍ Δ Θ} → Gen (Fn Γ₂ Δᵍ Δ Θ (obs natᵗ ×ᵗ natᵗ) (obs natᵗ))
+genObsScanFn = genB 6 >>=G λ c → genNat >>=G λ k →
+  let acc = fstᵗ (varᵗ (here refl))
+      cur = sndᵗ (varᵗ (here refl))
+  in pureG
+    (      if c ≡ᵇ 0 then strmᵗ (mergeAllᵉ nothing (ofᵉ (acc ∷ [])))
+      else if c ≡ᵇ 1 then acc
+      else if c ≡ᵇ 2 then strmᵗ (ofᵉ (cur ∷ []))
+      else if c ≡ᵇ 3 then strmᵗ emptyᵉ
+      else if c ≡ᵇ 4 then strmᵗ (switchAllᵉ (ofᵉ (acc ∷ [])))
+      else strmᵗ (mergeAllᵉ nothing
+             (ofᵉ (acc ∷ strmᵗ (ofᵉ (nat̂ k ∷ [])) ∷ []))))
+
+-- the fold's own seed, at observable type.  `emptyᵉ` is the shallowest
+-- one there is, so a climb read off a run seeded with it is the fold's
+-- entirely
+genObsSeed : ∀ {Δᵍ Δ Θ} → Gen (Tm Γ₂ Δᵍ Δ Θ (obs natᵗ))
+genObsSeed = genB 3 >>=G λ c → genNat >>=G λ k → genFin2 >>=G λ i →
+  pureG (      if c ≡ᵇ 0 then strmᵗ emptyᵉ
+          else if c ≡ᵇ 1 then strmᵗ (ofᵉ (nat̂ k ∷ []))
+          else strmᵗ (inputNat i))
 
 ------------------------------------------------------------------------
 -- scripted inputs
@@ -234,9 +284,37 @@ genInners g u d zero    = pureG []
 genInners g u d (suc n) =
   genExpAt g u d >>=G λ e → genInners g u d n >>=G λ rest → pureG (strmᵗ e ∷ rest)
 
+-- TWO WAYS TO BE A STREAM OF STREAMS, AND ONLY ONE OF THEM IS STATIC.
+-- A literal list of inners is closed syntax, so every observable an
+-- *All hops onto is a subterm of the program.  A fold AT OBSERVABLE TYPE
+-- is not: its emissions are built during the run out of its own previous
+-- ones, so the inners an *All meets here are terms the program does not
+-- contain.  The mix is weighted toward the list because repeated inner
+-- refs are what make the diamonds the batcher is checked on, and a fold
+-- emits one inner per delivery.
+--
+-- AND THE FOLD ARM IS CONFINED TO THE LEAF LEVEL, WHICH IS A COST BOUND
+-- AND NOT A TASTE.  A fold at observable type whose SOURCE is another
+-- such fold is a tower: the inner one hands out an accumulator that
+-- deepens per delivery, and the outer one wraps each of those again, so
+-- the term the evaluator walks grows as a product rather than a sum.
+-- Unconfined, about one depth-4 program in thirty took longer to
+-- evaluate than the whole sweep it was part of, which costs the harness
+-- its default run.  Held at `d ≡ᵇ 0` the fold's source is a plain
+-- burst, which is the shape the witness that made this region
+-- interesting has, and no two folds can stack.  The region is still
+-- reached — the summary line says how often — so what the confinement
+-- drops is towers, not coverage.
 genObsAt g u d =
-  genB 2 >>=G λ extra → genInners g u d (suc (suc extra)) >>=G λ items →
-  pureG (ofᵉ items)
+  let inners = genB 2 >>=G λ extra → genInners g u d (suc (suc extra)) >>=G λ items →
+                 pureG (ofᵉ items)
+  in genB 4 >>=G λ c →
+     if c ≡ᵇ 0
+     then (if d ≡ᵇ 0
+           then (genObsScanFn >>=G λ f → genObsSeed >>=G λ z → genExpAt g u d >>=G λ e →
+                 pureG (scanᵉ f z e))
+           else inners)
+     else inners
 
 -- past the gate: the var is in scope and this subtree plants exactly one
 genSpineD w zero    = pureG (varᵉ (here refl))
@@ -294,14 +372,14 @@ genExp d = genExpAt 0 0 d
 -- covered instead of the constructors that were added.
 
 Marks : Set
-Marks = Bool × Bool × Bool            -- μᵉ · varᵉ · deferᵉ
+Marks = Bool × Bool × Bool × Bool     -- μᵉ · varᵉ · deferᵉ · obs-accumulator fold
 
 noMarks : Marks
-noMarks = false , false , false
+noMarks = false , false , false , false
 
 infixr 5 _⊕_
 _⊕_ : Marks → Marks → Marks
-(a , b , c) ⊕ (x , y , z) = (a ∨ x) , (b ∨ y) , (c ∨ z)
+(a , b , c , d) ⊕ (w , x , y , z) = (a ∨ w) , (b ∨ x) , (c ∨ y) , (d ∨ z)
 
 marksᵉ  : ∀ {Δᵍ Δ Θ t} → Exp Γ₂ Δᵍ Δ Θ t → Marks
 marksᵗ  : ∀ {Δᵍ Δ Θ t} → Tm Γ₂ Δᵍ Δ Θ t → Marks
@@ -312,13 +390,17 @@ marksᵉ (ofᵉ ts)        = marksᵗˢ ts
 marksᵉ emptyᵉ          = noMarks
 marksᵉ (mapᵉ f e)      = marksᵗ f ⊕ marksᵉ e
 marksᵉ (takeᵉ c e)     = marksᵗ c ⊕ marksᵉ e
-marksᵉ (scanᵉ f z e)   = marksᵗ f ⊕ marksᵗ z ⊕ marksᵉ e
+-- the fourth mark reads the ACCUMULATOR's type, which is the fold's own
+-- result type: `isData (obs _)` is false, so this fires exactly when the
+-- fold re-binds something the run could subscribe
+marksᵉ {t = t} (scanᵉ f z e) =
+  (false , false , false , not (isData t)) ⊕ marksᵗ f ⊕ marksᵗ z ⊕ marksᵉ e
 marksᵉ (mergeAllᵉ _ e) = marksᵉ e
 marksᵉ (switchAllᵉ e)  = marksᵉ e
 marksᵉ (exhaustAllᵉ e) = marksᵉ e
-marksᵉ (μᵉ e)          = (true , false , false) ⊕ marksᵉ e
-marksᵉ (varᵉ x)        = false , true , false
-marksᵉ (deferᵉ e)      = (false , false , true) ⊕ marksᵉ e
+marksᵉ (μᵉ e)          = (true , false , false , false) ⊕ marksᵉ e
+marksᵉ (varᵉ x)        = false , true , false , false
+marksᵉ (deferᵉ e)      = (false , false , true , false) ⊕ marksᵉ e
 
 marksᵗ (varᵗ x)      = noMarks
 marksᵗ unit̂          = noMarks
@@ -525,11 +607,12 @@ reportWF e ins s =
 -- proof obligation rather than an output, and nothing a generator
 -- produces can fail one.
 Tally : Set
-Tally = ℕ × ℕ × ℕ                     -- programs carrying μᵉ · varᵉ · deferᵉ
+Tally = ℕ × ℕ × ℕ × ℕ        -- programs carrying μᵉ · varᵉ · deferᵉ · obs-fold
 
 bump : Marks → Tally → Tally
-bump (m , v , f) (a , b , c) =
-  (if m then suc a else a) , (if v then suc b else b) , (if f then suc c else c)
+bump (m , v , f , o) (a , b , c , p) =
+  (if m then suc a else a) , (if v then suc b else b)
+    , (if f then suc c else c) , (if o then suc p else p)
 
 oneCase : ℕ → Gen (Marks × List String)
 oneCase d = genSlots >>=G λ ins → genExp d >>=G λ e →
@@ -543,7 +626,7 @@ oneCase d = genSlots >>=G λ ins → genExp d >>=G λ e →
 -- accumulate EVERY failing case's reports, in generation order, and tally
 -- which recursion constructors the corpus actually reached
 runN : ℕ → ℕ → Gen (Tally × List String)
-runN zero    d = pureG ((0 , 0 , 0) , [])
+runN zero    d = pureG ((0 , 0 , 0 , 0) , [])
 runN (suc k) d = oneCase d >>=G λ r → runN k d >>=G λ acc →
   pureG (bump (proj₁ r) (proj₁ acc) , proj₂ r ++ᴸ proj₂ acc)
 
@@ -603,5 +686,6 @@ main = getContents >>= λ s →
        ∷ " cases, " ∷ show (length fails) ∷ " failures"
        ∷ "; μ " ∷ show (proj₁ tally)
        ∷ " var " ∷ show (proj₁ (proj₂ tally))
-       ∷ " defer " ∷ show (proj₂ (proj₂ tally)) ∷ "\n"
+       ∷ " defer " ∷ show (proj₁ (proj₂ (proj₂ tally)))
+       ∷ " obs-fold " ∷ show (proj₂ (proj₂ (proj₂ tally))) ∷ "\n"
        ∷ dumpFails fails ∷ []))

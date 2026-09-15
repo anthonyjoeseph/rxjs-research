@@ -75,6 +75,16 @@ open import Refuted.Carried-Derived using (carried-derived-false;
 open import Refuted.Scan-Reachable using (static-bounds-run-false;
   rows₃; rows₅; static₃; static₅; length-bound)
 
+-- and the leaf that was going to pay for the climb, refuted in the one
+-- quantity none of the witnesses above reads: the burst's LENGTH.  Its
+-- two figures are claimed because the finding is that neither moves —
+-- the template's reading and its rate are constants, so the demand is
+-- a count set against a rank the premises never relate it to, and an
+-- ordinary five-element burst clears it.  The escape of a wider bound
+-- is not available: the two quantities are independent, so any burst
+-- longer than the rank does the same
+open import Refuted.Scan-Length using (scan-fits-false; tmpl-is; rate-is)
+
 -- and the template drop asked WITHOUT the data hypothesis, which is
 -- what makes that hypothesis the statement rather than a convenience:
 -- reifying an observable argument writes a `strmᵗ` the template never
