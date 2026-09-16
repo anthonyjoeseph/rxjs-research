@@ -32,7 +32,8 @@ open import Rx.Exp
         ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ
         ; varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ
         ; caseᵗ; ifᵗ; primᵗ; strmᵗ; PrimOp
-        ; unitᵗ; boolᵗ; natᵗ; obs; _×ᵗ_; _+ᵗ_ )
+        ; nilᵗ; consᵗ; foldᵗ
+        ; unitᵗ; boolᵗ; natᵗ; obs; listᵗ; _×ᵗ_; _+ᵗ_ )
 
 private
   variable
@@ -199,6 +200,32 @@ pushStrm : (eq : Θ ≡ Θ') (e : Exp Γ Δᵍ Δ Θ t)
          → strmᵗ (subst (Cᵉ Γ Δᵍ Δ t) eq e)
              ≡ subst (Cᵗ Γ Δᵍ Δ (obs t)) eq (strmᵗ e)
 pushStrm refl e = refl
+
+pushNilᵗ : (eq : Θ ≡ Θ')
+         → nilᵗ {Γ = Γ} {Δᵍ} {Δ} {Θ'} {t} ≡ subst (Cᵗ Γ Δᵍ Δ (listᵗ t)) eq nilᵗ
+pushNilᵗ refl = refl
+
+pushConsᵗ : (eq : Θ ≡ Θ') (a : Tm Γ Δᵍ Δ Θ t) (as : Tm Γ Δᵍ Δ Θ (listᵗ t))
+          → consᵗ (subst (Cᵗ Γ Δᵍ Δ t) eq a)
+                  (subst (Cᵗ Γ Δᵍ Δ (listᵗ t)) eq as)
+              ≡ subst (Cᵗ Γ Δᵍ Δ (listᵗ t)) eq (consᵗ a as)
+pushConsᵗ refl a as = refl
+
+pushFoldᵗ : (eq : Θ ≡ Θ') (l : Tm Γ Δᵍ Δ Θ (listᵗ s)) (z : Tm Γ Δᵍ Δ Θ u)
+            (f : Tm Γ Δᵍ Δ (s ∷ u ∷ Θ) u)
+          → foldᵗ (subst (Cᵗ Γ Δᵍ Δ (listᵗ s)) eq l)
+                  (subst (Cᵗ Γ Δᵍ Δ u) eq z)
+                  (subst (λ z′ → Tm Γ Δᵍ Δ (s ∷ u ∷ z′) u) eq f)
+              ≡ subst (Cᵗ Γ Δᵍ Δ u) eq (foldᵗ l z f)
+pushFoldᵗ refl l z f = refl
+
+-- THE TWO-BINDER TRANSPORT.  `foldᵗ`'s step arm binds the element and
+-- the accumulator at once, so the one-binder form cannot report it: the
+-- inductive call arrives at a telescope extended twice.
+shift2 : (eq : Θ ≡ Θ') (f : Tm Γ Δᵍ Δ (s ∷ u ∷ Θ) t)
+       → subst (Cᵗ Γ Δᵍ Δ t) (cong (s ∷_) (cong (u ∷_) eq)) f
+           ≡ subst (λ z → Tm Γ Δᵍ Δ (s ∷ u ∷ z) t) eq f
+shift2 refl f = refl
 
 pushNilˢ : (eq : Θ ≡ Θ')
          → [] ≡ subst (Cˢ Γ Δᵍ Δ t) eq []
