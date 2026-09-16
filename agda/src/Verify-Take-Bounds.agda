@@ -24,10 +24,11 @@ open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.List using (List; []; _∷_; _++_; length; map)
 open import Data.List.Properties using (++-assoc; length-++; ++-identityʳ)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; zero; suc; _+_; _≤_)
+open import Data.Nat using (ℕ; zero; suc; _+_; _≤_; z≤n)
 open import Data.Nat.Properties using (≤-trans; +-monoʳ-≤; +-assoc; ≤-refl;
   ≤-reflexive)
 open import Data.Product using (_×_; proj₁; proj₂; _,_)
+open import Data.Sum using (inj₂)
 import Data.List.Relation.Unary.All as All
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂; subst)
 
@@ -36,14 +37,16 @@ open import Rx.Exp using (Ctx; Closed; nat̂; takeᵉ; Val; Tm; natᵗ; evalTm)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; take-st; lookupNode;
   sched-init; st-init; root; Path; takeVals; takeDispatch; NodeId;
   NodeState; take-f; retagEvents; splitEvents; scan-st; mergeAll-st;
-  switch-st; exhaust-st)
+  switch-st; exhaust-st; Arrival; sched-next; schedGo)
 open import Rx.Evaluator.Reducible using (reducible)
 open import Rx.Evaluator.Builder using (evaluate↓; drain!)
 open import Rx.Slots using (Slots)
 open import Rx.Evaluator.Freshness using (lookup-set; PreservedBelow)
 open import Rx.Evaluator.Freshness.Preserve using (subscribeE-preserves)
+open import Rx.Evaluator.Freshness.Mono using (subscribeE-mono; pushBurst-mono)
 open import Rx.Evaluator.Domain using (subscribeE⇓; pushBurst⇓; stepFrame⇓;
-  push-nil; push-cons; step-take; subs-take-zero; subs-take-suc)
+  push-nil; push-cons; step-take; subs-take-zero; subs-take-suc;
+  drain⇓; drain-done; drain-empty; drain-step; cascade⇓)
 open import Spec using (valuesOf)
 open import Readme-Theorems using (emitValues)
 
@@ -358,6 +361,118 @@ take-burst-bound :
 take-burst-bound k e ins = ≤-reflexive (take-burst-spends k e ins)
 
 ----------------------------------------------------------------------
+-- POPPING AN ARRIVAL DOES NOT MINT A NODE.  `sched-next` rewrites only
+-- the live list, so the node counter it hands on is the one it was
+-- given -- which is what carries the drain's guard from one arrival to
+-- the next.
+----------------------------------------------------------------------
+
+sched-next-node : ∀ {n} {Γ : Ctx n} {a : Arrival Γ} (sched sched′ : Sched Γ) →
+  sched-next sched ≡ inj₂ (a , sched′) →
+  Sched.nextNode sched′ ≡ Sched.nextNode sched
+sched-next-node sched sched′ eq with schedGo (Sched.live sched)
+sched-next-node sched .(record sched { live = _ }) refl | inj₂ (_ , _) = refl
+
+----------------------------------------------------------------------
+-- THE CASCADE'S HALF OF THE ACCOUNT.  One arrival's cascade emits some
+-- values and leaves the take node holding the rest, and the two add up
+-- to no more than it was holding -- an inequality rather than the
+-- frame's equality, because a cascade that reaches no take frame at all
+-- emits values this node never paid for and spends nothing.  Guarded by
+-- the node being BELOW the schedule's counter, which is what says the
+-- cascade cannot mint this node afresh: a subscribe entered mid-cascade
+-- installs at the counter and so lands above it.
+----------------------------------------------------------------------
+
+postulate
+  -- PROBED: `Probed.Take-Bounds`, at ONE arrival popped from what the
+  --   root frame left scheduled, against a take at one over a source of
+  --   two -- so the sum is pinned at a node that is actually holding a
+  --   budget rather than at a degenerate zero.  Not reached: any second
+  --   arrival, every flattening program, and a cascade entering a
+  --   subscribe, which is the shape the guard is there for.
+  cascade-take-spends : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    {a : Arrival Γ} {id} {sched : Sched Γ} {st : EvalSt e}
+    {out sched′ st′} (nid : NodeId) →
+    suc nid ≤ Sched.nextNode sched →
+    cascade⇓ {e = e} a id sched st (out , sched′ , st′) →
+    length (emitValues out) + nodeBudget nid st′ ≤ nodeBudget nid st
+
+  -- And the counter only ever rises, which is what lets the guard be
+  -- re-established for the next arrival rather than re-derived.  Every
+  -- clause under it either leaves the schedule alone or installs at the
+  -- counter and bumps it, so this is bookkeeping rather than a claim.
+  -- TWIN: `subscribeE-mono`
+  cascade-node-mono : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    {a : Arrival Γ} {id} {sched : Sched Γ} {st : EvalSt e}
+    {out sched′ st′} →
+    cascade⇓ {e = e} a id sched st (out , sched′ , st′) →
+    Sched.nextNode sched ≤ Sched.nextNode sched′
+
+----------------------------------------------------------------------
+-- THE DRAIN'S HALF, BY INDUCTION ON THE DERIVATION.  The route the
+-- frame's half took, repeated: the claim is about `drain⇓` rather than
+-- about the function that produces one, so the induction is on a
+-- datatype and the fuel is not the measure -- each arrival spends part
+-- of the node's holding and the recursive call is handed what is left.
+----------------------------------------------------------------------
+
+drain-take-bound : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  {fuel : Fuel} {id} {sched : Sched Γ} {st : EvalSt e} {rest}
+  (nid : NodeId) →
+  suc nid ≤ Sched.nextNode sched →
+  drain⇓ {e = e} fuel id sched st rest →
+  length (emitValues rest) ≤ nodeBudget nid st
+drain-take-bound nid lt drain-done      = z≤n
+drain-take-bound nid lt (drain-empty _) = z≤n
+drain-take-bound {sched = sched} nid lt
+  (drain-step {sched′ = sched′} {out = out} {rest = rest} eq c d) =
+  ≤-trans
+    (≤-reflexive (trans (cong length (emitValues-++ out rest))
+                        (length-++ (emitValues out))))
+    (≤-trans
+      (+-monoʳ-≤ (length (emitValues out))
+        (drain-take-bound nid (≤-trans lt′ (cascade-node-mono c)) d))
+      (cascade-take-spends nid lt′ c))
+  where
+    lt′ = ≤-trans lt (≤-reflexive (sym (sched-next-node sched sched′ eq)))
+
+----------------------------------------------------------------------
+-- AND THE DRAIN IS A DERIVATION TOO.  `drain!` pairs its stream with
+-- one about the very state the frame handed it, so the induction above
+-- applies to the run the bound is stated over with nothing transported.
+----------------------------------------------------------------------
+
+drainDeriv : ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (k : ℕ) (e : Closed Γ t)
+  (ins : Slots Γ) →
+  drain⇓ {e = takeᵉ (nat̂ k) e} fuel 1
+    (proj₁ (proj₂ (rootRun k e ins))) (proj₂ (proj₂ (rootRun k e ins)))
+    (drainRest fuel k e ins)
+drainDeriv fuel k e ins =
+  proj₂ (drain! fuel 1 (proj₁ (proj₂ (rootRun k e ins)))
+                       (proj₂ (proj₂ (rootRun k e ins))))
+
+----------------------------------------------------------------------
+-- THE GUARD AT THE ROOT.  A take at a POSITIVE count mints its node at
+-- the schedule's counter and subscribes above it, so the counter the
+-- drain inherits is strictly past the node the budget lives in.  At a
+-- count of zero nothing is minted at all, which is why the guard is
+-- stated against the positive arm and the zero arm is a separate
+-- obligation rather than a case of this one.
+----------------------------------------------------------------------
+
+root-take-minted : ∀ {n} {Γ : Ctx n} {t} {E : Closed Γ t} {u lo k}
+  {count : Tm Γ [] [] [] natᵗ} {b : Closed Γ u} {κ : Path Γ lo u t} {id now}
+  {sched : Sched Γ} {st : EvalSt E} {r}
+  → evalTm count ≡ suc k
+  → subscribeE⇓ {e = E} (takeᵉ count b) κ id now sched st r
+  → suc (Sched.nextNode sched) ≤ Sched.nextNode (proj₁ (proj₂ r))
+root-take-minted pos (subs-take-zero zeq _) with trans (sym zeq) pos
+... | ()
+root-take-minted pos (subs-take-suc _ refl inner push) =
+  ≤-trans (subscribeE-mono inner) (pushBurst-mono push)
+
+----------------------------------------------------------------------
 -- THE TWO HALVES OF THE BUDGET, and the split is the whole design.  The
 -- frame spends some of `k` and hands the rest on; the drain spends no
 -- more than it was handed.  Both leaves are denominated in the SAME
@@ -366,20 +481,36 @@ take-burst-bound k e ins = ≤-reflexive (take-burst-spends k e ins)
 ----------------------------------------------------------------------
 
 postulate
-  -- And the drain spends no more than it was handed.  Stated over the
-  -- budget rather than over `k` because the drain never sees `k`: it
-  -- reads the node's state, which is the only thing that crosses the
-  -- frame boundary.
-  -- PROBED: `Probed.Take-Bounds`, at a cut landing ACROSS two arrivals,
-  --   which is the one shape that forces the budget to survive the frame
-  --   and be spent in the drain.  TIGHT, and pinned beside the same
-  --   program with the take removed.  Not reached: every flattening
-  --   program, a take nested under another take, and a budget that is
-  --   not a literal.
-  take-drain-bound :
-    ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (k : ℕ) (e : Closed Γ t)
-      (ins : Slots Γ) →
-    length (emitValues (drainRest fuel k e ins)) ≤ takeBudget k e ins
+  -- AND AT A COUNT OF ZERO THE DRAIN IS SILENT, which is a claim about
+  -- REGISTRATION rather than about the budget: the take subscribes
+  -- nothing, so no chain is ever registered against any source and the
+  -- arrivals the slots seed reach no frame.  It cannot be a case of the
+  -- account above, whose guard is exactly the node this arm never mints.
+  -- PROBED: `Probed.Take-Bounds`, at a scripted source the drain must
+  --   pop -- both values pending at the subscribe tick, and again with
+  --   the second landing at a later tick so only the drain can reach
+  --   it.  Pinned beside what the same program emits with the take
+  --   removed, so the silence is this take's and not an empty
+  --   schedule's.  Not reached: every flattening program, a COLD
+  --   source, and a count that is not a literal.
+  take-zero-drain-silent :
+    ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slots Γ) →
+    emitValues (drainRest fuel zero e ins) ≡ []
+
+-- And the drain spends no more than it was handed.  Stated over the
+-- budget rather than over `k` because the drain never sees `k`: it
+-- reads the node's state, which is the only thing that crosses the
+-- frame boundary.
+take-drain-bound :
+  ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (k : ℕ) (e : Closed Γ t)
+    (ins : Slots Γ) →
+  length (emitValues (drainRest fuel k e ins)) ≤ takeBudget k e ins
+take-drain-bound fuel zero e ins =
+  subst (λ xs → length xs ≤ takeBudget zero e ins)
+        (sym (take-zero-drain-silent fuel e ins)) z≤n
+take-drain-bound fuel (suc k) e ins =
+  drain-take-bound 0 (root-take-minted refl (rootDeriv (suc k) e ins))
+                   (drainDeriv fuel (suc k) e ins)
 
 ----------------------------------------------------------------------
 -- THE BOUND.  Stated over the flat value stream rather than over

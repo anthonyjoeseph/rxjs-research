@@ -220,15 +220,15 @@ automaton.
 
 ### The monster
 
-`take-drain-bound` — the tier's one remaining leaf, and the deepest thing here
-that can be false on its own. The frame's half is now an EQUALITY the machine
-decides, so what is open is the carry: the drain re-enters itself against a
-budget it did not compute, and a re-entry that re-reads the node stale, or
-admits an arrival before spending, parts from this inequality and from nothing
-else. Its falsity takes the tier's statement with it, since the drain is where
-every value after the subscribe frame comes from. The subject is admitted
-below rather than climbed to: it has the whole tier for a cone and would
-decide nothing.
+`cascade-take-spends` — one arrival's whole cascade, and the deepest thing here
+that can be false on its own. The drain's own induction is now a body, so what
+is left is the step it recurses over: a cascade emits values and leaves the
+take node holding the rest, and the two are claimed to add up to no more than
+it was holding. That is an INEQUALITY rather than the frame's equality, because
+a cascade reaching no take frame emits values this node never paid for — so a
+path that delivers through a frame it did not charge, or charges a node it did
+not deliver through, parts from this and from nothing else. Its falsity takes
+the tier with it: every value after the subscribe frame comes through it.
 
 also: `take-bounds-values` — the tier's subject. Admitted only because this branch is the one that CARVED it: the assembly and its glue arrive here as added lines. It retires when the branch lands, and while it stands the cone decides nothing — which is the cost of the carve, paid once.
 also: `burst-drain-well-formed` — tier 2's monster. Admitted because the branch that carved this tier out of that one carries that face's seam and its two leaves, and the check reads the branch rather than the commit.
@@ -236,39 +236,50 @@ also: `evaluate-deterministic` — tier 3's monster, whose statement and leaves 
 
 ### Big picture tier roadmap
 
-- **THE DRAIN'S CARRY, WHICH IS THE INDUCTION AND IS NOW THE WHOLE TIER.**
-  `take-drain-bound` says the drain emits no more than the budget it was left.
-  The frame's half arrived as an EQUALITY — what it emits plus what it leaves
-  is exactly `k` — so the drain is handed an exact figure and the inequality is
-  entirely its own. The route the frame's half took is the one to repeat: state
-  the claim over the DRAIN's derivation rather than over the function that
-  produces one, so the induction is on a datatype and the walk's transports and
-  accessors never appear. One row reaches it today, at a cut spanning two
-  arrivals where the frame emits nothing at all.
+- **THE CASCADE'S ACCOUNT, WHICH IS NOW THE WHOLE TIER.** `cascade-take-spends`
+  says one arrival's cascade emits no more than it takes out of the take node.
+  The drain above it is a body by induction on `drain⇓`, and the route that
+  bought it is the one to repeat once more: state the account over the
+  derivation family — `cascadeGo⇓`, `chainStep⇓`, `foldPath⇓` — rather than over
+  the functions that produce one, so the induction is on datatypes and the
+  guard travels as a hypothesis. The subscribe side's own `stepFrame⇓` arm is
+  already an equality here, so what the fan-out owes is only that every OTHER
+  frame leaves the node alone.
 
-- **THEN THE ACCOUNT ACROSS THE SEAM, WHICH IS WHAT THE EQUALITY BUYS.** With
-  the frame exact, the tier's statement is an arithmetic step rather than a
-  second bound: emitted-at-frame plus emitted-in-drain is at most emitted plus
-  budget, which is `k`. That is already how `take-bounds-values` assembles, so
-  what this leg decides is whether the drain's half wants stating against the
-  budget (as now) or against what the frame EMITTED — the second is equivalent
-  under the equality and may be the easier induction, since it does not read
-  the node at all.
+- **AND THE GUARD IS THE PART THAT CAN GO WRONG, SO SEPARATE IT FIRST.** Both
+  leaves are conditioned on the take's node sitting BELOW the schedule's
+  counter, which is what says a subscribe entered mid-cascade cannot mint it
+  afresh. `cascade-node-mono` is the bookkeeping half and mirrors a proven
+  subscribe-side lemma clause for clause; the half with content is that the
+  counter is the ONLY place a node is minted. Establish that as its own
+  statement over the family before either account is ground, because if it
+  fails the account is not repairable — it is the wrong statement.
+
+- **THEN THE ZERO ARM, WHICH IS A REGISTRATION CLAIM AND NOT A BUDGET ONE.**
+  `take-zero-drain-silent` says a take at zero leaves the drain with nothing to
+  deliver: it subscribes nothing, so no chain is registered, while the slots go
+  on seeding arrivals the drain pops and discards. Two rows reach it. It cannot
+  be folded into the account above — the account's guard is exactly the node
+  this arm never mints — so it wants the registry read directly.
 
 - **AND PUSH THE ROWS PAST THE COVERAGE BOUNDARY THE PROBE DECLARES.** Three
   shapes are unreached and each is where a budget argument is least likely to
   be uniform: a take nested under another take, where two nodes' budgets are
-  live at once; a budget that is not a literal, so `evalTm` is a real step; and
+  live at once; a count that is not a literal, so `evalTm` is a real step; and
   any flattening program, where the inner subscribes mint nodes between the
   frame and the drain. A refutation at any of the three is worth more than
   either grind above it.
 
 ### The ledger
 
-- **`take-drain-bound`** (Verify-Take-Bounds) — FALSITY, `PROBED`: the drain
-  emits no more than the budget the subscribe frame left in the take node. The
-  rehearsal's inductive half; one row reaches it, at a cut spanning two
-  arrivals.
+- **`cascade-take-spends`** (Verify-Take-Bounds) — FALSITY, `PROBED`: one
+  arrival's cascade emits no more than it takes out of the take node. The
+  drain's inductive step, and the tier's monster.
+- **`take-zero-drain-silent`** (Verify-Take-Bounds) — DIFFICULTY, `PROBED`: a
+  take at zero registers nothing, so the drain pops its arrivals and delivers
+  none of them. Two rows reach it, one at an arrival only the drain can see.
+- **`cascade-node-mono`** (Verify-Take-Bounds) — GRINDABLE, `TWIN`: a cascade
+  never lowers the schedule's node counter. The guard's bookkeeping half.
 
 ## Tier 2 — `evaluate-well-formed` (parked behind tier 1)
 
