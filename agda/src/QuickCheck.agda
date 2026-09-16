@@ -57,7 +57,7 @@ open import Rx.Prim using (Timed; after_,_; ObservableInput; hot; cold; InstEven
 open import Rx.Exp using (Ty; natᵗ; obs; _×ᵗ_; isData; Ctx; Exp; Tm; Fn; PrimOp; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ;
   mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ;
   unit̂; bool̂; nat̂; primᵗ; pairᵗ; fstᵗ; sndᵗ;
-  strmᵗ; varᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; add; sub; mul; eqᵖ; ltᵖ; notᵖ)
+  strmᵗ; varᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; nilᵗ; consᵗ; foldᵗ; add; sub; mul; eqᵖ; ltᵖ; notᵖ)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Rx.Emit-Eq using (eqBatched)
 open import Rx.Evaluator.Builder using (evaluate↓)
@@ -414,6 +414,9 @@ marksᵗ (inrᵗ a)      = marksᵗ a
 marksᵗ (caseᵗ s l r) = marksᵗ s ⊕ marksᵗ l ⊕ marksᵗ r
 marksᵗ (ifᵗ c a b)   = marksᵗ c ⊕ marksᵗ a ⊕ marksᵗ b
 marksᵗ (primᵗ _ a)   = marksᵗ a
+marksᵗ nilᵗ          = noMarks
+marksᵗ (consᵗ a bs)  = marksᵗ a ⊕ marksᵗ bs
+marksᵗ (foldᵗ l z f) = marksᵗ l ⊕ marksᵗ z ⊕ marksᵗ f
 marksᵗ (strmᵗ e)     = marksᵉ e
 
 marksᵗˢ []       = noMarks
@@ -531,6 +534,10 @@ showTm (caseᵗ s l r)      =
 showTm (ifᵗ c a b)        =
   "(ifᵗ " ++ showTm c ++ " " ++ showTm a ++ " " ++ showTm b ++ ")"
 showTm (primᵗ op a)       = "(primᵗ " ++ showPrim op ++ " " ++ showTm a ++ ")"
+showTm nilᵗ               = "nilᵗ"
+showTm (consᵗ a bs)       = "(consᵗ " ++ showTm a ++ " " ++ showTm bs ++ ")"
+showTm (foldᵗ l z f)      =
+  "(foldᵗ " ++ showTm l ++ " " ++ showTm z ++ " " ++ showTm f ++ ")"
 showTm (strmᵗ e)          = "(strmᵗ " ++ showExp e ++ ")"
 
 showExp (input i)       = "(input " ++ showFin i ++ ")"

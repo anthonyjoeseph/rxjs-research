@@ -43,22 +43,39 @@ open import Rx.Slots using (Slots)
 -- language can carry VALUES, and a value's type is read against Γ — an
 -- observable of observables denotes something whose elements are
 -- themselves behaviours over the same table.
---
--- AND `denote` IS STATED AT `Closed`, WHICH IS NARROWER THAN IT WILL
--- END UP.  A compositional reading has to denote an OPEN expression,
--- and `Exp` binds in three places at once — the guarded fixpoint
--- variables, the let/`defer` variables, and the term variables a `Fn`
--- closes over — so it wants an environment for all three.  That
--- environment is leaves for an assembly nobody has written: it is
--- minted by the leg that states the first compositionality equation,
--- which is the only thing that can say what it must carry.
 ------------------------------------------------------------------
 
 postulate
+  -- DEAD ROUTE: choosing this domain's shape by instantiation, the way
+  --   every other face here is de-risked.  A postulated SET has no
+  --   elements, so there is nothing to compute with and no row decides
+  --   between two candidate domains; what decides between them is the
+  --   first compositionality equation, which is a statement rather than
+  --   a program.  So this trio is the one place on the face where
+  --   probing is not merely blocked but has no subject, and
+  --   `Verify-Well-Formed` is what supplies the requirement instead.
   Beh : ∀ {n} → Ctx n → Ty → Set
 
+  -- DEAD ROUTE: denoting an expression by recursion on `Closed` alone.
+  --   A compositional reading has to denote an OPEN expression, and
+  --   `Exp` binds in three places at once — the guarded fixpoint
+  --   variables, the let/`defer` variables, and the term variables a
+  --   `Fn` closes over — so it wants an environment for all three.
+  --   That environment is leaves for an assembly nobody has written: it
+  --   is minted by the leg that states the first equation, which is the
+  --   only thing that can say what it must carry.
   denote : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → Beh Γ t
 
+  -- WHAT THE OBSERVATION HANDS BACK IS FIXED FROM OUTSIDE THIS FACE.
+  -- The protocol automaton reads an emit list and asks whether it is
+  -- settled, so the well-formedness face is stated ACROSS this boundary
+  -- — which makes a `Beh` that cannot say where its instants end a
+  -- domain that face cannot use, however well it serves the pair below.
+  --
+  -- DEAD ROUTE: fixing the observation from the domain's side, by
+  --   reading off whatever shape the first-order formers make natural.
+  --   The consumer is a predicate demanded at a CUT POINT, so the
+  --   requirement arrives from `Verify-Well-Formed` and not here.
   observe : ∀ {n} {Γ : Ctx n} {t} → Beh Γ t → Stream Γ t
 
 -- WHAT A PROGRAM MEANS, READ BACK AS A STREAM.  A body rather than a
@@ -69,32 +86,82 @@ meaning e ins = observe (denote e ins)
 
 ------------------------------------------------------------------
 -- THE THREE CLAIMS.
---
--- `run-monotone` mentions nothing postulated and is the one row here a
--- program can refute today: more fuel only ever EXTENDS a run, it never
--- rewrites what a shorter one already emitted.  It is separate from
--- `adequacy` rather than folded into it because it is a fact about the
--- machine alone, so it survives every restatement of the domain above
--- it — and because without it "prefix of the limit" does not even
--- describe a coherent family of runs to take a limit of.
---
--- `saturation` is the half that stops the denotation running ahead of
--- the machine.  It is quantified over EVERY prefix, which is what keeps
--- it from being discharged at the empty one: a `pre` reaching into the
--- denotation's own tail is a demand for a fuel that reaches it.
 ------------------------------------------------------------------
 
 postulate
+  -- A FACT ABOUT THE MACHINE ALONE, WHICH IS WHY IT IS SEPARATE.  More
+  -- fuel only ever EXTENDS a run; it never rewrites what a shorter one
+  -- already emitted.  Folded into `adequacy` it would be restated every
+  -- time the domain is, and without it "prefix of the limit" does not
+  -- even describe a coherent family of runs to take a limit of.
+  --
+  -- PROBED: `Probed.Adequacy` reaches this conclusion at two programs
+  --   and three fuel gaps.  One row grows — the remainder is pinned
+  --   non-empty, so the EXISTENCE half is decided and not merely the
+  --   prefix half — and two saturate, where the remainder is pinned
+  --   EMPTY and a renumbered instant, a re-minted provenance or a
+  --   re-ordered burst is the only available failure.  One of those
+  --   two sits past a delivery, so the drain has stepped in the
+  --   shorter run and its resumption ordinal is part of what is
+  --   decided.  Not reached: any flattening program, any cold source,
+  --   a source firing at more than one tick, and a fuel gap wider than
+  --   the program's own horizon.
   run-monotone :
     ∀ {n} {Γ : Ctx n} {t} (fuel₁ fuel₂ : Fuel)
       (e : Closed Γ t) (ins : Slots Γ) → fuel₁ ≤ fuel₂ →
     ∃ λ rest → evaluate↓ fuel₂ e ins ≡ evaluate↓ fuel₁ e ins ++ rest
 
+  -- THE PAIR, AND NEITHER HALF IS THE CLAIM.  `adequacy` alone is
+  -- satisfied by a denotation defined as the machine's own limit and
+  -- `saturation` alone by one nobody can run; together they pin a
+  -- program's `meaning` to exactly what the machine converges to.
+  -- `saturation` is quantified over EVERY prefix, which is what keeps
+  -- it from being discharged at the empty one: a `pre` reaching into
+  -- the denotation's own tail is a demand for a fuel that reaches it.
+  --
+  -- AND IT IS FALSE AS STATED, BECAUSE `Stream` IS A `List` (Anthony,
+  -- asking whether the domain is too broad).  A finite `meaning` that
+  -- every run is a prefix of forces `length (meaning e ins)` to
+  -- dominate every fuel's run, so the statement commits this language
+  -- to programs whose TOTAL emission is finite — and it is not one.  A
+  -- guarded fixpoint under `mergeAllᵉ` whose second branch is `deferᵉ`
+  -- of its own variable, with no `takeᵉ` above it, emits exactly one
+  -- envelope per unit of fuel: measured at seven fuels up to
+  -- thirty-two, the length is the fuel.  No finite list bounds that, so
+  -- there is no `meaning` at that program whatever the domain is.
+  --
+  -- WHAT THE REPAIR IS, AND IT IS A RESTRICTION RATHER THAN A BIGGER
+  -- DOMAIN.  Either the observation becomes an infinitary object and
+  -- the pair becomes a limit statement, or the two claims are
+  -- quantified over programs that SATURATE — which is the restriction
+  -- the bug cache already observes without saying so, every one of its
+  -- guarded-fixpoint rows sitting under a `takeᵉ`.  The second keeps
+  -- `Beh` finite and keeps the observation something the protocol
+  -- automaton can be asked about at a cut point, which is what the
+  -- well-formedness face needs from it.  The restriction is NOT the
+  -- reducibility candidate transported: that one recurses on the type
+  -- and the flatteners move the type downward, whereas a fixpoint under
+  -- a `deferᵉ` gate leaves the type where it was.  It is a second axis,
+  -- and it is owed its own predicate.
+  --
+  -- DEAD ROUTE: de-risking either half by INSTANTIATION, ahead of the
+  --   domain being defined.  Both are stated over `meaning`, which is
+  --   `observe` of `denote` — two postulates, so the left side of each
+  --   conclusion reduces at no program whatever and no row can be
+  --   written at any point.  This is a coverage boundary rather than a
+  --   difficulty, and it lifts the moment `denote` becomes a
+  --   definition rather than ever being shown workable as it stands.
   adequacy :
     ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel)
       (e : Closed Γ t) (ins : Slots Γ) →
     ∃ λ rest → meaning e ins ≡ evaluate↓ fuel e ins ++ rest
 
+  -- DEAD ROUTE: instantiating this one at a prefix the machine
+  --   actually reached, which is the shape that would sidestep the
+  --   boundary above.  It does not: the HYPOTHESIS is a containment in
+  --   `meaning` too, so a row would have to discharge a premise about
+  --   the postulated domain before its conclusion was ever asked for.
+  --   Both sides are blocked here where only the conclusion is above.
   saturation :
     ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
       (pre : Stream Γ t) →

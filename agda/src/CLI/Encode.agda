@@ -5,7 +5,7 @@
 module CLI.Encode where
 
 open import Data.Bool using (true; false)
-open import Data.List using (List; []; _∷_)
+open import Data.List using (List; []; _∷_; map)
 open import Data.Nat.Show using (show)
 open import Data.Product using (_,_)
 open import Data.String using (String; _++_)
@@ -13,7 +13,7 @@ open import Data.Sum using (inj₁; inj₂)
 
 open import Rx.Prim using (InstEvent; init; value; close; handoff; complete; CloseReason; cut; cutPending; exhausted;
   dried; EmitKind; subscribe; delivery; plumbing; InstEmit; _at_from_as_)
-open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; Val; Ctx)
+open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; listᵗ; Val; Ctx)
 open import Rx.Evaluator using (Grouped)
 
 private
@@ -39,6 +39,7 @@ encodeVal natᵗ     n        = show n
 encodeVal (s ×ᵗ t) (a , b)  = arr (encodeVal s a ∷ encodeVal t b ∷ [])
 encodeVal (s +ᵗ t) (inj₁ a) = "{" ++ field′ "type" (quote′ "inl") ++ "," ++ field′ "val" (encodeVal s a) ++ "}"
 encodeVal (s +ᵗ t) (inj₂ b) = "{" ++ field′ "type" (quote′ "inr") ++ "," ++ field′ "val" (encodeVal t b) ++ "}"
+encodeVal (listᵗ t) xs     = arr (map (encodeVal t) xs)
 encodeVal (obs t)  _        = "null"   -- obs-valued streams don't occur at a first-order root
 
 private

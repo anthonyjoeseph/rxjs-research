@@ -42,7 +42,7 @@ open import Rx.Exp
         ; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ
         ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ
         ; varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ
-        ; caseᵗ; ifᵗ; primᵗ; strmᵗ )
+        ; caseᵗ; ifᵗ; primᵗ; strmᵗ; nilᵗ; consᵗ; foldᵗ )
 open import Rx.Subst-Transport using (cong₃)
 open import Rx.Subst-Split using (isˡ; isʳ; split; ++Ren-l; ++Ren-r)
 
@@ -292,6 +292,12 @@ mutual
     cong₃ ifᵗ (elimG-avᵗ Θl x cl av c) (elimG-avᵗ Θl x cl av a)
               (elimG-avᵗ Θl x cl av b)
   elimG-avᵗ Θl x cl av (primᵗ op a) = cong (primᵗ op) (elimG-avᵗ Θl x cl av a)
+  elimG-avᵗ Θl x cl av nilᵗ          = refl
+  elimG-avᵗ Θl x cl av (consᵗ a as)  =
+    cong₂ consᵗ (elimG-avᵗ Θl x cl av a) (elimG-avᵗ Θl x cl av as)
+  elimG-avᵗ Θl x cl av (foldᵗ {s = s} {u = w} l z f) =
+    cong₃ foldᵗ (elimG-avᵗ Θl x cl av l) (elimG-avᵗ Θl x cl av z)
+                (elimG-avᵗ (s ∷ w ∷ Θl) x cl av f)
   elimG-avᵗ Θl x cl av (strmᵗ e)    = cong strmᵗ (elimG-avᵉ Θl x cl av e)
 
   elimG-avˢ : (Θl : List Ty) (x : t ∈ Δᵍ) (cl : Exp Γ [] [] Θsub t)
@@ -362,6 +368,12 @@ mutual
               (elimD-avᵗ Θl x refl cl av b)
   elimD-avᵗ Θl x refl cl av (primᵗ op a) =
     cong (primᵗ op) (elimD-avᵗ Θl x refl cl av a)
+  elimD-avᵗ Θl x refl cl av nilᵗ          = refl
+  elimD-avᵗ Θl x refl cl av (consᵗ a as)  =
+    cong₂ consᵗ (elimD-avᵗ Θl x refl cl av a) (elimD-avᵗ Θl x refl cl av as)
+  elimD-avᵗ Θl x refl cl av (foldᵗ {s = s} {u = w} l z f) =
+    cong₃ foldᵗ (elimD-avᵗ Θl x refl cl av l) (elimD-avᵗ Θl x refl cl av z)
+                (elimD-avᵗ (s ∷ w ∷ Θl) x refl cl av f)
   elimD-avᵗ Θl x refl cl av (strmᵗ e) = cong strmᵗ (elimD-avᵉ Θl x refl cl av e)
 
   elimD-avˢ : (Θl : List Ty) (x : t ∈ Δ) (p : (Δ ⊟ x) ≡ Δd)

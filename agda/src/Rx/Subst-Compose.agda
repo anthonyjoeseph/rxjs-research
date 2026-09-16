@@ -30,19 +30,18 @@ open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong; cong₂; subst)
 
 open import Rx.Exp
-  using ( Ty; Ctx; Exp; Tm; Val; subΘExp; subΘTm; subΘTms
-        ; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ
-        ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ
-        ; varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ
-        ; caseᵗ; ifᵗ; primᵗ; strmᵗ; _×ᵗ_
-        ; renTm; wkTm; reify; lookupEnv )
+  using (Ty; Ctx; Exp; Tm; Val; subΘExp; subΘTm; subΘTms; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ;
+  mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ;
+  sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ; _×ᵗ_; nilᵗ; consᵗ; foldᵗ; renTm; wkTm; reify;
+  lookupEnv)
 open import Rx.Subst-Transport
   using ( Cᵉ; Cᵗ; Cˢ; shift; cong₃
         ; pushInput; pushEmpty; pushVarᵉ; pushOf; pushMap; pushTake; pushScan
         ; pushMerge; pushSwitch; pushExhaust; pushMu; pushDefer
         ; pushUnit; pushBool; pushNat; pushPair; pushFst; pushSnd
         ; pushInl; pushInr; pushCase; pushIf; pushPrim; pushStrm
-        ; pushNilˢ; pushConsˢ; pushVarᵗ; pushHere; pushThere )
+        ; pushNilˢ; pushConsˢ; pushVarᵗ; pushHere; pushThere
+        ; pushNilᵗ; pushConsᵗ; pushFoldᵗ; shift2 )
 open import Rx.Subst-Split
   using (split; isˡ; isʳ; sub-left; sub-right; lookup-left; lookup-right)
 open import Rx.Subst-Renaming using (sub-renᵗ)
@@ -216,6 +215,17 @@ mutual
   subΘ-compᵍᵗ {Θloc = Θl} {Θsub = Θs} Θo ρ σ (primᵗ op a) =
     trans (cong (primᵗ op) (subΘ-compᵍᵗ Θo ρ σ a))
           (cong (subΘTm Θo (++⁺ ρ σ)) (pushPrim (++-assoc Θo Θl Θs) op a))
+  subΘ-compᵍᵗ {Θloc = Θl} {Θsub = Θs} Θo ρ σ nilᵗ =
+    cong (subΘTm Θo (++⁺ ρ σ)) (pushNilᵗ (++-assoc Θo Θl Θs))
+  subΘ-compᵍᵗ {Θloc = Θl} {Θsub = Θs} Θo ρ σ (consᵗ a as) =
+    trans (cong₂ consᵗ (subΘ-compᵍᵗ Θo ρ σ a) (subΘ-compᵍᵗ Θo ρ σ as))
+          (cong (subΘTm Θo (++⁺ ρ σ)) (pushConsᵗ (++-assoc Θo Θl Θs) a as))
+  subΘ-compᵍᵗ {Θloc = Θl} {Θsub = Θs} Θo ρ σ (foldᵗ {s = s} {u = u} l z f) =
+    trans (cong₃ foldᵗ (subΘ-compᵍᵗ Θo ρ σ l) (subΘ-compᵍᵗ Θo ρ σ z)
+            (trans (subΘ-compᵍᵗ (s ∷ u ∷ Θo) ρ σ f)
+                   (cong (subΘTm (s ∷ u ∷ Θo) (++⁺ ρ σ))
+                         (shift2 (++-assoc Θo Θl Θs) f))))
+          (cong (subΘTm Θo (++⁺ ρ σ)) (pushFoldᵗ (++-assoc Θo Θl Θs) l z f))
   subΘ-compᵍᵗ {Θloc = Θl} {Θsub = Θs} Θo ρ σ (strmᵗ e) =
     trans (cong strmᵗ (subΘ-compᵍᵉ Θo ρ σ e))
           (cong (subΘTm Θo (++⁺ ρ σ)) (pushStrm (++-assoc Θo Θl Θs) e))

@@ -25,18 +25,17 @@ open import Relation.Binary.PropositionalEquality
   using (_≡_; trans; cong; cong₂; subst)
 
 open import Rx.Exp
-  using ( Ty; Ctx; Exp; Tm; subΘExp; subΘTm; subΘTms
-        ; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ
-        ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ
-        ; varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ
-        ; caseᵗ; ifᵗ; primᵗ; strmᵗ; _×ᵗ_ )
+  using (Ty; Ctx; Exp; Tm; subΘExp; subΘTm; subΘTms; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ;
+  mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ;
+  sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ; _×ᵗ_; nilᵗ; consᵗ; foldᵗ)
 open import Rx.Subst-Transport
   using ( Cᵉ; Cᵗ; Cˢ; shift; ∈-id; cong₃
         ; pushInput; pushEmpty; pushVarᵉ; pushOf; pushMap; pushTake; pushScan
         ; pushMerge; pushSwitch; pushExhaust; pushMu; pushDefer
         ; pushVarᵗ; pushUnit; pushBool; pushNat; pushPair; pushFst; pushSnd
         ; pushInl; pushInr; pushCase; pushIf; pushPrim; pushStrm
-        ; pushNilˢ; pushConsˢ )
+        ; pushNilˢ; pushConsˢ
+        ; pushNilᵗ; pushConsᵗ; pushFoldᵗ; shift2 )
 
 private
   variable
@@ -110,6 +109,16 @@ mutual
           (pushIf (++-identityʳ Θloc) c a b)
   subΘ-idᵗ Θloc (primᵗ op a) =
     trans (cong (primᵗ op) (subΘ-idᵗ Θloc a)) (pushPrim (++-identityʳ Θloc) op a)
+  subΘ-idᵗ Θloc nilᵗ =
+    pushNilᵗ (++-identityʳ Θloc)
+  subΘ-idᵗ Θloc (consᵗ a as) =
+    trans (cong₂ consᵗ (subΘ-idᵗ Θloc a) (subΘ-idᵗ Θloc as))
+          (pushConsᵗ (++-identityʳ Θloc) a as)
+  subΘ-idᵗ Θloc (foldᵗ {s = s} {u = u} l z f) =
+    trans (cong₃ foldᵗ (subΘ-idᵗ Θloc l) (subΘ-idᵗ Θloc z)
+            (trans (subΘ-idᵗ (s ∷ u ∷ Θloc) f)
+                   (shift2 (++-identityʳ Θloc) f)))
+          (pushFoldᵗ (++-identityʳ Θloc) l z f)
   subΘ-idᵗ Θloc (strmᵗ e) =
     trans (cong strmᵗ (subΘ-idᵉ Θloc e)) (pushStrm (++-identityʳ Θloc) e)
 

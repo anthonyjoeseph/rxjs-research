@@ -15,6 +15,19 @@ error message actively misdirects. Read the entry before reasoning from the erro
   of T" for something you meant as a variable, grep for `X :` before touching the
   proof.** Cost one 40-minute gate.
 
+- **AND A BINDER MAY COLLIDE WITH A MIXFIX NAME PART, WHERE THE ERROR NAMES NOTHING AT
+  ALL.** The bullet above has a culprit in the message; this one does not. A mixfix
+  operator puts each of its name parts into scope as a reserved token, so an ordinary
+  English word imported as part of one cannot be a variable — and a clause binding it
+  fails with `NoParseForLHS` plus "Operators used in the grammar: None", which reads as
+  a broken left-hand side rather than as one word being unavailable. Worked instance:
+  `as` is a name part of an emit constructor this repo imports widely, so `(consᵗ a as)`
+  parses in modules that do not import it and fails in modules that do — the same clause
+  text, green in one file and red in its neighbour, which is what makes it look like
+  anything but a name clash. **When a left-hand side will not parse and every constructor
+  in it is in scope, suspect the BINDERS, not the pattern**; a one-letter rename decides
+  it in one dev run.
+
 - **The termination checker rejects `where`-bound abbreviations of the recursion
   pattern.** Inline it — write `suc (suc j)`, not a bound alias.
 
