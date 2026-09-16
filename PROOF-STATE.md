@@ -220,41 +220,42 @@ automaton.
 
 ### The monster
 
-`take-burst-bound-suc` — the frame's half at a positive budget, and the
-deepest thing here that can be false on its own: the node's decrement happens at the dispatch while the cut is
-emitted from the frame, so a path that delivers before it spends parts from
-this inequality and from nothing else. Its falsity takes the tier's statement
-with it, because the budget it LEAVES is what the drain's half is denominated
-in — a frame that hands on too much satisfies its sibling and fails the claim.
-The sibling is admitted below rather than climbed over: the tier's own subject
-has the whole tier for a cone and would decide nothing.
+`take-drain-bound` — the tier's one remaining leaf, and the deepest thing here
+that can be false on its own. The frame's half is now an EQUALITY the machine
+decides, so what is open is the carry: the drain re-enters itself against a
+budget it did not compute, and a re-entry that re-reads the node stale, or
+admits an arrival before spending, parts from this inequality and from nothing
+else. Its falsity takes the tier's statement with it, since the drain is where
+every value after the subscribe frame comes from. The subject is admitted
+below rather than climbed to: it has the whole tier for a cone and would
+decide nothing.
 
 also: `take-bounds-values` — the tier's subject. Admitted only because this branch is the one that CARVED it: the assembly and its glue arrive here as added lines. It retires when the branch lands, and while it stands the cone decides nothing — which is the cost of the carve, paid once.
-also: `take-drain-bound` — the tier's other leaf, whose cone is its own arithmetic and excludes the frame's; the two are ground together and neither is reachable from the other.
 also: `burst-drain-well-formed` — tier 2's monster. Admitted because the branch that carved this tier out of that one carries that face's seam and its two leaves, and the check reads the branch rather than the commit.
 also: `evaluate-deterministic` — tier 3's monster, whose statement and leaves are already declared, on the same branch and for the same reason.
 
 ### Big picture tier roadmap
 
-- **THE FRAME'S ARITHMETIC, AT A POSITIVE BUDGET.** The split on `k` is done
-  and the zero arm is a theorem: the walk's transport lifts off the triple, so
-  the arm that mints no node computes off an abstract subterm. What remains is
-  `take-burst-bound-suc`, where a node IS minted and the decrement at the
-  dispatch has to agree with the cut at the frame. Under it is one mechanical
-  fact the tree does not have: what `takeVals` passes through plus what it
-  reports remaining is EXACTLY its budget, an equality rather than the
-  inequality the consumer needs. Land that equality and stand the arm on it
-  through the dispatch.
+- **THE DRAIN'S CARRY, WHICH IS THE INDUCTION AND IS NOW THE WHOLE TIER.**
+  `take-drain-bound` says the drain emits no more than the budget it was left.
+  The frame's half arrived as an EQUALITY — what it emits plus what it leaves
+  is exactly `k` — so the drain is handed an exact figure and the inequality is
+  entirely its own. The route the frame's half took is the one to repeat: state
+  the claim over the DRAIN's derivation rather than over the function that
+  produces one, so the induction is on a datatype and the walk's transports and
+  accessors never appear. One row reaches it today, at a cut spanning two
+  arrivals where the frame emits nothing at all.
 
-- **THEN THE DRAIN'S CARRY, WHICH IS THE INDUCTION.** `take-drain-bound` says
-  the drain emits no more than the budget it was left. The drain re-enters
-  itself and the budget is state it threads, so the motive is the node's own
-  reading and the grind is an induction over the drain — the same shape both
-  seam leaves of the tier below owe. One row reaches it today, at a cut
-  spanning two arrivals where the frame emits nothing at all, so the whole
-  bound is decided in the drain.
+- **THEN THE ACCOUNT ACROSS THE SEAM, WHICH IS WHAT THE EQUALITY BUYS.** With
+  the frame exact, the tier's statement is an arithmetic step rather than a
+  second bound: emitted-at-frame plus emitted-in-drain is at most emitted plus
+  budget, which is `k`. That is already how `take-bounds-values` assembles, so
+  what this leg decides is whether the drain's half wants stating against the
+  budget (as now) or against what the frame EMITTED — the second is equivalent
+  under the equality and may be the easier induction, since it does not read
+  the node at all.
 
-- **THEN PUSH THE ROWS PAST THE COVERAGE BOUNDARY THE PROBE DECLARES.** Three
+- **AND PUSH THE ROWS PAST THE COVERAGE BOUNDARY THE PROBE DECLARES.** Three
   shapes are unreached and each is where a budget argument is least likely to
   be uniform: a take nested under another take, where two nodes' budgets are
   live at once; a budget that is not a literal, so `evalTm` is a real step; and
@@ -263,12 +264,6 @@ also: `evaluate-deterministic` — tier 3's monster, whose statement and leaves 
   either grind above it.
 
 ### The ledger
-
-- **`take-burst-bound-suc`** (Verify-Take-Bounds) — FALSITY, `PROBED`: what the
-  subscribe frame emits plus what it leaves in the node is within `k`, at a
-  positive budget. One row reaches it; the decrement at the dispatch and the
-  cut at the frame are the two points that can disagree. The zero arm is
-  proven.
 
 - **`take-drain-bound`** (Verify-Take-Bounds) — FALSITY, `PROBED`: the drain
   emits no more than the budget the subscribe frame left in the take node. The
