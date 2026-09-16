@@ -220,9 +220,9 @@ automaton.
 
 ### The monster
 
-`cascadeGo-take-spends` — one arrival's walk over the chains registered against
-its source, and the deepest thing here that can be false on its own. The drain
-and the arrival's own bracket are now bodies, so what is left is the walk they
+`chainStep-take-spends` — ONE registered chain's walk, and the deepest thing
+here that can be false on its own. The drain, the arrival's bracket and the
+list of chains are all bodies now, so what is left is the single walk they
 recurse over: it emits values and leaves the take node holding the rest, and
 the two are claimed to add up to no more than it was holding. An INEQUALITY
 rather than the frame's equality, because a chain reaching no take frame emits
@@ -236,22 +236,21 @@ also: `evaluate-deterministic` — tier 3's monster, whose statement and leaves 
 
 ### Big picture tier roadmap
 
-- **THE CHAIN WALK'S ACCOUNT, WHICH IS NOW THE WHOLE TIER.**
-  `cascadeGo-take-spends` says one arrival's walk emits no more than it takes
-  out of the take node. Everything above it is a body: the drain by induction
-  on `drain⇓`, the arrival's bracket by reading the account across two rewrites
-  that touch no node. The route that bought both is the one to repeat over the
-  rest of the family — `chainStep⇓`, `foldPath⇓`, and the subscribe relations a
-  chain can re-enter — so the induction is on datatypes and the guard travels
-  as a hypothesis. The take frame's own arm is already an equality here, so
-  what the fan-out owes is that every OTHER frame leaves the node alone.
+- **THE FOLD IS WHERE THE FRAMES ARE, SO THAT IS THE NEXT BODY.**
+  `chainStep-take-spends` sits one constructor above a `foldPath⇓`, so it
+  converts the moment the fold's own account is stated: the walk carries values
+  sinkward one frame at a time, and the claim is that every frame other than
+  this take's leaves the node alone. The take's own arm is already an equality,
+  so what the fold owes is the other frame arms and the two clauses that re-enter
+  a subscribe — which is exactly where the guard earns its keep, since a
+  subscribe is the only thing that can mint a node mid-walk.
 
 - **AND THE GUARD IS THE PART THAT CAN GO WRONG, SO SEPARATE IT FIRST.** Both
   leaves are conditioned on the take's node sitting BELOW the schedule's
   counter, which is what says a subscribe entered mid-cascade cannot mint it
-  afresh. `cascade-node-mono` is the bookkeeping half and mirrors a proven
-  subscribe-side lemma clause for clause; the half with content is that the
-  counter is the ONLY place a node is minted. Establish that as its own
+  afresh. `chainStep-node-mono` and `cascade-node-mono` are the bookkeeping half
+  and mirror a proven subscribe-side lemma clause for clause; the half with
+  content is that the counter is the ONLY place a node is minted. Establish that as its own
   statement over the family before either account is ground, because if it
   fails the account is not repairable — it is the wrong statement.
 
@@ -272,12 +271,14 @@ also: `evaluate-deterministic` — tier 3's monster, whose statement and leaves 
 
 ### The ledger
 
-- **`cascadeGo-take-spends`** (Verify-Take-Bounds) — FALSITY, `PROBED`: one
-  arrival's walk over its source's chains emits no more than it takes out of
-  the take node. The drain's inductive step, and the tier's monster.
+- **`chainStep-take-spends`** (Verify-Take-Bounds) — FALSITY, `PROBED`: one
+  registered chain's walk emits no more than it takes out of the take node. The
+  tier's monster.
 - **`take-zero-drain-silent`** (Verify-Take-Bounds) — DIFFICULTY, `PROBED`: a
   take at zero registers nothing, so the drain pops its arrivals and delivers
   none of them. Two rows reach it, one at an arrival only the drain can see.
+- **`chainStep-node-mono`** (Verify-Take-Bounds) — GRINDABLE, `TWIN`: one
+  chain's walk never lowers the schedule's node counter.
 - **`cascade-node-mono`** (Verify-Take-Bounds) — GRINDABLE, `TWIN`: a cascade
   never lowers the schedule's node counter. The guard's bookkeeping half.
 

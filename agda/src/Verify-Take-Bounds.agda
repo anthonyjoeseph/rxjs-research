@@ -48,7 +48,7 @@ open import Rx.Evaluator.Freshness.Mono using (subscribeE-mono; pushBurst-mono)
 open import Rx.Evaluator.Domain using (subscribeE⇓; pushBurst⇓; stepFrame⇓;
   push-nil; push-cons; step-take; subs-take-zero; subs-take-suc;
   drain⇓; drain-done; drain-empty; drain-step; cascade⇓; casc-run;
-  cascadeGo⇓)
+  cascadeGo⇓; casc-nil; casc-cut; casc-live; chainStep⇓)
 open import Spec using (valuesOf)
 open import Readme-Theorems using (emitValues)
 
@@ -411,18 +411,28 @@ cascadeFinish-node nid a sched st with Arrival.isLast a
 ----------------------------------------------------------------------
 
 postulate
-  -- PROBED: `Probed.Take-Bounds`, at ONE arrival popped from what the
-  --   root frame left scheduled, against a take at one over a source of
-  --   two -- so the sum is pinned at a node that is actually holding a
-  --   budget rather than at a degenerate zero.  Not reached: any second
-  --   arrival, every flattening program, and a walk entering a
-  --   subscribe, which is the shape the guard is there for.
-  cascadeGo-take-spends : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    {a : Arrival Γ} {id cs} {sched : Sched Γ} {st : EvalSt e}
+  -- PROBED: `Probed.Take-Bounds`, at the chain walk of ONE arrival
+  --   popped from what the root frame left scheduled, against a take at
+  --   one over a source of two -- so the sum is pinned at a node that is
+  --   actually holding a budget rather than at a degenerate zero.  Not
+  --   reached: any second arrival, every flattening program, and a walk
+  --   entering a subscribe, which is the shape the guard is there for.
+  chainStep-take-spends : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    {a : Arrival Γ} {id c} {sched : Sched Γ} {st : EvalSt e}
     {out sched′ st′} (nid : NodeId) →
     suc nid ≤ Sched.nextNode sched →
-    cascadeGo⇓ {e = e} a id cs sched st (out , sched′ , st′) →
+    chainStep⇓ {e = e} id a c sched st (out , sched′ , st′) →
     length (emitValues out) + nodeBudget nid st′ ≤ nodeBudget nid st
+
+  -- And one chain's walk mints at the counter, so the guard survives the
+  -- hand-on to the next chain in the list exactly as it survives the
+  -- hand-on to the next arrival.
+  -- TWIN: `subscribeE-mono`
+  chainStep-node-mono : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    {a : Arrival Γ} {id c} {sched : Sched Γ} {st : EvalSt e}
+    {out sched′ st′} →
+    chainStep⇓ {e = e} id a c sched st (out , sched′ , st′) →
+    Sched.nextNode sched ≤ Sched.nextNode sched′
 
   -- And the counter only ever rises, which is what lets the guard be
   -- re-established for the next arrival rather than re-derived.  Every
@@ -434,6 +444,38 @@ postulate
     {out sched′ st′} →
     cascade⇓ {e = e} a id sched st (out , sched′ , st′) →
     Sched.nextNode sched ≤ Sched.nextNode sched′
+
+----------------------------------------------------------------------
+-- THE LIST OF CHAINS IS AN INDUCTION AND NOT A LEAF.  An arrival is
+-- delivered to every chain registered against its source in turn, each
+-- handed what the last one left, so the account over the list is the
+-- account over one chain summed -- and the guard travels with it,
+-- because a chain that minted nodes hands on a counter no lower than
+-- the one it was given.  A cut chain is skipped entirely and spends
+-- nothing, which is the arm that makes the claim an inequality.
+----------------------------------------------------------------------
+
+cascadeGo-take-spends : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  {a : Arrival Γ} {id cs} {sched : Sched Γ} {st : EvalSt e}
+  {out sched′ st′} (nid : NodeId) →
+  suc nid ≤ Sched.nextNode sched →
+  cascadeGo⇓ {e = e} a id cs sched st (out , sched′ , st′) →
+  length (emitValues out) + nodeBudget nid st′ ≤ nodeBudget nid st
+cascadeGo-take-spends nid lt casc-nil       = ≤-refl
+cascadeGo-take-spends nid lt (casc-cut _ g) = cascadeGo-take-spends nid lt g
+cascadeGo-take-spends nid lt
+  (casc-live {emits = emits} {rest = rest} _ cs g) =
+  ≤-trans
+    (≤-reflexive
+      (trans (cong (_+ _)
+               (trans (cong length (emitValues-++ emits rest))
+                      (length-++ (emitValues emits))))
+             (+-assoc (length (emitValues emits))
+                      (length (emitValues rest)) _)))
+    (≤-trans
+      (+-monoʳ-≤ (length (emitValues emits))
+        (cascadeGo-take-spends nid (≤-trans lt (chainStep-node-mono cs)) g))
+      (chainStep-take-spends nid lt cs))
 
 ----------------------------------------------------------------------
 -- AND THE ARRIVAL'S ACCOUNT IS THE WALK'S, READ ACROSS THE BRACKET.

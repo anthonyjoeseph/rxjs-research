@@ -24,11 +24,11 @@
 ----------------------------------------------------------------------
 
 -- TARGET: take-zero-drain-silent @f5150c
--- TARGET: cascadeGo-take-spends @632c1a
+-- TARGET: chainStep-take-spends @e5f7d7
 module Probed.Take-Bounds where
 
 open import Data.Fin using (zero)
-open import Data.List using (_∷_; [])
+open import Data.List using (List; _∷_; [])
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Vec using ([]; _∷_)     -- contexts are Vecs; ∷/[] overload per type
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
@@ -40,15 +40,15 @@ open import Data.Sum using (_⊎_)
 
 open import Rx.Prim using (after_,_; hot)
 open import Rx.Evaluator using (Arrival; Sched; sched-next; chainsOf;
-  cascadeLatch)
-open import Rx.Evaluator.Builder using (cascadeGo!)
+  cascadeLatch; AtFloor; RegId; arrTy)
+open import Rx.Evaluator.Builder using (chainStep!)
 open import Rx.Exp using (Ctx; natᵗ; Closed; nat̂; input; takeᵉ)
 open import Rx.Evaluator using (EvalSt)
 open import Rx.Slots using (Slots; scripted)
 open import Rx.Evaluator.Builder using (evaluate↓)
 open import Readme-Theorems using (oneSlot; emitValues)
 open import Verify-Take-Bounds using (take-zero-drain-silent;
-  cascadeGo-take-spends; rootRun)
+  chainStep-take-spends; rootRun)
 
 open import Probed.Apparatus using (Confirms)
 
@@ -103,19 +103,21 @@ cut-emits-nothing : emitValues (evaluate↓ 6 (takeᵉ (nat̂ 0) src₁) slots�
 cut-emits-nothing = refl
 
 ----------------------------------------------------------------------
--- 3.  ONE ARRIVAL'S CASCADE, AGAINST A TAKE THAT IS ABOUT TO CUT.
--- The tier's monster is about a single arrival rather than the whole
--- drain, so this row runs the root subscribe, pops what the frame left
--- scheduled, and cascades exactly that one arrival.  The take is at ONE
--- against a source with two values, so the node is holding a budget the
--- cascade must actually spend: LOAD-BEARING on the account, since a
--- cascade that delivered without charging, or charged without
--- delivering, misses the sum at this very program.
+-- 3.  ONE CHAIN'S WALK, AGAINST A TAKE THAT IS ABOUT TO CUT.
+-- The tier's monster is about a single registered chain rather than the
+-- whole drain, so this row runs the root subscribe, pops what the frame
+-- left scheduled, and walks exactly the one chain that arrival's source
+-- is registered on.  The take is at ONE against a source with two
+-- values, so the node is holding a budget the walk must actually spend:
+-- LOAD-BEARING on the account, since a walk that delivered without
+-- charging, or charged without delivering, misses the sum at this very
+-- program.
 --
--- THE ARRIVAL IS NOT WRITTEN DOWN, IT IS FORCED.  `sched-next` computes
--- at a concrete schedule, so binding its result through a `refl`
--- hypothesis makes Agda supply the arrival and the residual schedule --
--- a hand-written pair would be a state the evaluator need never reach.
+-- NEITHER THE ARRIVAL NOR THE CHAIN IS WRITTEN DOWN, THEY ARE FORCED.
+-- `sched-next` and `chainsOf` both compute at a concrete state, so
+-- binding each result through a `refl` hypothesis makes Agda supply the
+-- arrival, the residual schedule and the chain -- a hand-written one
+-- would be a state the evaluator need never reach.
 ----------------------------------------------------------------------
 
 sched₀ : Sched Γ₁
@@ -132,8 +134,19 @@ popped = go (sched-next sched₀) refl
 st₀ : EvalSt (takeᵉ (nat̂ 1) src₁)
 st₀ = proj₂ (proj₂ (rootRun 1 src₁ slots₁))
 
-row-cascade : Confirms (cascadeGo-take-spends {e = takeᵉ (nat̂ 1) src₁} 0
-  (s≤s z≤n) (proj₂ (cascadeGo! (proj₁ popped) 1
-                      (chainsOf (proj₁ popped) st₀) (proj₂ popped)
-                      (cascadeLatch (proj₁ popped) st₀))))
-row-cascade = s≤s z≤n
+latched : EvalSt (takeᵉ (nat̂ 1) src₁)
+latched = cascadeLatch (proj₁ popped) st₀
+
+chain₀ : AtFloor Γ₁ (arrTy (proj₁ popped)) natᵗ
+chain₀ = go (chainsOf (proj₁ popped) latched) refl
+  where
+    go : (xs : List (RegId × AtFloor Γ₁ (arrTy (proj₁ popped)) natᵗ)) →
+         chainsOf (proj₁ popped) latched ≡ xs →
+         AtFloor Γ₁ (arrTy (proj₁ popped)) natᵗ
+    go []            ()
+    go ((_ , c) ∷ _) _ = c
+
+row-chain : Confirms (chainStep-take-spends {e = takeᵉ (nat̂ 1) src₁} 0
+  (s≤s z≤n) (proj₂ (chainStep! 1 (proj₁ popped) chain₀
+                        (proj₂ popped) latched)))
+row-chain = s≤s z≤n
