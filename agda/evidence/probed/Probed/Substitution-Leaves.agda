@@ -15,7 +15,7 @@
 -- is any statement's inductive content, since every row is a single
 -- closed point.
 
--- TARGET: sub-unfoldμ @314410
+-- TARGET: sub-elimGᵉ @0cd8ca
 -- TARGET: sub-evalStrm @350562
 module Probed.Substitution-Leaves where
 
@@ -25,8 +25,8 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Vec using ([])
 open import Relation.Binary.PropositionalEquality using (refl)
 
-open import Rx.Exp using (Ctx; natᵗ; Exp; Val; ofᵉ; mapᵉ; varᵉ; deferᵉ; strmᵗ; varᵗ; fstᵗ; pairᵗ)
-open import Rx.Evaluator.Reducible using (sub-unfoldμ)
+open import Rx.Exp using (Ctx; natᵗ; Exp; Val; ofᵉ; mapᵉ; varᵉ; deferᵉ; μᵉ; strmᵗ; varᵗ; fstᵗ; pairᵗ)
+open import Rx.Subst-Elim using (sub-elimGᵉ)
 open import Rx.Subst-Eval using (sub-evalStrm)
 
 open import Probed.Apparatus using (Confirms)
@@ -40,16 +40,19 @@ open import Probed.Apparatus using (Confirms)
 σ₀ = 7 ∷ []
 
 ----------------------------------------------------------------------
--- 1.  THE PEEL UNDER AN ENVIRONMENT.  LOAD-BEARING: the body's μ
--- variable is really referenced, through the gate, so a peel that
--- inserted the wrong expression changes the left side and not the
--- right.
+-- 1.  THE PEEL UNDER AN ENVIRONMENT, taken at the general
+-- eliminator the peel is defined as -- at the EMPTY local telescope,
+-- where the general statement's transport is `refl` and the two sides
+-- are the peel's own.  LOAD-BEARING: the body's μ variable is really
+-- referenced, through the gate, so a peel that inserted the wrong
+-- expression changes the left side and not the right.  DEGENERATE in
+-- the transport, which an empty local telescope cannot exercise.
 ----------------------------------------------------------------------
 
 bodyμ : Exp Γ₀ (natᵗ ∷ []) [] (natᵗ ∷ []) natᵗ
 bodyμ = mapᵉ (varᵗ (here refl)) (deferᵉ (varᵉ (here refl)))
 
-row-unfoldμ : Confirms (sub-unfoldμ bodyμ σ₀)
+row-unfoldμ : Confirms (sub-elimGᵉ [] (here refl) (μᵉ bodyμ) σ₀ bodyμ)
 row-unfoldμ = refl
 
 -- AND THE SAME PEEL MET UNDER A BINDER, which is the one shape the
@@ -67,7 +70,7 @@ bodyμ-deep =
                     (strmᵗ (deferᵉ (varᵉ (here refl))))))
        (ofᵉ (varᵗ (here refl) ∷ []))
 
-row-unfoldμ-deep : Confirms (sub-unfoldμ bodyμ-deep σ₀)
+row-unfoldμ-deep : Confirms (sub-elimGᵉ [] (here refl) (μᵉ bodyμ-deep) σ₀ bodyμ-deep)
 row-unfoldμ-deep = refl
 
 -- AND THROUGH TWO GATES, which is the arm where the eliminator stops
@@ -82,7 +85,7 @@ bodyμ-gates =
                     (strmᵗ (deferᵉ (deferᵉ (varᵉ (here refl)))))))
        (ofᵉ (varᵗ (here refl) ∷ []))
 
-row-unfoldμ-gates : Confirms (sub-unfoldμ bodyμ-gates σ₀)
+row-unfoldμ-gates : Confirms (sub-elimGᵉ [] (here refl) (μᵉ bodyμ-gates) σ₀ bodyμ-gates)
 row-unfoldμ-gates = refl
 
 ----------------------------------------------------------------------

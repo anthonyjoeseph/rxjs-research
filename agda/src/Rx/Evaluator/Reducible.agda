@@ -61,6 +61,7 @@ open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; _�
   inputsBelowᵉ; inputsBelowᵗ; inputsBelowᵗˢ)
 open import Rx.Exp.Guarded using (gsizeᵉ; gsizeᵗ; gsizeᵗˢ; gsize-unfoldμ)
 open import Rx.Inputs-Below using (ib-unfoldμ; ib-topᵉ)
+open import Rx.Subst-Elim using (sub-elimGᵉ)
 open import Rx.Subst-Eval using (sub-evalTm; sub-applyFn)
 open import Rx.Subst-Identity using (subΘ-id-exp)
 open import Decide using (∧ˡ; ∧ʳ)
@@ -220,27 +221,24 @@ RedStep {Γ = Γ} {t = t} {e = e} {u = u} id now f κ vals fin sched st =
     stepFrame⇓ {e = e} id now f κ vals fin sched st r × All (Red u) (proj₁ r)
       × RedNode f (proj₂ (proj₂ (proj₂ (proj₂ r))))
 
+-- SUBSTITUTION COMMUTES WITH THE PEEL, which is the price of carrying
+-- the environment rather than applying it: closing against the
+-- environment and then peeling agrees with peeling under it.  This is
+-- the only point the face still reaches one on the EXPRESSION side --
+-- the readings on the TERM side are `evalTm` and `applyFn`, one
+-- `evalWith` at two telescopes, so they are one statement rather than
+-- two obligations, and it is proven.
+--
+-- THE PEEL IS THE ELIMINATOR AT THE EMPTY LOCAL TELESCOPE, and that is
+-- the whole of this body: the general statement is the only one whose
+-- induction can run, and at the empty telescope its transport is
+-- `refl`, so the instance reduces to the equation the walk spends.
+sub-unfoldμ : ∀ {n} {Γ : Ctx n} {Θ t} (body : Exp Γ (t ∷ []) [] Θ t)
+              (σ : All (Val Γ) Θ)
+            → subΘExp [] σ (unfoldμ body) ≡ unfoldμ (subΘExp [] σ body)
+sub-unfoldμ body σ = sub-elimGᵉ [] (here refl) (μᵉ body) σ body
+
 postulate
-  -- SUBSTITUTION COMMUTES WITH THE THING IT IS CARRIED PAST, which is
-  -- the price of carrying the environment rather than applying it.
-  -- Each says that closing against the environment and then acting
-  -- agrees with acting under it, at the two points this face still
-  -- reaches one on the EXPRESSION side: the fixpoint peel.  The
-  -- readings on the TERM side are not stated here -- `evalTm` and
-  -- `applyFn` are one `evalWith` at two telescopes, so they are one
-  -- statement rather than two obligations, and it is proven.
-  -- PROBED: `Probed.Substitution-Leaves`, at a body whose μ variable
-  --   is really referenced through the gate; with that gate met under
-  --   a BINDER, so the inserted copy crosses a non-empty local
-  --   telescope and reads the environment from under it; and through
-  --   TWO gates, where the eliminator shuffles the deferred context
-  --   and carries a transport on the Δ index.  Not reached: a nested
-  --   fixpoint, and a local telescope longer than one entry.
-
-  sub-unfoldμ : ∀ {n} {Γ : Ctx n} {Θ t} (body : Exp Γ (t ∷ []) [] Θ t)
-                (σ : All (Val Γ) Θ)
-              → subΘExp [] σ (unfoldμ body) ≡ unfoldμ (subΘExp [] σ body)
-
   -- THE FLATTENING WALK, and the one leaf here with rows against it.
   -- Every value it produces is an inner subscribed out of the arriving
   -- batch, and the census at `NodeState` says the nodes it consults

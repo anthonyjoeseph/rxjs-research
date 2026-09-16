@@ -233,14 +233,14 @@ deferred beside it.
 
 ### Big picture tier roadmap
 
-- **THE FIXPOINT PEEL, TAKEN FIRST BECAUSE IT IS THE ONE THAT COULD STILL BE
-  FALSE (Anthony).** The peel and the substitution commute, which is what the
-  partner's μ arm spends. Its induction is over the guarded ELIMINATION rather
-  than over the telescope, so nothing the renaming shelf buys transfers to it,
-  and a wrong telescope shows here and nowhere else. The rows now reach that
-  shape and hold, so what the leg carries is no longer whether the statement
-  survives it but whether the eliminator's six families can be walked under the
-  identity transport the empty substitution already spends.
+- **THE FIXPOINT PEEL, STILL FIRST AND NOW CARRYING A TRANSPORT.** The peel is
+  the guarded eliminator at the empty local telescope, and the eliminator walks
+  under binders by EXTENDING that telescope — so the statement the consumer
+  wants cannot be its own hypothesis, and the general one sits at `Θloc ++ []`
+  against `Θloc`. The peel is now a real body over that general form and the
+  instance costs nothing, which is what the leg bought: the transport is `refl`
+  where it is spent. What remains is the six-family walk carrying it, and the
+  rows cover only the empty telescope, so the transport itself is uncovered.
 
 - **THEN THE EMBEDDING ARM, WHICH IS ALL THAT IS LEFT OF THE TELESCOPE LEG.**
   A weakened-from-closed term is now proven inert under substitution, and
@@ -292,9 +292,10 @@ deferred beside it.
 
 ### The ledger
 
-- **`sub-unfoldμ`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`: the fixpoint
-  peel commutes with the environment substitution. This is what the partner's μ
-  arm spends, and it is where a wrong telescope would show.
+- **`sub-elimGᵉ`** (Rx/Subst-Elim) — FALSITY, `PROBED`: the guarded eliminator
+  commutes with the environment substitution at an arbitrary local telescope.
+  The peel is its instance at the empty one, which is where the rows sit and
+  where the transport is `refl`; the transport itself is uncovered.
 
 - **`sub-evalStrm`** (Rx/Subst-Eval) — FALSITY, `PROBED`: the term face handing
   back to the expression face. Not an induction hypothesis but substitution
