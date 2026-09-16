@@ -14,11 +14,20 @@
 -- this face saying something about a stream's contents alone.
 module Verify-Well-Formed where
 
+open import Data.Nat using (zero; suc; _+_)
+open import Data.Product using (_,_; proj₂)
+open import Data.Nat.Properties using (m≤m+n; +-suc)
+open import Relation.Binary.PropositionalEquality using (sym; subst)
+
 open import Rx.Prim using (Fuel)
 open import Rx.Exp using (Ctx; Closed)
 open import Rx.Slots using (Slots)
-open import Rx.Evaluator.Builder using (evaluate↓)
+open import Rx.Evaluator using (root; sched-init; st-init)
+open import Rx.Evaluator.Domain using (subscribeE⇓; cascade⇓; drain⇓; evaluate⇓;
+  drain-done; drain-empty; drain-step; eval-run)
+open import Rx.Evaluator.Builder using (evaluate↓; evaluate!)
 open import Rx.Protocol using (protocol-init; runProtocol; Accepted)
+open import Rx.Protocol.Sound using (Sound; Sound-[]; Sound-++; sound-accepted)
 
 -- Every clause the automaton checks — instant freshness, bracketing,
 -- fan-out exactness, complete discipline — is a promise the evaluator
@@ -44,11 +53,98 @@ open import Rx.Protocol using (protocol-init; runProtocol; Accepted)
 --   is rejected.  What is true of an arbitrary prefix is this
 --   statement ALONE, which needs no domain to say.
 
+-- THE SEGMENT FORM, AND IT IS STRICTLY STRONGER THAN WHAT IS ASKED FOR.
+-- Acceptance is a whole-stream claim from one fixed state, so it
+-- decomposes into nothing; soundness is the segment form, and a run
+-- is a CONCATENATION -- its root subscribe followed by one cascade
+-- per unit of fuel, which is what `evaluate⇓`'s single constructor
+-- says.  So the statement that has a route down through the
+-- evaluator is this one, and acceptance falls out of it at the root.
+--
+-- THE WATERMARK IT EXITS AT IS READ OFF THE DRAIN RATHER THAN CHOSEN:
+-- the counter enters at one, since the root subscribe spends the
+-- zeroth instant, and advances by one per cascade -- so a run of
+-- `fuel` cascades cannot leave a watermark above its successor.
+-- Stating the exit bound as an existential
+-- instead would be the weaker statement that composes with nothing --
+-- the next segment needs a NUMBER to discharge its own entry bound.
+--
+-- DEAD ROUTE: quantifying the segment predicate over every sane state
+--   rather than indexing it by the entry watermark.  Instant ids are
+--   absolute arrival positions, so a segment that emits anything at
+--   all is rejected out of any state whose watermark has passed its
+--   first instant -- the unindexed predicate is satisfied by no
+--   segment with content, while reading as the strongest form of it.
+--
 -- RECOVERY: git show 9f5e3339:agda/src/Verify-Well-Formed.agda restores
 --   the seam carve -- two leaves meeting at a named automaton state, the
 --   `BurstInv` relation they were denominated in, and `Glue`'s fold law
 --   composing their conclusions.
+
+-- THE TWO LEAVES THE RUN DECOMPOSES INTO, AND NEITHER IS AN ASSEMBLY.
+-- A cascade is one instant's worth of emission, so it opens at the
+-- counter it is handed and closes before the next -- which is the
+-- watermark step the drain's own `suc nextId` threads.  The root
+-- subscribe is the same claim at the seed: it is the only segment that
+-- runs before the counter has advanced at all, so its entry is zero
+-- and its exit is one.
+--
+-- PROBED: `Probed.Protocol-Segments` instantiates both at states a run
+--   actually enters -- the subscribe at the initial state, the cascade
+--   at the state that subscribe's own burst left -- over a synchronous
+--   two-value source and over a one-slot scripted arrival.  What the
+--   rows reach is the seed segment and the first cascade after it, so
+--   the entry watermark covered is zero and the exit watermarks are one
+--   and two.  They do not reach a watermark further along, which is the
+--   region the entry index exists for and the one where freshness can
+--   reject an otherwise impeccable segment; and they reach no former
+--   beyond a synchronous source and a slot, so nothing here covers a
+--   flattener, a share, or a cascade carrying more than one emit.
 postulate
-  evaluate-accepted :
-    ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slots Γ) →
-    Accepted (runProtocol protocol-init (evaluate↓ fuel e ins))
+  sound-cascade :
+    ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {a id sched st out sched′ st′} →
+    cascade⇓ {e = e} a id sched st (out , sched′ , st′) → Sound id (suc id) out
+
+  sound-subscribe :
+    ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
+      {burst sched₀ st₀} →
+    subscribeE⇓ {e = e} {lo = n} e root 0 0
+      (sched-init e ins) (st-init e) (burst , sched₀ , st₀) →
+    Sound 0 1 burst
+
+-- THE DRAIN IS THE INDUCTION, AND THE INDEXING IS WHAT MAKES IT ONE.
+-- Each constructor hands its tail a counter one higher than its own,
+-- so the exit watermark of a drain carrying `fuel` units is its entry
+-- plus that fuel -- and the arithmetic is the whole content of the
+-- step case, since `Sound-++` already composes the two segments once
+-- their indices meet.
+sound-drain :
+  ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (fuel : Fuel) {id sched st rest} →
+  drain⇓ {e = e} fuel id sched st rest → Sound id (id + fuel) rest
+sound-drain zero    {id = id} drain-done      = Sound-[] (m≤m+n id 0)
+sound-drain (suc k) {id = id} (drain-empty _) = Sound-[] (m≤m+n id (suc k))
+sound-drain _ (drain-step {k = k} {nextId = id} {out = out} {rest = rest}
+                                  _ c d) =
+  Sound-++ out rest (sound-cascade c)
+    (subst (λ z → Sound (suc id) z rest) (sym (+-suc id k)) (sound-drain k d))
+
+-- AND THE RUN IS THEIR CONCATENATION, WHICH IS WHAT `eval-run` SAYS.
+-- The exit watermark is one above the fuel rather than the fuel: the
+-- root subscribe spends the zeroth instant, so the drain starts at one
+-- and every cascade after it is offset by that seed.
+sound-run :
+  ∀ {n} {Γ : Ctx n} {t} {fuel : Fuel} {e : Closed Γ t} {ins : Slots Γ} {out} →
+  evaluate⇓ fuel e ins out → Sound 0 (suc fuel) out
+sound-run (eval-run {burst = burst} {rest = rest} s d) =
+  Sound-++ burst rest (sound-subscribe _ _ s) (sound-drain _ d)
+
+evaluate-sound :
+  ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slots Γ) →
+  Sound 0 (suc fuel) (evaluate↓ fuel e ins)
+evaluate-sound fuel e ins = sound-run (proj₂ (evaluate! fuel e ins))
+
+evaluate-accepted :
+  ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slots Γ) →
+  Accepted (runProtocol protocol-init (evaluate↓ fuel e ins))
+evaluate-accepted fuel e ins =
+  sound-accepted (evaluate↓ fuel e ins) (evaluate-sound fuel e ins)

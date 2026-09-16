@@ -68,3 +68,8 @@ open import Probed.Adequacy using (row-saturated; row-grows; row-past-horizon)
 -- is the one statement on that tier that must not be taken on trust.
 open import Probed.Take-Bounds using
   (row-zero; row-cuts-instant; row-exact; row-past-frame)
+
+-- THE SEGMENT ROWS, claimed here because the statements they
+-- instantiate are the two leaves the run's own concatenation
+-- decomposes into, and nothing had reached either.
+open import Probed.Protocol-Segments using (row-subscribe; row-cascade)
