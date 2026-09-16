@@ -233,15 +233,14 @@ deferred beside it.
 
 ### Big picture tier roadmap
 
-- **THE STORE CARRIER, NOW NARROWED TO ONE ARM BY THE NODE CENSUS.** `Red`
-  recurses on the type and so says nothing about what a NODE HOLDS — the
-  question four arms were jointly waiting on. The census at `NodeState` answers
-  most of it: only `scan-st` and `mergeAll-st`'s queue carry a payload, so the
-  take arm needed no carrier and is now a body, and switch and exhaust need
-  none either. The two that remain are not the same job — a queue entry's
-  candidate is a transport from the hypothesis that admitted it, an
-  accumulator's is the carrier problem proper. Next commit takes the queue
-  half.
+- **PIN THE WITNESS — THE THREE ARMS ASK FOR NOTHING.** The store carrier was
+  never what they were waiting on. `RedStep` quantifies over SOME run with a
+  reducible value column, and the domain relation carries a premise-free
+  fallback at each of these frames, every one with an empty or passed-through
+  column. A machine witness now inhabits all three without reading a
+  hypothesis. The fallbacks cost the BUILDER nothing and a prover choosing its
+  own run everything. This leg gives each fallback the side condition that
+  distinguishes it, which is what puts the carrier question back.
 
 - **DISCHARGE THE FOUR SUBSTITUTION LEAVES THE PARTNER BOUGHT ITSELF WITH.**
   The `Θloc` telescope landed and took three of the original six with it —
@@ -287,18 +286,6 @@ deferred beside it.
   `DEAD ROUTE, PROBED`: a share's slot is reducible. Its def is drawn from the
   table rather than the term, so no descent this module can see reaches it.
 
-- **`red-scan`** (Rx/Evaluator/Reducible) — FALSITY, `DEAD ROUTE, PROBED`: a
-  scan's accumulator is read back out of the node this face installed, and the
-  candidate carries no claim about what a node holds.
-
-- **`red-from-inner`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`: what an
-  inner emits on its way back up, where a mergeAll drains its queue and a
-  switch decides whether the emission still belongs to anybody.
-
-- **`red-thru`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`: the flattening
-  walk. Inhabited at every operator's reading of an EMPTY node; a node already
-  holding something is unreached.
-
 - **`sub-unfoldμ`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`: the fixpoint
   peel commutes with the environment substitution. This is what the partner's μ
   arm spends, and it is where a wrong telescope would show.
@@ -315,6 +302,19 @@ deferred beside it.
   substitution is the identity. It is what makes the top line a corollary of
   the partner at the empty environment.
 
+
+- **`red-scan`** (Rx/Evaluator/Reducible) — VACUITY,
+  `REFUTED, DEAD ROUTE, PROBED`: satisfiable by a body that reads no node,
+  because the relation offers a premise-free arm with an empty value column.
+  Pin the witness.
+
+- **`red-from-inner`** (Rx/Evaluator/Reducible) — VACUITY, `REFUTED, PROBED`:
+  satisfiable by handing the arriving batch straight back, at both settings of
+  the finished flag. Nothing it demands ever drains a queue.
+
+- **`red-thru`** (Rx/Evaluator/Reducible) — VACUITY, `REFUTED, PROBED`:
+  satisfiable by a walk that consumes every arriving observable and emits none,
+  whatever the node holds.
 
 ## Tier 2 — Verify-Well-Formed (parked behind tier 1)
 

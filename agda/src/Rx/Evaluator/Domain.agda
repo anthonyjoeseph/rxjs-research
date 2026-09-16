@@ -446,6 +446,20 @@ data subscribeInner⇓ {n} {Γ} {t} {e} where
 -- reason, and it costs nothing: a premise-free constructor whose RESULT
 -- INDEX is fixed admits no run it did not already admit, and the only
 -- direction spent here builds a derivation at the machine's own result.
+--
+-- AND THAT LAST CLAUSE IS A PREMISE RATHER THAN A PROPERTY, WHICH IS
+-- WHAT THE REDUCIBILITY FACE FOUND OUT.  A prover that CHOOSES its own
+-- run is not the machine, so for it a premise-free fallback is a free
+-- arm at every input: the scan that declines to read its node, the
+-- walk that consumes nothing, the reaction that hands its batch back.
+-- Each of those has an empty or passed-through value column, so any
+-- statement quantified over SOME derivation with a reducible column is
+-- discharged outright.  The fallbacks cost nothing to the direction
+-- this relation was written for and everything to the other one, and
+-- which direction a consumer is in is not visible from here.
+--
+-- REFUTED: `Refuted.Red-Step-Vacuous` inhabits three such statements
+--   with bodies that read no hypothesis.
 data thruConsume⇓ {n} {Γ} {t} {e} where
 
   consume-all-sub : ∀ {u lo nid} {κ : Path Γ lo u t} {id now}

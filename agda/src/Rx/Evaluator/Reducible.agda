@@ -233,6 +233,14 @@ postulate
   -- what makes its recursive calls free and is exactly what leaves
   -- this conclusion with nothing under it.
   --
+  -- REFUTED: `Refuted.Red-Step-Vacuous` inhabits this statement with a
+  --   body that reads no hypothesis and no node.  The domain relation
+  --   offers a premise-free arm at this frame whose value column is
+  --   empty, and the statement asks only for SOME derivation, so the
+  --   carrier below is not what it is waiting on -- it never demanded
+  --   the accumulator be read.  The repair is to pin the witness, not
+  --   to find the carrier.
+  --
   -- DEAD ROUTE: the fact this needs is `Red` of the stored value, and
   --   it is establishable at the install (`red-env` at the empty
   --   environment on the seed) and preserved at the writeback
@@ -292,6 +300,12 @@ postulate
   -- values can only be the ones that arrived, and the DRAIN is the one
   -- sub-arm here that reads a payload back out.
   --
+  -- REFUTED: `Refuted.Red-Step-Vacuous` inhabits this statement at both
+  --   settings of the finished flag by handing the arriving batch
+  --   straight back -- the unfinished arm outright, the finished one
+  --   through whichever liveness branch holds.  So no queue is ever
+  --   drained by anything this statement demands.
+  --
   -- PROBED: `Probed.Reducible-Arms` at the arm that CARRIES rather
   --   than spends -- an unfinished inner emit, whose values pass
   --   through untouched, so an observable payload's candidate has to
@@ -311,6 +325,13 @@ postulate
   -- carry no payload to confuse that -- so this arm owes a store
   -- invariant only through the QUEUE it may push into, never through
   -- what it reads.
+  --
+  -- REFUTED: `Refuted.Red-Step-Vacuous` inhabits this statement at the
+  --   unfinished setting with a walk that consumes every arriving
+  --   observable and emits nothing.  Each operator's own nil arm is
+  --   premise-free, so the empty column is available whatever the node
+  --   holds, and the finished setting only adds a wrap that forwards
+  --   the column it is handed.
   --
   -- PROBED: `Probed.Reducible-Arms` at each of the three operators,
   --   with the arriving batch carrying a real observable: mergeAll
