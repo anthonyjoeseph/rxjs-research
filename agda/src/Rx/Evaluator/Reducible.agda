@@ -34,7 +34,7 @@ module Rx.Evaluator.Reducible where
 open import Data.Bool using (Bool; true; false; if_then_else_; T; _∧_)
 open import Data.Fin using (Fin; toℕ)
 open import Data.List using (List; []; _∷_; _++_; map)
-open import Data.List.Relation.Unary.All using (All; []; _∷_)
+open import Data.List.Relation.Unary.All using (All; []; _∷_; universal)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All.Properties using (++⁺)
@@ -55,9 +55,10 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import Rx.Prim using (Id; Tick; Source; InstEmit; InstEvent; init; value; close; handoff;
   complete; hot; cold)
 open import Rx.Slots using (scripted; shared)
-open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; _≟ᵗ_; Ctx; Closed; Val; Exp; Tm; Fn; evalTm; evalWith; applyFn; input; ofᵉ; emptyᵉ;
+open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; listᵗ; _≟ᵗ_; Ctx; Closed; Val; Exp; Tm; Fn; evalTm; evalWith; foldVals; applyFn; input; ofᵉ; emptyᵉ;
   mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; isData; unfoldμ;
   varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ;
+  nilᵗ; consᵗ; foldᵗ;
   add; sub; mul; eqᵖ; ltᵖ; notᵖ; subΘExp; subΘTm; subΘTms; lookupEnv;
   inputsBelowᵉ; inputsBelowᵗ; inputsBelowᵗˢ)
 open import Rx.Exp.Guarded using (gsizeᵉ; gsizeᵗ; gsizeᵗˢ; gsize-unfoldμ)
@@ -110,6 +111,7 @@ Red natᵗ     _        = ⊤
 Red (s ×ᵗ t) (a , b)  = Red s a × Red t b
 Red (s +ᵗ t) (inj₁ a) = Red s a
 Red (s +ᵗ t) (inj₂ b) = Red t b
+Red (listᵗ t) xs      = All (Red t) xs
 Red {Γ = Γ} (obs u) b =
   ∀ {t} {e : Closed Γ t} {lo} (κ : Path Γ lo u t) (id : Id) (now : Tick)
     (sched : Sched Γ) (st : EvalSt e) →
@@ -164,6 +166,23 @@ RedPush {Γ = Γ} {e = e} {u = u} id now f κ burst sched st =
 RedFn : ∀ {n} {Γ : Ctx n} {s u} → Fn Γ [] [] [] s u → Set
 RedFn {Γ = Γ} {s = s} {u = u} fn =
   ∀ {v : Val Γ s} → Red s v → Red u (applyFn fn v)
+
+-- A FOLD PRESERVES THE CANDIDATE WHEN ITS STEP DOES, AND THE STEP IS A
+-- HYPOTHESIS FOR THE REASON `RedFn`'s IS: the fundamental theorem at
+-- terms is a member of the recursion at the foot of this module, so a
+-- walk declared above it cannot call it.  What is new is the recursion
+-- itself — every other former's value is a function of its subterms'
+-- values, so congruence discharges it, while a fold runs its step once
+-- per ELEMENT and the candidate has to be re-established at each.
+redFoldVals : ∀ {n} {Γ : Ctx n} {Θ s u}
+              (f : Tm Γ [] [] (s ∷ u ∷ Θ) u) (σ : All (Val Γ) Θ)
+            → (∀ {x : Val Γ s} {a : Val Γ u} → Red s x → Red u a
+                 → Red u (evalWith f (x ∷ a ∷ σ)))
+            → ∀ {xs : List (Val Γ s)} → All (Red s) xs
+            → ∀ {a : Val Γ u} → Red u a
+            → Red u (foldVals f σ xs a)
+redFoldVals f σ step []       ra = ra
+redFoldVals f σ step (p ∷ ps) ra = redFoldVals f σ step ps (step p ra)
 
 -- WHAT A FRAME'S OWN NODE MUST HOLD, AND IT IS ONLY EVER THE FOLD
 -- THAT ASKS.  The node census says four of the five frames read a
@@ -481,6 +500,7 @@ red-data (s ×ᵗ t) ok (a , b) =
   in red-data s o₁ a , red-data t o₂ b
 red-data (s +ᵗ t) ok (inj₁ a) = red-data s (proj₁ (T-if (isData s) (isData t) ok)) a
 red-data (s +ᵗ t) ok (inj₂ b) = red-data t (proj₂ (T-if (isData s) (isData t) ok)) b
+red-data (listᵗ t) ok xs      = universal (red-data t ok) xs
 red-data (obs u)  () _
 
 redDatas : ∀ {n} {Γ : Ctx n} (u : Ty) → T (isData u) → (vs : List (Val Γ u))
@@ -987,6 +1007,28 @@ mutual
         (rs (s≤s (m≤m+n (gsizeᵗ x) (gsizeᵗ y))))
     , redTmAcc y σ rσ k (∧ʳ (inputsBelowᵗ k x) (inputsBelowᵗ k y) ok) aK
         (rs (s≤s (m≤n+m (gsizeᵗ y) (gsizeᵗ x))))
+  redTmAcc nilᵗ σ rσ k ok aK a = []
+  redTmAcc (consᵗ x xs) σ rσ k ok aK (acc rs) =
+      redTmAcc x σ rσ k (∧ˡ (inputsBelowᵗ k x) (inputsBelowᵗ k xs) ok) aK
+        (rs (s≤s (m≤m+n (gsizeᵗ x) (gsizeᵗ xs))))
+    ∷ redTmAcc xs σ rσ k (∧ʳ (inputsBelowᵗ k x) (inputsBelowᵗ k xs) ok) aK
+        (rs (s≤s (m≤n+m (gsizeᵗ xs) (gsizeᵗ x))))
+  redTmAcc (foldᵗ l z f) σ rσ k ok aK (acc rs) =
+    redFoldVals f σ
+      (λ rx ra →
+        redTmAcc f (_ ∷ _ ∷ σ) (rx , ra , rσ) k
+          (∧ʳ (inputsBelowᵗ k z) (inputsBelowᵗ k f)
+            (∧ʳ (inputsBelowᵗ k l) (inputsBelowᵗ k z ∧ inputsBelowᵗ k f) ok)) aK
+          (rs (s≤s (≤-trans (m≤n+m (gsizeᵗ f) (gsizeᵗ z))
+                            (m≤n+m (gsizeᵗ z + gsizeᵗ f) (gsizeᵗ l))))))
+      (redTmAcc l σ rσ k
+        (∧ˡ (inputsBelowᵗ k l) (inputsBelowᵗ k z ∧ inputsBelowᵗ k f) ok) aK
+        (rs (s≤s (m≤m+n (gsizeᵗ l) (gsizeᵗ z + gsizeᵗ f)))))
+      (redTmAcc z σ rσ k
+        (∧ˡ (inputsBelowᵗ k z) (inputsBelowᵗ k f)
+          (∧ʳ (inputsBelowᵗ k l) (inputsBelowᵗ k z ∧ inputsBelowᵗ k f) ok)) aK
+        (rs (s≤s (≤-trans (m≤m+n (gsizeᵗ z) (gsizeᵗ f))
+                          (m≤n+m (gsizeᵗ z + gsizeᵗ f) (gsizeᵗ l))))))
   redTmAcc (fstᵗ q) σ rσ k ok aK (acc rs) =
     proj₁ (redTmAcc q σ rσ k ok aK (rs ≤-refl))
   redTmAcc (sndᵗ q) σ rσ k ok aK (acc rs) =

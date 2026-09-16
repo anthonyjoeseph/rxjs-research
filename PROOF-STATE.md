@@ -183,7 +183,7 @@ the row is DIFFICULTY.
 formal-verification-batchSimultaneous    The-Proof.agda — REAL, module postulate-free
  ├─ batch-agreement                      proven
  └─ evaluate-well-formed                 Verify-Well-Formed.agda — REAL, one match
-     └─ burst-drain-well-formed          one postulate — tier 3
+     └─ burst-drain-well-formed          one postulate — tier 2
 
   evaluate↓ = proj₁ ∘ evaluate!           Rx/Evaluator/Builder.agda — REAL
      └─ every value-path leaf is a body; the corpus runs; the tower descends
@@ -203,57 +203,7 @@ every guard, every `<?` and the dry marker leave the machine entirely.
 A row's class must agree with its postulate's header, which is where the
 research lives; where they disagree, the header wins.
 
-## Tier 1 — `listᵗ`, a list former in the type universe
-
-**A REFACTORING TIER: IT SCHEDULES NO POSTULATE AND STATES NOTHING.** `Ty` is
-non-recursive — five formers, not one of them a fixpoint — so products give
-fixed-arity tuples and a list is not expressible at all. That is what stops
-`InstEmit` becoming an ordinary payload the way it is one in the TypeScript: an
-emit carries arbitrarily many events, so there is no arity to pick.
-
-**IT IS FIRST BECAUSE TIER 2 CANNOT START WITHOUT IT**, and because it is the
-one tier here whose whole cost is clause-threading: every traversal over `Tm`
-owes three arms and the measure owes a congruence. The only part that could
-have objected is the eliminator — `foldᵗ`'s step body can build an observable
-through `strmᵗ`, so `gsizeᵗ` had to go on bounding one — and it does not: the
-step body is a subterm, so each iteration recurses strictly smaller.
-
-### The monster
-
-(no monster) — nothing here can be false. The tier declares no statement: it
-adds a former, its two introduction rules and its eliminator, and threads the
-clauses every existing traversal now owes. What can go wrong is a coverage
-failure, a scope failure or a termination failure, and the typechecker reports
-all three directly, at the clause, with no cone needed to aim anyone.
-
-### Big picture tier roadmap
-
-- **THE SUBSTITUTION FAMILY, WHICH IS NINE MODULES OF ONE CONGRUENCE.**
-  `Rx.Inputs-Below`, `Rx.Subst-Compose`, `Rx.Subst-Elim`, `Rx.Subst-Elim-Weak`,
-  `Rx.Subst-Eval`, `Rx.Subst-Identity`, `Rx.Subst-Ren-Fuse`,
-  `Rx.Subst-Renaming` and `Rx.Subst-Transport` each walk `Tm` and each owes the
-  same three arms — `refl` at the nil, a `cong₂` at the cons, a `cong` with a
-  DOUBLED binder extension at the fold, since its step body binds the element
-  and the accumulator at once. That doubling is the only place the shape
-  departs from the existing `caseᵗ` arm, and it is where a transport-flavoured
-  module will want more than a congruence. Land them together: they share one
-  reading of the tree and split into nine reviews of the same diff.
-
-- **THEN THE EVALUATOR AND `Reducible`, WHERE A MEASURE ARGUMENT COULD STILL
-  OBJECT.** The reducibility candidate recurses on the TYPE, so a new former is
-  a new arm of `Red` rather than a new clause of an existing one — and the
-  question it raises is whether a list of reducible values is reducible for the
-  reason the other formers are. The evaluator's own fold clause already
-  typechecks with a local helper, so the termination argument is settled at the
-  term level; what is open is the candidate's.
-
-- **THEN THE EDGES, WHICH ARE OFF THE PROOF PATH AND STILL PART OF THE GATE.**
-  `CLI.Decode`, `CLI.Encode`, `QuickCheck` and the bug cache's prelude each
-  match on `Ty` or on `Tm` exhaustively, so each goes red the moment the former
-  lands and none of them is proof work. They are last because they are the
-  cheapest to repair and the least informative if they break.
-
-## Tier 2 — `InstEmit` off the syntax tree
+## Tier 1 — `InstEmit` off the syntax tree
 
 **THE ENTANGLEMENT, PLAINLY: the syntax tree carries the emit metadata the
 implementation needs, and the spec's tree should not.** TypeScript has two
@@ -269,7 +219,7 @@ tree, every theorem already proven applies verbatim to the erasure.
 
 ### The monster
 
-(no monster) — for the same reason tier 1 declares none, and with one extra
+(no monster) — this tier declares no statement either, and with one extra
 thing worth saying: the erasure is where a mistake here would live, and an
 erasure is a DEFINITION. It cannot be false, only wrong, and what catches it
 wrong is the batching proof restated over the mirror failing to typecheck —
@@ -295,7 +245,7 @@ which is the tier's own third leg rather than a claim a cone could aim at.
   the two legs above are what say which side of the boundary each consumer
   belongs on.
 
-## Tier 3 — `evaluate-well-formed`
+## Tier 2 — `evaluate-well-formed`
 
 Built on the run's own derivation, which is now a body the whole tower
 descends through.
@@ -369,7 +319,7 @@ seam, and the WellFormed quantification `The-Proof` draws from here.
   paid up. Generic so its induction can re-enter itself; nothing has run a
   drain against it.
 
-## Tier 4 — the denotation and adequacy
+## Tier 3 — the denotation and adequacy
 
 **WHAT THIS FACE BUYS: an object that is not the machine.** Every statement in
 the repo today is read off `evaluate↓`, so the machine's own bookkeeping — node
@@ -433,7 +383,7 @@ also: `run-monotone` — a fact about the machine alone, which is why it survive
   `denote`, `observe`. Named individually because they are what makes the row
   above vacuous, and a collective phrase is invisible to the coverage check.
 
-## Tier 5 — take bounds, determinacy, and the top-line semantic claims
+## Tier 4 — take bounds, determinacy, and the top-line semantic claims
 
 **THE MISC TIER, AND THE ONLY ONE NOT DEDICATED TO A SINGLE STATEMENT.** Three
 faces share it because none of them is on any other tier's route, not because

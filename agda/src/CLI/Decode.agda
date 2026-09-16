@@ -24,7 +24,7 @@ open import Rx.Prim using (Timed; after_,_; ObservableInput; hot; cold)
 open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; _≟ᵗ_; isData; inputsBelowᵉ; Ctx; Val; Exp; Tm;
   input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ;
   varᵉ; deferᵉ; varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ;
-  strmᵗ; add; sub; mul; eqᵖ; ltᵖ; notᵖ)
+  strmᵗ; nilᵗ; consᵗ; foldᵗ; listᵗ; add; sub; mul; eqᵖ; ltᵖ; notᵖ)
 open import Rx.Evaluator.Builder using (evaluate↓)
 open import Rx.Slots using (scripted; shared; Slot; Slots)
 open import Implementation using (impl-batchSimultaneous)
@@ -92,6 +92,10 @@ asObs : Ty → Maybe Ty
 asObs (obs u) = just u
 asObs _       = nothing
 
+asList : Ty → Maybe Ty
+asList (listᵗ u) = just u
+asList _         = nothing
+
 natToFin : (n : ℕ) → ℕ → Maybe (Fin n)
 natToFin zero    _       = nothing
 natToFin (suc n) zero    = just zero
@@ -134,6 +138,8 @@ decodeTy (suc fuel) j = getField "type" j >>=? asStr >>=? λ tag →
      getField "right" j >>=? decodeTy fuel >>=? λ u → just (s +ᵗ u))
   else if tag is "obs" then
     (getField "elem" j >>=? decodeTy fuel >>=? λ u → just (obs u))
+  else if tag is "list" then
+    (getField "elem" j >>=? decodeTy fuel >>=? λ u → just (listᵗ u))
   else nothing
 
 -- the type annotation of a named child node
@@ -243,6 +249,21 @@ mutual
       (getField "ty" j >>=? decodeTy fuel >>=? asObs >>=? λ u →
        whenTy (obs u) t >>=? λ { refl →
          getField "exp" j >>=? decodeExp fuel Γ Δᵍ Δ Θ u >>=? λ e → just (strmᵗ e) })
+    else if tag is "nilT" then
+      (getField "ty" j >>=? decodeTy fuel >>=? asList >>=? λ u →
+       whenTy (listᵗ u) t >>=? λ { refl → just nilᵗ })
+    else if tag is "consT" then
+      (getField "ty" j >>=? decodeTy fuel >>=? asList >>=? λ u →
+       whenTy (listᵗ u) t >>=? λ { refl →
+         getField "head" j >>=? decodeTm fuel Γ Δᵍ Δ Θ u >>=? λ a →
+         getField "tail" j >>=? decodeTm fuel Γ Δᵍ Δ Θ (listᵗ u) >>=? λ as →
+         just (consᵗ a as) })
+    else if tag is "foldT" then
+      (childTy fuel "list" j >>=? asList >>=? λ s →
+       getField "list" j >>=? decodeTm fuel Γ Δᵍ Δ Θ (listᵗ s) >>=? λ l →
+       getField "init" j >>=? decodeTm fuel Γ Δᵍ Δ Θ t >>=? λ z →
+       getField "step" j >>=? decodeTm fuel Γ Δᵍ Δ (s ∷ t ∷ Θ) t >>=? λ f →
+       just (foldᵗ l z f))
     else nothing
 
   decodeTms : ℕ → ∀ {n} (Γ : Ctx n) (Δᵍ Δ Θ : List Ty) (t : Ty)
@@ -266,6 +287,7 @@ decodeVal fuel Γ (s +ᵗ u) j =
   if tag is "inl" then (decodeVal fuel Γ s vj >>=? λ v → just (inj₁ v))
   else if tag is "inr" then (decodeVal fuel Γ u vj >>=? λ v → just (inj₂ v))
   else nothing
+decodeVal fuel Γ (listᵗ u) j = asArr j >>=? mapMaybe (decodeVal fuel Γ u)
 decodeVal fuel Γ (obs u)  j = decodeExp fuel Γ [] [] [] u j
 
 ------------------------------------------------------------------------
