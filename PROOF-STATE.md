@@ -314,20 +314,23 @@ commit that states one.
   paid up. Generic so its induction can re-enter itself; nothing has run a
   drain against it.
 
-## Tier 3 — the denotation and adequacy
+## Tier 3 — the denotation, adequacy, and the take bound
 
 **WHAT THIS FACE BUYS: an object that is not the machine.** Every statement in
 the repo today is read off `evaluate↓`, so the machine's own bookkeeping — node
 ids, arrival ordinals, the drain counter — is visible in every answer. A
-denotation is what says what a PROGRAM means rather than what one run does, and
-it is what a determinacy or a timing claim ought to be stated against.
+denotation says what a PROGRAM means rather than what one run does.
 
-**AND COMPOSITIONALITY HAS A CONSUMER NOW (Anthony).** The pair below asserts a
-limit rather than a semantics until something says `denote` of a node is built
-from `denote` of its children. The tier under this one states its well-formedness
-over this domain while it is still postulated, so what arrives here is a
-REQUIREMENT rather than a free choice: the equations are the induction that
-replaces a seam argument over a machine.
+**AND COMPOSITIONALITY HAS A CONSUMER NOW (Anthony).** The tier under this one
+states its well-formedness over this domain while it is still postulated, so
+what arrives here is a REQUIREMENT rather than a free choice.
+
+**AND THE TAKE FACE IS HERE AS THE GUINEA PIG (Anthony).** The pair is false
+without a restriction to programs that SATURATE, and `take-bounds-values` is
+the one emission bound this repo has already proven uniform in fuel. So a
+candidate restriction is tested by whether that face satisfies it and whether
+that face's machinery proves it — iterated against a worked instance rather
+than judged by how it reads.
 
 ### The monster
 
@@ -339,6 +342,7 @@ machine-level claim into a denotational one would be transported along.
 
 also: `saturation` — the other half of the pair, off `adequacy`'s cone because its statement quantifies over a prefix the soundness half never mentions.
 also: `run-monotone` — a fact about the machine alone, which is why it survives every restatement of the domain and why nothing in the domain reaches it.
+also: `stepFrame-quiet`, `cascade-keeps-regs`, `chains-take-at`, `root-regs`, `take-zero-drain-silent`, `chainStep-node-mono`, `cascade-node-mono` — the take face, which is here to be measured against and shares no vocabulary with the domain.
 
 ### Big picture tier roadmap
 
@@ -352,6 +356,16 @@ also: `run-monotone` — a fact about the machine alone, which is why it survive
   form, which is a refutation rather than a receipt. It is first because it
   decides whether the domain below it is finite at all, and every later leg is
   written against the answer.
+
+- **THEN RUN THE CANDIDATE AGAINST THE TAKE FACE, WHICH IS WHY IT IS IN THIS
+  TIER (Anthony).** `take-bounds-values` is the one emission bound already
+  proven uniform in fuel, so it is the worked instance a restriction has to
+  admit — and the first question about any candidate is not whether it reads
+  well but whether that face SATISFIES it and whether that face's own drain
+  induction proves it does. A candidate the take face cannot discharge is
+  discarded on the spot; one it discharges cheaply is a candidate whose
+  machinery already exists. Expect several rounds: the product of this leg is a
+  predicate that survived a real consumer, not the first one written down.
 
 - **DEFINE `Beh` FOR THE FIRST-ORDER FORMERS AND EARN THE EQUATIONS.**
   `ofᵉ`, `emptyᵉ`, `mapᵉ`, `takeᵉ` and `scanᵉ` denote without any of the
@@ -372,6 +386,26 @@ also: `run-monotone` — a fact about the machine alone, which is why it survive
   leg of its own rather than a clause of the one above: getting it wrong is not
   an inelegant domain, it is a tier above that cannot state its own subject.
 
+- **THEN THE FRAME ARMS AND THE GUARD, WHICH IS WHERE THE TAKE FACE COULD BE
+  FALSE.** The walk is a body bottoming out in one leaf: every frame other than
+  the take's emits no value the take node paid for. The pass-through arms are
+  silent for a reason a row can check, so what is in doubt is the handful that
+  re-enter a subscribe — PROBE those first, since an inner subscribe splicing a
+  burst into the instant would say the statement is wrong rather than unproven.
+  The guard rides with them: both accounts are conditioned on the take's node
+  sitting below the schedule's counter, and the half with content is that the
+  counter is the ONLY place a node is minted.
+
+- **THEN THE REGISTRY INVARIANT AND THE ZERO ARM.** The account is FALSE for a
+  chain that never reaches the take's frame, so it is stated over chains that
+  DO, and the drain visits a fresh state at every arrival — which makes the
+  condition a property of the registry rather than of a path, splitting into
+  the filter read-back, the base case at the root subscribe, and
+  `cascade-keeps-regs`, the half with content since an inner subscribe
+  registers chains nobody has looked at. The zero arm is separate because its
+  guard is exactly the node that arm never mints, so it wants the registry read
+  directly.
+
 - **THEN THE FORMERS THAT MAKE IT HARD: the flatteners, `μᵉ` and `deferᵉ`.**
   These are the three edges no structural reading reaches, and they are why the
   evaluator needed a reducibility candidate. The denotation owes the same
@@ -379,14 +413,6 @@ also: `run-monotone` — a fact about the machine alone, which is why it survive
   fixpoint structure the first-order half did not need, or finds the candidate
   transports — and which of those it is decides whether adequacy is a grind or
   a restatement.
-
-- **AND THEN THE PAIR IS PROBEABLE, WHICH IS THE FIRST TIME IT SAYS ANYTHING.**
-  `adequacy` and `saturation` reduce at no program while `denote` is a
-  postulate, so the two rows that carry this tier's whole claim are today
-  asserting less than their names. The leg that makes `denote` compute is what
-  unblocks them, and instantiating the pair at the programs the corpus already
-  carries is what turns a VACUITY row into one a machine has looked at — and
-  what deletes the dead route standing over them.
 
 ### The ledger
 
@@ -397,25 +423,42 @@ also: `run-monotone` — a fact about the machine alone, which is why it survive
   pair pinning the denotation to the machine's limit. False as stated — a
   finite `Stream` cannot bound a fixpoint that emits one envelope per unit of
   fuel; the finding and the two available repairs are in the header.
+- **`stepFrame-quiet`** (Verify-Take-Bounds) — FALSITY, `PROBED`: one frame's
+  step emits no more values than it takes out of the take node. The flattener
+  arms are where it would be false.
+- **`cascade-keeps-regs`** (Verify-Take-Bounds) — FALSITY, `PROBED`: a cascade
+  leaves every registered chain still passing the take's frame. The half of the
+  path condition with content — an inner subscribe registers chains afresh.
+- **`chains-take-at`** (Verify-Take-Bounds) — FALSITY, `PROBED`: the chains an
+  arrival selects inherit the registry's own path condition. A transport along
+  a filter, and it is FALSITY because nothing has read the filter against it.
+- **`root-regs`** (Verify-Take-Bounds) — FALSITY, `PROBED`: the root subscribe
+  registers only chains through the take's frame. The base case; one row
+  computes the registry at a real program and inhabits it by hand.
 - **`Beh`, `denote`, `observe`** (Verify-Adequacy) — VACUITY, `DEAD ROUTE×3`:
   the domain the pair above quantifies over, and what makes it vacuous. Named
   in the head rather than described, so the row can carry its own evidence
   field.
+- **`take-zero-drain-silent`** (Verify-Take-Bounds) — DIFFICULTY, `PROBED`: a
+  take at zero registers nothing, so the drain pops its arrivals and delivers
+  none of them. Two rows reach it, one at an arrival only the drain can see.
+- **`chainStep-node-mono`** (Verify-Take-Bounds) — GRINDABLE, `TWIN`: one
+  chain's walk never lowers the schedule's node counter.
+- **`cascade-node-mono`** (Verify-Take-Bounds) — GRINDABLE, `TWIN`: a cascade
+  never lowers the schedule's node counter. The guard's bookkeeping half.
 
-## Tier 4 — take bounds, determinacy, and the top-line semantic claims
+## Tier 4 — determinacy and the top-line semantic claims
 
-**THE MISC TIER, AND THE ONLY ONE NOT DEDICATED TO A SINGLE STATEMENT.** Three
-faces share it because none of them is on any other tier's route, not because
-they share a subject: the take bound, the run relation being a function, and
-the claims Main asserts beside the main theorem.
+**THE MISC TIER, AND THE ONLY ONE NOT DEDICATED TO A SINGLE STATEMENT.** Two
+faces share it because neither is on any other tier's route, not because they
+share a subject: the run relation being a function, and the claims Main asserts
+beside the main theorem.
 
 **NONE OF THEM BLOCKS ANYTHING BELOW, WHICH IS WHY THEY ARE LAST.** The tiers
 above are stated over the ONE output the builder produces, so a verdict about
 that output means what it says whether or not a second derivation exists; what
 determinacy buys is the STRENGTHENING, and a strengthening is worth nothing
-until the weak form is proven. `take-bounds-values` is a rehearsal of a drain
-induction the well-formedness face has since carved for itself, and it is
-parked behind adequacy because the denotation is what its restatement wants.
+until the weak form is proven.
 
 ### The monster
 
@@ -429,44 +472,9 @@ nor the assembly consuming both — those are admitted below.
 
 also: `drain-det` — the other half of the same assembly, off the frame's cone and ground alongside it.
 also: `evaluate-deterministic` — the determinacy subject, which consumes both leaves and is unreachable from either.
-also: `take-bounds-values`, `stepFrame-quiet`, `cascade-keeps-regs`, `chains-take-at`, `root-regs`, `take-zero-drain-silent`, `chainStep-node-mono`, `cascade-node-mono` — the take face, which shares the tier and no vocabulary.
 also: `readme-batch-order-is-delivery-order` — the flagship semantic law, and with it the instance claims and the abstractions the timing claims quantify over.
 
 ### Big picture tier roadmap
-
-- **THE FRAME ARMS, WHICH IS WHERE THE FLATTENERS ARE.** The walk is a body
-  and it bottoms out in one leaf: every frame other than the take's emits no
-  value the take node paid for. The take's own arm is already an equality and
-  the pass-through arms are silent for a reason a row can check, so what is in
-  doubt is the handful of arms that re-enter a subscribe. PROBE those before
-  grinding any of them — an inner subscribe splicing a burst into the instant
-  is the cheapest refutation left in the face, and it would say the statement
-  is the wrong one rather than an unproven one.
-
-- **THEN THE REGISTRY INVARIANT, WHICH CARRIES THE PATH CONDITION.** The
-  account is FALSE for a chain that never reaches the take's frame — the value
-  reaches the root having charged nothing — so it is stated over chains that
-  DO, and the drain visits a fresh state at every arrival. That makes the
-  condition a property of the registry rather than of a path, and it splits
-  three ways: reading it back out of the chain filter, the base case at the
-  root subscribe, and `cascade-keeps-regs`, which is the half with content,
-  since an inner subscribe registers chains nobody has looked at.
-
-- **AND THE GUARD IS THE PART THAT CAN GO WRONG, SO SEPARATE IT FIRST.** Both
-  leaves are conditioned on the take's node sitting BELOW the schedule's
-  counter, which is what says a subscribe entered mid-cascade cannot mint it
-  afresh. `chainStep-node-mono` and `cascade-node-mono` are the bookkeeping
-  half and mirror a proven subscribe-side lemma clause for clause; the half
-  with content is that the counter is the ONLY place a node is minted.
-  Establish that over the family before either account is ground, because if it
-  fails the account is not repairable — it is the wrong statement.
-
-- **THEN THE ZERO ARM, A REGISTRATION CLAIM AND NOT A BUDGET ONE.**
-  `take-zero-drain-silent` says a take at zero leaves the drain with nothing to
-  deliver: it subscribes nothing, so no chain is registered, while the slots go
-  on seeding arrivals the drain pops and discards. Two rows reach it. It cannot
-  be folded into the account above — that account's guard is exactly the node
-  this arm never mints — so it wants the registry read directly.
 
 - **THEN INSTANTIATE THE DETERMINACY RING BEFORE GRINDING ANY OF IT.** The
   subscribe relation is twenty families and nothing has ever run two
@@ -495,18 +503,6 @@ also: `readme-batch-order-is-delivery-order` — the flagship semantic law, and 
 
 ### The ledger
 
-- **`stepFrame-quiet`** (Verify-Take-Bounds) — FALSITY, `PROBED`: one frame's
-  step emits no more values than it takes out of the take node. The flattener
-  arms are where it would be false.
-- **`cascade-keeps-regs`** (Verify-Take-Bounds) — FALSITY, `PROBED`: a cascade
-  leaves every registered chain still passing the take's frame. The half of the
-  path condition with content — an inner subscribe registers chains afresh.
-- **`chains-take-at`** (Verify-Take-Bounds) — FALSITY, `PROBED`: the chains an
-  arrival selects inherit the registry's own path condition. A transport along
-  a filter, and it is FALSITY because nothing has read the filter against it.
-- **`root-regs`** (Verify-Take-Bounds) — FALSITY, `PROBED`: the root subscribe
-  registers only chains through the take's frame. The base case; one row
-  computes the registry at a real program and inhabits it by hand.
 - **`subscribeE-det`, `drain-det`** (Verify-Determinacy) — FALSITY,
   `NO EVIDENCE`: each family admits one output at its own indices. Nothing has
   instantiated either, and the arms that do not follow from the head
@@ -534,9 +530,6 @@ also: `readme-batch-order-is-delivery-order` — the flagship semantic law, and 
   `retime`, `truncateIn`, `emittedBefore`. Named individually because they are
   what makes the row above vacuous, and a collective phrase is invisible to the
   coverage check.
-- **`take-zero-drain-silent`** (Verify-Take-Bounds) — DIFFICULTY, `PROBED`: a
-  take at zero registers nothing, so the drain pops its arrivals and delivers
-  none of them. Two rows reach it, one at an arrival only the drain can see.
 - **`batch-online`** — DIFFICULTY, `PROBED`: the restated form, instantiated at
   the very split that refuted the unqualified one — a left side closing one
   instant and leaving a second open, whose terminal flush was the old
@@ -545,9 +538,5 @@ also: `readme-batch-order-is-delivery-order` — the flagship semantic law, and 
   `PROBED×2`: the two evaluator laws a spent battery instantiated at every
   canonical program without refuting. Separated from the rows above because
   their receipt is a sweep rather than a point.
-- **`chainStep-node-mono`** (Verify-Take-Bounds) — GRINDABLE, `TWIN`: one
-  chain's walk never lowers the schedule's node counter.
-- **`cascade-node-mono`** (Verify-Take-Bounds) — GRINDABLE, `TWIN`: a cascade
-  never lowers the schedule's node counter. The guard's bookkeeping half.
 - **FFI, permanently trusted** — `_>>=_`/`getContents`/`putStr` (CLI/IO),
   `randFold`/`natMod` (QuickCheck). Carried, not counted.

@@ -18,6 +18,21 @@
 -- an off-by-one between those two points, or a path that delivers
 -- before it spends, is a counterexample rather than a hard proof -- and
 -- it is reachable at a scripted slot with two entries and a take at one.
+
+-- AND IT IS THE INSTANCE A SATURATION RESTRICTION IS MEASURED AGAINST
+-- (Anthony).  `adequacy` is false over this language unrestricted --
+-- an unguarded fixpoint emits one envelope per unit of fuel, so no
+-- finite meaning bounds it -- and the repair is a predicate confining
+-- the pair to programs that saturate.  This is the ONLY emission bound
+-- the repo states UNIFORMLY IN FUEL, which is exactly the shape such a
+-- predicate has to deliver, so a candidate is judged by whether a
+-- `take`-headed program satisfies it and whether the drain induction
+-- below proves that it does -- not by how the predicate reads.  The
+-- consequence worth knowing before writing one: everything here is
+-- stated at an OUTERMOST `take`, so a candidate that only admits
+-- programs of that shape has been tested by nothing, since the face
+-- cannot tell it apart from the one that admits every saturating
+-- program.
 module Verify-Take-Bounds where
 
 open import Data.Bool using (Bool; true; false; if_then_else_; _∧_)
