@@ -66,5 +66,5 @@ open import Probed.Seam using (row-root; row-drain; row-root-hot; row-drain-hot;
 -- TAKE'S BUDGET, the rehearsal claim's two halves: the one row set on
 -- this face that decides an evaluator fact without a spec, a batching
 -- stage or a second derivation to compare against.
-open import Probed.Take-Bounds using (row-mid-burst; row-zero; row-arrival;
+open import Probed.Take-Bounds using (row-mid-burst; row-arrival;
   mid-burst-cuts; mid-burst-uncut; arrival-cuts; arrival-uncut)

@@ -23,18 +23,24 @@ module Verify-Take-Bounds where
 open import Data.List using (List; []; _∷_; _++_; length)
 open import Data.List.Properties using (++-assoc; length-++)
 open import Data.Maybe using (just)
-open import Data.Nat using (ℕ; zero; _+_; _≤_)
+open import Data.Nat using (ℕ; zero; suc; _+_; _≤_; z≤n)
 open import Data.Nat.Properties using (≤-trans; +-monoʳ-≤)
 open import Data.Product using (_×_; proj₁; proj₂)
+open import Data.Unit using (tt)
+open import Data.Nat.Induction using (<-wellFounded)
+import Data.List.Relation.Unary.All as All
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 
-open import Rx.Prim using (Fuel; InstEmit; _at_from_as_)
-open import Rx.Exp using (Ctx; Closed; nat̂; takeᵉ)
+open import Rx.Prim using (Fuel; InstEmit; _at_from_as_; Id; Tick)
+open import Rx.Exp using (Ctx; Closed; nat̂; takeᵉ; obs)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; take-st; lookupNode;
-  sched-init; st-init; root)
-open import Rx.Evaluator.Reducible using (reducible)
+  sched-init; st-init; root; Path)
+open import Rx.Evaluator.Reducible using (reducible; Red; redExpAcc)
 open import Rx.Evaluator.Builder using (evaluate↓; drain!)
 open import Rx.Slots using (Slots)
+open import Rx.Inputs-Below using (ib-topᵉ)
+open import Rx.Exp.Guarded using (gsizeᵉ)
+open import Rx.Subst-Identity using (subΘ-id-exp)
 open import Spec using (valuesOf)
 open import Readme-Theorems using (emitValues)
 
@@ -80,11 +86,17 @@ drainRest fuel k e ins =
 -- at `nextNode` of the initial schedule, which is zero, so the node is
 -- named by a numeral rather than by a lookup of its own.  A state with
 -- no such node reads as zero, which is the honest reading: the drain
--- then has nothing to spend.
-takeBudget : ∀ {n} {Γ : Ctx n} {t} (k : ℕ) (e : Closed Γ t) (ins : Slots Γ) → ℕ
-takeBudget k e ins with lookupNode 0 (EvalSt.nodes (proj₂ (proj₂ (rootRun k e ins))))
+-- then has nothing to spend.  Read off a TRIPLE rather than off the run,
+-- so that a statement about the budget transports along an equation
+-- between two runs -- which is what the frame's zero arm needs.
+budgetOf : ∀ {n} {Γ : Ctx n} {t u} {E : Closed Γ u} →
+  Stream Γ t × Sched Γ × EvalSt E → ℕ
+budgetOf r with lookupNode 0 (EvalSt.nodes (proj₂ (proj₂ r)))
 ... | just (take-st b) = b
 ... | _                = zero
+
+takeBudget : ∀ {n} {Γ : Ctx n} {t} (k : ℕ) (e : Closed Γ t) (ins : Slots Γ) → ℕ
+takeBudget k e ins = budgetOf (rootRun k e ins)
 
 -- A RUN IS ITS BURST FOLLOWED BY ITS DRAIN, DEFINITIONALLY.  Pinned
 -- rather than assumed, because every line below reads the two halves
@@ -96,6 +108,47 @@ run-splits : ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (k : ℕ) (e : Closed Γ t)
 run-splits _ _ _ _ = refl
 
 ----------------------------------------------------------------------
+-- THE TRANSPORT IS WHAT STOPS THE FRAME COMPUTING, and lifting it is
+-- the whole of this block.  `reducible` hands back its walk under a
+-- `subst` along an expression identity, and that identity is a
+-- congruence over the SUBTERM -- stuck the moment the subterm is a
+-- variable.  So nothing under it reduces, at any budget, however
+-- concrete the take's own argument is.
+--
+-- IT LIFTS BECAUSE THE EXPRESSION IS NOT IN THE TRIPLE'S TYPE.  A
+-- reducibility witness at an observable returns a stream, a schedule
+-- and a state, and the expression being transported occurs only in the
+-- derivation the Σ pairs alongside them.  So the triple is the SAME
+-- triple on both sides and the transport can be pulled off it -- which
+-- is what makes the walk's own clauses visible to `refl`.
+----------------------------------------------------------------------
+
+red-subst-burst : ∀ {n} {Γ : Ctx n} {u} {b₁ b₂ : Closed Γ u} (eq : b₁ ≡ b₂)
+  (f : Red (obs u) b₁) {t} {e : Closed Γ t} {lo}
+  (κ : Path Γ lo u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+  proj₁ (subst (Red (obs u)) eq f κ id now sched st)
+    ≡ proj₁ (f κ id now sched st)
+red-subst-burst refl f κ id now sched st = refl
+
+-- THE WALK ITSELF, at the indices `reducible` instantiates: the
+-- context's own size as the ceiling out of `ib-topᵉ`, and the two
+-- accessors the descent is funded by.
+rawRun : ∀ {n} {Γ : Ctx n} {t} (k : ℕ) (e : Closed Γ t) (ins : Slots Γ) →
+  Stream Γ t × Sched Γ × EvalSt (takeᵉ (nat̂ k) e)
+rawRun {n = n} k e ins =
+  proj₁ (redExpAcc (takeᵉ (nat̂ k) e) All.[] tt n (ib-topᵉ (takeᵉ (nat̂ k) e))
+          (<-wellFounded n) (<-wellFounded (gsizeᵉ (takeᵉ (nat̂ k) e)))
+          (root {lo = n}) 0 0 (sched-init (takeᵉ (nat̂ k) e) ins)
+          (st-init (takeᵉ (nat̂ k) e)))
+
+-- AND THE RUN IS THAT WALK.  One equation, and it carries all three
+-- components, since the transport was only ever over the derivation.
+root-raw : ∀ {n} {Γ : Ctx n} {t} (k : ℕ) (e : Closed Γ t) (ins : Slots Γ) →
+  rootRun k e ins ≡ rawRun k e ins
+root-raw k e ins =
+  red-subst-burst (subΘ-id-exp (takeᵉ (nat̂ k) e)) _ _ _ _ _ _
+
+----------------------------------------------------------------------
 -- THE TWO HALVES OF THE BUDGET, and the split is the whole design.  The
 -- frame spends some of `k` and hands the rest on; the drain spends no
 -- more than it was handed.  Both leaves are denominated in the SAME
@@ -105,27 +158,24 @@ run-splits _ _ _ _ = refl
 
 postulate
   -- What the subscribe frame spends, plus what it leaves, is within the
-  -- budget it started with.  This is the half that can be false: the
-  -- node's decrement happens at the dispatch while the cut is emitted
-  -- from the frame, so a path that delivers before it spends parts from
-  -- this inequality and from nothing else.
-  -- DEAD ROUTE: closing the `k = 0` arm by computation.  The zero case
-  --   reads as though it should fall out -- the budget is spent before
-  --   anything is delivered -- but `reducible` runs `redExpAcc` under a
-  --   well-founded accessor, and `Acc` is a `data` type rather than a
-  --   record, so it has no eta and the accessor at an abstract `e` is
-  --   STUCK.  Neither side reduces and `z≤n` does not typecheck.  The
-  --   split has to case on the ACCESSOR, not on `k` alone.
-  -- PROBED: `Probed.Take-Bounds`, at a cut landing INSIDE the burst and
-  --   at a take of zero -- the two shapes the frame decides on its own.
-  --   The cutting row is TIGHT and pinned beside the same program with
-  --   the take removed, so it is not met by a node that emits nothing
-  --   and does not stand at a program that was short anyway.  Not
-  --   reached: every flattening program, a take nested under another
-  --   take, and a budget that is not a literal.
-  take-burst-bound :
-    ∀ {n} {Γ : Ctx n} {t} (k : ℕ) (e : Closed Γ t) (ins : Slots Γ) →
-    length (emitValues (rootBurst k e ins)) + takeBudget k e ins ≤ k
+  -- budget it started with, AT A POSITIVE BUDGET.  This is the half
+  -- that can be false: the node's decrement happens at the dispatch
+  -- while the cut is emitted from the frame, so a path that delivers
+  -- before it spends parts from this inequality and from nothing else.
+  -- Stated at `suc j` because the zero arm is proven below rather than
+  -- assumed -- there the frame mints no node at all, so there is no
+  -- decrement to get wrong and nothing for a counterexample to exploit.
+  -- PROBED: `Probed.Take-Bounds`, at a cut landing INSIDE the burst --
+  --   the shape the frame decides on its own.  The row is TIGHT and
+  --   pinned beside the same program with the take removed, so it is
+  --   not met by a node that emits nothing and does not stand at a
+  --   program that was short anyway.  Not reached: every flattening
+  --   program, a take nested under another take, and a budget that is
+  --   not a literal.
+  take-burst-bound-suc :
+    ∀ {n} {Γ : Ctx n} {t} (j : ℕ) (e : Closed Γ t) (ins : Slots Γ) →
+    length (emitValues (rootBurst (suc j) e ins))
+      + takeBudget (suc j) e ins ≤ suc j
 
   -- And the drain spends no more than it was handed.  Stated over the
   -- budget rather than over `k` because the drain never sees `k`: it
@@ -148,6 +198,18 @@ postulate
 -- be weaker exactly where the node is interesting, since the cut can
 -- land mid-batch.
 ----------------------------------------------------------------------
+
+-- THE FRAME'S HALF, and the zero arm is a theorem rather than a
+-- hypothesis.  At a budget of zero the walk takes the arm that mints no
+-- node, so both summands compute to zero off an abstract subterm -- the
+-- one place on this face where the machine decides the bound by itself.
+take-burst-bound :
+  ∀ {n} {Γ : Ctx n} {t} (k : ℕ) (e : Closed Γ t) (ins : Slots Γ) →
+  length (emitValues (rootBurst k e ins)) + takeBudget k e ins ≤ k
+take-burst-bound zero    e ins =
+  subst (λ r → length (emitValues (proj₁ r)) + budgetOf r ≤ 0)
+        (sym (root-raw 0 e ins)) z≤n
+take-burst-bound (suc j) e ins = take-burst-bound-suc j e ins
 
 take-bounds-values :
   ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (k : ℕ)

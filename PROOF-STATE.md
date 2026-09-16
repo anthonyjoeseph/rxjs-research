@@ -220,8 +220,8 @@ automaton.
 
 ### The monster
 
-`take-burst-bound` — the frame's half, and the deepest thing here that can be
-false on its own: the node's decrement happens at the dispatch while the cut is
+`take-burst-bound-suc` — the frame's half at a positive budget, and the
+deepest thing here that can be false on its own: the node's decrement happens at the dispatch while the cut is
 emitted from the frame, so a path that delivers before it spends parts from
 this inequality and from nothing else. Its falsity takes the tier's statement
 with it, because the budget it LEAVES is what the drain's half is denominated
@@ -236,13 +236,15 @@ also: `evaluate-deterministic` — tier 3's monster, whose statement and leaves 
 
 ### Big picture tier roadmap
 
-- **THE FRAME'S ARITHMETIC FIRST, BECAUSE IT IS THE HALF WITH NO INDUCTION.**
-  `take-burst-bound` says what the subscribe frame emits plus what it leaves in
-  the node is within `k`. Under it is one mechanical fact the tree does not
-  have: what `takeVals` passes through plus what it reports remaining is
-  EXACTLY its budget, an equality rather than the inequality the consumer
-  needs. Split the leaf on `k` — the zero arm mints no node at all — and let
-  the successor arm stand on that equality through the dispatch.
+- **THE FRAME'S ARITHMETIC, AT A POSITIVE BUDGET.** The split on `k` is done
+  and the zero arm is a theorem: the walk's transport lifts off the triple, so
+  the arm that mints no node computes off an abstract subterm. What remains is
+  `take-burst-bound-suc`, where a node IS minted and the decrement at the
+  dispatch has to agree with the cut at the frame. Under it is one mechanical
+  fact the tree does not have: what `takeVals` passes through plus what it
+  reports remaining is EXACTLY its budget, an equality rather than the
+  inequality the consumer needs. Land that equality and stand the arm on it
+  through the dispatch.
 
 - **THEN THE DRAIN'S CARRY, WHICH IS THE INDUCTION.** `take-drain-bound` says
   the drain emits no more than the budget it was left. The drain re-enters
@@ -262,10 +264,11 @@ also: `evaluate-deterministic` — tier 3's monster, whose statement and leaves 
 
 ### The ledger
 
-- **`take-burst-bound`** (Verify-Take-Bounds) — FALSITY, `DEAD ROUTE, PROBED`:
-  what the subscribe frame emits plus what it leaves in the node is within `k`.
-  Two rows reach it; the decrement at the dispatch and the cut at the frame are
-  the two points that can disagree.
+- **`take-burst-bound-suc`** (Verify-Take-Bounds) — FALSITY, `PROBED`: what the
+  subscribe frame emits plus what it leaves in the node is within `k`, at a
+  positive budget. One row reaches it; the decrement at the dispatch and the
+  cut at the frame are the two points that can disagree. The zero arm is
+  proven.
 
 - **`take-drain-bound`** (Verify-Take-Bounds) — FALSITY, `PROBED`: the drain
   emits no more than the budget the subscribe frame left in the take node. The

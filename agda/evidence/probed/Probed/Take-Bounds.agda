@@ -26,7 +26,7 @@
 -- `evalTm` and no row here makes that step non-trivial.
 ----------------------------------------------------------------------
 
--- TARGET: take-burst-bound @2872a7
+-- TARGET: take-burst-bound-suc @1c5517
 -- TARGET: take-drain-bound @eea582
 module Probed.Take-Bounds where
 
@@ -41,7 +41,7 @@ open import Rx.Exp using (Ctx; natᵗ; Closed; nat̂; ofᵉ; input; takeᵉ)
 open import Rx.Slots using (Slots; scripted)
 open import Rx.Evaluator.Builder using (evaluate↓)
 open import Readme-Theorems using (noSlots; oneSlot; emitValues)
-open import Verify-Take-Bounds using (take-burst-bound; take-drain-bound)
+open import Verify-Take-Bounds using (take-burst-bound-suc; take-drain-bound)
 
 open import Probed.Apparatus using (Confirms)
 
@@ -60,23 +60,13 @@ open import Probed.Apparatus using (Confirms)
 pair₀ : Closed Γ₀ natᵗ
 pair₀ = ofᵉ (nat̂ 3 ∷ nat̂ 7 ∷ [])
 
-row-mid-burst : Confirms (take-burst-bound 1 pair₀ noSlots)
+row-mid-burst : Confirms (take-burst-bound-suc 0 pair₀ noSlots)
 row-mid-burst = s≤s z≤n
 
 ----------------------------------------------------------------------
--- 2.  A TAKE AT ZERO.  LOAD-BEARING on the one shape that has no
--- decrement to get right: the budget is spent before anything is
--- delivered, so a node that emitted first and checked afterwards parts
--- from the bound here and nowhere else.
-----------------------------------------------------------------------
-
-row-zero : Confirms (take-burst-bound 0 pair₀ noSlots)
-row-zero = z≤n
-
-----------------------------------------------------------------------
--- 3.  THE CUT LANDS ACROSS AN ARRIVAL, which rows 1 and 2 cannot
--- reach: both decide the bound inside the subscribe frame, where the
--- drain never runs.  A scripted source delivers two values and the
+-- 2.  THE CUT LANDS ACROSS AN ARRIVAL, which row 1 cannot reach: it
+-- decides the bound inside the subscribe frame, where the drain never
+-- runs.  A scripted source delivers two values and the
 -- take is at one, so the budget has to survive being carried from the
 -- frame into the drain's state and be spent THERE.  LOAD-BEARING on
 -- that carry: the frame emits NOTHING here, so the whole bound is
@@ -101,7 +91,7 @@ row-arrival : Confirms (take-drain-bound 6 1 src₁ slots₁)
 row-arrival = s≤s z≤n
 
 ----------------------------------------------------------------------
--- NON-VACUITY, and it is what makes rows 1 and 3 rows at all.  Each
+-- NON-VACUITY, and it is what makes these rows rows at all.  Each
 -- bound is TIGHT — the take emits exactly its budget — so neither is
 -- satisfied by a node that emits nothing, which is the shape a
 -- mis-spent budget would produce and the one an inequality hides.
