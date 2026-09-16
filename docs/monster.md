@@ -37,15 +37,42 @@ the new leaves, so they are inside and the commit passes. The same reading is
 what lets a new lemma land: add it AND wire it into the monster in one commit,
 which is the wiring law's own workflow, and nothing further is owed.
 
-## Choosing one: usually a definition, rarely a leaf
+## Choosing one: the rule of thumb, and the floor under it
 
-A leaf's cone is its vocabulary, so naming one puts the assembly it serves
-OFF the monster's tree. Measured on the commit that introduced this check:
-naming the tier's drain leaf reported nine offenders, of which six were the
-assembly around it and its own sibling. Naming the assembly reported three,
-and all three were genuinely another tier's work. The monster is the riskiest
-node whose cone IS the work, and that is normally a definition — an assembly,
-or a relation every leaf is stated in.
+**As likely FALSE as possible, as far DOWN the tree as possible, and with as
+big a BLAST RADIUS as possible** (Anthony). The three pull against each other
+and the sweet spot is where they balance.
+
+They are not three co-equal pressures, and knowing which one does the work is
+what makes the rule usable. **Falsity and blast radius are both monotone UP
+the tree**: a parent is false whenever any child is, and its blast radius
+contains every child's. So maximising those two alone has exactly one answer —
+the tier's top line — every time, for every tier, forever. **Depth is the only
+pressure that can select anything else**, and it is therefore the one doing all
+the selecting. Read the rule that way: among the nodes that could genuinely be
+false, take the DEEPEST one that still takes its siblings and parents with it.
+
+**THE FLOOR IS THE CONE, AND IT IS WHAT STOPS THE DESCENT.** The monster's cone
+is the commit licence, so pushing the monster down narrows what may be worked
+on — which is the point, right up until the work that would KILL the monster
+falls outside its own cone. Then the gate forbids the only thing worth doing.
+A leaf is usually past that floor: its cone is its statement's vocabulary, so
+the assembly it serves and its own sibling are both off-tree. Measured on the
+commit that introduced this check, naming a tier's drain leaf reported nine
+offenders, six of them the assembly around it and its sibling; naming the
+assembly reported three, all genuinely another tier's work.
+
+**AND BOTH FAILURE DIRECTIONS HAVE A MECHANICAL SIGNAL, so neither is a matter
+of taste.** TOO HIGH is the cone percentage this check prints: a monster whose
+cone is very nearly the whole tree licenses everything, which is what naming a
+top line always produces. TOO DEEP is the offender list: a monster below the
+floor reports the same declarations every commit until they are `also:`-ed in,
+and an `also:` ledger that keeps growing is the tier saying its monster is in
+the wrong place.
+
+A small tier bottoms out near its own top, and that is not the degenerate case
+— it is a two-level tier having nowhere to descend to. Say so in the section,
+so the choice reads as made under the rule rather than defaulted into.
 
 ## The trap this check was born with
 

@@ -342,9 +342,16 @@ def main():
                 continue
         offenders.setdefault(owner, (relpath, ln))
 
+    # THE TWO FAILURE DIRECTIONS EACH HAVE A SIGNAL, WHICH IS WHY THE RULE OF
+    # THUMB IS MECHANISABLE AT ALL.  TOO HIGH shows here: a cone that is very
+    # nearly the whole tree is a monster that licenses everything, which is
+    # what naming a tier's top line always produces.  TOO DEEP shows below, as
+    # offenders — a monster whose cone excludes the work that would kill it
+    # reports the same declarations every commit until they are `also:`-ed in.
     print(f"check-monster: tier {tier}'s monster is `{monster}`"
           + (f" (also: {', '.join(also)})" if also else "")
-          + f" — {len(cone)} declaration(s) in its cone")
+          + f" — {len(cone)} of {len(defs)} declaration(s) in agda/src are in "
+            f"its cone ({100 * len(cone) // max(len(defs), 1)}%)")
     if not offenders:
         print("check-monster: every line added to agda/src since the "
               "merge-base with main lands inside that cone")

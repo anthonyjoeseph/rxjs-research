@@ -234,13 +234,14 @@ first thing on this face a program can be run against directly.
 
 ### The monster
 
-`burst-drain-well-formed` — what the whole tier asserts, and the one statement
-here that can be FALSE rather than merely unproven: a run whose emit stream the
-protocol automaton rejects kills both leaves, the seam relation they are
-denominated in, and the quantification over WellFormed streams that `The-Proof`
-draws from this face. The leaves are how it gets killed, not what is being
-killed — a leaf's cone is its own statement's vocabulary, so naming one here
-would put the assembly it serves off the monster's tree.
+`burst-drain-well-formed` — the DEEPEST node here whose cone still holds the
+work that kills it. Below it the tier is two leaves and the seam relation they
+are denominated in, each with a cone of its own vocabulary only, so naming one
+would forbid touching its sibling; above it sits a wrapper supplying
+derivations. The tier bottoms out near its own top because it is two levels
+deep, not because the top was defaulted to. It can be FALSE, not merely
+unproven: a run whose emit stream the automaton rejects kills both leaves, the
+seam, and the WellFormed quantification `The-Proof` draws from this face.
 
 also: `evaluate-deterministic` — a tier-2 statement worked here on Anthony's
 direction, because the coverage axis it closes is this face's and no schedule
@@ -302,11 +303,14 @@ critical path.
 
 ### The monster
 
-`subscribeE-det` — every claim in this tier that builds its own derivation
-rather than reading the builder's is worthless without it, and it is the one
-statement here whose falsity would be a fact about the EVALUATOR rather than
-about a claim: a subscribe frame admitting two outputs at one set of indices
-means the machine is not a function, which moves the tier below as well.
+`evaluate-deterministic` — `subscribeE-det` is likelier false and is deeper,
+and it is below the FLOOR: a leaf's cone is its statement's vocabulary, so
+naming it would put `drain-det` and the assembly itself off-tree and forbid the
+grind that kills it. This is the deepest node whose cone IS the work, and it
+still sits far below the tier's semantic top line. Its falsity would be a fact
+about the EVALUATOR rather than about a claim: a subscribe frame admitting two
+outputs at one set of indices means the machine is not a function, which moves
+the tier below as well.
 
 ### Big picture tier roadmap
 
