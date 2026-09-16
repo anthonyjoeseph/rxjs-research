@@ -287,6 +287,28 @@ d₂ : Σ (Stream Γ₀ natᵗ × Sched Γ₀ × EvalSt e₀) λ r →
     (installNode nid₂ (scan-st {t = obs natᵗ} acc₂) st₀) r
 d₂ = _ , subs-take-suc refl refl (subs-of refl) (push-cons refl step-take push-nil)
 
+-- and a source allocating TWO nodes of its own, which is the shape a
+-- single former cannot reach: the inner take allocates one id past the
+-- outer's, so an advance that were off by one anywhere in the nesting
+-- would land on the fold's node
+src₃ : Closed Γ₀ natᵗ
+src₃ = takeᵉ (nat̂ 1) (takeᵉ (nat̂ 1) (ofᵉ (nat̂ 5 ∷ [])))
+
+d₃ : Σ (Stream Γ₀ natᵗ × Sched Γ₀ × EvalSt e₀) λ r →
+  subscribeE⇓ {e = e₀} src₃ (scan-f fstFn nid₂ ↠ κ₂) 0 0
+    (record sch₀ { nextNode = Data.Nat.suc nid₂ })
+    (installNode nid₂ (scan-st {t = obs natᵗ} acc₂) st₀) r
+d₃ = _ , subs-take-suc refl refl
+            (subs-take-suc refl refl (subs-of refl)
+              (push-cons refl step-take push-nil))
+            (push-cons refl step-take push-nil)
+
+row-scan-fresh-deep : Confirms
+  (red-scan-installed {e = e₀} fstFn nid₂ (reducible acc₂)
+     {b = src₃} {κ = κ₂} {id = 0} {now = 0} sch₀ st₀ (proj₂ d₃)
+     {w = obs natᵗ} {a = acc₂})
+row-scan-fresh-deep eq = tie-scan eq (reducible acc₂)
+
 row-scan-fresh : Confirms
   (red-scan-installed {e = e₀} fstFn nid₂ (reducible acc₂)
      {b = src₂} {κ = κ₂} {id = 0} {now = 0} sch₀ st₀ (proj₂ d₂)
