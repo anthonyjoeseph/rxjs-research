@@ -35,6 +35,34 @@
 -- produced while both leaves quantify over any at their indices —
 -- `evaluate-deterministic` is the fact that would make those the same
 -- set.
+
+-- WHY THIS FACE IS STATED OVER THE RUN AND NOT OVER A LIMIT, since the
+-- denotational route is the obvious alternative and it is blocked by a
+-- property rather than by difficulty.  `WellFormed` applies its final
+-- check to the LAST state, so it is not prefix-closed: a stream cut
+-- mid-cascade carries owed registrations and is rejected.  An adequacy
+-- statement hands back a PREFIX — a run is what the meaning starts with
+-- — so descending from a well-formed meaning to a well-formed run is
+-- exactly the step that fails, and the repair is to show every cut
+-- point settled, which is the drain leaf's own exit obligation demanded
+-- once per fuel instead of once at the end.
+--
+-- AND THE SEAM IS WHAT A DENOTATION IS DEFINED TO DISCARD.  The root
+-- leaf's conclusion relates the automaton's state to the SCHEDULER and
+-- the eval state; a behaviour is the object those are absent from, so
+-- the invariant this face is built on cannot be stated there at all.
+-- The route worth having runs the other way: a well-formedness that is
+-- structural in a compositional semantics would make the machine
+-- result follow by adequacy — but the batching claim wants the
+-- property of a bare emit list, so it would have to come back through
+-- the observation, and a compositional semantics is what the
+-- denotation face does not yet state.
+--
+-- DEAD ROUTE: proving `evaluate-well-formed` by way of `adequacy` and a
+--   well-formed meaning.  Structurally blocked by the final check:
+--   `WellFormed` is not prefix-closed, and adequacy's conclusion is a
+--   prefix, so nothing carries the property down to the run.
+
 module Verify-Well-Formed where
 
 open import Data.Bool using (true)
