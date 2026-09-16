@@ -276,14 +276,28 @@ it when the descent under it settles.
 
 ### Big picture tier roadmap
 
-- **instantiate the leaf before carving it** — `burst-drain-well-formed`. Both
-  its hypotheses and its conclusion compute at a closed program, so the whole
-  statement is decidable by `refl` at canonical shapes — and nothing has ever
-  run the protocol automaton over an evaluator emit stream, at any program. The
-  commit is the probe alone: which operators the rows reach, which they do not,
-  and whatever a red row forces on the statement. It is taken first because
-  every way of carving this face into pieces is a bet on the leaf being true,
-  and a leaf refuted after the carve costs the carve as well.
+- **CLOSE THE GAP BETWEEN WHAT THE SWEEP RAN AND WHAT THE LEAF SAYS.** The
+  sweep decides the conclusion at thousands of programs, but only ever on
+  derivations the BUILDER produced, while the leaf quantifies over any
+  `subscribeE⇓` and any `drain⇓` at those indices. Nothing in the tree says
+  those are the same set — there is no functionality fact about either
+  relation, in code or in prose — so the uncovered region is a whole axis the
+  harness cannot reach by generating programs. Decide it: either the relations
+  are deterministic here, which makes every sampled program a real
+  instantiation, or they are not, and the leaf is strictly stronger than
+  anything has tested.
+
+- **THEN REACH THE FRAGMENT THE GENERATOR CANNOT WRITE.** The receipt names
+  what it did not cover, and it is not decoration: a context other than two nat
+  slots, a slot holding an observable rather than data, and any fuel but its
+  own. The first two are where the protocol automaton's sharing and connect
+  rules live, which is exactly where a bookkeeping argument is least likely to
+  be uniform. Extend the harness rather than the argument.
+
+- **THEN CARVE, AND NOT BEFORE.** Every way of cutting this face into pieces is
+  a bet on the leaf being true, and a leaf refuted after the carve costs the
+  carve as well — so the shape of the bookkeeping induction is decided once the
+  two legs above have said what the leaf actually covers.
 
 ### The ledger
 
