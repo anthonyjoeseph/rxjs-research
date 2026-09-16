@@ -26,27 +26,29 @@
 --
 -- NOT REACHED: every flattening program, since the frame dispatch hands
 -- a `thru-outer` frame to a live postulate and no `refl` decides
--- anything past it; any source at all, so the drain row below is read
--- at an EMPTY schedule and decides the drain's exit rather than its
--- step; any type other than `natᵗ`; any context but the empty one,
--- which is also what makes the schedule's well-typedness field
--- vacuously true here rather than checked.
+-- anything past it; any type other than `natᵗ`; any COLD source, and
+-- so every arrival that is not scheduled at tick zero; more than one
+-- scheduled source, so no row here separates the live multiset's
+-- entries from one another; and any close at all, since a hot script
+-- of one entry exhausts without the cut chain running.
 
 -- TARGET: subscribeE-root-wf @999a3b
 -- TARGET: drain-wf @c4f5d7
 module Probed.Seam where
 
-open import Data.List using (_∷_; [])
-open import Data.Vec using ([])     -- contexts are Vecs; ∷/[] overload per type
+open import Data.Fin using (zero; suc)
+open import Data.List using (_∷_; []; length)
+open import Data.Vec using ([]; _∷_)     -- contexts are Vecs; ∷/[] overload per type
 open import Data.Nat using (z≤n)
 open import Data.Product using (_,_; proj₁; proj₂)
 open import Data.Sum using (inj₂)
-open import Relation.Binary.PropositionalEquality using (refl)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import Rx.Exp using (Ctx; natᵗ; Closed; nat̂; ofᵉ)
+open import Rx.Exp using (Ctx; natᵗ; Closed; nat̂; ofᵉ; input)
 open import Rx.Evaluator using (root; sched-init; st-init)
 open import Rx.Evaluator.Builder using (Runs; subscribeE!; drain!)
-open import Readme-Theorems using (noSlots)
+open import Rx.Slots using (Slots)
+open import Readme-Theorems using (noSlots; oneSlot; hotOnce)
 open import Verify-Well-Formed using (subscribeE-root-wf; drain-wf)
 
 open import Probed.Apparatus using (Confirms)
@@ -104,3 +106,58 @@ row-root = _ , refl , record
 row-drain : Confirms (drain-wf {e = pair₀} 1 (proj₂ (proj₂ row-root))
   (proj₂ (drain! 1 1 (proj₁ (proj₂ (proj₁ sub₀))) (proj₂ (proj₂ (proj₁ sub₀))))))
 row-drain = _ , refl , refl
+
+----------------------------------------------------------------------
+-- 3.  A PROGRAM THAT SCHEDULES A SOURCE, which is the axis rows 1 and
+-- 2 name as unreached.  One hot slot firing at tick zero, read at the
+-- root: the schedule's live list is now non-empty, so `hot-live` is
+-- CHECKED here rather than discharged by an empty domain, and the
+-- registry the live multiset has to shadow holds a real registration
+-- rather than none.
+----------------------------------------------------------------------
+
+Γ₁ : Ctx 1
+Γ₁ = natᵗ ∷ []
+
+hot₁ : Closed Γ₁ natᵗ
+hot₁ = input zero
+
+slots₁ : Slots Γ₁
+slots₁ = oneSlot (hotOnce 5)
+
+sub₁ : Runs {e = hot₁} {lo = 1} hot₁ root 0 0 (sched-init hot₁ slots₁) (st-init hot₁)
+sub₁ = subscribeE! slots₁ hot₁ root 0 0 (sched-init hot₁ slots₁) refl (st-init hot₁)
+
+row-root-hot : Confirms (subscribeE-root-wf {e = hot₁} slots₁ (proj₂ sub₁))
+row-root-hot = _ , refl , record
+  { live-matches  = λ s _ → refl
+  ; reg-typed     = refl
+  ; horizon-low   = z≤n
+  ; current-frame = inj₂ refl
+  ; hot-live      = λ { zero _ → refl ; (suc ()) _ }
+  }
+
+----------------------------------------------------------------------
+-- 4.  THE DRAIN'S STEP, which row 2 could not reach.  The hot slot
+-- fires at tick zero, so the drain has an arrival to deliver and the
+-- fold runs over emits the drain MINTED rather than over an empty
+-- tail: the row now decides that a delivered arrival leaves the
+-- automaton paid up, which is the preservation half of the leaf and
+-- not merely its exit.  LOAD-BEARING on that — a delivery that opened
+-- an instant and left it owing, or that emitted a close for a source
+-- still registered, drives the fold to `nothing` and no witness
+-- exists.  Fuel is three so the arrival is reached and the loop then
+-- runs out of work rather than out of fuel.
+----------------------------------------------------------------------
+
+row-drain-hot : Confirms (drain-wf {e = hot₁} 3 (proj₂ (proj₂ row-root-hot))
+  (proj₂ (drain! 3 1 (proj₁ (proj₂ (proj₁ sub₁))) (proj₂ (proj₂ (proj₁ sub₁))))))
+row-drain-hot = _ , refl , refl
+
+-- NON-VACUITY, pinned rather than asserted: the count the drain
+-- actually produced.  Row 2's drain emits nothing, so without this the
+-- row above would read as reaching the step while in fact repeating
+-- row 2's exit at a different program.
+drain-hot-emits : length (proj₁ (drain! 3 1 (proj₁ (proj₂ (proj₁ sub₁)))
+                                            (proj₂ (proj₂ (proj₁ sub₁))))) ≡ 1
+drain-hot-emits = refl

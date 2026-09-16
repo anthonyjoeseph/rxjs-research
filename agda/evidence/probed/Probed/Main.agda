@@ -61,4 +61,4 @@ open import Probed.Pipeline-Claims using (row-online; row-ids)
 -- THE PROTOCOL FACE'S SEAM, which is the first thing on that face a
 -- program has ever been run against: its predecessor asserted a verdict
 -- about a concatenation and named nothing in between.
-open import Probed.Seam using (row-root; row-drain)
+open import Probed.Seam using (row-root; row-drain; row-root-hot; row-drain-hot; drain-hot-emits)

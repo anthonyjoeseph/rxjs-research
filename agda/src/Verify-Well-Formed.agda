@@ -68,15 +68,19 @@ postulate
   -- evaluator's.
   --
   -- PROBED: `Probed.Seam` reaches this conclusion at a two-value
-  --   source-free program, which decides all four of the relation's
-  --   non-vacuous fields at once — the burst drives the fold to a state
-  --   at all, that state's live multiset shadows the registry, its
-  --   horizon has not run ahead of the frame's own id, and its open
-  --   instant is the frame's with nothing owed.  Not reached: every
-  --   flattening program, since the frame dispatch hands a `thru-outer`
-  --   frame to a live postulate and nothing past it reduces; any source
-  --   at all; any context but the empty one, which is what makes the
-  --   schedule's well-typedness field vacuous rather than checked here.
+  --   source-free program and at a one-hot-slot program, which between
+  --   them decide every field of the relation.  The source-free row
+  --   decides the four the burst alone can reach — the fold arrives at
+  --   a state at all, that state's live multiset shadows the registry,
+  --   its horizon has not run ahead of the frame's own id, and its open
+  --   instant is the frame's with nothing owed.  The hot row carries a
+  --   non-empty live list and a real registration, so the schedule's
+  --   well-typedness is CHECKED there rather than discharged by an
+  --   empty domain.  Not reached: every flattening program, since the
+  --   frame dispatch hands a `thru-outer` frame to a live postulate and
+  --   nothing past it reduces; any COLD source, so every arrival not
+  --   scheduled at tick zero; more than one scheduled source, so no row
+  --   separates the live multiset's entries from one another.
   subscribeE-root-wf :
     ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (ins : Slots Γ)
       {burst : Stream Γ t} {sched′ : Sched Γ} {st′ : EvalSt e} →
@@ -94,13 +98,18 @@ postulate
   -- fact about the fold above supplies it.
   --
   -- PROBED: `Probed.Seam` reaches this conclusion at the state the root
-  --   row above produced, so the two rows compose into one run rather
-  --   than standing at a hand-built state the machine cannot reach.
-  --   DEGENERATE on the induction and load-bearing on the EXIT: the
-  --   program schedules no source, so what is decided is that a seam
+  --   row above produced, so the rows compose into one run rather than
+  --   standing at a hand-built state the machine cannot reach.  Two
+  --   rows, and they split the statement: at a source-free program the
+  --   drain emits nothing, so what is decided is the EXIT — a seam
   --   state is already paid up, and a relation admitting an unsettled
-  --   instant fails there.  Not reached: the stepping half, which needs
-  --   a scheduled source, and everything the row above does not reach.
+  --   instant fails there.  At a hot slot firing at tick zero the drain
+  --   delivers, and the probe pins the emit count, so the fold runs
+  --   over envelopes the drain MINTED and the row decides that a
+  --   delivered arrival leaves the automaton paid up — the preservation
+  --   half.  Not reached: any close, since a one-entry hot script
+  --   exhausts without the cut chain running, and everything the row
+  --   above does not reach.
   drain-wf :
     ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
       (fuel : Fuel) {sched : Sched Γ} {st : EvalSt e} {S : ProtocolSt}
