@@ -2,10 +2,10 @@
 -- THE PRICE OF CARRYING THE ENVIRONMENT, INSTANTIATED.
 ----------------------------------------------------------------------
 
--- WHY THESE FOUR ARE WORTH A ROW EACH THOUGH THEY READ AS BOOKKEEPING.
+-- WHY THESE ARE WORTH A ROW EACH THOUGH THEY READ AS BOOKKEEPING.
 -- The fundamental theorem recurses on RAW syntax under a carried
 -- environment, because a size may not be shown a substitution; the
--- four statements below are what that choice costs, and each is a
+-- statements below are what that choice costs, and each is a
 -- claim about WHERE a telescope is split rather than about
 -- substitution in general.  A split written one entry off typechecks
 -- at every one of them -- the indices are inferred, not stated -- so
@@ -16,8 +16,8 @@
 -- closed point.
 
 -- TARGET: sub-unfoldμ @314410
--- TARGET: sub-evalTm @688109
--- TARGET: sub-applyFn @87e1fd
+-- TARGET: evalWith-wkReify @d9e5a9
+-- TARGET: sub-evalStrm @350562
 -- TARGET: subΘ-idExp @3ee7cc
 module Probed.Substitution-Leaves where
 
@@ -27,8 +27,9 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Vec using ([])
 open import Relation.Binary.PropositionalEquality using (refl)
 
-open import Rx.Exp using (Ctx; natᵗ; Exp; Tm; Fn; Val; ofᵉ; mapᵉ; μᵉ; varᵉ; deferᵉ; nat̂; varᵗ; pairᵗ; fstᵗ)
-open import Rx.Evaluator.Reducible using (sub-unfoldμ; sub-evalTm; sub-applyFn; subΘ-idExp)
+open import Rx.Exp using (Ctx; natᵗ; obs; Exp; Val; ofᵉ; mapᵉ; μᵉ; varᵉ; deferᵉ; nat̂; varᵗ)
+open import Rx.Evaluator.Reducible using (sub-unfoldμ; subΘ-idExp)
+open import Rx.Subst-Eval using (evalWith-wkReify; sub-evalStrm)
 
 open import Probed.Apparatus using (Confirms)
 
@@ -54,30 +55,45 @@ row-unfoldμ : Confirms (sub-unfoldμ bodyμ σ₀)
 row-unfoldμ = refl
 
 ----------------------------------------------------------------------
--- 2.  A TERM'S VALUE.  LOAD-BEARING at a variable, which is the one
--- clause that reads the environment at all; the pair around it is
--- there so the row is not a bare lookup.
+-- 2.  REIFY-THEN-READ, AT THE ONE TYPE WHERE IT CAN FAIL.  At a data
+-- type the literal is a numeral and the row is DEGENERATE.  At an
+-- OBSERVABLE the literal carries a whole expression, and reading it
+-- back CLOSES that expression against the ambient environment -- so
+-- the row is LOAD-BEARING exactly there: it fails if closing an
+-- already-closed expression against a NON-EMPTY environment is not the
+-- identity.  The environment supplied is non-empty for that reason.
+--
+-- NOT REACHED: an expression with a real local telescope under the
+-- literal, and the product and sum arms, whose reified literals are
+-- built from the arms below them.
 ----------------------------------------------------------------------
 
-tm₀ : Tm Γ₀ [] [] (natᵗ ∷ []) natᵗ
-tm₀ = fstᵗ (pairᵗ (varᵗ (here refl)) (nat̂ 3))
+obs₀ : Val Γ₀ (obs natᵗ)
+obs₀ = ofᵉ (nat̂ 7 ∷ [])
 
-row-evalTm : Confirms (sub-evalTm tm₀ σ₀)
-row-evalTm = refl
+row-wkReify-obs : Confirms (evalWith-wkReify obs₀ σ₀)
+row-wkReify-obs = refl
+
+row-wkReify-nat : Confirms (evalWith-wkReify {Γ = Γ₀} 4 σ₀)
+row-wkReify-nat = refl
 
 ----------------------------------------------------------------------
--- 3.  A FRAME'S FUNCTION.  LOAD-BEARING in exactly the way the others
--- are not: the substituter must SKIP the slot the function binds and
--- reach past it into the environment, so a split one entry off sends
--- the argument where the environment entry should go.  The body reads
--- both positions, which is what makes the two distinguishable.
+-- 3.  THE TERM FACE HANDING BACK TO THE EXPRESSION FACE.
+-- LOAD-BEARING on the split, which is the whole content: the local
+-- telescope is non-empty and the embedded expression reads BOTH
+-- halves, so a substituter that took one entry too many or too few
+-- sends the local value where the environment entry belongs and the
+-- two sides come apart.
+--
+-- NOT REACHED: a local telescope longer than one entry, and any
+-- former between the embedding and the variables that reads them.
 ----------------------------------------------------------------------
 
-fn₀ : Fn Γ₀ [] [] (natᵗ ∷ []) natᵗ natᵗ
-fn₀ = fstᵗ (pairᵗ (varᵗ (here refl)) (varᵗ (there (here refl))))
+strm₀ : Exp Γ₀ [] [] (natᵗ ∷ natᵗ ∷ []) natᵗ
+strm₀ = ofᵉ (varᵗ (here refl) ∷ varᵗ (there (here refl)) ∷ [])
 
-row-applyFn : Confirms (sub-applyFn fn₀ σ₀ 5)
-row-applyFn = refl
+row-evalStrm : Confirms (sub-evalStrm strm₀ σ₀ (5 ∷ []))
+row-evalStrm = refl
 
 ----------------------------------------------------------------------
 -- 4.  THE EMPTY SUBSTITUTION.  DEGENERATE by construction -- nothing

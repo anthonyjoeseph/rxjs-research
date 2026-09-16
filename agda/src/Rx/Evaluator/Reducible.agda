@@ -61,6 +61,7 @@ open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; _�
   inputsBelowᵉ; inputsBelowᵗ; inputsBelowᵗˢ)
 open import Rx.Exp.Guarded using (gsizeᵉ; gsizeᵗ; gsizeᵗˢ; gsize-unfoldμ)
 open import Rx.Inputs-Below using (ib-unfoldμ; ib-topᵉ)
+open import Rx.Subst-Eval using (sub-evalTm; sub-applyFn)
 open import Decide using (∧ˡ; ∧ʳ)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; _↠_; map-f; take-f; scan-f; take-st; scan-st; thru-outer;
   mergeAllᵒ; switchᵒ; exhaustᵒ; mergeAll-st; switch-st; exhaust-st; takeVals; takeDispatch;
@@ -222,30 +223,18 @@ postulate
   -- SUBSTITUTION COMMUTES WITH THE THING IT IS CARRIED PAST, which is
   -- the price of carrying the environment rather than applying it.
   -- Each says that closing against the environment and then acting
-  -- agrees with acting under it, at the four points the recursion
-  -- below reaches one: the fixpoint peel, a one-shot's element, a
-  -- frame's function at an arriving value, and the whole telescope
-  -- being empty, where closing is the identity.
+  -- agrees with acting under it, at the two points this face still
+  -- reaches one on the EXPRESSION side: the fixpoint peel, and the
+  -- whole telescope being empty, where closing is the identity.  The
+  -- readings on the TERM side are not stated here -- `evalTm` and
+  -- `applyFn` are one `evalWith` at two telescopes, so they are one
+  -- statement rather than two obligations, and it is proven.
   -- PROBED: `Probed.Substitution-Leaves`, at a body whose μ variable
   --   is really referenced through the gate.
 
   sub-unfoldμ : ∀ {n} {Γ : Ctx n} {Θ t} (body : Exp Γ (t ∷ []) [] Θ t)
                 (σ : All (Val Γ) Θ)
               → subΘExp [] σ (unfoldμ body) ≡ unfoldμ (subΘExp [] σ body)
-
-  -- PROBED: `Probed.Substitution-Leaves`, at a term reading its
-  --   environment entry.
-
-  sub-evalTm : ∀ {n} {Γ : Ctx n} {Θ u} (tm : Tm Γ [] [] Θ u)
-               (σ : All (Val Γ) Θ)
-             → evalTm (subΘTm [] σ tm) ≡ evalWith tm σ
-
-  -- PROBED: `Probed.Substitution-Leaves`, at a function reading BOTH
-  --   its argument slot and the entry past it.
-
-  sub-applyFn : ∀ {n} {Γ : Ctx n} {Θ s u} (f : Fn Γ [] [] Θ s u)
-                (σ : All (Val Γ) Θ) (v : Val Γ s)
-              → applyFn (subΘTm (s ∷ []) σ f) v ≡ evalWith f (v ∷ σ)
 
   -- PROBED: `Probed.Substitution-Leaves`, at a former carrying a
   --   term, a list and a nested expression.

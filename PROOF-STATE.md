@@ -233,14 +233,14 @@ deferred beside it.
 
 ### Big picture tier roadmap
 
-- **DISCHARGE THE FOUR SUBSTITUTION LEAVES THE PARTNER BOUGHT ITSELF WITH.**
-  The `Θloc` telescope landed and took three of the original six with it —
-  they were never gaps, only a missing generalisation of the guarded
-  elimination. Four remain, all probed green: the fixpoint peel commuting with
-  the environment, a term's evaluation, a frame's function at its argument
-  slot, and the empty substitution being the identity. The last wants a
-  transport along `Θloc ++ []`, which does not reduce for a variable telescope.
-  None can move the ground.
+- **FINISH THE SUBSTITUTION SHELF, WHICH IS NOW THREE ARMS AND NOT FOUR
+  STATEMENTS.** The two readings on the TERM side turned out to be one lemma at
+  two telescopes — `evalTm` and `applyFn` are both `evalWith` at a fixed
+  environment — and the general form is proven, congruence arms and all. What is
+  left is where the walk stops being about terms: reify-then-read at an
+  observable, the embedding arm, the fixpoint peel, and the empty substitution.
+  The first three are coupled — a stream literal read at the empty environment
+  IS the empty substitution.
 
 - **THEN RUN A SELF-REFERENTIAL μ, IN THE CORPUS RATHER THAN IN A PROBE.** The
   peel is now paid for by a size the unfolding does not move, and what funds that
@@ -287,13 +287,13 @@ deferred beside it.
   peel commutes with the environment substitution. This is what the partner's μ
   arm spends, and it is where a wrong telescope would show.
 
-- **`sub-evalTm`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`: evaluating a
-  substituted term is evaluating it under the environment. Ordinary, and stated
-  rather than assumed because nothing has instantiated it.
+- **`evalWith-wkReify`** (Rx/Subst-Eval) — FALSITY, `PROBED`: reifying a value
+  and reading it back is the identity, in any environment. The observable arm
+  is the only one that can fail — its literal carries an expression to close.
 
-- **`sub-applyFn`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`: the same for
-  a frame's function, where the substitution must skip the argument slot the
-  function binds.
+- **`sub-evalStrm`** (Rx/Subst-Eval) — FALSITY, `PROBED`: the term face handing
+  back to the expression face. Not an induction hypothesis but substitution
+  COMPOSITION, since a stream literal is closed rather than read.
 
 - **`subΘ-idExp`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`: the empty
   substitution is the identity. It is what makes the top line a corollary of

@@ -12,7 +12,7 @@
 -- Note what is NOT here: `Verify-Well-Formed`.  It is machinery, not a
 -- claim, and it is reached the honest way —
 -- `formal-verification-batchSimultaneous` consumes
--- `evaluate-well-formed`, which consumes `rank-sufficient`.  If any part
+-- `evaluate-well-formed`, which consumes the run's two derivations.  If any part
 -- of that tower is NOT reachable from a name below, that is a finding to
 -- wire, not a reason to re-add a bulk import.
 --
