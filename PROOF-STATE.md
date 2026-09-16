@@ -233,15 +233,14 @@ deferred beside it.
 
 ### Big picture tier roadmap
 
-- **THE FRESHNESS FACT, NOW INSTANTIATED AND STILL OWED.** The accumulator's
-  crossing is paid and the fold is a body; what is left is structural. Two rows
-  say the counter suffices through a source that allocates, and through one that
-  allocates two deep — an advance off by one anywhere in the nesting would land
-  on the fold's node and neither row would typecheck. The shape they cannot
-  reach is a source whose subscription enters ANOTHER cycle: a share, or a
-  flattener, which allocates through its own. This leg reaches one of those, and
-  on a green there the row stops being about whether the statement is true and
-  starts being about the induction over the derivation that proves it.
+- **THE FRESHNESS FACT IS NO LONGER ABOUT TRUTH, AND THE ROUTE IS NOW LABOUR.**
+  Three rows stand: a source that allocates, one that allocates two deep, and a
+  flattener, whose subscription leaves this cycle for one of its own and whose
+  wrap READS its node and WRITES it back. What is owed is the general fact
+  underneath them: a subscription started at a counter writes no node below it.
+  That is a two-conjunct induction — freshness with the counter's monotonicity —
+  over nineteen mutual relations, mechanical per constructor and large in the
+  aggregate. This leg is that induction; its risk is labour, not falsity.
 
 - **DISCHARGE THE FOUR SUBSTITUTION LEAVES THE PARTNER BOUGHT ITSELF WITH.**
   The `Θloc` telescope landed and took three of the original six with it —
@@ -289,7 +288,8 @@ deferred beside it.
 
 - **`red-scan-installed`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`: a node
   installed just before a source's subscription reads back unchanged after it.
-  Rows at a take and at a take nested in a take; none reaching another cycle.
+  Rows at a take, a nested take, and a flattener, which reads and rewrites its
+  own node; none at a share, whose connect allocates on a third route.
 
 - **`sub-unfoldμ`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`: the fixpoint
   peel commutes with the environment substitution. This is what the partner's μ

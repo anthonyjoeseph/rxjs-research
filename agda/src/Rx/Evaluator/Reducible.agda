@@ -292,12 +292,15 @@ postulate
   --   really does allocate -- a `take`, which installs at the very next
   --   identifier and writes that node back on every step -- so a
   --   collision with the fold's node would compute the lookup to the
-  --   take's own state and the row would not typecheck.  Two rows: one
-  --   take, and a take nested inside a take, so the allocation runs two
-  --   deep and an advance off by one anywhere in the nesting would land
-  --   on the fold's node.  Not covered: a source whose own subscription
-  --   reaches a share, or a flattener, which allocates through its own
-  --   cycle rather than through this one.
+  --   take's own state and the row would not typecheck.  Three rows:
+  --   one take; a take nested inside a take, so the allocation runs
+  --   two deep and an advance off by one anywhere in the nesting would
+  --   land on the fold's node; and a flattener, whose subscription
+  --   leaves this cycle for one of its own and whose wrap READS its
+  --   node and WRITES it back, so a collision would overwrite the
+  --   accumulator rather than shadow it.  Not covered: a source whose
+  --   own subscription reaches a SHARE, whose definition is an
+  --   arbitrary term and whose connect allocates on a third route.
   red-scan-installed : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
              (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
              {a : Val Γ u} → Red u a
