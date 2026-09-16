@@ -50,6 +50,8 @@ open import Rx.Exp
         ; varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ
         ; caseᵗ; ifᵗ; primᵗ; strmᵗ )
 open import Rx.Subst-Transport using (Cᵉ; Cᵗ; Cˢ; cong₃; pushVarᵉ)
+open import Rx.Subst-Elim-Weak using (elimG-avᵗ; elimD-avᵗ)
+open import Rx.Subst-Ren-Fuse using (sub-fixᵉ; ren-wk-Θ; noRen)
 
 private
   variable
@@ -404,44 +406,44 @@ subΔᵉ Θloc σ refl E = refl
 -- THE LEAVES.
 ------------------------------------------------------------------
 
-postulate
-  -- A CLOSED TERM WEAKENED INTO THE WALK IS UNTOUCHED BY EITHER
-  -- ELIMINATOR, which is what the environment arm needs: the value
-  -- the substituter drops in is a literal with no variable of any
-  -- kind in it, so there is nothing for the eliminator to renumber.
-  -- Both faces are the same fusion of `renTm` with the walk and
-  -- neither can be read off the other, since the walks differ at the
-  -- variable arm they never reach here.
-  -- PROBED: `Probed.Substitution-Leaves`, both faces at a NON-EMPTY
-  --   local telescope, through a pair and through an embedded
-  --   expression, so the walk is shown to be the identity on a
-  --   literal with structure rather than only on a numeral.  Not
-  --   reached: the transport, which a concrete telescope cannot
-  --   exercise -- fixing `Θl` forces the equation to `refl`.
-  gWk : (Θl : List Ty) (eq : Θl ++ [] ≡ Θ) (x : t ∈ Δᵍ) (cl : Exp Γ [] [] [] t)
-        (m : Tm Γ [] [] [] u)
-      → Gᵗ {Δ = Δ} Θl eq x cl (wkTm m) ≡ wkTm m
+-- A CLOSED TERM WEAKENED INTO THE WALK IS UNTOUCHED BY EITHER
+-- ELIMINATOR, which is what the environment arm needs: the value the
+-- substituter drops in is a literal with no variable of any kind in
+-- it, so there is nothing for the eliminator to renumber.  Both faces
+-- are the instance of `Rx.Subst-Elim-Weak`'s avoidance theorem at the
+-- EMPTY source contexts, where the avoidance premise is vacuous and
+-- the renamings are the weakening's own absurd maps -- left implicit
+-- here so that unification takes them from `wkTm` itself rather than
+-- pairing two separately elaborated absurd lambdas.
+gWk : (Θl : List Ty) (eq : Θl ++ [] ≡ Θ) (x : t ∈ Δᵍ) (cl : Exp Γ [] [] [] t)
+      (m : Tm Γ [] [] [] u)
+    → Gᵗ {Δ = Δ} Θl eq x cl (wkTm m) ≡ wkTm m
+gWk Θl refl x cl m = elimG-avᵗ Θl x cl (λ ()) m
 
-  dWk : (Θl : List Ty) (eq : Θl ++ [] ≡ Θ) (x : t ∈ Δ) (cl : Exp Γ [] [] [] t)
-        (m : Tm Γ [] [] [] u)
-      → Dᵗ {Δᵍ = Δᵍ} Θl eq x cl (wkTm m) ≡ wkTm m
+dWk : (Θl : List Ty) (eq : Θl ++ [] ≡ Θ) (x : t ∈ Δ) (cl : Exp Γ [] [] [] t)
+      (m : Tm Γ [] [] [] u)
+    → Dᵗ {Δᵍ = Δᵍ} Θl eq x cl (wkTm m) ≡ wkTm m
+dWk Θl refl x cl m = elimD-avᵗ Θl x refl cl (λ ()) m
 
-  -- AND THE INSERTED COPY IS CLOSED BY THE SAME ENVIRONMENT IT IS
-  -- WEAKENED PAST.  The eliminator renames `cl` into the RIGHT half of
-  -- the walk's telescope -- the half the substituter is about to
-  -- consume -- so closing after the rename agrees with renaming the
-  -- already-closed copy.  This is the only place in the development
-  -- where a renaming and this substituter meet on the same expression.
-  -- PROBED: `Probed.Substitution-Leaves`, at a one-entry local
-  --   telescope with a copy that really reads the environment, so a
-  --   rename landing in the LOCAL half leaves a variable on the left
-  --   where the right side emits the literal.  Not reached: a longer
-  --   telescope, and an environment of more than one value.
-  sub-ren-gate : (Θl : List Ty) (cl : Exp Γ [] [] Θsub t)
-                 (σ : All (Val Γ) Θsub)
-               → subΘExp Θl σ (renExp {Δᵍ′ = Δᵍ′} {Δ′ = Δ′} (λ ()) (λ ()) (∈-++⁺ʳ Θl) cl)
-                   ≡ subst (Cᵉ Γ Δᵍ′ Δ′ t) (++-identityʳ Θl)
-                       (renExp (λ ()) (λ ()) (∈-++⁺ʳ Θl) (subΘExp [] σ cl))
+-- AND THE INSERTED COPY IS CLOSED BY THE SAME ENVIRONMENT IT IS
+-- WEAKENED PAST.  The eliminator renames `cl` into the RIGHT half of
+-- the walk's telescope -- the half the substituter is about to
+-- consume -- so closing after the rename agrees with renaming the
+-- already-closed copy.  This is the only place in the development
+-- where a renaming and this substituter meet on the same expression.
+-- It is `Rx.Subst-Ren-Fuse`'s fix-past-a-renaming theorem at an EMPTY
+-- local telescope, where the left premise is vacuous and the right one
+-- is reflexivity; what is left over is the transport the telescope's
+-- right identity leaves behind, and that falls to the empty source
+-- context admitting exactly one renaming.
+sub-ren-gate : (Θl : List Ty) (cl : Exp Γ [] [] Θsub t)
+               (σ : All (Val Γ) Θsub)
+             → subΘExp Θl σ (renExp {Δᵍ′ = Δᵍ′} {Δ′ = Δ′} (λ ()) (λ ()) (∈-++⁺ʳ Θl) cl)
+                 ≡ subst (Cᵉ Γ Δᵍ′ Δ′ t) (++-identityʳ Θl)
+                     (renExp (λ ()) (λ ()) (∈-++⁺ʳ Θl) (subΘExp [] σ cl))
+sub-ren-gate Θl cl σ =
+  trans (sub-fixᵉ [] Θl {ρa = noRen} σ (λ ()) (λ _ → refl) cl)
+        (sym (ren-wk-Θ (∈-++⁺ʳ Θl) noRen (++-identityʳ Θl) (subΘExp [] σ cl)))
 
 ------------------------------------------------------------------
 -- THE ARMS WHERE A WALK STOPS.

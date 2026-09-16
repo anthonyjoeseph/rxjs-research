@@ -25,17 +25,17 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties
   using (∈-++⁺ˡ; ∈-++⁺ʳ; ∈-++⁻)
 open import Data.List.Relation.Unary.Any using (here; there)
-open import Data.List.Relation.Unary.Any.Properties
-  using (++⁺∘++⁻; ++⁻∘++⁺)
-open import Data.Sum using (inj₁; inj₂; [_,_]′)
+open import Data.List.Relation.Unary.Any.Properties using (++⁻∘++⁺)
+open import Data.Sum using (inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality
-  using (_≡_; refl; sym; trans; cong; cong₂)
+  using (_≡_; refl; trans; cong; cong₂)
 
 open import Rx.Exp
   using (Ty; Ctx; Exp; Tm; Val; Ren∈; ext∈; ++Ren; renExp; renTm; renTms; subΘExp; subΘTm; subΘTms;
   input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ;
   varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ)
 open import Rx.Subst-Transport using (cong₃)
+open import Rx.Subst-Split using (left-back; right-back; sub-left)
 
 private
   variable
@@ -44,19 +44,6 @@ private
     Δᵍ Δᵍ′ Δ Δ′ : List Ty
     Θ Θloc Θsub : List Ty
     s t        : Ty
-
-private
-  -- THE SPLITTER'S ROUND TRIP, read backwards: a membership the
-  -- splitter sends left came from the left injection.
-  left-back : ∀ {A B : List Ty} (x : t ∈ (A ++ B)) (y : t ∈ A)
-            → ∈-++⁻ A x ≡ inj₁ y → ∈-++⁺ˡ {xs = A} {ys = B} y ≡ x
-  left-back {A = A} x y eq =
-    trans (sym (cong [ ∈-++⁺ˡ , ∈-++⁺ʳ A ]′ eq)) (++⁺∘++⁻ A x)
-
-  right-back : ∀ {A B : List Ty} (x : t ∈ (A ++ B)) (z : t ∈ B)
-             → ∈-++⁻ A x ≡ inj₂ z → ∈-++⁺ʳ A z ≡ x
-  right-back {A = A} x z eq =
-    trans (sym (cong [ ∈-++⁺ˡ , ∈-++⁺ʳ A ]′ eq)) (++⁺∘++⁻ A x)
 
 ------------------------------------------------------------------
 -- POINTWISE IDENTITY SURVIVES EVERY EXTENSION A RENAMING MAKES.
@@ -145,19 +132,6 @@ lands-ext : {ρ⁺ : Ren∈ Θ (Θloc ++ Θsub)} {ρt : Ren∈ Θ Θloc}
           → Lands ρ⁺ ρt → Lands (ext∈ {s = s} ρ⁺) (ext∈ ρt)
 lands-ext ag (here refl) = refl
 lands-ext ag (there x)   = cong there (ag x)
-
-private
-  -- THE SUBSTITUTER AT A VARIABLE IT DOES NOT OWN.  Stated on its own
-  -- because the splitter sits under a `with` in the substituter's own
-  -- clause, so the round trip has to be rewritten where the left
-  -- injection is still spelled out rather than standing behind an
-  -- abstracted equation.
-  sub-left : (Θloc : List Ty) (σ : All (Val Γ) Θsub)
-             (x : t ∈ (Θloc ++ Θsub)) (y : t ∈ Θloc)
-           → ∈-++⁻ Θloc x ≡ inj₁ y
-           → subΘTm {Δᵍ = Δᵍ} {Δ} Θloc σ (varᵗ x) ≡ varᵗ y
-  sub-left Θloc σ x y eq with ∈-++⁻ Θloc x | eq
-  ... | inj₁ y′ | refl = refl
 
 mutual
   sub-renᵉ : {ρg : Ren∈ Δᵍ Δᵍ′} {ρd : Ren∈ Δ Δ′}

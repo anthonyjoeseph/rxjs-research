@@ -60,5 +60,4 @@ open import Probed.Reducible-Arms using
 -- THE SUBSTITUTION LEAVES THE CARRIED ENVIRONMENT COSTS.  Claimed
 -- from the root for the same reason the arms are: a `Confirms` row's
 -- type is generated from its target, so the name is the only handle.
-open import Probed.Substitution-Leaves using
-  (row-gWk; row-gWk-deep; row-dWk; row-dWk-deep; row-gate; row-evalStrm)
+open import Probed.Substitution-Leaves using (row-evalStrm)

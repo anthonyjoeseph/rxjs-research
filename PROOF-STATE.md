@@ -233,17 +233,7 @@ deferred beside it.
 
 ### Big picture tier roadmap
 
-- **THE PEEL'S WALK IS WRITTEN; WHAT IS LEFT ARE ITS THREE LEAVES.** The guarded
-  eliminator now commutes with the environment substitution at an ARBITRARY local
-  telescope, by a six-family induction whose every constructor arm is a
-  congruence — the transport is carried as a PARAMETER, so each commutation is
-  its own defining clause and holds by `refl`. The three leaves left share a
-  region no probe can reach: fixing a telescope forces the transport to `refl`,
-  so the rows cover the walk's recursion and nothing covers the shuffle. Two say
-  a closed literal is inert under either walk; the third says the inserted copy
-  lands in the half the substituter consumes.
-
-- **THEN THE EMBEDDING ARM, WHICH IS ALL THAT IS LEFT OF THE TELESCOPE LEG.**
+- **THE EMBEDDING ARM, WHICH IS ALL THAT IS LEFT OF THE TELESCOPE LEG.**
   A weakened-from-closed term is now proven inert under substitution, and
   reify-then-read at an observable — the half of this leg that read as riskiest,
   since its literal carries a whole expression to close — fell straight out of
@@ -292,17 +282,6 @@ deferred beside it.
   boundary and the first leg here that is not the design session's own work.
 
 ### The ledger
-
-- **`{g,d}Wk`** (Rx/Subst-Elim) — FALSITY, `PROBED×2`: either walk leaves a
-  term weakened from closed alone. Rows at a one-entry telescope, through a
-  pair and through an embedded expression; the transport is uncovered and a
-  CONCRETE telescope cannot reach it, a boundary rather than a gap in the
-  sweep.
-
-- **`sub-ren-gate`** (Rx/Subst-Elim) — FALSITY, `PROBED`: the copy the gate
-  inserts is renamed into the half the substituter is about to consume, so
-  closing after the rename agrees with renaming the already-closed copy. One
-  row, at a copy that really reads the environment; the transport is uncovered.
 
 - **`sub-evalStrm`** (Rx/Subst-Eval) — FALSITY, `PROBED`: the term face handing
   back to the expression face. Not an induction hypothesis but substitution
