@@ -18,7 +18,31 @@ Id = ℕ                              -- concrete so the spec can compare; harne
 -- Protocol's horizon check reads exactly this), and timing-invariance
 -- holds up to ≡, not just ≈ — a retiming that preserves arbitration
 -- order preserves the ids themselves.
+--
+-- AND THE ORDER IS LOAD-BEARING, SO THIS IS NOT A TOKEN.  `Spec`
+-- compares instants and does nothing else with one, which makes this
+-- read as a type needing only decidable equality — and it is not one.
+-- `Rx.Protocol` carries a freshness watermark and admits an emit only
+-- when the watermark has not passed its instant, so the ORDER on this
+-- type is what rejects a stream revisiting a departed instant.  A
+-- carrier offering equality alone cannot state that check: the repair
+-- would be a seen-set, retaining every past instant for the length of
+-- the run where a watermark retains one position.  So the two ids of
+-- this module are not a pair to treat alike — this one is an ordered
+-- ARRIVAL POSITION and `Source` below is the token.
 
+-- A TOKEN, AND THAT IS THE WHOLE OF WHAT ANYTHING ASKS OF IT.  `Spec`
+-- binds this and copies it onto the batch envelope without ever
+-- comparing it; `Rx.Protocol` compares it and never orders or computes
+-- with it, a registration ledger being keyed by it and nothing more.
+-- So ℕ is over-strong here in a way it is not for `Id` above, and the
+-- over-strength is not free: every statement quantifying over streams
+-- inherits obligations about ones carrying sources no mint could
+-- produce.  The `dried` reason's own argument — that no numeric
+-- sentinel is collision-proof against breadth-many mints — is the same
+-- reading from the other side, the arithmetic being available and
+-- still not safe to rely on.  The TypeScript counterpart is already typed
+-- as a number OR a symbol; this module offers only the number.
 Source : Set                        -- a SOURCE observable; impl counts registrations of these
 Source = ℕ                          -- concrete so the scheduler can mint & compare; the harness compares up to renaming anyway
 
