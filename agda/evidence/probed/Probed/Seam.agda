@@ -29,21 +29,23 @@
 -- anything past it; any type other than `natᵗ`; any COLD source, and
 -- so every arrival that is not scheduled at tick zero; more than one
 -- scheduled source, so no row here separates the live multiset's
--- entries from one another; and any close at all, since a hot script
--- of one entry exhausts without the cut chain running.
+-- entries from one another; and every close but `exhausted`, since
+-- nothing here cuts — so the shadow field's `dying` condition is
+-- discharged vacuously at every row rather than exercised.
 
 -- TARGET: subscribeE-root-wf @999a3b
 -- TARGET: drain-wf @c4f5d7
 module Probed.Seam where
 
 open import Data.Fin using (zero; suc)
-open import Data.List using (_∷_; []; length)
+open import Data.List using (_∷_; [])
 open import Data.Vec using ([]; _∷_)     -- contexts are Vecs; ∷/[] overload per type
 open import Data.Nat using (z≤n)
 open import Data.Product using (_,_; proj₁; proj₂)
 open import Data.Sum using (inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
+open import Rx.Prim using (_at_from_as_; value; close; complete; exhausted; delivery)
 open import Rx.Exp using (Ctx; natᵗ; Closed; nat̂; ofᵉ; input)
 open import Rx.Evaluator using (root; sched-init; st-init)
 open import Rx.Evaluator.Builder using (Runs; subscribeE!; drain!)
@@ -154,10 +156,14 @@ row-drain-hot : Confirms (drain-wf {e = hot₁} 3 (proj₂ (proj₂ row-root-hot
   (proj₂ (drain! 3 1 (proj₁ (proj₂ (proj₁ sub₁))) (proj₂ (proj₂ (proj₁ sub₁))))))
 row-drain-hot = _ , refl , refl
 
--- NON-VACUITY, pinned rather than asserted: the count the drain
--- actually produced.  Row 2's drain emits nothing, so without this the
--- row above would read as reaching the step while in fact repeating
--- row 2's exit at a different program.
-drain-hot-emits : length (proj₁ (drain! 3 1 (proj₁ (proj₂ (proj₁ sub₁)))
-                                            (proj₂ (proj₂ (proj₁ sub₁))))) ≡ 1
+-- NON-VACUITY, pinned as the WHOLE envelope rather than as a count,
+-- because the count alone would not have shown the close.  A one-entry
+-- hot script exhausts ON the emit that delivers its last value, so this
+-- one envelope carries three events: the registration's close, the
+-- value, and the stream's completion.  The close is what makes the row
+-- above reach the cut-free half of the shadow field rather than only a
+-- plain delivery.
+drain-hot-emits : (proj₁ (drain! 3 1 (proj₁ (proj₂ (proj₁ sub₁)))
+                                     (proj₂ (proj₂ (proj₁ sub₁)))))
+                ≡ ((close 0 exhausted ∷ value 5 ∷ complete ∷ []) at 1 from 0 as delivery) ∷ []
 drain-hot-emits = refl

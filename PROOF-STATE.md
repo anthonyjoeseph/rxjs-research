@@ -255,10 +255,10 @@ of tier-1 work reaches it.
   envelopes the drain minted. What that leaves is the shadow field's
   HYPOTHESIS. It is conditioned on `dying` because the all-sources form is
   false — a victim carrying its own exhausted close parts the two counts — and
-  a one-entry hot script exhausts without the cut chain ever running, so
-  nothing has instantiated the condition that makes the field true rather than
-  the field itself. A second source and a close is the cheapest remaining
-  shape that could still refute either leaf.
+  `dying` is populated by the CUT chain, which nothing here runs: the one close
+  the rows reach is `exhausted`, so every row discharges the condition
+  vacuously rather than exercising it. A `take` cutting a live source is the
+  cheapest shape that could still refute either leaf.
 
 - **THEN CARRY THE INVARIANT ACROSS THE DRAIN'S OWN RECURSION.** `drain-wf` is
   generic in the seam state precisely so it can re-enter itself, which means

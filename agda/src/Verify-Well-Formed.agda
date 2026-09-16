@@ -107,9 +107,11 @@ postulate
   --   delivers, and the probe pins the emit count, so the fold runs
   --   over envelopes the drain MINTED and the row decides that a
   --   delivered arrival leaves the automaton paid up — the preservation
-  --   half.  Not reached: any close, since a one-entry hot script
-  --   exhausts without the cut chain running, and everything the row
-  --   above does not reach.
+  --   half, and the envelope is pinned whole rather than by count, so
+  --   the close it carries is part of what the row decides.  Not
+  --   reached: every close but `exhausted` — nothing here CUTS, so the
+  --   shadow field's `dying` condition is discharged vacuously at every
+  --   row — and everything the row above does not reach.
   drain-wf :
     ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
       (fuel : Fuel) {sched : Sched Γ} {st : EvalSt e} {S : ProtocolSt}
