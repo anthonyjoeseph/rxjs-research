@@ -46,14 +46,19 @@ open import Rx.Slots using (Slots)
 ------------------------------------------------------------------
 
 postulate
+  -- AND NOTHING OUTSIDE THIS FACE CONSTRAINS IT.  The pair below is
+  -- the domain's only consumer, and a claim stated over `meaning` can
+  -- be satisfied by whatever `meaning` is defined to be -- so the
+  -- requirement that would decide the shape has to arrive from a face
+  -- that spends the domain on something else, and no such face exists.
+  --
   -- DEAD ROUTE: choosing this domain's shape by instantiation, the way
   --   every other face here is de-risked.  A postulated SET has no
   --   elements, so there is nothing to compute with and no row decides
   --   between two candidate domains; what decides between them is the
   --   first compositionality equation, which is a statement rather than
   --   a program.  So this trio is the one place on the face where
-  --   probing is not merely blocked but has no subject, and
-  --   `Verify-Well-Formed` is what supplies the requirement instead.
+  --   probing is not merely blocked but has no subject.
   Beh : ∀ {n} → Ctx n → Ty → Set
 
   -- DEAD ROUTE: denoting an expression by recursion on `Closed` alone.
@@ -66,16 +71,19 @@ postulate
   --   only thing that can say what it must carry.
   denote : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → Beh Γ t
 
-  -- WHAT THE OBSERVATION HANDS BACK IS FIXED FROM OUTSIDE THIS FACE.
-  -- The protocol automaton reads an emit list and asks whether it is
-  -- settled, so the well-formedness face is stated ACROSS this boundary
-  -- — which makes a `Beh` that cannot say where its instants end a
-  -- domain that face cannot use, however well it serves the pair below.
+  -- WHAT THE OBSERVATION HANDS BACK IS FIXED BY NOTHING.  It was to be
+  -- fixed by the well-formedness face reading a prefix of it at a cut
+  -- point; that route is dead on its own terms -- `WellFormed` checks
+  -- the LAST state, so it holds of a cut only where the cut is settled,
+  -- which is a fact about where the MACHINE stops and not about any
+  -- domain.  The requirement that face was expected to supply is
+  -- therefore not owed here, and nothing has replaced it.
   --
   -- DEAD ROUTE: fixing the observation from the domain's side, by
   --   reading off whatever shape the first-order formers make natural.
-  --   The consumer is a predicate demanded at a CUT POINT, so the
-  --   requirement arrives from `Verify-Well-Formed` and not here.
+  --   Nothing rules such a reading out, which is the finding: an
+  --   observation no consumer constrains is one every candidate
+  --   satisfies.
   observe : ∀ {n} {Γ : Ctx n} {t} → Beh Γ t → Stream Γ t
 
 -- WHAT A PROGRAM MEANS, READ BACK AS A STREAM.  A body rather than a

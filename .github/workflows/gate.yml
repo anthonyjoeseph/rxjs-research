@@ -40,6 +40,15 @@ jobs:
       # shas with `git cat-file`, and those name ordinary ancestor commits
       # that a shallow (default depth-1) clone simply does not have, so the
       # lookup fails and a genuine, resolvable reference reads as dangling.
+      #
+      # AND IT BUYS ANCESTORS ONLY, WHICH IS THE TRAP: checkout fetches the
+      # full history OF THE CHECKED-OUT REF, not every branch. A sha on a
+      # feature branch resolves in the working copy that wrote it and is
+      # unreachable here the moment that branch is squash-merged -- the
+      # squash commit is a fresh object, so the branch's own commits never
+      # become ancestors of main. So a `RECOVERY:` sha must name a commit on
+      # MAIN. The local check cannot see this, because locally the branch is
+      # still there; it fails first in CI, on main, after the merge.
       - name: Checkout
         uses: actions/checkout@v4
         with:

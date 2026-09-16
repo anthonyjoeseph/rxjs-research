@@ -4,61 +4,63 @@
 -- automaton, which is what lets the batcher be quantified over
 -- WellFormed streams rather than arbitrary ones.
 --
--- AND IT IS A BODY OVER THE DENOTATION, WHICH IS WHAT ORDERS THE TIERS
--- (Anthony).  A run is a PREFIX of a program's meaning -- that is
--- adequacy, and it is the only thing in the repo carrying a fact about
--- a PROGRAM down onto an arbitrary fuel's run.  Stating this face as a
--- body over it makes the dependence checked rather than asserted: the
--- domain is what well-formedness is proven FROM, so the domain finishes
--- first, and a domain that cannot carry the predicate is a finding here
--- rather than a preference.
---
--- WHY THE SEAM ROUTE IS NOT THE ONE.  A seam argument re-establishes a
--- relation between an automaton, a scheduler and an eval state at every
--- step, in a currency carrying node ids and a drain counter; the
--- denotational one is an induction on SYNTAX, one clause per former, in
--- a currency with none of that in it.  The second is what the batching
--- claim above wants, since the property it needs is of a bare emit
--- list.
+-- AND IT IS A BODY OVER THE TWO HALVES `WellFormed` IS COMPOSED OF.
+-- `Rx.Protocol` splits the predicate where it actually divides: the
+-- automaton run, which is prefix-closed, and the final check, which
+-- reads the last state and is not.  Each half is owed separately here,
+-- and both are owed of the RUN — so both reduce at a concrete program,
+-- which the single statement they replace did not.
 module Verify-Well-Formed where
 
-open import Data.List using (_++_)
-open import Data.Product using (_,_)
+open import Data.Bool using (true)
+open import Data.Maybe using (just)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 
 open import Rx.Prim using (Fuel)
 open import Rx.Exp using (Ctx; Closed)
 open import Rx.Slots using (Slots)
-open import Rx.Evaluator using (Stream)
 open import Rx.Evaluator.Builder using (evaluate↓)
-open import Rx.Protocol using (WellFormed)
-open import Verify-Adequacy using (meaning; adequacy)
+open import Rx.Protocol using (WellFormed; ProtocolSt; protocol-init; runProtocol;
+  paidUp; Accepted; wellFormed-settled)
 
--- THE ONE LEAF, AND IT IS QUANTIFIED OVER EVERY PREFIX RATHER THAN
--- STATED AT THE MEANING.  That is not a convenience: the descent has to
--- land at an ARBITRARY fuel's stopping point, and only a
--- prefix-quantified statement reaches one.  It is also where the tier's
--- whole remaining risk sits, since nothing has instantiated it -- the
--- sweep below is evidence about the body's conclusion, not about this.
+-- THE AUTOMATON HALF: no emit of a run is ever rejected.  Every clause
+-- the automaton checks — instant freshness, bracketing, fan-out
+-- exactness, complete discipline — is a promise the evaluator makes
+-- while producing the stream, so this is the half that is structural
+-- in how the run is BUILT.
 --
--- DEAD ROUTE: descending from a well-formed meaning to a well-formed
---   run along `WellFormed` ITSELF.  Structurally blocked by the final
---   check: `WellFormed` applies it to the LAST state, so it is not
---   prefix-closed, and an adequacy conclusion is a PREFIX -- the
---   property does not travel down.  It is the descent along that
---   predicate that is dead, and the statement below is the different
---   one it rules in rather than out.
+-- DEAD ROUTE: obtaining this half from a well-formed denotation, by
+--   quantifying a leaf over every prefix of a program's meaning and
+--   instantiating it at the run.  `WellFormed` of a prefix demands the
+--   final check AT THE CUT, and an instant's obligations span several
+--   emits — `handoff` bumps owed and later deliveries pay it off, which
+--   is what `paidOff` exists to close — so a cut between them is
+--   rejected.  The prefix-quantified statement is therefore false at
+--   every instant with more than one emit, and what is true of an
+--   arbitrary prefix is the automaton half ALONE, which is
+--   `runProtocol-prefix` and needs no domain to say.
 postulate
-  meaning-prefix-well-formed :
-    ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
-      (pre rest : Stream Γ t) →
-    meaning e ins ≡ pre ++ rest →
-    WellFormed pre
+  evaluate-accepted :
+    ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slots Γ) →
+    Accepted (runProtocol protocol-init (evaluate↓ fuel e ins))
 
--- THE BODY, AND ITS ONE MOVE IS ELIMINATING ADEQUACY'S WITNESS.  The
--- remainder adequacy hands back is exactly what the leaf's `rest` wants,
--- so the composition reduces rather than being asserted -- which is what
--- makes a domain unable to supply the leaf show up as a type error here.
+-- THE SETTLEDNESS HALF: a run stops on an instant boundary, with every
+-- obligation paid.  This is a fact about where `evaluate↓` may CUT
+-- rather than about what it emits, and it is the whole of what the
+-- final check needs.  It is also where this face's remaining risk
+-- sits: an off-by-one between the point a budget is spent and the
+-- point a cut is emitted is a counterexample rather than a hard proof.
+postulate
+  evaluate-settled :
+    ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slots Γ)
+      (ps : ProtocolSt) →
+    runProtocol protocol-init (evaluate↓ fuel e ins) ≡ just ps →
+    paidUp ps ≡ true
+
+-- THE BODY, AND ITS ONE MOVE IS RECOMPOSING THE PREDICATE.  Neither
+-- half is `WellFormed` and together they are exactly it, so a leaf that
+-- does not suffice shows up as a type error here rather than as a
+-- statement nobody can instantiate.
 --
 -- A sampling sweep of 6200 programs over two depths, about a third
 -- carrying `μᵉ`, found no refutation of this conclusion; the harness's
@@ -68,12 +70,14 @@ postulate
 -- any at its indices -- `evaluate-deterministic` is the fact that would
 -- make those the same set.
 
--- RECOVERY: git show 081328b0:agda/src/Verify-Well-Formed.agda restores
+-- RECOVERY: git show 9f5e3339:agda/src/Verify-Well-Formed.agda restores
 --   the seam carve -- two leaves meeting at a named automaton state, the
 --   `BurstInv` relation they were denominated in, and `Glue`'s fold law
 --   composing their conclusions.
 evaluate-well-formed :
   ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slots Γ) →
   WellFormed (evaluate↓ fuel e ins)
-evaluate-well-formed fuel e ins with adequacy fuel e ins
-... | rest , eq = meaning-prefix-well-formed e ins (evaluate↓ fuel e ins) rest eq
+evaluate-well-formed fuel e ins =
+  wellFormed-settled (evaluate↓ fuel e ins)
+    (evaluate-accepted fuel e ins)
+    (evaluate-settled fuel e ins)

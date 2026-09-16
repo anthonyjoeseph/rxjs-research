@@ -48,10 +48,10 @@ open import Readme-Theorems using (emitValues)
 --   lives, since a take above a flattener holds its grant across an
 --   inner subscribe; and any source firing at more than one tick.
 --
--- RECOVERY: git show 081328b0:agda/src/Verify-Take-Bounds.agda restores
+-- RECOVERY: git show 9f5e3339:agda/src/Verify-Take-Bounds.agda restores
 --   the drain induction over registered chains, the budget's split
 --   across the root burst and the drain, and the registry's path
---   condition; git show 081328b0:agda/evidence/probed/Probed/Take-Bounds.agda
+--   condition; git show 9f5e3339:agda/evidence/probed/Probed/Take-Bounds.agda
 --   restores the rows that instantiated them.
 postulate
   take-bounds-values :
