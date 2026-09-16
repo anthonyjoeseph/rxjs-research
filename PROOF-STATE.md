@@ -220,15 +220,14 @@ automaton.
 
 ### The monster
 
-`chainStep-take-spends` — ONE registered chain's walk, and the deepest thing
-here that can be false on its own. The drain, the arrival's bracket and the
-list of chains are all bodies now, so what is left is the single walk they
-recurse over: it emits values and leaves the take node holding the rest, and
-the two are claimed to add up to no more than it was holding. An INEQUALITY
-rather than the frame's equality, because a chain reaching no take frame emits
-values this node never paid for — so a path that delivers through a frame it
-did not charge, or charges a node it did not deliver through, parts from this
-and from nothing else. Its falsity takes the tier with it.
+`stepFrame-quiet` — ONE frame's step, and the deepest thing here that can be
+false on its own. The drain, the cascade, the chain list and the frame walk
+are all bodies now, so what is left underneath them is a single frame: it
+emits events and hands the take node on, and the claim is that whatever it
+emitted came out of that node. A FLATTENER is where that breaks if it does —
+an inner subscribe entered mid-step can mint nodes and splice a burst into
+the instant, so what it emits was charged nowhere. The guard that the take's
+node sits BELOW the schedule's counter is all that rules it out.
 
 also: `take-bounds-values` — the tier's subject. Admitted only because this branch is the one that CARVED it: the assembly and its glue arrive here as added lines. It retires when the branch lands, and while it stands the cone decides nothing — which is the cost of the carve, paid once.
 also: `burst-drain-well-formed` — tier 2's monster. Admitted because the branch that carved this tier out of that one carries that face's seam and its two leaves, and the check reads the branch rather than the commit.
@@ -236,14 +235,23 @@ also: `evaluate-deterministic` — tier 3's monster, whose statement and leaves 
 
 ### Big picture tier roadmap
 
-- **THE FOLD IS WHERE THE FRAMES ARE, SO THAT IS THE NEXT BODY.**
-  `chainStep-take-spends` sits one constructor above a `foldPath⇓`, so it
-  converts the moment the fold's own account is stated: the walk carries values
-  sinkward one frame at a time, and the claim is that every frame other than
-  this take's leaves the node alone. The take's own arm is already an equality,
-  so what the fold owes is the other frame arms and the two clauses that re-enter
-  a subscribe — which is exactly where the guard earns its keep, since a
-  subscribe is the only thing that can mint a node mid-walk.
+- **THE FRAME ARMS, WHICH IS WHERE THE FLATTENERS ARE.** The walk is a body
+  now and it bottoms out in one leaf: every frame other than this take's emits
+  no value the take node paid for. The take's own arm is already an equality
+  and the pass-through arms are silent for a reason a row can check, so what is
+  actually in doubt is the handful of arms that re-enter a subscribe. PROBE
+  those before grinding any of them — an inner subscribe splicing a burst into
+  the instant is the cheapest refutation left in the tier, and it would say the
+  statement is the wrong one rather than an unproven one.
+
+- **THEN THE REGISTRY INVARIANT, WHICH IS WHAT CARRIES THE PATH CONDITION.**
+  The account is FALSE for a chain that never reaches the take's frame — the
+  value reaches the root having charged nothing — so it is stated over chains
+  that DO, and the drain visits a fresh state at every arrival. That makes the
+  condition a property of the registry rather than of a path, and it splits
+  three ways: reading it back out of the chain filter, the base case at the
+  root subscribe, and `cascade-keeps-regs`, which is the half with content,
+  since an inner subscribe registers chains nobody has looked at.
 
 - **AND THE GUARD IS THE PART THAT CAN GO WRONG, SO SEPARATE IT FIRST.** Both
   leaves are conditioned on the take's node sitting BELOW the schedule's
@@ -271,9 +279,18 @@ also: `evaluate-deterministic` — tier 3's monster, whose statement and leaves 
 
 ### The ledger
 
-- **`chainStep-take-spends`** (Verify-Take-Bounds) — FALSITY, `PROBED`: one
-  registered chain's walk emits no more than it takes out of the take node. The
-  tier's monster.
+- **`stepFrame-quiet`** (Verify-Take-Bounds) — FALSITY, `PROBED`: one frame's
+  step emits no more values than it takes out of the take node. The tier's
+  monster, and the flattener arms are where it would be false.
+- **`cascade-keeps-regs`** (Verify-Take-Bounds) — FALSITY, `PROBED`: a cascade
+  leaves every registered chain still passing the take's frame. The half of the
+  path condition with content — an inner subscribe registers chains afresh.
+- **`chains-take-at`** (Verify-Take-Bounds) — FALSITY, `PROBED`: the chains an
+  arrival selects inherit the registry's own path condition. A transport along
+  a filter, and it is FALSITY because nothing has read the filter against it.
+- **`root-regs`** (Verify-Take-Bounds) — FALSITY, `PROBED`: the root subscribe
+  registers only chains through the take's frame. The base case; one row
+  computes the registry at a real program and inhabits it by hand.
 - **`take-zero-drain-silent`** (Verify-Take-Bounds) — DIFFICULTY, `PROBED`: a
   take at zero registers nothing, so the drain pops its arrivals and delivers
   none of them. Two rows reach it, one at an arrival only the drain can see.

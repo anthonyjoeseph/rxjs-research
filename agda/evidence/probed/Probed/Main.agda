@@ -67,4 +67,5 @@ open import Probed.Seam using (row-root; row-drain; row-root-hot; row-drain-hot;
 -- fact without a spec, a batching stage or a second derivation to
 -- compare against.
 open import Probed.Take-Bounds using (row-zero-sync; row-zero-late;
-  row-chain; sync-uncut; late-uncut; cut-emits-nothing)
+  row-regs; row-chains; row-cascade; row-frame; sync-uncut; late-uncut;
+  cut-emits-nothing; frame-spends; frame-spent)

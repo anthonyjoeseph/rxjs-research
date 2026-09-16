@@ -20,35 +20,36 @@
 -- it is reachable at a scripted slot with two entries and a take at one.
 module Verify-Take-Bounds where
 
-open import Data.Bool using (Bool; true; false; if_then_else_)
+open import Data.Bool using (Bool; true; false; if_then_else_; _∧_)
+open import Data.Bool.ListAction using (any)
 open import Data.List using (List; []; _∷_; _++_; length; map)
 open import Data.List.Properties using (++-assoc; length-++; ++-identityʳ)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; zero; suc; _+_; _≤_; z≤n)
+open import Data.Nat using (ℕ; zero; suc; _+_; _≤_; z≤n; _≡ᵇ_)
 open import Data.Nat.Properties using (≤-trans; +-monoʳ-≤; +-assoc; ≤-refl;
-  ≤-reflexive)
+  ≤-reflexive; +-identityʳ)
 open import Data.Product using (_×_; proj₁; proj₂; _,_)
 open import Data.Sum using (inj₂)
 import Data.List.Relation.Unary.All as All
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂; subst)
 
-open import Rx.Prim using (Fuel; InstEmit; _at_from_as_; InstEvent; value; init; close; handoff; complete)
+open import Rx.Prim using (Fuel; InstEmit; _at_from_as_; InstEvent; value; init; close; handoff; complete; Source; delivery; exhausted)
 open import Rx.Exp using (Ctx; Closed; nat̂; takeᵉ; Val; Tm; natᵗ; evalTm)
-open import Rx.Evaluator using (Stream; Sched; EvalSt; take-st; lookupNode;
-  sched-init; st-init; root; Path; takeVals; takeDispatch; NodeId;
-  NodeState; take-f; retagEvents; splitEvents; scan-st; mergeAll-st;
-  switch-st; exhaust-st; Arrival; sched-next; schedGo;
-  cascadeLatch; cascadeFinish)
+open import Rx.Evaluator using (Stream; Sched; EvalSt; take-st; lookupNode; Frame; _↠_; cutThrough; RegRow; RegId;
+  pathHasNode; regSource; memberSource; arrSource; chainsOf; AtFloor; sched-init; st-init;
+  root; Path; takeVals; takeDispatch; NodeId; NodeState; take-f; retagEvents; splitEvents;
+  scan-st; mergeAll-st; switch-st; exhaust-st; Arrival; sched-next; schedGo; cascadeLatch;
+  cascadeFinish)
 open import Rx.Evaluator.Reducible using (reducible)
 open import Rx.Evaluator.Builder using (evaluate↓; drain!)
 open import Rx.Slots using (Slots)
 open import Rx.Evaluator.Freshness using (lookup-set; PreservedBelow)
 open import Rx.Evaluator.Freshness.Preserve using (subscribeE-preserves)
-open import Rx.Evaluator.Freshness.Mono using (subscribeE-mono; pushBurst-mono)
-open import Rx.Evaluator.Domain using (subscribeE⇓; pushBurst⇓; stepFrame⇓;
-  push-nil; push-cons; step-take; subs-take-zero; subs-take-suc;
-  drain⇓; drain-done; drain-empty; drain-step; cascade⇓; casc-run;
-  cascadeGo⇓; casc-nil; casc-cut; casc-live; chainStep⇓)
+open import Rx.Evaluator.Freshness.Mono using (subscribeE-mono; pushBurst-mono;
+  stepFrame-mono)
+open import Rx.Evaluator.Domain using (subscribeE⇓; pushBurst⇓; stepFrame⇓; push-nil; push-cons; step-take; subs-take-zero;
+  subs-take-suc; drain⇓; drain-done; drain-empty; drain-step; cascade⇓; casc-run; cascadeGo⇓;
+  casc-nil; casc-cut; casc-live; chainStep⇓; fold-root; fold-step; foldPath⇓; chain-step)
 open import Spec using (valuesOf)
 open import Readme-Theorems using (emitValues)
 
@@ -398,6 +399,163 @@ cascadeFinish-node nid a sched st with Arrival.isLast a
 ... | false = refl
 
 ----------------------------------------------------------------------
+-- WHICH PATHS THE ACCOUNT IS EVEN ABOUT.  A chain that never reaches
+-- the take's frame delivers its value to the root having charged
+-- nothing, so the account is FALSE of such a path and no proof of it
+-- can be uniform in the path.  This is the predicate that says which
+-- paths it holds of: the take's frame sits directly under the root,
+-- which is where the top-level subscribe installs it, and any number
+-- of the inner expression's own frames sit below.
+----------------------------------------------------------------------
+
+data TakeAt {n} {Γ : Ctx n} (nid : NodeId) :
+     ∀ {lo s t} → Path Γ lo s t → Set where
+  take-here  : ∀ {lo s} → TakeAt {Γ = Γ} nid (take-f {s = s} nid ↠ root {lo = lo})
+  take-later : ∀ {lo s u t} {f : Frame Γ s u} {κ : Path Γ lo u t}
+             → TakeAt nid κ → TakeAt nid (f ↠ κ)
+
+----------------------------------------------------------------------
+-- A CUT EMITS CLOSES AND NOTHING ELSE.  The take's own instant is the
+-- one place the account could leak: the frame charges for what it lets
+-- through as VALUES, so a value smuggled out among its bookkeeping
+-- events would be delivered free.  It cannot be, and the reason is
+-- structural rather than arithmetic -- the only events a cut mints are
+-- the closes it owes the registrations it is removing.
+----------------------------------------------------------------------
+
+cutThrough-quiet : ∀ {n} {Γ : Ctx n} {t}
+  (nid : NodeId) (dlv : List RegId) (wm : RegId) (dying : List Source)
+  (r : List (RegRow Γ t)) →
+  valuesOf (proj₁ (proj₂ (cutThrough {Γ = Γ} {t = t} nid dlv wm dying r))) ≡ []
+cutThrough-quiet nid dlv wm dying []                    = refl
+cutThrough-quiet nid dlv wm dying ((rid , rs , c) ∷ r)
+  with pathHasNode nid (proj₂ c)
+     | cutThrough nid dlv wm dying r
+     | cutThrough-quiet nid dlv wm dying r
+... | false | _             | ih = ih
+... | true  | _ , closes , _ | ih
+      with any (_≡ᵇ rid) dlv ∧ memberSource (regSource rs) dying
+...     | true  = ih
+...     | false = ih
+
+take-events-quiet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo}
+  {id now} {nid : NodeId} {κ : Path Γ lo s t} {vals : List (Val Γ s)} {fin}
+  {sched sched₁ : Sched Γ} {st st₁ : EvalSt e} {vals′ evs′ fin′}
+  → stepFrame⇓ {e = e} id now (take-f nid) κ vals fin sched st
+      (vals′ , evs′ , fin′ , sched₁ , st₁)
+  → valuesOf evs′ ≡ []
+take-events-quiet {nid = nid} {vals = vals} {st = st} step-take
+  with lookupNode nid (EvalSt.nodes st)
+... | just (take-st k) with proj₂ (proj₂ (takeVals k vals))
+...   | true  = cutThrough-quiet nid (EvalSt.delivered st)
+                  (EvalSt.regWatermark st) (EvalSt.dying st) (EvalSt.registry st)
+...   | false = refl
+take-events-quiet {nid = nid} {st = st} step-take
+    | just (scan-st _)           = refl
+take-events-quiet {nid = nid} {st = st} step-take
+    | just (mergeAll-st _ _ _ _) = refl
+take-events-quiet {nid = nid} {st = st} step-take
+    | just (switch-st _ _)       = refl
+take-events-quiet {nid = nid} {st = st} step-take
+    | just (exhaust-st _ _)      = refl
+take-events-quiet {nid = nid} {st = st} step-take
+    | nothing                    = refl
+
+----------------------------------------------------------------------
+-- AND THE ROOT INSTANT IS ITS CARRIED VALUES AND ITS ACCUMULATOR.  The
+-- root is the only path constructor that mints an emit from nothing,
+-- and what it mints is the values handed to it plus whatever the walk
+-- accumulated on the way -- so the fold's account can be denominated in
+-- the accumulator and the node, with nothing else in it.
+----------------------------------------------------------------------
+
+fold-root-values : ∀ {A : Set} (es : List (InstEvent A)) (vs : List A)
+  (fin : Bool) {i src κ} →
+  emitValues (((es ++ map value vs ++ (if fin then complete ∷ [] else []))
+                 at i from src as κ) ∷ []) ≡ valuesOf es ++ vs
+fold-root-values es vs fin =
+  trans (++-identityʳ (valuesOf (es ++ map value vs
+                                    ++ (if fin then complete ∷ [] else []))))
+    (trans (valuesOf-++ es _)
+      (cong (valuesOf es ++_)
+        (trans (valuesOf-++ (map value vs) _)
+          (trans (cong₂ _++_ (valuesOf-vals vs) (valuesOf-fin fin))
+                 (++-identityʳ vs)))))
+
+----------------------------------------------------------------------
+-- WHAT EVERY OTHER FRAME OWES.  The fold reaches the take through any
+-- number of the inner expression's frames, and the account survives
+-- them only if none of them delivers a value of its own or hands back a
+-- node holding MORE than it was given.  Guarded by the node sitting
+-- below the schedule's counter, which is what says a subscribe entered
+-- mid-frame installs above it rather than over it.
+--
+-- PROBED: `Probed.Take-Bounds`, at the TAKE's own arm, where the sum is
+--   tight -- one value emitted against a node going two to one.  Not
+--   reached, and this is the whole residual risk: both FLATTENER arms.
+--   `from-inner` is excluded by `srcFrame` outright and `thru-outer`
+--   wants a program whose value is itself an observable, which is where
+--   an inner subscribe can mint a node and splice a burst into the
+--   instant.  `map-f` and `scan-f` are unreached but local.
+----------------------------------------------------------------------
+
+postulate
+  stepFrame-quiet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
+    {id now} {f : Frame Γ s u} {κ : Path Γ lo u t} {vals fin}
+    {sched sched₁ : Sched Γ} {st st₁ : EvalSt e} {vals′ evs′ fin′}
+    (nid : NodeId) →
+    suc nid ≤ Sched.nextNode sched →
+    stepFrame⇓ {e = e} id now f κ vals fin sched st
+      (vals′ , evs′ , fin′ , sched₁ , st₁) →
+    length (valuesOf evs′) + nodeBudget nid st₁ ≤ nodeBudget nid st
+
+----------------------------------------------------------------------
+-- THE FOLD'S ACCOUNT, BY INDUCTION ON THE WALK.  The walk carries
+-- values sinkward one frame at a time; every frame but the take's
+-- leaves the node alone, and the take's arm is the equality already
+-- proven above.  The accumulator is on the RIGHT rather than assumed
+-- empty: a hypothesis that it is would be supplied by today's one
+-- caller and by nothing else, while the weaker statement is
+-- unconditional and reduces to what that caller wants.
+----------------------------------------------------------------------
+
+foldPath-take-spends : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
+  {id now envSrc} {κ : Path Γ lo u t} {vals evs fin}
+  {sched : Sched Γ} {st : EvalSt e} {out sched′ st′} (nid : NodeId) →
+  TakeAt nid κ →
+  suc nid ≤ Sched.nextNode sched →
+  foldPath⇓ {e = e} id now envSrc κ vals evs fin sched st (out , sched′ , st′) →
+  length (emitValues out) + nodeBudget nid st′
+    ≤ length (valuesOf evs) + nodeBudget nid st
+foldPath-take-spends {id = id} {envSrc = envSrc} {evs = evs} nid take-here lt
+  (fold-step {vals′ = vals′} {evs′ = evs′} {fin′ = fin′} d fold-root) =
+  ≤-trans
+    (≤-reflexive
+      (cong (_+ _)
+        (trans (cong length (fold-root-values (evs ++ evs′) vals′ fin′ {i = id} {src = envSrc} {κ = delivery}))
+          (trans (length-++ (valuesOf (evs ++ evs′)))
+            (cong (_+ _)
+              (trans (cong length (valuesOf-++ evs evs′))
+                (trans (length-++ (valuesOf evs))
+                  (trans (cong (length (valuesOf evs) +_)
+                           (cong length (take-events-quiet d)))
+                         (+-identityʳ (length (valuesOf evs)))))))))))
+    (≤-trans
+      (≤-reflexive (+-assoc (length (valuesOf evs)) _ _))
+      (+-monoʳ-≤ (length (valuesOf evs))
+        (≤-reflexive (step-take-deriv d))))
+foldPath-take-spends {evs = evs} nid (take-later ta) lt (fold-step d f) =
+  ≤-trans
+    (foldPath-take-spends nid ta (≤-trans lt (stepFrame-mono d)) f)
+    (≤-trans
+      (≤-reflexive
+        (trans (cong (_+ _)
+                 (trans (cong length (valuesOf-++ evs _))
+                        (length-++ (valuesOf evs))))
+               (+-assoc (length (valuesOf evs)) _ _)))
+      (+-monoʳ-≤ (length (valuesOf evs)) (stepFrame-quiet nid lt d)))
+
+----------------------------------------------------------------------
 -- THE CHAIN WALK'S HALF OF THE ACCOUNT.  One arrival is delivered to
 -- every chain registered against its source in turn, and the walk is
 -- where all of it happens: what it emits and what it takes out of the
@@ -410,20 +568,33 @@ cascadeFinish-node nid a sched st with Arrival.isLast a
 -- it.
 ----------------------------------------------------------------------
 
-postulate
-  -- PROBED: `Probed.Take-Bounds`, at the chain walk of ONE arrival
-  --   popped from what the root frame left scheduled, against a take at
-  --   one over a source of two -- so the sum is pinned at a node that is
-  --   actually holding a budget rather than at a degenerate zero.  Not
-  --   reached: any second arrival, every flattening program, and a walk
-  --   entering a subscribe, which is the shape the guard is there for.
-  chainStep-take-spends : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    {a : Arrival Γ} {id c} {sched : Sched Γ} {st : EvalSt e}
-    {out sched′ st′} (nid : NodeId) →
-    suc nid ≤ Sched.nextNode sched →
-    chainStep⇓ {e = e} id a c sched st (out , sched′ , st′) →
-    length (emitValues out) + nodeBudget nid st′ ≤ nodeBudget nid st
+----------------------------------------------------------------------
+-- ONE CHAIN'S WALK IS ITS FOLD, AND THE ACCUMULATOR IT STARTS FROM
+-- CARRIES NO VALUE.  A chain is entered with the arrival's own value
+-- and with a close if its source is spent, so the account's right-hand
+-- accumulator is empty at the entry and the fold's bound reduces to the
+-- node's holding alone.
+----------------------------------------------------------------------
 
+valuesOf-last : ∀ {n} {Γ : Ctx n} {t} (b : Bool) (src : Source) →
+  valuesOf {Val Γ t} (if b then close src exhausted ∷ [] else []) ≡ []
+valuesOf-last true  src = refl
+valuesOf-last false src = refl
+
+chainStep-take-spends : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  {a : Arrival Γ} {id c} {sched : Sched Γ} {st : EvalSt e}
+  {out sched′ st′} (nid : NodeId) →
+  TakeAt nid (proj₂ c) →
+  suc nid ≤ Sched.nextNode sched →
+  chainStep⇓ {e = e} id a c sched st (out , sched′ , st′) →
+  length (emitValues out) + nodeBudget nid st′ ≤ nodeBudget nid st
+chainStep-take-spends {a = a} nid ta lt (chain-step f) =
+  ≤-trans (foldPath-take-spends nid ta lt f)
+          (≤-reflexive
+            (cong (λ xs → length xs + _)
+                  (valuesOf-last (Arrival.isLast a) (arrSource a))))
+
+postulate
   -- And one chain's walk mints at the counter, so the guard survives the
   -- hand-on to the next chain in the list exactly as it survives the
   -- hand-on to the next arrival.
@@ -455,15 +626,21 @@ postulate
 -- nothing, which is the arm that makes the claim an inequality.
 ----------------------------------------------------------------------
 
+ChainsTakeAt : ∀ {n} {Γ : Ctx n} {t} {s} → NodeId →
+  List (RegId × AtFloor Γ s t) → Set
+ChainsTakeAt nid cs = All.All (λ rc → TakeAt nid (proj₂ (proj₂ rc))) cs
+
 cascadeGo-take-spends : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   {a : Arrival Γ} {id cs} {sched : Sched Γ} {st : EvalSt e}
   {out sched′ st′} (nid : NodeId) →
+  ChainsTakeAt nid cs →
   suc nid ≤ Sched.nextNode sched →
   cascadeGo⇓ {e = e} a id cs sched st (out , sched′ , st′) →
   length (emitValues out) + nodeBudget nid st′ ≤ nodeBudget nid st
-cascadeGo-take-spends nid lt casc-nil       = ≤-refl
-cascadeGo-take-spends nid lt (casc-cut _ g) = cascadeGo-take-spends nid lt g
-cascadeGo-take-spends nid lt
+cascadeGo-take-spends nid tas lt casc-nil = ≤-refl
+cascadeGo-take-spends nid (_ All.∷ tas) lt (casc-cut _ g) =
+  cascadeGo-take-spends nid tas lt g
+cascadeGo-take-spends nid (ta All.∷ tas) lt
   (casc-live {emits = emits} {rest = rest} _ cs g) =
   ≤-trans
     (≤-reflexive
@@ -474,8 +651,48 @@ cascadeGo-take-spends nid lt
                       (length (emitValues rest)) _)))
     (≤-trans
       (+-monoʳ-≤ (length (emitValues emits))
-        (cascadeGo-take-spends nid (≤-trans lt (chainStep-node-mono cs)) g))
-      (chainStep-take-spends nid lt cs))
+        (cascadeGo-take-spends nid tas (≤-trans lt (chainStep-node-mono cs)) g))
+      (chainStep-take-spends nid ta lt cs))
+
+----------------------------------------------------------------------
+-- WHICH CHAINS THE REGISTRY MAY HOLD.  The account is about paths that
+-- pass the take, and the chains an arrival is delivered to come out of
+-- the registry -- so what has to be true of a STATE is that every
+-- registration it holds is such a path.  It is a property of the state
+-- rather than a hypothesis of the walk because the drain visits many
+-- states, each produced by the cascade before it.
+----------------------------------------------------------------------
+
+RegTakeAt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → NodeId → EvalSt e → Set
+RegTakeAt nid st =
+  All.All (λ row → TakeAt nid (proj₂ (proj₂ (proj₂ row)))) (EvalSt.registry st)
+
+postulate
+  -- The chains an arrival is delivered to are read off the registry, so
+  -- this is the registry's own property transported along the filter.
+  -- PROBED: `Probed.Take-Bounds`, at the arrival the root subscribe
+  --   leaves scheduled, with the arrival and the residual schedule
+  --   FORCED off `sched-next` rather than written down.  Not reached:
+  --   any flattening program, which is the only shape whose registry
+  --   grows between the filter and the walk.
+  chains-take-at : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (nid : NodeId) (a : Arrival Γ) (st : EvalSt e) →
+    RegTakeAt nid st → ChainsTakeAt nid (chainsOf a st)
+
+  -- And a cascade may REGISTER, which is the half with content: an
+  -- inner subscribe entered mid-walk appends its own chains, and each
+  -- of them is grown from the path it was entered at.
+  -- PROBED: `Probed.Take-Bounds`, across the first arrival of a take
+  --   that is about to cut, the cascade built by the evaluator's own
+  --   builder rather than by hand.  Not reached: any flattening
+  --   program -- which is exactly the arm that can register mid-walk,
+  --   so the row covers the transport and not the claim's risk.
+  cascade-keeps-regs : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    {a : Arrival Γ} {id} {sched : Sched Γ} {st : EvalSt e}
+    {out sched′ st′} (nid : NodeId) →
+    RegTakeAt nid st →
+    cascade⇓ {e = e} a id sched st (out , sched′ , st′) →
+    RegTakeAt nid st′
 
 ----------------------------------------------------------------------
 -- AND THE ARRIVAL'S ACCOUNT IS THE WALK'S, READ ACROSS THE BRACKET.
@@ -484,15 +701,18 @@ cascadeGo-take-spends nid lt
 cascade-take-spends : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   {a : Arrival Γ} {id} {sched : Sched Γ} {st : EvalSt e}
   {out sched′ st′} (nid : NodeId) →
+  RegTakeAt nid st →
   suc nid ≤ Sched.nextNode sched →
   cascade⇓ {e = e} a id sched st (out , sched′ , st′) →
   length (emitValues out) + nodeBudget nid st′ ≤ nodeBudget nid st
-cascade-take-spends {a = a} {sched = sched} {st = st} {out = out} nid lt
+cascade-take-spends {a = a} {sched = sched} {st = st} {out = out} nid regs lt
   (casc-run {sched′ = sch} {st′ = stw} g) =
   ≤-trans
     (≤-reflexive (cong (length (emitValues out) +_)
                        (cascadeFinish-node nid a sch stw)))
-    (≤-trans (cascadeGo-take-spends nid lt g)
+    (≤-trans (cascadeGo-take-spends nid
+                (chains-take-at nid a st regs)
+                lt g)
              (≤-reflexive (cascadeLatch-node nid a st)))
 
 ----------------------------------------------------------------------
@@ -506,20 +726,22 @@ cascade-take-spends {a = a} {sched = sched} {st = st} {out = out} nid lt
 drain-take-bound : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   {fuel : Fuel} {id} {sched : Sched Γ} {st : EvalSt e} {rest}
   (nid : NodeId) →
+  RegTakeAt nid st →
   suc nid ≤ Sched.nextNode sched →
   drain⇓ {e = e} fuel id sched st rest →
   length (emitValues rest) ≤ nodeBudget nid st
-drain-take-bound nid lt drain-done      = z≤n
-drain-take-bound nid lt (drain-empty _) = z≤n
-drain-take-bound {sched = sched} nid lt
+drain-take-bound nid regs lt drain-done      = z≤n
+drain-take-bound nid regs lt (drain-empty _) = z≤n
+drain-take-bound {sched = sched} nid regs lt
   (drain-step {sched′ = sched′} {out = out} {rest = rest} eq c d) =
   ≤-trans
     (≤-reflexive (trans (cong length (emitValues-++ out rest))
                         (length-++ (emitValues out))))
     (≤-trans
       (+-monoʳ-≤ (length (emitValues out))
-        (drain-take-bound nid (≤-trans lt′ (cascade-node-mono c)) d))
-      (cascade-take-spends nid lt′ c))
+        (drain-take-bound nid (cascade-keeps-regs nid regs c)
+                          (≤-trans lt′ (cascade-node-mono c)) d))
+      (cascade-take-spends nid regs lt′ c))
   where
     lt′ = ≤-trans lt (≤-reflexive (sym (sched-next-node sched sched′ eq)))
 
@@ -567,6 +789,18 @@ root-take-minted pos (subs-take-suc _ refl inner push) =
 ----------------------------------------------------------------------
 
 postulate
+  -- THE REGISTRY THE FRAME HANDS THE DRAIN HOLDS ONLY PATHS THROUGH THE
+  -- TAKE, because every registration made under the root subscribe is
+  -- grown from the path the take frame was installed on.  The drain's
+  -- account needs it at its first arrival and re-establishes it after
+  -- each one.
+  -- PROBED: `Probed.Take-Bounds`, computing the registry at a real
+  --   program and inhabiting the predicate by hand, so a registration
+  --   grown from any other path leaves the row unclosable.  Not
+  --   reached: any flattening program, and any nesting of takes.
+  root-regs : ∀ {n} {Γ : Ctx n} {t} (k : ℕ) (e : Closed Γ t) (ins : Slots Γ) →
+    RegTakeAt 0 (proj₂ (proj₂ (rootRun (suc k) e ins)))
+
   -- AND AT A COUNT OF ZERO THE DRAIN IS SILENT, which is a claim about
   -- REGISTRATION rather than about the budget: the take subscribes
   -- nothing, so no chain is ever registered against any source and the
@@ -595,7 +829,8 @@ take-drain-bound fuel zero e ins =
   subst (λ xs → length xs ≤ takeBudget zero e ins)
         (sym (take-zero-drain-silent fuel e ins)) z≤n
 take-drain-bound fuel (suc k) e ins =
-  drain-take-bound 0 (root-take-minted refl (rootDeriv (suc k) e ins))
+  drain-take-bound 0 (root-regs k e ins)
+                   (root-take-minted refl (rootDeriv (suc k) e ins))
                    (drainDeriv fuel (suc k) e ins)
 
 ----------------------------------------------------------------------
