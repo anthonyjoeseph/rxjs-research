@@ -54,6 +54,21 @@ jobs:
         with:
           fetch-depth: 0
 
+      # `make gate`'s cheap path now includes `ts-gate` (tsc, eslint,
+      # prettier), so the TS toolchain has to be here before the gate runs.
+      # It is seconds and needs no Agda, which is why it sits above the
+      # toolchain build rather than beside it: a TS error should fail this
+      # job in under a minute, not after the tower.
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: typescript/package-lock.json
+
+      - name: Install TypeScript deps
+        run: cd typescript && npm ci
+
       # Runs first, before the expensive toolchain build: a broken swap step
       # should fail in seconds, not after a 20-minute cold Agda build.
       # A cold full-tower check has peaked near this container's RAM ceiling

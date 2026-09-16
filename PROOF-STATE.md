@@ -207,47 +207,54 @@ every guard, every `<?` and the dry marker leave the machine entirely.
 A row's class must agree with its postulate's header, which is where the
 research lives; where they disagree, the header wins.
 
-## Tier 1 — `InstEmit` off the syntax tree
+## Tier 1 — one pure-function former, and a palette a pipeline can be run in
 
-**THE ENTANGLEMENT, PLAINLY: the syntax tree carries the emit metadata the
-implementation needs, and the spec's tree should not.** TypeScript has two
-layers — a plain rxjs pipeline and an `InstEmit`-carrying one over it — and
-Agda has one, which is why every statement about the language drags the
-implementation's bookkeeping through it.
+**THE ENTANGLEMENT, PLAINLY: the Agda tree is the implementation's tree, and a
+former plain rxjs cannot express is one nothing can check against a running
+pipeline.** TypeScript has two layers — a plain rxjs pipeline and an
+`InstEmit`-carrying one over it — and Agda has one, so the palette is where the
+two are held to each other: restrict it to what primitive rxjs, conditionals
+and array operations write, and every former left is one the oracle exercises.
 
-**THE SHAPE IS A MIRROR TREE AND AN ERASURE, NEVER A SECOND EVALUATOR.** A
-second evaluator means duplicating the reducibility candidate and its
-termination argument, which is the most expensive artifact in this repo, and
-`dup-check` would be right to fire. With the mirror erased into the existing
-tree, every theorem already proven applies verbatim to the erasure.
+**AND THE PALETTE SIZES EVERY PER-FORMER GRIND ABOVE IT.** Those leaves are
+discharged one operator case at a time, so the size of the tree IS the size of
+that work. `liftᵉ` — an operator as a pure function on an emit's values, with
+carried state — absorbs the formers that are already that and nothing else: the
+dividing test is whether an operator SUBSCRIBES anything or reads the
+protocol's own bookkeeping.
 
 ### The monster
 
-(no monster) — this tier declares no statement either, and with one extra
-thing worth saying: the erasure is where a mistake here would live, and an
-erasure is a DEFINITION. It cannot be false, only wrong, and what catches it
-wrong is the batching proof restated over the mirror failing to typecheck —
-which is the tier's own third leg rather than a claim a cone could aim at.
+(no monster) — the tier declares no statement. What it lands are DEFINITIONS
+and a former, which cannot be false, only wrong; what catches one wrong is the
+oracle disagreeing before any of it reaches Agda, and then the existing proofs
+failing to typecheck over the collapsed tree. A cone cannot aim at either.
 
 ### Big picture tier roadmap
 
-- **DEFINE THE MIRROR AND THE ERASURE, AND NOTHING ELSE.** One tree carrying
-  the plain-rxjs formers, one function into `Rx.Exp`'s tree, and the clause per
-  former that says which existing node each mirror node erases to. Land it with
-  no consumer: the tree and the erasure typecheck on their own, and a mirror
-  whose erasure does not is a mirror with the wrong formers.
+- **THE TYPESCRIPT PASS FIRST: PRIMITIVE RXJS, CONDITIONALS, ARRAY OPERATIONS,
+  AND `lift`.** The palette is restricted where a pipeline can actually be RUN,
+  because a former that cannot be written against real rxjs is one the Agda
+  should never have gained. `lift` takes a pure function on an emit's value
+  array plus carried state; `map` and `scan` are rewritten through it, and the
+  oracle is what says the rewrite preserved behaviour rather than a reading of
+  the diff. The leg's product is also the count: `take` reads the open
+  registrations and the cut ledger, so absorbing it would mean putting source
+  ids and close reasons into the value language — that is the finding to
+  confirm or overturn here, not in Agda.
 
-- **THEN RESTATE THE BATCHING PROOF OVER THE MIRROR.** `The-Proof` and
-  `Batch-Theorems` are stated at `Closed`, so the restatement is a composition
-  with the erasure and its content is whether the mirror's formers suffice to
-  say what the batching claim says. This is the leg that decides the tree: a
-  claim that cannot be restated names a former the mirror is missing.
+- **THEN `liftᵉ`, MIRRORING WHAT RAN.** The Agda former is written to the
+  TypeScript's shape, not to a design. Its function is a `Tm`, so it is pure,
+  total and first-order — which is the reason the flatteners cannot follow it
+  in: their payloads are literal syntax that must be RUN, and `Tm` has no
+  eliminator for that. **This leg moves the language `Spec.agda` is written in,
+  so it stops and asks before it lands.**
 
-- **THEN THREAD IT UNTIL IT TYPECHECKS.** The evaluator, `Reducible` and the
-  CLI all read the old tree; whatever of them should read the mirror instead is
-  discovered here, not designed in advance. It is deliberately last, because
-  the two legs above are what say which side of the boundary each consumer
-  belongs on.
+- **THEN COLLAPSE THE ABSORBED FORMERS AND EVERY CASE THAT MATCHES ON THEM.**
+  The subscribe relation, the builder, the reducibility candidate and the CLI
+  all match per former, so this is where the palette actually pays. It is
+  deliberately after the mirror, because which clauses collapse is discovered by
+  writing `liftᵉ`'s own case rather than predicted from the tree.
 
 ## Tier 2 — the denotation, adequacy, and the take bound
 
@@ -347,61 +354,66 @@ also: `take-bounds-values` — the take face, which is here to be measured again
 
 ## Tier 3 — the automaton half, and it is the only half
 
-**THE TIER IS ONE LEAF.** `The-Proof` draws `evaluate-accepted` from here and
-nothing else: no emit of a canonical run is rejected by the protocol automaton.
+**THE TIER IS TWO LEAVES, ONE PER SEGMENT KIND.** `The-Proof` draws
+`evaluate-accepted` from here and nothing else: no emit of a canonical run is
+rejected by the protocol automaton. That is a body now, over `Sound i j xs` —
+acceptance with both endpoints removed and indexed by the watermarks a segment
+runs between — so what is left to prove is one claim about a cascade and one
+about the root subscribe.
 
-**THE SETTLEDNESS HALF IS GONE, AND THAT IS A STRENGTHENING RATHER THAN A
-RETREAT (Anthony, asking for a claim that does not read the evaluator).**
-`batch-agreement` took acceptance-and-settledness and spent only acceptance —
-its first move discarded the final check — so the conjunction was manufactured
-for a consumer that weakened it back. Its hypothesis is now `Accepted` of the
-run, the same conclusion over strictly more streams, and the one statement here
-about where the MACHINE stops has left the proof path.
+**THE INDEXING IS WHAT MAKES IT DECOMPOSE.** An instant id is an absolute
+arrival position, so a predicate quantified over every sane state is satisfied
+by no segment that emits anything. The entry bound repairs that, the exit bound
+is what the next segment spends, and a run is their concatenation.
 
-**AND WHAT SURVIVES IS PREFIX-CLOSED, WHICH IS WHAT TIER 2 NEEDS.**
-`runProtocol` short-circuits on rejection, so acceptance travels down a
-truncation for free — the property a compositional reading can descend through,
-where the final check read the last state and travelled nowhere.
+**AND IT IS PREFIX-CLOSED, WHICH IS WHAT TIER 2 NEEDS.** `runProtocol`
+short-circuits on rejection, so acceptance travels down a truncation for free.
 
 ### The monster
 
-`evaluate-accepted` — no emit of a canonical run is rejected. The tier's whole
-debt, so the choice is forced rather than judged; its cone reaches `evaluate↓`
-and the automaton, which is the machinery it must be discharged out of, so it
-admits the work that kills it.
+`evaluate-sound` — a canonical run takes the automaton from watermark zero to
+the fuel's successor. Not a postulate, and that is the point: it is the body
+the drain induction assembles, which is where a wrong decomposition lives while
+every leaf under it reads as reasonable. Chosen above its own leaves because
+its cone is what the per-former grind has to land in, and the cascade relation
+alone reaches neither the builder nor the reducibility candidate.
+
+also: `evaluate-accepted` — the tier's export, which CONSUMES the monster and
+so sits above it rather than inside its cone. Nothing else is admitted.
 
 ### Big picture tier roadmap
 
-- **INSTANTIATE IT, WHICH IS NOW POSSIBLE AND WAS NOT.** It is a computation
-  over a run, so a probe runs the automaton at concrete programs and reads the
-  verdict directly. The sampling sweep recorded in the face's own block reached
-  the CONJUNCTION this was half of, so it constrains the pair jointly and says
-  nothing about this half alone; rows against this statement are what move it
-  off `NO EVIDENCE` in its own right. Aim at the flatteners and at `μᵉ`, which
-  is where the clauses the evaluator asserts while building are hardest to keep.
+- **GRIND THE CASCADE LEAF, ONE FORMER AT A TIME, WIDENING THE ROWS AHEAD OF
+  EACH.** Its clause count is the tree's former count, which is what Tier 1's
+  collapse shrinks first. The rows covering it today reach a synchronous source
+  and a slot at the seed watermark only, so each clause is probed at its own
+  former before it is ground — the flatteners and `μᵉ` first, where an
+  instant's obligations are hardest to keep inside one cascade, and a cascade
+  emitting nothing, where the exit bound is the whole claim.
 
-- **THEN DECIDE WHAT DISCHARGES IT, WHICH IS THE TIER'S ONE DESIGN QUESTION.**
-  Two routes: a seam invariant relating the eval state to `ProtocolSt`,
-  recoverable from the face's header; or an induction on fuel over
-  `run-monotone`, which says a longer run EXTENDS a shorter one and so asks only
-  that an appended segment keeps the automaton happy. The second is the cheaper
-  bet and needs no domain. The leg's product is which, decided by reading the
-  evaluator's step structure rather than by preference — and the seam invariant
-  is no longer owed twice, which is what makes the cheaper bet worth taking.
+- **THEN THE SUBSCRIBE LEAF, WHICH THE COLLAPSE HAS MADE SMALLER.** It is an
+  induction over the subscribe relation, so its clause count is the former
+  count too. Taking it second is not deferral: ground before the collapse, most
+  of its clauses would be ground twice.
 
 - **THEN SETTLE WHETHER THE HARNESS'S QUESTION IS STILL THE RIGHT ONE.**
-  `wellFormed?` decides the retired conjunction, so QuickCheck now rejects
-  streams the theorem accepts. That is a harness stricter than the claim, which
-  costs coverage silently: every program whose run stops mid-instant is dropped
-  before it is compared. The leg's product is whether the decision procedure
-  drops its final check, and what the sweep then reaches that it did not.
+  `wellFormed?` decides a conjunction this face no longer claims, so QuickCheck
+  rejects streams the theorem accepts. That is a harness stricter than the
+  claim, which costs coverage silently: every program whose run stops
+  mid-instant is dropped before it is compared. The leg's product is whether
+  the decision procedure drops its final check, and what the sweep then reaches
+  that it did not.
 
 ### The ledger
 
-- **`evaluate-accepted`** (Verify-Well-Formed) — FALSITY, `RECOVERY`: no emit
-  of a run is rejected by the automaton. Every clause the automaton checks is a
-  promise the evaluator makes while building the stream, so it is structural in
-  the run.
+- **`sound-cascade`** (Verify-Well-Formed) — FALSITY, `PROBED`: one cascade's
+  emits take the automaton from the instant it opens to the next, from any sane
+  state at the entry watermark. The exit bound is the risky half — a cascade
+  that leaves an instant open exceeds it.
+
+- **`sound-subscribe`** (Verify-Well-Formed) — FALSITY, `PROBED`: the root
+  subscribe's burst is the zeroth instant and nothing more. Its clause count is
+  the tree's former count, which is what Tier 1 is for.
 
 ## Tier 4 — determinacy and the top-line semantic claims
 

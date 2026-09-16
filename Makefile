@@ -1,4 +1,4 @@
-.PHONY: find-prose gate cone-check cone-selftest roadmap-moved roadmap-moved-selftest roadmap-order roadmap-order-selftest roadmap-evidence gate-heavy gate-cheap gate-light dev-changed dev-changed-selftest stripped strip-selftest unmap-selftest postulates dup-check dup-selftest imports-check imports-fix imports-selftest find all help agda-dev agda-dev-selftest warm bg bg-check bg-wait bug-cache bug-cache-run unsafe-check wiring wiring-selftest comments-check comments-selftest refuted ev ts-check cli-build oracle qc-build quickcheck
+.PHONY: find-prose gate cone-check cone-selftest roadmap-moved roadmap-moved-selftest roadmap-order roadmap-order-selftest roadmap-evidence gate-heavy gate-cheap gate-light dev-changed dev-changed-selftest stripped strip-selftest unmap-selftest postulates dup-check dup-selftest imports-check imports-fix imports-selftest find all help agda-dev agda-dev-selftest warm bg bg-check bg-wait bug-cache bug-cache-run unsafe-check wiring wiring-selftest comments-check comments-selftest refuted ev ts-check ts-lint ts-format-check ts-gate cli-build oracle qc-build quickcheck
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -1163,7 +1163,7 @@ GATE_CHEAP = wiring-selftest wiring-gate wiring-refuted wiring-probed \
              cone-selftest cone-check \
              recursion-cover-selftest recursion-cover \
              comments-selftest comments-check dev-changed-selftest \
-             unmap-selftest spike
+             unmap-selftest spike ts-gate
 
 gate-cheap:
 	@for t in $(GATE_CHEAP); do \
@@ -1387,8 +1387,27 @@ bg-check:
 	  tail -2 $(LOG); exit 3; \
 	fi
 
+# THE TYPESCRIPT HALF OF THE GATE, AND IT IS CHEAP BY CONSTRUCTION.  The TS
+# impl is the thing the Agda impl must mirror, so a TS tree that does not
+# compile makes the mirror rule unfalsifiable -- there is nothing to compare
+# against.  All three run in seconds and need no Agda, so they sit with the
+# other textual checks rather than behind the tower.
+#
+# THE ORACLE IS NOT HERE, and that is deliberate: it needs the Agda CLI
+# COMPILED (GHC, minutes), so putting it on the cheap path would make the
+# cheap path the expensive one.  It has its own target below and its own CI
+# job, off the gate's critical path.
 ts-check:
-	cd typescript && npm run typecheck
+	@cd $(CURDIR)/typescript && npm run typecheck
+
+ts-lint:
+	@cd $(CURDIR)/typescript && npm run lint
+
+ts-format-check:
+	@cd $(CURDIR)/typescript && npm run format:check
+
+ts-gate: ts-check ts-lint ts-format-check
+	@echo "ts-gate: GREEN (tsc, eslint, prettier)"
 
 cli-build: stripped
 	@$(call AGDA_RUN,--compile --compile-dir=../_cli src/CLI/Main.agda)
