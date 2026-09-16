@@ -233,15 +233,15 @@ deferred beside it.
 
 ### Big picture tier roadmap
 
-- **THE FOLD'S ACCUMULATOR, WHICH IS THE CARRIER THAT SURVIVED.** The queue
-  carrier was owed to a leaf that turned out unreachable: a push cycle is entered
-  only from a source former, and saying so in a type retired the row outright, so
-  the queue is write-only from a subscribe and the instant loop inherits it. What
-  remains is the fold, whose node holds a payload and is read back inside the
-  cycle that wrote it — and there the accumulator HAS a source, in hand at the
-  arm that installs the node. The gap is that nothing carries it across the
-  source's subscription. This leg decides where that crossing is paid for, with
-  the store-invariant routes already dead.
+- **THE ONE FACT THE FOLD LEFT BEHIND, AND IT IS NOT ABOUT THE CANDIDATE.** The
+  accumulator's crossing is paid: the obligation on the node goes INTO the step
+  and is RE-ESTABLISHED coming out, so the fold is a body and nothing was
+  laundered into a hypothesis. What survives is structural — a node installed
+  just before a source runs is still there when its burst comes back, because
+  ids are drawn from a counter that only advances and a subscription writes only
+  what it allocated. Nothing has instantiated that, so it is born at the worst
+  class. This leg probes it at a source that really does allocate, and decides
+  whether the counter suffices or the store owes an invariant after all.
 
 - **DISCHARGE THE FOUR SUBSTITUTION LEAVES THE PARTNER BOUGHT ITSELF WITH.**
   The `Θloc` telescope landed and took three of the original six with it —
@@ -287,6 +287,10 @@ deferred beside it.
   `DEAD ROUTE, PROBED`: a share's slot is reducible. Its def is drawn from the
   table rather than the term, so no descent this module can see reaches it.
 
+- **`red-scan-installed`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`: a node
+  installed just before a source's subscription reads back unchanged after it.
+  Ids come from a counter that only advances. Nothing has instantiated it.
+
 - **`sub-unfoldμ`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`: the fixpoint
   peel commutes with the environment substitution. This is what the partner's μ
   arm spends, and it is where a wrong telescope would show.
@@ -303,10 +307,6 @@ deferred beside it.
   substitution is the identity. It is what makes the top line a corollary of
   the partner at the empty environment.
 
-
-- **`red-scan`** (Rx/Evaluator/Reducible) — SHAPE, `DEAD ROUTE, PROBED`: the
-  witness is pinned now, so the demand is real and unmet — the emitted value is
-  the stored accumulator and no hypothesis says a stored one is reducible.
 
 - **`red-thru`** (Rx/Evaluator/Reducible) — DIFFICULTY, `PROBED`: the consume
   fallback is pinned now, so an arrival at a usable node is subscribed and the

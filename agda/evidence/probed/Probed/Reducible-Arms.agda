@@ -43,7 +43,7 @@
 -- own recursion the body already checks.
 --
 -- TARGET: red-input-shared @21f529
--- TARGET: red-scan @c288cd
+-- TARGET: red-scan-installed @dbbe5c
 -- TARGET: red-thru @f94cad
 module Probed.Reducible-Arms where
 
@@ -56,19 +56,22 @@ open import Data.Nat using (zero; s≤s; z≤n)
 open import Data.List using ([])
 open import Data.Maybe using (nothing)
 open import Data.Bool using (false)
-open import Data.Product using (_,_; proj₁; proj₂)
+open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Unit using (tt)
 open import Data.Vec using ([]; _∷_)
 open import Data.List.Relation.Unary.Any using (here)
 open import Relation.Binary.PropositionalEquality using (refl)
 
-open import Rx.Exp using (Ctx; Closed; natᵗ; obs; ofᵉ; nat̂; varᵗ; input; _×ᵗ_; fstᵗ; Fn)
+open import Rx.Exp using (Ctx; Closed; natᵗ; obs; ofᵉ; takeᵉ; nat̂; varᵗ; input; _×ᵗ_; fstᵗ; Fn)
 open import Rx.Slots using (Slots; shared)
-open import Rx.Evaluator using (Sched; EvalSt; Path; root; sched-init; st-init; mergeAllᵒ; switchᵒ; exhaustᵒ; AllOp;
-  NodeState; from-inner; _↠_; map-f; mergeAll-st; switch-st; exhaust-st; installNode; scan-st)
-open import Rx.Evaluator.Reducible using (Red; reducible; red-input-shared; red-thru; red-scan)
+open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; root; sched-init; st-init; mergeAllᵒ; switchᵒ; exhaustᵒ; AllOp;
+  NodeId; NodeState; from-inner; _↠_; map-f; scan-f; mergeAll-st; switch-st; exhaust-st;
+  installNode; scan-st)
+open import Rx.Evaluator.Reducible using (Red; reducible; red-input-shared; red-thru;
+  red-scan-installed; tie-scan)
 
-open import Rx.Evaluator.Domain using (subs-shared; slot-spent; slot-join; step-thru-outer; walk-nil; walk-cons; inner; step-scan;
+open import Rx.Evaluator.Domain using (subs-shared; slot-spent; slot-join; step-thru-outer; walk-nil; walk-cons; inner;
+  subs-of; subs-take-suc; push-cons; push-nil; step-take; subscribeE⇓;
   consume-all-sub; consume-all-enqueue; consume-switch-sub; consume-exhaust-sub)
 
 open import Probed.Apparatus using (Confirms)
@@ -152,49 +155,7 @@ row-share-join =
 
 
 ----------------------------------------------------------------------
--- 4.  THE TWO STORE-READING FRAMES THAT ARE NOT FLATTENERS.  Both are
--- stated at an OBSERVABLE payload, which is the only shape in which
--- either can fail: at a data payload the satisfaction half is `⊤` and
--- the row asserts nothing about the candidate.
---
--- THE STATES ARE CONSTRUCTED, AND THAT IS THE FINDING RATHER THAN A
--- WEAKNESS OF THE ROWS.  A scan reads its accumulator back out of the
--- node and emits it, so the row can only be written by installing an
--- accumulator that IS reducible -- and nothing in the statement, in
--- `Red`, or in `EvalSt` says an installed one ever is.  The take arm
--- is the contrast that makes the point precise: its values pass
--- through untouched and the store only decides HOW MANY, so its row
--- needs no such installation and the arm is store-reading without
--- being store-DEPENDENT.  That split is what the leg above this tier
--- is deciding.
-----------------------------------------------------------------------
-
-fstFn : Fn Γ₀ [] [] [] (obs natᵗ ×ᵗ natᵗ) (obs natᵗ)
-fstFn = fstᵗ (varᵗ (here refl))
-
--- the frame's output is an observable, so the chain below it needs one
--- more hop to reach the run's data root
-κ₂ : Path Γ₀ 0 (obs natᵗ) natᵗ
-κ₂ = map-f (nat̂ 0) ↠ κ₀
-
-nid₂ : _
-nid₂ = Sched.nextNode sch₀
-
-acc₂ : Closed Γ₀ natᵗ
-acc₂ = ofᵉ (nat̂ 7 ∷ [])
-
-stScan : EvalSt e₀
-stScan = installNode nid₂ (scan-st {t = obs natᵗ} acc₂) st₀
-
--- LOAD-BEARING: the emitted value IS the stored accumulator, so the
--- row fails unless the candidate holds of what the node was holding.
-row-scan-acc : Confirms
-  (red-scan {e = e₀} 0 0 fstFn nid₂ κ₂ {3 ∷ []} (tt ∷ []) false sch₀ stScan)
-row-scan-acc =
-  _ , step-scan , reducible acc₂ ∷ []
-
-----------------------------------------------------------------------
--- 5.  THE SAME STEP THROUGH A FLATTENING FRAME, which is where the
+-- 4.  THE SAME STEP THROUGH A FLATTENING FRAME, which is where the
 -- hop lives.  The three `*All` operators are not statements of their
 -- own: each runs its source through a `thru-outer` frame and pushes
 -- what came back, so everything an operator DOES -- the queue, the
@@ -248,7 +209,7 @@ row-live-merge =
         (walk-cons (consume-all-sub refl refl
                      (inner refl (subLive mergeAllᵒ (mergeAll-st nothing 0 [] false)) refl))
                    walk-nil)
-    , allTriv (λ _ → tt) _
+    , allTriv (λ _ → tt) _ , tt
 
 stBound : EvalSt e₀
 stBound = installNode nid₃ (mergeAll-st {t = natᵗ} (just 0) 0 [] false) st₀
@@ -257,7 +218,7 @@ row-live-queue : Confirms
   (red-thru {e = e₀} 0 0 mergeAllᵒ nid₃ κ₀ satLive false sched₃ stBound)
 row-live-queue =
   _ , step-thru-outer (walk-cons (consume-all-enqueue refl refl) walk-nil)
-    , allTriv (λ _ → tt) _
+    , allTriv (λ _ → tt) _ , tt
 
 stSwitch : EvalSt e₀
 stSwitch = installNode nid₃ (switch-st nothing false) st₀
@@ -269,7 +230,7 @@ row-live-switch =
         (walk-cons (consume-switch-sub refl refl
                      (inner refl (subLive switchᵒ (switch-st nothing false)) refl))
                    walk-nil)
-    , allTriv (λ _ → tt) _
+    , allTriv (λ _ → tt) _ , tt
 
 stExhaust : EvalSt e₀
 stExhaust = installNode nid₃ (exhaust-st false false) st₀
@@ -281,4 +242,53 @@ row-live-exhaust =
         (walk-cons (consume-exhaust-sub refl
                      (inner refl (subLive exhaustᵒ (exhaust-st false false)) refl))
                    walk-nil)
-    , allTriv (λ _ → tt) _
+    , allTriv (λ _ → tt) _ , tt
+
+----------------------------------------------------------------------
+-- 5.  THE NODE A SOURCE CANNOT REACH, which is the fold's residue and
+-- the one part of it that is not about the candidate at all.  The
+-- accumulator is installed at an id taken from the scheduler's counter
+-- and the source is then subscribed with that counter already advanced
+-- past it, so the row is about ALLOCATION: it runs a source that really
+-- does allocate a node of its own and asks whether the accumulator is
+-- still there afterwards.
+--
+-- LOAD-BEARING, and the take is what makes it so.  A `take` installs a
+-- node at the next id and writes it back on every step, so if the
+-- advance were off by one the two writes would collide, the lookup
+-- would compute to the take's own state, and the row would not
+-- typecheck.  A source that allocates nothing could not have failed.
+----------------------------------------------------------------------
+
+fstFn : Fn Γ₀ [] [] [] (obs natᵗ ×ᵗ natᵗ) (obs natᵗ)
+fstFn = fstᵗ (varᵗ (here refl))
+
+-- the frame's output is an observable, so the chain below it needs one
+-- more hop to reach the run's data root
+κ₂ : Path Γ₀ 0 (obs natᵗ) natᵗ
+κ₂ = map-f (nat̂ 0) ↠ κ₀
+
+nid₂ : NodeId
+nid₂ = Sched.nextNode sch₀
+
+acc₂ : Closed Γ₀ natᵗ
+acc₂ = ofᵉ (nat̂ 7 ∷ [])
+
+-- the fold's source: a take, which allocates the very next id
+src₂ : Closed Γ₀ natᵗ
+src₂ = takeᵉ (nat̂ 1) (ofᵉ (nat̂ 5 ∷ []))
+
+-- the derivation is named rather than written into the claim, since
+-- the claim is inferred and the two implicits the conclusion binds are
+-- inserted as metas there
+d₂ : Σ (Stream Γ₀ natᵗ × Sched Γ₀ × EvalSt e₀) λ r →
+  subscribeE⇓ {e = e₀} src₂ (scan-f fstFn nid₂ ↠ κ₂) 0 0
+    (record sch₀ { nextNode = Data.Nat.suc nid₂ })
+    (installNode nid₂ (scan-st {t = obs natᵗ} acc₂) st₀) r
+d₂ = _ , subs-take-suc refl refl (subs-of refl) (push-cons refl step-take push-nil)
+
+row-scan-fresh : Confirms
+  (red-scan-installed {e = e₀} fstFn nid₂ (reducible acc₂)
+     {b = src₂} {κ = κ₂} {id = 0} {now = 0} sch₀ st₀ (proj₂ d₂)
+     {w = obs natᵗ} {a = acc₂})
+row-scan-fresh eq = tie-scan eq (reducible acc₂)
