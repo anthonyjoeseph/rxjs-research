@@ -93,6 +93,26 @@ open import Verify-Determinacy
   using (evaluate-deterministic)
 
 ------------------------------------------------------------------
+-- WHAT A PROGRAM MEANS, AND THAT THE MACHINE COMPUTES IT.  Claimed
+-- here rather than by a consumer for the same reason determinacy is:
+-- every face below is stated over the machine's own output, so none of
+-- them needs a denotation to typecheck, and a semantics stated only
+-- when its first consumer arrives is a semantics that consumer's
+-- author has to invent.
+--
+-- CAUTION, and it is the same shape as the timing claims': `adequacy`
+-- and `saturation` are stated over a POSTULATED domain (`Beh`,
+-- `denote`, `observe`), so what they pin today is the limit of the
+-- machine rather than a compositional reading of the syntax.  Listed
+-- anyway, on the same reasoning: they are claims we intend to make, and
+-- hiding them would shrink the ledger without shrinking the debt.
+-- `run-monotone` is the exception — it mentions nothing postulated and
+-- a program can refute it.
+------------------------------------------------------------------
+open import Verify-Adequacy
+  using (run-monotone; adequacy; saturation)
+
+------------------------------------------------------------------
 -- THE TIMING CLAIMS.  CAUTION: all three are stated over nine
 -- postulated abstract helpers in the same module (`Node`, `NodeSt`,
 -- `Inbox`, `inboxOf`, `stAt`, `cascade`, `δ`, `Retiming`, `retime`),
