@@ -68,6 +68,11 @@ postulate
   -- Batch order is delivery order.  The flagship: batching only
   -- GROUPS — never reorders, never drops.  MergeAlling the batches
   -- recovers the raw value stream, for every program and driver.
+  -- PROBED: `Probed.Readme-Claims`, at a two-value literal in an empty
+  --   slot table.  LOAD-BEARING on order and on completeness both --
+  --   the values differ, so a swap or a drop fails the `refl`.  Not
+  --   reached: anything the probe file's own header records as
+  --   unreachable, which is every flattening program.
   readme-batch-order-is-delivery-order :
     ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slots Γ) →
     concat (emitValues (spec-batchSimultaneous (evaluate↓ fuel e ins)))
@@ -76,6 +81,10 @@ postulate
   -- take counts values, even mid-batch: take k keeps the first k
   -- VALUES of the flat stream — never the first k batches — so it
   -- can cut a batch in half.
+  -- PROBED: `Probed.Readme-Claims`, at the cut the law is named for --
+  --   a two-value batch taken at one, so the row holds only if the
+  --   take reaches INSIDE a group.  Not reached: a take at zero, a
+  --   take past the end, and every flattening program.
   readme-take-counts-values :
     ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (k : ℕ)
       (e : Closed Γ t) (ins : Slots Γ) →
@@ -88,6 +97,10 @@ postulate
   -- subscribe frame — a single instant — so ANY program, however
   -- wired, yields at most one batch.  (Strictly stronger than v1's
   -- source-free version: arrivals cost fuel, defers included.)
+  -- PROBED: `Probed.Readme-Claims`, at a program whose subscribe frame
+  --   emits, so the bound is met at ONE rather than vacuously at
+  --   zero.  Not reached: a program whose subscribe frame emits
+  --   nothing, and every flattening program.
   readme-one-subscribe-one-batch :
     ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
     length (spec-batchSimultaneous (evaluate↓ 0 e ins)) ≤ 1

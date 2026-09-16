@@ -59,7 +59,13 @@ open import Rx.Protocol using (WellFormed)
 --   generator's fragment IS the coverage boundary.  Not reached:
 --   anything off that fragment —
 --   a context other than its two nat slots, a function returning an
---   observable, and any fuel but its own.
+--   observable, and any fuel but its own.  AND NOT REACHED ALONG AN
+--   AXIS THAT IS NOT THE GRAMMAR AT ALL: the sweep only ever sees
+--   derivations the BUILDER produced, while this statement quantifies
+--   over ANY `subscribeE⇓` and ANY `drain⇓` at these indices, and
+--   nothing in this development says those are the same set — there is
+--   no functionality fact about either relation.  Generating more
+--   programs cannot narrow that half.
 ------------------------------------------------------------------
 
 postulate

@@ -6,7 +6,6 @@ open import Data.Fin.Properties using (toℕ<n) renaming (_≟_ to _≟ᶠ_)
 open import Data.Maybe   using (Maybe; just; nothing; is-nothing)
 open import Data.Nat     using (ℕ; zero; suc; _+_; _<ᵇ_; _≡ᵇ_; _≤ᵇ_; _≤_)
 open import Data.Nat.Properties using (≤-trans)
-open import Data.Nat.ListAction using (sum)
 open import Data.List    using (List; []; _∷_; _++_; map; concat; tabulate; null)
 open import Data.Bool.ListAction using (any)
 open import Data.Vec     using (lookup)
@@ -14,6 +13,7 @@ open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Unit    using (⊤; tt)
 open import Data.Sum     using (_⊎_; inj₁; inj₂)
 open import Relation.Nullary using (yes; no)
+open import Relation.Nullary.Decidable using (⌊_⌋)
 open import Relation.Binary.PropositionalEquality using (refl)
 
 open import Rx.Prim using (Tick; Ordinal; Id; Source; Timed; after_,_; hot; cold; InstEvent; init; value; close;
@@ -92,18 +92,6 @@ sameSource = _≡ᵇ_
 memberSource : Source → List Source → Bool
 memberSource s = any (sameSource s)
 
--- THE UNCONNECTED-SHARE COUNT, outermost component of the order the
--- subscription machine descends on.  A connect moves one shared slot
--- out of the count and nothing puts one back, so that edge descends on
--- a quantity the telescope itself bounds and owes no budget.
-unconnAt : ∀ {n} {Γ : Ctx n} → Slots Γ → List Source → Fin n → ℕ
-unconnAt sl cs i with sl i
-... | shared _   = if memberSource (toℕ i) cs then 0 else 1
-... | scripted _ = 0
-
-unconn : ∀ {n} {Γ : Ctx n} → Slots Γ → List Source → ℕ
-unconn sl cs = sum (tabulate (unconnAt sl cs))
-
 -- delta-encoded waits → absolute ticks (gap = suc wait, so a source's
 -- ticks are strictly increasing by construction)
 resolve : ∀ {A : Set} → Tick → List (Timed A) → List (Tick × A)
@@ -172,6 +160,19 @@ sched-next sched = schedFinish sched (schedGo (Sched.live sched))
 NodeId : Set          -- a node instance in the dynamic topology,
 NodeId = ℕ            -- numbered in subscription order
 
+-- TWO OF THE FIVE ARMS CARRY A PAYLOAD, AND THAT CENSUS IS WHAT THE
+-- REDUCIBILITY FACE IS ACTUALLY WAITING ON.  A candidate defined by
+-- recursion on the type says nothing about what a NODE HOLDS, so every
+-- arm of `Rx.Evaluator.Reducible` that reads a node back is owed a
+-- store invariant -- but only where the read produces a VALUE.  Here
+-- `scan-st` holds one outright and `mergeAll-st`'s queue holds closed
+-- expressions; `take-st`, `switch-st` and `exhaust-st` hold a count, an
+-- identifier and two flags, and nothing that leaves a frame dispatching
+-- on those came from anywhere but the burst that arrived.  So three of
+-- the four arms need no carrier at all, and the two that do differ in
+-- cost: a queue entry's reducibility arrives from the hypothesis that
+-- admitted it, while an accumulator's is folded by the operator's own
+-- function and has no such source.
 data NodeState {n} (Γ : Ctx n) : Set where
   scan-st    : ∀ {t} → Val Γ t → NodeState Γ    -- current accumulator
   take-st    : ℕ → NodeState Γ                  -- emissions remaining
@@ -525,6 +526,27 @@ scanVals fn ac (v ∷ vs) =
       (outs , last) = scanVals fn ac′ vs
   in ac′ ∷ outs , last
 
+-- THE SCAN'S WHOLE STEP, AS ONE FUNCTION OF WHAT THE NODE HOLDS.  A
+-- fold that finds no accumulator of its own element type emits nothing
+-- and writes nothing, which is the same reading the queue's type test
+-- already forces on every existential read here.  Stating it as a
+-- function rather than as two constructors is what stops a prover
+-- choosing the empty reading at a node that really does hold an
+-- accumulator: the relation then has one arm and no arm to prefer.
+scanDispatch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+             → Fn Γ [] [] [] (u ×ᵗ s) u → NodeId → List (Val Γ s) → Bool
+             → Sched Γ → EvalSt e → Maybe (NodeState Γ)
+             → List (Val Γ u) × List (InstEvent (Val Γ t)) × Bool
+               × Sched Γ × EvalSt e
+scanDispatch {u = u} fn nid vals fin sched st (just (scan-st {w} a))
+  with w ≟ᵗ u
+... | no  _    = [] , [] , fin , sched , st
+... | yes refl =
+      proj₁ (scanVals fn a vals) , [] , fin , sched ,
+      record st { nodes = setNode nid (scan-st (proj₂ (scanVals fn a vals)))
+                                  (EvalSt.nodes st) }
+scanDispatch fn nid vals fin sched st _ = [] , [] , fin , sched , st
+
 -- take's per-emit step, lifted out of stepFrame so the well-formedness proof
 -- can reason about its reduction over a stuck node lookup.  Non-cut passes the
 -- budgeted prefix through untouched (threading the remaining count); the cut
@@ -581,6 +603,38 @@ switchKill (just v) sched₀ st₀ =
      record sched₀ { live = sweepLive kept (Sched.live sched₀) } ,
      record st₀ { registry = kept
                 ; cancelled = cutRids ++ EvalSt.cancelled st₀ }
+
+-- WHETHER A CONSUME CLAUSE HAS A NODE IT CAN USE AT ALL, AS ONE
+-- FUNCTION OF THE READING.  Each operator accepts exactly one shape of
+-- stored state: a merge wants its own, at its own element type, since
+-- the table carries that type existentially; a switch wants its own,
+-- which holds no type to disagree about; an exhaust wants its own with
+-- nothing already running, because a busy exhaust refuses the arrival
+-- outright.  Every other reading -- another operator's state, a
+-- mismatched element type, no node -- is the collapse, and naming the
+-- collapse is what lets the relation's fallback carry a side condition
+-- instead of standing free at every state.
+consumeUsable : ∀ {n} {Γ : Ctx n} → AllOp → (u : Ty) → Maybe (NodeState Γ) → Bool
+consumeUsable mergeAllᵒ u (just (mergeAll-st {w} _ _ _ _)) = ⌊ w ≟ᵗ u ⌋
+consumeUsable switchᵒ   u (just (switch-st _ _))           = true
+consumeUsable exhaustᵒ  u (just (exhaust-st false _))      = true
+consumeUsable _         _ _                                = false
+
+-- AND THE SAME QUESTION ON THE WAY BACK UP, WHERE AN INNER HAS DIED
+-- AND ITS OPERATOR HAS TO FINISH IT.  A merge finishes against its own
+-- node at its own element type, because that is the queue it drains; a
+-- switch finishes only the inner it currently believes is running, so
+-- a late death from an already-replaced inner clears nothing; an
+-- exhaust finishes against its own node whatever the running flag
+-- says, since clearing it is the whole point.  Anything else is the
+-- collapse, and naming it keeps the relation's fallback from standing
+-- free at a node that really does hold a queue.
+finishUsable : ∀ {n} {Γ : Ctx n} → AllOp → (s : Ty) → NodeId
+             → Maybe (NodeState Γ) → Bool
+finishUsable mergeAllᵒ s inst (just (mergeAll-st {w} _ _ _ _)) = ⌊ w ≟ᵗ s ⌋
+finishUsable switchᵒ   s inst (just (switch-st (just c) _))    = c ≡ᵇ inst
+finishUsable exhaustᵒ  s inst (just (exhaust-st _ _))          = true
+finishUsable _         _ _    _                                = false
 
 thruWrap : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
          → AllOp → NodeId → Bool

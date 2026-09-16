@@ -21,17 +21,19 @@ module Rx.Evaluator.Keeps-Slots where
 
 open import Data.Bool using (Bool; true; false)
 open import Data.Fin using (Fin; toℕ)
-open import Data.List using (List)
+open import Data.List using (List; [])
 open import Data.Maybe using (Maybe; nothing; just)
 open import Data.Nat using (ℕ; _<_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Vec using (lookup)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans)
+open import Relation.Nullary using (yes; no)
 
 open import Rx.Prim using (Id; Tick)
-open import Rx.Exp using (Ctx; Closed; Val; obs)
+open import Rx.Exp using (Ctx; Closed; Val; obs; Fn; _×ᵗ_; _≟ᵗ_)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; AllOp; NodeId;
-  NodeState; Frame; take-st; scan-st; takeVals; takeDispatch; thruWrap;
+  NodeState; Frame; take-st; scan-st; takeVals; takeDispatch;
+  scanDispatch; thruWrap;
   switchKill; oneShotBurst; lookupNode; mergeAll-st; switch-st; exhaust-st;
   mergeAllᵒ; switchᵒ; exhaustᵒ)
 open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeAll⇓; pushBurst⇓;
@@ -46,7 +48,7 @@ open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeAll⇓; pushBurst
   walk-nil; walk-cons; drain-nil; drain-no-room; drain-room;
   finish-all-drain; finish-switch-clear; finish-exhaust-clear; finish-nil;
   react-false; react-alive; react-dead;
-  step-map; step-scan; step-scan-nil; step-take; step-from-inner;
+  step-map; step-scan; step-take; step-from-inner;
   step-thru-outer; push-nil; push-cons; sub-all;
   connect-live; connect-died; slot-spent; slot-join; slot-connect)
 
@@ -80,6 +82,24 @@ take-slots nid vals fin sched st (just (mergeAll-st _ _ _ _)) = refl
 take-slots nid vals fin sched st (just (switch-st _ _))       = refl
 take-slots nid vals fin sched st (just (exhaust-st _ _))      = refl
 take-slots nid vals fin sched st (just (scan-st _))           = refl
+
+-- the fold rewrites its accumulator and passes the schedule through
+scan-slots : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (fn : Fn Γ [] [] [] (u ×ᵗ s) u)
+  (nid : NodeId) (vals : List (Val Γ s)) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) (ns : Maybe (NodeState Γ)) →
+  Sched.slots (proj₁ (proj₂ (proj₂ (proj₂
+    (scanDispatch {e = e} fn nid vals fin sched st ns)))))
+    ≡ Sched.slots sched
+scan-slots {u = u} fn nid vals fin sched st (just (scan-st {w} a))
+  with w ≟ᵗ u
+... | no  _    = refl
+... | yes refl = refl
+scan-slots fn nid vals fin sched st nothing                      = refl
+scan-slots fn nid vals fin sched st (just (take-st _))           = refl
+scan-slots fn nid vals fin sched st (just (mergeAll-st _ _ _ _)) = refl
+scan-slots fn nid vals fin sched st (just (switch-st _ _))       = refl
+scan-slots fn nid vals fin sched st (just (exhaust-st _ _))      = refl
 
 -- the wrap rewrites a node and passes the schedule straight through
 wrap-slots : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
@@ -192,8 +212,9 @@ mutual
       (vals′ , evs , fin′ , sched′ , st′) →
     Sched.slots sched′ ≡ Sched.slots sched
   step-keeps step-map        = refl
-  step-keeps (step-scan _ _) = refl
-  step-keeps step-scan-nil   = refl
+  step-keeps {vals = vals} {fin = fin} {sched = sched} {st = st}
+             (step-scan {fn = fn} {nid = nid}) =
+    scan-slots fn nid vals fin sched st (lookupNode nid (EvalSt.nodes st))
   step-keeps {id = id} {now = now} {vals = vals} {fin = fin}
              {sched = sched} {st = st} (step-take {nid = nid}) =
     take-slots nid vals fin sched st (lookupNode nid (EvalSt.nodes st))
@@ -226,7 +247,7 @@ mutual
   finish-keeps (finish-all-drain d)     = drain-keeps d
   finish-keeps (finish-switch-clear _)  = refl
   finish-keeps finish-exhaust-clear     = refl
-  finish-keeps finish-nil               = refl
+  finish-keeps (finish-nil _)           = refl
 
   drain-keeps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo}
     {allNid : NodeId} {κ : Path Γ lo s t} {id : Id} {now : Tick}
@@ -261,13 +282,13 @@ mutual
     Sched.slots sched′ ≡ Sched.slots sched
   consume-keeps (consume-all-sub _ _ i)     = inner-keeps i
   consume-keeps (consume-all-enqueue _ _)   = refl
-  consume-keeps consume-all-nil             = refl
+  consume-keeps (consume-all-nil _)         = refl
   consume-keeps (consume-switch-sub {sched₀ = sched₀} {st₀ = st₀} {cur = cur}
                 _ k i) =
     trans (inner-keeps i) (switchKill-slots cur sched₀ st₀ k)
-  consume-keeps consume-switch-nil          = refl
+  consume-keeps (consume-switch-nil _)      = refl
   consume-keeps (consume-exhaust-sub _ i)   = inner-keeps i
-  consume-keeps consume-exhaust-nil         = refl
+  consume-keeps (consume-exhaust-nil _)     = refl
 
   connect-keeps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo}
     {i : Fin n} {d : Closed Γ (lookup Γ i)}

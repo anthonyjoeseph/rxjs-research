@@ -43,7 +43,8 @@
 --   was consumed by that face and by nothing else.
 module Decide where
 
-open import Data.Bool using (true)
+open import Data.Bool using (Bool; true; false; T; _∧_)
+open import Data.Unit using (tt)
 open import Data.Nat using (ℕ; zero; suc; _≡ᵇ_)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Empty using (⊥)
@@ -77,3 +78,25 @@ just-injᵂ refl = refl
 
 n≢jᵂ : ∀ {A : Set} {x : A} → _≡_ {A = Maybe A} nothing (just x) → ⊥
 n≢jᵂ ()
+
+------------------------------------------------------------------
+-- CONJUNCTION IN `T` FORM, AND THE BOOLS ARE EXPLICIT ON PURPOSE.
+-- `T` is a FUNCTION on `Bool`, not a datatype, so `T ?a =?= T (f k x)`
+-- cannot be inverted while the argument is stuck on a variable --
+-- which it always is at the recursive call sites these serve.  With
+-- the Bools implicit every one of those raises an unsolved meta;
+-- passing them costs verbosity and buys independence from inference.
+-- `T-∧` in `Data.Bool.Properties` has the same problem behind a ⇔.
+------------------------------------------------------------------
+
+∧ˡ : ∀ (a b : Bool) → T (a ∧ b) → T a
+∧ˡ true  b _  = tt
+∧ˡ false b ()
+
+∧ʳ : ∀ (a b : Bool) → T (a ∧ b) → T b
+∧ʳ true  b h = h
+∧ʳ false b ()
+
+∧⁺ : ∀ (a b : Bool) → T a → T b → T (a ∧ b)
+∧⁺ true  b _  hb = hb
+∧⁺ false b () _

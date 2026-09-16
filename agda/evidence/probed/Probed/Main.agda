@@ -15,11 +15,14 @@
 -- nobody — so `using ()` is the correct and expected clause here.  It is not
 -- an omission: it says this module's content is its pins.  See EVIDENCE.md.
 --
--- WHY THE TREE IS SMALL.  A probe expires with its target, and the
--- statements this tree was written against were the budget's: a grant,
--- a nest store, a walk maximum, a caps arithmetic priced in gas.  None
--- of them is stateable now, so the rows are evidence about a machine
--- that is gone and E2 expires every one of them.
+-- WHY THE TREE IS EMPTY.  A probe expires with its target, and every
+-- statement this tree was written against was a reading of a MEASURE —
+-- a budget's grant, a frame's carried figure, a depth read off the
+-- program text.  None of them is stateable now, so the rows would be
+-- evidence about a machine that is gone and E2 expires every one of
+-- them.  What replaced the measure has not been instantiated at
+-- anything yet, which is the single largest unmanaged risk in the
+-- repo and the next thing this tree is for.
 --
 -- AND TWO FURTHER GENERATIONS EXPIRED THE SAME WAY, WHICH IS WHAT SAYS
 -- THE MECHANISM IS THE RIGHT ONE RATHER THAN AN OVERHEAD.  Six files
@@ -47,20 +50,10 @@ module Probed.Main where
 -- both belong to the tree and a tree with nothing open still owes them.
 open import Probed.Apparatus using (Confirms; Separates)
 
--- THE SHELF UNDER THE SUBSTITUTION LEMMA — the weakening, whose rows
--- have content on both sides, read at the closed bound and at a
--- positive one, since the bound is now a parameter of the reading.
-open import Probed.Data-Shelf using (row-wk-leaf; row-wk-strm;
-  row-wk-leaf-open; row-wk-strm-open)
+-- THE TOP-LINE CLAIMS.  Named and claimed from the root for the same
+-- reason: a `Confirms` row's type is generated from its target, so the
+-- name is the only handle the reachability law has on it.
+open import Probed.Readme-Claims using (row-order; row-take; row-one-batch)
 
-
--- THE BURST REPORT'S REMAINING PRICING LEAF — the data payload, whose
--- rows reach the two types at which the reading recurses.
-open import Probed.Burst-Handed using (row-data-flat; row-data-pair;
-  row-data-sum)
-
--- THE TWO HEADS THAT LEAVE THE BURST REPORT — instantiated on the arms
--- that pass a payload through, which is every arm reachable without a
--- subscription derivation.
-open import Probed.Frame-Heads using (row-inner-false; row-inner-dead;
-  row-thru-nil; row-thru-merge; row-thru-switch; row-thru-exhaust)
+-- THE PIPELINE-SIDE CLAIMS, claimed from the root for the same reason.
+open import Probed.Pipeline-Claims using (row-online; row-ids)
