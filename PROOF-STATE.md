@@ -221,50 +221,65 @@ research lives; where they disagree, the header wins.
 Built on the run's own derivation, which is now a body the whole tower
 descends through.
 
-**THE TIER IS ONE STATEMENT OVER ONE LEAF.** `The-Proof` draws
-`evaluate-well-formed` and nothing else from this face. That name is a real
-body: it splits the descent's dry-freeness across the subscribe frame and the
-drain, and hands the two halves to the leaf. The split is what CONSUMES the
-descent — a leaf handed its conclusion directly would assert its sufficiency
-without ever checking it, which is the shape the leaf law refuses.
+**THE TIER IS ONE STATEMENT, NOW CARVED AT ITS SEAM.** `The-Proof` draws
+`evaluate-well-formed` and nothing else from this face, and everything from
+that name down to the two leaves is a body: the run's constructor splits the
+burst from the drain, the automaton's state between them is named, and the two
+halves are composed by a proven fold law rather than by assumption.
 
-**AND THE BOOKKEEPING IS DELIBERATELY UNCARVED.** What used to hold the carve
-back was a recursion that might still be restated, and that is settled. What
-holds it now is the leaf's own evidence, which covers less than it reads as
-covering. One leaf at full strength; carve it when the legs below say what the
-evidence actually reaches.
+**SO WHAT IS OPEN IS TWO PRESERVATION CLAIMS AND THE RELATION THEY MEET IN.**
+Both are born without evidence — the sweep that covered the old fused leaf
+computed the concatenation's verdict and never the seam — and the seam is the
+first thing on this face a program can be run against directly.
 
 ### Big picture tier roadmap
 
-- **CLOSE THE GAP BETWEEN WHAT THE SWEEP RAN AND WHAT THE LEAF SAYS.** The
-  sweep decides the conclusion at thousands of programs, but only ever on
-  derivations the BUILDER produced, while the leaf quantifies over any
-  `subscribeE⇓` and any `drain⇓` at those indices. Nothing in the tree says
-  those are the same set — there is no functionality fact about either
-  relation, in code or in prose — so the uncovered region is a whole axis the
-  harness cannot reach by generating programs. Decide it: either the relations
-  are deterministic here, which makes every sampled program a real
-  instantiation, or they are not, and the leaf is strictly stronger than
-  anything has tested.
+- **REACH THE DRAIN'S STEP, WHICH THE FIRST ROWS COULD NOT.** The seam is
+  instantiated: both leaves now hold at a real two-value program, composed so
+  the drain row starts at the state the root row produced rather than at a
+  hand-built one. What that bought is the root frame outright and the drain's
+  EXIT — and nothing about its step, because the program schedules no source.
+  A program with a scheduled source is what decides whether the relation is
+  PRESERVED, which is the half the whole induction turns on, and it is the
+  cheapest remaining thing that could still refute either leaf. The
+  flattening fragment stays out of reach for a reason that is the evaluator's
+  and not this face's.
 
-- **THEN REACH THE FRAGMENT THE GENERATOR CANNOT WRITE.** The receipt names
-  what it did not cover, and it is not decoration: a context other than two nat
-  slots, a slot holding an observable rather than data, and any fuel but its
-  own. The first two are where the protocol automaton's sharing and connect
-  rules live, which is exactly where a bookkeeping argument is least likely to
-  be uniform. Extend the harness rather than the argument.
+- **THEN CARRY THE INVARIANT ACROSS THE DRAIN'S OWN RECURSION.** `drain-wf` is
+  generic in the seam state precisely so it can re-enter itself, which means
+  the grind is an induction over the drain with the relation as its motive —
+  and the fields the burst form deliberately omits (node-counter coherence,
+  the after-completion plumbing claim) are re-established once at the frame's
+  exit rather than threaded. That exit is where the second invariant record
+  and its heavier vocabulary land, and not before: carving it now would be
+  inventory against an assembly nothing has written.
 
-- **THEN CARVE, AND NOT BEFORE.** Every way of cutting this face into pieces is
-  a bet on the leaf being true, and a leaf refuted after the carve costs the
-  carve as well — so the shape of the bookkeeping induction is decided once the
-  two legs above have said what the leaf actually covers.
+- **THEN REACH THE FRAGMENT THE GENERATOR CANNOT WRITE.** The sweep's coverage
+  boundary survives the carve and is not decoration: a context other than two
+  nat slots, a slot holding an observable rather than data, and any fuel but
+  its own. The first two are where the protocol automaton's sharing and
+  connect rules live, which is exactly where a bookkeeping argument is least
+  likely to be uniform. Extend the harness rather than the argument.
+
+- **AND THE BASE CASE LANDS WITH THE ROOT HALF'S BODY, NOT BEFORE.** The
+  initial schedule and state do satisfy the seam relation against the
+  automaton's initial state and the proof is five projections — but its only
+  use today would be as an argument to the very leaf it is meant to start,
+  which the leaf law refuses. It is written down as a finding in the
+  relation's own module and lands in the commit that turns that leaf into a
+  body.
 
 ### The ledger
 
-- **`burst-drain-well-formed`** (Verify-Well-Formed) — FALSITY, `PROBED`:
-  everything the protocol argument owes about a run whose subscribe frame and
-  whose drain are each dry-free. The sweep decides its conclusion at every
-  program it runs, so what is open is the fragment the generator cannot write.
+- **`subscribeE-root-wf`** (Verify-Well-Formed) — FALSITY, `PROBED`: the root
+  subscribe frame's burst drives the automaton to a state standing in the seam
+  relation to the evaluator's. Computable at concrete programs and
+  uninstantiated; it also owes its own base case.
+
+- **`drain-wf`** (Verify-Well-Formed) — FALSITY, `PROBED`: from any state in
+  the seam relation, the drain's emits drive the automaton to a state that is
+  paid up. Generic so its induction can re-enter itself; nothing has run a
+  drain against it.
 
 ## Tier 2 — the top-line semantic claims (parked behind tier 1)
 
