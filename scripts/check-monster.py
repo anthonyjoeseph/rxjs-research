@@ -71,11 +71,22 @@ MONSTER_HEAD_RE = re.compile(r"^###\s+The monster\b", re.I)
 NAME_RE = re.compile(r"`([^`]+)`")
 
 
+NO_MONSTER_RE = re.compile(r"\(no monster\)", re.I)
+
+
 def parse_monsters(path):
     """tier number -> (monster, [also…], line, subject).  One backticked name
     in the section's first non-blank prose line; `also:` lines add admitted
     roots.  The SUBJECT is the backticked name in the tier's own heading, or
-    None where the tier names no single definition."""
+    None where the tier names no single definition.
+
+    A MONSTER IS NULL WHERE THE TIER WRITES `(no monster)`, and the monster is
+    then None rather than absent.  A tier whose work is REFACTORING has no
+    statement that could be false: the type it threads either checks or does
+    not, and the cone of a thing that cannot be wrong decides nothing while
+    still forbidding the threading, which touches every module by design.  The
+    opt-out is written in the section rather than passed as a flag for the same
+    reason an `also:` line is — it is reviewed with the roadmap."""
     out = {}
     subjects = {}
     tier = None
@@ -97,6 +108,9 @@ def parse_monsters(path):
             if line.strip().lower().startswith("also:"):
                 if tier in out:
                     out[tier][1].extend(names)
+                continue
+            if tier not in out and NO_MONSTER_RE.search(line):
+                out[tier] = (None, [], lineno)
                 continue
             if tier not in out and names:
                 out[tier] = (names[0], [], lineno)
@@ -206,6 +220,43 @@ also: `beta` — declared exception.
           "and a monster BELOW its tier's subject reads as distinct")
     os.unlink(tmp2)
 
+    # THE OPT-OUT.  A refactoring tier declares none, and it must turn the
+    # check OFF rather than fall through to the tier below -- which would hold
+    # the threading to a cone drawn for work nobody is doing.
+    doc3 = """## Tier 1 — a
+### The monster
+(no monster) — a refactoring tier.
+## Tier 2 — b
+### The monster
+`gamma` — a real one, one tier down.
+"""
+    with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False) as fh:
+        fh.write(doc3)
+        tmp3 = fh.name
+    g3 = parse_monsters(tmp3)
+    check(1 in g3 and g3[1][0] is None,
+          "`(no monster)` reads as a tier PRESENT with a null monster")
+    check(min(g3) == 1,
+          "and it still binds at the lowest tier, so the check goes quiet "
+          "rather than falling through to tier 2's cone")
+    check(g3.get(2, (None,))[0] == "gamma",
+          "while a lower tier's real monster is still parsed")
+    os.unlink(tmp3)
+
+    # AND THE OPT-OUT IS NOT A BACKTICK-FREE LINE.  A monster section whose
+    # prose simply names nothing is a tier that FORGOT, and it must not read
+    # as having opted out.
+    doc4 = """## Tier 1 — a
+### The monster
+the thing we are trying to kill, written without backticks.
+"""
+    with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False) as fh:
+        fh.write(doc4)
+        tmp4 = fh.name
+    check(1 not in parse_monsters(tmp4),
+          "a monster section naming nothing is NOT an opt-out")
+    os.unlink(tmp4)
+
     # the splice: an anonymous `with` continuation must not break the cone.
     class D:
         def __init__(self, kind, file):
@@ -230,7 +281,10 @@ also: `beta` — declared exception.
             print(f"monster-selftest: FAILED — {f}")
         sys.exit(1)
     print("monster-selftest: PASS (the lowest tier's monster is the one that "
-          "binds, a monster may not be its tier's own subject, an `also:` "
+          "binds, a monster may not be its tier's own subject, a `(no "
+          "monster)` tier turns the check OFF rather than falling through to "
+          "the cone below it while a section that merely names nothing is a "
+          "tier that forgot, an `also:` "
           "exception is collected and is not charged against "
           "the section's prose budget, and an anonymous `with` continuation is "
           "spliced into the declaration it continues -- without which an "
@@ -311,6 +365,17 @@ def main():
 
     tier = min(monsters)
     monster, also, lineno, subject = monsters[tier]
+
+    # THE OPT-OUT BINDS AT THE LOWEST TIER AND NOWHERE ELSE.  Falling through
+    # to the next tier's monster would be worse than holding nothing: it would
+    # hold this tier's work to a cone drawn for work nobody is doing.
+    if monster is None:
+        print(f"check-monster: tier {tier} declares `(no monster)` — it is a "
+              f"refactoring tier, with no statement under it that could be "
+              f"false, so no cone is held and every line added to agda/src is "
+              f"admitted.")
+        return
+
     roots = [monster] + also
 
     if subject is not None and monster == subject:
