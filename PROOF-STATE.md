@@ -182,7 +182,7 @@ the row is DIFFICULTY.
 formal-verification-batchSimultaneous    The-Proof.agda — REAL, module postulate-free
  ├─ batch-agreement                      proven
  └─ evaluate-well-formed                 Verify-Well-Formed.agda — REAL, one match
-     └─ burst-drain-well-formed          one postulate — tier 1
+     └─ burst-drain-well-formed          one postulate — tier 2
 
   evaluate↓ = proj₁ ∘ evaluate!           Rx/Evaluator/Builder.agda — REAL
      └─ every value-path leaf is a body; the corpus runs; the tower descends
@@ -202,10 +202,77 @@ every guard, every `<?` and the dry marker leave the machine entirely.
 A row's class must agree with its postulate's header, which is where the
 research lives; where they disagree, the header wins.
 
-## Tier 1 — Verify-Well-Formed
+## Tier 1 — `take-bounds-values`
+
+**THE TIER IS ONE STATEMENT AND IT IS ALREADY A BODY.** A program whose
+outermost node is `take k` emits at most k values — the smallest claim here
+about the EVALUATOR's own bookkeeping rather than about a correspondence: no
+spec, no batching, no second run to compare against, and no need for the run
+relation to be a function before it means anything.
+
+**IT IS FIRST BECAUSE IT IS THE REHEARSAL (Anthony).** What it exercises is the
+induction over the drain that every tier below also owes, with none of their
+apparatus in the way. A run splits definitionally into its subscribe frame and
+its drain, and the take node's remaining budget is the only thing crossing
+between them, so the statement carves at exactly the seam the well-formedness
+face has to carve at — and the pieces here are arithmetic rather than an
+automaton.
+
+### The monster
+
+`take-bounds-values` — the tier's one statement, and a body rather than a
+postulate, which is what a monster is allowed to be: it can be FALSE in a way
+no ledger row records, because the carve itself can be wrong. Its two leaves
+are denominated in a budget IT defines, so a mis-placed decrement satisfies
+both leaves and fails the claim. Below it the tier is those two leaves, each
+with a cone of its own arithmetic, so naming one would forbid its sibling.
+
+also: `burst-drain-well-formed` — tier 2's monster. Admitted because the branch that carved this tier out of that one carries that face's seam and its two leaves, and the check reads the branch rather than the commit.
+also: `evaluate-deterministic` — tier 3's monster, whose statement and leaves are already declared, on the same branch and for the same reason.
+
+### Big picture tier roadmap
+
+- **THE FRAME'S ARITHMETIC FIRST, BECAUSE IT IS THE HALF WITH NO INDUCTION.**
+  `take-burst-bound` says what the subscribe frame emits plus what it leaves in
+  the node is within `k`. Under it is one mechanical fact the tree does not
+  have: what `takeVals` passes through plus what it reports remaining is
+  EXACTLY its budget, an equality rather than the inequality the consumer
+  needs. Split the leaf on `k` — the zero arm mints no node at all — and let
+  the successor arm stand on that equality through the dispatch.
+
+- **THEN THE DRAIN'S CARRY, WHICH IS THE INDUCTION.** `take-drain-bound` says
+  the drain emits no more than the budget it was left. The drain re-enters
+  itself and the budget is state it threads, so the motive is the node's own
+  reading and the grind is an induction over the drain — the same shape both
+  seam leaves of the tier below owe. One row reaches it today, at a cut
+  spanning two arrivals where the frame emits nothing at all, so the whole
+  bound is decided in the drain.
+
+- **THEN PUSH THE ROWS PAST THE COVERAGE BOUNDARY THE PROBE DECLARES.** Three
+  shapes are unreached and each is where a budget argument is least likely to
+  be uniform: a take nested under another take, where two nodes' budgets are
+  live at once; a budget that is not a literal, so `evalTm` is a real step; and
+  any flattening program, where the inner subscribes mint nodes between the
+  frame and the drain. A refutation at any of the three is worth more than
+  either grind above it.
+
+### The ledger
+
+- **`take-burst-bound`** (Verify-Take-Bounds) — FALSITY, `PROBED`: what the
+  subscribe frame emits plus what it leaves in the node is within `k`. Two rows
+  reach it; the decrement at the dispatch and the cut at the frame are the two
+  points that can disagree.
+
+- **`take-drain-bound`** (Verify-Take-Bounds) — FALSITY, `PROBED`: the drain
+  emits no more than the budget the subscribe frame left in the take node. The
+  rehearsal's inductive half; one row reaches it, at a cut spanning two
+  arrivals.
+
+## Tier 2 — `evaluate-well-formed` (parked behind tier 1)
 
 Built on the run's own derivation, which is now a body the whole tower
-descends through.
+descends through. Parked behind the rehearsal, which exercises this face's
+drain induction with none of its apparatus in the way.
 
 **THE TIER IS ONE STATEMENT, NOW CARVED AT ITS SEAM.** `The-Proof` draws
 `evaluate-well-formed` and nothing else from this face, and everything from
@@ -227,20 +294,8 @@ forbid its sibling; above it sits a wrapper supplying derivations. It can be
 FALSE, not merely unproven: a run the automaton rejects kills both leaves, the
 seam, and the WellFormed quantification `The-Proof` draws from here.
 
-also: `take-bounds-values` — the REHEARSAL, run here on Anthony's direction before the monster itself is touched. Off the cone by construction: it names no seam and no automaton, which is the point — it exercises the drain induction with none of this face's apparatus in the way. Now a body, so its cone carries its two leaves and the run decomposition they are stated over.
-also: `evaluate-deterministic` — tier 3's monster, whose statement and leaves are already declared. Admitted here because the branch carrying this tier's work carries them too, and the check reads the branch rather than the commit.
 
 ### Big picture tier roadmap
-
-- **FINISH THE REHEARSAL: THE DRAIN HALF OF TAKE'S BUDGET (Anthony).** The
-  assembly landed and the top statement is a body: a run splits definitionally
-  into its subscribe frame and its drain, and the node's budget is the only
-  thing crossing between them. What is left is the two leaves that split
-  carved out. `take-drain-bound` is the one carrying the induction — the drain
-  re-enters itself and the budget is state it threads, which is the shape both
-  seam leaves owe. `take-burst-bound` is the frame's own arithmetic and should
-  fall to the dispatch's clauses. Both are instantiated and tight; neither has
-  been ground.
 
 - **THEN RUN A CLOSE, WHICH IS THE ONE FIELD NO ROW HAS CONDITIONED.** The drain's
   step is reached: a hot slot firing at tick zero delivers, the emit count is
@@ -279,16 +334,6 @@ also: `evaluate-deterministic` — tier 3's monster, whose statement and leaves 
 
 ### The ledger
 
-- **`take-drain-bound`** (Verify-Take-Bounds) — FALSITY, `PROBED`: the drain
-  emits no more than the budget the subscribe frame left in the take node. The
-  rehearsal's inductive half; one row reaches it, at a cut spanning two
-  arrivals.
-
-- **`take-burst-bound`** (Verify-Take-Bounds) — FALSITY, `PROBED`: what the
-  subscribe frame emits plus what it leaves in the node is within `k`. Two rows
-  reach it; the decrement at the dispatch and the cut at the frame are the two
-  points that can disagree.
-
 - **`subscribeE-root-wf`** (Verify-Well-Formed) — FALSITY, `PROBED`: the root
   subscribe frame's burst drives the automaton to a state standing in the seam
   relation to the evaluator's. Computable at concrete programs and
@@ -299,10 +344,63 @@ also: `evaluate-deterministic` — tier 3's monster, whose statement and leaves 
   paid up. Generic so its induction can re-enter itself; nothing has run a
   drain against it.
 
-## Tier 2 — the top-line semantic claims (parked behind tier 1)
+## Tier 3 — `evaluate-deterministic`
 
-The second ledger: claims Main asserts beside the main theorem, off its
-critical path.
+The determinacy face, parked behind both dedicated tiers above. Nothing open
+depends on it: the tiers below are stated over the ONE output the
+builder produces, so an inequality or a verdict about that output means what it
+says whether or not a second derivation could have produced another. What
+determinacy buys is the STRENGTHENING — a leaf quantified over an arbitrary
+derivation becomes a fact about the machine rather than about the builder — and
+a strengthening is worth exactly nothing until the weak form is proven.
+
+### The monster
+
+`evaluate-deterministic` — `subscribeE-det` is likelier false and is deeper,
+and it is below the FLOOR: a leaf's cone is its statement's vocabulary, so
+naming it would put `drain-det` and the assembly itself off-tree and forbid the
+grind that kills it. This is the deepest node whose cone IS the work. Its
+falsity would be a fact about the EVALUATOR rather than about a claim: a
+subscribe frame admitting two outputs at one set of indices means the machine
+is not a function, and then every face's quantification over derivations is a
+quantification over a set nobody has characterised.
+
+### Big picture tier roadmap
+
+- **INSTANTIATE THE RING BEFORE GRINDING ANY OF IT.** The subscribe relation is
+  twenty families and nothing has ever run two derivations at one set of
+  indices. A refutation at a single arm is worth far more than a partial
+  induction over all of them, and it is cheap: build two derivations of the
+  same frame by taking the builder's and one arm's alternative, and ask for the
+  `refl`. The arms that do not follow from the head constructor are the target;
+  the rest are decided by pattern matching and cannot refute.
+
+- **THEN GRIND `subscribeE-det`, ARM BY ARM.** What separates the arms is
+  EQUATION PREMISES rather than constructors, which is why this is not a
+  mechanical induction: two arms can agree on the head and be told apart only
+  by a derived equality on the schedule or the state. Each such pair is a
+  lemma, and the lemmas are what the leg delivers — the induction over them is
+  the cheap half.
+
+- **THEN `drain-det`, AND THE ASSEMBLY'S BODY.** The drain's determinacy is an
+  induction whose motive is the subscribe result, so it lands second by
+  necessity rather than by choice. When both leaves are bodies the assembly
+  stops being a claim over postulates and becomes what its name says, and the
+  faces below can be restated over an arbitrary derivation in whatever order
+  their own schedules reach.
+
+### The ledger
+
+- **`subscribeE-det`, `drain-det`** (Verify-Determinacy) — FALSITY,
+  `NO EVIDENCE`: each family admits one output at its own indices. Nothing has
+  instantiated either, and the arms that do not follow from the head
+  constructor are separated by equation premises — unwalked.
+## Tier 4 — misc: the top-line semantic claims
+
+The MISC tier, and the only one not dedicated to a single definition: claims
+Main asserts beside the main theorem, off its critical path. They share a
+ledger because none of them is on any other tier's route, not because they
+share a subject.
 
 ### The monster
 
@@ -377,54 +475,3 @@ reached.
 - **FFI, permanently trusted** — `_>>=_`/`getContents`/`putStr` (CLI/IO),
   `randFold`/`natMod` (QuickCheck). Carried, not counted.
 
-## Tier 3 — the run relation is a function
-
-The determinacy face, parked behind both ledgers above. It is last because
-nothing open depends on it: the tiers below are stated over the ONE output the
-builder produces, so an inequality or a verdict about that output means what it
-says whether or not a second derivation could have produced another. What
-determinacy buys is the STRENGTHENING — a leaf quantified over an arbitrary
-derivation becomes a fact about the machine rather than about the builder — and
-a strengthening is worth exactly nothing until the weak form is proven.
-
-### The monster
-
-`evaluate-deterministic` — `subscribeE-det` is likelier false and is deeper,
-and it is below the FLOOR: a leaf's cone is its statement's vocabulary, so
-naming it would put `drain-det` and the assembly itself off-tree and forbid the
-grind that kills it. This is the deepest node whose cone IS the work. Its
-falsity would be a fact about the EVALUATOR rather than about a claim: a
-subscribe frame admitting two outputs at one set of indices means the machine
-is not a function, and then every face's quantification over derivations is a
-quantification over a set nobody has characterised.
-
-### Big picture tier roadmap
-
-- **INSTANTIATE THE RING BEFORE GRINDING ANY OF IT.** The subscribe relation is
-  twenty families and nothing has ever run two derivations at one set of
-  indices. A refutation at a single arm is worth far more than a partial
-  induction over all of them, and it is cheap: build two derivations of the
-  same frame by taking the builder's and one arm's alternative, and ask for the
-  `refl`. The arms that do not follow from the head constructor are the target;
-  the rest are decided by pattern matching and cannot refute.
-
-- **THEN GRIND `subscribeE-det`, ARM BY ARM.** What separates the arms is
-  EQUATION PREMISES rather than constructors, which is why this is not a
-  mechanical induction: two arms can agree on the head and be told apart only
-  by a derived equality on the schedule or the state. Each such pair is a
-  lemma, and the lemmas are what the leg delivers — the induction over them is
-  the cheap half.
-
-- **THEN `drain-det`, AND THE ASSEMBLY'S BODY.** The drain's determinacy is an
-  induction whose motive is the subscribe result, so it lands second by
-  necessity rather than by choice. When both leaves are bodies the assembly
-  stops being a claim over postulates and becomes what its name says, and the
-  faces below can be restated over an arbitrary derivation in whatever order
-  their own schedules reach.
-
-### The ledger
-
-- **`subscribeE-det`, `drain-det`** (Verify-Determinacy) — FALSITY,
-  `NO EVIDENCE`: each family admits one output at its own indices. Nothing has
-  instantiated either, and the arms that do not follow from the head
-  constructor are separated by equation premises — unwalked.
