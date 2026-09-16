@@ -52,18 +52,19 @@ open import Data.Vec using (lookup)
 open import Induction.WellFounded using (Acc; acc)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; cong)
 open import Relation.Nullary using (yes; no)
+open import Relation.Nullary.Decidable using (⌊_⌋)
 
 open import Rx.Prim using (Fuel; Id; Source; Tick; InstEmit; InstEvent; close;
   exhausted; hot; cold)
 open import Rx.Exp using (Ctx; Closed; Val; _≟ᵗ_; obs; unfoldμ; evalTm; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ;
   switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ)
 open import Rx.Slots using (Slots; shared; scripted)
-open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; AllOp; NodeId; NodeState; Frame; root; _↠_; map-f; take-f; scan-f;
-  thru-outer; from-inner; mergeAllᵒ; switchᵒ; exhaustᵒ; mergeAll-st; switch-st; exhaust-st; take-st;
-  scan-st; installNode; lookupNode; setNode; hasRoom; switchKill; aliveThroughᶠ; splitEvents; splitBurst; sched-init; st-init;
-  memberSource; share-sink; lowerFloor; register; atSlot; burstCompleted;
-  Arrival; arrTick; arrSource; arrTy; arrVal; AtFloor; RegId; chainsOf;
-  cascadeLatch; sched-next; shareAdmit; shareLatch)
+open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; AllOp; NodeId; NodeState; Frame; root; _↠_; map-f; take-f;
+  scan-f; thru-outer; from-inner; mergeAllᵒ; switchᵒ; exhaustᵒ; mergeAll-st; switch-st;
+  exhaust-st; take-st; scan-st; installNode; lookupNode; setNode; hasRoom; consumeUsable;
+  switchKill; aliveThroughᶠ; splitEvents; splitBurst; sched-init; st-init; memberSource;
+  share-sink; lowerFloor; register; atSlot; burstCompleted; Arrival; arrTick; arrSource; arrTy;
+  arrVal; AtFloor; RegId; chainsOf; cascadeLatch; sched-next; shareAdmit; shareLatch)
 open import Rx.Evaluator.Keeps-Slots using (subs-keeps; step-keeps;
   consume-keeps; switchKill-slots)
 open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeAll⇓; pushBurst⇓;
@@ -413,40 +414,41 @@ thruWalk! sl op nid κ id now (o ∷ os) sched ag st =
 -- the same collapse the machine reaches through its catch-all.
 thruConsume! {u = u} sl mergeAllᵒ nid κ id now o sched ag st
   with lookupNode nid (EvalSt.nodes st) in eq
-... | nothing              = _ , consume-all-nil
-... | just (scan-st _)     = _ , consume-all-nil
-... | just (take-st _)     = _ , consume-all-nil
-... | just (switch-st _ _) = _ , consume-all-nil
-... | just (exhaust-st _ _) = _ , consume-all-nil
-... | just (mergeAll-st {w} lim act q od) with w ≟ᵗ u
+... | nothing              = _ , consume-all-nil (cong (consumeUsable mergeAllᵒ u) eq)
+... | just (scan-st _)     = _ , consume-all-nil (cong (consumeUsable mergeAllᵒ u) eq)
+... | just (take-st _)     = _ , consume-all-nil (cong (consumeUsable mergeAllᵒ u) eq)
+... | just (switch-st _ _) = _ , consume-all-nil (cong (consumeUsable mergeAllᵒ u) eq)
+... | just (exhaust-st _ _) = _ , consume-all-nil (cong (consumeUsable mergeAllᵒ u) eq)
+... | just (mergeAll-st {w} lim act q od) with w ≟ᵗ u in eqw
 ...   | no  _    = _ , consume-all-nil
+                        (trans (cong (consumeUsable mergeAllᵒ u) eq) (cong ⌊_⌋ eqw))
 ...   | yes refl with hasRoom lim act in eqr
 ...     | false = _ , consume-all-enqueue eq eqr
 ...     | true  =
           let (_ , i) = subscribeInner! sl mergeAllᵒ nid κ id now o sched ag st
           in _ , consume-all-sub eq eqr i
 
-thruConsume! sl switchᵒ nid κ id now o sched ag st
+thruConsume! {u = u} sl switchᵒ nid κ id now o sched ag st
   with lookupNode nid (EvalSt.nodes st) in eq
-... | nothing                    = _ , consume-switch-nil
-... | just (scan-st _)           = _ , consume-switch-nil
-... | just (take-st _)           = _ , consume-switch-nil
-... | just (mergeAll-st _ _ _ _) = _ , consume-switch-nil
-... | just (exhaust-st _ _)      = _ , consume-switch-nil
+... | nothing                    = _ , consume-switch-nil (cong (consumeUsable switchᵒ _) eq)
+... | just (scan-st _)           = _ , consume-switch-nil (cong (consumeUsable switchᵒ _) eq)
+... | just (take-st _)           = _ , consume-switch-nil (cong (consumeUsable switchᵒ _) eq)
+... | just (mergeAll-st _ _ _ _) = _ , consume-switch-nil (cong (consumeUsable switchᵒ _) eq)
+... | just (exhaust-st _ _)      = _ , consume-switch-nil (cong (consumeUsable switchᵒ _) eq)
 ... | just (switch-st cur od) with switchKill cur sched st in eqk
 ...   | (closes , sched₁ , st₁) =
         let (_ , i) = subscribeInner! sl switchᵒ nid κ id now o sched₁
                         (trans (switchKill-slots cur sched st eqk) ag) st₁
         in _ , consume-switch-sub eq eqk i
 
-thruConsume! sl exhaustᵒ nid κ id now o sched ag st
+thruConsume! {u = u} sl exhaustᵒ nid κ id now o sched ag st
   with lookupNode nid (EvalSt.nodes st) in eq
-... | nothing                    = _ , consume-exhaust-nil
-... | just (scan-st _)           = _ , consume-exhaust-nil
-... | just (take-st _)           = _ , consume-exhaust-nil
-... | just (mergeAll-st _ _ _ _) = _ , consume-exhaust-nil
-... | just (switch-st _ _)       = _ , consume-exhaust-nil
-... | just (exhaust-st true _)   = _ , consume-exhaust-nil
+... | nothing                    = _ , consume-exhaust-nil (cong (consumeUsable exhaustᵒ _) eq)
+... | just (scan-st _)           = _ , consume-exhaust-nil (cong (consumeUsable exhaustᵒ _) eq)
+... | just (take-st _)           = _ , consume-exhaust-nil (cong (consumeUsable exhaustᵒ _) eq)
+... | just (mergeAll-st _ _ _ _) = _ , consume-exhaust-nil (cong (consumeUsable exhaustᵒ _) eq)
+... | just (switch-st _ _)       = _ , consume-exhaust-nil (cong (consumeUsable exhaustᵒ _) eq)
+... | just (exhaust-st true _)   = _ , consume-exhaust-nil (cong (consumeUsable exhaustᵒ _) eq)
 ... | just (exhaust-st false od) =
       let (_ , i) = subscribeInner! sl exhaustᵒ nid κ id now o sched ag st
       in _ , consume-exhaust-sub eq i
@@ -575,18 +577,38 @@ innerFinish! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo}
   FinishRuns {e = e} op allNid inst κ id now vals sched st ns
 
 innerFinish! {s = s} mergeAllᵒ allNid inst κ id now vals sched st
-             (just (mergeAll-st {w} lim act q od)) with w ≟ᵗ s
-... | no  _    = _ , finish-nil
+             (just (mergeAll-st {w} lim act q od)) with w ≟ᵗ s in eqw
+... | no  _    = _ , finish-nil (cong ⌊_⌋ eqw)
 ... | yes refl =
       let (_ , d) = mergeAllDrain! allNid κ id now lim (pred act) od q sched st
       in _ , finish-all-drain d
 innerFinish! switchᵒ allNid inst κ id now vals sched st
              (just (switch-st (just c) od)) with (c ≡ᵇ inst) in eqc
 ... | true  = _ , finish-switch-clear eqc
-... | false = _ , finish-nil
+... | false = _ , finish-nil eqc
 innerFinish! exhaustᵒ allNid inst κ id now vals sched st
              (just (exhaust-st act od)) = _ , finish-exhaust-clear
-innerFinish! op allNid inst κ id now vals sched st ns = _ , finish-nil
+
+-- EVERY OTHER READING IS THE COLLAPSE, AND IT IS SPELT OUT RATHER THAN
+-- CAUGHT, because the fallback now carries a side condition and a
+-- condition on two variables does not reduce.  One clause per operator
+-- per shape the store can be in, each handing back the same `refl`.
+innerFinish! mergeAllᵒ allNid inst κ id now vals sched st nothing = _ , finish-nil refl
+innerFinish! mergeAllᵒ allNid inst κ id now vals sched st (just (scan-st _)) = _ , finish-nil refl
+innerFinish! mergeAllᵒ allNid inst κ id now vals sched st (just (take-st _)) = _ , finish-nil refl
+innerFinish! mergeAllᵒ allNid inst κ id now vals sched st (just (switch-st _ _)) = _ , finish-nil refl
+innerFinish! mergeAllᵒ allNid inst κ id now vals sched st (just (exhaust-st _ _)) = _ , finish-nil refl
+innerFinish! switchᵒ allNid inst κ id now vals sched st nothing = _ , finish-nil refl
+innerFinish! switchᵒ allNid inst κ id now vals sched st (just (scan-st _)) = _ , finish-nil refl
+innerFinish! switchᵒ allNid inst κ id now vals sched st (just (take-st _)) = _ , finish-nil refl
+innerFinish! switchᵒ allNid inst κ id now vals sched st (just (mergeAll-st _ _ _ _)) = _ , finish-nil refl
+innerFinish! switchᵒ allNid inst κ id now vals sched st (just (exhaust-st _ _)) = _ , finish-nil refl
+innerFinish! switchᵒ allNid inst κ id now vals sched st (just (switch-st nothing _)) = _ , finish-nil refl
+innerFinish! exhaustᵒ allNid inst κ id now vals sched st nothing = _ , finish-nil refl
+innerFinish! exhaustᵒ allNid inst κ id now vals sched st (just (scan-st _)) = _ , finish-nil refl
+innerFinish! exhaustᵒ allNid inst κ id now vals sched st (just (take-st _)) = _ , finish-nil refl
+innerFinish! exhaustᵒ allNid inst κ id now vals sched st (just (mergeAll-st _ _ _ _)) = _ , finish-nil refl
+innerFinish! exhaustᵒ allNid inst κ id now vals sched st (just (switch-st _ _)) = _ , finish-nil refl
 
 innerReact! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo}
   (op : AllOp) (allNid inst : NodeId)

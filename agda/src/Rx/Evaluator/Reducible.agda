@@ -293,13 +293,10 @@ postulate
   -- census at `NodeState` narrows which of those owe anything: the
   -- switch and exhaust faces hold a flag and an identifier, so their
   -- values can only be the ones that arrived, and the DRAIN is the one
-  -- sub-arm here that reads a payload back out.
-  --
-  -- REFUTED: `Refuted.Red-Step-Vacuous` inhabits this statement at both
-  --   settings of the finished flag by handing the arriving batch
-  --   straight back -- the unfinished arm outright, the finished one
-  --   through whichever liveness branch holds.  So no queue is ever
-  --   drained by anything this statement demands.
+  -- sub-arm here that reads a payload back out, and it is now the only
+  -- way through: the finish fallback carries the side condition that
+  -- says the node is not this operator's, so a dead inner at a real
+  -- queue has to drain it.
   --
   -- PROBED: `Probed.Reducible-Arms` at the arm that CARRIES rather
   --   than spends -- an unfinished inner emit, whose values pass
@@ -319,14 +316,9 @@ postulate
   -- batch, and the census at `NodeState` says the nodes it consults
   -- carry no payload to confuse that -- so this arm owes a store
   -- invariant only through the QUEUE it may push into, never through
-  -- what it reads.
-  --
-  -- REFUTED: `Refuted.Red-Step-Vacuous` inhabits this statement at the
-  --   unfinished setting with a walk that consumes every arriving
-  --   observable and emits nothing.  Each operator's own nil arm is
-  --   premise-free, so the empty column is available whatever the node
-  --   holds, and the finished setting only adds a wrap that forwards
-  --   the column it is handed.
+  -- what it reads.  The consume fallback carries the side condition
+  -- that says the node is not usable, so an arriving observable at a
+  -- real node has to be taken rather than dropped.
   --
   -- PROBED: `Probed.Reducible-Arms` at each of the three operators,
   --   with the arriving batch carrying a real observable: mergeAll

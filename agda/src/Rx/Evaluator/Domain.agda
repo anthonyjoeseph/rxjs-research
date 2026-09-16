@@ -117,6 +117,7 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; NodeId;
   mergeAllᵒ; switchᵒ; exhaustᵒ;
   lookupNode; setNode; hasRoom; mergeAllBump; switchKill; aliveThroughᶠ;
   splitEvents; retagEvents; scanDispatch; takeDispatch; thruWrap;
+  consumeUsable; finishUsable;
   burstCompleted; sharedPlumb; dropSource)
 
 ------------------------------------------------------------------
@@ -447,22 +448,21 @@ data subscribeInner⇓ {n} {Γ} {t} {e} where
 -- INDEX is fixed admits no run it did not already admit, and the only
 -- direction spent here builds a derivation at the machine's own result.
 --
--- AND THAT LAST CLAUSE IS A PREMISE RATHER THAN A PROPERTY, WHICH IS
--- WHAT THE REDUCIBILITY FACE FOUND OUT.  A prover that CHOOSES its own
--- run is not the machine, so for it a premise-free fallback is a free
--- arm at every input: the walk that consumes nothing, the reaction
--- that hands its batch back.  Each of those has an empty or
--- passed-through value column, so any statement quantified over SOME
--- derivation with a reducible column is discharged outright.  The
--- fallbacks cost nothing to the direction this relation was written
--- for and everything to the other one, and which direction a consumer
--- is in is not visible from here.  The repair where it has been made
--- is to name the machine's own dispatch from a SINGLE constructor,
--- which is what the step frames for a fold and for a truncation now
--- do: there is then no arm to prefer.
---
--- REFUTED: `Refuted.Red-Step-Vacuous` inhabits two such statements
---   with bodies that read no hypothesis.
+-- AND THAT LAST CLAUSE WAS A PREMISE RATHER THAN A PROPERTY, WHICH IS
+-- WHY NO FALLBACK HERE STANDS FREE ANY MORE.  A prover that CHOOSES
+-- its own run is not the machine, so for it a premise-free fallback is
+-- an arm available at every input -- and every one of these has an
+-- empty or passed-through value column, which discharges any statement
+-- quantified over SOME derivation with a reducible column.  The cost
+-- fell entirely on the other direction, and which direction a consumer
+-- is in is not visible from here.  So each collapse now carries the
+-- side condition that distinguishes it: a fold and a truncation name
+-- the machine's own dispatch from a SINGLE constructor, and the
+-- flattener's consume and finish arms carry a `usable` reading of the
+-- store that is false exactly where the machine collapses.  The
+-- builder pays for this in clauses -- a condition on two variables
+-- does not reduce, so its catch-alls are spelt out -- and the
+-- reducibility direction gets a relation with nothing to prefer.
 data thruConsume⇓ {n} {Γ} {t} {e} where
 
   consume-all-sub : ∀ {u lo nid} {κ : Path Γ lo u t} {id now}
@@ -491,7 +491,8 @@ data thruConsume⇓ {n} {Γ} {t} {e} where
                                   (EvalSt.nodes st₀) } )
 
   consume-all-nil : ∀ {u lo nid} {κ : Path Γ lo u t} {id now}
-                      {o : Val Γ (obs u)} {sched₀ st₀}
+                    {o : Val Γ (obs u)} {sched₀ st₀}
+                  → consumeUsable mergeAllᵒ u (lookupNode nid (EvalSt.nodes st₀)) ≡ false
                   → thruConsume⇓ mergeAllᵒ nid κ id now o sched₀ st₀
                       ([] , [] , sched₀ , st₀)
 
@@ -510,7 +511,8 @@ data thruConsume⇓ {n} {Γ} {t} {e} where
                                  (EvalSt.nodes st₂) } )
 
   consume-switch-nil : ∀ {u lo nid} {κ : Path Γ lo u t} {id now}
-                         {o : Val Γ (obs u)} {sched₀ st₀}
+                       {o : Val Γ (obs u)} {sched₀ st₀}
+                     → consumeUsable switchᵒ u (lookupNode nid (EvalSt.nodes st₀)) ≡ false
                      → thruConsume⇓ switchᵒ nid κ id now o sched₀ st₀
                          ([] , [] , sched₀ , st₀)
 
@@ -528,7 +530,8 @@ data thruConsume⇓ {n} {Γ} {t} {e} where
                                   (EvalSt.nodes st₁) } )
 
   consume-exhaust-nil : ∀ {u lo nid} {κ : Path Γ lo u t} {id now}
-                          {o : Val Γ (obs u)} {sched₀ st₀}
+                        {o : Val Γ (obs u)} {sched₀ st₀}
+                      → consumeUsable exhaustᵒ u (lookupNode nid (EvalSt.nodes st₀)) ≡ false
                       → thruConsume⇓ exhaustᵒ nid κ id now o sched₀ st₀
                           ([] , [] , sched₀ , st₀)
 
@@ -615,6 +618,7 @@ data innerFinish⇓ {n} {Γ} {t} {e} where
 
   finish-nil : ∀ {s lo op allNid inst} {κ : Path Γ lo s t} {id now}
                  {vals : List (Val Γ s)} {sched st ns}
+             → finishUsable op s inst ns ≡ false
              → innerFinish⇓ op allNid inst κ id now vals sched st ns
                  (vals , [] , false , sched , st)
 

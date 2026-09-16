@@ -13,6 +13,7 @@ open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Unit    using (⊤; tt)
 open import Data.Sum     using (_⊎_; inj₁; inj₂)
 open import Relation.Nullary using (yes; no)
+open import Relation.Nullary.Decidable using (⌊_⌋)
 open import Relation.Binary.PropositionalEquality using (refl)
 
 open import Rx.Prim using (Tick; Ordinal; Id; Source; Timed; after_,_; hot; cold; InstEvent; init; value; close;
@@ -602,6 +603,38 @@ switchKill (just v) sched₀ st₀ =
      record sched₀ { live = sweepLive kept (Sched.live sched₀) } ,
      record st₀ { registry = kept
                 ; cancelled = cutRids ++ EvalSt.cancelled st₀ }
+
+-- WHETHER A CONSUME CLAUSE HAS A NODE IT CAN USE AT ALL, AS ONE
+-- FUNCTION OF THE READING.  Each operator accepts exactly one shape of
+-- stored state: a merge wants its own, at its own element type, since
+-- the table carries that type existentially; a switch wants its own,
+-- which holds no type to disagree about; an exhaust wants its own with
+-- nothing already running, because a busy exhaust refuses the arrival
+-- outright.  Every other reading -- another operator's state, a
+-- mismatched element type, no node -- is the collapse, and naming the
+-- collapse is what lets the relation's fallback carry a side condition
+-- instead of standing free at every state.
+consumeUsable : ∀ {n} {Γ : Ctx n} → AllOp → (u : Ty) → Maybe (NodeState Γ) → Bool
+consumeUsable mergeAllᵒ u (just (mergeAll-st {w} _ _ _ _)) = ⌊ w ≟ᵗ u ⌋
+consumeUsable switchᵒ   u (just (switch-st _ _))           = true
+consumeUsable exhaustᵒ  u (just (exhaust-st false _))      = true
+consumeUsable _         _ _                                = false
+
+-- AND THE SAME QUESTION ON THE WAY BACK UP, WHERE AN INNER HAS DIED
+-- AND ITS OPERATOR HAS TO FINISH IT.  A merge finishes against its own
+-- node at its own element type, because that is the queue it drains; a
+-- switch finishes only the inner it currently believes is running, so
+-- a late death from an already-replaced inner clears nothing; an
+-- exhaust finishes against its own node whatever the running flag
+-- says, since clearing it is the whole point.  Anything else is the
+-- collapse, and naming it keeps the relation's fallback from standing
+-- free at a node that really does hold a queue.
+finishUsable : ∀ {n} {Γ : Ctx n} → AllOp → (s : Ty) → NodeId
+             → Maybe (NodeState Γ) → Bool
+finishUsable mergeAllᵒ s inst (just (mergeAll-st {w} _ _ _ _)) = ⌊ w ≟ᵗ s ⌋
+finishUsable switchᵒ   s inst (just (switch-st (just c) _))    = c ≡ᵇ inst
+finishUsable exhaustᵒ  s inst (just (exhaust-st _ _))          = true
+finishUsable _         _ _    _                                = false
 
 thruWrap : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
          → AllOp → NodeId → Bool

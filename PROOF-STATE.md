@@ -233,15 +233,15 @@ deferred beside it.
 
 ### Big picture tier roadmap
 
-- **PIN THE REMAINING TWO WITNESSES — THE FLATTENER ARMS STILL ASK FOR
-  NOTHING.** `RedStep` quantifies over SOME run with a reducible value column,
-  and the domain relation still carries a premise-free fallback at the walk and
-  at the inner reaction, each with an empty or passed-through column. The fold
-  frame is done: one constructor naming the evaluator's own dispatch leaves no
-  arm to prefer, and its row went straight back to SHAPE, which is the carrier
-  question returning as intended. The walk's `consume-*-nil` and the
-  reaction's `react-false`/`finish-nil` want the same treatment — a node
-  reading and a liveness reading each stated as one function of the store.
+- **THE QUEUE CARRIER, WHICH IS WHAT PINNING THE WITNESSES LEFT BEHIND.** Every
+  fallback the reducibility arms were escaping through now carries its side
+  condition, so the three rows say what they were meant to and two of them ask
+  for the same fact: a mergeAll's QUEUE holds closed observables, the walk
+  pushes into it and the drain reads them back, and nothing says an entry is
+  reducible. It is the one carrier the census leaves owed, and unlike the fold's
+  accumulator it has a source — the hypothesis that admitted the arrival. This
+  leg finds where that hypothesis can be spent: at the enqueue, at the drain, or
+  as a field the store must carry.
 
 - **DISCHARGE THE FOUR SUBSTITUTION LEAVES THE PARTNER BOUGHT ITSELF WITH.**
   The `Θloc` telescope landed and took three of the original six with it —
@@ -308,13 +308,13 @@ deferred beside it.
   witness is pinned now, so the demand is real and unmet — the emitted value is
   the stored accumulator and no hypothesis says a stored one is reducible.
 
-- **`red-from-inner`** (Rx/Evaluator/Reducible) — VACUITY, `REFUTED, PROBED`:
-  satisfiable by handing the arriving batch straight back, at both settings of
-  the finished flag. Nothing it demands ever drains a queue.
+- **`red-from-inner`** (Rx/Evaluator/Reducible) — SHAPE, `PROBED`: the finish
+  fallback is pinned now, so a dead inner at a real queue must drain it — and
+  nothing says a queued entry is reducible.
 
-- **`red-thru`** (Rx/Evaluator/Reducible) — VACUITY, `REFUTED, PROBED`:
-  satisfiable by a walk that consumes every arriving observable and emits none,
-  whatever the node holds.
+- **`red-thru`** (Rx/Evaluator/Reducible) — DIFFICULTY, `PROBED`: the consume
+  fallback is pinned now, so an arrival at a usable node is subscribed and the
+  inner's own derivation is what comes back. Rows at all three operators.
 
 ## Tier 2 — Verify-Well-Formed (parked behind tier 1)
 

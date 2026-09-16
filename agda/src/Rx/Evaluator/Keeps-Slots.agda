@@ -247,7 +247,7 @@ mutual
   finish-keeps (finish-all-drain d)     = drain-keeps d
   finish-keeps (finish-switch-clear _)  = refl
   finish-keeps finish-exhaust-clear     = refl
-  finish-keeps finish-nil               = refl
+  finish-keeps (finish-nil _)           = refl
 
   drain-keeps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo}
     {allNid : NodeId} {κ : Path Γ lo s t} {id : Id} {now : Tick}
@@ -282,13 +282,13 @@ mutual
     Sched.slots sched′ ≡ Sched.slots sched
   consume-keeps (consume-all-sub _ _ i)     = inner-keeps i
   consume-keeps (consume-all-enqueue _ _)   = refl
-  consume-keeps consume-all-nil             = refl
+  consume-keeps (consume-all-nil _)         = refl
   consume-keeps (consume-switch-sub {sched₀ = sched₀} {st₀ = st₀} {cur = cur}
                 _ k i) =
     trans (inner-keeps i) (switchKill-slots cur sched₀ st₀ k)
-  consume-keeps consume-switch-nil          = refl
+  consume-keeps (consume-switch-nil _)      = refl
   consume-keeps (consume-exhaust-sub _ i)   = inner-keeps i
-  consume-keeps consume-exhaust-nil         = refl
+  consume-keeps (consume-exhaust-nil _)     = refl
 
   connect-keeps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo}
     {i : Fin n} {d : Closed Γ (lookup Γ i)}
