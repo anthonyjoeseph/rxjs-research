@@ -24,6 +24,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; con
 data Ty : Set where
   unitᵗ boolᵗ natᵗ : Ty
   _×ᵗ_ _+ᵗ_ : Ty → Ty → Ty
+  listᵗ : Ty → Ty
   obs : Ty → Ty
 
 Ctx : ℕ → Set
@@ -41,6 +42,7 @@ isData boolᵗ    = true
 isData natᵗ     = true
 isData (s ×ᵗ t) = if isData s then isData t else false
 isData (s +ᵗ t) = if isData s then isData t else false
+isData (listᵗ t) = isData t
 isData (obs _)  = false
 
 -- concrete now (the JSON bridge fixes exactly this set): the binary ops
@@ -104,10 +106,15 @@ mutual
     pairᵗ : ∀ {s t} → Tm Γ Δᵍ Δ Θ s → Tm Γ Δᵍ Δ Θ t → Tm Γ Δᵍ Δ Θ (s ×ᵗ t)
     fstᵗ  : ∀ {s t} → Tm Γ Δᵍ Δ Θ (s ×ᵗ t) → Tm Γ Δᵍ Δ Θ s
     sndᵗ  : ∀ {s t} → Tm Γ Δᵍ Δ Θ (s ×ᵗ t) → Tm Γ Δᵍ Δ Θ t
+    nilᵗ  : ∀ {t} → Tm Γ Δᵍ Δ Θ (listᵗ t)
+    consᵗ : ∀ {t} → Tm Γ Δᵍ Δ Θ t → Tm Γ Δᵍ Δ Θ (listᵗ t)
+          → Tm Γ Δᵍ Δ Θ (listᵗ t)
     inlᵗ  : ∀ {s t} → Tm Γ Δᵍ Δ Θ s → Tm Γ Δᵍ Δ Θ (s +ᵗ t)
     inrᵗ  : ∀ {s t} → Tm Γ Δᵍ Δ Θ t → Tm Γ Δᵍ Δ Θ (s +ᵗ t)
     caseᵗ : ∀ {s t u} → Tm Γ Δᵍ Δ Θ (s +ᵗ t)
           → Tm Γ Δᵍ Δ (s ∷ Θ) u → Tm Γ Δᵍ Δ (t ∷ Θ) u → Tm Γ Δᵍ Δ Θ u
+    foldᵗ : ∀ {s u} → Tm Γ Δᵍ Δ Θ (listᵗ s) → Tm Γ Δᵍ Δ Θ u
+          → Tm Γ Δᵍ Δ (s ∷ u ∷ Θ) u → Tm Γ Δᵍ Δ Θ u
     ifᵗ   : ∀ {t} → Tm Γ Δᵍ Δ Θ boolᵗ → Tm Γ Δᵍ Δ Θ t → Tm Γ Δᵍ Δ Θ t
           → Tm Γ Δᵍ Δ Θ t
     primᵗ : ∀ {s t} → PrimOp s t → Tm Γ Δᵍ Δ Θ s → Tm Γ Δᵍ Δ Θ t
@@ -122,6 +129,7 @@ mutual
   Val Γ natᵗ     = ℕ
   Val Γ (s ×ᵗ t) = Val Γ s × Val Γ t
   Val Γ (s +ᵗ t) = Val Γ s ⊎ Val Γ t
+  Val Γ (listᵗ t) = List (Val Γ t)
   Val Γ (obs t)  = Exp Γ [] [] [] t     -- runtime observables are closed exprs
 
 Closed : ∀ {n} → Ctx n → Ty → Set
@@ -141,6 +149,9 @@ natᵗ  ≟ᵗ natᵗ  = yes refl
 ... | yes refl | yes refl = yes refl
 ... | no ¬p    | _        = no λ { refl → ¬p refl }
 ... | _        | no ¬p    = no λ { refl → ¬p refl }
+listᵗ a ≟ᵗ listᵗ c with a ≟ᵗ c
+... | yes refl = yes refl
+... | no ¬p    = no λ { refl → ¬p refl }
 obs a ≟ᵗ obs c with a ≟ᵗ c
 ... | yes refl = yes refl
 ... | no ¬p    = no λ { refl → ¬p refl }
@@ -174,6 +185,18 @@ obs _    ≟ᵗ boolᵗ    = no λ ()
 obs _    ≟ᵗ natᵗ     = no λ ()
 obs _    ≟ᵗ (_ ×ᵗ _) = no λ ()
 obs _    ≟ᵗ (_ +ᵗ _) = no λ ()
+unitᵗ    ≟ᵗ listᵗ _  = no λ ()
+boolᵗ    ≟ᵗ listᵗ _  = no λ ()
+natᵗ     ≟ᵗ listᵗ _  = no λ ()
+(_ ×ᵗ _) ≟ᵗ listᵗ _  = no λ ()
+(_ +ᵗ _) ≟ᵗ listᵗ _  = no λ ()
+obs _    ≟ᵗ listᵗ _  = no λ ()
+listᵗ _  ≟ᵗ unitᵗ    = no λ ()
+listᵗ _  ≟ᵗ boolᵗ    = no λ ()
+listᵗ _  ≟ᵗ natᵗ     = no λ ()
+listᵗ _  ≟ᵗ (_ ×ᵗ _) = no λ ()
+listᵗ _  ≟ᵗ (_ +ᵗ _) = no λ ()
+listᵗ _  ≟ᵗ obs _    = no λ ()
 
 -- one Θ value-environment lookup, indexed by the de Bruijn membership proof
 lookupEnv : ∀ {n} {Γ : Ctx n} {Θ t} → All (Val Γ) Θ → t ∈ Θ → Val Γ t
@@ -222,6 +245,11 @@ mutual
   renTm ρg ρd ρt unit̂         = unit̂
   renTm ρg ρd ρt (bool̂ b)     = bool̂ b
   renTm ρg ρd ρt (nat̂ n)      = nat̂ n
+  renTm ρg ρd ρt (foldᵗ l z f) =
+    foldᵗ (renTm ρg ρd ρt l) (renTm ρg ρd ρt z)
+          (renTm ρg ρd (ext∈ (ext∈ ρt)) f)
+  renTm ρg ρd ρt nilᵗ         = nilᵗ
+  renTm ρg ρd ρt (consᵗ a as) = consᵗ (renTm ρg ρd ρt a) (renTm ρg ρd ρt as)
   renTm ρg ρd ρt (pairᵗ a b)  = pairᵗ (renTm ρg ρd ρt a) (renTm ρg ρd ρt b)
   renTm ρg ρd ρt (fstᵗ p)     = fstᵗ (renTm ρg ρd ρt p)
   renTm ρg ρd ρt (sndᵗ p)     = sndᵗ (renTm ρg ρd ρt p)
@@ -247,14 +275,20 @@ wkTm = renTm (λ ()) (λ ()) (λ ())
 -- already a closed Exp, so no substitution)
 ------------------------------------------------------------------
 
-reify : ∀ {n} {Γ : Ctx n} {t} → Val Γ t → Tm Γ [] [] [] t
-reify {t = unitᵗ}   _        = unit̂
-reify {t = boolᵗ}   b        = bool̂ b
-reify {t = natᵗ}    n        = nat̂ n
-reify {t = _ ×ᵗ _}  (a , b)  = pairᵗ (reify a) (reify b)
-reify {t = _ +ᵗ _}  (inj₁ a) = inlᵗ (reify a)
-reify {t = _ +ᵗ _}  (inj₂ b) = inrᵗ (reify b)
-reify {t = obs _}   e        = strmᵗ e
+mutual
+  reify : ∀ {n} {Γ : Ctx n} {t} → Val Γ t → Tm Γ [] [] [] t
+  reify {t = unitᵗ}   _        = unit̂
+  reify {t = boolᵗ}   b        = bool̂ b
+  reify {t = natᵗ}    n        = nat̂ n
+  reify {t = _ ×ᵗ _}  (a , b)  = pairᵗ (reify a) (reify b)
+  reify {t = _ +ᵗ _}  (inj₁ a) = inlᵗ (reify a)
+  reify {t = _ +ᵗ _}  (inj₂ b) = inrᵗ (reify b)
+  reify {t = listᵗ _} xs       = reifyList xs
+  reify {t = obs _}   e        = strmᵗ e
+
+  reifyList : ∀ {n} {Γ : Ctx n} {t} → List (Val Γ t) → Tm Γ [] [] [] (listᵗ t)
+  reifyList []       = nilᵗ
+  reifyList (x ∷ xs) = consᵗ (reify x) (reifyList xs)
 
 ------------------------------------------------------------------
 -- closeUnderFn: substitute a Θ value-environment into a term, closing
@@ -287,11 +321,15 @@ mutual
   subΘTm Θloc σ unit̂         = unit̂
   subΘTm Θloc σ (bool̂ b)     = bool̂ b
   subΘTm Θloc σ (nat̂ n)      = nat̂ n
+  subΘTm Θloc σ nilᵗ         = nilᵗ
+  subΘTm Θloc σ (consᵗ a as) = consᵗ (subΘTm Θloc σ a) (subΘTm Θloc σ as)
   subΘTm Θloc σ (pairᵗ a b)  = pairᵗ (subΘTm Θloc σ a) (subΘTm Θloc σ b)
   subΘTm Θloc σ (fstᵗ p)     = fstᵗ (subΘTm Θloc σ p)
   subΘTm Θloc σ (sndᵗ p)     = sndᵗ (subΘTm Θloc σ p)
   subΘTm Θloc σ (inlᵗ a)     = inlᵗ (subΘTm Θloc σ a)
   subΘTm Θloc σ (inrᵗ a)     = inrᵗ (subΘTm Θloc σ a)
+  subΘTm Θloc σ (foldᵗ {s = s} {u = u} l z f) =
+    foldᵗ (subΘTm Θloc σ l) (subΘTm Θloc σ z) (subΘTm (s ∷ u ∷ Θloc) σ f)
   subΘTm Θloc σ (caseᵗ {s = s} {t = t} sc l r) =
     caseᵗ (subΘTm Θloc σ sc) (subΘTm (s ∷ Θloc) σ l) (subΘTm (t ∷ Θloc) σ r)
   subΘTm Θloc σ (ifᵗ c a b)  = ifᵗ (subΘTm Θloc σ c) (subΘTm Θloc σ a) (subΘTm Θloc σ b)
@@ -371,11 +409,16 @@ mutual
   elimGTm Θl x cl unit̂         = unit̂
   elimGTm Θl x cl (bool̂ b)     = bool̂ b
   elimGTm Θl x cl (nat̂ n)      = nat̂ n
+  elimGTm Θl x cl nilᵗ         = nilᵗ
+  elimGTm Θl x cl (consᵗ a as) = consᵗ (elimGTm Θl x cl a) (elimGTm Θl x cl as)
   elimGTm Θl x cl (pairᵗ a b)  = pairᵗ (elimGTm Θl x cl a) (elimGTm Θl x cl b)
   elimGTm Θl x cl (fstᵗ p)     = fstᵗ (elimGTm Θl x cl p)
   elimGTm Θl x cl (sndᵗ p)     = sndᵗ (elimGTm Θl x cl p)
   elimGTm Θl x cl (inlᵗ a)     = inlᵗ (elimGTm Θl x cl a)
   elimGTm Θl x cl (inrᵗ a)     = inrᵗ (elimGTm Θl x cl a)
+  elimGTm Θl x cl (foldᵗ l z f) =
+    foldᵗ (elimGTm Θl x cl l) (elimGTm Θl x cl z)
+          (elimGTm (_ ∷ _ ∷ Θl) x cl f)
   elimGTm Θl x cl (caseᵗ s l r) =
     caseᵗ (elimGTm Θl x cl s) (elimGTm (_ ∷ Θl) x cl l) (elimGTm (_ ∷ Θl) x cl r)
   elimGTm Θl x cl (ifᵗ c a b)  =
@@ -416,11 +459,16 @@ mutual
   elimDTm Θl x cl unit̂         = unit̂
   elimDTm Θl x cl (bool̂ b)     = bool̂ b
   elimDTm Θl x cl (nat̂ n)      = nat̂ n
+  elimDTm Θl x cl nilᵗ         = nilᵗ
+  elimDTm Θl x cl (consᵗ a as) = consᵗ (elimDTm Θl x cl a) (elimDTm Θl x cl as)
   elimDTm Θl x cl (pairᵗ a b)  = pairᵗ (elimDTm Θl x cl a) (elimDTm Θl x cl b)
   elimDTm Θl x cl (fstᵗ p)     = fstᵗ (elimDTm Θl x cl p)
   elimDTm Θl x cl (sndᵗ p)     = sndᵗ (elimDTm Θl x cl p)
   elimDTm Θl x cl (inlᵗ a)     = inlᵗ (elimDTm Θl x cl a)
   elimDTm Θl x cl (inrᵗ a)     = inrᵗ (elimDTm Θl x cl a)
+  elimDTm Θl x cl (foldᵗ l z f) =
+    foldᵗ (elimDTm Θl x cl l) (elimDTm Θl x cl z)
+          (elimDTm (_ ∷ _ ∷ Θl) x cl f)
   elimDTm Θl x cl (caseᵗ s l r) =
     caseᵗ (elimDTm Θl x cl s) (elimDTm (_ ∷ Θl) x cl l) (elimDTm (_ ∷ Θl) x cl r)
   elimDTm Θl x cl (ifᵗ c a b)  =
@@ -445,11 +493,19 @@ evalWith (varᵗ x)      env = lookupEnv env x
 evalWith unit̂          env = tt
 evalWith (bool̂ b)      env = b
 evalWith (nat̂ n)       env = n
+evalWith nilᵗ          env = []
+evalWith (consᵗ a as)  env = evalWith a env ∷ evalWith as env
 evalWith (pairᵗ a b)   env = evalWith a env , evalWith b env
 evalWith (fstᵗ p)      env = let (a , _) = evalWith p env in a
 evalWith (sndᵗ p)      env = let (_ , b) = evalWith p env in b
 evalWith (inlᵗ a)      env = inj₁ (evalWith a env)
 evalWith (inrᵗ a)      env = inj₂ (evalWith a env)
+evalWith {Γ = Γ} {Θ = Θ} (foldᵗ {s = s} {u = u} l z f) env =
+  go (evalWith l env) (evalWith z env)
+  where
+    go : List (Val Γ s) → Val Γ u → Val Γ u
+    go []       acc = acc
+    go (x ∷ xs) acc = go xs (evalWith f (x ∷ᵃ acc ∷ᵃ env))
 evalWith (caseᵗ sc l r) env with evalWith sc env
 ... | inj₁ x = evalWith l (x ∷ᵃ env)
 ... | inj₂ y = evalWith r (y ∷ᵃ env)
@@ -505,6 +561,10 @@ mutual
   inputsBelowᵗ k unit̂          = true
   inputsBelowᵗ k (bool̂ _)      = true
   inputsBelowᵗ k (nat̂ _)       = true
+  inputsBelowᵗ k (foldᵗ l z f) =
+    inputsBelowᵗ k l ∧ inputsBelowᵗ k z ∧ inputsBelowᵗ k f
+  inputsBelowᵗ k nilᵗ          = true
+  inputsBelowᵗ k (consᵗ a as)  = inputsBelowᵗ k a ∧ inputsBelowᵗ k as
   inputsBelowᵗ k (pairᵗ a b)   = inputsBelowᵗ k a ∧ inputsBelowᵗ k b
   inputsBelowᵗ k (fstᵗ p)      = inputsBelowᵗ k p
   inputsBelowᵗ k (sndᵗ p)      = inputsBelowᵗ k p

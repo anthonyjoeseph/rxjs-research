@@ -52,7 +52,8 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; cong
 open import Rx.Exp using (Ctx; Ty; Exp; Tm; elimGExp; elimGTm; elimGTms; unfoldμ;
   input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ;
   exhaustAllᵉ; μᵉ; varᵉ; deferᵉ;
-  varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ)
+  varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ;
+  nilᵗ; consᵗ; foldᵗ)
 
 -- The size, counting the formers a subscription actually descends
 -- through — an operator's own spine and the terms it carries — and
@@ -77,6 +78,9 @@ mutual
   gsizeᵗ unit̂         = zero
   gsizeᵗ (bool̂ b)     = zero
   gsizeᵗ (nat̂ k)      = zero
+  gsizeᵗ nilᵗ         = zero
+  gsizeᵗ (consᵗ a as) = suc (gsizeᵗ a + gsizeᵗ as)
+  gsizeᵗ (foldᵗ l z f) = suc (gsizeᵗ l + (gsizeᵗ z + gsizeᵗ f))
   gsizeᵗ (pairᵗ a b)  = suc (gsizeᵗ a + gsizeᵗ b)
   gsizeᵗ (fstᵗ p)     = suc (gsizeᵗ p)
   gsizeᵗ (sndᵗ p)     = suc (gsizeᵗ p)
@@ -125,6 +129,13 @@ mutual
   gsize-elimGt Θl x cl unit̂          = refl
   gsize-elimGt Θl x cl (bool̂ b)      = refl
   gsize-elimGt Θl x cl (nat̂ k)       = refl
+  gsize-elimGt Θl x cl nilᵗ          = refl
+  gsize-elimGt Θl x cl (consᵗ a as)  =
+    cong suc (cong₂ _+_ (gsize-elimGt Θl x cl a) (gsize-elimGt Θl x cl as))
+  gsize-elimGt Θl x cl (foldᵗ l z f) =
+    cong suc (cong₂ _+_ (gsize-elimGt Θl x cl l)
+                        (cong₂ _+_ (gsize-elimGt Θl x cl z)
+                                   (gsize-elimGt (_ ∷ _ ∷ Θl) x cl f)))
   gsize-elimGt Θl x cl (pairᵗ a b)   =
     cong suc (cong₂ _+_ (gsize-elimGt Θl x cl a) (gsize-elimGt Θl x cl b))
   gsize-elimGt Θl x cl (fstᵗ p)      = cong suc (gsize-elimGt Θl x cl p)
