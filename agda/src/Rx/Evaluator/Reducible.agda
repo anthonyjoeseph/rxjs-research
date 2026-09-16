@@ -40,7 +40,7 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Data.Bool using (Bool; true; false)
 open import Data.List.Relation.Unary.All.Properties using (++⁺)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; zero; suc; _<_; s≤s; _+_; _≡ᵇ_)
+open import Data.Nat using (ℕ; zero; suc; _<_; s≤s; _+_)
 open import Data.Nat.Induction using (<-wellFounded)
 open import Data.Nat.Properties using (_<?_; ≮⇒≥; ≤-refl; ≤-trans; m≤n+m; m≤m+n)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
@@ -49,7 +49,6 @@ open import Data.Unit using (⊤; tt)
 open import Data.Vec using (lookup)
 open import Induction.WellFounded using (Acc; acc)
 open import Relation.Nullary using (yes; no)
-open import Decide using (≡ᵇ-refl)
 
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
 
@@ -61,10 +60,12 @@ open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; _�
   varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ;
   add; sub; mul; eqᵖ; ltᵖ; notᵖ; subΘExp; subΘTm; subΘTms; lookupEnv)
 open import Rx.Exp.Guarded using (gsizeᵉ; gsizeᵗ; gsizeᵗˢ; gsize-unfoldμ)
-open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; _↠_; map-f; take-f; scan-f; take-st; scan-st;
-  thru-outer; mergeAllᵒ; switchᵒ; exhaustᵒ; mergeAll-st; switch-st; exhaust-st;
-  takeVals; takeDispatch; scanVals; scanDispatch; lookupNode; setNode; NodeState;
-  installNode; oneShotBurst; memberSource; splitEvents; retagEvents; NodeId; AllOp; from-inner)
+open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; _↠_; map-f; take-f; scan-f; take-st; scan-st; thru-outer;
+  mergeAllᵒ; switchᵒ; exhaustᵒ; mergeAll-st; switch-st; exhaust-st; takeVals; takeDispatch;
+  scanVals; scanDispatch; lookupNode; NodeState; installNode; oneShotBurst; memberSource;
+  splitEvents; retagEvents; NodeId; AllOp; from-inner)
+open import Rx.Evaluator.Freshness using (lookup-set; PreservedBelow)
+open import Rx.Evaluator.Freshness.Preserve using (subscribeE-preserves)
 open import Rx.Evaluator.Domain using (srcFrame; subscribeE⇓; pushBurst⇓; stepFrame⇓; step-map; step-scan; step-take; push-nil; push-cons; subs-of;
   subs-empty; subs-map; subs-take-zero; subs-take-suc; subs-scan; subs-defer;
   subs-floor; subs-hot-done; subs-hot-live; subs-cold-sync; subs-cold-async;
@@ -276,43 +277,6 @@ postulate
         subscribeE⇓ {e = e} (input i) κ id now sched st r
           × StreamSat (Red (lookup Γ i)) (proj₁ r)
 
-  -- AND THE ONE THING THE FOLD'S NODE OBLIGATION CANNOT ESTABLISH FOR
-  -- ITSELF: that the accumulator installed just before a subscription
-  -- is the one still standing when the push happens.  A node is keyed
-  -- by an identifier drawn from the schedule's own counter, the arm
-  -- above installs at the counter's current value and subscribes with
-  -- it advanced, and every node a subscription touches it allocated
-  -- itself -- so the fold's node is untouched for structural reasons
-  -- rather than by any property of the candidate.  Stating it over the
-  -- DERIVATION is what makes it provable at all: the state is reached
-  -- by a run, and nothing about a bare state could say which
-  -- identifiers a run was free to write.
-  --
-  -- PROBED: `Probed.Reducible-Arms` instantiates it at a source that
-  --   really does allocate -- a `take`, which installs at the very next
-  --   identifier and writes that node back on every step -- so a
-  --   collision with the fold's node would compute the lookup to the
-  --   take's own state and the row would not typecheck.  Three rows:
-  --   one take; a take nested inside a take, so the allocation runs
-  --   two deep and an advance off by one anywhere in the nesting would
-  --   land on the fold's node; and a flattener, whose subscription
-  --   leaves this cycle for one of its own and whose wrap READS its
-  --   node and WRITES it back, so a collision would overwrite the
-  --   accumulator rather than shadow it.  Not covered: a source whose
-  --   own subscription reaches a SHARE, whose definition is an
-  --   arbitrary term and whose connect allocates on a third route.
-  red-scan-installed : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
-             (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
-             {a : Val Γ u} → Red u a
-           → {b : Closed Γ s} {κ : Path Γ lo u t} {id : Id} {now : Tick}
-           → (sched : Sched Γ) (st : EvalSt e)
-           → {sched₂ : Sched Γ} {st₁ : EvalSt e} {burst : Stream Γ s}
-           → subscribeE⇓ {e = e} b (scan-f fn nid ↠ κ) id now
-               (record sched { nextNode = suc nid })
-               (installNode nid (scan-st a) st)
-               (burst , sched₂ , st₁)
-           → RedNode {e = e} (scan-f fn nid) st₁
-
   -- THE FLATTENING WALK, and the one leaf here with rows against it.
   -- Every value it produces is an inner subscribed out of the arriving
   -- batch, and the census at `NodeState` says the nodes it consults
@@ -503,19 +467,39 @@ redScanVals fn rf ra (p ∷ ps) =
   let (qs , last) = redScanVals fn rf (rf (ra , p)) ps
   in rf (ra , p) ∷ qs , last
 
--- a node just written reads back as what was written
-lookup-set : ∀ {n} {Γ : Ctx n} (nid : NodeId) (ns : NodeState Γ)
-             (ts : List (NodeId × NodeState Γ))
-           → lookupNode nid (setNode nid ns ts) ≡ just ns
-lookup-set nid ns []             rewrite ≡ᵇ-refl nid = refl
-lookup-set nid ns ((k , s) ∷ r) with k ≡ᵇ nid in eq
-... | true  rewrite ≡ᵇ-refl nid = refl
-... | false rewrite eq = lookup-set nid ns r
-
 -- the node read back is the one written, so its payload is that payload
 tie-scan : ∀ {n} {Γ : Ctx n} {w w′} {x : Val Γ w} {y : Val Γ w′}
          → just (scan-st x) ≡ just (scan-st y) → Red w x → Red w′ y
 tie-scan refl r = r
+
+-- AND THE ONE THING THE FOLD'S NODE OBLIGATION CANNOT ESTABLISH FOR
+-- ITSELF: that the accumulator installed just before a subscription is
+-- the one still standing when the push happens.  A node is keyed by an
+-- identifier drawn from the schedule's own counter, the fold installs
+-- at the counter's current value and subscribes with it advanced, and
+-- a subscription writes no node below the counter it started at -- so
+-- the accumulator is untouched for structural reasons rather than by
+-- any property of the candidate.  The floor spent here is the advanced
+-- counter itself, which is the tightest one the fold can offer and the
+-- only one under which its own node is strictly below.
+red-scan-installed : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
+           (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
+           {a : Val Γ u} → Red u a
+         → {b : Closed Γ s} {κ : Path Γ lo u t} {id : Id} {now : Tick}
+         → (sched : Sched Γ) (st : EvalSt e)
+         → {sched₂ : Sched Γ} {st₁ : EvalSt e} {burst : Stream Γ s}
+         → subscribeE⇓ {e = e} b (scan-f fn nid ↠ κ) id now
+             (record sched { nextNode = suc nid })
+             (installNode nid (scan-st a) st)
+             (burst , sched₂ , st₁)
+         → RedNode {e = e} (scan-f fn nid) st₁
+red-scan-installed {e = e} fn nid {a} ra sched st d eq =
+  tie-scan (trans (sym (trans (PreservedBelow.below
+                                 (subscribeE-preserves (suc nid) ≤-refl d)
+                                 nid ≤-refl)
+                              (lookup-set nid (scan-st a) (EvalSt.nodes st))))
+                  eq)
+           ra
 
 -- ONE READING OF THE NODE, WHICH IS WHERE BOTH HALVES ARE PAID.  The
 -- dispatch it mirrors branches on a lookup the goal does not mention,

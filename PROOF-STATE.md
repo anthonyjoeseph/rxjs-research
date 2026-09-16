@@ -233,14 +233,14 @@ deferred beside it.
 
 ### Big picture tier roadmap
 
-- **THE FRESHNESS FACT IS NO LONGER ABOUT TRUTH, AND THE ROUTE IS NOW LABOUR.**
-  Three rows stand: a source that allocates, one that allocates two deep, and a
-  flattener, whose subscription leaves this cycle for one of its own and whose
-  wrap READS its node and WRITES it back. What is owed is the general fact
-  underneath them: a subscription started at a counter writes no node below it.
-  That is a two-conjunct induction — freshness with the counter's monotonicity —
-  over nineteen mutual relations, mechanical per constructor and large in the
-  aggregate. This leg is that induction; its risk is labour, not falsity.
+- **THE SHARE'S SLOT IS NOW THE TIER'S ONLY STATEMENT THAT COULD BE FALSE.**
+  Its def is drawn from the scheduler's table rather than from the term, so the
+  structural descent the candidate recurses on does not reach it and the header
+  already carries a dead route. The leg is not a grind: decide whether the arm
+  can be stated over the table at all, or whether the candidate must carry the
+  slot's definition as an index — and refute the cheaper form before building
+  the dearer one. Everything else in this tier is labour once this settles,
+  which is why it goes first rather than beside the mechanical rows.
 
 - **DISCHARGE THE FOUR SUBSTITUTION LEAVES THE PARTNER BOUGHT ITSELF WITH.**
   The `Θloc` telescope landed and took three of the original six with it —
@@ -261,13 +261,14 @@ deferred beside it.
   does refer to itself, run end to end. Cheap, and the one thing that would catch
   the guard being right on paper and wrong in the code.
 
-- **THEN THE MECHANICAL SHELF, WHICH IS NOW TWO ROWS.** A term's own value and a
-  share's connect. They are one leg because neither can move the ground, and they
-  come after the push because the push leg can still change what they must be
-  written against — a walk that reaches a live inner subscribes it, and that is
-  where a term's own value is asked for. Grinding them before the risk above
-  settles buys work that a restatement upstream would throw away, which is the
-  whole reason the ordering is stated rather than left to whatever is nearest.
+- **THEN THE MECHANICAL SHELF, WHICH IS NOW ONE ROW.** The flattener's consume
+  fallback, where an arrival at a usable node is subscribed and the inner's own
+  derivation is what comes back. It comes last of the named legs because the
+  legs above can still change what it must be written against — a walk that
+  reaches a live inner subscribes it, and that is the site this row is stated
+  at. Grinding it before the risk above settles buys work a restatement upstream
+  would throw away, which is why the ordering is written down rather than left
+  to whatever happens to be nearest.
 
 - **THEN WHATEVER DESIGN WORK REMAINS.** The candidate funds `Runs` and nothing
   else; the other eight `*Runs` families have no candidate and the bet is that
@@ -285,11 +286,6 @@ deferred beside it.
 - **`red-input-shared`** (Rx/Evaluator/Reducible) — FALSITY,
   `DEAD ROUTE, PROBED`: a share's slot is reducible. Its def is drawn from the
   table rather than the term, so no descent this module can see reaches it.
-
-- **`red-scan-installed`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`: a node
-  installed just before a source's subscription reads back unchanged after it.
-  Rows at a take, a nested take, and a flattener, which reads and rewrites its
-  own node; none at a share, whose connect allocates on a third route.
 
 - **`sub-unfoldμ`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`: the fixpoint
   peel commutes with the environment substitution. This is what the partner's μ

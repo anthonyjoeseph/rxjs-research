@@ -55,7 +55,6 @@ open import Probed.Apparatus using (Confirms; Separates)
 -- type is generated from its target, so the name is the only handle the
 -- reachability law has on it.
 open import Probed.Reducible-Arms using (row-share-spent; row-share-join;
-  row-scan-fresh; row-scan-fresh-deep; row-scan-fresh-cycle;
   row-live-merge; row-live-queue; row-live-switch; row-live-exhaust)
 
 -- THE FOUR SUBSTITUTION LEAVES THE CARRIED ENVIRONMENT COSTS.  Claimed

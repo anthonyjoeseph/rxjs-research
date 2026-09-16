@@ -1,6 +1,6 @@
 -- THE REMAINING LEAVES OF THE REDUCIBILITY BODY, INSTANTIATED.
 --
--- WHAT IS AT RISK, AND IT IS THE SAME RISK IN ALL THREE.  The
+-- WHAT IS AT RISK, AND IT IS THE SAME RISK IN BOTH.  The
 -- candidate's observable arm demands a subscription derivation in
 -- EVERY schedule and EVERY state, together with a satisfaction claim
 -- over everything the derivation emits.  Nothing had ever produced one
@@ -43,7 +43,6 @@
 -- own recursion the body already checks.
 --
 -- TARGET: red-input-shared @21f529
--- TARGET: red-scan-installed @dbbe5c
 -- TARGET: red-thru @f94cad
 module Probed.Reducible-Arms where
 
@@ -56,22 +55,18 @@ open import Data.Nat using (zero; s≤s; z≤n)
 open import Data.List using ([])
 open import Data.Maybe using (nothing)
 open import Data.Bool using (false)
-open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.Product using (_,_; proj₁; proj₂)
 open import Data.Unit using (tt)
 open import Data.Vec using ([]; _∷_)
-open import Data.List.Relation.Unary.Any using (here)
 open import Relation.Binary.PropositionalEquality using (refl)
 
-open import Rx.Exp using (Ctx; Closed; natᵗ; obs; ofᵉ; takeᵉ; mergeAllᵉ; nat̂; varᵗ; input; _×ᵗ_; fstᵗ; Fn)
+open import Rx.Exp using (Ctx; Closed; natᵗ; obs; ofᵉ; nat̂; input)
 open import Rx.Slots using (Slots; shared)
-open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; root; sched-init; st-init; mergeAllᵒ; switchᵒ; exhaustᵒ; AllOp;
-  NodeId; NodeState; from-inner; _↠_; map-f; scan-f; mergeAll-st; switch-st; exhaust-st;
-  installNode; scan-st)
-open import Rx.Evaluator.Reducible using (Red; reducible; red-input-shared; red-thru;
-  red-scan-installed; tie-scan)
+open import Rx.Evaluator using (Sched; EvalSt; Path; root; sched-init; st-init; mergeAllᵒ; switchᵒ; exhaustᵒ; AllOp;
+  NodeState; from-inner; _↠_; mergeAll-st; switch-st; exhaust-st; installNode)
+open import Rx.Evaluator.Reducible using (Red; reducible; red-input-shared; red-thru)
 
 open import Rx.Evaluator.Domain using (subs-shared; slot-spent; slot-join; step-thru-outer; walk-nil; walk-cons; inner;
-  subs-of; subs-take-suc; subs-merge-all; sub-all; push-cons; push-nil; step-take; subscribeE⇓;
   consume-all-sub; consume-all-enqueue; consume-switch-sub; consume-exhaust-sub)
 
 open import Probed.Apparatus using (Confirms)
@@ -243,105 +238,3 @@ row-live-exhaust =
                      (inner refl (subLive exhaustᵒ (exhaust-st false false)) refl))
                    walk-nil)
     , allTriv (λ _ → tt) _ , tt
-
-----------------------------------------------------------------------
--- 5.  THE NODE A SOURCE CANNOT REACH, which is the fold's residue and
--- the one part of it that is not about the candidate at all.  The
--- accumulator is installed at an id taken from the scheduler's counter
--- and the source is then subscribed with that counter already advanced
--- past it, so the row is about ALLOCATION: it runs a source that really
--- does allocate a node of its own and asks whether the accumulator is
--- still there afterwards.
---
--- LOAD-BEARING, and the take is what makes it so.  A `take` installs a
--- node at the next id and writes it back on every step, so if the
--- advance were off by one the two writes would collide, the lookup
--- would compute to the take's own state, and the row would not
--- typecheck.  A source that allocates nothing could not have failed.
---
--- AND THE LAST ROW LEAVES THIS CYCLE ALTOGETHER, which is the shape a
--- source former cannot reach however deeply it is nested: a flattener
--- hands its outer to a SECOND subscription relation, which takes a
--- node of its own and returns to a wrap that reads that node and
--- writes it back.  So the collision this row rules out is a WRITE over
--- the accumulator rather than a shadowing of it.
-----------------------------------------------------------------------
-
-fstFn : Fn Γ₀ [] [] [] (obs natᵗ ×ᵗ natᵗ) (obs natᵗ)
-fstFn = fstᵗ (varᵗ (here refl))
-
--- the frame's output is an observable, so the chain below it needs one
--- more hop to reach the run's data root
-κ₂ : Path Γ₀ 0 (obs natᵗ) natᵗ
-κ₂ = map-f (nat̂ 0) ↠ κ₀
-
-nid₂ : NodeId
-nid₂ = Sched.nextNode sch₀
-
-acc₂ : Closed Γ₀ natᵗ
-acc₂ = ofᵉ (nat̂ 7 ∷ [])
-
--- the fold's source: a take, which allocates the very next id
-src₂ : Closed Γ₀ natᵗ
-src₂ = takeᵉ (nat̂ 1) (ofᵉ (nat̂ 5 ∷ []))
-
--- the derivation is named rather than written into the claim, since
--- the claim is inferred and the two implicits the conclusion binds are
--- inserted as metas there
-d₂ : Σ (Stream Γ₀ natᵗ × Sched Γ₀ × EvalSt e₀) λ r →
-  subscribeE⇓ {e = e₀} src₂ (scan-f fstFn nid₂ ↠ κ₂) 0 0
-    (record sch₀ { nextNode = Data.Nat.suc nid₂ })
-    (installNode nid₂ (scan-st {t = obs natᵗ} acc₂) st₀) r
-d₂ = _ , subs-take-suc refl refl (subs-of refl) (push-cons refl step-take push-nil)
-
--- and a source allocating TWO nodes of its own, which is the shape a
--- single former cannot reach: the inner take allocates one id past the
--- outer's, so an advance that were off by one anywhere in the nesting
--- would land on the fold's node
-src₃ : Closed Γ₀ natᵗ
-src₃ = takeᵉ (nat̂ 1) (takeᵉ (nat̂ 1) (ofᵉ (nat̂ 5 ∷ [])))
-
-d₃ : Σ (Stream Γ₀ natᵗ × Sched Γ₀ × EvalSt e₀) λ r →
-  subscribeE⇓ {e = e₀} src₃ (scan-f fstFn nid₂ ↠ κ₂) 0 0
-    (record sch₀ { nextNode = Data.Nat.suc nid₂ })
-    (installNode nid₂ (scan-st {t = obs natᵗ} acc₂) st₀) r
-d₃ = _ , subs-take-suc refl refl
-            (subs-take-suc refl refl (subs-of refl)
-              (push-cons refl step-take push-nil))
-            (push-cons refl step-take push-nil)
-
-row-scan-fresh-deep : Confirms
-  (red-scan-installed {e = e₀} fstFn nid₂ (reducible acc₂)
-     {b = src₃} {κ = κ₂} {id = 0} {now = 0} sch₀ st₀ (proj₂ d₃)
-     {w = obs natᵗ} {a = acc₂})
-row-scan-fresh-deep eq = tie-scan eq (reducible acc₂)
-
--- and a source whose subscription enters ANOTHER push cycle rather
--- than allocating inside this one.  A flattener runs its outer through
--- a frame of its own, so the node it takes is claimed by a second
--- subscription relation and returned to by the wrap -- which READS
--- that node and WRITES it back, so a collision would overwrite the
--- accumulator rather than merely shadow it, and the row's own tie
--- would compute to the flattener's state and fail to typecheck.
-src₄ : Closed Γ₀ natᵗ
-src₄ = mergeAllᵉ nothing (ofᵉ [])
-
-d₄ : Σ (Stream Γ₀ natᵗ × Sched Γ₀ × EvalSt e₀) λ r →
-  subscribeE⇓ {e = e₀} src₄ (scan-f fstFn nid₂ ↠ κ₂) 0 0
-    (record sch₀ { nextNode = Data.Nat.suc nid₂ })
-    (installNode nid₂ (scan-st {t = obs natᵗ} acc₂) st₀) r
-d₄ = _ , subs-merge-all
-           (sub-all refl (subs-of refl)
-             (push-cons refl (step-thru-outer walk-nil) push-nil))
-
-row-scan-fresh-cycle : Confirms
-  (red-scan-installed {e = e₀} fstFn nid₂ (reducible acc₂)
-     {b = src₄} {κ = κ₂} {id = 0} {now = 0} sch₀ st₀ (proj₂ d₄)
-     {w = obs natᵗ} {a = acc₂})
-row-scan-fresh-cycle eq = tie-scan eq (reducible acc₂)
-
-row-scan-fresh : Confirms
-  (red-scan-installed {e = e₀} fstFn nid₂ (reducible acc₂)
-     {b = src₂} {κ = κ₂} {id = 0} {now = 0} sch₀ st₀ (proj₂ d₂)
-     {w = obs natᵗ} {a = acc₂})
-row-scan-fresh eq = tie-scan eq (reducible acc₂)
