@@ -221,21 +221,27 @@ first thing on this face a program can be run against directly.
 ### The monster
 
 `burst-drain-well-formed` — the DEEPEST node here whose cone still holds the
-work that kills it. Below it the tier is two leaves and the seam relation they
-are denominated in, each with a cone of its own vocabulary only, so naming one
-would forbid touching its sibling; above it sits a wrapper supplying
-derivations. The tier bottoms out near its own top because it is two levels
-deep, not because the top was defaulted to. It can be FALSE, not merely
-unproven: a run whose emit stream the automaton rejects kills both leaves, the
-seam, and the WellFormed quantification `The-Proof` draws from this face.
+work that kills it. Below it are two leaves and the seam relation they are
+denominated in, each with a cone of its own vocabulary, so naming one would
+forbid its sibling; above it sits a wrapper supplying derivations. It can be
+FALSE, not merely unproven: a run the automaton rejects kills both leaves, the
+seam, and the WellFormed quantification `The-Proof` draws from here.
 
-also: `evaluate-deterministic` — a tier-2 statement worked here on Anthony's
-direction, because the coverage axis it closes is this face's and no schedule
-of tier-1 work reaches it.
+also: `take-bounds-values` — the REHEARSAL, run here on Anthony's direction before the monster itself is touched. Off the cone by construction: it names no seam and no automaton, which is the point — it exercises the drain induction with none of this face's apparatus in the way.
+also: `evaluate-deterministic` — tier 3's monster, whose statement and leaves are already declared. Admitted here because the branch carrying this tier's work carries them too, and the check reads the branch rather than the commit.
 
 ### Big picture tier roadmap
 
-- **RUN A CLOSE, WHICH IS THE ONE FIELD NO ROW HAS CONDITIONED.** The drain's
+- **THE REHEARSAL FIRST: PROVE THAT `take k` BOUNDS THE STREAM (Anthony).**
+  `take-bounds-values` is stated and claimed, and nothing on the monster moves
+  until it is discharged. It is the same induction over the drain that both
+  seam leaves owe, with none of this face's apparatus in the way — the reason
+  it is the rehearsal is in its own header. Instantiate before grinding: a
+  scripted slot with two entries under a take at one is the cheapest shape that
+  could refute it, since the cut landing mid-batch is where the node's budget
+  and its frame have to agree.
+
+- **THEN RUN A CLOSE, WHICH IS THE ONE FIELD NO ROW HAS CONDITIONED.** The drain's
   step is reached: a hot slot firing at tick zero delivers, the emit count is
   pinned so the row cannot be the exit again, and the fold now runs over
   envelopes the drain minted. What that leaves is the shadow field's
@@ -272,6 +278,11 @@ of tier-1 work reaches it.
 
 ### The ledger
 
+- **`take-bounds-values`** (Verify-Take-Bounds) — FALSITY, `PROBED`: a program
+  whose outermost node is `take k` emits at most k values. The rehearsal for
+  the drain induction; nothing has instantiated it, and the budget's decrement
+  and the frame's cut are two points that can disagree.
+
 - **`subscribeE-root-wf`** (Verify-Well-Formed) — FALSITY, `PROBED`: the root
   subscribe frame's burst drives the automaton to a state standing in the seam
   relation to the evaluator's. Computable at concrete programs and
@@ -289,26 +300,17 @@ critical path.
 
 ### The monster
 
-`evaluate-deterministic` — `subscribeE-det` is likelier false and is deeper,
-and it is below the FLOOR: a leaf's cone is its statement's vocabulary, so
-naming it would put `drain-det` and the assembly itself off-tree and forbid the
-grind that kills it. This is the deepest node whose cone IS the work, and it
-still sits far below the tier's semantic top line. Its falsity would be a fact
-about the EVALUATOR rather than about a claim: a subscribe frame admitting two
-outputs at one set of indices means the machine is not a function, which moves
-the tier below as well.
+`readme-batch-order-is-delivery-order` — the flagship law, and the deepest node
+here whose cone still holds the work that kills it. Below it is the SPEC, which
+cannot move, so the descent bottoms out at the lowest claim rather than at a
+leaf. Every other row is stated over values in delivery order, so if batching
+reorders or drops, the seven instances and the take law go with it and the two
+that survive assert something about a stream nobody should trust. It can be
+FALSE at a program with a flattener, which is exactly the region no row has
+reached.
 
 ### Big picture tier roadmap
 
-- **DECIDE WHETHER THE RUN RELATION IS A FUNCTION** — `subscribeE-det`,
-  `drain-det`, under the assembly `evaluate-deterministic` that Main now
-  claims. The body typechecks, so what is open is the two leaves and nothing
-  about the shape. It is first because it is the only row here whose answer
-  changes another tier: the protocol face's leaf quantifies over any subscribe
-  and any drain derivation while every sampled program exercised the builder's,
-  and this is the fact that makes those the same set. Instantiate before
-  grinding — the ring is twenty families, so a refutation at one arm is worth
-  far more than a partial induction over all of them.
 - **re-probe the three universal laws at a program that has a SOURCE** —
   `readme-batch-order-is-delivery-order`, `readme-take-counts-values`,
   `readme-one-subscribe-one-batch`. Their rows stand at a closed literal in an
@@ -335,10 +337,6 @@ the tier below as well.
 
 ### The ledger
 
-- **`subscribeE-det`, `drain-det`** (Verify-Determinacy) — FALSITY,
-  `NO EVIDENCE`: each family admits one output at its own indices. Nothing has
-  instantiated either, and the arms that do not follow from the head
-  constructor are separated by equation premises — unwalked.
 - **`readme-diamond`, `readme-each-next-own-instant`,
   `readme-cascades-inherit`, `readme-completion-cascades`,
   `readme-share-connect-no-replay`, `readme-late-join-growth`,
@@ -373,3 +371,54 @@ the tier below as well.
 - **FFI, permanently trusted** — `_>>=_`/`getContents`/`putStr` (CLI/IO),
   `randFold`/`natMod` (QuickCheck). Carried, not counted.
 
+## Tier 3 — the run relation is a function
+
+The determinacy face, parked behind both ledgers above. It is last because
+nothing open depends on it: the tiers below are stated over the ONE output the
+builder produces, so an inequality or a verdict about that output means what it
+says whether or not a second derivation could have produced another. What
+determinacy buys is the STRENGTHENING — a leaf quantified over an arbitrary
+derivation becomes a fact about the machine rather than about the builder — and
+a strengthening is worth exactly nothing until the weak form is proven.
+
+### The monster
+
+`evaluate-deterministic` — `subscribeE-det` is likelier false and is deeper,
+and it is below the FLOOR: a leaf's cone is its statement's vocabulary, so
+naming it would put `drain-det` and the assembly itself off-tree and forbid the
+grind that kills it. This is the deepest node whose cone IS the work. Its
+falsity would be a fact about the EVALUATOR rather than about a claim: a
+subscribe frame admitting two outputs at one set of indices means the machine
+is not a function, and then every face's quantification over derivations is a
+quantification over a set nobody has characterised.
+
+### Big picture tier roadmap
+
+- **INSTANTIATE THE RING BEFORE GRINDING ANY OF IT.** The subscribe relation is
+  twenty families and nothing has ever run two derivations at one set of
+  indices. A refutation at a single arm is worth far more than a partial
+  induction over all of them, and it is cheap: build two derivations of the
+  same frame by taking the builder's and one arm's alternative, and ask for the
+  `refl`. The arms that do not follow from the head constructor are the target;
+  the rest are decided by pattern matching and cannot refute.
+
+- **THEN GRIND `subscribeE-det`, ARM BY ARM.** What separates the arms is
+  EQUATION PREMISES rather than constructors, which is why this is not a
+  mechanical induction: two arms can agree on the head and be told apart only
+  by a derived equality on the schedule or the state. Each such pair is a
+  lemma, and the lemmas are what the leg delivers — the induction over them is
+  the cheap half.
+
+- **THEN `drain-det`, AND THE ASSEMBLY'S BODY.** The drain's determinacy is an
+  induction whose motive is the subscribe result, so it lands second by
+  necessity rather than by choice. When both leaves are bodies the assembly
+  stops being a claim over postulates and becomes what its name says, and the
+  faces below can be restated over an arbitrary derivation in whatever order
+  their own schedules reach.
+
+### The ledger
+
+- **`subscribeE-det`, `drain-det`** (Verify-Determinacy) — FALSITY,
+  `NO EVIDENCE`: each family admits one output at its own indices. Nothing has
+  instantiated either, and the arms that do not follow from the head
+  constructor are separated by equation premises — unwalked.

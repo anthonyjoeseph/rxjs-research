@@ -62,3 +62,9 @@ open import Probed.Pipeline-Claims using (row-online; row-ids)
 -- program has ever been run against: its predecessor asserted a verdict
 -- about a concatenation and named nothing in between.
 open import Probed.Seam using (row-root; row-drain; row-root-hot; row-drain-hot; drain-hot-emits)
+
+-- TAKE'S BOUND, the rehearsal claim: the one row set on this face that
+-- decides an evaluator fact without a spec, a batching stage or a
+-- second derivation to compare against.
+open import Probed.Take-Bounds using (row-mid-burst; row-zero; row-arrival;
+  mid-burst-cuts; mid-burst-uncut; arrival-cuts; arrival-uncut)
