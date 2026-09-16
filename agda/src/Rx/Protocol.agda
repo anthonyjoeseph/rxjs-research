@@ -5,7 +5,6 @@ open import Data.Nat     using (ℕ; zero; suc; _+_; _≡ᵇ_; _≤ᵇ_)
 open import Data.List    using (List; []; _∷_)
 open import Data.Maybe   using (Maybe; just; nothing)
 open import Data.Product using (_×_; _,_)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (Id; Source; InstEvent; init; value; close; handoff; complete; cutPending; EmitKind;
   subscribe; delivery; plumbing; InstEmit; _at_from_as_)
@@ -13,11 +12,11 @@ open import Rx.Prim using (Id; Source; InstEvent; init; value; close; handoff; c
 ------------------------------------------------------------------
 -- The protocol automaton: InstEmit's contract made explicit.
 -- batchSimultaneous is total and trusting — the impl reads only
--- init/close counts, the spec reads only instant ids.  WellFormed
--- is the bridge premise that the two vocabularies tell the same
--- story on a stream: what the evaluator promises
--- (evaluate-well-formed) and what the batcher assumes
--- (batch-agreement).  Every fact here is WRITER-ASSERTED (the kind
+-- init/close counts, the spec reads only instant ids.  ACCEPTANCE of
+-- the run is the bridge premise that the two vocabularies tell the
+-- same story on a stream: what the evaluator promises
+-- (`evaluate-accepted`) and what the batcher assumes
+-- (`batch-agreement`).  Every fact here is WRITER-ASSERTED (the kind
 -- tag, the handoff announcement, the close reason) and the
 -- automaton only checks; it never reconstructs.  stepProtocol
 -- rejects (nothing) any emit breaking a clause:
@@ -242,46 +241,32 @@ checkFinal (just ps) = if paidUp ps then just ps else nothing
 data Accepted {A : Set} : Maybe A → Set where
   accepted : ∀ {s} → Accepted (just s)
 
-WellFormed : ∀ {A : Set} → List (InstEmit A) → Set
-WellFormed xs = Accepted (checkFinal (runProtocol protocol-init xs))
-
--- the Bool twin of WellFormed, for the QuickCheck harness
+-- the Bool twin of the harness's own legality question
 wellFormed? : ∀ {A : Set} → List (InstEmit A) → Bool
 wellFormed? xs = accepts? (checkFinal (runProtocol protocol-init xs))
 
 ------------------------------------------------------------------
--- WHERE THE PREDICATE DIVIDES.  `WellFormed` is two judgements
--- composed and they behave differently under truncation: the
--- automaton RUN is prefix-closed, since `runProtocol`
+-- SETTLEDNESS IS NOT PART OF THE LEGALITY ANYTHING CLAIMS (Anthony,
+-- asking for a claim that does not read the evaluator).  The two
+-- judgements composable here behave differently under truncation --
+-- the automaton RUN is prefix-closed, since `runProtocol`
 -- short-circuits on rejection, while `checkFinal` reads the LAST
--- state and travels nowhere.  Naming the halves separately is what
--- lets a consumer owe acceptance of every emit and settledness of
--- its own stopping point as two obligations rather than one.
+-- state and travels nowhere -- and the batching proof turned out to
+-- spend only the first.  So the conjunction is gone and `Accepted` of
+-- the run is what a consumer owes; `checkFinal` survives for the
+-- harness alone, which asks a decidable question rather than proving
+-- one.
 --
--- The consequence for anything reading a PREFIX: `WellFormed` of a
--- prefix is strictly more than the prefix of a well-formed stream.
--- An instant's obligations span several emits — `handoff` bumps
--- owed and later deliveries pay it off, which is what `paidOff`
--- exists to close — so a cut between them is rejected outright.
--- A statement quantified over every prefix is therefore false at
--- every instant carrying more than one emit.
+-- The consequence for anything reading a PREFIX, which is why the
+-- conjunction looked necessary: acceptance-AND-settledness of a prefix
+-- is strictly more than the prefix of a stream satisfying it.  An
+-- instant's obligations span several emits — `handoff` bumps owed and
+-- later deliveries pay it off, which is what `paidOff` exists to close
+-- — so a cut between them fails the final check outright, and a
+-- statement quantified over every prefix would be false at every
+-- instant carrying more than one emit.  Acceptance alone carries no
+-- such gap, being exactly what survives truncation.
 ------------------------------------------------------------------
-
-checkFinal-paidUp : ∀ {ps} → paidUp ps ≡ true → Accepted (checkFinal (just ps))
-checkFinal-paidUp eq rewrite eq = accepted
-
--- the two halves recomposed: an accepted run that stops settled is
--- well formed.  This is the shape a consumer owes — acceptance is
--- about every emit, settledness is about the stopping point and
--- about nothing else
-wellFormed-settled :
-  ∀ {A : Set} (xs : List (InstEmit A)) →
-  Accepted (runProtocol protocol-init xs) →
-  (∀ ps → runProtocol protocol-init xs ≡ just ps → paidUp ps ≡ true) →
-  WellFormed xs
-wellFormed-settled xs acc settled
-  with runProtocol protocol-init xs | acc | settled
-... | just ps | _  | s = checkFinal-paidUp (s ps refl)
 
 ------------------------------------------------------------------
 -- frameFresh: the SUBSCRIPTION-BURST prefix discipline.

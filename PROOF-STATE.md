@@ -183,8 +183,11 @@ the row is DIFFICULTY.
 formal-verification-batchSimultaneous    The-Proof.agda — REAL, module postulate-free
  ├─ batch-agreement                      proven
  └─ evaluate-well-formed                 Verify-Well-Formed.agda — REAL, a body
-     └─ adequacy                         the run is a prefix — tier 2
-     └─ meaning-prefix-well-formed       one postulate — tier 3
+     ├─ evaluate-accepted                no emit of a run is rejected — tier 3
+     └─ evaluate-settled                 the run stops settled — tier 3
+
+adequacy / saturation / run-monotone      claimed by Main in their own right —
+                                          nothing above consumes them — tier 2
 
   evaluate↓ = proj₁ ∘ evaluate!           Rx/Evaluator/Builder.agda — REAL
      └─ every value-path leaf is a body; the corpus runs; the tower descends
@@ -342,74 +345,60 @@ also: `take-bounds-values` — the take face, which is here to be measured again
   in the head rather than described, so the row can carry its own evidence
   field.
 
-## Tier 3 — well-formedness, split where the predicate divides
+## Tier 3 — the automaton half, and it is the only half
 
-**THE TIER IS TWO LEAVES, AND THE STATEMENT ABOVE THEM IS A BODY.** `The-Proof`
-draws `evaluate-well-formed` from here and that name is a definition: it hands
-the run to `evaluate-accepted` and `evaluate-settled` through `Rx.Protocol`'s
-own recomposition, and those two are the whole of the tier's debt.
+**THE TIER IS ONE LEAF.** `The-Proof` draws `evaluate-accepted` from here and
+nothing else: no emit of a canonical run is rejected by the protocol automaton.
 
-**THE SPLIT IS WHERE `WellFormed` ALREADY DIVIDES, NOT A NEW PREDICATE.** It is
-`checkFinal` of `runProtocol`, and only the second is prefix-closed — the first
-reads the LAST state. `runProtocol-prefix` and `wellFormed-settled` are proven,
-so the automaton half travels down a truncation for free and the only thing a
-cut point owes is that it is settled.
+**THE SETTLEDNESS HALF IS GONE, AND THAT IS A STRENGTHENING RATHER THAN A
+RETREAT (Anthony, asking for a claim that does not read the evaluator).**
+`batch-agreement` took acceptance-and-settledness and spent only acceptance —
+its first move discarded the final check — so the conjunction was manufactured
+for a consumer that weakened it back. Its hypothesis is now `Accepted` of the
+run, the same conclusion over strictly more streams, and the one statement here
+about where the MACHINE stops has left the proof path.
 
-**AND BOTH LEAVES ARE ABOUT THE RUN, WHICH IS WHAT MAKES THEM PROBEABLE.**
-`runProtocol protocol-init (evaluate↓ fuel e ins)` reduces at a concrete
-program. The single statement they replace was stated over `meaning` and reduced
-at none, so nothing could instantiate it — the tier's risk was unmeasurable by
-construction and is now the ordinary kind.
+**AND WHAT SURVIVES IS PREFIX-CLOSED, WHICH IS WHAT TIER 2 NEEDS.**
+`runProtocol` short-circuits on rejection, so acceptance travels down a
+truncation for free — the property a compositional reading can descend through,
+where the final check read the last state and travelled nowhere.
 
 ### The monster
 
-`evaluate-settled` — a run stops on an instant boundary with every obligation
-paid. Deepest of the two and the likelier false: it is an off-by-one between the
-point a budget is spent and the point a cut is emitted, reachable at a scripted
-slot, while its sibling is a conjunction of clauses the evaluator asserts as it
-builds. Its cone reaches `evaluate↓` and the automaton, which is the machinery
-either leaf is discharged out of, so it admits the work that kills it.
-
-also: `evaluate-accepted` — the other half, off the monster's cone because it is a
-statement about every emit rather than about the stopping point.
+`evaluate-accepted` — no emit of a canonical run is rejected. The tier's whole
+debt, so the choice is forced rather than judged; its cone reaches `evaluate↓`
+and the automaton, which is the machinery it must be discharged out of, so it
+admits the work that kills it.
 
 ### Big picture tier roadmap
 
-- **INSTANTIATE BOTH LEAVES, WHICH IS NOW POSSIBLE AND WAS NOT.** Each is a
-  computation over a run, so a probe walks fuel across an instant boundary and
-  asks the automaton directly — and `evaluate-settled` is the one to aim at,
-  since a cut landing mid-instant refutes the tier outright. The sampling sweep
-  recorded in the body's own block reached the CONCLUSION and so constrains the
-  pair only jointly; rows against the leaves separately are what say which half
-  carries the risk.
+- **INSTANTIATE IT, WHICH IS NOW POSSIBLE AND WAS NOT.** It is a computation
+  over a run, so a probe runs the automaton at concrete programs and reads the
+  verdict directly. The sampling sweep recorded in the face's own block reached
+  the CONJUNCTION this was half of, so it constrains the pair jointly and says
+  nothing about this half alone; rows against this statement are what move it
+  off `NO EVIDENCE` in its own right. Aim at the flatteners and at `μᵉ`, which
+  is where the clauses the evaluator asserts while building are hardest to keep.
 
-- **THEN RESTATE WHAT CONSUMES WELL-FORMEDNESS, WHICH IS WHAT SAYS THE
-  PREDICATE IS THE RIGHT ONE.** `The-Proof` quantifies the batcher over
-  WellFormed streams, so the split has to reach that quantification rather than
-  merely sit beside it. A predicate the batching claim cannot be stated against
-  is one nobody will ever spend, however structural it reads — the same test the
-  mirror tier applies to its own erasure.
-
-- **THEN DECIDE WHAT DISCHARGES THE AUTOMATON HALF, WHICH IS THE TIER'S ONE
-  DESIGN QUESTION.** Two routes: a seam invariant relating the eval state to
-  `ProtocolSt`, recoverable from the face's header; or an induction on fuel over
+- **THEN DECIDE WHAT DISCHARGES IT, WHICH IS THE TIER'S ONE DESIGN QUESTION.**
+  Two routes: a seam invariant relating the eval state to `ProtocolSt`,
+  recoverable from the face's header; or an induction on fuel over
   `run-monotone`, which says a longer run EXTENDS a shorter one and so asks only
   that an appended segment keeps the automaton happy. The second is the cheaper
-  bet and needs no domain; the leg's product is which, decided by reading the
-  evaluator's step structure rather than by preference.
+  bet and needs no domain. The leg's product is which, decided by reading the
+  evaluator's step structure rather than by preference — and the seam invariant
+  is no longer owed twice, which is what makes the cheaper bet worth taking.
 
-- **AND THE SETTLEDNESS HALF IS WHERE A SEAM INVARIANT IS OWED WHATEVER THAT
-  DECIDES.** `evaluate-settled` is a fact about where the machine may CUT, so no
-  reorganisation of the other half removes it. That is the argument for pricing
-  the seam invariant before committing to any route that claims to avoid it: it
-  is owed once already, and a route avoiding it for one half still pays it here.
+- **THEN SETTLE WHETHER THE HARNESS'S QUESTION IS STILL THE RIGHT ONE.**
+  `wellFormed?` decides the retired conjunction, so QuickCheck now rejects
+  streams the theorem accepts. That is a harness stricter than the claim, which
+  costs coverage silently: every program whose run stops mid-instant is dropped
+  before it is compared. The leg's product is whether the decision procedure
+  drops its final check, and what the sweep then reaches that it did not.
 
 ### The ledger
 
-- **`evaluate-settled`** (Verify-Well-Formed) — FALSITY, `NO EVIDENCE`: a run's
-  last protocol state has every obligation paid. The tier's monster, and the
-  half a cut landing mid-instant refutes outright.
-- **`evaluate-accepted`** (Verify-Well-Formed) — FALSITY, `DEAD ROUTE`: no emit
+- **`evaluate-accepted`** (Verify-Well-Formed) — FALSITY, `RECOVERY`: no emit
   of a run is rejected by the automaton. Every clause the automaton checks is a
   promise the evaluator makes while building the stream, so it is structural in
   the run.
