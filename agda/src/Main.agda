@@ -72,6 +72,27 @@ open import Rx.Provenance-Theorems
   using (id-inheritance)
 
 ------------------------------------------------------------------
+-- TAKE BOUNDS THE STREAM.  Claimed here because it has no consumer and
+-- is not meant to acquire one: it is a rehearsal of the drain
+-- induction, chosen so that the machinery it exercises is the
+-- well-formedness face's while the statement needs none of that face's
+-- apparatus to mean something.
+------------------------------------------------------------------
+open import Verify-Take-Bounds
+  using (take-bounds-values)
+
+------------------------------------------------------------------
+-- THE RUN RELATION IS A FUNCTION.  Claimed here rather than by a
+-- consumer, because its consumers are the claims that build their own
+-- derivations and none of those is written yet — and because a claim
+-- that needs it typechecks without it while proving something weaker
+-- than its own name, which is the one shape a missing fact does not
+-- announce.
+------------------------------------------------------------------
+open import Verify-Determinacy
+  using (evaluate-deterministic)
+
+------------------------------------------------------------------
 -- THE TIMING CLAIMS.  CAUTION: all three are stated over nine
 -- postulated abstract helpers in the same module (`Node`, `NodeSt`,
 -- `Inbox`, `inboxOf`, `stAt`, `cascade`, `δ`, `Retiming`, `retime`),

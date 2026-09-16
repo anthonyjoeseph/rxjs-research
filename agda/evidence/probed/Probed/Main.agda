@@ -57,3 +57,15 @@ open import Probed.Readme-Claims using (row-order; row-take; row-one-batch)
 
 -- THE PIPELINE-SIDE CLAIMS, claimed from the root for the same reason.
 open import Probed.Pipeline-Claims using (row-online; row-ids)
+
+-- THE PROTOCOL FACE'S SEAM, which is the first thing on that face a
+-- program has ever been run against: its predecessor asserted a verdict
+-- about a concatenation and named nothing in between.
+open import Probed.Seam using (row-root; row-drain; row-root-hot; row-drain-hot; drain-hot-emits)
+
+-- TAKE AT ZERO, the one row set on this face that decides an evaluator
+-- fact without a spec, a batching stage or a second derivation to
+-- compare against.
+open import Probed.Take-Bounds using (row-zero-sync; row-zero-late;
+  row-regs; row-chains; row-cascade; row-frame; sync-uncut; late-uncut;
+  cut-emits-nothing; frame-spends; frame-spent)

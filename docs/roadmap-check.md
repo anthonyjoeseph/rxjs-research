@@ -48,10 +48,6 @@ can see into build failures.
     `make evidence-check` allows one postulate. The number is imported from that
     checker, so the two cannot drift apart.
 
-14. **The open-question cap** — a tier's `### Open questions` section names at most
-    `QUESTIONS_MAX`. The section is optional; the cap is not a quota.
-15. **The open-question budget** — each question's prose is within `QUESTION_BUDGET`.
-    Its `relevant:` line is free, on the same asymmetry as a row's names.
 16. **A question naming too few postulates** — under `QUESTION_NAMES_MIN`, it is one
     row given a heading, and that row's research already has a home.
 17. **A stale relevant list** — every name a question names is still a live postulate,
@@ -163,19 +159,6 @@ pins the CEILING in both directions at once: a tier of eight legs must fire and 
 sibling of seven must stay quiet, since a ceiling off by one reads exactly like a
 ceiling that works.
 
-Four more pin the open questions, on the same isolate-one-check discipline:
-`questions-many.md` names a fourth question with everything else well formed,
-`questions-thin.md` names one postulate under two good siblings, `questions-fat.md`
-carries a question that has started answering itself beside one whose `relevant:` line
-is long enough to break the budget were the list charged, and `questions-stale.md`
-names both a row that has come down out of FALSITY and a name that has left the ledger.
-`questions-good.md` is the must-NOT-fire side and it pins two things at once: a tier
-whose section is well formed, and a second tier carrying no section at all — because
-the section being optional is the property most easily lost by making the check
-uniform. Its third question wraps its `relevant:` list onto a continuation line, which
-is the failure worth a fixture: a wrapped ledger line read as prose is charged AND its
-names go unchecked, and only the second half is visible.
-
 ## The evidence field, and why a derived field may be mandatory
 
 A row reads `— SHAPE, `REFUTED`:` or `— DIFFICULTY, `NO EVIDENCE`:`. The field lists
@@ -215,41 +198,6 @@ Which markers a block reaches is decided by indentation: a header associates wit
 declaration under it until the next comment run or the next construct at **column 0**.
 That is why splitting a refuted postulate out of a shared `postulate` block into its own
 is what gives it its own markers, and why siblings in one block share a header's `TWIN`.
-
-## Open questions — the one section held to its LEDGER and not to its movement
-
-Checks 13-16 have a shape none of the others do, and the shape is the point. Every
-other thing this checker holds is either required (a row per postulate, a floor of three
-legs per tier) or bounded (a budget). A question is neither: the section may be absent, and when
-present it is never required to change.
-
-That follows from what a question IS. A leg is one commit, so `make roadmap-moved` can
-demand the roadmap move with every commit and be right. A question outlives many
-commits by construction — it is what several FALSITY rows are jointly waiting on, and
-those rows do not resolve in a sitting. Demanding movement there would produce a
-question REWRITTEN rather than one answered, which is the failure mode the roadmap's
-own second outcome already warns about one level down.
-
-Nor is it required per tier, and that is the same law the source headers carry: a
-mandatory `TWIN:` produces a filler twin, which is worse than a blank because it earns
-a class the row has not earned. A mandatory question produces a filler question, which
-is worse than silence because it reads as research.
-
-So what is held is the `relevant:` list, and only it. That list is the only part of the
-section a machine can check and the only part that rots invisibly — a question's prose
-stays readable while every row under it is discharged. Three conditions, and each names
-a different way the section stops being true: a name that is no longer LIVE means the
-question is answered or its row was restated; a name that is no longer a row of THIS
-tier means the question has been misfiled or the statement moved; a name that is no
-longer FALSITY means the uncertainty it was about has been settled at that row. When
-the list empties, the question goes — and that is the intended way for one to die,
-rather than by being edited into a different question.
-
-The minimum of two is the other half. A question over one postulate is that
-postulate's row given a heading, and its research already has a home — the postulate's
-own header, which is where the next person to pick it up will stand. What earns the
-section is that answering the question moves SEVERAL rows at once, which is also the
-only thing it can say that the ledger cannot say better.
 
 ## The hygiene rules a machine cannot check
 

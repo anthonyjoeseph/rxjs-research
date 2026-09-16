@@ -132,7 +132,9 @@ reason to spend those minutes only to fail on something a textual pass already k
 | `imports-selftest` | the import checker still fires, in both directions | [docs/imports-check.md](docs/imports-check.md) |
 | `imports-check` | **NO UNUSED IMPORT, AND NO UNUSED NAME IN A SURVIVING CLAUSE (Anthony: "no unused imports, either")** — an import is a module-graph EDGE, fixing what must be built BEFORE this file and what an edit to the imported module INVALIDATES, and Agda has no warning for a dead one so `-W error` cannot see it. `make imports-fix` deletes them, but never a **claim root**'s imports (one file per tree — they ARE the claim, so unused is the design) nor a **sole-route** edge, which is a wiring finding rather than dead weight. AND no import may put names in a file's SCOPE without naming them: a missing `using` list is a finding in every file, claim roots included (`using ()` and a qualified `import M as Q` are fine). AND **no `public` re-exports** — a name is imported from where it is DEFINED, so that `grep` and `make find` point at its real home. AND no `using` clause may ask a module of this tree for a name that module does not have — a definition MOVES, one consumer's clause is repaired and its sibling's is not, and Agda reports that only as a scope warning `-W error` promotes MANY MINUTES down the tower, one instance per build, naming the importer and not the name's new home. What makes the cheap check sound is the `public` ban directly above: with no re-exports, a module can only export what its own text mentions. AND every file DECLARES its own module name, matching its path: a missing header is not a syntax error, so Agda checks such a file as a target and then crashes every IMPORTER with an internal error naming neither end — and a dev check cannot see it, because it checks a generated copy carrying its own header. Every part of this buys LEGIBILITY, not time: `using` filters scope rather than the build, a re-export removes no edge since a ladder's name-level dependencies are genuine, and a clause with one live name holds its edge open however many dead names sit beside it — which is why the name-level half was once argued to be optional, and is the wrong measure. A list naming thirty things the file never touches is not a record of what the file depends on | [docs/imports-check.md](docs/imports-check.md) |
 | `roadmap-selftest` | the roadmap checker still fires | [docs/roadmap-check.md](docs/roadmap-check.md) |
-| `roadmap-check` | PROOF-STATE is sorted riskiest-first, names every live postulate AND NOTHING ELSE in a row head, keeps rows AND TIER PREAMBLES within a character budget — the second because holding every row to a line and writing the finding into the section text above them satisfies the first exactly — carries no date, and neither does this file or `docs/`; opens every tier with a BIG PICTURE ROADMAP of at least three legs and at most seven, each within a prose budget several times a row's, because the legs are the schedule and the rows are only the ledger it is drawn from — the floor so a tier cannot plan one leg ahead, the ceiling so a schedule cannot become a second copy of the ledger, and the gap between them because a route already decided is written down rather than displaced; and every classed row carries the DERIVED evidence field its postulates' headers dictate, which is why a field may be mandatory where the `TWIN:` section it summarises is not — a derived field cannot be filled with filler, so the blank is the product. `make roadmap-evidence` writes it; and no DIFFICULTY row stands on nothing, which is the same law the GRINDABLE half already carried — and a tier's OPEN QUESTIONS, which are the one thing here held to a LEDGER rather than to movement (Anthony). A question is what SEVERAL RISKY rows are jointly waiting on, so it outlives many commits by construction and demanding it move would buy a question REWRITTEN rather than one answered — the failure the roadmap's second outcome already names one level down. The section is OPTIONAL for the same reason a `TWIN:` is, since a mandatory question produces a filler question and filler that reads as research is worse than silence. What IS held is the `relevant:` list, which is the only part that rots invisibly — a question's prose stays readable while every row under it is discharged — so every name must still be LIVE, still a row of THAT tier, and still FALSITY OR SHAPE, each condition naming a different way the question stopped being true. SHAPE counts, and holding the list to FALSITY was wrong: a question's rows convert FALSITY → SHAPE as it is ANSWERED, since SHAPE is precisely the statement being wrong with the restatement guaranteed, which is what a half-answer leaves behind — so the narrower rule retired a question at the moment the narrowing it exists to record had happened. VACUITY is not admitted, because nothing WAITS on a statement that asserts nothing; when the list empties the question GOES, which is how one is meant to die rather than by being edited into a different question. And it names at least two, because a question over one row is that row given a heading and its research already has a home | [docs/roadmap-check.md](docs/roadmap-check.md) |
+| `roadmap-check` | PROOF-STATE is sorted riskiest-first, names every live postulate AND NOTHING ELSE in a row head, keeps rows AND TIER PREAMBLES within a character budget — the second because holding every row to a line and writing the finding into the section text above them satisfies the first exactly — carries no date, and neither does this file or `docs/`; opens every tier with a BIG PICTURE ROADMAP of at least three legs and at most seven, each within a prose budget several times a row's, because the legs are the schedule and the rows are only the ledger it is drawn from — the floor so a tier cannot plan one leg ahead, the ceiling so a schedule cannot become a second copy of the ledger, and the gap between them because a route already decided is written down rather than displaced; and every classed row carries the DERIVED evidence field its postulates' headers dictate, which is why a field may be mandatory where the `TWIN:` section it summarises is not — a derived field cannot be filled with filler, so the blank is the product. `make roadmap-evidence` writes it; and no DIFFICULTY row stands on nothing, which is the same law the GRINDABLE half already carried. | [docs/roadmap-check.md](docs/roadmap-check.md) |
+| `monster-selftest` | the monster checker still fires — the lowest tier binds, an `also:` exception is collected and is not charged, and an anonymous `with` continuation is spliced into what it continues | [docs/monster.md](docs/monster.md) |
+| `monster-check` | every line ADDED to `agda/src` belongs to a declaration inside the lowest open tier's MONSTER's own dependency cone. Not its blast radius — its CONE: what the monster's statement and body REACH, which is the set whose truth decides its own. Read off the tree AS EDITED, which is what makes converting the monster into a body over new leaves a passing commit rather than a forbidden one | [docs/monster.md](docs/monster.md) |
 | `roadmap-moved-selftest` | the movement checker still fires, in both directions — and that a trailing-whitespace edit does NOT count as movement | [docs/roadmap-check.md](docs/roadmap-check.md) |
 | `roadmap-order` | no GRINDABLE or DIFFICULTY row was DISCHARGED while its tier holds an open FALSITY or SHAPE row. A discharge is the one banking move — the name left the postulate ledger and is still declared in `agda/src` — so deleting, renaming, splitting, restating and reclassifying stay free, and a PREREQUISITE the risky statement names in its own header or type is exempt | [docs/roadmap-check.md](docs/roadmap-check.md) |
 | `roadmap-order-selftest` | the ordering checker still fires — and stays QUIET on the four shapes the proof must remain free to take, since a check that held a deletion or a reclassification would be worse than the failure it prevents | [docs/roadmap-check.md](docs/roadmap-check.md) |
@@ -1152,31 +1154,64 @@ What comes after the last leg is left unnamed deliberately: it will be re-groupe
 whatever the earlier ones turn up, so naming it now writes a schedule that ages before
 anyone reads it. A leg enumerating every remaining row has stopped being a plan.
 
-**AND THE LEGS ARE AIMED AT THE TIER'S OPEN QUESTIONS (Anthony).** The rows are
-the ledger and the legs are the schedule; the QUESTIONS are what the schedule is FOR. A
-tier's open questions are what several FALSITY rows are jointly waiting on, so they are
-the only thing in the file that names the risk ABOVE any single statement — and a set of
-legs that moves none of them is that many commits of work with nothing underneath it that
-got smaller. Write each leg so its own prose says which question it narrows; where the
+**AND THE LEGS ARE AIMED AT THE TIER'S MONSTER (Anthony).** The rows are the
+ledger and the legs are the schedule; the MONSTER is what the schedule is FOR. It is the
+one thing in the file naming the risk ABOVE any single statement, so a set of legs that
+does not narrow it is that many commits of work with nothing underneath it that got
+smaller. Write each leg so its own prose says what it decides about the monster; where the
 grouping is real this costs nothing, because a leg is already a group of rows sharing a
-currency and a claim, and a question is already a group of rows sharing a doubt.
+currency and a claim, and the monster is what they are jointly in doubt about.
 
-**AND NARROWING COUNTS — IT IS USUALLY WHAT A LEG BUYS (Anthony).** A question is not
-expected to be ANSWERED by the leg that works it; it is expected to come back SMALLER,
-which is the convergence test arriving at the schedule rather than at a postulate. So the
-outcome to write down when a leg retires is the question's NEW FORM: which half is
-settled, which region is left, and which rows still hang off it. A question rewritten that
-way has moved even when every row under it is still open, and that is the honest report —
-where the `relevant:` list shrinks the question narrowed, where it merely changes the
-question was restated, and the two must not be reported as the same thing.
+**AND NARROWING COUNTS — IT IS USUALLY WHAT A LEG BUYS (Anthony).** The monster is
+not expected to FALL to the leg that works it; it is expected to have a smaller region
+left where it could still be false, which is the convergence test arriving at the schedule
+rather than at a postulate. So the outcome to write down when a leg retires is what the
+leg RULED OUT: which shapes now instantiate it, which region is left, and whether the
+monster should move as a result. A monster narrowed that way has moved even when every row
+under it is still open — and narrowing it is not the same as REPLACING it, which is what
+happens when the old one falls or the tier descends past it, and the two must not be
+reported as the same thing.
 
 **AND THE ONE EXCEPTION IS A COST THAT STOPS THE QUESTIONS BEING WORKED AT ALL.** A leg
 that removes such a cost — a loop that is no longer a loop, a check that cannot run,
 apparatus a whole face needs before any of it can be instantiated — narrows nothing on its
-own and is still the right leg, because the questions are unreachable until it lands. It
+own and is still the right leg, because the monster is unreachable until it lands. It
 justifies itself in its own prose, saying what it unblocks; and it is never more than one
 leg of the set, since a schedule that is all tooling is a tier that has stopped being
 worked.
+
+### THE MONSTER — every tier names the one thing it is trying to kill (Anthony)
+
+A tier's rows are its ledger and its legs are its schedule; the MONSTER is what the
+schedule is FOR, and it is a NAME rather than prose, because a name is the part a
+machine can hold. **`make monster-check` fails when a line added
+to `agda/src` belongs to a declaration outside the lowest open tier's monster's own
+dependency CONE.** Not its blast radius; its cone: what the monster's statement and body
+REACH, which is the set whose truth decides its own. The cone is read off the tree AS
+EDITED, which is what makes converting the monster into a body over new leaves a passing
+commit rather than a forbidden one.
+
+**CHOOSING ONE: AS LIKELY FALSE AS POSSIBLE, AS FAR DOWN THE TREE AS POSSIBLE, AND WITH AS
+BIG A BLAST RADIUS AS POSSIBLE (Anthony).** The three pull against each other and the
+sweet spot is where they balance — but know which one is working. **Falsity and blast
+radius are both monotone UP the tree**, since a parent is false whenever any child is and
+its blast radius contains every child's, so maximising those two alone returns the tier's
+top line, for every tier, forever. **Depth is the only pressure that selects anything
+else.** Read the rule as: among nodes that could genuinely be false, take the DEEPEST one
+that still takes its siblings and parents with it.
+
+**AND THE FLOOR UNDER THE DESCENT IS THE CONE ITSELF.** The cone is the commit licence, so
+pushing the monster down narrows what may be worked — the point, until the work that would
+KILL it falls outside and the gate forbids the only thing worth doing. A leaf is usually
+past that floor: its cone is its statement's vocabulary, so the assembly it serves and its
+own sibling are both off-tree. **The monster need not be a postulate and usually is not** —
+a relation every leaf is stated in can be wrong in a way no ledger records.
+
+Neither failure is a matter of taste. TOO HIGH is the cone percentage the check prints;
+TOO DEEP is an offender list that repeats until it is `also:`-ed in, so a growing `also:`
+ledger is the tier saying its monster is misplaced. An exception is declared with an
+`also:` line in the tier's own section, never a flag — written there it is reviewed with
+the roadmap. → [docs/monster.md](docs/monster.md)
 
 **A RISING POSTULATE COUNT IS THE MECHANISM WORKING, NOT A REGRESSION.** This needs saying
 because every instinct — and every subagent's default — runs the other way. Anthony, in
