@@ -52,8 +52,8 @@ postulate
   --   between two candidate domains; what decides between them is the
   --   first compositionality equation, which is a statement rather than
   --   a program.  So this trio is the one place on the face where
-  --   probing is not merely blocked but has no subject, and the tier
-  --   above it is what supplies the requirement instead.
+  --   probing is not merely blocked but has no subject, and
+  --   `Verify-Well-Formed` is what supplies the requirement instead.
   Beh : ∀ {n} → Ctx n → Ty → Set
 
   -- DEAD ROUTE: denoting an expression by recursion on `Closed` alone.
@@ -75,7 +75,7 @@ postulate
   -- DEAD ROUTE: fixing the observation from the domain's side, by
   --   reading off whatever shape the first-order formers make natural.
   --   The consumer is a predicate demanded at a CUT POINT, so the
-  --   requirement arrives from the tier above and not from here.
+  --   requirement arrives from `Verify-Well-Formed` and not here.
   observe : ∀ {n} {Γ : Ctx n} {t} → Beh Γ t → Stream Γ t
 
 -- WHAT A PROGRAM MEANS, READ BACK AS A STREAM.  A body rather than a

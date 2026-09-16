@@ -183,7 +183,7 @@ the row is DIFFICULTY.
 formal-verification-batchSimultaneous    The-Proof.agda — REAL, module postulate-free
  ├─ batch-agreement                      proven
  └─ evaluate-well-formed                 Verify-Well-Formed.agda — REAL, one match
-     └─ burst-drain-well-formed          one postulate — tier 3
+     └─ burst-drain-well-formed          one postulate — tier 2
 
   evaluate↓ = proj₁ ∘ evaluate!           Rx/Evaluator/Builder.agda — REAL
      └─ every value-path leaf is a body; the corpus runs; the tower descends
@@ -245,7 +245,76 @@ which is the tier's own third leg rather than a claim a cone could aim at.
   the two legs above are what say which side of the boundary each consumer
   belongs on.
 
-## Tier 2 — the denotation and adequacy
+## Tier 2 — well-formedness, restated denotationally
+
+**THE TIER IS ONE STATEMENT, AND WHAT IS OPEN IS WHAT CARRIES IT.** `The-Proof`
+draws `evaluate-well-formed` and nothing else from here; everything down to the
+two leaves is a body, and what is open is two claims about a MACHINE's seam.
+
+**THE RESTATEMENT IS WHAT THIS TIER IS FOR (Anthony).** A well-formedness
+structural in the denotation is proven by induction on SYNTAX, one clause per
+former, in a currency with no node ids and no drain counter in it — against a
+seam argument re-establishing a relation between an automaton, a scheduler and
+an eval state at every step. The obstacle is a property rather than a
+difficulty, recorded as a dead route in the face's own header.
+
+**AND IT RUNS AHEAD OF THE DOMAIN BEING DEFINED, WHICH IS OUTSIDE-IN AND NOT AN
+INVERSION (Anthony).** A postulated `Beh` is enough to STATE a predicate and a
+descent against, and stating them is what says what the domain must supply.
+
+### The monster
+
+`burst-drain-well-formed` — the DEEPEST node here whose cone still holds the
+work that kills it. Below it are two leaves and the seam relation they are
+denominated in, each with a cone of its own vocabulary, so naming one would
+forbid its sibling; above it sits a wrapper supplying derivations. It can be
+FALSE, not merely unproven: a run the automaton rejects kills both leaves, the
+seam, and the WellFormed quantification `The-Proof` draws from here. It is also
+what the restatement replaces, so the monster moves to the descent claim in the
+commit that states one.
+
+### Big picture tier roadmap
+
+- **STATE THE PREDICATE AND THE DESCENT OVER THE POSTULATED DOMAIN.** A
+  well-formedness of a `Beh`, the claim that it hands back `WellFormed` of a run
+  at EVERY fuel, and a real body for `evaluate-well-formed` over the two.
+  Nothing here needs `denote` to compute, and the product is whether the descent
+  can be STATED at all with the cut-point strengthening carrying it — a
+  predicate that cannot reach an arbitrary fuel's stopping point is the finding,
+  and it arrives before any clause is ground and before any domain is built.
+
+- **THEN RESTATE WHAT CONSUMES WELL-FORMEDNESS, WHICH IS WHAT SAYS THE
+  PREDICATE IS THE RIGHT ONE.** `The-Proof` quantifies the batcher over
+  WellFormed streams, so the new predicate has to reach that quantification
+  rather than merely sit beside it. A predicate the batching claim cannot be
+  stated against is one nobody will ever spend, however structural it reads —
+  the same test the mirror tier applies to its own erasure.
+
+- **THEN INSTANTIATE THE CUT-POINT FACT ON THE MACHINE.** That a fuel cut lands
+  where the automaton is paid up is a claim about `evaluate↓` and nothing else,
+  so it is probeable today at the programs the corpus already carries, while
+  everything else here waits on a domain. A refutation retires the route while
+  it is still two postulates, for a reason no amount of domain work repairs.
+
+- **AND THE SEAM LEAVES STAY LIVE UNTIL THE DESCENT LANDS.** They are the route
+  that works today, and the roadmap holding two routes at once is the honest
+  state rather than an untidy one: the restatement is a bet on a compositional
+  domain nothing has built. If the bet fails they are what remains; if it lands
+  they are deleted in the commit that makes the body pass through the descent.
+
+### The ledger
+
+- **`subscribeE-root-wf`** (Verify-Well-Formed) — FALSITY, `PROBED`: the root
+  subscribe frame's burst drives the automaton to a state standing in the seam
+  relation to the evaluator's. Computable at concrete programs and
+  uninstantiated; it also owes its own base case.
+
+- **`drain-wf`** (Verify-Well-Formed) — FALSITY, `PROBED`: from any state in
+  the seam relation, the drain's emits drive the automaton to a state that is
+  paid up. Generic so its induction can re-enter itself; nothing has run a
+  drain against it.
+
+## Tier 3 — the denotation and adequacy
 
 **WHAT THIS FACE BUYS: an object that is not the machine.** Every statement in
 the repo today is read off `evaluate↓`, so the machine's own bookkeeping — node
@@ -253,13 +322,12 @@ ids, arrival ordinals, the drain counter — is visible in every answer. A
 denotation is what says what a PROGRAM means rather than what one run does, and
 it is what a determinacy or a timing claim ought to be stated against.
 
-**AND COMPOSITIONALITY HAS A CONSUMER NOW, WHICH IS WHY THIS FACE RUNS FIRST
-(Anthony).** The pair below asserts a limit rather than a semantics until
-something says `denote` of a node is built from `denote` of its children. The
-tier above is to be restated over this domain, so those equations are the
-induction that replaces a seam argument over a machine — and a domain that
-turns out not to be compositional is a finding wanted before the work above
-stands on it.
+**AND COMPOSITIONALITY HAS A CONSUMER NOW (Anthony).** The pair below asserts a
+limit rather than a semantics until something says `denote` of a node is built
+from `denote` of its children. The tier under this one states its well-formedness
+over this domain while it is still postulated, so what arrives here is a
+REQUIREMENT rather than a free choice: the equations are the induction that
+replaces a seam argument over a machine.
 
 ### The monster
 
@@ -282,8 +350,8 @@ also: `run-monotone` — a fact about the machine alone, which is why it survive
   proof of adequacy — and the equations are what the tier above inducts over,
   so a former whose equation cannot be stated is a former whose well-formedness
   clause will not be writable either. It is first because every remaining row
-  here is unprobeable until `denote` computes — which is a dead route recorded
-  on the domain itself, not a gap in the schedule.
+  here is unprobeable until `denote` computes — a dead route recorded on the
+  domain itself, not a gap in the schedule.
 
 - **THEN FIX WHAT `observe` HANDS BACK, BECAUSE THAT IS THE BOUNDARY THE TIER
   ABOVE IS STATED ACROSS.** The protocol automaton reads an emit list and asks
@@ -321,78 +389,6 @@ also: `run-monotone` — a fact about the machine alone, which is why it survive
   the domain the pair above quantifies over, and what makes it vacuous. Named
   in the head rather than described, so the row can carry its own evidence
   field.
-
-## Tier 3 — `evaluate-well-formed`
-
-Built on the run's own derivation today, and to be restated over the domain the
-tier below defines.
-
-**THE TIER IS ONE STATEMENT, AND WHAT IS OPEN IS WHAT CARRIES IT.** `The-Proof`
-draws `evaluate-well-formed` and nothing else from here; everything down to the
-two leaves is a body, and what is open is two claims about a MACHINE's seam.
-
-**AND THE RESTATEMENT IS WHAT THIS TIER IS NOW FOR (Anthony).** A
-well-formedness structural in the denotation is proven by induction on SYNTAX,
-one clause per former, in a currency with no node ids and no drain counter in
-it — against a seam argument re-establishing a relation between an automaton, a
-scheduler and an eval state at every step. The two leaves are not what the
-restatement proves; they are what it is trying not to need. What stands in its
-way is a property rather than a difficulty, recorded as a dead route in the
-face's own header.
-
-### The monster
-
-`burst-drain-well-formed` — the DEEPEST node here whose cone still holds the
-work that kills it. Below it are two leaves and the seam relation they are
-denominated in, each with a cone of its own vocabulary, so naming one would
-forbid its sibling; above it sits a wrapper supplying derivations. It can be
-FALSE, not merely unproven: a run the automaton rejects kills both leaves, the
-seam, and the WellFormed quantification `The-Proof` draws from here. It is also
-what the restatement replaces, so the monster moves to the descent claim in the
-commit that states one.
-
-### Big picture tier roadmap
-
-- **STATE THE DESCENT FIRST, BECAUSE IT IS THE ONE THING THAT CAN KILL THE
-  ROUTE.** A denotational well-formedness over a `Beh`, the claim that it hands
-  back `WellFormed` of a run at EVERY fuel, and a real body for
-  `evaluate-well-formed` over the two. Assembly first and leaves postulated, so
-  the product is whether the descent can be STATED at all with the cut-point
-  strengthening carrying it — a predicate that cannot reach an arbitrary fuel's
-  stopping point is the finding, and it arrives before any clause is ground.
-
-- **THEN INSTANTIATE THE CUT-POINT FACT ON THE MACHINE, BEFORE PROVING ANYTHING
-  ABOUT THE DOMAIN.** That a fuel cut lands where the automaton is paid up is a
-  claim about `evaluate↓` and nothing else, so it is probeable today at the
-  programs the corpus already carries, while every other row here waits on a
-  domain. A refutation retires the route while it is still two postulates, and
-  it retires it for a reason no amount of domain work would have repaired.
-
-- **THEN THE STRUCTURAL CLAUSES, ONE PER FORMER, IN THE ORDER THE TIER BELOW
-  EARNS THEM.** The first-order formers denote first, so their well-formedness
-  clauses are writable first; the flatteners' clauses arrive with the
-  flatteners' equations and not before. This is the leg that pays for the
-  restatement, and it is deliberately last of the three, because a clause
-  written against a descent that cannot be stated is inventory.
-
-- **AND THE SEAM LEAVES STAY LIVE UNTIL THE DESCENT LANDS.** They are the
-  route that works today, and the roadmap holding two routes at once is the
-  honest state rather than an untidy one: the restatement is a bet on a
-  compositional domain the tier below has not yet built. If that bet fails the
-  leaves are what remains, and if it lands they are deleted in the commit that
-  makes the body pass through the descent instead.
-
-### The ledger
-
-- **`subscribeE-root-wf`** (Verify-Well-Formed) — FALSITY, `PROBED`: the root
-  subscribe frame's burst drives the automaton to a state standing in the seam
-  relation to the evaluator's. Computable at concrete programs and
-  uninstantiated; it also owes its own base case.
-
-- **`drain-wf`** (Verify-Well-Formed) — FALSITY, `PROBED`: from any state in
-  the seam relation, the drain's emits drive the automaton to a state that is
-  paid up. Generic so its induction can re-enter itself; nothing has run a
-  drain against it.
 
 ## Tier 4 — take bounds, determinacy, and the top-line semantic claims
 
