@@ -37,7 +37,8 @@ open import Rx.Exp using (Ctx; Closed; nat̂; takeᵉ; Val; Tm; natᵗ; evalTm)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; take-st; lookupNode;
   sched-init; st-init; root; Path; takeVals; takeDispatch; NodeId;
   NodeState; take-f; retagEvents; splitEvents; scan-st; mergeAll-st;
-  switch-st; exhaust-st; Arrival; sched-next; schedGo)
+  switch-st; exhaust-st; Arrival; sched-next; schedGo;
+  cascadeLatch; cascadeFinish)
 open import Rx.Evaluator.Reducible using (reducible)
 open import Rx.Evaluator.Builder using (evaluate↓; drain!)
 open import Rx.Slots using (Slots)
@@ -46,7 +47,8 @@ open import Rx.Evaluator.Freshness.Preserve using (subscribeE-preserves)
 open import Rx.Evaluator.Freshness.Mono using (subscribeE-mono; pushBurst-mono)
 open import Rx.Evaluator.Domain using (subscribeE⇓; pushBurst⇓; stepFrame⇓;
   push-nil; push-cons; step-take; subs-take-zero; subs-take-suc;
-  drain⇓; drain-done; drain-empty; drain-step; cascade⇓)
+  drain⇓; drain-done; drain-empty; drain-step; cascade⇓; casc-run;
+  cascadeGo⇓)
 open import Spec using (valuesOf)
 open import Readme-Theorems using (emitValues)
 
@@ -374,14 +376,38 @@ sched-next-node sched sched′ eq with schedGo (Sched.live sched)
 sched-next-node sched .(record sched { live = _ }) refl | inj₂ (_ , _) = refl
 
 ----------------------------------------------------------------------
--- THE CASCADE'S HALF OF THE ACCOUNT.  One arrival's cascade emits some
--- values and leaves the take node holding the rest, and the two add up
--- to no more than it was holding -- an inequality rather than the
--- frame's equality, because a cascade that reaches no take frame at all
--- emits values this node never paid for and spends nothing.  Guarded by
--- the node being BELOW the schedule's counter, which is what says the
--- cascade cannot mint this node afresh: a subscribe entered mid-cascade
--- installs at the counter and so lands above it.
+-- THE ARRIVAL'S FRAME TOUCHES NO NODE.  A cascade brackets its chain
+-- walk with two rewrites -- one clearing the per-arrival scratch before
+-- it starts, one dropping a spent source's registrations after -- and
+-- neither goes near `nodes`.  So the account may be read across the
+-- bracket and stated of the walk alone.
+----------------------------------------------------------------------
+
+cascadeLatch-node : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (nid : NodeId) (a : Arrival Γ) (st : EvalSt e) →
+  nodeBudget nid (cascadeLatch a st) ≡ nodeBudget nid st
+cascadeLatch-node nid a st with Arrival.isLast a
+... | true  = refl
+... | false = refl
+
+cascadeFinish-node : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (nid : NodeId) (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
+  nodeBudget nid (proj₂ (cascadeFinish a sched st)) ≡ nodeBudget nid st
+cascadeFinish-node nid a sched st with Arrival.isLast a
+... | true  = refl
+... | false = refl
+
+----------------------------------------------------------------------
+-- THE CHAIN WALK'S HALF OF THE ACCOUNT.  One arrival is delivered to
+-- every chain registered against its source in turn, and the walk is
+-- where all of it happens: what it emits and what it takes out of the
+-- take node are claimed to add up to no more than the node was holding.
+-- An INEQUALITY rather than the frame's equality, because a chain
+-- reaching no take frame emits values this node never paid for and
+-- spends nothing.  Guarded by the node sitting BELOW the schedule's
+-- counter, which is what says the walk cannot mint this node afresh: a
+-- subscribe entered mid-walk installs at the counter and so lands above
+-- it.
 ----------------------------------------------------------------------
 
 postulate
@@ -389,13 +415,13 @@ postulate
   --   root frame left scheduled, against a take at one over a source of
   --   two -- so the sum is pinned at a node that is actually holding a
   --   budget rather than at a degenerate zero.  Not reached: any second
-  --   arrival, every flattening program, and a cascade entering a
+  --   arrival, every flattening program, and a walk entering a
   --   subscribe, which is the shape the guard is there for.
-  cascade-take-spends : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    {a : Arrival Γ} {id} {sched : Sched Γ} {st : EvalSt e}
+  cascadeGo-take-spends : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    {a : Arrival Γ} {id cs} {sched : Sched Γ} {st : EvalSt e}
     {out sched′ st′} (nid : NodeId) →
     suc nid ≤ Sched.nextNode sched →
-    cascade⇓ {e = e} a id sched st (out , sched′ , st′) →
+    cascadeGo⇓ {e = e} a id cs sched st (out , sched′ , st′) →
     length (emitValues out) + nodeBudget nid st′ ≤ nodeBudget nid st
 
   -- And the counter only ever rises, which is what lets the guard be
@@ -408,6 +434,24 @@ postulate
     {out sched′ st′} →
     cascade⇓ {e = e} a id sched st (out , sched′ , st′) →
     Sched.nextNode sched ≤ Sched.nextNode sched′
+
+----------------------------------------------------------------------
+-- AND THE ARRIVAL'S ACCOUNT IS THE WALK'S, READ ACROSS THE BRACKET.
+----------------------------------------------------------------------
+
+cascade-take-spends : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  {a : Arrival Γ} {id} {sched : Sched Γ} {st : EvalSt e}
+  {out sched′ st′} (nid : NodeId) →
+  suc nid ≤ Sched.nextNode sched →
+  cascade⇓ {e = e} a id sched st (out , sched′ , st′) →
+  length (emitValues out) + nodeBudget nid st′ ≤ nodeBudget nid st
+cascade-take-spends {a = a} {sched = sched} {st = st} {out = out} nid lt
+  (casc-run {sched′ = sch} {st′ = stw} g) =
+  ≤-trans
+    (≤-reflexive (cong (length (emitValues out) +_)
+                       (cascadeFinish-node nid a sch stw)))
+    (≤-trans (cascadeGo-take-spends nid lt g)
+             (≤-reflexive (cascadeLatch-node nid a st)))
 
 ----------------------------------------------------------------------
 -- THE DRAIN'S HALF, BY INDUCTION ON THE DERIVATION.  The route the

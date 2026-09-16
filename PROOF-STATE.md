@@ -220,15 +220,15 @@ automaton.
 
 ### The monster
 
-`cascade-take-spends` — one arrival's whole cascade, and the deepest thing here
-that can be false on its own. The drain's own induction is now a body, so what
-is left is the step it recurses over: a cascade emits values and leaves the
-take node holding the rest, and the two are claimed to add up to no more than
-it was holding. That is an INEQUALITY rather than the frame's equality, because
-a cascade reaching no take frame emits values this node never paid for — so a
-path that delivers through a frame it did not charge, or charges a node it did
-not deliver through, parts from this and from nothing else. Its falsity takes
-the tier with it: every value after the subscribe frame comes through it.
+`cascadeGo-take-spends` — one arrival's walk over the chains registered against
+its source, and the deepest thing here that can be false on its own. The drain
+and the arrival's own bracket are now bodies, so what is left is the walk they
+recurse over: it emits values and leaves the take node holding the rest, and
+the two are claimed to add up to no more than it was holding. An INEQUALITY
+rather than the frame's equality, because a chain reaching no take frame emits
+values this node never paid for — so a path that delivers through a frame it
+did not charge, or charges a node it did not deliver through, parts from this
+and from nothing else. Its falsity takes the tier with it.
 
 also: `take-bounds-values` — the tier's subject. Admitted only because this branch is the one that CARVED it: the assembly and its glue arrive here as added lines. It retires when the branch lands, and while it stands the cone decides nothing — which is the cost of the carve, paid once.
 also: `burst-drain-well-formed` — tier 2's monster. Admitted because the branch that carved this tier out of that one carries that face's seam and its two leaves, and the check reads the branch rather than the commit.
@@ -236,15 +236,15 @@ also: `evaluate-deterministic` — tier 3's monster, whose statement and leaves 
 
 ### Big picture tier roadmap
 
-- **THE CASCADE'S ACCOUNT, WHICH IS NOW THE WHOLE TIER.** `cascade-take-spends`
-  says one arrival's cascade emits no more than it takes out of the take node.
-  The drain above it is a body by induction on `drain⇓`, and the route that
-  bought it is the one to repeat once more: state the account over the
-  derivation family — `cascadeGo⇓`, `chainStep⇓`, `foldPath⇓` — rather than over
-  the functions that produce one, so the induction is on datatypes and the
-  guard travels as a hypothesis. The subscribe side's own `stepFrame⇓` arm is
-  already an equality here, so what the fan-out owes is only that every OTHER
-  frame leaves the node alone.
+- **THE CHAIN WALK'S ACCOUNT, WHICH IS NOW THE WHOLE TIER.**
+  `cascadeGo-take-spends` says one arrival's walk emits no more than it takes
+  out of the take node. Everything above it is a body: the drain by induction
+  on `drain⇓`, the arrival's bracket by reading the account across two rewrites
+  that touch no node. The route that bought both is the one to repeat over the
+  rest of the family — `chainStep⇓`, `foldPath⇓`, and the subscribe relations a
+  chain can re-enter — so the induction is on datatypes and the guard travels
+  as a hypothesis. The take frame's own arm is already an equality here, so
+  what the fan-out owes is that every OTHER frame leaves the node alone.
 
 - **AND THE GUARD IS THE PART THAT CAN GO WRONG, SO SEPARATE IT FIRST.** Both
   leaves are conditioned on the take's node sitting BELOW the schedule's
@@ -272,9 +272,9 @@ also: `evaluate-deterministic` — tier 3's monster, whose statement and leaves 
 
 ### The ledger
 
-- **`cascade-take-spends`** (Verify-Take-Bounds) — FALSITY, `PROBED`: one
-  arrival's cascade emits no more than it takes out of the take node. The
-  drain's inductive step, and the tier's monster.
+- **`cascadeGo-take-spends`** (Verify-Take-Bounds) — FALSITY, `PROBED`: one
+  arrival's walk over its source's chains emits no more than it takes out of
+  the take node. The drain's inductive step, and the tier's monster.
 - **`take-zero-drain-silent`** (Verify-Take-Bounds) — DIFFICULTY, `PROBED`: a
   take at zero registers nothing, so the drain pops its arrivals and delivers
   none of them. Two rows reach it, one at an arrival only the drain can see.

@@ -24,7 +24,7 @@
 ----------------------------------------------------------------------
 
 -- TARGET: take-zero-drain-silent @f5150c
--- TARGET: cascade-take-spends @87e3af
+-- TARGET: cascadeGo-take-spends @632c1a
 module Probed.Take-Bounds where
 
 open import Data.Fin using (zero)
@@ -39,14 +39,16 @@ open import Data.Unit using (⊤)
 open import Data.Sum using (_⊎_)
 
 open import Rx.Prim using (after_,_; hot)
-open import Rx.Evaluator using (Arrival; Sched; sched-next)
-open import Rx.Evaluator.Builder using (cascade!)
+open import Rx.Evaluator using (Arrival; Sched; sched-next; chainsOf;
+  cascadeLatch)
+open import Rx.Evaluator.Builder using (cascadeGo!)
 open import Rx.Exp using (Ctx; natᵗ; Closed; nat̂; input; takeᵉ)
+open import Rx.Evaluator using (EvalSt)
 open import Rx.Slots using (Slots; scripted)
 open import Rx.Evaluator.Builder using (evaluate↓)
 open import Readme-Theorems using (oneSlot; emitValues)
 open import Verify-Take-Bounds using (take-zero-drain-silent;
-  cascade-take-spends; rootRun)
+  cascadeGo-take-spends; rootRun)
 
 open import Probed.Apparatus using (Confirms)
 
@@ -127,7 +129,11 @@ popped = go (sched-next sched₀) refl
     go (inj₁ _) ()
     go (inj₂ p) _ = p
 
-row-cascade : Confirms (cascade-take-spends {e = takeᵉ (nat̂ 1) src₁} 0
-  (s≤s z≤n) (proj₂ (cascade! (proj₁ popped) 1 (proj₂ popped)
-                             (proj₂ (proj₂ (rootRun 1 src₁ slots₁))))))
+st₀ : EvalSt (takeᵉ (nat̂ 1) src₁)
+st₀ = proj₂ (proj₂ (rootRun 1 src₁ slots₁))
+
+row-cascade : Confirms (cascadeGo-take-spends {e = takeᵉ (nat̂ 1) src₁} 0
+  (s≤s z≤n) (proj₂ (cascadeGo! (proj₁ popped) 1
+                      (chainsOf (proj₁ popped) st₀) (proj₂ popped)
+                      (cascadeLatch (proj₁ popped) st₀))))
 row-cascade = s≤s z≤n
