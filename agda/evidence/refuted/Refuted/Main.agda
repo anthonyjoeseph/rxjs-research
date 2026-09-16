@@ -45,14 +45,14 @@ module Refuted.Main where
 open import Refuted.Domain-Predicate using
   (structural-domain-has-content-false; sub-total)
 
--- THE THREE REMAINING REDUCIBILITY ARMS, INHABITED WITHOUT READING A
+-- THE FLATTENER REDUCIBILITY ARMS, INHABITED WITHOUT READING A
 -- HYPOTHESIS.  `RedStep` lets the prover choose the run, and the
 -- domain relation offers a premise-free fallback at each of these
 -- frames whose value column is empty or passed straight through -- so
 -- the statements are satisfiable while saying nothing about what a
--- scan emits or what a flattener forwards.  `walk-nothing` is claimed
+-- flattener forwards.  `walk-nothing` is claimed
 -- beside them because it is the flattening half of the same finding:
 -- a walk over any batch can consume every value and emit none.
 open import Refuted.Red-Step-Vacuous using
-  (scan-vacuous; from-inner-vacuous; walk-nothing; thru-vacuous)
+  (from-inner-vacuous; walk-nothing; thru-vacuous)
 

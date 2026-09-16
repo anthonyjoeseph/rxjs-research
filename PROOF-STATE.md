@@ -233,14 +233,15 @@ deferred beside it.
 
 ### Big picture tier roadmap
 
-- **PIN THE WITNESS — THE THREE ARMS ASK FOR NOTHING.** The store carrier was
-  never what they were waiting on. `RedStep` quantifies over SOME run with a
-  reducible value column, and the domain relation carries a premise-free
-  fallback at each of these frames, every one with an empty or passed-through
-  column. A machine witness now inhabits all three without reading a
-  hypothesis. The fallbacks cost the BUILDER nothing and a prover choosing its
-  own run everything. This leg gives each fallback the side condition that
-  distinguishes it, which is what puts the carrier question back.
+- **PIN THE REMAINING TWO WITNESSES — THE FLATTENER ARMS STILL ASK FOR
+  NOTHING.** `RedStep` quantifies over SOME run with a reducible value column,
+  and the domain relation still carries a premise-free fallback at the walk and
+  at the inner reaction, each with an empty or passed-through column. The fold
+  frame is done: one constructor naming the evaluator's own dispatch leaves no
+  arm to prefer, and its row went straight back to SHAPE, which is the carrier
+  question returning as intended. The walk's `consume-*-nil` and the
+  reaction's `react-false`/`finish-nil` want the same treatment — a node
+  reading and a liveness reading each stated as one function of the store.
 
 - **DISCHARGE THE FOUR SUBSTITUTION LEAVES THE PARTNER BOUGHT ITSELF WITH.**
   The `Θloc` telescope landed and took three of the original six with it —
@@ -303,10 +304,9 @@ deferred beside it.
   the partner at the empty environment.
 
 
-- **`red-scan`** (Rx/Evaluator/Reducible) — VACUITY,
-  `REFUTED, DEAD ROUTE, PROBED`: satisfiable by a body that reads no node,
-  because the relation offers a premise-free arm with an empty value column.
-  Pin the witness.
+- **`red-scan`** (Rx/Evaluator/Reducible) — SHAPE, `DEAD ROUTE, PROBED`: the
+  witness is pinned now, so the demand is real and unmet — the emitted value is
+  the stored accumulator and no hypothesis says a stored one is reducible.
 
 - **`red-from-inner`** (Rx/Evaluator/Reducible) — VACUITY, `REFUTED, PROBED`:
   satisfiable by handing the arriving batch straight back, at both settings of

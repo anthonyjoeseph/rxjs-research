@@ -1,13 +1,13 @@
--- THE THREE REMAINING REDUCIBILITY ARMS ASSERT NOTHING, AND THIS FILE
--- INHABITS ALL THREE WITHOUT READING A HYPOTHESIS.  `RedStep` is a Σ
--- over the run the frame produces, and its witness is the prover's to
+-- THE FLATTENER REDUCIBILITY ARMS ASSERT NOTHING, AND THIS FILE
+-- INHABITS THEM WITHOUT READING A HYPOTHESIS.  `RedStep` is a Σ over
+-- the run the frame produces, and its witness is the prover's to
 -- choose: it asks only that SOME derivation exist whose value column
--- is reducible.  The domain relation offers a premise-free arm at every
--- one of these frames -- a scan that declines to read its node, an
--- inner reaction that hands its batch back, a walk that consumes
--- nothing -- and each of those arms has an EMPTY or a PASSED-THROUGH
--- value column, so the reducibility conjunct is discharged by `[]` or
--- by the hypothesis the statement was handed anyway.
+-- is reducible.  The domain relation offers a premise-free arm at each
+-- of these frames -- an inner reaction that hands its batch back, a
+-- walk that consumes nothing -- and each of those arms has an EMPTY or
+-- a PASSED-THROUGH value column, so the reducibility conjunct is
+-- discharged by `[]` or by the hypothesis the statement was handed
+-- anyway.
 --
 -- WHY THAT IS A REFUTATION AND NOT A SHORTCUT.  The premise-free arms
 -- are deliberate: they are the machine's type-mismatch and missing-node
@@ -18,8 +18,8 @@
 -- choosing its own witness is not the machine.  So the store carrier
 -- these statements were held open for is not what they were waiting on:
 -- as written they never demanded the store be read at all, and a proof
--- of the whole face could land while proving nothing about what a scan
--- emits or what a flattener forwards.
+-- of the whole face could land while proving nothing about what a
+-- flattener forwards.
 --
 -- The repair is to pin the witness rather than to weaken the arms:
 -- either the fallbacks carry the side conditions that distinguish them,
@@ -35,24 +35,12 @@ open import Data.List.Relation.Unary.All using (All; [])
 open import Data.Product using (_,_)
 
 open import Rx.Prim using (Id; Tick)
-open import Rx.Exp using (Ctx; Closed; Val; Fn; _×ᵗ_; obs)
-open import Rx.Evaluator using (Sched; EvalSt; Path; NodeId; AllOp; mergeAllᵒ; switchᵒ;
-  exhaustᵒ; scan-f; from-inner; thru-outer; aliveThroughᶠ)
-open import Rx.Evaluator.Domain using (step-scan-nil; step-from-inner; step-thru-outer;
-  react-false; react-alive; react-dead; finish-nil; thruWalk⇓; walk-nil; walk-cons;
-  consume-all-nil; consume-switch-nil; consume-exhaust-nil)
+open import Rx.Exp using (Ctx; Closed; Val; obs)
+open import Rx.Evaluator using (Sched; EvalSt; Path; NodeId; AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ; from-inner; thru-outer;
+  aliveThroughᶠ)
+open import Rx.Evaluator.Domain using (step-from-inner; step-thru-outer; react-false; react-alive; react-dead; finish-nil;
+  thruWalk⇓; walk-nil; walk-cons; consume-all-nil; consume-switch-nil; consume-exhaust-nil)
 open import Rx.Evaluator.Reducible using (Red; RedStep)
-
--- A SCAN NEED NOT READ ITS NODE.  `step-scan-nil` carries no premise,
--- so the empty column is available at every state -- including one
--- whose node really does hold an accumulator.
-scan-vacuous : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
-               (id : Id) (now : Tick) (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
-               (κ : Path Γ lo u t)
-               {vals : List (Val Γ s)} → All (Red s) vals → (fin : Bool)
-               (sched : Sched Γ) (st : EvalSt e)
-             → RedStep {e = e} id now (scan-f fn nid) κ vals fin sched st
-scan-vacuous id now fn nid κ rv fin sched st = _ , step-scan-nil , []
 
 -- AN INNER REACTION HANDS ITS OWN BATCH BACK, at both settings of the
 -- finished flag: unfinished is `react-false` outright, and finished is

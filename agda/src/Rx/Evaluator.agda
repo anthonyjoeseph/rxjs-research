@@ -525,6 +525,27 @@ scanVals fn ac (v ∷ vs) =
       (outs , last) = scanVals fn ac′ vs
   in ac′ ∷ outs , last
 
+-- THE SCAN'S WHOLE STEP, AS ONE FUNCTION OF WHAT THE NODE HOLDS.  A
+-- fold that finds no accumulator of its own element type emits nothing
+-- and writes nothing, which is the same reading the queue's type test
+-- already forces on every existential read here.  Stating it as a
+-- function rather than as two constructors is what stops a prover
+-- choosing the empty reading at a node that really does hold an
+-- accumulator: the relation then has one arm and no arm to prefer.
+scanDispatch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+             → Fn Γ [] [] [] (u ×ᵗ s) u → NodeId → List (Val Γ s) → Bool
+             → Sched Γ → EvalSt e → Maybe (NodeState Γ)
+             → List (Val Γ u) × List (InstEvent (Val Γ t)) × Bool
+               × Sched Γ × EvalSt e
+scanDispatch {u = u} fn nid vals fin sched st (just (scan-st {w} a))
+  with w ≟ᵗ u
+... | no  _    = [] , [] , fin , sched , st
+... | yes refl =
+      proj₁ (scanVals fn a vals) , [] , fin , sched ,
+      record st { nodes = setNode nid (scan-st (proj₂ (scanVals fn a vals)))
+                                  (EvalSt.nodes st) }
+scanDispatch fn nid vals fin sched st _ = [] , [] , fin , sched , st
+
 -- take's per-emit step, lifted out of stepFrame so the well-formedness proof
 -- can reason about its reduction over a stuck node lookup.  Non-cut passes the
 -- budgeted prefix through untouched (threading the remaining count); the cut

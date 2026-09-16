@@ -116,7 +116,7 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; NodeId;
   scan-st; take-st; mergeAll-st; switch-st; exhaust-st;
   mergeAllᵒ; switchᵒ; exhaustᵒ;
   lookupNode; setNode; hasRoom; mergeAllBump; switchKill; aliveThroughᶠ;
-  splitEvents; retagEvents; scanVals; takeDispatch; thruWrap;
+  splitEvents; retagEvents; scanDispatch; takeDispatch; thruWrap;
   burstCompleted; sharedPlumb; dropSource)
 
 ------------------------------------------------------------------
@@ -450,15 +450,18 @@ data subscribeInner⇓ {n} {Γ} {t} {e} where
 -- AND THAT LAST CLAUSE IS A PREMISE RATHER THAN A PROPERTY, WHICH IS
 -- WHAT THE REDUCIBILITY FACE FOUND OUT.  A prover that CHOOSES its own
 -- run is not the machine, so for it a premise-free fallback is a free
--- arm at every input: the scan that declines to read its node, the
--- walk that consumes nothing, the reaction that hands its batch back.
--- Each of those has an empty or passed-through value column, so any
--- statement quantified over SOME derivation with a reducible column is
--- discharged outright.  The fallbacks cost nothing to the direction
--- this relation was written for and everything to the other one, and
--- which direction a consumer is in is not visible from here.
+-- arm at every input: the walk that consumes nothing, the reaction
+-- that hands its batch back.  Each of those has an empty or
+-- passed-through value column, so any statement quantified over SOME
+-- derivation with a reducible column is discharged outright.  The
+-- fallbacks cost nothing to the direction this relation was written
+-- for and everything to the other one, and which direction a consumer
+-- is in is not visible from here.  The repair where it has been made
+-- is to name the machine's own dispatch from a SINGLE constructor,
+-- which is what the step frames for a fold and for a truncation now
+-- do: there is then no arm to prefer.
 --
--- REFUTED: `Refuted.Red-Step-Vacuous` inhabits three such statements
+-- REFUTED: `Refuted.Red-Step-Vacuous` inhabits two such statements
 --   with bodies that read no hypothesis.
 data thruConsume⇓ {n} {Γ} {t} {e} where
 
@@ -662,18 +665,9 @@ data stepFrame⇓ {n} {Γ} {t} {e} where
 
   step-scan : ∀ {s u lo} {fn nid} {κ : Path Γ lo u t}
                 {id now} {vals : List (Val Γ s)} {fin sched st}
-                {ac : Val Γ u} {outs ac′}
-            → lookupNode nid (EvalSt.nodes st) ≡ just (scan-st {t = u} ac)
-            → scanVals fn ac vals ≡ (outs , ac′)
             → stepFrame⇓ id now (scan-f fn nid) κ vals fin sched st
-                ( outs , [] , fin , sched
-                , record st
-                    { nodes = setNode nid (scan-st ac′) (EvalSt.nodes st) } )
-
-  step-scan-nil : ∀ {s u lo} {fn nid} {κ : Path Γ lo u t}
-                    {id now} {vals : List (Val Γ s)} {fin sched st}
-                → stepFrame⇓ id now (scan-f fn nid) κ vals fin sched st
-                    ([] , [] , fin , sched , st)
+                (scanDispatch fn nid vals fin sched st
+                  (lookupNode nid (EvalSt.nodes st)))
 
   step-take : ∀ {s lo nid} {κ : Path Γ lo s t}
                 {id now} {vals : List (Val Γ s)} {fin sched st}

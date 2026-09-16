@@ -72,7 +72,7 @@ open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeAll⇓; pushBurst
   finish-all-drain; finish-switch-clear;
   finish-exhaust-clear; finish-nil; react-false; react-alive; react-dead;
   push-nil; push-cons; step-map; step-scan;
-  step-scan-nil; step-take; step-from-inner; step-thru-outer;
+  step-take; step-from-inner; step-thru-outer;
   walk-nil; walk-cons; consume-all-sub; consume-all-enqueue; consume-all-nil;
   consume-switch-sub; consume-switch-nil; consume-exhaust-sub;
   consume-exhaust-nil; inner;
@@ -376,27 +376,17 @@ pushBurst! sl id now fr sv κ (em ∷ ems) sched ag st =
                    (trans (step-keeps sf) ag) st₁
   in _ , push-cons refl sf pb
 
--- THE SCAN CLAUSE IS THE ONLY ONE THAT LOOKS AT THE STORE, AND THE
--- RELATION SAYS WHAT TO DO WHEN THE READING DISAGREES.  A node table
--- carries its accumulator's type existentially, so the frame's own `u`
--- has to be decided against what is installed; every answer but `yes`
--- takes the nil clause, which is the same collapse the machine reaches
--- by its `dispatch`.  Nothing is owed here — the relation offers a
--- constructor at every reading, so the builder chooses rather than
--- having to prove a branch unreachable.
+-- THE STORE READINGS COST THE BUILDER NOTHING BECAUSE EACH FRAME'S
+-- RELATION IS PINNED TO THE MACHINE'S OWN DISPATCH.  A node table
+-- carries its accumulator's type existentially, so the scan frame's
+-- `u` has to be decided against what is installed and the take frame's
+-- count may be missing entirely; both decisions live inside the
+-- dispatch function the single constructor names, so no branch is
+-- split here and none has to be proven unreachable.
 stepFrame! sl id now (map-f fn) sv κ vals fin sched ag st = _ , step-map
 stepFrame! sl id now (take-f nid) sv κ vals fin sched ag st = _ , step-take
 
-stepFrame! {u = u} sl id now (scan-f fn nid) sv κ vals fin sched ag st
-  with lookupNode nid (EvalSt.nodes st) in eq
-... | nothing                    = _ , step-scan-nil
-... | just (take-st _)           = _ , step-scan-nil
-... | just (mergeAll-st _ _ _ _) = _ , step-scan-nil
-... | just (switch-st _ _)       = _ , step-scan-nil
-... | just (exhaust-st _ _)      = _ , step-scan-nil
-... | just (scan-st {w} a)       with w ≟ᵗ u
-...   | no  _    = _ , step-scan-nil
-...   | yes refl = _ , step-scan eq refl
+stepFrame! sl id now (scan-f fn nid) sv κ vals fin sched ag st = _ , step-scan
 
 stepFrame! sl id now (from-inner op allNid inst) () κ vals fin sched ag st
 

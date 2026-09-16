@@ -193,7 +193,7 @@ stScan = installNode nid₂ (scan-st {t = obs natᵗ} acc₂) st₀
 row-scan-acc : Confirms
   (red-scan {e = e₀} 0 0 fstFn nid₂ κ₂ {3 ∷ []} (tt ∷ []) false sch₀ stScan)
 row-scan-acc =
-  _ , step-scan refl refl , reducible acc₂ ∷ []
+  _ , step-scan , reducible acc₂ ∷ []
 
 -- THE INNER'S OWN FRAME, at the arm that carries rather than spends.
 -- An unfinished inner emit passes its values through untouched, so the

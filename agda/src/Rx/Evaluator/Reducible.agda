@@ -231,15 +231,10 @@ postulate
   -- batch, so what leaves the frame is a function of stored state.
   -- `Red` quantifies over every state with no precondition, which is
   -- what makes its recursive calls free and is exactly what leaves
-  -- this conclusion with nothing under it.
-  --
-  -- REFUTED: `Refuted.Red-Step-Vacuous` inhabits this statement with a
-  --   body that reads no hypothesis and no node.  The domain relation
-  --   offers a premise-free arm at this frame whose value column is
-  --   empty, and the statement asks only for SOME derivation, so the
-  --   carrier below is not what it is waiting on -- it never demanded
-  --   the accumulator be read.  The repair is to pin the witness, not
-  --   to find the carrier.
+  -- this conclusion with nothing under it.  The demand is real rather
+  -- than dodgeable: this frame's relation names the evaluator's own
+  -- dispatch from a single constructor, so there is no premise-free
+  -- arm to take and no run but the machine's to witness.
   --
   -- DEAD ROUTE: the fact this needs is `Red` of the stored value, and
   --   it is establishable at the install (`red-env` at the empty
