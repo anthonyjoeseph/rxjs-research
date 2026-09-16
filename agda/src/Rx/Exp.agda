@@ -489,6 +489,17 @@ unfoldμ body = elimGExp [] (here refl) (μᵉ body) body
 -- its (closed) observable, so obs values built outside a fn need no
 -- substitution
 evalWith : ∀ {n} {Γ : Ctx n} {Θ t} → Tm Γ [] [] Θ t → All (Val Γ) Θ → Val Γ t
+
+-- THE FOLD'S ACCUMULATOR LOOP, HOISTED OUT OF THE ARM THAT USES IT.  A
+-- `where` helper is invisible outside its clause, so no lemma could be
+-- STATED about it — and the substitution face needs exactly one: that
+-- folding under a substituted step agrees with folding under the
+-- composed environment.  Naming it costs a forward declaration and buys
+-- the statement.
+foldVals : ∀ {n} {Γ : Ctx n} {Θ s u}
+         → Tm Γ [] [] (s ∷ u ∷ Θ) u → All (Val Γ) Θ
+         → List (Val Γ s) → Val Γ u → Val Γ u
+
 evalWith (varᵗ x)      env = lookupEnv env x
 evalWith unit̂          env = tt
 evalWith (bool̂ b)      env = b
@@ -500,12 +511,7 @@ evalWith (fstᵗ p)      env = let (a , _) = evalWith p env in a
 evalWith (sndᵗ p)      env = let (_ , b) = evalWith p env in b
 evalWith (inlᵗ a)      env = inj₁ (evalWith a env)
 evalWith (inrᵗ a)      env = inj₂ (evalWith a env)
-evalWith {Γ = Γ} {Θ = Θ} (foldᵗ {s = s} {u = u} l z f) env =
-  go (evalWith l env) (evalWith z env)
-  where
-    go : List (Val Γ s) → Val Γ u → Val Γ u
-    go []       acc = acc
-    go (x ∷ xs) acc = go xs (evalWith f (x ∷ᵃ acc ∷ᵃ env))
+evalWith (foldᵗ l z f) env = foldVals f env (evalWith l env) (evalWith z env)
 evalWith (caseᵗ sc l r) env with evalWith sc env
 ... | inj₁ x = evalWith l (x ∷ᵃ env)
 ... | inj₂ y = evalWith r (y ∷ᵃ env)
@@ -518,6 +524,9 @@ evalWith (primᵗ ltᵖ arg)  env = let (a , b) = evalWith arg env in a <ᵇ b
 evalWith (primᵗ notᵖ arg) env = not (evalWith arg env)
 evalWith (strmᵗ e)     []ᵃ        = e
 evalWith (strmᵗ e)     (v ∷ᵃ vs)  = closeUnderFn e (v ∷ᵃ vs)
+
+foldVals f env []       acc = acc
+foldVals f env (x ∷ xs) acc = foldVals f env xs (evalWith f (x ∷ᵃ acc ∷ᵃ env))
 
 evalTm  : ∀ {n} {Γ : Ctx n} {t} → Tm Γ [] [] [] t → Val Γ t
 evalTm t = evalWith t []ᵃ

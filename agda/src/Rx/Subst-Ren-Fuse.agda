@@ -40,7 +40,7 @@ open import Rx.Exp
         ; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ
         ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ
         ; varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ
-        ; ifᵗ; primᵗ; strmᵗ )
+        ; ifᵗ; primᵗ; strmᵗ; nilᵗ; consᵗ; foldᵗ )
 open import Rx.Subst-Transport using (Cᵉ; cong₃)
 open import Rx.Subst-Renaming using (Idᵖ; ren-idᵉ)
 open import Rx.Subst-Split
@@ -137,6 +137,12 @@ mutual
   ren-∘ᵗ cg cd ct (ifᵗ c a b) =
     cong₃ ifᵗ (ren-∘ᵗ cg cd ct c) (ren-∘ᵗ cg cd ct a) (ren-∘ᵗ cg cd ct b)
   ren-∘ᵗ cg cd ct (primᵗ op a) = cong (primᵗ op) (ren-∘ᵗ cg cd ct a)
+  ren-∘ᵗ cg cd ct nilᵗ          = refl
+  ren-∘ᵗ cg cd ct (consᵗ a as)  =
+    cong₂ consᵗ (ren-∘ᵗ cg cd ct a) (ren-∘ᵗ cg cd ct as)
+  ren-∘ᵗ cg cd ct (foldᵗ l z f) =
+    cong₃ foldᵗ (ren-∘ᵗ cg cd ct l) (ren-∘ᵗ cg cd ct z)
+                (ren-∘ᵗ cg cd (comp-ext (comp-ext ct)) f)
   ren-∘ᵗ cg cd ct (strmᵗ e)    = cong strmᵗ (ren-∘ᵉ cg cd ct e)
 
   ren-∘ᵗˢ : {ρg : Ren∈ Δᵍ Δᵍ′} {σg : Ren∈ Δᵍ′ Δᵍ″} {τg : Ren∈ Δᵍ Δᵍ″}
@@ -269,6 +275,18 @@ mutual
               (sub-fixᵗ Θa Θb σ fl fr b)
   sub-fixᵗ Θa Θb σ fl fr (primᵗ op a) =
     cong (primᵗ op) (sub-fixᵗ Θa Θb σ fl fr a)
+  sub-fixᵗ Θa Θb σ fl fr nilᵗ         = refl
+  sub-fixᵗ Θa Θb σ fl fr (consᵗ a as) =
+    cong₂ consᵗ (sub-fixᵗ Θa Θb σ fl fr a) (sub-fixᵗ Θa Θb σ fl fr as)
+  sub-fixᵗ Θa Θb {ρ⁺ = ρ⁺} σ fl fr (foldᵗ {s = v} {u = w} l z f) =
+    cong₃ foldᵗ
+      (sub-fixᵗ Θa Θb σ fl fr l)
+      (sub-fixᵗ Θa Θb σ fl fr z)
+      (sub-fixᵗ (v ∷ w ∷ Θa) (v ∷ w ∷ Θb) σ
+         (fixL-ext (fixL-ext fl))
+         (fixR-ext {Θa = w ∷ Θa} {Θb = w ∷ Θb} {ρ⁺ = ext∈ ρ⁺}
+           (fixR-ext {Θa = Θa} {Θb = Θb} {ρ⁺ = ρ⁺} fr))
+         f)
   sub-fixᵗ Θa Θb σ fl fr (strmᵗ e) = cong strmᵗ (sub-fixᵉ Θa Θb σ fl fr e)
 
   sub-fixᵗˢ : (Θa Θb : List Ty) {ρg : Ren∈ Δᵍ Δᵍ′} {ρd : Ren∈ Δ Δ′}

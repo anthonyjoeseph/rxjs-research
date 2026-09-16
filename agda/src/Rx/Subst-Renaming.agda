@@ -33,7 +33,8 @@ open import Relation.Binary.PropositionalEquality
 open import Rx.Exp
   using (Ty; Ctx; Exp; Tm; Val; Ren∈; ext∈; ++Ren; renExp; renTm; renTms; subΘExp; subΘTm; subΘTms;
   input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ;
-  varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ)
+  varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ;
+  nilᵗ; consᵗ; foldᵗ)
 open import Rx.Subst-Transport using (cong₃)
 open import Rx.Subst-Split using (left-back; right-back; sub-left)
 
@@ -109,6 +110,12 @@ mutual
   ren-idᵗ ig id it (ifᵗ c a b) =
     cong₃ ifᵗ (ren-idᵗ ig id it c) (ren-idᵗ ig id it a) (ren-idᵗ ig id it b)
   ren-idᵗ ig id it (primᵗ op a) = cong (primᵗ op) (ren-idᵗ ig id it a)
+  ren-idᵗ ig id it nilᵗ          = refl
+  ren-idᵗ ig id it (consᵗ a as)  =
+    cong₂ consᵗ (ren-idᵗ ig id it a) (ren-idᵗ ig id it as)
+  ren-idᵗ ig id it (foldᵗ l z f) =
+    cong₃ foldᵗ (ren-idᵗ ig id it l) (ren-idᵗ ig id it z)
+                (ren-idᵗ ig id (ext-id (ext-id it)) f)
   ren-idᵗ ig id it (strmᵗ e)    = cong strmᵗ (ren-idᵉ ig id it e)
 
   ren-idᵗˢ : {ρg : Ren∈ Δᵍ Δᵍ} {ρd : Ren∈ Δ Δ} {ρt : Ren∈ Θ Θ}
@@ -179,6 +186,12 @@ mutual
   sub-renᵗ σ ag (ifᵗ c a b) =
     cong₃ ifᵗ (sub-renᵗ σ ag c) (sub-renᵗ σ ag a) (sub-renᵗ σ ag b)
   sub-renᵗ σ ag (primᵗ op a) = cong (primᵗ op) (sub-renᵗ σ ag a)
+  sub-renᵗ σ ag nilᵗ          = refl
+  sub-renᵗ σ ag (consᵗ a as)  =
+    cong₂ consᵗ (sub-renᵗ σ ag a) (sub-renᵗ σ ag as)
+  sub-renᵗ σ ag (foldᵗ l z f) =
+    cong₃ foldᵗ (sub-renᵗ σ ag l) (sub-renᵗ σ ag z)
+                (sub-renᵗ σ (lands-ext (lands-ext ag)) f)
   sub-renᵗ σ ag (strmᵗ e)    = cong strmᵗ (sub-renᵉ σ ag e)
 
   sub-renᵗˢ : {ρg : Ren∈ Δᵍ Δᵍ′} {ρd : Ren∈ Δ Δ′}

@@ -55,6 +55,7 @@ open import Rx.Exp using (Ty; Ctx; Exp; Tm; Ren∈; ext∈;
                           μᵉ; varᵉ; deferᵉ;
                           varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ;
                           inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ;
+                          nilᵗ; consᵗ; foldᵗ;
                           inputsBelowᵉ; inputsBelowᵗ; inputsBelowᵗˢ)
 
 ------------------------------------------------------------------
@@ -105,6 +106,13 @@ mutual
     cong₂ _∧_ (ib-renᵗ k ρg ρd ρt c)
               (cong₂ _∧_ (ib-renᵗ k ρg ρd ρt a) (ib-renᵗ k ρg ρd ρt b))
   ib-renᵗ k ρg ρd ρt (primᵗ _ a)   = ib-renᵗ k ρg ρd ρt a
+  ib-renᵗ k ρg ρd ρt nilᵗ          = refl
+  ib-renᵗ k ρg ρd ρt (consᵗ a as)  =
+    cong₂ _∧_ (ib-renᵗ k ρg ρd ρt a) (ib-renᵗ k ρg ρd ρt as)
+  ib-renᵗ k ρg ρd ρt (foldᵗ l z f) =
+    cong₂ _∧_ (ib-renᵗ k ρg ρd ρt l)
+              (cong₂ _∧_ (ib-renᵗ k ρg ρd ρt z)
+                         (ib-renᵗ k ρg ρd (ext∈ (ext∈ ρt)) f))
   ib-renᵗ k ρg ρd ρt (strmᵗ e)     = ib-renᵉ k ρg ρd ρt e
 
   ib-renᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δᵍ′ Δ Δ′ Θ Θ′ t} (k : ℕ)
@@ -223,6 +231,28 @@ mutual
       ab   = inputsBelowᵗ k a ∧ inputsBelowᵗ k b
       rest = ∧ʳ (inputsBelowᵗ k c) ab ok
   ib-elimGᵗ k Θl x cl hcl (primᵗ _ a)   ok = ib-elimGᵗ k Θl x cl hcl a ok
+  ib-elimGᵗ k Θl x cl hcl nilᵗ          ok = tt
+  ib-elimGᵗ k Θl x cl hcl (consᵗ a as)  ok =
+    ∧⁺ (inputsBelowᵗ k (elimGTm Θl x cl a))
+       (inputsBelowᵗ k (elimGTm Θl x cl as))
+       (ib-elimGᵗ k Θl x cl hcl a
+         (∧ˡ (inputsBelowᵗ k a) (inputsBelowᵗ k as) ok))
+       (ib-elimGᵗ k Θl x cl hcl as
+         (∧ʳ (inputsBelowᵗ k a) (inputsBelowᵗ k as) ok))
+  ib-elimGᵗ k Θl x cl hcl (foldᵗ l z f) ok =
+    ∧⁺ (inputsBelowᵗ k (elimGTm Θl x cl l))
+       (inputsBelowᵗ k (elimGTm Θl x cl z)
+         ∧ inputsBelowᵗ k (elimGTm (_ ∷ _ ∷ Θl) x cl f))
+       (ib-elimGᵗ k Θl x cl hcl l
+         (∧ˡ (inputsBelowᵗ k l) _ ok))
+       (∧⁺ (inputsBelowᵗ k (elimGTm Θl x cl z))
+           (inputsBelowᵗ k (elimGTm (_ ∷ _ ∷ Θl) x cl f))
+           (ib-elimGᵗ k Θl x cl hcl z
+             (∧ˡ (inputsBelowᵗ k z) (inputsBelowᵗ k f)
+               (∧ʳ (inputsBelowᵗ k l) _ ok)))
+           (ib-elimGᵗ k (_ ∷ _ ∷ Θl) x cl hcl f
+             (∧ʳ (inputsBelowᵗ k z) (inputsBelowᵗ k f)
+               (∧ʳ (inputsBelowᵗ k l) _ ok))))
   ib-elimGᵗ k Θl x cl hcl (strmᵗ e)     ok = ib-elimGᵉ k Θl x cl hcl e ok
 
   ib-elimGᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub u t} (k : ℕ)
@@ -337,6 +367,28 @@ mutual
       ab   = inputsBelowᵗ k a ∧ inputsBelowᵗ k b
       rest = ∧ʳ (inputsBelowᵗ k c) ab ok
   ib-elimDᵗ k Θl x cl hcl (primᵗ _ a)   ok = ib-elimDᵗ k Θl x cl hcl a ok
+  ib-elimDᵗ k Θl x cl hcl nilᵗ          ok = tt
+  ib-elimDᵗ k Θl x cl hcl (consᵗ a as)  ok =
+    ∧⁺ (inputsBelowᵗ k (elimDTm Θl x cl a))
+       (inputsBelowᵗ k (elimDTm Θl x cl as))
+       (ib-elimDᵗ k Θl x cl hcl a
+         (∧ˡ (inputsBelowᵗ k a) (inputsBelowᵗ k as) ok))
+       (ib-elimDᵗ k Θl x cl hcl as
+         (∧ʳ (inputsBelowᵗ k a) (inputsBelowᵗ k as) ok))
+  ib-elimDᵗ k Θl x cl hcl (foldᵗ l z f) ok =
+    ∧⁺ (inputsBelowᵗ k (elimDTm Θl x cl l))
+       (inputsBelowᵗ k (elimDTm Θl x cl z)
+         ∧ inputsBelowᵗ k (elimDTm (_ ∷ _ ∷ Θl) x cl f))
+       (ib-elimDᵗ k Θl x cl hcl l
+         (∧ˡ (inputsBelowᵗ k l) _ ok))
+       (∧⁺ (inputsBelowᵗ k (elimDTm Θl x cl z))
+           (inputsBelowᵗ k (elimDTm (_ ∷ _ ∷ Θl) x cl f))
+           (ib-elimDᵗ k Θl x cl hcl z
+             (∧ˡ (inputsBelowᵗ k z) (inputsBelowᵗ k f)
+               (∧ʳ (inputsBelowᵗ k l) _ ok)))
+           (ib-elimDᵗ k (_ ∷ _ ∷ Θl) x cl hcl f
+             (∧ʳ (inputsBelowᵗ k z) (inputsBelowᵗ k f)
+               (∧ʳ (inputsBelowᵗ k l) _ ok))))
   ib-elimDᵗ k Θl x cl hcl (strmᵗ e)     ok = ib-elimDᵉ k Θl x cl hcl e ok
 
   ib-elimDᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub u t} (k : ℕ)
@@ -392,6 +444,9 @@ mutual
   ib-topᵗ (caseᵗ s l r) = ∧⁺ _ _ (ib-topᵗ s) (∧⁺ _ _ (ib-topᵗ l) (ib-topᵗ r))
   ib-topᵗ (ifᵗ c a b)   = ∧⁺ _ _ (ib-topᵗ c) (∧⁺ _ _ (ib-topᵗ a) (ib-topᵗ b))
   ib-topᵗ (primᵗ _ a)   = ib-topᵗ a
+  ib-topᵗ nilᵗ          = tt
+  ib-topᵗ (consᵗ a as)  = ∧⁺ _ _ (ib-topᵗ a) (ib-topᵗ as)
+  ib-topᵗ (foldᵗ l z f) = ∧⁺ _ _ (ib-topᵗ l) (∧⁺ _ _ (ib-topᵗ z) (ib-topᵗ f))
   ib-topᵗ (strmᵗ e)     = ib-topᵉ e
 
   ib-topᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (ts : List (Tm Γ Δᵍ Δ Θ t)) →

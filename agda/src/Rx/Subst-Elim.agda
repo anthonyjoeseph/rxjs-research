@@ -48,7 +48,7 @@ open import Rx.Exp
         ; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ
         ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ
         ; varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ
-        ; caseᵗ; ifᵗ; primᵗ; strmᵗ )
+        ; caseᵗ; ifᵗ; primᵗ; strmᵗ; nilᵗ; consᵗ; foldᵗ; listᵗ )
 open import Rx.Subst-Transport using (Cᵉ; Cᵗ; Cˢ; cong₃; pushVarᵉ)
 open import Rx.Subst-Elim-Weak using (elimG-avᵗ; elimD-avᵗ)
 open import Rx.Subst-Ren-Fuse using (sub-fixᵉ; ren-wk-Θ; noRen)
@@ -237,6 +237,23 @@ gStrm : (Θl : List Ty) (eq : Θl ++ [] ≡ Θ) (x : t ∈ Δᵍ) (cl : Exp Γ [
        → Gᵗ Θl eq x cl (strmᵗ e) ≡ strmᵗ (Gᵉ Θl eq x cl e)
 gStrm Θl refl x cl e = refl
 
+gNilᵗ : (Θl : List Ty) (eq : Θl ++ [] ≡ Θ) (x : t ∈ Δᵍ) (cl : Exp Γ [] [] [] t)
+      → Gᵗ Θl eq x cl (nilᵗ {Γ = Γ} {Δᵍ} {Δ} {Θ} {u}) ≡ nilᵗ
+gNilᵗ Θl refl x cl = refl
+
+gConsᵗ : (Θl : List Ty) (eq : Θl ++ [] ≡ Θ) (x : t ∈ Δᵍ) (cl : Exp Γ [] [] [] t)
+           (a : Tm Γ Δᵍ Δ Θ u) (as : Tm Γ Δᵍ Δ Θ (listᵗ u))
+       → Gᵗ Θl eq x cl (consᵗ a as) ≡ consᵗ (Gᵗ Θl eq x cl a) (Gᵗ Θl eq x cl as)
+gConsᵗ Θl refl x cl a as = refl
+
+gFoldᵗ : (Θl : List Ty) (eq : Θl ++ [] ≡ Θ) (x : t ∈ Δᵍ) (cl : Exp Γ [] [] [] t)
+           (l : Tm Γ Δᵍ Δ Θ (listᵗ v)) (z : Tm Γ Δᵍ Δ Θ u)
+           (f : Tm Γ Δᵍ Δ (v ∷ u ∷ Θ) u)
+       → Gᵗ Θl eq x cl (foldᵗ l z f)
+           ≡ foldᵗ (Gᵗ Θl eq x cl l) (Gᵗ Θl eq x cl z)
+               (Gᵗ (v ∷ u ∷ Θl) (cong (v ∷_) (cong (u ∷_) eq)) x cl f)
+gFoldᵗ Θl refl x cl l z f = refl
+
 gNil : (Θl : List Ty) (eq : Θl ++ [] ≡ Θ) (x : t ∈ Δᵍ) (cl : Exp Γ [] [] [] t)
       → Gˢ {Δ = Δ} {u = u} Θl eq x cl [] ≡ []
 gNil Θl refl x cl = refl
@@ -368,6 +385,23 @@ dStrm : (Θl : List Ty) (eq : Θl ++ [] ≡ Θ) (x : t ∈ Δ) (cl : Exp Γ [] [
            (e : Exp Γ Δᵍ Δ Θ v)
        → Dᵗ Θl eq x cl (strmᵗ e) ≡ strmᵗ (Dᵉ Θl eq x cl e)
 dStrm Θl refl x cl e = refl
+
+dNilᵗ : (Θl : List Ty) (eq : Θl ++ [] ≡ Θ) (x : t ∈ Δ) (cl : Exp Γ [] [] [] t)
+      → Dᵗ Θl eq x cl (nilᵗ {Γ = Γ} {Δᵍ} {Δ} {Θ} {u}) ≡ nilᵗ
+dNilᵗ Θl refl x cl = refl
+
+dConsᵗ : (Θl : List Ty) (eq : Θl ++ [] ≡ Θ) (x : t ∈ Δ) (cl : Exp Γ [] [] [] t)
+           (a : Tm Γ Δᵍ Δ Θ u) (as : Tm Γ Δᵍ Δ Θ (listᵗ u))
+       → Dᵗ Θl eq x cl (consᵗ a as) ≡ consᵗ (Dᵗ Θl eq x cl a) (Dᵗ Θl eq x cl as)
+dConsᵗ Θl refl x cl a as = refl
+
+dFoldᵗ : (Θl : List Ty) (eq : Θl ++ [] ≡ Θ) (x : t ∈ Δ) (cl : Exp Γ [] [] [] t)
+           (l : Tm Γ Δᵍ Δ Θ (listᵗ v)) (z : Tm Γ Δᵍ Δ Θ u)
+           (f : Tm Γ Δᵍ Δ (v ∷ u ∷ Θ) u)
+       → Dᵗ Θl eq x cl (foldᵗ l z f)
+           ≡ foldᵗ (Dᵗ Θl eq x cl l) (Dᵗ Θl eq x cl z)
+               (Dᵗ (v ∷ u ∷ Θl) (cong (v ∷_) (cong (u ∷_) eq)) x cl f)
+dFoldᵗ Θl refl x cl l z f = refl
 
 dNil : (Θl : List Ty) (eq : Θl ++ [] ≡ Θ) (x : t ∈ Δ) (cl : Exp Γ [] [] [] t)
       → Dˢ {Δ = Δ} {Δᵍ = Δᵍ} {u = u} Θl eq x cl [] ≡ []
@@ -570,6 +604,15 @@ mutual
   sub-elimGᵗ Θloc x cl σ (primᵗ op a) =
     trans (cong (primᵗ op) (sub-elimGᵗ Θloc x cl σ a))
           (sym (gPrim Θloc (++-identityʳ Θloc) x _ op _))
+  sub-elimGᵗ Θloc x cl σ nilᵗ =
+    sym (gNilᵗ Θloc (++-identityʳ Θloc) x _)
+  sub-elimGᵗ Θloc x cl σ (consᵗ a as) =
+    trans (cong₂ consᵗ (sub-elimGᵗ Θloc x cl σ a) (sub-elimGᵗ Θloc x cl σ as))
+          (sym (gConsᵗ Θloc (++-identityʳ Θloc) x _ _ _))
+  sub-elimGᵗ Θloc x cl σ (foldᵗ {s = a} {u = b} l z f) =
+    trans (cong₃ foldᵗ (sub-elimGᵗ Θloc x cl σ l) (sub-elimGᵗ Θloc x cl σ z)
+                   (sub-elimGᵗ (a ∷ b ∷ Θloc) x cl σ f))
+          (sym (gFoldᵗ Θloc (++-identityʳ Θloc) x _ _ _ _))
   sub-elimGᵗ Θloc x cl σ (strmᵗ e) =
     trans (cong strmᵗ (sub-elimGᵉ Θloc x cl σ e))
           (sym (gStrm Θloc (++-identityʳ Θloc) x _ _))
@@ -666,6 +709,15 @@ mutual
   sub-elimDᵗ Θloc x cl σ (primᵗ op a) =
     trans (cong (primᵗ op) (sub-elimDᵗ Θloc x cl σ a))
           (sym (dPrim Θloc (++-identityʳ Θloc) x _ op _))
+  sub-elimDᵗ Θloc x cl σ nilᵗ =
+    sym (dNilᵗ Θloc (++-identityʳ Θloc) x _)
+  sub-elimDᵗ Θloc x cl σ (consᵗ a as) =
+    trans (cong₂ consᵗ (sub-elimDᵗ Θloc x cl σ a) (sub-elimDᵗ Θloc x cl σ as))
+          (sym (dConsᵗ Θloc (++-identityʳ Θloc) x _ _ _))
+  sub-elimDᵗ Θloc x cl σ (foldᵗ {s = a} {u = b} l z f) =
+    trans (cong₃ foldᵗ (sub-elimDᵗ Θloc x cl σ l) (sub-elimDᵗ Θloc x cl σ z)
+                   (sub-elimDᵗ (a ∷ b ∷ Θloc) x cl σ f))
+          (sym (dFoldᵗ Θloc (++-identityʳ Θloc) x _ _ _ _))
   sub-elimDᵗ Θloc x cl σ (strmᵗ e) =
     trans (cong strmᵗ (sub-elimDᵉ Θloc x cl σ e))
           (sym (dStrm Θloc (++-identityʳ Θloc) x _ _))

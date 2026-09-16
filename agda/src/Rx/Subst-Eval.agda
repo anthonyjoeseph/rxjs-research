@@ -21,7 +21,7 @@
 module Rx.Subst-Eval where
 
 open import Data.Bool using (if_then_else_; not)
-open import Data.List using ([]; _∷_; _++_)
+open import Data.List using (List; []; _∷_; _++_)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁻)
 open import Data.List.Relation.Unary.Any using (here; there)
@@ -34,6 +34,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 
 open import Rx.Exp using (Ctx; Val; Exp; Tm; Fn; evalTm; evalWith; applyFn; subΘTm; subΘExp; lookupEnv; wkTm; reify;
   varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ; add; sub;
+  nilᵗ; consᵗ; foldᵗ; foldVals; listᵗ; reifyList;
   mul; eqᵖ; ltᵖ; notᵖ; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs)
 open import Rx.Subst-Renaming using (ren-idᵉ; sub-renᵉ)
 open import Rx.Subst-Compose using (subΘ-compᵉ)
@@ -70,6 +71,14 @@ sub-evalStrm e σ       (w ∷ ρ) = subΘ-compᵉ (w ∷ ρ) σ e
 -- the walk has no subterm of its own to recurse on.
 evalWith-wkReify : ∀ {n} {Γ : Ctx n} {Θ t} (v : Val Γ t) (ρ : All (Val Γ) Θ)
                  → evalWith (wkTm (reify v)) ρ ≡ v
+
+-- THE LIST ARM'S OWN WALK, because `reify` hands a list off to a
+-- SIBLING rather than recursing: a list value is not built by a
+-- constructor of the universe, so its readback is a walk over the
+-- spine and the induction has to be stated there too.
+evalWith-wkReifyList : ∀ {n} {Γ : Ctx n} {Θ t}
+                       (xs : List (Val Γ t)) (ρ : All (Val Γ) Θ)
+                     → evalWith (wkTm (reifyList xs)) ρ ≡ xs
 evalWith-wkReify {t = unitᵗ}   v        ρ = refl
 evalWith-wkReify {t = boolᵗ}   b        ρ = refl
 evalWith-wkReify {t = natᵗ}    m        ρ = refl
@@ -77,10 +86,15 @@ evalWith-wkReify {t = _ ×ᵗ _} (a , b)   ρ =
   cong₂ _,_ (evalWith-wkReify a ρ) (evalWith-wkReify b ρ)
 evalWith-wkReify {t = _ +ᵗ _} (inj₁ a)  ρ = cong inj₁ (evalWith-wkReify a ρ)
 evalWith-wkReify {t = _ +ᵗ _} (inj₂ b)  ρ = cong inj₂ (evalWith-wkReify b ρ)
+evalWith-wkReify {t = listᵗ _} xs       ρ = evalWith-wkReifyList xs ρ
 evalWith-wkReify {t = obs _}   e []      = ren-idᵉ (λ ()) (λ ()) (λ ()) e
 evalWith-wkReify {t = obs _}   e (w ∷ ρ) =
   trans (sub-renᵉ {Θloc = []} {ρt = λ ()} (w ∷ ρ) (λ ()) e)
         (ren-idᵉ {ρg = λ ()} {ρd = λ ()} {ρt = λ ()} (λ ()) (λ ()) (λ ()) e)
+
+evalWith-wkReifyList []       ρ = refl
+evalWith-wkReifyList (x ∷ xs) ρ =
+  cong₂ _∷_ (evalWith-wkReify x ρ) (evalWith-wkReifyList xs ρ)
 
 -- THE VARIABLE ARM, BY INDUCTION ON THE LOCAL TELESCOPE.  A variable
 -- the telescope still covers is read straight out of `ρ`; one it has
@@ -108,6 +122,20 @@ sub-evalVar {Θloc = a ∷ Θl} (there p)    σ (w ∷ ρ)
 sub-evalWith : ∀ {n} {Γ : Ctx n} {Θloc Θsub t} (tm : Tm Γ [] [] (Θloc ++ Θsub) t)
                (σ : All (Val Γ) Θsub) (ρ : All (Val Γ) Θloc)
              → evalWith (subΘTm Θloc σ tm) ρ ≡ evalWith tm (++⁺ ρ σ)
+
+-- THE FOLD'S OWN INDUCTION, AND THE ONE ARM THAT IS NOT A `cong`.
+-- Every other constructor's obligation is discharged by congruence
+-- over its subterms, because the value each builds is a function of
+-- those subterms' values.  A fold's is not: its step runs once per
+-- ELEMENT, under an environment that grows by two, so the agreement
+-- has to be re-established at every element and the recursion is on
+-- the evaluated list rather than on the term.
+sub-foldVals : ∀ {n} {Γ : Ctx n} {Θloc Θsub s u}
+               (f : Tm Γ [] [] (s ∷ u ∷ (Θloc ++ Θsub)) u)
+               (σ : All (Val Γ) Θsub) (ρ : All (Val Γ) Θloc)
+               (xs : List (Val Γ s)) (acc : Val Γ u)
+             → foldVals (subΘTm (s ∷ u ∷ Θloc) σ f) ρ xs acc
+                 ≡ foldVals f (++⁺ ρ σ) xs acc
 sub-evalWith (varᵗ x)    σ ρ = sub-evalVar x σ ρ
 sub-evalWith unit̂        σ ρ = refl
 sub-evalWith (bool̂ b)    σ ρ = refl
@@ -135,10 +163,22 @@ sub-evalWith (primᵗ ltᵖ  a) σ ρ =
   cong (λ w → let (x , y) = w in x <ᵇ y) (sub-evalWith a σ ρ)
 sub-evalWith (primᵗ notᵖ a) σ ρ = cong not (sub-evalWith a σ ρ)
 sub-evalWith (strmᵗ e)   σ ρ = sub-evalStrm e σ ρ
+sub-evalWith nilᵗ         σ ρ = refl
+sub-evalWith (consᵗ a as) σ ρ =
+  cong₂ _∷_ (sub-evalWith a σ ρ) (sub-evalWith as σ ρ)
+sub-evalWith {Θloc = Θloc} (foldᵗ {s = s} {u = u} l z f) σ ρ =
+  trans (cong₂ (foldVals (subΘTm (s ∷ u ∷ Θloc) σ f) ρ)
+          (sub-evalWith l σ ρ) (sub-evalWith z σ ρ))
+        (sub-foldVals f σ ρ (evalWith l (++⁺ ρ σ)) (evalWith z (++⁺ ρ σ)))
 sub-evalWith (caseᵗ sc l r) σ ρ
   rewrite sub-evalWith sc σ ρ with evalWith sc (++⁺ ρ σ)
 ... | inj₁ x = sub-evalWith l σ (x ∷ ρ)
 ... | inj₂ y = sub-evalWith r σ (y ∷ ρ)
+
+sub-foldVals f σ ρ []       acc = refl
+sub-foldVals f σ ρ (x ∷ xs) acc =
+  trans (cong (foldVals (subΘTm _ σ f) ρ xs) (sub-evalWith f σ (x ∷ acc ∷ ρ)))
+        (sub-foldVals f σ ρ xs (evalWith f (x ∷ acc ∷ ++⁺ ρ σ)))
 
 -- A ONE-SHOT'S ELEMENT binds nothing, so the local telescope is empty
 -- and the environment is the substitution's own.
