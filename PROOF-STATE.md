@@ -233,17 +233,6 @@ deferred beside it.
 
 ### Big picture tier roadmap
 
-- **TAKE THE ACCUMULATING FACE'S MEASURE LEXICOGRAPHIC, CEILING OUTERMOST.**
-  The share's slot is decided: it CAN be stated over the table, and the
-  candidate need not carry the def as an index. The telescope is stratified,
-  so a slot's def reads only strictly earlier slots, and that is the descent
-  — the term never was. What blocks it is that an input's g-size is zero, so
-  the measure the face already runs has nothing left to spend there. This leg
-  is the restatement: thread the stratification ceiling as an index, order it
-  above the g-size, and let a term step hold the ceiling while this arm drops
-  it. The leaf becomes a body or the ceiling does not thread, and either is
-  the finding.
-
 - **DISCHARGE THE FOUR SUBSTITUTION LEAVES THE PARTNER BOUGHT ITSELF WITH.**
   The `Θloc` telescope landed and took three of the original six with it —
   they were never gaps, only a missing generalisation of the guarded
@@ -271,6 +260,15 @@ deferred beside it.
   at. Grinding it before the risk above settles buys work a restatement upstream
   would throw away, which is why the ordering is written down rather than left
   to whatever happens to be nearest.
+
+- **THEN COLLECT THE BUG CACHE, WHOSE SUSPENSION EXPIRES WITH THE LAST LEAF.**
+  `make bug-cache` self-suspends while the reducibility body holds live
+  postulate leaves, because a corpus run through a postulated arm is a run
+  through nothing. That suspension is written to expire on its own: the day
+  the last leaf falls the runner is live again, over a corpus that has been
+  appended to throughout and never executed against this body. This leg is
+  the collection — run it, and whatever it reports is a counterexample the
+  proof above was never checked against.
 
 - **THEN WHATEVER DESIGN WORK REMAINS.** The candidate funds `Runs` and nothing
   else; the other eight `*Runs` families have no candidate and the bet is that
@@ -301,10 +299,6 @@ deferred beside it.
   substitution is the identity. It is what makes the top line a corollary of
   the partner at the empty environment.
 
-
-- **`red-input-shared`** (Rx/Evaluator/Reducible) — SHAPE,
-  `DEAD ROUTE, PROBED`: a share's slot is reducible. Stated as a LEAF it is
-  wrong: the descent is the stratification ceiling, which no hypothesis carries.
 
 - **`red-thru`** (Rx/Evaluator/Reducible) — DIFFICULTY, `PROBED`: the consume
   fallback is pinned now, so an arrival at a usable node is subscribed and the

@@ -22,36 +22,19 @@
 -- DERIVATION half and about the state threading, and they are labelled
 -- so nobody reads them as coverage of the other.
 --
--- AND THE SLOT ARM CANNOT BE REACHED ON THE SATISFACTION HALF AT ALL,
--- WHICH IS A PROPERTY OF THE STATEMENT RATHER THAN A GAP HERE.  A
--- scripted slot carries its own side condition that the element type
--- is DATA, so the candidate at a slot's values is the trivial
--- predicate by construction and no program can make that conjunct
--- assert anything.  A slot whose values could fail it would have to be
--- a SHARE, whose def is an expression -- which is the sub-arm below
--- that nothing here reaches.
+-- NOT REACHED, and each is a region rather than a program.  A
+-- flattener's node holding something already -- a queue with an entry
+-- in it, a switch whose current inner is actually running, an exhaust
+-- already active -- so the kill below walks an empty registry and the
+-- refusal reached is the concurrency one rather than the exhaust's.
 --
--- NOT REACHED, and each is a region rather than a program.  A share's
--- connect, which is the slot leaf's sixth sub-arm and the only one
--- whose def is an arbitrary term.  A flattener's node holding
--- something already -- a queue with an entry in it, a switch whose
--- current inner is actually running, an exhaust already active -- so
--- the kill below walks an empty registry and the refusal reached is
--- the concurrency one rather than the exhaust's.  Two of the slot's
--- five scripted sub-arms -- the spent hot and the cold with an
--- asynchronous tail -- and the take and scan arms of the body, whose
--- own recursion the body already checks.
---
--- TARGET: red-input-shared @21f529
 -- TARGET: red-thru @f94cad
 module Probed.Reducible-Arms where
 
-open import Data.Fin using (zero)
 open import Data.List using (List; []; _∷_)
 open import Data.List.Relation.Unary.All using (All; []; _∷_)
 open import Data.Maybe using (nothing; just)
 import Data.Nat
-open import Data.Nat using (zero; s≤s; z≤n)
 open import Data.List using ([])
 open import Data.Maybe using (nothing)
 open import Data.Bool using (false)
@@ -60,14 +43,14 @@ open import Data.Unit using (tt)
 open import Data.Vec using ([]; _∷_)
 open import Relation.Binary.PropositionalEquality using (refl)
 
-open import Rx.Exp using (Ctx; Closed; natᵗ; obs; ofᵉ; nat̂; input)
-open import Rx.Slots using (Slots; shared)
+open import Rx.Exp using (Ctx; Closed; natᵗ; obs; ofᵉ; nat̂)
+open import Rx.Slots using (Slots)
 open import Rx.Evaluator using (Sched; EvalSt; Path; root; sched-init; st-init; mergeAllᵒ; switchᵒ; exhaustᵒ; AllOp;
   NodeState; from-inner; _↠_; mergeAll-st; switch-st; exhaust-st; installNode)
-open import Rx.Evaluator.Reducible using (Red; reducible; red-input-shared; red-thru)
+open import Rx.Evaluator.Reducible using (Red; reducible; red-thru)
 
-open import Rx.Evaluator.Domain using (subs-shared; slot-spent; slot-join; step-thru-outer; walk-nil; walk-cons; inner;
-  consume-all-sub; consume-all-enqueue; consume-switch-sub; consume-exhaust-sub)
+open import Rx.Evaluator.Domain using (step-thru-outer; walk-nil; walk-cons; inner; consume-all-sub; consume-all-enqueue;
+  consume-switch-sub; consume-exhaust-sub)
 
 open import Probed.Apparatus using (Confirms)
 
@@ -94,60 +77,6 @@ st₀ = st-init e₀
 -- the root of the chain, at the floor a run starts at
 κ₀ : Path Γ₀ 0 natᵗ natᵗ
 κ₀ = root
-
-----------------------------------------------------------------------
--- 3.  THE SLOT'S SHARE, at the two sub-arms that carry no payload.  A
--- share whose source has completed answers spent; one whose definition
--- is already connected joins the existing fan-out.  Neither runs the
--- definition, so neither reaches the connect -- which is the whole of
--- what is left in this statement, and is why the rows are evidence
--- about the SHAPE rather than about the hard sub-arm.
---
--- BOTH STATES ARE CONSTRUCTED RATHER THAN REACHED, and that is the
--- coverage boundary: the flags these arms dispatch on are written into
--- the state directly, so the rows say the arms compose at a state of
--- that description and not that a run produces one.  They are stated
--- anyway because the predicate HOLDS at them -- a constructed state
--- where it FAILED would be a refutation candidate instead.
-----------------------------------------------------------------------
-
-Γ₁ : Ctx 1
-Γ₁ = natᵗ ∷ []
-
-e₁ : Closed Γ₁ natᵗ
-e₁ = input zero
-
-d₁ : Closed Γ₁ natᵗ
-d₁ = ofᵉ (nat̂ 5 ∷ [])
-
-insShared : Slots Γ₁
-insShared zero = shared d₁ {ok = tt}
-
-schShared : Sched Γ₁
-schShared = sched-init e₁ insShared
-
--- the share's own source has completed, so the subscription is handed
--- the spent protocol burst and the state is threaded on untouched
-stSpent : EvalSt e₁
-stSpent = record (st-init e₁) { completedSources = 0 ∷ [] }
-
-row-share-spent : Confirms
-  (red-input-shared {Γ = Γ₁} zero d₁ {tt} (root {lo = 1}) (s≤s z≤n) 0 0
-     schShared refl stSpent)
-row-share-spent =
-  _ , subs-shared {d = d₁} {below = s≤s z≤n} {ok = tt} refl (slot-spent refl) , (tt ∷ tt ∷ tt ∷ []) ∷ []
-
--- the definition is live and already connected, so this subscription
--- only registers: the burst is one `init` and the state gains a row
-stJoin : EvalSt e₁
-stJoin = record (st-init e₁) { connectedShares = 0 ∷ [] }
-
-row-share-join : Confirms
-  (red-input-shared {Γ = Γ₁} zero d₁ {tt} (root {lo = 1}) (s≤s z≤n) 0 0
-     schShared refl stJoin)
-row-share-join =
-  _ , subs-shared {d = d₁} {below = s≤s z≤n} {ok = tt} refl (slot-join refl refl) , (tt ∷ []) ∷ []
-
 
 ----------------------------------------------------------------------
 -- 4.  THE SAME STEP THROUGH A FLATTENING FRAME, which is where the

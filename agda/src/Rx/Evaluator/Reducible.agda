@@ -31,18 +31,17 @@
 -- subscribe its inner in whatever state the outer delivery reached.
 module Rx.Evaluator.Reducible where
 
-open import Data.Bool using (Bool; true; false; if_then_else_; T)
+open import Data.Bool using (Bool; true; false; if_then_else_; T; _∧_)
 open import Data.Fin using (Fin; toℕ)
 open import Data.List using (List; []; _∷_; _++_; map)
 open import Data.List.Relation.Unary.All using (All; []; _∷_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Membership.Propositional using (_∈_)
-open import Data.Bool using (Bool; true; false)
 open import Data.List.Relation.Unary.All.Properties using (++⁺)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; zero; suc; _<_; s≤s; _+_)
+open import Data.Nat using (ℕ; zero; suc; _<_; s≤s; _+_; _<ᵇ_)
 open import Data.Nat.Induction using (<-wellFounded)
-open import Data.Nat.Properties using (_<?_; ≮⇒≥; ≤-refl; ≤-trans; m≤n+m; m≤m+n)
+open import Data.Nat.Properties using (_<?_; ≮⇒≥; ≤-refl; ≤-trans; m≤n+m; m≤m+n; <ᵇ⇒<)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
@@ -52,24 +51,29 @@ open import Relation.Nullary using (yes; no)
 
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
 
-open import Rx.Prim using (Id; Tick; InstEmit; InstEvent; init; value; close; handoff;
+open import Rx.Prim using (Id; Tick; Source; InstEmit; InstEvent; init; value; close; handoff;
   complete; hot; cold)
 open import Rx.Slots using (scripted; shared)
 open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; _≟ᵗ_; Ctx; Closed; Val; Exp; Tm; Fn; evalTm; evalWith; applyFn; input; ofᵉ; emptyᵉ;
   mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; isData; unfoldμ;
   varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ;
-  add; sub; mul; eqᵖ; ltᵖ; notᵖ; subΘExp; subΘTm; subΘTms; lookupEnv)
+  add; sub; mul; eqᵖ; ltᵖ; notᵖ; subΘExp; subΘTm; subΘTms; lookupEnv;
+  inputsBelowᵉ; inputsBelowᵗ; inputsBelowᵗˢ)
 open import Rx.Exp.Guarded using (gsizeᵉ; gsizeᵗ; gsizeᵗˢ; gsize-unfoldμ)
+open import Rx.Inputs-Below using (ib-unfoldμ; ib-topᵉ)
+open import Decide using (∧ˡ; ∧ʳ)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; _↠_; map-f; take-f; scan-f; take-st; scan-st; thru-outer;
   mergeAllᵒ; switchᵒ; exhaustᵒ; mergeAll-st; switch-st; exhaust-st; takeVals; takeDispatch;
   scanVals; scanDispatch; lookupNode; NodeState; installNode; oneShotBurst; memberSource;
-  splitEvents; retagEvents; NodeId; AllOp; from-inner)
+  splitEvents; retagEvents; NodeId; AllOp; from-inner;
+  share-sink; register; atSlot; lowerFloor; burstCompleted; sharedPlumb; spentBurst)
 open import Rx.Evaluator.Freshness using (lookup-set; PreservedBelow)
 open import Rx.Evaluator.Freshness.Preserve using (subscribeE-preserves)
 open import Rx.Evaluator.Domain using (srcFrame; subscribeE⇓; pushBurst⇓; stepFrame⇓; step-map; step-scan; step-take; push-nil; push-cons; subs-of;
   subs-empty; subs-map; subs-take-zero; subs-take-suc; subs-scan; subs-defer;
   subs-floor; subs-hot-done; subs-hot-live; subs-cold-sync; subs-cold-async;
-  subs-μ; sub-all; subs-merge-all; subs-switch-all; subs-exhaust-all)
+  subs-μ; sub-all; subs-merge-all; subs-switch-all; subs-exhaust-all;
+  subs-shared; slot-spent; slot-join; slot-connect; connect-live; connect-died)
 
 -- An emitted EVENT carries a payload only in the `value` arm; every
 -- other arm is protocol traffic and constrains nothing.
@@ -118,13 +122,19 @@ Red {Γ = Γ} (obs u) b =
 -- whose values are the def's, which is the induction hypothesis.  The
 -- semantic fact underneath is that this share does not replay, so there
 -- is nothing stored for the invariant to be about.
---
--- RECOVERY: git show 64c568e2:agda/src/Rx/Evaluator/Reducible.agda restores
---   `StreamSat-spent` and `StreamSat-plumb`, the two arms of that
---   argument discharged — the first at the spent slot's fixed burst,
---   the second across the plumbing retag.  They are three lines each
---   and belong in the body that replaces the leaf below, which is the
---   consumer they were written ahead of.
+
+-- A SPENT SLOT'S BURST is registration traffic and a completion, so
+-- every predicate holds of it for want of anything to hold of.
+StreamSat-spent : ∀ {A : Set} {P : A → Set} (src : Source) (id : Id)
+                → StreamSat P (spentBurst {A} src id)
+StreamSat-spent src id = (tt ∷ tt ∷ tt ∷ []) ∷ []
+
+-- AND THE FAN-OUT RETAGS ITS EMITS WITHOUT TOUCHING THEIR EVENTS, so
+-- whatever held of the def's burst still holds of what the readers see.
+StreamSat-plumb : ∀ {n} {Γ : Ctx n} {u} {P : Val Γ u → Set} (str : Stream Γ u)
+                → StreamSat P str → StreamSat P (sharedPlumb str)
+StreamSat-plumb []       []       = []
+StreamSat-plumb (x ∷ xs) (q ∷ qs) = q ∷ StreamSat-plumb xs qs
 
 -- PUSHING A BURST THROUGH A FRAME, WITH THE CANDIDATE CARRIED ACROSS.
 -- The three transformer arms all have the same two-step shape — run the
@@ -243,57 +253,6 @@ postulate
   subΘ-idExp : ∀ {n} {Γ : Ctx n} {Δᵍ Δ t} (e : Exp Γ Δᵍ Δ [] t)
              → subΘExp [] [] e ≡ e
 
-  -- THE SIXTH SLOT SUB-ARM, WHICH IS THE ONE THE OTHER FIVE ARE NOT.
-  -- A share's definition is an arbitrary term standing in no relation
-  -- to `input i`, so the body below cannot reach its candidate by any
-  -- descent this module can see -- it is the connect edge, and it is
-  -- answered by the quantification over state rather than by a
-  -- measure.  The other five sub-arms are now a body: what they emit
-  -- is protocol, and what values they carry are DATA by the slot's own
-  -- side condition, so `red-data` closes their satisfaction outright.
-  --
-  -- AND THE DESCENT IT WANTS IS THE SLOT INDEX, NOT THE TERM, WHICH
-  -- THE TELESCOPE'S OWN SIDE CONDITION ALREADY LICENSES.  A slot's
-  -- definition may reference only inputs STRICTLY BELOW that slot --
-  -- `inputsBelowᵉ`, stratified as a `const` telescope is, and
-  -- discharged by unification at every concrete program -- so the
-  -- table is not the simultaneous system it reads as.  What blocks the
-  -- body today is that the measure it already runs bottoms out exactly
-  -- here: an input's g-size is ZERO, so there is no room beneath it to
-  -- spend on a definition of arbitrary size.  The repair is therefore
-  -- a measure that is LEXICOGRAPHIC, the stratification ceiling
-  -- outermost and the g-size inside it: a term-structural step holds
-  -- the ceiling and shrinks the size, and this arm drops the ceiling to
-  -- the slot's own index and lets the size go free.  That is a
-  -- restatement of the accumulating face rather than a new hypothesis
-  -- on this one, and it is owed before this leaf can be a body.
-  --
-  -- DEAD ROUTE: it cannot be a leaf taking the body's own induction
-  --   hypothesis at the definition, which is the shape every other leaf
-  --   here has.  The definition is drawn from the slot table rather
-  --   than from the term, so passing `reducible d` would make this
-  --   mutual with a call Agda reads as non-structural, and the block
-  --   would need a measure back.  This kills the route through the
-  --   TERM only; the ceiling above is a different order and is open.
-  --
-  -- PROBED: `Probed.Reducible-Arms` at both sub-arms that carry no
-  --   payload -- a share whose source has completed, and one whose
-  --   definition is already connected so this subscription only joins
-  --   the fan-out.  Neither runs the definition, so the CONNECT is not
-  --   reached and neither is anything the definition emits.  Both
-  --   states are CONSTRUCTED rather than reached by a run, which is
-  --   what the rows are bounded by: they say the arms compose at a
-  --   state of that description.
-  red-input-shared : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo}
-      (i : Fin n) (d : Closed Γ (lookup Γ i)) {ok}
-      (κ : Path Γ lo (lookup Γ i) t) (below : toℕ i < lo)
-      (id : Id) (now : Tick) (sched : Sched Γ)
-    → Sched.slots sched i ≡ shared d {ok = ok}
-    → (st : EvalSt e)
-    → Σ (Stream Γ (lookup Γ i) × Sched Γ × EvalSt e) λ r →
-        subscribeE⇓ {e = e} (input i) κ id now sched st r
-          × StreamSat (Red (lookup Γ i)) (proj₁ r)
-
   -- THE FLATTENING WALK, and the one leaf here with rows against it.
   -- Every value it produces is an inner subscribed out of the arriving
   -- batch, and the census at `NodeState` says the nodes it consults
@@ -382,32 +341,6 @@ satValues : ∀ {A : Set} {P : A → Set} {vals : List A}
           → All P vals → All (EvSat P) (map value vals)
 satValues []       = []
 satValues (p ∷ ps) = p ∷ satValues ps
-
--- THE SLOT ARM, WHICH IS FIVE SUB-ARMS OF PROTOCOL AND ONE LEAF.  It
--- mirrors the builder's own case split on the slot exactly, because
--- the derivation it must produce is the one the builder produces; what
--- is new is the satisfaction beside it, and at a scripted slot that is
--- `red-data` at every value the script carries.
-red-input : ∀ {n} {Γ : Ctx n} (i : Fin n)
-          → Red {Γ = Γ} (obs (lookup Γ i)) (input i)
-red-input {Γ = Γ} i {lo = lo} κ id now sched st with toℕ i <? lo
-... | no  ¬below = _ , subs-floor (≮⇒≥ ¬below) , (tt ∷ tt ∷ tt ∷ []) ∷ []
-... | yes below  with Sched.slots sched i in slEq
-...   | scripted {ok = ok} (hot async)
-        with memberSource (toℕ i) (EvalSt.completedSources st) in doneEq
-...     | true  = _ , subs-hot-done below slEq doneEq , (tt ∷ tt ∷ tt ∷ []) ∷ []
-...     | false = _ , subs-hot-live below slEq doneEq , (tt ∷ []) ∷ []
-red-input {Γ = Γ} i {lo = lo} κ id now sched st
-    | yes below | scripted {ok = ok} (cold sync []) =
-      _ , subs-cold-sync below slEq refl
-        , satOneShot id sched (redDatas _ ok sync)
-red-input {Γ = Γ} i {lo = lo} κ id now sched st
-    | yes below | scripted {ok = ok} (cold sync (d ∷ ds)) =
-      _ , subs-cold-async below slEq refl refl
-        , (tt ∷ satValues (redDatas _ ok sync)) ∷ []
-red-input {Γ = Γ} i {lo = lo} κ id now sched st
-    | yes below | shared d {ok = ok} =
-      red-input-shared i d κ below id now sched slEq st
 
 -- AND A FRAME OWES IT WHEREVER IT APPLIES ONE, WHICH IS TWO OF THE
 -- FIVE.  The mapping frame applies its function to what arrived; the
@@ -683,47 +616,72 @@ redLookup : ∀ {n} {Γ : Ctx n} {Θ t} (σ : All (Val Γ) Θ) → RedEnv σ
 redLookup (v ∷ vs) (p , ps) (here refl) = p
 redLookup (v ∷ vs) (p , ps) (there x)   = redLookup vs ps x
 
+-- THE CEILING IS A MEASURE COMPONENT, NOT A HYPOTHESIS.  The walk
+-- carries a stratum `k` with the guard `T (inputsBelowᵉ k b)` and an
+-- `Acc` on it, ordered ABOVE the g-size accessibility.  A term step
+-- holds the ceiling and shrinks the size; the SHARED-SLOT step drops
+-- the ceiling to the slot's own index -- which its `ok` field licenses
+-- -- and lets the size go free.  That is what funds the descent into a
+-- definition drawn from the slot table rather than from the term, and
+-- an input's g-size being zero is why nothing smaller could.  Nothing
+-- of it reaches `reducible`, which instantiates the ceiling at the
+-- context's own size out of `ib-topᵉ`.
 mutual
   redExpAcc : ∀ {n} {Γ : Ctx n} {Θ t} (b : Exp Γ [] [] Θ t)
               (σ : All (Val Γ) Θ) → RedEnv σ
+            → (k : ℕ) → T (inputsBelowᵉ k b) → Acc _<_ k
             → Acc _<_ (gsizeᵉ b) → Red {Γ = Γ} (obs t) (subΘExp [] σ b)
-  redExpAcc (input i) σ rσ a κ id now sched st = red-input i κ id now sched st
-  redExpAcc (ofᵉ ts) σ rσ (acc rs) κ id now sched st =
-    _ , subs-of refl , satOneShot id sched (redTmsAcc ts σ rσ (rs ≤-refl))
-  redExpAcc emptyᵉ σ rσ a κ id now sched st =
+  redExpAcc (input i) σ rσ k ok aK a κ id now sched st =
+    red-input i k ok aK κ id now sched st
+  redExpAcc (ofᵉ ts) σ rσ k ok aK (acc rs) κ id now sched st =
+    _ , subs-of refl
+      , satOneShot id sched (redTmsAcc ts σ rσ k ok aK (rs ≤-refl))
+  redExpAcc emptyᵉ σ rσ k ok aK a κ id now sched st =
     _ , subs-empty refl , satOneShot id sched []
-  redExpAcc (mapᵉ {s = s} f b) σ rσ (acc rs) κ id now sched st =
+  redExpAcc (mapᵉ {s = s} f b) σ rσ k ok aK (acc rs) κ id now sched st =
     let fn = subΘTm (s ∷ []) σ f
+        okf = ∧ˡ (inputsBelowᵗ k f) (inputsBelowᵉ k b) ok
+        okb = ∧ʳ (inputsBelowᵗ k f) (inputsBelowᵉ k b) ok
         ((burst , sched₁ , st₁) , d , sat) =
-          redExpAcc b σ rσ (rs (s≤s (m≤n+m (gsizeᵉ b) (gsizeᵗ f))))
+          redExpAcc b σ rσ k okb aK
+            (rs (s≤s (m≤n+m (gsizeᵉ b) (gsizeᵗ f))))
             (map-f fn ↠ κ) id now sched st
         (r , p , sat′) =
           red-push id now (map-f fn) tt
-            (redFnAcc f σ rσ (rs (s≤s (m≤m+n (gsizeᵗ f) (gsizeᵉ b)))))
+            (redFnAcc f σ rσ k okf aK
+              (rs (s≤s (m≤m+n (gsizeᵗ f) (gsizeᵉ b)))))
             κ sat sched₁ st₁ tt
     in r , subs-map d p , sat′
-  redExpAcc (takeᵉ c b) σ rσ (acc rs) κ id now sched st
+  redExpAcc (takeᵉ c b) σ rσ k ok aK (acc rs) κ id now sched st
     with evalTm (subΘTm [] σ c) in ceq
   ... | zero  = _ , subs-take-zero ceq refl , satOneShot id sched []
-  ... | suc k =
+  ... | suc j =
     let nid = Sched.nextNode sched
+        okb = ∧ʳ (inputsBelowᵗ k c) (inputsBelowᵉ k b) ok
         ((burst , sched₂ , st₁) , d , sat) =
-          redExpAcc b σ rσ (rs (s≤s (m≤n+m (gsizeᵉ b) (gsizeᵗ c))))
+          redExpAcc b σ rσ k okb aK
+            (rs (s≤s (m≤n+m (gsizeᵉ b) (gsizeᵗ c))))
             (take-f nid ↠ κ) id now
             (record sched { nextNode = suc nid })
-            (installNode nid (take-st (suc k)) st)
+            (installNode nid (take-st (suc j)) st)
         (r , p , sat′) = red-push id now (take-f nid) tt tt κ sat sched₂ st₁ tt
     in r , subs-take-suc ceq refl d p , sat′
-  redExpAcc (scanᵉ {s = s} {t = u} f z b) σ rσ (acc rs) κ id now sched st =
+  redExpAcc (scanᵉ {s = s} {t = u} f z b) σ rσ k ok aK (acc rs) κ id now sched st =
     let nid = Sched.nextNode sched
         fn  = subΘTm ((u ×ᵗ s) ∷ []) σ f
-        rf  = redFnAcc f σ rσ (rs (s≤s (m≤m+n (gsizeᵗ f) (gsizeᵗ z + gsizeᵉ b))))
+        zbe = inputsBelowᵗ k z ∧ inputsBelowᵉ k b
+        okf = ∧ˡ (inputsBelowᵗ k f) zbe ok
+        rest = ∧ʳ (inputsBelowᵗ k f) zbe ok
+        okz = ∧ˡ (inputsBelowᵗ k z) (inputsBelowᵉ k b) rest
+        okb = ∧ʳ (inputsBelowᵗ k z) (inputsBelowᵉ k b) rest
+        rf  = redFnAcc f σ rσ k okf aK
+                (rs (s≤s (m≤m+n (gsizeᵗ f) (gsizeᵗ z + gsizeᵉ b))))
         rz  = subst (Red u) (sym (sub-evalTm z σ))
-                (redTmAcc z σ rσ
+                (redTmAcc z σ rσ k okz aK
                   (rs (s≤s (≤-trans (m≤m+n (gsizeᵗ z) (gsizeᵉ b))
                                     (m≤n+m (gsizeᵗ z + gsizeᵉ b) (gsizeᵗ f))))))
         ((burst , sched₂ , st₁) , d , sat) =
-          redExpAcc b σ rσ
+          redExpAcc b σ rσ k okb aK
             (rs (s≤s (≤-trans (m≤n+m (gsizeᵉ b) (gsizeᵗ z))
                               (m≤n+m (gsizeᵗ z + gsizeᵉ b) (gsizeᵗ f)))))
             (scan-f fn nid ↠ κ) id now
@@ -733,110 +691,218 @@ mutual
           red-push id now (scan-f fn nid) tt rf
             κ sat sched₂ st₁ (red-scan-installed fn nid rz sched st d)
     in r , subs-scan refl d p , sat′
-  redExpAcc (mergeAllᵉ lim b) σ rσ (acc rs) κ id now sched st =
+  redExpAcc (mergeAllᵉ lim b) σ rσ k ok aK (acc rs) κ id now sched st =
     let nid = Sched.nextNode sched
         ((burst , sched₂ , st₁) , d , sat) =
-          redExpAcc b σ rσ (rs ≤-refl) (thru-outer mergeAllᵒ nid ↠ κ) id now
+          redExpAcc b σ rσ k ok aK (rs ≤-refl)
+            (thru-outer mergeAllᵒ nid ↠ κ) id now
             (record sched { nextNode = suc nid })
             (installNode nid (mergeAll-st lim 0 [] false) st)
         (r , p , sat′) =
           red-push id now (thru-outer mergeAllᵒ nid) tt tt κ sat sched₂ st₁ tt
     in r , subs-merge-all (sub-all refl d p) , sat′
-  redExpAcc (switchAllᵉ b) σ rσ (acc rs) κ id now sched st =
+  redExpAcc (switchAllᵉ b) σ rσ k ok aK (acc rs) κ id now sched st =
     let nid = Sched.nextNode sched
         ((burst , sched₂ , st₁) , d , sat) =
-          redExpAcc b σ rσ (rs ≤-refl) (thru-outer switchᵒ nid ↠ κ) id now
+          redExpAcc b σ rσ k ok aK (rs ≤-refl)
+            (thru-outer switchᵒ nid ↠ κ) id now
             (record sched { nextNode = suc nid })
             (installNode nid (switch-st nothing false) st)
         (r , p , sat′) =
           red-push id now (thru-outer switchᵒ nid) tt tt κ sat sched₂ st₁ tt
     in r , subs-switch-all (sub-all refl d p) , sat′
-  redExpAcc (exhaustAllᵉ b) σ rσ (acc rs) κ id now sched st =
+  redExpAcc (exhaustAllᵉ b) σ rσ k ok aK (acc rs) κ id now sched st =
     let nid = Sched.nextNode sched
         ((burst , sched₂ , st₁) , d , sat) =
-          redExpAcc b σ rσ (rs ≤-refl) (thru-outer exhaustᵒ nid ↠ κ) id now
+          redExpAcc b σ rσ k ok aK (rs ≤-refl)
+            (thru-outer exhaustᵒ nid ↠ κ) id now
             (record sched { nextNode = suc nid })
             (installNode nid (exhaust-st false false) st)
         (r , p , sat′) =
           red-push id now (thru-outer exhaustᵒ nid) tt tt κ sat sched₂ st₁ tt
     in r , subs-exhaust-all (sub-all refl d p) , sat′
-  redExpAcc (μᵉ body) σ rσ (acc rs) κ id now sched st =
+  redExpAcc (μᵉ body) σ rσ k ok aK (acc rs) κ id now sched st =
     let ih = subst (Red (obs _)) (sub-unfoldμ body σ)
-               (redExpAcc (unfoldμ body) σ rσ
+               (redExpAcc (unfoldμ body) σ rσ k (ib-unfoldμ k body ok) aK
                  (rs (subst (_< suc (gsizeᵉ body))
                             (sym (gsize-unfoldμ body)) ≤-refl)))
         (r , d , sat) = ih κ id now sched st
     in r , subs-μ d , sat
-  redExpAcc (varᵉ ()) σ rσ a
-  redExpAcc (deferᵉ body) σ rσ a κ id now sched st =
+  redExpAcc (varᵉ ()) σ rσ k ok aK a
+  redExpAcc (deferᵉ body) σ rσ k ok aK a κ id now sched st =
     _ , subs-defer refl refl refl , (tt ∷ []) ∷ []
+
+  -- THE SLOT ARM, WHICH IS FIVE SUB-ARMS OF PROTOCOL AND ONE THAT
+  -- SPENDS THE CEILING.  It mirrors the builder's own case split on
+  -- the slot exactly, because the derivation it must produce is the
+  -- one the builder produces; what is new is the satisfaction beside
+  -- it, and at a scripted slot that is `red-data` at every value the
+  -- script carries.  The ceiling's accessibility is taken apart here
+  -- rather than passed on, since `toℕ i < k` is exactly what the
+  -- expression face's guard reduces to at this former.
+  red-input : ∀ {n} {Γ : Ctx n} (i : Fin n) (k : ℕ) → T (toℕ i <ᵇ k)
+            → Acc _<_ k → Red {Γ = Γ} (obs (lookup Γ i)) (input i)
+  red-input {Γ = Γ} i k ok (acc rsK) {lo = lo} κ id now sched st
+      with toℕ i <? lo
+  ... | no  ¬below = _ , subs-floor (≮⇒≥ ¬below) , (tt ∷ tt ∷ tt ∷ []) ∷ []
+  ... | yes below  with Sched.slots sched i in slEq
+  ...   | scripted {ok = okD} (hot async)
+          with memberSource (toℕ i) (EvalSt.completedSources st) in doneEq
+  ...     | true  = _ , subs-hot-done below slEq doneEq , (tt ∷ tt ∷ tt ∷ []) ∷ []
+  ...     | false = _ , subs-hot-live below slEq doneEq , (tt ∷ []) ∷ []
+  red-input {Γ = Γ} i k ok (acc rsK) {lo = lo} κ id now sched st
+      | yes below | scripted {ok = okD} (cold sync []) =
+        _ , subs-cold-sync below slEq refl
+          , satOneShot id sched (redDatas _ okD sync)
+  red-input {Γ = Γ} i k ok (acc rsK) {lo = lo} κ id now sched st
+      | yes below | scripted {ok = okD} (cold sync (v ∷ vs)) =
+        _ , subs-cold-async below slEq refl refl
+          , (tt ∷ satValues (redDatas _ okD sync)) ∷ []
+  red-input {Γ = Γ} i k ok (acc rsK) {lo = lo} κ id now sched st
+      | yes below | shared d {ok = okd} =
+        red-input-shared i d (rsK (<ᵇ⇒< (toℕ i) k ok))
+          κ below id now sched slEq st
+
+  -- THE SIXTH SLOT SUB-ARM, WHICH IS THE ONE THE OTHER FIVE ARE NOT.
+  -- A share's definition is an arbitrary term standing in no relation
+  -- to `input i`, so it cannot be reached by any descent on the TERM.
+  -- The telescope's own side condition is what reaches it instead: a
+  -- slot's definition may reference only inputs STRICTLY BELOW that
+  -- slot, so the definition is charged against the ceiling `toℕ i`,
+  -- which the caller's accessibility has just been taken apart to
+  -- supply.  The other five sub-arms emit protocol and values that are
+  -- DATA by the slot's own side condition, so `red-data` closes their
+  -- satisfaction outright; this one's values are the definition's,
+  -- which is what the recursion returns, retagged by the fan-out.
+  red-input-shared : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo}
+      (i : Fin n) (d : Closed Γ (lookup Γ i))
+      {okd : T (inputsBelowᵉ (toℕ i) d)}
+    → Acc _<_ (toℕ i)
+    → (κ : Path Γ lo (lookup Γ i) t) (below : toℕ i < lo)
+      (id : Id) (now : Tick) (sched : Sched Γ)
+    → Sched.slots sched i ≡ shared d {ok = okd}
+    → (st : EvalSt e)
+    → Σ (Stream Γ (lookup Γ i) × Sched Γ × EvalSt e) λ r →
+        subscribeE⇓ {e = e} (input i) κ id now sched st r
+          × StreamSat (Red (lookup Γ i)) (proj₁ r)
+  red-input-shared {Γ = Γ} i d {okd} aI κ below id now sched slEq st
+      with memberSource (toℕ i) (EvalSt.completedSources st) in doneEq
+  ... | true =
+        _ , subs-shared {κ = κ} {below = below} slEq
+              (slot-spent {κ = κ} {below = below} doneEq)
+          , StreamSat-spent (toℕ i) id
+  ... | false
+        with memberSource (toℕ i) (EvalSt.connectedShares st) in connEq
+  ...   | true =
+          _ , subs-shared {κ = κ} {below = below} slEq
+                (slot-join {κ = κ} {below = below} doneEq connEq)
+            , (tt ∷ []) ∷ []
+  ...   | false
+          with subst (Red (obs (lookup Γ i))) (subΘ-idExp d)
+                 (redExpAcc d [] tt (toℕ i) okd aI
+                   (<-wellFounded (gsizeᵉ d)))
+                 (share-sink i ≤-refl) id now sched
+                 (register (atSlot i) (lowerFloor below κ)
+                   (record st
+                     { connectedShares = toℕ i ∷ EvalSt.connectedShares st }))
+  ...     | ((burst , sched₁ , st₂) , dv , dsat)
+            with burstCompleted burst in compEq
+  ...       | false =
+              _ , subs-shared {κ = κ} {below = below} slEq
+                    (slot-connect doneEq connEq
+                      (connect-live {κ = κ} {below = below} dv compEq))
+                , (tt ∷ []) ∷ StreamSat-plumb burst dsat
+  ...       | true =
+              _ , subs-shared {κ = κ} {below = below} slEq
+                    (slot-connect doneEq connEq
+                      (connect-died {κ = κ} {below = below} dv compEq))
+                , (tt ∷ tt ∷ []) ∷ StreamSat-plumb burst dsat
 
   -- THE FUNDAMENTAL THEOREM AT TERMS, which is where the embedding
   -- former hands the recursion back to the expression face.
   redTmAcc : ∀ {n} {Γ : Ctx n} {Θ u} (tm : Tm Γ [] [] Θ u)
              (σ : All (Val Γ) Θ) → RedEnv σ
+           → (k : ℕ) → T (inputsBelowᵗ k tm) → Acc _<_ k
            → Acc _<_ (gsizeᵗ tm) → Red u (evalWith tm σ)
-  redTmAcc (varᵗ x) σ rσ a = redLookup σ rσ x
-  redTmAcc unit̂     σ rσ a = tt
-  redTmAcc (bool̂ b) σ rσ a = tt
-  redTmAcc (nat̂ k)  σ rσ a = tt
-  redTmAcc (pairᵗ x y) σ rσ (acc rs) =
-      redTmAcc x σ rσ (rs (s≤s (m≤m+n (gsizeᵗ x) (gsizeᵗ y))))
-    , redTmAcc y σ rσ (rs (s≤s (m≤n+m (gsizeᵗ y) (gsizeᵗ x))))
-  redTmAcc (fstᵗ q) σ rσ (acc rs) = proj₁ (redTmAcc q σ rσ (rs ≤-refl))
-  redTmAcc (sndᵗ q) σ rσ (acc rs) = proj₂ (redTmAcc q σ rσ (rs ≤-refl))
-  redTmAcc (inlᵗ x) σ rσ (acc rs) = redTmAcc x σ rσ (rs ≤-refl)
-  redTmAcc (inrᵗ x) σ rσ (acc rs) = redTmAcc x σ rσ (rs ≤-refl)
-  redTmAcc (caseᵗ sc l r) σ rσ (acc rs)
+  redTmAcc (varᵗ x) σ rσ k ok aK a = redLookup σ rσ x
+  redTmAcc unit̂     σ rσ k ok aK a = tt
+  redTmAcc (bool̂ b) σ rσ k ok aK a = tt
+  redTmAcc (nat̂ j)  σ rσ k ok aK a = tt
+  redTmAcc (pairᵗ x y) σ rσ k ok aK (acc rs) =
+      redTmAcc x σ rσ k (∧ˡ (inputsBelowᵗ k x) (inputsBelowᵗ k y) ok) aK
+        (rs (s≤s (m≤m+n (gsizeᵗ x) (gsizeᵗ y))))
+    , redTmAcc y σ rσ k (∧ʳ (inputsBelowᵗ k x) (inputsBelowᵗ k y) ok) aK
+        (rs (s≤s (m≤n+m (gsizeᵗ y) (gsizeᵗ x))))
+  redTmAcc (fstᵗ q) σ rσ k ok aK (acc rs) =
+    proj₁ (redTmAcc q σ rσ k ok aK (rs ≤-refl))
+  redTmAcc (sndᵗ q) σ rσ k ok aK (acc rs) =
+    proj₂ (redTmAcc q σ rσ k ok aK (rs ≤-refl))
+  redTmAcc (inlᵗ x) σ rσ k ok aK (acc rs) = redTmAcc x σ rσ k ok aK (rs ≤-refl)
+  redTmAcc (inrᵗ x) σ rσ k ok aK (acc rs) = redTmAcc x σ rσ k ok aK (rs ≤-refl)
+  redTmAcc (caseᵗ sc l r) σ rσ k ok aK (acc rs)
+    with ∧ˡ (inputsBelowᵗ k sc) (inputsBelowᵗ k l ∧ inputsBelowᵗ k r) ok
+       | ∧ʳ (inputsBelowᵗ k sc) (inputsBelowᵗ k l ∧ inputsBelowᵗ k r) ok
+  ... | oksc | rest
     with evalWith sc σ
-       | redTmAcc sc σ rσ (rs (s≤s (m≤m+n (gsizeᵗ sc) (gsizeᵗ l + gsizeᵗ r))))
+       | redTmAcc sc σ rσ k oksc aK
+           (rs (s≤s (m≤m+n (gsizeᵗ sc) (gsizeᵗ l + gsizeᵗ r))))
   ... | inj₁ x | q =
-    redTmAcc l (x ∷ σ) (q , rσ)
+    redTmAcc l (x ∷ σ) (q , rσ) k
+      (∧ˡ (inputsBelowᵗ k l) (inputsBelowᵗ k r) rest) aK
       (rs (s≤s (≤-trans (m≤m+n (gsizeᵗ l) (gsizeᵗ r))
                         (m≤n+m (gsizeᵗ l + gsizeᵗ r) (gsizeᵗ sc)))))
   ... | inj₂ y | q =
-    redTmAcc r (y ∷ σ) (q , rσ)
+    redTmAcc r (y ∷ σ) (q , rσ) k
+      (∧ʳ (inputsBelowᵗ k l) (inputsBelowᵗ k r) rest) aK
       (rs (s≤s (≤-trans (m≤n+m (gsizeᵗ r) (gsizeᵗ l))
                         (m≤n+m (gsizeᵗ l + gsizeᵗ r) (gsizeᵗ sc)))))
-  redTmAcc (ifᵗ c x y) σ rσ (acc rs) with evalWith c σ
+  redTmAcc (ifᵗ c x y) σ rσ k ok aK (acc rs)
+    with ∧ʳ (inputsBelowᵗ k c) (inputsBelowᵗ k x ∧ inputsBelowᵗ k y) ok
+  ... | rest with evalWith c σ
   ... | true  =
-    redTmAcc x σ rσ
+    redTmAcc x σ rσ k (∧ˡ (inputsBelowᵗ k x) (inputsBelowᵗ k y) rest) aK
       (rs (s≤s (≤-trans (m≤m+n (gsizeᵗ x) (gsizeᵗ y))
                         (m≤n+m (gsizeᵗ x + gsizeᵗ y) (gsizeᵗ c)))))
   ... | false =
-    redTmAcc y σ rσ
+    redTmAcc y σ rσ k (∧ʳ (inputsBelowᵗ k x) (inputsBelowᵗ k y) rest) aK
       (rs (s≤s (≤-trans (m≤n+m (gsizeᵗ y) (gsizeᵗ x))
                         (m≤n+m (gsizeᵗ x + gsizeᵗ y) (gsizeᵗ c)))))
-  redTmAcc (primᵗ add x) σ rσ a  = tt
-  redTmAcc (primᵗ sub x) σ rσ a  = tt
-  redTmAcc (primᵗ mul x) σ rσ a  = tt
-  redTmAcc (primᵗ eqᵖ x) σ rσ a  = tt
-  redTmAcc (primᵗ ltᵖ x) σ rσ a  = tt
-  redTmAcc (primᵗ notᵖ x) σ rσ a = tt
-  redTmAcc (strmᵗ e) []       rσ (acc rs) =
-    subst (Red (obs _)) (subΘ-idExp e) (redExpAcc e [] tt (rs ≤-refl))
-  redTmAcc (strmᵗ e) (v ∷ vs) rσ (acc rs) = redExpAcc e (v ∷ vs) rσ (rs ≤-refl)
+  redTmAcc (primᵗ add x) σ rσ k ok aK a  = tt
+  redTmAcc (primᵗ sub x) σ rσ k ok aK a  = tt
+  redTmAcc (primᵗ mul x) σ rσ k ok aK a  = tt
+  redTmAcc (primᵗ eqᵖ x) σ rσ k ok aK a  = tt
+  redTmAcc (primᵗ ltᵖ x) σ rσ k ok aK a  = tt
+  redTmAcc (primᵗ notᵖ x) σ rσ k ok aK a = tt
+  redTmAcc (strmᵗ e) []       rσ k ok aK (acc rs) =
+    subst (Red (obs _)) (subΘ-idExp e) (redExpAcc e [] tt k ok aK (rs ≤-refl))
+  redTmAcc (strmᵗ e) (v ∷ vs) rσ k ok aK (acc rs) =
+    redExpAcc e (v ∷ vs) rσ k ok aK (rs ≤-refl)
 
   redTmsAcc : ∀ {n} {Γ : Ctx n} {Θ u} (ts : List (Tm Γ [] [] Θ u))
               (σ : All (Val Γ) Θ) → RedEnv σ
+            → (k : ℕ) → T (inputsBelowᵗˢ k ts) → Acc _<_ k
             → Acc _<_ (gsizeᵗˢ ts)
             → All (Red u) (map (λ tm → evalTm tm) (subΘTms [] σ ts))
-  redTmsAcc []       σ rσ a = []
-  redTmsAcc (x ∷ xs) σ rσ (acc rs) =
+  redTmsAcc []       σ rσ k ok aK a = []
+  redTmsAcc (x ∷ xs) σ rσ k ok aK (acc rs) =
       subst (Red _) (sym (sub-evalTm x σ))
-        (redTmAcc x σ rσ (rs (s≤s (m≤m+n (gsizeᵗ x) (gsizeᵗˢ xs)))))
-    ∷ redTmsAcc xs σ rσ (rs (s≤s (m≤n+m (gsizeᵗˢ xs) (gsizeᵗ x))))
+        (redTmAcc x σ rσ k (∧ˡ (inputsBelowᵗ k x) (inputsBelowᵗˢ k xs) ok) aK
+          (rs (s≤s (m≤m+n (gsizeᵗ x) (gsizeᵗˢ xs)))))
+    ∷ redTmsAcc xs σ rσ k (∧ʳ (inputsBelowᵗ k x) (inputsBelowᵗˢ k xs) ok) aK
+        (rs (s≤s (m≤n+m (gsizeᵗˢ xs) (gsizeᵗ x))))
 
   -- A FRAME'S FUNCTION, CLOSED AGAINST THE AMBIENT ENVIRONMENT AND
   -- THEN APPLIED, is the term face at one more entry.
   redFnAcc : ∀ {n} {Γ : Ctx n} {Θ s u} (f : Fn Γ [] [] Θ s u)
              (σ : All (Val Γ) Θ) → RedEnv σ
+           → (k : ℕ) → T (inputsBelowᵗ k f) → Acc _<_ k
            → Acc _<_ (gsizeᵗ f) → RedFn (subΘTm (s ∷ []) σ f)
-  redFnAcc {s = s} f σ rσ a {v} p =
-    subst (Red _) (sym (sub-applyFn f σ v)) (redTmAcc f (v ∷ σ) (p , rσ) a)
+  redFnAcc {s = s} f σ rσ k ok aK a {v} p =
+    subst (Red _) (sym (sub-applyFn f σ v)) (redTmAcc f (v ∷ σ) (p , rσ) k ok aK a)
 
 -- THE TOP LINE: every closed expression is reducible, which is the
 -- face above at the empty environment, where closing is the identity.
 reducible : ∀ {n} {Γ : Ctx n} {t} (b : Closed Γ t) → Red {Γ = Γ} (obs t) b
 reducible b =
-  subst (Red (obs _)) (subΘ-idExp b) (redExpAcc b [] tt (<-wellFounded (gsizeᵉ b)))
+  subst (Red (obs _)) (subΘ-idExp b)
+    (redExpAcc b [] tt _ (ib-topᵉ b) (<-wellFounded _) (<-wellFounded (gsizeᵉ b)))

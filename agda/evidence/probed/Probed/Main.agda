@@ -54,8 +54,8 @@ open import Probed.Apparatus using (Confirms; Separates)
 -- and claimed here rather than pinned anonymously: a `Confirms` row's
 -- type is generated from its target, so the name is the only handle the
 -- reachability law has on it.
-open import Probed.Reducible-Arms using (row-share-spent; row-share-join;
-  row-live-merge; row-live-queue; row-live-switch; row-live-exhaust)
+open import Probed.Reducible-Arms using
+  (row-live-merge; row-live-queue; row-live-switch; row-live-exhaust)
 
 -- THE FOUR SUBSTITUTION LEAVES THE CARRIED ENVIRONMENT COSTS.  Claimed
 -- from the root for the same reason the arms are: a `Confirms` row's
