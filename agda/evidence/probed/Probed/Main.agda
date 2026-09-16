@@ -50,14 +50,6 @@ module Probed.Main where
 -- both belong to the tree and a tree with nothing open still owes them.
 open import Probed.Apparatus using (Confirms; Separates)
 
--- THE REMAINING LEAVES OF THE REDUCIBILITY BODY.  Every row is NAMED
--- and claimed here rather than pinned anonymously: a `Confirms` row's
--- type is generated from its target, so the name is the only handle the
--- reachability law has on it.
-open import Probed.Reducible-Arms using
-  (row-live-merge; row-live-queue; row-live-switch; row-live-exhaust;
-   row-live-burst)
-
 -- THE TOP-LINE CLAIMS.  Named and claimed from the root for the same
 -- reason: a `Confirms` row's type is generated from its target, so the
 -- name is the only handle the reachability law has on it.

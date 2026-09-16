@@ -48,8 +48,9 @@ open import Data.Unit using (⊤; tt)
 open import Data.Vec using (lookup)
 open import Induction.WellFounded using (Acc; acc)
 open import Relation.Nullary using (yes; no)
+open import Relation.Nullary.Decidable using (⌊_⌋)
 
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 
 open import Rx.Prim using (Id; Tick; Source; InstEmit; InstEvent; init; value; close; handoff;
   complete; hot; cold)
@@ -68,15 +69,18 @@ open import Decide using (∧ˡ; ∧ʳ)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; _↠_; map-f; take-f; scan-f; take-st; scan-st; thru-outer;
   mergeAllᵒ; switchᵒ; exhaustᵒ; mergeAll-st; switch-st; exhaust-st; takeVals; takeDispatch;
   scanVals; scanDispatch; lookupNode; NodeState; installNode; oneShotBurst; memberSource;
-  splitEvents; retagEvents; NodeId; AllOp; from-inner;
-  share-sink; register; atSlot; lowerFloor; burstCompleted; sharedPlumb; spentBurst)
+  splitEvents; splitBurst; retagEvents; NodeId; AllOp; from-inner; consumeUsable; hasRoom;
+  switchKill; thruWrap; share-sink; register; atSlot; lowerFloor; burstCompleted; sharedPlumb;
+  spentBurst)
 open import Rx.Evaluator.Freshness using (lookup-set; PreservedBelow)
 open import Rx.Evaluator.Freshness.Preserve using (subscribeE-preserves)
-open import Rx.Evaluator.Domain using (srcFrame; subscribeE⇓; pushBurst⇓; stepFrame⇓; step-map; step-scan; step-take; push-nil; push-cons; subs-of;
-  subs-empty; subs-map; subs-take-zero; subs-take-suc; subs-scan; subs-defer;
-  subs-floor; subs-hot-done; subs-hot-live; subs-cold-sync; subs-cold-async;
-  subs-μ; sub-all; subs-merge-all; subs-switch-all; subs-exhaust-all;
-  subs-shared; slot-spent; slot-join; slot-connect; connect-live; connect-died)
+open import Rx.Evaluator.Domain using (srcFrame; subscribeE⇓; pushBurst⇓; stepFrame⇓; step-map; step-scan; step-take; push-nil;
+  push-cons; subs-of; subs-empty; subs-map; subs-take-zero; subs-take-suc; subs-scan;
+  subs-defer; subs-floor; subs-hot-done; subs-hot-live; subs-cold-sync; subs-cold-async;
+  subs-μ; sub-all; subs-merge-all; subs-switch-all; subs-exhaust-all; thruConsume⇓; thruWalk⇓;
+  step-thru-outer; inner; consume-all-sub; consume-all-enqueue; consume-all-nil;
+  consume-switch-sub; consume-switch-nil; consume-exhaust-sub; consume-exhaust-nil; walk-nil;
+  walk-cons; subs-shared; slot-spent; slot-join; slot-connect; connect-live; connect-died)
 
 -- An emitted EVENT carries a payload only in the `value` arm; every
 -- other arm is protocol traffic and constrains nothing.
@@ -238,56 +242,204 @@ sub-unfoldμ : ∀ {n} {Γ : Ctx n} {Θ t} (body : Exp Γ (t ∷ []) [] Θ t)
             → subΘExp [] σ (unfoldμ body) ≡ unfoldμ (subΘExp [] σ body)
 sub-unfoldμ body σ = sub-elimGᵉ [] (here refl) (μᵉ body) σ body
 
-postulate
-  -- THE FLATTENING WALK, and the one leaf here with rows against it.
-  -- Every value it produces is an inner subscribed out of the arriving
-  -- batch, and the census at `NodeState` says the nodes it consults
-  -- carry no payload to confuse that.  The consume fallback carries
-  -- the side condition that says the node is not usable, so an
-  -- arriving observable at a real node has to be taken rather than
-  -- dropped.
-  --
-  -- AND THE QUEUE IT PUSHES INTO IS WRITE-ONLY FROM HERE, WHICH IS
-  -- WHY NO STORE INVARIANT IS OWED AT ALL.  A refused arrival is
-  -- enqueued and never read back within a subscribe: the read is the
-  -- DRAIN, which hangs off an inner's completion, and `srcFrame` says
-  -- in a type that a push cycle is entered only from a source former.
-  -- So the entry a subscribe stores is one this face can put in and
-  -- never has to take out, and the carrier the census left owed is
-  -- owed to the instant loop instead.
-  --
-  -- AND THIS STATEMENT IS THE GATE ON THE WHOLE EVIDENCE GRAPH, WHICH
-  -- IS A COST NOTHING ABOUT ITS OWN DIFFICULTY PREDICTS.  `evaluate↓`
-  -- reaches here through `evaluate!`, so a run of ANY program
-  -- containing a flattener gets stuck with this name in its normal
-  -- form -- measured directly, the stuck term naming this postulate
-  -- and the operator beside it.  Nothing downstream can then be
-  -- instantiated at such a program: every claim read off a run of one
-  -- is unprobeable by `refl` until this lands, which is most of the
-  -- top-line semantic ledger and the well-formedness leaf's whole
-  -- `*All` coverage gap.  Discharging it is not merely a row of the
-  -- ledger; it is what unblocks the evidence for the rest.
-  --
-  -- PROBED: `Probed.Reducible-Arms` at each of the three operators,
-  --   with the arriving batch carrying a real observable: mergeAll
-  --   subscribing it, mergeAll REFUSING it at a zero concurrency limit
-  --   and queueing instead, switch killing and subscribing, exhaust
-  --   subscribing with nothing active.  The inner's own subscription
-  --   derivation is what comes back, so the candidate is SPENT at
-  --   these rows rather than carried.  A two-value burst at a full
-  --   limit walks both entries, the second deciding against the queue
-  --   the first one wrote, so the walk's state THREADING is reached
-  --   and so is a node holding a queue entry.  Not reached: a switch
-  --   whose current inner is running or an exhaust already active,
-  --   both of which want an inner outliving its own subscribe frame;
-  --   and a subscribe and a refusal within ONE walk, which at a
-  --   positive limit the same fact rules out.
-  red-thru : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
-             (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
-             (κ : Path Γ lo u t)
-             {vals : List (Val Γ (obs u))} → All (Red (obs u)) vals → (fin : Bool)
-             (sched : Sched Γ) (st : EvalSt e)
-           → RedStep {e = e} id now (thru-outer op nid) κ vals fin sched st
+-- A SPLIT TAKES THE VALUE COLUMN OUT OF A BURST, and nothing else,
+-- so whatever held of every value the burst carried holds of every
+-- value the split hands back.  The other four event formers carry no
+-- payload, so their satisfaction is decided by the former alone and
+-- they simply leave the column.
+satSplitEvents : ∀ {n} {Γ : Ctx n} {u} {A : Set} {P : Val Γ u → Set}
+                 (es : List (InstEvent (Val Γ u))) → All (EvSat P) es
+               → All P (proj₁ (splitEvents {A = A} es))
+satSplitEvents []                []       = []
+satSplitEvents (init _     ∷ es) (_ ∷ ps) = satSplitEvents es ps
+satSplitEvents (value _    ∷ es) (p ∷ ps) = p ∷ satSplitEvents es ps
+satSplitEvents (close _ _  ∷ es) (_ ∷ ps) = satSplitEvents es ps
+satSplitEvents (handoff _  ∷ es) (_ ∷ ps) = satSplitEvents es ps
+satSplitEvents (complete   ∷ es) (_ ∷ ps) = satSplitEvents es ps
+
+satSplitBurst : ∀ {n} {Γ : Ctx n} {u} {A : Set} {P : Val Γ u → Set}
+                (str : Stream Γ u) → StreamSat P str
+              → All P (proj₁ (splitBurst {A = A} str))
+satSplitBurst []         []       = []
+satSplitBurst (em ∷ ems) (q ∷ qs) =
+  ++⁺ (satSplitEvents (InstEmit.events em) q) (satSplitBurst ems qs)
+
+-- AND THE WRAP AROUND THE WALK NEVER TOUCHES THAT COLUMN.  What it
+-- decides is whether the operator is finished and what its node then
+-- holds, both of which the candidate is silent about; the values pass
+-- through every arm unchanged.  Spelling the arms out is the price of
+-- the machine reading its own store: a catch-all in the definition
+-- does not reduce against a catch-all in a proof.
+thruWrap-vals : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+                (op : AllOp) (nid : NodeId) (fin : Bool)
+                {vs : List (Val Γ u)} {bs : List (InstEvent (Val Γ t))}
+                {sched′ : Sched Γ} {st′ : EvalSt e}
+              → proj₁ (thruWrap {e = e} op nid fin (vs , bs , sched′ , st′)) ≡ vs
+thruWrap-vals op nid false = refl
+thruWrap-vals mergeAllᵒ nid true {st′ = st′}
+  with lookupNode nid (EvalSt.nodes st′)
+... | nothing                    = refl
+... | just (scan-st _)           = refl
+... | just (take-st _)           = refl
+... | just (mergeAll-st _ _ _ _) = refl
+... | just (switch-st _ _)       = refl
+... | just (exhaust-st _ _)      = refl
+thruWrap-vals switchᵒ nid true {st′ = st′}
+  with lookupNode nid (EvalSt.nodes st′)
+... | nothing                    = refl
+... | just (scan-st _)           = refl
+... | just (take-st _)           = refl
+... | just (mergeAll-st _ _ _ _) = refl
+... | just (switch-st _ _)       = refl
+... | just (exhaust-st _ _)      = refl
+thruWrap-vals exhaustᵒ nid true {st′ = st′}
+  with lookupNode nid (EvalSt.nodes st′)
+... | nothing                    = refl
+... | just (scan-st _)           = refl
+... | just (take-st _)           = refl
+... | just (mergeAll-st _ _ _ _) = refl
+... | just (switch-st _ _)       = refl
+... | just (exhaust-st _ _)      = refl
+
+-- CONSUMING ONE ARRIVING OBSERVABLE, and walking a list of them, with
+-- the candidate carried across.  These are the flattener's two halves
+-- of `RedStep`, stated separately for the same reason the machine
+-- states them separately: what a consume decides is whether the
+-- observable is taken at all, and every operator answers that off the
+-- store.
+RedConsume : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
+           → AllOp → NodeId → Path Γ lo u t → Id → Tick
+           → Val Γ (obs u) → Sched Γ → EvalSt e → Set
+RedConsume {Γ = Γ} {t = t} {e = e} {u = u} op nid κ id now o sched st =
+  Σ (List (Val Γ u) × List (InstEvent (Val Γ t)) × Sched Γ × EvalSt e) λ r →
+    thruConsume⇓ {e = e} op nid κ id now o sched st r × All (Red u) (proj₁ r)
+
+RedWalk : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
+        → AllOp → NodeId → Path Γ lo u t → Id → Tick
+        → List (Val Γ (obs u)) → Sched Γ → EvalSt e → Set
+RedWalk {Γ = Γ} {t = t} {e = e} {u = u} op nid κ id now vals sched st =
+  Σ (List (Val Γ u) × List (InstEvent (Val Γ t)) × Sched Γ × EvalSt e) λ r →
+    thruWalk⇓ {e = e} op nid κ id now vals sched st r × All (Red u) (proj₁ r)
+
+-- THE HOP IS PAID FOR BY THE ARRIVING VALUE'S OWN CANDIDATE, which is
+-- what makes this a body rather than a leaf.  A subscribe arm hands
+-- the observable down at a `from-inner` frame and splits what comes
+-- back; the candidate quantifies over every schedule and every state,
+-- so the freshly-counted schedule this arm builds is one of them by
+-- construction and no invariant is threaded.  Every OTHER arm emits
+-- nothing at all -- a refused arrival is queued, an unusable store
+-- collapses -- so its column is satisfied for want of anything to
+-- hold of.
+red-consume : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
+              (op : AllOp) (nid : NodeId) (κ : Path Γ lo u t)
+              (id : Id) (now : Tick) {o : Val Γ (obs u)} → Red (obs u) o
+            → (sched : Sched Γ) (st : EvalSt e)
+            → RedConsume {e = e} op nid κ id now o sched st
+red-consume {u = u} mergeAllᵒ nid κ id now ro sched st
+  with lookupNode nid (EvalSt.nodes st) in eq
+... | nothing =
+      _ , consume-all-nil (cong (consumeUsable mergeAllᵒ u) eq) , []
+... | just (scan-st _) =
+      _ , consume-all-nil (cong (consumeUsable mergeAllᵒ u) eq) , []
+... | just (take-st _) =
+      _ , consume-all-nil (cong (consumeUsable mergeAllᵒ u) eq) , []
+... | just (switch-st _ _) =
+      _ , consume-all-nil (cong (consumeUsable mergeAllᵒ u) eq) , []
+... | just (exhaust-st _ _) =
+      _ , consume-all-nil (cong (consumeUsable mergeAllᵒ u) eq) , []
+... | just (mergeAll-st {w} lim act q od) with w ≟ᵗ u in eqw
+...   | no _ =
+        _ , consume-all-nil
+              (trans (cong (consumeUsable mergeAllᵒ u) eq) (cong ⌊_⌋ eqw)) , []
+...   | yes refl with hasRoom lim act in eqr
+...     | false = _ , consume-all-enqueue eq eqr , []
+...     | true =
+          let ((burst , _ , _) , d , ss) =
+                ro (from-inner mergeAllᵒ nid (Sched.nextNode sched) ↠ κ) id now
+                   (record sched { nextNode = suc (Sched.nextNode sched) }) st
+          in _ , consume-all-sub eq eqr (inner refl d refl)
+               , satSplitBurst burst ss
+
+red-consume {u = u} switchᵒ nid κ id now ro sched st
+  with lookupNode nid (EvalSt.nodes st) in eq
+... | nothing =
+      _ , consume-switch-nil (cong (consumeUsable switchᵒ u) eq) , []
+... | just (scan-st _) =
+      _ , consume-switch-nil (cong (consumeUsable switchᵒ u) eq) , []
+... | just (take-st _) =
+      _ , consume-switch-nil (cong (consumeUsable switchᵒ u) eq) , []
+... | just (mergeAll-st _ _ _ _) =
+      _ , consume-switch-nil (cong (consumeUsable switchᵒ u) eq) , []
+... | just (exhaust-st _ _) =
+      _ , consume-switch-nil (cong (consumeUsable switchᵒ u) eq) , []
+... | just (switch-st cur od) with switchKill cur sched st in eqk
+...   | (closes , sched₁ , st₁) =
+        let ((burst , _ , _) , d , ss) =
+              ro (from-inner switchᵒ nid (Sched.nextNode sched₁) ↠ κ) id now
+                 (record sched₁ { nextNode = suc (Sched.nextNode sched₁) }) st₁
+        in _ , consume-switch-sub eq eqk (inner refl d refl)
+             , satSplitBurst burst ss
+
+red-consume {u = u} exhaustᵒ nid κ id now ro sched st
+  with lookupNode nid (EvalSt.nodes st) in eq
+... | nothing =
+      _ , consume-exhaust-nil (cong (consumeUsable exhaustᵒ u) eq) , []
+... | just (scan-st _) =
+      _ , consume-exhaust-nil (cong (consumeUsable exhaustᵒ u) eq) , []
+... | just (take-st _) =
+      _ , consume-exhaust-nil (cong (consumeUsable exhaustᵒ u) eq) , []
+... | just (mergeAll-st _ _ _ _) =
+      _ , consume-exhaust-nil (cong (consumeUsable exhaustᵒ u) eq) , []
+... | just (switch-st _ _) =
+      _ , consume-exhaust-nil (cong (consumeUsable exhaustᵒ u) eq) , []
+... | just (exhaust-st true _) =
+      _ , consume-exhaust-nil (cong (consumeUsable exhaustᵒ u) eq) , []
+... | just (exhaust-st false od) =
+      let ((burst , _ , _) , d , ss) =
+            ro (from-inner exhaustᵒ nid (Sched.nextNode sched) ↠ κ) id now
+               (record sched { nextNode = suc (Sched.nextNode sched) }) st
+      in _ , consume-exhaust-sub eq (inner refl d refl)
+           , satSplitBurst burst ss
+
+-- THE WALK IS THE CONSUME THREADED, and the column it returns is the
+-- concatenation of the columns each arrival produced.
+red-walk : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
+           (op : AllOp) (nid : NodeId) (κ : Path Γ lo u t)
+           (id : Id) (now : Tick) {vals : List (Val Γ (obs u))}
+         → All (Red (obs u)) vals
+         → (sched : Sched Γ) (st : EvalSt e)
+         → RedWalk {e = e} op nid κ id now vals sched st
+red-walk op nid κ id now []       sched st = _ , walk-nil , []
+red-walk op nid κ id now (r ∷ rs) sched st =
+  let ((_ , _ , sched₁ , st₁) , c , rv) = red-consume op nid κ id now r sched st
+      (_ , w , rv′) = red-walk op nid κ id now rs sched₁ st₁
+  in _ , walk-cons c w , ++⁺ rv rv′
+
+-- THE FLATTENING WALK, AND THE NODE IT READS OWES NOTHING.  Every
+-- value it produces is an inner subscribed out of the arriving batch,
+-- and the census at `NodeState` says the nodes it consults carry no
+-- payload to confuse that -- so this frame's node obligation is the
+-- trivial one and the whole content is the value column.
+--
+-- AND THE QUEUE IT PUSHES INTO IS WRITE-ONLY FROM HERE, WHICH IS WHY
+-- NO STORE INVARIANT IS OWED AT ALL.  A refused arrival is enqueued
+-- and never read back within a subscribe: the read is the DRAIN,
+-- which hangs off an inner's completion, and `srcFrame` says in a
+-- type that a push cycle is entered only from a source former.  So
+-- the entry a subscribe stores is one this face can put in and never
+-- has to take out, and the carrier the census left owed is owed to
+-- the instant loop instead.
+red-thru : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
+           (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
+           (κ : Path Γ lo u t)
+           {vals : List (Val Γ (obs u))} → All (Red (obs u)) vals → (fin : Bool)
+           (sched : Sched Γ) (st : EvalSt e)
+         → RedStep {e = e} id now (thru-outer op nid) κ vals fin sched st
+red-thru id now op nid κ rv fin sched st =
+  let (_ , w , rvs) = red-walk op nid κ id now rv sched st
+  in _ , step-thru-outer w
+       , subst (All (Red _)) (sym (thruWrap-vals op nid fin)) rvs
+       , tt
 
 
 -- Every protocol event carries no payload, so a burst's values are the

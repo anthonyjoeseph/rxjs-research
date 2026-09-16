@@ -224,12 +224,13 @@ derivation, so the descent is a proof obligation rather than a reading the
 machine computes and the dry marker is unemittable — no constructor of the
 relation builds one.
 
-**AND THE TIER RETIRES ON NO POSTULATE AT ALL (Anthony).** `reducible` is a
-body recursing structurally on the term, and its remaining leaves are the arms
-with no subterm to recurse on. This tier is done when that definition stands on
-NONE of them. The shape they end up taking is free — what is not free is leaving
-one postulated, which is risk carried under every tier above rather than work
-deferred beside it.
+**AND THE TIER NOW STANDS ON NO POSTULATE, WHICH WAS ITS RETIREMENT
+CONDITION (Anthony).** `reducible` is a body recursing structurally on the
+term and every one of its leaves is discharged, so this tier's ledger is
+EMPTY. What is left of it is not proof but VERIFICATION: the candidate's
+executable face was unrunnable while any leaf stood, so nothing downstream of
+a flattener had ever been run at all, and the legs below are what that
+unblocks. The tier retires when they are spent.
 
 ### Big picture tier roadmap
 
@@ -242,24 +243,6 @@ deferred beside it.
   can carry a receipt for it and its home is the corpus — programs whose μ really
   does refer to itself, run end to end. Cheap, and the one thing that would catch
   the guard being right on paper and wrong in the code.
-
-- **THEN THE MECHANICAL SHELF, WHICH IS NOW ONE ROW.** The flattener's consume
-  fallback, where an arrival at a usable node is subscribed and the inner's own
-  derivation is what comes back. It comes last of the named legs because the
-  legs above can still change what it must be written against — a walk that
-  reaches a live inner subscribes it, and that is the site this row is stated
-  at. Grinding it before the risk above settles buys work a restatement upstream
-  would throw away, which is why the ordering is written down rather than left
-  to whatever happens to be nearest.
-
-- **THEN COLLECT THE BUG CACHE, WHOSE SUSPENSION EXPIRES WITH THE LAST LEAF.**
-  `make bug-cache` self-suspends while the reducibility body holds live
-  postulate leaves, because a corpus run through a postulated arm is a run
-  through nothing. That suspension is written to expire on its own: the day
-  the last leaf falls the runner is live again, over a corpus that has been
-  appended to throughout and never executed against this body. This leg is
-  the collection — run it, and whatever it reports is a counterexample the
-  proof above was never checked against.
 
 - **THEN WHATEVER DESIGN WORK REMAINS.** The candidate funds `Runs` and nothing
   else; the other eight `*Runs` families have no candidate and the bet is that
@@ -274,10 +257,7 @@ deferred beside it.
 
 ### The ledger
 
-- **`red-thru`** (Rx/Evaluator/Reducible) — DIFFICULTY, `PROBED`: the consume
-  fallback is pinned now, so an arrival at a usable node is subscribed and the
-  inner's own derivation is what comes back. The queue it fills is never read
-  back from here. Rows at all three operators.
+Empty — the tier stands on no postulate.
 
 ## Tier 2 — Verify-Well-Formed (parked behind tier 1)
 
