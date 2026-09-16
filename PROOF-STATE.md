@@ -182,8 +182,9 @@ the row is DIFFICULTY.
 ```
 formal-verification-batchSimultaneous    The-Proof.agda — REAL, module postulate-free
  ├─ batch-agreement                      proven
- └─ evaluate-well-formed                 Verify-Well-Formed.agda — REAL, one match
-     └─ burst-drain-well-formed          one postulate — tier 2
+ └─ evaluate-well-formed                 Verify-Well-Formed.agda — REAL, a body
+     └─ adequacy                         the run is a prefix — tier 2
+     └─ meaning-prefix-well-formed       one postulate — tier 3
 
   evaluate↓ = proj₁ ∘ evaluate!           Rx/Evaluator/Builder.agda — REAL
      └─ every value-path leaf is a body; the corpus runs; the tower descends
@@ -245,104 +246,35 @@ which is the tier's own third leg rather than a claim a cone could aim at.
   the two legs above are what say which side of the boundary each consumer
   belongs on.
 
-## Tier 2 — well-formedness, restated denotationally
-
-**THE TIER IS ONE STATEMENT, AND WHAT IS OPEN IS WHAT CARRIES IT.** `The-Proof`
-draws `evaluate-well-formed` and nothing else from here; everything down to the
-two leaves is a body, and what is open is two claims about a MACHINE's seam.
-
-**THE RESTATEMENT IS WHAT THIS TIER IS FOR (Anthony).** A well-formedness
-structural in the denotation is proven by induction on SYNTAX, one clause per
-former, in a currency with no node ids and no drain counter in it — against a
-seam argument re-establishing a relation between an automaton, a scheduler and
-an eval state at every step. The obstacle is a property rather than a
-difficulty, recorded as a dead route in the face's own header.
-
-**AND IT RUNS AHEAD OF THE DOMAIN BEING DEFINED, WHICH IS OUTSIDE-IN AND NOT AN
-INVERSION (Anthony).** A postulated `Beh` is enough to STATE a predicate and a
-descent against, and stating them is what says what the domain must supply.
-
-### The monster
-
-`burst-drain-well-formed` — the DEEPEST node here whose cone still holds the
-work that kills it. Below it are two leaves and the seam relation they are
-denominated in, each with a cone of its own vocabulary, so naming one would
-forbid its sibling; above it sits a wrapper supplying derivations. It can be
-FALSE, not merely unproven: a run the automaton rejects kills both leaves, the
-seam, and the WellFormed quantification `The-Proof` draws from here. It is also
-what the restatement replaces, so the monster moves to the descent claim in the
-commit that states one.
-
-### Big picture tier roadmap
-
-- **STATE THE PREDICATE AND THE DESCENT OVER THE POSTULATED DOMAIN.** A
-  well-formedness of a `Beh`, the claim that it hands back `WellFormed` of a run
-  at EVERY fuel, and a real body for `evaluate-well-formed` over the two.
-  Nothing here needs `denote` to compute, and the product is whether the descent
-  can be STATED at all with the cut-point strengthening carrying it — a
-  predicate that cannot reach an arbitrary fuel's stopping point is the finding,
-  and it arrives before any clause is ground and before any domain is built.
-
-- **THEN RESTATE WHAT CONSUMES WELL-FORMEDNESS, WHICH IS WHAT SAYS THE
-  PREDICATE IS THE RIGHT ONE.** `The-Proof` quantifies the batcher over
-  WellFormed streams, so the new predicate has to reach that quantification
-  rather than merely sit beside it. A predicate the batching claim cannot be
-  stated against is one nobody will ever spend, however structural it reads —
-  the same test the mirror tier applies to its own erasure.
-
-- **THEN INSTANTIATE THE CUT-POINT FACT ON THE MACHINE.** That a fuel cut lands
-  where the automaton is paid up is a claim about `evaluate↓` and nothing else,
-  so it is probeable today at the programs the corpus already carries, while
-  everything else here waits on a domain. A refutation retires the route while
-  it is still two postulates, for a reason no amount of domain work repairs.
-
-- **AND THE SEAM LEAVES STAY LIVE UNTIL THE DESCENT LANDS.** They are the route
-  that works today, and the roadmap holding two routes at once is the honest
-  state rather than an untidy one: the restatement is a bet on a compositional
-  domain nothing has built. If the bet fails they are what remains; if it lands
-  they are deleted in the commit that makes the body pass through the descent.
-
-### The ledger
-
-- **`subscribeE-root-wf`** (Verify-Well-Formed) — FALSITY, `PROBED`: the root
-  subscribe frame's burst drives the automaton to a state standing in the seam
-  relation to the evaluator's. Computable at concrete programs and
-  uninstantiated; it also owes its own base case.
-
-- **`drain-wf`** (Verify-Well-Formed) — FALSITY, `PROBED`: from any state in
-  the seam relation, the drain's emits drive the automaton to a state that is
-  paid up. Generic so its induction can re-enter itself; nothing has run a
-  drain against it.
-
-## Tier 3 — the denotation, adequacy, and the take bound
+## Tier 2 — the denotation, adequacy, and the take bound
 
 **WHAT THIS FACE BUYS: an object that is not the machine.** Every statement in
 the repo today is read off `evaluate↓`, so the machine's own bookkeeping — node
 ids, arrival ordinals, the drain counter — is visible in every answer. A
 denotation says what a PROGRAM means rather than what one run does.
 
-**AND COMPOSITIONALITY HAS A CONSUMER NOW (Anthony).** The tier under this one
-states its well-formedness over this domain while it is still postulated, so
-what arrives here is a REQUIREMENT rather than a free choice.
+**AND IT IS BELOW WELL-FORMEDNESS BECAUSE SOMETHING CONSUMES IT NOW (Anthony).**
+`evaluate-well-formed` is a body over `adequacy`, so the tier above is proven
+FROM this one and the order is checked rather than asserted here. A domain that
+cannot carry a prefix-closed predicate arrives as a type error up there.
 
 **AND THE TAKE FACE IS HERE AS THE GUINEA PIG (Anthony).** The pair is false
 without a restriction to programs that SATURATE, and `take-bounds-values` is
-the one emission bound this repo has already proven uniform in fuel. So a
-candidate restriction is tested by whether that face satisfies it and whether
-that face's machinery proves it — iterated against a worked instance rather
-than judged by how it reads.
+the one emission bound this repo states uniform in fuel. A candidate is tested
+by whether that face satisfies it and whether that face's machinery proves it.
 
 ### The monster
 
 `adequacy` — the soundness half, and the deepest node here whose cone holds the
 work that kills it: it reaches the observation of a closed program, hence
-`denote` and `observe`, and it reaches `evaluate↓`. Its
-falsity is the retroactive kind, since it is what every later restatement of a
-machine-level claim into a denotational one would be transported along.
+`denote` and `observe`, and it reaches `evaluate↓`. Its falsity is the
+retroactive kind, since it is what every later restatement of a machine-level
+claim into a denotational one would be transported along — and the tier above
+now transports one along it for real.
 
 also: `saturation` — the other half of the pair, off `adequacy`'s cone because its statement quantifies over a prefix the soundness half never mentions.
 also: `run-monotone` — a fact about the machine alone, which is why it survives every restatement of the domain and why nothing in the domain reaches it.
-also: `stepFrame-quiet`, `cascade-keeps-regs`, `chains-take-at`, `root-regs`, `take-zero-drain-silent`, `chainStep-node-mono`, `cascade-node-mono` — the take face, which is here to be measured against and shares no vocabulary with the domain.
+also: `take-bounds-values` — the take face, which is here to be measured against and shares no vocabulary with the domain.
 
 ### Big picture tier roadmap
 
@@ -354,18 +286,17 @@ also: `stepFrame-quiet`, `cascade-keeps-regs`, `chains-take-at`, `root-regs`, `t
   carries already satisfies it, so the restriction costs the corpus nothing —
   plus the machine proof that the unbounded program falsifies the unrestricted
   form, which is a refutation rather than a receipt. It is first because it
-  decides whether the domain below it is finite at all, and every later leg is
-  written against the answer.
+  decides whether the domain below it is finite at all.
 
 - **THEN RUN THE CANDIDATE AGAINST THE TAKE FACE, WHICH IS WHY IT IS IN THIS
   TIER (Anthony).** `take-bounds-values` is the one emission bound already
-  proven uniform in fuel, so it is the worked instance a restriction has to
+  stated uniform in fuel, so it is the worked instance a restriction has to
   admit — and the first question about any candidate is not whether it reads
   well but whether that face SATISFIES it and whether that face's own drain
   induction proves it does. A candidate the take face cannot discharge is
   discarded on the spot; one it discharges cheaply is a candidate whose
-  machinery already exists. Expect several rounds: the product of this leg is a
-  predicate that survived a real consumer, not the first one written down.
+  machinery already exists. Expect several rounds: the product is a predicate
+  that survived a real consumer, not the first one written down.
 
 - **DEFINE `Beh` FOR THE FIRST-ORDER FORMERS AND EARN THE EQUATIONS.**
   `ofᵉ`, `emptyᵉ`, `mapᵉ`, `takeᵉ` and `scanᵉ` denote without any of the
@@ -374,9 +305,8 @@ also: `stepFrame-quiet`, `cascade-keeps-regs`, `chains-take-at`, `root-regs`, `t
   all. The leg's product is the domain plus one equation per former, not a
   proof of adequacy — and the equations are what the tier above inducts over,
   so a former whose equation cannot be stated is a former whose well-formedness
-  clause will not be writable either. It is first because every remaining row
-  here is unprobeable until `denote` computes — a dead route recorded on the
-  domain itself, not a gap in the schedule.
+  clause will not be writable either. Every remaining row here is unprobeable
+  until `denote` computes, which is a dead route recorded on the domain itself.
 
 - **THEN FIX WHAT `observe` HANDS BACK, BECAUSE THAT IS THE BOUNDARY THE TIER
   ABOVE IS STATED ACROSS.** The protocol automaton reads an emit list and asks
@@ -385,26 +315,6 @@ also: `stepFrame-quiet`, `cascade-keeps-regs`, `chains-take-at`, `root-regs`, `t
   shape is decided by a requirement from outside this face, and it is worth a
   leg of its own rather than a clause of the one above: getting it wrong is not
   an inelegant domain, it is a tier above that cannot state its own subject.
-
-- **THEN THE FRAME ARMS AND THE GUARD, WHICH IS WHERE THE TAKE FACE COULD BE
-  FALSE.** The walk is a body bottoming out in one leaf: every frame other than
-  the take's emits no value the take node paid for. The pass-through arms are
-  silent for a reason a row can check, so what is in doubt is the handful that
-  re-enter a subscribe — PROBE those first, since an inner subscribe splicing a
-  burst into the instant would say the statement is wrong rather than unproven.
-  The guard rides with them: both accounts are conditioned on the take's node
-  sitting below the schedule's counter, and the half with content is that the
-  counter is the ONLY place a node is minted.
-
-- **THEN THE REGISTRY INVARIANT AND THE ZERO ARM.** The account is FALSE for a
-  chain that never reaches the take's frame, so it is stated over chains that
-  DO, and the drain visits a fresh state at every arrival — which makes the
-  condition a property of the registry rather than of a path, splitting into
-  the filter read-back, the base case at the root subscribe, and
-  `cascade-keeps-regs`, the half with content since an inner subscribe
-  registers chains nobody has looked at. The zero arm is separate because its
-  guard is exactly the node that arm never mints, so it wants the registry read
-  directly.
 
 - **THEN THE FORMERS THAT MAKE IT HARD: the flatteners, `μᵉ` and `deferᵉ`.**
   These are the three edges no structural reading reaches, and they are why the
@@ -417,35 +327,85 @@ also: `stepFrame-quiet`, `cascade-keeps-regs`, `chains-take-at`, `root-regs`, `t
 ### The ledger
 
 - **`run-monotone`** (Verify-Adequacy) — FALSITY, `PROBED`: more fuel only
-  extends a run. Nothing postulated in it and nothing has instantiated it; it
-  is the tier's one row a concrete program decides.
+  extends a run. Nothing postulated in it; it is the tier's one row a concrete
+  program decides.
 - **`adequacy`, `saturation`** (Verify-Adequacy) — FALSITY, `DEAD ROUTE×2`: the
   pair pinning the denotation to the machine's limit. False as stated — a
   finite `Stream` cannot bound a fixpoint that emits one envelope per unit of
   fuel; the finding and the two available repairs are in the header.
-- **`stepFrame-quiet`** (Verify-Take-Bounds) — FALSITY, `PROBED`: one frame's
-  step emits no more values than it takes out of the take node. The flattener
-  arms are where it would be false.
-- **`cascade-keeps-regs`** (Verify-Take-Bounds) — FALSITY, `PROBED`: a cascade
-  leaves every registered chain still passing the take's frame. The half of the
-  path condition with content — an inner subscribe registers chains afresh.
-- **`chains-take-at`** (Verify-Take-Bounds) — FALSITY, `PROBED`: the chains an
-  arrival selects inherit the registry's own path condition. A transport along
-  a filter, and it is FALSITY because nothing has read the filter against it.
-- **`root-regs`** (Verify-Take-Bounds) — FALSITY, `PROBED`: the root subscribe
-  registers only chains through the take's frame. The base case; one row
-  computes the registry at a real program and inhabits it by hand.
+- **`take-bounds-values`** (Verify-Take-Bounds) — FALSITY, `PROBED, RECOVERY`:
+  a program headed by `take k` emits at most k values, at every fuel. Bare, and
+  the one emission bound stated uniformly in fuel — which is what a saturation
+  restriction is measured against.
 - **`Beh`, `denote`, `observe`** (Verify-Adequacy) — VACUITY, `DEAD ROUTE×3`:
   the domain the pair above quantifies over, and what makes it vacuous. Named
   in the head rather than described, so the row can carry its own evidence
   field.
-- **`take-zero-drain-silent`** (Verify-Take-Bounds) — DIFFICULTY, `PROBED`: a
-  take at zero registers nothing, so the drain pops its arrivals and delivers
-  none of them. Two rows reach it, one at an arrival only the drain can see.
-- **`chainStep-node-mono`** (Verify-Take-Bounds) — GRINDABLE, `TWIN`: one
-  chain's walk never lowers the schedule's node counter.
-- **`cascade-node-mono`** (Verify-Take-Bounds) — GRINDABLE, `TWIN`: a cascade
-  never lowers the schedule's node counter. The guard's bookkeeping half.
+
+## Tier 3 — well-formedness, restated denotationally
+
+**THE TIER IS ONE LEAF, AND THE STATEMENT ABOVE IT IS A BODY (Anthony).**
+`The-Proof` draws `evaluate-well-formed` from here and that name is a
+definition now: it eliminates `adequacy`'s witness and hands the run to
+`meaning-prefix-well-formed`, which is the whole of the tier's debt.
+
+**THE RESTATEMENT IS WHAT THIS TIER IS FOR.** A well-formedness structural in
+the denotation is an induction on SYNTAX, one clause per former, in a currency
+with no node ids and no drain counter in it — against a seam argument
+re-establishing a relation between an automaton, a scheduler and an eval state
+at every step. The seam carve is deleted and recoverable from the face's header.
+
+**AND THE PREFIX QUANTIFICATION IS NOT A CONVENIENCE.** `WellFormed` checks the
+LAST state, so it does not travel down an adequacy conclusion; the leaf is
+stated at every prefix instead, which is what reaches an arbitrary fuel's stop.
+
+### The monster
+
+`meaning-prefix-well-formed` — the tier's only postulate and the deepest node
+it has, since the statement above it is a body that reaches it. It can be FALSE
+rather than merely unproven: a prefix of a meaning the automaton rejects kills
+the WellFormed quantification `The-Proof` draws from this face. Nothing has
+instantiated it, and nothing can until the tier below makes `denote` compute —
+which is why the first leg aims at the body's conclusion instead.
+
+### Big picture tier roadmap
+
+- **INSTANTIATE THE BODY'S CONCLUSION, WHICH IS THE ONE THING HERE THAT
+  COMPUTES.** `WellFormed (evaluate↓ fuel e ins)` reduces at a concrete
+  program, while the leaf above it is stated over `meaning` and reduces at
+  none. A refutation retires the face before any domain work is spent on it,
+  and a receipt is the cheapest thing this tier can buy. The sampling sweep
+  recorded in the body's own block was run against a Bool twin outside the
+  claim graph; rows in the probe tree are what make it evidence a checker
+  holds to account.
+
+- **THEN RESTATE WHAT CONSUMES WELL-FORMEDNESS, WHICH IS WHAT SAYS THE
+  PREDICATE IS THE RIGHT ONE.** `The-Proof` quantifies the batcher over
+  WellFormed streams, so the leaf's predicate has to reach that quantification
+  rather than merely sit beside it. A predicate the batching claim cannot be
+  stated against is one nobody will ever spend, however structural it reads —
+  the same test the mirror tier applies to its own erasure.
+
+- **THEN CUT THE LEAF INTO CLAUSES, ONCE THE DOMAIN COMPUTES.** The leaf is one
+  statement over every former; the induction it wants is one clause per former,
+  and no clause can be stated until the tier below has the equations. So this
+  leg is written against whatever those turn out to be, and its product is the
+  clause list rather than any proof — a former whose clause cannot be stated is
+  the finding, and it arrives at the domain rather than here.
+
+- **AND THE FALLBACK IS RECOVERY, NOT A SECOND LIVE ROUTE.** The seam carve is
+  in git with a pointer in the face's own header, so a restatement that fails
+  costs a `git show` rather than a rediscovery — which is what makes deleting it
+  cheaper than carrying it. Carrying it was the expensive option: two live
+  routes means every finding has to be assessed against both, and the leaves
+  would have gone on reading as the schedule while nothing spent them.
+
+### The ledger
+
+- **`meaning-prefix-well-formed`** (Verify-Well-Formed) — FALSITY,
+  `DEAD ROUTE`: every prefix of a program's meaning is accepted by the protocol
+  automaton. The tier's whole debt, and nothing has instantiated it — what the
+  sampling sweep reached is its consumer's conclusion, which is about a run.
 
 ## Tier 4 — determinacy and the top-line semantic claims
 

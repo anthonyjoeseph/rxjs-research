@@ -1,189 +1,79 @@
 -- THE PROTOCOL HALF OF THE SANDWICH, AND IT IS ONE STATEMENT OVER A
--- RUN THAT IS A DERIVATION.  `The-Proof` draws `evaluate-well-formed`
--- and nothing else from this face: a canonical run's emit stream is
--- accepted by the protocol automaton, which is what lets the batcher be
--- quantified over WellFormed streams rather than arbitrary ones.
+-- RUN.  `The-Proof` draws `evaluate-well-formed` and nothing else from
+-- this face: a canonical run's emit stream is accepted by the protocol
+-- automaton, which is what lets the batcher be quantified over
+-- WellFormed streams rather than arbitrary ones.
 --
--- THE SEAM IS THE RELATION'S OWN CONSTRUCTOR, WHICH IS WHAT THE
--- CUTOVER BOUGHT HERE.  The two halves are stepped by different
--- machinery — a subscribe frame returns its burst in one go while the
--- drain spends one unit per arrival — so a bookkeeping argument is an
--- induction over the drain seeded at whatever the burst left.  That
--- seam used to be recovered by a lemma about lists, because the
--- property was read off the OUTPUT; `eval-run` carries the two halves
--- as fields, so it is now a pattern match and the two seeds are the
--- ones the run itself passed.
+-- AND IT IS A BODY OVER THE DENOTATION, WHICH IS WHAT ORDERS THE TIERS
+-- (Anthony).  A run is a PREFIX of a program's meaning -- that is
+-- adequacy, and it is the only thing in the repo carrying a fact about
+-- a PROGRAM down onto an arbitrary fuel's run.  Stating this face as a
+-- body over it makes the dependence checked rather than asserted: the
+-- domain is what well-formedness is proven FROM, so the domain finishes
+-- first, and a domain that cannot carry the predicate is a finding here
+-- rather than a preference.
 --
--- AND THE COMPOSITE IS A BODY NOW, WHICH IS WHERE THE CARVE BUYS
--- SOMETHING.  The debt used to be ONE leaf over both derivations,
--- asserting a conclusion about the CONCATENATION — so the automaton's
--- state at the seam was named nowhere and every attempt on either half
--- would have had to rediscover it.  The two leaves below carry that
--- state explicitly, the composition of their conclusions is checked by
--- `Glue`'s fold law rather than assumed, and the final settle is its
--- own named step rather than something absorbed into a preservation
--- claim where it would be invisible.
---
--- WHAT THE SAMPLING SWEEP DECIDED, and it is recorded here rather than
--- as a receipt because the statement it instantiates is now proven:
--- 6200 programs over two depths, about a third carrying `μᵉ`, no
--- refutation of `WellFormed (evaluate↓ …)` — the harness's `wellFormed?`
--- is the same computation `WellFormed` is, pinned to
--- `git show a0d882c6:agda/src/QuickCheck.agda`.  It reaches NEITHER
--- leaf's conclusion, which mentions an intermediate automaton state the
--- harness never computes, and it reaches only derivations the BUILDER
--- produced while both leaves quantify over any at their indices —
--- `evaluate-deterministic` is the fact that would make those the same
--- set.
-
--- WHY THIS FACE IS STATED OVER THE RUN AND NOT OVER A LIMIT, since the
--- denotational route is the obvious alternative and it is blocked by a
--- property rather than by difficulty.  `WellFormed` applies its final
--- check to the LAST state, so it is not prefix-closed: a stream cut
--- mid-cascade carries owed registrations and is rejected.  An adequacy
--- statement hands back a PREFIX — a run is what the meaning starts with
--- — so descending from a well-formed meaning to a well-formed run is
--- exactly the step that fails, and the repair is to show every cut
--- point settled, which is the drain leaf's own exit obligation demanded
--- once per fuel instead of once at the end.
---
--- AND THE SEAM IS WHAT A DENOTATION IS DEFINED TO DISCARD.  The root
--- leaf's conclusion relates the automaton's state to the SCHEDULER and
--- the eval state; a behaviour is the object those are absent from, so
--- the invariant this face is built on cannot be stated there at all.
--- The route worth having runs the other way: a well-formedness that is
--- structural in a compositional semantics would make the machine
--- result follow by adequacy — but the batching claim wants the
--- property of a bare emit list, so it would have to come back through
--- the observation, and a compositional semantics is what the
--- denotation face does not yet state.
---
--- DEAD ROUTE: descending from a well-formed meaning to a well-formed run
---   along `WellFormed` ITSELF.  Structurally blocked by the final check:
---   `WellFormed` is not prefix-closed, and adequacy's conclusion is a
---   prefix, so the property does not travel down.  It is the descent
---   along this predicate that is dead — a denotational one demanding
---   settledness at every cut point is a different statement and is not
---   what this line rules out.
-
+-- WHY THE SEAM ROUTE IS NOT THE ONE.  A seam argument re-establishes a
+-- relation between an automaton, a scheduler and an eval state at every
+-- step, in a currency carrying node ids and a drain counter; the
+-- denotational one is an induction on SYNTAX, one clause per former, in
+-- a currency with none of that in it.  The second is what the batching
+-- claim above wants, since the property it needs is of a bare emit
+-- list.
 module Verify-Well-Formed where
 
-open import Data.Bool using (true)
 open import Data.List using (_++_)
-open import Data.Maybe using (just)
-open import Data.Product using (∃; _×_; _,_; proj₁)
+open import Data.Product using (_,_)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 
 open import Rx.Prim using (Fuel)
 open import Rx.Exp using (Ctx; Closed)
 open import Rx.Slots using (Slots)
-open import Rx.Evaluator using (Stream; Sched; EvalSt; root; sched-init; st-init)
-open import Rx.Evaluator.Builder using (evaluate↓; evaluate!)
-open import Rx.Evaluator.Domain using (evaluate⇓; subscribeE⇓; drain⇓; eval-run)
-open import Rx.Protocol using (WellFormed; ProtocolSt; protocol-init; runProtocol;
-  paidUp)
-open import Verify-Well-Formed.Invariant using (BurstInv)
-open import Verify-Well-Formed.Glue using (run-++-just; acceptPaid)
+open import Rx.Evaluator using (Stream)
+open import Rx.Evaluator.Builder using (evaluate↓)
+open import Rx.Protocol using (WellFormed)
+open import Verify-Adequacy using (meaning; adequacy)
 
-------------------------------------------------------------------
--- THE DEBT, IN TWO HALVES THAT MEET AT A NAMED STATE.
-------------------------------------------------------------------
-
-postulate
-  -- THE ROOT FRAME.  Stated at the initial states rather than over an
-  -- arbitrary invariant-satisfying one, so that it owes its own base
-  -- case: the generic form would need that base case handed IN, and a
-  -- proven base case handed to a postulate is a sufficiency claim
-  -- nothing checks.  Its conclusion is the seam — the automaton's state
-  -- after the burst, and the relation that state stands in to the
-  -- evaluator's.
-  --
-  -- PROBED: `Probed.Seam` reaches this conclusion at a two-value
-  --   source-free program and at a one-hot-slot program, which between
-  --   them decide every field of the relation.  The source-free row
-  --   decides the four the burst alone can reach — the fold arrives at
-  --   a state at all, that state's live multiset shadows the registry,
-  --   its horizon has not run ahead of the frame's own id, and its open
-  --   instant is the frame's with nothing owed.  The hot row carries a
-  --   non-empty live list and a real registration, so the schedule's
-  --   well-typedness is CHECKED there rather than discharged by an
-  --   empty domain.  Not reached: every flattening program, since the
-  --   frame dispatch hands a `thru-outer` frame to a live postulate and
-  --   nothing past it reduces; any COLD source, so every arrival not
-  --   scheduled at tick zero; more than one scheduled source, so no row
-  --   separates the live multiset's entries from one another.
-  subscribeE-root-wf :
-    ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (ins : Slots Γ)
-      {burst : Stream Γ t} {sched′ : Sched Γ} {st′ : EvalSt e} →
-    subscribeE⇓ {e = e} {lo = n} e root 0 0 (sched-init e ins) (st-init e)
-      (burst , sched′ , st′) →
-    ∃ λ S₁ → (runProtocol protocol-init burst ≡ just S₁)
-           × BurstInv {e = e} 0 sched′ st′ S₁
-
-  -- THE DRAIN.  Generic in the seam state, because its induction is
-  -- over the drain and every step of that induction re-enters this
-  -- statement at a state the previous step produced — a form pinned to
-  -- the root's own states could not be applied to itself.  It carries
-  -- the final settle rather than leaving it to the composite, since
-  -- the last instant is closed by the drain's own last step and no
-  -- fact about the fold above supplies it.
-  --
-  -- PROBED: `Probed.Seam` reaches this conclusion at the state the root
-  --   row above produced, so the rows compose into one run rather than
-  --   standing at a hand-built state the machine cannot reach.  Two
-  --   rows, and they split the statement: at a source-free program the
-  --   drain emits nothing, so what is decided is the EXIT — a seam
-  --   state is already paid up, and a relation admitting an unsettled
-  --   instant fails there.  At a hot slot firing at tick zero the drain
-  --   delivers, and the probe pins the emit count, so the fold runs
-  --   over envelopes the drain MINTED and the row decides that a
-  --   delivered arrival leaves the automaton paid up — the preservation
-  --   half, and the envelope is pinned whole rather than by count, so
-  --   the close it carries is part of what the row decides.  Not
-  --   reached: every close but `exhausted` — nothing here CUTS, so the
-  --   shadow field's `dying` condition is discharged vacuously at every
-  --   row — and everything the row above does not reach.
-  drain-wf :
-    ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-      (fuel : Fuel) {sched : Sched Γ} {st : EvalSt e} {S : ProtocolSt}
-      {rest : Stream Γ t} →
-    BurstInv {e = e} 0 sched st S →
-    drain⇓ {e = e} fuel 1 sched st rest →
-    ∃ λ S₂ → (runProtocol S rest ≡ just S₂) × (paidUp S₂ ≡ true)
-
-------------------------------------------------------------------
--- THE COMPOSITION.  Two runs meeting at a state, which is exactly the
--- shape `Glue` is written for.
-------------------------------------------------------------------
-
-burst-drain-well-formed :
-  ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (fuel : Fuel) (ins : Slots Γ) {burst rest : Stream Γ t} {sched′ st′} →
-  subscribeE⇓ {e = e} {lo = n} e root 0 0 (sched-init e ins) (st-init e)
-    (burst , sched′ , st′) →
-  drain⇓ {e = e} fuel 1 sched′ st′ rest →
-  WellFormed (burst ++ rest)
-burst-drain-well-formed fuel ins {burst} {rest} s d
-  with subscribeE-root-wf ins s
-... | (_ , eq₁ , inv) with drain-wf fuel inv d
-... | (S₂ , eq₂ , paid)
-  rewrite run-++-just protocol-init burst rest eq₁ eq₂ = acceptPaid S₂ paid
-
--- and the top line, which is one match.  The builder hands over a run
--- TOGETHER WITH its derivation, and `eval-run` is the only constructor
--- of that family, so matching it IS the seam — and the output the
--- constructor reassembles is the one the evaluator returns, because the
--- evaluator IS that pair's first projection.
+-- THE ONE LEAF, AND IT IS QUANTIFIED OVER EVERY PREFIX RATHER THAN
+-- STATED AT THE MEANING.  That is not a convenience: the descent has to
+-- land at an ARBITRARY fuel's stopping point, and only a
+-- prefix-quantified statement reaches one.  It is also where the tier's
+-- whole remaining risk sits, since nothing has instantiated it -- the
+-- sweep below is evidence about the body's conclusion, not about this.
 --
--- THE MATCH GOES THROUGH A LOCAL RATHER THAN A `with`, and it is the
--- projection that forces it: the goal names the evaluator, the
--- derivation is about the pair, and `with` abstracts syntactic
--- occurrences rather than unfolding to find them.  Naming the pair
--- makes the goal mention it, which is all the refinement needs.
+-- DEAD ROUTE: descending from a well-formed meaning to a well-formed
+--   run along `WellFormed` ITSELF.  Structurally blocked by the final
+--   check: `WellFormed` applies it to the LAST state, so it is not
+--   prefix-closed, and an adequacy conclusion is a PREFIX -- the
+--   property does not travel down.  It is the descent along that
+--   predicate that is dead, and the statement below is the different
+--   one it rules in rather than out.
+postulate
+  meaning-prefix-well-formed :
+    ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
+      (pre rest : Stream Γ t) →
+    meaning e ins ≡ pre ++ rest →
+    WellFormed pre
+
+-- THE BODY, AND ITS ONE MOVE IS ELIMINATING ADEQUACY'S WITNESS.  The
+-- remainder adequacy hands back is exactly what the leaf's `rest` wants,
+-- so the composition reduces rather than being asserted -- which is what
+-- makes a domain unable to supply the leaf show up as a type error here.
+--
+-- A sampling sweep of 6200 programs over two depths, about a third
+-- carrying `μᵉ`, found no refutation of this conclusion; the harness's
+-- `wellFormed?` is the same computation `WellFormed` is, pinned to
+-- `git show a0d882c6:agda/src/QuickCheck.agda`.  Every row sits at a
+-- derivation the BUILDER produced, while the statement quantifies over
+-- any at its indices -- `evaluate-deterministic` is the fact that would
+-- make those the same set.
+
+-- RECOVERY: git show 081328b0:agda/src/Verify-Well-Formed.agda restores
+--   the seam carve -- two leaves meeting at a named automaton state, the
+--   `BurstInv` relation they were denominated in, and `Glue`'s fold law
+--   composing their conclusions.
 evaluate-well-formed :
   ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slots Γ) →
   WellFormed (evaluate↓ fuel e ins)
-evaluate-well-formed fuel e ins = go (evaluate! fuel e ins)
-  where
-  go : (w : ∃ λ out → evaluate⇓ fuel e ins out) → WellFormed (proj₁ w)
-  go (_ , eval-run s d) = burst-drain-well-formed fuel ins s d
+evaluate-well-formed fuel e ins with adequacy fuel e ins
+... | rest , eq = meaning-prefix-well-formed e ins (evaluate↓ fuel e ins) rest eq

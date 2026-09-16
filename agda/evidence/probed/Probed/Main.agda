@@ -58,19 +58,13 @@ open import Probed.Readme-Claims using (row-order; row-take; row-one-batch)
 -- THE PIPELINE-SIDE CLAIMS, claimed from the root for the same reason.
 open import Probed.Pipeline-Claims using (row-online; row-ids)
 
--- THE PROTOCOL FACE'S SEAM, which is the first thing on that face a
--- program has ever been run against: its predecessor asserted a verdict
--- about a concatenation and named nothing in between.
-open import Probed.Seam using (row-root; row-drain; row-root-hot; row-drain-hot; drain-hot-emits)
-
 -- THE ADEQUACY FACE'S ONE DECIDABLE ROW, claimed here because the
 -- other two claims on that face are stated over a postulated domain and
 -- cannot be instantiated at all.
 open import Probed.Adequacy using (row-saturated; row-grows; row-past-horizon)
 
--- TAKE AT ZERO, the one row set on this face that decides an evaluator
--- fact without a spec, a batching stage or a second derivation to
--- compare against.
-open import Probed.Take-Bounds using (row-zero-sync; row-zero-late;
-  row-regs; row-chains; row-cascade; row-frame; sync-uncut; late-uncut;
-  cut-emits-nothing; frame-spends; frame-spent)
+-- THE TAKE FACE'S ROWS, claimed here for the same reason: it is the
+-- worked instance a saturation restriction is measured against, so it
+-- is the one statement on that tier that must not be taken on trust.
+open import Probed.Take-Bounds using
+  (row-zero; row-cuts-instant; row-exact; row-past-frame)
