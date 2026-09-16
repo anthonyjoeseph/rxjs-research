@@ -19,14 +19,13 @@ open import Rx.Prim               using (InstEmit; Fuel; Id; Source; _at_from_as
 open import Rx.Exp                using (Ctx; Closed)
 open import Rx.Evaluator.Builder using (evaluate↓)
 open import Rx.Slots using (Slots)
-open import Rx.Protocol           using (ProtocolSt; Owed; protocol-init; runProtocol; stepProtocol; checkFinal; paidOff; allZero;
-  Accepted; accepted; WellFormed; settle; applyEvents; hasOwed; bumpOwed; cancelOwed;
-  removeOne; countIn)
+open import Rx.Protocol           using (ProtocolSt; Owed; protocol-init; runProtocol; stepProtocol; paidOff; allZero; Accepted;
+  settle; applyEvents; hasOwed; bumpOwed; cancelOwed; removeOne; countIn)
 -- `just-injᵂ`/`n≢jᵂ` are imported rather than re-proven: this module
 -- had its own copies of the same two Maybe facts.  The import surface
 -- here is a CLAIM, so it stays minimal — but re-proving a fact to keep
 -- a using-list short is the trade `make dup-check` exists to refuse.
-open import Verify-Well-Formed using (evaluate-well-formed)
+open import Verify-Well-Formed using (evaluate-accepted)
 open import Spec                  using (spec-batchSimultaneous; specGo;
                                          batchOf; valuesAt; valuesOf; seenBefore)
 open import Implementation        using (impl-batchSimultaneous; foldBatch;
@@ -1058,10 +1057,6 @@ fold-agree seen S B (x ∷ rest) rel hi acc with step-accepted x S rest acc
                             (specGo (seen▸ x seen) rest))
              (cong (flushSpec B (x ∷ rest) ++_) (sym (specGo-split x seen rest))))))
 
--- WellFormed is acceptance-and-paid; fold-agree only needs acceptance
-run-accepted : (m : Maybe ProtocolSt) → Accepted (checkFinal m) → Accepted m
-run-accepted (just S) _ = accepted
-
 -- the empty states are related
 rel-init : ∀ {A : Set} → BatchRel {A} [] protocol-init batch-init
 rel-init = record
@@ -1069,12 +1064,19 @@ rel-init = record
   ; phase   = inj₁ (refl , inj₁ (refl , λ i ()))
   }
 
+-- THE HYPOTHESIS IS ACCEPTANCE, NOT WELL-FORMEDNESS (Anthony, asking
+-- for a claim that does not read the evaluator).  `WellFormed` is
+-- acceptance AND settledness, and the body below never had a use for
+-- the second half: it spent the hypothesis through one step that threw
+-- the final check away.  Taking the weaker premise is therefore a
+-- STRENGTHENING -- the same conclusion over strictly more streams --
+-- and it is what takes "the run stops on an instant boundary" off the
+-- proof path, since nothing else on it asks where a stream ends.
 batch-agreement :
-  ∀ {A} (xs : List (InstEmit A)) → WellFormed xs →
+  ∀ {A} (xs : List (InstEmit A)) → Accepted (runProtocol protocol-init xs) →
   spec-batchSimultaneous xs ≡ impl-batchSimultaneous xs
-batch-agreement xs wf =
-  sym (fold-agree [] protocol-init batch-init xs rel-init (λ j o ())
-        (run-accepted (runProtocol protocol-init xs) wf))
+batch-agreement xs acc =
+  sym (fold-agree [] protocol-init batch-init xs rel-init (λ j o ()) acc)
 
 -- THE verified object, end to end: for every program, batching its
 -- rendered stream is spec-correct.  A real definition — the proof
@@ -1084,4 +1086,4 @@ formal-verification-batchSimultaneous :
   spec-batchSimultaneous (evaluate↓ fuel e ins)
     ≡ impl-batchSimultaneous (evaluate↓ fuel e ins)
 formal-verification-batchSimultaneous fuel e ins =
-  batch-agreement (evaluate↓ fuel e ins) (evaluate-well-formed fuel e ins)
+  batch-agreement (evaluate↓ fuel e ins) (evaluate-accepted fuel e ins)

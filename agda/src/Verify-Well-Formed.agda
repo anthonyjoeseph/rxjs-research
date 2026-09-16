@@ -1,83 +1,54 @@
 -- THE PROTOCOL HALF OF THE SANDWICH, AND IT IS ONE STATEMENT OVER A
--- RUN.  `The-Proof` draws `evaluate-well-formed` and nothing else from
--- this face: a canonical run's emit stream is accepted by the protocol
--- automaton, which is what lets the batcher be quantified over
--- WellFormed streams rather than arbitrary ones.
+-- RUN.  `The-Proof` draws `evaluate-accepted` and nothing else from
+-- this face: no emit of a canonical run is rejected by the protocol
+-- automaton, which is what lets the batcher be quantified over legal
+-- streams rather than arbitrary ones.
 --
--- AND IT IS A BODY OVER THE TWO HALVES `WellFormed` IS COMPOSED OF.
--- `Rx.Protocol` splits the predicate where it actually divides: the
--- automaton run, which is prefix-closed, and the final check, which
--- reads the last state and is not.  Each half is owed separately here,
--- and both are owed of the RUN — so both reduce at a concrete program,
--- which the single statement they replace did not.
+-- AND ACCEPTANCE IS THE WHOLE OF WHAT IS OWED (Anthony, asking for a
+-- claim that does not read the evaluator).  This face used to owe a
+-- second half — that a run stops on an instant boundary, every
+-- obligation paid — and `batch-agreement` never had a use for it: it
+-- took the conjunction and immediately weakened it back to acceptance.
+-- A statement about where the MACHINE stops is the one thing here that
+-- could not be restated over the stream, so retiring it is what leaves
+-- this face saying something about a stream's contents alone.
 module Verify-Well-Formed where
-
-open import Data.Bool using (true)
-open import Data.Maybe using (just)
-open import Relation.Binary.PropositionalEquality using (_≡_)
 
 open import Rx.Prim using (Fuel)
 open import Rx.Exp using (Ctx; Closed)
 open import Rx.Slots using (Slots)
 open import Rx.Evaluator.Builder using (evaluate↓)
-open import Rx.Protocol using (WellFormed; ProtocolSt; protocol-init; runProtocol;
-  paidUp; Accepted; wellFormed-settled)
+open import Rx.Protocol using (protocol-init; runProtocol; Accepted)
 
--- THE AUTOMATON HALF: no emit of a run is ever rejected.  Every clause
--- the automaton checks — instant freshness, bracketing, fan-out
--- exactness, complete discipline — is a promise the evaluator makes
--- while producing the stream, so this is the half that is structural
--- in how the run is BUILT.
---
--- DEAD ROUTE: obtaining this half from a well-formed denotation, by
---   quantifying a leaf over every prefix of a program's meaning and
---   instantiating it at the run.  `WellFormed` of a prefix demands the
---   final check AT THE CUT, and an instant's obligations span several
---   emits — `handoff` bumps owed and later deliveries pay it off, which
---   is what `paidOff` exists to close — so a cut between them is
---   rejected.  The prefix-quantified statement is therefore false at
---   every instant with more than one emit, and what is true of an
---   arbitrary prefix is the automaton half ALONE, which is
---   `runProtocol-prefix` and needs no domain to say.
-postulate
-  evaluate-accepted :
-    ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slots Γ) →
-    Accepted (runProtocol protocol-init (evaluate↓ fuel e ins))
-
--- THE SETTLEDNESS HALF: a run stops on an instant boundary, with every
--- obligation paid.  This is a fact about where `evaluate↓` may CUT
--- rather than about what it emits, and it is the whole of what the
--- final check needs.  It is also where this face's remaining risk
--- sits: an off-by-one between the point a budget is spent and the
--- point a cut is emitted is a counterexample rather than a hard proof.
-postulate
-  evaluate-settled :
-    ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slots Γ)
-      (ps : ProtocolSt) →
-    runProtocol protocol-init (evaluate↓ fuel e ins) ≡ just ps →
-    paidUp ps ≡ true
-
--- THE BODY, AND ITS ONE MOVE IS RECOMPOSING THE PREDICATE.  Neither
--- half is `WellFormed` and together they are exactly it, so a leaf that
--- does not suffice shows up as a type error here rather than as a
--- statement nobody can instantiate.
+-- Every clause the automaton checks — instant freshness, bracketing,
+-- fan-out exactness, complete discipline — is a promise the evaluator
+-- makes while producing the stream, so this is the half that is
+-- structural in how the run is BUILT.  It is also prefix-closed, since
+-- `runProtocol` short-circuits on rejection, which is what makes it
+-- the half a compositional reading could ever descend through.
 --
 -- A sampling sweep of 6200 programs over two depths, about a third
--- carrying `μᵉ`, found no refutation of this conclusion; the harness's
--- `wellFormed?` is the same computation `WellFormed` is, pinned to
--- `git show a0d882c6:agda/src/QuickCheck.agda`.  Every row sits at a
--- derivation the BUILDER produced, while the statement quantifies over
--- any at its indices -- `evaluate-deterministic` is the fact that would
--- make those the same set.
+-- carrying `μᵉ`, found no refutation of the conjunction this was a
+-- half of; the harness's `wellFormed?` is a decision procedure for
+-- that conjunction, pinned to `git show a0d882c6:agda/src/QuickCheck.agda`.
+-- Every row sits at a derivation the BUILDER produced, while the
+-- statement quantifies over any at its indices --
+-- `evaluate-deterministic` is the fact that would make those the same
+-- set.
+--
+-- DEAD ROUTE: obtaining this from a well-formed denotation, by
+--   quantifying a leaf over every prefix of a program's meaning and
+--   instantiating it at the run.  That route was stated against the
+--   conjunction, whose final check demands settledness AT THE CUT, and
+--   an instant's obligations span several emits, so a cut between them
+--   is rejected.  What is true of an arbitrary prefix is this
+--   statement ALONE, which needs no domain to say.
 
 -- RECOVERY: git show 9f5e3339:agda/src/Verify-Well-Formed.agda restores
 --   the seam carve -- two leaves meeting at a named automaton state, the
 --   `BurstInv` relation they were denominated in, and `Glue`'s fold law
 --   composing their conclusions.
-evaluate-well-formed :
-  ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slots Γ) →
-  WellFormed (evaluate↓ fuel e ins)
-evaluate-well-formed fuel e ins =
-  wellFormed-settled (evaluate↓ fuel e ins)
-    (evaluate-accepted fuel e ins)
-    (evaluate-settled fuel e ins)
+postulate
+  evaluate-accepted :
+    ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slots Γ) →
+    Accepted (runProtocol protocol-init (evaluate↓ fuel e ins))
