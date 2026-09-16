@@ -25,6 +25,13 @@ cone and the commit passes.  The same reading is what lets a new lemma land:
 add it AND wire it into the monster in one commit, which is the wiring law's
 own workflow, and nothing further is owed.
 
+AND IT MAY NEVER BE THE TIER'S OWN SUBJECT.  A tier is dedicated to a single
+definition, named in its heading, so naming that definition the monster makes
+the cone the whole tier and the check stops deciding anything.  The monster is
+the deepest thing UNDER the subject that could genuinely be false; a sibling
+whose cone the choice excludes is admitted by an `also:` line, which says out
+loud what a monster at the top would admit silently.
+
 AND THE MONSTER NEED NOT BE A POSTULATE.  The riskiest object in a tier is
 routinely a DEFINITION -- a relation every leaf is stated in, an evaluator
 clause every claim reads through -- and such a thing can be wrong in a way no
@@ -65,9 +72,12 @@ NAME_RE = re.compile(r"`([^`]+)`")
 
 
 def parse_monsters(path):
-    """tier number -> (monster, [also…], line).  One backticked name in the
-    section's first non-blank prose line; `also:` lines add admitted roots."""
+    """tier number -> (monster, [also…], line, subject).  One backticked name
+    in the section's first non-blank prose line; `also:` lines add admitted
+    roots.  The SUBJECT is the backticked name in the tier's own heading, or
+    None where the tier names no single definition."""
     out = {}
+    subjects = {}
     tier = None
     in_section = False
     with open(path, encoding="utf-8") as fh:
@@ -75,6 +85,8 @@ def parse_monsters(path):
             m = TIER_RE.match(line)
             if m:
                 tier, in_section = int(m.group(1)), False
+                head = NAME_RE.findall(line)
+                subjects[tier] = head[0] if head else None
                 continue
             if line.startswith("###"):
                 in_section = bool(MONSTER_HEAD_RE.match(line))
@@ -88,7 +100,8 @@ def parse_monsters(path):
                 continue
             if tier not in out and names:
                 out[tier] = (names[0], [], lineno)
-    return out
+    return {t: (mon, also, ln, subjects.get(t))
+            for t, (mon, also, ln) in out.items()}
 
 
 def enclosing_index(defs, def_lines):
@@ -171,6 +184,27 @@ also: `beta` — declared exception.
     check(min(got) == 1, "the LOWEST tier is the one that binds")
     check(section_cost(tmp, 2) > 0, "the section's prose is charged")
     check(section_cost(tmp, 2) < PROSE_BUDGET, "an `also:` line is not charged")
+    check(got.get(1, (None, [], 0, None))[3] is None,
+          "a tier heading naming no definition has no subject")
+
+    # THE SUBJECT RULE.  A tier dedicated to one definition may not name that
+    # definition as its monster -- the cone would be the whole tier.
+    doc2 = """## Tier 1 — `alpha`
+### The monster
+`alpha` — the tier's own subject.
+## Tier 2 — `delta`
+### The monster
+`epsilon` — below the subject, which is what is wanted.
+"""
+    with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False) as fh:
+        fh.write(doc2)
+        tmp2 = fh.name
+    g2 = parse_monsters(tmp2)
+    check(g2[1][3] == "alpha" and g2[1][0] == "alpha",
+          "a monster equal to its tier's subject is visible to the check")
+    check(g2[2][3] == "delta" and g2[2][0] == "epsilon",
+          "and a monster BELOW its tier's subject reads as distinct")
+    os.unlink(tmp2)
 
     # the splice: an anonymous `with` continuation must not break the cone.
     class D:
@@ -196,7 +230,8 @@ also: `beta` — declared exception.
             print(f"monster-selftest: FAILED — {f}")
         sys.exit(1)
     print("monster-selftest: PASS (the lowest tier's monster is the one that "
-          "binds, an `also:` exception is collected and is not charged against "
+          "binds, a monster may not be its tier's own subject, an `also:` "
+          "exception is collected and is not charged against "
           "the section's prose budget, and an anonymous `with` continuation is "
           "spliced into the declaration it continues -- without which an "
           "assembly applying its leaves in a `with` arm reaches none of them, "
@@ -275,8 +310,28 @@ def main():
         sys.exit(1 if args.gate else 0)
 
     tier = min(monsters)
-    monster, also, lineno = monsters[tier]
+    monster, also, lineno, subject = monsters[tier]
     roots = [monster] + also
+
+    if subject is not None and monster == subject:
+        print(f"check-monster: {os.path.basename(roadmap)}:{lineno}: tier "
+              f"{tier} is dedicated to `{subject}` and names it as its own "
+              f"monster. A MONSTER MAY NEVER BE ITS TIER'S OWN SUBJECT: the "
+              f"subject's cone is the whole tier, so every line added "
+              f"anywhere in the tier is inside it by construction and the "
+              f"check stops deciding anything. Take the DEEPEST thing under "
+              f"it that could genuinely be false and that still takes its "
+              f"parents with it. The temptation is sharpest where the "
+              f"subject is a body over leaves whose cones exclude each "
+              f"other, and climbing to the parent looks like the only way to "
+              f"keep both grinds licensed — it is not, and the FLOOR "
+              f"argument does not license it: that argument says a monster "
+              f"may not go so deep that the work which would KILL it falls "
+              f"off-tree, and the answer to a SIBLING falling off-tree is an "
+              f"`also:` line, which is reviewed with the roadmap and says "
+              f"out loud which second cone is admitted. A monster at the top "
+              f"says nothing out loud and admits everything.")
+        sys.exit(1 if args.gate else 0)
 
     cost = section_cost(roadmap, lineno)
     if cost > PROSE_BUDGET:

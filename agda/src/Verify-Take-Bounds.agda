@@ -109,6 +109,13 @@ postulate
   -- node's decrement happens at the dispatch while the cut is emitted
   -- from the frame, so a path that delivers before it spends parts from
   -- this inequality and from nothing else.
+  -- DEAD ROUTE: closing the `k = 0` arm by computation.  The zero case
+  --   reads as though it should fall out -- the budget is spent before
+  --   anything is delivered -- but `reducible` runs `redExpAcc` under a
+  --   well-founded accessor, and `Acc` is a `data` type rather than a
+  --   record, so it has no eta and the accessor at an abstract `e` is
+  --   STUCK.  Neither side reduces and `z≤n` does not typecheck.  The
+  --   split has to case on the ACCESSOR, not on `k` alone.
   -- PROBED: `Probed.Take-Bounds`, at a cut landing INSIDE the burst and
   --   at a take of zero -- the two shapes the frame decides on its own.
   --   The cutting row is TIGHT and pinned beside the same program with

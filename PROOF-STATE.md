@@ -220,13 +220,17 @@ automaton.
 
 ### The monster
 
-`take-bounds-values` — the tier's one statement, and a body rather than a
-postulate, which is what a monster is allowed to be: it can be FALSE in a way
-no ledger row records, because the carve itself can be wrong. Its two leaves
-are denominated in a budget IT defines, so a mis-placed decrement satisfies
-both leaves and fails the claim. Below it the tier is those two leaves, each
-with a cone of its own arithmetic, so naming one would forbid its sibling.
+`take-burst-bound` — the frame's half, and the deepest thing here that can be
+false on its own: the node's decrement happens at the dispatch while the cut is
+emitted from the frame, so a path that delivers before it spends parts from
+this inequality and from nothing else. Its falsity takes the tier's statement
+with it, because the budget it LEAVES is what the drain's half is denominated
+in — a frame that hands on too much satisfies its sibling and fails the claim.
+The sibling is admitted below rather than climbed over: the tier's own subject
+has the whole tier for a cone and would decide nothing.
 
+also: `take-bounds-values` — the tier's subject. Admitted only because this branch is the one that CARVED it: the assembly and its glue arrive here as added lines. It retires when the branch lands, and while it stands the cone decides nothing — which is the cost of the carve, paid once.
+also: `take-drain-bound` — the tier's other leaf, whose cone is its own arithmetic and excludes the frame's; the two are ground together and neither is reachable from the other.
 also: `burst-drain-well-formed` — tier 2's monster. Admitted because the branch that carved this tier out of that one carries that face's seam and its two leaves, and the check reads the branch rather than the commit.
 also: `evaluate-deterministic` — tier 3's monster, whose statement and leaves are already declared, on the same branch and for the same reason.
 
@@ -258,10 +262,10 @@ also: `evaluate-deterministic` — tier 3's monster, whose statement and leaves 
 
 ### The ledger
 
-- **`take-burst-bound`** (Verify-Take-Bounds) — FALSITY, `PROBED`: what the
-  subscribe frame emits plus what it leaves in the node is within `k`. Two rows
-  reach it; the decrement at the dispatch and the cut at the frame are the two
-  points that can disagree.
+- **`take-burst-bound`** (Verify-Take-Bounds) — FALSITY, `DEAD ROUTE, PROBED`:
+  what the subscribe frame emits plus what it leaves in the node is within `k`.
+  Two rows reach it; the decrement at the dispatch and the cut at the frame are
+  the two points that can disagree.
 
 - **`take-drain-bound`** (Verify-Take-Bounds) — FALSITY, `PROBED`: the drain
   emits no more than the budget the subscribe frame left in the take node. The
@@ -356,14 +360,17 @@ a strengthening is worth exactly nothing until the weak form is proven.
 
 ### The monster
 
-`evaluate-deterministic` — `subscribeE-det` is likelier false and is deeper,
-and it is below the FLOOR: a leaf's cone is its statement's vocabulary, so
-naming it would put `drain-det` and the assembly itself off-tree and forbid the
-grind that kills it. This is the deepest node whose cone IS the work. Its
-falsity would be a fact about the EVALUATOR rather than about a claim: a
-subscribe frame admitting two outputs at one set of indices means the machine
-is not a function, and then every face's quantification over derivations is a
-quantification over a set nobody has characterised.
+`subscribeE-det` — the subscribe relation itself, which is where determinacy
+can actually fail. Its falsity would be a fact about the EVALUATOR rather than
+about a claim: a frame admitting two outputs at one set of indices means the
+machine is not a function, and then every face's quantification over
+derivations is over a set nobody has characterised. It is the deepest node
+whose falsity takes the whole tier. A leaf's cone is its statement's
+vocabulary, so it reaches neither its sibling nor the assembly consuming both —
+those are admitted below, where the admission is read with the roadmap.
+
+also: `drain-det` — the other half of the same assembly, off the frame's cone and ground alongside it.
+also: `evaluate-deterministic` — the tier's subject, which consumes both leaves and is unreachable from either.
 
 ### Big picture tier roadmap
 
