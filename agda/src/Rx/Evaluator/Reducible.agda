@@ -230,7 +230,12 @@ postulate
   -- `applyFn` are one `evalWith` at two telescopes, so they are one
   -- statement rather than two obligations, and it is proven.
   -- PROBED: `Probed.Substitution-Leaves`, at a body whose μ variable
-  --   is really referenced through the gate.
+  --   is really referenced through the gate; with that gate met under
+  --   a BINDER, so the inserted copy crosses a non-empty local
+  --   telescope and reads the environment from under it; and through
+  --   TWO gates, where the eliminator shuffles the deferred context
+  --   and carries a transport on the Δ index.  Not reached: a nested
+  --   fixpoint, and a local telescope longer than one entry.
 
   sub-unfoldμ : ∀ {n} {Γ : Ctx n} {Θ t} (body : Exp Γ (t ∷ []) [] Θ t)
                 (σ : All (Val Γ) Θ)

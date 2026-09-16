@@ -34,29 +34,10 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 
 open import Rx.Exp using (Ctx; Val; Exp; Tm; Fn; evalTm; evalWith; applyFn; subΘTm; subΘExp; lookupEnv; wkTm; reify;
   varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ; add; sub;
-  mul; eqᵖ; ltᵖ; notᵖ)
+  mul; eqᵖ; ltᵖ; notᵖ; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs)
+open import Rx.Subst-Renaming using (ren-idᵉ; sub-renᵉ)
 
 postulate
-  -- THE VARIABLE ARM, WHICH IS THE WHOLE OF WHAT A LEAF CAN BE HERE.
-  -- `subΘTm` dispatches a variable on which half of the telescope it
-  -- lands in: a local one is renamed and read from `ρ`, a substituted
-  -- one is REIFIED to a closed literal and weakened back in, so the
-  -- two sides agree for different reasons and neither has a subterm to
-  -- recurse on.
-  -- REIFYING A VALUE AND READING IT BACK IS THE IDENTITY, in any
-  -- environment at all.  The environment cannot matter because the
-  -- literal `reify` produces is CLOSED and weakened in, so nothing in
-  -- it is a variable -- but saying so needs the expression face at the
-  -- observable arm, where the literal carries a whole expression and
-  -- the reading closes it against an environment it does not mention.
-  -- PROBED: `Probed.Substitution-Leaves`, at an OBSERVABLE against a
-  --   non-empty environment, which is the one arm whose literal is not
-  --   already a value; and at a numeral, which is degenerate.  Not
-  --   reached: the product and sum arms, and a literal carrying an
-  --   expression with a real local telescope.
-  evalWith-wkReify : ∀ {n} {Γ : Ctx n} {Θ t} (v : Val Γ t) (ρ : All (Val Γ) Θ)
-                   → evalWith (wkTm (reify v)) ρ ≡ v
-
   -- THE EMBEDDING ARM, WHERE THE TERM FACE HANDS BACK TO THE
   -- EXPRESSION FACE AND THE STATEMENT STOPS BEING ABOUT TERMS.
   -- `evalWith` at a stream literal does not read the expression, it
@@ -71,6 +52,30 @@ postulate
                  (σ : All (Val Γ) Θsub) (ρ : All (Val Γ) Θloc)
                → evalWith (strmᵗ (subΘExp Θloc σ e)) ρ
                    ≡ evalWith (strmᵗ e) (++⁺ ρ σ)
+
+-- REIFYING A VALUE AND READING IT BACK IS THE IDENTITY, in any
+-- environment at all.  The environment cannot matter because the
+-- literal `reify` produces is CLOSED and weakened in, so nothing in it
+-- is a variable -- and at every arm but one the literal is already a
+-- value, so the reading is a congruence.  The OBSERVABLE arm is where
+-- that stops being bookkeeping: the literal carries a whole
+-- expression and the reading CLOSES it against an ambient
+-- environment, so what is owed there is that a weakened copy is inert
+-- under substitution.  That is the renaming shelf, at the one place
+-- the walk has no subterm of its own to recurse on.
+evalWith-wkReify : ∀ {n} {Γ : Ctx n} {Θ t} (v : Val Γ t) (ρ : All (Val Γ) Θ)
+                 → evalWith (wkTm (reify v)) ρ ≡ v
+evalWith-wkReify {t = unitᵗ}   v        ρ = refl
+evalWith-wkReify {t = boolᵗ}   b        ρ = refl
+evalWith-wkReify {t = natᵗ}    m        ρ = refl
+evalWith-wkReify {t = _ ×ᵗ _} (a , b)   ρ =
+  cong₂ _,_ (evalWith-wkReify a ρ) (evalWith-wkReify b ρ)
+evalWith-wkReify {t = _ +ᵗ _} (inj₁ a)  ρ = cong inj₁ (evalWith-wkReify a ρ)
+evalWith-wkReify {t = _ +ᵗ _} (inj₂ b)  ρ = cong inj₂ (evalWith-wkReify b ρ)
+evalWith-wkReify {t = obs _}   e []      = ren-idᵉ (λ ()) (λ ()) (λ ()) e
+evalWith-wkReify {t = obs _}   e (w ∷ ρ) =
+  trans (sub-renᵉ {Θloc = []} {ρt = λ ()} (w ∷ ρ) (λ ()) e)
+        (ren-idᵉ {ρg = λ ()} {ρd = λ ()} {ρt = λ ()} (λ ()) (λ ()) (λ ()) e)
 
 -- THE VARIABLE ARM, BY INDUCTION ON THE LOCAL TELESCOPE.  A variable
 -- the telescope still covers is read straight out of `ρ`; one it has

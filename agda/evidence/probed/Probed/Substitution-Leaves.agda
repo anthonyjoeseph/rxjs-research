@@ -16,7 +16,6 @@
 -- closed point.
 
 -- TARGET: sub-unfoldμ @314410
--- TARGET: evalWith-wkReify @d9e5a9
 -- TARGET: sub-evalStrm @350562
 module Probed.Substitution-Leaves where
 
@@ -26,9 +25,9 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Vec using ([])
 open import Relation.Binary.PropositionalEquality using (refl)
 
-open import Rx.Exp using (Ctx; natᵗ; obs; Exp; Val; ofᵉ; mapᵉ; varᵉ; deferᵉ; nat̂; varᵗ)
+open import Rx.Exp using (Ctx; natᵗ; Exp; Val; ofᵉ; mapᵉ; varᵉ; deferᵉ; strmᵗ; varᵗ; fstᵗ; pairᵗ)
 open import Rx.Evaluator.Reducible using (sub-unfoldμ)
-open import Rx.Subst-Eval using (evalWith-wkReify; sub-evalStrm)
+open import Rx.Subst-Eval using (sub-evalStrm)
 
 open import Probed.Apparatus using (Confirms)
 
@@ -53,31 +52,41 @@ bodyμ = mapᵉ (varᵗ (here refl)) (deferᵉ (varᵉ (here refl)))
 row-unfoldμ : Confirms (sub-unfoldμ bodyμ σ₀)
 row-unfoldμ = refl
 
+-- AND THE SAME PEEL MET UNDER A BINDER, which is the one shape the
+-- row above cannot reach: there the gate sits in the SOURCE of a
+-- former, where nothing is bound, so the inserted copy is weakened
+-- past an EMPTY local telescope and a split written one entry off
+-- still lands.  Here the gate sits inside the former's FUNCTION, so
+-- the walk meets it with one thing bound and the copy has to cross
+-- that binder on both sides; and the copy itself reads the
+-- environment, so a copy substituted at the wrong telescope emits a
+-- different literal.  LOAD-BEARING on exactly that.
+bodyμ-deep : Exp Γ₀ (natᵗ ∷ []) [] (natᵗ ∷ []) natᵗ
+bodyμ-deep =
+  mapᵉ (fstᵗ (pairᵗ (varᵗ (there (here refl)))
+                    (strmᵗ (deferᵉ (varᵉ (here refl))))))
+       (ofᵉ (varᵗ (here refl) ∷ []))
+
+row-unfoldμ-deep : Confirms (sub-unfoldμ bodyμ-deep σ₀)
+row-unfoldμ-deep = refl
+
+-- AND THROUGH TWO GATES, which is the arm where the eliminator stops
+-- shuffling the GUARD context and starts shuffling the deferred one:
+-- crossing the second gate re-splits the two halves and carries a
+-- transport on the Δ index that the substituter has to be pushed
+-- past.  LOAD-BEARING there: a transport pushed the wrong way round
+-- lands the inserted copy in the other half.
+bodyμ-gates : Exp Γ₀ (natᵗ ∷ []) [] (natᵗ ∷ []) natᵗ
+bodyμ-gates =
+  mapᵉ (fstᵗ (pairᵗ (varᵗ (there (here refl)))
+                    (strmᵗ (deferᵉ (deferᵉ (varᵉ (here refl)))))))
+       (ofᵉ (varᵗ (here refl) ∷ []))
+
+row-unfoldμ-gates : Confirms (sub-unfoldμ bodyμ-gates σ₀)
+row-unfoldμ-gates = refl
+
 ----------------------------------------------------------------------
--- 2.  REIFY-THEN-READ, AT THE ONE TYPE WHERE IT CAN FAIL.  At a data
--- type the literal is a numeral and the row is DEGENERATE.  At an
--- OBSERVABLE the literal carries a whole expression, and reading it
--- back CLOSES that expression against the ambient environment -- so
--- the row is LOAD-BEARING exactly there: it fails if closing an
--- already-closed expression against a NON-EMPTY environment is not the
--- identity.  The environment supplied is non-empty for that reason.
---
--- NOT REACHED: an expression with a real local telescope under the
--- literal, and the product and sum arms, whose reified literals are
--- built from the arms below them.
-----------------------------------------------------------------------
-
-obs₀ : Val Γ₀ (obs natᵗ)
-obs₀ = ofᵉ (nat̂ 7 ∷ [])
-
-row-wkReify-obs : Confirms (evalWith-wkReify obs₀ σ₀)
-row-wkReify-obs = refl
-
-row-wkReify-nat : Confirms (evalWith-wkReify {Γ = Γ₀} 4 σ₀)
-row-wkReify-nat = refl
-
-----------------------------------------------------------------------
--- 3.  THE TERM FACE HANDING BACK TO THE EXPRESSION FACE.
+-- 2.  THE TERM FACE HANDING BACK TO THE EXPRESSION FACE.
 -- LOAD-BEARING on the split, which is the whole content: the local
 -- telescope is non-empty and the embedded expression reads BOTH
 -- halves, so a substituter that took one entry too many or too few

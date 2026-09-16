@@ -61,4 +61,4 @@ open import Probed.Reducible-Arms using
 -- from the root for the same reason the arms are: a `Confirms` row's
 -- type is generated from its target, so the name is the only handle.
 open import Probed.Substitution-Leaves using
-  (row-unfoldμ; row-wkReify-obs; row-wkReify-nat; row-evalStrm)
+  (row-unfoldμ; row-unfoldμ-deep; row-unfoldμ-gates; row-evalStrm)

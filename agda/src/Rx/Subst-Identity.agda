@@ -22,7 +22,7 @@ open import Data.List using (List; []; _∷_; _++_)
 open import Data.List.Properties using (++-identityʳ)
 open import Data.List.Relation.Unary.All using ([])
 open import Relation.Binary.PropositionalEquality
-  using (_≡_; refl; trans; cong; cong₂; subst)
+  using (_≡_; trans; cong; cong₂; subst)
 
 open import Rx.Exp
   using ( Ty; Ctx; Exp; Tm; subΘExp; subΘTm; subΘTms
@@ -31,7 +31,7 @@ open import Rx.Exp
         ; varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ
         ; caseᵗ; ifᵗ; primᵗ; strmᵗ; _×ᵗ_ )
 open import Rx.Subst-Transport
-  using ( Cᵉ; Cᵗ; Cˢ; shift; ∈-id
+  using ( Cᵉ; Cᵗ; Cˢ; shift; ∈-id; cong₃
         ; pushInput; pushEmpty; pushVarᵉ; pushOf; pushMap; pushTake; pushScan
         ; pushMerge; pushSwitch; pushExhaust; pushMu; pushDefer
         ; pushVarᵗ; pushUnit; pushBool; pushNat; pushPair; pushFst; pushSnd
@@ -45,11 +45,6 @@ private
     Δᵍ Δ  : List Ty
     Θ Θ'  : List Ty
     s t u : Ty
-
-private
-  cong₃ : ∀ {A B C D : Set} (f : A → B → C → D) {x y : A} {u v : B} {p q : C}
-        → x ≡ y → u ≡ v → p ≡ q → f x u p ≡ f y v q
-  cong₃ f refl refl refl = refl
 
 ------------------------------------------------------------------
 -- THE INDUCTION.

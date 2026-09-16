@@ -233,21 +233,23 @@ deferred beside it.
 
 ### Big picture tier roadmap
 
-- **THE EMBEDDING ARM, WHICH IS WHERE THE WALK STOPS BEING ABOUT TERMS.** The
-  empty substitution is now proven and the identity it was blocking on is gone:
-  the two sides sit at telescopes an append with a variable on the left cannot
-  reconcile, so the statement is transported, and the whole content is the
-  splitter sending every variable left. What that leaves is the stream literal,
-  which is CLOSED rather than read, so its arm is not an induction hypothesis
-  but substitution COMPOSITION — and reify-then-read at an observable is the
-  same fact arriving from the value side. Those two are one leg because the
-  composition law discharges both.
+- **THE FIXPOINT PEEL, TAKEN FIRST BECAUSE IT IS THE ONE THAT COULD STILL BE
+  FALSE (Anthony).** The peel and the substitution commute, which is what the
+  partner's μ arm spends. Its induction is over the guarded ELIMINATION rather
+  than over the telescope, so nothing the renaming shelf buys transfers to it,
+  and a wrong telescope shows here and nowhere else. The rows now reach that
+  shape and hold, so what the leg carries is no longer whether the statement
+  survives it but whether the eliminator's six families can be walked under the
+  identity transport the empty substitution already spends.
 
-- **THEN THE FIXPOINT PEEL, AGAINST A CARRIED ENVIRONMENT.** The peel and the
-  substitution commute, which is what the partner's μ arm spends. It is separated
-  from the leg above because its induction is over the guarded ELIMINATION rather
-  than over the telescope, so nothing the composition law buys transfers to it —
-  and because a wrong telescope shows here and nowhere else.
+- **THEN THE EMBEDDING ARM, WHICH IS ALL THAT IS LEFT OF THE TELESCOPE LEG.**
+  A weakened-from-closed term is now proven inert under substitution, and
+  reify-then-read at an observable — the half of this leg that read as riskiest,
+  since its literal carries a whole expression to close — fell straight out of
+  it. What remains is the stream literal met on the TERM side, where the reading
+  does not read but CLOSES, so the arm is substitution COMPOSITION: two
+  substitutions in sequence against their concatenation, which is the renaming
+  shelf's statement with the right half reassociated rather than emptied.
 
 - **THEN RUN A SELF-REFERENTIAL μ, IN THE CORPUS RATHER THAN IN A PROBE.** The
   peel is now paid for by a size the unfolding does not move, and what funds that
@@ -293,10 +295,6 @@ deferred beside it.
 - **`sub-unfoldμ`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`: the fixpoint
   peel commutes with the environment substitution. This is what the partner's μ
   arm spends, and it is where a wrong telescope would show.
-
-- **`evalWith-wkReify`** (Rx/Subst-Eval) — FALSITY, `PROBED`: reifying a value
-  and reading it back is the identity, in any environment. The observable arm
-  is the only one that can fail — its literal carries an expression to close.
 
 - **`sub-evalStrm`** (Rx/Subst-Eval) — FALSITY, `PROBED`: the term face handing
   back to the expression face. Not an induction hypothesis but substitution

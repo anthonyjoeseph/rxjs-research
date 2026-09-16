@@ -42,6 +42,13 @@ private
     Θ Θ'  : List Ty
     s t u : Ty
 
+-- THREE-ARGUMENT CONGRUENCE, which the standard library stops at two.
+-- It sits here rather than beside either walk because both of them
+-- have a three-field constructor and the fact is the same one.
+cong₃ : ∀ {A B C D : Set} (f : A → B → C → D) {x y : A} {u v : B} {p q : C}
+      → x ≡ y → u ≡ v → p ≡ q → f x u p ≡ f y v q
+cong₃ f refl refl refl = refl
+
 ------------------------------------------------------------------
 -- THE TRANSPORTS.  Each says a constructor commutes with the
 -- telescope transport, and each holds by matching the equation.
