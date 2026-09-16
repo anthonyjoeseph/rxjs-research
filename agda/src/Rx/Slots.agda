@@ -32,9 +32,8 @@ open import Rx.Exp  using (Ty; Ctx; Val; Closed; isData; inputsBelowᵉ)
 -- so no edge can pay for it and the restriction is by construction.
 -- Higher-order pipelines are unaffected: an observable-typed slot is a
 -- `shared` def, which IS walked, so its emissions are syntactically
--- inside it and the crossing is the connect edge, whose entry
--- invariant `Rx.Evaluator.Doorless.connect-entry` discharges by the
--- telescope's own fixpoint.
+-- inside it and the crossing is the connect edge, which the
+-- reducibility candidate answers at the definition's own type.
 --
 -- THE TELESCOPE IS STRATIFIED (`inputsBelowᵉ k`): slot k's def may
 -- reference only inputs at indices strictly below k — a real JS
@@ -43,13 +42,10 @@ open import Rx.Exp  using (Ty; Ctx; Val; Closed; isData; inputsBelowᵉ)
 -- against the strict prefix of earlier slot types).  The index `k`
 -- is a parameter of `Slot` so the side condition can name it; like
 -- `isData` on scripted slots, it discharges by unification at every
--- concrete program.  What it buys: a per-slot reading is computable by
--- recursion on the slot index (slot k's reading consults only slots
--- j < k), which is what makes `Rx.Slot-Depth.ηAt` structural and its
--- fixpoint provable.  Without it a slot's reading would have to be
--- sought as a simultaneous solution over the whole table, and an
--- obs-typed shared def emits values of positive reading, so no
--- constant would stand in for one.
+-- concrete program.  What it buys: any per-slot reading is computable
+-- by recursion on the slot index, since slot k's def consults only
+-- slots j < k.  Without it a slot's reading would have to be sought as
+-- a simultaneous solution over the whole table.
 data Slot {n} (Γ : Ctx n) (k : ℕ) (t : Ty) : Set where
   scripted : {ok : T (isData t)} → ObservableInput (Val Γ t) → Slot Γ k t
   shared   : (d : Closed Γ t) {ok : T (inputsBelowᵉ k d)} → Slot Γ k t

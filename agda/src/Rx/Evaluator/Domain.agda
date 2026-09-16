@@ -94,7 +94,8 @@ open import Data.Nat using (ℕ; zero; suc; pred; _<_; _≤_; _≡ᵇ_)
 open import Data.Nat.Properties using (≤-refl)
 open import Data.Product using (_×_; _,_)
 open import Data.Sum using (inj₁; inj₂)
-open import Data.Unit using (tt)
+open import Data.Unit using (⊤; tt)
+open import Data.Empty using (⊥)
 open import Data.Vec using (lookup)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 
@@ -116,8 +117,28 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; NodeId;
   scan-st; take-st; mergeAll-st; switch-st; exhaust-st;
   mergeAllᵒ; switchᵒ; exhaustᵒ;
   lookupNode; setNode; hasRoom; mergeAllBump; switchKill; aliveThroughᶠ;
-  splitEvents; retagEvents; scanVals; takeDispatch; thruWrap;
+  splitEvents; retagEvents; scanDispatch; takeDispatch; thruWrap;
+  consumeUsable; finishUsable;
   burstCompleted; sharedPlumb; dropSource)
+
+-- THE FRAME A SUBSCRIBE CAN PUSH, WHICH IS EVERY FRAME BUT ONE, AND
+-- SAYING SO IN A TYPE IS WHAT TAKES THE DRAIN OUT OF A PUSH CYCLE.  A
+-- push cycle steps the frame it was handed, and what hands it one is a
+-- source former -- the map, the take, the scan, the outer of an
+-- operator.  The inner's own frame is never pushed: a subscribe returns
+-- the inner's synchronous burst UP to its caller as values, and the
+-- frame is walked later, by the instant loop, down a path the registry
+-- holds.  So the completion side -- react, finish, drain, and the
+-- queued subscribe they end in -- is not reachable from a subscribe at
+-- all, and the cycle that a measure was owed for does not exist.  What
+-- did exist was a DEFINITION order: a block answering for a frame it
+-- can never be given pays for that answer, and this is what stops it.
+-- The fact is stated here rather than beside either consumer because
+-- BOTH faces of the subscribe cycle need it and neither imports the
+-- other.
+srcFrame : ∀ {n} {Γ : Ctx n} {s u} → Frame Γ s u → Set
+srcFrame (from-inner _ _ _) = ⊥
+srcFrame _                  = ⊤
 
 ------------------------------------------------------------------
 -- THE SUBSCRIBE CYCLE.  Twelve families, exactly the members of the
@@ -446,6 +467,22 @@ data subscribeInner⇓ {n} {Γ} {t} {e} where
 -- reason, and it costs nothing: a premise-free constructor whose RESULT
 -- INDEX is fixed admits no run it did not already admit, and the only
 -- direction spent here builds a derivation at the machine's own result.
+--
+-- AND THAT LAST CLAUSE WAS A PREMISE RATHER THAN A PROPERTY, WHICH IS
+-- WHY NO FALLBACK HERE STANDS FREE ANY MORE.  A prover that CHOOSES
+-- its own run is not the machine, so for it a premise-free fallback is
+-- an arm available at every input -- and every one of these has an
+-- empty or passed-through value column, which discharges any statement
+-- quantified over SOME derivation with a reducible column.  The cost
+-- fell entirely on the other direction, and which direction a consumer
+-- is in is not visible from here.  So each collapse now carries the
+-- side condition that distinguishes it: a fold and a truncation name
+-- the machine's own dispatch from a SINGLE constructor, and the
+-- flattener's consume and finish arms carry a `usable` reading of the
+-- store that is false exactly where the machine collapses.  The
+-- builder pays for this in clauses -- a condition on two variables
+-- does not reduce, so its catch-alls are spelt out -- and the
+-- reducibility direction gets a relation with nothing to prefer.
 data thruConsume⇓ {n} {Γ} {t} {e} where
 
   consume-all-sub : ∀ {u lo nid} {κ : Path Γ lo u t} {id now}
@@ -474,7 +511,8 @@ data thruConsume⇓ {n} {Γ} {t} {e} where
                                   (EvalSt.nodes st₀) } )
 
   consume-all-nil : ∀ {u lo nid} {κ : Path Γ lo u t} {id now}
-                      {o : Val Γ (obs u)} {sched₀ st₀}
+                    {o : Val Γ (obs u)} {sched₀ st₀}
+                  → consumeUsable mergeAllᵒ u (lookupNode nid (EvalSt.nodes st₀)) ≡ false
                   → thruConsume⇓ mergeAllᵒ nid κ id now o sched₀ st₀
                       ([] , [] , sched₀ , st₀)
 
@@ -493,7 +531,8 @@ data thruConsume⇓ {n} {Γ} {t} {e} where
                                  (EvalSt.nodes st₂) } )
 
   consume-switch-nil : ∀ {u lo nid} {κ : Path Γ lo u t} {id now}
-                         {o : Val Γ (obs u)} {sched₀ st₀}
+                       {o : Val Γ (obs u)} {sched₀ st₀}
+                     → consumeUsable switchᵒ u (lookupNode nid (EvalSt.nodes st₀)) ≡ false
                      → thruConsume⇓ switchᵒ nid κ id now o sched₀ st₀
                          ([] , [] , sched₀ , st₀)
 
@@ -511,7 +550,8 @@ data thruConsume⇓ {n} {Γ} {t} {e} where
                                   (EvalSt.nodes st₁) } )
 
   consume-exhaust-nil : ∀ {u lo nid} {κ : Path Γ lo u t} {id now}
-                          {o : Val Γ (obs u)} {sched₀ st₀}
+                        {o : Val Γ (obs u)} {sched₀ st₀}
+                      → consumeUsable exhaustᵒ u (lookupNode nid (EvalSt.nodes st₀)) ≡ false
                       → thruConsume⇓ exhaustᵒ nid κ id now o sched₀ st₀
                           ([] , [] , sched₀ , st₀)
 
@@ -598,6 +638,7 @@ data innerFinish⇓ {n} {Γ} {t} {e} where
 
   finish-nil : ∀ {s lo op allNid inst} {κ : Path Γ lo s t} {id now}
                  {vals : List (Val Γ s)} {sched st ns}
+             → finishUsable op s inst ns ≡ false
              → innerFinish⇓ op allNid inst κ id now vals sched st ns
                  (vals , [] , false , sched , st)
 
@@ -648,18 +689,9 @@ data stepFrame⇓ {n} {Γ} {t} {e} where
 
   step-scan : ∀ {s u lo} {fn nid} {κ : Path Γ lo u t}
                 {id now} {vals : List (Val Γ s)} {fin sched st}
-                {ac : Val Γ u} {outs ac′}
-            → lookupNode nid (EvalSt.nodes st) ≡ just (scan-st {t = u} ac)
-            → scanVals fn ac vals ≡ (outs , ac′)
             → stepFrame⇓ id now (scan-f fn nid) κ vals fin sched st
-                ( outs , [] , fin , sched
-                , record st
-                    { nodes = setNode nid (scan-st ac′) (EvalSt.nodes st) } )
-
-  step-scan-nil : ∀ {s u lo} {fn nid} {κ : Path Γ lo u t}
-                    {id now} {vals : List (Val Γ s)} {fin sched st}
-                → stepFrame⇓ id now (scan-f fn nid) κ vals fin sched st
-                    ([] , [] , fin , sched , st)
+                (scanDispatch fn nid vals fin sched st
+                  (lookupNode nid (EvalSt.nodes st)))
 
   step-take : ∀ {s lo nid} {κ : Path Γ lo s t}
                 {id now} {vals : List (Val Γ s)} {fin sched st}

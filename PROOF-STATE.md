@@ -204,12 +204,14 @@ formal-verification-batchSimultaneous    The-Proof.agda — REAL, module postula
   every tier above is stated over Rx.Exp's syntax
 ```
 
-The descent is the evaluator's own and is stated nowhere else: `Acc _≺_` over a
-lexicographic triple — unconnected shares, `depᵉ (slotDepth sl)` joined with
-what the store holds, `syncSizeᵉ` — taken as an ARGUMENT rather than computed,
-so Agda's termination checker verifies the cycle per call site. The evaluator is
-`proj₁` of a builder that returns a run together with its derivation, which is
-what let every guard, every `<?` and the dry marker leave the machine entirely.
+The descent is the evaluator's own and is stated nowhere else: a Girard–Tait
+reducibility candidate `Red`, recursing on the TYPE rather than on any measure
+read off the program. The three edges no structural reading reaches — the μ
+peel, the flattener's hop, a share's connect — are answered by it and by
+nothing else; every other member of the subscribe cycle descends on a term or
+shortens a list, which Agda reads for itself. The evaluator is `proj₁` of a
+builder that returns a run together with its derivation, which is what let
+every guard, every `<?` and the dry marker leave the machine entirely.
 
 A row's class must agree with its postulate's header, which is where the
 research lives; where they disagree, the header wins.
@@ -220,102 +222,106 @@ research lives; where they disagree, the header wins.
 `proj₁` of `evaluate!`, which hands back a run TOGETHER with its `evaluate⇓`
 derivation, so the descent is a proof obligation rather than a reading the
 machine computes and the dry marker is unemittable — no constructor of the
-relation builds one. What that cost was reduction: a projection computes only if
-the thing projected is a real body. Every leaf on the VALUE path is now one, and
-the corpus runs end to end. What is left is the REPORT the builder carries
-beside the run — premise-only statements a row never forces — so the tier's
-remaining risk is entirely in what the report READS, not in what the machine
-does.
+relation builds one.
+
+**AND THE TIER RETIRES ON NO POSTULATE AT ALL (Anthony).** `reducible` is a
+body recursing structurally on the term, and its remaining leaves are the arms
+with no subterm to recurse on. This tier is done when that definition stands on
+NONE of them. The shape they end up taking is free — what is not free is leaving
+one postulated, which is risk carried under every tier above rather than work
+deferred beside it.
 
 ### Big picture tier roadmap
 
-- **ASK EVERY REMAINING ROW WHAT ITS PREMISES LEAVE OUT, THE WAY THE CONNECT
-  ANSWERED.** The share connect's arithmetic was refuted at a table of one: the
-  count is over SHARED slots and the premise named only membership, so a
-  `scripted` slot read nought either side. Its own probe had written the gap
-  down and drawn the opposite conclusion from it. That is a shape, not an
-  accident — a premise copied from the branch a caller happens to take, rather
-  than from what the conclusion reads — and the rows left here are the ones most
-  exposed to it. The leg is that audit, refutation first, and each repair carried
-  to a body in the same pass rather than left as a note.
+- **TAKE THE ACCUMULATING FACE'S MEASURE LEXICOGRAPHIC, CEILING OUTERMOST.**
+  The share's slot is decided: it CAN be stated over the table, and the
+  candidate need not carry the def as an index. The telescope is stratified,
+  so a slot's def reads only strictly earlier slots, and that is the descent
+  — the term never was. What blocks it is that an input's g-size is zero, so
+  the measure the face already runs has nothing left to spend there. This leg
+  is the restatement: thread the stratification ceiling as an index, order it
+  above the g-size, and let a term step hold the ceiling while this arm drops
+  it. The leaf becomes a body or the ceiling does not thread, and either is
+  the finding.
 
-- **AND THE TWO FRAME HEADS THAT LEAVE THE MODULE.** The frame walk is a body
-  at every head that rewrites a payload; what is left are the two that do not.
-  `inner-handed` and `thru-handed` follow the run into `innerReact⇓` and
-  `thruWalk⇓`, so what is owed is this same claim at the rank THAT family
-  entered at. The leg is the walk over those two relations, and what it decides
-  is whether the rank an inner subscription enters at is one this walk carries
-  or one the record has to.
+- **DISCHARGE THE FOUR SUBSTITUTION LEAVES THE PARTNER BOUGHT ITSELF WITH.**
+  The `Θloc` telescope landed and took three of the original six with it —
+  they were never gaps, only a missing generalisation of the guarded
+  elimination. Four remain, all probed green: the fixpoint peel commuting with
+  the environment, a term's evaluation, a frame's function at its argument
+  slot, and the empty substitution being the identity. The last wants a
+  transport along `Θloc ++ []`, which does not reduce for a variable telescope.
+  None can move the ground.
 
-- **SAMPLE THE HEADS ABOVE FROM A RUN, THE WAY THE LAWS WERE SAMPLED.** Hand
-  instantiation reached every arm of `innerReact⇓` and `thruWalk⇓` that passes
-  a payload THROUGH and none that MINTS one, because each minting arm runs a
-  subscription and no hand-built state has one. Nothing needs building to fix
-  that: `evaluate!` hands back the run's own derivation, and the generator
-  already produces programs that reach `μᵉ`. The leg is the decidable twin of
-  `HandedOK` plus a walk of that derivation, swept the way the protocol
-  automaton already is — which reaches the minting arms because a real run
-  subscribes, and is the apparatus every reading-over-a-run row here wants.
+- **THEN RUN A SELF-REFERENTIAL μ, IN THE CORPUS RATHER THAN IN A PROBE.** The
+  peel is now paid for by a size the unfolding does not move, and what funds that
+  size is a SYNTACTIC claim: the μ variable is bound into the guarded context,
+  `varᵉ` reads only from the usable one, and the guarded elimination substitutes
+  nowhere except through its gate clause. Every leaf under it now rests on that.
+  The claim is about the ELIMINATOR rather than about any statement, so nothing
+  can carry a receipt for it and its home is the corpus — programs whose μ really
+  does refer to itself, run end to end. Cheap, and the one thing that would catch
+  the guard being right on paper and wrong in the code.
 
-- **INSTANTIATE THE COMPOSING READING AT THE SHAPES THAT KILLED ITS
-  PREDECESSORS.** The reading now takes the bound it is read at as a parameter
-  and composes at every binder, so the join and the sum that the two `caseᵗ`
-  witnesses killed are both gone — and nothing has instantiated what replaced
-  them. `Refuted.Case-Binds` still stands against the join and so pins the
-  clause from below, but a receipt for the clause itself needs rows: the
-  evaluation lemma in its `reify` form at a wrapping template, at a scrutinee
-  bound under a branch, and at a fold whose seed is deeper than its source.
-  The leg is those rows, and what it buys is the only thing that moves the
-  measure's own statements off the class they are born into.
+- **THEN THE MECHANICAL SHELF, WHICH IS NOW ONE ROW.** The flattener's consume
+  fallback, where an arrival at a usable node is subscribed and the inner's own
+  derivation is what comes back. It comes last of the named legs because the
+  legs above can still change what it must be written against — a walk that
+  reaches a live inner subscribes it, and that is the site this row is stated
+  at. Grinding it before the risk above settles buys work a restatement upstream
+  would throw away, which is why the ordering is written down rather than left
+  to whatever happens to be nearest.
 
-- **RETIRE THE RANK FROM THE BUILDER, NOT THE FAMILIES FROM NOTHING.** The
-  previous wording of this leg is discarded rather than shrunk: it owed the
-  families, and the families are already the domain's twenty-one relations
-  with a real body above them. What the builder still spends is a RANK — an
-  accessibility witness, an entry invariant, a share bound — and every open
-  row here is one of that mechanism's own decrease obligations, which is why
-  they are refuted rather than hard. The leg is the type-denominated descent
-  put where the rank stands, leaf postulated — unblocked, since
-  the reading the rank produces has no customer outside the decrease.
+- **THEN WHATEVER DESIGN WORK REMAINS.** The candidate funds `Runs` and nothing
+  else; the other eight `*Runs` families have no candidate and the bet is that
+  once subscription is independently total their recursion is structural. That
+  bet is decided by CI rather than by argument, and whatever it leaves open is
+  this leg — it is named rather than planned because its content is exactly what
+  the three legs above turn up.
 
-### Open questions
+- **THEN WHATEVER GRINDING REMAINS.** The leaves the legs above leave behind,
+  once each has a settled shape and a named route. This is the delegation
+  boundary and the first leg here that is not the design session's own work.
 
 ### The ledger
 
-- **`inner-handed`, `thru-handed`** (Rx/Evaluator/Burst-Report) — FALSITY,
-  `PROBED×2`: the two `*All` heads, which rewrite no payload — they subscribe
-  one, or deliver what an inner subscription produced. So the claim owed is
-  this one about ANOTHER family's run, at the rank that family entered at
-  rather than this frame's.
+- **`sub-unfoldμ`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`: the fixpoint
+  peel commutes with the environment substitution. This is what the partner's μ
+  arm spends, and it is where a wrong telescope would show.
 
-- **`data-handed`** (Rx/Evaluator/Burst-Report) — FALSITY, `PROBED`: a scripted
-  slot's payload is data, and the rank is read only at `obs`, so this is an
-  induction on the TYPE with no arithmetic in it. A leaf only because it is
-  unwritten.
+- **`sub-evalTm`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`: evaluating a
+  substituted term is evaluating it under the environment. Ordinary, and stated
+  rather than assumed because nothing has instantiated it.
 
-- **`dep-wkTm`** (Rx/Obs-Depth/Substitution) — FALSITY, `PROBED`: the shelf
-  under the substitution's variable arm — a weakening moves no reading, at the
-  closed bound and at a positive one, which is where the bound being a
-  parameter could have leaked.
+- **`sub-applyFn`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`: the same for
+  a frame's function, where the substitution must skip the argument slot the
+  function binds.
 
-- **`scan-fits`** (Rx/Evaluator/Burst-Report) — FALSITY,
-  `REFUTED×6, DEAD ROUTE`: refuted at a five-element burst, the premise that
-  would carry the count refuted, the rank it reserves against refuted, and the
-  domain predicate that would replace the rank shown to be `⊤`. Neither a
-  number nor a predicate is available.
+- **`subΘ-idExp`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`: the empty
+  substitution is the identity. It is what makes the top line a corollary of
+  the partner at the empty environment.
 
+
+- **`red-input-shared`** (Rx/Evaluator/Reducible) — SHAPE,
+  `DEAD ROUTE, PROBED`: a share's slot is reducible. Stated as a LEAF it is
+  wrong: the descent is the stratification ceiling, which no hypothesis carries.
+
+- **`red-thru`** (Rx/Evaluator/Reducible) — DIFFICULTY, `PROBED`: the consume
+  fallback is pinned now, so an arrival at a usable node is subscribed and the
+  inner's own derivation is what comes back. The queue it fills is never read
+  back from here. Rows at all three operators.
 
 ## Tier 2 — Verify-Well-Formed (parked behind tier 1)
 
-Built on `rank-sufficient`, so proving anything here while tier 1 is open bets
-on ground a refutation of the descent would move.
+Built on the run's own derivation, so proving anything here while tier 1 is
+open bets on ground a failure of the descent would move.
 
 **THE TIER IS ONE STATEMENT OVER ONE LEAF.** `The-Proof` draws
 `evaluate-well-formed` and nothing else from this face. That name is a real
 body: it splits the descent's dry-freeness across the subscribe frame and the
 drain, and hands the two halves to the leaf. The split is what CONSUMES tier 1
-— a leaf handed `rank-sufficient` directly would assert its sufficiency without
-ever checking it, which is the shape the leaf law refuses.
+— a leaf handed the descent's own conclusion directly would assert its
+sufficiency without ever checking it, which is the shape the leaf law refuses.
 
 **AND THE BOOKKEEPING IS DELIBERATELY UNCARVED.** The protocol argument's shape
 is a function of a recursion tier 1 may still restate, so pieces cut against
