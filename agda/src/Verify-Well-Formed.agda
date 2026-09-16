@@ -70,7 +70,7 @@ postulate
 -- any at its indices -- `evaluate-deterministic` is the fact that would
 -- make those the same set.
 
--- RECOVERY: git show 081328b0:agda/src/Verify-Well-Formed.agda restores
+-- RECOVERY: git show 9f5e3339:agda/src/Verify-Well-Formed.agda restores
 --   the seam carve -- two leaves meeting at a named automaton state, the
 --   `BurstInv` relation they were denominated in, and `Glue`'s fold law
 --   composing their conclusions.
