@@ -63,6 +63,11 @@ open import Probed.Pipeline-Claims using (row-online; row-ids)
 -- about a concatenation and named nothing in between.
 open import Probed.Seam using (row-root; row-drain; row-root-hot; row-drain-hot; drain-hot-emits)
 
+-- THE ADEQUACY FACE'S ONE DECIDABLE ROW, claimed here because the
+-- other two claims on that face are stated over a postulated domain and
+-- cannot be instantiated at all.
+open import Probed.Adequacy using (row-saturated; row-grows; row-past-horizon)
+
 -- TAKE AT ZERO, the one row set on this face that decides an evaluator
 -- fact without a spec, a batching stage or a second derivation to
 -- compare against.

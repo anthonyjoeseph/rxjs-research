@@ -58,10 +58,13 @@
 -- the observation, and a compositional semantics is what the
 -- denotation face does not yet state.
 --
--- DEAD ROUTE: proving `evaluate-well-formed` by way of `adequacy` and a
---   well-formed meaning.  Structurally blocked by the final check:
+-- DEAD ROUTE: descending from a well-formed meaning to a well-formed run
+--   along `WellFormed` ITSELF.  Structurally blocked by the final check:
 --   `WellFormed` is not prefix-closed, and adequacy's conclusion is a
---   prefix, so nothing carries the property down to the run.
+--   prefix, so the property does not travel down.  It is the descent
+--   along this predicate that is dead — a denotational one demanding
+--   settledness at every cut point is a different statement and is not
+--   what this line rules out.
 
 module Verify-Well-Formed where
 
