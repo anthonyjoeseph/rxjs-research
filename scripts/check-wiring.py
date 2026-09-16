@@ -281,10 +281,18 @@ def extract_definitions(src_dir, files):
                          are excluded when counting NAME's consumers.
         postulate_names  set of names that are postulate members
         order            list of names in first-seen order (stable output)
+        postulate_sites  name -> (file, lineno) of the name's POSTULATE
+                         declaration, which is NOT always `defs[name]`.
+                         `defs` is first-writer-wins over a BARE name, so a
+                         postulate sharing a name with a real definition
+                         elsewhere in the tree loses its own site to
+                         whichever file sorts first -- and the ledger then
+                         prints a proven definition as the remaining work.
     """
     defs = {}
     def_lines = defaultdict(set)
     postulate_names = set()
+    postulate_sites = {}
     order = []
     # Mixfix cores: an operator declared `_foo_ : ...` is DEFINED with tok0
     # == "_foo_", but its pattern-matching clauses are written INFIX —
@@ -477,6 +485,7 @@ def extract_definitions(src_dir, files):
                         mname = mtoks[0].rstrip(":")
                         if kind == "postulate":
                             postulate_names.add(mname)
+                            postulate_sites.setdefault(mname, (relpath, i + 1))
                         register(mname, relpath, i + 1, kind)
                     i += 1
                     continue
@@ -672,6 +681,7 @@ def extract_definitions(src_dir, files):
             mname = tok0.rstrip(":")
             if kind == "postulate":
                 postulate_names.add(mname)
+                postulate_sites.setdefault(mname, (relpath, i + 1))
             register(mname, relpath, i + 1, kind)
             i += 1
         return i
@@ -681,7 +691,7 @@ def extract_definitions(src_dir, files):
         n = len(raw_lines)
         scan_block(raw_lines, visible, 0, n, 0, relpath)
 
-    return defs, def_lines, postulate_names, order
+    return defs, def_lines, postulate_names, order, postulate_sites
 
 
 def import_span_lines(visible):
@@ -1200,12 +1210,13 @@ def main():
         sys.exit(2)
 
     files = find_agda_files(src_dir)
-    defs, def_lines, postulate_names, order = extract_definitions(src_dir, files)
+    defs, def_lines, postulate_names, order, postulate_sites = \
+        extract_definitions(src_dir, files)
 
     if args.postulates:
         for name in sorted(postulate_names):
-            d = defs[name]
-            print(f"{name}  {d.file}:{d.line}")
+            f, ln = postulate_sites[name]
+            print(f"{name}  {f}:{ln}")
         print(f"-- {len(postulate_names)} postulate(s)")
         return
 
