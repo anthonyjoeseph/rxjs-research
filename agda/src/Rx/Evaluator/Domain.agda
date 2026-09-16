@@ -94,7 +94,8 @@ open import Data.Nat using (ℕ; zero; suc; pred; _<_; _≤_; _≡ᵇ_)
 open import Data.Nat.Properties using (≤-refl)
 open import Data.Product using (_×_; _,_)
 open import Data.Sum using (inj₁; inj₂)
-open import Data.Unit using (tt)
+open import Data.Unit using (⊤; tt)
+open import Data.Empty using (⊥)
 open import Data.Vec using (lookup)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 
@@ -119,6 +120,25 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; NodeId;
   splitEvents; retagEvents; scanDispatch; takeDispatch; thruWrap;
   consumeUsable; finishUsable;
   burstCompleted; sharedPlumb; dropSource)
+
+-- THE FRAME A SUBSCRIBE CAN PUSH, WHICH IS EVERY FRAME BUT ONE, AND
+-- SAYING SO IN A TYPE IS WHAT TAKES THE DRAIN OUT OF A PUSH CYCLE.  A
+-- push cycle steps the frame it was handed, and what hands it one is a
+-- source former -- the map, the take, the scan, the outer of an
+-- operator.  The inner's own frame is never pushed: a subscribe returns
+-- the inner's synchronous burst UP to its caller as values, and the
+-- frame is walked later, by the instant loop, down a path the registry
+-- holds.  So the completion side -- react, finish, drain, and the
+-- queued subscribe they end in -- is not reachable from a subscribe at
+-- all, and the cycle that a measure was owed for does not exist.  What
+-- did exist was a DEFINITION order: a block answering for a frame it
+-- can never be given pays for that answer, and this is what stops it.
+-- The fact is stated here rather than beside either consumer because
+-- BOTH faces of the subscribe cycle need it and neither imports the
+-- other.
+srcFrame : ∀ {n} {Γ : Ctx n} {s u} → Frame Γ s u → Set
+srcFrame (from-inner _ _ _) = ⊥
+srcFrame _                  = ⊤
 
 ------------------------------------------------------------------
 -- THE SUBSCRIBE CYCLE.  Twelve families, exactly the members of the

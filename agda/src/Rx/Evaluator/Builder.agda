@@ -46,8 +46,7 @@ open import Data.Nat.Induction using (<-wellFounded-fast)
 open import Data.Nat.Properties using (≤-refl; ≮⇒≥; ∸-monoʳ-<)
 open import Data.Product using (∃; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
-open import Data.Unit using (⊤; tt)
-open import Data.Empty using (⊥)
+open import Data.Unit using (tt)
 open import Data.Vec using (lookup)
 open import Induction.WellFounded using (Acc; acc)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; cong)
@@ -67,7 +66,7 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; AllOp; NodeId; Node
   arrVal; AtFloor; RegId; chainsOf; cascadeLatch; sched-next; shareAdmit; shareLatch)
 open import Rx.Evaluator.Keeps-Slots using (subs-keeps; step-keeps;
   consume-keeps; switchKill-slots)
-open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeAll⇓; pushBurst⇓;
+open import Rx.Evaluator.Domain using (srcFrame; subscribeE⇓; subscribeAll⇓; pushBurst⇓;
   stepFrame⇓; innerReact⇓; innerFinish⇓; mergeAllDrain⇓; thruWalk⇓;
   thruConsume⇓; subscribeInner⇓;
   finish-all-drain; finish-switch-clear;
@@ -216,22 +215,6 @@ slot-agree sl sched i ag eq = trans (cong (λ f → f i) ag) eq
 -- that reaches them, because what used to close their loop was the hop.
 --
 -- STRUCTURAL SCC: subscribeAll! subscribeE!
-
--- THE FRAME A SUBSCRIBE CAN PUSH, WHICH IS EVERY FRAME BUT ONE, AND
--- SAYING SO IN A TYPE IS WHAT TAKES THE DRAIN OUT OF THIS BLOCK.  A
--- push cycle steps the frame it was handed, and what hands it one is a
--- source former -- the map, the take, the scan, the outer of an
--- operator.  The inner's own frame is never pushed: a subscribe returns
--- the inner's synchronous burst UP to its caller as values, and the
--- frame is walked later, by the instant loop, down a path the registry
--- holds.  So the completion side -- react, finish, drain, and the
--- queued subscribe they end in -- is not reachable from a subscribe at
--- all, and the cycle that a measure was owed for does not exist.  What
--- did exist was a DEFINITION order: this block had to answer for a
--- frame it can never be given, and answering cost it the drain.
-srcFrame : ∀ {n} {Γ : Ctx n} {s u} → Frame Γ s u → Set
-srcFrame (from-inner _ _ _) = ⊥
-srcFrame _                  = ⊤
 
 subscribeE! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
   (sl : Slots Γ) (b : Closed Γ u)

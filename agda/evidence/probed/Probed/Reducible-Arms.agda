@@ -44,7 +44,6 @@
 --
 -- TARGET: red-input-shared @21f529
 -- TARGET: red-scan @c288cd
--- TARGET: red-from-inner @de6e75
 -- TARGET: red-thru @f94cad
 module Probed.Reducible-Arms where
 
@@ -67,11 +66,10 @@ open import Rx.Exp using (Ctx; Closed; natᵗ; obs; ofᵉ; nat̂; varᵗ; input;
 open import Rx.Slots using (Slots; shared)
 open import Rx.Evaluator using (Sched; EvalSt; Path; root; sched-init; st-init; mergeAllᵒ; switchᵒ; exhaustᵒ; AllOp;
   NodeState; from-inner; _↠_; map-f; mergeAll-st; switch-st; exhaust-st; installNode; scan-st)
-open import Rx.Evaluator.Reducible using (Red; reducible; red-input-shared; red-thru; red-scan; red-from-inner)
+open import Rx.Evaluator.Reducible using (Red; reducible; red-input-shared; red-thru; red-scan)
 
 open import Rx.Evaluator.Domain using (subs-shared; slot-spent; slot-join; step-thru-outer; walk-nil; walk-cons; inner; step-scan;
-  step-from-inner; react-false; consume-all-sub; consume-all-enqueue; consume-switch-sub;
-  consume-exhaust-sub)
+  consume-all-sub; consume-all-enqueue; consume-switch-sub; consume-exhaust-sub)
 
 open import Probed.Apparatus using (Confirms)
 
@@ -194,18 +192,6 @@ row-scan-acc : Confirms
   (red-scan {e = e₀} 0 0 fstFn nid₂ κ₂ {3 ∷ []} (tt ∷ []) false sch₀ stScan)
 row-scan-acc =
   _ , step-scan , reducible acc₂ ∷ []
-
--- THE INNER'S OWN FRAME, at the arm that carries rather than spends.
--- An unfinished inner emit passes its values through untouched, so the
--- row is LOAD-BEARING on the carry -- an observable payload leaves the
--- frame and its candidate has to arrive at the conclusion -- and reads
--- no store at all.  The drain and the kill, which are where this
--- statement reads the `*All` node, are NOT reached by it.
-row-inner-carry : Confirms
-  (red-from-inner {e = e₀} 0 0 mergeAllᵒ nid₂ nid₂ κ₂
-     {ofᵉ (nat̂ 7 ∷ []) ∷ []} (reducible (ofᵉ (nat̂ 7 ∷ [])) ∷ []) false sch₀ st₀)
-row-inner-carry =
-  _ , step-from-inner react-false , reducible (ofᵉ (nat̂ 7 ∷ [])) ∷ []
 
 ----------------------------------------------------------------------
 -- 5.  THE SAME STEP THROUGH A FLATTENING FRAME, which is where the

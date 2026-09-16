@@ -64,7 +64,7 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; _↠_; map-f
   thru-outer; mergeAllᵒ; switchᵒ; exhaustᵒ; mergeAll-st; switch-st; exhaust-st;
   takeVals; takeDispatch; lookupNode; NodeState;
   installNode; oneShotBurst; memberSource; splitEvents; retagEvents; NodeId; AllOp; from-inner)
-open import Rx.Evaluator.Domain using (subscribeE⇓; pushBurst⇓; stepFrame⇓; step-map; step-take; push-nil; push-cons; subs-of;
+open import Rx.Evaluator.Domain using (srcFrame; subscribeE⇓; pushBurst⇓; stepFrame⇓; step-map; step-take; push-nil; push-cons; subs-of;
   subs-empty; subs-map; subs-take-zero; subs-take-suc; subs-scan; subs-defer;
   subs-floor; subs-hot-done; subs-hot-live; subs-cold-sync; subs-cold-async;
   subs-μ; sub-all; subs-merge-all; subs-switch-all; subs-exhaust-all)
@@ -285,40 +285,22 @@ postulate
              (sched : Sched Γ) (st : EvalSt e)
            → RedStep {e = e} id now (scan-f fn nid) κ vals fin sched st
 
-  -- WHAT AN INNER EMITS ON ITS WAY BACK UP, which is the other half of
-  -- a flattener and the half no row has reached.  The walk below
-  -- SUBSCRIBES an inner; this is what happens when that inner later
-  -- fires, and it is where a mergeAll drains its queue and a switch
-  -- decides whether the emission still belongs to anybody.  The node
-  -- census at `NodeState` narrows which of those owe anything: the
-  -- switch and exhaust faces hold a flag and an identifier, so their
-  -- values can only be the ones that arrived, and the DRAIN is the one
-  -- sub-arm here that reads a payload back out, and it is now the only
-  -- way through: the finish fallback carries the side condition that
-  -- says the node is not this operator's, so a dead inner at a real
-  -- queue has to drain it.
-  --
-  -- PROBED: `Probed.Reducible-Arms` at the arm that CARRIES rather
-  --   than spends -- an unfinished inner emit, whose values pass
-  --   through untouched, so an observable payload's candidate has to
-  --   arrive at the conclusion.  That arm reads no store at all.  The
-  --   drain and the kill, which are where this statement reads the
-  --   `*All` node, are not reached.
-  red-from-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo}
-             (id : Id) (now : Tick) (op : AllOp) (allNid inst : NodeId)
-             (κ : Path Γ lo s t)
-             {vals : List (Val Γ s)} → All (Red s) vals → (fin : Bool)
-             (sched : Sched Γ) (st : EvalSt e)
-           → RedStep {e = e} id now (from-inner op allNid inst) κ vals fin sched st
-
   -- THE FLATTENING WALK, and the one leaf here with rows against it.
   -- Every value it produces is an inner subscribed out of the arriving
   -- batch, and the census at `NodeState` says the nodes it consults
-  -- carry no payload to confuse that -- so this arm owes a store
-  -- invariant only through the QUEUE it may push into, never through
-  -- what it reads.  The consume fallback carries the side condition
-  -- that says the node is not usable, so an arriving observable at a
-  -- real node has to be taken rather than dropped.
+  -- carry no payload to confuse that.  The consume fallback carries
+  -- the side condition that says the node is not usable, so an
+  -- arriving observable at a real node has to be taken rather than
+  -- dropped.
+  --
+  -- AND THE QUEUE IT PUSHES INTO IS WRITE-ONLY FROM HERE, WHICH IS
+  -- WHY NO STORE INVARIANT IS OWED AT ALL.  A refused arrival is
+  -- enqueued and never read back within a subscribe: the read is the
+  -- DRAIN, which hangs off an inner's completion, and `srcFrame` says
+  -- in a type that a push cycle is entered only from a source former.
+  -- So the entry a subscribe stores is one this face can put in and
+  -- never has to take out, and the carrier the census left owed is
+  -- owed to the instant loop instead.
   --
   -- PROBED: `Probed.Reducible-Arms` at each of the three operators,
   --   with the arriving batch carrying a real observable: mergeAll
@@ -487,25 +469,29 @@ red-take id now nid κ rv fin sched st =
   _ , step-take
     , redTakeDispatch nid fin sched st (lookupNode nid (EvalSt.nodes st)) rv
 
--- STEPPING ONE FRAME, DISPATCHED ON THE FRAME.  The mapping arm is a
--- body because nothing about it is stateful; the other four each read
--- a node this face installed earlier, which is the one thing the
--- candidate's quantification over every state does not hand back.
+-- STEPPING ONE FRAME, DISPATCHED ON THE FRAME, AND ONLY EVER A SOURCE
+-- FRAME.  The mapping arm is a body because nothing about it is
+-- stateful; the other three each read a node this face installed
+-- earlier, which is the one thing the candidate's quantification over
+-- every state does not hand back.  The fourth frame is not answered
+-- for at all: `srcFrame` says in a type that a push cycle is only
+-- entered from a source former, so the inner's own frame arrives here
+-- never, and a leaf stated for it would have been a claim about a
+-- run this face cannot reach.
 red-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
-           (id : Id) (now : Tick) (f : Frame Γ s u) → RedFrame f
+           (id : Id) (now : Tick) (f : Frame Γ s u) → srcFrame f → RedFrame f
          → (κ : Path Γ lo u t)
            {vals : List (Val Γ s)} → All (Red s) vals → (fin : Bool)
            (sched : Sched Γ) (st : EvalSt e)
          → RedStep {e = e} id now f κ vals fin sched st
-red-step id now (map-f fn) rf κ rv fin sched st =
+red-step id now (map-f fn) sv rf κ rv fin sched st =
   _ , step-map , redMapVals fn rf rv
-red-step id now (scan-f fn nid) rf κ rv fin sched st =
+red-step id now (scan-f fn nid) sv rf κ rv fin sched st =
   red-scan id now fn nid κ rv fin sched st
-red-step id now (take-f nid) rf κ rv fin sched st =
+red-step id now (take-f nid) sv rf κ rv fin sched st =
   red-take id now nid κ rv fin sched st
-red-step id now (from-inner op allNid inst) rf κ rv fin sched st =
-  red-from-inner id now op allNid inst κ rv fin sched st
-red-step id now (thru-outer op nid) rf κ rv fin sched st =
+red-step id now (from-inner op allNid inst) () rf κ rv fin sched st
+red-step id now (thru-outer op nid) sv rf κ rv fin sched st =
   red-thru id now op nid κ rv fin sched st
 
 -- WALKING A BURST IS BOOKKEEPING, AND SEPARATING IT FROM THE STEP IS
@@ -556,17 +542,17 @@ satFin false = []
 -- on the values alone, which is why the reassembly costs three
 -- appends of protocol traffic and one real obligation.
 red-push : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
-           (id : Id) (now : Tick) (f : Frame Γ s u) → RedFrame f
+           (id : Id) (now : Tick) (f : Frame Γ s u) → srcFrame f → RedFrame f
          → (κ : Path Γ lo u t)
            {burst : Stream Γ s} → StreamSat (Red s) burst
          → (sched : Sched Γ) (st : EvalSt e)
          → RedPush {e = e} id now f κ burst sched st
-red-push id now f rf κ {[]}      []       sched st = _ , push-nil , []
-red-push id now f rf κ {em ∷ ems} (p ∷ ps) sched st =
+red-push id now f sv rf κ {[]}      []       sched st = _ , push-nil , []
+red-push id now f sv rf κ {em ∷ ems} (p ∷ ps) sched st =
   let ((vals′ , evs , fin′ , sched₁ , st₁) , d , rv) =
-        red-step id now f rf κ (splitVals (InstEmit.events em) p)
+        red-step id now f sv rf κ (splitVals (InstEmit.events em) p)
           (proj₂ (proj₂ (splitEvents (InstEmit.events em)))) sched st
-      ((rest , sched₂ , st₂) , dr , sr) = red-push id now f rf κ ps sched₁ st₁
+      ((rest , sched₂ , st₂) , dr , sr) = red-push id now f sv rf κ ps sched₁ st₁
   in _ , push-cons refl d dr
        , ++⁺ (splitProt (InstEmit.events em))
              (++⁺ (satRetag evs) (satEvents rv (satFin fin′))) ∷ sr
@@ -612,7 +598,7 @@ mutual
           redExpAcc b σ rσ (rs (s≤s (m≤n+m (gsizeᵉ b) (gsizeᵗ f))))
             (map-f fn ↠ κ) id now sched st
         (r , p , sat′) =
-          red-push id now (map-f fn)
+          red-push id now (map-f fn) tt
             (redFnAcc f σ rσ (rs (s≤s (m≤m+n (gsizeᵗ f) (gsizeᵉ b)))))
             κ sat sched₁ st₁
     in r , subs-map d p , sat′
@@ -626,7 +612,7 @@ mutual
             (take-f nid ↠ κ) id now
             (record sched { nextNode = suc nid })
             (installNode nid (take-st (suc k)) st)
-        (r , p , sat′) = red-push id now (take-f nid) tt κ sat sched₂ st₁
+        (r , p , sat′) = red-push id now (take-f nid) tt tt κ sat sched₂ st₁
     in r , subs-take-suc ceq refl d p , sat′
   redExpAcc (scanᵉ {s = s} {t = u} f z b) σ rσ (acc rs) κ id now sched st =
     let nid = Sched.nextNode sched
@@ -638,7 +624,7 @@ mutual
             (record sched { nextNode = suc nid })
             (installNode nid (scan-st (evalTm (subΘTm [] σ z))) st)
         (r , p , sat′) =
-          red-push id now (scan-f (subΘTm ((u ×ᵗ s) ∷ []) σ f) nid) tt
+          red-push id now (scan-f (subΘTm ((u ×ᵗ s) ∷ []) σ f) nid) tt tt
             κ sat sched₂ st₁
     in r , subs-scan refl d p , sat′
   redExpAcc (mergeAllᵉ lim b) σ rσ (acc rs) κ id now sched st =
@@ -648,7 +634,7 @@ mutual
             (record sched { nextNode = suc nid })
             (installNode nid (mergeAll-st lim 0 [] false) st)
         (r , p , sat′) =
-          red-push id now (thru-outer mergeAllᵒ nid) tt κ sat sched₂ st₁
+          red-push id now (thru-outer mergeAllᵒ nid) tt tt κ sat sched₂ st₁
     in r , subs-merge-all (sub-all refl d p) , sat′
   redExpAcc (switchAllᵉ b) σ rσ (acc rs) κ id now sched st =
     let nid = Sched.nextNode sched
@@ -657,7 +643,7 @@ mutual
             (record sched { nextNode = suc nid })
             (installNode nid (switch-st nothing false) st)
         (r , p , sat′) =
-          red-push id now (thru-outer switchᵒ nid) tt κ sat sched₂ st₁
+          red-push id now (thru-outer switchᵒ nid) tt tt κ sat sched₂ st₁
     in r , subs-switch-all (sub-all refl d p) , sat′
   redExpAcc (exhaustAllᵉ b) σ rσ (acc rs) κ id now sched st =
     let nid = Sched.nextNode sched
@@ -666,7 +652,7 @@ mutual
             (record sched { nextNode = suc nid })
             (installNode nid (exhaust-st false false) st)
         (r , p , sat′) =
-          red-push id now (thru-outer exhaustᵒ nid) tt κ sat sched₂ st₁
+          red-push id now (thru-outer exhaustᵒ nid) tt tt κ sat sched₂ st₁
     in r , subs-exhaust-all (sub-all refl d p) , sat′
   redExpAcc (μᵉ body) σ rσ (acc rs) κ id now sched st =
     let ih = subst (Red (obs _)) (sub-unfoldμ body σ)

@@ -233,15 +233,15 @@ deferred beside it.
 
 ### Big picture tier roadmap
 
-- **THE QUEUE CARRIER, WHICH IS WHAT PINNING THE WITNESSES LEFT BEHIND.** Every
-  fallback the reducibility arms were escaping through now carries its side
-  condition, so the three rows say what they were meant to and two of them ask
-  for the same fact: a mergeAll's QUEUE holds closed observables, the walk
-  pushes into it and the drain reads them back, and nothing says an entry is
-  reducible. It is the one carrier the census leaves owed, and unlike the fold's
-  accumulator it has a source — the hypothesis that admitted the arrival. This
-  leg finds where that hypothesis can be spent: at the enqueue, at the drain, or
-  as a field the store must carry.
+- **THE FOLD'S ACCUMULATOR, WHICH IS THE CARRIER THAT SURVIVED.** The queue
+  carrier was owed to a leaf that turned out unreachable: a push cycle is entered
+  only from a source former, and saying so in a type retired the row outright, so
+  the queue is write-only from a subscribe and the instant loop inherits it. What
+  remains is the fold, whose node holds a payload and is read back inside the
+  cycle that wrote it — and there the accumulator HAS a source, in hand at the
+  arm that installs the node. The gap is that nothing carries it across the
+  source's subscription. This leg decides where that crossing is paid for, with
+  the store-invariant routes already dead.
 
 - **DISCHARGE THE FOUR SUBSTITUTION LEAVES THE PARTNER BOUGHT ITSELF WITH.**
   The `Θloc` telescope landed and took three of the original six with it —
@@ -308,13 +308,10 @@ deferred beside it.
   witness is pinned now, so the demand is real and unmet — the emitted value is
   the stored accumulator and no hypothesis says a stored one is reducible.
 
-- **`red-from-inner`** (Rx/Evaluator/Reducible) — SHAPE, `PROBED`: the finish
-  fallback is pinned now, so a dead inner at a real queue must drain it — and
-  nothing says a queued entry is reducible.
-
 - **`red-thru`** (Rx/Evaluator/Reducible) — DIFFICULTY, `PROBED`: the consume
   fallback is pinned now, so an arrival at a usable node is subscribed and the
-  inner's own derivation is what comes back. Rows at all three operators.
+  inner's own derivation is what comes back. The queue it fills is never read
+  back from here. Rows at all three operators.
 
 ## Tier 2 — Verify-Well-Formed (parked behind tier 1)
 
