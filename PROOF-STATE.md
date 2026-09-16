@@ -227,19 +227,20 @@ forbid its sibling; above it sits a wrapper supplying derivations. It can be
 FALSE, not merely unproven: a run the automaton rejects kills both leaves, the
 seam, and the WellFormed quantification `The-Proof` draws from here.
 
-also: `take-bounds-values` — the REHEARSAL, run here on Anthony's direction before the monster itself is touched. Off the cone by construction: it names no seam and no automaton, which is the point — it exercises the drain induction with none of this face's apparatus in the way.
+also: `take-bounds-values` — the REHEARSAL, run here on Anthony's direction before the monster itself is touched. Off the cone by construction: it names no seam and no automaton, which is the point — it exercises the drain induction with none of this face's apparatus in the way. Now a body, so its cone carries its two leaves and the run decomposition they are stated over.
 also: `evaluate-deterministic` — tier 3's monster, whose statement and leaves are already declared. Admitted here because the branch carrying this tier's work carries them too, and the check reads the branch rather than the commit.
 
 ### Big picture tier roadmap
 
-- **THE REHEARSAL FIRST: PROVE THAT `take k` BOUNDS THE STREAM (Anthony).**
-  `take-bounds-values` is stated and claimed, and nothing on the monster moves
-  until it is discharged. It is the same induction over the drain that both
-  seam leaves owe, with none of this face's apparatus in the way — the reason
-  it is the rehearsal is in its own header. Instantiate before grinding: a
-  scripted slot with two entries under a take at one is the cheapest shape that
-  could refute it, since the cut landing mid-batch is where the node's budget
-  and its frame have to agree.
+- **FINISH THE REHEARSAL: THE DRAIN HALF OF TAKE'S BUDGET (Anthony).** The
+  assembly landed and the top statement is a body: a run splits definitionally
+  into its subscribe frame and its drain, and the node's budget is the only
+  thing crossing between them. What is left is the two leaves that split
+  carved out. `take-drain-bound` is the one carrying the induction — the drain
+  re-enters itself and the budget is state it threads, which is the shape both
+  seam leaves owe. `take-burst-bound` is the frame's own arithmetic and should
+  fall to the dispatch's clauses. Both are instantiated and tight; neither has
+  been ground.
 
 - **THEN RUN A CLOSE, WHICH IS THE ONE FIELD NO ROW HAS CONDITIONED.** The drain's
   step is reached: a hot slot firing at tick zero delivers, the emit count is
@@ -278,10 +279,15 @@ also: `evaluate-deterministic` — tier 3's monster, whose statement and leaves 
 
 ### The ledger
 
-- **`take-bounds-values`** (Verify-Take-Bounds) — FALSITY, `PROBED`: a program
-  whose outermost node is `take k` emits at most k values. The rehearsal for
-  the drain induction; nothing has instantiated it, and the budget's decrement
-  and the frame's cut are two points that can disagree.
+- **`take-drain-bound`** (Verify-Take-Bounds) — FALSITY, `PROBED`: the drain
+  emits no more than the budget the subscribe frame left in the take node. The
+  rehearsal's inductive half; one row reaches it, at a cut spanning two
+  arrivals.
+
+- **`take-burst-bound`** (Verify-Take-Bounds) — FALSITY, `PROBED`: what the
+  subscribe frame emits plus what it leaves in the node is within `k`. Two rows
+  reach it; the decrement at the dispatch and the cut at the frame are the two
+  points that can disagree.
 
 - **`subscribeE-root-wf`** (Verify-Well-Formed) — FALSITY, `PROBED`: the root
   subscribe frame's burst drives the automaton to a state standing in the seam

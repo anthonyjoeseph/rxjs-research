@@ -1,13 +1,19 @@
 ----------------------------------------------------------------------
--- TAKE'S BOUND, AT THE CUT IT IS ABOUT.
+-- TAKE'S BUDGET, AT THE FRAME AND AT THE DRAIN.
 --
--- WHAT A ROW HERE DECIDES.  The bound is a length against a numeral, so
--- the whole statement computes: the take node's budget is spent at the
--- dispatch and its cut is emitted from the frame, and a row is green
--- only if those two points agree at the program it names.  Nothing is
--- postulated on the path — `evaluate↓` is the builder's own output —
--- so a row that failed would be a refutation rather than an unproven
+-- WHAT A ROW HERE DECIDES.  The bound the rows carry is a length
+-- against a numeral, so the whole statement computes: the take node's
+-- budget is spent at the dispatch and its cut is emitted from the
+-- frame, and a row is green only if those two points agree at the
+-- program it names.  Nothing is postulated on the path — `rootBurst`,
+-- `drainRest` and `takeBudget` are the builder's own output read back
+-- — so a row that failed would be a refutation rather than an unproven
 -- goal.
+--
+-- AND THE TWO TARGETS SPLIT AT THE FRAME BOUNDARY, which is why the
+-- rows do too.  The frame decides its own rows without the drain
+-- running at all; the budget's survival into the drain is a separate
+-- claim and only the third row reaches it.
 --
 -- AND THE INTERESTING ROWS ARE THE ONES WHERE THE BOUND IS TIGHT.  A
 -- take whose budget exceeds what the program can emit is bounded by
@@ -20,7 +26,8 @@
 -- `evalTm` and no row here makes that step non-trivial.
 ----------------------------------------------------------------------
 
--- TARGET: take-bounds-values @189781
+-- TARGET: take-burst-bound @2872a7
+-- TARGET: take-drain-bound @eea582
 module Probed.Take-Bounds where
 
 open import Data.Fin using (zero)
@@ -34,7 +41,7 @@ open import Rx.Exp using (Ctx; natᵗ; Closed; nat̂; ofᵉ; input; takeᵉ)
 open import Rx.Slots using (Slots; scripted)
 open import Rx.Evaluator.Builder using (evaluate↓)
 open import Readme-Theorems using (noSlots; oneSlot; emitValues)
-open import Verify-Take-Bounds using (take-bounds-values)
+open import Verify-Take-Bounds using (take-burst-bound; take-drain-bound)
 
 open import Probed.Apparatus using (Confirms)
 
@@ -44,25 +51,26 @@ open import Probed.Apparatus using (Confirms)
 ----------------------------------------------------------------------
 -- 1.  THE CUT LANDS MID-BURST.  LOAD-BEARING: the subscribe frame
 -- delivers two values in one instant and the take is at one, so the
--- bound holds only if the node stops INSIDE the burst rather than at
--- the instant boundary.  A take that let a whole batch through would
--- emit two and fail the row.
+-- row holds only if the node stops INSIDE the burst rather than at the
+-- instant boundary, AND leaves a budget small enough that what it
+-- spent plus what it left is still within one.  A frame that let a
+-- whole batch through, or one that left the budget unspent, fails it.
 ----------------------------------------------------------------------
 
 pair₀ : Closed Γ₀ natᵗ
 pair₀ = ofᵉ (nat̂ 3 ∷ nat̂ 7 ∷ [])
 
-row-mid-burst : Confirms (take-bounds-values 0 1 pair₀ noSlots)
+row-mid-burst : Confirms (take-burst-bound 1 pair₀ noSlots)
 row-mid-burst = s≤s z≤n
 
 ----------------------------------------------------------------------
 -- 2.  A TAKE AT ZERO.  LOAD-BEARING on the one shape that has no
 -- decrement to get right: the budget is spent before anything is
--- delivered, so a node that emitted first and checked afterwards
--- parts from the bound here and nowhere else.
+-- delivered, so a node that emitted first and checked afterwards parts
+-- from the bound here and nowhere else.
 ----------------------------------------------------------------------
 
-row-zero : Confirms (take-bounds-values 0 0 pair₀ noSlots)
+row-zero : Confirms (take-burst-bound 0 pair₀ noSlots)
 row-zero = z≤n
 
 ----------------------------------------------------------------------
@@ -71,9 +79,13 @@ row-zero = z≤n
 -- drain never runs.  A scripted source delivers two values and the
 -- take is at one, so the budget has to survive being carried from the
 -- frame into the drain's state and be spent THERE.  LOAD-BEARING on
--- that carry — a budget re-minted at the drain's entry, or one read
--- off the expression rather than off the node's state, admits the
--- second arrival and fails the row.
+-- that carry: the frame emits NOTHING here, so the whole bound is
+-- decided in the drain, against a budget of one that the drain did not
+-- compute.  A drain that admitted the second arrival emits two against
+-- that one and fails the row.  What this row does NOT catch is a
+-- budget re-minted LARGER, which only weakens its own right-hand side
+-- — that shape is refutable only against `take-burst-bound`, which
+-- pins what the frame may leave behind.
 ----------------------------------------------------------------------
 
 Γ₁ : Ctx 1
@@ -85,7 +97,7 @@ src₁ = input zero
 slots₁ : Slots Γ₁
 slots₁ = oneSlot (scripted (hot ((after 0 , 5) ∷ (after 0 , 7) ∷ [])))
 
-row-arrival : Confirms (take-bounds-values 6 1 src₁ slots₁)
+row-arrival : Confirms (take-drain-bound 6 1 src₁ slots₁)
 row-arrival = s≤s z≤n
 
 ----------------------------------------------------------------------
