@@ -234,22 +234,20 @@ unblocks. The tier retires when they are spent.
 
 ### Big picture tier roadmap
 
-- **RUN A SELF-REFERENTIAL μ, IN THE CORPUS RATHER THAN IN A PROBE.** The
-  peel is now paid for by a size the unfolding does not move, and what funds that
-  size is a SYNTACTIC claim: the μ variable is bound into the guarded context,
-  `varᵉ` reads only from the usable one, and the guarded elimination substitutes
-  nowhere except through its gate clause. Every leaf under it now rests on that.
-  The claim is about the ELIMINATOR rather than about any statement, so nothing
-  can carry a receipt for it and its home is the corpus — programs whose μ really
-  does refer to itself, run end to end. Cheap, and the one thing that would catch
-  the guard being right on paper and wrong in the code.
+- **CONFIRM THE DESCENT ON THE WHOLE TOWER, WHICH IS WHAT DECIDES THE TIER.**
+  The candidate funds `Runs` and nothing else; the other eight `*Runs` families
+  have no candidate, and the bet is that once subscription is independently
+  total their recursion is structural. Nothing cheap can see that — the dev loop
+  stubs mutual blocks, and the termination check is exactly where the bet lives —
+  so the run that decides it is the heavy gate over a tree whose candidate holds
+  no leaf, which is a tree that has never existed before. Green there is the
+  tier's retirement condition met; red names the family that does not descend,
+  and that name is the next leg.
 
-- **THEN WHATEVER DESIGN WORK REMAINS.** The candidate funds `Runs` and nothing
-  else; the other eight `*Runs` families have no candidate and the bet is that
-  once subscription is independently total their recursion is structural. That
-  bet is decided by CI rather than by argument, and whatever it leaves open is
-  this leg — it is named rather than planned because its content is exactly what
-  the three legs above turn up.
+- **THEN WHATEVER DESIGN WORK REMAINS.** Named rather than planned, because its
+  content is exactly what the leg above turns up: a family whose recursion the
+  termination check refuses needs a measure or a candidate of its own, and which
+  family it is decides everything about the shape of that work.
 
 - **THEN WHATEVER GRINDING REMAINS.** The leaves the legs above leave behind,
   once each has a settled shape and a named route. This is the delegation
