@@ -233,14 +233,15 @@ deferred beside it.
 
 ### Big picture tier roadmap
 
-- **THE FIXPOINT PEEL, STILL FIRST AND NOW CARRYING A TRANSPORT.** The peel is
-  the guarded eliminator at the empty local telescope, and the eliminator walks
-  under binders by EXTENDING that telescope — so the statement the consumer
-  wants cannot be its own hypothesis, and the general one sits at `Θloc ++ []`
-  against `Θloc`. The peel is now a real body over that general form and the
-  instance costs nothing, which is what the leg bought: the transport is `refl`
-  where it is spent. What remains is the six-family walk carrying it, and the
-  rows cover only the empty telescope, so the transport itself is uncovered.
+- **THE PEEL'S WALK IS WRITTEN; WHAT IS LEFT ARE ITS THREE LEAVES.** The guarded
+  eliminator now commutes with the environment substitution at an ARBITRARY local
+  telescope, by a six-family induction whose every constructor arm is a
+  congruence — the transport is carried as a PARAMETER, so each commutation is
+  its own defining clause and holds by `refl`. The three leaves left share a
+  region no probe can reach: fixing a telescope forces the transport to `refl`,
+  so the rows cover the walk's recursion and nothing covers the shuffle. Two say
+  a closed literal is inert under either walk; the third says the inserted copy
+  lands in the half the substituter consumes.
 
 - **THEN THE EMBEDDING ARM, WHICH IS ALL THAT IS LEFT OF THE TELESCOPE LEG.**
   A weakened-from-closed term is now proven inert under substitution, and
@@ -292,10 +293,16 @@ deferred beside it.
 
 ### The ledger
 
-- **`sub-elimGᵉ`** (Rx/Subst-Elim) — FALSITY, `PROBED`: the guarded eliminator
-  commutes with the environment substitution at an arbitrary local telescope.
-  The peel is its instance at the empty one, which is where the rows sit and
-  where the transport is `refl`; the transport itself is uncovered.
+- **`{g,d}Wk`** (Rx/Subst-Elim) — FALSITY, `PROBED×2`: either walk leaves a
+  term weakened from closed alone. Rows at a one-entry telescope, through a
+  pair and through an embedded expression; the transport is uncovered and a
+  CONCRETE telescope cannot reach it, a boundary rather than a gap in the
+  sweep.
+
+- **`sub-ren-gate`** (Rx/Subst-Elim) — FALSITY, `PROBED`: the copy the gate
+  inserts is renamed into the half the substituter is about to consume, so
+  closing after the rename agrees with renaming the already-closed copy. One
+  row, at a copy that really reads the environment; the transport is uncovered.
 
 - **`sub-evalStrm`** (Rx/Subst-Eval) — FALSITY, `PROBED`: the term face handing
   back to the expression face. Not an induction hypothesis but substitution

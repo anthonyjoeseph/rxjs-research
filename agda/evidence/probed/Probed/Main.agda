@@ -57,8 +57,8 @@ open import Probed.Apparatus using (Confirms; Separates)
 open import Probed.Reducible-Arms using
   (row-live-merge; row-live-queue; row-live-switch; row-live-exhaust)
 
--- THE FOUR SUBSTITUTION LEAVES THE CARRIED ENVIRONMENT COSTS.  Claimed
+-- THE SUBSTITUTION LEAVES THE CARRIED ENVIRONMENT COSTS.  Claimed
 -- from the root for the same reason the arms are: a `Confirms` row's
 -- type is generated from its target, so the name is the only handle.
 open import Probed.Substitution-Leaves using
-  (row-unfoldμ; row-unfoldμ-deep; row-unfoldμ-gates; row-evalStrm)
+  (row-gWk; row-gWk-deep; row-dWk; row-dWk-deep; row-gate; row-evalStrm)

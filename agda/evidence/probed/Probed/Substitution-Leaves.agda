@@ -15,18 +15,22 @@
 -- is any statement's inductive content, since every row is a single
 -- closed point.
 
--- TARGET: sub-elimGᵉ @0cd8ca
+-- TARGET: gWk @670218
+-- TARGET: dWk @522702
+-- TARGET: sub-ren-gate @5cd7ea
 -- TARGET: sub-evalStrm @350562
 module Probed.Substitution-Leaves where
 
 open import Data.List using ([]; _∷_)
 open import Data.List.Relation.Unary.All using (All; []; _∷_)
+open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Vec using ([])
 open import Relation.Binary.PropositionalEquality using (refl)
 
-open import Rx.Exp using (Ctx; natᵗ; Exp; Val; ofᵉ; mapᵉ; varᵉ; deferᵉ; μᵉ; strmᵗ; varᵗ; fstᵗ; pairᵗ)
-open import Rx.Subst-Elim using (sub-elimGᵉ)
+open import Rx.Exp
+  using (Ctx; natᵗ; obs; _×ᵗ_; Exp; Tm; Val; ofᵉ; nat̂; varᵗ; pairᵗ; strmᵗ)
+open import Rx.Subst-Elim using (gWk; dWk; sub-ren-gate)
 open import Rx.Subst-Eval using (sub-evalStrm)
 
 open import Probed.Apparatus using (Confirms)
@@ -40,56 +44,63 @@ open import Probed.Apparatus using (Confirms)
 σ₀ = 7 ∷ []
 
 ----------------------------------------------------------------------
--- 1.  THE PEEL UNDER AN ENVIRONMENT, taken at the general
--- eliminator the peel is defined as -- at the EMPTY local telescope,
--- where the general statement's transport is `refl` and the two sides
--- are the peel's own.  LOAD-BEARING: the body's μ variable is really
--- referenced, through the gate, so a peel that inserted the wrong
--- expression changes the left side and not the right.  DEGENERATE in
--- the transport, which an empty local telescope cannot exercise.
+-- 1.  A CLOSED LITERAL IS UNTOUCHED BY EITHER WALK, taken at a
+-- NON-EMPTY local telescope, which is where the eliminator's own
+-- index arithmetic could go wrong and where nothing before covered
+-- it.  LOAD-BEARING on the walk being the identity on a term with
+-- structure: the rows recurse through a pair and through an embedded
+-- expression, so a walk that renumbered anything inside a weakened
+-- literal changes the left side and not the right.
+--
+-- NOT REACHED: the transport, which a CONCRETE local telescope can
+-- never exercise -- fixing `Θl` forces the equation to `refl`, so
+-- every row here is at the identity transport and the general
+-- `Θl ++ [] ≡ Θ` is uninstantiable away from it.
 ----------------------------------------------------------------------
 
-bodyμ : Exp Γ₀ (natᵗ ∷ []) [] (natᵗ ∷ []) natᵗ
-bodyμ = mapᵉ (varᵗ (here refl)) (deferᵉ (varᵉ (here refl)))
+clos : Exp Γ₀ [] [] [] natᵗ
+clos = ofᵉ (nat̂ 3 ∷ [])
 
-row-unfoldμ : Confirms (sub-elimGᵉ [] (here refl) (μᵉ bodyμ) σ₀ bodyμ)
-row-unfoldμ = refl
+gate : natᵗ ∈ (natᵗ ∷ [])
+gate = here refl
 
--- AND THE SAME PEEL MET UNDER A BINDER, which is the one shape the
--- row above cannot reach: there the gate sits in the SOURCE of a
--- former, where nothing is bound, so the inserted copy is weakened
--- past an EMPTY local telescope and a split written one entry off
--- still lands.  Here the gate sits inside the former's FUNCTION, so
--- the walk meets it with one thing bound and the copy has to cross
--- that binder on both sides; and the copy itself reads the
--- environment, so a copy substituted at the wrong telescope emits a
--- different literal.  LOAD-BEARING on exactly that.
-bodyμ-deep : Exp Γ₀ (natᵗ ∷ []) [] (natᵗ ∷ []) natᵗ
-bodyμ-deep =
-  mapᵉ (fstᵗ (pairᵗ (varᵗ (there (here refl)))
-                    (strmᵗ (deferᵉ (varᵉ (here refl))))))
-       (ofᵉ (varᵗ (here refl) ∷ []))
+lit : Tm Γ₀ [] [] [] (natᵗ ×ᵗ natᵗ)
+lit = pairᵗ (nat̂ 1) (nat̂ 2)
 
-row-unfoldμ-deep : Confirms (sub-elimGᵉ [] (here refl) (μᵉ bodyμ-deep) σ₀ bodyμ-deep)
-row-unfoldμ-deep = refl
+deep : Tm Γ₀ [] [] [] (obs natᵗ)
+deep = strmᵗ (ofᵉ (nat̂ 5 ∷ []))
 
--- AND THROUGH TWO GATES, which is the arm where the eliminator stops
--- shuffling the GUARD context and starts shuffling the deferred one:
--- crossing the second gate re-splits the two halves and carries a
--- transport on the Δ index that the substituter has to be pushed
--- past.  LOAD-BEARING there: a transport pushed the wrong way round
--- lands the inserted copy in the other half.
-bodyμ-gates : Exp Γ₀ (natᵗ ∷ []) [] (natᵗ ∷ []) natᵗ
-bodyμ-gates =
-  mapᵉ (fstᵗ (pairᵗ (varᵗ (there (here refl)))
-                    (strmᵗ (deferᵉ (deferᵉ (varᵉ (here refl)))))))
-       (ofᵉ (varᵗ (here refl) ∷ []))
+row-gWk : Confirms (gWk {Δ = []} (natᵗ ∷ []) refl gate clos lit)
+row-gWk = refl
 
-row-unfoldμ-gates : Confirms (sub-elimGᵉ [] (here refl) (μᵉ bodyμ-gates) σ₀ bodyμ-gates)
-row-unfoldμ-gates = refl
+row-gWk-deep : Confirms (gWk {Δ = []} (natᵗ ∷ []) refl gate clos deep)
+row-gWk-deep = refl
+
+row-dWk : Confirms (dWk {Δᵍ = []} (natᵗ ∷ []) refl gate clos lit)
+row-dWk = refl
+
+row-dWk-deep : Confirms (dWk {Δᵍ = []} (natᵗ ∷ []) refl gate clos deep)
+row-dWk-deep = refl
 
 ----------------------------------------------------------------------
--- 2.  THE TERM FACE HANDING BACK TO THE EXPRESSION FACE.
+-- 2.  THE INSERTED COPY LANDS IN THE HALF THE SUBSTITUTER CONSUMES.
+-- LOAD-BEARING on exactly that: the copy reads the environment, and
+-- the local telescope is non-empty, so a rename that sent the copy's
+-- variable to the LOCAL half would leave a `varᵗ` on the left where
+-- the right side emits the literal.
+--
+-- NOT REACHED: a local telescope longer than one entry, and an
+-- environment supplying more than one value.
+----------------------------------------------------------------------
+
+gated : Exp Γ₀ [] [] (natᵗ ∷ []) natᵗ
+gated = ofᵉ (varᵗ (here refl) ∷ [])
+
+row-gate : Confirms (sub-ren-gate {Δᵍ′ = []} {Δ′ = []} (natᵗ ∷ []) gated σ₀)
+row-gate = refl
+
+----------------------------------------------------------------------
+-- 3.  THE TERM FACE HANDING BACK TO THE EXPRESSION FACE.
 -- LOAD-BEARING on the split, which is the whole content: the local
 -- telescope is non-empty and the embedded expression reads BOTH
 -- halves, so a substituter that took one entry too many or too few
@@ -105,4 +116,3 @@ strm₀ = ofᵉ (varᵗ (here refl) ∷ varᵗ (there (here refl)) ∷ [])
 
 row-evalStrm : Confirms (sub-evalStrm strm₀ σ₀ (5 ∷ []))
 row-evalStrm = refl
-
