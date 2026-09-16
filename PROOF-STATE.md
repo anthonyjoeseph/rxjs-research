@@ -85,31 +85,17 @@ LEDGER of one-line hooks; everything else lives in the code.
   times a row's, because a leg carries its own reasoning and a group has no
   header to send research to; past it, the leg has stopped saying why this group
   is next and started proving it.
-- **A TIER MAY OPEN AN `### Open questions` SECTION, AND IT IS NOT A SECOND
-  ROADMAP (Anthony).** A question is what the tier does not yet KNOW that
-  several of its FALSITY rows are all waiting on — the thing a row cannot
-  say, because a row is about one statement and the uncertainty is shared.
-  So it names at least two, and answering one moves all of them at once.
-  It is capped at three for the roadmap's reason: past that the entries are
-  rows wearing headings, or two phrasings of one question.
-  **BUT IT IS NOT REQUIRED TO MOVE, AND NOT REQUIRED AT ALL.** A leg is a
-  commit, so it moves with every commit; a question outlives many, and
-  forcing one to change per commit would produce a rewritten question rather
-  than an answered one. Nor is the section mandatory per tier — a required
-  question is a filler question, exactly as a required `TWIN:` is filler,
-  and filler here is worse than blank because it reads as research.
-  **WHAT IS HELD INSTEAD IS THE `relevant:` LINE, and `make roadmap-check`
-  enforces it.** Every name on it must still be a LIVE postulate, must be a
-  row of that same tier, and must still be FALSITY or SHAPE. Nothing else
-  would notice this section aging, so that list is the one thing kept
-  current: a name off the ledger means the question is answered or its row
-  was restated. SHAPE counts because a question's rows convert FALSITY →
-  SHAPE as it is ANSWERED — that is what a half-answer leaves behind, and
-  holding the list to FALSITY retired a question at the very moment the
-  narrowing it exists to record had happened. When nothing risky is left,
-  the question goes. The list is FREE of the prose budget, so a question is
-  never shortened by dropping a postulate from it — the same asymmetry the
-  rows carry, for the same reason.
+- **EVERY TIER NAMES ITS MONSTER, in a `### The monster` section (Anthony).** The
+  rows are the ledger and the legs are the schedule; the monster is what the
+  schedule is FOR — the one declaration the tier judges most likely to be FALSE,
+  and `make monster-check` holds every line added to `agda/src` to its dependency
+  CONE. Choose it as likely false as possible, as far DOWN the tree as possible,
+  and with as big a blast radius as possible; depth is the pressure doing the
+  selecting, since the other two are monotone up the tree and alone would always
+  return the tier's top line. The floor under the descent is the cone itself, which
+  is the commit licence. An exception is declared with an `also:` line, which is
+  free of the section's prose budget because charging a ledger buys exceptions left
+  undeclared rather than exceptions not taken.
 - **EVERY TIER IS SORTED RISKIEST-FIRST, AND THE SORT IS AN INVARIANT —
   NOT A ONE-TIME TIDY.** Within a tier, rows appear
   in risk-class order: FALSITY, then SHAPE, then VACUITY, then DIFFICULTY,

@@ -6,8 +6,9 @@ what the schedule is FOR: the single declaration the session currently judges
 most likely to be FALSE, chosen for BLAST RADIUS rather than for being a leaf
 -- if it falls, its siblings and its parents go with it.
 
-It replaces the OPEN QUESTIONS section, which was prose with a `relevant:`
-list, and it replaces it with a NAME, which is the part a machine can hold.
+It is a NAME rather than prose, because a name is the part a machine can hold:
+a tier's risk stated in a paragraph is read by whoever happens to read it, and
+a tier's risk stated as a declaration is read by the gate on every commit.
 
 WHAT IS HELD, and it is deliberately not a prose requirement: every line ADDED
 to `agda/src` must belong to a declaration inside the lowest open tier's
