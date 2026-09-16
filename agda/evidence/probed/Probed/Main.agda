@@ -55,9 +55,19 @@ open import Probed.Apparatus using (Confirms; Separates)
 -- type is generated from its target, so the name is the only handle the
 -- reachability law has on it.
 open import Probed.Reducible-Arms using
-  (row-live-merge; row-live-queue; row-live-switch; row-live-exhaust)
+  (row-live-merge; row-live-queue; row-live-switch; row-live-exhaust;
+   row-live-burst)
 
 -- THE SUBSTITUTION LEAVES THE CARRIED ENVIRONMENT COSTS.  Claimed
 -- from the root for the same reason the arms are: a `Confirms` row's
 -- type is generated from its target, so the name is the only handle.
-open import Probed.Substitution-Leaves using (row-evalStrm)
+open import Probed.Substitution-Leaves using
+  (row-evalStrm; row-evalStrm-deep; row-evalStrm-former)
+
+-- THE TOP-LINE CLAIMS.  Named and claimed from the root for the same
+-- reason: a `Confirms` row's type is generated from its target, so the
+-- name is the only handle the reachability law has on it.
+open import Probed.Readme-Claims using (row-order; row-take; row-one-batch)
+
+-- THE PIPELINE-SIDE CLAIMS, claimed from the root for the same reason.
+open import Probed.Pipeline-Claims using (row-online; row-ids)

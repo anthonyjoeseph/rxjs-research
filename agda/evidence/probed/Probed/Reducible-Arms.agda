@@ -23,10 +23,12 @@
 -- so nobody reads them as coverage of the other.
 --
 -- NOT REACHED, and each is a region rather than a program.  A
--- flattener's node holding something already -- a queue with an entry
--- in it, a switch whose current inner is actually running, an exhaust
--- already active -- so the kill below walks an empty registry and the
--- refusal reached is the concurrency one rather than the exhaust's.
+-- flattener's node whose inner is genuinely RUNNING -- a switch
+-- holding a live current, an exhaust already active -- so the refusal
+-- reached below is the concurrency one rather than the exhaust's.  A
+-- literal inner retires inside its own subscribe frame, so every
+-- running-inner region wants a scripted source the empty slot table
+-- here cannot supply.
 --
 -- TARGET: red-thru @f94cad
 module Probed.Reducible-Arms where
@@ -142,6 +144,56 @@ row-live-queue : Confirms
   (red-thru {e = e₀} 0 0 mergeAllᵒ nid₃ κ₀ satLive false sched₃ stBound)
 row-live-queue =
   _ , step-thru-outer (walk-cons (consume-all-enqueue refl refl) walk-nil)
+    , allTriv (λ _ → tt) _ , tt
+
+----------------------------------------------------------------------
+-- 5.  A BURST OF MORE THAN ONE VALUE, WHERE THE SECOND STEP'S GUARD
+-- READS WHAT THE FIRST STEP WROTE.  Every row above walks a ONE-value
+-- burst, so the walk reaches its terminal step immediately and the
+-- state it threads is never read back by anything.  Here two
+-- observables arrive together at a node whose limit is already full,
+-- so the first is queued and the second is decided against a queue
+-- that is no longer empty -- which is the node-holding-something
+-- region no row above stands in.
+--
+-- LOAD-BEARING on the threading.  The clause itself is reached one row
+-- up, at a state written down by hand; what no row reached is the walk
+-- CARRYING the first step's node state into the second's lookup, and
+-- the second `refl` is exactly that -- it holds only if the queue the
+-- guard reads is the one the first step appended to.  A walk handing
+-- the ORIGINAL state to its recursive step would leave that `refl`
+-- unprovable.
+--
+-- WHY THE MIXED BURST IS NOT THE ROW HERE, and it is a fact about the
+-- machine rather than about this file.  The obvious threading row is a
+-- limit of one with the first value subscribed and the second refused
+-- by the state it left; that derivation CANNOT BE BUILT.  A literal
+-- inner completes inside its own subscribe frame, so the active count
+-- is back at zero by the time the second value is considered and
+-- `hasRoom` answers true again.  At any positive limit a burst of
+-- synchronously-completing inners therefore subscribes every entry,
+-- and the refusal path is reachable mid-burst only with an inner that
+-- outlives its own subscribe frame -- which needs a scripted source
+-- rather than a literal, the same harness the switch and exhaust
+-- running-inner states want.
+--
+-- NOT REACHED STILL: a subscribe and a refusal in ONE walk, per the
+-- paragraph above; and a switch or exhaust whose inner is genuinely
+-- running.
+----------------------------------------------------------------------
+
+satBurst : All (Red {Γ = Γ₀} (obs natᵗ)) (oInner ∷ oInner ∷ [])
+satBurst = reducible oInner ∷ reducible oInner ∷ []
+
+stFull : EvalSt e₀
+stFull = installNode nid₃ (mergeAll-st {t = natᵗ} (just 0) 0 [] false) st₀
+
+row-live-burst : Confirms
+  (red-thru {e = e₀} 0 0 mergeAllᵒ nid₃ κ₀ satBurst false sched₃ stFull)
+row-live-burst =
+  _ , step-thru-outer
+        (walk-cons (consume-all-enqueue refl refl)
+          (walk-cons (consume-all-enqueue refl refl) walk-nil))
     , allTriv (λ _ → tt) _ , tt
 
 stSwitch : EvalSt e₀

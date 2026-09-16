@@ -37,6 +37,13 @@ horizon fuel = upTo (suc fuel)
 --   (0 ∷ 1 ∷ 2 ∷ 3 ∷ []) ⊆ᵢ horizon 3.  A confidence receipt over small
 --   horizons, not a theorem.  The probe is spent and deleted;
 --   `git show 1f1730e^:agda/probe/Battery-Eval-Laws.agda` recovers its rows.
+-- PROBED: `Probed.Pipeline-Claims` re-instantiates it against the
+--   evaluator as it now reads, at a scripted hot slot under a mapping
+--   former, with the witness naming ids 0 and 1 against `horizon 1` --
+--   TIGHT, since the last id sits exactly at the fuel bound and one
+--   more arrival than the horizon admits would refute the row.  Not
+--   reached: any program containing a flattener, because `evaluate↓`
+--   does not compute through one while `red-thru` stands.
 postulate
   -- every id in the output stream is the id of some arrival's cascade;
   -- sync-spawned inners inherit, never mint

@@ -46,8 +46,12 @@ postulate
   -- has no subterm of its own type here.
   -- PROBED: `Probed.Substitution-Leaves`, at a one-entry local
   --   telescope whose embedded expression reads BOTH halves of the
-  --   split.  Not reached: a longer local telescope, and any former
-  --   sitting between the embedding and the variables.
+  --   split, at a three-variable telescope reading every position of
+  --   it, and under a non-binding former combining two of them.  Not
+  --   reached: a substituted environment of more than one entry, and
+  --   any former that BINDS -- map, scan, case -- which grows the
+  --   local telescope under itself and is the arm the split's
+  --   arithmetic actually turns on.
   sub-evalStrm : ∀ {n} {Γ : Ctx n} {Θloc Θsub t} (e : Exp Γ [] [] (Θloc ++ Θsub) t)
                  (σ : All (Val Γ) Θsub) (ρ : All (Val Γ) Θloc)
                → evalWith (strmᵗ (subΘExp Θloc σ e)) ρ

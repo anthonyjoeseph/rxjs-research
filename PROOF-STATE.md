@@ -335,15 +335,22 @@ critical path.
 
 ### Big picture tier roadmap
 
-- **probe the `readme-*` family** — the `readme-*` rows. Nothing has ever
-  instantiated them and they are stated over defined machinery, so they are
-  probeable today and the whole family shares one harness: one context, many
-  similar obligations. One commit for the sweep and its receipts. A refutation
-  here is SPEC-level — surface it, do not patch it.
-- **probe the two inheritance claims** — `id-inheritance`, `batch-online`.
-  Separated from the family above because they are stated over the batching
-  pipeline rather than the readme's programs, so they need their own harness;
-  same shape of commit, and unprobed is unprobed whatever the statement reads.
+- **re-probe the three universal laws at a program that has a SOURCE** —
+  `readme-batch-order-is-delivery-order`, `readme-take-counts-values`,
+  `readme-one-subscribe-one-batch`. Their rows stand at a closed literal in an
+  empty slot table, so every one of them is decided inside the subscribe frame
+  and nothing arrival-driven has ever been instantiated: the flagship law is
+  about batching ACROSS instants and no row has reached a second one. A
+  scripted hot slot does, on the harness `Probed.Pipeline-Claims` already
+  carries. A refutation here is SPEC-level — surface it, do not patch it.
+- **the seven instance claims are BLOCKED, and the block is tier 1's** —
+  `readme-diamond`, `readme-each-next-own-instant`, `readme-cascades-inherit`,
+  `readme-completion-cascades`, `readme-share-connect-no-replay`,
+  `readme-late-join-growth`, `readme-serial-joins-mirror-rxjs`. Every one is
+  hard-wired to a flattener, and `evaluate↓` does not compute through one
+  while `red-thru` stands, so no `refl` row can be written for any of them at
+  any program. Nothing in this tier moves them. The leg is to re-run the
+  recovered predecessor battery the day the descent lands.
 - **draft the abstractions and ASK** — `locality`, `non-interference`,
   `timing-invariance`, `causality`, `μ-guarded`, `defer-shift`, over `Node`,
   `NodeSt`, `Inbox`, `inboxOf`, `stAt`, `cascade`, `δ`, `Retiming`, `retime`,
@@ -353,9 +360,18 @@ critical path.
 
 ### The ledger
 
-- **`id-inheritance`, `batch-online`, `readme-*`** — FALSITY, `NO EVIDENCE`:
-  the twelve top-line claims nothing has ever instantiated. A refutation of a
-  `readme-*` claim is SPEC-level: surface to Anthony, do not patch.
+- **`readme-diamond`, `readme-each-next-own-instant`,
+  `readme-cascades-inherit`, `readme-completion-cascades`,
+  `readme-share-connect-no-replay`, `readme-late-join-growth`,
+  `readme-serial-joins-mirror-rxjs`** — FALSITY, `NO EVIDENCE`: every one names
+  a flattening program, and `evaluate↓` is stuck on `red-thru` at one, so none
+  is probeable at all. A refutation is SPEC-level: surface to Anthony, do not
+  patch.
+- **`readme-batch-order-is-delivery-order`, `readme-take-counts-values`,
+  `readme-one-subscribe-one-batch`, `id-inheritance`** — FALSITY, `PROBED×3`:
+  instantiated now, but every row sits at a program with no flattener, which is
+  where each statement's risk actually lives. Still FALSITY for that reason,
+  not for want of a row.
 - **Vacuous-by-abstraction — VACUITY**, `NO EVIDENCE` — `locality`,
   `non-interference`, `timing-invariance`, `causality`, `μ-guarded`,
   `defer-shift` (the one allowlisted honest gap). De-risking these means
@@ -367,10 +383,14 @@ critical path.
   `retime`, `truncateIn`, `emittedBefore`. Named individually because they are
   what makes the row above vacuous, and a collective phrase is invisible to the
   coverage check.
+- **`batch-online`** — DIFFICULTY, `PROBED`: the restated form, instantiated at
+  the very split that refuted the unqualified one — a left side closing one
+  instant and leaving a second open, whose terminal flush was the old
+  statement's counterexample.
 - **`μ-unfold`, `fuel-coherent`** (Evaluator-Theorems) — DIFFICULTY,
   `PROBED×2`: the two evaluator laws a spent battery instantiated at every
-  canonical program without refuting. Split from the twelve below, which have
-  no receipt at all.
+  canonical program without refuting. Separated from the rows above because
+  their receipt is a sweep rather than a point.
 - **FFI, permanently trusted** — `_>>=_`/`getContents`/`putStr` (CLI/IO),
   `randFold`/`natMod` (QuickCheck). Carried, not counted.
 

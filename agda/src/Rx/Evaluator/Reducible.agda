@@ -256,16 +256,32 @@ postulate
   -- never has to take out, and the carrier the census left owed is
   -- owed to the instant loop instead.
   --
+  -- AND THIS STATEMENT IS THE GATE ON THE WHOLE EVIDENCE GRAPH, WHICH
+  -- IS A COST NOTHING ABOUT ITS OWN DIFFICULTY PREDICTS.  `evaluate↓`
+  -- reaches here through `evaluate!`, so a run of ANY program
+  -- containing a flattener gets stuck with this name in its normal
+  -- form -- measured directly, the stuck term naming this postulate
+  -- and the operator beside it.  Nothing downstream can then be
+  -- instantiated at such a program: every claim read off a run of one
+  -- is unprobeable by `refl` until this lands, which is most of the
+  -- top-line semantic ledger and the well-formedness leaf's whole
+  -- `*All` coverage gap.  Discharging it is not merely a row of the
+  -- ledger; it is what unblocks the evidence for the rest.
+  --
   -- PROBED: `Probed.Reducible-Arms` at each of the three operators,
   --   with the arriving batch carrying a real observable: mergeAll
   --   subscribing it, mergeAll REFUSING it at a zero concurrency limit
   --   and queueing instead, switch killing and subscribing, exhaust
   --   subscribing with nothing active.  The inner's own subscription
   --   derivation is what comes back, so the candidate is SPENT at
-  --   these rows rather than carried.  Not reached: a node already
-  --   holding something -- a queue with an entry, a switch whose
-  --   current inner is running, an exhaust already active -- and no
-  --   batch of more than one value.
+  --   these rows rather than carried.  A two-value burst at a full
+  --   limit walks both entries, the second deciding against the queue
+  --   the first one wrote, so the walk's state THREADING is reached
+  --   and so is a node holding a queue entry.  Not reached: a switch
+  --   whose current inner is running or an exhaust already active,
+  --   both of which want an inner outliving its own subscribe frame;
+  --   and a subscribe and a refusal within ONE walk, which at a
+  --   positive limit the same fact rules out.
   red-thru : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
              (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
              (κ : Path Γ lo u t)
