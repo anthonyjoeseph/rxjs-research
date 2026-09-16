@@ -233,14 +233,21 @@ deferred beside it.
 
 ### Big picture tier roadmap
 
-- **FINISH THE SUBSTITUTION SHELF, WHICH IS NOW THREE ARMS AND NOT FOUR
-  STATEMENTS.** The two readings on the TERM side turned out to be one lemma at
-  two telescopes — `evalTm` and `applyFn` are both `evalWith` at a fixed
-  environment — and the general form is proven, congruence arms and all. What is
-  left is where the walk stops being about terms: reify-then-read at an
-  observable, the embedding arm, the fixpoint peel, and the empty substitution.
-  The first three are coupled — a stream literal read at the empty environment
-  IS the empty substitution.
+- **THE EMBEDDING ARM, WHICH IS WHERE THE WALK STOPS BEING ABOUT TERMS.** The
+  empty substitution is now proven and the identity it was blocking on is gone:
+  the two sides sit at telescopes an append with a variable on the left cannot
+  reconcile, so the statement is transported, and the whole content is the
+  splitter sending every variable left. What that leaves is the stream literal,
+  which is CLOSED rather than read, so its arm is not an induction hypothesis
+  but substitution COMPOSITION — and reify-then-read at an observable is the
+  same fact arriving from the value side. Those two are one leg because the
+  composition law discharges both.
+
+- **THEN THE FIXPOINT PEEL, AGAINST A CARRIED ENVIRONMENT.** The peel and the
+  substitution commute, which is what the partner's μ arm spends. It is separated
+  from the leg above because its induction is over the guarded ELIMINATION rather
+  than over the telescope, so nothing the composition law buys transfers to it —
+  and because a wrong telescope shows here and nowhere else.
 
 - **THEN RUN A SELF-REFERENTIAL μ, IN THE CORPUS RATHER THAN IN A PROBE.** The
   peel is now paid for by a size the unfolding does not move, and what funds that
@@ -294,10 +301,6 @@ deferred beside it.
 - **`sub-evalStrm`** (Rx/Subst-Eval) — FALSITY, `PROBED`: the term face handing
   back to the expression face. Not an induction hypothesis but substitution
   COMPOSITION, since a stream literal is closed rather than read.
-
-- **`subΘ-idExp`** (Rx/Evaluator/Reducible) — FALSITY, `PROBED`: the empty
-  substitution is the identity. It is what makes the top line a corollary of
-  the partner at the empty environment.
 
 
 - **`red-thru`** (Rx/Evaluator/Reducible) — DIFFICULTY, `PROBED`: the consume

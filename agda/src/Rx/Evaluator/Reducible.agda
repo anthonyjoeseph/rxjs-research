@@ -62,6 +62,7 @@ open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; _�
 open import Rx.Exp.Guarded using (gsizeᵉ; gsizeᵗ; gsizeᵗˢ; gsize-unfoldμ)
 open import Rx.Inputs-Below using (ib-unfoldμ; ib-topᵉ)
 open import Rx.Subst-Eval using (sub-evalTm; sub-applyFn)
+open import Rx.Subst-Identity using (subΘ-id-exp)
 open import Decide using (∧ˡ; ∧ʳ)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; _↠_; map-f; take-f; scan-f; take-st; scan-st; thru-outer;
   mergeAllᵒ; switchᵒ; exhaustᵒ; mergeAll-st; switch-st; exhaust-st; takeVals; takeDispatch;
@@ -224,8 +225,7 @@ postulate
   -- the price of carrying the environment rather than applying it.
   -- Each says that closing against the environment and then acting
   -- agrees with acting under it, at the two points this face still
-  -- reaches one on the EXPRESSION side: the fixpoint peel, and the
-  -- whole telescope being empty, where closing is the identity.  The
+  -- reaches one on the EXPRESSION side: the fixpoint peel.  The
   -- readings on the TERM side are not stated here -- `evalTm` and
   -- `applyFn` are one `evalWith` at two telescopes, so they are one
   -- statement rather than two obligations, and it is proven.
@@ -235,12 +235,6 @@ postulate
   sub-unfoldμ : ∀ {n} {Γ : Ctx n} {Θ t} (body : Exp Γ (t ∷ []) [] Θ t)
                 (σ : All (Val Γ) Θ)
               → subΘExp [] σ (unfoldμ body) ≡ unfoldμ (subΘExp [] σ body)
-
-  -- PROBED: `Probed.Substitution-Leaves`, at a former carrying a
-  --   term, a list and a nested expression.
-
-  subΘ-idExp : ∀ {n} {Γ : Ctx n} {Δᵍ Δ t} (e : Exp Γ Δᵍ Δ [] t)
-             → subΘExp [] [] e ≡ e
 
   -- THE FLATTENING WALK, and the one leaf here with rows against it.
   -- Every value it produces is an inner subscribed out of the arriving
@@ -787,7 +781,7 @@ mutual
                 (slot-join {κ = κ} {below = below} doneEq connEq)
             , (tt ∷ []) ∷ []
   ...   | false
-          with subst (Red (obs (lookup Γ i))) (subΘ-idExp d)
+          with subst (Red (obs (lookup Γ i))) (subΘ-id-exp d)
                  (redExpAcc d [] tt (toℕ i) okd aI
                    (<-wellFounded (gsizeᵉ d)))
                  (share-sink i ≤-refl) id now sched
@@ -863,7 +857,7 @@ mutual
   redTmAcc (primᵗ ltᵖ x) σ rσ k ok aK a  = tt
   redTmAcc (primᵗ notᵖ x) σ rσ k ok aK a = tt
   redTmAcc (strmᵗ e) []       rσ k ok aK (acc rs) =
-    subst (Red (obs _)) (subΘ-idExp e) (redExpAcc e [] tt k ok aK (rs ≤-refl))
+    subst (Red (obs _)) (subΘ-id-exp e) (redExpAcc e [] tt k ok aK (rs ≤-refl))
   redTmAcc (strmᵗ e) (v ∷ vs) rσ k ok aK (acc rs) =
     redExpAcc e (v ∷ vs) rσ k ok aK (rs ≤-refl)
 
@@ -893,5 +887,5 @@ mutual
 -- face above at the empty environment, where closing is the identity.
 reducible : ∀ {n} {Γ : Ctx n} {t} (b : Closed Γ t) → Red {Γ = Γ} (obs t) b
 reducible b =
-  subst (Red (obs _)) (subΘ-idExp b)
+  subst (Red (obs _)) (subΘ-id-exp b)
     (redExpAcc b [] tt _ (ib-topᵉ b) (<-wellFounded _) (<-wellFounded (gsizeᵉ b)))

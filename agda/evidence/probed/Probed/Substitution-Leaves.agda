@@ -18,7 +18,6 @@
 -- TARGET: sub-unfoldμ @314410
 -- TARGET: evalWith-wkReify @d9e5a9
 -- TARGET: sub-evalStrm @350562
--- TARGET: subΘ-idExp @3ee7cc
 module Probed.Substitution-Leaves where
 
 open import Data.List using ([]; _∷_)
@@ -27,8 +26,8 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Vec using ([])
 open import Relation.Binary.PropositionalEquality using (refl)
 
-open import Rx.Exp using (Ctx; natᵗ; obs; Exp; Val; ofᵉ; mapᵉ; μᵉ; varᵉ; deferᵉ; nat̂; varᵗ)
-open import Rx.Evaluator.Reducible using (sub-unfoldμ; subΘ-idExp)
+open import Rx.Exp using (Ctx; natᵗ; obs; Exp; Val; ofᵉ; mapᵉ; varᵉ; deferᵉ; nat̂; varᵗ)
+open import Rx.Evaluator.Reducible using (sub-unfoldμ)
 open import Rx.Subst-Eval using (evalWith-wkReify; sub-evalStrm)
 
 open import Probed.Apparatus using (Confirms)
@@ -95,17 +94,3 @@ strm₀ = ofᵉ (varᵗ (here refl) ∷ varᵗ (there (here refl)) ∷ [])
 row-evalStrm : Confirms (sub-evalStrm strm₀ σ₀ (5 ∷ []))
 row-evalStrm = refl
 
-----------------------------------------------------------------------
--- 4.  THE EMPTY SUBSTITUTION.  DEGENERATE by construction -- nothing
--- can be substituted -- and stated anyway because it is what makes the
--- top line a corollary of the partner at the empty environment, and
--- because it fails outright if the identity is not definitional at
--- some former.  The expression reaches a term, a list and a nested
--- expression, which is where a non-definitional clause would sit.
-----------------------------------------------------------------------
-
-exp₀ : Exp Γ₀ [] [] [] natᵗ
-exp₀ = mapᵉ (varᵗ (here refl)) (μᵉ (ofᵉ (nat̂ 7 ∷ [])))
-
-row-idExp : Confirms (subΘ-idExp exp₀)
-row-idExp = refl
