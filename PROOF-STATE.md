@@ -253,10 +253,10 @@ the repo today is read off `evaluate↓`, so the machine's own bookkeeping — n
 ids, arrival ordinals, the drain counter — is visible in every answer. A
 denotation says what a PROGRAM means rather than what one run does.
 
-**AND IT IS BELOW WELL-FORMEDNESS BECAUSE SOMETHING CONSUMES IT NOW (Anthony).**
-`evaluate-well-formed` is a body over `adequacy`, so the tier above is proven
-FROM this one and the order is checked rather than asserted here. A domain that
-cannot carry a prefix-closed predicate arrives as a type error up there.
+**AND NOTHING OUTSIDE IT CONSUMES IT.** The well-formedness face was the one
+consumer and no longer is, so the pair below is its own only consumer and nothing
+constrains the domain's shape. Whether it earns its place is the open question
+here, not how to define it — the finding is on `Beh` and `observe`.
 
 **AND THE TAKE FACE IS HERE AS THE GUINEA PIG (Anthony).** The pair is false
 without a restriction to programs that SATURATE, and `take-bounds-values` is
@@ -342,70 +342,77 @@ also: `take-bounds-values` — the take face, which is here to be measured again
   in the head rather than described, so the row can carry its own evidence
   field.
 
-## Tier 3 — well-formedness, restated denotationally
+## Tier 3 — well-formedness, split where the predicate divides
 
-**THE TIER IS ONE LEAF, AND THE STATEMENT ABOVE IT IS A BODY (Anthony).**
-`The-Proof` draws `evaluate-well-formed` from here and that name is a
-definition now: it eliminates `adequacy`'s witness and hands the run to
-`meaning-prefix-well-formed`, which is the whole of the tier's debt.
+**THE TIER IS TWO LEAVES, AND THE STATEMENT ABOVE THEM IS A BODY.** `The-Proof`
+draws `evaluate-well-formed` from here and that name is a definition: it hands
+the run to `evaluate-accepted` and `evaluate-settled` through `Rx.Protocol`'s
+own recomposition, and those two are the whole of the tier's debt.
 
-**THE RESTATEMENT IS WHAT THIS TIER IS FOR.** A well-formedness structural in
-the denotation is an induction on SYNTAX, one clause per former, in a currency
-with no node ids and no drain counter in it — against a seam argument
-re-establishing a relation between an automaton, a scheduler and an eval state
-at every step. The seam carve is deleted and recoverable from the face's header.
+**THE SPLIT IS WHERE `WellFormed` ALREADY DIVIDES, NOT A NEW PREDICATE.** It is
+`checkFinal` of `runProtocol`, and only the second is prefix-closed — the first
+reads the LAST state. `runProtocol-prefix` and `wellFormed-settled` are proven,
+so the automaton half travels down a truncation for free and the only thing a
+cut point owes is that it is settled.
 
-**AND THE PREFIX QUANTIFICATION IS NOT A CONVENIENCE.** `WellFormed` checks the
-LAST state, so it does not travel down an adequacy conclusion; the leaf is
-stated at every prefix instead, which is what reaches an arbitrary fuel's stop.
+**AND BOTH LEAVES ARE ABOUT THE RUN, WHICH IS WHAT MAKES THEM PROBEABLE.**
+`runProtocol protocol-init (evaluate↓ fuel e ins)` reduces at a concrete
+program. The single statement they replace was stated over `meaning` and reduced
+at none, so nothing could instantiate it — the tier's risk was unmeasurable by
+construction and is now the ordinary kind.
 
 ### The monster
 
-`meaning-prefix-well-formed` — the tier's only postulate and the deepest node
-it has, since the statement above it is a body that reaches it. It can be FALSE
-rather than merely unproven: a prefix of a meaning the automaton rejects kills
-the WellFormed quantification `The-Proof` draws from this face. Nothing has
-instantiated it, and nothing can until the tier below makes `denote` compute —
-which is why the first leg aims at the body's conclusion instead.
+`evaluate-settled` — a run stops on an instant boundary with every obligation
+paid. Deepest of the two and the likelier false: it is an off-by-one between the
+point a budget is spent and the point a cut is emitted, reachable at a scripted
+slot, while its sibling is a conjunction of clauses the evaluator asserts as it
+builds. Its cone reaches `evaluate↓` and the automaton, which is the machinery
+either leaf is discharged out of, so it admits the work that kills it.
+
+also: `evaluate-accepted` — the other half, off the monster's cone because it is a
+statement about every emit rather than about the stopping point.
 
 ### Big picture tier roadmap
 
-- **INSTANTIATE THE BODY'S CONCLUSION, WHICH IS THE ONE THING HERE THAT
-  COMPUTES.** `WellFormed (evaluate↓ fuel e ins)` reduces at a concrete
-  program, while the leaf above it is stated over `meaning` and reduces at
-  none. A refutation retires the face before any domain work is spent on it,
-  and a receipt is the cheapest thing this tier can buy. The sampling sweep
-  recorded in the body's own block was run against a Bool twin outside the
-  claim graph; rows in the probe tree are what make it evidence a checker
-  holds to account.
+- **INSTANTIATE BOTH LEAVES, WHICH IS NOW POSSIBLE AND WAS NOT.** Each is a
+  computation over a run, so a probe walks fuel across an instant boundary and
+  asks the automaton directly — and `evaluate-settled` is the one to aim at,
+  since a cut landing mid-instant refutes the tier outright. The sampling sweep
+  recorded in the body's own block reached the CONCLUSION and so constrains the
+  pair only jointly; rows against the leaves separately are what say which half
+  carries the risk.
 
 - **THEN RESTATE WHAT CONSUMES WELL-FORMEDNESS, WHICH IS WHAT SAYS THE
   PREDICATE IS THE RIGHT ONE.** `The-Proof` quantifies the batcher over
-  WellFormed streams, so the leaf's predicate has to reach that quantification
-  rather than merely sit beside it. A predicate the batching claim cannot be
-  stated against is one nobody will ever spend, however structural it reads —
-  the same test the mirror tier applies to its own erasure.
+  WellFormed streams, so the split has to reach that quantification rather than
+  merely sit beside it. A predicate the batching claim cannot be stated against
+  is one nobody will ever spend, however structural it reads — the same test the
+  mirror tier applies to its own erasure.
 
-- **THEN CUT THE LEAF INTO CLAUSES, ONCE THE DOMAIN COMPUTES.** The leaf is one
-  statement over every former; the induction it wants is one clause per former,
-  and no clause can be stated until the tier below has the equations. So this
-  leg is written against whatever those turn out to be, and its product is the
-  clause list rather than any proof — a former whose clause cannot be stated is
-  the finding, and it arrives at the domain rather than here.
+- **THEN DECIDE WHAT DISCHARGES THE AUTOMATON HALF, WHICH IS THE TIER'S ONE
+  DESIGN QUESTION.** Two routes: a seam invariant relating the eval state to
+  `ProtocolSt`, recoverable from the face's header; or an induction on fuel over
+  `run-monotone`, which says a longer run EXTENDS a shorter one and so asks only
+  that an appended segment keeps the automaton happy. The second is the cheaper
+  bet and needs no domain; the leg's product is which, decided by reading the
+  evaluator's step structure rather than by preference.
 
-- **AND THE FALLBACK IS RECOVERY, NOT A SECOND LIVE ROUTE.** The seam carve is
-  in git with a pointer in the face's own header, so a restatement that fails
-  costs a `git show` rather than a rediscovery — which is what makes deleting it
-  cheaper than carrying it. Carrying it was the expensive option: two live
-  routes means every finding has to be assessed against both, and the leaves
-  would have gone on reading as the schedule while nothing spent them.
+- **AND THE SETTLEDNESS HALF IS WHERE A SEAM INVARIANT IS OWED WHATEVER THAT
+  DECIDES.** `evaluate-settled` is a fact about where the machine may CUT, so no
+  reorganisation of the other half removes it. That is the argument for pricing
+  the seam invariant before committing to any route that claims to avoid it: it
+  is owed once already, and a route avoiding it for one half still pays it here.
 
 ### The ledger
 
-- **`meaning-prefix-well-formed`** (Verify-Well-Formed) — FALSITY,
-  `DEAD ROUTE`: every prefix of a program's meaning is accepted by the protocol
-  automaton. The tier's whole debt, and nothing has instantiated it — what the
-  sampling sweep reached is its consumer's conclusion, which is about a run.
+- **`evaluate-settled`** (Verify-Well-Formed) — FALSITY, `NO EVIDENCE`: a run's
+  last protocol state has every obligation paid. The tier's monster, and the
+  half a cut landing mid-instant refutes outright.
+- **`evaluate-accepted`** (Verify-Well-Formed) — FALSITY, `DEAD ROUTE`: no emit
+  of a run is rejected by the automaton. Every clause the automaton checks is a
+  promise the evaluator makes while building the stream, so it is structural in
+  the run.
 
 ## Tier 4 — determinacy and the top-line semantic claims
 
