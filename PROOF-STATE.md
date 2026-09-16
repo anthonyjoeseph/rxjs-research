@@ -196,10 +196,10 @@ the row is DIFFICULTY.
 formal-verification-batchSimultaneous    The-Proof.agda — REAL, module postulate-free
  ├─ batch-agreement                      proven
  └─ evaluate-well-formed                 Verify-Well-Formed.agda — REAL, one match
-     └─ burst-drain-well-formed          one postulate — tier 2
+     └─ burst-drain-well-formed          one postulate — tier 1
 
-  evaluate↓ = proj₁ ∘ evaluate!           Rx/Evaluator/Builder.agda — tier 1
-     └─ every value-path leaf is a body; the corpus runs
+  evaluate↓ = proj₁ ∘ evaluate!           Rx/Evaluator/Builder.agda — REAL
+     └─ every value-path leaf is a body; the corpus runs; the tower descends
 
   every tier above is stated over Rx.Exp's syntax
 ```
@@ -216,63 +216,23 @@ every guard, every `<?` and the dry marker leave the machine entirely.
 A row's class must agree with its postulate's header, which is where the
 research lives; where they disagree, the header wins.
 
-## Tier 1 — the evaluator runs again
+## Tier 1 — Verify-Well-Formed
 
-**THE TIER IS A PROJECTION, AND THE PROJECTION NOW COMPUTES.** `evaluate↓` is
-`proj₁` of `evaluate!`, which hands back a run TOGETHER with its `evaluate⇓`
-derivation, so the descent is a proof obligation rather than a reading the
-machine computes and the dry marker is unemittable — no constructor of the
-relation builds one.
-
-**AND THE TIER NOW STANDS ON NO POSTULATE, WHICH WAS ITS RETIREMENT
-CONDITION (Anthony).** `reducible` is a body recursing structurally on the
-term and every one of its leaves is discharged, so this tier's ledger is
-EMPTY. What is left of it is not proof but VERIFICATION: the candidate's
-executable face was unrunnable while any leaf stood, so nothing downstream of
-a flattener had ever been run at all, and the legs below are what that
-unblocks. The tier retires when they are spent.
-
-### Big picture tier roadmap
-
-- **CONFIRM THE DESCENT ON THE WHOLE TOWER, WHICH IS WHAT DECIDES THE TIER.**
-  The candidate funds `Runs` and nothing else; the other eight `*Runs` families
-  have no candidate, and the bet is that once subscription is independently
-  total their recursion is structural. Nothing cheap can see that — the dev loop
-  stubs mutual blocks, and the termination check is exactly where the bet lives —
-  so the run that decides it is the heavy gate over a tree whose candidate holds
-  no leaf, which is a tree that has never existed before. Green there is the
-  tier's retirement condition met; red names the family that does not descend,
-  and that name is the next leg.
-
-- **THEN WHATEVER DESIGN WORK REMAINS.** Named rather than planned, because its
-  content is exactly what the leg above turns up: a family whose recursion the
-  termination check refuses needs a measure or a candidate of its own, and which
-  family it is decides everything about the shape of that work.
-
-- **THEN WHATEVER GRINDING REMAINS.** The leaves the legs above leave behind,
-  once each has a settled shape and a named route. This is the delegation
-  boundary and the first leg here that is not the design session's own work.
-
-### The ledger
-
-Empty — the tier stands on no postulate.
-
-## Tier 2 — Verify-Well-Formed (parked behind tier 1)
-
-Built on the run's own derivation, so proving anything here while tier 1 is
-open bets on ground a failure of the descent would move.
+Built on the run's own derivation, which is now a body the whole tower
+descends through.
 
 **THE TIER IS ONE STATEMENT OVER ONE LEAF.** `The-Proof` draws
 `evaluate-well-formed` and nothing else from this face. That name is a real
 body: it splits the descent's dry-freeness across the subscribe frame and the
-drain, and hands the two halves to the leaf. The split is what CONSUMES tier 1
-— a leaf handed the descent's own conclusion directly would assert its
-sufficiency without ever checking it, which is the shape the leaf law refuses.
+drain, and hands the two halves to the leaf. The split is what CONSUMES the
+descent — a leaf handed its conclusion directly would assert its sufficiency
+without ever checking it, which is the shape the leaf law refuses.
 
-**AND THE BOOKKEEPING IS DELIBERATELY UNCARVED.** The protocol argument's shape
-is a function of a recursion tier 1 may still restate, so pieces cut against
-today's machine are inventory and not progress. One leaf at full strength; carve
-it when the descent under it settles.
+**AND THE BOOKKEEPING IS DELIBERATELY UNCARVED.** What used to hold the carve
+back was a recursion that might still be restated, and that is settled. What
+holds it now is the leaf's own evidence, which covers less than it reads as
+covering. One leaf at full strength; carve it when the legs below say what the
+evidence actually reaches.
 
 ### Big picture tier roadmap
 
@@ -306,7 +266,7 @@ it when the descent under it settles.
   whose drain are each dry-free. The sweep decides its conclusion at every
   program it runs, so what is open is the fragment the generator cannot write.
 
-## Tier 3 — the top-line semantic claims (parked behind tier 2)
+## Tier 2 — the top-line semantic claims (parked behind tier 1)
 
 The second ledger: claims Main asserts beside the main theorem, off its
 critical path.
@@ -321,14 +281,15 @@ critical path.
   about batching ACROSS instants and no row has reached a second one. A
   scripted hot slot does, on the harness `Probed.Pipeline-Claims` already
   carries. A refutation here is SPEC-level — surface it, do not patch it.
-- **the seven instance claims are BLOCKED, and the block is tier 1's** —
+- **the seven instance claims are UNBLOCKED, and that IS the leg** —
   `readme-diamond`, `readme-each-next-own-instant`, `readme-cascades-inherit`,
   `readme-completion-cascades`, `readme-share-connect-no-replay`,
   `readme-late-join-growth`, `readme-serial-joins-mirror-rxjs`. Every one is
-  hard-wired to a flattener, and `evaluate↓` does not compute through one
-  while `red-thru` stands, so no `refl` row can be written for any of them at
-  any program. Nothing in this tier moves them. The leg is to re-run the
-  recovered predecessor battery the day the descent lands.
+  hard-wired to a flattener, and while the descent was stuck at one no `refl`
+  row could be written for any of them at any program. It is not stuck: the
+  corpus runs a self-referential μ through every flattener. Re-run the
+  recovered predecessor battery and let the rows say which of the seven hold
+  as stated. A refutation here is SPEC-level — surface it, do not patch it.
 - **draft the abstractions and ASK** — `locality`, `non-interference`,
   `timing-invariance`, `causality`, `μ-guarded`, `defer-shift`, over `Node`,
   `NodeSt`, `Inbox`, `inboxOf`, `stAt`, `cascade`, `δ`, `Retiming`, `retime`,
@@ -342,9 +303,9 @@ critical path.
   `readme-cascades-inherit`, `readme-completion-cascades`,
   `readme-share-connect-no-replay`, `readme-late-join-growth`,
   `readme-serial-joins-mirror-rxjs`** — FALSITY, `NO EVIDENCE`: every one names
-  a flattening program, and `evaluate↓` is stuck on `red-thru` at one, so none
-  is probeable at all. A refutation is SPEC-level: surface to Anthony, do not
-  patch.
+  a flattening program, and nothing has instantiated any of them. Probeable now
+  that the evaluator computes through a flattener. A refutation is SPEC-level:
+  surface to Anthony, do not patch.
 - **`readme-batch-order-is-delivery-order`, `readme-take-counts-values`,
   `readme-one-subscribe-one-batch`, `id-inheritance`** — FALSITY, `PROBED×3`:
   instantiated now, but every row sits at a program with no flattener, which is
