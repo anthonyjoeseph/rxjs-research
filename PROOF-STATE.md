@@ -183,8 +183,11 @@ the row is DIFFICULTY.
 formal-verification-batchSimultaneous    The-Proof.agda — REAL, module postulate-free
  ├─ batch-agreement                      proven
  └─ evaluate-well-formed                 Verify-Well-Formed.agda — REAL, a body
-     └─ adequacy                         the run is a prefix — tier 2
-     └─ meaning-prefix-well-formed       one postulate — tier 3
+     ├─ evaluate-accepted                no emit of a run is rejected — tier 3
+     └─ evaluate-settled                 the run stops settled — tier 3
+
+adequacy / saturation / run-monotone      claimed by Main in their own right —
+                                          nothing above consumes them — tier 2
 
   evaluate↓ = proj₁ ∘ evaluate!           Rx/Evaluator/Builder.agda — REAL
      └─ every value-path leaf is a body; the corpus runs; the tower descends
