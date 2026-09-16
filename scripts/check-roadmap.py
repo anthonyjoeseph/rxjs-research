@@ -268,6 +268,11 @@ LEG_BUDGET = 700
 # nothing -- so the section decays the way a `TWIN:` does, by pointing at
 # something that moved.
 QUESTIONS_RE = re.compile(r"^###\s+Open questions\s*$")
+# THE MONSTER SECTION IS NOT PREAMBLE, and its own checker owns its rules.
+# A preamble says what the tier IS; the monster says what it is trying to
+# KILL, which is a different question and is held by `make monster-check` --
+# the only check that can resolve the name it carries.
+MONSTER_RE = re.compile(r"^###\s+The monster\b", re.I)
 QUESTIONS_MAX = 3
 
 # THE CLASSES A QUESTION MAY NAME, and SHAPE is here because the rule that
@@ -353,6 +358,7 @@ def parse(path):
     qs = None        # [(label, lineno, cost, names)] for the questions subsection
     in_roadmap = False
     in_questions = False
+    in_monster = False
 
     def flush_pre():
         if pre is not None and pre[1]:
@@ -401,6 +407,7 @@ def parse(path):
             row = None
             in_roadmap = False
             in_questions = False
+            in_monster = False
             cur = mt.group(1)
             rows = []
             legs = []
@@ -420,6 +427,7 @@ def parse(path):
             row = None
             in_roadmap = bool(ROADMAP_RE.match(line))
             in_questions = bool(QUESTIONS_RE.match(line))
+            in_monster = bool(MONSTER_RE.match(line))
             continue
         if ROW_START_RE.match(line):
             flush_row()
@@ -432,11 +440,11 @@ def parse(path):
             else:
                 flush_row()
                 row = None
-                if line.strip():
+                if line.strip() and not in_monster:
                     if pre[0] is None:
                         pre[0] = i
                     pre[1].append(line)
-        elif line.strip():
+        elif line.strip() and not in_monster:
             if pre[0] is None:
                 pre[0] = i
             pre[1].append(line)

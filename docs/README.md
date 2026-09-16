@@ -42,6 +42,8 @@ yours. `gate-light` and `gate-heavy` force a path.
 | `imports-selftest` | [imports-check.md](imports-check.md) | ship an import checker that has stopped firing |
 | `imports-check` | [imports-check.md](imports-check.md) | leave an import no name in the file spends, or one that names nothing it takes |
 | `roadmap-selftest` | [roadmap-check.md](roadmap-check.md) | ship a roadmap checker that has stopped firing |
+| `monster-check` | [monster.md](monster.md) | add code to `agda/src` outside the lowest open tier's monster's cone |
+| `monster-selftest` | [monster.md](monster.md) | ship a monster checker that has stopped firing |
 | `dev-changed-selftest` | [gate.md](gate.md) | ship a light gate that passes while checking nothing |
 | `roadmap-check` | [roadmap-check.md](roadmap-check.md) | leave PROOF-STATE stale, unsorted, verbose, or dated — or date CLAUDE.md |
 | `recursion-cover-selftest` | [recursion-cover.md](recursion-cover.md) | ship a recursion-cover checker that has stopped firing |

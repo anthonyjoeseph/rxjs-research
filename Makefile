@@ -656,6 +656,19 @@ wiring-selftest:
 roadmap-check:
 	@scripts/check-roadmap.py
 
+# THE MONSTER.  Every tier names the ONE declaration it is currently trying to
+# prove FALSE, chosen for blast radius rather than for being a leaf, and no line
+# may be ADDED to `agda/src` outside the lowest open tier's monster's own
+# dependency cone.  The cone is read off the tree AS EDITED, which is what lets
+# the one move that kills a postulate -- converting it into a body over smaller
+# leaves -- pass rather than fail.  Off-monster work is declared with an `also:`
+# line in the tier's own section, never with a flag.
+monster-selftest:
+	@scripts/check-monster.py --selftest
+
+monster-check:
+	@scripts/check-monster.py --gate
+
 # WRITES the evidence field on every classed row, from the postulates' own
 # headers.  The field is DERIVED -- which is the whole reason it may be
 # mandatory without producing filler.  A hand-typed census is the failure this
@@ -1193,6 +1206,7 @@ GATE_CHEAP = wiring-selftest wiring-gate wiring-refuted wiring-probed \
              imports-selftest imports-check \
              evidence-selftest evidence-check \
              roadmap-selftest roadmap-check \
+             monster-selftest monster-check \
              roadmap-moved-selftest roadmap-moved \
              roadmap-order-selftest roadmap-order \
              cone-selftest cone-check \

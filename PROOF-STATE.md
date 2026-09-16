@@ -232,6 +232,20 @@ Both are born without evidence — the sweep that covered the old fused leaf
 computed the concatenation's verdict and never the seam — and the seam is the
 first thing on this face a program can be run against directly.
 
+### The monster
+
+`burst-drain-well-formed` — what the whole tier asserts, and the one statement
+here that can be FALSE rather than merely unproven: a run whose emit stream the
+protocol automaton rejects kills both leaves, the seam relation they are
+denominated in, and the quantification over WellFormed streams that `The-Proof`
+draws from this face. The leaves are how it gets killed, not what is being
+killed — a leaf's cone is its own statement's vocabulary, so naming one here
+would put the assembly it serves off the monster's tree.
+
+also: `evaluate-deterministic` — a tier-2 statement worked here on Anthony's
+direction, because the coverage axis it closes is this face's and no schedule
+of tier-1 work reaches it.
+
 ### Big picture tier roadmap
 
 - **REACH THE DRAIN'S STEP, WHICH THE FIRST ROWS COULD NOT.** The seam is
@@ -285,6 +299,14 @@ first thing on this face a program can be run against directly.
 
 The second ledger: claims Main asserts beside the main theorem, off its
 critical path.
+
+### The monster
+
+`subscribeE-det` — every claim in this tier that builds its own derivation
+rather than reading the builder's is worthless without it, and it is the one
+statement here whose falsity would be a fact about the EVALUATOR rather than
+about a claim: a subscribe frame admitting two outputs at one set of indices
+means the machine is not a function, which moves the tier below as well.
 
 ### Big picture tier roadmap
 

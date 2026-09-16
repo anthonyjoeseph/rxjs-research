@@ -1,0 +1,366 @@
+#!/usr/bin/env python3
+"""THE MONSTER: EVERY TIER NAMES THE ONE THING IT IS TRYING TO KILL.
+
+A tier's rows are its ledger and its legs are its schedule.  The MONSTER is
+what the schedule is FOR: the single declaration the session currently judges
+most likely to be FALSE, chosen for BLAST RADIUS rather than for being a leaf
+-- if it falls, its siblings and its parents go with it.
+
+It replaces the OPEN QUESTIONS section, which was prose with a `relevant:`
+list, and it replaces it with a NAME, which is the part a machine can hold.
+
+WHAT IS HELD, and it is deliberately not a prose requirement: every line ADDED
+to `agda/src` must belong to a declaration inside the lowest open tier's
+monster's own DEPENDENCY CONE.  Not its blast radius -- its cone: the things
+the monster's statement and body reach, which is exactly the set whose truth
+decides the monster's.
+
+THE CONE IS COMPUTED ON THE POST-EDIT TREE, WHICH IS WHAT MAKES THE RULE
+SATISFIABLE.  A monster that is a postulate has a cone of vocabulary only, so
+read against the OLD tree this check would forbid the one move that kills a
+postulate -- converting it into a real body over smaller leaves.  Read against
+the tree as it now stands, that body names the new leaves, so they are in the
+cone and the commit passes.  The same reading is what lets a new lemma land:
+add it AND wire it into the monster in one commit, which is the wiring law's
+own workflow, and nothing further is owed.
+
+AND THE MONSTER NEED NOT BE A POSTULATE.  The riskiest object in a tier is
+routinely a DEFINITION -- a relation every leaf is stated in, an evaluator
+clause every claim reads through -- and such a thing can be wrong in a way no
+postulate ledger records.  A postulate monster is the special case.
+
+THE ESCAPE HATCH IS IN THE FILE OF RECORD, NEVER IN THE ENVIRONMENT.  A tier's
+monster section may carry an `also:` line naming further roots whose cones are
+admitted, which is how a deliberately off-monster leg -- a rehearsal claim, a
+tooling face, apparatus a whole tier is unreachable without -- is declared.
+Written there it is reviewed with the roadmap; passed as a flag it would be
+invisible the moment it was used.
+
+Deletions are never held, and neither is a comment: what is charged is code
+ARRIVING, since that is the only thing that can be off-monster work.
+"""
+
+import argparse
+import importlib.util
+import os
+import re
+import subprocess
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+
+
+def load_wiring():
+    spec = importlib.util.spec_from_file_location(
+        "check_wiring", os.path.join(HERE, "check-wiring.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+TIER_RE = re.compile(r"^##\s+Tier\s+(\d+)\b")
+MONSTER_HEAD_RE = re.compile(r"^###\s+The monster\b", re.I)
+NAME_RE = re.compile(r"`([^`]+)`")
+
+
+def parse_monsters(path):
+    """tier number -> (monster, [also…], line).  One backticked name in the
+    section's first non-blank prose line; `also:` lines add admitted roots."""
+    out = {}
+    tier = None
+    in_section = False
+    with open(path, encoding="utf-8") as fh:
+        for lineno, line in enumerate(fh, 1):
+            m = TIER_RE.match(line)
+            if m:
+                tier, in_section = int(m.group(1)), False
+                continue
+            if line.startswith("###"):
+                in_section = bool(MONSTER_HEAD_RE.match(line))
+                continue
+            if not in_section or tier is None or not line.strip():
+                continue
+            names = NAME_RE.findall(line)
+            if line.strip().lower().startswith("also:"):
+                if tier in out:
+                    out[tier][1].extend(names)
+                continue
+            if tier not in out and names:
+                out[tier] = (names[0], [], lineno)
+    return out
+
+
+def enclosing_index(defs, def_lines):
+    """anon/module-app node -> the named declaration it continues."""
+    starts = {}
+    for name, sites in def_lines.items():
+        for relpath, ln in sites:
+            cur = starts.get(name)
+            if cur is None or ln < cur[1]:
+                starts[name] = (relpath, ln)
+    named, anon = {}, {}
+    for name, (relpath, ln) in starts.items():
+        (anon if defs[name].kind in ("anon", "module-app") else named) \
+            .setdefault(relpath, []).append((ln, name))
+    for rows in named.values():
+        rows.sort()
+    out = {}
+    for relpath, rows in anon.items():
+        pool = named.get(relpath, [])
+        for ln, name in rows:
+            best = None
+            for start, cand in pool:
+                if start < ln:
+                    best = cand
+                else:
+                    break
+            if best is not None:
+                out[name] = best
+    return out
+
+
+PROSE_BUDGET = 700
+
+
+def section_cost(path, tier_lineno):
+    """the monster section's prose, `also:` lines free — they are a LEDGER of
+    admitted exceptions, and charging a ledger buys exceptions left undeclared
+    rather than exceptions not taken."""
+    total, started = 0, False
+    with open(path, encoding="utf-8") as fh:
+        for lineno, line in enumerate(fh, 1):
+            if lineno < tier_lineno:
+                continue
+            if line.startswith("###") or line.startswith("##"):
+                if started:
+                    break
+                continue
+            started = True
+            if line.strip().lower().startswith("also:"):
+                continue
+            total += len(line.strip())
+    return total
+
+
+def selftest():
+    import tempfile
+    fails = []
+
+    def check(cond, what):
+        if not cond:
+            fails.append(what)
+
+    doc = """## Tier 1 — a
+### The monster
+`alpha` — because it would take the tier with it.
+also: `beta` — declared exception.
+### The ledger
+- **`x`** — FALSITY
+## Tier 2 — b
+### The monster
+`gamma` — the other one.
+"""
+    with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False) as fh:
+        fh.write(doc)
+        tmp = fh.name
+    got = parse_monsters(tmp)
+    check(got.get(1, (None,))[0] == "alpha", "tier 1's monster is read")
+    check(got.get(1, (None, []))[1] == ["beta"], "an `also:` line is collected")
+    check(got.get(2, (None,))[0] == "gamma", "a second tier carries its own")
+    check(min(got) == 1, "the LOWEST tier is the one that binds")
+    check(section_cost(tmp, 2) > 0, "the section's prose is charged")
+    check(section_cost(tmp, 2) < PROSE_BUDGET, "an `also:` line is not charged")
+
+    # the splice: an anonymous `with` continuation must not break the cone.
+    class D:
+        def __init__(self, kind, file):
+            self.kind, self.file = kind, file
+    defs = {"asm": D("def", "A.agda"), "...#A:9": D("anon", "A.agda"),
+            "leaf": D("postulate", "B.agda")}
+    dl = {"asm": {("A.agda", 5)}, "...#A:9": {("A.agda", 9)},
+          "leaf": {("B.agda", 3)}}
+    enc = enclosing_index(defs, dl)
+    check(enc.get("...#A:9") == "asm",
+          "an anonymous continuation is spliced into what it continues")
+    edges = {"...#A:9": {"leaf"}}
+    check("leaf" not in reach({"asm"}, edges),
+          "and without the splice the leaf is OFF the cone")
+    edges.setdefault("asm", set()).update(edges["...#A:9"])
+    check("leaf" in reach({"asm"}, edges),
+          "and with it the leaf is inside")
+
+    os.unlink(tmp)
+    if fails:
+        for f in fails:
+            print(f"monster-selftest: FAILED — {f}")
+        sys.exit(1)
+    print("monster-selftest: PASS (the lowest tier's monster is the one that "
+          "binds, an `also:` exception is collected and is not charged against "
+          "the section's prose budget, and an anonymous `with` continuation is "
+          "spliced into the declaration it continues -- without which an "
+          "assembly applying its leaves in a `with` arm reaches none of them, "
+          "which is the shape that made the first run of this check report "
+          "nine offenders that were all its own body)")
+
+
+def reach(seed, edges):
+    R, stack = set(seed), list(seed)
+    while stack:
+        n = stack.pop()
+        for m in edges.get(n, ()):
+            if m not in R:
+                R.add(m)
+                stack.append(m)
+    return R
+
+
+def merge_base():
+    for ref in ("origin/main", "main"):
+        p = subprocess.run(["git", "merge-base", ref, "HEAD"],
+                           capture_output=True, text=True)
+        if p.returncode == 0 and p.stdout.strip():
+            return p.stdout.strip()
+    return None
+
+
+def added_lines(base, src_rel):
+    """(relpath-within-src, new lineno) for every ADDED line under agda/src."""
+    p = subprocess.run(
+        ["git", "diff", "-U0", base, "--", src_rel],
+        capture_output=True, text=True)
+    if p.returncode != 0:
+        return None
+    hits, cur, n = [], None, 0
+    for line in p.stdout.splitlines():
+        if line.startswith("+++ b/"):
+            path = line[6:]
+            cur = os.path.relpath(path, src_rel) if path.startswith(src_rel) else None
+            continue
+        m = re.match(r"^@@ -\S+ \+(\d+)(?:,(\d+))? @@", line)
+        if m:
+            n = int(m.group(1))
+            continue
+        if line.startswith("+") and not line.startswith("+++"):
+            if cur:
+                hits.append((cur, n))
+            n += 1
+        elif line.startswith(" "):
+            n += 1
+    return hits
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--roadmap", default=os.path.join(HERE, "..", "PROOF-STATE.md"))
+    ap.add_argument("--src", default=os.path.join(HERE, "..", "agda", "src"))
+    ap.add_argument("--selftest", action="store_true",
+                    help="check that this check still fires, and exit")
+    ap.add_argument("--gate", action="store_true",
+                    help="exit 1 on a finding; without it this is a report")
+    args = ap.parse_args()
+    if args.selftest:
+        selftest()
+        return
+
+    roadmap = os.path.abspath(args.roadmap)
+    src_dir = os.path.abspath(args.src)
+    repo = os.path.abspath(os.path.join(HERE, ".."))
+    src_rel = os.path.relpath(src_dir, repo)
+
+    monsters = parse_monsters(roadmap)
+    if not monsters:
+        print("check-monster: no tier names a monster — every tier owes a "
+              "`### The monster` section naming one declaration in backticks.")
+        sys.exit(1 if args.gate else 0)
+
+    tier = min(monsters)
+    monster, also, lineno = monsters[tier]
+    roots = [monster] + also
+
+    cost = section_cost(roadmap, lineno)
+    if cost > PROSE_BUDGET:
+        print(f"check-monster: {os.path.basename(roadmap)}:{lineno}: tier "
+              f"{tier}'s monster section spends {cost} prose characters "
+              f"({cost - PROSE_BUDGET} over). It says WHY this is the thing "
+              f"most worth killing and what goes with it; the research behind "
+              f"that belongs in the declaration's own header, where a finding "
+              f"has somewhere to go. `also:` lines are free.")
+        sys.exit(1 if args.gate else 0)
+
+    w = load_wiring()
+    w.ROOT_REL = "Main.agda"
+    files = w.find_agda_files(src_dir)
+    defs, def_lines, postulate_names, order, _sites = \
+        w.extract_definitions(src_dir, files)
+
+    missing = [r for r in roots if r not in defs]
+    if missing:
+        for r in missing:
+            print(f"check-monster: {os.path.basename(roadmap)}:{lineno}: "
+                  f"tier {tier}'s monster root `{r}` is not declared in "
+                  f"agda/src — a monster is a NAME, and a name that resolves "
+                  f"to nothing holds nothing.")
+        sys.exit(1 if args.gate else 0)
+
+    corpus = w.build_corpus(src_dir, files)
+    main_claims, _ = w.read_main_claims(src_dir)
+    suppressed = w.postulate_arg_sites(src_dir, files, defs, def_lines,
+                                       postulate_names)
+    edges, _consumers, _seed = w.build_graph(
+        src_dir, files, defs, def_lines, postulate_names, order, corpus,
+        main_claims, suppressed)
+
+    # A column-0 `...` continuation — a `with` arm, a `rewrite` clause — is
+    # its OWN node in the wiring graph, seeded directly so that a name used
+    # only inside one still reads as reached.  That exemption is right there
+    # and wrong here: it breaks the chain, so an assembly whose body applies
+    # its leaves in a `with` arm reaches none of them.  Splice each anonymous
+    # node into the declaration it lexically continues.
+    enclosing = enclosing_index(defs, def_lines)
+    for anon, owner in enclosing.items():
+        edges[owner] |= edges.get(anon, set())
+    cone = w.reachable_from(set(roots), edges)
+
+    base = merge_base()
+    if base is None:
+        print("check-monster: no merge-base with main — nothing to hold.")
+        return
+    hits = added_lines(base, src_rel)
+    if hits is None:
+        print("check-monster: git diff failed — not holding anything.")
+        return
+
+    by_file = w.owner_index(def_lines)
+    offenders = {}
+    for relpath, ln in hits:
+        owner = w.owner_of(by_file, relpath, ln)
+        if owner is None or owner in cone:
+            continue
+        if defs[owner].kind in ("anon", "module-app"):
+            owner = enclosing.get(owner)
+            if owner is None or owner in cone:
+                continue
+        offenders.setdefault(owner, (relpath, ln))
+
+    print(f"check-monster: tier {tier}'s monster is `{monster}`"
+          + (f" (also: {', '.join(also)})" if also else "")
+          + f" — {len(cone)} declaration(s) in its cone")
+    if not offenders:
+        print("check-monster: every line added to agda/src since the "
+              "merge-base with main lands inside that cone")
+        return
+
+    for owner, (relpath, ln) in sorted(offenders.items()):
+        print(f"  {os.path.join(src_rel, relpath)}:{ln}: `{owner}` is OFF "
+              f"MONSTER — nothing the monster's statement or body reaches "
+              f"depends on it")
+    print(f"check-monster: {len(offenders)} declaration(s) added off the "
+          f"monster's tree.  Either wire them into `{monster}` in this "
+          f"commit, MOVE the monster to the thing this work is actually "
+          f"aimed at, or declare the exception with an `also:` line in the "
+          f"tier's monster section — where it is reviewed with the roadmap.")
+    sys.exit(1 if args.gate else 0)
+
+
+if __name__ == "__main__":
+    main()
