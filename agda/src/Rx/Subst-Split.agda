@@ -17,11 +17,13 @@
 module Rx.Subst-Split where
 
 open import Data.Nat using (ℕ)
-open import Data.List using (List; _++_)
-open import Data.List.Relation.Unary.All using (All)
+open import Data.List using (List; []; _∷_; _++_)
+open import Data.List.Relation.Unary.All using (All; []; _∷_)
+open import Data.List.Relation.Unary.All.Properties using (++⁺)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties
   using (∈-++⁺ˡ; ∈-++⁺ʳ; ∈-++⁻)
+open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.Any.Properties using (++⁺∘++⁻)
 open import Data.Sum using (inj₁; inj₂; [_,_]′)
 open import Relation.Binary.PropositionalEquality
@@ -34,7 +36,7 @@ private
   variable
     n           : ℕ
     Γ           : Ctx n
-    Δᵍ Δ Θsub   : List Ty
+    Δᵍ Δ Θloc Θsub : List Ty
     u           : Ty
 
 ------------------------------------------------------------------
@@ -94,3 +96,37 @@ sub-right : (Θloc : List Ty) (σ : All (Val Γ) Θsub)
           → subΘTm {Δᵍ = Δᵍ} {Δ} Θloc σ (varᵗ x) ≡ wkTm (reify (lookupEnv σ z))
 sub-right Θloc σ x z eq with ∈-++⁻ Θloc x | eq
 ... | inj₂ _ | refl = refl
+
+------------------------------------------------------------------
+-- READING A CONCATENATED ENVIRONMENT, at the same split.  The two
+-- substituter lemmas above say which TERM a variable becomes; this
+-- says which VALUE it is looked up as, and the two are what a
+-- composition of substitutions has to reconcile: the inner walk takes
+-- what its half owns and the outer takes the rest, while a single
+-- walk over the concatenation takes both from one environment.
+------------------------------------------------------------------
+
+lookup-++ : (Θloc : List Ty) (ρ : All (Val Γ) Θloc) (σ : All (Val Γ) Θsub)
+            (x : u ∈ (Θloc ++ Θsub))
+          → lookupEnv (++⁺ ρ σ) x
+              ≡ [ lookupEnv ρ , lookupEnv σ ]′ (∈-++⁻ Θloc x)
+lookup-++ []      []      σ x          = refl
+lookup-++ (a ∷ Θ) (w ∷ ρ) σ (here refl) = refl
+lookup-++ (a ∷ Θ) (w ∷ ρ) σ (there p)
+  with ∈-++⁻ Θ p | lookup-++ Θ ρ σ p
+... | inj₁ y | ih = ih
+... | inj₂ z | ih = ih
+
+lookup-left : (Θloc : List Ty) (ρ : All (Val Γ) Θloc) (σ : All (Val Γ) Θsub)
+              (x : u ∈ (Θloc ++ Θsub)) (y : u ∈ Θloc)
+            → ∈-++⁻ Θloc x ≡ inj₁ y
+            → lookupEnv (++⁺ ρ σ) x ≡ lookupEnv ρ y
+lookup-left Θloc ρ σ x y eq =
+  trans (lookup-++ Θloc ρ σ x) (cong [ lookupEnv ρ , lookupEnv σ ]′ eq)
+
+lookup-right : (Θloc : List Ty) (ρ : All (Val Γ) Θloc) (σ : All (Val Γ) Θsub)
+               (x : u ∈ (Θloc ++ Θsub)) (z : u ∈ Θsub)
+             → ∈-++⁻ Θloc x ≡ inj₂ z
+             → lookupEnv (++⁺ ρ σ) x ≡ lookupEnv σ z
+lookup-right Θloc ρ σ x z eq =
+  trans (lookup-++ Θloc ρ σ x) (cong [ lookupEnv ρ , lookupEnv σ ]′ eq)

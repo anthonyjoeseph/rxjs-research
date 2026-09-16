@@ -233,17 +233,7 @@ deferred beside it.
 
 ### Big picture tier roadmap
 
-- **THE COMPOSITION WALK, WHICH IS ALL THAT IS LEFT OF THE EMBEDDING ARM.**
-  The arm is now a real body over one leaf. Its other half wanted the empty
-  substitution to be the identity, and that was already proven on the identity
-  face — which is what says the remaining leaf has a walked route rather than
-  only a plausible one. The leaf is instantiated under a map and under a scan
-  at a product-typed binder over a two-entry environment, and not refuted, so
-  what is left is the walk: a THREE-telescope generalisation, since every
-  binding arm grows the outer telescope and forces the same associativity cast
-  the identity face already pushes through every constructor.
-
-- **THEN RUN A SELF-REFERENTIAL μ, IN THE CORPUS RATHER THAN IN A PROBE.** The
+- **RUN A SELF-REFERENTIAL μ, IN THE CORPUS RATHER THAN IN A PROBE.** The
   peel is now paid for by a size the unfolding does not move, and what funds that
   size is a SYNTACTIC claim: the μ variable is bound into the guarded context,
   `varᵉ` reads only from the usable one, and the guarded elimination substitutes
@@ -283,12 +273,6 @@ deferred beside it.
   boundary and the first leg here that is not the design session's own work.
 
 ### The ledger
-
-- **`subΘ-compᵉ`** (Rx/Subst-Compose) — DIFFICULTY, `TWIN, PROBED`: two
-  substitutions in sequence agree with their concatenation. The binding arms
-  grow the outer telescope, so the walk needs it as a parameter and pays an
-  associativity cast.
-
 
 - **`red-thru`** (Rx/Evaluator/Reducible) — DIFFICULTY, `PROBED`: the consume
   fallback is pinned now, so an arrival at a usable node is subscribed and the
