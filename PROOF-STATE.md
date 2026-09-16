@@ -273,6 +273,15 @@ critical path.
 
 ### Big picture tier roadmap
 
+- **DECIDE WHETHER THE RUN RELATION IS A FUNCTION** — `subscribeE-det`,
+  `drain-det`, under the assembly `evaluate-deterministic` that Main now
+  claims. The body typechecks, so what is open is the two leaves and nothing
+  about the shape. It is first because it is the only row here whose answer
+  changes another tier: the protocol face's leaf quantifies over any subscribe
+  and any drain derivation while every sampled program exercised the builder's,
+  and this is the fact that makes those the same set. Instantiate before
+  grinding — the ring is twenty families, so a refutation at one arm is worth
+  far more than a partial induction over all of them.
 - **re-probe the three universal laws at a program that has a SOURCE** —
   `readme-batch-order-is-delivery-order`, `readme-take-counts-values`,
   `readme-one-subscribe-one-batch`. Their rows stand at a closed literal in an
@@ -299,6 +308,10 @@ critical path.
 
 ### The ledger
 
+- **`subscribeE-det`, `drain-det`** (Verify-Determinacy) — FALSITY,
+  `NO EVIDENCE`: each family admits one output at its own indices. Nothing has
+  instantiated either, and the arms that do not follow from the head
+  constructor are separated by equation premises — unwalked.
 - **`readme-diamond`, `readme-each-next-own-instant`,
   `readme-cascades-inherit`, `readme-completion-cascades`,
   `readme-share-connect-no-replay`, `readme-late-join-growth`,

@@ -72,6 +72,17 @@ open import Rx.Provenance-Theorems
   using (id-inheritance)
 
 ------------------------------------------------------------------
+-- THE RUN RELATION IS A FUNCTION.  Claimed here rather than by a
+-- consumer, because its consumers are the claims that build their own
+-- derivations and none of those is written yet — and because a claim
+-- that needs it typechecks without it while proving something weaker
+-- than its own name, which is the one shape a missing fact does not
+-- announce.
+------------------------------------------------------------------
+open import Verify-Determinacy
+  using (evaluate-deterministic)
+
+------------------------------------------------------------------
 -- THE TIMING CLAIMS.  CAUTION: all three are stated over nine
 -- postulated abstract helpers in the same module (`Node`, `NodeSt`,
 -- `Inbox`, `inboxOf`, `stAt`, `cascade`, `δ`, `Retiming`, `retime`),
