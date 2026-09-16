@@ -119,6 +119,31 @@ postulate
   -- it from being discharged at the empty one: a `pre` reaching into
   -- the denotation's own tail is a demand for a fuel that reaches it.
   --
+  -- AND IT IS FALSE AS STATED, BECAUSE `Stream` IS A `List` (Anthony,
+  -- asking whether the domain is too broad).  A finite `meaning` that
+  -- every run is a prefix of forces `length (meaning e ins)` to
+  -- dominate every fuel's run, so the statement commits this language
+  -- to programs whose TOTAL emission is finite — and it is not one.  A
+  -- guarded fixpoint under `mergeAllᵉ` whose second branch is `deferᵉ`
+  -- of its own variable, with no `takeᵉ` above it, emits exactly one
+  -- envelope per unit of fuel: measured at seven fuels up to
+  -- thirty-two, the length is the fuel.  No finite list bounds that, so
+  -- there is no `meaning` at that program whatever the domain is.
+  --
+  -- WHAT THE REPAIR IS, AND IT IS A RESTRICTION RATHER THAN A BIGGER
+  -- DOMAIN.  Either the observation becomes an infinitary object and
+  -- the pair becomes a limit statement, or the two claims are
+  -- quantified over programs that SATURATE — which is the restriction
+  -- the bug cache already observes without saying so, every one of its
+  -- guarded-fixpoint rows sitting under a `takeᵉ`.  The second keeps
+  -- `Beh` finite and keeps the observation something the protocol
+  -- automaton can be asked about at a cut point, which is what the
+  -- well-formedness face needs from it.  The restriction is NOT the
+  -- reducibility candidate transported: that one recurses on the type
+  -- and the flatteners move the type downward, whereas a fixpoint under
+  -- a `deferᵉ` gate leaves the type where it was.  It is a second axis,
+  -- and it is owed its own predicate.
+  --
   -- DEAD ROUTE: de-risking either half by INSTANTIATION, ahead of the
   --   domain being defined.  Both are stated over `meaning`, which is
   --   `observe` of `denote` — two postulates, so the left side of each

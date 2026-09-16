@@ -342,6 +342,17 @@ also: `run-monotone` — a fact about the machine alone, which is why it survive
 
 ### Big picture tier roadmap
 
+- **STATE THE SATURATION RESTRICTION, BECAUSE THE PAIR IS FALSE WITHOUT ONE.**
+  A guarded fixpoint with no `takeᵉ` above it emits one envelope per unit of
+  fuel, so no finite `Stream` bounds its runs and there is no `meaning` at that
+  program whatever the domain turns out to be. The leg's product is the
+  predicate the two claims are quantified over — every program the bug cache
+  carries already satisfies it, so the restriction costs the corpus nothing —
+  plus the machine proof that the unbounded program falsifies the unrestricted
+  form, which is a refutation rather than a receipt. It is first because it
+  decides whether the domain below it is finite at all, and every later leg is
+  written against the answer.
+
 - **DEFINE `Beh` FOR THE FIRST-ORDER FORMERS AND EARN THE EQUATIONS.**
   `ofᵉ`, `emptyᵉ`, `mapᵉ`, `takeᵉ` and `scanᵉ` denote without any of the
   machinery the flatteners need, so this is where the domain's shape is
@@ -382,9 +393,10 @@ also: `run-monotone` — a fact about the machine alone, which is why it survive
 - **`run-monotone`** (Verify-Adequacy) — FALSITY, `PROBED`: more fuel only
   extends a run. Nothing postulated in it and nothing has instantiated it; it
   is the tier's one row a concrete program decides.
-- **`adequacy`, `saturation`** (Verify-Adequacy) — VACUITY, `DEAD ROUTE×2`: the
-  pair pinning the denotation to the machine's limit. Stated over a postulated
-  domain, so what they assert today is weaker than their names.
+- **`adequacy`, `saturation`** (Verify-Adequacy) — FALSITY, `DEAD ROUTE×2`: the
+  pair pinning the denotation to the machine's limit. False as stated — a
+  finite `Stream` cannot bound a fixpoint that emits one envelope per unit of
+  fuel; the finding and the two available repairs are in the header.
 - **`Beh`, `denote`, `observe`** (Verify-Adequacy) — VACUITY, `DEAD ROUTE×3`:
   the domain the pair above quantifies over, and what makes it vacuous. Named
   in the head rather than described, so the row can carry its own evidence
