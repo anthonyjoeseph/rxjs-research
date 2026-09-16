@@ -233,14 +233,15 @@ deferred beside it.
 
 ### Big picture tier roadmap
 
-- **THE EMBEDDING ARM, WHICH IS ALL THAT IS LEFT OF THE TELESCOPE LEG.**
-  A weakened-from-closed term is now proven inert under substitution, and
-  reify-then-read at an observable — the half of this leg that read as riskiest,
-  since its literal carries a whole expression to close — fell straight out of
-  it. What remains is the stream literal met on the TERM side, where the reading
-  does not read but CLOSES, so the arm is substitution COMPOSITION: two
-  substitutions in sequence against their concatenation, which is the renaming
-  shelf's statement with the right half reassociated rather than emptied.
+- **THE COMPOSITION WALK, WHICH IS ALL THAT IS LEFT OF THE EMBEDDING ARM.**
+  The arm is now a real body over one leaf. Its other half wanted the empty
+  substitution to be the identity, and that was already proven on the identity
+  face — which is what says the remaining leaf has a walked route rather than
+  only a plausible one. The leaf is instantiated under a map and under a scan
+  at a product-typed binder over a two-entry environment, and not refuted, so
+  what is left is the walk: a THREE-telescope generalisation, since every
+  binding arm grows the outer telescope and forces the same associativity cast
+  the identity face already pushes through every constructor.
 
 - **THEN RUN A SELF-REFERENTIAL μ, IN THE CORPUS RATHER THAN IN A PROBE.** The
   peel is now paid for by a size the unfolding does not move, and what funds that
@@ -283,9 +284,10 @@ deferred beside it.
 
 ### The ledger
 
-- **`sub-evalStrm`** (Rx/Subst-Eval) — FALSITY, `PROBED`: the term face handing
-  back to the expression face. Not an induction hypothesis but substitution
-  COMPOSITION, since a stream literal is closed rather than read.
+- **`subΘ-compᵉ`** (Rx/Subst-Compose) — DIFFICULTY, `TWIN, PROBED`: two
+  substitutions in sequence agree with their concatenation. The binding arms
+  grow the outer telescope, so the walk needs it as a parameter and pays an
+  associativity cast.
 
 
 - **`red-thru`** (Rx/Evaluator/Reducible) — DIFFICULTY, `PROBED`: the consume

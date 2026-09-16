@@ -36,26 +36,27 @@ open import Rx.Exp using (Ctx; Val; Exp; Tm; Fn; evalTm; evalWith; applyFn; sub�
   varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ; add; sub;
   mul; eqᵖ; ltᵖ; notᵖ; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs)
 open import Rx.Subst-Renaming using (ren-idᵉ; sub-renᵉ)
+open import Rx.Subst-Compose using (subΘ-compᵉ)
+open import Rx.Subst-Identity using (subΘ-id-exp)
 
-postulate
-  -- THE EMBEDDING ARM, WHERE THE TERM FACE HANDS BACK TO THE
-  -- EXPRESSION FACE AND THE STATEMENT STOPS BEING ABOUT TERMS.
-  -- `evalWith` at a stream literal does not read the expression, it
-  -- CLOSES it against the environment, so this arm is substitution
-  -- COMPOSITION rather than an induction hypothesis -- the term walk
-  -- has no subterm of its own type here.
-  -- PROBED: `Probed.Substitution-Leaves`, at a one-entry local
-  --   telescope whose embedded expression reads BOTH halves of the
-  --   split, at a three-variable telescope reading every position of
-  --   it, and under a non-binding former combining two of them.  Not
-  --   reached: a substituted environment of more than one entry, and
-  --   any former that BINDS -- map, scan, case -- which grows the
-  --   local telescope under itself and is the arm the split's
-  --   arithmetic actually turns on.
-  sub-evalStrm : ∀ {n} {Γ : Ctx n} {Θloc Θsub t} (e : Exp Γ [] [] (Θloc ++ Θsub) t)
-                 (σ : All (Val Γ) Θsub) (ρ : All (Val Γ) Θloc)
-               → evalWith (strmᵗ (subΘExp Θloc σ e)) ρ
-                   ≡ evalWith (strmᵗ e) (++⁺ ρ σ)
+-- THE EMBEDDING ARM, WHERE THE TERM FACE HANDS BACK TO THE
+-- EXPRESSION FACE AND THE STATEMENT STOPS BEING ABOUT TERMS.
+-- `evalWith` at a stream literal does not read the expression, it
+-- CLOSES it against the environment, so this arm is substitution
+-- COMPOSITION rather than an induction hypothesis -- the term walk
+-- has no subterm of its own type here.  The three clauses are the
+-- three shapes that composition can take at an embedding: an empty
+-- ambient environment over an empty substitution, where the outer
+-- closure must do nothing; an empty one over a non-empty
+-- substitution, where the two sides are already the same term; and
+-- a non-empty ambient environment, which is the composition proper.
+sub-evalStrm : ∀ {n} {Γ : Ctx n} {Θloc Θsub t} (e : Exp Γ [] [] (Θloc ++ Θsub) t)
+               (σ : All (Val Γ) Θsub) (ρ : All (Val Γ) Θloc)
+             → evalWith (strmᵗ (subΘExp Θloc σ e)) ρ
+                 ≡ evalWith (strmᵗ e) (++⁺ ρ σ)
+sub-evalStrm e []      []      = subΘ-id-exp e
+sub-evalStrm e (v ∷ σ) []      = refl
+sub-evalStrm e σ       (w ∷ ρ) = subΘ-compᵉ (w ∷ ρ) σ e
 
 -- REIFYING A VALUE AND READING IT BACK IS THE IDENTITY, in any
 -- environment at all.  The environment cannot matter because the

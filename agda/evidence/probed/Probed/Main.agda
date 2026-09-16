@@ -62,7 +62,8 @@ open import Probed.Reducible-Arms using
 -- from the root for the same reason the arms are: a `Confirms` row's
 -- type is generated from its target, so the name is the only handle.
 open import Probed.Substitution-Leaves using
-  (row-evalStrm; row-evalStrm-deep; row-evalStrm-former)
+  (row-compᵉ; row-compᵉ-deep; row-compᵉ-former; row-compᵉ-binder;
+   row-compᵉ-scan)
 
 -- THE TOP-LINE CLAIMS.  Named and claimed from the root for the same
 -- reason: a `Confirms` row's type is generated from its target, so the
