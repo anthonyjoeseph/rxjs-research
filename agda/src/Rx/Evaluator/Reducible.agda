@@ -252,12 +252,29 @@ postulate
   -- is protocol, and what values they carry are DATA by the slot's own
   -- side condition, so `red-data` closes their satisfaction outright.
   --
+  -- AND THE DESCENT IT WANTS IS THE SLOT INDEX, NOT THE TERM, WHICH
+  -- THE TELESCOPE'S OWN SIDE CONDITION ALREADY LICENSES.  A slot's
+  -- definition may reference only inputs STRICTLY BELOW that slot --
+  -- `inputsBelowᵉ`, stratified as a `const` telescope is, and
+  -- discharged by unification at every concrete program -- so the
+  -- table is not the simultaneous system it reads as.  What blocks the
+  -- body today is that the measure it already runs bottoms out exactly
+  -- here: an input's g-size is ZERO, so there is no room beneath it to
+  -- spend on a definition of arbitrary size.  The repair is therefore
+  -- a measure that is LEXICOGRAPHIC, the stratification ceiling
+  -- outermost and the g-size inside it: a term-structural step holds
+  -- the ceiling and shrinks the size, and this arm drops the ceiling to
+  -- the slot's own index and lets the size go free.  That is a
+  -- restatement of the accumulating face rather than a new hypothesis
+  -- on this one, and it is owed before this leaf can be a body.
+  --
   -- DEAD ROUTE: it cannot be a leaf taking the body's own induction
   --   hypothesis at the definition, which is the shape every other leaf
   --   here has.  The definition is drawn from the slot table rather
   --   than from the term, so passing `reducible d` would make this
   --   mutual with a call Agda reads as non-structural, and the block
-  --   would need a measure back.
+  --   would need a measure back.  This kills the route through the
+  --   TERM only; the ceiling above is a different order and is open.
   --
   -- PROBED: `Probed.Reducible-Arms` at both sub-arms that carry no
   --   payload -- a share whose source has completed, and one whose
