@@ -230,15 +230,16 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 
 ### Big picture tier roadmap
 
-- **THE MINT LANDS, AND THE READ IS WHAT IS LEFT (Anthony).** A source token is
-  now a BINDER in the plain tree alone — one fresh identifier per subscription,
-  drawn at the key `deferᵉ` already uses and bound into Θ, so a body can PLACE
-  one and still never write one; keeping it out of the simul tree is what leaves
-  the palette argument standing. A simul `take` cuts naively on values exactly
-  as `takeᵉ` does, so what blocks it is a LEVEL and not an operator. What
-  minting does not supply is READING the running instant — owed ONCE, to seed
-  the boundary fold, so a cold source's synchronous burst inherits the
-  subscriber's instant instead of minting one.
+- **THE READ IS ALL THAT IS LEFT OF THE MINT LEG, AND GROUPING WOULD RETIRE IT
+  RATHER THAN SUPPLY IT (Anthony's call).** The binder is in and swept through
+  every family matching on the plain tree. What it does not supply is READING
+  the running instant, owed ONCE to seed the boundary fold so a cold burst
+  inherits its subscriber's instant. The live candidate is not
+  a former for the read at all: make a source's delivery payload a NONEMPTY
+  LIST, so a group IS an instant and a fold wraps it with nothing to sense and
+  no seed to find. That moves what every theorem over the plain tree quantifies
+  over, so it is a ruling and not a leg — and the legs below wait on it, each
+  being typed through that payload.
 
 - **THEN THE DEMOTION, AND IT IS THE ORACLE'S AND NOT THE TOWER'S (Anthony:
   the harness "shouldn't test on srxjs at all — just plain rxjs now").** Target:
