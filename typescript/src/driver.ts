@@ -56,10 +56,18 @@ type RegisteredSource = {
   pending: { tick: number; fire: (arrival: Arrival) => void }[];
 };
 
-export const createDriver = (): Driver => {
+// `slotCount` RESERVES the first that many source ids for the slots,
+// which is not a convention this file is free to pick: a hot's source
+// IS its slot index and a shared slot connects under its own, so the
+// counter has to start above them or a minted source collides with a
+// slot's. Agda says the same thing in one line (`mint-init n`, at both
+// the source and ordinal keys) and the two must agree, since the oracle
+// compares the streams up to renaming and a COLLAPSE is not a renaming
+// -- two sources that became one cannot be renamed back apart.
+export const createDriver = (slotCount = 0): Driver => {
   const sources: RegisteredSource[] = [];
   let nextOrdinal = 0;
-  let nextSourceId = 0;
+  let nextSourceId = slotCount;
   // the root subscription's frame: tick 0, its own instant (Agda:
   // subscribeE e root (freshId 0 0) 0 …)
   let instant: Provenance = Symbol("subscribe-frame");

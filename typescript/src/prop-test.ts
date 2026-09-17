@@ -87,7 +87,7 @@ const readSeedFromCli = (): string | undefined => readFlag("seed");
 // switch onto the primitive-operators) live in their own modules.
 
 const evaluateRx = (testCase: TestCase): EvalResult => {
-  const driver = createDriver();
+  const driver = createDriver(testCase.slots.length);
   // the const telescope, literally: each shared slot compiles against
   // the prefix of already-built slots and connects through the
   // protocol share (all resets false; source id = slot index)
@@ -157,9 +157,16 @@ const sameStream = <A>(a: InstEmit<A>[], b: InstEmit<A>[]): boolean =>
 // in a fifth of its cases -- a check that cannot fail, standing where
 // the change workflow puts its second gate.  The report was always
 // right; nothing read it.
+//
+// AND A FAILING CASE PRINTS ITS PROGRAM, because the two streams alone
+// say WHAT diverged and nothing about what was run -- and the case
+// index is an offset into a seed sweep, so it cannot be fed back to
+// `--seed` to recover the input.  A divergence nobody can reproduce is
+// a report rather than a finding.
 const interpretResults = (
   agdaResults: EvalResult[],
   rxResults: EvalResult[],
+  testCases: TestCase[],
 ): { report: string; ok: boolean } => {
   const n = Math.min(agdaResults.length, rxResults.length);
   const lines: string[] = [];
@@ -172,6 +179,7 @@ const interpretResults = (
       continue;
     }
     lines.push(`case ${i}: stream ✗`);
+    lines.push(`  program     = ${serialize(testCases[i])}`);
     lines.push(`  agda.stream = ${JSON.stringify(canonical(a.stream))}`);
     lines.push(`  rx.stream   = ${JSON.stringify(canonical(r.stream))}`);
   }
@@ -193,7 +201,7 @@ async function main() {
   const testCases = seeds.flatMap((seed) => genTestCases(seed, operator));
   const agdaResults = await execAgda(testCases.map(serialize));
   const rxResults = testCases.map(evaluateRx);
-  const { report, ok } = interpretResults(agdaResults, rxResults);
+  const { report, ok } = interpretResults(agdaResults, rxResults, testCases);
   console.log(report);
   // a zero-case run is a failure too: it means the generator produced
   // nothing, which reads as a clean sweep of an empty corpus
