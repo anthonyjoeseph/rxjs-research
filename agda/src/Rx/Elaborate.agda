@@ -188,6 +188,23 @@ mutual
   toPlain : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
           → SExp Γ Δᵍ Δ Θ t
           → Exp (emitᵛ Γ) (emitᶜ Δᵍ) (emitᶜ Δ) (plainᶜ Θ) (emitᵗ t)
+  -- AN INPUT IS THE ONE SOURCE THIS BODY WRITES, AND IT IS A TRANSPORT
+  -- BECAUSE THE SLOT ALREADY CARRIES ENVELOPES.  The shape on the table
+  -- is a slot carrying PLAIN values that the elaboration wraps instead
+  -- -- a sync bracket for a cold, a bare stamp for a hot.  Two findings
+  -- about it, pointing opposite ways.
+
+  -- THE ELABORATION CANNOT TELL A COLD FROM A HOT.  Which one a slot is
+  -- lives in the schedule's script and is read at subscribe time;
+  -- nothing in the type or in the term distinguishes them, so a clause
+  -- keyed on that difference is not writable here at all.
+
+  -- AND IT DOES NOT NEED TO, WHICH IS WHY THE ABOVE BLOCKS NOTHING.  A
+  -- hot's subscribe burst carries an `init` and NO values, so a sync
+  -- bracket over it groups nothing and every later value leaves on its
+  -- own -- the bare stamp exactly.  One uniform clause covers both, and
+  -- the difference between the two is then a theorem about the two
+  -- scripts rather than a case split the elaboration owes.
   toPlain {Γ = Γ} (inputˢ i)  = subst (Exp _ _ _ _) (lookup-map i emitᵗ Γ)
                                       (input i)
   toPlain (ofˢ ts)            = ofᵖ (toPlainTms ts)
