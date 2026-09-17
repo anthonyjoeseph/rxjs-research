@@ -230,17 +230,15 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 
 ### Big picture tier roadmap
 
-- **LIFT COMES APART INTO TWO REAL RXJS OPERATORS (Anthony: "I've never liked
-  lift").** The former's step took a whole FRAME's value list, which plain rxjs
-  cannot hand it; the counterexample is in `liftᵉ`'s own header. Pointwise is
-  the repair and it is `scan` into `mergeMap`, so the palette carries those two
-  rather than their fusion: `scanᵉ`, and a `flattenᵉ` spreading a list-valued
-  emission over one emission per element. `mapᵉ` derives, and so do filter
-  (`[x]` or `[]`) and duplicate (`[x, x]`) — which is why the flatten is its
-  own FORMER rather than a wider step: the one-to-many-ness must live
-  somewhere, and it is cheapest there, its function being PURE and so owing
-  none of the subscription and instant accounting a former running an inner
-  expression owes.
+- **LIFT COMES APART INTO THE TWO PURE-FUNCTION OPERATORS RXJS HAS (Anthony:
+  "I've never liked lift"; "we must work with the primitives available already
+  in typescript").** The step took a whole FRAME's value list, which plain rxjs
+  cannot hand it; the counterexample is in the step's own header. Pointwise is
+  the repair, and pointwise is `mapᵉ` and `scanᵉ` — neither derivable from the
+  other, for the reason their header gives. ONE-TO-MANY GETS NO FORMER: a
+  list-returning step is a flatten wearing a map's name, and rxjs declines to
+  spell flattening once. Filter and duplicate go through `mergeAllᵉ` over a step
+  returning literal syntax — `mergeMap(x => p(x) ? of(x) : EMPTY)` written out.
 
 - **THEN THE DEMOTION, WHICH IS TWO EVALUATORS AND NOT A RETYPE (Anthony: the
   harness "shouldn't test on srxjs at all — just plain rxjs now", and the Main

@@ -41,13 +41,13 @@ open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeInner⇓; thruCon
   subscribeAll⇓; sharedConnect⇓; subscribeSharedSlot⇓;
   subs-floor; subs-shared; subs-hot-done; subs-hot-live; subs-cold-sync;
   subs-cold-async; subs-of; subs-empty; subs-take-zero; subs-take-suc;
-  subs-batchSync; subs-lift; subs-merge-all; subs-switch-all; subs-exhaust-all; subs-μ; subs-defer; subs-mint;
+  subs-batchSync; subs-map; subs-scan; subs-merge-all; subs-switch-all; subs-exhaust-all; subs-μ; subs-defer; subs-mint;
   inner; consume-all-sub; consume-all-enqueue; consume-all-nil; consume-switch-sub;
   consume-switch-nil; consume-exhaust-sub; consume-exhaust-nil;
   walk-nil; walk-cons; drain-nil; drain-no-room; drain-room;
   finish-all-drain; finish-switch-clear; finish-exhaust-clear; finish-nil;
   react-false; react-alive; react-dead;
-  step-scan; step-take; step-batchSync; step-from-inner; step-thru-outer;
+  step-map; step-scan; step-take; step-batchSync; step-from-inner; step-thru-outer;
   push-nil; push-cons; sub-all; connect-live; connect-died;
   slot-spent; slot-join; slot-connect)
 
@@ -70,16 +70,16 @@ switchKill-mint nothing  sched st refl k = ≤-refl
 switchKill-mint (just v) sched st refl k = ≤-refl
 
 -- the lifted step rewrites its own cell and nothing else
-scanDispatch-mint : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u w}
-                      (fn : Fn Γ [] [] [] (w ×ᵗ s) (w ×ᵗ listᵗ u)) (nid : NodeId)
+scanDispatch-mint : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+                      (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
                       (vals : List (Val Γ s)) (fin : Bool)
                       (sched : Sched Γ) (st : EvalSt e) (m : Maybe (NodeState Γ))
                       (k : MintKey)
                   → freshId k (Sched.mint sched)
                     ≤ freshId k (Sched.mint (proj₁ (proj₂ (proj₂ (proj₂
                         (scanDispatch {e = e} fn nid vals fin sched st m))))))
-scanDispatch-mint {w = w} fn nid vals fin sched st (just (cell-st {v} a)) k
-  with v ≟ᵗ w
+scanDispatch-mint {u = u} fn nid vals fin sched st (just (cell-st {v} a)) k
+  with v ≟ᵗ u
 ... | no  _    = ≤-refl
 ... | yes refl = ≤-refl
 scanDispatch-mint fn nid vals fin sched st nothing k = ≤-refl
@@ -286,7 +286,9 @@ subscribeE-mono (subs-take-suc {sched = sched} _ refl sub push) k =
 subscribeE-mono (subs-batchSync {sched = sched} refl sub push) k =
   ≤-trans (≤-trans (next-mono nodeᵏ k (Sched.mint sched)) (subscribeE-mono sub k))
           (pushBurst-mono push k)
-subscribeE-mono (subs-lift {sched = sched} refl sub push) k =
+subscribeE-mono (subs-map sub push) k =
+  ≤-trans (subscribeE-mono sub k) (pushBurst-mono push k)
+subscribeE-mono (subs-scan {sched = sched} refl sub push) k =
   ≤-trans (≤-trans (next-mono nodeᵏ k (Sched.mint sched)) (subscribeE-mono sub k))
           (pushBurst-mono push k)
 subscribeE-mono (subs-merge-all sa)         k = subscribeAll-mono sa k
@@ -304,6 +306,7 @@ subscribeE-mono (subs-mint {sched = sched} refl sub) k =
 pushBurst-mono push-nil              k = ≤-refl
 pushBurst-mono (push-cons _ st rest) k = ≤-trans (stepFrame-mono st k) (pushBurst-mono rest k)
 
+stepFrame-mono step-map k = ≤-refl
 stepFrame-mono (step-scan {fn = fn} {nid} {vals = vals} {fin} {sched} {st}) k =
   scanDispatch-mint fn nid vals fin sched st (lookupNode nid (EvalSt.nodes st)) k
 stepFrame-mono (step-take {nid = nid} {vals = vals} {fin} {sched} {st}) k =

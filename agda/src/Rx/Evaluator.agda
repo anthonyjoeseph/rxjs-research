@@ -561,6 +561,17 @@ aliveThroughᶠ inst st (rid , rs , (w , p)) =
   ∧ (not (memberSource (regSource rs) (EvalSt.dying st))
      ∨ not (any (_≡ᵇ rid) (EvalSt.delivered st)))
 
+-- THE STATELESS STEP, AND IT READS NO NODE AT ALL.  A map's whole
+-- effect is one application per arriving value, so unlike every other
+-- frame here it has no dispatch: there is no cell to read, no type to
+-- decide against what is installed, and so no stuck arm to state.  The
+-- frame's own declaration says the same thing from the other side by
+-- owning no `NodeId`.
+mapVals : ∀ {n} {Γ : Ctx n} {s u} → Fn Γ [] [] [] s u
+        → List (Val Γ s) → List (Val Γ u)
+mapVals fn []         = []
+mapVals fn (v ∷ vals) = applyFn fn v ∷ mapVals fn vals
+
 -- THE ACCUMULATING STEP, WHICH IS A LEFT FOLD AND NOT ONE
 -- APPLICATION.  The function is handed the carried state and ONE
 -- value and hands back the next state, which is also the value

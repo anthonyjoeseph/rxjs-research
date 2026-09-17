@@ -35,12 +35,13 @@ open import Data.Maybe using (just)
 open import Data.Nat using (ℕ; zero; suc; _<_; _≤_; s≤s; _≡ᵇ_)
 open import Data.Nat.Properties using (≤-trans)
 open import Data.Product using (_×_; _,_)
+open import Data.Unit using (⊤; tt)
 open import Data.List using (List; []; _∷_)
 open import Decide using (≡ᵇ-refl; ≡ᵇ→≡)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; cong)
 
 open import Rx.Exp using (Ctx; Closed)
-open import Rx.Evaluator using (EvalSt; Frame; NodeId; NodeState; take-f; batchSync-f; scan-f; from-inner; thru-outer; lookupNode;
+open import Rx.Evaluator using (EvalSt; Frame; NodeId; NodeState; take-f; batchSync-f; map-f; scan-f; from-inner; thru-outer; lookupNode;
   setNode)
 
 -- a node just written reads back as what was written
@@ -70,6 +71,7 @@ open PreservedBelow using (below)
 -- carries no node at all; the flattener's inner frame carries two, the
 -- operator's own and the instance it was opened at.
 FrameAbove : ∀ {n} {Γ : Ctx n} {s u} → ℕ → Frame Γ s u → Set
+FrameAbove f (map-f fn)                  = ⊤
 FrameAbove f (scan-f fn nid)             = f ≤ nid
 FrameAbove f (take-f nid)                = f ≤ nid
 FrameAbove f (batchSync-f nid)           = f ≤ nid

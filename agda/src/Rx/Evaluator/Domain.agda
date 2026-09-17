@@ -105,7 +105,7 @@ open import Rx.Prim using (Tick; Fuel; Id; Source; InstEvent; InstEmit; value; c
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
 open import Rx.Exp using (obs; Ctx; Val; Closed; Exp; Tm; Fn; _×ᵗ_; listᵗ; uniqᵗ; subΘExp;
   evalTm; unfoldμ; input; ofᵉ; emptyᵉ; takeᵉ; batchSyncᵉ;
-  scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; deferᵉ; mintᵉ)
+  mapᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; deferᵉ; mintᵉ)
 open import Rx.Mint using (ordinalᵏ; sourceᵏ; nodeᵏ; regᵏ; freshId; setAt)
 open import Rx.Slots using (Slots; scripted; shared)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; NodeId;
@@ -116,11 +116,11 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; NodeId;
   NodeState; AllOp; RegId; Arrival; AtFloor; arrTy;
   spentBurst; oneShotBurst; memberSource; register; installNode; resolve;
   atSlot; atDyn; lowerFloor;
-  scan-f; take-f; batchSync-f; thru-outer;
+  map-f; scan-f; take-f; batchSync-f; thru-outer;
   cell-st; take-st; batchSync-st; mergeAll-st; switch-st; exhaust-st;
   mergeAllᵒ; switchᵒ; exhaustᵒ;
   lookupNode; setNode; hasRoom; mergeAllBump; switchKill; aliveThroughᶠ;
-  splitEvents; retagEvents; scanDispatch; takeDispatch; batchSyncDispatch; thruWrap;
+  splitEvents; retagEvents; mapVals; scanDispatch; takeDispatch; batchSyncDispatch; thruWrap;
   consumeUsable; finishUsable;
   burstCompleted; sharedPlumb; dropSource)
 
@@ -399,7 +399,19 @@ data subscribeE⇓ {n} {Γ} {t} {e} where
                                                     (EvalSt.nodes st₂) } )
 
 
-  subs-lift : ∀ {lo s u w} {f} {i : Tm Γ [] [] [] w} {b : Closed Γ s}
+  -- A MAP INSTALLS NOTHING, WHICH IS WHY THIS ARM IS SHORTER THAN
+  -- EVERY OTHER SUBSCRIBE ARM HERE.  There is no node to mint, so no
+  -- freshness premise and no advanced mint in the recursive call: the
+  -- frame is pushed onto the path and the burst is pushed through it.
+  subs-map : ∀ {lo s u} {f : Fn Γ [] [] [] s u} {b : Closed Γ s}
+               {κ : Path Γ lo u t}
+               {id now sched st burst sched₂ st₁ r}
+           → subscribeE⇓ b (map-f f ↠ κ) id now sched st
+               (burst , sched₂ , st₁)
+           → pushBurst⇓ id now (map-f f) κ burst sched₂ st₁ r
+           → subscribeE⇓ (mapᵉ f b) κ id now sched st r
+
+  subs-scan : ∀ {lo s u} {f} {i : Tm Γ [] [] [] u} {b : Closed Γ s}
                 {κ : Path Γ lo u t}
                 {id now sched st nid burst sched₂ st₁ r}
             → freshId nodeᵏ (Sched.mint sched) ≡ nid
@@ -729,7 +741,14 @@ data stepFrame⇓ {n} {Γ} {t} {e} where
 
 
 
-  step-scan : ∀ {s u w lo} {fn : Fn Γ [] [] [] (w ×ᵗ s) (w ×ᵗ listᵗ u)}
+  -- the stateless step's arm reads no node, so it names the walk
+  -- directly rather than a dispatch over a store lookup.
+  step-map : ∀ {s u lo} {fn : Fn Γ [] [] [] s u} {κ : Path Γ lo u t}
+               {id now} {vals : List (Val Γ s)} {fin sched st}
+           → stepFrame⇓ id now (map-f fn) κ vals fin sched st
+               (mapVals fn vals , [] , fin , sched , st)
+
+  step-scan : ∀ {s u lo} {fn : Fn Γ [] [] [] (u ×ᵗ s) u}
                 {nid} {κ : Path Γ lo u t}
                 {id now} {vals : List (Val Γ s)} {fin sched st}
             → stepFrame⇓ id now (scan-f fn nid) κ vals fin sched st

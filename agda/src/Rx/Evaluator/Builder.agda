@@ -56,12 +56,12 @@ open import Relation.Nullary.Decidable using (⌊_⌋)
 
 open import Rx.Prim using (Fuel; Id; Source; Tick; InstEmit; InstEvent; close;
   exhausted; hot; cold)
-open import Rx.Exp using (Ctx; Closed; Val; _≟ᵗ_; obs; unfoldμ; evalTm; subΘExp; input; ofᵉ; emptyᵉ; takeᵉ; batchSyncᵉ; scanᵉ; mergeAllᵉ;
+open import Rx.Exp using (Ctx; Closed; Val; _≟ᵗ_; obs; unfoldμ; evalTm; subΘExp; input; ofᵉ; emptyᵉ; takeᵉ; batchSyncᵉ; mapᵉ; scanᵉ; mergeAllᵉ;
   switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ)
 open import Rx.Mint using (nodeᵏ; regᵏ; sourceᵏ; freshId; setAt; next)
 open import Rx.Slots using (Slots; shared; scripted)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; AllOp; NodeId; NodeState; Frame; root; _↠_; take-f;
-  scan-f; thru-outer; from-inner; mergeAllᵒ; switchᵒ; exhaustᵒ; mergeAll-st; switch-st;
+  map-f; scan-f; thru-outer; from-inner; mergeAllᵒ; switchᵒ; exhaustᵒ; mergeAll-st; switch-st;
   exhaust-st; take-st; batchSync-st; batchSync-f; cell-st; installNode; lookupNode; setNode; hasRoom; consumeUsable;
   switchKill; aliveThroughᶠ; splitEvents; splitBurst; sched-init; st-init; memberSource;
   share-sink; lowerFloor; register; atSlot; burstCompleted; Arrival; arrTick; arrSource; arrTy;
@@ -73,7 +73,7 @@ open import Rx.Evaluator.Domain using (srcFrame; subscribeE⇓; subscribeAll⇓;
   thruConsume⇓; subscribeInner⇓;
   finish-all-drain; finish-switch-clear;
   finish-exhaust-clear; finish-nil; react-false; react-alive; react-dead;
-  push-nil; push-cons; step-scan;
+  push-nil; push-cons; step-map; step-scan;
   step-take; step-batchSync; step-from-inner; step-thru-outer;
   walk-nil; walk-cons; consume-all-sub; consume-all-enqueue; consume-all-nil;
   consume-switch-sub; consume-switch-nil; consume-exhaust-sub;
@@ -84,7 +84,7 @@ open import Rx.Evaluator.Domain using (srcFrame; subscribeE⇓; subscribeAll⇓;
   drain-done; drain-empty; drain-step;
   drain-nil; drain-no-room; drain-room;
   drain⇓; evaluate⇓; subs-of; subs-empty; subs-take-zero;
-  subs-take-suc; subs-batchSync; subs-lift; subs-merge-all; subs-switch-all; subs-exhaust-all;
+  subs-take-suc; subs-batchSync; subs-map; subs-scan; subs-merge-all; subs-switch-all; subs-exhaust-all;
   subs-μ; subs-defer; subs-mint; sub-all; eval-run;
   subs-floor; subs-shared; subs-hot-done; subs-hot-live; subs-cold-sync;
   subs-cold-async; slot-spent; slot-join; slot-connect; connect-live;
@@ -308,6 +308,13 @@ subscribeE! sl (batchSyncᵉ b) κ id now sched ag st =
      , subs-batchSync refl d p
 
 
+subscribeE! sl (mapᵉ f b) κ id now sched ag st =
+  let ((burst , sched₂ , st₁) , d) =
+        subscribeE! sl b (map-f f ↠ κ) id now sched ag st
+      (r , p) = pushBurst! sl id now (map-f f) tt κ burst sched₂
+                  (trans (subs-keeps d) ag) st₁
+  in r , subs-map d p
+
 subscribeE! sl (scanᵉ f i b) κ id now sched ag st =
   let nid = freshId nodeᵏ (Sched.mint sched)
       ((burst , sched₂ , st₁) , d) =
@@ -316,7 +323,7 @@ subscribeE! sl (scanᵉ f i b) κ id now sched ag st =
                     (installNode nid (cell-st (evalTm i)) st)
       (r , p) = pushBurst! sl id now (scan-f f nid) tt κ burst sched₂
                   (trans (subs-keeps d) ag) st₁
-  in r , subs-lift refl d p
+  in r , subs-scan refl d p
 
 subscribeE! sl (mergeAllᵉ lim b) κ id now sched ag st =
   let (r , a) = subscribeAll! sl mergeAllᵒ (mergeAll-st lim 0 [] false)
@@ -386,6 +393,8 @@ stepFrame! sl id now (take-f nid) sv κ vals fin sched ag st = _ , step-take
 
 stepFrame! sl id now (batchSync-f nid) sv κ vals fin sched ag st = _ , step-batchSync
 
+
+stepFrame! sl id now (map-f fn) sv κ vals fin sched ag st = _ , step-map
 
 stepFrame! sl id now (scan-f fn nid) sv κ vals fin sched ag st = _ , step-scan
 
@@ -653,6 +662,8 @@ stepFrameAny! sl id now (take-f nid) κ vals fin sched ag st =
   stepFrame! sl id now (take-f nid) tt κ vals fin sched ag st
 stepFrameAny! sl id now (batchSync-f nid) κ vals fin sched ag st =
   stepFrame! sl id now (batchSync-f nid) tt κ vals fin sched ag st
+stepFrameAny! sl id now (map-f fn) κ vals fin sched ag st =
+  stepFrame! sl id now (map-f fn) tt κ vals fin sched ag st
 stepFrameAny! sl id now (scan-f fn nid) κ vals fin sched ag st =
   stepFrame! sl id now (scan-f fn nid) tt κ vals fin sched ag st
 stepFrameAny! sl id now (thru-outer op nid) κ vals fin sched ag st =
