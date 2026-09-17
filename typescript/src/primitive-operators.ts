@@ -226,18 +226,48 @@ export const defer = <A>(
     );
   });
 
-// map-f: map the value payloads, add no events, preserve fin — a pure
-// per-emit transform (Agda stepFrame (map-f fn))
+// lift: THE pure-function former. A step reads an emit's VALUES and the
+// state carried across emits, and returns the next state and the values
+// to emit in their place. That is the whole interface, and what it
+// EXCLUDES is the point: a step mints no registration, reads none of the
+// bookkeeping, cannot end the stream and cannot see which instant it is
+// in — so the emit's own events and its fin bit ride through untouched
+// and the protocol is not something a program can write.
+//
+// Its Agda counterpart is a `Tm` of type (u × list s) → (u × list t)
+// with a `Tm` seed, which is why the interface is an ARRAY in and an
+// array out rather than one value at a time: `Tm` is first-order and
+// total, so a step cannot be a callback the operator drives, and the
+// value language already has fold over lists.
+export const lift = <A, B, S>(
+  obs: Observable<InstEmit<A>>,
+  initial: S,
+  step: (state: S, values: A[]) => { state: S; values: B[] },
+): Observable<InstEmit<B>> =>
+  obs.pipe(
+    rxScan<InstEmit<A>, { state: S; out?: InstEmit<B> }>(
+      (carried, emit) => {
+        const { bookkeeping, values, fin } = splitEmit(emit);
+        const next = step(carried.state, values);
+        return {
+          state: next.state,
+          out: reassemble(emit, bookkeeping, [], next.values, fin),
+        };
+      },
+      { state: initial },
+    ),
+    rxMap((carried) => carried.out as InstEmit<B>), // the seed is never emitted, so out is set
+  );
+
+// map-f: a lift that carries nothing (Agda stepFrame (map-f fn))
 export const map = <A, B>(
   obs: Observable<InstEmit<A>>,
   fn: (a: A) => B,
 ): Observable<InstEmit<B>> =>
-  obs.pipe(
-    rxMap((emit) => {
-      const { bookkeeping, values, fin } = splitEmit(emit);
-      return reassemble(emit, bookkeeping, [], values.map(fn), fin);
-    }),
-  );
+  lift<A, B, null>(obs, null, (state, values) => ({
+    state,
+    values: values.map(fn),
+  }));
 
 // take-f: forward the first `emissions` values, then cut. The cut emit
 // carries the taken prefix plus a `close … cut` for EVERY registration
@@ -249,6 +279,16 @@ export const map = <A, B>(
 // stream completes — rx teardown cancelling any scheduled deliveries
 // (Agda's sweepLive). Count 0 is routed to `empty` by the compiler
 // (Agda: take 0 never subscribes its source), so `emissions ≥ 1` here.
+//
+// AND IT IS NOT A `lift`, WHICH IS THE PALETTE'S DIVIDING LINE DRAWN AT
+// THE ONE OPERATOR THAT LOOKS LIKE IT SHOULD BE ONE.  `map` and `scan`
+// are lifts because a step reading the values decides everything they
+// emit.  This one reads the open-registration multiset and the cut
+// ledger, MINTS bookkeeping (one close per victim, with a per-victim
+// reason), and raises fin on the emit that cuts.  A lift whose step
+// could do that would be a step handed source ids, close reasons and
+// emit kinds -- the protocol's own vocabulary, in the value language,
+// writable by a program.  So `take` stays a former of its own.
 export const take = <A>(
   obs: Observable<InstEmit<A>>,
   emissions: number,
@@ -302,30 +342,22 @@ export const take = <A>(
     rxMap((state) => state.out as InstEmit<A>), // the seed is never emitted, so out is set
   );
 
-// scan-f: fold each emit's values through the accumulator, emitting one
-// value per input value (the running acc), threading acc across emits
-// (Agda stepFrame (scan-f fn nid), the nid's state delegated to rx scan)
+// scan-f: a lift whose carried state is the accumulator, emitting one
+// value per input value (the running acc) and threading acc across
+// emits (Agda stepFrame (scan-f fn nid))
 export const scan = <A, B>(
   obs: Observable<InstEmit<A>>,
   initial: B,
   fn: (acc: B, cur: A) => B,
 ): Observable<InstEmit<B>> =>
-  obs.pipe(
-    rxScan<InstEmit<A>, { acc: B; out?: InstEmit<B> }>(
-      (state, emit) => {
-        const { bookkeeping, values, fin } = splitEmit(emit);
-        const { acc, outs } = values.reduce(
-          (s, cur) => {
-            const acc = fn(s.acc, cur);
-            return { acc, outs: [...s.outs, acc] };
-          },
-          { acc: state.acc, outs: [] as B[] },
-        );
-        return { acc, out: reassemble(emit, bookkeeping, [], outs, fin) };
+  lift<A, B, B>(obs, initial, (acc, values) =>
+    values.reduce(
+      (carried, cur) => {
+        const next = fn(carried.state, cur);
+        return { state: next, values: [...carried.values, next] };
       },
-      { acc: initial },
+      { state: acc, values: [] as B[] },
     ),
-    rxMap((state) => state.out as InstEmit<B>), // the seed is never emitted, so out is set
   );
 
 // the ROOT materializes the fin bit as a `complete` EVENT on the

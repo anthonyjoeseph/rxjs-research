@@ -317,6 +317,31 @@ stale by one cheap commit sits somewhere between the two rows, and nothing here 
 where. Why a PR that changes no Agda file can land on the cold row anyway:
 [docs/ci-cache.md](docs/ci-cache.md).
 
+### The other uncached third: MAlonzo objects
+
+`make gate` runs the bug cache, which is a GHC compile the interface cache above
+does not touch. Measured on one warm-cache CI run, gate step 177 s:
+
+| | |
+|---|---|
+| `ghc -O -o ../_cli/Bug-Cache`, `agda/_cli/MAlonzo` absent | **~61 s**, 157 modules |
+| the same compile with that tree warm (laptop) | **12 of 157** modules recompiled |
+
+The 12 are this repo's own, whose `.hs` Agda rewrites on every run; the 145 GHC
+skips are the stdlib's. Sizes, which decide the cache key: the object tree is
+44 MB and the three linked binaries are 84 MB — so the binaries are excluded and
+the key names the toolchain rather than the commit, per
+[docs/ci-cache.md](docs/ci-cache.md).
+
+### The TypeScript side of the gate — closed, and small
+
+Recorded so the question is not re-asked. `setup-node`'s `cache: npm` hits (the
+run log ends `Cache hit occurred on the primary key node-cache-…`), and against
+it: `Set up Node` **2 s**, `npm ci` **2 s**, and `ts-gate` **3.5 s** total
+(`tsc` 1.3 s, `eslint` 1.4 s, `prettier --check` 0.8 s; laptop). There is no
+third cache worth adding here — `node_modules`, `tsc --incremental` and
+`eslint --cache` are each worth about a second.
+
 ## The comment-stripped mirror — what a comment edit costs (2026-08-18)
 
 Agda invalidates an interface by source CONTENT, so before the mirror every

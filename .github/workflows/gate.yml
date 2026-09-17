@@ -59,6 +59,14 @@ jobs:
       # It is seconds and needs no Agda, which is why it sits above the
       # toolchain build rather than beside it: a TS error should fail this
       # job in under a minute, not after the tower.
+      #
+      # AND `cache: npm` IS THE WHOLE OF WHAT THIS SIDE NEEDS. The key hits,
+      # and against it the install and the whole TS gate are each a few
+      # seconds, so caching `node_modules` on top or wiring up
+      # `tsc --incremental` and `eslint --cache` would buy about a second
+      # apiece and add a staleness surface to checks whose job is to be
+      # trusted. Measured, so the question is closed rather than re-asked:
+      # typecheck-performance-numbers.md, under *The gate in CI*.
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
@@ -169,6 +177,38 @@ jobs:
           key: agda-interfaces-${{ runner.os }}-${{ github.sha }}
           restore-keys: |
             agda-interfaces-${{ runner.os }}-
+
+      # `make gate` runs the bug cache, which is a GHC compile of the whole
+      # MAlonzo cone, stdlib included -- a large fraction of a WARM gate, paid
+      # in full every run because this directory was cached by nothing.
+      # Restoring it pays because Agda's backend is incremental: it rewrites
+      # the `.hs` of the modules whose interfaces moved, and GHC then skips
+      # every module whose source did not change. The ones it skips are
+      # overwhelmingly the stdlib's, which is also where the bytes are.
+      #
+      # KEYED ON THE TOOLCHAIN, NOT THE COMMIT, and that is the design rather
+      # than a detail: the reusable part is the stdlib's objects, which move
+      # only when Agda or the stdlib does, while this repo's own modules are
+      # rebuilt every run whatever the cache holds. A commit-keyed entry would
+      # upload the tree per green run to store objects that are identical or
+      # about to be thrown away, competing for the repo-wide ceiling with
+      # interface snapshots worth more per byte. A fixed key hits, and
+      # `actions/cache` does not re-save on a hit.
+      #
+      # The linked binaries are excluded deliberately -- larger than the tree
+      # they link from, and relinked every run regardless.
+      #
+      # Safe for the same reason the interface cache is: GHC re-verifies every
+      # module's recompilation condition against the `.hs` Agda just wrote, so
+      # a stale or missing entry means ordinary recompilation, never a check
+      # that passes when it should fail.
+      #
+      # Numbers and the full argument: docs/ci-cache.md.
+      - name: Cache compiled MAlonzo objects
+        uses: actions/cache@v4
+        with:
+          path: agda/_cli/MAlonzo
+          key: agda-cli-${{ runner.os }}-${{ hashFiles('scripts/install-agda.sh') }}
 
       - name: make gate
         run: make gate

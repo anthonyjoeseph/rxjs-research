@@ -232,29 +232,30 @@ failing to typecheck over the collapsed tree. A cone cannot aim at either.
 
 ### Big picture tier roadmap
 
-- **THE TYPESCRIPT PASS FIRST: PRIMITIVE RXJS, CONDITIONALS, ARRAY OPERATIONS,
-  AND `lift`.** The palette is restricted where a pipeline can actually be RUN,
-  because a former that cannot be written against real rxjs is one the Agda
-  should never have gained. `lift` takes a pure function on an emit's value
-  array plus carried state; `map` and `scan` are rewritten through it, and the
-  oracle is what says the rewrite preserved behaviour rather than a reading of
-  the diff. The leg's product is also the count: `take` reads the open
-  registrations and the cut ledger, so absorbing it would mean putting source
-  ids and close reasons into the value language — that is the finding to
-  confirm or overturn here, not in Agda.
-
-- **THEN `liftᵉ`, MIRRORING WHAT RAN.** The Agda former is written to the
-  TypeScript's shape, not to a design. Its function is a `Tm`, so it is pure,
-  total and first-order — which is the reason the flatteners cannot follow it
-  in: their payloads are literal syntax that must be RUN, and `Tm` has no
-  eliminator for that. **This leg moves the language `Spec.agda` is written in,
-  so it stops and asks before it lands.**
+- **`liftᵉ` FIRST, MIRRORING WHAT RAN.** The Agda former is written to the
+  TypeScript's shape, not to a design: `lift` is landed there and the oracle
+  agrees over it, with `map` and `scan` rewritten through it. Its function is a
+  `Tm`, so it is pure, total and first-order — which is the reason the
+  flatteners cannot follow it in: their payloads are literal syntax that must be
+  RUN, and `Tm` has no eliminator for that. **It needs no new term-level
+  vocabulary and no approval**: `listᵗ`, `foldᵗ` and pairs already write the
+  step function, and `Spec.agda` is stated over emit streams and names no
+  former at all, so nothing here touches the gospel.
 
 - **THEN COLLAPSE THE ABSORBED FORMERS AND EVERY CASE THAT MATCHES ON THEM.**
   The subscribe relation, the builder, the reducibility candidate and the CLI
-  all match per former, so this is where the palette actually pays. It is
-  deliberately after the mirror, because which clauses collapse is discovered by
-  writing `liftᵉ`'s own case rather than predicted from the tree.
+  all match per former, so this is where the palette actually pays — and the
+  substitution tower is most of it, eight of the eighteen modules that match on
+  a former today. It is deliberately after the mirror, because which clauses
+  collapse is discovered by writing `liftᵉ`'s own case rather than predicted
+  from the tree.
+
+- **THEN THE BRIDGE AND THE GENERATOR, SO THE ORACLE EXERCISES THE NEW FORMER.**
+  The collapse is only checked where a program carrying a `liftᵉ` can cross
+  between the two trees and be generated at random; until then the rewrite is
+  held by the two formers that happen to survive it in TypeScript. What the leg
+  decides is whether a `Tm` payload can cross the JSON boundary at all, which is
+  the one part of the mirror the TypeScript pass could not answer.
 
 ## Tier 2 — the denotation, adequacy, and the take bound
 
