@@ -1,5 +1,5 @@
 import { Observable } from "rxjs";
-import { InstEmit, Provenance, SourceId } from "./inst-emit.js";
+import { InstEmit, Provenance } from "./inst-emit.js";
 import { hot } from "./constructors.js";
 
 // One scheduled delivery popped by the driver. Mirrors Agda's Arrival,

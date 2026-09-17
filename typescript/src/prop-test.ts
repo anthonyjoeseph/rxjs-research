@@ -1,8 +1,7 @@
-import { Observable, firstValueFrom, merge, of, toArray } from "rxjs";
+import { Observable, merge } from "rxjs";
 import { Closed, Ty, Val } from "./exp.js";
 import { InstEmit, Provenance, SourceId } from "./inst-emit.js";
 import { materializeCompletion, share } from "./primitive-operators.js";
-import { batchSimultaneous } from "./batch-simultaneous.js";
 import { createDriver } from "./driver.js";
 import { makeInputSource } from "./input-source.js";
 import { compile } from "./compile.js";
@@ -48,12 +47,12 @@ export type Slot =
 export type Slots = Slot[]; // one per Γ slot, index-aligned
 
 export type Stream = InstEmit<Val>[]; // the flat canonical stream
-export type Grouped = InstEmit<Val[]>[]; // batchSimultaneous's output: one emit per instant, still a protocol citizen (re-batchable)
 
-// one program's two outputs: the raw InstEmit stream the exp tree
-// produced, and that same stream folded through batchSimultaneous. Both
-// sides (TS-here and Agda-via-CLI) return this pair per case.
-export type EvalResult = { stream: Stream; batches: Grouped };
+// one program's output: the stream the exp tree produced. THE SIMUL
+// LAYER IS NOT CROSS-CHECKED HERE (Anthony) -- this harness tests the
+// plain tree against plain rxjs, and `batchSimultaneous` is deliberately
+// outside it. Both sides (TS-here and Agda-via-CLI) return this per case.
+export type EvalResult = { stream: Stream };
 
 // The serializable unit of differential testing: a whole program.
 // ctx is Γ — the types of the slots, index-aligned with slots.
@@ -87,7 +86,7 @@ const readSeedFromCli = (): string | undefined => readFlag("seed");
 // (scripted slots → protocol streams), and compile (the per-node
 // switch onto the primitive-operators) live in their own modules.
 
-const evaluateRx = async (testCase: TestCase): Promise<EvalResult> => {
+const evaluateRx = (testCase: TestCase): EvalResult => {
   const driver = createDriver();
   // the const telescope, literally: each shared slot compiles against
   // the prefix of already-built slots and connects through the
@@ -113,14 +112,7 @@ const evaluateRx = async (testCase: TestCase): Promise<EvalResult> => {
     if (!driver.deliverNextArrival()) break;
   }
   sub.unsubscribe();
-  // the batched twin: hand the finite raw stream to plain rxjs `of`, run
-  // it through the same batchSimultaneous operator the Agda side folds
-  // with, and toArray it back — so we hold both the raw emits and the
-  // fully batched result for the same program.
-  const batches = await firstValueFrom(
-    of(...out).pipe(batchSimultaneous<Val>(), toArray()),
-  );
-  return { stream: out, batches };
+  return { stream: out };
 };
 
 // Streams are compared up to id renaming (≈): the ids' only meaning is
@@ -172,40 +164,25 @@ const interpretResults = (
   const n = Math.min(agdaResults.length, rxResults.length);
   const lines: string[] = [];
   let streamOk = 0;
-  let batchOk = 0;
   for (let i = 0; i < n; i++) {
     const a = agdaResults[i];
     const r = rxResults[i];
-    const sEq = sameStream(a.stream, r.stream);
-    const bEq = sameStream(a.batches, r.batches);
-    if (sEq) streamOk++;
-    if (bEq) batchOk++;
-    if (!sEq || !bEq) {
-      lines.push(
-        `case ${i}: ${sEq ? "stream ✓" : "stream ✗"} ${bEq ? "batches ✓" : "batches ✗"}`,
-      );
-      if (!sEq) {
-        lines.push(`  agda.stream  = ${JSON.stringify(canonical(a.stream))}`);
-        lines.push(`  rx.stream    = ${JSON.stringify(canonical(r.stream))}`);
-      }
-      if (!bEq) {
-        lines.push(`  agda.batches = ${JSON.stringify(canonical(a.batches))}`);
-        lines.push(`  rx.batches   = ${JSON.stringify(canonical(r.batches))}`);
-      }
+    if (sameStream(a.stream, r.stream)) {
+      streamOk++;
+      continue;
     }
+    lines.push(`case ${i}: stream ✗`);
+    lines.push(`  agda.stream = ${JSON.stringify(canonical(a.stream))}`);
+    lines.push(`  rx.stream   = ${JSON.stringify(canonical(r.stream))}`);
   }
   const header =
-    `${n} cases: stream ${streamOk}/${n} match, batches ${batchOk}/${n} match` +
+    `${n} cases: stream ${streamOk}/${n} match` +
     (agdaResults.length !== rxResults.length
       ? ` (LENGTH MISMATCH: agda ${agdaResults.length}, rx ${rxResults.length})`
       : "");
   return {
     report: [header, ...lines].join("\n"),
-    ok:
-      streamOk === n &&
-      batchOk === n &&
-      n > 0 &&
-      agdaResults.length === rxResults.length,
+    ok: streamOk === n && n > 0 && agdaResults.length === rxResults.length,
   };
 };
 
@@ -214,10 +191,8 @@ async function main() {
   const cliSeed = readSeedFromCli();
   const seeds = cliSeed ? [cliSeed] : genSeeds();
   const testCases = seeds.flatMap((seed) => genTestCases(seed, operator));
-  const [agdaResults, rxResults] = await Promise.all([
-    execAgda(testCases.map(serialize)),
-    Promise.all(testCases.map(evaluateRx)),
-  ]);
+  const agdaResults = await execAgda(testCases.map(serialize));
+  const rxResults = testCases.map(evaluateRx);
   const { report, ok } = interpretResults(agdaResults, rxResults);
   console.log(report);
   // a zero-case run is a failure too: it means the generator produced

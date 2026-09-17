@@ -240,14 +240,16 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
   a consumer wants one. Still owed is READING the running instant at a source,
   which minting does not supply.
 
-- **THEN THE DEMOTION, ONCE A PROGRAM CAN BUILD AN ENVELOPE.** Target:
-  `evaluate : … → List (Val Γ t)`. The census called this and the simul tree
-  one landing; half of that held. The demotion does need the tree — it makes
-  the harness's case loop, every readme instance, the CLI's encode path and the
-  provenance leaf untypeable at once, and only a simul program repairs them —
-  but the tree needed none of the demotion, reaching Main through the restated
-  top line. Eleven sites read a field of the machine's own envelope and are the
-  work; the rest goes with the return type.
+- **THEN THE DEMOTION, AND IT IS THE ORACLE'S AND NOT THE TOWER'S (Anthony:
+  the harness "shouldn't test on srxjs at all — just plain rxjs now").** Target:
+  `evaluate : … → List (Val Γ t)`, with the srxjs layer deliberately no longer
+  cross-checked between the trees. The wire format goes first and alone, since
+  it is the one edit both sides must make together; then TypeScript's compile
+  path, where every former turns out to be a plain operator wearing an envelope
+  but two — `defer` wants the driver's hop and `mint` its counter, neither wants
+  an envelope. Where it STOPS is the tower: the proofs are stated over
+  `evaluate↓`, so demoting it moves five claims Main names, and Main is not
+  ours to touch.
 
 - **THEN THE FOUR LEAVES THAT ARE MERELY UNWRITTEN.** `liftᵖ` and the three
   flatteners want no ruling and no former. A lift unwraps its envelope, runs the

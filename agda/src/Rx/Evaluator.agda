@@ -38,10 +38,6 @@ open import Rx.Mint using (Mint; sourceᵏ; regᵏ; mint-init; freshId; next)
 Stream : ∀ {n} → Ctx n → Ty → Set          -- flat, canonical emission order
 Stream Γ t = List (InstEmit (Val Γ t))
 
-Grouped : ∀ {n} → Ctx n → Ty → Set         -- batchSimultaneous's output
-Grouped Γ t = List (InstEmit (List (Val Γ t)))
-  -- one emit per instant, still a protocol citizen (re-batchable)
-
 ------------------------------------------------------------------
 -- The global scheduler
 ------------------------------------------------------------------

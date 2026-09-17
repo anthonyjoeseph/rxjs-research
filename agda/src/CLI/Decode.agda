@@ -27,9 +27,8 @@ open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_
   strmᵗ; nilᵗ; consᵗ; foldᵗ; listᵗ; add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ)
 open import Rx.Evaluator.Builder using (evaluate↓)
 open import Rx.Slots using (scripted; shared; Slot; Slots)
-open import Implementation using (impl-batchSimultaneous)
 open import CLI.JSON using (jarr; jbool; jnum; jobj; JSON; jstr)
-open import CLI.Encode using (encodeStream; encodeBatched)
+open import CLI.Encode using (encodeStream)
 
 ------------------------------------------------------------------------
 -- JSON accessors and Maybe plumbing
@@ -350,6 +349,4 @@ decodeCase j =
   getField "slots" j >>=? asArr >>=? decodeSlots BIG (fromList tys) >>=? λ ins →
   getField "fuel" j >>=? asNum >>=? λ f →
   let stream = evaluate↓ f e ins in
-  just ("{" ++ˢ "\"stream\":" ++ˢ encodeStream t stream
-            ++ˢ ",\"batches\":" ++ˢ encodeBatched t (impl-batchSimultaneous stream)
-            ++ˢ "}")
+  just ("{" ++ˢ "\"stream\":" ++ˢ encodeStream t stream ++ˢ "}")
