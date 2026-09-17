@@ -191,20 +191,27 @@ mutual
   -- AN INPUT IS THE ONE SOURCE THIS BODY WRITES, AND IT IS A TRANSPORT
   -- BECAUSE THE SLOT ALREADY CARRIES ENVELOPES.  The shape on the table
   -- is a slot carrying PLAIN values that the elaboration wraps instead
-  -- -- a sync bracket for a cold, a bare stamp for a hot.  Two findings
-  -- about it, pointing opposite ways.
+  -- -- a sync bracket for a cold, a bare stamp for a hot -- which moves
+  -- the envelope's construction OUT of the machine and into the term
+  -- language, where every other elaborated behaviour already lives.
 
-  -- THE ELABORATION CANNOT TELL A COLD FROM A HOT.  Which one a slot is
-  -- lives in the schedule's script and is read at subscribe time;
-  -- nothing in the type or in the term distinguishes them, so a clause
-  -- keyed on that difference is not writable here at all.
+  -- THE BRANCH IS AVAILABLE FOR THE ASKING, and the cost is one
+  -- argument.  Cold and hot are not distinguished by the type or by the
+  -- term, so this body cannot split on them as it stands; they ARE
+  -- distinguished by the slot telescope, so an elaboration INDEXED BY
+  -- the telescope splits on them immediately.  That also hands a hot its
+  -- source for free, since a hot's source is its own slot index and the
+  -- token language has a literal.
 
-  -- AND IT DOES NOT NEED TO, WHICH IS WHY THE ABOVE BLOCKS NOTHING.  A
-  -- hot's subscribe burst carries an `init` and NO values, so a sync
-  -- bracket over it groups nothing and every later value leaves on its
-  -- own -- the bare stamp exactly.  One uniform clause covers both, and
-  -- the difference between the two is then a theorem about the two
-  -- scripts rather than a case split the elaboration owes.
+  -- WHAT THE TELESCOPE DOES NOT REACH IS THE INSTANT, AND THAT IS THE
+  -- WHOLE OF WHAT IS LEFT.  A term sees the machine's protocol through
+  -- exactly two windows: `batchSyncᵉ`, which reports one bit of
+  -- synchrony, and `mintᵉ`, which binds one token at the source key per
+  -- subscription.  A lift's step is handed VALUES alone.  An instant is
+  -- a property of the running cascade rather than of the script, so no
+  -- amount of slot information produces one, and a subscribe-frame
+  -- bracket does not either -- it groups per node, and two colds coming
+  -- alive in one frame owe the SAME id.
   toPlain {Γ = Γ} (inputˢ i)  = subst (Exp _ _ _ _) (lookup-map i emitᵗ Γ)
                                       (input i)
   toPlain (ofˢ ts)            = ofᵖ (toPlainTms ts)
