@@ -40,14 +40,23 @@ horizon fuel = upTo (suc fuel)
 -- the entire stream with it satisfies this in full.  Total id collapse is
 -- a model of it.
 --
--- DISTINCTNESS IS A SEPARATE CLAIM AND THIS TREE STATES IT NOWHERE -- not
--- proven, not postulated, not stated.  It was dropped on the reading that
--- instants mint from arrival position and so separate by construction,
--- which is a property of the evaluator's TEXT rather than a fact any
--- consumer can cite; and the proof must cite it, because a partition
--- indexed by instant is a partition only when the index separates.  The
--- gap is owed here rather than at the machine, since this is the module
--- that claims to say what the ids MEAN.
+-- SEPARATION IS A DIFFERENT CLAIM, AND IT IS NOT THIS MODULE'S.  It is
+-- what reconciles a CLAIRVOYANT spec with a STREAMING impl: `Spec` gathers
+-- every emit of an instant from anywhere in the stream, while
+-- `Implementation` keeps one open batch and flushes on an instant change,
+-- so the two agree exactly when an instant's emits are CONTIGUOUS -- once
+-- left, never recurring.  That is stated, as `Rx.Protocol`'s freshness
+-- clause: `ProtocolSt` carries a watermark and a new instant is admitted
+-- only at or above it.  The run's satisfaction of it is the
+-- well-formedness face, where `Sound` denominates it per segment and
+-- `sound-drain` composes the segments -- proven -- leaving it open at
+-- exactly two leaves, `sound-cascade` and `sound-subscribe`.
+--
+-- SO THE FINDING HERE IS PLACEMENT, NOT A MISSING FACT.  This module's
+-- banner says it is where the ids MEAN provenance, and separation is the
+-- whole of that meaning; the one statement it carries is containment, and
+-- the meaning is established two faces away.  A reader who comes here for
+-- the id discipline finds the weaker half and no pointer to the stronger.
 -- PROBED: no refutation for `id-inheritance`, with the fuel-3 row checking
 --   (0 ∷ 1 ∷ 2 ∷ 3 ∷ []) ⊆ᵢ horizon 3.  A confidence receipt over small
 --   horizons, not a theorem.  The probe is spent and deleted;
