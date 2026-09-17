@@ -14,6 +14,7 @@ import {
   CutLedger,
   InstEmit,
   InstEvent,
+  SUBSCRIBE_FRAME,
   SourceId,
   cutLedgerStep,
   cutVictimCloses,
@@ -49,7 +50,7 @@ export const of = <A>(driver: Driver, input: A[]): Observable<InstEmit<A>> =>
         { type: "close", source, reason: "exhausted" },
         { type: "complete" },
       ],
-      instant: driver.currentInstant(),
+      instant: SUBSCRIBE_FRAME,
       source,
       kind: "subscribe",
     });
@@ -115,14 +116,14 @@ export const share = <A>(
       { type: "close", source, reason: "exhausted" },
       { type: "complete" },
     ],
-    instant: driver.currentInstant(),
+    instant: SUBSCRIBE_FRAME,
     source,
     kind: "subscribe",
   });
 
   const initEmit = (extra: InstEvent<never>[]): InstEmit<A> => ({
     events: [{ type: "init", source }, ...extra],
-    instant: driver.currentInstant(),
+    instant: SUBSCRIBE_FRAME,
     source,
     kind: "subscribe",
   });
@@ -313,7 +314,7 @@ export const defer = <A>(
     return merge(
       rxOf<InstEmit<A>>({
         events: [{ type: "init", source }],
-        instant: driver.currentInstant(),
+        instant: SUBSCRIBE_FRAME,
         source,
         kind: "subscribe",
       }),

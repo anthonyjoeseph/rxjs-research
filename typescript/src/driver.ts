@@ -13,18 +13,22 @@ export type Arrival = {
 // Sched, and the ONE sanctioned mutable/impure edge of the TS side
 // (everything else delegates statefulness to rxjs operators). It holds
 // the pending deliveries keyed (tick, ordinal) — async input values
-// AND defer-node hops — plus the current cascade id, which sync
-// subscription work (cold bursts, init emits) inherits.
+// AND defer-node hops.
+//
+// WHAT IT DELIBERATELY DOES NOT HOLD is a readable "current instant".
+// An arrival's cascade id is handed to the delivery it belongs to, as
+// a field of the `Arrival` that fires; nobody may ask the driver which
+// cascade is running. That is the difference between an operator that
+// takes its instant from the emit in front of it and one that reaches
+// for ambient state, and only the first is expressible in plain rxjs.
+// The instant a subscribe burst carries is `SUBSCRIBE_FRAME`, which
+// the protocol module explains.
 export type Driver = {
   // ---- rx-leg internals (used by makeInputSource / compile) ----
   // fresh SourceId; Symbols compare only by identity, matching the
   // harness's comparison up to renaming (Agda mints ℕs — same order,
   // different carrier)
   mintSourceId: () => number;
-  // the instant sync work belongs to: the running arrival's cascade
-  // id, or the root subscribe-frame id before any arrival
-  // (id-inheritance is literally reading this)
-  currentInstant: () => Provenance;
   // anchor for per-subscription scheduling (cold async tails, deferᵉ
   // hops at tick + 1)
   currentTick: () => number;
@@ -68,9 +72,8 @@ export const createDriver = (slotCount = 0): Driver => {
   const sources: RegisteredSource[] = [];
   let nextOrdinal = 0;
   let nextSourceId = slotCount;
-  // the root subscription's frame: tick 0, its own instant (Agda:
-  // subscribeE e root (freshId 0 0) 0 …)
-  let instant: Provenance = Symbol("subscribe-frame");
+  // the root subscription's frame is tick 0 (Agda: subscribeE e root
+  // (freshId 0 0) 0 …)
   let tick = 0;
   const [chainEmits, chainSink] = channel<InstEmit<never>>();
 
@@ -82,7 +85,6 @@ export const createDriver = (slotCount = 0): Driver => {
     mintSourceId: () => nextSourceId++,
     pushChainEmit: (emit) => chainSink.next(emit),
     chainEmits,
-    currentInstant: () => instant,
     currentTick: () => tick,
     registerSource: (pending) => {
       const entry: RegisteredSource = {
@@ -111,8 +113,10 @@ export const createDriver = (slotCount = 0): Driver => {
       const head = next.pending[0];
       next.pending = next.pending.slice(1);
       tick = head.tick;
-      instant = Symbol(`arrival:${head.tick}:${next.ordinal}`);
-      head.fire({ instant, isLast: next.pending.length === 0 });
+      head.fire({
+        instant: Symbol(`arrival:${head.tick}:${next.ordinal}`),
+        isLast: next.pending.length === 0,
+      });
       return true;
     },
   };

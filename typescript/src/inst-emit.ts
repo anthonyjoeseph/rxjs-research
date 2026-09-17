@@ -1,6 +1,18 @@
 export type Provenance = number | symbol; // an INSTANT (one arrival's cascade); spec groups by this
 export type SourceId = number | symbol; // a SOURCE observable; the impl counts registrations of these
 
+// The instant every subscribe burst belongs to, and there is only ONE
+// of it because no operator ever compares two. A burst minted inside an
+// arrival's cascade is a GRAFT: the join that caused it reassembles it
+// under the carrier's envelope, so the burst's own stamp is computed
+// and then discarded. A burst minted outside one belongs to the root's
+// subscribe frame, which is a single frame. Neither case can tell two
+// subscribe instants apart, so an operator that READ an ambient
+// "current instant" to fill this field was reading a cell whose value
+// never reached an output -- and reading one is what would make these
+// operators require a driver, rather than plain rxjs, to run at all.
+export const SUBSCRIBE_FRAME: Provenance = Symbol("subscribe-frame");
+
 // The protocol (v1's, with the instant id moved onto the emission).
 // Batching is decided downstream by counting registrations, never by
 // comparing clocks: init/close traffic maintains the live-registration

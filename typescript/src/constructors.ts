@@ -1,5 +1,5 @@
 import { Observable, Subject, defer, endWith, merge, of } from "rxjs";
-import { InstEmit, InstEvent, SourceId } from "./inst-emit.js";
+import { InstEmit, InstEvent, SUBSCRIBE_FRAME, SourceId } from "./inst-emit.js";
 import type { Driver } from "./driver.js";
 
 // A minimal push sink — the only surface a producer needs. Kept to
@@ -119,7 +119,7 @@ const subscribeBurst = <A>(
         ]
       : []),
   ],
-  instant: driver.currentInstant(),
+  instant: SUBSCRIBE_FRAME,
   source,
   kind: "subscribe",
 });
