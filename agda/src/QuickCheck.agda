@@ -33,9 +33,15 @@
 -- scopes carried as indices rather than checked afterwards — the
 -- generator's type is `Exp` at the two μ contexts, so a synchronous
 -- self-reference is not a program it can emit and be rejected for; it is
--- one it cannot write down.  The summary line carries how many of the run's
--- programs actually carried each recursion constructor, because reaching the
--- region is the claim and it is a number.
+-- one it cannot write down.
+--
+-- AND EVERY RUN CARRIES A CENSUS LINE, ONE COUNT PER FORMER.  What a
+-- green claims is that the shapes were REACHED, and that is a number
+-- rather than a claim; counting per former rather than per interesting
+-- region is what stops the regions from being whichever ones somebody
+-- last thought about.  The per-run line is raw material: a sweep sums
+-- it across seeds, and a former totalling zero is a hole in what the
+-- sweep covered rather than a fact about any one seed.
 module QuickCheck where
 
 open import Data.Bool using (Bool; true; false; not; if_then_else_; _∧_; _∨_)
@@ -414,42 +420,91 @@ genExp : ℕ → Gen (Exp Γ₂ [] [] [] natᵗ)
 genExp d = genExpAt 0 0 d
 
 ------------------------------------------------------------------------
--- WHICH RECURSION CONSTRUCTORS A PROGRAM ACTUALLY CARRIED.  A generator
--- that CAN emit `μᵉ` says nothing about a sweep; what the descent's rank
--- guard needs is that runs REACH the shape, and that is a number rather
--- than a claim.  Each case reports its program's three marks and the
--- summary line totals them, so a coverage receipt can name the region it
--- covered instead of the constructors that were added.
+-- WHICH FORMERS A PROGRAM ACTUALLY CARRIED.  A generator that CAN emit
+-- one says nothing about a sweep; each case reports its program's marks
+-- and the run's line totals them, so a coverage receipt can name the
+-- region it covered instead of the constructors that were added.
 
+-- THE PALETTE, NAMED BY THE TAGS THE TWO TREES ARE PAIRED BY.  A census
+-- per INTERESTING REGION is a census whose regions were chosen by whoever
+-- last thought about one, which is how this generator came to have no raw
+-- lift lane at all — found by reading, and by no check, after sixty
+-- thousand programs had certified impl≡spec without once changing an
+-- emit's value count.  A census per FORMER cannot have that hole: the
+-- walk below is a total match, so a former added to `Exp` owes an arm
+-- here, and `scripts/formers.tsv` holds these tags to the ones the
+-- decoder and the TypeScript union spell.
+data Former : Set where
+  fInput fOf fEmpty fTake fLift fMergeAll fSwitchAll fExhaustAll
+    fMu fVar fDefer : Former
+
+formerTag : Former → String
+formerTag fInput      = "input"
+formerTag fOf         = "of"
+formerTag fEmpty      = "empty"
+formerTag fTake       = "take"
+formerTag fLift       = "lift"
+formerTag fMergeAll   = "mergeAll"
+formerTag fSwitchAll  = "switchAll"
+formerTag fExhaustAll = "exhaustAll"
+formerTag fMu         = "mu"
+formerTag fVar        = "varE"
+formerTag fDefer      = "defer"
+
+allFormers : List Former
+allFormers = fInput ∷ fOf ∷ fEmpty ∷ fTake ∷ fLift ∷ fMergeAll ∷ fSwitchAll
+           ∷ fExhaustAll ∷ fMu ∷ fVar ∷ fDefer ∷ []
+
+formerIx : Former → ℕ
+formerIx fInput      = 0
+formerIx fOf         = 1
+formerIx fEmpty      = 2
+formerIx fTake       = 3
+formerIx fLift       = 4
+formerIx fMergeAll   = 5
+formerIx fSwitchAll  = 6
+formerIx fExhaustAll = 7
+formerIx fMu         = 8
+formerIx fVar        = 9
+formerIx fDefer      = 10
+
+sameFormer : Former → Former → Bool
+sameFormer a b = formerIx a ≡ᵇ formerIx b
+
+-- the formers a program carries, and whether any `liftᵉ` re-binds
+-- something the run could subscribe
 Marks : Set
-Marks = Bool × Bool × Bool × Bool     -- μᵉ · varᵉ · deferᵉ · obs-accumulator fold
+Marks = List Former × Bool
 
 noMarks : Marks
-noMarks = false , false , false , false
+noMarks = [] , false
+
+one : Former → Marks
+one f = (f ∷ []) , false
 
 infixr 5 _⊕_
 _⊕_ : Marks → Marks → Marks
-(a , b , c , d) ⊕ (w , x , y , z) = (a ∨ w) , (b ∨ x) , (c ∨ y) , (d ∨ z)
+(fs , a) ⊕ (gs , b) = (fs ++ᴸ gs) , (a ∨ b)
 
 marksᵉ  : ∀ {Δᵍ Δ Θ t} → Exp Γ₂ Δᵍ Δ Θ t → Marks
 marksᵗ  : ∀ {Δᵍ Δ Θ t} → Tm Γ₂ Δᵍ Δ Θ t → Marks
 marksᵗˢ : ∀ {Δᵍ Δ Θ t} → List (Tm Γ₂ Δᵍ Δ Θ t) → Marks
 
-marksᵉ (input i)       = noMarks
-marksᵉ (ofᵉ ts)        = marksᵗˢ ts
-marksᵉ emptyᵉ          = noMarks
-marksᵉ (takeᵉ c e)     = marksᵗ c ⊕ marksᵉ e
--- the fourth mark reads the CARRIED state's type, which is the former's own
--- accumulator: `isData (obs _)` is false, so this fires exactly when the
+marksᵉ (input i)       = one fInput
+marksᵉ (ofᵉ ts)        = one fOf ⊕ marksᵗˢ ts
+marksᵉ emptyᵉ          = one fEmpty
+marksᵉ (takeᵉ c e)     = one fTake ⊕ marksᵗ c ⊕ marksᵉ e
+-- the second component reads the CARRIED state's type, which is the former's
+-- own accumulator: `isData (obs _)` is false, so it fires exactly when the
 -- former re-binds something the run could subscribe
 marksᵉ (liftᵉ {u = u} f z e) =
-  (false , false , false , not (isData u)) ⊕ marksᵗ f ⊕ marksᵗ z ⊕ marksᵉ e
-marksᵉ (mergeAllᵉ _ e) = marksᵉ e
-marksᵉ (switchAllᵉ e)  = marksᵉ e
-marksᵉ (exhaustAllᵉ e) = marksᵉ e
-marksᵉ (μᵉ e)          = (true , false , false , false) ⊕ marksᵉ e
-marksᵉ (varᵉ x)        = false , true , false , false
-marksᵉ (deferᵉ e)      = (false , false , true , false) ⊕ marksᵉ e
+  one fLift ⊕ ([] , not (isData u)) ⊕ marksᵗ f ⊕ marksᵗ z ⊕ marksᵉ e
+marksᵉ (mergeAllᵉ _ e) = one fMergeAll ⊕ marksᵉ e
+marksᵉ (switchAllᵉ e)  = one fSwitchAll ⊕ marksᵉ e
+marksᵉ (exhaustAllᵉ e) = one fExhaustAll ⊕ marksᵉ e
+marksᵉ (μᵉ e)          = one fMu ⊕ marksᵉ e
+marksᵉ (varᵉ x)        = one fVar
+marksᵉ (deferᵉ e)      = one fDefer ⊕ marksᵉ e
 
 marksᵗ (varᵗ x)      = noMarks
 marksᵗ unit̂          = noMarks
@@ -667,13 +722,25 @@ reportWF e ins s =
 -- sampled is not stateable.  What it would have to sample now is a
 -- proof obligation rather than an output, and nothing a generator
 -- produces can fail one.
+-- one count per former, in `allFormers` order, plus the obs-fold count
 Tally : Set
-Tally = ℕ × ℕ × ℕ × ℕ        -- programs carrying μᵉ · varᵉ · deferᵉ · obs-fold
+Tally = List ℕ × ℕ
+
+zeroTally : Tally
+zeroTally = map (λ _ → 0) allFormers , 0
+
+carries : Former → List Former → Bool
+carries f []       = false
+carries f (g ∷ gs) = sameFormer f g ∨ carries f gs
+
+bumpEach : List Former → List Former → List ℕ → List ℕ
+bumpEach fs []       cs       = cs
+bumpEach fs (g ∷ gs) []       = []
+bumpEach fs (g ∷ gs) (c ∷ cs) =
+  (if carries g fs then suc c else c) ∷ bumpEach fs gs cs
 
 bump : Marks → Tally → Tally
-bump (m , v , f , o) (a , b , c , p) =
-  (if m then suc a else a) , (if v then suc b else b)
-    , (if f then suc c else c) , (if o then suc p else p)
+bump (fs , o) (cs , p) = bumpEach fs allFormers cs , (if o then suc p else p)
 
 oneCase : ℕ → Gen (Marks × List String)
 oneCase d = genSlots >>=G λ ins → genExp d >>=G λ e →
@@ -687,7 +754,7 @@ oneCase d = genSlots >>=G λ ins → genExp d >>=G λ e →
 -- accumulate EVERY failing case's reports, in generation order, and tally
 -- which recursion constructors the corpus actually reached
 runN : ℕ → ℕ → Gen (Tally × List String)
-runN zero    d = pureG ((0 , 0 , 0 , 0) , [])
+runN zero    d = pureG (zeroTally , [])
 runN (suc k) d = oneCase d >>=G λ r → runN k d >>=G λ acc →
   pureG (bump (proj₁ r) (proj₁ acc) , proj₂ r ++ᴸ proj₂ acc)
 
@@ -729,6 +796,13 @@ numAt n def cs with dropSep (tailAfter n cs)
 -- every failing case's paste block, concatenated (each is self-delimited
 -- by its own <<<PASTE / PASTE>>> markers, so gen-unit-tests.sh can split
 -- them); "(all agree)" when the run turned up nothing
+-- the census, on its own line and in `<tag> <count>` pairs: a sweep is a
+-- run of many seeds, so the verdict on whether a former was reached AT
+-- ALL belongs to the caller summing these, not to any one run
+censusPairs : List Former → List ℕ → List String
+censusPairs (f ∷ gs) (c ∷ cs) = formerTag f ∷ " " ∷ show c ∷ " " ∷ censusPairs gs cs
+censusPairs _        _        = []
+
 dumpFails : List String → String
 dumpFails []       = "  (all agree)\n"
 dumpFails (f ∷ fs) = concatStr (f ∷ fs)
@@ -743,10 +817,8 @@ main = getContents >>= λ s →
       tally = proj₁ res
       fails = proj₂ res
   in putStr (concatStr
-       ( "seed " ∷ show seed ∷ " depth " ∷ show d ∷ " — ran " ∷ show runs
-       ∷ " cases, " ∷ show (length fails) ∷ " failures"
-       ∷ "; μ " ∷ show (proj₁ tally)
-       ∷ " var " ∷ show (proj₁ (proj₂ tally))
-       ∷ " defer " ∷ show (proj₁ (proj₂ (proj₂ tally)))
-       ∷ " obs-fold " ∷ show (proj₂ (proj₂ (proj₂ tally))) ∷ "\n"
-       ∷ dumpFails fails ∷ []))
+       (( "seed " ∷ show seed ∷ " depth " ∷ show d ∷ " — ran " ∷ show runs
+        ∷ " cases, " ∷ show (length fails) ∷ " failures"
+        ∷ "; obs-fold " ∷ show (proj₂ tally) ∷ "\ncensus " ∷ [])
+        ++ᴸ censusPairs allFormers (proj₁ tally)
+        ++ᴸ ("\n" ∷ dumpFails fails ∷ [])))
