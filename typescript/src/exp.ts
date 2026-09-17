@@ -107,7 +107,11 @@ export type Exp =
   | { type: "exhaustAll"; ty: Ty; src: Exp }
   | { type: "mu"; ty: Ty; body: Exp } // binds a μ-var, GUARDED (Agda's Δᵍ)
   | { type: "varE"; ty: Ty; index: number } // into the μ-binder stack, usable vars only (Agda's Δ)
-  | { type: "defer"; ty: Ty; body: Exp };
+  | { type: "defer"; ty: Ty; body: Exp }
+  // binds one fresh uniq token per subscription, extending Θ by uniqᵗ.
+  // The body sees the token as Θ-var 0; unlike defer it does NOT touch
+  // Δᵍ/Δ (μ-vars), only Θ.
+  | { type: "mint"; ty: Ty; body: Exp };
 // ⚠ defer here is Agda's deferᵉ, NOT rxjs defer: lazy PLUS a one-tick
 // hop, and the body's emissions mint fresh ids (an async boundary).
 //
@@ -325,6 +329,13 @@ const closeTm = (tm: Tm, env: Val[], depth: number): Tm => {
   }
 };
 
+// bind a mint's one Θ-var to the token the driver just handed out, which
+// is Agda's `subΘExp [] (src ∷ []) body` and nothing more: the binder is
+// gone by the time the body is compiled, so nothing downstream of here
+// ever sees a mint.
+export const bindMinted = (body: Closed, token: Val): Closed =>
+  closeExp(body, [token], 0);
+
 const closeExp = (exp: Exp, env: Val[], depth: number): Exp => {
   switch (exp.type) {
     case "input":
@@ -354,6 +365,9 @@ const closeExp = (exp: Exp, env: Val[], depth: number): Exp => {
     case "defer":
       // μ/defer bind μ-vars (Δᵍ/Δ), never Θ — depth unchanged
       return { ...exp, body: closeExp(exp.body, env, depth) };
+    case "mint":
+      // mint binds a Θ-var (uniqᵗ), not a μ-var — depth increases by 1
+      return { ...exp, body: closeExp(exp.body, env, depth + 1) };
   }
 };
 
@@ -473,6 +487,9 @@ const substMuExp = (exp: Exp, st: MuSt, knot: Exp): Exp => {
       return { ...exp, body: substMuExp(exp.body, muUnder(st), knot) };
     case "defer":
       return { ...exp, body: substMuExp(exp.body, deferUnder(st), knot) };
+    case "mint":
+      // mint extends Θ, not Δᵍ/Δ — μ-substitution state unchanged
+      return { ...exp, body: substMuExp(exp.body, st, knot) };
   }
 };
 
@@ -563,6 +580,10 @@ const shiftExp = (exp: Exp, cutoff: number, by: number): Exp => {
     case "mu":
     case "defer":
       return { ...exp, body: shiftExp(exp.body, cutoff, by) }; // bind no Θ
+    case "mint":
+      // mint binds one Θ-var (uniqᵗ) — free Θ-vars inside the body are
+      // above cutoff+1, so we shift with cutoff incremented by 1
+      return { ...exp, body: shiftExp(exp.body, cutoff + 1, by) };
   }
 };
 

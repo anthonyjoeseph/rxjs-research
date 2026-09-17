@@ -49,6 +49,7 @@ exp	exhaustAllᵉ	exhaustAll	yes	flatten
 exp	μᵉ	mu	yes	binder
 exp	varᵉ	varE	yes	binder
 exp	deferᵉ	defer	yes	protocol
+exp	mintᵉ	mint	yes	protocol
 tm	varᵗ	varT	yes	-
 tm	unit̂	unitT	yes	-
 tm	bool̂	boolT	yes	-

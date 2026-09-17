@@ -29,7 +29,7 @@ open import Relation.Binary.PropositionalEquality
 open import Rx.Exp
   using ( Ty; Ctx; Exp; Tm
         ; input; ofᵉ; emptyᵉ; takeᵉ; liftᵉ; mergeAllᵉ
-        ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ
+        ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ
         ; varᵗ; unit̂; bool̂; nat̂; uniq̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ
         ; caseᵗ; ifᵗ; primᵗ; strmᵗ; PrimOp
         ; nilᵗ; consᵗ; foldᵗ
@@ -129,6 +129,16 @@ pushDefer : (eq : Θ ≡ Θ') (e : Exp Γ [] (Δᵍ ++ Δ) Θ t)
           → deferᵉ (subst (Cᵉ Γ [] (Δᵍ ++ Δ) t) eq e)
               ≡ subst (Cᵉ Γ Δᵍ Δ t) eq (deferᵉ e)
 pushDefer refl e = refl
+
+shiftᵉ : (eq : Θ ≡ Θ') (e : Exp Γ Δᵍ Δ (s ∷ Θ) t)
+       → subst (Cᵉ Γ Δᵍ Δ t) (cong (s ∷_) eq) e
+           ≡ subst (λ z → Exp Γ Δᵍ Δ (s ∷ z) t) eq e
+shiftᵉ refl e = refl
+
+pushMint : (eq : Θ ≡ Θ') (e : Exp Γ Δᵍ Δ (uniqᵗ ∷ Θ) t)
+         → mintᵉ (subst (λ z → Exp Γ Δᵍ Δ (uniqᵗ ∷ z) t) eq e)
+             ≡ subst (Cᵉ Γ Δᵍ Δ t) eq (mintᵉ e)
+pushMint refl e = refl
 
 pushVarᵗ : (eq : Θ ≡ Θ') (x : t ∈ Θ)
          → varᵗ {Γ = Γ} {Δᵍ} {Δ} (subst (t ∈_) eq x)

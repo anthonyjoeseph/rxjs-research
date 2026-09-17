@@ -32,7 +32,7 @@ open import Relation.Binary.PropositionalEquality
 
 open import Rx.Exp
   using (Ty; Ctx; Exp; Tm; Val; Ren∈; ext∈; ++Ren; renExp; renTm; renTms; subΘExp; subΘTm; subΘTms;
-  input; ofᵉ; emptyᵉ; takeᵉ; liftᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ;
+  input; ofᵉ; emptyᵉ; takeᵉ; liftᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ;
   varᵗ; unit̂; bool̂; nat̂; uniq̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ;
   nilᵗ; consᵗ; foldᵗ)
 open import Rx.Subst-Transport using (cong₃)
@@ -88,6 +88,7 @@ mutual
   ren-idᵉ ig id it (μᵉ e)     = cong μᵉ (ren-idᵉ (ext-id ig) id it e)
   ren-idᵉ ig id it (deferᵉ e) =
     cong deferᵉ (ren-idᵉ (λ ()) (++Ren-id ig id) it e)
+  ren-idᵉ ig id it (mintᵉ e) = cong mintᵉ (ren-idᵉ ig id (ext-id it) e)
 
   ren-idᵗ : {ρg : Ren∈ Δᵍ Δᵍ} {ρd : Ren∈ Δ Δ} {ρt : Ren∈ Θ Θ}
           → Idᵖ ρg → Idᵖ ρd → Idᵖ ρt
@@ -159,6 +160,7 @@ mutual
   sub-renᵉ σ ag (exhaustAllᵉ e)   = cong exhaustAllᵉ (sub-renᵉ σ ag e)
   sub-renᵉ σ ag (μᵉ e)     = cong μᵉ (sub-renᵉ σ ag e)
   sub-renᵉ σ ag (deferᵉ e) = cong deferᵉ (sub-renᵉ σ ag e)
+  sub-renᵉ σ ag (mintᵉ e) = cong mintᵉ (sub-renᵉ σ (lands-ext ag) e)
 
   sub-renᵗ : {ρg : Ren∈ Δᵍ Δᵍ′} {ρd : Ren∈ Δ Δ′}
              {ρt : Ren∈ Θ Θloc} {ρ⁺ : Ren∈ Θ (Θloc ++ Θsub)}

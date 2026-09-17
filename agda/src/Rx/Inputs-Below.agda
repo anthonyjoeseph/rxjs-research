@@ -52,7 +52,7 @@ open import Rx.Exp using (Ty; Ctx; Exp; Tm; Ren∈; ext∈;
                           unfoldμ; compare∈; ⊟-++ˡ; ⊟-++ʳ;
                           input; ofᵉ; emptyᵉ; takeᵉ; liftᵉ;
                           mergeAllᵉ; switchAllᵉ; exhaustAllᵉ;
-                          μᵉ; varᵉ; deferᵉ;
+                          μᵉ; varᵉ; deferᵉ; mintᵉ;
                           varᵗ; unit̂; bool̂; nat̂; uniq̂; pairᵗ; fstᵗ; sndᵗ;
                           inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ;
                           nilᵗ; consᵗ; foldᵗ;
@@ -81,6 +81,7 @@ mutual
   ib-renᵉ k ρg ρd ρt (μᵉ e)          = ib-renᵉ k (ext∈ ρg) ρd ρt e
   ib-renᵉ k ρg ρd ρt (varᵉ x)        = refl
   ib-renᵉ k ρg ρd ρt (deferᵉ e)      = ib-renᵉ k (λ ()) _ ρt e
+  ib-renᵉ k ρg ρd ρt (mintᵉ e)       = ib-renᵉ k ρg ρd (ext∈ ρt) e
 
   ib-renᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δᵍ′ Δ Δ′ Θ Θ′ t} (k : ℕ)
     (ρg : Ren∈ Δᵍ Δᵍ′) (ρd : Ren∈ Δ Δ′) (ρt : Ren∈ Θ Θ′)
@@ -173,6 +174,7 @@ mutual
   ib-elimGᵉ k Θl x cl hcl (deferᵉ e)      ok =
     subst T (sym (ib-substᴱ k (⊟-++ˡ x) (elimDExp Θl (∈-++⁺ˡ x) cl e)))
             (ib-elimDᵉ k Θl (∈-++⁺ˡ x) cl hcl e ok)
+  ib-elimGᵉ k Θl x cl hcl (mintᵉ e)       ok = ib-elimGᵉ k (_ ∷ Θl) x cl hcl e ok
 
   ib-elimGᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub u t} (k : ℕ)
     (Θl : List Ty) (x : t ∈ Δᵍ)
@@ -303,6 +305,7 @@ mutual
     subst T (sym (ib-substᴱ k (⊟-++ʳ {Δᵍ = Δᵍ} x)
                     (elimDExp Θl (∈-++⁺ʳ Δᵍ x) cl e)))
             (ib-elimDᵉ k Θl (∈-++⁺ʳ Δᵍ x) cl hcl e ok)
+  ib-elimDᵉ k Θl x cl hcl (mintᵉ e)       ok = ib-elimDᵉ k (_ ∷ Θl) x cl hcl e ok
 
   ib-elimDᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub u t} (k : ℕ)
     (Θl : List Ty) (x : t ∈ Δ)
@@ -415,6 +418,7 @@ mutual
   ib-topᵉ (μᵉ e)          = ib-topᵉ e
   ib-topᵉ (varᵉ x)        = tt
   ib-topᵉ (deferᵉ e)      = ib-topᵉ e
+  ib-topᵉ (mintᵉ e)       = ib-topᵉ e
 
   ib-topᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (tm : Tm Γ Δᵍ Δ Θ t) →
     T (inputsBelowᵗ n tm)

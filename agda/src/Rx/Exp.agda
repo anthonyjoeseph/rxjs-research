@@ -131,6 +131,26 @@ mutual
     varᵉ       : ∀ {t} → t ∈ Δ → Exp Γ Δᵍ Δ Θ t
     deferᵉ     : ∀ {t} → Exp Γ [] (Δᵍ ++ Δ) Θ t → Exp Γ Δᵍ Δ Θ t
                  -- subscribe at tick k ⇒ body subscribed at k+1, fresh ids
+    mintᵉ      : ∀ {t} → Exp Γ Δᵍ Δ (uniqᵗ ∷ Θ) t → Exp Γ Δᵍ Δ Θ t
+                 -- A FRESH SOURCE TOKEN, BOUND AND NEVER WRITTEN.  A source
+                 -- coming alive owes an `init` naming a token nothing has
+                 -- used, and the elaboration of the srxjs sources is the only
+                 -- thing that writes one.  So the capability is a BINDER and
+                 -- not a term former: `uniq̂` is a literal, and a program that
+                 -- can write one can write one already in use, which is the
+                 -- forgery the palette exists to rule out.  Minting belongs to
+                 -- the run, so the token arrives from the scheduler's own
+                 -- ledger at the key `deferᵉ` already draws from — one per
+                 -- SUBSCRIPTION, and nesting is how a body needing two gets
+                 -- two.  Binding it into Θ is what lets the body PLACE it; the
+                 -- only eliminator `uniqᵗ` has is equality, so placing is very
+                 -- nearly all a body can do with it.
+                 --
+                 -- IT IS NOT IN THE SIMUL TREE AND MUST NOT BE.  The palette
+                 -- argument is that no former an author composes reaches the
+                 -- term that makes a token.  A binder only the elaboration
+                 -- emits leaves that argument standing; the same binder in
+                 -- `SExp` would hand every author a token to collide with.
 
   data Tm {n} (Γ : Ctx n) (Δᵍ Δ Θ : List Ty) : Ty → Set where
     varᵗ  : ∀ {t} → t ∈ Θ → Tm Γ Δᵍ Δ Θ t
@@ -287,6 +307,7 @@ mutual
   renExp ρg ρd ρt (μᵉ e)         = μᵉ (renExp (ext∈ ρg) ρd ρt e)
   renExp ρg ρd ρt (varᵉ x)       = varᵉ (ρd x)
   renExp ρg ρd ρt (deferᵉ e)     = deferᵉ (renExp (λ ()) (++Ren ρg ρd) ρt e)
+  renExp ρg ρd ρt (mintᵉ e)      = mintᵉ (renExp ρg ρd (ext∈ ρt) e)
 
   renTm : ∀ {n} {Γ : Ctx n} {Δᵍ Δᵍ′ Δ Δ′ Θ Θ′ t}
         → Ren∈ Δᵍ Δᵍ′ → Ren∈ Δ Δ′ → Ren∈ Θ Θ′
@@ -454,6 +475,7 @@ mutual
   subΘExp Θloc σ (μᵉ e)         = μᵉ (subΘExp Θloc σ e)
   subΘExp Θloc σ (varᵉ x)       = varᵉ x
   subΘExp Θloc σ (deferᵉ e)     = deferᵉ (subΘExp Θloc σ e)
+  subΘExp Θloc σ (mintᵉ e)      = mintᵉ (subΘExp (uniqᵗ ∷ Θloc) σ e)
 
   subΘTm : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (Θloc : List Ty)
          → All (Val Γ) Θsub → Tm Γ Δᵍ Δ (Θloc ++ Θsub) t → Tm Γ Δᵍ Δ Θloc t
@@ -543,6 +565,7 @@ mutual
   elimGExp Θl x cl (varᵉ y)       = varᵉ y
   elimGExp Θl x cl (deferᵉ e)     =
     deferᵉ (subst (λ ζ → Exp _ [] ζ _ _) (⊟-++ˡ x) (elimDExp Θl (∈-++⁺ˡ x) cl e))
+  elimGExp Θl x cl (mintᵉ e)      = mintᵉ (elimGExp (uniqᵗ ∷ Θl) x cl e)
 
   elimGTm : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub u t} (Θloc : List Ty) (x : t ∈ Δᵍ)
           → Exp Γ [] [] Θsub t → Tm Γ Δᵍ Δ (Θloc ++ Θsub) u
@@ -593,6 +616,7 @@ mutual
   ... | inj₂ y′   = varᵉ y′
   elimDExp Θl x cl (deferᵉ e)     =
     deferᵉ (subst (λ ζ → Exp _ [] ζ _ _) (⊟-++ʳ x) (elimDExp Θl (∈-++⁺ʳ _ x) cl e))
+  elimDExp Θl x cl (mintᵉ e)      = mintᵉ (elimDExp (uniqᵗ ∷ Θl) x cl e)
 
   elimDTm : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub u t} (Θloc : List Ty) (x : t ∈ Δ)
           → Exp Γ [] [] Θsub t → Tm Γ Δᵍ Δ (Θloc ++ Θsub) u
@@ -708,6 +732,7 @@ mutual
   inputsBelowᵉ k (μᵉ e)          = inputsBelowᵉ k e
   inputsBelowᵉ k (varᵉ x)        = true
   inputsBelowᵉ k (deferᵉ e)      = inputsBelowᵉ k e
+  inputsBelowᵉ k (mintᵉ e)       = inputsBelowᵉ k e
 
   inputsBelowᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → ℕ → Tm Γ Δᵍ Δ Θ t → Bool
   inputsBelowᵗ k (varᵗ x)      = true

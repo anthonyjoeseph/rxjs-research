@@ -230,15 +230,15 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 
 ### Big picture tier roadmap
 
-- **THE THREE THINGS THE PLAIN TREE CANNOT SAY, AND THEY ARE ANTHONY'S TO RULE
-  ON.** `toPlain` has a body now, so the gaps are named leaves rather than a
-  paragraph, and the census came out sharper than the old one. MINTING a source
-  token is owed by the two sources and by every registration a flattener brings
-  alive. READING the running instant is owed only at a SOURCE — downstream the
-  incoming emit is an envelope whose instant a term can project. And a simul
-  `take` counts VALUES where `takeᵉ` counts EMITS, so nothing here ends a stream
-  on a value-derived condition. A former decides what every theorem quantifies
-  over, so none is invented.
+- **THE MINT LANDS, AND THE READ IS WHAT IS LEFT (Anthony).** A source token is
+  now a BINDER in the plain tree alone — one fresh identifier per subscription,
+  drawn at the key `deferᵉ` already uses and bound into Θ, so a body can PLACE
+  one and still never write one; keeping it out of the simul tree is what leaves
+  the palette argument standing. Two rulings came with it. A simul `take` cuts
+  naively on values exactly as `takeᵉ` does, so what blocks it is a LEVEL and
+  not an operator. And a witness refining an incoming `Ty` is available whenever
+  a consumer wants one. Still owed is READING the running instant at a source,
+  which minting does not supply.
 
 - **THEN THE DEMOTION, ONCE A PROGRAM CAN BUILD AN ENVELOPE.** Target:
   `evaluate : … → List (Val Γ t)`. The census called this and the simul tree
@@ -281,9 +281,9 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 ### The ledger
 
 - **`{of,empty,take,mergeAll,switchAll}ᵖ`** (Rx.Elaborate) — SHAPE,
-  `DEAD ROUTE×4`: the elaboration's per-former plumbing. A source owes a token
-  nothing can mint, and a simul `take` cuts on a value count no former reads,
-  so each is restated the day the ruling lands.
+  `DEAD ROUTE×4`: the elaboration's per-former plumbing. A source still owes
+  the instant it stamps with, and `take` is the right operator at the wrong
+  level, so each is restated the day the read lands.
 
 ## Tier 2 — the proof statement, once there are two trees to state it over
 

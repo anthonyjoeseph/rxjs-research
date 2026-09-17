@@ -429,6 +429,18 @@ const genExp = (
         depth - 1,
       ),
     }),
+    // mint binds one fresh uniq token per subscription, extending Θ by
+    // uniqᵗ at index 0; μ-var state (guarded/usable) is unchanged
+    mint: () => ({
+      type: "mint",
+      ty,
+      body: genExp(
+        rng,
+        ty,
+        { ...ctx, theta: [uniqT, ...ctx.theta] },
+        depth - 1,
+      ),
+    }),
   };
 
   // of/empty are leaves; force them there, real operators from `operators`

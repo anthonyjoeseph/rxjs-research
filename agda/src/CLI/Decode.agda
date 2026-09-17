@@ -23,7 +23,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Rx.Prim using (Timed; after_,_; ObservableInput; hot; cold)
 open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; obs; _≟ᵗ_; isData; inputsBelowᵉ; Ctx; Val; Exp; Tm;
   input; ofᵉ; emptyᵉ; liftᵉ; takeᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ;
-  varᵉ; deferᵉ; varᵗ; unit̂; bool̂; nat̂; uniq̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ;
+  varᵉ; deferᵉ; mintᵉ; varᵗ; unit̂; bool̂; nat̂; uniq̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ;
   strmᵗ; nilᵗ; consᵗ; foldᵗ; listᵗ; add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ)
 open import Rx.Evaluator.Builder using (evaluate↓)
 open import Rx.Slots using (scripted; shared; Slot; Slots)
@@ -192,6 +192,8 @@ mutual
       (getField "index" j >>=? asNum >>=? λ k → nthMember Δ t k >>=? λ x → just (varᵉ x))
     else if tag is "defer" then
       (getField "body" j >>=? decodeExp fuel Γ [] (Δᵍ ++ Δ) Θ t >>=? λ b → just (deferᵉ b))
+    else if tag is "mint" then
+      (getField "body" j >>=? decodeExp fuel Γ Δᵍ Δ (uniqᵗ ∷ Θ) t >>=? λ b → just (mintᵉ b))
     else nothing
     where open import Data.List using (_++_)
 

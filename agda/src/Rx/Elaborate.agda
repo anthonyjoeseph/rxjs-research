@@ -58,10 +58,12 @@ open import Rx.SExp using (SExp; STm; inputˢ; ofˢ; emptyˢ; takeˢ; liftˢ;
 -- the observables its envelopes carry.  Each is a large term and none
 -- of them needs a capability that is missing.
 --
--- `takeᵖ` IS THE ONE GENUINE SURPRISE, AND IT IS NEITHER KIND.  A simul
--- `take` counts VALUES and the plain `takeᵉ` counts EMITS, which differ
--- exactly when an emit carries a burst — so the plain former is not the
--- author's operator at a different type, it is a different operator.
+-- `takeᵖ` IS THE ONE GENUINE SURPRISE, AND IT IS NEITHER KIND.  The
+-- author's operator and the plain one agree on everything that was in
+-- doubt — both cut naively on values, mid-batch, and both owe the
+-- closing envelope at the cut.  What they do not share is the LEVEL:
+-- elaboration puts the author's values inside the envelope, so a plain
+-- `takeᵉ` over an enveloped stream counts batches.
 -- Counting is a lift's business and ENDING is not: no former in the
 -- plain tree stops a stream on a condition read out of the values, and
 -- the cut also owes a `close` the lift could otherwise have written,
@@ -88,14 +90,21 @@ postulate
   emptyᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
          → Exp Γ Δᵍ Δ Θ (emitᵗ t)
 
-  -- THE ONE GAP THAT IS NEITHER A MINT NOR A READ.  A simul `take`
-  -- counts VALUES and the plain `takeᵉ` counts EMITS, and those differ
-  -- exactly when an emit carries a burst — so the plain former is not
-  -- this operator at another type, it is another operator.
-  -- DEAD ROUTE: count in a lift and cut with `takeᵉ`.  The counting
-  --   half works and the ENDING half has nowhere to land: no former in
-  --   the plain tree stops a stream on a condition read out of values,
-  --   and a lift is by construction unable to end one.
+  -- THE ONE GAP THAT IS NEITHER A MINT NOR A READ, AND IT IS A LEVEL
+  -- SHIFT.  A simul `take` cuts naively on the author's VALUES —
+  -- mid-batch, without waiting for one to finish, and sending the
+  -- closing envelope at the moment it cuts.  That is `takeᵉ`'s own
+  -- behaviour exactly, down to truncating the arriving list and minting
+  -- a close per victim on the cutting burst.  What it is not is
+  -- `takeᵉ` AT THIS TYPE: elaboration puts the author's values inside
+  -- the envelope, so an enveloped stream's own values are envelopes and
+  -- a plain `takeᵉ` over it counts batches.  The operator is right and
+  -- the level is wrong.
+  -- DEAD ROUTE: count in a lift and cut with `takeᵉ`.  The counting and
+  --   truncation halves are both a lift's work; the ENDING half is not,
+  --   since a lift cannot change how many emits pass through it, so
+  --   nothing converts a budget over values into the emit index a
+  --   subscription-time count has to name.
   takeᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
         → Tm Γ Δᵍ Δ Θ natᵗ → Exp Γ Δᵍ Δ Θ (emitᵗ t) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
 

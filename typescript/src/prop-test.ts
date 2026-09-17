@@ -129,7 +129,9 @@ const evaluateRx = async (testCase: TestCase): Promise<EvalResult> => {
 // an observable), each renamed to 0,1,2,… in first-appearance order over
 // the flat stream. This also erases the representation gap — TS mints ids
 // as `symbol` (dropped by JSON.stringify), Agda as ℕ — since each side is
-// renamed independently to the same integers. Values/kinds/event
+// renamed independently to the same integers. Instants still differ in
+// representation — TS mints them as `symbol` (dropped by JSON.stringify),
+// Agda as ℕ — and the renaming is what erases it. Values/kinds/event
 // types/order still compare exactly.
 const canonical = <A>(stream: InstEmit<A>[]): unknown => {
   const inst = new Map<Provenance, number>();

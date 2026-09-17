@@ -38,9 +38,9 @@ open import Rx.Exp
   using ( Ty; Ctx; Exp; Tm; Val; Ren∈; ext∈; ++Ren; renExp; renTm; renTms
         ; subΘExp; subΘTm; subΘTms; wkTm; reify; lookupEnv; _×ᵗ_; listᵗ
         ; input; ofᵉ; emptyᵉ; takeᵉ; liftᵉ; mergeAllᵉ; switchAllᵉ
-        ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ
+        ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ
         ; varᵗ; unit̂; bool̂; nat̂; uniq̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ
-        ; ifᵗ; primᵗ; strmᵗ; nilᵗ; consᵗ; foldᵗ )
+        ; ifᵗ; primᵗ; strmᵗ; nilᵗ; consᵗ; foldᵗ; uniqᵗ )
 open import Rx.Subst-Transport using (Cᵉ; cong₃)
 open import Rx.Subst-Renaming using (Idᵖ; ren-idᵉ)
 open import Rx.Subst-Split
@@ -112,6 +112,7 @@ mutual
     cong deferᵉ (ren-∘ᵉ (λ ())
       (comp-++ {ρa = ρg} {σa = σg} {τa = τg} {ρb = ρd} {σb = σd} {τb = τd}
                cg cd) ct e)
+  ren-∘ᵉ cg cd ct (mintᵉ e) = cong mintᵉ (ren-∘ᵉ cg cd (comp-ext ct) e)
 
   ren-∘ᵗ : {ρg : Ren∈ Δᵍ Δᵍ′} {σg : Ren∈ Δᵍ′ Δᵍ″} {τg : Ren∈ Δᵍ Δᵍ″}
            {ρd : Ren∈ Δ Δ′} {σd : Ren∈ Δ′ Δ″} {τd : Ren∈ Δ Δ″}
@@ -232,6 +233,8 @@ mutual
     cong exhaustAllᵉ (sub-fixᵉ Θa Θb σ fl fr e)
   sub-fixᵉ Θa Θb σ fl fr (μᵉ e)     = cong μᵉ (sub-fixᵉ Θa Θb σ fl fr e)
   sub-fixᵉ Θa Θb σ fl fr (deferᵉ e) = cong deferᵉ (sub-fixᵉ Θa Θb σ fl fr e)
+  sub-fixᵉ Θa Θb {ρ⁺ = ρ⁺} σ fl fr (mintᵉ e) =
+    cong mintᵉ (sub-fixᵉ (uniqᵗ ∷ Θa) (uniqᵗ ∷ Θb) σ (fixL-ext fl) (fixR-ext {Θa = Θa} {Θb = Θb} {ρ⁺ = ρ⁺} fr) e)
 
   sub-fixᵗ : (Θa Θb : List Ty) {ρg : Ren∈ Δᵍ Δᵍ′} {ρd : Ren∈ Δ Δ′}
              {ρ⁺ : Ren∈ (Θa ++ Θsub) (Θb ++ Θsub)} {ρa : Ren∈ Θa Θb}

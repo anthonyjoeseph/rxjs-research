@@ -1,6 +1,6 @@
 import { Observable } from "rxjs";
 import { InstEmit } from "./inst-emit.js";
-import { Closed, Val, applyFn, evalTm, unfoldMu } from "./exp.js";
+import { Closed, Val, applyFn, bindMinted, evalTm, unfoldMu } from "./exp.js";
 import { Driver } from "./driver.js";
 import * as P from "./primitive-operators.js";
 
@@ -61,6 +61,10 @@ export const compile = (
       return recur(unfoldMu(exp.body));
     case "defer":
       return P.defer(driver, () => recur(exp.body));
+    case "mint":
+      // the token is substituted INTO the body, mirroring Agda's
+      // subs-mint: the binder is discharged before the body compiles
+      return P.mint(driver, (token) => recur(bindMinted(exp.body, token)));
     case "varE":
       throw new Error(
         "varE in a closed expression — generator/decoder invariant violated",

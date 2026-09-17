@@ -102,8 +102,10 @@ open import Relation.Binary.PropositionalEquality using (_≡_)
 open import Rx.Prim using (Tick; Fuel; Id; Source; InstEvent; InstEmit; value; close;
   handoff; complete; exhausted; delivery; _at_from_as_;
   init; subscribe; hot; cold)
-open import Rx.Exp using (obs; Ctx; Val; Closed; Tm; Fn; _×ᵗ_; listᵗ; evalTm; unfoldμ; input; ofᵉ; emptyᵉ; takeᵉ;
-  liftᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; deferᵉ)
+open import Data.List.Relation.Unary.All using () renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
+open import Rx.Exp using (obs; Ctx; Val; Closed; Exp; Tm; Fn; _×ᵗ_; listᵗ; uniqᵗ; subΘExp;
+  evalTm; unfoldμ; input; ofᵉ; emptyᵉ; takeᵉ;
+  liftᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; deferᵉ; mintᵉ)
 open import Rx.Mint using (ordinalᵏ; sourceᵏ; nodeᵏ; regᵏ; freshId; setAt)
 open import Rx.Slots using (Slots; scripted; shared)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; NodeId;
@@ -442,6 +444,25 @@ data subscribeE⇓ {n} {Γ} {t} {e} where
                             (thru-outer mergeAllᵒ nid ↠ κ)
                             (installNode nid
                               (mergeAll-st {t = u} nothing 0 [] false) st) )
+
+  -- MINTING IS THE RUN'S, AND THE BODY RECEIVES THE TOKEN AS A VALUE.
+  -- The hop allocates at the same key `subs-defer` draws from and then
+  -- SUBSTITUTES the identifier into the body's one value slot, so the
+  -- premise is a subscription of an ordinary closed expression and the
+  -- binder has vanished by the time anything else looks.  That is the
+  -- whole of the rule: no event, no registration and no node, because
+  -- the operator this serves is the one WRAPPING the binder and it is
+  -- the operator that owes those.  A token the body could have written
+  -- for itself would need no rule at all -- the point is that it
+  -- cannot, so the value can only arrive from here.
+  subs-mint : ∀ {lo u} {body : Exp Γ [] [] (uniqᵗ ∷ []) u}
+                {κ : Path Γ lo u t} {id now sched st src r}
+            → freshId sourceᵏ (Sched.mint sched) ≡ src
+            → subscribeE⇓ (subΘExp [] (src ∷ᵃ []ᵃ) body) κ id now
+                (record sched
+                   { mint = setAt sourceᵏ (suc src) (Sched.mint sched) })
+                st r
+            → subscribeE⇓ (mintᵉ body) κ id now sched st r
 
 -- ONE CONSTRUCTOR WHERE THE EVALUATOR HAS TWO, AND THE MISSING ONE IS
 -- THE POINT.  The machine asks whether what arrived is written

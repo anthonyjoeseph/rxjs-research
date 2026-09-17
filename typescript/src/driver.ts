@@ -20,7 +20,7 @@ export type Driver = {
   // fresh SourceId; Symbols compare only by identity, matching the
   // harness's comparison up to renaming (Agda mints ℕs — same order,
   // different carrier)
-  mintSourceId: () => SourceId;
+  mintSourceId: () => number;
   // the instant sync work belongs to: the running arrival's cascade
   // id, or the root subscribe-frame id before any arrival
   // (id-inheritance is literally reading this)
@@ -67,7 +67,11 @@ export const createDriver = (): Driver => {
   const [chainEmits, chainSink] = hot<InstEmit<never>>();
 
   return {
-    mintSourceId: () => Symbol(`source:${nextSourceId++}`),
+    // a NUMBER, because Agda's uniqᵗ reads as ℕ and `mint` is the first
+    // thing that hands a token to a program rather than to the protocol.
+    // Nothing else produces a SourceId, so this counter is the whole
+    // namespace and a numeric one cannot collide.
+    mintSourceId: () => nextSourceId++,
     pushChainEmit: (emit) => chainSink.next(emit),
     chainEmits,
     currentInstant: () => instant,

@@ -61,7 +61,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong;
 open import Rx.Prim using (Timed; after_,_; ObservableInput; hot; cold; InstEvent; init; value; close; handoff;
   complete; InstEmit; _at_from_as_)
 open import Rx.Exp using (Ty; natᵗ; obs; listᵗ; revᵗ; _×ᵗ_; isData; Ctx; Exp; Tm; Fn; PrimOp; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; liftᵉ;
-  mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ;
+  mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ;
   unit̂; bool̂; nat̂; uniq̂; primᵗ; pairᵗ; fstᵗ; sndᵗ;
   strmᵗ; varᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; nilᵗ; consᵗ; foldᵗ; add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ)
 open import Data.List.Membership.Propositional using (_∈_)
@@ -436,7 +436,7 @@ genExp d = genExpAt 0 0 d
 -- decoder and the TypeScript union spell.
 data Former : Set where
   fInput fOf fEmpty fTake fLift fMergeAll fSwitchAll fExhaustAll
-    fMu fVar fDefer : Former
+    fMu fVar fDefer fMint : Former
 
 formerTag : Former → String
 formerTag fInput      = "input"
@@ -450,10 +450,11 @@ formerTag fExhaustAll = "exhaustAll"
 formerTag fMu         = "mu"
 formerTag fVar        = "varE"
 formerTag fDefer      = "defer"
+formerTag fMint       = "mint"
 
 allFormers : List Former
 allFormers = fInput ∷ fOf ∷ fEmpty ∷ fTake ∷ fLift ∷ fMergeAll ∷ fSwitchAll
-           ∷ fExhaustAll ∷ fMu ∷ fVar ∷ fDefer ∷ []
+           ∷ fExhaustAll ∷ fMu ∷ fVar ∷ fDefer ∷ fMint ∷ []
 
 formerIx : Former → ℕ
 formerIx fInput      = 0
@@ -467,6 +468,7 @@ formerIx fExhaustAll = 7
 formerIx fMu         = 8
 formerIx fVar        = 9
 formerIx fDefer      = 10
+formerIx fMint       = 11
 
 sameFormer : Former → Former → Bool
 sameFormer a b = formerIx a ≡ᵇ formerIx b
@@ -505,6 +507,7 @@ marksᵉ (exhaustAllᵉ e) = one fExhaustAll ⊕ marksᵉ e
 marksᵉ (μᵉ e)          = one fMu ⊕ marksᵉ e
 marksᵉ (varᵉ x)        = one fVar
 marksᵉ (deferᵉ e)      = one fDefer ⊕ marksᵉ e
+marksᵉ (mintᵉ e)       = one fMint ⊕ marksᵉ e
 
 marksᵗ (varᵗ x)      = noMarks
 marksᵗ unit̂          = noMarks
@@ -665,6 +668,7 @@ showExp (exhaustAllᵉ s) = "(exhaustAllᵉ " ++ showExp s ++ ")"
 showExp (μᵉ e)          = "(μᵉ " ++ showExp e ++ ")"
 showExp (varᵉ x)        = "(varᵉ " ++ showIx x ++ ")"
 showExp (deferᵉ e)      = "(deferᵉ " ++ showExp e ++ ")"
+showExp (mintᵉ e)       = "(mintᵉ " ++ showExp e ++ ")"
 
 -- slots render AFTER showExp because a shared slot's DEF is an expression and
 -- must be printed: a corpus-B witness whose slots read "shared" is not
