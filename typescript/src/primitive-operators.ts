@@ -77,6 +77,30 @@ export const empty = (driver: Driver): Observable<InstEmit<never>> =>
 //   mid-final-cascade — or any time later — gets the immediate
 //   init/close/complete one-shot, never a registration dropped
 //   without its close. Completion is re-observable, values are not.
+// DEAD ROUTE -- the two latches below do NOT come out the way the
+// registration count did.  That one was a cell between two folds and
+// moved onto the signal joining them, so the dependency became the
+// type's.  These are different: both are read at SUBSCRIBE time, to
+// decide what kind of subscriber this is, and the thing they are really
+// asking is "did someone get here first".
+//
+// Three routes tried, each dead for its own reason.  Deriving the answer
+// from a REPLAYED signal stream (rxjs `share` with a `ReplaySubject`
+// connector) hands a late subscriber the whole history, burst signals
+// included -- but a replay arrives in the subscriber's own subscribe
+// frame and so does a genuine connect burst, so the scan cannot tell
+// them apart, and `markSync` does not separate them either.  Reading a
+// derived status stream before building the pipeline is worse than
+// indistinguishable: subscribing it CONNECTS the upstream, the burst
+// fires into it, and the first subscriber's own scan then misses the
+// burst entirely.  And rxjs tracks a refCount internally without
+// exposing it, so there is no operator that answers the question.
+//
+// So "first subscriber" is a fact about subscription ORDER and not
+// about anything in the stream, which is why no rearrangement of the
+// folds reaches it.  The repair is not a cleverer pipeline -- it is a
+// share in which no subscriber is special, and that is a design change
+// to the protocol rather than to this function.
 export const share = <A>(
   driver: Driver,
   obs: Observable<InstEmit<A>>,
