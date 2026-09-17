@@ -27,7 +27,12 @@ open import Data.Nat.Properties using (≤-refl; n≤1+n)
 -- field.  The stronger EQUALITY that pairs with it, and the strict
 -- bound saying a minted identifier can never be handed out twice, are
 -- not stated here: nothing consumes them until distinctness itself is,
--- and a fact proven ahead of its assembly is inventory.
+-- and a fact proven ahead of its assembly is inventory.  Nor is
+-- distinctness stated: one table is what makes it SAYABLE, and its only
+-- consumer is a well-formedness claim read off a run, which is a tier of
+-- its own.  So the route from here is to that tier and not to a
+-- statement minted early -- which would reach Main through nothing and
+-- be inventory one level up.
 --
 -- THE CARRIER IS A FUNCTION FROM KEYS AND NOT A RECORD OF FIELDS,
 -- WHICH IS WHAT A GENERIC STATEMENT NEEDS.  Three fields would put the
