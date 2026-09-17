@@ -50,7 +50,7 @@ exp	μᵉ	mu	yes	binder
 exp	varᵉ	varE	yes	binder
 exp	deferᵉ	defer	yes	protocol
 exp	mintᵉ	mint	yes	protocol
-exp	batchSyncᵉ	batchSync	no	protocol	no TypeScript operator pairs with it yet — bracketing a subscribe frame is what the plain-rxjs refactor of the primitives has to say, and a generated one would decode into nothing
+exp	batchSyncᵉ	batchSync	yes	protocol
 tm	varᵗ	varT	yes	-
 tm	unit̂	unitT	yes	-
 tm	bool̂	boolT	yes	-

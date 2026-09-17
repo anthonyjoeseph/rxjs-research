@@ -443,6 +443,53 @@ const genExp = (
     }),
   };
 
+  // batchSync is the one former whose RESULT type is PINNED rather than
+  // free: a batchSync over `s` is a stream of `s × list s`, which the
+  // decoder re-derives and demands. A lane that only fired when the
+  // requested type already had that shape would be unreachable in
+  // practice — nothing asks for one — and would report a clean sweep of
+  // an empty corpus, so the lane MAKES the shape and then spends it.
+  //
+  // Spending it with a lift is not an arbitrary choice: bracket-then-
+  // fold is the pairing the former exists for, since the split arrives
+  // as a VALUE and a step over the value list is what regroups it. So
+  // the generated shape is the one the elaboration itself will write.
+  operators.batchSync = () => {
+    // when the caller already wants the pinned shape, hand the node back
+    // bare rather than folding it straight back down
+    if (
+      ty.type === "prod" &&
+      ty.snd.type === "list" &&
+      tyEq(ty.snd.elem, ty.fst)
+    )
+      return {
+        type: "batchSync",
+        ty,
+        src: genExp(rng, ty.fst, ctx, depth - 1),
+      };
+    const s = genValTy(rng, 2);
+    const pair: Ty = { type: "prod", fst: s, snd: { type: "list", elem: s } };
+    const node: Exp = {
+      type: "batchSync",
+      ty: pair,
+      src: genExp(rng, s, ctx, depth - 1),
+    };
+    const u = genValTy(rng, 1);
+    return {
+      type: "lift",
+      ty,
+      fn: genFn(
+        rng,
+        { type: "prod", fst: u, snd: { type: "list", elem: pair } },
+        { type: "prod", fst: u, snd: { type: "list", elem: ty } },
+        ctx,
+        depth - 1,
+      ),
+      init: genTm(rng, u, ctx, Math.min(depth, 2)),
+      src: node,
+    };
+  };
+
   // of/empty are leaves; force them there, real operators from `operators`
   const forced =
     force === "of"

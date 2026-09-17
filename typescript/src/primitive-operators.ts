@@ -348,6 +348,48 @@ export const lift = <A, B, S>(
     rxMap((carried) => carried.out as InstEmit<B>), // the seed is never emitted, so out is set
   );
 
+// batchSync-f: the one plain operator that can see synchrony, and it
+// sees exactly one bit of it — whether the emit it is regrouping was
+// pushed during its own subscribe call. An emit inside that burst
+// leaves as ONE group, head and tail (Agda's groupSync, so an empty
+// emit yields no group at all); every later emit's values leave as
+// singletons (soloSync). There is no accumulator and there cannot be:
+// holding a value back to see whether another joins it would need to
+// know that another is owed, which is the forward-looking knowledge
+// this operator is defined not to have.
+//
+// THE BIT COMES FROM rxjs's OWN SUBSCRIBE ORDERING, NOT FROM A
+// SUBSCRIPTION THIS OPERATOR OWNS. `bracketSync` merges a marker after
+// the source, and `merge` subscribes its inputs in order and
+// synchronously, so the source drains its whole subscribe burst before
+// the marker is subscribed and fires. The marker therefore lands
+// exactly at the boundary, in the same frame, with no hop and no
+// timing change — which is what lets the split arrive as a VALUE that
+// a scan reads, rather than as a callback an operator drives.
+export const batchSync = <A>(
+  obs: Observable<InstEmit<A>>,
+): Observable<InstEmit<[A, A[]]>> =>
+  bracketSync(obs).pipe(
+    rxScan<Bracketed<InstEmit<A>>, { sync: boolean; out?: InstEmit<[A, A[]]> }>(
+      (carried, item) => {
+        if (item === SYNC_END) return { sync: false };
+        const { bookkeeping, values, fin } = splitEmit(item);
+        const groups: [A, A[]][] = carried.sync
+          ? values.length === 0
+            ? []
+            : [[values[0], values.slice(1)]]
+          : values.map((v): [A, A[]] => [v, []]);
+        return {
+          sync: carried.sync,
+          out: reassemble(item, bookkeeping, [], groups, fin),
+        };
+      },
+      { sync: true },
+    ),
+    filter((carried) => carried.out !== undefined),
+    rxMap((carried) => carried.out as InstEmit<[A, A[]]>),
+  );
+
 // a lift that carries nothing. No Exp node compiles to this any more —
 // a program's map is built from the lift NODE, in the term language —
 // so what is left is the compiler's own use, mapping each emitted inner

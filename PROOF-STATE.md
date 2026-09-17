@@ -243,13 +243,13 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 - **THEN THE DEMOTION, AND IT IS THE ORACLE'S AND NOT THE TOWER'S (Anthony:
   the harness "shouldn't test on srxjs at all — just plain rxjs now").** Target:
   `evaluate : … → List (Val Γ t)`, with the srxjs layer deliberately no longer
-  cross-checked between the trees. The wire format goes first and alone, since
-  it is the one edit both sides must make together; then TypeScript's compile
-  path, where every former turns out to be a plain operator wearing an envelope
-  but two — `defer` wants the driver's hop and `mint` its counter, neither wants
-  an envelope. Where it STOPS is the tower: the proofs are stated over
-  `evaluate↓`, so demoting it moves five claims Main names, and Main is not
-  ours to touch.
+  cross-checked between the trees. The compile path is now WHOLE — every plain
+  former is a TypeScript operator, the last of them reading its subscribe frame
+  off rxjs's own subscribe ordering rather than off a subscription it owns, so
+  the path calls `subscribe` nowhere. What remains is the wire format, the one
+  edit both sides must make together, and the demotion waits on it. Where it
+  STOPS is the tower: the proofs are stated over `evaluate↓`, so demoting it
+  moves five claims Main names, and Main is not ours to touch.
 
 - **THEN THE SIX ROWS, WHICH THE RULING RELEASES TOGETHER.** The flatteners
   were held on a second blocker and are not: they wanted a token per inner
