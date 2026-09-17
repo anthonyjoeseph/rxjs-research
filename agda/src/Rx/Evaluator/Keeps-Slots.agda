@@ -42,7 +42,7 @@ open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeAll⇓; pushBurst
   subs-floor; subs-shared; subs-hot-done; subs-hot-live; subs-cold-sync;
   subs-cold-async; subs-of; subs-empty; subs-take-zero;
   subs-take-suc; subs-lift; subs-merge-all; subs-switch-all; subs-exhaust-all;
-  subs-μ; subs-defer; inner;
+  subs-μ; subs-defer; subs-mint; inner;
   consume-all-sub; consume-all-enqueue; consume-all-nil; consume-switch-sub;
   consume-switch-nil; consume-exhaust-sub; consume-exhaust-nil;
   walk-nil; walk-cons; drain-nil; drain-no-room; drain-room;
@@ -173,6 +173,7 @@ mutual
   subs-keeps (subs-exhaust-all a)    = all-keeps a
   subs-keeps (subs-μ d)              = subs-keeps d
   subs-keeps (subs-defer _ _ _ _)    = refl
+  subs-keeps (subs-mint _ d)         = subs-keeps d
 
   all-keeps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
     {op : AllOp} {ns : NodeState Γ} {b : Closed Γ (obs u)}
