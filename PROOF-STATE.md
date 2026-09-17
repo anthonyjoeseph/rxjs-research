@@ -257,13 +257,15 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 
 - **THEN THE TYPESCRIPT SIMUL OPERATORS, `lift` INCLUDED (Anthony).** Written
   over plain rxjs, ES6 array operations and conditionals only. `lift`, `take`,
-  `map` and the batcher already are; `share`, `defer` and the three flatteners
-  are not, and each needs a synchronous subscribe frame captured as a unit,
-  which plain combinators cannot observe. Whether the three quarantined escape
-  hatches count as permitted vocabulary is the question the leg opens with,
-  and it is Anthony's. **AND `expand` IS NEW.** It is in neither tree — the
-  census found the name nowhere in either source — so it is written here
-  first, which is the port order the change workflow already fixes.
+  `map` and the batcher already are; `share`, `defer` and the flatteners are
+  not, each needing a synchronous subscribe frame captured as a unit. Whether
+  the three quarantined escape hatches count as permitted vocabulary is the
+  question the leg opens with, and it is his.
+  **AND `expand` IS WRITTEN, AND DIVERGES.** Derived from
+  the shipped palette it is breadth-first: the recursion needs a guard, the
+  only lazy former is `defer`, and that costs a hop — so a countdown is four
+  batches here and one in rxjs. The values agree as a multiset. Closing the
+  gap wants a former or a hopless mu, so the leg stops there.
 
 - **THEN THE SAME OPERATORS IN `Tm`/`Ty`, AND TIER 1 IS COMPLETE (Anthony).**
   Each TS simul operator mirrored as an Agda definition in the value language,
