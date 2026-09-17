@@ -72,7 +72,7 @@ open import Decide using (∧ˡ; ∧ʳ)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; _↠_; take-f; map-f; scan-f; take-st; cell-st; thru-outer;
   batchSync-f; batchSync-st; batchSyncDispatch; groupSync; soloSync; setNode;
   mergeAllᵒ; switchᵒ; exhaustᵒ; mergeAll-st; switch-st; exhaust-st; takeVals; takeDispatch;
-  scanVals; scanDispatch; lookupNode; NodeState; installNode; oneShotBurst; memberSource;
+  mapVals; scanVals; scanDispatch; lookupNode; NodeState; installNode; oneShotBurst; memberSource;
   splitEvents; splitBurst; retagEvents; NodeId; AllOp; from-inner; consumeUsable; hasRoom;
   switchKill; thruWrap; share-sink; register; atSlot; lowerFloor; burstCompleted; sharedPlumb;
   spentBurst)
