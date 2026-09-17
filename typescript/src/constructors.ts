@@ -1,4 +1,4 @@
-import { Observable, Subject } from "rxjs";
+import { Observable, Subject, merge, of } from "rxjs";
 
 // A minimal push sink — the only surface a source producer needs. Kept to
 // next/complete (never a raw rxjs Subscriber) so the rest of the impl
@@ -35,6 +35,26 @@ export const hot = <A>(): [Observable<A>, Sink<A>] => {
     { next: (val) => subject.next(val), complete: () => subject.complete() },
   ];
 };
+
+// bracketSync: the sync/async boundary WITHOUT subscribing — the
+// replacement for captureSync, and the reason it works is rxjs's own
+// subscribe ordering rather than a scheduler. `merge` subscribes its
+// inputs in order, synchronously: it subscribes `src`, `src` drains
+// its entire subscribe burst during that call, and only then is
+// `of(SYNC_END)` subscribed and fires. So the marker lands exactly at
+// the boundary, in the same frame, with no hop and no timing change.
+//
+// This is what lets an operator stop owning its upstream subscription:
+// the split arrives as a VALUE in the stream, so a downstream `scan`
+// regroups the burst where the operator used to accumulate it by hand.
+// That pairing — bracket then fold — is `batchSyncᵉ` followed by
+// `liftᵉ`, which is why no new former is owed on the Agda side.
+export const SYNC_END = Symbol("end-of-sync");
+export type SyncEnd = typeof SYNC_END;
+export type Bracketed<A> = A | SyncEnd;
+
+export const bracketSync = <A>(src: Observable<A>): Observable<Bracketed<A>> =>
+  merge<Bracketed<A>[]>(src, of(SYNC_END));
 
 // captureSync: subscribe NOW, splitting the subscription at the
 // sync/async boundary. Emissions delivered during the subscribe call

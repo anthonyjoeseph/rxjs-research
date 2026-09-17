@@ -1,6 +1,7 @@
 import {
   Observable,
   defer as rxDefer,
+  filter,
   map as rxMap,
   merge,
   mergeMap,
@@ -22,7 +23,14 @@ import {
   splitEmit,
 } from "./inst-emit.js";
 import { Arrival, Driver } from "./driver.js";
-import { captureSync, cold, hot } from "./constructors.js";
+import {
+  Bracketed,
+  SYNC_END,
+  bracketSync,
+  captureSync,
+  cold,
+  hot,
+} from "./constructors.js";
 
 export { exhaustAll, mergeAllAll, switchAll } from "./join.js";
 
@@ -215,21 +223,44 @@ export const defer = <A>(
       }),
       oneShotArrival(driver, driver.currentTick() + 1).pipe(
         mergeMap(({ instant }) =>
-          cold<InstEmit<A>>((sink) => {
-            const capture = captureSync(compileBody(), sink);
-            const flat = mergeAllBurst(capture.burst);
-            sink.next(
-              reassemble(
-                { instant, source, kind: "delivery" },
-                [{ type: "close", source, reason: "exhausted" }],
-                flat.bookkeeping,
-                flat.values,
-                false,
-              ),
-            );
-            if (capture.completedSync || flat.done) sink.complete();
-            return () => capture.unsubscribe();
-          }),
+          // the body's burst is regrouped by a FOLD over the bracketed
+          // stream rather than accumulated by a subscriber: everything
+          // before SYNC_END is the burst, the marker itself is where
+          // the one delivery emit comes out, everything after is the
+          // body's async tail passing through under its own envelope.
+          // rx completion needs no special case — if the body finished
+          // inside its burst the merged stream completes on its own;
+          // `takeWhile` covers the other exit, a body that signalled
+          // done through its events without completing.
+          bracketSync(compileBody()).pipe(
+            rxScan<
+              Bracketed<InstEmit<A>>,
+              { burst: InstEmit<A>[]; done: boolean; out?: InstEmit<A> }
+            >(
+              (state, item) => {
+                if (item !== SYNC_END)
+                  return state.out === undefined && !state.done
+                    ? { burst: [...state.burst, item], done: false }
+                    : { burst: [], done: state.done, out: item };
+                const flat = mergeAllBurst(state.burst);
+                return {
+                  burst: [],
+                  done: flat.done,
+                  out: reassemble(
+                    { instant, source, kind: "delivery" },
+                    [{ type: "close", source, reason: "exhausted" }],
+                    flat.bookkeeping,
+                    flat.values,
+                    false,
+                  ),
+                };
+              },
+              { burst: [], done: false },
+            ),
+            takeWhile((state) => !state.done, true),
+            filter((state) => state.out !== undefined),
+            rxMap((state) => state.out as InstEmit<A>),
+          ),
         ),
       ),
     );
