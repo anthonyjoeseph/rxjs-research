@@ -207,60 +207,72 @@ every guard, every `<?` and the dry marker leave the machine entirely.
 A row's class must agree with its postulate's header, which is where the
 research lives; where they disagree, the header wins.
 
-## Tier 1 — one pure-function former, and a palette a pipeline can be run in
+## Tier 1 — the unique primitive, and the two trees that ride on it
 
-**THE ENTANGLEMENT, PLAINLY: the Agda tree is the implementation's tree, and a
-former plain rxjs cannot express is one nothing can check against a running
-pipeline.** TypeScript has two layers — a plain rxjs pipeline and an
-`InstEmit`-carrying one over it — and Agda has one, so the palette is where the
-two are held to each other: restrict it to what primitive rxjs, conditionals
-and array operations write, and every former left is one the oracle exercises.
-
-**AND THE PALETTE SIZES EVERY PER-FORMER GRIND ABOVE IT.** Those leaves are
-discharged one operator case at a time, so the size of the tree IS the size of
-that work. `liftᵉ` — an operator as a pure function on an emit's values, with
-carried state — absorbs the formers that are already that and nothing else: the
-dividing test is whether an operator SUBSCRIBES anything or reads the
-protocol's own bookkeeping.
+**THE ENTANGLEMENT, PLAINLY: the plain tree is rxjs, and must not know what an
+envelope is (Anthony).** TypeScript has two layers — plain rxjs, the published
+library, and an `InstEmit`-carrying one over it called srxjs — while Agda has
+one tree doing both jobs, which is why the evaluator mints envelopes it has no
+business knowing about. The tier splits them: a plain tree and evaluator
+mirroring ordinary rxjs, and a simul mirror tree whose formers are the
+envelope-carrying operators, elaborated down by `toPlain`. What the proofs
+above then quantify over is a program written in the SIMUL palette — which is
+the restriction on the input type that nothing here could state before, and the
+reason the split is worth a whole tier.
 
 ### The monster
 
-(no monster) — the tier declares no statement. What it lands are DEFINITIONS
-and a former, which cannot be false, only wrong; what catches one wrong is the
-oracle disagreeing before any of it reaches Agda, and then the existing proofs
-failing to typecheck over the collapsed tree. A cone cannot aim at either.
+(no monster) — the tier declares no statement. What it lands are DEFINITIONS,
+one type constructor and a second tree, which cannot be false, only wrong; what
+catches one wrong is the oracle disagreeing before any of it reaches Agda, and
+then the existing proofs failing to typecheck over the split. A cone cannot aim
+at either, and one drawn here would forbid the wide refactor that IS the tier.
 
 ### Big picture tier roadmap
 
-- **AND MAKE THE AGDA GENERATOR'S PROGRAMS REACHABLE BY A RUNNING PIPELINE.**
-  The bridge is one-way: the CLI encodes Vals and InstEmits and there is no
-  `Exp` encoder at all, so a program the Agda generator writes can never be
-  handed to rxjs. The all-Agda sweep therefore certifies impl≡spec over shapes
-  nothing ever ran, and the oracle certifies TS≡Agda-impl only over the shapes
-  the TS generator happens to write — two coverages with nothing forcing them
-  to overlap, which is the same silence the leg above closes arriving at the
-  programs rather than at the formers. The leg is that missing encoder, so one
-  generator's output can be put to both sides.
+- **THE UNIQUE PRIMITIVE, AND THE ENVELOPE IN `Ty`'s OWN VOCABULARY.** `Ty`
+  gains one constructor, `uniqᵗ`, mirroring TypeScript's provenance and source
+  id, with `Val` sending it to `ℕ`. It gets NO introduction form, and that
+  absence IS the guarantee — only an eliminator comparing two, which the
+  batcher needs to group by instant; a minting former would falsify the proven
+  lemma that substitution commutes with evaluation. The envelope is DEFINED
+  over `unitᵗ`, `_+ᵗ_`, `_×ᵗ_` and `listᵗ` rather than added to `Ty`, and is
+  parameterised over its uniq type, so a simul slot is declared at
+  `instEmitᵗ unitᵗ a`: an author can write only `tt` where a uniq goes, and
+  the evaluator's ingestion is the sole producer of one. Subsumes the
+  type-grammar pairing leg, which it forces anyway.
 
-- **AND THE TYPE GRAMMAR IS THE LAST FAMILY THE PAIRING DOES NOT REACH.** The
-  formers, the term formers and the primitive operators are now held to one
-  written-down map; `Ty` is not, and it crosses the same bridge by the same
-  tag strings — seven constructors on each side, decoded by the same wall and
-  written by both generators. The silence is worst here rather than mildest:
-  a type nothing generates makes every former over it unreachable too, so the
-  gap is in the whole palette's coverage and reads as nothing at all. What the
-  leg has to decide is the mixfix spelling, since two constructors are
-  operators and the reader has not been put to one.
+- **THEN DEMOTE THE ENVELOPE OUT OF THE EVALUATOR.** Target:
+  `evaluate : … → List (Val Γ t)`. The mentions split three ways and only one
+  is work — plumbing vanishes with the return type, a claim's statement
+  restates mechanically, and what is left is BEHAVIOUR, every place the
+  machine reads a field of its own envelope to decide something. Each of those
+  moves UP into a simul former, which is what makes this a demotion rather
+  than an extraction: the plain tree's `take` and `defer` are already protocol
+  formers by the pairing map's own role column, and they stop being that here.
 
-- **AND THE SLOT TELESCOPE IS THE OTHER HALF OF THE PALETTE, AND IS PAIRED BY
-  NOTHING.** `Slot` has two shapes, `scripted` and `shared`, both written by
-  both generators under those same tag strings and decoded by the same wall —
-  the identical bridge the formers cross, with none of the map behind it. It
-  is this tier's because the tier's subject is a palette a pipeline can be RUN
-  in: a program whose formers are all covered is still unreachable when the
-  telescope feeding it is not. Each shape carries a side condition the other
-  does not, so what the leg decides is whether the kind column takes a fourth
-  kind or a side condition is a column of its own.
+- **THEN THE SIMUL TREE AND `toPlain`.** A second `Exp` whose formers are the
+  envelope-carrying operators, and one elaboration into the plain tree. It is
+  where the demoted behaviour lands, so it cannot be written before the leg
+  above, and it is the leg that decides whether the split was real: a demoted
+  behaviour with no simul former to move into means the two trees are one tree
+  with extra steps.
+
+- **THEN THE TYPESCRIPT SIMUL OPERATORS, `lift` INCLUDED (Anthony).** Written
+  over plain rxjs, ES6 array operations and conditionals only. `lift`, `take`,
+  `map` and the batcher already are; `share`, `defer` and the three flatteners
+  are not, and each needs a synchronous subscribe frame captured as a unit,
+  which plain combinators cannot observe. Whether the three quarantined escape
+  hatches count as permitted vocabulary is the question the leg opens with,
+  and it is Anthony's.
+
+- **THEN THE SAME OPERATORS IN `Tm`/`Ty`, AND TIER 1 IS COMPLETE (Anthony).**
+  Each TS simul operator mirrored as an Agda definition in the value language,
+  in the same fashion, so the correspondence is readable rather than asserted.
+  **AND IF THE LANGUAGE CANNOT SAY ONE, STOP AND REPORT (Anthony).** A missing
+  former is never repaired by inventing one: a new `Ty` constructor or `Tm`
+  former changes what a program can SAY, so it decides what every theorem
+  above quantifies over — the same reason the spec is not an agent's to move.
 
 ## Tier 2 — the take bound, and the machine's own fuel
 
