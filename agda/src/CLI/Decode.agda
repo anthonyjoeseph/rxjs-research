@@ -22,7 +22,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (Timed; after_,_; ObservableInput; hot; cold)
 open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; _≟ᵗ_; isData; inputsBelowᵉ; Ctx; Val; Exp; Tm;
-  input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ;
+  input; ofᵉ; emptyᵉ; liftᵉ; takeᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ;
   varᵉ; deferᵉ; varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ;
   strmᵗ; nilᵗ; consᵗ; foldᵗ; listᵗ; add; sub; mul; eqᵖ; ltᵖ; notᵖ)
 open import Rx.Evaluator.Builder using (evaluate↓)
@@ -161,21 +161,20 @@ mutual
     else if tag is "of" then
       (getField "items" j >>=? asArr >>=? λ its →
        decodeTms fuel Γ Δᵍ Δ Θ t its >>=? λ ts → just (ofᵉ ts))
-    else if tag is "map" then
+    -- the carried type is read off the SEED's own annotation rather than
+    -- from a field of its own: every node here already carries its `ty`,
+    -- so the former needs no second copy of it
+    else if tag is "lift" then
       (childTy fuel "src" j >>=? λ s →
+       childTy fuel "init" j >>=? λ u →
+       getField "fn" j >>=? decodeTm fuel Γ Δᵍ Δ ((u ×ᵗ listᵗ s) ∷ Θ) (u ×ᵗ listᵗ t) >>=? λ fn →
+       getField "init" j >>=? decodeTm fuel Γ Δᵍ Δ Θ u >>=? λ ini →
        getField "src" j >>=? decodeExp fuel Γ Δᵍ Δ Θ s >>=? λ src →
-       getField "fn" j >>=? decodeTm fuel Γ Δᵍ Δ (s ∷ Θ) t >>=? λ fn →
-       just (mapᵉ fn src))
+       just (liftᵉ fn ini src))
     else if tag is "take" then
       (getField "count" j >>=? decodeTm fuel Γ Δᵍ Δ Θ natᵗ >>=? λ c →
        getField "src" j >>=? decodeExp fuel Γ Δᵍ Δ Θ t >>=? λ src →
        just (takeᵉ c src))
-    else if tag is "scan" then
-      (childTy fuel "src" j >>=? λ s →
-       getField "fn" j >>=? decodeTm fuel Γ Δᵍ Δ ((t ×ᵗ s) ∷ Θ) t >>=? λ fn →
-       getField "init" j >>=? decodeTm fuel Γ Δᵍ Δ Θ t >>=? λ ini →
-       getField "src" j >>=? decodeExp fuel Γ Δᵍ Δ Θ s >>=? λ src →
-       just (scanᵉ fn ini src))
     else if tag is "mergeAll" then
       -- an ABSENT "limit" is rxjs's Infinity, so the Maybe the accessor
       -- already returns IS the concurrency argument and the JSON grammar

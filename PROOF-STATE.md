@@ -232,20 +232,22 @@ failing to typecheck over the collapsed tree. A cone cannot aim at either.
 
 ### Big picture tier roadmap
 
-- **THE BRIDGE AND THE GENERATOR, SO THE ORACLE EXERCISES THE NEW FORMER.**
-  The collapse is only checked where a program carrying a `liftᵉ` can cross
-  between the two trees and be generated at random; until then the rewrite is
-  held by the two formers that happen to survive it in TypeScript. What the leg
-  decides is whether a `Tm` payload can cross the JSON boundary at all, which is
-  the one part of the mirror the TypeScript pass could not answer.
+- **THE ALL-AGDA SWEEP, WHICH IS THE HALF THE ORACLE CANNOT REACH.** The
+  oracle holds the TypeScript tree against the Agda IMPLEMENTATION, so a
+  program it certifies says nothing about the SPEC — and the collapse moved
+  the pure-function stages of every such program. The leg is QuickCheck's
+  `impl-batchSimultaneous` against `spec-batchSimultaneous` over programs whose
+  steps are `liftᵉ`, with every disagreement landing as a bug-cache row before
+  it is fixed: the cache is the only place a counterexample survives being
+  fixed, and a sweep nobody recorded certifies nothing.
 
-- **THEN RUN THE SWEEP THE MIRROR WAS BUILT FOR, AND BANK WHAT IT FINDS.** A
-  bridge and a generator make the new shapes REACHABLE; nothing yet says the
-  two trees agree on them. The leg is the oracle and the all-Agda QuickCheck
-  over programs whose pure-function stages are `liftᵉ`, with every disagreement
-  landing as a bug-cache row before it is fixed — the cache is the only place a
-  counterexample survives being fixed, and a mirror certified by a sweep nobody
-  recorded is certified by nothing.
+- **THEN MAKE THE TWO TREES' FORMER SETS A CHECKED CORRESPONDENCE, NOT A
+  CONVENTION.** What ties them today is a tag string the decoder matches and
+  the generator happens to emit, so a former only one tree has does not fail —
+  it is simply never generated, and the sweep above reports green over the
+  shapes it was never handed. The leg is whatever makes that divergence a
+  build failure rather than a silence, which is what lets a later collapse be
+  believed from a green oracle instead of a census run by hand.
 
 - **THEN AUDIT WHAT IS LEFT OF THE PALETTE AGAINST THE DIVIDING TEST, AND
   RECORD WHY EACH SURVIVOR SURVIVES.** The collapse absorbed the two formers

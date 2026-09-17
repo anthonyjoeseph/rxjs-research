@@ -1,4 +1,4 @@
-import { Closed, Exp, Fn, PrimOp, Tm, Ty, Val } from "./exp.js";
+import { Closed, Exp, Fn, PrimOp, Tm, Ty, Val, mapE, scanE } from "./exp.js";
 import type { ObservableInput, Slot, TestCase, Timed } from "./prop-test.js";
 
 // The differential-testing generator: deterministic, seeded canonical
@@ -48,11 +48,13 @@ const tyEq = (a: Ty, b: Ty): boolean => {
   if (a.type === "sum" && b.type === "sum")
     return tyEq(a.left, b.left) && tyEq(a.right, b.right);
   if (a.type === "obs" && b.type === "obs") return tyEq(a.elem, b.elem);
+  if (a.type === "list" && b.type === "list") return tyEq(a.elem, b.elem);
   return (
     a.type === b.type &&
     a.type !== "prod" &&
     a.type !== "sum" &&
-    a.type !== "obs"
+    a.type !== "obs" &&
+    a.type !== "list"
   );
 };
 
@@ -113,6 +115,11 @@ const litTm = (rng: Rng, ty: Ty, ctx: GenCtx, depth: number): Tm => {
         ty,
         exp: genExp(rng, ty.elem, ctx, Math.max(0, depth - 1)),
       };
+    // no generated type is a list — the lists in a tree are the ones the
+    // pure-function former's own encoding builds — but the empty one is
+    // the literal at that type, so the clause is real rather than a stub
+    case "list":
+      return { type: "nilT", ty };
   }
 };
 
@@ -129,6 +136,17 @@ const genTm = (rng: Rng, ty: Ty, ctx: GenCtx, depth: number): Tm => {
 
   const opts: (() => Tm)[] = [() => litTm(rng, ty, ctx, depth)];
   if (vars.length > 0) opts.push(varTm);
+  // PROJECTING A PAIR VARIABLE IS THE ONLY WAY INTO A BOUND PAIR, and
+  // it is what puts a list in scope at all: the pure-function former
+  // hands its step ONE argument, the pair of carried state and the
+  // emit's values, so without this the list half is unreachable and
+  // every generated step ignores its input.
+  for (const { vt, i } of ctx.theta.map((vt, i) => ({ vt, i })))
+    if (vt.type === "prod") {
+      const pair: Tm = { type: "varT", ty: vt, index: i };
+      if (tyEq(vt.fst, ty)) opts.push(() => ({ type: "fstT", ty, pair }));
+      if (tyEq(vt.snd, ty)) opts.push(() => ({ type: "sndT", ty, pair }));
+    }
   opts.push(() => ({
     type: "ifT",
     ty,
@@ -182,6 +200,51 @@ const genTm = (rng: Rng, ty: Ty, ctx: GenCtx, depth: number): Tm => {
       ty,
       exp: genExp(rng, ty.elem, ctx, depth - 1),
     }));
+  // A LIST-TYPED TERM IS WHERE A LIFT STOPS BEING A MAP OR A SCAN.
+  // Consing onto the argument's own list LENGTHENS an emit and folding
+  // with a conditional SHORTENS it, and neither is a shape map or scan
+  // can produce — so this is the clause that makes the raw `lift` lane
+  // below worth generating at all.
+  if (ty.type === "list") {
+    const elem = ty.elem;
+    opts.push(() => ({
+      type: "consT",
+      ty,
+      head: genTm(rng, elem, ctx, depth - 1),
+      tail: genTm(rng, ty, ctx, depth - 1),
+    }));
+    // the list folded over is drawn from the types REACHABLE in scope
+    // rather than from the variables themselves: a list is never bound
+    // directly here — it arrives as the second half of the former's
+    // argument pair — so a fold restricted to list-typed variables could
+    // never fire at all, its only source being another fold's own
+    // accumulator.
+    const reachable: Ty[] = [];
+    for (const vt of ctx.theta) {
+      if (vt.type === "list") reachable.push(vt);
+      if (vt.type === "prod") {
+        if (vt.fst.type === "list") reachable.push(vt.fst);
+        if (vt.snd.type === "list") reachable.push(vt.snd);
+      }
+    }
+    if (reachable.length > 0)
+      opts.push(() => {
+        const srcTy = pick(rng, reachable) as { type: "list"; elem: Ty };
+        return {
+          type: "foldT",
+          ty,
+          list: genTm(rng, srcTy, ctx, depth - 1),
+          init: genTm(rng, ty, ctx, depth - 1),
+          // the step binds the element then the accumulator
+          step: genTm(
+            rng,
+            ty,
+            { ...ctx, theta: [srcTy.elem, ty, ...ctx.theta] },
+            depth - 1,
+          ),
+        };
+      });
+  }
   return pick(rng, opts)();
 };
 
@@ -223,12 +286,42 @@ const genExp = (
 
   const obsOf: Ty = { type: "obs", elem: ty };
   const operators: Record<string, () => Exp> = {
+    // map and scan are not nodes any more: both are written over the one
+    // pure-function former, so what these lanes generate is a `lift`
+    // whose step is a fold in the term language
     map: () => {
       const s = genValTy(rng, 2);
-      return {
-        type: "map",
+      return mapE(
         ty,
-        fn: genFn(rng, s, ty, ctx, depth - 1),
+        s,
+        genFn(rng, s, ty, ctx, depth - 1),
+        genExp(rng, s, ctx, depth - 1),
+      );
+    },
+    // and the former ITSELF, with a step nothing constrains to a map or
+    // a scan shape: it may drop values, duplicate them, or emit a
+    // different count than it was handed. That range is the whole
+    // reason the palette collapsed onto one former, and a generator
+    // that only ever emitted the two encodings above would exercise
+    // the two absorbed operators in new clothes rather than this one.
+    lift: () => {
+      const s = genValTy(rng, 2);
+      const u = genValTy(rng, 1); // the carried state
+      const argTy: Ty = {
+        type: "prod",
+        fst: u,
+        snd: { type: "list", elem: s },
+      };
+      const resTy: Ty = {
+        type: "prod",
+        fst: u,
+        snd: { type: "list", elem: ty },
+      };
+      return {
+        type: "lift",
+        ty,
+        fn: genFn(rng, argTy, resTy, ctx, depth - 1),
+        init: genTm(rng, u, ctx, Math.min(depth, 2)),
         src: genExp(rng, s, ctx, depth - 1),
       };
     },
@@ -240,13 +333,13 @@ const genExp = (
     }),
     scan: () => {
       const s = genValTy(rng, 2);
-      return {
-        type: "scan",
+      return scanE(
         ty,
-        fn: genFn(rng, { type: "prod", fst: ty, snd: s }, ty, ctx, depth - 1),
-        init: genTm(rng, ty, ctx, Math.min(depth, 2)),
-        src: genExp(rng, s, ctx, depth - 1),
-      };
+        s,
+        genFn(rng, { type: "prod", fst: ty, snd: s }, ty, ctx, depth - 1),
+        genTm(rng, ty, ctx, Math.min(depth, 2)),
+        genExp(rng, s, ctx, depth - 1),
+      );
     },
     // the limit axis is where bounded concurrency gets exercised:
     // absent is the old mergeAll, 1 is the old concatAll, 2/3 are the
@@ -324,6 +417,8 @@ const genVal = (rng: Rng, ty: Ty, depth: number): Val => {
         : { type: "inr", val: genVal(rng, ty.right, depth) };
     case "obs":
       return { type: "empty", ty: ty.elem }; // unreachable: slots are value-typed
+    case "list":
+      return [];
   }
 };
 

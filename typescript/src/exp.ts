@@ -15,7 +15,12 @@ export type Ty =
   | { type: "nat" }
   | { type: "prod"; fst: Ty; snd: Ty }
   | { type: "sum"; left: Ty; right: Ty }
-  | { type: "obs"; elem: Ty };
+  | { type: "obs"; elem: Ty }
+  // lists are the pure-function former's own currency: a step reads the
+  // emit's values as one and returns the values to emit in their place,
+  // so the value language needs them even though no emit ever carries
+  // one. Nothing constructs a list-typed observable.
+  | { type: "list"; elem: Ty };
 
 // Concrete stand-in for Agda's `PrimOp` postulate — the Agda side must
 // become this exact datatype before the JSON bridge lands. Binary ops
@@ -24,11 +29,15 @@ export type PrimOp = "add" | "sub" | "mul" | "eq" | "lt" | "not";
 
 // Agda: Rx.Exp.Val. unit = null. An obs-typed value is a CLOSED Exp —
 // runtime observables are syntax, never host closures.
+// A pair and a list are both arrays at runtime and are told apart by
+// the TYPE at every site that needs to (reify); nothing else inspects a
+// value's shape, and no emit value is ever list-typed.
 export type Val =
   | null
   | boolean
   | number
   | [Val, Val]
+  | Val[]
   | { type: "inl" | "inr"; val: Val }
   | Exp;
 
@@ -48,7 +57,14 @@ export type Tm =
   | { type: "caseT"; ty: Ty; scrut: Tm; onInl: Tm; onInr: Tm } // branches bind Θ-var 0
   | { type: "ifT"; ty: Ty; cond: Tm; then: Tm; else: Tm }
   | { type: "primT"; ty: Ty; op: PrimOp; arg: Tm }
-  | { type: "strmT"; ty: Ty; exp: Exp }; // streams as values — how higher-order operators work
+  | { type: "strmT"; ty: Ty; exp: Exp } // streams as values — how higher-order operators work
+  | { type: "nilT"; ty: Ty }
+  | { type: "consT"; ty: Ty; head: Tm; tail: Tm }
+  // a LEFT fold: step binds the element as Θ-var 0 and the accumulator
+  // as Θ-var 1. It is the term language's only eliminator that binds
+  // more than one thing, and the only way to hand a step an argument —
+  // there is no application here.
+  | { type: "foldT"; ty: Ty; list: Tm; init: Tm; step: Tm };
 
 // Agda: Fn Γ Δᵍ Δ Θ s t = Tm with the argument bound as Θ-var 0.
 export type Fn = Tm;
@@ -57,9 +73,14 @@ export type Exp =
   | { type: "input"; ty: Ty; index: number } // into Γ
   | { type: "of"; ty: Ty; items: Tm[] }
   | { type: "empty"; ty: Ty }
-  | { type: "map"; ty: Ty; fn: Fn; src: Exp }
+  // THE pure-function former. fn's Θ-var 0 is the pair (carried state,
+  // the emit's values); it returns the pair (next state, the values to
+  // emit in their place). `init` is the seed, and its own `ty` is what
+  // pins the carried type — the decoder reads it from there rather than
+  // from a field of its own. map and scan are BUILT from this (mapE,
+  // scanE below), exactly as in Agda.
+  | { type: "lift"; ty: Ty; fn: Fn; init: Tm; src: Exp }
   | { type: "take"; ty: Ty; count: Tm; src: Exp } // count evaluated once, at subscription time
-  | { type: "scan"; ty: Ty; fn: Fn; init: Tm; src: Exp } // fn's Θ-var 0 = pair(acc, cur)
   // NOTE: share is NOT an Exp node — share identity is a binding, not
   // an expression. Shared observables live in the slot telescope
   // (prop-test's Slot) and are referenced with `input`, exactly like
@@ -174,6 +195,16 @@ const evalWith = (tm: Tm, env: Val[]): Val => {
     case "strmT":
       // an obs-typed value IS a closed Exp: bake the environment in
       return closeExp(tm.exp, env, 0);
+    case "nilT":
+      return [];
+    case "consT":
+      return [evalWith(tm.head, env), ...(evalWith(tm.tail, env) as Val[])];
+    case "foldT":
+      // left fold; the step sees the element at 0 and the accumulator at 1
+      return (evalWith(tm.list, env) as Val[]).reduce(
+        (acc, x) => evalWith(tm.step, [x, acc, ...env]),
+        evalWith(tm.init, env),
+      );
   }
 };
 
@@ -215,6 +246,11 @@ const reify = (v: Val, ty: Ty): Tm => {
     }
     case "obs":
       return { type: "strmT", ty, exp: v as Exp };
+    case "list":
+      return (v as Val[]).reduceRight<Tm>(
+        (tail, x) => ({ type: "consT", ty, head: reify(x, ty.elem), tail }),
+        { type: "nilT", ty },
+      );
   }
 };
 
@@ -226,7 +262,21 @@ const closeTm = (tm: Tm, env: Val[], depth: number): Tm => {
     case "unitT":
     case "boolT":
     case "natT":
+    case "nilT":
       return tm;
+    case "consT":
+      return {
+        ...tm,
+        head: closeTm(tm.head, env, depth),
+        tail: closeTm(tm.tail, env, depth),
+      };
+    case "foldT":
+      return {
+        ...tm,
+        list: closeTm(tm.list, env, depth),
+        init: closeTm(tm.init, env, depth),
+        step: closeTm(tm.step, env, depth + 2), // binds element and accumulator
+      };
     case "pairT":
       return {
         ...tm,
@@ -268,23 +318,17 @@ const closeExp = (exp: Exp, env: Val[], depth: number): Exp => {
       return exp; // no Θ subterms
     case "of":
       return { ...exp, items: exp.items.map((t) => closeTm(t, env, depth)) };
-    case "map":
+    case "lift":
       return {
         ...exp,
-        fn: closeTm(exp.fn, env, depth + 1), // fn binds its argument
+        fn: closeTm(exp.fn, env, depth + 1), // fn binds the (state, values) pair
+        init: closeTm(exp.init, env, depth),
         src: closeExp(exp.src, env, depth),
       };
     case "take":
       return {
         ...exp,
         count: closeTm(exp.count, env, depth),
-        src: closeExp(exp.src, env, depth),
-      };
-    case "scan":
-      return {
-        ...exp,
-        fn: closeTm(exp.fn, env, depth + 1), // fn binds the (acc, cur) pair
-        init: closeTm(exp.init, env, depth),
         src: closeExp(exp.src, env, depth),
       };
     case "mergeAll":
@@ -333,7 +377,21 @@ const substMuTm = (tm: Tm, st: MuSt, knot: Exp): Tm => {
     case "unitT":
     case "boolT":
     case "natT":
+    case "nilT":
       return tm;
+    case "consT":
+      return {
+        ...tm,
+        head: substMuTm(tm.head, st, knot),
+        tail: substMuTm(tm.tail, st, knot),
+      };
+    case "foldT":
+      return {
+        ...tm,
+        list: substMuTm(tm.list, st, knot),
+        init: substMuTm(tm.init, st, knot),
+        step: substMuTm(tm.step, st, knot),
+      };
     case "pairT":
       return {
         ...tm,
@@ -378,23 +436,17 @@ const substMuExp = (exp: Exp, st: MuSt, knot: Exp): Exp => {
       return st.loc.where === "usable" && exp.index === st.loc.idx ? knot : exp;
     case "of":
       return { ...exp, items: exp.items.map((t) => substMuTm(t, st, knot)) };
-    case "map":
+    case "lift":
       return {
         ...exp,
         fn: substMuTm(exp.fn, st, knot),
+        init: substMuTm(exp.init, st, knot),
         src: substMuExp(exp.src, st, knot),
       };
     case "take":
       return {
         ...exp,
         count: substMuTm(exp.count, st, knot),
-        src: substMuExp(exp.src, st, knot),
-      };
-    case "scan":
-      return {
-        ...exp,
-        fn: substMuTm(exp.fn, st, knot),
-        init: substMuTm(exp.init, st, knot),
         src: substMuExp(exp.src, st, knot),
       };
     case "mergeAll":
@@ -416,3 +468,223 @@ export const unfoldMu = (body: Exp): Closed =>
     { loc: { where: "guarded", idx: 0 }, gLen: 1 },
     { type: "mu", ty: body.ty, body },
   );
+
+// ---- Θ-index shifting: the renaming the smart constructors need ----
+// Agda's `renTm` with a Θ-renaming. Indices at or above `cutoff` move
+// up by `by`; below it they are bound locally and stay. A Tm reaches Θ
+// through its Exp subterms too (strmT, and the Tms inside an Exp), so
+// both walks are needed.
+
+const shiftTm = (tm: Tm, cutoff: number, by: number): Tm => {
+  const go = (x: Tm) => shiftTm(x, cutoff, by);
+  switch (tm.type) {
+    case "varT":
+      return tm.index >= cutoff ? { ...tm, index: tm.index + by } : tm;
+    case "unitT":
+    case "boolT":
+    case "natT":
+    case "nilT":
+      return tm;
+    case "consT":
+      return { ...tm, head: go(tm.head), tail: go(tm.tail) };
+    case "foldT":
+      return {
+        ...tm,
+        list: go(tm.list),
+        init: go(tm.init),
+        step: shiftTm(tm.step, cutoff + 2, by), // element and accumulator
+      };
+    case "pairT":
+      return { ...tm, fst: go(tm.fst), snd: go(tm.snd) };
+    case "fstT":
+    case "sndT":
+      return { ...tm, pair: go(tm.pair) };
+    case "inlT":
+    case "inrT":
+      return { ...tm, val: go(tm.val) };
+    case "caseT":
+      return {
+        ...tm,
+        scrut: go(tm.scrut),
+        onInl: shiftTm(tm.onInl, cutoff + 1, by),
+        onInr: shiftTm(tm.onInr, cutoff + 1, by),
+      };
+    case "ifT":
+      return { ...tm, cond: go(tm.cond), then: go(tm.then), else: go(tm.else) };
+    case "primT":
+      return { ...tm, arg: go(tm.arg) };
+    case "strmT":
+      return { ...tm, exp: shiftExp(tm.exp, cutoff, by) };
+  }
+};
+
+const shiftExp = (exp: Exp, cutoff: number, by: number): Exp => {
+  switch (exp.type) {
+    case "input":
+    case "empty":
+    case "varE":
+      return exp;
+    case "of":
+      return { ...exp, items: exp.items.map((t) => shiftTm(t, cutoff, by)) };
+    case "lift":
+      return {
+        ...exp,
+        fn: shiftTm(exp.fn, cutoff + 1, by),
+        init: shiftTm(exp.init, cutoff, by),
+        src: shiftExp(exp.src, cutoff, by),
+      };
+    case "take":
+      return {
+        ...exp,
+        count: shiftTm(exp.count, cutoff, by),
+        src: shiftExp(exp.src, cutoff, by),
+      };
+    case "mergeAll":
+    case "switchAll":
+    case "exhaustAll":
+      return { ...exp, src: shiftExp(exp.src, cutoff, by) };
+    case "mu":
+    case "defer":
+      return { ...exp, body: shiftExp(exp.body, cutoff, by) }; // bind no Θ
+  }
+};
+
+// ---- map and scan, written OVER the one pure-function former ----
+// THE TERM LANGUAGE HAS NO APPLICATION, and that is what shapes both
+// encodings. A Fn is a Tm under one extra binder, so a step cannot be
+// applied to a term: the argument has to be handed over by a former
+// that BINDS, and a fold over a one-element list is that former. Agda's
+// Rx.Exp carries the same two definitions over the same nodes; these
+// are their mirror, so a generated tree decodes to what Agda would have
+// built.
+
+const unitTy: Ty = { type: "unit" };
+const unitT: Tm = { type: "unitT", ty: unitTy };
+const listOf = (elem: Ty): Ty => ({ type: "list", elem });
+const prod = (fst: Ty, snd: Ty): Ty => ({ type: "prod", fst, snd });
+const vT = (ty: Ty, index: number): Tm => ({ type: "varT", ty, index });
+
+// let m in b, with an explicit seed: a fold over the singleton [m].
+// The body binds m as Θ-var 0, so everything it already named moves up.
+const letT = (sTy: Ty, uTy: Ty, m: Tm, seed: Tm, body: Tm): Tm => ({
+  type: "foldT",
+  ty: uTy,
+  list: {
+    type: "consT",
+    ty: listOf(sTy),
+    head: m,
+    tail: { type: "nilT", ty: listOf(sTy) },
+  },
+  init: seed,
+  step: shiftTm(body, 1, 1),
+});
+
+// a fold is a LEFT fold, so a list built by consing comes out reversed
+// and every encoding below pays one reversing pass
+const revT = (elem: Ty, list: Tm): Tm => ({
+  type: "foldT",
+  ty: listOf(elem),
+  list,
+  init: { type: "nilT", ty: listOf(elem) },
+  step: {
+    type: "consT",
+    ty: listOf(elem),
+    head: vT(elem, 0),
+    tail: vT(listOf(elem), 1),
+  },
+});
+
+// THE SEEDLESS ONE IS A PLAIN FOLD AND THE SEEDED ONE IS NOT. map's
+// step is applied to the element, and the element IS the fold's own
+// head binder, so the step drops in with a renaming and nothing else.
+// scan's step is applied to a PAIR of the carried state and the
+// element, which no binder here offers, so it needs letT to make one.
+export const mapE = (t: Ty, s: Ty, fn: Fn, src: Exp): Exp => {
+  const argTy = prod(unitTy, listOf(s));
+  const arg = vT(argTy, 0);
+  // fn lives under the fold's element and accumulator binders plus the
+  // former's own argument, so its free Θ moves up by two
+  const fnUp = shiftTm(fn, 1, 2);
+  const built: Tm = {
+    type: "foldT",
+    ty: listOf(t),
+    list: { type: "sndT", ty: listOf(s), pair: arg },
+    init: { type: "nilT", ty: listOf(t) },
+    step: {
+      type: "consT",
+      ty: listOf(t),
+      head: fnUp,
+      tail: vT(listOf(t), 1),
+    },
+  };
+  return {
+    type: "lift",
+    ty: t,
+    fn: {
+      type: "pairT",
+      ty: prod(unitTy, listOf(t)),
+      fst: unitT,
+      snd: revT(t, built),
+    },
+    init: unitT,
+    src,
+  };
+};
+
+export const scanE = (t: Ty, s: Ty, fn: Fn, init: Tm, src: Exp): Exp => {
+  const argTy = prod(t, listOf(s));
+  const arg = vT(argTy, 0);
+  // the fold's accumulator: the scan state, and the values emitted so
+  // far in reverse. The former carries only the state; the list is the
+  // former's own output and is rebuilt on every step.
+  const accTy = prod(t, listOf(t));
+  const seed: Tm = {
+    type: "pairT",
+    ty: accTy,
+    fst: { type: "fstT", ty: t, pair: arg },
+    snd: { type: "nilT", ty: listOf(t) },
+  };
+  // inside letT's body: the pair handed to the step, then the fold's
+  // element and accumulator, then the former's argument, then Θ
+  const fnUp = shiftTm(fn, 1, 3);
+  const run: Tm = {
+    type: "foldT",
+    ty: accTy,
+    list: { type: "sndT", ty: listOf(s), pair: arg },
+    init: seed,
+    step: letT(
+      prod(t, s),
+      accTy,
+      {
+        type: "pairT",
+        ty: prod(t, s),
+        fst: { type: "fstT", ty: t, pair: vT(accTy, 1) },
+        snd: vT(s, 0),
+      },
+      vT(accTy, 1),
+      {
+        type: "pairT",
+        ty: accTy,
+        fst: fnUp,
+        snd: {
+          type: "consT",
+          ty: listOf(t),
+          head: fnUp,
+          tail: { type: "sndT", ty: listOf(t), pair: vT(accTy, 2) },
+        },
+      },
+    ),
+  };
+  return {
+    type: "lift",
+    ty: t,
+    fn: letT(accTy, prod(t, listOf(t)), run, seed, {
+      type: "pairT",
+      ty: prod(t, listOf(t)),
+      fst: { type: "fstT", ty: t, pair: vT(accTy, 0) },
+      snd: revT(t, { type: "sndT", ty: listOf(t), pair: vT(accTy, 0) }),
+    }),
+    init,
+    src,
+  };
+};
