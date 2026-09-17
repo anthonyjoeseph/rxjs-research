@@ -230,22 +230,38 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 
 ### Big picture tier roadmap
 
-- **THE DEMOTION, NOW THAT A SIMUL PROGRAM SUPPLIES THE ENVELOPE.** Target:
-  `evaluate : … → List (Val Γ t)`. The census called this and the tree one
-  landing; half of that held. The demotion does need the tree — it makes the
-  harness's case loop, every readme instance, the CLI's encode path and the
+- **THE TWO FORMERS THE DEMOTION NEEDS, AND THEY ARE ANTHONY'S TO RULE ON.**
+  An elaborated program must read the running cascade's token and mint a
+  source token; neither is derivable inside a program, both being properties
+  of the run, and the TypeScript operators read exactly these two off the
+  driver. So the plain tree wants a former for each — and a former decides
+  what every theorem quantifies over, which is the one thing an agent does not
+  invent. The finding sits in `toPlain`'s header. Until it is ruled on, the
+  demotion and the elaboration's body are both parked, and the legs below run
+  first.
+
+- **MEANWHILE, ONE KEYED LEDGER FOR EVERY MINT.** The evaluator carries its
+  instant, source, node and registration counters separately, threaded through
+  the schedule and the state, so the distinctness each envelope field rests on
+  is a separate fact about each. One record with siloed counters and a keyed
+  table makes it one theorem — and it is what the two formers above would read
+  from, so it is the right leg to take while they are open rather than merely
+  the available one.
+
+- **THEN THE DEMOTION, ONCE A PROGRAM CAN BUILD AN ENVELOPE.** Target:
+  `evaluate : … → List (Val Γ t)`. The census called this and the simul tree
+  one landing; half of that held. The demotion does need the tree — it makes
+  the harness's case loop, every readme instance, the CLI's encode path and the
   provenance leaf untypeable at once, and only a simul program repairs them —
-  but the tree needed none of the demotion: it reaches Main through the
-  restated top line and has landed ahead. Eleven sites read a field of the
-  machine's own envelope and are the work; the rest goes with the return type.
+  but the tree needed none of the demotion, reaching Main through the restated
+  top line. Eleven sites read a field of the machine's own envelope and are the
+  work; the rest goes with the return type.
 
 - **THEN `toPlain` GETS A BODY.** It is a leaf today, so the restated top line
   claims correctness of an elaboration nothing has written; every former's
   protocol traffic is decided there. The body is per-former plumbing over the
   type translation, plus the one lemma a pointwise-translated context owes —
-  that looking an input up commutes with the walk. It comes after the demotion
-  because what the plumbing must produce is exactly what the demoted evaluator
-  no longer mints for itself.
+  that looking an input up commutes with the walk.
 
 - **THEN ONE KEYED LEDGER FOR EVERY MINT.** The evaluator carries its instant,
   source, node and registration counters separately, threaded through the

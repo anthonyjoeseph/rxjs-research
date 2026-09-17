@@ -25,6 +25,25 @@ open import Rx.SExp     using (SExp; plainᵗ; plainᶜ; plainᵛ)
 -- payload, in the pointwise-translated contexts — so a nested
 -- observable's own emits are envelopes too, which is the property the
 -- flatteners' protocol traffic is stated in.
+--
+-- AND THE BODY CANNOT BE WRITTEN IN TODAY'S PLAIN TREE, WHICH IS A
+-- QUESTION FOR ANTHONY AND NOT A GRIND.  Every envelope this
+-- elaboration builds needs two things the object language has no way to
+-- say: the token of the cascade the emit belongs to, and a fresh source
+-- token for a registration coming alive.  Neither is derivable inside a
+-- program.  A `liftᵉ` state advances per emit and so cannot tell two
+-- emits of one cascade from two cascades, and `uniq̂` is a literal,
+-- which is exactly the forgery the palette layer rules out; both are
+-- properties of the RUN, held by the scheduler.  The TypeScript mirror
+-- says the same thing outright — its operators read `currentInstant`
+-- and `mintSourceId` off the driver, which is its scheduler — so an
+-- Agda elaboration that produced them from nothing would be the one
+-- divergence the mirroring law forbids.  What the body needs is
+-- therefore a plain-tree FORMER for each read, and a new former decides
+-- what every theorem above quantifies over, so it is not an agent's to
+-- invent.  Until it is ruled on, the demotion this elaboration exists
+-- to permit cannot land either: the evaluator can stop RETURNING
+-- envelopes only once a program can build one.
 
 postulate
   toPlain : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
