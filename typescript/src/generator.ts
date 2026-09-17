@@ -88,6 +88,7 @@ const genValTy = (rng: Rng, depth: number): Ty => {
 // ---- generation context: Γ inputs, Δᵍ guarded / Δ usable μ-vars, Θ ----
 type GenCtx = {
   gamma: Ty[]; // slot types (input i : gamma[i])
+  sharedSlots: boolean[]; // slot i is an all-resets-false share
   guarded: Ty[]; // μ-vars bound but not yet past a defer (unreferenceable)
   usable: Ty[]; // μ-vars in scope (varE may name these)
   theta: Ty[]; // value-var types (varT index 0 = innermost)
@@ -324,7 +325,15 @@ const genExp = (
   for (const { i } of ctx.gamma
     .map((gt, i) => ({ gt, i }))
     .filter((x) => tyEq(x.gt, ty)))
-    leaves.push(() => ({ type: "input", ty, index: i }));
+    // A SHARED SLOT'S LEAF IS WEIGHTED, because a share with ONE
+    // subscriber is a degenerate share: the fan-out, the mid-flight
+    // join and the latched one-shot are all reachable only when the
+    // same slot is named twice, and an unweighted draw reached that
+    // in two cases out of five hundred. The weight is on the SLOT and
+    // not on the tree, so what it buys is second references to the
+    // one index rather than more inputs generally.
+    for (let w = 0; w < (ctx.sharedSlots[i] ? 5 : 3); w++)
+      leaves.push(() => ({ type: "input", ty, index: i }));
   for (const { i } of ctx.usable
     .map((ut, i) => ({ ut, i }))
     .filter((x) => tyEq(x.ut, ty)))
@@ -551,7 +560,15 @@ const genSlots = (rng: Rng, depth: number): { types: Ty[]; slots: Slot[] } => {
   const types: Ty[] = [];
   const slots: Slot[] = [];
   for (let i = 0; i < n; i++) {
-    const ty = genValTy(rng, 2);
+    // REUSING AN EARLIER SLOT'S TYPE ON PURPOSE. A slot is reachable
+    // only through an `input` leaf at its own type, so types drawn
+    // independently make every reference coincidental -- and a slot
+    // nothing references is constructed and never subscribed, which is
+    // the share telescope being built and not run.
+    const ty =
+      types.length > 0 && chance(rng, 0.4)
+        ? pick(rng, types)
+        : genValTy(rng, 2);
     const prefix = [...types]; // slots strictly before i
     types.push(ty);
     slots.push(
@@ -562,7 +579,13 @@ const genSlots = (rng: Rng, depth: number): { types: Ty[]; slots: Slot[] } => {
             def: genExp(
               rng,
               ty,
-              { gamma: prefix, guarded: [], usable: [], theta: [] },
+              {
+                gamma: prefix,
+                sharedSlots: slots.map((sl) => sl.type === "shared"),
+                guarded: [],
+                usable: [],
+                theta: [],
+              },
               Math.min(depth, 3),
             ) as Closed,
           },
@@ -572,12 +595,23 @@ const genSlots = (rng: Rng, depth: number): { types: Ty[]; slots: Slot[] } => {
 };
 
 const genTestCase = (rng: Rng, operator?: string): TestCase => {
-  const rootTy = genValTy(rng, 2);
+  // the slots come FIRST so the root type can be drawn from them: a
+  // root type unrelated to every slot leaves the tree no typed leaf to
+  // reach one through, which is how most of the corpus came to name no
+  // input at all
   const { types, slots } = genSlots(rng, 3);
+  const rootTy =
+    types.length > 0 && chance(rng, 0.5) ? pick(rng, types) : genValTy(rng, 2);
   const exp = genExp(
     rng,
     rootTy,
-    { gamma: types, guarded: [], usable: [], theta: [] },
+    {
+      gamma: types,
+      sharedSlots: slots.map((sl) => sl.type === "shared"),
+      guarded: [],
+      usable: [],
+      theta: [],
+    },
     4,
     operator,
   );

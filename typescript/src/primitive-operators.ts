@@ -84,7 +84,6 @@ export const share = <A>(
 ): Observable<InstEmit<A>> => {
   let connected = false;
   let completed = false;
-  let upstreamOpen: SourceId[] = [];
 
   const latchedOneShot = (): InstEmit<A> => ({
     events: [
@@ -111,36 +110,59 @@ export const share = <A>(
   // and fans out. `bracketSync` draws that line as a VALUE, so the
   // upstream can be an ordinary pipeline — and because it sits BELOW
   // the share, the fold runs once, which is what makes its writes to
-  // `upstreamOpen` and `completed` the share's own bookkeeping rather
-  // than a per-subscriber copy. `endWith` is what recovers an upstream
-  // that rx-completed inside the burst without closing its
-  // registrations: the marker arrives before SYNC_END exactly when the
-  // completion was synchronous.
+  // its registration tracking and its completion latch the share's own
+  // bookkeeping rather than a per-subscriber copy. `endWith` is what
+  // recovers an upstream that rx-completed inside the burst without
+  // closing its registrations: the marker arrives before SYNC_END
+  // exactly when the completion was synchronous.
+
+  // THE OPEN REGISTRATIONS RIDE THE `connected` SIGNAL rather than a
+  // cell, because the two scans that need them are different folds: the
+  // count is WRITTEN by this one and READ by the first subscriber's,
+  // and a cell between them is correct only while this fold happens to
+  // run first. It does — it is upstream — but that is subscription
+  // order standing in for a data dependency, so the count goes in the
+  // signal that marks the boundary and the dependency is the type's.
   type Signal =
     | { tag: "burst"; emit: InstEmit<A> }
-    | { tag: "connected"; spent: boolean }
+    | { tag: "connected"; spent: boolean; openCount: number }
     | { tag: "fanout"; emit: InstEmit<A> };
 
   const signals: Observable<Signal> = markSync(obs).pipe(
     rxScan<
       Marked<InstEmit<A>>,
-      { live: boolean; spent: boolean; fin: boolean; out?: Signal }
+      {
+        live: boolean;
+        spent: boolean;
+        fin: boolean;
+        open: SourceId[];
+        out?: Signal;
+      }
     >(
       (state, item) => {
         if (item === UPSTREAM_DONE)
           return { ...state, spent: true, fin: false, out: undefined };
         if (item === SYNC_END)
           return {
+            ...state,
             live: true,
-            spent: state.spent,
             fin: false,
-            out: { tag: "connected", spent: state.spent },
+            out: {
+              tag: "connected",
+              spent: state.spent,
+              openCount: state.open.length,
+            },
           };
-        upstreamOpen = openAfter(item, upstreamOpen, true);
+        const open = openAfter(item, state.open, true);
         if (!state.live)
-          return { ...state, fin: false, out: { tag: "burst", emit: item } };
+          return {
+            ...state,
+            open,
+            fin: false,
+            out: { tag: "burst", emit: item },
+          };
         const parts = splitEmit(item);
-        const fin = parts.fin || upstreamOpen.length === 0;
+        const fin = parts.fin || open.length === 0;
         // the chain's own emit, emptied of values, announcing the
         // handoff — it reaches the root directly (Agda foldPath's
         // share-sink clause)
@@ -154,6 +176,7 @@ export const share = <A>(
         return {
           live: true,
           spent: state.spent,
+          open,
           fin,
           out: {
             tag: "fanout",
@@ -173,7 +196,7 @@ export const share = <A>(
           },
         };
       },
-      { live: false, spent: false, fin: false },
+      { live: false, spent: false, fin: false, open: [] },
     ),
     takeWhile((state) => !state.fin, true), // the final fan-out, then done
     filter((state) => state.out !== undefined),
@@ -213,7 +236,7 @@ export const share = <A>(
           const burstFin =
             s.spent ||
             flat.done ||
-            (state.burst.length > 0 && upstreamOpen.length === 0);
+            (state.burst.length > 0 && s.openCount === 0);
           // the def died inside its own connect burst: latch; this
           // registration closes in the same instant
           if (burstFin) completed = true;
