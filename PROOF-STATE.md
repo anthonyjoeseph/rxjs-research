@@ -230,18 +230,18 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 
 ### Big picture tier roadmap
 
-- **THE UNIQUE PRIMITIVE, WHOSE IDENTITY LIVES ONLY IN THE EVALUATOR
+- **THE UNIQUE PRIMITIVE, AND THE WELL-FORMEDNESS RESHAPE IT BUYS
   (Anthony).** `Ty` gains `uniqᵗ`, `Val` sending it to `ℕ`, introduced by a
-  PLAIN-tree former no simul former elaborates to — so `reify` stays total and
-  an author still has no way to write one. Its one eliminator is a primitive
-  EQUALITY: comparing two is what lets the envelope operators be written in the
-  `Ty`/`Tm` language, and nothing projects the nat back out. Minting is the
-  evaluator's, against ONE ledger serving instant and source alike, so
-  uniqueness is a theorem about it. The envelope rides on this — `instEmitᵗ`,
-  `instEventᵗ`, `emitKindᵗ`, `closeReasonᵗ` DEFINED over `unitᵗ`, `_+ᵗ_`,
-  `_×ᵗ_`, `listᵗ`, parameterised over their uniq type — and is claimed through
-  the existing `InstEmit` heritage, so it lands with the simul tree and adds no
-  `Main` line.
+  PLAIN-tree former no simul former elaborates to and eliminated only by a
+  primitive EQUALITY — which is what lets `spec-batchSimultaneous` and its
+  mirror be stated at `instEmitᵗ uniqᵗ a` outright, no bridge, the envelope
+  DEFINED over `unitᵗ`, `_+ᵗ_`, `_×ᵗ_`, `listᵗ`. Minting is the evaluator's,
+  against ONE ledger serving instant and source alike. It is claimed by the
+  existing `InstEmit` heritage, so it lands with the simul tree; and it is what
+  lets `sound-cascade` and `sound-subscribe` be restated ONE CLAUSE PER
+  OPERATOR over well-formed simul trees, a second relation leaving the
+  reducibility candidate's measure untouched. Its header carries what it
+  owes.
 
 - **THEN DEMOTE THE ENVELOPE OUT OF THE EVALUATOR.** Target:
   `evaluate : … → List (Val Γ t)`. The mentions split three ways and only one

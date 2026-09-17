@@ -81,6 +81,46 @@ open import Rx.Protocol.Sound using (Sound; Sound-[]; Sound-++; sound-accepted)
 --   `BurstInv` relation they were denominated in, and `Glue`'s fold law
 --   composing their conclusions.
 
+-- THE SHAPE THESE TWO ARE TO BE RESTATED IN, ONCE THE SIMUL TREE
+-- EXISTS (Anthony): ONE CLAUSE PER OPERATOR, AND THE INDUCTION IS THE
+-- SYNTAX'S.  Both statements below quantify over a derivation and over
+-- nothing syntactic, which is why neither decomposes -- a cascade from
+-- an arbitrary closed program is every former at once, so there is no
+-- case to split on and no hypothesis to descend into.  The replacement
+-- reads: for each operator, given a WELL-FORMED simul tree ending in
+-- that operator, the plain-world evaluation of its elaboration is
+-- sound.  Every subtree's own well-formedness is then the hypothesis
+-- the statements below lack, and the operators are a finite shipped
+-- set, so the induction covers every syntax an author can write.
+
+-- AND THE PREMISE IS NOT BOILERPLATE -- IT IS WHERE THE FORGERY IS
+-- QUARANTINED.  Once the envelope is a VALUE rather than the machine's
+-- own output, any term that can write a unique can write an envelope
+-- carrying whatever instant it likes, so soundness is outright FALSE
+-- over the plain tree.  A simul tree is not automatically safe either,
+-- because its non-observable positions take arbitrary plain terms -- a
+-- mapping function is an author's own term.  Well-formedness is the
+-- structural predicate saying those embedded terms mint nothing, and
+-- it is closed under every former, which is what makes it an
+-- induction rather than a side condition rechecked at each node.
+
+-- SO THE SOUNDNESS HALF IS A SECOND RELATION, NOT A STRENGTHENING OF
+-- THE EXISTING CANDIDATE.  That candidate is quantified over the plain
+-- tree, where the conjunct is false, so it cannot carry this and stays
+-- exactly as it is -- guard measure and accessibility argument
+-- untouched, spent as a black box for the plain subtrees an
+-- elaboration emits.
+
+-- TWO THINGS THE RESTATEMENT OWES, AND NEITHER IS MECHANICAL.  The
+-- exit watermark has to be READ OFF THE RUN rather than chosen, which
+-- is what the ledger supplies: a segment exits at the counter its own
+-- end state carries, so the indices compose without the existential
+-- this file records as dead.  And a cascade RESUMES stored machinery
+-- rather than subscribing, so the soundness half wants an invariant on
+-- the evaluator's state where the payload half provably needed none --
+-- the fan-out that carries no payload is exactly the registration
+-- traffic the protocol reads.
+
 -- THE TWO LEAVES THE RUN DECOMPOSES INTO, AND NEITHER IS AN ASSEMBLY.
 -- A cascade is one instant's worth of emission, so it opens at the
 -- counter it is handed and closes before the next -- which is the
