@@ -134,8 +134,22 @@ emitᶜ ts = map emitᵗ ts
 -- WITH THE STREAM TRANSLATION AND NOT THE VALUE ONE.  The TypeScript
 -- mirror settles it: an input source there is built by the driver,
 -- which is what mints its source token and stamps its instant, so what
--- reaches the pipeline is already an `InstEmit`.  Reading inputs as
--- bare payloads instead would oblige the elaboration to wrap each one,
--- and wrapping is exactly the operation no program can perform.
+-- reaches the pipeline is already an `InstEmit`.
+--
+-- SO THE BOUNDARY IS ASSUMED HERE AND NOT PERFORMED, AND THAT IS NOW A
+-- CHOICE RATHER THAN A NECESSITY (Anthony).  This walk once carried the
+-- argument that reading inputs as bare payloads would oblige the
+-- elaboration to WRAP each one, wrapping being an operation no program
+-- could perform.  A program can perform it: the envelope's source is a
+-- token `mintᵉ` binds, and the rest of the stamp is a fold over the
+-- arriving values -- one `liftᵉ` per input, seeded once per
+-- subscription.  What the seed still wants is the AMBIENT INSTANT, so
+-- that a cold source's synchronous burst INHERITS the subscriber's
+-- rather than minting, and that one capability is what is missing.
+--
+-- The choice is not cosmetic and is the elaboration's to make: wrapping
+-- here leaves the slots at plain `Γ` and PROVES that a simul program
+-- holds no bare payload in a stream position, where this vector only
+-- ASSUMES it.
 emitᵛ : ∀ {n} → Ctx n → Ctx n
 emitᵛ Γ = mapⱽ emitᵗ Γ

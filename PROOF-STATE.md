@@ -234,11 +234,11 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
   now a BINDER in the plain tree alone — one fresh identifier per subscription,
   drawn at the key `deferᵉ` already uses and bound into Θ, so a body can PLACE
   one and still never write one; keeping it out of the simul tree is what leaves
-  the palette argument standing. Two rulings came with it. A simul `take` cuts
-  naively on values exactly as `takeᵉ` does, so what blocks it is a LEVEL and
-  not an operator. And a witness refining an incoming `Ty` is available whenever
-  a consumer wants one. Still owed is READING the running instant at a source,
-  which minting does not supply.
+  the palette argument standing. A simul `take` cuts naively on values exactly
+  as `takeᵉ` does, so what blocks it is a LEVEL and not an operator. What
+  minting does not supply is READING the running instant — owed ONCE, to seed
+  the boundary fold, so a cold source's synchronous burst inherits the
+  subscriber's instant instead of minting one.
 
 - **THEN THE DEMOTION, AND IT IS THE ORACLE'S AND NOT THE TOWER'S (Anthony:
   the harness "shouldn't test on srxjs at all — just plain rxjs now").** Target:
