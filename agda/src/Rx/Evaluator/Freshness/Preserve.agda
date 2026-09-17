@@ -42,7 +42,7 @@ open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeInner⇓; thruCon
   subscribeAll⇓; sharedConnect⇓; subscribeSharedSlot⇓;
   subs-floor; subs-shared; subs-hot-done; subs-hot-live; subs-cold-sync;
   subs-cold-async; subs-of; subs-empty; subs-take-zero; subs-take-suc;
-  subs-lift; subs-merge-all; subs-switch-all; subs-exhaust-all; subs-μ; subs-defer;
+  subs-lift; subs-merge-all; subs-switch-all; subs-exhaust-all; subs-μ; subs-defer; subs-mint;
   inner; consume-all-sub; consume-all-enqueue; consume-all-nil; consume-switch-sub;
   consume-switch-nil; consume-exhaust-sub; consume-exhaust-nil;
   walk-nil; walk-cons; drain-nil; drain-no-room; drain-room;
@@ -289,6 +289,7 @@ subscribeE-preserves f le (subs-switch-all sa)   = subscribeAll-preserves f le s
 subscribeE-preserves f le (subs-exhaust-all sa)  = subscribeAll-preserves f le sa
 subscribeE-preserves f le (subs-μ sub)           = subscribeE-preserves f le sub
 subscribeE-preserves f le (subs-defer refl _ _ _) = pres-write _ _ _ refl le
+subscribeE-preserves f le (subs-mint refl sub)   = subscribeE-preserves f le sub
 
 pushBurst-preserves f le fa push-nil = pres-same _ _ refl
 pushBurst-preserves f le fa (push-cons _ stp rest) =
