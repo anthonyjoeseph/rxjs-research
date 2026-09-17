@@ -260,17 +260,28 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
   two groups never join. What is owed is how an instant is IDENTIFIED in the
   plain tree, and that decides what every theorem over it quantifies over.
 
-- **THEN REFACTOR THE TYPESCRIPT PRIMITIVES IN PLACE, `lift` INCLUDED
-  (Anthony).** Not new operators: the shipped ones — `lift`, `map`, `take`,
-  `share`, `defer`, the flatteners — rewritten to use ONLY what `Ty`/`Tm`
-  has, which is plain rxjs, ES6 array operations and conditionals. What the
-  refactor has to remove is named and small: `cold`, `hot` and `captureSync`,
-  raw `Subject` and `new Observable` and hand-driven subscription, reached
-  from four files. Each is there to bracket a synchronous subscribe frame,
-  so the leg is one question asked five times — say that in rxjs alone.
+- **THEN THE CLOSURE STATE LEFT IN `share` AND THE JOIN (Anthony: use ONLY
+  what `Ty`/`Tm` has).** The subscribe-frame question is answered — bracketing
+  is rxjs's own subscribe ordering — so no operator owns a subscription and the
+  raw `Subject` and `new Observable` are confined to the driver's plumbing, the
+  one impure edge this tier sanctions. What is left is mutable cells no `Tm` can
+  hold: a share's two latches and its live-registration list, and the join's
+  per-inner handle. A latch read DURING the cascade that sets it is the hard
+  one, and it is why this blocks the next leg rather than tidying.
   **AND `expand` DIVERGES**, breadth-first where rxjs is depth-first, because
   the only lazy former is `defer` and that costs a hop; values agree as a
   multiset, batches do not.
+
+- **THEN THE SLOT TELESCOPE, WHICH SPLITS COLD FROM HOT AND CARRIES THE SHARE
+  (Anthony).** `toPlain (inputˢ i)` is a bare transport because the body cannot
+  tell the two source shapes apart: neither the type nor the term distinguishes
+  them, only the telescope does, so an elaboration INDEXED BY it splits on them
+  at once and hands a hot its source for free — a hot's source IS its slot
+  index, and the token language has a literal. A shared slot is the third arm,
+  an exp tree under an all-resets-false share identified by its de Bruijn index
+  rather than by its expression, which is what makes share identity a binding
+  exactly as a `const` is. The leg is the index and the split; what each arm
+  WRAPS waits on the instant ruling above.
 
 - **THEN THE SAME OPERATORS IN `Tm`/`Ty`, AND TIER 1 IS COMPLETE (Anthony).**
   Each TS simul operator mirrored as an Agda definition in the value language,
