@@ -33,6 +33,21 @@ ids = map InstEmit.instant
 horizon : Fuel → List Id
 horizon fuel = upTo (suc fuel)
 
+-- WHAT THIS SAYS, AND WHAT THE NAME SUGGESTS IT SAYS.  The statement is
+-- CONTAINMENT and nothing more: every id an emit carries lies inside the
+-- horizon.  A singleton is a sublist of the horizon exactly as readily as
+-- an enumeration of it, so a machine that minted ONE instant and stamped
+-- the entire stream with it satisfies this in full.  Total id collapse is
+-- a model of it.
+--
+-- DISTINCTNESS IS A SEPARATE CLAIM AND THIS TREE STATES IT NOWHERE -- not
+-- proven, not postulated, not stated.  It was dropped on the reading that
+-- instants mint from arrival position and so separate by construction,
+-- which is a property of the evaluator's TEXT rather than a fact any
+-- consumer can cite; and the proof must cite it, because a partition
+-- indexed by instant is a partition only when the index separates.  The
+-- gap is owed here rather than at the machine, since this is the module
+-- that claims to say what the ids MEAN.
 -- PROBED: no refutation for `id-inheritance`, with the fuel-3 row checking
 --   (0 ∷ 1 ∷ 2 ∷ 3 ∷ []) ⊆ᵢ horizon 3.  A confidence receipt over small
 --   horizons, not a theorem.  The probe is spent and deleted;
@@ -50,9 +65,3 @@ postulate
   id-inheritance :
     ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slots Γ) →
     ids (evaluate↓ fuel e ins) ⊆ᵢ horizon fuel
-
--- id-fresh became structural: instants mint from ARRIVAL POSITION
--- (0 the subscribe frame, then the drain counter), so distinct
--- cascades carry distinct, strictly increasing ids by construction —
--- the Protocol's horizon check consumes exactly this.
-
