@@ -60,7 +60,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong;
 
 open import Rx.Prim using (Timed; after_,_; ObservableInput; hot; cold; InstEvent; init; value; close; handoff;
   complete; InstEmit; _at_from_as_)
-open import Rx.Exp using (Ty; natᵗ; obs; listᵗ; revᵗ; _×ᵗ_; isData; Ctx; Exp; Tm; Fn; PrimOp; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; batchSyncᵉ; scanᵉ; liftᵉ;
+open import Rx.Exp using (Ty; natᵗ; obs; listᵗ; revᵗ; _×ᵗ_; isData; Ctx; Exp; Tm; Fn; PrimOp; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; batchSyncᵉ; scanᵉ;
   mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ;
   unit̂; bool̂; nat̂; uniq̂; primᵗ; pairᵗ; fstᵗ; sndᵗ;
   strmᵗ; varᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; nilᵗ; consᵗ; foldᵗ; add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ)
@@ -327,7 +327,7 @@ genExpAt g u (suc d) = genB 13 >>=G λ c →
   else if c ≡ᵇ 10 then (genExpAt 0 (g + u) d >>=G λ b → pureG (gate g u b))
   else if c ≡ᵇ 11 then
     (genLiftFn >>=G λ f → genNat >>=G λ s → genExpAt g u d >>=G λ e →
-     pureG (liftᵉ f (nat̂ s) e))
+     pureG (scanᵉ f (nat̂ s) e))
   else genLeafAt g u
 
 genInners g u d zero    = pureG []
@@ -386,7 +386,7 @@ genSpineD w (suc d) = genB 9 >>=G λ c →
      pureG (switchAllᵉ (ofᵉ (strmᵗ e ∷ rest))))
   else if c ≡ᵇ 7 then
     (genLiftFn >>=G λ f → genNat >>=G λ s → genSpineD w d >>=G λ e →
-     pureG (liftᵉ f (nat̂ s) e))
+     pureG (scanᵉ f (nat̂ s) e))
   else
     (genSpineD w d >>=G λ e → genB 2 >>=G λ extra → genInners 0 (suc w) d (suc extra) >>=G λ rest →
      pureG (exhaustAllᵉ (ofᵉ (strmᵗ e ∷ rest))))
@@ -410,7 +410,7 @@ genSpineG g u (suc d) = genB 9 >>=G λ c →
      pureG (switchAllᵉ (ofᵉ (strmᵗ e ∷ rest))))
   else if c ≡ᵇ 7 then
     (genLiftFn >>=G λ f → genNat >>=G λ s → genSpineG g u d >>=G λ e →
-     pureG (liftᵉ f (nat̂ s) e))
+     pureG (scanᵉ f (nat̂ s) e))
   else
     (genSpineG g u d >>=G λ e → genB 2 >>=G λ extra →
      genInners (suc g) u d (suc extra) >>=G λ rest →
@@ -475,7 +475,7 @@ formerIx fBatchSync  = 12
 sameFormer : Former → Former → Bool
 sameFormer a b = formerIx a ≡ᵇ formerIx b
 
--- the formers a program carries, and whether any `liftᵉ` re-binds
+-- the formers a program carries, and whether any `scanᵉ` re-binds
 -- something the run could subscribe
 Marks : Set
 Marks = List Former × Bool
@@ -501,7 +501,7 @@ marksᵉ (takeᵉ c e)     = one fTake ⊕ marksᵗ c ⊕ marksᵉ e
 -- the second component reads the CARRIED state's type, which is the former's
 -- own accumulator: `isData (obs _)` is false, so it fires exactly when the
 -- former re-binds something the run could subscribe
-marksᵉ (liftᵉ {u = u} f z e) =
+marksᵉ (scanᵉ {u = u} f z e) =
   one fLift ⊕ ([] , not (isData u)) ⊕ marksᵗ f ⊕ marksᵗ z ⊕ marksᵉ e
 marksᵉ (mergeAllᵉ _ e) = one fMergeAll ⊕ marksᵉ e
 marksᵉ (switchAllᵉ e)  = one fSwitchAll ⊕ marksᵉ e
@@ -660,7 +660,7 @@ showExp (input i)       = "(input " ++ showFin i ++ ")"
 showExp (ofᵉ items)     = "(ofᵉ (" ++ showTmList items ++ "))"
 showExp emptyᵉ          = "emptyᵉ"
 showExp (takeᵉ n e)     = "(takeᵉ " ++ showTm n ++ " " ++ showExp e ++ ")"
-showExp (liftᵉ f s e)   = "(liftᵉ " ++ showTm f ++ " " ++ showTm s ++ " " ++ showExp e ++ ")"
+showExp (scanᵉ f s e)   = "(scanᵉ " ++ showTm f ++ " " ++ showTm s ++ " " ++ showExp e ++ ")"
 -- the limit prints as the `Maybe ℕ` it IS, not as the ∞ a reader would
 -- prefer: a witness is printed to be PASTED, and the corpus is Agda
 showExp (mergeAllᵉ nothing s)  = "(mergeAllᵉ nothing " ++ showExp s ++ ")"

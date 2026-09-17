@@ -105,7 +105,7 @@ open import Rx.Prim using (Tick; Fuel; Id; Source; InstEvent; InstEmit; value; c
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
 open import Rx.Exp using (obs; Ctx; Val; Closed; Exp; Tm; Fn; _×ᵗ_; listᵗ; uniqᵗ; subΘExp;
   evalTm; unfoldμ; input; ofᵉ; emptyᵉ; takeᵉ; batchSyncᵉ;
-  liftᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; deferᵉ; mintᵉ)
+  scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; deferᵉ; mintᵉ)
 open import Rx.Mint using (ordinalᵏ; sourceᵏ; nodeᵏ; regᵏ; freshId; setAt)
 open import Rx.Slots using (Slots; scripted; shared)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; NodeId;
@@ -116,11 +116,11 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; NodeId;
   NodeState; AllOp; RegId; Arrival; AtFloor; arrTy;
   spentBurst; oneShotBurst; memberSource; register; installNode; resolve;
   atSlot; atDyn; lowerFloor;
-  lift-f; take-f; batchSync-f; thru-outer;
+  scan-f; take-f; batchSync-f; thru-outer;
   cell-st; take-st; batchSync-st; mergeAll-st; switch-st; exhaust-st;
   mergeAllᵒ; switchᵒ; exhaustᵒ;
   lookupNode; setNode; hasRoom; mergeAllBump; switchKill; aliveThroughᶠ;
-  splitEvents; retagEvents; liftDispatch; takeDispatch; batchSyncDispatch; thruWrap;
+  splitEvents; retagEvents; scanDispatch; takeDispatch; batchSyncDispatch; thruWrap;
   consumeUsable; finishUsable;
   burstCompleted; sharedPlumb; dropSource)
 
@@ -403,12 +403,12 @@ data subscribeE⇓ {n} {Γ} {t} {e} where
                 {κ : Path Γ lo u t}
                 {id now sched st nid burst sched₂ st₁ r}
             → freshId nodeᵏ (Sched.mint sched) ≡ nid
-            → subscribeE⇓ b (lift-f f nid ↠ κ) id now
+            → subscribeE⇓ b (scan-f f nid ↠ κ) id now
                 (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
                 (installNode nid (cell-st (evalTm i)) st)
                 (burst , sched₂ , st₁)
-            → pushBurst⇓ id now (lift-f f nid) κ burst sched₂ st₁ r
-            → subscribeE⇓ (liftᵉ f i b) κ id now sched st r
+            → pushBurst⇓ id now (scan-f f nid) κ burst sched₂ st₁ r
+            → subscribeE⇓ (scanᵉ f i b) κ id now sched st r
 
   subs-merge-all : ∀ {lo u} {lim} {b : Closed Γ (obs u)} {κ : Path Γ lo u t}
                      {id now sched st r}
@@ -729,11 +729,11 @@ data stepFrame⇓ {n} {Γ} {t} {e} where
 
 
 
-  step-lift : ∀ {s u w lo} {fn : Fn Γ [] [] [] (w ×ᵗ s) (w ×ᵗ listᵗ u)}
+  step-scan : ∀ {s u w lo} {fn : Fn Γ [] [] [] (w ×ᵗ s) (w ×ᵗ listᵗ u)}
                 {nid} {κ : Path Γ lo u t}
                 {id now} {vals : List (Val Γ s)} {fin sched st}
-            → stepFrame⇓ id now (lift-f fn nid) κ vals fin sched st
-                (liftDispatch fn nid vals fin sched st
+            → stepFrame⇓ id now (scan-f fn nid) κ vals fin sched st
+                (scanDispatch fn nid vals fin sched st
                   (lookupNode nid (EvalSt.nodes st)))
 
   step-take : ∀ {s lo nid} {κ : Path Γ lo s t}

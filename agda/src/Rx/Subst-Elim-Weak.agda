@@ -39,7 +39,7 @@ open import Rx.Exp
         ; _×ᵗ_; listᵗ
         ; _⊟_; ⊟-++ˡ; ⊟-++ʳ; compare∈
         ; elimGExp; elimGTm; elimGTms; elimDExp; elimDTm; elimDTms
-        ; input; ofᵉ; emptyᵉ; takeᵉ; liftᵉ; mergeAllᵉ; switchAllᵉ
+        ; input; ofᵉ; emptyᵉ; takeᵉ; mapᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ
         ; exhaustAllᵉ; batchSyncᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ; uniqᵗ
         ; varᵗ; unit̂; bool̂; nat̂; uniq̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ
         ; caseᵗ; ifᵗ; primᵗ; strmᵗ; nilᵗ; consᵗ; foldᵗ )
@@ -254,8 +254,10 @@ mutual
   elimG-avᵉ Θl x cl av (ofᵉ ts)   = cong ofᵉ (elimG-avˢ Θl x cl av ts)
   elimG-avᵉ Θl x cl av (takeᵉ m e) =
     cong₂ takeᵉ (elimG-avᵗ Θl x cl av m) (elimG-avᵉ Θl x cl av e)
-  elimG-avᵉ Θl x cl av (liftᵉ {s = s} {u = w} f i e) =
-    cong₃ liftᵉ (elimG-avᵗ ((w ×ᵗ s) ∷ Θl) x cl av f)
+  elimG-avᵉ Θl x cl av (mapᵉ {s = s} f e) =
+    cong₂ mapᵉ (elimG-avᵗ (s ∷ Θl) x cl av f) (elimG-avᵉ Θl x cl av e)
+  elimG-avᵉ Θl x cl av (scanᵉ {s = s} {t = w} f i e) =
+    cong₃ scanᵉ (elimG-avᵗ ((w ×ᵗ s) ∷ Θl) x cl av f)
                 (elimG-avᵗ Θl x cl av i) (elimG-avᵉ Θl x cl av e)
   elimG-avᵉ Θl x cl av (mergeAllᵉ lim e) =
     cong (mergeAllᵉ lim) (elimG-avᵉ Θl x cl av e)
@@ -327,8 +329,11 @@ mutual
   elimD-avᵉ Θl x refl cl av (ofᵉ ts)   = cong ofᵉ (elimD-avˢ Θl x refl cl av ts)
   elimD-avᵉ Θl x refl cl av (takeᵉ m e) =
     cong₂ takeᵉ (elimD-avᵗ Θl x refl cl av m) (elimD-avᵉ Θl x refl cl av e)
-  elimD-avᵉ Θl x refl cl av (liftᵉ {s = s} {u = w} f i e) =
-    cong₃ liftᵉ (elimD-avᵗ ((w ×ᵗ s) ∷ Θl) x refl cl av f)
+  elimD-avᵉ Θl x refl cl av (mapᵉ {s = s} f e) =
+    cong₂ mapᵉ (elimD-avᵗ (s ∷ Θl) x refl cl av f)
+               (elimD-avᵉ Θl x refl cl av e)
+  elimD-avᵉ Θl x refl cl av (scanᵉ {s = s} {t = w} f i e) =
+    cong₃ scanᵉ (elimD-avᵗ ((w ×ᵗ s) ∷ Θl) x refl cl av f)
                 (elimD-avᵗ Θl x refl cl av i) (elimD-avᵉ Θl x refl cl av e)
   elimD-avᵉ Θl x refl cl av (mergeAllᵉ lim e) =
     cong (mergeAllᵉ lim) (elimD-avᵉ Θl x refl cl av e)

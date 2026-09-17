@@ -68,7 +68,7 @@ PATHS = {
 # test, and inventing a word for it here is how that goes unnoticed.
 ROLES = {
     "source": "produces without reading anything, and subscribes nothing",
-    "lift": "a pure function of an emit's values, with carried state",
+    "pure": "a pure function of ONE value, with or without carried state",
     "protocol": "reads or writes the protocol's own bookkeeping",
     "flatten": "subscribes a payload that is literal syntax and must be RUN",
     "binder": "not an operator at all -- μ-binding structure",

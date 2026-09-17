@@ -44,7 +44,7 @@ open import Data.Vec using () renaming ([] to []ⱽ)
 open import Relation.Nullary using (¬_)
 
 open import Rx.Exp using (Ctx; Tm; Fn; Closed; obs; natᵗ; _×ᵗ_; listᵗ; input; ofᵉ; emptyᵉ; takeᵉ; batchSyncᵉ;
-  liftᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ)
+  scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ)
 
 -- the structural domain predicate: one constructor per former, each
 -- taking the predicate at the Exp children a subscribe actually walks.
@@ -63,9 +63,9 @@ data Sub {n} {Γ : Ctx n} : ∀ {t} → Closed Γ t → Set where
   s-μ     : ∀ {t body} → Sub (μᵉ {Γ = Γ} {t = t} body)
   s-mint  : ∀ {t body} → Sub (mintᵉ {Γ = Γ} {t = t} body)
   s-take  : ∀ {t} {c : Tm Γ [] [] [] _} {b} → Sub b → Sub (takeᵉ {t = t} c b)
-  s-lift  : ∀ {s t u} {f : Fn Γ [] [] [] (u ×ᵗ listᵗ s) (u ×ᵗ listᵗ t)}
+  s-scan  : ∀ {s t u} {f : Fn Γ [] [] [] (u ×ᵗ listᵗ s) (u ×ᵗ listᵗ t)}
               {z : Tm Γ [] [] [] u} {b : Closed Γ s}
-          → Sub b → Sub (liftᵉ f z b)
+          → Sub b → Sub (scanᵉ f z b)
   s-merge : ∀ {t lim} {b : Closed Γ (obs t)} → Sub b → Sub (mergeAllᵉ lim b)
   s-switch : ∀ {t} {b : Closed Γ (obs t)} → Sub b → Sub (switchAllᵉ b)
   s-batchSync : ∀ {t} {b : Closed Γ t} → Sub b → Sub (batchSyncᵉ b)
@@ -79,7 +79,7 @@ sub-total (deferᵉ body)     = s-defer
 sub-total (μᵉ body)         = s-μ
 sub-total (mintᵉ body)      = s-mint
 sub-total (takeᵉ c b)       = s-take (sub-total b)
-sub-total (liftᵉ f z b)     = s-lift (sub-total b)
+sub-total (scanᵉ f z b)     = s-scan (sub-total b)
 sub-total (mergeAllᵉ l b)   = s-merge (sub-total b)
 sub-total (switchAllᵉ b)    = s-switch (sub-total b)
 sub-total (batchSyncᵉ b)    = s-batchSync (sub-total b)

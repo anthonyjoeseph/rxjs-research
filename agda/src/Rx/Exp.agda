@@ -95,34 +95,46 @@ mutual
                  -- registration counts; that this operator cannot reach
                  -- it is why that one has to be proven rather than
                  -- assumed.
-    liftᵉ      : ∀ {s t u} → Fn Γ Δᵍ Δ Θ (u ×ᵗ s) (u ×ᵗ listᵗ t)
-               → Tm Γ Δᵍ Δ Θ u → Exp Γ Δᵍ Δ Θ s → Exp Γ Δᵍ Δ Θ t
-                 -- THE ONE PURE-FUNCTION FORMER, MIRRORING THE TYPESCRIPT
-                 -- `lift`: ONE value in, carried state threaded, zero or
-                 -- more values out — which is `scan` composed with
-                 -- `mergeMap` and so is expressible in plain rxjs, with no
-                 -- notion of a frame anywhere in it.  That is the largest
-                 -- thing an operator can be while still adding no event,
-                 -- minting no registration and being unable to end the
-                 -- stream.  The step is a `Tm`, so it is pure, total and
-                 -- first-order, and `Val` reads `listᵗ` as a list outright,
-                 -- so the types here need no new vocabulary.
+    mapᵉ       : ∀ {s t} → Fn Γ Δᵍ Δ Θ s t → Exp Γ Δᵍ Δ Θ s → Exp Γ Δᵍ Δ Θ t
+    scanᵉ      : ∀ {s t} → Fn Γ Δᵍ Δ Θ (t ×ᵗ s) t
+               → Tm Γ Δᵍ Δ Θ t → Exp Γ Δᵍ Δ Θ s → Exp Γ Δᵍ Δ Θ t
+                 -- THE PURE-FUNCTION FORMERS, AND THERE ARE TWO OF THEM
+                 -- BECAUSE RXJS HAS TWO.  Each is ONE value in and ONE
+                 -- value out, `scanᵉ` threading the carried state that is
+                 -- also what it emits — which is `map` and `scan`
+                 -- exactly, operator for operator, with no notion of a
+                 -- frame anywhere in either.  The step is a `Tm`, so it
+                 -- is pure, total and first-order.
                  --
-                 -- IT IS POINTWISE BECAUSE THE PLAIN TREE IS RXJS, AND
-                 -- RXJS HAS NO FRAMES.  A step handed a whole arriving
-                 -- value list can count it — `(u , vs) ↦ (u , [length vs])`
-                 -- separates `of 1 2 3` into one emission from three, and
-                 -- no plain-rxjs pipeline can tell those apart.  Grouping
-                 -- is not lost, it is DERIVED: `batchSyncᵉ` is the former
-                 -- that sees a frame, and a group-level step is that
-                 -- composed with a pointwise lift, which is a definition
-                 -- rather than a primitive.
+                 -- NEITHER IS DERIVABLE FROM THE OTHER, WHICH IS WHY
+                 -- RXJS CARRIES BOTH.  A scan's accumulator IS its
+                 -- output, so changing the value's type needs a seed at
+                 -- the new type, and `Tm` has no generic inhabitant to
+                 -- default one to; a map carries no state, so it cannot
+                 -- stand in for a scan either.
                  --
-                 -- WHAT IT ABSORBS IS DECIDED BY WHETHER AN OPERATOR READS
-                 -- THE PROTOCOL'S OWN BOOKKEEPING, and that test was run in
-                 -- TypeScript against real rxjs before it was written here.
-                 -- `mapᵉ` and `scanᵉ` are DEFINITIONS over this, below;
-                 -- `takeᵉ` is NOT, because it reads the open
+                 -- ZERO-OR-MORE OUT IS NOT THEIR JOB, AND THAT IS NOT A
+                 -- GAP.  A step that could emit a LIST would be a
+                 -- flatten fused into a map, and rxjs has no such
+                 -- operator for a reason — flattening is ambiguous, which
+                 -- is why `mergeAll`, `switchAll` and `exhaustAll` are
+                 -- three operators and not one.  So filter is
+                 -- `mergeAllᵉ` over a step returning `strmᵗ (ofᵉ [ x ])`
+                 -- or `strmᵗ emptyᵉ`, and duplicate is the same with a
+                 -- two-element `ofᵉ`: `mergeMap(x => p(x) ? of(x) :
+                 -- EMPTY)`, which is how a plain rxjs program writes it.
+                 --
+                 -- AND THE INNER SUBSCRIPTION THAT COSTS IS THE POINT
+                 -- RATHER THAN A PRICE — the spec is built around
+                 -- `mergeMap(of)` merging its synchronous bursts, so a
+                 -- former invented to avoid that hop would be avoiding
+                 -- the thing under test.
+                 --
+                 -- WHAT THEY ABSORB IS DECIDED BY WHETHER AN OPERATOR
+                 -- READS THE PROTOCOL'S OWN BOOKKEEPING, and that test
+                 -- was run in TypeScript against real rxjs before it was
+                 -- written here.
+                 -- `takeᵉ` is NOT absorbed, because it reads the open
                  -- registrations and the cut ledger and mints a close per
                  -- victim, so absorbing it would put source ids and close
                  -- reasons into the value language.  The flatteners cannot
@@ -338,7 +350,8 @@ mutual
   renExp ρg ρd ρt emptyᵉ         = emptyᵉ
   renExp ρg ρd ρt (takeᵉ n e)    = takeᵉ (renTm ρg ρd ρt n) (renExp ρg ρd ρt e)
   renExp ρg ρd ρt (batchSyncᵉ e) = batchSyncᵉ (renExp ρg ρd ρt e)
-  renExp ρg ρd ρt (liftᵉ f i e)  = liftᵉ (renTm ρg ρd (ext∈ ρt) f) (renTm ρg ρd ρt i) (renExp ρg ρd ρt e)
+  renExp ρg ρd ρt (mapᵉ f e)     = mapᵉ (renTm ρg ρd (ext∈ ρt) f) (renExp ρg ρd ρt e)
+  renExp ρg ρd ρt (scanᵉ f i e)  = scanᵉ (renTm ρg ρd (ext∈ ρt) f) (renTm ρg ρd ρt i) (renExp ρg ρd ρt e)
   renExp ρg ρd ρt (mergeAllᵉ lim e) = mergeAllᵉ lim (renExp ρg ρd ρt e)
   renExp ρg ρd ρt (switchAllᵉ e) = switchAllᵉ (renExp ρg ρd ρt e)
   renExp ρg ρd ρt (exhaustAllᵉ e) = exhaustAllᵉ (renExp ρg ρd ρt e)
@@ -381,11 +394,11 @@ wkTm : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → Tm Γ [] [] [] t → Tm Γ Δᵍ
 wkTm = renTm (λ ()) (λ ()) (λ ())
 
 ------------------------------------------------------------------
--- `mapᵉ` and `scanᵉ`, written OVER the one pure-function former.
+-- `letᵗ` and the list helpers the encodings above are written with.
 ------------------------------------------------------------------
 
--- THE TERM LANGUAGE HAS NO APPLICATION, AND THAT IS WHAT SHAPES BOTH
--- ENCODINGS.  A `Fn` is a `Tm` under one extra binder, and the only
+-- THE TERM LANGUAGE HAS NO APPLICATION, AND THAT IS WHAT SHAPES EVERY
+-- ENCODING HERE.  A `Fn` is a `Tm` under one extra binder, and the only
 -- substitution here carries VALUES, so a step cannot simply be applied
 -- to a term: the argument has to be handed over by a former that BINDS.
 -- `foldᵗ` over a ONE-ELEMENT list is that former, which is why `letᵗ`
@@ -413,29 +426,6 @@ appendᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t}
 appendᵗ xs ys = foldᵗ (revᵗ xs) ys (consᵗ (varᵗ (here refl))
                                           (varᵗ (there (here refl))))
 
--- A POINTWISE FORMER MAKES BOTH OF THESE SMALL, AND `scanᵉ` VANISHES
--- INTO IT.  The former hands its step the carried state paired with ONE
--- element, which is exactly `scanᵉ`'s own step type, so that encoding is
--- the step used twice — once as the next state, once as the single value
--- emitted.  `mapᵉ` carries no state, so its work is to reach past the
--- pair for the element; `foldᵗ` over a ONE-ELEMENT list is what binds it,
--- since the term language has no application.  Neither needs the
--- reversing pass a list-shaped former had to pay, because neither builds
--- a list by consing any more.
-mapᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ s t}
-     → Fn Γ Δᵍ Δ Θ s t → Exp Γ Δᵍ Δ Θ s → Exp Γ Δᵍ Δ Θ t
-mapᵉ {Θ = Θ} {s = s} {t = t} f e =
-  liftᵉ (pairᵗ unit̂ (foldᵗ (consᵗ (sndᵗ (varᵗ (here refl))) nilᵗ) nilᵗ
-                          (consᵗ f↑ (varᵗ (there (here refl))))))
-        unit̂ e
-  where
-  f↑ : Tm _ _ _ (s ∷ listᵗ t ∷ (unitᵗ ×ᵗ s) ∷ Θ) t
-  f↑ = renTm (λ x → x) (λ x → x) (ext∈ (λ x → there (there x))) f
-
-scanᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ s t}
-      → Fn Γ Δᵍ Δ Θ (t ×ᵗ s) t → Tm Γ Δᵍ Δ Θ t
-      → Exp Γ Δᵍ Δ Θ s → Exp Γ Δᵍ Δ Θ t
-scanᵉ f z e = liftᵉ (pairᵗ f (consᵗ f nilᵗ)) z e
 
 ------------------------------------------------------------------
 -- reify: a value → the closed Tm literal denoting it (an obs value is
@@ -492,8 +482,10 @@ mutual
   subΘExp Θloc σ emptyᵉ         = emptyᵉ
   subΘExp Θloc σ (takeᵉ n e)    = takeᵉ (subΘTm Θloc σ n) (subΘExp Θloc σ e)
   subΘExp Θloc σ (batchSyncᵉ e) = batchSyncᵉ (subΘExp Θloc σ e)
-  subΘExp Θloc σ (liftᵉ {s = s} {u = u} f i e) =
-    liftᵉ (subΘTm ((u ×ᵗ s) ∷ Θloc) σ f) (subΘTm Θloc σ i) (subΘExp Θloc σ e)
+  subΘExp Θloc σ (mapᵉ {s = s} f e) =
+    mapᵉ (subΘTm (s ∷ Θloc) σ f) (subΘExp Θloc σ e)
+  subΘExp Θloc σ (scanᵉ {s = s} {t = t} f i e) =
+    scanᵉ (subΘTm ((t ×ᵗ s) ∷ Θloc) σ f) (subΘTm Θloc σ i) (subΘExp Θloc σ e)
   subΘExp Θloc σ (mergeAllᵉ lim e) = mergeAllᵉ lim (subΘExp Θloc σ e)
   subΘExp Θloc σ (switchAllᵉ e) = switchAllᵉ (subΘExp Θloc σ e)
   subΘExp Θloc σ (exhaustAllᵉ e) = exhaustAllᵉ (subΘExp Θloc σ e)
@@ -582,8 +574,10 @@ mutual
   elimGExp Θl x cl emptyᵉ         = emptyᵉ
   elimGExp Θl x cl (takeᵉ n e)    = takeᵉ (elimGTm Θl x cl n) (elimGExp Θl x cl e)
   elimGExp Θl x cl (batchSyncᵉ e) = batchSyncᵉ (elimGExp Θl x cl e)
-  elimGExp Θl x cl (liftᵉ f i e)  =
-    liftᵉ (elimGTm (_ ∷ Θl) x cl f) (elimGTm Θl x cl i) (elimGExp Θl x cl e)
+  elimGExp Θl x cl (mapᵉ f e)     =
+    mapᵉ (elimGTm (_ ∷ Θl) x cl f) (elimGExp Θl x cl e)
+  elimGExp Θl x cl (scanᵉ f i e)  =
+    scanᵉ (elimGTm (_ ∷ Θl) x cl f) (elimGTm Θl x cl i) (elimGExp Θl x cl e)
   elimGExp Θl x cl (mergeAllᵉ lim e) = mergeAllᵉ lim (elimGExp Θl x cl e)
   elimGExp Θl x cl (switchAllᵉ e) = switchAllᵉ (elimGExp Θl x cl e)
   elimGExp Θl x cl (exhaustAllᵉ e) = exhaustAllᵉ (elimGExp Θl x cl e)
@@ -632,8 +626,10 @@ mutual
   elimDExp Θl x cl emptyᵉ         = emptyᵉ
   elimDExp Θl x cl (takeᵉ n e)    = takeᵉ (elimDTm Θl x cl n) (elimDExp Θl x cl e)
   elimDExp Θl x cl (batchSyncᵉ e) = batchSyncᵉ (elimDExp Θl x cl e)
-  elimDExp Θl x cl (liftᵉ f i e)  =
-    liftᵉ (elimDTm (_ ∷ Θl) x cl f) (elimDTm Θl x cl i) (elimDExp Θl x cl e)
+  elimDExp Θl x cl (mapᵉ f e)     =
+    mapᵉ (elimDTm (_ ∷ Θl) x cl f) (elimDExp Θl x cl e)
+  elimDExp Θl x cl (scanᵉ f i e)  =
+    scanᵉ (elimDTm (_ ∷ Θl) x cl f) (elimDTm Θl x cl i) (elimDExp Θl x cl e)
   elimDExp Θl x cl (mergeAllᵉ lim e) = mergeAllᵉ lim (elimDExp Θl x cl e)
   elimDExp Θl x cl (switchAllᵉ e) = switchAllᵉ (elimDExp Θl x cl e)
   elimDExp Θl x cl (exhaustAllᵉ e) = exhaustAllᵉ (elimDExp Θl x cl e)
@@ -752,7 +748,8 @@ mutual
   inputsBelowᵉ k emptyᵉ          = true
   inputsBelowᵉ k (takeᵉ c e)     = inputsBelowᵗ k c ∧ inputsBelowᵉ k e
   inputsBelowᵉ k (batchSyncᵉ e)  = inputsBelowᵉ k e
-  inputsBelowᵉ k (liftᵉ f z e)   =
+  inputsBelowᵉ k (mapᵉ f e)      = inputsBelowᵗ k f ∧ inputsBelowᵉ k e
+  inputsBelowᵉ k (scanᵉ f z e)   =
     inputsBelowᵗ k f ∧ inputsBelowᵗ k z ∧ inputsBelowᵉ k e
   inputsBelowᵉ k (mergeAllᵉ lim e) = inputsBelowᵉ k e
   inputsBelowᵉ k (switchAllᵉ e)  = inputsBelowᵉ k e

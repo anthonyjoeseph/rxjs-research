@@ -42,7 +42,7 @@ open import Relation.Binary.PropositionalEquality
 open import Rx.Exp
   using (Ty; Ctx; Val; Exp; Tm; PrimOp; subΘExp; subΘTm; subΘTms; elimGExp; elimGTm; elimGTms;
   elimDExp; elimDTm; elimDTms; _⊟_; ⊟-++ˡ; ⊟-++ʳ; compare∈; renExp; wkTm; reify; lookupEnv;
-  natᵗ; boolᵗ; obs; _×ᵗ_; _+ᵗ_; input; ofᵉ; emptyᵉ; takeᵉ; liftᵉ; mergeAllᵉ; switchAllᵉ;
+  natᵗ; boolᵗ; obs; _×ᵗ_; _+ᵗ_; input; ofᵉ; emptyᵉ; takeᵉ; mapᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ;
   exhaustAllᵉ; batchSyncᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ; uniqᵗ; varᵗ; unit̂; bool̂; nat̂; uniq̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ;
   inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ; nilᵗ; consᵗ; foldᵗ; listᵗ)
 open import Rx.Subst-Transport using (Cᵉ; Cᵗ; Cˢ; cong₃; pushVarᵉ)
@@ -131,13 +131,19 @@ gTake : (Θl : List Ty) (eq : Θl ++ [] ≡ Θ) (x : t ∈ Δᵍ) (cl : Exp Γ [
 gTake Θl refl x cl m e = refl
 
 
-gLift : (Θl : List Ty) (eq : Θl ++ [] ≡ Θ) (x : t ∈ Δᵍ) (cl : Exp Γ [] [] [] t)
-           (f : Tm Γ Δᵍ Δ ((v ×ᵗ s) ∷ Θ) (v ×ᵗ listᵗ u)) (i : Tm Γ Δᵍ Δ Θ v)
+gMap : (Θl : List Ty) (eq : Θl ++ [] ≡ Θ) (x : t ∈ Δᵍ) (cl : Exp Γ [] [] [] t)
+          (f : Tm Γ Δᵍ Δ (s ∷ Θ) u) (e : Exp Γ Δᵍ Δ Θ s)
+      → Gᵉ Θl eq x cl (mapᵉ f e)
+          ≡ mapᵉ (Gᵗ (s ∷ Θl) (cong (s ∷_) eq) x cl f) (Gᵉ Θl eq x cl e)
+gMap Θl refl x cl f e = refl
+
+gScan : (Θl : List Ty) (eq : Θl ++ [] ≡ Θ) (x : t ∈ Δᵍ) (cl : Exp Γ [] [] [] t)
+           (f : Tm Γ Δᵍ Δ ((u ×ᵗ s) ∷ Θ) u) (i : Tm Γ Δᵍ Δ Θ u)
            (e : Exp Γ Δᵍ Δ Θ s)
-       → Gᵉ Θl eq x cl (liftᵉ f i e)
-           ≡ liftᵉ (Gᵗ ((v ×ᵗ s) ∷ Θl) (cong ((v ×ᵗ s) ∷_) eq) x cl f)
+       → Gᵉ Θl eq x cl (scanᵉ f i e)
+           ≡ scanᵉ (Gᵗ ((u ×ᵗ s) ∷ Θl) (cong ((u ×ᵗ s) ∷_) eq) x cl f)
                    (Gᵗ Θl eq x cl i) (Gᵉ Θl eq x cl e)
-gLift Θl refl x cl f i e = refl
+gScan Θl refl x cl f i e = refl
 
 gMerge : (Θl : List Ty) (eq : Θl ++ [] ≡ Θ) (x : t ∈ Δᵍ) (cl : Exp Γ [] [] [] t)
            (lim : Maybe ℕ) (e : Exp Γ Δᵍ Δ Θ (obs u))
@@ -293,13 +299,19 @@ dTake : (Θl : List Ty) (eq : Θl ++ [] ≡ Θ) (x : t ∈ Δ) (cl : Exp Γ [] [
 dTake Θl refl x cl m e = refl
 
 
-dLift : (Θl : List Ty) (eq : Θl ++ [] ≡ Θ) (x : t ∈ Δ) (cl : Exp Γ [] [] [] t)
-           (f : Tm Γ Δᵍ Δ ((v ×ᵗ s) ∷ Θ) (v ×ᵗ listᵗ u)) (i : Tm Γ Δᵍ Δ Θ v)
+dMap : (Θl : List Ty) (eq : Θl ++ [] ≡ Θ) (x : t ∈ Δ) (cl : Exp Γ [] [] [] t)
+          (f : Tm Γ Δᵍ Δ (s ∷ Θ) u) (e : Exp Γ Δᵍ Δ Θ s)
+      → Dᵉ Θl eq x cl (mapᵉ f e)
+          ≡ mapᵉ (Dᵗ (s ∷ Θl) (cong (s ∷_) eq) x cl f) (Dᵉ Θl eq x cl e)
+dMap Θl refl x cl f e = refl
+
+dScan : (Θl : List Ty) (eq : Θl ++ [] ≡ Θ) (x : t ∈ Δ) (cl : Exp Γ [] [] [] t)
+           (f : Tm Γ Δᵍ Δ ((u ×ᵗ s) ∷ Θ) u) (i : Tm Γ Δᵍ Δ Θ u)
            (e : Exp Γ Δᵍ Δ Θ s)
-       → Dᵉ Θl eq x cl (liftᵉ f i e)
-           ≡ liftᵉ (Dᵗ ((v ×ᵗ s) ∷ Θl) (cong ((v ×ᵗ s) ∷_) eq) x cl f)
+       → Dᵉ Θl eq x cl (scanᵉ f i e)
+           ≡ scanᵉ (Dᵗ ((u ×ᵗ s) ∷ Θl) (cong ((u ×ᵗ s) ∷_) eq) x cl f)
                    (Dᵗ Θl eq x cl i) (Dᵉ Θl eq x cl e)
-dLift Θl refl x cl f i e = refl
+dScan Θl refl x cl f i e = refl
 
 dMerge : (Θl : List Ty) (eq : Θl ++ [] ≡ Θ) (x : t ∈ Δ) (cl : Exp Γ [] [] [] t)
            (lim : Maybe ℕ) (e : Exp Γ Δᵍ Δ Θ (obs u))
@@ -562,10 +574,14 @@ mutual
   sub-elimGᵉ Θloc x cl σ (takeᵉ m e) =
     trans (cong₂ takeᵉ (sub-elimGᵗ Θloc x cl σ m) (sub-elimGᵉ Θloc x cl σ e))
           (sym (gTake Θloc (++-identityʳ Θloc) x _ _ _))
-  sub-elimGᵉ Θloc x cl σ (liftᵉ {s = s} {u = a} f i e) =
-    trans (cong₃ liftᵉ (sub-elimGᵗ ((a ×ᵗ s) ∷ Θloc) x cl σ f)
+  sub-elimGᵉ Θloc x cl σ (mapᵉ {s = s} f e) =
+    trans (cong₂ mapᵉ (sub-elimGᵗ (s ∷ Θloc) x cl σ f)
+                   (sub-elimGᵉ Θloc x cl σ e))
+          (sym (gMap Θloc (++-identityʳ Θloc) x _ _ _))
+  sub-elimGᵉ Θloc x cl σ (scanᵉ {s = s} {t = a} f i e) =
+    trans (cong₃ scanᵉ (sub-elimGᵗ ((a ×ᵗ s) ∷ Θloc) x cl σ f)
                    (sub-elimGᵗ Θloc x cl σ i) (sub-elimGᵉ Θloc x cl σ e))
-          (sym (gLift Θloc (++-identityʳ Θloc) x _ _ _ _))
+          (sym (gScan Θloc (++-identityʳ Θloc) x _ _ _ _))
   sub-elimGᵉ Θloc x cl σ (mergeAllᵉ lim e) =
     trans (cong (mergeAllᵉ lim) (sub-elimGᵉ Θloc x cl σ e))
           (sym (gMerge Θloc (++-identityʳ Θloc) x _ lim _))
@@ -669,10 +685,14 @@ mutual
   sub-elimDᵉ Θloc x cl σ (takeᵉ m e) =
     trans (cong₂ takeᵉ (sub-elimDᵗ Θloc x cl σ m) (sub-elimDᵉ Θloc x cl σ e))
           (sym (dTake Θloc (++-identityʳ Θloc) x _ _ _))
-  sub-elimDᵉ Θloc x cl σ (liftᵉ {s = s} {u = a} f i e) =
-    trans (cong₃ liftᵉ (sub-elimDᵗ ((a ×ᵗ s) ∷ Θloc) x cl σ f)
+  sub-elimDᵉ Θloc x cl σ (mapᵉ {s = s} f e) =
+    trans (cong₂ mapᵉ (sub-elimDᵗ (s ∷ Θloc) x cl σ f)
+                   (sub-elimDᵉ Θloc x cl σ e))
+          (sym (dMap Θloc (++-identityʳ Θloc) x _ _ _))
+  sub-elimDᵉ Θloc x cl σ (scanᵉ {s = s} {t = a} f i e) =
+    trans (cong₃ scanᵉ (sub-elimDᵗ ((a ×ᵗ s) ∷ Θloc) x cl σ f)
                    (sub-elimDᵗ Θloc x cl σ i) (sub-elimDᵉ Θloc x cl σ e))
-          (sym (dLift Θloc (++-identityʳ Θloc) x _ _ _ _))
+          (sym (dScan Θloc (++-identityʳ Θloc) x _ _ _ _))
   sub-elimDᵉ Θloc x cl σ (mergeAllᵉ lim e) =
     trans (cong (mergeAllᵉ lim) (sub-elimDᵉ Θloc x cl σ e))
           (sym (dMerge Θloc (++-identityʳ Θloc) x _ lim _))

@@ -32,7 +32,7 @@ open import Relation.Binary.PropositionalEquality
 
 open import Rx.Exp
   using (Ty; Ctx; Exp; Tm; Val; Ren∈; ext∈; ++Ren; renExp; renTm; renTms; subΘExp; subΘTm; subΘTms;
-  input; ofᵉ; emptyᵉ; takeᵉ; batchSyncᵉ; liftᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ;
+  input; ofᵉ; emptyᵉ; takeᵉ; batchSyncᵉ; mapᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ;
   varᵗ; unit̂; bool̂; nat̂; uniq̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ;
   nilᵗ; consᵗ; foldᵗ)
 open import Rx.Subst-Transport using (cong₃)
@@ -78,8 +78,10 @@ mutual
   ren-idᵉ ig id it (ofᵉ ts)   = cong ofᵉ (ren-idᵗˢ ig id it ts)
   ren-idᵉ ig id it (takeᵉ m e) =
     cong₂ takeᵉ (ren-idᵗ ig id it m) (ren-idᵉ ig id it e)
-  ren-idᵉ ig id it (liftᵉ f i e) =
-    cong₃ liftᵉ (ren-idᵗ ig id (ext-id it) f) (ren-idᵗ ig id it i)
+  ren-idᵉ ig id it (mapᵉ f e) =
+    cong₂ mapᵉ (ren-idᵗ ig id (ext-id it) f) (ren-idᵉ ig id it e)
+  ren-idᵉ ig id it (scanᵉ f i e) =
+    cong₃ scanᵉ (ren-idᵗ ig id (ext-id it) f) (ren-idᵗ ig id it i)
                 (ren-idᵉ ig id it e)
   ren-idᵉ ig id it (mergeAllᵉ lim e) =
     cong (mergeAllᵉ lim) (ren-idᵉ ig id it e)
@@ -153,8 +155,10 @@ mutual
   sub-renᵉ σ ag (ofᵉ ts)   = cong ofᵉ (sub-renᵗˢ σ ag ts)
   sub-renᵉ σ ag (takeᵉ m e) =
     cong₂ takeᵉ (sub-renᵗ σ ag m) (sub-renᵉ σ ag e)
-  sub-renᵉ σ ag (liftᵉ f i e) =
-    cong₃ liftᵉ (sub-renᵗ σ (lands-ext ag) f) (sub-renᵗ σ ag i)
+  sub-renᵉ σ ag (mapᵉ f e) =
+    cong₂ mapᵉ (sub-renᵗ σ (lands-ext ag) f) (sub-renᵉ σ ag e)
+  sub-renᵉ σ ag (scanᵉ f i e) =
+    cong₃ scanᵉ (sub-renᵗ σ (lands-ext ag) f) (sub-renᵗ σ ag i)
                 (sub-renᵉ σ ag e)
   sub-renᵉ σ ag (mergeAllᵉ lim e) = cong (mergeAllᵉ lim) (sub-renᵉ σ ag e)
   sub-renᵉ σ ag (switchAllᵉ e)    = cong switchAllᵉ (sub-renᵉ σ ag e)

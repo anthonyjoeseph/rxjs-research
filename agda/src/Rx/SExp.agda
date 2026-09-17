@@ -42,7 +42,7 @@ open import Rx.Envelope using (machineEmitᵗ)
 -- observable is a BINDING and not an expression, so it lives in the
 -- slot telescope and is referenced with `inputˢ`.  `mapˢ` and `scanˢ`
 -- are likewise absent as formers because they are definitions over
--- `liftˢ`, exactly as their plain counterparts are over `liftᵉ`.
+-- `liftˢ`, exactly as their plain counterparts are over `scanᵉ`.
 
 mutual
 
@@ -142,7 +142,7 @@ emitᶜ ts = map emitᵗ ts
 -- elaboration to WRAP each one, wrapping being an operation no program
 -- could perform.  A program can perform it: the envelope's source is a
 -- token `mintᵉ` binds, and the rest of the stamp is a fold over the
--- arriving values -- one `liftᵉ` per input, seeded once per
+-- arriving values -- one `scanᵉ` per input, seeded once per
 -- subscription.  What the seed still wants is the AMBIENT INSTANT, so
 -- that a cold source's synchronous burst INHERITS the subscriber's
 -- rather than minting, and that one capability is what is missing.

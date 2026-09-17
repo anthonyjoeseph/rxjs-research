@@ -33,7 +33,7 @@ open import Rx.Prim using (Id; Tick)
 open import Rx.Exp using (Ctx; Closed; Val; obs; Fn; _×ᵗ_; listᵗ; _≟ᵗ_)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; AllOp; NodeId;
   NodeState; Frame; take-st; batchSync-st; batchSyncDispatch; cell-st; takeVals; takeDispatch;
-  liftDispatch; thruWrap;
+  scanDispatch; thruWrap;
   switchKill; oneShotBurst; lookupNode; mergeAll-st; switch-st; exhaust-st;
   mergeAllᵒ; switchᵒ; exhaustᵒ)
 open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeAll⇓; pushBurst⇓;
@@ -48,7 +48,7 @@ open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeAll⇓; pushBurst
   walk-nil; walk-cons; drain-nil; drain-no-room; drain-room;
   finish-all-drain; finish-switch-clear; finish-exhaust-clear; finish-nil;
   react-false; react-alive; react-dead;
-  step-lift; step-take; step-batchSync; step-from-inner;
+  step-scan; step-take; step-batchSync; step-from-inner;
   step-thru-outer; push-nil; push-cons; sub-all;
   connect-live; connect-died; slot-spent; slot-join; slot-connect)
 
@@ -106,7 +106,7 @@ lift-slots : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u w}
   (nid : NodeId) (vals : List (Val Γ s)) (fin : Bool)
   (sched : Sched Γ) (st : EvalSt e) (ns : Maybe (NodeState Γ)) →
   Sched.slots (proj₁ (proj₂ (proj₂ (proj₂
-    (liftDispatch {e = e} fn nid vals fin sched st ns)))))
+    (scanDispatch {e = e} fn nid vals fin sched st ns)))))
     ≡ Sched.slots sched
 lift-slots {w = w} fn nid vals fin sched st (just (cell-st {v} a))
   with v ≟ᵗ w
@@ -234,7 +234,7 @@ mutual
       (vals′ , evs , fin′ , sched′ , st′) →
     Sched.slots sched′ ≡ Sched.slots sched
   step-keeps {vals = vals} {fin = fin} {sched = sched} {st = st}
-             (step-lift {fn = fn} {nid = nid}) =
+             (step-scan {fn = fn} {nid = nid}) =
     lift-slots fn nid vals fin sched st (lookupNode nid (EvalSt.nodes st))
   step-keeps {id = id} {now = now} {vals = vals} {fin = fin}
              {sched = sched} {st = st} (step-take {nid = nid}) =

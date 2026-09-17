@@ -236,15 +236,24 @@ data AllOp : Set where
 -- an operator at all: a shared slot fans out by registry multiplicity,
 -- one chain per subscriber (see share-sink / dispatchShare)
 data Frame {n} (Γ : Ctx n) : Ty → Ty → Set where
-  lift-f     : ∀ {s u w} → Fn Γ [] [] [] (w ×ᵗ s) (w ×ᵗ listᵗ u)
+  map-f      : ∀ {s u} → Fn Γ [] [] [] s u → Frame Γ s u
+               -- the stateless step, applied once per arriving value.
+               -- It OWNS NO NODE, and that is forced rather than
+               -- chosen: a cell would need a seed, and the term
+               -- language has no generic inhabitant to build one from.
+  scan-f     : ∀ {s u} → Fn Γ [] [] [] (u ×ᵗ s) u
              → NodeId → Frame Γ s u
-               -- the lifted step, applied ONCE PER ARRIVING VALUE with
-               -- its cell threaded along, handing back zero or more.
-               -- That is the largest a frame can be while leaving the
-               -- protocol alone: it reads no node but its own cell,
-               -- mints no registration and cannot raise fin.  It cannot
-               -- see the frame it is stepping, which is what keeps it
-               -- expressible as a plain-rxjs `scan` into `mergeMap`.
+               -- the accumulating step, applied ONCE PER ARRIVING VALUE
+               -- with its cell threaded along.  Its output IS its
+               -- carried state, which is what rxjs's `scan` is and why
+               -- the seed lives in the cell rather than in the type.
+               --
+               -- Between them these two are the largest a frame can be
+               -- while leaving the protocol alone: each reads no node
+               -- but its own cell, mints no registration and cannot
+               -- raise fin, and neither can see the frame it is
+               -- stepping — which is what keeps both expressible as the
+               -- plain-rxjs operators they are named after.
   take-f     : ∀ {s} → NodeId → Frame Γ s s
   batchSync-f : ∀ {s} → NodeId → Frame Γ s (s ×ᵗ listᵗ s)
                -- THE ONLY FRAME WHOSE OUTPUT TYPE IS NOT ITS INPUT'S
@@ -324,7 +333,8 @@ lowerFloor le (share-sink i p) = share-sink i (≤-trans le p)
 lowerFloor le (f ↠ p)          = f ↠ lowerFloor le p
 
 frameNodes : ∀ {n} {Γ : Ctx n} {s u} → Frame Γ s u → List NodeId
-frameNodes (lift-f _ k)       = k ∷ []
+frameNodes (map-f _)          = []
+frameNodes (scan-f _ k)       = k ∷ []
 frameNodes (take-f k)         = k ∷ []
 frameNodes (batchSync-f k)    = k ∷ []
 frameNodes (from-inner _ k j) = k ∷ j ∷ []
@@ -551,39 +561,39 @@ aliveThroughᶠ inst st (rid , rs , (w , p)) =
   ∧ (not (memberSource (regSource rs) (EvalSt.dying st))
      ∨ not (any (_≡ᵇ rid) (EvalSt.delivered st)))
 
--- THE LIFTED STEP, WHICH IS A LEFT FOLD AND NOT ONE APPLICATION.  The
--- function is handed the carried state and ONE value and hands back
--- the next state with that value's output, so what the evaluator does
--- here is read the cell, walk the arriving list threading the state,
--- concatenate the outputs, and write the last state back.  That walk
--- is `scan` into `mergeMap`, which is why a plain-rxjs pipeline can
--- run it: the step is never told how many values shared its frame, so
--- there is nothing here for a frameless library to fail to supply.
-liftVals : ∀ {n} {Γ : Ctx n} {s u w} → Fn Γ [] [] [] (w ×ᵗ s) (w ×ᵗ listᵗ u)
-         → Val Γ w → List (Val Γ s) → List (Val Γ u) × Val Γ w
-liftVals fn ac []         = [] , ac
-liftVals fn ac (v ∷ vals) =
-  let step = applyFn fn (ac , v)
-      rest = liftVals fn (proj₁ step) vals
-  in proj₂ step ++ proj₁ rest , proj₂ rest
+-- THE ACCUMULATING STEP, WHICH IS A LEFT FOLD AND NOT ONE
+-- APPLICATION.  The function is handed the carried state and ONE
+-- value and hands back the next state, which is also the value
+-- emitted, so what the evaluator does here is read the cell, walk the
+-- arriving list threading the state, and write the last state back.
+-- That walk is `scan`, which is why a plain-rxjs pipeline can run it:
+-- the step is never told how many values shared its frame, so there is
+-- nothing here for a frameless library to fail to supply.
+scanVals : ∀ {n} {Γ : Ctx n} {s u} → Fn Γ [] [] [] (u ×ᵗ s) u
+         → Val Γ u → List (Val Γ s) → List (Val Γ u) × Val Γ u
+scanVals fn ac []         = [] , ac
+scanVals fn ac (v ∷ vals) =
+  let ac′  = applyFn fn (ac , v)
+      rest = scanVals fn ac′ vals
+  in ac′ ∷ proj₁ rest , proj₂ rest
 
 -- The same stuck reading as the fold's: a cell of the wrong type emits
 -- nothing and writes nothing, stated as a function so no prover can
 -- prefer that arm at a node that really does hold the state.
-liftDispatch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u w}
-             → Fn Γ [] [] [] (w ×ᵗ s) (w ×ᵗ listᵗ u) → NodeId
+scanDispatch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+             → Fn Γ [] [] [] (u ×ᵗ s) u → NodeId
              → List (Val Γ s) → Bool
              → Sched Γ → EvalSt e → Maybe (NodeState Γ)
              → List (Val Γ u) × List (InstEvent (Val Γ t)) × Bool
                × Sched Γ × EvalSt e
-liftDispatch {w = w} fn nid vals fin sched st (just (cell-st {v} a))
-  with v ≟ᵗ w
+scanDispatch {u = u} fn nid vals fin sched st (just (cell-st {v} a))
+  with v ≟ᵗ u
 ... | no  _    = [] , [] , fin , sched , st
 ... | yes refl =
-      proj₁ (liftVals fn a vals) , [] , fin , sched ,
-      record st { nodes = setNode nid (cell-st (proj₂ (liftVals fn a vals)))
+      proj₁ (scanVals fn a vals) , [] , fin , sched ,
+      record st { nodes = setNode nid (cell-st (proj₂ (scanVals fn a vals)))
                                   (EvalSt.nodes st) }
-liftDispatch fn nid vals fin sched st _ = [] , [] , fin , sched , st
+scanDispatch fn nid vals fin sched st _ = [] , [] , fin , sched , st
 
 -- take's per-emit step, lifted out of stepFrame so the well-formedness proof
 -- can reason about its reduction over a stuck node lookup.  Non-cut passes the

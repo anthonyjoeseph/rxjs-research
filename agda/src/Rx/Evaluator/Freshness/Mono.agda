@@ -34,7 +34,7 @@ open import Rx.Mint using (MintKey; ordinalᵏ; sourceᵏ; nodeᵏ; regᵏ; fres
 open import Rx.Exp using (Ctx; Closed; Val; obs; Fn; _×ᵗ_; listᵗ; _≟ᵗ_)
 open import Rx.Prim using (Id; InstEvent)
 open import Rx.Evaluator using (Sched; EvalSt; Path; Frame; NodeId; NodeState; AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ;
-  oneShotBurst; switchKill; liftDispatch; takeDispatch; batchSyncDispatch; thruWrap; cell-st; take-st; batchSync-st;
+  oneShotBurst; switchKill; scanDispatch; takeDispatch; batchSyncDispatch; thruWrap; cell-st; take-st; batchSync-st;
   mergeAll-st; switch-st; exhaust-st; lookupNode; takeVals)
 open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeInner⇓; thruConsume⇓;
   thruWalk⇓; mergeAllDrain⇓; innerFinish⇓; innerReact⇓; stepFrame⇓; pushBurst⇓;
@@ -47,7 +47,7 @@ open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeInner⇓; thruCon
   walk-nil; walk-cons; drain-nil; drain-no-room; drain-room;
   finish-all-drain; finish-switch-clear; finish-exhaust-clear; finish-nil;
   react-false; react-alive; react-dead;
-  step-lift; step-take; step-batchSync; step-from-inner; step-thru-outer;
+  step-scan; step-take; step-batchSync; step-from-inner; step-thru-outer;
   push-nil; push-cons; sub-all; connect-live; connect-died;
   slot-spent; slot-join; slot-connect)
 
@@ -70,24 +70,24 @@ switchKill-mint nothing  sched st refl k = ≤-refl
 switchKill-mint (just v) sched st refl k = ≤-refl
 
 -- the lifted step rewrites its own cell and nothing else
-liftDispatch-mint : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u w}
+scanDispatch-mint : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u w}
                       (fn : Fn Γ [] [] [] (w ×ᵗ s) (w ×ᵗ listᵗ u)) (nid : NodeId)
                       (vals : List (Val Γ s)) (fin : Bool)
                       (sched : Sched Γ) (st : EvalSt e) (m : Maybe (NodeState Γ))
                       (k : MintKey)
                   → freshId k (Sched.mint sched)
                     ≤ freshId k (Sched.mint (proj₁ (proj₂ (proj₂ (proj₂
-                        (liftDispatch {e = e} fn nid vals fin sched st m))))))
-liftDispatch-mint {w = w} fn nid vals fin sched st (just (cell-st {v} a)) k
+                        (scanDispatch {e = e} fn nid vals fin sched st m))))))
+scanDispatch-mint {w = w} fn nid vals fin sched st (just (cell-st {v} a)) k
   with v ≟ᵗ w
 ... | no  _    = ≤-refl
 ... | yes refl = ≤-refl
-liftDispatch-mint fn nid vals fin sched st nothing k = ≤-refl
-liftDispatch-mint fn nid vals fin sched st (just (take-st _)) k = ≤-refl
-liftDispatch-mint fn nid vals fin sched st (just (batchSync-st _)) k = ≤-refl
-liftDispatch-mint fn nid vals fin sched st (just (mergeAll-st _ _ _ _)) k = ≤-refl
-liftDispatch-mint fn nid vals fin sched st (just (switch-st _ _)) k = ≤-refl
-liftDispatch-mint fn nid vals fin sched st (just (exhaust-st _ _)) k = ≤-refl
+scanDispatch-mint fn nid vals fin sched st nothing k = ≤-refl
+scanDispatch-mint fn nid vals fin sched st (just (take-st _)) k = ≤-refl
+scanDispatch-mint fn nid vals fin sched st (just (batchSync-st _)) k = ≤-refl
+scanDispatch-mint fn nid vals fin sched st (just (mergeAll-st _ _ _ _)) k = ≤-refl
+scanDispatch-mint fn nid vals fin sched st (just (switch-st _ _)) k = ≤-refl
+scanDispatch-mint fn nid vals fin sched st (just (exhaust-st _ _)) k = ≤-refl
 
 -- the truncation's cut sweeps registrations, never the mint
 takeDispatch-mint : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
@@ -304,8 +304,8 @@ subscribeE-mono (subs-mint {sched = sched} refl sub) k =
 pushBurst-mono push-nil              k = ≤-refl
 pushBurst-mono (push-cons _ st rest) k = ≤-trans (stepFrame-mono st k) (pushBurst-mono rest k)
 
-stepFrame-mono (step-lift {fn = fn} {nid} {vals = vals} {fin} {sched} {st}) k =
-  liftDispatch-mint fn nid vals fin sched st (lookupNode nid (EvalSt.nodes st)) k
+stepFrame-mono (step-scan {fn = fn} {nid} {vals = vals} {fin} {sched} {st}) k =
+  scanDispatch-mint fn nid vals fin sched st (lookupNode nid (EvalSt.nodes st)) k
 stepFrame-mono (step-take {nid = nid} {vals = vals} {fin} {sched} {st}) k =
   takeDispatch-mint nid vals fin sched st (lookupNode nid (EvalSt.nodes st)) k
 stepFrame-mono (step-batchSync {nid = nid} {vals = vals} {fin} {sched} {st}) k =

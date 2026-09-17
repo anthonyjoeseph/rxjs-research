@@ -11,7 +11,7 @@ open import Relation.Binary.PropositionalEquality using (subst; refl)
 
 open import Rx.Exp using (Ty; Ctx; Exp; Tm; Fn; natᵗ; listᵗ; obs; _×ᵗ_;
                           boolᵗ; uniqᵗ;
-                          input; μᵉ; varᵉ; deferᵉ; liftᵉ;
+                          input; μᵉ; varᵉ; deferᵉ; scanᵉ;
                           varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; nilᵗ;
                           consᵗ; inlᵗ; inrᵗ; caseᵗ; foldᵗ; ifᵗ; primᵗ; strmᵗ;
                           letᵗ; revᵗ; renTm; ext∈;
@@ -208,7 +208,7 @@ liftᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {s t u : Ty}
                     (plainᵗ u ×ᵗ listᵗ (plainᵗ t))
       → Tm Γ Δᵍ Δ Θ (plainᵗ u)
       → Exp Γ Δᵍ Δ Θ (emitᵗ s) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
-liftᵖ {Θ = Θ} {s = s} {t = t} {u = u} f z e = liftᵉ step z e
+liftᵖ {Θ = Θ} {s = s} {t = t} {u = u} f z e = scanᵉ step z e
   where
   -- the outer fold's accumulator: the author's state, and the emits
   -- rebuilt so far in reverse

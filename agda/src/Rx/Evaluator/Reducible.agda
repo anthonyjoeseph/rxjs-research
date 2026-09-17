@@ -57,7 +57,7 @@ open import Rx.Prim using (Id; Tick; Source; InstEmit; InstEvent; init; value; c
 open import Rx.Mint using (nodeᵏ; regᵏ; sourceᵏ; freshId; setAt; next)
 open import Rx.Slots using (scripted; shared)
 open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; obs; listᵗ; _≟ᵗ_; Ctx; Closed; Val; Exp; Tm; Fn; evalTm; evalWith; foldVals; applyFn; input; ofᵉ; emptyᵉ;
-  takeᵉ; batchSyncᵉ; liftᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ; isData; unfoldμ;
+  takeᵉ; batchSyncᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ; isData; unfoldμ;
   varᵗ; unit̂; bool̂; nat̂; uniq̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ;
   nilᵗ; consᵗ; foldᵗ;
   add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ; subΘExp; subΘTm; subΘTms; lookupEnv;
@@ -69,16 +69,16 @@ open import Rx.Subst-Elim using (sub-elimGᵉ)
 open import Rx.Subst-Eval using (sub-evalTm; sub-applyFn)
 open import Rx.Subst-Identity using (subΘ-id-exp)
 open import Decide using (∧ˡ; ∧ʳ)
-open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; _↠_; take-f; lift-f; take-st; cell-st; thru-outer;
+open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; _↠_; take-f; scan-f; take-st; cell-st; thru-outer;
   batchSync-f; batchSync-st; batchSyncDispatch; groupSync; soloSync; setNode;
   mergeAllᵒ; switchᵒ; exhaustᵒ; mergeAll-st; switch-st; exhaust-st; takeVals; takeDispatch;
-  liftVals; liftDispatch; lookupNode; NodeState; installNode; oneShotBurst; memberSource;
+  scanVals; scanDispatch; lookupNode; NodeState; installNode; oneShotBurst; memberSource;
   splitEvents; splitBurst; retagEvents; NodeId; AllOp; from-inner; consumeUsable; hasRoom;
   switchKill; thruWrap; share-sink; register; atSlot; lowerFloor; burstCompleted; sharedPlumb;
   spentBurst)
 open import Rx.Evaluator.Freshness using (lookup-set; PreservedBelow)
 open import Rx.Evaluator.Freshness.Preserve using (subscribeE-preserves)
-open import Rx.Evaluator.Domain using (srcFrame; subscribeE⇓; pushBurst⇓; stepFrame⇓; step-lift; step-take; step-batchSync;
+open import Rx.Evaluator.Domain using (srcFrame; subscribeE⇓; pushBurst⇓; stepFrame⇓; step-scan; step-take; step-batchSync;
   subs-batchSync; push-nil;
   push-cons; subs-of; subs-empty; subs-take-zero; subs-take-suc; subs-lift;
   subs-defer; subs-mint; subs-floor; subs-hot-done; subs-hot-live; subs-cold-sync; subs-cold-async;
@@ -220,7 +220,7 @@ redFoldVals f σ step (p ∷ ps) ra = redFoldVals f σ step ps (step p ra)
 --   no information.
 RedNode : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
         → Frame Γ s u → EvalSt e → Set
-RedNode {Γ = Γ} (lift-f fn nid) st =
+RedNode {Γ = Γ} (scan-f fn nid) st =
   ∀ {w} {a : Val Γ w}
   → lookupNode nid (EvalSt.nodes st) ≡ just (cell-st a) → Red w a
 RedNode (take-f nid)                st = ⊤
@@ -538,7 +538,7 @@ satValues (p ∷ ps) = p ∷ satValues ps
 -- the first component of that pair being reducible, is the store
 -- obligation beside this one rather than anything about the function.
 RedFrame : ∀ {n} {Γ : Ctx n} {s u} → Frame Γ s u → Set
-RedFrame (lift-f fn nid)             = RedFn fn
+RedFrame (scan-f fn nid)             = RedFn fn
 RedFrame (take-f nid)                = ⊤
 RedFrame (batchSync-f nid)           = ⊤
 RedFrame (from-inner op allNid inst) = ⊤
@@ -662,8 +662,8 @@ redLiftVals : ∀ {n} {Γ : Ctx n} {s u w}
               (fn : Fn Γ [] [] [] (w ×ᵗ s) (w ×ᵗ listᵗ u)) → RedFn fn
             → {a : Val Γ w} → Red w a
             → {vals : List (Val Γ s)} → All (Red s) vals
-            → All (Red u) (proj₁ (liftVals fn a vals))
-              × Red w (proj₂ (liftVals fn a vals))
+            → All (Red u) (proj₁ (scanVals fn a vals))
+              × Red w (proj₂ (scanVals fn a vals))
 redLiftVals fn rf ra rv = proj₂ (rf (ra , rv)) , proj₁ (rf (ra , rv))
 
 -- the installation argument, spent at the cell the former writes
@@ -673,11 +673,11 @@ red-lift-installed : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u w lo}
          → {b : Closed Γ s} {κ : Path Γ lo u t} {id : Id} {now : Tick}
          → (sched : Sched Γ) (st : EvalSt e)
          → {sched₂ : Sched Γ} {st₁ : EvalSt e} {burst : Stream Γ s}
-         → subscribeE⇓ {e = e} b (lift-f fn nid ↠ κ) id now
+         → subscribeE⇓ {e = e} b (scan-f fn nid ↠ κ) id now
              (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
              (installNode nid (cell-st a) st)
              (burst , sched₂ , st₁)
-         → RedNode {e = e} (lift-f fn nid) st₁
+         → RedNode {e = e} (scan-f fn nid) st₁
 red-lift-installed {e = e} fn nid {a} ra sched st d eq =
   tie-cell (trans (sym (trans (PreservedBelow.below
                                  (subscribeE-preserves (suc nid) ≤-refl d)
@@ -691,18 +691,18 @@ redLiftDispatch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u w}
                   {vals : List (Val Γ s)} (fin : Bool)
                   (sched : Sched Γ) (st : EvalSt e) (m : Maybe (NodeState Γ))
                 → lookupNode nid (EvalSt.nodes st) ≡ m
-                → RedNode {e = e} (lift-f fn nid) st → RedFn fn → All (Red s) vals
-                → All (Red u) (proj₁ (liftDispatch {e = e} fn nid vals fin sched st m))
-                  × RedNode {e = e} (lift-f fn nid)
+                → RedNode {e = e} (scan-f fn nid) st → RedFn fn → All (Red s) vals
+                → All (Red u) (proj₁ (scanDispatch {e = e} fn nid vals fin sched st m))
+                  × RedNode {e = e} (scan-f fn nid)
                       (proj₂ (proj₂ (proj₂ (proj₂
-                        (liftDispatch {e = e} fn nid vals fin sched st m)))))
+                        (scanDispatch {e = e} fn nid vals fin sched st m)))))
 redLiftDispatch {w = w} fn nid {vals} fin sched st (just (cell-st {v} a)) eq rn rf rv
   with v ≟ᵗ w
 ... | no  _    = [] , rn
 ... | yes refl =
       let (outs , last) = redLiftVals fn rf (rn eq) rv
       in outs , λ eq′ → tie-cell (trans (sym (lookup-set nid
-                                    (cell-st (proj₂ (liftVals fn a vals)))
+                                    (cell-st (proj₂ (scanVals fn a vals)))
                                     (EvalSt.nodes st)))
                                   eq′)
                           last
@@ -719,12 +719,12 @@ red-lift : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u w lo}
            (κ : Path Γ lo u t) → RedFn fn
          → {vals : List (Val Γ s)} → All (Red s) vals → (fin : Bool)
          → (sched : Sched Γ) (st : EvalSt e)
-         → RedNode {e = e} (lift-f fn nid) st
-         → RedStep {e = e} id now (lift-f fn nid) κ vals fin sched st
+         → RedNode {e = e} (scan-f fn nid) st
+         → RedStep {e = e} id now (scan-f fn nid) κ vals fin sched st
 red-lift id now fn nid κ rf rv fin sched st rn =
   let (rvs , rn′) = redLiftDispatch fn nid fin sched st
                        (lookupNode nid (EvalSt.nodes st)) refl rn rf rv
-  in _ , step-lift , rvs , rn′
+  in _ , step-scan , rvs , rn′
 
 -- STEPPING ONE FRAME, DISPATCHED ON THE FRAME, AND ONLY EVER A SOURCE
 -- FRAME.  The mapping arm is a body because nothing about it is
@@ -741,7 +741,7 @@ red-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
            {vals : List (Val Γ s)} → All (Red s) vals → (fin : Bool)
            (sched : Sched Γ) (st : EvalSt e) → RedNode f st
          → RedStep {e = e} id now f κ vals fin sched st
-red-step id now (lift-f fn nid) sv rf κ rv fin sched st rn =
+red-step id now (scan-f fn nid) sv rf κ rv fin sched st rn =
   red-lift id now fn nid κ rf rv fin sched st rn
 red-step id now (take-f nid) sv rf κ rv fin sched st rn =
   red-take id now nid κ rv fin sched st
@@ -888,7 +888,7 @@ mutual
     in ( out , sched₃
        , record st₂ { nodes = setNode nid (batchSync-st false) (EvalSt.nodes st₂) } )
        , subs-batchSync refl d p , sat′
-  redExpAcc (liftᵉ {s = s} {u = w} f z b) σ rσ k ok aK (acc rs) κ id now sched st =
+  redExpAcc (scanᵉ {s = s} {u = w} f z b) σ rσ k ok aK (acc rs) κ id now sched st =
     let nid = freshId nodeᵏ (Sched.mint sched)
         fn  = subΘTm ((w ×ᵗ s) ∷ []) σ f
         zbe = inputsBelowᵗ k z ∧ inputsBelowᵉ k b
@@ -906,11 +906,11 @@ mutual
           redExpAcc b σ rσ k okb aK
             (rs (s≤s (≤-trans (m≤n+m (gsizeᵉ b) (gsizeᵗ z))
                               (m≤n+m (gsizeᵗ z + gsizeᵉ b) (gsizeᵗ f)))))
-            (lift-f fn nid ↠ κ) id now
+            (scan-f fn nid ↠ κ) id now
             (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
             (installNode nid (cell-st (evalTm (subΘTm [] σ z))) st)
         (r , p , sat′) =
-          red-push id now (lift-f fn nid) tt rf
+          red-push id now (scan-f fn nid) tt rf
             κ sat sched₂ st₁ (red-lift-installed fn nid rz sched st d)
     in r , subs-lift refl d p , sat′
   redExpAcc (mergeAllᵉ lim b) σ rσ k ok aK (acc rs) κ id now sched st =

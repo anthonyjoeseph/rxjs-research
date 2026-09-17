@@ -35,7 +35,7 @@ open import Rx.Mint using (nodeᵏ; freshId)
 open import Rx.Exp using (Ctx; Closed; Val; obs; Fn; _×ᵗ_; listᵗ; _≟ᵗ_)
 open import Rx.Prim using (InstEvent)
 open import Rx.Evaluator using (Sched; EvalSt; Path; Frame; NodeId; NodeState; AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ;
-  switchKill; liftDispatch; takeDispatch; batchSyncDispatch; thruWrap; mergeAllBump; liftVals; takeVals; cell-st;
+  switchKill; scanDispatch; takeDispatch; batchSyncDispatch; thruWrap; mergeAllBump; scanVals; takeVals; cell-st;
   take-st; batchSync-st; mergeAll-st; switch-st; exhaust-st; lookupNode)
 open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeInner⇓; thruConsume⇓;
   thruWalk⇓; mergeAllDrain⇓; innerFinish⇓; innerReact⇓; stepFrame⇓; pushBurst⇓;
@@ -48,7 +48,7 @@ open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeInner⇓; thruCon
   walk-nil; walk-cons; drain-nil; drain-no-room; drain-room;
   finish-all-drain; finish-switch-clear; finish-exhaust-clear; finish-nil;
   react-false; react-alive; react-dead;
-  step-lift; step-take; step-batchSync; step-from-inner; step-thru-outer;
+  step-scan; step-take; step-batchSync; step-from-inner; step-thru-outer;
   push-nil; push-cons; sub-all; connect-live; connect-died;
   slot-spent; slot-join; slot-connect)
 open import Rx.Evaluator.Freshness using (PreservedBelow; FrameAbove;
@@ -62,11 +62,11 @@ lift-pres : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u w} {f}
               (sched : Sched Γ) (st : EvalSt e) (m : Maybe (NodeState Γ))
           → f ≤ nid
           → PreservedBelow f st (proj₂ (proj₂ (proj₂ (proj₂
-              (liftDispatch {e = e} fn nid vals fin sched st m)))))
+              (scanDispatch {e = e} fn nid vals fin sched st m)))))
 lift-pres {w = w} fn nid vals fin sched st (just (cell-st {v} a)) f≤nid
   with v ≟ᵗ w
 ... | no  _    = pres-same _ _ refl
-... | yes refl = pres-write _ _ (cell-st (proj₂ (liftVals fn a vals))) refl f≤nid
+... | yes refl = pres-write _ _ (cell-st (proj₂ (scanVals fn a vals))) refl f≤nid
 lift-pres fn nid vals fin sched st nothing                    f≤nid = pres-same _ _ refl
 lift-pres fn nid vals fin sched st (just (take-st _))         f≤nid = pres-same _ _ refl
 lift-pres fn nid vals fin sched st (just (batchSync-st _))    f≤nid = pres-same _ _ refl
@@ -325,7 +325,7 @@ pushBurst-preserves f le fa (push-cons _ stp rest) =
              (pushBurst-preserves f (≤-trans le (stepFrame-mono stp nodeᵏ)) fa rest)
 
 stepFrame-preserves f le fa
-  (step-lift {fn = fn} {nid} {vals = vals} {fin} {sched} {st}) =
+  (step-scan {fn = fn} {nid} {vals = vals} {fin} {sched} {st}) =
   lift-pres fn nid vals fin sched st (lookupNode nid (EvalSt.nodes st)) fa
 stepFrame-preserves f le fa
   (step-take {nid = nid} {vals = vals} {fin} {sched} {st}) =

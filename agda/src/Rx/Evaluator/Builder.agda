@@ -56,12 +56,12 @@ open import Relation.Nullary.Decidable using (⌊_⌋)
 
 open import Rx.Prim using (Fuel; Id; Source; Tick; InstEmit; InstEvent; close;
   exhausted; hot; cold)
-open import Rx.Exp using (Ctx; Closed; Val; _≟ᵗ_; obs; unfoldμ; evalTm; subΘExp; input; ofᵉ; emptyᵉ; takeᵉ; batchSyncᵉ; liftᵉ; mergeAllᵉ;
+open import Rx.Exp using (Ctx; Closed; Val; _≟ᵗ_; obs; unfoldμ; evalTm; subΘExp; input; ofᵉ; emptyᵉ; takeᵉ; batchSyncᵉ; scanᵉ; mergeAllᵉ;
   switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ)
 open import Rx.Mint using (nodeᵏ; regᵏ; sourceᵏ; freshId; setAt; next)
 open import Rx.Slots using (Slots; shared; scripted)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; AllOp; NodeId; NodeState; Frame; root; _↠_; take-f;
-  lift-f; thru-outer; from-inner; mergeAllᵒ; switchᵒ; exhaustᵒ; mergeAll-st; switch-st;
+  scan-f; thru-outer; from-inner; mergeAllᵒ; switchᵒ; exhaustᵒ; mergeAll-st; switch-st;
   exhaust-st; take-st; batchSync-st; batchSync-f; cell-st; installNode; lookupNode; setNode; hasRoom; consumeUsable;
   switchKill; aliveThroughᶠ; splitEvents; splitBurst; sched-init; st-init; memberSource;
   share-sink; lowerFloor; register; atSlot; burstCompleted; Arrival; arrTick; arrSource; arrTy;
@@ -73,7 +73,7 @@ open import Rx.Evaluator.Domain using (srcFrame; subscribeE⇓; subscribeAll⇓;
   thruConsume⇓; subscribeInner⇓;
   finish-all-drain; finish-switch-clear;
   finish-exhaust-clear; finish-nil; react-false; react-alive; react-dead;
-  push-nil; push-cons; step-lift;
+  push-nil; push-cons; step-scan;
   step-take; step-batchSync; step-from-inner; step-thru-outer;
   walk-nil; walk-cons; consume-all-sub; consume-all-enqueue; consume-all-nil;
   consume-switch-sub; consume-switch-nil; consume-exhaust-sub;
@@ -308,13 +308,13 @@ subscribeE! sl (batchSyncᵉ b) κ id now sched ag st =
      , subs-batchSync refl d p
 
 
-subscribeE! sl (liftᵉ f i b) κ id now sched ag st =
+subscribeE! sl (scanᵉ f i b) κ id now sched ag st =
   let nid = freshId nodeᵏ (Sched.mint sched)
       ((burst , sched₂ , st₁) , d) =
-        subscribeE! sl b (lift-f f nid ↠ κ) id now
+        subscribeE! sl b (scan-f f nid ↠ κ) id now
                     (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) }) ag
                     (installNode nid (cell-st (evalTm i)) st)
-      (r , p) = pushBurst! sl id now (lift-f f nid) tt κ burst sched₂
+      (r , p) = pushBurst! sl id now (scan-f f nid) tt κ burst sched₂
                   (trans (subs-keeps d) ag) st₁
   in r , subs-lift refl d p
 
@@ -387,7 +387,7 @@ stepFrame! sl id now (take-f nid) sv κ vals fin sched ag st = _ , step-take
 stepFrame! sl id now (batchSync-f nid) sv κ vals fin sched ag st = _ , step-batchSync
 
 
-stepFrame! sl id now (lift-f fn nid) sv κ vals fin sched ag st = _ , step-lift
+stepFrame! sl id now (scan-f fn nid) sv κ vals fin sched ag st = _ , step-scan
 
 stepFrame! sl id now (from-inner op allNid inst) () κ vals fin sched ag st
 
@@ -653,8 +653,8 @@ stepFrameAny! sl id now (take-f nid) κ vals fin sched ag st =
   stepFrame! sl id now (take-f nid) tt κ vals fin sched ag st
 stepFrameAny! sl id now (batchSync-f nid) κ vals fin sched ag st =
   stepFrame! sl id now (batchSync-f nid) tt κ vals fin sched ag st
-stepFrameAny! sl id now (lift-f fn nid) κ vals fin sched ag st =
-  stepFrame! sl id now (lift-f fn nid) tt κ vals fin sched ag st
+stepFrameAny! sl id now (scan-f fn nid) κ vals fin sched ag st =
+  stepFrame! sl id now (scan-f fn nid) tt κ vals fin sched ag st
 stepFrameAny! sl id now (thru-outer op nid) κ vals fin sched ag st =
   stepFrame! sl id now (thru-outer op nid) tt κ vals fin sched ag st
 
