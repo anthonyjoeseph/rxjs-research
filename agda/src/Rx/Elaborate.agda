@@ -72,6 +72,14 @@ open import Rx.SExp using (SExp; STm; inputˢ; ofˢ; emptyˢ; takeˢ; liftˢ;
 postulate
   -- a source coming alive owes an `init` naming a token nothing has
   -- used, and the author's values owe an instant to be stamped with.
+  -- THE FIRST OF THOSE TWO IS NOW AVAILABLE AND THE SECOND IS NOT, SO
+  -- WHAT BLOCKS THIS IS THE READ ALONE.  `mintᵉ` binds an unforgeable
+  -- token drawn at the scheduler's own source key, once per
+  -- subscription, which is exactly the arity a source wants -- one
+  -- identifier, at subscribe time, that no term could have written.
+  -- What no former yet offers is the instant the values are stamped
+  -- with, and a source is the one place it cannot be projected off an
+  -- incoming envelope, there being none.
   -- DEAD ROUTE: build both inline, out of `uniq̂` and a counter carried
   --   in a lift's state.  `uniq̂` is a literal, so a program that writes
   --   one can write one already in use — which is the forgery the palette
@@ -123,6 +131,13 @@ postulate
   -- observables it carries, and the plain flattener runs them, their own
   -- emits being envelopes already.  What waits is the join's protocol
   -- traffic — a registration coming alive is a mint.
+  -- AND THE MINT BINDER DOES NOT REACH IT, WHICH IS WHY THIS STAYS
+  -- BLOCKED WHILE THE SOURCES DO NOT.  A mint draws ONE token, at the
+  -- scheduler's own source key, ONCE per subscription — the arity a
+  -- source wants.  A flattener brings registrations alive as the outer
+  -- stream hands it observables, so the count is dynamic and the key is
+  -- the registration one, a chain per subscribing path; neither is what
+  -- a binder fixed at subscribe time can supply.
   -- DEAD ROUTE: elaborate the handoff and init events in the projecting
   --   lift, which has the outer emit's instant but no token to name the
   --   inner source with.
