@@ -10,6 +10,7 @@ import {
   scan as rxScan,
   takeUntil,
   takeWhile,
+  tap,
 } from "rxjs";
 import {
   CutLedger,
@@ -25,7 +26,13 @@ import {
   reassemble,
   splitEmit,
 } from "./inst-emit.js";
-import { SYNC_END, UPSTREAM_DONE, channel, markSync } from "./constructors.js";
+import {
+  Marked,
+  SYNC_END,
+  UPSTREAM_DONE,
+  channel,
+  markSync,
+} from "./constructors.js";
 
 // ---- the one join engine: mergeAllAll/switchAll/exhaustAll ----
 // (the TS mirror of Agda's subscribeAll + stepFrame thru-outer/from-inner)
@@ -58,42 +65,73 @@ import { SYNC_END, UPSTREAM_DONE, channel, markSync } from "./constructors.js";
 //   registrations it still holds (Agda's cutThrough), and its teardown
 //   cancels whatever it had scheduled (sweepLive).
 
-// THE JOIN OWNS NO SUBSCRIPTION, AND A FRAME IS WHAT REPLACED IT. It
-// used to subscribe its outer and every inner by hand, because the one
-// thing it needs — an inner's subscribe burst, as a GROUP, grafted into
-// the emit that caused it — was only observable from inside a
-// subscriber. `markSync` makes that boundary a VALUE, so the whole
-// engine is a fold: every event enters one ordered channel, a FRAME
-// brackets a carrier emit together with whatever bursts its own
-// decisions produced, and a `scan` at the end reassembles each frame
-// into the single emit the protocol wants.
+// THE JOIN OWNS NO SUBSCRIPTION AND NO CELL: IT IS ONE FOLD. Every
+// event — the outer's, every inner's, and the engine's own decisions —
+// enters one ordered channel, and a single `scan` holds the whole
+// machine: the lane table, the parked queue, whether the outer is
+// finished, and the frame being assembled. Nothing is read out of a
+// variable, so nothing can be read at the wrong moment.
 //
 // THE CHANNEL IS WHAT MAKES THE ORDER EXACT, and it is the part worth
-// reading twice. Subscribing an inner is a PUSH, made from a `defer`
-// sitting between the carrier and the frame's end, so the burst it
-// releases lands after the carrier has already reached the fold and
-// before the end marker does. That is why a re-entrant push is safe
-// here: the carrier is spent by the time anything it caused is emitted.
+// reading twice. Subscribing an inner is a PUSH, and the push is made
+// from the fold's OUTPUT — so it happens after the item that caused it
+// has already been folded, and before the next item upstream is
+// released. The burst it releases therefore lands inside the frame that
+// caused it, and whatever the fold reads next sees that burst already
+// accounted for. That is also why a decision per arriving inner is a
+// separate ITEM rather than a loop: at limit 1, the second inner's
+// decision has to see whether the first survived its own burst, and
+// only a separate fold step can.
+type LaneId = number;
+
 type Item<A> =
-  // the emit a frame is built around: an outer emit, or one inner's
-  // later delivery (which opens a frame of its own, since finishing an
-  // inner can subscribe the next one)
-  | { tag: "carrier"; emit: InstEmit<unknown>; values: A[] }
-  // one emit of some inner's subscribe burst, belonging to whichever
-  // frame was open when that inner was subscribed
-  | { tag: "graft"; emit: InstEmit<A> }
-  // switch's victims, ahead of the replacement's burst
-  | { tag: "cut"; closes: InstEvent<never>[] }
-  | { tag: "frameEnd"; fin: boolean; done: boolean };
+  // the outer's emit: the frame is built around it
+  | { tag: "carrier"; emit: InstEmit<unknown> }
+  // one inner observable the outer just delivered, offered to the
+  // engine for its per-op decision
+  | { tag: "accept"; obs: Observable<InstEmit<A>>; instant: Provenance }
+  // the outer will deliver nothing further
+  | { tag: "outerFin" }
+  // one emit from a subscribed inner: a graft while it is still inside
+  // its subscribe burst, a carrier of its own afterwards
+  | { tag: "innerEmit"; lane: LaneId; emit: InstEmit<A> }
+  // that inner's subscribe burst is over
+  | { tag: "innerBoundary"; lane: LaneId }
+  // that inner rx-completed
+  | { tag: "innerDone"; lane: LaneId }
+  // mergeAll: take one parked inner if a lane is free
+  | { tag: "drain" }
+  | { tag: "frameEnd"; fromOuter: boolean };
 
 type JoinOp = "mergeAll" | "switch" | "exhaust";
 
-type InnerHandle<A> = {
-  open: SourceId[]; // this inner's live registrations — its fin bit
+// one subscribed inner, as the fold sees it
+type Lane<A> = {
+  id: LaneId;
+  open: SourceId[]; // its live registrations — its fin bit
   ledger: CutLedger; // who paid / was born this instant, for cut reasons
   burst: InstEmit<A>[]; // its subscribe burst, until the boundary
   spent: boolean; // it rx-completed inside that burst
-  cut: () => void; // switch's teardown, through takeUntil
+  live: boolean; // it survived past the boundary
+  seated: boolean; // it holds a lane (rxjs's `concurrent` counts these)
+};
+
+// the whole machine. The first four fields are the engine, the next
+// three are the frame under construction, and the last four are this
+// step's OUTPUT — what the fold asks its own downstream to do.
+type Engine<A> = {
+  lanes: Lane<A>[];
+  queue: Observable<InstEmit<A>>[]; // mergeAll only
+  outerDone: boolean;
+  nextId: LaneId;
+  carrier?: InstEmit<unknown>;
+  events: InstEvent<never>[];
+  values: A[];
+  done: boolean;
+  out?: InstEmit<A>;
+  subscribe: { id: LaneId; obs: Observable<InstEmit<A>> }[];
+  cuts: LaneId[];
+  needDrain: boolean;
 };
 
 const joinAll =
@@ -102,254 +140,277 @@ const joinAll =
     outer: Observable<InstEmit<Observable<InstEmit<A>>>>,
   ): Observable<InstEmit<A>> =>
     rxDefer(() => {
-      let outerDone = false;
-      const active: InnerHandle<A>[] = []; // mergeAll: up to `limit`; the rest at most one
-      const queue: Observable<InstEmit<A>>[] = []; // mergeAll only
-
       // the ordered channel every inner's traffic enters by. A push is
       // delivered synchronously, so push ORDER is output order.
       const [frames, frameSink] = channel<Observable<Item<A>>>();
+      // a cut names its victim by lane; the victim is listening
+      const [cuts, cutSink] = channel<LaneId>();
 
+      const seated = (e: Engine<A>) => e.lanes.filter((l) => l.seated).length;
       // is there a free lane? an absent limit is rxjs's Infinity
-      const hasRoom = () => limit === undefined || active.length < limit;
+      const hasRoom = (e: Engine<A>) =>
+        limit === undefined || seated(e) < limit;
+      const joinDone = (e: Engine<A>) =>
+        e.outerDone && seated(e) === 0 && e.queue.length === 0;
 
-      const joinDone = () =>
-        outerDone && active.length === 0 && queue.length === 0;
+      const openLane = (
+        e: Engine<A>,
+        obs: Observable<InstEmit<A>>,
+      ): Engine<A> => ({
+        ...e,
+        nextId: e.nextId + 1,
+        lanes: [
+          ...e.lanes,
+          {
+            id: e.nextId,
+            open: [],
+            ledger: emptyCutLedger,
+            burst: [],
+            spent: false,
+            live: false,
+            seated: false,
+          },
+        ],
+        subscribe: [...e.subscribe, { id: e.nextId, obs }],
+      });
 
-      const removeHandle = (handle: InnerHandle<A>) => {
-        const at = active.indexOf(handle);
-        if (at !== -1) active.splice(at, 1);
+      // the per-op decision for one arriving inner observable. switch's
+      // cut is a close for exactly the registrations the victim still
+      // holds, with per-victim reasons from its ledger (paid/born this
+      // instant ⇒ cut, else cutPending); the closes join the frame here,
+      // ahead of the replacement's burst, and the victim's teardown
+      // rides out on `cuts`.
+      const accept = (
+        e: Engine<A>,
+        obs: Observable<InstEmit<A>>,
+        cuttingInstant: Provenance,
+      ): Engine<A> => {
+        if (op === "mergeAll")
+          return hasRoom(e)
+            ? openLane(e, obs)
+            : { ...e, queue: [...e.queue, obs] };
+        if (op === "exhaust")
+          return e.lanes.some((l) => l.seated) ? e : openLane(e, obs);
+        const victim = e.lanes.find((l) => l.seated);
+        return openLane(
+          victim === undefined
+            ? e
+            : {
+                ...e,
+                lanes: e.lanes.filter((l) => l.id !== victim.id),
+                cuts: [...e.cuts, victim.id],
+                events: [
+                  ...e.events,
+                  ...cutVictimCloses(
+                    victim.open,
+                    victim.ledger,
+                    cuttingInstant,
+                  ),
+                ],
+              },
+          obs,
+        );
       };
 
-      // one inner, as items. Everything before its boundary is a graft
-      // for the open frame; everything after opens a frame of its own,
-      // because an emit that finishes this inner can subscribe the next.
-      const taggedInner = (
-        handle: InnerHandle<A>,
-        innerObs: Observable<InstEmit<A>>,
-        cutSignal: Observable<void>,
-      ): Observable<Item<A>> => {
-        let live = false;
-        return markSync(innerObs).pipe(
-          takeUntil(cutSignal),
-          mergeMap((item): Observable<Item<A>> => {
-            if (item === UPSTREAM_DONE) {
-              if (!live) handle.spent = true;
-              return EMPTY;
-            }
-            if (item === SYNC_END) {
-              live = true;
-              // the burst decided whether this inner survived it; only a
-              // survivor takes a lane (Agda: it is spent inside its own
-              // subscribe frame)
-              const done =
-                handle.spent ||
-                mergeAllBurst(handle.burst).done ||
-                handle.open.length === 0;
-              if (!done) active.push(handle);
-              return EMPTY;
-            }
-            handle.open = openAfter(item, handle.open, false);
-            handle.ledger = cutLedgerStep(item, handle.ledger);
-            if (!live) {
-              handle.burst = [...handle.burst, item];
-              return rxOf<Item<A>>({ tag: "graft", emit: item });
-            }
-            const parts = splitEmit(item);
-            const innerDone = parts.fin || handle.open.length === 0;
-            return concat(
-              rxOf<Item<A>>({
-                tag: "carrier",
-                emit: item,
-                values: parts.values,
-              }),
-              rxDefer(() => {
-                if (innerDone) {
-                  removeHandle(handle);
-                  if (op === "mergeAll") drainQueue();
-                }
-                return EMPTY;
-              }),
-              rxDefer(() =>
-                rxOf<Item<A>>({
-                  tag: "frameEnd",
-                  fin: false,
-                  done: joinDone(),
-                }),
+      // A FRAME'S EVENTS ACCUMULATE IN ARRIVAL ORDER, which is why a cut
+      // and a graft share one bucket: switch cuts the outgoing inner and
+      // subscribes the replacement once PER inner the carrier holds, so
+      // the close of the one and the init of the next interleave.
+      // Bucketing the two kinds apart reads as tidier and emits every
+      // cut ahead of every init, which is a different stream.
+      const step = (prev: Engine<A>, item: Item<A>): Engine<A> => {
+        const e: Engine<A> = {
+          ...prev,
+          out: undefined,
+          subscribe: [],
+          cuts: [],
+          needDrain: false,
+        };
+        switch (item.tag) {
+          case "carrier":
+            return { ...e, carrier: item.emit, events: [], values: [] };
+          case "accept":
+            return accept(e, item.obs, item.instant);
+          case "outerFin":
+            return { ...e, outerDone: true };
+          case "drain": {
+            const [head, ...rest] = e.queue;
+            return head === undefined || !hasRoom(e)
+              ? e
+              : { ...openLane({ ...e, queue: rest }, head), needDrain: true };
+          }
+          case "innerEmit": {
+            const lane = e.lanes.find((l) => l.id === item.lane);
+            if (lane === undefined) return e;
+            const open = openAfter(item.emit, lane.open, false);
+            const ledger = cutLedgerStep(item.emit, lane.ledger);
+            const parts = splitEmit(item.emit);
+            if (!lane.live)
+              return {
+                ...e,
+                lanes: e.lanes.map((l) =>
+                  l.id === lane.id
+                    ? { ...l, open, ledger, burst: [...l.burst, item.emit] }
+                    : l,
+                ),
+                events: [...e.events, ...parts.bookkeeping],
+                values: [...e.values, ...parts.values],
+              };
+            const innerDone = parts.fin || open.length === 0;
+            return {
+              ...e,
+              lanes: innerDone
+                ? e.lanes.filter((l) => l.id !== lane.id)
+                : e.lanes.map((l) =>
+                    l.id === lane.id ? { ...l, open, ledger } : l,
+                  ),
+              carrier: item.emit,
+              events: [],
+              values: parts.values,
+              needDrain: innerDone && op === "mergeAll",
+            };
+          }
+          case "innerBoundary": {
+            const lane = e.lanes.find((l) => l.id === item.lane);
+            if (lane === undefined) return e;
+            // the burst decided whether this inner survived it; only a
+            // survivor takes a lane (Agda: it is spent inside its own
+            // subscribe frame)
+            const dead =
+              lane.spent ||
+              mergeAllBurst(lane.burst).done ||
+              lane.open.length === 0;
+            return {
+              ...e,
+              lanes: dead
+                ? e.lanes.filter((l) => l.id !== lane.id)
+                : e.lanes.map((l) =>
+                    l.id === lane.id ? { ...l, live: true, seated: true } : l,
+                  ),
+            };
+          }
+          case "innerDone": {
+            const lane = e.lanes.find((l) => l.id === item.lane);
+            return lane === undefined || lane.live
+              ? e
+              : {
+                  ...e,
+                  lanes: e.lanes.map((l) =>
+                    l.id === lane.id ? { ...l, spent: true } : l,
+                  ),
+                };
+          }
+          case "frameEnd": {
+            const done = joinDone(e);
+            if (e.carrier === undefined) return { ...e, done };
+            const parts = splitEmit(e.carrier);
+            // a join spent inside the subscribe frame (subscribe OR
+            // plumbing carrier) materializes its complete right here
+            // (Agda's pushBurst appends on fin′); a spent delivery
+            // leaves that to the root, and an inner's own frame never
+            // carries it
+            const fin = item.fromOuter && done && e.carrier.kind !== "delivery";
+            return {
+              ...e,
+              carrier: undefined,
+              events: [],
+              values: [],
+              done,
+              out: reassemble(
+                e.carrier,
+                parts.bookkeeping,
+                e.events,
+                e.values,
+                fin,
               ),
-            );
+            };
+          }
+        }
+      };
+
+      // one inner, as items. The only thing decided here is WHERE its
+      // subscribe boundary falls, because everything after it opens a
+      // frame of its own — an emit that finishes this inner can
+      // subscribe the next. Everything else the inner knows about
+      // itself is folded by the engine.
+      const taggedInner = (
+        lane: LaneId,
+        innerObs: Observable<InstEmit<A>>,
+      ): Observable<Item<A>> =>
+        markSync(innerObs).pipe(
+          takeUntil(cuts.pipe(filter((id) => id === lane))),
+          rxScan<
+            Marked<InstEmit<A>>,
+            { live: boolean; item: Marked<InstEmit<A>> }
+          >((acc, item) => ({ live: acc.live || item === SYNC_END, item }), {
+            live: false,
+            item: SYNC_END,
+          }),
+          mergeMap(({ live, item }): Observable<Item<A>> => {
+            if (item === UPSTREAM_DONE)
+              return rxOf<Item<A>>({ tag: "innerDone", lane });
+            if (item === SYNC_END)
+              return rxOf<Item<A>>({ tag: "innerBoundary", lane });
+            const emit = item as InstEmit<A>;
+            return live
+              ? concat(
+                  rxOf<Item<A>>({ tag: "innerEmit", lane, emit }),
+                  rxOf<Item<A>>({ tag: "frameEnd", fromOuter: false }),
+                )
+              : rxOf<Item<A>>({ tag: "innerEmit", lane, emit });
           }),
         );
-      };
-
-      // subscribe an inner NOW: the push releases its burst into the
-      // open frame, synchronously and in place
-      const subscribeInner = (innerObs: Observable<InstEmit<A>>) => {
-        const [cutSignal, cutSink] = channel<void>();
-        const handle: InnerHandle<A> = {
-          open: [],
-          ledger: emptyCutLedger,
-          burst: [],
-          spent: false,
-          cut: () => cutSink.next(undefined),
-        };
-        frameSink.next(taggedInner(handle, innerObs, cutSignal));
-      };
-
-      // mergeAll: subscribe parked inners while a lane is free. The
-      // gate is hasRoom() and NOT "until one survives its burst" —
-      // taggedInner pushes to `active` exactly when the inner is still
-      // open, and it does so synchronously inside the push above, so at
-      // limit 1 the two coincide and above 1 the loop keeps filling
-      // lanes across several parked inners in one instant, which is what
-      // mergeMap(f, k) does when several finish together
-      const drainQueue = () => {
-        while (queue.length > 0 && hasRoom()) {
-          const nextInner = queue.shift();
-          if (nextInner === undefined) break;
-          subscribeInner(nextInner);
-        }
-      };
-
-      // switch: end the current inner — a close for exactly the
-      // registrations it still holds, per-victim reasons from its
-      // ledger (paid/born this instant ⇒ cut, else cutPending),
-      // teardown cancelling its schedule
-      const cutCurrent = (cuttingInstant: Provenance) => {
-        const current = active.shift();
-        if (current === undefined) return;
-        current.cut();
-        const closes = cutVictimCloses(
-          current.open,
-          current.ledger,
-          cuttingInstant,
-        );
-        if (closes.length > 0)
-          frameSink.next(rxOf<Item<A>>({ tag: "cut", closes }));
-      };
-
-      // the per-op decision for one arriving inner observable
-      const acceptInner = (
-        innerObs: Observable<InstEmit<A>>,
-        cuttingInstant: Provenance,
-      ) => {
-        switch (op) {
-          case "mergeAll":
-            if (!hasRoom()) queue.push(innerObs);
-            else subscribeInner(innerObs);
-            return;
-          case "switch":
-            cutCurrent(cuttingInstant);
-            subscribeInner(innerObs);
-            return;
-          case "exhaust":
-            if (active.length === 0) subscribeInner(innerObs); // else dropped: never subscribed
-            return;
-        }
-      };
 
       // the outer needs no boundary of its own: its burst emits and its
-      // later ones take the same path, which is exactly what the
-      // hand-rolled version did by replaying the captured burst through
-      // the same handler.
+      // later ones take the same path, which is exactly what replaying a
+      // captured burst through one handler would do.
       const outerItems: Observable<Item<A>> = markSync(outer).pipe(
         mergeMap((item): Observable<Item<A>> => {
-          if (item === UPSTREAM_DONE) {
-            outerDone = true;
-            return rxDefer(() =>
-              rxOf<Item<A>>({ tag: "frameEnd", fin: false, done: joinDone() }),
+          if (item === UPSTREAM_DONE)
+            return concat(
+              rxOf<Item<A>>({ tag: "outerFin" }),
+              rxOf<Item<A>>({ tag: "frameEnd", fromOuter: true }),
             );
-          }
           if (item === SYNC_END) return EMPTY;
           const parts = splitEmit(item);
-          return concat(
-            rxOf<Item<A>>({ tag: "carrier", emit: item, values: [] }),
-            rxDefer(() => {
-              for (const innerObs of parts.values)
-                acceptInner(innerObs, item.instant);
-              if (parts.fin) outerDone = true;
-              return EMPTY;
-            }),
-            rxDefer(() => {
-              const done = joinDone();
-              // the carrying emit under the outer's envelope; a join
-              // spent inside the subscribe frame (subscribe OR plumbing
-              // carrier) materializes its complete right here (Agda's
-              // pushBurst appends on fin′), a spent delivery leaves that
-              // to the root
-              return rxOf<Item<A>>({
-                tag: "frameEnd",
-                fin: done && item.kind !== "delivery",
-                done,
-              });
-            }),
+          return concat<Item<A>[]>(
+            rxOf<Item<A>>({ tag: "carrier", emit: item }),
+            ...parts.values.map((obs) =>
+              rxOf<Item<A>>({ tag: "accept", obs, instant: item.instant }),
+            ),
+            ...(parts.fin ? [rxOf<Item<A>>({ tag: "outerFin" })] : []),
+            rxOf<Item<A>>({ tag: "frameEnd", fromOuter: true }),
           );
         }),
       );
+
+      const initial: Engine<A> = {
+        lanes: [],
+        queue: [],
+        outerDone: false,
+        nextId: 0,
+        events: [],
+        values: [],
+        done: false,
+        subscribe: [],
+        cuts: [],
+        needDrain: false,
+      };
 
       // the channel is subscribed FIRST, so that the outer's own
       // subscribe burst — which pushes into it while it is still
       // draining — has somewhere to land
       return merge(frames.pipe(mergeAll()), outerItems).pipe(
-        // A FRAME'S EVENTS ACCUMULATE IN ARRIVAL ORDER, which is the
-        // whole reason a cut and a graft share one bucket: switch cuts
-        // the outgoing inner and subscribes the replacement once PER
-        // inner the carrier holds, so the close of the one and the init
-        // of the next interleave. Bucketing the two kinds apart reads
-        // as tidier and emits every cut ahead of every init, which is a
-        // different stream.
-        rxScan<
-          Item<A>,
-          {
-            carrier?: InstEmit<unknown>;
-            events: InstEvent<never>[];
-            values: A[];
-            done: boolean;
-            out?: InstEmit<A>;
-          }
-        >(
-          (state, item) => {
-            const open = { ...state, out: undefined };
-            switch (item.tag) {
-              case "carrier":
-                return {
-                  carrier: item.emit,
-                  events: [],
-                  values: item.values,
-                  done: false,
-                };
-              case "graft": {
-                const parts = splitEmit(item.emit);
-                return {
-                  ...open,
-                  events: [...state.events, ...parts.bookkeeping],
-                  values: [...state.values, ...parts.values],
-                };
-              }
-              case "cut":
-                return { ...open, events: [...state.events, ...item.closes] };
-              case "frameEnd": {
-                if (state.carrier === undefined)
-                  return { ...open, done: item.done };
-                const parts = splitEmit(state.carrier);
-                return {
-                  carrier: undefined,
-                  events: [],
-                  values: [],
-                  done: item.done,
-                  out: reassemble(
-                    state.carrier,
-                    parts.bookkeeping,
-                    state.events,
-                    state.values,
-                    item.fin,
-                  ),
-                };
-              }
-            }
-          },
-          { events: [], values: [], done: false },
-        ),
+        rxScan<Item<A>, Engine<A>>(step, initial),
+        // the fold's decisions, carried out in the order it made them.
+        // Each push re-enters the fold before this call returns, which
+        // is what puts a burst inside the frame that caused it.
+        tap((state) => {
+          for (const id of state.cuts) cutSink.next(id);
+          for (const cmd of state.subscribe)
+            frameSink.next(taggedInner(cmd.id, cmd.obs));
+          if (state.needDrain) frameSink.next(rxOf<Item<A>>({ tag: "drain" }));
+        }),
         takeWhile((state) => !state.done, true),
         filter((state) => state.out !== undefined),
         rxMap((state) => state.out as InstEmit<A>),
