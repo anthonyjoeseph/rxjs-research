@@ -237,14 +237,18 @@ failing to typecheck over the collapsed tree. A cone cannot aim at either.
   agrees over it, with `map` and `scan` rewritten through it. Its function is a
   `Tm`, so it is pure, total and first-order — which is the reason the
   flatteners cannot follow it in: their payloads are literal syntax that must be
-  RUN, and `Tm` has no eliminator for that. **This leg moves the language
-  `Spec.agda` is written in, so it stops and asks before it lands.**
+  RUN, and `Tm` has no eliminator for that. **It needs no new term-level
+  vocabulary and no approval**: `listᵗ`, `foldᵗ` and pairs already write the
+  step function, and `Spec.agda` is stated over emit streams and names no
+  former at all, so nothing here touches the gospel.
 
 - **THEN COLLAPSE THE ABSORBED FORMERS AND EVERY CASE THAT MATCHES ON THEM.**
   The subscribe relation, the builder, the reducibility candidate and the CLI
-  all match per former, so this is where the palette actually pays. It is
-  deliberately after the mirror, because which clauses collapse is discovered by
-  writing `liftᵉ`'s own case rather than predicted from the tree.
+  all match per former, so this is where the palette actually pays — and the
+  substitution tower is most of it, eight of the eighteen modules that match on
+  a former today. It is deliberately after the mirror, because which clauses
+  collapse is discovered by writing `liftᵉ`'s own case rather than predicted
+  from the tree.
 
 - **THEN THE BRIDGE AND THE GENERATOR, SO THE ORACLE EXERCISES THE NEW FORMER.**
   The collapse is only checked where a program carrying a `liftᵉ` can cross
