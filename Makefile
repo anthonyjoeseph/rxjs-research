@@ -1163,6 +1163,7 @@ GATE_CHEAP = wiring-selftest wiring-gate wiring-refuted wiring-probed \
              cone-selftest cone-check \
              recursion-cover-selftest recursion-cover \
              comments-selftest comments-check dev-changed-selftest \
+             formers-selftest formers-check \
              unmap-selftest spike ts-gate
 
 gate-cheap:
@@ -1408,6 +1409,63 @@ ts-format-check:
 
 ts-gate: ts-check ts-lint ts-format-check
 	@echo "ts-gate: GREEN (tsc, eslint, prettier)"
+
+# ─────────────────────────────────────────────────────────────────────────
+# THE ONE CHECK THAT SPANS BOTH TREES.  What tied their former sets was a
+# tag string one side matched and the other happened to emit, so a former
+# only one tree had was never generated rather than ever red -- and both
+# the oracle and the all-Agda sweep then reported green over shapes neither
+# had been handed.  scripts/formers.tsv is the one declaration of the
+# pairing; the checker holds four surfaces to it.
+# ─────────────────────────────────────────────────────────────────────────
+formers-check:
+	@scripts/check-formers.py
+
+# One perturbation per direction, each applied to a COPY of the fixture
+# tree -- the base of which is deliberately QUIET, so the two parses that
+# would otherwise rot in silence (a shared constructor signature, a
+# declared generator hole) are walked on every run.
+formers-selftest:
+	@tmp=$$(mktemp -d); trap 'rm -rf "$$tmp"' EXIT; fail=0; \
+	  base=$(CURDIR)/scripts/formers-selftest; \
+	  run() { cp -R "$$base" "$$tmp/t"; ( cd "$$tmp/t" && eval "$$2" ); \
+	          out=$$(scripts/check-formers.py --root "$$tmp/t" 2>&1); \
+	          rm -rf "$$tmp/t"; \
+	          case "$$out" in *"$$3"*) ;; \
+	            *) echo "SELFTEST FAIL: $$1 -- got: $$out"; fail=1;; esac; }; \
+	  out=$$(scripts/check-formers.py --root "$$base" 2>&1) || \
+	    { echo "SELFTEST FAIL: the base fixture is not quiet -- $$out"; fail=1; }; \
+	  echo "$$out" | grep -q 'UNREACHABLE BY THE GENERATOR: sharedSig' || \
+	    { echo "SELFTEST FAIL: a gen=no row stopped being REPORTED, so a former nothing generates would pass unmentioned"; fail=1; }; \
+	  run "an Agda constructor in no row" \
+	      "printf '    newᵉ : Exp Γ t\n' >> agda/src/Rx/Exp.agda" \
+	      "is in no row of the map"; \
+	  run "a row whose Agda constructor is gone" \
+	      "sed -i.bak 's/^    liftᵉ :/    renamedᵉ :/' agda/src/Rx/Exp.agda" \
+	      "Exp has no such constructor"; \
+	  run "a TS union member in no row" \
+	      "sed -i.bak 's/\"sharedSig\"/\"newTag\"/' typescript/src/exp.ts" \
+	      'union carries the tag "newTag"'; \
+	  run "a row the TS union does not carry" \
+	      "sed -i.bak 's/\"lift\"/\"renamed\"/' typescript/src/exp.ts" \
+	      'union does not carry it'; \
+	  run "a row nothing decodes" \
+	      "sed -i.bak 's/tag is \"lift\"/tag is \"gone\"/' agda/src/CLI/Decode.agda" \
+	      'nothing decodes the tag "lift"'; \
+	  run "a gen=yes row nothing generates" \
+	      "sed -i.bak 's/type: \"defer\"/type: \"nope\"/' typescript/src/generator.ts" \
+	      'nothing generates the tag "defer"'; \
+	  run "a gen=no row that IS generated" \
+	      "printf 'const g = () => ({ type: \"sharedSig\" });\n' >> typescript/src/generator.ts" \
+	      'the hole closed and the row was not'; \
+	  run "a gen=no row with no reason" \
+	      "sed -i.bak 's/\tno\tthe fixture.*/\tno/' scripts/formers.tsv" \
+	      "gen=no needs a reason"; \
+	  run "a tag declared twice" \
+	      "printf 'tm\tdupᵗ\tnatT\tyes\n' >> scripts/formers.tsv" \
+	      "already declared on line"; \
+	  [ $$fail -eq 0 ] && echo "formers-selftest: PASS (every surface fires in the direction it is checked, a shared constructor signature parses, and a declared generator hole is reported rather than merely tolerated)"; \
+	  exit $$fail
 
 cli-build: stripped
 	@$(call AGDA_RUN,--compile --compile-dir=../_cli src/CLI/Main.agda)

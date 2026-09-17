@@ -232,15 +232,7 @@ failing to typecheck over the collapsed tree. A cone cannot aim at either.
 
 ### Big picture tier roadmap
 
-- **MAKE THE TWO TREES' FORMER SETS A CHECKED CORRESPONDENCE, NOT A
-  CONVENTION.** What ties them today is a tag string the decoder matches and
-  the generator happens to emit, so a former only one tree has does not fail —
-  it is simply never generated, and the oracle reports green over the shapes
-  it was never handed. The leg is whatever makes that divergence a
-  build failure rather than a silence, which is what lets a later collapse be
-  believed from a green oracle instead of a census run by hand.
-
-- **THEN AUDIT WHAT IS LEFT OF THE PALETTE AGAINST THE DIVIDING TEST, AND
+- **AUDIT WHAT IS LEFT OF THE PALETTE AGAINST THE DIVIDING TEST, AND
   RECORD WHY EACH SURVIVOR SURVIVES.** The collapse absorbed the two formers
   nobody disputed; what closes the tier is the rest of the tree measured by the
   same test — does the former SUBSCRIBE anything, or read the protocol's own
@@ -249,6 +241,17 @@ failing to typecheck over the collapsed tree. A cone cannot aim at either.
   without reading anything. Each of those is a sentence in its own header or a
   further collapse, and the leg's product is that no former is left whose
   status is a matter of memory.
+
+- **AND HOLD THE AGDA GENERATOR'S LANES TO THE SAME PAIRING, WHICH IS THE ONE
+  SURFACE STILL RUNNING ON MEMORY.** The correspondence now binds four
+  surfaces and the all-Agda sweep's generator is not among them, so a former
+  it cannot write is covered by nothing and reported by nothing — which is
+  how it came to have no raw lift lane at all, found by reading rather than
+  by any check, after sixty thousand programs certified impl≡spec without
+  once changing an emit's values. A lane is a generator arm rather than
+  a tag, so what the leg has to decide is what a machine can read there; the
+  cheapest honest form is a per-former coverage count the sweep itself
+  reports, which fails on zero and needs no parse.
 
 - **AND MAKE THE AGDA GENERATOR'S PROGRAMS REACHABLE BY A RUNNING PIPELINE.**
   The bridge is one-way: the CLI encodes Vals and InstEmits and there is no

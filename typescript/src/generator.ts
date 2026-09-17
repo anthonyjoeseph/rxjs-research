@@ -194,6 +194,31 @@ const genTm = (rng: Rng, ty: Ty, ctx: GenCtx, depth: number): Tm => {
         ? { type: "inlT", ty, val: genTm(rng, ty.left, ctx, depth - 1) }
         : { type: "inrT", ty, val: genTm(rng, ty.right, ctx, depth - 1) },
     );
+  // THE ONLY ELIMINATOR A SUM HAS, and the one former either tree carried
+  // that nothing had ever generated: it decodes, it compiles, and it sits
+  // in both unions, so every run of the oracle and every all-Agda sweep
+  // reported green without once having been handed one. It is not
+  // guarded by a type test, because a case ELIMINATES at whatever type
+  // the surrounding term wants; what its own type pins is the scrutinee.
+  // That scrutinee's `ty` is built here rather than drawn from scope,
+  // since the decoder reads the branch contexts off it and a sum-typed
+  // variable is rare enough in a generated Θ that the lane would almost
+  // never fire.
+  opts.push(() => {
+    const scrutTy: Ty = { type: "sum", left: natT, right: boolT };
+    return {
+      type: "caseT",
+      ty,
+      scrut: genTm(rng, scrutTy, ctx, depth - 1),
+      onInl: genTm(rng, ty, { ...ctx, theta: [natT, ...ctx.theta] }, depth - 1),
+      onInr: genTm(
+        rng,
+        ty,
+        { ...ctx, theta: [boolT, ...ctx.theta] },
+        depth - 1,
+      ),
+    };
+  });
   if (ty.type === "obs")
     opts.push(() => ({
       type: "strmT",

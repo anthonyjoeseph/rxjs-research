@@ -1,0 +1,229 @@
+#!/usr/bin/env python3
+"""Hold the two trees' former sets to one written-down correspondence.
+
+The Agda tree and the TypeScript tree carry the same object language, and
+what tied them together was a tag string the decoder matched and the
+generator happened to emit.  Nothing failed when they diverged: a former
+only one tree had was simply never generated, so the oracle and the
+all-Agda sweep both reported green over shapes neither was ever handed.
+
+`scripts/formers.tsv` is the one declaration of the pairing, and this
+checks four surfaces against it, in both directions where both directions
+are decidable:
+
+  A  the Agda datatypes   agda/src/Rx/Exp.agda      `data Exp` / `data Tm`
+  B  the Agda decoder     agda/src/CLI/Decode.agda  `tag is "..."`
+  C  the TypeScript union typescript/src/exp.ts     `export type Exp` / `Tm`
+  D  the TS generator     typescript/src/generator.ts   `type: "..."`
+
+A and C are checked BOTH ways -- they are closed declarations, so a former
+present there and absent from the map is a finding, which is what catches a
+former added to one tree alone.  B and D are checked one way only: the
+decoder's file also carries the tags of types, inputs and primitive
+operators, and the generator's file writes every one of those too, so
+"a tag here that is not in the map" is the normal state of both and
+asserting otherwise would report the whole type grammar.
+
+D's direction is the one that costs something and the one the convention
+never had: a former the generator cannot reach is covered by no sweep and
+no oracle run whatever either reports, so the map's `gen` column is where
+that hole is declared and counted, with its reason beside it.
+"""
+
+from __future__ import annotations
+
+import argparse
+import re
+import sys
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parent.parent
+
+PATHS = {
+    "agda": "agda/src/Rx/Exp.agda",
+    "decode": "agda/src/CLI/Decode.agda",
+    "ts": "typescript/src/exp.ts",
+    "gen": "typescript/src/generator.ts",
+}
+
+
+class Row:
+    __slots__ = ("kind", "agda", "tag", "gen", "why")
+
+    def __init__(self, kind: str, agda: str, tag: str, gen: bool, why: str) -> None:
+        self.kind, self.agda, self.tag, self.gen, self.why = kind, agda, tag, gen, why
+
+
+def read_map(path: Path) -> list[Row]:
+    rows: list[Row] = []
+    seen_agda: dict[str, int] = {}
+    seen_tag: dict[str, int] = {}
+    for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        parts = line.split("\t")
+        if len(parts) < 4:
+            sys.exit(f"check-formers: {path}:{n}: want 4+ tab-separated fields, got {len(parts)}")
+        kind, agda, tag, gen = (p.strip() for p in parts[:4])
+        why = parts[4].strip() if len(parts) > 4 else ""
+        if kind not in ("exp", "tm"):
+            sys.exit(f"check-formers: {path}:{n}: kind must be exp or tm, got {kind!r}")
+        if gen not in ("yes", "no"):
+            sys.exit(f"check-formers: {path}:{n}: gen must be yes or no, got {gen!r}")
+        if gen == "no" and not why:
+            sys.exit(
+                f"check-formers: {path}:{n}: gen=no needs a reason in the fifth field -- "
+                "an unreachable former is a hole to state, not a box to tick"
+            )
+        for tbl, key in ((seen_agda, agda), (seen_tag, tag)):
+            if key in tbl:
+                sys.exit(f"check-formers: {path}:{n}: {key!r} already declared on line {tbl[key]}")
+            tbl[key] = n
+        rows.append(Row(kind, agda, tag, gen == "yes", why))
+    return rows
+
+
+# ---------------------------------------------------------------- surfaces
+
+
+def agda_ctors(text: str, name: str) -> set[str]:
+    """Constructors of `data <name> ... where`, by indentation.
+
+    The block ends at the first line indented no further than the `data`
+    itself, which is what keeps the siblings a `mutual` block puts beside it
+    (`Fn`, `Val`) out of the set.
+    """
+    lines = text.splitlines()
+    head = re.compile(r"^(\s*)data\s+" + re.escape(name) + r"\b.*\bwhere\s*$")
+    for i, line in enumerate(lines):
+        m = head.match(line)
+        if not m:
+            continue
+        depth = len(m.group(1))
+        out: set[str] = set()
+        for rest in lines[i + 1 :]:
+            if not rest.strip():
+                continue
+            indent = len(rest) - len(rest.lstrip())
+            if indent <= depth:
+                break
+            body = rest.strip()
+            if body.startswith("--"):
+                continue
+            # several constructors may SHARE one signature (`a b : T`), which
+            # is how two of the flatteners are declared -- taking the first
+            # name only reported the others as deleted
+            c = re.match(r"((?:[^\s:(){}]+\s+)*[^\s:(){}]+)\s*:(?!=)", body)
+            if c:
+                out.update(c.group(1).split())
+        return out
+    sys.exit(f"check-formers: no `data {name} ... where` found -- the datatype moved or was renamed")
+
+
+def ts_union(text: str, name: str) -> set[str]:
+    # to the first blank line, and NOT anchored to the union starting on the
+    # line below its own `=`: both layouts are ordinary TypeScript, and a
+    # checker that reads only the repo's current one is a checker the
+    # formatter can silence
+    m = re.search(r"^export type " + re.escape(name) + r"\s*=(.*?)(?:\n[ \t]*\n|\Z)", text, re.M | re.S)
+    if not m:
+        sys.exit(f"check-formers: no `export type {name} =` block found -- the union moved or was renamed")
+    return set(re.findall(r'type:\s*"([A-Za-z]+)"', m.group(1)))
+
+
+def quoted(text: str, pat: str) -> set[str]:
+    return set(re.findall(pat, text))
+
+
+# ---------------------------------------------------------------- the check
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--root", default=str(REPO), help="tree to check (the selftest points this at a fixture)")
+    ap.add_argument("--map", default=None, help="the correspondence file (default: scripts/formers.tsv under --root)")
+    args = ap.parse_args()
+
+    root = Path(args.root)
+    mp = Path(args.map) if args.map else root / "scripts" / "formers.tsv"
+    if not mp.is_file():
+        sys.exit(f"check-formers: no correspondence file at {mp}")
+    rows = read_map(mp)
+
+    src = {}
+    for key, rel in PATHS.items():
+        p = root / rel
+        if not p.is_file():
+            sys.exit(f"check-formers: missing {p}")
+        src[key] = p.read_text(encoding="utf-8")
+
+    findings: list[str] = []
+
+    for kind, dname, uname in (("exp", "Exp", "Exp"), ("tm", "Tm", "Tm")):
+        declared = {r.agda for r in rows if r.kind == kind}
+        tags = {r.tag for r in rows if r.kind == kind}
+
+        found = agda_ctors(src["agda"], dname)
+        for extra in sorted(found - declared):
+            findings.append(
+                f"{PATHS['agda']}: `{extra}` is a constructor of {dname} and is in no row of the "
+                f"map -- the TypeScript side cannot name it, so nothing generates or decodes it"
+            )
+        for missing in sorted(declared - found):
+            findings.append(
+                f"{PATHS['agda']}: the map pairs `{missing}` with a tag, but {dname} has no such "
+                f"constructor -- it was renamed or deleted and the map still claims it"
+            )
+
+        found = ts_union(src["ts"], uname)
+        for extra in sorted(found - tags):
+            findings.append(
+                f"{PATHS['ts']}: the {uname} union carries the tag \"{extra}\", which is in no row "
+                f"of the map -- the Agda side has no former to decode it into"
+            )
+        for missing in sorted(tags - found):
+            findings.append(
+                f"{PATHS['ts']}: the map pairs a former with the tag \"{missing}\", and the {uname} "
+                f"union does not carry it"
+            )
+
+    dec = quoted(src["decode"], r'tag is "([A-Za-z]+)"')
+    for r in rows:
+        if r.tag not in dec:
+            findings.append(
+                f"{PATHS['decode']}: nothing decodes the tag \"{r.tag}\" -- `{r.agda}` is reachable "
+                f"from neither the oracle nor any program the TypeScript tree writes"
+            )
+
+    gen = quoted(src["gen"], r'type:\s*"([A-Za-z]+)"')
+    for r in rows:
+        if r.gen and r.tag not in gen:
+            findings.append(
+                f"{PATHS['gen']}: nothing generates the tag \"{r.tag}\", which the map declares "
+                f"reachable -- either write the lane, or declare the hole with gen=no and say why"
+            )
+        if not r.gen and r.tag in gen:
+            findings.append(
+                f"{PATHS['gen']}: the tag \"{r.tag}\" IS generated, and the map declares it "
+                f"unreachable -- the hole closed and the row was not"
+            )
+
+    if findings:
+        print("check-formers: the two trees' former sets have diverged:")
+        for f in findings:
+            print(f"  {f}")
+        return 1
+
+    holes = [r for r in rows if not r.gen]
+    print(
+        f"check-formers: {len(rows)} former(s) paired across four surfaces -- every Agda "
+        f"constructor and every TypeScript union member is in the map, every tag decodes, "
+        f"and {len(rows) - len(holes)} are generated"
+    )
+    for r in holes:
+        print(f"  UNREACHABLE BY THE GENERATOR: {r.agda} / \"{r.tag}\" -- {r.why}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -48,6 +48,8 @@ yours. `gate-light` and `gate-heavy` force a path.
 | `roadmap-check` | [roadmap-check.md](roadmap-check.md) | leave PROOF-STATE stale, unsorted, verbose, or dated — or date CLAUDE.md |
 | `recursion-cover-selftest` | [recursion-cover.md](recursion-cover.md) | ship a recursion-cover checker that has stopped firing |
 | `recursion-cover` | [recursion-cover.md](recursion-cover.md) | open a cycle in the evaluator that no declared peel cuts and no declared structural descent carries |
+| `formers-selftest` | [formers-check.md](formers-check.md) | ship a former-correspondence checker that has stopped firing |
+| `formers-check` | [formers-check.md](formers-check.md) | let the two trees' former sets diverge, or leave a former the generator cannot reach undeclared |
 | `comments-selftest` | [comments-check.md](comments-check.md) | ship a comment checker that has stopped firing |
 | `comments-check` | [comments-check.md](comments-check.md) | date a source comment, record what happened to a declaration, bury the evidence mid-paragraph, cite a twin or probe that is not there, re-say in charged prose what a section below already says resolvably, or let an explanation grow into an essay |
 | the tower (inline in `gate-heavy`) | [agda-build.md](agda-build.md) | land anything that does not typecheck, warnings included |
@@ -64,6 +66,7 @@ yours. `gate-light` and `gate-heavy` force a path.
 | [gate.md](gate.md) | `make gate` routing, `gate-light` / `gate-heavy` — the four escalation triggers, and the consumer cone the light path does not reach |
 | [bg.md](bg.md) | `make bg` / `bg-check` / `bg-wait` — detaching a build that outlives a tool call |
 | [ci-cache.md](ci-cache.md) | the Actions interface cache — why a PR's snapshot reaches nobody else, the window in which main's is one merge stale, and the ceiling that evicts what you need |
+| [formers-check.md](formers-check.md) | `make formers-check` — the Agda and TypeScript former sets held to one written-down pairing, and the `gen` column where a former nothing generates is counted |
 | [find.md](find.md) | `make find` and `make dup-check` — search by the shape of the STATEMENT |
 | [find-prose.md](find-prose.md) | `make find-prose` — search FINDINGS: dead routes, coverage boundaries, rulings, traps |
 | [stub-proofs.md](stub-proofs.md) | `scripts/stub-proofs.py` — a `src` mirror with the proofs postulated; measured, and why it is not on the gate path |

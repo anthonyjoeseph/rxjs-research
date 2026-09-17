@@ -1,0 +1,45 @@
+# THE CORRESPONDENCE, WRITTEN DOWN ONCE.  Two trees carry the same object
+# language, and what tied them was a tag string one side matched and the other
+# happened to emit — so a former only one tree had did not fail, it was simply
+# never generated, and every sweep over the bridge reported green about shapes
+# it was never handed.  This file is the one declaration of the pairing, and
+# `scripts/check-formers.py` holds four surfaces to it: the Agda datatype, the
+# Agda decoder, the TypeScript union and the TypeScript generator.
+#
+# A NEW FORMER IS THEREFORE FIVE EDITS, AND THAT IS THE POINT — the fifth is
+# this line, and until it exists the other four are each separately red.
+#
+# GEN=no DECLARES A FORMER THE GENERATOR CANNOT REACH, and it is a finding
+# parked rather than an exemption granted: a former nothing generates is a
+# former no sweep and no oracle run has ever covered, whatever either reports.
+# It is written here rather than in the generator so that the hole is counted
+# where the pairing is read, and the reason is the third column.
+#
+# kind	agda	tag	gen	why-not
+exp	input	input	yes
+exp	ofᵉ	of	yes
+exp	emptyᵉ	empty	yes
+exp	takeᵉ	take	yes
+exp	liftᵉ	lift	yes
+exp	mergeAllᵉ	mergeAll	yes
+exp	switchAllᵉ	switchAll	yes
+exp	exhaustAllᵉ	exhaustAll	yes
+exp	μᵉ	mu	yes
+exp	varᵉ	varE	yes
+exp	deferᵉ	defer	yes
+tm	varᵗ	varT	yes
+tm	unit̂	unitT	yes
+tm	bool̂	boolT	yes
+tm	nat̂	natT	yes
+tm	pairᵗ	pairT	yes
+tm	fstᵗ	fstT	yes
+tm	sndᵗ	sndT	yes
+tm	nilᵗ	nilT	yes
+tm	consᵗ	consT	yes
+tm	inlᵗ	inlT	yes
+tm	inrᵗ	inrT	yes
+tm	caseᵗ	caseT	yes
+tm	foldᵗ	foldT	yes
+tm	ifᵗ	ifT	yes
+tm	primᵗ	primT	yes
+tm	strmᵗ	strmT	yes
