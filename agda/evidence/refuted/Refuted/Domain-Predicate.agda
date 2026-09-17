@@ -44,20 +44,24 @@ open import Data.Vec using () renaming ([] to []ⱽ)
 open import Relation.Nullary using (¬_)
 
 open import Rx.Exp using (Ctx; Tm; Fn; Closed; obs; natᵗ; _×ᵗ_; listᵗ; input; ofᵉ; emptyᵉ; takeᵉ;
-  liftᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ)
+  liftᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ)
 
 -- the structural domain predicate: one constructor per former, each
 -- taking the predicate at the Exp children a subscribe actually walks.
--- `input`, `ofᵉ`, `emptyᵉ`, `deferᵉ` and `μᵉ` are leaves here -- the
--- first is the share connect, whose descent is the unconnected count,
--- and the last is the μ peel, whose descent is `syncSize`.  Neither is
--- the hop, and neither is in question.
+-- `input`, `ofᵉ`, `emptyᵉ`, `deferᵉ`, `μᵉ` and `mintᵉ` are leaves here
+-- -- the first is the share connect, whose descent is the unconnected
+-- count, and the μ peel's is `syncSize`.  A mint is a leaf for a
+-- sharper reason than choice: it BINDS, so its child sits under a
+-- longer token telescope and is not closed, and this predicate is
+-- indexed by closed terms alone.  None of them is the hop, and none is
+-- in question.
 data Sub {n} {Γ : Ctx n} : ∀ {t} → Closed Γ t → Set where
   s-input : ∀ {i} → Sub (input {Γ = Γ} i)
   s-of    : ∀ {t ts} → Sub (ofᵉ {Γ = Γ} {t = t} ts)
   s-empty : ∀ {t} → Sub (emptyᵉ {Γ = Γ} {t = t})
   s-defer : ∀ {t body} → Sub (deferᵉ {Γ = Γ} {t = t} body)
   s-μ     : ∀ {t body} → Sub (μᵉ {Γ = Γ} {t = t} body)
+  s-mint  : ∀ {t body} → Sub (mintᵉ {Γ = Γ} {t = t} body)
   s-take  : ∀ {t} {c : Tm Γ [] [] [] _} {b} → Sub b → Sub (takeᵉ {t = t} c b)
   s-lift  : ∀ {s t u} {f : Fn Γ [] [] [] (u ×ᵗ listᵗ s) (u ×ᵗ listᵗ t)}
               {z : Tm Γ [] [] [] u} {b : Closed Γ s}
@@ -72,6 +76,7 @@ sub-total (ofᵉ ts)          = s-of
 sub-total emptyᵉ            = s-empty
 sub-total (deferᵉ body)     = s-defer
 sub-total (μᵉ body)         = s-μ
+sub-total (mintᵉ body)      = s-mint
 sub-total (takeᵉ c b)       = s-take (sub-total b)
 sub-total (liftᵉ f z b)     = s-lift (sub-total b)
 sub-total (mergeAllᵉ l b)   = s-merge (sub-total b)
