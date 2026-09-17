@@ -151,5 +151,27 @@ emitᶜ ts = map emitᵗ ts
 -- here leaves the slots at plain `Γ` and PROVES that a simul program
 -- holds no bare payload in a stream position, where this vector only
 -- ASSUMES it.
+
+-- AND THE OBSTACLE TO WRAPPING WITH A FOLD IS NOT THE STAMP BUT THE
+-- GROUPING, WHICH IS WHY A SYNCHRONY-SENSING OPERATOR IS THE WRONG
+-- ANSWER (Anthony).  A fold over a flat stream of payloads cannot tell
+-- which of them shared an instant, so wrapping each one separately
+-- would split a cold source's subscribe burst into as many instants as
+-- it has values.  The operator that recovers the boundary by TIMING --
+-- collect while a flag says synchronous, release on the first
+-- asynchronous turn -- is the standard rxjs repair and it re-derives
+-- something this side is GIVEN: the evaluator's cold arms read the
+-- split off `ObservableInput`'s own constructor, where the synchronous
+-- values are a bound field and the rest are a separate list, and the
+-- burst they build carries the whole field under ONE stamp.  Nothing
+-- here has ever had to sense synchrony, so nothing should acquire the
+-- machinery to.
+--
+-- What that leaves is a question about the PAYLOAD TYPE rather than
+-- about a former: a source whose deliveries are already grouped -- one
+-- delivery's values carried as a list -- is wrappable by an ordinary
+-- fold, since a group IS an instant and no arm has to ask which kind it
+-- is.  That is the shape the subscribe burst already has; it is not
+-- visible in the type.
 emitᵛ : ∀ {n} → Ctx n → Ctx n
 emitᵛ Γ = mapⱽ emitᵗ Γ
