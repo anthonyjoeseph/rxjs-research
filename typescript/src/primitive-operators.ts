@@ -23,14 +23,13 @@ import {
   reassemble,
   splitEmit,
 } from "./inst-emit.js";
-import { Arrival, Driver } from "./driver.js";
+import { Driver, oneShotArrival } from "./driver.js";
 import {
   Bracketed,
   Marked,
   SYNC_END,
   UPSTREAM_DONE,
   bracketSync,
-  cold,
   markSync,
 } from "./constructors.js";
 
@@ -241,22 +240,6 @@ export const share = <A>(
     );
   });
 };
-
-// a one-shot driver delivery at the NEXT tick, read per subscription —
-// the async boundary under deferᵉ/μᵉ. Teardown cancels the pending
-// hop (unsubscribing a not-yet-fired defer is free — Agda's sweepLive).
-const oneShotArrival = (driver: Driver, tick: number): Observable<Arrival> =>
-  cold<Arrival>((sink) =>
-    driver.registerSource([
-      {
-        tick,
-        fire: (arrival) => {
-          sink.next(arrival);
-          sink.complete();
-        },
-      },
-    ]),
-  );
 
 // mintᵉ: one fresh source token per SUBSCRIPTION, handed to the body and
 // nothing else. No event, no registration, no hop — the operator wrapping

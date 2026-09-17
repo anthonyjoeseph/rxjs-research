@@ -25,7 +25,7 @@ import {
   reassemble,
   splitEmit,
 } from "./inst-emit.js";
-import { SYNC_END, UPSTREAM_DONE, hot, markSync } from "./constructors.js";
+import { SYNC_END, UPSTREAM_DONE, channel, markSync } from "./constructors.js";
 
 // ---- the one join engine: mergeAllAll/switchAll/exhaustAll ----
 // (the TS mirror of Agda's subscribeAll + stepFrame thru-outer/from-inner)
@@ -108,7 +108,7 @@ const joinAll =
 
       // the ordered channel every inner's traffic enters by. A push is
       // delivered synchronously, so push ORDER is output order.
-      const [frames, frameSink] = hot<Observable<Item<A>>>();
+      const [frames, frameSink] = channel<Observable<Item<A>>>();
 
       // is there a free lane? an absent limit is rxjs's Infinity
       const hasRoom = () => limit === undefined || active.length < limit;
@@ -185,7 +185,7 @@ const joinAll =
       // subscribe an inner NOW: the push releases its burst into the
       // open frame, synchronously and in place
       const subscribeInner = (innerObs: Observable<InstEmit<A>>) => {
-        const [cutSignal, cutSink] = hot<void>();
+        const [cutSignal, cutSink] = channel<void>();
         const handle: InnerHandle<A> = {
           open: [],
           ledger: emptyCutLedger,

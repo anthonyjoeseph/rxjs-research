@@ -1,6 +1,6 @@
 import { Observable } from "rxjs";
 import { InstEmit, Provenance } from "./inst-emit.js";
-import { hot } from "./constructors.js";
+import { channel, producer } from "./constructors.js";
 
 // One scheduled delivery popped by the driver. Mirrors Agda's Arrival,
 // minus the fields the fire-closure already captures (source, payload).
@@ -72,7 +72,7 @@ export const createDriver = (slotCount = 0): Driver => {
   // subscribeE e root (freshId 0 0) 0 …)
   let instant: Provenance = Symbol("subscribe-frame");
   let tick = 0;
-  const [chainEmits, chainSink] = hot<InstEmit<never>>();
+  const [chainEmits, chainSink] = channel<InstEmit<never>>();
 
   return {
     // a NUMBER, because Agda's uniqᵗ reads as ℕ and `mint` is the first
@@ -117,3 +117,26 @@ export const createDriver = (slotCount = 0): Driver => {
     },
   };
 };
+
+// a one-shot driver delivery at a given tick, read per subscription —
+// the async boundary under deferᵉ/μᵉ. Teardown cancels the pending hop
+// (unsubscribing a not-yet-fired defer is free — Agda's sweepLive).
+// It carries no source lifecycle and mints nothing, which is why it is
+// a bare producer rather than either source constructor: what an
+// operator wants from it is the ARRIVAL, and the emit that arrival
+// causes is the operator's own to mint.
+export const oneShotArrival = (
+  driver: Driver,
+  tick: number,
+): Observable<Arrival> =>
+  producer<Arrival>((sink) =>
+    driver.registerSource([
+      {
+        tick,
+        fire: (arrival) => {
+          sink.next(arrival);
+          sink.complete();
+        },
+      },
+    ]),
+  );
