@@ -54,7 +54,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong;
 
 open import Rx.Prim using (Timed; after_,_; ObservableInput; hot; cold; InstEvent; init; value; close; handoff;
   complete; InstEmit; _at_from_as_)
-open import Rx.Exp using (Ty; natᵗ; obs; _×ᵗ_; isData; Ctx; Exp; Tm; Fn; PrimOp; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; liftᵉ;
+open import Rx.Exp using (Ty; natᵗ; obs; listᵗ; revᵗ; _×ᵗ_; isData; Ctx; Exp; Tm; Fn; PrimOp; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; liftᵉ;
   mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ;
   unit̂; bool̂; nat̂; primᵗ; pairᵗ; fstᵗ; sndᵗ;
   strmᵗ; varᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; nilᵗ; consᵗ; foldᵗ; add; sub; mul; eqᵖ; ltᵖ; notᵖ)
@@ -150,6 +150,47 @@ genFn = genB 4 >>=G λ c → genNat >>=G λ k →
 genScanFn : ∀ {Δᵍ Δ Θ} → Gen (Fn Γ₂ Δᵍ Δ Θ (natᵗ ×ᵗ natᵗ) natᵗ)
 genScanFn = pureG (primᵗ add (pairᵗ (fstᵗ (varᵗ (here refl)))
                                     (sndᵗ (varᵗ (here refl)))))
+
+-- THE RAW PURE-FUNCTION STEP, WHOSE WHOLE JOB IS THE SHAPES `mapᵉ` AND
+-- `scanᵉ` CANNOT REACH.  Both of those are per-VALUE, so the list they
+-- hand back is always as long as the one they were given; a step that
+-- DROPS, LENGTHENS or COLLAPSES an emit is a lift and nothing else, and
+-- a sweep built only out of the two encodings never generates one.  The
+-- arms are a lattice over what happens to the value COUNT — emptied,
+-- doubled, one longer, collapsed to a single value, filtered, and
+-- unchanged — because the count is the axis the encodings fix and the
+-- former does not.
+--
+-- THE IDENTITY ARM IS DELIBERATE, on the reasoning `genFn` records: a
+-- generator whose every arm exercises the interesting shape cannot
+-- produce the program that distinguishes a step which ignores its input
+-- from one that does not.
+--
+-- A left fold that conses builds its result reversed, so the arms that
+-- rebuild a list pay `revᵗ` exactly as `mapᵉ` does.
+genLiftFn : ∀ {Δᵍ Δ Θ}
+          → Gen (Fn Γ₂ Δᵍ Δ Θ (natᵗ ×ᵗ listᵗ natᵗ) (natᵗ ×ᵗ listᵗ natᵗ))
+genLiftFn = genB 6 >>=G λ c → genNat >>=G λ k →
+  let arg = varᵗ (here refl)
+      st  = fstᵗ arg
+      vs  = sndᵗ arg
+      -- inside a `foldᵗ` step whose accumulator is the rebuilt LIST: the
+      -- element at 0, the accumulator at 1.  The collapsing arm's fold
+      -- carries a nat instead, so it spells its two variables itself
+      x    = varᵗ (here refl)
+      accL = varᵗ (there (here refl))
+  in pureG
+    (      if c ≡ᵇ 0 then pairᵗ st nilᵗ
+      else if c ≡ᵇ 1 then pairᵗ st (revᵗ (foldᵗ vs nilᵗ (consᵗ x (consᵗ x accL))))
+      else if c ≡ᵇ 2 then pairᵗ st (consᵗ (nat̂ k) vs)
+      else if c ≡ᵇ 3 then
+        (let total = foldᵗ vs st (primᵗ add (pairᵗ (varᵗ (here refl))
+                                                   (varᵗ (there (here refl)))))
+         in pairᵗ total (consᵗ total nilᵗ))
+      else if c ≡ᵇ 4 then
+        pairᵗ st (revᵗ (foldᵗ vs nilᵗ
+          (ifᵗ (primᵗ ltᵖ (pairᵗ x (nat̂ k))) accL (consᵗ x accL))))
+      else arg)
 
 -- THE ACCUMULATOR AT OBSERVABLE TYPE, WHICH IS THE ONE BINDER THAT
 -- BREAKS A DATA ENVIRONMENT.  Substituting a value of observable type
@@ -259,7 +300,7 @@ genLeafAt g u = genB 3 >>=G λ c →
   else (genNat >>=G λ a → genNat >>=G λ b → pureG (ofᵉ (nat̂ a ∷ nat̂ b ∷ [])))
 
 genExpAt g u zero    = genLeafAt g u
-genExpAt g u (suc d) = genB 12 >>=G λ c →
+genExpAt g u (suc d) = genB 13 >>=G λ c →
   if c ≡ᵇ 0 then genLeafAt g u
   else if c ≡ᵇ 1 then genLeafAt g u
   else if c ≡ᵇ 2 then (genFn >>=G λ f → genExpAt g u d >>=G λ e → pureG (mapᵉ f e))
@@ -278,6 +319,9 @@ genExpAt g u (suc d) = genB 12 >>=G λ c →
   else if c ≡ᵇ 8 then (genObsAt g u d >>=G λ s → pureG (exhaustAllᵉ s))
   else if c ≡ᵇ 9 then (genSpineG g u d >>=G λ b → pureG (μᵉ b))
   else if c ≡ᵇ 10 then (genExpAt 0 (g + u) d >>=G λ b → pureG (gate g u b))
+  else if c ≡ᵇ 11 then
+    (genLiftFn >>=G λ f → genNat >>=G λ s → genExpAt g u d >>=G λ e →
+     pureG (liftᵉ f (nat̂ s) e))
   else genLeafAt g u
 
 genInners g u d zero    = pureG []
@@ -318,7 +362,7 @@ genObsAt g u d =
 
 -- past the gate: the var is in scope and this subtree plants exactly one
 genSpineD w zero    = pureG (varᵉ (here refl))
-genSpineD w (suc d) = genB 8 >>=G λ c →
+genSpineD w (suc d) = genB 9 >>=G λ c →
   if c ≡ᵇ 0 then pureG (varᵉ (here refl))
   else if c ≡ᵇ 1 then (genFn >>=G λ f → genSpineD w d >>=G λ e → pureG (mapᵉ f e))
   else if c ≡ᵇ 2 then (genB 4 >>=G λ k → genSpineD w d >>=G λ e → pureG (takeᵉ (nat̂ k) e))
@@ -334,13 +378,16 @@ genSpineD w (suc d) = genB 8 >>=G λ c →
   else if c ≡ᵇ 6 then
     (genSpineD w d >>=G λ e → genB 2 >>=G λ extra → genInners 0 (suc w) d (suc extra) >>=G λ rest →
      pureG (switchAllᵉ (ofᵉ (strmᵗ e ∷ rest))))
+  else if c ≡ᵇ 7 then
+    (genLiftFn >>=G λ f → genNat >>=G λ s → genSpineD w d >>=G λ e →
+     pureG (liftᵉ f (nat̂ s) e))
   else
     (genSpineD w d >>=G λ e → genB 2 >>=G λ extra → genInners 0 (suc w) d (suc extra) >>=G λ rest →
      pureG (exhaustAllᵉ (ofᵉ (strmᵗ e ∷ rest))))
 
 -- before the gate: the binder is guarded, so every route ends in a `deferᵉ`
 genSpineG g u zero    = pureG (gate (suc g) u (varᵉ (here refl)))
-genSpineG g u (suc d) = genB 8 >>=G λ c →
+genSpineG g u (suc d) = genB 9 >>=G λ c →
   if c ≡ᵇ 0 then (genSpineD (g + u) d >>=G λ b → pureG (gate (suc g) u b))
   else if c ≡ᵇ 1 then (genSpineD (g + u) d >>=G λ b → pureG (gate (suc g) u b))
   else if c ≡ᵇ 2 then (genFn >>=G λ f → genSpineG g u d >>=G λ e → pureG (mapᵉ f e))
@@ -355,6 +402,9 @@ genSpineG g u (suc d) = genB 8 >>=G λ c →
     (genSpineG g u d >>=G λ e → genB 2 >>=G λ extra →
      genInners (suc g) u d (suc extra) >>=G λ rest →
      pureG (switchAllᵉ (ofᵉ (strmᵗ e ∷ rest))))
+  else if c ≡ᵇ 7 then
+    (genLiftFn >>=G λ f → genNat >>=G λ s → genSpineG g u d >>=G λ e →
+     pureG (liftᵉ f (nat̂ s) e))
   else
     (genSpineG g u d >>=G λ e → genB 2 >>=G λ extra →
      genInners (suc g) u d (suc extra) >>=G λ rest →
@@ -476,8 +526,11 @@ showStream (e ∷ es) = showEmitR e ++ " " ++ showStream es
 
 ------------------------------------------------------------------------
 -- render a generated program back to Agda source (a paste-ready block for
--- the Unit-Test cache). Faithful over the fragment the generator emits;
--- constructors it never produces get a placeholder (kept total).
+-- the Unit-Test cache). Faithful over every constructor rather than over
+-- the fragment the generator happens to emit, and there is no placeholder
+-- arm: a lane added to the generator would otherwise print a row nobody
+-- can paste, and the only run that would reveal it is one that already
+-- found a counterexample.
 
 showFin : ∀ {n} → Fin n → String
 showFin zero    = "zero"
@@ -544,8 +597,11 @@ showExp (ofᵉ items)     = "(ofᵉ (" ++ showTmList items ++ "))"
 showExp emptyᵉ          = "emptyᵉ"
 showExp (takeᵉ n e)     = "(takeᵉ " ++ showTm n ++ " " ++ showExp e ++ ")"
 showExp (liftᵉ f s e)   = "(liftᵉ " ++ showTm f ++ " " ++ showTm s ++ " " ++ showExp e ++ ")"
-showExp (mergeAllᵉ nothing s)  = "(mergeAllᵉ ∞ " ++ showExp s ++ ")"
-showExp (mergeAllᵉ (just k) s) = "(mergeAllᵉ " ++ show k ++ " " ++ showExp s ++ ")"
+-- the limit prints as the `Maybe ℕ` it IS, not as the ∞ a reader would
+-- prefer: a witness is printed to be PASTED, and the corpus is Agda
+showExp (mergeAllᵉ nothing s)  = "(mergeAllᵉ nothing " ++ showExp s ++ ")"
+showExp (mergeAllᵉ (just k) s) =
+  "(mergeAllᵉ (just " ++ show k ++ ") " ++ showExp s ++ ")"
 showExp (switchAllᵉ s)  = "(switchAllᵉ " ++ showExp s ++ ")"
 showExp (exhaustAllᵉ s) = "(exhaustAllᵉ " ++ showExp s ++ ")"
 showExp (μᵉ e)          = "(μᵉ " ++ showExp e ++ ")"

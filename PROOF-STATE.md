@@ -232,20 +232,11 @@ failing to typecheck over the collapsed tree. A cone cannot aim at either.
 
 ### Big picture tier roadmap
 
-- **THE ALL-AGDA SWEEP, WHICH IS THE HALF THE ORACLE CANNOT REACH.** The
-  oracle holds the TypeScript tree against the Agda IMPLEMENTATION, so a
-  program it certifies says nothing about the SPEC — and the collapse moved
-  the pure-function stages of every such program. The leg is QuickCheck's
-  `impl-batchSimultaneous` against `spec-batchSimultaneous` over programs whose
-  steps are `liftᵉ`, with every disagreement landing as a bug-cache row before
-  it is fixed: the cache is the only place a counterexample survives being
-  fixed, and a sweep nobody recorded certifies nothing.
-
-- **THEN MAKE THE TWO TREES' FORMER SETS A CHECKED CORRESPONDENCE, NOT A
+- **MAKE THE TWO TREES' FORMER SETS A CHECKED CORRESPONDENCE, NOT A
   CONVENTION.** What ties them today is a tag string the decoder matches and
   the generator happens to emit, so a former only one tree has does not fail —
-  it is simply never generated, and the sweep above reports green over the
-  shapes it was never handed. The leg is whatever makes that divergence a
+  it is simply never generated, and the oracle reports green over the shapes
+  it was never handed. The leg is whatever makes that divergence a
   build failure rather than a silence, which is what lets a later collapse be
   believed from a green oracle instead of a census run by hand.
 
@@ -258,6 +249,16 @@ failing to typecheck over the collapsed tree. A cone cannot aim at either.
   without reading anything. Each of those is a sentence in its own header or a
   further collapse, and the leg's product is that no former is left whose
   status is a matter of memory.
+
+- **AND MAKE THE AGDA GENERATOR'S PROGRAMS REACHABLE BY A RUNNING PIPELINE.**
+  The bridge is one-way: the CLI encodes Vals and InstEmits and there is no
+  `Exp` encoder at all, so a program the Agda generator writes can never be
+  handed to rxjs. The all-Agda sweep therefore certifies impl≡spec over shapes
+  nothing ever ran, and the oracle certifies TS≡Agda-impl only over the shapes
+  the TS generator happens to write — two coverages with nothing forcing them
+  to overlap, which is the same silence the leg above closes arriving at the
+  programs rather than at the formers. The leg is that missing encoder, so one
+  generator's output can be put to both sides.
 
 ## Tier 2 — the denotation, adequacy, and the take bound
 

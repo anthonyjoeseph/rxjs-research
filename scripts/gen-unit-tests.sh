@@ -50,9 +50,10 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import Relation.Binary.PropositionalEquality using (refl)
 
 open import Rx.Prim using (after_,_; hot; cold)
-open import Rx.Exp using (input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ;
+open import Rx.Exp using (input; ofᵉ; emptyᵉ; takeᵉ; liftᵉ; mergeAllᵉ;
   switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ;
-  nat̂; primᵗ; pairᵗ; fstᵗ; sndᵗ; strmᵗ; varᵗ; add; mul)
+  nat̂; unit̂; nilᵗ; consᵗ; foldᵗ; ifᵗ; revᵗ;
+  primᵗ; pairᵗ; fstᵗ; sndᵗ; strmᵗ; varᵗ; add; sub; mul; eqᵖ; ltᵖ; notᵖ)
 open import Rx.Slots using (scripted; shared)
 
 open import Implementation.Unit-Test.Prelude using (Case; cached)
