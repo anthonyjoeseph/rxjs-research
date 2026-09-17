@@ -9,6 +9,7 @@ import {
   of as rxOf,
   scan as rxScan,
   takeWhile,
+  tap,
 } from "rxjs";
 import {
   CutLedger,
@@ -162,16 +163,31 @@ export const share = <A>(
         fin: boolean;
         open: SourceId[];
         out?: Signal;
+        // the chain's own emit, emptied of values, announcing the
+        // handoff — it reaches the root directly (Agda foldPath's
+        // share-sink clause) rather than through any subscriber's
+        // pipeline, so it leaves this fold as a RESULT and is sent
+        // below. Sending it from inside the accumulator would make
+        // this scan's answer depend on when it ran and not only on
+        // what it was handed.
+        chain?: InstEmit<never>;
       }
     >(
       (state, item) => {
         if (item === UPSTREAM_DONE)
-          return { ...state, spent: true, fin: false, out: undefined };
+          return {
+            ...state,
+            spent: true,
+            fin: false,
+            out: undefined,
+            chain: undefined,
+          };
         if (item === SYNC_END)
           return {
             ...state,
             live: true,
             fin: false,
+            chain: undefined,
             out: {
               tag: "connected",
               spent: state.spent,
@@ -184,25 +200,23 @@ export const share = <A>(
             ...state,
             open,
             fin: false,
+            chain: undefined,
             out: { tag: "burst", emit: item },
           };
         const parts = splitEmit(item);
         const fin = parts.fin || open.length === 0;
-        // the chain's own emit, emptied of values, announcing the
-        // handoff — it reaches the root directly (Agda foldPath's
-        // share-sink clause)
-        driver.pushChainEmit({
-          events: [...parts.bookkeeping, { type: "handoff", source }],
-          instant: item.instant,
-          source: item.source,
-          kind: item.kind,
-        });
         if (fin) completed = true; // latch BEFORE the final fan-out
         return {
           live: true,
           spent: state.spent,
           open,
           fin,
+          chain: {
+            events: [...parts.bookkeeping, { type: "handoff", source }],
+            instant: item.instant,
+            source: item.source,
+            kind: item.kind,
+          },
           out: {
             tag: "fanout",
             emit: {
@@ -223,6 +237,12 @@ export const share = <A>(
       },
       { live: false, spent: false, fin: false, open: [] },
     ),
+    // the chain emit leaves here rather than from inside the fold, and
+    // it leaves ABOVE the share below, so it is sent once for the def
+    // and not once per subscriber
+    tap((state) => {
+      if (state.chain !== undefined) driver.pushChainEmit(state.chain);
+    }),
     takeWhile((state) => !state.fin, true), // the final fan-out, then done
     filter((state) => state.out !== undefined),
     rxMap((state) => state.out as Signal),
