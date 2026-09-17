@@ -8,15 +8,16 @@ only one tree had was simply never generated, so the oracle and the
 all-Agda sweep both reported green over shapes neither was ever handed.
 
 `scripts/formers.tsv` is the one declaration of the pairing, and this
-checks four surfaces against it, in both directions where both directions
+checks five surfaces against it, in both directions where both directions
 are decidable:
 
   A  the Agda datatypes   agda/src/Rx/Exp.agda      `data Exp` / `Tm` / `PrimOp`
   B  the Agda decoder     agda/src/CLI/Decode.agda  `tag is "..."` / `op is "..."`
   C  the TypeScript types typescript/src/exp.ts     `export type Exp` / `Tm` / `PrimOp`
   D  the TS generator     typescript/src/generator.ts   `type: "..."`, the op lanes
+  E  the sweep's census   agda/src/QuickCheck.agda  `formerTag` / `allFormers`
 
-A and C are checked BOTH ways -- they are closed declarations, so a former
+A, C and E are checked BOTH ways -- they are closed declarations, so a former
 present there and absent from the map is a finding, which is what catches a
 former added to one tree alone.  B and D are checked one way only: the
 decoder's file also carries the tags of types, inputs and primitive
@@ -28,6 +29,14 @@ D's direction is the one that costs something and the one the convention
 never had: a former the generator cannot reach is covered by no sweep and
 no oracle run whatever either reports, so the map's `gen` column is where
 that hole is declared and counted, with its reason beside it.
+
+E is the one that says whether the other four were ever EXERCISED.  They
+decide that a former is generable; none of them can say whether a run ever
+produced one, and a former nothing produces is covered by no sweep and no
+oracle run whatever all four report.  So the census's own enumeration is
+held to the map, and `allFormers` -- the roll the tally walks -- separately,
+since a former missing from it counts zero forever while the file still
+typechecks and still prints a census.
 
 The map's `role` column is the DIVIDING TEST's verdict, and the vocabulary
 is closed below.  It is what stops a former's status from being a matter
@@ -50,6 +59,7 @@ PATHS = {
     "decode": "agda/src/CLI/Decode.agda",
     "ts": "typescript/src/exp.ts",
     "gen": "typescript/src/generator.ts",
+    "census": "agda/src/QuickCheck.agda",
 }
 
 
@@ -189,6 +199,33 @@ def gen_prim_lanes(text: str) -> set[str]:
     return out
 
 
+def census_enum(text: str) -> tuple[dict[str, str], set[str]]:
+    """The sweep's per-former census: constructor -> tag, and the roll walked.
+
+    THE FIFTH SURFACE, AND THE ONE THAT SAYS WHETHER THE OTHER FOUR WERE EVER
+    EXERCISED.  The four above decide that a former is GENERABLE -- every tree
+    spells it, the decoder takes it, the generator has a lane.  None of them
+    can say whether a run ever produced one, and a former nothing produces is
+    covered by no sweep and no oracle run whatever all four report: the same
+    silence, one layer in.  The census answers that, so its enumeration is
+    held to the map exactly as the closed declarations are.
+
+    Two readings, because the enumeration can fail in two ways.  `formerTag`
+    pairs a constructor with the tag it reports under, and a tag drifting from
+    the map makes the count unattributable.  `allFormers` is the roll the
+    tally actually walks, and a constructor missing from it is worse than a
+    missing tag: the former is declared, the file typechecks, and its count is
+    zero forever -- a coverage hole that reads as a coverage report.
+    """
+    tags = dict(re.findall(r"^formerTag\s+(\S+)\s*=\s*\"([A-Za-z]+)\"", text, re.M))
+    if not tags:
+        sys.exit("check-formers: no `formerTag` clauses found -- the census was renamed or removed")
+    m = re.search(r"^allFormers\s*=(.*?)\[\]", text, re.M | re.S)
+    if not m:
+        sys.exit("check-formers: no `allFormers =` list found -- the census roll moved or was renamed")
+    return tags, set(re.findall(r"\bf[A-Z]\w*", m.group(1)))
+
+
 def quoted(text: str, pat: str) -> set[str]:
     return set(re.findall(pat, text))
 
@@ -269,6 +306,24 @@ def main() -> int:
                 f"unreachable -- the hole closed and the row was not"
             )
 
+    ctag, roll = census_enum(src["census"])
+    exp_tags = {r.tag for r in rows if r.kind == "exp"}
+    for extra in sorted(set(ctag.values()) - exp_tags):
+        findings.append(
+            f"{PATHS['census']}: the census reports under the tag \"{extra}\", which is in no "
+            f"`exp` row of the map -- its count cannot be attributed to a former"
+        )
+    for missing in sorted(exp_tags - set(ctag.values())):
+        findings.append(
+            f"{PATHS['census']}: the census counts nothing under the tag \"{missing}\" -- the "
+            f"sweep cannot report whether a program carrying that former was ever generated"
+        )
+    for ctor in sorted(set(ctag) - roll):
+        findings.append(
+            f"{PATHS['census']}: `{ctor}` is declared and is not in `allFormers`, so the tally "
+            f"never walks it and its count is zero on every run, whatever the generator produced"
+        )
+
     if findings:
         print("check-formers: the two trees' former sets have diverged:")
         for f in findings:
@@ -285,7 +340,7 @@ def main() -> int:
 
     holes = [r for r in rows if not r.gen]
     print(
-        f"check-formers: {len(rows)} former(s) paired across four surfaces -- every Agda "
+        f"check-formers: {len(rows)} former(s) paired across five surfaces -- every Agda "
         f"constructor and every TypeScript union member is in the map, every tag decodes, "
         f"and {len(rows) - len(holes)} are generated"
     )

@@ -77,7 +77,8 @@ export LANG="${LANG:-C.UTF-8}"
 tmp="$(mktemp)"
 row="$(mktemp)"
 spl="$(mktemp)"
-trap 'rm -f "$tmp" "$row" "$spl"' EXIT
+cen="$(mktemp)"
+trap 'rm -f "$tmp" "$row" "$spl" "$cen"' EXIT
 
 widen
 
@@ -87,6 +88,10 @@ for seed in $(seq "$FIRST" "$LAST"); do
   # numAt 2 — runs before depth)
   printf '%s %s %s\n' "$seed" "$RUNS" "$DEPTH" | "$QC" > "$tmp"
   head -1 "$tmp"
+  # one census line per run, banked for the aggregate below rather than
+  # printed: per-seed counts are noise at 300 seeds, and the question the
+  # census answers is about the SWEEP
+  grep '^census ' "$tmp" >> "$cen" || true
 
   nblocks="$(grep -c '^-- <<<PASTE$' "$tmp" || true)"
   [ "${nblocks:-0}" -eq 0 ] && continue
@@ -126,6 +131,31 @@ for seed in $(seq "$FIRST" "$LAST"); do
 done
 
 echo "gen-unit-tests: appended $added new row(s) to ${CORPUS#"$ROOT"/}"
+
+# THE CENSUS, AGGREGATED ACROSS THE SWEEP.  The pairing check proves a former
+# is GENERABLE -- every surface spells it and the generator has a lane -- and
+# says nothing about whether any run generated one.  A former totalling ZERO
+# here is the pairing's own silence one layer in: all four surfaces agree
+# about it, the map is green, and no program carrying it has been run on
+# either side.
+#
+# WRITTEN TO A FILE AND NOT MERELY PRINTED, because the verdict this script
+# reports is the CORPUS and its exit status is 0 either way.  A second verdict
+# read off scrollback is a verdict nothing reads, so the totals go somewhere a
+# caller can fail on -- which is what the workflow's own step does.
+CENSUS="$ROOT/agda/_cli/census.txt"
+awk '{ for (i = 2; i < NF; i += 2) t[$i] += $(i + 1) }
+     END { for (k in t) print k, t[k] }' "$cen" | sort > "$CENSUS"
+echo "gen-unit-tests: census over seeds $FIRST..$LAST -> ${CENSUS#"$ROOT"/}"
+awk '{ printf "  %-12s %s\n", $1, $2 }' "$CENSUS"
+
+unreached="$(awk '$2 == 0 { printf "%s ", $1 }' "$CENSUS")"
+if [ -n "$unreached" ]; then
+  echo "gen-unit-tests: NEVER GENERATED: $unreached"
+  echo "                the pairing proves these are generable; this sweep"
+  echo "                shows nothing produced one, so no program carrying"
+  echo "                them has been checked on either side."
+fi
 
 # UNCONDITIONAL, because `widen` ran unconditionally: a dead import is an
 # `imports-check` failure, so leaving the wide form behind on a run that found

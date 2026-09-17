@@ -268,6 +268,38 @@ jobs:
           echo "is EXPECTED to fail from the moment they are committed."
           exit 1
 
+      # THE PAIRING'S SILENCE, ONE LAYER IN. `make formers-check` decides that
+      # a former is GENERABLE -- every surface spells it, the decoder takes it,
+      # a generator has a lane -- and can say nothing about whether any run
+      # produced one. A former totalling zero here is covered by no sweep and
+      # no oracle run whatever all five surfaces report, which is how the tree
+      # came to have no raw lift lane at all after sixty thousand programs
+      # certified impl=spec without once changing an emit's values.
+      #
+      # IT RUNS EVEN WHEN THE SWEEP FOUND A COUNTEREXAMPLE, because the two
+      # findings are independent and a coverage hole reported only on green
+      # runs is reported exactly when nobody is reading. It is skipped only
+      # when the sweep never got far enough to write the file, where the job
+      # is already red for the reason that matters.
+      - name: Every former generated?
+        if: always() && steps.found.conclusion != 'skipped'
+        run: |
+          census=agda/_cli/census.txt
+          if [ ! -s "$census" ]; then
+            echo "quickcheck: the sweep wrote no census to $census"
+            echo "scripts/gen-unit-tests.sh reports one; its absence means the"
+            echo "sweep's coverage is unknown rather than complete."
+            exit 1
+          fi
+          cat "$census"
+          unreached="$(awk '$2 == 0 { printf "%s ", $1 }' "$census")"
+          [ -z "$unreached" ] && { echo "quickcheck: every former was generated"; exit 0; }
+          echo
+          echo "quickcheck: NEVER GENERATED: $unreached"
+          echo "The pairing proves these are generable; this sweep produced no"
+          echo "program carrying them, so neither side has been checked at one."
+          exit 1
+
       - name: Upload the new rows
         if: failure() && steps.found.outcome == 'failure'
         uses: actions/upload-artifact@v4

@@ -232,17 +232,6 @@ failing to typecheck over the collapsed tree. A cone cannot aim at either.
 
 ### Big picture tier roadmap
 
-- **AND HOLD THE AGDA GENERATOR'S LANES TO THE SAME PAIRING, WHICH IS THE ONE
-  SURFACE STILL RUNNING ON MEMORY.** The correspondence now binds four
-  surfaces and the all-Agda sweep's generator is not among them, so a former
-  it cannot write is covered by nothing and reported by nothing — which is
-  how it came to have no raw lift lane at all, found by reading rather than
-  by any check, after sixty thousand programs certified impl≡spec without
-  once changing an emit's values. A lane is a generator arm rather than
-  a tag, so what the leg has to decide is what a machine can read there; the
-  cheapest honest form is a per-former coverage count the sweep itself
-  reports, which fails on zero and needs no parse.
-
 - **AND MAKE THE AGDA GENERATOR'S PROGRAMS REACHABLE BY A RUNNING PIPELINE.**
   The bridge is one-way: the CLI encodes Vals and InstEmits and there is no
   `Exp` encoder at all, so a program the Agda generator writes can never be
@@ -262,6 +251,16 @@ failing to typecheck over the collapsed tree. A cone cannot aim at either.
   gap is in the whole palette's coverage and reads as nothing at all. What the
   leg has to decide is the mixfix spelling, since two constructors are
   operators and the reader has not been put to one.
+
+- **AND THE SLOT TELESCOPE IS THE OTHER HALF OF THE PALETTE, AND IS PAIRED BY
+  NOTHING.** `Slot` has two shapes, `scripted` and `shared`, both written by
+  both generators under those same tag strings and decoded by the same wall —
+  the identical bridge the formers cross, with none of the map behind it. It
+  is this tier's because the tier's subject is a palette a pipeline can be RUN
+  in: a program whose formers are all covered is still unreachable when the
+  telescope feeding it is not. Each shape carries a side condition the other
+  does not, so what the leg decides is whether the kind column takes a fourth
+  kind or a side condition is a column of its own.
 
 ## Tier 2 — the denotation, adequacy, and the take bound
 

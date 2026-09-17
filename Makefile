@@ -1482,7 +1482,16 @@ formers-selftest:
 	  run "a primitive operator missing from its own lane, with the word still quoted elsewhere" \
 	      "sed -i.bak 's/op: \"not\"/op: \"gone\"/' typescript/src/generator.ts" \
 	      'nothing generates the tag "not"'; \
-	  [ $$fail -eq 0 ] && echo "formers-selftest: PASS (every surface fires in the direction it is checked at all three kinds, a shared constructor signature parses, a bare-string union and an operator lane are read as themselves, a declared generator hole is reported rather than merely tolerated, and the dividing test's vocabulary is closed)"; \
+	  run "a census tag in no exp row" \
+	      "sed -i.bak 's/formerTag fLift      = \"lift\"/formerTag fLift      = \"hoisted\"/' agda/src/QuickCheck.agda" \
+	      'reports under the tag "hoisted"'; \
+	  run "an exp row the census counts nothing under" \
+	      "sed -i.bak 's/formerTag fDefer     = \"defer\"/formerTag fDefer     = \"hoisted\"/' agda/src/QuickCheck.agda" \
+	      'counts nothing under the tag "defer"'; \
+	  run "a declared former the roll never walks" \
+	      "sed -i.bak 's/allFormers = fLift ∷ fDefer ∷ fSharedSig ∷ \[\]/allFormers = fLift ∷ fDefer ∷ []/' agda/src/QuickCheck.agda" \
+	      'so the tally never walks it'; \
+	  [ $$fail -eq 0 ] && echo "formers-selftest: PASS (every surface fires in the direction it is checked at all three kinds, a shared constructor signature parses, a bare-string union and an operator lane are read as themselves, a declared generator hole is reported rather than merely tolerated, the census is held to the map in both directions and its roll to its own declarations, and the dividing test's vocabulary is closed)"; \
 	  exit $$fail
 
 cli-build: stripped
