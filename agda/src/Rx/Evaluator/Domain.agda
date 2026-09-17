@@ -729,7 +729,7 @@ data stepFrame⇓ {n} {Γ} {t} {e} where
 
 
 
-  step-lift : ∀ {s u w lo} {fn : Fn Γ [] [] [] (w ×ᵗ listᵗ s) (w ×ᵗ listᵗ u)}
+  step-lift : ∀ {s u w lo} {fn : Fn Γ [] [] [] (w ×ᵗ s) (w ×ᵗ listᵗ u)}
                 {nid} {κ : Path Γ lo u t}
                 {id now} {vals : List (Val Γ s)} {fin sched st}
             → stepFrame⇓ id now (lift-f fn nid) κ vals fin sched st

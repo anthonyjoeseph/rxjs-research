@@ -51,7 +51,7 @@ mutual
     ofˢ         : ∀ {t} → List (STm Γ Δᵍ Δ Θ t) → SExp Γ Δᵍ Δ Θ t
     emptyˢ      : ∀ {t} → SExp Γ Δᵍ Δ Θ t
     takeˢ       : ∀ {t} → STm Γ Δᵍ Δ Θ natᵗ → SExp Γ Δᵍ Δ Θ t → SExp Γ Δᵍ Δ Θ t
-    liftˢ       : ∀ {s t u} → SFn Γ Δᵍ Δ Θ (u ×ᵗ listᵗ s) (u ×ᵗ listᵗ t)
+    liftˢ       : ∀ {s t u} → SFn Γ Δᵍ Δ Θ (u ×ᵗ s) (u ×ᵗ listᵗ t)
                 → STm Γ Δᵍ Δ Θ u → SExp Γ Δᵍ Δ Θ s → SExp Γ Δᵍ Δ Θ t
     mergeAllˢ   : ∀ {t} → Maybe ℕ → SExp Γ Δᵍ Δ Θ (obs t) → SExp Γ Δᵍ Δ Θ t
     switchAllˢ exhaustAllˢ :

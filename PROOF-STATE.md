@@ -230,59 +230,60 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 
 ### Big picture tier roadmap
 
-- **THE INSTANT RULING, NOW THE TIER'S ONLY BLOCKER AND SO THE TOP LEG.** A
-  source INHERITS its instant — the machine threads the id into subscribe — and
-  the spec groups by comparing ids, so two colds alive in one frame must carry
-  the same one. `batchSyncᵉ` brackets a frame without NAMING one and is per
-  node, so the two groups never join: what is owed is how an instant is
-  IDENTIFIED in the plain tree, and that decides what every theorem over it
-  quantifies over. It is the whole tier's blocker rather than the sources'
-  because the flatteners' separate one just fell — see the next leg — so the
-  question is worth answering before anything else is typed.
+- **LIFT COMES APART INTO TWO REAL RXJS OPERATORS (Anthony: "I've never liked
+  lift").** The former's step took a whole FRAME's value list, which plain rxjs
+  cannot hand it — a step counting its argument separates `of 1 2 3` into one
+  emission from three, and no frameless pipeline tells those apart. Pointwise is
+  the repair and it is `scan` composed with `mergeMap`, so the palette carries
+  those two rather than their fusion: `scanᵉ`, and a `flattenᵉ` turning a
+  list-valued emission into one emission per element — pure value
+  restructuring, subscribing nothing, so it is not a flattener. `mapᵉ` then
+  derives. The list output is NOT droppable: the step generator spends it on a
+  drop, a duplicate and a filter.
 
-- **THEN THE DEMOTION, AND IT IS THE ORACLE'S AND NOT THE TOWER'S (Anthony:
-  the harness "shouldn't test on srxjs at all — just plain rxjs now").** Target:
-  `evaluate : … → List (Val Γ t)`, with the srxjs layer deliberately no longer
-  cross-checked between the trees. The compile path is now WHOLE — every plain
-  former is a TypeScript operator, the last of them reading its subscribe frame
-  off rxjs's own subscribe ordering rather than off a subscription it owns, so
-  the path calls `subscribe` nowhere. What remains is the wire format, the one
-  edit both sides must make together, and the demotion waits on it. Where it
-  STOPS is the tower: the proofs are stated over `evaluate↓`, so demoting it
-  moves five claims Main names, and Main is not ours to touch.
+- **THEN THE DEMOTION, WHICH IS TWO EVALUATORS AND NOT A RETYPE (Anthony: the
+  harness "shouldn't test on srxjs at all — just plain rxjs now", and the Main
+  names are claimed).** Target: a plain `evaluate : … → List (Val Γ t)`
+  mirroring rxjs, which has no envelope. Retyping the existing one is not that
+  edit: of the twenty statements over `evaluate↓`, FOURTEEN are
+  envelope-essential — every readme theorem and the top line through
+  `spec-batchSimultaneous`, `id-inheritance` through the emit's own instant,
+  the protocol's soundness through `runProtocol`. Four are value-only and two
+  weaken silently while staying well-formed, which is the shape to watch. So
+  the plain evaluator is a NEW top line beside the existing one, and the leg is
+  the split rather than the move.
 
-- **THEN THE SIX ROWS, WHICH THE RULING RELEASES TOGETHER.** The flatteners
-  were held on a second blocker and are not: they wanted a token per inner
+- **THEN THE SIX ROWS, WHICH NOTHING HOLDS ANY MORE.** The flatteners
+  were held on a blocker and are not: they wanted a token per inner
   registration against a binder fixed at subscribe time, and an inner is a
   CLOSED EXPRESSION re-run through the same reduction path on every inner
   subscription, so the mint is the inner's own and the dynamic count is already
   there. Nothing else they might owe is theirs either — an inner's init and
   exhausted close ride its own burst, a switch's cancelling closes are the
-  cut's, a handoff is a share's. So the writing is one leg once the instant is
-  named, and `liftᵖ` has already paid for the envelope vocabulary it needs.
+  cut's, a handoff is a share's. So the writing is one leg, and `liftᵖ` has
+  already paid for the envelope vocabulary it needs.
 
 - **THEN THE CLOSURE STATE LEFT IN `share` AND THE JOIN (Anthony: use ONLY
   what `Ty`/`Tm` has).** The subscribe-frame question is answered — bracketing
-  is rxjs's own subscribe ordering — so no operator owns a subscription and the
-  raw `Subject` and `new Observable` are confined to the driver's plumbing, the
-  one impure edge this tier sanctions. What is left is mutable cells no `Tm` can
-  hold: a share's two latches and its live-registration list, and the join's
-  per-inner handle. A latch read DURING the cascade that sets it is the hard
-  one, and it is why this blocks the next leg rather than tidying.
-  **AND `expand` DIVERGES**, breadth-first where rxjs is depth-first, because
-  the only lazy former is `defer` and that costs a hop; values agree as a
-  multiset, batches do not.
+  is rxjs's own subscribe ordering — so no operator owns a subscription. The
+  join's per-inner handle is gone (a lane id and `takeUntil` carry it) and the
+  live-registration list rides the boundary signal, so what is left is a
+  share's two latches. They were recorded as a DEAD ROUTE on the reading that
+  "first subscriber" is a fact about subscription order alone; that reading
+  looks wrong, since under the boundary marker the three cases are each
+  separated by a value in the stream. The leg is to build it and delete the
+  dead route, which its own rule permits only on a WORKING route.
 
 - **THEN THE SLOT TELESCOPE, WHICH SPLITS COLD FROM HOT AND CARRIES THE SHARE
   (Anthony).** `toPlain (inputˢ i)` is a bare transport because the body cannot
-  tell the two source shapes apart: neither the type nor the term distinguishes
-  them, only the telescope does, so an elaboration INDEXED BY it splits on them
-  at once and hands a hot its source for free — a hot's source IS its slot
-  index, and the token language has a literal. A shared slot is the third arm,
-  an exp tree under an all-resets-false share identified by its de Bruijn index
-  rather than by its expression, which is what makes share identity a binding
-  exactly as a `const` is. The leg is the index and the split; what each arm
-  WRAPS waits on the instant ruling above.
+  tell the two source shapes apart: only the telescope does, so an elaboration
+  INDEXED BY it splits on them at once and hands a hot its source for free — a
+  hot's source IS its slot index, and the token language has a literal. A
+  shared slot is the third arm, an exp tree under an all-resets-false share
+  identified by its de Bruijn index rather than by its expression, which is
+  what makes share identity a binding exactly as a `const` is. The leg is the
+  index and the split, and what each arm WRAPS follows from the source formers
+  it is elaborated into.
 
 - **THEN THE SAME OPERATORS IN `Tm`/`Ty`, AND TIER 1 IS COMPLETE (Anthony).**
   Each TS simul operator mirrored as an Agda definition in the value language,

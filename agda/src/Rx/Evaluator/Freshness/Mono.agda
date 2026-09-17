@@ -71,7 +71,7 @@ switchKill-mint (just v) sched st refl k = ≤-refl
 
 -- the lifted step rewrites its own cell and nothing else
 liftDispatch-mint : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u w}
-                      (fn : Fn Γ [] [] [] (w ×ᵗ listᵗ s) (w ×ᵗ listᵗ u)) (nid : NodeId)
+                      (fn : Fn Γ [] [] [] (w ×ᵗ s) (w ×ᵗ listᵗ u)) (nid : NodeId)
                       (vals : List (Val Γ s)) (fin : Bool)
                       (sched : Sched Γ) (st : EvalSt e) (m : Maybe (NodeState Γ))
                       (k : MintKey)

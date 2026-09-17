@@ -95,16 +95,28 @@ mutual
                  -- registration counts; that this operator cannot reach
                  -- it is why that one has to be proven rather than
                  -- assumed.
-    liftᵉ      : ∀ {s t u} → Fn Γ Δᵍ Δ Θ (u ×ᵗ listᵗ s) (u ×ᵗ listᵗ t)
+    liftᵉ      : ∀ {s t u} → Fn Γ Δᵍ Δ Θ (u ×ᵗ s) (u ×ᵗ listᵗ t)
                → Tm Γ Δᵍ Δ Θ u → Exp Γ Δᵍ Δ Θ s → Exp Γ Δᵍ Δ Θ t
                  -- THE ONE PURE-FUNCTION FORMER, MIRRORING THE TYPESCRIPT
-                 -- `lift`: a step over an emit's VALUE LIST together with
-                 -- carried state, which is the largest thing an operator can
-                 -- be while still adding no event, minting no registration
-                 -- and being unable to end the stream.  The step is a `Tm`,
-                 -- so it is pure, total and first-order, and `Val` reads
-                 -- `listᵗ` as a list outright, so the types here need no
-                 -- new vocabulary.
+                 -- `lift`: ONE value in, carried state threaded, zero or
+                 -- more values out — which is `scan` composed with
+                 -- `mergeMap` and so is expressible in plain rxjs, with no
+                 -- notion of a frame anywhere in it.  That is the largest
+                 -- thing an operator can be while still adding no event,
+                 -- minting no registration and being unable to end the
+                 -- stream.  The step is a `Tm`, so it is pure, total and
+                 -- first-order, and `Val` reads `listᵗ` as a list outright,
+                 -- so the types here need no new vocabulary.
+                 --
+                 -- IT IS POINTWISE BECAUSE THE PLAIN TREE IS RXJS, AND
+                 -- RXJS HAS NO FRAMES.  A step handed a whole arriving
+                 -- value list can count it — `(u , vs) ↦ (u , [length vs])`
+                 -- separates `of 1 2 3` into one emission from three, and
+                 -- no plain-rxjs pipeline can tell those apart.  Grouping
+                 -- is not lost, it is DERIVED: `batchSyncᵉ` is the former
+                 -- that sees a frame, and a group-level step is that
+                 -- composed with a pointwise lift, which is a definition
+                 -- rather than a primitive.
                  --
                  -- WHAT IT ABSORBS IS DECIDED BY WHETHER AN OPERATOR READS
                  -- THE PROTOCOL'S OWN BOOKKEEPING, and that test was run in
@@ -401,52 +413,29 @@ appendᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t}
 appendᵗ xs ys = foldᵗ (revᵗ xs) ys (consᵗ (varᵗ (here refl))
                                           (varᵗ (there (here refl))))
 
--- THE SEEDLESS ONE IS A PLAIN FOLD AND THE SEEDED ONE IS NOT, WHICH IS
--- THE ANSWER THIS LEG WENT LOOKING FOR.  `mapᵉ`'s step is applied to the
--- element, and the element IS the fold's own head binder, so the step
--- drops in with a renaming and nothing else.  `scanᵉ`'s step is applied
--- to a PAIR of the carried state and the element, which no binder here
--- offers, so it needs `letᵗ` to make one.  They are not the same rewrite.
+-- A POINTWISE FORMER MAKES BOTH OF THESE SMALL, AND `scanᵉ` VANISHES
+-- INTO IT.  The former hands its step the carried state paired with ONE
+-- element, which is exactly `scanᵉ`'s own step type, so that encoding is
+-- the step used twice — once as the next state, once as the single value
+-- emitted.  `mapᵉ` carries no state, so its work is to reach past the
+-- pair for the element; `foldᵗ` over a ONE-ELEMENT list is what binds it,
+-- since the term language has no application.  Neither needs the
+-- reversing pass a list-shaped former had to pay, because neither builds
+-- a list by consing any more.
 mapᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ s t}
      → Fn Γ Δᵍ Δ Θ s t → Exp Γ Δᵍ Δ Θ s → Exp Γ Δᵍ Δ Θ t
 mapᵉ {Θ = Θ} {s = s} {t = t} f e =
-  liftᵉ (pairᵗ unit̂ (revᵗ (foldᵗ (sndᵗ (varᵗ (here refl))) nilᵗ
-                                (consᵗ f↑ (varᵗ (there (here refl)))))))
+  liftᵉ (pairᵗ unit̂ (foldᵗ (consᵗ (sndᵗ (varᵗ (here refl))) nilᵗ) nilᵗ
+                          (consᵗ f↑ (varᵗ (there (here refl))))))
         unit̂ e
   where
-  f↑ : Tm _ _ _ (s ∷ listᵗ t ∷ (unitᵗ ×ᵗ listᵗ s) ∷ Θ) t
+  f↑ : Tm _ _ _ (s ∷ listᵗ t ∷ (unitᵗ ×ᵗ s) ∷ Θ) t
   f↑ = renTm (λ x → x) (λ x → x) (ext∈ (λ x → there (there x))) f
 
 scanᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ s t}
       → Fn Γ Δᵍ Δ Θ (t ×ᵗ s) t → Tm Γ Δᵍ Δ Θ t
       → Exp Γ Δᵍ Δ Θ s → Exp Γ Δᵍ Δ Θ t
-scanᵉ {Θ = Θ} {s = s} {t = t} f z e = liftᵉ step z e
-  where
-  -- the fold's accumulator: the scan state, and the values emitted so
-  -- far in reverse.  The former carries only the state; the list is the
-  -- former's own output and is rebuilt on every step.
-  A : Ty
-  A = t ×ᵗ listᵗ t
-
-  -- the former's argument, in the step's own context
-  arg : Tm _ _ _ ((t ×ᵗ listᵗ s) ∷ Θ) (t ×ᵗ listᵗ s)
-  arg = varᵗ (here refl)
-
-  -- inside `letᵗ`'s body: the pair handed to the step, then the fold's
-  -- element and accumulator, then the former's argument, then Θ
-  f↑ : Tm _ _ _ ((t ×ᵗ s) ∷ s ∷ A ∷ (t ×ᵗ listᵗ s) ∷ Θ) t
-  f↑ = renTm (λ x → x) (λ x → x)
-             (ext∈ (λ x → there (there (there x)))) f
-
-  run : Tm _ _ _ ((t ×ᵗ listᵗ s) ∷ Θ) A
-  run = foldᵗ (sndᵗ arg) (pairᵗ (fstᵗ arg) nilᵗ)
-              (letᵗ (pairᵗ (fstᵗ (varᵗ (there (here refl)))) (varᵗ (here refl)))
-                    (varᵗ (there (here refl)))
-                    (pairᵗ f↑ (consᵗ f↑ (sndᵗ (varᵗ (there (there (here refl))))))))
-
-  step : Tm _ _ _ ((t ×ᵗ listᵗ s) ∷ Θ) (t ×ᵗ listᵗ t)
-  step = letᵗ run (pairᵗ (fstᵗ arg) nilᵗ)
-              (pairᵗ (fstᵗ (varᵗ (here refl))) (revᵗ (sndᵗ (varᵗ (here refl)))))
+scanᵉ f z e = liftᵉ (pairᵗ f (consᵗ f nilᵗ)) z e
 
 ------------------------------------------------------------------
 -- reify: a value → the closed Tm literal denoting it (an obs value is
@@ -504,7 +493,7 @@ mutual
   subΘExp Θloc σ (takeᵉ n e)    = takeᵉ (subΘTm Θloc σ n) (subΘExp Θloc σ e)
   subΘExp Θloc σ (batchSyncᵉ e) = batchSyncᵉ (subΘExp Θloc σ e)
   subΘExp Θloc σ (liftᵉ {s = s} {u = u} f i e) =
-    liftᵉ (subΘTm ((u ×ᵗ listᵗ s) ∷ Θloc) σ f) (subΘTm Θloc σ i) (subΘExp Θloc σ e)
+    liftᵉ (subΘTm ((u ×ᵗ s) ∷ Θloc) σ f) (subΘTm Θloc σ i) (subΘExp Θloc σ e)
   subΘExp Θloc σ (mergeAllᵉ lim e) = mergeAllᵉ lim (subΘExp Θloc σ e)
   subΘExp Θloc σ (switchAllᵉ e) = switchAllᵉ (subΘExp Θloc σ e)
   subΘExp Θloc σ (exhaustAllᵉ e) = exhaustAllᵉ (subΘExp Θloc σ e)

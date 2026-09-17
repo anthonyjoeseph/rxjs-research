@@ -102,7 +102,7 @@ batchSync-slots nid vals fin sched st (just (cell-st _))           = refl
 
 -- the lifted step rewrites its own cell and passes the schedule on
 lift-slots : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u w}
-  (fn : Fn Γ [] [] [] (w ×ᵗ listᵗ s) (w ×ᵗ listᵗ u))
+  (fn : Fn Γ [] [] [] (w ×ᵗ s) (w ×ᵗ listᵗ u))
   (nid : NodeId) (vals : List (Val Γ s)) (fin : Bool)
   (sched : Sched Γ) (st : EvalSt e) (ns : Maybe (NodeState Γ)) →
   Sched.slots (proj₁ (proj₂ (proj₂ (proj₂

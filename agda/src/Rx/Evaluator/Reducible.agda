@@ -659,7 +659,7 @@ tie-cell refl r = r
 -- the candidate at what gets written back.  Nothing is walked here
 -- because nothing is threaded.
 redLiftVals : ∀ {n} {Γ : Ctx n} {s u w}
-              (fn : Fn Γ [] [] [] (w ×ᵗ listᵗ s) (w ×ᵗ listᵗ u)) → RedFn fn
+              (fn : Fn Γ [] [] [] (w ×ᵗ s) (w ×ᵗ listᵗ u)) → RedFn fn
             → {a : Val Γ w} → Red w a
             → {vals : List (Val Γ s)} → All (Red s) vals
             → All (Red u) (proj₁ (liftVals fn a vals))
@@ -668,7 +668,7 @@ redLiftVals fn rf ra rv = proj₂ (rf (ra , rv)) , proj₁ (rf (ra , rv))
 
 -- the installation argument, spent at the cell the former writes
 red-lift-installed : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u w lo}
-           (fn : Fn Γ [] [] [] (w ×ᵗ listᵗ s) (w ×ᵗ listᵗ u)) (nid : NodeId)
+           (fn : Fn Γ [] [] [] (w ×ᵗ s) (w ×ᵗ listᵗ u)) (nid : NodeId)
            {a : Val Γ w} → Red w a
          → {b : Closed Γ s} {κ : Path Γ lo u t} {id : Id} {now : Tick}
          → (sched : Sched Γ) (st : EvalSt e)
@@ -687,7 +687,7 @@ red-lift-installed {e = e} fn nid {a} ra sched st d eq =
            ra
 
 redLiftDispatch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u w}
-                  (fn : Fn Γ [] [] [] (w ×ᵗ listᵗ s) (w ×ᵗ listᵗ u)) (nid : NodeId)
+                  (fn : Fn Γ [] [] [] (w ×ᵗ s) (w ×ᵗ listᵗ u)) (nid : NodeId)
                   {vals : List (Val Γ s)} (fin : Bool)
                   (sched : Sched Γ) (st : EvalSt e) (m : Maybe (NodeState Γ))
                 → lookupNode nid (EvalSt.nodes st) ≡ m
@@ -715,7 +715,7 @@ redLiftDispatch fn nid fin sched st (just (exhaust-st _ _))    eq rn rf rv = [] 
 
 red-lift : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u w lo}
            (id : Id) (now : Tick)
-           (fn : Fn Γ [] [] [] (w ×ᵗ listᵗ s) (w ×ᵗ listᵗ u)) (nid : NodeId)
+           (fn : Fn Γ [] [] [] (w ×ᵗ s) (w ×ᵗ listᵗ u)) (nid : NodeId)
            (κ : Path Γ lo u t) → RedFn fn
          → {vals : List (Val Γ s)} → All (Red s) vals → (fin : Bool)
          → (sched : Sched Γ) (st : EvalSt e)
@@ -890,7 +890,7 @@ mutual
        , subs-batchSync refl d p , sat′
   redExpAcc (liftᵉ {s = s} {u = w} f z b) σ rσ k ok aK (acc rs) κ id now sched st =
     let nid = freshId nodeᵏ (Sched.mint sched)
-        fn  = subΘTm ((w ×ᵗ listᵗ s) ∷ []) σ f
+        fn  = subΘTm ((w ×ᵗ s) ∷ []) σ f
         zbe = inputsBelowᵗ k z ∧ inputsBelowᵉ k b
         okf = ∧ˡ (inputsBelowᵗ k f) zbe ok
         rest = ∧ʳ (inputsBelowᵗ k f) zbe ok

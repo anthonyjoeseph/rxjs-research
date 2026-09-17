@@ -132,10 +132,10 @@ gTake Θl refl x cl m e = refl
 
 
 gLift : (Θl : List Ty) (eq : Θl ++ [] ≡ Θ) (x : t ∈ Δᵍ) (cl : Exp Γ [] [] [] t)
-           (f : Tm Γ Δᵍ Δ ((v ×ᵗ listᵗ s) ∷ Θ) (v ×ᵗ listᵗ u)) (i : Tm Γ Δᵍ Δ Θ v)
+           (f : Tm Γ Δᵍ Δ ((v ×ᵗ s) ∷ Θ) (v ×ᵗ listᵗ u)) (i : Tm Γ Δᵍ Δ Θ v)
            (e : Exp Γ Δᵍ Δ Θ s)
        → Gᵉ Θl eq x cl (liftᵉ f i e)
-           ≡ liftᵉ (Gᵗ ((v ×ᵗ listᵗ s) ∷ Θl) (cong ((v ×ᵗ listᵗ s) ∷_) eq) x cl f)
+           ≡ liftᵉ (Gᵗ ((v ×ᵗ s) ∷ Θl) (cong ((v ×ᵗ s) ∷_) eq) x cl f)
                    (Gᵗ Θl eq x cl i) (Gᵉ Θl eq x cl e)
 gLift Θl refl x cl f i e = refl
 
@@ -294,10 +294,10 @@ dTake Θl refl x cl m e = refl
 
 
 dLift : (Θl : List Ty) (eq : Θl ++ [] ≡ Θ) (x : t ∈ Δ) (cl : Exp Γ [] [] [] t)
-           (f : Tm Γ Δᵍ Δ ((v ×ᵗ listᵗ s) ∷ Θ) (v ×ᵗ listᵗ u)) (i : Tm Γ Δᵍ Δ Θ v)
+           (f : Tm Γ Δᵍ Δ ((v ×ᵗ s) ∷ Θ) (v ×ᵗ listᵗ u)) (i : Tm Γ Δᵍ Δ Θ v)
            (e : Exp Γ Δᵍ Δ Θ s)
        → Dᵉ Θl eq x cl (liftᵉ f i e)
-           ≡ liftᵉ (Dᵗ ((v ×ᵗ listᵗ s) ∷ Θl) (cong ((v ×ᵗ listᵗ s) ∷_) eq) x cl f)
+           ≡ liftᵉ (Dᵗ ((v ×ᵗ s) ∷ Θl) (cong ((v ×ᵗ s) ∷_) eq) x cl f)
                    (Dᵗ Θl eq x cl i) (Dᵉ Θl eq x cl e)
 dLift Θl refl x cl f i e = refl
 
@@ -563,7 +563,7 @@ mutual
     trans (cong₂ takeᵉ (sub-elimGᵗ Θloc x cl σ m) (sub-elimGᵉ Θloc x cl σ e))
           (sym (gTake Θloc (++-identityʳ Θloc) x _ _ _))
   sub-elimGᵉ Θloc x cl σ (liftᵉ {s = s} {u = a} f i e) =
-    trans (cong₃ liftᵉ (sub-elimGᵗ ((a ×ᵗ listᵗ s) ∷ Θloc) x cl σ f)
+    trans (cong₃ liftᵉ (sub-elimGᵗ ((a ×ᵗ s) ∷ Θloc) x cl σ f)
                    (sub-elimGᵗ Θloc x cl σ i) (sub-elimGᵉ Θloc x cl σ e))
           (sym (gLift Θloc (++-identityʳ Θloc) x _ _ _ _))
   sub-elimGᵉ Θloc x cl σ (mergeAllᵉ lim e) =
@@ -670,7 +670,7 @@ mutual
     trans (cong₂ takeᵉ (sub-elimDᵗ Θloc x cl σ m) (sub-elimDᵉ Θloc x cl σ e))
           (sym (dTake Θloc (++-identityʳ Θloc) x _ _ _))
   sub-elimDᵉ Θloc x cl σ (liftᵉ {s = s} {u = a} f i e) =
-    trans (cong₃ liftᵉ (sub-elimDᵗ ((a ×ᵗ listᵗ s) ∷ Θloc) x cl σ f)
+    trans (cong₃ liftᵉ (sub-elimDᵗ ((a ×ᵗ s) ∷ Θloc) x cl σ f)
                    (sub-elimDᵗ Θloc x cl σ i) (sub-elimDᵉ Θloc x cl σ e))
           (sym (dLift Θloc (++-identityʳ Θloc) x _ _ _ _))
   sub-elimDᵉ Θloc x cl σ (mergeAllᵉ lim e) =

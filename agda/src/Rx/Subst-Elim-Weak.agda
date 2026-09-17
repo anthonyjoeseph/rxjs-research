@@ -255,7 +255,7 @@ mutual
   elimG-avᵉ Θl x cl av (takeᵉ m e) =
     cong₂ takeᵉ (elimG-avᵗ Θl x cl av m) (elimG-avᵉ Θl x cl av e)
   elimG-avᵉ Θl x cl av (liftᵉ {s = s} {u = w} f i e) =
-    cong₃ liftᵉ (elimG-avᵗ ((w ×ᵗ listᵗ s) ∷ Θl) x cl av f)
+    cong₃ liftᵉ (elimG-avᵗ ((w ×ᵗ s) ∷ Θl) x cl av f)
                 (elimG-avᵗ Θl x cl av i) (elimG-avᵉ Θl x cl av e)
   elimG-avᵉ Θl x cl av (mergeAllᵉ lim e) =
     cong (mergeAllᵉ lim) (elimG-avᵉ Θl x cl av e)
@@ -328,7 +328,7 @@ mutual
   elimD-avᵉ Θl x refl cl av (takeᵉ m e) =
     cong₂ takeᵉ (elimD-avᵗ Θl x refl cl av m) (elimD-avᵉ Θl x refl cl av e)
   elimD-avᵉ Θl x refl cl av (liftᵉ {s = s} {u = w} f i e) =
-    cong₃ liftᵉ (elimD-avᵗ ((w ×ᵗ listᵗ s) ∷ Θl) x refl cl av f)
+    cong₃ liftᵉ (elimD-avᵗ ((w ×ᵗ s) ∷ Θl) x refl cl av f)
                 (elimD-avᵗ Θl x refl cl av i) (elimD-avᵉ Θl x refl cl av e)
   elimD-avᵉ Θl x refl cl av (mergeAllᵉ lim e) =
     cong (mergeAllᵉ lim) (elimD-avᵉ Θl x refl cl av e)

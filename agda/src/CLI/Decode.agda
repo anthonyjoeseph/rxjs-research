@@ -167,7 +167,7 @@ mutual
     else if tag is "lift" then
       (childTy fuel "src" j >>=? λ s →
        childTy fuel "init" j >>=? λ u →
-       getField "fn" j >>=? decodeTm fuel Γ Δᵍ Δ ((u ×ᵗ listᵗ s) ∷ Θ) (u ×ᵗ listᵗ t) >>=? λ fn →
+       getField "fn" j >>=? decodeTm fuel Γ Δᵍ Δ ((u ×ᵗ s) ∷ Θ) (u ×ᵗ listᵗ t) >>=? λ fn →
        getField "init" j >>=? decodeTm fuel Γ Δᵍ Δ Θ u >>=? λ ini →
        getField "src" j >>=? decodeExp fuel Γ Δᵍ Δ Θ s >>=? λ src →
        just (liftᵉ fn ini src))

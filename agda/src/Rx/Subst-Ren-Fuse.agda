@@ -224,7 +224,7 @@ mutual
     cong₂ takeᵉ (sub-fixᵗ Θa Θb σ fl fr m) (sub-fixᵉ Θa Θb σ fl fr e)
   sub-fixᵉ Θa Θb {ρ⁺ = ρ⁺} σ fl fr (liftᵉ {s = s} {u = w} f i e) =
     cong₃ liftᵉ
-      (sub-fixᵗ ((w ×ᵗ listᵗ s) ∷ Θa) ((w ×ᵗ listᵗ s) ∷ Θb) σ (fixL-ext fl) (fixR-ext {Θa = Θa} {Θb = Θb} {ρ⁺ = ρ⁺} fr) f)
+      (sub-fixᵗ ((w ×ᵗ s) ∷ Θa) ((w ×ᵗ s) ∷ Θb) σ (fixL-ext fl) (fixR-ext {Θa = Θa} {Θb = Θb} {ρ⁺ = ρ⁺} fr) f)
       (sub-fixᵗ Θa Θb σ fl fr i) (sub-fixᵉ Θa Θb σ fl fr e)
   sub-fixᵉ Θa Θb σ fl fr (mergeAllᵉ lim e) =
     cong (mergeAllᵉ lim) (sub-fixᵉ Θa Θb σ fl fr e)

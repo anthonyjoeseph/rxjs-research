@@ -98,9 +98,9 @@ pushTake : (eq : Θ ≡ Θ') (m : Tm Γ Δᵍ Δ Θ natᵗ) (e : Exp Γ Δᵍ Δ
 pushTake refl m e = refl
 
 
-pushLift : (eq : Θ ≡ Θ') (f : Tm Γ Δᵍ Δ ((u ×ᵗ listᵗ s) ∷ Θ) (u ×ᵗ listᵗ t))
+pushLift : (eq : Θ ≡ Θ') (f : Tm Γ Δᵍ Δ ((u ×ᵗ s) ∷ Θ) (u ×ᵗ listᵗ t))
            (i : Tm Γ Δᵍ Δ Θ u) (e : Exp Γ Δᵍ Δ Θ s)
-         → liftᵉ (subst (λ z → Tm Γ Δᵍ Δ ((u ×ᵗ listᵗ s) ∷ z) (u ×ᵗ listᵗ t)) eq f)
+         → liftᵉ (subst (λ z → Tm Γ Δᵍ Δ ((u ×ᵗ s) ∷ z) (u ×ᵗ listᵗ t)) eq f)
                  (subst (Cᵗ Γ Δᵍ Δ u) eq i) (subst (Cᵉ Γ Δᵍ Δ s) eq e)
              ≡ subst (Cᵉ Γ Δᵍ Δ t) eq (liftᵉ f i e)
 pushLift refl f i e = refl

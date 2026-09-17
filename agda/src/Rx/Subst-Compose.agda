@@ -147,8 +147,8 @@ mutual
           (cong (subΘExp Θo (++⁺ ρ σ)) (pushTake (++-assoc Θo Θl Θs) m e))
   subΘ-compᵍᵉ {Θloc = Θl} {Θsub = Θs} Θo ρ σ (liftᵉ {s = s} {u = u} f i e) =
     trans (cong₃ liftᵉ
-            (trans (subΘ-compᵍᵗ ((u ×ᵗ listᵗ s) ∷ Θo) ρ σ f)
-                   (cong (subΘTm ((u ×ᵗ listᵗ s) ∷ Θo) (++⁺ ρ σ))
+            (trans (subΘ-compᵍᵗ ((u ×ᵗ s) ∷ Θo) ρ σ f)
+                   (cong (subΘTm ((u ×ᵗ s) ∷ Θo) (++⁺ ρ σ))
                          (shift (++-assoc Θo Θl Θs) f)))
             (subΘ-compᵍᵗ Θo ρ σ i) (subΘ-compᵍᵉ Θo ρ σ e))
           (cong (subΘExp Θo (++⁺ ρ σ)) (pushLift (++-assoc Θo Θl Θs) f i e))

@@ -236,13 +236,15 @@ data AllOp : Set where
 -- an operator at all: a shared slot fans out by registry multiplicity,
 -- one chain per subscriber (see share-sink / dispatchShare)
 data Frame {n} (Γ : Ctx n) : Ty → Ty → Set where
-  lift-f     : ∀ {s u w} → Fn Γ [] [] [] (w ×ᵗ listᵗ s) (w ×ᵗ listᵗ u)
+  lift-f     : ∀ {s u w} → Fn Γ [] [] [] (w ×ᵗ s) (w ×ᵗ listᵗ u)
              → NodeId → Frame Γ s u
-               -- the lifted step, which sees the WHOLE arriving value
-               -- list at once and hands back a whole one.  That is the
-               -- largest a frame can be while leaving the protocol
-               -- alone: it reads no node but its own cell, mints no
-               -- registration and cannot raise fin.
+               -- the lifted step, applied ONCE PER ARRIVING VALUE with
+               -- its cell threaded along, handing back zero or more.
+               -- That is the largest a frame can be while leaving the
+               -- protocol alone: it reads no node but its own cell,
+               -- mints no registration and cannot raise fin.  It cannot
+               -- see the frame it is stepping, which is what keeps it
+               -- expressible as a plain-rxjs `scan` into `mergeMap`.
   take-f     : ∀ {s} → NodeId → Frame Γ s s
   batchSync-f : ∀ {s} → NodeId → Frame Γ s (s ×ᵗ listᵗ s)
                -- THE ONLY FRAME WHOSE OUTPUT TYPE IS NOT ITS INPUT'S
@@ -549,21 +551,27 @@ aliveThroughᶠ inst st (rid , rs , (w , p)) =
   ∧ (not (memberSource (regSource rs) (EvalSt.dying st))
      ∨ not (any (_≡ᵇ rid) (EvalSt.delivered st)))
 
--- THE LIFTED STEP, WHICH IS ONE APPLICATION AND NOT A FOLD.  The
--- function is handed the carried state and the whole arriving list and
--- hands back both, so what the evaluator does here is read the cell,
--- apply once, and write the cell back; a fold over the elements, if
--- the operator wants one, is written INSIDE the step with the term
--- language's own `foldᵗ`.
-liftVals : ∀ {n} {Γ : Ctx n} {s u w} → Fn Γ [] [] [] (w ×ᵗ listᵗ s) (w ×ᵗ listᵗ u)
+-- THE LIFTED STEP, WHICH IS A LEFT FOLD AND NOT ONE APPLICATION.  The
+-- function is handed the carried state and ONE value and hands back
+-- the next state with that value's output, so what the evaluator does
+-- here is read the cell, walk the arriving list threading the state,
+-- concatenate the outputs, and write the last state back.  That walk
+-- is `scan` into `mergeMap`, which is why a plain-rxjs pipeline can
+-- run it: the step is never told how many values shared its frame, so
+-- there is nothing here for a frameless library to fail to supply.
+liftVals : ∀ {n} {Γ : Ctx n} {s u w} → Fn Γ [] [] [] (w ×ᵗ s) (w ×ᵗ listᵗ u)
          → Val Γ w → List (Val Γ s) → List (Val Γ u) × Val Γ w
-liftVals fn ac vals = proj₂ (applyFn fn (ac , vals)) , proj₁ (applyFn fn (ac , vals))
+liftVals fn ac []         = [] , ac
+liftVals fn ac (v ∷ vals) =
+  let step = applyFn fn (ac , v)
+      rest = liftVals fn (proj₁ step) vals
+  in proj₂ step ++ proj₁ rest , proj₂ rest
 
 -- The same stuck reading as the fold's: a cell of the wrong type emits
 -- nothing and writes nothing, stated as a function so no prover can
 -- prefer that arm at a node that really does hold the state.
 liftDispatch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u w}
-             → Fn Γ [] [] [] (w ×ᵗ listᵗ s) (w ×ᵗ listᵗ u) → NodeId
+             → Fn Γ [] [] [] (w ×ᵗ s) (w ×ᵗ listᵗ u) → NodeId
              → List (Val Γ s) → Bool
              → Sched Γ → EvalSt e → Maybe (NodeState Γ)
              → List (Val Γ u) × List (InstEvent (Val Γ t)) × Bool

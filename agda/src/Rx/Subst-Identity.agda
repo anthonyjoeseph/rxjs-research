@@ -63,7 +63,7 @@ mutual
           (pushTake (++-identityʳ Θloc) m e)
   subΘ-idᵉ Θloc (liftᵉ {s = s} {u = u} f i e) =
     trans (cong₃ liftᵉ
-            (trans (subΘ-idᵗ ((u ×ᵗ listᵗ s) ∷ Θloc) f) (shift (++-identityʳ Θloc) f))
+            (trans (subΘ-idᵗ ((u ×ᵗ s) ∷ Θloc) f) (shift (++-identityʳ Θloc) f))
             (subΘ-idᵗ Θloc i) (subΘ-idᵉ Θloc e))
           (pushLift (++-identityʳ Θloc) f i e)
   subΘ-idᵉ Θloc (mergeAllᵉ lim e) =
