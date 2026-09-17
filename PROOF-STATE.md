@@ -274,68 +274,58 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
   former changes what a program can SAY, so it decides what every theorem
   above quantifies over — the same reason the spec is not an agent's to move.
 
-## Tier 2 — the take bound, and the machine's own fuel
+## Tier 2 — the machine's own fuel
 
-**WHAT THIS FACE BUYS: two claims about the evaluator that no correspondence
-carries.** Both rows are read off `evaluate↓` alone — no spec, no batching, no
-second run to compare against — and a concrete program decides each. That is
-the whole tier: what this repo asserts about its own machine, standing on
-nothing else.
+**WHAT THIS FACE BUYS: the one claim about the evaluator that no correspondence
+carries.** It is read off `evaluate↓` alone — no spec, no batching, no second
+run to compare against — and a concrete program decides it. That is the whole
+tier: what this repo asserts about its own machine, standing on nothing else.
 
-**AND THE RISK THEY SHARE IS THE FLATTENERS.** Each row carries a probe, and
-each receipt names the same region as NOT REACHED — no program whose evaluation
-enters a flattening node, and no source firing at more than one tick. So what
-is instantiated is the first-order half of both statements, and the region
-where either could still be false is one region, not two.
+**AND THE RISK IS THE FLATTENERS.** The row carries a probe whose receipt names
+the region it does NOT reach — no program whose evaluation enters a flattening
+node, and no source firing at more than one tick. So what is instantiated is the
+first-order half of the statement, and the region where it could still be false
+is named rather than guessed at.
 
 ### The monster
 
-`take-bounds-values` — the cheap thing to refute and the expensive thing to
-discover late. Its budget is decremented at the dispatch and its cut emitted
-from the frame, so an off-by-one between those two points, or a path that
-delivers before it spends, is a counterexample rather than a hard proof. And it
-is the only emission bound this repo states uniformly in fuel, so every later
-restriction on what a program may emit is measured against it and a restatement
-here moves what the tiers above can ask for.
-
-also: `run-monotone` — a fact about fuel alone, sharing no vocabulary with the take node's budget and reached by nothing in its cone.
+`run-monotone` — the cheapest thing here that can be false. It says more fuel
+EXTENDS a run and never rewrites what a shorter one emitted, which is two
+properties in one equation, and the second is the one a machine violates
+quietly: a drain resuming from a different arrival ordinal, an instant
+renumbered under the larger fuel, a burst reordered. Every face above reads its
+own fuel off its own hypotheses, so nothing yet forces the equation — which is
+why a restatement is cheap now and ruinous once a consumer exists.
 
 ### Big picture tier roadmap
 
-- **PROBE BOTH ROWS THROUGH A FLATTENER, BECAUSE THAT IS THE ONE REGION NEITHER
-  RECEIPT REACHES.** Both probes stop at the same boundary and both say so, so
-  the tier's whole remaining doubt sits in one shape: a `take` above a
-  `mergeAll`/`switchAll`/`exhaustAll` holds its grant across an inner
-  subscribe, and a longer fuel enters that subscribe at a different point. The
-  leg's product is rows at flattening programs for each row, or a refutation —
-  and a refutation here is the cheap outcome, since neither statement has a
-  consumer yet and restating one costs nothing above it.
+- **PROBE THROUGH A FLATTENER, BECAUSE THAT IS THE ONE REGION THE RECEIPT DOES
+  NOT REACH.** The probe stops at that boundary and says so, so the tier's whole
+  remaining doubt sits in one shape: a longer fuel enters an inner subscribe at
+  a different point, and what the shorter run emitted is rewritten rather than
+  extended. The leg's product is rows at `mergeAll`/`switchAll`/`exhaustAll`
+  programs, or a refutation — and a refutation is the cheap outcome here, since
+  the statement has no consumer yet and restating it costs nothing above it.
 
-- **THEN THE TAKE BOUND AT A `take` THAT IS NOT OUTERMOST.** The statement is
-  made at an OUTERMOST `take`, which its own header records as the reason a
-  candidate restriction admitting only that shape would be tested by nothing.
-  The same gap applies to the bound itself: what is claimed is a property of
-  one syntactic position, and whether it survives a `take` under a `lift`, under
-  a second `take`, or under a flattener is not asserted and not instantiated.
-  The leg decides whether the statement generalises or whether the outermost
-  form is the true one.
+- **THEN PAST ONE TICK, AND OFF A COLD SOURCE.** Every existing row scripts a
+  hot source firing once, so every arrival lands at tick zero and no row spans
+  two deliveries. That leaves the prefix property untested exactly where a run
+  carries state between ticks, which is where a drain counter could resume
+  differently. The leg adds rows at a source firing twice and at a cold source,
+  and its product is whether the equation survives a run with more than one
+  arrival ordinal in it.
 
 - **THEN MINT THE LEAVES, IN WHATEVER CURRENCY THE FIRST TWO LEAVE STANDING.**
-  The bound is a BARE postulate on purpose: its previous leaves were
-  denominated in the take node's own budget — the registry's path condition,
-  the node counter's guard, a drain induction over chains — and which of those
-  is still the right currency is what the flattener rows decide. So this leg is
-  last by construction, and minting ahead of it is a hypothesis about the route
-  rather than a decomposition. The apparatus is recoverable; the choice of
-  currency is not.
+  The row is a BARE postulate on purpose: what the induction is over — the
+  drain's own step, the frame's concatenation, the arrival ordinal — is what the
+  flattener and multi-tick rows decide, and minting ahead of them is a
+  hypothesis about the route rather than a decomposition. So this leg is last by
+  construction, and its own product is the split, not a proof of it.
 
 ### The ledger
 
 - **`run-monotone`** (Verify-Run-Monotone) — FALSITY, `PROBED`: more fuel only
   extends a run. Nothing postulated in it, and a concrete program decides it.
-- **`take-bounds-values`** (Verify-Take-Bounds) — FALSITY, `PROBED, RECOVERY`:
-  a program headed by `take k` emits at most k values, at every fuel. Bare, and
-  the one emission bound stated uniformly in fuel.
 
 ## Tier 3 — the automaton half, and it is the only half
 

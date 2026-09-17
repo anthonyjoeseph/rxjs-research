@@ -63,12 +63,6 @@ open import Probed.Pipeline-Claims using (row-online; row-ids)
 -- trust.
 open import Probed.Run-Monotone using (row-saturated; row-grows; row-past-horizon)
 
--- THE TAKE FACE'S ROWS, claimed here for the same reason: it is the
--- worked instance a saturation restriction is measured against, so it
--- is the one statement on that tier that must not be taken on trust.
-open import Probed.Take-Bounds using
-  (row-zero; row-cuts-instant; row-exact; row-past-frame)
-
 -- THE SEGMENT ROWS, claimed here because the statements they
 -- instantiate are the two leaves the run's own concatenation
 -- decomposes into, and nothing had reached either.
