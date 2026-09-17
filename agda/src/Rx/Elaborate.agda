@@ -87,6 +87,18 @@ postulate
   -- ids -- two colds coming alive in one frame have to carry the SAME
   -- id or the batch they belong to is split.  A fresh mint per source
   -- is the one answer that is certainly wrong.
+  --
+  -- AND THE CAPABILITY IS A READ OF A PARAMETER, WHICH NARROWS WHAT AN
+  -- ANSWER CAN BE.  An instant is not drawn from the ledger at any key:
+  -- it is THREADED, an argument of subscribe held constant across one
+  -- frame and replaced per arrival cascade, which is the arity wanted
+  -- exactly.  Of the plain tree's formers exactly one binds a token, and
+  -- it draws per node per subscription, so two sources alive in one
+  -- frame get two; none of the rest mentions the parameter at all, so no
+  -- composition of them reaches it.  An answer is therefore a BINDER the
+  -- tree does not have, and what a new former admits is what every
+  -- theorem above quantifies over -- so the shape of it is a ruling and
+  -- not an elaboration detail.
   -- DEAD ROUTE: bracket the subscribe frame with `batchSyncᵉ` and let
   --   the grouping stand in for the id.  It brackets a frame without
   --   NAMING one, and the bracket is per node, so two colds subscribed
@@ -99,7 +111,12 @@ postulate
   --   exists to rule out — and a lift's state advances per EMIT, so it
   --   cannot tell two emits of one cascade from two cascades.  Both
   --   quantities are properties of the RUN, and the run is the
-  --   scheduler's.
+  --   scheduler's.  AND BRACKETING FIRST DOES NOT REPAIR IT, which is
+  --   the repair the bracket invites: a group-advanced counter numbers
+  --   frames consistently and still numbers them in the scheduler's own
+  --   namespace with no relation to it, while the slots hand the same
+  --   program envelopes carrying the machine's ids — so the two kinds
+  --   of instant meet in one output and no renaming separates them.
   ofᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
       → List (Tm Γ Δᵍ Δ Θ (plainᵗ t)) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
 
