@@ -40,7 +40,7 @@ open import Rx.Exp
         ; _⊟_; ⊟-++ˡ; ⊟-++ʳ; compare∈
         ; elimGExp; elimGTm; elimGTms; elimDExp; elimDTm; elimDTms
         ; input; ofᵉ; emptyᵉ; takeᵉ; liftᵉ; mergeAllᵉ; switchAllᵉ
-        ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ
+        ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ; uniqᵗ
         ; varᵗ; unit̂; bool̂; nat̂; uniq̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ
         ; caseᵗ; ifᵗ; primᵗ; strmᵗ; nilᵗ; consᵗ; foldᵗ )
 open import Rx.Subst-Transport using (cong₃)
@@ -266,6 +266,8 @@ mutual
   elimG-avᵉ Θl x cl {ρ⁺ = ρ⁺} {ρg = ρg} {ρd = ρd} av (deferᵉ e) =
     cong deferᵉ (elimD-avᵉ Θl (∈-++⁺ˡ x) (⊟-++ˡ x) cl
                    (avoids-++ˡ {x = x} {ρ⁺ = ρ⁺} {ρ = ρg} ρd av) e)
+  elimG-avᵉ Θl x cl av (mintᵉ e) =
+    cong mintᵉ (elimG-avᵉ (uniqᵗ ∷ Θl) x cl av e)
 
   elimG-avᵗ : (Θl : List Ty) (x : t ∈ Δᵍ) (cl : Exp Γ [] [] Θsub t)
               {ρ⁺ : Ren∈ Δ₀ᵍ Δᵍ} {ρg : Ren∈ Δ₀ᵍ (Δᵍ ⊟ x)}
@@ -336,6 +338,8 @@ mutual
   elimD-avᵉ Θl x refl cl av (μᵉ e) = cong μᵉ (elimD-avᵉ Θl x refl cl av e)
   elimD-avᵉ Θl x refl cl {ρg = ρg} av (deferᵉ e) =
     cong deferᵉ (elimD-avᵉ Θl (∈-++⁺ʳ _ x) (⊟-++ʳ x) cl (avoids-++ʳ ρg av) e)
+  elimD-avᵉ Θl x refl cl av (mintᵉ e) =
+    cong mintᵉ (elimD-avᵉ (uniqᵗ ∷ Θl) x refl cl av e)
 
   elimD-avᵗ : (Θl : List Ty) (x : t ∈ Δ) (p : (Δ ⊟ x) ≡ Δd)
               (cl : Exp Γ [] [] Θsub t)

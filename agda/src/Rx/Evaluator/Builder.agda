@@ -40,6 +40,7 @@ open import Data.Bool.ListAction using (any)
 open import Data.Fin using (Fin; toℕ)
 open import Data.Fin.Properties using (toℕ<n)
 open import Data.List using (List; []; _∷_; _++_)
+open import Data.List.Relation.Unary.All using () renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
 open import Data.Maybe using (Maybe; nothing; just)
 open import Data.Nat using (ℕ; zero; suc; pred; _≤_; _<_; _∸_; s≤s; _≡ᵇ_; _<?_)
 open import Data.Nat.Induction using (<-wellFounded-fast)
@@ -55,9 +56,9 @@ open import Relation.Nullary.Decidable using (⌊_⌋)
 
 open import Rx.Prim using (Fuel; Id; Source; Tick; InstEmit; InstEvent; close;
   exhausted; hot; cold)
-open import Rx.Exp using (Ctx; Closed; Val; _≟ᵗ_; obs; unfoldμ; evalTm; input; ofᵉ; emptyᵉ; takeᵉ; liftᵉ; mergeAllᵉ;
-  switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ)
-open import Rx.Mint using (nodeᵏ; regᵏ; freshId; setAt; next)
+open import Rx.Exp using (Ctx; Closed; Val; _≟ᵗ_; obs; unfoldμ; evalTm; subΘExp; input; ofᵉ; emptyᵉ; takeᵉ; liftᵉ; mergeAllᵉ;
+  switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ)
+open import Rx.Mint using (nodeᵏ; regᵏ; sourceᵏ; freshId; setAt; next)
 open import Rx.Slots using (Slots; shared; scripted)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; AllOp; NodeId; NodeState; Frame; root; _↠_; take-f;
   lift-f; thru-outer; from-inner; mergeAllᵒ; switchᵒ; exhaustᵒ; mergeAll-st; switch-st;
@@ -84,7 +85,7 @@ open import Rx.Evaluator.Domain using (srcFrame; subscribeE⇓; subscribeAll⇓;
   drain-nil; drain-no-room; drain-room;
   drain⇓; evaluate⇓; subs-of; subs-empty; subs-take-zero;
   subs-take-suc; subs-lift; subs-merge-all; subs-switch-all; subs-exhaust-all;
-  subs-μ; subs-defer; sub-all; eval-run;
+  subs-μ; subs-defer; subs-mint; sub-all; eval-run;
   subs-floor; subs-shared; subs-hot-done; subs-hot-live; subs-cold-sync;
   subs-cold-async; slot-spent; slot-join; slot-connect; connect-live;
   connect-died)
@@ -328,6 +329,11 @@ subscribeE! sl (μᵉ body) κ id now sched ag st =
 
 subscribeE! sl (varᵉ ()) κ id now sched ag st
 subscribeE! sl (deferᵉ body) κ id now sched ag st = _ , subs-defer refl refl refl refl
+subscribeE! sl (mintᵉ body) κ id now sched ag st =
+  let src    = freshId sourceᵏ (Sched.mint sched)
+      sched' = record sched { mint = setAt sourceᵏ (suc src) (Sched.mint sched) }
+      (r , d) = subscribeE! sl (subΘExp [] (src ∷ᵃ []ᵃ) body) κ id now sched' ag st
+  in r , subs-mint refl d
 
 -- THE FLATTENER'S OUTER SUBSCRIBE, WHICH HAS EXACTLY ONE CLAUSE.  All
 -- three `*All` operators install their own node state and then run the

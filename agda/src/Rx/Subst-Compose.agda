@@ -31,13 +31,14 @@ open import Relation.Binary.PropositionalEquality
 
 open import Rx.Exp
   using (Ty; Ctx; Exp; Tm; Val; subΘExp; subΘTm; subΘTms; input; ofᵉ; emptyᵉ; takeᵉ; liftᵉ;
-  mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; varᵗ; unit̂; bool̂; nat̂; uniq̂; pairᵗ; fstᵗ;
+  mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ; uniqᵗ; varᵗ; unit̂; bool̂; nat̂; uniq̂; pairᵗ; fstᵗ;
   sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ; _×ᵗ_; listᵗ; nilᵗ; consᵗ; foldᵗ; renTm; wkTm; reify;
   lookupEnv)
 open import Rx.Subst-Transport
   using ( Cᵉ; Cᵗ; Cˢ; shift; cong₃
         ; pushInput; pushEmpty; pushVarᵉ; pushOf; pushTake; pushLift
-        ; pushMerge; pushSwitch; pushExhaust; pushMu; pushDefer
+        ; pushMerge; pushSwitch; pushExhaust; pushMu; pushDefer; pushMint
+        ; shiftᵉ
         ; pushUnit; pushBool; pushNat; pushUniq; pushPair; pushFst; pushSnd
         ; pushInl; pushInr; pushCase; pushIf; pushPrim; pushStrm
         ; pushNilˢ; pushConsˢ; pushVarᵗ; pushHere; pushThere
@@ -166,6 +167,11 @@ mutual
   subΘ-compᵍᵉ {Θloc = Θl} {Θsub = Θs} Θo ρ σ (deferᵉ e) =
     trans (cong deferᵉ (subΘ-compᵍᵉ Θo ρ σ e))
           (cong (subΘExp Θo (++⁺ ρ σ)) (pushDefer (++-assoc Θo Θl Θs) e))
+  subΘ-compᵍᵉ {Θloc = Θl} {Θsub = Θs} Θo ρ σ (mintᵉ e) =
+    trans (cong mintᵉ (trans (subΘ-compᵍᵉ (uniqᵗ ∷ Θo) ρ σ e)
+                             (cong (subΘExp (uniqᵗ ∷ Θo) (++⁺ ρ σ))
+                                   (shiftᵉ (++-assoc Θo Θl Θs) e))))
+          (cong (subΘExp Θo (++⁺ ρ σ)) (pushMint (++-assoc Θo Θl Θs) e))
 
   subΘ-compᵍᵗ : (Θout : List Ty) (ρ : All (Val Γ) Θloc)
                 (σ : All (Val Γ) Θsub)

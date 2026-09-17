@@ -26,12 +26,13 @@ open import Relation.Binary.PropositionalEquality
 
 open import Rx.Exp
   using (Ty; Ctx; Exp; Tm; subΘExp; subΘTm; subΘTms; input; ofᵉ; emptyᵉ; takeᵉ; liftᵉ;
-  mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; varᵗ; unit̂; bool̂; nat̂; uniq̂; pairᵗ; fstᵗ;
+  mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ; uniqᵗ; varᵗ; unit̂; bool̂; nat̂; uniq̂; pairᵗ; fstᵗ;
   sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ; _×ᵗ_; listᵗ; nilᵗ; consᵗ; foldᵗ)
 open import Rx.Subst-Transport
   using ( Cᵉ; Cᵗ; Cˢ; shift; ∈-id; cong₃
         ; pushInput; pushEmpty; pushVarᵉ; pushOf; pushTake; pushLift
-        ; pushMerge; pushSwitch; pushExhaust; pushMu; pushDefer
+        ; pushMerge; pushSwitch; pushExhaust; pushMu; pushDefer; pushMint
+        ; shiftᵉ
         ; pushVarᵗ; pushUnit; pushBool; pushNat; pushUniq; pushPair; pushFst; pushSnd
         ; pushInl; pushInr; pushCase; pushIf; pushPrim; pushStrm
         ; pushNilˢ; pushConsˢ
@@ -76,6 +77,9 @@ mutual
     trans (cong μᵉ (subΘ-idᵉ Θloc e)) (pushMu (++-identityʳ Θloc) e)
   subΘ-idᵉ Θloc (deferᵉ e) =
     trans (cong deferᵉ (subΘ-idᵉ Θloc e)) (pushDefer (++-identityʳ Θloc) e)
+  subΘ-idᵉ Θloc (mintᵉ e) =
+    trans (cong mintᵉ (trans (subΘ-idᵉ (uniqᵗ ∷ Θloc) e) (shiftᵉ (++-identityʳ Θloc) e)))
+          (pushMint (++-identityʳ Θloc) e)
 
   subΘ-idᵗ : (Θloc : List Ty) (m : Tm Γ Δᵍ Δ (Θloc ++ []) t)
            → subΘTm Θloc [] m ≡ subst (Cᵗ Γ Δᵍ Δ t) (++-identityʳ Θloc) m

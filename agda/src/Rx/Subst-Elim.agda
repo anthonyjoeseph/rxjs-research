@@ -43,7 +43,7 @@ open import Rx.Exp
   using (Ty; Ctx; Val; Exp; Tm; PrimOp; subΘExp; subΘTm; subΘTms; elimGExp; elimGTm; elimGTms;
   elimDExp; elimDTm; elimDTms; _⊟_; ⊟-++ˡ; ⊟-++ʳ; compare∈; renExp; wkTm; reify; lookupEnv;
   natᵗ; boolᵗ; obs; _×ᵗ_; _+ᵗ_; input; ofᵉ; emptyᵉ; takeᵉ; liftᵉ; mergeAllᵉ; switchAllᵉ;
-  exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; varᵗ; unit̂; bool̂; nat̂; uniq̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ;
+  exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ; uniqᵗ; varᵗ; unit̂; bool̂; nat̂; uniq̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ;
   inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ; nilᵗ; consᵗ; foldᵗ; listᵗ)
 open import Rx.Subst-Transport using (Cᵉ; Cᵗ; Cˢ; cong₃; pushVarᵉ)
 open import Rx.Subst-Elim-Weak using (elimG-avᵗ; elimD-avᵗ)
@@ -164,6 +164,11 @@ gDefer : (Θl : List Ty) (eq : Θl ++ [] ≡ Θ) (x : t ∈ Δᵍ) (cl : Exp Γ 
        → Gᵉ Θl eq x cl (deferᵉ e) ≡ deferᵉ (subst (λ ζ → Exp Γ [] ζ Θ u) (⊟-++ˡ x)
                        (Dᵉ Θl eq (∈-++⁺ˡ x) cl e))
 gDefer Θl refl x cl e = refl
+
+gMint : (Θl : List Ty) (eq : Θl ++ [] ≡ Θ) (x : t ∈ Δᵍ) (cl : Exp Γ [] [] [] t)
+           (e : Exp Γ Δᵍ Δ (uniqᵗ ∷ Θ) u)
+       → Gᵉ Θl eq x cl (mintᵉ e) ≡ mintᵉ (Gᵉ (uniqᵗ ∷ Θl) (cong (uniqᵗ ∷_) eq) x cl e)
+gMint Θl refl x cl e = refl
 
 gVarT : (Θl : List Ty) (eq : Θl ++ [] ≡ Θ) (x : t ∈ Δᵍ) (cl : Exp Γ [] [] [] t)
            (y : u ∈ Θ)
@@ -316,6 +321,11 @@ dDefer : (Θl : List Ty) (eq : Θl ++ [] ≡ Θ) (x : t ∈ Δ) (cl : Exp Γ [] 
        → Dᵉ Θl eq x cl (deferᵉ e) ≡ deferᵉ (subst (λ ζ → Exp Γ [] ζ Θ u) (⊟-++ʳ x)
                        (Dᵉ Θl eq (∈-++⁺ʳ Δᵍ x) cl e))
 dDefer Θl refl x cl e = refl
+
+dMint : (Θl : List Ty) (eq : Θl ++ [] ≡ Θ) (x : t ∈ Δ) (cl : Exp Γ [] [] [] t)
+           (e : Exp Γ Δᵍ Δ (uniqᵗ ∷ Θ) u)
+       → Dᵉ Θl eq x cl (mintᵉ e) ≡ mintᵉ (Dᵉ (uniqᵗ ∷ Θl) (cong (uniqᵗ ∷_) eq) x cl e)
+dMint Θl refl x cl e = refl
 
 dVarT : (Θl : List Ty) (eq : Θl ++ [] ≡ Θ) (x : t ∈ Δ) (cl : Exp Γ [] [] [] t)
            (y : u ∈ Θ)
@@ -564,6 +574,9 @@ mutual
                    (cong (subst (λ ζ → Exp _ [] ζ _ _) (⊟-++ˡ x))
                          (sub-elimDᵉ Θloc (∈-++⁺ˡ x) cl σ e))))
           (sym (gDefer Θloc (++-identityʳ Θloc) x _ _))
+  sub-elimGᵉ Θloc x cl σ (mintᵉ e) =
+    trans (cong mintᵉ (sub-elimGᵉ (uniqᵗ ∷ Θloc) x cl σ e))
+          (sym (gMint Θloc (++-identityʳ Θloc) x _ _))
 
   sub-elimGᵗ : (Θloc : List Ty) (x : t ∈ Δᵍ)
        (cl : Exp Γ [] [] Θsub t) (σ : All (Val Γ) Θsub)
@@ -665,6 +678,9 @@ mutual
                    (cong (subst (λ ζ → Exp _ [] ζ _ _) (⊟-++ʳ x))
                          (sub-elimDᵉ Θloc (∈-++⁺ʳ _ x) cl σ e))))
           (sym (dDefer Θloc (++-identityʳ Θloc) x _ _))
+  sub-elimDᵉ Θloc x cl σ (mintᵉ e) =
+    trans (cong mintᵉ (sub-elimDᵉ (uniqᵗ ∷ Θloc) x cl σ e))
+          (sym (dMint Θloc (++-identityʳ Θloc) x _ _))
   sub-elimDᵉ Θloc x cl σ (varᵉ y) =
     trans (sub-elimD-varᵉ Θloc x cl σ y)
           (sym (dVarE Θloc (++-identityʳ Θloc) x _ y))
