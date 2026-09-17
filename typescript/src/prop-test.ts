@@ -156,10 +156,17 @@ const sameStream = <A>(a: InstEmit<A>[], b: InstEmit<A>[]): boolean =>
 
 // Compare the Agda (oracle) and rxjs results case by case, on BOTH the
 // raw stream and the batched output, and render a compact report.
+//
+// THE VERDICT IS RETURNED BESIDE THE REPORT, AND THAT IS NOT A
+// REFINEMENT.  This printed its findings and exited 0 whatever they
+// were, so `make oracle` was green on a run whose rx stream was EMPTY
+// in a fifth of its cases -- a check that cannot fail, standing where
+// the change workflow puts its second gate.  The report was always
+// right; nothing read it.
 const interpretResults = (
   agdaResults: EvalResult[],
   rxResults: EvalResult[],
-): string => {
+): { report: string; ok: boolean } => {
   const n = Math.min(agdaResults.length, rxResults.length);
   const lines: string[] = [];
   let streamOk = 0;
@@ -190,7 +197,14 @@ const interpretResults = (
     (agdaResults.length !== rxResults.length
       ? ` (LENGTH MISMATCH: agda ${agdaResults.length}, rx ${rxResults.length})`
       : "");
-  return [header, ...lines].join("\n");
+  return {
+    report: [header, ...lines].join("\n"),
+    ok:
+      streamOk === n &&
+      batchOk === n &&
+      n > 0 &&
+      agdaResults.length === rxResults.length,
+  };
 };
 
 async function main() {
@@ -202,7 +216,11 @@ async function main() {
     execAgda(testCases.map(serialize)),
     Promise.all(testCases.map(evaluateRx)),
   ]);
-  console.log(interpretResults(agdaResults, rxResults));
+  const { report, ok } = interpretResults(agdaResults, rxResults);
+  console.log(report);
+  // a zero-case run is a failure too: it means the generator produced
+  // nothing, which reads as a clean sweep of an empty corpus
+  if (!ok) process.exitCode = 1;
 }
 
 main();

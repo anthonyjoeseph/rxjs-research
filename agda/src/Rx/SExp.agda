@@ -116,5 +116,26 @@ plainᵗ (obs t)    = obs (machineEmitᵗ (plainᵗ t))
 plainᶜ : List Ty → List Ty
 plainᶜ ts = map plainᵗ ts
 
-plainᵛ : ∀ {n} → Ctx n → Ctx n
-plainᵛ Γ = mapⱽ plainᵗ Γ
+-- WHAT A STREAM NAME STANDS AT IS WHAT ITS SUBTREE ELABORATES TO, AND
+-- THAT IS NOT WHAT A VALUE NAME STANDS AT.  A μ-bound name in a simul
+-- program is a STREAM at the author's payload, so the program it
+-- elaborates to binds one at the envelope over the translated payload;
+-- a `Θ` name is an ordinary value and carries no envelope anywhere.
+-- One translation cannot serve both, so the elaboration's four contexts
+-- split two and two: the two stream telescopes walk with `emitᶜ` and
+-- the value telescope with `plainᶜ`.
+emitᵗ : Ty → Ty
+emitᵗ t = machineEmitᵗ (plainᵗ t)
+
+emitᶜ : List Ty → List Ty
+emitᶜ ts = map emitᵗ ts
+
+-- AND AN INPUT IS A STREAM TOO, WHICH IS WHY THE INPUT VECTOR WALKS
+-- WITH THE STREAM TRANSLATION AND NOT THE VALUE ONE.  The TypeScript
+-- mirror settles it: an input source there is built by the driver,
+-- which is what mints its source token and stamps its instant, so what
+-- reaches the pipeline is already an `InstEmit`.  Reading inputs as
+-- bare payloads instead would oblige the elaboration to wrap each one,
+-- and wrapping is exactly the operation no program can perform.
+emitᵛ : ∀ {n} → Ctx n → Ctx n
+emitᵛ Γ = mapⱽ emitᵗ Γ

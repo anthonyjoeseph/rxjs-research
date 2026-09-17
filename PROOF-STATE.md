@@ -230,15 +230,15 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 
 ### Big picture tier roadmap
 
-- **THE TWO FORMERS THE DEMOTION NEEDS, AND THEY ARE ANTHONY'S TO RULE ON.**
-  An elaborated program must read the running cascade's token and mint a
-  source token; neither is derivable inside a program, both being properties
-  of the run, and the TypeScript operators read exactly these two off the
-  driver. So the plain tree wants a former for each — and a former decides
-  what every theorem quantifies over, which is the one thing an agent does not
-  invent. The finding sits in `toPlain`'s header. Until it is ruled on, the
-  demotion and the elaboration's body are both parked, and the legs below run
-  first.
+- **THE THREE THINGS THE PLAIN TREE CANNOT SAY, AND THEY ARE ANTHONY'S TO RULE
+  ON.** `toPlain` has a body now, so the gaps are named leaves rather than a
+  paragraph, and the census came out sharper than the old one. MINTING a source
+  token is owed by the two sources and by every registration a flattener brings
+  alive. READING the running instant is owed only at a SOURCE — downstream the
+  incoming emit is an envelope whose instant a term can project. And a simul
+  `take` counts VALUES where `takeᵉ` counts EMITS, so nothing here ends a stream
+  on a value-derived condition. A former decides what every theorem quantifies
+  over, so none is invented.
 
 - **THEN THE DEMOTION, ONCE A PROGRAM CAN BUILD AN ENVELOPE.** Target:
   `evaluate : … → List (Val Γ t)`. The census called this and the simul tree
@@ -249,11 +249,14 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
   top line. Eleven sites read a field of the machine's own envelope and are the
   work; the rest goes with the return type.
 
-- **THEN `toPlain` GETS A BODY.** It is a leaf today, so the restated top line
-  claims correctness of an elaboration nothing has written; every former's
-  protocol traffic is decided there. The body is per-former plumbing over the
-  type translation, plus the one lemma a pointwise-translated context owes —
-  that looking an input up commutes with the walk.
+- **THEN THE FOUR LEAVES THAT ARE MERELY UNWRITTEN.** `liftᵖ` and the three
+  flatteners want no ruling and no former. A lift unwraps its envelope, runs the
+  author's step over the value list and rewraps under the instant it was handed,
+  which is a fold, a case and a pair; a flattener's values come out of
+  `mergeAllᵉ` over the observables its envelopes carry, and only the join's own
+  protocol emits wait on the mint. Each is a large term in a language with no
+  application, so `letᵗ` and `revᵗ` are the vocabulary — the shape `scanᵉ`
+  already pays for.
 
 - **THEN REFACTOR THE TYPESCRIPT PRIMITIVES IN PLACE, `lift` INCLUDED
   (Anthony).** Not new operators: the shipped ones — `lift`, `map`, `take`,
@@ -274,6 +277,13 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
   former is never repaired by inventing one: a new `Ty` constructor or `Tm`
   former changes what a program can SAY, so it decides what every theorem
   above quantifies over — the same reason the spec is not an agent's to move.
+
+### The ledger
+
+- **`{of,empty,take,mergeAll,switchAll}ᵖ`** (Rx.Elaborate) — SHAPE,
+  `DEAD ROUTE×4`: the elaboration's per-former plumbing. A source owes a token
+  nothing can mint, and a simul `take` cuts on a value count no former reads,
+  so each is restated the day the ruling lands.
 
 ## Tier 2 — the proof statement, once there are two trees to state it over
 
