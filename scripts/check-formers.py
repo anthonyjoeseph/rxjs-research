@@ -28,6 +28,12 @@ D's direction is the one that costs something and the one the convention
 never had: a former the generator cannot reach is covered by no sweep and
 no oracle run whatever either reports, so the map's `gen` column is where
 that hole is declared and counted, with its reason beside it.
+
+The map's `role` column is the DIVIDING TEST's verdict, and the vocabulary
+is closed below.  It is what stops a former's status from being a matter
+of memory: the test decides which formers the one pure-function former
+absorbs, and before this it was answerable only by whoever had last
+thought about it, so a former added later owed no answer at all.
 """
 
 from __future__ import annotations
@@ -47,11 +53,24 @@ PATHS = {
 }
 
 
-class Row:
-    __slots__ = ("kind", "agda", "tag", "gen", "why")
+# THE DIVIDING TEST'S ANSWERS, and the vocabulary is closed on purpose: a
+# former whose status is none of these has not been measured against the
+# test, and inventing a word for it here is how that goes unnoticed.
+ROLES = {
+    "source": "produces without reading anything, and subscribes nothing",
+    "lift": "a pure function of an emit's values, with carried state",
+    "protocol": "reads or writes the protocol's own bookkeeping",
+    "flatten": "subscribes a payload that is literal syntax and must be RUN",
+    "binder": "not an operator at all -- μ-binding structure",
+}
 
-    def __init__(self, kind: str, agda: str, tag: str, gen: bool, why: str) -> None:
-        self.kind, self.agda, self.tag, self.gen, self.why = kind, agda, tag, gen, why
+
+class Row:
+    __slots__ = ("kind", "agda", "tag", "gen", "role", "why")
+
+    def __init__(self, kind: str, agda: str, tag: str, gen: bool, role: str, why: str) -> None:
+        self.kind, self.agda, self.tag, self.gen = kind, agda, tag, gen
+        self.role, self.why = role, why
 
 
 def read_map(path: Path) -> list[Row]:
@@ -62,24 +81,34 @@ def read_map(path: Path) -> list[Row]:
         if not line.strip() or line.lstrip().startswith("#"):
             continue
         parts = line.split("\t")
-        if len(parts) < 4:
-            sys.exit(f"check-formers: {path}:{n}: want 4+ tab-separated fields, got {len(parts)}")
-        kind, agda, tag, gen = (p.strip() for p in parts[:4])
-        why = parts[4].strip() if len(parts) > 4 else ""
+        if len(parts) < 5:
+            sys.exit(f"check-formers: {path}:{n}: want 5+ tab-separated fields, got {len(parts)}")
+        kind, agda, tag, gen, role = (p.strip() for p in parts[:5])
+        why = parts[5].strip() if len(parts) > 5 else ""
         if kind not in ("exp", "tm"):
             sys.exit(f"check-formers: {path}:{n}: kind must be exp or tm, got {kind!r}")
         if gen not in ("yes", "no"):
             sys.exit(f"check-formers: {path}:{n}: gen must be yes or no, got {gen!r}")
+        if kind == "exp" and role not in ROLES:
+            sys.exit(
+                f"check-formers: {path}:{n}: `{agda}` has no verdict under the dividing test -- "
+                f"role must be one of {', '.join(sorted(ROLES))}, got {role!r}"
+            )
+        if kind == "tm" and role != "-":
+            sys.exit(
+                f"check-formers: {path}:{n}: `{agda}` is a term former, where the dividing test "
+                f"does not apply -- its role must be `-`, got {role!r}"
+            )
         if gen == "no" and not why:
             sys.exit(
-                f"check-formers: {path}:{n}: gen=no needs a reason in the fifth field -- "
+                f"check-formers: {path}:{n}: gen=no needs a reason in the sixth field -- "
                 "an unreachable former is a hole to state, not a box to tick"
             )
         for tbl, key in ((seen_agda, agda), (seen_tag, tag)):
             if key in tbl:
                 sys.exit(f"check-formers: {path}:{n}: {key!r} already declared on line {tbl[key]}")
             tbl[key] = n
-        rows.append(Row(kind, agda, tag, gen == "yes", why))
+        rows.append(Row(kind, agda, tag, gen == "yes", role, why))
     return rows
 
 
@@ -213,6 +242,14 @@ def main() -> int:
         for f in findings:
             print(f"  {f}")
         return 1
+
+    palette: dict[str, list[str]] = {}
+    for r in rows:
+        if r.kind == "exp":
+            palette.setdefault(r.role, []).append(r.agda)
+    print("check-formers: the palette under the dividing test:")
+    for role in sorted(palette):
+        print(f"  {role:9} {' '.join(sorted(palette[role]))}  -- {ROLES[role]}")
 
     holes = [r for r in rows if not r.gen]
     print(

@@ -4,8 +4,8 @@
 # that takes the first name only would report it deleted, and it is
 # declared gen=no, so the hole path is walked on every run rather than
 # only when one appears.
-# kind	agda	tag	gen	why-not
-exp	liftᵉ	lift	yes
-exp	deferᵉ	defer	yes
-exp	sharedSigᵉ	sharedSig	no	the fixture's generator does not write one
-tm	nat̂	natT	yes
+# kind	agda	tag	gen	role	why
+exp	liftᵉ	lift	yes	lift
+exp	deferᵉ	defer	yes	protocol
+exp	sharedSigᵉ	sharedSig	no	source	the fixture's generator does not write one
+tm	nat̂	natT	yes	-

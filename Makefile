@@ -1459,12 +1459,18 @@ formers-selftest:
 	      "printf 'const g = () => ({ type: \"sharedSig\" });\n' >> typescript/src/generator.ts" \
 	      'the hole closed and the row was not'; \
 	  run "a gen=no row with no reason" \
-	      "sed -i.bak 's/\tno\tthe fixture.*/\tno/' scripts/formers.tsv" \
+	      "sed -i.bak 's/\tno\tsource\tthe fixture.*/\tno\tsource/' scripts/formers.tsv" \
 	      "gen=no needs a reason"; \
 	  run "a tag declared twice" \
-	      "printf 'tm\tdupᵗ\tnatT\tyes\n' >> scripts/formers.tsv" \
+	      "printf 'tm\tdupᵗ\tnatT\tyes\t-\n' >> scripts/formers.tsv" \
 	      "already declared on line"; \
-	  [ $$fail -eq 0 ] && echo "formers-selftest: PASS (every surface fires in the direction it is checked, a shared constructor signature parses, and a declared generator hole is reported rather than merely tolerated)"; \
+	  run "an exp row with no verdict under the dividing test" \
+	      "sed -i.bak 's/\tyes\tprotocol/\tyes\tmisc/' scripts/formers.tsv" \
+	      "has no verdict under the dividing test"; \
+	  run "a tm row claiming one" \
+	      "sed -i.bak 's/natT\tyes\t-/natT\tyes\tsource/' scripts/formers.tsv" \
+	      "its role must be \`-\`"; \
+	  [ $$fail -eq 0 ] && echo "formers-selftest: PASS (every surface fires in the direction it is checked, a shared constructor signature parses, a declared generator hole is reported rather than merely tolerated, and the dividing test's vocabulary is closed at both kinds)"; \
 	  exit $$fail
 
 cli-build: stripped

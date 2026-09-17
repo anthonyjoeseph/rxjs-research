@@ -232,15 +232,15 @@ failing to typecheck over the collapsed tree. A cone cannot aim at either.
 
 ### Big picture tier roadmap
 
-- **AUDIT WHAT IS LEFT OF THE PALETTE AGAINST THE DIVIDING TEST, AND
-  RECORD WHY EACH SURVIVOR SURVIVES.** The collapse absorbed the two formers
-  nobody disputed; what closes the tier is the rest of the tree measured by the
-  same test — does the former SUBSCRIBE anything, or read the protocol's own
-  bookkeeping. `takeᵉ` raises fin and so is not a lift however pure its step
-  reads, the flatteners and the share subscribe, and the sources produce
-  without reading anything. Each of those is a sentence in its own header or a
-  further collapse, and the leg's product is that no former is left whose
-  status is a matter of memory.
+- **EXTEND THE PAIRING TO THE PRIMITIVE OPERATORS, WHICH IT DOES NOT REACH.**
+  It now binds the two datatypes and the two unions, and `PrimOp` is a third
+  family carried across the same bridge by the same tag strings with nothing
+  holding it to either side — so an operator added to one tree is exactly the
+  silence the pairing was built to end, one family over, and the argument for
+  ending it is already written. Small and mechanical, which is what makes it a
+  leg rather than a line of the last one: the map grows a kind, the checker
+  grows a surface, and the generator owes a lane per operator as it now owes
+  one per former.
 
 - **AND HOLD THE AGDA GENERATOR'S LANES TO THE SAME PAIRING, WHICH IS THE ONE
   SURFACE STILL RUNNING ON MEMORY.** The correspondence now binds four

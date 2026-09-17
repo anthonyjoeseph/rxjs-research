@@ -89,6 +89,18 @@ mutual
                  -- follow it in for a different reason: their payloads are
                  -- literal syntax that must be RUN, and `Tm` has no
                  -- eliminator for that.
+                 --
+                 -- THE REST OF THE PALETTE HAS BEEN PUT TO THE SAME TEST,
+                 -- and the verdicts are a column of `scripts/formers.tsv`
+                 -- rather than a sentence each here, so that a former added
+                 -- later inherits the obligation to have one.  The sources
+                 -- pass it trivially in the other direction — they produce
+                 -- without reading anything and subscribe nothing — while
+                 -- `deferᵉ` fails it the way `takeᵉ` does, since what it
+                 -- moves is the SUBSCRIPTION, which is protocol and not
+                 -- value.  `μᵉ` and `varᵉ` are not operators at all and the
+                 -- test does not apply: they are the binding structure the
+                 -- operators sit inside.
                -- NOTE: share is NOT an Exp primitive — share identity is a
                -- binding, not an expression.  Shared observables live in the
                -- slot telescope (Rx.Evaluator.Slot) and are referenced with
