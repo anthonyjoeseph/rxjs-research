@@ -31,6 +31,23 @@ Id = ℕ                              -- concrete so the spec can compare; harne
 -- this module are not a pair to treat alike — this one is an ordered
 -- ARRIVAL POSITION and `Source` below is the token.
 
+-- AND WHAT NEEDS THE ORDER IS THE CHECKER, NOT THE PIPELINE — WHICH IS
+-- WHAT DECIDES THE OBJECT-LANGUAGE ENCODING.  The paragraph above is a
+-- fact about `Rx.Protocol`, and `Rx.Protocol` is an ACCEPTANCE ORACLE:
+-- it reads a finished stream and rules on whether the protocol was
+-- obeyed.  Nothing in the batching pipeline the theorem is about ever
+-- consults the order.  `Spec` groups by comparing instants for
+-- equality; the implementation holds one open batch and asks only
+-- whether the incoming instant equals the open one, flushing when it
+-- does not.  So when the envelope is re-expressed as a TYPE of the
+-- object language, its instant field stands at the unique primitive,
+-- whose sole eliminator is a primitive equality, and nothing is lost —
+-- the watermark stays where it already is, in a meta-level automaton
+-- over meta-level emits, which is the only thing that could have
+-- wanted a successor or a `≤` in the first place.  Read the two
+-- paragraphs together: equality alone cannot state the CHECK, and
+-- equality alone is all the RUN was ever asking for.
+
 -- A TOKEN, AND THAT IS THE WHOLE OF WHAT ANYTHING ASKS OF IT.  `Spec`
 -- binds this and copies it onto the batch envelope without ever
 -- comparing it; `Rx.Protocol` compares it and never orders or computes
