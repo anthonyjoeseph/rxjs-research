@@ -232,14 +232,15 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 
 - **LIFT COMES APART INTO TWO REAL RXJS OPERATORS (Anthony: "I've never liked
   lift").** The former's step took a whole FRAME's value list, which plain rxjs
-  cannot hand it — a step counting its argument separates `of 1 2 3` into one
-  emission from three, and no frameless pipeline tells those apart. Pointwise is
-  the repair and it is `scan` composed with `mergeMap`, so the palette carries
-  those two rather than their fusion: `scanᵉ`, and a `flattenᵉ` turning a
-  list-valued emission into one emission per element — pure value
-  restructuring, subscribing nothing, so it is not a flattener. `mapᵉ` then
-  derives. The list output is NOT droppable: the step generator spends it on a
-  drop, a duplicate and a filter.
+  cannot hand it; the counterexample is in `liftᵉ`'s own header. Pointwise is
+  the repair and it is `scan` into `mergeMap`, so the palette carries those two
+  rather than their fusion: `scanᵉ`, and a `flattenᵉ` spreading a list-valued
+  emission over one emission per element. `mapᵉ` derives, and so do filter
+  (`[x]` or `[]`) and duplicate (`[x, x]`) — which is why the flatten is its
+  own FORMER rather than a wider step: the one-to-many-ness must live
+  somewhere, and it is cheapest there, its function being PURE and so owing
+  none of the subscription and instant accounting a former running an inner
+  expression owes.
 
 - **THEN THE DEMOTION, WHICH IS TWO EVALUATORS AND NOT A RETYPE (Anthony: the
   harness "shouldn't test on srxjs at all — just plain rxjs now", and the Main
