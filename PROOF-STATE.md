@@ -230,15 +230,15 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 
 ### Big picture tier roadmap
 
-- **THE ELABORATION THROUGH `batchSyncᵉ`, WHICH IS WHAT THE FORMER WAS FOR.**
-  The former is in and swept through every family matching on the plain tree:
-  it brackets a cold's subscribe burst against everything later, and nothing
-  else. What it does not yet do is serve a single elaboration row, and the
-  plumbing the ledger names is what it was
-  minted for: a source delivers its burst grouped, `takeᵖ` cuts underneath the
-  grouping rather than over it, and the flatteners' own emits are ungrouped
-  singletons. Each is a plain term over the former, so the leg is written and
-  not decided — and until one lands, the former is a definition no claim rides.
+- **THE FOUR LEAVES THAT ARE MERELY UNWRITTEN, AND THEY ARE NOW THE TOP LEG.**
+  `liftᵖ` and the three flatteners want no ruling and no former. A lift unwraps
+  its envelope, runs the author's step over the value list and rewraps under
+  the instant it was handed, which is a fold, a case and a pair; a flattener's
+  values come out of `mergeAllᵉ` over the observables its envelopes carry, and
+  only the join's own protocol emits wait on the mint. Each is a large term in
+  a language with no application, so `letᵗ` and `revᵗ` are the vocabulary — the
+  shape `scanᵉ` already pays for. They go first because the source rows above
+  them are now known to be blocked on a ruling and these are blocked on nobody.
 
 - **THEN THE DEMOTION, AND IT IS THE ORACLE'S AND NOT THE TOWER'S (Anthony:
   the harness "shouldn't test on srxjs at all — just plain rxjs now").** Target:
@@ -251,14 +251,14 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
   `evaluate↓`, so demoting it moves five claims Main names, and Main is not
   ours to touch.
 
-- **THEN THE FOUR LEAVES THAT ARE MERELY UNWRITTEN.** `liftᵖ` and the three
-  flatteners want no ruling and no former. A lift unwraps its envelope, runs the
-  author's step over the value list and rewraps under the instant it was handed,
-  which is a fold, a case and a pair; a flattener's values come out of
-  `mergeAllᵉ` over the observables its envelopes carry, and only the join's own
-  protocol emits wait on the mint. Each is a large term in a language with no
-  application, so `letᵗ` and `revᵗ` are the vocabulary — the shape `scanᵉ`
-  already pays for.
+- **AND THE SOURCES WAIT ON A RULING, WHICH IS WHERE `batchSyncᵉ` STOPPED.**
+  The former brackets a cold's subscribe burst and is swept through every
+  family that matches the plain tree, and it does not discharge `ofᵖ` or
+  `emptyᵖ`. A source INHERITS its instant — the machine threads the id into
+  subscribe — and the spec groups by comparing ids, so two colds alive in one
+  frame must carry the same one. A bracket names no id and is per node, so the
+  two groups never join. What is owed is how an instant is IDENTIFIED in the
+  plain tree, and that decides what every theorem over it quantifies over.
 
 - **THEN REFACTOR THE TYPESCRIPT PRIMITIVES IN PLACE, `lift` INCLUDED
   (Anthony).** Not new operators: the shipped ones — `lift`, `map`, `take`,
@@ -283,7 +283,7 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 ### The ledger
 
 - **`{of,empty,take,mergeAll,switchAll}ᵖ`** (Rx.Elaborate) — SHAPE,
-  `DEAD ROUTE×4`: the elaboration's per-former plumbing. A source still owes
+  `DEAD ROUTE×5`: the elaboration's per-former plumbing. A source still owes
   the instant it stamps with, and `take` is the right operator at the wrong
   level, so each is restated the day the read lands.
 

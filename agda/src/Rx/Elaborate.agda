@@ -72,14 +72,23 @@ open import Rx.SExp using (SExp; STm; inputˢ; ofˢ; emptyˢ; takeˢ; liftˢ;
 postulate
   -- a source coming alive owes an `init` naming a token nothing has
   -- used, and the author's values owe an instant to be stamped with.
-  -- THE FIRST OF THOSE TWO IS NOW AVAILABLE AND THE SECOND IS NOT, SO
-  -- WHAT BLOCKS THIS IS THE READ ALONE.  `mintᵉ` binds an unforgeable
-  -- token drawn at the scheduler's own source key, once per
-  -- subscription, which is exactly the arity a source wants -- one
-  -- identifier, at subscribe time, that no term could have written.
-  -- What no former yet offers is the instant the values are stamped
-  -- with, and a source is the one place it cannot be projected off an
-  -- incoming envelope, there being none.
+  -- THE FIRST OF THOSE TWO IS AVAILABLE AND THE SECOND IS NOT, SO WHAT
+  -- BLOCKS THIS IS THE READ ALONE.  `mintᵉ` binds an unforgeable token
+  -- drawn at the scheduler's own source key, once per subscription,
+  -- which is exactly the arity a SOURCE wants.  An INSTANT has a
+  -- different arity, and that is the finding: the machine mints a
+  -- source per cold and threads the instant IN, as an argument to
+  -- subscribe handed down by the subscriber.  So a source INHERITS its
+  -- instant, and it must, because the spec groups by comparing instant
+  -- ids -- two colds coming alive in one frame have to carry the SAME
+  -- id or the batch they belong to is split.  A fresh mint per source
+  -- is the one answer that is certainly wrong.
+  -- DEAD ROUTE: bracket the subscribe frame with `batchSyncᵉ` and let
+  --   the grouping stand in for the id.  It brackets a frame without
+  --   NAMING one, and the bracket is per node, so two colds subscribed
+  --   in one frame group separately and nothing joins the two groups --
+  --   which is the whole of what the id was doing.  The former is
+  --   necessary here and is not sufficient.
   -- DEAD ROUTE: build both inline, out of `uniq̂` and a counter carried
   --   in a lift's state.  `uniq̂` is a literal, so a program that writes
   --   one can write one already in use — which is the forgery the palette
