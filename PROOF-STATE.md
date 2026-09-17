@@ -234,13 +234,13 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
   `instEmitᵗ`, `instEventᵗ`, `emitKindᵗ` and `closeReasonᵗ` are DEFINED over
   `unitᵗ`, `_+ᵗ_`, `_×ᵗ_` and `listᵗ` rather than added to `Ty`, parameterised
   over their uniq type, so a simul slot declared at `instEmitᵗ unitᵗ a` admits
-  only `tt` where a uniq goes. That half is unblocked and is what lands here.
-  The tag is not: a `uniqᵗ` with NO introduction form cannot be built, since
-  `reify` is total over `Ty` and each clause owes a CLOSED term — its header
-  carries the reasoning. Two horns, both deciding what a program may SAY, so
+  only `tt` where a uniq goes. That half needs no fork, but written out the
+  four are unreachable, so the leg's first commit is a `Main` line — Anthony's,
+  like the fork. The tag half cannot be built as planned: a `uniqᵗ` with NO
+  introduction form needs `reify`, total over `Ty`, to hand back a CLOSED term
+  it cannot write — its header carries this. Two horns, both deciding SAYability, so
   neither is an agent's: drop the tag (`uniqᵗ = natᵗ`), or keep it with an
-  intro form and rest unforgeability on the simul palette, where the
-  shipped-formers framing already puts it.
+  intro form and rest unforgeability on the simul palette.
 
 - **THEN DEMOTE THE ENVELOPE OUT OF THE EVALUATOR.** Target:
   `evaluate : … → List (Val Γ t)`. The mentions split three ways and only one
