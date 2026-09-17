@@ -230,16 +230,15 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 
 ### Big picture tier roadmap
 
-- **THE FLATTENERS, WHICH ARE WHAT IS LEFT OF THE UNWRITTEN LEAVES.** A lift
-  is written: unwrap, run the author's step over the value list, rewrap under
-  the instant it was handed, which turned out to be a split, a fold and a
-  reassembly, and the vocabulary it needed — an envelope term language over
-  `letᵗ` and `revᵗ`, the shape `scanᵉ` already pays for — is now there for the
-  three that remain. What a flattener adds over a lift is that its values are
-  `mergeAllᵉ` over the observables its envelopes carry, and that only the
-  join's own protocol emits wait on the mint. They stay the top leg for the
-  same reason the four were: the source rows are blocked on a ruling and these
-  are blocked on nobody.
+- **THE INSTANT RULING, NOW THE TIER'S ONLY BLOCKER AND SO THE TOP LEG.** A
+  source INHERITS its instant — the machine threads the id into subscribe — and
+  the spec groups by comparing ids, so two colds alive in one frame must carry
+  the same one. `batchSyncᵉ` brackets a frame without NAMING one and is per
+  node, so the two groups never join: what is owed is how an instant is
+  IDENTIFIED in the plain tree, and that decides what every theorem over it
+  quantifies over. It is the whole tier's blocker rather than the sources'
+  because the flatteners' separate one just fell — see the next leg — so the
+  question is worth answering before anything else is typed.
 
 - **THEN THE DEMOTION, AND IT IS THE ORACLE'S AND NOT THE TOWER'S (Anthony:
   the harness "shouldn't test on srxjs at all — just plain rxjs now").** Target:
@@ -252,14 +251,15 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
   `evaluate↓`, so demoting it moves five claims Main names, and Main is not
   ours to touch.
 
-- **AND THE SOURCES WAIT ON A RULING, WHICH IS WHERE `batchSyncᵉ` STOPPED.**
-  The former brackets a cold's subscribe burst and is swept through every
-  family that matches the plain tree, and it does not discharge `ofᵖ` or
-  `emptyᵖ`. A source INHERITS its instant — the machine threads the id into
-  subscribe — and the spec groups by comparing ids, so two colds alive in one
-  frame must carry the same one. A bracket names no id and is per node, so the
-  two groups never join. What is owed is how an instant is IDENTIFIED in the
-  plain tree, and that decides what every theorem over it quantifies over.
+- **THEN THE SIX ROWS, WHICH THE RULING RELEASES TOGETHER.** The flatteners
+  were held on a second blocker and are not: they wanted a token per inner
+  registration against a binder fixed at subscribe time, and an inner is a
+  CLOSED EXPRESSION re-run through the same reduction path on every inner
+  subscription, so the mint is the inner's own and the dynamic count is already
+  there. Nothing else they might owe is theirs either — an inner's init and
+  exhausted close ride its own burst, a switch's cancelling closes are the
+  cut's, a handoff is a share's. So the writing is one leg once the instant is
+  named, and `liftᵖ` has already paid for the envelope vocabulary it needs.
 
 - **THEN THE CLOSURE STATE LEFT IN `share` AND THE JOIN (Anthony: use ONLY
   what `Ty`/`Tm` has).** The subscribe-frame question is answered — bracketing

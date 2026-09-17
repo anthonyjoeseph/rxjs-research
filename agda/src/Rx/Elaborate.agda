@@ -131,23 +131,42 @@ postulate
 
   -- the VALUES need nothing new: a lift projects each envelope to the
   -- observables it carries, and the plain flattener runs them, their own
-  -- emits being envelopes already.  What waits is the join's protocol
-  -- traffic — a registration coming alive is a mint.
-  -- AND THE MINT BINDER DOES NOT REACH IT, WHICH IS WHY THIS STAYS
-  -- BLOCKED WHILE THE SOURCES DO NOT.  A mint draws ONE token, at the
-  -- scheduler's own source key, ONCE per subscription — the arity a
-  -- source wants.  A flattener brings registrations alive as the outer
-  -- stream hands it observables, so the count is dynamic and the key is
-  -- the registration one, a chain per subscribing path; neither is what
-  -- a binder fixed at subscribe time can supply.
+  -- emits being envelopes already.
+  --
+  -- AND THE MINT IS NOT WHAT BLOCKS THIS, WHICH IS A CORRECTION: the
+  -- arity argument said a flattener needs a token per registration it
+  -- brings alive while a binder is fixed at subscribe time, and the
+  -- evaluator does not work that way.  An inner observable is a CLOSED
+  -- EXPRESSION, and subscribing one runs it through the same reduction
+  -- path the outer subscribe took, `mintᵉ` clause included — so a mint
+  -- at an inner's head draws a fresh token on every inner subscription,
+  -- which is exactly the dynamic count that was called unavailable.  The
+  -- token is the INNER's to draw and never the flattener's, and that is
+  -- the same division the TypeScript twin already runs under, where the
+  -- join mints nothing at all.
+  --
+  -- SO WHAT IS LEFT IS THE INSTANT READ, AND IT IS THE SOURCES' BLOCKER
+  -- RATHER THAN A SECOND ONE.  The three events a flattener might have
+  -- owed are each owed elsewhere: an inner's `init` and its exhausted
+  -- `close` ride the inner's own burst, a switch's cancelling closes are
+  -- `cutThrough`'s and are read off the registrations whose chain passes
+  -- the node rather than minted, and a `handoff` is a SHARE's
+  -- announcement that no flattener writes.  What the elaboration still
+  -- cannot say is the instant the outer's own bookkeeping is stamped
+  -- with, which is one ruling short for every row of this block at once.
   -- DEAD ROUTE: elaborate the handoff and init events in the projecting
   --   lift, which has the outer emit's instant but no token to name the
   --   inner source with.
   mergeAllᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
             → Maybe ℕ → Exp Γ Δᵍ Δ Θ (emitᵗ (obs t)) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
 
-  -- the two cutting flatteners, blocked where `mergeAllᵖ` is and also on
-  -- the `close` a switch owes the registration it drops.
+  -- the two cutting flatteners, blocked where `mergeAllᵖ` is — which is
+  -- now the instant read alone.  The `close` a switch owes the
+  -- registration it drops was listed here as a second blocker and is
+  -- not one: the plain evaluator already mints those closes off the
+  -- registration set, one per chain passing the node, with the
+  -- per-victim reason decided by the cut ledger, and the elaboration
+  -- inherits them by delegating rather than by writing any.
   -- DEAD ROUTE: the projecting lift again — it sees the emit that causes
   --   the switch, and not the source being cut.
   switchAllᵖ exhaustAllᵖ :
