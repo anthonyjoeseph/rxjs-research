@@ -15,10 +15,11 @@ open import Rx.Evaluator.Builder using (evaluate↓)
 open import Readme-Theorems using (emitValues)
 
 -- IT IS THE INSTANCE A SATURATION RESTRICTION IS MEASURED AGAINST
--- (Anthony).  `adequacy` is false over this language unrestricted --
--- an unguarded fixpoint emits one envelope per unit of fuel, so no
--- finite meaning bounds it -- and the repair is a predicate confining
--- the pair to programs that saturate.  This is the ONLY emission bound
+-- (Anthony).  Any claim that a program's whole emission is bounded is
+-- false over this language unrestricted -- an unguarded fixpoint emits
+-- one envelope per unit of fuel, so no finite list bounds it -- and the
+-- repair is a predicate confining such a claim to programs that
+-- saturate.  This is the ONLY emission bound
 -- the repo states UNIFORMLY IN FUEL, which is exactly the shape such a
 -- predicate has to deliver, so a candidate is judged by whether a
 -- `take`-headed program satisfies it and whether the machinery below

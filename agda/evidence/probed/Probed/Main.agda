@@ -58,10 +58,10 @@ open import Probed.Readme-Claims using (row-order; row-take; row-one-batch)
 -- THE PIPELINE-SIDE CLAIMS, claimed from the root for the same reason.
 open import Probed.Pipeline-Claims using (row-online; row-ids)
 
--- THE ADEQUACY FACE'S ONE DECIDABLE ROW, claimed here because the
--- other two claims on that face are stated over a postulated domain and
--- cannot be instantiated at all.
-open import Probed.Adequacy using (row-saturated; row-grows; row-past-horizon)
+-- THE ONE CLAIM STATED OVER THE MACHINE ALONE, claimed here because a
+-- statement a concrete program decides is one nothing should take on
+-- trust.
+open import Probed.Run-Monotone using (row-saturated; row-grows; row-past-horizon)
 
 -- THE TAKE FACE'S ROWS, claimed here for the same reason: it is the
 -- worked instance a saturation restriction is measured against, so it

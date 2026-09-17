@@ -1,14 +1,7 @@
 ----------------------------------------------------------------------
--- THE ONE ROW ON THE ADEQUACY FACE A PROGRAM CAN DECIDE.
+-- MORE FUEL ONLY EXTENDS A RUN, AT CONCRETE PROGRAMS.
 ----------------------------------------------------------------------
 
--- WHY THIS FILE HOLDS EXACTLY ONE TARGET AND NOT THREE.  The face
--- carries three claims and the other two are stated over `meaning`,
--- which is `observe` of `denote` — two postulates, so neither side
--- reduces at any program whatever and no row can be written.  The
--- finding is recorded where it constrains something, in the domain's
--- own header; here it is why the file is small.
---
 -- WHAT THE ROWS DECIDE.  `run-monotone` says more fuel EXTENDS a run
 -- and never rewrites what a shorter one emitted, which is two
 -- properties in one equation: the existence of a remainder, and the
@@ -26,7 +19,7 @@
 -- has already saturated and is then given far more fuel.
 
 -- TARGET: run-monotone @b08aea
-module Probed.Adequacy where
+module Probed.Run-Monotone where
 
 open import Data.Fin using (zero)
 open import Data.List using ([]; _∷_)
@@ -40,7 +33,7 @@ open import Rx.Exp using (natᵗ; Closed; nat̂; pairᵗ; primᵗ; varᵗ; add;
                           input; mapᵉ; ofᵉ)
 open import Rx.Slots using (Slots)
 open import Readme-Theorems using (hotOnce; oneSlot)
-open import Verify-Adequacy using (run-monotone)
+open import Verify-Run-Monotone using (run-monotone)
 
 open import Probed.Apparatus using (Confirms)
 

@@ -186,8 +186,8 @@ formal-verification-batchSimultaneous    The-Proof.agda — REAL, module postula
      ├─ evaluate-accepted                no emit of a run is rejected — tier 3
      └─ evaluate-settled                 the run stops settled — tier 3
 
-adequacy / saturation / run-monotone      claimed by Main in their own right —
-                                          nothing above consumes them — tier 2
+run-monotone                              claimed by Main in its own right —
+                                          nothing above consumes it — tier 2
 
   evaluate↓ = proj₁ ∘ evaluate!           Rx/Evaluator/Builder.agda — REAL
      └─ every value-path leaf is a body; the corpus runs; the tower descends
@@ -262,101 +262,68 @@ failing to typecheck over the collapsed tree. A cone cannot aim at either.
   does not, so what the leg decides is whether the kind column takes a fourth
   kind or a side condition is a column of its own.
 
-## Tier 2 — the denotation, adequacy, and the take bound
+## Tier 2 — the take bound, and the machine's own fuel
 
-**WHAT THIS FACE BUYS: an object that is not the machine.** Every statement in
-the repo today is read off `evaluate↓`, so the machine's own bookkeeping — node
-ids, arrival ordinals, the drain counter — is visible in every answer. A
-denotation says what a PROGRAM means rather than what one run does.
+**WHAT THIS FACE BUYS: two claims about the evaluator that no correspondence
+carries.** Both rows are read off `evaluate↓` alone — no spec, no batching, no
+second run to compare against — and a concrete program decides each. That is
+the whole tier: what this repo asserts about its own machine, standing on
+nothing else.
 
-**AND NOTHING OUTSIDE IT CONSUMES IT.** The well-formedness face was the one
-consumer and no longer is, so the pair below is its own only consumer and nothing
-constrains the domain's shape. Whether it earns its place is the open question
-here, not how to define it — the finding is on `Beh` and `observe`.
-
-**AND THE TAKE FACE IS HERE AS THE GUINEA PIG (Anthony).** The pair is false
-without a restriction to programs that SATURATE, and `take-bounds-values` is
-the one emission bound this repo states uniform in fuel. A candidate is tested
-by whether that face satisfies it and whether that face's machinery proves it.
+**AND THE RISK THEY SHARE IS THE FLATTENERS.** Each row carries a probe, and
+each receipt names the same region as NOT REACHED — no program whose evaluation
+enters a flattening node, and no source firing at more than one tick. So what
+is instantiated is the first-order half of both statements, and the region
+where either could still be false is one region, not two.
 
 ### The monster
 
-`adequacy` — the soundness half, and the deepest node here whose cone holds the
-work that kills it: it reaches the observation of a closed program, hence
-`denote` and `observe`, and it reaches `evaluate↓`. Its falsity is the
-retroactive kind, since it is what every later restatement of a machine-level
-claim into a denotational one would be transported along — and the tier above
-now transports one along it for real.
+`take-bounds-values` — the cheap thing to refute and the expensive thing to
+discover late. Its budget is decremented at the dispatch and its cut emitted
+from the frame, so an off-by-one between those two points, or a path that
+delivers before it spends, is a counterexample rather than a hard proof. And it
+is the only emission bound this repo states uniformly in fuel, so every later
+restriction on what a program may emit is measured against it and a restatement
+here moves what the tiers above can ask for.
 
-also: `saturation` — the other half of the pair, off `adequacy`'s cone because its statement quantifies over a prefix the soundness half never mentions.
-also: `run-monotone` — a fact about the machine alone, which is why it survives every restatement of the domain and why nothing in the domain reaches it.
-also: `take-bounds-values` — the take face, which is here to be measured against and shares no vocabulary with the domain.
+also: `run-monotone` — a fact about fuel alone, sharing no vocabulary with the take node's budget and reached by nothing in its cone.
 
 ### Big picture tier roadmap
 
-- **STATE THE SATURATION RESTRICTION, BECAUSE THE PAIR IS FALSE WITHOUT ONE.**
-  A guarded fixpoint with no `takeᵉ` above it emits one envelope per unit of
-  fuel, so no finite `Stream` bounds its runs and there is no `meaning` at that
-  program whatever the domain turns out to be. The leg's product is the
-  predicate the two claims are quantified over — every program the bug cache
-  carries already satisfies it, so the restriction costs the corpus nothing —
-  plus the machine proof that the unbounded program falsifies the unrestricted
-  form, which is a refutation rather than a receipt. It is first because it
-  decides whether the domain below it is finite at all.
+- **PROBE BOTH ROWS THROUGH A FLATTENER, BECAUSE THAT IS THE ONE REGION NEITHER
+  RECEIPT REACHES.** Both probes stop at the same boundary and both say so, so
+  the tier's whole remaining doubt sits in one shape: a `take` above a
+  `mergeAll`/`switchAll`/`exhaustAll` holds its grant across an inner
+  subscribe, and a longer fuel enters that subscribe at a different point. The
+  leg's product is rows at flattening programs for each row, or a refutation —
+  and a refutation here is the cheap outcome, since neither statement has a
+  consumer yet and restating one costs nothing above it.
 
-- **THEN RUN THE CANDIDATE AGAINST THE TAKE FACE, WHICH IS WHY IT IS IN THIS
-  TIER (Anthony).** `take-bounds-values` is the one emission bound already
-  stated uniform in fuel, so it is the worked instance a restriction has to
-  admit — and the first question about any candidate is not whether it reads
-  well but whether that face SATISFIES it and whether that face's own drain
-  induction proves it does. A candidate the take face cannot discharge is
-  discarded on the spot; one it discharges cheaply is a candidate whose
-  machinery already exists. Expect several rounds: the product is a predicate
-  that survived a real consumer, not the first one written down.
+- **THEN THE TAKE BOUND AT A `take` THAT IS NOT OUTERMOST.** The statement is
+  made at an OUTERMOST `take`, which its own header records as the reason a
+  candidate restriction admitting only that shape would be tested by nothing.
+  The same gap applies to the bound itself: what is claimed is a property of
+  one syntactic position, and whether it survives a `take` under a `lift`, under
+  a second `take`, or under a flattener is not asserted and not instantiated.
+  The leg decides whether the statement generalises or whether the outermost
+  form is the true one.
 
-- **DEFINE `Beh` FOR THE FIRST-ORDER FORMERS AND EARN THE EQUATIONS.**
-  `ofᵉ`, `emptyᵉ`, `liftᵉ` and `takeᵉ` denote without any of the
-  machinery the flatteners need, so this is where the domain's shape is
-  actually decided and where a compositionality equation can first be stated at
-  all. The leg's product is the domain plus one equation per former, not a
-  proof of adequacy — and the equations are what the tier above inducts over,
-  so a former whose equation cannot be stated is a former whose well-formedness
-  clause will not be writable either. Every remaining row here is unprobeable
-  until `denote` computes, which is a dead route recorded on the domain itself.
-
-- **THEN FIX WHAT `observe` HANDS BACK, BECAUSE THAT IS THE BOUNDARY THE TIER
-  ABOVE IS STATED ACROSS.** The protocol automaton reads an emit list and asks
-  whether it is settled; a `Beh` that cannot say where its instants end has an
-  observation nothing can be demanded of at a cut point. So the observation's
-  shape is decided by a requirement from outside this face, and it is worth a
-  leg of its own rather than a clause of the one above: getting it wrong is not
-  an inelegant domain, it is a tier above that cannot state its own subject.
-
-- **THEN THE FORMERS THAT MAKE IT HARD: the flatteners, `μᵉ` and `deferᵉ`.**
-  These are the three edges no structural reading reaches, and they are why the
-  evaluator needed a reducibility candidate. The denotation owes the same
-  descent in its own currency, so this leg either finds the domain wants a
-  fixpoint structure the first-order half did not need, or finds the candidate
-  transports — and which of those it is decides whether adequacy is a grind or
-  a restatement.
+- **THEN MINT THE LEAVES, IN WHATEVER CURRENCY THE FIRST TWO LEAVE STANDING.**
+  The bound is a BARE postulate on purpose: its previous leaves were
+  denominated in the take node's own budget — the registry's path condition,
+  the node counter's guard, a drain induction over chains — and which of those
+  is still the right currency is what the flattener rows decide. So this leg is
+  last by construction, and minting ahead of it is a hypothesis about the route
+  rather than a decomposition. The apparatus is recoverable; the choice of
+  currency is not.
 
 ### The ledger
 
-- **`run-monotone`** (Verify-Adequacy) — FALSITY, `PROBED`: more fuel only
-  extends a run. Nothing postulated in it; it is the tier's one row a concrete
-  program decides.
-- **`adequacy`, `saturation`** (Verify-Adequacy) — FALSITY, `DEAD ROUTE×2`: the
-  pair pinning the denotation to the machine's limit. False as stated — a
-  finite `Stream` cannot bound a fixpoint that emits one envelope per unit of
-  fuel; the finding and the two available repairs are in the header.
+- **`run-monotone`** (Verify-Run-Monotone) — FALSITY, `PROBED`: more fuel only
+  extends a run. Nothing postulated in it, and a concrete program decides it.
 - **`take-bounds-values`** (Verify-Take-Bounds) — FALSITY, `PROBED, RECOVERY`:
   a program headed by `take k` emits at most k values, at every fuel. Bare, and
-  the one emission bound stated uniformly in fuel — which is what a saturation
-  restriction is measured against.
-- **`Beh`, `denote`, `observe`** (Verify-Adequacy) — VACUITY, `DEAD ROUTE×3`:
-  the domain the pair above quantifies over, and what makes it vacuous. Named
-  in the head rather than described, so the row can carry its own evidence
-  field.
+  the one emission bound stated uniformly in fuel.
 
 ## Tier 3 — the automaton half, and it is the only half
 
