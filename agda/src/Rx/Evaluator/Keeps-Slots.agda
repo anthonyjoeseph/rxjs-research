@@ -60,7 +60,7 @@ open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeAll⇓; pushBurst
 -- is this function's, so the relation says nothing about it and the
 -- fact has to be read off the body.
 
--- the mint touches `nextSource` and nothing else
+-- the mint touches the source key and nothing else
 oneShot-slots : ∀ {n} {Γ : Ctx n} {u}
   (vals : List (Val Γ u)) (id : Id) (sched : Sched Γ) →
   Sched.slots (proj₂ (oneShotBurst vals id sched)) ≡ Sched.slots sched

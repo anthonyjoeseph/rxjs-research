@@ -8,7 +8,7 @@
 --
 -- THE STATEMENT IS PARAMETERISED BY A FLOOR RATHER THAN READING ONE OFF
 -- THE SCHEDULER, AND THAT IS WHAT KEEPS THE TWO CONJUNCTS APART.
--- Stated against `Sched.nextNode` directly, every recursive premise
+-- Stated against the mint's node counter directly, every premise
 -- would sit at an advanced counter and the induction would have to
 -- transport the bound through each one.  Taking the floor as an
 -- argument makes each premise an instance of the SAME statement at the

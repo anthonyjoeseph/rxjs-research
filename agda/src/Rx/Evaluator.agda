@@ -33,6 +33,7 @@ variable
 -- checked by the generator/decoder, not by these types; a forward
 -- reference is rejected there.
 open import Rx.Slots using (scripted; shared; Slots)
+open import Rx.Mint using (Mint; sourceᵏ; mint-init; freshId; next)
 
 Stream : ∀ {n} → Ctx n → Ty → Set          -- flat, canonical emission order
 Stream Γ t = List (InstEmit (Val Γ t))
@@ -60,9 +61,10 @@ record LiveSource {n} (Γ : Ctx n) : Set where
 -- the term, so there is nothing left for the schedule to carry and
 -- nothing left for a caller to pick wrong.
 record Sched {n} (Γ : Ctx n) : Set where
-  field nextOrdinal : Ordinal          -- ordinals mint in subscription order
-        nextSource  : Source           -- dynamic sources (colds, deferᵉ bodies) mint from n up
-        nextNode    : ℕ                -- node instances mint in subscription order
+  field mint        : Mint            -- every identifier the run hands out, keyed:
+                                     -- ordinals in subscription order, dynamic
+                                     -- sources (colds, deferᵉ bodies) from n up,
+                                     -- node instances from zero
         live        : List (LiveSource Γ)
         slots       : Slots Γ          -- scripts and shared defs, kept so subscribeE can anchor colds and connect shares
 
@@ -103,7 +105,7 @@ resolve anchor ((after w , v) ∷ r) =
 -- the convention subscribeE relies on to register hot chains.  Shared
 -- slots also own source toℕ i but connect lazily, at their first
 -- subscription; colds and deferᵉ bodies are registered by subscribeE
--- at subscription time, minting from nextSource/nextOrdinal
+-- at subscription time, minting at the source and ordinal keys
 -- top-level (not sched-init-local) so the budget-sufficiency proof
 -- can case-split each slot's initial LiveSource
 mkHot : ∀ {n} {Γ : Ctx n} (ins : Slots Γ) (i : Fin n) → List (LiveSource Γ)
@@ -115,7 +117,7 @@ mkHot {Γ = Γ} ins i with ins i
 
 sched-init : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → Sched Γ
 sched-init {n = n} {Γ = Γ} e ins = record
-  { nextOrdinal = n ; nextSource = n ; nextNode = 0
+  { mint = mint-init n
   ; live = concat (tabulate (mkHot ins)) ; slots = ins }
 
 -- pop the pending arrival minimal by (tick, ordinal), or report empty.
@@ -399,7 +401,7 @@ record EvalSt {n} {Γ : Ctx n} {t} (e : Closed Γ t) : Set where
 
 mintSource : ∀ {n} {Γ : Ctx n} → Sched Γ → Source × Sched Γ
 mintSource sched =
-  Sched.nextSource sched , record sched { nextSource = suc (Sched.nextSource sched) }
+  freshId sourceᵏ (Sched.mint sched) , record sched { mint = next sourceᵏ (Sched.mint sched) }
 
 -- append: the registry stays in subscription order; the id is minted here
 register : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}

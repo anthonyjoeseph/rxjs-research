@@ -57,6 +57,7 @@ open import Rx.Prim using (Fuel; Id; Source; Tick; InstEmit; InstEvent; close;
   exhausted; hot; cold)
 open import Rx.Exp using (Ctx; Closed; Val; _≟ᵗ_; obs; unfoldμ; evalTm; input; ofᵉ; emptyᵉ; takeᵉ; liftᵉ; mergeAllᵉ;
   switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ)
+open import Rx.Mint using (nodeᵏ; freshId; setAt)
 open import Rx.Slots using (Slots; shared; scripted)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; AllOp; NodeId; NodeState; Frame; root; _↠_; take-f;
   lift-f; thru-outer; from-inner; mergeAllᵒ; switchᵒ; exhaustᵒ; mergeAll-st; switch-st;
@@ -283,10 +284,10 @@ subscribeE! sl (takeᵉ c b) κ id now sched ag st
   with evalTm c in eq
 ... | zero  = _ , subs-take-zero eq refl
 ... | suc k =
-  let nid = Sched.nextNode sched
+  let nid = freshId nodeᵏ (Sched.mint sched)
       ((burst , sched₂ , st₁) , d) =
         subscribeE! sl b (take-f nid ↠ κ) id now
-                    (record sched { nextNode = suc nid }) ag
+                    (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) }) ag
                     (installNode nid (take-st (suc k)) st)
       (r , p) = pushBurst! sl id now (take-f nid) tt κ burst sched₂
                   (trans (subs-keeps d) ag) st₁
@@ -294,10 +295,10 @@ subscribeE! sl (takeᵉ c b) κ id now sched ag st
 
 
 subscribeE! sl (liftᵉ f i b) κ id now sched ag st =
-  let nid = Sched.nextNode sched
+  let nid = freshId nodeᵏ (Sched.mint sched)
       ((burst , sched₂ , st₁) , d) =
         subscribeE! sl b (lift-f f nid ↠ κ) id now
-                    (record sched { nextNode = suc nid }) ag
+                    (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) }) ag
                     (installNode nid (cell-st (evalTm i)) st)
       (r , p) = pushBurst! sl id now (lift-f f nid) tt κ burst sched₂
                   (trans (subs-keeps d) ag) st₁
@@ -333,10 +334,10 @@ subscribeE! sl (deferᵉ body) κ id now sched ag st = _ , subs-defer refl refl 
 -- same outer subscribe through a `thru-outer` frame, so the operator is
 -- carried as a value and the shape is shared.
 subscribeAll! sl op ns b κ id now sched ag st =
-  let nid = Sched.nextNode sched
+  let nid = freshId nodeᵏ (Sched.mint sched)
       ((burst , sched₂ , st₁) , d) =
         subscribeE! sl b (thru-outer op nid ↠ κ) id now
-                    (record sched { nextNode = suc nid }) ag
+                    (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) }) ag
                     (installNode nid ns st)
       (r , p) = pushBurst! sl id now (thru-outer op nid) tt κ burst sched₂
                   (trans (subs-keeps d) ag) st₁
@@ -439,10 +440,10 @@ thruConsume! {u = u} sl exhaustᵒ nid κ id now o sched ag st
 -- exactly the descent the candidate recurses on, so the hop is answered
 -- by `reducible` and the block is left with nothing to carry.
 subscribeInner! sl op allNid κ id now o sched ag st =
-  let inst = Sched.nextNode sched
+  let inst = freshId nodeᵏ (Sched.mint sched)
       ((burst , sched′ , st′) , d , _) =
         reducible o (from-inner op allNid inst ↠ κ) id now
-                  (record sched { nextNode = suc inst }) st
+                  (record sched { mint = setAt nodeᵏ (suc inst) (Sched.mint sched) }) st
       (vs , bs , done) = splitBurst burst
   in (inst , vs , bs , done , sched′ , st′) , inner refl d refl
 

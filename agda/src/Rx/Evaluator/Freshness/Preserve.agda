@@ -31,6 +31,7 @@ open import Data.Product using (_,_; proj₁; proj₂)
 open import Relation.Nullary using (yes; no)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
+open import Rx.Mint using (nodeᵏ; freshId)
 open import Rx.Exp using (Ctx; Closed; Val; obs; Fn; _×ᵗ_; listᵗ; _≟ᵗ_)
 open import Rx.Prim using (InstEvent)
 open import Rx.Evaluator using (Sched; EvalSt; Path; Frame; NodeId; NodeState; AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ;
@@ -52,7 +53,7 @@ open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeInner⇓; thruCon
   slot-spent; slot-join; slot-connect)
 open import Rx.Evaluator.Freshness using (PreservedBelow; FrameAbove;
   pres-same; pres-trans; pres-write)
-open import Rx.Evaluator.Freshness.Mono using (subscribeE-mono; stepFrame-mono; subscribeInner-mono; thruConsume-mono; switchKill-node)
+open import Rx.Evaluator.Freshness.Mono using (subscribeE-mono; stepFrame-mono; subscribeInner-mono; thruConsume-mono; switchKill-mint)
 
 -- the lifted step rewrites its own cell and nothing else
 lift-pres : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u w} {f}
@@ -149,7 +150,7 @@ kill-pres (just v) sched st refl = pres-same _ _ refl
 subscribeE-preserves : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
                          (f : ℕ) {b : Closed Γ u} {κ : Path Γ lo u t} {id now}
                          {sched sched₂ : Sched Γ} {st st₁ : EvalSt e} {burst}
-                     → f ≤ Sched.nextNode sched
+                     → f ≤ freshId nodeᵏ (Sched.mint sched)
                      → subscribeE⇓ {e = e} b κ id now sched st
                          (burst , sched₂ , st₁)
                      → PreservedBelow f st st₁
@@ -158,7 +159,7 @@ pushBurst-preserves : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
                         (f : ℕ) {fr : Frame Γ s u} {κ : Path Γ lo u t}
                         {id now} {ems}
                         {sched sched₂ : Sched Γ} {st st₂ : EvalSt e} {rest}
-                    → f ≤ Sched.nextNode sched
+                    → f ≤ freshId nodeᵏ (Sched.mint sched)
                     → FrameAbove f fr
                     → pushBurst⇓ {e = e} id now fr κ ems sched st
                         (rest , sched₂ , st₂)
@@ -169,7 +170,7 @@ stepFrame-preserves : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
                         {id now} {vals : List (Val Γ s)} {fin}
                         {sched sched₁ : Sched Γ} {st st₁ : EvalSt e}
                         {vals′ evs fin′}
-                    → f ≤ Sched.nextNode sched
+                    → f ≤ freshId nodeᵏ (Sched.mint sched)
                     → FrameAbove f fr
                     → stepFrame⇓ {e = e} id now fr κ vals fin sched st
                         (vals′ , evs , fin′ , sched₁ , st₁)
@@ -179,7 +180,7 @@ subscribeAll-preserves : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
                            (f : ℕ) {op} {ns : NodeState Γ}
                            {b : Closed Γ (obs u)} {κ : Path Γ lo u t} {id now}
                            {sched sched₂ : Sched Γ} {st st₁ : EvalSt e} {burst}
-                       → f ≤ Sched.nextNode sched
+                       → f ≤ freshId nodeᵏ (Sched.mint sched)
                        → subscribeAll⇓ {e = e} op ns b κ id now sched st
                            (burst , sched₂ , st₁)
                        → PreservedBelow f st st₁
@@ -189,7 +190,7 @@ subscribeInner-preserves : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
                              {o : Val Γ (obs u)}
                              {sched sched′ : Sched Γ} {st st′ : EvalSt e}
                              {inst vs bs done}
-                         → f ≤ Sched.nextNode sched
+                         → f ≤ freshId nodeᵏ (Sched.mint sched)
                          → subscribeInner⇓ {e = e} op allNid κ id now o sched st
                              (inst , vs , bs , done , sched′ , st′)
                          → PreservedBelow f st st′
@@ -197,7 +198,7 @@ subscribeInner-preserves : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
 thruWalk-preserves : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
                        (f : ℕ) {op} {nid} {κ : Path Γ lo u t} {id now} {os}
                        {sched₀ sched₂ : Sched Γ} {st₀ st₂ : EvalSt e} {vs bs}
-                   → f ≤ Sched.nextNode sched₀
+                   → f ≤ freshId nodeᵏ (Sched.mint sched₀)
                    → f ≤ nid
                    → thruWalk⇓ {e = e} op nid κ id now os sched₀ st₀
                        (vs , bs , sched₂ , st₂)
@@ -207,7 +208,7 @@ thruConsume-preserves : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
                           (f : ℕ) {op} {nid} {κ : Path Γ lo u t} {id now}
                           {o : Val Γ (obs u)}
                           {sched₀ sched₁ : Sched Γ} {st₀ st₁ : EvalSt e} {vs bs}
-                      → f ≤ Sched.nextNode sched₀
+                      → f ≤ freshId nodeᵏ (Sched.mint sched₀)
                       → f ≤ nid
                       → thruConsume⇓ {e = e} op nid κ id now o sched₀ st₀
                           (vs , bs , sched₁ , st₁)
@@ -218,7 +219,7 @@ mergeAllDrain-preserves : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
                             {lim act od q}
                             {sched₀ sched₂ : Sched Γ} {st₀ st₂ : EvalSt e}
                             {vs bs act′ q′}
-                        → f ≤ Sched.nextNode sched₀
+                        → f ≤ freshId nodeᵏ (Sched.mint sched₀)
                         → f ≤ allNid
                         → mergeAllDrain⇓ {e = e} allNid κ id now lim act od q
                             sched₀ st₀ (vs , bs , act′ , q′ , sched₂ , st₂)
@@ -229,7 +230,7 @@ innerFinish-preserves : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
                           {id now} {vals : List (Val Γ u)}
                           {sched sched′ : Sched Γ} {st st′ : EvalSt e} {ns}
                           {vals′ bs done}
-                      → f ≤ Sched.nextNode sched
+                      → f ≤ freshId nodeᵏ (Sched.mint sched)
                       → f ≤ allNid
                       → innerFinish⇓ {e = e} op allNid inst κ id now vals sched st
                           ns (vals′ , bs , done , sched′ , st′)
@@ -240,7 +241,7 @@ innerReact-preserves : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
                          {id now} {vals : List (Val Γ u)}
                          {sched sched₁ : Sched Γ} {st st₁ : EvalSt e} {fin}
                          {vals′ evs fin′}
-                     → f ≤ Sched.nextNode sched
+                     → f ≤ freshId nodeᵏ (Sched.mint sched)
                      → f ≤ allNid
                      → innerReact⇓ {e = e} op allNid inst κ id now vals sched st
                          fin (vals′ , evs , fin′ , sched₁ , st₁)
@@ -250,7 +251,7 @@ sharedConnect-preserves : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo}
                             (f : ℕ) {i} {d} {κ : Path Γ lo _ t} {below}
                             {id now} {sched sched₁ : Sched Γ}
                             {st st₂ : EvalSt e} {burst}
-                        → f ≤ Sched.nextNode sched
+                        → f ≤ freshId nodeᵏ (Sched.mint sched)
                         → sharedConnect⇓ {e = e} i d κ below id now sched st
                             (burst , sched₁ , st₂)
                         → PreservedBelow f st st₂
@@ -259,7 +260,7 @@ subscribeSharedSlot-preserves : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo}
                                   (f : ℕ) {i} {d} {κ : Path Γ lo _ t} {below}
                                   {id now} {sched sched₁ : Sched Γ}
                                   {st st₂ : EvalSt e} {burst}
-                              → f ≤ Sched.nextNode sched
+                              → f ≤ freshId nodeᵏ (Sched.mint sched)
                               → subscribeSharedSlot⇓ {e = e} i d κ below id now
                                   sched st (burst , sched₁ , st₂)
                               → PreservedBelow f st st₂
@@ -277,12 +278,12 @@ subscribeE-preserves f le (subs-take-suc {k = k} _ refl sub push) =
   pres-trans (pres-trans (pres-write _ _ (take-st (suc k)) refl le)
                          (subscribeE-preserves f (≤-trans le (n≤1+n _)) sub))
              (pushBurst-preserves f
-                (≤-trans (≤-trans le (n≤1+n _)) (subscribeE-mono sub)) le push)
+                (≤-trans (≤-trans le (n≤1+n _)) (subscribeE-mono sub nodeᵏ)) le push)
 subscribeE-preserves f le (subs-lift refl sub push) =
   pres-trans (pres-trans (pres-write _ _ _ refl le)
                          (subscribeE-preserves f (≤-trans le (n≤1+n _)) sub))
              (pushBurst-preserves f
-                (≤-trans (≤-trans le (n≤1+n _)) (subscribeE-mono sub)) le push)
+                (≤-trans (≤-trans le (n≤1+n _)) (subscribeE-mono sub nodeᵏ)) le push)
 subscribeE-preserves f le (subs-merge-all sa)    = subscribeAll-preserves f le sa
 subscribeE-preserves f le (subs-switch-all sa)   = subscribeAll-preserves f le sa
 subscribeE-preserves f le (subs-exhaust-all sa)  = subscribeAll-preserves f le sa
@@ -292,7 +293,7 @@ subscribeE-preserves f le (subs-defer refl _ _)  = pres-write _ _ _ refl le
 pushBurst-preserves f le fa push-nil = pres-same _ _ refl
 pushBurst-preserves f le fa (push-cons _ stp rest) =
   pres-trans (stepFrame-preserves f le fa stp)
-             (pushBurst-preserves f (≤-trans le (stepFrame-mono stp)) fa rest)
+             (pushBurst-preserves f (≤-trans le (stepFrame-mono stp nodeᵏ)) fa rest)
 
 stepFrame-preserves f le fa
   (step-lift {fn = fn} {nid} {vals = vals} {fin} {sched} {st}) =
@@ -311,7 +312,7 @@ subscribeAll-preserves f le (sub-all refl sub push) =
   pres-trans (pres-trans (pres-write _ _ _ refl le)
                          (subscribeE-preserves f (≤-trans le (n≤1+n _)) sub))
              (pushBurst-preserves f
-                (≤-trans (≤-trans le (n≤1+n _)) (subscribeE-mono sub)) le push)
+                (≤-trans (≤-trans le (n≤1+n _)) (subscribeE-mono sub nodeᵏ)) le push)
 
 subscribeInner-preserves f le (inner refl sub _) =
   subscribeE-preserves f (≤-trans le (n≤1+n _)) sub
@@ -319,7 +320,7 @@ subscribeInner-preserves f le (inner refl sub _) =
 thruWalk-preserves f le fn walk-nil = pres-same _ _ refl
 thruWalk-preserves f le fn (walk-cons c w) =
   pres-trans (thruConsume-preserves f le fn c)
-             (thruWalk-preserves f (≤-trans le (thruConsume-mono c)) fn w)
+             (thruWalk-preserves f (≤-trans le (thruConsume-mono c nodeᵏ)) fn w)
 
 thruConsume-preserves f le fn (consume-all-sub _ _ si) =
   pres-trans (subscribeInner-preserves f le si) (bump-pres _ fn)
@@ -329,7 +330,7 @@ thruConsume-preserves f le fn
   (consume-switch-sub {sched₀ = sched₀} {st₀ = st₀} {cur = cur} _ kl si) =
   pres-trans (pres-trans (kill-pres cur sched₀ st₀ kl)
                          (subscribeInner-preserves f
-                            (≤-trans le (switchKill-node cur sched₀ st₀ kl)) si))
+                            (≤-trans le (switchKill-mint cur sched₀ st₀ kl nodeᵏ)) si))
              (pres-write _ _ _ refl fn)
 thruConsume-preserves f le fn (consume-switch-nil _)     = pres-same _ _ refl
 thruConsume-preserves f le fn (consume-exhaust-sub _ si) =
@@ -342,7 +343,7 @@ mergeAllDrain-preserves f le fn (drain-room _ si dr) =
   pres-trans (pres-write _ _ _ refl fn)
              (pres-trans (subscribeInner-preserves f le si)
                          (mergeAllDrain-preserves f
-                            (≤-trans le (subscribeInner-mono si)) fn dr))
+                            (≤-trans le (subscribeInner-mono si nodeᵏ)) fn dr))
 
 innerFinish-preserves f le fn (finish-all-drain dr) =
   pres-trans (mergeAllDrain-preserves f le fn dr) (pres-write _ _ _ refl fn)

@@ -104,6 +104,7 @@ open import Rx.Prim using (Tick; Fuel; Id; Source; InstEvent; InstEmit; value; c
   init; subscribe; hot; cold)
 open import Rx.Exp using (obs; Ctx; Val; Closed; Tm; Fn; _×ᵗ_; listᵗ; evalTm; unfoldμ; input; ofᵉ; emptyᵉ; takeᵉ;
   liftᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; deferᵉ)
+open import Rx.Mint using (ordinalᵏ; sourceᵏ; nodeᵏ; freshId; setAt)
 open import Rx.Slots using (Slots; scripted; shared)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; NodeId;
   root; share-sink; _↠_; shareAdmit; shareLatch; shareFinish;
@@ -329,14 +330,14 @@ data subscribeE⇓ {n} {Γ} {t} {e} where
                       {ok sync d ds} {id now sched st src ord}
                   → toℕ i < lo
                   → Sched.slots sched i ≡ scripted {ok = ok} (cold sync (d ∷ ds))
-                  → Sched.nextSource sched ≡ src
-                  → Sched.nextOrdinal sched ≡ ord
+                  → freshId sourceᵏ (Sched.mint sched) ≡ src
+                  → freshId ordinalᵏ (Sched.mint sched) ≡ ord
                   → subscribeE⇓ (input i) κ id now sched st
                       ( ((init src ∷ map value sync)
                            at id from src as subscribe) ∷ []
                       , record sched
-                          { nextSource = suc src
-                          ; nextOrdinal = suc ord
+                          { mint = setAt sourceᵏ (suc src)
+                                     (setAt ordinalᵏ (suc ord) (Sched.mint sched))
                           ; live = record { source = src ; ordinal = ord
                                           ; elemTy = lookup Γ i
                                           ; pending = resolve now (d ∷ ds) }
@@ -362,9 +363,9 @@ data subscribeE⇓ {n} {Γ} {t} {e} where
   subs-take-suc : ∀ {lo u} {count k} {b : Closed Γ u} {κ : Path Γ lo u t}
                     {id now sched st nid burst sched₂ st₁ r}
                 → evalTm count ≡ suc k
-                → Sched.nextNode sched ≡ nid
+                → freshId nodeᵏ (Sched.mint sched) ≡ nid
                 → subscribeE⇓ b (take-f nid ↠ κ) id now
-                    (record sched { nextNode = suc nid })
+                    (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
                     (installNode nid (take-st (suc k)) st)
                     (burst , sched₂ , st₁)
                 → pushBurst⇓ id now (take-f nid) κ burst sched₂ st₁ r
@@ -374,9 +375,9 @@ data subscribeE⇓ {n} {Γ} {t} {e} where
   subs-lift : ∀ {lo s u w} {f} {i : Tm Γ [] [] [] w} {b : Closed Γ s}
                 {κ : Path Γ lo u t}
                 {id now sched st nid burst sched₂ st₁ r}
-            → Sched.nextNode sched ≡ nid
+            → freshId nodeᵏ (Sched.mint sched) ≡ nid
             → subscribeE⇓ b (lift-f f nid ↠ κ) id now
-                (record sched { nextNode = suc nid })
+                (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
                 (installNode nid (cell-st (evalTm i)) st)
                 (burst , sched₂ , st₁)
             → pushBurst⇓ id now (lift-f f nid) κ burst sched₂ st₁ r
@@ -419,15 +420,15 @@ data subscribeE⇓ {n} {Γ} {t} {e} where
 
   subs-defer : ∀ {lo u} {body} {κ : Path Γ lo u t}
                  {id now sched st nid src ord}
-             → Sched.nextNode sched ≡ nid
-             → Sched.nextSource sched ≡ src
-             → Sched.nextOrdinal sched ≡ ord
+             → freshId nodeᵏ (Sched.mint sched) ≡ nid
+             → freshId sourceᵏ (Sched.mint sched) ≡ src
+             → freshId ordinalᵏ (Sched.mint sched) ≡ ord
              → subscribeE⇓ (deferᵉ body) κ id now sched st
                  ( ((init src ∷ []) at id from src as subscribe) ∷ []
                  , record sched
-                     { nextNode = suc nid
-                     ; nextSource = suc src
-                     ; nextOrdinal = suc ord
+                     { mint = setAt nodeᵏ (suc nid)
+                                (setAt sourceᵏ (suc src)
+                                  (setAt ordinalᵏ (suc ord) (Sched.mint sched)))
                      ; live = record { source = src ; ordinal = ord
                                      ; elemTy = obs u
                                      ; pending = (suc now , body) ∷ [] }
@@ -447,9 +448,9 @@ data subscribeE⇓ {n} {Γ} {t} {e} where
 data subscribeInner⇓ {n} {Γ} {t} {e} where
   inner : ∀ {u lo op allNid} {κ : Path Γ lo u t} {id now}
             {o : Val Γ (obs u)} {sched st inst burst sched′ st′ vs bs done}
-        → Sched.nextNode sched ≡ inst
+        → freshId nodeᵏ (Sched.mint sched) ≡ inst
         → subscribeE⇓ o (from-inner op allNid inst ↠ κ) id now
-            (record sched { nextNode = suc inst }) st
+            (record sched { mint = setAt nodeᵏ (suc inst) (Sched.mint sched) }) st
             (burst , sched′ , st′)
         → splitBurst burst ≡ (vs , bs , done)
         → subscribeInner⇓ op allNid κ id now o sched st
@@ -732,9 +733,9 @@ data subscribeAll⇓ {n} {Γ} {t} {e} where
 
   sub-all : ∀ {u lo op} {ns : NodeState Γ} {b : Closed Γ (obs u)}
               {κ : Path Γ lo u t} {id now sched st nid burst sched₂ st₁ r}
-          → Sched.nextNode sched ≡ nid
+          → freshId nodeᵏ (Sched.mint sched) ≡ nid
           → subscribeE⇓ b (thru-outer op nid ↠ κ) id now
-              (record sched { nextNode = suc nid })
+              (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
               (installNode nid ns st)
               (burst , sched₂ , st₁)
           → pushBurst⇓ id now (thru-outer op nid) κ burst sched₂ st₁ r

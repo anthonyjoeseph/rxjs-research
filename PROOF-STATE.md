@@ -240,13 +240,15 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
   demotion and the elaboration's body are both parked, and the legs below run
   first.
 
-- **MEANWHILE, ONE KEYED LEDGER FOR EVERY MINT.** The evaluator carries its
-  instant, source, node and registration counters separately, threaded through
-  the schedule and the state, so the distinctness each envelope field rests on
-  is a separate fact about each. One record with siloed counters and a keyed
-  table makes it one theorem — and it is what the two formers above would read
-  from, so it is the right leg to take while they are open rather than merely
-  the available one.
+- **MEANWHILE, THE REGISTRATION COUNTER JOINS THE LEDGER.** The scheduler's
+  three counters are keyed and monotonicity is now one statement at an
+  arbitrary key, which is what the leg bought; the run's fourth counter is not
+  in it, because it sits on the evaluator STATE rather than on the schedule and
+  every write to it is a `register`. Folding it in is what makes "no identifier
+  this run hands out is handed out twice" a single statement over a single
+  table — and until it is one table, the strict bound and the off-key equality
+  that a distinctness proof spends have no assembly to be proven for, which is
+  why this leg holds them rather than the ledger module.
 
 - **THEN THE DEMOTION, ONCE A PROGRAM CAN BUILD AN ENVELOPE.** Target:
   `evaluate : … → List (Val Γ t)`. The census called this and the simul tree
@@ -262,13 +264,6 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
   protocol traffic is decided there. The body is per-former plumbing over the
   type translation, plus the one lemma a pointwise-translated context owes —
   that looking an input up commutes with the walk.
-
-- **THEN ONE KEYED LEDGER FOR EVERY MINT.** The evaluator carries its instant,
-  source, node and registration counters separately, threaded through the
-  schedule and the state, so the distinctness each envelope field rests on is
-  a separate fact about each. One record with siloed counters and a keyed
-  table makes it one theorem. The demotion comes first because it is what
-  leaves minting as the only thing in the evaluator the envelope ever wanted.
 
 - **THEN THE TYPESCRIPT SIMUL OPERATORS, `lift` INCLUDED (Anthony).** Written
   over plain rxjs, ES6 array operations and conditionals only. `lift`, `take`,
