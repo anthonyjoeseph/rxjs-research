@@ -62,8 +62,8 @@ export const producer = <A>(
 // This is what lets an operator stop owning its upstream subscription:
 // the split arrives as a VALUE in the stream, so a downstream `scan`
 // regroups the burst where the operator used to accumulate it by hand.
-// That pairing — bracket then fold — is `batchSyncᵉ` followed by
-// `liftᵉ`, which is why no new former is owed on the Agda side.
+// That pairing — bracket then read — is `batchSyncᵉ` followed by
+// `mapᵉ`, which is why no new former is owed on the Agda side.
 export const SYNC_END = Symbol("end-of-sync");
 export const UPSTREAM_DONE = Symbol("upstream-done");
 export type SyncEnd = typeof SYNC_END;

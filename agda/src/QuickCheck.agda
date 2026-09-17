@@ -60,10 +60,10 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong;
 
 open import Rx.Prim using (Timed; after_,_; ObservableInput; hot; cold; InstEvent; init; value; close; handoff;
   complete; InstEmit; _at_from_as_)
-open import Rx.Exp using (Ty; natᵗ; obs; listᵗ; revᵗ; _×ᵗ_; isData; Ctx; Exp; Tm; Fn; PrimOp; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; batchSyncᵉ; scanᵉ;
-  mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ;
-  unit̂; bool̂; nat̂; uniq̂; primᵗ; pairᵗ; fstᵗ; sndᵗ;
-  strmᵗ; varᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; nilᵗ; consᵗ; foldᵗ; add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ)
+open import Rx.Exp using (Ty; natᵗ; obs; _×ᵗ_; isData; Ctx; Exp; Tm; Fn; PrimOp; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ;
+  batchSyncᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ; unit̂; bool̂;
+  nat̂; uniq̂; primᵗ; pairᵗ; fstᵗ; sndᵗ; strmᵗ; varᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; nilᵗ; consᵗ;
+  foldᵗ; add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Rx.Emit-Eq using (eqBatched)
 open import Rx.Evaluator.Builder using (evaluate↓)

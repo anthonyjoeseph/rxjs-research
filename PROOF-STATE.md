@@ -230,15 +230,14 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 
 ### Big picture tier roadmap
 
-- **LIFT IS APART IN BOTH TREES; WHAT IS LEFT IS THE BRIDGE (Anthony: "I've
-  never liked lift"; "split it into mapˢ/scanˢ like the plain side").** The
-  split has landed in `Exp`, in the author's tree and in the elaboration
-  between them — `mapᵖ` and `scanᵖ` are real bodies, so the step is pointwise
-  on both sides and one-to-many is `mergeAllˢ` over a step returning literal
-  syntax. What remains names a former by a TAG rather than by its type: the
-  generator's lane, the decoder, the refuted witness, and then the TypeScript
-  union, whose `lift` is still frame-shaped and is the half the oracle
-  compares.
+- **THE NEW PALETTE HAS NEVER BEEN ROUND-TRIPPED, AND THAT IS THE NEXT LEG.**
+  Lift came apart in both trees and across all five surfaces, so the
+  correspondence checker is green on a pairing no run has exercised: every
+  generated tree now carries `map`/`scan` tags the decoder has only been read
+  against, and the count-changing shapes moved from a step returning a LIST to
+  a step returning literal syntax that `mergeAll` must RUN. That is a
+  different operator with different timing, so the sweep and the oracle are
+  what say whether the ruling's palette computes what the old one did.
 
 - **THEN THE DEMOTION, WHICH IS TWO EVALUATORS AND NOT A RETYPE (Anthony: the
   harness "shouldn't test on srxjs at all — just plain rxjs now", and the Main

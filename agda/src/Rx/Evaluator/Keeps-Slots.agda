@@ -30,7 +30,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans)
 open import Relation.Nullary using (yes; no)
 
 open import Rx.Prim using (Id; Tick)
-open import Rx.Exp using (Ctx; Closed; Val; obs; Fn; _×ᵗ_; listᵗ; _≟ᵗ_)
+open import Rx.Exp using (Ctx; Closed; Val; obs; Fn; _×ᵗ_; _≟ᵗ_)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; AllOp; NodeId;
   NodeState; Frame; take-st; batchSync-st; batchSyncDispatch; cell-st; takeVals; takeDispatch;
   scanDispatch; thruWrap;

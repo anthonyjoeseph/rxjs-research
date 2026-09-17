@@ -1,4 +1,4 @@
-import { Closed, Exp, Fn, PrimOp, Tm, Ty, Val, mapE, scanE } from "./exp.js";
+import { Closed, Exp, Fn, PrimOp, Tm, Ty, Val } from "./exp.js";
 import type { ObservableInput, Slot, TestCase, Timed } from "./prop-test.js";
 
 // The differential-testing generator: deterministic, seeded canonical
@@ -247,11 +247,11 @@ const genTm = (rng: Rng, ty: Ty, ctx: GenCtx, depth: number): Tm => {
       ty,
       exp: genExp(rng, ty.elem, ctx, depth - 1),
     }));
-  // A LIST-TYPED TERM IS WHERE A LIFT STOPS BEING A MAP OR A SCAN.
-  // Consing onto the argument's own list LENGTHENS an emit and folding
-  // with a conditional SHORTENS it, and neither is a shape map or scan
-  // can produce — so this is the clause that makes the raw `lift` lane
-  // below worth generating at all.
+  // A LIST-TYPED TERM IS WHERE THE VALUE LANGUAGE GETS ITS OWN REACH.
+  // Consing and folding with a conditional are how a term builds a list
+  // of a length it was not handed, which is what a pointwise step can
+  // never do — so this clause is what the fan lane below spends when it
+  // hands `mergeAll` a step that returns literal syntax.
   if (ty.type === "list") {
     const elem = ty.elem;
     opts.push(() => ({
@@ -341,43 +341,57 @@ const genExp = (
 
   const obsOf: Ty = { type: "obs", elem: ty };
   const operators: Record<string, () => Exp> = {
-    // map and scan are not nodes any more: both are written over the one
-    // pure-function former, so what these lanes generate is a `lift`
-    // whose step is a fold in the term language
     map: () => {
       const s = genValTy(rng, 2);
-      return mapE(
-        ty,
-        s,
-        genFn(rng, s, ty, ctx, depth - 1),
-        genExp(rng, s, ctx, depth - 1),
-      );
-    },
-    // and the former ITSELF, with a step nothing constrains to a map or
-    // a scan shape: it may drop values, duplicate them, or emit a
-    // different count than it was handed. That range is the whole
-    // reason the palette collapsed onto one former, and a generator
-    // that only ever emitted the two encodings above would exercise
-    // the two absorbed operators in new clothes rather than this one.
-    lift: () => {
-      const s = genValTy(rng, 2);
-      const u = genValTy(rng, 1); // the carried state
-      const argTy: Ty = {
-        type: "prod",
-        fst: u,
-        snd: { type: "list", elem: s },
-      };
-      const resTy: Ty = {
-        type: "prod",
-        fst: u,
-        snd: { type: "list", elem: ty },
-      };
       return {
-        type: "lift",
+        type: "map",
         ty,
-        fn: genFn(rng, argTy, resTy, ctx, depth - 1),
-        init: genTm(rng, u, ctx, Math.min(depth, 2)),
+        fn: genFn(rng, s, ty, ctx, depth - 1),
         src: genExp(rng, s, ctx, depth - 1),
+      };
+    },
+    // AND THE COUNT-CHANGING LANE, WHICH IS NOW A FLATTEN. A pointwise
+    // step emits exactly what it was handed, so dropping a value and
+    // duplicating one are shapes neither lane above can reach -- and a
+    // generator blind to them is the blind spot this file's history
+    // already records. rxjs reaches them with `mergeMap(x => ...)`, so
+    // this lane writes exactly that: a step returning literal syntax,
+    // spent by `mergeAll`.
+    fan: () => {
+      const inner: Ty = { type: "obs", elem: ty };
+      const x: Tm = { type: "varT", ty, index: 0 };
+      const step: Fn = pick(rng, [
+        () => ({ type: "strmT", ty: inner, exp: { type: "empty", ty } }),
+        () => ({
+          type: "strmT",
+          ty: inner,
+          exp: { type: "of", ty, items: [x] },
+        }),
+        () => ({
+          type: "strmT",
+          ty: inner,
+          exp: { type: "of", ty, items: [x, x] },
+        }),
+        () => ({
+          type: "strmT",
+          ty: inner,
+          exp: {
+            type: "of",
+            ty,
+            items: [x, genTm(rng, ty, ctx, Math.min(depth, 2))],
+          },
+        }),
+      ])() as Fn;
+      return {
+        type: "mergeAll",
+        ty,
+        limit: undefined,
+        src: {
+          type: "map",
+          ty: inner,
+          fn: step,
+          src: genExp(rng, ty, ctx, depth - 1),
+        },
       };
     },
     take: () => ({
@@ -388,13 +402,13 @@ const genExp = (
     }),
     scan: () => {
       const s = genValTy(rng, 2);
-      return scanE(
+      return {
+        type: "scan",
         ty,
-        s,
-        genFn(rng, { type: "prod", fst: ty, snd: s }, ty, ctx, depth - 1),
-        genTm(rng, ty, ctx, Math.min(depth, 2)),
-        genExp(rng, s, ctx, depth - 1),
-      );
+        fn: genFn(rng, { type: "prod", fst: ty, snd: s }, ty, ctx, depth - 1),
+        init: genTm(rng, ty, ctx, Math.min(depth, 2)),
+        src: genExp(rng, s, ctx, depth - 1),
+      };
     },
     // the limit axis is where bounded concurrency gets exercised:
     // absent is the old mergeAll, 1 is the old concatAll, 2/3 are the
@@ -459,9 +473,9 @@ const genExp = (
   // practice — nothing asks for one — and would report a clean sweep of
   // an empty corpus, so the lane MAKES the shape and then spends it.
   //
-  // Spending it with a lift is not an arbitrary choice: bracket-then-
-  // fold is the pairing the former exists for, since the split arrives
-  // as a VALUE and a step over the value list is what regroups it. So
+  // Spending it with a map is not an arbitrary choice: bracket-then-
+  // read is the pairing the former exists for, since the split arrives
+  // as a VALUE and a pointwise step over the pair is what reads it. So
   // the generated shape is the one the elaboration itself will write.
   operators.batchSync = () => {
     // when the caller already wants the pinned shape, hand the node back
@@ -483,18 +497,10 @@ const genExp = (
       ty: pair,
       src: genExp(rng, s, ctx, depth - 1),
     };
-    const u = genValTy(rng, 1);
     return {
-      type: "lift",
+      type: "map",
       ty,
-      fn: genFn(
-        rng,
-        { type: "prod", fst: u, snd: { type: "list", elem: pair } },
-        { type: "prod", fst: u, snd: { type: "list", elem: ty } },
-        ctx,
-        depth - 1,
-      ),
-      init: genTm(rng, u, ctx, Math.min(depth, 2)),
+      fn: genFn(rng, pair, ty, ctx, depth - 1),
       src: node,
     };
   };

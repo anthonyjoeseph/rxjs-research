@@ -383,37 +383,60 @@ export const defer = <A>(
     );
   });
 
-// lift: THE pure-function former. A step reads an emit's VALUES and the
-// state carried across emits, and returns the next state and the values
-// to emit in their place. That is the whole interface, and what it
-// EXCLUDES is the point: a step mints no registration, reads none of the
-// bookkeeping, cannot end the stream and cannot see which instant it is
-// in — so the emit's own events and its fin bit ride through untouched
-// and the protocol is not something a program can write.
+// map and scan: THE pure-function formers, and there are two because
+// rxjs has two. A step reads ONE value -- and, for scan, the state
+// carried across it -- and returns one value. That is the whole
+// interface, and what it EXCLUDES is the point: a step mints no
+// registration, reads none of the bookkeeping, cannot end the stream
+// and cannot see which instant it is in -- so the emit's own events and
+// its fin bit ride through untouched and the protocol is not something
+// a program can write.
 //
-// Its Agda counterpart is a `Tm` of type (u × list s) → (u × list t)
-// with a `Tm` seed, which is why the interface is an ARRAY in and an
-// array out rather than one value at a time: `Tm` is first-order and
-// total, so a step cannot be a callback the operator drives, and the
-// value language already has fold over lists.
-export const lift = <A, B, S>(
+// THE STEP IS POINTWISE AND THE EMIT IS NOT, which is the one thing to
+// carry when reading either body. An emit carries a LIST of values, so
+// each operator runs its step once per element and rebuilds the emit
+// around the results; a frame is never something the step can see, and
+// that is what stops a program writing one.
+//
+// NEITHER IS DERIVABLE FROM THE OTHER. A scan's accumulator IS its
+// output, so changing the value's type needs a seed at the new type,
+// and the value language has no generic inhabitant to default one to; a
+// map carries no state, so it cannot stand in for a scan either.
+export const map = <A, B>(
   obs: Observable<InstEmit<A>>,
-  initial: S,
-  step: (state: S, values: A[]) => { state: S; values: B[] },
+  fn: (a: A) => B,
 ): Observable<InstEmit<B>> =>
   obs.pipe(
-    rxScan<InstEmit<A>, { state: S; out?: InstEmit<B> }>(
+    rxMap((emit) => {
+      const { bookkeeping, values, fin } = splitEmit(emit);
+      return reassemble(emit, bookkeeping, [], values.map(fn), fin);
+    }),
+  );
+
+export const scan = <A, S>(
+  obs: Observable<InstEmit<A>>,
+  initial: S,
+  step: (state: S, value: A) => S,
+): Observable<InstEmit<S>> =>
+  obs.pipe(
+    rxScan<InstEmit<A>, { state: S; out?: InstEmit<S> }>(
       (carried, emit) => {
         const { bookkeeping, values, fin } = splitEmit(emit);
-        const next = step(carried.state, values);
+        const out = values.reduce<{ state: S; emitted: S[] }>(
+          (acc, value) => {
+            const next = step(acc.state, value);
+            return { state: next, emitted: [...acc.emitted, next] };
+          },
+          { state: carried.state, emitted: [] },
+        );
         return {
-          state: next.state,
-          out: reassemble(emit, bookkeeping, [], next.values, fin),
+          state: out.state,
+          out: reassemble(emit, bookkeeping, [], out.emitted, fin),
         };
       },
       { state: initial },
     ),
-    rxMap((carried) => carried.out as InstEmit<B>), // the seed is never emitted, so out is set
+    rxMap((carried) => carried.out as InstEmit<S>), // the seed is never emitted, so out is set
   );
 
 // batchSync-f: the one plain operator that can see synchrony, and it
@@ -458,19 +481,6 @@ export const batchSync = <A>(
     rxMap((carried) => carried.out as InstEmit<[A, A[]]>),
   );
 
-// a lift that carries nothing. No Exp node compiles to this any more —
-// a program's map is built from the lift NODE, in the term language —
-// so what is left is the compiler's own use, mapping each emitted inner
-// observable to its compilation.
-export const map = <A, B>(
-  obs: Observable<InstEmit<A>>,
-  fn: (a: A) => B,
-): Observable<InstEmit<B>> =>
-  lift<A, B, null>(obs, null, (state, values) => ({
-    state,
-    values: values.map(fn),
-  }));
-
 // take-f: forward the first `emissions` values, then cut. The cut emit
 // carries the taken prefix plus a `close … cut` for EVERY registration
 // still open through this operator (Agda's cutThrough) — tracked from
@@ -482,15 +492,15 @@ export const map = <A, B>(
 // (Agda's sweepLive). Count 0 is routed to `empty` by the compiler
 // (Agda: take 0 never subscribes its source), so `emissions ≥ 1` here.
 //
-// AND IT IS NOT A `lift`, WHICH IS THE PALETTE'S DIVIDING LINE DRAWN AT
-// THE ONE OPERATOR THAT LOOKS LIKE IT SHOULD BE ONE.  `map` and `scan`
-// are lifts because a step reading the values decides everything they
-// emit.  This one reads the open-registration multiset and the cut
-// ledger, MINTS bookkeeping (one close per victim, with a per-victim
-// reason), and raises fin on the emit that cuts.  A lift whose step
-// could do that would be a step handed source ids, close reasons and
-// emit kinds -- the protocol's own vocabulary, in the value language,
-// writable by a program.  So `take` stays a former of its own.
+// AND IT IS NOT A PURE-FUNCTION FORMER, WHICH IS THE PALETTE'S DIVIDING
+// LINE DRAWN AT THE ONE OPERATOR THAT LOOKS LIKE IT SHOULD BE ONE.
+// `map` and `scan` pass the test because a step reading one value
+// decides everything they emit.  This one reads the open-registration
+// multiset and the cut ledger, MINTS bookkeeping (one close per victim,
+// with a per-victim reason), and raises fin on the emit that cuts.  A
+// step that could do that would be a step handed source ids, close
+// reasons and emit kinds -- the protocol's own vocabulary, in the value
+// language, writable by a program.  So `take` stays a former of its own.
 export const take = <A>(
   obs: Observable<InstEmit<A>>,
   emissions: number,

@@ -31,9 +31,9 @@ open import Relation.Binary.PropositionalEquality
 
 open import Rx.Exp
   using (Ty; Ctx; Exp; Tm; Val; subΘExp; subΘTm; subΘTms; input; ofᵉ; emptyᵉ; takeᵉ; mapᵉ; scanᵉ;
-  mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; batchSyncᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ; uniqᵗ; varᵗ; unit̂; bool̂; nat̂; uniq̂; pairᵗ; fstᵗ;
-  sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ; _×ᵗ_; listᵗ; nilᵗ; consᵗ; foldᵗ; renTm; wkTm; reify;
-  lookupEnv)
+  mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; batchSyncᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ; uniqᵗ; varᵗ; unit̂;
+  bool̂; nat̂; uniq̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ; _×ᵗ_; nilᵗ;
+  consᵗ; foldᵗ; renTm; wkTm; reify; lookupEnv)
 open import Rx.Subst-Transport
   using ( Cᵉ; Cᵗ; Cˢ; shift; cong₃
         ; pushInput; pushEmpty; pushVarᵉ; pushOf; pushTake; pushMap; pushScan

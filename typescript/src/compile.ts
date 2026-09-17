@@ -5,7 +5,7 @@ import { Driver } from "./driver.js";
 import * as P from "./primitive-operators.js";
 
 // the per-node switch delegating to the primitive-operators:
-// evalTm/applyFn for of/lift/take, unfoldMu + a driver hop for
+// evalTm/applyFn for of/map/scan/take, unfoldMu + a driver hop for
 // mu/defer. Inner observables are CLOSED EXPS carried as values
 // (strmT), so the *All cases compile each inner as its emission
 // passes — laziness for free, defers inside stay thunked.
@@ -31,14 +31,16 @@ export const compile = (
       );
     case "empty":
       return P.empty(driver);
-    case "lift":
-      // the step is a Tm on the pair (carried state, the emit's values)
-      // and returns the same shape; the primitive's interface IS that
-      // pair, so applying the Fn is the whole clause
-      return P.lift(recur(exp.src), evalTm(exp.init), (state, values) => {
-        const [next, out] = applyFn(exp.fn, [state, values]) as [Val, Val[]];
-        return { state: next, values: out };
-      });
+    case "map":
+      // the step is a Tm on ONE value; the primitive is pointwise too,
+      // so applying the Fn is the whole clause
+      return P.map(recur(exp.src), (value: Val) => applyFn(exp.fn, value));
+    case "scan":
+      // a scan's step takes the pair (carried state, one value) and its
+      // result IS the next state, so nothing is projected out of it
+      return P.scan(recur(exp.src), evalTm(exp.init), (state, value) =>
+        applyFn(exp.fn, [state, value]),
+      );
     case "take": {
       // Agda evaluates the count at subscription time; a closed Tm is
       // deterministic, so evaluating once here cannot differ

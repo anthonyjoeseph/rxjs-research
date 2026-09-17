@@ -35,14 +35,11 @@ open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong; cong₂; subst)
 
 open import Rx.Exp
-  using ( Ty; Ctx; Exp; Tm; Ren∈; ext∈; ++Ren; renExp; renTm; renTms
-        ; _×ᵗ_; listᵗ
-        ; _⊟_; ⊟-++ˡ; ⊟-++ʳ; compare∈
-        ; elimGExp; elimGTm; elimGTms; elimDExp; elimDTm; elimDTms
-        ; input; ofᵉ; emptyᵉ; takeᵉ; mapᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ
-        ; exhaustAllᵉ; batchSyncᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ; uniqᵗ
-        ; varᵗ; unit̂; bool̂; nat̂; uniq̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ
-        ; caseᵗ; ifᵗ; primᵗ; strmᵗ; nilᵗ; consᵗ; foldᵗ )
+  using (Ty; Ctx; Exp; Tm; Ren∈; ext∈; ++Ren; renExp; renTm; renTms; _×ᵗ_; _⊟_; ⊟-++ˡ; ⊟-++ʳ;
+  compare∈; elimGExp; elimGTm; elimGTms; elimDExp; elimDTm; elimDTms; input; ofᵉ; emptyᵉ;
+  takeᵉ; mapᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; batchSyncᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ;
+  uniqᵗ; varᵗ; unit̂; bool̂; nat̂; uniq̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ;
+  strmᵗ; nilᵗ; consᵗ; foldᵗ)
 open import Rx.Subst-Transport using (cong₃)
 open import Rx.Subst-Split using (isˡ; isʳ; split; ++Ren-l; ++Ren-r)
 
