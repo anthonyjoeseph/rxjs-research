@@ -111,7 +111,15 @@ export type Exp =
   // binds one fresh uniq token per subscription, extending Θ by uniqᵗ.
   // The body sees the token as Θ-var 0; unlike defer it does NOT touch
   // Δᵍ/Δ (μ-vars), only Θ.
-  | { type: "mint"; ty: Ty; body: Exp };
+  | { type: "mint"; ty: Ty; body: Exp }
+  // the one plain former that can see synchrony, and it sees exactly one
+  // bit of it: the subscribe frame's values leave as ONE group, every
+  // later value as its own singleton. `ty` is the node's own type, so a
+  // batchSync over `s` carries `s ×ᵗ listᵗ s` — head and tail, since the
+  // group is never empty. NOTHING COMPILES IT YET: the plain-rxjs
+  // refactor of the primitives is what has to write the operator, and
+  // until then the generator has no lane for it (scripts/formers.tsv).
+  | { type: "batchSync"; ty: Ty; src: Exp };
 // ⚠ defer here is Agda's deferᵉ, NOT rxjs defer: lazy PLUS a one-tick
 // hop, and the body's emissions mint fresh ids (an async boundary).
 //
@@ -360,6 +368,7 @@ const closeExp = (exp: Exp, env: Val[], depth: number): Exp => {
     case "mergeAll":
     case "switchAll":
     case "exhaustAll":
+    case "batchSync":
       return { ...exp, src: closeExp(exp.src, env, depth) };
     case "mu":
     case "defer":
@@ -482,6 +491,7 @@ const substMuExp = (exp: Exp, st: MuSt, knot: Exp): Exp => {
     case "mergeAll":
     case "switchAll":
     case "exhaustAll":
+    case "batchSync":
       return { ...exp, src: substMuExp(exp.src, st, knot) };
     case "mu":
       return { ...exp, body: substMuExp(exp.body, muUnder(st), knot) };
@@ -576,6 +586,7 @@ const shiftExp = (exp: Exp, cutoff: number, by: number): Exp => {
     case "mergeAll":
     case "switchAll":
     case "exhaustAll":
+    case "batchSync":
       return { ...exp, src: shiftExp(exp.src, cutoff, by) };
     case "mu":
     case "defer":

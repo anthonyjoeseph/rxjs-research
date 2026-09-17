@@ -22,7 +22,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (Timed; after_,_; ObservableInput; hot; cold)
 open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; obs; _≟ᵗ_; isData; inputsBelowᵉ; Ctx; Val; Exp; Tm;
-  input; ofᵉ; emptyᵉ; liftᵉ; takeᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ;
+  input; ofᵉ; emptyᵉ; liftᵉ; takeᵉ; batchSyncᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ;
   varᵉ; deferᵉ; mintᵉ; varᵗ; unit̂; bool̂; nat̂; uniq̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ;
   strmᵗ; nilᵗ; consᵗ; foldᵗ; listᵗ; add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ)
 open import Rx.Evaluator.Builder using (evaluate↓)
@@ -193,6 +193,13 @@ mutual
       (getField "body" j >>=? decodeExp fuel Γ [] (Δᵍ ++ Δ) Θ t >>=? λ b → just (deferᵉ b))
     else if tag is "mint" then
       (getField "body" j >>=? decodeExp fuel Γ Δᵍ Δ (uniqᵗ ∷ Θ) t >>=? λ b → just (mintᵉ b))
+    else if tag is "batchSync" then
+      -- the node's own type PINS the source's: a batchSync over `s` is a
+      -- stream of `s ×ᵗ listᵗ s`, so reading the child's type and
+      -- demanding that shape is the whole check
+      (childTy fuel "src" j >>=? λ s →
+       whenTy (s ×ᵗ listᵗ s) t >>=? λ { refl →
+         getField "src" j >>=? decodeExp fuel Γ Δᵍ Δ Θ s >>=? λ b → just (batchSyncᵉ b) })
     else nothing
     where open import Data.List using (_++_)
 

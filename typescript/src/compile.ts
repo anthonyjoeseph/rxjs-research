@@ -65,6 +65,15 @@ export const compile = (
       // the token is substituted INTO the body, mirroring Agda's
       // subs-mint: the binder is discharged before the body compiles
       return P.mint(driver, (token) => recur(bindMinted(exp.body, token)));
+    case "batchSync":
+      // NO PRIMITIVE PAIRS WITH IT YET. Bracketing a subscribe frame is
+      // what the plain-rxjs refactor of the primitives has to say, and a
+      // stub written before that ruling would be a second answer to it.
+      // Nothing generates the former either (scripts/formers.tsv), so no
+      // program the oracle runs can reach this arm.
+      throw new Error(
+        "batchSync has no plain-rxjs primitive yet — see the primitives refactor leg",
+      );
     case "varE":
       throw new Error(
         "varE in a closed expression — generator/decoder invariant violated",
