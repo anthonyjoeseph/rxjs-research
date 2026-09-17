@@ -73,3 +73,37 @@ missed, and trims main's interface snapshots to the newest few — only the newe
 is ever restored, since the restore-key takes the most recent prefix match.
 **Do not instead stop saving on PR branches**: that removes a benefit the repo
 actually collects, to avoid a cost that a scheduled job removes for free.
+
+## The second cache: MAlonzo objects, and why its key is the TOOLCHAIN
+
+`make gate` runs the bug cache, which is a real GHC compile — the Agda backend
+emits MAlonzo Haskell for the whole transitive cone, stdlib included, and then
+links a binary. That directory was cached by nothing, so every run paid for all
+of it; the figure is in `typecheck-performance-numbers.md` under *The gate in
+CI*, and it is a large fraction of a WARM gate rather than a rounding error on a
+cold one.
+
+**What makes it worth restoring is that the Agda backend is incremental.** On a
+warm `_cli` Agda rewrites the `.hs` of the modules whose interfaces moved, and
+GHC's own recompilation check then skips every module whose source did not
+change — it reports `[Source file changed]` on exactly the ones that did. The
+modules it skips are overwhelmingly the stdlib's, which is also where the bytes
+are.
+
+That is why the key names `scripts/install-agda.sh` and not the commit. The
+reusable part of this tree is the stdlib's objects, which move only when Agda or
+the stdlib does; this repo's own modules are rebuilt on every run whatever the
+cache holds, because Agda rewrites their `.hs`. A commit-keyed entry would
+therefore upload tens of megabytes per green run to store objects that are
+either byte-identical to the last run's or about to be thrown away — straight
+into the ceiling above, competing with interface snapshots that are worth more
+per byte. A fixed key hits, and `actions/cache` does not re-save on a hit.
+
+**The linked binaries are excluded on purpose.** They are larger than the object
+tree they are linked from and they relink on every run regardless, so caching
+them is upload with no restore value. The cached path is the object tree alone.
+
+Safety is the same argument as the interface cache one section up: GHC
+re-verifies every module's recompilation condition against the `.hs` Agda has
+just written, so a stale or absent entry costs a rebuild and can never turn a
+check that should fail into one that passes.
