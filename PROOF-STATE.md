@@ -230,32 +230,23 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 
 ### Big picture tier roadmap
 
-- **THE UNIQUE PRIMITIVE, WHOSE IDENTITY LIVES ONLY IN THE EVALUATOR
-  (Anthony).** `Ty` gains `uniqᵗ`, `Val` sending it to `ℕ`, introduced by a
-  PLAIN-tree former no simul former elaborates to and eliminated only by a
-  primitive EQUALITY — which is what lets the envelope operators be written in
-  the `Ty`/`Tm` language, the envelope itself DEFINED over `unitᵗ`, `_+ᵗ_`,
-  `_×ᵗ_`, `listᵗ` and parameterised over its uniq type. Nothing projects the
-  nat back out. Minting is the evaluator's, against ONE ledger serving instant
-  and source alike, so uniqueness is a theorem about it. The envelope is
-  claimed by the existing `InstEmit` heritage rather than a `Main` line, so it
-  lands with the simul tree.
+- **THE DEMOTION AND THE SIMUL TREE, WHICH ARE ONE LANDING AND NOT TWO.**
+  Target: `evaluate : … → List (Val Γ t)`, plus a second `Exp` whose formers
+  are the envelope-carrying operators and one elaboration down into the plain
+  tree. They were two legs until the census, which found no state in between:
+  the moment the evaluator stops returning envelopes, the harness's case loop,
+  every readme instance, the CLI's encode path and the provenance leaf are
+  untypeable, and nothing repairs them until a simul program supplies the
+  envelope. The bridge would be a second envelope-producing path, which is the
+  one repair this repo forbids. Eleven sites read a field of the machine's own
+  envelope and are the work; the rest goes with the return type.
 
-- **THEN DEMOTE THE ENVELOPE OUT OF THE EVALUATOR.** Target:
-  `evaluate : … → List (Val Γ t)`. The mentions split three ways and only one
-  is work — plumbing vanishes with the return type, a claim's statement
-  restates mechanically, and what is left is BEHAVIOUR, every place the
-  machine reads a field of its own envelope to decide something. Each of those
-  moves UP into a simul former, which is what makes this a demotion rather
-  than an extraction: the plain tree's `take` and `defer` are already protocol
-  formers by the pairing map's own role column, and they stop being that here.
-
-- **THEN THE SIMUL TREE AND `toPlain`.** A second `Exp` whose formers are the
-  envelope-carrying operators, and one elaboration into the plain tree. It is
-  where the demoted behaviour lands, so it cannot be written before the leg
-  above, and it is the leg that decides whether the split was real: a demoted
-  behaviour with no simul former to move into means the two trees are one tree
-  with extra steps.
+- **THEN ONE KEYED LEDGER FOR EVERY MINT.** The evaluator carries its instant,
+  source, node and registration counters separately, threaded through the
+  schedule and the state, so the distinctness each envelope field rests on is
+  a separate fact about each. One record with siloed counters and a keyed
+  table makes it one theorem. The demotion comes first because it is what
+  leaves minting as the only thing in the evaluator the envelope ever wanted.
 
 - **THEN THE TYPESCRIPT SIMUL OPERATORS, `lift` INCLUDED (Anthony).** Written
   over plain rxjs, ES6 array operations and conditionals only. `lift`, `take`,
@@ -263,7 +254,9 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
   are not, and each needs a synchronous subscribe frame captured as a unit,
   which plain combinators cannot observe. Whether the three quarantined escape
   hatches count as permitted vocabulary is the question the leg opens with,
-  and it is Anthony's.
+  and it is Anthony's. **AND `expand` IS NEW.** It is in neither tree — the
+  census found the name nowhere in either source — so it is written here
+  first, which is the port order the change workflow already fixes.
 
 - **THEN THE SAME OPERATORS IN `Tm`/`Ty`, AND TIER 1 IS COMPLETE (Anthony).**
   Each TS simul operator mirrored as an Agda definition in the value language,
