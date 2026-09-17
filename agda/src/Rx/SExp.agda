@@ -40,9 +40,11 @@ open import Rx.Envelope using (machineEmitᵗ)
 -- the two implementations comparable at all rather than merely
 -- analogous.  `share` is absent from both for the same reason: a shared
 -- observable is a BINDING and not an expression, so it lives in the
--- slot telescope and is referenced with `inputˢ`.  `mapˢ` and `scanˢ`
--- are likewise absent as formers because they are definitions over
--- `liftˢ`, exactly as their plain counterparts are over `scanᵉ`.
+-- slot telescope and is referenced with `inputˢ`.  The two pure-function
+-- formers are `mapˢ` and `scanˢ` for the reason their plain
+-- counterparts are two: rxjs ships two operators and neither derives
+-- from the other, so one former over a step returning a LIST would be
+-- an operator the palette is supposed to mirror and does not have.
 
 mutual
 
@@ -51,8 +53,9 @@ mutual
     ofˢ         : ∀ {t} → List (STm Γ Δᵍ Δ Θ t) → SExp Γ Δᵍ Δ Θ t
     emptyˢ      : ∀ {t} → SExp Γ Δᵍ Δ Θ t
     takeˢ       : ∀ {t} → STm Γ Δᵍ Δ Θ natᵗ → SExp Γ Δᵍ Δ Θ t → SExp Γ Δᵍ Δ Θ t
-    liftˢ       : ∀ {s t u} → SFn Γ Δᵍ Δ Θ (u ×ᵗ s) (u ×ᵗ listᵗ t)
-                → STm Γ Δᵍ Δ Θ u → SExp Γ Δᵍ Δ Θ s → SExp Γ Δᵍ Δ Θ t
+    mapˢ        : ∀ {s t} → SFn Γ Δᵍ Δ Θ s t → SExp Γ Δᵍ Δ Θ s → SExp Γ Δᵍ Δ Θ t
+    scanˢ       : ∀ {s t} → SFn Γ Δᵍ Δ Θ (t ×ᵗ s) t
+                → STm Γ Δᵍ Δ Θ t → SExp Γ Δᵍ Δ Θ s → SExp Γ Δᵍ Δ Θ t
     mergeAllˢ   : ∀ {t} → Maybe ℕ → SExp Γ Δᵍ Δ Θ (obs t) → SExp Γ Δᵍ Δ Θ t
     switchAllˢ exhaustAllˢ :
                   ∀ {t} → SExp Γ Δᵍ Δ Θ (obs t) → SExp Γ Δᵍ Δ Θ t

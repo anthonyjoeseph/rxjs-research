@@ -176,7 +176,7 @@ data NodeState {n} (Γ : Ctx n) : Set where
                -- ONE CARRIED VALUE, AND IT IS NOT SCAN'S.  Every
                -- stateful pure-function former keeps exactly this and
                -- nothing else -- a running accumulator for the fold,
-               -- the carried state for the lifted step -- so the cell
+               -- the carried state for the scanning step -- so the cell
                -- is named for what it HOLDS rather than for whichever
                -- former happens to be installed over it.  The type is
                -- existential, so each read pays a `_≟ᵗ_`.

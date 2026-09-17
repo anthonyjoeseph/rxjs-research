@@ -1,5 +1,6 @@
 module Rx.Elaborate where
 
+open import Data.Bool using (false)
 open import Data.List using (List; []; _∷_)
 open import Data.List.Properties using (map-++)
 open import Data.List.Membership.Propositional.Properties using (∈-map⁺)
@@ -11,13 +12,14 @@ open import Relation.Binary.PropositionalEquality using (subst; refl)
 
 open import Rx.Exp using (Ty; Ctx; Exp; Tm; Fn; natᵗ; listᵗ; obs; _×ᵗ_;
                           boolᵗ; uniqᵗ;
-                          input; μᵉ; varᵉ; deferᵉ; scanᵉ;
-                          varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; nilᵗ;
+                          input; μᵉ; varᵉ; deferᵉ; mapᵉ; scanᵉ;
+                          varᵗ; unit̂; bool̂; nat̂; uniq̂; pairᵗ; fstᵗ; sndᵗ; nilᵗ;
                           consᵗ; inlᵗ; inrᵗ; caseᵗ; foldᵗ; ifᵗ; primᵗ; strmᵗ;
                           letᵗ; revᵗ; renTm; ext∈;
                           add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ)
-open import Rx.Envelope using (instEventᵗ; eventsᵛ; splitEventsᵛ; reassembleᵛ)
-open import Rx.SExp using (SExp; STm; inputˢ; ofˢ; emptyˢ; takeˢ; liftˢ;
+open import Rx.Envelope using (instEventᵗ; eventsᵛ; splitEventsᵛ; reassembleᵛ;
+                               instEmitᵛ)
+open import Rx.SExp using (SExp; STm; inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; scanˢ;
                            mergeAllˢ; switchAllˢ; exhaustAllˢ; μˢ; varˢ; deferˢ;
                            varˢᵗ; unitˢ; boolˢ; natˢ; pairˢ; fstˢ; sndˢ; nilˢ;
                            consˢ; inlˢ; inrˢ; caseˢ; foldˢ; ifˢ; primˢ; strmˢ;
@@ -54,13 +56,13 @@ open import Rx.SExp using (SExp; STm; inputˢ; ofˢ; emptyˢ; takeˢ; liftˢ;
 -- The finding is that the two gaps coincide exactly, at the sources,
 -- which is also where the TypeScript mirror reaches for its driver.
 --
--- `liftᵖ` AND THE FLATTENERS ARE A THIRD THING, AND SAYING SO IS THE
--- POINT: they are not blocked, they are unwritten.  A lift's whole job
--- is to unwrap, run the author's step over the value list, and rewrap
--- under the instant it was given, and every part of that is a fold, a
--- case and a pair; a flattener's values come out of `mergeAllᵉ` over
--- the observables its envelopes carry.  Each is a large term and none
--- of them needs a capability that is missing.
+-- THE TWO PURE-FUNCTION FORMERS AND THE FLATTENERS ARE A THIRD THING,
+-- AND SAYING SO IS THE POINT: they are not blocked, they are unwritten.
+-- Their whole job is to unwrap, run the author's step over the value
+-- list, and rewrap under the instant they were given, and every part of
+-- that is a fold, a case and a pair; a flattener's values come out of
+-- `mergeAllᵉ` over the observables its envelopes carry.  Each is a
+-- large term and none of them needs a capability that is missing.
 --
 -- `takeᵖ` IS THE ONE GENUINE SURPRISE, AND IT IS NEITHER KIND.  The
 -- author's operator and the plain one agree on everything that was in
@@ -68,9 +70,9 @@ open import Rx.SExp using (SExp; STm; inputˢ; ofˢ; emptyˢ; takeˢ; liftˢ;
 -- closing envelope at the cut.  What they do not share is the LEVEL:
 -- elaboration puts the author's values inside the envelope, so a plain
 -- `takeᵉ` over an enveloped stream counts batches.
--- Counting is a lift's business and ENDING is not: no former in the
+-- Counting is a step's business and ENDING is not: no former in the
 -- plain tree stops a stream on a condition read out of the values, and
--- the cut also owes a `close` the lift could otherwise have written,
+-- the cut also owes a `close` a step could otherwise have written,
 -- since by then it has an instant in hand.
 
 postulate
@@ -106,9 +108,9 @@ postulate
   --   which is the whole of what the id was doing.  The former is
   --   necessary here and is not sufficient.
   -- DEAD ROUTE: build both inline, out of `uniq̂` and a counter carried
-  --   in a lift's state.  `uniq̂` is a literal, so a program that writes
+  --   in a scan's state.  `uniq̂` is a literal, so a program that writes
   --   one can write one already in use — which is the forgery the palette
-  --   exists to rule out — and a lift's state advances per EMIT, so it
+  --   exists to rule out — and a scan's state advances per EMIT, so it
   --   cannot tell two emits of one cascade from two cascades.  Both
   --   quantities are properties of the RUN, and the run is the
   --   scheduler's.  AND BRACKETING FIRST DOES NOT REPAIR IT, which is
@@ -138,15 +140,16 @@ postulate
   -- the envelope, so an enveloped stream's own values are envelopes and
   -- a plain `takeᵉ` over it counts batches.  The operator is right and
   -- the level is wrong.
-  -- DEAD ROUTE: count in a lift and cut with `takeᵉ`.  The counting and
-  --   truncation halves are both a lift's work; the ENDING half is not,
-  --   since a lift cannot change how many emits pass through it, so
+  -- DEAD ROUTE: count in a scan and cut with `takeᵉ`.  The counting and
+  --   truncation halves are both a pure-function step's work; the ENDING
+  --   half is not, since such a step cannot change how many emits pass
+  --   through it, so
   --   nothing converts a budget over values into the emit index a
   --   subscription-time count has to name.
   takeᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
         → Tm Γ Δᵍ Δ Θ natᵗ → Exp Γ Δᵍ Δ Θ (emitᵗ t) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
 
-  -- the VALUES need nothing new: a lift projects each envelope to the
+  -- the VALUES need nothing new: a map projects each envelope to the
   -- observables it carries, and the plain flattener runs them, their own
   -- emits being envelopes already.
   --
@@ -172,7 +175,7 @@ postulate
   -- cannot say is the instant the outer's own bookkeeping is stamped
   -- with, which is one ruling short for every row of this block at once.
   -- DEAD ROUTE: elaborate the handoff and init events in the projecting
-  --   lift, which has the outer emit's instant but no token to name the
+  --   map, which has the outer emit's instant but no token to name the
   --   inner source with.
   mergeAllᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
             → Maybe ℕ → Exp Γ Δᵍ Δ Θ (emitᵗ (obs t)) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
@@ -184,84 +187,140 @@ postulate
   -- registration set, one per chain passing the node, with the
   -- per-victim reason decided by the cut ledger, and the elaboration
   -- inherits them by delegating rather than by writing any.
-  -- DEAD ROUTE: the projecting lift again — it sees the emit that causes
+  -- DEAD ROUTE: the projecting step again — it sees the emit that causes
   --   the switch, and not the source being cut.
   switchAllᵖ exhaustAllᵖ :
               ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
             → Exp Γ Δᵍ Δ Θ (emitᵗ (obs t)) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
 
--- THE ONE FORMER OF THIS LEG THAT WAS NEVER BLOCKED, AND WRITING IT IS
--- WHAT SAYS SO.  A lift adds no event, mints nothing and cannot end the
--- stream, so everything it needs is in the emit it was handed: the
--- payloads come out of the envelope, the author's step runs over them
--- with its carried state, and what goes back in is the same envelope
--- with new payloads.  The instant is not missing here — it is READ off
--- the incoming emit, which is the finding the source rows above turn on.
+-- THE TWO FORMERS OF THIS LEG THAT WERE NEVER BLOCKED, AND WRITING
+-- THEM IS WHAT SAYS SO.  Neither adds an event, mints anything or can
+-- end the stream, so everything either needs is in the emit it was
+-- handed: the payloads come out of the envelope, the author's step runs
+-- over them, and what goes back in is the same envelope with new
+-- payloads.  The instant is not missing here — it is READ off the
+-- incoming emit, which is the finding the source rows above turn on.
 --
--- IT IS `scanᵉ`'S SHAPE, TWICE OVER, AND THAT IS WHY IT IS LARGE.  The
--- outer fold walks the emits of one plain delivery threading the
--- author's state; the inner `letᵗ`s are how a term language with no
--- application hands an argument to a step.  The reversing pass each
--- `foldᵗ` costs is paid once per level, exactly as `scanᵉ` pays it.
-liftᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {s t u : Ty}
-      → Fn Γ Δᵍ Δ Θ (plainᵗ u ×ᵗ listᵗ (plainᵗ s))
-                    (plainᵗ u ×ᵗ listᵗ (plainᵗ t))
-      → Tm Γ Δᵍ Δ Θ (plainᵗ u)
-      → Exp Γ Δᵍ Δ Θ (emitᵗ s) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
-liftᵖ {Θ = Θ} {s = s} {t = t} {u = u} f z e = scanᵉ step z e
+-- ONE AUTHOR VALUE IS ONE PAYLOAD AND NOT ONE DELIVERY, which is the
+-- whole of why these are folds rather than applications.  A plain emit
+-- carries a LIST, so the author's pointwise step runs once per element
+-- inside an emit and the plain former runs once per emit — two levels,
+-- and the `letᵗ`s are how a term language with no application hands an
+-- argument to a step.  The reversing pass each `foldᵗ` costs is paid
+-- once per level.
+mapᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {s t : Ty}
+     → Fn Γ Δᵍ Δ Θ (plainᵗ s) (plainᵗ t)
+     → Exp Γ Δᵍ Δ Θ (emitᵗ s) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
+mapᵖ {Θ = Θ} {s = s} {t = t} f e = mapᵉ step e
   where
-  -- the outer fold's accumulator: the author's state, and the emits
-  -- rebuilt so far in reverse
-  A : Ty
-  A = plainᵗ u ×ᵗ listᵗ (emitᵗ t)
-
-  P : Ty
-  P = plainᵗ u ×ᵗ listᵗ (emitᵗ s)
-
-  arg : Tm _ _ _ (P ∷ Θ) P
-  arg = varᵗ (here refl)
-
   -- the split of one emit: its bookkeeping already retagged at the
   -- outgoing payload, its payloads, and whether it completes
   S : Ty
   S = listᵗ (instEventᵗ uniqᵗ (plainᵗ t)) ×ᵗ (listᵗ (plainᵗ s) ×ᵗ boolᵗ)
 
-  -- inside both `letᵗ`s: the step's result, the split, then the fold's
-  -- element and accumulator, then the former's argument, then Θ
-  f↑ : Tm _ _ _ ((plainᵗ u ×ᵗ listᵗ (plainᵗ s)) ∷ S ∷ emitᵗ s ∷ A ∷ P ∷ Θ)
-                (plainᵗ u ×ᵗ listᵗ (plainᵗ t))
+  arg : Tm _ _ _ (emitᵗ s ∷ Θ) (emitᵗ s)
+  arg = varᵗ (here refl)
+
+  -- the author's step is already a function of one payload, so it IS
+  -- the fold's body once weakened past the accumulator and the split
+  f↑ : Tm _ _ _ (plainᵗ s ∷ listᵗ (plainᵗ t) ∷ S ∷ emitᵗ s ∷ Θ) (plainᵗ t)
+  f↑ = renTm (λ x → x) (λ x → x)
+             (ext∈ (λ x → there (there (there x)))) f
+
+  -- inside the `letᵗ`: the split, then the former's argument, then Θ
+  body : Tm _ _ _ (S ∷ emitᵗ s ∷ Θ) (emitᵗ t)
+  body = reassembleᵛ env (fstᵗ split)
+                     (revᵗ (foldᵗ (fstᵗ (sndᵗ split)) nilᵗ
+                                  (consᵗ f↑ (varᵗ (there (here refl))))))
+                     (sndᵗ (sndᵗ split))
+    where
+    split = varᵗ (here refl)
+    env   = varᵗ (there (here refl))
+
+  step : Tm _ _ _ (emitᵗ s ∷ Θ) (emitᵗ t)
+  step = letᵗ (splitEventsᵛ {b = plainᵗ t} (eventsᵛ arg))
+              (reassembleᵛ arg nilᵗ nilᵗ (bool̂ false))
+              body
+
+-- THE CARRIED VALUE IS A PAIR BECAUSE `scanᵉ`'S OUTPUT IS ITS STATE,
+-- and what this former outputs is an EMIT while what the author's step
+-- threads is a plain value.  So the plain scan carries both and a
+-- `mapᵉ` projects, which is the same two-stage shape rxjs writes as
+-- `scan` followed by `map`.
+--
+-- THE SEED'S EMIT COMPONENT IS UNOBSERVABLE, AND THAT IS WHAT MAKES
+-- WRITING ONE LEGITIMATE HERE.  A scan emits the result of its FIRST
+-- application and never the seed, so the tokens below are read by
+-- nothing and claim no freshness — which is the capability the two
+-- source rows above are blocked on, and is not this one.
+scanᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {s t : Ty}
+      → Fn Γ Δᵍ Δ Θ (plainᵗ t ×ᵗ plainᵗ s) (plainᵗ t)
+      → Tm Γ Δᵍ Δ Θ (plainᵗ t)
+      → Exp Γ Δᵍ Δ Θ (emitᵗ s) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
+scanᵖ {Θ = Θ} {s = s} {t = t} f z e =
+  mapᵉ (sndᵗ (varᵗ (here refl))) (scanᵉ step seed e)
+  where
+  -- the carried value: the author's state, and the emit built for the
+  -- delivery that produced it
+  A : Ty
+  A = plainᵗ t ×ᵗ emitᵗ t
+
+  -- the step's argument: the carried value and the arriving emit
+  P : Ty
+  P = A ×ᵗ emitᵗ s
+
+  seed : Tm _ _ _ Θ A
+  seed = pairᵗ z (instEmitᵛ nilᵗ (uniq̂ 0) (uniq̂ 0) (inlᵗ unit̂))
+
+  S : Ty
+  S = listᵗ (instEventᵗ uniqᵗ (plainᵗ t)) ×ᵗ (listᵗ (plainᵗ s) ×ᵗ boolᵗ)
+
+  -- the inner fold's accumulator: the author's state, and the outputs
+  -- of this delivery in reverse
+  B : Ty
+  B = plainᵗ t ×ᵗ listᵗ (plainᵗ t)
+
+  arg : Tm _ _ _ (P ∷ Θ) P
+  arg = varᵗ (here refl)
+
+  -- inside both `letᵗ`s: the step's argument, then the fold's element
+  -- and accumulator, then the split, then the former's argument, then Θ
+  f↑ : Tm _ _ _ ((plainᵗ t ×ᵗ plainᵗ s) ∷ plainᵗ s ∷ B ∷ S ∷ P ∷ Θ) (plainᵗ t)
   f↑ = renTm (λ x → x) (λ x → x)
              (ext∈ (λ x → there (there (there (there x))))) f
 
-  -- the innermost body: the step's result, the step's argument, the
-  -- split, then the fold's element and accumulator, then the former's
-  -- argument, then Θ
-  rebuilt : Tm _ _ _ ((plainᵗ u ×ᵗ listᵗ (plainᵗ t))
-                      ∷ (plainᵗ u ×ᵗ listᵗ (plainᵗ s)) ∷ S ∷ emitᵗ s ∷ A ∷ P ∷ Θ) A
-  rebuilt = pairᵗ (fstᵗ res)
-                  (consᵗ (reassembleᵛ env (fstᵗ split) (sndᵗ res)
-                                      (sndᵗ (sndᵗ split)))
-                         (sndᵗ acc))
+  -- the fold's body: pair the carried state with the arriving payload,
+  -- run the step on it, and push the result onto both halves
+  fbody : Tm _ _ _ (plainᵗ s ∷ B ∷ S ∷ P ∷ Θ) B
+  fbody = letᵗ (pairᵗ (fstᵗ (varᵗ (there (here refl)))) (varᵗ (here refl)))
+               (varᵗ (there (here refl)))
+               (letᵗ f↑ (varᵗ (there (there (here refl)))) rebuilt)
     where
-    res   = varᵗ (here refl)
-    split = varᵗ (there (there (here refl)))
-    env   = varᵗ (there (there (there (here refl))))
-    acc   = varᵗ (there (there (there (there (here refl)))))
+    rebuilt : Tm _ _ _ (plainᵗ t ∷ (plainᵗ t ×ᵗ plainᵗ s) ∷ plainᵗ s ∷ B
+                        ∷ S ∷ P ∷ Θ) B
+    rebuilt = pairᵗ (varᵗ (here refl))
+                    (consᵗ (varᵗ (here refl))
+                           (sndᵗ (varᵗ (there (there (there (here refl)))))))
 
-  run : Tm _ _ _ (P ∷ Θ) A
-  run = foldᵗ (sndᵗ arg) (pairᵗ (fstᵗ arg) nilᵗ)
-              (letᵗ (splitEventsᵛ {b = plainᵗ t} (eventsᵛ (varᵗ (here refl))))
-                    (varᵗ (there (here refl)))
-                    (letᵗ (pairᵗ (fstᵗ (varᵗ (there (there (here refl)))))
-                                 (fstᵗ (sndᵗ (varᵗ (here refl)))))
-                          (varᵗ (there (there (here refl))))
-                          (letᵗ f↑ (varᵗ (there (there (there (here refl)))))
-                                rebuilt)))
+  -- inside the `letᵗ`: the split, then the former's argument, then Θ
+  body : Tm _ _ _ (S ∷ P ∷ Θ) A
+  body = letᵗ (foldᵗ (fstᵗ (sndᵗ split)) start fbody)
+              (fstᵗ (varᵗ (there (here refl)))) out
+    where
+    split = varᵗ (here refl)
+    start = pairᵗ (fstᵗ (fstᵗ (varᵗ (there (here refl))))) nilᵗ
+
+    out : Tm _ _ _ (B ∷ S ∷ P ∷ Θ) A
+    out = pairᵗ (fstᵗ (varᵗ (here refl)))
+                (reassembleᵛ (sndᵗ (varᵗ (there (there (here refl)))))
+                             (fstᵗ (varᵗ (there (here refl))))
+                             (revᵗ (sndᵗ (varᵗ (here refl))))
+                             (sndᵗ (sndᵗ (varᵗ (there (here refl))))))
 
   step : Tm _ _ _ (P ∷ Θ) A
-  step = letᵗ run (pairᵗ (fstᵗ arg) nilᵗ)
-              (pairᵗ (fstᵗ (varᵗ (here refl)))
-                     (revᵗ (sndᵗ (varᵗ (here refl)))))
+  step = letᵗ (splitEventsᵛ {b = plainᵗ t} (eventsᵛ (sndᵗ arg)))
+              (fstᵗ arg)
+              body
 
 ------------------------------------------------------------------
 -- The elaboration: one simul program down into one plain program.
@@ -335,7 +394,8 @@ mutual
   toPlain (ofˢ ts)            = ofᵖ (toPlainTms ts)
   toPlain emptyˢ              = emptyᵖ
   toPlain (takeˢ k e)         = takeᵖ (toPlainTm k) (toPlain e)
-  toPlain (liftˢ f i e)       = liftᵖ (toPlainTm f) (toPlainTm i) (toPlain e)
+  toPlain (mapˢ f e)          = mapᵖ (toPlainTm f) (toPlain e)
+  toPlain (scanˢ f z e)       = scanᵖ (toPlainTm f) (toPlainTm z) (toPlain e)
   toPlain (mergeAllˢ k e)     = mergeAllᵖ k (toPlain e)
   toPlain (switchAllˢ e)      = switchAllᵖ (toPlain e)
   toPlain (exhaustAllˢ e)     = exhaustAllᵖ (toPlain e)

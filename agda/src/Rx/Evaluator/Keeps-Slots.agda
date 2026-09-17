@@ -100,7 +100,7 @@ batchSync-slots nid vals fin sched st (just (switch-st _ _))       = refl
 batchSync-slots nid vals fin sched st (just (exhaust-st _ _))      = refl
 batchSync-slots nid vals fin sched st (just (cell-st _))           = refl
 
--- the lifted step rewrites its own cell and passes the schedule on
+-- the scanning step rewrites its own cell and passes the schedule on
 scan-slots : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   (fn : Fn Γ [] [] [] (u ×ᵗ s) u)
   (nid : NodeId) (vals : List (Val Γ s)) (fin : Bool)

@@ -593,8 +593,8 @@ red-take id now nid κ rv fin sched st =
 -- THE FIRST FRAME WHOSE VALUE COLUMN IS NOT A SUB-MULTISET OF WHAT
 -- ARRIVED, AND IT STILL NEEDS NOTHING FROM THE STORE.  Every other
 -- frame either passes arrivals through (the take, whose store decides
--- only how many survive) or applies a function to them (the lift,
--- which is why that one owes a store obligation and a `RedFn`).  This
+-- only how many survive) or applies a function to them (the map and
+-- the scan, which is why those owe a `RedFn`).  This
 -- one BUILDS values -- a pair per departing group -- so the take's
 -- argument does not cover it, and the reason it is still carrier-free
 -- is that the construction is pure RE-ASSOCIATION: the components of
@@ -917,7 +917,7 @@ mutual
         (r , p , sat′) =
           red-push id now (map-f fn) tt rf κ sat sched₂ st₁ tt
     in r , subs-map d p , sat′
-  redExpAcc (scanᵉ {s = s} {u = w} f z b) σ rσ k ok aK (acc rs) κ id now sched st =
+  redExpAcc (scanᵉ {s = s} {t = w} f z b) σ rσ k ok aK (acc rs) κ id now sched st =
     let nid = freshId nodeᵏ (Sched.mint sched)
         fn  = subΘTm ((w ×ᵗ s) ∷ []) σ f
         zbe = inputsBelowᵗ k z ∧ inputsBelowᵉ k b

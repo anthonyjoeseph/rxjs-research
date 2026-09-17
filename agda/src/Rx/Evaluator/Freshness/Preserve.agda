@@ -56,7 +56,7 @@ open import Rx.Evaluator.Freshness using (PreservedBelow; FrameAbove;
   pres-same; pres-trans; pres-write)
 open import Rx.Evaluator.Freshness.Mono using (subscribeE-mono; stepFrame-mono; subscribeInner-mono; thruConsume-mono; switchKill-mint)
 
--- the lifted step rewrites its own cell and nothing else
+-- the scanning step rewrites its own cell and nothing else
 scan-pres : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {f}
               (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
               (vals : List (Val Γ s)) (fin : Bool)

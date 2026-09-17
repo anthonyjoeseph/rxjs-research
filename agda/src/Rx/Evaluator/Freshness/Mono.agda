@@ -69,7 +69,7 @@ switchKill-mint : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 switchKill-mint nothing  sched st refl k = ≤-refl
 switchKill-mint (just v) sched st refl k = ≤-refl
 
--- the lifted step rewrites its own cell and nothing else
+-- the scanning step rewrites its own cell and nothing else
 scanDispatch-mint : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
                       (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
                       (vals : List (Val Γ s)) (fin : Bool)

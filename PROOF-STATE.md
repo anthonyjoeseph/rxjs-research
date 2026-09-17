@@ -230,15 +230,15 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 
 ### Big picture tier roadmap
 
-- **LIFT COMES APART INTO THE TWO PURE-FUNCTION OPERATORS RXJS HAS (Anthony:
-  "I've never liked lift"; "we must work with the primitives available already
-  in typescript").** The step took a whole FRAME's value list, which plain rxjs
-  cannot hand it; the counterexample is in the step's own header. Pointwise is
-  the repair, and pointwise is `mapᵉ` and `scanᵉ` — neither derivable from the
-  other, for the reason their header gives. ONE-TO-MANY GETS NO FORMER: a
-  list-returning step is a flatten wearing a map's name, and rxjs declines to
-  spell flattening once. Filter and duplicate go through `mergeAllᵉ` over a step
-  returning literal syntax — `mergeMap(x => p(x) ? of(x) : EMPTY)` written out.
+- **LIFT IS APART IN BOTH TREES; WHAT IS LEFT IS THE BRIDGE (Anthony: "I've
+  never liked lift"; "split it into mapˢ/scanˢ like the plain side").** The
+  split has landed in `Exp`, in the author's tree and in the elaboration
+  between them — `mapᵖ` and `scanᵖ` are real bodies, so the step is pointwise
+  on both sides and one-to-many is `mergeAllˢ` over a step returning literal
+  syntax. What remains names a former by a TAG rather than by its type: the
+  generator's lane, the decoder, the refuted witness, and then the TypeScript
+  union, whose `lift` is still frame-shaped and is the half the oracle
+  compares.
 
 - **THEN THE DEMOTION, WHICH IS TWO EVALUATORS AND NOT A RETYPE (Anthony: the
   harness "shouldn't test on srxjs at all — just plain rxjs now", and the Main
@@ -259,8 +259,9 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
   subscription, so the mint is the inner's own and the dynamic count is already
   there. Nothing else they might owe is theirs either — an inner's init and
   exhausted close ride its own burst, a switch's cancelling closes are the
-  cut's, a handoff is a share's. So the writing is one leg, and `liftᵖ` has
-  already paid for the envelope vocabulary it needs.
+  cut's, a handoff is a share's. So the writing is one leg, and the two
+  pure-function formers have already paid for the envelope vocabulary it
+  needs.
 
 - **THEN THE CLOSURE STATE LEFT IN `share` AND THE JOIN (Anthony: use ONLY
   what `Ty`/`Tm` has).** The subscribe-frame question is answered — bracketing
