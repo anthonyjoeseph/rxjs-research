@@ -13,6 +13,11 @@ export type Ty =
   | { type: "unit" }
   | { type: "bool" }
   | { type: "nat" }
+  // an identity TOKEN: carried as a number, but with only equality on
+  // it, so no program can do arithmetic on one or invent one that was
+  // never minted. That is the whole of the difference from nat, and it
+  // is what lets a simul operator key a value by where it came from.
+  | { type: "uniq" }
   | { type: "prod"; fst: Ty; snd: Ty }
   | { type: "sum"; left: Ty; right: Ty }
   | { type: "obs"; elem: Ty }
@@ -25,7 +30,10 @@ export type Ty =
 // Concrete stand-in for Agda's `PrimOp` postulate — the Agda side must
 // become this exact datatype before the JSON bridge lands. Binary ops
 // take a pair argument; sub is ℕ monus (truncated at 0).
-export type PrimOp = "add" | "sub" | "mul" | "eq" | "lt" | "not";
+// `eqU` is the only operation on a uniq, and it is a separate op rather
+// than `eq` widened because that is what keeps the token opaque: sharing
+// one op would type it at nat and hand every nat operation to it.
+export type PrimOp = "add" | "sub" | "mul" | "eq" | "lt" | "not" | "eqU";
 
 // Agda: Rx.Exp.Val. unit = null. An obs-typed value is a CLOSED Exp —
 // runtime observables are syntax, never host closures.
@@ -49,6 +57,7 @@ export type Tm =
   | { type: "unitT"; ty: Ty }
   | { type: "boolT"; ty: Ty; val: boolean }
   | { type: "natT"; ty: Ty; val: number }
+  | { type: "uniqT"; ty: Ty; val: number }
   | { type: "pairT"; ty: Ty; fst: Tm; snd: Tm }
   | { type: "fstT"; ty: Ty; pair: Tm }
   | { type: "sndT"; ty: Ty; pair: Tm }
@@ -137,6 +146,8 @@ const applyPrim = (op: PrimOp, arg: Val): Val => {
       return valEq(a, b);
     case "lt":
       return (a as number) < (b as number);
+    case "eqU":
+      return a === b; // tokens are compared by identity and nothing else
   }
 };
 
@@ -168,6 +179,7 @@ const evalWith = (tm: Tm, env: Val[]): Val => {
     case "boolT":
       return tm.val;
     case "natT":
+    case "uniqT":
       return tm.val;
     case "pairT":
       return [evalWith(tm.fst, env), evalWith(tm.snd, env)];
@@ -229,6 +241,8 @@ const reify = (v: Val, ty: Ty): Tm => {
       return { type: "boolT", ty, val: v as boolean };
     case "nat":
       return { type: "natT", ty, val: v as number };
+    case "uniq":
+      return { type: "uniqT", ty, val: v as number };
     case "prod": {
       const [a, b] = v as [Val, Val];
       return {
@@ -262,6 +276,7 @@ const closeTm = (tm: Tm, env: Val[], depth: number): Tm => {
     case "unitT":
     case "boolT":
     case "natT":
+    case "uniqT":
     case "nilT":
       return tm;
     case "consT":
@@ -377,6 +392,7 @@ const substMuTm = (tm: Tm, st: MuSt, knot: Exp): Tm => {
     case "unitT":
     case "boolT":
     case "natT":
+    case "uniqT":
     case "nilT":
       return tm;
     case "consT":
@@ -483,6 +499,7 @@ const shiftTm = (tm: Tm, cutoff: number, by: number): Tm => {
     case "unitT":
     case "boolT":
     case "natT":
+    case "uniqT":
     case "nilT":
       return tm;
     case "consT":

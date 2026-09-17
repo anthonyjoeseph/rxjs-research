@@ -23,8 +23,8 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Rx.Prim using (Timed; after_,_; ObservableInput; hot; cold)
 open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; obs; _≟ᵗ_; isData; inputsBelowᵉ; Ctx; Val; Exp; Tm;
   input; ofᵉ; emptyᵉ; liftᵉ; takeᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ;
-  varᵉ; deferᵉ; varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ;
-  strmᵗ; nilᵗ; consᵗ; foldᵗ; listᵗ; add; sub; mul; eqᵖ; ltᵖ; notᵖ)
+  varᵉ; deferᵉ; varᵗ; unit̂; bool̂; nat̂; uniq̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ;
+  strmᵗ; nilᵗ; consᵗ; foldᵗ; listᵗ; add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ)
 open import Rx.Evaluator.Builder using (evaluate↓)
 open import Rx.Slots using (scripted; shared; Slot; Slots)
 open import Implementation using (impl-batchSimultaneous)
@@ -130,6 +130,7 @@ decodeTy (suc fuel) j = getField "type" j >>=? asStr >>=? λ tag →
   if tag is "unit" then just unitᵗ
   else if tag is "bool" then just boolᵗ
   else if tag is "nat" then just natᵗ
+  else if tag is "uniq" then just uniqᵗ
   else if tag is "prod" then
     (getField "fst" j >>=? decodeTy fuel >>=? λ s →
      getField "snd" j >>=? decodeTy fuel >>=? λ u → just (s ×ᵗ u))
@@ -205,6 +206,8 @@ mutual
       (whenTy boolᵗ t >>=? λ { refl → getField "val" j >>=? asBool >>=? λ b → just (bool̂ b) })
     else if tag is "natT" then
       (whenTy natᵗ t >>=? λ { refl → getField "val" j >>=? asNum >>=? λ v → just (nat̂ v) })
+    else if tag is "uniqT" then
+      (whenTy uniqᵗ t >>=? λ { refl → getField "val" j >>=? asNum >>=? λ v → just (uniq̂ v) })
     else if tag is "pairT" then
       (childTy fuel "fst" j >>=? λ s → childTy fuel "snd" j >>=? λ u →
        whenTy (s ×ᵗ u) t >>=? λ { refl →
@@ -242,6 +245,7 @@ mutual
        else if op is "mul" then (whenTy natᵗ t >>=? λ { refl → decodeTm fuel Γ Δᵍ Δ Θ (natᵗ ×ᵗ natᵗ) argJ >>=? λ a → just (primᵗ mul a) })
        else if op is "eq" then (whenTy boolᵗ t >>=? λ { refl → decodeTm fuel Γ Δᵍ Δ Θ (natᵗ ×ᵗ natᵗ) argJ >>=? λ a → just (primᵗ eqᵖ a) })
        else if op is "lt" then (whenTy boolᵗ t >>=? λ { refl → decodeTm fuel Γ Δᵍ Δ Θ (natᵗ ×ᵗ natᵗ) argJ >>=? λ a → just (primᵗ ltᵖ a) })
+       else if op is "eqU" then (whenTy boolᵗ t >>=? λ { refl → decodeTm fuel Γ Δᵍ Δ Θ (uniqᵗ ×ᵗ uniqᵗ) argJ >>=? λ a → just (primᵗ eqᵘ a) })
        else if op is "not" then (whenTy boolᵗ t >>=? λ { refl → decodeTm fuel Γ Δᵍ Δ Θ boolᵗ argJ >>=? λ a → just (primᵗ notᵖ a) })
        else nothing)
     else if tag is "strmT" then

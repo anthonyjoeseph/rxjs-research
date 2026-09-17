@@ -53,6 +53,7 @@ tm	varᵗ	varT	yes	-
 tm	unit̂	unitT	yes	-
 tm	bool̂	boolT	yes	-
 tm	nat̂	natT	yes	-
+tm	uniq̂	uniqT	yes	-
 tm	pairᵗ	pairT	yes	-
 tm	fstᵗ	fstT	yes	-
 tm	sndᵗ	sndT	yes	-
@@ -70,4 +71,5 @@ prim	sub	sub	yes	-
 prim	mul	mul	yes	-
 prim	eqᵖ	eq	yes	-
 prim	ltᵖ	lt	yes	-
+prim	eqᵘ	eqU	yes	-
 prim	notᵖ	not	yes	-

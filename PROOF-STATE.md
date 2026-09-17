@@ -255,17 +255,17 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
   type translation, plus the one lemma a pointwise-translated context owes —
   that looking an input up commutes with the walk.
 
-- **THEN THE TYPESCRIPT SIMUL OPERATORS, `lift` INCLUDED (Anthony).** Written
-  over plain rxjs, ES6 array operations and conditionals only. `lift`, `take`,
-  `map` and the batcher already are; `share`, `defer` and the flatteners are
-  not, each needing a synchronous subscribe frame captured as a unit. Whether
-  the three quarantined escape hatches count as permitted vocabulary is the
-  question the leg opens with, and it is his.
-  **AND `expand` IS WRITTEN, AND DIVERGES.** Derived from
-  the shipped palette it is breadth-first: the recursion needs a guard, the
-  only lazy former is `defer`, and that costs a hop — so a countdown is four
-  batches here and one in rxjs. The values agree as a multiset. Closing the
-  gap wants a former or a hopless mu, so the leg stops there.
+- **THEN REFACTOR THE TYPESCRIPT PRIMITIVES IN PLACE, `lift` INCLUDED
+  (Anthony).** Not new operators: the shipped ones — `lift`, `map`, `take`,
+  `share`, `defer`, the flatteners — rewritten to use ONLY what `Ty`/`Tm`
+  has, which is plain rxjs, ES6 array operations and conditionals. What the
+  refactor has to remove is named and small: `cold`, `hot` and `captureSync`,
+  raw `Subject` and `new Observable` and hand-driven subscription, reached
+  from four files. Each is there to bracket a synchronous subscribe frame,
+  so the leg is one question asked five times — say that in rxjs alone.
+  **AND `expand` DIVERGES**, breadth-first where rxjs is depth-first, because
+  the only lazy former is `defer` and that costs a hop; values agree as a
+  multiset, batches do not.
 
 - **THEN THE SAME OPERATORS IN `Tm`/`Ty`, AND TIER 1 IS COMPLETE (Anthony).**
   Each TS simul operator mirrored as an Agda definition in the value language,

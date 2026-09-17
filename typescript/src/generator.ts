@@ -40,7 +40,9 @@ const chance = (rng: Rng, p: number): boolean => rng() < p;
 const unitT: Ty = { type: "unit" };
 const boolT: Ty = { type: "bool" };
 const natT: Ty = { type: "nat" };
+const uniqT: Ty = { type: "uniq" };
 const prodNN: Ty = { type: "prod", fst: natT, snd: natT };
+const prodUU: Ty = { type: "prod", fst: uniqT, snd: uniqT };
 
 const tyEq = (a: Ty, b: Ty): boolean => {
   if (a.type === "prod" && b.type === "prod")
@@ -65,7 +67,11 @@ const genValTy = (rng: Rng, depth: number): Ty => {
   const r = rng();
   if (r < 0.55) return natT; // bias nat — the value domain's workhorse
   if (r < 0.7) return boolT;
-  if (r < 0.78) return unitT;
+  if (r < 0.75) return unitT;
+  // a thin lane, because a uniq's only operation is equality and a
+  // program made of them does nothing -- but not zero, since a former
+  // nothing generates is covered by no sweep whatever it reports
+  if (r < 0.78) return uniqT;
   if (r < 0.9)
     return {
       type: "prod",
@@ -98,6 +104,10 @@ const litTm = (rng: Rng, ty: Ty, ctx: GenCtx, depth: number): Tm => {
       return { type: "boolT", ty, val: chance(rng, 0.5) };
     case "nat":
       return { type: "natT", ty, val: int(rng, 0, 9) };
+    // a narrow range on purpose: two tokens drawn from three collide
+    // often enough that eqU is exercised on both answers
+    case "uniq":
+      return { type: "uniqT", ty, val: int(rng, 0, 2) };
     case "prod":
       return {
         type: "pairT",
@@ -173,6 +183,17 @@ const genTm = (rng: Rng, ty: Ty, ctx: GenCtx, depth: number): Tm => {
       ty,
       op: pick(rng, ["eq", "lt"] as PrimOp[]),
       arg: natPair(),
+    }));
+    opts.push(() => ({
+      type: "primT",
+      ty,
+      op: "eqU" as PrimOp,
+      arg: {
+        type: "pairT",
+        ty: prodUU,
+        fst: genTm(rng, uniqT, ctx, depth - 1),
+        snd: genTm(rng, uniqT, ctx, depth - 1),
+      },
     }));
     opts.push(() => ({
       type: "primT",
@@ -434,6 +455,8 @@ const genVal = (rng: Rng, ty: Ty, depth: number): Val => {
       return chance(rng, 0.5);
     case "nat":
       return int(rng, 0, 9);
+    case "uniq":
+      return int(rng, 0, 2);
     case "prod":
       return [genVal(rng, ty.fst, depth), genVal(rng, ty.snd, depth)];
     case "sum":
