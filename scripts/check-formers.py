@@ -11,10 +11,10 @@ all-Agda sweep both reported green over shapes neither was ever handed.
 checks four surfaces against it, in both directions where both directions
 are decidable:
 
-  A  the Agda datatypes   agda/src/Rx/Exp.agda      `data Exp` / `data Tm`
-  B  the Agda decoder     agda/src/CLI/Decode.agda  `tag is "..."`
-  C  the TypeScript union typescript/src/exp.ts     `export type Exp` / `Tm`
-  D  the TS generator     typescript/src/generator.ts   `type: "..."`
+  A  the Agda datatypes   agda/src/Rx/Exp.agda      `data Exp` / `Tm` / `PrimOp`
+  B  the Agda decoder     agda/src/CLI/Decode.agda  `tag is "..."` / `op is "..."`
+  C  the TypeScript types typescript/src/exp.ts     `export type Exp` / `Tm` / `PrimOp`
+  D  the TS generator     typescript/src/generator.ts   `type: "..."`, the op lanes
 
 A and C are checked BOTH ways -- they are closed declarations, so a former
 present there and absent from the map is a finding, which is what catches a
@@ -85,8 +85,8 @@ def read_map(path: Path) -> list[Row]:
             sys.exit(f"check-formers: {path}:{n}: want 5+ tab-separated fields, got {len(parts)}")
         kind, agda, tag, gen, role = (p.strip() for p in parts[:5])
         why = parts[5].strip() if len(parts) > 5 else ""
-        if kind not in ("exp", "tm"):
-            sys.exit(f"check-formers: {path}:{n}: kind must be exp or tm, got {kind!r}")
+        if kind not in ("exp", "tm", "prim"):
+            sys.exit(f"check-formers: {path}:{n}: kind must be exp, tm or prim, got {kind!r}")
         if gen not in ("yes", "no"):
             sys.exit(f"check-formers: {path}:{n}: gen must be yes or no, got {gen!r}")
         if kind == "exp" and role not in ROLES:
@@ -94,10 +94,10 @@ def read_map(path: Path) -> list[Row]:
                 f"check-formers: {path}:{n}: `{agda}` has no verdict under the dividing test -- "
                 f"role must be one of {', '.join(sorted(ROLES))}, got {role!r}"
             )
-        if kind == "tm" and role != "-":
+        if kind != "exp" and role != "-":
             sys.exit(
-                f"check-formers: {path}:{n}: `{agda}` is a term former, where the dividing test "
-                f"does not apply -- its role must be `-`, got {role!r}"
+                f"check-formers: {path}:{n}: `{agda}` is not a stream former, so the dividing "
+                f"test does not apply to it -- its role must be `-`, got {role!r}"
             )
         if gen == "no" and not why:
             sys.exit(
@@ -160,6 +160,35 @@ def ts_union(text: str, name: str) -> set[str]:
     return set(re.findall(r'type:\s*"([A-Za-z]+)"', m.group(1)))
 
 
+def ts_string_union(text: str, name: str) -> set[str]:
+    """`export type PrimOp = "add" | "sub" | …;` -- a union of BARE STRINGS.
+
+    The primitive operators are spelled that way rather than as tagged
+    objects, so the object-union reader above finds nothing in them and
+    would report the whole family missing.
+    """
+    m = re.search(r"^export type " + re.escape(name) + r"\s*=(.*?);", text, re.M | re.S)
+    if not m:
+        sys.exit(f"check-formers: no `export type {name} =` found -- the union moved or was renamed")
+    return set(re.findall(r'"([A-Za-z]+)"', m.group(1)))
+
+
+def gen_prim_lanes(text: str) -> set[str]:
+    """Which primitive operators the generator can actually write.
+
+    Two shapes, because an operator whose argument is not a nat pair is
+    picked on its own rather than out of a list: the members of a
+    `[…] as PrimOp[]` array, and any `op: "…"` written directly.  A bare
+    scan for the quoted word would pass on the operator's name appearing
+    anywhere in the file, which for `not` is every other line.
+    """
+    out: set[str] = set()
+    for arr in re.findall(r"\[([^\]]*)\]\s*as PrimOp\[\]", text):
+        out.update(re.findall(r'"([A-Za-z]+)"', arr))
+    out.update(re.findall(r'op:\s*"([A-Za-z]+)"', text))
+    return out
+
+
 def quoted(text: str, pat: str) -> set[str]:
     return set(re.findall(pat, text))
 
@@ -188,7 +217,7 @@ def main() -> int:
 
     findings: list[str] = []
 
-    for kind, dname, uname in (("exp", "Exp", "Exp"), ("tm", "Tm", "Tm")):
+    for kind, dname, uname in (("exp", "Exp", "Exp"), ("tm", "Tm", "Tm"), ("prim", "PrimOp", "PrimOp")):
         declared = {r.agda for r in rows if r.kind == kind}
         tags = {r.tag for r in rows if r.kind == kind}
 
@@ -204,10 +233,10 @@ def main() -> int:
                 f"constructor -- it was renamed or deleted and the map still claims it"
             )
 
-        found = ts_union(src["ts"], uname)
+        found = ts_string_union(src["ts"], uname) if kind == "prim" else ts_union(src["ts"], uname)
         for extra in sorted(found - tags):
             findings.append(
-                f"{PATHS['ts']}: the {uname} union carries the tag \"{extra}\", which is in no row "
+                f"{PATHS['ts']}: the {uname} union carries \"{extra}\", which is in no row "
                 f"of the map -- the Agda side has no former to decode it into"
             )
         for missing in sorted(tags - found):
@@ -217,21 +246,24 @@ def main() -> int:
             )
 
     dec = quoted(src["decode"], r'tag is "([A-Za-z]+)"')
+    ops = quoted(src["decode"], r'op is "([A-Za-z]+)"')
     for r in rows:
-        if r.tag not in dec:
+        if r.tag not in (ops if r.kind == "prim" else dec):
             findings.append(
                 f"{PATHS['decode']}: nothing decodes the tag \"{r.tag}\" -- `{r.agda}` is reachable "
                 f"from neither the oracle nor any program the TypeScript tree writes"
             )
 
     gen = quoted(src["gen"], r'type:\s*"([A-Za-z]+)"')
+    gops = gen_prim_lanes(src["gen"])
     for r in rows:
-        if r.gen and r.tag not in gen:
+        here = gops if r.kind == "prim" else gen
+        if r.gen and r.tag not in here:
             findings.append(
                 f"{PATHS['gen']}: nothing generates the tag \"{r.tag}\", which the map declares "
                 f"reachable -- either write the lane, or declare the hole with gen=no and say why"
             )
-        if not r.gen and r.tag in gen:
+        if not r.gen and r.tag in here:
             findings.append(
                 f"{PATHS['gen']}: the tag \"{r.tag}\" IS generated, and the map declares it "
                 f"unreachable -- the hole closed and the row was not"

@@ -9,3 +9,5 @@ exp	liftᵉ	lift	yes	lift
 exp	deferᵉ	defer	yes	protocol
 exp	sharedSigᵉ	sharedSig	no	source	the fixture's generator does not write one
 tm	nat̂	natT	yes	-
+prim	add	add	yes	-
+prim	notᵖ	not	yes	-

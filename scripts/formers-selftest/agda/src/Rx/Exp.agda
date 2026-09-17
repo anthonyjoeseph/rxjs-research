@@ -11,3 +11,7 @@ mutual
 
   data Tm (Γ : Ctx n) : Ty → Set where
     nat̂ : ℕ → Tm Γ natᵗ
+
+data PrimOp : Ty → Ty → Set where
+  add : PrimOp (natᵗ ×ᵗ natᵗ) natᵗ
+  notᵖ : PrimOp boolᵗ boolᵗ

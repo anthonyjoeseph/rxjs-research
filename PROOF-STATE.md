@@ -232,16 +232,6 @@ failing to typecheck over the collapsed tree. A cone cannot aim at either.
 
 ### Big picture tier roadmap
 
-- **EXTEND THE PAIRING TO THE PRIMITIVE OPERATORS, WHICH IT DOES NOT REACH.**
-  It now binds the two datatypes and the two unions, and `PrimOp` is a third
-  family carried across the same bridge by the same tag strings with nothing
-  holding it to either side — so an operator added to one tree is exactly the
-  silence the pairing was built to end, one family over, and the argument for
-  ending it is already written. Small and mechanical, which is what makes it a
-  leg rather than a line of the last one: the map grows a kind, the checker
-  grows a surface, and the generator owes a lane per operator as it now owes
-  one per former.
-
 - **AND HOLD THE AGDA GENERATOR'S LANES TO THE SAME PAIRING, WHICH IS THE ONE
   SURFACE STILL RUNNING ON MEMORY.** The correspondence now binds four
   surfaces and the all-Agda sweep's generator is not among them, so a former
@@ -262,6 +252,16 @@ failing to typecheck over the collapsed tree. A cone cannot aim at either.
   to overlap, which is the same silence the leg above closes arriving at the
   programs rather than at the formers. The leg is that missing encoder, so one
   generator's output can be put to both sides.
+
+- **AND THE TYPE GRAMMAR IS THE LAST FAMILY THE PAIRING DOES NOT REACH.** The
+  formers, the term formers and the primitive operators are now held to one
+  written-down map; `Ty` is not, and it crosses the same bridge by the same
+  tag strings — seven constructors on each side, decoded by the same wall and
+  written by both generators. The silence is worst here rather than mildest:
+  a type nothing generates makes every former over it unreachable too, so the
+  gap is in the whole palette's coverage and reads as nothing at all. What the
+  leg has to decide is the mixfix spelling, since two constructors are
+  operators and the reader has not been put to one.
 
 ## Tier 2 — the denotation, adequacy, and the take bound
 

@@ -30,7 +30,8 @@
 #   protocol  reads or writes the protocol's own bookkeeping
 #   flatten   subscribes a payload that is literal syntax and must be RUN
 #   binder    not an operator at all — μ-binding structure
-#   -         the value language, where the test does not apply
+#   -         the value language and the primitive operators, neither of
+#             which is a stream former, so the test does not apply
 #
 # The reasoning behind each verdict is NOT here: it is in the header of the
 # one pure-function former, which is where the test is stated, and a second
@@ -64,3 +65,9 @@ tm	foldᵗ	foldT	yes	-
 tm	ifᵗ	ifT	yes	-
 tm	primᵗ	primT	yes	-
 tm	strmᵗ	strmT	yes	-
+prim	add	add	yes	-
+prim	sub	sub	yes	-
+prim	mul	mul	yes	-
+prim	eqᵖ	eq	yes	-
+prim	ltᵖ	lt	yes	-
+prim	notᵖ	not	yes	-

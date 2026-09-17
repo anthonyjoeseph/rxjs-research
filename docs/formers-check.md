@@ -22,13 +22,14 @@ exp	liftᵉ	lift	yes	lift
 tm	caseᵗ	caseT	yes	-
 ```
 
-- **`kind`** — `exp` or `tm`, naming which datatype and which union the row
-  belongs to.
+- **`kind`** — `exp`, `tm` or `prim`, naming which datatype and which union the
+  row belongs to.
 - **`agda`** — the constructor, spelled as the datatype spells it.
 - **`tag`** — the JSON tag, spelled as both the decoder and the union spell it.
 - **`gen`** — whether the TypeScript generator can produce one.
 - **`role`** — the dividing test's verdict, from a closed vocabulary. `-` for
-  a term former, where the test does not apply.
+  a term former or a primitive operator, neither of which is a stream former,
+  so the test does not apply.
 - **`why-not`** — required when `gen` is `no`, and printed on every green run.
 
 A `gen=no` row is a **hole parked, not an exemption granted**: a former nothing
@@ -70,16 +71,23 @@ rather than remembered.
 | the TypeScript unions | `typescript/src/exp.ts` | both |
 | the TypeScript generator | `typescript/src/generator.ts` | both, via `gen` |
 
+Each surface carries three families: the stream formers, the value language's
+term formers, and the **primitive operators**, which the bridge moves by the
+same tag strings and which nothing held to either side until the map grew a
+kind for them. An operator added to one tree is exactly the silence above, one
+family over.
+
 The datatypes and the unions are **closed declarations**, so a former present
 in one and absent from the map is a finding — that is what catches a former
 added to one tree alone. The decoder and the generator are not: both files
-also carry the tags of types, inputs and primitive operators, so "a tag here
-that is not in the map" is their normal state and asserting otherwise would
-report the whole grammar.
+also carry the tags of types and of inputs, so "a tag here that is not in the
+map" is their normal state and asserting otherwise would report the whole
+grammar.
 
-A new former is therefore **five edits**, and the fifth is the map row. Until
-it exists the other four are each separately red, which is the property the
-tag-string convention never had.
+A new former is therefore **five edits**, and the fifth is the map row — which
+cannot be written without a verdict under the dividing test, so a new stream
+former owes that too. Until the row exists the other four are each separately
+red, which is the property the tag-string convention never had.
 
 ## Parsing, and the two things that rot silently
 
@@ -89,6 +97,15 @@ siblings (`Fn`, `Val`) out of the set. Several constructors may **share one
 signature** (`switchAllᵉ exhaustAllᵉ : …`), and a reader taking the first name
 only reports the rest as deleted; that is a real shape in this tree, and the
 fixture reproduces it.
+
+The primitive operators are spelled **differently on every surface**, and each
+spelling needs its own reader. The TypeScript union is one of BARE STRINGS
+(`export type PrimOp = "add" | "sub" | …`), which the tagged-object reader
+finds nothing in and would report as the whole family missing. The decoder
+matches `op is "…"` rather than `tag is "…"`. And the generator writes an
+operator two ways: out of a `[…] as PrimOp[]` list when its argument is a nat
+pair, and directly as `op: "…"` when it is not — so a bare scan for the quoted
+word is not available, since for `not` that word occurs all over the file.
 
 `make formers-selftest` perturbs one surface at a time against a copy of
 `scripts/formers-selftest/`, whose base is deliberately **quiet**. Both of the

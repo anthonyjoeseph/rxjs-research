@@ -1445,7 +1445,7 @@ formers-selftest:
 	      "Exp has no such constructor"; \
 	  run "a TS union member in no row" \
 	      "sed -i.bak 's/\"sharedSig\"/\"newTag\"/' typescript/src/exp.ts" \
-	      'union carries the tag "newTag"'; \
+	      'union carries "newTag"'; \
 	  run "a row the TS union does not carry" \
 	      "sed -i.bak 's/\"lift\"/\"renamed\"/' typescript/src/exp.ts" \
 	      'union does not carry it'; \
@@ -1470,7 +1470,19 @@ formers-selftest:
 	  run "a tm row claiming one" \
 	      "sed -i.bak 's/natT\tyes\t-/natT\tyes\tsource/' scripts/formers.tsv" \
 	      "its role must be \`-\`"; \
-	  [ $$fail -eq 0 ] && echo "formers-selftest: PASS (every surface fires in the direction it is checked, a shared constructor signature parses, a declared generator hole is reported rather than merely tolerated, and the dividing test's vocabulary is closed at both kinds)"; \
+	  run "a primitive operator the string union does not carry" \
+	      "sed -i.bak 's/\"add\" |/\"plus\" |/' typescript/src/exp.ts" \
+	      'union does not carry it'; \
+	  run "a primitive operator nothing decodes" \
+	      "sed -i.bak 's/op is \"add\"/op is \"gone\"/' agda/src/CLI/Decode.agda" \
+	      'nothing decodes the tag "add"'; \
+	  run "a primitive operator missing from the generator's list lane" \
+	      "sed -i.bak 's/\[\"add\"\]/[]/' typescript/src/generator.ts" \
+	      'nothing generates the tag "add"'; \
+	  run "a primitive operator missing from its own lane, with the word still quoted elsewhere" \
+	      "sed -i.bak 's/op: \"not\"/op: \"gone\"/' typescript/src/generator.ts" \
+	      'nothing generates the tag "not"'; \
+	  [ $$fail -eq 0 ] && echo "formers-selftest: PASS (every surface fires in the direction it is checked at all three kinds, a shared constructor signature parses, a bare-string union and an operator lane are read as themselves, a declared generator hole is reported rather than merely tolerated, and the dividing test's vocabulary is closed)"; \
 	  exit $$fail
 
 cli-build: stripped
