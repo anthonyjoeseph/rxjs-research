@@ -54,16 +54,17 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 
 open import Rx.Prim using (Id; Tick; Source; InstEmit; InstEvent; init; value; close; handoff;
   complete; hot; cold)
-open import Rx.Mint using (nodeᵏ; regᵏ; freshId; setAt; next)
+open import Rx.Mint using (nodeᵏ; regᵏ; sourceᵏ; freshId; setAt; next)
 open import Rx.Slots using (scripted; shared)
 open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; obs; listᵗ; _≟ᵗ_; Ctx; Closed; Val; Exp; Tm; Fn; evalTm; evalWith; foldVals; applyFn; input; ofᵉ; emptyᵉ;
-  takeᵉ; liftᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; isData; unfoldμ;
+  takeᵉ; liftᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ; isData; unfoldμ;
   varᵗ; unit̂; bool̂; nat̂; uniq̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ;
   nilᵗ; consᵗ; foldᵗ;
   add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ; subΘExp; subΘTm; subΘTms; lookupEnv;
   inputsBelowᵉ; inputsBelowᵗ; inputsBelowᵗˢ)
 open import Rx.Exp.Guarded using (gsizeᵉ; gsizeᵗ; gsizeᵗˢ; gsize-unfoldμ)
 open import Rx.Inputs-Below using (ib-unfoldμ; ib-topᵉ)
+open import Rx.Subst-Compose using (subΘ-compᵍᵉ)
 open import Rx.Subst-Elim using (sub-elimGᵉ)
 open import Rx.Subst-Eval using (sub-evalTm; sub-applyFn)
 open import Rx.Subst-Identity using (subΘ-id-exp)
@@ -78,7 +79,7 @@ open import Rx.Evaluator.Freshness using (lookup-set; PreservedBelow)
 open import Rx.Evaluator.Freshness.Preserve using (subscribeE-preserves)
 open import Rx.Evaluator.Domain using (srcFrame; subscribeE⇓; pushBurst⇓; stepFrame⇓; step-lift; step-take; push-nil;
   push-cons; subs-of; subs-empty; subs-take-zero; subs-take-suc; subs-lift;
-  subs-defer; subs-floor; subs-hot-done; subs-hot-live; subs-cold-sync; subs-cold-async;
+  subs-defer; subs-mint; subs-floor; subs-hot-done; subs-hot-live; subs-cold-sync; subs-cold-async;
   subs-μ; sub-all; subs-merge-all; subs-switch-all; subs-exhaust-all; thruConsume⇓; thruWalk⇓;
   step-thru-outer; inner; consume-all-sub; consume-all-enqueue; consume-all-nil;
   consume-switch-sub; consume-switch-nil; consume-exhaust-sub; consume-exhaust-nil; walk-nil;
@@ -875,6 +876,13 @@ mutual
   redExpAcc (varᵉ ()) σ rσ k ok aK a
   redExpAcc (deferᵉ body) σ rσ k ok aK a κ id now sched st =
     _ , subs-defer refl refl refl refl , (tt ∷ []) ∷ []
+  redExpAcc (mintᵉ body) σ rσ k ok aK (acc rs) κ id now sched st =
+    let src    = freshId sourceᵏ (Sched.mint sched)
+        sched' = record sched { mint = setAt sourceᵏ (suc src) (Sched.mint sched) }
+        (r , d , sat) = redExpAcc body (src ∷ σ) (tt , rσ) k ok aK (rs ≤-refl) κ id now sched' st
+        d' = subst (λ e → subscribeE⇓ e κ id now sched' st r)
+                   (sym (subΘ-compᵍᵉ [] (src ∷ []) σ body)) d
+    in r , subs-mint refl d' , sat
 
   -- THE SLOT ARM, WHICH IS FIVE SUB-ARMS OF PROTOCOL AND ONE THAT
   -- SPENDS THE CEILING.  It mirrors the builder's own case split on

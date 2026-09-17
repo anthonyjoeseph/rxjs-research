@@ -41,7 +41,7 @@ open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeInner⇓; thruCon
   subscribeAll⇓; sharedConnect⇓; subscribeSharedSlot⇓;
   subs-floor; subs-shared; subs-hot-done; subs-hot-live; subs-cold-sync;
   subs-cold-async; subs-of; subs-empty; subs-take-zero; subs-take-suc;
-  subs-lift; subs-merge-all; subs-switch-all; subs-exhaust-all; subs-μ; subs-defer;
+  subs-lift; subs-merge-all; subs-switch-all; subs-exhaust-all; subs-μ; subs-defer; subs-mint;
   inner; consume-all-sub; consume-all-enqueue; consume-all-nil; consume-switch-sub;
   consume-switch-nil; consume-exhaust-sub; consume-exhaust-nil;
   walk-nil; walk-cons; drain-nil; drain-no-room; drain-room;
@@ -273,6 +273,8 @@ subscribeE-mono (subs-defer {sched = sched} refl refl refl refl) k =
           (≤-trans (next-mono sourceᵏ k (next ordinalᵏ (Sched.mint sched)))
                    (≤-trans (next-mono nodeᵏ k (next sourceᵏ (next ordinalᵏ (Sched.mint sched))))
                             (next-mono regᵏ k (next nodeᵏ (next sourceᵏ (next ordinalᵏ (Sched.mint sched)))))))
+subscribeE-mono (subs-mint {sched = sched} refl sub) k =
+  ≤-trans (next-mono sourceᵏ k (Sched.mint sched)) (subscribeE-mono sub k)
 
 pushBurst-mono push-nil              k = ≤-refl
 pushBurst-mono (push-cons _ st rest) k = ≤-trans (stepFrame-mono st k) (pushBurst-mono rest k)
