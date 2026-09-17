@@ -40,6 +40,7 @@ data MintKey : Set where
   ordinalᵏ : MintKey                  -- arbitration order among scheduled sources
   sourceᵏ  : MintKey                  -- dynamic sources: colds, deferᵉ bodies
   nodeᵏ    : MintKey                  -- operator node instances
+  regᵏ     : MintKey                  -- registration chains, one per subscribing path
 
 record Mint : Set where
   constructor mint
@@ -55,6 +56,7 @@ mint-init n = mint λ where
   ordinalᵏ → n
   sourceᵏ  → n
   nodeᵏ    → 0
+  regᵏ     → 0
 
 -- the identifier a mint hands out at a key.  Reading and advancing are
 -- separate because a call site names the value it just minted and then
@@ -67,19 +69,34 @@ freshId k m = counter m k
 -- update site spells its new counter with the bound variable it just
 -- minted, and a derived-only `next` would force a second reading of the
 -- same mint in every such statement.
+-- RECOVERY: git show 309d7206^:agda/src/Rx/Mint.agda restores the
+--   setter's hit/miss characterisation, the off-key equality and the
+--   strict bound saying a minted identifier is never handed out twice
+--   -- the four facts a distinctness statement spends, deleted because
+--   none of them had a consumer and the statement that would give them
+--   one is not written.
+
 setAt : MintKey → ℕ → Mint → Mint
 setAt ordinalᵏ v m = mint λ where
   ordinalᵏ → v
   sourceᵏ  → counter m sourceᵏ
   nodeᵏ    → counter m nodeᵏ
-setAt sourceᵏ v m = mint λ where
+  regᵏ     → counter m regᵏ
+setAt sourceᵏ  v m = mint λ where
   ordinalᵏ → counter m ordinalᵏ
   sourceᵏ  → v
   nodeᵏ    → counter m nodeᵏ
-setAt nodeᵏ v m = mint λ where
+  regᵏ     → counter m regᵏ
+setAt nodeᵏ    v m = mint λ where
   ordinalᵏ → counter m ordinalᵏ
   sourceᵏ  → counter m sourceᵏ
   nodeᵏ    → v
+  regᵏ     → counter m regᵏ
+setAt regᵏ     v m = mint λ where
+  ordinalᵏ → counter m ordinalᵏ
+  sourceᵏ  → counter m sourceᵏ
+  nodeᵏ    → counter m nodeᵏ
+  regᵏ     → v
 
 next : MintKey → Mint → Mint
 next k m = setAt k (suc (counter m k)) m
@@ -92,9 +109,16 @@ next-mono : ∀ (k j : MintKey) (m : Mint)
 next-mono ordinalᵏ ordinalᵏ m = n≤1+n _
 next-mono ordinalᵏ sourceᵏ  m = ≤-refl
 next-mono ordinalᵏ nodeᵏ    m = ≤-refl
+next-mono ordinalᵏ regᵏ     m = ≤-refl
 next-mono sourceᵏ  ordinalᵏ m = ≤-refl
 next-mono sourceᵏ  sourceᵏ  m = n≤1+n _
 next-mono sourceᵏ  nodeᵏ    m = ≤-refl
+next-mono sourceᵏ  regᵏ     m = ≤-refl
 next-mono nodeᵏ    ordinalᵏ m = ≤-refl
 next-mono nodeᵏ    sourceᵏ  m = ≤-refl
 next-mono nodeᵏ    nodeᵏ    m = n≤1+n _
+next-mono nodeᵏ    regᵏ     m = ≤-refl
+next-mono regᵏ     ordinalᵏ m = ≤-refl
+next-mono regᵏ     sourceᵏ  m = ≤-refl
+next-mono regᵏ     nodeᵏ    m = ≤-refl
+next-mono regᵏ     regᵏ     m = n≤1+n _

@@ -159,10 +159,10 @@ mutual
   subs-keeps (subs-floor _)          = refl
   subs-keeps (subs-shared _ s)       = slot-keeps s
   subs-keeps (subs-hot-done _ _ _)   = refl
-  subs-keeps (subs-hot-live _ _ _)   = refl
+  subs-keeps (subs-hot-live _ _ _ _) = refl
   subs-keeps {sched = sched} (subs-cold-sync {sync = sync} {id = id} _ _ refl) =
     oneShot-slots sync id sched
-  subs-keeps (subs-cold-async _ _ _ _) = refl
+  subs-keeps (subs-cold-async _ _ _ _ _) = refl
   subs-keeps {sched = sched} (subs-of {ts = ts} {id = id} refl) = refl
   subs-keeps {sched = sched} (subs-empty {id = id} refl) = refl
   subs-keeps (subs-take-zero _ refl) = refl
@@ -172,7 +172,7 @@ mutual
   subs-keeps (subs-switch-all a)     = all-keeps a
   subs-keeps (subs-exhaust-all a)    = all-keeps a
   subs-keeps (subs-μ d)              = subs-keeps d
-  subs-keeps (subs-defer _ _ _)      = refl
+  subs-keeps (subs-defer _ _ _ _)    = refl
 
   all-keeps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
     {op : AllOp} {ns : NodeState Γ} {b : Closed Γ (obs u)}
@@ -296,8 +296,8 @@ mutual
     sharedConnect⇓ {e = e} i d κ below id now sched st
       (burst , sched′ , st′) →
     Sched.slots sched′ ≡ Sched.slots sched
-  connect-keeps (connect-live d _) = subs-keeps d
-  connect-keeps (connect-died d _) = subs-keeps d
+  connect-keeps (connect-live _ d _) = subs-keeps d
+  connect-keeps (connect-died _ d _) = subs-keeps d
 
   slot-keeps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo}
     {i : Fin n} {d : Closed Γ (lookup Γ i)}
@@ -308,5 +308,5 @@ mutual
       (burst , sched′ , st′) →
     Sched.slots sched′ ≡ Sched.slots sched
   slot-keeps (slot-spent _)      = refl
-  slot-keeps (slot-join _ _)     = refl
+  slot-keeps (slot-join _ _ _)   = refl
   slot-keeps (slot-connect _ _ c) = connect-keeps c

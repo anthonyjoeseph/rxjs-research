@@ -104,7 +104,7 @@ open import Rx.Prim using (Tick; Fuel; Id; Source; InstEvent; InstEmit; value; c
   init; subscribe; hot; cold)
 open import Rx.Exp using (obs; Ctx; Val; Closed; Tm; Fn; _×ᵗ_; listᵗ; evalTm; unfoldμ; input; ofᵉ; emptyᵉ; takeᵉ;
   liftᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; deferᵉ)
-open import Rx.Mint using (ordinalᵏ; sourceᵏ; nodeᵏ; freshId; setAt)
+open import Rx.Mint using (ordinalᵏ; sourceᵏ; nodeᵏ; regᵏ; freshId; setAt)
 open import Rx.Slots using (Slots; scripted; shared)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; NodeId;
   root; share-sink; _↠_; shareAdmit; shareLatch; shareFinish;
@@ -309,14 +309,15 @@ data subscribeE⇓ {n} {Γ} {t} {e} where
                     (spentBurst (toℕ i) id , sched , st)
 
   subs-hot-live : ∀ {lo} {i : Fin n} {κ : Path Γ lo (lookup Γ i) t}
-                    {ok async} {id now sched st}
+                    {ok async} {id now sched st rid}
                 → (below : toℕ i < lo)
                 → Sched.slots sched i ≡ scripted {ok = ok} (hot async)
                 → memberSource (toℕ i) (EvalSt.completedSources st) ≡ false
+                → freshId regᵏ (Sched.mint sched) ≡ rid
                 → subscribeE⇓ (input i) κ id now sched st
                     ( ((init (toℕ i) ∷ []) at id from toℕ i as subscribe) ∷ []
-                    , sched
-                    , register (atSlot i) (lowerFloor below κ) st )
+                    , record sched { mint = setAt regᵏ (suc rid) (Sched.mint sched) }
+                    , register rid (atSlot i) (lowerFloor below κ) st )
 
   subs-cold-sync : ∀ {lo} {i : Fin n} {κ : Path Γ lo (lookup Γ i) t}
                      {ok sync} {id now sched st burst sched₁}
@@ -327,22 +328,24 @@ data subscribeE⇓ {n} {Γ} {t} {e} where
                      (burst , sched₁ , st)
 
   subs-cold-async : ∀ {lo} {i : Fin n} {κ : Path Γ lo (lookup Γ i) t}
-                      {ok sync d ds} {id now sched st src ord}
+                      {ok sync d ds} {id now sched st src ord rid}
                   → toℕ i < lo
                   → Sched.slots sched i ≡ scripted {ok = ok} (cold sync (d ∷ ds))
                   → freshId sourceᵏ (Sched.mint sched) ≡ src
                   → freshId ordinalᵏ (Sched.mint sched) ≡ ord
+                  → freshId regᵏ (Sched.mint sched) ≡ rid
                   → subscribeE⇓ (input i) κ id now sched st
                       ( ((init src ∷ map value sync)
                            at id from src as subscribe) ∷ []
                       , record sched
-                          { mint = setAt sourceᵏ (suc src)
-                                     (setAt ordinalᵏ (suc ord) (Sched.mint sched))
+                          { mint = setAt regᵏ (suc rid)
+                                     (setAt sourceᵏ (suc src)
+                                       (setAt ordinalᵏ (suc ord) (Sched.mint sched)))
                           ; live = record { source = src ; ordinal = ord
                                           ; elemTy = lookup Γ i
                                           ; pending = resolve now (d ∷ ds) }
                                    ∷ Sched.live sched }
-                      , register (atDyn src lo) κ st )
+                      , register rid (atDyn src lo) κ st )
 
   subs-of : ∀ {lo u} {ts} {κ : Path Γ lo u t} {id now sched st burst sched₁}
           → oneShotBurst (map (λ tm → evalTm tm) ts) id sched ≡ (burst , sched₁)
@@ -419,21 +422,23 @@ data subscribeE⇓ {n} {Γ} {t} {e} where
          → subscribeE⇓ (μᵉ body) κ id now sched st r
 
   subs-defer : ∀ {lo u} {body} {κ : Path Γ lo u t}
-                 {id now sched st nid src ord}
+                 {id now sched st nid src ord rid}
              → freshId nodeᵏ (Sched.mint sched) ≡ nid
              → freshId sourceᵏ (Sched.mint sched) ≡ src
              → freshId ordinalᵏ (Sched.mint sched) ≡ ord
+             → freshId regᵏ (Sched.mint sched) ≡ rid
              → subscribeE⇓ (deferᵉ body) κ id now sched st
                  ( ((init src ∷ []) at id from src as subscribe) ∷ []
                  , record sched
-                     { mint = setAt nodeᵏ (suc nid)
-                                (setAt sourceᵏ (suc src)
-                                  (setAt ordinalᵏ (suc ord) (Sched.mint sched)))
+                     { mint = setAt regᵏ (suc rid)
+                                (setAt nodeᵏ (suc nid)
+                                  (setAt sourceᵏ (suc src)
+                                    (setAt ordinalᵏ (suc ord) (Sched.mint sched))))
                      ; live = record { source = src ; ordinal = ord
                                      ; elemTy = obs u
                                      ; pending = (suc now , body) ∷ [] }
                               ∷ Sched.live sched }
-                 , register (atDyn src lo)
+                 , register rid (atDyn src lo)
                             (thru-outer mergeAllᵒ nid ↠ κ)
                             (installNode nid
                               (mergeAll-st {t = u} nothing 0 [] false) st) )
@@ -753,9 +758,11 @@ data subscribeAll⇓ {n} {Γ} {t} {e} where
 data sharedConnect⇓ {n} {Γ} {t} {e} where
 
   connect-live : ∀ {lo} {i : Fin n} {d} {κ : Path Γ lo (lookup Γ i) t}
-                   {below : toℕ i < lo} {id now sched st burst sched₁ st₂}
-               → subscribeE⇓ d (share-sink i ≤-refl) id now sched
-                   (register (atSlot i) (lowerFloor below κ)
+                   {below : toℕ i < lo} {id now sched st burst sched₁ st₂ rid}
+               → freshId regᵏ (Sched.mint sched) ≡ rid
+               → subscribeE⇓ d (share-sink i ≤-refl) id now
+                   (record sched { mint = setAt regᵏ (suc rid) (Sched.mint sched) })
+                   (register rid (atSlot i) (lowerFloor below κ)
                      (record st
                        { connectedShares =
                            toℕ i ∷ EvalSt.connectedShares st }))
@@ -767,9 +774,11 @@ data sharedConnect⇓ {n} {Γ} {t} {e} where
                    , sched₁ , st₂ )
 
   connect-died : ∀ {lo} {i : Fin n} {d} {κ : Path Γ lo (lookup Γ i) t}
-                   {below : toℕ i < lo} {id now sched st burst sched₁ st₂}
-               → subscribeE⇓ d (share-sink i ≤-refl) id now sched
-                   (register (atSlot i) (lowerFloor below κ)
+                   {below : toℕ i < lo} {id now sched st burst sched₁ st₂ rid}
+               → freshId regᵏ (Sched.mint sched) ≡ rid
+               → subscribeE⇓ d (share-sink i ≤-refl) id now
+                   (record sched { mint = setAt regᵏ (suc rid) (Sched.mint sched) })
+                   (register rid (atSlot i) (lowerFloor below κ)
                      (record st
                        { connectedShares =
                            toℕ i ∷ EvalSt.connectedShares st }))
@@ -794,12 +803,14 @@ data subscribeSharedSlot⇓ {n} {Γ} {t} {e} where
                  (spentBurst (toℕ i) id , sched , st)
 
   slot-join : ∀ {lo} {i : Fin n} {d} {κ : Path Γ lo (lookup Γ i) t}
-                {below : toℕ i < lo} {id now sched st}
+                {below : toℕ i < lo} {id now sched st rid}
             → memberSource (toℕ i) (EvalSt.completedSources st) ≡ false
             → memberSource (toℕ i) (EvalSt.connectedShares st) ≡ true
+            → freshId regᵏ (Sched.mint sched) ≡ rid
             → subscribeSharedSlot⇓ i d κ below id now sched st
                 ( ((init (toℕ i) ∷ []) at id from toℕ i as subscribe) ∷ []
-                , sched , register (atSlot i) (lowerFloor below κ) st )
+                , record sched { mint = setAt regᵏ (suc rid) (Sched.mint sched) }
+                , register rid (atSlot i) (lowerFloor below κ) st )
 
   slot-connect : ∀ {lo} {i : Fin n} {d} {κ : Path Γ lo (lookup Γ i) t}
                    {below : toℕ i < lo} {id now sched st r}
@@ -909,7 +920,7 @@ data cascadeGo⇓ {n} {Γ} {t} {e} where
 
 data cascade⇓ {n} {Γ} {t} {e} where
   casc-run : ∀ {a id sched st} {emits sched′ st′}
-           → cascadeGo⇓ a id (chainsOf a st) sched (cascadeLatch a st)
+           → cascadeGo⇓ a id (chainsOf a st) sched (cascadeLatch a sched st)
                (emits , sched′ , st′)
            → cascade⇓ a id sched st (emits , cascadeFinish a sched′ st′)
 

@@ -268,9 +268,9 @@ subscribeSharedSlot-preserves : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo}
 subscribeE-preserves f le (subs-floor _)         = pres-same _ _ refl
 subscribeE-preserves f le (subs-shared _ slot)   = subscribeSharedSlot-preserves f le slot
 subscribeE-preserves f le (subs-hot-done _ _ _)  = pres-same _ _ refl
-subscribeE-preserves f le (subs-hot-live _ _ _)  = pres-same _ _ refl
+subscribeE-preserves f le (subs-hot-live _ _ _ _) = pres-same _ _ refl
 subscribeE-preserves f le (subs-cold-sync _ _ _) = pres-same _ _ refl
-subscribeE-preserves f le (subs-cold-async _ _ _ _) = pres-same _ _ refl
+subscribeE-preserves f le (subs-cold-async _ _ _ _ _) = pres-same _ _ refl
 subscribeE-preserves f le (subs-of _)            = pres-same _ _ refl
 subscribeE-preserves f le (subs-empty _)         = pres-same _ _ refl
 subscribeE-preserves f le (subs-take-zero _ _)   = pres-same _ _ refl
@@ -288,7 +288,7 @@ subscribeE-preserves f le (subs-merge-all sa)    = subscribeAll-preserves f le s
 subscribeE-preserves f le (subs-switch-all sa)   = subscribeAll-preserves f le sa
 subscribeE-preserves f le (subs-exhaust-all sa)  = subscribeAll-preserves f le sa
 subscribeE-preserves f le (subs-μ sub)           = subscribeE-preserves f le sub
-subscribeE-preserves f le (subs-defer refl _ _)  = pres-write _ _ _ refl le
+subscribeE-preserves f le (subs-defer refl _ _ _) = pres-write _ _ _ refl le
 
 pushBurst-preserves f le fa push-nil = pres-same _ _ refl
 pushBurst-preserves f le fa (push-cons _ stp rest) =
@@ -355,13 +355,13 @@ innerReact-preserves f le fn react-false       = pres-same _ _ refl
 innerReact-preserves f le fn (react-alive _)   = pres-same _ _ refl
 innerReact-preserves f le fn (react-dead _ fi) = innerFinish-preserves f le fn fi
 
-sharedConnect-preserves f le (connect-live sub _) =
+sharedConnect-preserves f le (connect-live _ sub _) =
   pres-trans (pres-same _ _ refl) (subscribeE-preserves f le sub)
-sharedConnect-preserves f le (connect-died sub _) =
+sharedConnect-preserves f le (connect-died _ sub _) =
   pres-trans (pres-same _ _ refl)
              (pres-trans (subscribeE-preserves f le sub) (pres-same _ _ refl))
 
 subscribeSharedSlot-preserves f le (slot-spent _)        = pres-same _ _ refl
-subscribeSharedSlot-preserves f le (slot-join _ _)       = pres-same _ _ refl
+subscribeSharedSlot-preserves f le (slot-join _ _ _)     = pres-same _ _ refl
 subscribeSharedSlot-preserves f le (slot-connect _ _ sc) =
   sharedConnect-preserves f le sc

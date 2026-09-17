@@ -57,7 +57,7 @@ open import Rx.Prim using (Fuel; Id; Source; Tick; InstEmit; InstEvent; close;
   exhausted; hot; cold)
 open import Rx.Exp using (Ctx; Closed; Val; _≟ᵗ_; obs; unfoldμ; evalTm; input; ofᵉ; emptyᵉ; takeᵉ; liftᵉ; mergeAllᵉ;
   switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ)
-open import Rx.Mint using (nodeᵏ; freshId; setAt)
+open import Rx.Mint using (nodeᵏ; regᵏ; freshId; setAt; next)
 open import Rx.Slots using (Slots; shared; scripted)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; AllOp; NodeId; NodeState; Frame; root; _↠_; take-f;
   lift-f; thru-outer; from-inner; mergeAllᵒ; switchᵒ; exhaustᵒ; mergeAll-st; switch-st;
@@ -327,7 +327,7 @@ subscribeE! sl (μᵉ body) κ id now sched ag st =
   in r , subs-μ d
 
 subscribeE! sl (varᵉ ()) κ id now sched ag st
-subscribeE! sl (deferᵉ body) κ id now sched ag st = _ , subs-defer refl refl refl
+subscribeE! sl (deferᵉ body) κ id now sched ag st = _ , subs-defer refl refl refl refl
 
 -- THE FLATTENER'S OUTER SUBSCRIBE, WHICH HAS EXACTLY ONE CLAUSE.  All
 -- three `*All` operators install their own node state and then run the
@@ -468,13 +468,13 @@ subscribeE!-input {lo = lo} sl i κ id now sched ag st
 ...   | scripted (hot async)
         with memberSource (toℕ i) (EvalSt.completedSources st) in doneEq
 ...     | true  = _ , subs-hot-done below (slot-agree sl sched i ag slEq) doneEq
-...     | false = _ , subs-hot-live below (slot-agree sl sched i ag slEq) doneEq
+...     | false = _ , subs-hot-live below (slot-agree sl sched i ag slEq) doneEq refl
 subscribeE!-input {lo = lo} sl i κ id now sched ag st
     | yes below | scripted (cold sync []) =
       _ , subs-cold-sync below (slot-agree sl sched i ag slEq) refl
 subscribeE!-input {lo = lo} sl i κ id now sched ag st
     | yes below | scripted (cold sync (d ∷ ds)) =
-      _ , subs-cold-async below (slot-agree sl sched i ag slEq) refl refl
+      _ , subs-cold-async below (slot-agree sl sched i ag slEq) refl refl refl
 subscribeE!-input {lo = lo} sl i κ id now sched ag st
     | yes below | shared d
         with memberSource (toℕ i) (EvalSt.completedSources st) in doneEq
@@ -486,10 +486,12 @@ subscribeE!-input {lo = lo} sl i κ id now sched ag st
 ...       | true  =
             _ , subs-shared {κ = κ} {below = below}
                   (slot-agree sl sched i ag slEq)
-                  (slot-join {κ = κ} {below = below} doneEq connEq)
+                  (slot-join {κ = κ} {below = below} doneEq connEq refl)
 ...       | false
-            with reducible d (share-sink i ≤-refl) id now sched
-                   (register (atSlot i) (lowerFloor below κ)
+            with reducible d (share-sink i ≤-refl) id now
+                   (record sched { mint = next regᵏ (Sched.mint sched) })
+                   (register (freshId regᵏ (Sched.mint sched))
+                     (atSlot i) (lowerFloor below κ)
                      (record st
                        { connectedShares = toℕ i ∷ EvalSt.connectedShares st }))
 ...         | ((burst , sched₁ , st₂) , dv , _) with burstCompleted burst in compEq
@@ -497,12 +499,12 @@ subscribeE!-input {lo = lo} sl i κ id now sched ag st
                 _ , subs-shared {κ = κ} {below = below}
                       (slot-agree sl sched i ag slEq)
                       (slot-connect doneEq connEq
-                        (connect-live {κ = κ} {below = below} dv compEq))
+                        (connect-live {κ = κ} {below = below} refl dv compEq))
 ...           | true  =
                 _ , subs-shared {κ = κ} {below = below}
                       (slot-agree sl sched i ag slEq)
                       (slot-connect doneEq connEq
-                        (connect-died {κ = κ} {below = below} dv compEq))
+                        (connect-died {κ = κ} {below = below} refl dv compEq))
 
 ------------------------------------------------------------------
 -- THE COMPLETION SIDE, WHICH THE CYCLE ABOVE CANNOT REACH.
@@ -736,7 +738,7 @@ cascade! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (a : Arrival Γ) (id : Id) (sched : Sched Γ) (st : EvalSt e) →
   ∃ λ r → cascade⇓ {e = e} a id sched st r
 cascade! a id sched st =
-  let (_ , g) = cascadeGo! a id (chainsOf a st) sched (cascadeLatch a st)
+  let (_ , g) = cascadeGo! a id (chainsOf a st) sched (cascadeLatch a sched st)
   in _ , casc-run g
 
 -- THE FAR END OF THE RUN, WHICH SPENDS FUEL OVER THE SCHEDULE RATHER

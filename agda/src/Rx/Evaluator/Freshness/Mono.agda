@@ -30,7 +30,7 @@ open import Data.Product using (_,_; proj₁; proj₂)
 open import Relation.Nullary using (yes; no)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import Rx.Mint using (MintKey; ordinalᵏ; sourceᵏ; nodeᵏ; freshId; next; next-mono)
+open import Rx.Mint using (MintKey; ordinalᵏ; sourceᵏ; nodeᵏ; regᵏ; freshId; next; next-mono)
 open import Rx.Exp using (Ctx; Closed; Val; obs; Fn; _×ᵗ_; listᵗ; _≟ᵗ_)
 open import Rx.Prim using (Id; InstEvent)
 open import Rx.Evaluator using (Sched; EvalSt; Path; Frame; NodeId; NodeState; AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ;
@@ -245,12 +245,14 @@ subscribeSharedSlot-mono : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo}
 subscribeE-mono (subs-floor _)              k = ≤-refl
 subscribeE-mono (subs-shared _ slot)        k = subscribeSharedSlot-mono slot k
 subscribeE-mono (subs-hot-done _ _ _)       k = ≤-refl
-subscribeE-mono (subs-hot-live _ _ _)       k = ≤-refl
+subscribeE-mono (subs-hot-live {sched = sched} _ _ _ refl) k =
+  next-mono regᵏ k (Sched.mint sched)
 subscribeE-mono (subs-cold-sync {sync = sync} {id = id} {sched = sched} _ _ eq) k =
   oneShot-mint sync id sched eq k
-subscribeE-mono (subs-cold-async {sched = sched} _ _ refl refl) k =
+subscribeE-mono (subs-cold-async {sched = sched} _ _ refl refl refl) k =
   ≤-trans (next-mono ordinalᵏ k (Sched.mint sched))
-          (next-mono sourceᵏ k (next ordinalᵏ (Sched.mint sched)))
+          (≤-trans (next-mono sourceᵏ k (next ordinalᵏ (Sched.mint sched)))
+                   (next-mono regᵏ k (next sourceᵏ (next ordinalᵏ (Sched.mint sched)))))
 subscribeE-mono (subs-of {id = id} {sched = sched} eq)           k = oneShot-mint _ id sched eq k
 subscribeE-mono (subs-empty {u = u} {id = id} {sched = sched} eq) k =
   oneShot-mint ([] {A = Val _ u}) id sched eq k
@@ -266,10 +268,11 @@ subscribeE-mono (subs-merge-all sa)         k = subscribeAll-mono sa k
 subscribeE-mono (subs-switch-all sa)        k = subscribeAll-mono sa k
 subscribeE-mono (subs-exhaust-all sa)       k = subscribeAll-mono sa k
 subscribeE-mono (subs-μ sub)                k = subscribeE-mono sub k
-subscribeE-mono (subs-defer {sched = sched} refl refl refl) k =
+subscribeE-mono (subs-defer {sched = sched} refl refl refl refl) k =
   ≤-trans (next-mono ordinalᵏ k (Sched.mint sched))
           (≤-trans (next-mono sourceᵏ k (next ordinalᵏ (Sched.mint sched)))
-                   (next-mono nodeᵏ k (next sourceᵏ (next ordinalᵏ (Sched.mint sched)))))
+                   (≤-trans (next-mono nodeᵏ k (next sourceᵏ (next ordinalᵏ (Sched.mint sched))))
+                            (next-mono regᵏ k (next nodeᵏ (next sourceᵏ (next ordinalᵏ (Sched.mint sched)))))))
 
 pushBurst-mono push-nil              k = ≤-refl
 pushBurst-mono (push-cons _ st rest) k = ≤-trans (stepFrame-mono st k) (pushBurst-mono rest k)
@@ -315,9 +318,12 @@ innerFinish-mono (finish-switch-clear _)   k = ≤-refl
 innerFinish-mono finish-exhaust-clear      k = ≤-refl
 innerFinish-mono (finish-nil _)            k = ≤-refl
 
-sharedConnect-mono (connect-live sub _) k = subscribeE-mono sub k
-sharedConnect-mono (connect-died sub _) k = subscribeE-mono sub k
+sharedConnect-mono (connect-live {sched = sched} refl sub _) k =
+  ≤-trans (next-mono regᵏ k (Sched.mint sched)) (subscribeE-mono sub k)
+sharedConnect-mono (connect-died {sched = sched} refl sub _) k =
+  ≤-trans (next-mono regᵏ k (Sched.mint sched)) (subscribeE-mono sub k)
 
 subscribeSharedSlot-mono (slot-spent _)        k = ≤-refl
-subscribeSharedSlot-mono (slot-join _ _)       k = ≤-refl
+subscribeSharedSlot-mono (slot-join {sched = sched} _ _ refl) k =
+  next-mono regᵏ k (Sched.mint sched)
 subscribeSharedSlot-mono (slot-connect _ _ sc) k = sharedConnect-mono sc k

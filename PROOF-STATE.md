@@ -240,15 +240,15 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
   demotion and the elaboration's body are both parked, and the legs below run
   first.
 
-- **MEANWHILE, THE REGISTRATION COUNTER JOINS THE LEDGER.** The scheduler's
-  three counters are keyed and monotonicity is now one statement at an
-  arbitrary key, which is what the leg bought; the run's fourth counter is not
-  in it, because it sits on the evaluator STATE rather than on the schedule and
-  every write to it is a `register`. Folding it in is what makes "no identifier
-  this run hands out is handed out twice" a single statement over a single
-  table — and until it is one table, the strict bound and the off-key equality
-  that a distinctness proof spends have no assembly to be proven for, which is
-  why this leg holds them rather than the ledger module.
+- **MEANWHILE, DISTINCTNESS GETS ITS FIRST STATEMENT, NOW THAT THERE IS ONE
+  TABLE.** All four counters are keyed, so "no identifier this run hands out
+  is handed out twice" is sayable at last — over one mint rather than over a
+  schedule field and a state field that no lemma could relate. The leg states
+  it and mints the leaves the statement spends: the strict bound saying a
+  reading is below every later one at the same key, and the off-key equality
+  saying a bump at one key moves no other. Both were deleted from the ledger
+  module for having no consumer; this is the assembly that gives them one,
+  which is the order outside-in fixes and the reason they were not kept.
 
 - **THEN THE DEMOTION, ONCE A PROGRAM CAN BUILD AN ENVELOPE.** Target:
   `evaluate : … → List (Val Γ t)`. The census called this and the simul tree

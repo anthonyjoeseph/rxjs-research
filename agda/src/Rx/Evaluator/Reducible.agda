@@ -54,7 +54,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 
 open import Rx.Prim using (Id; Tick; Source; InstEmit; InstEvent; init; value; close; handoff;
   complete; hot; cold)
-open import Rx.Mint using (nodeᵏ; freshId; setAt; next)
+open import Rx.Mint using (nodeᵏ; regᵏ; freshId; setAt; next)
 open import Rx.Slots using (scripted; shared)
 open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; obs; listᵗ; _≟ᵗ_; Ctx; Closed; Val; Exp; Tm; Fn; evalTm; evalWith; foldVals; applyFn; input; ofᵉ; emptyᵉ;
   takeᵉ; liftᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; isData; unfoldμ;
@@ -874,7 +874,7 @@ mutual
     in r , subs-μ d , sat
   redExpAcc (varᵉ ()) σ rσ k ok aK a
   redExpAcc (deferᵉ body) σ rσ k ok aK a κ id now sched st =
-    _ , subs-defer refl refl refl , (tt ∷ []) ∷ []
+    _ , subs-defer refl refl refl refl , (tt ∷ []) ∷ []
 
   -- THE SLOT ARM, WHICH IS FIVE SUB-ARMS OF PROTOCOL AND ONE THAT
   -- SPENDS THE CEILING.  It mirrors the builder's own case split on
@@ -893,14 +893,14 @@ mutual
   ...   | scripted {ok = okD} (hot async)
           with memberSource (toℕ i) (EvalSt.completedSources st) in doneEq
   ...     | true  = _ , subs-hot-done below slEq doneEq , (tt ∷ tt ∷ tt ∷ []) ∷ []
-  ...     | false = _ , subs-hot-live below slEq doneEq , (tt ∷ []) ∷ []
+  ...     | false = _ , subs-hot-live below slEq doneEq refl , (tt ∷ []) ∷ []
   red-input {Γ = Γ} i k ok (acc rsK) {lo = lo} κ id now sched st
       | yes below | scripted {ok = okD} (cold sync []) =
         _ , subs-cold-sync below slEq refl
           , satOneShot id sched (redDatas _ okD sync)
   red-input {Γ = Γ} i k ok (acc rsK) {lo = lo} κ id now sched st
       | yes below | scripted {ok = okD} (cold sync (v ∷ vs)) =
-        _ , subs-cold-async below slEq refl refl
+        _ , subs-cold-async below slEq refl refl refl
           , (tt ∷ satValues (redDatas _ okD sync)) ∷ []
   red-input {Γ = Γ} i k ok (acc rsK) {lo = lo} κ id now sched st
       | yes below | shared d {ok = okd} =
@@ -939,14 +939,16 @@ mutual
         with memberSource (toℕ i) (EvalSt.connectedShares st) in connEq
   ...   | true =
           _ , subs-shared {κ = κ} {below = below} slEq
-                (slot-join {κ = κ} {below = below} doneEq connEq)
+                (slot-join {κ = κ} {below = below} doneEq connEq refl)
             , (tt ∷ []) ∷ []
   ...   | false
           with subst (Red (obs (lookup Γ i))) (subΘ-id-exp d)
                  (redExpAcc d [] tt (toℕ i) okd aI
                    (<-wellFounded (gsizeᵉ d)))
-                 (share-sink i ≤-refl) id now sched
-                 (register (atSlot i) (lowerFloor below κ)
+                 (share-sink i ≤-refl) id now
+                 (record sched { mint = next regᵏ (Sched.mint sched) })
+                 (register (freshId regᵏ (Sched.mint sched))
+                   (atSlot i) (lowerFloor below κ)
                    (record st
                      { connectedShares = toℕ i ∷ EvalSt.connectedShares st }))
   ...     | ((burst , sched₁ , st₂) , dv , dsat)
@@ -954,12 +956,12 @@ mutual
   ...       | false =
               _ , subs-shared {κ = κ} {below = below} slEq
                     (slot-connect doneEq connEq
-                      (connect-live {κ = κ} {below = below} dv compEq))
+                      (connect-live {κ = κ} {below = below} refl dv compEq))
                 , (tt ∷ []) ∷ StreamSat-plumb burst dsat
   ...       | true =
               _ , subs-shared {κ = κ} {below = below} slEq
                     (slot-connect doneEq connEq
-                      (connect-died {κ = κ} {below = below} dv compEq))
+                      (connect-died {κ = κ} {below = below} refl dv compEq))
                 , (tt ∷ tt ∷ []) ∷ StreamSat-plumb burst dsat
 
   -- THE FUNDAMENTAL THEOREM AT TERMS, which is where the embedding

@@ -33,7 +33,7 @@ variable
 -- checked by the generator/decoder, not by these types; a forward
 -- reference is rejected there.
 open import Rx.Slots using (scripted; shared; Slots)
-open import Rx.Mint using (Mint; sourceᵏ; mint-init; freshId; next)
+open import Rx.Mint using (Mint; sourceᵏ; regᵏ; mint-init; freshId; next)
 
 Stream : ∀ {n} → Ctx n → Ty → Set          -- flat, canonical emission order
 Stream Γ t = List (InstEmit (Val Γ t))
@@ -378,7 +378,6 @@ dropSource src ((rid , s , c) ∷ r) =
 
 record EvalSt {n} {Γ : Ctx n} {t} (e : Closed Γ t) : Set where
   field registry        : List (RegRow Γ t)   -- live registration chains, subscription order
-        nextReg         : RegId         -- registration ids, minted by register
         nodes           : NodeSt e
         connectedShares : List Source   -- shared slots whose def is live (connect happens once, ever)
         completedSources : List Source  -- the completion latch: completed shares AND spent
@@ -391,8 +390,9 @@ record EvalSt {n} {Γ : Ctx n} {t} (e : Closed Γ t) : Set where
         cancelled       : List RegId    -- victims cut mid-cascade: their snapshot
                                         -- chains are skipped outright (an unsubscribed
                                         -- rxjs chain delivers nothing)
-        regWatermark    : RegId         -- nextReg at cascade start: registrations at or
-                                        -- above it were born this cascade and owe nothing
+        regWatermark    : RegId         -- the mint's registration counter at cascade
+                                        -- start: registrations at or above it were born
+                                        -- this cascade and owe nothing
         dying           : List Source   -- sources spending their final delivery this
                                         -- cascade (the isLast arrival, a completing
                                         -- share): their delivered registrations already
@@ -403,13 +403,15 @@ mintSource : ∀ {n} {Γ : Ctx n} → Sched Γ → Source × Sched Γ
 mintSource sched =
   freshId sourceᵏ (Sched.mint sched) , record sched { mint = next sourceᵏ (Sched.mint sched) }
 
--- append: the registry stays in subscription order; the id is minted here
+-- append: the registry stays in subscription order.  The id is HANDED
+-- IN rather than minted here, because the run has exactly one ledger
+-- and it rides on the schedule, which this function is not given; the
+-- caller reads `regᵏ` and advances it in the same breath, which is the
+-- shape node instances already have.
 register : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-         → (rs : RegSrc Γ) → Path Γ (regFloor rs) u t → EvalSt e → EvalSt e
-register {u = u} rs path st =
-  record st { registry = EvalSt.registry st
-                           ++ (EvalSt.nextReg st , rs , u , path) ∷ []
-            ; nextReg  = suc (EvalSt.nextReg st) }
+         → RegId → (rs : RegSrc Γ) → Path Γ (regFloor rs) u t → EvalSt e → EvalSt e
+register {u = u} rid rs path st =
+  record st { registry = EvalSt.registry st ++ (rid , rs , u , path) ∷ [] }
 
 installNode : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
             → NodeId → NodeState Γ → EvalSt e → EvalSt e
@@ -437,7 +439,7 @@ spentBurst src id =
   ((init src ∷ close src exhausted ∷ complete ∷ []) at id from src as subscribe) ∷ []
 
 st-init : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) → EvalSt e
-st-init e = record { registry = [] ; nextReg = 0 ; nodes = []
+st-init e = record { registry = [] ; nodes = []
                    ; connectedShares = [] ; completedSources = []
                    ; delivered = [] ; cancelled = [] ; regWatermark = 0
                    ; dying = [] }
@@ -760,12 +762,12 @@ shareFinish i true  (emits , sched′ , st′) =
 -- deferᵉ hops get latched too, harmlessly: their sources are
 -- per-subscription, never re-subscribed
 cascadeLatch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-             → Arrival Γ → EvalSt e → EvalSt e
-cascadeLatch a st₀ =
+             → Arrival Γ → Sched Γ → EvalSt e → EvalSt e
+cascadeLatch a sched st₀ =
   record (if Arrival.isLast a
           then record st₀ { completedSources = arrSource a ∷ EvalSt.completedSources st₀ }
           else st₀)
-    { delivered = [] ; cancelled = [] ; regWatermark = EvalSt.nextReg st₀
+    { delivered = [] ; cancelled = [] ; regWatermark = freshId regᵏ (Sched.mint sched)
     ; dying = if Arrival.isLast a then arrSource a ∷ [] else [] }
 
 -- the spent source's registrations drop at the end (each delivered
