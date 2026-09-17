@@ -70,6 +70,28 @@ mutual
                  -- count is a term: evaluated once, at subscription time
     scanᵉ      : ∀ {s t} → Fn Γ Δᵍ Δ Θ (t ×ᵗ s) t → Tm Γ Δᵍ Δ Θ t
                → Exp Γ Δᵍ Δ Θ s → Exp Γ Δᵍ Δ Θ t
+    liftᵉ      : ∀ {s t u} → Fn Γ Δᵍ Δ Θ (u ×ᵗ listᵗ s) (u ×ᵗ listᵗ t)
+               → Tm Γ Δᵍ Δ Θ u → Exp Γ Δᵍ Δ Θ s → Exp Γ Δᵍ Δ Θ t
+                 -- THE ONE PURE-FUNCTION FORMER, MIRRORING THE TYPESCRIPT
+                 -- `lift`: a step over an emit's VALUE LIST together with
+                 -- carried state, which is the largest thing an operator can
+                 -- be while still adding no event, minting no registration
+                 -- and being unable to end the stream.  The step is a `Tm`,
+                 -- so it is pure, total and first-order, and `Val` reads
+                 -- `listᵗ` as a list outright, so the types here need no
+                 -- new vocabulary.
+                 --
+                 -- WHAT IT ABSORBS IS DECIDED BY WHETHER AN OPERATOR READS
+                 -- THE PROTOCOL'S OWN BOOKKEEPING, and that test was run in
+                 -- TypeScript against real rxjs before it was written here.
+                 -- `mapᵉ` is this at `u = unitᵗ` and `scanᵉ` is it at
+                 -- `u = t`; `takeᵉ` is NOT, because it reads the open
+                 -- registrations and the cut ledger and mints a close per
+                 -- victim, so absorbing it would put source ids and close
+                 -- reasons into the value language.  The flatteners cannot
+                 -- follow it in for a different reason: their payloads are
+                 -- literal syntax that must be RUN, and `Tm` has no
+                 -- eliminator for that.
                -- NOTE: share is NOT an Exp primitive — share identity is a
                -- binding, not an expression.  Shared observables live in the
                -- slot telescope (Rx.Evaluator.Slot) and are referenced with
@@ -231,6 +253,7 @@ mutual
   renExp ρg ρd ρt (mapᵉ f e)     = mapᵉ (renTm ρg ρd (ext∈ ρt) f) (renExp ρg ρd ρt e)
   renExp ρg ρd ρt (takeᵉ n e)    = takeᵉ (renTm ρg ρd ρt n) (renExp ρg ρd ρt e)
   renExp ρg ρd ρt (scanᵉ f i e)  = scanᵉ (renTm ρg ρd (ext∈ ρt) f) (renTm ρg ρd ρt i) (renExp ρg ρd ρt e)
+  renExp ρg ρd ρt (liftᵉ f i e)  = liftᵉ (renTm ρg ρd (ext∈ ρt) f) (renTm ρg ρd ρt i) (renExp ρg ρd ρt e)
   renExp ρg ρd ρt (mergeAllᵉ lim e) = mergeAllᵉ lim (renExp ρg ρd ρt e)
   renExp ρg ρd ρt (switchAllᵉ e) = switchAllᵉ (renExp ρg ρd ρt e)
   renExp ρg ρd ρt (exhaustAllᵉ e) = exhaustAllᵉ (renExp ρg ρd ρt e)
@@ -306,6 +329,8 @@ mutual
   subΘExp Θloc σ (takeᵉ n e)    = takeᵉ (subΘTm Θloc σ n) (subΘExp Θloc σ e)
   subΘExp Θloc σ (scanᵉ {s = s} {t = t} f i e) =
     scanᵉ (subΘTm ((t ×ᵗ s) ∷ Θloc) σ f) (subΘTm Θloc σ i) (subΘExp Θloc σ e)
+  subΘExp Θloc σ (liftᵉ {s = s} {u = u} f i e) =
+    liftᵉ (subΘTm ((u ×ᵗ listᵗ s) ∷ Θloc) σ f) (subΘTm Θloc σ i) (subΘExp Θloc σ e)
   subΘExp Θloc σ (mergeAllᵉ lim e) = mergeAllᵉ lim (subΘExp Θloc σ e)
   subΘExp Θloc σ (switchAllᵉ e) = switchAllᵉ (subΘExp Θloc σ e)
   subΘExp Θloc σ (exhaustAllᵉ e) = exhaustAllᵉ (subΘExp Θloc σ e)
@@ -394,6 +419,8 @@ mutual
   elimGExp Θl x cl (takeᵉ n e)    = takeᵉ (elimGTm Θl x cl n) (elimGExp Θl x cl e)
   elimGExp Θl x cl (scanᵉ f i e)  =
     scanᵉ (elimGTm (_ ∷ Θl) x cl f) (elimGTm Θl x cl i) (elimGExp Θl x cl e)
+  elimGExp Θl x cl (liftᵉ f i e)  =
+    liftᵉ (elimGTm (_ ∷ Θl) x cl f) (elimGTm Θl x cl i) (elimGExp Θl x cl e)
   elimGExp Θl x cl (mergeAllᵉ lim e) = mergeAllᵉ lim (elimGExp Θl x cl e)
   elimGExp Θl x cl (switchAllᵉ e) = switchAllᵉ (elimGExp Θl x cl e)
   elimGExp Θl x cl (exhaustAllᵉ e) = exhaustAllᵉ (elimGExp Θl x cl e)
@@ -442,6 +469,8 @@ mutual
   elimDExp Θl x cl (takeᵉ n e)    = takeᵉ (elimDTm Θl x cl n) (elimDExp Θl x cl e)
   elimDExp Θl x cl (scanᵉ f i e)  =
     scanᵉ (elimDTm (_ ∷ Θl) x cl f) (elimDTm Θl x cl i) (elimDExp Θl x cl e)
+  elimDExp Θl x cl (liftᵉ f i e)  =
+    liftᵉ (elimDTm (_ ∷ Θl) x cl f) (elimDTm Θl x cl i) (elimDExp Θl x cl e)
   elimDExp Θl x cl (mergeAllᵉ lim e) = mergeAllᵉ lim (elimDExp Θl x cl e)
   elimDExp Θl x cl (switchAllᵉ e) = switchAllᵉ (elimDExp Θl x cl e)
   elimDExp Θl x cl (exhaustAllᵉ e) = exhaustAllᵉ (elimDExp Θl x cl e)
@@ -557,6 +586,8 @@ mutual
   inputsBelowᵉ k (mapᵉ f e)      = inputsBelowᵗ k f ∧ inputsBelowᵉ k e
   inputsBelowᵉ k (takeᵉ c e)     = inputsBelowᵗ k c ∧ inputsBelowᵉ k e
   inputsBelowᵉ k (scanᵉ f z e)   =
+    inputsBelowᵗ k f ∧ inputsBelowᵗ k z ∧ inputsBelowᵉ k e
+  inputsBelowᵉ k (liftᵉ f z e)   =
     inputsBelowᵗ k f ∧ inputsBelowᵗ k z ∧ inputsBelowᵉ k e
   inputsBelowᵉ k (mergeAllᵉ lim e) = inputsBelowᵉ k e
   inputsBelowᵉ k (switchAllᵉ e)  = inputsBelowᵉ k e

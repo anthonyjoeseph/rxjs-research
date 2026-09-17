@@ -232,23 +232,16 @@ failing to typecheck over the collapsed tree. A cone cannot aim at either.
 
 ### Big picture tier roadmap
 
-- **`liftᵉ` FIRST, MIRRORING WHAT RAN.** The Agda former is written to the
-  TypeScript's shape, not to a design: `lift` is landed there and the oracle
-  agrees over it, with `map` and `scan` rewritten through it. Its function is a
-  `Tm`, so it is pure, total and first-order — which is the reason the
-  flatteners cannot follow it in: their payloads are literal syntax that must be
-  RUN, and `Tm` has no eliminator for that. **It needs no new term-level
-  vocabulary and no approval**: `listᵗ`, `foldᵗ` and pairs already write the
-  step function, and `Spec.agda` is stated over emit streams and names no
-  former at all, so nothing here touches the gospel.
-
-- **THEN COLLAPSE THE ABSORBED FORMERS AND EVERY CASE THAT MATCHES ON THEM.**
-  The subscribe relation, the builder, the reducibility candidate and the CLI
-  all match per former, so this is where the palette actually pays — and the
-  substitution tower is most of it, eight of the eighteen modules that match on
-  a former today. It is deliberately after the mirror, because which clauses
-  collapse is discovered by writing `liftᵉ`'s own case rather than predicted
-  from the tree.
+- **COLLAPSE THE ABSORBED FORMERS AND EVERY CASE THAT MATCHES ON THEM.** The
+  former is in and the tree checks over it, so what is left of the mirror is
+  removing what it absorbed: `mapᵉ` and `scanᵉ` are `liftᵉ` at `unitᵗ` and at
+  the output type, and every walk that matches per former carries a clause for
+  each. The size of the leg is now known rather than estimated — adding one
+  former cost one clause in each of eighteen modules, so removing two returns
+  twice that, and the node cell the fold reads is already shared, which is why
+  no state constructor moves. What the leg decides is whether the two
+  eliminations can be written as the same rewrite or whether the seedless one
+  needs its own.
 
 - **THEN THE BRIDGE AND THE GENERATOR, SO THE ORACLE EXERCISES THE NEW FORMER.**
   The collapse is only checked where a program carrying a `liftᵉ` can cross
@@ -256,6 +249,14 @@ failing to typecheck over the collapsed tree. A cone cannot aim at either.
   held by the two formers that happen to survive it in TypeScript. What the leg
   decides is whether a `Tm` payload can cross the JSON boundary at all, which is
   the one part of the mirror the TypeScript pass could not answer.
+
+- **THEN RUN THE SWEEP THE MIRROR WAS BUILT FOR, AND BANK WHAT IT FINDS.** A
+  bridge and a generator make the new shapes REACHABLE; nothing yet says the
+  two trees agree on them. The leg is the oracle and the all-Agda QuickCheck
+  over programs whose pure-function stages are `liftᵉ`, with every disagreement
+  landing as a bug-cache row before it is fixed — the cache is the only place a
+  counterexample survives being fixed, and a mirror certified by a sweep nobody
+  recorded is certified by nothing.
 
 ## Tier 2 — the denotation, adequacy, and the take bound
 

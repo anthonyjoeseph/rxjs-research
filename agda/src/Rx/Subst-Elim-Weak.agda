@@ -36,10 +36,10 @@ open import Relation.Binary.PropositionalEquality
 
 open import Rx.Exp
   using ( Ty; Ctx; Exp; Tm; Ren∈; ext∈; ++Ren; renExp; renTm; renTms
-        ; _×ᵗ_
+        ; _×ᵗ_; listᵗ
         ; _⊟_; ⊟-++ˡ; ⊟-++ʳ; compare∈
         ; elimGExp; elimGTm; elimGTms; elimDExp; elimDTm; elimDTms
-        ; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ
+        ; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; liftᵉ; mergeAllᵉ; switchAllᵉ
         ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ
         ; varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ
         ; caseᵗ; ifᵗ; primᵗ; strmᵗ; nilᵗ; consᵗ; foldᵗ )
@@ -259,6 +259,9 @@ mutual
   elimG-avᵉ Θl x cl av (scanᵉ {s = s} {t = w} f i e) =
     cong₃ scanᵉ (elimG-avᵗ ((w ×ᵗ s) ∷ Θl) x cl av f)
                 (elimG-avᵗ Θl x cl av i) (elimG-avᵉ Θl x cl av e)
+  elimG-avᵉ Θl x cl av (liftᵉ {s = s} {u = w} f i e) =
+    cong₃ liftᵉ (elimG-avᵗ ((w ×ᵗ listᵗ s) ∷ Θl) x cl av f)
+                (elimG-avᵗ Θl x cl av i) (elimG-avᵉ Θl x cl av e)
   elimG-avᵉ Θl x cl av (mergeAllᵉ lim e) =
     cong (mergeAllᵉ lim) (elimG-avᵉ Θl x cl av e)
   elimG-avᵉ Θl x cl av (switchAllᵉ e)  = cong switchAllᵉ (elimG-avᵉ Θl x cl av e)
@@ -329,6 +332,9 @@ mutual
     cong₂ takeᵉ (elimD-avᵗ Θl x refl cl av m) (elimD-avᵉ Θl x refl cl av e)
   elimD-avᵉ Θl x refl cl av (scanᵉ {s = s} {t = w} f i e) =
     cong₃ scanᵉ (elimD-avᵗ ((w ×ᵗ s) ∷ Θl) x refl cl av f)
+                (elimD-avᵗ Θl x refl cl av i) (elimD-avᵉ Θl x refl cl av e)
+  elimD-avᵉ Θl x refl cl av (liftᵉ {s = s} {u = w} f i e) =
+    cong₃ liftᵉ (elimD-avᵗ ((w ×ᵗ listᵗ s) ∷ Θl) x refl cl av f)
                 (elimD-avᵗ Θl x refl cl av i) (elimD-avᵉ Θl x refl cl av e)
   elimD-avᵉ Θl x refl cl av (mergeAllᵉ lim e) =
     cong (mergeAllᵉ lim) (elimD-avᵉ Θl x refl cl av e)

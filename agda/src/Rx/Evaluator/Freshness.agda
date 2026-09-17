@@ -41,7 +41,7 @@ open import Decide using (≡ᵇ-refl; ≡ᵇ→≡)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; cong)
 
 open import Rx.Exp using (Ctx; Closed)
-open import Rx.Evaluator using (EvalSt; Frame; NodeId; NodeState; map-f; take-f; scan-f; from-inner; thru-outer; lookupNode;
+open import Rx.Evaluator using (EvalSt; Frame; NodeId; NodeState; map-f; take-f; scan-f; lift-f; from-inner; thru-outer; lookupNode;
   setNode)
 
 -- a node just written reads back as what was written
@@ -73,6 +73,7 @@ open PreservedBelow using (below)
 FrameAbove : ∀ {n} {Γ : Ctx n} {s u} → ℕ → Frame Γ s u → Set
 FrameAbove f (map-f fn)                  = ⊤
 FrameAbove f (scan-f fn nid)             = f ≤ nid
+FrameAbove f (lift-f fn nid)             = f ≤ nid
 FrameAbove f (take-f nid)                = f ≤ nid
 FrameAbove f (from-inner op allNid inst) = f ≤ allNid × f ≤ inst
 FrameAbove f (thru-outer op nid)         = f ≤ nid
