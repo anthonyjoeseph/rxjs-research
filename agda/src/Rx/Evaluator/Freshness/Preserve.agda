@@ -31,23 +31,23 @@ open import Data.Product using (_,_; proj₁; proj₂)
 open import Relation.Nullary using (yes; no)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import Rx.Exp using (Ctx; Closed; Val; obs; Fn; _×ᵗ_; _≟ᵗ_)
+open import Rx.Exp using (Ctx; Closed; Val; obs; Fn; _×ᵗ_; listᵗ; _≟ᵗ_)
 open import Rx.Prim using (InstEvent)
 open import Rx.Evaluator using (Sched; EvalSt; Path; Frame; NodeId; NodeState; AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ;
-  switchKill; scanDispatch; takeDispatch; thruWrap; mergeAllBump; scanVals; takeVals; scan-st;
+  switchKill; scanDispatch; liftDispatch; takeDispatch; thruWrap; mergeAllBump; scanVals; liftVals; takeVals; cell-st;
   take-st; mergeAll-st; switch-st; exhaust-st; lookupNode)
 open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeInner⇓; thruConsume⇓;
   thruWalk⇓; mergeAllDrain⇓; innerFinish⇓; innerReact⇓; stepFrame⇓; pushBurst⇓;
   subscribeAll⇓; sharedConnect⇓; subscribeSharedSlot⇓;
   subs-floor; subs-shared; subs-hot-done; subs-hot-live; subs-cold-sync;
   subs-cold-async; subs-of; subs-empty; subs-map; subs-take-zero; subs-take-suc;
-  subs-scan; subs-merge-all; subs-switch-all; subs-exhaust-all; subs-μ; subs-defer;
+  subs-scan; subs-lift; subs-merge-all; subs-switch-all; subs-exhaust-all; subs-μ; subs-defer;
   inner; consume-all-sub; consume-all-enqueue; consume-all-nil; consume-switch-sub;
   consume-switch-nil; consume-exhaust-sub; consume-exhaust-nil;
   walk-nil; walk-cons; drain-nil; drain-no-room; drain-room;
   finish-all-drain; finish-switch-clear; finish-exhaust-clear; finish-nil;
   react-false; react-alive; react-dead;
-  step-map; step-scan; step-take; step-from-inner; step-thru-outer;
+  step-map; step-scan; step-lift; step-take; step-from-inner; step-thru-outer;
   push-nil; push-cons; sub-all; connect-live; connect-died;
   slot-spent; slot-join; slot-connect)
 open import Rx.Evaluator.Freshness using (PreservedBelow; FrameAbove;
@@ -62,15 +62,33 @@ scan-pres : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {f}
           → f ≤ nid
           → PreservedBelow f st (proj₂ (proj₂ (proj₂ (proj₂
               (scanDispatch {e = e} fn nid vals fin sched st m)))))
-scan-pres {u = u} fn nid vals fin sched st (just (scan-st {w} a)) f≤nid
+scan-pres {u = u} fn nid vals fin sched st (just (cell-st {w} a)) f≤nid
   with w ≟ᵗ u
 ... | no  _    = pres-same _ _ refl
-... | yes refl = pres-write _ _ (scan-st (proj₂ (scanVals fn a vals))) refl f≤nid
+... | yes refl = pres-write _ _ (cell-st (proj₂ (scanVals fn a vals))) refl f≤nid
 scan-pres fn nid vals fin sched st nothing                    f≤nid = pres-same _ _ refl
 scan-pres fn nid vals fin sched st (just (take-st _))         f≤nid = pres-same _ _ refl
 scan-pres fn nid vals fin sched st (just (mergeAll-st _ _ _ _)) f≤nid = pres-same _ _ refl
 scan-pres fn nid vals fin sched st (just (switch-st _ _))     f≤nid = pres-same _ _ refl
 scan-pres fn nid vals fin sched st (just (exhaust-st _ _))    f≤nid = pres-same _ _ refl
+
+-- and the lifted step is the same story over the same cell
+lift-pres : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u w} {f}
+              (fn : Fn Γ [] [] [] (w ×ᵗ listᵗ s) (w ×ᵗ listᵗ u)) (nid : NodeId)
+              (vals : List (Val Γ s)) (fin : Bool)
+              (sched : Sched Γ) (st : EvalSt e) (m : Maybe (NodeState Γ))
+          → f ≤ nid
+          → PreservedBelow f st (proj₂ (proj₂ (proj₂ (proj₂
+              (liftDispatch {e = e} fn nid vals fin sched st m)))))
+lift-pres {w = w} fn nid vals fin sched st (just (cell-st {v} a)) f≤nid
+  with v ≟ᵗ w
+... | no  _    = pres-same _ _ refl
+... | yes refl = pres-write _ _ (cell-st (proj₂ (liftVals fn a vals))) refl f≤nid
+lift-pres fn nid vals fin sched st nothing                    f≤nid = pres-same _ _ refl
+lift-pres fn nid vals fin sched st (just (take-st _))         f≤nid = pres-same _ _ refl
+lift-pres fn nid vals fin sched st (just (mergeAll-st _ _ _ _)) f≤nid = pres-same _ _ refl
+lift-pres fn nid vals fin sched st (just (switch-st _ _))     f≤nid = pres-same _ _ refl
+lift-pres fn nid vals fin sched st (just (exhaust-st _ _))    f≤nid = pres-same _ _ refl
 
 -- the truncation's cut severs registrations and rewrites its own node
 take-pres : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s} {f}
@@ -84,7 +102,7 @@ take-pres nid vals fin sched st (just (take-st k)) f≤nid
 ... | true  = pres-write _ _ (take-st zero) refl f≤nid
 ... | false = pres-write _ _ (take-st (proj₁ (proj₂ (takeVals k vals)))) refl f≤nid
 take-pres nid vals fin sched st nothing                     f≤nid = pres-same _ _ refl
-take-pres nid vals fin sched st (just (scan-st _))          f≤nid = pres-same _ _ refl
+take-pres nid vals fin sched st (just (cell-st _))          f≤nid = pres-same _ _ refl
 take-pres nid vals fin sched st (just (mergeAll-st _ _ _ _)) f≤nid = pres-same _ _ refl
 take-pres nid vals fin sched st (just (switch-st _ _))      f≤nid = pres-same _ _ refl
 take-pres nid vals fin sched st (just (exhaust-st _ _))     f≤nid = pres-same _ _ refl
@@ -101,7 +119,7 @@ wrap-pres op nid false vs bs sched′ st′ f≤nid = pres-same _ _ refl
 wrap-pres mergeAllᵒ nid true vs bs sched′ st′ f≤nid
   with lookupNode nid (EvalSt.nodes st′)
 ... | just (mergeAll-st lim act q _) = pres-write _ _ (mergeAll-st lim act q true) refl f≤nid
-... | just (scan-st _)               = pres-same _ _ refl
+... | just (cell-st _)               = pres-same _ _ refl
 ... | just (take-st _)               = pres-same _ _ refl
 ... | just (switch-st _ _)           = pres-same _ _ refl
 ... | just (exhaust-st _ _)          = pres-same _ _ refl
@@ -109,7 +127,7 @@ wrap-pres mergeAllᵒ nid true vs bs sched′ st′ f≤nid
 wrap-pres switchᵒ nid true vs bs sched′ st′ f≤nid
   with lookupNode nid (EvalSt.nodes st′)
 ... | just (switch-st cur _)         = pres-write _ _ (switch-st cur true) refl f≤nid
-... | just (scan-st _)               = pres-same _ _ refl
+... | just (cell-st _)               = pres-same _ _ refl
 ... | just (take-st _)               = pres-same _ _ refl
 ... | just (mergeAll-st _ _ _ _)     = pres-same _ _ refl
 ... | just (exhaust-st _ _)          = pres-same _ _ refl
@@ -117,7 +135,7 @@ wrap-pres switchᵒ nid true vs bs sched′ st′ f≤nid
 wrap-pres exhaustᵒ nid true vs bs sched′ st′ f≤nid
   with lookupNode nid (EvalSt.nodes st′)
 ... | just (exhaust-st act _)        = pres-write _ _ (exhaust-st act true) refl f≤nid
-... | just (scan-st _)               = pres-same _ _ refl
+... | just (cell-st _)               = pres-same _ _ refl
 ... | just (take-st _)               = pres-same _ _ refl
 ... | just (mergeAll-st _ _ _ _)     = pres-same _ _ refl
 ... | just (switch-st _ _)           = pres-same _ _ refl
@@ -131,7 +149,7 @@ bump-pres : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {f} {nid} {done}
               (record st { nodes = mergeAllBump nid done (EvalSt.nodes st) })
 bump-pres {nid = nid} st f≤nid with lookupNode nid (EvalSt.nodes st)
 ... | just (mergeAll-st _ _ _ _) = pres-write _ _ _ refl f≤nid
-... | just (scan-st _)           = pres-same _ _ refl
+... | just (cell-st _)           = pres-same _ _ refl
 ... | just (take-st _)           = pres-same _ _ refl
 ... | just (switch-st _ _)       = pres-same _ _ refl
 ... | just (exhaust-st _ _)      = pres-same _ _ refl
@@ -286,6 +304,11 @@ subscribeE-preserves f le (subs-scan {seed = seed} refl sub push) =
                          (subscribeE-preserves f (≤-trans le (n≤1+n _)) sub))
              (pushBurst-preserves f
                 (≤-trans (≤-trans le (n≤1+n _)) (subscribeE-mono sub)) le push)
+subscribeE-preserves f le (subs-lift refl sub push) =
+  pres-trans (pres-trans (pres-write _ _ _ refl le)
+                         (subscribeE-preserves f (≤-trans le (n≤1+n _)) sub))
+             (pushBurst-preserves f
+                (≤-trans (≤-trans le (n≤1+n _)) (subscribeE-mono sub)) le push)
 subscribeE-preserves f le (subs-merge-all sa)    = subscribeAll-preserves f le sa
 subscribeE-preserves f le (subs-switch-all sa)   = subscribeAll-preserves f le sa
 subscribeE-preserves f le (subs-exhaust-all sa)  = subscribeAll-preserves f le sa
@@ -301,6 +324,9 @@ stepFrame-preserves f le fa step-map = pres-same _ _ refl
 stepFrame-preserves f le fa
   (step-scan {fn = fn} {nid} {vals = vals} {fin} {sched} {st}) =
   scan-pres fn nid vals fin sched st (lookupNode nid (EvalSt.nodes st)) fa
+stepFrame-preserves f le fa
+  (step-lift {fn = fn} {nid} {vals = vals} {fin} {sched} {st}) =
+  lift-pres fn nid vals fin sched st (lookupNode nid (EvalSt.nodes st)) fa
 stepFrame-preserves f le fa
   (step-take {nid = nid} {vals = vals} {fin} {sched} {st}) =
   take-pres nid vals fin sched st (lookupNode nid (EvalSt.nodes st)) fa

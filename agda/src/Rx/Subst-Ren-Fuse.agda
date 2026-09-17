@@ -36,8 +36,8 @@ open import Relation.Binary.PropositionalEquality
 
 open import Rx.Exp
   using ( Ty; Ctx; Exp; Tm; Val; Ren∈; ext∈; ++Ren; renExp; renTm; renTms
-        ; subΘExp; subΘTm; subΘTms; wkTm; reify; lookupEnv; _×ᵗ_
-        ; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ
+        ; subΘExp; subΘTm; subΘTms; wkTm; reify; lookupEnv; _×ᵗ_; listᵗ
+        ; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; liftᵉ; mergeAllᵉ; switchAllᵉ
         ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ
         ; varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ
         ; ifᵗ; primᵗ; strmᵗ; nilᵗ; consᵗ; foldᵗ )
@@ -104,6 +104,9 @@ mutual
     cong₂ takeᵉ (ren-∘ᵗ cg cd ct m) (ren-∘ᵉ cg cd ct e)
   ren-∘ᵉ cg cd ct (scanᵉ f i e) =
     cong₃ scanᵉ (ren-∘ᵗ cg cd (comp-ext ct) f) (ren-∘ᵗ cg cd ct i)
+                (ren-∘ᵉ cg cd ct e)
+  ren-∘ᵉ cg cd ct (liftᵉ f i e) =
+    cong₃ liftᵉ (ren-∘ᵗ cg cd (comp-ext ct) f) (ren-∘ᵗ cg cd ct i)
                 (ren-∘ᵉ cg cd ct e)
   ren-∘ᵉ cg cd ct (mergeAllᵉ lim e) = cong (mergeAllᵉ lim) (ren-∘ᵉ cg cd ct e)
   ren-∘ᵉ cg cd ct (switchAllᵉ e)    = cong switchAllᵉ (ren-∘ᵉ cg cd ct e)
@@ -227,6 +230,10 @@ mutual
   sub-fixᵉ Θa Θb {ρ⁺ = ρ⁺} σ fl fr (scanᵉ {s = s} {t = w} f i e) =
     cong₃ scanᵉ
       (sub-fixᵗ ((w ×ᵗ s) ∷ Θa) ((w ×ᵗ s) ∷ Θb) σ (fixL-ext fl) (fixR-ext {Θa = Θa} {Θb = Θb} {ρ⁺ = ρ⁺} fr) f)
+      (sub-fixᵗ Θa Θb σ fl fr i) (sub-fixᵉ Θa Θb σ fl fr e)
+  sub-fixᵉ Θa Θb {ρ⁺ = ρ⁺} σ fl fr (liftᵉ {s = s} {u = w} f i e) =
+    cong₃ liftᵉ
+      (sub-fixᵗ ((w ×ᵗ listᵗ s) ∷ Θa) ((w ×ᵗ listᵗ s) ∷ Θb) σ (fixL-ext fl) (fixR-ext {Θa = Θa} {Θb = Θb} {ρ⁺ = ρ⁺} fr) f)
       (sub-fixᵗ Θa Θb σ fl fr i) (sub-fixᵉ Θa Θb σ fl fr e)
   sub-fixᵉ Θa Θb σ fl fr (mergeAllᵉ lim e) =
     cong (mergeAllᵉ lim) (sub-fixᵉ Θa Θb σ fl fr e)

@@ -18,7 +18,7 @@ open import Relation.Binary.PropositionalEquality using (refl)
 
 open import Rx.Prim using (Tick; Ordinal; Id; Source; Timed; after_,_; hot; cold; InstEvent; init; value; close;
   handoff; complete; cut; cutPending; exhausted; subscribe; plumbing; InstEmit; _at_from_as_)
-open import Rx.Exp  using (Ty; obs; _×ᵗ_; _≟ᵗ_; Ctx; Val; Closed; Fn; applyFn)
+open import Rx.Exp  using (Ty; obs; _×ᵗ_; listᵗ; _≟ᵗ_; Ctx; Val; Closed; Fn; applyFn)
 
 variable
   lo : ℕ
@@ -165,7 +165,7 @@ NodeId = ℕ            -- numbered in subscription order
 -- recursion on the type says nothing about what a NODE HOLDS, so every
 -- arm of `Rx.Evaluator.Reducible` that reads a node back is owed a
 -- store invariant -- but only where the read produces a VALUE.  Here
--- `scan-st` holds one outright and `mergeAll-st`'s queue holds closed
+-- `cell-st` holds one outright and `mergeAll-st`'s queue holds closed
 -- expressions; `take-st`, `switch-st` and `exhaust-st` hold a count, an
 -- identifier and two flags, and nothing that leaves a frame dispatching
 -- on those came from anywhere but the burst that arrived.  So three of
@@ -174,7 +174,14 @@ NodeId = ℕ            -- numbered in subscription order
 -- admitted it, while an accumulator's is folded by the operator's own
 -- function and has no such source.
 data NodeState {n} (Γ : Ctx n) : Set where
-  scan-st    : ∀ {t} → Val Γ t → NodeState Γ    -- current accumulator
+  cell-st    : ∀ {t} → Val Γ t → NodeState Γ
+               -- ONE CARRIED VALUE, AND IT IS NOT SCAN'S.  Every
+               -- stateful pure-function former keeps exactly this and
+               -- nothing else -- a running accumulator for the fold,
+               -- the carried state for the lifted step -- so the cell
+               -- is named for what it HOLDS rather than for whichever
+               -- former happens to be installed over it.  The type is
+               -- existential, so each read pays a `_≟ᵗ_`.
   take-st    : ℕ → NodeState Γ                  -- emissions remaining
   mergeAll-st : ∀ {t} → (limit : Maybe ℕ) (active : ℕ)
                (queued : List (Closed Γ t)) (outerDone : Bool) → NodeState Γ
@@ -222,6 +229,13 @@ data AllOp : Set where
 data Frame {n} (Γ : Ctx n) : Ty → Ty → Set where
   map-f      : ∀ {s u} → Fn Γ [] [] [] s u → Frame Γ s u
   scan-f     : ∀ {s u} → Fn Γ [] [] [] (u ×ᵗ s) u → NodeId → Frame Γ s u
+  lift-f     : ∀ {s u w} → Fn Γ [] [] [] (w ×ᵗ listᵗ s) (w ×ᵗ listᵗ u)
+             → NodeId → Frame Γ s u
+               -- the lifted step, which sees the WHOLE arriving value
+               -- list at once and hands back a whole one.  That is the
+               -- largest a frame can be while leaving the protocol
+               -- alone: it reads no node but its own cell, mints no
+               -- registration and cannot raise fin.
   take-f     : ∀ {s} → NodeId → Frame Γ s s
   from-inner : ∀ {s} → AllOp → (allNode innerInstance : NodeId) → Frame Γ s s
                -- exiting a subscribed inner: the *All's own node, and
@@ -292,6 +306,7 @@ lowerFloor le (f ↠ p)          = f ↠ lowerFloor le p
 frameNodes : ∀ {n} {Γ : Ctx n} {s u} → Frame Γ s u → List NodeId
 frameNodes (map-f _)          = []
 frameNodes (scan-f _ k)       = k ∷ []
+frameNodes (lift-f _ k)       = k ∷ []
 frameNodes (take-f k)         = k ∷ []
 frameNodes (from-inner _ k j) = k ∷ j ∷ []
 frameNodes (thru-outer _ k)   = k ∷ []
@@ -538,14 +553,42 @@ scanDispatch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
              → Sched Γ → EvalSt e → Maybe (NodeState Γ)
              → List (Val Γ u) × List (InstEvent (Val Γ t)) × Bool
                × Sched Γ × EvalSt e
-scanDispatch {u = u} fn nid vals fin sched st (just (scan-st {w} a))
+scanDispatch {u = u} fn nid vals fin sched st (just (cell-st {w} a))
   with w ≟ᵗ u
 ... | no  _    = [] , [] , fin , sched , st
 ... | yes refl =
       proj₁ (scanVals fn a vals) , [] , fin , sched ,
-      record st { nodes = setNode nid (scan-st (proj₂ (scanVals fn a vals)))
+      record st { nodes = setNode nid (cell-st (proj₂ (scanVals fn a vals)))
                                   (EvalSt.nodes st) }
 scanDispatch fn nid vals fin sched st _ = [] , [] , fin , sched , st
+
+-- THE LIFTED STEP, WHICH IS ONE APPLICATION AND NOT A FOLD.  The
+-- function is handed the carried state and the whole arriving list and
+-- hands back both, so what the evaluator does here is read the cell,
+-- apply once, and write the cell back; a fold over the elements, if
+-- the operator wants one, is written INSIDE the step with the term
+-- language's own `foldᵗ`.
+liftVals : ∀ {n} {Γ : Ctx n} {s u w} → Fn Γ [] [] [] (w ×ᵗ listᵗ s) (w ×ᵗ listᵗ u)
+         → Val Γ w → List (Val Γ s) → List (Val Γ u) × Val Γ w
+liftVals fn ac vals = proj₂ (applyFn fn (ac , vals)) , proj₁ (applyFn fn (ac , vals))
+
+-- The same stuck reading as the fold's: a cell of the wrong type emits
+-- nothing and writes nothing, stated as a function so no prover can
+-- prefer that arm at a node that really does hold the state.
+liftDispatch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u w}
+             → Fn Γ [] [] [] (w ×ᵗ listᵗ s) (w ×ᵗ listᵗ u) → NodeId
+             → List (Val Γ s) → Bool
+             → Sched Γ → EvalSt e → Maybe (NodeState Γ)
+             → List (Val Γ u) × List (InstEvent (Val Γ t)) × Bool
+               × Sched Γ × EvalSt e
+liftDispatch {w = w} fn nid vals fin sched st (just (cell-st {v} a))
+  with v ≟ᵗ w
+... | no  _    = [] , [] , fin , sched , st
+... | yes refl =
+      proj₁ (liftVals fn a vals) , [] , fin , sched ,
+      record st { nodes = setNode nid (cell-st (proj₂ (liftVals fn a vals)))
+                                  (EvalSt.nodes st) }
+liftDispatch fn nid vals fin sched st _ = [] , [] , fin , sched , st
 
 -- take's per-emit step, lifted out of stepFrame so the well-formedness proof
 -- can reason about its reduction over a stuck node lookup.  Non-cut passes the

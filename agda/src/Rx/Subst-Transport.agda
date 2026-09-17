@@ -28,7 +28,7 @@ open import Relation.Binary.PropositionalEquality
 
 open import Rx.Exp
   using ( Ty; Ctx; Exp; Tm
-        ; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ
+        ; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; liftᵉ; mergeAllᵉ
         ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ
         ; varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ
         ; caseᵗ; ifᵗ; primᵗ; strmᵗ; PrimOp
@@ -108,6 +108,13 @@ pushScan : (eq : Θ ≡ Θ') (f : Tm Γ Δᵍ Δ ((t ×ᵗ s) ∷ Θ) t)
                  (subst (Cᵗ Γ Δᵍ Δ t) eq i) (subst (Cᵉ Γ Δᵍ Δ s) eq e)
              ≡ subst (Cᵉ Γ Δᵍ Δ t) eq (scanᵉ f i e)
 pushScan refl f i e = refl
+
+pushLift : (eq : Θ ≡ Θ') (f : Tm Γ Δᵍ Δ ((u ×ᵗ listᵗ s) ∷ Θ) (u ×ᵗ listᵗ t))
+           (i : Tm Γ Δᵍ Δ Θ u) (e : Exp Γ Δᵍ Δ Θ s)
+         → liftᵉ (subst (λ z → Tm Γ Δᵍ Δ ((u ×ᵗ listᵗ s) ∷ z) (u ×ᵗ listᵗ t)) eq f)
+                 (subst (Cᵗ Γ Δᵍ Δ u) eq i) (subst (Cᵉ Γ Δᵍ Δ s) eq e)
+             ≡ subst (Cᵉ Γ Δᵍ Δ t) eq (liftᵉ f i e)
+pushLift refl f i e = refl
 
 pushMerge : (eq : Θ ≡ Θ') (lim : Maybe ℕ) (e : Exp Γ Δᵍ Δ Θ (obs t))
           → mergeAllᵉ lim (subst (Cᵉ Γ Δᵍ Δ (obs t)) eq e)
