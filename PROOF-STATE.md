@@ -230,16 +230,22 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 
 ### Big picture tier roadmap
 
-- **THE DEMOTION AND THE SIMUL TREE, WHICH ARE ONE LANDING AND NOT TWO.**
-  Target: `evaluate : … → List (Val Γ t)`, plus a second `Exp` whose formers
-  are the envelope-carrying operators and one elaboration down into the plain
-  tree. They were two legs until the census, which found no state in between:
-  the moment the evaluator stops returning envelopes, the harness's case loop,
-  every readme instance, the CLI's encode path and the provenance leaf are
-  untypeable, and nothing repairs them until a simul program supplies the
-  envelope. The bridge would be a second envelope-producing path, which is the
-  one repair this repo forbids. Eleven sites read a field of the machine's own
-  envelope and are the work; the rest goes with the return type.
+- **THE DEMOTION, NOW THAT A SIMUL PROGRAM SUPPLIES THE ENVELOPE.** Target:
+  `evaluate : … → List (Val Γ t)`. The census called this and the tree one
+  landing; half of that held. The demotion does need the tree — it makes the
+  harness's case loop, every readme instance, the CLI's encode path and the
+  provenance leaf untypeable at once, and only a simul program repairs them —
+  but the tree needed none of the demotion: it reaches Main through the
+  restated top line and has landed ahead. Eleven sites read a field of the
+  machine's own envelope and are the work; the rest goes with the return type.
+
+- **THEN `toPlain` GETS A BODY.** It is a leaf today, so the restated top line
+  claims correctness of an elaboration nothing has written; every former's
+  protocol traffic is decided there. The body is per-former plumbing over the
+  type translation, plus the one lemma a pointwise-translated context owes —
+  that looking an input up commutes with the walk. It comes after the demotion
+  because what the plumbing must produce is exactly what the demoted evaluator
+  no longer mints for itself.
 
 - **THEN ONE KEYED LEDGER FOR EVERY MINT.** The evaluator carries its instant,
   source, node and registration counters separately, threaded through the

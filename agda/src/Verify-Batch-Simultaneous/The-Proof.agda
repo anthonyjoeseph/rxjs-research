@@ -16,7 +16,9 @@ open import Relation.Binary.PropositionalEquality
 
 open import Rx.Prim               using (InstEmit; Fuel; Id; Source; _at_from_as_; InstEvent; init; value; close; handoff; complete;
   EmitKind; subscribe; delivery; plumbing; cut; cutPending; exhausted)
-open import Rx.Exp                using (Ctx; Closed)
+open import Rx.Exp                using (Ctx)
+open import Rx.SExp               using (SExp; plainᵛ)
+open import Rx.Elaborate          using (toPlain)
 open import Rx.Evaluator.Builder using (evaluate↓)
 open import Rx.Slots using (Slots)
 open import Rx.Protocol           using (ProtocolSt; Owed; protocol-init; runProtocol; stepProtocol; paidOff; allZero; Accepted;
@@ -1075,12 +1077,26 @@ batch-agreement :
 batch-agreement xs acc =
   sym (fold-agree [] protocol-init batch-init xs rel-init (λ j o ()) acc)
 
--- THE verified object, end to end: for every program, batching its
--- rendered stream is spec-correct.  A real definition — the proof
--- IS the composition of the two lemmas.
+-- THE verified object, end to end: for every SRXJS program, batching
+-- its rendered stream is spec-correct.  A real definition — the proof
+-- IS the composition of the two lemmas, applied to the elaboration.
+--
+-- THE PROGRAM IS A SIMUL PROGRAM AND THAT IS THE CLAIM'S SHAPE, NOT A
+-- CONVENIENCE.  `Closed` is the whole of what the evaluator runs, which
+-- is strictly more than the operators this development ships: it can
+-- build an emit by hand and name an instant that no mint produced, and
+-- a theorem quantified over it is a theorem about programs nobody is
+-- meant to write.  Quantifying over `SExp` instead says what is
+-- actually being claimed — every program an author can compose out of
+-- the shipped palette batches correctly — and it says it by SCOPE, so
+-- the restriction costs no hypothesis and nothing downstream carries a
+-- side condition.  The elaboration is the only bridge, so the run below
+-- is still an ordinary run of the ordinary machine.
 formal-verification-batchSimultaneous :
-  ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slots Γ) →
-  spec-batchSimultaneous (evaluate↓ fuel e ins)
-    ≡ impl-batchSimultaneous (evaluate↓ fuel e ins)
+  ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : SExp Γ [] [] [] t)
+    (ins : Slots (plainᵛ Γ)) →
+  spec-batchSimultaneous (evaluate↓ fuel (toPlain e) ins)
+    ≡ impl-batchSimultaneous (evaluate↓ fuel (toPlain e) ins)
 formal-verification-batchSimultaneous fuel e ins =
-  batch-agreement (evaluate↓ fuel e ins) (evaluate-accepted fuel e ins)
+  batch-agreement (evaluate↓ fuel (toPlain e) ins)
+                  (evaluate-accepted fuel (toPlain e) ins)
