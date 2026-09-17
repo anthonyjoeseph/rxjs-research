@@ -43,6 +43,14 @@ grep -qx -- '-- <<<IMPORTS' "$CORPUS" || {
 # `make imports-fix` prunes it to what the corpus actually uses, which is what
 # makes the pruned file unable to accept the NEXT row — so the wide form is
 # restored here, before anything is appended, and pruned again at the end.
+#
+# AND IT COVERS WHAT THE CORPUS ALREADY SPENDS, NOT ONLY WHAT THE GENERATOR
+# CAN EMIT TODAY.  The corpus is APPEND-ONLY and the pruner reads the WHOLE
+# file, so a name dropped from this block because the generator stopped
+# emitting it is deleted from the import list of rows that still use it, and
+# the corpus goes unscopeable on the next run of this script.  `mapᵉ` and
+# `scanᵉ` are here for exactly that reason: they are definitions over `liftᵉ`
+# that older rows were written in, and no row is ever rewritten.
 read -r -d '' WIDE_IMPORTS <<'AGDA' || true
 open import Data.Fin using (zero; suc)
 open import Data.Maybe using (nothing; just)
@@ -50,7 +58,7 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import Relation.Binary.PropositionalEquality using (refl)
 
 open import Rx.Prim using (after_,_; hot; cold)
-open import Rx.Exp using (input; ofᵉ; emptyᵉ; takeᵉ; liftᵉ; mergeAllᵉ;
+open import Rx.Exp using (input; ofᵉ; emptyᵉ; takeᵉ; liftᵉ; mapᵉ; scanᵉ; mergeAllᵉ;
   switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ;
   nat̂; unit̂; nilᵗ; consᵗ; foldᵗ; ifᵗ; revᵗ;
   primᵗ; pairᵗ; fstᵗ; sndᵗ; strmᵗ; varᵗ; add; sub; mul; eqᵖ; ltᵖ; notᵖ)
