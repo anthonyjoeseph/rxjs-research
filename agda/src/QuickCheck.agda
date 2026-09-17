@@ -157,46 +157,29 @@ genScanFn : ∀ {Δᵍ Δ Θ} → Gen (Fn Γ₂ Δᵍ Δ Θ (natᵗ ×ᵗ natᵗ
 genScanFn = pureG (primᵗ add (pairᵗ (fstᵗ (varᵗ (here refl)))
                                     (sndᵗ (varᵗ (here refl)))))
 
--- THE RAW PURE-FUNCTION STEP, WHOSE WHOLE JOB IS THE SHAPES `mapᵉ` AND
--- `scanᵉ` CANNOT REACH.  Both of those are per-VALUE, so the list they
--- hand back is always as long as the one they were given; a step that
--- DROPS, LENGTHENS or COLLAPSES an emit is a lift and nothing else, and
--- a sweep built only out of the two encodings never generates one.  The
--- arms are a lattice over what happens to the value COUNT — emptied,
--- doubled, one longer, collapsed to a single value, filtered, and
--- unchanged — because the count is the axis the encodings fix and the
--- former does not.
+-- THE STEP THAT CHANGES AN EMIT'S VALUE COUNT, WHICH IS NOW A FLATTEN
+-- AND NOT A STEP AT ALL.  `mapᵉ` and `scanᵉ` are both per-VALUE, so the
+-- list they hand back is always as long as the one they were given, and
+-- a sweep built only out of them never changes a count.  Zero-or-more
+-- out is `mergeAllᵉ` over a step returning LITERAL SYNTAX — rxjs's own
+-- `mergeMap(x => …)` — so this generates the step and the lane spends
+-- it under a flattener.  The arms are a lattice over what happens to
+-- the count: emptied, doubled, one longer, filtered, and unchanged.
 --
 -- THE IDENTITY ARM IS DELIBERATE, on the reasoning `genFn` records: a
 -- generator whose every arm exercises the interesting shape cannot
 -- produce the program that distinguishes a step which ignores its input
 -- from one that does not.
---
--- A left fold that conses builds its result reversed, so the arms that
--- rebuild a list pay `revᵗ` exactly as `mapᵉ` does.
-genLiftFn : ∀ {Δᵍ Δ Θ}
-          → Gen (Fn Γ₂ Δᵍ Δ Θ (natᵗ ×ᵗ listᵗ natᵗ) (natᵗ ×ᵗ listᵗ natᵗ))
-genLiftFn = genB 6 >>=G λ c → genNat >>=G λ k →
-  let arg = varᵗ (here refl)
-      st  = fstᵗ arg
-      vs  = sndᵗ arg
-      -- inside a `foldᵗ` step whose accumulator is the rebuilt LIST: the
-      -- element at 0, the accumulator at 1.  The collapsing arm's fold
-      -- carries a nat instead, so it spells its two variables itself
-      x    = varᵗ (here refl)
-      accL = varᵗ (there (here refl))
+genFanFn : ∀ {Δᵍ Δ Θ} → Gen (Fn Γ₂ Δᵍ Δ Θ natᵗ (obs natᵗ))
+genFanFn = genB 5 >>=G λ c → genNat >>=G λ k →
+  let x = varᵗ (here refl)
   in pureG
-    (      if c ≡ᵇ 0 then pairᵗ st nilᵗ
-      else if c ≡ᵇ 1 then pairᵗ st (revᵗ (foldᵗ vs nilᵗ (consᵗ x (consᵗ x accL))))
-      else if c ≡ᵇ 2 then pairᵗ st (consᵗ (nat̂ k) vs)
+    (      if c ≡ᵇ 0 then strmᵗ emptyᵉ
+      else if c ≡ᵇ 1 then strmᵗ (ofᵉ (x ∷ x ∷ []))
+      else if c ≡ᵇ 2 then strmᵗ (ofᵉ (x ∷ nat̂ k ∷ []))
       else if c ≡ᵇ 3 then
-        (let total = foldᵗ vs st (primᵗ add (pairᵗ (varᵗ (here refl))
-                                                   (varᵗ (there (here refl)))))
-         in pairᵗ total (consᵗ total nilᵗ))
-      else if c ≡ᵇ 4 then
-        pairᵗ st (revᵗ (foldᵗ vs nilᵗ
-          (ifᵗ (primᵗ ltᵖ (pairᵗ x (nat̂ k))) accL (consᵗ x accL))))
-      else arg)
+        ifᵗ (primᵗ ltᵖ (pairᵗ x (nat̂ k))) (strmᵗ emptyᵉ) (strmᵗ (ofᵉ (x ∷ [])))
+      else strmᵗ (ofᵉ (x ∷ [])))
 
 -- THE ACCUMULATOR AT OBSERVABLE TYPE, WHICH IS THE ONE BINDER THAT
 -- BREAKS A DATA ENVIRONMENT.  Substituting a value of observable type
@@ -326,8 +309,8 @@ genExpAt g u (suc d) = genB 13 >>=G λ c →
   else if c ≡ᵇ 9 then (genSpineG g u d >>=G λ b → pureG (μᵉ b))
   else if c ≡ᵇ 10 then (genExpAt 0 (g + u) d >>=G λ b → pureG (gate g u b))
   else if c ≡ᵇ 11 then
-    (genLiftFn >>=G λ f → genNat >>=G λ s → genExpAt g u d >>=G λ e →
-     pureG (scanᵉ f (nat̂ s) e))
+    (genFanFn >>=G λ f → genExpAt g u d >>=G λ e →
+     pureG (mergeAllᵉ nothing (mapᵉ f e)))
   else genLeafAt g u
 
 genInners g u d zero    = pureG []
@@ -385,8 +368,8 @@ genSpineD w (suc d) = genB 9 >>=G λ c →
     (genSpineD w d >>=G λ e → genB 2 >>=G λ extra → genInners 0 (suc w) d (suc extra) >>=G λ rest →
      pureG (switchAllᵉ (ofᵉ (strmᵗ e ∷ rest))))
   else if c ≡ᵇ 7 then
-    (genLiftFn >>=G λ f → genNat >>=G λ s → genSpineD w d >>=G λ e →
-     pureG (scanᵉ f (nat̂ s) e))
+    (genFanFn >>=G λ f → genSpineD w d >>=G λ e →
+     pureG (mergeAllᵉ nothing (mapᵉ f e)))
   else
     (genSpineD w d >>=G λ e → genB 2 >>=G λ extra → genInners 0 (suc w) d (suc extra) >>=G λ rest →
      pureG (exhaustAllᵉ (ofᵉ (strmᵗ e ∷ rest))))
@@ -409,8 +392,8 @@ genSpineG g u (suc d) = genB 9 >>=G λ c →
      genInners (suc g) u d (suc extra) >>=G λ rest →
      pureG (switchAllᵉ (ofᵉ (strmᵗ e ∷ rest))))
   else if c ≡ᵇ 7 then
-    (genLiftFn >>=G λ f → genNat >>=G λ s → genSpineG g u d >>=G λ e →
-     pureG (scanᵉ f (nat̂ s) e))
+    (genFanFn >>=G λ f → genSpineG g u d >>=G λ e →
+     pureG (mergeAllᵉ nothing (mapᵉ f e)))
   else
     (genSpineG g u d >>=G λ e → genB 2 >>=G λ extra →
      genInners (suc g) u d (suc extra) >>=G λ rest →
@@ -427,15 +410,15 @@ genExp d = genExpAt 0 0 d
 
 -- THE PALETTE, NAMED BY THE TAGS THE TWO TREES ARE PAIRED BY.  A census
 -- per INTERESTING REGION is a census whose regions were chosen by whoever
--- last thought about one, which is how this generator came to have no raw
--- lift lane at all — found by reading, and by no check, after sixty
--- thousand programs had certified impl≡spec without once changing an
--- emit's value count.  A census per FORMER cannot have that hole: the
+-- last thought about one, which is how this generator came to have no
+-- count-changing lane at all — found by reading, and by no check, after
+-- sixty thousand programs had certified impl≡spec without once changing
+-- an emit's value count.  A census per FORMER cannot have that hole: the
 -- walk below is a total match, so a former added to `Exp` owes an arm
 -- here, and `scripts/formers.tsv` holds these tags to the ones the
 -- decoder and the TypeScript union spell.
 data Former : Set where
-  fInput fOf fEmpty fTake fLift fMergeAll fSwitchAll fExhaustAll
+  fInput fOf fEmpty fTake fMap fScan fMergeAll fSwitchAll fExhaustAll
     fMu fVar fDefer fMint fBatchSync : Former
 
 formerTag : Former → String
@@ -443,7 +426,8 @@ formerTag fInput      = "input"
 formerTag fOf         = "of"
 formerTag fEmpty      = "empty"
 formerTag fTake       = "take"
-formerTag fLift       = "lift"
+formerTag fMap        = "map"
+formerTag fScan       = "scan"
 formerTag fMergeAll   = "mergeAll"
 formerTag fSwitchAll  = "switchAll"
 formerTag fExhaustAll = "exhaustAll"
@@ -454,23 +438,25 @@ formerTag fMint       = "mint"
 formerTag fBatchSync  = "batchSync"
 
 allFormers : List Former
-allFormers = fInput ∷ fOf ∷ fEmpty ∷ fTake ∷ fLift ∷ fMergeAll ∷ fSwitchAll
-           ∷ fExhaustAll ∷ fMu ∷ fVar ∷ fDefer ∷ fMint ∷ fBatchSync ∷ []
+allFormers = fInput ∷ fOf ∷ fEmpty ∷ fTake ∷ fMap ∷ fScan ∷ fMergeAll
+           ∷ fSwitchAll ∷ fExhaustAll ∷ fMu ∷ fVar ∷ fDefer ∷ fMint
+           ∷ fBatchSync ∷ []
 
 formerIx : Former → ℕ
 formerIx fInput      = 0
 formerIx fOf         = 1
 formerIx fEmpty      = 2
 formerIx fTake       = 3
-formerIx fLift       = 4
-formerIx fMergeAll   = 5
-formerIx fSwitchAll  = 6
-formerIx fExhaustAll = 7
-formerIx fMu         = 8
-formerIx fVar        = 9
-formerIx fDefer      = 10
-formerIx fMint       = 11
-formerIx fBatchSync  = 12
+formerIx fMap        = 4
+formerIx fScan       = 5
+formerIx fMergeAll   = 6
+formerIx fSwitchAll  = 7
+formerIx fExhaustAll = 8
+formerIx fMu         = 9
+formerIx fVar        = 10
+formerIx fDefer      = 11
+formerIx fMint       = 12
+formerIx fBatchSync  = 13
 
 sameFormer : Former → Former → Bool
 sameFormer a b = formerIx a ≡ᵇ formerIx b
@@ -501,8 +487,9 @@ marksᵉ (takeᵉ c e)     = one fTake ⊕ marksᵗ c ⊕ marksᵉ e
 -- the second component reads the CARRIED state's type, which is the former's
 -- own accumulator: `isData (obs _)` is false, so it fires exactly when the
 -- former re-binds something the run could subscribe
-marksᵉ (scanᵉ {u = u} f z e) =
-  one fLift ⊕ ([] , not (isData u)) ⊕ marksᵗ f ⊕ marksᵗ z ⊕ marksᵉ e
+marksᵉ (mapᵉ f e)      = one fMap ⊕ marksᵗ f ⊕ marksᵉ e
+marksᵉ (scanᵉ {t = t} f z e) =
+  one fScan ⊕ ([] , not (isData t)) ⊕ marksᵗ f ⊕ marksᵗ z ⊕ marksᵉ e
 marksᵉ (mergeAllᵉ _ e) = one fMergeAll ⊕ marksᵉ e
 marksᵉ (switchAllᵉ e)  = one fSwitchAll ⊕ marksᵉ e
 marksᵉ (batchSyncᵉ e)  = one fBatchSync ⊕ marksᵉ e
@@ -660,6 +647,7 @@ showExp (input i)       = "(input " ++ showFin i ++ ")"
 showExp (ofᵉ items)     = "(ofᵉ (" ++ showTmList items ++ "))"
 showExp emptyᵉ          = "emptyᵉ"
 showExp (takeᵉ n e)     = "(takeᵉ " ++ showTm n ++ " " ++ showExp e ++ ")"
+showExp (mapᵉ f e)      = "(mapᵉ " ++ showTm f ++ " " ++ showExp e ++ ")"
 showExp (scanᵉ f s e)   = "(scanᵉ " ++ showTm f ++ " " ++ showTm s ++ " " ++ showExp e ++ ")"
 -- the limit prints as the `Maybe ℕ` it IS, not as the ∞ a reader would
 -- prefer: a witness is printed to be PASTED, and the corpus is Agda
