@@ -36,9 +36,11 @@ export const hot = <A>(): [Observable<A>, Sink<A>] => {
   ];
 };
 
-// bracketSync: the sync/async boundary WITHOUT subscribing — the
-// replacement for captureSync, and the reason it works is rxjs's own
-// subscribe ordering rather than a scheduler. `merge` subscribes its
+// bracketSync: the sync/async boundary WITHOUT subscribing, and the
+// reason it works is rxjs's own subscribe ordering rather than any
+// scheduler — which is what makes it legal here at all, since an
+// operator of this implementation may never call `.subscribe`, that
+// being the user's one entry point. `merge` subscribes its
 // inputs in order, synchronously: it subscribes `src`, `src` drains
 // its entire subscribe burst during that call, and only then is
 // `of(SYNC_END)` subscribed and fires. So the marker lands exactly at
@@ -68,41 +70,3 @@ export const bracketSync = <A>(src: Observable<A>): Observable<Bracketed<A>> =>
 // SYNC_END means the completion was synchronous.
 export const markSync = <A>(src: Observable<A>): Observable<Marked<A>> =>
   merge<Marked<A>[]>(src.pipe(endWith(UPSTREAM_DONE)), of(SYNC_END));
-
-// captureSync: subscribe NOW, splitting the subscription at the
-// sync/async boundary. Emissions delivered during the subscribe call
-// itself land in `burst` (with completedSync when the source finished
-// inside it); everything later goes to the caller's sink. This is how
-// an operator flattens a subscription's sync burst into the emit that
-// caused it (Agda's subscribeInner ∘ splitBurst) — and the third and
-// last sanctioned use of raw rxjs subscription machinery in this file.
-export type SyncCapture<A> = {
-  burst: A[];
-  completedSync: boolean;
-  unsubscribe: () => void;
-};
-
-export const captureSync = <A>(
-  obs: Observable<A>,
-  onAsync: Sink<A>,
-): SyncCapture<A> => {
-  const burst: A[] = [];
-  let sync = true;
-  let completedSync = false;
-  const subscription = obs.subscribe({
-    next: (val) => {
-      if (sync) burst.push(val);
-      else onAsync.next(val);
-    },
-    complete: () => {
-      if (sync) completedSync = true;
-      else onAsync.complete();
-    },
-  });
-  sync = false;
-  return {
-    burst,
-    completedSync,
-    unsubscribe: () => subscription.unsubscribe(),
-  };
-};
