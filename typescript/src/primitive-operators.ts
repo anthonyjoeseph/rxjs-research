@@ -4,6 +4,7 @@ import {
   filter,
   map as rxMap,
   merge,
+  share as rxShare,
   mergeMap,
   of as rxOf,
   scan as rxScan,
@@ -25,11 +26,12 @@ import {
 import { Arrival, Driver } from "./driver.js";
 import {
   Bracketed,
+  Marked,
   SYNC_END,
+  UPSTREAM_DONE,
   bracketSync,
-  captureSync,
   cold,
-  hot,
+  markSync,
 } from "./constructors.js";
 
 export { exhaustAll, mergeAllAll, switchAll } from "./join.js";
@@ -58,10 +60,12 @@ export const of = <A>(driver: Driver, input: A[]): Observable<InstEmit<A>> =>
 export const empty = (driver: Driver): Observable<InstEmit<never>> =>
   of<never>(driver, []);
 
-// The slot-telescope share (NOT default rxjs share()): all reset
-// options are false by definition — connect once at the first
-// subscription, never disconnect (an unobserved share keeps burning
-// arrivals), latch completion forever. Mirrors Agda's
+// The slot-telescope share IS rxjs's own `share` with every reset
+// turned off (Anthony) — connect once at the first subscription, never
+// disconnect (an unobserved share keeps burning arrivals), latch
+// completion forever. That ruling is what let the hand-rolled connect
+// go: rxjs holds the one upstream subscription and the fan-out, and
+// what is left here is the protocol traffic around it. Mirrors Agda's
 // subscribeSharedSlot + dispatchShare:
 // - the connect burst flows up the FIRST subscriber only, retagged
 //   plumbing (its registrations belong to the share, not to any
@@ -82,7 +86,6 @@ export const share = <A>(
   let connected = false;
   let completed = false;
   let upstreamOpen: SourceId[] = [];
-  const [broadcast, broadcastSink] = hot<InstEmit<A>>();
 
   const latchedOneShot = (): InstEmit<A> => ({
     events: [
@@ -102,77 +105,140 @@ export const share = <A>(
     kind: "subscribe",
   });
 
-  const onUpstreamEmit = (emit: InstEmit<A>) => {
-    const parts = splitEmit(emit);
-    upstreamOpen = openAfter(emit, upstreamOpen, true);
-    const fin = parts.fin || upstreamOpen.length === 0;
-    // the chain's own emit, emptied of values, announcing the handoff —
-    // it reaches the root directly (Agda foldPath's share-sink clause)
-    driver.pushChainEmit({
-      events: [...parts.bookkeeping, { type: "handoff", source }],
-      instant: emit.instant,
-      source: emit.source,
-      kind: emit.kind,
-    });
-    if (fin) completed = true; // latch BEFORE the final fan-out
-    broadcastSink.next({
-      events: [
-        ...(fin
-          ? [{ type: "close", source, reason: "exhausted" } as const]
-          : []),
-        ...parts.values.map((value) => ({ type: "value", value }) as const),
-      ],
-      instant: emit.instant,
-      source,
-      kind: "delivery",
-    });
-    if (fin) broadcastSink.complete();
-  };
+  // THE CONNECT BURST AND THE LATER ARRIVALS ARE DIFFERENT TRAFFIC, and
+  // telling them apart used to be what forced the manual subscription:
+  // a burst emit is the def coming alive and rides up the first
+  // subscriber retagged `plumbing`, while an arrival mints a chain emit
+  // and fans out. `bracketSync` draws that line as a VALUE, so the
+  // upstream can be an ordinary pipeline — and because it sits BELOW
+  // the share, the fold runs once, which is what makes its writes to
+  // `upstreamOpen` and `completed` the share's own bookkeeping rather
+  // than a per-subscriber copy. `endWith` is what recovers an upstream
+  // that rx-completed inside the burst without closing its
+  // registrations: the marker arrives before SYNC_END exactly when the
+  // completion was synchronous.
+  type Signal =
+    | { tag: "burst"; emit: InstEmit<A> }
+    | { tag: "connected"; spent: boolean }
+    | { tag: "fanout"; emit: InstEmit<A> };
 
-  return cold<InstEmit<A>>((sink) => {
-    if (completed) {
-      sink.next(latchedOneShot());
-      sink.complete();
-      return () => {};
-    }
-    if (connected) {
-      // live: join mid-flight, future values only
-      sink.next(initEmit([]));
-      const registration = captureSync(broadcast, sink);
-      return () => registration.unsubscribe();
-    }
-    connected = true;
-    const connect = captureSync(obs, {
-      next: onUpstreamEmit,
-      complete: () => {
-        // fin rides the closing emit (the open multiset); the rx
-        // completion itself is absorbed here
+  const signals: Observable<Signal> = markSync(obs).pipe(
+    rxScan<
+      Marked<InstEmit<A>>,
+      { live: boolean; spent: boolean; fin: boolean; out?: Signal }
+    >(
+      (state, item) => {
+        if (item === UPSTREAM_DONE)
+          return { ...state, spent: true, fin: false, out: undefined };
+        if (item === SYNC_END)
+          return {
+            live: true,
+            spent: state.spent,
+            fin: false,
+            out: { tag: "connected", spent: state.spent },
+          };
+        upstreamOpen = openAfter(item, upstreamOpen, true);
+        if (!state.live)
+          return { ...state, fin: false, out: { tag: "burst", emit: item } };
+        const parts = splitEmit(item);
+        const fin = parts.fin || upstreamOpen.length === 0;
+        // the chain's own emit, emptied of values, announcing the
+        // handoff — it reaches the root directly (Agda foldPath's
+        // share-sink clause)
+        driver.pushChainEmit({
+          events: [...parts.bookkeeping, { type: "handoff", source }],
+          instant: item.instant,
+          source: item.source,
+          kind: item.kind,
+        });
+        if (fin) completed = true; // latch BEFORE the final fan-out
+        return {
+          live: true,
+          spent: state.spent,
+          fin,
+          out: {
+            tag: "fanout",
+            emit: {
+              events: [
+                ...(fin
+                  ? [{ type: "close", source, reason: "exhausted" } as const]
+                  : []),
+                ...parts.values.map(
+                  (value) => ({ type: "value", value }) as const,
+                ),
+              ],
+              instant: item.instant,
+              source,
+              kind: "delivery",
+            },
+          },
+        };
       },
-    });
-    // never disconnect: the upstream subscription is permanent
-    for (const emit of connect.burst)
-      upstreamOpen = openAfter(emit, upstreamOpen, true);
-    const plumbed = connect.burst.map((emit): InstEmit<A> => ({
-      ...emit,
-      kind: "plumbing",
-    }));
-    const burstFin =
-      connect.completedSync ||
-      mergeAllBurst(connect.burst).done ||
-      (connect.burst.length > 0 && upstreamOpen.length === 0);
-    if (burstFin) {
-      // the def died inside its own connect burst: latch; this
-      // registration closes in the same instant
-      completed = true;
-      sink.next(initEmit([{ type: "close", source, reason: "exhausted" }]));
-      for (const emit of plumbed) sink.next(emit);
-      sink.complete();
-      return () => {};
-    }
-    sink.next(initEmit([]));
-    const registration = captureSync(broadcast, sink);
-    for (const emit of plumbed) sink.next(emit);
-    return () => registration.unsubscribe();
+      { live: false, spent: false, fin: false },
+    ),
+    takeWhile((state) => !state.fin, true), // the final fan-out, then done
+    filter((state) => state.out !== undefined),
+    rxMap((state) => state.out as Signal),
+    rxShare({
+      resetOnRefCountZero: false,
+      resetOnComplete: false,
+      resetOnError: false,
+    }),
+  );
+
+  const fanouts = signals.pipe(
+    filter((s): s is Signal & { tag: "fanout" } => s.tag === "fanout"),
+    rxMap((s) => s.emit),
+  );
+
+  return rxDefer(() => {
+    if (completed) return rxOf(latchedOneShot());
+    if (connected) return merge(rxOf(initEmit([])), fanouts); // join mid-flight
+    connected = true;
+    // the first subscriber is the one the connect burst flows up, and
+    // its init is emitted AT the boundary rather than before it: the
+    // burst decides whether that init already carries its close, and
+    // nothing observable is reordered because the whole group is one
+    // frame.
+    return signals.pipe(
+      rxScan<
+        Signal,
+        { burst: InstEmit<A>[]; done: boolean; out: InstEmit<A>[] }
+      >(
+        (state, s) => {
+          if (s.tag === "burst")
+            return { burst: [...state.burst, s.emit], done: false, out: [] };
+          if (s.tag === "fanout")
+            return { burst: [], done: false, out: [s.emit] };
+          const flat = mergeAllBurst(state.burst);
+          const burstFin =
+            s.spent ||
+            flat.done ||
+            (state.burst.length > 0 && upstreamOpen.length === 0);
+          // the def died inside its own connect burst: latch; this
+          // registration closes in the same instant
+          if (burstFin) completed = true;
+          return {
+            burst: [],
+            done: burstFin,
+            out: [
+              initEmit(
+                burstFin
+                  ? [{ type: "close", source, reason: "exhausted" }]
+                  : [],
+              ),
+              ...state.burst.map((emit): InstEmit<A> => ({
+                ...emit,
+                kind: "plumbing",
+              })),
+            ],
+          };
+        },
+        { burst: [], done: false, out: [] },
+      ),
+      takeWhile((state) => !state.done, true),
+      mergeMap((state) => rxOf(...state.out)),
+    );
   });
 };
 

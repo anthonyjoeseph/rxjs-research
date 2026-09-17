@@ -1,4 +1,4 @@
-import { Observable, Subject, merge, of } from "rxjs";
+import { Observable, Subject, endWith, merge, of } from "rxjs";
 
 // A minimal push sink — the only surface a source producer needs. Kept to
 // next/complete (never a raw rxjs Subscriber) so the rest of the impl
@@ -50,11 +50,24 @@ export const hot = <A>(): [Observable<A>, Sink<A>] => {
 // That pairing — bracket then fold — is `batchSyncᵉ` followed by
 // `liftᵉ`, which is why no new former is owed on the Agda side.
 export const SYNC_END = Symbol("end-of-sync");
+export const UPSTREAM_DONE = Symbol("upstream-done");
 export type SyncEnd = typeof SYNC_END;
+export type UpstreamDone = typeof UPSTREAM_DONE;
 export type Bracketed<A> = A | SyncEnd;
+export type Marked<A> = A | SyncEnd | UpstreamDone;
 
 export const bracketSync = <A>(src: Observable<A>): Observable<Bracketed<A>> =>
   merge<Bracketed<A>[]>(src, of(SYNC_END));
+
+// markSync: the boundary PLUS the source's own completion, for a
+// consumer that has to tell "finished inside its own burst" from "still
+// live" — a distinction `SYNC_END` alone cannot carry, since a stream
+// that completes synchronously and one that merely falls quiet look
+// identical at the marker. `endWith` fires on completion whenever it
+// happens, so the ordering of the two markers IS the answer: before
+// SYNC_END means the completion was synchronous.
+export const markSync = <A>(src: Observable<A>): Observable<Marked<A>> =>
+  merge<Marked<A>[]>(src.pipe(endWith(UPSTREAM_DONE)), of(SYNC_END));
 
 // captureSync: subscribe NOW, splitting the subscription at the
 // sync/async boundary. Emissions delivered during the subscribe call
