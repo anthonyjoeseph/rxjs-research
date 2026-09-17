@@ -259,7 +259,10 @@ export const lift = <A, B, S>(
     rxMap((carried) => carried.out as InstEmit<B>), // the seed is never emitted, so out is set
   );
 
-// map-f: a lift that carries nothing (Agda stepFrame (map-f fn))
+// a lift that carries nothing. No Exp node compiles to this any more —
+// a program's map is built from the lift NODE, in the term language —
+// so what is left is the compiler's own use, mapping each emitted inner
+// observable to its compilation.
 export const map = <A, B>(
   obs: Observable<InstEmit<A>>,
   fn: (a: A) => B,
@@ -340,24 +343,6 @@ export const take = <A>(
     ),
     takeWhile((state) => !state.cut, true), // include the cutting emit, then complete
     rxMap((state) => state.out as InstEmit<A>), // the seed is never emitted, so out is set
-  );
-
-// scan-f: a lift whose carried state is the accumulator, emitting one
-// value per input value (the running acc) and threading acc across
-// emits (Agda stepFrame (scan-f fn nid))
-export const scan = <A, B>(
-  obs: Observable<InstEmit<A>>,
-  initial: B,
-  fn: (acc: B, cur: A) => B,
-): Observable<InstEmit<B>> =>
-  lift<A, B, B>(obs, initial, (acc, values) =>
-    values.reduce(
-      (carried, cur) => {
-        const next = fn(carried.state, cur);
-        return { state: next, values: [...carried.values, next] };
-      },
-      { state: acc, values: [] as B[] },
-    ),
   );
 
 // the ROOT materializes the fin bit as a `complete` EVENT on the
