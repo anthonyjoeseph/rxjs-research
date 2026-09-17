@@ -376,6 +376,26 @@ scanᵉ {Θ = Θ} {s = s} {t = t} f z e = liftᵉ step z e
 -- already a closed Exp, so no substitution)
 ------------------------------------------------------------------
 
+-- TOTALITY HERE IS WHAT PRICES A NEW `Ty` CONSTRUCTOR, AND THE PRICE IS
+-- AN INTRODUCTION FORM.  Every constructor of `Ty` owes a clause, and a
+-- clause must hand back a CLOSED `Tm` at that type -- so a constructor
+-- whose `Val` is inhabited and whose `Tm` has no way to write one of
+-- its inhabitants makes this definition partial.  A tag that carries
+-- values and has no intro form is therefore not a thing this language
+-- offers: a `Ty` constructor and a `Tm` intro form arrive together or
+-- neither does.  And the obligation is not local, since the
+-- substitution face spends this in several places, each of which needs
+-- the literal it produces to be closed and weakenable.
+--
+-- SO UNFORGEABILITY CANNOT BE THE TYPE'S EMPTINESS, AND HAS TO BE A
+-- RESTRICTION ON WHICH FORMERS A PROGRAM MAY USE.  A provenance tag is
+-- wanted precisely so that an author cannot mint one while the machine
+-- can; read off the above, the guarantee that an intro form exists but
+-- is out of an author's reach is a claim about the palette a program is
+-- written in, not about the type it is written at.  That is the shape
+-- the envelope's own parameterisation already takes, where a slot
+-- declared at the unit type admits exactly one value whoever writes it.
+
 mutual
   reify : ∀ {n} {Γ : Ctx n} {t} → Val Γ t → Tm Γ [] [] [] t
   reify {t = unitᵗ}   _        = unit̂

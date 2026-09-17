@@ -230,17 +230,17 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 
 ### Big picture tier roadmap
 
-- **THE UNIQUE PRIMITIVE, AND THE ENVELOPE IN `Ty`'s OWN VOCABULARY.** `Ty`
-  gains one constructor, `uniqᵗ`, mirroring TypeScript's provenance and source
-  id, with `Val` sending it to `ℕ`. It gets NO introduction form, and that
-  absence IS the guarantee — only an eliminator comparing two, which the
-  batcher needs to group by instant; a minting former would falsify the proven
-  lemma that substitution commutes with evaluation. The envelope is DEFINED
-  over `unitᵗ`, `_+ᵗ_`, `_×ᵗ_` and `listᵗ` rather than added to `Ty`, and is
-  parameterised over its uniq type, so a simul slot is declared at
-  `instEmitᵗ unitᵗ a`: an author can write only `tt` where a uniq goes, and
-  the evaluator's ingestion is the sole producer of one. Subsumes the
-  type-grammar pairing leg, which it forces anyway.
+- **THE ENVELOPE IN `Ty`'s OWN VOCABULARY, WITH THE TAG FORKED TO ANTHONY.**
+  `instEmitᵗ`, `instEventᵗ`, `emitKindᵗ` and `closeReasonᵗ` are DEFINED over
+  `unitᵗ`, `_+ᵗ_`, `_×ᵗ_` and `listᵗ` rather than added to `Ty`, parameterised
+  over their uniq type, so a simul slot declared at `instEmitᵗ unitᵗ a` admits
+  only `tt` where a uniq goes. That half is unblocked and is what lands here.
+  The tag is not: a `uniqᵗ` with NO introduction form cannot be built, since
+  `reify` is total over `Ty` and each clause owes a CLOSED term — its header
+  carries the reasoning. Two horns, both deciding what a program may SAY, so
+  neither is an agent's: drop the tag (`uniqᵗ = natᵗ`), or keep it with an
+  intro form and rest unforgeability on the simul palette, where the
+  shipped-formers framing already puts it.
 
 - **THEN DEMOTE THE ENVELOPE OUT OF THE EVALUATOR.** Target:
   `evaluate : … → List (Val Γ t)`. The mentions split three ways and only one
