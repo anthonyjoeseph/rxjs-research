@@ -30,13 +30,13 @@ open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong; cong₂; subst)
 
 open import Rx.Exp
-  using (Ty; Ctx; Exp; Tm; Val; subΘExp; subΘTm; subΘTms; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; liftᵉ;
+  using (Ty; Ctx; Exp; Tm; Val; subΘExp; subΘTm; subΘTms; input; ofᵉ; emptyᵉ; takeᵉ; liftᵉ;
   mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ;
   sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ; _×ᵗ_; listᵗ; nilᵗ; consᵗ; foldᵗ; renTm; wkTm; reify;
   lookupEnv)
 open import Rx.Subst-Transport
   using ( Cᵉ; Cᵗ; Cˢ; shift; cong₃
-        ; pushInput; pushEmpty; pushVarᵉ; pushOf; pushMap; pushTake; pushScan; pushLift
+        ; pushInput; pushEmpty; pushVarᵉ; pushOf; pushTake; pushLift
         ; pushMerge; pushSwitch; pushExhaust; pushMu; pushDefer
         ; pushUnit; pushBool; pushNat; pushPair; pushFst; pushSnd
         ; pushInl; pushInr; pushCase; pushIf; pushPrim; pushStrm
@@ -141,22 +141,9 @@ mutual
   subΘ-compᵍᵉ {Θloc = Θl} {Θsub = Θs} Θo ρ σ (ofᵉ ts) =
     trans (cong ofᵉ (subΘ-compᵍᵗˢ Θo ρ σ ts))
           (cong (subΘExp Θo (++⁺ ρ σ)) (pushOf (++-assoc Θo Θl Θs) ts))
-  subΘ-compᵍᵉ {Θloc = Θl} {Θsub = Θs} Θo ρ σ (mapᵉ {s = s} f e) =
-    trans (cong₂ mapᵉ
-            (trans (subΘ-compᵍᵗ (s ∷ Θo) ρ σ f)
-                   (cong (subΘTm (s ∷ Θo) (++⁺ ρ σ)) (shift (++-assoc Θo Θl Θs) f)))
-            (subΘ-compᵍᵉ Θo ρ σ e))
-          (cong (subΘExp Θo (++⁺ ρ σ)) (pushMap (++-assoc Θo Θl Θs) f e))
   subΘ-compᵍᵉ {Θloc = Θl} {Θsub = Θs} Θo ρ σ (takeᵉ m e) =
     trans (cong₂ takeᵉ (subΘ-compᵍᵗ Θo ρ σ m) (subΘ-compᵍᵉ Θo ρ σ e))
           (cong (subΘExp Θo (++⁺ ρ σ)) (pushTake (++-assoc Θo Θl Θs) m e))
-  subΘ-compᵍᵉ {Θloc = Θl} {Θsub = Θs} Θo ρ σ (scanᵉ {s = s} {t = t} f i e) =
-    trans (cong₃ scanᵉ
-            (trans (subΘ-compᵍᵗ ((t ×ᵗ s) ∷ Θo) ρ σ f)
-                   (cong (subΘTm ((t ×ᵗ s) ∷ Θo) (++⁺ ρ σ))
-                         (shift (++-assoc Θo Θl Θs) f)))
-            (subΘ-compᵍᵗ Θo ρ σ i) (subΘ-compᵍᵉ Θo ρ σ e))
-          (cong (subΘExp Θo (++⁺ ρ σ)) (pushScan (++-assoc Θo Θl Θs) f i e))
   subΘ-compᵍᵉ {Θloc = Θl} {Θsub = Θs} Θo ρ σ (liftᵉ {s = s} {u = u} f i e) =
     trans (cong₃ liftᵉ
             (trans (subΘ-compᵍᵗ ((u ×ᵗ listᵗ s) ∷ Θo) ρ σ f)

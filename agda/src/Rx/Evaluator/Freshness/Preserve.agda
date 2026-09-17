@@ -34,45 +34,27 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Rx.Exp using (Ctx; Closed; Val; obs; Fn; _×ᵗ_; listᵗ; _≟ᵗ_)
 open import Rx.Prim using (InstEvent)
 open import Rx.Evaluator using (Sched; EvalSt; Path; Frame; NodeId; NodeState; AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ;
-  switchKill; scanDispatch; liftDispatch; takeDispatch; thruWrap; mergeAllBump; scanVals; liftVals; takeVals; cell-st;
+  switchKill; liftDispatch; takeDispatch; thruWrap; mergeAllBump; liftVals; takeVals; cell-st;
   take-st; mergeAll-st; switch-st; exhaust-st; lookupNode)
 open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeInner⇓; thruConsume⇓;
   thruWalk⇓; mergeAllDrain⇓; innerFinish⇓; innerReact⇓; stepFrame⇓; pushBurst⇓;
   subscribeAll⇓; sharedConnect⇓; subscribeSharedSlot⇓;
   subs-floor; subs-shared; subs-hot-done; subs-hot-live; subs-cold-sync;
-  subs-cold-async; subs-of; subs-empty; subs-map; subs-take-zero; subs-take-suc;
-  subs-scan; subs-lift; subs-merge-all; subs-switch-all; subs-exhaust-all; subs-μ; subs-defer;
+  subs-cold-async; subs-of; subs-empty; subs-take-zero; subs-take-suc;
+  subs-lift; subs-merge-all; subs-switch-all; subs-exhaust-all; subs-μ; subs-defer;
   inner; consume-all-sub; consume-all-enqueue; consume-all-nil; consume-switch-sub;
   consume-switch-nil; consume-exhaust-sub; consume-exhaust-nil;
   walk-nil; walk-cons; drain-nil; drain-no-room; drain-room;
   finish-all-drain; finish-switch-clear; finish-exhaust-clear; finish-nil;
   react-false; react-alive; react-dead;
-  step-map; step-scan; step-lift; step-take; step-from-inner; step-thru-outer;
+  step-lift; step-take; step-from-inner; step-thru-outer;
   push-nil; push-cons; sub-all; connect-live; connect-died;
   slot-spent; slot-join; slot-connect)
 open import Rx.Evaluator.Freshness using (PreservedBelow; FrameAbove;
   pres-same; pres-trans; pres-write)
 open import Rx.Evaluator.Freshness.Mono using (subscribeE-mono; stepFrame-mono; subscribeInner-mono; thruConsume-mono; switchKill-node)
 
--- the fold's dispatch rewrites its own node and nothing else
-scan-pres : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {f}
-              (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
-              (vals : List (Val Γ s)) (fin : Bool)
-              (sched : Sched Γ) (st : EvalSt e) (m : Maybe (NodeState Γ))
-          → f ≤ nid
-          → PreservedBelow f st (proj₂ (proj₂ (proj₂ (proj₂
-              (scanDispatch {e = e} fn nid vals fin sched st m)))))
-scan-pres {u = u} fn nid vals fin sched st (just (cell-st {w} a)) f≤nid
-  with w ≟ᵗ u
-... | no  _    = pres-same _ _ refl
-... | yes refl = pres-write _ _ (cell-st (proj₂ (scanVals fn a vals))) refl f≤nid
-scan-pres fn nid vals fin sched st nothing                    f≤nid = pres-same _ _ refl
-scan-pres fn nid vals fin sched st (just (take-st _))         f≤nid = pres-same _ _ refl
-scan-pres fn nid vals fin sched st (just (mergeAll-st _ _ _ _)) f≤nid = pres-same _ _ refl
-scan-pres fn nid vals fin sched st (just (switch-st _ _))     f≤nid = pres-same _ _ refl
-scan-pres fn nid vals fin sched st (just (exhaust-st _ _))    f≤nid = pres-same _ _ refl
-
--- and the lifted step is the same story over the same cell
+-- the lifted step rewrites its own cell and nothing else
 lift-pres : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u w} {f}
               (fn : Fn Γ [] [] [] (w ×ᵗ listᵗ s) (w ×ᵗ listᵗ u)) (nid : NodeId)
               (vals : List (Val Γ s)) (fin : Bool)
@@ -291,16 +273,8 @@ subscribeE-preserves f le (subs-cold-async _ _ _ _) = pres-same _ _ refl
 subscribeE-preserves f le (subs-of _)            = pres-same _ _ refl
 subscribeE-preserves f le (subs-empty _)         = pres-same _ _ refl
 subscribeE-preserves f le (subs-take-zero _ _)   = pres-same _ _ refl
-subscribeE-preserves f le (subs-map sub push) =
-  pres-trans (subscribeE-preserves f le sub)
-             (pushBurst-preserves f (≤-trans le (subscribeE-mono sub)) _ push)
 subscribeE-preserves f le (subs-take-suc {k = k} _ refl sub push) =
   pres-trans (pres-trans (pres-write _ _ (take-st (suc k)) refl le)
-                         (subscribeE-preserves f (≤-trans le (n≤1+n _)) sub))
-             (pushBurst-preserves f
-                (≤-trans (≤-trans le (n≤1+n _)) (subscribeE-mono sub)) le push)
-subscribeE-preserves f le (subs-scan {seed = seed} refl sub push) =
-  pres-trans (pres-trans (pres-write _ _ _ refl le)
                          (subscribeE-preserves f (≤-trans le (n≤1+n _)) sub))
              (pushBurst-preserves f
                 (≤-trans (≤-trans le (n≤1+n _)) (subscribeE-mono sub)) le push)
@@ -320,10 +294,6 @@ pushBurst-preserves f le fa (push-cons _ stp rest) =
   pres-trans (stepFrame-preserves f le fa stp)
              (pushBurst-preserves f (≤-trans le (stepFrame-mono stp)) fa rest)
 
-stepFrame-preserves f le fa step-map = pres-same _ _ refl
-stepFrame-preserves f le fa
-  (step-scan {fn = fn} {nid} {vals = vals} {fin} {sched} {st}) =
-  scan-pres fn nid vals fin sched st (lookupNode nid (EvalSt.nodes st)) fa
 stepFrame-preserves f le fa
   (step-lift {fn = fn} {nid} {vals = vals} {fin} {sched} {st}) =
   lift-pres fn nid vals fin sched st (lookupNode nid (EvalSt.nodes st)) fa

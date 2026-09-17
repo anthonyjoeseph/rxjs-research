@@ -102,8 +102,8 @@ open import Relation.Binary.PropositionalEquality using (_≡_)
 open import Rx.Prim using (Tick; Fuel; Id; Source; InstEvent; InstEmit; value; close;
   handoff; complete; exhausted; delivery; _at_from_as_;
   init; subscribe; hot; cold)
-open import Rx.Exp using (obs; Ctx; Val; Closed; Tm; Fn; _×ᵗ_; listᵗ; evalTm; unfoldμ; applyFn; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; liftᵉ; mergeAllᵉ;
-  switchAllᵉ; exhaustAllᵉ; μᵉ; deferᵉ)
+open import Rx.Exp using (obs; Ctx; Val; Closed; Tm; Fn; _×ᵗ_; listᵗ; evalTm; unfoldμ; input; ofᵉ; emptyᵉ; takeᵉ;
+  liftᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; deferᵉ)
 open import Rx.Slots using (Slots; scripted; shared)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; NodeId;
   root; share-sink; _↠_; shareAdmit; shareLatch; shareFinish;
@@ -113,11 +113,11 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; NodeId;
   NodeState; AllOp; RegId; Arrival; AtFloor; arrTy;
   spentBurst; oneShotBurst; memberSource; register; installNode; resolve;
   atSlot; atDyn; lowerFloor;
-  map-f; scan-f; lift-f; take-f; thru-outer;
+  lift-f; take-f; thru-outer;
   cell-st; take-st; mergeAll-st; switch-st; exhaust-st;
   mergeAllᵒ; switchᵒ; exhaustᵒ;
   lookupNode; setNode; hasRoom; mergeAllBump; switchKill; aliveThroughᶠ;
-  splitEvents; retagEvents; scanDispatch; liftDispatch; takeDispatch; thruWrap;
+  splitEvents; retagEvents; liftDispatch; takeDispatch; thruWrap;
   consumeUsable; finishUsable;
   burstCompleted; sharedPlumb; dropSource)
 
@@ -351,11 +351,6 @@ data subscribeE⇓ {n} {Γ} {t} {e} where
              → oneShotBurst [] id sched ≡ (burst , sched₁)
              → subscribeE⇓ emptyᵉ κ id now sched st (burst , sched₁ , st)
 
-  subs-map : ∀ {lo s u} {f} {b : Closed Γ s} {κ : Path Γ lo u t}
-               {id now sched st burst sched₁ st₁ r}
-           → subscribeE⇓ b (map-f f ↠ κ) id now sched st (burst , sched₁ , st₁)
-           → pushBurst⇓ id now (map-f f) κ burst sched₁ st₁ r
-           → subscribeE⇓ (mapᵉ f b) κ id now sched st r
 
   subs-take-zero : ∀ {lo u} {count} {b : Closed Γ u} {κ : Path Γ lo u t}
                      {id now sched st burst sched₁}
@@ -375,15 +370,6 @@ data subscribeE⇓ {n} {Γ} {t} {e} where
                 → pushBurst⇓ id now (take-f nid) κ burst sched₂ st₁ r
                 → subscribeE⇓ (takeᵉ count b) κ id now sched st r
 
-  subs-scan : ∀ {lo s u} {f seed} {b : Closed Γ s} {κ : Path Γ lo u t}
-                {id now sched st nid burst sched₂ st₁ r}
-            → Sched.nextNode sched ≡ nid
-            → subscribeE⇓ b (scan-f f nid ↠ κ) id now
-                (record sched { nextNode = suc nid })
-                (installNode nid (cell-st (evalTm seed)) st)
-                (burst , sched₂ , st₁)
-            → pushBurst⇓ id now (scan-f f nid) κ burst sched₂ st₁ r
-            → subscribeE⇓ (scanᵉ f seed b) κ id now sched st r
 
   subs-lift : ∀ {lo s u w} {f} {i : Tm Γ [] [] [] w} {b : Closed Γ s}
                 {κ : Path Γ lo u t}
@@ -693,16 +679,7 @@ data innerReact⇓ {n} {Γ} {t} {e} where
 --   currency and not of the per-frame statement it proved.
 data stepFrame⇓ {n} {Γ} {t} {e} where
 
-  step-map : ∀ {s u lo} {fn} {κ : Path Γ lo u t}
-               {id now} {vals : List (Val Γ s)} {fin sched st}
-           → stepFrame⇓ id now (map-f fn) κ vals fin sched st
-               (map (applyFn fn) vals , [] , fin , sched , st)
 
-  step-scan : ∀ {s u lo} {fn nid} {κ : Path Γ lo u t}
-                {id now} {vals : List (Val Γ s)} {fin sched st}
-            → stepFrame⇓ id now (scan-f fn nid) κ vals fin sched st
-                (scanDispatch fn nid vals fin sched st
-                  (lookupNode nid (EvalSt.nodes st)))
 
   step-lift : ∀ {s u w lo} {fn : Fn Γ [] [] [] (w ×ᵗ listᵗ s) (w ×ᵗ listᵗ u)}
                 {nid} {κ : Path Γ lo u t}

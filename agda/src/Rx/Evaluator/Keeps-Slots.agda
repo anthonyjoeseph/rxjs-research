@@ -33,22 +33,22 @@ open import Rx.Prim using (Id; Tick)
 open import Rx.Exp using (Ctx; Closed; Val; obs; Fn; _×ᵗ_; listᵗ; _≟ᵗ_)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; AllOp; NodeId;
   NodeState; Frame; take-st; cell-st; takeVals; takeDispatch;
-  scanDispatch; liftDispatch; thruWrap;
+  liftDispatch; thruWrap;
   switchKill; oneShotBurst; lookupNode; mergeAll-st; switch-st; exhaust-st;
   mergeAllᵒ; switchᵒ; exhaustᵒ)
 open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeAll⇓; pushBurst⇓;
   stepFrame⇓; innerReact⇓; innerFinish⇓; mergeAllDrain⇓; thruWalk⇓;
   thruConsume⇓; subscribeInner⇓; sharedConnect⇓; subscribeSharedSlot⇓;
   subs-floor; subs-shared; subs-hot-done; subs-hot-live; subs-cold-sync;
-  subs-cold-async; subs-of; subs-empty; subs-map; subs-take-zero;
-  subs-take-suc; subs-scan; subs-lift; subs-merge-all; subs-switch-all; subs-exhaust-all;
+  subs-cold-async; subs-of; subs-empty; subs-take-zero;
+  subs-take-suc; subs-lift; subs-merge-all; subs-switch-all; subs-exhaust-all;
   subs-μ; subs-defer; inner;
   consume-all-sub; consume-all-enqueue; consume-all-nil; consume-switch-sub;
   consume-switch-nil; consume-exhaust-sub; consume-exhaust-nil;
   walk-nil; walk-cons; drain-nil; drain-no-room; drain-room;
   finish-all-drain; finish-switch-clear; finish-exhaust-clear; finish-nil;
   react-false; react-alive; react-dead;
-  step-map; step-scan; step-lift; step-take; step-from-inner;
+  step-lift; step-take; step-from-inner;
   step-thru-outer; push-nil; push-cons; sub-all;
   connect-live; connect-died; slot-spent; slot-join; slot-connect)
 
@@ -83,25 +83,7 @@ take-slots nid vals fin sched st (just (switch-st _ _))       = refl
 take-slots nid vals fin sched st (just (exhaust-st _ _))      = refl
 take-slots nid vals fin sched st (just (cell-st _))           = refl
 
--- the fold rewrites its accumulator and passes the schedule through
-scan-slots : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-  (fn : Fn Γ [] [] [] (u ×ᵗ s) u)
-  (nid : NodeId) (vals : List (Val Γ s)) (fin : Bool)
-  (sched : Sched Γ) (st : EvalSt e) (ns : Maybe (NodeState Γ)) →
-  Sched.slots (proj₁ (proj₂ (proj₂ (proj₂
-    (scanDispatch {e = e} fn nid vals fin sched st ns)))))
-    ≡ Sched.slots sched
-scan-slots {u = u} fn nid vals fin sched st (just (cell-st {w} a))
-  with w ≟ᵗ u
-... | no  _    = refl
-... | yes refl = refl
-scan-slots fn nid vals fin sched st nothing                      = refl
-scan-slots fn nid vals fin sched st (just (take-st _))           = refl
-scan-slots fn nid vals fin sched st (just (mergeAll-st _ _ _ _)) = refl
-scan-slots fn nid vals fin sched st (just (switch-st _ _))       = refl
-scan-slots fn nid vals fin sched st (just (exhaust-st _ _))      = refl
-
--- and the lifted step rewrites the same cell and passes the schedule on
+-- the lifted step rewrites its own cell and passes the schedule on
 lift-slots : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u w}
   (fn : Fn Γ [] [] [] (w ×ᵗ listᵗ s) (w ×ᵗ listᵗ u))
   (nid : NodeId) (vals : List (Val Γ s)) (fin : Bool)
@@ -183,10 +165,8 @@ mutual
   subs-keeps (subs-cold-async _ _ _ _) = refl
   subs-keeps {sched = sched} (subs-of {ts = ts} {id = id} refl) = refl
   subs-keeps {sched = sched} (subs-empty {id = id} refl) = refl
-  subs-keeps (subs-map d p)          = trans (push-keeps p) (subs-keeps d)
   subs-keeps (subs-take-zero _ refl) = refl
   subs-keeps (subs-take-suc _ refl d p) = trans (push-keeps p) (subs-keeps d)
-  subs-keeps (subs-scan refl d p)    = trans (push-keeps p) (subs-keeps d)
   subs-keeps (subs-lift refl d p)    = trans (push-keeps p) (subs-keeps d)
   subs-keeps (subs-merge-all a)      = all-keeps a
   subs-keeps (subs-switch-all a)     = all-keeps a
@@ -230,10 +210,6 @@ mutual
     stepFrame⇓ {e = e} id now fr κ vals fin sched st
       (vals′ , evs , fin′ , sched′ , st′) →
     Sched.slots sched′ ≡ Sched.slots sched
-  step-keeps step-map        = refl
-  step-keeps {vals = vals} {fin = fin} {sched = sched} {st = st}
-             (step-scan {fn = fn} {nid = nid}) =
-    scan-slots fn nid vals fin sched st (lookupNode nid (EvalSt.nodes st))
   step-keeps {vals = vals} {fin = fin} {sched = sched} {st = st}
              (step-lift {fn = fn} {nid = nid}) =
     lift-slots fn nid vals fin sched st (lookupNode nid (EvalSt.nodes st))

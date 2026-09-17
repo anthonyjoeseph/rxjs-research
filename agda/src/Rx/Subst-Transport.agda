@@ -28,7 +28,7 @@ open import Relation.Binary.PropositionalEquality
 
 open import Rx.Exp
   using ( Ty; Ctx; Exp; Tm
-        ; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; liftᵉ; mergeAllᵉ
+        ; input; ofᵉ; emptyᵉ; takeᵉ; liftᵉ; mergeAllᵉ
         ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ
         ; varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ
         ; caseᵗ; ifᵗ; primᵗ; strmᵗ; PrimOp
@@ -91,23 +91,12 @@ pushOf : (eq : Θ ≡ Θ') (ts : List (Tm Γ Δᵍ Δ Θ t))
        → ofᵉ (subst (Cˢ Γ Δᵍ Δ t) eq ts) ≡ subst (Cᵉ Γ Δᵍ Δ t) eq (ofᵉ ts)
 pushOf refl ts = refl
 
-pushMap : (eq : Θ ≡ Θ') (f : Tm Γ Δᵍ Δ (s ∷ Θ) t) (e : Exp Γ Δᵍ Δ Θ s)
-        → mapᵉ (subst (λ z → Tm Γ Δᵍ Δ (s ∷ z) t) eq f)
-               (subst (Cᵉ Γ Δᵍ Δ s) eq e)
-            ≡ subst (Cᵉ Γ Δᵍ Δ t) eq (mapᵉ f e)
-pushMap refl f e = refl
 
 pushTake : (eq : Θ ≡ Θ') (m : Tm Γ Δᵍ Δ Θ natᵗ) (e : Exp Γ Δᵍ Δ Θ t)
          → takeᵉ (subst (Cᵗ Γ Δᵍ Δ natᵗ) eq m) (subst (Cᵉ Γ Δᵍ Δ t) eq e)
              ≡ subst (Cᵉ Γ Δᵍ Δ t) eq (takeᵉ m e)
 pushTake refl m e = refl
 
-pushScan : (eq : Θ ≡ Θ') (f : Tm Γ Δᵍ Δ ((t ×ᵗ s) ∷ Θ) t)
-           (i : Tm Γ Δᵍ Δ Θ t) (e : Exp Γ Δᵍ Δ Θ s)
-         → scanᵉ (subst (λ z → Tm Γ Δᵍ Δ ((t ×ᵗ s) ∷ z) t) eq f)
-                 (subst (Cᵗ Γ Δᵍ Δ t) eq i) (subst (Cᵉ Γ Δᵍ Δ s) eq e)
-             ≡ subst (Cᵉ Γ Δᵍ Δ t) eq (scanᵉ f i e)
-pushScan refl f i e = refl
 
 pushLift : (eq : Θ ≡ Θ') (f : Tm Γ Δᵍ Δ ((u ×ᵗ listᵗ s) ∷ Θ) (u ×ᵗ listᵗ t))
            (i : Tm Γ Δᵍ Δ Θ u) (e : Exp Γ Δᵍ Δ Θ s)

@@ -232,18 +232,7 @@ failing to typecheck over the collapsed tree. A cone cannot aim at either.
 
 ### Big picture tier roadmap
 
-- **COLLAPSE THE ABSORBED FORMERS AND EVERY CASE THAT MATCHES ON THEM.** The
-  former is in and the tree checks over it, so what is left of the mirror is
-  removing what it absorbed: `mapᵉ` and `scanᵉ` are `liftᵉ` at `unitᵗ` and at
-  the output type, and every walk that matches per former carries a clause for
-  each. The size of the leg is now known rather than estimated — adding one
-  former cost one clause in each of eighteen modules, so removing two returns
-  twice that, and the node cell the fold reads is already shared, which is why
-  no state constructor moves. What the leg decides is whether the two
-  eliminations can be written as the same rewrite or whether the seedless one
-  needs its own.
-
-- **THEN THE BRIDGE AND THE GENERATOR, SO THE ORACLE EXERCISES THE NEW FORMER.**
+- **THE BRIDGE AND THE GENERATOR, SO THE ORACLE EXERCISES THE NEW FORMER.**
   The collapse is only checked where a program carrying a `liftᵉ` can cross
   between the two trees and be generated at random; until then the rewrite is
   held by the two formers that happen to survive it in TypeScript. What the leg
@@ -257,6 +246,16 @@ failing to typecheck over the collapsed tree. A cone cannot aim at either.
   landing as a bug-cache row before it is fixed — the cache is the only place a
   counterexample survives being fixed, and a mirror certified by a sweep nobody
   recorded is certified by nothing.
+
+- **THEN AUDIT WHAT IS LEFT OF THE PALETTE AGAINST THE DIVIDING TEST, AND
+  RECORD WHY EACH SURVIVOR SURVIVES.** The collapse absorbed the two formers
+  nobody disputed; what closes the tier is the rest of the tree measured by the
+  same test — does the former SUBSCRIBE anything, or read the protocol's own
+  bookkeeping. `takeᵉ` raises fin and so is not a lift however pure its step
+  reads, the flatteners and the share subscribe, and the sources produce
+  without reading anything. Each of those is a sentence in its own header or a
+  further collapse, and the leg's product is that no former is left whose
+  status is a matter of memory.
 
 ## Tier 2 — the denotation, adequacy, and the take bound
 
@@ -311,7 +310,7 @@ also: `take-bounds-values` — the take face, which is here to be measured again
   that survived a real consumer, not the first one written down.
 
 - **DEFINE `Beh` FOR THE FIRST-ORDER FORMERS AND EARN THE EQUATIONS.**
-  `ofᵉ`, `emptyᵉ`, `mapᵉ`, `takeᵉ` and `scanᵉ` denote without any of the
+  `ofᵉ`, `emptyᵉ`, `liftᵉ` and `takeᵉ` denote without any of the
   machinery the flatteners need, so this is where the domain's shape is
   actually decided and where a compositionality equation can first be stated at
   all. The leg's product is the domain plus one equation per former, not a
