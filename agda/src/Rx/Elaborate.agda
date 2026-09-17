@@ -3,16 +3,20 @@ module Rx.Elaborate where
 open import Data.List using (List; []; _∷_)
 open import Data.List.Properties using (map-++)
 open import Data.List.Membership.Propositional.Properties using (∈-map⁺)
+open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (Maybe)
 open import Data.Nat using (ℕ)
 open import Data.Vec.Properties using (lookup-map)
-open import Relation.Binary.PropositionalEquality using (subst)
+open import Relation.Binary.PropositionalEquality using (subst; refl)
 
 open import Rx.Exp using (Ty; Ctx; Exp; Tm; Fn; natᵗ; listᵗ; obs; _×ᵗ_;
-                          input; μᵉ; varᵉ; deferᵉ;
+                          boolᵗ; uniqᵗ;
+                          input; μᵉ; varᵉ; deferᵉ; liftᵉ;
                           varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; nilᵗ;
                           consᵗ; inlᵗ; inrᵗ; caseᵗ; foldᵗ; ifᵗ; primᵗ; strmᵗ;
+                          letᵗ; revᵗ; renTm; ext∈;
                           add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ)
+open import Rx.Envelope using (instEventᵗ; eventsᵛ; splitEventsᵛ; reassembleᵛ)
 open import Rx.SExp using (SExp; STm; inputˢ; ofˢ; emptyˢ; takeˢ; liftˢ;
                            mergeAllˢ; switchAllˢ; exhaustAllˢ; μˢ; varˢ; deferˢ;
                            varˢᵗ; unitˢ; boolˢ; natˢ; pairˢ; fstˢ; sndˢ; nilˢ;
@@ -125,17 +129,6 @@ postulate
   takeᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
         → Tm Γ Δᵍ Δ Θ natᵗ → Exp Γ Δᵍ Δ Θ (emitᵗ t) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
 
-  -- NOT BLOCKED, ONLY UNWRITTEN, and the difference is the leg's whole
-  -- finding.  The body unwraps the envelope, runs the author's step over
-  -- the value list and rewraps under the instant it was HANDED, which is
-  -- a fold, a case and a pair; the instant is missing only at a source.
-  -- TWIN: `scanᵉ`
-  liftᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {s t u : Ty}
-        → Fn Γ Δᵍ Δ Θ (plainᵗ u ×ᵗ listᵗ (plainᵗ s))
-                      (plainᵗ u ×ᵗ listᵗ (plainᵗ t))
-        → Tm Γ Δᵍ Δ Θ (plainᵗ u)
-        → Exp Γ Δᵍ Δ Θ (emitᵗ s) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
-
   -- the VALUES need nothing new: a lift projects each envelope to the
   -- observables it carries, and the plain flattener runs them, their own
   -- emits being envelopes already.  What waits is the join's protocol
@@ -160,6 +153,79 @@ postulate
   switchAllᵖ exhaustAllᵖ :
               ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
             → Exp Γ Δᵍ Δ Θ (emitᵗ (obs t)) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
+
+-- THE ONE FORMER OF THIS LEG THAT WAS NEVER BLOCKED, AND WRITING IT IS
+-- WHAT SAYS SO.  A lift adds no event, mints nothing and cannot end the
+-- stream, so everything it needs is in the emit it was handed: the
+-- payloads come out of the envelope, the author's step runs over them
+-- with its carried state, and what goes back in is the same envelope
+-- with new payloads.  The instant is not missing here — it is READ off
+-- the incoming emit, which is the finding the source rows above turn on.
+--
+-- IT IS `scanᵉ`'S SHAPE, TWICE OVER, AND THAT IS WHY IT IS LARGE.  The
+-- outer fold walks the emits of one plain delivery threading the
+-- author's state; the inner `letᵗ`s are how a term language with no
+-- application hands an argument to a step.  The reversing pass each
+-- `foldᵗ` costs is paid once per level, exactly as `scanᵉ` pays it.
+liftᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {s t u : Ty}
+      → Fn Γ Δᵍ Δ Θ (plainᵗ u ×ᵗ listᵗ (plainᵗ s))
+                    (plainᵗ u ×ᵗ listᵗ (plainᵗ t))
+      → Tm Γ Δᵍ Δ Θ (plainᵗ u)
+      → Exp Γ Δᵍ Δ Θ (emitᵗ s) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
+liftᵖ {Θ = Θ} {s = s} {t = t} {u = u} f z e = liftᵉ step z e
+  where
+  -- the outer fold's accumulator: the author's state, and the emits
+  -- rebuilt so far in reverse
+  A : Ty
+  A = plainᵗ u ×ᵗ listᵗ (emitᵗ t)
+
+  P : Ty
+  P = plainᵗ u ×ᵗ listᵗ (emitᵗ s)
+
+  arg : Tm _ _ _ (P ∷ Θ) P
+  arg = varᵗ (here refl)
+
+  -- the split of one emit: its bookkeeping already retagged at the
+  -- outgoing payload, its payloads, and whether it completes
+  S : Ty
+  S = listᵗ (instEventᵗ uniqᵗ (plainᵗ t)) ×ᵗ (listᵗ (plainᵗ s) ×ᵗ boolᵗ)
+
+  -- inside both `letᵗ`s: the step's result, the split, then the fold's
+  -- element and accumulator, then the former's argument, then Θ
+  f↑ : Tm _ _ _ ((plainᵗ u ×ᵗ listᵗ (plainᵗ s)) ∷ S ∷ emitᵗ s ∷ A ∷ P ∷ Θ)
+                (plainᵗ u ×ᵗ listᵗ (plainᵗ t))
+  f↑ = renTm (λ x → x) (λ x → x)
+             (ext∈ (λ x → there (there (there (there x))))) f
+
+  -- the innermost body: the step's result, the step's argument, the
+  -- split, then the fold's element and accumulator, then the former's
+  -- argument, then Θ
+  rebuilt : Tm _ _ _ ((plainᵗ u ×ᵗ listᵗ (plainᵗ t))
+                      ∷ (plainᵗ u ×ᵗ listᵗ (plainᵗ s)) ∷ S ∷ emitᵗ s ∷ A ∷ P ∷ Θ) A
+  rebuilt = pairᵗ (fstᵗ res)
+                  (consᵗ (reassembleᵛ env (fstᵗ split) (sndᵗ res)
+                                      (sndᵗ (sndᵗ split)))
+                         (sndᵗ acc))
+    where
+    res   = varᵗ (here refl)
+    split = varᵗ (there (there (here refl)))
+    env   = varᵗ (there (there (there (here refl))))
+    acc   = varᵗ (there (there (there (there (here refl)))))
+
+  run : Tm _ _ _ (P ∷ Θ) A
+  run = foldᵗ (sndᵗ arg) (pairᵗ (fstᵗ arg) nilᵗ)
+              (letᵗ (splitEventsᵛ {b = plainᵗ t} (eventsᵛ (varᵗ (here refl))))
+                    (varᵗ (there (here refl)))
+                    (letᵗ (pairᵗ (fstᵗ (varᵗ (there (there (here refl)))))
+                                 (fstᵗ (sndᵗ (varᵗ (here refl)))))
+                          (varᵗ (there (there (here refl))))
+                          (letᵗ f↑ (varᵗ (there (there (there (here refl)))))
+                                rebuilt)))
+
+  step : Tm _ _ _ (P ∷ Θ) A
+  step = letᵗ run (pairᵗ (fstᵗ arg) nilᵗ)
+              (pairᵗ (fstᵗ (varᵗ (here refl)))
+                     (revᵗ (sndᵗ (varᵗ (here refl)))))
 
 ------------------------------------------------------------------
 -- The elaboration: one simul program down into one plain program.

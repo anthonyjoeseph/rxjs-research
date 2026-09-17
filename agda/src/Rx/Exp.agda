@@ -392,6 +392,15 @@ revᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t}
      → Tm Γ Δᵍ Δ Θ (listᵗ t) → Tm Γ Δᵍ Δ Θ (listᵗ t)
 revᵗ l = foldᵗ l nilᵗ (consᵗ (varᵗ (here refl)) (varᵗ (there (here refl))))
 
+-- append, which is `revᵗ` seeded with the second list rather than with
+-- nothing: consing the reverse of the first onto it puts it back in
+-- order.  So the two are one encoding and the reversing pass `foldᵗ`
+-- costs is paid once either way.
+appendᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t}
+        → Tm Γ Δᵍ Δ Θ (listᵗ t) → Tm Γ Δᵍ Δ Θ (listᵗ t) → Tm Γ Δᵍ Δ Θ (listᵗ t)
+appendᵗ xs ys = foldᵗ (revᵗ xs) ys (consᵗ (varᵗ (here refl))
+                                          (varᵗ (there (here refl))))
+
 -- THE SEEDLESS ONE IS A PLAIN FOLD AND THE SEEDED ONE IS NOT, WHICH IS
 -- THE ANSWER THIS LEG WENT LOOKING FOR.  `mapᵉ`'s step is applied to the
 -- element, and the element IS the fold's own head binder, so the step

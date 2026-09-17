@@ -230,15 +230,16 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 
 ### Big picture tier roadmap
 
-- **THE FOUR LEAVES THAT ARE MERELY UNWRITTEN, AND THEY ARE NOW THE TOP LEG.**
-  `liftᵖ` and the three flatteners want no ruling and no former. A lift unwraps
-  its envelope, runs the author's step over the value list and rewraps under
-  the instant it was handed, which is a fold, a case and a pair; a flattener's
-  values come out of `mergeAllᵉ` over the observables its envelopes carry, and
-  only the join's own protocol emits wait on the mint. Each is a large term in
-  a language with no application, so `letᵗ` and `revᵗ` are the vocabulary — the
-  shape `scanᵉ` already pays for. They go first because the source rows above
-  them are now known to be blocked on a ruling and these are blocked on nobody.
+- **THE FLATTENERS, WHICH ARE WHAT IS LEFT OF THE UNWRITTEN LEAVES.** A lift
+  is written: unwrap, run the author's step over the value list, rewrap under
+  the instant it was handed, which turned out to be a split, a fold and a
+  reassembly, and the vocabulary it needed — an envelope term language over
+  `letᵗ` and `revᵗ`, the shape `scanᵉ` already pays for — is now there for the
+  three that remain. What a flattener adds over a lift is that its values are
+  `mergeAllᵉ` over the observables its envelopes carry, and that only the
+  join's own protocol emits wait on the mint. They stay the top leg for the
+  same reason the four were: the source rows are blocked on a ruling and these
+  are blocked on nobody.
 
 - **THEN THE DEMOTION, AND IT IS THE ORACLE'S AND NOT THE TOWER'S (Anthony:
   the harness "shouldn't test on srxjs at all — just plain rxjs now").** Target:
