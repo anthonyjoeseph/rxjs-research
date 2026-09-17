@@ -200,15 +200,15 @@ slot-agree sl sched i ag eq = trans (cong (λ f → f i) ag) eq
 
 -- EIGHT SIGNATURES BEFORE ANY BODY, AND WHAT THE BLOCK NO LONGER
 -- CARRIES IS A MEASURE.  Every member here descends on a term or
--- shortens a list, which Agda reads for itself.  The three edges that
--- descend on NEITHER — the μ peel, the hop out of a burst, and a
--- share's connect — leave the block entirely and are answered by
+-- shortens a list, which Agda reads for itself.  The four edges that
+-- descend on NEITHER — the μ peel, the mint's substituted body, the hop
+-- out of a burst, and a share's connect — leave the block entirely and are answered by
 -- `reducible`, whose recursion is on the TYPE rather than on anything
 -- this block can see.  So the premises a measure needed at every call
 -- site are gone: what travels is the slot table, and it travels because
 -- the arms genuinely dispatch on it.
 --
--- AND ONLY ONE CYCLE SURVIVES THE THREE LEAVING, which is sharper than
+-- AND ONLY ONE CYCLE SURVIVES THE FOUR LEAVING, which is sharper than
 -- the block's size suggests: the flattener's outer subscribe re-enters
 -- the term subscribe at the operator's own argument, and that is the
 -- whole of the recursion here.  The other six members are in the block
@@ -332,7 +332,7 @@ subscribeE! sl (deferᵉ body) κ id now sched ag st = _ , subs-defer refl refl 
 subscribeE! sl (mintᵉ body) κ id now sched ag st =
   let src    = freshId sourceᵏ (Sched.mint sched)
       sched' = record sched { mint = setAt sourceᵏ (suc src) (Sched.mint sched) }
-      (r , d) = subscribeE! sl (subΘExp [] (src ∷ᵃ []ᵃ) body) κ id now sched' ag st
+      (r , d , _) = reducible (subΘExp [] (src ∷ᵃ []ᵃ) body) κ id now sched' st
   in r , subs-mint refl d
 
 -- THE FLATTENER'S OUTER SUBSCRIBE, WHICH HAS EXACTLY ONE CLAUSE.  All
