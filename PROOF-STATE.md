@@ -231,16 +231,17 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 ### Big picture tier roadmap
 
 - **THE UNIQUE PRIMITIVE, WHOSE IDENTITY LIVES ONLY IN THE EVALUATOR
-  (Anthony).** `Ty` gains `uniqᵗ`, with `Val` sending it to `⊤` and one NULLARY
-  introduction form: an author writes a placeholder, never a nat, and `reify`
-  stays total on a constant. Identity is not in the value layer at all — the
-  evaluator keys each placeholder by the position it was found at, against ONE
-  ledger serving instant and source alike, so uniqueness is a theorem about
-  that ledger. Corollary: no operator reading an id can be a composition, each
-  being a FORMER the evaluator gives meaning to. The envelope rides on this —
-  `instEmitᵗ`, `instEventᵗ`, `emitKindᵗ`, `closeReasonᵗ` DEFINED over `unitᵗ`,
-  `_+ᵗ_`, `_×ᵗ_` and `listᵗ`, parameterised over their uniq type. Written out
-  the four are unreachable, so this leg also adds a `Main` line.
+  (Anthony).** `Ty` gains `uniqᵗ`, `Val` sending it to `ℕ`, introduced by a
+  PLAIN-tree former no simul former elaborates to — so `reify` stays total and
+  an author still has no way to write one. Its one eliminator is a primitive
+  EQUALITY: comparing two is what lets the envelope operators be written in the
+  `Ty`/`Tm` language, and nothing projects the nat back out. Minting is the
+  evaluator's, against ONE ledger serving instant and source alike, so
+  uniqueness is a theorem about it. The envelope rides on this — `instEmitᵗ`,
+  `instEventᵗ`, `emitKindᵗ`, `closeReasonᵗ` DEFINED over `unitᵗ`, `_+ᵗ_`,
+  `_×ᵗ_`, `listᵗ`, parameterised over their uniq type — and is claimed through
+  the existing `InstEmit` heritage, so it lands with the simul tree and adds no
+  `Main` line.
 
 - **THEN DEMOTE THE ENVELOPE OUT OF THE EVALUATOR.** Target:
   `evaluate : … → List (Val Γ t)`. The mentions split three ways and only one
