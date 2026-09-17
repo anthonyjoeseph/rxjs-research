@@ -57,7 +57,7 @@ open import Rx.Prim using (Id; Tick; Source; InstEmit; InstEvent; init; value; c
 open import Rx.Mint using (nodeᵏ; regᵏ; sourceᵏ; freshId; setAt; next)
 open import Rx.Slots using (scripted; shared)
 open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; obs; listᵗ; _≟ᵗ_; Ctx; Closed; Val; Exp; Tm; Fn; evalTm; evalWith; foldVals; applyFn; input; ofᵉ; emptyᵉ;
-  takeᵉ; liftᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ; isData; unfoldμ;
+  takeᵉ; batchSyncᵉ; liftᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ; isData; unfoldμ;
   varᵗ; unit̂; bool̂; nat̂; uniq̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ;
   nilᵗ; consᵗ; foldᵗ;
   add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ; subΘExp; subΘTm; subΘTms; lookupEnv;
@@ -70,6 +70,7 @@ open import Rx.Subst-Eval using (sub-evalTm; sub-applyFn)
 open import Rx.Subst-Identity using (subΘ-id-exp)
 open import Decide using (∧ˡ; ∧ʳ)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; _↠_; take-f; lift-f; take-st; cell-st; thru-outer;
+  batchSync-f; batchSync-st; batchSyncDispatch; groupSync; soloSync; setNode;
   mergeAllᵒ; switchᵒ; exhaustᵒ; mergeAll-st; switch-st; exhaust-st; takeVals; takeDispatch;
   liftVals; liftDispatch; lookupNode; NodeState; installNode; oneShotBurst; memberSource;
   splitEvents; splitBurst; retagEvents; NodeId; AllOp; from-inner; consumeUsable; hasRoom;
@@ -77,7 +78,8 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; _↠_; take-
   spentBurst)
 open import Rx.Evaluator.Freshness using (lookup-set; PreservedBelow)
 open import Rx.Evaluator.Freshness.Preserve using (subscribeE-preserves)
-open import Rx.Evaluator.Domain using (srcFrame; subscribeE⇓; pushBurst⇓; stepFrame⇓; step-lift; step-take; push-nil;
+open import Rx.Evaluator.Domain using (srcFrame; subscribeE⇓; pushBurst⇓; stepFrame⇓; step-lift; step-take; step-batchSync;
+  subs-batchSync; push-nil;
   push-cons; subs-of; subs-empty; subs-take-zero; subs-take-suc; subs-lift;
   subs-defer; subs-mint; subs-floor; subs-hot-done; subs-hot-live; subs-cold-sync; subs-cold-async;
   subs-μ; sub-all; subs-merge-all; subs-switch-all; subs-exhaust-all; thruConsume⇓; thruWalk⇓;
@@ -222,6 +224,7 @@ RedNode {Γ = Γ} (lift-f fn nid) st =
   ∀ {w} {a : Val Γ w}
   → lookupNode nid (EvalSt.nodes st) ≡ just (cell-st a) → Red w a
 RedNode (take-f nid)                st = ⊤
+RedNode (batchSync-f nid)           st = ⊤
 RedNode (from-inner op allNid inst) st = ⊤
 RedNode (thru-outer op nid)         st = ⊤
 
@@ -302,6 +305,7 @@ thruWrap-vals mergeAllᵒ nid true {st′ = st′}
 ... | nothing                    = refl
 ... | just (cell-st _)           = refl
 ... | just (take-st _)           = refl
+... | just (batchSync-st _)      = refl
 ... | just (mergeAll-st _ _ _ _) = refl
 ... | just (switch-st _ _)       = refl
 ... | just (exhaust-st _ _)      = refl
@@ -310,6 +314,7 @@ thruWrap-vals switchᵒ nid true {st′ = st′}
 ... | nothing                    = refl
 ... | just (cell-st _)           = refl
 ... | just (take-st _)           = refl
+... | just (batchSync-st _)      = refl
 ... | just (mergeAll-st _ _ _ _) = refl
 ... | just (switch-st _ _)       = refl
 ... | just (exhaust-st _ _)      = refl
@@ -318,6 +323,7 @@ thruWrap-vals exhaustᵒ nid true {st′ = st′}
 ... | nothing                    = refl
 ... | just (cell-st _)           = refl
 ... | just (take-st _)           = refl
+... | just (batchSync-st _)      = refl
 ... | just (mergeAll-st _ _ _ _) = refl
 ... | just (switch-st _ _)       = refl
 ... | just (exhaust-st _ _)      = refl
@@ -364,6 +370,8 @@ red-consume {u = u} mergeAllᵒ nid κ id now ro sched st
       _ , consume-all-nil (cong (consumeUsable mergeAllᵒ u) eq) , []
 ... | just (take-st _) =
       _ , consume-all-nil (cong (consumeUsable mergeAllᵒ u) eq) , []
+... | just (batchSync-st _) =
+      _ , consume-all-nil (cong (consumeUsable mergeAllᵒ u) eq) , []
 ... | just (switch-st _ _) =
       _ , consume-all-nil (cong (consumeUsable mergeAllᵒ u) eq) , []
 ... | just (exhaust-st _ _) =
@@ -389,6 +397,8 @@ red-consume {u = u} switchᵒ nid κ id now ro sched st
       _ , consume-switch-nil (cong (consumeUsable switchᵒ u) eq) , []
 ... | just (take-st _) =
       _ , consume-switch-nil (cong (consumeUsable switchᵒ u) eq) , []
+... | just (batchSync-st _) =
+      _ , consume-switch-nil (cong (consumeUsable switchᵒ u) eq) , []
 ... | just (mergeAll-st _ _ _ _) =
       _ , consume-switch-nil (cong (consumeUsable switchᵒ u) eq) , []
 ... | just (exhaust-st _ _) =
@@ -408,6 +418,8 @@ red-consume {u = u} exhaustᵒ nid κ id now ro sched st
 ... | just (cell-st _) =
       _ , consume-exhaust-nil (cong (consumeUsable exhaustᵒ u) eq) , []
 ... | just (take-st _) =
+      _ , consume-exhaust-nil (cong (consumeUsable exhaustᵒ u) eq) , []
+... | just (batchSync-st _) =
       _ , consume-exhaust-nil (cong (consumeUsable exhaustᵒ u) eq) , []
 ... | just (mergeAll-st _ _ _ _) =
       _ , consume-exhaust-nil (cong (consumeUsable exhaustᵒ u) eq) , []
@@ -528,6 +540,7 @@ satValues (p ∷ ps) = p ∷ satValues ps
 RedFrame : ∀ {n} {Γ : Ctx n} {s u} → Frame Γ s u → Set
 RedFrame (lift-f fn nid)             = RedFn fn
 RedFrame (take-f nid)                = ⊤
+RedFrame (batchSync-f nid)           = ⊤
 RedFrame (from-inner op allNid inst) = ⊤
 RedFrame (thru-outer op nid)         = ⊤
 
@@ -562,6 +575,7 @@ redTakeDispatch nid fin sched st (just (cell-st _))        rv = []
 redTakeDispatch nid fin sched st (just (mergeAll-st _ _ _ _)) rv = []
 redTakeDispatch nid fin sched st (just (switch-st _ _))    rv = []
 redTakeDispatch nid fin sched st (just (exhaust-st _ _))   rv = []
+redTakeDispatch nid fin sched st (just (batchSync-st _))   rv = []
 redTakeDispatch nid fin sched st nothing                   rv = []
 
 red-take : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo}
@@ -572,6 +586,54 @@ red-take : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo}
 red-take id now nid κ rv fin sched st =
   _ , step-take
     , redTakeDispatch nid fin sched st (lookupNode nid (EvalSt.nodes st)) rv
+    , tt
+
+-- THE FIRST FRAME WHOSE VALUE COLUMN IS NOT A SUB-MULTISET OF WHAT
+-- ARRIVED, AND IT STILL NEEDS NOTHING FROM THE STORE.  Every other
+-- frame either passes arrivals through (the take, whose store decides
+-- only how many survive) or applies a function to them (the lift,
+-- which is why that one owes a store obligation and a `RedFn`).  This
+-- one BUILDS values -- a pair per departing group -- so the take's
+-- argument does not cover it, and the reason it is still carrier-free
+-- is that the construction is pure RE-ASSOCIATION: the components of
+-- every pair built are arrivals, and `Red` at a product is the
+-- conjunction of `Red` at the components, so the departing obligation
+-- is the arriving one re-bracketed.  The node holds a Bool, which
+-- carries no payload to be reducible about.
+redGroupSync : ∀ {n} {Γ : Ctx n} {s} {vals : List (Val Γ s)}
+             → All (Red s) vals → All (Red (s ×ᵗ listᵗ s)) (groupSync vals)
+redGroupSync []       = []
+redGroupSync (p ∷ ps) = (p , ps) ∷ []
+
+redSoloSync : ∀ {n} {Γ : Ctx n} {s} {vals : List (Val Γ s)}
+            → All (Red s) vals → All (Red (s ×ᵗ listᵗ s)) (soloSync vals)
+redSoloSync []       = []
+redSoloSync (p ∷ ps) = (p , []) ∷ redSoloSync ps
+
+redBatchSyncDispatch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+                       (nid : NodeId) {vals : List (Val Γ s)} (fin : Bool)
+                       (sched : Sched Γ) (st : EvalSt e) (m : Maybe (NodeState Γ))
+                     → All (Red s) vals
+                     → All (Red (s ×ᵗ listᵗ s))
+                         (proj₁ (batchSyncDispatch {e = e} nid vals fin sched st m))
+redBatchSyncDispatch nid fin sched st (just (batchSync-st true))  rv = redGroupSync rv
+redBatchSyncDispatch nid fin sched st (just (batchSync-st false)) rv = redSoloSync rv
+redBatchSyncDispatch nid fin sched st (just (cell-st _))          rv = []
+redBatchSyncDispatch nid fin sched st (just (take-st _))          rv = []
+redBatchSyncDispatch nid fin sched st (just (mergeAll-st _ _ _ _)) rv = []
+redBatchSyncDispatch nid fin sched st (just (switch-st _ _))      rv = []
+redBatchSyncDispatch nid fin sched st (just (exhaust-st _ _))     rv = []
+redBatchSyncDispatch nid fin sched st nothing                     rv = []
+
+red-batchSync : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo}
+                (id : Id) (now : Tick) (nid : NodeId)
+                (κ : Path Γ lo (s ×ᵗ listᵗ s) t)
+                {vals : List (Val Γ s)} → All (Red s) vals → (fin : Bool)
+                (sched : Sched Γ) (st : EvalSt e)
+              → RedStep {e = e} id now (batchSync-f nid) κ vals fin sched st
+red-batchSync id now nid κ rv fin sched st =
+  _ , step-batchSync
+    , redBatchSyncDispatch nid fin sched st (lookupNode nid (EvalSt.nodes st)) rv
     , tt
 
 -- the node read back is the one written, so its payload is that payload
@@ -646,6 +708,7 @@ redLiftDispatch {w = w} fn nid {vals} fin sched st (just (cell-st {v} a)) eq rn 
                           last
 redLiftDispatch fn nid fin sched st nothing                    eq rn rf rv = [] , rn
 redLiftDispatch fn nid fin sched st (just (take-st _))         eq rn rf rv = [] , rn
+redLiftDispatch fn nid fin sched st (just (batchSync-st _))    eq rn rf rv = [] , rn
 redLiftDispatch fn nid fin sched st (just (mergeAll-st _ _ _ _)) eq rn rf rv = [] , rn
 redLiftDispatch fn nid fin sched st (just (switch-st _ _))     eq rn rf rv = [] , rn
 redLiftDispatch fn nid fin sched st (just (exhaust-st _ _))    eq rn rf rv = [] , rn
@@ -682,6 +745,8 @@ red-step id now (lift-f fn nid) sv rf κ rv fin sched st rn =
   red-lift id now fn nid κ rf rv fin sched st rn
 red-step id now (take-f nid) sv rf κ rv fin sched st rn =
   red-take id now nid κ rv fin sched st
+red-step id now (batchSync-f nid) sv rf κ rv fin sched st rn =
+  red-batchSync id now nid κ rv fin sched st
 red-step id now (from-inner op allNid inst) () rf κ rv fin sched st rn
 red-step id now (thru-outer op nid) sv rf κ rv fin sched st rn =
   red-thru id now op nid κ rv fin sched st
@@ -811,6 +876,18 @@ mutual
             (installNode nid (take-st (suc j)) st)
         (r , p , sat′) = red-push id now (take-f nid) tt tt κ sat sched₂ st₁ tt
     in r , subs-take-suc ceq refl d p , sat′
+  redExpAcc (batchSyncᵉ b) σ rσ k ok aK (acc rs) κ id now sched st =
+    let nid = freshId nodeᵏ (Sched.mint sched)
+        ((burst , sched₂ , st₁) , d , sat) =
+          redExpAcc b σ rσ k ok aK (rs ≤-refl)
+            (batchSync-f nid ↠ κ) id now
+            (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
+            (installNode nid (batchSync-st true) st)
+        ((out , sched₃ , st₂) , p , sat′) =
+          red-push id now (batchSync-f nid) tt tt κ sat sched₂ st₁ tt
+    in ( out , sched₃
+       , record st₂ { nodes = setNode nid (batchSync-st false) (EvalSt.nodes st₂) } )
+       , subs-batchSync refl d p , sat′
   redExpAcc (liftᵉ {s = s} {u = w} f z b) σ rσ k ok aK (acc rs) κ id now sched st =
     let nid = freshId nodeᵏ (Sched.mint sched)
         fn  = subΘTm ((w ×ᵗ listᵗ s) ∷ []) σ f

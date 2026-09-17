@@ -60,7 +60,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong;
 
 open import Rx.Prim using (Timed; after_,_; ObservableInput; hot; cold; InstEvent; init; value; close; handoff;
   complete; InstEmit; _at_from_as_)
-open import Rx.Exp using (Ty; natᵗ; obs; listᵗ; revᵗ; _×ᵗ_; isData; Ctx; Exp; Tm; Fn; PrimOp; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; liftᵉ;
+open import Rx.Exp using (Ty; natᵗ; obs; listᵗ; revᵗ; _×ᵗ_; isData; Ctx; Exp; Tm; Fn; PrimOp; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; batchSyncᵉ; scanᵉ; liftᵉ;
   mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ;
   unit̂; bool̂; nat̂; uniq̂; primᵗ; pairᵗ; fstᵗ; sndᵗ;
   strmᵗ; varᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; nilᵗ; consᵗ; foldᵗ; add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ)
@@ -436,7 +436,7 @@ genExp d = genExpAt 0 0 d
 -- decoder and the TypeScript union spell.
 data Former : Set where
   fInput fOf fEmpty fTake fLift fMergeAll fSwitchAll fExhaustAll
-    fMu fVar fDefer fMint : Former
+    fMu fVar fDefer fMint fBatchSync : Former
 
 formerTag : Former → String
 formerTag fInput      = "input"
@@ -451,10 +451,11 @@ formerTag fMu         = "mu"
 formerTag fVar        = "varE"
 formerTag fDefer      = "defer"
 formerTag fMint       = "mint"
+formerTag fBatchSync  = "batchSync"
 
 allFormers : List Former
 allFormers = fInput ∷ fOf ∷ fEmpty ∷ fTake ∷ fLift ∷ fMergeAll ∷ fSwitchAll
-           ∷ fExhaustAll ∷ fMu ∷ fVar ∷ fDefer ∷ fMint ∷ []
+           ∷ fExhaustAll ∷ fMu ∷ fVar ∷ fDefer ∷ fMint ∷ fBatchSync ∷ []
 
 formerIx : Former → ℕ
 formerIx fInput      = 0
@@ -469,6 +470,7 @@ formerIx fMu         = 8
 formerIx fVar        = 9
 formerIx fDefer      = 10
 formerIx fMint       = 11
+formerIx fBatchSync  = 12
 
 sameFormer : Former → Former → Bool
 sameFormer a b = formerIx a ≡ᵇ formerIx b
@@ -503,6 +505,7 @@ marksᵉ (liftᵉ {u = u} f z e) =
   one fLift ⊕ ([] , not (isData u)) ⊕ marksᵗ f ⊕ marksᵗ z ⊕ marksᵉ e
 marksᵉ (mergeAllᵉ _ e) = one fMergeAll ⊕ marksᵉ e
 marksᵉ (switchAllᵉ e)  = one fSwitchAll ⊕ marksᵉ e
+marksᵉ (batchSyncᵉ e)  = one fBatchSync ⊕ marksᵉ e
 marksᵉ (exhaustAllᵉ e) = one fExhaustAll ⊕ marksᵉ e
 marksᵉ (μᵉ e)          = one fMu ⊕ marksᵉ e
 marksᵉ (varᵉ x)        = one fVar
@@ -664,6 +667,7 @@ showExp (mergeAllᵉ nothing s)  = "(mergeAllᵉ nothing " ++ showExp s ++ ")"
 showExp (mergeAllᵉ (just k) s) =
   "(mergeAllᵉ (just " ++ show k ++ ") " ++ showExp s ++ ")"
 showExp (switchAllᵉ s)  = "(switchAllᵉ " ++ showExp s ++ ")"
+showExp (batchSyncᵉ s)  = "(batchSyncᵉ " ++ showExp s ++ ")"
 showExp (exhaustAllᵉ s) = "(exhaustAllᵉ " ++ showExp s ++ ")"
 showExp (μᵉ e)          = "(μᵉ " ++ showExp e ++ ")"
 showExp (varᵉ x)        = "(varᵉ " ++ showIx x ++ ")"

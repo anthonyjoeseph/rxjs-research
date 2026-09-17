@@ -25,13 +25,13 @@ open import Relation.Binary.PropositionalEquality
   using (_≡_; trans; cong; cong₂; subst)
 
 open import Rx.Exp
-  using (Ty; Ctx; Exp; Tm; subΘExp; subΘTm; subΘTms; input; ofᵉ; emptyᵉ; takeᵉ; liftᵉ;
+  using (Ty; Ctx; Exp; Tm; subΘExp; subΘTm; subΘTms; input; ofᵉ; emptyᵉ; takeᵉ; batchSyncᵉ; liftᵉ;
   mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ; uniqᵗ; varᵗ; unit̂; bool̂; nat̂; uniq̂; pairᵗ; fstᵗ;
   sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ; _×ᵗ_; listᵗ; nilᵗ; consᵗ; foldᵗ)
 open import Rx.Subst-Transport
   using ( Cᵉ; Cᵗ; Cˢ; shift; ∈-id; cong₃
         ; pushInput; pushEmpty; pushVarᵉ; pushOf; pushTake; pushLift
-        ; pushMerge; pushSwitch; pushExhaust; pushMu; pushDefer; pushMint
+        ; pushMerge; pushSwitch; pushBatchSync; pushExhaust; pushMu; pushDefer; pushMint
         ; shiftᵉ
         ; pushVarᵗ; pushUnit; pushBool; pushNat; pushUniq; pushPair; pushFst; pushSnd
         ; pushInl; pushInr; pushCase; pushIf; pushPrim; pushStrm
@@ -71,6 +71,8 @@ mutual
           (pushMerge (++-identityʳ Θloc) lim e)
   subΘ-idᵉ Θloc (switchAllᵉ e) =
     trans (cong switchAllᵉ (subΘ-idᵉ Θloc e)) (pushSwitch (++-identityʳ Θloc) e)
+  subΘ-idᵉ Θloc (batchSyncᵉ e) =
+    trans (cong batchSyncᵉ (subΘ-idᵉ Θloc e)) (pushBatchSync (++-identityʳ Θloc) e)
   subΘ-idᵉ Θloc (exhaustAllᵉ e) =
     trans (cong exhaustAllᵉ (subΘ-idᵉ Θloc e)) (pushExhaust (++-identityʳ Θloc) e)
   subΘ-idᵉ Θloc (μᵉ e) =

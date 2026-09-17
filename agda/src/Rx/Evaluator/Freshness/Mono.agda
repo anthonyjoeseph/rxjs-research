@@ -34,20 +34,20 @@ open import Rx.Mint using (MintKey; ordinalᵏ; sourceᵏ; nodeᵏ; regᵏ; fres
 open import Rx.Exp using (Ctx; Closed; Val; obs; Fn; _×ᵗ_; listᵗ; _≟ᵗ_)
 open import Rx.Prim using (Id; InstEvent)
 open import Rx.Evaluator using (Sched; EvalSt; Path; Frame; NodeId; NodeState; AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ;
-  oneShotBurst; switchKill; liftDispatch; takeDispatch; thruWrap; cell-st; take-st;
+  oneShotBurst; switchKill; liftDispatch; takeDispatch; batchSyncDispatch; thruWrap; cell-st; take-st; batchSync-st;
   mergeAll-st; switch-st; exhaust-st; lookupNode; takeVals)
 open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeInner⇓; thruConsume⇓;
   thruWalk⇓; mergeAllDrain⇓; innerFinish⇓; innerReact⇓; stepFrame⇓; pushBurst⇓;
   subscribeAll⇓; sharedConnect⇓; subscribeSharedSlot⇓;
   subs-floor; subs-shared; subs-hot-done; subs-hot-live; subs-cold-sync;
   subs-cold-async; subs-of; subs-empty; subs-take-zero; subs-take-suc;
-  subs-lift; subs-merge-all; subs-switch-all; subs-exhaust-all; subs-μ; subs-defer; subs-mint;
+  subs-batchSync; subs-lift; subs-merge-all; subs-switch-all; subs-exhaust-all; subs-μ; subs-defer; subs-mint;
   inner; consume-all-sub; consume-all-enqueue; consume-all-nil; consume-switch-sub;
   consume-switch-nil; consume-exhaust-sub; consume-exhaust-nil;
   walk-nil; walk-cons; drain-nil; drain-no-room; drain-room;
   finish-all-drain; finish-switch-clear; finish-exhaust-clear; finish-nil;
   react-false; react-alive; react-dead;
-  step-lift; step-take; step-from-inner; step-thru-outer;
+  step-lift; step-take; step-batchSync; step-from-inner; step-thru-outer;
   push-nil; push-cons; sub-all; connect-live; connect-died;
   slot-spent; slot-join; slot-connect)
 
@@ -84,6 +84,7 @@ liftDispatch-mint {w = w} fn nid vals fin sched st (just (cell-st {v} a)) k
 ... | yes refl = ≤-refl
 liftDispatch-mint fn nid vals fin sched st nothing k = ≤-refl
 liftDispatch-mint fn nid vals fin sched st (just (take-st _)) k = ≤-refl
+liftDispatch-mint fn nid vals fin sched st (just (batchSync-st _)) k = ≤-refl
 liftDispatch-mint fn nid vals fin sched st (just (mergeAll-st _ _ _ _)) k = ≤-refl
 liftDispatch-mint fn nid vals fin sched st (just (switch-st _ _)) k = ≤-refl
 liftDispatch-mint fn nid vals fin sched st (just (exhaust-st _ _)) k = ≤-refl
@@ -105,6 +106,24 @@ takeDispatch-mint nid vals fin sched st (just (cell-st _)) k = ≤-refl
 takeDispatch-mint nid vals fin sched st (just (mergeAll-st _ _ _ _)) k = ≤-refl
 takeDispatch-mint nid vals fin sched st (just (switch-st _ _)) k = ≤-refl
 takeDispatch-mint nid vals fin sched st (just (exhaust-st _ _)) k = ≤-refl
+takeDispatch-mint nid vals fin sched st (just (batchSync-st _)) k = ≤-refl
+
+-- the grouping reads one bit and re-brackets the arriving column; it
+-- hands the scheduler straight back, so every arm is `≤-refl`
+batchSyncDispatch-mint : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+                      (nid : NodeId) (vals : List (Val Γ s)) (fin : Bool)
+                      (sched : Sched Γ) (st : EvalSt e) (m : Maybe (NodeState Γ))
+                      (k : MintKey)
+                  → freshId k (Sched.mint sched)
+                    ≤ freshId k (Sched.mint (proj₁ (proj₂ (proj₂ (proj₂
+                        (batchSyncDispatch {e = e} nid vals fin sched st m))))))
+batchSyncDispatch-mint nid vals fin sched st (just (batchSync-st _)) k = ≤-refl
+batchSyncDispatch-mint nid vals fin sched st nothing k = ≤-refl
+batchSyncDispatch-mint nid vals fin sched st (just (cell-st _)) k = ≤-refl
+batchSyncDispatch-mint nid vals fin sched st (just (take-st _)) k = ≤-refl
+batchSyncDispatch-mint nid vals fin sched st (just (mergeAll-st _ _ _ _)) k = ≤-refl
+batchSyncDispatch-mint nid vals fin sched st (just (switch-st _ _)) k = ≤-refl
+batchSyncDispatch-mint nid vals fin sched st (just (exhaust-st _ _)) k = ≤-refl
 
 -- the flattener's wrap marks its own node done and hands the walk's
 -- scheduler straight back
@@ -121,6 +140,7 @@ thruWrap-mint mergeAllᵒ nid true vs bs sched′ st′ k
 ... | just (mergeAll-st _ _ _ _) = ≤-refl
 ... | just (cell-st _)           = ≤-refl
 ... | just (take-st _)           = ≤-refl
+... | just (batchSync-st _)      = ≤-refl
 ... | just (switch-st _ _)       = ≤-refl
 ... | just (exhaust-st _ _)      = ≤-refl
 ... | nothing                    = ≤-refl
@@ -129,6 +149,7 @@ thruWrap-mint switchᵒ nid true vs bs sched′ st′ k
 ... | just (switch-st _ _)       = ≤-refl
 ... | just (cell-st _)           = ≤-refl
 ... | just (take-st _)           = ≤-refl
+... | just (batchSync-st _)      = ≤-refl
 ... | just (mergeAll-st _ _ _ _) = ≤-refl
 ... | just (exhaust-st _ _)      = ≤-refl
 ... | nothing                    = ≤-refl
@@ -137,6 +158,7 @@ thruWrap-mint exhaustᵒ nid true vs bs sched′ st′ k
 ... | just (exhaust-st _ _)      = ≤-refl
 ... | just (cell-st _)           = ≤-refl
 ... | just (take-st _)           = ≤-refl
+... | just (batchSync-st _)      = ≤-refl
 ... | just (mergeAll-st _ _ _ _) = ≤-refl
 ... | just (switch-st _ _)       = ≤-refl
 ... | nothing                    = ≤-refl
@@ -261,6 +283,9 @@ subscribeE-mono (subs-take-zero {u = u} {id = id} {sched = sched} _ eq) k =
 subscribeE-mono (subs-take-suc {sched = sched} _ refl sub push) k =
   ≤-trans (≤-trans (next-mono nodeᵏ k (Sched.mint sched)) (subscribeE-mono sub k))
           (pushBurst-mono push k)
+subscribeE-mono (subs-batchSync {sched = sched} refl sub push) k =
+  ≤-trans (≤-trans (next-mono nodeᵏ k (Sched.mint sched)) (subscribeE-mono sub k))
+          (pushBurst-mono push k)
 subscribeE-mono (subs-lift {sched = sched} refl sub push) k =
   ≤-trans (≤-trans (next-mono nodeᵏ k (Sched.mint sched)) (subscribeE-mono sub k))
           (pushBurst-mono push k)
@@ -283,6 +308,8 @@ stepFrame-mono (step-lift {fn = fn} {nid} {vals = vals} {fin} {sched} {st}) k =
   liftDispatch-mint fn nid vals fin sched st (lookupNode nid (EvalSt.nodes st)) k
 stepFrame-mono (step-take {nid = nid} {vals = vals} {fin} {sched} {st}) k =
   takeDispatch-mint nid vals fin sched st (lookupNode nid (EvalSt.nodes st)) k
+stepFrame-mono (step-batchSync {nid = nid} {vals = vals} {fin} {sched} {st}) k =
+  batchSyncDispatch-mint nid vals fin sched st (lookupNode nid (EvalSt.nodes st)) k
 stepFrame-mono (step-from-inner r)   k = innerReact-mono r k
 stepFrame-mono (step-thru-outer {op = op} {nid} {fin = fin} w) k =
   ≤-trans (thruWalk-mono w k) (thruWrap-mint op nid fin _ _ _ _ k)

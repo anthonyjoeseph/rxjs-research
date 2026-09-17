@@ -104,7 +104,7 @@ open import Rx.Prim using (Tick; Fuel; Id; Source; InstEvent; InstEmit; value; c
   init; subscribe; hot; cold)
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
 open import Rx.Exp using (obs; Ctx; Val; Closed; Exp; Tm; Fn; _×ᵗ_; listᵗ; uniqᵗ; subΘExp;
-  evalTm; unfoldμ; input; ofᵉ; emptyᵉ; takeᵉ;
+  evalTm; unfoldμ; input; ofᵉ; emptyᵉ; takeᵉ; batchSyncᵉ;
   liftᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; deferᵉ; mintᵉ)
 open import Rx.Mint using (ordinalᵏ; sourceᵏ; nodeᵏ; regᵏ; freshId; setAt)
 open import Rx.Slots using (Slots; scripted; shared)
@@ -116,11 +116,11 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; NodeId;
   NodeState; AllOp; RegId; Arrival; AtFloor; arrTy;
   spentBurst; oneShotBurst; memberSource; register; installNode; resolve;
   atSlot; atDyn; lowerFloor;
-  lift-f; take-f; thru-outer;
-  cell-st; take-st; mergeAll-st; switch-st; exhaust-st;
+  lift-f; take-f; batchSync-f; thru-outer;
+  cell-st; take-st; batchSync-st; mergeAll-st; switch-st; exhaust-st;
   mergeAllᵒ; switchᵒ; exhaustᵒ;
   lookupNode; setNode; hasRoom; mergeAllBump; switchKill; aliveThroughᶠ;
-  splitEvents; retagEvents; liftDispatch; takeDispatch; thruWrap;
+  splitEvents; retagEvents; liftDispatch; takeDispatch; batchSyncDispatch; thruWrap;
   consumeUsable; finishUsable;
   burstCompleted; sharedPlumb; dropSource)
 
@@ -375,6 +375,28 @@ data subscribeE⇓ {n} {Γ} {t} {e} where
                     (burst , sched₂ , st₁)
                 → pushBurst⇓ id now (take-f nid) κ burst sched₂ st₁ r
                 → subscribeE⇓ (takeᵉ count b) κ id now sched st r
+
+  -- THE BRACKET IS CLOSED HERE AND NOWHERE ELSE, WHICH IS WHAT MAKES
+  -- AN EMPTY BURST BEHAVE.  The bit is cleared in the CONCLUSION,
+  -- after the push, so it is cleared whether or not the push
+  -- dispatched anything -- a body that emitted nothing on subscribe
+  -- leaves this node in the async state exactly as one that emitted
+  -- three does.  Clearing it inside the dispatch instead would leave a
+  -- silent body's node armed, and its first later value would leave as
+  -- a group of one pretending to be a subscribe burst.
+  subs-batchSync : ∀ {lo u} {b : Closed Γ u} {κ : Path Γ lo (u ×ᵗ listᵗ u) t}
+                     {id now sched st nid burst sched₂ st₁ out sched₃ st₂}
+                 → freshId nodeᵏ (Sched.mint sched) ≡ nid
+                 → subscribeE⇓ b (batchSync-f nid ↠ κ) id now
+                     (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
+                     (installNode nid (batchSync-st true) st)
+                     (burst , sched₂ , st₁)
+                 → pushBurst⇓ id now (batchSync-f nid) κ burst sched₂ st₁
+                     (out , sched₃ , st₂)
+                 → subscribeE⇓ (batchSyncᵉ b) κ id now sched st
+                     ( out , sched₃
+                     , record st₂ { nodes = setNode nid (batchSync-st false)
+                                                    (EvalSt.nodes st₂) } )
 
 
   subs-lift : ∀ {lo s u w} {f} {i : Tm Γ [] [] [] w} {b : Closed Γ s}
@@ -719,6 +741,12 @@ data stepFrame⇓ {n} {Γ} {t} {e} where
             → stepFrame⇓ id now (take-f nid) κ vals fin sched st
                 (takeDispatch nid vals fin sched st
                   (lookupNode nid (EvalSt.nodes st)))
+
+  step-batchSync : ∀ {s lo nid} {κ : Path Γ lo (s ×ᵗ listᵗ s) t}
+                     {id now} {vals : List (Val Γ s)} {fin sched st}
+                 → stepFrame⇓ id now (batchSync-f nid) κ vals fin sched st
+                     (batchSyncDispatch nid vals fin sched st
+                       (lookupNode nid (EvalSt.nodes st)))
 
   step-from-inner : ∀ {s lo op allNid inst} {κ : Path Γ lo s t}
                       {id now} {vals : List (Val Γ s)} {fin sched st r}

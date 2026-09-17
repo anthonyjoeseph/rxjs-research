@@ -43,7 +43,7 @@ open import Data.Product using (Σ; _,_)
 open import Data.Vec using () renaming ([] to []ⱽ)
 open import Relation.Nullary using (¬_)
 
-open import Rx.Exp using (Ctx; Tm; Fn; Closed; obs; natᵗ; _×ᵗ_; listᵗ; input; ofᵉ; emptyᵉ; takeᵉ;
+open import Rx.Exp using (Ctx; Tm; Fn; Closed; obs; natᵗ; _×ᵗ_; listᵗ; input; ofᵉ; emptyᵉ; takeᵉ; batchSyncᵉ;
   liftᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ)
 
 -- the structural domain predicate: one constructor per former, each
@@ -68,6 +68,7 @@ data Sub {n} {Γ : Ctx n} : ∀ {t} → Closed Γ t → Set where
           → Sub b → Sub (liftᵉ f z b)
   s-merge : ∀ {t lim} {b : Closed Γ (obs t)} → Sub b → Sub (mergeAllᵉ lim b)
   s-switch : ∀ {t} {b : Closed Γ (obs t)} → Sub b → Sub (switchAllᵉ b)
+  s-batchSync : ∀ {t} {b : Closed Γ t} → Sub b → Sub (batchSyncᵉ b)
   s-exhaust : ∀ {t} {b : Closed Γ (obs t)} → Sub b → Sub (exhaustAllᵉ b)
 
 sub-total : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) → Sub e
@@ -81,6 +82,7 @@ sub-total (takeᵉ c b)       = s-take (sub-total b)
 sub-total (liftᵉ f z b)     = s-lift (sub-total b)
 sub-total (mergeAllᵉ l b)   = s-merge (sub-total b)
 sub-total (switchAllᵉ b)    = s-switch (sub-total b)
+sub-total (batchSyncᵉ b)    = s-batchSync (sub-total b)
 sub-total (exhaustAllᵉ b)   = s-exhaust (sub-total b)
 sub-total (varᵉ ())
 

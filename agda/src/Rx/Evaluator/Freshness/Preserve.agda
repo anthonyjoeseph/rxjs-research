@@ -35,20 +35,20 @@ open import Rx.Mint using (nodeᵏ; freshId)
 open import Rx.Exp using (Ctx; Closed; Val; obs; Fn; _×ᵗ_; listᵗ; _≟ᵗ_)
 open import Rx.Prim using (InstEvent)
 open import Rx.Evaluator using (Sched; EvalSt; Path; Frame; NodeId; NodeState; AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ;
-  switchKill; liftDispatch; takeDispatch; thruWrap; mergeAllBump; liftVals; takeVals; cell-st;
-  take-st; mergeAll-st; switch-st; exhaust-st; lookupNode)
+  switchKill; liftDispatch; takeDispatch; batchSyncDispatch; thruWrap; mergeAllBump; liftVals; takeVals; cell-st;
+  take-st; batchSync-st; mergeAll-st; switch-st; exhaust-st; lookupNode)
 open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeInner⇓; thruConsume⇓;
   thruWalk⇓; mergeAllDrain⇓; innerFinish⇓; innerReact⇓; stepFrame⇓; pushBurst⇓;
   subscribeAll⇓; sharedConnect⇓; subscribeSharedSlot⇓;
   subs-floor; subs-shared; subs-hot-done; subs-hot-live; subs-cold-sync;
-  subs-cold-async; subs-of; subs-empty; subs-take-zero; subs-take-suc;
+  subs-cold-async; subs-of; subs-empty; subs-take-zero; subs-take-suc; subs-batchSync;
   subs-lift; subs-merge-all; subs-switch-all; subs-exhaust-all; subs-μ; subs-defer; subs-mint;
   inner; consume-all-sub; consume-all-enqueue; consume-all-nil; consume-switch-sub;
   consume-switch-nil; consume-exhaust-sub; consume-exhaust-nil;
   walk-nil; walk-cons; drain-nil; drain-no-room; drain-room;
   finish-all-drain; finish-switch-clear; finish-exhaust-clear; finish-nil;
   react-false; react-alive; react-dead;
-  step-lift; step-take; step-from-inner; step-thru-outer;
+  step-lift; step-take; step-batchSync; step-from-inner; step-thru-outer;
   push-nil; push-cons; sub-all; connect-live; connect-died;
   slot-spent; slot-join; slot-connect)
 open import Rx.Evaluator.Freshness using (PreservedBelow; FrameAbove;
@@ -69,6 +69,7 @@ lift-pres {w = w} fn nid vals fin sched st (just (cell-st {v} a)) f≤nid
 ... | yes refl = pres-write _ _ (cell-st (proj₂ (liftVals fn a vals))) refl f≤nid
 lift-pres fn nid vals fin sched st nothing                    f≤nid = pres-same _ _ refl
 lift-pres fn nid vals fin sched st (just (take-st _))         f≤nid = pres-same _ _ refl
+lift-pres fn nid vals fin sched st (just (batchSync-st _))    f≤nid = pres-same _ _ refl
 lift-pres fn nid vals fin sched st (just (mergeAll-st _ _ _ _)) f≤nid = pres-same _ _ refl
 lift-pres fn nid vals fin sched st (just (switch-st _ _))     f≤nid = pres-same _ _ refl
 lift-pres fn nid vals fin sched st (just (exhaust-st _ _))    f≤nid = pres-same _ _ refl
@@ -89,6 +90,23 @@ take-pres nid vals fin sched st (just (cell-st _))          f≤nid = pres-same 
 take-pres nid vals fin sched st (just (mergeAll-st _ _ _ _)) f≤nid = pres-same _ _ refl
 take-pres nid vals fin sched st (just (switch-st _ _))      f≤nid = pres-same _ _ refl
 take-pres nid vals fin sched st (just (exhaust-st _ _))     f≤nid = pres-same _ _ refl
+take-pres nid vals fin sched st (just (batchSync-st _))     f≤nid = pres-same _ _ refl
+
+-- the grouping writes no node at all: it reads one bit and re-brackets
+-- the arriving column, so the store it hands back is the store it got
+batchSync-pres : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s} {f}
+              (nid : NodeId) (vals : List (Val Γ s)) (fin : Bool)
+              (sched : Sched Γ) (st : EvalSt e) (m : Maybe (NodeState Γ))
+          → f ≤ nid
+          → PreservedBelow f st (proj₂ (proj₂ (proj₂ (proj₂
+              (batchSyncDispatch {e = e} nid vals fin sched st m)))))
+batchSync-pres nid vals fin sched st (just (batchSync-st _))  f≤nid = pres-same _ _ refl
+batchSync-pres nid vals fin sched st nothing                  f≤nid = pres-same _ _ refl
+batchSync-pres nid vals fin sched st (just (cell-st _))       f≤nid = pres-same _ _ refl
+batchSync-pres nid vals fin sched st (just (take-st _))       f≤nid = pres-same _ _ refl
+batchSync-pres nid vals fin sched st (just (mergeAll-st _ _ _ _)) f≤nid = pres-same _ _ refl
+batchSync-pres nid vals fin sched st (just (switch-st _ _))   f≤nid = pres-same _ _ refl
+batchSync-pres nid vals fin sched st (just (exhaust-st _ _))  f≤nid = pres-same _ _ refl
 
 -- the flattener's wrap marks its own node done
 wrap-pres : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} {f}
@@ -104,6 +122,7 @@ wrap-pres mergeAllᵒ nid true vs bs sched′ st′ f≤nid
 ... | just (mergeAll-st lim act q _) = pres-write _ _ (mergeAll-st lim act q true) refl f≤nid
 ... | just (cell-st _)               = pres-same _ _ refl
 ... | just (take-st _)               = pres-same _ _ refl
+... | just (batchSync-st _)          = pres-same _ _ refl
 ... | just (switch-st _ _)           = pres-same _ _ refl
 ... | just (exhaust-st _ _)          = pres-same _ _ refl
 ... | nothing                        = pres-same _ _ refl
@@ -112,6 +131,7 @@ wrap-pres switchᵒ nid true vs bs sched′ st′ f≤nid
 ... | just (switch-st cur _)         = pres-write _ _ (switch-st cur true) refl f≤nid
 ... | just (cell-st _)               = pres-same _ _ refl
 ... | just (take-st _)               = pres-same _ _ refl
+... | just (batchSync-st _)          = pres-same _ _ refl
 ... | just (mergeAll-st _ _ _ _)     = pres-same _ _ refl
 ... | just (exhaust-st _ _)          = pres-same _ _ refl
 ... | nothing                        = pres-same _ _ refl
@@ -120,6 +140,7 @@ wrap-pres exhaustᵒ nid true vs bs sched′ st′ f≤nid
 ... | just (exhaust-st act _)        = pres-write _ _ (exhaust-st act true) refl f≤nid
 ... | just (cell-st _)               = pres-same _ _ refl
 ... | just (take-st _)               = pres-same _ _ refl
+... | just (batchSync-st _)          = pres-same _ _ refl
 ... | just (mergeAll-st _ _ _ _)     = pres-same _ _ refl
 ... | just (switch-st _ _)           = pres-same _ _ refl
 ... | nothing                        = pres-same _ _ refl
@@ -134,6 +155,7 @@ bump-pres {nid = nid} st f≤nid with lookupNode nid (EvalSt.nodes st)
 ... | just (mergeAll-st _ _ _ _) = pres-write _ _ _ refl f≤nid
 ... | just (cell-st _)           = pres-same _ _ refl
 ... | just (take-st _)           = pres-same _ _ refl
+... | just (batchSync-st _)      = pres-same _ _ refl
 ... | just (switch-st _ _)       = pres-same _ _ refl
 ... | just (exhaust-st _ _)      = pres-same _ _ refl
 ... | nothing                    = pres-same _ _ refl
@@ -279,6 +301,12 @@ subscribeE-preserves f le (subs-take-suc {k = k} _ refl sub push) =
                          (subscribeE-preserves f (≤-trans le (n≤1+n _)) sub))
              (pushBurst-preserves f
                 (≤-trans (≤-trans le (n≤1+n _)) (subscribeE-mono sub nodeᵏ)) le push)
+subscribeE-preserves f le (subs-batchSync refl sub push) =
+  pres-trans (pres-trans (pres-trans (pres-write _ _ _ refl le)
+                                     (subscribeE-preserves f (≤-trans le (n≤1+n _)) sub))
+                         (pushBurst-preserves f
+                            (≤-trans (≤-trans le (n≤1+n _)) (subscribeE-mono sub nodeᵏ)) le push))
+             (pres-write _ _ _ refl le)
 subscribeE-preserves f le (subs-lift refl sub push) =
   pres-trans (pres-trans (pres-write _ _ _ refl le)
                          (subscribeE-preserves f (≤-trans le (n≤1+n _)) sub))
@@ -302,6 +330,9 @@ stepFrame-preserves f le fa
 stepFrame-preserves f le fa
   (step-take {nid = nid} {vals = vals} {fin} {sched} {st}) =
   take-pres nid vals fin sched st (lookupNode nid (EvalSt.nodes st)) fa
+stepFrame-preserves f le fa
+  (step-batchSync {nid = nid} {vals = vals} {fin} {sched} {st}) =
+  batchSync-pres nid vals fin sched st (lookupNode nid (EvalSt.nodes st)) fa
 stepFrame-preserves f le fa (step-from-inner r) =
   innerReact-preserves f le (proj₁ fa) r
 stepFrame-preserves f le fa

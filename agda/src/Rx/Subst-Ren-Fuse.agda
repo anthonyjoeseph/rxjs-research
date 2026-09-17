@@ -38,7 +38,7 @@ open import Rx.Exp
   using ( Ty; Ctx; Exp; Tm; Val; Ren∈; ext∈; ++Ren; renExp; renTm; renTms
         ; subΘExp; subΘTm; subΘTms; wkTm; reify; lookupEnv; _×ᵗ_; listᵗ
         ; input; ofᵉ; emptyᵉ; takeᵉ; liftᵉ; mergeAllᵉ; switchAllᵉ
-        ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ
+        ; exhaustAllᵉ; batchSyncᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ
         ; varᵗ; unit̂; bool̂; nat̂; uniq̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ
         ; ifᵗ; primᵗ; strmᵗ; nilᵗ; consᵗ; foldᵗ; uniqᵗ )
 open import Rx.Subst-Transport using (Cᵉ; cong₃)
@@ -105,6 +105,7 @@ mutual
                 (ren-∘ᵉ cg cd ct e)
   ren-∘ᵉ cg cd ct (mergeAllᵉ lim e) = cong (mergeAllᵉ lim) (ren-∘ᵉ cg cd ct e)
   ren-∘ᵉ cg cd ct (switchAllᵉ e)    = cong switchAllᵉ (ren-∘ᵉ cg cd ct e)
+  ren-∘ᵉ cg cd ct (batchSyncᵉ e)    = cong batchSyncᵉ (ren-∘ᵉ cg cd ct e)
   ren-∘ᵉ cg cd ct (exhaustAllᵉ e)   = cong exhaustAllᵉ (ren-∘ᵉ cg cd ct e)
   ren-∘ᵉ cg cd ct (μᵉ e)     = cong μᵉ (ren-∘ᵉ (comp-ext cg) cd ct e)
   ren-∘ᵉ {ρg = ρg} {σg = σg} {τg = τg} {ρd = ρd} {σd = σd} {τd = τd}
@@ -229,6 +230,8 @@ mutual
     cong (mergeAllᵉ lim) (sub-fixᵉ Θa Θb σ fl fr e)
   sub-fixᵉ Θa Θb σ fl fr (switchAllᵉ e)  =
     cong switchAllᵉ (sub-fixᵉ Θa Θb σ fl fr e)
+  sub-fixᵉ Θa Θb σ fl fr (batchSyncᵉ e)  =
+    cong batchSyncᵉ (sub-fixᵉ Θa Θb σ fl fr e)
   sub-fixᵉ Θa Θb σ fl fr (exhaustAllᵉ e) =
     cong exhaustAllᵉ (sub-fixᵉ Θa Θb σ fl fr e)
   sub-fixᵉ Θa Θb σ fl fr (μᵉ e)     = cong μᵉ (sub-fixᵉ Θa Θb σ fl fr e)

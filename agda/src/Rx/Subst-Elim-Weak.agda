@@ -40,7 +40,7 @@ open import Rx.Exp
         ; _⊟_; ⊟-++ˡ; ⊟-++ʳ; compare∈
         ; elimGExp; elimGTm; elimGTms; elimDExp; elimDTm; elimDTms
         ; input; ofᵉ; emptyᵉ; takeᵉ; liftᵉ; mergeAllᵉ; switchAllᵉ
-        ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ; uniqᵗ
+        ; exhaustAllᵉ; batchSyncᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ; uniqᵗ
         ; varᵗ; unit̂; bool̂; nat̂; uniq̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ
         ; caseᵗ; ifᵗ; primᵗ; strmᵗ; nilᵗ; consᵗ; foldᵗ )
 open import Rx.Subst-Transport using (cong₃)
@@ -260,6 +260,7 @@ mutual
   elimG-avᵉ Θl x cl av (mergeAllᵉ lim e) =
     cong (mergeAllᵉ lim) (elimG-avᵉ Θl x cl av e)
   elimG-avᵉ Θl x cl av (switchAllᵉ e)  = cong switchAllᵉ (elimG-avᵉ Θl x cl av e)
+  elimG-avᵉ Θl x cl av (batchSyncᵉ e)  = cong batchSyncᵉ (elimG-avᵉ Θl x cl av e)
   elimG-avᵉ Θl x cl av (exhaustAllᵉ e) = cong exhaustAllᵉ (elimG-avᵉ Θl x cl av e)
   elimG-avᵉ Θl x cl av (μᵉ e) =
     cong μᵉ (elimG-avᵉ Θl (there x) cl (avoids-ext av) e)
@@ -333,6 +334,8 @@ mutual
     cong (mergeAllᵉ lim) (elimD-avᵉ Θl x refl cl av e)
   elimD-avᵉ Θl x refl cl av (switchAllᵉ e) =
     cong switchAllᵉ (elimD-avᵉ Θl x refl cl av e)
+  elimD-avᵉ Θl x refl cl av (batchSyncᵉ e) =
+    cong batchSyncᵉ (elimD-avᵉ Θl x refl cl av e)
   elimD-avᵉ Θl x refl cl av (exhaustAllᵉ e) =
     cong exhaustAllᵉ (elimD-avᵉ Θl x refl cl av e)
   elimD-avᵉ Θl x refl cl av (μᵉ e) = cong μᵉ (elimD-avᵉ Θl x refl cl av e)

@@ -31,13 +31,13 @@ open import Relation.Binary.PropositionalEquality
 
 open import Rx.Exp
   using (Ty; Ctx; Exp; Tm; Val; subΘExp; subΘTm; subΘTms; input; ofᵉ; emptyᵉ; takeᵉ; liftᵉ;
-  mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ; uniqᵗ; varᵗ; unit̂; bool̂; nat̂; uniq̂; pairᵗ; fstᵗ;
+  mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; batchSyncᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ; uniqᵗ; varᵗ; unit̂; bool̂; nat̂; uniq̂; pairᵗ; fstᵗ;
   sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ; _×ᵗ_; listᵗ; nilᵗ; consᵗ; foldᵗ; renTm; wkTm; reify;
   lookupEnv)
 open import Rx.Subst-Transport
   using ( Cᵉ; Cᵗ; Cˢ; shift; cong₃
         ; pushInput; pushEmpty; pushVarᵉ; pushOf; pushTake; pushLift
-        ; pushMerge; pushSwitch; pushExhaust; pushMu; pushDefer; pushMint
+        ; pushMerge; pushSwitch; pushBatchSync; pushExhaust; pushMu; pushDefer; pushMint
         ; shiftᵉ
         ; pushUnit; pushBool; pushNat; pushUniq; pushPair; pushFst; pushSnd
         ; pushInl; pushInr; pushCase; pushIf; pushPrim; pushStrm
@@ -158,6 +158,9 @@ mutual
   subΘ-compᵍᵉ {Θloc = Θl} {Θsub = Θs} Θo ρ σ (switchAllᵉ e) =
     trans (cong switchAllᵉ (subΘ-compᵍᵉ Θo ρ σ e))
           (cong (subΘExp Θo (++⁺ ρ σ)) (pushSwitch (++-assoc Θo Θl Θs) e))
+  subΘ-compᵍᵉ {Θloc = Θl} {Θsub = Θs} Θo ρ σ (batchSyncᵉ e) =
+    trans (cong batchSyncᵉ (subΘ-compᵍᵉ Θo ρ σ e))
+          (cong (subΘExp Θo (++⁺ ρ σ)) (pushBatchSync (++-assoc Θo Θl Θs) e))
   subΘ-compᵍᵉ {Θloc = Θl} {Θsub = Θs} Θo ρ σ (exhaustAllᵉ e) =
     trans (cong exhaustAllᵉ (subΘ-compᵍᵉ Θo ρ σ e))
           (cong (subΘExp Θo (++⁺ ρ σ)) (pushExhaust (++-assoc Θo Θl Θs) e))

@@ -43,7 +43,7 @@ open import Rx.Exp
   using (Ty; Ctx; Val; Exp; Tm; PrimOp; subΘExp; subΘTm; subΘTms; elimGExp; elimGTm; elimGTms;
   elimDExp; elimDTm; elimDTms; _⊟_; ⊟-++ˡ; ⊟-++ʳ; compare∈; renExp; wkTm; reify; lookupEnv;
   natᵗ; boolᵗ; obs; _×ᵗ_; _+ᵗ_; input; ofᵉ; emptyᵉ; takeᵉ; liftᵉ; mergeAllᵉ; switchAllᵉ;
-  exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ; uniqᵗ; varᵗ; unit̂; bool̂; nat̂; uniq̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ;
+  exhaustAllᵉ; batchSyncᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ; uniqᵗ; varᵗ; unit̂; bool̂; nat̂; uniq̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ;
   inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ; nilᵗ; consᵗ; foldᵗ; listᵗ)
 open import Rx.Subst-Transport using (Cᵉ; Cᵗ; Cˢ; cong₃; pushVarᵉ)
 open import Rx.Subst-Elim-Weak using (elimG-avᵗ; elimD-avᵗ)
@@ -148,6 +148,11 @@ gSwitch : (Θl : List Ty) (eq : Θl ++ [] ≡ Θ) (x : t ∈ Δᵍ) (cl : Exp Γ
            (e : Exp Γ Δᵍ Δ Θ (obs u))
        → Gᵉ Θl eq x cl (switchAllᵉ e) ≡ switchAllᵉ (Gᵉ Θl eq x cl e)
 gSwitch Θl refl x cl e = refl
+
+gBatchSync : (Θl : List Ty) (eq : Θl ++ [] ≡ Θ) (x : t ∈ Δᵍ) (cl : Exp Γ [] [] [] t)
+             (e : Exp Γ Δᵍ Δ Θ u)
+         → Gᵉ Θl eq x cl (batchSyncᵉ e) ≡ batchSyncᵉ (Gᵉ Θl eq x cl e)
+gBatchSync Θl refl x cl e = refl
 
 gExhaust : (Θl : List Ty) (eq : Θl ++ [] ≡ Θ) (x : t ∈ Δᵍ) (cl : Exp Γ [] [] [] t)
            (e : Exp Γ Δᵍ Δ Θ (obs u))
@@ -305,6 +310,11 @@ dSwitch : (Θl : List Ty) (eq : Θl ++ [] ≡ Θ) (x : t ∈ Δ) (cl : Exp Γ []
            (e : Exp Γ Δᵍ Δ Θ (obs u))
        → Dᵉ Θl eq x cl (switchAllᵉ e) ≡ switchAllᵉ (Dᵉ Θl eq x cl e)
 dSwitch Θl refl x cl e = refl
+
+dBatchSync : (Θl : List Ty) (eq : Θl ++ [] ≡ Θ) (x : t ∈ Δ) (cl : Exp Γ [] [] [] t)
+             (e : Exp Γ Δᵍ Δ Θ u)
+         → Dᵉ Θl eq x cl (batchSyncᵉ e) ≡ batchSyncᵉ (Dᵉ Θl eq x cl e)
+dBatchSync Θl refl x cl e = refl
 
 dExhaust : (Θl : List Ty) (eq : Θl ++ [] ≡ Θ) (x : t ∈ Δ) (cl : Exp Γ [] [] [] t)
            (e : Exp Γ Δᵍ Δ Θ (obs u))
@@ -562,6 +572,9 @@ mutual
   sub-elimGᵉ Θloc x cl σ (switchAllᵉ e) =
     trans (cong switchAllᵉ (sub-elimGᵉ Θloc x cl σ e))
           (sym (gSwitch Θloc (++-identityʳ Θloc) x _ _))
+  sub-elimGᵉ Θloc x cl σ (batchSyncᵉ e) =
+    trans (cong batchSyncᵉ (sub-elimGᵉ Θloc x cl σ e))
+          (sym (gBatchSync Θloc (++-identityʳ Θloc) x _ _))
   sub-elimGᵉ Θloc x cl σ (exhaustAllᵉ e) =
     trans (cong exhaustAllᵉ (sub-elimGᵉ Θloc x cl σ e))
           (sym (gExhaust Θloc (++-identityʳ Θloc) x _ _))
@@ -666,6 +679,9 @@ mutual
   sub-elimDᵉ Θloc x cl σ (switchAllᵉ e) =
     trans (cong switchAllᵉ (sub-elimDᵉ Θloc x cl σ e))
           (sym (dSwitch Θloc (++-identityʳ Θloc) x _ _))
+  sub-elimDᵉ Θloc x cl σ (batchSyncᵉ e) =
+    trans (cong batchSyncᵉ (sub-elimDᵉ Θloc x cl σ e))
+          (sym (dBatchSync Θloc (++-identityʳ Θloc) x _ _))
   sub-elimDᵉ Θloc x cl σ (exhaustAllᵉ e) =
     trans (cong exhaustAllᵉ (sub-elimDᵉ Θloc x cl σ e))
           (sym (dExhaust Θloc (++-identityʳ Θloc) x _ _))

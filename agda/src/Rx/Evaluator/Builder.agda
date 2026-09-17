@@ -56,13 +56,13 @@ open import Relation.Nullary.Decidable using (⌊_⌋)
 
 open import Rx.Prim using (Fuel; Id; Source; Tick; InstEmit; InstEvent; close;
   exhausted; hot; cold)
-open import Rx.Exp using (Ctx; Closed; Val; _≟ᵗ_; obs; unfoldμ; evalTm; subΘExp; input; ofᵉ; emptyᵉ; takeᵉ; liftᵉ; mergeAllᵉ;
+open import Rx.Exp using (Ctx; Closed; Val; _≟ᵗ_; obs; unfoldμ; evalTm; subΘExp; input; ofᵉ; emptyᵉ; takeᵉ; batchSyncᵉ; liftᵉ; mergeAllᵉ;
   switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ)
 open import Rx.Mint using (nodeᵏ; regᵏ; sourceᵏ; freshId; setAt; next)
 open import Rx.Slots using (Slots; shared; scripted)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; AllOp; NodeId; NodeState; Frame; root; _↠_; take-f;
   lift-f; thru-outer; from-inner; mergeAllᵒ; switchᵒ; exhaustᵒ; mergeAll-st; switch-st;
-  exhaust-st; take-st; cell-st; installNode; lookupNode; setNode; hasRoom; consumeUsable;
+  exhaust-st; take-st; batchSync-st; batchSync-f; cell-st; installNode; lookupNode; setNode; hasRoom; consumeUsable;
   switchKill; aliveThroughᶠ; splitEvents; splitBurst; sched-init; st-init; memberSource;
   share-sink; lowerFloor; register; atSlot; burstCompleted; Arrival; arrTick; arrSource; arrTy;
   arrVal; AtFloor; RegId; chainsOf; cascadeLatch; sched-next; shareAdmit; shareLatch)
@@ -74,7 +74,7 @@ open import Rx.Evaluator.Domain using (srcFrame; subscribeE⇓; subscribeAll⇓;
   finish-all-drain; finish-switch-clear;
   finish-exhaust-clear; finish-nil; react-false; react-alive; react-dead;
   push-nil; push-cons; step-lift;
-  step-take; step-from-inner; step-thru-outer;
+  step-take; step-batchSync; step-from-inner; step-thru-outer;
   walk-nil; walk-cons; consume-all-sub; consume-all-enqueue; consume-all-nil;
   consume-switch-sub; consume-switch-nil; consume-exhaust-sub;
   consume-exhaust-nil; inner;
@@ -84,7 +84,7 @@ open import Rx.Evaluator.Domain using (srcFrame; subscribeE⇓; subscribeAll⇓;
   drain-done; drain-empty; drain-step;
   drain-nil; drain-no-room; drain-room;
   drain⇓; evaluate⇓; subs-of; subs-empty; subs-take-zero;
-  subs-take-suc; subs-lift; subs-merge-all; subs-switch-all; subs-exhaust-all;
+  subs-take-suc; subs-batchSync; subs-lift; subs-merge-all; subs-switch-all; subs-exhaust-all;
   subs-μ; subs-defer; subs-mint; sub-all; eval-run;
   subs-floor; subs-shared; subs-hot-done; subs-hot-live; subs-cold-sync;
   subs-cold-async; slot-spent; slot-join; slot-connect; connect-live;
@@ -294,6 +294,19 @@ subscribeE! sl (takeᵉ c b) κ id now sched ag st
                   (trans (subs-keeps d) ag) st₁
   in r , subs-take-suc eq refl d p
 
+subscribeE! sl (batchSyncᵉ b) κ id now sched ag st =
+  let nid = freshId nodeᵏ (Sched.mint sched)
+      ((burst , sched₂ , st₁) , d) =
+        subscribeE! sl b (batchSync-f nid ↠ κ) id now
+                    (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) }) ag
+                    (installNode nid (batchSync-st true) st)
+      ((out , sched₃ , st₂) , p) =
+        pushBurst! sl id now (batchSync-f nid) tt κ burst sched₂
+          (trans (subs-keeps d) ag) st₁
+  in ( out , sched₃
+     , record st₂ { nodes = setNode nid (batchSync-st false) (EvalSt.nodes st₂) } )
+     , subs-batchSync refl d p
+
 
 subscribeE! sl (liftᵉ f i b) κ id now sched ag st =
   let nid = freshId nodeᵏ (Sched.mint sched)
@@ -371,6 +384,8 @@ pushBurst! sl id now fr sv κ (em ∷ ems) sched ag st =
 -- split here and none has to be proven unreachable.
 stepFrame! sl id now (take-f nid) sv κ vals fin sched ag st = _ , step-take
 
+stepFrame! sl id now (batchSync-f nid) sv κ vals fin sched ag st = _ , step-batchSync
+
 
 stepFrame! sl id now (lift-f fn nid) sv κ vals fin sched ag st = _ , step-lift
 
@@ -402,6 +417,7 @@ thruConsume! {u = u} sl mergeAllᵒ nid κ id now o sched ag st
 ... | nothing              = _ , consume-all-nil (cong (consumeUsable mergeAllᵒ u) eq)
 ... | just (cell-st _)     = _ , consume-all-nil (cong (consumeUsable mergeAllᵒ u) eq)
 ... | just (take-st _)     = _ , consume-all-nil (cong (consumeUsable mergeAllᵒ u) eq)
+... | just (batchSync-st _) = _ , consume-all-nil (cong (consumeUsable mergeAllᵒ u) eq)
 ... | just (switch-st _ _) = _ , consume-all-nil (cong (consumeUsable mergeAllᵒ u) eq)
 ... | just (exhaust-st _ _) = _ , consume-all-nil (cong (consumeUsable mergeAllᵒ u) eq)
 ... | just (mergeAll-st {w} lim act q od) with w ≟ᵗ u in eqw
@@ -418,6 +434,7 @@ thruConsume! {u = u} sl switchᵒ nid κ id now o sched ag st
 ... | nothing                    = _ , consume-switch-nil (cong (consumeUsable switchᵒ _) eq)
 ... | just (cell-st _)           = _ , consume-switch-nil (cong (consumeUsable switchᵒ _) eq)
 ... | just (take-st _)           = _ , consume-switch-nil (cong (consumeUsable switchᵒ _) eq)
+... | just (batchSync-st _)      = _ , consume-switch-nil (cong (consumeUsable switchᵒ _) eq)
 ... | just (mergeAll-st _ _ _ _) = _ , consume-switch-nil (cong (consumeUsable switchᵒ _) eq)
 ... | just (exhaust-st _ _)      = _ , consume-switch-nil (cong (consumeUsable switchᵒ _) eq)
 ... | just (switch-st cur od) with switchKill cur sched st in eqk
@@ -431,6 +448,7 @@ thruConsume! {u = u} sl exhaustᵒ nid κ id now o sched ag st
 ... | nothing                    = _ , consume-exhaust-nil (cong (consumeUsable exhaustᵒ _) eq)
 ... | just (cell-st _)           = _ , consume-exhaust-nil (cong (consumeUsable exhaustᵒ _) eq)
 ... | just (take-st _)           = _ , consume-exhaust-nil (cong (consumeUsable exhaustᵒ _) eq)
+... | just (batchSync-st _)      = _ , consume-exhaust-nil (cong (consumeUsable exhaustᵒ _) eq)
 ... | just (mergeAll-st _ _ _ _) = _ , consume-exhaust-nil (cong (consumeUsable exhaustᵒ _) eq)
 ... | just (switch-st _ _)       = _ , consume-exhaust-nil (cong (consumeUsable exhaustᵒ _) eq)
 ... | just (exhaust-st true _)   = _ , consume-exhaust-nil (cong (consumeUsable exhaustᵒ _) eq)
@@ -583,17 +601,20 @@ innerFinish! exhaustᵒ allNid inst κ id now vals sched st
 innerFinish! mergeAllᵒ allNid inst κ id now vals sched st nothing = _ , finish-nil refl
 innerFinish! mergeAllᵒ allNid inst κ id now vals sched st (just (cell-st _)) = _ , finish-nil refl
 innerFinish! mergeAllᵒ allNid inst κ id now vals sched st (just (take-st _)) = _ , finish-nil refl
+innerFinish! mergeAllᵒ allNid inst κ id now vals sched st (just (batchSync-st _)) = _ , finish-nil refl
 innerFinish! mergeAllᵒ allNid inst κ id now vals sched st (just (switch-st _ _)) = _ , finish-nil refl
 innerFinish! mergeAllᵒ allNid inst κ id now vals sched st (just (exhaust-st _ _)) = _ , finish-nil refl
 innerFinish! switchᵒ allNid inst κ id now vals sched st nothing = _ , finish-nil refl
 innerFinish! switchᵒ allNid inst κ id now vals sched st (just (cell-st _)) = _ , finish-nil refl
 innerFinish! switchᵒ allNid inst κ id now vals sched st (just (take-st _)) = _ , finish-nil refl
+innerFinish! switchᵒ allNid inst κ id now vals sched st (just (batchSync-st _)) = _ , finish-nil refl
 innerFinish! switchᵒ allNid inst κ id now vals sched st (just (mergeAll-st _ _ _ _)) = _ , finish-nil refl
 innerFinish! switchᵒ allNid inst κ id now vals sched st (just (exhaust-st _ _)) = _ , finish-nil refl
 innerFinish! switchᵒ allNid inst κ id now vals sched st (just (switch-st nothing _)) = _ , finish-nil refl
 innerFinish! exhaustᵒ allNid inst κ id now vals sched st nothing = _ , finish-nil refl
 innerFinish! exhaustᵒ allNid inst κ id now vals sched st (just (cell-st _)) = _ , finish-nil refl
 innerFinish! exhaustᵒ allNid inst κ id now vals sched st (just (take-st _)) = _ , finish-nil refl
+innerFinish! exhaustᵒ allNid inst κ id now vals sched st (just (batchSync-st _)) = _ , finish-nil refl
 innerFinish! exhaustᵒ allNid inst κ id now vals sched st (just (mergeAll-st _ _ _ _)) = _ , finish-nil refl
 innerFinish! exhaustᵒ allNid inst κ id now vals sched st (just (switch-st _ _)) = _ , finish-nil refl
 
@@ -630,6 +651,8 @@ stepFrameAny! sl id now (from-inner op allNid inst) κ vals fin sched ag st =
   in _ , step-from-inner r
 stepFrameAny! sl id now (take-f nid) κ vals fin sched ag st =
   stepFrame! sl id now (take-f nid) tt κ vals fin sched ag st
+stepFrameAny! sl id now (batchSync-f nid) κ vals fin sched ag st =
+  stepFrame! sl id now (batchSync-f nid) tt κ vals fin sched ag st
 stepFrameAny! sl id now (lift-f fn nid) κ vals fin sched ag st =
   stepFrame! sl id now (lift-f fn nid) tt κ vals fin sched ag st
 stepFrameAny! sl id now (thru-outer op nid) κ vals fin sched ag st =

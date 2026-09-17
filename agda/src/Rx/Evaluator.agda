@@ -181,6 +181,17 @@ data NodeState {n} (Γ : Ctx n) : Set where
                -- former happens to be installed over it.  The type is
                -- existential, so each read pays a `_≟ᵗ_`.
   take-st    : ℕ → NodeState Γ                  -- emissions remaining
+  batchSync-st : Bool → NodeState Γ
+               -- THE ONE BIT A PLAIN OPERATOR MAY KNOW ABOUT SYNCHRONY:
+               -- whether this node's own subscribe call has returned.
+               -- It is set when the node is installed and cleared once
+               -- the subscribe burst has been pushed, which is exactly
+               -- the bracket the TypeScript `captureSync` holds open
+               -- between `sync = true` and the `sync = false` after
+               -- `obs.subscribe(…)` returns.  Nothing else about the
+               -- arriving values is recorded, and nothing can be: the
+               -- bit says which side of one call we are on, never
+               -- where a value came from nor whether more is owed.
   mergeAll-st : ∀ {t} → (limit : Maybe ℕ) (active : ℕ)
                (queued : List (Closed Γ t)) (outerDone : Bool) → NodeState Γ
                -- ONE state for every concurrency.  The two states this
@@ -233,6 +244,17 @@ data Frame {n} (Γ : Ctx n) : Ty → Ty → Set where
                -- alone: it reads no node but its own cell, mints no
                -- registration and cannot raise fin.
   take-f     : ∀ {s} → NodeId → Frame Γ s s
+  batchSync-f : ∀ {s} → NodeId → Frame Γ s (s ×ᵗ listᵗ s)
+               -- THE ONLY FRAME WHOSE OUTPUT TYPE IS NOT ITS INPUT'S
+               -- OR A LAYER OFF IT, AND THE GROUPING IS WHY.  Values
+               -- arriving inside the subscribe bracket leave as ONE
+               -- value carrying all of them, head and tail, so the
+               -- result is nonempty by construction and needs no `Ty`
+               -- former of its own; values arriving after it leave one
+               -- per singleton.  An empty subscribe burst produces no
+               -- value at all rather than an empty group, which is
+               -- what the TypeScript does when its burst array comes
+               -- back empty.
   from-inner : ∀ {s} → AllOp → (allNode innerInstance : NodeId) → Frame Γ s s
                -- exiting a subscribed inner: the *All's own node, and
                -- this inner subscription's instance (switch kills by it)
@@ -302,6 +324,7 @@ lowerFloor le (f ↠ p)          = f ↠ lowerFloor le p
 frameNodes : ∀ {n} {Γ : Ctx n} {s u} → Frame Γ s u → List NodeId
 frameNodes (lift-f _ k)       = k ∷ []
 frameNodes (take-f k)         = k ∷ []
+frameNodes (batchSync-f k)    = k ∷ []
 frameNodes (from-inner _ k j) = k ∷ j ∷ []
 frameNodes (thru-outer _ k)   = k ∷ []
 
@@ -575,6 +598,33 @@ takeDispatch nid vals fin sched st (just (take-st k)) =
         record st { nodes = setNode nid (take-st (proj₁ (proj₂ (takeVals k vals))))
                                       (EvalSt.nodes st) })
 takeDispatch nid vals fin sched st _ = [] , [] , fin , sched , st
+
+-- THE GROUPING, WHICH IS ONE PAIRING AND NOT A WINDOW.  Inside the
+-- subscribe bracket the whole arriving list becomes a single value;
+-- outside it every value becomes its own.  There is no third arm and
+-- there is no accumulator: the operator has no way to hold a value
+-- back waiting to see whether another joins it, because holding one
+-- back would need to know that another is owed, and knowing that is
+-- what this operator cannot do.  Recovering a true instant is
+-- `batchSimultaneous`'s job, off the registration counts.
+groupSync : ∀ {n} {Γ : Ctx n} {s} → List (Val Γ s) → List (Val Γ (s ×ᵗ listᵗ s))
+groupSync []       = []
+groupSync (v ∷ vs) = (v , vs) ∷ []
+
+soloSync : ∀ {n} {Γ : Ctx n} {s} → List (Val Γ s) → List (Val Γ (s ×ᵗ listᵗ s))
+soloSync = map (λ v → v , [])
+
+-- the same stuck reading as the lift's and the take's: a node that is
+-- not this operator's emits nothing and writes nothing, so no prover
+-- can prefer that arm at a node that really does hold the bit.
+batchSyncDispatch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+                  → NodeId → List (Val Γ s) → Bool → Sched Γ → EvalSt e
+                  → Maybe (NodeState Γ)
+                  → List (Val Γ (s ×ᵗ listᵗ s)) × List (InstEvent (Val Γ t)) × Bool
+                    × Sched Γ × EvalSt e
+batchSyncDispatch nid vals fin sched st (just (batchSync-st sync)) =
+  (if sync then groupSync vals else soloSync vals) , [] , fin , sched , st
+batchSyncDispatch nid vals fin sched st _ = [] , [] , fin , sched , st
 
 -- the outer *All frame's machinery, lifted out of stepFrame so the
 -- budget proof can reason about its reduction.  One walk for all four

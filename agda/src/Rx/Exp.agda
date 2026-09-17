@@ -70,6 +70,31 @@ mutual
     emptyᵉ     : ∀ {t} → Exp Γ Δᵍ Δ Θ t
     takeᵉ      : ∀ {t} → Tm Γ Δᵍ Δ Θ natᵗ → Exp Γ Δᵍ Δ Θ t → Exp Γ Δᵍ Δ Θ t
                  -- count is a term: evaluated once, at subscription time
+    batchSyncᵉ : ∀ {t} → Exp Γ Δᵍ Δ Θ t → Exp Γ Δᵍ Δ Θ (t ×ᵗ listᵗ t)
+                 -- THE ONE PLAIN OPERATOR THAT CAN SEE SYNCHRONY, AND IT
+                 -- SEES EXACTLY ONE BIT OF IT.  The subscribe frame's
+                 -- values leave as ONE group; every value arriving after
+                 -- that leaves as its own singleton.  The result is
+                 -- NONEMPTY by construction -- head and tail, so no new
+                 -- `Ty` is needed -- because an empty subscribe burst
+                 -- emits nothing at all rather than an empty group,
+                 -- which is what the TypeScript `captureSync` does when
+                 -- its burst array comes back empty.
+                 --
+                 -- WHAT IT CANNOT DO IS THE REASON IT EXISTS.  Cutting a
+                 -- batch of genuinely simultaneous emissions means
+                 -- knowing when NOT to cut -- whether more is still owed
+                 -- this instant -- and that is forward-looking knowledge
+                 -- no operator reading its own input can have.  This one
+                 -- knows a single bit, whether its subscribe call has
+                 -- returned.  It learns nothing about where a value came
+                 -- from and nothing about parents, siblings or children,
+                 -- so it can separate a cold's initial burst from the
+                 -- rest and NOTHING FURTHER.  Recovering a true instant
+                 -- is `batchSimultaneous`'s job and needs the
+                 -- registration counts; that this operator cannot reach
+                 -- it is why that one has to be proven rather than
+                 -- assumed.
     liftᵉ      : ∀ {s t u} → Fn Γ Δᵍ Δ Θ (u ×ᵗ listᵗ s) (u ×ᵗ listᵗ t)
                → Tm Γ Δᵍ Δ Θ u → Exp Γ Δᵍ Δ Θ s → Exp Γ Δᵍ Δ Θ t
                  -- THE ONE PURE-FUNCTION FORMER, MIRRORING THE TYPESCRIPT
@@ -300,6 +325,7 @@ mutual
   renExp ρg ρd ρt (ofᵉ ts)       = ofᵉ (renTms ρg ρd ρt ts)
   renExp ρg ρd ρt emptyᵉ         = emptyᵉ
   renExp ρg ρd ρt (takeᵉ n e)    = takeᵉ (renTm ρg ρd ρt n) (renExp ρg ρd ρt e)
+  renExp ρg ρd ρt (batchSyncᵉ e) = batchSyncᵉ (renExp ρg ρd ρt e)
   renExp ρg ρd ρt (liftᵉ f i e)  = liftᵉ (renTm ρg ρd (ext∈ ρt) f) (renTm ρg ρd ρt i) (renExp ρg ρd ρt e)
   renExp ρg ρd ρt (mergeAllᵉ lim e) = mergeAllᵉ lim (renExp ρg ρd ρt e)
   renExp ρg ρd ρt (switchAllᵉ e) = switchAllᵉ (renExp ρg ρd ρt e)
@@ -467,6 +493,7 @@ mutual
   subΘExp Θloc σ (ofᵉ ts)       = ofᵉ (subΘTms Θloc σ ts)
   subΘExp Θloc σ emptyᵉ         = emptyᵉ
   subΘExp Θloc σ (takeᵉ n e)    = takeᵉ (subΘTm Θloc σ n) (subΘExp Θloc σ e)
+  subΘExp Θloc σ (batchSyncᵉ e) = batchSyncᵉ (subΘExp Θloc σ e)
   subΘExp Θloc σ (liftᵉ {s = s} {u = u} f i e) =
     liftᵉ (subΘTm ((u ×ᵗ listᵗ s) ∷ Θloc) σ f) (subΘTm Θloc σ i) (subΘExp Θloc σ e)
   subΘExp Θloc σ (mergeAllᵉ lim e) = mergeAllᵉ lim (subΘExp Θloc σ e)
@@ -556,6 +583,7 @@ mutual
   elimGExp Θl x cl (ofᵉ ts)       = ofᵉ (elimGTms Θl x cl ts)
   elimGExp Θl x cl emptyᵉ         = emptyᵉ
   elimGExp Θl x cl (takeᵉ n e)    = takeᵉ (elimGTm Θl x cl n) (elimGExp Θl x cl e)
+  elimGExp Θl x cl (batchSyncᵉ e) = batchSyncᵉ (elimGExp Θl x cl e)
   elimGExp Θl x cl (liftᵉ f i e)  =
     liftᵉ (elimGTm (_ ∷ Θl) x cl f) (elimGTm Θl x cl i) (elimGExp Θl x cl e)
   elimGExp Θl x cl (mergeAllᵉ lim e) = mergeAllᵉ lim (elimGExp Θl x cl e)
@@ -605,6 +633,7 @@ mutual
   elimDExp Θl x cl (ofᵉ ts)       = ofᵉ (elimDTms Θl x cl ts)
   elimDExp Θl x cl emptyᵉ         = emptyᵉ
   elimDExp Θl x cl (takeᵉ n e)    = takeᵉ (elimDTm Θl x cl n) (elimDExp Θl x cl e)
+  elimDExp Θl x cl (batchSyncᵉ e) = batchSyncᵉ (elimDExp Θl x cl e)
   elimDExp Θl x cl (liftᵉ f i e)  =
     liftᵉ (elimDTm (_ ∷ Θl) x cl f) (elimDTm Θl x cl i) (elimDExp Θl x cl e)
   elimDExp Θl x cl (mergeAllᵉ lim e) = mergeAllᵉ lim (elimDExp Θl x cl e)
@@ -724,6 +753,7 @@ mutual
   inputsBelowᵉ k (ofᵉ ts)        = inputsBelowᵗˢ k ts
   inputsBelowᵉ k emptyᵉ          = true
   inputsBelowᵉ k (takeᵉ c e)     = inputsBelowᵗ k c ∧ inputsBelowᵉ k e
+  inputsBelowᵉ k (batchSyncᵉ e)  = inputsBelowᵉ k e
   inputsBelowᵉ k (liftᵉ f z e)   =
     inputsBelowᵗ k f ∧ inputsBelowᵗ k z ∧ inputsBelowᵉ k e
   inputsBelowᵉ k (mergeAllᵉ lim e) = inputsBelowᵉ k e

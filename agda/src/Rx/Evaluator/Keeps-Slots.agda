@@ -32,7 +32,7 @@ open import Relation.Nullary using (yes; no)
 open import Rx.Prim using (Id; Tick)
 open import Rx.Exp using (Ctx; Closed; Val; obs; Fn; _×ᵗ_; listᵗ; _≟ᵗ_)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; AllOp; NodeId;
-  NodeState; Frame; take-st; cell-st; takeVals; takeDispatch;
+  NodeState; Frame; take-st; batchSync-st; batchSyncDispatch; cell-st; takeVals; takeDispatch;
   liftDispatch; thruWrap;
   switchKill; oneShotBurst; lookupNode; mergeAll-st; switch-st; exhaust-st;
   mergeAllᵒ; switchᵒ; exhaustᵒ)
@@ -41,14 +41,14 @@ open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeAll⇓; pushBurst
   thruConsume⇓; subscribeInner⇓; sharedConnect⇓; subscribeSharedSlot⇓;
   subs-floor; subs-shared; subs-hot-done; subs-hot-live; subs-cold-sync;
   subs-cold-async; subs-of; subs-empty; subs-take-zero;
-  subs-take-suc; subs-lift; subs-merge-all; subs-switch-all; subs-exhaust-all;
+  subs-take-suc; subs-batchSync; subs-lift; subs-merge-all; subs-switch-all; subs-exhaust-all;
   subs-μ; subs-defer; subs-mint; inner;
   consume-all-sub; consume-all-enqueue; consume-all-nil; consume-switch-sub;
   consume-switch-nil; consume-exhaust-sub; consume-exhaust-nil;
   walk-nil; walk-cons; drain-nil; drain-no-room; drain-room;
   finish-all-drain; finish-switch-clear; finish-exhaust-clear; finish-nil;
   react-false; react-alive; react-dead;
-  step-lift; step-take; step-from-inner;
+  step-lift; step-take; step-batchSync; step-from-inner;
   step-thru-outer; push-nil; push-cons; sub-all;
   connect-live; connect-died; slot-spent; slot-join; slot-connect)
 
@@ -82,6 +82,23 @@ take-slots nid vals fin sched st (just (mergeAll-st _ _ _ _)) = refl
 take-slots nid vals fin sched st (just (switch-st _ _))       = refl
 take-slots nid vals fin sched st (just (exhaust-st _ _))      = refl
 take-slots nid vals fin sched st (just (cell-st _))           = refl
+take-slots nid vals fin sched st (just (batchSync-st _))      = refl
+
+-- the grouping rewrites neither the schedule nor the store: it reads
+-- one bit and re-brackets the arriving column, so every arm is `refl`
+batchSync-slots : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (nid : NodeId) (vals : List (Val Γ s)) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) (ns : Maybe (NodeState Γ)) →
+  Sched.slots (proj₁ (proj₂ (proj₂ (proj₂
+    (batchSyncDispatch {e = e} nid vals fin sched st ns)))))
+    ≡ Sched.slots sched
+batchSync-slots nid vals fin sched st (just (batchSync-st _))      = refl
+batchSync-slots nid vals fin sched st nothing                      = refl
+batchSync-slots nid vals fin sched st (just (take-st _))           = refl
+batchSync-slots nid vals fin sched st (just (mergeAll-st _ _ _ _)) = refl
+batchSync-slots nid vals fin sched st (just (switch-st _ _))       = refl
+batchSync-slots nid vals fin sched st (just (exhaust-st _ _))      = refl
+batchSync-slots nid vals fin sched st (just (cell-st _))           = refl
 
 -- the lifted step rewrites its own cell and passes the schedule on
 lift-slots : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u w}
@@ -97,6 +114,7 @@ lift-slots {w = w} fn nid vals fin sched st (just (cell-st {v} a))
 ... | yes refl = refl
 lift-slots fn nid vals fin sched st nothing                      = refl
 lift-slots fn nid vals fin sched st (just (take-st _))           = refl
+lift-slots fn nid vals fin sched st (just (batchSync-st _))      = refl
 lift-slots fn nid vals fin sched st (just (mergeAll-st _ _ _ _)) = refl
 lift-slots fn nid vals fin sched st (just (switch-st _ _))       = refl
 lift-slots fn nid vals fin sched st (just (exhaust-st _ _))      = refl
@@ -114,6 +132,7 @@ wrap-slots mergeAllᵒ nid true (vs , bs , sched′ , st′)
 ... | just (switch-st _ _)       = refl
 ... | just (exhaust-st _ _)      = refl
 ... | just (take-st _)           = refl
+... | just (batchSync-st _)      = refl
 ... | just (cell-st _)           = refl
 ... | nothing                    = refl
 wrap-slots switchᵒ nid true (vs , bs , sched′ , st′)
@@ -122,6 +141,7 @@ wrap-slots switchᵒ nid true (vs , bs , sched′ , st′)
 ... | just (switch-st _ _)       = refl
 ... | just (exhaust-st _ _)      = refl
 ... | just (take-st _)           = refl
+... | just (batchSync-st _)      = refl
 ... | just (cell-st _)           = refl
 ... | nothing                    = refl
 wrap-slots exhaustᵒ nid true (vs , bs , sched′ , st′)
@@ -130,6 +150,7 @@ wrap-slots exhaustᵒ nid true (vs , bs , sched′ , st′)
 ... | just (switch-st _ _)       = refl
 ... | just (exhaust-st _ _)      = refl
 ... | just (take-st _)           = refl
+... | just (batchSync-st _)      = refl
 ... | just (cell-st _)           = refl
 ... | nothing                    = refl
 
@@ -167,6 +188,7 @@ mutual
   subs-keeps {sched = sched} (subs-empty {id = id} refl) = refl
   subs-keeps (subs-take-zero _ refl) = refl
   subs-keeps (subs-take-suc _ refl d p) = trans (push-keeps p) (subs-keeps d)
+  subs-keeps (subs-batchSync refl d p)  = trans (push-keeps p) (subs-keeps d)
   subs-keeps (subs-lift refl d p)    = trans (push-keeps p) (subs-keeps d)
   subs-keeps (subs-merge-all a)      = all-keeps a
   subs-keeps (subs-switch-all a)     = all-keeps a
@@ -217,6 +239,9 @@ mutual
   step-keeps {id = id} {now = now} {vals = vals} {fin = fin}
              {sched = sched} {st = st} (step-take {nid = nid}) =
     take-slots nid vals fin sched st (lookupNode nid (EvalSt.nodes st))
+  step-keeps {id = id} {now = now} {vals = vals} {fin = fin}
+             {sched = sched} {st = st} (step-batchSync {nid = nid}) =
+    batchSync-slots nid vals fin sched st (lookupNode nid (EvalSt.nodes st))
   step-keeps (step-from-inner r) = react-keeps r
   step-keeps {id = id} {now = now} {fin = fin} (step-thru-outer {op = op}
              {nid = nid} w) = trans (wrap-slots op nid fin _) (walk-keeps w)

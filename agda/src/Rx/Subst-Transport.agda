@@ -28,7 +28,7 @@ open import Relation.Binary.PropositionalEquality
 
 open import Rx.Exp
   using ( Ty; Ctx; Exp; Tm
-        ; input; ofᵉ; emptyᵉ; takeᵉ; liftᵉ; mergeAllᵉ
+        ; input; ofᵉ; emptyᵉ; takeᵉ; batchSyncᵉ; liftᵉ; mergeAllᵉ
         ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ
         ; varᵗ; unit̂; bool̂; nat̂; uniq̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ
         ; caseᵗ; ifᵗ; primᵗ; strmᵗ; PrimOp
@@ -114,6 +114,11 @@ pushSwitch : (eq : Θ ≡ Θ') (e : Exp Γ Δᵍ Δ Θ (obs t))
            → switchAllᵉ (subst (Cᵉ Γ Δᵍ Δ (obs t)) eq e)
                ≡ subst (Cᵉ Γ Δᵍ Δ t) eq (switchAllᵉ e)
 pushSwitch refl e = refl
+
+pushBatchSync : (eq : Θ ≡ Θ') (e : Exp Γ Δᵍ Δ Θ t)
+              → batchSyncᵉ (subst (Cᵉ Γ Δᵍ Δ t) eq e)
+                  ≡ subst (Cᵉ Γ Δᵍ Δ (t ×ᵗ listᵗ t)) eq (batchSyncᵉ e)
+pushBatchSync refl e = refl
 
 pushExhaust : (eq : Θ ≡ Θ') (e : Exp Γ Δᵍ Δ Θ (obs t))
             → exhaustAllᵉ (subst (Cᵉ Γ Δᵍ Δ (obs t)) eq e)

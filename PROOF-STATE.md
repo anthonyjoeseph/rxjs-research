@@ -230,16 +230,15 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 
 ### Big picture tier roadmap
 
-- **THE READ IS ALL THAT IS LEFT OF THE MINT LEG, AND GROUPING WOULD RETIRE IT
-  RATHER THAN SUPPLY IT (Anthony's call).** The binder is in and swept through
-  every family matching on the plain tree. What it does not supply is READING
-  the running instant, owed ONCE to seed the boundary fold so a cold burst
-  inherits its subscriber's instant. The live candidate is not
-  a former for the read at all: make a source's delivery payload a NONEMPTY
-  LIST, so a group IS an instant and a fold wraps it with nothing to sense and
-  no seed to find. That moves what every theorem over the plain tree quantifies
-  over, so it is a ruling and not a leg — and the legs below wait on it, each
-  being typed through that payload.
+- **THE ELABORATION THROUGH `batchSyncᵉ`, WHICH IS WHAT THE FORMER WAS FOR.**
+  The former is in and swept through every family matching on the plain tree:
+  it brackets a cold's subscribe burst against everything later, and nothing
+  else. What it does not yet do is serve a single elaboration row, and the
+  plumbing the ledger names is what it was
+  minted for: a source delivers its burst grouped, `takeᵖ` cuts underneath the
+  grouping rather than over it, and the flatteners' own emits are ungrouped
+  singletons. Each is a plain term over the former, so the leg is written and
+  not decided — and until one lands, the former is a definition no claim rides.
 
 - **THEN THE DEMOTION, AND IT IS THE ORACLE'S AND NOT THE TOWER'S (Anthony:
   the harness "shouldn't test on srxjs at all — just plain rxjs now").** Target:
