@@ -183,11 +183,11 @@ the row is DIFFICULTY.
 formal-verification-batchSimultaneous    The-Proof.agda — REAL, module postulate-free
  ├─ batch-agreement                      proven
  └─ evaluate-well-formed                 Verify-Well-Formed.agda — REAL, a body
-     ├─ evaluate-accepted                no emit of a run is rejected — tier 3
-     └─ evaluate-settled                 the run stops settled — tier 3
+     ├─ evaluate-accepted                no emit of a run is rejected — tier 4
+     └─ evaluate-settled                 the run stops settled — tier 4
 
 run-monotone                              claimed by Main in its own right —
-                                          nothing above consumes it — tier 2
+                                          nothing above consumes it — tier 3
 
   evaluate↓ = proj₁ ∘ evaluate!           Rx/Evaluator/Builder.agda — REAL
      └─ every value-path leaf is a body; the corpus runs; the tower descends
@@ -230,18 +230,16 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 
 ### Big picture tier roadmap
 
-- **THE UNIQUE PRIMITIVE, AND THE WELL-FORMEDNESS RESHAPE IT BUYS
+- **THE UNIQUE PRIMITIVE, WHOSE IDENTITY LIVES ONLY IN THE EVALUATOR
   (Anthony).** `Ty` gains `uniqᵗ`, `Val` sending it to `ℕ`, introduced by a
   PLAIN-tree former no simul former elaborates to and eliminated only by a
-  primitive EQUALITY — which is what lets `spec-batchSimultaneous` and its
-  mirror be stated at `instEmitᵗ uniqᵗ a` outright, no bridge, the envelope
-  DEFINED over `unitᵗ`, `_+ᵗ_`, `_×ᵗ_`, `listᵗ`. Minting is the evaluator's,
-  against ONE ledger serving instant and source alike. It is claimed by the
-  existing `InstEmit` heritage, so it lands with the simul tree; and it is what
-  lets `sound-cascade` and `sound-subscribe` be restated ONE CLAUSE PER
-  OPERATOR over well-formed simul trees, a second relation leaving the
-  reducibility candidate's measure untouched. Its header carries what it
-  owes.
+  primitive EQUALITY — which is what lets the envelope operators be written in
+  the `Ty`/`Tm` language, the envelope itself DEFINED over `unitᵗ`, `_+ᵗ_`,
+  `_×ᵗ_`, `listᵗ` and parameterised over its uniq type. Nothing projects the
+  nat back out. Minting is the evaluator's, against ONE ledger serving instant
+  and source alike, so uniqueness is a theorem about it. The envelope is
+  claimed by the existing `InstEmit` heritage rather than a `Main` line, so it
+  lands with the simul tree.
 
 - **THEN DEMOTE THE ENVELOPE OUT OF THE EVALUATOR.** Target:
   `evaluate : … → List (Val Γ t)`. The mentions split three ways and only one
@@ -275,7 +273,67 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
   former changes what a program can SAY, so it decides what every theorem
   above quantifies over — the same reason the spec is not an agent's to move.
 
-## Tier 2 — the machine's own fuel
+## Tier 2 — the proof statement, once there are two trees to state it over
+
+**WHY THIS IS DEFERRED RATHER THAN SKIPPED (Anthony: "it will be easier to
+communicate my ideas once the syntax trees and working eval are in place").**
+Tier 1 lands the syntax and a working evaluator, and nothing above can be
+restated until both exist — settling the statement first argues a design in the
+abstract, against trees nobody has run. So the order is trees, then statement.
+What makes it a tier rather than a leg of tier 1 is the kind of failure
+available to each: tier 1 lands DEFINITIONS, which can only be wrong, and these
+are STATEMENTS, which can be false.
+
+### The monster
+
+(no monster) — a monster is a NAME, and this tier's statements are not written
+yet. It takes one at the commit that first states the restated top line; until
+then tier 1 is the lowest open tier and holds the cone.
+
+### Big picture tier roadmap
+
+- **THE TOP LINE, RESTATED AND POSTULATED THROUGH (Anthony: "just make it
+  typecheck for now and postulate out all the details").** The theorem
+  quantified over a SIMUL tree, elaborated by `toPlain` and run on the plain
+  evaluator, with `spec-batchSimultaneous` and its mirror at
+  `instEmitᵗ uniqᵗ a` — no bridge. The impl becomes a `Tm` carrying a free
+  variable of the stream type, `Ty` having no arrows; the spec stays an Agda
+  function over `Val`, being the mathematical statement rather than a library
+  one. Everything between is a leaf postulate. What the leg buys is a tower
+  that TYPECHECKS over the new trees, which is what makes the legs below it
+  arguable from code instead of from prose.
+
+- **THEN THE WELL-FORMEDNESS DECOMPOSITION, ONE CLAUSE PER OPERATOR
+  (Anthony).** `evaluate-accepted` keeps its conclusion and changes its route.
+  It splits over the RUN today and bottoms out in two leaves quantified over a
+  derivation and nothing syntactic — which is exactly why neither decomposes: a
+  cascade from an arbitrary closed program is every former at once, so there is
+  no case to split on. The replacement splits over the SYNTAX, so each
+  subtree's own conclusion is the hypothesis those leaves lack, and the shipped
+  palette being finite is what makes the induction cover every program an
+  author can write.
+
+- **THEN THE PURITY RULING, WHICH DECIDES WHETHER THE TOP LINE CARRIES A
+  HYPOTHESIS AT ALL.** A simul tree's non-observable positions take an author's
+  own terms and a unique is reachable from there, so a mapping function can
+  forge an envelope at any instant it likes. Either a predicate on the tree,
+  discharged per program by a decision procedure, or a restriction on the TYPES
+  at those positions in the mould of `isData`, making the forgery
+  unrepresentable. The precedent sits in the tree already — guardedness here is
+  not a predicate but a context gate, synchronous self-reference being a type
+  error. The leg is the ruling and the churn it causes.
+
+- **THEN REDUCIBILITY'S SECOND HALF, AND IT IS WHERE THE RED LINE IS TESTED.**
+  The existing candidate is about a FRESH subscribe and says nothing about a
+  cascade, which resumes stored machinery. Its standing argument that no state
+  invariant is owed rests on a fan-out carrying no PAYLOAD — and protocol
+  traffic is precisely what a fan-out does carry, so the argument does not
+  transfer. The soundness half therefore wants its own invariant on the
+  evaluator's state, seeded at the root and preserved per cascade, leaving the
+  guard measure and the accessibility argument untouched. It holds, or the leg
+  reports.
+
+## Tier 3 — the machine's own fuel
 
 **WHAT THIS FACE BUYS: the one claim about the evaluator that no correspondence
 carries.** It is read off `evaluate↓` alone — no spec, no batching, no second
@@ -328,7 +386,7 @@ why a restatement is cheap now and ruinous once a consumer exists.
 - **`run-monotone`** (Verify-Run-Monotone) — FALSITY, `PROBED`: more fuel only
   extends a run. Nothing postulated in it, and a concrete program decides it.
 
-## Tier 3 — the automaton half, and it is the only half
+## Tier 4 — the automaton half, and it is the only half
 
 **THE TIER IS TWO LEAVES, ONE PER SEGMENT KIND.** `The-Proof` draws
 `evaluate-accepted` from here and nothing else: no emit of a canonical run is
@@ -391,7 +449,7 @@ so sits above it rather than inside its cone. Nothing else is admitted.
   subscribe's burst is the zeroth instant and nothing more. Its clause count is
   the tree's former count, which is what Tier 1 is for.
 
-## Tier 4 — determinacy and the top-line semantic claims
+## Tier 5 — determinacy and the top-line semantic claims
 
 **THE MISC TIER, AND THE ONLY ONE NOT DEDICATED TO A SINGLE STATEMENT.** Two
 faces share it because neither is on any other tier's route, not because they
