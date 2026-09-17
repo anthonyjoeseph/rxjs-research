@@ -203,15 +203,31 @@ mutual
   -- source for free, since a hot's source is its own slot index and the
   -- token language has a literal.
 
-  -- WHAT THE TELESCOPE DOES NOT REACH IS THE INSTANT, AND THAT IS THE
-  -- WHOLE OF WHAT IS LEFT.  A term sees the machine's protocol through
-  -- exactly two windows: `batchSyncᵉ`, which reports one bit of
-  -- synchrony, and `mintᵉ`, which binds one token at the source key per
-  -- subscription.  A lift's step is handed VALUES alone.  An instant is
-  -- a property of the running cascade rather than of the script, so no
-  -- amount of slot information produces one, and a subscribe-frame
-  -- bracket does not either -- it groups per node, and two colds coming
-  -- alive in one frame owe the SAME id.
+  -- AN INSTANT IS NOT DRAWN BY A PROGRAM AT ALL, IT IS READ, AND
+  -- MISSING THAT IS WHAT MADE IT LOOK UNREACHABLE.  A source token is
+  -- drawn fresh, once per subscription, which is the arity `mintᵉ`
+  -- has.  An instant is never drawn by whatever needs one: the running
+  -- cascade already has an instant and so does the subscribe frame, and
+  -- a source COPIES whichever of the two is current.  The TypeScript
+  -- mirror puts this beyond doubt -- an instant is made in its driver
+  -- and nowhere else, at the root frame and once per arrival, and every
+  -- other site in the implementation reads it.
+
+  -- A READ HAS THE TWO PROPERTIES A MINT CANNOT HAVE, AND HAS THEM FOR
+  -- FREE.  It varies over time, so one source's subscribe burst and its
+  -- later deliveries fall in different instants; and it is shared
+  -- between siblings, so two colds coming alive in one frame read the
+  -- same one.  Those are exactly the two a binder was argued to be
+  -- unable to combine, and the argument only ever ruled out a MINT.
+
+  -- SO WHAT THE PLAIN TREE LACKS IS ONE WINDOW, AND IT IS A NARROWER
+  -- CAPABILITY THAN THE ONE ALREADY GRANTED FOR SOURCES.  A former
+  -- pairing the machine's ambient instant onto each emit forges
+  -- nothing, since its token can only be copied out of the run, where
+  -- the source binder genuinely hands a program a token no one has
+  -- used.  The slot telescope is orthogonal to it and still wanted: it
+  -- is what splits cold from hot and what makes a hot's source a
+  -- literal.
   toPlain {Γ = Γ} (inputˢ i)  = subst (Exp _ _ _ _) (lookup-map i emitᵗ Γ)
                                       (input i)
   toPlain (ofˢ ts)            = ofᵖ (toPlainTms ts)
