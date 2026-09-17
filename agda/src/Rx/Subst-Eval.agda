@@ -33,9 +33,9 @@ open import Data.Sum using (inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂)
 
 open import Rx.Exp using (Ctx; Val; Exp; Tm; Fn; evalTm; evalWith; applyFn; subΘTm; subΘExp; lookupEnv; wkTm; reify;
-  varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ; add; sub;
+  varᵗ; unit̂; bool̂; nat̂; uniq̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ; add; sub;
   nilᵗ; consᵗ; foldᵗ; foldVals; listᵗ; reifyList;
-  mul; eqᵖ; ltᵖ; notᵖ; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs)
+  mul; eqᵖ; eqᵘ; ltᵖ; notᵖ; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; obs)
 open import Rx.Subst-Renaming using (ren-idᵉ; sub-renᵉ)
 open import Rx.Subst-Compose using (subΘ-compᵉ)
 open import Rx.Subst-Identity using (subΘ-id-exp)
@@ -82,6 +82,7 @@ evalWith-wkReifyList : ∀ {n} {Γ : Ctx n} {Θ t}
 evalWith-wkReify {t = unitᵗ}   v        ρ = refl
 evalWith-wkReify {t = boolᵗ}   b        ρ = refl
 evalWith-wkReify {t = natᵗ}    m        ρ = refl
+evalWith-wkReify {t = uniqᵗ}   m        ρ = refl
 evalWith-wkReify {t = _ ×ᵗ _} (a , b)   ρ =
   cong₂ _,_ (evalWith-wkReify a ρ) (evalWith-wkReify b ρ)
 evalWith-wkReify {t = _ +ᵗ _} (inj₁ a)  ρ = cong inj₁ (evalWith-wkReify a ρ)
@@ -140,6 +141,7 @@ sub-evalWith (varᵗ x)    σ ρ = sub-evalVar x σ ρ
 sub-evalWith unit̂        σ ρ = refl
 sub-evalWith (bool̂ b)    σ ρ = refl
 sub-evalWith (nat̂ n)     σ ρ = refl
+sub-evalWith (uniq̂ n)     σ ρ = refl
 sub-evalWith (pairᵗ a b) σ ρ = cong₂ _,_ (sub-evalWith a σ ρ) (sub-evalWith b σ ρ)
 sub-evalWith (fstᵗ p)    σ ρ = cong (λ w → let (a , _) = w in a) (sub-evalWith p σ ρ)
 sub-evalWith (sndᵗ p)    σ ρ = cong (λ w → let (_ , b) = w in b) (sub-evalWith p σ ρ)
@@ -158,6 +160,8 @@ sub-evalWith (primᵗ sub  a) σ ρ =
 sub-evalWith (primᵗ mul  a) σ ρ =
   cong (λ w → let (x , y) = w in x * y) (sub-evalWith a σ ρ)
 sub-evalWith (primᵗ eqᵖ  a) σ ρ =
+  cong (λ w → let (x , y) = w in x ≡ᵇ y) (sub-evalWith a σ ρ)
+sub-evalWith (primᵗ eqᵘ  a) σ ρ =
   cong (λ w → let (x , y) = w in x ≡ᵇ y) (sub-evalWith a σ ρ)
 sub-evalWith (primᵗ ltᵖ  a) σ ρ =
   cong (λ w → let (x , y) = w in x <ᵇ y) (sub-evalWith a σ ρ)

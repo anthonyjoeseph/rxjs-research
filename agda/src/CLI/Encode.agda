@@ -13,7 +13,7 @@ open import Data.Sum using (inj₁; inj₂)
 
 open import Rx.Prim using (InstEvent; init; value; close; handoff; complete; CloseReason; cut; cutPending; exhausted;
   EmitKind; subscribe; delivery; plumbing; InstEmit; _at_from_as_)
-open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; listᵗ; Val; Ctx)
+open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; obs; listᵗ; Val; Ctx)
 open import Rx.Evaluator using (Grouped)
 
 private
@@ -36,6 +36,7 @@ encodeVal unitᵗ    _        = "null"
 encodeVal boolᵗ    false    = "false"
 encodeVal boolᵗ    true     = "true"
 encodeVal natᵗ     n        = show n
+encodeVal uniqᵗ    n        = show n
 encodeVal (s ×ᵗ t) (a , b)  = arr (encodeVal s a ∷ encodeVal t b ∷ [])
 encodeVal (s +ᵗ t) (inj₁ a) = "{" ++ field′ "type" (quote′ "inl") ++ "," ++ field′ "val" (encodeVal s a) ++ "}"
 encodeVal (s +ᵗ t) (inj₂ b) = "{" ++ field′ "type" (quote′ "inr") ++ "," ++ field′ "val" (encodeVal t b) ++ "}"

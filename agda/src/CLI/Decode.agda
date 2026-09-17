@@ -21,7 +21,7 @@ open import Relation.Nullary using (yes; no)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (Timed; after_,_; ObservableInput; hot; cold)
-open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; _≟ᵗ_; isData; inputsBelowᵉ; Ctx; Val; Exp; Tm;
+open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; obs; _≟ᵗ_; isData; inputsBelowᵉ; Ctx; Val; Exp; Tm;
   input; ofᵉ; emptyᵉ; liftᵉ; takeᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ;
   varᵉ; deferᵉ; varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ;
   strmᵗ; nilᵗ; consᵗ; foldᵗ; listᵗ; add; sub; mul; eqᵖ; ltᵖ; notᵖ)
@@ -278,6 +278,7 @@ decodeVal : ℕ → ∀ {n} (Γ : Ctx n) (t : Ty) → JSON → Maybe (Val Γ t)
 decodeVal fuel Γ unitᵗ    j = just tt
 decodeVal fuel Γ boolᵗ    j = asBool j
 decodeVal fuel Γ natᵗ     j = asNum j
+decodeVal fuel Γ uniqᵗ    j = asNum j
 decodeVal fuel Γ (s ×ᵗ u) j = asArr j >>=? λ
   { (a ∷ b ∷ []) → decodeVal fuel Γ s a >>=? λ va → decodeVal fuel Γ u b >>=? λ vb → just (va , vb)
   ; _            → nothing }

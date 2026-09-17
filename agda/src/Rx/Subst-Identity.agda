@@ -26,13 +26,13 @@ open import Relation.Binary.PropositionalEquality
 
 open import Rx.Exp
   using (Ty; Ctx; Exp; Tm; subΘExp; subΘTm; subΘTms; input; ofᵉ; emptyᵉ; takeᵉ; liftᵉ;
-  mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ;
+  mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; varᵗ; unit̂; bool̂; nat̂; uniq̂; pairᵗ; fstᵗ;
   sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ; _×ᵗ_; listᵗ; nilᵗ; consᵗ; foldᵗ)
 open import Rx.Subst-Transport
   using ( Cᵉ; Cᵗ; Cˢ; shift; ∈-id; cong₃
         ; pushInput; pushEmpty; pushVarᵉ; pushOf; pushTake; pushLift
         ; pushMerge; pushSwitch; pushExhaust; pushMu; pushDefer
-        ; pushVarᵗ; pushUnit; pushBool; pushNat; pushPair; pushFst; pushSnd
+        ; pushVarᵗ; pushUnit; pushBool; pushNat; pushUniq; pushPair; pushFst; pushSnd
         ; pushInl; pushInr; pushCase; pushIf; pushPrim; pushStrm
         ; pushNilˢ; pushConsˢ
         ; pushNilᵗ; pushConsᵗ; pushFoldᵗ; shift2 )
@@ -83,6 +83,7 @@ mutual
   subΘ-idᵗ Θloc unit̂     = pushUnit (++-identityʳ Θloc)
   subΘ-idᵗ Θloc (bool̂ b) = pushBool (++-identityʳ Θloc) b
   subΘ-idᵗ Θloc (nat̂ m)  = pushNat (++-identityʳ Θloc) m
+  subΘ-idᵗ Θloc (uniq̂ m) = pushUniq (++-identityʳ Θloc) m
   subΘ-idᵗ Θloc (pairᵗ a b) =
     trans (cong₂ pairᵗ (subΘ-idᵗ Θloc a) (subΘ-idᵗ Θloc b))
           (pushPair (++-identityʳ Θloc) a b)

@@ -39,7 +39,7 @@ open import Rx.Exp
         ; subΘExp; subΘTm; subΘTms; wkTm; reify; lookupEnv; _×ᵗ_; listᵗ
         ; input; ofᵉ; emptyᵉ; takeᵉ; liftᵉ; mergeAllᵉ; switchAllᵉ
         ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ
-        ; varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ
+        ; varᵗ; unit̂; bool̂; nat̂; uniq̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ
         ; ifᵗ; primᵗ; strmᵗ; nilᵗ; consᵗ; foldᵗ )
 open import Rx.Subst-Transport using (Cᵉ; cong₃)
 open import Rx.Subst-Renaming using (Idᵖ; ren-idᵉ)
@@ -123,6 +123,7 @@ mutual
   ren-∘ᵗ cg cd ct unit̂        = refl
   ren-∘ᵗ cg cd ct (bool̂ b)    = refl
   ren-∘ᵗ cg cd ct (nat̂ m)     = refl
+  ren-∘ᵗ cg cd ct (uniq̂ m)     = refl
   ren-∘ᵗ cg cd ct (pairᵗ a b) =
     cong₂ pairᵗ (ren-∘ᵗ cg cd ct a) (ren-∘ᵗ cg cd ct b)
   ren-∘ᵗ cg cd ct (fstᵗ p) = cong fstᵗ (ren-∘ᵗ cg cd ct p)
@@ -255,6 +256,7 @@ mutual
   sub-fixᵗ Θa Θb σ fl fr unit̂        = refl
   sub-fixᵗ Θa Θb σ fl fr (bool̂ b)    = refl
   sub-fixᵗ Θa Θb σ fl fr (nat̂ m)     = refl
+  sub-fixᵗ Θa Θb σ fl fr (uniq̂ m)     = refl
   sub-fixᵗ Θa Θb σ fl fr (pairᵗ a b) =
     cong₂ pairᵗ (sub-fixᵗ Θa Θb σ fl fr a) (sub-fixᵗ Θa Θb σ fl fr b)
   sub-fixᵗ Θa Θb σ fl fr (fstᵗ p) = cong fstᵗ (sub-fixᵗ Θa Θb σ fl fr p)

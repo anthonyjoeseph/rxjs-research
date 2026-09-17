@@ -33,7 +33,7 @@ open import Relation.Binary.PropositionalEquality
 open import Rx.Exp
   using (Ty; Ctx; Exp; Tm; Val; Ren∈; ext∈; ++Ren; renExp; renTm; renTms; subΘExp; subΘTm; subΘTms;
   input; ofᵉ; emptyᵉ; takeᵉ; liftᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ;
-  varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ;
+  varᵗ; unit̂; bool̂; nat̂; uniq̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ;
   nilᵗ; consᵗ; foldᵗ)
 open import Rx.Subst-Transport using (cong₃)
 open import Rx.Subst-Split using (left-back; right-back; sub-left)
@@ -96,6 +96,7 @@ mutual
   ren-idᵗ ig id it unit̂        = refl
   ren-idᵗ ig id it (bool̂ b)    = refl
   ren-idᵗ ig id it (nat̂ m)     = refl
+  ren-idᵗ ig id it (uniq̂ m)     = refl
   ren-idᵗ ig id it (pairᵗ a b) =
     cong₂ pairᵗ (ren-idᵗ ig id it a) (ren-idᵗ ig id it b)
   ren-idᵗ ig id it (fstᵗ p)  = cong fstᵗ (ren-idᵗ ig id it p)
@@ -170,6 +171,7 @@ mutual
   sub-renᵗ σ ag unit̂        = refl
   sub-renᵗ σ ag (bool̂ b)    = refl
   sub-renᵗ σ ag (nat̂ m)     = refl
+  sub-renᵗ σ ag (uniq̂ m)     = refl
   sub-renᵗ σ ag (pairᵗ a b) =
     cong₂ pairᵗ (sub-renᵗ σ ag a) (sub-renᵗ σ ag b)
   sub-renᵗ σ ag (fstᵗ p) = cong fstᵗ (sub-renᵗ σ ag p)

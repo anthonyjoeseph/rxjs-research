@@ -41,7 +41,7 @@ open import Rx.Exp
         ; elimGExp; elimGTm; elimGTms; elimDExp; elimDTm; elimDTms
         ; input; ofᵉ; emptyᵉ; takeᵉ; liftᵉ; mergeAllᵉ; switchAllᵉ
         ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ
-        ; varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ
+        ; varᵗ; unit̂; bool̂; nat̂; uniq̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ
         ; caseᵗ; ifᵗ; primᵗ; strmᵗ; nilᵗ; consᵗ; foldᵗ )
 open import Rx.Subst-Transport using (cong₃)
 open import Rx.Subst-Split using (isˡ; isʳ; split; ++Ren-l; ++Ren-r)
@@ -277,6 +277,7 @@ mutual
   elimG-avᵗ Θl x cl av unit̂        = refl
   elimG-avᵗ Θl x cl av (bool̂ b)    = refl
   elimG-avᵗ Θl x cl av (nat̂ m)     = refl
+  elimG-avᵗ Θl x cl av (uniq̂ m)     = refl
   elimG-avᵗ Θl x cl av (pairᵗ a b) =
     cong₂ pairᵗ (elimG-avᵗ Θl x cl av a) (elimG-avᵗ Θl x cl av b)
   elimG-avᵗ Θl x cl av (fstᵗ q) = cong fstᵗ (elimG-avᵗ Θl x cl av q)
@@ -349,6 +350,7 @@ mutual
   elimD-avᵗ Θl x refl cl av unit̂        = refl
   elimD-avᵗ Θl x refl cl av (bool̂ b)    = refl
   elimD-avᵗ Θl x refl cl av (nat̂ m)     = refl
+  elimD-avᵗ Θl x refl cl av (uniq̂ m)     = refl
   elimD-avᵗ Θl x refl cl av (pairᵗ a b) =
     cong₂ pairᵗ (elimD-avᵗ Θl x refl cl av a) (elimD-avᵗ Θl x refl cl av b)
   elimD-avᵗ Θl x refl cl av (fstᵗ q) = cong fstᵗ (elimD-avᵗ Θl x refl cl av q)

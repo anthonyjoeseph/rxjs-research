@@ -53,7 +53,7 @@ open import Rx.Exp using (Ty; Ctx; Exp; Tm; Ren∈; ext∈;
                           input; ofᵉ; emptyᵉ; takeᵉ; liftᵉ;
                           mergeAllᵉ; switchAllᵉ; exhaustAllᵉ;
                           μᵉ; varᵉ; deferᵉ;
-                          varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ;
+                          varᵗ; unit̂; bool̂; nat̂; uniq̂; pairᵗ; fstᵗ; sndᵗ;
                           inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ;
                           nilᵗ; consᵗ; foldᵗ;
                           inputsBelowᵉ; inputsBelowᵗ; inputsBelowᵗˢ)
@@ -90,6 +90,7 @@ mutual
   ib-renᵗ k ρg ρd ρt unit̂          = refl
   ib-renᵗ k ρg ρd ρt (bool̂ _)      = refl
   ib-renᵗ k ρg ρd ρt (nat̂ _)       = refl
+  ib-renᵗ k ρg ρd ρt (uniq̂ _)       = refl
   ib-renᵗ k ρg ρd ρt (pairᵗ a b)   =
     cong₂ _∧_ (ib-renᵗ k ρg ρd ρt a) (ib-renᵗ k ρg ρd ρt b)
   ib-renᵗ k ρg ρd ρt (fstᵗ p)      = ib-renᵗ k ρg ρd ρt p
@@ -182,6 +183,7 @@ mutual
   ib-elimGᵗ k Θl x cl hcl unit̂          ok = tt
   ib-elimGᵗ k Θl x cl hcl (bool̂ _)      ok = tt
   ib-elimGᵗ k Θl x cl hcl (nat̂ _)       ok = tt
+  ib-elimGᵗ k Θl x cl hcl (uniq̂ _)       ok = tt
   ib-elimGᵗ k Θl x cl hcl (pairᵗ a b)   ok =
     ∧⁺ (inputsBelowᵗ k (elimGTm Θl x cl a))
        (inputsBelowᵗ k (elimGTm Θl x cl b))
@@ -311,6 +313,7 @@ mutual
   ib-elimDᵗ k Θl x cl hcl unit̂          ok = tt
   ib-elimDᵗ k Θl x cl hcl (bool̂ _)      ok = tt
   ib-elimDᵗ k Θl x cl hcl (nat̂ _)       ok = tt
+  ib-elimDᵗ k Θl x cl hcl (uniq̂ _)       ok = tt
   ib-elimDᵗ k Θl x cl hcl (pairᵗ a b)   ok =
     ∧⁺ (inputsBelowᵗ k (elimDTm Θl x cl a))
        (inputsBelowᵗ k (elimDTm Θl x cl b))
@@ -419,6 +422,7 @@ mutual
   ib-topᵗ unit̂          = tt
   ib-topᵗ (bool̂ _)      = tt
   ib-topᵗ (nat̂ _)       = tt
+  ib-topᵗ (uniq̂ _)       = tt
   ib-topᵗ (pairᵗ a b)   = ∧⁺ _ _ (ib-topᵗ a) (ib-topᵗ b)
   ib-topᵗ (fstᵗ p)      = ib-topᵗ p
   ib-topᵗ (sndᵗ p)      = ib-topᵗ p

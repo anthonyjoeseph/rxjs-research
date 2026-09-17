@@ -55,11 +55,11 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import Rx.Prim using (Id; Tick; Source; InstEmit; InstEvent; init; value; close; handoff;
   complete; hot; cold)
 open import Rx.Slots using (scripted; shared)
-open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; listᵗ; _≟ᵗ_; Ctx; Closed; Val; Exp; Tm; Fn; evalTm; evalWith; foldVals; applyFn; input; ofᵉ; emptyᵉ;
+open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; obs; listᵗ; _≟ᵗ_; Ctx; Closed; Val; Exp; Tm; Fn; evalTm; evalWith; foldVals; applyFn; input; ofᵉ; emptyᵉ;
   takeᵉ; liftᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; isData; unfoldμ;
-  varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ;
+  varᵗ; unit̂; bool̂; nat̂; uniq̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ;
   nilᵗ; consᵗ; foldᵗ;
-  add; sub; mul; eqᵖ; ltᵖ; notᵖ; subΘExp; subΘTm; subΘTms; lookupEnv;
+  add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ; subΘExp; subΘTm; subΘTms; lookupEnv;
   inputsBelowᵉ; inputsBelowᵗ; inputsBelowᵗˢ)
 open import Rx.Exp.Guarded using (gsizeᵉ; gsizeᵗ; gsizeᵗˢ; gsize-unfoldμ)
 open import Rx.Inputs-Below using (ib-unfoldμ; ib-topᵉ)
@@ -108,6 +108,7 @@ Red : ∀ {n} {Γ : Ctx n} (t : Ty) → Val Γ t → Set
 Red unitᵗ    _        = ⊤
 Red boolᵗ    _        = ⊤
 Red natᵗ     _        = ⊤
+Red uniqᵗ    _        = ⊤
 Red (s ×ᵗ t) (a , b)  = Red s a × Red t b
 Red (s +ᵗ t) (inj₁ a) = Red s a
 Red (s +ᵗ t) (inj₂ b) = Red t b
@@ -493,6 +494,7 @@ red-data : ∀ {n} {Γ : Ctx n} (u : Ty) → T (isData u) → (v : Val Γ u)
          → Red {Γ = Γ} u v
 red-data unitᵗ    _  _       = tt
 red-data natᵗ     _  _       = tt
+red-data uniqᵗ    _  _       = tt
 red-data boolᵗ    _  _       = tt
 red-data (s ×ᵗ t) ok (a , b) =
   let (o₁ , o₂) = T-if (isData s) (isData t) ok
@@ -969,6 +971,7 @@ mutual
   redTmAcc unit̂     σ rσ k ok aK a = tt
   redTmAcc (bool̂ b) σ rσ k ok aK a = tt
   redTmAcc (nat̂ j)  σ rσ k ok aK a = tt
+  redTmAcc (uniq̂ j)  σ rσ k ok aK a = tt
   redTmAcc (pairᵗ x y) σ rσ k ok aK (acc rs) =
       redTmAcc x σ rσ k (∧ˡ (inputsBelowᵗ k x) (inputsBelowᵗ k y) ok) aK
         (rs (s≤s (m≤m+n (gsizeᵗ x) (gsizeᵗ y))))
@@ -1035,6 +1038,7 @@ mutual
   redTmAcc (primᵗ mul x) σ rσ k ok aK a  = tt
   redTmAcc (primᵗ eqᵖ x) σ rσ k ok aK a  = tt
   redTmAcc (primᵗ ltᵖ x) σ rσ k ok aK a  = tt
+  redTmAcc (primᵗ eqᵘ x) σ rσ k ok aK a  = tt
   redTmAcc (primᵗ notᵖ x) σ rσ k ok aK a = tt
   redTmAcc (strmᵗ e) []       rσ k ok aK (acc rs) =
     subst (Red (obs _)) (subΘ-id-exp e) (redExpAcc e [] tt k ok aK (rs ≤-refl))

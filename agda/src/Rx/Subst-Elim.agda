@@ -40,15 +40,11 @@ open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong; cong₂; subst)
 
 open import Rx.Exp
-  using ( Ty; Ctx; Val; Exp; Tm; PrimOp
-        ; subΘExp; subΘTm; subΘTms
-        ; elimGExp; elimGTm; elimGTms; elimDExp; elimDTm; elimDTms
-        ; _⊟_; ⊟-++ˡ; ⊟-++ʳ; compare∈; renExp; wkTm; reify; lookupEnv
-        ; natᵗ; boolᵗ; obs; _×ᵗ_; _+ᵗ_
-        ; input; ofᵉ; emptyᵉ; takeᵉ; liftᵉ; mergeAllᵉ
-        ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ
-        ; varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ
-        ; caseᵗ; ifᵗ; primᵗ; strmᵗ; nilᵗ; consᵗ; foldᵗ; listᵗ )
+  using (Ty; Ctx; Val; Exp; Tm; PrimOp; subΘExp; subΘTm; subΘTms; elimGExp; elimGTm; elimGTms;
+  elimDExp; elimDTm; elimDTms; _⊟_; ⊟-++ˡ; ⊟-++ʳ; compare∈; renExp; wkTm; reify; lookupEnv;
+  natᵗ; boolᵗ; obs; _×ᵗ_; _+ᵗ_; input; ofᵉ; emptyᵉ; takeᵉ; liftᵉ; mergeAllᵉ; switchAllᵉ;
+  exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; varᵗ; unit̂; bool̂; nat̂; uniq̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ;
+  inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ; nilᵗ; consᵗ; foldᵗ; listᵗ)
 open import Rx.Subst-Transport using (Cᵉ; Cᵗ; Cˢ; cong₃; pushVarᵉ)
 open import Rx.Subst-Elim-Weak using (elimG-avᵗ; elimD-avᵗ)
 open import Rx.Subst-Ren-Fuse using (sub-fixᵉ; ren-wk-Θ; noRen)
@@ -187,6 +183,11 @@ gNat : (Θl : List Ty) (eq : Θl ++ [] ≡ Θ) (x : t ∈ Δᵍ) (cl : Exp Γ []
            (m : ℕ)
        → Gᵗ Θl eq x cl (nat̂ {Γ = Γ} {Δᵍ} {Δ} {Θ} m) ≡ nat̂ m
 gNat Θl refl x cl m = refl
+
+gUniq : (Θl : List Ty) (eq : Θl ++ [] ≡ Θ) (x : t ∈ Δᵍ) (cl : Exp Γ [] [] [] t)
+           (m : ℕ)
+       → Gᵗ Θl eq x cl (uniq̂ {Γ = Γ} {Δᵍ} {Δ} {Θ} m) ≡ uniq̂ m
+gUniq Θl refl x cl m = refl
 
 gPair : (Θl : List Ty) (eq : Θl ++ [] ≡ Θ) (x : t ∈ Δᵍ) (cl : Exp Γ [] [] [] t)
            (a : Tm Γ Δᵍ Δ Θ s) (b : Tm Γ Δᵍ Δ Θ u)
@@ -334,6 +335,11 @@ dNat : (Θl : List Ty) (eq : Θl ++ [] ≡ Θ) (x : t ∈ Δ) (cl : Exp Γ [] []
            (m : ℕ)
        → Dᵗ Θl eq x cl (nat̂ {Γ = Γ} {Δᵍ} {Δ} {Θ} m) ≡ nat̂ m
 dNat Θl refl x cl m = refl
+
+dUniq : (Θl : List Ty) (eq : Θl ++ [] ≡ Θ) (x : t ∈ Δ) (cl : Exp Γ [] [] [] t)
+           (m : ℕ)
+       → Dᵗ Θl eq x cl (uniq̂ {Γ = Γ} {Δᵍ} {Δ} {Θ} m) ≡ uniq̂ m
+dUniq Θl refl x cl m = refl
 
 dPair : (Θl : List Ty) (eq : Θl ++ [] ≡ Θ) (x : t ∈ Δ) (cl : Exp Γ [] [] [] t)
            (a : Tm Γ Δᵍ Δ Θ s) (b : Tm Γ Δᵍ Δ Θ u)
@@ -571,6 +577,8 @@ mutual
     sym (gBool Θloc (++-identityʳ Θloc) x _ b)
   sub-elimGᵗ Θloc x cl σ (nat̂ m) =
     sym (gNat Θloc (++-identityʳ Θloc) x _ m)
+  sub-elimGᵗ Θloc x cl σ (uniq̂ m) =
+    sym (gUniq Θloc (++-identityʳ Θloc) x _ m)
   sub-elimGᵗ Θloc x cl σ (pairᵗ a b) =
     trans (cong₂ pairᵗ (sub-elimGᵗ Θloc x cl σ a) (sub-elimGᵗ Θloc x cl σ b))
           (sym (gPair Θloc (++-identityʳ Θloc) x _ _ _))
@@ -673,6 +681,8 @@ mutual
     sym (dBool Θloc (++-identityʳ Θloc) x _ b)
   sub-elimDᵗ Θloc x cl σ (nat̂ m) =
     sym (dNat Θloc (++-identityʳ Θloc) x _ m)
+  sub-elimDᵗ Θloc x cl σ (uniq̂ m) =
+    sym (dUniq Θloc (++-identityʳ Θloc) x _ m)
   sub-elimDᵗ Θloc x cl σ (pairᵗ a b) =
     trans (cong₂ pairᵗ (sub-elimDᵗ Θloc x cl σ a) (sub-elimDᵗ Θloc x cl σ b))
           (sym (dPair Θloc (++-identityʳ Θloc) x _ _ _))

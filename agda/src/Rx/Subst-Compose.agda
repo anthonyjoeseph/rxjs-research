@@ -31,14 +31,14 @@ open import Relation.Binary.PropositionalEquality
 
 open import Rx.Exp
   using (Ty; Ctx; Exp; Tm; Val; subΘExp; subΘTm; subΘTms; input; ofᵉ; emptyᵉ; takeᵉ; liftᵉ;
-  mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ;
+  mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; varᵗ; unit̂; bool̂; nat̂; uniq̂; pairᵗ; fstᵗ;
   sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ; _×ᵗ_; listᵗ; nilᵗ; consᵗ; foldᵗ; renTm; wkTm; reify;
   lookupEnv)
 open import Rx.Subst-Transport
   using ( Cᵉ; Cᵗ; Cˢ; shift; cong₃
         ; pushInput; pushEmpty; pushVarᵉ; pushOf; pushTake; pushLift
         ; pushMerge; pushSwitch; pushExhaust; pushMu; pushDefer
-        ; pushUnit; pushBool; pushNat; pushPair; pushFst; pushSnd
+        ; pushUnit; pushBool; pushNat; pushUniq; pushPair; pushFst; pushSnd
         ; pushInl; pushInr; pushCase; pushIf; pushPrim; pushStrm
         ; pushNilˢ; pushConsˢ; pushVarᵗ; pushHere; pushThere
         ; pushNilᵗ; pushConsᵗ; pushFoldᵗ; shift2 )
@@ -180,6 +180,8 @@ mutual
     cong (subΘTm Θo (++⁺ ρ σ)) (pushBool (++-assoc Θo Θl Θs) b)
   subΘ-compᵍᵗ {Θloc = Θl} {Θsub = Θs} Θo ρ σ (nat̂ m) =
     cong (subΘTm Θo (++⁺ ρ σ)) (pushNat (++-assoc Θo Θl Θs) m)
+  subΘ-compᵍᵗ {Θloc = Θl} {Θsub = Θs} Θo ρ σ (uniq̂ m) =
+    cong (subΘTm Θo (++⁺ ρ σ)) (pushUniq (++-assoc Θo Θl Θs) m)
   subΘ-compᵍᵗ {Θloc = Θl} {Θsub = Θs} Θo ρ σ (pairᵗ a b) =
     trans (cong₂ pairᵗ (subΘ-compᵍᵗ Θo ρ σ a) (subΘ-compᵍᵗ Θo ρ σ b))
           (cong (subΘTm Θo (++⁺ ρ σ)) (pushPair (++-assoc Θo Θl Θs) a b))

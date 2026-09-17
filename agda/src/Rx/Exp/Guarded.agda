@@ -52,7 +52,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; cong
 open import Rx.Exp using (Ctx; Ty; Exp; Tm; elimGExp; elimGTm; elimGTms; unfoldμ;
   input; ofᵉ; emptyᵉ; takeᵉ; liftᵉ; mergeAllᵉ; switchAllᵉ;
   exhaustAllᵉ; μᵉ; varᵉ; deferᵉ;
-  varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ;
+  varᵗ; unit̂; bool̂; nat̂; uniq̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ;
   nilᵗ; consᵗ; foldᵗ)
 
 -- The size, counting the formers a subscription actually descends
@@ -77,6 +77,7 @@ mutual
   gsizeᵗ unit̂         = zero
   gsizeᵗ (bool̂ b)     = zero
   gsizeᵗ (nat̂ k)      = zero
+  gsizeᵗ (uniq̂ k)      = zero
   gsizeᵗ nilᵗ         = zero
   gsizeᵗ (consᵗ a as) = suc (gsizeᵗ a + gsizeᵗ as)
   gsizeᵗ (foldᵗ l z f) = suc (gsizeᵗ l + (gsizeᵗ z + gsizeᵗ f))
@@ -126,6 +127,7 @@ mutual
   gsize-elimGt Θl x cl unit̂          = refl
   gsize-elimGt Θl x cl (bool̂ b)      = refl
   gsize-elimGt Θl x cl (nat̂ k)       = refl
+  gsize-elimGt Θl x cl (uniq̂ k)       = refl
   gsize-elimGt Θl x cl nilᵗ          = refl
   gsize-elimGt Θl x cl (consᵗ a as)  =
     cong suc (cong₂ _+_ (gsize-elimGt Θl x cl a) (gsize-elimGt Θl x cl as))

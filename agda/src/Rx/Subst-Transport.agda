@@ -30,10 +30,10 @@ open import Rx.Exp
   using ( Ty; Ctx; Exp; Tm
         ; input; ofᵉ; emptyᵉ; takeᵉ; liftᵉ; mergeAllᵉ
         ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ
-        ; varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ
+        ; varᵗ; unit̂; bool̂; nat̂; uniq̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ
         ; caseᵗ; ifᵗ; primᵗ; strmᵗ; PrimOp
         ; nilᵗ; consᵗ; foldᵗ
-        ; unitᵗ; boolᵗ; natᵗ; obs; listᵗ; _×ᵗ_; _+ᵗ_ )
+        ; unitᵗ; boolᵗ; natᵗ; uniqᵗ; obs; listᵗ; _×ᵗ_; _+ᵗ_ )
 
 private
   variable
@@ -146,6 +146,10 @@ pushBool refl b = refl
 pushNat : (eq : Θ ≡ Θ') (m : ℕ)
         → nat̂ {Γ = Γ} {Δᵍ} {Δ} {Θ'} m ≡ subst (Cᵗ Γ Δᵍ Δ natᵗ) eq (nat̂ m)
 pushNat refl m = refl
+
+pushUniq : (eq : Θ ≡ Θ') (m : ℕ)
+         → uniq̂ {Γ = Γ} {Δᵍ} {Δ} {Θ'} m ≡ subst (Cᵗ Γ Δᵍ Δ uniqᵗ) eq (uniq̂ m)
+pushUniq refl m = refl
 
 pushPair : (eq : Θ ≡ Θ') (a : Tm Γ Δᵍ Δ Θ s) (b : Tm Γ Δᵍ Δ Θ t)
          → pairᵗ (subst (Cᵗ Γ Δᵍ Δ s) eq a) (subst (Cᵗ Γ Δᵍ Δ t) eq b)
