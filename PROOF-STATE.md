@@ -230,17 +230,17 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 
 ### Big picture tier roadmap
 
-- **THE ENVELOPE IN `Ty`'s OWN VOCABULARY, WITH THE TAG FORKED TO ANTHONY.**
-  `instEmitᵗ`, `instEventᵗ`, `emitKindᵗ` and `closeReasonᵗ` are DEFINED over
-  `unitᵗ`, `_+ᵗ_`, `_×ᵗ_` and `listᵗ` rather than added to `Ty`, parameterised
-  over their uniq type, so a simul slot declared at `instEmitᵗ unitᵗ a` admits
-  only `tt` where a uniq goes. That half needs no fork, but written out the
-  four are unreachable, so the leg's first commit is a `Main` line — Anthony's,
-  like the fork. The tag half cannot be built as planned: a `uniqᵗ` with NO
-  introduction form needs `reify`, total over `Ty`, to hand back a CLOSED term
-  it cannot write — its header carries this. Two horns, both deciding SAYability, so
-  neither is an agent's: drop the tag (`uniqᵗ = natᵗ`), or keep it with an
-  intro form and rest unforgeability on the simul palette.
+- **THE UNIQUE PRIMITIVE, WHOSE IDENTITY LIVES ONLY IN THE EVALUATOR
+  (Anthony).** `Ty` gains `uniqᵗ`, with `Val` sending it to `⊤` and one NULLARY
+  introduction form: an author writes a placeholder, never a nat, and `reify`
+  stays total on a constant. Identity is not in the value layer at all — the
+  evaluator keys each placeholder by the position it was found at, against ONE
+  ledger serving instant and source alike, so uniqueness is a theorem about
+  that ledger. Corollary: no operator reading an id can be a composition, each
+  being a FORMER the evaluator gives meaning to. The envelope rides on this —
+  `instEmitᵗ`, `instEventᵗ`, `emitKindᵗ`, `closeReasonᵗ` DEFINED over `unitᵗ`,
+  `_+ᵗ_`, `_×ᵗ_` and `listᵗ`, parameterised over their uniq type. Written out
+  the four are unreachable, so this leg also adds a `Main` line.
 
 - **THEN DEMOTE THE ENVELOPE OUT OF THE EVALUATOR.** Target:
   `evaluate : … → List (Val Γ t)`. The mentions split three ways and only one
