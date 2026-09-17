@@ -443,8 +443,7 @@ data subscribeE⇓ {n} {Γ} {t} {e} where
 -- case by minting an instance and closing it dry.  Here the hop's
 -- premise IS a sub-derivation at the arriving value, so there is
 -- nothing to ask and no arm to answer: a relation with no dry
--- constructor cannot relate a run to a dry stream, which is what makes
--- `hasDry` false by construction once the evaluator recurses on this.
+-- constructor cannot relate a run to a dry stream.
 data subscribeInner⇓ {n} {Γ} {t} {e} where
   inner : ∀ {u lo op allNid} {κ : Path Γ lo u t} {id now}
             {o : Val Γ (obs u)} {sched st inst burst sched′ st′ vs bs done}

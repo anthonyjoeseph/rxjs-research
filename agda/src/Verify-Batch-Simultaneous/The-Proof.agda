@@ -15,7 +15,7 @@ open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong; subst)
 
 open import Rx.Prim               using (InstEmit; Fuel; Id; Source; _at_from_as_; InstEvent; init; value; close; handoff; complete;
-  EmitKind; subscribe; delivery; plumbing; cut; cutPending; exhausted; dried)
+  EmitKind; subscribe; delivery; plumbing; cut; cutPending; exhausted)
 open import Rx.Exp                using (Ctx; Closed)
 open import Rx.Evaluator.Builder using (evaluate↓)
 open import Rx.Slots using (Slots)
@@ -182,8 +182,6 @@ apply-agree (close x cutPending ∷ es) live owed done vs eq
 apply-agree (close x cut ∷ es) live owed done vs eq with removeOne x live | eq
 ... | just live₁ | eq′ = apply-agree es live₁ owed done vs eq′
 apply-agree (close x exhausted ∷ es) live owed done vs eq with removeOne x live | eq
-... | just live₁ | eq′ = apply-agree es live₁ owed done vs eq′
-apply-agree (close x dried ∷ es) live owed done vs eq with removeOne x live | eq
 ... | just live₁ | eq′ = apply-agree es live₁ owed done vs eq′
 
 ------------------------------------------------------------------
@@ -591,7 +589,6 @@ applyBatch-vals (complete  ∷ es) live owed vs = applyBatch-vals es live owed v
 applyBatch-vals (close x cutPending ∷ es) live owed vs = applyBatch-vals es _ _ vs
 applyBatch-vals (close x cut       ∷ es) live owed vs = applyBatch-vals es _ _ vs
 applyBatch-vals (close x exhausted ∷ es) live owed vs = applyBatch-vals es _ _ vs
-applyBatch-vals (close x dried     ∷ es) live owed vs = applyBatch-vals es _ _ vs
 
 -- idle-batcher OUTPUT: the emit's online output plus the resulting state's
 -- eventual flush.  paidOff ⇒ flush batchOf i s k vs NOW; else keep it open,

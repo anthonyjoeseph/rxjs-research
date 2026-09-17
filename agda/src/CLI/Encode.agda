@@ -12,7 +12,7 @@ open import Data.String using (String; _++_)
 open import Data.Sum using (inj₁; inj₂)
 
 open import Rx.Prim using (InstEvent; init; value; close; handoff; complete; CloseReason; cut; cutPending; exhausted;
-  dried; EmitKind; subscribe; delivery; plumbing; InstEmit; _at_from_as_)
+  EmitKind; subscribe; delivery; plumbing; InstEmit; _at_from_as_)
 open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; listᵗ; Val; Ctx)
 open import Rx.Evaluator using (Grouped)
 
@@ -52,7 +52,6 @@ private
   encReason cut        = quote′ "cut"
   encReason cutPending = quote′ "cutPending"
   encReason exhausted  = quote′ "exhausted"
-  encReason dried      = quote′ "dried"
 
   encEvent : ∀ {n} {Γ : Ctx n} (t : Ty) → InstEvent (Val Γ t) → String
   encEvent t (init s)     = "{" ++ field′ "type" (quote′ "init") ++ "," ++ field′ "source" (show s) ++ "}"

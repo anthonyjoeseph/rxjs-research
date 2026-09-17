@@ -38,11 +38,8 @@ Id = ℕ                              -- concrete so the spec can compare; harne
 -- So ℕ is over-strong here in a way it is not for `Id` above, and the
 -- over-strength is not free: every statement quantifying over streams
 -- inherits obligations about ones carrying sources no mint could
--- produce.  The `dried` reason's own argument — that no numeric
--- sentinel is collision-proof against breadth-many mints — is the same
--- reading from the other side, the arithmetic being available and
--- still not safe to rely on.  The TypeScript counterpart is already typed
--- as a number OR a symbol; this module offers only the number.
+-- produce.  The TypeScript counterpart is already typed as a number OR
+-- a symbol; this module offers only the number.
 Source : Set                        -- a SOURCE observable; impl counts registrations of these
 Source = ℕ                          -- concrete so the scheduler can mint & compare; the harness compares up to renaming anyway
 
@@ -79,26 +76,6 @@ data CloseReason : Set where
                                     -- (a cut registration delivers NOTHING, as in rxjs:
                                     -- take(1)(merge(s,s)) — the second chain is silent)
   exhausted  : CloseReason          -- the source ran dry on its own
-  dried      : CloseReason          -- a GUARD REFUSED — the dry marker
-                                    -- (Rx.Evaluator.dryBurst), never emitted by any
-                                    -- machine rule.  Detection is by THIS REASON
-                                    -- (hasDry), not by a sentinel source: Source is an
-                                    -- unbounded ℕ and mints are breadth-many, so no
-                                    -- numeric sentinel is collision-proof
-
-                                    -- THE NAME IS OLDER THAN WHAT IT MARKS, and it is
-                                    -- kept because `CLI/Encode` puts the word on the
-                                    -- oracle wire.  There is no fuel and nothing runs
-                                    -- out: the evaluator descends on a TRIPLE, and each
-                                    -- of its three components has a guard that emits
-                                    -- this when it cannot decrease — the rank at an
-                                    -- inner subscribe, the unconnected count at a shared
-                                    -- connect, the sync size at a μ unfolding.  So a run
-                                    -- free of this reason is one where the descent's
-                                    -- order never had to be argued about.  No builder
-                                    -- constructs it, so after the cutover it is a reason
-                                    -- no run can carry — kept because the protocol's
-                                    -- vocabulary is what the spec reads
 
 data InstEvent (A : Set) : Set where
   init     : Source → InstEvent A   -- a registration chain of this source came alive

@@ -13,10 +13,10 @@
 -- has nothing to eliminate because the `with` is gone.
 --
 -- SO THE EVALUATOR IS A PROJECTION.  It is `proj₁` of this, and every
--- reading of a rank, every `<?`, every `dryBurst` and the marker `dried`
--- itself have left the evaluator entirely.  `hasDry` reads `false` of
--- every run because no constructor of the relation builds a dry emit —
--- not because a number came out large enough.
+-- reading of a rank and every `<?` have left the evaluator entirely.
+-- No constructor of the relation builds a dry emit — not because a
+-- number came out large enough, but because no arm of the builder
+-- produces one.
 --
 -- AND A PROJECTION COMPUTES ONLY IF THE THING PROJECTED IS A REAL BODY,
 -- WHICH IS WHAT THE EVALUATOR IS CURRENTLY TRADING.  While any leaf
