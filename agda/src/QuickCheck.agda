@@ -388,13 +388,10 @@ marksᵗˢ : ∀ {Δᵍ Δ Θ t} → List (Tm Γ₂ Δᵍ Δ Θ t) → Marks
 marksᵉ (input i)       = noMarks
 marksᵉ (ofᵉ ts)        = marksᵗˢ ts
 marksᵉ emptyᵉ          = noMarks
-marksᵉ (mapᵉ f e)      = marksᵗ f ⊕ marksᵉ e
 marksᵉ (takeᵉ c e)     = marksᵗ c ⊕ marksᵉ e
--- the fourth mark reads the ACCUMULATOR's type, which is the fold's own
--- result type: `isData (obs _)` is false, so this fires exactly when the
--- fold re-binds something the run could subscribe
-marksᵉ {t = t} (scanᵉ f z e) =
-  (false , false , false , not (isData t)) ⊕ marksᵗ f ⊕ marksᵗ z ⊕ marksᵉ e
+-- the fourth mark reads the CARRIED state's type, which is the former's own
+-- accumulator: `isData (obs _)` is false, so this fires exactly when the
+-- former re-binds something the run could subscribe
 marksᵉ (liftᵉ {u = u} f z e) =
   (false , false , false , not (isData u)) ⊕ marksᵗ f ⊕ marksᵗ z ⊕ marksᵉ e
 marksᵉ (mergeAllᵉ _ e) = marksᵉ e
@@ -545,9 +542,7 @@ showTm (strmᵗ e)          = "(strmᵗ " ++ showExp e ++ ")"
 showExp (input i)       = "(input " ++ showFin i ++ ")"
 showExp (ofᵉ items)     = "(ofᵉ (" ++ showTmList items ++ "))"
 showExp emptyᵉ          = "emptyᵉ"
-showExp (mapᵉ f e)      = "(mapᵉ " ++ showTm f ++ " " ++ showExp e ++ ")"
 showExp (takeᵉ n e)     = "(takeᵉ " ++ showTm n ++ " " ++ showExp e ++ ")"
-showExp (scanᵉ f s e)   = "(scanᵉ " ++ showTm f ++ " " ++ showTm s ++ " " ++ showExp e ++ ")"
 showExp (liftᵉ f s e)   = "(liftᵉ " ++ showTm f ++ " " ++ showTm s ++ " " ++ showExp e ++ ")"
 showExp (mergeAllᵉ nothing s)  = "(mergeAllᵉ ∞ " ++ showExp s ++ ")"
 showExp (mergeAllᵉ (just k) s) = "(mergeAllᵉ " ++ show k ++ " " ++ showExp s ++ ")"

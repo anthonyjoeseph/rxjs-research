@@ -50,7 +50,7 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; cong₂)
 
 open import Rx.Exp using (Ctx; Ty; Exp; Tm; elimGExp; elimGTm; elimGTms; unfoldμ;
-  input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; liftᵉ; mergeAllᵉ; switchAllᵉ;
+  input; ofᵉ; emptyᵉ; takeᵉ; liftᵉ; mergeAllᵉ; switchAllᵉ;
   exhaustAllᵉ; μᵉ; varᵉ; deferᵉ;
   varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ;
   nilᵗ; consᵗ; foldᵗ)
@@ -63,9 +63,7 @@ mutual
   gsizeᵉ (input i)         = zero
   gsizeᵉ (ofᵉ ts)          = suc (gsizeᵗˢ ts)
   gsizeᵉ emptyᵉ            = zero
-  gsizeᵉ (mapᵉ f e)        = suc (gsizeᵗ f + gsizeᵉ e)
   gsizeᵉ (takeᵉ c e)       = suc (gsizeᵗ c + gsizeᵉ e)
-  gsizeᵉ (scanᵉ f z e)     = suc (gsizeᵗ f + (gsizeᵗ z + gsizeᵉ e))
   gsizeᵉ (liftᵉ f z e)     = suc (gsizeᵗ f + (gsizeᵗ z + gsizeᵉ e))
   gsizeᵉ (mergeAllᵉ lim e) = suc (gsizeᵉ e)
   gsizeᵉ (switchAllᵉ e)    = suc (gsizeᵉ e)
@@ -109,13 +107,8 @@ mutual
   gsize-elimG Θl x cl (input i)         = refl
   gsize-elimG Θl x cl (ofᵉ ts)          = cong suc (gsize-elimGs Θl x cl ts)
   gsize-elimG Θl x cl emptyᵉ            = refl
-  gsize-elimG Θl x cl (mapᵉ f e)        =
-    cong suc (cong₂ _+_ (gsize-elimGt (_ ∷ Θl) x cl f) (gsize-elimG Θl x cl e))
   gsize-elimG Θl x cl (takeᵉ c e)       =
     cong suc (cong₂ _+_ (gsize-elimGt Θl x cl c) (gsize-elimG Θl x cl e))
-  gsize-elimG Θl x cl (scanᵉ f z e)     =
-    cong suc (cong₂ _+_ (gsize-elimGt (_ ∷ Θl) x cl f)
-                        (cong₂ _+_ (gsize-elimGt Θl x cl z) (gsize-elimG Θl x cl e)))
   gsize-elimG Θl x cl (liftᵉ f z e)     =
     cong suc (cong₂ _+_ (gsize-elimGt (_ ∷ Θl) x cl f)
                         (cong₂ _+_ (gsize-elimGt Θl x cl z) (gsize-elimG Θl x cl e)))

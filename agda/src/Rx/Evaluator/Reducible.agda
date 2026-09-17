@@ -56,7 +56,7 @@ open import Rx.Prim using (Id; Tick; Source; InstEmit; InstEvent; init; value; c
   complete; hot; cold)
 open import Rx.Slots using (scripted; shared)
 open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; listᵗ; _≟ᵗ_; Ctx; Closed; Val; Exp; Tm; Fn; evalTm; evalWith; foldVals; applyFn; input; ofᵉ; emptyᵉ;
-  mapᵉ; takeᵉ; scanᵉ; liftᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; isData; unfoldμ;
+  takeᵉ; liftᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; isData; unfoldμ;
   varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ;
   nilᵗ; consᵗ; foldᵗ;
   add; sub; mul; eqᵖ; ltᵖ; notᵖ; subΘExp; subΘTm; subΘTms; lookupEnv;
@@ -67,16 +67,16 @@ open import Rx.Subst-Elim using (sub-elimGᵉ)
 open import Rx.Subst-Eval using (sub-evalTm; sub-applyFn)
 open import Rx.Subst-Identity using (subΘ-id-exp)
 open import Decide using (∧ˡ; ∧ʳ)
-open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; _↠_; map-f; take-f; scan-f; lift-f; take-st; cell-st; thru-outer;
+open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; _↠_; take-f; lift-f; take-st; cell-st; thru-outer;
   mergeAllᵒ; switchᵒ; exhaustᵒ; mergeAll-st; switch-st; exhaust-st; takeVals; takeDispatch;
-  scanVals; scanDispatch; liftVals; liftDispatch; lookupNode; NodeState; installNode; oneShotBurst; memberSource;
+  liftVals; liftDispatch; lookupNode; NodeState; installNode; oneShotBurst; memberSource;
   splitEvents; splitBurst; retagEvents; NodeId; AllOp; from-inner; consumeUsable; hasRoom;
   switchKill; thruWrap; share-sink; register; atSlot; lowerFloor; burstCompleted; sharedPlumb;
   spentBurst)
 open import Rx.Evaluator.Freshness using (lookup-set; PreservedBelow)
 open import Rx.Evaluator.Freshness.Preserve using (subscribeE-preserves)
-open import Rx.Evaluator.Domain using (srcFrame; subscribeE⇓; pushBurst⇓; stepFrame⇓; step-map; step-scan; step-lift; step-take; push-nil;
-  push-cons; subs-of; subs-empty; subs-map; subs-take-zero; subs-take-suc; subs-scan; subs-lift;
+open import Rx.Evaluator.Domain using (srcFrame; subscribeE⇓; pushBurst⇓; stepFrame⇓; step-lift; step-take; push-nil;
+  push-cons; subs-of; subs-empty; subs-take-zero; subs-take-suc; subs-lift;
   subs-defer; subs-floor; subs-hot-done; subs-hot-live; subs-cold-sync; subs-cold-async;
   subs-μ; sub-all; subs-merge-all; subs-switch-all; subs-exhaust-all; thruConsume⇓; thruWalk⇓;
   step-thru-outer; inner; consume-all-sub; consume-all-enqueue; consume-all-nil;
@@ -215,13 +215,9 @@ redFoldVals f σ step (p ∷ ps) ra = redFoldVals f σ step ps (step p ra)
 --   no information.
 RedNode : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
         → Frame Γ s u → EvalSt e → Set
-RedNode {Γ = Γ} (scan-f fn nid) st =
-  ∀ {w} {a : Val Γ w}
-  → lookupNode nid (EvalSt.nodes st) ≡ just (cell-st a) → Red w a
 RedNode {Γ = Γ} (lift-f fn nid) st =
   ∀ {w} {a : Val Γ w}
   → lookupNode nid (EvalSt.nodes st) ≡ just (cell-st a) → Red w a
-RedNode (map-f fn)                  st = ⊤
 RedNode (take-f nid)                st = ⊤
 RedNode (from-inner op allNid inst) st = ⊤
 RedNode (thru-outer op nid)         st = ⊤
@@ -526,18 +522,11 @@ satValues (p ∷ ps) = p ∷ satValues ps
 -- the first component of that pair being reducible, is the store
 -- obligation beside this one rather than anything about the function.
 RedFrame : ∀ {n} {Γ : Ctx n} {s u} → Frame Γ s u → Set
-RedFrame (map-f fn)                  = RedFn fn
-RedFrame (scan-f fn nid)             = RedFn fn
 RedFrame (lift-f fn nid)             = RedFn fn
 RedFrame (take-f nid)                = ⊤
 RedFrame (from-inner op allNid inst) = ⊤
 RedFrame (thru-outer op nid)         = ⊤
 
-redMapVals : ∀ {n} {Γ : Ctx n} {s u} (fn : Fn Γ [] [] [] s u) → RedFn fn
-           → {vals : List (Val Γ s)} → All (Red s) vals
-           → All (Red u) (map (applyFn fn) vals)
-redMapVals fn rf []       = []
-redMapVals fn rf (p ∷ ps) = rf p ∷ redMapVals fn rf ps
 
 -- A TRUNCATION CANNOT INVENT A VALUE, WHICH IS WHY THE TAKE ARM NEEDS
 -- NOTHING FROM THE STORE.  The node a take installs holds a COUNT, and
@@ -581,104 +570,21 @@ red-take id now nid κ rv fin sched st =
     , redTakeDispatch nid fin sched st (lookupNode nid (EvalSt.nodes st)) rv
     , tt
 
--- A FOLD IS ITS ACCUMULATOR THREADED ALONG THE BATCH, and so is the
--- claim about it: each output IS the next accumulator, so one walk
--- delivers both the candidate at every emitted value and the
--- candidate at what gets written back.
-redScanVals : ∀ {n} {Γ : Ctx n} {s u} (fn : Fn Γ [] [] [] (u ×ᵗ s) u) → RedFn fn
-            → {a : Val Γ u} → Red u a
-            → {vals : List (Val Γ s)} → All (Red s) vals
-            → All (Red u) (proj₁ (scanVals fn a vals))
-              × Red u (proj₂ (scanVals fn a vals))
-redScanVals fn rf ra []       = [] , ra
-redScanVals fn rf ra (p ∷ ps) =
-  let (qs , last) = redScanVals fn rf (rf (ra , p)) ps
-  in rf (ra , p) ∷ qs , last
-
 -- the node read back is the one written, so its payload is that payload
-tie-scan : ∀ {n} {Γ : Ctx n} {w w′} {x : Val Γ w} {y : Val Γ w′}
+tie-cell : ∀ {n} {Γ : Ctx n} {w w′} {x : Val Γ w} {y : Val Γ w′}
          → just (cell-st x) ≡ just (cell-st y) → Red w x → Red w′ y
-tie-scan refl r = r
+tie-cell refl r = r
 
--- AND THE ONE THING THE FOLD'S NODE OBLIGATION CANNOT ESTABLISH FOR
--- ITSELF: that the accumulator installed just before a subscription is
--- the one still standing when the push happens.  A node is keyed by an
--- identifier drawn from the schedule's own counter, the fold installs
+-- AND THE ONE THING THE CELL'S NODE OBLIGATION CANNOT ESTABLISH FOR
+-- ITSELF: that the state installed just before a subscription is the
+-- one still standing when the push happens.  A node is keyed by an
+-- identifier drawn from the schedule's own counter, the former installs
 -- at the counter's current value and subscribes with it advanced, and
 -- a subscription writes no node below the counter it started at -- so
--- the accumulator is untouched for structural reasons rather than by
+-- the carried state is untouched for structural reasons rather than by
 -- any property of the candidate.  The floor spent here is the advanced
--- counter itself, which is the tightest one the fold can offer and the
--- only one under which its own node is strictly below.
-red-scan-installed : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
-           (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
-           {a : Val Γ u} → Red u a
-         → {b : Closed Γ s} {κ : Path Γ lo u t} {id : Id} {now : Tick}
-         → (sched : Sched Γ) (st : EvalSt e)
-         → {sched₂ : Sched Γ} {st₁ : EvalSt e} {burst : Stream Γ s}
-         → subscribeE⇓ {e = e} b (scan-f fn nid ↠ κ) id now
-             (record sched { nextNode = suc nid })
-             (installNode nid (cell-st a) st)
-             (burst , sched₂ , st₁)
-         → RedNode {e = e} (scan-f fn nid) st₁
-red-scan-installed {e = e} fn nid {a} ra sched st d eq =
-  tie-scan (trans (sym (trans (PreservedBelow.below
-                                 (subscribeE-preserves (suc nid) ≤-refl d)
-                                 nid ≤-refl)
-                              (lookup-set nid (cell-st a) (EvalSt.nodes st))))
-                  eq)
-           ra
-
--- ONE READING OF THE NODE, WHICH IS WHERE BOTH HALVES ARE PAID.  The
--- dispatch it mirrors branches on a lookup the goal does not mention,
--- so the reading is taken as a parameter and pinned by an equation --
--- and that equation is what lets the obligation coming IN be spent on
--- the accumulator that was found, before the obligation going OUT is
--- re-established against the accumulator that replaces it.
-redScanDispatch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-                  (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
-                  {vals : List (Val Γ s)} (fin : Bool)
-                  (sched : Sched Γ) (st : EvalSt e) (m : Maybe (NodeState Γ))
-                → lookupNode nid (EvalSt.nodes st) ≡ m
-                → RedNode {e = e} (scan-f fn nid) st → RedFn fn → All (Red s) vals
-                → All (Red u) (proj₁ (scanDispatch {e = e} fn nid vals fin sched st m))
-                  × RedNode {e = e} (scan-f fn nid)
-                      (proj₂ (proj₂ (proj₂ (proj₂
-                        (scanDispatch {e = e} fn nid vals fin sched st m)))))
-redScanDispatch {u = u} fn nid {vals} fin sched st (just (cell-st {w} a)) eq rn rf rv
-  with w ≟ᵗ u
-... | no  _    = [] , rn
-... | yes refl =
-      let (outs , last) = redScanVals fn rf (rn eq) rv
-      in outs , λ eq′ → tie-scan (trans (sym (lookup-set nid
-                                    (cell-st (proj₂ (scanVals fn a vals)))
-                                    (EvalSt.nodes st)))
-                                  eq′)
-                          last
-redScanDispatch fn nid fin sched st nothing                    eq rn rf rv = [] , rn
-redScanDispatch fn nid fin sched st (just (take-st _))         eq rn rf rv = [] , rn
-redScanDispatch fn nid fin sched st (just (mergeAll-st _ _ _ _)) eq rn rf rv = [] , rn
-redScanDispatch fn nid fin sched st (just (switch-st _ _))     eq rn rf rv = [] , rn
-redScanDispatch fn nid fin sched st (just (exhaust-st _ _))    eq rn rf rv = [] , rn
-
--- A SCAN READS ITS ACCUMULATOR BACK OUT OF A NODE, AND EMITS IT --
--- which is what the node obligation beside the frame's function is
--- for.  Three of the dispatch's readings write nothing and emit
--- nothing, so the obligation they hand back is the one they were
--- given; the fourth folds, and there the two halves of the walk above
--- are exactly the two things owed -- the batch that leaves and the
--- accumulator that stays.
-red-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
-           (id : Id) (now : Tick) (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
-           (κ : Path Γ lo u t) → RedFn fn
-         → {vals : List (Val Γ s)} → All (Red s) vals → (fin : Bool)
-         → (sched : Sched Γ) (st : EvalSt e)
-         → RedNode {e = e} (scan-f fn nid) st
-         → RedStep {e = e} id now (scan-f fn nid) κ vals fin sched st
-red-scan id now fn nid κ rf rv fin sched st rn =
-  let (rvs , rn′) = redScanDispatch fn nid fin sched st
-                       (lookupNode nid (EvalSt.nodes st)) refl rn rf rv
-  in _ , step-scan , rvs , rn′
+-- counter itself, which is the tightest one available and the only one
+-- under which the former's own node is strictly below.
 
 -- THE LIFTED STEP HANDS ITS WHOLE BATCH TO ONE APPLICATION, so the
 -- two halves come back already paired: the function's own candidate,
@@ -694,7 +600,7 @@ redLiftVals : ∀ {n} {Γ : Ctx n} {s u w}
               × Red w (proj₂ (liftVals fn a vals))
 redLiftVals fn rf ra rv = proj₂ (rf (ra , rv)) , proj₁ (rf (ra , rv))
 
--- the same installation argument the fold spends, at the same cell
+-- the installation argument, spent at the cell the former writes
 red-lift-installed : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u w lo}
            (fn : Fn Γ [] [] [] (w ×ᵗ listᵗ s) (w ×ᵗ listᵗ u)) (nid : NodeId)
            {a : Val Γ w} → Red w a
@@ -707,7 +613,7 @@ red-lift-installed : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u w lo}
              (burst , sched₂ , st₁)
          → RedNode {e = e} (lift-f fn nid) st₁
 red-lift-installed {e = e} fn nid {a} ra sched st d eq =
-  tie-scan (trans (sym (trans (PreservedBelow.below
+  tie-cell (trans (sym (trans (PreservedBelow.below
                                  (subscribeE-preserves (suc nid) ≤-refl d)
                                  nid ≤-refl)
                               (lookup-set nid (cell-st a) (EvalSt.nodes st))))
@@ -729,7 +635,7 @@ redLiftDispatch {w = w} fn nid {vals} fin sched st (just (cell-st {v} a)) eq rn 
 ... | no  _    = [] , rn
 ... | yes refl =
       let (outs , last) = redLiftVals fn rf (rn eq) rv
-      in outs , λ eq′ → tie-scan (trans (sym (lookup-set nid
+      in outs , λ eq′ → tie-cell (trans (sym (lookup-set nid
                                     (cell-st (proj₂ (liftVals fn a vals)))
                                     (EvalSt.nodes st)))
                                   eq′)
@@ -768,10 +674,6 @@ red-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
            {vals : List (Val Γ s)} → All (Red s) vals → (fin : Bool)
            (sched : Sched Γ) (st : EvalSt e) → RedNode f st
          → RedStep {e = e} id now f κ vals fin sched st
-red-step id now (map-f fn) sv rf κ rv fin sched st rn =
-  _ , step-map , redMapVals fn rf rv , tt
-red-step id now (scan-f fn nid) sv rf κ rv fin sched st rn =
-  red-scan id now fn nid κ rf rv fin sched st rn
 red-step id now (lift-f fn nid) sv rf κ rv fin sched st rn =
   red-lift id now fn nid κ rf rv fin sched st rn
 red-step id now (take-f nid) sv rf κ rv fin sched st rn =
@@ -891,20 +793,6 @@ mutual
       , satOneShot id sched (redTmsAcc ts σ rσ k ok aK (rs ≤-refl))
   redExpAcc emptyᵉ σ rσ k ok aK a κ id now sched st =
     _ , subs-empty refl , satOneShot id sched []
-  redExpAcc (mapᵉ {s = s} f b) σ rσ k ok aK (acc rs) κ id now sched st =
-    let fn = subΘTm (s ∷ []) σ f
-        okf = ∧ˡ (inputsBelowᵗ k f) (inputsBelowᵉ k b) ok
-        okb = ∧ʳ (inputsBelowᵗ k f) (inputsBelowᵉ k b) ok
-        ((burst , sched₁ , st₁) , d , sat) =
-          redExpAcc b σ rσ k okb aK
-            (rs (s≤s (m≤n+m (gsizeᵉ b) (gsizeᵗ f))))
-            (map-f fn ↠ κ) id now sched st
-        (r , p , sat′) =
-          red-push id now (map-f fn) tt
-            (redFnAcc f σ rσ k okf aK
-              (rs (s≤s (m≤m+n (gsizeᵗ f) (gsizeᵉ b)))))
-            κ sat sched₁ st₁ tt
-    in r , subs-map d p , sat′
   redExpAcc (takeᵉ c b) σ rσ k ok aK (acc rs) κ id now sched st
     with evalTm (subΘTm [] σ c) in ceq
   ... | zero  = _ , subs-take-zero ceq refl , satOneShot id sched []
@@ -919,31 +807,6 @@ mutual
             (installNode nid (take-st (suc j)) st)
         (r , p , sat′) = red-push id now (take-f nid) tt tt κ sat sched₂ st₁ tt
     in r , subs-take-suc ceq refl d p , sat′
-  redExpAcc (scanᵉ {s = s} {t = u} f z b) σ rσ k ok aK (acc rs) κ id now sched st =
-    let nid = Sched.nextNode sched
-        fn  = subΘTm ((u ×ᵗ s) ∷ []) σ f
-        zbe = inputsBelowᵗ k z ∧ inputsBelowᵉ k b
-        okf = ∧ˡ (inputsBelowᵗ k f) zbe ok
-        rest = ∧ʳ (inputsBelowᵗ k f) zbe ok
-        okz = ∧ˡ (inputsBelowᵗ k z) (inputsBelowᵉ k b) rest
-        okb = ∧ʳ (inputsBelowᵗ k z) (inputsBelowᵉ k b) rest
-        rf  = redFnAcc f σ rσ k okf aK
-                (rs (s≤s (m≤m+n (gsizeᵗ f) (gsizeᵗ z + gsizeᵉ b))))
-        rz  = subst (Red u) (sym (sub-evalTm z σ))
-                (redTmAcc z σ rσ k okz aK
-                  (rs (s≤s (≤-trans (m≤m+n (gsizeᵗ z) (gsizeᵉ b))
-                                    (m≤n+m (gsizeᵗ z + gsizeᵉ b) (gsizeᵗ f))))))
-        ((burst , sched₂ , st₁) , d , sat) =
-          redExpAcc b σ rσ k okb aK
-            (rs (s≤s (≤-trans (m≤n+m (gsizeᵉ b) (gsizeᵗ z))
-                              (m≤n+m (gsizeᵗ z + gsizeᵉ b) (gsizeᵗ f)))))
-            (scan-f fn nid ↠ κ) id now
-            (record sched { nextNode = suc nid })
-            (installNode nid (cell-st (evalTm (subΘTm [] σ z))) st)
-        (r , p , sat′) =
-          red-push id now (scan-f fn nid) tt rf
-            κ sat sched₂ st₁ (red-scan-installed fn nid rz sched st d)
-    in r , subs-scan refl d p , sat′
   redExpAcc (liftᵉ {s = s} {u = w} f z b) σ rσ k ok aK (acc rs) κ id now sched st =
     let nid = Sched.nextNode sched
         fn  = subΘTm ((w ×ᵗ listᵗ s) ∷ []) σ f

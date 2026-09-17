@@ -43,7 +43,7 @@ open import Data.Product using (Σ; _,_)
 open import Data.Vec using () renaming ([] to []ⱽ)
 open import Relation.Nullary using (¬_)
 
-open import Rx.Exp using (Ctx; Tm; Fn; Closed; obs; natᵗ; _×ᵗ_; listᵗ; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ;
+open import Rx.Exp using (Ctx; Tm; Fn; Closed; obs; natᵗ; _×ᵗ_; listᵗ; input; ofᵉ; emptyᵉ; takeᵉ;
   liftᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ)
 
 -- the structural domain predicate: one constructor per former, each
@@ -58,10 +58,7 @@ data Sub {n} {Γ : Ctx n} : ∀ {t} → Closed Γ t → Set where
   s-empty : ∀ {t} → Sub (emptyᵉ {Γ = Γ} {t = t})
   s-defer : ∀ {t body} → Sub (deferᵉ {Γ = Γ} {t = t} body)
   s-μ     : ∀ {t body} → Sub (μᵉ {Γ = Γ} {t = t} body)
-  s-map   : ∀ {s t} {f : Fn Γ [] [] [] s t} {b} → Sub b → Sub (mapᵉ f b)
   s-take  : ∀ {t} {c : Tm Γ [] [] [] _} {b} → Sub b → Sub (takeᵉ {t = t} c b)
-  s-scan  : ∀ {s t} {f : Fn Γ [] [] [] _ t} {z} {b : Closed Γ s}
-          → Sub b → Sub (scanᵉ f z b)
   s-lift  : ∀ {s t u} {f : Fn Γ [] [] [] (u ×ᵗ listᵗ s) (u ×ᵗ listᵗ t)}
               {z : Tm Γ [] [] [] u} {b : Closed Γ s}
           → Sub b → Sub (liftᵉ f z b)
@@ -75,9 +72,7 @@ sub-total (ofᵉ ts)          = s-of
 sub-total emptyᵉ            = s-empty
 sub-total (deferᵉ body)     = s-defer
 sub-total (μᵉ body)         = s-μ
-sub-total (mapᵉ f b)        = s-map (sub-total b)
 sub-total (takeᵉ c b)       = s-take (sub-total b)
-sub-total (scanᵉ f z b)     = s-scan (sub-total b)
 sub-total (liftᵉ f z b)     = s-lift (sub-total b)
 sub-total (mergeAllᵉ l b)   = s-merge (sub-total b)
 sub-total (switchAllᵉ b)    = s-switch (sub-total b)

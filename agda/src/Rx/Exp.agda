@@ -65,11 +65,8 @@ mutual
     input      : (i : Fin n) → Exp Γ Δᵍ Δ Θ (lookup Γ i)
     ofᵉ        : ∀ {t} → List (Tm Γ Δᵍ Δ Θ t) → Exp Γ Δᵍ Δ Θ t
     emptyᵉ     : ∀ {t} → Exp Γ Δᵍ Δ Θ t
-    mapᵉ       : ∀ {s t} → Fn Γ Δᵍ Δ Θ s t → Exp Γ Δᵍ Δ Θ s → Exp Γ Δᵍ Δ Θ t
     takeᵉ      : ∀ {t} → Tm Γ Δᵍ Δ Θ natᵗ → Exp Γ Δᵍ Δ Θ t → Exp Γ Δᵍ Δ Θ t
                  -- count is a term: evaluated once, at subscription time
-    scanᵉ      : ∀ {s t} → Fn Γ Δᵍ Δ Θ (t ×ᵗ s) t → Tm Γ Δᵍ Δ Θ t
-               → Exp Γ Δᵍ Δ Θ s → Exp Γ Δᵍ Δ Θ t
     liftᵉ      : ∀ {s t u} → Fn Γ Δᵍ Δ Θ (u ×ᵗ listᵗ s) (u ×ᵗ listᵗ t)
                → Tm Γ Δᵍ Δ Θ u → Exp Γ Δᵍ Δ Θ s → Exp Γ Δᵍ Δ Θ t
                  -- THE ONE PURE-FUNCTION FORMER, MIRRORING THE TYPESCRIPT
@@ -84,8 +81,8 @@ mutual
                  -- WHAT IT ABSORBS IS DECIDED BY WHETHER AN OPERATOR READS
                  -- THE PROTOCOL'S OWN BOOKKEEPING, and that test was run in
                  -- TypeScript against real rxjs before it was written here.
-                 -- `mapᵉ` is this at `u = unitᵗ` and `scanᵉ` is it at
-                 -- `u = t`; `takeᵉ` is NOT, because it reads the open
+                 -- `mapᵉ` and `scanᵉ` are DEFINITIONS over this, below;
+                 -- `takeᵉ` is NOT, because it reads the open
                  -- registrations and the cut ledger and mints a close per
                  -- victim, so absorbing it would put source ids and close
                  -- reasons into the value language.  The flatteners cannot
@@ -250,9 +247,7 @@ mutual
   renExp ρg ρd ρt (input i)      = input i
   renExp ρg ρd ρt (ofᵉ ts)       = ofᵉ (renTms ρg ρd ρt ts)
   renExp ρg ρd ρt emptyᵉ         = emptyᵉ
-  renExp ρg ρd ρt (mapᵉ f e)     = mapᵉ (renTm ρg ρd (ext∈ ρt) f) (renExp ρg ρd ρt e)
   renExp ρg ρd ρt (takeᵉ n e)    = takeᵉ (renTm ρg ρd ρt n) (renExp ρg ρd ρt e)
-  renExp ρg ρd ρt (scanᵉ f i e)  = scanᵉ (renTm ρg ρd (ext∈ ρt) f) (renTm ρg ρd ρt i) (renExp ρg ρd ρt e)
   renExp ρg ρd ρt (liftᵉ f i e)  = liftᵉ (renTm ρg ρd (ext∈ ρt) f) (renTm ρg ρd ρt i) (renExp ρg ρd ρt e)
   renExp ρg ρd ρt (mergeAllᵉ lim e) = mergeAllᵉ lim (renExp ρg ρd ρt e)
   renExp ρg ρd ρt (switchAllᵉ e) = switchAllᵉ (renExp ρg ρd ρt e)
@@ -294,6 +289,77 @@ wkTm : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → Tm Γ [] [] [] t → Tm Γ Δᵍ
 wkTm = renTm (λ ()) (λ ()) (λ ())
 
 ------------------------------------------------------------------
+-- `mapᵉ` and `scanᵉ`, written OVER the one pure-function former.
+------------------------------------------------------------------
+
+-- THE TERM LANGUAGE HAS NO APPLICATION, AND THAT IS WHAT SHAPES BOTH
+-- ENCODINGS.  A `Fn` is a `Tm` under one extra binder, and the only
+-- substitution here carries VALUES, so a step cannot simply be applied
+-- to a term: the argument has to be handed over by a former that BINDS.
+-- `foldᵗ` over a ONE-ELEMENT list is that former, which is why `letᵗ`
+-- below is a definition and not a new constructor — a constructor would
+-- have cost a clause in every walk, which is exactly the price this
+-- whole leg is collecting back.  The seed is explicit because `Tm` has
+-- no generic inhabitant to default it to, and every caller here has a
+-- real one in hand.
+letᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ s u}
+     → Tm Γ Δᵍ Δ Θ s → Tm Γ Δᵍ Δ Θ u → Tm Γ Δᵍ Δ (s ∷ Θ) u → Tm Γ Δᵍ Δ Θ u
+letᵗ m d b = foldᵗ (consᵗ m nilᵗ) d (renTm (λ x → x) (λ x → x) (ext∈ there) b)
+
+-- `foldᵗ` is a LEFT fold, so a list built by consing comes out reversed
+-- and every encoding below pays one reversing pass.
+revᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t}
+     → Tm Γ Δᵍ Δ Θ (listᵗ t) → Tm Γ Δᵍ Δ Θ (listᵗ t)
+revᵗ l = foldᵗ l nilᵗ (consᵗ (varᵗ (here refl)) (varᵗ (there (here refl))))
+
+-- THE SEEDLESS ONE IS A PLAIN FOLD AND THE SEEDED ONE IS NOT, WHICH IS
+-- THE ANSWER THIS LEG WENT LOOKING FOR.  `mapᵉ`'s step is applied to the
+-- element, and the element IS the fold's own head binder, so the step
+-- drops in with a renaming and nothing else.  `scanᵉ`'s step is applied
+-- to a PAIR of the carried state and the element, which no binder here
+-- offers, so it needs `letᵗ` to make one.  They are not the same rewrite.
+mapᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ s t}
+     → Fn Γ Δᵍ Δ Θ s t → Exp Γ Δᵍ Δ Θ s → Exp Γ Δᵍ Δ Θ t
+mapᵉ {Θ = Θ} {s = s} {t = t} f e =
+  liftᵉ (pairᵗ unit̂ (revᵗ (foldᵗ (sndᵗ (varᵗ (here refl))) nilᵗ
+                                (consᵗ f↑ (varᵗ (there (here refl)))))))
+        unit̂ e
+  where
+  f↑ : Tm _ _ _ (s ∷ listᵗ t ∷ (unitᵗ ×ᵗ listᵗ s) ∷ Θ) t
+  f↑ = renTm (λ x → x) (λ x → x) (ext∈ (λ x → there (there x))) f
+
+scanᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ s t}
+      → Fn Γ Δᵍ Δ Θ (t ×ᵗ s) t → Tm Γ Δᵍ Δ Θ t
+      → Exp Γ Δᵍ Δ Θ s → Exp Γ Δᵍ Δ Θ t
+scanᵉ {Θ = Θ} {s = s} {t = t} f z e = liftᵉ step z e
+  where
+  -- the fold's accumulator: the scan state, and the values emitted so
+  -- far in reverse.  The former carries only the state; the list is the
+  -- former's own output and is rebuilt on every step.
+  A : Ty
+  A = t ×ᵗ listᵗ t
+
+  -- the former's argument, in the step's own context
+  arg : Tm _ _ _ ((t ×ᵗ listᵗ s) ∷ Θ) (t ×ᵗ listᵗ s)
+  arg = varᵗ (here refl)
+
+  -- inside `letᵗ`'s body: the pair handed to the step, then the fold's
+  -- element and accumulator, then the former's argument, then Θ
+  f↑ : Tm _ _ _ ((t ×ᵗ s) ∷ s ∷ A ∷ (t ×ᵗ listᵗ s) ∷ Θ) t
+  f↑ = renTm (λ x → x) (λ x → x)
+             (ext∈ (λ x → there (there (there x)))) f
+
+  run : Tm _ _ _ ((t ×ᵗ listᵗ s) ∷ Θ) A
+  run = foldᵗ (sndᵗ arg) (pairᵗ (fstᵗ arg) nilᵗ)
+              (letᵗ (pairᵗ (fstᵗ (varᵗ (there (here refl)))) (varᵗ (here refl)))
+                    (varᵗ (there (here refl)))
+                    (pairᵗ f↑ (consᵗ f↑ (sndᵗ (varᵗ (there (there (here refl))))))))
+
+  step : Tm _ _ _ ((t ×ᵗ listᵗ s) ∷ Θ) (t ×ᵗ listᵗ t)
+  step = letᵗ run (pairᵗ (fstᵗ arg) nilᵗ)
+              (pairᵗ (fstᵗ (varᵗ (here refl))) (revᵗ (sndᵗ (varᵗ (here refl)))))
+
+------------------------------------------------------------------
 -- reify: a value → the closed Tm literal denoting it (an obs value is
 -- already a closed Exp, so no substitution)
 ------------------------------------------------------------------
@@ -325,10 +391,7 @@ mutual
   subΘExp Θloc σ (input i)      = input i
   subΘExp Θloc σ (ofᵉ ts)       = ofᵉ (subΘTms Θloc σ ts)
   subΘExp Θloc σ emptyᵉ         = emptyᵉ
-  subΘExp Θloc σ (mapᵉ {s = s} f e) = mapᵉ (subΘTm (s ∷ Θloc) σ f) (subΘExp Θloc σ e)
   subΘExp Θloc σ (takeᵉ n e)    = takeᵉ (subΘTm Θloc σ n) (subΘExp Θloc σ e)
-  subΘExp Θloc σ (scanᵉ {s = s} {t = t} f i e) =
-    scanᵉ (subΘTm ((t ×ᵗ s) ∷ Θloc) σ f) (subΘTm Θloc σ i) (subΘExp Θloc σ e)
   subΘExp Θloc σ (liftᵉ {s = s} {u = u} f i e) =
     liftᵉ (subΘTm ((u ×ᵗ listᵗ s) ∷ Θloc) σ f) (subΘTm Θloc σ i) (subΘExp Θloc σ e)
   subΘExp Θloc σ (mergeAllᵉ lim e) = mergeAllᵉ lim (subΘExp Θloc σ e)
@@ -415,10 +478,7 @@ mutual
   elimGExp Θl x cl (input i)      = input i
   elimGExp Θl x cl (ofᵉ ts)       = ofᵉ (elimGTms Θl x cl ts)
   elimGExp Θl x cl emptyᵉ         = emptyᵉ
-  elimGExp Θl x cl (mapᵉ f e)     = mapᵉ (elimGTm (_ ∷ Θl) x cl f) (elimGExp Θl x cl e)
   elimGExp Θl x cl (takeᵉ n e)    = takeᵉ (elimGTm Θl x cl n) (elimGExp Θl x cl e)
-  elimGExp Θl x cl (scanᵉ f i e)  =
-    scanᵉ (elimGTm (_ ∷ Θl) x cl f) (elimGTm Θl x cl i) (elimGExp Θl x cl e)
   elimGExp Θl x cl (liftᵉ f i e)  =
     liftᵉ (elimGTm (_ ∷ Θl) x cl f) (elimGTm Θl x cl i) (elimGExp Θl x cl e)
   elimGExp Θl x cl (mergeAllᵉ lim e) = mergeAllᵉ lim (elimGExp Θl x cl e)
@@ -465,10 +525,7 @@ mutual
   elimDExp Θl x cl (input i)      = input i
   elimDExp Θl x cl (ofᵉ ts)       = ofᵉ (elimDTms Θl x cl ts)
   elimDExp Θl x cl emptyᵉ         = emptyᵉ
-  elimDExp Θl x cl (mapᵉ f e)     = mapᵉ (elimDTm (_ ∷ Θl) x cl f) (elimDExp Θl x cl e)
   elimDExp Θl x cl (takeᵉ n e)    = takeᵉ (elimDTm Θl x cl n) (elimDExp Θl x cl e)
-  elimDExp Θl x cl (scanᵉ f i e)  =
-    scanᵉ (elimDTm (_ ∷ Θl) x cl f) (elimDTm Θl x cl i) (elimDExp Θl x cl e)
   elimDExp Θl x cl (liftᵉ f i e)  =
     liftᵉ (elimDTm (_ ∷ Θl) x cl f) (elimDTm Θl x cl i) (elimDExp Θl x cl e)
   elimDExp Θl x cl (mergeAllᵉ lim e) = mergeAllᵉ lim (elimDExp Θl x cl e)
@@ -583,10 +640,7 @@ mutual
   inputsBelowᵉ k (input i)       = toℕ i <ᵇ k
   inputsBelowᵉ k (ofᵉ ts)        = inputsBelowᵗˢ k ts
   inputsBelowᵉ k emptyᵉ          = true
-  inputsBelowᵉ k (mapᵉ f e)      = inputsBelowᵗ k f ∧ inputsBelowᵉ k e
   inputsBelowᵉ k (takeᵉ c e)     = inputsBelowᵗ k c ∧ inputsBelowᵉ k e
-  inputsBelowᵉ k (scanᵉ f z e)   =
-    inputsBelowᵗ k f ∧ inputsBelowᵗ k z ∧ inputsBelowᵉ k e
   inputsBelowᵉ k (liftᵉ f z e)   =
     inputsBelowᵗ k f ∧ inputsBelowᵗ k z ∧ inputsBelowᵉ k e
   inputsBelowᵉ k (mergeAllᵉ lim e) = inputsBelowᵉ k e
