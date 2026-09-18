@@ -2,10 +2,32 @@
 # Append newly-discovered QuickCheck counterexamples to the bug cache's
 # corpus, agda/src/Implementation/Unit-Test.agda.
 #
-#   scripts/gen-unit-tests.sh [FIRST] [LAST] [RUNS] [DEPTH]
+#   scripts/gen-unit-tests.sh [FIRST] [LAST] [RUNS] [DEPTH] [SECS]
 #
 # Defaults: seeds 1..300, 200 runs each, depth 4 — what `make quickcheck`
-# runs with no ARGS.
+# runs with no ARGS — and 60 seconds per seed, ten times what a seed costs.
+#
+# A SEED IS BOUNDED IN WALL CLOCK, BECAUSE ONE CASE CAN COST MORE THAN THE
+# WHOLE SWEEP.  A guarded fixpoint whose step hands back more elements than
+# it was given, with no `takeᵉ` above it, has a run exponential in the
+# fuel; the corpus contains such programs and the generator has no reason
+# not to draw one.  The cost is INSIDE `evaluate↓` rather than in the list
+# it returns — the drain forces each cascade whole — so a budget on the
+# stream's length buys nothing, and wall clock is what actually measures
+# the thing.  Measured: one case of seed 3 outruns the other 199 by more
+# than two orders of magnitude and does not finish.
+#
+# THE SEED IS THEN REPORTED AS TIMED OUT, NOT AS AGREEING.  It contributes
+# no census and no rows, so the sweep says which part of its corpus it
+# could not run rather than reporting the remainder as a clean sweep —
+# and the exit status stays what it was, since the verdict this script
+# reports is the CORPUS.  What retires the bound is the saturation
+# restriction the roadmap carries, which is the predicate that would let
+# the GENERATOR decline such a program in the first place.
+#
+# `timeout` DOES NOT EXIST ON macOS, so it is used when present (`gtimeout`
+# from coreutils counts) and skipped with a warning when it is not.  A
+# local run then behaves as it always did.
 #
 # APPEND-ONLY.  QuickCheck emits each failing case as a self-delimited
 # `-- <<<PASTE` / `-- PASTE>>>` block; we dedup on the block's PROGRAM line,
@@ -27,6 +49,17 @@ FIRST=${1:-1}
 LAST=${2:-300}
 RUNS=${3:-200}
 DEPTH=${4:-4}
+SECS=${5:-60}
+
+# a seed that ran out of time leaves the binary killed mid-write, so the
+# capture is treated as absent rather than parsed
+TIMEOUT=""
+if command -v timeout >/dev/null 2>&1; then TIMEOUT="timeout $SECS"
+elif command -v gtimeout >/dev/null 2>&1; then TIMEOUT="gtimeout $SECS"
+else
+  echo "gen-unit-tests: no timeout(1) on PATH — a pathological seed will" >&2
+  echo "                run until it is killed by hand" >&2
+fi
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 QC="$ROOT/agda/_cli/QuickCheck"
@@ -91,10 +124,21 @@ trap 'rm -f "$tmp" "$row" "$spl" "$cen"' EXIT
 widen
 
 added=0
+timedout=""
 for seed in $(seq "$FIRST" "$LAST"); do
   # stdin is: SEED RUNS DEPTH  (QuickCheck.agda's main: parseNat, numAt 1,
   # numAt 2 — runs before depth)
-  printf '%s %s %s\n' "$seed" "$RUNS" "$DEPTH" | "$QC" > "$tmp"
+  if printf '%s %s %s\n' "$seed" "$RUNS" "$DEPTH" | $TIMEOUT "$QC" > "$tmp"
+  then :; else
+    rc=$?
+    if [ "$rc" -eq 124 ]; then
+      echo "seed $seed depth $DEPTH — TIMED OUT after ${SECS}s; not checked"
+      timedout="$timedout $seed"
+      continue
+    fi
+    echo "gen-unit-tests: seed $seed exited $rc" >&2
+    exit "$rc"
+  fi
   head -1 "$tmp"
   # one census line per run, banked for the aggregate below rather than
   # printed: per-seed counts are noise at 300 seeds, and the question the
@@ -156,6 +200,13 @@ awk '{ for (i = 2; i < NF; i += 2) t[$i] += $(i + 1) }
      END { for (k in t) print k, t[k] }' "$cen" | sort > "$CENSUS"
 echo "gen-unit-tests: census over seeds $FIRST..$LAST -> ${CENSUS#"$ROOT"/}"
 awk '{ printf "  %-12s %s\n", $1, $2 }' "$CENSUS"
+
+if [ -n "$timedout" ]; then
+  echo "gen-unit-tests: TIMED OUT:$timedout"
+  echo "                each of these seeds drew a program whose run does not"
+  echo "                finish in ${SECS}s, so its whole batch is unchecked —"
+  echo "                the census and the corpus below cover the rest."
+fi
 
 unreached="$(awk '$2 == 0 { printf "%s ", $1 }' "$CENSUS")"
 if [ -n "$unreached" ]; then

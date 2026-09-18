@@ -682,6 +682,21 @@ showSlots ins =
 ------------------------------------------------------------------------
 -- one case, a run, and reporting
 
+-- THE FUEL IS AN EXPONENT FOR SOME PROGRAMS, WHICH IS WHY THE SWEEP HAS
+-- TO BE BOUNDED FROM OUTSIDE.  A guarded fixpoint under an unbounded
+-- `mergeAllᵉ` with no `takeᵉ` above it emits once per unit of fuel; one
+-- whose step hands back MORE elements than it was given doubles instead,
+-- and the corpus contains such programs because nothing in the generator
+-- declines to draw one.  The cost is inside `evaluate↓` rather than in
+-- the stream it returns, the drain forcing each cascade whole, so no
+-- budget readable from here can decline the case after the fact — a cap
+-- on the stream's length was tried and buys nothing, since the length is
+-- reached only by paying for it.  `scripts/gen-unit-tests.sh` therefore
+-- bounds a SEED in wall clock and reports the ones it could not run.
+--
+-- What retires that, and it is not a harness question: a predicate
+-- admitting only the programs that SATURATE, which the roadmap carries
+-- and which would let the generator decline the draw instead.
 FUEL : ℕ
 FUEL = 30
 
