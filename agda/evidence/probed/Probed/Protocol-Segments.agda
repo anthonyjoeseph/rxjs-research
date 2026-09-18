@@ -25,7 +25,7 @@ open import Data.Vec using (_∷_; [])
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (after_,_; hot)
-open import Rx.Exp using (Ctx; natᵗ; Closed; nat̂; ofᵉ; input)
+open import Rx.Exp using (Ctx; natᵗ; Closed; nat̂; ofᵉ; input; []ᵉ)
 open import Rx.Slots using (Slots; scripted)
 open import Rx.Evaluator using (root; sched-init; st-init; sched-next; Arrival;
   Sched; EvalSt; Stream)
@@ -46,11 +46,11 @@ open import Probed.Apparatus using (Confirms)
 pair₀ : Closed Γ₀ natᵗ
 pair₀ = ofᵉ (nat̂ 3 ∷ nat̂ 7 ∷ [])
 
--- TARGET: sound-subscribe @754ca7
+-- TARGET: sound-subscribe @1af6f6
 row-subscribe :
   Confirms (Sound.run
              (sound-subscribe pair₀ noSlots
-               (proj₂ (subscribeE! noSlots pair₀ root 0 0
+               (proj₂ (subscribeE! noSlots pair₀ []ᵉ root 0 0
                         (sched-init pair₀ noSlots) refl (st-init pair₀))))
              protocol-init Sane-init z≤n)
 row-subscribe = _ , refl , (λ i o _ → z≤n) , z≤n
@@ -67,7 +67,7 @@ ins₁ zero = scripted (hot ((after 1 , 5) ∷ []))
 prog₁ : Closed Γ₁ natᵗ
 prog₁ = input zero
 
-sub₁ = subscribeE! ins₁ prog₁ (root {lo = 1}) 0 0 (sched-init prog₁ ins₁) refl
+sub₁ = subscribeE! ins₁ prog₁ []ᵉ (root {lo = 1}) 0 0 (sched-init prog₁ ins₁) refl
          (st-init prog₁)
 
 sched₀ : Sched Γ₁

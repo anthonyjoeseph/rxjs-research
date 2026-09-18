@@ -21,7 +21,7 @@ module Rx.Evaluator.Keeps-Slots where
 
 open import Data.Bool using (Bool; true; false)
 open import Data.Fin using (Fin; toℕ)
-open import Data.List using (List; [])
+open import Data.List using (List)
 open import Data.Maybe using (Maybe; nothing; just)
 open import Data.Nat using (ℕ; _<_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
@@ -30,7 +30,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans)
 open import Relation.Nullary using (yes; no)
 
 open import Rx.Prim using (Id; Tick)
-open import Rx.Exp using (Ctx; Closed; Val; obs; Fn; FnClo; _×ᵗ_; _≟ᵗ_)
+open import Rx.Exp using (Ctx; Closed; Val; obs; FnClo; _×ᵗ_; _≟ᵗ_)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; AllOp; NodeId;
   NodeState; Frame; take-st; batchSync-st; batchSyncDispatch; cell-st; takeVals; takeDispatch;
   scanDispatch; thruWrap;

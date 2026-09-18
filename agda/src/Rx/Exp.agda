@@ -429,10 +429,6 @@ mutual
   renTms ρg ρd ρt []       = []
   renTms ρg ρd ρt (x ∷ xs) = renTm ρg ρd ρt x ∷ renTms ρg ρd ρt xs
 
--- weaken a closed term into any context (source contexts empty)
-wkTm : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → Tm Γ [] [] [] t → Tm Γ Δᵍ Δ Θ t
-wkTm = renTm (λ ()) (λ ()) (λ ())
-
 ------------------------------------------------------------------
 -- `letᵗ` and the list helpers the encodings above are written with.
 ------------------------------------------------------------------

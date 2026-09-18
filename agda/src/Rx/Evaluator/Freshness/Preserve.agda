@@ -23,7 +23,7 @@
 module Rx.Evaluator.Freshness.Preserve where
 
 open import Data.Bool using (Bool; true; false)
-open import Data.List using (List; [])
+open import Data.List using (List)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _≤_)
 open import Data.Nat.Properties using (≤-trans; n≤1+n)
@@ -33,7 +33,7 @@ open import Relation.Nullary using (yes; no)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Mint using (nodeᵏ; freshId)
-open import Rx.Exp using (Ctx; Closed; Val; obs; Fn; FnClo; _×ᵗ_; _≟ᵗ_)
+open import Rx.Exp using (Ctx; Closed; Val; obs; FnClo; _×ᵗ_; _≟ᵗ_)
 open import Rx.Prim using (InstEvent)
 open import Rx.Evaluator using (Sched; EvalSt; Path; Frame; NodeId; NodeState; AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ;
   switchKill; scanDispatch; takeDispatch; batchSyncDispatch; thruWrap; mergeAllBump; scanVals; takeVals; cell-st;
