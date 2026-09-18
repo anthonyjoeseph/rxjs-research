@@ -384,9 +384,25 @@ mutual
   -- argument.  Cold and hot are not distinguished by the type or by the
   -- term, so this body cannot split on them as it stands; they ARE
   -- distinguished by the slot telescope, so an elaboration INDEXED BY
-  -- the telescope splits on them immediately.  That also hands a hot its
-  -- source for free, since a hot's source is its own slot index and the
-  -- token language has a literal.
+  -- the telescope splits on them immediately.
+
+  -- BUT THE SPLIT ARRIVES AT A SECOND GAP AND IT IS IN THE TERM
+  -- LANGUAGE, NOT THE STREAM ONE.  A hot's source is its SLOT INDEX --
+  -- minted once at construction, which is what makes every subscriber
+  -- join one live source -- and the term language cannot write that
+  -- index.  Its only token is nullary and names the one reserved token
+  -- just above the slot band, deliberately so, since a PARAMETERISED
+  -- former at that type is the forgery the mint binder exists to rule
+  -- out.  So one hot is nameable by accident and two are not
+  -- distinguishable at all, and the arm this split exists to write is
+  -- the arm that cannot be written.  What would close it is narrower
+  -- than the former that is ruled out: a term naming the token of a
+  -- SLOT, whose range is exactly the reserved band and so is disjoint
+  -- from the dynamic counter, forging nothing.  It is a new `Tm`
+  -- former either way, so it is not this body's to mint.
+  -- DEAD ROUTE: draw a hot's source with the mint binder.  That draws
+  --   one per SUBSCRIPTION, which is the arity a COLD wants; a hot's
+  --   subscribers would each see a different source.
 
   -- AN INSTANT IS NOT DRAWN BY A PROGRAM AT ALL, IT IS READ, AND
   -- MISSING THAT IS WHAT MADE IT LOOK UNREACHABLE.  A source token is

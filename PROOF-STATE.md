@@ -230,16 +230,15 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 
 ### Big picture tier roadmap
 
-- **THEN THE SLOT TELESCOPE, WHICH SPLITS COLD FROM HOT AND CARRIES THE SHARE
-  (Anthony).** `toPlain (inputˢ i)` is a bare transport because the body cannot
-  tell the two source shapes apart: only the telescope does, so an elaboration
-  INDEXED BY it splits on them at once and hands a hot its source for free — a
-  hot's source IS its slot index, and the token language has a literal. A
-  shared slot is the third arm, an exp tree under an all-resets-false share
-  identified by its de Bruijn index rather than by its expression, which is
-  what makes share identity a binding exactly as a `const` is. The leg is the
-  index and the split, and what each arm WRAPS follows from the source formers
-  it is elaborated into.
+- **THEN THE TWO NAMING GAPS THE SOURCES WAIT ON, AS ONE REPORT AND NOT A
+  GRIND.** The slot-telescope split was to be free and is not: a hot's source
+  is its slot index, the term language's only token is NULLARY and names the
+  one reserved slot above the band, and a parameterised one is the forgery the
+  mint binder rules out — so the arm the split exists to write cannot be
+  written. That is a second gap converging with the first: sources and
+  flatteners already wait on a plain former READING the ambient instant, and
+  sources now also want a term naming a SLOT's token. Both are Anthony's. The
+  leg is to state each precisely enough to be ruled on.
 
 - **THEN THE SAME OPERATORS IN `Tm`/`Ty` (Anthony).**
   Each TS simul operator mirrored as an Agda definition in the value language,
