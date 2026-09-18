@@ -168,6 +168,9 @@ data Workᵈ {n} (Γ : Ctx n) (t : Ty) : Set where
             -- subscribe this observable value with this sink
   finish  : ∀ {s} → Pathᵈ Γ s t → Workᵈ Γ t
             -- a completion travelling rootward
+  regTail : ∀ {s} → List (Timed (Val Γ s)) → Pathᵈ Γ s t → Workᵈ Γ t
+            -- a scripted tail's REGISTRATION, which is where its
+            -- ordinal is minted — see the cold slot's arm
   seal    : ∀ {s} → Nodeᵈ → Pathᵈ Γ (s ×ᵗ listᵗ s) t → Workᵈ Γ t
             -- THE SUBSCRIBE FRAME'S OWN BOUNDARY, AS A STACK ENTRY.
             -- This is pushed BENEATH the source's `connect`, so it pops
@@ -209,6 +212,7 @@ workThroughᵈ : ∀ {n} {Γ : Ctx n} {t} → Nodeᵈ → Workᵈ Γ t → Bool
 workThroughᵈ k (deliver _ _ p) = pathThroughᵈ k p
 workThroughᵈ k (connect _ p)   = pathThroughᵈ k p
 workThroughᵈ k (finish p)      = pathThroughᵈ k p
+workThroughᵈ k (regTail _ p)   = pathThroughᵈ k p
 workThroughᵈ k (seal j p)      = (j ≡ᵇ k) ∨ pathThroughᵈ k p
 
 ------------------------------------------------------------------
@@ -327,10 +331,6 @@ evalTmsᵈ : ∀ {n} {Γ : Ctx n} {Θ s} → List (Tm Γ [] [] Θ s) → Env Γ 
 evalTmsᵈ []       ρ = []
 evalTmsᵈ (x ∷ xs) ρ = evalWith x ρ ∷ evalTmsᵈ xs ρ
 
-nullᵈ : ∀ {A : Set} → List A → Bool
-nullᵈ []      = true
-nullᵈ (_ ∷ _) = false
-
 mutual
 
   -- SUBSCRIBING IS ONE FORMER PER STEP, NEVER A DESCENT.  Every arm
@@ -347,12 +347,20 @@ mutual
         let (_ , done) = multiFlagsᵈ i (Stᵈ.multis st)
         in if done then pushWorkᵈ (finish p) st
            else record st { multis = addSinkᵈ i p (Stᵈ.multis st) }
-      slotᵈ (scripted (cold sync async)) =
-        let o = Stᵈ.nextOrd st
-        in pushWorkᵈ (deliver sync (nullᵈ async) p)
-             (record st { nextOrd  = suc o
-                        ; arrivals = Stᵈ.arrivals st
-                                     ++ scheduleᵈ o (Stᵈ.now st) async p })
+      -- A COLD'S TAIL IS REGISTERED AFTER ITS BURST, NOT AT SUBSCRIBE,
+      -- AND THE ORDINAL IS WHAT THAT BUYS.  The mirror's cold is a
+      -- `concat`, so the scripted tail is subscribed only once the sync
+      -- prefix has completed -- and every subscription that prefix's own
+      -- cascade makes registers FIRST.  Minting the ordinal here instead
+      -- reverses the two at a tied tick: an outer source whose burst
+      -- subscribes an inner would arrive ahead of that inner, where rxjs
+      -- puts it behind. So the registration rides the stack beneath the
+      -- delivery, exactly as `seal` does, and an empty tail mints
+      -- nothing at all -- the mirror registers no source for it, so an
+      -- ordinal spent here would shift every later one.
+      slotᵈ (scripted (cold sync []))       = pushWorkᵈ (deliver sync true p) st
+      slotᵈ (scripted (cold sync (a ∷ as))) =
+        pushWorkᵈ (deliver sync false p) (pushWorkᵈ (regTail (a ∷ as) p) st)
       slotᵈ (shared d) =
         let (conn , done) = multiFlagsᵈ i (Stᵈ.multis st)
             st₁ = record st { multis = addSinkᵈ i p (Stᵈ.multis st) }
@@ -596,6 +604,11 @@ mutual
     pushValueᵈ v p (record st { work = deliver vs done p ∷ Stᵈ.work st })
   stepᵈ ins (connect o p) st = subscribeᵈ ins o p st
   stepᵈ ins (finish p)    st = finishPathᵈ p st
+
+  stepᵈ ins (regTail async p) st =
+    let o = Stᵈ.nextOrd st
+    in record st { nextOrd  = suc o
+                 ; arrivals = Stᵈ.arrivals st ++ scheduleᵈ o (Stᵈ.now st) async p }
 
   -- THE GROUP LEAVES HERE AND THE FRAME SHUTS, IN THAT ORDER.  An empty
   -- burst emits nothing rather than an empty group, since the result is
