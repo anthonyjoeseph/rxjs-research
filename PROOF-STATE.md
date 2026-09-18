@@ -268,13 +268,15 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
   reducibility candidate and freshness, and the tier's one genuine architecture
   decision. `budgetᵈ`'s silent truncation stands until it lands.
 
-- **THE FLATTENERS, WHICH ARE THE ONE HALF STILL SHORT A CAPABILITY.** A
-  delegating flattener consumes the envelope in its projecting map and the
-  outer's own bookkeeping goes with it; a lane is cut by a switch and dropped by
-  an exhaust, and a second consumer is a second subscription. The sources turned
-  out to want a placement rather than a former, so this is the tier's remaining
-  candidate for a genuine palette gap — and a new former is Anthony's, never an
-  agent's. State what the three need in one shape and report it; do not invent.
+- **THE FLATTENERS: THE CENSUS IS DONE AND THE ANSWER IS A PALETTE GAP.** One
+  shape, not three: no plain former lifts an ENVELOPED outer through a flatten,
+  forwarding the outer's own bookkeeping while the inner payloads are
+  subscribed and merged. The four placements are all dead and recorded at the
+  postulates — in the projecting map, which has the outer's instant but no
+  token; through `mapᵉ`, which consumes the envelope and loses every valueless
+  outer emit; on a LANE, which a switch cuts and an exhaust drops; and split in
+  two, which is two subscriptions. So the ask is one capability at three
+  policies, mirroring the plain tree's own three. A former is Anthony's.
 
 - **THEN `takeᵖ`, THE LEVEL SHIFT, WHICH IS NEITHER A MINT NOR A FORWARD.** The
   author's `take` and the plain one agree on everything that was in doubt —
