@@ -212,12 +212,17 @@ mutual
                  --   `reify` is total over `Ty` and owes a CLOSED `Tm` at
                  --   each arm, and a closed term denoting an arbitrary
                  --   token IS the literal.  So this binder is not where
-                 --   the literal is held: what holds it is `reify`, and
-                 --   what makes `reify` owe a `uniqᵗ` arm is an envelope
-                 --   standing its own fields at the token type.  The
-                 --   route is dead as a route to DELETING `uniq̂`; it
-                 --   stays correct about the binder, and the deletion is
-                 --   owed at the envelope instead.
+                 --   the literal is held, and neither is the envelope:
+                 --   moving the token out of `machineEmitᵗ` would only
+                 --   move which arm of `reify` owes a closed term.  What
+                 --   holds the literal is CLOSURE BY SUBSTITUTION — the
+                 --   evaluator subscribes closed `Exp`s and closes them
+                 --   by substituting VALUES into TERMS, which obliges
+                 --   every bindable value to be denotable, while a token
+                 --   is by design not denotable.  The two are the same
+                 --   requirement with opposite signs, so the deletion is
+                 --   owed at `subΘExp`: values reach the body by
+                 --   ENVIRONMENT or `uniq̂` stays.
 
   data Tm {n} (Γ : Ctx n) (Δᵍ Δ Θ : List Ty) : Ty → Set where
     varᵗ  : ∀ {t} → t ∈ Θ → Tm Γ Δᵍ Δ Θ t

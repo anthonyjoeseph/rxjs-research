@@ -4,7 +4,11 @@
 -- the resulting stream. A fast in-Agda dev loop for the implementation.
 --
 --   agda --compile --compile-dir=_cli src/QuickCheck.agda
---   echo "<seed> [runs] [depth]" | ./_cli/QuickCheck
+--   echo "<seed> [runs] [depth] [at]" | ./_cli/QuickCheck
+--
+-- A nonzero `at` prints the paste row of that one case (1-based) and runs
+-- nothing, which is the only way to read a program whose evaluation costs
+-- more than the sweep it sits in.
 --
 -- The fragment's payloads are ℕ, because batching is value-agnostic.
 -- Repeated inner refs to a source inside an *All make diamonds —
@@ -806,16 +810,36 @@ dumpFails : List String → String
 dumpFails []       = "  (all agree)\n"
 dumpFails (f ∷ fs) = concatStr (f ∷ fs)
 
+-- ADVANCE THE GENERATOR WITHOUT RUNNING ANYTHING, so that a case which
+-- costs more than the whole sweep it belongs to can still be READ.  Such
+-- a case is invisible to every other route the harness has: the failure
+-- report is what prints a program, and the run that would print this one
+-- is the run that does not finish.  Skipping is exact rather than
+-- approximate because generation is UPSTREAM of evaluation and consumes
+-- the same randomness whether or not the program is then run -- so case
+-- N reached this way is the same program case N is in a full sweep.
+skipN : ℕ → ℕ → Gen ℕ
+skipN zero    d = pureG 0
+skipN (suc k) d = genSlots >>=G λ _ → genExp d >>=G λ _ → skipN k d
+
+-- the paste row of ONE case, named by its 1-based index
+showAt : ℕ → ℕ → Gen String
+showAt n d = skipN (n ∸ 1) d >>=G λ _ →
+  genSlots >>=G λ ins → genExp d >>=G λ e → pureG (pasteRow e ins)
+
 main : IO Unit
 main = getContents >>= λ s →
   let cs    = toCodes s
       seed  = parseNat cs
       runs  = numAt 1 200 cs
       d     = numAt 2 4 cs
+      at    = numAt 3 0 cs
       res   = proj₁ (runN runs d (randList seed 2000000))
       tally = proj₁ res
       fails = proj₂ res
-  in putStr (concatStr
+  in if not (at ≡ᵇ 0)
+     then putStr (proj₁ (showAt at d (randList seed 2000000)))
+     else putStr (concatStr
        (( "seed " ∷ show seed ∷ " depth " ∷ show d ∷ " — ran " ∷ show runs
         ∷ " cases, " ∷ show (length fails) ∷ " failures"
         ∷ "; obs-fold " ∷ show (proj₂ tally) ∷ "\ncensus " ∷ [])
