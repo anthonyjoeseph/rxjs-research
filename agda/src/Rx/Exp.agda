@@ -6,11 +6,10 @@ open import Data.List    using (List; []; _∷_; _++_)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁻; ∈-++⁺ˡ; ∈-++⁺ʳ)
 open import Data.List.Relation.Unary.Any using (here; there)
-open import Data.List.Relation.Unary.All using (All) renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
 open import Data.Vec     using (Vec; lookup)
 open import Data.Fin     using (Fin; toℕ)
 open import Data.Maybe   using (Maybe)
-open import Data.Product using (_×_; _,_)
+open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Unit    using (⊤; tt)
 open import Data.Sum     using (_⊎_; inj₁; inj₂)
 open import Relation.Nullary using (Dec; yes; no)
@@ -31,12 +30,13 @@ data Ty : Set where
 Ctx : ℕ → Set
 Ctx n = Vec Ty n
 
--- A type is DATA when no `obs` occurs anywhere inside it.  `Val Γ (obs u)`
--- is `Closed Γ u` — an observable value IS an arbitrary closed expression —
--- so a value at a non-data type smuggles unbounded syntax in from outside
--- the program.  Nested occurrences count: `natᵗ ×ᵗ obs natᵗ` is reachable
--- with `mapᵉ (sndᵗ …)`, so the check has to be hereditary.  This is the
--- side condition on scripted slots (Rx.Evaluator.Slot).
+-- A type is DATA when no `obs` occurs anywhere inside it.  An observable
+-- value is a CLOSURE — an arbitrary expression paired with an environment
+-- for its free token variables — so a value at a non-data type smuggles
+-- unbounded syntax in from outside the program.  Nested occurrences
+-- count: `natᵗ ×ᵗ obs natᵗ` is reachable with `mapᵉ (sndᵗ …)`, so the
+-- check has to be hereditary.  This is the side condition on scripted
+-- slots (Rx.Evaluator.Slot).
 isData : Ty → Bool
 isData unitᵗ    = true
 isData boolᵗ    = true
@@ -185,9 +185,14 @@ mutual
                  -- coming alive owes an `init` naming a token nothing has
                  -- used, and the elaboration of the srxjs sources is the only
                  -- thing that writes one.  So the capability is a BINDER and
-                 -- not a term former: `uniq̂` is a literal, and a program that
-                 -- can write one can write one already in use, which is the
-                 -- forgery the palette exists to rule out.  Minting belongs to
+                 -- not a term former: a term former at `uniqᵗ` would be a
+                 -- LITERAL, and a program that can write one can write one
+                 -- already in use, which is the forgery the palette exists to
+                 -- rule out.  `Tm` has no such former, and the evaluator
+                 -- never needs one because it closes bodies by ENVIRONMENT
+                 -- rather than by substitution — nothing reifies a value back
+                 -- into a term, so nothing owes a term at `uniqᵗ`.
+                 -- Minting belongs to
                  -- the run, so the token arrives from the scheduler's own
                  -- ledger at the key `deferᵉ` already draws from — one per
                  -- SUBSCRIPTION, and nesting is how a body needing two gets
@@ -200,36 +205,12 @@ mutual
                  -- term that makes a token.  A binder only the elaboration
                  -- emits leaves that argument standing; the same binder in
                  -- `SExp` would hand every author a token to collide with.
-                 -- DEAD ROUTE: move this binder out of Θ into a token
-                 --   context of its own, discharged by ENVIRONMENT rather
-                 --   than by substitution, so that no term denotes a token
-                 --   and `uniq̂` can be deleted.  It retires exactly one
-                 --   reify site — this binder's — and leaves every other
-                 --   one standing, because a token is STREAM DATA here:
-                 --   `machineEmitᵗ` stands the instant and the source at
-                 --   `uniqᵗ`, so every elaborated operator binds a whole
-                 --   envelope into Θ and every Θ-substitution reifies one.
-                 --   `reify` is total over `Ty` and owes a CLOSED `Tm` at
-                 --   each arm, and a closed term denoting an arbitrary
-                 --   token IS the literal.  So this binder is not where
-                 --   the literal is held, and neither is the envelope:
-                 --   moving the token out of `machineEmitᵗ` would only
-                 --   move which arm of `reify` owes a closed term.  What
-                 --   holds the literal is CLOSURE BY SUBSTITUTION — the
-                 --   evaluator subscribes closed `Exp`s and closes them
-                 --   by substituting VALUES into TERMS, which obliges
-                 --   every bindable value to be denotable, while a token
-                 --   is by design not denotable.  The two are the same
-                 --   requirement with opposite signs, so the deletion is
-                 --   owed at `subΘExp`: values reach the body by
-                 --   ENVIRONMENT or `uniq̂` stays.
 
   data Tm {n} (Γ : Ctx n) (Δᵍ Δ Θ : List Ty) : Ty → Set where
     varᵗ  : ∀ {t} → t ∈ Θ → Tm Γ Δᵍ Δ Θ t
     unit̂  : Tm Γ Δᵍ Δ Θ unitᵗ
     bool̂  : Bool → Tm Γ Δᵍ Δ Θ boolᵗ
     nat̂   : ℕ → Tm Γ Δᵍ Δ Θ natᵗ
-    uniq̂  : ℕ → Tm Γ Δᵍ Δ Θ uniqᵗ
     pairᵗ : ∀ {s t} → Tm Γ Δᵍ Δ Θ s → Tm Γ Δᵍ Δ Θ t → Tm Γ Δᵍ Δ Θ (s ×ᵗ t)
     fstᵗ  : ∀ {s t} → Tm Γ Δᵍ Δ Θ (s ×ᵗ t) → Tm Γ Δᵍ Δ Θ s
     sndᵗ  : ∀ {s t} → Tm Γ Δᵍ Δ Θ (s ×ᵗ t) → Tm Γ Δᵍ Δ Θ t
@@ -250,6 +231,40 @@ mutual
   Fn : ∀ {n} → Ctx n → List Ty → List Ty → List Ty → Ty → Ty → Set
   Fn Γ Δᵍ Δ Θ s t = Tm Γ Δᵍ Δ (s ∷ Θ) t
 
+Closed : ∀ {n} → Ctx n → Ty → Set
+Closed Γ t = Exp Γ [] [] [] t
+
+------------------------------------------------------------------
+-- Val: an observable value is a CLOSURE, and that is what keeps a
+-- token out of the term language
+------------------------------------------------------------------
+
+-- THE `obs` ARM USED TO READ AN OBSERVABLE VALUE AS A CLOSED
+-- EXPRESSION, AND THAT IS WHAT PUT A NUMERAL IN THE TERM LANGUAGE.
+-- Closing an expression is the evaluator's job, and the only closing
+-- move a first-order evaluator has is SUBSTITUTION -- which obliges
+-- every bindable value to be DENOTABLE by a closed term, at every type,
+-- the provenance token included.  A token a term can denote is a token
+-- a program can forge, so the two requirements are one requirement with
+-- opposite signs, and the literal was the sign flip.
+--
+-- CARRYING THE ENVIRONMENT INSTEAD BUYS THE WHOLE QUESTION.  An
+-- observable value is a CLOSURE -- the expression together with the
+-- environment its free binders stand in -- so nothing is ever
+-- substituted and no value is ever denoted.  The token stays a runtime
+-- quantity the scheduler mints and the term language cannot write.
+--
+-- AND THE ENVIRONMENT IS ITS OWN DATATYPE BECAUSE THE ARM CANNOT BE
+-- WRITTEN BY RECURSION ON `Ty`.  A closure's environment is indexed by
+-- the binder telescope its body stands under, and those types are not
+-- smaller than `obs t`, so an equation reaching for `All (Val Γ) Θ`
+-- would ask for `Val` at types the recursion has no access to.  As a
+-- DATATYPE mutual with the recursion the same occurrence is strictly
+-- positive and costs nothing -- and it costs nothing in the sense that
+-- matters: every other arm still COMPUTES, so a value at a data type is
+-- still the bare `ℕ`, `Bool` or pair it always was.
+mutual
+
   Val : ∀ {n} → Ctx n → Ty → Set
   Val Γ unitᵗ    = ⊤
   Val Γ boolᵗ    = Bool
@@ -258,10 +273,13 @@ mutual
   Val Γ (s ×ᵗ t) = Val Γ s × Val Γ t
   Val Γ (s +ᵗ t) = Val Γ s ⊎ Val Γ t
   Val Γ (listᵗ t) = List (Val Γ t)
-  Val Γ (obs t)  = Exp Γ [] [] [] t     -- runtime observables are closed exprs
+  Val Γ (obs t)  = Σ (List Ty) (λ Θ → Exp Γ [] [] Θ t × Env Γ Θ)
 
-Closed : ∀ {n} → Ctx n → Ty → Set
-Closed Γ t = Exp Γ [] [] [] t
+  data Env {n} (Γ : Ctx n) : List Ty → Set where
+    []ᵉ  : Env Γ []
+    _∷ᵉ_ : ∀ {s Θ} → Val Γ s → Env Γ Θ → Env Γ (s ∷ Θ)
+
+infixr 5 _∷ᵉ_
 
 -- decidable type equality (the evaluator admits a chain only past a Ty
 -- match, so no payload is ever read at the wrong type)
@@ -342,9 +360,9 @@ listᵗ _  ≟ᵗ uniqᵗ    = no λ ()
 obs _    ≟ᵗ uniqᵗ    = no λ ()
 
 -- one Θ value-environment lookup, indexed by the de Bruijn membership proof
-lookupEnv : ∀ {n} {Γ : Ctx n} {Θ t} → All (Val Γ) Θ → t ∈ Θ → Val Γ t
-lookupEnv (v ∷ᵃ _)  (here refl) = v
-lookupEnv (_ ∷ᵃ vs) (there p)   = lookupEnv vs p
+lookupEnv : ∀ {n} {Γ : Ctx n} {Θ t} → Env Γ Θ → t ∈ Θ → Val Γ t
+lookupEnv (v ∷ᵉ _)  (here refl) = v
+lookupEnv (_ ∷ᵉ vs) (there p)   = lookupEnv vs p
 
 ------------------------------------------------------------------
 -- Renaming: re-index a term into wider μ-var (Δᵍ, Δ) and value-var (Θ)
@@ -390,7 +408,6 @@ mutual
   renTm ρg ρd ρt unit̂         = unit̂
   renTm ρg ρd ρt (bool̂ b)     = bool̂ b
   renTm ρg ρd ρt (nat̂ n)      = nat̂ n
-  renTm ρg ρd ρt (uniq̂ n)      = uniq̂ n
   renTm ρg ρd ρt (foldᵗ l z f) =
     foldᵗ (renTm ρg ρd ρt l) (renTm ρg ρd ρt z)
           (renTm ρg ρd (ext∈ (ext∈ ρt)) f)
@@ -449,106 +466,6 @@ appendᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t}
 appendᵗ xs ys = foldᵗ (revᵗ xs) ys (consᵗ (varᵗ (here refl))
                                           (varᵗ (there (here refl))))
 
-
-------------------------------------------------------------------
--- reify: a value → the closed Tm literal denoting it (an obs value is
--- already a closed Exp, so no substitution)
-------------------------------------------------------------------
-
--- TOTALITY HERE IS WHAT PRICES A NEW `Ty` CONSTRUCTOR, AND THE PRICE IS
--- AN INTRODUCTION FORM.  Every constructor of `Ty` owes a clause, and a
--- clause must hand back a CLOSED `Tm` at that type -- so a constructor
--- whose `Val` is inhabited and whose `Tm` has no way to write one of
--- its inhabitants makes this definition partial.  A tag that carries
--- values and has no intro form is therefore not a thing this language
--- offers: a `Ty` constructor and a `Tm` intro form arrive together or
--- neither does.  And the obligation is not local, since the
--- substitution face spends this in several places, each of which needs
--- the literal it produces to be closed and weakenable.
---
--- SO UNFORGEABILITY CANNOT BE THE TYPE'S EMPTINESS, AND HAS TO BE A
--- RESTRICTION ON WHICH FORMERS A PROGRAM MAY USE.  A provenance tag is
--- wanted precisely so that an author cannot mint one while the machine
--- can; read off the above, the guarantee that an intro form exists but
--- is out of an author's reach is a claim about the palette a program is
--- written in, not about the type it is written at.  That is the shape
--- the envelope's own parameterisation already takes, where a slot
--- declared at the unit type admits exactly one value whoever writes it.
-
-mutual
-  reify : ∀ {n} {Γ : Ctx n} {t} → Val Γ t → Tm Γ [] [] [] t
-  reify {t = unitᵗ}   _        = unit̂
-  reify {t = boolᵗ}   b        = bool̂ b
-  reify {t = natᵗ}    n        = nat̂ n
-  reify {t = uniqᵗ}   n        = uniq̂ n
-  reify {t = _ ×ᵗ _}  (a , b)  = pairᵗ (reify a) (reify b)
-  reify {t = _ +ᵗ _}  (inj₁ a) = inlᵗ (reify a)
-  reify {t = _ +ᵗ _}  (inj₂ b) = inrᵗ (reify b)
-  reify {t = listᵗ _} xs       = reifyList xs
-  reify {t = obs _}   e        = strmᵗ e
-
-  reifyList : ∀ {n} {Γ : Ctx n} {t} → List (Val Γ t) → Tm Γ [] [] [] (listᵗ t)
-  reifyList []       = nilᵗ
-  reifyList (x ∷ xs) = consᵗ (reify x) (reifyList xs)
-
-------------------------------------------------------------------
--- closeUnderFn: substitute a Θ value-environment into a term, closing
--- the whole environment. A varᵗ in the local binders (Θloc) stays; one
--- naming an environment value is reified (closed) and weakened in.
-------------------------------------------------------------------
-
-mutual
-  subΘExp : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (Θloc : List Ty)
-          → All (Val Γ) Θsub → Exp Γ Δᵍ Δ (Θloc ++ Θsub) t → Exp Γ Δᵍ Δ Θloc t
-  subΘExp Θloc σ (input i)      = input i
-  subΘExp Θloc σ (ofᵉ ts)       = ofᵉ (subΘTms Θloc σ ts)
-  subΘExp Θloc σ emptyᵉ         = emptyᵉ
-  subΘExp Θloc σ (takeᵉ n e)    = takeᵉ (subΘTm Θloc σ n) (subΘExp Θloc σ e)
-  subΘExp Θloc σ (batchSyncᵉ e) = batchSyncᵉ (subΘExp Θloc σ e)
-  subΘExp Θloc σ (mapᵉ {s = s} f e) =
-    mapᵉ (subΘTm (s ∷ Θloc) σ f) (subΘExp Θloc σ e)
-  subΘExp Θloc σ (scanᵉ {s = s} {t = t} f i e) =
-    scanᵉ (subΘTm ((t ×ᵗ s) ∷ Θloc) σ f) (subΘTm Θloc σ i) (subΘExp Θloc σ e)
-  subΘExp Θloc σ (mergeAllᵉ lim e) = mergeAllᵉ lim (subΘExp Θloc σ e)
-  subΘExp Θloc σ (switchAllᵉ e) = switchAllᵉ (subΘExp Θloc σ e)
-  subΘExp Θloc σ (exhaustAllᵉ e) = exhaustAllᵉ (subΘExp Θloc σ e)
-  subΘExp Θloc σ (μᵉ e)         = μᵉ (subΘExp Θloc σ e)
-  subΘExp Θloc σ (varᵉ x)       = varᵉ x
-  subΘExp Θloc σ (deferᵉ e)     = deferᵉ (subΘExp Θloc σ e)
-  subΘExp Θloc σ (mintᵉ e)      = mintᵉ (subΘExp (uniqᵗ ∷ Θloc) σ e)
-
-  subΘTm : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (Θloc : List Ty)
-         → All (Val Γ) Θsub → Tm Γ Δᵍ Δ (Θloc ++ Θsub) t → Tm Γ Δᵍ Δ Θloc t
-  subΘTm Θloc σ (varᵗ x) with ∈-++⁻ Θloc x
-  ... | inj₁ y = varᵗ y
-  ... | inj₂ z = wkTm (reify (lookupEnv σ z))
-  subΘTm Θloc σ unit̂         = unit̂
-  subΘTm Θloc σ (bool̂ b)     = bool̂ b
-  subΘTm Θloc σ (nat̂ n)      = nat̂ n
-  subΘTm Θloc σ (uniq̂ n)      = uniq̂ n
-  subΘTm Θloc σ nilᵗ         = nilᵗ
-  subΘTm Θloc σ (consᵗ a as) = consᵗ (subΘTm Θloc σ a) (subΘTm Θloc σ as)
-  subΘTm Θloc σ (pairᵗ a b)  = pairᵗ (subΘTm Θloc σ a) (subΘTm Θloc σ b)
-  subΘTm Θloc σ (fstᵗ p)     = fstᵗ (subΘTm Θloc σ p)
-  subΘTm Θloc σ (sndᵗ p)     = sndᵗ (subΘTm Θloc σ p)
-  subΘTm Θloc σ (inlᵗ a)     = inlᵗ (subΘTm Θloc σ a)
-  subΘTm Θloc σ (inrᵗ a)     = inrᵗ (subΘTm Θloc σ a)
-  subΘTm Θloc σ (foldᵗ {s = s} {u = u} l z f) =
-    foldᵗ (subΘTm Θloc σ l) (subΘTm Θloc σ z) (subΘTm (s ∷ u ∷ Θloc) σ f)
-  subΘTm Θloc σ (caseᵗ {s = s} {t = t} sc l r) =
-    caseᵗ (subΘTm Θloc σ sc) (subΘTm (s ∷ Θloc) σ l) (subΘTm (t ∷ Θloc) σ r)
-  subΘTm Θloc σ (ifᵗ c a b)  = ifᵗ (subΘTm Θloc σ c) (subΘTm Θloc σ a) (subΘTm Θloc σ b)
-  subΘTm Θloc σ (primᵗ op a) = primᵗ op (subΘTm Θloc σ a)
-  subΘTm Θloc σ (strmᵗ e)    = strmᵗ (subΘExp Θloc σ e)
-
-  subΘTms : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub t} (Θloc : List Ty)
-          → All (Val Γ) Θsub → List (Tm Γ Δᵍ Δ (Θloc ++ Θsub) t) → List (Tm Γ Δᵍ Δ Θloc t)
-  subΘTms Θloc σ []       = []
-  subΘTms Θloc σ (x ∷ xs) = subΘTm Θloc σ x ∷ subΘTms Θloc σ xs
-
-closeUnderFn : ∀ {n} {Γ : Ctx n} {s Θ t}
-             → Exp Γ [] [] (s ∷ Θ) t → All (Val Γ) (s ∷ Θ) → Exp Γ [] [] [] t
-closeUnderFn e env = subΘExp [] env e
 
 ------------------------------------------------------------------
 -- unfoldμ: substitute the (closed) `μᵉ body` for the μ-var this μ binds.
@@ -617,7 +534,6 @@ mutual
   elimGTm Θl x cl unit̂         = unit̂
   elimGTm Θl x cl (bool̂ b)     = bool̂ b
   elimGTm Θl x cl (nat̂ n)      = nat̂ n
-  elimGTm Θl x cl (uniq̂ n)      = uniq̂ n
   elimGTm Θl x cl nilᵗ         = nilᵗ
   elimGTm Θl x cl (consᵗ a as) = consᵗ (elimGTm Θl x cl a) (elimGTm Θl x cl as)
   elimGTm Θl x cl (pairᵗ a b)  = pairᵗ (elimGTm Θl x cl a) (elimGTm Θl x cl b)
@@ -671,7 +587,6 @@ mutual
   elimDTm Θl x cl unit̂         = unit̂
   elimDTm Θl x cl (bool̂ b)     = bool̂ b
   elimDTm Θl x cl (nat̂ n)      = nat̂ n
-  elimDTm Θl x cl (uniq̂ n)      = uniq̂ n
   elimDTm Θl x cl nilᵗ         = nilᵗ
   elimDTm Θl x cl (consᵗ a as) = consᵗ (elimDTm Θl x cl a) (elimDTm Θl x cl as)
   elimDTm Θl x cl (pairᵗ a b)  = pairᵗ (elimDTm Θl x cl a) (elimDTm Θl x cl b)
@@ -698,10 +613,13 @@ mutual
 unfoldμ : ∀ {n} {Γ : Ctx n} {Θ t} → Exp Γ (t ∷ []) [] Θ t → Exp Γ [] [] Θ t
 unfoldμ body = elimGExp [] (here refl) (μᵉ body) body
 
--- the first-order evaluator, in a Θ value-environment; a closed strmᵗ IS
--- its (closed) observable, so obs values built outside a fn need no
--- substitution
-evalWith : ∀ {n} {Γ : Ctx n} {Θ t} → Tm Γ [] [] Θ t → All (Val Γ) Θ → Val Γ t
+
+-- the first-order evaluator, in a Θ value-environment.  A `strmᵗ` is
+-- evaluated by PAIRING its body with the environment in hand rather
+-- than by substituting that environment into it — which is the whole
+-- point of the family: nothing is ever reified, so no value needs a
+-- term denoting it, so a token needs no intro form.
+evalWith : ∀ {n} {Γ : Ctx n} {Θ t} → Tm Γ [] [] Θ t → Env Γ Θ → Val Γ t
 
 -- THE FOLD'S ACCUMULATOR LOOP, HOISTED OUT OF THE ARM THAT USES IT.  A
 -- `where` helper is invisible outside its clause, so no lemma could be
@@ -710,25 +628,24 @@ evalWith : ∀ {n} {Γ : Ctx n} {Θ t} → Tm Γ [] [] Θ t → All (Val Γ) Θ 
 -- composed environment.  Naming it costs a forward declaration and buys
 -- the statement.
 foldVals : ∀ {n} {Γ : Ctx n} {Θ s u}
-         → Tm Γ [] [] (s ∷ u ∷ Θ) u → All (Val Γ) Θ
+         → Tm Γ [] [] (s ∷ u ∷ Θ) u → Env Γ Θ
          → List (Val Γ s) → Val Γ u → Val Γ u
 
 evalWith (varᵗ x)      env = lookupEnv env x
 evalWith unit̂          env = tt
 evalWith (bool̂ b)      env = b
 evalWith (nat̂ n)       env = n
-evalWith (uniq̂ n)       env = n
 evalWith nilᵗ          env = []
 evalWith (consᵗ a as)  env = evalWith a env ∷ evalWith as env
 evalWith (pairᵗ a b)   env = evalWith a env , evalWith b env
-evalWith (fstᵗ p)      env = let (a , _) = evalWith p env in a
-evalWith (sndᵗ p)      env = let (_ , b) = evalWith p env in b
+evalWith (fstᵗ p)      env = proj₁ (evalWith p env)
+evalWith (sndᵗ p)      env = proj₂ (evalWith p env)
 evalWith (inlᵗ a)      env = inj₁ (evalWith a env)
 evalWith (inrᵗ a)      env = inj₂ (evalWith a env)
 evalWith (foldᵗ l z f) env = foldVals f env (evalWith l env) (evalWith z env)
 evalWith (caseᵗ sc l r) env with evalWith sc env
-... | inj₁ x = evalWith l (x ∷ᵃ env)
-... | inj₂ y = evalWith r (y ∷ᵃ env)
+... | inj₁ x = evalWith l (x ∷ᵉ env)
+... | inj₂ y = evalWith r (y ∷ᵉ env)
 evalWith (ifᵗ c t e)   env = if evalWith c env then evalWith t env else evalWith e env
 evalWith (primᵗ add arg)  env = let (a , b) = evalWith arg env in a + b
 evalWith (primᵗ sub arg)  env = let (a , b) = evalWith arg env in a ∸ b
@@ -737,17 +654,19 @@ evalWith (primᵗ eqᵖ arg)  env = let (a , b) = evalWith arg env in a ≡ᵇ b
 evalWith (primᵗ eqᵘ arg)  env = let (a , b) = evalWith arg env in a ≡ᵇ b
 evalWith (primᵗ ltᵖ arg)  env = let (a , b) = evalWith arg env in a <ᵇ b
 evalWith (primᵗ notᵖ arg) env = not (evalWith arg env)
-evalWith (strmᵗ e)     []ᵃ        = e
-evalWith (strmᵗ e)     (v ∷ᵃ vs)  = closeUnderFn e (v ∷ᵃ vs)
+-- THE CLAUSE THE WHOLE FAMILY EXISTS FOR: the body is PAIRED with the
+-- environment rather than substituted into, so nothing is reified and
+-- no value is ever denoted by a term.
+evalWith (strmᵗ e)     env = _ , e , env
 
 foldVals f env []       acc = acc
-foldVals f env (x ∷ xs) acc = foldVals f env xs (evalWith f (x ∷ᵃ acc ∷ᵃ env))
+foldVals f env (x ∷ xs) acc = foldVals f env xs (evalWith f (x ∷ᵉ acc ∷ᵉ env))
 
 evalTm  : ∀ {n} {Γ : Ctx n} {t} → Tm Γ [] [] [] t → Val Γ t
-evalTm t = evalWith t []ᵃ
+evalTm t = evalWith t []ᵉ
 
 applyFn : ∀ {n} {Γ : Ctx n} {s t} → Fn Γ [] [] [] s t → Val Γ s → Val Γ t
-applyFn fn v = evalWith fn (v ∷ᵃ []ᵃ)
+applyFn fn v = evalWith fn (v ∷ᵉ []ᵉ)
 
 ------------------------------------------------------------------
 -- STRATIFICATION of the slot telescope: every `input j` an
@@ -787,7 +706,6 @@ mutual
   inputsBelowᵗ k unit̂          = true
   inputsBelowᵗ k (bool̂ _)      = true
   inputsBelowᵗ k (nat̂ _)       = true
-  inputsBelowᵗ k (uniq̂ _)       = true
   inputsBelowᵗ k (foldᵗ l z f) =
     inputsBelowᵗ k l ∧ inputsBelowᵗ k z ∧ inputsBelowᵗ k f
   inputsBelowᵗ k nilᵗ          = true
