@@ -52,7 +52,6 @@ mutual
     inputˢ      : (i : Fin n) → SExp Γ Δᵍ Δ Θ (lookup Γ i)
     ofˢ         : ∀ {t} → List (STm Γ Δᵍ Δ Θ t) → SExp Γ Δᵍ Δ Θ t
     emptyˢ      : ∀ {t} → SExp Γ Δᵍ Δ Θ t
-    takeˢ       : ∀ {t} → STm Γ Δᵍ Δ Θ natᵗ → SExp Γ Δᵍ Δ Θ t → SExp Γ Δᵍ Δ Θ t
     mapˢ        : ∀ {s t} → SFn Γ Δᵍ Δ Θ s t → SExp Γ Δᵍ Δ Θ s → SExp Γ Δᵍ Δ Θ t
     scanˢ       : ∀ {s t} → SFn Γ Δᵍ Δ Θ (t ×ᵗ s) t
                 → STm Γ Δᵍ Δ Θ t → SExp Γ Δᵍ Δ Θ s → SExp Γ Δᵍ Δ Θ t

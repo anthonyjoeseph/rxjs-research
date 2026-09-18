@@ -653,12 +653,6 @@ evalWith (strmᵗ e)     env = _ , e , env
 foldVals f env []       acc = acc
 foldVals f env (x ∷ xs) acc = foldVals f env xs (evalWith f (x ∷ᵉ acc ∷ᵉ env))
 
-evalTm  : ∀ {n} {Γ : Ctx n} {t} → Tm Γ [] [] [] t → Val Γ t
-evalTm t = evalWith t []ᵉ
-
-applyFn : ∀ {n} {Γ : Ctx n} {s t} → Fn Γ [] [] [] s t → Val Γ s → Val Γ t
-applyFn fn v = evalWith fn (v ∷ᵉ []ᵉ)
-
 -- A STEP FUNCTION AS A VALUE, WHICH IN A LANGUAGE WHOSE `Ty` HAS NO
 -- ARROW IS THE ONLY THING ONE CAN BE.  `Val Γ (obs u)` pairs a body
 -- with an environment because an observable is carried as data; a

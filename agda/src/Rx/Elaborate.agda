@@ -16,7 +16,7 @@ open import Rx.Exp using (Ty; Ctx; Exp; Tm; Fn; natᵗ; listᵗ; obs; _×ᵗ_; b
 open import Rx.Envelope using (instEventᵗ; closeReasonᵗ; emitKindᵗ; eventsᵛ;
                                splitEventsᵛ; reassembleᵛ; instEmitᵛ; initᵛ;
                                valueᵛ; closeᵛ; completeᵛ)
-open import Rx.SExp using (SExp; STm; inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; scanˢ;
+open import Rx.SExp using (SExp; STm; inputˢ; ofˢ; emptyˢ; mapˢ; scanˢ;
                            mergeAllˢ; switchAllˢ; exhaustAllˢ; μˢ; varˢ; deferˢ;
                            varˢᵗ; unitˢ; boolˢ; natˢ; pairˢ; fstˢ; sndˢ; nilˢ;
                            consˢ; inlˢ; inrˢ; caseˢ; foldˢ; ifˢ; primˢ; strmˢ;
@@ -494,18 +494,32 @@ mutual
   -- same one.  Those are exactly the two a binder was argued to be
   -- unable to combine, and the argument only ever ruled out a MINT.
 
-  -- SO WHAT THE PLAIN TREE LACKS IS ONE WINDOW, AND IT IS A NARROWER
-  -- CAPABILITY THAN THE ONE ALREADY GRANTED FOR SOURCES.  A former
-  -- pairing the machine's ambient instant onto each emit forges
-  -- nothing, since its token can only be copied out of the run, where
-  -- the source binder genuinely hands a program a token no one has
-  -- used.  The slot telescope is orthogonal to it and still wanted: it
-  -- is what splits cold from hot.
+  -- AND A WINDOWING FORMER IS NOT THE REPAIR (Anthony: "this is not
+  -- something we want to ever do").  Pairing the machine's ambient
+  -- instant onto each emit would forge nothing, since the token could
+  -- only be copied out of the run -- but the palette is the TypeScript
+  -- one name for name, and rxjs has no such operator, so adding it
+  -- would put the two implementations out of correspondence to buy a
+  -- reading the slot telescope already splits cold from hot with.
+
+  -- WHAT A SLOT'S DEF COSTS AN EVIDENCE ROW, AND IT IS OWED HERE
+  -- BECAUSE IT IS A FACT ABOUT THIS ARM.  The arm passes the slot
+  -- STRAIGHT THROUGH: the input already stands at the envelope, so
+  -- nothing is wrapped here and the program's own elaboration mints
+  -- over whatever the slot hands it.  A `shared` def is then a program
+  -- at the envelope that was itself elaborated, so it arrives already
+  -- minted and the mint above it is a second layer.  Instantiated, the
+  -- decoded instant came back equal to the def's own payload literal
+  -- rather than to any frame -- the shape of a decode reading one layer
+  -- while two are present.  `Probed.Pipeline-Claims` records it as the
+  -- reason its id row carries no source; what is NOT established is
+  -- whether the second layer is the elaboration's or the harness's, and
+  -- that is the question to settle before any claim is read at a
+  -- program whose slot has a def.
   toPlain {Γ = Γ} (inputˢ i)  = subst (Exp _ _ _ _) (lookup-map i emitᵗ Γ)
                                       (input i)
   toPlain {Θ = Θ} (ofˢ ts)    = ofᵖ (frameᵛ Θ) (toPlainTms ts)
   toPlain {Θ = Θ} emptyˢ      = emptyᵖ (frameᵛ Θ)
-  toPlain (takeˢ k e)         = takeᵖ (toPlainTm k) (toPlain e)
   toPlain (mapˢ f e)          = mapᵖ (toPlainTm f) (toPlain e)
   toPlain (scanˢ f z e)       = scanᵖ (toPlainTm f) (toPlainTm z) (toPlain e)
   toPlain (mergeAllˢ k e)     = mergeAllᵖ k (toPlain e)

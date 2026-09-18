@@ -32,10 +32,10 @@ open import Relation.Binary.PropositionalEquality using (refl)
 open import Rx.Exp using (natᵗ; Closed; nat̂; pairᵗ; primᵗ; varᵗ; add;
                           input; mapᵉ; ofᵉ)
 open import Rx.Slots using (Slots)
-open import Readme-Theorems using (hotOnce; oneSlot)
+
 open import Verify-Run-Monotone using (run-monotone)
 
-open import Probed.Apparatus using (Confirms)
+open import Probed.Apparatus using (Confirms; hotOnce; oneSlot)
 
 ----------------------------------------------------------------------
 -- THE TWO PROGRAMS, AND THE CONTEXT IS THE SAME ONE SO THE SLOT TABLE

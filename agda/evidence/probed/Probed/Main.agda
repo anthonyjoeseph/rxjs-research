@@ -53,7 +53,7 @@ open import Probed.Apparatus using (Confirms; Separates)
 -- THE TOP-LINE CLAIMS.  Named and claimed from the root for the same
 -- reason: a `Confirms` row's type is generated from its target, so the
 -- name is the only handle the reachability law has on it.
-open import Probed.Readme-Claims using (row-order; row-take; row-one-batch)
+open import Probed.Readme-Claims using (row-order; row-one-batch)
 
 -- THE PIPELINE-SIDE CLAIMS, claimed from the root for the same reason.
 open import Probed.Pipeline-Claims using (row-online; row-ids)

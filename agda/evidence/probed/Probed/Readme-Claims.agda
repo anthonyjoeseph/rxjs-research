@@ -14,23 +14,26 @@
 -- witness, whose frame dispatch hands a `thru-outer` frame to a LIVE
 -- POSTULATE -- so a program routing through any of the three
 -- flatteners leaves that application STUCK in the normal form and no
--- `refl` can decide anything about it.  The seven quantified instances
--- of this family are each hard-wired to a merge, so none of them can
--- be instantiated at all while that postulate stands, and the same
--- blocks every downstream claim read off a flattening program.  This
--- is recorded here rather than in those statements' own headers
--- because it is a fact about the EVALUATOR rather than about any of
--- them; it is owed where the block is, and the block is the frame
--- dispatch.
+-- `refl` can decide anything about it, and the same blocks every
+-- downstream claim read off a flattening program.  This is recorded
+-- here rather than in those statements' own headers because it is a
+-- fact about the EVALUATOR rather than about any of them; it is owed
+-- where the block is, and the block is the frame dispatch.
 --
--- NOT REACHED: every flattening program, for the reason above; any
--- type other than `natᵗ`; any source at all, since the rows below are
--- read at the subscribe frame where a source-free program emits
--- everything.
+-- AND THE TAKE LAW IS UNREACHABLE FOR THE SAME KIND OF REASON, WHICH
+-- IS WHY IT IS NOT A TARGET HERE.  `readme-take-counts-values` is
+-- stated over `takeᵖ`, and `takeᵖ` is itself a LIVE POSTULATE, so the
+-- program the law is read at is stuck before the evaluator ever sees
+-- it: neither side reduces and no `refl` can decide anything.  A row
+-- for it was written, run, and found stuck rather than false.
+--
+-- NOT REACHED: every flattening program, for the reason above; the take
+-- law at any program whatever; any type other than `natᵗ`; any source
+-- at all, since the rows below are read at the subscribe frame where a
+-- source-free program emits everything.
 
--- TARGET: readme-batch-order-is-delivery-order @784389
--- TARGET: readme-take-counts-values @b13b90
--- TARGET: readme-one-subscribe-one-batch @cf4ec0
+-- TARGET: readme-batch-order-is-delivery-order @bcd168
+-- TARGET: readme-one-subscribe-one-batch @6d21f6
 module Probed.Readme-Claims where
 
 open import Data.List using (_∷_; [])
@@ -38,14 +41,14 @@ open import Data.Vec using ([])     -- contexts are Vecs; ∷/[] overload per ty
 open import Data.Nat using (s≤s; z≤n)
 open import Relation.Binary.PropositionalEquality using (refl)
 
-open import Rx.Exp using (Ctx; natᵗ; Closed; nat̂; ofᵉ)
+open import Rx.Exp using (Ctx; natᵗ; Closed)
+open import Rx.SExp using (ofˢ; natˢ; emitᵗ)
+open import Rx.Elaborate using (elaborate)
 
 open import Readme-Theorems using
-  (noSlots;
-   readme-batch-order-is-delivery-order; readme-take-counts-values;
-   readme-one-subscribe-one-batch)
+  (readme-batch-order-is-delivery-order; readme-one-subscribe-one-batch)
 
-open import Probed.Apparatus using (Confirms)
+open import Probed.Apparatus using (Confirms; noSlots)
 
 Γ₀ : Ctx 0
 Γ₀ = []
@@ -53,8 +56,15 @@ open import Probed.Apparatus using (Confirms)
 -- TWO VALUES IN ONE SUBSCRIBE BURST, which is the smallest shape that
 -- can tell grouping from ordering: a law that dropped one, added one,
 -- or split the instant gives a different list at every row below.
-pair₀ : Closed Γ₀ natᵗ
-pair₀ = ofᵉ (nat̂ 3 ∷ nat̂ 7 ∷ [])
+--
+-- AND IT IS AN ELABORATED SOURCE RATHER THAN A PLAIN ONE, WHICH IS
+-- WHAT THE LAWS NOW DEMAND AND WHAT THE ROWS COST.  The statements
+-- quantify over an ENVELOPE-typed program, since the batcher reads the
+-- protocol off the values and a plain run carries none; `ofˢ` under
+-- `elaborate` is the smallest program that supplies one, and it mints
+-- through the source former rather than asking anything of a driver.
+pair₀ : Closed Γ₀ (emitᵗ natᵗ)
+pair₀ = elaborate (ofˢ (natˢ 3 ∷ natˢ 7 ∷ []))
 
 ----------------------------------------------------------------------
 -- 1.  BATCHING ONLY GROUPS.  LOAD-BEARING: flattening the batches must
@@ -65,15 +75,6 @@ pair₀ = ofᵉ (nat̂ 3 ∷ nat̂ 7 ∷ [])
 row-order : Confirms (readme-batch-order-is-delivery-order 0 pair₀ noSlots)
 row-order = refl
 
-----------------------------------------------------------------------
--- 2.  TAKE COUNTS VALUES, NOT BATCHES.  The one point where the law
--- says something a batch-counting `take` would not: both values are in
--- ONE batch and k is 1, so the row cuts a batch in half and a `take`
--- keeping whole batches keeps both.
-----------------------------------------------------------------------
-
-row-take : Confirms (readme-take-counts-values 0 1 pair₀ noSlots)
-row-take = refl
 
 ----------------------------------------------------------------------
 -- 3.  ONE SUBSCRIBE IS ONE BATCH.  LOAD-BEARING rather than the

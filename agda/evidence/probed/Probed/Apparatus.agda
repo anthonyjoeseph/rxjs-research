@@ -54,10 +54,34 @@ module Probed.Apparatus where
 
 open import Relation.Nullary.Negation using (¬_)
 open import Relation.Binary.PropositionalEquality using (_≡_)
+open import Data.Bool using (T)
+open import Data.List using (_∷_; [])
+open import Data.Vec using (_∷_; [])   -- contexts are Vecs; ∷/[] overload per type
+open import Data.Fin using (zero; suc)
+open import Rx.Prim using (after_,_; hot)
+open import Rx.Exp using (Ctx; Val; isData)
+open import Rx.Slots using (Slot; Slots; scripted)
 
 
 Confirms : {A : Set} → .(claim : A) → Set
 Confirms {A} _ = A
+
+-- THE SMALLEST SLOT TABLES A ROW CAN RUN AGAINST, AND THEY LIVE HERE
+-- BECAUSE THE TREE THAT USED TO HOLD THEM STATES NO PROGRAM ANY MORE.
+-- They were shorthands beside the readme's quantified instances, and
+-- those instances named a shape the plain tree cannot express; three
+-- probes still need a table to evaluate at, and a table is not evidence
+-- about anything, so it is apparatus rather than a claim.  Scripted
+-- slots carry data only, which is what the `isData` witness discharges.
+noSlots : Slots []
+noSlots ()
+
+hotOnce : ∀ {n} {Γ : Ctx n} {k} {t} {ok : T (isData t)} → Val Γ t → Slot Γ k t
+hotOnce {ok = ok} v = scripted {ok = ok} (hot ((after 0 , v) ∷ []))
+
+oneSlot : ∀ {t} → Slot (t ∷ []) 0 t → Slots (t ∷ [])
+oneSlot s zero    = s
+oneSlot s (suc ())
 
 -- THE FORK'S PRODUCT, AND IT IS A TYPE RATHER THAN A MARKER.  A
 -- `-- FORK:` probe stands between two candidate MECHANISMS, and what it

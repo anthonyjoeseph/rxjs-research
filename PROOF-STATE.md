@@ -230,32 +230,27 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 
 ### Big picture tier roadmap
 
-- **THE INSTANT WINDOW, WHICH IS THE ONE THING BLOCKING EVERY REMAINING
-  INSTANCE.** `toPlain`'s `inputˢ` arm is a bare `subst`: it passes the slot
-  through, so the slot lands at the envelope type and the DRIVER owes the
-  envelope — which is the thing srxjs is not allowed to require. Six readme
-  instances, four probe fingerprints and the QuickCheck harness are all blocked
-  on exactly this and on nothing else. The arm's own header already argues the
-  repair and shows it forges nothing: an instant is READ, never drawn, so a
-  former copying the ambient one onto each emit is narrower than the source
-  mint already granted. A new plain former is Anthony's, so this leg is a
-  question, not a patch.
+- **THE PROBE SUITE, RE-RUN RATHER THAN RESTAMPED — AND ONE LAW CAME BACK
+  UNREACHABLE.** Four `-- TARGET:` fingerprints stood against statements this
+  branch restated, and a fingerprint is exactly the check that refuses a
+  restatement under an unchanged name. Re-running rather than stamping is what
+  found the boundary: two of the readme laws hold at an elaborated two-value
+  source and were re-earned, while the take law cannot be instantiated at any
+  program at all, since `takeᵖ` is a live postulate and leaves the application
+  stuck rather than false. Its target is dropped and the boundary recorded at
+  the statement; what remains of the leg is `id-inheritance`, whose rows are
+  re-run the same way.
 
-- **THEN THE README OVER `SExp`, WHICH THE WINDOW MAKES MECHANICAL (Anthony).**
-  Seven instance claims are stated over plain programs and hot slots carrying
-  plain values — the shape the plain tree can no longer batch. With `inputˢ`
-  elaborating, each restates as its simul program under `elaborate`, the slots
-  stay plain-valued and the conclusions are unchanged. One of the seven is
-  slot-free and ports without waiting. Landing this is what stops the readme
-  claims being a face the split left behind.
-
-- **THEN THE PROBE SUITE, RE-RUN RATHER THAN RESTAMPED.** Four `-- TARGET:`
-  fingerprints stand against statements this branch restated, and a
-  fingerprint is exactly the check that refuses a restatement under an
-  unchanged name. The repair is never the stamp: each probe's rows are
-  evidence about a statement that admitted plain programs, and the narrowed
-  statement admits none of them. All four are `noSlots` rows, so they re-run
-  against an elaborated source and need nothing the leg above does not build.
+- **THE INSTANT WINDOW IS RULED OUT, AND THE LEG THAT ASKED FOR IT IS
+  DISCARDED (Anthony: "this is not something we want to ever do").** It
+  proposed a plain former copying the machine's ambient instant onto each
+  emit, so `toPlain`'s `inputˢ` arm could stamp a hot arrival instead of
+  passing the slot through. The finding it rested on was real and is recorded
+  at the arm; what was wrong was the conclusion, since the six claims it was
+  meant to unblock were written at the PLAIN tree and a plain run carries no
+  envelope for the batcher to group at all. They are deleted, with a recovery
+  pointer, and restating them over `SExp` is tier 2's work rather than a
+  repair owed here. Nothing now asks for the window.
 
 - **`Rx.Depth` IS NOT RETIRED BY ANY OF THE ABOVE, AND THE OLD LEG SAYING SO
   IS DISCARDED.** It claimed the second top line papered over a divergence the
@@ -278,13 +273,15 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
   two, which is two subscriptions. So the ask is one capability at three
   policies, mirroring the plain tree's own three. A former is Anthony's.
 
-- **THEN `takeᵖ`, THE LEVEL SHIFT, WHICH IS NEITHER A MINT NOR A FORWARD.** The
-  author's `take` and the plain one agree on everything that was in doubt —
-  both cut naively on values, mid-batch, both owe the closing envelope at the
-  cut — and disagree only on the LEVEL, since elaboration puts the author's
-  values inside the envelope and a plain `takeᵉ` over it counts batches. The
-  counting half is a step's work and the ENDING half is not, which is the whole
-  of the row. It is the last live row of the tier that is not a flattener.
+- **THEN `takeᵖ`, THE LEVEL SHIFT, WHICH IS NEITHER A MINT NOR A FORWARD.** It
+  and the plain `takeᵉ` agree on everything that was in doubt — both cut
+  naively on values, mid-batch, both owe the closing envelope at the cut — and
+  disagree only on the LEVEL, since the enveloped stream's own values are
+  envelopes and a plain take over it counts batches. The counting half is a
+  step's work and the ENDING half is not, which is the whole of the row. The
+  simul tree's third take is GONE (Anthony: "let's get rid of `takeˢ`"), so
+  what is left is the two that earn their place: the mirrored one and rxjs's.
+  It is the last live row of the tier that is not a flattener.
 
 - **THEN THE SAME OPERATORS MIRRORED IN `Tm`/`Ty` (Anthony).**
   Each TS simul operator mirrored as an Agda definition in the value language,
@@ -538,15 +535,8 @@ also: `readme-batch-order-is-delivery-order` — the flagship semantic law, and 
   `NO EVIDENCE`: each family admits one output at its own indices. Nothing has
   instantiated either, and the arms that do not follow from the head
   constructor are separated by equation premises — unwalked.
-- **`readme-diamond`, `readme-each-next-own-instant`,
-  `readme-cascades-inherit`, `readme-completion-cascades`,
-  `readme-share-connect-no-replay`, `readme-late-join-growth`,
-  `readme-serial-joins-mirror-rxjs`** — FALSITY, `NO EVIDENCE`: every one names
-  a flattening program, and nothing has instantiated any of them. Probeable now
-  that the evaluator computes through a flattener. A refutation is SPEC-level:
-  surface to Anthony, do not patch.
 - **`readme-batch-order-is-delivery-order`, `readme-take-counts-values`,
-  `readme-one-subscribe-one-batch`, `id-inheritance`** — FALSITY, `PROBED×3`:
+  `readme-one-subscribe-one-batch`, `id-inheritance`** — FALSITY, `PROBED×2`:
   instantiated now, but every row sits at a program with no flattener, which is
   where each statement's risk actually lives. Still FALSITY for that reason,
   not for want of a row.
