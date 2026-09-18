@@ -20,7 +20,7 @@ open import Data.Nat.Properties using (m≤m+n; +-suc)
 open import Relation.Binary.PropositionalEquality using (sym; subst)
 
 open import Rx.Prim using (Fuel)
-open import Rx.Exp using (Ctx; Closed)
+open import Rx.Exp using (Ctx; Closed; []ᵉ)
 open import Rx.Slots using (Slots)
 open import Rx.Evaluator using (root; sched-init; st-init)
 open import Rx.Evaluator.Domain using (subscribeE⇓; cascade⇓; drain⇓; evaluate⇓;
@@ -148,7 +148,7 @@ postulate
   sound-subscribe :
     ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
       {burst sched₀ st₀} →
-    subscribeE⇓ {e = e} {lo = n} e root 0 0
+    subscribeE⇓ {e = e} {lo = n} (_ , e , []ᵉ) root 0 0
       (sched-init e ins) (st-init e) (burst , sched₀ , st₀) →
     Sound 0 1 burst
 
