@@ -35,8 +35,14 @@ variable
 open import Rx.Slots using (scripted; shared; Slots)
 open import Rx.Mint using (Mint; sourceᵏ; regᵏ; mint-init; freshId; next)
 
+-- THE CARRIER IS PLAIN, AND THE PROTOCOL RIDES ON ITS VALUES.  What a
+-- run pushes is what an rxjs subscriber sees: values in order, then an
+-- end.  A simultaneity-aware program reaches this machine only through
+-- the elaboration, which compiles the protocol into the VALUE type, so
+-- the machine itself never handles an envelope and the mirror keeps
+-- its footing — the TypeScript's operators are plain rxjs too.
 Stream : ∀ {n} → Ctx n → Ty → Set          -- flat, canonical emission order
-Stream Γ t = List (InstEmit (Val Γ t))
+Stream Γ t = List (PlainEvent (Val Γ t))
 
 ------------------------------------------------------------------
 -- The global scheduler
@@ -450,14 +456,16 @@ installNode nid nodeState st =
   record st { nodes = setNode nid nodeState (EvalSt.nodes st) }
 
 -- a source that lives and dies inside its own subscription burst
--- (ofᵉ, emptyᵉ, take 0, a cold with no async tail): init, values,
--- close, complete — one emit, nothing registered, nothing scheduled
+-- (ofᵉ, emptyᵉ, take 0, a cold with no async tail): its values and
+-- then the end — nothing registered, nothing scheduled.  The source is
+-- still MINTED and then discarded, because what the mint moves is the
+-- scheduler's own allocation and the freshness argument reads that
+-- sequence; only the identity's appearance in the stream has gone.
 oneShotBurst : ∀ {n} {Γ : Ctx n} {u}
              → List (Val Γ u) → Id → Sched Γ → Stream Γ u × Sched Γ
 oneShotBurst vals id sched =
-  let (src , sched₁) = mintSource sched
-  in ((init src ∷ map value vals ++ close src exhausted ∷ complete ∷ [])
-       at id from src as subscribe) ∷ [] , sched₁
+  let (_ , sched₁) = mintSource sched
+  in map valueᵖ vals ++ completeᵖ ∷ [] , sched₁
 
 -- a source that was already spent before this subscription reached it
 -- — a completed Subject, a share whose def has closed, or a slot the
@@ -465,9 +473,8 @@ oneShotBurst vals id sched =
 -- no values, but the source is GIVEN rather than minted, because the
 -- point is that this subscriber joins something that already has an
 -- identity.
-spentBurst : ∀ {A : Set} → Source → Id → List (InstEmit A)
-spentBurst src id =
-  ((init src ∷ close src exhausted ∷ complete ∷ []) at id from src as subscribe) ∷ []
+spentBurst : ∀ {A : Set} → Source → Id → List (PlainEvent A)
+spentBurst src id = completeᵖ ∷ []
 
 st-init : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) → EvalSt e
 st-init e = record { registry = [] ; nodes = []
@@ -500,33 +507,23 @@ chainsOf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
          → (a : Arrival Γ) → EvalSt e → List (RegId × AtFloor Γ (arrTy a) t)
 chainsOf a st = chainsGo a (EvalSt.registry st)
 
--- split a subscription burst into grafted values, retagged
--- bookkeeping events, and whether the inner completed synchronously
-splitEvents : ∀ {n} {Γ : Ctx n} {u} {A : Set}
-            → List (InstEvent (Val Γ u))
-            → List (Val Γ u) × List (InstEvent A) × Bool
-splitEvents []              = [] , [] , false
-splitEvents (value v  ∷ es) = let (vs , bs , c) = splitEvents es in v ∷ vs , bs , c
-splitEvents (init s   ∷ es) = let (vs , bs , c) = splitEvents es in vs , init s ∷ bs , c
-splitEvents (close s r ∷ es) = let (vs , bs , c) = splitEvents es in vs , close s r ∷ bs , c
-splitEvents (handoff s ∷ es) = let (vs , bs , c) = splitEvents es in vs , handoff s ∷ bs , c
-splitEvents (complete ∷ es) = let (vs , bs , _) = splitEvents es in vs , bs , true
+-- SPLIT A SUBSCRIPTION'S OWN OUTPUT into the values to graft and
+-- whether it finished while the subscribe was still running.  The
+-- bookkeeping column this used to carry was protocol traffic, and the
+-- protocol is in the values now, so what is left is what rxjs itself
+-- distinguishes: what came out, and whether more can.
+splitStream : ∀ {n} {Γ : Ctx n} {u}
+            → Stream Γ u → List (Val Γ u) × Bool
+splitStream []                = [] , false
+splitStream (valueᵖ v  ∷ es)  = let (vs , c) = splitStream es in v ∷ vs , c
+splitStream (completeᵖ ∷ es)  = let (vs , _) = splitStream es in vs , true
 
-splitBurst : ∀ {n} {Γ : Ctx n} {u} {A : Set}
-           → Stream Γ u → List (Val Γ u) × List (InstEvent A) × Bool
-splitBurst []         = [] , [] , false
-splitBurst (em ∷ ems) =
-  let (vs  , bs  , c ) = splitEvents (InstEmit.events em)
-      (vs′ , bs′ , c′) = splitBurst ems
-  in vs ++ vs′ , bs ++ bs′ , c ∨ c′
-
-hasComplete : ∀ {A : Set} → List (InstEvent A) → Bool
-hasComplete []             = false
-hasComplete (complete ∷ _) = true
-hasComplete (_ ∷ es)       = hasComplete es
-
-burstCompleted : ∀ {n} {Γ : Ctx n} {u} → Stream Γ u → Bool
-burstCompleted = any (λ em → hasComplete (InstEmit.events em))
+streamCompleted : ∀ {n} {Γ : Ctx n} {u} → Stream Γ u → Bool
+streamCompleted = any isCompleteᵖ
+  where
+  isCompleteᵖ : ∀ {A : Set} → PlainEvent A → Bool
+  isCompleteᵖ (valueᵖ _) = false
+  isCompleteᵖ completeᵖ  = true
 
 -- the per-frame semantics.  All recursion here is structural — the
 -- deep recursion (a subscription's sync burst re-entering the
@@ -757,17 +754,6 @@ thruWrap exhaustᵒ nid true (vs , bs , sched′ , st′)
 -- filling lanes across several parked inners in one instant, which is
 -- precisely what `mergeMap(f , k)` does when several finish together
 
--- bookkeeping crosses payload types freely — init/close/complete
--- carry none.  A value cannot cross and is dropped; the callers only
--- ever retag event lists that stepFrame produced, which are value-free
-retagEvents : ∀ {A B : Set} → List (InstEvent A) → List (InstEvent B)
-retagEvents []              = []
-retagEvents (init s    ∷ es) = init s    ∷ retagEvents es
-retagEvents (close s r ∷ es) = close s r ∷ retagEvents es
-retagEvents (handoff s ∷ es) = handoff s ∷ retagEvents es
-retagEvents (complete  ∷ es) = complete  ∷ retagEvents es
-retagEvents (value _   ∷ es) = retagEvents es
-
 -- a shared slot: identity IS the index, source toℕ i (a hot's
 -- convention).  All reset options are false by definition: connect at
 -- the first subscription (anchoring the def's colds at that tick),
@@ -775,13 +761,12 @@ retagEvents (value _   ∷ es) = retagEvents es
 -- latch completion forever — a post-completion subscriber sees only
 -- an immediate close/complete, because completion is re-observable
 -- and values are not
--- the connect burst is retagged plumbing: it flows up the first
--- subscriber's frames as real protocol traffic, but its
--- registrations belong to the share (registered at share-sink,
--- surviving the subscriber) — a downstream cut or join must not
--- adopt them
-sharedPlumb : ∀ {n} {Γ : Ctx n} {u} → Stream Γ u → Stream Γ u
-sharedPlumb = map (λ em → record em { kind = plumbing })
+-- AND THE CONNECT BURST IS NO LONGER MARKED AS IT PASSES.  It used to
+-- be retagged plumbing, so that the first subscriber's frames could
+-- tell a share's own registrations (which survive it) from their own
+-- and refuse to adopt them on a cut or a join.  That mark was a field
+-- of the carrier; with the protocol in the values, a frame reads the
+-- distinction off the registry it already consults.
 
 -- latch completion AND mark the share dying: a delivered fan-out
 -- registration's exhausted close rides its own emit, so a cut during

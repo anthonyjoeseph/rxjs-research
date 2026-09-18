@@ -112,6 +112,29 @@ record InstEmit (A : Set) : Set where
         source  : Source              -- the arrival's source (owed = its live-registration count)
         kind    : EmitKind            -- who minted it: a subscription or an arrival cascade
 
+-- AND WHAT AN EVALUATOR PUSHES IS NOT THAT, WHICH IS A STATEMENT
+-- ABOUT LEVELS AND NOT ABOUT RICHNESS.  `InstEmit` is the PROTOCOL's
+-- vocabulary: the spec reads one, batches by its `instant`, and hands
+-- back another.  A machine running an ordinary rxjs pipeline pushes
+-- something far smaller — a value, or the end of the stream — one at
+-- a time and depth-first, with no envelope around it and no grouping
+-- across a cascade.
+--
+-- SO THE PROTOCOL RIDES ON THE VALUES RATHER THAN ON THE CARRIER,
+-- which is where the TypeScript keeps it: its operators are plain
+-- rxjs and the envelope is the type flowing THROUGH them.  `emitᵗ` in
+-- `Rx.Envelope` is that envelope at the object level and `toPlain`
+-- puts it there, so a machine carrying one too would be holding the
+-- same record twice, once at each level, with only the object-level
+-- copy having a counterpart in the mirror.
+--
+-- THERE IS NO ERROR ARM BECAUSE THE PROTOCOL HAS NONE.  A stream here
+-- ends by completing or by being closed from above, and closure is a
+-- registration's business rather than an emission's.
+data PlainEvent (A : Set) : Set where
+  valueᵖ    : A → PlainEvent A
+  completeᵖ : PlainEvent A            -- the stream ends here (concatAll grafts on it)
+
 ------------------------------------------------------------------
 -- Timed inputs (delta-encoded; real gap = suc wait, so per-source
 -- strict monotonicity holds by construction; ticks are logical
