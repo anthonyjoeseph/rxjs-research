@@ -8,7 +8,7 @@ only one tree had was simply never generated, so the oracle and the
 all-Agda sweep both reported green over shapes neither was ever handed.
 
 `scripts/formers.tsv` is the one declaration of the pairing, and this
-checks five surfaces against it, in both directions where both directions
+checks six surfaces against it, in both directions where both directions
 are decidable:
 
   A  the Agda datatypes   agda/src/Rx/Exp.agda      `data Exp` / `Tm` / `PrimOp`
@@ -16,6 +16,7 @@ are decidable:
   C  the TypeScript types typescript/src/exp.ts     `export type Exp` / `Tm` / `PrimOp`
   D  the TS generator     typescript/src/generator.ts   `type: "..."`, the op lanes
   E  the sweep's census   agda/src/QuickCheck.agda  `formerTag` / `allFormers`
+  F  the Agda generator   agda/src/QuickCheck.agda  the `gen*` definitions
 
 A, C and E are checked BOTH ways -- they are closed declarations, so a former
 present there and absent from the map is a finding, which is what catches a
@@ -25,10 +26,20 @@ operators, and the generator's file writes every one of those too, so
 "a tag here that is not in the map" is the normal state of both and
 asserting otherwise would report the whole type grammar.
 
-D's direction is the one that costs something and the one the convention
-never had: a former the generator cannot reach is covered by no sweep and
-no oracle run whatever either reports, so the map's `gen` column is where
-that hole is declared and counted, with its reason beside it.
+D's and F's direction is the one that costs something and the one the
+convention never had: a former neither generator can reach is covered by
+no sweep and no oracle run whatever either reports, so the map's `gen`
+and `agen` columns are where that hole is declared and counted, with its
+reason beside it.
+
+F EXISTS BECAUSE A `gen=no` REASON USED TO APPEAL TO AN UNCHECKED
+SURFACE.  The two generators cover different holes on purpose -- a former
+whose type IS the protocol's own structure cannot be mirrored by plain
+rxjs, so the TS lane declines it and the all-Agda sweep is what covers
+it -- and that division was written in the map's reason column and read
+by nothing.  A reason naming a surface no check holds is a claim that
+cannot go red, which is how `batchSyncᵉ` came to be declared covered by
+the all-Agda sweep while the Agda generator had no arm for it at all.
 
 E is the one that says whether the other four were ever EXERCISED.  They
 decide that a former is generable; none of them can say whether a run ever
@@ -76,10 +87,12 @@ ROLES = {
 
 
 class Row:
-    __slots__ = ("kind", "agda", "tag", "gen", "role", "why")
+    __slots__ = ("kind", "agda", "tag", "gen", "agen", "role", "why")
 
-    def __init__(self, kind: str, agda: str, tag: str, gen: bool, role: str, why: str) -> None:
-        self.kind, self.agda, self.tag, self.gen = kind, agda, tag, gen
+    def __init__(
+        self, kind: str, agda: str, tag: str, gen: bool, agen: bool, role: str, why: str
+    ) -> None:
+        self.kind, self.agda, self.tag, self.gen, self.agen = kind, agda, tag, gen, agen
         self.role, self.why = role, why
 
 
@@ -91,14 +104,15 @@ def read_map(path: Path) -> list[Row]:
         if not line.strip() or line.lstrip().startswith("#"):
             continue
         parts = line.split("\t")
-        if len(parts) < 5:
-            sys.exit(f"check-formers: {path}:{n}: want 5+ tab-separated fields, got {len(parts)}")
-        kind, agda, tag, gen, role = (p.strip() for p in parts[:5])
-        why = parts[5].strip() if len(parts) > 5 else ""
+        if len(parts) < 6:
+            sys.exit(f"check-formers: {path}:{n}: want 6+ tab-separated fields, got {len(parts)}")
+        kind, agda, tag, gen, agen, role = (p.strip() for p in parts[:6])
+        why = parts[6].strip() if len(parts) > 6 else ""
         if kind not in ("exp", "tm", "prim"):
             sys.exit(f"check-formers: {path}:{n}: kind must be exp, tm or prim, got {kind!r}")
-        if gen not in ("yes", "no"):
-            sys.exit(f"check-formers: {path}:{n}: gen must be yes or no, got {gen!r}")
+        for col, val in (("gen", gen), ("agen", agen)):
+            if val not in ("yes", "no"):
+                sys.exit(f"check-formers: {path}:{n}: {col} must be yes or no, got {val!r}")
         if kind == "exp" and role not in ROLES:
             sys.exit(
                 f"check-formers: {path}:{n}: `{agda}` has no verdict under the dividing test -- "
@@ -109,16 +123,22 @@ def read_map(path: Path) -> list[Row]:
                 f"check-formers: {path}:{n}: `{agda}` is not a stream former, so the dividing "
                 f"test does not apply to it -- its role must be `-`, got {role!r}"
             )
-        if gen == "no" and not why:
+        if "no" in (gen, agen) and not why:
             sys.exit(
-                f"check-formers: {path}:{n}: gen=no needs a reason in the sixth field -- "
+                f"check-formers: {path}:{n}: gen=no or agen=no needs a reason in the last field -- "
                 "an unreachable former is a hole to state, not a box to tick"
+            )
+        if gen == "no" and agen == "no":
+            sys.exit(
+                f"check-formers: {path}:{n}: `{agda}` is reachable by NEITHER generator, so no "
+                "sweep and no oracle run has ever been handed it -- that is not a hole to declare, "
+                "it is a former nothing covers"
             )
         for tbl, key in ((seen_agda, agda), (seen_tag, tag)):
             if key in tbl:
                 sys.exit(f"check-formers: {path}:{n}: {key!r} already declared on line {tbl[key]}")
             tbl[key] = n
-        rows.append(Row(kind, agda, tag, gen == "yes", role, why))
+        rows.append(Row(kind, agda, tag, gen == "yes", agen == "yes", role, why))
     return rows
 
 
@@ -226,6 +246,33 @@ def census_enum(text: str) -> tuple[dict[str, str], set[str]]:
     return tags, set(re.findall(r"\bf[A-Z]\w*", m.group(1)))
 
 
+def agda_gen_reach(text: str) -> set[str]:
+    """THE SIXTH SURFACE: which names the Agda generator can actually write.
+
+    The generator is the run of definitions from `genB` down to the census,
+    and what it can produce is what it MENTIONS -- every arm builds its node
+    by naming the constructor, so a former with no arm appears nowhere in the
+    region.  The region is bounded at both ends rather than scanned whole
+    because the census below it names every former by construction, and a
+    scan that ran past it would report the whole palette reachable.
+
+    A name is taken as MENTIONED only when it stands as a token.  Agda puts
+    almost nothing out of bounds in an identifier, so the delimiter set is
+    the punctuation the language actually separates applications with --
+    without it `input` matches `genInput` and `ObservableInput`, and the
+    surface reports a lane the generator does not have.
+    """
+    lines = text.splitlines()
+    start = next((i for i, l in enumerate(lines) if re.match(r"^genB\b.*:", l)), None)
+    if start is None:
+        sys.exit("check-formers: no `genB :` found -- the Agda generator moved or was renamed")
+    end = next((i for i, l in enumerate(lines[start:], start) if re.match(r"^marks", l)), None)
+    if end is None:
+        sys.exit("check-formers: no `marks…` after the generator -- the census moved or was renamed")
+    body = "\n".join(l for l in lines[start:end] if not l.lstrip().startswith("--"))
+    return set(re.findall(r"(?:^|[\s(){}\[\],;])([^\s(){}\[\],;]+)", body))
+
+
 def quoted(text: str, pat: str) -> set[str]:
     return set(re.findall(pat, text))
 
@@ -306,6 +353,19 @@ def main() -> int:
                 f"unreachable -- the hole closed and the row was not"
             )
 
+    agen = agda_gen_reach(src["census"])
+    for r in rows:
+        if r.agen and r.agda not in agen:
+            findings.append(
+                f"{PATHS['census']}: no arm of the Agda generator writes `{r.agda}`, which the map "
+                f"declares reachable -- either write the arm, or declare the hole with agen=no"
+            )
+        if not r.agen and r.agda in agen:
+            findings.append(
+                f"{PATHS['census']}: the Agda generator DOES write `{r.agda}`, and the map declares "
+                f"it unreachable -- the hole closed and the row was not"
+            )
+
     ctag, roll = census_enum(src["census"])
     exp_tags = {r.tag for r in rows if r.kind == "exp"}
     for extra in sorted(set(ctag.values()) - exp_tags):
@@ -338,14 +398,15 @@ def main() -> int:
     for role in sorted(palette):
         print(f"  {role:9} {' '.join(sorted(palette[role]))}  -- {ROLES[role]}")
 
-    holes = [r for r in rows if not r.gen]
+    holes = [r for r in rows if not (r.gen and r.agen)]
     print(
-        f"check-formers: {len(rows)} former(s) paired across five surfaces -- every Agda "
+        f"check-formers: {len(rows)} former(s) paired across six surfaces -- every Agda "
         f"constructor and every TypeScript union member is in the map, every tag decodes, "
-        f"and {len(rows) - len(holes)} are generated"
+        f"and {len(rows) - len(holes)} are reachable by BOTH generators"
     )
     for r in holes:
-        print(f"  UNREACHABLE BY THE GENERATOR: {r.agda} / \"{r.tag}\" -- {r.why}")
+        which = "the TypeScript generator" if r.agen else "the Agda generator"
+        print(f"  UNREACHABLE BY {which}: {r.agda} / \"{r.tag}\" -- {r.why}")
     return 0
 
 

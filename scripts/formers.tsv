@@ -3,18 +3,24 @@
 # happened to emit — so a former only one tree had did not fail, it was simply
 # never generated, and every sweep over the bridge reported green about shapes
 # it was never handed.  This file is the one declaration of the pairing, and
-# `scripts/check-formers.py` holds four surfaces to it: the Agda datatype, the
-# Agda decoder, the TypeScript union and the TypeScript generator.
+# `scripts/check-formers.py` holds six surfaces to it: the Agda datatype, the
+# Agda decoder, the TypeScript union, the TypeScript generator, the sweep's
+# census and the Agda generator.
 #
-# A NEW FORMER IS THEREFORE SIX EDITS, AND THAT IS THE POINT — the fifth is
-# this line, and until it exists the other four are each separately red.  The
-# sixth is its ROLE, below.
+# A NEW FORMER IS THEREFORE SEVEN EDITS, AND THAT IS THE POINT — one is this
+# line, and until it exists the other six are each separately red.  The last
+# is its ROLE, below.
 #
-# GEN=no DECLARES A FORMER THE GENERATOR CANNOT REACH, and it is a finding
-# parked rather than an exemption granted: a former nothing generates is a
-# former no sweep and no oracle run has ever covered, whatever either reports.
-# It is written here rather than in the generator so that the hole is counted
-# where the pairing is read, and the reason is the last column.
+# GEN=no AND AGEN=no DECLARE A FORMER A GENERATOR CANNOT REACH, and each is a
+# finding parked rather than an exemption granted: a former nothing generates
+# is a former no sweep and no oracle run has ever covered, whatever either
+# reports.  There are two columns because the two generators cover different
+# holes on purpose — a former whose type IS the protocol's own structure has
+# no plain-rxjs mirror, so the TypeScript lane declines it and the all-Agda
+# sweep is what covers it — and that division used to be written in the reason
+# column and read by nothing.  BOTH `no` is refused outright: that is not a
+# hole to declare, it is a former nothing covers.  The reason is the last
+# column, and it is owed the moment either column says no.
 #
 # ROLE IS THE DIVIDING TEST'S VERDICT, AND EVERY `exp` ROW OWES ONE.  The test
 # is whether an operator SUBSCRIBES anything or reads the protocol's own
@@ -37,42 +43,42 @@
 # one pure-function former, which is where the test is stated, and a second
 # copy of it would be the copy that ages.
 #
-# kind	agda	tag	gen	role	why
-exp	input	input	yes	source
-exp	ofᵉ	of	yes	source
-exp	emptyᵉ	empty	yes	source
-exp	takeᵉ	take	yes	protocol
-exp	mapᵉ	map	yes	pure
-exp	scanᵉ	scan	yes	pure
-exp	mergeAllᵉ	mergeAll	yes	flatten
-exp	switchAllᵉ	switchAll	yes	flatten
-exp	exhaustAllᵉ	exhaustAll	yes	flatten
-exp	μᵉ	mu	yes	binder
-exp	varᵉ	varE	yes	binder
-exp	deferᵉ	defer	yes	protocol
-exp	mintᵉ	mint	yes	protocol
-exp	batchSyncᵉ	batchSync	no	protocol	its type IS the instant/batch structure, so plain rxjs cannot mirror it and the oracle's plain leg cannot cover it; it is covered by the all-Agda QuickCheck instead
-tm	varᵗ	varT	yes	-
-tm	unit̂	unitT	yes	-
-tm	bool̂	boolT	yes	-
-tm	nat̂	natT	yes	-
-tm	uniq̂	uniqT	yes	-
-tm	pairᵗ	pairT	yes	-
-tm	fstᵗ	fstT	yes	-
-tm	sndᵗ	sndT	yes	-
-tm	nilᵗ	nilT	yes	-
-tm	consᵗ	consT	yes	-
-tm	inlᵗ	inlT	yes	-
-tm	inrᵗ	inrT	yes	-
-tm	caseᵗ	caseT	yes	-
-tm	foldᵗ	foldT	yes	-
-tm	ifᵗ	ifT	yes	-
-tm	primᵗ	primT	yes	-
-tm	strmᵗ	strmT	yes	-
-prim	add	add	yes	-
-prim	sub	sub	yes	-
-prim	mul	mul	yes	-
-prim	eqᵖ	eq	yes	-
-prim	ltᵖ	lt	yes	-
-prim	eqᵘ	eqU	yes	-
-prim	notᵖ	not	yes	-
+# kind	agda	tag	gen	agen	role	why
+exp	input	input	yes	yes	source
+exp	ofᵉ	of	yes	yes	source
+exp	emptyᵉ	empty	yes	yes	source
+exp	takeᵉ	take	yes	yes	protocol
+exp	mapᵉ	map	yes	yes	pure
+exp	scanᵉ	scan	yes	yes	pure
+exp	mergeAllᵉ	mergeAll	yes	yes	flatten
+exp	switchAllᵉ	switchAll	yes	yes	flatten
+exp	exhaustAllᵉ	exhaustAll	yes	yes	flatten
+exp	μᵉ	mu	yes	yes	binder
+exp	varᵉ	varE	yes	yes	binder
+exp	deferᵉ	defer	yes	yes	protocol
+exp	mintᵉ	mint	yes	yes	protocol
+exp	batchSyncᵉ	batchSync	no	yes	protocol	its type IS the instant/batch structure, so plain rxjs cannot mirror it and the oracle's plain leg cannot cover it; the Agda generator reaches it, which is what agen=yes on this row now holds someone to
+tm	varᵗ	varT	yes	yes	-
+tm	unit̂	unitT	yes	no	-	the Agda generator draws every node at natᵗ, so it never has a unit to build
+tm	bool̂	boolT	yes	no	-	the Agda generator reaches boolᵗ only through a comparison primitive, never as a literal
+tm	nat̂	natT	yes	yes	-
+tm	uniq̂	uniqT	yes	yes	-
+tm	pairᵗ	pairT	yes	yes	-
+tm	fstᵗ	fstT	yes	yes	-
+tm	sndᵗ	sndT	yes	yes	-
+tm	nilᵗ	nilT	yes	no	-	the Agda generator meets a list only as `batchSyncᵉ`'s own result type, which it folds rather than builds
+tm	consᵗ	consT	yes	no	-	the Agda generator meets a list only as `batchSyncᵉ`'s own result type, which it folds rather than builds
+tm	inlᵗ	inlT	yes	no	-	sums are not in the Agda generator's type palette, whose every node is natᵗ
+tm	inrᵗ	inrT	yes	no	-	sums are not in the Agda generator's type palette, whose every node is natᵗ
+tm	caseᵗ	caseT	yes	no	-	sums are not in the Agda generator's type palette, whose every node is natᵗ
+tm	foldᵗ	foldT	yes	yes	-
+tm	ifᵗ	ifT	yes	yes	-
+tm	primᵗ	primT	yes	yes	-
+tm	strmᵗ	strmT	yes	yes	-
+prim	add	add	yes	yes	-
+prim	sub	sub	yes	no	-	the Agda generator's operator menu is add, mul and the two comparisons its branches need
+prim	mul	mul	yes	yes	-
+prim	eqᵖ	eq	yes	no	-	the Agda generator's operator menu is add, mul and the two comparisons its branches need
+prim	ltᵖ	lt	yes	yes	-
+prim	eqᵘ	eqU	yes	yes	-
+prim	notᵖ	not	yes	no	-	the Agda generator's operator menu is add, mul and the two comparisons its branches need

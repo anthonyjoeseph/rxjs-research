@@ -1416,7 +1416,7 @@ ts-gate: ts-check ts-lint ts-format-check
 # only one tree had was never generated rather than ever red -- and both
 # the oracle and the all-Agda sweep then reported green over shapes neither
 # had been handed.  scripts/formers.tsv is the one declaration of the
-# pairing; the checker holds four surfaces to it.
+# pairing; the checker holds six surfaces to it.
 # ─────────────────────────────────────────────────────────────────────────
 formers-check:
 	@scripts/check-formers.py
@@ -1435,8 +1435,10 @@ formers-selftest:
 	            *) echo "SELFTEST FAIL: $$1 -- got: $$out"; fail=1;; esac; }; \
 	  out=$$(scripts/check-formers.py --root "$$base" 2>&1) || \
 	    { echo "SELFTEST FAIL: the base fixture is not quiet -- $$out"; fail=1; }; \
-	  echo "$$out" | grep -q 'UNREACHABLE BY THE GENERATOR: sharedSig' || \
-	    { echo "SELFTEST FAIL: a gen=no row stopped being REPORTED, so a former nothing generates would pass unmentioned"; fail=1; }; \
+	  echo "$$out" | grep -q 'UNREACHABLE BY the TypeScript generator: sharedSig' || \
+	    { echo "SELFTEST FAIL: a gen=no row stopped being REPORTED, so a former the TypeScript generator cannot reach would pass unmentioned"; fail=1; }; \
+	  echo "$$out" | grep -q 'UNREACHABLE BY the Agda generator: notᵖ' || \
+	    { echo "SELFTEST FAIL: an agen=no row stopped being REPORTED, so a former the Agda generator cannot reach would pass unmentioned"; fail=1; }; \
 	  run "an Agda constructor in no row" \
 	      "printf '    newᵉ : Exp Γ t\n' >> agda/src/Rx/Exp.agda" \
 	      "is in no row of the map"; \
@@ -1459,16 +1461,25 @@ formers-selftest:
 	      "printf 'const g = () => ({ type: \"sharedSig\" });\n' >> typescript/src/generator.ts" \
 	      'the hole closed and the row was not'; \
 	  run "a gen=no row with no reason" \
-	      "sed -i.bak 's/\tno\tsource\tthe fixture.*/\tno\tsource/' scripts/formers.tsv" \
-	      "gen=no needs a reason"; \
+	      "sed -i.bak 's/\tno\tyes\tsource\tthe fixture.*/\tno\tyes\tsource/' scripts/formers.tsv" \
+	      "needs a reason"; \
+	  run "an agen=yes row no arm of the Agda generator writes" \
+	      "sed -i.bak 's/sharedSigᵉ (add d)/renamedᵉ (add d)/' agda/src/QuickCheck.agda" \
+	      'no arm of the Agda generator writes `sharedSigᵉ`'; \
+	  run "an agen=no row the Agda generator DOES write" \
+	      "sed -i.bak 's/notᵖCount/notᵖ/' agda/src/QuickCheck.agda" \
+	      'the Agda generator DOES write `notᵖ`'; \
+	  run "a row unreachable by BOTH generators" \
+	      "sed -i.bak 's/\tno\tyes\tsource/\tno\tno\tsource/' scripts/formers.tsv" \
+	      'reachable by NEITHER generator'; \
 	  run "a tag declared twice" \
-	      "printf 'tm\tdupᵗ\tnatT\tyes\t-\n' >> scripts/formers.tsv" \
+	      "printf 'tm\tdupᵗ\tnatT\tyes\tyes\t-\n' >> scripts/formers.tsv" \
 	      "already declared on line"; \
 	  run "an exp row with no verdict under the dividing test" \
-	      "sed -i.bak 's/\tyes\tprotocol/\tyes\tmisc/' scripts/formers.tsv" \
+	      "sed -i.bak 's/\tyes\tyes\tprotocol/\tyes\tyes\tmisc/' scripts/formers.tsv" \
 	      "has no verdict under the dividing test"; \
 	  run "a tm row claiming one" \
-	      "sed -i.bak 's/natT\tyes\t-/natT\tyes\tsource/' scripts/formers.tsv" \
+	      "sed -i.bak 's/natT\tyes\tyes\t-/natT\tyes\tyes\tsource/' scripts/formers.tsv" \
 	      "its role must be \`-\`"; \
 	  run "a primitive operator the string union does not carry" \
 	      "sed -i.bak 's/\"add\" |/\"plus\" |/' typescript/src/exp.ts" \
@@ -1491,7 +1502,7 @@ formers-selftest:
 	  run "a declared former the roll never walks" \
 	      "sed -i.bak 's/allFormers = fLift ∷ fDefer ∷ fSharedSig ∷ \[\]/allFormers = fLift ∷ fDefer ∷ []/' agda/src/QuickCheck.agda" \
 	      'so the tally never walks it'; \
-	  [ $$fail -eq 0 ] && echo "formers-selftest: PASS (every surface fires in the direction it is checked at all three kinds, a shared constructor signature parses, a bare-string union and an operator lane are read as themselves, a declared generator hole is reported rather than merely tolerated, the census is held to the map in both directions and its roll to its own declarations, and the dividing test's vocabulary is closed)"; \
+	  [ $$fail -eq 0 ] && echo "formers-selftest: PASS (every surface fires in the direction it is checked at all three kinds, a shared constructor signature parses, a bare-string union and an operator lane are read as themselves, a declared generator hole is reported rather than merely tolerated, the census is held to the map in both directions and its roll to its own declarations, the Agda generator is held to the map in both directions with a token boundary that a substring scan would cross, a former reachable by neither generator is refused, and the dividing test's vocabulary is closed)"; \
 	  exit $$fail
 
 cli-build: stripped

@@ -21,9 +21,10 @@
 # no census and no rows, so the sweep says which part of its corpus it
 # could not run rather than reporting the remainder as a clean sweep —
 # and the exit status stays what it was, since the verdict this script
-# reports is the CORPUS.  What retires the bound is the saturation
-# restriction the roadmap carries, which is the predicate that would let
-# the GENERATOR decline such a program in the first place.
+# reports is the CORPUS.  The bound is a BACKSTOP rather than the fix: the
+# generator caps every tree it draws with a root `takeᵉ`, which unsubscribes
+# the fixpoint once the cap is reached and is what actually keeps such a
+# program finite.
 #
 # `timeout` DOES NOT EXIST ON macOS, so it is used when present (`gtimeout`
 # from coreutils counts) and skipped with a warning when it is not.  A

@@ -429,6 +429,21 @@ genSpineG g u (suc d) = genB 9 >>=G λ c →
 genExp : ℕ → Gen (Exp Γ₂ [] [] [] natᵗ)
 genExp d = genExpAt 0 0 d
 
+-- EVERY DRAWN TREE IS CAPPED AT THE ROOT, AND THE CAP IS WHAT MAKES THE
+-- SWEEP FINITE AT ALL.  A guarded fixpoint whose step hands back more
+-- elements than it was given costs the fuel as an EXPONENT, and the
+-- generator has no reason not to draw one: two seeds of eight did not
+-- finish in 150 s before this.  A budget on the emitted list cannot
+-- retire it, because the cost is inside ONE cascade rather than in the
+-- stream's spine, so the budget is only reached by paying for it; a
+-- root `takeᵉ` cuts instead — it unsubscribes the fixpoint, so the
+-- doubling stops being performed rather than being performed and
+-- discarded.  The number is above every bound the generator can draw
+-- for an inner `takeᵉ`, so it shortens only the programs that would
+-- otherwise not stop.
+capExp : Exp Γ₂ [] [] [] natᵗ → Exp Γ₂ [] [] [] natᵗ
+capExp e = takeᵉ (nat̂ 24) e
+
 ------------------------------------------------------------------------
 -- WHICH FORMERS A PROGRAM ACTUALLY CARRIED.  A generator that CAN emit
 -- one says nothing about a sweep; each case reports its program's marks
@@ -717,9 +732,11 @@ showSlots ins =
 -- reached only by paying for it.  `scripts/gen-unit-tests.sh` therefore
 -- bounds a SEED in wall clock and reports the ones it could not run.
 --
--- What retires that, and it is not a harness question: a predicate
--- admitting only the programs that SATURATE, which the roadmap carries
--- and which would let the generator decline the draw instead.
+-- What retires it is the GENERATOR's own root cap, not a budget read
+-- from here: `capExp` puts a `takeᵉ` above every drawn tree, which
+-- unsubscribes the fixpoint instead of letting it be performed and then
+-- discarded.  The wall-clock bound stays on as a backstop for whatever
+-- the cap does not cut.
 FUEL : ℕ
 FUEL = 30
 
@@ -784,12 +801,19 @@ bump : Marks → Tally → Tally
 bump (fs , o) (cs , p) = bumpEach fs allFormers cs , (if o then suc p else p)
 
 oneCase : ℕ → Gen (Marks × List String)
+-- THE CAP IS RUN AND THE DRAWN TREE IS COUNTED, WHICH ARE DIFFERENT
+-- PROGRAMS ON PURPOSE.  Marking the capped tree would report a `take`
+-- on every case, so the one former whose count says something about the
+-- generator would be the one former whose count is the run length.  A
+-- failing case still reports the program that FAILED, cap included,
+-- since that is the row the corpus has to reproduce.
 oneCase d = genSlots >>=G λ ins → genExp d >>=G λ e →
-  let s    = evaluate↓ FUEL e ins
+  let e↑   = capExp e
+      s    = evaluate↓ FUEL e↑ ins
       impl = impl-batchSimultaneous s
       spec = spec-batchSimultaneous s
-      agreeFails = if eqBatched impl spec then [] else report e ins impl spec ∷ []
-      wfFails    = if wellFormed? s then [] else reportWF e ins s ∷ []
+      agreeFails = if eqBatched impl spec then [] else report e↑ ins impl spec ∷ []
+      wfFails    = if wellFormed? s then [] else reportWF e↑ ins s ∷ []
   in pureG (marksᵉ e , agreeFails ++ᴸ wfFails)
 
 -- accumulate EVERY failing case's reports, in generation order, and tally
