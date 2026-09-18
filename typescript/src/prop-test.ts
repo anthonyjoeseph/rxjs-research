@@ -210,7 +210,8 @@ const drawCorpus = (operator?: string): TestCase[] => {
   const silent: TestCase[] = [];
   for (
     let i = 0;
-    i < MAX_SEEDS && (live.length < LIVE_TARGET || silent.length < SILENT_QUOTA);
+    i < MAX_SEEDS &&
+    (live.length < LIVE_TARGET || silent.length < SILENT_QUOTA);
     i++
   ) {
     for (const testCase of genTestCases(`s${i}`, operator)) {
