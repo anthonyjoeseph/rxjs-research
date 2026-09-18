@@ -211,12 +211,13 @@ mutual
                  --   envelope into Θ and every Θ-substitution reifies one.
                  --   `reify` is total over `Ty` and owes a CLOSED `Tm` at
                  --   each arm, and a closed term denoting an arbitrary
-                 --   token IS the literal.  So the literal goes only if
-                 --   `uniqᵗ` stops being data an envelope carries, which
-                 --   is a ruling about the protocol and not about this
-                 --   binder — and the unforgeability an author needs is
-                 --   then a restriction on the PALETTE, the shape the
-                 --   paragraph above already takes.
+                 --   token IS the literal.  So this binder is not where
+                 --   the literal is held: what holds it is `reify`, and
+                 --   what makes `reify` owe a `uniqᵗ` arm is an envelope
+                 --   standing its own fields at the token type.  The
+                 --   route is dead as a route to DELETING `uniq̂`; it
+                 --   stays correct about the binder, and the deletion is
+                 --   owed at the envelope instead.
 
   data Tm {n} (Γ : Ctx n) (Δᵍ Δ Θ : List Ty) : Ty → Set where
     varᵗ  : ∀ {t} → t ∈ Θ → Tm Γ Δᵍ Δ Θ t

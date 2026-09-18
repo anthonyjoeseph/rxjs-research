@@ -44,7 +44,7 @@ open import Data.Vec using () renaming ([] to []ⱽ)
 open import Relation.Nullary using (¬_)
 
 open import Rx.Exp using (Ctx; Tm; Fn; Closed; obs; natᵗ; _×ᵗ_; input; ofᵉ; emptyᵉ; takeᵉ; batchSyncᵉ;
-  scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ)
+  mapᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ)
 
 -- the structural domain predicate: one constructor per former, each
 -- taking the predicate at the Exp children a subscribe actually walks.
@@ -63,6 +63,8 @@ data Sub {n} {Γ : Ctx n} : ∀ {t} → Closed Γ t → Set where
   s-μ     : ∀ {t body} → Sub (μᵉ {Γ = Γ} {t = t} body)
   s-mint  : ∀ {t body} → Sub (mintᵉ {Γ = Γ} {t = t} body)
   s-take  : ∀ {t} {c : Tm Γ [] [] [] _} {b} → Sub b → Sub (takeᵉ {t = t} c b)
+  s-map   : ∀ {s t} {f : Fn Γ [] [] [] s t} {b : Closed Γ s}
+          → Sub b → Sub (mapᵉ f b)
   s-scan  : ∀ {s t} {f : Fn Γ [] [] [] (t ×ᵗ s) t}
               {z : Tm Γ [] [] [] t} {b : Closed Γ s}
           → Sub b → Sub (scanᵉ f z b)
@@ -79,6 +81,7 @@ sub-total (deferᵉ body)     = s-defer
 sub-total (μᵉ body)         = s-μ
 sub-total (mintᵉ body)      = s-mint
 sub-total (takeᵉ c b)       = s-take (sub-total b)
+sub-total (mapᵉ f b)        = s-map (sub-total b)
 sub-total (scanᵉ f z b)     = s-scan (sub-total b)
 sub-total (mergeAllᵉ l b)   = s-merge (sub-total b)
 sub-total (switchAllᵉ b)    = s-switch (sub-total b)
