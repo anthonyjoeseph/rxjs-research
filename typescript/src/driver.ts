@@ -29,6 +29,12 @@ export type Driver = {
   // harness's comparison up to renaming (Agda mints ℕs — same order,
   // different carrier)
   mintSourceId: () => number;
+  // fresh uniq TOKEN for a `mint` binder, and a SEPARATE namespace from
+  // the source ids above: a token is handed to the program, a source id
+  // to the protocol, and no operation relates the two. They shared a
+  // counter only while a program could compare a token against a
+  // literal, which the term language no longer lets it write.
+  mintToken: () => symbol;
   // anchor for per-subscription scheduling (cold async tails, deferᵉ
   // hops at tick + 1)
   currentTick: () => number;
@@ -89,11 +95,15 @@ export const createDriver = (slotCount = 0): Driver => {
   const [chainEmits, chainSink] = channel<InstEmit<never>>();
 
   return {
-    // a NUMBER, because Agda's uniqᵗ reads as ℕ and `mint` is the first
-    // thing that hands a token to a program rather than to the protocol.
-    // Nothing else produces a SourceId, so this counter is the whole
-    // namespace and a numeric one cannot collide.
+    // a NUMBER, because a source id is protocol data: it is counted,
+    // compared and renamed by the harness. Nothing else produces a
+    // SourceId, so this counter is the whole namespace and a numeric
+    // one cannot collide.
     mintSourceId: () => nextSourceId++,
+    // a SYMBOL, because a token is program data with identity as its
+    // only content: `Symbol()` cannot be forged, counted or ordered,
+    // so the host type admits exactly the operation `eqU` is
+    mintToken: () => Symbol("uniq"),
     pushChainEmit: (emit) => chainSink.next(emit),
     chainEmits,
     currentTick: () => tick,

@@ -318,14 +318,14 @@ export const share = <A>(
   });
 };
 
-// mintᵉ: one fresh source token per SUBSCRIPTION, handed to the body and
+// mintᵉ: one fresh uniq token per SUBSCRIPTION, handed to the body and
 // nothing else. No event, no registration, no hop — the operator wrapping
 // the binder owes those. `rxDefer` is what makes it per-subscription
 // rather than per-pipeline, which is the whole of the semantics.
 export const mint = <A>(
   driver: Driver,
-  compileBody: (token: number) => Observable<InstEmit<A>>,
-): Observable<InstEmit<A>> => rxDefer(() => compileBody(driver.mintSourceId()));
+  compileBody: (token: symbol) => Observable<InstEmit<A>>,
+): Observable<InstEmit<A>> => rxDefer(() => compileBody(driver.mintToken()));
 
 // deferᵉ (NOT rxjs defer): lazy PLUS a one-tick hop, the body's
 // emissions minting fresh ids (an async boundary). Mirrors Agda's

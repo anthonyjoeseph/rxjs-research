@@ -102,7 +102,7 @@ const evaluateRx = (testCase: TestCase): EvalResult => {
       ...prefix,
       slot.type === "scripted"
         ? makeInputSource(driver, slot.input, index)
-        : share(driver, compile(slot.def, driver, prefix), index),
+        : share(driver, compile(slot.def, [], driver, prefix), index),
     ],
     [],
   );
@@ -111,7 +111,7 @@ const evaluateRx = (testCase: TestCase): EvalResult => {
   // push order) with the shares' chain emits, the fin bit materialized
   // once over the merged ledger — the mirror of Agda's cascade output
   const sub = materializeCompletion<Val>(
-    merge(driver.chainEmits, compile(testCase.exp, driver, slotSources)),
+    merge(driver.chainEmits, compile(testCase.exp, [], driver, slotSources)),
   ).subscribe((emit) => out.push(emit));
   // subscribing already ran the root sync burst — fuel pays only for arrivals
   for (let spent = 0; spent < testCase.fuel; spent++) {
@@ -125,12 +125,31 @@ const evaluateRx = (testCase: TestCase): EvalResult => {
 // the partition structure, so canonicalize both sides before comparing.
 // Instants and sources are separate namespaces (an arrival's cascade vs
 // an observable), each renamed to 0,1,2,… in first-appearance order over
-// the flat stream. This also erases the representation gap — TS mints ids
-// as `symbol` (dropped by JSON.stringify), Agda as ℕ — since each side is
-// renamed independently to the same integers. Instants still differ in
-// representation — TS mints them as `symbol` (dropped by JSON.stringify),
-// Agda as ℕ — and the renaming is what erases it. Values/kinds/event
-// types/order still compare exactly.
+// the flat stream. That is also what erases the representation gap — TS
+// mints both as `symbol`, Agda as ℕ — since each side is renamed
+// independently to the same integers. Values/kinds/event types/order
+// still compare exactly.
+//
+// AND A TOKEN IN A VALUE POSITION IS REFUSED RATHER THAN RENAMED, WHICH
+// IS THE ONE PLACE A SYMBOL WOULD LIE.  `JSON.stringify` drops a symbol
+// silently, so a minted token reaching the stream would compare equal to
+// a TS side that emitted nothing there — a false green, and the only
+// kind this comparison can produce. Renaming it instead is not available
+// here: the Agda side carries the same token as a ℕ, indistinguishable
+// from a nat without the element TYPE, which this walk does not have.
+// The generator keeps uniq out of every element type precisely so the
+// case cannot arise; this says so if it ever does.
+const noToken = (v: unknown): void => {
+  if (typeof v === "symbol")
+    throw new Error(
+      "a uniq token reached the stream — the comparison has no renaming " +
+        "for one, and JSON.stringify would drop it silently",
+    );
+  if (Array.isArray(v)) v.forEach(noToken);
+  else if (v !== null && typeof v === "object")
+    Object.values(v).forEach(noToken);
+};
+
 const canonical = <A>(stream: InstEmit<A>[]): unknown => {
   const inst = new Map<Provenance, number>();
   const src = new Map<SourceId, number>();
@@ -143,9 +162,11 @@ const canonical = <A>(stream: InstEmit<A>[]): unknown => {
     instant: ri(emit.instant),
     source: rs(emit.source),
     events: emit.events.map((ev) =>
-      ev.type === "value" || ev.type === "complete"
-        ? ev
-        : { ...ev, source: rs(ev.source) },
+      ev.type === "value"
+        ? (noToken(ev.value), ev)
+        : ev.type === "complete"
+          ? ev
+          : { ...ev, source: rs(ev.source) },
     ),
   }));
 };

@@ -135,9 +135,10 @@ const subscribeBurst = <A>(
 // once, at construction" actually lands: a hot exists only as a
 // scripted SLOT, and a slot's identifier is its index — reserved
 // below the dynamic counter precisely so nothing mints into it. Minted
-// from that counter instead, a hot both burns an id the slots already
-// own and shifts every later one, so a `mint` token compared against a
-// literal reads differently from the same program in Agda.
+// from that counter instead, a hot burns an id the slots already own,
+// which is a COLLAPSE rather than a shift: two sources that became one
+// cannot be renamed back apart, so the harness's comparison up to
+// renaming stops covering the difference.
 export const hot = <A>(
   driver: Driver,
   source: SourceId,

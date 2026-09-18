@@ -13,10 +13,21 @@ export type Ty =
   | { type: "unit" }
   | { type: "bool" }
   | { type: "nat" }
-  // an identity TOKEN: carried as a number, but with only equality on
-  // it, so no program can do arithmetic on one or invent one that was
-  // never minted. That is the whole of the difference from nat, and it
-  // is what lets a simul operator key a value by where it came from.
+  // an identity TOKEN: a host `symbol`, with only equality on it, so no
+  // program can do arithmetic on one or invent one that was never
+  // minted. That is the whole of the difference from nat, and it is
+  // what lets a simul operator key a value by where it came from.
+  //
+  // A SYMBOL RATHER THAN A NUMBER, AND IT IS THE SYNTAX THAT FREED THE
+  // REPRESENTATION.  While the term language could write a token down,
+  // a program could compare a minted one against a LITERAL, so the
+  // number TS handed out had to be the number Agda's counter would
+  // hand out at the same point -- two independent evaluators kept in
+  // lockstep by nothing the typechecker could see.  With no literal at
+  // uniqᵗ the only operation left is `eqU` between two minted tokens,
+  // which is identity and nothing else, so the representation is free
+  // -- and `symbol` is the one host type whose values cannot be forged,
+  // counted or ordered, which is exactly what the type says.
   | { type: "uniq" }
   | { type: "prod"; fst: Ty; snd: Ty }
   | { type: "sum"; left: Ty; right: Ty }
@@ -35,19 +46,31 @@ export type Ty =
 // one op would type it at nat and hand every nat operation to it.
 export type PrimOp = "add" | "sub" | "mul" | "eq" | "lt" | "not" | "eqU";
 
-// Agda: Rx.Exp.Val. unit = null. An obs-typed value is a CLOSED Exp —
-// runtime observables are syntax, never host closures.
+// Agda: Rx.Exp.Val. unit = null. An obs-typed value is a CLOSURE — the
+// body it was written as, paired with the environment it was written
+// under — never a closed Exp and never a host closure.
 // A pair and a list are both arrays at runtime and are told apart by
-// the TYPE at every site that needs to (reify); nothing else inspects a
-// value's shape, and no emit value is ever list-typed.
+// the TYPE at every site that needs to; nothing else inspects a value's
+// shape, and no emit value is ever list-typed.
+//
+// THE ENVIRONMENT IS WHAT REPLACED SUBSTITUTION, AND IT IS WHAT MAKES A
+// UNIQ TOKEN STATELESS SYNTAX RATHER THAN A LITERAL.  Closing a body by
+// substituting its environment in demanded a closed Tm denoting every
+// value, a token included, so `uniqᵗ` needed an intro form carrying a
+// numeral.  Carrying the environment instead asks for no such term: the
+// token is a runtime number in the environment and the language never
+// has to be able to write one down.
+export type ObsVal = { exp: Exp; env: Val[] };
+
 export type Val =
   | null
   | boolean
   | number
+  | symbol // a minted uniq token, and the only symbol in the domain
   | [Val, Val]
   | Val[]
   | { type: "inl" | "inr"; val: Val }
-  | Exp;
+  | ObsVal;
 
 // Agda: Rx.Exp.Tm — first-order terms, the only function language.
 // All variables are de Bruijn indices. Θ-binders (map/scan fns, case
@@ -57,7 +80,6 @@ export type Tm =
   | { type: "unitT"; ty: Ty }
   | { type: "boolT"; ty: Ty; val: boolean }
   | { type: "natT"; ty: Ty; val: number }
-  | { type: "uniqT"; ty: Ty; val: number }
   | { type: "pairT"; ty: Ty; fst: Tm; snd: Tm }
   | { type: "fstT"; ty: Ty; pair: Tm }
   | { type: "sndT"; ty: Ty; pair: Tm }
@@ -187,7 +209,7 @@ const valEq = (a: Val, b: Val): boolean => {
   return a === b;
 };
 
-const evalWith = (tm: Tm, env: Val[]): Val => {
+export const evalWith = (tm: Tm, env: Val[]): Val => {
   switch (tm.type) {
     case "varT":
       return env[tm.index];
@@ -196,7 +218,6 @@ const evalWith = (tm: Tm, env: Val[]): Val => {
     case "boolT":
       return tm.val;
     case "natT":
-    case "uniqT":
       return tm.val;
     case "pairT":
       return [evalWith(tm.fst, env), evalWith(tm.snd, env)];
@@ -222,8 +243,9 @@ const evalWith = (tm: Tm, env: Val[]): Val => {
     case "primT":
       return applyPrim(tm.op, evalWith(tm.arg, env));
     case "strmT":
-      // an obs-typed value IS a closed Exp: bake the environment in
-      return closeExp(tm.exp, env, 0);
+      // an obs-typed value is the body PAIRED with the environment, so
+      // nothing is baked in and nothing has to be denotable as a term
+      return { exp: tm.exp, env };
     case "nilT":
       return [];
     case "consT":
@@ -239,157 +261,6 @@ const evalWith = (tm: Tm, env: Val[]): Val => {
 
 export const evalTm = (tm: Tm): Val => evalWith(tm, []);
 export const applyFn = (fn: Fn, arg: Val): Val => evalWith(fn, [arg]);
-
-// ---- closing a runtime observable: syntactic Θ-substitution ----
-// A strmT-wrapped Exp under a Fn carries free Θ-vars (the fn's
-// argument); to become a closed obs value its Tms must have the
-// environment substituted in AS SYNTAX (the observable is compiled
-// later, not evaluated now). `depth` counts Θ-binders local to the exp
-// (map/scan fns, case branches); a varT below depth is local and kept,
-// otherwise it names an environment value, reified to a closed Tm.
-
-// a value → the closed Tm literal denoting it, guided by its type (the
-// type resolves a sum's other, absent branch)
-const reify = (v: Val, ty: Ty): Tm => {
-  switch (ty.type) {
-    case "unit":
-      return { type: "unitT", ty };
-    case "bool":
-      return { type: "boolT", ty, val: v as boolean };
-    case "nat":
-      return { type: "natT", ty, val: v as number };
-    case "uniq":
-      return { type: "uniqT", ty, val: v as number };
-    case "prod": {
-      const [a, b] = v as [Val, Val];
-      return {
-        type: "pairT",
-        ty,
-        fst: reify(a, ty.fst),
-        snd: reify(b, ty.snd),
-      };
-    }
-    case "sum": {
-      const s = v as { type: "inl" | "inr"; val: Val };
-      return s.type === "inl"
-        ? { type: "inlT", ty, val: reify(s.val, ty.left) }
-        : { type: "inrT", ty, val: reify(s.val, ty.right) };
-    }
-    case "obs":
-      return { type: "strmT", ty, exp: v as Exp };
-    case "list":
-      return (v as Val[]).reduceRight<Tm>(
-        (tail, x) => ({ type: "consT", ty, head: reify(x, ty.elem), tail }),
-        { type: "nilT", ty },
-      );
-  }
-};
-
-const closeTm = (tm: Tm, env: Val[], depth: number): Tm => {
-  switch (tm.type) {
-    case "varT":
-      // reified environment values are closed, so no weakening by depth
-      return tm.index < depth ? tm : reify(env[tm.index - depth], tm.ty);
-    case "unitT":
-    case "boolT":
-    case "natT":
-    case "uniqT":
-    case "nilT":
-      return tm;
-    case "consT":
-      return {
-        ...tm,
-        head: closeTm(tm.head, env, depth),
-        tail: closeTm(tm.tail, env, depth),
-      };
-    case "foldT":
-      return {
-        ...tm,
-        list: closeTm(tm.list, env, depth),
-        init: closeTm(tm.init, env, depth),
-        step: closeTm(tm.step, env, depth + 2), // binds element and accumulator
-      };
-    case "pairT":
-      return {
-        ...tm,
-        fst: closeTm(tm.fst, env, depth),
-        snd: closeTm(tm.snd, env, depth),
-      };
-    case "fstT":
-    case "sndT":
-      return { ...tm, pair: closeTm(tm.pair, env, depth) };
-    case "inlT":
-    case "inrT":
-      return { ...tm, val: closeTm(tm.val, env, depth) };
-    case "caseT":
-      return {
-        ...tm,
-        scrut: closeTm(tm.scrut, env, depth),
-        onInl: closeTm(tm.onInl, env, depth + 1), // branch binds Θ-var 0
-        onInr: closeTm(tm.onInr, env, depth + 1),
-      };
-    case "ifT":
-      return {
-        ...tm,
-        cond: closeTm(tm.cond, env, depth),
-        then: closeTm(tm.then, env, depth),
-        else: closeTm(tm.else, env, depth),
-      };
-    case "primT":
-      return { ...tm, arg: closeTm(tm.arg, env, depth) };
-    case "strmT":
-      return { ...tm, exp: closeExp(tm.exp, env, depth) };
-  }
-};
-
-// bind a mint's one Θ-var to the token the driver just handed out, which
-// is Agda's `subΘExp [] (src ∷ []) body` and nothing more: the binder is
-// gone by the time the body is compiled, so nothing downstream of here
-// ever sees a mint.
-export const bindMinted = (body: Closed, token: Val): Closed =>
-  closeExp(body, [token], 0);
-
-const closeExp = (exp: Exp, env: Val[], depth: number): Exp => {
-  switch (exp.type) {
-    case "input":
-    case "empty":
-    case "varE":
-      return exp; // no Θ subterms
-    case "of":
-      return { ...exp, items: exp.items.map((t) => closeTm(t, env, depth)) };
-    case "map":
-      return {
-        ...exp,
-        fn: closeTm(exp.fn, env, depth + 1), // fn binds the source value
-        src: closeExp(exp.src, env, depth),
-      };
-    case "scan":
-      return {
-        ...exp,
-        fn: closeTm(exp.fn, env, depth + 1), // fn binds the (state, value) pair
-        init: closeTm(exp.init, env, depth),
-        src: closeExp(exp.src, env, depth),
-      };
-    case "take":
-      return {
-        ...exp,
-        count: closeTm(exp.count, env, depth),
-        src: closeExp(exp.src, env, depth),
-      };
-    case "mergeAll":
-    case "switchAll":
-    case "exhaustAll":
-    case "batchSync":
-      return { ...exp, src: closeExp(exp.src, env, depth) };
-    case "mu":
-    case "defer":
-      // μ/defer bind μ-vars (Δᵍ/Δ), never Θ — depth unchanged
-      return { ...exp, body: closeExp(exp.body, env, depth) };
-    case "mint":
-      // mint binds a Θ-var (uniqᵗ), not a μ-var — depth increases by 1
-      return { ...exp, body: closeExp(exp.body, env, depth + 1) };
-  }
-};
 
 // ---- unfoldMu: one unfolding of the μ knot ----
 // Substitute the μ-var bound by this μ with the (closed) `mu body` node.
@@ -426,7 +297,6 @@ const substMuTm = (tm: Tm, st: MuSt, knot: Exp): Tm => {
     case "unitT":
     case "boolT":
     case "natT":
-    case "uniqT":
     case "nilT":
       return tm;
     case "consT":
@@ -543,7 +413,6 @@ const shiftTm = (tm: Tm, cutoff: number, by: number): Tm => {
     case "unitT":
     case "boolT":
     case "natT":
-    case "uniqT":
     case "nilT":
       return tm;
     case "consT":

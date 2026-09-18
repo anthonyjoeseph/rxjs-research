@@ -68,10 +68,12 @@ const genValTy = (rng: Rng, depth: number): Ty => {
   if (r < 0.55) return natT; // bias nat — the value domain's workhorse
   if (r < 0.7) return boolT;
   if (r < 0.75) return unitT;
-  // a thin lane, because a uniq's only operation is equality and a
-  // program made of them does nothing -- but not zero, since a former
-  // nothing generates is covered by no sweep whatever it reports
-  if (r < 0.78) return uniqT;
+  // NO uniq LANE, AND IT IS THE LANGUAGE SAYING SO RATHER THAN A BIAS.
+  // A type generated here is one terms will be needed AT -- an `of`
+  // item, a `scan` init, a leaf of a step -- and uniqᵗ has no closed
+  // term at all: a token enters only through a `mint` binder. So the
+  // lane that exercises uniq is `mint`, whose body generates under a
+  // Θ that HAS one, and the eqU lane below fires exactly there.
   if (r < 0.9)
     return {
       type: "prod",
@@ -95,6 +97,26 @@ type GenCtx = {
 };
 
 // ---- terms ----
+// WHICH TYPES HAVE A LITERAL AT ALL.  Every former below builds its
+// value out of constructors, and there is no constructor at uniqᵗ --
+// a token is minted at subscription and read out of Θ, never written
+// down -- so a type mentioning uniq anywhere has no literal and can
+// only be reached through a variable.
+const litable = (ty: Ty): boolean => {
+  switch (ty.type) {
+    case "uniq":
+      return false;
+    case "prod":
+      return litable(ty.fst) && litable(ty.snd);
+    case "sum":
+      return litable(ty.left) && litable(ty.right);
+    case "list":
+      return litable(ty.elem);
+    default:
+      return true;
+  }
+};
+
 // a guaranteed-terminating literal of the type (obs → a strmT wrapping a
 // shallow observable)
 const litTm = (rng: Rng, ty: Ty, ctx: GenCtx, depth: number): Tm => {
@@ -105,10 +127,9 @@ const litTm = (rng: Rng, ty: Ty, ctx: GenCtx, depth: number): Tm => {
       return { type: "boolT", ty, val: chance(rng, 0.5) };
     case "nat":
       return { type: "natT", ty, val: int(rng, 0, 9) };
-    // a narrow range on purpose: two tokens drawn from three collide
-    // often enough that eqU is exercised on both answers
     case "uniq":
-      return { type: "uniqT", ty, val: int(rng, 0, 2) };
+      // unreachable: every caller consults `litable` first
+      throw new Error("no literal inhabits uniq — a token comes from mint");
     case "prod":
       return {
         type: "pairT",
@@ -140,12 +161,20 @@ const genTm = (rng: Rng, ty: Ty, ctx: GenCtx, depth: number): Tm => {
     .filter((x) => tyEq(x.vt, ty));
   const varTm = (): Tm => ({ type: "varT", ty, index: pick(rng, vars).i });
 
+  // a non-litable type is reachable only through Θ, so the variable
+  // lane is not a preference there but the whole of it
+  const lit = litable(ty);
+  if (!lit && vars.length === 0)
+    throw new Error(
+      `no term inhabits ${ty.type} without a variable — caller invariant violated`,
+    );
   if (depth <= 0 || chance(rng, 0.35))
-    return vars.length > 0 && chance(rng, 0.6)
+    return vars.length > 0 && (!lit || chance(rng, 0.6))
       ? varTm()
       : litTm(rng, ty, ctx, depth);
 
-  const opts: (() => Tm)[] = [() => litTm(rng, ty, ctx, depth)];
+  const opts: (() => Tm)[] = [];
+  if (lit) opts.push(() => litTm(rng, ty, ctx, depth));
   if (vars.length > 0) opts.push(varTm);
   // PROJECTING A PAIR VARIABLE IS THE ONLY WAY INTO A BOUND PAIR, and
   // it is what puts a list in scope at all: the pure-function former
@@ -185,17 +214,42 @@ const genTm = (rng: Rng, ty: Ty, ctx: GenCtx, depth: number): Tm => {
       op: pick(rng, ["eq", "lt"] as PrimOp[]),
       arg: natPair(),
     }));
-    opts.push(() => ({
-      type: "primT",
-      ty,
-      op: "eqU" as PrimOp,
-      arg: {
-        type: "pairT",
-        ty: prodUU,
-        fst: genTm(rng, uniqT, ctx, depth - 1),
-        snd: genTm(rng, uniqT, ctx, depth - 1),
-      },
-    }));
+    // guarded on a token being IN SCOPE, which is the only place one
+    // can come from: nested mints put two there and that is when the
+    // operation has both answers to give.
+    //
+    // WEIGHTED, AND THE WEIGHT DOES NOT CLOSE THE GAP -- SAY SO RATHER
+    // THAN READ IT AS FIXED.  While a token could be written down this
+    // lane fired wherever a bool was wanted; now it needs a `mint`
+    // ancestor AND a bool request under it AND this option out of a
+    // dozen. Measured over the default corpus: 500 cases, 153 mint
+    // nodes, and eqU terms went 0 -> 1 when this draw was weighted
+    // four-fold, while the same weight on a mint-forced corpus went
+    // 257 -> 655. So the weight works and the CONJUNCTION is the
+    // limit: default-corpus mints sit deep, where the body is a leaf.
+    //
+    // THE REAL REMEDY IS uniq AS AN ELEMENT TYPE, WHICH IS NOT FREE.
+    // A token flowing as stream data is what makes eqU ordinary rather
+    // than a coincidence of scope -- and it is legal, nothing in either
+    // tree forbids `mint(token => of(token))`. What blocks it is the
+    // harness: the streams are compared up to renaming of instants and
+    // sources, a token in a value position is renamed by neither, and
+    // `canonical` walks values without their TYPE, so it cannot tell a
+    // token from a nat to rename it. Allowing the element type means
+    // teaching that walk the element type on both sides.
+    if (ctx.theta.some((vt) => tyEq(vt, uniqT)))
+      for (let w = 0; w < 4; w++)
+        opts.push(() => ({
+          type: "primT",
+          ty,
+          op: "eqU" as PrimOp,
+          arg: {
+            type: "pairT",
+            ty: prodUU,
+            fst: genTm(rng, uniqT, ctx, depth - 1),
+            snd: genTm(rng, uniqT, ctx, depth - 1),
+          },
+        }));
     opts.push(() => ({
       type: "primT",
       ty,
@@ -529,7 +583,10 @@ const genVal = (rng: Rng, ty: Ty, depth: number): Val => {
     case "nat":
       return int(rng, 0, 9);
     case "uniq":
-      return int(rng, 0, 2);
+      // unreachable: `genValTy` yields no uniq, and that is the point —
+      // a token is minted at subscription, so nothing OUTSIDE the
+      // program can produce one, a scripted input least of all
+      throw new Error("no scripted value inhabits uniq — a token is minted");
     case "prod":
       return [genVal(rng, ty.fst, depth), genVal(rng, ty.snd, depth)];
     case "sum":
@@ -537,7 +594,9 @@ const genVal = (rng: Rng, ty: Ty, depth: number): Val => {
         ? { type: "inl", val: genVal(rng, ty.left, depth) }
         : { type: "inr", val: genVal(rng, ty.right, depth) };
     case "obs":
-      return { type: "empty", ty: ty.elem }; // unreachable: slots are value-typed
+      // unreachable: slots are value-typed. A value at obs type is a
+      // CLOSURE, so the empty environment is part of the shape
+      return { exp: { type: "empty", ty: ty.elem }, env: [] };
     case "list":
       return [];
   }
