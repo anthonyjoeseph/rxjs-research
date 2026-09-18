@@ -66,7 +66,7 @@ open import Rx.Prim using (Timed; after_,_; ObservableInput; hot; cold; InstEven
   complete; InstEmit; _at_from_as_)
 open import Rx.Exp using (Ty; natᵗ; obs; _×ᵗ_; isData; Ctx; Exp; Tm; Fn; PrimOp; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ;
   batchSyncᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ; unit̂; bool̂;
-  nat̂; uniq̂; primᵗ; pairᵗ; fstᵗ; sndᵗ; strmᵗ; varᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; nilᵗ; consᵗ;
+  nat̂; primᵗ; pairᵗ; fstᵗ; sndᵗ; strmᵗ; varᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; nilᵗ; consᵗ;
   foldᵗ; add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Rx.Emit-Eq using (eqBatched)
@@ -507,7 +507,6 @@ marksᵗ (varᵗ x)      = noMarks
 marksᵗ unit̂          = noMarks
 marksᵗ (bool̂ _)      = noMarks
 marksᵗ (nat̂ _)       = noMarks
-marksᵗ (uniq̂ _)      = noMarks
 marksᵗ (pairᵗ a b)   = marksᵗ a ⊕ marksᵗ b
 marksᵗ (fstᵗ p)      = marksᵗ p
 marksᵗ (sndᵗ p)      = marksᵗ p
@@ -630,7 +629,6 @@ showTm (varᵗ x)           = "(varᵗ " ++ showIx x ++ ")"
 showTm unit̂               = "unit̂"
 showTm (bool̂ b)           = "(bool̂ " ++ (if b then "true" else "false") ++ ")"
 showTm (nat̂ n)            = "(nat̂ " ++ show n ++ ")"
-showTm (uniq̂ n)           = "(uniq̂ " ++ show n ++ ")"
 showTm (pairᵗ a b)        = "(pairᵗ " ++ showTm a ++ " " ++ showTm b ++ ")"
 showTm (fstᵗ p)           = "(fstᵗ " ++ showTm p ++ ")"
 showTm (sndᵗ p)           = "(sndᵗ " ++ showTm p ++ ")"

@@ -12,10 +12,10 @@ open import Relation.Binary.PropositionalEquality using (subst; refl)
 
 open import Rx.Exp using (Ty; Ctx; Exp; Tm; Fn; natᵗ; listᵗ; obs; _×ᵗ_;
                           boolᵗ; uniqᵗ;
-                          input; μᵉ; varᵉ; deferᵉ; mapᵉ; scanᵉ;
-                          varᵗ; unit̂; bool̂; nat̂; uniq̂; pairᵗ; fstᵗ; sndᵗ; nilᵗ;
+                          input; μᵉ; varᵉ; deferᵉ; mapᵉ; scanᵉ; mintᵉ;
+                          varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; nilᵗ;
                           consᵗ; inlᵗ; inrᵗ; caseᵗ; foldᵗ; ifᵗ; primᵗ; strmᵗ;
-                          letᵗ; revᵗ; renTm; ext∈;
+                          letᵗ; revᵗ; renTm; renExp; ext∈;
                           add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ)
 open import Rx.Envelope using (instEventᵗ; eventsᵛ; splitEventsᵛ; reassembleᵛ;
                                instEmitᵛ)
@@ -40,10 +40,12 @@ open import Rx.SExp using (SExp; STm; inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; sca
 -- is short a capability of the same two kinds.
 --
 -- MINTING IS THE FIRST KIND AND IT IS THE HARD ONE.  A source coming
--- alive owes an `init` naming a token nothing has used, and `uniq̂` is a
--- literal — the one term that makes a token and the one the simul
--- palette deliberately does not reach, since a program that could write
--- a token could forge a collision.  So `ofᵖ` and `emptyᵖ` are blocked
+-- alive owes an `init` naming a token nothing has used, and the term
+-- language has no former at `uniqᵗ` at all — a term that made a token
+-- would be a literal, and a program that could write a token could
+-- forge a collision.  A token is drawn from a BINDER, and a binder
+-- names one token per subscription while a source owes one per time it
+-- comes alive.  So `ofᵖ` and `emptyᵖ` are blocked
 -- outright, and the three flatteners are blocked on the registrations
 -- they bring alive rather than on their values.
 --
@@ -107,11 +109,12 @@ postulate
   --   in one frame group separately and nothing joins the two groups --
   --   which is the whole of what the id was doing.  The former is
   --   necessary here and is not sufficient.
-  -- DEAD ROUTE: build both inline, out of `uniq̂` and a counter carried
-  --   in a scan's state.  `uniq̂` is a literal, so a program that writes
-  --   one can write one already in use — which is the forgery the palette
-  --   exists to rule out — and a scan's state advances per EMIT, so it
-  --   cannot tell two emits of one cascade from two cascades.  Both
+  -- DEAD ROUTE: build both inline, out of a `mintᵉ`-bound token and a
+  --   counter carried in a scan's state.  A mint binds ONE token per
+  --   subscription, so it cannot name the successive instants a source
+  --   coming alive repeatedly owes; and a scan's state advances per
+  --   EMIT, so it cannot tell two emits of one cascade from two
+  --   cascades.  Both
   --   quantities are properties of the RUN, and the run is the
   --   scheduler's.  AND BRACKETING FIRST DOES NOT REPAIR IT, which is
   --   the repair the bracket invites: a group-advanced counter numbers
@@ -248,16 +251,22 @@ mapᵖ {Θ = Θ} {s = s} {t = t} f e = mapᵉ step e
 -- `mapᵉ` projects, which is the same two-stage shape rxjs writes as
 -- `scan` followed by `map`.
 --
--- THE SEED'S EMIT COMPONENT IS UNOBSERVABLE, AND THAT IS WHAT MAKES
--- WRITING ONE LEGITIMATE HERE.  A scan emits the result of its FIRST
+-- THE SEED'S EMIT COMPONENT IS UNOBSERVABLE, AND THAT IS WHY A BOUND
+-- TOKEN SUFFICES FOR IT.  A scan emits the result of its FIRST
 -- application and never the seed, so the tokens below are read by
 -- nothing and claim no freshness — which is the capability the two
--- source rows above are blocked on, and is not this one.
-scanᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {s t : Ty}
-      → Fn Γ Δᵍ Δ Θ (plainᵗ t ×ᵗ plainᵗ s) (plainᵗ t)
-      → Tm Γ Δᵍ Δ Θ (plainᵗ t)
-      → Exp Γ Δᵍ Δ Θ (emitᵗ s) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
-scanᵖ {Θ = Θ} {s = s} {t = t} f z e =
+-- source rows above are blocked on, and is not this one.  What the
+-- seed still needs is an INHABITANT of `uniqᵗ`, and the term language
+-- has no closed one: a former at that type would be a literal, and a
+-- program that can write a token can write one already in use.  So the
+-- placeholder is taken from a BINDER, and the elaboration pays one
+-- `mintᵉ` per `scanˢ` for a token it never reads.
+scanᵖ′ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {s t : Ty}
+       → Tm Γ Δᵍ Δ Θ uniqᵗ
+       → Fn Γ Δᵍ Δ Θ (plainᵗ t ×ᵗ plainᵗ s) (plainᵗ t)
+       → Tm Γ Δᵍ Δ Θ (plainᵗ t)
+       → Exp Γ Δᵍ Δ Θ (emitᵗ s) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
+scanᵖ′ {Θ = Θ} {s = s} {t = t} tok f z e =
   mapᵉ (sndᵗ (varᵗ (here refl))) (scanᵉ step seed e)
   where
   -- the carried value: the author's state, and the emit built for the
@@ -270,7 +279,7 @@ scanᵖ {Θ = Θ} {s = s} {t = t} f z e =
   P = A ×ᵗ emitᵗ s
 
   seed : Tm _ _ _ Θ A
-  seed = pairᵗ z (instEmitᵛ nilᵗ (uniq̂ 0) (uniq̂ 0) (inlᵗ unit̂))
+  seed = pairᵗ z (instEmitᵛ nilᵗ tok tok (inlᵗ unit̂))
 
   S : Ty
   S = listᵗ (instEventᵗ uniqᵗ (plainᵗ t)) ×ᵗ (listᵗ (plainᵗ s) ×ᵗ boolᵗ)
@@ -321,6 +330,16 @@ scanᵖ {Θ = Θ} {s = s} {t = t} f z e =
   step = letᵗ (splitEventsᵛ {b = plainᵗ t} (eventsᵛ (sndᵗ arg)))
               (fstᵗ arg)
               body
+
+scanᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {s t : Ty}
+      → Fn Γ Δᵍ Δ Θ (plainᵗ t ×ᵗ plainᵗ s) (plainᵗ t)
+      → Tm Γ Δᵍ Δ Θ (plainᵗ t)
+      → Exp Γ Δᵍ Δ Θ (emitᵗ s) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
+scanᵖ f z e =
+  mintᵉ (scanᵖ′ (varᵗ (here refl))
+                (renTm (λ x → x) (λ x → x) (ext∈ there) f)
+                (renTm (λ x → x) (λ x → x) there z)
+                (renExp (λ x → x) (λ x → x) there e))
 
 ------------------------------------------------------------------
 -- The elaboration: one simul program down into one plain program.
