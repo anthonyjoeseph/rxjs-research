@@ -814,9 +814,13 @@ evaluate! {n = n} fuel e ins =
 -- it there and nothing of it here.  The witness is one program: a
 -- shared slot over a two-item `ofᵉ`, flattened by a map whose payload is
 -- that same slot, where rxjs yields the second item and this yields
--- nothing.  The mechanism is `oneShotBurst`, which packages a whole
--- synchronous source as ONE emit carrying its own `complete`, so
--- "part-way through" is not a state this machine has; the share's
+-- nothing.  The mechanism is `oneShotBurst`, which runs a whole
+-- synchronous source in ONE STEP -- every value and then its
+-- `complete`, with nothing scheduled and nothing able to interleave --
+-- so "part-way through" is not a state this machine has.  The plain
+-- carrier did not touch this: it split that burst into one event per
+-- value, which changes what the stream LOOKS like and not when any of
+-- it is produced.  The share's
 -- completion latch then makes the re-entrant subscribe spent, but
 -- removing the latch would only buy an init.  That is why the plain
 -- evaluator is a SECOND top line rather than a retype of this one, and
