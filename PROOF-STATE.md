@@ -254,7 +254,8 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
   in the same fashion, so the correspondence is readable rather than asserted.
   The first thing tested is the SEEDED channel the share reads at subscribe
   time, a further ask than a plain channel which `Tm` may not have.
-  `batchSyncᵉ` is already one, and its shape is in doubt — see its header.
+  `batchSyncᵉ` is already one, at the index Anthony has ruled on — see its
+  header — and now carried by both TypeScript legs and by `Rx.Depth`.
   **AND IF THE LANGUAGE CANNOT SAY ONE, STOP AND REPORT (Anthony).** A missing
   former is never repaired by inventing one: a new `Ty` constructor or `Tm`
   former changes what a program can SAY, so it decides what every theorem above

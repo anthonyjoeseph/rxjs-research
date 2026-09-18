@@ -41,7 +41,7 @@ open import Relation.Binary.PropositionalEquality using (refl)
 
 open import Rx.Prim  using (Tick; Fuel; Timed; after_,_; hot; cold)
 open import Rx.Exp   using (Ty; Ctx; Val; Env; []ᵉ; _∷ᵉ_; Closed; Tm; FnClo; applyClo; evalWith; unfoldμ; _≟ᵗ_; uniqᵗ;
-  obs; _×ᵗ_; input; ofᵉ; emptyᵉ; takeᵉ; batchSyncᵉ; mapᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ;
+  obs; _×ᵗ_; listᵗ; input; ofᵉ; emptyᵉ; takeᵉ; batchSyncᵉ; mapᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ;
   exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ)
 open import Rx.Slots using (Slots; Slot; scripted; shared)
 
@@ -66,6 +66,7 @@ data Frameᵈ {n} (Γ : Ctx n) : Ty → Ty → Set where
   map-f      : ∀ {s u} → FnClo Γ s u → Frameᵈ Γ s u
   scan-f     : ∀ {s u} → FnClo Γ (u ×ᵗ s) u → Nodeᵈ → Frameᵈ Γ s u
   take-f     : ∀ {s} → Nodeᵈ → Frameᵈ Γ s s
+  batch-f    : ∀ {s} → Nodeᵈ → Frameᵈ Γ s (s ×ᵗ listᵗ s)
   from-inner : ∀ {s} → AllOpᵈ → (allNode innerInstance : Nodeᵈ) → Frameᵈ Γ s s
   thru-outer : ∀ {u} → AllOpᵈ → Nodeᵈ → Frameᵈ Γ (obs u) u
 
@@ -94,6 +95,12 @@ infixr 5 _↠ᵈ_
 data Cellᵈ {n} (Γ : Ctx n) : Set where
   scan-c    : ∀ {u} → Val Γ u → Cellᵈ Γ
   take-c    : (remaining : ℕ) → Cellᵈ Γ
+  -- the accumulator the subscribe burst is collected into, and the two
+  -- bits that say where the frame is: `sync` is open until the seal
+  -- pops, and `srcDone` holds a completion that arrived while it was,
+  -- since a source finishing inside its own subscribe call must not
+  -- take the group down with it.
+  batch-c   : ∀ {u} → (sync srcDone : Bool) → List (Val Γ u) → Cellᵈ Γ
   merge-c   : ∀ {u} → (limit : Maybe ℕ) (active : ℕ)
             → (queued : List (Val Γ (obs u))) (outerDone : Bool) → Cellᵈ Γ
   switch-c  : (currentInner : Maybe Nodeᵈ) (outerDone : Bool) → Cellᵈ Γ
@@ -126,6 +133,13 @@ readTakeᵈ : ∀ {n} {Γ : Ctx n} → Maybe (Cellᵈ Γ) → Maybe ℕ
 readTakeᵈ (just (take-c r)) = just r
 readTakeᵈ _                 = nothing
 
+readBatchᵈ : ∀ {n} {Γ : Ctx n} (u : Ty) → Maybe (Cellᵈ Γ)
+           → Maybe (Bool × Bool × List (Val Γ u))
+readBatchᵈ u (just (batch-c {u = w} s d vs)) with w ≟ᵗ u
+... | yes refl = just (s , d , vs)
+... | no  _    = nothing
+readBatchᵈ u _ = nothing
+
 readMergeᵈ : ∀ {n} {Γ : Ctx n} (u : Ty) → Maybe (Cellᵈ Γ)
            → Maybe (Maybe ℕ × ℕ × List (Val Γ (obs u)) × Bool)
 readMergeᵈ u (just (merge-c {u = w} l a q d)) with w ≟ᵗ u
@@ -154,6 +168,16 @@ data Workᵈ {n} (Γ : Ctx n) (t : Ty) : Set where
             -- subscribe this observable value with this sink
   finish  : ∀ {s} → Pathᵈ Γ s t → Workᵈ Γ t
             -- a completion travelling rootward
+  seal    : ∀ {s} → Nodeᵈ → Pathᵈ Γ (s ×ᵗ listᵗ s) t → Workᵈ Γ t
+            -- THE SUBSCRIBE FRAME'S OWN BOUNDARY, AS A STACK ENTRY.
+            -- This is pushed BENEATH the source's `connect`, so it pops
+            -- once that subscription's whole cascade has unwound and
+            -- nothing synchronous is left above it — which is exactly
+            -- what `merge`'s in-order, synchronous subscription of its
+            -- second input buys the mirror, and by the same mechanism
+            -- rather than an analogous one. Scheduled arrivals sit in
+            -- the queue and not on the stack, so they cannot pre-empt
+            -- it, and that is the whole of the bit this operator sees.
 
 -- WHAT A CUT HAS TO REMOVE IS PENDING WORK, NOT LIVE STRUCTURE.  A
 -- cancelled branch in rxjs is silent, and silence is all any consumer
@@ -168,6 +192,7 @@ frameNodesᵈ : ∀ {n} {Γ : Ctx n} {s u} → Frameᵈ Γ s u → List Nodeᵈ
 frameNodesᵈ (map-f _)          = []
 frameNodesᵈ (scan-f _ k)       = k ∷ []
 frameNodesᵈ (take-f k)         = k ∷ []
+frameNodesᵈ (batch-f k)        = k ∷ []
 frameNodesᵈ (from-inner _ k j) = k ∷ j ∷ []
 frameNodesᵈ (thru-outer _ k)   = k ∷ []
 
@@ -184,6 +209,7 @@ workThroughᵈ : ∀ {n} {Γ : Ctx n} {t} → Nodeᵈ → Workᵈ Γ t → Bool
 workThroughᵈ k (deliver _ _ p) = pathThroughᵈ k p
 workThroughᵈ k (connect _ p)   = pathThroughᵈ k p
 workThroughᵈ k (finish p)      = pathThroughᵈ k p
+workThroughᵈ k (seal j p)      = (j ≡ᵇ k) ∨ pathThroughᵈ k p
 
 ------------------------------------------------------------------
 -- Scripted arrivals and share cells
@@ -385,21 +411,18 @@ mutual
     let x = Stᵈ.nextTok st
     in pushWorkᵈ (connect (uniqᵗ ∷ _ , e , x ∷ᵉ ρ) p) (record st { nextTok = suc x })
 
-  -- THIS ARM IS UNWRITTEN, AND IT FINISHES EMPTY RATHER THAN SAYING SO,
-  -- WHICH IS WHAT MAKES IT COSTLY.  The operator has a plain-rxjs mirror
-  -- and both TypeScript legs now carry it -- the sync bit is `merge`'s
-  -- own subscribe ordering, never a subscription either leg owns -- so
-  -- what is missing here is a CELL, not a capability.  This carrier
-  -- delivers a burst one value per event, so the grouping needs an
-  -- accumulator held across the subscribe frame and flipped shut when
-  -- it drains, which is exactly the shape the reference operator has and
-  -- exactly what no cell kind here can hold today.
-  -- DEAD ROUTE: finish empty and let the pairing's `gen`/`agen` columns
-  --   carry it as a hole.  A node that emits nothing is not a hole, it
-  --   is a DISAGREEMENT, and the oracle reports it as one the moment the
-  --   generator draws a `batchSync` -- every such case comes back with
-  --   the plain leg's values against an empty Agda run.
-  subscribeᵈ ins (_ , batchSyncᵉ _ , ρ) p st = pushWorkᵈ (finish p) st
+  -- THE SEAL GOES ON FIRST, WHICH IS THE WHOLE OPERATOR.  Pushing it
+  -- beneath the source's `connect` makes the stack do what `merge`
+  -- does in the mirror: the source drains its subscribe burst, every
+  -- value's cascade included, and only then does the boundary pop.
+  -- Nothing here looks forward and nothing is held back to see whether
+  -- more is owed.
+  subscribeᵈ ins (_ , batchSyncᵉ {t = u} e , ρ) p st =
+    let k = Stᵈ.nextNode st
+    in pushWorkᵈ (connect (_ , e , ρ) (batch-f k ↠ᵈ p))
+         (pushWorkᵈ (seal k p)
+           (record st { nodes    = setCellᵈ k (batch-c {u = u} true false []) (Stᵈ.nodes st)
+                      ; nextNode = suc k }))
 
   pushValueᵈ : ∀ {n} {Γ : Ctx n} {t s} → Val Γ s → Pathᵈ Γ s t → Stᵈ Γ t → Stᵈ Γ t
   pushValueᵈ v rootᵈ      st = record st { out = Stᵈ.out st ++ v ∷ [] }
@@ -425,6 +448,16 @@ mutual
                       (record st { nodes = setCellᵈ k (take-c r) (Stᵈ.nodes st) })
           in if r ≡ᵇ 0 then finishPathᵈ p (cutᵈ k st₁) else st₁
 
+  -- inside the frame the value is ACCUMULATED and nothing is emitted;
+  -- outside it, it leaves as its own singleton, tail empty.
+  pushValueᵈ {s = u} v (batch-f k ↠ᵈ p) st
+    with readBatchᵈ u (lookupCellᵈ k (Stᵈ.nodes st))
+  ... | nothing              = st
+  ... | just (false , _ , _) = pushValueᵈ (v , []) p st
+  ... | just (true , d , vs) =
+          record st { nodes = setCellᵈ k (batch-c {u = u} true d (vs ++ v ∷ []))
+                                (Stᵈ.nodes st) }
+
   pushValueᵈ v (from-inner mergeᵒ   _ _ ↠ᵈ p) st = pushValueᵈ v p st
   pushValueᵈ v (from-inner exhaustᵒ _ _ ↠ᵈ p) st = pushValueᵈ v p st
   pushValueᵈ v (from-inner switchᵒ k j ↠ᵈ p) st
@@ -442,6 +475,17 @@ mutual
   finishPathᵈ (map-f _    ↠ᵈ p) st = finishPathᵈ p st
   finishPathᵈ (scan-f _ _ ↠ᵈ p) st = finishPathᵈ p st
   finishPathᵈ (take-f _   ↠ᵈ p) st = finishPathᵈ p st
+
+  -- A SOURCE THAT COMPLETES INSIDE ITS OWN SUBSCRIBE CALL MUST NOT TAKE
+  -- THE GROUP WITH IT.  In the mirror the completion reaches a `merge`
+  -- whose second input is not yet subscribed, so the merge stays live;
+  -- here the bit is parked in the cell and spent at the seal.
+  finishPathᵈ {s = u} (batch-f k ↠ᵈ p) st
+    with readBatchᵈ u (lookupCellᵈ k (Stᵈ.nodes st))
+  ... | nothing              = finishPathᵈ p st
+  ... | just (false , _ , _) = finishPathᵈ p st
+  ... | just (true , _ , vs) =
+          record st { nodes = setCellᵈ k (batch-c {u = u} true true vs) (Stᵈ.nodes st) }
 
   finishPathᵈ (from-inner mergeᵒ k j ↠ᵈ p) st = innerDoneMergeᵈ k j p st
 
@@ -552,6 +596,22 @@ mutual
     pushValueᵈ v p (record st { work = deliver vs done p ∷ Stᵈ.work st })
   stepᵈ ins (connect o p) st = subscribeᵈ ins o p st
   stepᵈ ins (finish p)    st = finishPathᵈ p st
+
+  -- THE GROUP LEAVES HERE AND THE FRAME SHUTS, IN THAT ORDER.  An empty
+  -- burst emits nothing rather than an empty group, since the result is
+  -- a head and a tail; a parked completion is spent afterwards, so the
+  -- group is never lost to it.
+  stepᵈ ins (seal {s = u} k p) st with readBatchᵈ u (lookupCellᵈ k (Stᵈ.nodes st))
+  ... | nothing = st
+  ... | just (_ , d , []) =
+          let st₁ = record st { nodes = setCellᵈ k (batch-c {u = u} false d [])
+                                          (Stᵈ.nodes st) }
+          in if d then finishPathᵈ p st₁ else st₁
+  ... | just (_ , d , (v ∷ vs)) =
+          let st₁ = pushValueᵈ (v , vs) p
+                      (record st { nodes = setCellᵈ k (batch-c {u = u} false d [])
+                                             (Stᵈ.nodes st) })
+          in if d then finishPathᵈ p st₁ else st₁
 
 ------------------------------------------------------------------
 -- The top line
