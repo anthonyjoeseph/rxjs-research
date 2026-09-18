@@ -54,11 +54,13 @@ const scriptedDeliveries = (
 export const makeInputSource = (
   driver: Driver,
   input: ObservableInput<Val>,
+  index: number,
 ): Observable<InstEmit<Val>> =>
   input.type === "hot"
-    ? hot<Val>(driver, (source, sink) => {
+    ? hot<Val>(driver, index, (source, sink) => {
         driver.registerSource(
           scriptedDeliveries(source, resolveTicks(0, input.async), sink),
+          index,
         );
       })
     : cold<Val>(driver, (source) => ({

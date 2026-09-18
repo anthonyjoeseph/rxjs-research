@@ -38,8 +38,16 @@ export type Driver = {
   // total (tick, ordinal) arbitration order is what must match, not
   // the ordinal values. Returns a cancel: rx teardown drops the
   // remaining deliveries (Agda's sweepLive).
+  //
+  // A SCRIPTED HOT SLOT SUPPLIES ITS OWN ORDINAL, because it owns one
+  // before the run starts: Agda's `mkHot` gives slot i both source and
+  // ordinal `toℕ i`, and the dynamic counters begin ABOVE the slots.
+  // Minted in registration order a hot slot's ordinal counts the hots
+  // rather than the slots, so a shared slot ahead of a hot one shifts
+  // every ordinal down and the (tick, ordinal) arbitration diverges.
   registerSource: (
     pending: { tick: number; fire: (arrival: Arrival) => void }[],
+    ordinal?: number,
   ) => () => void;
   // a share's chain emits (the emptied pass-through carrying the
   // handoff — Agda foldPath's share-sink clause) reach the root
@@ -70,7 +78,10 @@ type RegisteredSource = {
 // -- two sources that became one cannot be renamed back apart.
 export const createDriver = (slotCount = 0): Driver => {
   const sources: RegisteredSource[] = [];
-  let nextOrdinal = 0;
+  // both counters begin ABOVE the slots, which own the identifiers
+  // below that bound — Agda's `mint-init n` at `ordinalᵏ` as well as
+  // `sourceᵏ`, the two being one line there and two here.
+  let nextOrdinal = slotCount;
   let nextSourceId = slotCount;
   // the root subscription's frame is tick 0 (Agda: subscribeE e root
   // (freshId 0 0) 0 …)
@@ -86,9 +97,9 @@ export const createDriver = (slotCount = 0): Driver => {
     pushChainEmit: (emit) => chainSink.next(emit),
     chainEmits,
     currentTick: () => tick,
-    registerSource: (pending) => {
+    registerSource: (pending, ordinal) => {
       const entry: RegisteredSource = {
-        ordinal: nextOrdinal++,
+        ordinal: ordinal ?? nextOrdinal++,
         pending: [...pending],
       };
       sources.push(entry);

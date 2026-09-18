@@ -101,7 +101,7 @@ const evaluateRx = (testCase: TestCase): EvalResult => {
     (prefix, slot, index) => [
       ...prefix,
       slot.type === "scripted"
-        ? makeInputSource(driver, slot.input)
+        ? makeInputSource(driver, slot.input, index)
         : share(driver, compile(slot.def, driver, prefix), index),
     ],
     [],

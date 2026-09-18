@@ -130,11 +130,19 @@ const subscribeBurst = <A>(
 // burst rather than a registration nothing would ever close, and the
 // latch is what makes that true DURING the final cascade as well as
 // after it (see `LiveSink`).
+//
+// AND ITS ID IS HANDED IN RATHER THAN MINTED, which is where "minted
+// once, at construction" actually lands: a hot exists only as a
+// scripted SLOT, and a slot's identifier is its index — reserved
+// below the dynamic counter precisely so nothing mints into it. Minted
+// from that counter instead, a hot both burns an id the slots already
+// own and shifts every later one, so a `mint` token compared against a
+// literal reads differently from the same program in Agda.
 export const hot = <A>(
   driver: Driver,
+  source: SourceId,
   register: (source: SourceId, sink: LiveSink<InstEmit<A>>) => void,
 ): Observable<InstEmit<A>> => {
-  const source = driver.mintSourceId();
   const [live, sink] = channel<InstEmit<A>>();
   let spent = false;
   register(source, {
