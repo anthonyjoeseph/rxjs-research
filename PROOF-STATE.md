@@ -249,16 +249,26 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
   `Reducible`'s candidate reads any of it, which is the claim this leg
   tests by deleting it.
 
-- **RE-ENTRANT SOURCES, AND `Reducible` IS WHY THIS COSTS NOTHING
-  (Anthony: the candidate "was written against an evaluator whose only
-  difference was that it had instemit cruft built into it").** The one
-  measured divergence is `oneShotBurst`: a source runs whole, so a
-  subscriber attaching part-way sees the remainder in rxjs and nothing
-  here. Depth-first is the NATURAL recursion of a big-step relation — run
-  each value's cascade before the next — so the fix is to interleave the
-  fold, not to schedule a work stack, and the type descent that funds the
-  candidate is untouched. `budgetᵈ` is already gone with the machine that
-  needed it.
+- **RE-ENTRANT SOURCES, AND THE COST IS THE RESULT TYPE RATHER THAN THE
+  DESCENT.** `Reducible` transfers untouched: it recurses on the TYPE and
+  reads no instant bookkeeping, so nothing it funds moves. What moves is
+  `subscribeE⇓`, which hands its burst back at the SOURCE's element type
+  for each enclosing frame to push — so a source is materialised whole
+  before any of it descends, and a re-entrant subscribe writes into a
+  registry read only after the loop it should have joined. A subscribe
+  must carry its path and emit at the ROOT type, one value at a time.
+  Then depth-first is the recursion's own order, no work stack appears,
+  and `pushBurst⇓` is deleted rather than repaired.
+
+- **AND THE BRACKET OPERATOR IS WHAT THAT COSTS.** `batchSyncᵉ` groups
+  the whole arriving LIST into one value, and per-value emission leaves
+  no list to group. The semantics survives and is the one real rxjs has:
+  a flag raised for the subscribe call, values buffered while it is up,
+  one flush when the call returns. What goes is the reading that a burst
+  IS a batch — never a fact about rxjs, only about how this machine
+  carried a source's output. The flatteners get cheaper in the same
+  move: a saturated `mergeAll` queues the OBSERVABLE, as rxjs does,
+  instead of re-dispatching a list of values its inner already produced.
 
 - **THEN THE FLATTENERS AND `takeᵖ`, AND NO FORMER IS OWED AFTER ALL
   (Anthony: "the flattens, mergeAll etc, _are_ the primitives … they can

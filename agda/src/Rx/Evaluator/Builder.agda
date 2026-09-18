@@ -807,30 +807,46 @@ evaluate! {n = n} fuel e ins =
 -- machine with three clauses' worth of question removed, reached
 -- through the builder rather than through a witness it seeds itself.
 
--- AND ITS VALUES ARE NOT PLAIN rxjs's, WHICH THE ORACLE SHOWED AND NO
--- REPAIR HERE CAN ANSWER.  A burst is collected WHOLE and then pushed,
--- while rxjs pushes each item depth-first — so a subscriber that
--- attaches part-way through a source's synchronous run sees the rest of
--- it there and nothing of it here.  The witness is one program: a
--- shared slot over a two-item `ofᵉ`, flattened by a map whose payload is
--- that same slot, where rxjs yields the second item and this yields
--- nothing.  Run in real rxjs at THREE items, with the flattening branch
--- merged ahead of a plain one, it answers `1->2 1->3 2->3`: each
--- re-entrant subscribe sees a strictly shorter SUFFIX of a source still
--- mid-run, and the plain branch sees nothing because the source has
--- finished by the time `merge` reaches it.  Every row of that is a
--- state this machine cannot be in, and the suffixes are what says the
--- gap is ordering rather than an off-by-one.  The mechanism is `oneShotBurst`, which runs a whole
--- synchronous source in ONE STEP -- every value and then its
--- `complete`, with nothing scheduled and nothing able to interleave --
--- so "part-way through" is not a state this machine has.  The plain
--- carrier did not touch this: it split that burst into one event per
--- value, which changes what the stream LOOKS like and not when any of
--- it is produced.  The share's
--- completion latch then makes the re-entrant subscribe spent, but
--- removing the latch would only buy an init.  That is why the plain
--- evaluator is a SECOND top line rather than a retype of this one, and
--- why projecting values out of here is only the oracle's stopgap.
+-- AND ITS VALUES ARE NOT PLAIN rxjs's, WHICH THE ORACLE SHOWED.  A
+-- burst is collected WHOLE and then pushed, while rxjs pushes each item
+-- depth-first -- so a subscriber that attaches part-way through a
+-- source's synchronous run sees the rest of it there and nothing of it
+-- here.  The witness is one program: a shared slot over a two-item
+-- `ofᵉ`, flattened by a map whose payload is that same slot, where rxjs
+-- yields the second item and this yields nothing.  Run in real rxjs at
+-- THREE items, with the flattening branch merged ahead of a plain one,
+-- it answers `1->2 1->3 2->3`: each re-entrant subscribe sees a
+-- strictly shorter SUFFIX of a source still mid-run, and the plain
+-- branch sees nothing because the source has finished by the time
+-- `merge` reaches it.  Every row of that is a state this machine cannot
+-- be in, and the suffixes are what says the gap is ordering rather than
+-- an off-by-one.
+
+-- AND WHAT HAS TO MOVE IS THIS FAMILY'S RESULT TYPE, WHICH IS THE ONE
+-- THING A LOCAL REPAIR CANNOT REACH.  `oneShotBurst` is the mechanism,
+-- but it is not the cause: a subscribe here hands its burst back at the
+-- SOURCE's element type and each enclosing frame pushes that finished
+-- list through itself, so the whole source is materialised before any
+-- of it descends and the registry a re-entrant subscribe writes into is
+-- read only after the loop it should have joined.  Interleaving is not
+-- available to a family shaped that way -- the values would have to be
+-- produced and consumed in the same fold -- so a subscribe must instead
+-- carry its path and emit at the ROOT type, one value at a time, with
+-- the state threaded through each value's whole cascade before the next
+-- is produced.  Then depth-first is the recursion's own order rather
+-- than a schedule laid over it, which is why no work stack and no
+-- emission cutoff appear: the descent stays the type's, exactly as
+-- `Rx.Evaluator.Reducible` funds it today.
+
+-- AND THE BRACKET OPERATOR IS WHAT THAT COSTS, WHICH IS WORTH KNOWING
+-- BEFORE THE REWRITE STARTS.  `batchSyncᵉ` groups the whole arriving
+-- LIST into one value, and per-value emission leaves no list to group.
+-- The semantics it names survives unchanged and is the one real rxjs
+-- has: a flag raised for the subscribe call, values buffered while it
+-- is up, one flush when the call returns.  What goes is the reading
+-- that a burst IS a batch -- which was never a fact about rxjs, only
+-- about how this machine happened to carry a source's output.
+
 evaluate↓ : ∀ {n} {Γ : Ctx n} {t} → Fuel → (e : Closed Γ t) → Slots Γ
           → Stream Γ t
 evaluate↓ fuel e ins = proj₁ (evaluate! fuel e ins)
