@@ -814,7 +814,13 @@ evaluate! {n = n} fuel e ins =
 -- it there and nothing of it here.  The witness is one program: a
 -- shared slot over a two-item `ofᵉ`, flattened by a map whose payload is
 -- that same slot, where rxjs yields the second item and this yields
--- nothing.  The mechanism is `oneShotBurst`, which runs a whole
+-- nothing.  Run in real rxjs at THREE items, with the flattening branch
+-- merged ahead of a plain one, it answers `1->2 1->3 2->3`: each
+-- re-entrant subscribe sees a strictly shorter SUFFIX of a source still
+-- mid-run, and the plain branch sees nothing because the source has
+-- finished by the time `merge` reaches it.  Every row of that is a
+-- state this machine cannot be in, and the suffixes are what says the
+-- gap is ordering rather than an off-by-one.  The mechanism is `oneShotBurst`, which runs a whole
 -- synchronous source in ONE STEP -- every value and then its
 -- `complete`, with nothing scheduled and nothing able to interleave --
 -- so "part-way through" is not a state this machine has.  The plain
