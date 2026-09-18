@@ -8,6 +8,8 @@ import {
   mergeMap,
   of as rxOf,
   scan as rxScan,
+  switchMap,
+  take as rxTake,
   takeWhile,
   tap,
 } from "rxjs";
@@ -32,6 +34,7 @@ import {
   SYNC_END,
   UPSTREAM_DONE,
   bracketSync,
+  latch,
   markSync,
 } from "./constructors.js";
 
@@ -79,37 +82,31 @@ export const empty = (driver: Driver): Observable<InstEmit<never>> =>
 //   mid-final-cascade — or any time later — gets the immediate
 //   init/close/complete one-shot, never a registration dropped
 //   without its close. Completion is re-observable, values are not.
-// DEAD ROUTE -- the two latches below do NOT come out the way the
-// registration count did.  That one was a cell between two folds and
-// moved onto the signal joining them, so the dependency became the
-// type's.  These are different: both are read at SUBSCRIBE time, to
-// decide what kind of subscriber this is, and the thing they are really
-// asking is "did someone get here first".
+// WHAT KIND OF SUBSCRIBER THIS IS COMES OUT OF A `latch`, and it is
+// the registration count's move made once more.  That count was a cell
+// between two folds and went onto the signal joining them; these two
+// are read at SUBSCRIBE time, so what they need is not a signal at the
+// boundary but a stream with a CURRENT VALUE -- which is the one thing
+// a plain channel cannot have, since it drops a push nobody is hearing.
+// Seeded, the answer is in the stream and arrives inside the reader's
+// own subscribe frame, so the three cases are chosen from a value
+// rather than from whose turn it was.
 //
-// Three routes tried, each dead for its own reason.  Deriving the answer
-// from a REPLAYED signal stream (rxjs `share` with a `ReplaySubject`
-// connector) hands a late subscriber the whole history, burst signals
-// included -- but a replay arrives in the subscriber's own subscribe
-// frame and so does a genuine connect burst, so the scan cannot tell
-// them apart, and `markSync` does not separate them either.  Reading a
-// derived status stream before building the pipeline is worse than
-// indistinguishable: subscribing it CONNECTS the upstream, the burst
-// fires into it, and the first subscriber's own scan then misses the
-// burst entirely.  And rxjs tracks a refCount internally without
-// exposing it, so there is no operator that answers the question.
-//
-// So "first subscriber" is a fact about subscription ORDER and not
-// about anything in the stream, which is why no rearrangement of the
-// folds reaches it.  The repair is not a cleverer pipeline -- it is a
-// share in which no subscriber is special, and that is a design change
-// to the protocol rather than to this function.
+// AND THE WRITES SIT WHERE THE ORDER IS ALREADY DECIDED, which is what
+// makes the read safe rather than merely tidy.  `live` is written from
+// the signals `tap` on the boundary marker, and the boundary fires
+// inside the FIRST subscriber's own subscribe frame while its fold is
+// still holding the whole burst -- so nothing has flowed downstream
+// yet, and a subscriber the burst itself causes reads `live`.  `spent`
+// is written from the same `tap`, above the `takeWhile`, so it lands
+// before the final fan-out: a subscriber joining mid-cascade gets the
+// one-shot rather than a registration nothing would close.
 export const share = <A>(
   driver: Driver,
   obs: Observable<InstEmit<A>>,
   source: SourceId,
 ): Observable<InstEmit<A>> => {
-  let connected = false;
-  let completed = false;
+  const [phase, phaseSink] = latch<"fresh" | "live" | "spent">("fresh");
 
   const latchedOneShot = (): InstEmit<A> => ({
     events: [
@@ -214,7 +211,6 @@ export const share = <A>(
           };
         const parts = splitEmit(item);
         const fin = parts.fin || open.length === 0;
-        if (fin) completed = true; // latch BEFORE the final fan-out
         return {
           live: true,
           spent: state.spent,
@@ -248,9 +244,14 @@ export const share = <A>(
     ),
     // the chain emit leaves here rather than from inside the fold, and
     // it leaves ABOVE the share below, so it is sent once for the def
-    // and not once per subscriber
+    // and not once per subscriber. The phase writes ride the same tap
+    // for the same reason: a write from inside the accumulator would
+    // make the fold's answer depend on when it ran, and one from below
+    // the `takeWhile` would miss the final fan-out it has to precede.
     tap((state) => {
       if (state.chain !== undefined) driver.pushChainEmit(state.chain);
+      if (state.fin) phaseSink.next("spent");
+      else if (state.out?.tag === "connected") phaseSink.next("live");
     }),
     takeWhile((state) => !state.fin, true), // the final fan-out, then done
     filter((state) => state.out !== undefined),
@@ -267,55 +268,63 @@ export const share = <A>(
     rxMap((s) => s.emit),
   );
 
-  return rxDefer(() => {
-    if (completed) return rxOf(latchedOneShot());
-    if (connected) return merge(rxOf(initEmit([])), fanouts); // join mid-flight
-    connected = true;
-    // the first subscriber is the one the connect burst flows up, and
-    // its init is emitted AT the boundary rather than before it: the
-    // burst decides whether that init already carries its close, and
-    // nothing observable is reordered because the whole group is one
-    // frame.
-    return signals.pipe(
-      rxScan<
-        Signal,
-        { burst: InstEmit<A>[]; done: boolean; out: InstEmit<A>[] }
-      >(
-        (state, s) => {
-          if (s.tag === "burst")
-            return { burst: [...state.burst, s.emit], done: false, out: [] };
-          if (s.tag === "fanout")
-            return { burst: [], done: false, out: [s.emit] };
-          const flat = mergeAllBurst(state.burst);
-          const burstFin =
-            s.spent ||
-            flat.done ||
-            (state.burst.length > 0 && s.openCount === 0);
-          // the def died inside its own connect burst: latch; this
-          // registration closes in the same instant
-          if (burstFin) completed = true;
-          return {
-            burst: [],
-            done: burstFin,
-            out: [
-              initEmit(
-                burstFin
-                  ? [{ type: "close", source, reason: "exhausted" }]
-                  : [],
-              ),
-              ...state.burst.map((emit): InstEmit<A> => ({
-                ...emit,
-                kind: "plumbing",
-              })),
-            ],
-          };
-        },
-        { burst: [], done: false, out: [] },
-      ),
-      takeWhile((state) => !state.done, true),
-      mergeMap((state) => rxOf(...state.out)),
-    );
-  });
+  // the phase is read ONCE, at subscribe, and `take(1)` on a seeded
+  // stream delivers it synchronously — so the branch is chosen in the
+  // subscriber's own frame, with no hop, exactly where the `defer` body
+  // used to read its flags.
+  return phase.pipe(
+    rxTake(1),
+    switchMap((current): Observable<InstEmit<A>> => {
+      if (current === "spent") return rxOf(latchedOneShot());
+      if (current === "live") return merge(rxOf(initEmit([])), fanouts); // join mid-flight
+      // the first subscriber is the one the connect burst flows up, and
+      // its init is emitted AT the boundary rather than before it: the
+      // burst decides whether that init already carries its close, and
+      // nothing observable is reordered because the whole group is one
+      // frame.
+      return signals.pipe(
+        rxScan<
+          Signal,
+          { burst: InstEmit<A>[]; done: boolean; out: InstEmit<A>[] }
+        >(
+          (state, s) => {
+            if (s.tag === "burst")
+              return { burst: [...state.burst, s.emit], done: false, out: [] };
+            if (s.tag === "fanout")
+              return { burst: [], done: false, out: [s.emit] };
+            const flat = mergeAllBurst(state.burst);
+            const burstFin =
+              s.spent ||
+              flat.done ||
+              (state.burst.length > 0 && s.openCount === 0);
+            return {
+              burst: [],
+              done: burstFin,
+              out: [
+                initEmit(
+                  burstFin
+                    ? [{ type: "close", source, reason: "exhausted" }]
+                    : [],
+                ),
+                ...state.burst.map((emit): InstEmit<A> => ({
+                  ...emit,
+                  kind: "plumbing",
+                })),
+              ],
+            };
+          },
+          { burst: [], done: false, out: [] },
+        ),
+        // the def died inside its own connect burst: latch above the
+        // `takeWhile`, so it is spent before its own init reaches anyone
+        tap((state) => {
+          if (state.done) phaseSink.next("spent");
+        }),
+        takeWhile((state) => !state.done, true),
+        mergeMap((state) => rxOf(...state.out)),
+      );
+    }),
+  );
 };
 
 // mintᵉ: one fresh uniq token per SUBSCRIPTION, handed to the body and

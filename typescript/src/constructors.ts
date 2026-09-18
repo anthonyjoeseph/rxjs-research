@@ -1,4 +1,12 @@
-import { Observable, Subject, defer, endWith, merge, of } from "rxjs";
+import {
+  BehaviorSubject,
+  Observable,
+  Subject,
+  defer,
+  endWith,
+  merge,
+  of,
+} from "rxjs";
 import { InstEmit, InstEvent, SUBSCRIBE_FRAME, SourceId } from "./inst-emit.js";
 import type { Driver } from "./driver.js";
 
@@ -29,6 +37,28 @@ export type LiveSink<A> = {
 // it is how one part of an operator hands work to another in order.
 export const channel = <A>(): [Observable<A>, Sink<A>] => {
   const subject = new Subject<A>();
+  return [
+    subject.asObservable(),
+    { next: (val) => subject.next(val), complete: () => subject.complete() },
+  ];
+};
+
+// latch: a channel that REMEMBERS, and the difference from `channel` is
+// the whole of why it exists. A channel drops a push with no listener,
+// so it can only answer "what is happening now"; an operator that has
+// to decide, AT SUBSCRIBE TIME, what kind of subscriber this is needs
+// "what has happened already", and that is a question no plain Subject
+// answers. Seeded, so there is always a current value: a reader gets it
+// synchronously, inside its own subscribe frame, and so decides without
+// a hop.
+//
+// THIS IS WHAT REPLACES A CLOSURE FLAG, and the gain is not cosmetic. A
+// flag read in a `defer` body is correct only while the writes happen to
+// precede the reads; a seeded channel makes that a data dependency the
+// types carry, which is the same move the share's registration count
+// already made onto its boundary signal.
+export const latch = <A>(initial: A): [Observable<A>, Sink<A>] => {
+  const subject = new BehaviorSubject<A>(initial);
   return [
     subject.asObservable(),
     { next: (val) => subject.next(val), complete: () => subject.complete() },

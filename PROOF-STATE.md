@@ -230,17 +230,6 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 
 ### Big picture tier roadmap
 
-- **THEN THE CLOSURE STATE LEFT IN `share` AND THE JOIN (Anthony: use ONLY
-  what `Ty`/`Tm` has).** The subscribe-frame question is answered — bracketing
-  is rxjs's own subscribe ordering — so no operator owns a subscription. The
-  join's per-inner handle is gone (a lane id and `takeUntil` carry it) and the
-  live-registration list rides the boundary signal, so what is left is a
-  share's two latches. They were recorded as a DEAD ROUTE on the reading that
-  "first subscriber" is a fact about subscription order alone; that reading
-  looks wrong, since under the boundary marker the three cases are each
-  separated by a value in the stream. The leg is to build it and delete the
-  dead route, which its own rule permits only on a WORKING route.
-
 - **THEN THE SLOT TELESCOPE, WHICH SPLITS COLD FROM HOT AND CARRIES THE SHARE
   (Anthony).** `toPlain (inputˢ i)` is a bare transport because the body cannot
   tell the two source shapes apart: only the telescope does, so an elaboration
@@ -255,6 +244,9 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 - **THEN THE SAME OPERATORS IN `Tm`/`Ty` (Anthony).**
   Each TS simul operator mirrored as an Agda definition in the value language,
   in the same fashion, so the correspondence is readable rather than asserted.
+  The TS side now carries no closure flag, so its state is all in streams; the
+  first thing tested is the SEEDED channel the share reads at subscribe time,
+  a further ask than a plain channel which `Tm` may not have.
   **AND IF THE LANGUAGE CANNOT SAY ONE, STOP AND REPORT (Anthony).** A missing
   former is never repaired by inventing one: a new `Ty` constructor or `Tm`
   former changes what a program can SAY, so it decides what every theorem
