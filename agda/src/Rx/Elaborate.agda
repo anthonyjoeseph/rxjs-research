@@ -10,13 +10,9 @@ open import Data.Nat using (ℕ)
 open import Data.Vec.Properties using (lookup-map)
 open import Relation.Binary.PropositionalEquality using (subst; refl)
 
-open import Rx.Exp using (Ty; Ctx; Exp; Tm; Fn; natᵗ; listᵗ; obs; _×ᵗ_;
-                          boolᵗ; uniqᵗ;
-                          input; μᵉ; varᵉ; deferᵉ; mapᵉ; scanᵉ; mintᵉ;
-                          varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; nilᵗ;
-                          consᵗ; inlᵗ; inrᵗ; caseᵗ; foldᵗ; ifᵗ; primᵗ; strmᵗ;
-                          letᵗ; revᵗ; renTm; renExp; ext∈;
-                          add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ)
+open import Rx.Exp using (Ty; Ctx; Exp; Tm; Fn; natᵗ; listᵗ; obs; _×ᵗ_; boolᵗ; uniqᵗ; input; μᵉ; varᵉ; deferᵉ; mapᵉ;
+  scanᵉ; varᵗ; unit̂; bool̂; nat̂; uniq̂; pairᵗ; fstᵗ; sndᵗ; nilᵗ; consᵗ; inlᵗ; inrᵗ; caseᵗ;
+  foldᵗ; ifᵗ; primᵗ; strmᵗ; letᵗ; revᵗ; renTm; ext∈; add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ)
 open import Rx.Envelope using (instEventᵗ; eventsᵛ; splitEventsᵛ; reassembleᵛ;
                                instEmitᵛ)
 open import Rx.SExp using (SExp; STm; inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; scanˢ;
@@ -251,22 +247,21 @@ mapᵖ {Θ = Θ} {s = s} {t = t} f e = mapᵉ step e
 -- `mapᵉ` projects, which is the same two-stage shape rxjs writes as
 -- `scan` followed by `map`.
 --
--- THE SEED'S EMIT COMPONENT IS UNOBSERVABLE, AND THAT IS WHY A BOUND
--- TOKEN SUFFICES FOR IT.  A scan emits the result of its FIRST
+-- THE SEED'S EMIT COMPONENT IS UNOBSERVABLE, AND THAT IS WHY THE
+-- RESERVED TOKEN SUFFICES FOR IT.  A scan emits the result of its FIRST
 -- application and never the seed, so the tokens below are read by
 -- nothing and claim no freshness — which is the capability the two
--- source rows above are blocked on, and is not this one.  What the
--- seed still needs is an INHABITANT of `uniqᵗ`, and the term language
--- has no closed one: a former at that type would be a literal, and a
--- program that can write a token can write one already in use.  So the
--- placeholder is taken from a BINDER, and the elaboration pays one
--- `mintᵉ` per `scanˢ` for a token it never reads.
-scanᵖ′ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {s t : Ty}
-       → Tm Γ Δᵍ Δ Θ uniqᵗ
-       → Fn Γ Δᵍ Δ Θ (plainᵗ t ×ᵗ plainᵗ s) (plainᵗ t)
-       → Tm Γ Δᵍ Δ Θ (plainᵗ t)
-       → Exp Γ Δᵍ Δ Θ (emitᵗ s) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
-scanᵖ′ {Θ = Θ} {s = s} {t = t} tok f z e =
+-- source rows above are blocked on, and is not this one.  What the seed
+-- needs is an INHABITANT of `uniqᵗ` and nothing more, which is exactly
+-- what the nullary `uniq̂` is: one reserved token, forging nothing
+-- because it can reach no other.  A placeholder taken from a BINDER
+-- would do as well and cost a `mintᵉ` per `scanˢ` for a token nothing
+-- reads.
+scanᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {s t : Ty}
+      → Fn Γ Δᵍ Δ Θ (plainᵗ t ×ᵗ plainᵗ s) (plainᵗ t)
+      → Tm Γ Δᵍ Δ Θ (plainᵗ t)
+      → Exp Γ Δᵍ Δ Θ (emitᵗ s) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
+scanᵖ {Θ = Θ} {s = s} {t = t} f z e =
   mapᵉ (sndᵗ (varᵗ (here refl))) (scanᵉ step seed e)
   where
   -- the carried value: the author's state, and the emit built for the
@@ -279,7 +274,7 @@ scanᵖ′ {Θ = Θ} {s = s} {t = t} tok f z e =
   P = A ×ᵗ emitᵗ s
 
   seed : Tm _ _ _ Θ A
-  seed = pairᵗ z (instEmitᵛ nilᵗ tok tok (inlᵗ unit̂))
+  seed = pairᵗ z (instEmitᵛ nilᵗ uniq̂ uniq̂ (inlᵗ unit̂))
 
   S : Ty
   S = listᵗ (instEventᵗ uniqᵗ (plainᵗ t)) ×ᵗ (listᵗ (plainᵗ s) ×ᵗ boolᵗ)
@@ -330,16 +325,6 @@ scanᵖ′ {Θ = Θ} {s = s} {t = t} tok f z e =
   step = letᵗ (splitEventsᵛ {b = plainᵗ t} (eventsᵛ (sndᵗ arg)))
               (fstᵗ arg)
               body
-
-scanᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {s t : Ty}
-      → Fn Γ Δᵍ Δ Θ (plainᵗ t ×ᵗ plainᵗ s) (plainᵗ t)
-      → Tm Γ Δᵍ Δ Θ (plainᵗ t)
-      → Exp Γ Δᵍ Δ Θ (emitᵗ s) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
-scanᵖ f z e =
-  mintᵉ (scanᵖ′ (varᵗ (here refl))
-                (renTm (λ x → x) (λ x → x) (ext∈ there) f)
-                (renTm (λ x → x) (λ x → x) there z)
-                (renExp (λ x → x) (λ x → x) there e))
 
 ------------------------------------------------------------------
 -- The elaboration: one simul program down into one plain program.

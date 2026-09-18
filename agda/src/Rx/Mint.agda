@@ -56,10 +56,17 @@ open Mint public using (counter)
 -- the seeds the run starts from: ordinals and sources both begin above
 -- the scripted slots, which own the identifiers below that bound, while
 -- node instances begin at zero and are the run's own.
+--
+-- AND SOURCES BEGIN ONE HIGHER STILL, WHICH IS WHAT RESERVES THE TOKEN
+-- LITERAL.  `uniq̂` is nullary, so it denotes a single identifier, and it
+-- can only be a literal at all if nothing else can ever produce that
+-- identifier: `n` is then owned by no slot (they hold `0 … n-1`) and
+-- handed out by no mint (this counter starts above it).  Ordinals are a
+-- separate namespace and no term denotes one, so that seed is unmoved.
 mint-init : ℕ → Mint
 mint-init n = mint λ where
   ordinalᵏ → n
-  sourceᵏ  → n
+  sourceᵏ  → suc n
   nodeᵏ    → 0
   regᵏ     → 0
 
