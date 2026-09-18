@@ -231,14 +231,14 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 ### Big picture tier roadmap
 
 - **THE ORACLE IS RED ON EVERY BIASED LANE AND NOTHING RUNS IT, WHICH IS THE
-  NEXT LEG.** The round-trip happened and the palette is not what is wrong: the
-  default sweep is clean, and so is every lane biased at a pure-function
-  former. Red is every lane biased at a FLATTENER or a protocol operator, and
-  it was red the same way before lift came apart, so it is this branch's
-  standing state, not the ruling's cost. Two causes are out, each recorded
-  where it was found, and both were an INSTANT read off the wrong emit. The
-  leg is the remaining lanes, carried down the same way, and then the sweep
-  put where a regression fails: CI has never run the oracle at all.
+  NEXT LEG.** The palette is not what is wrong: the default sweep is clean and
+  so is every lane biased at a pure-function former, red is every lane biased
+  at a FLATTENER or a protocol operator, and it was red the same way before
+  lift came apart. Three causes are out, each recorded where it was found: two
+  an INSTANT read off the wrong emit, the third a share counting an inner
+  share's PLUMBING registrations as its own, so a chain of shares never
+  completed. Seven divergences left, from twenty-two. The leg is the remaining
+  lanes, then the sweep put where a regression fails: CI never runs it.
 
 - **THEN THE DEMOTION, WHICH IS TWO EVALUATORS AND NOT A RETYPE (Anthony: the
   harness "shouldn't test on srxjs at all — just plain rxjs now", and the Main

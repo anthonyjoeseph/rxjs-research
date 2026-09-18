@@ -194,7 +194,16 @@ export const share = <A>(
               openCount: state.open.length,
             },
           };
-        const open = openAfter(item, state.open, true);
+        // A PLUMBING EMIT CARRIES NO REGISTRATION OF THIS SHARE'S, AND
+        // A CHAIN OF SHARES IS WHERE THAT BITES. An inner share retags
+        // its own connect burst `plumbing` and sends it up, so those
+        // inits are registrations the INNER share already tracks and
+        // will itself close. Counted here as well, this share's open
+        // multiset never empties on the arrival that closes its one
+        // real registration -- so `fin` stays false, the fanout loses
+        // its `close … exhausted`, and the root never materializes the
+        // completion. Only the root's ledger tracks plumbing.
+        const open = openAfter(item, state.open, false);
         if (!state.live)
           return {
             ...state,
