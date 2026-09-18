@@ -41,12 +41,10 @@ open import Rx.SExp using (SExp; STm; inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; sca
 -- would be a literal, and a program that could write a token could
 -- forge a collision.  A token is drawn from a BINDER, and a binder
 -- names one token per subscription while a source owes one per time it
--- comes alive.  So `ofᵖ` and `emptyᵖ` are blocked
--- outright, and the three flatteners are blocked on the registrations
--- they bring alive rather than on their values.
+-- comes alive.  So `ofᵖ` and `emptyᵖ` are blocked outright.
 --
--- READING THE RUNNING INSTANT IS THE SECOND, AND IT IS NARROWER THAN
--- THE ELABORATION'S OWN HEADER ONCE CLAIMED.  Downstream of a source
+-- READING THE RUNNING INSTANT IS THE SECOND, AND IT IS NARROW.
+-- Downstream of a source
 -- the instant is not missing at all: the incoming emit IS an envelope,
 -- a term can project its instant field, and a step that stamps its
 -- output with the instant it was handed is an ordinary `Tm`.  Only a
@@ -54,13 +52,14 @@ open import Rx.SExp using (SExp; STm; inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; sca
 -- The finding is that the two gaps coincide exactly, at the sources,
 -- which is also where the TypeScript mirror reaches for its driver.
 --
--- THE TWO PURE-FUNCTION FORMERS AND THE FLATTENERS ARE A THIRD THING,
--- AND SAYING SO IS THE POINT: they are not blocked, they are unwritten.
--- Their whole job is to unwrap, run the author's step over the value
--- list, and rewrap under the instant they were given, and every part of
--- that is a fold, a case and a pair; a flattener's values come out of
--- `mergeAllᵉ` over the observables its envelopes carry.  Each is a
--- large term and none of them needs a capability that is missing.
+-- FORWARDING IS THE THIRD KIND AND IT IS THE FLATTENERS' ALONE.  Their
+-- values need nothing missing — a map projects each envelope to the
+-- observables it carries and the plain flattener runs them — but an
+-- operator delegating that way has CONSUMED the envelope, and the
+-- outer's own bookkeeping goes with it.  Each row below says what that
+-- costs at its own operator; between them they rule out every place
+-- the plain palette offers to put traffic which must survive a cut, a
+-- drop and a concurrency limit.
 --
 -- `takeᵖ` IS THE ONE GENUINE SURPRISE, AND IT IS NEITHER KIND.  The
 -- author's operator and the plain one agree on everything that was in
@@ -152,40 +151,61 @@ postulate
   -- observables it carries, and the plain flattener runs them, their own
   -- emits being envelopes already.
   --
-  -- AND THE MINT IS NOT WHAT BLOCKS THIS, WHICH IS A CORRECTION: the
-  -- arity argument said a flattener needs a token per registration it
-  -- brings alive while a binder is fixed at subscribe time, and the
-  -- evaluator does not work that way.  An inner observable is a CLOSED
+  -- THE MINT IS NOT WHAT BLOCKS THIS.  An inner observable is a CLOSED
   -- EXPRESSION, and subscribing one runs it through the same reduction
   -- path the outer subscribe took, `mintᵉ` clause included — so a mint
   -- at an inner's head draws a fresh token on every inner subscription,
-  -- which is exactly the dynamic count that was called unavailable.  The
-  -- token is the INNER's to draw and never the flattener's, and that is
-  -- the same division the TypeScript twin already runs under, where the
-  -- join mints nothing at all.
+  -- which is the dynamic count a flattener was said to need and to be
+  -- unable to get.  The token is the INNER's to draw and never the
+  -- flattener's, which is the division the TypeScript twin runs under,
+  -- where the join mints nothing at all.  Nor does a flattener owe any
+  -- of the three events it might: an inner's `init` and its exhausted
+  -- `close` ride the inner's own burst, a switch's cancelling closes
+  -- are `cutThrough`'s and are read off the registrations whose chain
+  -- passes the node, and a `handoff` is a SHARE's announcement.
   --
-  -- SO WHAT IS LEFT IS THE INSTANT READ, AND IT IS THE SOURCES' BLOCKER
-  -- RATHER THAN A SECOND ONE.  The three events a flattener might have
-  -- owed are each owed elsewhere: an inner's `init` and its exhausted
-  -- `close` ride the inner's own burst, a switch's cancelling closes are
-  -- `cutThrough`'s and are read off the registrations whose chain passes
-  -- the node rather than minted, and a `handoff` is a SHARE's
-  -- announcement that no flattener writes.  What the elaboration still
-  -- cannot say is the instant the outer's own bookkeeping is stamped
-  -- with, which is one ruling short for every row of this block at once.
+  -- WHAT BLOCKS IT IS THE OUTER'S OWN BOOKKEEPING, WHICH IS TRAFFIC TO
+  -- FORWARD RATHER THAN TRAFFIC TO WRITE.  Those events arrive already
+  -- stamped, so nothing about an instant is missing; what is missing is
+  -- anywhere to put them.  The TypeScript twin reassembles every output
+  -- emit out of the carrier's bookkeeping together with the inner burst
+  -- it caused, so an outer emit carrying NO observable still produces
+  -- an emit — and the shape below produces none, which is a divergence
+  -- decided by a program with a valueless outer emit rather than by any
+  -- argument about tokens.
   -- DEAD ROUTE: elaborate the handoff and init events in the projecting
   --   map, which has the outer emit's instant but no token to name the
   --   inner source with.
+  -- DEAD ROUTE: project the payloads with a `mapᵉ` and hand them to the
+  --   plain flattener.  The map is the only consumer of the envelope,
+  --   so the bookkeeping is consumed with it and every valueless outer
+  --   emit vanishes.
+  -- DEAD ROUTE: carry that bookkeeping on a LANE of the flattener, as a
+  --   singleton observable emitted beside the payloads or prepended to
+  --   the first of them.  A lane is what the concurrency argument
+  --   COUNTS, so at `just 1` the bookkeeping queues behind a running
+  --   inner; and a lane is what the two cutting flatteners dispose of,
+  --   so a switch cuts it and an exhaust drops it.  The traffic that
+  --   must not be lost is put in the one place each operator is free to
+  --   discard.
+  -- DEAD ROUTE: split the outer into a bookkeeping stream and a value
+  --   stream and merge the two results.  Two consumers are two
+  --   SUBSCRIPTIONS, so a cold outer runs twice; one subscription
+  --   feeding two consumers is a share, and share identity is a BINDING
+  --   rather than an expression, so no `Exp` former reaches one from
+  --   inside an operator's body.
   mergeAllᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
             → Maybe ℕ → Exp Γ Δᵍ Δ Θ (emitᵗ (obs t)) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
 
   -- the two cutting flatteners, blocked where `mergeAllᵖ` is — which is
-  -- now the instant read alone.  The `close` a switch owes the
-  -- registration it drops was listed here as a second blocker and is
-  -- not one: the plain evaluator already mints those closes off the
-  -- registration set, one per chain passing the node, with the
-  -- per-victim reason decided by the cut ledger, and the elaboration
-  -- inherits them by delegating rather than by writing any.
+  -- the outer's own bookkeeping, and sharply so: these two DISPOSE of
+  -- lanes, so bookkeeping riding one is cut by a switch and dropped by
+  -- an exhaust rather than merely delayed.  The `close` a switch owes
+  -- the registration it drops is not a second blocker: the plain
+  -- evaluator already mints those closes off the registration set, one
+  -- per chain passing the node, with the per-victim reason decided by
+  -- the cut ledger, and the elaboration inherits them by delegating
+  -- rather than by writing any.
   -- DEAD ROUTE: the projecting step again — it sees the emit that causes
   --   the switch, and not the source being cut.
   switchAllᵖ exhaustAllᵖ :

@@ -230,17 +230,6 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 
 ### Big picture tier roadmap
 
-- **THEN THE SIX ROWS, WHICH NOTHING HOLDS ANY MORE.** The flatteners
-  were held on a blocker and are not: they wanted a token per inner
-  registration against a binder fixed at subscribe time, and an inner is a
-  CLOSED EXPRESSION re-run through the same reduction path on every inner
-  subscription, so the mint is the inner's own and the dynamic count is already
-  there. Nothing else they might owe is theirs either — an inner's init and
-  exhausted close ride its own burst, a switch's cancelling closes are the
-  cut's, a handoff is a share's. So the writing is one leg, and the two
-  pure-function formers have already paid for the envelope vocabulary it
-  needs.
-
 - **THEN THE CLOSURE STATE LEFT IN `share` AND THE JOIN (Anthony: use ONLY
   what `Ty`/`Tm` has).** The subscribe-frame question is answered — bracketing
   is rxjs's own subscribe ordering — so no operator owns a subscription. The
@@ -263,7 +252,7 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
   index and the split, and what each arm WRAPS follows from the source formers
   it is elaborated into.
 
-- **THEN THE SAME OPERATORS IN `Tm`/`Ty`, AND TIER 1 IS COMPLETE (Anthony).**
+- **THEN THE SAME OPERATORS IN `Tm`/`Ty` (Anthony).**
   Each TS simul operator mirrored as an Agda definition in the value language,
   in the same fashion, so the correspondence is readable rather than asserted.
   **AND IF THE LANGUAGE CANNOT SAY ONE, STOP AND REPORT (Anthony).** A missing
@@ -271,12 +260,23 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
   former changes what a program can SAY, so it decides what every theorem
   above quantifies over — the same reason the spec is not an agent's to move.
 
+- **THEN THE FLATTENERS AND THE SOURCES, ONCE THE RULING THEY WAIT ON EXISTS,
+  AND TIER 1 IS COMPLETE.** Both halves of that ruling are a new PLAIN former
+  and so are Anthony's: a source reads the ambient instant, and a flattener
+  needs one stream to carry the outer's bookkeeping beside the flattened
+  values. The second is what the delegating shape cannot do — the projecting
+  map is the envelope's only consumer, a lane is cut by a switch and dropped
+  by an exhaust, and a second consumer is a second subscription. Whichever
+  former answers it, the three flatteners are a body over it rather than a
+  design, which is why they are one leg with the sources and not four.
+
 ### The ledger
 
 - **`{of,empty,take,mergeAll,switchAll}ᵖ`** (Rx.Elaborate) — SHAPE,
-  `DEAD ROUTE×5`: the elaboration's per-former plumbing. A source still owes
-  the instant it stamps with, and `take` is the right operator at the wrong
-  level, so each is restated the day the read lands.
+  `DEAD ROUTE×8`: the elaboration's per-former plumbing. Five want a plain
+  former nobody here may invent — a source the ambient instant, a flattener
+  somewhere to forward the outer's bookkeeping; `take` is the right operator
+  at the wrong level.
 
 ## Tier 2 — the proof statement, once there are two trees to state it over
 
