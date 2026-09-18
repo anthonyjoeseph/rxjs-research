@@ -43,12 +43,12 @@ open import Data.String using (String)
 open import Data.Vec using () renaming (_∷_ to _∷ⱽ_; [] to []ⱽ)
 
 open import Rx.Prim using (InstEmit)
-open import Rx.Exp using (Ctx; Closed; Val; natᵗ; takeᵉ; nat̂)
+open import Rx.Exp using (Ctx; Closed; Val; natᵗ; emptyᵉ; takeᵉ; nat̂)
 open import Rx.SExp using (SExp; emitᵗ; emitᵛ)
 open import Rx.Elaborate using (elaborate)
 open import Rx.Envelope.Decode using (decodeStream)
 open import Rx.Evaluator.Builder using (evaluate↓)
-open import Rx.Slots using (Slots)
+open import Rx.Slots using (Slots; shared)
 open import Rx.Protocol using (wellFormed?)
 open import Rx.Emit-Eq using (eqBatched)
 open import Implementation using (impl-batchSimultaneous)
@@ -62,6 +62,28 @@ open import Spec using (spec-batchSimultaneous)
 
 Γ₂ᵉ : Ctx 2
 Γ₂ᵉ = emitᵛ Γ₂
+
+-- THE TELESCOPE IS EMPTY OBSERVABLES, AND THAT IS A BLOCKAGE RATHER
+-- THAN A CHOICE.  An elaborated program's slots stand at the ENVELOPE,
+-- so the two shapes a `Slot` offers are a script -- which would be
+-- writing source and instant tokens by hand, the one thing the palette
+-- exists to make unsayable -- and a `shared` def, which has to be an
+-- elaborated program to carry an envelope honestly.  The def route is
+-- what is blocked: the stratification field asks for
+-- `T (inputsBelowᵉ k d)` to compute, and `d` is a real body over
+-- POSTULATED leaves, so the walk hits a postulate at the first former
+-- and gets stuck for every elaborated `d`, at every `k`.  `emptyᵉ` is a
+-- constructor and reduces, so it is the one def this table can state,
+-- and every `inputˢ` a program draws therefore reaches a source that
+-- never emits.
+--
+-- WHAT THAT COSTS THE SWEEP, and it is worth knowing before reading a
+-- green: no hot or cold source, so no asynchronous arrival, so the
+-- whole timing axis is uncovered -- what remains is the synchronous
+-- one, where every value enters through an `ofˢ`.  The blockage lifts
+-- on its own the day the elaboration's leaves become definitions.
+slots₂ : Slots Γ₂ᵉ
+slots₂ _ = shared emptyᵉ
 
 -- one cached counterexample: a label, and the run that produced it
 record Case : Set where
@@ -82,13 +104,14 @@ open Case using (name; fuel; prog; slots)
 -- is only reached by paying for it; a `takeᵉ` cuts instead, since it
 -- unsubscribes the fixpoint.
 --
--- IT IS A PLAIN FORMER OVER THE ELABORATED PROGRAM, AND IT HAS TO BE.
--- The author's palette has no `take` at all, so there is nothing to cut
--- with on the simul side; above the elaboration the count is in
--- ENVELOPES rather than in values, which is a coarser cut than the
--- author's would have been and is the right one here -- what has to be
--- bounded is how much of the run the harness performs, and an envelope
--- is one delivery.
+-- AND IT IS A PLAIN FORMER OVER THE ELABORATED PROGRAM RATHER THAN THE
+-- AUTHOR'S `takeˢ`, WHICH CUTS AT THE WRONG LEVEL FOR THIS JOB.  A
+-- `takeˢ` counts the author's VALUES, so a program whose every value
+-- arrives in one envelope is not bounded by one at all; above the
+-- elaboration the count is in ENVELOPES, and an envelope is one
+-- delivery -- which is the quantity the harness's cost is linear in.
+-- The cap is a harness budget and not part of any program a row names,
+-- so it belongs above the elaboration on those grounds too.
 capProg : Closed Γ₂ᵉ (emitᵗ natᵗ) → Closed Γ₂ᵉ (emitᵗ natᵗ)
 capProg e = takeᵉ (nat̂ 24) e
 

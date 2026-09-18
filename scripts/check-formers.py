@@ -16,7 +16,8 @@ are decidable:
   C  the TypeScript types typescript/src/exp.ts     `export type Exp` / `Tm` / `PrimOp`
   D  the TS generator     typescript/src/generator.ts   `type: "..."`, the op lanes
   E  the sweep's census   agda/src/QuickCheck.agda  `formerTag` / `allFormers`
-  F  the Agda generator   agda/src/QuickCheck.agda  the `gen*` definitions
+  F  the Agda sweep's reach  the `gen*` definitions, composed with
+                             `Rx/Elaborate.agda` and the harness root
 
 A, C and E are checked BOTH ways -- they are closed declarations, so a former
 present there and absent from the map is a finding, which is what catches a
@@ -71,6 +72,8 @@ PATHS = {
     "ts": "typescript/src/exp.ts",
     "gen": "typescript/src/generator.ts",
     "census": "agda/src/QuickCheck.agda",
+    "elab": "agda/src/Rx/Elaborate.agda",
+    "harness": "agda/src/Implementation/Unit-Test/Prelude.agda",
 }
 
 
@@ -246,31 +249,172 @@ def census_enum(text: str) -> tuple[dict[str, str], set[str]]:
     return tags, set(re.findall(r"\bf[A-Z]\w*", m.group(1)))
 
 
-def agda_gen_reach(text: str) -> set[str]:
-    """THE SIXTH SURFACE: which names the Agda generator can actually write.
+def mentions(text: str) -> set[str]:
+    """Every name a stretch of Agda MENTIONS, comment lines excluded.
 
-    The generator is the run of definitions from `genB` down to the census,
-    and what it can produce is what it MENTIONS -- every arm builds its node
-    by naming the constructor, so a former with no arm appears nowhere in the
-    region.  The region is bounded at both ends rather than scanned whole
-    because the census below it names every former by construction, and a
-    scan that ran past it would report the whole palette reachable.
+    A name counts only when it stands as a token.  Agda puts almost nothing
+    out of bounds in an identifier, so the delimiter set is the punctuation
+    the language actually separates applications with -- without it `input`
+    matches `genInput` and `ObservableInput`, and a surface reports a lane
+    its file does not have.
+    """
+    body = "\n".join(l for l in text.splitlines() if not l.lstrip().startswith("--"))
+    return set(re.findall(r"(?:^|[\s(){}\[\],;])([^\s(){}\[\],;]+)", body))
 
-    A name is taken as MENTIONED only when it stands as a token.  Agda puts
-    almost nothing out of bounds in an identifier, so the delimiter set is
-    the punctuation the language actually separates applications with --
-    without it `input` matches `genInput` and `ObservableInput`, and the
-    surface reports a lane the generator does not have.
+
+def bodies(text: str) -> str:
+    """A file with its `postulate` blocks removed.
+
+    A postulate has NO BODY, so nothing is reached THROUGH one: a former
+    named only inside a postulated statement's type is a former the
+    elaboration cannot actually emit, and counting it would report coverage
+    the sweep does not have.  That distinction is the whole reason this
+    composition is worth computing rather than approximating by file.
+    """
+    out: list[str] = []
+    lines = text.splitlines()
+    i = 0
+    while i < len(lines):
+        m = re.match(r"^(\s*)postulate\b(.*)$", lines[i])
+        if m is None:
+            out.append(lines[i])
+            i += 1
+            continue
+        if m.group(2).strip():          # a one-line `postulate x : T`
+            i += 1
+            continue
+        indent = len(m.group(1))
+        i += 1
+        while i < len(lines):
+            nxt = lines[i]
+            if nxt.strip() and len(nxt) - len(nxt.lstrip()) <= indent:
+                break
+            i += 1
+    return "\n".join(out)
+
+
+# the author's palette wears its ornament, so which names are the AUTHOR's is
+# read off the name itself and no list of them has to be kept here to go stale
+PALETTE = re.compile("ˢ")
+
+
+def top_level(text: str) -> dict[str, set[str]]:
+    """Each definition at column zero, paired with every name it mentions.
+
+    A `where` block is indented under the definition it belongs to, so
+    slicing at column zero folds one into the other -- which is what is
+    wanted, since a helper's local scaffolding is reached exactly when the
+    helper is.
     """
     lines = text.splitlines()
+    head = re.compile(r"^([^\s(){}\[\],;:]+)\s*(:|=)")
+    starts = [(i, m.group(1)) for i, l in enumerate(lines) if (m := head.match(l))]
+    out: dict[str, set[str]] = {}
+    for n, (i, nm) in enumerate(starts):
+        j = starts[n + 1][0] if n + 1 < len(starts) else len(lines)
+        out.setdefault(nm, set()).update(mentions("\n".join(lines[i:j])))
+    return out
+
+
+def elab_arms(elab: str) -> tuple[list[tuple[set[str], set[str]]], str]:
+    """The elaboration, arm by arm: what each clause CONSUMES and what it WRITES.
+
+    `toPlain` is defined one clause per author former, so the pairing is
+    already in the source and needs only to be read off: the left of the
+    first top-level `=` names the author's constructor, the right names the
+    plain formers that constructor turns into.  Keeping them paired is what
+    makes the surface a COMPOSITION rather than a union -- a union would
+    credit the sweep with every former the elaboration could ever emit,
+    including the ones no generator arm can reach, which is a coverage claim
+    that cannot go red.
+
+    An author-side name is recognised by its ORNAMENT: every `SExp` and
+    `STm` constructor carries the palette's superscript, so no list of them
+    has to be kept here to go stale.  A clause consuming none of them --
+    a catch-all, a helper's recursion -- constrains nothing and is read as
+    always reachable, which is the safe direction for a clause that does not
+    branch on a former.
+    """
+    lines = bodies(elab).splitlines()
+    head = re.compile(r"^\s{2}toPlain(Tm|Tms)?\b")
+    starts = [i for i, l in enumerate(lines) if head.match(l)]
+    covered: set[int] = set()
+    arms: list[tuple[set[str], set[str]]] = []
+    for n, i in enumerate(starts):
+        if n + 1 < len(starts):
+            j = starts[n + 1]
+        else:                       # the last clause ends where its block does
+            j = next((k for k in range(i + 1, len(lines))
+                      if lines[k].strip() and not lines[k].startswith(" ")), len(lines))
+        covered |= set(range(i, j))
+        text = "\n".join(l for l in lines[i:j] if not l.lstrip().startswith("--"))
+        depth, cut = 0, None
+        for k, ch in enumerate(text):
+            if ch in "({[":
+                depth += 1
+            elif ch in ")}]":
+                depth -= 1
+            elif ch == "=" and depth == 0 and text[k + 1 : k + 2] != "=":
+                cut = k
+                break
+        if cut is None:
+            continue
+        arms.append((mentions(text[:cut]), mentions(text[cut + 1 :])))
+    if not arms:
+        sys.exit("check-formers: no `toPlain` clauses found -- the elaboration moved or was renamed")
+    rest = "\n".join(l for k, l in enumerate(lines) if k not in covered)
+    return arms, rest
+
+
+def agda_gen_reach(census: str, elab: str, harness: str) -> set[str]:
+    """THE SIXTH SURFACE: which plain formers the Agda sweep can actually write.
+
+    The sweep no longer builds plain programs.  It draws from the AUTHOR's
+    palette and the harness root elaborates what it drew, so what reaches the
+    plain tree is a COMPOSITION of three stretches and not one of them alone:
+    the generator, the elaboration's definitions, and the harness root that
+    mints and caps.  Reading any single one of them would answer a different
+    question -- the generator names no plain former at all, and the
+    elaboration names every one it could ever emit whether or not a program
+    reaching it can be drawn.
+
+    The generator is the run of definitions from `genB` down to the census.
+    The region is bounded at both ends rather than scanned whole because the
+    census below it names every former by construction, and a scan that ran
+    past it would report the whole palette reachable.
+
+    THE ELABORATION IS TAKEN AT ITS DEFINITIONS AND NOT AT ITS STATEMENTS,
+    which is where this surface earns its keep: four of its arms are still
+    POSTULATES, so the plain formers their conclusions are stated in are
+    formers no run can produce, however freely the generator draws the
+    author's operator.  `bodies` is what holds that line.
+    """
+    lines = census.splitlines()
     start = next((i for i, l in enumerate(lines) if re.match(r"^genB\b.*:", l)), None)
     if start is None:
         sys.exit("check-formers: no `genB :` found -- the Agda generator moved or was renamed")
     end = next((i for i, l in enumerate(lines[start:], start) if re.match(r"^marks", l)), None)
     if end is None:
         sys.exit("check-formers: no `marks…` after the generator -- the census moved or was renamed")
-    body = "\n".join(l for l in lines[start:end] if not l.lstrip().startswith("--"))
-    return set(re.findall(r"(?:^|[\s(){}\[\],;])([^\s(){}\[\],;]+)", body))
+    drawn = mentions("\n".join(lines[start:end]))
+
+    # the arms the generator can actually reach, and what each of them writes
+    arms, rest = elab_arms(elab)
+    reach = set(drawn)
+    for lhs, rhs in arms:
+        if {t for t in lhs if PALETTE.search(t)} <= drawn:
+            reach |= rhs
+
+    # and then the helpers those arms call, to a fixpoint: an arm reaching
+    # `mapᵖ` reaches whatever `mapᵖ`'s body writes, and an arm nothing reaches
+    # takes its helper down with it
+    reach |= mentions(bodies(harness))
+    helpers = top_level(rest)
+    while True:
+        grown = reach | {t for nm, body in helpers.items() if nm in reach for t in body}
+        if grown == reach:
+            return reach
+        reach = grown
 
 
 def quoted(text: str, pat: str) -> set[str]:
@@ -353,7 +497,7 @@ def main() -> int:
                 f"unreachable -- the hole closed and the row was not"
             )
 
-    agen = agda_gen_reach(src["census"])
+    agen = agda_gen_reach(src["census"], src["elab"], src["harness"])
     for r in rows:
         if r.agen and r.agda not in agen:
             findings.append(

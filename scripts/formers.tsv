@@ -50,34 +50,34 @@ exp	emptyᵉ	empty	yes	yes	source
 exp	takeᵉ	take	yes	yes	protocol
 exp	mapᵉ	map	yes	yes	pure
 exp	scanᵉ	scan	yes	yes	pure
-exp	mergeAllᵉ	mergeAll	yes	yes	flatten
-exp	switchAllᵉ	switchAll	yes	yes	flatten
-exp	exhaustAllᵉ	exhaustAll	yes	yes	flatten
+exp	mergeAllᵉ	mergeAll	yes	no	flatten	the all-Agda sweep draws the author's flattener freely, but its elaboration is still a postulate, so no run it produces ever reaches the plain former
+exp	switchAllᵉ	switchAll	yes	no	flatten	the all-Agda sweep draws the author's flattener freely, but its elaboration is still a postulate, so no run it produces ever reaches the plain former
+exp	exhaustAllᵉ	exhaustAll	yes	no	flatten	the all-Agda sweep draws the author's flattener freely, but its elaboration is still a postulate, so no run it produces ever reaches the plain former
 exp	μᵉ	mu	yes	yes	binder
 exp	varᵉ	varE	yes	yes	binder
 exp	deferᵉ	defer	yes	yes	protocol
 exp	mintᵉ	mint	yes	yes	protocol
 exp	batchSyncᵉ	batchSync	no	yes	protocol	its type IS the instant/batch structure, so plain rxjs cannot mirror it and the oracle's plain leg cannot cover it; the Agda generator reaches it, which is what agen=yes on this row now holds someone to
 tm	varᵗ	varT	yes	yes	-
-tm	unit̂	unitT	yes	no	-	the Agda generator draws every node at natᵗ, so it never has a unit to build
-tm	bool̂	boolT	yes	no	-	the Agda generator reaches boolᵗ only through a comparison primitive, never as a literal
+tm	unit̂	unitT	yes	yes	-
+tm	bool̂	boolT	yes	yes	-
 tm	nat̂	natT	yes	yes	-
 tm	pairᵗ	pairT	yes	yes	-
 tm	fstᵗ	fstT	yes	yes	-
 tm	sndᵗ	sndT	yes	yes	-
-tm	nilᵗ	nilT	yes	no	-	the Agda generator meets a list only as `batchSyncᵉ`'s own result type, which it folds rather than builds
-tm	consᵗ	consT	yes	no	-	the Agda generator meets a list only as `batchSyncᵉ`'s own result type, which it folds rather than builds
-tm	inlᵗ	inlT	yes	no	-	sums are not in the Agda generator's type palette, whose every node is natᵗ
-tm	inrᵗ	inrT	yes	no	-	sums are not in the Agda generator's type palette, whose every node is natᵗ
+tm	nilᵗ	nilT	yes	yes	-
+tm	consᵗ	consT	yes	yes	-
+tm	inlᵗ	inlT	yes	yes	-
+tm	inrᵗ	inrT	yes	yes	-
 tm	caseᵗ	caseT	yes	no	-	sums are not in the Agda generator's type palette, whose every node is natᵗ
 tm	foldᵗ	foldT	yes	yes	-
 tm	ifᵗ	ifT	yes	yes	-
 tm	primᵗ	primT	yes	yes	-
 tm	strmᵗ	strmT	yes	yes	-
 prim	add	add	yes	yes	-
-prim	sub	sub	yes	no	-	the Agda generator's operator menu is add, mul and the two comparisons its branches need
+prim	sub	sub	yes	yes	-
 prim	mul	mul	yes	yes	-
-prim	eqᵖ	eq	yes	no	-	the Agda generator's operator menu is add, mul and the two comparisons its branches need
+prim	eqᵖ	eq	yes	yes	-
 prim	ltᵖ	lt	yes	yes	-
 prim	eqᵘ	eqU	yes	yes	-
-prim	notᵖ	not	yes	no	-	the Agda generator's operator menu is add, mul and the two comparisons its branches need
+prim	notᵖ	not	yes	yes	-

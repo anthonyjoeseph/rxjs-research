@@ -278,6 +278,9 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
   `DEAD ROUTE×4`: the elaboration's per-former plumbing, after the two sources
   came out of it. The flatteners want somewhere to forward the outer's
   bookkeeping, which nothing plain offers.
+- **`takeᵖ`** (Rx.Elaborate) — DIFFICULTY, `DEAD ROUTE`: the author cuts on
+  VALUES and a plain `takeᵉ` above the envelope cuts on BATCHES, so the
+  elaboration owes a count that crosses the level and closes at the cut.
 
 ## Tier 2 — the proof statement, once there are two trees to state it over
 

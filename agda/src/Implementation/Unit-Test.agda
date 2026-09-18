@@ -28,9 +28,11 @@
 -- CLEARED LEDGER.  Every row it held was a plain `Exp` program driven
 -- by scripted slots, and a plain run carries no envelope, so none of
 -- them is a case the batching question can even be asked of now that a
--- row is an author's `SExp` under `elaborate`; every one of them also
--- cut with `takeᵉ`, which the author's palette does not have, so the
--- rows could not be ported mechanically either.  What they established
+-- row is an author's `SExp` under `elaborate`; every one of them was
+-- also driven by a SCRIPTED slot, which an elaborated telescope does
+-- not admit -- a script at the envelope would be writing tokens by
+-- hand -- so the tables could not be ported mechanically either.  What
+-- they established
 -- was agreement on the PLAIN tree, which is the oracle's question and
 -- not this cache's.  Until the sweep refills it the invariant below
 -- holds vacuously, which is worth knowing before reading a green.

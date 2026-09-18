@@ -22,10 +22,11 @@
 --   wrappers their expected sides were written in, which nothing else
 --   consumed and which are one line each over `evalWith`.
 -- RECOVERY: git show 54227c28:agda/src/Readme-Theorems.agda restores
---   `readme-take-counts-values`, the take law, whose statement stood over
---   the `takeᵖ` of that sha's `Rx/Elaborate.agda` -- the level shift the
---   law exists to name, deleted with it because the law was its only
---   consumer.  Both are owed where the simul tree is worked.
+--   `readme-take-counts-values`, the take law, whose statement stands
+--   over `Rx.Elaborate`'s `takeᵖ` -- the level shift the law exists to
+--   name.  It is owed where the simul tree is worked, as an `SExp`
+--   program under `elaborate` rather than at the plain tree it was
+--   written at.
 module Readme-Theorems where
 
 open import Data.Nat     using (_≤_)

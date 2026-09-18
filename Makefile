@@ -1463,12 +1463,21 @@ formers-selftest:
 	  run "a gen=no row with no reason" \
 	      "sed -i.bak 's/\tno\tyes\tsource\tthe fixture.*/\tno\tyes\tsource/' scripts/formers.tsv" \
 	      "needs a reason"; \
-	  run "an agen=yes row no arm of the Agda generator writes" \
-	      "sed -i.bak 's/sharedSigᵉ (add d)/renamedᵉ (add d)/' agda/src/QuickCheck.agda" \
+	  run "an agen=yes row the harness root stops writing" \
+	      "sed -i.bak 's/capProg e = sharedSigᵉ e/capProg e = e/' agda/src/Implementation/Unit-Test/Prelude.agda" \
 	      'no arm of the Agda generator writes `sharedSigᵉ`'; \
 	  run "an agen=no row the Agda generator DOES write" \
 	      "sed -i.bak 's/notᵖCount/notᵖ/' agda/src/QuickCheck.agda" \
 	      'the Agda generator DOES write `notᵖ`'; \
+	  run "an agen=no row whose elaboration arm the generator starts drawing" \
+	      "sed -i.bak 's/else liftˢ (natˢ d))/else notˢ d)/' agda/src/QuickCheck.agda" \
+	      'the Agda generator DOES write `notᵖ`'; \
+	  run "an agen=no row whose postulated elaboration arm gains a body" \
+	      "sed -i.bak 's/^  deferᵖ : SExp Γ t → Exp Γ t/deferᵖ : SExp Γ t → Exp Γ t\ndeferᵖ e = deferᵉ e/' agda/src/Rx/Elaborate.agda" \
+	      'the Agda generator DOES write `deferᵉ`'; \
+	  run "an agen=yes row whose elaboration helper stops being reached" \
+	      "sed -i.bak 's/toPlain (liftˢ f)  = liftᵖ (toPlainTm f)/toPlain (liftˢ f)  = toPlain f/' agda/src/Rx/Elaborate.agda" \
+	      'no arm of the Agda generator writes `liftᵉ`'; \
 	  run "a row unreachable by BOTH generators" \
 	      "sed -i.bak 's/\tno\tyes\tsource/\tno\tno\tsource/' scripts/formers.tsv" \
 	      'reachable by NEITHER generator'; \
@@ -1476,7 +1485,7 @@ formers-selftest:
 	      "printf 'tm\tdupᵗ\tnatT\tyes\tyes\t-\n' >> scripts/formers.tsv" \
 	      "already declared on line"; \
 	  run "an exp row with no verdict under the dividing test" \
-	      "sed -i.bak 's/\tyes\tyes\tprotocol/\tyes\tyes\tmisc/' scripts/formers.tsv" \
+	      "sed -i.bak 's/\tyes\tno\tprotocol/\tyes\tno\tmisc/' scripts/formers.tsv" \
 	      "has no verdict under the dividing test"; \
 	  run "a tm row claiming one" \
 	      "sed -i.bak 's/natT\tyes\tyes\t-/natT\tyes\tyes\tsource/' scripts/formers.tsv" \
@@ -1502,7 +1511,7 @@ formers-selftest:
 	  run "a declared former the roll never walks" \
 	      "sed -i.bak 's/allFormers = fLift ∷ fDefer ∷ fSharedSig ∷ \[\]/allFormers = fLift ∷ fDefer ∷ []/' agda/src/QuickCheck.agda" \
 	      'so the tally never walks it'; \
-	  [ $$fail -eq 0 ] && echo "formers-selftest: PASS (every surface fires in the direction it is checked at all three kinds, a shared constructor signature parses, a bare-string union and an operator lane are read as themselves, a declared generator hole is reported rather than merely tolerated, the census is held to the map in both directions and its roll to its own declarations, the Agda generator is held to the map in both directions with a token boundary that a substring scan would cross, a former reachable by neither generator is refused, and the dividing test's vocabulary is closed)"; \
+	  [ $$fail -eq 0 ] && echo "formers-selftest: PASS (every surface fires in the direction it is checked at all three kinds, a shared constructor signature parses, a bare-string union and an operator lane are read as themselves, a declared generator hole is reported rather than merely tolerated, the census is held to the map in both directions and its roll to its own declarations, the Agda sweep's REACH is held to the map in both directions with a token boundary that a substring scan would cross, and that reach composes rather than unions -- the harness root counts, an undrawn elaboration arm does not, a postulated one does not, and a helper the arms reach does, a former reachable by neither generator is refused, and the dividing test's vocabulary is closed)"; \
 	  exit $$fail
 
 cli-build: stripped
