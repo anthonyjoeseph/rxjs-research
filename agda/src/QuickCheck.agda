@@ -67,7 +67,7 @@ open import Rx.Prim using (Timed; after_,_; ObservableInput; hot; cold; InstEven
 open import Rx.Exp using (Ty; natᵗ; obs; _×ᵗ_; isData; Ctx; Exp; Tm; Fn; PrimOp; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ;
   batchSyncᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ; unit̂; bool̂;
   nat̂; uniq̂; primᵗ; pairᵗ; fstᵗ; sndᵗ; strmᵗ; varᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; nilᵗ; consᵗ;
-  foldᵗ; add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ)
+  foldᵗ; add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ; renExp)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Rx.Emit-Eq using (eqBatched)
 open import Rx.Evaluator.Builder using (evaluate↓)
@@ -293,7 +293,7 @@ genLeafAt g u = genB 3 >>=G λ c →
   else (genNat >>=G λ a → genNat >>=G λ b → pureG (ofᵉ (nat̂ a ∷ nat̂ b ∷ [])))
 
 genExpAt g u zero    = genLeafAt g u
-genExpAt g u (suc d) = genB 13 >>=G λ c →
+genExpAt g u (suc d) = genB 15 >>=G λ c →
   if c ≡ᵇ 0 then genLeafAt g u
   else if c ≡ᵇ 1 then genLeafAt g u
   else if c ≡ᵇ 2 then (genFn >>=G λ f → genExpAt g u d >>=G λ e → pureG (mapᵉ f e))
@@ -315,6 +315,29 @@ genExpAt g u (suc d) = genB 13 >>=G λ c →
   else if c ≡ᵇ 11 then
     (genFanFn >>=G λ f → genExpAt g u d >>=G λ e →
      pureG (mergeAllᵉ nothing (mapᵉ f e)))
+  -- THE TWO PROTOCOL FORMERS, AND EACH IS WRAPPED IN THE READER THAT MAKES
+  -- IT DISCRIMINATE.  Both change the type or the context, so neither can
+  -- appear bare in a generator whose every node is `natᵗ` at `Θ = []`, and a
+  -- wrapper chosen for TYPING alone would project the evidence away with it:
+  -- `fstᵗ` off a batch discards the group, and a mint whose body ignores its
+  -- token emits what it would have emitted unminted.  So the batch is SUMMED
+  -- — head plus every element of the tail, which is the one reading that
+  -- differs the moment the two sides cut the subscribe frame differently —
+  -- and the mint's body ASKS whether its token is the reserved one, which is
+  -- the invariant `mint-init` exists to hold and the only question `uniqᵗ`
+  -- can be asked.  Neither wrapper can enlarge the run: a fold over one
+  -- group and an equality test are each one step per value.
+  else if c ≡ᵇ 12 then
+    (genExpAt g u d >>=G λ e →
+     pureG (mapᵉ (foldᵗ (sndᵗ (varᵗ (here refl))) (fstᵗ (varᵗ (here refl)))
+                        (primᵗ add (pairᵗ (varᵗ (here refl))
+                                          (varᵗ (there (here refl))))))
+                 (batchSyncᵉ e)))
+  else if c ≡ᵇ 13 then
+    (genExpAt g u d >>=G λ e →
+     pureG (mintᵉ (mapᵉ (ifᵗ (primᵗ eqᵘ (pairᵗ (varᵗ (there (here refl))) uniq̂))
+                             (nat̂ 0) (varᵗ (here refl)))
+                        (renExp (λ x → x) (λ x → x) there e))))
   else genLeafAt g u
 
 genInners g u d zero    = pureG []
