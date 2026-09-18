@@ -362,7 +362,7 @@ red-consume {u = u} switchᵒ nid κ id now ro sched st
 ... | just (exhaust-st _ _) =
       _ , consume-switch-nil (cong (consumeUsable switchᵒ u) eq) , []
 ... | just (switch-st cur od) with switchKill cur sched st in eqk
-...   | (closes , sched₁ , st₁) =
+...   | (sched₁ , st₁) =
         let ((burst , _ , _) , d , ss) =
               ro (from-inner switchᵒ nid (freshId nodeᵏ (Sched.mint sched₁)) ↠ κ) id now
                  (record sched₁ { mint = next nodeᵏ (Sched.mint sched₁) }) st₁
@@ -666,8 +666,8 @@ redScanDispatch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
                 → RedNode {e = e} (scan-f fn nid) st → RedFn fn → All (Red s) vals
                 → All (Red u) (proj₁ (scanDispatch {e = e} fn nid vals fin sched st m))
                   × RedNode {e = e} (scan-f fn nid)
-                      (proj₂ (proj₂ (proj₂ (proj₂
-                        (scanDispatch {e = e} fn nid vals fin sched st m)))))
+                      (proj₂ (proj₂ (proj₂
+                        (scanDispatch {e = e} fn nid vals fin sched st m))))
 redScanDispatch {u = u} fn nid {vals} fin sched st (just (cell-st {v} a)) eq rn rf rv
   with v ≟ᵗ u
 ... | no  _    = [] , rn
@@ -900,7 +900,7 @@ mutual
     in r , subs-μ d , sat
   redExpAcc (varᵉ ()) σ rσ k ok aK a
   redExpAcc (deferᵉ body) σ rσ k ok aK a κ id now sched st =
-    _ , subs-defer refl refl refl refl , (tt ∷ []) ∷ []
+    _ , subs-defer refl refl refl refl , []
   redExpAcc (mintᵉ body) σ rσ k ok aK (acc rs) κ id now sched st =
     let src    = freshId sourceᵏ (Sched.mint sched)
         sched' = record sched { mint = setAt sourceᵏ (suc src) (Sched.mint sched) }

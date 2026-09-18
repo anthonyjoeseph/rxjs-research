@@ -34,7 +34,6 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Mint using (nodeᵏ; freshId)
 open import Rx.Exp using (Ctx; Closed; Val; obs; FnClo; _×ᵗ_; _≟ᵗ_)
-open import Rx.Prim using (InstEvent)
 open import Rx.Evaluator using (Sched; EvalSt; Path; Frame; NodeId; NodeState; AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ;
   switchKill; scanDispatch; takeDispatch; batchSyncDispatch; thruWrap; mergeAllBump; scanVals; takeVals; cell-st;
   take-st; batchSync-st; mergeAll-st; switch-st; exhaust-st; lookupNode)
@@ -50,7 +49,7 @@ open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeInner⇓; thruCon
   finish-all-drain; finish-switch-clear; finish-exhaust-clear; finish-nil;
   react-false; react-alive; react-dead;
   step-map; step-scan; step-take; step-batchSync; step-from-inner; step-thru-outer;
-  push-nil; push-cons; sub-all; connect-live; connect-died;
+  push-all; sub-all; connect-live; connect-died;
   slot-spent; slot-join; slot-connect)
 open import Rx.Evaluator.Freshness using (PreservedBelow; FrameAbove;
   pres-same; pres-trans; pres-write)
@@ -62,8 +61,8 @@ scan-pres : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {f}
               (vals : List (Val Γ s)) (fin : Bool)
               (sched : Sched Γ) (st : EvalSt e) (m : Maybe (NodeState Γ))
           → f ≤ nid
-          → PreservedBelow f st (proj₂ (proj₂ (proj₂ (proj₂
-              (scanDispatch {e = e} fn nid vals fin sched st m)))))
+          → PreservedBelow f st (proj₂ (proj₂ (proj₂
+              (scanDispatch {e = e} fn nid vals fin sched st m))))
 scan-pres {u = u} fn nid vals fin sched st (just (cell-st {v} a)) f≤nid
   with v ≟ᵗ u
 ... | no  _    = pres-same _ _ refl
@@ -80,8 +79,8 @@ take-pres : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s} {f}
               (nid : NodeId) (vals : List (Val Γ s)) (fin : Bool)
               (sched : Sched Γ) (st : EvalSt e) (m : Maybe (NodeState Γ))
           → f ≤ nid
-          → PreservedBelow f st (proj₂ (proj₂ (proj₂ (proj₂
-              (takeDispatch {e = e} nid vals fin sched st m)))))
+          → PreservedBelow f st (proj₂ (proj₂ (proj₂
+              (takeDispatch {e = e} nid vals fin sched st m))))
 take-pres nid vals fin sched st (just (take-st k)) f≤nid
   with proj₂ (proj₂ (takeVals k vals))
 ... | true  = pres-write _ _ (take-st zero) refl f≤nid
@@ -99,8 +98,8 @@ batchSync-pres : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s} {f}
               (nid : NodeId) (vals : List (Val Γ s)) (fin : Bool)
               (sched : Sched Γ) (st : EvalSt e) (m : Maybe (NodeState Γ))
           → f ≤ nid
-          → PreservedBelow f st (proj₂ (proj₂ (proj₂ (proj₂
-              (batchSyncDispatch {e = e} nid vals fin sched st m)))))
+          → PreservedBelow f st (proj₂ (proj₂ (proj₂
+              (batchSyncDispatch {e = e} nid vals fin sched st m))))
 batchSync-pres nid vals fin sched st (just (batchSync-st _))  f≤nid = pres-same _ _ refl
 batchSync-pres nid vals fin sched st nothing                  f≤nid = pres-same _ _ refl
 batchSync-pres nid vals fin sched st (just (cell-st _))       f≤nid = pres-same _ _ refl
@@ -112,13 +111,13 @@ batchSync-pres nid vals fin sched st (just (exhaust-st _ _))  f≤nid = pres-sam
 -- the flattener's wrap marks its own node done
 wrap-pres : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} {f}
               (op : AllOp) (nid : NodeId) (fin : Bool)
-              (vs : List (Val Γ u)) (bs : List (InstEvent (Val Γ t)))
+              (vs : List (Val Γ u))
               (sched′ : Sched Γ) (st′ : EvalSt e)
           → f ≤ nid
-          → PreservedBelow f st′ (proj₂ (proj₂ (proj₂ (proj₂
-              (thruWrap {e = e} op nid fin (vs , bs , sched′ , st′))))))
-wrap-pres op nid false vs bs sched′ st′ f≤nid = pres-same _ _ refl
-wrap-pres mergeAllᵒ nid true vs bs sched′ st′ f≤nid
+          → PreservedBelow f st′ (proj₂ (proj₂ (proj₂
+              (thruWrap {e = e} op nid fin (vs , sched′ , st′)))))
+wrap-pres op nid false vs sched′ st′ f≤nid = pres-same _ _ refl
+wrap-pres mergeAllᵒ nid true vs sched′ st′ f≤nid
   with lookupNode nid (EvalSt.nodes st′)
 ... | just (mergeAll-st lim act q _) = pres-write _ _ (mergeAll-st lim act q true) refl f≤nid
 ... | just (cell-st _)               = pres-same _ _ refl
@@ -127,7 +126,7 @@ wrap-pres mergeAllᵒ nid true vs bs sched′ st′ f≤nid
 ... | just (switch-st _ _)           = pres-same _ _ refl
 ... | just (exhaust-st _ _)          = pres-same _ _ refl
 ... | nothing                        = pres-same _ _ refl
-wrap-pres switchᵒ nid true vs bs sched′ st′ f≤nid
+wrap-pres switchᵒ nid true vs sched′ st′ f≤nid
   with lookupNode nid (EvalSt.nodes st′)
 ... | just (switch-st cur _)         = pres-write _ _ (switch-st cur true) refl f≤nid
 ... | just (cell-st _)               = pres-same _ _ refl
@@ -136,7 +135,7 @@ wrap-pres switchᵒ nid true vs bs sched′ st′ f≤nid
 ... | just (mergeAll-st _ _ _ _)     = pres-same _ _ refl
 ... | just (exhaust-st _ _)          = pres-same _ _ refl
 ... | nothing                        = pres-same _ _ refl
-wrap-pres exhaustᵒ nid true vs bs sched′ st′ f≤nid
+wrap-pres exhaustᵒ nid true vs sched′ st′ f≤nid
   with lookupNode nid (EvalSt.nodes st′)
 ... | just (exhaust-st act _)        = pres-write _ _ (exhaust-st act true) refl f≤nid
 ... | just (cell-st _)               = pres-same _ _ refl
@@ -164,8 +163,8 @@ bump-pres {nid = nid} st f≤nid with lookupNode nid (EvalSt.nodes st)
 -- the switch's cut sweeps registrations, never the table
 kill-pres : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {f}
               (cur : Maybe NodeId) (sched : Sched Γ) (st : EvalSt e)
-              {closes sched₁ st₁}
-          → switchKill {e = e} cur sched st ≡ (closes , sched₁ , st₁)
+              {sched₁ st₁}
+          → switchKill {e = e} cur sched st ≡ (sched₁ , st₁)
           → PreservedBelow f st st₁
 kill-pres nothing  sched st refl = pres-same _ _ refl
 kill-pres (just v) sched st refl = pres-same _ _ refl
@@ -192,11 +191,11 @@ stepFrame-preserves : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
                         (f : ℕ) {fr : Frame Γ s u} {κ : Path Γ lo u t}
                         {id now} {vals : List (Val Γ s)} {fin}
                         {sched sched₁ : Sched Γ} {st st₁ : EvalSt e}
-                        {vals′ evs fin′}
+                        {vals′ fin′}
                     → f ≤ freshId nodeᵏ (Sched.mint sched)
                     → FrameAbove f fr
                     → stepFrame⇓ {e = e} id now fr κ vals fin sched st
-                        (vals′ , evs , fin′ , sched₁ , st₁)
+                        (vals′ , fin′ , sched₁ , st₁)
                     → PreservedBelow f st st₁
 
 subscribeAll-preserves : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
@@ -212,62 +211,62 @@ subscribeInner-preserves : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
                              (f : ℕ) {op} {allNid} {κ : Path Γ lo u t} {id now}
                              {o : Val Γ (obs u)}
                              {sched sched′ : Sched Γ} {st st′ : EvalSt e}
-                             {inst vs bs done}
+                             {inst vs done}
                          → f ≤ freshId nodeᵏ (Sched.mint sched)
                          → subscribeInner⇓ {e = e} op allNid κ id now o sched st
-                             (inst , vs , bs , done , sched′ , st′)
+                             (inst , vs , done , sched′ , st′)
                          → PreservedBelow f st st′
 
 thruWalk-preserves : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
                        (f : ℕ) {op} {nid} {κ : Path Γ lo u t} {id now} {os}
-                       {sched₀ sched₂ : Sched Γ} {st₀ st₂ : EvalSt e} {vs bs}
+                       {sched₀ sched₂ : Sched Γ} {st₀ st₂ : EvalSt e} {vs}
                    → f ≤ freshId nodeᵏ (Sched.mint sched₀)
                    → f ≤ nid
                    → thruWalk⇓ {e = e} op nid κ id now os sched₀ st₀
-                       (vs , bs , sched₂ , st₂)
+                       (vs , sched₂ , st₂)
                    → PreservedBelow f st₀ st₂
 
 thruConsume-preserves : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
                           (f : ℕ) {op} {nid} {κ : Path Γ lo u t} {id now}
                           {o : Val Γ (obs u)}
-                          {sched₀ sched₁ : Sched Γ} {st₀ st₁ : EvalSt e} {vs bs}
+                          {sched₀ sched₁ : Sched Γ} {st₀ st₁ : EvalSt e} {vs}
                       → f ≤ freshId nodeᵏ (Sched.mint sched₀)
                       → f ≤ nid
                       → thruConsume⇓ {e = e} op nid κ id now o sched₀ st₀
-                          (vs , bs , sched₁ , st₁)
+                          (vs , sched₁ , st₁)
                       → PreservedBelow f st₀ st₁
 
 mergeAllDrain-preserves : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
                             (f : ℕ) {allNid} {κ : Path Γ lo u t} {id now}
                             {lim act od q}
                             {sched₀ sched₂ : Sched Γ} {st₀ st₂ : EvalSt e}
-                            {vs bs act′ q′}
+                            {vs act′ q′}
                         → f ≤ freshId nodeᵏ (Sched.mint sched₀)
                         → f ≤ allNid
                         → mergeAllDrain⇓ {e = e} allNid κ id now lim act od q
-                            sched₀ st₀ (vs , bs , act′ , q′ , sched₂ , st₂)
+                            sched₀ st₀ (vs , act′ , q′ , sched₂ , st₂)
                         → PreservedBelow f st₀ st₂
 
 innerFinish-preserves : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
                           (f : ℕ) {op} {allNid} {inst} {κ : Path Γ lo u t}
                           {id now} {vals : List (Val Γ u)}
                           {sched sched′ : Sched Γ} {st st′ : EvalSt e} {ns}
-                          {vals′ bs done}
+                          {vals′ done}
                       → f ≤ freshId nodeᵏ (Sched.mint sched)
                       → f ≤ allNid
                       → innerFinish⇓ {e = e} op allNid inst κ id now vals sched st
-                          ns (vals′ , bs , done , sched′ , st′)
+                          ns (vals′ , done , sched′ , st′)
                       → PreservedBelow f st st′
 
 innerReact-preserves : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
                          (f : ℕ) {op} {allNid} {inst} {κ : Path Γ lo u t}
                          {id now} {vals : List (Val Γ u)}
                          {sched sched₁ : Sched Γ} {st st₁ : EvalSt e} {fin}
-                         {vals′ evs fin′}
+                         {vals′ fin′}
                      → f ≤ freshId nodeᵏ (Sched.mint sched)
                      → f ≤ allNid
                      → innerReact⇓ {e = e} op allNid inst κ id now vals sched st
-                         fin (vals′ , evs , fin′ , sched₁ , st₁)
+                         fin (vals′ , fin′ , sched₁ , st₁)
                      → PreservedBelow f st st₁
 
 sharedConnect-preserves : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo}
@@ -323,10 +322,7 @@ subscribeE-preserves f le (subs-μ sub)           = subscribeE-preserves f le su
 subscribeE-preserves f le (subs-defer refl _ _ _) = pres-write _ _ _ refl le
 subscribeE-preserves f le (subs-mint refl sub)   = subscribeE-preserves f le sub
 
-pushBurst-preserves f le fa push-nil = pres-same _ _ refl
-pushBurst-preserves f le fa (push-cons _ stp rest) =
-  pres-trans (stepFrame-preserves f le fa stp)
-             (pushBurst-preserves f (≤-trans le (stepFrame-mono stp nodeᵏ)) fa rest)
+pushBurst-preserves f le fa (push-all _ stp) = stepFrame-preserves f le fa stp
 
 stepFrame-preserves f le fa step-map = pres-same _ _ refl
 stepFrame-preserves f le fa
@@ -341,9 +337,9 @@ stepFrame-preserves f le fa
 stepFrame-preserves f le fa (step-from-inner r) =
   innerReact-preserves f le (proj₁ fa) r
 stepFrame-preserves f le fa
-  (step-thru-outer {op = op} {nid} {fin = fin} {vs = vs} {bs} {sched′} {st′} w) =
+  (step-thru-outer {op = op} {nid} {fin = fin} {vs = vs} {sched′} {st′} w) =
   pres-trans (thruWalk-preserves f le fa w)
-             (wrap-pres op nid fin vs bs sched′ st′ fa)
+             (wrap-pres op nid fin vs sched′ st′ fa)
 
 subscribeAll-preserves f le (sub-all refl sub push) =
   pres-trans (pres-trans (pres-write _ _ _ refl le)

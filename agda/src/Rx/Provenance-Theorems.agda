@@ -6,8 +6,9 @@ open import Data.List.Relation.Unary.All          using (All)
 open import Data.Nat                              using (suc)
 
 open import Rx.Prim      using (Fuel; Id; InstEmit)
-open import Rx.Exp       using (Ctx; Closed)
-open import Rx.Evaluator using (Stream)
+open import Rx.Exp       using (Ctx; Closed; uniqᵗ)
+open import Rx.Envelope  using (instEmitᵗ)
+open import Rx.Envelope.Decode using (decodeStream)
 open import Rx.Evaluator.Builder using (evaluate↓)
 open import Rx.Slots using (Slots)
 
@@ -21,8 +22,12 @@ open import Rx.Slots using (Slots)
 _⊆ᵢ_ : List Id → List Id → Set
 xs ⊆ᵢ ys = All (λ x → x ∈ ys) xs
 
--- every id an emit carries, in stream order
-ids : ∀ {n} {Γ : Ctx n} {t} → Stream Γ t → List Id
+-- every id an emit carries, in stream order.  Stated over the DECODED
+-- stream, because the evaluator's own carrier is a plain rxjs stream
+-- and carries no instants at all: provenance is a property of the
+-- protocol alphabet, which a run only has when its program is
+-- envelope-typed.
+ids : ∀ {A : Set} → List (InstEmit A) → List Id
 ids = map InstEmit.instant
 
 -- {0 … fuel}: Fuel is ℕ (Rx.Prim) and Id is ℕ too (Rx.Prim),
@@ -72,5 +77,6 @@ postulate
   -- every id in the output stream is the id of some arrival's cascade;
   -- sync-spawned inners inherit, never mint
   id-inheritance :
-    ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slots Γ) →
-    ids (evaluate↓ fuel e ins) ⊆ᵢ horizon fuel
+    ∀ {n} {Γ : Ctx n} {u} (fuel : Fuel)
+      (e : Closed Γ (instEmitᵗ uniqᵗ u)) (ins : Slots Γ) →
+    ids (decodeStream (evaluate↓ fuel e ins)) ⊆ᵢ horizon fuel

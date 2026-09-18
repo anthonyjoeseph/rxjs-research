@@ -20,6 +20,7 @@ open import Rx.Exp                using (Ctx)
 open import Rx.SExp               using (SExp; emitᵛ)
 open import Rx.Elaborate          using (elaborate)
 open import Rx.Evaluator.Builder using (evaluate↓)
+open import Rx.Envelope.Decode using (decodeStream)
 open import Rx.Slots using (Slots)
 open import Rx.Protocol           using (ProtocolSt; Owed; protocol-init; runProtocol; stepProtocol; paidOff; allZero; Accepted;
   settle; applyEvents; hasOwed; bumpOwed; cancelOwed; removeOne; countIn)
@@ -1092,11 +1093,21 @@ batch-agreement xs acc =
 -- the restriction costs no hypothesis and nothing downstream carries a
 -- side condition.  The elaboration is the only bridge, so the run below
 -- is still an ordinary run of the ordinary machine.
+
+-- THE `decodeStream` IS WHERE THE PROTOCOL ENTERS, AND IT ENTERS ONCE.
+-- The evaluator's carrier is a plain stream of ordinary rxjs events,
+-- so nothing it produces is an `InstEmit` and no stage of it knows the
+-- protocol exists.  What makes the statement about batching sayable is
+-- that `elaborate` lands in the envelope type, so the run's VALUES are
+-- the protocol's alphabet and reading them off is total and
+-- structural.  Both sides take the same decoded stream, so the theorem
+-- compares two batchings of one list and the decode is not a party to
+-- the claim.
 formal-verification-batchSimultaneous :
   ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : SExp Γ [] [] [] t)
     (ins : Slots (emitᵛ Γ)) →
-  spec-batchSimultaneous (evaluate↓ fuel (elaborate e) ins)
-    ≡ impl-batchSimultaneous (evaluate↓ fuel (elaborate e) ins)
+  spec-batchSimultaneous (decodeStream (evaluate↓ fuel (elaborate e) ins))
+    ≡ impl-batchSimultaneous (decodeStream (evaluate↓ fuel (elaborate e) ins))
 formal-verification-batchSimultaneous fuel e ins =
-  batch-agreement (evaluate↓ fuel (elaborate e) ins)
+  batch-agreement (decodeStream (evaluate↓ fuel (elaborate e) ins))
                   (evaluate-accepted fuel (elaborate e) ins)

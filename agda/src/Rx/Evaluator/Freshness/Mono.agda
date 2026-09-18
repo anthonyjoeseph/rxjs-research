@@ -32,7 +32,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Mint using (MintKey; ordinalᵏ; sourceᵏ; nodeᵏ; regᵏ; freshId; next; next-mono)
 open import Rx.Exp using (Ctx; Closed; Val; obs; FnClo; _×ᵗ_; _≟ᵗ_)
-open import Rx.Prim using (Id; InstEvent)
+open import Rx.Prim using (Id)
 open import Rx.Evaluator using (Sched; EvalSt; Path; Frame; NodeId; NodeState; AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ;
   oneShotBurst; switchKill; scanDispatch; takeDispatch; batchSyncDispatch; thruWrap; cell-st; take-st; batchSync-st;
   mergeAll-st; switch-st; exhaust-st; lookupNode; takeVals)
@@ -48,7 +48,7 @@ open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeInner⇓; thruCon
   finish-all-drain; finish-switch-clear; finish-exhaust-clear; finish-nil;
   react-false; react-alive; react-dead;
   step-map; step-scan; step-take; step-batchSync; step-from-inner; step-thru-outer;
-  push-nil; push-cons; sub-all; connect-live; connect-died;
+  push-all; sub-all; connect-live; connect-died;
   slot-spent; slot-join; slot-connect)
 
 -- the one-shot burst mints at the SOURCE key and at no other
@@ -62,8 +62,8 @@ oneShot-mint vals id sched refl k = next-mono sourceᵏ k _
 -- the switch's cut sweeps live registrations, never the mint
 switchKill-mint : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
                     (cur : Maybe NodeId) (sched : Sched Γ) (st : EvalSt e)
-                    {closes sched₁ st₁}
-                → switchKill {e = e} cur sched st ≡ (closes , sched₁ , st₁)
+                    {sched₁ st₁}
+                → switchKill {e = e} cur sched st ≡ (sched₁ , st₁)
                 → (k : MintKey)
                 → freshId k (Sched.mint sched) ≤ freshId k (Sched.mint sched₁)
 switchKill-mint nothing  sched st refl k = ≤-refl
@@ -76,8 +76,8 @@ scanDispatch-mint : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
                       (sched : Sched Γ) (st : EvalSt e) (m : Maybe (NodeState Γ))
                       (k : MintKey)
                   → freshId k (Sched.mint sched)
-                    ≤ freshId k (Sched.mint (proj₁ (proj₂ (proj₂ (proj₂
-                        (scanDispatch {e = e} fn nid vals fin sched st m))))))
+                    ≤ freshId k (Sched.mint (proj₁ (proj₂ (proj₂
+                        (scanDispatch {e = e} fn nid vals fin sched st m)))))
 scanDispatch-mint {u = u} fn nid vals fin sched st (just (cell-st {v} a)) k
   with v ≟ᵗ u
 ... | no  _    = ≤-refl
@@ -95,8 +95,8 @@ takeDispatch-mint : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
                       (sched : Sched Γ) (st : EvalSt e) (m : Maybe (NodeState Γ))
                       (k : MintKey)
                   → freshId k (Sched.mint sched)
-                    ≤ freshId k (Sched.mint (proj₁ (proj₂ (proj₂ (proj₂
-                        (takeDispatch {e = e} nid vals fin sched st m))))))
+                    ≤ freshId k (Sched.mint (proj₁ (proj₂ (proj₂
+                        (takeDispatch {e = e} nid vals fin sched st m)))))
 takeDispatch-mint nid vals fin sched st (just (take-st cap)) k
   with proj₂ (proj₂ (takeVals cap vals))
 ... | true  = ≤-refl
@@ -115,8 +115,8 @@ batchSyncDispatch-mint : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
                       (sched : Sched Γ) (st : EvalSt e) (m : Maybe (NodeState Γ))
                       (k : MintKey)
                   → freshId k (Sched.mint sched)
-                    ≤ freshId k (Sched.mint (proj₁ (proj₂ (proj₂ (proj₂
-                        (batchSyncDispatch {e = e} nid vals fin sched st m))))))
+                    ≤ freshId k (Sched.mint (proj₁ (proj₂ (proj₂
+                        (batchSyncDispatch {e = e} nid vals fin sched st m)))))
 batchSyncDispatch-mint nid vals fin sched st (just (batchSync-st _)) k = ≤-refl
 batchSyncDispatch-mint nid vals fin sched st nothing k = ≤-refl
 batchSyncDispatch-mint nid vals fin sched st (just (cell-st _)) k = ≤-refl
@@ -129,13 +129,13 @@ batchSyncDispatch-mint nid vals fin sched st (just (exhaust-st _ _)) k = ≤-ref
 -- scheduler straight back
 thruWrap-mint : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
                   (op : AllOp) (nid : NodeId) (fin : Bool)
-                  (vs : List (Val Γ u)) (bs : List (InstEvent (Val Γ t)))
+                  (vs : List (Val Γ u))
                   (sched′ : Sched Γ) (st′ : EvalSt e) (k : MintKey)
               → freshId k (Sched.mint sched′)
-                ≤ freshId k (Sched.mint (proj₁ (proj₂ (proj₂ (proj₂
-                    (thruWrap {e = e} op nid fin (vs , bs , sched′ , st′)))))))
-thruWrap-mint op nid false vs bs sched′ st′ k = ≤-refl
-thruWrap-mint mergeAllᵒ nid true vs bs sched′ st′ k
+                ≤ freshId k (Sched.mint (proj₁ (proj₂ (proj₂
+                    (thruWrap {e = e} op nid fin (vs , sched′ , st′))))))
+thruWrap-mint op nid false vs sched′ st′ k = ≤-refl
+thruWrap-mint mergeAllᵒ nid true vs sched′ st′ k
   with lookupNode nid (EvalSt.nodes st′)
 ... | just (mergeAll-st _ _ _ _) = ≤-refl
 ... | just (cell-st _)           = ≤-refl
@@ -144,7 +144,7 @@ thruWrap-mint mergeAllᵒ nid true vs bs sched′ st′ k
 ... | just (switch-st _ _)       = ≤-refl
 ... | just (exhaust-st _ _)      = ≤-refl
 ... | nothing                    = ≤-refl
-thruWrap-mint switchᵒ nid true vs bs sched′ st′ k
+thruWrap-mint switchᵒ nid true vs sched′ st′ k
   with lookupNode nid (EvalSt.nodes st′)
 ... | just (switch-st _ _)       = ≤-refl
 ... | just (cell-st _)           = ≤-refl
@@ -153,7 +153,7 @@ thruWrap-mint switchᵒ nid true vs bs sched′ st′ k
 ... | just (mergeAll-st _ _ _ _) = ≤-refl
 ... | just (exhaust-st _ _)      = ≤-refl
 ... | nothing                    = ≤-refl
-thruWrap-mint exhaustᵒ nid true vs bs sched′ st′ k
+thruWrap-mint exhaustᵒ nid true vs sched′ st′ k
   with lookupNode nid (EvalSt.nodes st′)
 ... | just (exhaust-st _ _)      = ≤-refl
 ... | just (cell-st _)           = ≤-refl
@@ -179,9 +179,9 @@ pushBurst-mono : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
 
 stepFrame-mono : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
                    {fr : Frame Γ s u} {κ : Path Γ lo u t} {id now} {vals fin}
-                   {sched sched₁ : Sched Γ} {st st₁ : EvalSt e} {vals′ evs fin′}
+                   {sched sched₁ : Sched Γ} {st st₁ : EvalSt e} {vals′ fin′}
                → stepFrame⇓ {e = e} id now fr κ vals fin sched st
-                   (vals′ , evs , fin′ , sched₁ , st₁)
+                   (vals′ , fin′ , sched₁ , st₁)
                → (k : MintKey)
                → freshId k (Sched.mint sched) ≤ freshId k (Sched.mint sched₁)
 
@@ -197,54 +197,54 @@ subscribeAll-mono : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
 subscribeInner-mono : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
                         {op} {allNid} {κ : Path Γ lo u t} {id now}
                         {o : Val Γ (obs u)} {sched sched′ : Sched Γ}
-                        {st st′ : EvalSt e} {inst vs bs done}
+                        {st st′ : EvalSt e} {inst vs done}
                     → subscribeInner⇓ {e = e} op allNid κ id now o sched st
-                        (inst , vs , bs , done , sched′ , st′)
+                        (inst , vs , done , sched′ , st′)
                     → (k : MintKey)
                     → freshId k (Sched.mint sched) ≤ freshId k (Sched.mint sched′)
 
 thruWalk-mono : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
                   {op} {nid} {κ : Path Γ lo u t} {id now}
                   {vals : List (Val Γ (obs u))} {sched sched′ : Sched Γ}
-                  {st st′ : EvalSt e} {vs bs}
+                  {st st′ : EvalSt e} {vs}
               → thruWalk⇓ {e = e} op nid κ id now vals sched st
-                  (vs , bs , sched′ , st′)
+                  (vs , sched′ , st′)
               → (k : MintKey)
               → freshId k (Sched.mint sched) ≤ freshId k (Sched.mint sched′)
 
 thruConsume-mono : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
                      {op} {nid} {κ : Path Γ lo u t} {id now}
                      {o : Val Γ (obs u)} {sched sched′ : Sched Γ}
-                     {st st′ : EvalSt e} {vs bs}
+                     {st st′ : EvalSt e} {vs}
                  → thruConsume⇓ {e = e} op nid κ id now o sched st
-                     (vs , bs , sched′ , st′)
+                     (vs , sched′ , st′)
                  → (k : MintKey)
                  → freshId k (Sched.mint sched) ≤ freshId k (Sched.mint sched′)
 
 mergeAllDrain-mono : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo}
                        {allNid} {κ : Path Γ lo s t} {id now} {lim act od q}
                        {sched sched′ : Sched Γ} {st st′ : EvalSt e}
-                       {vs bs act′ q′}
+                       {vs act′ q′}
                    → mergeAllDrain⇓ {e = e} allNid κ id now lim act od q sched st
-                       (vs , bs , act′ , q′ , sched′ , st′)
+                       (vs , act′ , q′ , sched′ , st′)
                    → (k : MintKey)
                    → freshId k (Sched.mint sched) ≤ freshId k (Sched.mint sched′)
 
 innerFinish-mono : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo}
                      {op} {allNid inst} {κ : Path Γ lo s t} {id now}
                      {vals : List (Val Γ s)} {sched sched′ : Sched Γ}
-                     {st st′ : EvalSt e} {m} {vs bs fin}
+                     {st st′ : EvalSt e} {m} {vs fin}
                  → innerFinish⇓ {e = e} op allNid inst κ id now vals sched st m
-                     (vs , bs , fin , sched′ , st′)
+                     (vs , fin , sched′ , st′)
                  → (k : MintKey)
                  → freshId k (Sched.mint sched) ≤ freshId k (Sched.mint sched′)
 
 innerReact-mono : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo}
                     {op} {allNid inst} {κ : Path Γ lo s t} {id now}
                     {vals : List (Val Γ s)} {sched sched′ : Sched Γ}
-                    {st st′ : EvalSt e} {alive} {vs bs fin}
+                    {st st′ : EvalSt e} {alive} {vs fin}
                 → innerReact⇓ {e = e} op allNid inst κ id now vals sched st alive
-                    (vs , bs , fin , sched′ , st′)
+                    (vs , fin , sched′ , st′)
                 → (k : MintKey)
                 → freshId k (Sched.mint sched) ≤ freshId k (Sched.mint sched′)
 
@@ -303,8 +303,7 @@ subscribeE-mono (subs-defer {sched = sched} refl refl refl refl) k =
 subscribeE-mono (subs-mint {sched = sched} refl sub) k =
   ≤-trans (next-mono sourceᵏ k (Sched.mint sched)) (subscribeE-mono sub k)
 
-pushBurst-mono push-nil              k = ≤-refl
-pushBurst-mono (push-cons _ st rest) k = ≤-trans (stepFrame-mono st k) (pushBurst-mono rest k)
+pushBurst-mono (push-all _ st) k = stepFrame-mono st k
 
 stepFrame-mono step-map k = ≤-refl
 stepFrame-mono (step-scan {fn = fn} {nid} {vals = vals} {fin} {sched} {st}) k =
@@ -315,7 +314,7 @@ stepFrame-mono (step-batchSync {nid = nid} {vals = vals} {fin} {sched} {st}) k =
   batchSyncDispatch-mint nid vals fin sched st (lookupNode nid (EvalSt.nodes st)) k
 stepFrame-mono (step-from-inner r)   k = innerReact-mono r k
 stepFrame-mono (step-thru-outer {op = op} {nid} {fin = fin} w) k =
-  ≤-trans (thruWalk-mono w k) (thruWrap-mint op nid fin _ _ _ _ k)
+  ≤-trans (thruWalk-mono w k) (thruWrap-mint op nid fin _ _ _ k)
 
 subscribeAll-mono (sub-all {sched = sched} refl sub push) k =
   ≤-trans (≤-trans (next-mono nodeᵏ k (Sched.mint sched)) (subscribeE-mono sub k))

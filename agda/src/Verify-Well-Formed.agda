@@ -17,10 +17,12 @@ module Verify-Well-Formed where
 open import Data.Nat using (zero; suc; _+_)
 open import Data.Product using (_,_; proj₂)
 open import Data.Nat.Properties using (m≤m+n; +-suc)
-open import Relation.Binary.PropositionalEquality using (sym; subst)
+open import Relation.Binary.PropositionalEquality using (sym; subst; trans; cong₂)
 
 open import Rx.Prim using (Fuel)
-open import Rx.Exp using (Ctx; Closed; []ᵉ)
+open import Rx.Exp using (Ctx; Closed; []ᵉ; uniqᵗ)
+open import Rx.Envelope using (instEmitᵗ)
+open import Rx.Envelope.Decode using (decodeStream; decodeStream-++)
 open import Rx.Slots using (Slots)
 open import Rx.Evaluator using (root; sched-init; st-init)
 open import Rx.Evaluator.Domain using (subscribeE⇓; cascade⇓; drain⇓; evaluate⇓;
@@ -142,15 +144,17 @@ open import Rx.Protocol.Sound using (Sound; Sound-[]; Sound-++; sound-accepted)
 --   flattener, a share, or a cascade carrying more than one emit.
 postulate
   sound-cascade :
-    ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {a id sched st out sched′ st′} →
-    cascade⇓ {e = e} a id sched st (out , sched′ , st′) → Sound id (suc id) out
+    ∀ {n} {Γ : Ctx n} {u} {e : Closed Γ (instEmitᵗ uniqᵗ u)}
+      {a id sched st out sched′ st′} →
+    cascade⇓ {e = e} a id sched st (out , sched′ , st′) →
+    Sound id (suc id) (decodeStream out)
 
   sound-subscribe :
-    ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
+    ∀ {n} {Γ : Ctx n} {u} (e : Closed Γ (instEmitᵗ uniqᵗ u)) (ins : Slots Γ)
       {burst sched₀ st₀} →
     subscribeE⇓ {e = e} {lo = n} (_ , e , []ᵉ) root 0 0
       (sched-init e ins) (st-init e) (burst , sched₀ , st₀) →
-    Sound 0 1 burst
+    Sound 0 1 (decodeStream burst)
 
 -- THE DRAIN IS THE INDUCTION, AND THE INDEXING IS WHAT MAKES IT ONE.
 -- Each constructor hands its tail a counter one higher than its own,
@@ -159,32 +163,41 @@ postulate
 -- step case, since `Sound-++` already composes the two segments once
 -- their indices meet.
 sound-drain :
-  ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (fuel : Fuel) {id sched st rest} →
-  drain⇓ {e = e} fuel id sched st rest → Sound id (id + fuel) rest
+  ∀ {n} {Γ : Ctx n} {u} {e : Closed Γ (instEmitᵗ uniqᵗ u)}
+    (fuel : Fuel) {id sched st rest} →
+  drain⇓ {e = e} fuel id sched st rest → Sound id (id + fuel) (decodeStream rest)
 sound-drain zero    {id = id} drain-done      = Sound-[] (m≤m+n id 0)
 sound-drain (suc k) {id = id} (drain-empty _) = Sound-[] (m≤m+n id (suc k))
 sound-drain _ (drain-step {k = k} {nextId = id} {out = out} {rest = rest}
                                   _ c d) =
-  Sound-++ out rest (sound-cascade c)
-    (subst (λ z → Sound (suc id) z rest) (sym (+-suc id k)) (sound-drain k d))
+  subst (Sound _ _) (sym (decodeStream-++ out rest))
+    (Sound-++ (decodeStream out) (decodeStream rest) (sound-cascade c)
+      (subst (λ z → Sound (suc id) z (decodeStream rest)) (sym (+-suc id k))
+        (sound-drain k d)))
 
 -- AND THE RUN IS THEIR CONCATENATION, WHICH IS WHAT `eval-run` SAYS.
 -- The exit watermark is one above the fuel rather than the fuel: the
 -- root subscribe spends the zeroth instant, so the drain starts at one
 -- and every cascade after it is offset by that seed.
 sound-run :
-  ∀ {n} {Γ : Ctx n} {t} {fuel : Fuel} {e : Closed Γ t} {ins : Slots Γ} {out} →
-  evaluate⇓ fuel e ins out → Sound 0 (suc fuel) out
+  ∀ {n} {Γ : Ctx n} {u} {fuel : Fuel} {e : Closed Γ (instEmitᵗ uniqᵗ u)}
+    {ins : Slots Γ} {out} →
+  evaluate⇓ fuel e ins out → Sound 0 (suc fuel) (decodeStream out)
 sound-run (eval-run {burst = burst} {rest = rest} s d) =
-  Sound-++ burst rest (sound-subscribe _ _ s) (sound-drain _ d)
+  subst (Sound _ _) (sym (decodeStream-++ burst rest))
+    (Sound-++ (decodeStream burst) (decodeStream rest)
+      (sound-subscribe _ _ s) (sound-drain _ d))
 
 evaluate-sound :
-  ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slots Γ) →
-  Sound 0 (suc fuel) (evaluate↓ fuel e ins)
+  ∀ {n} {Γ : Ctx n} {u} (fuel : Fuel) (e : Closed Γ (instEmitᵗ uniqᵗ u))
+    (ins : Slots Γ) →
+  Sound 0 (suc fuel) (decodeStream (evaluate↓ fuel e ins))
 evaluate-sound fuel e ins = sound-run (proj₂ (evaluate! fuel e ins))
 
 evaluate-accepted :
-  ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slots Γ) →
-  Accepted (runProtocol protocol-init (evaluate↓ fuel e ins))
+  ∀ {n} {Γ : Ctx n} {u} (fuel : Fuel) (e : Closed Γ (instEmitᵗ uniqᵗ u))
+    (ins : Slots Γ) →
+  Accepted (runProtocol protocol-init (decodeStream (evaluate↓ fuel e ins)))
 evaluate-accepted fuel e ins =
-  sound-accepted (evaluate↓ fuel e ins) (evaluate-sound fuel e ins)
+  sound-accepted (decodeStream (evaluate↓ fuel e ins))
+                 (evaluate-sound fuel e ins)

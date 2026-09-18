@@ -230,28 +230,24 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 
 ### Big picture tier roadmap
 
-- **TAKE `InstEmit` OUT OF THE EVALUATOR'S CARRIER (Anthony).** `Stream Γ t = List (InstEmit (Val Γ t))` COALESCES a whole cascade
-  into one envelope — the burst-vs-depth-first divergence witnessed at
-  `evaluate↓`, and why `Rx.Depth` exists as a second top line carrying
-  `budgetᵈ` and its silent truncation. `Rx.Envelope` already mirrors that
-  envelope field-for-field at the OBJECT level and `toPlain` puts it there, so
-  the meta-level copy is duplication. Dropping it makes the carrier plain
-  values and leaves `Reducible` covering the only evaluator — SIMPLER, since
-  `EvSat` loses three provenance arms, `push-cons`'s walk collapses into one
-  rule, and `foldPath⇓`'s event accumulator goes with it. That accumulator was
-  the coalescing itself, stated as an induction, and nothing had named it.
+- **ENVELOPE-VALUED INPUT SLOTS — WHAT THE DECODE LEG TURNED OUT TO OWE.**
+  Three of the four orphaned faces crossed on a narrowing alone, QUANTIFYING
+  over their program so an abstract slot table came with it. The readme
+  instances do not: their content is the concrete script, and under
+  elaboration a slot carries the envelope type, so a scripted hot slot must
+  deliver an envelope rather than a value. Nothing in `src` builds one. The gap
+  is wider than the readme — every probe instantiates at a plain program, which
+  no narrowed statement admits — so one missing constructor is what makes the
+  evidence tree re-runnable. The semantics question is in the decoder's header.
 
-- **THEN DECODE AT THE BOUNDARY, WHICH THE LEG ABOVE TURNED OUT TO CONTAIN.**
-  Four faces read the protocol off the CARRIER — the acceptance sandwich, the
-  id-discipline premise, the readme instances and the top line — so a plain
-  carrier orphans all four at once. `Rx.Envelope.Decode` reads the envelope
-  back out of the values it now rides on, structurally and totally, and the
-  spec's own statement is then transported rather than restated: `Spec.agda`
-  does not move. The carrier's own end drops, which is a fact about the
-  elaboration — an elaborated source emits `init`, its payloads, a `close` at
-  `exhausted` and a `complete` in ONE envelope — and not a convention. Each of
-  the four narrows to programs that emit envelopes, which is what they always
-  meant.
+- **THEN THE PROBE SUITE, RE-RUN RATHER THAN RESTAMPED.** Six `-- TARGET:`
+  fingerprints across four probe files stand against statements this leg
+  restated, and a fingerprint is exactly the check that refuses a restatement
+  under an unchanged name. The repair is never the stamp: each probe's rows
+  are evidence about a statement that admitted plain programs, and the
+  narrowed statement admits none of them, so the rows are re-run against the
+  new reading on the apparatus the leg above builds, or the probe goes and its
+  receipts go with it. What the receipts claim today is coverage nothing buys.
 
 - **THEN RETIRE `Rx.Depth` AND `budgetᵈ`.** The second top line existed to
   paper over the divergence the leg above removes, and it is a pure function
