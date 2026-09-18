@@ -243,7 +243,22 @@ const joinAll =
             const lane = e.lanes.find((l) => l.id === item.lane);
             if (lane === undefined) return e;
             const open = openAfter(item.emit, lane.open, false);
-            const ledger = cutLedgerStep(item.emit, lane.ledger);
+            // THE LEDGER READS THE BURST UNDER THE FRAME'S INSTANT, NOT
+            // THE BURST'S OWN. An inner subscribed inside a delivery
+            // cascade stamps its burst `SUBSCRIBE_FRAME`, because that
+            // is what a subscribe burst is; but the registrations it
+            // opens are BORN IN THE CASCADE (id-inheritance, which is
+            // why the graft carries the carrier's instant downstream).
+            // Ledgered under their own stamp they are born in an
+            // instant nothing ever cuts, so a switch cutting this lane
+            // in the very frame that opened it reads every victim as
+            // pre-existing and closes it `cutPending` instead of `cut`.
+            const ledger = cutLedgerStep(
+              lane.live || e.carrier === undefined
+                ? item.emit
+                : { ...item.emit, instant: e.carrier.instant },
+              lane.ledger,
+            );
             const parts = splitEmit(item.emit);
             if (!lane.live)
               return {

@@ -235,11 +235,10 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
   default sweep is clean, and so is every lane biased at a pure-function
   former. Red is every lane biased at a FLATTENER or a protocol operator, and
   it was red the same way before lift came apart, so it is this branch's
-  standing state rather than the ruling's cost. One cause is out, recorded at
-  the constructor it was found in. The leg is to carry the remaining lanes
-  down the same way and then to put the sweep where a regression fails: CI
-  runs the gate, the tower and the QuickCheck sweep, and has never run the
-  oracle at all.
+  standing state, not the ruling's cost. Two causes are out, each recorded
+  where it was found, and both were an INSTANT read off the wrong emit. The
+  leg is the remaining lanes, carried down the same way, and then the sweep
+  put where a regression fails: CI has never run the oracle at all.
 
 - **THEN THE DEMOTION, WHICH IS TWO EVALUATORS AND NOT A RETYPE (Anthony: the
   harness "shouldn't test on srxjs at all — just plain rxjs now", and the Main
