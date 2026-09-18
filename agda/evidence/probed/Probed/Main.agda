@@ -56,7 +56,7 @@ open import Probed.Apparatus using (Confirms; Separates)
 open import Probed.Readme-Claims using (row-order; row-one-batch)
 
 -- THE PIPELINE-SIDE CLAIMS, claimed from the root for the same reason.
-open import Probed.Pipeline-Claims using (row-online; row-ids)
+open import Probed.Pipeline-Claims using (row-online)
 
 -- THE ONE CLAIM STATED OVER THE MACHINE ALONE, claimed here because a
 -- statement a concrete program decides is one nothing should take on

@@ -3,7 +3,7 @@
 -- all ten were proven).  A statement that will not prove is a drift
 -- between the README and the Agda spec: exactly what this file catches.
 --
--- Three universal laws over the whole grammar.  They compare only
+-- Two universal laws over the whole grammar.  They compare only
 -- VALUES (emitValues) — ids and protocol traffic are the other theorem
 -- files' business.
 --
@@ -21,19 +21,22 @@
 --   sha's `Rx/Exp.agda` holds `evalTm` and `applyFn`, the closed-term
 --   wrappers their expected sides were written in, which nothing else
 --   consumed and which are one line each over `evalWith`.
+-- RECOVERY: git show 54227c28:agda/src/Readme-Theorems.agda restores
+--   `readme-take-counts-values`, the take law, whose statement stood over
+--   the `takeᵖ` of that sha's `Rx/Elaborate.agda` -- the level shift the
+--   law exists to name, deleted with it because the law was its only
+--   consumer.  Both are owed where the simul tree is worked.
 module Readme-Theorems where
 
-open import Data.Nat     using (ℕ; _≤_)
-open import Data.List    using (List; []; _∷_; _++_; take; concat; length)
+open import Data.Nat     using (_≤_)
+open import Data.List    using (List; []; _∷_; _++_; concat; length)
 open import Data.Vec     using ([]; _∷_)     -- contexts are Vecs; ∷/[] overload per type
 open import Relation.Binary.PropositionalEquality using (_≡_)
 
 open import Rx.Prim      using (Fuel; InstEmit; _at_from_as_)
-open import Rx.Exp       using (Ctx; Closed; nat̂; uniqᵗ)
+open import Rx.Exp       using (Ctx; Closed; uniqᵗ)
 open import Rx.Envelope  using (instEmitᵗ)
 open import Rx.Envelope.Decode using (decodeStream)
-open import Rx.SExp      using (emitᵗ)
-open import Rx.Elaborate using (takeᵖ)
 open import Rx.Evaluator.Builder using (evaluate↓)
 open import Rx.Slots using (Slots)
 open import Spec         using (spec-batchSimultaneous; valuesOf)
@@ -66,27 +69,6 @@ postulate
     concat (emitValues (spec-batchSimultaneous
                          (decodeStream (evaluate↓ fuel e ins))))
       ≡ emitValues (decodeStream (evaluate↓ fuel e ins))
-
-  -- take counts values, even mid-batch: take k keeps the first k
-  -- VALUES of the flat stream — never the first k batches — so it
-  -- can cut a batch in half.  AT `takeᵖ` AND NOT AT `takeᵉ`, which is
-  -- what the law costs now that the stream is decoded: elaboration puts
-  -- the author's values INSIDE the envelope, so a plain `takeᵉ` over an
-  -- enveloped program counts batches and this statement would be FALSE
-  -- at it -- the level shift `takeᵖ` is postulated for.
-  -- AND IT CANNOT BE INSTANTIATED AT ALL WHILE `takeᵖ` IS POSTULATED,
-  -- which is a coverage boundary rather than a doubt about the claim: a
-  -- row written at any program leaves the whole application stuck in
-  -- the normal form, so neither side reduces and nothing decides it.
-  -- Discharging `takeᵖ` is what makes this law probeable, and until
-  -- then it carries no receipt and is owed one.
-  readme-take-counts-values :
-    ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (k : ℕ)
-      (e : Closed Γ (emitᵗ t)) (ins : Slots Γ) →
-    concat (emitValues (spec-batchSimultaneous
-                          (decodeStream (evaluate↓ fuel (takeᵖ (nat̂ k) e) ins))))
-      ≡ take k (concat (emitValues (spec-batchSimultaneous
-                                      (decodeStream (evaluate↓ fuel e ins)))))
 
   -- One subscribe() call is one batch.  Fuel 0 runs only the
   -- subscribe frame — a single instant — so ANY program, however

@@ -36,14 +36,13 @@ open import Verify-Batch-Simultaneous.Batch-Theorems
   using (batch-online)
 
 ------------------------------------------------------------------
--- THE README'S SEMANTICS, AND ALL THREE NOW QUANTIFY OVER THE WHOLE
+-- THE README'S SEMANTICS, AND BOTH NOW QUANTIFY OVER THE WHOLE
 -- GRAMMAR.  The claims pinned to a canonical program are gone with the
 -- plain tree that could state them; what is left names no program, so
 -- there is nothing beside these for Main to reach.
 ------------------------------------------------------------------
 open import Readme-Theorems
   using (readme-batch-order-is-delivery-order
-        ; readme-take-counts-values
         ; readme-one-subscribe-one-batch)
 
 ------------------------------------------------------------------
@@ -62,8 +61,6 @@ open import Readme-Theorems
 open import Rx.Evaluator-Theorems
   using (fuel-coherent; causality; μ-unfold; μ-guarded; defer-shift)
 
-open import Rx.Provenance-Theorems
-  using (id-inheritance)
 
 ------------------------------------------------------------------
 -- THE RUN RELATION IS A FUNCTION.  Claimed here rather than by a

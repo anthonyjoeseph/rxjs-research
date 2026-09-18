@@ -10,9 +10,10 @@ open import Data.Nat using (ℕ)
 open import Data.Vec.Properties using (lookup-map)
 open import Relation.Binary.PropositionalEquality using (subst; refl)
 
-open import Rx.Exp using (Ty; Ctx; Exp; Tm; Fn; natᵗ; listᵗ; obs; _×ᵗ_; boolᵗ; uniqᵗ; input; ofᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ; mapᵉ;
-  scanᵉ; varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; nilᵗ; consᵗ; inlᵗ; inrᵗ; caseᵗ;
-  foldᵗ; ifᵗ; primᵗ; strmᵗ; letᵗ; revᵗ; renTm; renExp; ext∈; add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ)
+open import Rx.Exp using (Ty; Ctx; Exp; Tm; Fn; listᵗ; obs; _×ᵗ_; boolᵗ; uniqᵗ; input; ofᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ;
+  mapᵉ; scanᵉ; varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; nilᵗ; consᵗ; inlᵗ; inrᵗ; caseᵗ;
+  foldᵗ; ifᵗ; primᵗ; strmᵗ; letᵗ; revᵗ; renTm; renExp; ext∈; add; sub; mul; eqᵖ; ltᵖ; eqᵘ;
+  notᵖ)
 open import Rx.Envelope using (instEventᵗ; closeReasonᵗ; emitKindᵗ; eventsᵛ;
                                splitEventsᵛ; reassembleᵛ; instEmitᵛ; initᵛ;
                                valueᵛ; closeᵛ; completeᵛ)
@@ -69,37 +70,26 @@ open import Rx.SExp using (SExp; STm; inputˢ; ofˢ; emptyˢ; mapˢ; scanˢ;
 -- the plain palette offers to put traffic which must survive a cut, a
 -- drop and a concurrency limit.
 
--- `takeᵖ` IS THE ONE GENUINE SURPRISE, AND IT IS NEITHER KIND.  The
--- author's operator and the plain one agree on everything that was in
--- doubt — both cut naively on values, mid-batch, and both owe the
--- closing envelope at the cut.  What they do not share is the LEVEL:
--- elaboration puts the author's values inside the envelope, so a plain
--- `takeᵉ` over an enveloped stream counts batches.
--- Counting is a step's business and ENDING is not: no former in the
--- plain tree stops a stream on a condition read out of the values, and
--- the cut also owes a `close` a step could otherwise have written,
--- since by then it has an instant in hand.
+-- THE LEVEL SHIFT A SIMUL `take` NEEDS IS NOT STATED HERE, AND THAT IS
+-- A GAP RATHER THAN A DECISION.  The author's operator and the plain
+-- one agree on everything that was in doubt -- both cut naively on
+-- values, mid-batch, and both owe the closing envelope at the cut.
+-- What they do not share is the LEVEL: elaboration puts the author's
+-- values inside the envelope, so a plain `takeᵉ` over an enveloped
+-- stream counts batches.  Counting is a step's business and ENDING is
+-- not, since no plain former stops a stream on a condition read out of
+-- the values.  Nothing in the simul tree asks for it today, so nothing
+-- here states it; restating it is owed wherever a simul `take` returns.
+-- DEAD ROUTE: count in a scan and cut with `takeᵉ`.  The counting and
+--   truncation halves are both a pure-function step's work; the ENDING
+--   half is not, since such a step cannot change how many emits pass
+--   through it, so nothing converts a budget over values into the emit
+--   index a subscription-time count has to name.
+-- RECOVERY: git show 54227c28:agda/src/Rx/Elaborate.agda restores
+--   `takeᵖ`, the postulated shift itself, deleted with the one law that
+--   consumed it.
 
 postulate
-  -- THE ONE GAP THAT IS NEITHER A MINT NOR A READ, AND IT IS A LEVEL
-  -- SHIFT.  A simul `take` cuts naively on the author's VALUES —
-  -- mid-batch, without waiting for one to finish, and sending the
-  -- closing envelope at the moment it cuts.  That is `takeᵉ`'s own
-  -- behaviour exactly, down to truncating the arriving list and minting
-  -- a close per victim on the cutting burst.  What it is not is
-  -- `takeᵉ` AT THIS TYPE: elaboration puts the author's values inside
-  -- the envelope, so an enveloped stream's own values are envelopes and
-  -- a plain `takeᵉ` over it counts batches.  The operator is right and
-  -- the level is wrong.
-  -- DEAD ROUTE: count in a scan and cut with `takeᵉ`.  The counting and
-  --   truncation halves are both a pure-function step's work; the ENDING
-  --   half is not, since such a step cannot change how many emits pass
-  --   through it, so
-  --   nothing converts a budget over values into the emit index a
-  --   subscription-time count has to name.
-  takeᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
-        → Tm Γ Δᵍ Δ Θ natᵗ → Exp Γ Δᵍ Δ Θ (emitᵗ t) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
-
   -- AN AMBIENT INSTANT IS STILL WANTED HERE, AND THESE TWO ROUTES TO
   -- ONE ARE DEAD.  The subscribe frame is reached by a root `mintᵉ`,
   -- which is what the two sources stand on; a LATER cascade's instant
