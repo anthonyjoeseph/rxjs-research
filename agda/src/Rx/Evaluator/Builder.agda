@@ -814,6 +814,21 @@ evaluate! {n = n} fuel e ins =
 -- AND THE EVALUATOR AFTER THE CUTOVER.  Not a new machine — the SAME
 -- machine with three clauses' worth of question removed, reached
 -- through the builder rather than through a witness it seeds itself.
+
+-- AND ITS VALUES ARE NOT PLAIN rxjs's, WHICH THE ORACLE SHOWED AND NO
+-- REPAIR HERE CAN ANSWER.  A burst is collected WHOLE and then pushed,
+-- while rxjs pushes each item depth-first — so a subscriber that
+-- attaches part-way through a source's synchronous run sees the rest of
+-- it there and nothing of it here.  The witness is one program: a
+-- shared slot over a two-item `ofᵉ`, flattened by a map whose payload is
+-- that same slot, where rxjs yields the second item and this yields
+-- nothing.  The mechanism is `oneShotBurst`, which packages a whole
+-- synchronous source as ONE emit carrying its own `complete`, so
+-- "part-way through" is not a state this machine has; the share's
+-- completion latch then makes the re-entrant subscribe spent, but
+-- removing the latch would only buy an init.  That is why the plain
+-- evaluator is a SECOND top line rather than a retype of this one, and
+-- why projecting values out of here is only the oracle's stopgap.
 evaluate↓ : ∀ {n} {Γ : Ctx n} {t} → Fuel → (e : Closed Γ t) → Slots Γ
           → Stream Γ t
 evaluate↓ fuel e ins = proj₁ (evaluate! fuel e ins)

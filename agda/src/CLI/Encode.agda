@@ -1,18 +1,26 @@
--- Encode an evaluated Stream (List (InstEmit (Val Γ t))) as JSON matching
--- the TS InstEmit shape. Values are encoded by recursion on the root type
--- t; ids (instant/source, both ℕ) print as numbers — the TS side compares
--- streams up to id renaming, so the exact numerals do not matter.
+-- Encode an evaluated run's VALUES as JSON: the `value` payloads in
+-- stream order, encoded by recursion on the root type t.
+--
+-- THE ENVELOPE IS PROJECTED AWAY HERE AND THAT IS THE POINT (Anthony:
+-- the oracle wants "nothing involving InstEmit at all").  What the
+-- comparison is about is whether this tree run as ORDINARY rxjs emits
+-- what the Agda evaluator emits, so the ids, the kinds, the
+-- registrations and the instants are all this evaluator's own
+-- bookkeeping rather than anything a plain pipeline has — and a
+-- comparison carrying them tests the protocol layer instead of the
+-- tree.  The projection is a stand-in: the evaluator that produces
+-- values WITHOUT minting an envelope is a tier-1 leg of its own, and it
+-- is what retires this walk.
 module CLI.Encode where
 
 open import Data.Bool using (true; false)
-open import Data.List using (List; []; _∷_; map)
+open import Data.List using (List; []; _∷_; map) renaming (_++_ to _++ˡ_)
 open import Data.Nat.Show using (show)
 open import Data.Product using (_,_)
 open import Data.String using (String; _++_)
 open import Data.Sum using (inj₁; inj₂)
 
-open import Rx.Prim using (InstEvent; init; value; close; handoff; complete; CloseReason; cut; cutPending; exhausted;
-  EmitKind; subscribe; delivery; plumbing; InstEmit; _at_from_as_)
+open import Rx.Prim using (InstEvent; value; InstEmit; _at_from_as_)
 open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; obs; listᵗ; Val; Ctx)
 
 private
@@ -42,38 +50,14 @@ encodeVal (s +ᵗ t) (inj₂ b) = "{" ++ field′ "type" (quote′ "inr") ++ ","
 encodeVal (listᵗ t) xs     = arr (map (encodeVal t) xs)
 encodeVal (obs t)  _        = "null"   -- obs-valued streams don't occur at a first-order root
 
-private
-  encKind : EmitKind → String
-  encKind subscribe = quote′ "subscribe"
-  encKind delivery  = quote′ "delivery"
-  encKind plumbing  = quote′ "plumbing"
-
-  encReason : CloseReason → String
-  encReason cut        = quote′ "cut"
-  encReason cutPending = quote′ "cutPending"
-  encReason exhausted  = quote′ "exhausted"
-
-  encEvent : ∀ {n} {Γ : Ctx n} (t : Ty) → InstEvent (Val Γ t) → String
-  encEvent t (init s)     = "{" ++ field′ "type" (quote′ "init") ++ "," ++ field′ "source" (show s) ++ "}"
-  encEvent t (value v)    = "{" ++ field′ "type" (quote′ "value") ++ "," ++ field′ "value" (encodeVal t v) ++ "}"
-  encEvent t (close s r)  = "{" ++ field′ "type" (quote′ "close") ++ "," ++ field′ "source" (show s) ++ "," ++ field′ "reason" (encReason r) ++ "}"
-  encEvent t (handoff s)  = "{" ++ field′ "type" (quote′ "handoff") ++ "," ++ field′ "source" (show s) ++ "}"
-  encEvent t complete     = "{" ++ field′ "type" (quote′ "complete") ++ "}"
-
-  encEmit : ∀ {n} {Γ : Ctx n} (t : Ty) → InstEmit (Val Γ t) → String
-  encEmit t (es at i from s as k) =
-    "{" ++ field′ "events" (arr (mapEvents es))
-        ++ "," ++ field′ "instant" (show i)
-        ++ "," ++ field′ "source" (show s)
-        ++ "," ++ field′ "kind" (encKind k) ++ "}"
-    where
-      mapEvents : List (InstEvent (Val _ t)) → List String
-      mapEvents []       = []
-      mapEvents (e ∷ es) = encEvent t e ∷ mapEvents es
-
-encodeStream : ∀ {n} {Γ : Ctx n} (t : Ty) → List (InstEmit (Val Γ t)) → String
-encodeStream t ems = arr (go ems)
+encodeValues : ∀ {n} {Γ : Ctx n} (t : Ty) → List (InstEmit (Val Γ t)) → String
+encodeValues t ems = arr (go ems)
   where
+    evs : List (InstEvent (Val _ t)) → List String
+    evs []             = []
+    evs (value v ∷ es) = encodeVal t v ∷ evs es
+    evs (_       ∷ es) = evs es
+
     go : List (InstEmit (Val _ t)) → List String
-    go []       = []
-    go (e ∷ es) = encEmit t e ∷ go es
+    go []                             = []
+    go ((es at _ from _ as _) ∷ rest) = evs es ++ˡ go rest

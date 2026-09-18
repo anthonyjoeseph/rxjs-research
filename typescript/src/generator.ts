@@ -486,44 +486,11 @@ const genExp = (
     }),
   };
 
-  // batchSync is the one former whose RESULT type is PINNED rather than
-  // free: a batchSync over `s` is a stream of `s × list s`, which the
-  // decoder re-derives and demands. A lane that only fired when the
-  // requested type already had that shape would be unreachable in
-  // practice — nothing asks for one — and would report a clean sweep of
-  // an empty corpus, so the lane MAKES the shape and then spends it.
-  //
-  // Spending it with a map is not an arbitrary choice: bracket-then-
-  // read is the pairing the former exists for, since the split arrives
-  // as a VALUE and a pointwise step over the pair is what reads it. So
-  // the generated shape is the one the elaboration itself will write.
-  operators.batchSync = () => {
-    // when the caller already wants the pinned shape, hand the node back
-    // bare rather than folding it straight back down
-    if (
-      ty.type === "prod" &&
-      ty.snd.type === "list" &&
-      tyEq(ty.snd.elem, ty.fst)
-    )
-      return {
-        type: "batchSync",
-        ty,
-        src: genExp(rng, ty.fst, ctx, depth - 1),
-      };
-    const s = genValTy(rng, 2);
-    const pair: Ty = { type: "prod", fst: s, snd: { type: "list", elem: s } };
-    const node: Exp = {
-      type: "batchSync",
-      ty: pair,
-      src: genExp(rng, s, ctx, depth - 1),
-    };
-    return {
-      type: "map",
-      ty,
-      fn: genFn(rng, pair, ty, ctx, depth - 1),
-      src: node,
-    };
-  };
+  // THE GENERATOR PRODUCES THE PLAIN TREE ONLY, so there is no
+  // batchSync lane: that former's type IS the instant/batch structure,
+  // which plain rxjs has no notion of and the oracle's plain leg
+  // therefore cannot mirror. `scripts/formers.tsv` carries the hole with
+  // gen=no, which is where a former nothing reaches is counted.
 
   // of/empty are leaves; force them there, real operators from `operators`
   const forced =

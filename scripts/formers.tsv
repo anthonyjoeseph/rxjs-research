@@ -51,7 +51,7 @@ exp	μᵉ	mu	yes	binder
 exp	varᵉ	varE	yes	binder
 exp	deferᵉ	defer	yes	protocol
 exp	mintᵉ	mint	yes	protocol
-exp	batchSyncᵉ	batchSync	yes	protocol
+exp	batchSyncᵉ	batchSync	no	protocol	its type IS the instant/batch structure, so plain rxjs cannot mirror it and the oracle's plain leg cannot cover it; it is covered by the all-Agda QuickCheck instead
 tm	varᵗ	varT	yes	-
 tm	unit̂	unitT	yes	-
 tm	bool̂	boolT	yes	-

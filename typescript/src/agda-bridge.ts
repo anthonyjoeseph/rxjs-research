@@ -53,12 +53,12 @@ export const execAgda = (serialized: string[]): Promise<EvalResult[]> =>
           ),
         );
       try {
-        // each line is either `null` (declined case) or {"stream":[...]}
-        // — normalize null to an empty stream
+        // each line is either `null` (declined case) or {"values":[...]}
+        // — normalize null to an empty value list
         resolvePromise(
           lines.map((line) => {
             const parsed = JSON.parse(line) as EvalResult | null;
-            return parsed ?? { stream: [] };
+            return parsed ?? { values: [] };
           }),
         );
       } catch (e) {

@@ -1,14 +1,23 @@
-import { Observable, merge } from "rxjs";
 import { Closed, Ty, Val } from "./exp.js";
-import { InstEmit, Provenance, SourceId } from "./inst-emit.js";
-import { materializeCompletion, share } from "./primitive-operators.js";
-import { createDriver } from "./driver.js";
-import { makeInputSource } from "./input-source.js";
-import { compile } from "./compile.js";
+import { evaluatePlain } from "./plain-eval.js";
 import { genSeeds, genTestCases } from "./generator.js";
 import { serialize } from "./serialize.js";
 import { execAgda } from "./agda-bridge.js";
 import { readFileSync } from "node:fs";
+
+// THE ORACLE, AND WHAT IT IS AN ORACLE FOR (Anthony: "the sole purpose
+// of the fastcheck run is to ensure that the 'plain' agda Exp tree and
+// evaluator's behavior matches the behavior of 'plain' rxjs. Nothing
+// involving InstEmit at all"). Both sides produce a LIST OF VALUES and
+// the lists are compared exactly. The envelope — instants, source ids,
+// chain emits, the fin bit — is a construct of the simultaneity layer
+// and is not under test here on either side: the TS leg is built from
+// ordinary rxjs operators in `plain-eval.ts`, and the Agda leg projects
+// the values out of its envelope evaluator until a plain one lands.
+//
+// The srxjs modules (`join.ts`, `primitive-operators.ts`,
+// `inst-emit.ts`, `compile.ts`, `driver.ts`, `input-source.ts`) stay in
+// the tree and are reached by nothing this file runs.
 
 // Virtual time. fuel = ARRIVALS DELIVERED by the driver — async input
 // values and defer-body wakeups, popped in (tick, ordinal) order. Sync
@@ -23,7 +32,7 @@ export type Timed<A> = {
 
 export type ObservableInputCold<A> = {
   type: "cold";
-  sync: A[]; // fired immediately on subscription, inside the subscriber's instant (id-inheritance)
+  sync: A[]; // fired immediately on subscription, inside the subscriber's frame
   async: Timed<A>[]; // re-anchored at each subscription tick
 };
 
@@ -47,13 +56,9 @@ export type Slot =
 
 export type Slots = Slot[]; // one per Γ slot, index-aligned
 
-export type Stream = InstEmit<Val>[]; // the flat canonical stream
-
-// one program's output: the stream the exp tree produced. THE SIMUL
-// LAYER IS NOT CROSS-CHECKED HERE (Anthony) -- this harness tests the
-// plain tree against plain rxjs, and `batchSimultaneous` is deliberately
-// outside it. Both sides (TS-here and Agda-via-CLI) return this per case.
-export type EvalResult = { stream: Stream };
+// one program's output: the values the exp tree emitted, in order. Both
+// sides (TS-here and Agda-via-CLI) return this per case.
+export type EvalResult = { values: Val[] };
 
 // The serializable unit of differential testing: a whole program.
 // ctx is Γ — the types of the slots, index-aligned with slots.
@@ -88,61 +93,19 @@ const readSeedFromCli = (): string | undefined => readFlag("seed");
 // the sweep that found it, and a generator edit moves every offset.
 const readCasesFromCli = (): string | undefined => readFlag("cases");
 
-// createDriver (virtual time, the one impure edge), makeInputSource
-// (scripted slots → protocol streams), and compile (the per-node
-// switch onto the primitive-operators) live in their own modules.
-
-const evaluateRx = (testCase: TestCase): EvalResult => {
-  const driver = createDriver(testCase.slots.length);
-  // the const telescope, literally: each shared slot compiles against
-  // the prefix of already-built slots and connects through the
-  // protocol share (all resets false; source id = slot index)
-  const slotSources = testCase.slots.reduce<Observable<InstEmit<Val>>[]>(
-    (prefix, slot, index) => [
-      ...prefix,
-      slot.type === "scripted"
-        ? makeInputSource(driver, slot.input, index)
-        : share(driver, compile(slot.def, [], driver, prefix), index),
-    ],
-    [],
-  );
-  const out: Stream = [];
-  // the canonical root stream: the pipeline's emits interleaved (in
-  // push order) with the shares' chain emits, the fin bit materialized
-  // once over the merged ledger — the mirror of Agda's cascade output
-  const sub = materializeCompletion<Val>(
-    merge(driver.chainEmits, compile(testCase.exp, [], driver, slotSources)),
-  ).subscribe((emit) => out.push(emit));
-  // subscribing already ran the root sync burst — fuel pays only for arrivals
-  for (let spent = 0; spent < testCase.fuel; spent++) {
-    if (!driver.deliverNextArrival()) break;
-  }
-  sub.unsubscribe();
-  return { stream: out };
-};
-
-// Streams are compared up to id renaming (≈): the ids' only meaning is
-// the partition structure, so canonicalize both sides before comparing.
-// Instants and sources are separate namespaces (an arrival's cascade vs
-// an observable), each renamed to 0,1,2,… in first-appearance order over
-// the flat stream. That is also what erases the representation gap — TS
-// mints both as `symbol`, Agda as ℕ — since each side is renamed
-// independently to the same integers. Values/kinds/event types/order
-// still compare exactly.
-//
-// AND A TOKEN IN A VALUE POSITION IS REFUSED RATHER THAN RENAMED, WHICH
-// IS THE ONE PLACE A SYMBOL WOULD LIE.  `JSON.stringify` drops a symbol
-// silently, so a minted token reaching the stream would compare equal to
-// a TS side that emitted nothing there — a false green, and the only
-// kind this comparison can produce. Renaming it instead is not available
-// here: the Agda side carries the same token as a ℕ, indistinguishable
-// from a nat without the element TYPE, which this walk does not have.
-// The generator keeps uniq out of every element type precisely so the
-// case cannot arise; this says so if it ever does.
+// A TOKEN IN A VALUE POSITION IS REFUSED, WHICH IS THE ONE PLACE A
+// SYMBOL WOULD LIE.  `JSON.stringify` drops a symbol silently, so a
+// minted token reaching the output would compare equal to a side that
+// emitted nothing there — a false green, and the only kind this
+// comparison can produce. The two sides carry a token differently (TS a
+// `symbol`, Agda a ℕ), and nothing in a value list says which position
+// is a token, so there is no renaming available either. The generator
+// keeps uniq out of every element type precisely so the case cannot
+// arise; this says so if it ever does.
 const noToken = (v: unknown): void => {
   if (typeof v === "symbol")
     throw new Error(
-      "a uniq token reached the stream — the comparison has no renaming " +
+      "a uniq token reached the output — the comparison has no renaming " +
         "for one, and JSON.stringify would drop it silently",
     );
   if (Array.isArray(v)) v.forEach(noToken);
@@ -150,42 +113,22 @@ const noToken = (v: unknown): void => {
     Object.values(v).forEach(noToken);
 };
 
-const canonical = <A>(stream: InstEmit<A>[]): unknown => {
-  const inst = new Map<Provenance, number>();
-  const src = new Map<SourceId, number>();
-  const ri = (id: Provenance): number =>
-    inst.has(id) ? inst.get(id)! : (inst.set(id, inst.size), inst.size - 1);
-  const rs = (id: SourceId): number =>
-    src.has(id) ? src.get(id)! : (src.set(id, src.size), src.size - 1);
-  return stream.map((emit) => ({
-    kind: emit.kind,
-    instant: ri(emit.instant),
-    source: rs(emit.source),
-    events: emit.events.map((ev) =>
-      ev.type === "value"
-        ? (noToken(ev.value), ev)
-        : ev.type === "complete"
-          ? ev
-          : { ...ev, source: rs(ev.source) },
-    ),
-  }));
-};
+const render = (values: Val[]): string => (
+  values.forEach(noToken),
+  JSON.stringify(values)
+);
 
-// Structural equality up to id renaming.
-const sameStream = <A>(a: InstEmit<A>[], b: InstEmit<A>[]): boolean =>
-  JSON.stringify(canonical(a)) === JSON.stringify(canonical(b));
-
-// Compare the Agda (oracle) and rxjs results case by case, on BOTH the
-// raw stream and the batched output, and render a compact report.
+// Compare the Agda (oracle) and rxjs value lists case by case, and
+// render a compact report.
 //
 // THE VERDICT IS RETURNED BESIDE THE REPORT, AND THAT IS NOT A
 // REFINEMENT.  This printed its findings and exited 0 whatever they
-// were, so `make oracle` was green on a run whose rx stream was EMPTY
+// were, so `make oracle` was green on a run whose rx output was EMPTY
 // in a fifth of its cases -- a check that cannot fail, standing where
 // the change workflow puts its second gate.  The report was always
 // right; nothing read it.
 //
-// AND A FAILING CASE PRINTS ITS PROGRAM, because the two streams alone
+// AND A FAILING CASE PRINTS ITS PROGRAM, because the two lists alone
 // say WHAT diverged and nothing about what was run -- and the case
 // index is an offset into a seed sweep, so it cannot be fed back to
 // `--seed` to recover the input.  A divergence nobody can reproduce is
@@ -197,27 +140,27 @@ const interpretResults = (
 ): { report: string; ok: boolean } => {
   const n = Math.min(agdaResults.length, rxResults.length);
   const lines: string[] = [];
-  let streamOk = 0;
+  let valuesOk = 0;
   for (let i = 0; i < n; i++) {
-    const a = agdaResults[i];
-    const r = rxResults[i];
-    if (sameStream(a.stream, r.stream)) {
-      streamOk++;
+    const a = render(agdaResults[i].values);
+    const r = render(rxResults[i].values);
+    if (a === r) {
+      valuesOk++;
       continue;
     }
-    lines.push(`case ${i}: stream ✗`);
+    lines.push(`case ${i}: values ✗`);
     lines.push(`  program     = ${serialize(testCases[i])}`);
-    lines.push(`  agda.stream = ${JSON.stringify(canonical(a.stream))}`);
-    lines.push(`  rx.stream   = ${JSON.stringify(canonical(r.stream))}`);
+    lines.push(`  agda.values = ${a}`);
+    lines.push(`  rx.values   = ${r}`);
   }
   const header =
-    `${n} cases: stream ${streamOk}/${n} match` +
+    `${n} cases: values ${valuesOk}/${n} match` +
     (agdaResults.length !== rxResults.length
       ? ` (LENGTH MISMATCH: agda ${agdaResults.length}, rx ${rxResults.length})`
       : "");
   return {
     report: [header, ...lines].join("\n"),
-    ok: streamOk === n && n > 0 && agdaResults.length === rxResults.length,
+    ok: valuesOk === n && n > 0 && agdaResults.length === rxResults.length,
   };
 };
 
@@ -234,7 +177,9 @@ async function main() {
           .map((line) => JSON.parse(line) as TestCase)
       : seeds.flatMap((seed) => genTestCases(seed, operator));
   const agdaResults = await execAgda(testCases.map(serialize));
-  const rxResults = testCases.map(evaluateRx);
+  const rxResults = testCases.map((testCase): EvalResult => ({
+    values: evaluatePlain(testCase),
+  }));
   const { report, ok } = interpretResults(agdaResults, rxResults, testCases);
   console.log(report);
   // a zero-case run is a failure too: it means the generator produced
