@@ -10,9 +10,9 @@ open import Data.Nat using (ℕ)
 open import Data.Vec.Properties using (lookup-map)
 open import Relation.Binary.PropositionalEquality using (subst; refl)
 
-open import Rx.Exp using (Ty; Ctx; Exp; Tm; Fn; natᵗ; listᵗ; obs; _×ᵗ_; boolᵗ; uniqᵗ; input; μᵉ; varᵉ; deferᵉ; mapᵉ;
-  scanᵉ; varᵗ; unit̂; bool̂; nat̂; uniq̂; pairᵗ; fstᵗ; sndᵗ; nilᵗ; consᵗ; inlᵗ; inrᵗ; caseᵗ;
-  foldᵗ; ifᵗ; primᵗ; strmᵗ; letᵗ; revᵗ; renTm; ext∈; add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ)
+open import Rx.Exp using (Ty; Ctx; Exp; Tm; Fn; natᵗ; listᵗ; obs; _×ᵗ_; boolᵗ; uniqᵗ; input; μᵉ; varᵉ; deferᵉ; mintᵉ; mapᵉ;
+  scanᵉ; varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; nilᵗ; consᵗ; inlᵗ; inrᵗ; caseᵗ;
+  foldᵗ; ifᵗ; primᵗ; strmᵗ; letᵗ; revᵗ; renTm; renExp; ext∈; add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ)
 open import Rx.Envelope using (instEventᵗ; eventsᵛ; splitEventsᵛ; reassembleᵛ;
                                instEmitᵛ)
 open import Rx.SExp using (SExp; STm; inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; scanˢ;
@@ -267,22 +267,17 @@ mapᵖ {Θ = Θ} {s = s} {t = t} f e = mapᵉ step e
 -- `mapᵉ` projects, which is the same two-stage shape rxjs writes as
 -- `scan` followed by `map`.
 --
--- THE SEED'S EMIT COMPONENT IS UNOBSERVABLE, AND THAT IS WHY THE
--- RESERVED TOKEN SUFFICES FOR IT.  A scan emits the result of its FIRST
--- application and never the seed, so the tokens below are read by
--- nothing and claim no freshness — which is the capability the two
--- source rows above are blocked on, and is not this one.  What the seed
--- needs is an INHABITANT of `uniqᵗ` and nothing more, which is exactly
--- what the nullary `uniq̂` is: one reserved token, forging nothing
--- because it can reach no other.  A placeholder taken from a BINDER
--- would do as well and cost a `mintᵉ` per `scanˢ` for a token nothing
--- reads.
+-- THE SEED'S EMIT COMPONENT IS UNOBSERVABLE.  A scan emits the result
+-- of its FIRST application and never the seed, so the tokens below are
+-- read by nothing and claim no freshness.  The seed needs an INHABITANT
+-- of `uniqᵗ` and nothing more; a binder supplies one at the cost of a
+-- `mintᵉ` per `scanˢ` for a token nothing reads.
 scanᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {s t : Ty}
       → Fn Γ Δᵍ Δ Θ (plainᵗ t ×ᵗ plainᵗ s) (plainᵗ t)
       → Tm Γ Δᵍ Δ Θ (plainᵗ t)
       → Exp Γ Δᵍ Δ Θ (emitᵗ s) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
 scanᵖ {Θ = Θ} {s = s} {t = t} f z e =
-  mapᵉ (sndᵗ (varᵗ (here refl))) (scanᵉ step seed e)
+  mintᵉ (mapᵉ (sndᵗ (varᵗ (here refl))) (scanᵉ step seed e'))
   where
   -- the carried value: the author's state, and the emit built for the
   -- delivery that produced it
@@ -293,8 +288,22 @@ scanᵖ {Θ = Θ} {s = s} {t = t} f z e =
   P : Ty
   P = A ×ᵗ emitᵗ s
 
-  seed : Tm _ _ _ Θ A
-  seed = pairᵗ z (instEmitᵛ nilᵗ uniq̂ uniq̂ (inlᵗ unit̂))
+  -- the token bound by the enclosing mint, read by nothing
+  tok : Tm _ _ _ (uniqᵗ ∷ Θ) uniqᵗ
+  tok = varᵗ (here refl)
+
+  -- shift the incoming arguments under the mint binder
+  z' : Tm _ _ _ (uniqᵗ ∷ Θ) (plainᵗ t)
+  z' = renTm (λ x → x) (λ x → x) there z
+
+  f' : Fn _ _ _ (uniqᵗ ∷ Θ) (plainᵗ t ×ᵗ plainᵗ s) (plainᵗ t)
+  f' = renTm (λ x → x) (λ x → x) (ext∈ there) f
+
+  e' : Exp _ _ _ (uniqᵗ ∷ Θ) (emitᵗ s)
+  e' = renExp (λ x → x) (λ x → x) there e
+
+  seed : Tm _ _ _ (uniqᵗ ∷ Θ) A
+  seed = pairᵗ z' (instEmitᵛ nilᵗ tok tok (inlᵗ unit̂))
 
   S : Ty
   S = listᵗ (instEventᵗ uniqᵗ (plainᵗ t)) ×ᵗ (listᵗ (plainᵗ s) ×ᵗ boolᵗ)
@@ -304,44 +313,44 @@ scanᵖ {Θ = Θ} {s = s} {t = t} f z e =
   B : Ty
   B = plainᵗ t ×ᵗ listᵗ (plainᵗ t)
 
-  arg : Tm _ _ _ (P ∷ Θ) P
+  arg : Tm _ _ _ (P ∷ uniqᵗ ∷ Θ) P
   arg = varᵗ (here refl)
 
   -- inside both `letᵗ`s: the step's argument, then the fold's element
   -- and accumulator, then the split, then the former's argument, then Θ
-  f↑ : Tm _ _ _ ((plainᵗ t ×ᵗ plainᵗ s) ∷ plainᵗ s ∷ B ∷ S ∷ P ∷ Θ) (plainᵗ t)
+  f↑ : Tm _ _ _ ((plainᵗ t ×ᵗ plainᵗ s) ∷ plainᵗ s ∷ B ∷ S ∷ P ∷ uniqᵗ ∷ Θ) (plainᵗ t)
   f↑ = renTm (λ x → x) (λ x → x)
-             (ext∈ (λ x → there (there (there (there x))))) f
+             (ext∈ (λ x → there (there (there (there x))))) f'
 
   -- the fold's body: pair the carried state with the arriving payload,
   -- run the step on it, and push the result onto both halves
-  fbody : Tm _ _ _ (plainᵗ s ∷ B ∷ S ∷ P ∷ Θ) B
+  fbody : Tm _ _ _ (plainᵗ s ∷ B ∷ S ∷ P ∷ uniqᵗ ∷ Θ) B
   fbody = letᵗ (pairᵗ (fstᵗ (varᵗ (there (here refl)))) (varᵗ (here refl)))
                (varᵗ (there (here refl)))
                (letᵗ f↑ (varᵗ (there (there (here refl)))) rebuilt)
     where
     rebuilt : Tm _ _ _ (plainᵗ t ∷ (plainᵗ t ×ᵗ plainᵗ s) ∷ plainᵗ s ∷ B
-                        ∷ S ∷ P ∷ Θ) B
+                        ∷ S ∷ P ∷ uniqᵗ ∷ Θ) B
     rebuilt = pairᵗ (varᵗ (here refl))
                     (consᵗ (varᵗ (here refl))
                            (sndᵗ (varᵗ (there (there (there (here refl)))))))
 
   -- inside the `letᵗ`: the split, then the former's argument, then Θ
-  body : Tm _ _ _ (S ∷ P ∷ Θ) A
+  body : Tm _ _ _ (S ∷ P ∷ uniqᵗ ∷ Θ) A
   body = letᵗ (foldᵗ (fstᵗ (sndᵗ split)) start fbody)
               (fstᵗ (varᵗ (there (here refl)))) out
     where
     split = varᵗ (here refl)
     start = pairᵗ (fstᵗ (fstᵗ (varᵗ (there (here refl))))) nilᵗ
 
-    out : Tm _ _ _ (B ∷ S ∷ P ∷ Θ) A
+    out : Tm _ _ _ (B ∷ S ∷ P ∷ uniqᵗ ∷ Θ) A
     out = pairᵗ (fstᵗ (varᵗ (here refl)))
                 (reassembleᵛ (sndᵗ (varᵗ (there (there (here refl)))))
                              (fstᵗ (varᵗ (there (here refl))))
                              (revᵗ (sndᵗ (varᵗ (here refl))))
                              (sndᵗ (sndᵗ (varᵗ (there (here refl))))))
 
-  step : Tm _ _ _ (P ∷ Θ) A
+  step : Tm _ _ _ (P ∷ uniqᵗ ∷ Θ) A
   step = letᵗ (splitEventsᵛ {b = plainᵗ t} (eventsᵛ (sndᵗ arg)))
               (fstᵗ arg)
               body

@@ -62,7 +62,6 @@ tm	varᵗ	varT	yes	yes	-
 tm	unit̂	unitT	yes	no	-	the Agda generator draws every node at natᵗ, so it never has a unit to build
 tm	bool̂	boolT	yes	no	-	the Agda generator reaches boolᵗ only through a comparison primitive, never as a literal
 tm	nat̂	natT	yes	yes	-
-tm	uniq̂	uniqT	yes	yes	-
 tm	pairᵗ	pairT	yes	yes	-
 tm	fstᵗ	fstT	yes	yes	-
 tm	sndᵗ	sndT	yes	yes	-

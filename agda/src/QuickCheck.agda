@@ -66,7 +66,7 @@ open import Rx.Prim using (Timed; after_,_; ObservableInput; hot; cold; InstEven
   complete; InstEmit; _at_from_as_)
 open import Rx.Exp using (Ty; natᵗ; obs; _×ᵗ_; isData; Ctx; Exp; Tm; Fn; PrimOp; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ;
   batchSyncᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ; unit̂; bool̂;
-  nat̂; uniq̂; primᵗ; pairᵗ; fstᵗ; sndᵗ; strmᵗ; varᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; nilᵗ; consᵗ;
+  nat̂; primᵗ; pairᵗ; fstᵗ; sndᵗ; strmᵗ; varᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; nilᵗ; consᵗ;
   foldᵗ; add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ; renExp)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Rx.Emit-Eq using (eqBatched)
@@ -323,10 +323,12 @@ genExpAt g u (suc d) = genB 15 >>=G λ c →
   -- token emits what it would have emitted unminted.  So the batch is SUMMED
   -- — head plus every element of the tail, which is the one reading that
   -- differs the moment the two sides cut the subscribe frame differently —
-  -- and the mint's body ASKS whether its token is the reserved one, which is
-  -- the invariant `mint-init` exists to hold and the only question `uniqᵗ`
-  -- can be asked.  Neither wrapper can enlarge the run: a fold over one
-  -- group and an equality test are each one step per value.
+  -- and the mint is NESTED, its body asking whether the two tokens are the
+  -- same one, which is the only question `uniqᵗ` can be asked and the
+  -- strongest answer available: two draws at one key are distinct, so a row
+  -- that ever reports equal is a ledger handing an identifier out twice.
+  -- Neither wrapper can enlarge the run: a fold over one group and an
+  -- equality test are each one step per value.
   else if c ≡ᵇ 12 then
     (genExpAt g u d >>=G λ e →
      pureG (mapᵉ (foldᵗ (sndᵗ (varᵗ (here refl))) (fstᵗ (varᵗ (here refl)))
@@ -335,9 +337,10 @@ genExpAt g u (suc d) = genB 15 >>=G λ c →
                  (batchSyncᵉ e)))
   else if c ≡ᵇ 13 then
     (genExpAt g u d >>=G λ e →
-     pureG (mintᵉ (mapᵉ (ifᵗ (primᵗ eqᵘ (pairᵗ (varᵗ (there (here refl))) uniq̂))
-                             (nat̂ 0) (varᵗ (here refl)))
-                        (renExp (λ x → x) (λ x → x) there e))))
+     pureG (mintᵉ (mintᵉ (mapᵉ (ifᵗ (primᵗ eqᵘ (pairᵗ (varᵗ (there (here refl)))
+                                                      (varᵗ (there (there (here refl))))))
+                                    (nat̂ 0) (varᵗ (here refl)))
+                               (renExp (λ x → x) (λ x → x) (λ x → there (there x)) e)))))
   else genLeafAt g u
 
 genInners g u d zero    = pureG []
@@ -545,7 +548,6 @@ marksᵗ (varᵗ x)      = noMarks
 marksᵗ unit̂          = noMarks
 marksᵗ (bool̂ _)      = noMarks
 marksᵗ (nat̂ _)       = noMarks
-marksᵗ uniq̂          = noMarks
 marksᵗ (pairᵗ a b)   = marksᵗ a ⊕ marksᵗ b
 marksᵗ (fstᵗ p)      = marksᵗ p
 marksᵗ (sndᵗ p)      = marksᵗ p
@@ -668,7 +670,6 @@ showTm (varᵗ x)           = "(varᵗ " ++ showIx x ++ ")"
 showTm unit̂               = "unit̂"
 showTm (bool̂ b)           = "(bool̂ " ++ (if b then "true" else "false") ++ ")"
 showTm (nat̂ n)            = "(nat̂ " ++ show n ++ ")"
-showTm uniq̂               = "uniq̂"
 showTm (pairᵗ a b)        = "(pairᵗ " ++ showTm a ++ " " ++ showTm b ++ ")"
 showTm (fstᵗ p)           = "(fstᵗ " ++ showTm p ++ ")"
 showTm (sndᵗ p)           = "(sndᵗ " ++ showTm p ++ ")"

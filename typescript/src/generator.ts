@@ -90,7 +90,7 @@ const genValTy = (rng: Rng, depth: number): Ty => {
   // token from a nat to rename it. `mint(t => of(t))` is well-typed in
   // both trees; it is unCOMPARABLE, which is a different finding and
   // the one `noToken` in the harness states. uniq is exercised at term
-  // level instead, where `uniq̂` and a mint binder both reach it.
+  // level instead, where a mint binder reaches it.
   if (r < 0.9)
     return {
       type: "prod",
@@ -125,9 +125,12 @@ const litTm = (rng: Rng, ty: Ty, ctx: GenCtx, depth: number): Tm => {
     case "nat":
       return { type: "natT", ty, val: int(rng, 0, 9) };
     case "uniq":
-      // the reserved token, and the only one a term can name: every
-      // other token comes from a `mint` binder and is read out of Θ
-      return { type: "uniqT", ty };
+      // UNREACHABLE, and it is the language rather than the generator
+      // that makes it so: there is no literal at this type, every token
+      // comes from a `mint` binder and is read out of Θ, so the one
+      // lane that wants a uniq guards itself on Θ holding one. A throw
+      // here is the guard's assertion rather than a stub.
+      throw new Error("litTm: no literal at uniq");
     case "prod":
       return {
         type: "pairT",
@@ -158,6 +161,11 @@ const genTm = (rng: Rng, ty: Ty, ctx: GenCtx, depth: number): Tm => {
     .map((vt, i) => ({ vt, i }))
     .filter((x) => tyEq(x.vt, ty));
   const varTm = (): Tm => ({ type: "varT", ty, index: pick(rng, vars).i });
+
+  // a uniq has no literal and no introduction form in the term language,
+  // so a variable is the only term at this type. The caller guards on Θ
+  // holding one, which is what makes this total.
+  if (ty.type === "uniq") return varTm();
 
   if (depth <= 0 || chance(rng, 0.35))
     return vars.length > 0 && chance(rng, 0.6)
@@ -205,12 +213,12 @@ const genTm = (rng: Rng, ty: Ty, ctx: GenCtx, depth: number): Tm => {
       op: pick(rng, ["eq", "lt"] as PrimOp[]),
       arg: natPair(),
     }));
-    // BOTH SIDES ARE GENERATED FREELY, because a token can now be
-    // WRITTEN as well as bound: `uniq̂` names the reserved one and a
-    // `mint` ancestor puts minted ones in Θ. So this lane fires
-    // wherever a bool is wanted rather than only under a mint, and the
-    // interesting rows -- literal against minted, minted against a
-    // DIFFERENT minted -- come from the same draw.
+    // THE LANE IS GUARDED ON Θ, because there is no literal at this
+    // type: every token comes from a `mint` binder, so the only terms
+    // that can stand on either side are variables and the lane fires
+    // only under a mint ancestor. The interesting row -- one minted
+    // token against a DIFFERENT minted one -- needs two, and nesting
+    // two mints is what the Agda sweep's own uniq lane does.
     //
     // WHAT IS STILL OUT OF REACH IS A TOKEN AS STREAM DATA, and that is
     // the harness rather than the language: `mint(t => of(t))` is legal
@@ -219,17 +227,18 @@ const genTm = (rng: Rng, ty: Ty, ctx: GenCtx, depth: number): Tm => {
     // neither, and `canonical` walks values without their TYPE, so it
     // cannot tell a token from a nat to rename it. `genValTy` keeps
     // uniq out of every element type for exactly that reason.
-    opts.push(() => ({
-      type: "primT",
-      ty,
-      op: "eqU" as PrimOp,
-      arg: {
-        type: "pairT",
-        ty: prodUU,
-        fst: genTm(rng, uniqT, ctx, depth - 1),
-        snd: genTm(rng, uniqT, ctx, depth - 1),
-      },
-    }));
+    if (ctx.theta.some((vt) => tyEq(vt, uniqT)))
+      opts.push(() => ({
+        type: "primT",
+        ty,
+        op: "eqU" as PrimOp,
+        arg: {
+          type: "pairT",
+          ty: prodUU,
+          fst: genTm(rng, uniqT, ctx, depth - 1),
+          snd: genTm(rng, uniqT, ctx, depth - 1),
+        },
+      }));
     opts.push(() => ({
       type: "primT",
       ty,

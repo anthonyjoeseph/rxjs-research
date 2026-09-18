@@ -57,12 +57,12 @@ open Mint public using (counter)
 -- the scripted slots, which own the identifiers below that bound, while
 -- node instances begin at zero and are the run's own.
 --
--- AND SOURCES BEGIN ONE HIGHER STILL, WHICH IS WHAT RESERVES THE TOKEN
--- LITERAL.  `uniq̂` is nullary, so it denotes a single identifier, and it
--- can only be a literal at all if nothing else can ever produce that
--- identifier: `n` is then owned by no slot (they hold `0 … n-1`) and
--- handed out by no mint (this counter starts above it).  Ordinals are a
--- separate namespace and no term denotes one, so that seed is unmoved.
+-- AND SOURCES BEGIN ONE HIGHER STILL, LEAVING `n` OWNED BY NOTHING: no
+-- slot holds it (they hold `0 ... n-1`) and no mint hands it out (this
+-- counter starts above it).  Nothing in the term language can denote a
+-- token now, so the gap buys no property; closing it would renumber
+-- every source a run produces, which is the only reason it stands.
+-- Ordinals are a separate namespace, so that seed is unmoved.
 mint-init : ℕ → Mint
 mint-init n = mint λ where
   ordinalᵏ → n

@@ -58,7 +58,7 @@ open import Rx.Mint using (nodeᵏ; regᵏ; sourceᵏ; freshId; setAt; next)
 open import Rx.Slots using (scripted; shared)
 open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; obs; listᵗ; _≟ᵗ_; Ctx; Closed; Val; Exp; Tm; Fn; FnClo; applyClo; Env; []ᵉ; _∷ᵉ_; evalWith; foldVals; input; ofᵉ; emptyᵉ;
   takeᵉ; batchSyncᵉ; mapᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ; isData; unfoldμ;
-  varᵗ; unit̂; bool̂; nat̂; uniq̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ;
+  varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ;
   nilᵗ; consᵗ; foldᵗ;
   add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ; lookupEnv;
   inputsBelowᵉ; inputsBelowᵗ; inputsBelowᵗˢ)
@@ -1063,7 +1063,6 @@ mutual
   redTmAcc unit̂     σ rσ k ok aK a = tt
   redTmAcc (bool̂ b) σ rσ k ok aK a = tt
   redTmAcc (nat̂ j)  σ rσ k ok aK a = tt
-  redTmAcc uniq̂     σ rσ k ok aK a = tt
   redTmAcc (pairᵗ x y) σ rσ k ok aK (acc rs) =
       redTmAcc x σ rσ k (∧ˡ (inputsBelowᵗ k x) (inputsBelowᵗ k y) ok) aK
         (rs (s≤s (m≤m+n (gsizeᵗ x) (gsizeᵗ y))))

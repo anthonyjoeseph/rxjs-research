@@ -187,11 +187,8 @@ mutual
                  -- thing that writes one.  So the capability is a BINDER and
                  -- not a term former: a PARAMETERISED former at `uniqᵗ` would
                  -- let a program write a token already in use, which is the
-                 -- forgery the palette exists to rule out.  The nullary
-                 -- `uniq̂` is not that former — it names one reserved token
-                 -- and cannot reach any other, so it forges nothing and
-                 -- mints nothing.  Minting belongs to
-                 -- the run, so the token arrives from the scheduler's own
+                 -- forgery the palette exists to rule out.  Minting belongs
+                 -- to the run, so the token arrives from the scheduler's own
                  -- ledger at the key `deferᵉ` already draws from — one per
                  -- SUBSCRIPTION, and nesting is how a body needing two gets
                  -- two.  Binding it into Θ is what lets the body PLACE it; the
@@ -209,17 +206,6 @@ mutual
     unit̂  : Tm Γ Δᵍ Δ Θ unitᵗ
     bool̂  : Bool → Tm Γ Δᵍ Δ Θ boolᵗ
     nat̂   : ℕ → Tm Γ Δᵍ Δ Θ natᵗ
-    uniq̂  : Tm Γ Δᵍ Δ Θ uniqᵗ
-            -- THE ONE TOKEN A PROGRAM MAY WRITE, AND IT TAKES NO ARGUMENT.
-            -- A parameter here would let a program name an ARBITRARY token,
-            -- which is the forgery `mintᵉ` exists to rule out, and it would
-            -- oblige two independent evaluators to hand out the same numeral
-            -- at the same point.  Nullary, it names exactly one token, and
-            -- that token is reserved: `mint-init` seeds the source counter
-            -- one above the slot range, so the identifier this denotes is
-            -- owned by no slot and handed out by no mint.  Every equality a
-            -- program can ask about it therefore has the same answer in both
-            -- trees, which is what a literal at this type has to buy.
     pairᵗ : ∀ {s t} → Tm Γ Δᵍ Δ Θ s → Tm Γ Δᵍ Δ Θ t → Tm Γ Δᵍ Δ Θ (s ×ᵗ t)
     fstᵗ  : ∀ {s t} → Tm Γ Δᵍ Δ Θ (s ×ᵗ t) → Tm Γ Δᵍ Δ Θ s
     sndᵗ  : ∀ {s t} → Tm Γ Δᵍ Δ Θ (s ×ᵗ t) → Tm Γ Δᵍ Δ Θ t
@@ -417,7 +403,6 @@ mutual
   renTm ρg ρd ρt unit̂         = unit̂
   renTm ρg ρd ρt (bool̂ b)     = bool̂ b
   renTm ρg ρd ρt (nat̂ n)      = nat̂ n
-  renTm ρg ρd ρt uniq̂         = uniq̂
   renTm ρg ρd ρt (foldᵗ l z f) =
     foldᵗ (renTm ρg ρd ρt l) (renTm ρg ρd ρt z)
           (renTm ρg ρd (ext∈ (ext∈ ρt)) f)
@@ -540,7 +525,6 @@ mutual
   elimGTm Θl x cl unit̂         = unit̂
   elimGTm Θl x cl (bool̂ b)     = bool̂ b
   elimGTm Θl x cl (nat̂ n)      = nat̂ n
-  elimGTm Θl x cl uniq̂         = uniq̂
   elimGTm Θl x cl nilᵗ         = nilᵗ
   elimGTm Θl x cl (consᵗ a as) = consᵗ (elimGTm Θl x cl a) (elimGTm Θl x cl as)
   elimGTm Θl x cl (pairᵗ a b)  = pairᵗ (elimGTm Θl x cl a) (elimGTm Θl x cl b)
@@ -594,7 +578,6 @@ mutual
   elimDTm Θl x cl unit̂         = unit̂
   elimDTm Θl x cl (bool̂ b)     = bool̂ b
   elimDTm Θl x cl (nat̂ n)      = nat̂ n
-  elimDTm Θl x cl uniq̂         = uniq̂
   elimDTm Θl x cl nilᵗ         = nilᵗ
   elimDTm Θl x cl (consᵗ a as) = consᵗ (elimDTm Θl x cl a) (elimDTm Θl x cl as)
   elimDTm Θl x cl (pairᵗ a b)  = pairᵗ (elimDTm Θl x cl a) (elimDTm Θl x cl b)
@@ -643,9 +626,6 @@ evalWith (varᵗ x)      env = lookupEnv env x
 evalWith unit̂          env = tt
 evalWith (bool̂ b)      env = b
 evalWith (nat̂ n)       env = n
--- the reserved token: `mint-init` seeds the source counter at `suc n`,
--- so `n` itself is owned by no slot and handed out by no mint
-evalWith {n = n} uniq̂  env = n
 evalWith nilᵗ          env = []
 evalWith (consᵗ a as)  env = evalWith a env ∷ evalWith as env
 evalWith (pairᵗ a b)   env = evalWith a env , evalWith b env
@@ -731,7 +711,6 @@ mutual
   inputsBelowᵗ k unit̂          = true
   inputsBelowᵗ k (bool̂ _)      = true
   inputsBelowᵗ k (nat̂ _)       = true
-  inputsBelowᵗ k uniq̂          = true
   inputsBelowᵗ k (foldᵗ l z f) =
     inputsBelowᵗ k l ∧ inputsBelowᵗ k z ∧ inputsBelowᵗ k f
   inputsBelowᵗ k nilᵗ          = true

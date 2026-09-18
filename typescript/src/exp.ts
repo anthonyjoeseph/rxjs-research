@@ -18,16 +18,11 @@ export type Ty =
   // minted. That is the whole of the difference from nat, and it is
   // what lets a simul operator key a value by where it came from.
   //
-  // A SYMBOL RATHER THAN A NUMBER, AND IT IS THE NUMERAL'S REMOVAL THAT
-  // FREED THE REPRESENTATION.  `uniqT` used to CARRY a number, so a
-  // program could name an arbitrary token, and the number TS handed out
-  // had to be the number Agda's counter would hand out at the same point
-  // -- two independent evaluators kept in lockstep by nothing the
-  // typechecker could see.  Nullary, the literal names ONE reserved
-  // token and every other token comes from a `mint` binder, so all that
-  // is left at this type is identity, and the representation is free --
-  // and `symbol` is the one host type whose values cannot be forged,
-  // counted or ordered, which is exactly what the type says.
+  // A SYMBOL RATHER THAN A NUMBER, AND IT IS THE ABSENCE OF ANY LITERAL
+  // THAT FREES THE REPRESENTATION.  Every token comes from a `mint`
+  // binder, so no program can write one down, and all that is left at
+  // this type is identity -- which makes `symbol` exactly right, being
+  // the one host type whose values cannot be forged, counted or ordered.
   | { type: "uniq" }
   | { type: "prod"; fst: Ty; snd: Ty }
   | { type: "sum"; left: Ty; right: Ty }
@@ -53,29 +48,20 @@ export type PrimOp = "add" | "sub" | "mul" | "eq" | "lt" | "not" | "eqU";
 // the TYPE at every site that needs to; nothing else inspects a value's
 // shape, and no emit value is ever list-typed.
 //
-// THE ENVIRONMENT IS WHAT REPLACED SUBSTITUTION, AND IT IS WHY THE TOKEN
-// LITERAL NEEDS NO PAYLOAD.  Closing a body by substituting its
+// THE ENVIRONMENT IS WHAT REPLACED SUBSTITUTION, AND IT IS WHY NO TERM
+// AT THIS TYPE IS NEEDED AT ALL.  Closing a body by substituting its
 // environment in demanded a closed Tm denoting every value a binder
 // could carry, a MINTED token included, and the only such term is one
 // carrying a numeral.  Carrying the environment instead asks for no such
 // term: a minted token sits in the environment as a runtime value, and
-// the one token the language can still write is the reserved literal,
-// which needs nothing written down to name it.
+// nothing else at this type can be written down.
 export type ObsVal = { exp: Exp; env: Val[] };
-
-// the value `uniqT` denotes: one reserved token, distinct from every
-// minted one because `mintToken` returns a FRESH symbol and no symbol is
-// ever equal to another. Agda reserves the same token arithmetically --
-// the identifier just above the slot range, which its source counter is
-// seeded past -- because its tokens are numbers and it has no such
-// freshness for free.
-export const UNIQ_LITERAL: unique symbol = Symbol("uniq-literal");
 
 export type Val =
   | null
   | boolean
   | number
-  | symbol // a uniq token: minted, or the reserved literal
+  | symbol // a uniq token, always from a `mint` binder
   | [Val, Val]
   | Val[]
   | { type: "inl" | "inr"; val: Val }
@@ -89,15 +75,6 @@ export type Tm =
   | { type: "unitT"; ty: Ty }
   | { type: "boolT"; ty: Ty; val: boolean }
   | { type: "natT"; ty: Ty; val: number }
-  // the ONE token a program may write, and it carries no payload. A
-  // parameter here would let a program name an arbitrary token — the
-  // forgery `mint` exists to rule out — and would oblige this evaluator
-  // and Agda's to hand out the same numeral at the same point. Nullary,
-  // it names one RESERVED token: here a dedicated symbol no `mintToken`
-  // can return, in Agda the identifier just above the slot range, which
-  // its source counter is seeded past. So every equality a program can
-  // ask about it has the same answer in both trees.
-  | { type: "uniqT"; ty: Ty }
   | { type: "pairT"; ty: Ty; fst: Tm; snd: Tm }
   | { type: "fstT"; ty: Ty; pair: Tm }
   | { type: "sndT"; ty: Ty; pair: Tm }
@@ -237,8 +214,6 @@ export const evalWith = (tm: Tm, env: Val[]): Val => {
       return tm.val;
     case "natT":
       return tm.val;
-    case "uniqT":
-      return UNIQ_LITERAL;
     case "pairT":
       return [evalWith(tm.fst, env), evalWith(tm.snd, env)];
     case "fstT":
@@ -317,7 +292,6 @@ const substMuTm = (tm: Tm, st: MuSt, knot: Exp): Tm => {
     case "unitT":
     case "boolT":
     case "natT":
-    case "uniqT":
     case "nilT":
       return tm;
     case "consT":
@@ -434,7 +408,6 @@ const shiftTm = (tm: Tm, cutoff: number, by: number): Tm => {
     case "unitT":
     case "boolT":
     case "natT":
-    case "uniqT":
     case "nilT":
       return tm;
     case "consT":
