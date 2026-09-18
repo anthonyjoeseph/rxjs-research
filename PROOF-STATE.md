@@ -230,15 +230,15 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 
 ### Big picture tier roadmap
 
-- **THE THREE HARNESSES, WHICH THE CARRIER CROSSING LEFT RED AND WHICH ARE
-  ONE QUESTION.** `QuickCheck.agda` and the bug cache both run a
-  `Closed Γ₂ natᵗ` program under a two-slot table, and batching now demands an
-  ENVELOPE-typed one; elaboration moves the context to `emitᵛ Γ`, so a
-  `scripted` slot there has to carry a forged source token and an instant the
-  machine alone mints. Nothing checks impl against spec until it is answered,
-  so this leg unblocks rather than narrows. It picks between two repairs by
-  building the cheaper: a validity predicate on `Slots`, or a generator
-  restricted to source-free programs.
+- **THE THREE HARNESSES, AND THE SLOT QUESTION IS ANSWERED: A DEF, NOT A
+  SCRIPT.** `QuickCheck.agda` and the bug cache run a `Closed Γ₂ natᵗ`
+  program under a two-slot table, and batching demands an ENVELOPE-typed one;
+  elaboration moves the context to `emitᵛ Γ`, where a `scripted` slot would
+  have to carry a forged token. A `shared` def holding an elaborated simul
+  program does not: instantiated, it evaluates, the input delivers and the
+  decode is coherent. So the leg rebuilds both harnesses over a simul slot
+  telescope elaborated by defs, which costs only an EXTERNAL scripted source
+  at the envelope. Nothing checks impl against spec until it lands.
 
 - **`Rx.Depth` IS NOT RETIRED BY ANY OF THE ABOVE, AND THE OLD LEG SAYING SO
   IS DISCARDED.** It claimed the second top line papered over a divergence the

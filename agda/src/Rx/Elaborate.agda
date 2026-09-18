@@ -501,20 +501,27 @@ mutual
   -- would put the two implementations out of correspondence to buy a
   -- reading the slot telescope already splits cold from hot with.
 
-  -- WHAT A SLOT'S DEF COSTS AN EVIDENCE ROW, AND IT IS OWED HERE
-  -- BECAUSE IT IS A FACT ABOUT THIS ARM.  The arm passes the slot
-  -- STRAIGHT THROUGH: the input already stands at the envelope, so
-  -- nothing is wrapped here and the program's own elaboration mints
-  -- over whatever the slot hands it.  A `shared` def is then a program
-  -- at the envelope that was itself elaborated, so it arrives already
-  -- minted and the mint above it is a second layer.  Instantiated, the
-  -- decoded instant came back equal to the def's own payload literal
-  -- rather than to any frame -- the shape of a decode reading one layer
-  -- while two are present.  `Probed.Pipeline-Claims` records it as the
-  -- reason its id row carries no source; what is NOT established is
-  -- whether the second layer is the elaboration's or the harness's, and
-  -- that is the question to settle before any claim is read at a
-  -- program whose slot has a def.
+  -- WHAT A SLOT'S DEF DOES AT THIS ARM, INSTANTIATED RATHER THAN READ
+  -- OFF THE CODE.  The arm passes the slot STRAIGHT THROUGH: the input
+  -- already stands at the envelope, so nothing is wrapped here and the
+  -- program's own elaboration mints over whatever the slot hands it.  A
+  -- `shared` def is then a program at the envelope that was itself
+  -- elaborated, so it arrives already minted and the mint above it is a
+  -- second layer.  Run at a def that is an elaborated source, the
+  -- second layer costs nothing a consumer can see: the program
+  -- evaluates, the input delivers, and the decoded emit is a single
+  -- coherent envelope.  What the def DOES move is the ambient token,
+  -- since instants are minted from one counter -- a source-free program
+  -- reads its own frame at token 1 in an empty context, at 2 under a
+  -- table of width one whatever the slot holds, and at 3 when the
+  -- program actually reads a def.  So an instant is a token and not a
+  -- frame ORDINAL, and a claim comparing one against a literal is
+  -- comparing against the shape of the table.
+  -- WHAT WAS COVERED, since a definition cannot carry a receipt and the
+  -- rows were scratch: one cold def at one width, read at fuels 0, 1, 2
+  -- and 3, with payload and fuel both varied so neither could be what
+  -- the token was tracking.  Not covered: a hot def, a def reading
+  -- another slot, and every table wider than one.
   toPlain {Γ = Γ} (inputˢ i)  = subst (Exp _ _ _ _) (lookup-map i emitᵗ Γ)
                                       (input i)
   toPlain {Θ = Θ} (ofˢ ts)    = ofᵖ (frameᵛ Θ) (toPlainTms ts)
