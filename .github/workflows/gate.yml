@@ -307,3 +307,76 @@ jobs:
           name: quickcheck-counterexamples
           path: agda/src/Implementation/Unit-Test.agda
           if-no-files-found: ignore
+
+  # THE OTHER DIFFERENTIAL LEG, AND THE ONE NOTHING WAS RUNNING. `quickcheck`
+  # compares Agda against Agda -- impl against spec -- and can say nothing
+  # about whether either resembles rxjs. The oracle is the only check in the
+  # tree that runs REAL rxjs, and until now it was a command a session typed:
+  # a green measured once is a receipt, and a receipt is not a check. What
+  # the plain tree and its evaluator claim rests on this job.
+  #
+  # IT IS ITS OWN JOB RATHER THAN A STEP OF `gate`, for the reason `ts` is:
+  # the gate is the merge gate and stays whole, while a divergence between
+  # two machines that take seconds to run has no business waiting on the
+  # tower. It needs the Agda toolchain only to link the CLI -- the cone under
+  # `CLI/Main.agda`, not the tower -- so it restores the same read-only
+  # caches the sweep does.
+  oracle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: typescript/package-lock.json
+
+      - name: Install TypeScript deps
+        run: cd typescript && npm ci
+
+      - name: Set up Agda
+        uses: ./.github/actions/agda-toolchain
+
+      # RESTORE-ONLY, as in the sweep: the gate job owns these keys, and a
+      # miss costs a cold build of the cone under `CLI/Main.agda`.
+      - name: Restore Agda interfaces
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            agda/_stripped-comments/_build
+            agda/_stripped-comments/evidence/_build
+          key: agda-interfaces-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            agda-interfaces-${{ runner.os }}-
+
+      - name: Restore compiled MAlonzo objects
+        uses: actions/cache/restore@v4
+        with:
+          path: agda/_cli/MAlonzo
+          key: agda-cli-${{ runner.os }}-${{ hashFiles('scripts/install-agda.sh') }}
+
+      # The corpus is drawn by rejection and the draw holds its own YIELD, so
+      # this is red on a divergence, on a corpus that came up short of
+      # emitting rows, and on a zero-case run -- the three ways the
+      # comparison stops being one. A failing case prints its whole program,
+      # so the log is the reproduction rather than an offset into a sweep.
+      - name: make oracle
+        run: make oracle
+
+      # AND THE PINNED ROWS, WHICH THE SWEEP IS NOT GUARANTEED TO REDRAW.
+      # `corpus/` holds programs that once separated the two machines; the
+      # draw is random and most of what it draws is silent, so a regression
+      # on one of them is exactly what a sweep can miss. Replaying them costs
+      # a second, and it runs even when the sweep went red, since the two
+      # findings are independent.
+      - name: replay the pinned corpus
+        if: always() && !cancelled()
+        run: |
+          for f in typescript/corpus/*.ndjson; do
+            echo "== ${f#typescript/}"
+            make oracle ARGS="--cases ${f#typescript/}"
+          done

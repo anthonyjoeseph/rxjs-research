@@ -230,12 +230,6 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 
 ### Big picture tier roadmap
 
-- **THEN THE ORACLE'S CI JOB, SO IT CANNOT ROT.** A harness nobody runs is a
-  harness that goes stale silently, which is the failure the gate exists to
-  make impossible everywhere else. The job is one workflow step and a fixed
-  seed corpus, and it is owed the moment the oracle is green — a green
-  measured once is a receipt, and a receipt is not a check.
-
 - **THEN THE SIX ROWS, WHICH NOTHING HOLDS ANY MORE.** The flatteners
   were held on a blocker and are not: they wanted a token per inner
   registration against a binder fixed at subscribe time, and an inner is a
