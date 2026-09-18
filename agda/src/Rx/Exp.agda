@@ -200,6 +200,23 @@ mutual
                  -- term that makes a token.  A binder only the elaboration
                  -- emits leaves that argument standing; the same binder in
                  -- `SExp` would hand every author a token to collide with.
+                 -- DEAD ROUTE: move this binder out of Θ into a token
+                 --   context of its own, discharged by ENVIRONMENT rather
+                 --   than by substitution, so that no term denotes a token
+                 --   and `uniq̂` can be deleted.  It retires exactly one
+                 --   reify site — this binder's — and leaves every other
+                 --   one standing, because a token is STREAM DATA here:
+                 --   `machineEmitᵗ` stands the instant and the source at
+                 --   `uniqᵗ`, so every elaborated operator binds a whole
+                 --   envelope into Θ and every Θ-substitution reifies one.
+                 --   `reify` is total over `Ty` and owes a CLOSED `Tm` at
+                 --   each arm, and a closed term denoting an arbitrary
+                 --   token IS the literal.  So the literal goes only if
+                 --   `uniqᵗ` stops being data an envelope carries, which
+                 --   is a ruling about the protocol and not about this
+                 --   binder — and the unforgeability an author needs is
+                 --   then a restriction on the PALETTE, the shape the
+                 --   paragraph above already takes.
 
   data Tm {n} (Γ : Ctx n) (Δᵍ Δ Θ : List Ty) : Ty → Set where
     varᵗ  : ∀ {t} → t ∈ Θ → Tm Γ Δᵍ Δ Θ t
