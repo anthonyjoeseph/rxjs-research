@@ -334,7 +334,18 @@ jobs:
   # tower. It needs the Agda toolchain only to link the CLI -- the cone under
   # `CLI/Main.agda`, not the tower -- so it restores the same read-only
   # caches the sweep does.
+  #
+  # DISABLED WHILE THE EVALUATOR IS REWRITTEN (Anthony: "let's disable the
+  # oracle until we get the evaluator up and running w/ rxjs-parity and
+  # reducibility"). The machine this job compares against rxjs is the one
+  # being replaced, and it is known to diverge -- a shared slot re-entered
+  # mid-run is a state it cannot represent -- so the job would report a
+  # divergence already recorded, on every push, while the fix is in flight.
+  # It comes back ON, unchanged, the day the new evaluator computes: that is
+  # the check that decides whether the rewrite achieved what it is for, so
+  # nothing here may be narrowed to make it pass.
   oracle:
+    if: false
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:

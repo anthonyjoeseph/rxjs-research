@@ -183,11 +183,11 @@ the row is DIFFICULTY.
 formal-verification-batchSimultaneous    The-Proof.agda — REAL, module postulate-free
  ├─ batch-agreement                      proven
  └─ evaluate-well-formed                 Verify-Well-Formed.agda — REAL, a body
-     ├─ evaluate-accepted                no emit of a run is rejected — tier 4
-     └─ evaluate-settled                 the run stops settled — tier 4
+     ├─ evaluate-accepted                no emit of a run is rejected — tier 3
+     └─ evaluate-settled                 the run stops settled — tier 3
 
-run-monotone                              claimed by Main in its own right —
-                                          nothing above consumes it — tier 3
+batch-online                              claimed by Main in its own right —
+                                          nothing above consumes it — tier 4
 
   evaluate↓ = proj₁ ∘ evaluate!           Rx/Evaluator/Builder.agda — REAL
      └─ every value-path leaf is a body; the corpus runs; the tower descends
@@ -230,44 +230,62 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 
 ### Big picture tier roadmap
 
-- **THE FLATTENERS AND `takeᵖ`, WHICH ARE THE `Tm`/`Ty` MIRROR'S OWN PALETTE
-  GAP (Anthony: these "all need to be defined. These are crucial").** The join
-  bracket is walked and recorded at `mergeAllᵖ`: `batchSyncᵉ` buys the
-  id-inheritance half outright, and the other half is closed by a TYPE —
-  `mergeAllᵉ` takes `obs t`, so everything reaching a flattener's output rides
-  a lane, which is what a limit counts, a switch cuts and an exhaust drops.
-  Three postulates therefore share ONE ask, a multicast reachable inside an
-  expression, which is leg three's channel arriving early. `takeᵖ` wants a
-  different one and the channel would not close it. Both asks are formers, so
-  both are Anthony's — the leg is to put them to him, not to invent them.
+- **THE OLD MACHINE'S CLAIMS AND THE PLAIN ONE ARE BOTH GONE, AND THAT IS
+  THE TIER CLEARING ITS OWN GROUND (Anthony: "that is dead weight and we
+  need to lose it asap").** `Rx.Depth` mirrored rxjs and carried no
+  theorems; the five evaluator laws, determinacy, run monotonicity and the
+  three timing claims carried the theorems and mirrored nothing. Neither
+  survives a rewrite that changes what the machine MEANS, so both were
+  deleted with recovery shas rather than ported, and the oracle is off
+  until the replacement computes. What is left is one evaluator to fix and
+  nothing stated over it that the fix would falsify.
 
-- **`Rx.Depth` / SCHEDULING SOURCES — the tier's one genuine architecture
-  decision.** What forces `evaluateᵈ` is that a whole synchronous source runs
-  in ONE STEP, so a subscriber attaching part-way through sees the remainder in
-  rxjs and nothing here. The plain carrier split that burst into one event per
-  value, which changed the stream's shape and not its timing. Matching rxjs
-  means SCHEDULING sources rather than running them whole — an evaluator change
-  reaching the builder, the domain, the reducibility candidate and freshness.
-  `budgetᵈ`'s silent truncation stands until it lands, and `Reducible`'s
-  Girard–Tait candidate must keep working exactly as well as it does now.
+- **STRIP THE INSTANT BOOKKEEPING OUT OF THE EVALUATOR (Anthony: "no
+  instemit … that's the whole point of the tier").** The machine mints
+  `Id`s, carries `Ordinal`s, numbers registrations and orders a share's
+  fan-out by a FLOOR — every one of it a reading of simultaneity, and the
+  elaboration now compiles that into the value type instead. The stream is
+  already plain; what is not plain is the state behind it. Nothing in
+  `Reducible`'s candidate reads any of it, which is the claim this leg
+  tests by deleting it.
+
+- **RE-ENTRANT SOURCES, AND `Reducible` IS WHY THIS COSTS NOTHING
+  (Anthony: the candidate "was written against an evaluator whose only
+  difference was that it had instemit cruft built into it").** The one
+  measured divergence is `oneShotBurst`: a source runs whole, so a
+  subscriber attaching part-way sees the remainder in rxjs and nothing
+  here. Depth-first is the NATURAL recursion of a big-step relation — run
+  each value's cascade before the next — so the fix is to interleave the
+  fold, not to schedule a work stack, and the type descent that funds the
+  candidate is untouched. `budgetᵈ` is already gone with the machine that
+  needed it.
+
+- **THEN THE FLATTENERS AND `takeᵖ`, AND NO FORMER IS OWED AFTER ALL
+  (Anthony: "the flattens, mergeAll etc, _are_ the primitives … they can
+  be implemented however you want, just so long as they … mirror exactly
+  what rxjs would do").** The recorded ask — a multicast inside an
+  expression — was an envelope obligation smuggled into a plain question:
+  in rxjs every outer emit of a `mergeAll` IS an observable, so nothing
+  owes an output emit without a lane. `takeᵖ`'s behaviour is measured
+  rather than inferred and the plain `takeᵉ` already has all three facts.
 
 - **THEN THE REST OF THE SIMUL OPERATORS MIRRORED IN `Tm`/`Ty` (Anthony).**
-  Each TS simul operator mirrored as an Agda definition in the value language,
-  in the same fashion, so the correspondence is readable rather than asserted.
-  The first thing tested is the SEEDED channel the share reads at subscribe
-  time, a further ask than a plain channel which `Tm` may not have.
-  `batchSyncᵉ` is already one, at the index Anthony has ruled on.
-  **AND IF THE LANGUAGE CANNOT SAY ONE, STOP AND REPORT (Anthony).** A missing
-  former is never repaired by inventing one: a new `Ty` constructor or `Tm`
-  former changes what a program can SAY, so it decides what every theorem above
-  quantifies over — the same reason the spec is not an agent's to move.
+  Each TS simul operator mirrored as an Agda definition in the value
+  language, in the same fashion, so the correspondence is readable rather
+  than asserted. The first thing tested is the SEEDED channel the share
+  reads at subscribe time, a further ask than a plain channel which `Tm`
+  may not have. `batchSyncᵉ` is already one, at the index Anthony has
+  ruled on. **AND IF THE LANGUAGE CANNOT SAY ONE, STOP AND REPORT
+  (Anthony).** A new `Ty` constructor or `Tm` former changes what a
+  program can SAY, so it decides what every theorem above quantifies
+  over — the same reason the spec is not an agent's to move.
 
 ### The ledger
 
 - **`{mergeAll,switchAll,exhaustAll}ᵖ`** (Rx.Elaborate) — SHAPE,
   `DEAD ROUTE×4`: the elaboration's per-former plumbing, after the two sources
-  came out of it. The flatteners want somewhere to forward the outer's
-  bookkeeping, which nothing plain offers.
+  came out of it. The outer's bookkeeping needs no plain home — it rides the
+  lane — so what is left is the compile of an envelope stream into a stream.
 - **`takeᵖ`** (Rx.Elaborate) — DIFFICULTY, `DEAD ROUTE`: the author cuts on
   VALUES and a plain `takeᵉ` above the envelope cuts on BATCHES, so the
   elaboration owes a count that crosses the level and closes at the cut.
@@ -341,60 +359,7 @@ then tier 1 is the lowest open tier and holds the cone.
   program with no flattener — which is where their risk actually lives, and the
   first thing a restatement owes.
 
-## Tier 3 — the machine's own fuel
-
-**WHAT THIS FACE BUYS: the one claim about the evaluator that no correspondence
-carries.** It is read off `evaluate↓` alone — no spec, no batching, no second
-run to compare against — and a concrete program decides it. That is the whole
-tier: what this repo asserts about its own machine, standing on nothing else.
-
-**AND THE RISK IS THE FLATTENERS.** The row carries a probe whose receipt names
-the region it does NOT reach — no program whose evaluation enters a flattening
-node, and no source firing at more than one tick. So what is instantiated is the
-first-order half of the statement, and the region where it could still be false
-is named rather than guessed at.
-
-### The monster
-
-`run-monotone` — the cheapest thing here that can be false. It says more fuel
-EXTENDS a run and never rewrites what a shorter one emitted, which is two
-properties in one equation, and the second is the one a machine violates
-quietly: a drain resuming from a different arrival ordinal, an instant
-renumbered under the larger fuel, a burst reordered. Every face above reads its
-own fuel off its own hypotheses, so nothing yet forces the equation — which is
-why a restatement is cheap now and ruinous once a consumer exists.
-
-### Big picture tier roadmap
-
-- **PROBE THROUGH A FLATTENER, BECAUSE THAT IS THE ONE REGION THE RECEIPT DOES
-  NOT REACH.** The probe stops at that boundary and says so, so the tier's whole
-  remaining doubt sits in one shape: a longer fuel enters an inner subscribe at
-  a different point, and what the shorter run emitted is rewritten rather than
-  extended. The leg's product is rows at `mergeAll`/`switchAll`/`exhaustAll`
-  programs, or a refutation — and a refutation is the cheap outcome here, since
-  the statement has no consumer yet and restating it costs nothing above it.
-
-- **THEN PAST ONE TICK, AND OFF A COLD SOURCE.** Every existing row scripts a
-  hot source firing once, so every arrival lands at tick zero and no row spans
-  two deliveries. That leaves the prefix property untested exactly where a run
-  carries state between ticks, which is where a drain counter could resume
-  differently. The leg adds rows at a source firing twice and at a cold source,
-  and its product is whether the equation survives a run with more than one
-  arrival ordinal in it.
-
-- **THEN MINT THE LEAVES, IN WHATEVER CURRENCY THE FIRST TWO LEAVE STANDING.**
-  The row is a BARE postulate on purpose: what the induction is over — the
-  drain's own step, the frame's concatenation, the arrival ordinal — is what the
-  flattener and multi-tick rows decide, and minting ahead of them is a
-  hypothesis about the route rather than a decomposition. So this leg is last by
-  construction, and its own product is the split, not a proof of it.
-
-### The ledger
-
-- **`run-monotone`** (Verify-Run-Monotone) — FALSITY, `PROBED`: more fuel only
-  extends a run. Nothing postulated in it, and a concrete program decides it.
-
-## Tier 4 — the automaton half, and it is the only half
+## Tier 3 — the automaton half, and it is the only half
 
 **THE TIER IS ONE LEAF AGAIN.** `The-Proof` draws `evaluate-accepted` from here
 and nothing else: no emit of a canonical run is rejected by the protocol
@@ -454,82 +419,75 @@ so a leaf carved out today would inherit the defect rather than localise it.
   automaton. A scripted slot supplies the ENVELOPE and the machine carries it
   out opaquely, so a driver refutes this without entering a clause.
 
-## Tier 5 — determinacy and the top-line semantic claims
+## Tier 4 — what Main asserts beside the main theorem
 
-**THE MISC TIER, AND THE ONLY ONE NOT DEDICATED TO A SINGLE STATEMENT.** Two
-faces share it because neither is on any other tier's route, not because they
-share a subject: the run relation being a function, and the claims Main asserts
-beside the main theorem.
+**THE MISC TIER, AND IT IS NOW ONE ROW PLUS A DEBT.** It held ten claims about
+the machine — determinacy, fuel coherence, the μ laws, run monotonicity and the
+three timing claims. Every one was stated over the evaluator tier 1 is
+rewriting, so they were deleted with recovery shas rather than transported: a
+claim about the wrong semantics is not evidence about the right one, and none
+of them blocked anything below. What is left standing is the one claim read off
+the batcher rather than the machine.
 
-**NONE OF THEM BLOCKS ANYTHING BELOW, WHICH IS WHY THEY ARE LAST.** The tiers
-above are stated over the ONE output the builder produces, so a verdict about
-that output means what it says whether or not a second derivation exists; what
-determinacy buys is the STRENGTHENING, and a strengthening is worth nothing
-until the weak form is proven.
+**SO THE TIER'S REAL CONTENT IS A DEBT, AND IT IS NAMED RATHER THAN CARRIED.**
+Main asserts less than it did, and that is honest only while the restatement is
+scheduled — which is what the legs below are. They cannot start until the new
+machine computes, so this tier stays last for the reason it always was.
 
 ### The monster
 
-`subscribeE-det` — the subscribe relation itself, and the deepest node in the
-tier whose falsity takes the rest of it. It would be a fact about the
-EVALUATOR rather than about a claim: a frame admitting two outputs at one set
-of indices means the machine is not a function, and then every face's
-quantification over derivations is over a set nobody has characterised. A
-leaf's cone is its statement's vocabulary, so it reaches neither its sibling
-nor the assembly consuming both — those are admitted below.
-
-also: `drain-det` — the other half of the same assembly, off the frame's cone and ground alongside it.
-also: `evaluate-deterministic` — the determinacy subject, which consumes both leaves and is unreachable from either.
+`batch-online` — the only live statement here, and the only one a concrete
+program still decides. It says the batcher's answer on a prefix is the prefix
+of its answer, which is what makes a streaming reading of the spec legitimate
+at all; its unqualified form was refuted by a split closing one instant and
+leaving a second open, so the form standing today is the repaired one and the
+repair is exactly where it could still be wrong. A leaf's cone is its
+statement's vocabulary.
 
 ### Big picture tier roadmap
 
-- **THEN INSTANTIATE THE DETERMINACY RING BEFORE GRINDING ANY OF IT.** The
-  subscribe relation is twenty families and nothing has ever run two
-  derivations at one set of indices. A refutation at a single arm is worth far
-  more than a partial induction over all of them, and it is cheap: build two
-  derivations of one frame by taking the builder's and one arm's alternative,
-  and ask for the `refl`. The arms that do not follow from the head constructor
-  are the target; the rest are decided by pattern matching and cannot refute.
+- **RESTATE DETERMINACY OVER THE NEW MACHINE, AND INSTANTIATE IT BEFORE
+  GRINDING ANY OF IT.** The old ring quantified over a subscribe relation of
+  twenty families and nothing ever ran two derivations at one set of indices;
+  the relation went with its evaluator and the ring went with it. What is owed
+  again is the same fact about whatever machine lands — a frame admitting two
+  outputs at one set of indices means the machine is not a function. The leg is
+  to state it, then refute at a single arm before inducting over all of them,
+  which is the cheap order and was never taken.
 
-- **THEN `subscribeE-det` ARM BY ARM, THEN `drain-det` AND THE ASSEMBLY.** What
-  separates the arms is EQUATION PREMISES rather than constructors, so two arms
-  can agree on the head and be told apart only by a derived equality on the
-  schedule or the state; each such pair is a lemma and the lemmas are the
-  product. The drain's determinacy is an induction whose motive is the
-  subscribe result, so it lands second by necessity rather than by choice.
+- **THEN THE FUEL AND UNFOLDING LAWS, WHICH ARE THE ONES A PROGRAM DECIDES.**
+  Fuel coherence, `μ-unfold`, and more fuel extending a run rather than
+  rewriting it: three statements the old machine carried with a sweep and three
+  rows behind them. They are cheap to restate and cheap to probe, and the
+  region the old receipts never reached — a program entering a flattening node,
+  a source firing past one tick — is the region the rewrite most changes. The
+  leg's product is rows there, or a refutation.
 
-- **AND EVERY ROW HERE IS STATED OVER A MACHINE TIER 1 IS DELETING, SO THE
-  RESTATEMENT COMES FIRST.** `subscribeE-det` and `drain-det` quantify over the
-  old subscribe relation's twenty families, and that relation goes with its
-  evaluator. Nothing is lost — determinacy is owed by whatever machine replaces
-  it, and arms separated by equation premises will separate the same way — but
-  grinding an arm of a relation being rewritten is work forfeit by
-  construction. The leg is to restate the ring over the new evaluator once it
-  computes, and to re-rank what is left from the risk as it then stands.
+- **THEN THE TIMING CLAIMS, WHICH NEED AUTHORING RATHER THAN PROOF.** Locality,
+  non-interference and timing invariance were stated over nine postulated
+  abstractions and asserted close to nothing; `causality` was satisfiable by an
+  empty helper and `defer-shift` was ⊤-typed outright. Restating them means
+  DEFINING the abstractions, which is claim authoring and needs Anthony. **Not
+  GRINDABLE and never will be** — no precedent makes them mechanical, because
+  nothing is stated yet.
+
+- **AND `batch-online` IS THE ONE LEG THAT CAN RUN TODAY.** It reads the
+  batcher and not the machine, so the rewrite does not touch it and nothing
+  above it waits. Its receipt sits at the very split that refuted the
+  unqualified form; what it has never been run against is a prefix cut INSIDE a
+  flattened instant, which is the shape the new machine will start producing.
 
 ### The ledger
 
-- **`subscribeE-det`, `drain-det`** (Verify-Determinacy) — FALSITY,
-  `NO EVIDENCE`: each family admits one output at its own indices. Nothing has
-  instantiated either, and the arms that do not follow from the head
-  constructor are separated by equation premises — unwalked.
-- **Vacuous-by-abstraction — VACUITY**, `NO EVIDENCE` — `locality`,
-  `non-interference`, `timing-invariance`, `causality`, `μ-guarded`,
-  `defer-shift` (the one allowlisted honest gap). De-risking these means
-  DEFINING the abstractions: claim authoring that needs Anthony. **Not
-  GRINDABLE and never will be** — no precedent can make them mechanical,
-  because nothing is stated yet.
-- **The abstractions those claims quantify over — VACUITY**, `NO EVIDENCE` —
-  `Node`, `NodeSt`, `Inbox`, `inboxOf`, `stAt`, `cascade`, `δ`, `Retiming`,
-  `retime`, `truncateIn`, `emittedBefore`. Named individually because they are
-  what makes the row above vacuous, and a collective phrase is invisible to the
-  coverage check.
 - **`batch-online`** — DIFFICULTY, `PROBED`: the restated form, instantiated at
   the very split that refuted the unqualified one — a left side closing one
   instant and leaving a second open, whose terminal flush was the old
   statement's counterexample.
-- **`μ-unfold`, `fuel-coherent`** (Evaluator-Theorems) — DIFFICULTY,
-  `PROBED×2`: the two evaluator laws a spent battery instantiated at every
-  canonical program without refuting. Separated from the rows above because
-  their receipt is a sweep rather than a point.
+- **The claims Main no longer makes — a DEBT, not a row.** Determinacy, fuel
+  coherence, the two μ laws, run monotonicity and the three timing claims are
+  deleted, not discharged; `git show b5601783` restores all four modules and
+  the three rows that were the only instantiation any of them had. They are
+  uncounted here deliberately, because a postulate ledger counts statements
+  `agda/src` makes and `agda/src` no longer makes these.
 - **FFI, permanently trusted** — `_>>=_`/`getContents`/`putStr` (CLI/IO),
   `randFold`/`natMod` (QuickCheck). Carried, not counted.

@@ -40,6 +40,9 @@
 -- several of them — since a green on a bound this development no longer
 -- states says nothing about the descent that replaced it.
 --
+-- RECOVERY: git show b5601783:agda/evidence/probed/Probed/Run-Monotone.agda
+--   restores the three fuel-monotonicity rows, whose statement went with
+--   the machine it read.
 -- RECOVERY: git show 919f115:agda/evidence/probed/Probed/
 -- RECOVERY: git show 3a3bd405:agda/evidence/probed/Probed/Connect-Count.agda
 module Probed.Main where
@@ -52,9 +55,4 @@ open import Probed.Apparatus using (Confirms; Separates)
 
 -- THE PIPELINE-SIDE CLAIMS, claimed from the root for the same reason.
 open import Probed.Pipeline-Claims using (row-online)
-
--- THE ONE CLAIM STATED OVER THE MACHINE ALONE, claimed here because a
--- statement a concrete program decides is one nothing should take on
--- trust.
-open import Probed.Run-Monotone using (row-saturated; row-grows; row-past-horizon)
 

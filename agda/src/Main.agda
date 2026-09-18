@@ -36,53 +36,20 @@ open import Verify-Batch-Simultaneous.Batch-Theorems
   using (batch-online)
 
 ------------------------------------------------------------------
--- THE EVALUATOR-LEVEL CLAIMS.
+-- THE EVALUATOR-LEVEL CLAIMS ARE GONE, AND WHAT REMOVED THEM WAS NOT
+-- A TIDY-UP.  Every one of them — the five fuel and unfolding claims,
+-- determinacy, run monotonicity, the three timing claims — was stated
+-- over a machine that does not mirror rxjs, so porting them across the
+-- rewrite would carry a statement about the wrong semantics into a
+-- tree built to have the right one.  They are owed again once the new
+-- machine computes, and they will be stated over it rather than
+-- transported.
 --
--- CAUTION, recorded here because Main is where it will be read:
--- `causality` is stated over `truncateIn`/`emittedBefore`, which are
--- POSTULATED functions, so it is currently satisfiable by instantiating
--- `emittedBefore k = []`.  `defer-shift` is still `⊤`-typed — an emit
--- carries `instant : Id` but no `Tick`, so its claim is not statable
--- without new machinery (see that module's header).  `μ-guarded`'s type
--- is syntactically IDENTICAL to `μ-unfold`'s despite its comment
--- claiming a distinct bound.  All three are listed anyway: they are
--- claims we intend to make, and hiding them would shrink the ledger
--- without shrinking the debt.
-open import Rx.Evaluator-Theorems
-  using (fuel-coherent; causality; μ-unfold; μ-guarded; defer-shift)
-
-
+-- RECOVERY: git show b5601783:agda/src/Rx/Evaluator-Theorems.agda
+-- RECOVERY: git show b5601783:agda/src/Verify-Determinacy.agda
+-- RECOVERY: git show b5601783:agda/src/Verify-Run-Monotone.agda
+-- RECOVERY: git show b5601783:agda/src/Rx/Time-Theorems.agda
+--   holds all four, and the same sha's
+--   `agda/evidence/probed/Probed/Run-Monotone.agda` the three rows that
+--   were the only instantiation any of them ever had.
 ------------------------------------------------------------------
--- THE RUN RELATION IS A FUNCTION.  Claimed here rather than by a
--- consumer, because its consumers are the claims that build their own
--- derivations and none of those is written yet — and because a claim
--- that needs it typechecks without it while proving something weaker
--- than its own name, which is the one shape a missing fact does not
--- announce.
-------------------------------------------------------------------
-open import Verify-Determinacy
-  using (evaluate-deterministic)
-
-------------------------------------------------------------------
--- MORE FUEL ONLY EXTENDS A RUN.  Claimed here rather than by a
--- consumer for the same reason determinacy is: every face below reads
--- its own fuel off its own hypotheses, so none of them needs this to
--- typecheck, and a fact about the machine that is stated only when its
--- first consumer arrives is one that consumer's author has to invent.
---
--- IT MENTIONS NOTHING POSTULATED, which is what distinguishes it from
--- the timing claims below: a concrete program decides it, so what it
--- pins is checkable rather than merely intended.
-------------------------------------------------------------------
-open import Verify-Run-Monotone
-  using (run-monotone)
-
-------------------------------------------------------------------
--- THE TIMING CLAIMS.  CAUTION: all three are stated over nine
--- postulated abstract helpers in the same module (`Node`, `NodeSt`,
--- `Inbox`, `inboxOf`, `stAt`, `cascade`, `δ`, `Retiming`, `retime`),
--- so as written they are close to vacuous — those helpers must become
--- definitions before these assert anything.
-------------------------------------------------------------------
-open import Rx.Time-Theorems
-  using (locality; non-interference; timing-invariance)

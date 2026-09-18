@@ -39,6 +39,11 @@
 -- no longer has: the grant, the nest store and the walk maximum it was
 -- written over went with the budget.
 --
+-- RECOVERY: git show b5601783:agda/evidence/probed/Probed/Apparatus.agda
+--   restores `hotOnce` and `oneSlot`, the one-slot table every row that
+--   evaluated a program ran against.  They went with the last such row,
+--   and they are five lines to rewrite; what is worth knowing is that
+--   every program-running probe wanted exactly this shape.
 -- RECOVERY: git show 919f115:agda/evidence/probed/Probed/Apparatus.agda
 -- RECOVERY: git show 8c6fc8d:agda/evidence/probed/Probed/Apparatus.agda
 --   holds the seven forks that spent `Separates` before this tree was
@@ -54,35 +59,11 @@ module Probed.Apparatus where
 
 open import Relation.Nullary.Negation using (¬_)
 open import Relation.Binary.PropositionalEquality using (_≡_)
-open import Data.Bool using (T)
-open import Data.List using (_∷_; [])
-open import Data.Vec using (_∷_; [])   -- contexts are Vecs; ∷/[] overload per type
-open import Data.Fin using (zero; suc)
-open import Rx.Prim using (after_,_; hot)
-open import Rx.Exp using (Ctx; Val; isData)
-open import Rx.Slots using (Slot; Slots; scripted)
+-- contexts are Vecs; ∷/[] overload per type
 
 
 Confirms : {A : Set} → .(claim : A) → Set
 Confirms {A} _ = A
-
--- THE SMALLEST SLOT TABLES A ROW CAN RUN AGAINST, AND THEY LIVE HERE
--- BECAUSE THE TREE THAT USED TO HOLD THEM STATES NO PROGRAM ANY MORE.
--- They were shorthands beside the readme's quantified instances, and
--- those instances named a shape the plain tree cannot express; the
--- probes still here need a table to evaluate at, and a table is not
--- evidence about anything, so it is apparatus rather than a claim.
--- Scripted slots carry data only, which the `isData` witness discharges.
--- RECOVERY: git show 5ade0b38:agda/evidence/probed/Probed/Readme-Claims.agda
---   restores the readme rows, and with them the empty table they were the
---   only consumer of.
-
-hotOnce : ∀ {n} {Γ : Ctx n} {k} {t} {ok : T (isData t)} → Val Γ t → Slot Γ k t
-hotOnce {ok = ok} v = scripted {ok = ok} (hot ((after 0 , v) ∷ []))
-
-oneSlot : ∀ {t} → Slot (t ∷ []) 0 t → Slots (t ∷ [])
-oneSlot s zero    = s
-oneSlot s (suc ())
 
 -- THE FORK'S PRODUCT, AND IT IS A TYPE RATHER THAN A MARKER.  A
 -- `-- FORK:` probe stands between two candidate MECHANISMS, and what it
