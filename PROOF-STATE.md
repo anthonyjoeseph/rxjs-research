@@ -180,14 +180,13 @@ the row is DIFFICULTY.
 ## The theorem chain (top → leaves)
 
 ```
-formal-verification-batchSimultaneous    The-Proof.agda — REAL, module postulate-free
- ├─ batch-agreement                      proven
- └─ evaluate-well-formed                 Verify-Well-Formed.agda — REAL, a body
-     ├─ evaluate-accepted                no emit of a run is rejected — tier 3
-     └─ evaluate-settled                 the run stops settled — tier 3
+formal-verification-batchSimultaneous    The-Proof.agda — a BARE POSTULATE
+                                          while the machine is rewritten — tier 2
+ └─ batch-agreement                      proven, and claimed by Main in its
+                                          own right rather than through the top
 
 batch-online                              claimed by Main in its own right —
-                                          nothing above consumes it — tier 4
+                                          nothing above consumes it — tier 3
 
   evaluate↓ = proj₁ ∘ evaluate!           Rx/Evaluator/Builder.agda — REAL
      └─ every value-path leaf is a body; the corpus runs; the tower descends
@@ -260,15 +259,15 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
   Then depth-first is the recursion's own order, no work stack appears,
   and `pushBurst⇓` is deleted rather than repaired.
 
-- **AND THE BRACKET OPERATOR IS WHAT THAT COSTS.** `batchSyncᵉ` groups
-  the whole arriving LIST into one value, and per-value emission leaves
-  no list to group. The semantics survives and is the one real rxjs has:
-  a flag raised for the subscribe call, values buffered while it is up,
-  one flush when the call returns. What goes is the reading that a burst
-  IS a batch — never a fact about rxjs, only about how this machine
-  carried a source's output. The flatteners get cheaper in the same
-  move: a saturated `mergeAll` queues the OBSERVABLE, as rxjs does,
-  instead of re-dispatching a list of values its inner already produced.
+- **AND THE BRACKET OPERATOR MOVES CLOSER TO ITS MIRROR, NOT AWAY
+  (Anthony: "it needs to mirror what you'll see in the typescript
+  definition and experience when you run it").** `batchSyncᵉ` groups the
+  whole arriving LIST into one value, and per-value emission leaves no
+  list — so the arm gets written as the TypeScript writes it, a flag and
+  a buffer flushed by a merged second input. Semantics unchanged; only
+  the ENCODING goes, and it was available here solely because a source
+  ran whole. The flatteners gain the same way: a saturated `mergeAll`
+  queues the OBSERVABLE, as rxjs does.
 
 - **THEN THE FLATTENERS AND `takeᵖ`, AND NO FORMER IS OWED AFTER ALL
   (Anthony: "the flattens, mergeAll etc, _are_ the primitives … they can
@@ -314,7 +313,9 @@ are STATEMENTS, which can be false.
 ### The monster
 
 (no monster) — a monster is a NAME, and this tier's statements are not written
-yet. It takes one at the commit that first states the restated top line; until
+yet. The top line standing today is a bare postulate over the machine tier 1 is
+replacing, so it is the thing to be restated rather than a thing to aim at. The
+tier takes a monster at the commit that first states the restatement; until
 then tier 1 is the lowest open tier and holds the cone.
 
 ### Big picture tier roadmap
@@ -330,15 +331,14 @@ then tier 1 is the lowest open tier and holds the cone.
   that TYPECHECKS over the new trees, which is what makes the legs below it
   arguable from code instead of from prose.
 
-- **THEN THE WELL-FORMEDNESS DECOMPOSITION, ONE CLAUSE PER OPERATOR
-  (Anthony).** `evaluate-accepted` keeps its conclusion and changes its route.
-  It splits over the RUN today and bottoms out in two leaves quantified over a
-  derivation and nothing syntactic — which is exactly why neither decomposes: a
-  cascade from an arbitrary closed program is every former at once, so there is
-  no case to split on. The replacement splits over the SYNTAX, so each
-  subtree's own conclusion is the hypothesis those leaves lack, and the shipped
-  palette being finite is what makes the induction cover every program an
-  author can write.
+- **THEN WHATEVER LEGALITY THE TOP LINE NEEDS, STATED OVER THE TABLE AND NOT
+  OVER THE RUN.** The old leaf claimed the automaton rejects no emit of a
+  canonical run, and it was false: a slot is writable at the envelope type and
+  elaboration passes an `input` through untouched, so a table naming an instant
+  past the counter reaches the output without entering a clause. The route that
+  split that claim over the syntax died with it. What is owed instead is a
+  predicate on the SLOTS — and the first question it answers is whether it is
+  per-slot or per-table, since a shared slot is read at several sites.
 
 - **THEN THE PURITY RULING, WHICH DECIDES WHETHER THE TOP LINE CARRIES A
   HYPOTHESIS AT ALL.** A simul tree's non-observable positions take an author's
@@ -369,67 +369,15 @@ then tier 1 is the lowest open tier and holds the cone.
   program with no flattener — which is where their risk actually lives, and the
   first thing a restatement owes.
 
-## Tier 3 — the automaton half, and it is the only half
-
-**THE TIER IS ONE LEAF AGAIN.** `The-Proof` draws `evaluate-accepted` from here
-and nothing else: no emit of a canonical run is rejected by the protocol
-automaton. The segment carve that used to stand under it is gone, and its
-deletion is the tier's finding rather than a retreat.
-
-**BECAUSE THE PROTOCOL NOW RIDES ON THE VALUES, THE MACHINE NO LONGER OWNS IT.**
-An input slot is writable at the envelope type, and elaboration passes it
-through untouched, so a table scripted to an instant past the counter reaches
-the output verbatim. Acceptance is FALSE as it stands, and no clause of the
-evaluator can see the counterexample.
-
-**SO WHAT THE TIER OWES IS A HYPOTHESIS, NOT A GRIND.** The well-formedness
-obligation has moved from the machine to whoever supplies the inputs, and
-naming it is a statement about the slot table rather than about a run.
-
-### The monster
-
-`evaluate-accepted` — the tier's whole content, and false at its current
-strength. Chosen with nothing under it because there IS nothing under it: the
-decomposition that used to hold the risk was refuted by the same slot table,
-so a leaf carved out today would inherit the defect rather than localise it.
-
-### Big picture tier roadmap
-
-- **MACHINE-REFUTE IT, WHICH IS THE CHEAP HALF.** An adversarial envelope needs
-  no decision about what a WELL-formed one carries: a slot scripted to an
-  instant far past the counter, run at a one-slot program, and the automaton
-  rejects its own output. That turns the FALSITY from a header note into a row
-  of `agda/evidence/refuted`, and it pins which conjunct fails, which is what
-  the hypothesis has to exclude.
-
-- **THEN STATE THE VALIDITY PREDICATE WHERE THE TABLE IS.** A predicate over
-  `Slots`, closed under whatever a driver may write, and carried as a
-  hypothesis of acceptance. The question the refutation answers first is
-  whether it is a property of each slot separately or of the table as a whole —
-  a shared slot's envelope is read at several sites, so per-slot may not
-  compose.
-
-- **THEN SEE WHETHER THE DECOMPOSITION COMES BACK.** With the hypothesis in
-  hand the segment carve may be sound again, and the recovery sha holds it
-  verbatim. Worth one attempt before any clause is ground, because if it does
-  come back the grind is per-former and if it does not the tier is one
-  statement with no induction inside it.
-
-- **THEN SETTLE WHETHER THE HARNESS'S QUESTION IS STILL THE RIGHT ONE.**
-  `wellFormed?` decides a conjunction this face no longer claims, so QuickCheck
-  rejects streams the theorem accepts. That costs coverage silently: every
-  program whose run stops mid-instant is dropped before it is compared. The
-  leg's product is whether the decision procedure drops its final check, and
-  what the sweep then reaches that it did not.
-
 ### The ledger
 
-- **`evaluate-accepted`** (Verify-Well-Formed) — FALSITY,
-  `DEAD ROUTE×2, RECOVERY`: no emit of a canonical run is rejected by the
-  automaton. A scripted slot supplies the ENVELOPE and the machine carries it
-  out opaquely, so a driver refutes this without entering a clause.
+- **`formal-verification-batchSimultaneous`** (The-Proof) — FALSITY,
+  `RECOVERY`: the top line, bare while the machine under it is rewritten. It
+  was a body over one leaf; that leaf was refuted by a slot table scripted at
+  the envelope type, and its subject is the envelope the evaluator no longer
+  mints.
 
-## Tier 4 — what Main asserts beside the main theorem
+## Tier 3 — what Main asserts beside the main theorem
 
 **THE MISC TIER, AND IT IS NOW ONE ROW PLUS A DEBT.** It held ten claims about
 the machine — determinacy, fuel coherence, the μ laws, run monotonicity and the

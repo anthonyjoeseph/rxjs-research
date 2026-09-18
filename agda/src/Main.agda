@@ -9,12 +9,13 @@
 --      by whatever a module happens to re-export.
 --   3. MAIN IS NEVER TOUCHED WITHOUT ANTHONY'S EXPLICIT APPROVAL.
 --
--- Note what is NOT here: `Verify-Well-Formed`.  It is machinery, not a
--- claim, and it is reached the honest way —
--- `formal-verification-batchSimultaneous` consumes
--- `evaluate-well-formed`, which consumes the run's two derivations.  If any part
--- of that tower is NOT reachable from a name below, that is a finding to
--- wire, not a reason to re-add a bulk import.
+-- Note what is NOT here and no longer exists: the protocol face.  Its
+-- one statement said no emit of a canonical run is rejected by the
+-- automaton, and it was the single leaf the top line stood on; it was
+-- also false against a slot table scripted at the envelope type.  What
+-- replaces it is owed over the values once the plain machine computes,
+-- so the top line below is a bare postulate meanwhile — the leaf-only
+-- law, which forbids minting a leaf whose fit nothing can check.
 --
 -- COVERAGE, and read this before trusting a green `make gate-heavy`: Agda
 -- compiles exactly what is transitively imported, so this file defines

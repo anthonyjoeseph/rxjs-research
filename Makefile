@@ -1302,10 +1302,10 @@ dev-changed-selftest:
 	    || { echo "SELFTEST FAIL: a CHANGED claim root was not held back — a root's dev check IS the tower, so it times out at the per-module budget and reports RED for a module with nothing wrong with it, and one edited comment is enough to put it in the changed set"; fail=1; }; \
 	  echo "$$out" | grep -q 'plan .* agda/src/Main.agda' \
 	    && { echo "SELFTEST FAIL: a CHANGED claim root is in the sweep plan — the cone half of this exclusion was written first and is not the whole rule"; fail=1; }; \
-	  out=$$(scripts/dev-changed.py --deps --budget 1 --files agda/src/Verify-Well-Formed.agda 2>&1); \
+	  out=$$(scripts/dev-changed.py --deps --budget 1 --files agda/src/Spec.agda 2>&1); \
 	  echo "$$out" | grep -q 'skip  agda/src/Verify-Batch-Simultaneous/The-Proof.agda' \
 	    || { echo "SELFTEST FAIL: a CONE member over budget was not reported as skipped — a timeout there is only the bet the light path already makes, and calling it RED makes every wide-cone run fail"; fail=1; }; \
-	  echo "$$out" | grep -q 'FAIL  agda/src/Verify-Well-Formed.agda' \
+	  echo "$$out" | grep -q 'FAIL  agda/src/Spec.agda' \
 	    || { echo "SELFTEST FAIL: a CHANGED module over budget was not a FAIL — that module is the one thing this run exists to check"; fail=1; }; \
 	  out=$$(scripts/dev-changed.py --deps --budget 2 --cone-budget 0 --files $$n 2>&1); \
 	  echo "$$out" | grep -q 'unchecked: ' \

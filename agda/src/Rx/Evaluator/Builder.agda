@@ -838,14 +838,25 @@ evaluate! {n = n} fuel e ins =
 -- emission cutoff appear: the descent stays the type's, exactly as
 -- `Rx.Evaluator.Reducible` funds it today.
 
--- AND THE BRACKET OPERATOR IS WHAT THAT COSTS, WHICH IS WORTH KNOWING
--- BEFORE THE REWRITE STARTS.  `batchSyncᵉ` groups the whole arriving
--- LIST into one value, and per-value emission leaves no list to group.
--- The semantics it names survives unchanged and is the one real rxjs
--- has: a flag raised for the subscribe call, values buffered while it
--- is up, one flush when the call returns.  What goes is the reading
--- that a burst IS a batch -- which was never a fact about rxjs, only
--- about how this machine happened to carry a source's output.
+-- AND THE BRACKET OPERATOR MOVES CLOSER TO ITS MIRROR RATHER THAN
+-- AWAY FROM IT, WHICH IS WORTH KNOWING BEFORE THE REWRITE STARTS.
+-- `batchSyncᵉ` groups the whole arriving LIST into one value, and
+-- per-value emission leaves no list to group -- so the arm has to be
+-- written as the TypeScript writes it, and the TypeScript is a flag
+-- and a buffer: values pushed while the flag is up are held, a second
+-- input `merge`d after the source fires once the source's synchronous
+-- drain has returned, lowers the flag and emits the held values as one
+-- head-and-tail pair.  An empty buffer yields no pair at all.
+--
+-- THE SEMANTICS IS UNCHANGED AND THE MECHANISM IS rxjs's OWN.  `merge`
+-- subscribes its inputs in order and synchronously, so the boundary
+-- arrives as a VALUE in the same frame with no hop and no timing
+-- change -- which is the one bit of synchrony a plain operator may
+-- see, and it is the bit this node has always held.  What goes is only
+-- the ENCODING: grouping a list handed back by a subscribe was
+-- available here because a source ran whole before any of it descended,
+-- and it is not available to rxjs, which is why the TypeScript already
+-- carries the buffer this now has to.
 
 evaluate↓ : ∀ {n} {Γ : Ctx n} {t} → Fuel → (e : Closed Γ t) → Slots Γ
           → Stream Γ t

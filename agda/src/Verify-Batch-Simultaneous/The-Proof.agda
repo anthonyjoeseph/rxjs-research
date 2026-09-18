@@ -28,7 +28,6 @@ open import Rx.Protocol           using (ProtocolSt; Owed; protocol-init; runPro
 -- had its own copies of the same two Maybe facts.  The import surface
 -- here is a CLAIM, so it stays minimal — but re-proving a fact to keep
 -- a using-list short is the trade `make dup-check` exists to refuse.
-open import Verify-Well-Formed using (evaluate-accepted)
 open import Spec                  using (spec-batchSimultaneous; specGo;
                                          batchOf; valuesAt; valuesOf; seenBefore)
 open import Implementation        using (impl-batchSimultaneous; foldBatch;
@@ -1103,11 +1102,33 @@ batch-agreement xs acc =
 -- structural.  Both sides take the same decoded stream, so the theorem
 -- compares two batchings of one list and the decode is not a party to
 -- the claim.
-formal-verification-batchSimultaneous :
-  ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : SExp Γ [] [] [] t)
-    (ins : Slots (emitᵛ Γ)) →
-  spec-batchSimultaneous (decodeStream (evaluate↓ fuel (elaborate e) ins))
-    ≡ impl-batchSimultaneous (decodeStream (evaluate↓ fuel (elaborate e) ins))
-formal-verification-batchSimultaneous fuel e ins =
-  batch-agreement (decodeStream (evaluate↓ fuel (elaborate e) ins))
-                  (evaluate-accepted fuel (elaborate e) ins)
+-- AND THE TOP LINE IS A BARE POSTULATE WHILE THE MACHINE UNDER IT IS
+-- REWRITTEN, WHICH IS THE LEAF-ONLY LAW RATHER THAN AN EXCEPTION TO IT.
+-- This was a real body over one leaf: `batch-agreement` applied to the
+-- acceptance of the run.  That leaf said no emit of a canonical run is
+-- rejected by the protocol automaton, and it was FALSE as it stood --
+-- a scripted slot is writable at the envelope type, elaboration passes
+-- an `input` through untouched, and a table naming an instant past the
+-- counter reaches the output verbatim, entering no clause the machine
+-- could induct over.  A statement whose subject is the envelope the
+-- evaluator no longer mints cannot be repaired by proving it; it is
+-- owed again, over the values, once the plain machine computes.
+--
+-- So the body cannot be written, and the rule for that is to postulate
+-- the PARENT bare and mint no leaves -- a leaf whose fit nothing checks
+-- is a hypothesis about the route wearing a type.  `batch-agreement`
+-- stays claimed from Main in its own right, so what is postulated here
+-- is exactly the step from a run to a legal stream and nothing else.
+--
+-- RECOVERY: git show f26f7a82:agda/src/Verify-Well-Formed.agda
+--   restores `evaluate-accepted`, the two dead routes recorded against
+--   it -- a well-formed denotation quantified over prefixes, which the
+--   settledness check rejects at a cut inside an instant, and a repair
+--   by strengthening an evaluator clause, which cannot see a value it
+--   never inspects -- and the sampling figure the face stood on.
+postulate
+  formal-verification-batchSimultaneous :
+    ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : SExp Γ [] [] [] t)
+      (ins : Slots (emitᵛ Γ)) →
+    spec-batchSimultaneous (decodeStream (evaluate↓ fuel (elaborate e) ins))
+      ≡ impl-batchSimultaneous (decodeStream (evaluate↓ fuel (elaborate e) ins))
