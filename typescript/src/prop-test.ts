@@ -12,8 +12,11 @@ import { readFileSync } from "node:fs";
 // the lists are compared exactly. The envelope — instants, source ids,
 // chain emits, the fin bit — is a construct of the simultaneity layer
 // and is not under test here on either side: the TS leg is built from
-// ordinary rxjs operators in `plain-eval.ts`, and the Agda leg projects
-// the values out of its envelope evaluator until a plain one lands.
+// ordinary rxjs operators in `plain-eval.ts`, and the Agda leg is
+// `Rx.Depth`, a plain evaluator whose result type carries no envelope
+// at all — so there is nothing to project away, which is what makes
+// this a comparison of two plain machines rather than of one plain one
+// against a projection.
 //
 // The srxjs modules (`join.ts`, `primitive-operators.ts`,
 // `inst-emit.ts`, `compile.ts`, `driver.ts`, `input-source.ts`) stay in

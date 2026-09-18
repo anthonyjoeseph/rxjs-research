@@ -8,6 +8,17 @@ import type { ObservableInput, Slot, TestCase, Timed } from "./prop-test.js";
 // μ-vars). The generator is the authority on the program corpus; the
 // Agda side only decodes and evaluates what it emits. There is no Agda
 // twin — Agda has its own QuickCheck — so this is free implementation.
+//
+// MOST OF WHAT IT DRAWS EMITS NOTHING, AND THE HEADLINE COUNT DOES NOT
+// SAY SO.  Measured over the full seed sweep: 357 of 500 programs
+// produce an EMPTY value list, so a reported 500/500 is 143 rows that
+// could have diverged and 357 that agree because neither side emitted.
+// An empty row is not a wrong row — a program rooted at `empty`, or one
+// whose fuel never reaches its async script, legitimately yields nothing
+// — but it is not evidence either, and the ratio is what a coverage
+// claim has to be denominated in.  This is the same shape as the
+// EMPTY-output incident `prop-test.ts` records, one level up: there the
+// check could not fail, here it can, and most of it does not.
 
 // ---- seeded PRNG (mulberry32 over an FNV-1a string hash) ----
 type Rng = () => number; // [0, 1)

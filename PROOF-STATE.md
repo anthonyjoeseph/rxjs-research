@@ -230,22 +230,22 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 
 ### Big picture tier roadmap
 
-- **THE ORACLE, WHICH IS WHAT THE DEMOTION WAS FOR.** The plain machine
-  stands — a work STACK, so a value's cascade finishes before its successor is
-  taken, which is the one thing the burst machine cannot do — and the CLI
-  spends it. What is unmeasured is whether it agrees with real rxjs: the
-  witness program that motivated the whole leg is one row, and the generator
-  reaches thirteen formers the sweep has never run against a plain evaluator.
-  So the leg is to build the CLI, run the oracle, and fix what it finds — in
-  the machine, never in the spec. This narrows nothing on its own and is the
-  right leg anyway: nothing below can be instantiated until the harness that
-  instantiates it runs.
-
 - **THEN THE ORACLE'S CI JOB, SO IT CANNOT ROT.** A harness nobody runs is a
   harness that goes stale silently, which is the failure the gate exists to
   make impossible everywhere else. The job is one workflow step and a fixed
   seed corpus, and it is owed the moment the oracle is green — a green
   measured once is a receipt, and a receipt is not a check.
+
+- **THEN THE SWEEP'S YIELD, WHICH THE HEADLINE COUNT HIDES.** The oracle
+  is green and the demotion's own witness agrees — a shared slot over a
+  two-item source, flattened by a map whose payload is that same slot,
+  where a depth-first cascade yields the second item and a burst yields
+  none. But 357 of the 500 drawn programs emit NOTHING, so the count is
+  143 rows that could have diverged and 357 that agree vacuously. The leg
+  is to raise the yield — bias fuel toward the async scripts that are
+  drawn and away from roots that cannot emit — and to denominate the
+  report in rows that could have failed, since a coverage claim stated in
+  cases is the claim this campaign has twice had to restate.
 
 - **THEN THE SIX ROWS, WHICH NOTHING HOLDS ANY MORE.** The flatteners
   were held on a blocker and are not: they wanted a token per inner
