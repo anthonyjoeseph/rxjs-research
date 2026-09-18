@@ -43,7 +43,7 @@ open import Data.Product using (Σ; _,_)
 open import Data.Vec using () renaming ([] to []ⱽ)
 open import Relation.Nullary using (¬_)
 
-open import Rx.Exp using (Ctx; Tm; Fn; Closed; obs; natᵗ; _×ᵗ_; listᵗ; input; ofᵉ; emptyᵉ; takeᵉ; batchSyncᵉ;
+open import Rx.Exp using (Ctx; Tm; Fn; Closed; obs; natᵗ; _×ᵗ_; input; ofᵉ; emptyᵉ; takeᵉ; batchSyncᵉ;
   scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ)
 
 -- the structural domain predicate: one constructor per former, each
@@ -63,8 +63,8 @@ data Sub {n} {Γ : Ctx n} : ∀ {t} → Closed Γ t → Set where
   s-μ     : ∀ {t body} → Sub (μᵉ {Γ = Γ} {t = t} body)
   s-mint  : ∀ {t body} → Sub (mintᵉ {Γ = Γ} {t = t} body)
   s-take  : ∀ {t} {c : Tm Γ [] [] [] _} {b} → Sub b → Sub (takeᵉ {t = t} c b)
-  s-scan  : ∀ {s t u} {f : Fn Γ [] [] [] (u ×ᵗ listᵗ s) (u ×ᵗ listᵗ t)}
-              {z : Tm Γ [] [] [] u} {b : Closed Γ s}
+  s-scan  : ∀ {s t} {f : Fn Γ [] [] [] (t ×ᵗ s) t}
+              {z : Tm Γ [] [] [] t} {b : Closed Γ s}
           → Sub b → Sub (scanᵉ f z b)
   s-merge : ∀ {t lim} {b : Closed Γ (obs t)} → Sub b → Sub (mergeAllᵉ lim b)
   s-switch : ∀ {t} {b : Closed Γ (obs t)} → Sub b → Sub (switchAllᵉ b)
