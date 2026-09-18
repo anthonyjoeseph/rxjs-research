@@ -269,10 +269,11 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 
 ### The ledger
 
-- **`{take,mergeAll,switchAll}ᵖ`** (Rx.Elaborate) — SHAPE, `DEAD ROUTE×5`: the
-  elaboration's per-former plumbing, after the two sources came out of it. The
-  flatteners want somewhere to forward the outer's bookkeeping, which nothing
-  plain offers; `take` is the right operator at the wrong level.
+- **`{take,mergeAll,switchAll,exhaustAll}ᵖ`** (Rx.Elaborate) — SHAPE,
+  `DEAD ROUTE×5`: the elaboration's per-former plumbing, after the two sources
+  came out of it. The flatteners want somewhere to forward the outer's
+  bookkeeping, which nothing plain offers; `take` is the right operator at the
+  wrong level.
 
 ## Tier 2 — the proof statement, once there are two trees to state it over
 
