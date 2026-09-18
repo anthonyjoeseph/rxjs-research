@@ -88,17 +88,17 @@ postulate
   -- the envelope, so an enveloped stream's own values are envelopes and
   -- a plain `takeᵉ` over it counts batches.  The operator is right and
   -- the level is wrong.
-  -- AND THE ASK IS NOT THE FLATTENERS' ASK, WHICH IS WORTH SAYING SINCE
-  -- THE TWO SIT IN ONE LEG.  What this one wants is a DATA-DEPENDENT
-  -- TERMINATOR, and the plain palette has none: `takeᵉ` is the only
-  -- former that ends a stream its source has not ended, and its count is
-  -- a term read once at subscription; every other former completes
-  -- exactly when what it is subscribed to does.  A multicast does not
-  -- supply one either — it buys a second consumer, not a new way to
-  -- stop — so the flatteners' channel would leave this row open.  The
-  -- operator wanted is ordinary rxjs and inclusive: cut on the emit that
-  -- exhausts the budget, that emit's own values truncated where the
-  -- budget ran out.
+  -- AND THE BEHAVIOUR IT MUST MIRROR IS MEASURED RATHER THAN INFERRED
+  -- (Anthony: "just run it in js").  Real rxjs `take` was run against a
+  -- four-item synchronous source, against a `mergeAll` of two inner
+  -- bursts, and at zero.  Three facts, and the plain `takeᵉ` already
+  -- has every one: it emits the nth value and completes AFTER it; it
+  -- cuts mid-burst, so an inner's remaining values are dropped rather
+  -- than waited for; and at ZERO it never subscribes its source at all,
+  -- which is the fact a count-down implementation silently gets wrong.
+  -- The source's own synchronous loop runs on past the cut, since
+  -- unsubscription cannot interrupt it, and nothing downstream sees any
+  -- of it.
   -- DEAD ROUTE: count in a scan and cut with `takeᵉ`.  The counting and
   --   truncation halves are both a pure-function step's work; the ENDING
   --   half is not, since such a step cannot change how many emits pass
