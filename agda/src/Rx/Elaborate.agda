@@ -128,6 +128,15 @@ postulate
   -- observables it carries, and the plain flattener runs them, their own
   -- emits being envelopes already.
   --
+  -- AND THE ENVELOPE APPEARS TWICE IN THE ARGUMENT, WHICH IS EASY TO
+  -- READ PAST AND CHANGES WHAT THE BLOCKER IS ABOUT.  `emitᵗ (obs t)`
+  -- unfolds through `plainᵗ`'s observable clause, so the outer's
+  -- payload is an observable of ENVELOPES and not of values: the
+  -- argument is an enveloped stream of enveloped streams.  Both layers
+  -- are already stamped when they arrive, which is why nothing below is
+  -- a question about minting a token -- the inner's bookkeeping rides
+  -- the inner's own emits, and only the OUTER's has nowhere to go.
+  --
   -- THE MINT IS NOT WHAT BLOCKS THIS.  An inner observable is a CLOSED
   -- EXPRESSION, and subscribing one runs it through the same reduction
   -- path the outer subscribe took, `mintᵉ` clause included — so a mint
