@@ -4,7 +4,7 @@ open import Data.Bool    using (Bool; true; false; if_then_else_; not; _∨_; _�
 open import Data.Fin     using (Fin; toℕ)
 open import Data.Fin.Properties using (toℕ<n) renaming (_≟_ to _≟ᶠ_)
 open import Data.Maybe   using (Maybe; just; nothing; is-nothing)
-open import Data.Nat     using (ℕ; zero; suc; _+_; _<ᵇ_; _≡ᵇ_; _≤ᵇ_; _≤_)
+open import Data.Nat     using (ℕ; zero; suc; _+_; _<ᵇ_; _≡ᵇ_; _≤_)
 open import Data.Nat.Properties using (≤-trans)
 open import Data.List    using (List; []; _∷_; _++_; map; concat; tabulate; null)
 open import Data.Bool.ListAction using (any)
@@ -33,7 +33,7 @@ variable
 -- checked by the generator/decoder, not by these types; a forward
 -- reference is rejected there.
 open import Rx.Slots using (scripted; shared; Slots)
-open import Rx.Mint using (Mint; sourceᵏ; regᵏ; mint-init; freshId; next)
+open import Rx.Mint using (Mint; sourceᵏ; mint-init; freshId; next)
 
 -- THE CARRIER IS PLAIN, AND THE PROTOCOL RIDES ON ITS VALUES.  What a
 -- run pushes is what an rxjs subscriber sees: values in order, then an

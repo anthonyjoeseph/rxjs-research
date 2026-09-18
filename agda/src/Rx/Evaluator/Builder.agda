@@ -65,8 +65,7 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; AllOp; NodeId; Node
   switchKill; aliveThroughᶠ; splitStream; sched-init; st-init; memberSource;
   share-sink; lowerFloor; register; atSlot; streamCompleted; Arrival; arrTick; arrSource; arrTy;
   arrVal; AtFloor; RegId; chainsOf; cascadeLatch; sched-next; shareAdmit; shareLatch)
-open import Rx.Evaluator.Keeps-Slots using (subs-keeps; step-keeps;
-  consume-keeps; switchKill-slots)
+open import Rx.Evaluator.Keeps-Slots using (subs-keeps; consume-keeps; switchKill-slots)
 open import Rx.Evaluator.Domain using (srcFrame; subscribeE⇓; subscribeAll⇓; pushBurst⇓;
   stepFrame⇓; innerReact⇓; innerFinish⇓; mergeAllDrain⇓; thruWalk⇓;
   thruConsume⇓; subscribeInner⇓;

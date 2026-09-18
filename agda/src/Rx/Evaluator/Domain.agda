@@ -99,8 +99,7 @@ open import Data.Empty using (⊥)
 open import Data.Vec using (lookup)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 
-open import Rx.Prim using (Tick; Fuel; Id; Source; PlainEvent; valueᵖ; completeᵖ;
-  hot; cold)
+open import Rx.Prim using (Tick; Fuel; Id; Source; valueᵖ; completeᵖ; hot; cold)
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
 open import Rx.Exp using (obs; Ctx; Val; Closed; Exp; Tm; Fn; FnClo; _×ᵗ_; listᵗ; uniqᵗ;
   Env; _∷ᵉ_; []ᵉ; evalWith; unfoldμ; input; ofᵉ; emptyᵉ; takeᵉ; batchSyncᵉ;

@@ -18,9 +18,14 @@ open import Relation.Binary.PropositionalEquality using (_≡_)
 
 open import Rx.Prim      using (Fuel; InstEmit; _at_from_as_; after_,_; hot)
 open import Rx.Exp       using (Ty; Ctx; Closed; Val; Fn; Tm; nat̂; strmᵗ; isData;
+                                uniqᵗ;
                                 inputsBelowᵉ;
                                 input; ofᵉ; mapᵉ; takeᵉ; mergeAllᵉ;
                                 exhaustAllᵉ; evalTm; applyFn)
+open import Rx.Envelope  using (instEmitᵗ)
+open import Rx.Envelope.Decode using (decodeStream)
+open import Rx.SExp      using (emitᵗ)
+open import Rx.Elaborate using (takeᵖ)
 open import Rx.Evaluator.Builder using (evaluate↓)
 open import Rx.Slots using (scripted; shared; Slot; Slots)
 open import Data.Bool using (T)
@@ -74,24 +79,30 @@ postulate
   --   reached: anything the probe file's own header records as
   --   unreachable, which is every flattening program.
   readme-batch-order-is-delivery-order :
-    ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slots Γ) →
-    concat (emitValues (spec-batchSimultaneous (evaluate↓ fuel e ins)))
-      ≡ emitValues (evaluate↓ fuel e ins)
+    ∀ {n} {Γ : Ctx n} {u} (fuel : Fuel)
+      (e : Closed Γ (instEmitᵗ uniqᵗ u)) (ins : Slots Γ) →
+    concat (emitValues (spec-batchSimultaneous
+                         (decodeStream (evaluate↓ fuel e ins))))
+      ≡ emitValues (decodeStream (evaluate↓ fuel e ins))
 
   -- take counts values, even mid-batch: take k keeps the first k
   -- VALUES of the flat stream — never the first k batches — so it
-  -- can cut a batch in half.
+  -- can cut a batch in half.  AT `takeᵖ` AND NOT AT `takeᵉ`, which is
+  -- what the law costs now that the stream is decoded: elaboration puts
+  -- the author's values INSIDE the envelope, so a plain `takeᵉ` over an
+  -- enveloped program counts batches and this statement would be FALSE
+  -- at it -- the level shift `takeᵖ` is postulated for.
   -- PROBED: `Probed.Readme-Claims`, at the cut the law is named for --
   --   a two-value batch taken at one, so the row holds only if the
   --   take reaches INSIDE a group.  Not reached: a take at zero, a
   --   take past the end, and every flattening program.
   readme-take-counts-values :
     ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (k : ℕ)
-      (e : Closed Γ t) (ins : Slots Γ) →
+      (e : Closed Γ (emitᵗ t)) (ins : Slots Γ) →
     concat (emitValues (spec-batchSimultaneous
-                          (evaluate↓ fuel (takeᵉ (nat̂ k) e) ins)))
+                          (decodeStream (evaluate↓ fuel (takeᵖ (nat̂ k) e) ins))))
       ≡ take k (concat (emitValues (spec-batchSimultaneous
-                                      (evaluate↓ fuel e ins))))
+                                      (decodeStream (evaluate↓ fuel e ins)))))
 
   -- One subscribe() call is one batch.  Fuel 0 runs only the
   -- subscribe frame — a single instant — so ANY program, however
@@ -102,8 +113,8 @@ postulate
   --   zero.  Not reached: a program whose subscribe frame emits
   --   nothing, and every flattening program.
   readme-one-subscribe-one-batch :
-    ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
-    length (spec-batchSimultaneous (evaluate↓ 0 e ins)) ≤ 1
+    ∀ {n} {Γ : Ctx n} {u} (e : Closed Γ (instEmitᵗ uniqᵗ u)) (ins : Slots Γ) →
+    length (spec-batchSimultaneous (decodeStream (evaluate↓ 0 e ins))) ≤ 1
 
 ------------------------------------------------------------------
 -- SEVEN QUANTIFIED INSTANCES

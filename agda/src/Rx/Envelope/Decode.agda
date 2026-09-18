@@ -14,8 +14,7 @@
 -- State it in one shape and report it; do not invent one.
 module Rx.Envelope.Decode where
 
-open import Data.List using (List; []; _∷_; _++_)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong)
+open import Data.List using (List; []; _∷_)
 open import Data.Product using (_,_)
 open import Data.Sum using (inj₁; inj₂)
 
@@ -94,18 +93,3 @@ decodeStream : ∀ {n} {Γ : Ctx n} {a}
 decodeStream []               = []
 decodeStream (valueᵖ e ∷ es)  = decodeEmit e ∷ decodeStream es
 decodeStream (completeᵖ ∷ es) = decodeStream es
-
--- AND THE DECODE COMMUTES WITH CONCATENATION, WHICH IS WHAT THE
--- ACCEPTANCE FACE SPENDS IT ON.  A run is its subscribe burst followed
--- by its drain, and soundness composes the two segments once their
--- watermarks meet; with the protocol read off the values, that
--- composition happens one level up from where the stream is built, so
--- the two levels have to be shown to agree on `++` before `Sound-++`
--- can be applied at all.
-decodeStream-++ : ∀ {n} {Γ : Ctx n} {a}
-                  (xs ys : List (PlainEvent (Val Γ (instEmitᵗ uniqᵗ a))))
-                → decodeStream (xs ++ ys)
-                  ≡ decodeStream xs ++ decodeStream ys
-decodeStream-++ []               ys = refl
-decodeStream-++ (valueᵖ e ∷ xs)  ys = cong (decodeEmit e ∷_) (decodeStream-++ xs ys)
-decodeStream-++ (completeᵖ ∷ xs) ys = decodeStream-++ xs ys

@@ -63,7 +63,3 @@ open import Probed.Pipeline-Claims using (row-online; row-ids)
 -- trust.
 open import Probed.Run-Monotone using (row-saturated; row-grows; row-past-horizon)
 
--- THE SEGMENT ROWS, claimed here because the statements they
--- instantiate are the two leaves the run's own concatenation
--- decomposes into, and nothing had reached either.
-open import Probed.Protocol-Segments using (row-subscribe; row-cascade)

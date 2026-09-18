@@ -407,66 +407,63 @@ why a restatement is cheap now and ruinous once a consumer exists.
 
 ## Tier 4 — the automaton half, and it is the only half
 
-**THE TIER IS TWO LEAVES, ONE PER SEGMENT KIND.** `The-Proof` draws
-`evaluate-accepted` from here and nothing else: no emit of a canonical run is
-rejected by the protocol automaton. That is a body now, over `Sound i j xs` —
-acceptance with both endpoints removed and indexed by the watermarks a segment
-runs between — so what is left to prove is one claim about a cascade and one
-about the root subscribe.
+**THE TIER IS ONE LEAF AGAIN.** `The-Proof` draws `evaluate-accepted` from here
+and nothing else: no emit of a canonical run is rejected by the protocol
+automaton. The segment carve that used to stand under it is gone, and its
+deletion is the tier's finding rather than a retreat.
 
-**THE INDEXING IS WHAT MAKES IT DECOMPOSE.** An instant id is an absolute
-arrival position, so a predicate quantified over every sane state is satisfied
-by no segment that emits anything. The entry bound repairs that, the exit bound
-is what the next segment spends, and a run is their concatenation.
+**BECAUSE THE PROTOCOL NOW RIDES ON THE VALUES, THE MACHINE NO LONGER OWNS IT.**
+An input slot is writable at the envelope type, and elaboration passes it
+through untouched, so a table scripted to an instant past the counter reaches
+the output verbatim. Acceptance is FALSE as it stands, and no clause of the
+evaluator can see the counterexample.
 
-**AND IT IS PREFIX-CLOSED, WHICH IS WHAT TIER 2 NEEDS.** `runProtocol`
-short-circuits on rejection, so acceptance travels down a truncation for free.
+**SO WHAT THE TIER OWES IS A HYPOTHESIS, NOT A GRIND.** The well-formedness
+obligation has moved from the machine to whoever supplies the inputs, and
+naming it is a statement about the slot table rather than about a run.
 
 ### The monster
 
-`evaluate-sound` — a canonical run takes the automaton from watermark zero to
-the fuel's successor. Not a postulate, and that is the point: it is the body
-the drain induction assembles, which is where a wrong decomposition lives while
-every leaf under it reads as reasonable. Chosen above its own leaves because
-its cone is what the per-former grind has to land in, and the cascade relation
-alone reaches neither the builder nor the reducibility candidate.
-
-also: `evaluate-accepted` — the tier's export, which CONSUMES the monster and
-so sits above it rather than inside its cone. Nothing else is admitted.
+`evaluate-accepted` — the tier's whole content, and false at its current
+strength. Chosen with nothing under it because there IS nothing under it: the
+decomposition that used to hold the risk was refuted by the same slot table,
+so a leaf carved out today would inherit the defect rather than localise it.
 
 ### Big picture tier roadmap
 
-- **GRIND THE CASCADE LEAF, ONE FORMER AT A TIME, WIDENING THE ROWS AHEAD OF
-  EACH.** Its clause count is the tree's former count, which is what Tier 1's
-  collapse shrinks first. The rows covering it today reach a synchronous source
-  and a slot at the seed watermark only, so each clause is probed at its own
-  former before it is ground — the flatteners and `μᵉ` first, where an
-  instant's obligations are hardest to keep inside one cascade, and a cascade
-  emitting nothing, where the exit bound is the whole claim.
+- **MACHINE-REFUTE IT, WHICH IS THE CHEAP HALF.** An adversarial envelope needs
+  no decision about what a WELL-formed one carries: a slot scripted to an
+  instant far past the counter, run at a one-slot program, and the automaton
+  rejects its own output. That turns the FALSITY from a header note into a row
+  of `agda/evidence/refuted`, and it pins which conjunct fails, which is what
+  the hypothesis has to exclude.
 
-- **THEN THE SUBSCRIBE LEAF, WHICH THE COLLAPSE HAS MADE SMALLER.** It is an
-  induction over the subscribe relation, so its clause count is the former
-  count too. Taking it second is not deferral: ground before the collapse, most
-  of its clauses would be ground twice.
+- **THEN STATE THE VALIDITY PREDICATE WHERE THE TABLE IS.** A predicate over
+  `Slots`, closed under whatever a driver may write, and carried as a
+  hypothesis of acceptance. The question the refutation answers first is
+  whether it is a property of each slot separately or of the table as a whole —
+  a shared slot's envelope is read at several sites, so per-slot may not
+  compose.
+
+- **THEN SEE WHETHER THE DECOMPOSITION COMES BACK.** With the hypothesis in
+  hand the segment carve may be sound again, and the recovery sha holds it
+  verbatim. Worth one attempt before any clause is ground, because if it does
+  come back the grind is per-former and if it does not the tier is one
+  statement with no induction inside it.
 
 - **THEN SETTLE WHETHER THE HARNESS'S QUESTION IS STILL THE RIGHT ONE.**
   `wellFormed?` decides a conjunction this face no longer claims, so QuickCheck
-  rejects streams the theorem accepts. That is a harness stricter than the
-  claim, which costs coverage silently: every program whose run stops
-  mid-instant is dropped before it is compared. The leg's product is whether
-  the decision procedure drops its final check, and what the sweep then reaches
-  that it did not.
+  rejects streams the theorem accepts. That costs coverage silently: every
+  program whose run stops mid-instant is dropped before it is compared. The
+  leg's product is whether the decision procedure drops its final check, and
+  what the sweep then reaches that it did not.
 
 ### The ledger
 
-- **`sound-cascade`** (Verify-Well-Formed) — FALSITY, `PROBED`: one cascade's
-  emits take the automaton from the instant it opens to the next, from any sane
-  state at the entry watermark. The exit bound is the risky half — a cascade
-  that leaves an instant open exceeds it.
-
-- **`sound-subscribe`** (Verify-Well-Formed) — FALSITY, `PROBED`: the root
-  subscribe's burst is the zeroth instant and nothing more. Its clause count is
-  the tree's former count, which is what Tier 1 is for.
+- **`evaluate-accepted`** (Verify-Well-Formed) — FALSITY,
+  `DEAD ROUTE×2, RECOVERY`: no emit of a canonical run is rejected by the
+  automaton. A scripted slot supplies the ENVELOPE and the machine carries it
+  out opaquely, so a driver refutes this without entering a clause.
 
 ## Tier 5 — determinacy and the top-line semantic claims
 

@@ -53,7 +53,7 @@ open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeInner⇓; thruCon
   slot-spent; slot-join; slot-connect)
 open import Rx.Evaluator.Freshness using (PreservedBelow; FrameAbove;
   pres-same; pres-trans; pres-write)
-open import Rx.Evaluator.Freshness.Mono using (subscribeE-mono; stepFrame-mono; subscribeInner-mono; thruConsume-mono; switchKill-mint)
+open import Rx.Evaluator.Freshness.Mono using (subscribeE-mono; subscribeInner-mono; thruConsume-mono; switchKill-mint)
 
 -- the scanning step rewrites its own cell and nothing else
 scan-pres : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {f}
