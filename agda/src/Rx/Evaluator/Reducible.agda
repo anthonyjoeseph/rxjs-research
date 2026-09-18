@@ -56,18 +56,14 @@ open import Rx.Prim using (Id; Tick; Source; InstEmit; InstEvent; init; value; c
   complete; hot; cold)
 open import Rx.Mint using (nodeᵏ; regᵏ; sourceᵏ; freshId; setAt; next)
 open import Rx.Slots using (scripted; shared)
-open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; obs; listᵗ; _≟ᵗ_; Ctx; Closed; Val; Exp; Tm; Fn; evalTm; evalWith; foldVals; applyFn; input; ofᵉ; emptyᵉ;
+open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; obs; listᵗ; _≟ᵗ_; Ctx; Closed; Val; Exp; Tm; Fn; FnClo; applyClo; Env; []ᵉ; _∷ᵉ_; evalWith; foldVals; input; ofᵉ; emptyᵉ;
   takeᵉ; batchSyncᵉ; mapᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ; isData; unfoldμ;
   varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ;
   nilᵗ; consᵗ; foldᵗ;
-  add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ; subΘExp; subΘTm; subΘTms; lookupEnv;
+  add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ; lookupEnv;
   inputsBelowᵉ; inputsBelowᵗ; inputsBelowᵗˢ)
 open import Rx.Exp.Guarded using (gsizeᵉ; gsizeᵗ; gsizeᵗˢ; gsize-unfoldμ)
 open import Rx.Inputs-Below using (ib-unfoldμ; ib-topᵉ)
-open import Rx.Subst-Compose using (subΘ-compᵍᵉ)
-open import Rx.Subst-Elim using (sub-elimGᵉ)
-open import Rx.Subst-Eval using (sub-evalTm; sub-applyFn)
-open import Rx.Subst-Identity using (subΘ-id-exp)
 open import Decide using (∧ˡ; ∧ʳ)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; _↠_; take-f; map-f; scan-f; take-st; cell-st; thru-outer;
   batchSync-f; batchSync-st; batchSyncDispatch; groupSync; soloSync; setNode;
@@ -168,9 +164,9 @@ RedPush {Γ = Γ} {e = e} {u = u} id now f κ burst sched st =
 -- reached by a call: the fundamental theorem at terms is a member of
 -- the recursion at the foot of this module, so a walk declared above
 -- it cannot name it.
-RedFn : ∀ {n} {Γ : Ctx n} {s u} → Fn Γ [] [] [] s u → Set
+RedFn : ∀ {n} {Γ : Ctx n} {s u} → FnClo Γ s u → Set
 RedFn {Γ = Γ} {s = s} {u = u} fn =
-  ∀ {v : Val Γ s} → Red s v → Red u (applyFn fn v)
+  ∀ {v : Val Γ s} → Red s v → Red u (applyClo fn v)
 
 -- A FOLD PRESERVES THE CANDIDATE WHEN ITS STEP DOES, AND THE STEP IS A
 -- HYPOTHESIS FOR THE REASON `RedFn`'s IS: the fundamental theorem at
@@ -180,9 +176,9 @@ RedFn {Γ = Γ} {s = s} {u = u} fn =
 -- values, so congruence discharges it, while a fold runs its step once
 -- per ELEMENT and the candidate has to be re-established at each.
 redFoldVals : ∀ {n} {Γ : Ctx n} {Θ s u}
-              (f : Tm Γ [] [] (s ∷ u ∷ Θ) u) (σ : All (Val Γ) Θ)
+              (f : Tm Γ [] [] (s ∷ u ∷ Θ) u) (σ : Env Γ Θ)
             → (∀ {x : Val Γ s} {a : Val Γ u} → Red s x → Red u a
-                 → Red u (evalWith f (x ∷ a ∷ σ)))
+                 → Red u (evalWith f (x ∷ᵉ a ∷ᵉ σ)))
             → ∀ {xs : List (Val Γ s)} → All (Red s) xs
             → ∀ {a : Val Γ u} → Red u a
             → Red u (foldVals f σ xs a)
@@ -232,10 +228,10 @@ RedNode (thru-outer op nid)         st = ⊤
 -- A VALUE ENVIRONMENT IS REDUCIBLE WHEN EVERY ENTRY IS.  Terms are
 -- open in a Θ telescope and a frame's function is a term with one
 -- entry bound, so the fundamental theorem at terms has to be stated
--- under a substitution rather than at closed terms alone.
-RedEnv : ∀ {n} {Γ : Ctx n} {Θ : List Ty} → All (Val Γ) Θ → Set
-RedEnv []                    = ⊤
-RedEnv (_∷_ {x = t} v vs)    = Red t v × RedEnv vs
+-- under an environment rather than at closed terms alone.
+RedEnv : ∀ {n} {Γ : Ctx n} {Θ : List Ty} → Env Γ Θ → Set
+RedEnv []ᵉ                   = ⊤
+RedEnv (_∷ᵉ_ {s = t} v vs)   = Red t v × RedEnv vs
 
 -- THE SAME CLAIM ONE BATCH DOWN: a frame, the values that arrived at
 -- it, and the candidate carried across to what leaves.  The push above
@@ -249,23 +245,6 @@ RedStep {Γ = Γ} {t = t} {e = e} {u = u} id now f κ vals fin sched st =
   Σ (List (Val Γ u) × List (InstEvent (Val Γ t)) × Bool × Sched Γ × EvalSt e) λ r →
     stepFrame⇓ {e = e} id now f κ vals fin sched st r × All (Red u) (proj₁ r)
       × RedNode f (proj₂ (proj₂ (proj₂ (proj₂ r))))
-
--- SUBSTITUTION COMMUTES WITH THE PEEL, which is the price of carrying
--- the environment rather than applying it: closing against the
--- environment and then peeling agrees with peeling under it.  This is
--- the only point the face still reaches one on the EXPRESSION side --
--- the readings on the TERM side are `evalTm` and `applyFn`, one
--- `evalWith` at two telescopes, so they are one statement rather than
--- two obligations, and it is proven.
---
--- THE PEEL IS THE ELIMINATOR AT THE EMPTY LOCAL TELESCOPE, and that is
--- the whole of this body: the general statement is the only one whose
--- induction can run, and at the empty telescope its transport is
--- `refl`, so the instance reduces to the equation the walk spends.
-sub-unfoldμ : ∀ {n} {Γ : Ctx n} {Θ t} (body : Exp Γ (t ∷ []) [] Θ t)
-              (σ : All (Val Γ) Θ)
-            → subΘExp [] σ (unfoldμ body) ≡ unfoldμ (subΘExp [] σ body)
-sub-unfoldμ body σ = sub-elimGᵉ [] (here refl) (μᵉ body) σ body
 
 -- A SPLIT TAKES THE VALUE COLUMN OUT OF A BURST, and nothing else,
 -- so whatever held of every value the burst carried holds of every
@@ -658,7 +637,7 @@ tie-cell refl r = r
 -- having no cell buys the candidate: each output is one application to
 -- one input, so the walk re-establishes the predicate elementwise with
 -- nothing threaded between the elements.
-redMapVals : ∀ {n} {Γ : Ctx n} {s u} (fn : Fn Γ [] [] [] s u) → RedFn fn
+redMapVals : ∀ {n} {Γ : Ctx n} {s u} (fn : FnClo Γ s u) → RedFn fn
            → {vals : List (Val Γ s)} → All (Red s) vals
            → All (Red u) (mapVals fn vals)
 redMapVals fn rf []         = []
@@ -671,7 +650,7 @@ redMapVals fn rf (rv ∷ rvs) = rf rv ∷ redMapVals fn rf rvs
 -- state, so the two halves stand at the same type -- which is the
 -- shape of rxjs's `scan` showing up in the proof.
 redScanVals : ∀ {n} {Γ : Ctx n} {s u}
-              (fn : Fn Γ [] [] [] (u ×ᵗ s) u) → RedFn fn
+              (fn : FnClo Γ (u ×ᵗ s) u) → RedFn fn
             → {a : Val Γ u} → Red u a
             → {vals : List (Val Γ s)} → All (Red s) vals
             → All (Red u) (proj₁ (scanVals fn a vals))
@@ -683,9 +662,9 @@ redScanVals fn rf ra (rv ∷ rvs) =
 
 -- the installation argument, spent at the cell the former writes
 red-scan-installed : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
-           (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
+           (fn : FnClo Γ (u ×ᵗ s) u) (nid : NodeId)
            {a : Val Γ u} → Red u a
-         → {b : Closed Γ s} {κ : Path Γ lo u t} {id : Id} {now : Tick}
+         → {b : Val Γ (obs s)} {κ : Path Γ lo u t} {id : Id} {now : Tick}
          → (sched : Sched Γ) (st : EvalSt e)
          → {sched₂ : Sched Γ} {st₁ : EvalSt e} {burst : Stream Γ s}
          → subscribeE⇓ {e = e} b (scan-f fn nid ↠ κ) id now
@@ -702,7 +681,7 @@ red-scan-installed {e = e} fn nid {a} ra sched st d eq =
            ra
 
 redScanDispatch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-                  (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
+                  (fn : FnClo Γ (u ×ᵗ s) u) (nid : NodeId)
                   {vals : List (Val Γ s)} (fin : Bool)
                   (sched : Sched Γ) (st : EvalSt e) (m : Maybe (NodeState Γ))
                 → lookupNode nid (EvalSt.nodes st) ≡ m
@@ -730,7 +709,7 @@ redScanDispatch fn nid fin sched st (just (exhaust-st _ _))    eq rn rf rv = [] 
 
 red-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
            (id : Id) (now : Tick)
-           (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
+           (fn : FnClo Γ (u ×ᵗ s) u) (nid : NodeId)
            (κ : Path Γ lo u t) → RedFn fn
          → {vals : List (Val Γ s)} → All (Red s) vals → (fin : Bool)
          → (sched : Sched Γ) (st : EvalSt e)
@@ -839,12 +818,13 @@ red-push id now f sv rf κ {em ∷ ems} (p ∷ ps) sched st rn =
 -- carries and stops at the gate; every call below hands on a strictly
 -- smaller size, the fixpoint arm included.
 --
--- AND THE ENVIRONMENT IS CARRIED, NOT APPLIED, WHICH IS WHAT THE SIZE
--- COSTS.  An entry at observable type is a whole expression, so the
--- substituted form is unbounded against the syntax that binds it and
--- no measure reaches it.  So the expression face is stated at a raw
--- body under a reducible substitution and concludes about the CLOSED
--- form, and the measure is read off the raw body alone.
+-- AND THE ENVIRONMENT IS CARRIED, NOT APPLIED, WHICH IS WHY THE
+-- MEASURE WORKS AT ALL.  An entry at observable type is a whole
+-- expression, so anything that pushed one into the body would be
+-- unbounded against the syntax that binds it and no measure would
+-- reach it.  A value IS the pair of a body and its environment, so
+-- the face is stated at the raw body under a reducible environment
+-- and the measure is read off that body alone.
 --
 -- THE ONE ARM WITH NO SUBTERM IS THE μ, AND THE SYNTAX PAYS FOR IT.
 -- An unfolding is no subterm of its fixpoint and sits at the same
@@ -852,10 +832,10 @@ red-push id now f sv rf κ {em ∷ ems} (p ∷ ps) sched st rn =
 -- reaches it.  What does is the size: the μ former spends a unit, the
 -- gate the μ variable must sit behind is where the size stops looking,
 -- and the unfolding therefore has exactly the size the body had.
-redLookup : ∀ {n} {Γ : Ctx n} {Θ t} (σ : All (Val Γ) Θ) → RedEnv σ
+redLookup : ∀ {n} {Γ : Ctx n} {Θ t} (σ : Env Γ Θ) → RedEnv σ
           → (x : t ∈ Θ) → Red t (lookupEnv σ x)
-redLookup (v ∷ vs) (p , ps) (here refl) = p
-redLookup (v ∷ vs) (p , ps) (there x)   = redLookup vs ps x
+redLookup (v ∷ᵉ vs) (p , ps) (here refl) = p
+redLookup (v ∷ᵉ vs) (p , ps) (there x)   = redLookup vs ps x
 
 -- THE CEILING IS A MEASURE COMPONENT, NOT A HYPOTHESIS.  The walk
 -- carries a stratum `k` with the guard `T (inputsBelowᵉ k b)` and an
@@ -869,18 +849,18 @@ redLookup (v ∷ vs) (p , ps) (there x)   = redLookup vs ps x
 -- context's own size out of `ib-topᵉ`.
 mutual
   redExpAcc : ∀ {n} {Γ : Ctx n} {Θ t} (b : Exp Γ [] [] Θ t)
-              (σ : All (Val Γ) Θ) → RedEnv σ
+              (σ : Env Γ Θ) → RedEnv σ
             → (k : ℕ) → T (inputsBelowᵉ k b) → Acc _<_ k
-            → Acc _<_ (gsizeᵉ b) → Red {Γ = Γ} (obs t) (subΘExp [] σ b)
+            → Acc _<_ (gsizeᵉ b) → Red {Γ = Γ} (obs t) (Θ , b , σ)
   redExpAcc (input i) σ rσ k ok aK a κ id now sched st =
-    red-input i k ok aK κ id now sched st
+    red-input i σ k ok aK κ id now sched st
   redExpAcc (ofᵉ ts) σ rσ k ok aK (acc rs) κ id now sched st =
     _ , subs-of refl
       , satOneShot id sched (redTmsAcc ts σ rσ k ok aK (rs ≤-refl))
   redExpAcc emptyᵉ σ rσ k ok aK a κ id now sched st =
     _ , subs-empty refl , satOneShot id sched []
   redExpAcc (takeᵉ c b) σ rσ k ok aK (acc rs) κ id now sched st
-    with evalTm (subΘTm [] σ c) in ceq
+    with evalWith c σ in ceq
   ... | zero  = _ , subs-take-zero ceq refl , satOneShot id sched []
   ... | suc j =
     let nid = freshId nodeᵏ (Sched.mint sched)
@@ -906,7 +886,7 @@ mutual
        , record st₂ { nodes = setNode nid (batchSync-st false) (EvalSt.nodes st₂) } )
        , subs-batchSync refl d p , sat′
   redExpAcc (mapᵉ {s = s} f b) σ rσ k ok aK (acc rs) κ id now sched st =
-    let fn   = subΘTm (s ∷ []) σ f
+    let fn   = _ , f , σ
         okf  = ∧ˡ (inputsBelowᵗ k f) (inputsBelowᵉ k b) ok
         okb  = ∧ʳ (inputsBelowᵗ k f) (inputsBelowᵉ k b) ok
         rf   = redFnAcc f σ rσ k okf aK (rs (s≤s (m≤m+n (gsizeᵗ f) (gsizeᵉ b))))
@@ -919,7 +899,7 @@ mutual
     in r , subs-map d p , sat′
   redExpAcc (scanᵉ {s = s} {t = w} f z b) σ rσ k ok aK (acc rs) κ id now sched st =
     let nid = freshId nodeᵏ (Sched.mint sched)
-        fn  = subΘTm ((w ×ᵗ s) ∷ []) σ f
+        fn  = _ , f , σ
         zbe = inputsBelowᵗ k z ∧ inputsBelowᵉ k b
         okf = ∧ˡ (inputsBelowᵗ k f) zbe ok
         rest = ∧ʳ (inputsBelowᵗ k f) zbe ok
@@ -927,17 +907,16 @@ mutual
         okb = ∧ʳ (inputsBelowᵗ k z) (inputsBelowᵉ k b) rest
         rf  = redFnAcc f σ rσ k okf aK
                 (rs (s≤s (m≤m+n (gsizeᵗ f) (gsizeᵗ z + gsizeᵉ b))))
-        rz  = subst (Red w) (sym (sub-evalTm z σ))
-                (redTmAcc z σ rσ k okz aK
-                  (rs (s≤s (≤-trans (m≤m+n (gsizeᵗ z) (gsizeᵉ b))
-                                    (m≤n+m (gsizeᵗ z + gsizeᵉ b) (gsizeᵗ f))))))
+        rz  = redTmAcc z σ rσ k okz aK
+                (rs (s≤s (≤-trans (m≤m+n (gsizeᵗ z) (gsizeᵉ b))
+                                  (m≤n+m (gsizeᵗ z + gsizeᵉ b) (gsizeᵗ f)))))
         ((burst , sched₂ , st₁) , d , sat) =
           redExpAcc b σ rσ k okb aK
             (rs (s≤s (≤-trans (m≤n+m (gsizeᵉ b) (gsizeᵗ z))
                               (m≤n+m (gsizeᵗ z + gsizeᵉ b) (gsizeᵗ f)))))
             (scan-f fn nid ↠ κ) id now
             (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
-            (installNode nid (cell-st (evalTm (subΘTm [] σ z))) st)
+            (installNode nid (cell-st (evalWith z σ)) st)
         (r , p , sat′) =
           red-push id now (scan-f fn nid) tt rf
             κ sat sched₂ st₁ (red-scan-installed fn nid rz sched st d)
@@ -973,10 +952,9 @@ mutual
           red-push id now (thru-outer exhaustᵒ nid) tt tt κ sat sched₂ st₁ tt
     in r , subs-exhaust-all (sub-all refl d p) , sat′
   redExpAcc (μᵉ body) σ rσ k ok aK (acc rs) κ id now sched st =
-    let ih = subst (Red (obs _)) (sub-unfoldμ body σ)
-               (redExpAcc (unfoldμ body) σ rσ k (ib-unfoldμ k body ok) aK
-                 (rs (subst (_< suc (gsizeᵉ body))
-                            (sym (gsize-unfoldμ body)) ≤-refl)))
+    let ih = redExpAcc (unfoldμ body) σ rσ k (ib-unfoldμ k body ok) aK
+               (rs (subst (_< suc (gsizeᵉ body))
+                          (sym (gsize-unfoldμ body)) ≤-refl))
         (r , d , sat) = ih κ id now sched st
     in r , subs-μ d , sat
   redExpAcc (varᵉ ()) σ rσ k ok aK a
@@ -985,10 +963,8 @@ mutual
   redExpAcc (mintᵉ body) σ rσ k ok aK (acc rs) κ id now sched st =
     let src    = freshId sourceᵏ (Sched.mint sched)
         sched' = record sched { mint = setAt sourceᵏ (suc src) (Sched.mint sched) }
-        (r , d , sat) = redExpAcc body (src ∷ σ) (tt , rσ) k ok aK (rs ≤-refl) κ id now sched' st
-        d' = subst (λ e → subscribeE⇓ e κ id now sched' st r)
-                   (sym (subΘ-compᵍᵉ [] (src ∷ []) σ body)) d
-    in r , subs-mint refl d' , sat
+        (r , d , sat) = redExpAcc body (src ∷ᵉ σ) (tt , rσ) k ok aK (rs ≤-refl) κ id now sched' st
+    in r , subs-mint refl d , sat
 
   -- THE SLOT ARM, WHICH IS FIVE SUB-ARMS OF PROTOCOL AND ONE THAT
   -- SPENDS THE CEILING.  It mirrors the builder's own case split on
@@ -998,9 +974,9 @@ mutual
   -- script carries.  The ceiling's accessibility is taken apart here
   -- rather than passed on, since `toℕ i < k` is exactly what the
   -- expression face's guard reduces to at this former.
-  red-input : ∀ {n} {Γ : Ctx n} (i : Fin n) (k : ℕ) → T (toℕ i <ᵇ k)
-            → Acc _<_ k → Red {Γ = Γ} (obs (lookup Γ i)) (input i)
-  red-input {Γ = Γ} i k ok (acc rsK) {lo = lo} κ id now sched st
+  red-input : ∀ {n} {Γ : Ctx n} {Θ} (i : Fin n) (σ : Env Γ Θ) (k : ℕ) → T (toℕ i <ᵇ k)
+            → Acc _<_ k → Red {Γ = Γ} (obs (lookup Γ i)) (Θ , input i , σ)
+  red-input {Γ = Γ} i σ k ok (acc rsK) {lo = lo} κ id now sched st
       with toℕ i <? lo
   ... | no  ¬below = _ , subs-floor (≮⇒≥ ¬below) , (tt ∷ tt ∷ tt ∷ []) ∷ []
   ... | yes below  with Sched.slots sched i in slEq
@@ -1008,17 +984,17 @@ mutual
           with memberSource (toℕ i) (EvalSt.completedSources st) in doneEq
   ...     | true  = _ , subs-hot-done below slEq doneEq , (tt ∷ tt ∷ tt ∷ []) ∷ []
   ...     | false = _ , subs-hot-live below slEq doneEq refl , (tt ∷ []) ∷ []
-  red-input {Γ = Γ} i k ok (acc rsK) {lo = lo} κ id now sched st
+  red-input {Γ = Γ} i σ k ok (acc rsK) {lo = lo} κ id now sched st
       | yes below | scripted {ok = okD} (cold sync []) =
         _ , subs-cold-sync below slEq refl
           , satOneShot id sched (redDatas _ okD sync)
-  red-input {Γ = Γ} i k ok (acc rsK) {lo = lo} κ id now sched st
+  red-input {Γ = Γ} i σ k ok (acc rsK) {lo = lo} κ id now sched st
       | yes below | scripted {ok = okD} (cold sync (v ∷ vs)) =
         _ , subs-cold-async below slEq refl refl refl
           , (tt ∷ satValues (redDatas _ okD sync)) ∷ []
-  red-input {Γ = Γ} i k ok (acc rsK) {lo = lo} κ id now sched st
+  red-input {Γ = Γ} i σ k ok (acc rsK) {lo = lo} κ id now sched st
       | yes below | shared d {ok = okd} =
-        red-input-shared i d (rsK (<ᵇ⇒< (toℕ i) k ok))
+        red-input-shared i σ d (rsK (<ᵇ⇒< (toℕ i) k ok))
           κ below id now sched slEq st
 
   -- THE SIXTH SLOT SUB-ARM, WHICH IS THE ONE THE OTHER FIVE ARE NOT.
@@ -1032,8 +1008,8 @@ mutual
   -- DATA by the slot's own side condition, so `red-data` closes their
   -- satisfaction outright; this one's values are the definition's,
   -- which is what the recursion returns, retagged by the fan-out.
-  red-input-shared : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo}
-      (i : Fin n) (d : Closed Γ (lookup Γ i))
+  red-input-shared : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo Θ}
+      (i : Fin n) (σ : Env Γ Θ) (d : Closed Γ (lookup Γ i))
       {okd : T (inputsBelowᵉ (toℕ i) d)}
     → Acc _<_ (toℕ i)
     → (κ : Path Γ lo (lookup Γ i) t) (below : toℕ i < lo)
@@ -1041,9 +1017,9 @@ mutual
     → Sched.slots sched i ≡ shared d {ok = okd}
     → (st : EvalSt e)
     → Σ (Stream Γ (lookup Γ i) × Sched Γ × EvalSt e) λ r →
-        subscribeE⇓ {e = e} (input i) κ id now sched st r
+        subscribeE⇓ {e = e} (Θ , input i , σ) κ id now sched st r
           × StreamSat (Red (lookup Γ i)) (proj₁ r)
-  red-input-shared {Γ = Γ} i d {okd} aI κ below id now sched slEq st
+  red-input-shared {Γ = Γ} i σ d {okd} aI κ below id now sched slEq st
       with memberSource (toℕ i) (EvalSt.completedSources st) in doneEq
   ... | true =
         _ , subs-shared {κ = κ} {below = below} slEq
@@ -1056,9 +1032,8 @@ mutual
                 (slot-join {κ = κ} {below = below} doneEq connEq refl)
             , (tt ∷ []) ∷ []
   ...   | false
-          with subst (Red (obs (lookup Γ i))) (subΘ-id-exp d)
-                 (redExpAcc d [] tt (toℕ i) okd aI
-                   (<-wellFounded (gsizeᵉ d)))
+          with redExpAcc d []ᵉ tt (toℕ i) okd aI
+                 (<-wellFounded (gsizeᵉ d))
                  (share-sink i ≤-refl) id now
                  (record sched { mint = next regᵏ (Sched.mint sched) })
                  (register (freshId regᵏ (Sched.mint sched))
@@ -1081,7 +1056,7 @@ mutual
   -- THE FUNDAMENTAL THEOREM AT TERMS, which is where the embedding
   -- former hands the recursion back to the expression face.
   redTmAcc : ∀ {n} {Γ : Ctx n} {Θ u} (tm : Tm Γ [] [] Θ u)
-             (σ : All (Val Γ) Θ) → RedEnv σ
+             (σ : Env Γ Θ) → RedEnv σ
            → (k : ℕ) → T (inputsBelowᵗ k tm) → Acc _<_ k
            → Acc _<_ (gsizeᵗ tm) → Red u (evalWith tm σ)
   redTmAcc (varᵗ x) σ rσ k ok aK a = redLookup σ rσ x
@@ -1102,7 +1077,7 @@ mutual
   redTmAcc (foldᵗ l z f) σ rσ k ok aK (acc rs) =
     redFoldVals f σ
       (λ rx ra →
-        redTmAcc f (_ ∷ _ ∷ σ) (rx , ra , rσ) k
+        redTmAcc f (_ ∷ᵉ _ ∷ᵉ σ) (rx , ra , rσ) k
           (∧ʳ (inputsBelowᵗ k z) (inputsBelowᵗ k f)
             (∧ʳ (inputsBelowᵗ k l) (inputsBelowᵗ k z ∧ inputsBelowᵗ k f) ok)) aK
           (rs (s≤s (≤-trans (m≤n+m (gsizeᵗ f) (gsizeᵗ z))
@@ -1129,12 +1104,12 @@ mutual
        | redTmAcc sc σ rσ k oksc aK
            (rs (s≤s (m≤m+n (gsizeᵗ sc) (gsizeᵗ l + gsizeᵗ r))))
   ... | inj₁ x | q =
-    redTmAcc l (x ∷ σ) (q , rσ) k
+    redTmAcc l (x ∷ᵉ σ) (q , rσ) k
       (∧ˡ (inputsBelowᵗ k l) (inputsBelowᵗ k r) rest) aK
       (rs (s≤s (≤-trans (m≤m+n (gsizeᵗ l) (gsizeᵗ r))
                         (m≤n+m (gsizeᵗ l + gsizeᵗ r) (gsizeᵗ sc)))))
   ... | inj₂ y | q =
-    redTmAcc r (y ∷ σ) (q , rσ) k
+    redTmAcc r (y ∷ᵉ σ) (q , rσ) k
       (∧ʳ (inputsBelowᵗ k l) (inputsBelowᵗ k r) rest) aK
       (rs (s≤s (≤-trans (m≤n+m (gsizeᵗ r) (gsizeᵗ l))
                         (m≤n+m (gsizeᵗ l + gsizeᵗ r) (gsizeᵗ sc)))))
@@ -1156,36 +1131,38 @@ mutual
   redTmAcc (primᵗ ltᵖ x) σ rσ k ok aK a  = tt
   redTmAcc (primᵗ eqᵘ x) σ rσ k ok aK a  = tt
   redTmAcc (primᵗ notᵖ x) σ rσ k ok aK a = tt
-  redTmAcc (strmᵗ e) []       rσ k ok aK (acc rs) =
-    subst (Red (obs _)) (subΘ-id-exp e) (redExpAcc e [] tt k ok aK (rs ≤-refl))
-  redTmAcc (strmᵗ e) (v ∷ vs) rσ k ok aK (acc rs) =
-    redExpAcc e (v ∷ vs) rσ k ok aK (rs ≤-refl)
+  redTmAcc (strmᵗ e) σ rσ k ok aK (acc rs) =
+    redExpAcc e σ rσ k ok aK (rs ≤-refl)
 
   redTmsAcc : ∀ {n} {Γ : Ctx n} {Θ u} (ts : List (Tm Γ [] [] Θ u))
-              (σ : All (Val Γ) Θ) → RedEnv σ
+              (σ : Env Γ Θ) → RedEnv σ
             → (k : ℕ) → T (inputsBelowᵗˢ k ts) → Acc _<_ k
             → Acc _<_ (gsizeᵗˢ ts)
-            → All (Red u) (map (λ tm → evalTm tm) (subΘTms [] σ ts))
+            → All (Red u) (map (λ tm → evalWith tm σ) ts)
   redTmsAcc []       σ rσ k ok aK a = []
   redTmsAcc (x ∷ xs) σ rσ k ok aK (acc rs) =
-      subst (Red _) (sym (sub-evalTm x σ))
-        (redTmAcc x σ rσ k (∧ˡ (inputsBelowᵗ k x) (inputsBelowᵗˢ k xs) ok) aK
-          (rs (s≤s (m≤m+n (gsizeᵗ x) (gsizeᵗˢ xs)))))
+      redTmAcc x σ rσ k (∧ˡ (inputsBelowᵗ k x) (inputsBelowᵗˢ k xs) ok) aK
+        (rs (s≤s (m≤m+n (gsizeᵗ x) (gsizeᵗˢ xs))))
     ∷ redTmsAcc xs σ rσ k (∧ʳ (inputsBelowᵗ k x) (inputsBelowᵗˢ k xs) ok) aK
         (rs (s≤s (m≤n+m (gsizeᵗˢ xs) (gsizeᵗ x))))
 
-  -- A FRAME'S FUNCTION, CLOSED AGAINST THE AMBIENT ENVIRONMENT AND
-  -- THEN APPLIED, is the term face at one more entry.
+  -- A FRAME'S FUNCTION, PAIRED WITH THE AMBIENT ENVIRONMENT AND THEN
+  -- APPLIED, is the term face at one more entry.
   redFnAcc : ∀ {n} {Γ : Ctx n} {Θ s u} (f : Fn Γ [] [] Θ s u)
-             (σ : All (Val Γ) Θ) → RedEnv σ
+             (σ : Env Γ Θ) → RedEnv σ
            → (k : ℕ) → T (inputsBelowᵗ k f) → Acc _<_ k
-           → Acc _<_ (gsizeᵗ f) → RedFn (subΘTm (s ∷ []) σ f)
-  redFnAcc {s = s} f σ rσ k ok aK a {v} p =
-    subst (Red _) (sym (sub-applyFn f σ v)) (redTmAcc f (v ∷ σ) (p , rσ) k ok aK a)
+           → Acc _<_ (gsizeᵗ f) → RedFn {Γ = Γ} (Θ , f , σ)
+  redFnAcc {s = s} f σ rσ k ok aK a {v} p = redTmAcc f (v ∷ᵉ σ) (p , rσ) k ok aK a
 
--- THE TOP LINE: every closed expression is reducible, which is the
--- face above at the empty environment, where closing is the identity.
-reducible : ∀ {n} {Γ : Ctx n} {t} (b : Closed Γ t) → Red {Γ = Γ} (obs t) b
-reducible b =
-  subst (Red (obs _)) (subΘ-id-exp b)
-    (redExpAcc b [] tt _ (ib-topᵉ b) (<-wellFounded _) (<-wellFounded (gsizeᵉ b)))
+-- THE TOP LINE: every observable VALUE over a reducible environment is
+-- reducible, which is the face above with its measure arguments
+-- instantiated.  The environment obligation is not a weakening: a
+-- value at observable type IS a body paired with an environment, and
+-- an entry of that environment at observable type is another such
+-- value, so nothing could be claimed about the pair that was not
+-- already claimed of its entries.  At the machine's own entry point
+-- the program is closed and the obligation is `tt`.
+reducible : ∀ {n} {Γ : Ctx n} {Θ t} (b : Exp Γ [] [] Θ t) (σ : Env Γ Θ) → RedEnv σ
+          → Red {Γ = Γ} (obs t) (Θ , b , σ)
+reducible b σ rσ =
+  redExpAcc b σ rσ _ (ib-topᵉ b) (<-wellFounded _) (<-wellFounded (gsizeᵉ b))

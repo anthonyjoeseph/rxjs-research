@@ -31,7 +31,7 @@ open import Relation.Nullary using (yes; no)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Mint using (MintKey; ordinalᵏ; sourceᵏ; nodeᵏ; regᵏ; freshId; next; next-mono)
-open import Rx.Exp using (Ctx; Closed; Val; obs; Fn; _×ᵗ_; _≟ᵗ_)
+open import Rx.Exp using (Ctx; Closed; Val; obs; Fn; FnClo; _×ᵗ_; _≟ᵗ_)
 open import Rx.Prim using (Id; InstEvent)
 open import Rx.Evaluator using (Sched; EvalSt; Path; Frame; NodeId; NodeState; AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ;
   oneShotBurst; switchKill; scanDispatch; takeDispatch; batchSyncDispatch; thruWrap; cell-st; take-st; batchSync-st;
@@ -71,7 +71,7 @@ switchKill-mint (just v) sched st refl k = ≤-refl
 
 -- the scanning step rewrites its own cell and nothing else
 scanDispatch-mint : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-                      (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
+                      (fn : FnClo Γ (u ×ᵗ s) u) (nid : NodeId)
                       (vals : List (Val Γ s)) (fin : Bool)
                       (sched : Sched Γ) (st : EvalSt e) (m : Maybe (NodeState Γ))
                       (k : MintKey)
@@ -164,7 +164,7 @@ thruWrap-mint exhaustᵒ nid true vs bs sched′ st′ k
 ... | nothing                    = ≤-refl
 
 subscribeE-mono : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
-                    {b : Closed Γ u} {κ : Path Γ lo u t} {id now}
+                    {b : Val Γ (obs u)} {κ : Path Γ lo u t} {id now}
                     {sched sched₂ : Sched Γ} {st st₁ : EvalSt e} {burst}
                 → subscribeE⇓ {e = e} b κ id now sched st (burst , sched₂ , st₁)
                 → (k : MintKey)
@@ -186,7 +186,7 @@ stepFrame-mono : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
                → freshId k (Sched.mint sched) ≤ freshId k (Sched.mint sched₁)
 
 subscribeAll-mono : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
-                      {op} {ns : NodeState Γ} {b : Closed Γ (obs u)}
+                      {op} {ns : NodeState Γ} {b : Val Γ (obs (obs u))}
                       {κ : Path Γ lo u t} {id now}
                       {sched sched₂ : Sched Γ} {st st₁ : EvalSt e} {burst}
                   → subscribeAll⇓ {e = e} op ns b κ id now sched st

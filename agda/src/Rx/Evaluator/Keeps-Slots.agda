@@ -30,7 +30,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans)
 open import Relation.Nullary using (yes; no)
 
 open import Rx.Prim using (Id; Tick)
-open import Rx.Exp using (Ctx; Closed; Val; obs; Fn; _×ᵗ_; _≟ᵗ_)
+open import Rx.Exp using (Ctx; Closed; Val; obs; Fn; FnClo; _×ᵗ_; _≟ᵗ_)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; AllOp; NodeId;
   NodeState; Frame; take-st; batchSync-st; batchSyncDispatch; cell-st; takeVals; takeDispatch;
   scanDispatch; thruWrap;
@@ -102,7 +102,7 @@ batchSync-slots nid vals fin sched st (just (cell-st _))           = refl
 
 -- the scanning step rewrites its own cell and passes the schedule on
 scan-slots : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-  (fn : Fn Γ [] [] [] (u ×ᵗ s) u)
+  (fn : FnClo Γ (u ×ᵗ s) u)
   (nid : NodeId) (vals : List (Val Γ s)) (fin : Bool)
   (sched : Sched Γ) (st : EvalSt e) (ns : Maybe (NodeState Γ)) →
   Sched.slots (proj₁ (proj₂ (proj₂ (proj₂
@@ -172,7 +172,7 @@ switchKill-slots (just v) sched st refl = refl
 mutual
 
   subs-keeps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
-    {b : Closed Γ u} {κ : Path Γ lo u t} {id : Id} {now : Tick}
+    {b : Val Γ (obs u)} {κ : Path Γ lo u t} {id : Id} {now : Tick}
     {sched : Sched Γ} {st : EvalSt e} {burst : Stream Γ u}
     {sched′ : Sched Γ} {st′ : EvalSt e} →
     subscribeE⇓ {e = e} b κ id now sched st (burst , sched′ , st′) →
@@ -199,7 +199,7 @@ mutual
   subs-keeps (subs-mint _ d)         = subs-keeps d
 
   all-keeps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
-    {op : AllOp} {ns : NodeState Γ} {b : Closed Γ (obs u)}
+    {op : AllOp} {ns : NodeState Γ} {b : Val Γ (obs (obs u))}
     {κ : Path Γ lo u t} {id : Id} {now : Tick}
     {sched : Sched Γ} {st : EvalSt e} {burst : Stream Γ u}
     {sched′ : Sched Γ} {st′ : EvalSt e} →
@@ -277,9 +277,9 @@ mutual
 
   drain-keeps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo}
     {allNid : NodeId} {κ : Path Γ lo s t} {id : Id} {now : Tick}
-    {lim : Maybe ℕ} {act : ℕ} {od : Bool} {q : List (Closed Γ s)}
+    {lim : Maybe ℕ} {act : ℕ} {od : Bool} {q : List (Val Γ (obs s))}
     {sched : Sched Γ} {st : EvalSt e}
-    {vs : List (Val Γ s)} {bs : List _} {act′ : ℕ} {q′ : List (Closed Γ s)}
+    {vs : List (Val Γ s)} {bs : List _} {act′ : ℕ} {q′ : List (Val Γ (obs s))}
     {sched′ : Sched Γ} {st′ : EvalSt e} →
     mergeAllDrain⇓ {e = e} allNid κ id now lim act od q sched st
       (vs , bs , act′ , q′ , sched′ , st′) →
