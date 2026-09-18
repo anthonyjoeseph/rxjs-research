@@ -36,16 +36,6 @@ open import Verify-Batch-Simultaneous.Batch-Theorems
   using (batch-online)
 
 ------------------------------------------------------------------
--- THE README'S SEMANTICS, AND BOTH NOW QUANTIFY OVER THE WHOLE
--- GRAMMAR.  The claims pinned to a canonical program are gone with the
--- plain tree that could state them; what is left names no program, so
--- there is nothing beside these for Main to reach.
-------------------------------------------------------------------
-open import Readme-Theorems
-  using (readme-batch-order-is-delivery-order
-        ; readme-one-subscribe-one-batch)
-
-------------------------------------------------------------------
 -- THE EVALUATOR-LEVEL CLAIMS.
 --
 -- CAUTION, recorded here because Main is where it will be read:

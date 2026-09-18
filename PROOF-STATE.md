@@ -332,6 +332,15 @@ then tier 1 is the lowest open tier and holds the cone.
   guard measure and the accessibility argument untouched. It holds, or the leg
   reports.
 
+- **AND THE README'S TWO SEMANTIC LAWS COME BACK HERE, DELETED FOR NOW
+  (Anthony).** `readme-batch-order-is-delivery-order` and
+  `readme-one-subscribe-one-batch` were stated over the machine tier 1 is
+  deleting, so porting them twice buys nothing.  They are gone from `src` and
+  unwired from Main; `git show 5ade0b38:agda/src/Readme-Theorems.agda` restores
+  both statements and the header recording that every probe row sat at a
+  program with no flattener — which is where their risk actually lives, and the
+  first thing a restatement owes.
+
 ## Tier 3 — the machine's own fuel
 
 **WHAT THIS FACE BUYS: the one claim about the evaluator that no correspondence
@@ -470,7 +479,6 @@ nor the assembly consuming both — those are admitted below.
 
 also: `drain-det` — the other half of the same assembly, off the frame's cone and ground alongside it.
 also: `evaluate-deterministic` — the determinacy subject, which consumes both leaves and is unreachable from either.
-also: `readme-batch-order-is-delivery-order` — the flagship semantic law, and with it the instance claims and the abstractions the timing claims quantify over.
 
 ### Big picture tier roadmap
 
@@ -489,15 +497,14 @@ also: `readme-batch-order-is-delivery-order` — the flagship semantic law, and 
   product. The drain's determinacy is an induction whose motive is the
   subscribe result, so it lands second by necessity rather than by choice.
 
-- **AND THE SEVEN INSTANCE CLAIMS ARE UNBLOCKED, WHICH IS A LEG BY ITSELF.**
-  Every one of `readme-diamond`, `readme-each-next-own-instant`,
-  `readme-cascades-inherit`, `readme-completion-cascades`,
-  `readme-share-connect-no-replay`, `readme-late-join-growth` and
-  `readme-serial-joins-mirror-rxjs` is hard-wired to a flattener, and while the
-  descent was stuck at one no row could be written for any of them at any
-  program. It is not stuck. Re-run the recovered battery, and re-probe the
-  three universal laws at a program with a SOURCE while the harness is open. A
-  refutation here is SPEC-level — surface it, do not patch it.
+- **AND EVERY ROW HERE IS STATED OVER A MACHINE TIER 1 IS DELETING, SO THE
+  RESTATEMENT COMES FIRST.** `subscribeE-det` and `drain-det` quantify over the
+  old subscribe relation's twenty families, and that relation goes with its
+  evaluator. Nothing is lost — determinacy is owed by whatever machine replaces
+  it, and arms separated by equation premises will separate the same way — but
+  grinding an arm of a relation being rewritten is work forfeit by
+  construction. The leg is to restate the ring over the new evaluator once it
+  computes, and to re-rank what is left from the risk as it then stands.
 
 ### The ledger
 
@@ -505,10 +512,6 @@ also: `readme-batch-order-is-delivery-order` — the flagship semantic law, and 
   `NO EVIDENCE`: each family admits one output at its own indices. Nothing has
   instantiated either, and the arms that do not follow from the head
   constructor are separated by equation premises — unwalked.
-- **`readme-batch-order-is-delivery-order`, `readme-one-subscribe-one-batch`**
-  — FALSITY, `PROBED×2`: instantiated now, but every row sits at a program with
-  no flattener, which is where each statement's risk actually lives. Still
-  FALSITY for that reason, not for want of a row.
 - **Vacuous-by-abstraction — VACUITY**, `NO EVIDENCE` — `locality`,
   `non-interference`, `timing-invariance`, `causality`, `μ-guarded`,
   `defer-shift` (the one allowlisted honest gap). De-risking these means
