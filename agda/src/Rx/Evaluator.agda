@@ -18,7 +18,7 @@ open import Relation.Binary.PropositionalEquality using (refl)
 
 open import Rx.Prim using (Tick; Ordinal; Id; Source; Timed; after_,_; hot; cold; InstEvent; init; value; close;
   handoff; complete; cut; cutPending; exhausted; subscribe; plumbing; InstEmit; _at_from_as_)
-open import Rx.Exp  using (Ty; obs; _×ᵗ_; listᵗ; _≟ᵗ_; Ctx; Val; Closed; Fn; applyFn)
+open import Rx.Exp  using (Ty; obs; _×ᵗ_; listᵗ; _≟ᵗ_; Ctx; Val; Closed; Fn; FnClo; applyClo)
 
 variable
   lo : ℕ
@@ -163,8 +163,8 @@ NodeId = ℕ            -- numbered in subscription order
 -- recursion on the type says nothing about what a NODE HOLDS, so every
 -- arm of `Rx.Evaluator.Reducible` that reads a node back is owed a
 -- store invariant -- but only where the read produces a VALUE.  Here
--- `cell-st` holds one outright and `mergeAll-st`'s queue holds closed
--- expressions; `take-st`, `switch-st` and `exhaust-st` hold a count, an
+-- `cell-st` holds one outright and `mergeAll-st`'s queue holds
+-- observable values; `take-st`, `switch-st` and `exhaust-st` hold a count, an
 -- identifier and two flags, and nothing that leaves a frame dispatching
 -- on those came from anywhere but the burst that arrived.  So three of
 -- the four arms need no carrier at all, and the two that do differ in
@@ -193,7 +193,7 @@ data NodeState {n} (Γ : Ctx n) : Set where
                -- bit says which side of one call we are on, never
                -- where a value came from nor whether more is owed.
   mergeAll-st : ∀ {t} → (limit : Maybe ℕ) (active : ℕ)
-               (queued : List (Closed Γ t)) (outerDone : Bool) → NodeState Γ
+               (queued : List (Val Γ (obs t))) (outerDone : Bool) → NodeState Γ
                -- ONE state for every concurrency.  The two states this
                -- replaced were each a projection of it: unbounded merge kept
                -- a counter and no queue (`nothing`, q ≡ []), concat kept a
@@ -236,12 +236,12 @@ data AllOp : Set where
 -- an operator at all: a shared slot fans out by registry multiplicity,
 -- one chain per subscriber (see share-sink / dispatchShare)
 data Frame {n} (Γ : Ctx n) : Ty → Ty → Set where
-  map-f      : ∀ {s u} → Fn Γ [] [] [] s u → Frame Γ s u
+  map-f      : ∀ {s u} → FnClo Γ s u → Frame Γ s u
                -- the stateless step, applied once per arriving value.
                -- It OWNS NO NODE, and that is forced rather than
                -- chosen: a cell would need a seed, and the term
                -- language has no generic inhabitant to build one from.
-  scan-f     : ∀ {s u} → Fn Γ [] [] [] (u ×ᵗ s) u
+  scan-f     : ∀ {s u} → FnClo Γ (u ×ᵗ s) u
              → NodeId → Frame Γ s u
                -- the accumulating step, applied ONCE PER ARRIVING VALUE
                -- with its cell threaded along.  Its output IS its
@@ -567,10 +567,10 @@ aliveThroughᶠ inst st (rid , rs , (w , p)) =
 -- decide against what is installed, and so no stuck arm to state.  The
 -- frame's own declaration says the same thing from the other side by
 -- owning no `NodeId`.
-mapVals : ∀ {n} {Γ : Ctx n} {s u} → Fn Γ [] [] [] s u
+mapVals : ∀ {n} {Γ : Ctx n} {s u} → FnClo Γ s u
         → List (Val Γ s) → List (Val Γ u)
 mapVals fn []         = []
-mapVals fn (v ∷ vals) = applyFn fn v ∷ mapVals fn vals
+mapVals fn (v ∷ vals) = applyClo fn v ∷ mapVals fn vals
 
 -- THE ACCUMULATING STEP, WHICH IS A LEFT FOLD AND NOT ONE
 -- APPLICATION.  The function is handed the carried state and ONE
@@ -580,11 +580,11 @@ mapVals fn (v ∷ vals) = applyFn fn v ∷ mapVals fn vals
 -- That walk is `scan`, which is why a plain-rxjs pipeline can run it:
 -- the step is never told how many values shared its frame, so there is
 -- nothing here for a frameless library to fail to supply.
-scanVals : ∀ {n} {Γ : Ctx n} {s u} → Fn Γ [] [] [] (u ×ᵗ s) u
+scanVals : ∀ {n} {Γ : Ctx n} {s u} → FnClo Γ (u ×ᵗ s) u
          → Val Γ u → List (Val Γ s) → List (Val Γ u) × Val Γ u
 scanVals fn ac []         = [] , ac
 scanVals fn ac (v ∷ vals) =
-  let ac′  = applyFn fn (ac , v)
+  let ac′  = applyClo fn (ac , v)
       rest = scanVals fn ac′ vals
   in ac′ ∷ proj₁ rest , proj₂ rest
 
@@ -592,7 +592,7 @@ scanVals fn ac (v ∷ vals) =
 -- nothing and writes nothing, stated as a function so no prover can
 -- prefer that arm at a node that really does hold the state.
 scanDispatch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-             → Fn Γ [] [] [] (u ×ᵗ s) u → NodeId
+             → FnClo Γ (u ×ᵗ s) u → NodeId
              → List (Val Γ s) → Bool
              → Sched Γ → EvalSt e → Maybe (NodeState Γ)
              → List (Val Γ u) × List (InstEvent (Val Γ t)) × Bool

@@ -668,6 +668,20 @@ evalTm t = evalWith t []ᵉ
 applyFn : ∀ {n} {Γ : Ctx n} {s t} → Fn Γ [] [] [] s t → Val Γ s → Val Γ t
 applyFn fn v = evalWith fn (v ∷ᵉ []ᵉ)
 
+-- A STEP FUNCTION AS A VALUE, WHICH IN A LANGUAGE WHOSE `Ty` HAS NO
+-- ARROW IS THE ONLY THING ONE CAN BE.  `Val Γ (obs u)` pairs a body
+-- with an environment because an observable is carried as data; a
+-- frame's step is carried the same way for the same reason, since the
+-- operator that installed it was itself reached under a token
+-- telescope and its body is not closed.  There is no `Ty` for this and
+-- there is not meant to be: nothing in the term language holds a step,
+-- only the machine does.
+FnClo : ∀ {n} → Ctx n → Ty → Ty → Set
+FnClo Γ s t = Σ (List Ty) (λ Θ → Fn Γ [] [] Θ s t × Env Γ Θ)
+
+applyClo : ∀ {n} {Γ : Ctx n} {s t} → FnClo Γ s t → Val Γ s → Val Γ t
+applyClo (_ , fn , ρ) v = evalWith fn (v ∷ᵉ ρ)
+
 ------------------------------------------------------------------
 -- STRATIFICATION of the slot telescope: every `input j` an
 -- expression mentions has j < k.  A shared slot's def carries this
