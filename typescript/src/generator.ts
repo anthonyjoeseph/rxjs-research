@@ -508,11 +508,49 @@ const genExp = (
     }),
   };
 
-  // THE GENERATOR PRODUCES THE PLAIN TREE ONLY, so there is no
-  // batchSync lane: that former's type IS the instant/batch structure,
-  // which plain rxjs has no notion of and the oracle's plain leg
-  // therefore cannot mirror. `scripts/formers.tsv` carries the hole with
-  // gen=no, which is where a former nothing reaches is counted.
+  // THE batchSync LANE, AND THE PROJECTION IS THE WHOLE OF ITS SHAPE.
+  // The operator is ordinary plain rxjs -- a `merge` whose second input's
+  // `defer` runs once the source's subscribe burst has drained -- so the
+  // plain leg mirrors it like any other former.  What it cannot do is
+  // land at an arbitrary requested type: its result is its source's
+  // head-and-tail PAIR, and `genValTy` never draws a list, so a lane
+  // gated on the requested type having that shape would never fire once
+  // and would report as a former nothing generates.  So the pair is
+  // projected back to the type asked for, and the projection decides
+  // which half of the grouping is observed: the head alone says whether
+  // the burst collapsed to ONE emission, and the fold reads the tail, so
+  // the burst's LENGTH and contents are compared too.
+  operators.batchSync = () => {
+    const pairTy: Ty = {
+      type: "prod",
+      fst: ty,
+      snd: { type: "list", elem: ty },
+    };
+    const x: Tm = { type: "varT", ty: pairTy, index: 0 };
+    const head: Tm = { type: "fstT", ty, pair: x };
+    const fn: Tm = pick(rng, [
+      () => head,
+      // the step hands back the ELEMENT, so the fold is the tail's last
+      // value and falls through to the head when the tail is empty
+      (): Tm => ({
+        type: "foldT",
+        ty,
+        list: { type: "sndT", ty: { type: "list", elem: ty }, pair: x },
+        init: head,
+        step: { type: "varT", ty, index: 0 },
+      }),
+    ])();
+    return {
+      type: "map",
+      ty,
+      fn,
+      src: {
+        type: "batchSync",
+        ty: pairTy,
+        src: genExp(rng, ty, ctx, depth - 1),
+      },
+    };
+  };
 
   // of/empty are leaves; force them there, real operators from `operators`
   const forced =

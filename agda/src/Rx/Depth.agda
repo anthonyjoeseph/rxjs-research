@@ -385,8 +385,20 @@ mutual
     let x = Stᵈ.nextTok st
     in pushWorkᵈ (connect (uniqᵗ ∷ _ , e , x ∷ᵉ ρ) p) (record st { nextTok = suc x })
 
-  -- batchSyncᵉ has no plain-rxjs mirror: its type IS the protocol's
-  -- own batch structure, so this arm finishes empty.
+  -- THIS ARM IS UNWRITTEN, AND IT FINISHES EMPTY RATHER THAN SAYING SO,
+  -- WHICH IS WHAT MAKES IT COSTLY.  The operator has a plain-rxjs mirror
+  -- and both TypeScript legs now carry it -- the sync bit is `merge`'s
+  -- own subscribe ordering, never a subscription either leg owns -- so
+  -- what is missing here is a CELL, not a capability.  This carrier
+  -- delivers a burst one value per event, so the grouping needs an
+  -- accumulator held across the subscribe frame and flipped shut when
+  -- it drains, which is exactly the shape the reference operator has and
+  -- exactly what no cell kind here can hold today.
+  -- DEAD ROUTE: finish empty and let the pairing's `gen`/`agen` columns
+  --   carry it as a hole.  A node that emits nothing is not a hole, it
+  --   is a DISAGREEMENT, and the oracle reports it as one the moment the
+  --   generator draws a `batchSync` -- every such case comes back with
+  --   the plain leg's values against an empty Agda run.
   subscribeᵈ ins (_ , batchSyncᵉ _ , ρ) p st = pushWorkᵈ (finish p) st
 
   pushValueᵈ : ∀ {n} {Γ : Ctx n} {t s} → Val Γ s → Pathᵈ Γ s t → Stᵈ Γ t → Stᵈ Γ t

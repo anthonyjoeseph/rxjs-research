@@ -6,6 +6,7 @@ import {
   defer as rxDefer,
   exhaustAll,
   map as rxMap,
+  merge,
   mergeAll,
   mergeMap,
   of as rxOf,
@@ -172,12 +173,45 @@ export const compilePlain = (
         compilePlain(exp.body, [Symbol("uniq"), ...env], driver, slotSources),
       );
     case "batchSync":
-      // batchSync reads the protocol's own bookkeeping, so it is not a
-      // former of the plain tree at all and the generator does not
-      // produce one. Reaching here means a tree crossed the split.
-      throw new Error(
-        "batchSync in a plain program — it belongs to the simul tree",
-      );
+      // THE SYNC BIT IS rxjs's OWN SUBSCRIBE ORDERING AND NOTHING ELSE.
+      // `merge` subscribes its inputs in order and synchronously, so the
+      // source drains its whole subscribe burst before the second input's
+      // `defer` runs — which is the boundary, arriving as a VALUE rather
+      // than as a callback, with no hop and no timing change. That is the
+      // one bit this operator sees, and it is why nothing here is
+      // forward-looking: the group is emitted once the burst is known to
+      // be over, never held back to see whether more is owed.
+      //
+      // STATE IS PER SUBSCRIPTION, NOT PER PIPE: a cold carrying one of
+      // these can be subscribed many times — a reused inner delivered by
+      // several triggers — and a burst shared across those subscriptions
+      // would group one subscriber's values into another's frame.
+      //
+      // The pair is Agda's `groupSync`/`soloSync` exactly: the burst
+      // leaves as ONE head-and-tail pair, every later value as its own
+      // `(v , [])`, and an EMPTY burst yields no pair at all rather than
+      // an empty group.
+      return rxDefer(() => {
+        let sync = true;
+        const burst: Val[] = [];
+        return merge(
+          recur(exp.src).pipe(
+            mergeMap((value) => {
+              if (sync) {
+                burst.push(value);
+                return EMPTY;
+              }
+              return rxOf([value, []] as Val);
+            }),
+          ),
+          rxDefer(() => {
+            sync = false;
+            return burst.length === 0
+              ? EMPTY
+              : rxOf([burst[0], burst.slice(1)] as Val);
+          }),
+        );
+      });
     case "varE":
       throw new Error(
         "varE in a closed expression — generator/decoder invariant violated",

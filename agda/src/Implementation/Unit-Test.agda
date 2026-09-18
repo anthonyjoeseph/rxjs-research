@@ -57,4 +57,5 @@ open import Implementation.Unit-Test.Prelude using (Case)
 -- IMPORTS>>>
 
 cases : List Case
-cases = []
+cases =
+  []

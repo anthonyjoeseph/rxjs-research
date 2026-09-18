@@ -230,47 +230,35 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 
 ### Big picture tier roadmap
 
-- **THE THREE HARNESSES, AND THE SLOT QUESTION IS ANSWERED: A DEF, NOT A
-  SCRIPT.** `QuickCheck.agda` and the bug cache run a `Closed Γ₂ natᵗ`
-  program under a two-slot table, and batching demands an ENVELOPE-typed one;
-  elaboration moves the context to `emitᵛ Γ`, where a `scripted` slot would
-  have to carry a forged token. A `shared` def holding an elaborated simul
-  program does not: instantiated, it evaluates, the input delivers and the
-  decode is coherent. So the leg rebuilds both harnesses over a simul slot
-  telescope elaborated by defs, which costs only an EXTERNAL scripted source
-  at the envelope. Nothing checks impl against spec until it lands.
+- **THE FLATTENERS AND `takeᵖ`, WHICH ARE THE `Tm`/`Ty` MIRROR'S OWN PALETTE
+  GAP (Anthony: these "all need to be defined. These are crucial").** One
+  shape, not four: no plain former lifts an ENVELOPED outer through a flatten,
+  forwarding the outer's own bookkeeping, and `takeᵖ` is the same ask one level
+  down. The four placements are dead and recorded at the postulates; what is
+  NOT refuted there is a bracket at the JOIN, and that route is the one to walk
+  before asking for a former. Four postulates fall together, or the ask is one
+  capability at three policies. A former is Anthony's.
 
-- **`Rx.Depth` IS NOT RETIRED BY ANY OF THE ABOVE, AND THE OLD LEG SAYING SO
-  IS DISCARDED.** It claimed the second top line papered over a divergence the
-  decode leg removes. It does not: what forces `evaluateᵈ` is that a whole
-  synchronous source runs in ONE STEP, so a subscriber attaching part-way
-  through sees the remainder in rxjs and nothing here. The plain carrier split
-  that burst into one event per value, which changed the stream's shape and not
-  its timing. Matching rxjs means SCHEDULING sources rather than running them
-  whole — an evaluator change reaching the builder, the domain, the
-  reducibility candidate and freshness, and the tier's one genuine architecture
-  decision. `budgetᵈ`'s silent truncation stands until it lands.
+- **`Rx.Depth` / SCHEDULING SOURCES — the tier's one genuine architecture
+  decision.** What forces `evaluateᵈ` is that a whole synchronous source runs
+  in ONE STEP, so a subscriber attaching part-way through sees the remainder in
+  rxjs and nothing here. The plain carrier split that burst into one event per
+  value, which changed the stream's shape and not its timing. Matching rxjs
+  means SCHEDULING sources rather than running them whole — an evaluator change
+  reaching the builder, the domain, the reducibility candidate and freshness.
+  `budgetᵈ`'s silent truncation stands until it lands, and `Reducible`'s
+  Girard–Tait candidate must keep working exactly as well as it does now.
 
-- **THE FLATTENERS: THE CENSUS IS DONE AND THE ANSWER IS A PALETTE GAP.** One
-  shape, not three: no plain former lifts an ENVELOPED outer through a flatten,
-  forwarding the outer's own bookkeeping while the inner payloads are
-  subscribed and merged. The four placements are all dead and recorded at the
-  postulates — in the projecting map, which has the outer's instant but no
-  token; through `mapᵉ`, which consumes the envelope and loses every valueless
-  outer emit; on a LANE, which a switch cuts and an exhaust drops; and split in
-  two, which is two subscriptions. So the ask is one capability at three
-  policies, mirroring the plain tree's own three. A former is Anthony's.
-
-- **THEN THE SAME OPERATORS MIRRORED IN `Tm`/`Ty` (Anthony).**
+- **THEN THE REST OF THE SIMUL OPERATORS MIRRORED IN `Tm`/`Ty` (Anthony).**
   Each TS simul operator mirrored as an Agda definition in the value language,
   in the same fashion, so the correspondence is readable rather than asserted.
-  The TS side now carries no closure flag, so its state is all in streams; the
-  first thing tested is the SEEDED channel the share reads at subscribe time,
-  a further ask than a plain channel which `Tm` may not have.
+  The first thing tested is the SEEDED channel the share reads at subscribe
+  time, a further ask than a plain channel which `Tm` may not have.
+  `batchSyncᵉ` is already one, and its shape is in doubt — see its header.
   **AND IF THE LANGUAGE CANNOT SAY ONE, STOP AND REPORT (Anthony).** A missing
   former is never repaired by inventing one: a new `Ty` constructor or `Tm`
-  former changes what a program can SAY, so it decides what every theorem
-  above quantifies over — the same reason the spec is not an agent's to move.
+  former changes what a program can SAY, so it decides what every theorem above
+  quantifies over — the same reason the spec is not an agent's to move.
 
 ### The ledger
 

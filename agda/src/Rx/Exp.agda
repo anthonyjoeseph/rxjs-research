@@ -81,6 +81,21 @@ mutual
                  -- which is what the TypeScript `captureSync` does when
                  -- its burst array comes back empty.
                  --
+                 -- AND THE INDEX IS IN DOUBT, WHICH IS A QUESTION
+                 -- ABOUT THIS FORMER AND NOT ABOUT THE OPERATOR.  The
+                 -- reference operator tags each output sync-or-async and
+                 -- carries the sync burst as a plain LIST, so an empty
+                 -- subscribe burst leaves as an empty group and a
+                 -- one-value burst is still distinguishable from a later
+                 -- singleton.  A head-and-tail pair can say neither: it
+                 -- has no empty, so the empty burst is dropped, and
+                 -- `(v , [])` is what BOTH of those produce.  The shape
+                 -- the reference asks for is `listᵗ t +ᵗ t`, which this
+                 -- language already says -- sums, `inlᵗ`, `inrᵗ` and
+                 -- `caseᵗ` are all here -- so the repair costs no new
+                 -- former, only this one's index.  Changing it is
+                 -- Anthony's, since it changes what a program can say.
+
                  -- WHAT IT CANNOT DO IS THE REASON IT EXISTS.  Cutting a
                  -- batch of genuinely simultaneous emissions means
                  -- knowing when NOT to cut -- whether more is still owed

@@ -86,19 +86,19 @@ grep -qx -- '-- <<<IMPORTS' "$CORPUS" || {
 # is WIDER than the generator's palette on purpose, and a name leaves it
 # only when the language it names has stopped having that former.
 read -r -d '' WIDE_IMPORTS <<'AGDA' || true
+open import Data.Bool using (true; false)
 open import Data.Fin using (zero; suc)
 open import Data.Maybe using (nothing; just)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Relation.Binary.PropositionalEquality using (refl)
 
-open import Rx.Prim using (after_,_; hot; cold)
-open import Rx.Exp using (input; ofᵉ; emptyᵉ; takeᵉ; mapᵉ; scanᵉ; mergeAllᵉ;
-  switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ;
-  nat̂; unit̂; nilᵗ; consᵗ; foldᵗ; ifᵗ; revᵗ;
-  primᵗ; pairᵗ; fstᵗ; sndᵗ; strmᵗ; varᵗ; add; sub; mul; eqᵖ; ltᵖ; notᵖ)
-open import Rx.Slots using (scripted; shared)
+open import Rx.Exp using (add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ)
+open import Rx.SExp using (inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; scanˢ; mergeAllˢ;
+  switchAllˢ; exhaustAllˢ; μˢ; varˢ; deferˢ;
+  varˢᵗ; unitˢ; boolˢ; natˢ; pairˢ; fstˢ; sndˢ; inlˢ; inrˢ; caseˢ; ifˢ;
+  primˢ; nilˢ; consˢ; foldˢ; strmˢ)
 
-open import Implementation.Unit-Test.Prelude using (Case; cached)
+open import Implementation.Unit-Test.Prelude using (Case; cached; slots₂)
 AGDA
 
 widen () {

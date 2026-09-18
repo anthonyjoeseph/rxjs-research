@@ -137,10 +137,10 @@ export type Exp =
   // the one plain former that can see synchrony, and it sees exactly one
   // bit of it: the subscribe frame's values leave as ONE group, every
   // later value as its own singleton. `ty` is the node's own type, so a
-  // batchSync over `s` carries `s ×ᵗ listᵗ s` — head and tail, since the
-  // group is never empty. NOTHING COMPILES IT YET: the plain-rxjs
-  // refactor of the primitives is what has to write the operator, and
-  // until then the generator has no lane for it (scripts/formers.tsv).
+  // batchSync over `s` carries `s ×ᵗ listᵗ s` — head and tail, since a
+  // group that would be empty is not emitted at all. Both legs compile
+  // it out of ordinary rxjs: the bit is `merge`'s subscribe ordering,
+  // never a subscription either leg owns.
   | { type: "batchSync"; ty: Ty; src: Exp };
 // ⚠ defer here is Agda's deferᵉ, NOT rxjs defer: lazy PLUS a one-tick
 // hop, and the body's emissions mint fresh ids (an async boundary).
