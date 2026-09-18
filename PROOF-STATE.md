@@ -236,17 +236,6 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
   seed corpus, and it is owed the moment the oracle is green — a green
   measured once is a receipt, and a receipt is not a check.
 
-- **THEN THE SWEEP'S YIELD, WHICH THE HEADLINE COUNT HIDES.** The oracle
-  is green and the demotion's own witness agrees — a shared slot over a
-  two-item source, flattened by a map whose payload is that same slot,
-  where a depth-first cascade yields the second item and a burst yields
-  none. But 357 of the 500 drawn programs emit NOTHING, so the count is
-  143 rows that could have diverged and 357 that agree vacuously. The leg
-  is to raise the yield — bias fuel toward the async scripts that are
-  drawn and away from roots that cannot emit — and to denominate the
-  report in rows that could have failed, since a coverage claim stated in
-  cases is the claim this campaign has twice had to restate.
-
 - **THEN THE SIX ROWS, WHICH NOTHING HOLDS ANY MORE.** The flatteners
   were held on a blocker and are not: they wanted a token per inner
   registration against a binder fixed at subscribe time, and an inner is a

@@ -1,6 +1,6 @@
 import { Closed, Ty, Val } from "./exp.js";
 import { evaluatePlain } from "./plain-eval.js";
-import { genSeeds, genTestCases } from "./generator.js";
+import { genTestCases } from "./generator.js";
 import { serialize } from "./serialize.js";
 import { execAgda } from "./agda-bridge.js";
 import { readFileSync } from "node:fs";
@@ -74,7 +74,7 @@ export type TestCase = {
 
 // CLI flags biasing the run: `--operator <op>` features that operator at
 // the root of every generated program (the generator ignores an unknown
-// name); `--seed <s>` pins a single seed, else the full genSeeds() sweep.
+// name); `--seed <s>` pins a single seed, else the rejection draw below.
 // Both accept `--flag value` and `--flag=value`; absent ⇒ undefined.
 const readFlag = (name: string): string | undefined => {
   const argv = process.argv.slice(2);
@@ -136,17 +136,26 @@ const render = (values: Val[]): string => (
 // index is an offset into a seed sweep, so it cannot be fed back to
 // `--seed` to recover the input.  A divergence nobody can reproduce is
 // a report rather than a finding.
+// AND THE COUNT IS DENOMINATED IN ROWS THAT COULD HAVE DIVERGED, not in
+// cases drawn. A program where NEITHER side emits agrees for a reason
+// that has nothing to do with the machines under test, so counting it
+// toward a coverage claim is the vacuous-row failure this file's own
+// EMPTY-output incident already records, one notch weaker: there the
+// check could not fail, here most of it does not.
 const interpretResults = (
   agdaResults: EvalResult[],
   rxResults: EvalResult[],
   testCases: TestCase[],
-): { report: string; ok: boolean } => {
+): { report: string; ok: boolean; live: number } => {
   const n = Math.min(agdaResults.length, rxResults.length);
   const lines: string[] = [];
   let valuesOk = 0;
+  let live = 0;
   for (let i = 0; i < n; i++) {
     const a = render(agdaResults[i].values);
     const r = render(rxResults[i].values);
+    if (agdaResults[i].values.length > 0 || rxResults[i].values.length > 0)
+      live++;
     if (a === r) {
       valuesOk++;
       continue;
@@ -157,37 +166,99 @@ const interpretResults = (
     lines.push(`  rx.values   = ${r}`);
   }
   const header =
-    `${n} cases: values ${valuesOk}/${n} match` +
+    `${n} cases (${live} emitting): values ${valuesOk}/${n} match` +
     (agdaResults.length !== rxResults.length
       ? ` (LENGTH MISMATCH: agda ${agdaResults.length}, rx ${rxResults.length})`
       : "");
   return {
     report: [header, ...lines].join("\n"),
     ok: valuesOk === n && n > 0 && agdaResults.length === rxResults.length,
+    live,
   };
+};
+
+// THE CORPUS IS DRAWN BY REJECTION, AND THE THING REJECTED IS A SILENT
+// PROGRAM. A flat sweep of the seed list runs 500 programs of which 357
+// emit NOTHING, so a reported 500/500 is 143 rows that could have
+// diverged. Emptiness is a property of the PROGRAM and it is decidable
+// here for free -- the rx leg has to be evaluated anyway -- so the draw
+// keeps drawing past a silent program instead of spending an Agda row
+// on it. Yield is what this buys; the Agda side still sees CORPUS cases,
+// so it costs nothing.
+//
+// AND BIASING THE FUEL WAS THE OTHER CANDIDATE AND IT IS DEAD: re-run at
+// fuel 60, 348 of the 357 stay empty. They are silent structurally --
+// rooted at `empty`, at a flattener whose source never fires, at a
+// spent `take` -- not starved of arrivals. Nine rows was the whole prize.
+//
+// A SILENT QUOTA IS KEPT DELIBERATELY, AND DROPPING IT WOULD DROP THE
+// ONE CLASS THAT HAS ALREADY CAUGHT A REAL BUG. The rejection predicate
+// reads ONE leg (rx), so a program where rx is silent and Agda is not is
+// exactly a divergence -- and that is the shape of the depth-first
+// witness this branch pinned, where the two machines disagreed by one
+// side emitting and the other not. Filtering on rx-empty would have
+// filtered that finding away. So the silent rows are thinned, never
+// excluded.
+const CORPUS = 500;
+const SILENT_QUOTA = 100;
+const LIVE_TARGET = CORPUS - SILENT_QUOTA;
+const MAX_SEEDS = 400; // a bound, so an `--operator` that can only draw
+// silent programs reports a short corpus instead of looping
+
+const drawCorpus = (operator?: string): TestCase[] => {
+  const live: TestCase[] = [];
+  const silent: TestCase[] = [];
+  for (
+    let i = 0;
+    i < MAX_SEEDS && (live.length < LIVE_TARGET || silent.length < SILENT_QUOTA);
+    i++
+  ) {
+    for (const testCase of genTestCases(`s${i}`, operator)) {
+      const bucket = evaluatePlain(testCase).length > 0 ? live : silent;
+      const cap = bucket === live ? LIVE_TARGET : SILENT_QUOTA;
+      if (bucket.length < cap) bucket.push(testCase);
+    }
+  }
+  return [...live, ...silent];
 };
 
 async function main() {
   const operator = readOperatorFromCli();
   const cliSeed = readSeedFromCli();
   const casesFile = readCasesFromCli();
-  const seeds = cliSeed ? [cliSeed] : genSeeds();
   const testCases =
     casesFile !== undefined
       ? readFileSync(casesFile, "utf8")
           .split("\n")
           .filter((line) => line.trim().length > 0)
           .map((line) => JSON.parse(line) as TestCase)
-      : seeds.flatMap((seed) => genTestCases(seed, operator));
+      : cliSeed !== undefined
+        ? genTestCases(cliSeed, operator)
+        : drawCorpus(operator);
   const agdaResults = await execAgda(testCases.map(serialize));
   const rxResults = testCases.map((testCase): EvalResult => ({
     values: evaluatePlain(testCase),
   }));
-  const { report, ok } = interpretResults(agdaResults, rxResults, testCases);
+  const { report, ok, live } = interpretResults(
+    agdaResults,
+    rxResults,
+    testCases,
+  );
   console.log(report);
   // a zero-case run is a failure too: it means the generator produced
   // nothing, which reads as a clean sweep of an empty corpus
   if (!ok) process.exitCode = 1;
+  // AND A SWEPT CORPUS THAT CAME UP SHORT ON EMITTING ROWS IS A FAILURE,
+  // because the yield is the thing the draw exists to hold. Only the
+  // full sweep is held to it -- a pinned `--seed` or a `--cases` replay
+  // is whatever the user asked for.
+  if (casesFile === undefined && cliSeed === undefined && live < LIVE_TARGET) {
+    console.log(
+      `YIELD SHORT: ${live} emitting rows, target ${LIVE_TARGET} -- the ` +
+        `draw could not find enough programs that emit within ${MAX_SEEDS} seeds`,
+    );
+    process.exitCode = 1;
+  }
 }
 
 main();

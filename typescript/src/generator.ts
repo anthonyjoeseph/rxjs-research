@@ -9,16 +9,18 @@ import type { ObservableInput, Slot, TestCase, Timed } from "./prop-test.js";
 // Agda side only decodes and evaluates what it emits. There is no Agda
 // twin — Agda has its own QuickCheck — so this is free implementation.
 //
-// MOST OF WHAT IT DRAWS EMITS NOTHING, AND THE HEADLINE COUNT DOES NOT
-// SAY SO.  Measured over the full seed sweep: 357 of 500 programs
-// produce an EMPTY value list, so a reported 500/500 is 143 rows that
-// could have diverged and 357 that agree because neither side emitted.
-// An empty row is not a wrong row — a program rooted at `empty`, or one
-// whose fuel never reaches its async script, legitimately yields nothing
-// — but it is not evidence either, and the ratio is what a coverage
-// claim has to be denominated in.  This is the same shape as the
-// EMPTY-output incident `prop-test.ts` records, one level up: there the
-// check could not fail, here it can, and most of it does not.
+// MOST OF WHAT IT DRAWS EMITS NOTHING, AND THAT IS A PROPERTY OF THE
+// TREE SHAPES RATHER THAN OF THE FUEL.  Measured over a flat 500-program
+// sweep: 357 emit an EMPTY value list, and re-running those at fuel 60
+// leaves 348 of them still empty.  So they are silent STRUCTURALLY — a
+// root at `empty`, a flattener whose source never fires, a spent `take`
+// — and no amount of arrival budget reaches them.  The consequence for
+// anyone tempted to tune the fuel distribution here: that lever is worth
+// nine rows in 500, and it has already been tried.  The yield is raised
+// where it can be, by rejection at draw time in `prop-test.ts`, which
+// keeps drawing past a silent program; this file stays a plain
+// distribution over well-typed trees and is not asked to know which of
+// them speak.
 
 // ---- seeded PRNG (mulberry32 over an FNV-1a string hash) ----
 type Rng = () => number; // [0, 1)
@@ -636,6 +638,3 @@ export const genTestCases = (seed: string, operator?: string): TestCase[] => {
     genTestCase(rng, operator),
   );
 };
-
-export const genSeeds = (): string[] =>
-  Array.from({ length: 25 }, (_, i) => `s${i}`);
