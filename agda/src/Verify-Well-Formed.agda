@@ -37,14 +37,6 @@ open import Rx.Protocol using (protocol-init; runProtocol; Accepted)
 -- statement quantifies over any at its indices --
 -- `evaluate-deterministic` is the fact that would make those the same
 -- set.
---
--- DEAD ROUTE: obtaining this from a well-formed denotation, by
---   quantifying a leaf over every prefix of a program's meaning and
---   instantiating it at the run.  That route was stated against the
---   conjunction, whose final check demands settledness AT THE CUT, and
---   an instant's obligations span several emits, so a cut between them
---   is rejected.  What is true of an arbitrary prefix is this
---   statement ALONE, which needs no domain to say.
 
 -- AND THE SEGMENT DECOMPOSITION IS NOT PART OF IT, BECAUSE THE PLAIN
 -- CARRIER PUT THE PROTOCOL BEYOND THE MACHINE'S REACH.  While the
@@ -60,6 +52,13 @@ open import Rx.Protocol using (protocol-init; runProtocol; Accepted)
 -- from the machine to whoever supplies the inputs, and where that
 -- hypothesis belongs is the simul tree's question rather than this
 -- face's.
+-- DEAD ROUTE: obtaining this from a well-formed denotation, by
+--   quantifying a leaf over every prefix of a program's meaning and
+--   instantiating it at the run.  That route was stated against the
+--   conjunction, whose final check demands settledness AT THE CUT, and
+--   an instant's obligations span several emits, so a cut between them
+--   is rejected.  What is true of an arbitrary prefix is this
+--   statement ALONE, which needs no domain to say.
 -- DEAD ROUTE: recovering soundness by strengthening an evaluator
 --   clause, or by carving the run into segments and composing them.
 --   The counterexample never enters a clause -- the value is opaque to

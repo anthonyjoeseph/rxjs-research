@@ -230,32 +230,43 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 
 ### Big picture tier roadmap
 
-- **ENVELOPE-VALUED INPUT SLOTS — WHAT THE DECODE LEG TURNED OUT TO OWE.**
-  Three of the four orphaned faces crossed on a narrowing alone, QUANTIFYING
-  over their program so an abstract slot table came with it. The readme
-  instances do not: their content is the concrete script, and under
-  elaboration a slot carries the envelope type, so a scripted hot slot must
-  deliver an envelope rather than a value. Nothing in `src` builds one. The gap
-  is wider than the readme — every probe instantiates at a plain program, which
-  no narrowed statement admits — so one missing constructor is what makes the
-  evidence tree re-runnable. The semantics question is in the decoder's header.
+- **THE INSTANT WINDOW, WHICH IS THE ONE THING BLOCKING EVERY REMAINING
+  INSTANCE.** `toPlain`'s `inputˢ` arm is a bare `subst`: it passes the slot
+  through, so the slot lands at the envelope type and the DRIVER owes the
+  envelope — which is the thing srxjs is not allowed to require. Six readme
+  instances, four probe fingerprints and the QuickCheck harness are all blocked
+  on exactly this and on nothing else. The arm's own header already argues the
+  repair and shows it forges nothing: an instant is READ, never drawn, so a
+  former copying the ambient one onto each emit is narrower than the source
+  mint already granted. A new plain former is Anthony's, so this leg is a
+  question, not a patch.
 
-- **THEN THE PROBE SUITE, RE-RUN RATHER THAN RESTAMPED.** Six `-- TARGET:`
-  fingerprints across four probe files stand against statements this leg
-  restated, and a fingerprint is exactly the check that refuses a restatement
-  under an unchanged name. The repair is never the stamp: each probe's rows
-  are evidence about a statement that admitted plain programs, and the
-  narrowed statement admits none of them, so the rows are re-run against the
-  new reading on the apparatus the leg above builds, or the probe goes and its
-  receipts go with it. What the receipts claim today is coverage nothing buys.
+- **THEN THE README OVER `SExp`, WHICH THE WINDOW MAKES MECHANICAL (Anthony).**
+  Seven instance claims are stated over plain programs and hot slots carrying
+  plain values — the shape the plain tree can no longer batch. With `inputˢ`
+  elaborating, each restates as its simul program under `elaborate`, the slots
+  stay plain-valued and the conclusions are unchanged. One of the seven is
+  slot-free and ports without waiting. Landing this is what stops the readme
+  claims being a face the split left behind.
 
-- **THEN RETIRE `Rx.Depth` AND `budgetᵈ`.** The second top line existed to
-  paper over the divergence the leg above removes, and it is a pure function
-  total by `budgetᵈ f = 512 * suc f` — a cascade outrunning it is SILENTLY
-  TRUNCATED, with no marker. It is under no theorem, and its only `src`
-  consumer is the CLI decoder, so the truncation is exposed to the
-  differential oracle, where a cut-short run still reports agreement with
-  TypeScript. Cut that consumer over to `evaluate↓` and the module goes.
+- **THEN THE PROBE SUITE, RE-RUN RATHER THAN RESTAMPED.** Four `-- TARGET:`
+  fingerprints stand against statements this branch restated, and a
+  fingerprint is exactly the check that refuses a restatement under an
+  unchanged name. The repair is never the stamp: each probe's rows are
+  evidence about a statement that admitted plain programs, and the narrowed
+  statement admits none of them. All four are `noSlots` rows, so they re-run
+  against an elaborated source and need nothing the leg above does not build.
+
+- **`Rx.Depth` IS NOT RETIRED BY ANY OF THE ABOVE, AND THE OLD LEG SAYING SO
+  IS DISCARDED.** It claimed the second top line papered over a divergence the
+  decode leg removes. It does not: what forces `evaluateᵈ` is that a whole
+  synchronous source runs in ONE STEP, so a subscriber attaching part-way
+  through sees the remainder in rxjs and nothing here. The plain carrier split
+  that burst into one event per value, which changed the stream's shape and not
+  its timing. Matching rxjs means SCHEDULING sources rather than running them
+  whole — an evaluator change reaching the builder, the domain, the
+  reducibility candidate and freshness, and the tier's one genuine architecture
+  decision. `budgetᵈ`'s silent truncation stands until it lands.
 
 - **THE FLATTENERS, WHICH ARE THE ONE HALF STILL SHORT A CAPABILITY.** A
   delegating flattener consumes the envelope in its projecting map and the
