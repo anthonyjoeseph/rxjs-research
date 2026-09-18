@@ -593,6 +593,24 @@ initᵈ {n} {Γ} {t} ins = go (toList (allFin n)) empty
 -- run's fuel counts ARRIVALS, which is what the TypeScript counts; the
 -- budget counts stack entries, and nothing in the mirror corresponds
 -- to it.  Deriving it keeps a single knob on the harness side.
+
+-- AND IT IS A WEAKER TOTALITY DEVICE THAN THE ONE THE OTHER EVALUATOR
+-- HAS, WHICH IS A FINDING ABOUT THE SPLIT RATHER THAN ABOUT THIS
+-- NUMBER.  `runWorkᵈ` recurses structurally on this count, so the
+-- cascade loop is total for free and a cascade that outruns the count
+-- is TRUNCATED, silently and with no marker in the output.  The
+-- envelope-carrying evaluator pays for the same totality with a
+-- Girard-Tait reducibility candidate instead, which is a PROOF that
+-- every cascade finishes and admits no truncation at all.
+--
+-- SO THE TWO EVALUATORS DO NOT DIFFER ONLY IN WHAT THEY EMIT, and
+-- whichever device survives the split is a decision about the proof
+-- statement rather than about either machine.  Retargeting the
+-- theorems at this evaluator as it stands trades a theorem for a
+-- constant; porting the candidate across is mechanical but touches
+-- every member of the subscribe cycle, since the candidate is stated
+-- over the other machine's own state types throughout.  Neither is an
+-- elaboration detail and neither is chosen here.
 budgetᵈ : Fuel → ℕ
 budgetᵈ f = 512 * suc f
 

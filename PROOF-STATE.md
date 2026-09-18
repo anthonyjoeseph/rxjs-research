@@ -258,14 +258,11 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
   above quantifies over — the same reason the spec is not an agent's to move.
 
 - **THEN THE TOWER OVER THE SPLIT, WITH `Reducible` THE THING THAT MUST NOT
-  REGRESS (Anthony).** The tier's own product cannot be false, so what catches
-  it wrong is the existing proofs failing over the split — and the one that
-  matters is the Girard–Tait termination machinery, which must work exactly as
-  well as it always has. The other two consumers are held to the cheapest thing
-  that typechecks and keeps its wiring, since the statements they carry are
-  about to move: `Verify-Well-Formed` is not worth investment before tier 2
-  restates it, and `Verify-Determinacy` should be down to its monotonicity
-  lemma alone once the denotation and adequacy faces come out.
+  REGRESS (Anthony).** `Reducible` is green and postulate-free today; which
+  totality device survives the split is tier 2's decision, recorded at
+  `budgetᵈ`. `Verify-Well-Formed` and `Verify-Determinacy` are held to the
+  cheapest thing that typechecks and keeps their wiring — their statements
+  are about to move.
 
 ### The ledger
 
