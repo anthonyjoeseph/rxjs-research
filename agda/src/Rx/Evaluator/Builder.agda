@@ -54,8 +54,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; con
 open import Relation.Nullary using (yes; no)
 open import Relation.Nullary.Decidable using (⌊_⌋)
 
-open import Rx.Prim using (Fuel; Id; Source; Tick; InstEmit; InstEvent; close;
-  exhausted; hot; cold)
+open import Rx.Prim using (Fuel; Id; Source; Tick; hot; cold)
 open import Rx.Exp using (Ctx; Closed; Val; Exp; _≟ᵗ_; obs; Env; _∷ᵉ_; []ᵉ; unfoldμ; evalWith; input; ofᵉ; emptyᵉ;
   takeᵉ; batchSyncᵉ; mapᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ)
 open import Rx.Mint using (nodeᵏ; regᵏ; sourceᵏ; freshId; setAt; next)
@@ -63,8 +62,8 @@ open import Rx.Slots using (Slots; shared; scripted)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; AllOp; NodeId; NodeState; Frame; root; _↠_; take-f;
   map-f; scan-f; thru-outer; from-inner; mergeAllᵒ; switchᵒ; exhaustᵒ; mergeAll-st; switch-st;
   exhaust-st; take-st; batchSync-st; batchSync-f; cell-st; installNode; lookupNode; setNode; hasRoom; consumeUsable;
-  switchKill; aliveThroughᶠ; splitEvents; splitBurst; sched-init; st-init; memberSource;
-  share-sink; lowerFloor; register; atSlot; burstCompleted; Arrival; arrTick; arrSource; arrTy;
+  switchKill; aliveThroughᶠ; splitStream; sched-init; st-init; memberSource;
+  share-sink; lowerFloor; register; atSlot; streamCompleted; Arrival; arrTick; arrSource; arrTy;
   arrVal; AtFloor; RegId; chainsOf; cascadeLatch; sched-next; shareAdmit; shareLatch)
 open import Rx.Evaluator.Keeps-Slots using (subs-keeps; step-keeps;
   consume-keeps; switchKill-slots)
@@ -73,7 +72,7 @@ open import Rx.Evaluator.Domain using (srcFrame; subscribeE⇓; subscribeAll⇓;
   thruConsume⇓; subscribeInner⇓;
   finish-all-drain; finish-switch-clear;
   finish-exhaust-clear; finish-nil; react-false; react-alive; react-dead;
-  push-nil; push-cons; step-map; step-scan;
+  push-all; step-map; step-scan;
   step-take; step-batchSync; step-from-inner; step-thru-outer;
   walk-nil; walk-cons; consume-all-sub; consume-all-enqueue; consume-all-nil;
   consume-switch-sub; consume-switch-nil; consume-exhaust-sub;
@@ -369,18 +368,16 @@ subscribeAll! sl op ns b ρ κ id now sched ag st =
                   (trans (subs-keeps d) ag) st₁
   in r , sub-all refl d p
 
--- THE PUSH CYCLE STEPS ONE EMIT PER ITERATION, handing the frame that
--- emit's own values and threading the schedule and the state onward.
---
-pushBurst! sl id now fr sv κ []         sched ag st = _ , push-nil
-pushBurst! sl id now fr sv κ (em ∷ ems) sched ag st =
-  let sp = splitEvents (InstEmit.events em)
-      ((vals′ , evs , fin′ , sched₁ , st₁) , sf) =
-        stepFrame! sl id now fr sv κ (proj₁ sp)
-          (proj₂ (proj₂ sp)) sched ag st
-      (_ , pb) = pushBurst! sl id now fr sv κ ems sched₁
-                   (trans (step-keeps sf) ag) st₁
-  in _ , push-cons refl sf pb
+-- THE PUSH IS ONE STEP, WHICH IS WHAT DROPPING THE ENVELOPE BOUGHT.
+-- This used to cycle, because a burst was a list of envelopes and each
+-- one had to be unwrapped, stepped and wrapped again.  A plain stream
+-- has no brackets to preserve, so the whole burst splits once and the
+-- frame is asked once.
+pushBurst! sl id now fr sv κ burst sched ag st =
+  let sp = splitStream burst
+      (_ , sf) =
+        stepFrame! sl id now fr sv κ (proj₁ sp) (proj₂ sp) sched ag st
+  in _ , push-all refl sf
 
 -- THE STORE READINGS COST THE BUILDER NOTHING BECAUSE EACH FRAME'S
 -- RELATION IS PINNED TO THE MACHINE'S OWN DISPATCH.  A node table
@@ -401,13 +398,13 @@ stepFrame! sl id now (scan-f fn nid) sv κ vals fin sched ag st = _ , step-scan
 stepFrame! sl id now (from-inner op allNid inst) () κ vals fin sched ag st
 
 stepFrame! sl id now (thru-outer op nid) sv κ vals fin sched ag st =
-  let ((vs , bs , sched′ , st′) , w) =
+  let ((vs , sched′ , st′) , w) =
         thruWalk! sl op nid κ id now vals sched ag st
   in _ , step-thru-outer w
 
 thruWalk! sl op nid κ id now []       sched ag st = _ , walk-nil
 thruWalk! sl op nid κ id now (o ∷ os) sched ag st =
-  let ((vs , bs , sched₁ , st₁) , c) =
+  let ((vs , sched₁ , st₁) , c) =
         thruConsume! sl op nid κ id now o sched ag st
       (_ , w) = thruWalk! sl op nid κ id now os sched₁
                   (trans (consume-keeps c) ag) st₁
@@ -447,7 +444,7 @@ thruConsume! {u = u} sl switchᵒ nid κ id now o sched ag st
 ... | just (mergeAll-st _ _ _ _) = _ , consume-switch-nil (cong (consumeUsable switchᵒ _) eq)
 ... | just (exhaust-st _ _)      = _ , consume-switch-nil (cong (consumeUsable switchᵒ _) eq)
 ... | just (switch-st cur od) with switchKill cur sched st in eqk
-...   | (closes , sched₁ , st₁) =
+...   | (sched₁ , st₁) =
         let (_ , i) = subscribeInner! sl switchᵒ nid κ id now o sched₁
                         (trans (switchKill-slots cur sched st eqk) ag) st₁
         in _ , consume-switch-sub eq eqk i
@@ -477,8 +474,8 @@ subscribeInner! sl op allNid κ id now o sched ag st =
       ((burst , sched′ , st′) , d , _) =
         red-val (obs _) o (from-inner op allNid inst ↠ κ) id now
                   (record sched { mint = setAt nodeᵏ (suc inst) (Sched.mint sched) }) st
-      (vs , bs , done) = splitBurst burst
-  in (inst , vs , bs , done , sched′ , st′) , inner refl d refl
+      (vs , done) = splitStream burst
+  in (inst , vs , done , sched′ , st′) , inner refl d refl
 
 -- THE SLOT TABLE'S SIX ARMS, AND THE ONE OF THEM THAT RECURSES — WHICH
 -- IS THE THIRD EDGE THIS BLOCK CANNOT PAY FOR.  Five arms read the
@@ -527,7 +524,7 @@ subscribeE!-input {lo = lo} sl i κ id now sched ag st
                      (atSlot i) (lowerFloor below κ)
                      (record st
                        { connectedShares = toℕ i ∷ EvalSt.connectedShares st }))
-...         | ((burst , sched₁ , st₂) , dv , _) with burstCompleted burst in compEq
+...         | ((burst , sched₁ , st₂) , dv , _) with streamCompleted burst in compEq
 ...           | false =
                 _ , subs-shared {κ = κ} {below = below}
                       (slot-agree sl sched i ag slEq)
@@ -567,7 +564,7 @@ mergeAllDrain! allNid κ id now lim act od (o ∷ q) sched st
   with hasRoom lim act in eqr
 ... | false = _ , drain-no-room eqr
 ... | true  =
-  let ((inst , vs , bs , done , sched₁ , st₁) , s) =
+  let ((inst , vs , done , sched₁ , st₁) , s) =
         queuedInner! allNid κ id now o sched
           (record st
              { nodes = setNode allNid (mergeAll-st lim act q od)
@@ -694,10 +691,9 @@ mutual
 
   foldPath! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
     (ac : Acc _<_ (n ∸ lo)) (id : Id) (now : Tick) (envSrc : Source)
-    (κ : Path Γ lo u t) (vals : List (Val Γ u))
-    (evs : List (InstEvent (Val Γ t))) (fin : Bool)
+    (κ : Path Γ lo u t) (vals : List (Val Γ u)) (fin : Bool)
     (sched : Sched Γ) (st : EvalSt e) →
-    ∃ λ r → foldPath⇓ {e = e} id now envSrc κ vals evs fin sched st r
+    ∃ λ r → foldPath⇓ {e = e} id now envSrc κ vals fin sched st r
 
   dispatchShare! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo} {i : Fin n}
     (ac : Acc _<_ (n ∸ suc (toℕ i))) (below : lo ≤ toℕ i)
@@ -712,17 +708,17 @@ mutual
     (sched : Sched Γ) (st : EvalSt e) →
     ∃ λ r → shareGo⇓ {e = e} id now i vals fin ps sched st r
 
-  foldPath! ac id now envSrc root vals evs fin sched st = _ , fold-root
-  foldPath! (acc rec) id now envSrc (share-sink i below) vals evs fin sched st =
+  foldPath! ac id now envSrc root vals fin sched st = _ , fold-root
+  foldPath! (acc rec) id now envSrc (share-sink i below) vals fin sched st =
     let (_ , d) = dispatchShare! (rec (monus-sink i below)) below
                     id now vals fin sched st
     in _ , fold-sink d
-  foldPath! {u = u} ac id now envSrc (fr ↠ κ) vals evs fin sched st =
+  foldPath! {u = u} ac id now envSrc (fr ↠ κ) vals fin sched st =
     let sl = Sched.slots sched
-        ((vals′ , evs′ , fin′ , sched₁ , st₁) , sf) =
+        ((vals′ , fin′ , sched₁ , st₁) , sf) =
           stepFrameAny! sl id now fr κ vals fin sched refl st
         (_ , rest) =
-          foldPath! ac id now envSrc κ vals′ (evs ++ evs′) fin′ sched₁ st₁
+          foldPath! ac id now envSrc κ vals′ fin′ sched₁ st₁
     in _ , fold-step sf rest
 
   dispatchShare! {i = i} ac below id now vals fin sched st =
@@ -738,8 +734,7 @@ mutual
                 in _ , go-cut eqc g
   ... | false =
     let ((emits , sched₁ , st₁) , f) =
-          foldPath! ac id now (toℕ i) p vals
-            (if fin then close (toℕ i) exhausted ∷ [] else []) fin sched
+          foldPath! ac id now (toℕ i) p vals fin sched
             (record st { delivered = rid ∷ EvalSt.delivered st })
         (_ , g) = shareGo! ac id now vals fin ps sched₁ st₁
     in _ , go-live eqc f g
@@ -752,8 +747,6 @@ chainStep! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 chainStep! {n = n} id a (lo , path) sched st =
   let (_ , f) = foldPath! (<-wellFounded-fast (n ∸ lo)) id (arrTick a)
                   (arrSource a) path (arrVal a ∷ [])
-                  (if Arrival.isLast a
-                     then close (arrSource a) exhausted ∷ [] else [])
                   (Arrival.isLast a) sched st
   in _ , chain-step f
 

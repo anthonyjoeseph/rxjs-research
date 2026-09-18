@@ -52,8 +52,7 @@ open import Relation.Nullary.Decidable using (⌊_⌋)
 
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 
-open import Rx.Prim using (Id; Tick; Source; InstEmit; InstEvent; init; value; close; handoff;
-  complete; hot; cold)
+open import Rx.Prim using (Id; Tick; Source; PlainEvent; valueᵖ; completeᵖ; hot; cold)
 open import Rx.Mint using (nodeᵏ; regᵏ; sourceᵏ; freshId; setAt; next)
 open import Rx.Slots using (scripted; shared)
 open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; obs; listᵗ; _≟ᵗ_; Ctx; Closed; Val; Exp; Tm; Fn; FnClo; applyClo; Env; []ᵉ; _∷ᵉ_; evalWith; foldVals; input; ofᵉ; emptyᵉ;
@@ -69,35 +68,32 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; _↠_; take-
   batchSync-f; batchSync-st; batchSyncDispatch; groupSync; soloSync; setNode;
   mergeAllᵒ; switchᵒ; exhaustᵒ; mergeAll-st; switch-st; exhaust-st; takeVals; takeDispatch;
   mapVals; scanVals; scanDispatch; lookupNode; NodeState; installNode; oneShotBurst; memberSource;
-  splitEvents; splitBurst; retagEvents; NodeId; AllOp; from-inner; consumeUsable; hasRoom;
-  switchKill; thruWrap; share-sink; register; atSlot; lowerFloor; burstCompleted; sharedPlumb;
+  splitStream; NodeId; AllOp; from-inner; consumeUsable; hasRoom;
+  switchKill; thruWrap; share-sink; register; atSlot; lowerFloor; streamCompleted;
   spentBurst)
 open import Rx.Evaluator.Freshness using (lookup-set; PreservedBelow)
 open import Rx.Evaluator.Freshness.Preserve using (subscribeE-preserves)
 open import Rx.Evaluator.Domain using (srcFrame; subscribeE⇓; pushBurst⇓; stepFrame⇓; step-map; step-scan; step-take; step-batchSync;
-  subs-batchSync; push-nil;
-  push-cons; subs-of; subs-empty; subs-take-zero; subs-take-suc; subs-map; subs-scan;
+  subs-batchSync;
+  push-all; subs-of; subs-empty; subs-take-zero; subs-take-suc; subs-map; subs-scan;
   subs-defer; subs-mint; subs-floor; subs-hot-done; subs-hot-live; subs-cold-sync; subs-cold-async;
   subs-μ; sub-all; subs-merge-all; subs-switch-all; subs-exhaust-all; thruConsume⇓; thruWalk⇓;
   step-thru-outer; inner; consume-all-sub; consume-all-enqueue; consume-all-nil;
   consume-switch-sub; consume-switch-nil; consume-exhaust-sub; consume-exhaust-nil; walk-nil;
   walk-cons; subs-shared; slot-spent; slot-join; slot-connect; connect-live; connect-died)
 
--- An emitted EVENT carries a payload only in the `value` arm; every
--- other arm is protocol traffic and constrains nothing.
-EvSat : ∀ {A : Set} → (A → Set) → InstEvent A → Set
-EvSat P (init _)    = ⊤
-EvSat P (value v)   = P v
-EvSat P (close _ _) = ⊤
-EvSat P (handoff _) = ⊤
-EvSat P complete    = ⊤
+-- An emitted EVENT carries a payload only in the `value` arm; the end
+-- of a stream carries none and constrains nothing.
+EvSat : ∀ {A : Set} → (A → Set) → PlainEvent A → Set
+EvSat P (valueᵖ v) = P v
+EvSat P completeᵖ  = ⊤
 
 -- …and a STREAM satisfies a predicate when every value it ever carries
 -- does.  Taking the predicate as a parameter is what keeps `Red`'s
 -- recursion structural: the recursive occurrence is `Red u` applied at
 -- a strictly smaller type, not a call at the type being defined.
-StreamSat : ∀ {A : Set} → (A → Set) → List (InstEmit A) → Set
-StreamSat P = All (λ em → All (EvSat P) (InstEmit.events em))
+StreamSat : ∀ {A : Set} → (A → Set) → List (PlainEvent A) → Set
+StreamSat P = All (EvSat P)
 
 -- THE CANDIDATE.  At a data type it is trivial, because nothing about
 -- a number can fail to be reducible; at an observable it is the pair
@@ -133,18 +129,11 @@ Red {Γ = Γ} (obs u) b =
 -- semantic fact underneath is that this share does not replay, so there
 -- is nothing stored for the invariant to be about.
 
--- A SPENT SLOT'S BURST is registration traffic and a completion, so
--- every predicate holds of it for want of anything to hold of.
+-- A SPENT SLOT'S BURST is an end and nothing else, so every predicate
+-- holds of it for want of anything to hold of.
 StreamSat-spent : ∀ {A : Set} {P : A → Set} (src : Source) (id : Id)
                 → StreamSat P (spentBurst {A} src id)
-StreamSat-spent src id = (tt ∷ tt ∷ tt ∷ []) ∷ []
-
--- AND THE FAN-OUT RETAGS ITS EMITS WITHOUT TOUCHING THEIR EVENTS, so
--- whatever held of the def's burst still holds of what the readers see.
-StreamSat-plumb : ∀ {n} {Γ : Ctx n} {u} {P : Val Γ u → Set} (str : Stream Γ u)
-                → StreamSat P str → StreamSat P (sharedPlumb str)
-StreamSat-plumb []       []       = []
-StreamSat-plumb (x ∷ xs) (q ∷ qs) = q ∷ StreamSat-plumb xs qs
+StreamSat-spent src id = tt ∷ []
 
 -- PUSHING A BURST THROUGH A FRAME, WITH THE CANDIDATE CARRIED ACROSS.
 -- The three transformer arms all have the same two-step shape — run the
@@ -242,31 +231,20 @@ RedStep : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
         → Id → Tick → Frame Γ s u → Path Γ lo u t
         → List (Val Γ s) → Bool → Sched Γ → EvalSt e → Set
 RedStep {Γ = Γ} {t = t} {e = e} {u = u} id now f κ vals fin sched st =
-  Σ (List (Val Γ u) × List (InstEvent (Val Γ t)) × Bool × Sched Γ × EvalSt e) λ r →
+  Σ (List (Val Γ u) × Bool × Sched Γ × EvalSt e) λ r →
     stepFrame⇓ {e = e} id now f κ vals fin sched st r × All (Red u) (proj₁ r)
-      × RedNode f (proj₂ (proj₂ (proj₂ (proj₂ r))))
+      × RedNode f (proj₂ (proj₂ (proj₂ r)))
 
--- A SPLIT TAKES THE VALUE COLUMN OUT OF A BURST, and nothing else,
--- so whatever held of every value the burst carried holds of every
--- value the split hands back.  The other four event formers carry no
--- payload, so their satisfaction is decided by the former alone and
--- they simply leave the column.
-satSplitEvents : ∀ {n} {Γ : Ctx n} {u} {A : Set} {P : Val Γ u → Set}
-                 (es : List (InstEvent (Val Γ u))) → All (EvSat P) es
-               → All P (proj₁ (splitEvents {A = A} es))
-satSplitEvents []                []       = []
-satSplitEvents (init _     ∷ es) (_ ∷ ps) = satSplitEvents es ps
-satSplitEvents (value _    ∷ es) (p ∷ ps) = p ∷ satSplitEvents es ps
-satSplitEvents (close _ _  ∷ es) (_ ∷ ps) = satSplitEvents es ps
-satSplitEvents (handoff _  ∷ es) (_ ∷ ps) = satSplitEvents es ps
-satSplitEvents (complete   ∷ es) (_ ∷ ps) = satSplitEvents es ps
-
-satSplitBurst : ∀ {n} {Γ : Ctx n} {u} {A : Set} {P : Val Γ u → Set}
-                (str : Stream Γ u) → StreamSat P str
-              → All P (proj₁ (splitBurst {A = A} str))
-satSplitBurst []         []       = []
-satSplitBurst (em ∷ ems) (q ∷ qs) =
-  ++⁺ (satSplitEvents (InstEmit.events em) q) (satSplitBurst ems qs)
+-- A SPLIT TAKES THE VALUE COLUMN OUT OF A STREAM, and nothing else,
+-- so whatever held of every value the stream carried holds of every
+-- value the split hands back.  The end carries no payload, so its
+-- satisfaction is decided by the former alone and it leaves the column.
+satSplitStream : ∀ {n} {Γ : Ctx n} {u} {P : Val Γ u → Set}
+                 (str : Stream Γ u) → StreamSat P str
+               → All P (proj₁ (splitStream str))
+satSplitStream []               []       = []
+satSplitStream (valueᵖ _ ∷ es)  (p ∷ ps) = p ∷ satSplitStream es ps
+satSplitStream (completeᵖ ∷ es) (_ ∷ ps) = satSplitStream es ps
 
 -- AND THE WRAP AROUND THE WALK NEVER TOUCHES THAT COLUMN.  What it
 -- decides is whether the operator is finished and what its node then
@@ -276,9 +254,9 @@ satSplitBurst (em ∷ ems) (q ∷ qs) =
 -- does not reduce against a catch-all in a proof.
 thruWrap-vals : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
                 (op : AllOp) (nid : NodeId) (fin : Bool)
-                {vs : List (Val Γ u)} {bs : List (InstEvent (Val Γ t))}
+                {vs : List (Val Γ u)}
                 {sched′ : Sched Γ} {st′ : EvalSt e}
-              → proj₁ (thruWrap {e = e} op nid fin (vs , bs , sched′ , st′)) ≡ vs
+              → proj₁ (thruWrap {e = e} op nid fin (vs , sched′ , st′)) ≡ vs
 thruWrap-vals op nid false = refl
 thruWrap-vals mergeAllᵒ nid true {st′ = st′}
   with lookupNode nid (EvalSt.nodes st′)
@@ -318,14 +296,14 @@ RedConsume : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
            → AllOp → NodeId → Path Γ lo u t → Id → Tick
            → Val Γ (obs u) → Sched Γ → EvalSt e → Set
 RedConsume {Γ = Γ} {t = t} {e = e} {u = u} op nid κ id now o sched st =
-  Σ (List (Val Γ u) × List (InstEvent (Val Γ t)) × Sched Γ × EvalSt e) λ r →
+  Σ (List (Val Γ u) × Sched Γ × EvalSt e) λ r →
     thruConsume⇓ {e = e} op nid κ id now o sched st r × All (Red u) (proj₁ r)
 
 RedWalk : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
         → AllOp → NodeId → Path Γ lo u t → Id → Tick
         → List (Val Γ (obs u)) → Sched Γ → EvalSt e → Set
 RedWalk {Γ = Γ} {t = t} {e = e} {u = u} op nid κ id now vals sched st =
-  Σ (List (Val Γ u) × List (InstEvent (Val Γ t)) × Sched Γ × EvalSt e) λ r →
+  Σ (List (Val Γ u) × Sched Γ × EvalSt e) λ r →
     thruWalk⇓ {e = e} op nid κ id now vals sched st r × All (Red u) (proj₁ r)
 
 -- THE HOP IS PAID FOR BY THE ARRIVING VALUE'S OWN CANDIDATE, which is
@@ -367,7 +345,7 @@ red-consume {u = u} mergeAllᵒ nid κ id now ro sched st
                 ro (from-inner mergeAllᵒ nid (freshId nodeᵏ (Sched.mint sched)) ↠ κ) id now
                    (record sched { mint = next nodeᵏ (Sched.mint sched) }) st
           in _ , consume-all-sub eq eqr (inner refl d refl)
-               , satSplitBurst burst ss
+               , satSplitStream burst ss
 
 red-consume {u = u} switchᵒ nid κ id now ro sched st
   with lookupNode nid (EvalSt.nodes st) in eq
@@ -389,7 +367,7 @@ red-consume {u = u} switchᵒ nid κ id now ro sched st
               ro (from-inner switchᵒ nid (freshId nodeᵏ (Sched.mint sched₁)) ↠ κ) id now
                  (record sched₁ { mint = next nodeᵏ (Sched.mint sched₁) }) st₁
         in _ , consume-switch-sub eq eqk (inner refl d refl)
-             , satSplitBurst burst ss
+             , satSplitStream burst ss
 
 red-consume {u = u} exhaustᵒ nid κ id now ro sched st
   with lookupNode nid (EvalSt.nodes st) in eq
@@ -412,7 +390,7 @@ red-consume {u = u} exhaustᵒ nid κ id now ro sched st
             ro (from-inner exhaustᵒ nid (freshId nodeᵏ (Sched.mint sched)) ↠ κ) id now
                (record sched { mint = next nodeᵏ (Sched.mint sched) }) st
       in _ , consume-exhaust-sub eq (inner refl d refl)
-           , satSplitBurst burst ss
+           , satSplitStream burst ss
 
 -- THE WALK IS THE CONSUME THREADED, and the column it returns is the
 -- concatenation of the columns each arrival produced.
@@ -424,7 +402,7 @@ red-walk : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
          → RedWalk {e = e} op nid κ id now vals sched st
 red-walk op nid κ id now []       sched st = _ , walk-nil , []
 red-walk op nid κ id now (r ∷ rs) sched st =
-  let ((_ , _ , sched₁ , st₁) , c , rv) = red-consume op nid κ id now r sched st
+  let ((_ , sched₁ , st₁) , c , rv) = red-consume op nid κ id now r sched st
       (_ , w , rv′) = red-walk op nid κ id now rs sched₁ st₁
   in _ , walk-cons c w , ++⁺ rv rv′
 
@@ -457,16 +435,16 @@ red-thru id now op nid κ rv fin sched st =
 
 -- Every protocol event carries no payload, so a burst's values are the
 -- only thing to check and a burst with none is satisfied outright.
-satEvents : ∀ {A : Set} {P : A → Set} {vals : List A} {rest : List (InstEvent A)}
+satEvents : ∀ {A : Set} {P : A → Set} {vals : List A} {rest : List (PlainEvent A)}
           → All P vals → All (EvSat P) rest
-          → All (EvSat P) (map value vals ++ rest)
+          → All (EvSat P) (map valueᵖ vals ++ rest)
 satEvents []       ar = ar
 satEvents (p ∷ ps) ar = p ∷ satEvents ps ar
 
 satOneShot : ∀ {n} {Γ : Ctx n} {u} {P : Val Γ u → Set} {vals}
              (id : Id) (sched : Sched Γ)
            → All P vals → StreamSat P (proj₁ (oneShotBurst vals id sched))
-satOneShot id sched ps = (tt ∷ satEvents ps (tt ∷ tt ∷ [])) ∷ []
+satOneShot id sched ps = satEvents ps (tt ∷ [])
 
 -- EVERY VALUE OF A DATA TYPE IS REDUCIBLE, AND THAT IS WHY THE SLOT
 -- ARM IS SHORT.  The candidate is trivial at each data former and
@@ -507,7 +485,7 @@ redDatas u ok (v ∷ vs) = red-data u ok v ∷ redDatas u ok vs
 -- after them, so it wants the values alone rather than `satEvents`'
 -- append.
 satValues : ∀ {A : Set} {P : A → Set} {vals : List A}
-          → All P vals → All (EvSat P) (map value vals)
+          → All P vals → All (EvSat P) (map valueᵖ vals)
 satValues []       = []
 satValues (p ∷ ps) = p ∷ satValues ps
 
@@ -747,68 +725,31 @@ red-step id now (from-inner op allNid inst) () rf κ rv fin sched st rn
 red-step id now (thru-outer op nid) sv rf κ rv fin sched st rn =
   red-thru id now op nid κ rv fin sched st
 
--- WALKING A BURST IS BOOKKEEPING, AND SEPARATING IT FROM THE STEP IS
--- WHAT MAKES THAT VISIBLE.  An emit splits into the values a frame
--- must act on and the protocol traffic that flows past it untouched,
--- and what comes back out is the step's own values plus retagged
--- plumbing.  Only the first of those can fail the candidate: the
--- other three carry no payload, so their satisfaction is decided by
--- the event former alone.
-satRetag : ∀ {A B : Set} {P : B → Set} (es : List (InstEvent A))
-         → All (EvSat P) (retagEvents {A = A} {B = B} es)
-satRetag []                = []
-satRetag (init _    ∷ es) = tt ∷ satRetag es
-satRetag (value _   ∷ es) = satRetag es
-satRetag (close _ _ ∷ es) = tt ∷ satRetag es
-satRetag (handoff _ ∷ es) = tt ∷ satRetag es
-satRetag (complete  ∷ es) = tt ∷ satRetag es
-
-splitVals : ∀ {n} {Γ : Ctx n} {u} {A : Set} {P : Val Γ u → Set}
-            (es : List (InstEvent (Val Γ u)))
-          → All (EvSat P) es
-          → All P (proj₁ (splitEvents {A = A} es))
-splitVals []                []       = []
-splitVals (init _    ∷ es) (_ ∷ ps) = splitVals es ps
-splitVals (value _   ∷ es) (p ∷ ps) = p ∷ splitVals es ps
-splitVals (close _ _ ∷ es) (_ ∷ ps) = splitVals es ps
-splitVals (handoff _ ∷ es) (_ ∷ ps) = splitVals es ps
-splitVals (complete  ∷ es) (_ ∷ ps) = splitVals es ps
-
-splitProt : ∀ {n} {Γ : Ctx n} {u} {A : Set} {P : A → Set}
-            (es : List (InstEvent (Val Γ u)))
-          → All (EvSat P) (proj₁ (proj₂ (splitEvents {A = A} es)))
-splitProt []                = []
-splitProt (init _    ∷ es) = tt ∷ splitProt es
-splitProt (value _   ∷ es) = splitProt es
-splitProt (close _ _ ∷ es) = tt ∷ splitProt es
-splitProt (handoff _ ∷ es) = tt ∷ splitProt es
-splitProt (complete  ∷ es) = splitProt es
-
--- a frame's completion flag becomes at most one protocol event
+-- a frame's completion flag becomes at most one end marker
 satFin : ∀ {A : Set} {P : A → Set} (b : Bool)
-       → All (EvSat P) (if b then complete ∷ [] else [])
+       → All (EvSat P) (if b then completeᵖ ∷ [] else [])
 satFin true  = tt ∷ []
 satFin false = []
 
--- PUSHING A BURST THROUGH A FRAME IS A WALK, AND THE WALK IS A BODY.
--- Each emit is split, stepped and reassembled; the candidate travels
--- on the values alone, which is why the reassembly costs three
--- appends of protocol traffic and one real obligation.
+-- PUSHING A BURST THROUGH A FRAME IS ONE STEP, WHICH IS WHAT DROPPING
+-- THE ENVELOPE BOUGHT.  The walk this used to be existed because a
+-- burst was a LIST OF ENVELOPES and each had to be unwrapped, stepped
+-- and wrapped again, carrying three columns of protocol traffic past
+-- the frame untouched.  A plain stream has no brackets to preserve, so
+-- what is left is the one thing that was ever real: the values go to
+-- the frame, the end tells it the source finished, and what comes back
+-- is values and possibly an end.
 red-push : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
            (id : Id) (now : Tick) (f : Frame Γ s u) → srcFrame f → RedFrame f
          → (κ : Path Γ lo u t)
            {burst : Stream Γ s} → StreamSat (Red s) burst
          → (sched : Sched Γ) (st : EvalSt e) → RedNode f st
          → RedPush {e = e} id now f κ burst sched st
-red-push id now f sv rf κ {[]}      []       sched st rn = _ , push-nil , []
-red-push id now f sv rf κ {em ∷ ems} (p ∷ ps) sched st rn =
-  let ((vals′ , evs , fin′ , sched₁ , st₁) , d , rv , rn₁) =
-        red-step id now f sv rf κ (splitVals (InstEmit.events em) p)
-          (proj₂ (proj₂ (splitEvents (InstEmit.events em)))) sched st rn
-      ((rest , sched₂ , st₂) , dr , sr) = red-push id now f sv rf κ ps sched₁ st₁ rn₁
-  in _ , push-cons refl d dr
-       , ++⁺ (splitProt (InstEmit.events em))
-             (++⁺ (satRetag evs) (satEvents rv (satFin fin′))) ∷ sr
+red-push id now f sv rf κ {burst} ss sched st rn =
+  let ((vals′ , fin′ , sched₁ , st₁) , d , rv , rn₁) =
+        red-step id now f sv rf κ (satSplitStream burst ss)
+          (proj₂ (splitStream burst)) sched st rn
+  in _ , push-all refl d , satEvents rv (satFin fin′)
 
 -- THE BODY, AND WHAT PAYS FOR IT.  The expression face and the term
 -- face are ONE recursion: a term embeds an expression and an operator
@@ -978,12 +919,12 @@ mutual
             → Acc _<_ k → Red {Γ = Γ} (obs (lookup Γ i)) (Θ , input i , σ)
   red-input {Γ = Γ} i σ k ok (acc rsK) {lo = lo} κ id now sched st
       with toℕ i <? lo
-  ... | no  ¬below = _ , subs-floor (≮⇒≥ ¬below) , (tt ∷ tt ∷ tt ∷ []) ∷ []
+  ... | no  ¬below = _ , subs-floor (≮⇒≥ ¬below) , tt ∷ []
   ... | yes below  with Sched.slots sched i in slEq
   ...   | scripted {ok = okD} (hot async)
           with memberSource (toℕ i) (EvalSt.completedSources st) in doneEq
-  ...     | true  = _ , subs-hot-done below slEq doneEq , (tt ∷ tt ∷ tt ∷ []) ∷ []
-  ...     | false = _ , subs-hot-live below slEq doneEq refl , (tt ∷ []) ∷ []
+  ...     | true  = _ , subs-hot-done below slEq doneEq , tt ∷ []
+  ...     | false = _ , subs-hot-live below slEq doneEq refl , []
   red-input {Γ = Γ} i σ k ok (acc rsK) {lo = lo} κ id now sched st
       | yes below | scripted {ok = okD} (cold sync []) =
         _ , subs-cold-sync below slEq refl
@@ -991,7 +932,7 @@ mutual
   red-input {Γ = Γ} i σ k ok (acc rsK) {lo = lo} κ id now sched st
       | yes below | scripted {ok = okD} (cold sync (v ∷ vs)) =
         _ , subs-cold-async below slEq refl refl refl
-          , (tt ∷ satValues (redDatas _ okD sync)) ∷ []
+          , satValues (redDatas _ okD sync)
   red-input {Γ = Γ} i σ k ok (acc rsK) {lo = lo} κ id now sched st
       | yes below | shared d {ok = okd} =
         red-input-shared i σ d (rsK (<ᵇ⇒< (toℕ i) k ok))
@@ -1030,7 +971,7 @@ mutual
   ...   | true =
           _ , subs-shared {κ = κ} {below = below} slEq
                 (slot-join {κ = κ} {below = below} doneEq connEq refl)
-            , (tt ∷ []) ∷ []
+            , []
   ...   | false
           with redExpAcc d []ᵉ tt (toℕ i) okd aI
                  (<-wellFounded (gsizeᵉ d))
@@ -1041,17 +982,17 @@ mutual
                    (record st
                      { connectedShares = toℕ i ∷ EvalSt.connectedShares st }))
   ...     | ((burst , sched₁ , st₂) , dv , dsat)
-            with burstCompleted burst in compEq
+            with streamCompleted burst in compEq
   ...       | false =
               _ , subs-shared {κ = κ} {below = below} slEq
                     (slot-connect doneEq connEq
                       (connect-live {κ = κ} {below = below} refl dv compEq))
-                , (tt ∷ []) ∷ StreamSat-plumb burst dsat
+                , dsat
   ...       | true =
               _ , subs-shared {κ = κ} {below = below} slEq
                     (slot-connect doneEq connEq
                       (connect-died {κ = κ} {below = below} refl dv compEq))
-                , (tt ∷ tt ∷ []) ∷ StreamSat-plumb burst dsat
+                , dsat
 
   -- THE FUNDAMENTAL THEOREM AT TERMS, which is where the embedding
   -- former hands the recursion back to the expression face.

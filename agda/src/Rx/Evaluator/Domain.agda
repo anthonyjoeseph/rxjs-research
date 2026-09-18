@@ -99,9 +99,8 @@ open import Data.Empty using (⊥)
 open import Data.Vec using (lookup)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 
-open import Rx.Prim using (Tick; Fuel; Id; Source; InstEvent; InstEmit; value; close;
-  handoff; complete; exhausted; delivery; _at_from_as_;
-  init; subscribe; hot; cold)
+open import Rx.Prim using (Tick; Fuel; Id; Source; PlainEvent; valueᵖ; completeᵖ;
+  hot; cold)
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
 open import Rx.Exp using (obs; Ctx; Val; Closed; Exp; Tm; Fn; FnClo; _×ᵗ_; listᵗ; uniqᵗ;
   Env; _∷ᵉ_; []ᵉ; evalWith; unfoldμ; input; ofᵉ; emptyᵉ; takeᵉ; batchSyncᵉ;
@@ -110,7 +109,7 @@ open import Rx.Mint using (ordinalᵏ; sourceᵏ; nodeᵏ; regᵏ; freshId; setA
 open import Rx.Slots using (Slots; scripted; shared)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; NodeId;
   root; share-sink; _↠_; shareAdmit; shareLatch; shareFinish;
-  from-inner; splitBurst;
+  from-inner; splitStream;
   arrTick; arrSource; arrVal; chainsOf; cascadeLatch; cascadeFinish;
   sched-next; sched-init; st-init;
   NodeState; AllOp; RegId; Arrival; AtFloor; arrTy;
@@ -120,9 +119,9 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; NodeId;
   cell-st; take-st; batchSync-st; mergeAll-st; switch-st; exhaust-st;
   mergeAllᵒ; switchᵒ; exhaustᵒ;
   lookupNode; setNode; hasRoom; mergeAllBump; switchKill; aliveThroughᶠ;
-  splitEvents; retagEvents; mapVals; scanDispatch; takeDispatch; batchSyncDispatch; thruWrap;
+  mapVals; scanDispatch; takeDispatch; batchSyncDispatch; thruWrap;
   consumeUsable; finishUsable;
-  burstCompleted; sharedPlumb; dropSource)
+  streamCompleted; dropSource)
 
 -- THE FRAME A SUBSCRIBE CAN PUSH, WHICH IS EVERY FRAME BUT ONE, AND
 -- SAYING SO IN A TYPE IS WHAT TAKES THE DRAIN OUT OF A PUSH CYCLE.  A
@@ -158,48 +157,43 @@ data subscribeInner⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
      ∀ {u lo} →
      AllOp → NodeId → Path Γ lo u t → Id → Tick
    → Val Γ (obs u) → Sched Γ → EvalSt e
-   → NodeId × List (Val Γ u) × List (InstEvent (Val Γ t)) × Bool
-     × Sched Γ × EvalSt e → Set
+   → NodeId × List (Val Γ u) × Bool × Sched Γ × EvalSt e → Set
 
 data thruConsume⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
      ∀ {u lo} →
      AllOp → NodeId → Path Γ lo u t → Id → Tick
    → Val Γ (obs u) → Sched Γ → EvalSt e
-   → List (Val Γ u) × List (InstEvent (Val Γ t)) × Sched Γ × EvalSt e → Set
+   → List (Val Γ u) × Sched Γ × EvalSt e → Set
 
 data thruWalk⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
      ∀ {u lo} →
      AllOp → NodeId → Path Γ lo u t → Id → Tick
    → List (Val Γ (obs u)) → Sched Γ → EvalSt e
-   → List (Val Γ u) × List (InstEvent (Val Γ t)) × Sched Γ × EvalSt e → Set
+   → List (Val Γ u) × Sched Γ × EvalSt e → Set
 
 data mergeAllDrain⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
      ∀ {s lo} →
      NodeId → Path Γ lo s t → Id → Tick
    → Maybe ℕ → ℕ → Bool → List (Val Γ (obs s)) → Sched Γ → EvalSt e
-   → List (Val Γ s) × List (InstEvent (Val Γ t)) × ℕ
-     × List (Val Γ (obs s)) × Sched Γ × EvalSt e → Set
+   → List (Val Γ s) × ℕ × List (Val Γ (obs s)) × Sched Γ × EvalSt e → Set
 
 data innerFinish⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
      ∀ {s lo} →
      AllOp → NodeId → NodeId → Path Γ lo s t → Id → Tick
    → List (Val Γ s) → Sched Γ → EvalSt e → Maybe (NodeState Γ)
-   → List (Val Γ s) × List (InstEvent (Val Γ t)) × Bool
-     × Sched Γ × EvalSt e → Set
+   → List (Val Γ s) × Bool × Sched Γ × EvalSt e → Set
 
 data innerReact⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
      ∀ {s lo} →
      AllOp → NodeId → NodeId → Path Γ lo s t → Id → Tick
    → List (Val Γ s) → Sched Γ → EvalSt e → Bool
-   → List (Val Γ s) × List (InstEvent (Val Γ t)) × Bool
-     × Sched Γ × EvalSt e → Set
+   → List (Val Γ s) × Bool × Sched Γ × EvalSt e → Set
 
 data stepFrame⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
      ∀ {s u lo} →
      Id → Tick → Frame Γ s u → Path Γ lo u t
    → List (Val Γ s) → Bool → Sched Γ → EvalSt e
-   → List (Val Γ u) × List (InstEvent (Val Γ t)) × Bool
-     × Sched Γ × EvalSt e → Set
+   → List (Val Γ u) × Bool × Sched Γ × EvalSt e → Set
 
 data pushBurst⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
      ∀ {s u lo} →
@@ -247,7 +241,7 @@ data shareGo⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
 data foldPath⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
      ∀ {u lo} →
      Id → Tick → Source → Path Γ lo u t
-   → List (Val Γ u) → List (InstEvent (Val Γ t)) → Bool
+   → List (Val Γ u) → Bool
    → Sched Γ → EvalSt e
    → Stream Γ t × Sched Γ × EvalSt e → Set
 
@@ -317,7 +311,7 @@ data subscribeE⇓ {n} {Γ} {t} {e} where
                 → memberSource (toℕ i) (EvalSt.completedSources st) ≡ false
                 → freshId regᵏ (Sched.mint sched) ≡ rid
                 → subscribeE⇓ (Θ , input i , ρ) κ id now sched st
-                    ( ((init (toℕ i) ∷ []) at id from toℕ i as subscribe) ∷ []
+                    ( []
                     , record sched { mint = setAt regᵏ (suc rid) (Sched.mint sched) }
                     , register rid (atSlot i) (lowerFloor below κ) st )
 
@@ -337,8 +331,7 @@ data subscribeE⇓ {n} {Γ} {t} {e} where
                   → freshId ordinalᵏ (Sched.mint sched) ≡ ord
                   → freshId regᵏ (Sched.mint sched) ≡ rid
                   → subscribeE⇓ (Θ , input i , ρ) κ id now sched st
-                      ( ((init src ∷ map value sync)
-                           at id from src as subscribe) ∷ []
+                      ( map valueᵖ sync
                       , record sched
                           { mint = setAt regᵏ (suc rid)
                                      (setAt sourceᵏ (suc src)
@@ -475,7 +468,7 @@ data subscribeE⇓ {n} {Γ} {t} {e} where
              → freshId ordinalᵏ (Sched.mint sched) ≡ ord
              → freshId regᵏ (Sched.mint sched) ≡ rid
              → subscribeE⇓ (Θ , deferᵉ body , ρ) κ id now sched st
-                 ( ((init src ∷ []) at id from src as subscribe) ∷ []
+                 ( []
                  , record sched
                      { mint = setAt regᵏ (suc rid)
                                 (setAt nodeᵏ (suc nid)
@@ -520,14 +513,14 @@ data subscribeE⇓ {n} {Γ} {t} {e} where
 -- constructor cannot relate a run to a dry stream.
 data subscribeInner⇓ {n} {Γ} {t} {e} where
   inner : ∀ {u lo op allNid} {κ : Path Γ lo u t} {id now}
-            {o : Val Γ (obs u)} {sched st inst burst sched′ st′ vs bs done}
+            {o : Val Γ (obs u)} {sched st inst burst sched′ st′ vs done}
         → freshId nodeᵏ (Sched.mint sched) ≡ inst
         → subscribeE⇓ o (from-inner op allNid inst ↠ κ) id now
             (record sched { mint = setAt nodeᵏ (suc inst) (Sched.mint sched) }) st
             (burst , sched′ , st′)
-        → splitBurst burst ≡ (vs , bs , done)
+        → splitStream burst ≡ (vs , done)
         → subscribeInner⇓ op allNid κ id now o sched st
-            (inst , vs , bs , done , sched′ , st′)
+            (inst , vs , done , sched′ , st′)
 
 -- FOUR TYPE-MISMATCH ARMS COLLAPSE INTO THE CATCH-ALL BESIDE THEM, AND
 -- THAT IS A MERGE RATHER THAN A DROP.  Each returns exactly what the
@@ -557,14 +550,14 @@ data thruConsume⇓ {n} {Γ} {t} {e} where
 
   consume-all-sub : ∀ {u lo nid} {κ : Path Γ lo u t} {id now}
                       {o : Val Γ (obs u)} {sched₀ st₀} {lim act q od}
-                      {inst vs bs done sched₁ st₁}
+                      {inst vs done sched₁ st₁}
                   → lookupNode nid (EvalSt.nodes st₀)
                       ≡ just (mergeAll-st {t = u} lim act q od)
                   → hasRoom lim act ≡ true
                   → subscribeInner⇓ mergeAllᵒ nid κ id now o sched₀ st₀
-                      (inst , vs , bs , done , sched₁ , st₁)
+                      (inst , vs , done , sched₁ , st₁)
                   → thruConsume⇓ mergeAllᵒ nid κ id now o sched₀ st₀
-                      ( vs , bs , sched₁
+                      ( vs , sched₁
                       , record st₁
                           { nodes = mergeAllBump nid done (EvalSt.nodes st₁) } )
 
@@ -574,7 +567,7 @@ data thruConsume⇓ {n} {Γ} {t} {e} where
                           ≡ just (mergeAll-st {t = u} lim act q od)
                       → hasRoom lim act ≡ false
                       → thruConsume⇓ mergeAllᵒ nid κ id now o sched₀ st₀
-                          ( [] , [] , sched₀
+                          ( [] , sched₀
                           , record st₀
                               { nodes = setNode nid
                                   (mergeAll-st lim act (q ++ o ∷ []) od)
@@ -584,17 +577,17 @@ data thruConsume⇓ {n} {Γ} {t} {e} where
                     {o : Val Γ (obs u)} {sched₀ st₀}
                   → consumeUsable mergeAllᵒ u (lookupNode nid (EvalSt.nodes st₀)) ≡ false
                   → thruConsume⇓ mergeAllᵒ nid κ id now o sched₀ st₀
-                      ([] , [] , sched₀ , st₀)
+                      ([] , sched₀ , st₀)
 
   consume-switch-sub : ∀ {u lo nid} {κ : Path Γ lo u t} {id now}
                          {o : Val Γ (obs u)} {sched₀ st₀} {cur od}
-                         {closes sched₁ st₁} {inst vs bs done sched₂ st₂}
+                         {sched₁ st₁} {inst vs done sched₂ st₂}
                      → lookupNode nid (EvalSt.nodes st₀) ≡ just (switch-st cur od)
-                     → switchKill cur sched₀ st₀ ≡ (closes , sched₁ , st₁)
+                     → switchKill cur sched₀ st₀ ≡ (sched₁ , st₁)
                      → subscribeInner⇓ switchᵒ nid κ id now o sched₁ st₁
-                         (inst , vs , bs , done , sched₂ , st₂)
+                         (inst , vs , done , sched₂ , st₂)
                      → thruConsume⇓ switchᵒ nid κ id now o sched₀ st₀
-                         ( vs , closes ++ bs , sched₂
+                         ( vs , sched₂
                          , record st₂
                              { nodes = setNode nid
                                  (switch-st (if done then nothing else just inst) od)
@@ -604,17 +597,17 @@ data thruConsume⇓ {n} {Γ} {t} {e} where
                        {o : Val Γ (obs u)} {sched₀ st₀}
                      → consumeUsable switchᵒ u (lookupNode nid (EvalSt.nodes st₀)) ≡ false
                      → thruConsume⇓ switchᵒ nid κ id now o sched₀ st₀
-                         ([] , [] , sched₀ , st₀)
+                         ([] , sched₀ , st₀)
 
   consume-exhaust-sub : ∀ {u lo nid} {κ : Path Γ lo u t} {id now}
                           {o : Val Γ (obs u)} {sched₀ st₀} {od}
-                          {inst vs bs done sched₁ st₁}
+                          {inst vs done sched₁ st₁}
                       → lookupNode nid (EvalSt.nodes st₀)
                           ≡ just (exhaust-st false od)
                       → subscribeInner⇓ exhaustᵒ nid κ id now o sched₀ st₀
-                          (inst , vs , bs , done , sched₁ , st₁)
+                          (inst , vs , done , sched₁ , st₁)
                       → thruConsume⇓ exhaustᵒ nid κ id now o sched₀ st₀
-                          ( vs , bs , sched₁
+                          ( vs , sched₁
                           , record st₁
                               { nodes = setNode nid (exhaust-st (not done) od)
                                   (EvalSt.nodes st₁) } )
@@ -623,32 +616,32 @@ data thruConsume⇓ {n} {Γ} {t} {e} where
                         {o : Val Γ (obs u)} {sched₀ st₀}
                       → consumeUsable exhaustᵒ u (lookupNode nid (EvalSt.nodes st₀)) ≡ false
                       → thruConsume⇓ exhaustᵒ nid κ id now o sched₀ st₀
-                          ([] , [] , sched₀ , st₀)
+                          ([] , sched₀ , st₀)
 
 data thruWalk⇓ {n} {Γ} {t} {e} where
 
   walk-nil : ∀ {u lo op nid} {κ : Path Γ lo u t} {id now} {sched₀ st₀}
-           → thruWalk⇓ op nid κ id now [] sched₀ st₀ ([] , [] , sched₀ , st₀)
+           → thruWalk⇓ op nid κ id now [] sched₀ st₀ ([] , sched₀ , st₀)
 
   walk-cons : ∀ {u lo op nid} {κ : Path Γ lo u t} {id now}
                 {o : Val Γ (obs u)} {os sched₀ st₀}
-                {vs bs sched₁ st₁} {vs′ bs′ sched₂ st₂}
-            → thruConsume⇓ op nid κ id now o sched₀ st₀ (vs , bs , sched₁ , st₁)
-            → thruWalk⇓ op nid κ id now os sched₁ st₁ (vs′ , bs′ , sched₂ , st₂)
+                {vs sched₁ st₁} {vs′ sched₂ st₂}
+            → thruConsume⇓ op nid κ id now o sched₀ st₀ (vs , sched₁ , st₁)
+            → thruWalk⇓ op nid κ id now os sched₁ st₁ (vs′ , sched₂ , st₂)
             → thruWalk⇓ op nid κ id now (o ∷ os) sched₀ st₀
-                (vs ++ vs′ , bs ++ bs′ , sched₂ , st₂)
+                (vs ++ vs′ , sched₂ , st₂)
 
 data mergeAllDrain⇓ {n} {Γ} {t} {e} where
 
   drain-nil : ∀ {s lo allNid} {κ : Path Γ lo s t} {id now} {lim act od sched₀ st₀}
             → mergeAllDrain⇓ allNid κ id now lim act od [] sched₀ st₀
-                ([] , [] , act , [] , sched₀ , st₀)
+                ([] , act , [] , sched₀ , st₀)
 
   drain-no-room : ∀ {s lo allNid} {κ : Path Γ lo s t} {id now}
                     {lim act od} {o : Val Γ (obs s)} {q sched₀ st₀}
                 → hasRoom lim act ≡ false
                 → mergeAllDrain⇓ allNid κ id now lim act od (o ∷ q) sched₀ st₀
-                    ([] , [] , act , o ∷ q , sched₀ , st₀)
+                    ([] , act , o ∷ q , sched₀ , st₀)
 
   -- THE SHORTENED QUEUE IS WRITTEN BEFORE THE SUBSCRIBE, NOT AFTER THE
   -- WHOLE DRAIN.  A batch write-back leaves the node holding the items
@@ -660,29 +653,29 @@ data mergeAllDrain⇓ {n} {Γ} {t} {e} where
   -- measure denominated in it can order this edge.
   drain-room : ∀ {s lo allNid} {κ : Path Γ lo s t} {id now}
                  {lim act od} {o : Val Γ (obs s)} {q sched₀ st₀}
-                 {inst vs bs done sched₁ st₁} {vs′ bs′ act′ q′ sched₂ st₂}
+                 {inst vs done sched₁ st₁} {vs′ act′ q′ sched₂ st₂}
              → hasRoom lim act ≡ true
              → subscribeInner⇓ mergeAllᵒ allNid κ id now o sched₀
                  (record st₀
                     { nodes = setNode allNid (mergeAll-st {t = s} lim act q od)
                         (EvalSt.nodes st₀) })
-                 (inst , vs , bs , done , sched₁ , st₁)
+                 (inst , vs , done , sched₁ , st₁)
              → mergeAllDrain⇓ allNid κ id now lim
                  (if done then act else suc act) od q sched₁ st₁
-                 (vs′ , bs′ , act′ , q′ , sched₂ , st₂)
+                 (vs′ , act′ , q′ , sched₂ , st₂)
              → mergeAllDrain⇓ allNid κ id now lim act od (o ∷ q) sched₀ st₀
-                 (vs ++ vs′ , bs ++ bs′ , act′ , q′ , sched₂ , st₂)
+                 (vs ++ vs′ , act′ , q′ , sched₂ , st₂)
 
 data innerFinish⇓ {n} {Γ} {t} {e} where
 
   finish-all-drain : ∀ {s lo allNid inst} {κ : Path Γ lo s t} {id now}
                        {vals : List (Val Γ s)} {sched st} {lim act q od}
-                       {vs bs act′ q′ sched′ st′}
+                       {vs act′ q′ sched′ st′}
                    → mergeAllDrain⇓ allNid κ id now lim (pred act) od q sched st
-                       (vs , bs , act′ , q′ , sched′ , st′)
+                       (vs , act′ , q′ , sched′ , st′)
                    → innerFinish⇓ mergeAllᵒ allNid inst κ id now vals sched st
                        (just (mergeAll-st {t = s} lim act q od))
-                       ( vals ++ vs , bs , od ∧ (act′ ≡ᵇ 0) ∧ null q′ , sched′
+                       ( vals ++ vs , od ∧ (act′ ≡ᵇ 0) ∧ null q′ , sched′
                        , record st′
                            { nodes = setNode allNid (mergeAll-st lim act′ q′ od)
                                (EvalSt.nodes st′) } )
@@ -692,7 +685,7 @@ data innerFinish⇓ {n} {Γ} {t} {e} where
                       → (c ≡ᵇ inst) ≡ true
                       → innerFinish⇓ switchᵒ allNid inst κ id now vals sched st
                           (just (switch-st (just c) od))
-                          ( vals , [] , od , sched
+                          ( vals , od , sched
                           , record st
                               { nodes = setNode allNid (switch-st nothing od)
                                   (EvalSt.nodes st) } )
@@ -701,7 +694,7 @@ data innerFinish⇓ {n} {Γ} {t} {e} where
                            {vals : List (Val Γ s)} {sched st} {act od}
                        → innerFinish⇓ exhaustᵒ allNid inst κ id now vals sched st
                            (just (exhaust-st act od))
-                           ( vals , [] , od , sched
+                           ( vals , od , sched
                            , record st
                                { nodes = setNode allNid (exhaust-st false od)
                                    (EvalSt.nodes st) } )
@@ -710,20 +703,20 @@ data innerFinish⇓ {n} {Γ} {t} {e} where
                  {vals : List (Val Γ s)} {sched st ns}
              → finishUsable op s inst ns ≡ false
              → innerFinish⇓ op allNid inst κ id now vals sched st ns
-                 (vals , [] , false , sched , st)
+                 (vals , false , sched , st)
 
 data innerReact⇓ {n} {Γ} {t} {e} where
 
   react-false : ∀ {s lo op allNid inst} {κ : Path Γ lo s t} {id now}
                   {vals : List (Val Γ s)} {sched st}
               → innerReact⇓ op allNid inst κ id now vals sched st false
-                  (vals , [] , false , sched , st)
+                  (vals , false , sched , st)
 
   react-alive : ∀ {s lo op allNid inst} {κ : Path Γ lo s t} {id now}
                   {vals : List (Val Γ s)} {sched st}
               → any (aliveThroughᶠ inst st) (EvalSt.registry st) ≡ true
               → innerReact⇓ op allNid inst κ id now vals sched st true
-                  (vals , [] , false , sched , st)
+                  (vals , false , sched , st)
 
   react-dead : ∀ {s lo op allNid inst} {κ : Path Γ lo s t} {id now}
                  {vals : List (Val Γ s)} {sched st r}
@@ -740,8 +733,9 @@ data innerReact⇓ {n} {Γ} {t} {e} where
 -- the relation must expose is exactly the recursive structure; a total
 -- function of the state is carried as itself.  The one place this would
 -- cost something is the dry proof, and it does not arise here: this
--- family hands back EVENTS rather than emits, and the dry marker is an
--- emit's, so no arm of it can carry one however the helper computes.
+-- family hands back a VALUE column and a finished flag, and the dry
+-- marker was an envelope's, so no arm of it can carry one however the
+-- helper computes.
 --
 -- RECOVERY: git show 234074e:agda/src/Verify-Rank-Sufficient/ restores
 --   the CARRIED tower, whose whole subject was this family: a bound a
@@ -759,7 +753,7 @@ data stepFrame⇓ {n} {Γ} {t} {e} where
   step-map : ∀ {s u lo} {fn : FnClo Γ s u} {κ : Path Γ lo u t}
                {id now} {vals : List (Val Γ s)} {fin sched st}
            → stepFrame⇓ id now (map-f fn) κ vals fin sched st
-               (mapVals fn vals , [] , fin , sched , st)
+               (mapVals fn vals , fin , sched , st)
 
   step-scan : ∀ {s u lo} {fn : FnClo Γ (u ×ᵗ s) u}
                 {nid} {κ : Path Γ lo u t}
@@ -788,32 +782,30 @@ data stepFrame⇓ {n} {Γ} {t} {e} where
 
   step-thru-outer : ∀ {u lo op nid} {κ : Path Γ lo u t}
                       {id now} {vals : List (Val Γ (obs u))} {fin sched st}
-                      {vs bs sched′ st′}
+                      {vs sched′ st′}
                   → thruWalk⇓ op nid κ id now vals sched st
-                      (vs , bs , sched′ , st′)
+                      (vs , sched′ , st′)
                   → stepFrame⇓ id now (thru-outer op nid) κ vals fin sched st
-                      (thruWrap op nid fin (vs , bs , sched′ , st′))
+                      (thruWrap op nid fin (vs , sched′ , st′))
 
 data pushBurst⇓ {n} {Γ} {t} {e} where
 
-  push-nil : ∀ {s u lo} {f : Frame Γ s u} {κ : Path Γ lo u t} {id now sched st}
-           → pushBurst⇓ id now f κ [] sched st ([] , sched , st)
-
-  push-cons : ∀ {s u lo} {f : Frame Γ s u} {κ : Path Γ lo u t} {id now}
-                {em ems sched st} {vs bs c}
-                {vals′ evs fin′ sched₁ st₁} {rest sched₂ st₂}
-            → splitEvents {A = Val Γ u} (InstEmit.events em) ≡ (vs , bs , c)
-            → stepFrame⇓ id now f κ vs c sched st
-                (vals′ , evs , fin′ , sched₁ , st₁)
-            → pushBurst⇓ id now f κ ems sched₁ st₁ (rest , sched₂ , st₂)
-            → pushBurst⇓ id now f κ (em ∷ ems) sched st
-                ( ((bs ++ retagEvents evs ++ map value vals′
-                      ++ (if fin′ then complete ∷ [] else []))
-                    at InstEmit.instant em
-                    from InstEmit.source em
-                    as InstEmit.kind em)
-                  ∷ rest
-                , sched₂ , st₂ )
+  -- ONE RULE, WHICH IS WHAT DROPPING THE ENVELOPE BOUGHT.  This used
+  -- to be a WALK, because a burst was a list of envelopes and each one
+  -- had to be unwrapped, stepped, and wrapped again around three
+  -- columns of protocol traffic that flowed past the frame untouched.
+  -- A plain stream has no brackets to preserve, so what is left is the
+  -- one thing that was ever real: the values go to the frame, the end
+  -- tells it the source finished, and what comes back is values and
+  -- possibly an end.
+  push-all : ∀ {s u lo} {f : Frame Γ s u} {κ : Path Γ lo u t} {id now}
+               {burst sched st} {vs c} {vals′ fin′ sched₁ st₁}
+           → splitStream burst ≡ (vs , c)
+           → stepFrame⇓ id now f κ vs c sched st
+               (vals′ , fin′ , sched₁ , st₁)
+           → pushBurst⇓ id now f κ burst sched st
+               ( map valueᵖ vals′ ++ (if fin′ then completeᵖ ∷ [] else [])
+               , sched₁ , st₁ )
 
 data subscribeAll⇓ {n} {Γ} {t} {e} where
 
@@ -848,11 +840,9 @@ data sharedConnect⇓ {n} {Γ} {t} {e} where
                        { connectedShares =
                            toℕ i ∷ EvalSt.connectedShares st }))
                    (burst , sched₁ , st₂)
-               → burstCompleted burst ≡ false
+               → streamCompleted burst ≡ false
                → sharedConnect⇓ i d κ below id now sched st
-                   ( ((init (toℕ i) ∷ []) at id from toℕ i as subscribe)
-                     ∷ sharedPlumb burst
-                   , sched₁ , st₂ )
+                   ( burst , sched₁ , st₂ )
 
   connect-died : ∀ {lo} {i : Fin n} {d} {κ : Path Γ lo (lookup Γ i) t}
                    {below : toℕ i < lo} {id now sched st burst sched₁ st₂ rid}
@@ -864,11 +854,9 @@ data sharedConnect⇓ {n} {Γ} {t} {e} where
                        { connectedShares =
                            toℕ i ∷ EvalSt.connectedShares st }))
                    (burst , sched₁ , st₂)
-               → burstCompleted burst ≡ true
+               → streamCompleted burst ≡ true
                → sharedConnect⇓ i d κ below id now sched st
-                   ( ((init (toℕ i) ∷ close (toℕ i) exhausted ∷ [])
-                       at id from toℕ i as subscribe)
-                     ∷ sharedPlumb burst
+                   ( burst
                    , sched₁
                    , record st₂
                        { registry = dropSource (toℕ i) (EvalSt.registry st₂)
@@ -889,7 +877,7 @@ data subscribeSharedSlot⇓ {n} {Γ} {t} {e} where
             → memberSource (toℕ i) (EvalSt.connectedShares st) ≡ true
             → freshId regᵏ (Sched.mint sched) ≡ rid
             → subscribeSharedSlot⇓ i d κ below id now sched st
-                ( ((init (toℕ i) ∷ []) at id from toℕ i as subscribe) ∷ []
+                ( []
                 , record sched { mint = setAt regᵏ (suc rid) (Sched.mint sched) }
                 , register rid (atSlot i) (lowerFloor below κ) st )
 
@@ -935,50 +923,50 @@ data shareGo⇓ {n} {Γ} {t} {e} where
               {p : Path Γ lo (lookup Γ i) t} {ps sched₀ st₀}
               {emits sched₁ st₁ rest sched₂ st₂}
           → any (_≡ᵇ rid) (EvalSt.cancelled st₀) ≡ false
-          → foldPath⇓ id now (toℕ i) p vals
-              (if fin then close (toℕ i) exhausted ∷ [] else []) fin sched₀
+          → foldPath⇓ id now (toℕ i) p vals fin sched₀
               (record st₀ { delivered = rid ∷ EvalSt.delivered st₀ })
               (emits , sched₁ , st₁)
           → shareGo⇓ id now i vals fin ps sched₁ st₁ (rest , sched₂ , st₂)
           → shareGo⇓ id now i vals fin ((rid , p) ∷ ps) sched₀ st₀
               (emits ++ rest , sched₂ , st₂)
 
--- THE PATH IS WALKED SINKWARD AND THE ENVELOPE IS ASSEMBLED HERE, so
--- the root clause is the only one that mints an emit from nothing and
+-- THE PATH IS WALKED SINKWARD AND WHAT REACHES THE ROOT IS WHAT THE
+-- SUBSCRIBER SEES, so the root clause is the only one that emits and
 -- the other two hand their own results on.  The sink clause is where
 -- the floor descends: its premise is the path constructor's argument,
 -- so nothing has to be carried alongside.
+--
+-- AND THE ACCUMULATOR IS GONE WITH THE ENVELOPE IT WAS FILLING.  This
+-- spine used to thread a column of protocol events down the path so
+-- that the root could mint ONE envelope holding everything the cascade
+-- produced — which is the coalescing itself, stated as an induction.
+-- A plain carrier has nothing to coalesce into, so each leg emits what
+-- it emits and the concatenation is the stream.
 data foldPath⇓ {n} {Γ} {t} {e} where
-  fold-root : ∀ {lo id now envSrc} {vals : List (Val Γ t)} {evs fin sched st}
-            → foldPath⇓ {lo = lo} id now envSrc root vals evs fin sched st
-                ( ((evs ++ map value vals
-                        ++ (if fin then complete ∷ [] else []))
-                     at id from envSrc as delivery) ∷ []
+  fold-root : ∀ {lo id now envSrc} {vals : List (Val Γ t)} {fin sched st}
+            → foldPath⇓ {lo = lo} id now envSrc root vals fin sched st
+                ( map valueᵖ vals ++ (if fin then completeᵖ ∷ [] else [])
                 , sched , st )
 
   fold-sink : ∀ {lo id now envSrc} {i : Fin n} {below : lo ≤ toℕ i}
-                {vals evs fin sched st} {fanout sched₁ st₁}
+                {vals fin sched st} {fanout sched₁ st₁}
             → dispatchShare⇓ id now i below vals fin sched st
                 (fanout , sched₁ , st₁)
-            → foldPath⇓ id now envSrc (share-sink i below) vals evs fin sched st
-                ( ((evs ++ handoff (toℕ i) ∷ [])
-                     at id from envSrc as delivery) ∷ fanout
-                , sched₁ , st₁ )
+            → foldPath⇓ id now envSrc (share-sink i below) vals fin sched st
+                ( fanout , sched₁ , st₁ )
 
   fold-step : ∀ {lo s u id now envSrc} {f : Frame Γ s u}
-                {path′ : Path Γ lo u t} {vals evs fin sched st}
-                {vals′ evs′ fin′ sched₁ st₁ r}
+                {path′ : Path Γ lo u t} {vals fin sched st}
+                {vals′ fin′ sched₁ st₁ r}
             → stepFrame⇓ id now f path′ vals fin sched st
-                (vals′ , evs′ , fin′ , sched₁ , st₁)
-            → foldPath⇓ id now envSrc path′ vals′ (evs ++ evs′) fin′ sched₁ st₁ r
-            → foldPath⇓ id now envSrc (f ↠ path′) vals evs fin sched st r
+                (vals′ , fin′ , sched₁ , st₁)
+            → foldPath⇓ id now envSrc path′ vals′ fin′ sched₁ st₁ r
+            → foldPath⇓ id now envSrc (f ↠ path′) vals fin sched st r
 
 data chainStep⇓ {n} {Γ} {t} {e} where
   chain-step : ∀ {id} {a : Arrival Γ} {lo} {path : Path Γ lo (arrTy a) t}
                  {sched st r}
              → foldPath⇓ id (arrTick a) (arrSource a) path (arrVal a ∷ [])
-                 (if Arrival.isLast a
-                    then close (arrSource a) exhausted ∷ [] else [])
                  (Arrival.isLast a) sched st r
              → chainStep⇓ id a (lo , path) sched st r
 

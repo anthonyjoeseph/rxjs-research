@@ -16,8 +16,8 @@ open import Relation.Nullary using (yes; no)
 open import Relation.Nullary.Decidable using (⌊_⌋)
 open import Relation.Binary.PropositionalEquality using (refl)
 
-open import Rx.Prim using (Tick; Ordinal; Id; Source; Timed; after_,_; hot; cold; InstEvent; init; value; close;
-  handoff; complete; cut; cutPending; exhausted; subscribe; plumbing; InstEmit; _at_from_as_)
+open import Rx.Prim using (Tick; Ordinal; Id; Source; Timed; after_,_; hot; cold;
+  PlainEvent; valueᵖ; completeᵖ)
 open import Rx.Exp  using (Ty; obs; _×ᵗ_; listᵗ; _≟ᵗ_; Ctx; Val; Closed; FnClo; applyClo)
 
 variable
@@ -351,13 +351,9 @@ pathHasNode nid root           = false
 pathHasNode nid (share-sink i _) = false
 pathHasNode nid (f ↠ p)       = any (_≡ᵇ nid) (frameNodes f) ∨ pathHasNode nid p
 
--- remove every registration whose chain passes through the given
--- node, emitting one close per removed registration
--- registrations carry an identity so a mid-cascade cut can name its
+-- Registrations carry an identity so a mid-cascade cut can name its
 -- victims: a cancelled registration's snapshot chain must deliver
--- NOTHING (as in rxjs — an unsubscribed chain is silent), and its
--- close must say whether it had already paid this instant (cut) or
--- never will (cutPending, cancelling one owed count downstream)
+-- NOTHING, as in rxjs, where an unsubscribed chain is silent.
 RegId : Set
 RegId = ℕ
 
@@ -369,29 +365,19 @@ RegId = ℕ
 RegRow : ∀ {n} → Ctx n → Ty → Set
 RegRow Γ t = RegId × Σ (RegSrc Γ) (λ rs → Chain Γ (regFloor rs) t)
 
--- the close reason is writer-asserted per victim: delivered this
--- cascade, or born since the cascade started (owing nothing) ⇒ cut;
--- a pre-existing registration cut before its delivery ⇒ cutPending.
--- A victim of a DYING source that already delivered carried its own
--- exhausted close on its own emit — no second close for it.  Also
--- returns the victims' ids for the cascade's cancelled set.
+-- Remove every registration whose chain passes through the given node,
+-- and return the victims' ids for the cascade's cancelled set.  The
+-- severing is all there is: which victim had already paid this instant
+-- and which never would used to decide a close reason per victim, and a
+-- plain stream carries no closes for that reason to ride on.
 cutThrough : ∀ {n} {Γ : Ctx n} {t}
-           → NodeId → List RegId → RegId → List Source
-           → List (RegRow Γ t)
-           → List (RegRow Γ t)
-             × List (InstEvent (Val Γ t)) × List RegId
-cutThrough nid delivered wm dying [] = [] , [] , []
-cutThrough nid delivered wm dying ((rid , rs , c) ∷ r)
-  with pathHasNode nid (proj₂ c) | cutThrough nid delivered wm dying r
-... | true  | kept , closes , rids =
-      kept
-      , (if any (_≡ᵇ rid) delivered ∧ memberSource (regSource rs) dying
-         then closes
-         else close (regSource rs)
-                (if any (_≡ᵇ rid) delivered ∨ (wm ≤ᵇ rid)
-                 then cut else cutPending) ∷ closes)
-      , rid ∷ rids
-... | false | kept , closes , rids = (rid , rs , c) ∷ kept , closes , rids
+           → NodeId → List (RegRow Γ t)
+           → List (RegRow Γ t) × List RegId
+cutThrough nid [] = [] , []
+cutThrough nid ((rid , rs , c) ∷ r)
+  with pathHasNode nid (proj₂ c) | cutThrough nid r
+... | true  | kept , rids = kept , rid ∷ rids
+... | false | kept , rids = (rid , rs , c) ∷ kept , rids
 
 -- drop dead dynamic sources (no remaining registrations); hot input
 -- slots (sources < n by convention) keep firing regardless, exactly
@@ -427,14 +413,11 @@ record EvalSt {n} {Γ : Ctx n} {t} (e : Closed Γ t) : Set where
         cancelled       : List RegId    -- victims cut mid-cascade: their snapshot
                                         -- chains are skipped outright (an unsubscribed
                                         -- rxjs chain delivers nothing)
-        regWatermark    : RegId         -- the mint's registration counter at cascade
-                                        -- start: registrations at or above it were born
-                                        -- this cascade and owe nothing
         dying           : List Source   -- sources spending their final delivery this
                                         -- cascade (the isLast arrival, a completing
-                                        -- share): their delivered registrations already
-                                        -- carried their own exhausted closes, and the
-                                        -- whole source's registry entries drop at finish
+                                        -- share): their delivered registrations have
+                                        -- nothing left to be asked for, and the whole
+                                        -- source's registry entries drop at finish
 
 mintSource : ∀ {n} {Γ : Ctx n} → Sched Γ → Source × Sched Γ
 mintSource sched =
@@ -479,8 +462,7 @@ spentBurst src id = completeᵖ ∷ []
 st-init : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) → EvalSt e
 st-init e = record { registry = [] ; nodes = []
                    ; connectedShares = [] ; completedSources = []
-                   ; delivered = [] ; cancelled = [] ; regWatermark = 0
-                   ; dying = [] }
+                   ; delivered = [] ; cancelled = [] ; dying = [] }
   -- all populated by the root subscribeE and by lazy share connects
 
 -- the arrival's source's live chains, in subscription order, at
@@ -592,16 +574,15 @@ scanDispatch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
              → FnClo Γ (u ×ᵗ s) u → NodeId
              → List (Val Γ s) → Bool
              → Sched Γ → EvalSt e → Maybe (NodeState Γ)
-             → List (Val Γ u) × List (InstEvent (Val Γ t)) × Bool
-               × Sched Γ × EvalSt e
+             → List (Val Γ u) × Bool × Sched Γ × EvalSt e
 scanDispatch {u = u} fn nid vals fin sched st (just (cell-st {v} a))
   with v ≟ᵗ u
-... | no  _    = [] , [] , fin , sched , st
+... | no  _    = [] , fin , sched , st
 ... | yes refl =
-      proj₁ (scanVals fn a vals) , [] , fin , sched ,
+      proj₁ (scanVals fn a vals) , fin , sched ,
       record st { nodes = setNode nid (cell-st (proj₂ (scanVals fn a vals)))
                                   (EvalSt.nodes st) }
-scanDispatch fn nid vals fin sched st _ = [] , [] , fin , sched , st
+scanDispatch fn nid vals fin sched st _ = [] , fin , sched , st
 
 -- take's per-emit step, lifted out of stepFrame so the well-formedness proof
 -- can reason about its reduction over a stuck node lookup.  Non-cut passes the
@@ -609,21 +590,19 @@ scanDispatch fn nid vals fin sched st _ = [] , [] , fin , sched , st
 -- exhausts the budget, forces `complete`, and severs the registry (cutThrough).
 takeDispatch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
              → NodeId → List (Val Γ s) → Bool → Sched Γ → EvalSt e → Maybe (NodeState Γ)
-             → List (Val Γ s) × List (InstEvent (Val Γ t)) × Bool × Sched Γ × EvalSt e
+             → List (Val Γ s) × Bool × Sched Γ × EvalSt e
 takeDispatch nid vals fin sched st (just (take-st k)) =
   if proj₂ (proj₂ (takeVals k vals))
-  then (let (kept , closes , cutRids) =
-              cutThrough nid (EvalSt.delivered st) (EvalSt.regWatermark st)
-                         (EvalSt.dying st) (EvalSt.registry st)
-        in proj₁ (takeVals k vals) , closes , true ,
+  then (let (kept , cutRids) = cutThrough nid (EvalSt.registry st)
+        in proj₁ (takeVals k vals) , true ,
            record sched { live = sweepLive kept (Sched.live sched) } ,
            record st { registry = kept
                      ; cancelled = cutRids ++ EvalSt.cancelled st
                      ; nodes = setNode nid (take-st zero) (EvalSt.nodes st) })
-  else (proj₁ (takeVals k vals) , [] , fin , sched ,
+  else (proj₁ (takeVals k vals) , fin , sched ,
         record st { nodes = setNode nid (take-st (proj₁ (proj₂ (takeVals k vals))))
                                       (EvalSt.nodes st) })
-takeDispatch nid vals fin sched st _ = [] , [] , fin , sched , st
+takeDispatch nid vals fin sched st _ = [] , fin , sched , st
 
 -- THE GROUPING, WHICH IS ONE PAIRING AND NOT A WINDOW.  Inside the
 -- subscribe bracket the whole arriving list becomes a single value;
@@ -646,11 +625,10 @@ soloSync = map (λ v → v , [])
 batchSyncDispatch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
                   → NodeId → List (Val Γ s) → Bool → Sched Γ → EvalSt e
                   → Maybe (NodeState Γ)
-                  → List (Val Γ (s ×ᵗ listᵗ s)) × List (InstEvent (Val Γ t)) × Bool
-                    × Sched Γ × EvalSt e
+                  → List (Val Γ (s ×ᵗ listᵗ s)) × Bool × Sched Γ × EvalSt e
 batchSyncDispatch nid vals fin sched st (just (batchSync-st sync)) =
-  (if sync then groupSync vals else soloSync vals) , [] , fin , sched , st
-batchSyncDispatch nid vals fin sched st _ = [] , [] , fin , sched , st
+  (if sync then groupSync vals else soloSync vals) , fin , sched , st
+batchSyncDispatch nid vals fin sched st _ = [] , fin , sched , st
 
 -- the outer *All frame's machinery, lifted out of stepFrame so the
 -- budget proof can reason about its reduction.  One walk for all four
@@ -676,14 +654,11 @@ mergeAllBump nid done ns with lookupNode nid ns
 -- switchAll's cut: the outgoing inner's registrations are severed
 switchKill : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
            → Maybe NodeId → Sched Γ → EvalSt e
-           → List (InstEvent (Val Γ t)) × Sched Γ × EvalSt e
-switchKill nothing  sched₀ st₀ = [] , sched₀ , st₀
+           → Sched Γ × EvalSt e
+switchKill nothing  sched₀ st₀ = sched₀ , st₀
 switchKill (just v) sched₀ st₀ =
-  let (kept , closes , cutRids) =
-        cutThrough v (EvalSt.delivered st₀) (EvalSt.regWatermark st₀)
-                   (EvalSt.dying st₀) (EvalSt.registry st₀)
-  in closes ,
-     record sched₀ { live = sweepLive kept (Sched.live sched₀) } ,
+  let (kept , cutRids) = cutThrough v (EvalSt.registry st₀)
+  in record sched₀ { live = sweepLive kept (Sched.live sched₀) } ,
      record st₀ { registry = kept
                 ; cancelled = cutRids ++ EvalSt.cancelled st₀ }
 
@@ -721,27 +696,27 @@ finishUsable _         _ _    _                                = false
 
 thruWrap : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
          → AllOp → NodeId → Bool
-         → List (Val Γ u) × List (InstEvent (Val Γ t)) × Sched Γ × EvalSt e
-         → List (Val Γ u) × List (InstEvent (Val Γ t)) × Bool × Sched Γ × EvalSt e
-thruWrap op nid false (vs , bs , sched′ , st′) = vs , bs , false , sched′ , st′
-thruWrap mergeAllᵒ nid true (vs , bs , sched′ , st′)
+         → List (Val Γ u) × Sched Γ × EvalSt e
+         → List (Val Γ u) × Bool × Sched Γ × EvalSt e
+thruWrap op nid false (vs , sched′ , st′) = vs , false , sched′ , st′
+thruWrap mergeAllᵒ nid true (vs , sched′ , st′)
   with lookupNode nid (EvalSt.nodes st′)
 ... | just (mergeAll-st lim act q _) =
-      vs , bs , (act ≡ᵇ 0) ∧ null q , sched′ ,
+      vs , (act ≡ᵇ 0) ∧ null q , sched′ ,
       record st′ { nodes = setNode nid (mergeAll-st lim act q true) (EvalSt.nodes st′) }
-... | _ = vs , bs , true , sched′ , st′
-thruWrap switchᵒ nid true (vs , bs , sched′ , st′)
+... | _ = vs , true , sched′ , st′
+thruWrap switchᵒ nid true (vs , sched′ , st′)
   with lookupNode nid (EvalSt.nodes st′)
 ... | just (switch-st cur _) =
-      vs , bs , is-nothing cur , sched′ ,
+      vs , is-nothing cur , sched′ ,
       record st′ { nodes = setNode nid (switch-st cur true) (EvalSt.nodes st′) }
-... | _ = vs , bs , true , sched′ , st′
-thruWrap exhaustᵒ nid true (vs , bs , sched′ , st′)
+... | _ = vs , true , sched′ , st′
+thruWrap exhaustᵒ nid true (vs , sched′ , st′)
   with lookupNode nid (EvalSt.nodes st′)
 ... | just (exhaust-st act _) =
-      vs , bs , not act , sched′ ,
+      vs , not act , sched′ ,
       record st′ { nodes = setNode nid (exhaust-st act true) (EvalSt.nodes st′) }
-... | _ = vs , bs , true , sched′ , st′
+... | _ = vs , true , sched′ , st′
 
 -- the inner *All frame's machinery, lifted out of stepFrame so the
 -- budget proof can reason about its reduction.  The drain walks the
@@ -768,10 +743,9 @@ thruWrap exhaustᵒ nid true (vs , bs , sched′ , st′)
 -- of the carrier; with the protocol in the values, a frame reads the
 -- distinction off the registry it already consults.
 
--- latch completion AND mark the share dying: a delivered fan-out
--- registration's exhausted close rides its own emit, so a cut during
--- the fan-out suppresses its second close (cutThrough's
--- delivered∧dying rule); the registry entries drop at shareFinish
+-- Latch completion AND mark the share dying, so that a cut landing
+-- mid-fan-out can tell a share that has already finished from one
+-- still running; the registry entries drop at shareFinish.
 shareLatch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
            → (i : Fin n) → Bool → EvalSt e → EvalSt e
 shareLatch i false st₀ = st₀
@@ -816,9 +790,9 @@ shareFinish i true  (emits , sched′ , st′) =
 -- value) is latched completed BEFORE its last delivery fans out — as
 -- a Subject closes before delivering its completion — so a subscriber
 -- joining mid-cascade already sees the one-shot close/complete; it is
--- also marked dying (each of its chains seeds its own exhausted
--- close; a cut never closes a delivered dying registration a second
--- time; its registry entries drop at cascadeFinish).  Colds and
+-- also marked dying, so a chain that has already spent this
+-- source's final delivery is not asked for another; its registry
+-- entries drop at cascadeFinish.  Colds and
 -- deferᵉ hops get latched too, harmlessly: their sources are
 -- per-subscription, never re-subscribed
 cascadeLatch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
@@ -827,12 +801,11 @@ cascadeLatch a sched st₀ =
   record (if Arrival.isLast a
           then record st₀ { completedSources = arrSource a ∷ EvalSt.completedSources st₀ }
           else st₀)
-    { delivered = [] ; cancelled = [] ; regWatermark = freshId regᵏ (Sched.mint sched)
+    { delivered = [] ; cancelled = []
     ; dying = if Arrival.isLast a then arrSource a ∷ [] else [] }
 
--- the spent source's registrations drop at the end (each delivered
--- chain carried its own close; cut victims' closes rode the cutting
--- emit) and the sweep collects its live entry
+-- the spent source's registrations drop at the end, and the sweep
+-- collects its live entry
 cascadeFinish : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
               → Arrival Γ → Sched Γ → EvalSt e → Sched Γ × EvalSt e
 cascadeFinish a sched′ st′ with Arrival.isLast a

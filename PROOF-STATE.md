@@ -230,6 +230,37 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 
 ### Big picture tier roadmap
 
+- **TAKE `InstEmit` OUT OF THE EVALUATOR'S CARRIER (Anthony).** `Stream Γ t = List (InstEmit (Val Γ t))` COALESCES a whole cascade
+  into one envelope — the burst-vs-depth-first divergence witnessed at
+  `evaluate↓`, and why `Rx.Depth` exists as a second top line carrying
+  `budgetᵈ` and its silent truncation. `Rx.Envelope` already mirrors that
+  envelope field-for-field at the OBJECT level and `toPlain` puts it there, so
+  the meta-level copy is duplication. Dropping it makes the carrier plain
+  values and leaves `Reducible` covering the only evaluator — SIMPLER, since
+  `EvSat` loses three provenance arms, `push-cons`'s walk collapses into one
+  rule, and `foldPath⇓`'s event accumulator goes with it. That accumulator was
+  the coalescing itself, stated as an induction, and nothing had named it.
+
+- **THEN DECODE AT THE BOUNDARY, WHICH THE LEG ABOVE TURNED OUT TO CONTAIN.**
+  Four faces read the protocol off the CARRIER — the acceptance sandwich, the
+  id-discipline premise, the readme instances and the top line — so a plain
+  carrier orphans all four at once. `Rx.Envelope.Decode` reads the envelope
+  back out of the values it now rides on, structurally and totally, and the
+  spec's own statement is then transported rather than restated: `Spec.agda`
+  does not move. The carrier's own end drops, which is a fact about the
+  elaboration — an elaborated source emits `init`, its payloads, a `close` at
+  `exhausted` and a `complete` in ONE envelope — and not a convention. Each of
+  the four narrows to programs that emit envelopes, which is what they always
+  meant.
+
+- **THEN RETIRE `Rx.Depth` AND `budgetᵈ`.** The second top line existed to
+  paper over the divergence the leg above removes, and it is a pure function
+  total by `budgetᵈ f = 512 * suc f` — a cascade outrunning it is SILENTLY
+  TRUNCATED, with no marker. It is under no theorem, and its only `src`
+  consumer is the CLI decoder, so the truncation is exposed to the
+  differential oracle, where a cut-short run still reports agreement with
+  TypeScript. Cut that consumer over to `evaluate↓` and the module goes.
+
 - **THE FLATTENERS, WHICH ARE THE ONE HALF STILL SHORT A CAPABILITY.** A
   delegating flattener consumes the envelope in its projecting map and the
   outer's own bookkeeping goes with it; a lane is cut by a switch and dropped by
@@ -256,17 +287,6 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
   former is never repaired by inventing one: a new `Ty` constructor or `Tm`
   former changes what a program can SAY, so it decides what every theorem
   above quantifies over — the same reason the spec is not an agent's to move.
-
-- **THEN TAKE `InstEmit` OUT OF THE EVALUATOR'S CARRIER, WHICH IS ONE LEG AND
-  NOT THREE (Anthony).** `Stream Γ t = List (InstEmit (Val Γ t))` COALESCES a
-  whole cascade into one envelope — which is the burst-vs-depth-first
-  divergence witnessed at `evaluate↓`, which is why `Rx.Depth` exists as a
-  second top line carrying `budgetᵈ` and its silent truncation. `Rx.Envelope`
-  already mirrors that envelope field-for-field at the OBJECT level and
-  `toPlain` puts it there, so the meta-level copy is duplication. Dropping it
-  makes the carrier plain values, matches rxjs's push, retires `Rx.Depth` with
-  its budget, and leaves `Reducible` covering the only evaluator — SIMPLER,
-  since `EvSat` loses three provenance constructors.
 
 ### The ledger
 
