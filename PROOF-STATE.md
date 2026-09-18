@@ -230,14 +230,16 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 
 ### Big picture tier roadmap
 
-- **THE NEW PALETTE HAS NEVER BEEN ROUND-TRIPPED, AND THAT IS THE NEXT LEG.**
-  Lift came apart in both trees and across all five surfaces, so the
-  correspondence checker is green on a pairing no run has exercised: every
-  generated tree now carries `map`/`scan` tags the decoder has only been read
-  against, and the count-changing shapes moved from a step returning a LIST to
-  a step returning literal syntax that `mergeAll` must RUN. That is a
-  different operator with different timing, so the sweep and the oracle are
-  what say whether the ruling's palette computes what the old one did.
+- **THE ORACLE IS RED ON EVERY BIASED LANE AND NOTHING RUNS IT, WHICH IS THE
+  NEXT LEG.** The round-trip happened and the palette is not what is wrong: the
+  default sweep is clean, and so is every lane biased at a pure-function
+  former. Red is every lane biased at a FLATTENER or a protocol operator, and
+  it was red the same way before lift came apart, so it is this branch's
+  standing state rather than the ruling's cost. One cause is out, recorded at
+  the constructor it was found in. The leg is to carry the remaining lanes
+  down the same way and then to put the sweep where a regression fails: CI
+  runs the gate, the tower and the QuickCheck sweep, and has never run the
+  oracle at all.
 
 - **THEN THE DEMOTION, WHICH IS TWO EVALUATORS AND NOT A RETYPE (Anthony: the
   harness "shouldn't test on srxjs at all — just plain rxjs now", and the Main

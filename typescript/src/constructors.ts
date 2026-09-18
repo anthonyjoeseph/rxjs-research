@@ -151,6 +151,25 @@ export const hot = <A>(
   );
 };
 
+// AND THE REGISTRATION IS SUBSCRIBED BEFORE THE BURST, WHICH IS AN
+// ORDERING FACT AND NOT A STYLE ONE -- READ THIS BEFORE TIDYING THE
+// `merge` ARGUMENTS BACK INTO READING ORDER. The driver mints a
+// source's arbitration ordinal when it REGISTERS, and `merge`
+// subscribes its inputs in order, draining each one fully before the
+// next. So a burst subscribed first runs its whole downstream cascade
+// -- including every source that cascade causes to be subscribed --
+// while this source has not yet registered, and those later sources
+// take the earlier ordinals. Two arrivals at the same tick are then
+// arbitrated in the reverse of subscription order, which is what the
+// evaluator's convention says they are not. The registration emits
+// nothing synchronously, so putting it first costs no ordering in the
+// stream and buys the one that matters.
+//
+// The shape that shows it: a flattener over a step returning a fresh
+// subscription of the same cold slot. The outer and the inner then
+// have async tails at the SAME tick, and which one fires first decides
+// whether the flattener is still busy when the other arrives.
+//
 // cold: a fresh source per subscription. `produce` is handed the id
 // just minted and answers with the events that fire INSIDE the
 // subscribe burst and, when the source outlives that burst, the
@@ -170,5 +189,5 @@ export const cold = <A>(
     const burst = subscribeBurst(driver, source, sync, async === undefined);
     return async === undefined
       ? of(burst)
-      : merge(of(burst), producer<InstEmit<A>>(async));
+      : merge(producer<InstEmit<A>>(async), of(burst));
   });

@@ -8,6 +8,7 @@ import { compile } from "./compile.js";
 import { genSeeds, genTestCases } from "./generator.js";
 import { serialize } from "./serialize.js";
 import { execAgda } from "./agda-bridge.js";
+import { readFileSync } from "node:fs";
 
 // Virtual time. fuel = ARRIVALS DELIVERED by the driver — async input
 // values and defer-body wakeups, popped in (tick, ordinal) order. Sync
@@ -81,6 +82,11 @@ const readFlag = (name: string): string | undefined => {
 };
 const readOperatorFromCli = (): string | undefined => readFlag("operator");
 const readSeedFromCli = (): string | undefined => readFlag("seed");
+// `--cases <file>` REPLAYS programs instead of generating them: one
+// serialized TestCase per line, which is exactly what a failing case
+// prints.  Without it a divergence is reproducible only by re-running
+// the sweep that found it, and a generator edit moves every offset.
+const readCasesFromCli = (): string | undefined => readFlag("cases");
 
 // createDriver (virtual time, the one impure edge), makeInputSource
 // (scripted slots → protocol streams), and compile (the per-node
@@ -197,8 +203,15 @@ const interpretResults = (
 async function main() {
   const operator = readOperatorFromCli();
   const cliSeed = readSeedFromCli();
+  const casesFile = readCasesFromCli();
   const seeds = cliSeed ? [cliSeed] : genSeeds();
-  const testCases = seeds.flatMap((seed) => genTestCases(seed, operator));
+  const testCases =
+    casesFile !== undefined
+      ? readFileSync(casesFile, "utf8")
+          .split("\n")
+          .filter((line) => line.trim().length > 0)
+          .map((line) => JSON.parse(line) as TestCase)
+      : seeds.flatMap((seed) => genTestCases(seed, operator));
   const agdaResults = await execAgda(testCases.map(serialize));
   const rxResults = testCases.map(evaluateRx);
   const { report, ok } = interpretResults(agdaResults, rxResults, testCases);
