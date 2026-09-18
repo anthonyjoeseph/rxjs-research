@@ -58,8 +58,8 @@ export type PrimOp = "add" | "sub" | "mul" | "eq" | "lt" | "not" | "eqU";
 // substituting its environment in demanded a closed Tm denoting every
 // value, a token included, so `uniqᵗ` needed an intro form carrying a
 // numeral.  Carrying the environment instead asks for no such term: the
-// token is a runtime number in the environment and the language never
-// has to be able to write one down.
+// token sits in the environment as a runtime value and the language
+// never has to be able to write one down.
 export type ObsVal = { exp: Exp; env: Val[] };
 
 export type Val =
