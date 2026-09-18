@@ -230,14 +230,15 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 
 ### Big picture tier roadmap
 
-- **THEN THE SOURCES' HOT ARM, WHICH IS WRITABLE NOW.** The elaboration indexed
-  by the slot telescope, a hot's token drawn by one ROOT-LEVEL mint per slot —
-  scope rather than a new former, so this arm waits on no ruling. It costs a
-  renaming of the body's value variables and a wrapper above the walk. The COLD
-  arm stays open behind the one gap that survived, and that gap is narrower than
-  a former reading the instant: a FLAT delivery stream cannot say which payloads
-  shared one, so what is wanted is a shape on the input interface, not a
-  capability. Build the hot; state the cold's shape precisely enough to rule on.
+- **THE SUBSCRIBE-FRAME INSTANT, AS ONE ROOT-LEVEL MINT, WHICH IS WHAT THE
+  SOURCES WERE WAITING ON.** The TS mirror stamps every subscribe burst with a
+  single global constant and nothing in either tree ever COMPARES against it, so
+  its whole content is that the bursts share one token — which one mint above the
+  whole walk supplies, in scope at every site beneath and unforgeable where a
+  literal would not be. The walk carries it at the far end of Θ, so its index is
+  the telescope's length and the existing prefix-relative chains are untouched;
+  what it costs is the author variables' injection, not a former. Land the
+  wrapper and thread the token.
 
 - **THEN THE SAME OPERATORS IN `Tm`/`Ty` (Anthony).**
   Each TS simul operator mirrored as an Agda definition in the value language,
@@ -250,23 +251,31 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
   former changes what a program can SAY, so it decides what every theorem
   above quantifies over — the same reason the spec is not an agent's to move.
 
-- **THEN THE FLATTENERS AND THE SOURCES, ONCE THE RULING THEY WAIT ON EXISTS,
-  AND TIER 1 IS COMPLETE.** Both halves of that ruling are a new PLAIN former
-  and so are Anthony's: a source reads the ambient instant, and a flattener
-  needs one stream to carry the outer's bookkeeping beside the flattened
-  values. The second is what the delegating shape cannot do — the projecting
-  map is the envelope's only consumer, a lane is cut by a switch and dropped
-  by an exhaust, and a second consumer is a second subscription. Whichever
-  former answers it, the three flatteners are a body over it rather than a
-  design, which is why they are one leg with the sources and not four.
+- **THEN `ofᵖ` AND `emptyᵖ` AS REAL BODIES, THE SOURCES BEING THE HALF THAT NO
+  LONGER NEEDS A RULING.** A cold's source token is a `mintᵉ` at its own head,
+  which draws per subscription, and its instant is the frame token from the leg
+  above; the burst is one emit carrying init, the values, an exhausted close and
+  complete, mirroring the TS primitive event for event. Whether two colds alive
+  in one frame ought to share more than the frame token is a TIER 3 question
+  (Anthony: simul correctness is off the table here), so this leg owes a
+  `toPlain` that is TOTAL and type-correct and owes nothing about grouping.
+
+- **THEN THE FLATTENERS, WHICH ARE THE ONE HALF STILL SHORT A CAPABILITY.** A
+  delegating flattener consumes the envelope in its projecting map and the
+  outer's own bookkeeping goes with it; a lane is cut by a switch and dropped by
+  an exhaust, and a second consumer is a second subscription. That is a genuine
+  gap in the plain palette rather than a placement problem, so it is the one
+  place in this tier where a new PLAIN former may be the answer — and a new
+  former is Anthony's, never an agent's. State what the three need in one shape
+  and report it.
 
 ### The ledger
 
 - **`{of,empty,take,mergeAll,switchAll}ᵖ`** (Rx.Elaborate) — SHAPE,
-  `DEAD ROUTE×8`: the elaboration's per-former plumbing. Five want a plain
-  former nobody here may invent — a source the ambient instant, a flattener
-  somewhere to forward the outer's bookkeeping; `take` is the right operator
-  at the wrong level.
+  `DEAD ROUTE×8`: the elaboration's per-former plumbing. The two sources want a
+  root-level mint and a placement, not a former; the flatteners want somewhere
+  to forward the outer's bookkeeping, which nothing plain offers; `take` is the
+  right operator at the wrong level.
 
 ## Tier 2 — the proof statement, once there are two trees to state it over
 
