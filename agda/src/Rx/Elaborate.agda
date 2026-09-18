@@ -88,6 +88,17 @@ postulate
   -- the envelope, so an enveloped stream's own values are envelopes and
   -- a plain `takeᵉ` over it counts batches.  The operator is right and
   -- the level is wrong.
+  -- AND THE ASK IS NOT THE FLATTENERS' ASK, WHICH IS WORTH SAYING SINCE
+  -- THE TWO SIT IN ONE LEG.  What this one wants is a DATA-DEPENDENT
+  -- TERMINATOR, and the plain palette has none: `takeᵉ` is the only
+  -- former that ends a stream its source has not ended, and its count is
+  -- a term read once at subscription; every other former completes
+  -- exactly when what it is subscribed to does.  A multicast does not
+  -- supply one either — it buys a second consumer, not a new way to
+  -- stop — so the flatteners' channel would leave this row open.  The
+  -- operator wanted is ordinary rxjs and inclusive: cut on the emit that
+  -- exhausts the budget, that emit's own values truncated where the
+  -- budget ran out.
   -- DEAD ROUTE: count in a scan and cut with `takeᵉ`.  The counting and
   --   truncation halves are both a pure-function step's work; the ENDING
   --   half is not, since such a step cannot change how many emits pass
@@ -155,6 +166,23 @@ postulate
   -- an emit — and the shape below produces none, which is a divergence
   -- decided by a program with a valueless outer emit rather than by any
   -- argument about tokens.
+  --
+  -- THE BRACKET AT THE JOIN IS HALF AN ANSWER, AND THE TYPE SAYS WHICH
+  -- HALF.  `batchSyncᵉ` delivers the half nothing else reached: an
+  -- inner's whole subscribe burst arrives as ONE value, so the burst an
+  -- outer emit CAUSED is reassemblable into that emit rather than
+  -- trailing behind it — the id-inheritance the mirror's diamond batch
+  -- rests on.  The other half no bracket reaches, because `mergeAllᵉ`
+  -- takes `obs t`: everything reaching a flattener's output rides a
+  -- LANE, and a lane is what a limit COUNTS, a switch CUTS and an
+  -- exhaust DROPS.  An outer emit carrying no observable still owes an
+  -- output emit, and at a saturated limit it owes it NOW — a lane can
+  -- promise neither.  So the residue is ONE capability and not three
+  -- policies: a second path from outer to output, which is a second
+  -- SUBSCRIPTION unless the outer is multicast.  That is the mirror's
+  -- join — one channel every event enters, one `scan` holding the lane
+  -- table — and a channel is this language's one multicast, reachable
+  -- today only as a slot BINDING.
   -- DEAD ROUTE: elaborate the handoff and init events in the projecting
   --   map, which has the outer emit's instant but no token to name the
   --   inner source with.

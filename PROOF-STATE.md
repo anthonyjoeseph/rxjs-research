@@ -231,13 +231,15 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 ### Big picture tier roadmap
 
 - **THE FLATTENERS AND `takeᵖ`, WHICH ARE THE `Tm`/`Ty` MIRROR'S OWN PALETTE
-  GAP (Anthony: these "all need to be defined. These are crucial").** One
-  shape, not four: no plain former lifts an ENVELOPED outer through a flatten,
-  forwarding the outer's own bookkeeping, and `takeᵖ` is the same ask one level
-  down. The four placements are dead and recorded at the postulates; what is
-  NOT refuted there is a bracket at the JOIN, and that route is the one to walk
-  before asking for a former. Four postulates fall together, or the ask is one
-  capability at three policies. A former is Anthony's.
+  GAP (Anthony: these "all need to be defined. These are crucial").** The join
+  bracket is walked and recorded at `mergeAllᵖ`: `batchSyncᵉ` buys the
+  id-inheritance half outright, and the other half is closed by a TYPE —
+  `mergeAllᵉ` takes `obs t`, so everything reaching a flattener's output rides
+  a lane, which is what a limit counts, a switch cuts and an exhaust drops.
+  Three postulates therefore share ONE ask, a multicast reachable inside an
+  expression, which is leg three's channel arriving early. `takeᵖ` wants a
+  different one and the channel would not close it. Both asks are formers, so
+  both are Anthony's — the leg is to put them to him, not to invent them.
 
 - **`Rx.Depth` / SCHEDULING SOURCES — the tier's one genuine architecture
   decision.** What forces `evaluateᵈ` is that a whole synchronous source runs
@@ -254,8 +256,7 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
   in the same fashion, so the correspondence is readable rather than asserted.
   The first thing tested is the SEEDED channel the share reads at subscribe
   time, a further ask than a plain channel which `Tm` may not have.
-  `batchSyncᵉ` is already one, at the index Anthony has ruled on — see its
-  header — and now carried by both TypeScript legs and by `Rx.Depth`.
+  `batchSyncᵉ` is already one, at the index Anthony has ruled on.
   **AND IF THE LANGUAGE CANNOT SAY ONE, STOP AND REPORT (Anthony).** A missing
   former is never repaired by inventing one: a new `Ty` constructor or `Tm`
   former changes what a program can SAY, so it decides what every theorem above
@@ -504,11 +505,10 @@ also: `readme-batch-order-is-delivery-order` — the flagship semantic law, and 
   `NO EVIDENCE`: each family admits one output at its own indices. Nothing has
   instantiated either, and the arms that do not follow from the head
   constructor are separated by equation premises — unwalked.
-- **`readme-batch-order-is-delivery-order`,
-  `readme-one-subscribe-one-batch`** — FALSITY, `PROBED×2`: instantiated now,
-  but every row sits at a program with no flattener, which is where each
-  statement's risk actually lives. Still FALSITY for that reason, not for want
-  of a row.
+- **`readme-batch-order-is-delivery-order`, `readme-one-subscribe-one-batch`**
+  — FALSITY, `PROBED×2`: instantiated now, but every row sits at a program with
+  no flattener, which is where each statement's risk actually lives. Still
+  FALSITY for that reason, not for want of a row.
 - **Vacuous-by-abstraction — VACUITY**, `NO EVIDENCE` — `locality`,
   `non-interference`, `timing-invariance`, `causality`, `μ-guarded`,
   `defer-shift` (the one allowlisted honest gap). De-risking these means
