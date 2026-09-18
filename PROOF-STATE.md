@@ -257,12 +257,16 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
   former changes what a program can SAY, so it decides what every theorem
   above quantifies over — the same reason the spec is not an agent's to move.
 
-- **THEN THE TOWER OVER THE SPLIT, WITH `Reducible` THE THING THAT MUST NOT
-  REGRESS (Anthony).** `Reducible` is green and postulate-free today; which
-  totality device survives the split is tier 2's decision, recorded at
-  `budgetᵈ`. `Verify-Well-Formed` and `Verify-Determinacy` are held to the
-  cheapest thing that typechecks and keeps their wiring — their statements
-  are about to move.
+- **THEN TAKE `InstEmit` OUT OF THE EVALUATOR'S CARRIER, WHICH IS ONE LEG AND
+  NOT THREE (Anthony).** `Stream Γ t = List (InstEmit (Val Γ t))` COALESCES a
+  whole cascade into one envelope — which is the burst-vs-depth-first
+  divergence witnessed at `evaluate↓`, which is why `Rx.Depth` exists as a
+  second top line carrying `budgetᵈ` and its silent truncation. `Rx.Envelope`
+  already mirrors that envelope field-for-field at the OBJECT level and
+  `toPlain` puts it there, so the meta-level copy is duplication. Dropping it
+  makes the carrier plain values, matches rxjs's push, retires `Rx.Depth` with
+  its budget, and leaves `Reducible` covering the only evaluator — SIMPLER,
+  since `EvSat` loses three provenance constructors.
 
 ### The ledger
 

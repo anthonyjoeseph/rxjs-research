@@ -603,14 +603,28 @@ initᵈ {n} {Γ} {t} ins = go (toList (allFin n)) empty
 -- Girard-Tait reducibility candidate instead, which is a PROOF that
 -- every cascade finishes and admits no truncation at all.
 --
--- SO THE TWO EVALUATORS DO NOT DIFFER ONLY IN WHAT THEY EMIT, and
--- whichever device survives the split is a decision about the proof
--- statement rather than about either machine.  Retargeting the
--- theorems at this evaluator as it stands trades a theorem for a
--- constant; porting the candidate across is mechanical but touches
--- every member of the subscribe cycle, since the candidate is stated
--- over the other machine's own state types throughout.  Neither is an
--- elaboration detail and neither is chosen here.
+-- BUT NO THEOREM STANDS ON THIS ONE, WHICH IS WHERE THE SEVERITY
+-- ACTUALLY LANDS.  Every module that proves anything reaches the
+-- evaluator through `evaluate↓`, which is the candidate-backed one;
+-- this machine's sole consumer is the CLI.  So the truncation is
+-- exposed to the DIFFERENTIAL ORACLE rather than to the proof — a run
+-- the count cuts short still reports agreement with TypeScript, which
+-- is the one place a silent cut buys a false green.
+
+-- AND THE CANDIDATE CANNOT BE POINTED AT THIS MACHINE, WHICH IS A
+-- FACT ABOUT KIND AND NOT ABOUT VOCABULARY.  Reducibility is an
+-- argument that a RELATION is inhabited, and this evaluator declares
+-- none: it is a function whose termination argument IS the count, so
+-- there is nothing here for the candidate to be about.  Giving it one
+-- means a relational domain of its own before any of the candidate
+-- transfers, which is why this is not the mechanical port it reads as.
+
+-- AND THE REVERSE DIRECTION IS REFUSED FOR A REASON THAT IS NOT ABOUT
+-- TOTALITY AT ALL.  This machine is a SECOND top line rather than a
+-- retype of the other because the two disagree with real rxjs
+-- differently — a burst collected whole against a depth-first push —
+-- on a witness of one program.  That is recorded where the cutover it
+-- blocks is defined, in `evaluate↓`'s own header.
 budgetᵈ : Fuel → ℕ
 budgetᵈ f = 512 * suc f
 
