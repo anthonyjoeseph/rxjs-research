@@ -35,15 +35,20 @@ open import Rx.SExp using (SExp; STm; inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; sca
 -- is left is the protocol traffic of six formers, and every one of them
 -- is short a capability of the same two kinds.
 --
--- MINTING IS THE FIRST KIND AND IT IS THE HARD ONE.  A source coming
--- alive owes an `init` naming a token nothing has used, and the term
--- language has no former at `uniqᵗ` at all — a term that made a token
--- would be a literal, and a program that could write a token could
--- forge a collision.  A token is drawn from a BINDER, and a binder
--- names one token per subscription while a source owes one per time it
--- comes alive.  So `ofᵖ` and `emptyᵖ` are blocked outright.
+-- MINTING IS THE FIRST KIND, AND WHAT IT COSTS IS PLACEMENT RATHER
+-- THAN A FORMER.  A source coming alive owes an `init` naming a token
+-- nothing has used, and the term language has no former at `uniqᵗ` at
+-- all — a term that made a token would be a literal, and a program
+-- that could write a token could forge a collision.  A token is drawn
+-- from a BINDER, and a binder reads as one token per subscription
+-- while a source owes one per time it comes alive; those are the same
+-- arity, since coming alive IS being subscribed, and a mint standing
+-- at an INNER's head is subscribed once per outer value, so the binder
+-- reaches a per-delivery token too.  What the sources are short of is
+-- therefore not a draw.
 --
--- READING THE RUNNING INSTANT IS THE SECOND, AND IT IS NARROW.
+-- READING THE RUNNING INSTANT IS THE SECOND, AND IT IS THE ONE THAT
+-- ACTUALLY BLOCKS THEM.
 -- Downstream of a source
 -- the instant is not missing at all: the incoming emit IS an envelope,
 -- a term can project its instant field, and a step that stamps its
@@ -98,25 +103,26 @@ postulate
   -- tree does not have, and what a new former admits is what every
   -- theorem above quantifies over -- so the shape of it is a ruling and
   -- not an elaboration detail.
-  -- DEAD ROUTE: bracket the subscribe frame with `batchSyncᵉ` and let
-  --   the grouping stand in for the id.  It brackets a frame without
-  --   NAMING one, and the bracket is per node, so two colds subscribed
-  --   in one frame group separately and nothing joins the two groups --
-  --   which is the whole of what the id was doing.  The former is
-  --   necessary here and is not sufficient.
+  -- DEAD ROUTE: bracket the subscribe frame with `batchSyncᵉ` AT THE
+  --   SOURCE and let the grouping stand in for the id.  It brackets a
+  --   frame without NAMING one, and the bracket is per node, so two
+  --   colds subscribed in one frame group separately and nothing joins
+  --   the two groups -- which is the whole of what the id was doing.
+  --   The bracket at a JOIN is a different route and is not refuted
+  --   here: the flatteners are the only nodes where two sources meet,
+  --   so a bracket there sees both bursts in one group.  What that
+  --   reaches is the subscribe frame alone, since `batchSyncᵉ` hands
+  --   every later value out as a singleton.
   -- DEAD ROUTE: build both inline, out of a `mintᵉ`-bound token and a
-  --   counter carried in a scan's state.  A mint binds ONE token per
-  --   subscription, so it cannot name the successive instants a source
-  --   coming alive repeatedly owes; and a scan's state advances per
-  --   EMIT, so it cannot tell two emits of one cascade from two
-  --   cascades.  Both
-  --   quantities are properties of the RUN, and the run is the
-  --   scheduler's.  AND BRACKETING FIRST DOES NOT REPAIR IT, which is
-  --   the repair the bracket invites: a group-advanced counter numbers
-  --   frames consistently and still numbers them in the scheduler's own
-  --   namespace with no relation to it, while the slots hand the same
-  --   program envelopes carrying the machine's ids — so the two kinds
-  --   of instant meet in one output and no renaming separates them.
+  --   counter carried in a scan's state.  The MINT half of this is not
+  --   what fails: a mint at an inner's head is subscribed once per
+  --   outer value, so a draw per delivery is reachable.  What fails is
+  --   the counter, and it fails on its own terms -- a scan's state
+  --   advances per EMIT, so it cannot tell two emits of one cascade
+  --   from two cascades, which is a property of the RUN and the run is
+  --   the scheduler's.  A per-delivery draw does not repair that: it
+  --   gives every delivery a DISTINCT id where the whole content of an
+  --   instant is which deliveries SHARE one.
   ofᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
       → List (Tm Γ Δᵍ Δ Θ (plainᵗ t)) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
 
