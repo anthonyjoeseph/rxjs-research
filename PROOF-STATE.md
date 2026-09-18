@@ -230,16 +230,22 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 
 ### Big picture tier roadmap
 
-- **THE DEMOTION, WHICH IS TWO EVALUATORS AND NOT A RETYPE, AND WHICH THE
-  REBUILT ORACLE HAS NOW PRICED (Anthony).** Target: a plain
-  `evaluate : … → List (Val Γ t)` mirroring rxjs, which has no envelope.
-  Retyping the existing one is not that edit: of the twenty statements over
-  `evaluate↓`, FOURTEEN are envelope-essential, four value-only, two weaken
-  silently. And the interim projection is measurably NOT rxjs — one shape in
-  five hundred, recorded in the top line's own header: a burst is pushed whole
-  where rxjs pushes depth-first. So the plain evaluator must cascade
-  depth-first, which is the leg's real content; the oracle goes green and gets
-  its CI job when it does.
+- **THE ORACLE, WHICH IS WHAT THE DEMOTION WAS FOR.** The plain machine
+  stands — a work STACK, so a value's cascade finishes before its successor is
+  taken, which is the one thing the burst machine cannot do — and the CLI
+  spends it. What is unmeasured is whether it agrees with real rxjs: the
+  witness program that motivated the whole leg is one row, and the generator
+  reaches thirteen formers the sweep has never run against a plain evaluator.
+  So the leg is to build the CLI, run the oracle, and fix what it finds — in
+  the machine, never in the spec. This narrows nothing on its own and is the
+  right leg anyway: nothing below can be instantiated until the harness that
+  instantiates it runs.
+
+- **THEN THE ORACLE'S CI JOB, SO IT CANNOT ROT.** A harness nobody runs is a
+  harness that goes stale silently, which is the failure the gate exists to
+  make impossible everywhere else. The job is one workflow step and a fixed
+  seed corpus, and it is owed the moment the oracle is green — a green
+  measured once is a receipt, and a receipt is not a check.
 
 - **THEN THE SIX ROWS, WHICH NOTHING HOLDS ANY MORE.** The flatteners
   were held on a blocker and are not: they wanted a token per inner
