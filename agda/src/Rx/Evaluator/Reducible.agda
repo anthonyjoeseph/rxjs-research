@@ -1166,3 +1166,37 @@ reducible : ∀ {n} {Γ : Ctx n} {Θ t} (b : Exp Γ [] [] Θ t) (σ : Env Γ Θ)
           → Red {Γ = Γ} (obs t) (Θ , b , σ)
 reducible b σ rσ =
   redExpAcc b σ rσ _ (ib-topᵉ b) (<-wellFounded _) (<-wellFounded (gsizeᵉ b))
+
+-- AND THE SAME CLAIM WITH NO OBLIGATION LEFT, WHICH IS WHAT THE DRAIN
+-- SIDE SPENDS.  A value at observable type is a body paired with an
+-- environment whose entries are themselves values, so the obligation
+-- the line above carries is discharged by the same claim one entry
+-- down -- and an entry is a SUBTERM of the pair, which is the measure
+-- here.  The type is not: an entry sits at whatever type the telescope
+-- names, unrelated to the observable's own.
+--
+-- This is what a runtime value costs now that a value is a CLOSURE.
+-- While the evaluator closed its terms by substitution every value was
+-- a closed term outright and every closed term was reducible, so an
+-- observable pulled out of a queue or split off a burst carried its
+-- own candidate for free.  A closure carries an environment instead,
+-- and the entries of that environment are where the claim now has to
+-- be re-established -- once, here, rather than threaded through every
+-- site that meets a stored value.
+mutual
+
+  red-val : ∀ {n} {Γ : Ctx n} (t : Ty) (v : Val Γ t) → Red t v
+  red-val unitᵗ    v              = tt
+  red-val boolᵗ    v              = tt
+  red-val natᵗ     v              = tt
+  red-val uniqᵗ    v              = tt
+  red-val (s ×ᵗ u) (a , b)        = red-val s a , red-val u b
+  red-val (s +ᵗ u) (inj₁ a)       = red-val s a
+  red-val (s +ᵗ u) (inj₂ b)       = red-val u b
+  red-val (listᵗ s) []            = []
+  red-val (listᵗ s) (x ∷ xs)      = red-val s x ∷ red-val (listᵗ s) xs
+  red-val (obs u)  (Θ , b , σ)    = reducible b σ (red-env σ)
+
+  red-env : ∀ {n} {Γ : Ctx n} {Θ : List Ty} (σ : Env Γ Θ) → RedEnv σ
+  red-env []ᵉ                     = tt
+  red-env (_∷ᵉ_ {s = s} v vs)     = red-val s v , red-env vs

@@ -56,7 +56,7 @@ open import Relation.Nullary.Decidable using (⌊_⌋)
 
 open import Rx.Prim using (Fuel; Id; Source; Tick; InstEmit; InstEvent; close;
   exhausted; hot; cold)
-open import Rx.Exp using (Ctx; Closed; Val; _≟ᵗ_; obs; unfoldμ; evalTm; subΘExp; input; ofᵉ; emptyᵉ; takeᵉ; batchSyncᵉ; mapᵉ; scanᵉ; mergeAllᵉ;
+open import Rx.Exp using (Ctx; Closed; Val; Exp; _≟ᵗ_; obs; uniqᵗ; Env; _∷ᵉ_; []ᵉ; unfoldμ; evalWith; input; ofᵉ; emptyᵉ; takeᵉ; batchSyncᵉ; mapᵉ; scanᵉ; mergeAllᵉ;
   switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ)
 open import Rx.Mint using (nodeᵏ; regᵏ; sourceᵏ; freshId; setAt; next)
 open import Rx.Slots using (Slots; shared; scripted)
@@ -89,7 +89,7 @@ open import Rx.Evaluator.Domain using (srcFrame; subscribeE⇓; subscribeAll⇓;
   subs-floor; subs-shared; subs-hot-done; subs-hot-live; subs-cold-sync;
   subs-cold-async; slot-spent; slot-join; slot-connect; connect-live;
   connect-died)
-open import Rx.Evaluator.Reducible using (reducible)
+open import Rx.Evaluator.Reducible using (reducible; red-val; red-env)
 
 ------------------------------------------------------------------
 -- WHAT A BUILDER RETURNS.  The result and the derivation together, so
@@ -98,7 +98,7 @@ open import Rx.Evaluator.Reducible using (reducible)
 ------------------------------------------------------------------
 
 Runs : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
-     → Closed Γ u → Path Γ lo u t → Id → Tick → Sched Γ → EvalSt e → Set
+     → Val Γ (obs u) → Path Γ lo u t → Id → Tick → Sched Γ → EvalSt e → Set
 Runs {e = e} b κ id now sched st =
   ∃ λ r → subscribeE⇓ {e = e} b κ id now sched st r
 
@@ -109,7 +109,7 @@ PushRuns {e = e} id now fr κ bs sched st =
   ∃ λ r → pushBurst⇓ {e = e} id now fr κ bs sched st r
 
 AllRuns : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
-        → AllOp → NodeState Γ → Closed Γ (obs u) → Path Γ lo u t
+        → AllOp → NodeState Γ → Val Γ (obs (obs u)) → Path Γ lo u t
         → Id → Tick → Sched Γ → EvalSt e → Set
 AllRuns {e = e} op ns b κ id now sched st =
   ∃ λ r → subscribeAll⇓ {e = e} op ns b κ id now sched st r
@@ -152,7 +152,7 @@ FinishRuns {e = e} op allNid inst κ id now vals sched st ns =
 
 DrainsQ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo}
         → NodeId → Path Γ lo s t → Id → Tick
-        → Maybe ℕ → ℕ → Bool → List (Closed Γ s) → Sched Γ → EvalSt e → Set
+        → Maybe ℕ → ℕ → Bool → List (Val Γ (obs s)) → Sched Γ → EvalSt e → Set
 DrainsQ {e = e} allNid κ id now lim act od q sched st =
   ∃ λ r → mergeAllDrain⇓ {e = e} allNid κ id now lim act od q sched st r
 
@@ -218,24 +218,24 @@ slot-agree sl sched i ag eq = trans (cong (λ f → f i) ag) eq
 --
 -- STRUCTURAL SCC: subscribeAll! subscribeE!
 
-subscribeE! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
-  (sl : Slots Γ) (b : Closed Γ u)
+subscribeE! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo Θ}
+  (sl : Slots Γ) (b : Exp Γ [] [] Θ u) (ρ : Env Γ Θ)
   (κ : Path Γ lo u t) (id : Id) (now : Tick)
   (sched : Sched Γ) → Sched.slots sched ≡ sl → (st : EvalSt e) →
-  Runs {e = e} b κ id now sched st
+  Runs {e = e} (Θ , b , ρ) κ id now sched st
 
-subscribeE!-input : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo}
+subscribeE!-input : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo Θ} {ρ : Env Γ Θ}
   (sl : Slots Γ) (i : Fin n)
   (κ : Path Γ lo (lookup Γ i) t) (id : Id) (now : Tick)
   (sched : Sched Γ) → Sched.slots sched ≡ sl → (st : EvalSt e) →
-  Runs {e = e} (input i) κ id now sched st
+  Runs {e = e} (Θ , input i , ρ) κ id now sched st
 
-subscribeAll! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
+subscribeAll! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo Θ}
   (sl : Slots Γ) (op : AllOp) (ns : NodeState Γ)
-  (b : Closed Γ (obs u))
+  (b : Exp Γ [] [] Θ (obs u)) (ρ : Env Γ Θ)
   (κ : Path Γ lo u t) (id : Id) (now : Tick)
   (sched : Sched Γ) → Sched.slots sched ≡ sl → (st : EvalSt e) →
-  AllRuns {e = e} op ns b κ id now sched st
+  AllRuns {e = e} op ns (Θ , b , ρ) κ id now sched st
 
 pushBurst! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
   (sl : Slots Γ) (id : Id) (now : Tick) (fr : Frame Γ s u)
@@ -275,29 +275,29 @@ subscribeInner! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
 -- alongside it.  What still travels is the slot agreement, because the
 -- input arm genuinely dispatches on the table and the relation speaks
 -- of the schedule's own reading.
-subscribeE! sl (input i) κ id now sched ag st =
+subscribeE! sl (input i) ρ κ id now sched ag st =
   subscribeE!-input sl i κ id now sched ag st
-subscribeE! sl (ofᵉ ts)  κ id now sched ag st = _ , subs-of refl
-subscribeE! sl emptyᵉ    κ id now sched ag st = _ , subs-empty refl
+subscribeE! sl (ofᵉ ts) ρ  κ id now sched ag st = _ , subs-of refl
+subscribeE! sl emptyᵉ ρ  κ id now sched ag st = _ , subs-empty refl
 
 
-subscribeE! sl (takeᵉ c b) κ id now sched ag st
-  with evalTm c in eq
+subscribeE! sl (takeᵉ c b) ρ κ id now sched ag st
+  with evalWith c ρ in eq
 ... | zero  = _ , subs-take-zero eq refl
 ... | suc k =
   let nid = freshId nodeᵏ (Sched.mint sched)
       ((burst , sched₂ , st₁) , d) =
-        subscribeE! sl b (take-f nid ↠ κ) id now
+        subscribeE! sl b ρ (take-f nid ↠ κ) id now
                     (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) }) ag
                     (installNode nid (take-st (suc k)) st)
       (r , p) = pushBurst! sl id now (take-f nid) tt κ burst sched₂
                   (trans (subs-keeps d) ag) st₁
   in r , subs-take-suc eq refl d p
 
-subscribeE! sl (batchSyncᵉ b) κ id now sched ag st =
+subscribeE! sl (batchSyncᵉ b) ρ κ id now sched ag st =
   let nid = freshId nodeᵏ (Sched.mint sched)
       ((burst , sched₂ , st₁) , d) =
-        subscribeE! sl b (batchSync-f nid ↠ κ) id now
+        subscribeE! sl b ρ (batchSync-f nid ↠ κ) id now
                     (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) }) ag
                     (installNode nid (batchSync-st true) st)
       ((out , sched₃ , st₂) , p) =
@@ -308,34 +308,34 @@ subscribeE! sl (batchSyncᵉ b) κ id now sched ag st =
      , subs-batchSync refl d p
 
 
-subscribeE! sl (mapᵉ f b) κ id now sched ag st =
+subscribeE! sl (mapᵉ f b) ρ κ id now sched ag st =
   let ((burst , sched₂ , st₁) , d) =
-        subscribeE! sl b (map-f f ↠ κ) id now sched ag st
-      (r , p) = pushBurst! sl id now (map-f f) tt κ burst sched₂
+        subscribeE! sl b ρ (map-f (_ , f , ρ) ↠ κ) id now sched ag st
+      (r , p) = pushBurst! sl id now (map-f (_ , f , ρ)) tt κ burst sched₂
                   (trans (subs-keeps d) ag) st₁
   in r , subs-map d p
 
-subscribeE! sl (scanᵉ f i b) κ id now sched ag st =
+subscribeE! sl (scanᵉ f i b) ρ κ id now sched ag st =
   let nid = freshId nodeᵏ (Sched.mint sched)
       ((burst , sched₂ , st₁) , d) =
-        subscribeE! sl b (scan-f f nid ↠ κ) id now
+        subscribeE! sl b ρ (scan-f (_ , f , ρ) nid ↠ κ) id now
                     (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) }) ag
-                    (installNode nid (cell-st (evalTm i)) st)
-      (r , p) = pushBurst! sl id now (scan-f f nid) tt κ burst sched₂
+                    (installNode nid (cell-st (evalWith i ρ)) st)
+      (r , p) = pushBurst! sl id now (scan-f (_ , f , ρ) nid) tt κ burst sched₂
                   (trans (subs-keeps d) ag) st₁
   in r , subs-scan refl d p
 
-subscribeE! sl (mergeAllᵉ lim b) κ id now sched ag st =
+subscribeE! sl (mergeAllᵉ lim b) ρ κ id now sched ag st =
   let (r , a) = subscribeAll! sl mergeAllᵒ (mergeAll-st lim 0 [] false)
-                              b κ id now sched ag st
+                              b ρ κ id now sched ag st
   in r , subs-merge-all a
-subscribeE! sl (switchAllᵉ b) κ id now sched ag st =
+subscribeE! sl (switchAllᵉ b) ρ κ id now sched ag st =
   let (r , a) = subscribeAll! sl switchᵒ (switch-st nothing false)
-                              b κ id now sched ag st
+                              b ρ κ id now sched ag st
   in r , subs-switch-all a
-subscribeE! sl (exhaustAllᵉ b) κ id now sched ag st =
+subscribeE! sl (exhaustAllᵉ b) ρ κ id now sched ag st =
   let (r , a) = subscribeAll! sl exhaustᵒ (exhaust-st false false)
-                              b κ id now sched ag st
+                              b ρ κ id now sched ag st
   in r , subs-exhaust-all a
 
 -- THE μ PEEL, WHICH IS THE FIRST OF THE THREE EDGES THIS BLOCK CANNOT
@@ -343,26 +343,26 @@ subscribeE! sl (exhaustAllᵉ b) κ id now sched ag st =
 -- structural reading of the term reaches it; the reducibility candidate
 -- does, because the unfolding sits at the SAME type and the candidate
 -- recurses on the type rather than on the term.
-subscribeE! sl (μᵉ body) κ id now sched ag st =
-  let (r , d , _) = reducible (unfoldμ body) κ id now sched st
+subscribeE! sl (μᵉ body) ρ κ id now sched ag st =
+  let (r , d , _) = reducible (unfoldμ body) ρ (red-env ρ) κ id now sched st
   in r , subs-μ d
 
-subscribeE! sl (varᵉ ()) κ id now sched ag st
-subscribeE! sl (deferᵉ body) κ id now sched ag st = _ , subs-defer refl refl refl refl
-subscribeE! sl (mintᵉ body) κ id now sched ag st =
+subscribeE! sl (varᵉ ()) ρ κ id now sched ag st
+subscribeE! sl (deferᵉ body) ρ κ id now sched ag st = _ , subs-defer refl refl refl refl
+subscribeE! sl (mintᵉ body) ρ κ id now sched ag st =
   let src    = freshId sourceᵏ (Sched.mint sched)
       sched' = record sched { mint = setAt sourceᵏ (suc src) (Sched.mint sched) }
-      (r , d , _) = reducible (subΘExp [] (src ∷ᵃ []ᵃ) body) κ id now sched' st
+      (r , d , _) = reducible body (src ∷ᵉ ρ) (tt , red-env ρ) κ id now sched' st
   in r , subs-mint refl d
 
 -- THE FLATTENER'S OUTER SUBSCRIBE, WHICH HAS EXACTLY ONE CLAUSE.  All
 -- three `*All` operators install their own node state and then run the
 -- same outer subscribe through a `thru-outer` frame, so the operator is
 -- carried as a value and the shape is shared.
-subscribeAll! sl op ns b κ id now sched ag st =
+subscribeAll! sl op ns b ρ κ id now sched ag st =
   let nid = freshId nodeᵏ (Sched.mint sched)
       ((burst , sched₂ , st₁) , d) =
-        subscribeE! sl b (thru-outer op nid ↠ κ) id now
+        subscribeE! sl b ρ (thru-outer op nid ↠ κ) id now
                     (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) }) ag
                     (installNode nid ns st)
       (r , p) = pushBurst! sl id now (thru-outer op nid) tt κ burst sched₂
@@ -475,7 +475,7 @@ thruConsume! {u = u} sl exhaustᵒ nid κ id now o sched ag st
 subscribeInner! sl op allNid κ id now o sched ag st =
   let inst = freshId nodeᵏ (Sched.mint sched)
       ((burst , sched′ , st′) , d , _) =
-        reducible o (from-inner op allNid inst ↠ κ) id now
+        red-val (obs _) o (from-inner op allNid inst ↠ κ) id now
                   (record sched { mint = setAt nodeᵏ (suc inst) (Sched.mint sched) }) st
       (vs , bs , done) = splitBurst burst
   in (inst , vs , bs , done , sched′ , st′) , inner refl d refl
@@ -521,7 +521,7 @@ subscribeE!-input {lo = lo} sl i κ id now sched ag st
                   (slot-agree sl sched i ag slEq)
                   (slot-join {κ = κ} {below = below} doneEq connEq refl)
 ...       | false
-            with reducible d (share-sink i ≤-refl) id now
+            with reducible d []ᵉ tt (share-sink i ≤-refl) id now
                    (record sched { mint = next regᵏ (Sched.mint sched) })
                    (register (freshId regᵏ (Sched.mint sched))
                      (atSlot i) (lowerFloor below κ)
@@ -552,14 +552,14 @@ subscribeE!-input {lo = lo} sl i κ id now sched ag st
 -- handed in.
 queuedInner! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo}
   (allNid : NodeId) (κ : Path Γ lo s t) (id : Id) (now : Tick)
-  (o : Closed Γ s) (sched : Sched Γ) (st : EvalSt e) →
+  (o : Val Γ (obs s)) (sched : Sched Γ) (st : EvalSt e) →
   InnerSubRuns {e = e} mergeAllᵒ allNid κ id now o sched st
 queuedInner! allNid κ id now o sched st =
   subscribeInner! (Sched.slots sched) mergeAllᵒ allNid κ id now o sched refl st
 
 mergeAllDrain! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo}
   (allNid : NodeId) (κ : Path Γ lo s t) (id : Id) (now : Tick)
-  (lim : Maybe ℕ) (act : ℕ) (od : Bool) (q : List (Closed Γ s))
+  (lim : Maybe ℕ) (act : ℕ) (od : Bool) (q : List (Val Γ (obs s)))
   (sched : Sched Γ) (st : EvalSt e) →
   DrainsQ {e = e} allNid κ id now lim act od q sched st
 mergeAllDrain! allNid κ id now lim act od []      sched st = _ , drain-nil
@@ -807,7 +807,7 @@ evaluate! : ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t)
   (ins : Slots Γ) → ∃ λ out → evaluate⇓ fuel e ins out
 evaluate! {n = n} fuel e ins =
   let ((burst , sched₀ , st₀) , s , _) =
-        reducible e root 0 0 (sched-init e ins) (st-init e)
+        reducible e []ᵉ tt root 0 0 (sched-init e ins) (st-init e)
       (rest , d) = drain! fuel 1 sched₀ st₀
   in (burst ++ rest) , eval-run s d
 

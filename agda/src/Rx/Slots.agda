@@ -25,9 +25,10 @@ open import Rx.Exp  using (Ty; Ctx; Val; Closed; isData; inputsBelowᵉ)
 -- SCRIPTED SLOTS CARRY DATA ONLY (`T (isData t)`, discharged by
 -- unification at every data type, so ordinary scripts are written
 -- unchanged).  An observable-typed slot would be a hole in the walk's
--- descent order: `Val Γ (obs u) = Closed Γ u`, so its script could emit
--- the very program being walked, and the *All hop off it would be asked
--- to descend from a rank to itself.  The regress is real, not merely
+-- descent order: a value at observable type is a body paired with an
+-- environment, so its script could emit the very program being walked,
+-- and the *All hop off it would be asked to descend from a rank to
+-- itself.  The regress is real, not merely
 -- undescending — such a program re-enters itself unboundedly —
 -- so no edge can pay for it and the restriction is by construction.
 -- Higher-order pipelines are unaffected: an observable-typed slot is a

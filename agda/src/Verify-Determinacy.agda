@@ -45,11 +45,11 @@
 module Verify-Determinacy where
 
 open import Data.List using (_++_)
-open import Data.Product using (_×_)
+open import Data.Product using (_×_; _,_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong)
 
 open import Rx.Prim using (Tick; Fuel; Id)
-open import Rx.Exp using (Ctx; Closed)
+open import Rx.Exp using (Ctx; Closed; Val; obs; []ᵉ)
 open import Rx.Slots using (Slots)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; root; sched-init; st-init)
 open import Rx.Evaluator.Domain using (subscribeE⇓; drain⇓; evaluate⇓; eval-run)
@@ -61,7 +61,7 @@ open import Rx.Evaluator.Domain using (subscribeE⇓; drain⇓; evaluate⇓; eva
 postulate
   subscribeE-det :
     ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
-      (b : Closed Γ u) (κ : Path Γ lo u t) (id : Id) (now : Tick)
+      (b : Val Γ (obs u)) (κ : Path Γ lo u t) (id : Id) (now : Tick)
       (sched : Sched Γ) (st : EvalSt e)
       {r₁ r₂ : Stream Γ u × Sched Γ × EvalSt e} →
     subscribeE⇓ {e = e} b κ id now sched st r₁ →
@@ -88,5 +88,5 @@ evaluate-deterministic :
   evaluate⇓ fuel e ins out₂ →
   out₁ ≡ out₂
 evaluate-deterministic fuel e ins (eval-run s₁ d₁) (eval-run s₂ d₂)
-  with subscribeE-det e root 0 0 (sched-init e ins) (st-init e) s₁ s₂
+  with subscribeE-det (_ , e , []ᵉ) root 0 0 (sched-init e ins) (st-init e) s₁ s₂
 ... | refl = cong (_ ++_) (drain-det fuel 1 _ _ d₁ d₂)
