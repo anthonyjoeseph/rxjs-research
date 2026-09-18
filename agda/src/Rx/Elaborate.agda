@@ -386,23 +386,22 @@ mutual
   -- distinguished by the slot telescope, so an elaboration INDEXED BY
   -- the telescope splits on them immediately.
 
-  -- BUT THE SPLIT ARRIVES AT A SECOND GAP AND IT IS IN THE TERM
-  -- LANGUAGE, NOT THE STREAM ONE.  A hot's source is its SLOT INDEX --
-  -- minted once at construction, which is what makes every subscriber
-  -- join one live source -- and the term language cannot write that
-  -- index.  Its only token is nullary and names the one reserved token
-  -- just above the slot band, deliberately so, since a PARAMETERISED
-  -- former at that type is the forgery the mint binder exists to rule
-  -- out.  So one hot is nameable by accident and two are not
-  -- distinguishable at all, and the arm this split exists to write is
-  -- the arm that cannot be written.  What would close it is narrower
-  -- than the former that is ruled out: a term naming the token of a
-  -- SLOT, whose range is exactly the reserved band and so is disjoint
-  -- from the dynamic counter, forging nothing.  It is a new `Tm`
-  -- former either way, so it is not this body's to mint.
-  -- DEAD ROUTE: draw a hot's source with the mint binder.  That draws
-  --   one per SUBSCRIPTION, which is the arity a COLD wants; a hot's
-  --   subscribers would each see a different source.
+  -- AND THE SPLIT'S HOT ARM IS WRITABLE WITH THE PALETTE AS IT STANDS,
+  -- WHICH IS WHAT A MINT'S SCOPE BUYS AND ITS ARITY HIDES.  A hot's
+  -- source must be ONE token every subscriber sees, and the mint binder
+  -- reads as drawing per SUBSCRIPTION -- a COLD's arity -- so a hot
+  -- looks unreachable and the nullary literal, which names a single
+  -- reserved token, looks like the only other candidate; it is not one,
+  -- since two hots standing at it would collapse onto one identifier.
+
+  -- WHAT SETTLES IT IS THAT THE BINDER DRAWS PER SUBSCRIPTION OF ITS
+  -- OWN NODE AND BINDS INTO THE VALUE TELESCOPE.  At the ROOT, one
+  -- binder per slot draws once for the whole program, and every site
+  -- beneath it -- inside a deferred body, inside an unrolled recursion,
+  -- inside a resubscribed inner stream -- reads a token already
+  -- substituted into its closure.  So "minted once at construction" is
+  -- a question of SCOPE and not of a missing former, and what it costs
+  -- is a renaming of the body's value variables.
 
   -- AN INSTANT IS NOT DRAWN BY A PROGRAM AT ALL, IT IS READ, AND
   -- MISSING THAT IS WHAT MADE IT LOOK UNREACHABLE.  A source token is
@@ -427,8 +426,7 @@ mutual
   -- nothing, since its token can only be copied out of the run, where
   -- the source binder genuinely hands a program a token no one has
   -- used.  The slot telescope is orthogonal to it and still wanted: it
-  -- is what splits cold from hot and what makes a hot's source a
-  -- literal.
+  -- is what splits cold from hot.
   toPlain {Γ = Γ} (inputˢ i)  = subst (Exp _ _ _ _) (lookup-map i emitᵗ Γ)
                                       (input i)
   toPlain (ofˢ ts)            = ofᵖ (toPlainTms ts)

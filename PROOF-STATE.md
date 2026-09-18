@@ -230,15 +230,14 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 
 ### Big picture tier roadmap
 
-- **THEN THE TWO NAMING GAPS THE SOURCES WAIT ON, AS ONE REPORT AND NOT A
-  GRIND.** The slot-telescope split was to be free and is not: a hot's source
-  is its slot index, the term language's only token is NULLARY and names the
-  one reserved slot above the band, and a parameterised one is the forgery the
-  mint binder rules out — so the arm the split exists to write cannot be
-  written. That is a second gap converging with the first: sources and
-  flatteners already wait on a plain former READING the ambient instant, and
-  sources now also want a term naming a SLOT's token. Both are Anthony's. The
-  leg is to state each precisely enough to be ruled on.
+- **THEN THE SOURCES' HOT ARM, WHICH IS WRITABLE NOW.** The elaboration indexed
+  by the slot telescope, a hot's token drawn by one ROOT-LEVEL mint per slot —
+  scope rather than a new former, so this arm waits on no ruling. It costs a
+  renaming of the body's value variables and a wrapper above the walk. The COLD
+  arm stays open behind the one gap that survived, and that gap is narrower than
+  a former reading the instant: a FLAT delivery stream cannot say which payloads
+  shared one, so what is wanted is a shape on the input interface, not a
+  capability. Build the hot; state the cold's shape precisely enough to rule on.
 
 - **THEN THE SAME OPERATORS IN `Tm`/`Ty` (Anthony).**
   Each TS simul operator mirrored as an Agda definition in the value language,
