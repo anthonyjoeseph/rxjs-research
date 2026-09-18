@@ -255,8 +255,21 @@ jobs:
       - name: New counterexamples?
         id: found
         run: |
-          if git diff --quiet -- agda/src/Implementation/Unit-Test.agda; then
-            echo "quickcheck: no new counterexample — the corpus is unchanged"
+          added="$(cat agda/_cli/added.txt 2>/dev/null || echo unknown)"
+          if [ "$added" = unknown ]; then
+            echo "quickcheck: the sweep wrote no count to agda/_cli/added.txt"
+            echo "scripts/gen-unit-tests.sh writes one; its absence means the"
+            echo "sweep did not finish, so whether the corpus grew is unknown."
+            exit 1
+          fi
+          # THE COUNT, NOT A DIFF OF THE FILE. The sweep WIDENS the corpus's
+          # import block from its own list and prunes it back afterwards, so
+          # a run that found nothing still leaves the file textually changed
+          # when the two orders differ -- and this step then reported new
+          # rows under a diff that was one import list reordered. What is
+          # asked here is whether the corpus GREW, and the script counts that.
+          if [ "$added" -eq 0 ]; then
+            echo "quickcheck: no new counterexample — the corpus did not grow"
             exit 0
           fi
           echo "quickcheck: THE SWEEP FOUND SOMETHING — new bug-cache row(s):"

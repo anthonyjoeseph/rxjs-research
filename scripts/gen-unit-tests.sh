@@ -223,6 +223,21 @@ fi
 ( cd "$ROOT" && make --no-print-directory imports-fix >/dev/null )
 echo "gen-unit-tests: pruned the corpus's imports"
 
+# THE COUNT GOES TO A FILE, FOR THE REASON THE CENSUS DOES: a caller has to
+# be able to fail on "the corpus grew", and this script's exit status is 0
+# whether or not it found anything.
+#
+# AND A CALLER MUST NOT READ IT OFF `git diff`, WHICH IS WHAT THE WORKFLOW
+# DID.  `widen` rewrites the import block from this script's own list and the
+# prune above puts back only the live names -- in the WIDE list's order, not
+# the committed file's.  So a sweep that found nothing still left the corpus
+# textually changed, and the job went red reporting new rows under a diff
+# that was one import list reordered.  A check whose subject is whether the
+# corpus GREW reads the number this script computed, not a diff of a file it
+# rewrites unconditionally.
+printf '%s\n' "$added" > "$ROOT/agda/_cli/added.txt"
+echo "gen-unit-tests: appended count -> agda/_cli/added.txt"
+
 if [ "$added" -gt 0 ]; then
   echo "gen-unit-tests: now run 'make bug-cache' — it is green iff no known"
   echo "                counterexample remains, so it should fail until the"
