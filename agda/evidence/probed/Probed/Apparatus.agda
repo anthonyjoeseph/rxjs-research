@@ -69,12 +69,13 @@ Confirms {A} _ = A
 -- THE SMALLEST SLOT TABLES A ROW CAN RUN AGAINST, AND THEY LIVE HERE
 -- BECAUSE THE TREE THAT USED TO HOLD THEM STATES NO PROGRAM ANY MORE.
 -- They were shorthands beside the readme's quantified instances, and
--- those instances named a shape the plain tree cannot express; three
--- probes still need a table to evaluate at, and a table is not evidence
--- about anything, so it is apparatus rather than a claim.  Scripted
--- slots carry data only, which is what the `isData` witness discharges.
-noSlots : Slots []
-noSlots ()
+-- those instances named a shape the plain tree cannot express; the
+-- probes still here need a table to evaluate at, and a table is not
+-- evidence about anything, so it is apparatus rather than a claim.
+-- Scripted slots carry data only, which the `isData` witness discharges.
+-- RECOVERY: git show 5ade0b38:agda/evidence/probed/Probed/Readme-Claims.agda
+--   restores the readme rows, and with them the empty table they were the
+--   only consumer of.
 
 hotOnce : ∀ {n} {Γ : Ctx n} {k} {t} {ok : T (isData t)} → Val Γ t → Slot Γ k t
 hotOnce {ok = ok} v = scripted {ok = ok} (hot ((after 0 , v) ∷ []))
