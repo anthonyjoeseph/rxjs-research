@@ -1,20 +1,21 @@
 module Rx.Elaborate where
 
 open import Data.Bool using (false)
-open import Data.List using (List; []; _∷_)
+open import Data.List using (List; []; _∷_; _++_; map)
 open import Data.List.Properties using (map-++)
-open import Data.List.Membership.Propositional.Properties using (∈-map⁺)
+open import Data.List.Membership.Propositional.Properties using (∈-map⁺; ∈-++⁺ˡ; ∈-++⁺ʳ)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (Maybe)
 open import Data.Nat using (ℕ)
 open import Data.Vec.Properties using (lookup-map)
 open import Relation.Binary.PropositionalEquality using (subst; refl)
 
-open import Rx.Exp using (Ty; Ctx; Exp; Tm; Fn; natᵗ; listᵗ; obs; _×ᵗ_; boolᵗ; uniqᵗ; input; μᵉ; varᵉ; deferᵉ; mintᵉ; mapᵉ;
+open import Rx.Exp using (Ty; Ctx; Exp; Tm; Fn; natᵗ; listᵗ; obs; _×ᵗ_; boolᵗ; uniqᵗ; input; ofᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ; mapᵉ;
   scanᵉ; varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; nilᵗ; consᵗ; inlᵗ; inrᵗ; caseᵗ;
   foldᵗ; ifᵗ; primᵗ; strmᵗ; letᵗ; revᵗ; renTm; renExp; ext∈; add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ)
-open import Rx.Envelope using (instEventᵗ; eventsᵛ; splitEventsᵛ; reassembleᵛ;
-                               instEmitᵛ)
+open import Rx.Envelope using (instEventᵗ; closeReasonᵗ; emitKindᵗ; eventsᵛ;
+                               splitEventsᵛ; reassembleᵛ; instEmitᵛ; initᵛ;
+                               valueᵛ; closeᵛ; completeᵛ)
 open import Rx.SExp using (SExp; STm; inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; scanˢ;
                            mergeAllˢ; switchAllˢ; exhaustAllˢ; μˢ; varˢ; deferˢ;
                            varˢᵗ; unitˢ; boolˢ; natˢ; pairˢ; fstˢ; sndˢ; nilˢ;
@@ -34,7 +35,7 @@ open import Rx.SExp using (SExp; STm; inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; sca
 -- four contexts run over — needs nothing new and is written out; what
 -- is left is the protocol traffic of six formers, and every one of them
 -- is short a capability of the same two kinds.
---
+
 -- MINTING IS THE FIRST KIND, AND WHAT IT COSTS IS PLACEMENT RATHER
 -- THAN A FORMER.  A source coming alive owes an `init` naming a token
 -- nothing has used, and the term language has no former at `uniqᵗ` at
@@ -46,17 +47,19 @@ open import Rx.SExp using (SExp; STm; inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; sca
 -- at an INNER's head is subscribed once per outer value, so the binder
 -- reaches a per-delivery token too.  What the sources are short of is
 -- therefore not a draw.
---
--- READING THE RUNNING INSTANT IS THE SECOND, AND IT IS THE ONE THAT
--- ACTUALLY BLOCKS THEM.
--- Downstream of a source
--- the instant is not missing at all: the incoming emit IS an envelope,
--- a term can project its instant field, and a step that stamps its
--- output with the instant it was handed is an ordinary `Tm`.  Only a
--- former with NO input — the two sources — has nothing to read it off.
--- The finding is that the two gaps coincide exactly, at the sources,
--- which is also where the TypeScript mirror reaches for its driver.
---
+
+-- READING THE RUNNING INSTANT IS THE SECOND, AND WHICH INSTANT IS
+-- WANTED DECIDES WHETHER IT IS REACHABLE.  Downstream of a source the
+-- instant is not missing at all: the incoming emit IS an envelope, a
+-- term can project its instant field, and a step that stamps its
+-- output with the instant it was handed is an ordinary `Tm`.  A former
+-- with NO input has nothing to read it off — but the two sources want
+-- the SUBSCRIBE FRAME's instant and no other, since a cold's whole
+-- emission leaves in one burst, and a frame is exactly what one token
+-- bound above the walk names.  So the sources are written, and what is
+-- left wanting an instant is the traffic a flattener forwards from a
+-- LATER cascade, where no binder has the right arity.
+
 -- FORWARDING IS THE THIRD KIND AND IT IS THE FLATTENERS' ALONE.  Their
 -- values need nothing missing — a map projects each envelope to the
 -- observables it carries and the plain flattener runs them — but an
@@ -65,7 +68,7 @@ open import Rx.SExp using (SExp; STm; inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; sca
 -- costs at its own operator; between them they rule out every place
 -- the plain palette offers to put traffic which must survive a cut, a
 -- drop and a concurrency limit.
---
+
 -- `takeᵖ` IS THE ONE GENUINE SURPRISE, AND IT IS NEITHER KIND.  The
 -- author's operator and the plain one agree on everything that was in
 -- doubt — both cut naively on values, mid-batch, and both owe the
@@ -78,62 +81,6 @@ open import Rx.SExp using (SExp; STm; inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; sca
 -- since by then it has an instant in hand.
 
 postulate
-  -- a source coming alive owes an `init` naming a token nothing has
-  -- used, and the author's values owe an instant to be stamped with.
-  -- THE FIRST OF THOSE TWO IS AVAILABLE AND THE SECOND IS NOT, SO WHAT
-  -- BLOCKS THIS IS THE READ ALONE.  `mintᵉ` binds an unforgeable token
-  -- drawn at the scheduler's own source key, once per subscription,
-  -- which is exactly the arity a SOURCE wants.  An INSTANT has a
-  -- different arity, and that is the finding: the machine mints a
-  -- source per cold and threads the instant IN, as an argument to
-  -- subscribe handed down by the subscriber.  So a source INHERITS its
-  -- instant, and it must, because the spec groups by comparing instant
-  -- ids -- two colds coming alive in one frame have to carry the SAME
-  -- id or the batch they belong to is split.  A fresh mint per source
-  -- is the one answer that is certainly wrong.
-  --
-  -- AND THE CAPABILITY IS A READ OF A PARAMETER, WHICH NARROWS WHAT AN
-  -- ANSWER CAN BE.  An instant is not drawn from the ledger at any key:
-  -- it is THREADED, an argument of subscribe held constant across one
-  -- frame and replaced per arrival cascade, which is the arity wanted
-  -- exactly.  Of the plain tree's formers exactly one binds a token, and
-  -- it draws per node per subscription, so two sources alive in one
-  -- frame get two; none of the rest mentions the parameter at all, so no
-  -- composition of them reaches it.  An answer is therefore a BINDER the
-  -- tree does not have, and what a new former admits is what every
-  -- theorem above quantifies over -- so the shape of it is a ruling and
-  -- not an elaboration detail.
-  -- DEAD ROUTE: bracket the subscribe frame with `batchSyncᵉ` AT THE
-  --   SOURCE and let the grouping stand in for the id.  It brackets a
-  --   frame without NAMING one, and the bracket is per node, so two
-  --   colds subscribed in one frame group separately and nothing joins
-  --   the two groups -- which is the whole of what the id was doing.
-  --   The bracket at a JOIN is a different route and is not refuted
-  --   here: the flatteners are the only nodes where two sources meet,
-  --   so a bracket there sees both bursts in one group.  What that
-  --   reaches is the subscribe frame alone, since `batchSyncᵉ` hands
-  --   every later value out as a singleton.
-  -- DEAD ROUTE: build both inline, out of a `mintᵉ`-bound token and a
-  --   counter carried in a scan's state.  The MINT half of this is not
-  --   what fails: a mint at an inner's head is subscribed once per
-  --   outer value, so a draw per delivery is reachable.  What fails is
-  --   the counter, and it fails on its own terms -- a scan's state
-  --   advances per EMIT, so it cannot tell two emits of one cascade
-  --   from two cascades, which is a property of the RUN and the run is
-  --   the scheduler's.  A per-delivery draw does not repair that: it
-  --   gives every delivery a DISTINCT id where the whole content of an
-  --   instant is which deliveries SHARE one.
-  ofᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
-      → List (Tm Γ Δᵍ Δ Θ (plainᵗ t)) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
-
-  -- the empty srxjs source is not the empty plain one: it still brackets
-  -- a subscribe frame, so it emits an envelope carrying `init` and
-  -- `complete` where `emptyᵉ` emits nothing at all.
-  -- DEAD ROUTE: `emptyᵉ`, which has no emit to hang the frame on; and
-  --   `ofᵖ []`, which is the same mint blocked one entry up.
-  emptyᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
-         → Exp Γ Δᵍ Δ Θ (emitᵗ t)
-
   -- THE ONE GAP THAT IS NEITHER A MINT NOR A READ, AND IT IS A LEVEL
   -- SHIFT.  A simul `take` cuts naively on the author's VALUES —
   -- mid-batch, without waiting for one to finish, and sending the
@@ -152,6 +99,30 @@ postulate
   --   subscription-time count has to name.
   takeᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
         → Tm Γ Δᵍ Δ Θ natᵗ → Exp Γ Δᵍ Δ Θ (emitᵗ t) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
+
+  -- AN AMBIENT INSTANT IS STILL WANTED HERE, AND THESE TWO ROUTES TO
+  -- ONE ARE DEAD.  The subscribe frame is reached by a root `mintᵉ`,
+  -- which is what the two sources stand on; a LATER cascade's instant
+  -- is not, and a flattener is where two of them meet.
+  -- DEAD ROUTE: bracket the frame with `batchSyncᵉ` AT A SOURCE and let
+  --   the grouping stand in for the id.  It brackets a frame without
+  --   NAMING one, and the bracket is per node, so two colds subscribed
+  --   in one frame group separately and nothing joins the two groups.
+  --   The bracket at a JOIN is a different route and is not refuted
+  --   here: the flatteners are the only nodes where two sources meet,
+  --   so a bracket there sees both bursts in one group.  What that
+  --   reaches is the subscribe frame alone, since `batchSyncᵉ` hands
+  --   every later value out as a singleton.
+  -- DEAD ROUTE: build the id inline, out of a `mintᵉ`-bound token and a
+  --   counter carried in a scan's state.  The MINT half of this is not
+  --   what fails: a mint at an inner's head is subscribed once per
+  --   outer value, so a draw per delivery is reachable.  What fails is
+  --   the counter, and it fails on its own terms -- a scan's state
+  --   advances per EMIT, so it cannot tell two emits of one cascade
+  --   from two cascades, which is a property of the RUN and the run is
+  --   the scheduler's.  A per-delivery draw does not repair that: it
+  --   gives every delivery a DISTINCT id where the whole content of an
+  --   instant is which deliveries SHARE one.
 
   -- the VALUES need nothing new: a map projects each envelope to the
   -- observables it carries, and the plain flattener runs them, their own
@@ -217,6 +188,70 @@ postulate
   switchAllᵖ exhaustAllᵖ :
               ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
             → Exp Γ Δᵍ Δ Θ (emitᵗ (obs t)) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
+
+-- THE TWO ARMS OF A NESTED SUM THAT THIS ELABORATION NAMES, AND THEY
+-- ARE HERE RATHER THAN BESIDE THE ENCODING BECAUSE ONE ELABORATION IS
+-- THEIR ONLY CONSUMER.  `Rx.Envelope` owes the constructors, which
+-- every operator needs; which REASON a source closes for and which
+-- KIND of emit a subscribe burst is are this walk's vocabulary.
+exhaustedᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ} → Tm Γ Δᵍ Δ Θ closeReasonᵗ
+exhaustedᵛ = inrᵗ (inrᵗ unit̂)
+
+subscribeᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ} → Tm Γ Δᵍ Δ Θ emitKindᵗ
+subscribeᵛ = inlᵗ unit̂
+
+-- a run of `value` events, in order, ahead of whatever closes the list
+valuesᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ a}
+        → List (Tm Γ Δᵍ Δ Θ a)
+        → Tm Γ Δᵍ Δ Θ (listᵗ (instEventᵗ uniqᵗ a))
+        → Tm Γ Δᵍ Δ Θ (listᵗ (instEventᵗ uniqᵗ a))
+valuesᵛ []       rest = rest
+valuesᵛ (v ∷ vs) rest = consᵗ (valueᵛ v) (valuesᵛ vs rest)
+
+-- A COLD SOURCE IS ONE ENVELOPE, WHICH IS WHY THE FRAME TOKEN IS THE
+-- WHOLE OF WHAT IT WAS SHORT OF.  Everything this former emits leaves
+-- in the subscribe burst — the `init` naming the source, every value
+-- the author wrote, the exhausted `close` and the `complete` — so the
+-- one instant it has to name is the frame's, and a source that
+-- INHERITED a later cascade's would be naming something it can never
+-- be handed.  The mirror settles the field order and the kind:
+-- `primitive-operators.ts`'s `of` builds exactly this list, stamps it
+-- `SUBSCRIBE_FRAME`, and marks the emit `subscribe`.
+--
+-- THE SOURCE TOKEN IS MINTED AT THIS NODE AND THE INSTANT IS NOT, AND
+-- the difference is the arity.  A source is a fresh identity per
+-- subscription, which is `mintᵉ`'s own arity, so it is bound here; the
+-- frame is one identity for every source alive in the same frame, so it
+-- is bound once above the whole walk and read here.  Two colds side by
+-- side therefore get two sources and one instant, which is what the
+-- spec's grouping compares.
+ofᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
+    → Tm Γ Δᵍ Δ Θ uniqᵗ
+    → List (Tm Γ Δᵍ Δ Θ (plainᵗ t)) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
+ofᵖ {Θ = Θ} {t = t} frame ts = mintᵉ (ofᵉ (instEmitᵛ evs frame↑ src subscribeᵛ ∷ []))
+  where
+  ↑ : ∀ {r} → Tm _ _ _ Θ r → Tm _ _ _ (uniqᵗ ∷ Θ) r
+  ↑ = renTm (λ x → x) (λ x → x) there
+
+  src : Tm _ _ _ (uniqᵗ ∷ Θ) uniqᵗ
+  src = varᵗ (here refl)
+
+  frame↑ : Tm _ _ _ (uniqᵗ ∷ Θ) uniqᵗ
+  frame↑ = ↑ frame
+
+  evs : Tm _ _ _ (uniqᵗ ∷ Θ) (listᵗ (instEventᵗ uniqᵗ (plainᵗ t)))
+  evs = consᵗ (initᵛ src)
+              (valuesᵛ (map ↑ ts)
+                       (consᵗ (closeᵛ src exhaustedᵛ) (consᵗ completeᵛ nilᵗ)))
+
+-- THE EMPTY SRXJS SOURCE IS NOT THE EMPTY PLAIN ONE, and the gap is
+-- one envelope rather than one event: it still brackets a subscribe
+-- frame, so it emits an `init` and a `complete` where `emptyᵉ` emits
+-- nothing at all.  It is `ofᵖ` at no values, which is what the mirror
+-- writes too.
+emptyᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
+       → Tm Γ Δᵍ Δ Θ uniqᵗ → Exp Γ Δᵍ Δ Θ (emitᵗ t)
+emptyᵖ frame = ofᵖ frame []
 
 -- THE TWO FORMERS OF THIS LEG THAT WERE NEVER BLOCKED, AND WRITING
 -- THEM IS WHAT SAYS SO.  Neither adds an event, mints anything or can
@@ -383,11 +418,35 @@ scanᵖ {Θ = Θ} {s = s} {t = t} f z e =
 -- one: their argument and result types are concrete, so the walk is the
 -- identity on each, and Agda needs the constructor in hand to see it.
 
+-- THE SUBSCRIBE FRAME IS ONE TOKEN THE WHOLE WALK STANDS UNDER, AND
+-- THAT IS THE ENTIRETY OF WHAT THE MIRROR'S CONSTANT SAYS.  The
+-- TypeScript side stamps every subscribe burst with a single global
+-- symbol and nothing in either tree ever COMPARES against it, so its
+-- content is not an identity anyone reads back — it is that the bursts
+-- of one frame carry the SAME token and a later cascade's do not.  One
+-- `mintᵉ` above the walk supplies exactly that: in scope at every site
+-- beneath, drawn once per subscription of the program, and unforgeable
+-- where a literal would not be.  What it is NOT is an ambient instant,
+-- which varies per arrival cascade; the frame is the one instant a
+-- program can hold, and it is the one the sources need.
+plainᶜ⁺ : List Ty → List Ty
+plainᶜ⁺ Θ = plainᶜ Θ ++ uniqᵗ ∷ []
+
+-- AND IT RIDES AT THE FAR END, WHICH IS WHAT KEEPS EVERY AUTHOR
+-- VARIABLE'S INDEX UNMOVED.  A binder conses, so a token at the FRONT
+-- would sit at a different depth under every binder the walk descends
+-- through and every author chain would shift by one; at the end it is
+-- reached by the telescope's own length and the author names inject
+-- untouched.  The cost is the injection and nothing else.
+frameᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ : List Ty} (Θ : List Ty)
+       → Tm Γ Δᵍ Δ (plainᶜ⁺ Θ) uniqᵗ
+frameᵛ Θ = varᵗ (∈-++⁺ʳ (plainᶜ Θ) (here refl))
+
 mutual
 
   toPlain : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
           → SExp Γ Δᵍ Δ Θ t
-          → Exp (emitᵛ Γ) (emitᶜ Δᵍ) (emitᶜ Δ) (plainᶜ Θ) (emitᵗ t)
+          → Exp (emitᵛ Γ) (emitᶜ Δᵍ) (emitᶜ Δ) (plainᶜ⁺ Θ) (emitᵗ t)
   -- AN INPUT IS THE ONE SOURCE THIS BODY WRITES, AND IT IS A TRANSPORT
   -- BECAUSE THE SLOT ALREADY CARRIES ENVELOPES.  The shape on the table
   -- is a slot carrying PLAIN values that the elaboration wraps instead
@@ -444,8 +503,8 @@ mutual
   -- is what splits cold from hot.
   toPlain {Γ = Γ} (inputˢ i)  = subst (Exp _ _ _ _) (lookup-map i emitᵗ Γ)
                                       (input i)
-  toPlain (ofˢ ts)            = ofᵖ (toPlainTms ts)
-  toPlain emptyˢ              = emptyᵖ
+  toPlain {Θ = Θ} (ofˢ ts)    = ofᵖ (frameᵛ Θ) (toPlainTms ts)
+  toPlain {Θ = Θ} emptyˢ      = emptyᵖ (frameᵛ Θ)
   toPlain (takeˢ k e)         = takeᵖ (toPlainTm k) (toPlain e)
   toPlain (mapˢ f e)          = mapᵖ (toPlainTm f) (toPlain e)
   toPlain (scanˢ f z e)       = scanᵖ (toPlainTm f) (toPlainTm z) (toPlain e)
@@ -455,13 +514,13 @@ mutual
   toPlain (μˢ e)              = μᵉ (toPlain e)
   toPlain (varˢ x)            = varᵉ (∈-map⁺ emitᵗ x)
   toPlain {Γ = Γ} {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} (deferˢ {t = t} e) =
-    deferᵉ (subst (λ ζ → Exp (emitᵛ Γ) [] ζ (plainᶜ Θ) (emitᵗ t))
+    deferᵉ (subst (λ ζ → Exp (emitᵛ Γ) [] ζ (plainᶜ⁺ Θ) (emitᵗ t))
                   (map-++ emitᵗ Δᵍ Δ) (toPlain e))
 
   toPlainTm : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
             → STm Γ Δᵍ Δ Θ t
-            → Tm (emitᵛ Γ) (emitᶜ Δᵍ) (emitᶜ Δ) (plainᶜ Θ) (plainᵗ t)
-  toPlainTm (varˢᵗ x)      = varᵗ (∈-map⁺ plainᵗ x)
+            → Tm (emitᵛ Γ) (emitᶜ Δᵍ) (emitᶜ Δ) (plainᶜ⁺ Θ) (plainᵗ t)
+  toPlainTm (varˢᵗ x)      = varᵗ (∈-++⁺ˡ (∈-map⁺ plainᵗ x))
   toPlainTm unitˢ          = unit̂
   toPlainTm (boolˢ b)      = bool̂ b
   toPlainTm (natˢ k)       = nat̂ k
@@ -487,6 +546,34 @@ mutual
   -- spelled out rather than `map`ped, so the recursion is structural
   toPlainTms : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
              → List (STm Γ Δᵍ Δ Θ t)
-             → List (Tm (emitᵛ Γ) (emitᶜ Δᵍ) (emitᶜ Δ) (plainᶜ Θ) (plainᵗ t))
+             → List (Tm (emitᵛ Γ) (emitᶜ Δᵍ) (emitᶜ Δ) (plainᶜ⁺ Θ) (plainᵗ t))
   toPlainTms []       = []
   toPlainTms (m ∷ ms) = toPlainTm m ∷ toPlainTms ms
+
+-- THE ELABORATION PROPER, AND THE ONE THING IT ADDS TO THE WALK IS THE
+-- FRAME.  A closed simul program elaborates to a closed plain one, so
+-- the token the walk stands under is bound and discharged here and
+-- nowhere else; every consumer sees an ordinary `Exp` at an empty value
+-- telescope and carries no side condition about a token being in scope.
+--
+-- ONE MINT FOR THE WHOLE PROGRAM IS THE CLAIM, and it is the mirror's.
+-- `mintᵉ` draws once per subscription of the node it stands at, and it
+-- stands at the root, so every source beneath reads the same token for
+-- one subscription of the program and a fresh one for the next — which
+-- is what a subscribe frame is.  A resubscribe through `deferᵉ` re-runs
+-- the body and not this binder, so an inner's frame is its outer's,
+-- which is the sharing the grouping compares and the reason the token
+-- could not have been bound per source.
+--
+-- THE MIRROR'S CONSTANT IS COARSER THAN THIS AND THE TWO STILL AGREE,
+-- because the token's identity is READ BY NOBODY.  `SUBSCRIBE_FRAME`
+-- is one module-level symbol shared by every run the process performs,
+-- where this draws one per subscription; nothing on either side ever
+-- compares a stamp against a literal, and every comparison that does
+-- happen is between two stamps of the SAME run, which the two agree on
+-- exactly.  So the difference is reachable by no program, and the
+-- binder is the tighter of the two rather than a divergence.
+elaborate : ∀ {n} {Γ : Ctx n} {Δᵍ Δ : List Ty} {t : Ty}
+          → SExp Γ Δᵍ Δ [] t
+          → Exp (emitᵛ Γ) (emitᶜ Δᵍ) (emitᶜ Δ) [] (emitᵗ t)
+elaborate e = mintᵉ (toPlain e)

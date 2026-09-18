@@ -18,7 +18,7 @@ open import Rx.Prim               using (InstEmit; Fuel; Id; Source; _at_from_as
   EmitKind; subscribe; delivery; plumbing; cut; cutPending; exhausted)
 open import Rx.Exp                using (Ctx)
 open import Rx.SExp               using (SExp; emitᵛ)
-open import Rx.Elaborate          using (toPlain)
+open import Rx.Elaborate          using (elaborate)
 open import Rx.Evaluator.Builder using (evaluate↓)
 open import Rx.Slots using (Slots)
 open import Rx.Protocol           using (ProtocolSt; Owed; protocol-init; runProtocol; stepProtocol; paidOff; allZero; Accepted;
@@ -1095,8 +1095,8 @@ batch-agreement xs acc =
 formal-verification-batchSimultaneous :
   ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : SExp Γ [] [] [] t)
     (ins : Slots (emitᵛ Γ)) →
-  spec-batchSimultaneous (evaluate↓ fuel (toPlain e) ins)
-    ≡ impl-batchSimultaneous (evaluate↓ fuel (toPlain e) ins)
+  spec-batchSimultaneous (evaluate↓ fuel (elaborate e) ins)
+    ≡ impl-batchSimultaneous (evaluate↓ fuel (elaborate e) ins)
 formal-verification-batchSimultaneous fuel e ins =
-  batch-agreement (evaluate↓ fuel (toPlain e) ins)
-                  (evaluate-accepted fuel (toPlain e) ins)
+  batch-agreement (evaluate↓ fuel (elaborate e) ins)
+                  (evaluate-accepted fuel (elaborate e) ins)
