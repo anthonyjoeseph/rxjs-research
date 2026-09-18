@@ -359,29 +359,28 @@ const genExp = (
     // spent by `mergeAll`.
     fan: () => {
       const inner: Ty = { type: "obs", elem: ty };
+      // the step's OWN context: its argument is Θ-var 0, so everything
+      // generated under it counts from there and nothing here may be
+      // built in the caller's Θ
+      const under: GenCtx = { ...ctx, theta: [ty, ...ctx.theta] };
       const x: Tm = { type: "varT", ty, index: 0 };
+      const strm = (exp: Exp): Fn => ({ type: "strmT", ty: inner, exp });
       const step: Fn = pick(rng, [
-        () => ({ type: "strmT", ty: inner, exp: { type: "empty", ty } }),
-        () => ({
-          type: "strmT",
+        () => strm({ type: "empty", ty }),
+        () => strm({ type: "of", ty, items: [x] }),
+        () => strm({ type: "of", ty, items: [x, x] }),
+        () => strm({ type: "of", ty, items: [x, genTm(rng, ty, under, 1)] }),
+        // the value-dependent one: which arm is taken is decided by the
+        // value itself, per element, so a program cannot be read off the
+        // tree the way the four above can
+        (): Fn => ({
+          type: "ifT",
           ty: inner,
-          exp: { type: "of", ty, items: [x] },
+          cond: genTm(rng, boolT, under, Math.min(depth, 2)),
+          then: strm({ type: "empty", ty }),
+          else: strm({ type: "of", ty, items: [x] }),
         }),
-        () => ({
-          type: "strmT",
-          ty: inner,
-          exp: { type: "of", ty, items: [x, x] },
-        }),
-        () => ({
-          type: "strmT",
-          ty: inner,
-          exp: {
-            type: "of",
-            ty,
-            items: [x, genTm(rng, ty, ctx, Math.min(depth, 2))],
-          },
-        }),
-      ])() as Fn;
+      ])();
       return {
         type: "mergeAll",
         ty,
