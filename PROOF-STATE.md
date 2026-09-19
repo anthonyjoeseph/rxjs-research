@@ -229,27 +229,23 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 
 ### Big picture tier roadmap
 
-- **THE DESCENT IS TYPED; TIE THE KNOT — CUT THE BUILDER INTO LEVELS.**
-  The candidate is indexed by the bound, so a term face is a face AT a
-  level rather than one promise covering all of them, and the connect arm
-  now refutes the zero level outright and subscribes the definition under
-  the walk ONE LEVEL DOWN. `walk-above` is then the walk at a strictly
-  smaller bound — what a recursion on the bound may supply and what one
-  file cannot. The cut is at that leaf, since everything above it is
-  level-free: a level-indexed module taking the walks below it as a
-  parameter, and a file above it closing the loop.
+- **THE BOUND'S REMAINING OBLIGATION, WHICH IS WHAT THE SHAPE BOUGHT ON
+  CREDIT.** Every arm must hand back a store still under the bound. The
+  STEP half is paid: a node step is a record update on a field the count
+  cannot read, so each one is a case split whose arms are all `refl`,
+  and the enumeration is the whole proof. What is left is the RELATION
+  half, where a builder holds a derivation rather than the function that
+  produced it — five statements, one per relation, each an induction
+  over constructors that spend the step half.
 
-- **THEN THE BOUND'S TWO OBLIGATIONS, WHICH ARE WHAT THE SHAPE BUYS ON
-  CREDIT.** The zero level must be unreachable at the connect arm — its
-  guard says the slot is shared and unconnected while the bound says no
-  such slot exists — and every arm must hand back a store still under
-  the bound. The STEP half of that is paid: a node step is a record
-  update on a field the count cannot read, so each one is a case split
-  whose arms are all `refl`, and the enumeration is the whole proof.
-  What is left is the RELATION half, where a builder holds a derivation
-  rather than the function that produced it — five statements, one per
-  relation, each an induction over constructors that spend the step
-  half.
+- **THEN THE LANE DRAIN, THE BUILDER'S LAST CUT CYCLE.** `drainQueue!`
+  is what remains of the two edges that closed a loop: a parked lane's
+  backlog is spent under a frame whose own closing side runs the drain.
+  It is stated over a `Handles` it is handed, so the cycle is not the
+  term face but the walk's `from-inner` side — and the levels now give a
+  place to stand that a single file did not. The question the leg
+  answers is which measure the queue offers, since the bound's count is
+  untouched by a drain and the path does not shorten.
 
 - **THEN THE FLATTENERS AND `takeᵖ`, AND NO FORMER IS OWED AFTER ALL
   (Anthony: "the flattens, mergeAll etc, _are_ the primitives … they can
@@ -273,10 +269,9 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 
 ### The ledger
 
-- **`drainQueue!`**, **`walk-above`** (Rx.Evaluator.Builder) — FALSITY,
-  `DEAD ROUTE`: the builder's two cut cycles, a lane drain and the walk a share
-  connect spends. Both want the term face from inside the walk; neither has
-  been instantiated.
+- **`drainQueue!`** (Rx.Evaluator.Builder.Frames) — FALSITY, `DEAD ROUTE`: the
+  builder's one remaining cut cycle, a parked lane's backlog spent under the
+  frame whose closing side runs the drain. Not instantiated.
 
 - **`{mergeAll,switchAll,exhaustAll}ᵖ`** (Rx.Elaborate) — SHAPE,
   `DEAD ROUTE×4`: the elaboration's per-former plumbing, after the two sources

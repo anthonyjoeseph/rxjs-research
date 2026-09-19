@@ -80,7 +80,7 @@ Out {Γ = Γ} {t = t} e = Stream Γ t × Sched Γ × EvalSt e
 -- THE CANDIDATE NEVER APPEARS IN IT.  It rides the three halves below
 -- as an inert index, so the descent that licenses them is still the
 -- TYPE and is untouched -- the distinction that keeps this clear of
--- the route `Rx.Evaluator.Builder`'s own header records as dead.
+-- the route `Rx.Evaluator.Builder.Level`'s own header records as dead.
 
 -- AND IT IS A FUNCTION OF TWO FIELDS AND NOTHING ELSE, which is what
 -- makes a step's obligation to it cheap: a store handed back with the

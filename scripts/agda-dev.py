@@ -540,8 +540,35 @@ def parse(path: str) -> Parsed:
     return Parsed(lines, items, blocks, options, module_line)
 
 
+def module_rest(p: Parsed) -> str:
+    """Everything after the module's NAME -- its telescope and the `where`.
+
+    A module TELESCOPE is part of every declaration underneath it, so a
+    generated copy that dropped it would report every parameter out of scope:
+    a false failure, in a file the compiler accepts.  Only the NAME may change.
+    """
+    if p.module_line is None:
+        return "where"
+    it = next((t for t in p.items if t.start == p.module_line), None)
+    txt = "\n".join(p.lines[p.module_line : it.end if it else p.module_line + 1])
+    parts = txt.split(None, 2)
+    return parts[2] if len(parts) > 2 else "where"
+
+
+def parametrised(p: Parsed) -> bool:
+    return module_rest(p).lstrip() != "where"
+
+
 def heavy_blocks(p: Parsed) -> list[int]:
-    """Blocks worth stubbing: 2+ members.  A 1-member block costs ~nothing."""
+    """Blocks worth stubbing: 2+ members.  A 1-member block costs ~nothing.
+
+    A PARAMETRISED module has none, whatever it contains: the shared-context
+    split has a focus module `open import`ing the context, and a parametrised
+    context cannot be opened without its arguments.  Such a file is checked
+    verbatim, which is always correct and merely slower.
+    """
+    if parametrised(p):
+        return []
     return [i for i, b in enumerate(p.blocks) if len(b.members) > 1]
 
 
@@ -756,11 +783,18 @@ def render_ctx(p: Parsed, mod: str, foci: list[str] = [],
             if tgt is not None and tgt in all_stubs:
                 continue
         if it.kind == "pass" and it.start == p.module_line:
-            out.append(f"module {mod} where")
+            out.extend((f"module {mod} " + module_rest(p)).split("\n"))
             continue
         if it.kind == "pass":
             if idx not in carried:
-                out.extend(publicize(p.lines[it.start : it.end], reimported))
+                # AN IMPORT AHEAD OF THE MODULE HEADER MAY NOT BE PUBLIC.
+                # A module telescope mentioning imported names forces the
+                # imports above the header, and `public` there is a warning
+                # -- which `-W error` turns into a failure of a correct file.
+                if p.module_line is not None and it.start < p.module_line:
+                    out.extend(p.lines[it.start : it.end])
+                else:
+                    out.extend(publicize(p.lines[it.start : it.end], reimported))
             continue
         if it.block is not None and it.block in heavy:
             # A KEPT-REAL member stays EXACTLY WHERE IT WAS.  Relocating these
