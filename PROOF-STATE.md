@@ -209,68 +209,6 @@ every guard, every `<?` and the dry marker leave the machine entirely.
 A row's class must agree with its postulate's header, which is where the
 research lives; where they disagree, the header wins.
 
-## Tier 0 — the seam's four formers, transcribed
-
-**THE SEAM, AND IT IS WHERE A PROGRAM'S MEANING IS DECIDED (Anthony: "the plain
-tree is rxjs, and must not know what an envelope is").** `toPlain` compiles the
-author's palette into the plain tree, and all four of its formers are bodies
-now. The tier sits under tier 1 because the top line quantifies over `toPlain`:
-seam first, then statement.
-
-**AND THE TYPECHECKER JUDGES NONE OF IT, WHICH IS WHAT THE LEGS ARE FOR
-(Anthony: "we are not worried about correctness, just a basic mirroring of what
-the typescript side is already doing").** Every one of the four is a FORMER
-rather than a statement, so any inhabitant of its type checks. A transcription
-is evidence of nothing until it RUNS, so the tier holds no ledger: what is open
-is what running it says.
-
-### The monster
-
-`mergeAllᵖ` — the one body here whose shape is shared. Its two siblings are the
-same lane step under a different plain flattener, so a lane that cannot carry
-the outer's bookkeeping takes all three: a switch cuts a lane, an exhaust drops
-one, a limit counts one. TypeScript pays none of that, holding the lane table
-beside a channel — and a channel is a BINDING, not an expression. So if the
-lane is wrong, the seam's shape moves under everything above it, where the cut
-falling costs one operator. The exception is the rest of the seam, transcribed
-in one commit (Anthony: "take on all legs at once"), plus two names charged a
-comment block alone — the owner map hands prose to the declaration above it.
-
-also: `takeᵖ`, `switchAllᵖ`, `exhaustAllᵖ`, `scanᵖ`, `batch-agreement`
-
-### Big picture tier roadmap
-
-- **THE ORACLE OVER THE ELABORATION, WHICH IS THE ONLY THING THAT CAN
-  JUDGE A TRANSCRIPTION.** `npm run agda:qc` compares impl against spec and the
-  oracle compares the TS impl against the Agda one; between them they are the
-  whole of what decides whether these four bodies say what their twins say. The
-  leg is to get elaborated programs through both, and its product is a list of
-  separating programs rather than a green run — a green run over programs that
-  never reach a flattener's bookkeeping would say nothing.
-
-- **THEN THE LANE'S KNOWN DIVERGENCES, EACH NAMED BY THE PROGRAM THAT SEPARATES
-  IT.** Four are written down already: bookkeeping queued behind a running inner
-  at `just 1`, bookkeeping cut with the lane by a switch, dropped with it by an
-  exhaust, and a cut's per-victim close reason written `cut` throughout where
-  the mirror reads a ledger. Each is a program, so each is a bug-cache row. What
-  the leg decides is whether the first three are one finding — which is the
-  channel ruling, and that one is Anthony's, because either answer changes what
-  the plain tree IS.
-
-- **AND THE CUT'S MISSING ENDING, WHICH IS THE SAME RULING ARRIVING FROM THE
-  OTHER SIDE.** `takeᵖ`'s scan counts and truncates, and the emit filling the
-  quota carries the closes and the completion; what it cannot do is END, since
-  the plain palette cuts at an emit index fixed at subscription and a quota over
-  the author's values is not one. So emits after the cut pass through carrying
-  bookkeeping and no values, where rxjs has unsubscribed. The leg is the program
-  separating the two, and then the ruling: a plain `takeWhileᵉ` mirroring what
-  rxjs itself ends on, or a cut that needs none.
-
-### The ledger
-
-The tier holds no live postulate. Its four formers are bodies; what is open is
-the three legs' findings, and a finding here lands in the body's own header.
-
 ## Tier 1 — the proof statement over the elaboration
 
 **THE EVALUATOR TIER IS GONE.** Subscribe is a bottom-up burst assembly and the
@@ -278,12 +216,12 @@ candidate recurses on the TYPE, so the machine is DEFINED end to end and
 carries no postulate. A drain that cannot re-mint a parked candidate is not
 statable over a candidate with no bound.
 
-**SO WHAT IS LEFT HERE IS THE STATEMENT, AND IT WAITS ON THE SEAM BELOW.** The
-top line quantifies over a simul tree run through `toPlain`, so every question
-about what it ASSERTS is downstream of what the elaboration compiles to. The
-legs below are the statement's own — restating it, the legality it needs, the
-purity ruling it may or may not carry a hypothesis for, and reducibility's
-second half.
+**AND THE SEAM UNDER IT IS TRANSCRIBED, SO WHAT IS LEFT HERE IS THE STATEMENT.**
+The top line quantifies over a simul tree run through `toPlain`, whose cut and
+three flatteners are now bodies, so every question about what it ASSERTS has
+something compiled to ask it of. The legs are the statement's own — restating
+it, the legality it needs, the purity ruling it may or may not carry a
+hypothesis for, and reducibility's second half.
 
 ### The monster
 

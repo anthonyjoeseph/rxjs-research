@@ -1127,7 +1127,7 @@ postulate
   -- flatteners are `mergeAllᵖ`, `switchAllᵖ` and `exhaustAllᵖ`; the run
   -- below is their output, so what they emit is what is being claimed
   -- about.  A statement about batching cannot be true of a seam that
-  -- does not yet compile, which is why that tier sits under this one.
+  -- does not yet compile, which is why those four were transcribed first.
   -- RECOVERY: git show 8c1b5750^:agda/src/Verify-Well-Formed.agda
   --   restores `evaluate-accepted`, the two dead routes recorded against
   --   it -- a well-formed denotation quantified over prefixes, which the
