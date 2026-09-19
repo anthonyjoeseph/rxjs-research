@@ -73,6 +73,14 @@ import Rx.Evaluator.Builder.Level as L
 -- which is exactly what the share connect asked for and what no single
 -- file could state; everything else about the builder is either free in
 -- the bound or already inside a level.
+--
+-- AND THE CYCLE THE FOUR NAMES BELOW FORM DESCENDS ON THE
+-- ACCESSIBILITY, NOT ON A COUNTER.  Every path around it passes through
+-- `level`, whose only re-entry is at a strictly smaller bound through
+-- the `Acc` it was handed; the two faces it reaches at its OWN bound
+-- belong to the level module and reach back here only along `beneath`,
+-- which is that same descent spelled as a parameter.
+-- STRUCTURAL SCC: builder handles! level red-val
 level : ∀ (m : ℕ) → Acc _<_ m → Below m
 level m (acc rec) =
   record { walk = L.handles!  m (λ {m′} lt → level m′ (rec lt))
