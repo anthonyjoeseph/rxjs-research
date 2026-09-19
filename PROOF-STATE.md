@@ -235,23 +235,24 @@ the work that would kill it sits outside by construction.
 
 ### Big picture tier roadmap
 
-- **FIRST, MOVE THE BOUND THE DRAIN SUBSCRIBES AT, BECAUSE THE
-  HYPOTHESIS IS RIGHT AND UNFUNDABLE WHERE IT STANDS.** Threading the
-  value face up from the drain through both `from-inner` frames,
-  `consume!`, both `thru-outer` frames and `subsAll!`, with the level
-  taking it as a parameter, typechecks in every module and dies at the
-  tie: the value face is what the level is BUILDING, so the knot is a
-  definition calling itself with nothing descending. So the question is
-  no longer WHAT the drain asks for — that is settled, it is the
-  fundamental theorem at values — but at which bound, and whether a pop
-  can be made to descend one.
+- **FIRST, MAKE A POP DESCEND — THE TWO WAYS OF NOT NEEDING IT TO ARE
+  BOTH CLOSED NOW.** The drain's candidate cannot be CARRIED: a
+  store would have to hold a family that takes the store as an
+  argument. And it cannot be MOVED to the spine where a candidate is
+  free: that reorders one instant, which the batching stage reads as a
+  different batch. Both findings sit in the monster's own header. What
+  is left is the measure, whose one fact is that a subscribe never
+  net-increases the total of queued inners — the pop removes one, and
+  only the OUTER emitting during the subscribe puts one back. Probe
+  that before stating it.
 
-- **THEN THE DRAIN AS A BODY, WHICH IS WHAT THE HYPOTHESIS WAS FOR.** The
+- **THEN THE DRAIN AS A BODY, ONCE THE POP PAYS FOR ITS SUBSCRIBE.** The
   pop takes the node's queue WHOLE and subscribes each carried inner
-  once, so the recursion is structural on the popped list and wants no
-  measure; the only non-structural step is the subscribe, and the value
-  face funds exactly that. If the leg above comes back green this is a
-  body over leaves already declared.
+  once, so the recursion down the popped list is structural and wants no
+  measure; the only non-structural step is the subscribe, and a bound
+  the pop strictly drops is what would fund it — the descent to
+  `beneath` the share connect already spends. If the leg above comes
+  back green this is a body over leaves already declared.
 
 - **THEN THE DERIVATION-LEVEL OBLIGATIONS THE ARRIVAL SPINE STILL OWES.**
   The delivery cycle's eleven relations carry the count, and the spine
@@ -284,7 +285,7 @@ the work that would kill it sits outside by construction.
 ### The ledger
 
 - **`drainQueue!`** (Rx.Evaluator.Builder.Frames) — FALSITY,
-  `REFUTED, DEAD ROUTE×2`: the tier's monster. A parked lane's backlog, spent
+  `REFUTED, DEAD ROUTE×4`: the tier's monster. A parked lane's backlog, spent
   under the frame whose closing side runs it. Not instantiated.
 
 - **`{mergeAll,switchAll,exhaustAll}ᵖ`** (Rx.Elaborate) — SHAPE,

@@ -126,6 +126,30 @@ postulate
   --   putting every declaration between the two into one mutual block,
   --   which is the single shape this module's layering exists to avoid.
   --
+  -- DEAD ROUTE: parking the CANDIDATE beside the value, which the park
+  --   arm has in hand and discards -- so the pop would need nothing at
+  --   all.  It is not a layering problem and no reordering reaches it:
+  --   the candidate at observable type takes the store as an ARGUMENT,
+  --   so a store carrying candidates puts the family to the left of its
+  --   own arrow.  Written as a recursive family the self-reference is
+  --   under-applied and orders nothing; written as a datatype it is
+  --   refused for strict positivity, naming the store's own field as
+  --   the occurrence.  Parameterising the store by the family is the
+  --   same shape a third time.  What this kills is the whole idea that
+  --   the drain's candidate can be CARRIED rather than re-minted.
+  --
+  -- DEAD ROUTE: deferring the re-subscribe to the arrival spine, where
+  --   the value face is a finished field and a candidate is free.  It
+  --   would delete this statement outright, and it changes what the
+  --   program emits.  One arrival can both complete a live inner --
+  --   freeing the lane that drains the parked one -- and feed a sibling
+  --   chain registered on the same source afterwards; real rxjs
+  --   subscribes the parked inner INSIDE the completion, so its value
+  --   precedes the sibling's, while a spine-deferred subscribe follows
+  --   it.  Both land in one instant, so the batching stage keeps them
+  --   together and concatenates in STREAM ORDER -- which makes the two
+  --   readings different batches, not different schedules.
+  --
   -- REFUTED: `Refuted.Park-Unpaid` -- the reading that made the park pay
   --   out of the step relation, which no arm of that relation can.
   drainQueue! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo m}
