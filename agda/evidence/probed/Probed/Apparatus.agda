@@ -39,11 +39,9 @@
 -- no longer has: the grant, the nest store and the walk maximum it was
 -- written over went with the budget.
 --
--- RECOVERY: git show b5601783:agda/evidence/probed/Probed/Apparatus.agda
---   restores `hotOnce` and `oneSlot`, the one-slot table every row that
---   evaluated a program ran against.  They went with the last such row,
---   and they are five lines to rewrite; what is worth knowing is that
---   every program-running probe wanted exactly this shape.
+-- `hotOnce` and the one-slot table `oneSlot` went with the last row that
+-- evaluated a program.  They are five lines to rewrite, and what is worth
+-- knowing is that every program-running probe wanted exactly that shape.
 -- RECOVERY: git show 919f115:agda/evidence/probed/Probed/Apparatus.agda
 -- RECOVERY: git show 8c6fc8d:agda/evidence/probed/Probed/Apparatus.agda
 --   holds the seven forks that spent `Separates` before this tree was

@@ -1120,7 +1120,7 @@ batch-agreement xs acc =
 -- stays claimed from Main in its own right, so what is postulated here
 -- is exactly the step from a run to a legal stream and nothing else.
 --
--- RECOVERY: git show f26f7a82:agda/src/Verify-Well-Formed.agda
+-- RECOVERY: git show 8c1b5750^:agda/src/Verify-Well-Formed.agda
 --   restores `evaluate-accepted`, the two dead routes recorded against
 --   it -- a well-formed denotation quantified over prefixes, which the
 --   settledness check rejects at a cut inside an instant, and a repair

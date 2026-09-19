@@ -69,7 +69,7 @@ open import Rx.Prim using (Id; Source; InstEvent; init; value; close; handoff; c
 -- instant's emits are CONTIGUOUS.  That is this clause, and its
 -- satisfaction by a run is the well-formedness face, open at
 -- `sound-cascade` and `sound-subscribe`.
--- RECOVERY: git show 54227c28:agda/src/Rx/Provenance-Theorems.agda
+-- RECOVERY: git show 8c1b5750^:agda/src/Rx/Provenance-Theorems.agda
 --   restores the containment statement with its `ids`, `horizon` and
 --   `⊆ᵢ` apparatus.
 

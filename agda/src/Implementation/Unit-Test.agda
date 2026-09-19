@@ -44,9 +44,6 @@
 -- `imports-check` failure, and a missing one would make the very next
 -- appended row unscopeable.  Edit the wide form in the generator, not
 -- here; anything written between the markers by hand is overwritten.
---
--- RECOVERY: git show 0f4998f0:agda/src/Implementation/Unit-Test.agda
---   restores all eight plain rows, each with its scripted slot table.
 ------------------------------------------------------------------
 module Implementation.Unit-Test where
 

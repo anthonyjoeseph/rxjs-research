@@ -40,9 +40,6 @@
 -- several of them — since a green on a bound this development no longer
 -- states says nothing about the descent that replaced it.
 --
--- RECOVERY: git show b5601783:agda/evidence/probed/Probed/Run-Monotone.agda
---   restores the three fuel-monotonicity rows, whose statement went with
---   the machine it read.
 -- RECOVERY: git show 919f115:agda/evidence/probed/Probed/
 -- RECOVERY: git show 3a3bd405:agda/evidence/probed/Probed/Connect-Count.agda
 module Probed.Main where

@@ -80,12 +80,10 @@ freshId k m = counter m k
 -- update site spells its new counter with the bound variable it just
 -- minted, and a derived-only `next` would force a second reading of the
 -- same mint in every such statement.
--- RECOVERY: git show 309d7206^:agda/src/Rx/Mint.agda restores the
---   setter's hit/miss characterisation, the off-key equality and the
---   strict bound saying a minted identifier is never handed out twice
---   -- the four facts a distinctness statement spends, deleted because
---   none of them had a consumer and the statement that would give them
---   one is not written.
+-- The setter's hit/miss characterisation, the off-key equality and the
+-- strict bound saying a minted identifier is never handed out twice are
+-- the four facts a distinctness statement spends.  None has a consumer
+-- and the statement that would give them one is not written.
 
 setAt : MintKey → ℕ → Mint → Mint
 setAt ordinalᵏ v m = mint λ where
