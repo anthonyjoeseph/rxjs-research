@@ -5,7 +5,7 @@ open import Data.Unit    using (tt)
 open import Data.Nat     using (suc; _≤_; s≤s; _≤ᵇ_; _≡ᵇ_)
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤-trans; n≤1+n; ≤-refl; 1+n≰n)
 open import Data.Empty   using (⊥; ⊥-elim)
-open import Data.List    using (List; []; _∷_; _++_)
+open import Data.List    using (List; []; _∷_; _++_; concat)
 open import Data.List.Properties using (++-assoc; ++-identityʳ)
 open import Data.Maybe   using (Maybe; just; nothing)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
@@ -1130,5 +1130,5 @@ postulate
   formal-verification-batchSimultaneous :
     ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : SExp Γ [] [] [] t)
       (ins : Slots (emitᵛ Γ)) →
-    spec-batchSimultaneous (decodeStream (evaluate↓ fuel (elaborate e) ins))
-      ≡ impl-batchSimultaneous (decodeStream (evaluate↓ fuel (elaborate e) ins))
+    spec-batchSimultaneous (decodeStream (concat (evaluate↓ fuel (elaborate e) ins)))
+      ≡ impl-batchSimultaneous (decodeStream (concat (evaluate↓ fuel (elaborate e) ins)))

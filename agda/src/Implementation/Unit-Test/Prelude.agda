@@ -37,7 +37,7 @@
 module Implementation.Unit-Test.Prelude where
 
 open import Data.Bool using (Bool)
-open import Data.List using (List; [])
+open import Data.List using (List; []; concat)
 open import Data.Nat using (ℕ)
 open import Data.String using (String)
 open import Data.Vec using () renaming (_∷_ to _∷ⱽ_; [] to []ⱽ)
@@ -120,7 +120,7 @@ capProg e = takeᵉ (nat̂ 24) e
 -- batchings read
 runOf : Case → List (InstEmit (Val Γ₂ᵉ natᵗ))
 runOf c = decodeStream {Γ = Γ₂ᵉ} {a = natᵗ}
-            (evaluate↓ (fuel c) (capProg (elaborate (prog c))) (slots c))
+            (concat (evaluate↓ (fuel c) (capProg (elaborate (prog c))) (slots c)))
 
 -- the decoded stream must satisfy the protocol automaton
 -- (evaluate-well-formed, cached case by case)
