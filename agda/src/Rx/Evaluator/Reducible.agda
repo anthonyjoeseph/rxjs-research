@@ -37,21 +37,21 @@ open import Data.Maybe using (just)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong)
 
-open import Rx.Prim using (Tick)
+open import Rx.Prim using (Tick; Source)
 open import Function.Base using (case_of_)
 open import Relation.Nullary using (yes; no)
 open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; obs; listᵗ;
   Ctx; Closed; Val; Tm; FnClo; applyClo; Env; []ᵉ; _∷ᵉ_; evalWith; foldVals;
   isData; lookupEnv; _≟ᵗ_)
-open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; NodeId;
+open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; AllOp; NodeId;
   scanStep; batchSyncPush; batchSyncFlush; lookupNode; batchSync-st;
   memberSource)
-open import Rx.Evaluator.Domain using (subscribeE⇓; emit⇓; close⇓)
-open import Rx.Slots using (Slot; scripted; shared)
+open import Rx.Evaluator.Domain using (subscribeE⇓; emit⇓; emits⇓; close⇓; drainQueue⇓)
+open import Rx.Slots using (Slots; scripted; shared)
 open import Data.Fin using (Fin; toℕ)
-open import Data.Nat using (ℕ; zero; suc; _+_; _≤_)
+open import Data.Nat using (ℕ; _+_; _≤_)
 open import Data.Vec using (tabulate; foldr′)
 
 ------------------------------------------------------------------
@@ -78,15 +78,27 @@ Out {Γ = Γ} {t = t} e = Stream Γ t × Sched Γ × EvalSt e
 -- as an inert index, so the descent that licenses them is still the
 -- TYPE and is untouched -- the distinction that keeps this clear of
 -- the route `Rx.Evaluator.Builder`'s own header records as dead.
-unconnected : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → Sched Γ → EvalSt e → ℕ
-unconnected {n = n} sched st =
+
+-- AND IT IS A FUNCTION OF TWO FIELDS AND NOTHING ELSE, which is what
+-- makes a step's obligation to it cheap: a store handed back with the
+-- same connected list carries the same count, whatever else moved.
+unconnectedS : ∀ {n} {Γ : Ctx n} → Slots Γ → List Source → ℕ
+unconnectedS {n = n} slots cs =
   foldr′ _+_ 0 (tabulate {n = n} λ i → slotCost i)
   where
     slotCost : Fin n → ℕ
-    slotCost i with Sched.slots sched i
+    slotCost i with slots i
     ... | scripted _ = 0
-    ... | shared _   =
-            if memberSource (toℕ i) (EvalSt.connectedShares st) then 0 else 1
+    ... | shared _   = if memberSource (toℕ i) cs then 0 else 1
+
+unconnected : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → Sched Γ → EvalSt e → ℕ
+unconnected sched st = unconnectedS (Sched.slots sched) (EvalSt.connectedShares st)
+
+unconn-cong : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+              (sched : Sched Γ) {st st′ : EvalSt e}
+            → EvalSt.connectedShares st′ ≡ EvalSt.connectedShares st
+            → unconnected sched st′ ≡ unconnected sched st
+unconn-cong sched p = cong (unconnectedS (Sched.slots sched)) p
 
 -- WHAT A STEP OWES THE COUNT, AND IT IS THE CREDIT THE SHAPE ABOVE
 -- BUYS ON.  A frame's obligation is stated under a bound on the store
@@ -99,9 +111,15 @@ unconnected {n = n} sched st =
 --
 -- STATED OVER THE RELATION RATHER THAN THE STEP, because what a
 -- builder holds at the point of spending is the derivation and not
--- the function that produced it.  Three of them because the three
--- halves of the obligation run three different relations, and the
--- fact is the same fact in each.
+-- the function that produced it.  Five of them because the obligation
+-- is spent through five different relations, and the fact is the same
+-- fact in each.
+--
+-- TWIN: `unconn-latch` -- the same fact one level down, over a store
+--   STEP rather than a derivation: a case split on the move, every arm
+--   discharged outright because the count reads two fields and the
+--   move writes neither.  Each of these five is that proof once per
+--   constructor, and the arms it needs are proven already.
 postulate
   unconn-emit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
                   {κ : Path Γ lo u t} {now} {v : Val Γ u}
@@ -123,6 +141,21 @@ postulate
               → subscribeE⇓ {e = e} b κ now sched st r
               → unconnected (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
                   ≤ unconnected sched st
+
+  unconn-emits : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
+                   {κ : Path Γ lo u t} {now} {vs : List (Val Γ u)}
+                   {sched : Sched Γ} {st : EvalSt e} {r : Out e}
+               → emits⇓ {e = e} κ now vs sched st r
+               → unconnected (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+                   ≤ unconnected sched st
+
+  unconn-drain : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
+                   {op : AllOp} {nid : NodeId} {κ : Path Γ lo u t} {now}
+                   {q : List (Val Γ (obs u))}
+                   {sched : Sched Γ} {st : EvalSt e} {r : Out e}
+               → drainQueue⇓ {e = e} op nid κ now q sched st r
+               → unconnected (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+                   ≤ unconnected sched st
 
 ------------------------------------------------------------------
 -- THE CANDIDATE.

@@ -229,28 +229,28 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 
 ### Big picture tier roadmap
 
-- **STEP-INDEX THE BUILDER ON THE UNCONNECTED-SHARE COUNT.** The measure
-  is found and checked at minimal scale, and `walk-above`'s header
-  carries it: a connect is guarded by a slot being shared and not yet
-  connected and adds it on the way out, so that count drops across
-  exactly the call that raises the floor. It is a COUNT and not an
-  invariant, so the candidate is never a premise of anything about the
-  store and the dead route does not reach it. The shape is the builder
-  parameterised by the bound, the term face left strictly below the walk
-  as it is today, and a connect spending the level below instead of its
-  own walk. Merging the two faces under one measure is refused and that
-  arrangement is closed.
+- **THE BOUND IS THREADED; THE DESCENT IS NOT — FINISH THE STEP INDEX.**
+  Every obligation the builder states now carries `unconnected sched st
+  ≤ m`, and every frame, the term face and the arrival spine spend it,
+  which is what the measure was for. What the connect arm does with it
+  is still nothing: it instantiates a fresh bound rather than handing
+  the walk the level below, so the round trip it was meant to order is
+  exactly as unordered as before. Turning `walk-above` into a recursion
+  on that bound is the work that remains. Only the third arrangement is
+  open — the term face strictly below the walk, the builder recursing on
+  the bound — the other two being refused already.
 
 - **THEN THE BOUND'S TWO OBLIGATIONS, WHICH ARE WHAT THE SHAPE BUYS ON
   CREDIT.** The zero level must be unreachable at the connect arm — its
   guard says the slot is shared and unconnected while the bound says no
-  such slot exists — and every other arm must hand back a store still
-  under the bound, which is monotonicity of the count along the whole
-  arrival relation. Nothing un-connects a slot, so both are mechanical
-  rather than uncertain; the second is one obligation per evaluator
-  step, which is what makes it a leg. With the term face below the walk
-  at every level the three remaining leaves read their candidate off
-  the fundamental theorem at values.
+  such slot exists — and every arm must hand back a store still under
+  the bound. The STEP half of that is paid: a node step is a record
+  update on a field the count cannot read, so each one is a case split
+  whose arms are all `refl`, and the enumeration is the whole proof.
+  What is left is the RELATION half, where a builder holds a derivation
+  rather than the function that produced it — five statements, one per
+  relation, each an induction over constructors that spend the step
+  half.
 
 - **THEN THE FLATTENERS AND `takeᵖ`, AND NO FORMER IS OWED AFTER ALL
   (Anthony: "the flattens, mergeAll etc, _are_ the primitives … they can
@@ -290,6 +290,11 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 - **`takeᵖ`** (Rx.Elaborate) — DIFFICULTY, `DEAD ROUTE`: the author cuts on
   VALUES and a plain `takeᵉ` above the envelope cuts on BATCHES, so the
   elaboration owes a count that crosses the level and closes at the cut.
+
+- **`unconn-{emit,emits,close,subs,drain}`** (Rx.Evaluator.Reducible) —
+  GRINDABLE, `TWIN×5`: the unconnected-share count never rises along an arrival
+  relation. One induction each over the relation's constructors, whose arms are
+  the store-step lemmas the builder already proves outright.
 
 ## Tier 2 — the proof statement, once there are two trees to state it over
 
