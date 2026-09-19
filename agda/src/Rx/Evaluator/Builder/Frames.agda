@@ -67,8 +67,15 @@ open import Rx.Evaluator.Unconnected using (unconn-latch; unconn-scanStep; uncon
 -- STRICTLY SMALLER bound offers, which is a recursion on the bound
 -- rather than a forward reference, and the file above this one ties it.
 --
--- IT HAS NOT BEEN INSTANTIATED.  It is stated at full strength; what
--- would reach it is a probe over a parked lane that frees.
+-- AND A PROBE CANNOT REACH WHAT IS IN DOUBT HERE, which is why it is
+-- stated at full strength and left uninstantiated.  The conclusion is
+-- an EXISTENCE claim, so a row means hand-building one derivation at
+-- one concrete point -- and that succeeds whenever the queue handed
+-- over is finite, so it could not have failed.  What is in doubt is
+-- uniform rather than pointwise: whether a body exists at EVERY store,
+-- which is the measure question the statement's own header carries.
+-- A parked lane that frees is the right shape for a bug-cache row and
+-- the wrong shape for a receipt.
 
 postulate
   -- THE PARKED LANE, HANDED BACK ITS QUEUE.  A flattener that could not
