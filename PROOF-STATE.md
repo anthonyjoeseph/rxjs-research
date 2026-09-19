@@ -235,17 +235,16 @@ the work that would kill it sits outside by construction.
 
 ### Big picture tier roadmap
 
-- **FIRST, TIE THE DRAIN INTO THE TERM FACE'S OWN RECURSION — EVERY WAY
-  OF NOT DOING SO IS NOW CLOSED.** The candidate cannot be CARRIED (a
-  store would hold a family taking the store as an argument), cannot be
-  MOVED to the spine (that reorders the flat emit list), and cannot be
-  fetched at ANOTHER BOUND: the bound is mixed-variance in the
-  candidate, a hypothesis at the top and an index of the `Handles` it
-  consumes, so widening and narrowing each need the other. That closes
-  the measure family whole — and no measure was ever owed, since
-  `dq-run` peels its popped list. All four findings sit in the
-  monster's header. What is left is the cycle the layering was built to
-  avoid, and the first question is what orders it.
+- **FIRST, RE-MINT THE DRAIN'S CANDIDATE FROM THE CLOSURE — EVERY ROUTE
+  THAT CARRIES ONE IS CLOSED, AND CARRYING WAS THE ONLY THING TRIED.** A
+  value at observable type IS a closure, and `reducible` turns one into
+  a candidate given `RedEnv` of its environment. So the pop owes a
+  reducible ENVIRONMENT, which is a differently shaped fact from the
+  four that died: a store field fails positivity, the spine reorders the
+  flat emit list, another bound is mixed-variance, and an invariant
+  naming the candidate is refused because the arm descends on the
+  element type. Settle whether the parked closure's environment is
+  reachable where the park admitted it.
 
 - **THEN THE DRAIN AS A BODY, WHICH IS A FEW LINES ONCE IT IS IN THE
   BLOCK.** `dq-run` peels its popped list and `dq-full` restores what it
