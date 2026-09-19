@@ -1,7 +1,6 @@
 module Rx.Mint where
 
-open import Data.Nat  using (ℕ; suc; _≤_)
-open import Data.Nat.Properties using (≤-refl; n≤1+n)
+open import Data.Nat  using (ℕ; suc)
 
 ------------------------------------------------------------------
 -- One ledger for every identifier the run mints.
@@ -110,27 +109,3 @@ setAt regᵏ     v m = mint λ where
   nodeᵏ    → counter m nodeᵏ
   regᵏ     → v
 
-next : MintKey → Mint → Mint
-next k m = setAt k (suc (counter m k)) m
-
--- a mint only ever advances, at every key at once: the key asked for by
--- one, every other by none.  This is the fact the run's freshness
--- induction spends, and it is stated at an arbitrary key.
-next-mono : ∀ (k j : MintKey) (m : Mint)
-          → counter m j ≤ counter (next k m) j
-next-mono ordinalᵏ ordinalᵏ m = n≤1+n _
-next-mono ordinalᵏ sourceᵏ  m = ≤-refl
-next-mono ordinalᵏ nodeᵏ    m = ≤-refl
-next-mono ordinalᵏ regᵏ     m = ≤-refl
-next-mono sourceᵏ  ordinalᵏ m = ≤-refl
-next-mono sourceᵏ  sourceᵏ  m = n≤1+n _
-next-mono sourceᵏ  nodeᵏ    m = ≤-refl
-next-mono sourceᵏ  regᵏ     m = ≤-refl
-next-mono nodeᵏ    ordinalᵏ m = ≤-refl
-next-mono nodeᵏ    sourceᵏ  m = ≤-refl
-next-mono nodeᵏ    nodeᵏ    m = n≤1+n _
-next-mono nodeᵏ    regᵏ     m = ≤-refl
-next-mono regᵏ     ordinalᵏ m = ≤-refl
-next-mono regᵏ     sourceᵏ  m = ≤-refl
-next-mono regᵏ     nodeᵏ    m = ≤-refl
-next-mono regᵏ     regᵏ     m = n≤1+n _

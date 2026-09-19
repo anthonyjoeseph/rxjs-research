@@ -23,6 +23,28 @@
 -- DERIVATION and never of the run: nothing is tested, and no
 -- constructor emits the marker.
 
+-- A SUBSCRIPTION EMITS AT THE ROOT TYPE, ONE VALUE AT A TIME, AND THAT
+-- IS WHAT MAKES DEPTH-FIRST THE RECURSION'S OWN ORDER RATHER THAN A
+-- PROPERTY SOMETHING HAD TO RE-ESTABLISH.  A subscription used to hand
+-- its whole output back at the SOURCE's element type, and each
+-- enclosing frame pushed that finished list through itself; a source
+-- was therefore materialised whole before any of it descended, so a
+-- re-entrant subscribe wrote into a registry that the loop it should
+-- have joined had already read past.  Carrying the rest of the path
+-- INTO the subscribe fixes it at the root: a value reaches the
+-- subscriber before the next one is produced, exactly as an rxjs
+-- observer does, and the burst-pushing family is deleted rather than
+-- repaired.
+--
+-- AND IT IS WHAT LETS EVERY OPERATOR BE WRITTEN AS ITS MIRROR IS.  A
+-- frame handed a finished list could group it, count it or truncate it
+-- knowing how much was coming; none of those is a capability rxjs
+-- gives an operator.  So the bracket operator holds a flag and a
+-- buffer, the truncation spends its count one value at a time and cuts
+-- mid-burst, and a saturated flattener queues the OBSERVABLE — which
+-- is what the TypeScript does in each case, and what the list encoding
+-- was quietly standing in for.
+
 -- THE DESCENT IS DENOMINATED IN THE TYPE, AND THAT IS WHAT REACHES
 -- THE ONE FORMER A FIGURE AND A TERM PREDICATE BOTH MISS.  Every
 -- killed reading recursed on the TERM or on a quantity fixed before
@@ -85,163 +107,133 @@
 --   knows.
 module Rx.Evaluator.Domain where
 
-open import Data.Bool using (Bool; true; false; not; _∧_; if_then_else_)
+open import Data.Bool using (true; false)
 open import Data.Fin using (Fin; toℕ)
-open import Data.List using (List; []; _∷_; _++_; map; null)
+open import Data.List using (List; []; _∷_; _++_; map)
 open import Data.Bool.ListAction using (any)
-open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; zero; suc; pred; _<_; _≤_; _≡ᵇ_)
+open import Data.Maybe using (just; nothing)
+open import Data.Nat using (zero; suc; _<_; _≤_; _≡ᵇ_)
 open import Data.Nat.Properties using (≤-refl)
 open import Data.Product using (_×_; _,_)
 open import Data.Sum using (inj₁; inj₂)
-open import Data.Unit using (⊤; tt)
-open import Data.Empty using (⊥)
+open import Data.Unit using (tt)
 open import Data.Vec using (lookup)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 
-open import Rx.Prim using (Tick; Fuel; Id; Source; valueᵖ; completeᵖ; hot; cold)
-open import Data.List.Relation.Unary.All using () renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
-open import Rx.Exp using (obs; Ctx; Val; Closed; Exp; Tm; Fn; FnClo; _×ᵗ_; listᵗ; uniqᵗ;
+open import Rx.Prim using (Tick; Fuel; PlainEvent; valueᵖ; completeᵖ; hot; cold)
+open import Rx.Exp using (obs; Ctx; Val; Closed; Exp; Tm; Fn; FnClo; applyClo;
+  _×ᵗ_; listᵗ; uniqᵗ;
   Env; _∷ᵉ_; []ᵉ; evalWith; unfoldμ; input; ofᵉ; emptyᵉ; takeᵉ; batchSyncᵉ;
   mapᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; deferᵉ; mintᵉ)
 open import Rx.Mint using (ordinalᵏ; sourceᵏ; nodeᵏ; regᵏ; freshId; setAt)
 open import Rx.Slots using (Slots; scripted; shared)
-open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; Frame; NodeId;
+open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; NodeId;
   root; share-sink; _↠_; shareAdmit; shareLatch; shareFinish;
-  from-inner; splitStream;
-  arrTick; arrSource; arrVal; chainsOf; cascadeLatch; cascadeFinish;
+  from-inner; isFinᵖ;
+  arrTick; arrVal; chainsOf; cascadeLatch; cascadeFinish;
   sched-next; sched-init; st-init;
   NodeState; AllOp; RegId; Arrival; AtFloor; arrTy;
-  spentBurst; oneShotBurst; memberSource; register; installNode; resolve;
+  memberSource; register; installNode; resolve;
   atSlot; atDyn; lowerFloor;
   map-f; scan-f; take-f; batchSync-f; thru-outer;
   cell-st; take-st; batchSync-st; mergeAll-st; switch-st; exhaust-st;
   mergeAllᵒ; switchᵒ; exhaustᵒ;
-  lookupNode; setNode; hasRoom; mergeAllBump; switchKill; aliveThroughᶠ;
-  mapVals; scanDispatch; takeDispatch; batchSyncDispatch; thruWrap;
-  consumeUsable; finishUsable;
-  streamCompleted; dropSource)
-
--- THE FRAME A SUBSCRIBE CAN PUSH, WHICH IS EVERY FRAME BUT ONE, AND
--- SAYING SO IN A TYPE IS WHAT TAKES THE DRAIN OUT OF A PUSH CYCLE.  A
--- push cycle steps the frame it was handed, and what hands it one is a
--- source former -- the map, the take, the scan, the outer of an
--- operator.  The inner's own frame is never pushed: a subscribe returns
--- the inner's synchronous burst UP to its caller as values, and the
--- frame is walked later, by the instant loop, down a path the registry
--- holds.  So the completion side -- react, finish, drain, and the
--- queued subscribe they end in -- is not reachable from a subscribe at
--- all, and the cycle that a measure was owed for does not exist.  What
--- did exist was a DEFINITION order: a block answering for a frame it
--- can never be given pays for that answer, and this is what stops it.
--- The fact is stated here rather than beside either consumer because
--- BOTH faces of the subscribe cycle need it and neither imports the
--- other.
-srcFrame : ∀ {n} {Γ : Ctx n} {s u} → Frame Γ s u → Set
-srcFrame (from-inner _ _ _) = ⊥
-srcFrame _                  = ⊤
+  lookupNode; setNode; hasRoom; switchKill; aliveThroughᶠ; consumeUsable;
+  scanStep; takeStep; cutAt; batchSyncPush; batchSyncFlush;
+  markOuterDone; markInnerDone; mergeAllPark;
+  mergeAllQueue; mergeRoom; mergeAllClaim; mergeAllRestore;
+  allFinished; takeSpent)
 
 ------------------------------------------------------------------
--- THE SUBSCRIBE CYCLE.  Twelve families, exactly the members of the
--- evaluator's larger genuine cycle: everything else it calls is
--- structurally recursive and is APPLIED here rather than related.
+-- THE DELIVERY CYCLE.  Every family here answers in the ROOT's
+-- stream, because a value's whole remaining journey — the frames
+-- above it, the shares it fans into, the subscriber at the end — is
+-- carried in the path it is handed alongside.  That is what makes a
+-- subscription's own re-entry ordinary recursion: what a frame does
+-- with a value is finished before the next value exists.
 ------------------------------------------------------------------
+
+-- ONE VALUE, ENTERING THE PATH AT ITS FOOT.
+data emit⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
+     ∀ {s lo} → Path Γ lo s t → Tick → Val Γ s
+   → Sched Γ → EvalSt e → Stream Γ t × Sched Γ × EvalSt e → Set
+
+-- THE END OF A SOURCE, ENTERING THE SAME PATH.  It is a separate
+-- family rather than an event column because every frame treats it
+-- differently from a value, and several of them answer it by doing
+-- work: a bracket flushes, a flattener asks whether anything is still
+-- running under it.
+data close⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
+     ∀ {s lo} → Path Γ lo s t → Tick
+   → Sched Γ → EvalSt e → Stream Γ t × Sched Γ × EvalSt e → Set
+
+-- SEVERAL VALUES IN ORDER, WHICH IS A SCRIPT'S SYNCHRONOUS PREFIX AND
+-- NOTHING ELSE.  It is not a frame's capability: no constructor of
+-- `emit⇓` names it, and the only things that do are the source
+-- formers that are WRITTEN as a list of values.
+data emits⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
+     ∀ {s lo} → Path Γ lo s t → Tick → List (Val Γ s)
+   → Sched Γ → EvalSt e → Stream Γ t × Sched Γ × EvalSt e → Set
 
 data subscribeE⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
      ∀ {u lo} →
-     Val Γ (obs u) → Path Γ lo u t → Id → Tick → Sched Γ → EvalSt e
-   → Stream Γ u × Sched Γ × EvalSt e → Set
+     Val Γ (obs u) → Path Γ lo u t → Tick → Sched Γ → EvalSt e
+   → Stream Γ t × Sched Γ × EvalSt e → Set
 
-data subscribeInner⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
+-- AN INNER OBSERVABLE HAS ARRIVED AT A FLATTENER'S OUTER FRAME.
+data consume⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
      ∀ {u lo} →
-     AllOp → NodeId → Path Γ lo u t → Id → Tick
-   → Val Γ (obs u) → Sched Γ → EvalSt e
-   → NodeId × List (Val Γ u) × Bool × Sched Γ × EvalSt e → Set
+     AllOp → NodeId → Path Γ lo u t → Tick → Val Γ (obs u)
+   → Sched Γ → EvalSt e → Stream Γ t × Sched Γ × EvalSt e → Set
 
-data thruConsume⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
+-- A LANE HAS FREED, SO WHATEVER IS PARKED MAY NOW RUN.  The queue is
+-- a COLUMN of the relation rather than something each step reads back
+-- out of the store, and that is what orders this edge: a drain
+-- subscribes, a subscribe runs user code, and user code can park
+-- further inners on this very node -- so a store-reading drain walks a
+-- list its own walk extends.  Carried, it is an ordinary list and the
+-- recursion is structural on it.  Only the merge ever has a nonempty
+-- one; the other two are handed `[]`, so their case is the empty arm
+-- rather than an operator-specific one.
+data drainQueue⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
      ∀ {u lo} →
-     AllOp → NodeId → Path Γ lo u t → Id → Tick
-   → Val Γ (obs u) → Sched Γ → EvalSt e
-   → List (Val Γ u) × Sched Γ × EvalSt e → Set
-
-data thruWalk⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
-     ∀ {u lo} →
-     AllOp → NodeId → Path Γ lo u t → Id → Tick
-   → List (Val Γ (obs u)) → Sched Γ → EvalSt e
-   → List (Val Γ u) × Sched Γ × EvalSt e → Set
-
-data mergeAllDrain⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
-     ∀ {s lo} →
-     NodeId → Path Γ lo s t → Id → Tick
-   → Maybe ℕ → ℕ → Bool → List (Val Γ (obs s)) → Sched Γ → EvalSt e
-   → List (Val Γ s) × ℕ × List (Val Γ (obs s)) × Sched Γ × EvalSt e → Set
-
-data innerFinish⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
-     ∀ {s lo} →
-     AllOp → NodeId → NodeId → Path Γ lo s t → Id → Tick
-   → List (Val Γ s) → Sched Γ → EvalSt e → Maybe (NodeState Γ)
-   → List (Val Γ s) × Bool × Sched Γ × EvalSt e → Set
-
-data innerReact⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
-     ∀ {s lo} →
-     AllOp → NodeId → NodeId → Path Γ lo s t → Id → Tick
-   → List (Val Γ s) → Sched Γ → EvalSt e → Bool
-   → List (Val Γ s) × Bool × Sched Γ × EvalSt e → Set
-
-data stepFrame⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
-     ∀ {s u lo} →
-     Id → Tick → Frame Γ s u → Path Γ lo u t
-   → List (Val Γ s) → Bool → Sched Γ → EvalSt e
-   → List (Val Γ u) × Bool × Sched Γ × EvalSt e → Set
-
-data pushBurst⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
-     ∀ {s u lo} →
-     Id → Tick → Frame Γ s u → Path Γ lo u t
-   → Stream Γ s → Sched Γ → EvalSt e
-   → Stream Γ u × Sched Γ × EvalSt e → Set
+     AllOp → NodeId → Path Γ lo u t → Tick → List (Val Γ (obs u))
+   → Sched Γ → EvalSt e → Stream Γ t × Sched Γ × EvalSt e → Set
 
 data subscribeAll⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
      ∀ {u lo} →
      AllOp → NodeState Γ → Val Γ (obs (obs u)) → Path Γ lo u t
-   → Id → Tick → Sched Γ → EvalSt e
-   → Stream Γ u × Sched Γ × EvalSt e → Set
+   → Tick → Sched Γ → EvalSt e
+   → Stream Γ t × Sched Γ × EvalSt e → Set
 
 data sharedConnect⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
      ∀ {lo} →
      (i : Fin n) → Closed Γ (lookup Γ i) → Path Γ lo (lookup Γ i) t
-   → toℕ i < lo → Id → Tick → Sched Γ → EvalSt e
-   → Stream Γ (lookup Γ i) × Sched Γ × EvalSt e → Set
+   → toℕ i < lo → Tick → Sched Γ → EvalSt e
+   → Stream Γ t × Sched Γ × EvalSt e → Set
 
 data subscribeSharedSlot⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
      ∀ {lo} →
      (i : Fin n) → Closed Γ (lookup Γ i) → Path Γ lo (lookup Γ i) t
-   → toℕ i < lo → Id → Tick → Sched Γ → EvalSt e
-   → Stream Γ (lookup Γ i) × Sched Γ × EvalSt e → Set
+   → toℕ i < lo → Tick → Sched Γ → EvalSt e
+   → Stream Γ t × Sched Γ × EvalSt e → Set
 
 ------------------------------------------------------------------
 -- THE SHARE CYCLE.  The evaluator's second genuine cycle, entered
--- once per delivered chain; its members carry the subscribe cycle's
+-- once per delivered chain; its members carry the delivery cycle's
 -- derivation too, because a fold re-enters a frame.
 ------------------------------------------------------------------
 
 data dispatchShare⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
      ∀ {lo} →
-     Id → Tick → (i : Fin n) → lo ≤ toℕ i
-   → List (Val Γ (lookup Γ i)) → Bool → Sched Γ → EvalSt e
+     Tick → (i : Fin n) → lo ≤ toℕ i
+   → PlainEvent (Val Γ (lookup Γ i)) → Sched Γ → EvalSt e
    → Stream Γ t × Sched Γ × EvalSt e → Set
 
 data shareGo⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
      ∀ {lo} →
-     Id → Tick → (i : Fin n)
-   → List (Val Γ (lookup Γ i)) → Bool
+     Tick → (i : Fin n) → PlainEvent (Val Γ (lookup Γ i))
    → List (RegId × Path Γ lo (lookup Γ i) t) → Sched Γ → EvalSt e
-   → Stream Γ t × Sched Γ × EvalSt e → Set
-
-data foldPath⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
-     ∀ {u lo} →
-     Id → Tick → Source → Path Γ lo u t
-   → List (Val Γ u) → Bool
-   → Sched Γ → EvalSt e
    → Stream Γ t × Sched Γ × EvalSt e → Set
 
 ------------------------------------------------------------------
@@ -251,20 +243,20 @@ data foldPath⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
 ------------------------------------------------------------------
 
 data chainStep⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
-     Id → (a : Arrival Γ) → AtFloor Γ (arrTy a) t → Sched Γ → EvalSt e
+     (a : Arrival Γ) → AtFloor Γ (arrTy a) t → Sched Γ → EvalSt e
    → Stream Γ t × Sched Γ × EvalSt e → Set
 
 data cascadeGo⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
-     (a : Arrival Γ) → Id
+     (a : Arrival Γ)
    → List (RegId × AtFloor Γ (arrTy a) t) → Sched Γ → EvalSt e
    → Stream Γ t × Sched Γ × EvalSt e → Set
 
 data cascade⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
-     Arrival Γ → Id → Sched Γ → EvalSt e
+     Arrival Γ → Sched Γ → EvalSt e
    → Stream Γ t × Sched Γ × EvalSt e → Set
 
 data drain⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
-     Fuel → Id → Sched Γ → EvalSt e → Stream Γ t → Set
+     Fuel → Sched Γ → EvalSt e → Stream Γ t → Set
 
 data evaluate⇓ {n} {Γ : Ctx n} {t} :
      Fuel → Closed Γ t → Slots Γ → Stream Γ t → Set
@@ -273,6 +265,228 @@ data evaluate⇓ {n} {Γ : Ctx n} {t} :
 -- THE CONSTRUCTORS.  One per clause of the function each family
 -- mirrors, every recursive call appearing as a sub-derivation.
 ----------------------------------------------------------------------
+
+-- THE PATH IS WALKED SINKWARD AND WHAT REACHES THE ROOT IS WHAT THE
+-- SUBSCRIBER SEES, so the root clause is the only one that emits and
+-- every other clause hands its own result on.  The sink clause is
+-- where the floor descends: its premise is the path constructor's
+-- argument, so nothing has to be carried alongside.
+--
+-- A HELPER OUTSIDE THE CYCLE IS NAMED IN A PREMISE'S EQUATION RATHER
+-- THAN UNFOLDED INTO ARMS, AND THAT IS A CHOICE ABOUT WHAT THIS
+-- RELATION IS FOR.  Each stateful frame branches on a node lookup, but
+-- none of those branches re-enters the cycle, so relating them
+-- separately would add cases the induction never splits on.  What the
+-- relation must expose is exactly the recursive structure; a total
+-- function of the state is carried as itself, and the equation is what
+-- keeps two arms from both applying.
+--
+-- RECOVERY: git show 234074e:agda/src/Verify-Rank-Sufficient/ restores
+--   the CARRIED tower, whose whole subject was the per-frame step: a
+--   bound a frame's emissions were held to, stated per template and
+--   pushed through a burst.  It is the apparatus to read if a
+--   strengthened return type is ever wanted here — what killed it is
+--   that the figure was seeded off SYNTAX, which is a property of that
+--   tower's currency and not of the per-frame statement it proved.
+data emit⇓ {n} {Γ} {t} {e} where
+
+  emit-root : ∀ {lo now} {v : Val Γ t} {sched st}
+            → emit⇓ {lo = lo} root now v sched st
+                (valueᵖ v ∷ [] , sched , st)
+
+  emit-sink : ∀ {lo now} {i : Fin n} {below : lo ≤ toℕ i}
+                {v : Val Γ (lookup Γ i)} {sched st r}
+            → dispatchShare⇓ now i below (valueᵖ v) sched st r
+            → emit⇓ (share-sink i below) now v sched st r
+
+  emit-map : ∀ {s u lo} {fn : FnClo Γ s u} {κ : Path Γ lo u t}
+               {now} {v : Val Γ s} {sched st r}
+           → emit⇓ κ now (applyClo fn v) sched st r
+           → emit⇓ (map-f fn ↠ κ) now v sched st r
+
+  emit-scan : ∀ {s u lo} {fn : FnClo Γ (u ×ᵗ s) u} {nid} {κ : Path Γ lo u t}
+                {now} {v : Val Γ s} {sched st} {ac st₁ r}
+            → scanStep fn nid v st ≡ (just ac , st₁)
+            → emit⇓ κ now ac sched st₁ r
+            → emit⇓ (scan-f fn nid ↠ κ) now v sched st r
+
+  emit-scan-stuck : ∀ {s u lo} {fn : FnClo Γ (u ×ᵗ s) u} {nid}
+                      {κ : Path Γ lo u t}
+                      {now} {v : Val Γ s} {sched st st₁}
+                  → scanStep fn nid v st ≡ (nothing , st₁)
+                  → emit⇓ (scan-f fn nid ↠ κ) now v sched st
+                      ([] , sched , st₁)
+
+  -- THE TRUNCATION PASSES THE VALUE ON AND KEEPS ITS COUNT.
+  emit-take-more : ∀ {s lo nid} {κ : Path Γ lo s t}
+                     {now} {v : Val Γ s} {sched st st₁ r}
+                 → takeStep nid st ≡ (just false , st₁)
+                 → emit⇓ κ now v sched st₁ r
+                 → emit⇓ (take-f nid ↠ κ) now v sched st r
+
+  -- AND THE LAST ONE OWED LEAVES BEFORE THE CUT, WHICH IS WHAT REAL
+  -- `take` DOES: the nth value is emitted and the completion follows
+  -- it, mid-burst, without waiting for whatever else the source was
+  -- about to produce.
+  emit-take-last : ∀ {s lo nid} {κ : Path Γ lo s t}
+                     {now} {v : Val Γ s} {sched st st₁}
+                     {out sched₁ st₂ sched₂ st₃ out′ sched₃ st₄}
+                 → takeStep nid st ≡ (just true , st₁)
+                 → emit⇓ κ now v sched st₁ (out , sched₁ , st₂)
+                 → cutAt nid sched₁ st₂ ≡ (sched₂ , st₃)
+                 → close⇓ κ now sched₂ st₃ (out′ , sched₃ , st₄)
+                 → emit⇓ (take-f nid ↠ κ) now v sched st
+                     (out ++ out′ , sched₃ , st₄)
+
+  emit-take-spent : ∀ {s lo nid} {κ : Path Γ lo s t}
+                      {now} {v : Val Γ s} {sched st st₁}
+                  → takeStep nid st ≡ (nothing , st₁)
+                  → emit⇓ (take-f nid ↠ κ) now v sched st
+                      ([] , sched , st₁)
+
+  -- THE BRACKET, ARRIVING SIDE.  While the node's bit is up nothing
+  -- leaves at all; once it is down each value leaves as its own group
+  -- of one.  Which of the two happened is the helper's answer, so the
+  -- two arms are told apart by its equation rather than by a test
+  -- stated here.
+  emit-batchSync : ∀ {s lo nid} {κ : Path Γ lo (s ×ᵗ listᵗ s) t}
+                     {now} {v : Val Γ s} {sched st g st₁ r}
+                 → batchSyncPush nid v st ≡ (just g , st₁)
+                 → emit⇓ κ now g sched st₁ r
+                 → emit⇓ (batchSync-f nid ↠ κ) now v sched st r
+
+  emit-batchSync-held : ∀ {s lo nid} {κ : Path Γ lo (s ×ᵗ listᵗ s) t}
+                          {now} {v : Val Γ s} {sched st st₁}
+                      → batchSyncPush nid v st ≡ (nothing , st₁)
+                      → emit⇓ (batchSync-f nid ↠ κ) now v sched st
+                          ([] , sched , st₁)
+
+  -- LEAVING A SUBSCRIBED INNER IS FREE, and it is the completion side
+  -- of this frame that does all the work.
+  emit-from-inner : ∀ {s lo op allNid inst} {κ : Path Γ lo s t}
+                      {now} {v : Val Γ s} {sched st r}
+                  → emit⇓ κ now v sched st r
+                  → emit⇓ (from-inner op allNid inst ↠ κ) now v sched st r
+
+  emit-thru-outer : ∀ {u lo op nid} {κ : Path Γ lo u t}
+                      {now} {o : Val Γ (obs u)} {sched st r}
+                  → consume⇓ op nid κ now o sched st r
+                  → emit⇓ (thru-outer op nid ↠ κ) now o sched st r
+
+data close⇓ {n} {Γ} {t} {e} where
+
+  close-root : ∀ {lo now sched st}
+             → close⇓ {s = t} {lo = lo} root now sched st
+                 (completeᵖ ∷ [] , sched , st)
+
+  close-sink : ∀ {lo now} {i : Fin n} {below : lo ≤ toℕ i} {sched st r}
+             → dispatchShare⇓ now i below completeᵖ sched st r
+             → close⇓ (share-sink i below) now sched st r
+
+  close-map : ∀ {s u lo} {fn : FnClo Γ s u} {κ : Path Γ lo u t}
+                {now sched st r}
+            → close⇓ κ now sched st r
+            → close⇓ (map-f fn ↠ κ) now sched st r
+
+  close-scan : ∀ {s u lo} {fn : FnClo Γ (u ×ᵗ s) u} {nid}
+                 {κ : Path Γ lo u t} {now sched st r}
+             → close⇓ κ now sched st r
+             → close⇓ (scan-f fn nid ↠ κ) now sched st r
+
+  -- A SPENT TRUNCATION IS SILENT, because it has already cut: the
+  -- registrations under it are severed and its own completion has
+  -- gone rootward, and in rxjs an unsubscribed chain delivers
+  -- nothing.
+  close-take-spent : ∀ {s lo nid} {κ : Path Γ lo s t} {now sched st}
+                   → takeSpent nid st ≡ true
+                   → close⇓ (take-f nid ↠ κ) now sched st ([] , sched , st)
+
+  close-take : ∀ {s lo nid} {κ : Path Γ lo s t} {now sched st r}
+             → takeSpent nid st ≡ false
+             → close⇓ κ now sched st r
+             → close⇓ (take-f nid ↠ κ) now sched st r
+
+  -- THE BRACKET, CLOSING SIDE, AND THE FLUSH COMES FIRST.  A source
+  -- that completes inside the subscribe call must still deliver what
+  -- it buffered, and it must deliver it BEFORE the completion — which
+  -- is the order the TypeScript's merged flush produces, since its
+  -- second input is subscribed while the first has only just
+  -- finished.
+  close-batchSync : ∀ {s lo nid} {κ : Path Γ lo (s ×ᵗ listᵗ s) t}
+                      {now sched st g st₁}
+                      {out sched₁ st₂ out′ sched₂ st₃}
+                  → batchSyncFlush {s = s} nid st ≡ (just g , st₁)
+                  → emit⇓ κ now g sched st₁ (out , sched₁ , st₂)
+                  → close⇓ κ now sched₁ st₂ (out′ , sched₂ , st₃)
+                  → close⇓ (batchSync-f nid ↠ κ) now sched st
+                      (out ++ out′ , sched₂ , st₃)
+
+  close-batchSync-empty : ∀ {s lo nid} {κ : Path Γ lo (s ×ᵗ listᵗ s) t}
+                            {now sched st st₁ r}
+                        → batchSyncFlush {s = s} nid st ≡ (nothing , st₁)
+                        → close⇓ κ now sched st₁ r
+                        → close⇓ (batchSync-f nid ↠ κ) now sched st r
+
+  -- AN INNER'S COMPLETION IS ABSORBED WHILE ANYTHING UNDER THIS
+  -- INSTANCE IS STILL LIVE, which is the one reading of the registry
+  -- a frame makes.
+  close-inner-absorb : ∀ {s lo op allNid inst} {κ : Path Γ lo s t}
+                         {now sched st}
+                     → any (aliveThroughᶠ inst st) (EvalSt.registry st) ≡ true
+                     → close⇓ (from-inner op allNid inst ↠ κ) now sched st
+                         ([] , sched , st)
+
+  -- OTHERWISE THE LANE IS RELEASED, WHATEVER IS PARKED IS RUN, AND
+  -- ONLY THEN IS THE OPERATOR ASKED WHETHER IT IS FINISHED.  The
+  -- question is asked of the store the drain LEFT, because a lane
+  -- freed here is refilled there and a verdict taken before the drain
+  -- would be a verdict about a store that no longer stands.
+  close-inner-done : ∀ {s lo op allNid inst} {κ : Path Γ lo s t}
+                       {now sched st} {q st₀ out sched₁ st₁ out′ sched₂ st₂}
+                   → any (aliveThroughᶠ inst st) (EvalSt.registry st) ≡ false
+                   → mergeAllQueue {s = s} allNid
+                       (markInnerDone op allNid inst st) ≡ (q , st₀)
+                   → drainQueue⇓ op allNid κ now q sched st₀
+                       (out , sched₁ , st₁)
+                   → allFinished op allNid st₁ ≡ true
+                   → close⇓ κ now sched₁ st₁ (out′ , sched₂ , st₂)
+                   → close⇓ (from-inner op allNid inst ↠ κ) now sched st
+                       (out ++ out′ , sched₂ , st₂)
+
+  close-inner-open : ∀ {s lo op allNid inst} {κ : Path Γ lo s t}
+                       {now sched st} {q st₀ out sched₁ st₁}
+                   → any (aliveThroughᶠ inst st) (EvalSt.registry st) ≡ false
+                   → mergeAllQueue {s = s} allNid
+                       (markInnerDone op allNid inst st) ≡ (q , st₀)
+                   → drainQueue⇓ op allNid κ now q sched st₀
+                       (out , sched₁ , st₁)
+                   → allFinished op allNid st₁ ≡ false
+                   → close⇓ (from-inner op allNid inst ↠ κ) now sched st
+                       (out , sched₁ , st₁)
+
+  -- THE OUTER HAS FINISHED, and an `*All` outlives it for exactly as
+  -- long as something is still running underneath.
+  close-outer-done : ∀ {u lo op nid} {κ : Path Γ lo u t} {now sched st r}
+                   → allFinished op nid (markOuterDone op nid st) ≡ true
+                   → close⇓ κ now sched (markOuterDone op nid st) r
+                   → close⇓ (thru-outer op nid ↠ κ) now sched st r
+
+  close-outer-open : ∀ {u lo op nid} {κ : Path Γ lo u t} {now sched st}
+                   → allFinished op nid (markOuterDone op nid st) ≡ false
+                   → close⇓ (thru-outer op nid ↠ κ) now sched st
+                       ([] , sched , markOuterDone op nid st)
+
+data emits⇓ {n} {Γ} {t} {e} where
+
+  emits-nil : ∀ {s lo} {κ : Path Γ lo s t} {now sched st}
+            → emits⇓ κ now [] sched st ([] , sched , st)
+
+  emits-cons : ∀ {s lo} {κ : Path Γ lo s t} {now} {v : Val Γ s} {vs}
+                 {sched st out sched₁ st₁ out′ sched₂ st₂}
+             → emit⇓ κ now v sched st (out , sched₁ , st₁)
+             → emits⇓ κ now vs sched₁ st₁ (out′ , sched₂ , st₂)
+             → emits⇓ κ now (v ∷ vs) sched st
+                 (out ++ out′ , sched₂ , st₂)
 
 -- THE SLOT TESTS STAY PREMISES AND THE SCRIPT'S OWN WELL-FORMEDNESS
 -- WITNESS IS BOUND RATHER THAN LEFT TO INFERENCE.  A slot's constructor
@@ -284,163 +498,175 @@ data evaluate⇓ {n} {Γ : Ctx n} {t} :
 data subscribeE⇓ {n} {Γ} {t} {e} where
 
   subs-floor : ∀ {lo} {i : Fin n} {κ : Path Γ lo (lookup Γ i) t}
-                 {Θ ρ} {id now sched st}
+                 {Θ ρ} {now sched st r}
              → lo ≤ toℕ i
-             → subscribeE⇓ (Θ , input i , ρ) κ id now sched st
-                 (spentBurst (toℕ i) id , sched , st)
+             → close⇓ κ now sched st r
+             → subscribeE⇓ (Θ , input i , ρ) κ now sched st r
 
   subs-shared : ∀ {lo} {i : Fin n} {d} {κ : Path Γ lo (lookup Γ i) t}
-                  {below : toℕ i < lo} {ok} {Θ ρ} {id now sched st r}
+                  {below : toℕ i < lo} {ok} {Θ ρ} {now sched st r}
               → Sched.slots sched i ≡ shared d {ok = ok}
-              → subscribeSharedSlot⇓ i d κ below id now sched st r
-              → subscribeE⇓ (Θ , input i , ρ) κ id now sched st r
+              → subscribeSharedSlot⇓ i d κ below now sched st r
+              → subscribeE⇓ (Θ , input i , ρ) κ now sched st r
 
   subs-hot-done : ∀ {lo} {i : Fin n} {κ : Path Γ lo (lookup Γ i) t}
-                    {ok async} {Θ ρ} {id now sched st}
+                    {ok async} {Θ ρ} {now sched st r}
                 → toℕ i < lo
                 → Sched.slots sched i ≡ scripted {ok = ok} (hot async)
                 → memberSource (toℕ i) (EvalSt.completedSources st) ≡ true
-                → subscribeE⇓ (Θ , input i , ρ) κ id now sched st
-                    (spentBurst (toℕ i) id , sched , st)
+                → close⇓ κ now sched st r
+                → subscribeE⇓ (Θ , input i , ρ) κ now sched st r
 
   subs-hot-live : ∀ {lo} {i : Fin n} {κ : Path Γ lo (lookup Γ i) t}
-                    {ok async} {Θ ρ} {id now sched st rid}
+                    {ok async} {Θ ρ} {now sched st rid}
                 → (below : toℕ i < lo)
                 → Sched.slots sched i ≡ scripted {ok = ok} (hot async)
                 → memberSource (toℕ i) (EvalSt.completedSources st) ≡ false
                 → freshId regᵏ (Sched.mint sched) ≡ rid
-                → subscribeE⇓ (Θ , input i , ρ) κ id now sched st
+                → subscribeE⇓ (Θ , input i , ρ) κ now sched st
                     ( []
                     , record sched { mint = setAt regᵏ (suc rid) (Sched.mint sched) }
                     , register rid (atSlot i) (lowerFloor below κ) st )
 
+  -- A COLD IS `new Observable()`: A FRESH INDEPENDENT RUN PER
+  -- SUBSCRIBER, ITS SYNCHRONOUS PREFIX REPLAYED INTO THE SUBSCRIBE
+  -- FRAME.  With no asynchronous tail the run is over as it starts,
+  -- so the prefix is followed by the end and nothing is registered.
   subs-cold-sync : ∀ {lo} {i : Fin n} {κ : Path Γ lo (lookup Γ i) t}
-                     {ok sync} {Θ ρ} {id now sched st burst sched₁}
+                     {ok sync} {Θ ρ} {now sched st}
+                     {out sched₁ st₁ out′ sched₂ st₂}
                  → toℕ i < lo
                  → Sched.slots sched i ≡ scripted {ok = ok} (cold sync [])
-                 → oneShotBurst sync id sched ≡ (burst , sched₁)
-                 → subscribeE⇓ (Θ , input i , ρ) κ id now sched st
-                     (burst , sched₁ , st)
+                 → emits⇓ κ now sync sched st (out , sched₁ , st₁)
+                 → close⇓ κ now sched₁ st₁ (out′ , sched₂ , st₂)
+                 → subscribeE⇓ (Θ , input i , ρ) κ now sched st
+                     (out ++ out′ , sched₂ , st₂)
 
+  -- AND WITH A TAIL THE REGISTRATION IS MADE BEFORE THE PREFIX IS
+  -- REPLAYED, NOT AFTER.  A synchronous value can cut this very
+  -- chain, and a cut severs REGISTRATIONS — so a source registered
+  -- afterwards would go on delivering into something nothing reads.
   subs-cold-async : ∀ {lo} {i : Fin n} {κ : Path Γ lo (lookup Γ i) t}
-                      {ok sync d ds} {Θ ρ} {id now sched st src ord rid}
+                      {ok sync d ds} {Θ ρ} {now sched st src ord rid r}
                   → toℕ i < lo
                   → Sched.slots sched i ≡ scripted {ok = ok} (cold sync (d ∷ ds))
                   → freshId sourceᵏ (Sched.mint sched) ≡ src
                   → freshId ordinalᵏ (Sched.mint sched) ≡ ord
                   → freshId regᵏ (Sched.mint sched) ≡ rid
-                  → subscribeE⇓ (Θ , input i , ρ) κ id now sched st
-                      ( map valueᵖ sync
-                      , record sched
-                          { mint = setAt regᵏ (suc rid)
-                                     (setAt sourceᵏ (suc src)
-                                       (setAt ordinalᵏ (suc ord) (Sched.mint sched)))
-                          ; live = record { source = src ; ordinal = ord
-                                          ; elemTy = lookup Γ i
-                                          ; pending = resolve now (d ∷ ds) }
-                                   ∷ Sched.live sched }
-                      , register rid (atDyn src lo) κ st )
+                  → emits⇓ κ now sync
+                      (record sched
+                         { mint = setAt regᵏ (suc rid)
+                                    (setAt sourceᵏ (suc src)
+                                      (setAt ordinalᵏ (suc ord) (Sched.mint sched)))
+                         ; live = record { source = src ; ordinal = ord
+                                         ; elemTy = lookup Γ i
+                                         ; pending = resolve now (d ∷ ds) }
+                                  ∷ Sched.live sched })
+                      (register rid (atDyn src lo) κ st)
+                      r
+                  → subscribeE⇓ (Θ , input i , ρ) κ now sched st r
 
   subs-of : ∀ {lo u Θ} {ts} {ρ : Env Γ Θ} {κ : Path Γ lo u t}
-              {id now sched st burst sched₁}
-          → oneShotBurst (map (λ tm → evalWith tm ρ) ts) id sched ≡ (burst , sched₁)
-          → subscribeE⇓ (Θ , ofᵉ ts , ρ) κ id now sched st (burst , sched₁ , st)
+              {now sched st out sched₁ st₁ out′ sched₂ st₂}
+          → emits⇓ κ now (map (λ tm → evalWith tm ρ) ts) sched st
+              (out , sched₁ , st₁)
+          → close⇓ κ now sched₁ st₁ (out′ , sched₂ , st₂)
+          → subscribeE⇓ (Θ , ofᵉ ts , ρ) κ now sched st
+              (out ++ out′ , sched₂ , st₂)
 
   subs-empty : ∀ {lo u Θ} {ρ : Env Γ Θ} {κ : Path Γ lo u t}
-                 {id now sched st burst sched₁}
-             → oneShotBurst [] id sched ≡ (burst , sched₁)
-             → subscribeE⇓ (Θ , emptyᵉ , ρ) κ id now sched st (burst , sched₁ , st)
+                 {now sched st r}
+             → close⇓ κ now sched st r
+             → subscribeE⇓ (Θ , emptyᵉ , ρ) κ now sched st r
 
-
+  -- `take(0)` NEVER SUBSCRIBES ITS SOURCE, which was measured rather
+  -- than assumed: the operator completes on subscription and the
+  -- source is not touched at all.
   subs-take-zero : ∀ {lo u Θ} {ρ : Env Γ Θ} {count} {b : Exp Γ [] [] Θ u}
-                     {κ : Path Γ lo u t}
-                     {id now sched st burst sched₁}
+                     {κ : Path Γ lo u t} {now sched st r}
                  → evalWith count ρ ≡ zero
-                 → oneShotBurst [] id sched ≡ (burst , sched₁)
-                 → subscribeE⇓ (Θ , takeᵉ count b , ρ) κ id now sched st
-                     (burst , sched₁ , st)
+                 → close⇓ κ now sched st r
+                 → subscribeE⇓ (Θ , takeᵉ count b , ρ) κ now sched st r
 
   subs-take-suc : ∀ {lo u Θ} {ρ : Env Γ Θ} {count k} {b : Exp Γ [] [] Θ u}
-                    {κ : Path Γ lo u t}
-                    {id now sched st nid burst sched₂ st₁ r}
+                    {κ : Path Γ lo u t} {now sched st nid r}
                 → evalWith count ρ ≡ suc k
                 → freshId nodeᵏ (Sched.mint sched) ≡ nid
-                → subscribeE⇓ (Θ , b , ρ) (take-f nid ↠ κ) id now
+                → subscribeE⇓ (Θ , b , ρ) (take-f nid ↠ κ) now
                     (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
                     (installNode nid (take-st (suc k)) st)
-                    (burst , sched₂ , st₁)
-                → pushBurst⇓ id now (take-f nid) κ burst sched₂ st₁ r
-                → subscribeE⇓ (Θ , takeᵉ count b , ρ) κ id now sched st r
+                    r
+                → subscribeE⇓ (Θ , takeᵉ count b , ρ) κ now sched st r
 
-  -- THE BRACKET IS CLOSED HERE AND NOWHERE ELSE, WHICH IS WHAT MAKES
-  -- AN EMPTY BURST BEHAVE.  The bit is cleared in the CONCLUSION,
-  -- after the push, so it is cleared whether or not the push
-  -- dispatched anything -- a body that emitted nothing on subscribe
-  -- leaves this node in the async state exactly as one that emitted
-  -- three does.  Clearing it inside the dispatch instead would leave a
-  -- silent body's node armed, and its first later value would leave as
-  -- a group of one pretending to be a subscribe burst.
+  -- THE BRACKET IS OPENED BY THE INSTALL AND CLOSED BY THE FLUSH, AND
+  -- THE FLUSH SITS AFTER THE SUBSCRIBE CALL RETURNS — which is where
+  -- the TypeScript's merged second input is subscribed.  A body that
+  -- completed inside the call has already been flushed by its own
+  -- completion, so what this finds is an empty buffer and no value
+  -- leaves twice.
   subs-batchSync : ∀ {lo u Θ} {ρ : Env Γ Θ} {b : Exp Γ [] [] Θ u}
                      {κ : Path Γ lo (u ×ᵗ listᵗ u) t}
-                     {id now sched st nid burst sched₂ st₁ out sched₃ st₂}
+                     {now sched st nid out sched₁ st₁ g st₂}
+                     {out′ sched₂ st₃}
                  → freshId nodeᵏ (Sched.mint sched) ≡ nid
-                 → subscribeE⇓ (Θ , b , ρ) (batchSync-f nid ↠ κ) id now
+                 → subscribeE⇓ (Θ , b , ρ) (batchSync-f nid ↠ κ) now
                      (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
-                     (installNode nid (batchSync-st true) st)
-                     (burst , sched₂ , st₁)
-                 → pushBurst⇓ id now (batchSync-f nid) κ burst sched₂ st₁
-                     (out , sched₃ , st₂)
-                 → subscribeE⇓ (Θ , batchSyncᵉ b , ρ) κ id now sched st
-                     ( out , sched₃
-                     , record st₂ { nodes = setNode nid (batchSync-st false)
-                                                    (EvalSt.nodes st₂) } )
+                     (installNode nid (batchSync-st {t = u} true []) st)
+                     (out , sched₁ , st₁)
+                 → batchSyncFlush {s = u} nid st₁ ≡ (just g , st₂)
+                 → emit⇓ κ now g sched₁ st₂ (out′ , sched₂ , st₃)
+                 → subscribeE⇓ (Θ , batchSyncᵉ b , ρ) κ now sched st
+                     (out ++ out′ , sched₂ , st₃)
 
+  subs-batchSync-empty : ∀ {lo u Θ} {ρ : Env Γ Θ} {b : Exp Γ [] [] Θ u}
+                           {κ : Path Γ lo (u ×ᵗ listᵗ u) t}
+                           {now sched st nid out sched₁ st₁ st₂}
+                       → freshId nodeᵏ (Sched.mint sched) ≡ nid
+                       → subscribeE⇓ (Θ , b , ρ) (batchSync-f nid ↠ κ) now
+                           (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
+                           (installNode nid (batchSync-st {t = u} true []) st)
+                           (out , sched₁ , st₁)
+                       → batchSyncFlush {s = u} nid st₁ ≡ (nothing , st₂)
+                       → subscribeE⇓ (Θ , batchSyncᵉ b , ρ) κ now sched st
+                           (out , sched₁ , st₂)
 
   -- A MAP INSTALLS NOTHING, WHICH IS WHY THIS ARM IS SHORTER THAN
   -- EVERY OTHER SUBSCRIBE ARM HERE.  There is no node to mint, so no
   -- freshness premise and no advanced mint in the recursive call: the
-  -- frame is pushed onto the path and the burst is pushed through it.
+  -- frame is pushed onto the path and the subscription runs under it.
   subs-map : ∀ {lo s u Θ} {ρ : Env Γ Θ} {f : Fn Γ [] [] Θ s u}
-               {b : Exp Γ [] [] Θ s}
-               {κ : Path Γ lo u t}
-               {id now sched st burst sched₂ st₁ r}
-           → subscribeE⇓ (Θ , b , ρ) (map-f (Θ , f , ρ) ↠ κ) id now sched st
-               (burst , sched₂ , st₁)
-           → pushBurst⇓ id now (map-f (Θ , f , ρ)) κ burst sched₂ st₁ r
-           → subscribeE⇓ (Θ , mapᵉ f b , ρ) κ id now sched st r
+               {b : Exp Γ [] [] Θ s} {κ : Path Γ lo u t}
+               {now sched st r}
+           → subscribeE⇓ (Θ , b , ρ) (map-f (Θ , f , ρ) ↠ κ) now sched st r
+           → subscribeE⇓ (Θ , mapᵉ f b , ρ) κ now sched st r
 
   subs-scan : ∀ {lo s u Θ} {ρ : Env Γ Θ} {f} {i : Tm Γ [] [] Θ u}
-                {b : Exp Γ [] [] Θ s}
-                {κ : Path Γ lo u t}
-                {id now sched st nid burst sched₂ st₁ r}
+                {b : Exp Γ [] [] Θ s} {κ : Path Γ lo u t}
+                {now sched st nid r}
             → freshId nodeᵏ (Sched.mint sched) ≡ nid
-            → subscribeE⇓ (Θ , b , ρ) (scan-f (Θ , f , ρ) nid ↠ κ) id now
+            → subscribeE⇓ (Θ , b , ρ) (scan-f (Θ , f , ρ) nid ↠ κ) now
                 (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
                 (installNode nid (cell-st (evalWith i ρ)) st)
-                (burst , sched₂ , st₁)
-            → pushBurst⇓ id now (scan-f (Θ , f , ρ) nid) κ burst sched₂ st₁ r
-            → subscribeE⇓ (Θ , scanᵉ f i b , ρ) κ id now sched st r
+                r
+            → subscribeE⇓ (Θ , scanᵉ f i b , ρ) κ now sched st r
 
   subs-merge-all : ∀ {lo u Θ} {ρ : Env Γ Θ} {lim} {b : Exp Γ [] [] Θ (obs u)}
-                     {κ : Path Γ lo u t}
-                     {id now sched st r}
+                     {κ : Path Γ lo u t} {now sched st r}
                  → subscribeAll⇓ mergeAllᵒ (mergeAll-st {t = u} lim 0 [] false)
-                     (Θ , b , ρ) κ id now sched st r
-                 → subscribeE⇓ (Θ , mergeAllᵉ lim b , ρ) κ id now sched st r
+                     (Θ , b , ρ) κ now sched st r
+                 → subscribeE⇓ (Θ , mergeAllᵉ lim b , ρ) κ now sched st r
 
   subs-switch-all : ∀ {lo u Θ} {ρ : Env Γ Θ} {b : Exp Γ [] [] Θ (obs u)}
-                      {κ : Path Γ lo u t}
-                      {id now sched st r}
+                      {κ : Path Γ lo u t} {now sched st r}
                   → subscribeAll⇓ switchᵒ (switch-st nothing false)
-                      (Θ , b , ρ) κ id now sched st r
-                  → subscribeE⇓ (Θ , switchAllᵉ b , ρ) κ id now sched st r
+                      (Θ , b , ρ) κ now sched st r
+                  → subscribeE⇓ (Θ , switchAllᵉ b , ρ) κ now sched st r
 
   subs-exhaust-all : ∀ {lo u Θ} {ρ : Env Γ Θ} {b : Exp Γ [] [] Θ (obs u)}
-                       {κ : Path Γ lo u t}
-                       {id now sched st r}
+                       {κ : Path Γ lo u t} {now sched st r}
                    → subscribeAll⇓ exhaustᵒ (exhaust-st false false)
-                       (Θ , b , ρ) κ id now sched st r
-                   → subscribeE⇓ (Θ , exhaustAllᵉ b , ρ) κ id now sched st r
+                       (Θ , b , ρ) κ now sched st r
+                   → subscribeE⇓ (Θ , exhaustAllᵉ b , ρ) κ now sched st r
 
   -- THE SECOND DRY ARM, AND THE ONE THE RELATION CANNOT EVEN ASK ABOUT.
   -- The machine compares the unfolding's synchronous size against a
@@ -456,17 +682,17 @@ data subscribeE⇓ {n} {Γ} {t} {e} where
   -- which is where the measure belongs, since the unfolding is larger
   -- than the term it replaces and nothing here is structural in it.
   subs-μ : ∀ {lo u Θ} {ρ : Env Γ Θ} {body} {κ : Path Γ lo u t}
-             {id now sched st r}
-         → subscribeE⇓ (Θ , unfoldμ body , ρ) κ id now sched st r
-         → subscribeE⇓ (Θ , μᵉ body , ρ) κ id now sched st r
+             {now sched st r}
+         → subscribeE⇓ (Θ , unfoldμ body , ρ) κ now sched st r
+         → subscribeE⇓ (Θ , μᵉ body , ρ) κ now sched st r
 
   subs-defer : ∀ {lo u Θ} {ρ : Env Γ Θ} {body} {κ : Path Γ lo u t}
-                 {id now sched st nid src ord rid}
+                 {now sched st nid src ord rid}
              → freshId nodeᵏ (Sched.mint sched) ≡ nid
              → freshId sourceᵏ (Sched.mint sched) ≡ src
              → freshId ordinalᵏ (Sched.mint sched) ≡ ord
              → freshId regᵏ (Sched.mint sched) ≡ rid
-             → subscribeE⇓ (Θ , deferᵉ body , ρ) κ id now sched st
+             → subscribeE⇓ (Θ , deferᵉ body , ρ) κ now sched st
                  ( []
                  , record sched
                      { mint = setAt regᵏ (suc rid)
@@ -495,397 +721,189 @@ data subscribeE⇓ {n} {Γ} {t} {e} where
   -- for itself would need no rule at all -- the point is that it
   -- cannot, so the value can only arrive from here.
   subs-mint : ∀ {lo u Θ} {ρ : Env Γ Θ} {body : Exp Γ [] [] (uniqᵗ ∷ Θ) u}
-                {κ : Path Γ lo u t} {id now sched st src r}
+                {κ : Path Γ lo u t} {now sched st src r}
             → freshId sourceᵏ (Sched.mint sched) ≡ src
-            → subscribeE⇓ (uniqᵗ ∷ Θ , body , src ∷ᵉ ρ) κ id now
+            → subscribeE⇓ (uniqᵗ ∷ Θ , body , src ∷ᵉ ρ) κ now
                 (record sched
                    { mint = setAt sourceᵏ (suc src) (Sched.mint sched) })
                 st r
-            → subscribeE⇓ (Θ , mintᵉ body , ρ) κ id now sched st r
+            → subscribeE⇓ (Θ , mintᵉ body , ρ) κ now sched st r
 
--- ONE CONSTRUCTOR WHERE THE EVALUATOR HAS TWO, AND THE MISSING ONE IS
--- THE POINT.  The machine asks whether what arrived is written
--- shallower than the component it stands at, and answers the negative
--- case by minting an instance and closing it dry.  Here the hop's
--- premise IS a sub-derivation at the arriving value, so there is
--- nothing to ask and no arm to answer: a relation with no dry
--- constructor cannot relate a run to a dry stream.
-data subscribeInner⇓ {n} {Γ} {t} {e} where
-  inner : ∀ {u lo op allNid} {κ : Path Γ lo u t} {id now}
-            {o : Val Γ (obs u)} {sched st inst burst sched′ st′ vs done}
-        → freshId nodeᵏ (Sched.mint sched) ≡ inst
-        → subscribeE⇓ o (from-inner op allNid inst ↠ κ) id now
-            (record sched { mint = setAt nodeᵏ (suc inst) (Sched.mint sched) }) st
-            (burst , sched′ , st′)
-        → splitStream burst ≡ (vs , done)
-        → subscribeInner⇓ op allNid κ id now o sched st
-            (inst , vs , done , sched′ , st′)
+-- THE LANE IS TAKEN BEFORE THE SUBSCRIBE, NOT AFTER IT, AND THAT IS
+-- WHAT A PER-VALUE MACHINE FORCES.  An inner that completes inside its
+-- own subscribe call releases its lane on the way back up, so a count
+-- raised afterwards would be raised against a release that already
+-- happened — the same reasoning that puts a switch's current instance
+-- in the node before the call rather than after.  It is also what rxjs
+-- does: `mergeMap` takes the slot, then subscribes.
+data consume⇓ {n} {Γ} {t} {e} where
 
--- FOUR TYPE-MISMATCH ARMS COLLAPSE INTO THE CATCH-ALL BESIDE THEM, AND
--- THAT IS A MERGE RATHER THAN A DROP.  Each returns exactly what the
--- wildcard directly below it returns, so relating them separately would
--- need a disequality premise to tell two constructors apart that agree
--- on their result.  The catch-alls carry no premise for the same
--- reason, and it costs nothing: a premise-free constructor whose RESULT
--- INDEX is fixed admits no run it did not already admit, and the only
--- direction spent here builds a derivation at the machine's own result.
---
--- AND THAT LAST CLAUSE WAS A PREMISE RATHER THAN A PROPERTY, WHICH IS
--- WHY NO FALLBACK HERE STANDS FREE ANY MORE.  A prover that CHOOSES
--- its own run is not the machine, so for it a premise-free fallback is
--- an arm available at every input -- and every one of these has an
--- empty or passed-through value column, which discharges any statement
--- quantified over SOME derivation with a reducible column.  The cost
--- fell entirely on the other direction, and which direction a consumer
--- is in is not visible from here.  So each collapse now carries the
--- side condition that distinguishes it: a fold and a truncation name
--- the machine's own dispatch from a SINGLE constructor, and the
--- flattener's consume and finish arms carry a `usable` reading of the
--- store that is false exactly where the machine collapses.  The
--- builder pays for this in clauses -- a condition on two variables
--- does not reduce, so its catch-alls are spelt out -- and the
--- reducibility direction gets a relation with nothing to prefer.
-data thruConsume⇓ {n} {Γ} {t} {e} where
+  consume-merge-sub : ∀ {u lo nid} {κ : Path Γ lo u t} {now}
+                        {o : Val Γ (obs u)} {sched st} {lim act q od}
+                        {inst r}
+                    → lookupNode nid (EvalSt.nodes st)
+                        ≡ just (mergeAll-st {t = u} lim act q od)
+                    → hasRoom lim act ≡ true
+                    → freshId nodeᵏ (Sched.mint sched) ≡ inst
+                    → subscribeE⇓ o (from-inner mergeAllᵒ nid inst ↠ κ) now
+                        (record sched { mint = setAt nodeᵏ (suc inst) (Sched.mint sched) })
+                        (record st { nodes = setNode nid
+                            (mergeAll-st lim (suc act) q od) (EvalSt.nodes st) })
+                        r
+                    → consume⇓ mergeAllᵒ nid κ now o sched st r
 
-  consume-all-sub : ∀ {u lo nid} {κ : Path Γ lo u t} {id now}
-                      {o : Val Γ (obs u)} {sched₀ st₀} {lim act q od}
-                      {inst vs done sched₁ st₁}
-                  → lookupNode nid (EvalSt.nodes st₀)
-                      ≡ just (mergeAll-st {t = u} lim act q od)
-                  → hasRoom lim act ≡ true
-                  → subscribeInner⇓ mergeAllᵒ nid κ id now o sched₀ st₀
-                      (inst , vs , done , sched₁ , st₁)
-                  → thruConsume⇓ mergeAllᵒ nid κ id now o sched₀ st₀
-                      ( vs , sched₁
-                      , record st₁
-                          { nodes = mergeAllBump nid done (EvalSt.nodes st₁) } )
+  -- A SATURATED MERGE QUEUES THE OBSERVABLE, WHICH IS WHAT rxjs
+  -- QUEUES.  A full lane has subscribed nothing, so there are no
+  -- values to hold and nothing to hold them for.
+  consume-merge-park : ∀ {u lo nid} {κ : Path Γ lo u t} {now}
+                         {o : Val Γ (obs u)} {sched st} {lim act q od}
+                     → lookupNode nid (EvalSt.nodes st)
+                         ≡ just (mergeAll-st {t = u} lim act q od)
+                     → hasRoom lim act ≡ false
+                     → consume⇓ mergeAllᵒ nid κ now o sched st
+                         ([] , sched , mergeAllPark nid o st)
 
-  consume-all-enqueue : ∀ {u lo nid} {κ : Path Γ lo u t} {id now}
-                          {o : Val Γ (obs u)} {sched₀ st₀} {lim act q od}
-                      → lookupNode nid (EvalSt.nodes st₀)
-                          ≡ just (mergeAll-st {t = u} lim act q od)
-                      → hasRoom lim act ≡ false
-                      → thruConsume⇓ mergeAllᵒ nid κ id now o sched₀ st₀
-                          ( [] , sched₀
-                          , record st₀
-                              { nodes = setNode nid
-                                  (mergeAll-st lim act (q ++ o ∷ []) od)
-                                  (EvalSt.nodes st₀) } )
+  consume-merge-nil : ∀ {u lo nid} {κ : Path Γ lo u t} {now}
+                        {o : Val Γ (obs u)} {sched st}
+                    → consumeUsable mergeAllᵒ u (lookupNode nid (EvalSt.nodes st))
+                        ≡ false
+                    → consume⇓ mergeAllᵒ nid κ now o sched st ([] , sched , st)
 
-  consume-all-nil : ∀ {u lo nid} {κ : Path Γ lo u t} {id now}
-                    {o : Val Γ (obs u)} {sched₀ st₀}
-                  → consumeUsable mergeAllᵒ u (lookupNode nid (EvalSt.nodes st₀)) ≡ false
-                  → thruConsume⇓ mergeAllᵒ nid κ id now o sched₀ st₀
-                      ([] , sched₀ , st₀)
+  consume-switch-sub : ∀ {u lo nid} {κ : Path Γ lo u t} {now}
+                         {o : Val Γ (obs u)} {sched st} {cur od}
+                         {sched₁ st₁ inst r}
+                     → lookupNode nid (EvalSt.nodes st) ≡ just (switch-st cur od)
+                     → switchKill cur sched st ≡ (sched₁ , st₁)
+                     → freshId nodeᵏ (Sched.mint sched₁) ≡ inst
+                     → subscribeE⇓ o (from-inner switchᵒ nid inst ↠ κ) now
+                         (record sched₁ { mint = setAt nodeᵏ (suc inst) (Sched.mint sched₁) })
+                         (record st₁ { nodes = setNode nid
+                             (switch-st (just inst) od) (EvalSt.nodes st₁) })
+                         r
+                     → consume⇓ switchᵒ nid κ now o sched st r
 
-  consume-switch-sub : ∀ {u lo nid} {κ : Path Γ lo u t} {id now}
-                         {o : Val Γ (obs u)} {sched₀ st₀} {cur od}
-                         {sched₁ st₁} {inst vs done sched₂ st₂}
-                     → lookupNode nid (EvalSt.nodes st₀) ≡ just (switch-st cur od)
-                     → switchKill cur sched₀ st₀ ≡ (sched₁ , st₁)
-                     → subscribeInner⇓ switchᵒ nid κ id now o sched₁ st₁
-                         (inst , vs , done , sched₂ , st₂)
-                     → thruConsume⇓ switchᵒ nid κ id now o sched₀ st₀
-                         ( vs , sched₂
-                         , record st₂
-                             { nodes = setNode nid
-                                 (switch-st (if done then nothing else just inst) od)
-                                 (EvalSt.nodes st₂) } )
+  consume-switch-nil : ∀ {u lo nid} {κ : Path Γ lo u t} {now}
+                         {o : Val Γ (obs u)} {sched st}
+                     → consumeUsable switchᵒ u (lookupNode nid (EvalSt.nodes st))
+                         ≡ false
+                     → consume⇓ switchᵒ nid κ now o sched st ([] , sched , st)
 
-  consume-switch-nil : ∀ {u lo nid} {κ : Path Γ lo u t} {id now}
-                       {o : Val Γ (obs u)} {sched₀ st₀}
-                     → consumeUsable switchᵒ u (lookupNode nid (EvalSt.nodes st₀)) ≡ false
-                     → thruConsume⇓ switchᵒ nid κ id now o sched₀ st₀
-                         ([] , sched₀ , st₀)
-
-  consume-exhaust-sub : ∀ {u lo nid} {κ : Path Γ lo u t} {id now}
-                          {o : Val Γ (obs u)} {sched₀ st₀} {od}
-                          {inst vs done sched₁ st₁}
-                      → lookupNode nid (EvalSt.nodes st₀)
+  consume-exhaust-sub : ∀ {u lo nid} {κ : Path Γ lo u t} {now}
+                          {o : Val Γ (obs u)} {sched st} {od} {inst r}
+                      → lookupNode nid (EvalSt.nodes st)
                           ≡ just (exhaust-st false od)
-                      → subscribeInner⇓ exhaustᵒ nid κ id now o sched₀ st₀
-                          (inst , vs , done , sched₁ , st₁)
-                      → thruConsume⇓ exhaustᵒ nid κ id now o sched₀ st₀
-                          ( vs , sched₁
-                          , record st₁
-                              { nodes = setNode nid (exhaust-st (not done) od)
-                                  (EvalSt.nodes st₁) } )
+                      → freshId nodeᵏ (Sched.mint sched) ≡ inst
+                      → subscribeE⇓ o (from-inner exhaustᵒ nid inst ↠ κ) now
+                          (record sched { mint = setAt nodeᵏ (suc inst) (Sched.mint sched) })
+                          (record st { nodes = setNode nid
+                              (exhaust-st true od) (EvalSt.nodes st) })
+                          r
+                      → consume⇓ exhaustᵒ nid κ now o sched st r
 
-  consume-exhaust-nil : ∀ {u lo nid} {κ : Path Γ lo u t} {id now}
-                        {o : Val Γ (obs u)} {sched₀ st₀}
-                      → consumeUsable exhaustᵒ u (lookupNode nid (EvalSt.nodes st₀)) ≡ false
-                      → thruConsume⇓ exhaustᵒ nid κ id now o sched₀ st₀
-                          ([] , sched₀ , st₀)
+  -- A BUSY EXHAUST REFUSES THE ARRIVAL OUTRIGHT, and the refusal is
+  -- the same reading as a mistyped or absent node: forward nothing.
+  consume-exhaust-nil : ∀ {u lo nid} {κ : Path Γ lo u t} {now}
+                          {o : Val Γ (obs u)} {sched st}
+                      → consumeUsable exhaustᵒ u (lookupNode nid (EvalSt.nodes st))
+                          ≡ false
+                      → consume⇓ exhaustᵒ nid κ now o sched st ([] , sched , st)
 
-data thruWalk⇓ {n} {Γ} {t} {e} where
+-- THE LANE IS CLAIMED BEFORE THE SUBSCRIBE AND THE ROOM IS ASKED
+-- AGAIN AT EVERY STEP.  Both halves are the same reading: an inner
+-- can complete synchronously inside the subscribe, so a verdict about
+-- free lanes taken once at the top is a verdict about a store that no
+-- longer stands by the second item — and a lane counted as filled
+-- only afterwards would be decremented by that death before it was
+-- ever raised.
+data drainQueue⇓ {n} {Γ} {t} {e} where
 
-  walk-nil : ∀ {u lo op nid} {κ : Path Γ lo u t} {id now} {sched₀ st₀}
-           → thruWalk⇓ op nid κ id now [] sched₀ st₀ ([] , sched₀ , st₀)
+  dq-nil : ∀ {u lo op nid} {κ : Path Γ lo u t} {now sched st}
+         → drainQueue⇓ op nid κ now [] sched st ([] , sched , st)
 
-  walk-cons : ∀ {u lo op nid} {κ : Path Γ lo u t} {id now}
-                {o : Val Γ (obs u)} {os sched₀ st₀}
-                {vs sched₁ st₁} {vs′ sched₂ st₂}
-            → thruConsume⇓ op nid κ id now o sched₀ st₀ (vs , sched₁ , st₁)
-            → thruWalk⇓ op nid κ id now os sched₁ st₁ (vs′ , sched₂ , st₂)
-            → thruWalk⇓ op nid κ id now (o ∷ os) sched₀ st₀
-                (vs ++ vs′ , sched₂ , st₂)
+  -- THE LANES REFILLED WHILE THE DRAIN RAN, so what it did not reach
+  -- goes back in front of whatever parked behind it.
+  dq-full : ∀ {u lo op nid} {κ : Path Γ lo u t} {now sched st}
+              {o : Val Γ (obs u)} {q}
+          → mergeRoom nid st ≡ false
+          → drainQueue⇓ op nid κ now (o ∷ q) sched st
+              ([] , sched , mergeAllRestore nid (o ∷ q) st)
 
-data mergeAllDrain⇓ {n} {Γ} {t} {e} where
-
-  drain-nil : ∀ {s lo allNid} {κ : Path Γ lo s t} {id now} {lim act od sched₀ st₀}
-            → mergeAllDrain⇓ allNid κ id now lim act od [] sched₀ st₀
-                ([] , act , [] , sched₀ , st₀)
-
-  drain-no-room : ∀ {s lo allNid} {κ : Path Γ lo s t} {id now}
-                    {lim act od} {o : Val Γ (obs s)} {q sched₀ st₀}
-                → hasRoom lim act ≡ false
-                → mergeAllDrain⇓ allNid κ id now lim act od (o ∷ q) sched₀ st₀
-                    ([] , act , o ∷ q , sched₀ , st₀)
-
-  -- THE SHORTENED QUEUE IS WRITTEN BEFORE THE SUBSCRIBE, NOT AFTER THE
-  -- WHOLE DRAIN.  A batch write-back leaves the node holding the items
-  -- already spent, so anything re-entering this node mid-drain reads a
-  -- queue that is no longer true — and rxjs takes the item OUT of the
-  -- buffer before it subscribes it, so the batch form was the one that
-  -- diverged.  It is also what lets the store be read as a census: a
-  -- reading over a stale queue cannot fall as the drain proceeds, so no
-  -- measure denominated in it can order this edge.
-  drain-room : ∀ {s lo allNid} {κ : Path Γ lo s t} {id now}
-                 {lim act od} {o : Val Γ (obs s)} {q sched₀ st₀}
-                 {inst vs done sched₁ st₁} {vs′ act′ q′ sched₂ st₂}
-             → hasRoom lim act ≡ true
-             → subscribeInner⇓ mergeAllᵒ allNid κ id now o sched₀
-                 (record st₀
-                    { nodes = setNode allNid (mergeAll-st {t = s} lim act q od)
-                        (EvalSt.nodes st₀) })
-                 (inst , vs , done , sched₁ , st₁)
-             → mergeAllDrain⇓ allNid κ id now lim
-                 (if done then act else suc act) od q sched₁ st₁
-                 (vs′ , act′ , q′ , sched₂ , st₂)
-             → mergeAllDrain⇓ allNid κ id now lim act od (o ∷ q) sched₀ st₀
-                 (vs ++ vs′ , act′ , q′ , sched₂ , st₂)
-
-data innerFinish⇓ {n} {Γ} {t} {e} where
-
-  finish-all-drain : ∀ {s lo allNid inst} {κ : Path Γ lo s t} {id now}
-                       {vals : List (Val Γ s)} {sched st} {lim act q od}
-                       {vs act′ q′ sched′ st′}
-                   → mergeAllDrain⇓ allNid κ id now lim (pred act) od q sched st
-                       (vs , act′ , q′ , sched′ , st′)
-                   → innerFinish⇓ mergeAllᵒ allNid inst κ id now vals sched st
-                       (just (mergeAll-st {t = s} lim act q od))
-                       ( vals ++ vs , od ∧ (act′ ≡ᵇ 0) ∧ null q′ , sched′
-                       , record st′
-                           { nodes = setNode allNid (mergeAll-st lim act′ q′ od)
-                               (EvalSt.nodes st′) } )
-
-  finish-switch-clear : ∀ {s lo allNid inst} {κ : Path Γ lo s t} {id now}
-                          {vals : List (Val Γ s)} {sched st} {c od}
-                      → (c ≡ᵇ inst) ≡ true
-                      → innerFinish⇓ switchᵒ allNid inst κ id now vals sched st
-                          (just (switch-st (just c) od))
-                          ( vals , od , sched
-                          , record st
-                              { nodes = setNode allNid (switch-st nothing od)
-                                  (EvalSt.nodes st) } )
-
-  finish-exhaust-clear : ∀ {s lo allNid inst} {κ : Path Γ lo s t} {id now}
-                           {vals : List (Val Γ s)} {sched st} {act od}
-                       → innerFinish⇓ exhaustᵒ allNid inst κ id now vals sched st
-                           (just (exhaust-st act od))
-                           ( vals , od , sched
-                           , record st
-                               { nodes = setNode allNid (exhaust-st false od)
-                                   (EvalSt.nodes st) } )
-
-  finish-nil : ∀ {s lo op allNid inst} {κ : Path Γ lo s t} {id now}
-                 {vals : List (Val Γ s)} {sched st ns}
-             → finishUsable op s inst ns ≡ false
-             → innerFinish⇓ op allNid inst κ id now vals sched st ns
-                 (vals , false , sched , st)
-
-data innerReact⇓ {n} {Γ} {t} {e} where
-
-  react-false : ∀ {s lo op allNid inst} {κ : Path Γ lo s t} {id now}
-                  {vals : List (Val Γ s)} {sched st}
-              → innerReact⇓ op allNid inst κ id now vals sched st false
-                  (vals , false , sched , st)
-
-  react-alive : ∀ {s lo op allNid inst} {κ : Path Γ lo s t} {id now}
-                  {vals : List (Val Γ s)} {sched st}
-              → any (aliveThroughᶠ inst st) (EvalSt.registry st) ≡ true
-              → innerReact⇓ op allNid inst κ id now vals sched st true
-                  (vals , false , sched , st)
-
-  react-dead : ∀ {s lo op allNid inst} {κ : Path Γ lo s t} {id now}
-                 {vals : List (Val Γ s)} {sched st r}
-             → any (aliveThroughᶠ inst st) (EvalSt.registry st) ≡ false
-             → innerFinish⇓ op allNid inst κ id now vals sched st
-                 (lookupNode allNid (EvalSt.nodes st)) r
-             → innerReact⇓ op allNid inst κ id now vals sched st true r
-
--- A HELPER OUTSIDE THE CYCLE IS NAMED IN THE RESULT INDEX RATHER THAN
--- UNFOLDED INTO ARMS, AND THAT IS A CHOICE ABOUT WHAT THIS RELATION IS
--- FOR.  The take dispatch and the outer wrap each branch on a node
--- lookup, but neither re-enters the subscribe cycle, so relating their
--- arms separately would add cases the induction never splits on.  What
--- the relation must expose is exactly the recursive structure; a total
--- function of the state is carried as itself.  The one place this would
--- cost something is the dry proof, and it does not arise here: this
--- family hands back a VALUE column and a finished flag, and the dry
--- marker was an envelope's, so no arm of it can carry one however the
--- helper computes.
---
--- RECOVERY: git show 234074e:agda/src/Verify-Rank-Sufficient/ restores
---   the CARRIED tower, whose whole subject was this family: a bound a
---   frame's emissions were held to, stated per template and pushed
---   through a burst.  It is the apparatus to read if a strengthened
---   return type is ever wanted here — what killed it is that the
---   figure was seeded off SYNTAX, which is a property of that tower's
---   currency and not of the per-frame statement it proved.
-data stepFrame⇓ {n} {Γ} {t} {e} where
-
-
-
-  -- the stateless step's arm reads no node, so it names the walk
-  -- directly rather than a dispatch over a store lookup.
-  step-map : ∀ {s u lo} {fn : FnClo Γ s u} {κ : Path Γ lo u t}
-               {id now} {vals : List (Val Γ s)} {fin sched st}
-           → stepFrame⇓ id now (map-f fn) κ vals fin sched st
-               (mapVals fn vals , fin , sched , st)
-
-  step-scan : ∀ {s u lo} {fn : FnClo Γ (u ×ᵗ s) u}
-                {nid} {κ : Path Γ lo u t}
-                {id now} {vals : List (Val Γ s)} {fin sched st}
-            → stepFrame⇓ id now (scan-f fn nid) κ vals fin sched st
-                (scanDispatch fn nid vals fin sched st
-                  (lookupNode nid (EvalSt.nodes st)))
-
-  step-take : ∀ {s lo nid} {κ : Path Γ lo s t}
-                {id now} {vals : List (Val Γ s)} {fin sched st}
-            → stepFrame⇓ id now (take-f nid) κ vals fin sched st
-                (takeDispatch nid vals fin sched st
-                  (lookupNode nid (EvalSt.nodes st)))
-
-  step-batchSync : ∀ {s lo nid} {κ : Path Γ lo (s ×ᵗ listᵗ s) t}
-                     {id now} {vals : List (Val Γ s)} {fin sched st}
-                 → stepFrame⇓ id now (batchSync-f nid) κ vals fin sched st
-                     (batchSyncDispatch nid vals fin sched st
-                       (lookupNode nid (EvalSt.nodes st)))
-
-  step-from-inner : ∀ {s lo op allNid inst} {κ : Path Γ lo s t}
-                      {id now} {vals : List (Val Γ s)} {fin sched st r}
-                  → innerReact⇓ op allNid inst κ id now vals sched st fin r
-                  → stepFrame⇓ id now (from-inner op allNid inst) κ
-                      vals fin sched st r
-
-  step-thru-outer : ∀ {u lo op nid} {κ : Path Γ lo u t}
-                      {id now} {vals : List (Val Γ (obs u))} {fin sched st}
-                      {vs sched′ st′}
-                  → thruWalk⇓ op nid κ id now vals sched st
-                      (vs , sched′ , st′)
-                  → stepFrame⇓ id now (thru-outer op nid) κ vals fin sched st
-                      (thruWrap op nid fin (vs , sched′ , st′))
-
-data pushBurst⇓ {n} {Γ} {t} {e} where
-
-  -- ONE RULE, WHICH IS WHAT DROPPING THE ENVELOPE BOUGHT.  This used
-  -- to be a WALK, because a burst was a list of envelopes and each one
-  -- had to be unwrapped, stepped, and wrapped again around three
-  -- columns of protocol traffic that flowed past the frame untouched.
-  -- A plain stream has no brackets to preserve, so what is left is the
-  -- one thing that was ever real: the values go to the frame, the end
-  -- tells it the source finished, and what comes back is values and
-  -- possibly an end.
-  push-all : ∀ {s u lo} {f : Frame Γ s u} {κ : Path Γ lo u t} {id now}
-               {burst sched st} {vs c} {vals′ fin′ sched₁ st₁}
-           → splitStream burst ≡ (vs , c)
-           → stepFrame⇓ id now f κ vs c sched st
-               (vals′ , fin′ , sched₁ , st₁)
-           → pushBurst⇓ id now f κ burst sched st
-               ( map valueᵖ vals′ ++ (if fin′ then completeᵖ ∷ [] else [])
-               , sched₁ , st₁ )
+  dq-run : ∀ {u lo op nid} {κ : Path Γ lo u t} {now sched st}
+             {o : Val Γ (obs u)} {q inst out sched₁ st₂ out′ sched₂ st₃}
+         → mergeRoom nid st ≡ true
+         → freshId nodeᵏ (Sched.mint sched) ≡ inst
+         → subscribeE⇓ o (from-inner op nid inst ↠ κ) now
+             (record sched { mint = setAt nodeᵏ (suc inst) (Sched.mint sched) })
+             (mergeAllClaim nid st) (out , sched₁ , st₂)
+         → drainQueue⇓ op nid κ now q sched₁ st₂ (out′ , sched₂ , st₃)
+         → drainQueue⇓ op nid κ now (o ∷ q) sched st
+             (out ++ out′ , sched₂ , st₃)
 
 data subscribeAll⇓ {n} {Γ} {t} {e} where
 
   sub-all : ∀ {u lo op} {ns : NodeState Γ} {b : Val Γ (obs (obs u))}
-              {κ : Path Γ lo u t} {id now sched st nid burst sched₂ st₁ r}
+              {κ : Path Γ lo u t} {now sched st nid r}
           → freshId nodeᵏ (Sched.mint sched) ≡ nid
-          → subscribeE⇓ b (thru-outer op nid ↠ κ) id now
+          → subscribeE⇓ b (thru-outer op nid ↠ κ) now
               (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
               (installNode nid ns st)
-              (burst , sched₂ , st₁)
-          → pushBurst⇓ id now (thru-outer op nid) κ burst sched₂ st₁ r
-          → subscribeAll⇓ op ns b κ id now sched st r
+              r
+          → subscribeAll⇓ op ns b κ now sched st r
 
+-- THE CONNECT IS ONE ARM, AND THE SECOND ONE WENT WITH THE LIST.  A
+-- def that completes synchronously used to be told apart by READING
+-- its returned burst for an end; the connect's output is the root's
+-- stream now, where an end is the ROOT's and not the share's.  It
+-- needs no telling: a def completing inside its own subscribe routes
+-- through the sink's close, which latches the share and drops its
+-- registrations exactly as the second arm did.
+--
 -- THE THIRD GUARD THE RELATION DOES NOT INDEX, AND THE SAME RULING AS
 -- THE UNFOLD'S.  The connect compares the unconnected-share count
 -- against a component of the caller's own measure, which is threaded
 -- alongside every argument and is a function of none of them — so it is
--- not among these indices and no premise could pin it.  Both
--- constructors are therefore unconditional in it, and that concedes
+-- not among these indices and no premise could pin it.  The
+-- constructor is therefore unconditional in it, and that concedes
 -- nothing: at a run that answered no, the result is a dry burst, which
 -- no constructor of this family produces, so the comparison stays owed
 -- by the inhabitation proof rather than being assumed away here.
 data sharedConnect⇓ {n} {Γ} {t} {e} where
 
-  connect-live : ∀ {lo} {i : Fin n} {d} {κ : Path Γ lo (lookup Γ i) t}
-                   {below : toℕ i < lo} {id now sched st burst sched₁ st₂ rid}
-               → freshId regᵏ (Sched.mint sched) ≡ rid
-               → subscribeE⇓ ([] , d , []ᵉ) (share-sink i ≤-refl) id now
-                   (record sched { mint = setAt regᵏ (suc rid) (Sched.mint sched) })
-                   (register rid (atSlot i) (lowerFloor below κ)
-                     (record st
-                       { connectedShares =
-                           toℕ i ∷ EvalSt.connectedShares st }))
-                   (burst , sched₁ , st₂)
-               → streamCompleted burst ≡ false
-               → sharedConnect⇓ i d κ below id now sched st
-                   ( burst , sched₁ , st₂ )
-
-  connect-died : ∀ {lo} {i : Fin n} {d} {κ : Path Γ lo (lookup Γ i) t}
-                   {below : toℕ i < lo} {id now sched st burst sched₁ st₂ rid}
-               → freshId regᵏ (Sched.mint sched) ≡ rid
-               → subscribeE⇓ ([] , d , []ᵉ) (share-sink i ≤-refl) id now
-                   (record sched { mint = setAt regᵏ (suc rid) (Sched.mint sched) })
-                   (register rid (atSlot i) (lowerFloor below κ)
-                     (record st
-                       { connectedShares =
-                           toℕ i ∷ EvalSt.connectedShares st }))
-                   (burst , sched₁ , st₂)
-               → streamCompleted burst ≡ true
-               → sharedConnect⇓ i d κ below id now sched st
-                   ( burst
-                   , sched₁
-                   , record st₂
-                       { registry = dropSource (toℕ i) (EvalSt.registry st₂)
-                       ; completedSources =
-                           toℕ i ∷ EvalSt.completedSources st₂ } )
+  connect : ∀ {lo} {i : Fin n} {d} {κ : Path Γ lo (lookup Γ i) t}
+              {below : toℕ i < lo} {now sched st rid r}
+          → freshId regᵏ (Sched.mint sched) ≡ rid
+          → subscribeE⇓ ([] , d , []ᵉ) (share-sink i ≤-refl) now
+              (record sched { mint = setAt regᵏ (suc rid) (Sched.mint sched) })
+              (register rid (atSlot i) (lowerFloor below κ)
+                (record st
+                  { connectedShares = toℕ i ∷ EvalSt.connectedShares st }))
+              r
+          → sharedConnect⇓ i d κ below now sched st r
 
 data subscribeSharedSlot⇓ {n} {Γ} {t} {e} where
 
   slot-spent : ∀ {lo} {i : Fin n} {d} {κ : Path Γ lo (lookup Γ i) t}
-                 {below : toℕ i < lo} {id now sched st}
+                 {below : toℕ i < lo} {now sched st r}
              → memberSource (toℕ i) (EvalSt.completedSources st) ≡ true
-             → subscribeSharedSlot⇓ i d κ below id now sched st
-                 (spentBurst (toℕ i) id , sched , st)
+             → close⇓ κ now sched st r
+             → subscribeSharedSlot⇓ i d κ below now sched st r
 
   slot-join : ∀ {lo} {i : Fin n} {d} {κ : Path Γ lo (lookup Γ i) t}
-                {below : toℕ i < lo} {id now sched st rid}
+                {below : toℕ i < lo} {now sched st rid}
             → memberSource (toℕ i) (EvalSt.completedSources st) ≡ false
             → memberSource (toℕ i) (EvalSt.connectedShares st) ≡ true
             → freshId regᵏ (Sched.mint sched) ≡ rid
-            → subscribeSharedSlot⇓ i d κ below id now sched st
+            → subscribeSharedSlot⇓ i d κ below now sched st
                 ( []
                 , record sched { mint = setAt regᵏ (suc rid) (Sched.mint sched) }
                 , register rid (atSlot i) (lowerFloor below κ) st )
 
   slot-connect : ∀ {lo} {i : Fin n} {d} {κ : Path Γ lo (lookup Γ i) t}
-                   {below : toℕ i < lo} {id now sched st r}
+                   {below : toℕ i < lo} {now sched st r}
                → memberSource (toℕ i) (EvalSt.completedSources st) ≡ false
                → memberSource (toℕ i) (EvalSt.connectedShares st) ≡ false
-               → sharedConnect⇓ i d κ below id now sched st r
-               → subscribeSharedSlot⇓ i d κ below id now sched st r
+               → sharedConnect⇓ i d κ below now sched st r
+               → subscribeSharedSlot⇓ i d κ below now sched st r
 
 -- THE ONE CLAUSE, and the whole reason the share cycle is separate: the
 -- fan-out re-enters at the floor the sink's own premise names, so the
@@ -894,121 +912,110 @@ data subscribeSharedSlot⇓ {n} {Γ} {t} {e} where
 -- witness.  `shareFinish`, `shareAdmit` and `shareLatch` compute, so
 -- they stay applied.
 data dispatchShare⇓ {n} {Γ} {t} {e} where
-  disp : ∀ {lo id now} {i : Fin n} {below : lo ≤ toℕ i}
-           {vals fin sched st} {r}
-       → shareGo⇓ id now i vals fin
-           (shareAdmit i (EvalSt.registry st)) sched (shareLatch i fin st) r
-       → dispatchShare⇓ id now i below vals fin sched st
-           (shareFinish i fin r)
+  disp : ∀ {lo now} {i : Fin n} {below : lo ≤ toℕ i}
+           {ev : PlainEvent (Val Γ (lookup Γ i))} {sched st r}
+       → shareGo⇓ now i ev
+           (shareAdmit i (EvalSt.registry st)) sched (shareLatch i (isFinᵖ ev) st) r
+       → dispatchShare⇓ now i below ev sched st (shareFinish i (isFinᵖ ev) r)
 
 -- THE CANCELLATION TEST STAYS A PREMISE RATHER THAN A SIDE CONDITION.
 -- It is decidable and it decides which of two clauses ran, so the
 -- relation carries the answer as an equation and the two arms cannot
--- both apply.  `go-live` is where the threading shows: what the tail is
--- handed is the head's own results, which is why this is a graph
--- relation and not a domain predicate.
+-- both apply.  The live arms are where the threading shows: what the
+-- tail is handed is the head's own results, which is why this is a
+-- graph relation and not a domain predicate.
 data shareGo⇓ {n} {Γ} {t} {e} where
-  go-nil : ∀ {lo id now} {i : Fin n} {vals fin sched st}
-         → shareGo⇓ {lo = lo} id now i vals fin [] sched st
-             ([] , sched , st)
+  go-nil : ∀ {lo now} {i : Fin n} {ev sched st}
+         → shareGo⇓ {lo = lo} now i ev [] sched st ([] , sched , st)
 
-  go-cut : ∀ {lo id now} {i : Fin n} {vals fin rid}
+  go-cut : ∀ {lo now} {i : Fin n} {ev rid}
              {p : Path Γ lo (lookup Γ i) t} {ps sched st r}
          → any (_≡ᵇ rid) (EvalSt.cancelled st) ≡ true
-         → shareGo⇓ id now i vals fin ps sched st r
-         → shareGo⇓ id now i vals fin ((rid , p) ∷ ps) sched st r
+         → shareGo⇓ now i ev ps sched st r
+         → shareGo⇓ now i ev ((rid , p) ∷ ps) sched st r
 
-  go-live : ∀ {lo id now} {i : Fin n} {vals fin rid}
-              {p : Path Γ lo (lookup Γ i) t} {ps sched₀ st₀}
-              {emits sched₁ st₁ rest sched₂ st₂}
-          → any (_≡ᵇ rid) (EvalSt.cancelled st₀) ≡ false
-          → foldPath⇓ id now (toℕ i) p vals fin sched₀
-              (record st₀ { delivered = rid ∷ EvalSt.delivered st₀ })
-              (emits , sched₁ , st₁)
-          → shareGo⇓ id now i vals fin ps sched₁ st₁ (rest , sched₂ , st₂)
-          → shareGo⇓ id now i vals fin ((rid , p) ∷ ps) sched₀ st₀
-              (emits ++ rest , sched₂ , st₂)
+  go-val : ∀ {lo now} {i : Fin n} {v : Val Γ (lookup Γ i)} {rid}
+             {p : Path Γ lo (lookup Γ i) t} {ps sched st}
+             {emits sched₁ st₁ rest sched₂ st₂}
+         → any (_≡ᵇ rid) (EvalSt.cancelled st) ≡ false
+         → emit⇓ p now v sched
+             (record st { delivered = rid ∷ EvalSt.delivered st })
+             (emits , sched₁ , st₁)
+         → shareGo⇓ now i (valueᵖ v) ps sched₁ st₁ (rest , sched₂ , st₂)
+         → shareGo⇓ now i (valueᵖ v) ((rid , p) ∷ ps) sched st
+             (emits ++ rest , sched₂ , st₂)
 
--- THE PATH IS WALKED SINKWARD AND WHAT REACHES THE ROOT IS WHAT THE
--- SUBSCRIBER SEES, so the root clause is the only one that emits and
--- the other two hand their own results on.  The sink clause is where
--- the floor descends: its premise is the path constructor's argument,
--- so nothing has to be carried alongside.
---
--- AND THE ACCUMULATOR IS GONE WITH THE ENVELOPE IT WAS FILLING.  This
--- spine used to thread a column of protocol events down the path so
--- that the root could mint ONE envelope holding everything the cascade
--- produced — which is the coalescing itself, stated as an induction.
--- A plain carrier has nothing to coalesce into, so each leg emits what
--- it emits and the concatenation is the stream.
-data foldPath⇓ {n} {Γ} {t} {e} where
-  fold-root : ∀ {lo id now envSrc} {vals : List (Val Γ t)} {fin sched st}
-            → foldPath⇓ {lo = lo} id now envSrc root vals fin sched st
-                ( map valueᵖ vals ++ (if fin then completeᵖ ∷ [] else [])
-                , sched , st )
+  go-fin : ∀ {lo now} {i : Fin n} {rid}
+             {p : Path Γ lo (lookup Γ i) t} {ps sched st}
+             {emits sched₁ st₁ rest sched₂ st₂}
+         → any (_≡ᵇ rid) (EvalSt.cancelled st) ≡ false
+         → close⇓ p now sched
+             (record st { delivered = rid ∷ EvalSt.delivered st })
+             (emits , sched₁ , st₁)
+         → shareGo⇓ now i completeᵖ ps sched₁ st₁ (rest , sched₂ , st₂)
+         → shareGo⇓ now i completeᵖ ((rid , p) ∷ ps) sched st
+             (emits ++ rest , sched₂ , st₂)
 
-  fold-sink : ∀ {lo id now envSrc} {i : Fin n} {below : lo ≤ toℕ i}
-                {vals fin sched st} {fanout sched₁ st₁}
-            → dispatchShare⇓ id now i below vals fin sched st
-                (fanout , sched₁ , st₁)
-            → foldPath⇓ id now envSrc (share-sink i below) vals fin sched st
-                ( fanout , sched₁ , st₁ )
-
-  fold-step : ∀ {lo s u id now envSrc} {f : Frame Γ s u}
-                {path′ : Path Γ lo u t} {vals fin sched st}
-                {vals′ fin′ sched₁ st₁ r}
-            → stepFrame⇓ id now f path′ vals fin sched st
-                (vals′ , fin′ , sched₁ , st₁)
-            → foldPath⇓ id now envSrc path′ vals′ fin′ sched₁ st₁ r
-            → foldPath⇓ id now envSrc (f ↠ path′) vals fin sched st r
-
+-- A SCRIPTED SOURCE'S LAST VALUE IS FOLLOWED BY ITS END, IN THAT
+-- ORDER AND DOWN THE SAME CHAIN.  The end used to ride alongside the
+-- value as a flag a frame read; a plain carrier has two separate
+-- things to deliver, and delivering them in order is what an rxjs
+-- observer sees.
 data chainStep⇓ {n} {Γ} {t} {e} where
-  chain-step : ∀ {id} {a : Arrival Γ} {lo} {path : Path Γ lo (arrTy a) t}
+  chain-more : ∀ {a : Arrival Γ} {lo} {path : Path Γ lo (arrTy a) t}
                  {sched st r}
-             → foldPath⇓ id (arrTick a) (arrSource a) path (arrVal a ∷ [])
-                 (Arrival.isLast a) sched st r
-             → chainStep⇓ id a (lo , path) sched st r
+             → Arrival.isLast a ≡ false
+             → emit⇓ path (arrTick a) (arrVal a) sched st r
+             → chainStep⇓ a (lo , path) sched st r
+
+  chain-last : ∀ {a : Arrival Γ} {lo} {path : Path Γ lo (arrTy a) t}
+                 {sched st out sched₁ st₁ out′ sched₂ st₂}
+             → Arrival.isLast a ≡ true
+             → emit⇓ path (arrTick a) (arrVal a) sched st (out , sched₁ , st₁)
+             → close⇓ path (arrTick a) sched₁ st₁ (out′ , sched₂ , st₂)
+             → chainStep⇓ a (lo , path) sched st
+                 (out ++ out′ , sched₂ , st₂)
 
 data cascadeGo⇓ {n} {Γ} {t} {e} where
-  casc-nil : ∀ {a id sched₀ st₀}
-           → cascadeGo⇓ a id [] sched₀ st₀ ([] , sched₀ , st₀)
-  casc-cut : ∀ {a id rid} {c : AtFloor Γ (arrTy a) t} {chains sched₀ st₀ r}
-           → any (_≡ᵇ rid) (EvalSt.cancelled st₀) ≡ true
-           → cascadeGo⇓ a id chains sched₀ st₀ r
-           → cascadeGo⇓ a id ((rid , c) ∷ chains) sched₀ st₀ r
-  casc-live : ∀ {a id rid} {c : AtFloor Γ (arrTy a) t} {chains sched₀ st₀}
+  casc-nil : ∀ {a sched st}
+           → cascadeGo⇓ a [] sched st ([] , sched , st)
+  casc-cut : ∀ {a rid} {c : AtFloor Γ (arrTy a) t} {chains sched st r}
+           → any (_≡ᵇ rid) (EvalSt.cancelled st) ≡ true
+           → cascadeGo⇓ a chains sched st r
+           → cascadeGo⇓ a ((rid , c) ∷ chains) sched st r
+  casc-live : ∀ {a rid} {c : AtFloor Γ (arrTy a) t} {chains sched st}
                 {emits sched₁ st₁ rest sched₂ st₂}
-            → any (_≡ᵇ rid) (EvalSt.cancelled st₀) ≡ false
-            → chainStep⇓ id a c sched₀
-                (record st₀ { delivered = rid ∷ EvalSt.delivered st₀ })
+            → any (_≡ᵇ rid) (EvalSt.cancelled st) ≡ false
+            → chainStep⇓ a c sched
+                (record st { delivered = rid ∷ EvalSt.delivered st })
                 (emits , sched₁ , st₁)
-            → cascadeGo⇓ a id chains sched₁ st₁ (rest , sched₂ , st₂)
-            → cascadeGo⇓ a id ((rid , c) ∷ chains) sched₀ st₀
+            → cascadeGo⇓ a chains sched₁ st₁ (rest , sched₂ , st₂)
+            → cascadeGo⇓ a ((rid , c) ∷ chains) sched st
                 (emits ++ rest , sched₂ , st₂)
 
 data cascade⇓ {n} {Γ} {t} {e} where
-  casc-run : ∀ {a id sched st} {emits sched′ st′}
-           → cascadeGo⇓ a id (chainsOf a st) sched (cascadeLatch a sched st)
+  casc-run : ∀ {a sched st} {emits sched′ st′}
+           → cascadeGo⇓ a (chainsOf a st) sched (cascadeLatch a sched st)
                (emits , sched′ , st′)
-           → cascade⇓ a id sched st (emits , cascadeFinish a sched′ st′)
+           → cascade⇓ a sched st (emits , cascadeFinish a sched′ st′)
 
 data drain⇓ {n} {Γ} {t} {e} where
-  drain-done : ∀ {nextId sched st}
-             → drain⇓ zero nextId sched st []
-  drain-empty : ∀ {k nextId sched st}
+  drain-done : ∀ {sched st}
+             → drain⇓ zero sched st []
+  drain-empty : ∀ {k sched st}
               → sched-next sched ≡ inj₁ tt
-              → drain⇓ (suc k) nextId sched st []
-  drain-step : ∀ {k nextId sched st} {a : Arrival Γ}
+              → drain⇓ (suc k) sched st []
+  drain-step : ∀ {k sched st} {a : Arrival Γ}
                  {sched′ out sched″ st′ rest}
              → sched-next sched ≡ inj₂ (a , sched′)
-             → cascade⇓ a nextId sched′ st (out , sched″ , st′)
-             → drain⇓ k (suc nextId) sched″ st′ rest
-             → drain⇓ (suc k) nextId sched st (out ++ rest)
+             → cascade⇓ a sched′ st (out , sched″ , st′)
+             → drain⇓ k sched″ st′ rest
+             → drain⇓ (suc k) sched st (out ++ rest)
 
 data evaluate⇓ {n} {Γ} {t} where
   eval-run : ∀ {fuel} {e : Closed Γ t} {ins : Slots Γ}
                {burst sched₀ st₀ rest}
-           → subscribeE⇓ {e = e} {lo = n} ([] , e , []ᵉ) root 0 0
+           → subscribeE⇓ {e = e} {lo = n} ([] , e , []ᵉ) root 0
                (sched-init e ins) (st-init e) (burst , sched₀ , st₀)
-           → drain⇓ {e = e} fuel 1 sched₀ st₀ rest
+           → drain⇓ {e = e} fuel sched₀ st₀ rest
            → evaluate⇓ fuel e ins (burst ++ rest)

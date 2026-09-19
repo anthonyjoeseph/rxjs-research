@@ -229,45 +229,34 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 
 ### Big picture tier roadmap
 
-- **THE OLD MACHINE'S CLAIMS AND THE PLAIN ONE ARE BOTH GONE, AND THAT IS
-  THE TIER CLEARING ITS OWN GROUND (Anthony: "that is dead weight and we
-  need to lose it asap").** `Rx.Depth` mirrored rxjs and carried no
-  theorems; the five evaluator laws, determinacy, run monotonicity and the
-  three timing claims carried the theorems and mirrored nothing. Neither
-  survives a rewrite that changes what the machine MEANS, so both were
-  deleted with recovery shas rather than ported, and the oracle is off
-  until the replacement computes. What is left is one evaluator to fix and
-  nothing stated over it that the fix would falsify.
+- **GET THE REWRITTEN MACHINE THROUGH THE TYPECHECKER, AND THAT IS THE
+  WHOLE LEG.** The root-typed relation, the reducibility candidate and the
+  builder were written in one pass with no check run against any of them,
+  on the ruling that an evaluator of this shape is settled whole or not at
+  all. Nothing below can be instantiated, probed or measured until it
+  checks, so this narrows nothing on its own and is still the leg that has
+  to land first. What it buys beside a green tower is the first real
+  reading of where the cost now sits, since every per-module figure in the
+  numbers file was taken against a machine that no longer exists.
 
-- **STRIP THE INSTANT BOOKKEEPING OUT OF THE EVALUATOR (Anthony: "no
-  instemit … that's the whole point of the tier").** The machine mints
-  `Id`s, carries `Ordinal`s, numbers registrations and orders a share's
-  fan-out by a FLOOR — every one of it a reading of simultaneity, and the
-  elaboration now compiles that into the value type instead. The stream is
-  already plain; what is not plain is the state behind it. Nothing in
-  `Reducible`'s candidate reads any of it, which is the claim this leg
-  tests by deleting it.
+- **THE TWO CUT EDGES GET REAL BODIES.** `drainQueue!` and
+  `handles-share` are the module's only two genuine cycles, stated rather
+  than written so the rest of the builder layers strictly: the lane drain
+  subscribes under a frame whose closing side is the drain, and the share
+  connect re-enters the term face at a slot's definition. Neither is hard
+  — the drain is structural on the carried queue, the connect descends on
+  the slot's own index — and both are a mutual block spanning the module,
+  which is the cost being deferred rather than a fact in doubt. The leg
+  decides whether that block is one or two.
 
-- **RE-ENTRANT SOURCES, AND THE COST IS THE RESULT TYPE RATHER THAN THE
-  DESCENT.** `Reducible` transfers untouched: it recurses on the TYPE and
-  reads no instant bookkeeping, so nothing it funds moves. What moves is
-  `subscribeE⇓`, which hands its burst back at the SOURCE's element type
-  for each enclosing frame to push — so a source is materialised whole
-  before any of it descends, and a re-entrant subscribe writes into a
-  registry read only after the loop it should have joined. A subscribe
-  must carry its path and emit at the ROOT type, one value at a time.
-  Then depth-first is the recursion's own order, no work stack appears,
-  and `pushBurst⇓` is deleted rather than repaired.
-
-- **AND THE BRACKET OPERATOR MOVES CLOSER TO ITS MIRROR, NOT AWAY
-  (Anthony: "it needs to mirror what you'll see in the typescript
-  definition and experience when you run it").** `batchSyncᵉ` groups the
-  whole arriving LIST into one value, and per-value emission leaves no
-  list — so the arm gets written as the TypeScript writes it, a flag and
-  a buffer flushed by a merged second input. Semantics unchanged; only
-  the ENCODING goes, and it was available here solely because a source
-  ran whole. The flatteners gain the same way: a saturated `mergeAll`
-  queues the OBSERVABLE, as rxjs does.
+- **THE THREE STORE-RECOVERY LEAVES, AND THE QUESTION IS WHERE TO SAY
+  THEM.** A fold's accumulator, a bracket's held value and its flushed
+  group are each written by a clause holding the candidate and read by a
+  clause holding only the store. The fundamental theorem at values settles
+  all three on paper; calling it from the walk that spends them is a
+  definitional cycle, and an invariant on the state is a dead route the
+  header records. So the leg is a placement decision, not a grind, and it
+  is the one place left where the candidate's shape could still be wrong.
 
 - **THEN THE FLATTENERS AND `takeᵖ`, AND NO FORMER IS OWED AFTER ALL
   (Anthony: "the flattens, mergeAll etc, _are_ the primitives … they can
@@ -291,10 +280,19 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 
 ### The ledger
 
+- **`drainQueue!`**, **`handles-share`** (Rx.Evaluator.Builder) — FALSITY,
+  `DEAD ROUTE`: the builder's two cut cycles, a lane drain and a share connect.
+  Stated so the rest of the module layers strictly; neither has been
+  instantiated.
+
 - **`{mergeAll,switchAll,exhaustAll}ᵖ`** (Rx.Elaborate) — SHAPE,
   `DEAD ROUTE×4`: the elaboration's per-former plumbing, after the two sources
   came out of it. The outer's bookkeeping needs no plain home — it rides the
   lane — so what is left is the compile of an envelope stream into a stream.
+- **`red-{scanned,pushed,flushed}`** (Rx.Evaluator.Reducible) — DIFFICULTY,
+  `DEAD ROUTE×3`: a value handed back out of the store arrives without the
+  candidate it went in with. True through the term face, which the walk that
+  spends them cannot call.
 - **`takeᵖ`** (Rx.Elaborate) — DIFFICULTY, `DEAD ROUTE`: the author cuts on
   VALUES and a plain `takeᵉ` above the envelope cuts on BATCHES, so the
   elaboration owes a count that crosses the level and closes at the cut.
