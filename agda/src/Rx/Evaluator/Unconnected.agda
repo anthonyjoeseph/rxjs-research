@@ -30,7 +30,7 @@ open import Data.List using (List; []; _∷_)
 open import Data.List.Relation.Unary.All using (All) renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
 open import Data.Maybe using (Maybe; nothing; just)
 open import Data.Maybe.Properties using (just-injective)
-open import Data.Nat using (zero; suc; _≤_; _<_; _≡ᵇ_; z≤n)
+open import Data.Nat using (zero; suc; _≤_; _<_; _≡ᵇ_; z≤n; pred)
 open import Data.Nat.Properties using (≤-reflexive; ≤-refl; ≤-trans; +-mono-≤; +-identityʳ)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁)
@@ -648,6 +648,34 @@ postulate
                      < unconnected sched st
 
 
+-- AND THE ONE SHAPE THE STEPS ABOVE DO NOT COVER: A NODE REWRITTEN IN
+-- PLACE BY A CALLER RATHER THAN BY A NAMED STEP.  A lane claim, a
+-- mark, a restore -- each replaces one node and the parked total
+-- follows that node's own queue, so the caller owes exactly a reading
+-- of the two states' queues and nothing about the store around them.
+queued-setNode : ∀ {n} {Γ : Ctx n} (nid : NodeId) (s s′ : NodeState Γ)
+                 (ns : List (NodeId × NodeState Γ))
+               → lookupNode nid ns ≡ just s′
+               → nodeQueued s ≤ nodeQueued s′
+               → queuedS (setNode nid s ns) ≤ queuedS ns
+queued-setNode nid s s′ ((k , s″) ∷ r) eq q with k ≡ᵇ nid
+... | true  rewrite just-injective eq = +-mono-≤ q ≤-refl
+... | false = +-mono-≤ (≤-refl {x = nodeQueued s″}) (queued-setNode nid s s′ r eq q)
+
+-- AND THE SAME WHERE THE INCOMING NODE CARRIES NO QUEUE AT ALL, WHICH
+-- IS EVERY LANE BUT THE FLATTENER'S.  No reading of the outgoing node
+-- is needed then -- not even that one is there, since installing a
+-- node with an empty queue adds nothing to the total either.
+queued-setNode0 : ∀ {n} {Γ : Ctx n} (nid : NodeId) (s : NodeState Γ)
+                  (ns : List (NodeId × NodeState Γ))
+                → nodeQueued s ≡ 0
+                → queuedS (setNode nid s ns) ≤ queuedS ns
+queued-setNode0 nid s [] p = ≤-reflexive (trans (+-identityʳ (nodeQueued s)) p)
+queued-setNode0 nid s ((k , s″) ∷ r) p with k ≡ᵇ nid
+... | true  = +-mono-≤ (≤-trans (≤-reflexive p) z≤n) ≤-refl
+... | false = +-mono-≤ (≤-refl {x = nodeQueued s″}) (queued-setNode0 nid s r p)
+
+
 -- AND THE SAME STEPS' OBLIGATION TO THE PARKED TOTAL, WHICH IS WHERE
 -- THE TWO HALVES DIFFER.  Each of these rewrites ONE node, so the
 -- question is only what that node's own queue did -- and for every
@@ -662,54 +690,188 @@ postulate
 --   for the connected list instead of for the queue -- each proven by
 --   unfolding the step at the node it rewrites, which is the whole of
 --   what these ask for as well.
-postulate
-  queued-latch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-                 (i : Fin n) (b : Bool) (st : EvalSt e)
-               → queued (shareLatch i b st) ≤ queued st
+queued-latch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+               (i : Fin n) (b : Bool) (st : EvalSt e)
+             → queued (shareLatch i b st) ≤ queued st
+queued-latch i false st = ≤-refl
+queued-latch i true  st = ≤-refl
 
-  queued-scanStep : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-                    (fn : FnClo Γ (u ×ᵗ s) u) (nid : NodeId) (v : Val Γ s)
-                    (st : EvalSt e) {ac : Maybe (Val Γ u)} {st₁ : EvalSt e}
-                  → scanStep fn nid v st ≡ (ac , st₁)
+queued-scanStep : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+                  (fn : FnClo Γ (u ×ᵗ s) u) (nid : NodeId) (v : Val Γ s)
+                  (st : EvalSt e) {ac : Maybe (Val Γ u)} {st₁ : EvalSt e}
+                → scanStep fn nid v st ≡ (ac , st₁)
+                → queued st₁ ≤ queued st
+queued-scanStep {u = u} fn nid v st refl with lookupNode nid (EvalSt.nodes st)
+... | just (cell-st {w} ac) with w ≟ᵗ u
+...   | no  _    = ≤-refl
+...   | yes refl = queued-setNode0 nid (cell-st _) (EvalSt.nodes st) refl
+queued-scanStep fn nid v st refl | nothing = ≤-refl
+queued-scanStep fn nid v st refl | just (take-st _) = ≤-refl
+queued-scanStep fn nid v st refl | just (batchSync-st _ _) = ≤-refl
+queued-scanStep fn nid v st refl | just (mergeAll-st _ _ _ _) = ≤-refl
+queued-scanStep fn nid v st refl | just (switch-st _ _) = ≤-refl
+queued-scanStep fn nid v st refl | just (exhaust-st _ _) = ≤-refl
+
+queued-takeStep : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+                  (nid : NodeId) (st : EvalSt e)
+                  {b : Maybe Bool} {st₁ : EvalSt e}
+                → takeStep nid st ≡ (b , st₁)
+                → queued st₁ ≤ queued st
+queued-takeStep nid st refl with lookupNode nid (EvalSt.nodes st)
+... | just (take-st (suc k)) = queued-setNode0 nid (take-st k) (EvalSt.nodes st) refl
+... | just (take-st zero)    = ≤-refl
+queued-takeStep nid st refl | nothing = ≤-refl
+queued-takeStep nid st refl | just (cell-st _) = ≤-refl
+queued-takeStep nid st refl | just (batchSync-st _ _) = ≤-refl
+queued-takeStep nid st refl | just (mergeAll-st _ _ _ _) = ≤-refl
+queued-takeStep nid st refl | just (switch-st _ _) = ≤-refl
+queued-takeStep nid st refl | just (exhaust-st _ _) = ≤-refl
+
+queued-cutAt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+               (nid : NodeId) (sched : Sched Γ) (st : EvalSt e)
+             → queued (proj₂ (cutAt nid sched st)) ≤ queued st
+queued-cutAt nid sched st = queued-setNode0 nid (take-st zero) (EvalSt.nodes st) refl
+
+queued-batchSyncPush : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+                       (nid : NodeId) (v : Val Γ s) (st : EvalSt e)
+                       {g : Maybe (Val Γ (s ×ᵗ listᵗ s))} {st₁ : EvalSt e}
+                     → batchSyncPush nid v st ≡ (g , st₁)
+                     → queued st₁ ≤ queued st
+queued-batchSyncPush {s = s} nid v st refl with lookupNode nid (EvalSt.nodes st)
+... | just (batchSync-st {w} true buf) with w ≟ᵗ s
+...   | no  _    = ≤-refl
+...   | yes refl = queued-setNode0 nid (batchSync-st _ _) (EvalSt.nodes st) refl
+queued-batchSyncPush nid v st refl | just (batchSync-st false buf) = ≤-refl
+queued-batchSyncPush nid v st refl | nothing = ≤-refl
+queued-batchSyncPush nid v st refl | just (cell-st _) = ≤-refl
+queued-batchSyncPush nid v st refl | just (take-st _) = ≤-refl
+queued-batchSyncPush nid v st refl | just (mergeAll-st _ _ _ _) = ≤-refl
+queued-batchSyncPush nid v st refl | just (switch-st _ _) = ≤-refl
+queued-batchSyncPush nid v st refl | just (exhaust-st _ _) = ≤-refl
+
+queued-batchSyncFlush : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+                        (nid : NodeId) (st : EvalSt e)
+                        {g : Maybe (Val Γ (s ×ᵗ listᵗ s))} {st₁ : EvalSt e}
+                      → batchSyncFlush {s = s} nid st ≡ (g , st₁)
+                      → queued st₁ ≤ queued st
+queued-batchSyncFlush {s = s} nid st refl with lookupNode nid (EvalSt.nodes st)
+... | just (batchSync-st {w} _ buf) with w ≟ᵗ s
+...   | no  _    = queued-setNode0 nid (batchSync-st {t = s} false []) (EvalSt.nodes st) refl
+...   | yes refl = queued-setNode0 nid (batchSync-st {t = s} false []) (EvalSt.nodes st) refl
+queued-batchSyncFlush {s = s} nid st refl | nothing =
+  queued-setNode0 nid (batchSync-st {t = s} false []) (EvalSt.nodes st) refl
+queued-batchSyncFlush {s = s} nid st refl | just (cell-st _) =
+  queued-setNode0 nid (batchSync-st {t = s} false []) (EvalSt.nodes st) refl
+queued-batchSyncFlush {s = s} nid st refl | just (take-st _) =
+  queued-setNode0 nid (batchSync-st {t = s} false []) (EvalSt.nodes st) refl
+queued-batchSyncFlush {s = s} nid st refl | just (mergeAll-st _ _ _ _) =
+  queued-setNode0 nid (batchSync-st {t = s} false []) (EvalSt.nodes st) refl
+queued-batchSyncFlush {s = s} nid st refl | just (switch-st _ _) =
+  queued-setNode0 nid (batchSync-st {t = s} false []) (EvalSt.nodes st) refl
+queued-batchSyncFlush {s = s} nid st refl | just (exhaust-st _ _) =
+  queued-setNode0 nid (batchSync-st {t = s} false []) (EvalSt.nodes st) refl
+
+-- THE INNER MARK IS THE ONE STEP THAT REWRITES A NODE WITH A QUEUE AND
+-- LEAVES THE QUEUE ALONE, so it is the one arm that reads the outgoing
+-- node rather than ignoring it.
+queued-markInnerDone : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+                       (op : AllOp) (nid inst : NodeId) (st : EvalSt e)
+                     → queued (markInnerDone op nid inst st) ≤ queued st
+queued-markInnerDone mergeAllᵒ nid inst st with lookupNode nid (EvalSt.nodes st) in leq
+... | just (mergeAll-st lim act q od) =
+      queued-setNode nid (mergeAll-st lim (pred act) q od) (mergeAll-st lim act q od)
+        (EvalSt.nodes st) leq ≤-refl
+queued-markInnerDone mergeAllᵒ nid inst st | nothing = ≤-refl
+queued-markInnerDone mergeAllᵒ nid inst st | just (cell-st _) = ≤-refl
+queued-markInnerDone mergeAllᵒ nid inst st | just (take-st _) = ≤-refl
+queued-markInnerDone mergeAllᵒ nid inst st | just (batchSync-st _ _) = ≤-refl
+queued-markInnerDone mergeAllᵒ nid inst st | just (switch-st _ _) = ≤-refl
+queued-markInnerDone mergeAllᵒ nid inst st | just (exhaust-st _ _) = ≤-refl
+queued-markInnerDone switchᵒ nid inst st with lookupNode nid (EvalSt.nodes st)
+... | just (switch-st (just c) od) with c ≡ᵇ inst
+...   | true  = queued-setNode0 nid (switch-st nothing od) (EvalSt.nodes st) refl
+...   | false = ≤-refl
+queued-markInnerDone switchᵒ nid inst st | just (switch-st nothing od) = ≤-refl
+queued-markInnerDone switchᵒ nid inst st | nothing = ≤-refl
+queued-markInnerDone switchᵒ nid inst st | just (cell-st _) = ≤-refl
+queued-markInnerDone switchᵒ nid inst st | just (take-st _) = ≤-refl
+queued-markInnerDone switchᵒ nid inst st | just (batchSync-st _ _) = ≤-refl
+queued-markInnerDone switchᵒ nid inst st | just (mergeAll-st _ _ _ _) = ≤-refl
+queued-markInnerDone switchᵒ nid inst st | just (exhaust-st _ _) = ≤-refl
+queued-markInnerDone exhaustᵒ nid inst st with lookupNode nid (EvalSt.nodes st)
+... | just (exhaust-st ia od) = queued-setNode0 nid (exhaust-st false od) (EvalSt.nodes st) refl
+queued-markInnerDone exhaustᵒ nid inst st | nothing = ≤-refl
+queued-markInnerDone exhaustᵒ nid inst st | just (cell-st _) = ≤-refl
+queued-markInnerDone exhaustᵒ nid inst st | just (take-st _) = ≤-refl
+queued-markInnerDone exhaustᵒ nid inst st | just (batchSync-st _ _) = ≤-refl
+queued-markInnerDone exhaustᵒ nid inst st | just (mergeAll-st _ _ _ _) = ≤-refl
+queued-markInnerDone exhaustᵒ nid inst st | just (switch-st _ _) = ≤-refl
+
+-- AND THE POP IS THE STRICT ONE THE DRAIN IS ORDERED BY: the node it
+-- writes back holds NO queue, so the whole of what that node was
+-- carrying leaves the total.  It is stated as the `≤` its consumers
+-- transport, since a drain of an EMPTY lane is a legal step too.
+queued-mergeAllQueue′ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+                        (nid : NodeId) (st : EvalSt e)
+                      → queued (proj₂ (mergeAllQueue {s = s} nid st)) ≤ queued st
+queued-mergeAllQueue′ {s = s} nid st with lookupNode nid (EvalSt.nodes st)
+... | just (mergeAll-st {w} lim act q od) with w ≟ᵗ s
+...   | no  _    = ≤-refl
+...   | yes refl = queued-setNode0 nid (mergeAll-st {t = s} lim act [] od)
+                     (EvalSt.nodes st) refl
+queued-mergeAllQueue′ nid st | nothing = ≤-refl
+queued-mergeAllQueue′ nid st | just (cell-st _) = ≤-refl
+queued-mergeAllQueue′ nid st | just (take-st _) = ≤-refl
+queued-mergeAllQueue′ nid st | just (batchSync-st _ _) = ≤-refl
+queued-mergeAllQueue′ nid st | just (switch-st _ _) = ≤-refl
+queued-mergeAllQueue′ nid st | just (exhaust-st _ _) = ≤-refl
+
+queued-mergeAllQueue : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+                       (op : AllOp) (nid inst : NodeId) (st : EvalSt e)
+                       {q : List (Val Γ (obs s))} {st₀ : EvalSt e}
+                     → mergeAllQueue {s = s} nid (markInnerDone op nid inst st) ≡ (q , st₀)
+                     → queued st₀ ≤ queued st
+queued-mergeAllQueue {s = s} op nid inst st refl =
+  ≤-trans (queued-mergeAllQueue′ {s = s} nid (markInnerDone op nid inst st))
+          (queued-markInnerDone op nid inst st)
+
+queued-markOuterDone : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+                       (op : AllOp) (nid : NodeId) (st : EvalSt e)
+                     → queued (markOuterDone op nid st) ≤ queued st
+queued-markOuterDone mergeAllᵒ nid st with lookupNode nid (EvalSt.nodes st) in leq
+... | just (mergeAll-st lim act q od) =
+      queued-setNode nid (mergeAll-st lim act q true) (mergeAll-st lim act q od)
+        (EvalSt.nodes st) leq ≤-refl
+queued-markOuterDone mergeAllᵒ nid st | nothing = ≤-refl
+queued-markOuterDone mergeAllᵒ nid st | just (cell-st _) = ≤-refl
+queued-markOuterDone mergeAllᵒ nid st | just (take-st _) = ≤-refl
+queued-markOuterDone mergeAllᵒ nid st | just (batchSync-st _ _) = ≤-refl
+queued-markOuterDone mergeAllᵒ nid st | just (switch-st _ _) = ≤-refl
+queued-markOuterDone mergeAllᵒ nid st | just (exhaust-st _ _) = ≤-refl
+queued-markOuterDone switchᵒ nid st with lookupNode nid (EvalSt.nodes st)
+... | just (switch-st cur od) = queued-setNode0 nid (switch-st cur true) (EvalSt.nodes st) refl
+queued-markOuterDone switchᵒ nid st | nothing = ≤-refl
+queued-markOuterDone switchᵒ nid st | just (cell-st _) = ≤-refl
+queued-markOuterDone switchᵒ nid st | just (take-st _) = ≤-refl
+queued-markOuterDone switchᵒ nid st | just (batchSync-st _ _) = ≤-refl
+queued-markOuterDone switchᵒ nid st | just (mergeAll-st _ _ _ _) = ≤-refl
+queued-markOuterDone switchᵒ nid st | just (exhaust-st _ _) = ≤-refl
+queued-markOuterDone exhaustᵒ nid st with lookupNode nid (EvalSt.nodes st)
+... | just (exhaust-st act od) = queued-setNode0 nid (exhaust-st act true) (EvalSt.nodes st) refl
+queued-markOuterDone exhaustᵒ nid st | nothing = ≤-refl
+queued-markOuterDone exhaustᵒ nid st | just (cell-st _) = ≤-refl
+queued-markOuterDone exhaustᵒ nid st | just (take-st _) = ≤-refl
+queued-markOuterDone exhaustᵒ nid st | just (batchSync-st _ _) = ≤-refl
+queued-markOuterDone exhaustᵒ nid st | just (mergeAll-st _ _ _ _) = ≤-refl
+queued-markOuterDone exhaustᵒ nid st | just (switch-st _ _) = ≤-refl
+
+queued-switchKill : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+                    (cur : Maybe NodeId) (sched : Sched Γ) (st : EvalSt e)
+                    {sched₁ : Sched Γ} {st₁ : EvalSt e}
+                  → switchKill cur sched st ≡ (sched₁ , st₁)
                   → queued st₁ ≤ queued st
-
-  queued-takeStep : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-                    (nid : NodeId) (st : EvalSt e)
-                    {b : Maybe Bool} {st₁ : EvalSt e}
-                  → takeStep nid st ≡ (b , st₁)
-                  → queued st₁ ≤ queued st
-
-  queued-cutAt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-                 (nid : NodeId) (sched : Sched Γ) (st : EvalSt e)
-               → queued (proj₂ (cutAt nid sched st)) ≤ queued st
-
-  queued-batchSyncPush : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-                         (nid : NodeId) (v : Val Γ s) (st : EvalSt e)
-                         {g : Maybe (Val Γ (s ×ᵗ listᵗ s))} {st₁ : EvalSt e}
-                       → batchSyncPush nid v st ≡ (g , st₁)
-                       → queued st₁ ≤ queued st
-
-  queued-batchSyncFlush : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-                          (nid : NodeId) (st : EvalSt e)
-                          {g : Maybe (Val Γ (s ×ᵗ listᵗ s))} {st₁ : EvalSt e}
-                        → batchSyncFlush {s = s} nid st ≡ (g , st₁)
-                        → queued st₁ ≤ queued st
-
-  queued-mergeAllQueue : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-                         (op : AllOp) (nid inst : NodeId) (st : EvalSt e)
-                         {q : List (Val Γ (obs s))} {st₀ : EvalSt e}
-                       → mergeAllQueue {s = s} nid (markInnerDone op nid inst st) ≡ (q , st₀)
-                       → queued st₀ ≤ queued st
-
-  queued-markOuterDone : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-                         (op : AllOp) (nid : NodeId) (st : EvalSt e)
-                       → queued (markOuterDone op nid st) ≤ queued st
-
-  queued-switchKill : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-                      (cur : Maybe NodeId) (sched : Sched Γ) (st : EvalSt e)
-                      {sched₁ : Sched Γ} {st₁ : EvalSt e}
-                    → switchKill cur sched st ≡ (sched₁ , st₁)
-                    → queued st₁ ≤ queued st
+queued-switchKill nothing  sched st refl = ≤-refl
+queued-switchKill (just v) sched st refl = ≤-refl
 
 -- AND THE TRANSPORT EACH SITE ACTUALLY SPENDS, which is a body over
 -- the pair above it: the connected list is untouched, so the count is
@@ -870,33 +1032,6 @@ budget-switchKill (just v) sched st bg =
     (queued-switchKill (just v) sched st refl) bg
 
 budget-switchKill-eq cur sched st refl bg = budget-switchKill cur sched st bg
-
--- AND THE ONE SHAPE THE STEPS ABOVE DO NOT COVER: A NODE REWRITTEN IN
--- PLACE BY A CALLER RATHER THAN BY A NAMED STEP.  A lane claim, a
--- mark, a restore -- each replaces one node and the parked total
--- follows that node's own queue, so the caller owes exactly a reading
--- of the two states' queues and nothing about the store around them.
-queued-setNode : ∀ {n} {Γ : Ctx n} (nid : NodeId) (s s′ : NodeState Γ)
-                 (ns : List (NodeId × NodeState Γ))
-               → lookupNode nid ns ≡ just s′
-               → nodeQueued s ≤ nodeQueued s′
-               → queuedS (setNode nid s ns) ≤ queuedS ns
-queued-setNode nid s s′ ((k , s″) ∷ r) eq q with k ≡ᵇ nid
-... | true  rewrite just-injective eq = +-mono-≤ q ≤-refl
-... | false = +-mono-≤ (≤-refl {x = nodeQueued s″}) (queued-setNode nid s s′ r eq q)
-
--- AND THE SAME WHERE THE INCOMING NODE CARRIES NO QUEUE AT ALL, WHICH
--- IS EVERY LANE BUT THE FLATTENER'S.  No reading of the outgoing node
--- is needed then -- not even that one is there, since installing a
--- node with an empty queue adds nothing to the total either.
-queued-setNode0 : ∀ {n} {Γ : Ctx n} (nid : NodeId) (s : NodeState Γ)
-                  (ns : List (NodeId × NodeState Γ))
-                → nodeQueued s ≡ 0
-                → queuedS (setNode nid s ns) ≤ queuedS ns
-queued-setNode0 nid s [] p = ≤-reflexive (trans (+-identityʳ (nodeQueued s)) p)
-queued-setNode0 nid s ((k , s″) ∷ r) p with k ≡ᵇ nid
-... | true  = +-mono-≤ (≤-trans (≤-reflexive p) z≤n) ≤-refl
-... | false = +-mono-≤ (≤-refl {x = nodeQueued s″}) (queued-setNode0 nid s r p)
 
 budget-setNode0 : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {β}
                   (nid : NodeId) (s : NodeState Γ)

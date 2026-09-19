@@ -229,14 +229,19 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 
 ### Big picture tier roadmap
 
-- **THEN THE DRAIN'S INVARIANT SPENT RATHER THAN THREADED.** The pair is
-  now what the whole builder carries and what a connect descends on, so
-  what is left of the leg is the half it bought on credit: fourteen
-  readings of the parked total, five over the delivery cycle and nine
-  over the store steps, each the exact mirror of a count lemma already
-  proven. Then the drain itself, which is the only thing that can spend
-  them — and the only statement in the builder still standing on
-  nothing.
+- **THEN THE CYCLE'S FIVE, WHICH ARE WHAT THE STORE STEPS ARE FOR.** The
+  nine step readings are proven and the setNode lemmas under them are
+  general, so what is left is the induction those nine feed: the same
+  eleven-armed walk over the delivery relations the count's half already
+  took, read for the parked total, where each arm is either a step
+  reading already in hand or a recursive call. Six arms are minted with
+  it, as clauses rather than as leaves.
+
+- **THEN THE DRAIN AS A BODY, WHICH IS WHAT THE WHOLE PAIR WAS FOR.** It
+  is the only statement in the builder standing on nothing, and the only
+  one that can spend the disjunction: a pop drops the parked total
+  outright, and the one thing that can put items back needs a connect,
+  which drops the count the descent is ordered by.
 
 - **THEN THE FLATTENERS AND `takeᵖ`, AND NO FORMER IS OWED AFTER ALL
   (Anthony: "the flattens, mergeAll etc, _are_ the primitives … they can
@@ -287,9 +292,6 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 - **`queued-{emit,close,emits,subs,drain}`** (Rx.Evaluator.Unconnected) —
   GRINDABLE, `TWIN×5`: the delivery cycle read for the parked total instead of
   the count, where a park forces a disjunction.
-- **`queued-{latch,scanStep,takeStep,cutAt,batchSyncPush,batchSyncFlush,mergeAllQueue,markOuterDone,switchKill}`**
-  (Rx.Evaluator.Unconnected) — GRINDABLE, `TWIN×9`: the nine store steps' queue
-  readings, eight of them a node with no queue at all.
 
 ## Tier 2 — the proof statement, once there are two trees to state it over
 
