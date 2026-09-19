@@ -1116,8 +1116,26 @@ comments-selftest:
 	    || { echo "SELFTEST FAIL: a marker doubled into the comment text was not reported -- the form no other check in this repo can see"; fail=1; }; \
 	  echo "$$ob" | grep -q 'RECOVERY' \
 	    || { echo "SELFTEST FAIL: the obscured marker was reported without naming which marker it was"; fail=1; }; \
-	  scripts/check-comments.py --dir scripts/comments-selftest/ref-ok > /dev/null 2>&1 \
-	    || { echo "SELFTEST FAIL: a TWIN naming a PROVEN definition, a REFUTED naming a real refutation and a RECOVERY carrying a real sha were REJECTED"; fail=1; }; \
+	  tn=$$(scripts/check-comments.py --sample-proven 2>/dev/null); \
+	  if [ -z "$$tn" ]; then \
+	    echo "SELFTEST FAIL: no proven definition to build the passing fixture from — the reference assertion cannot run"; fail=1; \
+	  else \
+	    rd=$$(mktemp -d); \
+	    { echo 'module RefOk where'; echo; \
+	      echo '-- WHAT THIS LEAF OWES.  Every reference below resolves, and each is'; \
+	      echo '-- written BACKTICKED or DOTTED, which is what makes it read as a'; \
+	      echo '-- reference at all.'; \
+	      echo '--'; \
+	      echo '-- REFUTED: the unconditional form is killed at git show 919f115 — the'; \
+	      echo '--   sha form, which is what a marker carries once `src` can no longer'; \
+	      echo '--   STATE the route and the witness has correctly been deleted.'; \
+	      printf -- '-- TWIN: `%s` is the proven counterpart whose clauses correspond.\n' "$$tn"; \
+	      echo '-- RECOVERY: git show 2984f1e575d8699e8ce78975e23c530d803fc911 restores the predecessor and its whole cone.'; \
+	      echo 'postulate leaf : Set'; } > $$rd/RefOk.agda; \
+	    scripts/check-comments.py --dir $$rd > /dev/null 2>&1 \
+	      || { echo "SELFTEST FAIL: a TWIN naming the PROVEN definition $$tn, a REFUTED naming a real refutation and a RECOVERY carrying a real sha were REJECTED"; fail=1; }; \
+	    rm -rf $$rd; \
+	  fi; \
 	  out=$$(scripts/check-comments.py --dir scripts/comments-selftest/ref-bad 2>&1); \
 	  if scripts/check-comments.py --dir scripts/comments-selftest/ref-bad > /dev/null 2>&1; then \
 	    echo "SELFTEST FAIL: references naming nothing PASSED — the resolution check is dead"; fail=1; \
@@ -1261,9 +1279,9 @@ NODRIFT := --drift 1000000
 
 dev-changed-selftest:
 	@fail=0; \
-	  m=agda/src/Rx/Evaluator/Builder.agda; \
+	  m=scripts/dev-changed-selftest/Heavy.agda; mr=--src-root\ scripts/dev-changed-selftest; \
 	  n=agda/src/Rx/Evaluator/Reducible.agda; \
-	  out=$$(scripts/dev-changed.py --verdict-only $(NODRIFT) --assume-stamp HEAD --files $$m 2>&1); ec=$$?; \
+	  out=$$(scripts/dev-changed.py --verdict-only $(NODRIFT) --assume-stamp HEAD $$mr --files $$m 2>&1); ec=$$?; \
 	  echo "$$out" | grep -q 'FULL GATE REQUIRED' \
 	    || { echo "SELFTEST FAIL: a multi-member block did not escalate — agda-dev stubs those, so a light gate there is not a check"; fail=1; }; \
 	  [ $$ec -eq 2 ] \
@@ -1273,7 +1291,8 @@ dev-changed-selftest:
 	    || { echo "SELFTEST FAIL: a module with NO multi-member block escalated — the light gate would never be usable"; fail=1; }; \
 	  [ $$ec -eq 0 ] \
 	    || { echo "SELFTEST FAIL: the no-block case exited $$ec, not 0"; fail=1; }; \
-	  out=$$(scripts/dev-changed.py --verdict-only $(NODRIFT) --assume-stamp HEAD --max-files 2 --files $$n $$m $$n $$m 2>&1); \
+	  q=agda/src/Rx/Evaluator/Domain.agda; r=agda/src/Rx/Evaluator.agda; u=agda/src/Rx/Mint.agda; \
+	  out=$$(scripts/dev-changed.py --verdict-only $(NODRIFT) --assume-stamp HEAD --max-files 2 --files $$n $$q $$r $$u 2>&1); \
 	  echo "$$out" | grep -q 'ESCALATE  4 changed modules' \
 	    || { echo "SELFTEST FAIL: a changed set over the ceiling did not escalate — N dev checks cost more than the one full build they replace"; fail=1; }; \
 	  w=agda/src/Rx/Prim.agda; \
@@ -1314,7 +1333,7 @@ dev-changed-selftest:
 	    python3 -c 'import importlib.util,sys; sp=importlib.util.spec_from_file_location("dc","scripts/dev-changed.py"); m=importlib.util.module_from_spec(sp); sp.loader.exec_module(m); sys.exit(0 if m.gate_base() != "HEAD" else 1)' \
 	      || { echo "SELFTEST FAIL: the changed set is measured against HEAD while a heavy-gate stamp exists — a session that COMMITS then gates has a clean tree, so nothing gets checked and the gate reports ALL GREEN about a commit it never looked at"; fail=1; }; \
 	  fi; \
-	  out=$$(scripts/dev-changed.py --plan --deps --files $$n 2>&1); \
+	  out=$$(scripts/dev-changed.py --plan --deps $$mr --files scripts/dev-changed-selftest/Leaf.agda 2>&1); \
 	  echo "$$out" | grep -q "skip  $$m  — has a multi-member mutual block" \
 	    || { echo "SELFTEST FAIL: a cone member with a multi-member block was dropped in SILENCE — agda-dev stubs a block's siblings, so a dev check there is not a check, and the consumer that validates a new arm's FIT is exactly such a module"; fail=1; }; \
 	  out=$$(scripts/dev-changed.py --verdict-only $(NODRIFT) --files 2>&1); \
