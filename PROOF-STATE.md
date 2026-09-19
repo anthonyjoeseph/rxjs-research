@@ -229,16 +229,6 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 
 ### Big picture tier roadmap
 
-- **GET THE REWRITTEN MACHINE THROUGH THE TYPECHECKER, AND THAT IS THE
-  WHOLE LEG.** The root-typed relation, the reducibility candidate and the
-  builder were written in one pass with no check run against any of them,
-  on the ruling that an evaluator of this shape is settled whole or not at
-  all. Nothing below can be instantiated, probed or measured until it
-  checks, so this narrows nothing on its own and is still the leg that has
-  to land first. What it buys beside a green tower is the first real
-  reading of where the cost now sits, since every per-module figure in the
-  numbers file was taken against a machine that no longer exists.
-
 - **THE FOUR LEAVES ARE ONE PROBLEM, AND THE LEG IS TO FIND ITS MEASURE.**
   The share fan-out is a body now, over a leaf naming only the WALK a
   connect spends — which is what showed the rest to be one question. Every
