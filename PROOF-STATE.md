@@ -191,6 +191,9 @@ batch-online                              claimed by Main in its own right —
   evaluate↓ = proj₁ ∘ evaluate!           Rx/Evaluator/Builder.agda — REAL
      └─ every value-path leaf is a body; the corpus runs; the tower descends
 
+  toPlain                                 Rx/Elaborate.agda — a REAL body over
+     └─ four postulated formers            four leaves — tier 0
+
   every tier above is stated over Rx.Exp's syntax
 ```
 
@@ -206,21 +209,95 @@ every guard, every `<?` and the dry marker leave the machine entirely.
 A row's class must agree with its postulate's header, which is where the
 research lives; where they disagree, the header wins.
 
-## Tier 1 — the elaboration, and the proof statement over it
+## Tier 0 — the four formers the seam cannot compile
+
+**THE SEAM, AND IT IS WHERE A PROGRAM'S MEANING IS DECIDED (Anthony: "the plain
+tree is rxjs, and must not know what an envelope is").** `toPlain` compiles the
+author's palette into the plain tree. The STRUCTURE compiles already; what is
+left is the protocol traffic of four operators, each short a capability rather
+than a proof. The tier sits under tier 1 because the top line quantifies over
+`toPlain`: seam first, then statement.
+
+**AND THE JOB IS TRANSCRIPTION, NOT SEMANTICS (Anthony: "we are not worried
+about correctness, just a basic mirroring of what the typescript side is
+already doing").** All four are written at the envelope-carrying layer already,
+out of stock rxjs — `primitive-operators.ts` for the cut, `join.ts` for the one
+join engine — so no row owes a ruling on what an operator MEANS. What each
+owes is the finding transcription produces: which plain former `Rx.Exp` is
+short of, and whether it is an expression at all. That is what orders them.
+
+### The monster
+
+`takeᵖ` — and it is the monster for the reason the section asks for rather than
+in spite of it. It is a FORMER and not a proposition, so every inhabitant of its
+type typechecks, the identity on its second argument included; nothing above it
+would notice a wrong body, which is exactly the way a declaration is wrong that
+no postulate ledger records. It is the deepest of the four in the sense that
+decides this tier: the three flatteners are blocked on one shared question and
+`takeᵖ` is blocked on nothing, so it is the row whose transcription happens
+first and the row whose residue tells the others what the palette costs.
+
+### Big picture tier roadmap
+
+- **THE PLAIN FORMER THE CUT IS SHORT OF, WHICH IS THE ONE MOVE UNDER
+  EVERYTHING ELSE HERE.** `takeᵖ`'s header refutes counting in a `scanᵉ` and
+  cutting with `takeᵉ`: a step cannot change how many emits pass through it, so
+  nothing converts a budget over the author's VALUES into the emit index a
+  plain count has to name. TypeScript does not convert it — it never names an
+  index at all, ending on `takeWhile` at `inclusive`, whose predicate reads the
+  scan's own state. `Rx.Exp` has `scanᵉ` and `mapᵉ` and no `takeWhileᵉ`. The
+  leg is that former, TypeScript first per the port order, and it is worth its
+  own commit because it is the first new plain former this seam has asked for
+  and the precedent for whatever the flatteners ask for next.
+
+- **THEN `takeᵖ` AS THE THREE-OPERATOR PIPELINE, AND THE RESIDUE IS THE
+  PRODUCT.** Scan carrying the quota, the open registrations and the cut
+  ledger; `takeWhileᵉ` ending on the cutting emit; a projection out of the
+  state. Everything up to the cut is a pure step's work and transcribes
+  directly. What does not is the minting at the cut — one close per victim,
+  each with its own reason off the ledger — and that is where the leaf that
+  replaces `takeᵖ` lands. A body over a smaller leaf is the outcome to aim at,
+  not a discharge.
+
+- **THEN THE CHANNEL RULING, WHICH IS ALL THREE FLATTENERS AT ONCE.** Their
+  headers already agree on the blocker and state it four ways: the outer's
+  bookkeeping rides a lane, and a lane is the one thing a switch cuts and an
+  exhaust drops. TypeScript's engine keeps it by cutting with `takeUntil` over
+  a Subject, and a Subject is a share — a BINDING rather than an expression, so
+  no `Exp` former reaches one from inside an operator's body. The leg decides
+  it: a channel former in the plain tree, or a join that needs none. It is a
+  ruling and it is Anthony's, because either answer changes what the plain tree
+  IS.
+
+- **THEN THE THREE OFF ONE ENGINE, THE WAY TYPESCRIPT WRITES THEM.** `join.ts`
+  is one `joinAll` parameterised by how a lane is disposed of, and the three
+  exports differ only in that parameter. Three separate Agda bodies would be
+  three chances to transcribe the shared half differently, and the shared half
+  is the whole of the bookkeeping. One engine, three applications.
+
+### The ledger
+
+- **`{mergeAll,switchAll,exhaustAll}ᵖ`** (Rx.Elaborate) — SHAPE,
+  `DEAD ROUTE×4`: the elaboration's per-former plumbing, after the two sources
+  came out of it. The outer's bookkeeping needs no plain home — it rides the
+  lane — so what is left is the compile of an envelope stream into a stream.
+- **`takeᵖ`** (Rx.Elaborate) — DIFFICULTY, `DEAD ROUTE`: the author cuts on
+  VALUES and a plain `takeᵉ` above the envelope cuts on BATCHES, so the
+  elaboration owes a count that crosses the level and closes at the cut.
+
+## Tier 1 — the proof statement over the elaboration
 
 **THE EVALUATOR TIER IS GONE.** Subscribe is a bottom-up burst assembly and the
 candidate recurses on the TYPE, so the machine is DEFINED end to end and
 carries no postulate. A drain that cannot re-mint a parked candidate is not
 statable over a candidate with no bound.
 
-**SO THE RISK MOVED UP, TO THE TWO TREES AND THE SEAM BETWEEN THEM (Anthony:
-"the plain tree is rxjs, and must not know what an envelope is").** TypeScript
-has plain rxjs and an `InstEmit`-carrying layer over it; Agda has one tree doing
-both jobs, and `toPlain` is the seam that compiles the author's palette down.
-Four primitives in it are still postulated, and they are where a program's
-meaning is decided. Above them sits the statement itself, which cannot be
-restated until the elaboration it quantifies over is settled — so the order is
-seam, then statement.
+**SO WHAT IS LEFT HERE IS THE STATEMENT, AND IT WAITS ON THE SEAM BELOW.** The
+top line quantifies over a simul tree run through `toPlain`, so every question
+about what it ASSERTS is downstream of what the elaboration compiles to. The
+legs below are the statement's own — restating it, the legality it needs, the
+purity ruling it may or may not carry a hypothesis for, and reducibility's
+second half.
 
 ### The monster
 
@@ -228,10 +305,7 @@ seam, then statement.
 yet. The top line standing today is a bare postulate over the machine that has
 just been replaced, so it is the thing to be RESTATED rather than a thing to
 aim at, and a cone drawn round it would hold the restatement outside itself.
-The seam is the obvious candidate and it is premature for the same reason: the
-statement that would quantify over `toPlain` does not exist, so nothing yet
-says which of its four primitives is the one that could be false. The tier
-takes a monster at the commit that first states the restatement.
+The tier takes a monster at the commit that first states the restatement.
 
 ### Big picture tier roadmap
 
@@ -291,13 +365,6 @@ takes a monster at the commit that first states the restatement.
   was a body over one leaf; that leaf was refuted by a slot table scripted at
   the envelope type, and its subject is the envelope the evaluator no longer
   mints.
-- **`{mergeAll,switchAll,exhaustAll}ᵖ`** (Rx.Elaborate) — SHAPE,
-  `DEAD ROUTE×4`: the elaboration's per-former plumbing, after the two sources
-  came out of it. The outer's bookkeeping needs no plain home — it rides the
-  lane — so what is left is the compile of an envelope stream into a stream.
-- **`takeᵖ`** (Rx.Elaborate) — DIFFICULTY, `DEAD ROUTE`: the author cuts on
-  VALUES and a plain `takeᵉ` above the envelope cuts on BATCHES, so the
-  elaboration owes a count that crosses the level and closes at the cut.
 
 ## Tier 2 — what Main asserts beside the main theorem
 
