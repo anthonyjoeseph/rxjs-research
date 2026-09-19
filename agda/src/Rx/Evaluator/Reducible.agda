@@ -46,8 +46,13 @@ open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_
   Ctx; Closed; Val; Tm; FnClo; applyClo; Env; []ᵉ; _∷ᵉ_; evalWith; foldVals;
   isData; lookupEnv; _≟ᵗ_)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; NodeId;
-  scanStep; batchSyncPush; batchSyncFlush; lookupNode; batchSync-st)
+  scanStep; batchSyncPush; batchSyncFlush; lookupNode; batchSync-st;
+  memberSource)
 open import Rx.Evaluator.Domain using (subscribeE⇓; emit⇓; close⇓)
+open import Rx.Slots using (Slot; scripted; shared)
+open import Data.Fin using (Fin; toℕ)
+open import Data.Nat using (ℕ; zero; suc; _+_; _≤_)
+open import Data.Vec using (tabulate; foldr′)
 
 ------------------------------------------------------------------
 -- WHAT EVERY FAMILY HERE ANSWERS IN.
@@ -55,6 +60,69 @@ open import Rx.Evaluator.Domain using (subscribeE⇓; emit⇓; close⇓)
 
 Out : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Set
 Out {Γ = Γ} {t = t} e = Stream Γ t × Sched Γ × EvalSt e
+
+------------------------------------------------------------------
+-- WHAT THE BUILDER RECURSES ON.
+------------------------------------------------------------------
+
+-- THE ONE QUANTITY THAT ORDERS A CONNECT, and it is a COUNT rather
+-- than a statement about what the store holds -- which is the whole
+-- reason it is available where an invariant is not.  A connect is
+-- guarded by its slot being shared and absent from the connected
+-- list, and adds it on the way out; nothing anywhere takes one back
+-- out, and the list starts empty.  So this number strictly drops
+-- across exactly the call that raises the floor measure, and is left
+-- alone by every other arm.
+--
+-- THE CANDIDATE NEVER APPEARS IN IT.  It rides the three halves below
+-- as an inert index, so the descent that licenses them is still the
+-- TYPE and is untouched -- the distinction that keeps this clear of
+-- the route `Rx.Evaluator.Builder`'s own header records as dead.
+unconnected : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → Sched Γ → EvalSt e → ℕ
+unconnected {n = n} sched st =
+  foldr′ _+_ 0 (tabulate {n = n} λ i → slotCost i)
+  where
+    slotCost : Fin n → ℕ
+    slotCost i with Sched.slots sched i
+    ... | scripted _ = 0
+    ... | shared _   =
+            if memberSource (toℕ i) (EvalSt.connectedShares st) then 0 else 1
+
+-- WHAT A STEP OWES THE COUNT, AND IT IS THE CREDIT THE SHAPE ABOVE
+-- BUYS ON.  A frame's obligation is stated under a bound on the store
+-- it is handed, so a frame that runs a step and then spends the next
+-- obligation has to know the step left the count where it was.  It
+-- did: the connected list is written at exactly one site in the whole
+-- tree -- a connect, which EXTENDS it -- and the slot telescope is
+-- fixed at the start of the run, so every other step leaves both
+-- readings alone and the count with them.
+--
+-- STATED OVER THE RELATION RATHER THAN THE STEP, because what a
+-- builder holds at the point of spending is the derivation and not
+-- the function that produced it.  Three of them because the three
+-- halves of the obligation run three different relations, and the
+-- fact is the same fact in each.
+postulate
+  unconn-emit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
+                  {κ : Path Γ lo u t} {now} {v : Val Γ u}
+                  {sched : Sched Γ} {st : EvalSt e} {r : Out e}
+              → emit⇓ {e = e} κ now v sched st r
+              → unconnected (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+                  ≤ unconnected sched st
+
+  unconn-close : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
+                   {κ : Path Γ lo u t} {now}
+                   {sched : Sched Γ} {st : EvalSt e} {r : Out e}
+               → close⇓ {e = e} κ now sched st r
+               → unconnected (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+                   ≤ unconnected sched st
+
+  unconn-subs : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
+                  {b : Val Γ (obs u)} {κ : Path Γ lo u t} {now}
+                  {sched : Sched Γ} {st : EvalSt e} {r : Out e}
+              → subscribeE⇓ {e = e} b κ now sched st r
+              → unconnected (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+                  ≤ unconnected sched st
 
 ------------------------------------------------------------------
 -- THE CANDIDATE.
@@ -87,29 +155,30 @@ mutual
   Red (s +ᵗ u)  (inj₂ b) = Red u b
   Red (listᵗ s) xs       = All (Red s) xs
   Red {Γ = Γ} (obs u) b =
-    ∀ {t} {e : Closed Γ t} {lo} (κ : Path Γ lo u t) → Handles u κ
-    → (now : Tick) (sched : Sched Γ) (st : EvalSt e)
+    ∀ {t} {e : Closed Γ t} {lo m} (κ : Path Γ lo u t) → Handles {m = m} u κ
+    → (now : Tick) (sched : Sched Γ) (st : EvalSt e) → unconnected sched st ≤ m
     → Σ (Out e) λ r → subscribeE⇓ {e = e} b κ now sched st r
 
   -- ONE VALUE, HANDED TO THE PATH WITH ITS OWN CANDIDATE.  The
   -- candidate travels WITH the value rather than being recovered at
   -- the far end, which is what lets a flattener's frame subscribe what
   -- reaches it without asking anything of the store.
-  Emits : ∀ {n} {Γ : Ctx n} {t lo} (u : Ty) → Path Γ lo u t → Set
-  Emits {Γ = Γ} {t = t} u κ =
+  Emits : ∀ {n} {Γ : Ctx n} {t lo m} (u : Ty) → Path Γ lo u t → Set
+  Emits {Γ = Γ} {t = t} {m = m} u κ =
     ∀ {e : Closed Γ t} {v : Val Γ u} → Red u v
-    → (now : Tick) (sched : Sched Γ) (st : EvalSt e)
+    → (now : Tick) (sched : Sched Γ) (st : EvalSt e) → unconnected sched st ≤ m
     → Σ (Out e) λ r → emit⇓ {e = e} κ now v sched st r
 
   -- THE END CARRIES NO PAYLOAD, so this half asks for nothing and is
   -- where every frame that does work on a completion is discharged.
-  Closes : ∀ {n} {Γ : Ctx n} {t lo} {u : Ty} → Path Γ lo u t → Set
-  Closes {Γ = Γ} {t = t} κ =
+  Closes : ∀ {n} {Γ : Ctx n} {t lo m} {u : Ty} → Path Γ lo u t → Set
+  Closes {Γ = Γ} {t = t} {m = m} κ =
     ∀ {e : Closed Γ t} (now : Tick) (sched : Sched Γ) (st : EvalSt e)
+    → unconnected sched st ≤ m
     → Σ (Out e) λ r → close⇓ {e = e} κ now sched st r
 
-  Handles : ∀ {n} {Γ : Ctx n} {t lo} (u : Ty) → Path Γ lo u t → Set
-  Handles u κ = Emits u κ × Closes κ
+  Handles : ∀ {n} {Γ : Ctx n} {t lo m} (u : Ty) → Path Γ lo u t → Set
+  Handles {m = m} u κ = Emits {m = m} u κ × Closes {m = m} κ
 
 -- A FRAME'S FUNCTION CARRIES THE CANDIDATE ACROSS, which is the one
 -- thing a transformer owes and the only thing a path builder asks of
