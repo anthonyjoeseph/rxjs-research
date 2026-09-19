@@ -217,6 +217,31 @@ handles-share i below w =
 -- reaches the term face back HERE -- a frame's function is handed to the
 -- walk with a fresh accessibility, so nothing around that loop shrinks.
 --
+-- THE MEASURE IS A COUNT THE STORE CARRIES, AND IT ORDERS THE ROUND
+-- TRIP THE FLOOR CANNOT.  What a connect consumes is a share that has
+-- not been connected yet -- the arm is guarded by the slot's absence
+-- from the connected list and adds it on the way out -- so the number
+-- of slots that are shared and unconnected strictly drops across
+-- exactly the call that raises the floor measure.  Nothing anywhere
+-- puts a slot back, so every other arm leaves that number alone or
+-- lowers it.
+--
+-- AND IT IS A COUNT RATHER THAN AN INVARIANT, WHICH IS WHY THE ROUTE
+-- BELOW DOES NOT REACH IT.  That route dies because the candidate
+-- cannot be a premise of a statement about the store; a natural number
+-- is not the candidate, so the bound rides as an inert index and the
+-- type descent is untouched.  The shape was put to the checker at
+-- minimal scale in all three arrangements: the bound on the candidate
+-- is accepted, the two faces merged under one lexicographic measure
+-- are REFUSED -- a walk hands the term face an arbitrary term, so that
+-- edge has nothing that drops -- and the two faces left stratified
+-- with the whole builder recursing on the bound is accepted.  So the
+-- shape is the third: the term face stays below the walk exactly as it
+-- is, and a connect spends the builder one level down instead of
+-- reaching back into its own walk.  The floor arm is then unreachable
+-- at a zero bound, since the guard says the slot is shared and
+-- unconnected and the bound says no such slot exists.
+--
 -- DEAD ROUTE: merging the term face and the walk into one block puts
 --   both recursions under one measure, and the two move in OPPOSITE
 --   directions: a connect drops to the floor `toℕ i` its own slot names,

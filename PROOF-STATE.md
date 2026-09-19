@@ -229,26 +229,28 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 
 ### Big picture tier roadmap
 
-- **THE FOUR LEAVES ARE ONE PROBLEM, AND THE LEG IS TO FIND ITS MEASURE.**
-  The share fan-out is a body now, over a leaf naming only the WALK a
-  connect spends — which is what showed the rest to be one question. Every
-  remaining leaf wants the term face from inside the walk: the drain and
-  the two store reads each hold a value whose candidate was dropped. A
-  measure ordering that round trip exists, and `walk-above`'s header says
-  what it is and why it cannot be stated where it is needed. So the leg is
-  whether it can be carried anywhere the promise is spent; a no closes off
-  the per-value shape rather than one leaf.
+- **STEP-INDEX THE BUILDER ON THE UNCONNECTED-SHARE COUNT.** The measure
+  is found and checked at minimal scale, and `walk-above`'s header
+  carries it: a connect is guarded by a slot being shared and not yet
+  connected and adds it on the way out, so that count drops across
+  exactly the call that raises the floor. It is a COUNT and not an
+  invariant, so the candidate is never a premise of anything about the
+  store and the dead route does not reach it. The shape is the builder
+  parameterised by the bound, the term face left strictly below the walk
+  as it is today, and a connect spending the level below instead of its
+  own walk. Merging the two faces under one measure is refused and that
+  arrangement is closed.
 
-- **THE TWO STORE-RECOVERY LEAVES, AND THE QUESTION IS WHERE TO SAY
-  THEM.** The leg above decides whether they fall together; this one runs
-  if they do not. The bracket's PUSH reads nothing after all — it hands
-  back the arriving value alone, whose candidate is the emitting premise —
-  leaving a fold's accumulator and a flushed group, each written by a
-  clause holding the candidate and read by one holding only the store.
-  The fundamental theorem at values settles both on paper; calling it from
-  the walk that spends them is a definitional cycle, and the state
-  invariant is now dead in all three of its forms, the inductive family
-  included. So the leg is a placement decision with one licence fewer.
+- **THEN THE BOUND'S TWO OBLIGATIONS, WHICH ARE WHAT THE SHAPE BUYS ON
+  CREDIT.** The zero level must be unreachable at the connect arm — its
+  guard says the slot is shared and unconnected while the bound says no
+  such slot exists — and every other arm must hand back a store still
+  under the bound, which is monotonicity of the count along the whole
+  arrival relation. Nothing un-connects a slot, so both are mechanical
+  rather than uncertain; the second is one obligation per evaluator
+  step, which is what makes it a leg. With the term face below the walk
+  at every level the three remaining leaves read their candidate off
+  the fundamental theorem at values.
 
 - **THEN THE FLATTENERS AND `takeᵖ`, AND NO FORMER IS OWED AFTER ALL
   (Anthony: "the flattens, mergeAll etc, _are_ the primitives … they can
