@@ -228,52 +228,51 @@ short of, and whether it is an expression at all. That is what orders them.
 
 ### The monster
 
-`takeᵖ` — and it is the monster for the reason the section asks for rather than
-in spite of it. It is a FORMER and not a proposition, so every inhabitant of its
-type typechecks, the identity on its second argument included; nothing above it
-would notice a wrong body, which is exactly the way a declaration is wrong that
-no postulate ledger records. It is the deepest of the four in the sense that
-decides this tier: the three flatteners are blocked on one shared question and
-`takeᵖ` is blocked on nothing, so it is the row whose transcription happens
-first and the row whose residue tells the others what the palette costs.
+`mergeAllᵖ` — the only row here whose blocker is shared, and the blast radius is
+what that sharing buys. Its two siblings are stopped at the same place and by
+the same thing: the outer's own bookkeeping rides a lane, and a lane is cut by a
+switch and dropped by an exhaust, so the traffic that must survive is put in the
+one place each operator is free to discard. TypeScript keeps it by cutting the
+lane with a Subject, which is a BINDING and not an expression. So if the plain
+tree cannot name a lane, all three fall together and the seam's shape moves
+under everything above it — where `takeᵖ` falling costs one operator.
 
 ### Big picture tier roadmap
 
-- **THE PLAIN FORMER THE CUT IS SHORT OF, WHICH IS THE ONE MOVE UNDER
-  EVERYTHING ELSE HERE.** `takeᵖ`'s header refutes counting in a `scanᵉ` and
-  cutting with `takeᵉ`: a step cannot change how many emits pass through it, so
-  nothing converts a budget over the author's VALUES into the emit index a
-  plain count has to name. TypeScript does not convert it — it never names an
-  index at all, ending on `takeWhile` at `inclusive`, whose predicate reads the
-  scan's own state. `Rx.Exp` has `scanᵉ` and `mapᵉ` and no `takeWhileᵉ`. The
-  leg is that former, TypeScript first per the port order, and it is worth its
-  own commit because it is the first new plain former this seam has asked for
-  and the precedent for whatever the flatteners ask for next.
+- **THE CHANNEL RULING, WHICH IS THE MONSTER'S OWN QUESTION AND ALL THREE
+  FLATTENERS AT ONCE.** Their headers already agree on the blocker and state it
+  four ways: the outer's bookkeeping rides a lane, and a lane is the one thing a
+  switch cuts and an exhaust drops. TypeScript's engine keeps it by cutting with
+  `takeUntil` over a Subject, and a Subject is a share — a BINDING rather than
+  an expression, so no `Exp` former reaches one from inside an operator's body.
+  The leg decides it: a channel former in the plain tree, or a join that needs
+  none. It is a ruling and it is Anthony's, because either answer changes what
+  the plain tree IS.
 
-- **THEN `takeᵖ` AS THE THREE-OPERATOR PIPELINE, AND THE RESIDUE IS THE
-  PRODUCT.** Scan carrying the quota, the open registrations and the cut
-  ledger; `takeWhileᵉ` ending on the cutting emit; a projection out of the
-  state. Everything up to the cut is a pure step's work and transcribes
-  directly. What does not is the minting at the cut — one close per victim,
-  each with its own reason off the ledger — and that is where the leaf that
-  replaces `takeᵖ` lands. A body over a smaller leaf is the outcome to aim at,
-  not a discharge.
+- **THEN THE ENGINE, AND THE THREE OFF IT THE WAY TYPESCRIPT WRITES THEM.**
+  `join.ts` is one `joinAll` parameterised by how a lane is disposed of, and the
+  three exports differ only in that parameter. Three separate Agda bodies would
+  be three chances to transcribe the shared half differently, and the shared
+  half is the whole of the bookkeeping. One engine, three applications — and
+  whatever the ruling did not supply is the leaf `mergeAllᵖ` becomes a body
+  over.
 
-- **THEN THE CHANNEL RULING, WHICH IS ALL THREE FLATTENERS AT ONCE.** Their
-  headers already agree on the blocker and state it four ways: the outer's
-  bookkeeping rides a lane, and a lane is the one thing a switch cuts and an
-  exhaust drops. TypeScript's engine keeps it by cutting with `takeUntil` over
-  a Subject, and a Subject is a share — a BINDING rather than an expression, so
-  no `Exp` former reaches one from inside an operator's body. The leg decides
-  it: a channel former in the plain tree, or a join that needs none. It is a
-  ruling and it is Anthony's, because either answer changes what the plain tree
-  IS.
+- **THEN THE PLAIN FORMER THE CUT IS SHORT OF.** `takeᵖ`'s header refutes
+  counting in a `scanᵉ` and cutting with `takeᵉ`: a step cannot change how many
+  emits pass through it, so nothing converts a budget over the author's VALUES
+  into the emit index a plain count has to name. TypeScript does not convert it
+  — it never names an index at all, ending on `takeWhile` at `inclusive`, whose
+  predicate reads the scan's own state. `Rx.Exp` has `scanᵉ` and `mapᵉ` and no
+  `takeWhileᵉ`. The leg is that former, TypeScript first per the port order.
 
-- **THEN THE THREE OFF ONE ENGINE, THE WAY TYPESCRIPT WRITES THEM.** `join.ts`
-  is one `joinAll` parameterised by how a lane is disposed of, and the three
-  exports differ only in that parameter. Three separate Agda bodies would be
-  three chances to transcribe the shared half differently, and the shared half
-  is the whole of the bookkeeping. One engine, three applications.
+- **THEN `takeᵖ` AS THE THREE-OPERATOR PIPELINE.** Scan carrying the quota, the
+  open registrations and the cut ledger; `takeWhileᵉ` ending on the cutting
+  emit; a projection out of the state. Everything up to the cut is a pure step's
+  work and transcribes directly. What does not is the minting at the cut — one
+  close per victim, each with its own reason off the ledger — and that is where
+  the leaf that replaces `takeᵖ` lands. These last two legs are OFF the monster,
+  so the commit that opens them moves the monster first; declaring them now with
+  an `also:` would pre-authorise the jump the check exists to catch.
 
 ### The ledger
 
