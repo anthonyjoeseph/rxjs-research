@@ -181,12 +181,12 @@ the row is DIFFICULTY.
 
 ```
 formal-verification-batchSimultaneous    The-Proof.agda — a BARE POSTULATE
-                                          while the machine is rewritten — tier 2
+                                          while the machine is rewritten — tier 1
  └─ batch-agreement                      proven, and claimed by Main in its
                                           own right rather than through the top
 
 batch-online                              claimed by Main in its own right —
-                                          nothing above consumes it — tier 3
+                                          nothing above consumes it — tier 2
 
   evaluate↓ = proj₁ ∘ evaluate!           Rx/Evaluator/Builder.agda — REAL
      └─ every value-path leaf is a body; the corpus runs; the tower descends
@@ -206,117 +206,32 @@ every guard, every `<?` and the dry marker leave the machine entirely.
 A row's class must agree with its postulate's header, which is where the
 research lives; where they disagree, the header wins.
 
-## Tier 1 — the unique primitive, and the two trees that ride on it
+## Tier 1 — the elaboration, and the proof statement over it
 
-**THE ENTANGLEMENT, PLAINLY: the plain tree is rxjs, and must not know what an
-envelope is (Anthony).** TypeScript has two layers — plain rxjs, the published
-library, and an `InstEmit`-carrying one over it called srxjs — while Agda has
-one tree doing both jobs, which is why the evaluator mints envelopes it has no
-business knowing about. The tier splits them: a plain tree and evaluator
-mirroring ordinary rxjs, and a simul mirror tree whose formers are the
-envelope-carrying operators, elaborated down by `toPlain`. What the proofs
-above then quantify over is a program written in the SIMUL palette — which is
-the restriction on the input type that nothing here could state before, and the
-reason the split is worth a whole tier.
+**THE EVALUATOR TIER IS GONE.** Subscribe is a bottom-up burst assembly and the
+candidate recurses on the TYPE, so the machine is DEFINED end to end and
+carries no postulate. A drain that cannot re-mint a parked candidate is not
+statable over a candidate with no bound.
 
-### The monster
-
-`drainQueue!` — BOUNDED-CONCURRENCY `mergeAll`, and it stays so (Anthony). Only
-a saturating lane count ever parks, so this statement exists at all because the
-merge is bounded, and it is the one declaration in the builder standing on
-nothing. What it is short of is not a fact about the queue: a parked inner's
-candidate is free to re-mint, since the ceiling reading holds at the context's
-own width and the environment's is total. It needs the value face AT ITS OWN
-BOUND, which is what the level above is building.
-
-also: `level` — one definition, where that loop would be tied, and the builder
-it conducts. The monster is a POSTULATE, so its cone is its own vocabulary and
-the work that would kill it sits outside by construction.
-
-### Big picture tier roadmap
-
-- **FIRST, RE-MINT THE DRAIN'S CANDIDATE FROM THE CLOSURE — EVERY ROUTE
-  THAT CARRIES ONE IS CLOSED, AND CARRYING WAS THE ONLY THING TRIED.** A
-  value at observable type IS a closure, and `reducible` turns one into
-  a candidate given `RedEnv` of its environment. So the pop owes a
-  reducible ENVIRONMENT, which is a differently shaped fact from the
-  four that died: a store field fails positivity, the spine reorders the
-  flat emit list, another bound is mixed-variance, and an invariant
-  naming the candidate is refused because the arm descends on the
-  element type. Settle whether the parked closure's environment is
-  reachable where the park admitted it.
-
-- **THEN THE DRAIN AS A BODY, WHICH IS A FEW LINES ONCE IT IS IN THE
-  BLOCK.** `dq-run` peels its popped list and `dq-full` restores what it
-  did not reach, so both arms are structural; `dq-nil` is the base. The
-  whole of the difficulty is the subscribe in `dq-run` needing a
-  candidate, so a drain written where the term face can hand it one is a
-  body over leaves already declared.
-
-- **THEN THE DERIVATION-LEVEL OBLIGATIONS THE ARRIVAL SPINE STILL OWES.**
-  The delivery cycle's eleven relations carry the count, and the spine
-  above them — a chain step, a cascade, a drain — does not. It is the
-  same induction one level up, over relations whose every arm is a cycle
-  member already discharged, and it is what a `Below` handed to
-  `evaluate!` will be spending. It closes the layer rather than opening
-  one, and the monster's call site sits inside it.
-
-- **THEN THE FLATTENERS AND `takeᵖ`, AND NO FORMER IS OWED AFTER ALL
-  (Anthony: "the flattens, mergeAll etc, _are_ the primitives … they can
-  be implemented however you want, just so long as they … mirror exactly
-  what rxjs would do").** The recorded ask — a multicast inside an
-  expression — was an envelope obligation smuggled into a plain question:
-  in rxjs every outer emit of a `mergeAll` IS an observable, so nothing
-  owes an output emit without a lane. `takeᵖ`'s behaviour is measured
-  rather than inferred and the plain `takeᵉ` already has all three facts.
-
-- **THEN THE REST OF THE SIMUL OPERATORS MIRRORED IN `Tm`/`Ty` (Anthony).**
-  Each TS simul operator mirrored as an Agda definition in the value
-  language, in the same fashion, so the correspondence is readable rather
-  than asserted. The first thing tested is the SEEDED channel the share
-  reads at subscribe time, a further ask than a plain channel which `Tm`
-  may not have. `batchSyncᵉ` is already one, at the index Anthony has
-  ruled on. **AND IF THE LANGUAGE CANNOT SAY ONE, STOP AND REPORT
-  (Anthony).** A new `Ty` constructor or `Tm` former changes what a
-  program can SAY, so it decides what every theorem above quantifies
-  over — the same reason the spec is not an agent's to move.
-
-### The ledger
-
-- **`drainQueue!`** (Rx.Evaluator.Builder.Frames) — FALSITY,
-  `REFUTED, DEAD ROUTE×5`: the tier's monster. A parked lane's backlog, spent
-  under the frame whose closing side runs it. Not instantiated.
-
-- **`{mergeAll,switchAll,exhaustAll}ᵖ`** (Rx.Elaborate) — SHAPE,
-  `DEAD ROUTE×4`: the elaboration's per-former plumbing, after the two sources
-  came out of it. The outer's bookkeeping needs no plain home — it rides the
-  lane — so what is left is the compile of an envelope stream into a stream.
-- **`red-{scanned,flushed}`** (Rx.Evaluator.Reducible) — DIFFICULTY,
-  `DEAD ROUTE×4`: a value handed back out of the store arrives without the
-  candidate it went in with. True through the term face, which the walk that
-  spends them cannot call.
-- **`takeᵖ`** (Rx.Elaborate) — DIFFICULTY, `DEAD ROUTE`: the author cuts on
-  VALUES and a plain `takeᵉ` above the envelope cuts on BATCHES, so the
-  elaboration owes a count that crosses the level and closes at the cut.
-
-## Tier 2 — the proof statement, once there are two trees to state it over
-
-**WHY THIS IS DEFERRED RATHER THAN SKIPPED (Anthony: "it will be easier to
-communicate my ideas once the syntax trees and working eval are in place").**
-Tier 1 lands the syntax and a working evaluator, and nothing above can be
-restated until both exist — settling the statement first argues a design in the
-abstract, against trees nobody has run. So the order is trees, then statement.
-What makes it a tier rather than a leg of tier 1 is the kind of failure
-available to each: tier 1 lands DEFINITIONS, which can only be wrong, and these
-are STATEMENTS, which can be false.
+**SO THE RISK MOVED UP, TO THE TWO TREES AND THE SEAM BETWEEN THEM (Anthony:
+"the plain tree is rxjs, and must not know what an envelope is").** TypeScript
+has plain rxjs and an `InstEmit`-carrying layer over it; Agda has one tree doing
+both jobs, and `toPlain` is the seam that compiles the author's palette down.
+Four primitives in it are still postulated, and they are where a program's
+meaning is decided. Above them sits the statement itself, which cannot be
+restated until the elaboration it quantifies over is settled — so the order is
+seam, then statement.
 
 ### The monster
 
 (no monster) — a monster is a NAME, and this tier's statements are not written
-yet. The top line standing today is a bare postulate over the machine tier 1 is
-replacing, so it is the thing to be restated rather than a thing to aim at. The
-tier takes a monster at the commit that first states the restatement; until
-then tier 1 is the lowest open tier and holds the cone.
+yet. The top line standing today is a bare postulate over the machine that has
+just been replaced, so it is the thing to be RESTATED rather than a thing to
+aim at, and a cone drawn round it would hold the restatement outside itself.
+The seam is the obvious candidate and it is premature for the same reason: the
+statement that would quantify over `toPlain` does not exist, so nothing yet
+says which of its four primitives is the one that could be false. The tier
+takes a monster at the commit that first states the restatement.
 
 ### Big picture tier roadmap
 
@@ -376,8 +291,15 @@ then tier 1 is the lowest open tier and holds the cone.
   was a body over one leaf; that leaf was refuted by a slot table scripted at
   the envelope type, and its subject is the envelope the evaluator no longer
   mints.
+- **`{mergeAll,switchAll,exhaustAll}ᵖ`** (Rx.Elaborate) — SHAPE,
+  `DEAD ROUTE×4`: the elaboration's per-former plumbing, after the two sources
+  came out of it. The outer's bookkeeping needs no plain home — it rides the
+  lane — so what is left is the compile of an envelope stream into a stream.
+- **`takeᵖ`** (Rx.Elaborate) — DIFFICULTY, `DEAD ROUTE`: the author cuts on
+  VALUES and a plain `takeᵉ` above the envelope cuts on BATCHES, so the
+  elaboration owes a count that crosses the level and closes at the cut.
 
-## Tier 3 — what Main asserts beside the main theorem
+## Tier 2 — what Main asserts beside the main theorem
 
 **THE MISC TIER, AND IT IS NOW ONE ROW PLUS A DEBT.** It held ten claims about
 the machine — determinacy, fuel coherence, the μ laws, run monotonicity and the
