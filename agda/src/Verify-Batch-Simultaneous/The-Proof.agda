@@ -5,7 +5,7 @@ open import Data.Unit    using (tt)
 open import Data.Nat     using (suc; _≤_; s≤s; _≤ᵇ_; _≡ᵇ_)
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤-trans; n≤1+n; ≤-refl; 1+n≰n)
 open import Data.Empty   using (⊥; ⊥-elim)
-open import Data.List    using (List; []; _∷_; _++_)
+open import Data.List    using (List; []; _∷_; _++_; concat)
 open import Data.List.Properties using (++-assoc; ++-identityʳ)
 open import Data.Maybe   using (Maybe; just; nothing)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
@@ -1120,7 +1120,7 @@ batch-agreement xs acc =
 -- stays claimed from Main in its own right, so what is postulated here
 -- is exactly the step from a run to a legal stream and nothing else.
 --
--- RECOVERY: git show f26f7a82:agda/src/Verify-Well-Formed.agda
+-- RECOVERY: git show 8c1b5750^:agda/src/Verify-Well-Formed.agda
 --   restores `evaluate-accepted`, the two dead routes recorded against
 --   it -- a well-formed denotation quantified over prefixes, which the
 --   settledness check rejects at a cut inside an instant, and a repair
@@ -1130,5 +1130,5 @@ postulate
   formal-verification-batchSimultaneous :
     ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : SExp Γ [] [] [] t)
       (ins : Slots (emitᵛ Γ)) →
-    spec-batchSimultaneous (decodeStream (evaluate↓ fuel (elaborate e) ins))
-      ≡ impl-batchSimultaneous (decodeStream (evaluate↓ fuel (elaborate e) ins))
+    spec-batchSimultaneous (decodeStream (concat (evaluate↓ fuel (elaborate e) ins)))
+      ≡ impl-batchSimultaneous (decodeStream (concat (evaluate↓ fuel (elaborate e) ins)))

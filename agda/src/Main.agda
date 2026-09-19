@@ -46,11 +46,10 @@ open import Verify-Batch-Simultaneous.Batch-Theorems
 -- machine computes, and they will be stated over it rather than
 -- transported.
 --
--- RECOVERY: git show b5601783:agda/src/Rx/Evaluator-Theorems.agda
--- RECOVERY: git show b5601783:agda/src/Verify-Determinacy.agda
--- RECOVERY: git show b5601783:agda/src/Verify-Run-Monotone.agda
--- RECOVERY: git show b5601783:agda/src/Rx/Time-Theorems.agda
---   holds all four, and the same sha's
---   `agda/evidence/probed/Probed/Run-Monotone.agda` the three rows that
---   were the only instantiation any of them ever had.
+-- RECOVERY: git show 8c1b5750^:agda/src/Rx/Evaluator-Theorems.agda
+-- RECOVERY: git show 8c1b5750^:agda/src/Verify-Determinacy.agda
+-- RECOVERY: git show 8c1b5750^:agda/src/Rx/Time-Theorems.agda
+--   holds three of them.  Run monotonicity and the probe rows that were
+--   its only instantiation never reached main, so nothing restores
+--   them; that statement is owed again from scratch.
 ------------------------------------------------------------------

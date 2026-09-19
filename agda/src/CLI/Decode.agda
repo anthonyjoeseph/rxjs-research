@@ -7,7 +7,7 @@ module CLI.Decode where
 open import Data.Bool using (Bool; true; false; if_then_else_; _∧_; T)
 open import Data.Char using () renaming (toℕ to charToℕ)
 open import Data.Fin using (Fin; zero; suc; toℕ)
-open import Data.List using (List; []; _∷_; map)
+open import Data.List using (List; []; _∷_; map; concat)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (Maybe; just; nothing)
@@ -365,5 +365,5 @@ decodeCase j =
   decodeExp BIG (fromList tys) [] [] [] t expJ >>=? λ e →
   getField "slots" j >>=? asArr >>=? decodeSlots BIG (fromList tys) >>=? λ ins →
   getField "fuel" j >>=? asNum >>=? λ f →
-  let values = valuesOf (evaluate↓ f e ins) in
+  let values = valuesOf (concat (evaluate↓ f e ins)) in
   just ("{" ++ˢ "\"values\":" ++ˢ encodeValues t values ++ˢ "}")

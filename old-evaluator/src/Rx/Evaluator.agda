@@ -2,9 +2,9 @@ module Rx.Evaluator where
 
 open import Data.Bool    using (Bool; true; false; if_then_else_; not; _∨_; _∧_)
 open import Data.Fin     using (Fin; toℕ)
-open import Data.Fin.Properties using () renaming (_≟_ to _≟ᶠ_)
+open import Data.Fin.Properties using (toℕ<n) renaming (_≟_ to _≟ᶠ_)
 open import Data.Maybe   using (Maybe; just; nothing; is-nothing)
-open import Data.Nat     using (ℕ; zero; suc; _+_; _<ᵇ_; _≡ᵇ_; _≤_)
+open import Data.Nat     using (ℕ; zero; suc; _+_; _<ᵇ_; _≡ᵇ_; _≤ᵇ_; _≤_)
 open import Data.Nat.Properties using (≤-trans)
 open import Data.List    using (List; []; _∷_; _++_; map; concat; tabulate; null)
 open import Data.Bool.ListAction using (any)
@@ -16,9 +16,9 @@ open import Relation.Nullary using (yes; no)
 open import Relation.Nullary.Decidable using (⌊_⌋)
 open import Relation.Binary.PropositionalEquality using (refl)
 
-open import Rx.Prim using (Tick; Ordinal; Source; Timed; after_,_; hot; cold;
-  PlainEvent; valueᵖ; completeᵖ)
-open import Rx.Exp  using (Ty; obs; _×ᵗ_; listᵗ; _≟ᵗ_; Ctx; Val; Closed; FnClo; applyClo)
+open import Rx.Prim using (Tick; Ordinal; Id; Source; Timed; after_,_; hot; cold; InstEvent; init; value; close;
+  handoff; complete; cut; cutPending; exhausted; subscribe; plumbing; InstEmit; _at_from_as_)
+open import Rx.Exp  using (Ty; obs; _×ᵗ_; _≟ᵗ_; Ctx; Val; Closed; Fn; applyFn)
 
 variable
   lo : ℕ
@@ -33,26 +33,13 @@ variable
 -- checked by the generator/decoder, not by these types; a forward
 -- reference is rejected there.
 open import Rx.Slots using (scripted; shared; Slots)
-open import Rx.Mint using (Mint; mint-init)
 
--- THE CARRIER IS PLAIN, AND THE PROTOCOL RIDES ON ITS VALUES.  What a
--- run pushes is what an rxjs subscriber sees: values in order, then an
--- end.  A simultaneity-aware program reaches this machine only through
--- the elaboration, which compiles the protocol into the VALUE type, so
--- the machine itself never handles an envelope and the mirror keeps
--- its footing — the TypeScript's operators are plain rxjs too.
+Stream : ∀ {n} → Ctx n → Ty → Set          -- flat, canonical emission order
+Stream Γ t = List (InstEmit (Val Γ t))
 
--- A BURST IS EVERYTHING ONE INCOMING EMIT CAUSES, AND IT IS THE UNIT A
--- SUBSCRIBE HANDS BACK.  A subscription returns its whole output at
--- once, so an operator bracketing the subscribe call sees a LIST at the
--- moment of grouping and needs no bit recording which side of that call
--- it is on -- which is the one thing a per-value descent has to carry
--- and this one does not.
-Burst : ∀ {n} → Ctx n → Ty → Set
-Burst Γ t = List (PlainEvent (Val Γ t))
-
-Stream : ∀ {n} → Ctx n → Ty → Set          -- bursts, in canonical order
-Stream Γ t = List (Burst Γ t)
+Grouped : ∀ {n} → Ctx n → Ty → Set         -- batchSimultaneous's output
+Grouped Γ t = List (InstEmit (List (Val Γ t)))
+  -- one emit per instant, still a protocol citizen (re-batchable)
 
 ------------------------------------------------------------------
 -- The global scheduler
@@ -73,10 +60,9 @@ record LiveSource {n} (Γ : Ctx n) : Set where
 -- the term, so there is nothing left for the schedule to carry and
 -- nothing left for a caller to pick wrong.
 record Sched {n} (Γ : Ctx n) : Set where
-  field mint        : Mint            -- every identifier the run hands out, keyed:
-                                     -- ordinals in subscription order, dynamic
-                                     -- sources (colds, deferᵉ bodies) from n up,
-                                     -- node instances from zero
+  field nextOrdinal : Ordinal          -- ordinals mint in subscription order
+        nextSource  : Source           -- dynamic sources (colds, deferᵉ bodies) mint from n up
+        nextNode    : ℕ                -- node instances mint in subscription order
         live        : List (LiveSource Γ)
         slots       : Slots Γ          -- scripts and shared defs, kept so subscribeE can anchor colds and connect shares
 
@@ -117,7 +103,7 @@ resolve anchor ((after w , v) ∷ r) =
 -- the convention subscribeE relies on to register hot chains.  Shared
 -- slots also own source toℕ i but connect lazily, at their first
 -- subscription; colds and deferᵉ bodies are registered by subscribeE
--- at subscription time, minting at the source and ordinal keys
+-- at subscription time, minting from nextSource/nextOrdinal
 -- top-level (not sched-init-local) so the budget-sufficiency proof
 -- can case-split each slot's initial LiveSource
 mkHot : ∀ {n} {Γ : Ctx n} (ins : Slots Γ) (i : Fin n) → List (LiveSource Γ)
@@ -129,13 +115,13 @@ mkHot {Γ = Γ} ins i with ins i
 
 sched-init : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → Sched Γ
 sched-init {n = n} {Γ = Γ} e ins = record
-  { mint = mint-init n
+  { nextOrdinal = n ; nextSource = n ; nextNode = 0
   ; live = concat (tabulate (mkHot ins)) ; slots = ins }
 
 -- pop the pending arrival minimal by (tick, ordinal), or report empty.
--- The workers are TOP-LEVEL (not where-local of sched-next) so a proof
--- can reason about the arrival sched-next yields — in particular that
--- it carries its LiveSource's elemTy
+-- The workers are TOP-LEVEL (not where-local of sched-next) so
+-- Verify-Well-Formed can reason about the arrival sched-next yields —
+-- in particular that it carries its LiveSource's elemTy
 schedEarlier : ∀ {n} {Γ : Ctx n} → Arrival Γ → Arrival Γ → Bool   -- ordinals are unique, so no tie survives
 schedEarlier a a′ = (Arrival.tick a <ᵇ Arrival.tick a′)
              ∨ ((Arrival.tick a ≡ᵇ Arrival.tick a′) ∧ (Arrival.ordinal a <ᵇ Arrival.ordinal a′))
@@ -179,8 +165,8 @@ NodeId = ℕ            -- numbered in subscription order
 -- recursion on the type says nothing about what a NODE HOLDS, so every
 -- arm of `Rx.Evaluator.Reducible` that reads a node back is owed a
 -- store invariant -- but only where the read produces a VALUE.  Here
--- `cell-st` holds one outright and `mergeAll-st`'s queue holds
--- observable values; `take-st`, `switch-st` and `exhaust-st` hold a count, an
+-- `scan-st` holds one outright and `mergeAll-st`'s queue holds closed
+-- expressions; `take-st`, `switch-st` and `exhaust-st` hold a count, an
 -- identifier and two flags, and nothing that leaves a frame dispatching
 -- on those came from anywhere but the burst that arrived.  So three of
 -- the four arms need no carrier at all, and the two that do differ in
@@ -188,17 +174,10 @@ NodeId = ℕ            -- numbered in subscription order
 -- admitted it, while an accumulator's is folded by the operator's own
 -- function and has no such source.
 data NodeState {n} (Γ : Ctx n) : Set where
-  cell-st    : ∀ {t} → Val Γ t → NodeState Γ
-               -- ONE CARRIED VALUE, AND IT IS NOT SCAN'S.  Every
-               -- stateful pure-function former keeps exactly this and
-               -- nothing else -- a running accumulator for the fold,
-               -- the carried state for the scanning step -- so the cell
-               -- is named for what it HOLDS rather than for whichever
-               -- former happens to be installed over it.  The type is
-               -- existential, so each read pays a `_≟ᵗ_`.
+  scan-st    : ∀ {t} → Val Γ t → NodeState Γ    -- current accumulator
   take-st    : ℕ → NodeState Γ                  -- emissions remaining
   mergeAll-st : ∀ {t} → (limit : Maybe ℕ) (active : ℕ)
-               (queued : List (Val Γ (obs t))) (outerDone : Bool) → NodeState Γ
+               (queued : List (Closed Γ t)) (outerDone : Bool) → NodeState Γ
                -- ONE state for every concurrency.  The two states this
                -- replaced were each a projection of it: unbounded merge kept
                -- a counter and no queue (`nothing`, q ≡ []), concat kept a
@@ -212,15 +191,6 @@ data NodeState {n} (Γ : Ctx n) : Set where
                -- face did not pay one before and its clauses now do.
   switch-st  : (currentInner : Maybe NodeId) (outerDone : Bool) → NodeState Γ
   exhaust-st : (innerActive outerDone : Bool) → NodeState Γ
-  batchSync-st : Bool → NodeState Γ
-               -- ONE BIT AND NO BUFFER, WHICH IS WHAT THE BURST MODEL
-               -- TAKES AWAY.  A subscription hands its whole output back
-               -- as BURSTS, so the group a bracket wants is already
-               -- assembled by the time a frame sees it and there is
-               -- nothing to accumulate.  What is left is the bit itself:
-               -- whether the subscribe call has returned, which is the
-               -- one thing about synchrony a plain rxjs operator may
-               -- know and the whole of what `captureSync` reads.
 
 NodeSt : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Set
 NodeSt {Γ = Γ} e = List (NodeId × NodeState Γ)   -- assoc list, subscription order
@@ -250,36 +220,9 @@ data AllOp : Set where
 -- an operator at all: a shared slot fans out by registry multiplicity,
 -- one chain per subscriber (see share-sink / dispatchShare)
 data Frame {n} (Γ : Ctx n) : Ty → Ty → Set where
-  map-f      : ∀ {s u} → FnClo Γ s u → Frame Γ s u
-               -- the stateless step, applied once per arriving value.
-               -- It OWNS NO NODE, and that is forced rather than
-               -- chosen: a cell would need a seed, and the term
-               -- language has no generic inhabitant to build one from.
-  scan-f     : ∀ {s u} → FnClo Γ (u ×ᵗ s) u
-             → NodeId → Frame Γ s u
-               -- the accumulating step, applied ONCE PER ARRIVING VALUE
-               -- with its cell threaded along.  Its output IS its
-               -- carried state, which is what rxjs's `scan` is and why
-               -- the seed lives in the cell rather than in the type.
-               --
-               -- Between them these two are the largest a frame can be
-               -- while leaving the protocol alone: each reads no node
-               -- but its own cell, mints no registration and cannot
-               -- raise fin, and neither can see the frame it is
-               -- stepping — which is what keeps both expressible as the
-               -- plain-rxjs operators they are named after.
+  map-f      : ∀ {s u} → Fn Γ [] [] [] s u → Frame Γ s u
+  scan-f     : ∀ {s u} → Fn Γ [] [] [] (u ×ᵗ s) u → NodeId → Frame Γ s u
   take-f     : ∀ {s} → NodeId → Frame Γ s s
-  batchSync-f : ∀ {s} → NodeId → Frame Γ s (s ×ᵗ listᵗ s)
-               -- THE ONLY FRAME WHOSE OUTPUT TYPE IS NOT ITS INPUT'S
-               -- OR A LAYER OFF IT, AND THE GROUPING IS WHY.  Values
-               -- arriving inside the subscribe bracket leave as ONE
-               -- value carrying all of them, head and tail, so the
-               -- result is nonempty by construction and needs no `Ty`
-               -- former of its own; values arriving after it leave one
-               -- per singleton.  An empty subscribe burst produces no
-               -- value at all rather than an empty group, which is
-               -- what the TypeScript does when its burst array comes
-               -- back empty.
   from-inner : ∀ {s} → AllOp → (allNode innerInstance : NodeId) → Frame Γ s s
                -- exiting a subscribed inner: the *All's own node, and
                -- this inner subscription's instance (switch kills by it)
@@ -350,7 +293,6 @@ frameNodes : ∀ {n} {Γ : Ctx n} {s u} → Frame Γ s u → List NodeId
 frameNodes (map-f _)          = []
 frameNodes (scan-f _ k)       = k ∷ []
 frameNodes (take-f k)         = k ∷ []
-frameNodes (batchSync-f k)    = k ∷ []
 frameNodes (from-inner _ k j) = k ∷ j ∷ []
 frameNodes (thru-outer _ k)   = k ∷ []
 
@@ -359,9 +301,13 @@ pathHasNode nid root           = false
 pathHasNode nid (share-sink i _) = false
 pathHasNode nid (f ↠ p)       = any (_≡ᵇ nid) (frameNodes f) ∨ pathHasNode nid p
 
--- Registrations carry an identity so a mid-cascade cut can name its
+-- remove every registration whose chain passes through the given
+-- node, emitting one close per removed registration
+-- registrations carry an identity so a mid-cascade cut can name its
 -- victims: a cancelled registration's snapshot chain must deliver
--- NOTHING, as in rxjs, where an unsubscribed chain is silent.
+-- NOTHING (as in rxjs — an unsubscribed chain is silent), and its
+-- close must say whether it had already paid this instant (cut) or
+-- never will (cutPending, cancelling one owed count downstream)
 RegId : Set
 RegId = ℕ
 
@@ -373,19 +319,29 @@ RegId = ℕ
 RegRow : ∀ {n} → Ctx n → Ty → Set
 RegRow Γ t = RegId × Σ (RegSrc Γ) (λ rs → Chain Γ (regFloor rs) t)
 
--- Remove every registration whose chain passes through the given node,
--- and return the victims' ids for the cascade's cancelled set.  The
--- severing is all there is: which victim had already paid this instant
--- and which never would used to decide a close reason per victim, and a
--- plain stream carries no closes for that reason to ride on.
+-- the close reason is writer-asserted per victim: delivered this
+-- cascade, or born since the cascade started (owing nothing) ⇒ cut;
+-- a pre-existing registration cut before its delivery ⇒ cutPending.
+-- A victim of a DYING source that already delivered carried its own
+-- exhausted close on its own emit — no second close for it.  Also
+-- returns the victims' ids for the cascade's cancelled set.
 cutThrough : ∀ {n} {Γ : Ctx n} {t}
-           → NodeId → List (RegRow Γ t)
-           → List (RegRow Γ t) × List RegId
-cutThrough nid [] = [] , []
-cutThrough nid ((rid , rs , c) ∷ r)
-  with pathHasNode nid (proj₂ c) | cutThrough nid r
-... | true  | kept , rids = kept , rid ∷ rids
-... | false | kept , rids = (rid , rs , c) ∷ kept , rids
+           → NodeId → List RegId → RegId → List Source
+           → List (RegRow Γ t)
+           → List (RegRow Γ t)
+             × List (InstEvent (Val Γ t)) × List RegId
+cutThrough nid delivered wm dying [] = [] , [] , []
+cutThrough nid delivered wm dying ((rid , rs , c) ∷ r)
+  with pathHasNode nid (proj₂ c) | cutThrough nid delivered wm dying r
+... | true  | kept , closes , rids =
+      kept
+      , (if any (_≡ᵇ rid) delivered ∧ memberSource (regSource rs) dying
+         then closes
+         else close (regSource rs)
+                (if any (_≡ᵇ rid) delivered ∨ (wm ≤ᵇ rid)
+                 then cut else cutPending) ∷ closes)
+      , rid ∷ rids
+... | false | kept , closes , rids = (rid , rs , c) ∷ kept , closes , rids
 
 -- drop dead dynamic sources (no remaining registrations); hot input
 -- slots (sources < n by convention) keep firing regardless, exactly
@@ -409,6 +365,7 @@ dropSource src ((rid , s , c) ∷ r) =
 
 record EvalSt {n} {Γ : Ctx n} {t} (e : Closed Γ t) : Set where
   field registry        : List (RegRow Γ t)   -- live registration chains, subscription order
+        nextReg         : RegId         -- registration ids, minted by register
         nodes           : NodeSt e
         connectedShares : List Source   -- shared slots whose def is live (connect happens once, ever)
         completedSources : List Source  -- the completion latch: completed shares AND spent
@@ -421,55 +378,65 @@ record EvalSt {n} {Γ : Ctx n} {t} (e : Closed Γ t) : Set where
         cancelled       : List RegId    -- victims cut mid-cascade: their snapshot
                                         -- chains are skipped outright (an unsubscribed
                                         -- rxjs chain delivers nothing)
+        regWatermark    : RegId         -- nextReg at cascade start: registrations at or
+                                        -- above it were born this cascade and owe nothing
         dying           : List Source   -- sources spending their final delivery this
                                         -- cascade (the isLast arrival, a completing
-                                        -- share): their delivered registrations have
-                                        -- nothing left to be asked for, and the whole
-                                        -- source's registry entries drop at finish
+                                        -- share): their delivered registrations already
+                                        -- carried their own exhausted closes, and the
+                                        -- whole source's registry entries drop at finish
 
--- append: the registry stays in subscription order.  The id is HANDED
--- IN rather than minted here, because the run has exactly one ledger
--- and it rides on the schedule, which this function is not given; the
--- caller reads `regᵏ` and advances it in the same breath, which is the
--- shape node instances already have.
+mintSource : ∀ {n} {Γ : Ctx n} → Sched Γ → Source × Sched Γ
+mintSource sched =
+  Sched.nextSource sched , record sched { nextSource = suc (Sched.nextSource sched) }
+
+-- append: the registry stays in subscription order; the id is minted here
 register : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-         → RegId → (rs : RegSrc Γ) → Path Γ (regFloor rs) u t → EvalSt e → EvalSt e
-register {u = u} rid rs path st =
-  record st { registry = EvalSt.registry st ++ (rid , rs , u , path) ∷ [] }
+         → (rs : RegSrc Γ) → Path Γ (regFloor rs) u t → EvalSt e → EvalSt e
+register {u = u} rs path st =
+  record st { registry = EvalSt.registry st
+                           ++ (EvalSt.nextReg st , rs , u , path) ∷ []
+            ; nextReg  = suc (EvalSt.nextReg st) }
 
 installNode : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
             → NodeId → NodeState Γ → EvalSt e → EvalSt e
 installNode nid nodeState st =
   record st { nodes = setNode nid nodeState (EvalSt.nodes st) }
 
+-- a source that lives and dies inside its own subscription burst
+-- (ofᵉ, emptyᵉ, take 0, a cold with no async tail): init, values,
+-- close, complete — one emit, nothing registered, nothing scheduled
+oneShotBurst : ∀ {n} {Γ : Ctx n} {u}
+             → List (Val Γ u) → Id → Sched Γ → Stream Γ u × Sched Γ
+oneShotBurst vals id sched =
+  let (src , sched₁) = mintSource sched
+  in ((init src ∷ map value vals ++ close src exhausted ∷ complete ∷ [])
+       at id from src as subscribe) ∷ [] , sched₁
+
+-- a source that was already spent before this subscription reached it
+-- — a completed Subject, a share whose def has closed, or a slot the
+-- registration's own floor test refuses.  Same shape as a one-shot with
+-- no values, but the source is GIVEN rather than minted, because the
+-- point is that this subscriber joins something that already has an
+-- identity.
+spentBurst : ∀ {A : Set} → Source → Id → List (InstEmit A)
+spentBurst src id =
+  ((init src ∷ close src exhausted ∷ complete ∷ []) at id from src as subscribe) ∷ []
+
 st-init : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) → EvalSt e
-st-init e = record { registry = [] ; nodes = []
+st-init e = record { registry = [] ; nextReg = 0 ; nodes = []
                    ; connectedShares = [] ; completedSources = []
-                   ; delivered = [] ; cancelled = [] ; dying = [] }
+                   ; delivered = [] ; cancelled = [] ; regWatermark = 0
+                   ; dying = [] }
   -- all populated by the root subscribeE and by lazy share connects
-
--- A SOURCE THAT LIVES AND DIES INSIDE ITS OWN SUBSCRIPTION BURST
--- (`ofᵉ`, `emptyᵉ`, `take 0`, a cold with no async tail): its values
--- and the end, as ONE burst, with nothing registered and nothing
--- scheduled.  It is pure, and that is the protocol leaving: the old
--- shape minted a source so an `init`/`close` pair had something to
--- name, and a plain carrier has neither event to carry.
-oneShotBurst : ∀ {n} {Γ : Ctx n} {u} → List (Val Γ u) → Stream Γ u
-oneShotBurst vals = (map valueᵖ vals ++ completeᵖ ∷ []) ∷ []
-
--- A source already spent before this subscription reached it — a
--- completed Subject, a share whose def has closed, or a slot the
--- registration's own floor test refuses.  The end, immediately.
-spentBurst : ∀ {n} {Γ : Ctx n} {u} → Stream Γ u
-spentBurst = (completeᵖ ∷ []) ∷ []
 
 -- the arrival's source's live chains, in subscription order, at
 -- exactly the arrival's element type: a chain is admitted only past a
 -- Ty equality check, so no payload is ever read at the wrong type (a
 -- mistyped registry entry — impossible by the registration invariant —
 -- is dropped, never trusted)
--- TOP-LEVEL (not where-local of chainsOf) so a proof can induct on it
--- against the registry — the snapshot of a's source-typed chains
+-- TOP-LEVEL (not where-local of chainsOf) so Verify-Well-Formed can induct
+-- on it against the registry — the snapshot of a's source-typed chains
 -- AND THE SOURCE TEST IS A DECISION RATHER THAN A BOOL, which is what
 -- lets the row's stored floor arrive in the caller's type.  Matching on
 -- `_≡ᵇ_` selects the right rows and teaches the clause nothing, so the
@@ -487,50 +454,48 @@ chainsOf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
          → (a : Arrival Γ) → EvalSt e → List (RegId × AtFloor Γ (arrTy a) t)
 chainsOf a st = chainsGo a (EvalSt.registry st)
 
--- SPLITTING A BURST INTO WHAT A FRAME STEPS AND WHAT IT REACTS TO.
--- A plain burst carries values and, at most, the end; the values are
--- what the frame transforms and the end is the `fin` bit threaded
--- alongside.  With the protocol out of the carrier there is no third
--- column: nothing has to be retagged across a payload type, because
--- nothing but a value carries one.
-splitEvents : ∀ {n} {Γ : Ctx n} {u} → Burst Γ u → List (Val Γ u) × Bool
-splitEvents []              = [] , false
-splitEvents (valueᵖ v ∷ es) = let (vs , c) = splitEvents es in v ∷ vs , c
-splitEvents (completeᵖ ∷ es) = let (vs , _) = splitEvents es in vs , true
+-- split a subscription burst into grafted values, retagged
+-- bookkeeping events, and whether the inner completed synchronously
+splitEvents : ∀ {n} {Γ : Ctx n} {u} {A : Set}
+            → List (InstEvent (Val Γ u))
+            → List (Val Γ u) × List (InstEvent A) × Bool
+splitEvents []              = [] , [] , false
+splitEvents (value v  ∷ es) = let (vs , bs , c) = splitEvents es in v ∷ vs , bs , c
+splitEvents (init s   ∷ es) = let (vs , bs , c) = splitEvents es in vs , init s ∷ bs , c
+splitEvents (close s r ∷ es) = let (vs , bs , c) = splitEvents es in vs , close s r ∷ bs , c
+splitEvents (handoff s ∷ es) = let (vs , bs , c) = splitEvents es in vs , handoff s ∷ bs , c
+splitEvents (complete ∷ es) = let (vs , bs , _) = splitEvents es in vs , bs , true
 
-splitBurst : ∀ {n} {Γ : Ctx n} {u} → Stream Γ u → List (Val Γ u) × Bool
-splitBurst []         = [] , false
-splitBurst (b ∷ bs) =
-  let (vs  , c ) = splitEvents b
-      (vs′ , c′) = splitBurst bs
-  in vs ++ vs′ , c ∨ c′
+splitBurst : ∀ {n} {Γ : Ctx n} {u} {A : Set}
+           → Stream Γ u → List (Val Γ u) × List (InstEvent A) × Bool
+splitBurst []         = [] , [] , false
+splitBurst (em ∷ ems) =
+  let (vs  , bs  , c ) = splitEvents (InstEmit.events em)
+      (vs′ , bs′ , c′) = splitBurst ems
+  in vs ++ vs′ , bs ++ bs′ , c ∨ c′
 
-hasComplete : ∀ {n} {Γ : Ctx n} {u} → Burst Γ u → Bool
-hasComplete = any isFinᵖ
-  where isFinᵖ : ∀ {A : Set} → PlainEvent A → Bool
-        isFinᵖ (valueᵖ _) = false
-        isFinᵖ completeᵖ  = true
+hasComplete : ∀ {A : Set} → List (InstEvent A) → Bool
+hasComplete []             = false
+hasComplete (complete ∷ _) = true
+hasComplete (_ ∷ es)       = hasComplete es
 
 burstCompleted : ∀ {n} {Γ : Ctx n} {u} → Stream Γ u → Bool
-burstCompleted = any hasComplete
+burstCompleted = any (λ em → hasComplete (InstEmit.events em))
 
--- THE PER-FRAME SEMANTICS, AND EVERY ONE OF THEM TAKES A BURST.  A
--- subscription hands its whole output back at once, so what arrives
--- at a frame is a LIST of values that a single incoming emit caused —
--- which is exactly what an rxjs operator sees inside one synchronous
--- turn, and is why the bracket below needs no buffer.  The threaded
--- Bool is "this stream completes as part of THIS burst": raised by a
--- spent source or a take's cut, absorbed by the `*All` frames, turned
--- into a `completeᵖ` only at the root.
---
--- Missing or mistyped node state — impossible by the subscription
--- invariant — degrades to forwarding NOTHING, never to a wrong read.
-
--- take's emission split: pass through up to the remaining budget,
--- reporting the new remaining count and whether this burst hit the
--- limit.  Real `take` cuts MID-BURST rather than waiting for the burst
--- to finish, which is what the third component says and what the
--- dispatch below acts on.
+-- the per-frame semantics.  All recursion here is structural — the
+-- deep recursion (a subscription's sync burst re-entering the
+-- pipeline) lives in subscribeE.  The threaded Bool is v1's fin:
+-- "this stream completes as part of THIS emit" — raised by a spent
+-- source or a takeᵉ cut, absorbed and reacted to by the *All frames
+-- (concatAll advances by grafting the next queued inner's flush into
+-- the fin-carrying emit), turned into a `complete` event only at the
+-- root.  Missing or mistyped node state (impossible by the
+-- subscription invariant) degrades to forwarding nothing, never to a
+-- wrong read.
+-- take's emission split: pass through up to the remaining budget, reporting
+-- the new remaining count and whether this burst hit the limit (didCut).
+-- Top-level (not stepFrame-local) so the well-formedness proof can case-split
+-- its cut flag to separate the quiet non-cut path from the cutting one.
 takeVals : ∀ {n} {Γ : Ctx n} {s} → ℕ → List (Val Γ s) → List (Val Γ s) × ℕ × Bool
 takeVals zero          _        = [] , zero , false
 takeVals (suc k)       []       = [] , suc k , false
@@ -538,80 +503,10 @@ takeVals (suc zero)    (v ∷ _)  = v ∷ [] , zero , true
 takeVals (suc (suc k)) (v ∷ vs) =
   let (out , rem , didCut) = takeVals (suc k) vs in v ∷ out , rem , didCut
 
--- take's whole step.  Non-cut passes the budgeted prefix through and
--- threads the remaining count; the cut exhausts the budget, forces the
--- end, and severs the registrations threaded through this node.
-takeDispatch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-             → NodeId → List (Val Γ s) → Bool → Sched Γ → EvalSt e
-             → Maybe (NodeState Γ)
-             → List (Val Γ s) × Bool × Sched Γ × EvalSt e
-takeDispatch nid vals fin sched st (just (take-st k)) =
-  if proj₂ (proj₂ (takeVals k vals))
-  then (let (kept , cutRids) = cutThrough nid (EvalSt.registry st)
-        in proj₁ (takeVals k vals) , true ,
-           record sched { live = sweepLive kept (Sched.live sched) } ,
-           record st { registry = kept
-                     ; cancelled = cutRids ++ EvalSt.cancelled st
-                     ; nodes = setNode nid (take-st zero) (EvalSt.nodes st) })
-  else (proj₁ (takeVals k vals) , fin , sched ,
-        record st { nodes = setNode nid (take-st (proj₁ (proj₂ (takeVals k vals))))
-                                      (EvalSt.nodes st) })
-takeDispatch nid vals fin sched st _ = [] , fin , sched , st
-
--- scan's per-value fold: one running output per input, threading the
--- accumulator.  Its output IS its carried state, which is what rxjs's
--- `scan` is and why the seed lives in the cell rather than in the type.
-scanVals : ∀ {n} {Γ : Ctx n} {s u} → FnClo Γ (u ×ᵗ s) u
-         → Val Γ u → List (Val Γ s) → List (Val Γ u) × Val Γ u
-scanVals fn ac []       = [] , ac
-scanVals fn ac (v ∷ vs) =
-  let ac′           = applyClo fn (ac , v)
-      (outs , last) = scanVals fn ac′ vs
-  in ac′ ∷ outs , last
-
--- THE SCAN'S WHOLE STEP, AS ONE FUNCTION OF WHAT THE NODE HOLDS.  A
--- fold that finds no accumulator of its own element type emits nothing
--- and writes nothing.  Stating it as a function rather than as two
--- constructors is what stops a prover choosing the empty reading at a
--- node that really does hold an accumulator: the relation then has one
--- arm and no arm to prefer.
-scanDispatch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-             → FnClo Γ (u ×ᵗ s) u → NodeId → List (Val Γ s) → Bool
-             → Sched Γ → EvalSt e → Maybe (NodeState Γ)
-             → List (Val Γ u) × Bool × Sched Γ × EvalSt e
-scanDispatch {u = u} fn nid vals fin sched st (just (cell-st {w} a))
-  with w ≟ᵗ u
-... | no  _    = [] , fin , sched , st
-... | yes refl =
-      proj₁ (scanVals fn a vals) , fin , sched ,
-      record st { nodes = setNode nid (cell-st (proj₂ (scanVals fn a vals)))
-                                  (EvalSt.nodes st) }
-scanDispatch fn nid vals fin sched st _ = [] , fin , sched , st
-
--- THE BRACKET, AND THE BURST IS THE BATCH.  While the bit is up —
--- inside the subscribe call — the whole burst leaves as ONE value
--- carrying all of it, head and tail, so the result is nonempty by
--- construction and needs no `Ty` former of its own; an empty burst
--- produces no value at all rather than an empty group, which is what
--- the TypeScript does when its burst array comes back empty.  Once the
--- bit is down every value leaves as its own group of one.  That is the
--- TypeScript's `isSync` exactly, and it is the whole of what a plain
--- operator may know about synchrony.
-batchVals : ∀ {n} {Γ : Ctx n} {s} → Bool → List (Val Γ s)
-          → List (Val Γ (s ×ᵗ listᵗ s))
-batchVals _     []       = []
-batchVals true  (v ∷ vs) = (v , vs) ∷ []
-batchVals false (v ∷ vs) = (v , []) ∷ batchVals false vs
-
-batchDispatch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-              → NodeId → List (Val Γ s) → EvalSt e → Maybe (NodeState Γ)
-              → List (Val Γ (s ×ᵗ listᵗ s))
-batchDispatch nid vals st (just (batchSync-st sync)) = batchVals sync vals
-batchDispatch nid vals st _                          = []
-
 -- a from-inner completion is absorbed iff some registration under this inner
 -- instance is still live: its path threads `inst`, it is not cancelled, and it
--- is not an already-delivered dying-source chain.
+-- is not an already-delivered dying-source chain.  Top-level (not from-inner-
+-- local) so the well-formedness proof can case-split the absorb vs. finish paths.
 aliveThroughᶠ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
               → NodeId → EvalSt e → RegRow Γ t → Bool
 aliveThroughᶠ inst st (rid , rs , (w , p)) =
@@ -620,7 +515,64 @@ aliveThroughᶠ inst st (rid , rs , (w , p)) =
   ∧ (not (memberSource (regSource rs) (EvalSt.dying st))
      ∨ not (any (_≡ᵇ rid) (EvalSt.delivered st)))
 
--- IS THERE A FREE LANE?  `nothing` is rxjs's Infinity, so always.
+-- scan's per-emit fold: one running output per input, threading the accumulator.
+-- Top-level (not stepFrame-local) so the well-formedness proof can name the value
+-- transform it feeds to the protocol-transparency fold.
+scanVals : ∀ {n} {Γ : Ctx n} {s u} → Fn Γ [] [] [] (u ×ᵗ s) u
+         → Val Γ u → List (Val Γ s) → List (Val Γ u) × Val Γ u
+scanVals fn ac []       = [] , ac
+scanVals fn ac (v ∷ vs) =
+  let ac′           = applyFn fn (ac , v)
+      (outs , last) = scanVals fn ac′ vs
+  in ac′ ∷ outs , last
+
+-- THE SCAN'S WHOLE STEP, AS ONE FUNCTION OF WHAT THE NODE HOLDS.  A
+-- fold that finds no accumulator of its own element type emits nothing
+-- and writes nothing, which is the same reading the queue's type test
+-- already forces on every existential read here.  Stating it as a
+-- function rather than as two constructors is what stops a prover
+-- choosing the empty reading at a node that really does hold an
+-- accumulator: the relation then has one arm and no arm to prefer.
+scanDispatch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+             → Fn Γ [] [] [] (u ×ᵗ s) u → NodeId → List (Val Γ s) → Bool
+             → Sched Γ → EvalSt e → Maybe (NodeState Γ)
+             → List (Val Γ u) × List (InstEvent (Val Γ t)) × Bool
+               × Sched Γ × EvalSt e
+scanDispatch {u = u} fn nid vals fin sched st (just (scan-st {w} a))
+  with w ≟ᵗ u
+... | no  _    = [] , [] , fin , sched , st
+... | yes refl =
+      proj₁ (scanVals fn a vals) , [] , fin , sched ,
+      record st { nodes = setNode nid (scan-st (proj₂ (scanVals fn a vals)))
+                                  (EvalSt.nodes st) }
+scanDispatch fn nid vals fin sched st _ = [] , [] , fin , sched , st
+
+-- take's per-emit step, lifted out of stepFrame so the well-formedness proof
+-- can reason about its reduction over a stuck node lookup.  Non-cut passes the
+-- budgeted prefix through untouched (threading the remaining count); the cut
+-- exhausts the budget, forces `complete`, and severs the registry (cutThrough).
+takeDispatch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+             → NodeId → List (Val Γ s) → Bool → Sched Γ → EvalSt e → Maybe (NodeState Γ)
+             → List (Val Γ s) × List (InstEvent (Val Γ t)) × Bool × Sched Γ × EvalSt e
+takeDispatch nid vals fin sched st (just (take-st k)) =
+  if proj₂ (proj₂ (takeVals k vals))
+  then (let (kept , closes , cutRids) =
+              cutThrough nid (EvalSt.delivered st) (EvalSt.regWatermark st)
+                         (EvalSt.dying st) (EvalSt.registry st)
+        in proj₁ (takeVals k vals) , closes , true ,
+           record sched { live = sweepLive kept (Sched.live sched) } ,
+           record st { registry = kept
+                     ; cancelled = cutRids ++ EvalSt.cancelled st
+                     ; nodes = setNode nid (take-st zero) (EvalSt.nodes st) })
+  else (proj₁ (takeVals k vals) , [] , fin , sched ,
+        record st { nodes = setNode nid (take-st (proj₁ (proj₂ (takeVals k vals))))
+                                      (EvalSt.nodes st) })
+takeDispatch nid vals fin sched st _ = [] , [] , fin , sched , st
+
+-- the outer *All frame's machinery, lifted out of stepFrame so the
+-- budget proof can reason about its reduction.  One walk for all four
+-- ops (they differ only in the per-emit step and the wrap's node read)
+-- is there a free lane?  `nothing` is rxjs's Infinity, so always
 hasRoom : Maybe ℕ → ℕ → Bool
 hasRoom nothing  active = true
 hasRoom (just m) active = active <ᵇ m
@@ -630,7 +582,7 @@ hasRoom (just m) active = active <ᵇ m
 -- subscription is not fastidiousness: the inner's own synchronous burst
 -- can route back through THIS node and finish there, and a captured
 -- count silently discards that drain — the freed lane is refilled and
--- then un-freed by a stale write.
+-- then un-freed by a stale write
 mergeAllBump : ∀ {n} {Γ : Ctx n} → NodeId → Bool
             → List (NodeId × NodeState Γ) → List (NodeId × NodeState Γ)
 mergeAllBump nid done ns with lookupNode nid ns
@@ -641,11 +593,14 @@ mergeAllBump nid done ns with lookupNode nid ns
 -- switchAll's cut: the outgoing inner's registrations are severed
 switchKill : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
            → Maybe NodeId → Sched Γ → EvalSt e
-           → Sched Γ × EvalSt e
-switchKill nothing  sched₀ st₀ = sched₀ , st₀
+           → List (InstEvent (Val Γ t)) × Sched Γ × EvalSt e
+switchKill nothing  sched₀ st₀ = [] , sched₀ , st₀
 switchKill (just v) sched₀ st₀ =
-  let (kept , cutRids) = cutThrough v (EvalSt.registry st₀)
-  in record sched₀ { live = sweepLive kept (Sched.live sched₀) } ,
+  let (kept , closes , cutRids) =
+        cutThrough v (EvalSt.delivered st₀) (EvalSt.regWatermark st₀)
+                   (EvalSt.dying st₀) (EvalSt.registry st₀)
+  in closes ,
+     record sched₀ { live = sweepLive kept (Sched.live sched₀) } ,
      record st₀ { registry = kept
                 ; cancelled = cutRids ++ EvalSt.cancelled st₀ }
 
@@ -655,7 +610,8 @@ switchKill (just v) sched₀ st₀ =
 -- the table carries that type existentially; a switch wants its own,
 -- which holds no type to disagree about; an exhaust wants its own with
 -- nothing already running, because a busy exhaust refuses the arrival
--- outright.  Every other reading is the collapse, and naming the
+-- outright.  Every other reading -- another operator's state, a
+-- mismatched element type, no node -- is the collapse, and naming the
 -- collapse is what lets the relation's fallback carry a side condition
 -- instead of standing free at every state.
 consumeUsable : ∀ {n} {Γ : Ctx n} → AllOp → (u : Ty) → Maybe (NodeState Γ) → Bool
@@ -670,7 +626,9 @@ consumeUsable _         _ _                                = false
 -- switch finishes only the inner it currently believes is running, so
 -- a late death from an already-replaced inner clears nothing; an
 -- exhaust finishes against its own node whatever the running flag
--- says, since clearing it is the whole point.
+-- says, since clearing it is the whole point.  Anything else is the
+-- collapse, and naming it keeps the relation's fallback from standing
+-- free at a node that really does hold a queue.
 finishUsable : ∀ {n} {Γ : Ctx n} → AllOp → (s : Ty) → NodeId
              → Maybe (NodeState Γ) → Bool
 finishUsable mergeAllᵒ s inst (just (mergeAll-st {w} _ _ _ _)) = ⌊ w ≟ᵗ s ⌋
@@ -678,37 +636,51 @@ finishUsable switchᵒ   s inst (just (switch-st (just c) _))    = c ≡ᵇ inst
 finishUsable exhaustᵒ  s inst (just (exhaust-st _ _))          = true
 finishUsable _         _ _    _                                = false
 
--- THE OUTER HAS FINISHED, RECORDED AND READ BACK IN ONE BREATH.  An
--- `*All` outlives its outer for exactly as long as something is still
--- running under it, so the bit is written and the verdict is a READING
--- of the store as it then stands — a lane can be drained and refilled
--- while the outer's own burst is still being walked, so a verdict
--- computed before the write is a verdict about a store that no longer
--- holds.
 thruWrap : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
          → AllOp → NodeId → Bool
-         → List (Val Γ u) × Sched Γ × EvalSt e
-         → List (Val Γ u) × Bool × Sched Γ × EvalSt e
-thruWrap op nid false (vs , sched′ , st′) = vs , false , sched′ , st′
-thruWrap mergeAllᵒ nid true (vs , sched′ , st′)
+         → List (Val Γ u) × List (InstEvent (Val Γ t)) × Sched Γ × EvalSt e
+         → List (Val Γ u) × List (InstEvent (Val Γ t)) × Bool × Sched Γ × EvalSt e
+thruWrap op nid false (vs , bs , sched′ , st′) = vs , bs , false , sched′ , st′
+thruWrap mergeAllᵒ nid true (vs , bs , sched′ , st′)
   with lookupNode nid (EvalSt.nodes st′)
 ... | just (mergeAll-st lim act q _) =
-      vs , (act ≡ᵇ 0) ∧ null q , sched′ ,
+      vs , bs , (act ≡ᵇ 0) ∧ null q , sched′ ,
       record st′ { nodes = setNode nid (mergeAll-st lim act q true) (EvalSt.nodes st′) }
-... | _ = vs , true , sched′ , st′
-thruWrap switchᵒ nid true (vs , sched′ , st′)
+... | _ = vs , bs , true , sched′ , st′
+thruWrap switchᵒ nid true (vs , bs , sched′ , st′)
   with lookupNode nid (EvalSt.nodes st′)
 ... | just (switch-st cur _) =
-      vs , is-nothing cur , sched′ ,
+      vs , bs , is-nothing cur , sched′ ,
       record st′ { nodes = setNode nid (switch-st cur true) (EvalSt.nodes st′) }
-... | _ = vs , true , sched′ , st′
-thruWrap exhaustᵒ nid true (vs , sched′ , st′)
+... | _ = vs , bs , true , sched′ , st′
+thruWrap exhaustᵒ nid true (vs , bs , sched′ , st′)
   with lookupNode nid (EvalSt.nodes st′)
 ... | just (exhaust-st act _) =
-      vs , not act , sched′ ,
+      vs , bs , not act , sched′ ,
       record st′ { nodes = setNode nid (exhaust-st act true) (EvalSt.nodes st′) }
-... | _ = vs , true , sched′ , st′
+... | _ = vs , bs , true , sched′ , st′
 
+-- the inner *All frame's machinery, lifted out of stepFrame so the
+-- budget proof can reason about its reduction.  The drain walks the
+-- parked queue, subscribing while a lane is free and stopping the
+-- instant one is not.  This is the ONE behaviour bounded concurrency
+-- adds that neither face it replaces had: unbounded merge never
+-- queues, so it never drains, and concat's drain could stop only at
+-- the first inner that stayed open because its capacity was one.  The
+-- accumulator is the live count and NOT a flag, so the walk keeps
+-- filling lanes across several parked inners in one instant, which is
+-- precisely what `mergeMap(f , k)` does when several finish together
+
+-- bookkeeping crosses payload types freely — init/close/complete
+-- carry none.  A value cannot cross and is dropped; the callers only
+-- ever retag event lists that stepFrame produced, which are value-free
+retagEvents : ∀ {A B : Set} → List (InstEvent A) → List (InstEvent B)
+retagEvents []              = []
+retagEvents (init s    ∷ es) = init s    ∷ retagEvents es
+retagEvents (close s r ∷ es) = close s r ∷ retagEvents es
+retagEvents (handoff s ∷ es) = handoff s ∷ retagEvents es
+retagEvents (complete  ∷ es) = complete  ∷ retagEvents es
+retagEvents (value _   ∷ es) = retagEvents es
 
 -- a shared slot: identity IS the index, source toℕ i (a hot's
 -- convention).  All reset options are false by definition: connect at
@@ -717,16 +689,18 @@ thruWrap exhaustᵒ nid true (vs , sched′ , st′)
 -- latch completion forever — a post-completion subscriber sees only
 -- an immediate close/complete, because completion is re-observable
 -- and values are not
--- AND THE CONNECT BURST IS NO LONGER MARKED AS IT PASSES.  It used to
--- be retagged plumbing, so that the first subscriber's frames could
--- tell a share's own registrations (which survive it) from their own
--- and refuse to adopt them on a cut or a join.  That mark was a field
--- of the carrier; with the protocol in the values, a frame reads the
--- distinction off the registry it already consults.
+-- the connect burst is retagged plumbing: it flows up the first
+-- subscriber's frames as real protocol traffic, but its
+-- registrations belong to the share (registered at share-sink,
+-- surviving the subscriber) — a downstream cut or join must not
+-- adopt them
+sharedPlumb : ∀ {n} {Γ : Ctx n} {u} → Stream Γ u → Stream Γ u
+sharedPlumb = map (λ em → record em { kind = plumbing })
 
--- Latch completion AND mark the share dying, so that a cut landing
--- mid-fan-out can tell a share that has already finished from one
--- still running; the registry entries drop at shareFinish.
+-- latch completion AND mark the share dying: a delivered fan-out
+-- registration's exhausted close rides its own emit, so a cut during
+-- the fan-out suppresses its second close (cutThrough's
+-- delivered∧dying rule); the registry entries drop at shareFinish
 shareLatch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
            → (i : Fin n) → Bool → EvalSt e → EvalSt e
 shareLatch i false st₀ = st₀
@@ -771,22 +745,23 @@ shareFinish i true  (emits , sched′ , st′) =
 -- value) is latched completed BEFORE its last delivery fans out — as
 -- a Subject closes before delivering its completion — so a subscriber
 -- joining mid-cascade already sees the one-shot close/complete; it is
--- also marked dying, so a chain that has already spent this
--- source's final delivery is not asked for another; its registry
--- entries drop at cascadeFinish.  Colds and
+-- also marked dying (each of its chains seeds its own exhausted
+-- close; a cut never closes a delivered dying registration a second
+-- time; its registry entries drop at cascadeFinish).  Colds and
 -- deferᵉ hops get latched too, harmlessly: their sources are
 -- per-subscription, never re-subscribed
 cascadeLatch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-             → Arrival Γ → Sched Γ → EvalSt e → EvalSt e
-cascadeLatch a sched st₀ =
+             → Arrival Γ → EvalSt e → EvalSt e
+cascadeLatch a st₀ =
   record (if Arrival.isLast a
           then record st₀ { completedSources = arrSource a ∷ EvalSt.completedSources st₀ }
           else st₀)
-    { delivered = [] ; cancelled = []
+    { delivered = [] ; cancelled = [] ; regWatermark = EvalSt.nextReg st₀
     ; dying = if Arrival.isLast a then arrSource a ∷ [] else [] }
 
--- the spent source's registrations drop at the end, and the sweep
--- collects its live entry
+-- the spent source's registrations drop at the end (each delivered
+-- chain carried its own close; cut victims' closes rode the cutting
+-- emit) and the sweep collects its live entry
 cascadeFinish : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
               → Arrival Γ → Sched Γ → EvalSt e → Sched Γ × EvalSt e
 cascadeFinish a sched′ st′ with Arrival.isLast a
