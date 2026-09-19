@@ -1,22 +1,23 @@
 module Rx.Elaborate where
 
-open import Data.Bool using (false)
+open import Data.Bool using (true; false)
 open import Data.List using (List; []; _∷_; _++_; map)
 open import Data.List.Properties using (map-++)
 open import Data.List.Membership.Propositional.Properties using (∈-map⁺; ∈-++⁺ˡ; ∈-++⁺ʳ)
 open import Data.List.Relation.Unary.Any using (here; there)
-open import Data.Maybe using (Maybe)
+open import Data.Maybe using (Maybe; nothing)
 open import Data.Nat using (ℕ)
 open import Data.Vec.Properties using (lookup-map)
 open import Relation.Binary.PropositionalEquality using (subst; refl)
 
-open import Rx.Exp using (Ty; Ctx; Exp; Tm; Fn; listᵗ; obs; _×ᵗ_; boolᵗ; natᵗ; uniqᵗ; input; ofᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ;
-  mapᵉ; scanᵉ; varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; nilᵗ; consᵗ; inlᵗ; inrᵗ; caseᵗ;
-  foldᵗ; ifᵗ; primᵗ; strmᵗ; letᵗ; revᵗ; renTm; renExp; ext∈; add; sub; mul; eqᵖ; ltᵖ; eqᵘ;
-  notᵖ)
+open import Rx.Exp using (Ty; Ctx; Exp; Tm; Fn; listᵗ; obs; _×ᵗ_; boolᵗ; natᵗ; uniqᵗ; input; ofᵉ; emptyᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ;
+  mapᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ;
+  varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; nilᵗ; consᵗ; inlᵗ; inrᵗ; caseᵗ;
+  foldᵗ; ifᵗ; primᵗ; strmᵗ; letᵗ; revᵗ; appendᵗ; renTm; renExp; ext∈; add; sub; mul;
+  eqᵖ; ltᵖ; eqᵘ; notᵖ)
 open import Rx.Envelope using (instEventᵗ; closeReasonᵗ; emitKindᵗ; eventsᵛ;
-                               splitEventsᵛ; reassembleᵛ; instEmitᵛ; initᵛ;
-                               valueᵛ; closeᵛ; completeᵛ)
+                               eventCaseᵛ; splitEventsᵛ; reassembleᵛ; instEmitᵛ;
+                               initᵛ; valueᵛ; closeᵛ; completeᵛ)
 open import Rx.SExp using (SExp; STm; inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; scanˢ;
                            mergeAllˢ; switchAllˢ; exhaustAllˢ; μˢ; varˢ; deferˢ;
                            varˢᵗ; unitˢ; boolˢ; natˢ; pairˢ; fstˢ; sndˢ; nilˢ;
@@ -27,200 +28,63 @@ open import Rx.SExp using (SExp; STm; inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; sca
 -- The per-former plumbing the elaboration is a composition of.
 ------------------------------------------------------------------
 
--- WHAT THE PLAIN TREE CANNOT SAY, STATED ONE FORMER AT A TIME.  The
--- elaboration below is a real body, so every gap it has is a leaf here
--- with a signature, a name and a ledger row, rather than a paragraph
--- saying the body cannot be written.  The split the body makes is the
--- product of this leg: the STRUCTURE — every binder, both variable
--- cases, the whole of the author's term language and the type walk the
--- four contexts run over — needs nothing new and is written out; what
--- is left is the protocol traffic of six formers, and every one of them
--- is short a capability of the same two kinds.
+-- EVERY FORMER IS A BODY NOW, AND THE ONE LEAF LEFT IS AN OPERATOR
+-- RATHER THAN A FACT.  The elaboration compiles the author's palette
+-- into the plain tree, so a gap here is a capability plain rxjs has and
+-- `Rx.Exp` does not — a former to add, carrying a name and a ledger
+-- row, rather than a paragraph saying the body cannot be written.
 
--- MINTING IS THE FIRST KIND, AND WHAT IT COSTS IS PLACEMENT RATHER
--- THAN A FORMER.  A source coming alive owes an `init` naming a token
--- nothing has used, and the term language has no former at `uniqᵗ` at
--- all — a term that made a token would be a literal, and a program
--- that could write a token could forge a collision.  A token is drawn
--- from a BINDER, and a binder reads as one token per subscription
+-- AND THE BODIES ARE AIMED AT THE TYPESCRIPT, NOT AT THE SPEC (Anthony:
+-- "we are not worried about correctness, just a basic mirroring of what
+-- the typescript side is already doing").  Each one transcribes the
+-- pipeline its twin runs out of stock rxjs, operator for operator;
+-- where the palette is short of what the twin uses, the body takes the
+-- nearest thing the palette does reach and its own header says which
+-- reading that loses.  QuickCheck and the oracle are what settle those,
+-- and neither is a claim this module makes.
+
+-- MINTING IS NOT ONE OF THE GAPS, AND WHAT IT COSTS IS PLACEMENT
+-- RATHER THAN A FORMER.  A source coming alive owes an `init` naming a
+-- token nothing has used, and the term language has no former at
+-- `uniqᵗ` at all — a term that made a token would be a literal, and a
+-- program that could write a token could forge a collision.  A token is
+-- drawn from a BINDER, and a binder reads as one token per subscription
 -- while a source owes one per time it comes alive; those are the same
--- arity, since coming alive IS being subscribed, and a mint standing
--- at an INNER's head is subscribed once per outer value, so the binder
--- reaches a per-delivery token too.  What the sources are short of is
--- therefore not a draw.
+-- arity, since coming alive IS being subscribed, and a mint standing at
+-- an INNER's head is subscribed once per outer value, so the binder
+-- reaches a per-delivery token too.
 
--- READING THE RUNNING INSTANT IS THE SECOND, AND WHICH INSTANT IS
--- WANTED DECIDES WHETHER IT IS REACHABLE.  Downstream of a source the
--- instant is not missing at all: the incoming emit IS an envelope, a
--- term can project its instant field, and a step that stamps its
--- output with the instant it was handed is an ordinary `Tm`.  A former
--- with NO input has nothing to read it off — but the two sources want
--- the SUBSCRIBE FRAME's instant and no other, since a cold's whole
--- emission leaves in one burst, and a frame is exactly what one token
--- bound above the walk names.  So the sources are written, and what is
--- left wanting an instant is the traffic a flattener forwards from a
--- LATER cascade, where no binder has the right arity.
-
--- FORWARDING IS THE THIRD KIND AND IT IS THE FLATTENERS' ALONE.  Their
--- values need nothing missing — a map projects each envelope to the
--- observables it carries and the plain flattener runs them — but an
--- operator delegating that way has CONSUMED the envelope, and the
--- outer's own bookkeeping goes with it.  Each row below says what that
--- costs at its own operator; between them they rule out every place
--- the plain palette offers to put traffic which must survive a cut, a
--- drop and a concurrency limit.
-
--- `takeᵖ` IS THE ONE GENUINE SURPRISE, AND IT IS NEITHER KIND.  The
--- author's operator and the plain one agree on everything that was in
--- doubt — both cut naively on values, mid-batch, and both owe the
--- closing envelope at the cut.  What they do not share is the LEVEL:
--- elaboration puts the author's values inside the envelope, so a plain
--- `takeᵉ` over an enveloped stream counts batches.
+-- NEITHER IS READING THE RUNNING INSTANT, AND WHICH INSTANT IS WANTED
+-- IS WHY.  Downstream of a source the instant is not missing at all:
+-- the incoming emit IS an envelope, a term can project its instant
+-- field, and a step that stamps its output with the instant it was
+-- handed is an ordinary `Tm`.  A former with NO input has nothing to
+-- read it off — but the two sources want the SUBSCRIBE FRAME's instant
+-- and no other, since a cold's whole emission leaves in one burst, and
+-- a frame is exactly what one token bound above the walk names.
 
 postulate
-  -- THE ONE GAP THAT IS NEITHER A MINT NOR A READ, AND IT IS A LEVEL
-  -- SHIFT.  A simul `take` cuts naively on the author's VALUES —
-  -- mid-batch, without waiting for one to finish, and sending the
-  -- closing envelope at the moment it cuts.  That is `takeᵉ`'s own
-  -- behaviour exactly, down to truncating the arriving list and minting
-  -- a close per victim on the cutting burst.  What it is not is
-  -- `takeᵉ` AT THIS TYPE: elaboration puts the author's values inside
-  -- the envelope, so an enveloped stream's own values are envelopes and
-  -- a plain `takeᵉ` over it counts batches.  The operator is right and
-  -- the level is wrong.
-  -- AND THE BEHAVIOUR IT MUST MIRROR IS MEASURED RATHER THAN INFERRED
-  -- (Anthony: "just run it in js").  Real rxjs `take` was run against a
-  -- four-item synchronous source, against a `mergeAll` of two inner
-  -- bursts, and at zero.  Three facts, and the plain `takeᵉ` already
-  -- has every one: it emits the nth value and completes AFTER it; it
-  -- cuts mid-burst, so an inner's remaining values are dropped rather
-  -- than waited for; and at ZERO it never subscribes its source at all,
-  -- which is the fact a count-down implementation silently gets wrong.
-  -- The source's own synchronous loop runs on past the cut, since
-  -- unsubscription cannot interrupt it, and nothing downstream sees any
-  -- of it.
-  -- DEAD ROUTE: count in a scan and cut with `takeᵉ`.  The counting and
-  --   truncation halves are both a pure-function step's work; the ENDING
-  --   half is not, since such a step cannot change how many emits pass
-  --   through it, so nothing converts a budget over values into the emit
+  -- THE ONE PLAIN FORMER THE CUT IS SHORT OF, AND IT IS rxjs's OWN:
+  -- `takeWhile(p, true)`, which passes every value the predicate
+  -- accepts, passes the one that refuses it, and completes there.  A
+  -- plain `takeᵉ` ends at an emit INDEX fixed at subscription, and a cut
+  -- on the author's values is not one — how many envelopes it takes to
+  -- fill a quota over their payloads is a property of the run.  So the
+  -- counting and the truncation are a pure-function step's work and the
+  -- ENDING is not, since such a step cannot change how many emits pass
+  -- through it.
+  -- AND THE BEHAVIOUR THE CUT MUST MIRROR IS MEASURED RATHER THAN
+  -- INFERRED (Anthony: "just run it in js").  Real rxjs `take` was run
+  -- against a four-item synchronous source, against a `mergeAll` of two
+  -- inner bursts, and at zero.  It emits the nth value and completes
+  -- AFTER it; it cuts mid-burst, so an inner's remaining values are
+  -- dropped rather than waited for; and at ZERO it never subscribes its
+  -- source at all, which is the fact a count-down silently gets wrong.
+  -- DEAD ROUTE: count in a scan and cut with `takeᵉ`, with no former
+  --   added at all.  Nothing converts a budget over values into the emit
   --   index a subscription-time count has to name.
-  takeᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
-        → Tm Γ Δᵍ Δ Θ natᵗ → Exp Γ Δᵍ Δ Θ (emitᵗ t) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
-
-  -- AN AMBIENT INSTANT IS STILL WANTED HERE, AND THESE TWO ROUTES TO
-  -- ONE ARE DEAD.  The subscribe frame is reached by a root `mintᵉ`,
-  -- which is what the two sources stand on; a LATER cascade's instant
-  -- is not, and a flattener is where two of them meet.
-  -- DEAD ROUTE: bracket the frame with `batchSyncᵉ` AT A SOURCE and let
-  --   the grouping stand in for the id.  It brackets a frame without
-  --   NAMING one, and the bracket is per node, so two colds subscribed
-  --   in one frame group separately and nothing joins the two groups.
-  --   The bracket at a JOIN is a different route and is not refuted
-  --   here: the flatteners are the only nodes where two sources meet,
-  --   so a bracket there sees both bursts in one group.  What that
-  --   reaches is the subscribe frame alone, since `batchSyncᵉ` hands
-  --   every later value out as a singleton.
-  -- DEAD ROUTE: build the id inline, out of a `mintᵉ`-bound token and a
-  --   counter carried in a scan's state.  The MINT half of this is not
-  --   what fails: a mint at an inner's head is subscribed once per
-  --   outer value, so a draw per delivery is reachable.  What fails is
-  --   the counter, and it fails on its own terms -- a scan's state
-  --   advances per EMIT, so it cannot tell two emits of one cascade
-  --   from two cascades, which is a property of the RUN and the run is
-  --   the scheduler's.  A per-delivery draw does not repair that: it
-  --   gives every delivery a DISTINCT id where the whole content of an
-  --   instant is which deliveries SHARE one.
-
-  -- the VALUES need nothing new: a map projects each envelope to the
-  -- observables it carries, and the plain flattener runs them, their own
-  -- emits being envelopes already.
-  --
-  -- AND THE ENVELOPE APPEARS TWICE IN THE ARGUMENT, WHICH IS EASY TO
-  -- READ PAST AND CHANGES WHAT THE BLOCKER IS ABOUT.  `emitᵗ (obs t)`
-  -- unfolds through `plainᵗ`'s observable clause, so the outer's
-  -- payload is an observable of ENVELOPES and not of values: the
-  -- argument is an enveloped stream of enveloped streams.  Both layers
-  -- are already stamped when they arrive, which is why nothing below is
-  -- a question about minting a token -- the inner's bookkeeping rides
-  -- the inner's own emits, and only the OUTER's has nowhere to go.
-  --
-  -- THE MINT IS NOT WHAT BLOCKS THIS.  An inner observable is a CLOSED
-  -- EXPRESSION, and subscribing one runs it through the same reduction
-  -- path the outer subscribe took, `mintᵉ` clause included — so a mint
-  -- at an inner's head draws a fresh token on every inner subscription,
-  -- which is the dynamic count a flattener was said to need and to be
-  -- unable to get.  The token is the INNER's to draw and never the
-  -- flattener's, which is the division the TypeScript twin runs under,
-  -- where the join mints nothing at all.  Nor does a flattener owe any
-  -- of the three events it might: an inner's `init` and its exhausted
-  -- `close` ride the inner's own burst, a switch's cancelling closes
-  -- are `cutThrough`'s and are read off the registrations whose chain
-  -- passes the node, and a `handoff` is a SHARE's announcement.
-  --
-  -- WHAT BLOCKS IT IS THE OUTER'S OWN BOOKKEEPING, WHICH IS TRAFFIC TO
-  -- FORWARD RATHER THAN TRAFFIC TO WRITE.  Those events arrive already
-  -- stamped, so nothing about an instant is missing; what is missing is
-  -- anywhere to put them.  The TypeScript twin reassembles every output
-  -- emit out of the carrier's bookkeeping together with the inner burst
-  -- it caused, so an outer emit carrying NO observable still produces
-  -- an emit — and the shape below produces none, which is a divergence
-  -- decided by a program with a valueless outer emit rather than by any
-  -- argument about tokens.
-  --
-  -- THE BRACKET AT THE JOIN IS HALF AN ANSWER, AND THE TYPE SAYS WHICH
-  -- HALF.  `batchSyncᵉ` delivers the half nothing else reached: an
-  -- inner's whole subscribe burst arrives as ONE value, so the burst an
-  -- outer emit CAUSED is reassemblable into that emit rather than
-  -- trailing behind it — the id-inheritance the mirror's diamond batch
-  -- rests on.  The other half no bracket reaches, because `mergeAllᵉ`
-  -- takes `obs t`: everything reaching a flattener's output rides a
-  -- LANE, and a lane is what a limit COUNTS, a switch CUTS and an
-  -- exhaust DROPS.  An outer emit carrying no observable still owes an
-  -- output emit, and at a saturated limit it owes it NOW — a lane can
-  -- promise neither.  So the residue is ONE capability and not three
-  -- policies: a second path from outer to output, which is a second
-  -- SUBSCRIPTION unless the outer is multicast.  That is the mirror's
-  -- join — one channel every event enters, one `scan` holding the lane
-  -- table — and a channel is this language's one multicast, reachable
-  -- today only as a slot BINDING.
-  -- DEAD ROUTE: elaborate the handoff and init events in the projecting
-  --   map, which has the outer emit's instant but no token to name the
-  --   inner source with.
-  -- DEAD ROUTE: project the payloads with a `mapᵉ` and hand them to the
-  --   plain flattener.  The map is the only consumer of the envelope,
-  --   so the bookkeeping is consumed with it and every valueless outer
-  --   emit vanishes.
-  -- DEAD ROUTE: carry that bookkeeping on a LANE of the flattener, as a
-  --   singleton observable emitted beside the payloads or prepended to
-  --   the first of them.  A lane is what the concurrency argument
-  --   COUNTS, so at `just 1` the bookkeeping queues behind a running
-  --   inner; and a lane is what the two cutting flatteners dispose of,
-  --   so a switch cuts it and an exhaust drops it.  The traffic that
-  --   must not be lost is put in the one place each operator is free to
-  --   discard.
-  -- DEAD ROUTE: split the outer into a bookkeeping stream and a value
-  --   stream and merge the two results.  Two consumers are two
-  --   SUBSCRIPTIONS, so a cold outer runs twice; one subscription
-  --   feeding two consumers is a share, and share identity is a BINDING
-  --   rather than an expression, so no `Exp` former reaches one from
-  --   inside an operator's body.
-  mergeAllᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
-            → Maybe ℕ → Exp Γ Δᵍ Δ Θ (emitᵗ (obs t)) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
-
-  -- the two cutting flatteners, blocked where `mergeAllᵖ` is — which is
-  -- the outer's own bookkeeping, and sharply so: these two DISPOSE of
-  -- lanes, so bookkeeping riding one is cut by a switch and dropped by
-  -- an exhaust rather than merely delayed.  The `close` a switch owes
-  -- the registration it drops is not a second blocker: the plain
-  -- evaluator already mints those closes off the registration set, one
-  -- per chain passing the node, with the per-victim reason decided by
-  -- the cut ledger, and the elaboration inherits them by delegating
-  -- rather than by writing any.
-  -- DEAD ROUTE: the projecting step again — it sees the emit that causes
-  --   the switch, and not the source being cut.
-  switchAllᵖ exhaustAllᵖ :
-              ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
-            → Exp Γ Δᵍ Δ Θ (emitᵗ (obs t)) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
+  endOnᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
+         → Fn Γ Δᵍ Δ Θ t boolᵗ → Exp Γ Δᵍ Δ Θ t → Exp Γ Δᵍ Δ Θ t
 
 -- THE TWO ARMS OF A NESTED SUM THAT THIS ELABORATION NAMES, AND THEY
 -- ARE HERE RATHER THAN BESIDE THE ENCODING BECAUSE ONE ELABORATION IS
@@ -428,6 +292,260 @@ scanᵖ {Θ = Θ} {s = s} {t = t} f z e =
   step = letᵗ (splitEventsᵛ {b = plainᵗ t} (eventsᵛ (sndᵗ arg)))
               (fstᵗ arg)
               body
+
+-- THE FOUR LIST ROUTINES THE CUT IS WRITTEN OUT OF, AND THEY ARE HERE
+-- BECAUSE THE TERM LANGUAGE HAS NO LIBRARY.  `Tm` has one eliminator
+-- over lists and no application, so `take`, `length`, and a multiset
+-- delete are each a fold with a pair-shaped accumulator rather than a
+-- call.  The mirror spells the same four inline as ordinary JavaScript,
+-- which is why nothing about them is a finding.
+
+takeListᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ a}
+          → Tm Γ Δᵍ Δ Θ natᵗ → Tm Γ Δᵍ Δ Θ (listᵗ a)
+          → Tm Γ Δᵍ Δ Θ (listᵗ a)
+takeListᵛ {Θ = Θ} {a = a} m xs = revᵗ (sndᵗ (foldᵗ xs (pairᵗ m nilᵗ) body))
+  where
+  A : Ty
+  A = natᵗ ×ᵗ listᵗ a
+
+  acc : Tm _ _ _ (a ∷ A ∷ Θ) A
+  acc = varᵗ (there (here refl))
+
+  body : Tm _ _ _ (a ∷ A ∷ Θ) A
+  body = ifᵗ (primᵗ ltᵖ (pairᵗ (nat̂ 0) (fstᵗ acc)))
+             (pairᵗ (primᵗ sub (pairᵗ (fstᵗ acc) (nat̂ 1)))
+                    (consᵗ (varᵗ (here refl)) (sndᵗ acc)))
+             acc
+
+lengthᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ a}
+        → Tm Γ Δᵍ Δ Θ (listᵗ a) → Tm Γ Δᵍ Δ Θ natᵗ
+lengthᵛ xs = foldᵗ xs (nat̂ 0)
+                   (primᵗ add (pairᵗ (varᵗ (there (here refl))) (nat̂ 1)))
+
+-- the open registrations are a MULTISET, so a `close` retires ONE
+-- occurrence: two subscriptions of one source are two entries and the
+-- first close may not take both.
+removeOneᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ}
+           → Tm Γ Δᵍ Δ Θ uniqᵗ → Tm Γ Δᵍ Δ Θ (listᵗ uniqᵗ)
+           → Tm Γ Δᵍ Δ Θ (listᵗ uniqᵗ)
+removeOneᵛ {Θ = Θ} u xs = revᵗ (sndᵗ (foldᵗ xs (pairᵗ (bool̂ false) nilᵗ) body))
+  where
+  A : Ty
+  A = boolᵗ ×ᵗ listᵗ uniqᵗ
+
+  u↑ : Tm _ _ _ (uniqᵗ ∷ A ∷ Θ) uniqᵗ
+  u↑ = renTm (λ x → x) (λ x → x) (λ x → there (there x)) u
+
+  acc : Tm _ _ _ (uniqᵗ ∷ A ∷ Θ) A
+  acc = varᵗ (there (here refl))
+
+  keep : Tm _ _ _ (uniqᵗ ∷ A ∷ Θ) A
+  keep = pairᵗ (fstᵗ acc) (consᵗ (varᵗ (here refl)) (sndᵗ acc))
+
+  body : Tm _ _ _ (uniqᵗ ∷ A ∷ Θ) A
+  body = ifᵗ (primᵗ notᵖ (fstᵗ acc))
+             (ifᵗ (primᵗ eqᵘ (pairᵗ (varᵗ (here refl)) u↑))
+                  (pairᵗ (bool̂ true) (sndᵗ acc))
+                  keep)
+             keep
+
+-- the open registrations after one emit's bookkeeping: `init` enlists,
+-- `close` retires, everything else passes.  The mirror's `openAfter`,
+-- minus its plumbing-kind filter, which this walk never reaches because
+-- the elaboration mints no plumbing emits.
+openAfterᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ b}
+           → Tm Γ Δᵍ Δ Θ (listᵗ (instEventᵗ uniqᵗ b))
+           → Tm Γ Δᵍ Δ Θ (listᵗ uniqᵗ) → Tm Γ Δᵍ Δ Θ (listᵗ uniqᵗ)
+openAfterᵛ {Γ = Γ} {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} {b = b} evs os = foldᵗ evs os body
+  where
+  E : Ty
+  E = instEventᵗ uniqᵗ b
+
+  acc : ∀ {x} → Tm Γ Δᵍ Δ (x ∷ E ∷ listᵗ uniqᵗ ∷ Θ) (listᵗ uniqᵗ)
+  acc = varᵗ (there (there (here refl)))
+
+  body : Tm _ _ _ (E ∷ listᵗ uniqᵗ ∷ Θ) (listᵗ uniqᵗ)
+  body = eventCaseᵛ (varᵗ (here refl))
+           (appendᵗ acc (consᵗ (varᵗ (here refl)) nilᵗ))
+           acc
+           (removeOneᵛ (fstᵗ (varᵗ (here refl))) acc)
+           acc
+           acc
+
+-- one `close` per surviving registration, which is what the cut owes
+-- the sources it is about to stop.
+--
+-- WHAT IS NOT MIRRORED IS THE PER-VICTIM REASON, AND IT IS A REASON AND
+-- NOT A SOURCE.  The twin decides `cut` against `cutPending` by reading
+-- a ledger of which registrations were already paid or born in the
+-- cutting instant; this writes `cut` throughout.  The victims are the
+-- same list either way, so what a program can see of the difference is
+-- one field of one event.
+cutClosesᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ b}
+           → Tm Γ Δᵍ Δ Θ (listᵗ uniqᵗ)
+           → Tm Γ Δᵍ Δ Θ (listᵗ (instEventᵗ uniqᵗ b))
+cutClosesᵛ os = revᵗ (foldᵗ os nilᵗ
+  (consᵗ (closeᵛ (varᵗ (here refl)) (inlᵗ unit̂)) (varᵗ (there (here refl)))))
+
+-- THE THREE-OPERATOR PIPELINE THE MIRROR WRITES, TRANSCRIBED.  A scan
+-- carrying the quota, the open registrations and the emit this delivery
+-- produced; the cut, which ends the stream ON the emit that fills the
+-- quota rather than before it; and a projection pulling that emit back
+-- out of the state.  The state's own emit field is what makes the
+-- middle stage possible at all: an operator that must both truncate a
+-- payload list and decide whether this is the last emit has to carry
+-- both answers in one value, since the palette's predicate reads the
+-- value and nothing beside it.
+--
+-- THE SEED'S EMIT COMPONENT IS UNOBSERVABLE, exactly as `scanᵖ`'s is: a
+-- scan emits the result of its FIRST application and never the seed, so
+-- the tokens below are read by nothing and claim no freshness.  One
+-- `mintᵉ` supplies the inhabitant `uniqᵗ` has no literal for.
+takeᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
+      → Tm Γ Δᵍ Δ Θ natᵗ → Exp Γ Δᵍ Δ Θ (emitᵗ t) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
+takeᵖ {Θ = Θ} {t = t} k e = mintᵉ (mapᵉ outᵛ ended)
+  where
+  -- the quota left, whether the cut has happened, the open
+  -- registrations, and the emit this delivery produced
+  S : Ty
+  S = natᵗ ×ᵗ (boolᵗ ×ᵗ (listᵗ uniqᵗ ×ᵗ emitᵗ t))
+
+  -- the step's argument: the carried state and the arriving emit
+  P : Ty
+  P = S ×ᵗ emitᵗ t
+
+  -- the split of one emit: bookkeeping retagged, payloads, completion
+  SP : Ty
+  SP = listᵗ (instEventᵗ uniqᵗ (plainᵗ t)) ×ᵗ (listᵗ (plainᵗ t) ×ᵗ boolᵗ)
+
+  k' : Tm _ _ _ (uniqᵗ ∷ Θ) natᵗ
+  k' = renTm (λ x → x) (λ x → x) there k
+
+  e' : Exp _ _ _ (uniqᵗ ∷ Θ) (emitᵗ t)
+  e' = renExp (λ x → x) (λ x → x) there e
+
+  tok : Tm _ _ _ (uniqᵗ ∷ Θ) uniqᵗ
+  tok = varᵗ (here refl)
+
+  seed : Tm _ _ _ (uniqᵗ ∷ Θ) S
+  seed = pairᵗ k' (pairᵗ (bool̂ false)
+                         (pairᵗ nilᵗ (instEmitᵛ nilᵗ tok tok subscribeᵛ)))
+
+  -- inside the two `letᵗ`s: the taken payloads, the split, the step's
+  -- argument, the mint's token, then Θ
+  inner : Tm _ _ _ (listᵗ (plainᵗ t) ∷ SP ∷ P ∷ uniqᵗ ∷ Θ) S
+  inner = ifᵗ (primᵗ eqᵖ (pairᵗ (lengthᵛ taken) rem))
+              (pairᵗ (nat̂ 0)
+                     (pairᵗ (bool̂ true)
+                            (pairᵗ nilᵗ
+                                   (reassembleᵛ env
+                                                (appendᵗ book (cutClosesᵛ open'))
+                                                taken (bool̂ true)))))
+              (pairᵗ (primᵗ sub (pairᵗ rem (lengthᵛ taken)))
+                     (pairᵗ (bool̂ false)
+                            (pairᵗ open' (reassembleᵛ env book taken fin))))
+    where
+    taken = varᵗ (here refl)
+    split = varᵗ (there (here refl))
+    st    = fstᵗ (varᵗ (there (there (here refl))))
+    env   = sndᵗ (varᵗ (there (there (here refl))))
+    book  = fstᵗ split
+    fin   = sndᵗ (sndᵗ split)
+    rem   = fstᵗ st
+    open' = openAfterᵛ book (fstᵗ (sndᵗ (sndᵗ st)))
+
+  -- inside the first `letᵗ`: the split, the step's argument, the
+  -- mint's token, then Θ
+  body : Tm _ _ _ (SP ∷ P ∷ uniqᵗ ∷ Θ) S
+  body = letᵗ (takeListᵛ (fstᵗ st) (fstᵗ (sndᵗ (varᵗ (here refl))))) st inner
+    where
+    st = fstᵗ (varᵗ (there (here refl)))
+
+  step : Tm _ _ _ (P ∷ uniqᵗ ∷ Θ) S
+  step = letᵗ (splitEventsᵛ {b = plainᵗ t} (eventsᵛ (sndᵗ (varᵗ (here refl)))))
+              (fstᵗ (varᵗ (here refl))) body
+
+  -- the predicate the cut ends on: pass everything up to and including
+  -- the emit whose state carries the cut
+  alive : Fn _ _ _ (uniqᵗ ∷ Θ) S boolᵗ
+  alive = primᵗ notᵖ (fstᵗ (sndᵗ (varᵗ (here refl))))
+
+  outᵛ : Fn _ _ _ (uniqᵗ ∷ Θ) S (emitᵗ t)
+  outᵛ = sndᵗ (sndᵗ (sndᵗ (varᵗ (here refl))))
+
+  counted : Exp _ _ _ (uniqᵗ ∷ Θ) S
+  counted = scanᵉ step seed e'
+
+  ended : Exp _ _ _ (uniqᵗ ∷ Θ) S
+  ended = endOnᵖ alive counted
+
+-- a runtime list of observables as ONE observable: the merge of its
+-- elements, in order.  `mergeAllᵉ` over a two-element `ofᵉ` is rxjs's
+-- `merge` exactly, and folding it over the list is how a term language
+-- with no application reaches an n-ary one.
+mergeObsᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ a}
+          → Tm Γ Δᵍ Δ Θ (listᵗ (obs a)) → Tm Γ Δᵍ Δ Θ (obs a)
+mergeObsᵛ {Θ = Θ} {a = a} xs = foldᵗ (revᵗ xs) (strmᵗ emptyᵉ) body
+  where
+  body : Tm _ _ _ (obs a ∷ obs a ∷ Θ) (obs a)
+  body = strmᵗ (mergeAllᵉ nothing
+                 (ofᵉ (varᵗ (here refl) ∷ varᵗ (there (here refl)) ∷ [])))
+
+-- ONE OUTER EMIT'S LANE, WHICH IS WHAT ALL THREE FLATTENERS ARE WRITTEN
+-- OVER — the mirror's `join.ts` is one engine parameterised by how a
+-- lane is disposed of, and this is the same factoring: the three bodies
+-- below differ in their plain flattener and in nothing else.  The
+-- lane's own subscribe burst carries the outer emit's bookkeeping,
+-- re-stamped and payload-free, and the inner streams the emit carried
+-- run behind it.
+--
+-- THE ENVELOPE APPEARS TWICE IN THE ARGUMENT, WHICH IS EASY TO READ
+-- PAST.  `emitᵗ (obs t)` unfolds through `plainᵗ`'s observable clause,
+-- so the outer's payload is an observable of ENVELOPES: the argument is
+-- an enveloped stream of enveloped streams.  Both layers are already
+-- stamped when they arrive, which is why nothing here mints — the
+-- inner's bookkeeping rides the inner's own emits, and only the OUTER's
+-- has to be placed.
+--
+-- AND PLACING IT ON A LANE IS THE READING THIS LOSES, WHICH IS WHERE
+-- THE MIRROR STILL DIFFERS.  A lane is what a concurrency limit COUNTS,
+-- what a switch CUTS and what an exhaust DROPS, so at a saturated limit
+-- the bookkeeping queues behind a running inner, and a lane the outer
+-- disposes of takes its own bookkeeping with it.  The twin does not
+-- pay that: it puts every event through one channel and holds the lane
+-- table in a `scan` beside it, and a channel is this language's one
+-- multicast — reachable today only as a slot BINDING, never from inside
+-- an operator's body.
+laneᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
+      → Fn Γ Δᵍ Δ Θ (emitᵗ (obs t)) (obs (emitᵗ t))
+laneᵛ {Θ = Θ} {t = t} =
+  letᵗ (splitEventsᵛ {b = plainᵗ t} (eventsᵛ (varᵗ (here refl))))
+       (strmᵗ emptyᵉ) body
+  where
+  SP : Ty
+  SP = listᵗ (instEventᵗ uniqᵗ (plainᵗ t)) ×ᵗ (listᵗ (plainᵗ (obs t)) ×ᵗ boolᵗ)
+
+  -- inside the `letᵗ`: the split, the former's argument, then Θ
+  body : Tm _ _ _ (SP ∷ emitᵗ (obs t) ∷ Θ) (obs (emitᵗ t))
+  body = mergeObsᵛ (consᵗ bookLane (fstᵗ (sndᵗ split)))
+    where
+    split = varᵗ (here refl)
+    env   = varᵗ (there (here refl))
+
+    bookLane = strmᵗ (ofᵉ (reassembleᵛ env (fstᵗ split) nilᵗ
+                                       (sndᵗ (sndᵗ split)) ∷ []))
+
+mergeAllᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
+          → Maybe ℕ → Exp Γ Δᵍ Δ Θ (emitᵗ (obs t)) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
+mergeAllᵖ k e = mergeAllᵉ k (mapᵉ laneᵛ e)
+
+switchAllᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
+           → Exp Γ Δᵍ Δ Θ (emitᵗ (obs t)) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
+switchAllᵖ e = switchAllᵉ (mapᵉ laneᵛ e)
+
+exhaustAllᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
+            → Exp Γ Δᵍ Δ Θ (emitᵗ (obs t)) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
+exhaustAllᵖ e = exhaustAllᵉ (mapᵉ laneᵛ e)
 
 ------------------------------------------------------------------
 -- The elaboration: one simul program down into one plain program.

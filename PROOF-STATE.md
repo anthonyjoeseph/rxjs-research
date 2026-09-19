@@ -209,80 +209,69 @@ every guard, every `<?` and the dry marker leave the machine entirely.
 A row's class must agree with its postulate's header, which is where the
 research lives; where they disagree, the header wins.
 
-## Tier 0 — the four formers the seam cannot compile
+## Tier 0 — the seam's four formers, transcribed
 
 **THE SEAM, AND IT IS WHERE A PROGRAM'S MEANING IS DECIDED (Anthony: "the plain
 tree is rxjs, and must not know what an envelope is").** `toPlain` compiles the
-author's palette into the plain tree. The STRUCTURE compiles already; what is
-left is the protocol traffic of four operators, each short a capability rather
-than a proof. The tier sits under tier 1 because the top line quantifies over
-`toPlain`: seam first, then statement.
+author's palette into the plain tree, and all four of its formers are bodies
+now. The tier sits under tier 1 because the top line quantifies over `toPlain`:
+seam first, then statement.
 
-**AND THE JOB IS TRANSCRIPTION, NOT SEMANTICS (Anthony: "we are not worried
-about correctness, just a basic mirroring of what the typescript side is
-already doing").** All four are written at the envelope-carrying layer already,
-out of stock rxjs — `primitive-operators.ts` for the cut, `join.ts` for the one
-join engine — so no row owes a ruling on what an operator MEANS. What each
-owes is the finding transcription produces: which plain former `Rx.Exp` is
-short of, and whether it is an expression at all. That is what orders them.
+**AND THE TYPECHECKER JUDGES NONE OF IT, WHICH IS WHAT THE LEGS ARE FOR
+(Anthony: "we are not worried about correctness, just a basic mirroring of what
+the typescript side is already doing").** Every one of the four is a FORMER
+rather than a statement, so any inhabitant of its type checks — `λ _ e → e`
+inhabits the cut and `λ _ _ → emptyᵉ` each flattener. A transcription is
+therefore evidence of nothing until it RUNS, and the one leaf left is an
+operator, so nothing elaborated from `takeˢ` reduces at all. That orders the
+legs: make it runnable, run it, then pay the divergences the run names.
 
 ### The monster
 
-`mergeAllᵖ` — the only row here whose blocker is shared, and the blast radius is
-what that sharing buys. Its two siblings are stopped at the same place and by
-the same thing: the outer's own bookkeeping rides a lane, and a lane is cut by a
-switch and dropped by an exhaust, so the traffic that must survive is put in the
-one place each operator is free to discard. TypeScript keeps it by cutting the
-lane with a Subject, which is a BINDING and not an expression. So if the plain
-tree cannot name a lane, all three fall together and the seam's shape moves
-under everything above it — where `takeᵖ` falling costs one operator.
+`mergeAllᵖ` — the one body here whose shape is shared. Its two siblings are the
+same lane step under a different plain flattener, so a lane that cannot carry
+the outer's bookkeeping takes all three: a switch cuts a lane, an exhaust drops
+one, a limit counts one. TypeScript pays none of that, holding the lane table
+beside a channel — and a channel is a BINDING, not an expression. So if the
+lane is wrong, the seam's shape moves under everything above it, where the cut
+falling costs one operator. The exception is the rest of the seam, transcribed
+in one commit (Anthony: "take on all legs at once").
+
+also: `takeᵖ`, `switchAllᵖ`, `exhaustAllᵖ`, `scanᵖ`
 
 ### Big picture tier roadmap
 
-- **THE CHANNEL RULING, WHICH IS THE MONSTER'S OWN QUESTION AND ALL THREE
-  FLATTENERS AT ONCE.** Their headers already agree on the blocker and state it
-  four ways: the outer's bookkeeping rides a lane, and a lane is the one thing a
-  switch cuts and an exhaust drops. TypeScript's engine keeps it by cutting with
-  `takeUntil` over a Subject, and a Subject is a share — a BINDING rather than
-  an expression, so no `Exp` former reaches one from inside an operator's body.
-  The leg decides it: a channel former in the plain tree, or a join that needs
-  none. It is a ruling and it is Anthony's, because either answer changes what
+- **THE FORMER THAT MAKES THE SEAM RUNNABLE AT ALL, AND IT IS THE LEG THAT
+  NARROWS NOTHING BY ITSELF.** `endOnᵖ` is rxjs's own `takeWhile(p, true)`, and
+  until it is a real former no program containing `takeˢ` reduces — so the
+  oracle cannot see the cut, QuickCheck cannot see it, and the bug cache cannot
+  hold a row about it. TypeScript first per the port order: `plain-eval.ts` and
+  the decoder, then `takeWhileᵉ` in `Rx.Exp` and its evaluator clause, then the
+  postulate goes. It justifies itself by what it unblocks and by nothing else.
+
+- **THEN THE ORACLE OVER THE ELABORATION, WHICH IS THE ONLY THING THAT CAN
+  JUDGE A TRANSCRIPTION.** `npm run agda:qc` compares impl against spec and the
+  oracle compares the TS impl against the Agda one; between them they are the
+  whole of what decides whether these four bodies say what their twins say. The
+  leg is to get elaborated programs through both, and its product is a list of
+  separating programs rather than a green run — a green run over programs that
+  never reach a flattener's bookkeeping would say nothing.
+
+- **THEN THE LANE'S KNOWN DIVERGENCES, EACH NAMED BY THE PROGRAM THAT SEPARATES
+  IT.** Four are written down already: bookkeeping queued behind a running inner
+  at `just 1`, bookkeeping cut with the lane by a switch, dropped with it by an
+  exhaust, and a cut's per-victim close reason written `cut` throughout where
+  the mirror reads a ledger. Each is a program, so each is a bug-cache row. What
+  the leg decides is whether the first three are one finding — which is the
+  channel ruling, and that one is Anthony's, because either answer changes what
   the plain tree IS.
-
-- **THEN THE ENGINE, AND THE THREE OFF IT THE WAY TYPESCRIPT WRITES THEM.**
-  `join.ts` is one `joinAll` parameterised by how a lane is disposed of, and the
-  three exports differ only in that parameter. Three separate Agda bodies would
-  be three chances to transcribe the shared half differently, and the shared
-  half is the whole of the bookkeeping. One engine, three applications — and
-  whatever the ruling did not supply is the leaf `mergeAllᵖ` becomes a body
-  over.
-
-- **THEN THE PLAIN FORMER THE CUT IS SHORT OF.** `takeᵖ`'s header refutes
-  counting in a `scanᵉ` and cutting with `takeᵉ`: a step cannot change how many
-  emits pass through it, so nothing converts a budget over the author's VALUES
-  into the emit index a plain count has to name. TypeScript does not convert it
-  — it never names an index at all, ending on `takeWhile` at `inclusive`, whose
-  predicate reads the scan's own state. `Rx.Exp` has `scanᵉ` and `mapᵉ` and no
-  `takeWhileᵉ`. The leg is that former, TypeScript first per the port order.
-
-- **THEN `takeᵖ` AS THE THREE-OPERATOR PIPELINE.** Scan carrying the quota, the
-  open registrations and the cut ledger; `takeWhileᵉ` ending on the cutting
-  emit; a projection out of the state. Everything up to the cut is a pure step's
-  work and transcribes directly. What does not is the minting at the cut — one
-  close per victim, each with its own reason off the ledger — and that is where
-  the leaf that replaces `takeᵖ` lands. These last two legs are OFF the monster,
-  so the commit that opens them moves the monster first; declaring them now with
-  an `also:` would pre-authorise the jump the check exists to catch.
 
 ### The ledger
 
-- **`{mergeAll,switchAll,exhaustAll}ᵖ`** (Rx.Elaborate) — SHAPE,
-  `DEAD ROUTE×4`: the elaboration's per-former plumbing, after the two sources
-  came out of it. The outer's bookkeeping needs no plain home — it rides the
-  lane — so what is left is the compile of an envelope stream into a stream.
-- **`takeᵖ`** (Rx.Elaborate) — DIFFICULTY, `DEAD ROUTE`: the author cuts on
-  VALUES and a plain `takeᵉ` above the envelope cuts on BATCHES, so the
-  elaboration owes a count that crosses the level and closes at the cut.
+- **`endOnᵖ`** (Rx.Elaborate) — DIFFICULTY, `DEAD ROUTE`: rxjs's `takeWhile(p,
+  true)`, which the plain palette has no former for. The cut's counting and
+  truncation are a pure step's work; its ENDING is not, since such a step
+  cannot change how many emits pass through it.
 
 ## Tier 1 — the proof statement over the elaboration
 
