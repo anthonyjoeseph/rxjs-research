@@ -11,20 +11,20 @@
 -- one level down, and a single file cannot state that.
 module Rx.Evaluator.Builder.Frames where
 
-open import Data.Bool using (Bool; true; false; T)
+open import Data.Bool using (true; false; T)
 open import Data.Bool.ListAction using (any)
 open import Data.Fin using (Fin; toℕ)
 open import Data.Fin.Properties using (toℕ<n)
 open import Data.List using (List; []; _∷_)
 open import Data.List.Relation.Unary.All using (All) renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
-open import Data.Maybe using (Maybe; nothing; just)
-open import Data.Nat using (ℕ; zero; suc; _<_; _≤_; s≤s; _∸_; _≡ᵇ_)
-open import Data.Nat.Properties using (≤-reflexive; ≤-trans; ∸-monoʳ-<)
+open import Data.Maybe using (nothing; just)
+open import Data.Nat using (ℕ; suc; _<_; _≤_; s≤s; _∸_; _≡ᵇ_)
+open import Data.Nat.Properties using (≤-trans; ∸-monoʳ-<)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
 open import Data.Vec using (lookup)
 open import Induction.WellFounded using (Acc)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; cong)
 open import Relation.Nullary using (yes; no)
 open import Relation.Nullary.Decidable using (⌊_⌋)
 
@@ -47,8 +47,10 @@ open import Rx.Evaluator.Domain using (emits⇓; subscribeE⇓; consume⇓; drai
   consume-merge-nil; consume-switch-sub; consume-switch-nil; consume-exhaust-sub;
   consume-exhaust-nil; sub-all; dispatchShare⇓; shareGo⇓; disp; go-nil; go-cut; go-val; go-fin;
   emit-sink; close-sink)
-open import Rx.Evaluator.Reducible using (Out; Red; Emits; Closes; Handles; RedFn; RedEnv; unconnected; unconn-cong; unconn-emit;
-  unconn-close; unconn-subs; unconn-drain; red-scanned; red-pushed; red-flushed)
+open import Rx.Evaluator.Reducible using (Out; Red; Emits; Closes; Handles; RedFn; RedEnv; unconnected; red-scanned; red-pushed; red-flushed)
+open import Rx.Evaluator.Unconnected using (unconn-latch; unconn-scanStep; unconn-takeStep; unconn-cutAt; unconn-batchSyncPush;
+  unconn-batchSyncFlush; unconn-mergeAllQueue; unconn-markOuterDone; unconn-switchKill-eq;
+  unconn-emit; unconn-close; unconn-subs; unconn-drain)
 ------------------------------------------------------------------
 -- THE ONE LEAF LEFT, AND WHY IT IS THE ONLY ONE.
 ------------------------------------------------------------------
@@ -145,259 +147,6 @@ share-go! i w now completeᵖ rv ((rid , p) ∷ ps) sched st le
                       (≤-trans (unconn-close f) le)
       in _ , go-fin eqc f g
 
--- THE LATCH RUNS BEFORE THE FAN-OUT AND THE SWEEP AFTER IT, WHICH IS
--- WHY BOTH STAY APPLIED.  An end latches the share as completed on the
--- way in, so a chain subscribing to it DURING the fan-out sees a spent
--- slot; the registrations are dropped on the way out, once every chain
--- that was admitted has had its end.
--- THE LATCH IS THE ONE STORE STEP THE COUNT CANNOT READ THROUGH ON
--- ITS OWN, and it is a two-line case split rather than a leaf: the
--- completion arm writes two fields, neither of them the connected
--- list, and the other arm writes nothing at all.  What makes it owed
--- here rather than free is only that the step branches on a value the
--- caller has not forced.
-unconn-latch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m}
-               (i : Fin n) (b : Bool) (sched : Sched Γ) (st : EvalSt e)
-             → unconnected sched st ≤ m
-             → unconnected sched (shareLatch i b st) ≤ m
-unconn-latch i false sched st le = le
-unconn-latch i true  sched st le = le
-
--- WHAT A NODE STEP OWES THE COUNT, AND IT IS THE SAME PROOF IN EVERY
--- ARM.  Each of these hands back either the store it was given or a
--- record update on a field the count does not read, so the whole
--- obligation is a case split all of whose arms are `refl`.  They are
--- split out from the frames below rather than inlined because a frame
--- runs its step under a `with` and so never has the step's own result
--- in a form that reduces.
-shares-scanStep : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-                  (fn : FnClo Γ (u ×ᵗ s) u) (nid : NodeId) (v : Val Γ s) (st : EvalSt e)
-                → EvalSt.connectedShares (proj₂ (scanStep fn nid v st))
-                  ≡ EvalSt.connectedShares st
-shares-scanStep {u = u} fn nid v st with lookupNode nid (EvalSt.nodes st)
-... | just (cell-st {w} ac) with w ≟ᵗ u
-...   | no  _    = refl
-...   | yes refl = refl
-shares-scanStep fn nid v st | nothing = refl
-shares-scanStep fn nid v st | just (take-st _) = refl
-shares-scanStep fn nid v st | just (batchSync-st _ _) = refl
-shares-scanStep fn nid v st | just (mergeAll-st _ _ _ _) = refl
-shares-scanStep fn nid v st | just (switch-st _ _) = refl
-shares-scanStep fn nid v st | just (exhaust-st _ _) = refl
-
-shares-takeStep : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (nid : NodeId) (st : EvalSt e)
-                → EvalSt.connectedShares (proj₂ (takeStep nid st))
-                  ≡ EvalSt.connectedShares st
-shares-takeStep nid st with lookupNode nid (EvalSt.nodes st)
-... | just (take-st (suc k)) = refl
-... | just (take-st zero)    = refl
-shares-takeStep nid st | nothing = refl
-shares-takeStep nid st | just (cell-st _) = refl
-shares-takeStep nid st | just (batchSync-st _ _) = refl
-shares-takeStep nid st | just (mergeAll-st _ _ _ _) = refl
-shares-takeStep nid st | just (switch-st _ _) = refl
-shares-takeStep nid st | just (exhaust-st _ _) = refl
-
-shares-batchSyncPush : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-                       (nid : NodeId) (v : Val Γ s) (st : EvalSt e)
-                     → EvalSt.connectedShares (proj₂ (batchSyncPush nid v st))
-                       ≡ EvalSt.connectedShares st
-shares-batchSyncPush {s = s} nid v st with lookupNode nid (EvalSt.nodes st)
-... | just (batchSync-st {w} true buf) with w ≟ᵗ s
-...   | no  _    = refl
-...   | yes refl = refl
-shares-batchSyncPush nid v st | just (batchSync-st false buf) = refl
-shares-batchSyncPush nid v st | nothing = refl
-shares-batchSyncPush nid v st | just (cell-st _) = refl
-shares-batchSyncPush nid v st | just (take-st _) = refl
-shares-batchSyncPush nid v st | just (mergeAll-st _ _ _ _) = refl
-shares-batchSyncPush nid v st | just (switch-st _ _) = refl
-shares-batchSyncPush nid v st | just (exhaust-st _ _) = refl
-
-shares-batchSyncFlush : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-                        (nid : NodeId) (st : EvalSt e)
-                      → EvalSt.connectedShares (proj₂ (batchSyncFlush {s = s} nid st))
-                        ≡ EvalSt.connectedShares st
-shares-batchSyncFlush {s = s} nid st with lookupNode nid (EvalSt.nodes st)
-... | just (batchSync-st {w} _ buf) with w ≟ᵗ s
-...   | no  _    = refl
-...   | yes refl = refl
-shares-batchSyncFlush nid st | nothing = refl
-shares-batchSyncFlush nid st | just (cell-st _) = refl
-shares-batchSyncFlush nid st | just (take-st _) = refl
-shares-batchSyncFlush nid st | just (mergeAll-st _ _ _ _) = refl
-shares-batchSyncFlush nid st | just (switch-st _ _) = refl
-shares-batchSyncFlush nid st | just (exhaust-st _ _) = refl
-
-shares-markInnerDone : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-                       (op : AllOp) (nid inst : NodeId) (st : EvalSt e)
-                     → EvalSt.connectedShares (markInnerDone op nid inst st)
-                       ≡ EvalSt.connectedShares st
-shares-markInnerDone mergeAllᵒ nid inst st with lookupNode nid (EvalSt.nodes st)
-... | just (mergeAll-st lim act q od) = refl
-shares-markInnerDone mergeAllᵒ nid inst st | nothing = refl
-shares-markInnerDone mergeAllᵒ nid inst st | just (cell-st _) = refl
-shares-markInnerDone mergeAllᵒ nid inst st | just (take-st _) = refl
-shares-markInnerDone mergeAllᵒ nid inst st | just (batchSync-st _ _) = refl
-shares-markInnerDone mergeAllᵒ nid inst st | just (switch-st _ _) = refl
-shares-markInnerDone mergeAllᵒ nid inst st | just (exhaust-st _ _) = refl
-shares-markInnerDone switchᵒ nid inst st with lookupNode nid (EvalSt.nodes st)
-... | just (switch-st (just c) od) with c ≡ᵇ inst
-...   | true  = refl
-...   | false = refl
-shares-markInnerDone switchᵒ nid inst st | just (switch-st nothing od) = refl
-shares-markInnerDone switchᵒ nid inst st | nothing = refl
-shares-markInnerDone switchᵒ nid inst st | just (cell-st _) = refl
-shares-markInnerDone switchᵒ nid inst st | just (take-st _) = refl
-shares-markInnerDone switchᵒ nid inst st | just (batchSync-st _ _) = refl
-shares-markInnerDone switchᵒ nid inst st | just (mergeAll-st _ _ _ _) = refl
-shares-markInnerDone switchᵒ nid inst st | just (exhaust-st _ _) = refl
-shares-markInnerDone exhaustᵒ nid inst st with lookupNode nid (EvalSt.nodes st)
-... | just (exhaust-st ia od) = refl
-shares-markInnerDone exhaustᵒ nid inst st | nothing = refl
-shares-markInnerDone exhaustᵒ nid inst st | just (cell-st _) = refl
-shares-markInnerDone exhaustᵒ nid inst st | just (take-st _) = refl
-shares-markInnerDone exhaustᵒ nid inst st | just (batchSync-st _ _) = refl
-shares-markInnerDone exhaustᵒ nid inst st | just (mergeAll-st _ _ _ _) = refl
-shares-markInnerDone exhaustᵒ nid inst st | just (switch-st _ _) = refl
-
-shares-mergeAllQueue : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-                       (nid : NodeId) (st : EvalSt e)
-                     → EvalSt.connectedShares (proj₂ (mergeAllQueue {s = s} nid st))
-                       ≡ EvalSt.connectedShares st
-shares-mergeAllQueue {s = s} nid st with lookupNode nid (EvalSt.nodes st)
-... | just (mergeAll-st {w} lim act q od) with w ≟ᵗ s
-...   | no  _    = refl
-...   | yes refl = refl
-shares-mergeAllQueue nid st | nothing = refl
-shares-mergeAllQueue nid st | just (cell-st _) = refl
-shares-mergeAllQueue nid st | just (take-st _) = refl
-shares-mergeAllQueue nid st | just (batchSync-st _ _) = refl
-shares-mergeAllQueue nid st | just (switch-st _ _) = refl
-shares-mergeAllQueue nid st | just (exhaust-st _ _) = refl
-
--- THE COUNT, CARRIED ACROSS A STEP THAT LEFT THE CONNECTED LIST ALONE.
-unconn-shares : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m}
-                (sched : Sched Γ) (st st′ : EvalSt e)
-              → EvalSt.connectedShares st′ ≡ EvalSt.connectedShares st
-              → unconnected sched st ≤ m → unconnected sched st′ ≤ m
-unconn-shares sched st st′ p le =
-  ≤-trans (≤-reflexive (unconn-cong sched {st = st} {st′ = st′} p)) le
-
--- AND THE SIX A FRAME ACTUALLY SPENDS, each reading its step's result
--- back off the equation the frame's own `with` recorded.
-unconn-scanStep : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u m}
-                  (fn : FnClo Γ (u ×ᵗ s) u) (nid : NodeId) (v : Val Γ s)
-                  (sched : Sched Γ) (st : EvalSt e)
-                  {ac : Val Γ u} {st₁ : EvalSt e}
-                → scanStep fn nid v st ≡ (just ac , st₁)
-                → unconnected sched st ≤ m → unconnected sched st₁ ≤ m
-unconn-scanStep fn nid v sched st {st₁ = st₁} eq =
-  unconn-shares sched st st₁
-    (trans (cong (λ z → EvalSt.connectedShares (proj₂ z)) (sym eq))
-           (shares-scanStep fn nid v st))
-
-unconn-takeStep : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m}
-                  (nid : NodeId) (sched : Sched Γ) (st : EvalSt e)
-                  {b : Maybe Bool} {st₁ : EvalSt e}
-                → takeStep nid st ≡ (b , st₁)
-                → unconnected sched st ≤ m → unconnected sched st₁ ≤ m
-unconn-takeStep nid sched st {st₁ = st₁} eq =
-  unconn-shares sched st st₁
-    (trans (cong (λ z → EvalSt.connectedShares (proj₂ z)) (sym eq))
-           (shares-takeStep nid st))
-
-unconn-cutAt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m}
-               (nid : NodeId) (sched : Sched Γ) (st : EvalSt e)
-             → unconnected sched st ≤ m
-             → unconnected (proj₁ (cutAt nid sched st)) (proj₂ (cutAt nid sched st)) ≤ m
-unconn-cutAt nid sched st le = le
-
-unconn-batchSyncPush : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s m}
-                       (nid : NodeId) (v : Val Γ s)
-                       (sched : Sched Γ) (st : EvalSt e)
-                       {g : Maybe (Val Γ (s ×ᵗ listᵗ s))} {st₁ : EvalSt e}
-                     → batchSyncPush nid v st ≡ (g , st₁)
-                     → unconnected sched st ≤ m → unconnected sched st₁ ≤ m
-unconn-batchSyncPush nid v sched st {st₁ = st₁} eq =
-  unconn-shares sched st st₁
-    (trans (cong (λ z → EvalSt.connectedShares (proj₂ z)) (sym eq))
-           (shares-batchSyncPush nid v st))
-
-unconn-batchSyncFlush : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s m}
-                        (nid : NodeId) (sched : Sched Γ) (st : EvalSt e)
-                        {g : Maybe (Val Γ (s ×ᵗ listᵗ s))} {st₁ : EvalSt e}
-                      → batchSyncFlush {s = s} nid st ≡ (g , st₁)
-                      → unconnected sched st ≤ m → unconnected sched st₁ ≤ m
-unconn-batchSyncFlush {s = s} nid sched st {st₁ = st₁} eq =
-  unconn-shares sched st st₁
-    (trans (cong (λ z → EvalSt.connectedShares (proj₂ z)) (sym eq))
-           (shares-batchSyncFlush {s = s} nid st))
-
-unconn-mergeAllQueue : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s m}
-                       (op : AllOp) (nid inst : NodeId)
-                       (sched : Sched Γ) (st : EvalSt e)
-                       {q : List (Val Γ (obs s))} {st₀ : EvalSt e}
-                     → mergeAllQueue {s = s} nid (markInnerDone op nid inst st) ≡ (q , st₀)
-                     → unconnected sched st ≤ m → unconnected sched st₀ ≤ m
-unconn-mergeAllQueue {s = s} op nid inst sched st {st₀ = st₀} eq =
-  unconn-shares sched st st₀
-    (trans (cong (λ z → EvalSt.connectedShares (proj₂ z)) (sym eq))
-      (trans (shares-mergeAllQueue {s = s} nid (markInnerDone op nid inst st))
-             (shares-markInnerDone op nid inst st)))
-
-shares-markOuterDone : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-                       (op : AllOp) (nid : NodeId) (st : EvalSt e)
-                     → EvalSt.connectedShares (markOuterDone op nid st)
-                       ≡ EvalSt.connectedShares st
-shares-markOuterDone mergeAllᵒ nid st with lookupNode nid (EvalSt.nodes st)
-... | just (mergeAll-st lim act q od) = refl
-shares-markOuterDone mergeAllᵒ nid st | nothing = refl
-shares-markOuterDone mergeAllᵒ nid st | just (cell-st _) = refl
-shares-markOuterDone mergeAllᵒ nid st | just (take-st _) = refl
-shares-markOuterDone mergeAllᵒ nid st | just (batchSync-st _ _) = refl
-shares-markOuterDone mergeAllᵒ nid st | just (switch-st _ _) = refl
-shares-markOuterDone mergeAllᵒ nid st | just (exhaust-st _ _) = refl
-shares-markOuterDone switchᵒ nid st with lookupNode nid (EvalSt.nodes st)
-... | just (switch-st cur od) = refl
-shares-markOuterDone switchᵒ nid st | nothing = refl
-shares-markOuterDone switchᵒ nid st | just (cell-st _) = refl
-shares-markOuterDone switchᵒ nid st | just (take-st _) = refl
-shares-markOuterDone switchᵒ nid st | just (batchSync-st _ _) = refl
-shares-markOuterDone switchᵒ nid st | just (mergeAll-st _ _ _ _) = refl
-shares-markOuterDone switchᵒ nid st | just (exhaust-st _ _) = refl
-shares-markOuterDone exhaustᵒ nid st with lookupNode nid (EvalSt.nodes st)
-... | just (exhaust-st ia od) = refl
-shares-markOuterDone exhaustᵒ nid st | nothing = refl
-shares-markOuterDone exhaustᵒ nid st | just (cell-st _) = refl
-shares-markOuterDone exhaustᵒ nid st | just (take-st _) = refl
-shares-markOuterDone exhaustᵒ nid st | just (batchSync-st _ _) = refl
-shares-markOuterDone exhaustᵒ nid st | just (mergeAll-st _ _ _ _) = refl
-shares-markOuterDone exhaustᵒ nid st | just (switch-st _ _) = refl
-
-unconn-markOuterDone : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m}
-                       (op : AllOp) (nid : NodeId) (sched : Sched Γ) (st : EvalSt e)
-                     → unconnected sched st ≤ m
-                     → unconnected sched (markOuterDone op nid st) ≤ m
-unconn-markOuterDone op nid sched st =
-  unconn-shares sched st (markOuterDone op nid st) (shares-markOuterDone op nid st)
-
--- THE SWITCH'S CUT MOVES BOTH HALVES AT ONCE, so this one is stated
--- over the pair rather than over the store alone.
-unconn-switchKill : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m}
-                    (cur : Maybe NodeId) (sched : Sched Γ) (st : EvalSt e)
-                  → unconnected sched st ≤ m
-                  → unconnected (proj₁ (switchKill cur sched st))
-                                (proj₂ (switchKill cur sched st)) ≤ m
-unconn-switchKill nothing  sched st le = le
-unconn-switchKill (just v) sched st le = le
-
-unconn-switchKill-eq : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {m}
-                       (cur : Maybe NodeId) (sched : Sched Γ) (st : EvalSt e)
-                       {sched₁ : Sched Γ} {st₁ : EvalSt e}
-                     → switchKill cur sched st ≡ (sched₁ , st₁)
-                     → unconnected sched st ≤ m → unconnected sched₁ st₁ ≤ m
-unconn-switchKill-eq cur sched st refl le = unconn-switchKill cur sched st le
 
 dispatch-share! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo m} (i : Fin n)
                   (below : lo ≤ toℕ i) (w : Walk Γ t m (suc (toℕ i))) (now : Tick)

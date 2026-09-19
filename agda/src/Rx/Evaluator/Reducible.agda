@@ -45,10 +45,9 @@ open import Relation.Nullary using (yes; no)
 open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; obs; listᵗ;
   Ctx; Closed; Val; Tm; FnClo; applyClo; Env; []ᵉ; _∷ᵉ_; evalWith; foldVals;
   isData; lookupEnv; _≟ᵗ_; inputsBelowᵉ)
-open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; AllOp; NodeId;
-  scanStep; batchSyncPush; batchSyncFlush; lookupNode; batchSync-st;
-  memberSource)
-open import Rx.Evaluator.Domain using (subscribeE⇓; emit⇓; emits⇓; close⇓; drainQueue⇓)
+open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; NodeId; scanStep; batchSyncPush; batchSyncFlush; lookupNode;
+  batchSync-st; memberSource)
+open import Rx.Evaluator.Domain using (subscribeE⇓; emit⇓; close⇓)
 open import Rx.Slots using (Slot; Slots; scripted; shared)
 open import Decide using (≡ᵇ-refl)
 open import Data.Fin using (Fin; toℕ)
@@ -175,63 +174,6 @@ unconn-connect i sched st slEq connEq =
 
     hit : slotCost slots (toℕ i ∷ cs) i < slotCost slots cs i
     hit rewrite lhs≡0 | rhs≡1 = s≤s z≤n
-
--- WHAT A STEP OWES THE COUNT, AND IT IS THE CREDIT THE SHAPE ABOVE
--- BUYS ON.  A frame's obligation is stated under a bound on the store
--- it is handed, so a frame that runs a step and then spends the next
--- obligation has to know the step left the count where it was.  It
--- did: the connected list is written at exactly one site in the whole
--- tree -- a connect, which EXTENDS it -- and the slot telescope is
--- fixed at the start of the run, so every other step leaves both
--- readings alone and the count with them.
---
--- STATED OVER THE RELATION RATHER THAN THE STEP, because what a
--- builder holds at the point of spending is the derivation and not
--- the function that produced it.  Five of them because the obligation
--- is spent through five different relations, and the fact is the same
--- fact in each.
---
--- TWIN: `unconn-latch` -- the same fact one level down, over a store
---   STEP rather than a derivation: a case split on the move, every arm
---   discharged outright because the count reads two fields and the
---   move writes neither.  Each of these five is that proof once per
---   constructor, and the arms it needs are proven already.
-postulate
-  unconn-emit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
-                  {κ : Path Γ lo u t} {now} {v : Val Γ u}
-                  {sched : Sched Γ} {st : EvalSt e} {r : Out e}
-              → emit⇓ {e = e} κ now v sched st r
-              → unconnected (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
-                  ≤ unconnected sched st
-
-  unconn-close : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
-                   {κ : Path Γ lo u t} {now}
-                   {sched : Sched Γ} {st : EvalSt e} {r : Out e}
-               → close⇓ {e = e} κ now sched st r
-               → unconnected (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
-                   ≤ unconnected sched st
-
-  unconn-subs : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
-                  {b : Val Γ (obs u)} {κ : Path Γ lo u t} {now}
-                  {sched : Sched Γ} {st : EvalSt e} {r : Out e}
-              → subscribeE⇓ {e = e} b κ now sched st r
-              → unconnected (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
-                  ≤ unconnected sched st
-
-  unconn-emits : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
-                   {κ : Path Γ lo u t} {now} {vs : List (Val Γ u)}
-                   {sched : Sched Γ} {st : EvalSt e} {r : Out e}
-               → emits⇓ {e = e} κ now vs sched st r
-               → unconnected (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
-                   ≤ unconnected sched st
-
-  unconn-drain : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
-                   {op : AllOp} {nid : NodeId} {κ : Path Γ lo u t} {now}
-                   {q : List (Val Γ (obs u))}
-                   {sched : Sched Γ} {st : EvalSt e} {r : Out e}
-               → drainQueue⇓ {e = e} op nid κ now q sched st r
-               → unconnected (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
-                   ≤ unconnected sched st
 
 ------------------------------------------------------------------
 -- THE CANDIDATE.

@@ -285,7 +285,7 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
   VALUES and a plain `takeᵉ` above the envelope cuts on BATCHES, so the
   elaboration owes a count that crosses the level and closes at the cut.
 
-- **`unconn-{emit,emits,close,subs,drain}`** (Rx.Evaluator.Reducible) —
+- **`unconn-{emit,emits,close,subs,drain}`** (Rx.Evaluator.Unconnected) —
   GRINDABLE, `TWIN×5`: the unconnected-share count never rises along an arrival
   relation. One induction each over the relation's constructors, whose arms are
   the store-step lemmas the builder already proves outright.

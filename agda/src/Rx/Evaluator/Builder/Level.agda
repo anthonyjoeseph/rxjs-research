@@ -78,8 +78,8 @@ open import Rx.Evaluator.Domain using (subscribeE⇓; subs-floor; subs-shared; s
   subs-cold-async; subs-of; subs-empty; subs-take-zero; subs-take-suc; subs-map; subs-scan;
   subs-merge-all; subs-switch-all; subs-exhaust-all; subs-μ; subs-defer; subs-mint; connect;
   slot-spent; slot-join; slot-connect)
-open import Rx.Evaluator.Reducible using (Out; Red; Handles; RedFn; RedEnv; redDatas; redLookup; redFoldVals; unconnected;
-  unconn-emits; unconn-connect)
+open import Rx.Evaluator.Reducible using (Out; Red; Handles; RedFn; RedEnv; redDatas; redLookup; redFoldVals; unconnected; unconn-connect)
+open import Rx.Evaluator.Unconnected using (unconn-emits)
 open import Rx.Evaluator.Builder.Frames using (Walk; monus-sink; handles-share; emits!; handles-root; handles-map; handles-scan;
   handles-take; handles-batchSync; handles-from-inner; handles-thru-outer; subsAll!;
   subsBatchSync!; Below)
