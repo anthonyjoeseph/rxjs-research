@@ -1,17 +1,23 @@
 import {
   Observable,
   defer as rxDefer,
+  filter,
   map as rxMap,
   merge,
+  share as rxShare,
   mergeMap,
   of as rxOf,
   scan as rxScan,
+  switchMap,
+  take as rxTake,
   takeWhile,
+  tap,
 } from "rxjs";
 import {
   CutLedger,
   InstEmit,
   InstEvent,
+  SUBSCRIBE_FRAME,
   SourceId,
   cutLedgerStep,
   cutVictimCloses,
@@ -21,8 +27,16 @@ import {
   reassemble,
   splitEmit,
 } from "./inst-emit.js";
-import { Arrival, Driver } from "./driver.js";
-import { captureSync, cold, hot } from "./constructors.js";
+import { Driver, oneShotArrival } from "./driver.js";
+import {
+  Bracketed,
+  Marked,
+  SYNC_END,
+  UPSTREAM_DONE,
+  bracketSync,
+  latch,
+  markSync,
+} from "./constructors.js";
 
 export { exhaustAll, mergeAllAll, switchAll } from "./join.js";
 
@@ -40,7 +54,7 @@ export const of = <A>(driver: Driver, input: A[]): Observable<InstEmit<A>> =>
         { type: "close", source, reason: "exhausted" },
         { type: "complete" },
       ],
-      instant: driver.currentInstant(),
+      instant: SUBSCRIBE_FRAME,
       source,
       kind: "subscribe",
     });
@@ -50,10 +64,12 @@ export const of = <A>(driver: Driver, input: A[]): Observable<InstEmit<A>> =>
 export const empty = (driver: Driver): Observable<InstEmit<never>> =>
   of<never>(driver, []);
 
-// The slot-telescope share (NOT default rxjs share()): all reset
-// options are false by definition — connect once at the first
-// subscription, never disconnect (an unobserved share keeps burning
-// arrivals), latch completion forever. Mirrors Agda's
+// The slot-telescope share IS rxjs's own `share` with every reset
+// turned off (Anthony) — connect once at the first subscription, never
+// disconnect (an unobserved share keeps burning arrivals), latch
+// completion forever. That ruling is what let the hand-rolled connect
+// go: rxjs holds the one upstream subscription and the fan-out, and
+// what is left here is the protocol traffic around it. Mirrors Agda's
 // subscribeSharedSlot + dispatchShare:
 // - the connect burst flows up the FIRST subscriber only, retagged
 //   plumbing (its registrations belong to the share, not to any
@@ -66,15 +82,31 @@ export const empty = (driver: Driver): Observable<InstEmit<never>> =>
 //   mid-final-cascade — or any time later — gets the immediate
 //   init/close/complete one-shot, never a registration dropped
 //   without its close. Completion is re-observable, values are not.
+// WHAT KIND OF SUBSCRIBER THIS IS COMES OUT OF A `latch`, and it is
+// the registration count's move made once more.  That count was a cell
+// between two folds and went onto the signal joining them; these two
+// are read at SUBSCRIBE time, so what they need is not a signal at the
+// boundary but a stream with a CURRENT VALUE -- which is the one thing
+// a plain channel cannot have, since it drops a push nobody is hearing.
+// Seeded, the answer is in the stream and arrives inside the reader's
+// own subscribe frame, so the three cases are chosen from a value
+// rather than from whose turn it was.
+//
+// AND THE WRITES SIT WHERE THE ORDER IS ALREADY DECIDED, which is what
+// makes the read safe rather than merely tidy.  `live` is written from
+// the signals `tap` on the boundary marker, and the boundary fires
+// inside the FIRST subscriber's own subscribe frame while its fold is
+// still holding the whole burst -- so nothing has flowed downstream
+// yet, and a subscriber the burst itself causes reads `live`.  `spent`
+// is written from the same `tap`, above the `takeWhile`, so it lands
+// before the final fan-out: a subscriber joining mid-cascade gets the
+// one-shot rather than a registration nothing would close.
 export const share = <A>(
   driver: Driver,
   obs: Observable<InstEmit<A>>,
   source: SourceId,
 ): Observable<InstEmit<A>> => {
-  let connected = false;
-  let completed = false;
-  let upstreamOpen: SourceId[] = [];
-  const [broadcast, broadcastSink] = hot<InstEmit<A>>();
+  const [phase, phaseSink] = latch<"fresh" | "live" | "spent">("fresh");
 
   const latchedOneShot = (): InstEmit<A> => ({
     events: [
@@ -82,107 +114,227 @@ export const share = <A>(
       { type: "close", source, reason: "exhausted" },
       { type: "complete" },
     ],
-    instant: driver.currentInstant(),
+    instant: SUBSCRIBE_FRAME,
     source,
     kind: "subscribe",
   });
 
   const initEmit = (extra: InstEvent<never>[]): InstEmit<A> => ({
     events: [{ type: "init", source }, ...extra],
-    instant: driver.currentInstant(),
+    instant: SUBSCRIBE_FRAME,
     source,
     kind: "subscribe",
   });
 
-  const onUpstreamEmit = (emit: InstEmit<A>) => {
-    const parts = splitEmit(emit);
-    upstreamOpen = openAfter(emit, upstreamOpen, true);
-    const fin = parts.fin || upstreamOpen.length === 0;
-    // the chain's own emit, emptied of values, announcing the handoff —
-    // it reaches the root directly (Agda foldPath's share-sink clause)
-    driver.pushChainEmit({
-      events: [...parts.bookkeeping, { type: "handoff", source }],
-      instant: emit.instant,
-      source: emit.source,
-      kind: emit.kind,
-    });
-    if (fin) completed = true; // latch BEFORE the final fan-out
-    broadcastSink.next({
-      events: [
-        ...(fin
-          ? [{ type: "close", source, reason: "exhausted" } as const]
-          : []),
-        ...parts.values.map((value) => ({ type: "value", value }) as const),
-      ],
-      instant: emit.instant,
-      source,
-      kind: "delivery",
-    });
-    if (fin) broadcastSink.complete();
-  };
+  // THE CONNECT BURST AND THE LATER ARRIVALS ARE DIFFERENT TRAFFIC, and
+  // telling them apart used to be what forced the manual subscription:
+  // a burst emit is the def coming alive and rides up the first
+  // subscriber retagged `plumbing`, while an arrival mints a chain emit
+  // and fans out. `bracketSync` draws that line as a VALUE, so the
+  // upstream can be an ordinary pipeline — and because it sits BELOW
+  // the share, the fold runs once, which is what makes its writes to
+  // its registration tracking and its completion latch the share's own
+  // bookkeeping rather than a per-subscriber copy. `endWith` is what
+  // recovers an upstream that rx-completed inside the burst without
+  // closing its registrations: the marker arrives before SYNC_END
+  // exactly when the completion was synchronous.
 
-  return cold<InstEmit<A>>((sink) => {
-    if (completed) {
-      sink.next(latchedOneShot());
-      sink.complete();
-      return () => {};
-    }
-    if (connected) {
-      // live: join mid-flight, future values only
-      sink.next(initEmit([]));
-      const registration = captureSync(broadcast, sink);
-      return () => registration.unsubscribe();
-    }
-    connected = true;
-    const connect = captureSync(obs, {
-      next: onUpstreamEmit,
-      complete: () => {
-        // fin rides the closing emit (the open multiset); the rx
-        // completion itself is absorbed here
+  // THE OPEN REGISTRATIONS RIDE THE `connected` SIGNAL rather than a
+  // cell, because the two scans that need them are different folds: the
+  // count is WRITTEN by this one and READ by the first subscriber's,
+  // and a cell between them is correct only while this fold happens to
+  // run first. It does — it is upstream — but that is subscription
+  // order standing in for a data dependency, so the count goes in the
+  // signal that marks the boundary and the dependency is the type's.
+  type Signal =
+    | { tag: "burst"; emit: InstEmit<A> }
+    | { tag: "connected"; spent: boolean; openCount: number }
+    | { tag: "fanout"; emit: InstEmit<A> };
+
+  const signals: Observable<Signal> = markSync(obs).pipe(
+    rxScan<
+      Marked<InstEmit<A>>,
+      {
+        live: boolean;
+        spent: boolean;
+        fin: boolean;
+        open: SourceId[];
+        out?: Signal;
+        // the chain's own emit, emptied of values, announcing the
+        // handoff — it reaches the root directly (Agda foldPath's
+        // share-sink clause) rather than through any subscriber's
+        // pipeline, so it leaves this fold as a RESULT and is sent
+        // below. Sending it from inside the accumulator would make
+        // this scan's answer depend on when it ran and not only on
+        // what it was handed.
+        chain?: InstEmit<never>;
+      }
+    >(
+      (state, item) => {
+        if (item === UPSTREAM_DONE)
+          return {
+            ...state,
+            spent: true,
+            fin: false,
+            out: undefined,
+            chain: undefined,
+          };
+        if (item === SYNC_END)
+          return {
+            ...state,
+            live: true,
+            fin: false,
+            chain: undefined,
+            out: {
+              tag: "connected",
+              spent: state.spent,
+              openCount: state.open.length,
+            },
+          };
+        // A PLUMBING EMIT CARRIES NO REGISTRATION OF THIS SHARE'S, AND
+        // A CHAIN OF SHARES IS WHERE THAT BITES. An inner share retags
+        // its own connect burst `plumbing` and sends it up, so those
+        // inits are registrations the INNER share already tracks and
+        // will itself close. Counted here as well, this share's open
+        // multiset never empties on the arrival that closes its one
+        // real registration -- so `fin` stays false, the fanout loses
+        // its `close … exhausted`, and the root never materializes the
+        // completion. Only the root's ledger tracks plumbing.
+        const open = openAfter(item, state.open, false);
+        if (!state.live)
+          return {
+            ...state,
+            open,
+            fin: false,
+            chain: undefined,
+            out: { tag: "burst", emit: item },
+          };
+        const parts = splitEmit(item);
+        const fin = parts.fin || open.length === 0;
+        return {
+          live: true,
+          spent: state.spent,
+          open,
+          fin,
+          chain: {
+            events: [...parts.bookkeeping, { type: "handoff", source }],
+            instant: item.instant,
+            source: item.source,
+            kind: item.kind,
+          },
+          out: {
+            tag: "fanout",
+            emit: {
+              events: [
+                ...(fin
+                  ? [{ type: "close", source, reason: "exhausted" } as const]
+                  : []),
+                ...parts.values.map(
+                  (value) => ({ type: "value", value }) as const,
+                ),
+              ],
+              instant: item.instant,
+              source,
+              kind: "delivery",
+            },
+          },
+        };
       },
-    });
-    // never disconnect: the upstream subscription is permanent
-    for (const emit of connect.burst)
-      upstreamOpen = openAfter(emit, upstreamOpen, true);
-    const plumbed = connect.burst.map((emit): InstEmit<A> => ({
-      ...emit,
-      kind: "plumbing",
-    }));
-    const burstFin =
-      connect.completedSync ||
-      mergeAllBurst(connect.burst).done ||
-      (connect.burst.length > 0 && upstreamOpen.length === 0);
-    if (burstFin) {
-      // the def died inside its own connect burst: latch; this
-      // registration closes in the same instant
-      completed = true;
-      sink.next(initEmit([{ type: "close", source, reason: "exhausted" }]));
-      for (const emit of plumbed) sink.next(emit);
-      sink.complete();
-      return () => {};
-    }
-    sink.next(initEmit([]));
-    const registration = captureSync(broadcast, sink);
-    for (const emit of plumbed) sink.next(emit);
-    return () => registration.unsubscribe();
-  });
+      { live: false, spent: false, fin: false, open: [] },
+    ),
+    // the chain emit leaves here rather than from inside the fold, and
+    // it leaves ABOVE the share below, so it is sent once for the def
+    // and not once per subscriber. The phase writes ride the same tap
+    // for the same reason: a write from inside the accumulator would
+    // make the fold's answer depend on when it ran, and one from below
+    // the `takeWhile` would miss the final fan-out it has to precede.
+    tap((state) => {
+      if (state.chain !== undefined) driver.pushChainEmit(state.chain);
+      if (state.fin) phaseSink.next("spent");
+      else if (state.out?.tag === "connected") phaseSink.next("live");
+    }),
+    takeWhile((state) => !state.fin, true), // the final fan-out, then done
+    filter((state) => state.out !== undefined),
+    rxMap((state) => state.out as Signal),
+    rxShare({
+      resetOnRefCountZero: false,
+      resetOnComplete: false,
+      resetOnError: false,
+    }),
+  );
+
+  const fanouts = signals.pipe(
+    filter((s): s is Signal & { tag: "fanout" } => s.tag === "fanout"),
+    rxMap((s) => s.emit),
+  );
+
+  // the phase is read ONCE, at subscribe, and `take(1)` on a seeded
+  // stream delivers it synchronously — so the branch is chosen in the
+  // subscriber's own frame, with no hop, exactly where the `defer` body
+  // used to read its flags.
+  return phase.pipe(
+    rxTake(1),
+    switchMap((current): Observable<InstEmit<A>> => {
+      if (current === "spent") return rxOf(latchedOneShot());
+      if (current === "live") return merge(rxOf(initEmit([])), fanouts); // join mid-flight
+      // the first subscriber is the one the connect burst flows up, and
+      // its init is emitted AT the boundary rather than before it: the
+      // burst decides whether that init already carries its close, and
+      // nothing observable is reordered because the whole group is one
+      // frame.
+      return signals.pipe(
+        rxScan<
+          Signal,
+          { burst: InstEmit<A>[]; done: boolean; out: InstEmit<A>[] }
+        >(
+          (state, s) => {
+            if (s.tag === "burst")
+              return { burst: [...state.burst, s.emit], done: false, out: [] };
+            if (s.tag === "fanout")
+              return { burst: [], done: false, out: [s.emit] };
+            const flat = mergeAllBurst(state.burst);
+            const burstFin =
+              s.spent ||
+              flat.done ||
+              (state.burst.length > 0 && s.openCount === 0);
+            return {
+              burst: [],
+              done: burstFin,
+              out: [
+                initEmit(
+                  burstFin
+                    ? [{ type: "close", source, reason: "exhausted" }]
+                    : [],
+                ),
+                ...state.burst.map((emit): InstEmit<A> => ({
+                  ...emit,
+                  kind: "plumbing",
+                })),
+              ],
+            };
+          },
+          { burst: [], done: false, out: [] },
+        ),
+        // the def died inside its own connect burst: latch above the
+        // `takeWhile`, so it is spent before its own init reaches anyone
+        tap((state) => {
+          if (state.done) phaseSink.next("spent");
+        }),
+        takeWhile((state) => !state.done, true),
+        mergeMap((state) => rxOf(...state.out)),
+      );
+    }),
+  );
 };
 
-// a one-shot driver delivery at the NEXT tick, read per subscription —
-// the async boundary under deferᵉ/μᵉ. Teardown cancels the pending
-// hop (unsubscribing a not-yet-fired defer is free — Agda's sweepLive).
-const oneShotArrival = (driver: Driver, tick: number): Observable<Arrival> =>
-  cold<Arrival>((sink) =>
-    driver.registerSource([
-      {
-        tick,
-        fire: (arrival) => {
-          sink.next(arrival);
-          sink.complete();
-        },
-      },
-    ]),
-  );
+// mintᵉ: one fresh uniq token per SUBSCRIPTION, handed to the body and
+// nothing else. No event, no registration, no hop — the operator wrapping
+// the binder owes those. `rxDefer` is what makes it per-subscription
+// rather than per-pipeline, which is the whole of the semantics.
+export const mint = <A>(
+  driver: Driver,
+  compileBody: (token: symbol) => Observable<InstEmit<A>>,
+): Observable<InstEmit<A>> => rxDefer(() => compileBody(driver.mintToken()));
 
 // deferᵉ (NOT rxjs defer): lazy PLUS a one-tick hop, the body's
 // emissions minting fresh ids (an async boundary). Mirrors Agda's
@@ -200,77 +352,152 @@ export const defer = <A>(
     return merge(
       rxOf<InstEmit<A>>({
         events: [{ type: "init", source }],
-        instant: driver.currentInstant(),
+        instant: SUBSCRIBE_FRAME,
         source,
         kind: "subscribe",
       }),
       oneShotArrival(driver, driver.currentTick() + 1).pipe(
         mergeMap(({ instant }) =>
-          cold<InstEmit<A>>((sink) => {
-            const capture = captureSync(compileBody(), sink);
-            const flat = mergeAllBurst(capture.burst);
-            sink.next(
-              reassemble(
-                { instant, source, kind: "delivery" },
-                [{ type: "close", source, reason: "exhausted" }],
-                flat.bookkeeping,
-                flat.values,
-                false,
-              ),
-            );
-            if (capture.completedSync || flat.done) sink.complete();
-            return () => capture.unsubscribe();
-          }),
+          // the body's burst is regrouped by a FOLD over the bracketed
+          // stream rather than accumulated by a subscriber: everything
+          // before SYNC_END is the burst, the marker itself is where
+          // the one delivery emit comes out, everything after is the
+          // body's async tail passing through under its own envelope.
+          // rx completion needs no special case — if the body finished
+          // inside its burst the merged stream completes on its own;
+          // `takeWhile` covers the other exit, a body that signalled
+          // done through its events without completing.
+          bracketSync(compileBody()).pipe(
+            rxScan<
+              Bracketed<InstEmit<A>>,
+              { burst: InstEmit<A>[]; done: boolean; out?: InstEmit<A> }
+            >(
+              (state, item) => {
+                if (item !== SYNC_END)
+                  return state.out === undefined && !state.done
+                    ? { burst: [...state.burst, item], done: false }
+                    : { burst: [], done: state.done, out: item };
+                const flat = mergeAllBurst(state.burst);
+                return {
+                  burst: [],
+                  done: flat.done,
+                  out: reassemble(
+                    { instant, source, kind: "delivery" },
+                    [{ type: "close", source, reason: "exhausted" }],
+                    flat.bookkeeping,
+                    flat.values,
+                    false,
+                  ),
+                };
+              },
+              { burst: [], done: false },
+            ),
+            takeWhile((state) => !state.done, true),
+            filter((state) => state.out !== undefined),
+            rxMap((state) => state.out as InstEmit<A>),
+          ),
         ),
       ),
     );
   });
 
-// lift: THE pure-function former. A step reads an emit's VALUES and the
-// state carried across emits, and returns the next state and the values
-// to emit in their place. That is the whole interface, and what it
-// EXCLUDES is the point: a step mints no registration, reads none of the
-// bookkeeping, cannot end the stream and cannot see which instant it is
-// in — so the emit's own events and its fin bit ride through untouched
-// and the protocol is not something a program can write.
+// map and scan: THE pure-function formers, and there are two because
+// rxjs has two. A step reads ONE value -- and, for scan, the state
+// carried across it -- and returns one value. That is the whole
+// interface, and what it EXCLUDES is the point: a step mints no
+// registration, reads none of the bookkeeping, cannot end the stream
+// and cannot see which instant it is in -- so the emit's own events and
+// its fin bit ride through untouched and the protocol is not something
+// a program can write.
 //
-// Its Agda counterpart is a `Tm` of type (u × list s) → (u × list t)
-// with a `Tm` seed, which is why the interface is an ARRAY in and an
-// array out rather than one value at a time: `Tm` is first-order and
-// total, so a step cannot be a callback the operator drives, and the
-// value language already has fold over lists.
-export const lift = <A, B, S>(
-  obs: Observable<InstEmit<A>>,
-  initial: S,
-  step: (state: S, values: A[]) => { state: S; values: B[] },
-): Observable<InstEmit<B>> =>
-  obs.pipe(
-    rxScan<InstEmit<A>, { state: S; out?: InstEmit<B> }>(
-      (carried, emit) => {
-        const { bookkeeping, values, fin } = splitEmit(emit);
-        const next = step(carried.state, values);
-        return {
-          state: next.state,
-          out: reassemble(emit, bookkeeping, [], next.values, fin),
-        };
-      },
-      { state: initial },
-    ),
-    rxMap((carried) => carried.out as InstEmit<B>), // the seed is never emitted, so out is set
-  );
-
-// a lift that carries nothing. No Exp node compiles to this any more —
-// a program's map is built from the lift NODE, in the term language —
-// so what is left is the compiler's own use, mapping each emitted inner
-// observable to its compilation.
+// THE STEP IS POINTWISE AND THE EMIT IS NOT, which is the one thing to
+// carry when reading either body. An emit carries a LIST of values, so
+// each operator runs its step once per element and rebuilds the emit
+// around the results; a frame is never something the step can see, and
+// that is what stops a program writing one.
+//
+// NEITHER IS DERIVABLE FROM THE OTHER. A scan's accumulator IS its
+// output, so changing the value's type needs a seed at the new type,
+// and the value language has no generic inhabitant to default one to; a
+// map carries no state, so it cannot stand in for a scan either.
 export const map = <A, B>(
   obs: Observable<InstEmit<A>>,
   fn: (a: A) => B,
 ): Observable<InstEmit<B>> =>
-  lift<A, B, null>(obs, null, (state, values) => ({
-    state,
-    values: values.map(fn),
-  }));
+  obs.pipe(
+    rxMap((emit) => {
+      const { bookkeeping, values, fin } = splitEmit(emit);
+      return reassemble(emit, bookkeeping, [], values.map(fn), fin);
+    }),
+  );
+
+export const scan = <A, S>(
+  obs: Observable<InstEmit<A>>,
+  initial: S,
+  step: (state: S, value: A) => S,
+): Observable<InstEmit<S>> =>
+  obs.pipe(
+    rxScan<InstEmit<A>, { state: S; out?: InstEmit<S> }>(
+      (carried, emit) => {
+        const { bookkeeping, values, fin } = splitEmit(emit);
+        const out = values.reduce<{ state: S; emitted: S[] }>(
+          (acc, value) => {
+            const next = step(acc.state, value);
+            return { state: next, emitted: [...acc.emitted, next] };
+          },
+          { state: carried.state, emitted: [] },
+        );
+        return {
+          state: out.state,
+          out: reassemble(emit, bookkeeping, [], out.emitted, fin),
+        };
+      },
+      { state: initial },
+    ),
+    rxMap((carried) => carried.out as InstEmit<S>), // the seed is never emitted, so out is set
+  );
+
+// batchSync-f: the one plain operator that can see synchrony, and it
+// sees exactly one bit of it — whether the emit it is regrouping was
+// pushed during its own subscribe call. An emit inside that burst
+// leaves as ONE group, head and tail (Agda's groupSync, so an empty
+// emit yields no group at all); every later emit's values leave as
+// singletons (soloSync). There is no accumulator and there cannot be:
+// holding a value back to see whether another joins it would need to
+// know that another is owed, which is the forward-looking knowledge
+// this operator is defined not to have.
+//
+// THE BIT COMES FROM rxjs's OWN SUBSCRIBE ORDERING, NOT FROM A
+// SUBSCRIPTION THIS OPERATOR OWNS. `bracketSync` merges a marker after
+// the source, and `merge` subscribes its inputs in order and
+// synchronously, so the source drains its whole subscribe burst before
+// the marker is subscribed and fires. The marker therefore lands
+// exactly at the boundary, in the same frame, with no hop and no
+// timing change — which is what lets the split arrive as a VALUE that
+// a scan reads, rather than as a callback an operator drives.
+export const batchSync = <A>(
+  obs: Observable<InstEmit<A>>,
+): Observable<InstEmit<[A, A[]]>> =>
+  bracketSync(obs).pipe(
+    rxScan<Bracketed<InstEmit<A>>, { sync: boolean; out?: InstEmit<[A, A[]]> }>(
+      (carried, item) => {
+        if (item === SYNC_END) return { sync: false };
+        const { bookkeeping, values, fin } = splitEmit(item);
+        const groups: [A, A[]][] = carried.sync
+          ? values.length === 0
+            ? []
+            : [[values[0], values.slice(1)]]
+          : values.map((v): [A, A[]] => [v, []]);
+        return {
+          sync: carried.sync,
+          out: reassemble(item, bookkeeping, [], groups, fin),
+        };
+      },
+      { sync: true },
+    ),
+    filter((carried) => carried.out !== undefined),
+    rxMap((carried) => carried.out as InstEmit<[A, A[]]>),
+  );
 
 // take-f: forward the first `emissions` values, then cut. The cut emit
 // carries the taken prefix plus a `close … cut` for EVERY registration
@@ -283,15 +510,15 @@ export const map = <A, B>(
 // (Agda's sweepLive). Count 0 is routed to `empty` by the compiler
 // (Agda: take 0 never subscribes its source), so `emissions ≥ 1` here.
 //
-// AND IT IS NOT A `lift`, WHICH IS THE PALETTE'S DIVIDING LINE DRAWN AT
-// THE ONE OPERATOR THAT LOOKS LIKE IT SHOULD BE ONE.  `map` and `scan`
-// are lifts because a step reading the values decides everything they
-// emit.  This one reads the open-registration multiset and the cut
-// ledger, MINTS bookkeeping (one close per victim, with a per-victim
-// reason), and raises fin on the emit that cuts.  A lift whose step
-// could do that would be a step handed source ids, close reasons and
-// emit kinds -- the protocol's own vocabulary, in the value language,
-// writable by a program.  So `take` stays a former of its own.
+// AND IT IS NOT A PURE-FUNCTION FORMER, WHICH IS THE PALETTE'S DIVIDING
+// LINE DRAWN AT THE ONE OPERATOR THAT LOOKS LIKE IT SHOULD BE ONE.
+// `map` and `scan` pass the test because a step reading one value
+// decides everything they emit.  This one reads the open-registration
+// multiset and the cut ledger, MINTS bookkeeping (one close per victim,
+// with a per-victim reason), and raises fin on the emit that cuts.  A
+// step that could do that would be a step handed source ids, close
+// reasons and emit kinds -- the protocol's own vocabulary, in the value
+// language, writable by a program.  So `take` stays a former of its own.
 export const take = <A>(
   obs: Observable<InstEmit<A>>,
   emissions: number,

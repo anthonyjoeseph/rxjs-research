@@ -4,7 +4,11 @@
 -- the resulting stream. A fast in-Agda dev loop for the implementation.
 --
 --   agda --compile --compile-dir=_cli src/QuickCheck.agda
---   echo "<seed> [runs] [depth]" | ./_cli/QuickCheck
+--   echo "<seed> [runs] [depth] [at]" | ./_cli/QuickCheck
+--
+-- A nonzero `at` prints the paste row of that one case (1-based) and runs
+-- nothing, which is the only way to read a program whose evaluation costs
+-- more than the sweep it sits in.
 --
 -- The fragment's payloads are ℕ, because batching is value-agnostic.
 -- Repeated inner refs to a source inside an *All make diamonds —
@@ -33,9 +37,15 @@
 -- scopes carried as indices rather than checked afterwards — the
 -- generator's type is `Exp` at the two μ contexts, so a synchronous
 -- self-reference is not a program it can emit and be rejected for; it is
--- one it cannot write down.  The summary line carries how many of the run's
--- programs actually carried each recursion constructor, because reaching the
--- region is the claim and it is a number.
+-- one it cannot write down.
+--
+-- AND EVERY RUN CARRIES A CENSUS LINE, ONE COUNT PER FORMER.  What a
+-- green claims is that the shapes were REACHED, and that is a number
+-- rather than a claim; counting per former rather than per interesting
+-- region is what stops the regions from being whichever ones somebody
+-- last thought about.  The per-run line is raw material: a sweep sums
+-- it across seeds, and a former totalling zero is a hole in what the
+-- sweep covered rather than a fact about any one seed.
 module QuickCheck where
 
 open import Data.Bool using (Bool; true; false; not; if_then_else_; _∧_; _∨_)
@@ -52,19 +62,17 @@ open import Data.Vec using () renaming (_∷_ to _∷ⱽ_; [] to []ⱽ)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong; subst)
 
-open import Rx.Prim using (Timed; after_,_; ObservableInput; hot; cold; InstEvent; init; value; close; handoff;
-  complete; InstEmit; _at_from_as_)
-open import Rx.Exp using (Ty; natᵗ; obs; _×ᵗ_; isData; Ctx; Exp; Tm; Fn; PrimOp; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; liftᵉ;
-  mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ;
-  unit̂; bool̂; nat̂; primᵗ; pairᵗ; fstᵗ; sndᵗ;
-  strmᵗ; varᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; nilᵗ; consᵗ; foldᵗ; add; sub; mul; eqᵖ; ltᵖ; notᵖ)
+open import Rx.Prim using (after_,_; InstEvent; init; value; close; handoff; complete; InstEmit; _at_from_as_)
+open import Rx.Exp using (Ty; natᵗ; obs; _×ᵗ_; isData; PrimOp; input; add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ)
+open import Rx.SExp using (SExp; STm; SFn; inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; scanˢ; mergeAllˢ; switchAllˢ; exhaustAllˢ;
+  μˢ; varˢ; deferˢ; varˢᵗ; unitˢ; boolˢ; natˢ; pairˢ; fstˢ; sndˢ; nilˢ; consˢ; inlˢ; inrˢ;
+  caseˢ; foldˢ; primˢ; ifˢ; strmˢ)
 open import Data.List.Membership.Propositional using (_∈_)
-open import Rx.Emit-Eq using (eqBatched)
-open import Rx.Evaluator.Builder using (evaluate↓)
-open import Rx.Slots using (scripted; shared; Slot; Slots)
 open import Rx.Protocol using (wellFormed?)
+open import Rx.Emit-Eq using (eqBatched)
 open import Implementation using (impl-batchSimultaneous)
 open import Spec using (spec-batchSimultaneous)
+open import Implementation.Unit-Test.Prelude using (Γ₂; slots₂; cached; runOf)
 open import Agda.Builtin.IO using (IO)
 open import CLI.IO using (_>>=_; getContents; putStr; Unit)
 
@@ -107,21 +115,41 @@ genB bound []       = 0 , []
 genB bound (r ∷ rs) = natMod r bound , rs
 
 ------------------------------------------------------------------------
--- the fixed context: two nat-typed slots
-
-Γ₂ : Ctx 2
-Γ₂ = natᵗ ∷ⱽ natᵗ ∷ⱽ []ⱽ
+-- THE TREE THE SWEEP DRAWS IS THE AUTHOR'S, WHICH IS WHAT PUTS THE
+-- BATCHING QUESTION IN RANGE AT ALL.  Both batchings read the protocol
+-- off an ENVELOPE, and only an elaborated program carries one, so a
+-- drawn `Exp` could be run and could not be ASKED.  The generator is
+-- therefore indexed by `SExp`, and `Rx.Elaborate` is what stands
+-- between it and the evaluator; the two formers the plain tree has and
+-- the author's does not -- mint and batchSync -- leave with it, and
+-- what reaches them now is the elaboration rather than a seed.
+--
+-- THE CONTEXT COMES FROM THE PRELUDE BECAUSE A CACHED ROW AND THE SEED
+-- THAT FOUND IT HAVE TO BE ONE RUN.  `Γ₂` is what the author sees and
+-- `Γ₂ᵉ` is where an elaborated program stands, each slot holding the
+-- envelope over the author's type.
 
 genFin2 : Gen (Fin 2)
 genFin2 = genB 2 >>=G λ c → pureG (if c ≡ᵇ 0 then zero else suc zero)
 
--- input i : Exp … (lookup Γ₂ i); matching i lets lookup reduce to natᵗ.
+-- inputˢ i : SExp … (lookup Γ₂ i); matching i lets lookup reduce to natᵗ.
 -- Polymorphic in the μ-var contexts: a slot reference is legal wherever the
 -- generator stands, binders open or not.
-inputNat : ∀ {Δᵍ Δ Θ} → Fin 2 → Exp Γ₂ Δᵍ Δ Θ natᵗ
-inputNat zero          = input zero
-inputNat (suc zero)    = input (suc zero)
+inputNat : ∀ {Δᵍ Δ Θ} → Fin 2 → SExp Γ₂ Δᵍ Δ Θ natᵗ
+inputNat zero          = inputˢ zero
+inputNat (suc zero)    = inputˢ (suc zero)
 inputNat (suc (suc ()))
+
+-- WHICH SLOTS A SUBTREE MAY READ, AND IT IS A NUMBER BECAUSE THE
+-- TELESCOPE IS STRATIFIED.  Slot k's def may name only slots below k,
+-- so the same generator draws the program (both slots readable), slot
+-- one's def (slot zero readable) and slot zero's (none) -- and the
+-- side condition on `shared` is then discharged by computation rather
+-- than by a proof threaded through the generator.
+genSlotRef : ∀ {Δᵍ Δ Θ} → ℕ → Gen (SExp Γ₂ Δᵍ Δ Θ natᵗ)
+genSlotRef zero          = pureG emptyˢ
+genSlotRef (suc zero)    = pureG (inputNat zero)
+genSlotRef (suc (suc _)) = genFin2 >>=G λ i → pureG (inputNat i)
 
 genNat : Gen ℕ
 genNat = genB 10
@@ -139,17 +167,41 @@ genNat = genB 10
 -- generator built to produce interesting terms systematically
 -- under-samples degenerate ones, and the degenerate ones are where this
 -- campaign's counterexamples have been.
-genFn : ∀ {Δᵍ Δ Θ} → Gen (Fn Γ₂ Δᵍ Δ Θ natᵗ natᵗ)
+genFn : ∀ {Δᵍ Δ Θ} → Gen (SFn Γ₂ Δᵍ Δ Θ natᵗ natᵗ)
 genFn = genB 4 >>=G λ c → genNat >>=G λ k →
-  pureG (if c ≡ᵇ 0 then varᵗ (here refl)
-    else if c ≡ᵇ 1 then primᵗ add (pairᵗ (varᵗ (here refl)) (nat̂ k))
-    else if c ≡ᵇ 2 then primᵗ mul (pairᵗ (varᵗ (here refl)) (nat̂ k))
-    else nat̂ k)
+  pureG (if c ≡ᵇ 0 then varˢᵗ (here refl)
+    else if c ≡ᵇ 1 then primˢ add (pairˢ (varˢᵗ (here refl)) (natˢ k))
+    else if c ≡ᵇ 2 then primˢ mul (pairˢ (varˢᵗ (here refl)) (natˢ k))
+    else natˢ k)
 
 -- scan step (acc, cur) → acc + cur
-genScanFn : ∀ {Δᵍ Δ Θ} → Gen (Fn Γ₂ Δᵍ Δ Θ (natᵗ ×ᵗ natᵗ) natᵗ)
-genScanFn = pureG (primᵗ add (pairᵗ (fstᵗ (varᵗ (here refl)))
-                                    (sndᵗ (varᵗ (here refl)))))
+genScanFn : ∀ {Δᵍ Δ Θ} → Gen (SFn Γ₂ Δᵍ Δ Θ (natᵗ ×ᵗ natᵗ) natᵗ)
+genScanFn = pureG (primˢ add (pairˢ (fstˢ (varˢᵗ (here refl)))
+                                    (sndˢ (varˢᵗ (here refl)))))
+
+-- THE STEP THAT CHANGES AN EMIT'S VALUE COUNT, WHICH IS NOW A FLATTEN
+-- AND NOT A STEP AT ALL.  `mapᵉ` and `scanᵉ` are both per-VALUE, so the
+-- list they hand back is always as long as the one they were given, and
+-- a sweep built only out of them never changes a count.  Zero-or-more
+-- out is `mergeAllᵉ` over a step returning LITERAL SYNTAX — rxjs's own
+-- `mergeMap(x => …)` — so this generates the step and the lane spends
+-- it under a flattener.  The arms are a lattice over what happens to
+-- the count: emptied, doubled, one longer, filtered, and unchanged.
+--
+-- THE IDENTITY ARM IS DELIBERATE, on the reasoning `genFn` records: a
+-- generator whose every arm exercises the interesting shape cannot
+-- produce the program that distinguishes a step which ignores its input
+-- from one that does not.
+genFanFn : ∀ {Δᵍ Δ Θ} → Gen (SFn Γ₂ Δᵍ Δ Θ natᵗ (obs natᵗ))
+genFanFn = genB 5 >>=G λ c → genNat >>=G λ k →
+  let x = varˢᵗ (here refl)
+  in pureG
+    (      if c ≡ᵇ 0 then strmˢ emptyˢ
+      else if c ≡ᵇ 1 then strmˢ (ofˢ (x ∷ x ∷ []))
+      else if c ≡ᵇ 2 then strmˢ (ofˢ (x ∷ natˢ k ∷ []))
+      else if c ≡ᵇ 3 then
+        ifˢ (primˢ ltᵖ (pairˢ x (natˢ k))) (strmˢ emptyˢ) (strmˢ (ofˢ (x ∷ [])))
+      else strmˢ (ofˢ (x ∷ [])))
 
 -- THE ACCUMULATOR AT OBSERVABLE TYPE, WHICH IS THE ONE BINDER THAT
 -- BREAKS A DATA ENVIRONMENT.  Substituting a value of observable type
@@ -164,52 +216,27 @@ genScanFn = pureG (primᵗ add (pairᵗ (fstᵗ (varᵗ (here refl)))
 -- could produce a fold whose output is independent of everything handed
 -- to it — the same trap `genFn` records one declaration up, where three
 -- arms all USED the argument and the shape that mattered was the fourth.
-genObsScanFn : ∀ {Δᵍ Δ Θ} → Gen (Fn Γ₂ Δᵍ Δ Θ (obs natᵗ ×ᵗ natᵗ) (obs natᵗ))
+genObsScanFn : ∀ {Δᵍ Δ Θ} → Gen (SFn Γ₂ Δᵍ Δ Θ (obs natᵗ ×ᵗ natᵗ) (obs natᵗ))
 genObsScanFn = genB 6 >>=G λ c → genNat >>=G λ k →
-  let acc = fstᵗ (varᵗ (here refl))
-      cur = sndᵗ (varᵗ (here refl))
+  let acc = fstˢ (varˢᵗ (here refl))
+      cur = sndˢ (varˢᵗ (here refl))
   in pureG
-    (      if c ≡ᵇ 0 then strmᵗ (mergeAllᵉ nothing (ofᵉ (acc ∷ [])))
+    (      if c ≡ᵇ 0 then strmˢ (mergeAllˢ nothing (ofˢ (acc ∷ [])))
       else if c ≡ᵇ 1 then acc
-      else if c ≡ᵇ 2 then strmᵗ (ofᵉ (cur ∷ []))
-      else if c ≡ᵇ 3 then strmᵗ emptyᵉ
-      else if c ≡ᵇ 4 then strmᵗ (switchAllᵉ (ofᵉ (acc ∷ [])))
-      else strmᵗ (mergeAllᵉ nothing
-             (ofᵉ (acc ∷ strmᵗ (ofᵉ (nat̂ k ∷ [])) ∷ []))))
+      else if c ≡ᵇ 2 then strmˢ (ofˢ (cur ∷ []))
+      else if c ≡ᵇ 3 then strmˢ emptyˢ
+      else if c ≡ᵇ 4 then strmˢ (switchAllˢ (ofˢ (acc ∷ [])))
+      else strmˢ (mergeAllˢ nothing
+             (ofˢ (acc ∷ strmˢ (ofˢ (natˢ k ∷ [])) ∷ []))))
 
 -- the fold's own seed, at observable type.  `emptyᵉ` is the shallowest
 -- one there is, so a climb read off a run seeded with it is the fold's
 -- entirely
-genObsSeed : ∀ {Δᵍ Δ Θ} → Gen (Tm Γ₂ Δᵍ Δ Θ (obs natᵗ))
-genObsSeed = genB 3 >>=G λ c → genNat >>=G λ k → genFin2 >>=G λ i →
-  pureG (      if c ≡ᵇ 0 then strmᵗ emptyᵉ
-          else if c ≡ᵇ 1 then strmᵗ (ofᵉ (nat̂ k ∷ []))
-          else strmᵗ (inputNat i))
-
-------------------------------------------------------------------------
--- scripted inputs
-
-genTimed : ℕ → Gen (List (Timed ℕ))
-genTimed zero    = pureG []
-genTimed (suc n) = genB 3 >>=G λ w → genNat >>=G λ v → genTimed n >>=G λ rest →
-  pureG ((after w , v) ∷ rest)
-
-genSyncVals : ℕ → Gen (List ℕ)
-genSyncVals zero    = pureG []
-genSyncVals (suc n) = genNat >>=G λ v → genSyncVals n >>=G λ vs → pureG (v ∷ vs)
-
-genInput : Gen (ObservableInput ℕ)
-genInput = genB 2 >>=G λ c → genB 4 >>=G λ len →
-  if c ≡ᵇ 0
-  then (genTimed len >>=G λ a → pureG (hot a))
-  else (genSyncVals len >>=G λ s → genTimed len >>=G λ a → pureG (cold s a))
-
-genSlots : Gen (Slots Γ₂)
-genSlots = genInput >>=G λ i0 → genInput >>=G λ i1 →
-  pureG λ where
-    zero          → scripted i0
-    (suc zero)    → scripted i1
-    (suc (suc ()))
+genObsSeed : ∀ {Δᵍ Δ Θ} → ℕ → Gen (STm Γ₂ Δᵍ Δ Θ (obs natᵗ))
+genObsSeed sl = genB 3 >>=G λ c → genNat >>=G λ k → genSlotRef sl >>=G λ r →
+  pureG (      if c ≡ᵇ 0 then strmˢ emptyˢ
+          else if c ≡ᵇ 1 then strmˢ (ofˢ (natˢ k ∷ []))
+          else strmˢ r)
 
 ------------------------------------------------------------------------
 -- the program generator, structural on depth
@@ -232,8 +259,8 @@ nats-++ : ∀ g u → nats g ++ᴸ nats u ≡ nats (g + u)
 nats-++ zero    u = refl
 nats-++ (suc g) u = cong (natᵗ ∷_) (nats-++ g u)
 
-gate : ∀ g u → Exp Γ₂ [] (nats (g + u)) [] natᵗ → Exp Γ₂ (nats g) (nats u) [] natᵗ
-gate g u b = deferᵉ (subst (λ Δ → Exp Γ₂ [] Δ [] natᵗ) (sym (nats-++ g u)) b)
+gate : ∀ g u → SExp Γ₂ [] (nats (g + u)) [] natᵗ → SExp Γ₂ (nats g) (nats u) [] natᵗ
+gate g u b = deferˢ (subst (λ Δ → SExp Γ₂ [] Δ [] natᵗ) (sym (nats-++ g u)) b)
 
 -- RECURSION IS GENERATED LINEAR — exactly one reference per binder — and that
 -- is a feasibility bound rather than a taste.  A μ whose body reads its own
@@ -246,43 +273,48 @@ gate g u b = deferᵉ (subst (λ Δ → Exp Γ₂ [] Δ [] natᵗ) (sym (nats-++
 -- var.  Ordinary subtrees never emit a var at all, so a μ's arity is a
 -- property of the grammar rather than of the seed.
 {-# TERMINATING #-}
-genExpAt   : ∀ g u → ℕ → Gen (Exp Γ₂ (nats g) (nats u) [] natᵗ)
-genObsAt   : ∀ g u → ℕ → Gen (Exp Γ₂ (nats g) (nats u) [] (obs natᵗ))
-genInners  : ∀ g u → ℕ → ℕ → Gen (List (Tm Γ₂ (nats g) (nats u) [] (obs natᵗ)))
-genSpineG  : ∀ g u → ℕ → Gen (Exp Γ₂ (nats (suc g)) (nats u) [] natᵗ)
-genSpineD  : ∀ w   → ℕ → Gen (Exp Γ₂ [] (nats (suc w)) [] natᵗ)
+genExpAt   : ∀ g u → ℕ → ℕ → Gen (SExp Γ₂ (nats g) (nats u) [] natᵗ)
+genObsAt   : ∀ g u → ℕ → ℕ → Gen (SExp Γ₂ (nats g) (nats u) [] (obs natᵗ))
+genInners  : ∀ g u → ℕ → ℕ → ℕ → Gen (List (STm Γ₂ (nats g) (nats u) [] (obs natᵗ)))
+genSpineG  : ∀ g u → ℕ → ℕ → Gen (SExp Γ₂ (nats (suc g)) (nats u) [] natᵗ)
+genSpineD  : ∀ w   → ℕ → ℕ → Gen (SExp Γ₂ [] (nats (suc w)) [] natᵗ)
 
-genLeafAt : ∀ g u → Gen (Exp Γ₂ (nats g) (nats u) [] natᵗ)
-genLeafAt g u = genB 3 >>=G λ c →
-  if c ≡ᵇ 0 then (genFin2 >>=G λ i → pureG (inputNat i))
-  else if c ≡ᵇ 1 then pureG emptyᵉ
-  else (genNat >>=G λ a → genNat >>=G λ b → pureG (ofᵉ (nat̂ a ∷ nat̂ b ∷ [])))
+genLeafAt : ∀ g u → ℕ → Gen (SExp Γ₂ (nats g) (nats u) [] natᵗ)
+genLeafAt g u sl = genB 3 >>=G λ c →
+  if c ≡ᵇ 0 then genSlotRef sl
+  else if c ≡ᵇ 1 then pureG emptyˢ
+  else (genNat >>=G λ a → genNat >>=G λ b → pureG (ofˢ (natˢ a ∷ natˢ b ∷ [])))
 
-genExpAt g u zero    = genLeafAt g u
-genExpAt g u (suc d) = genB 12 >>=G λ c →
-  if c ≡ᵇ 0 then genLeafAt g u
-  else if c ≡ᵇ 1 then genLeafAt g u
-  else if c ≡ᵇ 2 then (genFn >>=G λ f → genExpAt g u d >>=G λ e → pureG (mapᵉ f e))
-  else if c ≡ᵇ 3 then (genB 4 >>=G λ k → genExpAt g u d >>=G λ e → pureG (takeᵉ (nat̂ k) e))
-  else if c ≡ᵇ 4 then
-    (genScanFn >>=G λ f → genNat >>=G λ s → genExpAt g u d >>=G λ e → pureG (scanᵉ f (nat̂ s) e))
-  else if c ≡ᵇ 5 then (genObsAt g u d >>=G λ s → pureG (mergeAllᵉ nothing s))
-  else if c ≡ᵇ 6 then
+genExpAt g u sl zero    = genLeafAt g u sl
+genExpAt g u sl (suc d) = genB 12 >>=G λ c →
+  if c ≡ᵇ 0 then genLeafAt g u sl
+  else if c ≡ᵇ 1 then genLeafAt g u sl
+  else if c ≡ᵇ 2 then (genFn >>=G λ f → genExpAt g u sl d >>=G λ e → pureG (mapˢ f e))
+  else if c ≡ᵇ 3 then
+    (genScanFn >>=G λ f → genNat >>=G λ z → genExpAt g u sl d >>=G λ e →
+     pureG (scanˢ f (natˢ z) e))
+  else if c ≡ᵇ 4 then (genObsAt g u sl d >>=G λ t → pureG (mergeAllˢ nothing t))
+  else if c ≡ᵇ 5 then
     -- the limit axis, which is where bounded concurrency gets sampled:
     -- 1 is the old concat, 2 and 3 are the middle nothing here could
     -- previously reach.  Two lanes with three parked inners is the
     -- smallest shape whose drain refills more than one lane in a
     -- single instant, so `genB 3` is the floor and not a taste
-    (genB 3 >>=G λ k → genObsAt g u d >>=G λ s → pureG (mergeAllᵉ (just (suc k)) s))
-  else if c ≡ᵇ 7 then (genObsAt g u d >>=G λ s → pureG (switchAllᵉ s))
-  else if c ≡ᵇ 8 then (genObsAt g u d >>=G λ s → pureG (exhaustAllᵉ s))
-  else if c ≡ᵇ 9 then (genSpineG g u d >>=G λ b → pureG (μᵉ b))
-  else if c ≡ᵇ 10 then (genExpAt 0 (g + u) d >>=G λ b → pureG (gate g u b))
-  else genLeafAt g u
+    (genB 3 >>=G λ k → genObsAt g u sl d >>=G λ t → pureG (mergeAllˢ (just (suc k)) t))
+  else if c ≡ᵇ 6 then (genObsAt g u sl d >>=G λ t → pureG (switchAllˢ t))
+  else if c ≡ᵇ 7 then (genObsAt g u sl d >>=G λ t → pureG (exhaustAllˢ t))
+  else if c ≡ᵇ 8 then (genSpineG g u sl d >>=G λ b → pureG (μˢ b))
+  else if c ≡ᵇ 9 then (genExpAt 0 (g + u) sl d >>=G λ b → pureG (gate g u b))
+  else if c ≡ᵇ 10 then
+    (genNat >>=G λ k → genExpAt g u sl d >>=G λ e → pureG (takeˢ (natˢ k) e))
+  else
+    (genFanFn >>=G λ f → genExpAt g u sl d >>=G λ e →
+     pureG (mergeAllˢ nothing (mapˢ f e)))
 
-genInners g u d zero    = pureG []
-genInners g u d (suc n) =
-  genExpAt g u d >>=G λ e → genInners g u d n >>=G λ rest → pureG (strmᵗ e ∷ rest)
+genInners g u sl d zero    = pureG []
+genInners g u sl d (suc n) =
+  genExpAt g u sl d >>=G λ e → genInners g u sl d n >>=G λ rest →
+  pureG (strmˢ e ∷ rest)
 
 -- TWO WAYS TO BE A STREAM OF STREAMS, AND ONLY ONE OF THEM IS STATIC.
 -- A literal list of inners is closed syntax, so every observable an
@@ -305,121 +337,195 @@ genInners g u d (suc n) =
 -- interesting has, and no two folds can stack.  The region is still
 -- reached — the summary line says how often — so what the confinement
 -- drops is towers, not coverage.
-genObsAt g u d =
-  let inners = genB 2 >>=G λ extra → genInners g u d (suc (suc extra)) >>=G λ items →
-                 pureG (ofᵉ items)
+genObsAt g u sl d =
+  let inners = genB 2 >>=G λ extra → genInners g u sl d (suc (suc extra)) >>=G λ items →
+                 pureG (ofˢ items)
   in genB 4 >>=G λ c →
      if c ≡ᵇ 0
      then (if d ≡ᵇ 0
-           then (genObsScanFn >>=G λ f → genObsSeed >>=G λ z → genExpAt g u d >>=G λ e →
-                 pureG (scanᵉ f z e))
+           then (genObsScanFn >>=G λ f → genObsSeed sl >>=G λ z →
+                 genExpAt g u sl d >>=G λ e → pureG (scanˢ f z e))
            else inners)
      else inners
 
 -- past the gate: the var is in scope and this subtree plants exactly one
-genSpineD w zero    = pureG (varᵉ (here refl))
-genSpineD w (suc d) = genB 8 >>=G λ c →
-  if c ≡ᵇ 0 then pureG (varᵉ (here refl))
-  else if c ≡ᵇ 1 then (genFn >>=G λ f → genSpineD w d >>=G λ e → pureG (mapᵉ f e))
-  else if c ≡ᵇ 2 then (genB 4 >>=G λ k → genSpineD w d >>=G λ e → pureG (takeᵉ (nat̂ k) e))
+genSpineD w sl zero    = pureG (varˢ (here refl))
+genSpineD w sl (suc d) = genB 9 >>=G λ c →
+  if c ≡ᵇ 0 then pureG (varˢ (here refl))
+  else if c ≡ᵇ 1 then (genFn >>=G λ f → genSpineD w sl d >>=G λ e → pureG (mapˢ f e))
+  else if c ≡ᵇ 2 then
+    (genScanFn >>=G λ f → genNat >>=G λ z → genSpineD w sl d >>=G λ e →
+     pureG (scanˢ f (natˢ z) e))
   else if c ≡ᵇ 3 then
-    (genScanFn >>=G λ f → genNat >>=G λ s → genSpineD w d >>=G λ e → pureG (scanᵉ f (nat̂ s) e))
+    (genSpineD w sl d >>=G λ e → genB 2 >>=G λ extra →
+     genInners 0 (suc w) sl d (suc extra) >>=G λ rest →
+     pureG (mergeAllˢ nothing (ofˢ (strmˢ e ∷ rest))))
   else if c ≡ᵇ 4 then
-    (genSpineD w d >>=G λ e → genB 2 >>=G λ extra → genInners 0 (suc w) d (suc extra) >>=G λ rest →
-     pureG (mergeAllᵉ nothing (ofᵉ (strmᵗ e ∷ rest))))
+    (genB 3 >>=G λ k → genSpineD w sl d >>=G λ e → genB 2 >>=G λ extra →
+     genInners 0 (suc w) sl d (suc extra) >>=G λ rest →
+     pureG (mergeAllˢ (just (suc k)) (ofˢ (strmˢ e ∷ rest))))
   else if c ≡ᵇ 5 then
-    (genB 3 >>=G λ k → genSpineD w d >>=G λ e → genB 2 >>=G λ extra →
-     genInners 0 (suc w) d (suc extra) >>=G λ rest →
-     pureG (mergeAllᵉ (just (suc k)) (ofᵉ (strmᵗ e ∷ rest))))
+    (genSpineD w sl d >>=G λ e → genB 2 >>=G λ extra →
+     genInners 0 (suc w) sl d (suc extra) >>=G λ rest →
+     pureG (switchAllˢ (ofˢ (strmˢ e ∷ rest))))
   else if c ≡ᵇ 6 then
-    (genSpineD w d >>=G λ e → genB 2 >>=G λ extra → genInners 0 (suc w) d (suc extra) >>=G λ rest →
-     pureG (switchAllᵉ (ofᵉ (strmᵗ e ∷ rest))))
+    (genFanFn >>=G λ f → genSpineD w sl d >>=G λ e →
+     pureG (mergeAllˢ nothing (mapˢ f e)))
+  else if c ≡ᵇ 7 then
+    (genNat >>=G λ k → genSpineD w sl d >>=G λ e →
+     pureG (takeˢ (natˢ (suc k)) e))
   else
-    (genSpineD w d >>=G λ e → genB 2 >>=G λ extra → genInners 0 (suc w) d (suc extra) >>=G λ rest →
-     pureG (exhaustAllᵉ (ofᵉ (strmᵗ e ∷ rest))))
+    (genSpineD w sl d >>=G λ e → genB 2 >>=G λ extra →
+     genInners 0 (suc w) sl d (suc extra) >>=G λ rest →
+     pureG (exhaustAllˢ (ofˢ (strmˢ e ∷ rest))))
 
 -- before the gate: the binder is guarded, so every route ends in a `deferᵉ`
-genSpineG g u zero    = pureG (gate (suc g) u (varᵉ (here refl)))
-genSpineG g u (suc d) = genB 8 >>=G λ c →
-  if c ≡ᵇ 0 then (genSpineD (g + u) d >>=G λ b → pureG (gate (suc g) u b))
-  else if c ≡ᵇ 1 then (genSpineD (g + u) d >>=G λ b → pureG (gate (suc g) u b))
-  else if c ≡ᵇ 2 then (genFn >>=G λ f → genSpineG g u d >>=G λ e → pureG (mapᵉ f e))
-  else if c ≡ᵇ 3 then (genB 4 >>=G λ k → genSpineG g u d >>=G λ e → pureG (takeᵉ (nat̂ k) e))
+genSpineG g u sl zero    = pureG (gate (suc g) u (varˢ (here refl)))
+genSpineG g u sl (suc d) = genB 9 >>=G λ c →
+  if c ≡ᵇ 0 then (genSpineD (g + u) sl d >>=G λ b → pureG (gate (suc g) u b))
+  else if c ≡ᵇ 1 then (genSpineD (g + u) sl d >>=G λ b → pureG (gate (suc g) u b))
+  else if c ≡ᵇ 2 then (genFn >>=G λ f → genSpineG g u sl d >>=G λ e → pureG (mapˢ f e))
+  else if c ≡ᵇ 3 then
+    (genScanFn >>=G λ f → genNat >>=G λ z → genSpineG g u sl d >>=G λ e →
+     pureG (scanˢ f (natˢ z) e))
   else if c ≡ᵇ 4 then
-    (genScanFn >>=G λ f → genNat >>=G λ s → genSpineG g u d >>=G λ e → pureG (scanᵉ f (nat̂ s) e))
+    (genSpineG g u sl d >>=G λ e → genB 2 >>=G λ extra →
+     genInners (suc g) u sl d (suc extra) >>=G λ rest →
+     pureG (mergeAllˢ nothing (ofˢ (strmˢ e ∷ rest))))
   else if c ≡ᵇ 5 then
-    (genSpineG g u d >>=G λ e → genB 2 >>=G λ extra →
-     genInners (suc g) u d (suc extra) >>=G λ rest →
-     pureG (mergeAllᵉ nothing (ofᵉ (strmᵗ e ∷ rest))))
+    (genSpineG g u sl d >>=G λ e → genB 2 >>=G λ extra →
+     genInners (suc g) u sl d (suc extra) >>=G λ rest →
+     pureG (switchAllˢ (ofˢ (strmˢ e ∷ rest))))
   else if c ≡ᵇ 6 then
-    (genSpineG g u d >>=G λ e → genB 2 >>=G λ extra →
-     genInners (suc g) u d (suc extra) >>=G λ rest →
-     pureG (switchAllᵉ (ofᵉ (strmᵗ e ∷ rest))))
+    (genFanFn >>=G λ f → genSpineG g u sl d >>=G λ e →
+     pureG (mergeAllˢ nothing (mapˢ f e)))
+  else if c ≡ᵇ 7 then
+    (genNat >>=G λ k → genSpineG g u sl d >>=G λ e →
+     pureG (takeˢ (natˢ (suc k)) e))
   else
-    (genSpineG g u d >>=G λ e → genB 2 >>=G λ extra →
-     genInners (suc g) u d (suc extra) >>=G λ rest →
-     pureG (exhaustAllᵉ (ofᵉ (strmᵗ e ∷ rest))))
+    (genSpineG g u sl d >>=G λ e → genB 2 >>=G λ extra →
+     genInners (suc g) u sl d (suc extra) >>=G λ rest →
+     pureG (exhaustAllˢ (ofˢ (strmˢ e ∷ rest))))
 
-genExp : ℕ → Gen (Exp Γ₂ [] [] [] natᵗ)
-genExp d = genExpAt 0 0 d
+-- the PROGRAM's slot bound is the whole table: a program, unlike a def,
+-- sits above every slot and may read any of them
+genExp : ℕ → Gen (SExp Γ₂ [] [] [] natᵗ)
+genExp d = genExpAt 0 0 2 d
 
 ------------------------------------------------------------------------
--- WHICH RECURSION CONSTRUCTORS A PROGRAM ACTUALLY CARRIED.  A generator
--- that CAN emit `μᵉ` says nothing about a sweep; what the descent's rank
--- guard needs is that runs REACH the shape, and that is a number rather
--- than a claim.  Each case reports its program's three marks and the
--- summary line totals them, so a coverage receipt can name the region it
--- covered instead of the constructors that were added.
+-- WHICH FORMERS A PROGRAM ACTUALLY CARRIED.  A generator that CAN emit
+-- one says nothing about a sweep; each case reports its program's marks
+-- and the run's line totals them, so a coverage receipt can name the
+-- region it covered instead of the constructors that were added.
 
+-- THE PALETTE, NAMED BY THE TAGS THE TWO TREES ARE PAIRED BY.  A census
+-- per INTERESTING REGION is a census whose regions were chosen by whoever
+-- last thought about one, which is how this generator came to have no
+-- count-changing lane at all — found by reading, and by no check, after
+-- sixty thousand programs had certified impl≡spec without once changing
+-- an emit's value count.  A census per FORMER cannot have that hole: the
+-- walk below is a total match, so a former added to `Exp` owes an arm
+-- here, and `scripts/formers.tsv` holds these tags to the ones the
+-- decoder and the TypeScript union spell.
+data Former : Set where
+  fInput fOf fEmpty fTake fMap fScan fMergeAll fSwitchAll fExhaustAll
+    fMu fVar fDefer fMint fBatchSync : Former
+
+formerTag : Former → String
+formerTag fInput      = "input"
+formerTag fOf         = "of"
+formerTag fEmpty      = "empty"
+formerTag fTake       = "take"
+formerTag fMap        = "map"
+formerTag fScan       = "scan"
+formerTag fMergeAll   = "mergeAll"
+formerTag fSwitchAll  = "switchAll"
+formerTag fExhaustAll = "exhaustAll"
+formerTag fMu         = "mu"
+formerTag fVar        = "varE"
+formerTag fDefer      = "defer"
+formerTag fMint       = "mint"
+formerTag fBatchSync  = "batchSync"
+
+allFormers : List Former
+allFormers = fInput ∷ fOf ∷ fEmpty ∷ fTake ∷ fMap ∷ fScan ∷ fMergeAll
+           ∷ fSwitchAll ∷ fExhaustAll ∷ fMu ∷ fVar ∷ fDefer ∷ fMint
+           ∷ fBatchSync ∷ []
+
+formerIx : Former → ℕ
+formerIx fInput      = 0
+formerIx fOf         = 1
+formerIx fEmpty      = 2
+formerIx fTake       = 3
+formerIx fMap        = 4
+formerIx fScan       = 5
+formerIx fMergeAll   = 6
+formerIx fSwitchAll  = 7
+formerIx fExhaustAll = 8
+formerIx fMu         = 9
+formerIx fVar        = 10
+formerIx fDefer      = 11
+formerIx fMint       = 12
+formerIx fBatchSync  = 13
+
+sameFormer : Former → Former → Bool
+sameFormer a b = formerIx a ≡ᵇ formerIx b
+
+-- the formers a program carries, and whether any `scanᵉ` re-binds
+-- something the run could subscribe
 Marks : Set
-Marks = Bool × Bool × Bool × Bool     -- μᵉ · varᵉ · deferᵉ · obs-accumulator fold
+Marks = List Former × Bool
 
 noMarks : Marks
-noMarks = false , false , false , false
+noMarks = [] , false
+
+one : Former → Marks
+one f = (f ∷ []) , false
 
 infixr 5 _⊕_
 _⊕_ : Marks → Marks → Marks
-(a , b , c , d) ⊕ (w , x , y , z) = (a ∨ w) , (b ∨ x) , (c ∨ y) , (d ∨ z)
+(fs , a) ⊕ (gs , b) = (fs ++ᴸ gs) , (a ∨ b)
 
-marksᵉ  : ∀ {Δᵍ Δ Θ t} → Exp Γ₂ Δᵍ Δ Θ t → Marks
-marksᵗ  : ∀ {Δᵍ Δ Θ t} → Tm Γ₂ Δᵍ Δ Θ t → Marks
-marksᵗˢ : ∀ {Δᵍ Δ Θ t} → List (Tm Γ₂ Δᵍ Δ Θ t) → Marks
+marksˢ   : ∀ {Δᵍ Δ Θ t} → SExp Γ₂ Δᵍ Δ Θ t → Marks
+marksˢᵗ  : ∀ {Δᵍ Δ Θ t} → STm Γ₂ Δᵍ Δ Θ t → Marks
+marksˢᵗˢ : ∀ {Δᵍ Δ Θ t} → List (STm Γ₂ Δᵍ Δ Θ t) → Marks
 
-marksᵉ (input i)       = noMarks
-marksᵉ (ofᵉ ts)        = marksᵗˢ ts
-marksᵉ emptyᵉ          = noMarks
-marksᵉ (takeᵉ c e)     = marksᵗ c ⊕ marksᵉ e
--- the fourth mark reads the CARRIED state's type, which is the former's own
--- accumulator: `isData (obs _)` is false, so this fires exactly when the
+marksˢ (inputˢ i)       = one fInput
+marksˢ (ofˢ ts)         = one fOf ⊕ marksˢᵗˢ ts
+marksˢ emptyˢ           = one fEmpty
+marksˢ (takeˢ c e)      = one fTake ⊕ marksˢᵗ c ⊕ marksˢ e
+-- the second component reads the CARRIED state's type, which is the former's
+-- own accumulator: `isData (obs _)` is false, so it fires exactly when the
 -- former re-binds something the run could subscribe
-marksᵉ (liftᵉ {u = u} f z e) =
-  (false , false , false , not (isData u)) ⊕ marksᵗ f ⊕ marksᵗ z ⊕ marksᵉ e
-marksᵉ (mergeAllᵉ _ e) = marksᵉ e
-marksᵉ (switchAllᵉ e)  = marksᵉ e
-marksᵉ (exhaustAllᵉ e) = marksᵉ e
-marksᵉ (μᵉ e)          = (true , false , false , false) ⊕ marksᵉ e
-marksᵉ (varᵉ x)        = false , true , false , false
-marksᵉ (deferᵉ e)      = (false , false , true , false) ⊕ marksᵉ e
+marksˢ (mapˢ f e)       = one fMap ⊕ marksˢᵗ f ⊕ marksˢ e
+marksˢ (scanˢ {t = t} f z e) =
+  one fScan ⊕ ([] , not (isData t)) ⊕ marksˢᵗ f ⊕ marksˢᵗ z ⊕ marksˢ e
+marksˢ (mergeAllˢ _ e)  = one fMergeAll ⊕ marksˢ e
+marksˢ (switchAllˢ e)   = one fSwitchAll ⊕ marksˢ e
+marksˢ (exhaustAllˢ e)  = one fExhaustAll ⊕ marksˢ e
+marksˢ (μˢ e)           = one fMu ⊕ marksˢ e
+marksˢ (varˢ x)         = one fVar
+marksˢ (deferˢ e)       = one fDefer ⊕ marksˢ e
 
-marksᵗ (varᵗ x)      = noMarks
-marksᵗ unit̂          = noMarks
-marksᵗ (bool̂ _)      = noMarks
-marksᵗ (nat̂ _)       = noMarks
-marksᵗ (pairᵗ a b)   = marksᵗ a ⊕ marksᵗ b
-marksᵗ (fstᵗ p)      = marksᵗ p
-marksᵗ (sndᵗ p)      = marksᵗ p
-marksᵗ (inlᵗ a)      = marksᵗ a
-marksᵗ (inrᵗ a)      = marksᵗ a
-marksᵗ (caseᵗ s l r) = marksᵗ s ⊕ marksᵗ l ⊕ marksᵗ r
-marksᵗ (ifᵗ c a b)   = marksᵗ c ⊕ marksᵗ a ⊕ marksᵗ b
-marksᵗ (primᵗ _ a)   = marksᵗ a
-marksᵗ nilᵗ          = noMarks
-marksᵗ (consᵗ a bs)  = marksᵗ a ⊕ marksᵗ bs
-marksᵗ (foldᵗ l z f) = marksᵗ l ⊕ marksᵗ z ⊕ marksᵗ f
-marksᵗ (strmᵗ e)     = marksᵉ e
+marksˢᵗ (varˢᵗ x)     = noMarks
+marksˢᵗ unitˢ         = noMarks
+marksˢᵗ (boolˢ _)     = noMarks
+marksˢᵗ (natˢ _)      = noMarks
+marksˢᵗ (pairˢ a b)   = marksˢᵗ a ⊕ marksˢᵗ b
+marksˢᵗ (fstˢ p)      = marksˢᵗ p
+marksˢᵗ (sndˢ p)      = marksˢᵗ p
+marksˢᵗ (inlˢ a)      = marksˢᵗ a
+marksˢᵗ (inrˢ a)      = marksˢᵗ a
+marksˢᵗ (caseˢ s l r) = marksˢᵗ s ⊕ marksˢᵗ l ⊕ marksˢᵗ r
+marksˢᵗ (ifˢ c a b)   = marksˢᵗ c ⊕ marksˢᵗ a ⊕ marksˢᵗ b
+marksˢᵗ (primˢ _ a)   = marksˢᵗ a
+marksˢᵗ nilˢ          = noMarks
+marksˢᵗ (consˢ a bs)  = marksˢᵗ a ⊕ marksˢᵗ bs
+marksˢᵗ (foldˢ l z f) = marksˢᵗ l ⊕ marksˢᵗ z ⊕ marksˢᵗ f
+marksˢᵗ (strmˢ e)     = marksˢ e
 
-marksᵗˢ []       = noMarks
-marksᵗˢ (y ∷ ys) = marksᵗ y ⊕ marksᵗˢ ys
+marksˢᵗˢ []       = noMarks
+marksˢᵗˢ (y ∷ ys) = marksˢᵗ y ⊕ marksˢᵗˢ ys
 
 ------------------------------------------------------------------------
 -- a compact dump of a batched stream (for failure reports)
@@ -476,25 +582,15 @@ showStream (e ∷ es) = showEmitR e ++ " " ++ showStream es
 
 ------------------------------------------------------------------------
 -- render a generated program back to Agda source (a paste-ready block for
--- the Unit-Test cache). Faithful over the fragment the generator emits;
--- constructors it never produces get a placeholder (kept total).
+-- the Unit-Test cache). Faithful over every constructor rather than over
+-- the fragment the generator happens to emit, and there is no placeholder
+-- arm: a lane added to the generator would otherwise print a row nobody
+-- can paste, and the only run that would reveal it is one that already
+-- found a counterexample.
 
 showFin : ∀ {n} → Fin n → String
 showFin zero    = "zero"
 showFin (suc i) = "(suc " ++ showFin i ++ ")"
-
-showNatList : List ℕ → String
-showNatList []       = "[]"
-showNatList (v ∷ vs) = show v ++ " ∷ " ++ showNatList vs
-
-showTimedList : List (Timed ℕ) → String
-showTimedList []                = "[]"
-showTimedList ((after w , v) ∷ ts) =
-  "(after " ++ show w ++ " , " ++ show v ++ ") ∷ " ++ showTimedList ts
-
-showInput : ObservableInput ℕ → String
-showInput (hot a)    = "hot (" ++ showTimedList a ++ ")"
-showInput (cold s a) = "cold (" ++ showNatList s ++ ") (" ++ showTimedList a ++ ")"
 
 showPrim : ∀ {s t} → PrimOp s t → String
 showPrim add  = "add"
@@ -502,72 +598,82 @@ showPrim sub  = "sub"
 showPrim mul  = "mul"
 showPrim eqᵖ  = "eqᵖ"
 showPrim ltᵖ  = "ltᵖ"
+showPrim eqᵘ  = "eqᵘ"
 showPrim notᵖ = "notᵖ"
 
-showExp : ∀ {Δᵍ Δ Θ t} → Exp Γ₂ Δᵍ Δ Θ t → String
-showTm  : ∀ {Δᵍ Δ Θ t} → Tm Γ₂ Δᵍ Δ Θ t → String
+showSExp : ∀ {Δᵍ Δ Θ t} → SExp Γ₂ Δᵍ Δ Θ t → String
+showSTm  : ∀ {Δᵍ Δ Θ t} → STm Γ₂ Δᵍ Δ Θ t → String
 
-showTmList : ∀ {Δᵍ Δ Θ t} → List (Tm Γ₂ Δᵍ Δ Θ t) → String
-showTmList []       = "[]"
-showTmList (x ∷ xs) = showTm x ++ " ∷ " ++ showTmList xs
+showSTmList : ∀ {Δᵍ Δ Θ t} → List (STm Γ₂ Δᵍ Δ Θ t) → String
+showSTmList []       = "[]"
+showSTmList (x ∷ xs) = showSTm x ++ " ∷ " ++ showSTmList xs
 
--- a variable is rendered by its de Bruijn PATH, not just as "here": corpus D
--- builds templates with nested binders, and a witness that cannot say WHICH
--- binder a variable belongs to is not reproducible — which is the only reason
--- witnesses are printed at all
+-- a variable is rendered by its de Bruijn PATH, not just as "here": a
+-- witness with nested binders that cannot say WHICH binder a variable
+-- belongs to is not reproducible — which is the only reason witnesses
+-- are printed at all
 showIx : ∀ {t} {Θ : List Ty} → t ∈ Θ → String
 showIx (here refl) = "(here refl)"
 showIx (there x)   = "(there " ++ showIx x ++ ")"
 
-showTm (varᵗ x)           = "(varᵗ " ++ showIx x ++ ")"
-showTm unit̂               = "unit̂"
-showTm (bool̂ b)           = "(bool̂ " ++ (if b then "true" else "false") ++ ")"
-showTm (nat̂ n)            = "(nat̂ " ++ show n ++ ")"
-showTm (pairᵗ a b)        = "(pairᵗ " ++ showTm a ++ " " ++ showTm b ++ ")"
-showTm (fstᵗ p)           = "(fstᵗ " ++ showTm p ++ ")"
-showTm (sndᵗ p)           = "(sndᵗ " ++ showTm p ++ ")"
-showTm (inlᵗ a)           = "(inlᵗ " ++ showTm a ++ ")"
-showTm (inrᵗ a)           = "(inrᵗ " ++ showTm a ++ ")"
-showTm (caseᵗ s l r)      =
-  "(caseᵗ " ++ showTm s ++ " " ++ showTm l ++ " " ++ showTm r ++ ")"
-showTm (ifᵗ c a b)        =
-  "(ifᵗ " ++ showTm c ++ " " ++ showTm a ++ " " ++ showTm b ++ ")"
-showTm (primᵗ op a)       = "(primᵗ " ++ showPrim op ++ " " ++ showTm a ++ ")"
-showTm nilᵗ               = "nilᵗ"
-showTm (consᵗ a bs)       = "(consᵗ " ++ showTm a ++ " " ++ showTm bs ++ ")"
-showTm (foldᵗ l z f)      =
-  "(foldᵗ " ++ showTm l ++ " " ++ showTm z ++ " " ++ showTm f ++ ")"
-showTm (strmᵗ e)          = "(strmᵗ " ++ showExp e ++ ")"
+showSTm (varˢᵗ x)      = "(varˢᵗ " ++ showIx x ++ ")"
+showSTm unitˢ          = "unitˢ"
+showSTm (boolˢ b)      = "(boolˢ " ++ (if b then "true" else "false") ++ ")"
+showSTm (natˢ n)       = "(natˢ " ++ show n ++ ")"
+showSTm (pairˢ a b)    = "(pairˢ " ++ showSTm a ++ " " ++ showSTm b ++ ")"
+showSTm (fstˢ p)       = "(fstˢ " ++ showSTm p ++ ")"
+showSTm (sndˢ p)       = "(sndˢ " ++ showSTm p ++ ")"
+showSTm (inlˢ a)       = "(inlˢ " ++ showSTm a ++ ")"
+showSTm (inrˢ a)       = "(inrˢ " ++ showSTm a ++ ")"
+showSTm (caseˢ s l r)  =
+  "(caseˢ " ++ showSTm s ++ " " ++ showSTm l ++ " " ++ showSTm r ++ ")"
+showSTm (ifˢ c a b)    =
+  "(ifˢ " ++ showSTm c ++ " " ++ showSTm a ++ " " ++ showSTm b ++ ")"
+showSTm (primˢ op a)   = "(primˢ " ++ showPrim op ++ " " ++ showSTm a ++ ")"
+showSTm nilˢ           = "nilˢ"
+showSTm (consˢ a bs)   = "(consˢ " ++ showSTm a ++ " " ++ showSTm bs ++ ")"
+showSTm (foldˢ l z f)  =
+  "(foldˢ " ++ showSTm l ++ " " ++ showSTm z ++ " " ++ showSTm f ++ ")"
+showSTm (strmˢ e)      = "(strmˢ " ++ showSExp e ++ ")"
 
-showExp (input i)       = "(input " ++ showFin i ++ ")"
-showExp (ofᵉ items)     = "(ofᵉ (" ++ showTmList items ++ "))"
-showExp emptyᵉ          = "emptyᵉ"
-showExp (takeᵉ n e)     = "(takeᵉ " ++ showTm n ++ " " ++ showExp e ++ ")"
-showExp (liftᵉ f s e)   = "(liftᵉ " ++ showTm f ++ " " ++ showTm s ++ " " ++ showExp e ++ ")"
-showExp (mergeAllᵉ nothing s)  = "(mergeAllᵉ ∞ " ++ showExp s ++ ")"
-showExp (mergeAllᵉ (just k) s) = "(mergeAllᵉ " ++ show k ++ " " ++ showExp s ++ ")"
-showExp (switchAllᵉ s)  = "(switchAllᵉ " ++ showExp s ++ ")"
-showExp (exhaustAllᵉ s) = "(exhaustAllᵉ " ++ showExp s ++ ")"
-showExp (μᵉ e)          = "(μᵉ " ++ showExp e ++ ")"
-showExp (varᵉ x)        = "(varᵉ " ++ showIx x ++ ")"
-showExp (deferᵉ e)      = "(deferᵉ " ++ showExp e ++ ")"
-
--- slots render AFTER showExp because a shared slot's DEF is an expression and
--- must be printed: a corpus-B witness whose slots read "shared" is not
--- reproducible, which is the whole point of printing a witness
-showSlot : ∀ {k} → Slot Γ₂ k natᵗ → String
-showSlot (scripted i) = "scripted (" ++ showInput i ++ ")"
-showSlot (shared d)   = "shared " ++ showExp d
-
-showSlots : Slots Γ₂ → String
-showSlots ins =
-  "(λ { zero → " ++ showSlot (ins zero)
-    ++ " ; (suc zero) → " ++ showSlot (ins (suc zero))
-    ++ " ; (suc (suc ())) })"
+showSExp (inputˢ i)      = "(inputˢ " ++ showFin i ++ ")"
+showSExp (ofˢ items)     = "(ofˢ (" ++ showSTmList items ++ "))"
+showSExp emptyˢ          = "emptyˢ"
+showSExp (takeˢ n e)     = "(takeˢ " ++ showSTm n ++ " " ++ showSExp e ++ ")"
+showSExp (mapˢ f e)      = "(mapˢ " ++ showSTm f ++ " " ++ showSExp e ++ ")"
+showSExp (scanˢ f z e)   =
+  "(scanˢ " ++ showSTm f ++ " " ++ showSTm z ++ " " ++ showSExp e ++ ")"
+-- the limit prints as the `Maybe ℕ` it IS, not as the ∞ a reader would
+-- prefer: a witness is printed to be PASTED, and the corpus is Agda
+showSExp (mergeAllˢ nothing s)  = "(mergeAllˢ nothing " ++ showSExp s ++ ")"
+showSExp (mergeAllˢ (just k) s) =
+  "(mergeAllˢ (just " ++ show k ++ ") " ++ showSExp s ++ ")"
+showSExp (switchAllˢ s)  = "(switchAllˢ " ++ showSExp s ++ ")"
+showSExp (exhaustAllˢ s) = "(exhaustAllˢ " ++ showSExp s ++ ")"
+showSExp (μˢ e)          = "(μˢ " ++ showSExp e ++ ")"
+showSExp (varˢ x)        = "(varˢ " ++ showIx x ++ ")"
+showSExp (deferˢ e)      = "(deferˢ " ++ showSExp e ++ ")"
 
 ------------------------------------------------------------------------
 -- one case, a run, and reporting
 
+-- THE FUEL IS AN EXPONENT FOR SOME PROGRAMS, WHICH IS WHY THE SWEEP HAS
+-- TO BE BOUNDED FROM OUTSIDE.  A guarded fixpoint under an unbounded
+-- `mergeAllᵉ` with no `takeᵉ` above it emits once per unit of fuel; one
+-- whose step hands back MORE elements than it was given doubles instead,
+-- and the corpus contains such programs because nothing in the generator
+-- declines to draw one.  The cost is inside `evaluate↓` rather than in
+-- the stream it returns, the drain forcing each cascade whole, so no
+-- budget readable from here can decline the case after the fact — a cap
+-- on the stream's length was tried and buys nothing, since the length is
+-- reached only by paying for it.  `scripts/gen-unit-tests.sh` therefore
+-- bounds a SEED in wall clock and reports the ones it could not run.
+--
+-- What retires it is the ROOT CAP, not a budget read from here: the
+-- prelude's `capProg` puts a `takeᵉ` above every elaborated tree, which
+-- unsubscribes the fixpoint instead of letting it be performed and then
+-- discarded.  The wall-clock bound stays on as a backstop for whatever
+-- the cap does not cut.
 FUEL : ℕ
 FUEL = 30
 
@@ -582,22 +688,26 @@ FUEL = 30
 -- cache holds every row to BOTH properties, so a program that fails
 -- either one wants the same row, and a program that fails both dedups
 -- to it instead of being cached twice.
-pasteRow : Exp Γ₂ [] [] [] natᵗ → Slots Γ₂ → String
-pasteRow e ins =
+--
+-- THE SLOT TABLE IS A NAME RATHER THAN A RENDERING, because it is a
+-- constant: `slots₂` is the one telescope an elaborated program can be
+-- driven by today, and a row naming it is reproducible exactly as a
+-- printed script was.
+pasteRow : SExp Γ₂ [] [] [] natᵗ → String
+pasteRow e =
   "\n-- <<<PASTE\n  cached \"?\" " ++ show FUEL ++ "\n          "
-       ++ showExp e ++ "\n          " ++ showSlots ins
-       ++ " ∷\n-- PASTE>>>\n"
+       ++ showSExp e ++ "\n          slots₂ ∷\n-- PASTE>>>\n"
 
-report : Exp Γ₂ [] [] [] natᵗ → Slots Γ₂
+report : SExp Γ₂ [] [] [] natᵗ
        → List (InstEmit (List ℕ)) → List (InstEmit (List ℕ)) → String
-report e ins impl spec =
+report e impl spec =
   "  FAIL\n    impl = " ++ showBatched impl
-       ++ "\n    spec = " ++ showBatched spec ++ pasteRow e ins
+       ++ "\n    spec = " ++ showBatched spec ++ pasteRow e
 
 -- a WellFormed violation of the evaluator's raw output
-reportWF : Exp Γ₂ [] [] [] natᵗ → Slots Γ₂ → List (InstEmit ℕ) → String
-reportWF e ins s =
-  "  WF-FAIL\n    stream = " ++ showStream s ++ pasteRow e ins
+reportWF : SExp Γ₂ [] [] [] natᵗ → List (InstEmit ℕ) → String
+reportWF e s =
+  "  WF-FAIL\n    stream = " ++ showStream s ++ pasteRow e
 
 -- two checks on one generated program: impl ≡ spec on the batched stream,
 -- and the raw stream satisfies the protocol automaton
@@ -611,27 +721,44 @@ reportWF e ins s =
 -- sampled is not stateable.  What it would have to sample now is a
 -- proof obligation rather than an output, and nothing a generator
 -- produces can fail one.
+-- one count per former, in `allFormers` order, plus the obs-fold count
 Tally : Set
-Tally = ℕ × ℕ × ℕ × ℕ        -- programs carrying μᵉ · varᵉ · deferᵉ · obs-fold
+Tally = List ℕ × ℕ
+
+zeroTally : Tally
+zeroTally = map (λ _ → 0) allFormers , 0
+
+carries : Former → List Former → Bool
+carries f []       = false
+carries f (g ∷ gs) = sameFormer f g ∨ carries f gs
+
+bumpEach : List Former → List Former → List ℕ → List ℕ
+bumpEach fs []       cs       = cs
+bumpEach fs (g ∷ gs) []       = []
+bumpEach fs (g ∷ gs) (c ∷ cs) =
+  (if carries g fs then suc c else c) ∷ bumpEach fs gs cs
 
 bump : Marks → Tally → Tally
-bump (m , v , f , o) (a , b , c , p) =
-  (if m then suc a else a) , (if v then suc b else b)
-    , (if f then suc c else c) , (if o then suc p else p)
+bump (fs , o) (cs , p) = bumpEach fs allFormers cs , (if o then suc p else p)
 
 oneCase : ℕ → Gen (Marks × List String)
-oneCase d = genSlots >>=G λ ins → genExp d >>=G λ e →
-  let s    = evaluate↓ FUEL e ins
+-- THE DRAWN TREE IS WHAT IS COUNTED AND WHAT IS PRINTED, AND THE CAP IS
+-- NEITHER.  It is applied above the elaboration, so it is not a former
+-- of the author's tree at all and cannot inflate a census; and a cached
+-- row names the author's program, since the cap is the harness's and
+-- `runOf` re-applies it wherever the row is run.
+oneCase d = genExp d >>=G λ e →
+  let s    = runOf (cached "?" FUEL e slots₂)
       impl = impl-batchSimultaneous s
       spec = spec-batchSimultaneous s
-      agreeFails = if eqBatched impl spec then [] else report e ins impl spec ∷ []
-      wfFails    = if wellFormed? s then [] else reportWF e ins s ∷ []
-  in pureG (marksᵉ e , agreeFails ++ᴸ wfFails)
+      agreeFails = if eqBatched impl spec then [] else report e impl spec ∷ []
+      wfFails    = if wellFormed? s then [] else reportWF e s ∷ []
+  in pureG (marksˢ e , agreeFails ++ᴸ wfFails)
 
 -- accumulate EVERY failing case's reports, in generation order, and tally
 -- which recursion constructors the corpus actually reached
 runN : ℕ → ℕ → Gen (Tally × List String)
-runN zero    d = pureG ((0 , 0 , 0 , 0) , [])
+runN zero    d = pureG (zeroTally , [])
 runN (suc k) d = oneCase d >>=G λ r → runN k d >>=G λ acc →
   pureG (bump (proj₁ r) (proj₁ acc) , proj₂ r ++ᴸ proj₂ acc)
 
@@ -673,9 +800,33 @@ numAt n def cs with dropSep (tailAfter n cs)
 -- every failing case's paste block, concatenated (each is self-delimited
 -- by its own <<<PASTE / PASTE>>> markers, so gen-unit-tests.sh can split
 -- them); "(all agree)" when the run turned up nothing
+-- the census, on its own line and in `<tag> <count>` pairs: a sweep is a
+-- run of many seeds, so the verdict on whether a former was reached AT
+-- ALL belongs to the caller summing these, not to any one run
+censusPairs : List Former → List ℕ → List String
+censusPairs (f ∷ gs) (c ∷ cs) = formerTag f ∷ " " ∷ show c ∷ " " ∷ censusPairs gs cs
+censusPairs _        _        = []
+
 dumpFails : List String → String
 dumpFails []       = "  (all agree)\n"
 dumpFails (f ∷ fs) = concatStr (f ∷ fs)
+
+-- ADVANCE THE GENERATOR WITHOUT RUNNING ANYTHING, so that a case which
+-- costs more than the whole sweep it belongs to can still be READ.  Such
+-- a case is invisible to every other route the harness has: the failure
+-- report is what prints a program, and the run that would print this one
+-- is the run that does not finish.  Skipping is exact rather than
+-- approximate because generation is UPSTREAM of evaluation and consumes
+-- the same randomness whether or not the program is then run -- so case
+-- N reached this way is the same program case N is in a full sweep.
+skipN : ℕ → ℕ → Gen ℕ
+skipN zero    d = pureG 0
+skipN (suc k) d = genExp d >>=G λ _ → skipN k d
+
+-- the paste row of ONE case, named by its 1-based index
+showAt : ℕ → ℕ → Gen String
+showAt n d = skipN (n ∸ 1) d >>=G λ _ →
+  genExp d >>=G λ e → pureG (pasteRow e)
 
 main : IO Unit
 main = getContents >>= λ s →
@@ -683,14 +834,15 @@ main = getContents >>= λ s →
       seed  = parseNat cs
       runs  = numAt 1 200 cs
       d     = numAt 2 4 cs
+      at    = numAt 3 0 cs
       res   = proj₁ (runN runs d (randList seed 2000000))
       tally = proj₁ res
       fails = proj₂ res
-  in putStr (concatStr
-       ( "seed " ∷ show seed ∷ " depth " ∷ show d ∷ " — ran " ∷ show runs
-       ∷ " cases, " ∷ show (length fails) ∷ " failures"
-       ∷ "; μ " ∷ show (proj₁ tally)
-       ∷ " var " ∷ show (proj₁ (proj₂ tally))
-       ∷ " defer " ∷ show (proj₁ (proj₂ (proj₂ tally)))
-       ∷ " obs-fold " ∷ show (proj₂ (proj₂ (proj₂ tally))) ∷ "\n"
-       ∷ dumpFails fails ∷ []))
+  in if not (at ≡ᵇ 0)
+     then putStr (proj₁ (showAt at d (randList seed 2000000)))
+     else putStr (concatStr
+       (( "seed " ∷ show seed ∷ " depth " ∷ show d ∷ " — ran " ∷ show runs
+        ∷ " cases, " ∷ show (length fails) ∷ " failures"
+        ∷ "; obs-fold " ∷ show (proj₂ tally) ∷ "\ncensus " ∷ [])
+        ++ᴸ censusPairs allFormers (proj₁ tally)
+        ++ᴸ ("\n" ∷ dumpFails fails ∷ [])))

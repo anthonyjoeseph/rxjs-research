@@ -1,6 +1,18 @@
 export type Provenance = number | symbol; // an INSTANT (one arrival's cascade); spec groups by this
 export type SourceId = number | symbol; // a SOURCE observable; the impl counts registrations of these
 
+// The instant every subscribe burst belongs to, and there is only ONE
+// of it because no operator ever compares two. A burst minted inside an
+// arrival's cascade is a GRAFT: the join that caused it reassembles it
+// under the carrier's envelope, so the burst's own stamp is computed
+// and then discarded. A burst minted outside one belongs to the root's
+// subscribe frame, which is a single frame. Neither case can tell two
+// subscribe instants apart, so an operator that READ an ambient
+// "current instant" to fill this field was reading a cell whose value
+// never reached an output -- and reading one is what would make these
+// operators require a driver, rather than plain rxjs, to run at all.
+export const SUBSCRIBE_FRAME: Provenance = Symbol("subscribe-frame");
+
 // The protocol (v1's, with the instant id moved onto the emission).
 // Batching is decided downstream by counting registrations, never by
 // comparing clocks: init/close traffic maintains the live-registration
@@ -137,20 +149,26 @@ export const cutLedgerStep = <A>(
     ledger.instant === emit.instant
       ? ledger
       : { instant: emit.instant, paid: [], born: [] };
-  let paid = emit.kind === "delivery" ? [...base.paid, emit.source] : base.paid;
-  let born = [...base.born];
-  for (const ev of emit.events) {
-    if (ev.type === "init") born = [...born, ev.source];
-    else if (ev.type === "close") {
+  return emit.events.reduce<CutLedger>(
+    (acc, ev) => {
+      if (ev.type === "init") return { ...acc, born: [...acc.born, ev.source] };
+      if (ev.type !== "close") return acc;
       // a closing registration leaves the ledger: the payer's own close
       // rides its paying emit; a dying newborn leaves born
-      const inPaid = paid.indexOf(ev.source);
-      if (inPaid !== -1)
-        paid = [...paid.slice(0, inPaid), ...paid.slice(inPaid + 1)];
-      else born = removeOneSource(ev.source, born);
-    }
-  }
-  return { instant: base.instant, paid, born };
+      const inPaid = acc.paid.indexOf(ev.source);
+      return inPaid === -1
+        ? { ...acc, born: removeOneSource(ev.source, acc.born) }
+        : {
+            ...acc,
+            paid: [...acc.paid.slice(0, inPaid), ...acc.paid.slice(inPaid + 1)],
+          };
+    },
+    {
+      instant: base.instant,
+      paid: emit.kind === "delivery" ? [...base.paid, emit.source] : base.paid,
+      born: base.born,
+    },
+  );
 };
 
 // the victims' closes, in registration order, one per open entry:
@@ -166,16 +184,16 @@ export const cutVictimCloses = (
   const active = ledger.instant === cuttingInstant;
   const countOf = (xs: SourceId[], x: SourceId) =>
     xs.filter((s) => s === x).length;
-  const total = new Map<SourceId, number>();
-  for (const x of open) total.set(x, (total.get(x) ?? 0) + 1);
-  const seen = new Map<SourceId, number>();
-  return open.map((x) => {
-    const i = (seen.get(x) ?? 0) + 1;
-    seen.set(x, i);
+  return open.map((x, at) => {
+    // this entry's place among the occurrences of its own source, and
+    // how many there are in all — both read off `open` directly, since
+    // a tally carried along the walk is the same numbers kept in a cell
+    const i = countOf(open.slice(0, at + 1), x);
+    const total = countOf(open, x);
     const paid = active ? countOf(ledger.paid, x) : 0;
     const born = active ? countOf(ledger.born, x) : 0;
     const reason: CloseReason =
-      i <= paid || i > (total.get(x) ?? 0) - born ? "cut" : "cutPending";
+      i <= paid || i > total - born ? "cut" : "cutPending";
     return { type: "close", source: x, reason } as const;
   });
 };

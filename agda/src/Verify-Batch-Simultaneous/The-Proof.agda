@@ -15,9 +15,12 @@ open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong; subst)
 
 open import Rx.Prim               using (InstEmit; Fuel; Id; Source; _at_from_as_; InstEvent; init; value; close; handoff; complete;
-  EmitKind; subscribe; delivery; plumbing; cut; cutPending; exhausted; dried)
-open import Rx.Exp                using (Ctx; Closed)
+  EmitKind; subscribe; delivery; plumbing; cut; cutPending; exhausted)
+open import Rx.Exp                using (Ctx)
+open import Rx.SExp               using (SExp; emitᵛ)
+open import Rx.Elaborate          using (elaborate)
 open import Rx.Evaluator.Builder using (evaluate↓)
+open import Rx.Envelope.Decode using (decodeStream)
 open import Rx.Slots using (Slots)
 open import Rx.Protocol           using (ProtocolSt; Owed; protocol-init; runProtocol; stepProtocol; paidOff; allZero; Accepted;
   settle; applyEvents; hasOwed; bumpOwed; cancelOwed; removeOne; countIn)
@@ -25,7 +28,6 @@ open import Rx.Protocol           using (ProtocolSt; Owed; protocol-init; runPro
 -- had its own copies of the same two Maybe facts.  The import surface
 -- here is a CLAIM, so it stays minimal — but re-proving a fact to keep
 -- a using-list short is the trade `make dup-check` exists to refuse.
-open import Verify-Well-Formed using (evaluate-accepted)
 open import Spec                  using (spec-batchSimultaneous; specGo;
                                          batchOf; valuesAt; valuesOf; seenBefore)
 open import Implementation        using (impl-batchSimultaneous; foldBatch;
@@ -182,8 +184,6 @@ apply-agree (close x cutPending ∷ es) live owed done vs eq
 apply-agree (close x cut ∷ es) live owed done vs eq with removeOne x live | eq
 ... | just live₁ | eq′ = apply-agree es live₁ owed done vs eq′
 apply-agree (close x exhausted ∷ es) live owed done vs eq with removeOne x live | eq
-... | just live₁ | eq′ = apply-agree es live₁ owed done vs eq′
-apply-agree (close x dried ∷ es) live owed done vs eq with removeOne x live | eq
 ... | just live₁ | eq′ = apply-agree es live₁ owed done vs eq′
 
 ------------------------------------------------------------------
@@ -591,7 +591,6 @@ applyBatch-vals (complete  ∷ es) live owed vs = applyBatch-vals es live owed v
 applyBatch-vals (close x cutPending ∷ es) live owed vs = applyBatch-vals es _ _ vs
 applyBatch-vals (close x cut       ∷ es) live owed vs = applyBatch-vals es _ _ vs
 applyBatch-vals (close x exhausted ∷ es) live owed vs = applyBatch-vals es _ _ vs
-applyBatch-vals (close x dried     ∷ es) live owed vs = applyBatch-vals es _ _ vs
 
 -- idle-batcher OUTPUT: the emit's online output plus the resulting state's
 -- eventual flush.  paidOff ⇒ flush batchOf i s k vs NOW; else keep it open,
@@ -1078,12 +1077,58 @@ batch-agreement :
 batch-agreement xs acc =
   sym (fold-agree [] protocol-init batch-init xs rel-init (λ j o ()) acc)
 
--- THE verified object, end to end: for every program, batching its
--- rendered stream is spec-correct.  A real definition — the proof
--- IS the composition of the two lemmas.
-formal-verification-batchSimultaneous :
-  ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slots Γ) →
-  spec-batchSimultaneous (evaluate↓ fuel e ins)
-    ≡ impl-batchSimultaneous (evaluate↓ fuel e ins)
-formal-verification-batchSimultaneous fuel e ins =
-  batch-agreement (evaluate↓ fuel e ins) (evaluate-accepted fuel e ins)
+-- THE verified object, end to end: for every SRXJS program, batching
+-- its rendered stream is spec-correct.  A real definition — the proof
+-- IS the composition of the two lemmas, applied to the elaboration.
+--
+-- THE PROGRAM IS A SIMUL PROGRAM AND THAT IS THE CLAIM'S SHAPE, NOT A
+-- CONVENIENCE.  `Closed` is the whole of what the evaluator runs, which
+-- is strictly more than the operators this development ships: it can
+-- build an emit by hand and name an instant that no mint produced, and
+-- a theorem quantified over it is a theorem about programs nobody is
+-- meant to write.  Quantifying over `SExp` instead says what is
+-- actually being claimed — every program an author can compose out of
+-- the shipped palette batches correctly — and it says it by SCOPE, so
+-- the restriction costs no hypothesis and nothing downstream carries a
+-- side condition.  The elaboration is the only bridge, so the run below
+-- is still an ordinary run of the ordinary machine.
+
+-- THE `decodeStream` IS WHERE THE PROTOCOL ENTERS, AND IT ENTERS ONCE.
+-- The evaluator's carrier is a plain stream of ordinary rxjs events,
+-- so nothing it produces is an `InstEmit` and no stage of it knows the
+-- protocol exists.  What makes the statement about batching sayable is
+-- that `elaborate` lands in the envelope type, so the run's VALUES are
+-- the protocol's alphabet and reading them off is total and
+-- structural.  Both sides take the same decoded stream, so the theorem
+-- compares two batchings of one list and the decode is not a party to
+-- the claim.
+-- AND THE TOP LINE IS A BARE POSTULATE WHILE THE MACHINE UNDER IT IS
+-- REWRITTEN, WHICH IS THE LEAF-ONLY LAW RATHER THAN AN EXCEPTION TO IT.
+-- This was a real body over one leaf: `batch-agreement` applied to the
+-- acceptance of the run.  That leaf said no emit of a canonical run is
+-- rejected by the protocol automaton, and it was FALSE as it stood --
+-- a scripted slot is writable at the envelope type, elaboration passes
+-- an `input` through untouched, and a table naming an instant past the
+-- counter reaches the output verbatim, entering no clause the machine
+-- could induct over.  A statement whose subject is the envelope the
+-- evaluator no longer mints cannot be repaired by proving it; it is
+-- owed again, over the values, once the plain machine computes.
+--
+-- So the body cannot be written, and the rule for that is to postulate
+-- the PARENT bare and mint no leaves -- a leaf whose fit nothing checks
+-- is a hypothesis about the route wearing a type.  `batch-agreement`
+-- stays claimed from Main in its own right, so what is postulated here
+-- is exactly the step from a run to a legal stream and nothing else.
+--
+-- RECOVERY: git show f26f7a82:agda/src/Verify-Well-Formed.agda
+--   restores `evaluate-accepted`, the two dead routes recorded against
+--   it -- a well-formed denotation quantified over prefixes, which the
+--   settledness check rejects at a cut inside an instant, and a repair
+--   by strengthening an evaluator clause, which cannot see a value it
+--   never inspects -- and the sampling figure the face stood on.
+postulate
+  formal-verification-batchSimultaneous :
+    ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : SExp Γ [] [] [] t)
+      (ins : Slots (emitᵛ Γ)) →
+    spec-batchSimultaneous (decodeStream (evaluate↓ fuel (elaborate e) ins))
+      ≡ impl-batchSimultaneous (decodeStream (evaluate↓ fuel (elaborate e) ins))

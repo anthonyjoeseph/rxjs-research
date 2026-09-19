@@ -50,9 +50,9 @@ open import Rx.Exp using (Ty; Ctx; Exp; Tm; Ren∈; ext∈;
                           elimGExp; elimGTm; elimGTms;
                           elimDExp; elimDTm; elimDTms;
                           unfoldμ; compare∈; ⊟-++ˡ; ⊟-++ʳ;
-                          input; ofᵉ; emptyᵉ; takeᵉ; liftᵉ;
+                          input; ofᵉ; emptyᵉ; takeᵉ; batchSyncᵉ; mapᵉ; scanᵉ;
                           mergeAllᵉ; switchAllᵉ; exhaustAllᵉ;
-                          μᵉ; varᵉ; deferᵉ;
+                          μᵉ; varᵉ; deferᵉ; mintᵉ;
                           varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ;
                           inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ;
                           nilᵗ; consᵗ; foldᵗ;
@@ -72,15 +72,19 @@ mutual
   ib-renᵉ k ρg ρd ρt emptyᵉ          = refl
   ib-renᵉ k ρg ρd ρt (takeᵉ c e)     =
     cong₂ _∧_ (ib-renᵗ k ρg ρd ρt c) (ib-renᵉ k ρg ρd ρt e)
-  ib-renᵉ k ρg ρd ρt (liftᵉ f z e)   =
+  ib-renᵉ k ρg ρd ρt (mapᵉ f e)      =
+    cong₂ _∧_ (ib-renᵗ k ρg ρd (ext∈ ρt) f) (ib-renᵉ k ρg ρd ρt e)
+  ib-renᵉ k ρg ρd ρt (scanᵉ f z e)   =
     cong₂ _∧_ (ib-renᵗ k ρg ρd (ext∈ ρt) f)
               (cong₂ _∧_ (ib-renᵗ k ρg ρd ρt z) (ib-renᵉ k ρg ρd ρt e))
   ib-renᵉ k ρg ρd ρt (mergeAllᵉ _ e) = ib-renᵉ k ρg ρd ρt e
   ib-renᵉ k ρg ρd ρt (switchAllᵉ e)  = ib-renᵉ k ρg ρd ρt e
+  ib-renᵉ k ρg ρd ρt (batchSyncᵉ e)  = ib-renᵉ k ρg ρd ρt e
   ib-renᵉ k ρg ρd ρt (exhaustAllᵉ e) = ib-renᵉ k ρg ρd ρt e
   ib-renᵉ k ρg ρd ρt (μᵉ e)          = ib-renᵉ k (ext∈ ρg) ρd ρt e
   ib-renᵉ k ρg ρd ρt (varᵉ x)        = refl
   ib-renᵉ k ρg ρd ρt (deferᵉ e)      = ib-renᵉ k (λ ()) _ ρt e
+  ib-renᵉ k ρg ρd ρt (mintᵉ e)       = ib-renᵉ k ρg ρd (ext∈ ρt) e
 
   ib-renᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δᵍ′ Δ Δ′ Θ Θ′ t} (k : ℕ)
     (ρg : Ren∈ Δᵍ Δᵍ′) (ρd : Ren∈ Δ Δ′) (ρt : Ren∈ Θ Θ′)
@@ -149,7 +153,12 @@ mutual
          (∧ˡ (inputsBelowᵗ k c) (inputsBelowᵉ k e) ok))
        (ib-elimGᵉ k Θl x cl hcl e
          (∧ʳ (inputsBelowᵗ k c) (inputsBelowᵉ k e) ok))
-  ib-elimGᵉ k Θl x cl hcl (liftᵉ f z e)   ok =
+  ib-elimGᵉ k Θl x cl hcl (mapᵉ f e)      ok =
+    ∧⁺ (inputsBelowᵗ k (elimGTm (_ ∷ Θl) x cl f))
+       (inputsBelowᵉ k (elimGExp Θl x cl e))
+       (ib-elimGᵗ k (_ ∷ Θl) x cl hcl f (∧ˡ (inputsBelowᵗ k f) _ ok))
+       (ib-elimGᵉ k Θl x cl hcl e (∧ʳ (inputsBelowᵗ k f) _ ok))
+  ib-elimGᵉ k Θl x cl hcl (scanᵉ f z e)   ok =
     ∧⁺ (inputsBelowᵗ k (elimGTm (_ ∷ Θl) x cl f))
        (inputsBelowᵗ k (elimGTm Θl x cl z)
          ∧ inputsBelowᵉ k (elimGExp Θl x cl e))
@@ -165,6 +174,7 @@ mutual
       rest = ∧ʳ (inputsBelowᵗ k f) zbe ok
   ib-elimGᵉ k Θl x cl hcl (mergeAllᵉ _ e) ok = ib-elimGᵉ k Θl x cl hcl e ok
   ib-elimGᵉ k Θl x cl hcl (switchAllᵉ e)  ok = ib-elimGᵉ k Θl x cl hcl e ok
+  ib-elimGᵉ k Θl x cl hcl (batchSyncᵉ e)  ok = ib-elimGᵉ k Θl x cl hcl e ok
   ib-elimGᵉ k Θl x cl hcl (exhaustAllᵉ e) ok = ib-elimGᵉ k Θl x cl hcl e ok
   ib-elimGᵉ k Θl x cl hcl (μᵉ e)          ok =
     ib-elimGᵉ k Θl (there x) cl hcl e ok
@@ -172,6 +182,7 @@ mutual
   ib-elimGᵉ k Θl x cl hcl (deferᵉ e)      ok =
     subst T (sym (ib-substᴱ k (⊟-++ˡ x) (elimDExp Θl (∈-++⁺ˡ x) cl e)))
             (ib-elimDᵉ k Θl (∈-++⁺ˡ x) cl hcl e ok)
+  ib-elimGᵉ k Θl x cl hcl (mintᵉ e)       ok = ib-elimGᵉ k (_ ∷ Θl) x cl hcl e ok
 
   ib-elimGᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub u t} (k : ℕ)
     (Θl : List Ty) (x : t ∈ Δᵍ)
@@ -275,7 +286,12 @@ mutual
          (∧ˡ (inputsBelowᵗ k c) (inputsBelowᵉ k e) ok))
        (ib-elimDᵉ k Θl x cl hcl e
          (∧ʳ (inputsBelowᵗ k c) (inputsBelowᵉ k e) ok))
-  ib-elimDᵉ k Θl x cl hcl (liftᵉ f z e)   ok =
+  ib-elimDᵉ k Θl x cl hcl (mapᵉ f e)      ok =
+    ∧⁺ (inputsBelowᵗ k (elimDTm (_ ∷ Θl) x cl f))
+       (inputsBelowᵉ k (elimDExp Θl x cl e))
+       (ib-elimDᵗ k (_ ∷ Θl) x cl hcl f (∧ˡ (inputsBelowᵗ k f) _ ok))
+       (ib-elimDᵉ k Θl x cl hcl e (∧ʳ (inputsBelowᵗ k f) _ ok))
+  ib-elimDᵉ k Θl x cl hcl (scanᵉ f z e)   ok =
     ∧⁺ (inputsBelowᵗ k (elimDTm (_ ∷ Θl) x cl f))
        (inputsBelowᵗ k (elimDTm Θl x cl z)
          ∧ inputsBelowᵉ k (elimDExp Θl x cl e))
@@ -291,6 +307,7 @@ mutual
       rest = ∧ʳ (inputsBelowᵗ k f) zbe ok
   ib-elimDᵉ k Θl x cl hcl (mergeAllᵉ _ e) ok = ib-elimDᵉ k Θl x cl hcl e ok
   ib-elimDᵉ k Θl x cl hcl (switchAllᵉ e)  ok = ib-elimDᵉ k Θl x cl hcl e ok
+  ib-elimDᵉ k Θl x cl hcl (batchSyncᵉ e)  ok = ib-elimDᵉ k Θl x cl hcl e ok
   ib-elimDᵉ k Θl x cl hcl (exhaustAllᵉ e) ok = ib-elimDᵉ k Θl x cl hcl e ok
   ib-elimDᵉ k Θl x cl hcl (μᵉ e)          ok = ib-elimDᵉ k Θl x cl hcl e ok
   ib-elimDᵉ k Θl x cl hcl (varᵉ y)        ok with compare∈ x y
@@ -301,6 +318,7 @@ mutual
     subst T (sym (ib-substᴱ k (⊟-++ʳ {Δᵍ = Δᵍ} x)
                     (elimDExp Θl (∈-++⁺ʳ Δᵍ x) cl e)))
             (ib-elimDᵉ k Θl (∈-++⁺ʳ Δᵍ x) cl hcl e ok)
+  ib-elimDᵉ k Θl x cl hcl (mintᵉ e)       ok = ib-elimDᵉ k (_ ∷ Θl) x cl hcl e ok
 
   ib-elimDᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub u t} (k : ℕ)
     (Θl : List Ty) (x : t ∈ Δ)
@@ -405,13 +423,16 @@ mutual
   ib-topᵉ (ofᵉ ts)        = ib-topᵗˢ ts
   ib-topᵉ emptyᵉ          = tt
   ib-topᵉ (takeᵉ c e)     = ∧⁺ _ _ (ib-topᵗ c) (ib-topᵉ e)
-  ib-topᵉ (liftᵉ f z e)   = ∧⁺ _ _ (ib-topᵗ f) (∧⁺ _ _ (ib-topᵗ z) (ib-topᵉ e))
+  ib-topᵉ (mapᵉ f e)      = ∧⁺ _ _ (ib-topᵗ f) (ib-topᵉ e)
+  ib-topᵉ (scanᵉ f z e)   = ∧⁺ _ _ (ib-topᵗ f) (∧⁺ _ _ (ib-topᵗ z) (ib-topᵉ e))
   ib-topᵉ (mergeAllᵉ _ e) = ib-topᵉ e
   ib-topᵉ (switchAllᵉ e)  = ib-topᵉ e
+  ib-topᵉ (batchSyncᵉ e)  = ib-topᵉ e
   ib-topᵉ (exhaustAllᵉ e) = ib-topᵉ e
   ib-topᵉ (μᵉ e)          = ib-topᵉ e
   ib-topᵉ (varᵉ x)        = tt
   ib-topᵉ (deferᵉ e)      = ib-topᵉ e
+  ib-topᵉ (mintᵉ e)       = ib-topᵉ e
 
   ib-topᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (tm : Tm Γ Δᵍ Δ Θ t) →
     T (inputsBelowᵗ n tm)

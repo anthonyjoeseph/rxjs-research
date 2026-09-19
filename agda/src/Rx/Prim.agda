@@ -31,6 +31,23 @@ Id = ℕ                              -- concrete so the spec can compare; harne
 -- this module are not a pair to treat alike — this one is an ordered
 -- ARRIVAL POSITION and `Source` below is the token.
 
+-- AND WHAT NEEDS THE ORDER IS THE CHECKER, NOT THE PIPELINE — WHICH IS
+-- WHAT DECIDES THE OBJECT-LANGUAGE ENCODING.  The paragraph above is a
+-- fact about `Rx.Protocol`, and `Rx.Protocol` is an ACCEPTANCE ORACLE:
+-- it reads a finished stream and rules on whether the protocol was
+-- obeyed.  Nothing in the batching pipeline the theorem is about ever
+-- consults the order.  `Spec` groups by comparing instants for
+-- equality; the implementation holds one open batch and asks only
+-- whether the incoming instant equals the open one, flushing when it
+-- does not.  So when the envelope is re-expressed as a TYPE of the
+-- object language, its instant field stands at the unique primitive,
+-- whose sole eliminator is a primitive equality, and nothing is lost —
+-- the watermark stays where it already is, in a meta-level automaton
+-- over meta-level emits, which is the only thing that could have
+-- wanted a successor or a `≤` in the first place.  Read the two
+-- paragraphs together: equality alone cannot state the CHECK, and
+-- equality alone is all the RUN was ever asking for.
+
 -- A TOKEN, AND THAT IS THE WHOLE OF WHAT ANYTHING ASKS OF IT.  `Spec`
 -- binds this and copies it onto the batch envelope without ever
 -- comparing it; `Rx.Protocol` compares it and never orders or computes
@@ -38,11 +55,8 @@ Id = ℕ                              -- concrete so the spec can compare; harne
 -- So ℕ is over-strong here in a way it is not for `Id` above, and the
 -- over-strength is not free: every statement quantifying over streams
 -- inherits obligations about ones carrying sources no mint could
--- produce.  The `dried` reason's own argument — that no numeric
--- sentinel is collision-proof against breadth-many mints — is the same
--- reading from the other side, the arithmetic being available and
--- still not safe to rely on.  The TypeScript counterpart is already typed
--- as a number OR a symbol; this module offers only the number.
+-- produce.  The TypeScript counterpart is already typed as a number OR
+-- a symbol; this module offers only the number.
 Source : Set                        -- a SOURCE observable; impl counts registrations of these
 Source = ℕ                          -- concrete so the scheduler can mint & compare; the harness compares up to renaming anyway
 
@@ -79,26 +93,6 @@ data CloseReason : Set where
                                     -- (a cut registration delivers NOTHING, as in rxjs:
                                     -- take(1)(merge(s,s)) — the second chain is silent)
   exhausted  : CloseReason          -- the source ran dry on its own
-  dried      : CloseReason          -- a GUARD REFUSED — the dry marker
-                                    -- (Rx.Evaluator.dryBurst), never emitted by any
-                                    -- machine rule.  Detection is by THIS REASON
-                                    -- (hasDry), not by a sentinel source: Source is an
-                                    -- unbounded ℕ and mints are breadth-many, so no
-                                    -- numeric sentinel is collision-proof
-
-                                    -- THE NAME IS OLDER THAN WHAT IT MARKS, and it is
-                                    -- kept because `CLI/Encode` puts the word on the
-                                    -- oracle wire.  There is no fuel and nothing runs
-                                    -- out: the evaluator descends on a TRIPLE, and each
-                                    -- of its three components has a guard that emits
-                                    -- this when it cannot decrease — the rank at an
-                                    -- inner subscribe, the unconnected count at a shared
-                                    -- connect, the sync size at a μ unfolding.  So a run
-                                    -- free of this reason is one where the descent's
-                                    -- order never had to be argued about.  No builder
-                                    -- constructs it, so after the cutover it is a reason
-                                    -- no run can carry — kept because the protocol's
-                                    -- vocabulary is what the spec reads
 
 data InstEvent (A : Set) : Set where
   init     : Source → InstEvent A   -- a registration chain of this source came alive
@@ -117,6 +111,29 @@ record InstEmit (A : Set) : Set where
         instant : Id                  -- the instant it belongs to
         source  : Source              -- the arrival's source (owed = its live-registration count)
         kind    : EmitKind            -- who minted it: a subscription or an arrival cascade
+
+-- AND WHAT AN EVALUATOR PUSHES IS NOT THAT, WHICH IS A STATEMENT
+-- ABOUT LEVELS AND NOT ABOUT RICHNESS.  `InstEmit` is the PROTOCOL's
+-- vocabulary: the spec reads one, batches by its `instant`, and hands
+-- back another.  A machine running an ordinary rxjs pipeline pushes
+-- something far smaller — a value, or the end of the stream — one at
+-- a time and depth-first, with no envelope around it and no grouping
+-- across a cascade.
+--
+-- SO THE PROTOCOL RIDES ON THE VALUES RATHER THAN ON THE CARRIER,
+-- which is where the TypeScript keeps it: its operators are plain
+-- rxjs and the envelope is the type flowing THROUGH them.  `emitᵗ` in
+-- `Rx.Envelope` is that envelope at the object level and `toPlain`
+-- puts it there, so a machine carrying one too would be holding the
+-- same record twice, once at each level, with only the object-level
+-- copy having a counterpart in the mirror.
+--
+-- THERE IS NO ERROR ARM BECAUSE THE PROTOCOL HAS NONE.  A stream here
+-- ends by completing or by being closed from above, and closure is a
+-- registration's business rather than an emission's.
+data PlainEvent (A : Set) : Set where
+  valueᵖ    : A → PlainEvent A
+  completeᵖ : PlainEvent A            -- the stream ends here (concatAll grafts on it)
 
 ------------------------------------------------------------------
 -- Timed inputs (delta-encoded; real gap = suc wait, so per-source

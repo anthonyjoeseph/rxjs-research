@@ -79,6 +79,11 @@ import io
 import os
 import re
 import sys
+
+# a name a declaration can introduce: no bracket, no binder punctuation.
+# Anything else left of a `:` means the line is an argument pattern or a
+# type, not a list of names being declared.
+NAME_RE = re.compile(r"[^\s(){}@;.]+")
 from bisect import bisect_right
 from collections import defaultdict
 
@@ -549,10 +554,31 @@ def extract_definitions(src_dir, files):
             if owner is not None:
                 def_lines[owner].add((relpath, i + 1))
             else:
-                name = tok0.rstrip(":")
-                register(name, relpath, i + 1, "def")
+                for name in (declared_names(tokens) or [tok0.rstrip(":")]):
+                    register(name, relpath, i + 1, "def")
             i += 1
         return i
+
+
+    # A SIGNATURE MAY DECLARE SEVERAL NAMES AT ONCE, AND TAKING ONLY THE
+    # FIRST IS HOW A POSTULATE HIDES.  `switchAllᵖ exhaustAllᵖ : T` is two
+    # postulates, and reading `tok0` alone put exactly one of them outside
+    # the ledger the wiring law calls complete — invisible to `make
+    # postulates`, unroutable by the reachability pass, and reported by
+    # `make roadmap-check` as a row head naming something not in `agda/src`
+    # when the roadmap tried to carry it.  Every name left of a standalone
+    # `:` is a declaration; a CLAUSE has no such token, and a name carrying
+    # a bracket is an argument pattern rather than a name being declared.
+    def declared_names(tokens):
+        if ":" not in tokens:
+            return None
+        k = tokens.index(":")
+        if k < 1:
+            return None
+        names = tokens[:k]
+        if not all(NAME_RE.fullmatch(nm) for nm in names):
+            return [tokens[0].rstrip(":")]
+        return names
 
     def scan_sub_block(raw_lines, visible, start, end, base_indent, relpath, kind):
         """Like scan_block, but every plain-definition member found is
@@ -678,11 +704,11 @@ def extract_definitions(src_dir, files):
                 def_lines[owner].add((relpath, i + 1))
                 i += 1
                 continue
-            mname = tok0.rstrip(":")
-            if kind == "postulate":
-                postulate_names.add(mname)
-                postulate_sites.setdefault(mname, (relpath, i + 1))
-            register(mname, relpath, i + 1, kind)
+            for mname in (declared_names(tokens) or [tok0.rstrip(":")]):
+                if kind == "postulate":
+                    postulate_names.add(mname)
+                    postulate_sites.setdefault(mname, (relpath, i + 1))
+                register(mname, relpath, i + 1, kind)
             i += 1
         return i
 

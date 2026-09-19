@@ -1,20 +1,75 @@
-import { Observable, Subject } from "rxjs";
+import {
+  BehaviorSubject,
+  Observable,
+  Subject,
+  defer,
+  endWith,
+  merge,
+  of,
+} from "rxjs";
+import { InstEmit, InstEvent, SUBSCRIBE_FRAME, SourceId } from "./inst-emit.js";
+import type { Driver } from "./driver.js";
 
-// A minimal push sink — the only surface a source producer needs. Kept to
+// A minimal push sink — the only surface a producer needs. Kept to
 // next/complete (never a raw rxjs Subscriber) so the rest of the impl
-// stays clear of imperative rxjs internals; these two constructors are
-// the single place Subject / new Observable are allowed to appear.
+// stays clear of imperative rxjs internals; this file is the single
+// place Subject / new Observable are allowed to appear.
 export type Sink<A> = {
   next: (val: A) => void;
   complete: () => void;
 };
 
-// cold: a fresh producer per subscription. `produce` is handed this
-// subscription's sink and returns its teardown — unsubscribing runs it,
-// cancelling whatever the producer scheduled (Agda's sweepLive). A cold
-// re-runs its producer on every subscribe, minting a fresh source each
-// time (the caller's job); nothing is shared across subscribers.
-export const cold = <A>(
+// The push surface a LIVE source's registration is handed instead.
+// `isLast` is the registration's own knowledge that this delivery
+// spends the source, and it rides on the push rather than arriving as
+// a separate `complete()` because the spent latch has to flip BEFORE
+// the value fans out: a subscriber that joins during the final cascade
+// must see a spent source, and an rx completion sent first would
+// swallow the value it was meant to follow.
+export type LiveSink<A> = {
+  next: (val: A, isLast: boolean) => void;
+};
+
+// channel: one Subject behind a sink — the plumbing primitive. A push
+// is delivered synchronously to whoever is listening, which is what
+// makes push order output order; a push with no listener is dropped.
+// This is NOT a source (it carries no lifecycle and mints nothing) —
+// it is how one part of an operator hands work to another in order.
+export const channel = <A>(): [Observable<A>, Sink<A>] => {
+  const subject = new Subject<A>();
+  return [
+    subject.asObservable(),
+    { next: (val) => subject.next(val), complete: () => subject.complete() },
+  ];
+};
+
+// latch: a channel that REMEMBERS, and the difference from `channel` is
+// the whole of why it exists. A channel drops a push with no listener,
+// so it can only answer "what is happening now"; an operator that has
+// to decide, AT SUBSCRIBE TIME, what kind of subscriber this is needs
+// "what has happened already", and that is a question no plain Subject
+// answers. Seeded, so there is always a current value: a reader gets it
+// synchronously, inside its own subscribe frame, and so decides without
+// a hop.
+//
+// THIS IS WHAT REPLACES A CLOSURE FLAG, and the gain is not cosmetic. A
+// flag read in a `defer` body is correct only while the writes happen to
+// precede the reads; a seeded channel makes that a data dependency the
+// types carry, which is the same move the share's registration count
+// already made onto its boundary signal.
+export const latch = <A>(initial: A): [Observable<A>, Sink<A>] => {
+  const subject = new BehaviorSubject<A>(initial);
+  return [
+    subject.asObservable(),
+    { next: (val) => subject.next(val), complete: () => subject.complete() },
+  ];
+};
+
+// producer: a fresh imperative producer per subscription, returning its
+// teardown — unsubscribing runs it, cancelling whatever the producer
+// scheduled (Agda's sweepLive). Also plumbing: it carries no lifecycle
+// and mints nothing.
+export const producer = <A>(
   produce: (sink: Sink<A>) => () => void,
 ): Observable<A> =>
   new Observable<A>((subscriber) =>
@@ -24,52 +79,154 @@ export const cold = <A>(
     }),
   );
 
-// hot: one shared Subject behind a next/complete sink. Deliveries are
-// driven through the sink independently of subscription (a value with no
-// subscriber is dropped, and still costs fuel); every subscriber shares
-// the one live stream.
-export const hot = <A>(): [Observable<A>, Sink<A>] => {
-  const subject = new Subject<A>();
-  return [
-    subject.asObservable(),
-    { next: (val) => subject.next(val), complete: () => subject.complete() },
-  ];
-};
+// bracketSync: the sync/async boundary WITHOUT subscribing, and the
+// reason it works is rxjs's own subscribe ordering rather than any
+// scheduler — which is what makes it legal here at all, since an
+// operator of this implementation may never call `.subscribe`, that
+// being the user's one entry point. `merge` subscribes its inputs in
+// order, synchronously: it subscribes `src`, `src` drains its entire
+// subscribe burst during that call, and only then is `of(SYNC_END)`
+// subscribed and fires. So the marker lands exactly at the boundary,
+// in the same frame, with no hop and no timing change.
+//
+// This is what lets an operator stop owning its upstream subscription:
+// the split arrives as a VALUE in the stream, so a downstream `scan`
+// regroups the burst where the operator used to accumulate it by hand.
+// That pairing — bracket then read — is `batchSyncᵉ` followed by
+// `mapᵉ`, which is why no new former is owed on the Agda side.
+export const SYNC_END = Symbol("end-of-sync");
+export const UPSTREAM_DONE = Symbol("upstream-done");
+export type SyncEnd = typeof SYNC_END;
+export type UpstreamDone = typeof UPSTREAM_DONE;
+export type Bracketed<A> = A | SyncEnd;
+export type Marked<A> = A | SyncEnd | UpstreamDone;
 
-// captureSync: subscribe NOW, splitting the subscription at the
-// sync/async boundary. Emissions delivered during the subscribe call
-// itself land in `burst` (with completedSync when the source finished
-// inside it); everything later goes to the caller's sink. This is how
-// an operator flattens a subscription's sync burst into the emit that
-// caused it (Agda's subscribeInner ∘ splitBurst) — and the third and
-// last sanctioned use of raw rxjs subscription machinery in this file.
-export type SyncCapture<A> = {
-  burst: A[];
-  completedSync: boolean;
-  unsubscribe: () => void;
-};
+export const bracketSync = <A>(src: Observable<A>): Observable<Bracketed<A>> =>
+  merge<Bracketed<A>[]>(src, of(SYNC_END));
 
-export const captureSync = <A>(
-  obs: Observable<A>,
-  onAsync: Sink<A>,
-): SyncCapture<A> => {
-  const burst: A[] = [];
-  let sync = true;
-  let completedSync = false;
-  const subscription = obs.subscribe({
-    next: (val) => {
-      if (sync) burst.push(val);
-      else onAsync.next(val);
-    },
-    complete: () => {
-      if (sync) completedSync = true;
-      else onAsync.complete();
+// markSync: the boundary PLUS the source's own completion, for a
+// consumer that has to tell "finished inside its own burst" from "still
+// live" — a distinction `SYNC_END` alone cannot carry, since a stream
+// that completes synchronously and one that merely falls quiet look
+// identical at the marker. `endWith` fires on completion whenever it
+// happens, so the ordering of the two markers IS the answer: before
+// SYNC_END means the completion was synchronous.
+export const markSync = <A>(src: Observable<A>): Observable<Marked<A>> =>
+  merge<Marked<A>[]>(src.pipe(endWith(UPSTREAM_DONE)), of(SYNC_END));
+
+// ---- the two SOURCE constructors ----
+//
+// A source is an `Observable<InstEmit<A>>` and not an `Observable<A>`,
+// because what the protocol is about is a source's LIFECYCLE — its
+// init, the registrations it opens, its close — and a bare value
+// carries none of that. So both constructors MINT the source id and
+// lay down the subscribe envelope themselves; a caller supplies only
+// what the source has to say.
+//
+// They differ in exactly one place and everything else follows from
+// it: WHEN the id is minted. A hot mints once, at construction, so
+// every subscriber joins one live source. A cold mints per
+// subscription, so its producer re-runs and its burst rides inside the
+// subscriber's own instant (id-inheritance).
+
+// Every subscription leads with its own init. `spent` folds in the
+// close and the completion, which is the ONE-SHOT burst: a source with
+// nothing left to deliver says everything it has to say inside the
+// frame that subscribed to it (Agda's oneShotBurst).
+const subscribeBurst = <A>(
+  driver: Driver,
+  source: SourceId,
+  body: InstEvent<A>[],
+  spent: boolean,
+): InstEmit<A> => ({
+  events: [
+    { type: "init", source },
+    ...body,
+    ...(spent
+      ? [
+          { type: "close", source, reason: "exhausted" } as const,
+          { type: "complete" } as const,
+        ]
+      : []),
+  ],
+  instant: SUBSCRIBE_FRAME,
+  source,
+  kind: "subscribe",
+});
+
+// hot: minted once and live whether or not anyone is subscribed — a
+// delivery with no subscribers is dropped, and still costs fuel. A
+// subscriber arriving after the source is spent gets the one-shot
+// burst rather than a registration nothing would ever close, and the
+// latch is what makes that true DURING the final cascade as well as
+// after it (see `LiveSink`).
+//
+// AND ITS ID IS HANDED IN RATHER THAN MINTED, which is where "minted
+// once, at construction" actually lands: a hot exists only as a
+// scripted SLOT, and a slot's identifier is its index — reserved
+// below the dynamic counter precisely so nothing mints into it. Minted
+// from that counter instead, a hot burns an id the slots already own,
+// which is a COLLAPSE rather than a shift: two sources that became one
+// cannot be renamed back apart, so the harness's comparison up to
+// renaming stops covering the difference.
+export const hot = <A>(
+  driver: Driver,
+  source: SourceId,
+  register: (source: SourceId, sink: LiveSink<InstEmit<A>>) => void,
+): Observable<InstEmit<A>> => {
+  const [live, sink] = channel<InstEmit<A>>();
+  let spent = false;
+  register(source, {
+    next: (emit, isLast) => {
+      if (isLast) spent = true;
+      sink.next(emit);
+      if (isLast) sink.complete();
     },
   });
-  sync = false;
-  return {
-    burst,
-    completedSync,
-    unsubscribe: () => subscription.unsubscribe(),
-  };
+  return defer(() =>
+    spent
+      ? of(subscribeBurst<A>(driver, source, [], true))
+      : merge(of(subscribeBurst<A>(driver, source, [], false)), live),
+  );
 };
+
+// AND THE REGISTRATION IS SUBSCRIBED BEFORE THE BURST, WHICH IS AN
+// ORDERING FACT AND NOT A STYLE ONE -- READ THIS BEFORE TIDYING THE
+// `merge` ARGUMENTS BACK INTO READING ORDER. The driver mints a
+// source's arbitration ordinal when it REGISTERS, and `merge`
+// subscribes its inputs in order, draining each one fully before the
+// next. So a burst subscribed first runs its whole downstream cascade
+// -- including every source that cascade causes to be subscribed --
+// while this source has not yet registered, and those later sources
+// take the earlier ordinals. Two arrivals at the same tick are then
+// arbitrated in the reverse of subscription order, which is what the
+// evaluator's convention says they are not. The registration emits
+// nothing synchronously, so putting it first costs no ordering in the
+// stream and buys the one that matters.
+//
+// The shape that shows it: a flattener over a step returning a fresh
+// subscription of the same cold slot. The outer and the inner then
+// have async tails at the SAME tick, and which one fires first decides
+// whether the flattener is still busy when the other arrives.
+//
+// cold: a fresh source per subscription. `produce` is handed the id
+// just minted and answers with the events that fire INSIDE the
+// subscribe burst and, when the source outlives that burst, the
+// registration that carries the rest. An absent `async` is what makes
+// the source spent in its own burst — there is no other way to say it,
+// which is why it is an absence rather than a flag.
+export const cold = <A>(
+  driver: Driver,
+  produce: (source: SourceId) => {
+    sync: InstEvent<A>[];
+    async?: (sink: Sink<InstEmit<A>>) => () => void;
+  },
+): Observable<InstEmit<A>> =>
+  defer(() => {
+    const source = driver.mintSourceId();
+    const { sync, async } = produce(source);
+    const burst = subscribeBurst(driver, source, sync, async === undefined);
+    return async === undefined
+      ? of(burst)
+      : merge(producer<InstEmit<A>>(async), of(burst));
+  });

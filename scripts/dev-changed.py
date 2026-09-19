@@ -50,6 +50,18 @@ import detect_env  # noqa: E402  (needs the path fixup above)
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join("agda", "src")
 
+# WHICH FILES COUNT AS SOURCE, WHICH IS NOT THE SAME QUESTION AS WHERE AGDA
+# READS THEM FROM.  The escalation rule this script exists for -- a module
+# carrying a multi-member mutual block cannot be checked by a dev pass, since
+# agda-dev stubs the block's siblings -- can only be exercised against a module
+# that HAS one, and `agda/src` currently has none: every mutual block in the
+# tree is written with the keyword, which agda-dev treats as opaque and emits
+# verbatim.  A check that fires on nothing rots untested, so the selftest
+# points this at a fixture tree instead.  Only the classification moves; paths
+# handed to agda-dev stay relative to the real `agda/src`, which is the base it
+# joins them onto.
+SRC_CLASS = SRC
+
 # THE EVIDENCE TREES, AND WHY THEY ARE NOT AN ESCALATION.  Neither is
 # dev-checkable, which is why this used to send them to the tower -- but the
 # tower is not what checks them either, and it cannot be broken by them: no
@@ -166,6 +178,8 @@ def consumers(mods: set[str]) -> set[str]:
     """Every module that transitively imports one of `mods` — the unchecked bet."""
     ci = _load("check-imports")
     ci.TREES = list(ci.CLAIM_ROOT)
+    if SRC_CLASS not in ci.TREES:
+        ci.TREES.append(SRC_CLASS)
     files = []
     for tree in ci.TREES:
         for root, _, fs in os.walk(os.path.join(REPO, tree)):
@@ -206,6 +220,11 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--files", nargs="*", default=None,
                     help="override the changed set (selftest / manual use)")
+    ap.add_argument("--src-root", default=None, metavar="PATH",
+                    help="treat files under PATH as source rather than those "
+                         "under agda/src (selftest only).  It moves the "
+                         "CLASSIFICATION and nothing else: the paths handed to "
+                         "agda-dev stay relative to the real agda/src.")
     ap.add_argument("--budget",
                     default=str(detect_env.AGDA_DEV_BUDGET[detect_env.detect_env()]),
                     help="per-module dev-check budget in seconds.  Defaults to "
@@ -263,6 +282,9 @@ def main() -> int:
                          "the cold-cache escalation in an environment where no "
                          "heavy gate has ever completed")
     a = ap.parse_args()
+    global SRC_CLASS
+    if a.src_root:
+        SRC_CLASS = os.path.normpath(a.src_root)
 
     if a.stamp:
         with open(STAMP, "w", encoding="utf-8") as fh:
@@ -271,8 +293,8 @@ def main() -> int:
         return 0
 
     files = a.files if a.files is not None else changed_files()
-    src_files = [f for f in files if f.startswith(SRC + os.sep)]
-    other = [f for f in files if not f.startswith(SRC + os.sep)]
+    src_files = [f for f in files if f.startswith(SRC_CLASS + os.sep)]
+    other = [f for f in files if not f.startswith(SRC_CLASS + os.sep)]
 
     if a.owed_only:
         seen = []
@@ -285,7 +307,7 @@ def main() -> int:
         return 0
 
     print(f"dev-changed: {len(files)} changed .agda file(s)"
-          f" — {len(src_files)} in {SRC}, {len(other)} elsewhere")
+          f" — {len(src_files)} in {SRC_CLASS}, {len(other)} elsewhere")
     if not files:
         print("dev-changed: nothing changed under agda/ — no Agda was checked, "
               "and this is a REPORT rather than a pass")
@@ -296,7 +318,7 @@ def main() -> int:
     # build is the better buy -- it costs about the same and checks EVERYTHING,
     # consumers included, which the light gate explicitly does not.
     if len(src_files) > a.max_files:
-        escalate.append(f"{len(src_files)} changed modules in {SRC} (limit "
+        escalate.append(f"{len(src_files)} changed modules in {SRC_CLASS} (limit "
                         f"{a.max_files}) — that many dev checks costs more "
                         f"than one full build, which checks the consumers too")
     owed = []
@@ -385,6 +407,8 @@ def main() -> int:
     if deps:
         ci = _load("check-imports")
         ci.TREES = list(ci.CLAIM_ROOT)
+        if SRC_CLASS not in ci.TREES:
+            ci.TREES.append(SRC_CLASS)
         mods = {ci.module_of(f) for f in src_files}
         cone = consumers(mods)
         # A CLAIM ROOT'S DEV CHECK *IS* THE TOWER, so it is never part of a
@@ -411,7 +435,7 @@ def main() -> int:
         # went unchecked: agda-dev stubs a block's siblings, so a dev check
         # there is not a check.  Say so and count it unchecked.
         for m in sorted(cone):
-            p = os.path.join(SRC, m.replace(".", os.sep) + ".agda")
+            p = os.path.join(SRC_CLASS, m.replace(".", os.sep) + ".agda")
             if os.path.exists(os.path.join(REPO, p)) and p not in by_mod:
                 k = multi_member(os.path.relpath(p, SRC))
                 if k == 0:

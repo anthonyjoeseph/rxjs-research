@@ -1,6 +1,6 @@
 import { Observable } from "rxjs";
-import { InstEmit, Provenance, SourceId } from "./inst-emit.js";
-import { hot } from "./constructors.js";
+import { InstEmit, Provenance } from "./inst-emit.js";
+import { channel, producer } from "./constructors.js";
 
 // One scheduled delivery popped by the driver. Mirrors Agda's Arrival,
 // minus the fields the fire-closure already captures (source, payload).
@@ -13,18 +13,28 @@ export type Arrival = {
 // Sched, and the ONE sanctioned mutable/impure edge of the TS side
 // (everything else delegates statefulness to rxjs operators). It holds
 // the pending deliveries keyed (tick, ordinal) — async input values
-// AND defer-node hops — plus the current cascade id, which sync
-// subscription work (cold bursts, init emits) inherits.
+// AND defer-node hops.
+//
+// WHAT IT DELIBERATELY DOES NOT HOLD is a readable "current instant".
+// An arrival's cascade id is handed to the delivery it belongs to, as
+// a field of the `Arrival` that fires; nobody may ask the driver which
+// cascade is running. That is the difference between an operator that
+// takes its instant from the emit in front of it and one that reaches
+// for ambient state, and only the first is expressible in plain rxjs.
+// The instant a subscribe burst carries is `SUBSCRIBE_FRAME`, which
+// the protocol module explains.
 export type Driver = {
   // ---- rx-leg internals (used by makeInputSource / compile) ----
   // fresh SourceId; Symbols compare only by identity, matching the
   // harness's comparison up to renaming (Agda mints ℕs — same order,
   // different carrier)
-  mintSourceId: () => SourceId;
-  // the instant sync work belongs to: the running arrival's cascade
-  // id, or the root subscribe-frame id before any arrival
-  // (id-inheritance is literally reading this)
-  currentInstant: () => Provenance;
+  mintSourceId: () => number;
+  // fresh uniq TOKEN for a `mint` binder, and a SEPARATE namespace from
+  // the source ids above: a token is handed to the program, a source id
+  // to the protocol, and no operation relates the two. They shared a
+  // counter only while a program could compare a token against a
+  // literal, which the term language no longer lets it write.
+  mintToken: () => symbol;
   // anchor for per-subscription scheduling (cold async tails, deferᵉ
   // hops at tick + 1)
   currentTick: () => number;
@@ -34,8 +44,16 @@ export type Driver = {
   // total (tick, ordinal) arbitration order is what must match, not
   // the ordinal values. Returns a cancel: rx teardown drops the
   // remaining deliveries (Agda's sweepLive).
+  //
+  // A SCRIPTED HOT SLOT SUPPLIES ITS OWN ORDINAL, because it owns one
+  // before the run starts: Agda's `mkHot` gives slot i both source and
+  // ordinal `toℕ i`, and the dynamic counters begin ABOVE the slots.
+  // Minted in registration order a hot slot's ordinal counts the hots
+  // rather than the slots, so a shared slot ahead of a hot one shifts
+  // every ordinal down and the (tick, ordinal) arbitration diverges.
   registerSource: (
     pending: { tick: number; fire: (arrival: Arrival) => void }[],
+    ordinal?: number,
   ) => () => void;
   // a share's chain emits (the emptied pass-through carrying the
   // handoff — Agda foldPath's share-sink clause) reach the root
@@ -56,25 +74,42 @@ type RegisteredSource = {
   pending: { tick: number; fire: (arrival: Arrival) => void }[];
 };
 
-export const createDriver = (): Driver => {
+// `slotCount` RESERVES the first that many source ids for the slots,
+// which is not a convention this file is free to pick: a hot's source
+// IS its slot index and a shared slot connects under its own, so the
+// counter has to start above them or a minted source collides with a
+// slot's. Agda says the same thing in one line (`mint-init n`, at both
+// the source and ordinal keys) and the two must agree, since the oracle
+// compares the streams up to renaming and a COLLAPSE is not a renaming
+// -- two sources that became one cannot be renamed back apart.
+export const createDriver = (slotCount = 0): Driver => {
   const sources: RegisteredSource[] = [];
-  let nextOrdinal = 0;
-  let nextSourceId = 0;
-  // the root subscription's frame: tick 0, its own instant (Agda:
-  // subscribeE e root (freshId 0 0) 0 …)
-  let instant: Provenance = Symbol("subscribe-frame");
+  // both counters begin ABOVE the slots, which own the identifiers
+  // below that bound — Agda's `mint-init n` at `ordinalᵏ` as well as
+  // `sourceᵏ`, the two being one line there and two here.
+  let nextOrdinal = slotCount;
+  let nextSourceId = slotCount;
+  // the root subscription's frame is tick 0 (Agda: subscribeE e root
+  // (freshId 0 0) 0 …)
   let tick = 0;
-  const [chainEmits, chainSink] = hot<InstEmit<never>>();
+  const [chainEmits, chainSink] = channel<InstEmit<never>>();
 
   return {
-    mintSourceId: () => Symbol(`source:${nextSourceId++}`),
+    // a NUMBER, because a source id is protocol data: it is counted,
+    // compared and renamed by the harness. Nothing else produces a
+    // SourceId, so this counter is the whole namespace and a numeric
+    // one cannot collide.
+    mintSourceId: () => nextSourceId++,
+    // a SYMBOL, because a token is program data with identity as its
+    // only content: `Symbol()` cannot be forged, counted or ordered,
+    // so the host type admits exactly the operation `eqU` is
+    mintToken: () => Symbol("uniq"),
     pushChainEmit: (emit) => chainSink.next(emit),
     chainEmits,
-    currentInstant: () => instant,
     currentTick: () => tick,
-    registerSource: (pending) => {
+    registerSource: (pending, ordinal) => {
       const entry: RegisteredSource = {
-        ordinal: nextOrdinal++,
+        ordinal: ordinal ?? nextOrdinal++,
         pending: [...pending],
       };
       sources.push(entry);
@@ -99,9 +134,34 @@ export const createDriver = (): Driver => {
       const head = next.pending[0];
       next.pending = next.pending.slice(1);
       tick = head.tick;
-      instant = Symbol(`arrival:${head.tick}:${next.ordinal}`);
-      head.fire({ instant, isLast: next.pending.length === 0 });
+      head.fire({
+        instant: Symbol(`arrival:${head.tick}:${next.ordinal}`),
+        isLast: next.pending.length === 0,
+      });
       return true;
     },
   };
 };
+
+// a one-shot driver delivery at a given tick, read per subscription —
+// the async boundary under deferᵉ/μᵉ. Teardown cancels the pending hop
+// (unsubscribing a not-yet-fired defer is free — Agda's sweepLive).
+// It carries no source lifecycle and mints nothing, which is why it is
+// a bare producer rather than either source constructor: what an
+// operator wants from it is the ARRIVAL, and the emit that arrival
+// causes is the operator's own to mint.
+export const oneShotArrival = (
+  driver: Driver,
+  tick: number,
+): Observable<Arrival> =>
+  producer<Arrival>((sink) =>
+    driver.registerSource([
+      {
+        tick,
+        fire: (arrival) => {
+          sink.next(arrival);
+          sink.complete();
+        },
+      },
+    ]),
+  );

@@ -57,6 +57,22 @@ open import Rx.Prim using (Id; Source; InstEvent; init; value; close; handoff; c
 --                         legitimately outlive the root's completion)
 ------------------------------------------------------------------
 
+-- WHERE THE ID DISCIPLINE ACTUALLY LIVES, AND IT IS THE FRESHNESS
+-- CLAUSE ABOVE.  A separate face once carried the id law, and what it
+-- stated was CONTAINMENT alone: every id an emit carries lies inside
+-- the run's horizon.  A machine that minted ONE instant and stamped the
+-- whole stream with it models that in full, so containment is not the
+-- property the batcher needs.  What reconciles a CLAIRVOYANT spec with
+-- a STREAMING impl is SEPARATION -- `Spec` gathers an instant's emits
+-- from anywhere in the stream while `Implementation` keeps one open
+-- batch and flushes on a change, so the two agree exactly when an
+-- instant's emits are CONTIGUOUS.  That is this clause, and its
+-- satisfaction by a run is the well-formedness face, open at
+-- `sound-cascade` and `sound-subscribe`.
+-- RECOVERY: git show 54227c28:agda/src/Rx/Provenance-Theorems.agda
+--   restores the containment statement with its `ids`, `horizon` and
+--   `⊆ᵢ` apparatus.
+
 Owed : Set                    -- this instant: remaining owed per source
 Owed = List (Source × ℕ)
 

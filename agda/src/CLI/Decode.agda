@@ -20,16 +20,15 @@ open import Data.Vec using (lookup; fromList)
 open import Relation.Nullary using (yes; no)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import Rx.Prim using (Timed; after_,_; ObservableInput; hot; cold)
-open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; _≟ᵗ_; isData; inputsBelowᵉ; Ctx; Val; Exp; Tm;
-  input; ofᵉ; emptyᵉ; liftᵉ; takeᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ;
-  varᵉ; deferᵉ; varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ;
-  strmᵗ; nilᵗ; consᵗ; foldᵗ; listᵗ; add; sub; mul; eqᵖ; ltᵖ; notᵖ)
+open import Rx.Prim using (Timed; after_,_; ObservableInput; hot; cold; PlainEvent; valueᵖ; completeᵖ)
+open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; obs; _≟ᵗ_; isData; inputsBelowᵉ; Ctx; Val; Exp; Tm; []ᵉ;
+  input; ofᵉ; emptyᵉ; mapᵉ; scanᵉ; takeᵉ; batchSyncᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ;
+  varᵉ; deferᵉ; mintᵉ; varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ;
+  strmᵗ; nilᵗ; consᵗ; foldᵗ; listᵗ; add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ)
 open import Rx.Evaluator.Builder using (evaluate↓)
 open import Rx.Slots using (scripted; shared; Slot; Slots)
-open import Implementation using (impl-batchSimultaneous)
 open import CLI.JSON using (jarr; jbool; jnum; jobj; JSON; jstr)
-open import CLI.Encode using (encodeStream; encodeBatched)
+open import CLI.Encode using (encodeValues)
 
 ------------------------------------------------------------------------
 -- JSON accessors and Maybe plumbing
@@ -130,6 +129,7 @@ decodeTy (suc fuel) j = getField "type" j >>=? asStr >>=? λ tag →
   if tag is "unit" then just unitᵗ
   else if tag is "bool" then just boolᵗ
   else if tag is "nat" then just natᵗ
+  else if tag is "uniq" then just uniqᵗ
   else if tag is "prod" then
     (getField "fst" j >>=? decodeTy fuel >>=? λ s →
      getField "snd" j >>=? decodeTy fuel >>=? λ u → just (s ×ᵗ u))
@@ -161,16 +161,20 @@ mutual
     else if tag is "of" then
       (getField "items" j >>=? asArr >>=? λ its →
        decodeTms fuel Γ Δᵍ Δ Θ t its >>=? λ ts → just (ofᵉ ts))
-    -- the carried type is read off the SEED's own annotation rather than
-    -- from a field of its own: every node here already carries its `ty`,
-    -- so the former needs no second copy of it
-    else if tag is "lift" then
+    else if tag is "map" then
       (childTy fuel "src" j >>=? λ s →
-       childTy fuel "init" j >>=? λ u →
-       getField "fn" j >>=? decodeTm fuel Γ Δᵍ Δ ((u ×ᵗ listᵗ s) ∷ Θ) (u ×ᵗ listᵗ t) >>=? λ fn →
-       getField "init" j >>=? decodeTm fuel Γ Δᵍ Δ Θ u >>=? λ ini →
+       getField "fn" j >>=? decodeTm fuel Γ Δᵍ Δ (s ∷ Θ) t >>=? λ fn →
        getField "src" j >>=? decodeExp fuel Γ Δᵍ Δ Θ s >>=? λ src →
-       just (liftᵉ fn ini src))
+       just (mapᵉ fn src))
+    -- THE SEED CARRIES NO TYPE OF ITS OWN, since a scan's output IS its
+    -- carried value: the node's own `ty` pins both, so the former needs
+    -- no second copy of it and the `init` child is read AT `t`
+    else if tag is "scan" then
+      (childTy fuel "src" j >>=? λ s →
+       getField "fn" j >>=? decodeTm fuel Γ Δᵍ Δ ((t ×ᵗ s) ∷ Θ) t >>=? λ fn →
+       getField "init" j >>=? decodeTm fuel Γ Δᵍ Δ Θ t >>=? λ ini →
+       getField "src" j >>=? decodeExp fuel Γ Δᵍ Δ Θ s >>=? λ src →
+       just (scanᵉ fn ini src))
     else if tag is "take" then
       (getField "count" j >>=? decodeTm fuel Γ Δᵍ Δ Θ natᵗ >>=? λ c →
        getField "src" j >>=? decodeExp fuel Γ Δᵍ Δ Θ t >>=? λ src →
@@ -191,6 +195,15 @@ mutual
       (getField "index" j >>=? asNum >>=? λ k → nthMember Δ t k >>=? λ x → just (varᵉ x))
     else if tag is "defer" then
       (getField "body" j >>=? decodeExp fuel Γ [] (Δᵍ ++ Δ) Θ t >>=? λ b → just (deferᵉ b))
+    else if tag is "mint" then
+      (getField "body" j >>=? decodeExp fuel Γ Δᵍ Δ (uniqᵗ ∷ Θ) t >>=? λ b → just (mintᵉ b))
+    else if tag is "batchSync" then
+      -- the node's own type PINS the source's: a batchSync over `s` is a
+      -- stream of `s ×ᵗ listᵗ s`, so reading the child's type and
+      -- demanding that shape is the whole check
+      (childTy fuel "src" j >>=? λ s →
+       whenTy (s ×ᵗ listᵗ s) t >>=? λ { refl →
+         getField "src" j >>=? decodeExp fuel Γ Δᵍ Δ Θ s >>=? λ b → just (batchSyncᵉ b) })
     else nothing
     where open import Data.List using (_++_)
 
@@ -242,6 +255,7 @@ mutual
        else if op is "mul" then (whenTy natᵗ t >>=? λ { refl → decodeTm fuel Γ Δᵍ Δ Θ (natᵗ ×ᵗ natᵗ) argJ >>=? λ a → just (primᵗ mul a) })
        else if op is "eq" then (whenTy boolᵗ t >>=? λ { refl → decodeTm fuel Γ Δᵍ Δ Θ (natᵗ ×ᵗ natᵗ) argJ >>=? λ a → just (primᵗ eqᵖ a) })
        else if op is "lt" then (whenTy boolᵗ t >>=? λ { refl → decodeTm fuel Γ Δᵍ Δ Θ (natᵗ ×ᵗ natᵗ) argJ >>=? λ a → just (primᵗ ltᵖ a) })
+       else if op is "eqU" then (whenTy boolᵗ t >>=? λ { refl → decodeTm fuel Γ Δᵍ Δ Θ (uniqᵗ ×ᵗ uniqᵗ) argJ >>=? λ a → just (primᵗ eqᵘ a) })
        else if op is "not" then (whenTy boolᵗ t >>=? λ { refl → decodeTm fuel Γ Δᵍ Δ Θ boolᵗ argJ >>=? λ a → just (primᵗ notᵖ a) })
        else nothing)
     else if tag is "strmT" then
@@ -278,6 +292,7 @@ decodeVal : ℕ → ∀ {n} (Γ : Ctx n) (t : Ty) → JSON → Maybe (Val Γ t)
 decodeVal fuel Γ unitᵗ    j = just tt
 decodeVal fuel Γ boolᵗ    j = asBool j
 decodeVal fuel Γ natᵗ     j = asNum j
+decodeVal fuel Γ uniqᵗ    j = asNum j
 decodeVal fuel Γ (s ×ᵗ u) j = asArr j >>=? λ
   { (a ∷ b ∷ []) → decodeVal fuel Γ s a >>=? λ va → decodeVal fuel Γ u b >>=? λ vb → just (va , vb)
   ; _            → nothing }
@@ -287,7 +302,8 @@ decodeVal fuel Γ (s +ᵗ u) j =
   else if tag is "inr" then (decodeVal fuel Γ u vj >>=? λ v → just (inj₂ v))
   else nothing
 decodeVal fuel Γ (listᵗ u) j = asArr j >>=? mapMaybe (decodeVal fuel Γ u)
-decodeVal fuel Γ (obs u)  j = decodeExp fuel Γ [] [] [] u j
+decodeVal fuel Γ (obs u)  j =
+  decodeExp fuel Γ [] [] [] u j >>=? λ e → just (_ , e , []ᵉ)
 
 ------------------------------------------------------------------------
 -- scripted inputs and the slot telescope
@@ -334,6 +350,13 @@ decodeSlots fuel Γ slotsJ = seqFin (decodeSlotAt fuel Γ slotsJ)
 BIG : ℕ
 BIG = 100000
 
+-- The CLI reports VALUES; the stream's end marker is the machine's
+-- business and the encoder has no arm for it.
+valuesOf : {A : Set} → List (PlainEvent A) → List A
+valuesOf []               = []
+valuesOf (valueᵖ v ∷ evs) = v ∷ valuesOf evs
+valuesOf (completeᵖ ∷ evs) = valuesOf evs
+
 decodeCase : JSON → Maybe String
 decodeCase j =
   getField "ctx" j >>=? asArr >>=? mapMaybe (decodeTy BIG) >>=? λ tys →
@@ -342,7 +365,5 @@ decodeCase j =
   decodeExp BIG (fromList tys) [] [] [] t expJ >>=? λ e →
   getField "slots" j >>=? asArr >>=? decodeSlots BIG (fromList tys) >>=? λ ins →
   getField "fuel" j >>=? asNum >>=? λ f →
-  let stream = evaluate↓ f e ins in
-  just ("{" ++ˢ "\"stream\":" ++ˢ encodeStream t stream
-            ++ˢ ",\"batches\":" ++ˢ encodeBatched t (impl-batchSimultaneous stream)
-            ++ˢ "}")
+  let values = valuesOf (evaluate↓ f e ins) in
+  just ("{" ++ˢ "\"values\":" ++ˢ encodeValues t values ++ˢ "}")

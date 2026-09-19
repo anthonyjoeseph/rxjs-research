@@ -24,6 +24,19 @@
 -- which run to make; the label is the seed that found it and means
 -- nothing more.
 --
+-- THE CORPUS IS EMPTY, AND THAT IS A GENERATION CHANGE RATHER THAN A
+-- CLEARED LEDGER.  Every row it held was a plain `Exp` program driven
+-- by scripted slots, and a plain run carries no envelope, so none of
+-- them is a case the batching question can even be asked of now that a
+-- row is an author's `SExp` under `elaborate`; every one of them was
+-- also driven by a SCRIPTED slot, which an elaborated telescope does
+-- not admit -- a script at the envelope would be writing tokens by
+-- hand -- so the tables could not be ported mechanically either.  What
+-- they established
+-- was agreement on the PLAIN tree, which is the oracle's question and
+-- not this cache's.  Until the sweep refills it the invariant below
+-- holds vacuously, which is worth knowing before reading a green.
+--
 -- THE IMPORT BLOCK IS MACHINE-OWNED, between the markers below.  A row
 -- can mention any constructor the generator can emit, and nothing knows
 -- which until the row exists, so the block is written WIDE before an
@@ -31,50 +44,18 @@
 -- `imports-check` failure, and a missing one would make the very next
 -- appended row unscopeable.  Edit the wide form in the generator, not
 -- here; anything written between the markers by hand is overwritten.
+--
+-- RECOVERY: git show 0f4998f0:agda/src/Implementation/Unit-Test.agda
+--   restores all eight plain rows, each with its scripted slot table.
 ------------------------------------------------------------------
 module Implementation.Unit-Test where
 
-open import Data.List using (List; []; _∷_)
+open import Data.List using (List; [])
 
 -- <<<IMPORTS
-open import Data.Fin using (zero; suc)
-open import Data.Maybe using (nothing; just)
-open import Data.List.Relation.Unary.Any using (here; there)
-open import Relation.Binary.PropositionalEquality using (refl)
-
-open import Rx.Prim using (after_,_; hot; cold)
-open import Rx.Exp using (input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ;
-  switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ;
-  nat̂; primᵗ; pairᵗ; fstᵗ; sndᵗ; strmᵗ; varᵗ; add; mul)
-open import Rx.Slots using (scripted)
-
-open import Implementation.Unit-Test.Prelude using (Case; cached)
+open import Implementation.Unit-Test.Prelude using (Case)
 -- IMPORTS>>>
 
 cases : List Case
 cases =
-  cached "315" 30
-          (mergeAllᵉ nothing (ofᵉ ((strmᵗ (exhaustAllᵉ (ofᵉ ((strmᵗ (exhaustAllᵉ (ofᵉ ((strmᵗ emptyᵉ) ∷ (strmᵗ (takeᵉ (nat̂ 2) (mapᵉ (varᵗ (here refl)) (switchAllᵉ (ofᵉ ((strmᵗ (ofᵉ ((nat̂ 3) ∷ (nat̂ 5) ∷ []))) ∷ (strmᵗ (input (suc zero))) ∷ (strmᵗ (ofᵉ ((nat̂ 1) ∷ (nat̂ 3) ∷ []))) ∷ [])))))) ∷ [])))) ∷ (strmᵗ (exhaustAllᵉ (ofᵉ ((strmᵗ (exhaustAllᵉ (ofᵉ ((strmᵗ (mergeAllᵉ nothing (ofᵉ ((strmᵗ (mapᵉ (primᵗ mul (pairᵗ (varᵗ (here refl)) (nat̂ 3))) emptyᵉ)) ∷ (strmᵗ emptyᵉ) ∷ (strmᵗ (scanᵉ (primᵗ add (pairᵗ (fstᵗ (varᵗ (here refl))) (sndᵗ (varᵗ (here refl))))) (nat̂ 8) (input zero))) ∷ [])))) ∷ (strmᵗ (scanᵉ (primᵗ add (pairᵗ (fstᵗ (varᵗ (here refl))) (sndᵗ (varᵗ (here refl))))) (nat̂ 8) (exhaustAllᵉ (ofᵉ ((strmᵗ (ofᵉ ((nat̂ 6) ∷ (nat̂ 6) ∷ []))) ∷ (strmᵗ (ofᵉ ((nat̂ 2) ∷ (nat̂ 4) ∷ []))) ∷ []))))) ∷ [])))) ∷ (strmᵗ (mergeAllᵉ (just 1) (ofᵉ ((strmᵗ (takeᵉ (nat̂ 2) (ofᵉ ((nat̂ 4) ∷ (nat̂ 8) ∷ [])))) ∷ (strmᵗ (exhaustAllᵉ (ofᵉ ((strmᵗ (mergeAllᵉ nothing (ofᵉ ((strmᵗ (ofᵉ ((nat̂ 8) ∷ (nat̂ 6) ∷ []))) ∷ (strmᵗ (input (suc zero))) ∷ [])))) ∷ (strmᵗ (mergeAllᵉ nothing (ofᵉ ((strmᵗ (input (suc zero))) ∷ (strmᵗ (ofᵉ ((nat̂ 7) ∷ (nat̂ 5) ∷ []))) ∷ (strmᵗ (input zero)) ∷ [])))) ∷ (strmᵗ (scanᵉ (primᵗ add (pairᵗ (fstᵗ (varᵗ (here refl))) (sndᵗ (varᵗ (here refl))))) (nat̂ 9) (input zero))) ∷ [])))) ∷ [])))) ∷ [])))) ∷ (strmᵗ (mapᵉ (primᵗ add (pairᵗ (varᵗ (here refl)) (nat̂ 4))) (input (suc zero)))) ∷ [])))) ∷ (strmᵗ (mergeAllᵉ nothing (ofᵉ ((strmᵗ (mergeAllᵉ nothing (ofᵉ ((strmᵗ (ofᵉ ((nat̂ 5) ∷ (nat̂ 8) ∷ []))) ∷ (strmᵗ (mapᵉ (varᵗ (here refl)) (scanᵉ (primᵗ add (pairᵗ (fstᵗ (varᵗ (here refl))) (sndᵗ (varᵗ (here refl))))) (nat̂ 8) (mapᵉ (varᵗ (here refl)) emptyᵉ)))) ∷ [])))) ∷ (strmᵗ (takeᵉ (nat̂ 3) (mergeAllᵉ nothing (ofᵉ ((strmᵗ (takeᵉ (nat̂ 2) (mergeAllᵉ nothing (ofᵉ ((strmᵗ (input zero)) ∷ (strmᵗ (input (suc zero))) ∷ []))))) ∷ (strmᵗ (mapᵉ (primᵗ mul (pairᵗ (varᵗ (here refl)) (nat̂ 1))) (mapᵉ (primᵗ mul (pairᵗ (varᵗ (here refl)) (nat̂ 0))) (input zero)))) ∷ (strmᵗ (mergeAllᵉ (just 1) (ofᵉ ((strmᵗ emptyᵉ) ∷ (strmᵗ (exhaustAllᵉ (ofᵉ ((strmᵗ (input zero)) ∷ (strmᵗ (input (suc zero))) ∷ [])))) ∷ [])))) ∷ []))))) ∷ [])))) ∷ (strmᵗ (switchAllᵉ (ofᵉ ((strmᵗ (exhaustAllᵉ (ofᵉ ((strmᵗ (mapᵉ (primᵗ add (pairᵗ (varᵗ (here refl)) (nat̂ 6))) (takeᵉ (nat̂ 3) (mergeAllᵉ nothing (ofᵉ ((strmᵗ (input (suc zero))) ∷ (strmᵗ emptyᵉ) ∷ [])))))) ∷ (strmᵗ (scanᵉ (primᵗ add (pairᵗ (fstᵗ (varᵗ (here refl))) (sndᵗ (varᵗ (here refl))))) (nat̂ 8) (mergeAllᵉ nothing (ofᵉ ((strmᵗ (exhaustAllᵉ (ofᵉ ((strmᵗ emptyᵉ) ∷ (strmᵗ emptyᵉ) ∷ (strmᵗ emptyᵉ) ∷ [])))) ∷ (strmᵗ (switchAllᵉ (ofᵉ ((strmᵗ (ofᵉ ((nat̂ 8) ∷ (nat̂ 4) ∷ []))) ∷ (strmᵗ emptyᵉ) ∷ [])))) ∷ []))))) ∷ [])))) ∷ (strmᵗ (mapᵉ (varᵗ (here refl)) (mergeAllᵉ (just 1) (ofᵉ ((strmᵗ (mapᵉ (primᵗ mul (pairᵗ (varᵗ (here refl)) (nat̂ 7))) (mergeAllᵉ (just 1) (ofᵉ ((strmᵗ emptyᵉ) ∷ (strmᵗ (ofᵉ ((nat̂ 5) ∷ (nat̂ 9) ∷ []))) ∷ []))))) ∷ (strmᵗ (mergeAllᵉ (just 1) (ofᵉ ((strmᵗ (scanᵉ (primᵗ add (pairᵗ (fstᵗ (varᵗ (here refl))) (sndᵗ (varᵗ (here refl))))) (nat̂ 3) (input zero))) ∷ (strmᵗ (scanᵉ (primᵗ add (pairᵗ (fstᵗ (varᵗ (here refl))) (sndᵗ (varᵗ (here refl))))) (nat̂ 6) (ofᵉ ((nat̂ 9) ∷ (nat̂ 1) ∷ [])))) ∷ (strmᵗ (input (suc zero))) ∷ [])))) ∷ (strmᵗ (scanᵉ (primᵗ add (pairᵗ (fstᵗ (varᵗ (here refl))) (sndᵗ (varᵗ (here refl))))) (nat̂ 1) (mapᵉ (varᵗ (here refl)) emptyᵉ))) ∷ []))))) ∷ [])))) ∷ [])))
-          (λ { zero → scripted (hot ((after 2 , 0) ∷ [])) ; (suc zero) → scripted (cold (1 ∷ 2 ∷ 3 ∷ []) ((after 1 , 2) ∷ (after 2 , 6) ∷ (after 1 , 3) ∷ [])) ; (suc (suc ())) }) ∷
-  cached "378" 30
-          (mergeAllᵉ nothing (ofᵉ ((strmᵗ (ofᵉ ((nat̂ 0) ∷ (nat̂ 4) ∷ []))) ∷ (strmᵗ (mergeAllᵉ nothing (ofᵉ ((strmᵗ (takeᵉ (nat̂ 2) (takeᵉ (nat̂ 1) (exhaustAllᵉ (ofᵉ ((strmᵗ (switchAllᵉ (ofᵉ ((strmᵗ emptyᵉ) ∷ (strmᵗ (ofᵉ ((nat̂ 7) ∷ (nat̂ 3) ∷ []))) ∷ (strmᵗ (input zero)) ∷ [])))) ∷ (strmᵗ (switchAllᵉ (ofᵉ ((strmᵗ emptyᵉ) ∷ (strmᵗ (ofᵉ ((nat̂ 4) ∷ (nat̂ 6) ∷ []))) ∷ [])))) ∷ [])))))) ∷ (strmᵗ (mergeAllᵉ nothing (ofᵉ ((strmᵗ (exhaustAllᵉ (ofᵉ ((strmᵗ (mergeAllᵉ (just 1) (ofᵉ ((strmᵗ (mergeAllᵉ nothing (ofᵉ ((strmᵗ (ofᵉ ((nat̂ 2) ∷ (nat̂ 7) ∷ []))) ∷ (strmᵗ emptyᵉ) ∷ [])))) ∷ (strmᵗ (mapᵉ (primᵗ add (pairᵗ (varᵗ (here refl)) (nat̂ 6))) emptyᵉ)) ∷ (strmᵗ (mapᵉ (primᵗ add (pairᵗ (varᵗ (here refl)) (nat̂ 5))) emptyᵉ)) ∷ [])))) ∷ (strmᵗ (switchAllᵉ (ofᵉ ((strmᵗ (scanᵉ (primᵗ add (pairᵗ (fstᵗ (varᵗ (here refl))) (sndᵗ (varᵗ (here refl))))) (nat̂ 7) (input (suc zero)))) ∷ (strmᵗ (switchAllᵉ (ofᵉ ((strmᵗ (input (suc zero))) ∷ (strmᵗ (ofᵉ ((nat̂ 4) ∷ (nat̂ 3) ∷ []))) ∷ (strmᵗ emptyᵉ) ∷ [])))) ∷ (strmᵗ (mergeAllᵉ (just 1) (ofᵉ ((strmᵗ emptyᵉ) ∷ (strmᵗ emptyᵉ) ∷ [])))) ∷ [])))) ∷ (strmᵗ (scanᵉ (primᵗ add (pairᵗ (fstᵗ (varᵗ (here refl))) (sndᵗ (varᵗ (here refl))))) (nat̂ 7) (mergeAllᵉ nothing (ofᵉ ((strmᵗ emptyᵉ) ∷ (strmᵗ (input zero)) ∷ (strmᵗ (ofᵉ ((nat̂ 9) ∷ (nat̂ 4) ∷ []))) ∷ []))))) ∷ [])))) ∷ (strmᵗ (ofᵉ ((nat̂ 4) ∷ (nat̂ 0) ∷ []))) ∷ (strmᵗ (switchAllᵉ (ofᵉ ((strmᵗ (mergeAllᵉ (just 1) (ofᵉ ((strmᵗ (mapᵉ (primᵗ mul (pairᵗ (varᵗ (here refl)) (nat̂ 0))) (input zero))) ∷ (strmᵗ (mapᵉ (primᵗ add (pairᵗ (varᵗ (here refl)) (nat̂ 8))) emptyᵉ)) ∷ [])))) ∷ (strmᵗ (input zero)) ∷ (strmᵗ (scanᵉ (primᵗ add (pairᵗ (fstᵗ (varᵗ (here refl))) (sndᵗ (varᵗ (here refl))))) (nat̂ 3) emptyᵉ)) ∷ [])))) ∷ [])))) ∷ [])))) ∷ (strmᵗ (exhaustAllᵉ (ofᵉ ((strmᵗ (mapᵉ (varᵗ (here refl)) (exhaustAllᵉ (ofᵉ ((strmᵗ (mapᵉ (primᵗ add (pairᵗ (varᵗ (here refl)) (nat̂ 3))) (scanᵉ (primᵗ add (pairᵗ (fstᵗ (varᵗ (here refl))) (sndᵗ (varᵗ (here refl))))) (nat̂ 3) emptyᵉ))) ∷ (strmᵗ (takeᵉ (nat̂ 3) (mergeAllᵉ nothing (ofᵉ ((strmᵗ (ofᵉ ((nat̂ 7) ∷ (nat̂ 2) ∷ []))) ∷ (strmᵗ (input (suc zero))) ∷ (strmᵗ (input (suc zero))) ∷ []))))) ∷ []))))) ∷ (strmᵗ (mergeAllᵉ (just 1) (ofᵉ ((strmᵗ (mapᵉ (varᵗ (here refl)) (mergeAllᵉ nothing (ofᵉ ((strmᵗ emptyᵉ) ∷ (strmᵗ emptyᵉ) ∷ (strmᵗ (exhaustAllᵉ (ofᵉ ((strmᵗ emptyᵉ) ∷ (strmᵗ (input zero)) ∷ (strmᵗ (ofᵉ ((nat̂ 9) ∷ (nat̂ 5) ∷ []))) ∷ [])))) ∷ []))))) ∷ (strmᵗ (exhaustAllᵉ (ofᵉ ((strmᵗ (scanᵉ (primᵗ add (pairᵗ (fstᵗ (varᵗ (here refl))) (sndᵗ (varᵗ (here refl))))) (nat̂ 2) (ofᵉ ((nat̂ 9) ∷ (nat̂ 0) ∷ [])))) ∷ (strmᵗ emptyᵉ) ∷ [])))) ∷ (strmᵗ (ofᵉ ((nat̂ 3) ∷ (nat̂ 8) ∷ []))) ∷ [])))) ∷ (strmᵗ (ofᵉ ((nat̂ 2) ∷ (nat̂ 2) ∷ []))) ∷ [])))) ∷ [])))
-          (λ { zero → scripted (cold (6 ∷ 7 ∷ 8 ∷ []) ((after 2 , 6) ∷ (after 2 , 4) ∷ (after 0 , 9) ∷ [])) ; (suc zero) → scripted (hot ((after 1 , 8) ∷ [])) ; (suc (suc ())) }) ∷
-  cached "mu-merge" 30
-          (takeᵉ (nat̂ 5) (μᵉ (mergeAllᵉ nothing (ofᵉ ((strmᵗ (ofᵉ ((nat̂ 1) ∷ []))) ∷ (strmᵗ (deferᵉ (varᵉ (here refl)))) ∷ [])))))
-          (λ { zero → scripted (cold (1 ∷ 2 ∷ 3 ∷ []) ((after 1 , 1) ∷ (after 1 , 2) ∷ [])) ; (suc zero) → scripted (hot ((after 1 , 4) ∷ [])) ; (suc (suc ())) }) ∷
-  cached "mu-concat" 30
-          (takeᵉ (nat̂ 4) (μᵉ (mergeAllᵉ (just 1) (ofᵉ ((strmᵗ (ofᵉ ((nat̂ 2) ∷ (nat̂ 3) ∷ []))) ∷ (strmᵗ (deferᵉ (varᵉ (here refl)))) ∷ [])))))
-          (λ { zero → scripted (cold (1 ∷ 2 ∷ 3 ∷ []) ((after 1 , 1) ∷ (after 1 , 2) ∷ [])) ; (suc zero) → scripted (hot ((after 1 , 4) ∷ [])) ; (suc (suc ())) }) ∷
-  cached "mu-switch" 30
-          (takeᵉ (nat̂ 4) (μᵉ (switchAllᵉ (ofᵉ ((strmᵗ (ofᵉ ((nat̂ 6) ∷ []))) ∷ (strmᵗ (deferᵉ (varᵉ (here refl)))) ∷ [])))))
-          (λ { zero → scripted (cold (1 ∷ 2 ∷ 3 ∷ []) ((after 1 , 1) ∷ (after 1 , 2) ∷ [])) ; (suc zero) → scripted (hot ((after 1 , 4) ∷ [])) ; (suc (suc ())) }) ∷
-  cached "mu-exhaust" 30
-          (takeᵉ (nat̂ 4) (μᵉ (exhaustAllᵉ (ofᵉ ((strmᵗ (ofᵉ ((nat̂ 9) ∷ []))) ∷ (strmᵗ (deferᵉ (varᵉ (here refl)))) ∷ [])))))
-          (λ { zero → scripted (cold (1 ∷ 2 ∷ 3 ∷ []) ((after 1 , 1) ∷ (after 1 , 2) ∷ [])) ; (suc zero) → scripted (hot ((after 1 , 4) ∷ [])) ; (suc (suc ())) }) ∷
-  cached "mu-input" 30
-          (takeᵉ (nat̂ 5) (μᵉ (mergeAllᵉ nothing (ofᵉ ((strmᵗ (input zero)) ∷ (strmᵗ (deferᵉ (mapᵉ (primᵗ add (pairᵗ (varᵗ (here refl)) (nat̂ 1))) (varᵉ (here refl))))) ∷ [])))))
-          (λ { zero → scripted (cold (1 ∷ 2 ∷ 3 ∷ []) ((after 1 , 1) ∷ (after 1 , 2) ∷ [])) ; (suc zero) → scripted (hot ((after 1 , 4) ∷ [])) ; (suc (suc ())) }) ∷
-  cached "mu-nested" 30
-          (takeᵉ (nat̂ 5) (μᵉ (mergeAllᵉ nothing (ofᵉ ((strmᵗ (ofᵉ ((nat̂ 4) ∷ []))) ∷ (strmᵗ (μᵉ (mergeAllᵉ (just 1) (ofᵉ ((strmᵗ (ofᵉ ((nat̂ 5) ∷ []))) ∷ (strmᵗ (deferᵉ (varᵉ (there (here refl))))) ∷ []))))) ∷ [])))))
-          (λ { zero → scripted (cold (1 ∷ 2 ∷ 3 ∷ []) ((after 1 , 1) ∷ (after 1 , 2) ∷ [])) ; (suc zero) → scripted (hot ((after 1 , 4) ∷ [])) ; (suc (suc ())) }) ∷
   []

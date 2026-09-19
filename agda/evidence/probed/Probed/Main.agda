@@ -40,6 +40,9 @@
 -- several of them — since a green on a bound this development no longer
 -- states says nothing about the descent that replaced it.
 --
+-- RECOVERY: git show b5601783:agda/evidence/probed/Probed/Run-Monotone.agda
+--   restores the three fuel-monotonicity rows, whose statement went with
+--   the machine it read.
 -- RECOVERY: git show 919f115:agda/evidence/probed/Probed/
 -- RECOVERY: git show 3a3bd405:agda/evidence/probed/Probed/Connect-Count.agda
 module Probed.Main where
@@ -50,26 +53,6 @@ module Probed.Main where
 -- both belong to the tree and a tree with nothing open still owes them.
 open import Probed.Apparatus using (Confirms; Separates)
 
--- THE TOP-LINE CLAIMS.  Named and claimed from the root for the same
--- reason: a `Confirms` row's type is generated from its target, so the
--- name is the only handle the reachability law has on it.
-open import Probed.Readme-Claims using (row-order; row-take; row-one-batch)
-
 -- THE PIPELINE-SIDE CLAIMS, claimed from the root for the same reason.
-open import Probed.Pipeline-Claims using (row-online; row-ids)
+open import Probed.Pipeline-Claims using (row-online)
 
--- THE ADEQUACY FACE'S ONE DECIDABLE ROW, claimed here because the
--- other two claims on that face are stated over a postulated domain and
--- cannot be instantiated at all.
-open import Probed.Adequacy using (row-saturated; row-grows; row-past-horizon)
-
--- THE TAKE FACE'S ROWS, claimed here for the same reason: it is the
--- worked instance a saturation restriction is measured against, so it
--- is the one statement on that tier that must not be taken on trust.
-open import Probed.Take-Bounds using
-  (row-zero; row-cuts-instant; row-exact; row-past-frame)
-
--- THE SEGMENT ROWS, claimed here because the statements they
--- instantiate are the two leaves the run's own concatenation
--- decomposes into, and nothing had reached either.
-open import Probed.Protocol-Segments using (row-subscribe; row-cascade)

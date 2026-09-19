@@ -1,41 +1,31 @@
 ----------------------------------------------------------------------
--- THE TWO CLAIMS READ OFF THE PIPELINE RATHER THAN OFF A PROGRAM.
+-- THE ONLINE CLAIM, READ OFF THE PIPELINE RATHER THAN OFF A PROGRAM.
 ----------------------------------------------------------------------
 
--- WHY THESE TWO SHARE A FILE AND THE README FAMILY DOES NOT.  Both are
+-- WHY THIS ONE IS REACHABLE WHERE THE README FAMILY IS NOT.  It is
 -- stated over the BATCHING side rather than over a canonical program,
--- so neither needs an evaluator harness to say something: the online
--- claim is plain list computation, and the id claim reads a finished
--- run's envelopes rather than its values.  That is also why they are
--- reachable while the readme instances are not -- neither has to route
--- a flattener through the frame dispatch to compute.
+-- so it needs no evaluator harness to say something: the claim is plain
+-- list computation, and nothing has to route a flattener through the
+-- frame dispatch to compute.
 --
--- NOT REACHED: any program whose evaluation enters a flattening node,
--- for the reason the sibling probe records; a source firing past the
--- two ticks scripted below; and any batching input that a real run
--- produced, since the online rows are hand-written envelope lists
--- chosen to sit either side of a group boundary rather than taken
--- from an evaluation.
+-- NOT REACHED: any batching input that a real run produced, since the
+-- rows below are hand-written envelope lists chosen to sit either side
+-- of a group boundary rather than taken from an evaluation.
 
 -- TARGET: batch-online @73ae89
--- TARGET: id-inheritance @c5b127
 module Probed.Pipeline-Claims where
 
 open import Data.List using (List; []; _∷_)
 open import Data.List.Relation.Binary.Prefix.Heterogeneous using ([]; _∷_)
 open import Data.List.Relation.Unary.All using ([]; _∷_)
-open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Nat using (ℕ)
 open import Data.Vec using ([]; _∷_)   -- contexts are Vecs; ∷/[] overload per type
-open import Data.Fin using (zero)
 open import Relation.Binary.PropositionalEquality using (refl)
 
 open import Rx.Prim using (InstEmit; _at_from_as_; init; value;
                            subscribe; delivery)
-open import Rx.Exp using (natᵗ; Closed; nat̂; pairᵗ; primᵗ; varᵗ; add; input; mapᵉ)
-open import Readme-Theorems using (hotOnce; oneSlot)
+
 open import Verify-Batch-Simultaneous.Batch-Theorems using (batch-online)
-open import Rx.Provenance-Theorems using (id-inheritance)
 
 open import Probed.Apparatus using (Confirms)
 
@@ -70,25 +60,3 @@ ys₀ = ((value 3 ∷ []) at 1 from 5 as delivery) ∷ []
 
 row-online : Confirms (batch-online xs₀ ys₀)
 row-online = refl ∷ []
-
-----------------------------------------------------------------------
--- 2.  EVERY ID IS AN ARRIVAL'S, NEVER A FRESHLY MINTED ONE.
---
--- Read at a program WITH a source and at more than one instant, which
--- is what makes the claim say anything: a source-free program emits
--- only at the subscribe frame, so its id list is `0` and the
--- containment holds however the counter behaves.  Here the scripted
--- hot fires and a mapped leg carries the arrival onward, so the run
--- spans the subscribe frame and a delivery.
---
--- LOAD-BEARING on the horizon being a BOUND rather than a label: the
--- claim fails the moment any emit carries an instant above the fuel,
--- which is what a cascade minting its own id rather than inheriting
--- its trigger's would produce.
-----------------------------------------------------------------------
-
-mapped₀ : Closed (natᵗ ∷ []) natᵗ
-mapped₀ = mapᵉ (primᵗ add (pairᵗ (varᵗ (here refl)) (nat̂ 100))) (input zero)
-
-row-ids : Confirms (id-inheritance 1 mapped₀ (oneSlot (hotOnce 3)))
-row-ids = here refl ∷ there (here refl) ∷ []

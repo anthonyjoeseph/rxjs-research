@@ -1116,8 +1116,26 @@ comments-selftest:
 	    || { echo "SELFTEST FAIL: a marker doubled into the comment text was not reported -- the form no other check in this repo can see"; fail=1; }; \
 	  echo "$$ob" | grep -q 'RECOVERY' \
 	    || { echo "SELFTEST FAIL: the obscured marker was reported without naming which marker it was"; fail=1; }; \
-	  scripts/check-comments.py --dir scripts/comments-selftest/ref-ok > /dev/null 2>&1 \
-	    || { echo "SELFTEST FAIL: a TWIN naming a PROVEN definition, a REFUTED naming a real refutation and a RECOVERY carrying a real sha were REJECTED"; fail=1; }; \
+	  tn=$$(scripts/check-comments.py --sample-proven 2>/dev/null); \
+	  if [ -z "$$tn" ]; then \
+	    echo "SELFTEST FAIL: no proven definition to build the passing fixture from — the reference assertion cannot run"; fail=1; \
+	  else \
+	    rd=$$(mktemp -d); \
+	    { echo 'module RefOk where'; echo; \
+	      echo '-- WHAT THIS LEAF OWES.  Every reference below resolves, and each is'; \
+	      echo '-- written BACKTICKED or DOTTED, which is what makes it read as a'; \
+	      echo '-- reference at all.'; \
+	      echo '--'; \
+	      echo '-- REFUTED: the unconditional form is killed at git show 919f115 — the'; \
+	      echo '--   sha form, which is what a marker carries once `src` can no longer'; \
+	      echo '--   STATE the route and the witness has correctly been deleted.'; \
+	      printf -- '-- TWIN: `%s` is the proven counterpart whose clauses correspond.\n' "$$tn"; \
+	      echo '-- RECOVERY: git show 2984f1e575d8699e8ce78975e23c530d803fc911 restores the predecessor and its whole cone.'; \
+	      echo 'postulate leaf : Set'; } > $$rd/RefOk.agda; \
+	    scripts/check-comments.py --dir $$rd > /dev/null 2>&1 \
+	      || { echo "SELFTEST FAIL: a TWIN naming the PROVEN definition $$tn, a REFUTED naming a real refutation and a RECOVERY carrying a real sha were REJECTED"; fail=1; }; \
+	    rm -rf $$rd; \
+	  fi; \
 	  out=$$(scripts/check-comments.py --dir scripts/comments-selftest/ref-bad 2>&1); \
 	  if scripts/check-comments.py --dir scripts/comments-selftest/ref-bad > /dev/null 2>&1; then \
 	    echo "SELFTEST FAIL: references naming nothing PASSED — the resolution check is dead"; fail=1; \
@@ -1163,6 +1181,7 @@ GATE_CHEAP = wiring-selftest wiring-gate wiring-refuted wiring-probed \
              cone-selftest cone-check \
              recursion-cover-selftest recursion-cover \
              comments-selftest comments-check dev-changed-selftest \
+             formers-selftest formers-check \
              unmap-selftest spike ts-gate
 
 gate-cheap:
@@ -1260,9 +1279,9 @@ NODRIFT := --drift 1000000
 
 dev-changed-selftest:
 	@fail=0; \
-	  m=agda/src/Rx/Evaluator/Builder.agda; \
+	  m=scripts/dev-changed-selftest/Heavy.agda; mr=--src-root\ scripts/dev-changed-selftest; \
 	  n=agda/src/Rx/Evaluator/Reducible.agda; \
-	  out=$$(scripts/dev-changed.py --verdict-only $(NODRIFT) --assume-stamp HEAD --files $$m 2>&1); ec=$$?; \
+	  out=$$(scripts/dev-changed.py --verdict-only $(NODRIFT) --assume-stamp HEAD $$mr --files $$m 2>&1); ec=$$?; \
 	  echo "$$out" | grep -q 'FULL GATE REQUIRED' \
 	    || { echo "SELFTEST FAIL: a multi-member block did not escalate — agda-dev stubs those, so a light gate there is not a check"; fail=1; }; \
 	  [ $$ec -eq 2 ] \
@@ -1272,7 +1291,8 @@ dev-changed-selftest:
 	    || { echo "SELFTEST FAIL: a module with NO multi-member block escalated — the light gate would never be usable"; fail=1; }; \
 	  [ $$ec -eq 0 ] \
 	    || { echo "SELFTEST FAIL: the no-block case exited $$ec, not 0"; fail=1; }; \
-	  out=$$(scripts/dev-changed.py --verdict-only $(NODRIFT) --assume-stamp HEAD --max-files 2 --files $$n $$m $$n $$m 2>&1); \
+	  q=agda/src/Rx/Evaluator/Domain.agda; r=agda/src/Rx/Evaluator.agda; u=agda/src/Rx/Mint.agda; \
+	  out=$$(scripts/dev-changed.py --verdict-only $(NODRIFT) --assume-stamp HEAD --max-files 2 --files $$n $$q $$r $$u 2>&1); \
 	  echo "$$out" | grep -q 'ESCALATE  4 changed modules' \
 	    || { echo "SELFTEST FAIL: a changed set over the ceiling did not escalate — N dev checks cost more than the one full build they replace"; fail=1; }; \
 	  w=agda/src/Rx/Prim.agda; \
@@ -1301,10 +1321,10 @@ dev-changed-selftest:
 	    || { echo "SELFTEST FAIL: a CHANGED claim root was not held back — a root's dev check IS the tower, so it times out at the per-module budget and reports RED for a module with nothing wrong with it, and one edited comment is enough to put it in the changed set"; fail=1; }; \
 	  echo "$$out" | grep -q 'plan .* agda/src/Main.agda' \
 	    && { echo "SELFTEST FAIL: a CHANGED claim root is in the sweep plan — the cone half of this exclusion was written first and is not the whole rule"; fail=1; }; \
-	  out=$$(scripts/dev-changed.py --deps --budget 1 --files agda/src/Verify-Well-Formed.agda 2>&1); \
+	  out=$$(scripts/dev-changed.py --deps --budget 1 --files agda/src/Spec.agda 2>&1); \
 	  echo "$$out" | grep -q 'skip  agda/src/Verify-Batch-Simultaneous/The-Proof.agda' \
 	    || { echo "SELFTEST FAIL: a CONE member over budget was not reported as skipped — a timeout there is only the bet the light path already makes, and calling it RED makes every wide-cone run fail"; fail=1; }; \
-	  echo "$$out" | grep -q 'FAIL  agda/src/Verify-Well-Formed.agda' \
+	  echo "$$out" | grep -q 'FAIL  agda/src/Spec.agda' \
 	    || { echo "SELFTEST FAIL: a CHANGED module over budget was not a FAIL — that module is the one thing this run exists to check"; fail=1; }; \
 	  out=$$(scripts/dev-changed.py --deps --budget 2 --cone-budget 0 --files $$n 2>&1); \
 	  echo "$$out" | grep -q 'unchecked: ' \
@@ -1313,7 +1333,7 @@ dev-changed-selftest:
 	    python3 -c 'import importlib.util,sys; sp=importlib.util.spec_from_file_location("dc","scripts/dev-changed.py"); m=importlib.util.module_from_spec(sp); sp.loader.exec_module(m); sys.exit(0 if m.gate_base() != "HEAD" else 1)' \
 	      || { echo "SELFTEST FAIL: the changed set is measured against HEAD while a heavy-gate stamp exists — a session that COMMITS then gates has a clean tree, so nothing gets checked and the gate reports ALL GREEN about a commit it never looked at"; fail=1; }; \
 	  fi; \
-	  out=$$(scripts/dev-changed.py --plan --deps --files $$n 2>&1); \
+	  out=$$(scripts/dev-changed.py --plan --deps $$mr --files scripts/dev-changed-selftest/Leaf.agda 2>&1); \
 	  echo "$$out" | grep -q "skip  $$m  — has a multi-member mutual block" \
 	    || { echo "SELFTEST FAIL: a cone member with a multi-member block was dropped in SILENCE — agda-dev stubs a block's siblings, so a dev check there is not a check, and the consumer that validates a new arm's FIT is exactly such a module"; fail=1; }; \
 	  out=$$(scripts/dev-changed.py --verdict-only $(NODRIFT) --files 2>&1); \
@@ -1408,6 +1428,110 @@ ts-format-check:
 
 ts-gate: ts-check ts-lint ts-format-check
 	@echo "ts-gate: GREEN (tsc, eslint, prettier)"
+
+# ─────────────────────────────────────────────────────────────────────────
+# THE ONE CHECK THAT SPANS BOTH TREES.  What tied their former sets was a
+# tag string one side matched and the other happened to emit, so a former
+# only one tree had was never generated rather than ever red -- and both
+# the oracle and the all-Agda sweep then reported green over shapes neither
+# had been handed.  scripts/formers.tsv is the one declaration of the
+# pairing; the checker holds six surfaces to it.
+# ─────────────────────────────────────────────────────────────────────────
+formers-check:
+	@scripts/check-formers.py
+
+# One perturbation per direction, each applied to a COPY of the fixture
+# tree -- the base of which is deliberately QUIET, so the two parses that
+# would otherwise rot in silence (a shared constructor signature, a
+# declared generator hole) are walked on every run.
+formers-selftest:
+	@tmp=$$(mktemp -d); trap 'rm -rf "$$tmp"' EXIT; fail=0; \
+	  base=$(CURDIR)/scripts/formers-selftest; \
+	  run() { cp -R "$$base" "$$tmp/t"; ( cd "$$tmp/t" && eval "$$2" ); \
+	          out=$$(scripts/check-formers.py --root "$$tmp/t" 2>&1); \
+	          rm -rf "$$tmp/t"; \
+	          case "$$out" in *"$$3"*) ;; \
+	            *) echo "SELFTEST FAIL: $$1 -- got: $$out"; fail=1;; esac; }; \
+	  out=$$(scripts/check-formers.py --root "$$base" 2>&1) || \
+	    { echo "SELFTEST FAIL: the base fixture is not quiet -- $$out"; fail=1; }; \
+	  echo "$$out" | grep -q 'UNREACHABLE BY the TypeScript generator: sharedSig' || \
+	    { echo "SELFTEST FAIL: a gen=no row stopped being REPORTED, so a former the TypeScript generator cannot reach would pass unmentioned"; fail=1; }; \
+	  echo "$$out" | grep -q 'UNREACHABLE BY the Agda generator: notᵖ' || \
+	    { echo "SELFTEST FAIL: an agen=no row stopped being REPORTED, so a former the Agda generator cannot reach would pass unmentioned"; fail=1; }; \
+	  run "an Agda constructor in no row" \
+	      "printf '    newᵉ : Exp Γ t\n' >> agda/src/Rx/Exp.agda" \
+	      "is in no row of the map"; \
+	  run "a row whose Agda constructor is gone" \
+	      "sed -i.bak 's/^    liftᵉ :/    renamedᵉ :/' agda/src/Rx/Exp.agda" \
+	      "Exp has no such constructor"; \
+	  run "a TS union member in no row" \
+	      "sed -i.bak 's/\"sharedSig\"/\"newTag\"/' typescript/src/exp.ts" \
+	      'union carries "newTag"'; \
+	  run "a row the TS union does not carry" \
+	      "sed -i.bak 's/\"lift\"/\"renamed\"/' typescript/src/exp.ts" \
+	      'union does not carry it'; \
+	  run "a row nothing decodes" \
+	      "sed -i.bak 's/tag is \"lift\"/tag is \"gone\"/' agda/src/CLI/Decode.agda" \
+	      'nothing decodes the tag "lift"'; \
+	  run "a gen=yes row nothing generates" \
+	      "sed -i.bak 's/type: \"defer\"/type: \"nope\"/' typescript/src/generator.ts" \
+	      'nothing generates the tag "defer"'; \
+	  run "a gen=no row that IS generated" \
+	      "printf 'const g = () => ({ type: \"sharedSig\" });\n' >> typescript/src/generator.ts" \
+	      'the hole closed and the row was not'; \
+	  run "a gen=no row with no reason" \
+	      "sed -i.bak 's/\tno\tyes\tsource\tthe fixture.*/\tno\tyes\tsource/' scripts/formers.tsv" \
+	      "needs a reason"; \
+	  run "an agen=yes row the harness root stops writing" \
+	      "sed -i.bak 's/capProg e = sharedSigᵉ e/capProg e = e/' agda/src/Implementation/Unit-Test/Prelude.agda" \
+	      'no arm of the Agda generator writes `sharedSigᵉ`'; \
+	  run "an agen=no row the Agda generator DOES write" \
+	      "sed -i.bak 's/notᵖCount/notᵖ/' agda/src/QuickCheck.agda" \
+	      'the Agda generator DOES write `notᵖ`'; \
+	  run "an agen=no row whose elaboration arm the generator starts drawing" \
+	      "sed -i.bak 's/else liftˢ (natˢ d))/else notˢ d)/' agda/src/QuickCheck.agda" \
+	      'the Agda generator DOES write `notᵖ`'; \
+	  run "an agen=no row whose postulated elaboration arm gains a body" \
+	      "sed -i.bak 's/^  deferᵖ : SExp Γ t → Exp Γ t/deferᵖ : SExp Γ t → Exp Γ t\ndeferᵖ e = deferᵉ e/' agda/src/Rx/Elaborate.agda" \
+	      'the Agda generator DOES write `deferᵉ`'; \
+	  run "an agen=yes row whose elaboration helper stops being reached" \
+	      "sed -i.bak 's/toPlain (liftˢ f)  = liftᵖ (toPlainTm f)/toPlain (liftˢ f)  = toPlain f/' agda/src/Rx/Elaborate.agda" \
+	      'no arm of the Agda generator writes `liftᵉ`'; \
+	  run "a row unreachable by BOTH generators" \
+	      "sed -i.bak 's/\tno\tyes\tsource/\tno\tno\tsource/' scripts/formers.tsv" \
+	      'reachable by NEITHER generator'; \
+	  run "a tag declared twice" \
+	      "printf 'tm\tdupᵗ\tnatT\tyes\tyes\t-\n' >> scripts/formers.tsv" \
+	      "already declared on line"; \
+	  run "an exp row with no verdict under the dividing test" \
+	      "sed -i.bak 's/\tyes\tno\tprotocol/\tyes\tno\tmisc/' scripts/formers.tsv" \
+	      "has no verdict under the dividing test"; \
+	  run "a tm row claiming one" \
+	      "sed -i.bak 's/natT\tyes\tyes\t-/natT\tyes\tyes\tsource/' scripts/formers.tsv" \
+	      "its role must be \`-\`"; \
+	  run "a primitive operator the string union does not carry" \
+	      "sed -i.bak 's/\"add\" |/\"plus\" |/' typescript/src/exp.ts" \
+	      'union does not carry it'; \
+	  run "a primitive operator nothing decodes" \
+	      "sed -i.bak 's/op is \"add\"/op is \"gone\"/' agda/src/CLI/Decode.agda" \
+	      'nothing decodes the tag "add"'; \
+	  run "a primitive operator missing from the generator's list lane" \
+	      "sed -i.bak 's/\[\"add\"\]/[]/' typescript/src/generator.ts" \
+	      'nothing generates the tag "add"'; \
+	  run "a primitive operator missing from its own lane, with the word still quoted elsewhere" \
+	      "sed -i.bak 's/op: \"not\"/op: \"gone\"/' typescript/src/generator.ts" \
+	      'nothing generates the tag "not"'; \
+	  run "a census tag in no exp row" \
+	      "sed -i.bak 's/formerTag fLift      = \"lift\"/formerTag fLift      = \"hoisted\"/' agda/src/QuickCheck.agda" \
+	      'reports under the tag "hoisted"'; \
+	  run "an exp row the census counts nothing under" \
+	      "sed -i.bak 's/formerTag fDefer     = \"defer\"/formerTag fDefer     = \"hoisted\"/' agda/src/QuickCheck.agda" \
+	      'counts nothing under the tag "defer"'; \
+	  run "a declared former the roll never walks" \
+	      "sed -i.bak 's/allFormers = fLift ∷ fDefer ∷ fSharedSig ∷ \[\]/allFormers = fLift ∷ fDefer ∷ []/' agda/src/QuickCheck.agda" \
+	      'so the tally never walks it'; \
+	  [ $$fail -eq 0 ] && echo "formers-selftest: PASS (every surface fires in the direction it is checked at all three kinds, a shared constructor signature parses, a bare-string union and an operator lane are read as themselves, a declared generator hole is reported rather than merely tolerated, the census is held to the map in both directions and its roll to its own declarations, the Agda sweep's REACH is held to the map in both directions with a token boundary that a substring scan would cross, and that reach composes rather than unions -- the harness root counts, an undrawn elaboration arm does not, a postulated one does not, and a helper the arms reach does, a former reachable by neither generator is refused, and the dividing test's vocabulary is closed)"; \
+	  exit $$fail
 
 cli-build: stripped
 	@$(call AGDA_RUN,--compile --compile-dir=../_cli src/CLI/Main.agda)

@@ -518,9 +518,28 @@ def main():
     ap.add_argument("--no-refs", action="store_true",
                     help="skip reference resolution (it reads the real trees, so "
                          "a fixture outside them cannot be judged by it)")
+    ap.add_argument("--sample-proven", action="store_true",
+                    help="print one name a TWIN may legally carry -- declared in "
+                         "agda/src and not on the live postulate ledger -- so the "
+                         "selftest's passing fixture is GENERATED rather than "
+                         "naming a definition by hand, which rots the day that "
+                         "definition is deleted")
     args = ap.parse_args()
 
     root = pathlib.Path(__file__).resolve().parent.parent
+
+    if args.sample_proven:
+        # The same two sets the TWIN rule itself consults, so the fixture can
+        # only go stale by the rule changing -- never by the tree moving.
+        live = live_postulates(root) or set()
+        # Length filters out the single letters a type telescope binds, which
+        # resolve but read as nothing a header would ever claim as a twin.
+        ok = sorted(n for n in declared_names(root / "agda" / "src")
+                    if n not in live and n.isidentifier() and len(n) >= 8)
+        if not ok:
+            return 1
+        print(ok[0])
+        return 0
     dirs = [pathlib.Path(d) for d in (args.dir or [root / d for d in DEFAULT_DIRS])]
     files = sorted(p for d in dirs for p in pathlib.Path(d).rglob("*.agda"))
     if not files:

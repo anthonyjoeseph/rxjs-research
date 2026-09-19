@@ -1,0 +1,15 @@
+# the selftest's own correspondence. Three formers, and the base tree is
+# QUIET -- which is what pins the parses that would otherwise rot silently:
+# `sharedSigᵉ` shares one signature with `deferᵉ`, so a reader that takes
+# the first name only would report it deleted; it is declared gen=no, so
+# the hole path is walked on every run rather than only when one appears;
+# and its agen=yes is carried by the HARNESS ROOT alone, while `deferᵉ`'s
+# hole is open because its elaboration arm is a POSTULATE and `notᵖ`'s
+# because the arm writing it is one the generator never draws.
+# kind	agda	tag	gen	agen	role	why
+exp	liftᵉ	lift	yes	yes	pure
+exp	deferᵉ	defer	yes	no	protocol	the fixture's elaboration arm for it is a postulate, so no run reaches one
+exp	sharedSigᵉ	sharedSig	no	yes	source	the fixture's TypeScript generator does not write one
+tm	nat̂	natT	yes	yes	-
+prim	add	add	yes	yes	-
+prim	notᵖ	not	yes	no	-	the fixture's Agda generator draws no `notˢ`, so the arm writing it is unreached

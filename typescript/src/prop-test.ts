@@ -1,14 +1,26 @@
-import { Observable, firstValueFrom, merge, of, toArray } from "rxjs";
 import { Closed, Ty, Val } from "./exp.js";
-import { InstEmit, Provenance, SourceId } from "./inst-emit.js";
-import { materializeCompletion, share } from "./primitive-operators.js";
-import { batchSimultaneous } from "./batch-simultaneous.js";
-import { createDriver } from "./driver.js";
-import { makeInputSource } from "./input-source.js";
-import { compile } from "./compile.js";
-import { genSeeds, genTestCases } from "./generator.js";
+import { evaluatePlain } from "./plain-eval.js";
+import { genTestCases } from "./generator.js";
 import { serialize } from "./serialize.js";
 import { execAgda } from "./agda-bridge.js";
+import { readFileSync } from "node:fs";
+
+// THE ORACLE, AND WHAT IT IS AN ORACLE FOR (Anthony: "the sole purpose
+// of the fastcheck run is to ensure that the 'plain' agda Exp tree and
+// evaluator's behavior matches the behavior of 'plain' rxjs. Nothing
+// involving InstEmit at all"). Both sides produce a LIST OF VALUES and
+// the lists are compared exactly. The envelope — instants, source ids,
+// chain emits, the fin bit — is a construct of the simultaneity layer
+// and is not under test here on either side: the TS leg is built from
+// ordinary rxjs operators in `plain-eval.ts`, and the Agda leg is
+// `Rx.Depth`, a plain evaluator whose result type carries no envelope
+// at all — so there is nothing to project away, which is what makes
+// this a comparison of two plain machines rather than of one plain one
+// against a projection.
+//
+// The srxjs modules (`join.ts`, `primitive-operators.ts`,
+// `inst-emit.ts`, `compile.ts`, `driver.ts`, `input-source.ts`) stay in
+// the tree and are reached by nothing this file runs.
 
 // Virtual time. fuel = ARRIVALS DELIVERED by the driver — async input
 // values and defer-body wakeups, popped in (tick, ordinal) order. Sync
@@ -23,7 +35,7 @@ export type Timed<A> = {
 
 export type ObservableInputCold<A> = {
   type: "cold";
-  sync: A[]; // fired immediately on subscription, inside the subscriber's instant (id-inheritance)
+  sync: A[]; // fired immediately on subscription, inside the subscriber's frame
   async: Timed<A>[]; // re-anchored at each subscription tick
 };
 
@@ -47,13 +59,9 @@ export type Slot =
 
 export type Slots = Slot[]; // one per Γ slot, index-aligned
 
-export type Stream = InstEmit<Val>[]; // the flat canonical stream
-export type Grouped = InstEmit<Val[]>[]; // batchSimultaneous's output: one emit per instant, still a protocol citizen (re-batchable)
-
-// one program's two outputs: the raw InstEmit stream the exp tree
-// produced, and that same stream folded through batchSimultaneous. Both
-// sides (TS-here and Agda-via-CLI) return this pair per case.
-export type EvalResult = { stream: Stream; batches: Grouped };
+// one program's output: the values the exp tree emitted, in order. Both
+// sides (TS-here and Agda-via-CLI) return this per case.
+export type EvalResult = { values: Val[] };
 
 // The serializable unit of differential testing: a whole program.
 // ctx is Γ — the types of the slots, index-aligned with slots.
@@ -66,7 +74,7 @@ export type TestCase = {
 
 // CLI flags biasing the run: `--operator <op>` features that operator at
 // the root of every generated program (the generator ignores an unknown
-// name); `--seed <s>` pins a single seed, else the full genSeeds() sweep.
+// name); `--seed <s>` pins a single seed, else the rejection draw below.
 // Both accept `--flag value` and `--flag=value`; absent ⇒ undefined.
 const readFlag = (name: string): string | undefined => {
   const argv = process.argv.slice(2);
@@ -82,127 +90,176 @@ const readFlag = (name: string): string | undefined => {
 };
 const readOperatorFromCli = (): string | undefined => readFlag("operator");
 const readSeedFromCli = (): string | undefined => readFlag("seed");
+// `--cases <file>` REPLAYS programs instead of generating them: one
+// serialized TestCase per line, which is exactly what a failing case
+// prints.  Without it a divergence is reproducible only by re-running
+// the sweep that found it, and a generator edit moves every offset.
+const readCasesFromCli = (): string | undefined => readFlag("cases");
 
-// createDriver (virtual time, the one impure edge), makeInputSource
-// (scripted slots → protocol streams), and compile (the per-node
-// switch onto the primitive-operators) live in their own modules.
-
-const evaluateRx = async (testCase: TestCase): Promise<EvalResult> => {
-  const driver = createDriver();
-  // the const telescope, literally: each shared slot compiles against
-  // the prefix of already-built slots and connects through the
-  // protocol share (all resets false; source id = slot index)
-  const slotSources = testCase.slots.reduce<Observable<InstEmit<Val>>[]>(
-    (prefix, slot, index) => [
-      ...prefix,
-      slot.type === "scripted"
-        ? makeInputSource(driver, slot.input)
-        : share(driver, compile(slot.def, driver, prefix), index),
-    ],
-    [],
-  );
-  const out: Stream = [];
-  // the canonical root stream: the pipeline's emits interleaved (in
-  // push order) with the shares' chain emits, the fin bit materialized
-  // once over the merged ledger — the mirror of Agda's cascade output
-  const sub = materializeCompletion<Val>(
-    merge(driver.chainEmits, compile(testCase.exp, driver, slotSources)),
-  ).subscribe((emit) => out.push(emit));
-  // subscribing already ran the root sync burst — fuel pays only for arrivals
-  for (let spent = 0; spent < testCase.fuel; spent++) {
-    if (!driver.deliverNextArrival()) break;
-  }
-  sub.unsubscribe();
-  // the batched twin: hand the finite raw stream to plain rxjs `of`, run
-  // it through the same batchSimultaneous operator the Agda side folds
-  // with, and toArray it back — so we hold both the raw emits and the
-  // fully batched result for the same program.
-  const batches = await firstValueFrom(
-    of(...out).pipe(batchSimultaneous<Val>(), toArray()),
-  );
-  return { stream: out, batches };
+// A TOKEN IN A VALUE POSITION IS REFUSED, WHICH IS THE ONE PLACE A
+// SYMBOL WOULD LIE.  `JSON.stringify` drops a symbol silently, so a
+// minted token reaching the output would compare equal to a side that
+// emitted nothing there — a false green, and the only kind this
+// comparison can produce. The two sides carry a token differently (TS a
+// `symbol`, Agda a ℕ), and nothing in a value list says which position
+// is a token, so there is no renaming available either. The generator
+// keeps uniq out of every element type precisely so the case cannot
+// arise; this says so if it ever does.
+const noToken = (v: unknown): void => {
+  if (typeof v === "symbol")
+    throw new Error(
+      "a uniq token reached the output — the comparison has no renaming " +
+        "for one, and JSON.stringify would drop it silently",
+    );
+  if (Array.isArray(v)) v.forEach(noToken);
+  else if (v !== null && typeof v === "object")
+    Object.values(v).forEach(noToken);
 };
 
-// Streams are compared up to id renaming (≈): the ids' only meaning is
-// the partition structure, so canonicalize both sides before comparing.
-// Instants and sources are separate namespaces (an arrival's cascade vs
-// an observable), each renamed to 0,1,2,… in first-appearance order over
-// the flat stream. This also erases the representation gap — TS mints ids
-// as `symbol` (dropped by JSON.stringify), Agda as ℕ — since each side is
-// renamed independently to the same integers. Values/kinds/event
-// types/order still compare exactly.
-const canonical = <A>(stream: InstEmit<A>[]): unknown => {
-  const inst = new Map<Provenance, number>();
-  const src = new Map<SourceId, number>();
-  const ri = (id: Provenance): number =>
-    inst.has(id) ? inst.get(id)! : (inst.set(id, inst.size), inst.size - 1);
-  const rs = (id: SourceId): number =>
-    src.has(id) ? src.get(id)! : (src.set(id, src.size), src.size - 1);
-  return stream.map((emit) => ({
-    kind: emit.kind,
-    instant: ri(emit.instant),
-    source: rs(emit.source),
-    events: emit.events.map((ev) =>
-      ev.type === "value" || ev.type === "complete"
-        ? ev
-        : { ...ev, source: rs(ev.source) },
-    ),
-  }));
-};
+const render = (values: Val[]): string => (
+  values.forEach(noToken),
+  JSON.stringify(values)
+);
 
-// Structural equality up to id renaming.
-const sameStream = <A>(a: InstEmit<A>[], b: InstEmit<A>[]): boolean =>
-  JSON.stringify(canonical(a)) === JSON.stringify(canonical(b));
-
-// Compare the Agda (oracle) and rxjs results case by case, on BOTH the
-// raw stream and the batched output, and render a compact report.
+// Compare the Agda (oracle) and rxjs value lists case by case, and
+// render a compact report.
+//
+// THE VERDICT IS RETURNED BESIDE THE REPORT, AND THAT IS NOT A
+// REFINEMENT.  This printed its findings and exited 0 whatever they
+// were, so `make oracle` was green on a run whose rx output was EMPTY
+// in a fifth of its cases -- a check that cannot fail, standing where
+// the change workflow puts its second gate.  The report was always
+// right; nothing read it.
+//
+// AND A FAILING CASE PRINTS ITS PROGRAM, because the two lists alone
+// say WHAT diverged and nothing about what was run -- and the case
+// index is an offset into a seed sweep, so it cannot be fed back to
+// `--seed` to recover the input.  A divergence nobody can reproduce is
+// a report rather than a finding.
+// AND THE COUNT IS DENOMINATED IN ROWS THAT COULD HAVE DIVERGED, not in
+// cases drawn. A program where NEITHER side emits agrees for a reason
+// that has nothing to do with the machines under test, so counting it
+// toward a coverage claim is the vacuous-row failure this file's own
+// EMPTY-output incident already records, one notch weaker: there the
+// check could not fail, here most of it does not.
 const interpretResults = (
   agdaResults: EvalResult[],
   rxResults: EvalResult[],
-): string => {
+  testCases: TestCase[],
+): { report: string; ok: boolean; live: number } => {
   const n = Math.min(agdaResults.length, rxResults.length);
   const lines: string[] = [];
-  let streamOk = 0;
-  let batchOk = 0;
+  let valuesOk = 0;
+  let live = 0;
   for (let i = 0; i < n; i++) {
-    const a = agdaResults[i];
-    const r = rxResults[i];
-    const sEq = sameStream(a.stream, r.stream);
-    const bEq = sameStream(a.batches, r.batches);
-    if (sEq) streamOk++;
-    if (bEq) batchOk++;
-    if (!sEq || !bEq) {
-      lines.push(
-        `case ${i}: ${sEq ? "stream ✓" : "stream ✗"} ${bEq ? "batches ✓" : "batches ✗"}`,
-      );
-      if (!sEq) {
-        lines.push(`  agda.stream  = ${JSON.stringify(canonical(a.stream))}`);
-        lines.push(`  rx.stream    = ${JSON.stringify(canonical(r.stream))}`);
-      }
-      if (!bEq) {
-        lines.push(`  agda.batches = ${JSON.stringify(canonical(a.batches))}`);
-        lines.push(`  rx.batches   = ${JSON.stringify(canonical(r.batches))}`);
-      }
+    const a = render(agdaResults[i].values);
+    const r = render(rxResults[i].values);
+    if (agdaResults[i].values.length > 0 || rxResults[i].values.length > 0)
+      live++;
+    if (a === r) {
+      valuesOk++;
+      continue;
     }
+    lines.push(`case ${i}: values ✗`);
+    lines.push(`  program     = ${serialize(testCases[i])}`);
+    lines.push(`  agda.values = ${a}`);
+    lines.push(`  rx.values   = ${r}`);
   }
   const header =
-    `${n} cases: stream ${streamOk}/${n} match, batches ${batchOk}/${n} match` +
+    `${n} cases (${live} emitting): values ${valuesOk}/${n} match` +
     (agdaResults.length !== rxResults.length
       ? ` (LENGTH MISMATCH: agda ${agdaResults.length}, rx ${rxResults.length})`
       : "");
-  return [header, ...lines].join("\n");
+  return {
+    report: [header, ...lines].join("\n"),
+    ok: valuesOk === n && n > 0 && agdaResults.length === rxResults.length,
+    live,
+  };
+};
+
+// THE CORPUS IS DRAWN BY REJECTION, AND THE THING REJECTED IS A SILENT
+// PROGRAM. A flat sweep of the seed list runs 500 programs of which 357
+// emit NOTHING, so a reported 500/500 is 143 rows that could have
+// diverged. Emptiness is a property of the PROGRAM and it is decidable
+// here for free -- the rx leg has to be evaluated anyway -- so the draw
+// keeps drawing past a silent program instead of spending an Agda row
+// on it. Yield is what this buys; the Agda side still sees CORPUS cases,
+// so it costs nothing.
+//
+// AND BIASING THE FUEL WAS THE OTHER CANDIDATE AND IT IS DEAD: re-run at
+// fuel 60, 348 of the 357 stay empty. They are silent structurally --
+// rooted at `empty`, at a flattener whose source never fires, at a
+// spent `take` -- not starved of arrivals. Nine rows was the whole prize.
+//
+// A SILENT QUOTA IS KEPT DELIBERATELY, AND DROPPING IT WOULD DROP THE
+// ONE CLASS THAT HAS ALREADY CAUGHT A REAL BUG. The rejection predicate
+// reads ONE leg (rx), so a program where rx is silent and Agda is not is
+// exactly a divergence -- and that is the shape of the depth-first
+// witness this branch pinned, where the two machines disagreed by one
+// side emitting and the other not. Filtering on rx-empty would have
+// filtered that finding away. So the silent rows are thinned, never
+// excluded.
+const CORPUS = 500;
+const SILENT_QUOTA = 100;
+const LIVE_TARGET = CORPUS - SILENT_QUOTA;
+const MAX_SEEDS = 400; // a bound, so an `--operator` that can only draw
+// silent programs reports a short corpus instead of looping
+
+const drawCorpus = (operator?: string): TestCase[] => {
+  const live: TestCase[] = [];
+  const silent: TestCase[] = [];
+  for (
+    let i = 0;
+    i < MAX_SEEDS &&
+    (live.length < LIVE_TARGET || silent.length < SILENT_QUOTA);
+    i++
+  ) {
+    for (const testCase of genTestCases(`s${i}`, operator)) {
+      const bucket = evaluatePlain(testCase).length > 0 ? live : silent;
+      const cap = bucket === live ? LIVE_TARGET : SILENT_QUOTA;
+      if (bucket.length < cap) bucket.push(testCase);
+    }
+  }
+  return [...live, ...silent];
 };
 
 async function main() {
   const operator = readOperatorFromCli();
   const cliSeed = readSeedFromCli();
-  const seeds = cliSeed ? [cliSeed] : genSeeds();
-  const testCases = seeds.flatMap((seed) => genTestCases(seed, operator));
-  const [agdaResults, rxResults] = await Promise.all([
-    execAgda(testCases.map(serialize)),
-    Promise.all(testCases.map(evaluateRx)),
-  ]);
-  console.log(interpretResults(agdaResults, rxResults));
+  const casesFile = readCasesFromCli();
+  const testCases =
+    casesFile !== undefined
+      ? readFileSync(casesFile, "utf8")
+          .split("\n")
+          .filter((line) => line.trim().length > 0)
+          .map((line) => JSON.parse(line) as TestCase)
+      : cliSeed !== undefined
+        ? genTestCases(cliSeed, operator)
+        : drawCorpus(operator);
+  const agdaResults = await execAgda(testCases.map(serialize));
+  const rxResults = testCases.map((testCase): EvalResult => ({
+    values: evaluatePlain(testCase),
+  }));
+  const { report, ok, live } = interpretResults(
+    agdaResults,
+    rxResults,
+    testCases,
+  );
+  console.log(report);
+  // a zero-case run is a failure too: it means the generator produced
+  // nothing, which reads as a clean sweep of an empty corpus
+  if (!ok) process.exitCode = 1;
+  // AND A SWEPT CORPUS THAT CAME UP SHORT ON EMITTING ROWS IS A FAILURE,
+  // because the yield is the thing the draw exists to hold. Only the
+  // full sweep is held to it -- a pinned `--seed` or a `--cases` replay
+  // is whatever the user asked for.
+  if (casesFile === undefined && cliSeed === undefined && live < LIVE_TARGET) {
+    console.log(
+      `YIELD SHORT: ${live} emitting rows, target ${LIVE_TARGET} -- the ` +
+        `draw could not find enough programs that emit within ${MAX_SEEDS} seeds`,
+    );
+    process.exitCode = 1;
+  }
 }
 
 main();

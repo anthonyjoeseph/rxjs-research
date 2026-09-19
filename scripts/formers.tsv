@@ -1,0 +1,83 @@
+# THE CORRESPONDENCE, WRITTEN DOWN ONCE.  Two trees carry the same object
+# language, and what tied them was a tag string one side matched and the other
+# happened to emit — so a former only one tree had did not fail, it was simply
+# never generated, and every sweep over the bridge reported green about shapes
+# it was never handed.  This file is the one declaration of the pairing, and
+# `scripts/check-formers.py` holds six surfaces to it: the Agda datatype, the
+# Agda decoder, the TypeScript union, the TypeScript generator, the sweep's
+# census and the Agda generator.
+#
+# A NEW FORMER IS THEREFORE SEVEN EDITS, AND THAT IS THE POINT — one is this
+# line, and until it exists the other six are each separately red.  The last
+# is its ROLE, below.
+#
+# GEN=no AND AGEN=no DECLARE A FORMER A GENERATOR CANNOT REACH, and each is a
+# finding parked rather than an exemption granted: a former nothing generates
+# is a former no sweep and no oracle run has ever covered, whatever either
+# reports.  There are two columns because the two generators cover different
+# holes on purpose — a former whose type IS the protocol's own structure has
+# no plain-rxjs mirror, so the TypeScript lane declines it and the all-Agda
+# sweep is what covers it — and that division used to be written in the reason
+# column and read by nothing.  BOTH `no` is refused outright: that is not a
+# hole to declare, it is a former nothing covers.  The reason is the last
+# column, and it is owed the moment either column says no.
+#
+# ROLE IS THE DIVIDING TEST'S VERDICT, AND EVERY `exp` ROW OWES ONE.  The test
+# is whether an operator SUBSCRIBES anything or reads the protocol's own
+# bookkeeping; what it decides is which formers the one pure-function former
+# absorbs.  That verdict used to live in memory and in one header's prose, so
+# a former's status was answerable only by whoever had last thought about it
+# — and a former added later inherited no obligation to have a status at all.
+# The vocabulary is closed, so a new answer is a change to the checker and
+# therefore to the test:
+#
+#   source    produces without reading anything, and subscribes nothing
+#   pure      a pure function of ONE value, with or without carried state
+#   protocol  reads or writes the protocol's own bookkeeping
+#   flatten   subscribes a payload that is literal syntax and must be RUN
+#   binder    not an operator at all — μ-binding structure
+#   -         the value language and the primitive operators, neither of
+#             which is a stream former, so the test does not apply
+#
+# The reasoning behind each verdict is NOT here: it is in the header of the
+# one pure-function former, which is where the test is stated, and a second
+# copy of it would be the copy that ages.
+#
+# kind	agda	tag	gen	agen	role	why
+exp	input	input	yes	yes	source
+exp	ofᵉ	of	yes	yes	source
+exp	emptyᵉ	empty	yes	yes	source
+exp	takeᵉ	take	yes	yes	protocol
+exp	mapᵉ	map	yes	yes	pure
+exp	scanᵉ	scan	yes	yes	pure
+exp	mergeAllᵉ	mergeAll	yes	no	flatten	the all-Agda sweep draws the author's flattener freely, but its elaboration is still a postulate, so no run it produces ever reaches the plain former
+exp	switchAllᵉ	switchAll	yes	no	flatten	the all-Agda sweep draws the author's flattener freely, but its elaboration is still a postulate, so no run it produces ever reaches the plain former
+exp	exhaustAllᵉ	exhaustAll	yes	no	flatten	the all-Agda sweep draws the author's flattener freely, but its elaboration is still a postulate, so no run it produces ever reaches the plain former
+exp	μᵉ	mu	yes	yes	binder
+exp	varᵉ	varE	yes	yes	binder
+exp	deferᵉ	defer	yes	yes	protocol
+exp	mintᵉ	mint	yes	yes	protocol
+exp	batchSyncᵉ	batchSync	yes	no	protocol	the author's palette has no counterpart to draw, and the elaboration writes none, so no run the all-Agda sweep produces reaches this former
+tm	varᵗ	varT	yes	yes	-
+tm	unit̂	unitT	yes	yes	-
+tm	bool̂	boolT	yes	yes	-
+tm	nat̂	natT	yes	yes	-
+tm	pairᵗ	pairT	yes	yes	-
+tm	fstᵗ	fstT	yes	yes	-
+tm	sndᵗ	sndT	yes	yes	-
+tm	nilᵗ	nilT	yes	yes	-
+tm	consᵗ	consT	yes	yes	-
+tm	inlᵗ	inlT	yes	yes	-
+tm	inrᵗ	inrT	yes	yes	-
+tm	caseᵗ	caseT	yes	no	-	sums are not in the Agda generator's type palette, whose every node is natᵗ
+tm	foldᵗ	foldT	yes	yes	-
+tm	ifᵗ	ifT	yes	yes	-
+tm	primᵗ	primT	yes	yes	-
+tm	strmᵗ	strmT	yes	yes	-
+prim	add	add	yes	yes	-
+prim	sub	sub	yes	yes	-
+prim	mul	mul	yes	yes	-
+prim	eqᵖ	eq	yes	yes	-
+prim	ltᵖ	lt	yes	yes	-
+prim	eqᵘ	eqU	yes	yes	-
+prim	notᵖ	not	yes	yes	-

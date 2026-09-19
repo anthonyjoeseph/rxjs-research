@@ -1,4 +1,4 @@
-import { Closed, Exp, Fn, PrimOp, Tm, Ty, Val, mapE, scanE } from "./exp.js";
+import { Closed, Exp, Fn, PrimOp, Tm, Ty, Val } from "./exp.js";
 import type { ObservableInput, Slot, TestCase, Timed } from "./prop-test.js";
 
 // The differential-testing generator: deterministic, seeded canonical
@@ -8,6 +8,19 @@ import type { ObservableInput, Slot, TestCase, Timed } from "./prop-test.js";
 // μ-vars). The generator is the authority on the program corpus; the
 // Agda side only decodes and evaluates what it emits. There is no Agda
 // twin — Agda has its own QuickCheck — so this is free implementation.
+//
+// MOST OF WHAT IT DRAWS EMITS NOTHING, AND THAT IS A PROPERTY OF THE
+// TREE SHAPES RATHER THAN OF THE FUEL.  Measured over a flat 500-program
+// sweep: 357 emit an EMPTY value list, and re-running those at fuel 60
+// leaves 348 of them still empty.  So they are silent STRUCTURALLY — a
+// root at `empty`, a flattener whose source never fires, a spent `take`
+// — and no amount of arrival budget reaches them.  The consequence for
+// anyone tempted to tune the fuel distribution here: that lever is worth
+// nine rows in 500, and it has already been tried.  The yield is raised
+// where it can be, by rejection at draw time in `prop-test.ts`, which
+// keeps drawing past a silent program; this file stays a plain
+// distribution over well-typed trees and is not asked to know which of
+// them speak.
 
 // ---- seeded PRNG (mulberry32 over an FNV-1a string hash) ----
 type Rng = () => number; // [0, 1)
@@ -40,7 +53,9 @@ const chance = (rng: Rng, p: number): boolean => rng() < p;
 const unitT: Ty = { type: "unit" };
 const boolT: Ty = { type: "bool" };
 const natT: Ty = { type: "nat" };
+const uniqT: Ty = { type: "uniq" };
 const prodNN: Ty = { type: "prod", fst: natT, snd: natT };
+const prodUU: Ty = { type: "prod", fst: uniqT, snd: uniqT };
 
 const tyEq = (a: Ty, b: Ty): boolean => {
   if (a.type === "prod" && b.type === "prod")
@@ -65,7 +80,17 @@ const genValTy = (rng: Rng, depth: number): Ty => {
   const r = rng();
   if (r < 0.55) return natT; // bias nat — the value domain's workhorse
   if (r < 0.7) return boolT;
-  if (r < 0.78) return unitT;
+  if (r < 0.75) return unitT;
+  // NO uniq LANE, AND IT IS THE HARNESS SAYING SO RATHER THAN THE
+  // LANGUAGE.  A type generated here is one a STREAM will carry -- a
+  // scripted slot's element, an `of` item -- and a token in a value
+  // position is one the differential comparison cannot handle: it
+  // renames instants and sources, renames a token in neither, and
+  // `canonical` walks values without their TYPE, so it cannot tell a
+  // token from a nat to rename it. `mint(t => of(t))` is well-typed in
+  // both trees; it is unCOMPARABLE, which is a different finding and
+  // the one `noToken` in the harness states. uniq is exercised at term
+  // level instead, where a mint binder reaches it.
   if (r < 0.9)
     return {
       type: "prod",
@@ -82,6 +107,7 @@ const genValTy = (rng: Rng, depth: number): Ty => {
 // ---- generation context: Γ inputs, Δᵍ guarded / Δ usable μ-vars, Θ ----
 type GenCtx = {
   gamma: Ty[]; // slot types (input i : gamma[i])
+  sharedSlots: boolean[]; // slot i is an all-resets-false share
   guarded: Ty[]; // μ-vars bound but not yet past a defer (unreferenceable)
   usable: Ty[]; // μ-vars in scope (varE may name these)
   theta: Ty[]; // value-var types (varT index 0 = innermost)
@@ -98,6 +124,13 @@ const litTm = (rng: Rng, ty: Ty, ctx: GenCtx, depth: number): Tm => {
       return { type: "boolT", ty, val: chance(rng, 0.5) };
     case "nat":
       return { type: "natT", ty, val: int(rng, 0, 9) };
+    case "uniq":
+      // UNREACHABLE, and it is the language rather than the generator
+      // that makes it so: there is no literal at this type, every token
+      // comes from a `mint` binder and is read out of Θ, so the one
+      // lane that wants a uniq guards itself on Θ holding one. A throw
+      // here is the guard's assertion rather than a stub.
+      throw new Error("litTm: no literal at uniq");
     case "prod":
       return {
         type: "pairT",
@@ -129,12 +162,18 @@ const genTm = (rng: Rng, ty: Ty, ctx: GenCtx, depth: number): Tm => {
     .filter((x) => tyEq(x.vt, ty));
   const varTm = (): Tm => ({ type: "varT", ty, index: pick(rng, vars).i });
 
+  // a uniq has no literal and no introduction form in the term language,
+  // so a variable is the only term at this type. The caller guards on Θ
+  // holding one, which is what makes this total.
+  if (ty.type === "uniq") return varTm();
+
   if (depth <= 0 || chance(rng, 0.35))
     return vars.length > 0 && chance(rng, 0.6)
       ? varTm()
       : litTm(rng, ty, ctx, depth);
 
-  const opts: (() => Tm)[] = [() => litTm(rng, ty, ctx, depth)];
+  const opts: (() => Tm)[] = [];
+  opts.push(() => litTm(rng, ty, ctx, depth));
   if (vars.length > 0) opts.push(varTm);
   // PROJECTING A PAIR VARIABLE IS THE ONLY WAY INTO A BOUND PAIR, and
   // it is what puts a list in scope at all: the pure-function former
@@ -174,6 +213,32 @@ const genTm = (rng: Rng, ty: Ty, ctx: GenCtx, depth: number): Tm => {
       op: pick(rng, ["eq", "lt"] as PrimOp[]),
       arg: natPair(),
     }));
+    // THE LANE IS GUARDED ON Θ, because there is no literal at this
+    // type: every token comes from a `mint` binder, so the only terms
+    // that can stand on either side are variables and the lane fires
+    // only under a mint ancestor. The interesting row -- one minted
+    // token against a DIFFERENT minted one -- needs two, and nesting
+    // two mints is what the Agda sweep's own uniq lane does.
+    //
+    // WHAT IS STILL OUT OF REACH IS A TOKEN AS STREAM DATA, and that is
+    // the harness rather than the language: `mint(t => of(t))` is legal
+    // in both trees, but the streams are compared up to renaming of
+    // instants and sources, a token in a VALUE position is renamed by
+    // neither, and `canonical` walks values without their TYPE, so it
+    // cannot tell a token from a nat to rename it. `genValTy` keeps
+    // uniq out of every element type for exactly that reason.
+    if (ctx.theta.some((vt) => tyEq(vt, uniqT)))
+      opts.push(() => ({
+        type: "primT",
+        ty,
+        op: "eqU" as PrimOp,
+        arg: {
+          type: "pairT",
+          ty: prodUU,
+          fst: genTm(rng, uniqT, ctx, depth - 1),
+          snd: genTm(rng, uniqT, ctx, depth - 1),
+        },
+      }));
     opts.push(() => ({
       type: "primT",
       ty,
@@ -194,17 +259,42 @@ const genTm = (rng: Rng, ty: Ty, ctx: GenCtx, depth: number): Tm => {
         ? { type: "inlT", ty, val: genTm(rng, ty.left, ctx, depth - 1) }
         : { type: "inrT", ty, val: genTm(rng, ty.right, ctx, depth - 1) },
     );
+  // THE ONLY ELIMINATOR A SUM HAS, and the one former either tree carried
+  // that nothing had ever generated: it decodes, it compiles, and it sits
+  // in both unions, so every run of the oracle and every all-Agda sweep
+  // reported green without once having been handed one. It is not
+  // guarded by a type test, because a case ELIMINATES at whatever type
+  // the surrounding term wants; what its own type pins is the scrutinee.
+  // That scrutinee's `ty` is built here rather than drawn from scope,
+  // since the decoder reads the branch contexts off it and a sum-typed
+  // variable is rare enough in a generated Θ that the lane would almost
+  // never fire.
+  opts.push(() => {
+    const scrutTy: Ty = { type: "sum", left: natT, right: boolT };
+    return {
+      type: "caseT",
+      ty,
+      scrut: genTm(rng, scrutTy, ctx, depth - 1),
+      onInl: genTm(rng, ty, { ...ctx, theta: [natT, ...ctx.theta] }, depth - 1),
+      onInr: genTm(
+        rng,
+        ty,
+        { ...ctx, theta: [boolT, ...ctx.theta] },
+        depth - 1,
+      ),
+    };
+  });
   if (ty.type === "obs")
     opts.push(() => ({
       type: "strmT",
       ty,
       exp: genExp(rng, ty.elem, ctx, depth - 1),
     }));
-  // A LIST-TYPED TERM IS WHERE A LIFT STOPS BEING A MAP OR A SCAN.
-  // Consing onto the argument's own list LENGTHENS an emit and folding
-  // with a conditional SHORTENS it, and neither is a shape map or scan
-  // can produce — so this is the clause that makes the raw `lift` lane
-  // below worth generating at all.
+  // A LIST-TYPED TERM IS WHERE THE VALUE LANGUAGE GETS ITS OWN REACH.
+  // Consing and folding with a conditional are how a term builds a list
+  // of a length it was not handed, which is what a pointwise step can
+  // never do — so this clause is what the fan lane below spends when it
+  // hands `mergeAll` a step that returns literal syntax.
   if (ty.type === "list") {
     const elem = ty.elem;
     opts.push(() => ({
@@ -278,7 +368,15 @@ const genExp = (
   for (const { i } of ctx.gamma
     .map((gt, i) => ({ gt, i }))
     .filter((x) => tyEq(x.gt, ty)))
-    leaves.push(() => ({ type: "input", ty, index: i }));
+    // A SHARED SLOT'S LEAF IS WEIGHTED, because a share with ONE
+    // subscriber is a degenerate share: the fan-out, the mid-flight
+    // join and the latched one-shot are all reachable only when the
+    // same slot is named twice, and an unweighted draw reached that
+    // in two cases out of five hundred. The weight is on the SLOT and
+    // not on the tree, so what it buys is second references to the
+    // one index rather than more inputs generally.
+    for (let w = 0; w < (ctx.sharedSlots[i] ? 5 : 3); w++)
+      leaves.push(() => ({ type: "input", ty, index: i }));
   for (const { i } of ctx.usable
     .map((ut, i) => ({ ut, i }))
     .filter((x) => tyEq(x.ut, ty)))
@@ -286,43 +384,56 @@ const genExp = (
 
   const obsOf: Ty = { type: "obs", elem: ty };
   const operators: Record<string, () => Exp> = {
-    // map and scan are not nodes any more: both are written over the one
-    // pure-function former, so what these lanes generate is a `lift`
-    // whose step is a fold in the term language
     map: () => {
       const s = genValTy(rng, 2);
-      return mapE(
-        ty,
-        s,
-        genFn(rng, s, ty, ctx, depth - 1),
-        genExp(rng, s, ctx, depth - 1),
-      );
-    },
-    // and the former ITSELF, with a step nothing constrains to a map or
-    // a scan shape: it may drop values, duplicate them, or emit a
-    // different count than it was handed. That range is the whole
-    // reason the palette collapsed onto one former, and a generator
-    // that only ever emitted the two encodings above would exercise
-    // the two absorbed operators in new clothes rather than this one.
-    lift: () => {
-      const s = genValTy(rng, 2);
-      const u = genValTy(rng, 1); // the carried state
-      const argTy: Ty = {
-        type: "prod",
-        fst: u,
-        snd: { type: "list", elem: s },
-      };
-      const resTy: Ty = {
-        type: "prod",
-        fst: u,
-        snd: { type: "list", elem: ty },
-      };
       return {
-        type: "lift",
+        type: "map",
         ty,
-        fn: genFn(rng, argTy, resTy, ctx, depth - 1),
-        init: genTm(rng, u, ctx, Math.min(depth, 2)),
+        fn: genFn(rng, s, ty, ctx, depth - 1),
         src: genExp(rng, s, ctx, depth - 1),
+      };
+    },
+    // AND THE COUNT-CHANGING LANE, WHICH IS NOW A FLATTEN. A pointwise
+    // step emits exactly what it was handed, so dropping a value and
+    // duplicating one are shapes neither lane above can reach -- and a
+    // generator blind to them is the blind spot this file's history
+    // already records. rxjs reaches them with `mergeMap(x => ...)`, so
+    // this lane writes exactly that: a step returning literal syntax,
+    // spent by `mergeAll`.
+    fan: () => {
+      const inner: Ty = { type: "obs", elem: ty };
+      // the step's OWN context: its argument is Θ-var 0, so everything
+      // generated under it counts from there and nothing here may be
+      // built in the caller's Θ
+      const under: GenCtx = { ...ctx, theta: [ty, ...ctx.theta] };
+      const x: Tm = { type: "varT", ty, index: 0 };
+      const strm = (exp: Exp): Fn => ({ type: "strmT", ty: inner, exp });
+      const step: Fn = pick(rng, [
+        () => strm({ type: "empty", ty }),
+        () => strm({ type: "of", ty, items: [x] }),
+        () => strm({ type: "of", ty, items: [x, x] }),
+        () => strm({ type: "of", ty, items: [x, genTm(rng, ty, under, 1)] }),
+        // the value-dependent one: which arm is taken is decided by the
+        // value itself, per element, so a program cannot be read off the
+        // tree the way the four above can
+        (): Fn => ({
+          type: "ifT",
+          ty: inner,
+          cond: genTm(rng, boolT, under, Math.min(depth, 2)),
+          then: strm({ type: "empty", ty }),
+          else: strm({ type: "of", ty, items: [x] }),
+        }),
+      ])();
+      return {
+        type: "mergeAll",
+        ty,
+        limit: undefined,
+        src: {
+          type: "map",
+          ty: inner,
+          fn: step,
+          src: genExp(rng, ty, ctx, depth - 1),
+        },
       };
     },
     take: () => ({
@@ -333,13 +444,13 @@ const genExp = (
     }),
     scan: () => {
       const s = genValTy(rng, 2);
-      return scanE(
+      return {
+        type: "scan",
         ty,
-        s,
-        genFn(rng, { type: "prod", fst: ty, snd: s }, ty, ctx, depth - 1),
-        genTm(rng, ty, ctx, Math.min(depth, 2)),
-        genExp(rng, s, ctx, depth - 1),
-      );
+        fn: genFn(rng, { type: "prod", fst: ty, snd: s }, ty, ctx, depth - 1),
+        init: genTm(rng, ty, ctx, Math.min(depth, 2)),
+        src: genExp(rng, s, ctx, depth - 1),
+      };
     },
     // the limit axis is where bounded concurrency gets exercised:
     // absent is the old mergeAll, 1 is the old concatAll, 2/3 are the
@@ -383,6 +494,62 @@ const genExp = (
         depth - 1,
       ),
     }),
+    // mint binds one fresh uniq token per subscription, extending Θ by
+    // uniqᵗ at index 0; μ-var state (guarded/usable) is unchanged
+    mint: () => ({
+      type: "mint",
+      ty,
+      body: genExp(
+        rng,
+        ty,
+        { ...ctx, theta: [uniqT, ...ctx.theta] },
+        depth - 1,
+      ),
+    }),
+  };
+
+  // THE batchSync LANE, AND THE PROJECTION IS THE WHOLE OF ITS SHAPE.
+  // The operator is ordinary plain rxjs -- a `merge` whose second input's
+  // `defer` runs once the source's subscribe burst has drained -- so the
+  // plain leg mirrors it like any other former.  What it cannot do is
+  // land at an arbitrary requested type: its result is its source's
+  // head-and-tail PAIR, and `genValTy` never draws a list, so a lane
+  // gated on the requested type having that shape would never fire once
+  // and would report as a former nothing generates.  So the pair is
+  // projected back to the type asked for, and the projection decides
+  // which half of the grouping is observed: the head alone says whether
+  // the burst collapsed to ONE emission, and the fold reads the tail, so
+  // the burst's LENGTH and contents are compared too.
+  operators.batchSync = () => {
+    const pairTy: Ty = {
+      type: "prod",
+      fst: ty,
+      snd: { type: "list", elem: ty },
+    };
+    const x: Tm = { type: "varT", ty: pairTy, index: 0 };
+    const head: Tm = { type: "fstT", ty, pair: x };
+    const fn: Tm = pick(rng, [
+      () => head,
+      // the step hands back the ELEMENT, so the fold is the tail's last
+      // value and falls through to the head when the tail is empty
+      (): Tm => ({
+        type: "foldT",
+        ty,
+        list: { type: "sndT", ty: { type: "list", elem: ty }, pair: x },
+        init: head,
+        step: { type: "varT", ty, index: 0 },
+      }),
+    ])();
+    return {
+      type: "map",
+      ty,
+      fn,
+      src: {
+        type: "batchSync",
+        ty: pairTy,
+        src: genExp(rng, ty, ctx, depth - 1),
+      },
+    };
   };
 
   // of/empty are leaves; force them there, real operators from `operators`
@@ -409,6 +576,11 @@ const genVal = (rng: Rng, ty: Ty, depth: number): Val => {
       return chance(rng, 0.5);
     case "nat":
       return int(rng, 0, 9);
+    case "uniq":
+      // unreachable: `genValTy` yields no uniq, and that is the point —
+      // a token is minted at subscription, so nothing OUTSIDE the
+      // program can produce one, a scripted input least of all
+      throw new Error("no scripted value inhabits uniq — a token is minted");
     case "prod":
       return [genVal(rng, ty.fst, depth), genVal(rng, ty.snd, depth)];
     case "sum":
@@ -416,7 +588,9 @@ const genVal = (rng: Rng, ty: Ty, depth: number): Val => {
         ? { type: "inl", val: genVal(rng, ty.left, depth) }
         : { type: "inr", val: genVal(rng, ty.right, depth) };
     case "obs":
-      return { type: "empty", ty: ty.elem }; // unreachable: slots are value-typed
+      // unreachable: slots are value-typed. A value at obs type is a
+      // CLOSURE, so the empty environment is part of the shape
+      return { exp: { type: "empty", ty: ty.elem }, env: [] };
     case "list":
       return [];
   }
@@ -444,7 +618,15 @@ const genSlots = (rng: Rng, depth: number): { types: Ty[]; slots: Slot[] } => {
   const types: Ty[] = [];
   const slots: Slot[] = [];
   for (let i = 0; i < n; i++) {
-    const ty = genValTy(rng, 2);
+    // REUSING AN EARLIER SLOT'S TYPE ON PURPOSE. A slot is reachable
+    // only through an `input` leaf at its own type, so types drawn
+    // independently make every reference coincidental -- and a slot
+    // nothing references is constructed and never subscribed, which is
+    // the share telescope being built and not run.
+    const ty =
+      types.length > 0 && chance(rng, 0.4)
+        ? pick(rng, types)
+        : genValTy(rng, 2);
     const prefix = [...types]; // slots strictly before i
     types.push(ty);
     slots.push(
@@ -455,7 +637,13 @@ const genSlots = (rng: Rng, depth: number): { types: Ty[]; slots: Slot[] } => {
             def: genExp(
               rng,
               ty,
-              { gamma: prefix, guarded: [], usable: [], theta: [] },
+              {
+                gamma: prefix,
+                sharedSlots: slots.map((sl) => sl.type === "shared"),
+                guarded: [],
+                usable: [],
+                theta: [],
+              },
               Math.min(depth, 3),
             ) as Closed,
           },
@@ -465,12 +653,23 @@ const genSlots = (rng: Rng, depth: number): { types: Ty[]; slots: Slot[] } => {
 };
 
 const genTestCase = (rng: Rng, operator?: string): TestCase => {
-  const rootTy = genValTy(rng, 2);
+  // the slots come FIRST so the root type can be drawn from them: a
+  // root type unrelated to every slot leaves the tree no typed leaf to
+  // reach one through, which is how most of the corpus came to name no
+  // input at all
   const { types, slots } = genSlots(rng, 3);
+  const rootTy =
+    types.length > 0 && chance(rng, 0.5) ? pick(rng, types) : genValTy(rng, 2);
   const exp = genExp(
     rng,
     rootTy,
-    { gamma: types, guarded: [], usable: [], theta: [] },
+    {
+      gamma: types,
+      sharedSlots: slots.map((sl) => sl.type === "shared"),
+      guarded: [],
+      usable: [],
+      theta: [],
+    },
     4,
     operator,
   );
@@ -486,6 +685,3 @@ export const genTestCases = (seed: string, operator?: string): TestCase[] => {
     genTestCase(rng, operator),
   );
 };
-
-export const genSeeds = (): string[] =>
-  Array.from({ length: 25 }, (_, i) => `s${i}`);

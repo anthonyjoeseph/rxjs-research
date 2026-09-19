@@ -50,8 +50,8 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; cong₂)
 
 open import Rx.Exp using (Ctx; Ty; Exp; Tm; elimGExp; elimGTm; elimGTms; unfoldμ;
-  input; ofᵉ; emptyᵉ; takeᵉ; liftᵉ; mergeAllᵉ; switchAllᵉ;
-  exhaustAllᵉ; μᵉ; varᵉ; deferᵉ;
+  input; ofᵉ; emptyᵉ; takeᵉ; mapᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ;
+  exhaustAllᵉ; batchSyncᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ;
   varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ;
   nilᵗ; consᵗ; foldᵗ)
 
@@ -64,13 +64,16 @@ mutual
   gsizeᵉ (ofᵉ ts)          = suc (gsizeᵗˢ ts)
   gsizeᵉ emptyᵉ            = zero
   gsizeᵉ (takeᵉ c e)       = suc (gsizeᵗ c + gsizeᵉ e)
-  gsizeᵉ (liftᵉ f z e)     = suc (gsizeᵗ f + (gsizeᵗ z + gsizeᵉ e))
+  gsizeᵉ (mapᵉ f e)        = suc (gsizeᵗ f + gsizeᵉ e)
+  gsizeᵉ (scanᵉ f z e)     = suc (gsizeᵗ f + (gsizeᵗ z + gsizeᵉ e))
   gsizeᵉ (mergeAllᵉ lim e) = suc (gsizeᵉ e)
   gsizeᵉ (switchAllᵉ e)    = suc (gsizeᵉ e)
+  gsizeᵉ (batchSyncᵉ e)    = suc (gsizeᵉ e)
   gsizeᵉ (exhaustAllᵉ e)   = suc (gsizeᵉ e)
   gsizeᵉ (μᵉ e)            = suc (gsizeᵉ e)
   gsizeᵉ (varᵉ x)          = zero
   gsizeᵉ (deferᵉ e)        = zero
+  gsizeᵉ (mintᵉ e)         = suc (gsizeᵉ e)
 
   gsizeᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → Tm Γ Δᵍ Δ Θ t → ℕ
   gsizeᵗ (varᵗ x)     = zero
@@ -109,15 +112,19 @@ mutual
   gsize-elimG Θl x cl emptyᵉ            = refl
   gsize-elimG Θl x cl (takeᵉ c e)       =
     cong suc (cong₂ _+_ (gsize-elimGt Θl x cl c) (gsize-elimG Θl x cl e))
-  gsize-elimG Θl x cl (liftᵉ f z e)     =
+  gsize-elimG Θl x cl (mapᵉ f e)        =
+    cong suc (cong₂ _+_ (gsize-elimGt (_ ∷ Θl) x cl f) (gsize-elimG Θl x cl e))
+  gsize-elimG Θl x cl (scanᵉ f z e)     =
     cong suc (cong₂ _+_ (gsize-elimGt (_ ∷ Θl) x cl f)
                         (cong₂ _+_ (gsize-elimGt Θl x cl z) (gsize-elimG Θl x cl e)))
   gsize-elimG Θl x cl (mergeAllᵉ lim e) = cong suc (gsize-elimG Θl x cl e)
   gsize-elimG Θl x cl (switchAllᵉ e)    = cong suc (gsize-elimG Θl x cl e)
+  gsize-elimG Θl x cl (batchSyncᵉ e)    = cong suc (gsize-elimG Θl x cl e)
   gsize-elimG Θl x cl (exhaustAllᵉ e)   = cong suc (gsize-elimG Θl x cl e)
   gsize-elimG Θl x cl (μᵉ e)            = cong suc (gsize-elimG Θl (there x) cl e)
   gsize-elimG Θl x cl (varᵉ y)          = refl
   gsize-elimG Θl x cl (deferᵉ e)        = refl
+  gsize-elimG Θl x cl (mintᵉ e)         = cong suc (gsize-elimG (_ ∷ Θl) x cl e)
 
   gsize-elimGt : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θsub u t} (Θloc : List Ty) (x : t ∈ Δᵍ)
                  (cl : Exp Γ [] [] Θsub t) (tm : Tm Γ Δᵍ Δ (Θloc ++ Θsub) u)
