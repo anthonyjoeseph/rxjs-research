@@ -1,11 +1,13 @@
 name: Gate
 
-# THREE JOBS IN PARALLEL, AND THE SPLIT IS BY HOW LONG A FAILURE TAKES TO
+# THE JOBS RUN IN PARALLEL, AND THE SPLIT IS BY HOW LONG A FAILURE TAKES TO
 # ARRIVE RATHER THAN BY SUBJECT. `ts` answers in about a minute, `gate` and
 # `quickcheck` each take the better part of an hour, and neither of the slow
 # two blocks the other — so a TypeScript error is red before the Agda
 # toolchain has finished building, and a counterexample is found on the same
-# run that types the tower instead of the one after it.
+# run that types the tower instead of the one after it. Two of the four are
+# switched off while the evaluator is rewritten; each says so at its own
+# `if: false`, and the switch is the only edit either one carries.
 #
 # `make gate` is this repo's merge gate (see CLAUDE.md). On a fresh checkout
 # there is never a `.gate-heavy-stamp` (it's gitignored — local dev-loop
@@ -202,7 +204,18 @@ jobs:
   # rows and is green exactly when no KNOWN counterexample remains; nothing in
   # it ever looks for a new one. This job does, on the same run rather than on
   # whichever later session happens to type the command.
+  #
+  # DISABLED WHILE THE EVALUATOR IS REWRITTEN (Anthony: "we need to disable
+  # quickcheck in ci for now"), for the same reason the oracle below is: the
+  # machine it sweeps is the one being replaced. It is red on every push on a
+  # postulate the rewrite has not yet reached -- the elaborator's `mergeAllᵖ`
+  # arm -- which is a state of the work rather than a finding, and a red that
+  # reports the same known thing on every run is a red nobody reads. It comes
+  # back ON, unchanged, when the new evaluator computes: nothing here may be
+  # narrowed to make it pass, and a sweep is worth nothing against a machine
+  # that does not yet run.
   quickcheck:
+    if: false
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
