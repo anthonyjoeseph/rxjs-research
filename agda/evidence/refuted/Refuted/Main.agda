@@ -30,6 +30,10 @@
 --   was true when written; what transfers is the adversarial program
 --   family, never the conclusion drawn from it.
 -- RECOVERY: git show ba1285b:agda/evidence/refuted/Refuted/Dry-Wrap.agda
+-- RECOVERY: git show 47273877:agda/evidence/refuted/Refuted/Park-Unpaid.agda
+--   killed the unconnected-count/parked-total PAIR, which died the way
+--   the numbers above it did: the descent is no longer denominated in a
+--   budget at all, so `src` can no longer state the pair to preserve.
 module Refuted.Main where
 
 -- THE REPAIR THE WHOLE DELETED FAMILY INVITED, killed in its own
@@ -45,12 +49,3 @@ module Refuted.Main where
 open import Refuted.Domain-Predicate using
   (structural-domain-has-content-false; sub-total)
 
-
--- AND THE SECOND FLOOR, UNDER THE PAIR THAT REPLACED THE NUMBERS.  A
--- descent carrying an unconnected count beside a parked total needs
--- each step to hold the pair, and one arm of the delivery cycle holds
--- neither half: a saturated merge parks, which raises the parked
--- total, and parks nothing else, which leaves the count where it was.
--- What was to pay for it is a connect further up the run, and the
--- step relation says nothing about the run.
-open import Refuted.Park-Unpaid using (step-preserves-pair-false)

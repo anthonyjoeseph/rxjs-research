@@ -42,16 +42,16 @@ open import Data.Maybe using (Maybe; nothing; just)
 open import Data.Nat using (ℕ; zero; suc; pred; _≤_; _<_; _∸_; s≤s; _≡ᵇ_)
 open import Data.Nat.Induction using (<-wellFounded)
 open import Data.Nat.Properties using (∸-monoʳ-<)
-open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.Product using (Σ; _×_; _,_; proj₁)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (tt)
 open import Induction.WellFounded using (Acc; acc)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong)
+open import Relation.Binary.PropositionalEquality using (refl; cong)
 open import Relation.Nullary using (yes; no)
 open import Relation.Nullary.Decidable using (⌊_⌋)
 
 open import Rx.Prim using (Fuel; Tick)
-open import Rx.Exp using (Ty; obs; _≟ᵗ_; Ctx; Closed; Val; Env; []ᵉ)
+open import Rx.Exp using (Ty; obs; _≟ᵗ_; Ctx; Closed; Val; []ᵉ)
 open import Rx.Mint using (nodeᵏ; freshId; setAt)
 open import Rx.Slots using (Slots)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; root; share-sink; _↠_;
@@ -61,15 +61,12 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; root; share-sink; _
   lookupNode; setNode; hasRoom; aliveThroughᶠ;
   Arrival; arrTick; arrTy; arrVal; AtFloor; RegId; chainsOf; cascadeLatch;
   sched-next; sched-init; st-init; shareAdmit; shareLatch)
-open import Rx.Evaluator.Domain using (subscribeInner⇓; mergeAllDrain⇓; innerFinish⇓;
-  innerReact⇓; stepFrame⇓; thruWalk⇓; foldPath⇓; dispatchShare⇓; shareGo⇓;
-  chainStep⇓; cascadeGo⇓; cascade⇓; drain⇓; evaluate⇓;
-  inner; drain-nil; drain-no-room; drain-room;
-  finish-all-drain; finish-switch-clear; finish-exhaust-clear; finish-nil;
-  react-false; react-alive; react-dead;
-  step-map; step-scan; step-take; step-batchSync; step-from-inner;
-  step-thru-outer; fold-root; fold-sink; fold-step; disp; go-nil; go-cut;
-  go-live; chain-step; casc-nil; casc-cut; casc-live; casc-run;
+open import Rx.Evaluator.Domain using (subscribeInner⇓; mergeAllDrain⇓; innerFinish⇓; innerReact⇓; stepFrame⇓; foldPath⇓;
+  dispatchShare⇓; shareGo⇓; chainStep⇓; cascadeGo⇓; cascade⇓; drain⇓; evaluate⇓; inner;
+  drain-nil; drain-no-room; drain-room; finish-all-drain; finish-switch-clear;
+  finish-exhaust-clear; finish-nil; react-false; react-alive; react-dead; step-map; step-scan;
+  step-take; step-batchSync; step-from-inner; step-thru-outer; fold-root; fold-sink; fold-step;
+  disp; go-nil; go-cut; go-live; chain-step; casc-nil; casc-cut; casc-live; casc-run;
   drain-done; drain-empty; drain-step; eval-run)
 open import Rx.Evaluator.Reducible using (Red; red-val; red-walk; reducible)
 

@@ -56,7 +56,7 @@ open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_
   caseᵗ; ifᵗ; primᵗ; strmᵗ; add; sub; mul; eqᵖ; eqᵘ; ltᵖ; notᵖ;
   inputsBelowᵉ; inputsBelowᵗ; inputsBelowᵗˢ)
 open import Rx.Exp.Guarded using (gsizeᵉ; gsizeᵗ; gsizeᵗˢ; gsize-unfoldμ)
-open import Rx.Inputs-Below using (ib-unfoldμ; ib-topᵉ; ib-topᵗ)
+open import Rx.Inputs-Below using (ib-unfoldμ; ib-topᵉ)
 open import Rx.Mint using (nodeᵏ; regᵏ; sourceᵏ; freshId; setAt)
 open import Decide using (∧ˡ; ∧ʳ)
 open import Rx.Evaluator using (Stream; Burst; Sched; EvalSt; Path; Frame; _↠_;
@@ -1123,10 +1123,3 @@ mutual
   red-env : ∀ {n} {Γ : Ctx n} {Θ : List Ty} (ρ : Env Γ Θ) → RedEnv ρ
   red-env []ᵉ                 = tt
   red-env (_∷ᵉ_ {s = s} v vs) = red-val s v , red-env vs
-
--- A FRAME'S FUNCTION IS THE TERM FACE AT ONE MORE ENTRY, and its
--- environment is closed over by the same value face.
-redFn : ∀ {n} {Γ : Ctx n} {s u} (fn : FnClo Γ s u) → RedFn fn
-redFn (Θ , f , ρ) =
-  redFnAcc f ρ (red-env ρ) _ (ib-topᵗ f)
-    (<-wellFounded _) (<-wellFounded (gsizeᵗ f))

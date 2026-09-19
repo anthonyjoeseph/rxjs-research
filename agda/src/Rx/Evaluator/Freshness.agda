@@ -41,7 +41,7 @@ open import Decide using (≡ᵇ-refl; ≡ᵇ→≡)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; cong)
 
 open import Rx.Exp using (Ctx; Closed)
-open import Rx.Mint using (Mint; nodeᵏ; freshId)
+open import Rx.Mint using (nodeᵏ; freshId)
 open import Rx.Evaluator using (Sched; EvalSt; Frame; NodeId; NodeState;
   map-f; take-f; scan-f; batchSync-f; from-inner; thru-outer;
   lookupNode; setNode)

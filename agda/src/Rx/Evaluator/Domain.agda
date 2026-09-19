@@ -121,28 +121,22 @@ open import Data.Empty using (⊥)
 open import Data.Vec using (lookup)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 
-open import Rx.Prim using (Tick; Fuel; PlainEvent; valueᵖ; completeᵖ; hot; cold)
+open import Rx.Prim using (Tick; Fuel; valueᵖ; completeᵖ; hot; cold)
 open import Rx.Exp using (obs; Ctx; Val; Closed; Exp; Tm; Fn; FnClo; applyClo;
   _×ᵗ_; listᵗ; uniqᵗ;
   Env; _∷ᵉ_; []ᵉ; evalWith; unfoldμ; input; ofᵉ; emptyᵉ; takeᵉ; batchSyncᵉ;
   mapᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; deferᵉ; mintᵉ)
 open import Rx.Mint using (ordinalᵏ; sourceᵏ; nodeᵏ; regᵏ; freshId; setAt)
 open import Rx.Slots using (Slots; scripted; shared)
-open import Rx.Evaluator using (Stream; Burst; Sched; EvalSt; Path; Frame; NodeId;
-  root; share-sink; _↠_; shareAdmit; shareLatch; shareFinish;
-  from-inner; splitEvents; splitBurst; burstCompleted;
-  oneShotBurst; spentBurst;
-  arrTick; arrSource; arrVal; chainsOf; cascadeLatch; cascadeFinish;
-  sched-next; sched-init; st-init;
-  NodeState; AllOp; RegId; Arrival; AtFloor; arrTy;
-  memberSource; register; installNode; resolve; dropSource;
-  atSlot; atDyn; lowerFloor;
-  map-f; scan-f; take-f; batchSync-f; thru-outer;
-  cell-st; take-st; batchSync-st; mergeAll-st; switch-st; exhaust-st;
-  mergeAllᵒ; switchᵒ; exhaustᵒ;
-  lookupNode; setNode; hasRoom; mergeAllBump; switchKill; aliveThroughᶠ;
-  scanDispatch; takeDispatch; batchDispatch; thruWrap;
-  consumeUsable; finishUsable)
+open import Rx.Evaluator using (Stream; Burst; Sched; EvalSt; Path; Frame; NodeId; root; share-sink; _↠_; shareAdmit;
+  shareLatch; shareFinish; from-inner; splitEvents; splitBurst; burstCompleted; oneShotBurst;
+  spentBurst; arrTick; arrVal; chainsOf; cascadeLatch; cascadeFinish; sched-next; sched-init;
+  st-init; NodeState; AllOp; RegId; Arrival; AtFloor; arrTy; memberSource; register;
+  installNode; resolve; dropSource; atSlot; atDyn; lowerFloor; map-f; scan-f; take-f;
+  batchSync-f; thru-outer; cell-st; take-st; batchSync-st; mergeAll-st; switch-st; exhaust-st;
+  mergeAllᵒ; switchᵒ; exhaustᵒ; lookupNode; setNode; hasRoom; mergeAllBump; switchKill;
+  aliveThroughᶠ; scanDispatch; takeDispatch; batchDispatch; thruWrap; consumeUsable;
+  finishUsable)
 
 -- THE FRAME A SUBSCRIBE CAN PUSH, WHICH IS EVERY FRAME BUT ONE, AND
 -- SAYING SO IN A TYPE IS WHAT TAKES THE DRAIN OUT OF A PUSH CYCLE.  A
