@@ -48,7 +48,7 @@ open import Data.Fin using (Fin; toℕ)
 open import Data.List using (List; []; _∷_; map)
 open import Data.List.Relation.Unary.All using (All) renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
 open import Data.Maybe using (nothing)
-open import Data.Nat using (ℕ; zero; suc; _<_; s≤s; _+_; _∸_; _<ᵇ_)
+open import Data.Nat using (ℕ; zero; suc; _<_; _≤_; s≤s; _+_; _∸_; _<ᵇ_)
 open import Data.Nat.Induction using (<-wellFounded-fast)
 open import Data.Nat.Properties using (_<?_; ≮⇒≥; ≤-refl; ≤-trans; m≤n+m; m≤m+n; <ᵇ⇒<)
 open import Data.Product using (Σ; _,_; proj₁; proj₂)
@@ -78,26 +78,16 @@ open import Rx.Evaluator.Domain using (subscribeE⇓; subs-floor; subs-shared; s
   subs-cold-async; subs-of; subs-empty; subs-take-zero; subs-take-suc; subs-map; subs-scan;
   subs-merge-all; subs-switch-all; subs-exhaust-all; subs-μ; subs-defer; subs-mint; connect;
   slot-spent; slot-join; slot-connect)
-open import Rx.Evaluator.Reducible using (Out; Red; Handles; RedFn; RedEnv; redDatas; redLookup; redFoldVals; Bnd; _/_; Budget;
-  budget-step; _∣_; under; unconn-connect)
-open import Rx.Evaluator.Unconnected using (unconn-emits; queued-emits; budget-setNode0; budget-mint; budget-register)
+open import Rx.Evaluator.Reducible using (Out; Red; Handles; RedFn; RedEnv; redDatas; redLookup; redFoldVals; unconnected; unconn-connect)
+open import Rx.Evaluator.Unconnected using (unconn-emits)
 open import Rx.Evaluator.Builder.Frames using (Walk; monus-sink; handles-share; emits!; handles-root; handles-map; handles-scan;
   handles-take; handles-batchSync; handles-from-inner; handles-thru-outer; subsAll!;
   subsBatchSync!; Below)
 
 module Rx.Evaluator.Builder.Level
-  (m p : ℕ)
+  (m : ℕ)
   (beneath : ∀ {m′} → m′ < m → Below m′)
   where
-
--- THE LEVEL IS FIXED AT ONE BACKLOG AS WELL AS ONE COUNT, AND ONLY THE
--- COUNT IS DESCENDED ON.  The backlog is a parameter rather than a
--- field of the descent because nothing in a level lowers it: a park
--- raises it, and what pays for that is the count.  The builder above
--- quantifies it away, which is what lets a connect land at whatever
--- backlog the store it hands down happens to hold.
-β : Bnd
-β = m / p
 
 ------------------------------------------------------------------
 -- THE FUNDAMENTAL THEOREM AT TERMS.
@@ -118,16 +108,16 @@ module Rx.Evaluator.Builder.Level
 -- block mutual with itself alone.
 mutual
   redExpAcc : ∀ {n} {Γ : Ctx n} {Θ t} (b : Exp Γ [] [] Θ t)
-              (σ : Env Γ Θ) → RedEnv β σ
+              (σ : Env Γ Θ) → RedEnv m σ
             → (k : ℕ) → T (inputsBelowᵉ k b) → Acc _<_ k
-            → Acc _<_ (gsizeᵉ b) → Red {Γ = Γ} β (obs t) (Θ , b , σ)
+            → Acc _<_ (gsizeᵉ b) → Red {Γ = Γ} m (obs t) (Θ , b , σ)
   redExpAcc (input i) σ rσ k ok aK a κ hκ now sched st le =
     red-input i σ k ok aK κ hκ now sched st le
   redExpAcc (ofᵉ ts) σ rσ k ok aK (acc rs) κ hκ now sched st le =
     let ((out , sched₁ , st₁) , d) =
           emits! κ (proj₁ hκ) now (map (λ tm → evalWith tm σ) ts)
             (redTmsAcc ts σ rσ k ok aK (rs ≤-refl)) sched st le
-        (r , c) = proj₂ hκ now sched₁ st₁ (budget-step le (unconn-emits d) (queued-emits d))
+        (r , c) = proj₂ hκ now sched₁ st₁ (≤-trans (unconn-emits d) le)
     in _ , subs-of d c
   redExpAcc emptyᵉ σ rσ k ok aK a κ hκ now sched st le =
     let (r , c) = proj₂ hκ now sched st le in r , subs-empty c
@@ -142,10 +132,7 @@ mutual
                 (rs (s≤s (m≤n+m (gsizeᵉ b) (gsizeᵗ c))))
                 (take-f nid ↠ κ) (handles-take nid κ hκ) now
                 (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
-                (installNode nid (take-st (suc j)) st)
-                (budget-setNode0 nid (take-st (suc j))
-                   (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) }) st refl
-                   (budget-mint (setAt nodeᵏ (suc nid) (Sched.mint sched)) sched st le))
+                (installNode nid (take-st (suc j)) st) le
         in r , subs-take-suc ceq refl d
   redExpAcc (batchSyncᵉ {t = u} b) σ rσ k ok aK (acc rs) κ hκ now sched st le =
     let nid = freshId nodeᵏ (Sched.mint sched)
@@ -153,10 +140,7 @@ mutual
           redExpAcc b σ rσ k ok aK (rs ≤-refl)
             (batchSync-f nid ↠ κ) (handles-batchSync nid κ hκ) now
             (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
-            (installNode nid (batchSync-st {t = u} true []) st)
-                (budget-setNode0 nid (batchSync-st {t = u} true [])
-                   (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) }) st refl
-                   (budget-mint (setAt nodeᵏ (suc nid) (Sched.mint sched)) sched st le))
+            (installNode nid (batchSync-st {t = u} true []) st) le
     in subsBatchSync! κ (proj₁ hκ) nid now sched st out sched₁ st₁ le refl d
   redExpAcc (mapᵉ f b) σ rσ k ok aK (acc rs) κ hκ now sched st le =
     let fn  = _ , f , σ
@@ -179,21 +163,18 @@ mutual
                               (m≤n+m (gsizeᵗ z + gsizeᵉ b) (gsizeᵗ f)))))
             (scan-f fn nid ↠ κ) (handles-scan fn nid κ hκ) now
             (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
-            (installNode nid (cell-st (evalWith z σ)) st)
-                (budget-setNode0 nid (cell-st (evalWith z σ))
-                   (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) }) st refl
-                   (budget-mint (setAt nodeᵏ (suc nid) (Sched.mint sched)) sched st le))
+            (installNode nid (cell-st (evalWith z σ)) st) le
     in r , subs-scan refl d
   redExpAcc (mergeAllᵉ {t = u} lim b) σ rσ k ok aK (acc rs) κ hκ now sched st le =
-    let (r , d) = subsAll! mergeAllᵒ (mergeAll-st {t = u} lim 0 [] false) refl
+    let (r , d) = subsAll! mergeAllᵒ (mergeAll-st {t = u} lim 0 [] false)
                     (redExpAcc b σ rσ k ok aK (rs ≤-refl)) κ hκ now sched st le
     in r , subs-merge-all d
   redExpAcc (switchAllᵉ b) σ rσ k ok aK (acc rs) κ hκ now sched st le =
-    let (r , d) = subsAll! switchᵒ (switch-st nothing false) refl
+    let (r , d) = subsAll! switchᵒ (switch-st nothing false)
                     (redExpAcc b σ rσ k ok aK (rs ≤-refl)) κ hκ now sched st le
     in r , subs-switch-all d
   redExpAcc (exhaustAllᵉ b) σ rσ k ok aK (acc rs) κ hκ now sched st le =
-    let (r , d) = subsAll! exhaustᵒ (exhaust-st false false) refl
+    let (r , d) = subsAll! exhaustᵒ (exhaust-st false false)
                     (redExpAcc b σ rσ k ok aK (rs ≤-refl)) κ hκ now sched st le
     in r , subs-exhaust-all d
   redExpAcc (μᵉ body) σ rσ k ok aK (acc rs) κ hκ now sched st le =
@@ -209,8 +190,7 @@ mutual
     let src     = freshId sourceᵏ (Sched.mint sched)
         sched′  = record sched { mint = setAt sourceᵏ (suc src) (Sched.mint sched) }
         (r , d) = redExpAcc body (src ∷ᵉ σ) (tt , rσ) k ok aK (rs ≤-refl)
-                    κ hκ now sched′ st
-                    (budget-mint (setAt sourceᵏ (suc src) (Sched.mint sched)) sched st le)
+                    κ hκ now sched′ st le
     in r , subs-mint refl d
 
   -- THE SLOT ARM, WHICH IS FIVE SUB-ARMS OF PROTOCOL AND ONE THAT
@@ -221,7 +201,7 @@ mutual
   -- former.
   red-input : ∀ {n} {Γ : Ctx n} {Θ} (i : Fin n) (σ : Env Γ Θ) (k : ℕ)
             → T (toℕ i <ᵇ k) → Acc _<_ k
-            → Red {Γ = Γ} β (obs (lookup Γ i)) (Θ , input i , σ)
+            → Red {Γ = Γ} m (obs (lookup Γ i)) (Θ , input i , σ)
   red-input {Γ = Γ} i σ k ok (acc rsK) {lo = lo} κ hκ now sched st le
       with toℕ i <? lo
   ... | no  ¬below = let (r , c) = proj₂ hκ now sched st le
@@ -236,7 +216,7 @@ mutual
       | yes below | scripted {ok = okD} (cold sync []) =
         let ((out , sched₁ , st₁) , d) =
               emits! κ (proj₁ hκ) now sync (redDatas _ okD sync) sched st le
-            (r , c) = proj₂ hκ now sched₁ st₁ (budget-step le (unconn-emits d) (queued-emits d))
+            (r , c) = proj₂ hκ now sched₁ st₁ (≤-trans (unconn-emits d) le)
         in _ , subs-cold-sync below slEq d c
   red-input {Γ = Γ} i σ k ok (acc rsK) {lo = lo} κ hκ now sched st le
       | yes below | scripted {ok = okD} (cold sync (dv ∷ ds)) =
@@ -252,8 +232,7 @@ mutual
                                        ; pending = resolve now (dv ∷ ds) }
                                 ∷ Sched.live sched }
             (r , d) = emits! κ (proj₁ hκ) now sync (redDatas _ okD sync)
-                        sched′ (register rid (atDyn src lo) κ st)
-                        (budget-register rid (atDyn src lo) κ sched sched′ st refl le)
+                        sched′ (register rid (atDyn src lo) κ st) le
         in r , subs-cold-async below slEq refl refl refl d
   red-input {Γ = Γ} i σ k ok (acc rsK) {lo = lo} κ hκ now sched st le
       | yes below | shared d {ok = okd} =
@@ -275,7 +254,7 @@ mutual
     → (κ : Path Γ lo (lookup Γ i) t) (below : toℕ i < lo)
       (now : Tick) (sched : Sched Γ)
     → Sched.slots sched i ≡ shared d {ok = okd}
-    → (st : EvalSt e) → Handles {m = β} (lookup Γ i) κ → Budget β sched st
+    → (st : EvalSt e) → Handles {m = m} (lookup Γ i) κ → unconnected sched st ≤ m
     → Σ (Out e) λ r → subscribeE⇓ {e = e} (Θ , input i , σ) κ now sched st r
   red-input-shared {Γ = Γ} i σ d {okd} aI κ below now sched slEq st hκ le
       with memberSource (toℕ i) (EvalSt.completedSources st) in doneEq
@@ -286,7 +265,7 @@ mutual
   ...   | true  = _ , subs-shared {κ = κ} {below = below} slEq
                         (slot-join {κ = κ} {below = below} doneEq connEq refl)
   ...   | false =
-          let B   = beneath (≤-trans (unconn-connect i sched st slEq connEq) (under le))
+          let B   = beneath (≤-trans (unconn-connect i sched st slEq connEq) le)
               rid = freshId regᵏ (Sched.mint sched)
               (r , dv) =
                 Below.term B d []ᵉ tt (toℕ i) okd aI
@@ -297,16 +276,16 @@ mutual
                   (register rid (atSlot i) (lowerFloor below κ)
                     (record st
                       { connectedShares = toℕ i ∷ EvalSt.connectedShares st }))
-                  (≤-refl ∣ inj₂ ≤-refl)
+                  ≤-refl
           in r , subs-shared {κ = κ} {below = below} slEq
                    (slot-connect doneEq connEq (connect refl dv))
 
   -- THE FUNDAMENTAL THEOREM AT TERMS, which is where the embedding
   -- former hands the recursion back to the expression face.
   redTmAcc : ∀ {n} {Γ : Ctx n} {Θ u} (tm : Tm Γ [] [] Θ u)
-             (σ : Env Γ Θ) → RedEnv β σ
+             (σ : Env Γ Θ) → RedEnv m σ
            → (k : ℕ) → T (inputsBelowᵗ k tm) → Acc _<_ k
-           → Acc _<_ (gsizeᵗ tm) → Red β u (evalWith tm σ)
+           → Acc _<_ (gsizeᵗ tm) → Red m u (evalWith tm σ)
   redTmAcc (varᵗ x) σ rσ k ok aK a = redLookup σ rσ x
   redTmAcc unit̂     σ rσ k ok aK a = tt
   redTmAcc (bool̂ b) σ rσ k ok aK a = tt
@@ -383,10 +362,10 @@ mutual
     redExpAcc e σ rσ k ok aK (rs ≤-refl)
 
   redTmsAcc : ∀ {n} {Γ : Ctx n} {Θ u} (ts : List (Tm Γ [] [] Θ u))
-              (σ : Env Γ Θ) → RedEnv β σ
+              (σ : Env Γ Θ) → RedEnv m σ
             → (k : ℕ) → T (inputsBelowᵗˢ k ts) → Acc _<_ k
             → Acc _<_ (gsizeᵗˢ ts)
-            → All (Red β u) (map (λ tm → evalWith tm σ) ts)
+            → All (Red m u) (map (λ tm → evalWith tm σ) ts)
   redTmsAcc []       σ rσ k ok aK a = []ᵃ
   redTmsAcc (x ∷ xs) σ rσ k ok aK (acc rs) =
       redTmAcc x σ rσ k (∧ˡ (inputsBelowᵗ k x) (inputsBelowᵗˢ k xs) ok) aK
@@ -397,9 +376,9 @@ mutual
   -- A FRAME'S FUNCTION, PAIRED WITH THE AMBIENT ENVIRONMENT AND THEN
   -- APPLIED, is the term face at one more entry.
   redFnAcc : ∀ {n} {Γ : Ctx n} {Θ s u} (f : Fn Γ [] [] Θ s u)
-             (σ : Env Γ Θ) → RedEnv β σ
+             (σ : Env Γ Θ) → RedEnv m σ
            → (k : ℕ) → T (inputsBelowᵗ k f) → Acc _<_ k
-           → Acc _<_ (gsizeᵗ f) → RedFn {Γ = Γ} β (Θ , f , σ)
+           → Acc _<_ (gsizeᵗ f) → RedFn {Γ = Γ} m (Θ , f , σ)
   redFnAcc f σ rσ k ok aK a {v} p = redTmAcc f (v ∷ᵉ σ) (p , rσ) k ok aK a
 
 ------------------------------------------------------------------
@@ -413,13 +392,13 @@ mutual
 -- now that a value is a CLOSURE: the environment's entries are where
 -- the claim is re-established, once, rather than threaded through every
 -- site that meets a stored value.
-reducible : ∀ {n} {Γ : Ctx n} {Θ t} (b : Exp Γ [] [] Θ t) (σ : Env Γ Θ) → RedEnv β σ
-          → Red {Γ = Γ} β (obs t) (Θ , b , σ)
+reducible : ∀ {n} {Γ : Ctx n} {Θ t} (b : Exp Γ [] [] Θ t) (σ : Env Γ Θ) → RedEnv m σ
+          → Red {Γ = Γ} m (obs t) (Θ , b , σ)
 reducible b σ rσ =
   redExpAcc b σ rσ _ (ib-topᵉ b) (<-wellFounded-fast _) (<-wellFounded-fast (gsizeᵉ b))
 
 mutual
-  red-val : ∀ {n} {Γ : Ctx n} (t : Ty) (v : Val Γ t) → Red β t v
+  red-val : ∀ {n} {Γ : Ctx n} (t : Ty) (v : Val Γ t) → Red m t v
   red-val unitᵗ     v           = tt
   red-val boolᵗ     v           = tt
   red-val natᵗ      v           = tt
@@ -431,11 +410,11 @@ mutual
   red-val (listᵗ s) (x ∷ xs)    = red-val s x ∷ᵃ red-val (listᵗ s) xs
   red-val (obs u)   (Θ , b , σ) = reducible b σ (red-env σ)
 
-  red-env : ∀ {n} {Γ : Ctx n} {Θ : List Ty} (σ : Env Γ Θ) → RedEnv β σ
+  red-env : ∀ {n} {Γ : Ctx n} {Θ : List Ty} (σ : Env Γ Θ) → RedEnv m σ
   red-env []ᵉ                 = tt
   red-env (_∷ᵉ_ {s = s} v vs) = red-val s v , red-env vs
 
-redFn : ∀ {n} {Γ : Ctx n} {s u} (fn : FnClo Γ s u) → RedFn β fn
+redFn : ∀ {n} {Γ : Ctx n} {s u} (fn : FnClo Γ s u) → RedFn m fn
 redFn (Θ , f , σ) =
   redFnAcc f σ (red-env σ) _ (ib-topᵗ f)
     (<-wellFounded-fast _) (<-wellFounded-fast (gsizeᵗ f))
@@ -449,7 +428,7 @@ redFn (Θ , f , σ) =
 -- for it is the floor: `shareAdmit` hands back chains at `suc (toℕ i)`,
 -- strictly above the floor this path sinks at, so `n ∸ lo` drops.  Every
 -- other arm peels a frame.
-handlesAcc : ∀ {n} {Γ : Ctx n} {t lo} → Acc _<_ (n ∸ lo) → Walk Γ t β lo
+handlesAcc : ∀ {n} {Γ : Ctx n} {t lo} → Acc _<_ (n ∸ lo) → Walk Γ t m lo
 handlesAcc ac       root                    = handles-root
 handlesAcc (acc rec) (share-sink i below)   =
   handles-share i below (λ {u} κ → handlesAcc (rec (monus-sink i below)) {u} κ)
@@ -460,5 +439,5 @@ handlesAcc ac (batchSync-f nid ↠ κ)   = handles-batchSync nid κ (handlesAcc 
 handlesAcc ac (from-inner op a i ↠ κ) = handles-from-inner op a i κ (handlesAcc ac κ)
 handlesAcc ac (thru-outer op nid ↠ κ) = handles-thru-outer op nid κ (handlesAcc ac κ)
 
-handles! : ∀ {n} {Γ : Ctx n} {t u lo} (κ : Path Γ lo u t) → Handles {m = β} u κ
+handles! : ∀ {n} {Γ : Ctx n} {t u lo} (κ : Path Γ lo u t) → Handles {m = m} u κ
 handles! {n = n} {lo = lo} = handlesAcc (<-wellFounded-fast (n ∸ lo))

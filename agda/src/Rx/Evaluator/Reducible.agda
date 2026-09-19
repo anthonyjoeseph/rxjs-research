@@ -29,13 +29,13 @@
 module Rx.Evaluator.Reducible where
 
 open import Data.Bool using (Bool; true; false; if_then_else_; T)
-open import Data.List using (List; []; _∷_; length)
+open import Data.List using (List; []; _∷_)
 open import Data.List.Relation.Unary.All using (All; []; _∷_; universal)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (just)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Data.Sum using (_⊎_; inj₁; inj₂)
+open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; trans)
 
@@ -45,15 +45,15 @@ open import Relation.Nullary using (yes; no)
 open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; obs; listᵗ;
   Ctx; Closed; Val; Tm; FnClo; applyClo; Env; []ᵉ; _∷ᵉ_; evalWith; foldVals;
   isData; lookupEnv; _≟ᵗ_; inputsBelowᵉ)
-open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; NodeId; NodeState; mergeAll-st; scanStep; batchSyncPush;
-  batchSyncFlush; lookupNode; batchSync-st; memberSource)
+open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; NodeId; scanStep; batchSyncPush; batchSyncFlush; lookupNode;
+  batchSync-st; memberSource)
 open import Rx.Evaluator.Domain using (subscribeE⇓; emit⇓; close⇓)
 open import Rx.Slots using (Slot; Slots; scripted; shared)
 open import Decide using (≡ᵇ-refl)
 open import Data.Fin using (Fin; toℕ)
 import Data.Fin as F
 open import Data.Nat using (ℕ; zero; suc; _+_; _≤_; _<_; z≤n; s≤s; _≡ᵇ_)
-open import Data.Nat.Properties using (+-mono-≤; +-mono-<-≤; +-mono-≤-<; ≤-trans; ≤-<-trans; <-≤-trans)
+open import Data.Nat.Properties using (+-mono-≤; +-mono-<-≤; +-mono-≤-<)
 open import Data.Vec using (tabulate; foldr′; lookup)
 
 ------------------------------------------------------------------
@@ -185,76 +185,6 @@ unconn-connect i sched st slEq connEq =
     hit : slotCost slots (toℕ i ∷ cs) i < slotCost slots cs i
     hit rewrite lhs≡0 | rhs≡1 = s≤s z≤n
 
--- THE SECOND MEASURE, AND IT IS NOT A SECOND BUDGET.  A merge parks an
--- arriving inner when its lanes are full, and a drain spends the
--- backlog -- so this counts what is parked, over every node at once
--- rather than at the one node a drain names, because a drain's own
--- subscribe can park at ANOTHER merge and a per-node reading would not
--- see it.  Only a merge parks: a switch keeps no queue and an exhaust
--- drops rather than parks, so every other node reads as nothing.
-nodeQueued : ∀ {n} {Γ : Ctx n} → NodeState Γ → ℕ
-nodeQueued (mergeAll-st _ _ q _) = length q
-nodeQueued _                     = 0
-
-queuedS : ∀ {n} {Γ : Ctx n} → List (NodeId × NodeState Γ) → ℕ
-queuedS []             = 0
-queuedS ((_ , s) ∷ ns) = nodeQueued s + queuedS ns
-
-queued : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → EvalSt e → ℕ
-queued st = queuedS (EvalSt.nodes st)
-
--- WHAT A FRAME IS HANDED, AND IT IS A DISJUNCTION BECAUSE THE PARKED
--- TOTAL CANNOT BE A BOUND.  A budget has to be PRESERVED across every
--- step, which is what makes the count's bound re-checkable at each use;
--- a park RAISES the parked total, so a bound on it is not preserved and
--- a second index would be a dead route.  What survives is this: the
--- count is under its bound, and either strictly under it or the parked
--- total is under one of its own.  A subscribe that parks pays a
--- connect, which buys the first disjunct; one that does not park keeps
--- the second.  That is what lets a drain descend on the parked total
--- while the count holds, and fall back on the count exactly where a
--- connect fired.
-record Bnd : Set where
-  constructor _/_
-  field count parked : ℕ
-
-open Bnd public using (count; parked)
-
--- AND IT IS A RECORD RATHER THAN A PAIR, WHICH IS A UNIFICATION
--- PROPERTY AND NOT A PRESENTATION ONE.  A transport is applied against
--- its own conclusion, so the store it reads FROM arrives as a meta; a
--- defined pair unfolds and leaves that meta under the count's `foldr`,
--- where inversion gives up.  A record type is injective in its
--- indices, so the pair of stores is solved before either field is.
-record Budget {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-              (β : Bnd) (sched : Sched Γ) (st : EvalSt e) : Set where
-  constructor _∣_
-  field
-    under : unconnected sched st ≤ count β
-    slack : unconnected sched st < count β ⊎ queued st ≤ parked β
-
-open Budget public using (under; slack)
-
--- AND HOW A FRAME PASSES IT ON, WHICH IS THE ONLY WAY A BUDGET EVER
--- MOVES.  A step owes two readings and no more: that the count did not
--- RISE, which every arm of the delivery cycle already establishes, and
--- that either the parked total did not rise or the count strictly
--- FELL.  The second is where the disjunction is spent -- a step that
--- parked paid a connect, so the bound is met strictly and the parked
--- total is free to be anything at all afterwards.
--- THE BUDGET COMES FIRST, AND THAT IS NOT COSMETIC: it is what pins
--- the store the step is read FROM, so the two readings below are
--- checked against a known pair instead of against metas.
-budget-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {β}
-              {sched sched₁ : Sched Γ} {st st₁ : EvalSt e}
-            → Budget β sched st
-            → unconnected sched₁ st₁ ≤ unconnected sched st
-            → (queued st₁ ≤ queued st ⊎ unconnected sched₁ st₁ < unconnected sched st)
-            → Budget β sched₁ st₁
-budget-step (cb ∣ inj₁ lt) cle (inj₁ qle) = ≤-trans cle cb ∣ inj₁ (≤-<-trans cle lt)
-budget-step (cb ∣ inj₂ qb) cle (inj₁ qle) = ≤-trans cle cb ∣ inj₂ (≤-trans qle qb)
-budget-step (cb ∣ _)        cle (inj₂ clt) = ≤-trans cle cb ∣ inj₁ (<-≤-trans clt cb)
-
 ------------------------------------------------------------------
 -- THE CANDIDATE.
 ------------------------------------------------------------------
@@ -276,7 +206,7 @@ budget-step (cb ∣ _)        cle (inj₂ clt) = ≤-trans cle cb ∣ inj₁ (<-
 -- candidate at a type the recursion cannot order.
 mutual
 
-  Red : ∀ {n} {Γ : Ctx n} (m : Bnd) (t : Ty) → Val Γ t → Set
+  Red : ∀ {n} {Γ : Ctx n} (m : ℕ) (t : Ty) → Val Γ t → Set
   Red m unitᵗ     _        = ⊤
   Red m boolᵗ     _        = ⊤
   Red m natᵗ      _        = ⊤
@@ -287,7 +217,7 @@ mutual
   Red m (listᵗ s) xs       = All (Red m s) xs
   Red {Γ = Γ} m (obs u) b =
     ∀ {t} {e : Closed Γ t} {lo} (κ : Path Γ lo u t) → Handles {m = m} u κ
-    → (now : Tick) (sched : Sched Γ) (st : EvalSt e) → Budget m sched st
+    → (now : Tick) (sched : Sched Γ) (st : EvalSt e) → unconnected sched st ≤ m
     → Σ (Out e) λ r → subscribeE⇓ {e = e} b κ now sched st r
 
   -- ONE VALUE, HANDED TO THE PATH WITH ITS OWN CANDIDATE.  The
@@ -297,7 +227,7 @@ mutual
   Emits : ∀ {n} {Γ : Ctx n} {t lo m} (u : Ty) → Path Γ lo u t → Set
   Emits {Γ = Γ} {t = t} {m = m} u κ =
     ∀ {e : Closed Γ t} {v : Val Γ u} → Red m u v
-    → (now : Tick) (sched : Sched Γ) (st : EvalSt e) → Budget m sched st
+    → (now : Tick) (sched : Sched Γ) (st : EvalSt e) → unconnected sched st ≤ m
     → Σ (Out e) λ r → emit⇓ {e = e} κ now v sched st r
 
   -- THE END CARRIES NO PAYLOAD, so this half asks for nothing and is
@@ -305,7 +235,7 @@ mutual
   Closes : ∀ {n} {Γ : Ctx n} {t lo m} {u : Ty} → Path Γ lo u t → Set
   Closes {Γ = Γ} {t = t} {m = m} κ =
     ∀ {e : Closed Γ t} (now : Tick) (sched : Sched Γ) (st : EvalSt e)
-    → Budget m sched st
+    → unconnected sched st ≤ m
     → Σ (Out e) λ r → close⇓ {e = e} κ now sched st r
 
   Handles : ∀ {n} {Γ : Ctx n} {t lo m} (u : Ty) → Path Γ lo u t → Set
@@ -314,7 +244,7 @@ mutual
 -- A FRAME'S FUNCTION CARRIES THE CANDIDATE ACROSS, which is the one
 -- thing a transformer owes and the only thing a path builder asks of
 -- the term face.
-RedFn : ∀ {n} {Γ : Ctx n} {s u} (m : Bnd) → FnClo Γ s u → Set
+RedFn : ∀ {n} {Γ : Ctx n} {s u} (m : ℕ) → FnClo Γ s u → Set
 RedFn {Γ = Γ} {s = s} {u = u} m fn =
   ∀ {v : Val Γ s} → Red m s v → Red m u (applyClo fn v)
 
@@ -322,7 +252,7 @@ RedFn {Γ = Γ} {s = s} {u = u} m fn =
 -- open in a Θ telescope and a frame's function is a term with one
 -- entry bound, so the fundamental theorem at terms has to be stated
 -- under an environment rather than at closed terms alone.
-RedEnv : ∀ {n} {Γ : Ctx n} {Θ : List Ty} (m : Bnd) → Env Γ Θ → Set
+RedEnv : ∀ {n} {Γ : Ctx n} {Θ : List Ty} (m : ℕ) → Env Γ Θ → Set
 RedEnv m []ᵉ                 = ⊤
 RedEnv m (_∷ᵉ_ {s = t} v vs) = Red m t v × RedEnv m vs
 

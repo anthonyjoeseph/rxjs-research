@@ -60,7 +60,7 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; root; Arrival; AtFl
   cascadeLatch; sched-next; sched-init; st-init)
 open import Rx.Evaluator.Domain using (chainStep⇓; cascadeGo⇓; cascade⇓; drain⇓; evaluate⇓; chain-more; chain-last; casc-nil;
   casc-cut; casc-live; casc-run; drain-done; drain-empty; drain-step; eval-run)
-open import Rx.Evaluator.Reducible using (Out; Red; Handles; RedEnv; count; parked; _∣_)
+open import Rx.Evaluator.Reducible using (Out; Red; Handles; RedEnv)
 open import Rx.Evaluator.Builder.Frames using (handles-root; Below)
 import Rx.Evaluator.Builder.Level as L
 
@@ -75,31 +75,24 @@ import Rx.Evaluator.Builder.Level as L
 -- the bound or already inside a level.
 level : ∀ (m : ℕ) → Acc _<_ m → Below m
 level m (acc rec) =
-  record { walk = λ {_} {_} {_} {_} {p} →
-                    L.handles!  m p (λ {m′} lt → level m′ (rec lt))
-         ; term = λ {_} {_} {_} {_} {p} →
-                    L.redExpAcc m p (λ {m′} lt → level m′ (rec lt))
-         ; val  = λ {_} {_} {p} →
-                    L.red-val   m p (λ {m′} lt → level m′ (rec lt))
+  record { walk = L.handles!  m (λ {m′} lt → level m′ (rec lt))
+         ; term = L.redExpAcc m (λ {m′} lt → level m′ (rec lt))
+         ; val  = L.red-val   m (λ {m′} lt → level m′ (rec lt))
          }
 
 builder : ∀ (m : ℕ) → Below m
 builder m = level m (<-wellFounded-fast m)
 
--- THE BOUND IS TAKEN APART HERE AND NOWHERE ELSE.  A level is built at
--- a COUNT, and offers every backlog; a caller names a whole bound.  The
--- two meet by reading the pair's components off it, which is why these
--- three are the only definitions in the builder that mention either.
 handles! : ∀ {n} {Γ : Ctx n} {t u lo m} (κ : Path Γ lo u t) → Handles {m = m} u κ
-handles! {m = m} = Below.walk (builder (count m)) {p = parked m}
+handles! {m = m} = Below.walk (builder m)
 
 red-val : ∀ {n} {Γ : Ctx n} {m} (u : Ty) (v : Val Γ u) → Red m u v
-red-val {m = m} = Below.val (builder (count m)) {p = parked m}
+red-val {m = m} = Below.val (builder m)
 
 reducible : ∀ {n} {Γ : Ctx n} {Θ t m} (b : Exp Γ [] [] Θ t) (σ : Env Γ Θ)
           → RedEnv m σ → Red m (obs t) (Θ , b , σ)
 reducible {m = m} b σ rσ =
-  Below.term (builder (count m)) {p = parked m} b σ rσ _ (ib-topᵉ b)
+  Below.term (builder m) b σ rσ _ (ib-topᵉ b)
     (<-wellFounded-fast _) (<-wellFounded-fast (gsizeᵉ b))
 
 ------------------------------------------------------------------
@@ -114,12 +107,12 @@ chainStep! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
            → Σ (Out e) λ r → chainStep⇓ {e = e} a c sched st r
 chainStep! a (lo , path) sched st with Arrival.isLast a in leq
 ... | false = let (r , d) = proj₁ (handles! path) (red-val (arrTy a) (arrVal a))
-                              (arrTick a) sched st (≤-refl ∣ inj₂ ≤-refl)
+                              (arrTick a) sched st ≤-refl
               in r , chain-more leq d
 ... | true  = let ((out , sched₁ , st₁) , d) =
                     proj₁ (handles! path) (red-val (arrTy a) (arrVal a))
-                      (arrTick a) sched st (≤-refl ∣ inj₂ ≤-refl)
-                  (r , c) = proj₂ (handles! path) (arrTick a) sched₁ st₁ (≤-refl ∣ inj₂ ≤-refl)
+                      (arrTick a) sched st ≤-refl
+                  (r , c) = proj₂ (handles! path) (arrTick a) sched₁ st₁ ≤-refl
               in _ , chain-last leq d c
 
 cascadeGo! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
@@ -159,7 +152,7 @@ evaluate! : ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slot
 evaluate! {n = n} fuel e ins =
   let ((burst , sched₀ , st₀) , s) =
         reducible e []ᵉ tt (root {lo = n}) handles-root 0
-          (sched-init e ins) (st-init e) (≤-refl ∣ inj₂ ≤-refl)
+          (sched-init e ins) (st-init e) ≤-refl
       (rest , d) = drain! fuel sched₀ st₀
   in _ , eval-run s d
 

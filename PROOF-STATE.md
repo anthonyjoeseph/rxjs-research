@@ -221,31 +221,45 @@ reason the split is worth a whole tier.
 
 ### The monster
 
-(no monster) — the tier declares no statement. What it lands are DEFINITIONS,
-one type constructor and a second tree, which cannot be false, only wrong; what
-catches one wrong is the oracle disagreeing before any of it reaches Agda, and
-then the existing proofs failing to typecheck over the split. A cone cannot aim
-at either, and one drawn here would forbid the wide refactor that IS the tier.
+`drainQueue!` — BOUNDED-CONCURRENCY `mergeAll`, and it stays so (Anthony). Only
+a saturating lane count ever parks, so this statement exists at all because the
+merge is bounded, and it is the one declaration in the builder standing on
+nothing. What it is short of is not a fact about the queue: a parked inner's
+candidate is free to re-mint, since the ceiling reading holds at the context's
+own width and the environment's is total. It needs the value face AT ITS OWN
+BOUND, which is what the level above is building.
+
+also: `level` — one definition, where that loop would be tied, and the builder
+it conducts. The monster is a POSTULATE, so its cone is its own vocabulary and
+the work that would kill it sits outside by construction.
 
 ### Big picture tier roadmap
 
-- **FIRST, WHERE THE PARK'S PAYMENT IS WRITTEN DOWN, BECAUSE NOTHING
-  CARRIES IT TODAY.** The cycle read for the parked total is refuted at
-  the one arm that raises it: a saturated merge parks with the count
-  unmoved, as a leaf of the relation, so neither disjunct is available
-  and no arm-by-arm grind reaches it. The connect meant to pay for it
-  is above the step, and the step quantifies over every path and every
-  store. Decide between the two repairs — restrict the paths the
-  statement ranges over, or make the connect's payment a quantity the
-  STORE holds, which is what a record field would do and what a
-  derivation cannot — and land the restatement before any of the
-  eleven arms is written.
+- **FIRST, MOVE THE BOUND THE DRAIN SUBSCRIBES AT, BECAUSE THE
+  HYPOTHESIS IS RIGHT AND UNFUNDABLE WHERE IT STANDS.** Threading the
+  value face up from the drain through both `from-inner` frames,
+  `consume!`, both `thru-outer` frames and `subsAll!`, with the level
+  taking it as a parameter, typechecks in every module and dies at the
+  tie: the value face is what the level is BUILDING, so the knot is a
+  definition calling itself with nothing descending. So the question is
+  no longer WHAT the drain asks for — that is settled, it is the
+  fundamental theorem at values — but at which bound, and whether a pop
+  can be made to descend one.
 
-- **THEN THE DRAIN AS A BODY, WHICH IS WHAT THE WHOLE PAIR WAS FOR.** It
-  is the only statement in the builder standing on nothing, and the only
-  one that can spend the disjunction: a pop drops the parked total
-  outright, and the one thing that can put items back needs a connect,
-  which drops the count the descent is ordered by.
+- **THEN THE DRAIN AS A BODY, WHICH IS WHAT THE HYPOTHESIS WAS FOR.** The
+  pop takes the node's queue WHOLE and subscribes each carried inner
+  once, so the recursion is structural on the popped list and wants no
+  measure; the only non-structural step is the subscribe, and the value
+  face funds exactly that. If the leg above comes back green this is a
+  body over leaves already declared.
+
+- **THEN THE DERIVATION-LEVEL OBLIGATIONS THE ARRIVAL SPINE STILL OWES.**
+  The delivery cycle's eleven relations carry the count, and the spine
+  above them — a chain step, a cascade, a drain — does not. It is the
+  same induction one level up, over relations whose every arm is a cycle
+  member already discharged, and it is what a `Below` handed to
+  `evaluate!` will be spending. It closes the layer rather than opening
+  one, and the monster's call site sits inside it.
 
 - **THEN THE FLATTENERS AND `takeᵖ`, AND NO FORMER IS OWED AFTER ALL
   (Anthony: "the flattens, mergeAll etc, _are_ the primitives … they can
@@ -255,14 +269,6 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
   in rxjs every outer emit of a `mergeAll` IS an observable, so nothing
   owes an output emit without a lane. `takeᵖ`'s behaviour is measured
   rather than inferred and the plain `takeᵉ` already has all three facts.
-
-- **THEN THE DERIVATION-LEVEL OBLIGATIONS THE ARRIVAL SPINE STILL OWES.**
-  The delivery cycle's eleven relations now carry the count, and the
-  spine above them — a chain step, a cascade, a drain — does not. It is
-  the same induction one level up, over relations whose every arm is a
-  cycle member already discharged, and it is what a `Below` handed to
-  `evaluate!` will be spending. Small, and it closes the layer rather
-  than opening one.
 
 - **THEN THE REST OF THE SIMUL OPERATORS MIRRORED IN `Tm`/`Ty` (Anthony).**
   Each TS simul operator mirrored as an Agda definition in the value
@@ -277,13 +283,9 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 
 ### The ledger
 
-- **`drainQueue!`** (Rx.Evaluator.Builder.Frames) — FALSITY, `DEAD ROUTE`: the
-  builder's one remaining cut cycle, a parked lane's backlog spent under the
-  frame whose closing side runs the drain. Not instantiated.
-
-- **`queued-{emit,close,emits,subs,drain}`** (Rx.Evaluator.Unconnected) —
-  SHAPE, `REFUTED×5`: the delivery cycle read for the parked total, refuted at
-  the park arm. The conclusion needs a connect no hypothesis mentions.
+- **`drainQueue!`** (Rx.Evaluator.Builder.Frames) — FALSITY,
+  `REFUTED, DEAD ROUTE×2`: the tier's monster. A parked lane's backlog, spent
+  under the frame whose closing side runs it. Not instantiated.
 
 - **`{mergeAll,switchAll,exhaustAll}ᵖ`** (Rx.Elaborate) — SHAPE,
   `DEAD ROUTE×4`: the elaboration's per-former plumbing, after the two sources

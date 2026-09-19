@@ -28,26 +28,43 @@ module Refuted.Park-Unpaid where
 
 open import Data.Bool using (false)
 open import Data.Empty using (⊥)
-open import Data.List using ([]; _∷_)
+open import Data.List using (List; []; _∷_; length)
 open import Data.Maybe using (just)
-open import Data.Nat using (_≤_; _<_)
+open import Data.Nat using (ℕ; _+_; _≤_; _<_)
 open import Data.Nat.Properties using (n≮n)
-open import Data.Product using (_,_; proj₁; proj₂)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
-open import Data.Vec using ([])
+import Data.Vec as Vec
 open import Relation.Binary.PropositionalEquality using (refl)
 
 open import Rx.Exp using (natᵗ; obs; Ctx; Closed; Val; emptyᵉ; []ᵉ)
-open import Rx.Evaluator using (Sched; EvalSt; Path; root; _↠_; thru-outer;
-  mergeAllᵒ; mergeAll-st; mergeAllPark; st-init; sched-init)
+open import Rx.Evaluator using (Sched; EvalSt; NodeId; NodeState; Path; root;
+  _↠_; thru-outer; mergeAllᵒ; mergeAll-st; mergeAllPark; st-init; sched-init)
 open import Rx.Evaluator.Domain using (emit⇓; emit-thru-outer; consume-merge-park)
-open import Rx.Evaluator.Reducible using (Out; queued; unconnected)
+open import Rx.Evaluator.Reducible using (Out; unconnected)
+
+-- THE PARKED TOTAL, STATED HERE RATHER THAN IMPORTED.  It is what the
+-- refuted reading is denominated in, and `src` carries no such
+-- quantity now that the reading is gone -- keeping one there would be
+-- a definition held up by nothing but its own obituary.  Only a merge
+-- parks: a switch keeps no queue and an exhaust drops rather than
+-- parks, so every other node reads as nothing.
+nodeQueued : ∀ {n} {Γ : Ctx n} → NodeState Γ → ℕ
+nodeQueued (mergeAll-st _ _ q _) = length q
+nodeQueued _                     = 0
+
+queuedS : ∀ {n} {Γ : Ctx n} → List (NodeId × NodeState Γ) → ℕ
+queuedS []             = 0
+queuedS ((_ , s) ∷ ns) = nodeQueued s + queuedS ns
+
+queued : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → EvalSt e → ℕ
+queued st = queuedS (EvalSt.nodes st)
 
 -- THE SMALLEST RUN THAT PARKS: an empty program, one `mergeAll` node
 -- whose limit is zero, and an inner arriving at it down a path with
 -- nothing above the outer.
 Γ₀ : Ctx 0
-Γ₀ = []
+Γ₀ = Vec.[]
 
 e₀ : Closed Γ₀ natᵗ
 e₀ = emptyᵉ
