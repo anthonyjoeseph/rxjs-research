@@ -30,10 +30,6 @@
 --   was true when written; what transfers is the adversarial program
 --   family, never the conclusion drawn from it.
 -- RECOVERY: git show ba1285b:agda/evidence/refuted/Refuted/Dry-Wrap.agda
--- RECOVERY: git show 47273877:agda/evidence/refuted/Refuted/Park-Unpaid.agda
---   killed the unconnected-count/parked-total PAIR, which died the way
---   the numbers above it did: the descent is no longer denominated in a
---   budget at all, so `src` can no longer state the pair to preserve.
 module Refuted.Main where
 
 -- THE REPAIR THE WHOLE DELETED FAMILY INVITED, killed in its own

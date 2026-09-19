@@ -279,7 +279,7 @@ takes a monster at the commit that first states the restatement.
   (Anthony).** `readme-batch-order-is-delivery-order` and
   `readme-one-subscribe-one-batch` were stated over the machine tier 1 is
   deleting, so porting them twice buys nothing.  They are gone from `src` and
-  unwired from Main; `git show 5ade0b38:agda/src/Readme-Theorems.agda` restores
+  unwired from Main; `git show 729afbd2:agda/src/Readme-Theorems.agda` restores
   both statements and the header recording that every probe row sat at a
   program with no flattener — which is where their risk actually lives, and the
   first thing a restatement owes.
@@ -365,7 +365,7 @@ statement's vocabulary.
   statement's counterexample.
 - **The claims Main no longer makes — a DEBT, not a row.** Determinacy, fuel
   coherence, the two μ laws, run monotonicity and the three timing claims are
-  deleted, not discharged; `git show b5601783` restores all four modules and
+  deleted, not discharged; `git show 729afbd2` restores all four modules and
   the three rows that were the only instantiation any of them had. They are
   uncounted here deliberately, because a postulate ledger counts statements
   `agda/src` makes and `agda/src` no longer makes these.
