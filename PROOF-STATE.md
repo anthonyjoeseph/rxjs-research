@@ -239,25 +239,26 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
   reading of where the cost now sits, since every per-module figure in the
   numbers file was taken against a machine that no longer exists.
 
-- **THE FIVE LEAVES ARE ONE PROBLEM, AND THE LEG IS TO FIND ITS MEASURE.**
+- **THE FOUR LEAVES ARE ONE PROBLEM, AND THE LEG IS TO FIND ITS MEASURE.**
   The share fan-out is a body now, over a leaf naming only the WALK a
   connect spends — which is what showed the rest to be one question. Every
   remaining leaf wants the term face from inside the walk: the drain and
-  the three store reads each hold a value whose candidate was dropped. A
+  the two store reads each hold a value whose candidate was dropped. A
   measure ordering that round trip exists, and `walk-above`'s header says
   what it is and why it cannot be stated where it is needed. So the leg is
   whether it can be carried anywhere the promise is spent; a no closes off
   the per-value shape rather than one leaf.
 
-- **THE THREE STORE-RECOVERY LEAVES, AND THE QUESTION IS WHERE TO SAY
+- **THE TWO STORE-RECOVERY LEAVES, AND THE QUESTION IS WHERE TO SAY
   THEM.** The leg above decides whether they fall together; this one runs
-  if they do not. A fold's accumulator, a bracket's held value and its
-  flushed group are each written by a clause holding the candidate and
-  read by a clause holding only the store. The fundamental theorem at values settles
-  all three on paper; calling it from the walk that spends them is a
-  definitional cycle, and an invariant on the state is a dead route the
-  header records. So the leg is a placement decision, not a grind, and it
-  is the one place left where the candidate's shape could still be wrong.
+  if they do not. The bracket's PUSH reads nothing after all — it hands
+  back the arriving value alone, whose candidate is the emitting premise —
+  leaving a fold's accumulator and a flushed group, each written by a
+  clause holding the candidate and read by one holding only the store.
+  The fundamental theorem at values settles both on paper; calling it from
+  the walk that spends them is a definitional cycle, and the state
+  invariant is now dead in all three of its forms, the inductive family
+  included. So the leg is a placement decision with one licence fewer.
 
 - **THEN THE FLATTENERS AND `takeᵖ`, AND NO FORMER IS OWED AFTER ALL
   (Anthony: "the flattens, mergeAll etc, _are_ the primitives … they can
@@ -290,8 +291,8 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
   `DEAD ROUTE×4`: the elaboration's per-former plumbing, after the two sources
   came out of it. The outer's bookkeeping needs no plain home — it rides the
   lane — so what is left is the compile of an envelope stream into a stream.
-- **`red-{scanned,pushed,flushed}`** (Rx.Evaluator.Reducible) — DIFFICULTY,
-  `DEAD ROUTE×3`: a value handed back out of the store arrives without the
+- **`red-{scanned,flushed}`** (Rx.Evaluator.Reducible) — DIFFICULTY,
+  `DEAD ROUTE×4`: a value handed back out of the store arrives without the
   candidate it went in with. True through the term face, which the walk that
   spends them cannot call.
 - **`takeᵖ`** (Rx.Elaborate) — DIFFICULTY, `DEAD ROUTE`: the author cuts on

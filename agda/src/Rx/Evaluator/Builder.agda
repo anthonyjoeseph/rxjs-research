@@ -308,7 +308,7 @@ emits-batchSync : ∀ {n} {Γ : Ctx n} {t s lo} (nid : NodeId)
 emits-batchSync nid κ em {v = v} rv now sched st with batchSyncPush nid v st in peq
 ... | (nothing , st₁) = _ , emit-batchSync-held peq
 ... | (just g , st₁)  =
-      let (r , d) = em (red-pushed nid v st peq) now sched st₁
+      let (r , d) = em (red-pushed nid v st rv peq) now sched st₁
       in r , emit-batchSync peq d
 
 closes-batchSync : ∀ {n} {Γ : Ctx n} {t s lo} (nid : NodeId)

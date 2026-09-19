@@ -40,11 +40,13 @@ open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (Tick)
+open import Function.Base using (case_of_)
+open import Relation.Nullary using (yes; no)
 open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; obs; listᵗ;
   Ctx; Closed; Val; Tm; FnClo; applyClo; Env; []ᵉ; _∷ᵉ_; evalWith; foldVals;
-  isData; lookupEnv)
+  isData; lookupEnv; _≟ᵗ_)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; NodeId;
-  scanStep; batchSyncPush; batchSyncFlush)
+  scanStep; batchSyncPush; batchSyncFlush; lookupNode; batchSync-st)
 open import Rx.Evaluator.Domain using (subscribeE⇓; emit⇓; close⇓)
 
 ------------------------------------------------------------------
@@ -128,19 +130,18 @@ RedEnv (_∷ᵉ_ {s = t} v vs)   = Red t v × RedEnv vs
 -- WHAT THE MACHINE HANDS BACK, AND WHY IT IS NOT PROVEN HERE.
 ------------------------------------------------------------------
 
--- THREE STEPS HAND A VALUE BACK OUT OF THE STORE, AND A VALUE TAKEN
+-- TWO STEPS HAND A VALUE BACK OUT OF THE STORE, AND A VALUE TAKEN
 -- OUT OF ONE ARRIVES WITHOUT THE CANDIDATE IT WENT IN WITH.  The
--- fold's accumulator, the bracket's held value and the bracket's
--- flushed group are each written by a clause that HAD the candidate --
--- the arriving value's own -- and read by a clause that has only the
--- store.  Every one of the three is TRUE, and trivially so: a value at
--- observable type is a closure over a term, and the term face proves
--- the candidate of every such closure.  What is missing is a place to
--- say it.
+-- fold's accumulator and the bracket's flushed group are each written
+-- by a clause that HAD the candidate -- the arriving value's own --
+-- and read by a clause that has only the store.  Both are TRUE, and
+-- trivially so: a value at observable type is a closure over a term,
+-- and the term face proves the candidate of every such closure.  What
+-- is missing is a place to say it.
 --
 -- AND THE ROUTE THROUGH THE TERM FACE IS WHAT CLOSES RATHER THAN WHAT
 -- OPENS.  The fundamental theorem at VALUES is total, so it discharges
--- all three on paper -- but the walk that spends them is the same walk
+-- both on paper -- but the walk that spends them is the same walk
 -- the term face re-enters when it connects a share, so calling it here
 -- is a cycle and not a proof.  That is why the statements sit at the
 -- STEP and not at the node: what the spender has in hand is the step's
@@ -163,6 +164,20 @@ RedEnv (_∷ᵉ_ {s = t} v vs)   = Red t v × RedEnv vs
 --   predicate.  And a SYNTACTIC invariant saying a stored value is the
 --   denotation of a closed term is VACUOUS: reflection is total, so
 --   every value is one and the pairing carries no information.
+-- DEAD ROUTE: making the candidate an inductive FAMILY, so that strict
+--   positivity licenses what the type descent will not.  The descent is
+--   what the function form spends and a store notion is exactly what
+--   breaks it, so the family is the only other licence on offer -- and
+--   it is already spent.  `Handles` is a PREMISE of the observable arm
+--   and the candidate is a premise of `Handles`, so the candidate sits
+--   to the left of an arrow inside its own definition however the store
+--   is added; a doubly negative occurrence is positive but not STRICTLY
+--   positive, which is the one Agda accepts.  All three forms were put
+--   to the checker at minimal scale and all three are refused: the
+--   family for positivity, the function for termination, and the
+--   genuinely inductive-recursive shape -- store predicate as data,
+--   candidate as function -- for positivity again.  The licence this
+--   route needs exists in neither checker.
 postulate
   red-scanned : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
                   (fn : FnClo Γ (u ×ᵗ s) u) (nid : NodeId)
@@ -171,17 +186,35 @@ postulate
               → scanStep {e = e} fn nid v st ≡ (just ac , st₁)
               → Red {Γ = Γ} u ac
 
-  red-pushed : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-                 (nid : NodeId) (v : Val Γ s) (st : EvalSt e)
-                 {g : Val Γ (s ×ᵗ listᵗ s)} {st₁ : EvalSt e}
-             → batchSyncPush {e = e} nid v st ≡ (just g , st₁)
-             → Red {Γ = Γ} (s ×ᵗ listᵗ s) g
-
   red-flushed : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
                   (nid : NodeId) (st : EvalSt e)
                   {g : Val Γ (s ×ᵗ listᵗ s)} {st₁ : EvalSt e}
               → batchSyncFlush {e = e} {s = s} nid st ≡ (just g , st₁)
               → Red {Γ = Γ} (s ×ᵗ listᵗ s) g
+
+-- THE BRACKET'S PUSH NEVER HANDS BACK WHAT IT IS HOLDING, which is
+-- what takes it out of the group above: the synchronous arm BUFFERS
+-- and emits nothing, so the only value this step ever produces is the
+-- ARRIVING one, alone, under an empty tail.  Its candidate is then the
+-- emitting premise the caller already holds, and the tail's is the
+-- empty `All` -- so the step asks the store for nothing at all and the
+-- missing place to say it is not needed here.  The premise is what
+-- makes it provable rather than a weakening: the spender is an `Emits`,
+-- whose own signature carries the arriving value's candidate.
+red-pushed : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+               (nid : NodeId) (v : Val Γ s) (st : EvalSt e)
+               {g : Val Γ (s ×ᵗ listᵗ s)} {st₁ : EvalSt e}
+           → Red {Γ = Γ} s v
+           → batchSyncPush {e = e} nid v st ≡ (just g , st₁)
+           → Red {Γ = Γ} (s ×ᵗ listᵗ s) g
+red-pushed {s = s} nid v st rv eq with lookupNode nid (EvalSt.nodes st)
+red-pushed nid v st rv refl | just (batchSync-st false _) = rv , []
+red-pushed {s = s} nid v st rv eq | just (batchSync-st {w} true buf)
+  with w ≟ᵗ s
+red-pushed nid v st rv eq | just (batchSync-st true buf) | no  _    =
+  case eq of λ ()
+red-pushed nid v st rv eq | just (batchSync-st true buf) | yes refl =
+  case eq of λ ()
 
 ------------------------------------------------------------------
 -- THE TRIVIAL CLOSURES, WHICH ARE WHAT THE SCRIPTED SOURCES SPEND.
