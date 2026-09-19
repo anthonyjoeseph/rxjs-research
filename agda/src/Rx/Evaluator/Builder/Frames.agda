@@ -70,16 +70,24 @@ open import Rx.Evaluator.Unconnected using (unconn-latch; unconn-scanStep; uncon
 -- IT HAS NOT BEEN INSTANTIATED.  It is stated at full strength; what
 -- would reach it is a probe over a parked lane that frees.
 
--- THE PARKED LANE, HANDED BACK ITS QUEUE.  A flattener that could not
--- subscribe when a value arrived kept it; this is the walk that spends
--- the backlog once a lane frees, one carried value at a time.
---
--- DEAD ROUTE: writing it as a body here needs the general path walk,
---   and the walk's own `from-inner` CLOSING side is what runs the drain
---   -- so the direct route does not fail on difficulty, it fails by
---   putting every declaration between the two into one mutual block,
---   which is the single shape this module's layering exists to avoid.
 postulate
+  -- THE PARKED LANE, HANDED BACK ITS QUEUE.  A flattener that could not
+  -- subscribe when a value arrived kept it; this is the walk that spends
+  -- the backlog once a lane frees, one carried value at a time.
+  --
+  -- WHAT IT CONSUMES, AND WHY THAT IS FIVE STATEMENTS RATHER THAN ONE.
+  -- A drain hands back a derivation, so its call site reaches the frame's
+  -- closing side only by carrying the count PAST that derivation, which
+  -- is `unconn-drain`.  And `unconn-drain` cannot be had on its own:
+  -- `drainQueue⇓` is mutually defined with the delivery relations, so its
+  -- count lemma is one member of an indivisible block it shares with
+  -- `unconn-emit`, `unconn-close`, `unconn-emits` and `unconn-subs`.
+  --
+  -- DEAD ROUTE: writing it as a body here needs the general path walk,
+  --   and the walk's own `from-inner` CLOSING side is what runs the drain
+  --   -- so the direct route does not fail on difficulty, it fails by
+  --   putting every declaration between the two into one mutual block,
+  --   which is the single shape this module's layering exists to avoid.
   drainQueue! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo m}
                 (op : AllOp) (nid : NodeId) (κ : Path Γ lo u t)
                 (now : Tick) (q : List (Val Γ (obs u)))

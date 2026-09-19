@@ -229,15 +229,6 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 
 ### Big picture tier roadmap
 
-- **THE BOUND'S REMAINING OBLIGATION, WHICH IS WHAT THE SHAPE BOUGHT ON
-  CREDIT.** Every arm must hand back a store still under the bound. The
-  STEP half is paid: a node step is a record update on a field the count
-  cannot read, so each one is a case split whose arms are all `refl`,
-  and the enumeration is the whole proof. What is left is the RELATION
-  half, where a builder holds a derivation rather than the function that
-  produced it — five statements, one per relation, each an induction
-  over constructors that spend the step half.
-
 - **THEN THE LANE DRAIN, THE BUILDER'S LAST CUT CYCLE.** `drainQueue!`
   is what remains of the two edges that closed a loop: a parked lane's
   backlog is spent under a frame whose own closing side runs the drain.
@@ -255,6 +246,14 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
   in rxjs every outer emit of a `mergeAll` IS an observable, so nothing
   owes an output emit without a lane. `takeᵖ`'s behaviour is measured
   rather than inferred and the plain `takeᵉ` already has all three facts.
+
+- **THEN THE DERIVATION-LEVEL OBLIGATIONS THE ARRIVAL SPINE STILL OWES.**
+  The delivery cycle's eleven relations now carry the count, and the
+  spine above them — a chain step, a cascade, a drain — does not. It is
+  the same induction one level up, over relations whose every arm is a
+  cycle member already discharged, and it is what a `Below` handed to
+  `evaluate!` will be spending. Small, and it closes the layer rather
+  than opening one.
 
 - **THEN THE REST OF THE SIMUL OPERATORS MIRRORED IN `Tm`/`Ty` (Anthony).**
   Each TS simul operator mirrored as an Agda definition in the value
@@ -284,11 +283,6 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 - **`takeᵖ`** (Rx.Elaborate) — DIFFICULTY, `DEAD ROUTE`: the author cuts on
   VALUES and a plain `takeᵉ` above the envelope cuts on BATCHES, so the
   elaboration owes a count that crosses the level and closes at the cut.
-
-- **`unconn-{emit,emits,close,subs,drain}`** (Rx.Evaluator.Unconnected) —
-  GRINDABLE, `TWIN×5`: the unconnected-share count never rises along an arrival
-  relation. One induction each over the relation's constructors, whose arms are
-  the store-step lemmas the builder already proves outright.
 
 ## Tier 2 — the proof statement, once there are two trees to state it over
 

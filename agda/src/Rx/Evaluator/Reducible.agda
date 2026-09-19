@@ -148,6 +148,16 @@ cost-mono slots s cs i with slots i
 ...   | false | true  = z≤n
 ...   | false | false = s≤s z≤n
 
+-- AND WHAT A CONNECT COSTS WITHOUT ITS GUARD, which is the half a
+-- CONNECT'S CONSUMER needs: a slot added to the list is one fewer slot
+-- the count can charge for, whether or not it was there already.  The
+-- strict version below is what orders the recursion; this one is what
+-- lets a derivation ENDING in a connect be read as no worse.
+unconn-extend : ∀ {n} {Γ : Ctx n} (slots : Slots Γ) (s : Source) (cs : List Source)
+              → unconnectedS slots (s ∷ cs) ≤ unconnectedS slots cs
+unconn-extend {n = n} slots s cs =
+  sumF-mono (slotCost slots cs) (slotCost slots (s ∷ cs)) (cost-mono slots s cs)
+
 unconn-connect : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
                  (i : Fin n) (sched : Sched Γ) (st : EvalSt e)
                  {d : Closed Γ (lookup Γ i)}
