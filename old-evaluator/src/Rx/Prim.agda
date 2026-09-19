@@ -1,0 +1,110 @@
+module Rx.Prim where
+
+open import Data.Nat     using (ℕ)
+open import Data.List    using (List)
+
+------------------------------------------------------------------
+-- Time, ids, emissions
+------------------------------------------------------------------
+
+Tick Fuel Ordinal : Set
+Tick = ℕ ; Fuel = ℕ ; Ordinal = ℕ
+
+Id : Set                            -- an INSTANT (one arrival's cascade); spec groups by this
+Id = ℕ                              -- concrete so the spec can compare; harness compares up to renaming
+-- Ids mint from ARRIVAL POSITION: 0 is the subscribe frame, then
+-- 1, 2, … per cascade (the drain counter).  Distinctness is
+-- structural, instants strictly increase along the stream (the
+-- Protocol's horizon check reads exactly this), and timing-invariance
+-- holds up to ≡, not just ≈ — a retiming that preserves arbitration
+-- order preserves the ids themselves.
+
+Source : Set                        -- a SOURCE observable; impl counts registrations of these
+Source = ℕ                          -- concrete so the scheduler can mint & compare; the harness compares up to renaming anyway
+
+-- The protocol (v1's, with the instant id moved onto the emission).
+-- Batching is decided downstream by counting registrations, never by
+-- comparing clocks: init/close traffic maintains the live-registration
+-- count per source, and for each arrival every live registration chain
+-- of that source forwards EXACTLY ONE InstEmit (possibly valueless —
+-- emits are emptied, never swallowed) — UNLESS an operator cuts it
+-- mid-cascade before its turn: a cut chain delivers nothing (as in
+-- rxjs), and its `close … cutPending` on the cutting emit tells the
+-- batcher to cancel the emit it was owed.  So a batcher owes
+-- count(source) emits for an instant, cancels one per cutPending, and
+-- flushes when the remainder have arrived.
+-- Writer-asserted facts (the reader checks, never reconstructs):
+-- every mint site knows definitively whether it is a subscription
+-- burst or an arrival delivery, and why a registration ended.
+data EmitKind : Set where
+  subscribe : EmitKind              -- a subscription's own burst — owes nothing, pays nothing
+  delivery  : EmitKind              -- an arrival emit — pays the instant's owed count
+  plumbing  : EmitKind              -- a share's connect burst forwarded up its first
+                                    -- subscriber: real protocol traffic for the root's
+                                    -- ledger, but its registrations belong to the share
+                                    -- (they survive the subscriber), so the operators it
+                                    -- flows through take no lifecycle signal from it
+
+data CloseReason : Set where
+  cut        : CloseReason          -- an operator ended it (take's cut, switch switching
+                                    -- away) AFTER it delivered this instant (or it was
+                                    -- born mid-instant and owed nothing)
+  cutPending : CloseReason          -- an operator ended it BEFORE it delivered the emit
+                                    -- it owed this instant — the victim will never pay,
+                                    -- so the reader cancels one owed count against it
+                                    -- (a cut registration delivers NOTHING, as in rxjs:
+                                    -- take(1)(merge(s,s)) — the second chain is silent)
+  exhausted  : CloseReason          -- the source ran dry on its own
+  dried      : CloseReason          -- a GUARD REFUSED — the dry marker
+                                    -- (Rx.Evaluator.dryBurst), never emitted by any
+                                    -- machine rule.  Detection is by THIS REASON
+                                    -- (hasDry), not by a sentinel source: Source is an
+                                    -- unbounded ℕ and mints are breadth-many, so no
+                                    -- numeric sentinel is collision-proof
+
+                                    -- THE NAME IS OLDER THAN WHAT IT MARKS, and it is
+                                    -- kept because `CLI/Encode` puts the word on the
+                                    -- oracle wire.  There is no fuel and nothing runs
+                                    -- out: the evaluator descends on a TRIPLE, and each
+                                    -- of its three components has a guard that emits
+                                    -- this when it cannot decrease — the rank at an
+                                    -- inner subscribe, the unconnected count at a shared
+                                    -- connect, the sync size at a μ unfolding.  So a run
+                                    -- free of this reason is one where the descent's
+                                    -- order never had to be argued about.  No builder
+                                    -- constructs it, so after the cutover it is a reason
+                                    -- no run can carry — kept because the protocol's
+                                    -- vocabulary is what the spec reads
+
+data InstEvent (A : Set) : Set where
+  init     : Source → InstEvent A   -- a registration chain of this source came alive
+  value    : A → InstEvent A
+  close    : Source → CloseReason → InstEvent A   -- a registration of this source ended
+  handoff  : Source → InstEvent A   -- this share fans out next, still inside this instant
+  complete : InstEvent A            -- the stream completes as part of THIS emit (concatAll grafts on it)
+
+-- Everything is an InstEmit stream — including batchSimultaneous's
+-- output (InstEmit (List A)): a batch keeps its instant id and stays a
+-- protocol citizen, so a batched stream feeds every primitive again
+-- (e.g. merge it with itself and batch once more).
+record InstEmit (A : Set) : Set where
+  constructor _at_from_as_
+  field events  : List (InstEvent A)  -- everything caused by one incoming emit, COALESCED
+        instant : Id                  -- the instant it belongs to
+        source  : Source              -- the arrival's source (owed = its live-registration count)
+        kind    : EmitKind            -- who minted it: a subscription or an arrival cascade
+
+------------------------------------------------------------------
+-- Timed inputs (delta-encoded; real gap = suc wait, so per-source
+-- strict monotonicity holds by construction; ticks are logical
+-- order, not wall-clock — see timing-invariance)
+------------------------------------------------------------------
+
+record Timed (A : Set) : Set where
+  constructor after_,_
+  field wait : ℕ            -- gap = suc wait
+        val  : A
+
+data ObservableInput (A : Set) : Set where
+  hot  : (async : List (Timed A))                 → ObservableInput A   -- anchor 0
+  cold : (sync : List A) (async : List (Timed A)) → ObservableInput A   -- anchor = subscription tick
