@@ -50,9 +50,9 @@ exp	emptyᵉ	empty	yes	yes	source
 exp	takeᵉ	take	yes	yes	protocol
 exp	mapᵉ	map	yes	yes	pure
 exp	scanᵉ	scan	yes	yes	pure
-exp	mergeAllᵉ	mergeAll	yes	no	flatten	the all-Agda sweep draws the author's flattener freely, but its elaboration is still a postulate, so no run it produces ever reaches the plain former
-exp	switchAllᵉ	switchAll	yes	no	flatten	the all-Agda sweep draws the author's flattener freely, but its elaboration is still a postulate, so no run it produces ever reaches the plain former
-exp	exhaustAllᵉ	exhaustAll	yes	no	flatten	the all-Agda sweep draws the author's flattener freely, but its elaboration is still a postulate, so no run it produces ever reaches the plain former
+exp	mergeAllᵉ	mergeAll	yes	yes	flatten
+exp	switchAllᵉ	switchAll	yes	yes	flatten
+exp	exhaustAllᵉ	exhaustAll	yes	yes	flatten
 exp	μᵉ	mu	yes	yes	binder
 exp	varᵉ	varE	yes	yes	binder
 exp	deferᵉ	defer	yes	yes	protocol

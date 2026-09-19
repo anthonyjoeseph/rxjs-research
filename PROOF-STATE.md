@@ -191,6 +191,9 @@ batch-online                              claimed by Main in its own right —
   evaluate↓ = proj₁ ∘ evaluate!           Rx/Evaluator/Builder.agda — REAL
      └─ every value-path leaf is a body; the corpus runs; the tower descends
 
+  toPlain                                 Rx/Elaborate.agda — a REAL body over
+     └─ four postulated formers            four leaves — tier 0
+
   every tier above is stated over Rx.Exp's syntax
 ```
 
@@ -206,21 +209,19 @@ every guard, every `<?` and the dry marker leave the machine entirely.
 A row's class must agree with its postulate's header, which is where the
 research lives; where they disagree, the header wins.
 
-## Tier 1 — the elaboration, and the proof statement over it
+## Tier 1 — the proof statement over the elaboration
 
 **THE EVALUATOR TIER IS GONE.** Subscribe is a bottom-up burst assembly and the
 candidate recurses on the TYPE, so the machine is DEFINED end to end and
 carries no postulate. A drain that cannot re-mint a parked candidate is not
 statable over a candidate with no bound.
 
-**SO THE RISK MOVED UP, TO THE TWO TREES AND THE SEAM BETWEEN THEM (Anthony:
-"the plain tree is rxjs, and must not know what an envelope is").** TypeScript
-has plain rxjs and an `InstEmit`-carrying layer over it; Agda has one tree doing
-both jobs, and `toPlain` is the seam that compiles the author's palette down.
-Four primitives in it are still postulated, and they are where a program's
-meaning is decided. Above them sits the statement itself, which cannot be
-restated until the elaboration it quantifies over is settled — so the order is
-seam, then statement.
+**AND THE SEAM UNDER IT IS TRANSCRIBED, SO WHAT IS LEFT HERE IS THE STATEMENT.**
+The top line quantifies over a simul tree run through `toPlain`, whose cut and
+three flatteners are now bodies, so every question about what it ASSERTS has
+something compiled to ask it of. The legs are the statement's own — restating
+it, the legality it needs, the purity ruling it may or may not carry a
+hypothesis for, and reducibility's second half.
 
 ### The monster
 
@@ -228,10 +229,7 @@ seam, then statement.
 yet. The top line standing today is a bare postulate over the machine that has
 just been replaced, so it is the thing to be RESTATED rather than a thing to
 aim at, and a cone drawn round it would hold the restatement outside itself.
-The seam is the obvious candidate and it is premature for the same reason: the
-statement that would quantify over `toPlain` does not exist, so nothing yet
-says which of its four primitives is the one that could be false. The tier
-takes a monster at the commit that first states the restatement.
+The tier takes a monster at the commit that first states the restatement.
 
 ### Big picture tier roadmap
 
@@ -291,13 +289,6 @@ takes a monster at the commit that first states the restatement.
   was a body over one leaf; that leaf was refuted by a slot table scripted at
   the envelope type, and its subject is the envelope the evaluator no longer
   mints.
-- **`{mergeAll,switchAll,exhaustAll}ᵖ`** (Rx.Elaborate) — SHAPE,
-  `DEAD ROUTE×4`: the elaboration's per-former plumbing, after the two sources
-  came out of it. The outer's bookkeeping needs no plain home — it rides the
-  lane — so what is left is the compile of an envelope stream into a stream.
-- **`takeᵖ`** (Rx.Elaborate) — DIFFICULTY, `DEAD ROUTE`: the author cuts on
-  VALUES and a plain `takeᵉ` above the envelope cuts on BATCHES, so the
-  elaboration owes a count that crosses the level and closes at the cut.
 
 ## Tier 2 — what Main asserts beside the main theorem
 

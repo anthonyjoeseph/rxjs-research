@@ -1120,13 +1120,20 @@ batch-agreement xs acc =
 -- stays claimed from Main in its own right, so what is postulated here
 -- is exactly the step from a run to a legal stream and nothing else.
 --
--- RECOVERY: git show 8c1b5750^:agda/src/Verify-Well-Formed.agda
---   restores `evaluate-accepted`, the two dead routes recorded against
---   it -- a well-formed denotation quantified over prefixes, which the
---   settledness check rejects at a cut inside an instant, and a repair
---   by strengthening an evaluator clause, which cannot see a value it
---   never inspects -- and the sampling figure the face stood on.
 postulate
+  -- WHAT THIS QUANTIFIES OVER IS THE ELABORATION, SO THE SEAM'S FORMERS
+  -- ARE ITS PREREQUISITES AND NOT ITS NEIGHBOURS.  `elaborate` compiles
+  -- an `SExp` through `toPlain`, whose cut is `takeᵖ` and whose
+  -- flatteners are `mergeAllᵖ`, `switchAllᵖ` and `exhaustAllᵖ`; the run
+  -- below is their output, so what they emit is what is being claimed
+  -- about.  A statement about batching cannot be true of a seam that
+  -- does not yet compile, which is why those four were transcribed first.
+  -- RECOVERY: git show 8c1b5750^:agda/src/Verify-Well-Formed.agda
+  --   restores `evaluate-accepted`, the two dead routes recorded against
+  --   it -- a well-formed denotation quantified over prefixes, which the
+  --   settledness check rejects at a cut inside an instant, and a repair
+  --   by strengthening an evaluator clause, which cannot see a value it
+  --   never inspects -- and the sampling figure the face stood on.
   formal-verification-batchSimultaneous :
     ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : SExp Γ [] [] [] t)
       (ins : Slots (emitᵛ Γ)) →
