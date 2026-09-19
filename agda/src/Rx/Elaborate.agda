@@ -63,29 +63,6 @@ open import Rx.SExp using (SExp; STm; inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; sca
 -- and no other, since a cold's whole emission leaves in one burst, and
 -- a frame is exactly what one token bound above the walk names.
 
-postulate
-  -- THE ONE PLAIN FORMER THE CUT IS SHORT OF, AND IT IS rxjs's OWN:
-  -- `takeWhile(p, true)`, which passes every value the predicate
-  -- accepts, passes the one that refuses it, and completes there.  A
-  -- plain `takeᵉ` ends at an emit INDEX fixed at subscription, and a cut
-  -- on the author's values is not one — how many envelopes it takes to
-  -- fill a quota over their payloads is a property of the run.  So the
-  -- counting and the truncation are a pure-function step's work and the
-  -- ENDING is not, since such a step cannot change how many emits pass
-  -- through it.
-  -- AND THE BEHAVIOUR THE CUT MUST MIRROR IS MEASURED RATHER THAN
-  -- INFERRED (Anthony: "just run it in js").  Real rxjs `take` was run
-  -- against a four-item synchronous source, against a `mergeAll` of two
-  -- inner bursts, and at zero.  It emits the nth value and completes
-  -- AFTER it; it cuts mid-burst, so an inner's remaining values are
-  -- dropped rather than waited for; and at ZERO it never subscribes its
-  -- source at all, which is the fact a count-down silently gets wrong.
-  -- DEAD ROUTE: count in a scan and cut with `takeᵉ`, with no former
-  --   added at all.  Nothing converts a budget over values into the emit
-  --   index a subscription-time count has to name.
-  endOnᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
-         → Fn Γ Δᵍ Δ Θ t boolᵗ → Exp Γ Δᵍ Δ Θ t → Exp Γ Δᵍ Δ Θ t
-
 -- THE TWO ARMS OF A NESTED SUM THAT THIS ELABORATION NAMES, AND THEY
 -- ARE HERE RATHER THAN BESIDE THE ENCODING BECAUSE ONE ELABORATION IS
 -- THEIR ONLY CONSUMER.  `Rx.Envelope` owes the constructors, which
@@ -387,23 +364,42 @@ cutClosesᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ b}
 cutClosesᵛ os = revᵗ (foldᵗ os nilᵗ
   (consᵗ (closeᵛ (varᵗ (here refl)) (inlᵗ unit̂)) (varᵗ (there (here refl)))))
 
--- THE THREE-OPERATOR PIPELINE THE MIRROR WRITES, TRANSCRIBED.  A scan
--- carrying the quota, the open registrations and the emit this delivery
--- produced; the cut, which ends the stream ON the emit that fills the
--- quota rather than before it; and a projection pulling that emit back
--- out of the state.  The state's own emit field is what makes the
--- middle stage possible at all: an operator that must both truncate a
--- payload list and decide whether this is the last emit has to carry
--- both answers in one value, since the palette's predicate reads the
--- value and nothing beside it.
+-- THE PIPELINE THE MIRROR WRITES, MINUS ITS ENDING.  A scan carrying
+-- the quota, the open registrations, whether the cut has happened and
+-- the emit this delivery produced; then a projection pulling that emit
+-- back out of the state.  Counting the author's values and truncating
+-- their list is a pure step's work, and the state carries the answer
+-- and the emit together because the palette reads a value and nothing
+-- beside it.
+--
+-- WHAT IS NOT MIRRORED IS THE ENDING, AND IT IS THE ONE PIECE THAT IS
+-- NOT A STEP'S WORK.  rxjs ends on `takeWhile(p, true)`, whose
+-- predicate reads the scan's own state; the plain palette can only end
+-- at an emit INDEX fixed at subscription, and a cut over the author's
+-- VALUES is not one, since how many envelopes it takes to fill a quota
+-- over their payloads is a property of the run.  So the emit that fills
+-- the quota carries the closes and the completion, and every emit after
+-- it passes through carrying its bookkeeping and no values — where the
+-- twin has unsubscribed and the stream is over.
+--
+-- AND THE BEHAVIOUR THE CUT MUST MIRROR IS MEASURED RATHER THAN
+-- INFERRED (Anthony: "just run it in js").  Real rxjs `take` was run
+-- against a four-item synchronous source, against a `mergeAll` of two
+-- inner bursts, and at zero.  It emits the nth value and completes
+-- AFTER it; it cuts mid-burst, so an inner's remaining values are
+-- dropped rather than waited for; and at ZERO it never subscribes its
+-- source at all, which is the fact a count-down silently gets wrong.
 --
 -- THE SEED'S EMIT COMPONENT IS UNOBSERVABLE, exactly as `scanᵖ`'s is: a
 -- scan emits the result of its FIRST application and never the seed, so
 -- the tokens below are read by nothing and claim no freshness.  One
 -- `mintᵉ` supplies the inhabitant `uniqᵗ` has no literal for.
+-- DEAD ROUTE: cut with `takeᵉ` over a count the scan computes.  Nothing
+--   converts a budget over values into the emit index a
+--   subscription-time count has to name.
 takeᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
       → Tm Γ Δᵍ Δ Θ natᵗ → Exp Γ Δᵍ Δ Θ (emitᵗ t) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
-takeᵖ {Θ = Θ} {t = t} k e = mintᵉ (mapᵉ outᵛ ended)
+takeᵖ {Θ = Θ} {t = t} k e = mintᵉ (mapᵉ outᵛ counted)
   where
   -- the quota left, whether the cut has happened, the open
   -- registrations, and the emit this delivery produced
@@ -434,7 +430,7 @@ takeᵖ {Θ = Θ} {t = t} k e = mintᵉ (mapᵉ outᵛ ended)
   -- inside the two `letᵗ`s: the taken payloads, the split, the step's
   -- argument, the mint's token, then Θ
   inner : Tm _ _ _ (listᵗ (plainᵗ t) ∷ SP ∷ P ∷ uniqᵗ ∷ Θ) S
-  inner = ifᵗ (primᵗ eqᵖ (pairᵗ (lengthᵛ taken) rem))
+  inner = ifᵗ cut?
               (pairᵗ (nat̂ 0)
                      (pairᵗ (bool̂ true)
                             (pairᵗ nilᵗ
@@ -442,7 +438,7 @@ takeᵖ {Θ = Θ} {t = t} k e = mintᵉ (mapᵉ outᵛ ended)
                                                 (appendᵗ book (cutClosesᵛ open'))
                                                 taken (bool̂ true)))))
               (pairᵗ (primᵗ sub (pairᵗ rem (lengthᵛ taken)))
-                     (pairᵗ (bool̂ false)
+                     (pairᵗ done
                             (pairᵗ open' (reassembleᵛ env book taken fin))))
     where
     taken = varᵗ (here refl)
@@ -452,7 +448,13 @@ takeᵖ {Θ = Θ} {t = t} k e = mintᵉ (mapᵉ outᵛ ended)
     book  = fstᵗ split
     fin   = sndᵗ (sndᵗ split)
     rem   = fstᵗ st
+    done  = fstᵗ (sndᵗ st)
     open' = openAfterᵛ book (fstᵗ (sndᵗ (sndᵗ st)))
+
+    -- the closes are minted ONCE: the quota is spent from the emit that
+    -- fills it onwards, so the equality alone would re-cut on every
+    -- emit after it.
+    cut? = ifᵗ done (bool̂ false) (primᵗ eqᵖ (pairᵗ (lengthᵛ taken) rem))
 
   -- inside the first `letᵗ`: the split, the step's argument, the
   -- mint's token, then Θ
@@ -465,19 +467,11 @@ takeᵖ {Θ = Θ} {t = t} k e = mintᵉ (mapᵉ outᵛ ended)
   step = letᵗ (splitEventsᵛ {b = plainᵗ t} (eventsᵛ (sndᵗ (varᵗ (here refl)))))
               (fstᵗ (varᵗ (here refl))) body
 
-  -- the predicate the cut ends on: pass everything up to and including
-  -- the emit whose state carries the cut
-  alive : Fn _ _ _ (uniqᵗ ∷ Θ) S boolᵗ
-  alive = primᵗ notᵖ (fstᵗ (sndᵗ (varᵗ (here refl))))
-
   outᵛ : Fn _ _ _ (uniqᵗ ∷ Θ) S (emitᵗ t)
   outᵛ = sndᵗ (sndᵗ (sndᵗ (varᵗ (here refl))))
 
   counted : Exp _ _ _ (uniqᵗ ∷ Θ) S
   counted = scanᵉ step seed e'
-
-  ended : Exp _ _ _ (uniqᵗ ∷ Θ) S
-  ended = endOnᵖ alive counted
 
 -- a runtime list of observables as ONE observable: the merge of its
 -- elements, in order.  `mergeAllᵉ` over a two-element `ofᵉ` is rxjs's

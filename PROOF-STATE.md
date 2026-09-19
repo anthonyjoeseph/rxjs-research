@@ -220,11 +220,9 @@ seam first, then statement.
 **AND THE TYPECHECKER JUDGES NONE OF IT, WHICH IS WHAT THE LEGS ARE FOR
 (Anthony: "we are not worried about correctness, just a basic mirroring of what
 the typescript side is already doing").** Every one of the four is a FORMER
-rather than a statement, so any inhabitant of its type checks — `λ _ e → e`
-inhabits the cut and `λ _ _ → emptyᵉ` each flattener. A transcription is
-therefore evidence of nothing until it RUNS, and the one leaf left is an
-operator, so nothing elaborated from `takeˢ` reduces at all. That orders the
-legs: make it runnable, run it, then pay the divergences the run names.
+rather than a statement, so any inhabitant of its type checks. A transcription
+is evidence of nothing until it RUNS, so the tier holds no ledger: what is open
+is what running it says.
 
 ### The monster
 
@@ -235,21 +233,14 @@ one, a limit counts one. TypeScript pays none of that, holding the lane table
 beside a channel — and a channel is a BINDING, not an expression. So if the
 lane is wrong, the seam's shape moves under everything above it, where the cut
 falling costs one operator. The exception is the rest of the seam, transcribed
-in one commit (Anthony: "take on all legs at once").
+in one commit (Anthony: "take on all legs at once"), plus two names charged a
+comment block alone — the owner map hands prose to the declaration above it.
 
-also: `takeᵖ`, `switchAllᵖ`, `exhaustAllᵖ`, `scanᵖ`
+also: `takeᵖ`, `switchAllᵖ`, `exhaustAllᵖ`, `scanᵖ`, `batch-agreement`
 
 ### Big picture tier roadmap
 
-- **THE FORMER THAT MAKES THE SEAM RUNNABLE AT ALL, AND IT IS THE LEG THAT
-  NARROWS NOTHING BY ITSELF.** `endOnᵖ` is rxjs's own `takeWhile(p, true)`, and
-  until it is a real former no program containing `takeˢ` reduces — so the
-  oracle cannot see the cut, QuickCheck cannot see it, and the bug cache cannot
-  hold a row about it. TypeScript first per the port order: `plain-eval.ts` and
-  the decoder, then `takeWhileᵉ` in `Rx.Exp` and its evaluator clause, then the
-  postulate goes. It justifies itself by what it unblocks and by nothing else.
-
-- **THEN THE ORACLE OVER THE ELABORATION, WHICH IS THE ONLY THING THAT CAN
+- **THE ORACLE OVER THE ELABORATION, WHICH IS THE ONLY THING THAT CAN
   JUDGE A TRANSCRIPTION.** `npm run agda:qc` compares impl against spec and the
   oracle compares the TS impl against the Agda one; between them they are the
   whole of what decides whether these four bodies say what their twins say. The
@@ -266,12 +257,19 @@ also: `takeᵖ`, `switchAllᵖ`, `exhaustAllᵖ`, `scanᵖ`
   channel ruling, and that one is Anthony's, because either answer changes what
   the plain tree IS.
 
+- **AND THE CUT'S MISSING ENDING, WHICH IS THE SAME RULING ARRIVING FROM THE
+  OTHER SIDE.** `takeᵖ`'s scan counts and truncates, and the emit filling the
+  quota carries the closes and the completion; what it cannot do is END, since
+  the plain palette cuts at an emit index fixed at subscription and a quota over
+  the author's values is not one. So emits after the cut pass through carrying
+  bookkeeping and no values, where rxjs has unsubscribed. The leg is the program
+  separating the two, and then the ruling: a plain `takeWhileᵉ` mirroring what
+  rxjs itself ends on, or a cut that needs none.
+
 ### The ledger
 
-- **`endOnᵖ`** (Rx.Elaborate) — DIFFICULTY, `DEAD ROUTE`: rxjs's `takeWhile(p,
-  true)`, which the plain palette has no former for. The cut's counting and
-  truncation are a pure step's work; its ENDING is not, since such a step
-  cannot change how many emits pass through it.
+The tier holds no live postulate. Its four formers are bodies; what is open is
+the three legs' findings, and a finding here lands in the body's own header.
 
 ## Tier 1 — the proof statement over the elaboration
 
