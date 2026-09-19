@@ -2,11 +2,11 @@ module Rx.Evaluator where
 
 open import Data.Bool    using (Bool; true; false; if_then_else_; not; _∨_; _∧_)
 open import Data.Fin     using (Fin; toℕ)
-open import Data.Fin.Properties using (toℕ<n) renaming (_≟_ to _≟ᶠ_)
+open import Data.Fin.Properties using () renaming (_≟_ to _≟ᶠ_)
 open import Data.Maybe   using (Maybe; just; nothing; is-nothing)
-open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _<ᵇ_; _≡ᵇ_; _≤_)
+open import Data.Nat     using (ℕ; zero; suc; _+_; _<ᵇ_; _≡ᵇ_; _≤_)
 open import Data.Nat.Properties using (≤-trans)
-open import Data.List    using (List; []; _∷_; _++_; concat; tabulate; null)
+open import Data.List    using (List; []; _∷_; _++_; map; concat; tabulate; null)
 open import Data.Bool.ListAction using (any)
 open import Data.Vec     using (lookup)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
@@ -41,8 +41,18 @@ open import Rx.Mint using (Mint; mint-init)
 -- the elaboration, which compiles the protocol into the VALUE type, so
 -- the machine itself never handles an envelope and the mirror keeps
 -- its footing — the TypeScript's operators are plain rxjs too.
-Stream : ∀ {n} → Ctx n → Ty → Set          -- flat, canonical emission order
-Stream Γ t = List (PlainEvent (Val Γ t))
+
+-- A BURST IS EVERYTHING ONE INCOMING EMIT CAUSES, AND IT IS THE UNIT A
+-- SUBSCRIBE HANDS BACK.  A subscription returns its whole output at
+-- once, so an operator bracketing the subscribe call sees a LIST at the
+-- moment of grouping and needs no bit recording which side of that call
+-- it is on -- which is the one thing a per-value descent has to carry
+-- and this one does not.
+Burst : ∀ {n} → Ctx n → Ty → Set
+Burst Γ t = List (PlainEvent (Val Γ t))
+
+Stream : ∀ {n} → Ctx n → Ty → Set          -- bursts, in canonical order
+Stream Γ t = List (Burst Γ t)
 
 ------------------------------------------------------------------
 -- The global scheduler
@@ -187,30 +197,6 @@ data NodeState {n} (Γ : Ctx n) : Set where
                -- former happens to be installed over it.  The type is
                -- existential, so each read pays a `_≟ᵗ_`.
   take-st    : ℕ → NodeState Γ                  -- emissions remaining
-  batchSync-st : ∀ {t} → Bool → List (Val Γ t) → NodeState Γ
-               -- THE ONE BIT A PLAIN OPERATOR MAY KNOW ABOUT SYNCHRONY,
-               -- AND THE BUFFER THAT BIT IS FOR.  The bit is whether
-               -- this node's own subscribe call has returned: set when
-               -- the node is installed, cleared at the flush, which is
-               -- exactly the bracket the TypeScript `captureSync` holds
-               -- open between `sync = true` and the `sync = false`
-               -- after `obs.subscribe(…)` returns.
-               --
-               -- THE BUFFER IS WHAT A PER-VALUE MACHINE NEEDS AND A
-               -- BURST-COLLECTING ONE DID NOT.  While a subscribe
-               -- handed its whole output back as a list, the bracket
-               -- could be honoured by GROUPING that list and the node
-               -- held one bit.  Values now descend one at a time, so
-               -- there is no list at the moment of grouping and the
-               -- operator has to hold what arrived while its bit was
-               -- up -- which is what the TypeScript does, and the
-               -- reading that a burst IS a batch was only ever a fact
-               -- about how this machine carried a source's output.
-               -- Nothing else about the values is recorded, and
-               -- nothing can be: the bit says which side of one call
-               -- we are on, never where a value came from nor whether
-               -- more is owed.  The element type is existential, so
-               -- each read pays a `_≟ᵗ_`.
   mergeAll-st : ∀ {t} → (limit : Maybe ℕ) (active : ℕ)
                (queued : List (Val Γ (obs t))) (outerDone : Bool) → NodeState Γ
                -- ONE state for every concurrency.  The two states this
@@ -226,6 +212,15 @@ data NodeState {n} (Γ : Ctx n) : Set where
                -- face did not pay one before and its clauses now do.
   switch-st  : (currentInner : Maybe NodeId) (outerDone : Bool) → NodeState Γ
   exhaust-st : (innerActive outerDone : Bool) → NodeState Γ
+  batchSync-st : Bool → NodeState Γ
+               -- ONE BIT AND NO BUFFER, WHICH IS WHAT THE BURST MODEL
+               -- TAKES AWAY.  A subscription hands its whole output back
+               -- as BURSTS, so the group a bracket wants is already
+               -- assembled by the time a frame sees it and there is
+               -- nothing to accumulate.  What is left is the bit itself:
+               -- whether the subscribe call has returned, which is the
+               -- one thing about synchrony a plain rxjs operator may
+               -- know and the whole of what `captureSync` reads.
 
 NodeSt : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Set
 NodeSt {Γ = Γ} e = List (NodeId × NodeState Γ)   -- assoc list, subscription order
@@ -453,6 +448,21 @@ st-init e = record { registry = [] ; nodes = []
                    ; delivered = [] ; cancelled = [] ; dying = [] }
   -- all populated by the root subscribeE and by lazy share connects
 
+-- A SOURCE THAT LIVES AND DIES INSIDE ITS OWN SUBSCRIPTION BURST
+-- (`ofᵉ`, `emptyᵉ`, `take 0`, a cold with no async tail): its values
+-- and the end, as ONE burst, with nothing registered and nothing
+-- scheduled.  It is pure, and that is the protocol leaving: the old
+-- shape minted a source so an `init`/`close` pair had something to
+-- name, and a plain carrier has neither event to carry.
+oneShotBurst : ∀ {n} {Γ : Ctx n} {u} → List (Val Γ u) → Stream Γ u
+oneShotBurst vals = (map valueᵖ vals ++ completeᵖ ∷ []) ∷ []
+
+-- A source already spent before this subscription reached it — a
+-- completed Subject, a share whose def has closed, or a slot the
+-- registration's own floor test refuses.  The end, immediately.
+spentBurst : ∀ {n} {Γ : Ctx n} {u} → Stream Γ u
+spentBurst = (completeᵖ ∷ []) ∷ []
+
 -- the arrival's source's live chains, in subscription order, at
 -- exactly the arrival's element type: a chain is admitted only past a
 -- Ty equality check, so no payload is ever read at the wrong type (a
@@ -477,126 +487,131 @@ chainsOf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
          → (a : Arrival Γ) → EvalSt e → List (RegId × AtFloor Γ (arrTy a) t)
 chainsOf a st = chainsGo a (EvalSt.registry st)
 
--- WHETHER AN EVENT IS THE END, which is the only thing anyone reads
--- off one: a share's fan-out dispatches a value to `emit` and an end
--- to `close`, and that choice is the whole of the test.
-isFinᵖ : ∀ {A : Set} → PlainEvent A → Bool
-isFinᵖ (valueᵖ _) = false
-isFinᵖ completeᵖ  = true
+-- SPLITTING A BURST INTO WHAT A FRAME STEPS AND WHAT IT REACTS TO.
+-- A plain burst carries values and, at most, the end; the values are
+-- what the frame transforms and the end is the `fin` bit threaded
+-- alongside.  With the protocol out of the carrier there is no third
+-- column: nothing has to be retagged across a payload type, because
+-- nothing but a value carries one.
+splitEvents : ∀ {n} {Γ : Ctx n} {u} → Burst Γ u → List (Val Γ u) × Bool
+splitEvents []              = [] , false
+splitEvents (valueᵖ v ∷ es) = let (vs , c) = splitEvents es in v ∷ vs , c
+splitEvents (completeᵖ ∷ es) = let (vs , _) = splitEvents es in vs , true
 
--- THE PER-FRAME SEMANTICS, AND EVERY ONE OF THEM TAKES ONE VALUE.
--- The deep recursion -- a subscription's synchronous run re-entering
--- the pipeline -- lives in the subscribe cycle, and what lives here is
--- what a frame does to a single arriving value: one application, one
--- fold step, one decrement, one buffer append.  There is no list, and
--- the absence is the whole point.  A frame that was handed the whole
--- of its source's output could group it, count it, or truncate it
--- knowing how much was coming; none of those is a capability rxjs
--- gives an operator, and each was reachable here only because a
--- source was run to the end before any of it descended.
+splitBurst : ∀ {n} {Γ : Ctx n} {u} → Stream Γ u → List (Val Γ u) × Bool
+splitBurst []         = [] , false
+splitBurst (b ∷ bs) =
+  let (vs  , c ) = splitEvents b
+      (vs′ , c′) = splitBurst bs
+  in vs ++ vs′ , c ∨ c′
+
+hasComplete : ∀ {n} {Γ : Ctx n} {u} → Burst Γ u → Bool
+hasComplete = any isFinᵖ
+  where isFinᵖ : ∀ {A : Set} → PlainEvent A → Bool
+        isFinᵖ (valueᵖ _) = false
+        isFinᵖ completeᵖ  = true
+
+burstCompleted : ∀ {n} {Γ : Ctx n} {u} → Stream Γ u → Bool
+burstCompleted = any hasComplete
+
+-- THE PER-FRAME SEMANTICS, AND EVERY ONE OF THEM TAKES A BURST.  A
+-- subscription hands its whole output back at once, so what arrives
+-- at a frame is a LIST of values that a single incoming emit caused —
+-- which is exactly what an rxjs operator sees inside one synchronous
+-- turn, and is why the bracket below needs no buffer.  The threaded
+-- Bool is "this stream completes as part of THIS burst": raised by a
+-- spent source or a take's cut, absorbed by the `*All` frames, turned
+-- into a `completeᵖ` only at the root.
 --
--- Missing or mistyped node state -- impossible by the subscription
--- invariant -- degrades to forwarding NOTHING, never to a wrong read,
--- which is why each of these returns a `Maybe` rather than a value.
+-- Missing or mistyped node state — impossible by the subscription
+-- invariant — degrades to forwarding NOTHING, never to a wrong read.
 
--- THE STATELESS STEP, AND IT READS NO NODE AT ALL.  A map's whole
--- effect is one application, so unlike every other frame here it has
--- no dispatch: there is no cell to read, no type to decide against
--- what is installed, and so no stuck arm to state.  The frame's own
--- declaration says the same thing from the other side by owning no
--- `NodeId`.  It is not written as a function because there is nothing
--- left to write: the relation applies the closure.
+-- take's emission split: pass through up to the remaining budget,
+-- reporting the new remaining count and whether this burst hit the
+-- limit.  Real `take` cuts MID-BURST rather than waiting for the burst
+-- to finish, which is what the third component says and what the
+-- dispatch below acts on.
+takeVals : ∀ {n} {Γ : Ctx n} {s} → ℕ → List (Val Γ s) → List (Val Γ s) × ℕ × Bool
+takeVals zero          _        = [] , zero , false
+takeVals (suc k)       []       = [] , suc k , false
+takeVals (suc zero)    (v ∷ _)  = v ∷ [] , zero , true
+takeVals (suc (suc k)) (v ∷ vs) =
+  let (out , rem , didCut) = takeVals (suc k) vs in v ∷ out , rem , didCut
 
--- THE ACCUMULATING STEP, WHICH IS ONE APPLICATION WITH THE CELL
--- THREADED.  The function is handed the carried state and the value
--- and hands back the next state, which is also what leaves -- so the
--- step reads the cell, applies, writes back, and emits what it wrote.
--- A cell of the wrong type emits nothing and writes nothing, stated
--- as a function so no prover can prefer that arm at a node that
--- really does hold the state.
-scanStep : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-         → FnClo Γ (u ×ᵗ s) u → NodeId → Val Γ s → EvalSt e
-         → Maybe (Val Γ u) × EvalSt e
-scanStep {u = u} fn nid v st with lookupNode nid (EvalSt.nodes st)
-... | just (cell-st {w} ac) with w ≟ᵗ u
-...   | no  _    = nothing , st
-...   | yes refl =
-        let ac′ = applyClo fn (ac , v)
-        in just ac′ , record st { nodes = setNode nid (cell-st ac′) (EvalSt.nodes st) }
-scanStep fn nid v st | _ = nothing , st
+-- take's whole step.  Non-cut passes the budgeted prefix through and
+-- threads the remaining count; the cut exhausts the budget, forces the
+-- end, and severs the registrations threaded through this node.
+takeDispatch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+             → NodeId → List (Val Γ s) → Bool → Sched Γ → EvalSt e
+             → Maybe (NodeState Γ)
+             → List (Val Γ s) × Bool × Sched Γ × EvalSt e
+takeDispatch nid vals fin sched st (just (take-st k)) =
+  if proj₂ (proj₂ (takeVals k vals))
+  then (let (kept , cutRids) = cutThrough nid (EvalSt.registry st)
+        in proj₁ (takeVals k vals) , true ,
+           record sched { live = sweepLive kept (Sched.live sched) } ,
+           record st { registry = kept
+                     ; cancelled = cutRids ++ EvalSt.cancelled st
+                     ; nodes = setNode nid (take-st zero) (EvalSt.nodes st) })
+  else (proj₁ (takeVals k vals) , fin , sched ,
+        record st { nodes = setNode nid (take-st (proj₁ (proj₂ (takeVals k vals))))
+                                      (EvalSt.nodes st) })
+takeDispatch nid vals fin sched st _ = [] , fin , sched , st
 
--- TAKE, AND THE COUNT IS SPENT ONE VALUE AT A TIME BECAUSE THAT IS
--- WHAT rxjs DOES.  Real `take` was run against a four-item synchronous
--- source, against a `mergeAll` of two inner bursts, and at zero; it
--- emits the nth value and completes AFTER it, and it cuts mid-burst
--- rather than waiting for the burst to finish.  Both facts are
--- properties of a per-value decrement and neither survives a
--- budgeted-prefix reading of a whole list.  The Bool is whether THIS
--- value was the last one owed, which is where the cut happens.
-takeStep : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-         → NodeId → EvalSt e → Maybe Bool × EvalSt e
-takeStep nid st with lookupNode nid (EvalSt.nodes st)
-... | just (take-st (suc k)) =
-      just (k ≡ᵇ 0) , record st { nodes = setNode nid (take-st k) (EvalSt.nodes st) }
-... | _ = nothing , st
+-- scan's per-value fold: one running output per input, threading the
+-- accumulator.  Its output IS its carried state, which is what rxjs's
+-- `scan` is and why the seed lives in the cell rather than in the type.
+scanVals : ∀ {n} {Γ : Ctx n} {s u} → FnClo Γ (u ×ᵗ s) u
+         → Val Γ u → List (Val Γ s) → List (Val Γ u) × Val Γ u
+scanVals fn ac []       = [] , ac
+scanVals fn ac (v ∷ vs) =
+  let ac′           = applyClo fn (ac , v)
+      (outs , last) = scanVals fn ac′ vs
+  in ac′ ∷ outs , last
 
--- THE CUT ITSELF, which take performs on the value that exhausts it:
--- the registrations threaded through this node are severed and the
--- scheduler's live sources swept of anything nothing reads any more.
-cutAt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-      → NodeId → Sched Γ → EvalSt e → Sched Γ × EvalSt e
-cutAt nid sched st =
-  let (kept , cutRids) = cutThrough nid (EvalSt.registry st)
-  in record sched { live = sweepLive kept (Sched.live sched) } ,
-     record st { registry = kept
-               ; cancelled = cutRids ++ EvalSt.cancelled st
-               ; nodes = setNode nid (take-st zero) (EvalSt.nodes st) }
+-- THE SCAN'S WHOLE STEP, AS ONE FUNCTION OF WHAT THE NODE HOLDS.  A
+-- fold that finds no accumulator of its own element type emits nothing
+-- and writes nothing.  Stating it as a function rather than as two
+-- constructors is what stops a prover choosing the empty reading at a
+-- node that really does hold an accumulator: the relation then has one
+-- arm and no arm to prefer.
+scanDispatch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+             → FnClo Γ (u ×ᵗ s) u → NodeId → List (Val Γ s) → Bool
+             → Sched Γ → EvalSt e → Maybe (NodeState Γ)
+             → List (Val Γ u) × Bool × Sched Γ × EvalSt e
+scanDispatch {u = u} fn nid vals fin sched st (just (cell-st {w} a))
+  with w ≟ᵗ u
+... | no  _    = [] , fin , sched , st
+... | yes refl =
+      proj₁ (scanVals fn a vals) , fin , sched ,
+      record st { nodes = setNode nid (cell-st (proj₂ (scanVals fn a vals)))
+                                  (EvalSt.nodes st) }
+scanDispatch fn nid vals fin sched st _ = [] , fin , sched , st
 
--- THE BRACKET, ARRIVING SIDE.  While the bit is up the value is
--- BUFFERED and nothing leaves; once it is down every value leaves as
--- its own group of one.  That is the TypeScript's `isSync` exactly,
--- and it is the whole of what a plain operator may know about
--- synchrony.
-batchSyncPush : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-              → NodeId → Val Γ s → EvalSt e
-              → Maybe (Val Γ (s ×ᵗ listᵗ s)) × EvalSt e
-batchSyncPush {s = s} nid v st with lookupNode nid (EvalSt.nodes st)
-... | just (batchSync-st {w} true buf) with w ≟ᵗ s
-...   | no  _    = nothing , st
-...   | yes refl =
-        nothing , record st { nodes = setNode nid (batchSync-st true (buf ++ v ∷ []))
-                                              (EvalSt.nodes st) }
-batchSyncPush nid v st | just (batchSync-st false _) = just (v , []) , st
-batchSyncPush nid v st | _                           = nothing , st
+-- THE BRACKET, AND THE BURST IS THE BATCH.  While the bit is up —
+-- inside the subscribe call — the whole burst leaves as ONE value
+-- carrying all of it, head and tail, so the result is nonempty by
+-- construction and needs no `Ty` former of its own; an empty burst
+-- produces no value at all rather than an empty group, which is what
+-- the TypeScript does when its burst array comes back empty.  Once the
+-- bit is down every value leaves as its own group of one.  That is the
+-- TypeScript's `isSync` exactly, and it is the whole of what a plain
+-- operator may know about synchrony.
+batchVals : ∀ {n} {Γ : Ctx n} {s} → Bool → List (Val Γ s)
+          → List (Val Γ (s ×ᵗ listᵗ s))
+batchVals _     []       = []
+batchVals true  (v ∷ vs) = (v , vs) ∷ []
+batchVals false (v ∷ vs) = (v , []) ∷ batchVals false vs
 
--- THE BRACKET, CLOSING SIDE, AND IT IS WHERE THE GROUP IS BUILT.  The
--- subscribe call has returned, so whatever was buffered leaves as ONE
--- value carrying all of it, head and tail -- nonempty by construction,
--- which is why the result needs no `Ty` former of its own.  An empty
--- buffer produces no value at all rather than an empty group, which is
--- what the TypeScript does when its burst array comes back empty.  The
--- bit is cleared either way, so a body that emitted nothing on
--- subscribe leaves this node in the async state exactly as one that
--- emitted three does.
-batchSyncFlush : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-               → NodeId → EvalSt e
-               → Maybe (Val Γ (s ×ᵗ listᵗ s)) × EvalSt e
-batchSyncFlush {Γ = Γ} {s = s} nid st with lookupNode nid (EvalSt.nodes st)
-... | just (batchSync-st {w} _ buf) with w ≟ᵗ s
-...   | no  _    = nothing , record st { nodes = setNode nid (batchSync-st {t = s} false [])
-                                                         (EvalSt.nodes st) }
-...   | yes refl = grp buf , record st { nodes = setNode nid (batchSync-st {t = s} false [])
-                                                         (EvalSt.nodes st) }
-        where grp : List (Val Γ s) → Maybe (Val Γ (s ×ᵗ listᵗ s))
-              grp []       = nothing
-              grp (x ∷ xs) = just (x , xs)
-batchSyncFlush {Γ = Γ} {s = s} nid st | _ =
-  nothing , record st { nodes = setNode nid (batchSync-st {t = s} false []) (EvalSt.nodes st) }
+batchDispatch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+              → NodeId → List (Val Γ s) → EvalSt e → Maybe (NodeState Γ)
+              → List (Val Γ (s ×ᵗ listᵗ s))
+batchDispatch nid vals st (just (batchSync-st sync)) = batchVals sync vals
+batchDispatch nid vals st _                          = []
 
 -- a from-inner completion is absorbed iff some registration under this inner
 -- instance is still live: its path threads `inst`, it is not cancelled, and it
--- is not an already-delivered dying-source chain.  Top-level (not from-inner-
--- local) so a proof can case-split the absorb vs. finish paths.
+-- is not an already-delivered dying-source chain.
 aliveThroughᶠ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
               → NodeId → EvalSt e → RegRow Γ t → Bool
 aliveThroughᶠ inst st (rid , rs , (w , p)) =
@@ -605,11 +620,23 @@ aliveThroughᶠ inst st (rid , rs , (w , p)) =
   ∧ (not (memberSource (regSource rs) (EvalSt.dying st))
      ∨ not (any (_≡ᵇ rid) (EvalSt.delivered st)))
 
-
 -- IS THERE A FREE LANE?  `nothing` is rxjs's Infinity, so always.
 hasRoom : Maybe ℕ → ℕ → Bool
 hasRoom nothing  active = true
 hasRoom (just m) active = active <ᵇ m
+
+-- bump the live count on whatever state the node holds NOW.  Re-reading
+-- the table rather than writing back a count captured before the
+-- subscription is not fastidiousness: the inner's own synchronous burst
+-- can route back through THIS node and finish there, and a captured
+-- count silently discards that drain — the freed lane is refilled and
+-- then un-freed by a stale write.
+mergeAllBump : ∀ {n} {Γ : Ctx n} → NodeId → Bool
+            → List (NodeId × NodeState Γ) → List (NodeId × NodeState Γ)
+mergeAllBump nid done ns with lookupNode nid ns
+... | just (mergeAll-st lim act q od) =
+      setNode nid (mergeAll-st lim (if done then act else suc act) q od) ns
+... | _ = ns
 
 -- switchAll's cut: the outgoing inner's registrations are severed
 switchKill : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
@@ -628,8 +655,7 @@ switchKill (just v) sched₀ st₀ =
 -- the table carries that type existentially; a switch wants its own,
 -- which holds no type to disagree about; an exhaust wants its own with
 -- nothing already running, because a busy exhaust refuses the arrival
--- outright.  Every other reading -- another operator's state, a
--- mismatched element type, no node -- is the collapse, and naming the
+-- outright.  Every other reading is the collapse, and naming the
 -- collapse is what lets the relation's fallback carry a side condition
 -- instead of standing free at every state.
 consumeUsable : ∀ {n} {Γ : Ctx n} → AllOp → (u : Ty) → Maybe (NodeState Γ) → Bool
@@ -638,150 +664,50 @@ consumeUsable switchᵒ   u (just (switch-st _ _))           = true
 consumeUsable exhaustᵒ  u (just (exhaust-st false _))      = true
 consumeUsable _         _ _                                = false
 
--- THE OUTER HAS FINISHED, RECORDED AND NOTHING ELSE.  An `*All`
--- outlives its outer for exactly as long as something is still
--- running under it, so what this does is set the bit; whether the
--- operator is now finished is a READING of the store, and the reading
--- is `allFinished` below.  Splitting the two is not tidiness: between
--- the write and the question a lane can be drained and refilled, so a
--- verdict computed at the write is a verdict about a store that no
--- longer stands.
-markOuterDone : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-              → AllOp → NodeId → EvalSt e → EvalSt e
-markOuterDone mergeAllᵒ nid st with lookupNode nid (EvalSt.nodes st)
+-- AND THE SAME QUESTION ON THE WAY BACK UP, WHERE AN INNER HAS DIED
+-- AND ITS OPERATOR HAS TO FINISH IT.  A merge finishes against its own
+-- node at its own element type, because that is the queue it drains; a
+-- switch finishes only the inner it currently believes is running, so
+-- a late death from an already-replaced inner clears nothing; an
+-- exhaust finishes against its own node whatever the running flag
+-- says, since clearing it is the whole point.
+finishUsable : ∀ {n} {Γ : Ctx n} → AllOp → (s : Ty) → NodeId
+             → Maybe (NodeState Γ) → Bool
+finishUsable mergeAllᵒ s inst (just (mergeAll-st {w} _ _ _ _)) = ⌊ w ≟ᵗ s ⌋
+finishUsable switchᵒ   s inst (just (switch-st (just c) _))    = c ≡ᵇ inst
+finishUsable exhaustᵒ  s inst (just (exhaust-st _ _))          = true
+finishUsable _         _ _    _                                = false
+
+-- THE OUTER HAS FINISHED, RECORDED AND READ BACK IN ONE BREATH.  An
+-- `*All` outlives its outer for exactly as long as something is still
+-- running under it, so the bit is written and the verdict is a READING
+-- of the store as it then stands — a lane can be drained and refilled
+-- while the outer's own burst is still being walked, so a verdict
+-- computed before the write is a verdict about a store that no longer
+-- holds.
+thruWrap : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+         → AllOp → NodeId → Bool
+         → List (Val Γ u) × Sched Γ × EvalSt e
+         → List (Val Γ u) × Bool × Sched Γ × EvalSt e
+thruWrap op nid false (vs , sched′ , st′) = vs , false , sched′ , st′
+thruWrap mergeAllᵒ nid true (vs , sched′ , st′)
+  with lookupNode nid (EvalSt.nodes st′)
 ... | just (mergeAll-st lim act q _) =
-      record st { nodes = setNode nid (mergeAll-st lim act q true) (EvalSt.nodes st) }
-... | _ = st
-markOuterDone switchᵒ nid st with lookupNode nid (EvalSt.nodes st)
+      vs , (act ≡ᵇ 0) ∧ null q , sched′ ,
+      record st′ { nodes = setNode nid (mergeAll-st lim act q true) (EvalSt.nodes st′) }
+... | _ = vs , true , sched′ , st′
+thruWrap switchᵒ nid true (vs , sched′ , st′)
+  with lookupNode nid (EvalSt.nodes st′)
 ... | just (switch-st cur _) =
-      record st { nodes = setNode nid (switch-st cur true) (EvalSt.nodes st) }
-... | _ = st
-markOuterDone exhaustᵒ nid st with lookupNode nid (EvalSt.nodes st)
+      vs , is-nothing cur , sched′ ,
+      record st′ { nodes = setNode nid (switch-st cur true) (EvalSt.nodes st′) }
+... | _ = vs , true , sched′ , st′
+thruWrap exhaustᵒ nid true (vs , sched′ , st′)
+  with lookupNode nid (EvalSt.nodes st′)
 ... | just (exhaust-st act _) =
-      record st { nodes = setNode nid (exhaust-st act true) (EvalSt.nodes st) }
-... | _ = st
-
--- AN INNER HAS FINISHED, WHICH FREES ITS LANE.  The merge drops its
--- live count; the switch clears the current inner only if this IS the
--- current one, so a late death from an already-replaced inner clears
--- nothing; the exhaust clears its flag whatever it said, since
--- clearing it is the whole point.  What a merge then does with a freed
--- lane and a nonempty queue is the relation's, because draining one
--- means SUBSCRIBING -- which is also why no verdict is returned here:
--- the question is asked after the drain, of the store the drain left.
-markInnerDone : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-              → AllOp → NodeId → NodeId → EvalSt e → EvalSt e
-markInnerDone mergeAllᵒ nid inst st with lookupNode nid (EvalSt.nodes st)
-... | just (mergeAll-st lim act q od) =
-      record st { nodes = setNode nid (mergeAll-st lim (pred act) q od) (EvalSt.nodes st) }
-... | _ = st
-markInnerDone switchᵒ nid inst st with lookupNode nid (EvalSt.nodes st)
-... | just (switch-st (just c) od) =
-      if c ≡ᵇ inst
-      then record st { nodes = setNode nid (switch-st nothing od) (EvalSt.nodes st) }
-      else st
-... | _ = st
-markInnerDone exhaustᵒ nid inst st with lookupNode nid (EvalSt.nodes st)
-... | just (exhaust-st _ od) =
-      record st { nodes = setNode nid (exhaust-st false od) (EvalSt.nodes st) }
-... | _ = st
-
--- THE QUEUE, TAKEN OUT WHOLE AND LEFT EMPTY BEHIND.  A drain
--- subscribes, and subscribing runs arbitrary user code that can park
--- FURTHER inners on this same node, so a drain that read the queue one
--- head at a time out of the store would be walking a list the walk
--- itself extends -- with nothing decreasing.  Handing the queue over
--- bodily makes it an ORDINARY LIST the relation carries and recurses
--- on, and leaves the store's own queue holding exactly what arrived
--- DURING the drain, which is where it belongs: those arrivals are
--- later than everything being drained and must stay behind them.
--- Only a merge has a queue: a switch keeps none and an exhaust drops
--- rather than parks.
-mergeAllQueue : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-              → NodeId → EvalSt e → List (Val Γ (obs s)) × EvalSt e
-mergeAllQueue {s = s} nid st with lookupNode nid (EvalSt.nodes st)
-... | just (mergeAll-st {w} lim act q od) with w ≟ᵗ s
-...   | no  _    = [] , st
-...   | yes refl =
-        q , record st { nodes = setNode nid (mergeAll-st {t = s} lim act [] od)
-                                        (EvalSt.nodes st) }
-mergeAllQueue nid st | _ = [] , st
-
--- IS THERE A FREE LANE AT THIS NODE, RIGHT NOW.  Asked once per drain
--- step rather than computed at the top, because each subscribe fills a
--- lane and the inner it starts may die inside the same breath and free
--- it again.
-mergeRoom : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-          → NodeId → EvalSt e → Bool
-mergeRoom nid st with lookupNode nid (EvalSt.nodes st)
-... | just (mergeAll-st lim act _ _) = hasRoom lim act
-... | _                              = false
-
--- THE LANE, CLAIMED.  Counted as filled BEFORE the subscribe, so an
--- inner that completes synchronously decrements a count that was
--- already raised -- which is the order `mergeMap` itself takes.
-mergeAllClaim : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-              → NodeId → EvalSt e → EvalSt e
-mergeAllClaim nid st with lookupNode nid (EvalSt.nodes st)
-... | just (mergeAll-st lim act q od) =
-      record st { nodes = setNode nid (mergeAll-st lim (suc act) q od)
-                                  (EvalSt.nodes st) }
-... | _ = st
-
--- WHAT THE DRAIN DID NOT REACH, PUT BACK IN FRONT.  A drain stops the
--- moment the lanes are full again, and the undrained tail is older
--- than anything parked while it ran, so it goes ahead of it.
-mergeAllRestore : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-                → NodeId → List (Val Γ (obs s)) → EvalSt e → EvalSt e
-mergeAllRestore {s = s} nid os st with lookupNode nid (EvalSt.nodes st)
-... | just (mergeAll-st {w} lim act q od) with w ≟ᵗ s
-...   | no  _    = st
-...   | yes refl =
-        record st { nodes = setNode nid (mergeAll-st lim act (os ++ q) od)
-                                    (EvalSt.nodes st) }
-mergeAllRestore nid os st | _ = st
-
--- AND THE PARK, which is where a saturated merge puts an arriving
--- inner.  It queues the OBSERVABLE and not the inner's values, which
--- is what rxjs queues -- a lane that is full has not subscribed
--- anything, so there are no values to hold.
-mergeAllPark : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-             → NodeId → Val Γ (obs s) → EvalSt e → EvalSt e
-mergeAllPark {s = s} nid o st with lookupNode nid (EvalSt.nodes st)
-... | just (mergeAll-st {w} lim act q od) with w ≟ᵗ s
-...   | no  _    = st
-...   | yes refl =
-        record st { nodes = setNode nid (mergeAll-st lim act (q ++ o ∷ []) od)
-                                    (EvalSt.nodes st) }
-mergeAllPark nid o st | _ = st
-
--- IS THE OPERATOR FINISHED, READ OFF THE STORE AS IT NOW STANDS.  An
--- `*All` closes when its outer has closed AND nothing is left under
--- it, and both halves move while a cascade is running -- a drained
--- lane refills, an inner dies -- so the answer is a reading rather
--- than something a clause can carry.  A node that is not this
--- operator's reads as finished, which is the same stuck reading every
--- dispatch here takes: forward nothing, never a wrong read.
-allFinished : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-            → AllOp → NodeId → EvalSt e → Bool
-allFinished mergeAllᵒ nid st with lookupNode nid (EvalSt.nodes st)
-... | just (mergeAll-st _ act q od) = od ∧ (act ≡ᵇ 0) ∧ null q
-... | _                             = true
-allFinished switchᵒ nid st with lookupNode nid (EvalSt.nodes st)
-... | just (switch-st cur od) = od ∧ is-nothing cur
-... | _                       = true
-allFinished exhaustᵒ nid st with lookupNode nid (EvalSt.nodes st)
-... | just (exhaust-st act od) = od ∧ not act
-... | _                        = true
-
--- HAS THIS TAKE ALREADY CUT?  The count reaching zero is what severs
--- the registrations and emits the end, so a source completing AFTER
--- that must not emit a second one -- the chain is already closed, and
--- in rxjs an unsubscribed chain is silent.
-takeSpent : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → NodeId → EvalSt e → Bool
-takeSpent nid st with lookupNode nid (EvalSt.nodes st)
-... | just (take-st zero) = true
-... | _                   = false
+      vs , not act , sched′ ,
+      record st′ { nodes = setNode nid (exhaust-st act true) (EvalSt.nodes st′) }
+... | _ = vs , true , sched′ , st′
 
 
 -- a shared slot: identity IS the index, source toℕ i (a hot's
