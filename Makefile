@@ -1280,7 +1280,7 @@ NODRIFT := --drift 1000000
 dev-changed-selftest:
 	@fail=0; \
 	  m=scripts/dev-changed-selftest/Heavy.agda; mr=--src-root\ scripts/dev-changed-selftest; \
-	  n=agda/src/Rx/Evaluator/Reducible.agda; \
+	  n=agda/src/Rx/Mint.agda; \
 	  out=$$(scripts/dev-changed.py --verdict-only $(NODRIFT) --assume-stamp HEAD $$mr --files $$m 2>&1); ec=$$?; \
 	  echo "$$out" | grep -q 'FULL GATE REQUIRED' \
 	    || { echo "SELFTEST FAIL: a multi-member block did not escalate — agda-dev stubs those, so a light gate there is not a check"; fail=1; }; \
