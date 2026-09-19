@@ -229,14 +229,16 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 
 ### Big picture tier roadmap
 
-- **THEN THE LANE DRAIN, THE BUILDER'S LAST CUT CYCLE.** `drainQueue!`
-  is what remains of the two edges that closed a loop: a parked lane's
-  backlog is spent under a frame whose own closing side runs the drain.
-  It is stated over a `Handles` it is handed, so the cycle is not the
-  term face but the walk's `from-inner` side — and the levels now give a
-  place to stand that a single file did not. The question the leg
-  answers is which measure the queue offers, since the bound's count is
-  untouched by a drain and the path does not shorten.
+- **THEN THE LANE DRAIN, ON THE PAIR ITS HEADER NOW NAMES.** The measure
+  question is answered in `drainQueue!`'s own header: the parked total
+  falls when the queue is popped whole, and the only thing that can put
+  items back is a share fan-out, whose path is installed by a connect —
+  so the bound is the unconnected count and the parked total read
+  LEXICOGRAPHICALLY. What the leg carries out is the second index: a
+  `queued` measure, the obligation that a subscribe either leaves it no
+  larger or drops the count, and the level telescope widened to take
+  both. The residue is stated at full strength and the leaves are minted
+  only where this parent can spend them.
 
 - **THEN THE FLATTENERS AND `takeᵖ`, AND NO FORMER IS OWED AFTER ALL
   (Anthony: "the flattens, mergeAll etc, _are_ the primitives … they can

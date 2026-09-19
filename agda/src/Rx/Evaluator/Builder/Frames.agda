@@ -83,6 +83,30 @@ postulate
   -- count lemma is one member of an indivisible block it shares with
   -- `unconn-emit`, `unconn-close`, `unconn-emits` and `unconn-subs`.
   --
+  -- WHICH MEASURE THE QUEUE OFFERS, AND IT IS A PAIR RATHER THAN A
+  -- NUMBER.  A drain pops the node's queue WHOLE, so the store it
+  -- recurses under holds strictly fewer parked inners than the one it
+  -- was handed.  That count alone cannot be the bound, because a
+  -- subscribe run DURING the drain may park again -- and the pair
+  -- survives exactly that, since a park is not free.  An inner's own
+  -- values travel UP its frame and park nothing, so a park during a
+  -- drain needs the node's OUTER to fire, and the drain is not walking
+  -- the outer's chain.  The one edge that reaches a chain the walk is
+  -- not on is the share fan-out, and its path constructor is installed
+  -- by a connect and by nothing else -- so regrowth costs the count
+  -- the builder is ALREADY ordered by, and the measure is that count
+  -- and the parked total read LEXICOGRAPHICALLY, where the second
+  -- component is free to jump because it jumps only where the first
+  -- has fallen.  That is read off the subscribe relation's own
+  -- constructors rather than instantiated, which is why the obligation
+  -- below is stated as a statement and not as a remark.
+  --
+  -- AND WHAT THE PAIR OWES, stated so it can be refuted rather than
+  -- assumed: a subscribe either leaves the parked total no larger or
+  -- strictly drops the unconnected count.  One more induction over the
+  -- delivery relations, in the idiom of the count's own -- and the
+  -- leaves for it are not minted until this parent can spend them.
+  --
   -- DEAD ROUTE: writing it as a body here needs the general path walk,
   --   and the walk's own `from-inner` CLOSING side is what runs the drain
   --   -- so the direct route does not fail on difficulty, it fails by
