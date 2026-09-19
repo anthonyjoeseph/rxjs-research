@@ -589,26 +589,34 @@ mutual
   unconn-go (go-fin _ c g)    = ≤-trans (unconn-go g) (unconn-close c)
 
 
--- THE PARKED TOTAL'S HALF, AND IT IS A DISJUNCTION WHERE THE COUNT'S
--- WAS A BOUND.  The count never rises, so its obligation is a plain
--- `≤`; the parked total DOES rise, at exactly the arm that parks an
--- arriving inner, so the honest statement is that a step either leaves
--- it no larger or strictly drops the count.  A park is reached only
--- through the node's outer, and the only thing that fires a chain the
--- walk is not on is a share fan-out, whose path a connect installs --
--- so the arm that raises this total is the arm that pays for it.
+-- THE PARKED TOTAL'S HALF, AND IT IS FALSE AS WRITTEN.  The count
+-- never rises, so its obligation is a plain `≤`; the parked total
+-- DOES rise, at exactly the arm that parks an arriving inner, so the
+-- reading attempted here is that a step either leaves it no larger or
+-- strictly drops the count.  What was meant to pay for a park is a
+-- connect further up the run -- the fan-out that fires a chain the
+-- walk is not standing on -- and THE STEP RELATION DOES NOT CARRY
+-- THAT.  It quantifies over every path and every store, so the park
+-- arm is reachable as a LEAF, with the count unmoved and the parked
+-- total one higher, and neither disjunct is available there.
+--
+-- SO WHAT IS OWED IS A RESTATEMENT, NOT AN INDUCTION.  The fact the
+-- conclusion needs -- that the run reaching this store went through a
+-- connect -- appears in none of these hypotheses, and no arm-by-arm
+-- grind can supply it.  Either the statement quantifies over a
+-- restricted class of paths, or the connect's payment is carried in
+-- the store rather than inferred from the derivation.
 --
 -- AND ONLY THE FIVE THE BUILDER SPENDS ARE STATED, THOUGH THE
--- INDUCTION IS ELEVEN.  The cycle is mutually defined, so the proof
--- will be over all of it at once -- but the other six are members of
+-- INDUCTION IS ELEVEN.  The cycle is mutually defined, so a proof
+-- would be over all of it at once -- but the other six are members of
 -- a body nobody has written, and a leaf is minted when a parent can
--- spend it and not before.  They come back as clauses of that mutual
--- block, not as postulates waiting for one.
+-- spend it and not before.
 --
--- TWIN: `unconn-emit` and its ten siblings, which are this same
---   induction over this same cycle with `≤` where these have a
---   disjunction -- so the arm-by-arm correspondence is exact and the
---   only arms that differ are the ones that touch a node's queue.
+-- REFUTED: `Refuted.Park-Unpaid`, which inhabits this hypothesis at a
+--   saturated `mergeAll` and reads both disjuncts off the resulting
+--   store.  It is stated over `emit⇓`, which is the weakest of the
+--   five; the other four reach the same arm through it.
 postulate
   queued-emit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
                   {κ : Path Γ lo u t} {now} {v : Val Γ u}

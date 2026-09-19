@@ -229,13 +229,17 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 
 ### Big picture tier roadmap
 
-- **THEN THE CYCLE'S FIVE, WHICH ARE WHAT THE STORE STEPS ARE FOR.** The
-  nine step readings are proven and the setNode lemmas under them are
-  general, so what is left is the induction those nine feed: the same
-  eleven-armed walk over the delivery relations the count's half already
-  took, read for the parked total, where each arm is either a step
-  reading already in hand or a recursive call. Six arms are minted with
-  it, as clauses rather than as leaves.
+- **FIRST, WHERE THE PARK'S PAYMENT IS WRITTEN DOWN, BECAUSE NOTHING
+  CARRIES IT TODAY.** The cycle read for the parked total is refuted at
+  the one arm that raises it: a saturated merge parks with the count
+  unmoved, as a leaf of the relation, so neither disjunct is available
+  and no arm-by-arm grind reaches it. The connect meant to pay for it
+  is above the step, and the step quantifies over every path and every
+  store. Decide between the two repairs — restrict the paths the
+  statement ranges over, or make the connect's payment a quantity the
+  STORE holds, which is what a record field would do and what a
+  derivation cannot — and land the restatement before any of the
+  eleven arms is written.
 
 - **THEN THE DRAIN AS A BODY, WHICH IS WHAT THE WHOLE PAIR WAS FOR.** It
   is the only statement in the builder standing on nothing, and the only
@@ -277,6 +281,10 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
   builder's one remaining cut cycle, a parked lane's backlog spent under the
   frame whose closing side runs the drain. Not instantiated.
 
+- **`queued-{emit,close,emits,subs,drain}`** (Rx.Evaluator.Unconnected) —
+  SHAPE, `REFUTED×5`: the delivery cycle read for the parked total, refuted at
+  the park arm. The conclusion needs a connect no hypothesis mentions.
+
 - **`{mergeAll,switchAll,exhaustAll}ᵖ`** (Rx.Elaborate) — SHAPE,
   `DEAD ROUTE×4`: the elaboration's per-former plumbing, after the two sources
   came out of it. The outer's bookkeeping needs no plain home — it rides the
@@ -288,10 +296,6 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 - **`takeᵖ`** (Rx.Elaborate) — DIFFICULTY, `DEAD ROUTE`: the author cuts on
   VALUES and a plain `takeᵉ` above the envelope cuts on BATCHES, so the
   elaboration owes a count that crosses the level and closes at the cut.
-
-- **`queued-{emit,close,emits,subs,drain}`** (Rx.Evaluator.Unconnected) —
-  GRINDABLE, `TWIN×5`: the delivery cycle read for the parked total instead of
-  the count, where a park forces a disjunction.
 
 ## Tier 2 — the proof statement, once there are two trees to state it over
 

@@ -45,3 +45,12 @@ module Refuted.Main where
 open import Refuted.Domain-Predicate using
   (structural-domain-has-content-false; sub-total)
 
+
+-- AND THE SECOND FLOOR, UNDER THE PAIR THAT REPLACED THE NUMBERS.  A
+-- descent carrying an unconnected count beside a parked total needs
+-- each step to hold the pair, and one arm of the delivery cycle holds
+-- neither half: a saturated merge parks, which raises the parked
+-- total, and parks nothing else, which leaves the count where it was.
+-- What was to pay for it is a connect further up the run, and the
+-- step relation says nothing about the run.
+open import Refuted.Park-Unpaid using (step-preserves-pair-false)
