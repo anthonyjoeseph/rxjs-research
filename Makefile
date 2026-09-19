@@ -1536,6 +1536,17 @@ formers-selftest:
 cli-build: stripped
 	@$(call AGDA_RUN,--compile --compile-dir=../_cli src/CLI/Main.agda)
 
+# NOT A GATE TARGET, AND THAT IS A DECISION RATHER THAN AN OMISSION
+# (Anthony: "we want to officially disable that check from our gate and from
+# ci, so that we can tackle it later").  It is absent from GATE_CHEAP and its
+# CI job is `if: false`; the two are one decision and move together.
+#
+# WHAT IS ALREADY KNOWN ABOUT IT, so that typing it is not a rediscovery: the
+# CLI it links reaches the new evaluator through `CLI.Decode`, a full sweep
+# draws 500 cases with 400 emitting, and 498 of them match.  The two that do
+# not are flattener shapes -- an `exhaustAll` over a `mergeAll` of a doubled
+# inner, and a `switchAll` reading a shared slot -- and they are the work
+# this target is waiting on, not a reason to narrow it.
 oracle: cli-build
 	cd typescript && npm run oracle -- $(ARGS)
 
