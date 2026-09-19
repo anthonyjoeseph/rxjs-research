@@ -19,7 +19,7 @@ open import Data.List using (List; []; _∷_)
 open import Data.List.Relation.Unary.All using (All) renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
 open import Data.Maybe using (nothing; just)
 open import Data.Nat using (ℕ; suc; _<_; _≤_; s≤s; _∸_; _≡ᵇ_)
-open import Data.Nat.Properties using (≤-trans; ∸-monoʳ-<)
+open import Data.Nat.Properties using (≤-refl; ∸-monoʳ-<)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
 open import Data.Vec using (lookup)
@@ -47,10 +47,11 @@ open import Rx.Evaluator.Domain using (emits⇓; subscribeE⇓; consume⇓; drai
   consume-merge-nil; consume-switch-sub; consume-switch-nil; consume-exhaust-sub;
   consume-exhaust-nil; sub-all; dispatchShare⇓; shareGo⇓; disp; go-nil; go-cut; go-val; go-fin;
   emit-sink; close-sink)
-open import Rx.Evaluator.Reducible using (Out; Red; Emits; Closes; Handles; RedFn; RedEnv; unconnected; red-scanned; red-pushed; red-flushed)
-open import Rx.Evaluator.Unconnected using (unconn-latch; unconn-scanStep; unconn-takeStep; unconn-cutAt; unconn-batchSyncPush;
-  unconn-batchSyncFlush; unconn-mergeAllQueue; unconn-markOuterDone; unconn-switchKill-eq;
-  unconn-emit; unconn-close; unconn-subs; unconn-drain)
+open import Rx.Evaluator.Reducible using (Out; Red; Emits; Closes; Handles; RedFn; RedEnv; Bnd; _/_; Budget; budget-step; nodeQueued; red-scanned; red-pushed; red-flushed)
+open import Rx.Evaluator.Unconnected using (budget-setNode; budget-setNode0; budget-deliver; budget-mint; budget-latch; budget-scanStep; budget-takeStep; budget-cutAt; budget-batchSyncPush;
+  budget-batchSyncFlush; budget-mergeAllQueue; budget-markOuterDone; budget-switchKill-eq;
+  unconn-emit; unconn-close; unconn-subs; unconn-drain;
+  queued-emit; queued-close; queued-subs; queued-drain)
 ------------------------------------------------------------------
 -- THE ONE LEAF LEFT, AND WHY IT IS THE ONLY ONE.
 ------------------------------------------------------------------
@@ -128,7 +129,7 @@ postulate
                 (op : AllOp) (nid : NodeId) (κ : Path Γ lo u t)
                 (now : Tick) (q : List (Val Γ (obs u)))
               → Handles {m = m} u κ → (sched : Sched Γ) (st : EvalSt e)
-              → unconnected sched st ≤ m
+              → Budget m sched st
               → Σ (Out e) λ r → drainQueue⇓ {e = e} op nid κ now q sched st r
 
 ------------------------------------------------------------------
@@ -139,13 +140,13 @@ postulate
 -- BE A BODY.  The sink does not walk anything itself: it hands each
 -- admitted chain to a walk it was GIVEN, so the recursion lives at the
 -- caller and this file's share machinery has none.
-Walk : ∀ {n} (Γ : Ctx n) (t : Ty) (m lo : ℕ) → Set
+Walk : ∀ {n} (Γ : Ctx n) (t : Ty) (m : Bnd) (lo : ℕ) → Set
 Walk Γ t m lo = ∀ {u} (κ : Path Γ lo u t) → Handles {m = m} u κ
 
 -- THE PAYLOAD'S CANDIDATE, WHICH ONLY ONE OF THE TWO EVENTS HAS.  An
 -- end carries nothing, so the fan-out's value arm is the only one that
 -- owes a candidate and the completion arm asks for `⊤`.
-RedEv : ∀ {n} {Γ : Ctx n} (m : ℕ) (u : Ty) → PlainEvent (Val Γ u) → Set
+RedEv : ∀ {n} {Γ : Ctx n} (m : Bnd) (u : Ty) → PlainEvent (Val Γ u) → Set
 RedEv m u (valueᵖ v) = Red m u v
 RedEv m u completeᵖ  = ⊤
 
@@ -165,7 +166,7 @@ share-go! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo m} (i : Fin n)
             (w : Walk Γ t m lo) (now : Tick)
             (ev : PlainEvent (Val Γ (lookup Γ i))) → RedEv m (lookup Γ i) ev
           → (ps : List (RegId × Path Γ lo (lookup Γ i) t))
-          → (sched : Sched Γ) (st : EvalSt e) → unconnected sched st ≤ m
+          → (sched : Sched Γ) (st : EvalSt e) → Budget m sched st
           → Σ (Out e) λ r → shareGo⇓ {e = e} now i ev ps sched st r
 share-go! i w now ev rev []              sched st le = _ , go-nil
 share-go! i w now (valueᵖ v) rv ((rid , p) ∷ ps) sched st le
@@ -175,9 +176,10 @@ share-go! i w now (valueᵖ v) rv ((rid , p) ∷ ps) sched st le
 ... | false =
       let ((_ , sched₁ , st₁) , f) =
             proj₁ (w p) rv now sched
-              (record st { delivered = rid ∷ EvalSt.delivered st }) le
+              (record st { delivered = rid ∷ EvalSt.delivered st })
+              (budget-deliver rid sched st le)
           (_ , g) = share-go! i w now (valueᵖ v) rv ps sched₁ st₁
-                      (≤-trans (unconn-emit f) le)
+                      (budget-step le (unconn-emit f) (queued-emit f))
       in _ , go-val eqc f g
 share-go! i w now completeᵖ rv ((rid , p) ∷ ps) sched st le
   with any (_≡ᵇ rid) (EvalSt.cancelled st) in eqc
@@ -186,20 +188,21 @@ share-go! i w now completeᵖ rv ((rid , p) ∷ ps) sched st le
 ... | false =
       let ((_ , sched₁ , st₁) , f) =
             proj₂ (w p) now sched
-              (record st { delivered = rid ∷ EvalSt.delivered st }) le
+              (record st { delivered = rid ∷ EvalSt.delivered st })
+              (budget-deliver rid sched st le)
           (_ , g) = share-go! i w now completeᵖ rv ps sched₁ st₁
-                      (≤-trans (unconn-close f) le)
+                      (budget-step le (unconn-close f) (queued-close f))
       in _ , go-fin eqc f g
 
 
 dispatch-share! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo m} (i : Fin n)
                   (below : lo ≤ toℕ i) (w : Walk Γ t m (suc (toℕ i))) (now : Tick)
                   (ev : PlainEvent (Val Γ (lookup Γ i))) → RedEv m (lookup Γ i) ev
-                → (sched : Sched Γ) (st : EvalSt e) → unconnected sched st ≤ m
+                → (sched : Sched Γ) (st : EvalSt e) → Budget m sched st
                 → Σ (Out e) λ r → dispatchShare⇓ {e = e} now i below ev sched st r
 dispatch-share! i below w now ev rev sched st le =
   let (_ , g) = share-go! i w now ev rev (shareAdmit i (EvalSt.registry st))
-                  sched (shareLatch i (isFinᵖ ev) st) (unconn-latch i (isFinᵖ ev) sched st le)
+                  sched (shareLatch i (isFinᵖ ev) st) (budget-latch i (isFinᵖ ev) sched st le)
   in _ , disp g
 
 handles-share : ∀ {n} {Γ : Ctx n} {t lo m} (i : Fin n) (below : lo ≤ toℕ i)
@@ -219,13 +222,13 @@ handles-share i below w =
 
 emits! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo m} (κ : Path Γ lo u t)
        → Emits {m = m} u κ → (now : Tick) (vs : List (Val Γ u)) → All (Red m u) vs
-       → (sched : Sched Γ) (st : EvalSt e) → unconnected sched st ≤ m
+       → (sched : Sched Γ) (st : EvalSt e) → Budget m sched st
        → Σ (Out e) λ r → emits⇓ {e = e} κ now vs sched st r
 emits! κ em now []       []ᵃ         sched st le = _ , emits-nil
 emits! κ em now (v ∷ vs) (rv ∷ᵃ rs)  sched st le =
   let ((out , sched₁ , st₁) , d) = em rv now sched st le
       (r , ds)                   = emits! κ em now vs rs sched₁ st₁
-                                     (≤-trans (unconn-emit d) le)
+                                     (budget-step le (unconn-emit d) (queued-emit d))
   in _ , emits-cons d ds
 
 ------------------------------------------------------------------
@@ -252,7 +255,7 @@ emits-scan fn nid κ em {v = v} rv now sched st le with scanStep fn nid v st in 
 ... | (nothing , st₁) = _ , emit-scan-stuck seq
 ... | (just ac , st₁) =
       let (r , d) = em (red-scanned fn nid v st seq) now sched st₁
-                      (unconn-scanStep fn nid v sched st seq le)
+                      (budget-scanStep fn nid v sched st seq le)
       in r , emit-scan seq d
 
 handles-scan : ∀ {n} {Γ : Ctx n} {t s u lo m} (fn : FnClo Γ (u ×ᵗ s) u) (nid : NodeId)
@@ -269,15 +272,15 @@ emits-take : ∀ {n} {Γ : Ctx n} {t s lo m} (nid : NodeId) (κ : Path Γ lo s t
 emits-take nid κ (em , cl) rv now sched st le with takeStep nid st in teq
 ... | (nothing , st₁)    = _ , emit-take-spent teq
 ... | (just false , st₁) =
-      let (r , d) = em rv now sched st₁ (unconn-takeStep nid sched st teq le)
+      let (r , d) = em rv now sched st₁ (budget-takeStep nid sched st teq le)
       in r , emit-take-more teq d
 ... | (just true , st₁)  =
-      let le₁                        = unconn-takeStep nid sched st teq le
+      let le₁                        = budget-takeStep nid sched st teq le
           ((out , sched₁ , st₂) , d) = em rv now sched st₁ le₁
           cut                        = cutAt nid sched₁ st₂
           (r , c)                    = cl now (proj₁ cut) (proj₂ cut)
-                                         (unconn-cutAt nid sched₁ st₂
-                                           (≤-trans (unconn-emit d) le₁))
+                                         (budget-cutAt nid sched₁ st₂
+                                           (budget-step le₁ (unconn-emit d) (queued-emit d)))
       in _ , emit-take-last teq d refl c
 
 closes-take : ∀ {n} {Γ : Ctx n} {t s lo m} (nid : NodeId) (κ : Path Γ lo s t)
@@ -302,7 +305,7 @@ emits-batchSync nid κ em {v = v} rv now sched st le
 ... | (nothing , st₁) = _ , emit-batchSync-held peq
 ... | (just g , st₁)  =
       let (r , d) = em (red-pushed nid v st rv peq) now sched st₁
-                      (unconn-batchSyncPush nid v sched st peq le)
+                      (budget-batchSyncPush nid v sched st peq le)
       in r , emit-batchSync peq d
 
 closes-batchSync : ∀ {n} {Γ : Ctx n} {t s lo m} (nid : NodeId)
@@ -311,13 +314,13 @@ closes-batchSync : ∀ {n} {Γ : Ctx n} {t s lo m} (nid : NodeId)
 closes-batchSync {s = s} nid κ (em , cl) now sched st le
   with batchSyncFlush {s = s} nid st in feq
 ... | (nothing , st₁) = let (r , d) = cl now sched st₁
-                                        (unconn-batchSyncFlush nid sched st feq le)
+                                        (budget-batchSyncFlush nid sched st feq le)
                         in r , close-batchSync-empty feq d
 ... | (just g , st₁)  =
-      let le₁                        = unconn-batchSyncFlush nid sched st feq le
+      let le₁                        = budget-batchSyncFlush nid sched st feq le
           ((out , sched₁ , st₂) , d) = em (red-flushed nid st feq) now sched st₁ le₁
           (r , c)                    = cl now sched₁ st₂
-                                         (≤-trans (unconn-emit d) le₁)
+                                         (budget-step le₁ (unconn-emit d) (queued-emit d))
       in _ , close-batchSync feq d c
 
 handles-batchSync : ∀ {n} {Γ : Ctx n} {t s lo m} (nid : NodeId)
@@ -342,11 +345,11 @@ closes-from-inner {s = s} op allNid inst κ hκ now sched st le
   with any (aliveThroughᶠ inst st) (EvalSt.registry st) in aeq
 ... | true  = _ , close-inner-absorb aeq
 ... | false with mergeAllQueue {s = s} allNid (markInnerDone op allNid inst st) in qeq
-...   | (q , st₀) with unconn-mergeAllQueue op allNid inst sched st qeq le
+...   | (q , st₀) with budget-mergeAllQueue op allNid inst sched st qeq le
 ...     | le₀ with drainQueue! op allNid κ now q hκ sched st₀ le₀
 ...       | ((out , sched₁ , st₁) , dd) with allFinished op allNid st₁ in feq
 ...         | true  = let (r , c) = proj₂ hκ now sched₁ st₁
-                                      (≤-trans (unconn-drain dd) le₀)
+                                      (budget-step le₀ (unconn-drain dd) (queued-drain dd))
                       in _ , close-inner-done aeq qeq dd feq c
 ...         | false = _ , close-inner-open aeq qeq dd feq
 
@@ -366,7 +369,7 @@ handles-from-inner op allNid inst κ hκ =
 consume! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo m}
            (op : AllOp) (nid : NodeId) (κ : Path Γ lo u t) → Handles {m = m} u κ
          → {o : Val Γ (obs u)} → Red m (obs u) o
-         → (now : Tick) (sched : Sched Γ) (st : EvalSt e) → unconnected sched st ≤ m
+         → (now : Tick) (sched : Sched Γ) (st : EvalSt e) → Budget m sched st
          → Σ (Out e) λ r → consume⇓ {e = e} op nid κ now o sched st r
 consume! {u = u} mergeAllᵒ nid κ hκ ro now sched st le
   with lookupNode nid (EvalSt.nodes st) in neq
@@ -389,7 +392,12 @@ consume! {u = u} mergeAllᵒ nid κ hκ ro now sched st le
                    (record sched { mint = setAt nodeᵏ (suc inst) (Sched.mint sched) })
                    (record st { nodes = setNode nid (mergeAll-st lim (suc act) q od)
                                                 (EvalSt.nodes st) })
-                   le
+                   (budget-setNode nid (mergeAll-st lim (suc act) q od)
+                                   (mergeAll-st lim act q od)
+                                   (record sched { mint = setAt nodeᵏ (suc inst) (Sched.mint sched) })
+                                   st neq ≤-refl
+                                   (budget-mint (setAt nodeᵏ (suc inst) (Sched.mint sched))
+                                                sched st le))
           in r , consume-merge-sub neq req refl d
 consume! {u = u} switchᵒ nid κ hκ ro now sched st le
   with lookupNode nid (EvalSt.nodes st) in neq
@@ -408,7 +416,10 @@ consume! {u = u} switchᵒ nid κ hκ ro now sched st le
                  (record sched₁ { mint = setAt nodeᵏ (suc inst) (Sched.mint sched₁) })
                  (record st₁ { nodes = setNode nid (switch-st (just inst) od)
                                                (EvalSt.nodes st₁) })
-                 (unconn-switchKill-eq cur sched st keq le)
+                 (budget-setNode0 nid (switch-st (just inst) od)
+                    (record sched₁ { mint = setAt nodeᵏ (suc inst) (Sched.mint sched₁) }) st₁ refl
+                    (budget-mint (setAt nodeᵏ (suc inst) (Sched.mint sched₁)) sched₁ st₁
+                       (budget-switchKill-eq cur sched st keq le)))
         in r , consume-switch-sub neq keq refl d
 consume! {u = u} exhaustᵒ nid κ hκ ro now sched st le
   with lookupNode nid (EvalSt.nodes st) in neq
@@ -426,7 +437,9 @@ consume! {u = u} exhaustᵒ nid κ hκ ro now sched st le
                (handles-from-inner exhaustᵒ nid inst κ hκ) now
                (record sched { mint = setAt nodeᵏ (suc inst) (Sched.mint sched) })
                (record st { nodes = setNode nid (exhaust-st true od) (EvalSt.nodes st) })
-               le
+               (budget-setNode0 nid (exhaust-st true od)
+                  (record sched { mint = setAt nodeᵏ (suc inst) (Sched.mint sched) }) st refl
+                  (budget-mint (setAt nodeᵏ (suc inst) (Sched.mint sched)) sched st le))
       in r , consume-exhaust-sub neq refl d
 
 emits-thru-outer : ∀ {n} {Γ : Ctx n} {t u lo m} (op : AllOp) (nid : NodeId)
@@ -441,7 +454,7 @@ closes-thru-outer : ∀ {n} {Γ : Ctx n} {t u lo m} (op : AllOp) (nid : NodeId)
 closes-thru-outer op nid κ cl now sched st le
   with allFinished op nid (markOuterDone op nid st) in feq
 ... | true  = let (r , d) = cl now sched (markOuterDone op nid st)
-                              (unconn-markOuterDone op nid sched st le)
+                              (budget-markOuterDone op nid sched st le)
               in r , close-outer-done feq d
 ... | false = _ , close-outer-open feq
 
@@ -456,18 +469,26 @@ handles-thru-outer op nid κ hκ =
 -- HAVE TO INLINE.
 ------------------------------------------------------------------
 
+-- THE INSTALLED NODE CARRIES NO QUEUE, AND THE CALLER SAYS SO.  Every
+-- flattener is installed empty -- a lane can only be parked by a value
+-- arriving later -- so the reading is `refl` at each of the three call
+-- sites, and asking for it here is what keeps the parked total out of
+-- this assembly's own reasoning.
 subsAll! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo m}
            (op : AllOp) (ns : NodeState Γ) {b : Val Γ (obs (obs u))}
+         → nodeQueued ns ≡ 0
          → Red m (obs (obs u)) b
          → (κ : Path Γ lo u t) → Handles {m = m} u κ
-         → (now : Tick) (sched : Sched Γ) (st : EvalSt e) → unconnected sched st ≤ m
+         → (now : Tick) (sched : Sched Γ) (st : EvalSt e) → Budget m sched st
          → Σ (Out e) λ r → subscribeAll⇓ {e = e} op ns b κ now sched st r
-subsAll! op ns rb κ hκ now sched st le =
+subsAll! op ns nq rb κ hκ now sched st le =
   let nid     = freshId nodeᵏ (Sched.mint sched)
       (r , d) = rb (thru-outer op nid ↠ κ) (handles-thru-outer op nid κ hκ) now
                    (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
                    (installNode nid ns st)
-                   le
+                   (budget-setNode0 nid ns
+                      (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) }) st nq
+                      (budget-mint (setAt nodeᵏ (suc nid) (Sched.mint sched)) sched st le))
   in r , sub-all refl d
 
 -- THE FLUSH SITS AFTER THE SUBSCRIBE CALL RETURNS, which is where the
@@ -476,10 +497,10 @@ subsAll! op ns rb κ hκ now sched st le =
 -- completion, so what this finds is an empty buffer.
 subsBatchSync! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo Θ}
                  {ρ : Env Γ Θ} {b : Exp Γ [] [] Θ u}
-                 (κ : Path Γ lo (u ×ᵗ listᵗ u) t) {m : ℕ} → Emits {m = m} (u ×ᵗ listᵗ u) κ
+                 (κ : Path Γ lo (u ×ᵗ listᵗ u) t) {m : Bnd} → Emits {m = m} (u ×ᵗ listᵗ u) κ
                → (nid : NodeId) (now : Tick) (sched₀ : Sched Γ) (st₀ : EvalSt e)
                  (out : Stream Γ t) (sched₁ : Sched Γ) (st₁ : EvalSt e)
-               → unconnected sched₀ st₀ ≤ m
+               → Budget m sched₀ st₀
                → freshId nodeᵏ (Sched.mint sched₀) ≡ nid
                → subscribeE⇓ {e = e} (Θ , b , ρ) (batchSync-f nid ↠ κ) now
                    (record sched₀ { mint = setAt nodeᵏ (suc nid) (Sched.mint sched₀) })
@@ -491,7 +512,11 @@ subsBatchSync! {u = u} κ em nid now sched₀ st₀ out sched₁ st₁ le neq d
   with batchSyncFlush {s = u} nid st₁ in fq
 ... | (nothing , st₂) = _ , subs-batchSync-empty neq d fq
 ... | (just g , st₂)  =
-      let le₁     = unconn-batchSyncFlush nid sched₁ st₁ fq (≤-trans (unconn-subs d) le)
+      let le₀     = budget-setNode0 nid (batchSync-st {t = u} true [])
+                      (record sched₀ { mint = setAt nodeᵏ (suc nid) (Sched.mint sched₀) }) st₀ refl
+                      (budget-mint (setAt nodeᵏ (suc nid) (Sched.mint sched₀)) sched₀ st₀ le)
+          le₁     = budget-batchSyncFlush nid sched₁ st₁ fq
+                      (budget-step le₀ (unconn-subs d) (queued-subs d))
           (r , ed) = em (red-flushed nid st₁ fq) now sched₁ st₂ le₁
       in _ , subs-batchSync neq d fq ed
 
@@ -506,11 +531,19 @@ subsBatchSync! {u = u} κ em nid now sched₀ st₀ out sched₁ st₁ le neq d
 -- recursion on the bound ONE function rather than a mutual block --
 -- and the fundamental theorem at values rides along because the
 -- arrival spine reads it at whatever bound it is standing at.
+-- AND THE INDEX IS THE COUNT ALONE, WITH THE PARKED TOTAL QUANTIFIED
+-- INSIDE EACH FIELD.  The recursion descends on the count, because
+-- that is the component a connect strictly drops; the parked total is
+-- not descended on at all -- it is picked afresh at whatever the store
+-- reads, which is what makes a level usable at every backlog rather
+-- than at one.  A step that raises the backlog while holding the count
+-- therefore re-enters the SAME level, which is precisely why the lane
+-- drain cannot be written as a body here and is the file's one leaf.
 record Below (m : ℕ) : Set where
   field
-    walk : ∀ {n} {Γ : Ctx n} {t lo} → Walk Γ t m lo
-    term : ∀ {n} {Γ : Ctx n} {Θ t} (b : Exp Γ [] [] Θ t)
-             (σ : Env Γ Θ) → RedEnv m σ
+    walk : ∀ {n} {Γ : Ctx n} {t lo p} → Walk Γ t (m / p) lo
+    term : ∀ {n} {Γ : Ctx n} {Θ t p} (b : Exp Γ [] [] Θ t)
+             (σ : Env Γ Θ) → RedEnv (m / p) σ
          → (k : ℕ) → T (inputsBelowᵉ k b) → Acc _<_ k
-         → Acc _<_ (gsizeᵉ b) → Red m (obs t) (Θ , b , σ)
-    val  : ∀ {n} {Γ : Ctx n} (u : Ty) (v : Val Γ u) → Red m u v
+         → Acc _<_ (gsizeᵉ b) → Red (m / p) (obs t) (Θ , b , σ)
+    val  : ∀ {n} {Γ : Ctx n} {p} (u : Ty) (v : Val Γ u) → Red (m / p) u v

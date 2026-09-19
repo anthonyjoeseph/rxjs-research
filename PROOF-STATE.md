@@ -229,13 +229,14 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 
 ### Big picture tier roadmap
 
-- **THEN THE LANE DRAIN, ON THE INVARIANT ITS HEADER NOW NAMES.** The
-  measure question is answered where it was asked, in `drainQueue!`'s own
-  header: a pair, spent as a disjunction, because a parked total is
-  raised by a park and so cannot be a budget the way the count is. What
-  the leg carries out is putting that invariant in place of the bare
-  bound the whole builder currently threads — which moves every frame
-  helper's obligation at once, and is why it is a leg rather than a row.
+- **THEN THE DRAIN'S INVARIANT SPENT RATHER THAN THREADED.** The pair is
+  now what the whole builder carries and what a connect descends on, so
+  what is left of the leg is the half it bought on credit: fourteen
+  readings of the parked total, five over the delivery cycle and nine
+  over the store steps, each the exact mirror of a count lemma already
+  proven. Then the drain itself, which is the only thing that can spend
+  them — and the only statement in the builder still standing on
+  nothing.
 
 - **THEN THE FLATTENERS AND `takeᵖ`, AND NO FORMER IS OWED AFTER ALL
   (Anthony: "the flattens, mergeAll etc, _are_ the primitives … they can
@@ -282,6 +283,13 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 - **`takeᵖ`** (Rx.Elaborate) — DIFFICULTY, `DEAD ROUTE`: the author cuts on
   VALUES and a plain `takeᵉ` above the envelope cuts on BATCHES, so the
   elaboration owes a count that crosses the level and closes at the cut.
+
+- **`queued-{emit,close,emits,subs,drain}`** (Rx.Evaluator.Unconnected) —
+  GRINDABLE, `TWIN×5`: the delivery cycle read for the parked total instead of
+  the count, where a park forces a disjunction.
+- **`queued-{latch,scanStep,takeStep,cutAt,batchSyncPush,batchSyncFlush,mergeAllQueue,markOuterDone,switchKill}`**
+  (Rx.Evaluator.Unconnected) — GRINDABLE, `TWIN×9`: the nine store steps' queue
+  readings, eight of them a node with no queue at all.
 
 ## Tier 2 — the proof statement, once there are two trees to state it over
 
