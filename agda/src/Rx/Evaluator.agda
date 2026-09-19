@@ -4,7 +4,7 @@ open import Data.Bool    using (Bool; true; false; if_then_else_; not; _∨_; _�
 open import Data.Fin     using (Fin; toℕ)
 open import Data.Fin.Properties using (toℕ<n) renaming (_≟_ to _≟ᶠ_)
 open import Data.Maybe   using (Maybe; just; nothing; is-nothing)
-open import Data.Nat     using (ℕ; zero; suc; _+_; _<ᵇ_; _≡ᵇ_; _≤_)
+open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _<ᵇ_; _≡ᵇ_; _≤_)
 open import Data.Nat.Properties using (≤-trans)
 open import Data.List    using (List; []; _∷_; _++_; concat; tabulate; null)
 open import Data.Bool.ListAction using (any)
@@ -581,7 +581,7 @@ batchSyncPush nid v st | _                           = nothing , st
 batchSyncFlush : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
                → NodeId → EvalSt e
                → Maybe (Val Γ (s ×ᵗ listᵗ s)) × EvalSt e
-batchSyncFlush {s = s} nid st with lookupNode nid (EvalSt.nodes st)
+batchSyncFlush {Γ = Γ} {s = s} nid st with lookupNode nid (EvalSt.nodes st)
 ... | just (batchSync-st {w} _ buf) with w ≟ᵗ s
 ...   | no  _    = nothing , record st { nodes = setNode nid (batchSync-st {t = s} false [])
                                                          (EvalSt.nodes st) }
@@ -590,7 +590,7 @@ batchSyncFlush {s = s} nid st with lookupNode nid (EvalSt.nodes st)
         where grp : List (Val Γ s) → Maybe (Val Γ (s ×ᵗ listᵗ s))
               grp []       = nothing
               grp (x ∷ xs) = just (x , xs)
-batchSyncFlush {s = s} nid st | _ =
+batchSyncFlush {Γ = Γ} {s = s} nid st | _ =
   nothing , record st { nodes = setNode nid (batchSync-st {t = s} false []) (EvalSt.nodes st) }
 
 -- a from-inner completion is absorbed iff some registration under this inner
@@ -703,7 +703,7 @@ mergeAllQueue {s = s} nid st with lookupNode nid (EvalSt.nodes st)
 ... | just (mergeAll-st {w} lim act q od) with w ≟ᵗ s
 ...   | no  _    = [] , st
 ...   | yes refl =
-        q , record st { nodes = setNode nid (mergeAll-st lim act [] od)
+        q , record st { nodes = setNode nid (mergeAll-st {t = s} lim act [] od)
                                         (EvalSt.nodes st) }
 mergeAllQueue nid st | _ = [] , st
 
