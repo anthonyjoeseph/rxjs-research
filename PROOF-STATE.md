@@ -229,16 +229,15 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 
 ### Big picture tier roadmap
 
-- **THE BOUND IS THREADED; THE DESCENT IS NOT — FINISH THE STEP INDEX.**
-  Every obligation the builder states now carries `unconnected sched st
-  ≤ m`, and every frame, the term face and the arrival spine spend it,
-  which is what the measure was for. What the connect arm does with it
-  is still nothing: it instantiates a fresh bound rather than handing
-  the walk the level below, so the round trip it was meant to order is
-  exactly as unordered as before. Turning `walk-above` into a recursion
-  on that bound is the work that remains. Only the third arrangement is
-  open — the term face strictly below the walk, the builder recursing on
-  the bound — the other two being refused already.
+- **THE DESCENT IS TYPED; TIE THE KNOT — CUT THE BUILDER INTO LEVELS.**
+  The candidate is indexed by the bound, so a term face is a face AT a
+  level rather than one promise covering all of them, and the connect arm
+  now refutes the zero level outright and subscribes the definition under
+  the walk ONE LEVEL DOWN. `walk-above` is then the walk at a strictly
+  smaller bound — what a recursion on the bound may supply and what one
+  file cannot. The cut is at that leaf, since everything above it is
+  level-free: a level-indexed module taking the walks below it as a
+  parameter, and a file above it closing the loop.
 
 - **THEN THE BOUND'S TWO OBLIGATIONS, WHICH ARE WHAT THE SHAPE BUYS ON
   CREDIT.** The zero level must be unreachable at the connect arm — its

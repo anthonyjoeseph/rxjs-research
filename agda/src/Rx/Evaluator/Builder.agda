@@ -90,7 +90,7 @@ open import Rx.Evaluator.Domain using (emits⇓; subscribeE⇓; consume⇓; drai
   go-nil; go-cut; go-val; go-fin; emit-sink; close-sink)
 open import Rx.Evaluator.Reducible using (Out; Red; Emits; Closes; Handles; RedFn; RedEnv; redDatas; redLookup; redFoldVals;
   unconnected; unconn-cong; unconn-emit; unconn-close; unconn-emits; unconn-subs; unconn-drain;
-  red-scanned; red-pushed; red-flushed)
+  unconn-connect; red-scanned; red-pushed; red-flushed)
 
 ------------------------------------------------------------------
 -- THE TWO LEAVES, AND WHY THEY ARE THE ONLY TWO.
@@ -142,9 +142,9 @@ Walk Γ t m lo = ∀ {u} (κ : Path Γ lo u t) → Handles {m = m} u κ
 -- THE PAYLOAD'S CANDIDATE, WHICH ONLY ONE OF THE TWO EVENTS HAS.  An
 -- end carries nothing, so the fan-out's value arm is the only one that
 -- owes a candidate and the completion arm asks for `⊤`.
-RedEv : ∀ {n} {Γ : Ctx n} (u : Ty) → PlainEvent (Val Γ u) → Set
-RedEv u (valueᵖ v) = Red u v
-RedEv u completeᵖ  = ⊤
+RedEv : ∀ {n} {Γ : Ctx n} (m : ℕ) (u : Ty) → PlainEvent (Val Γ u) → Set
+RedEv m u (valueᵖ v) = Red m u v
+RedEv m u completeᵖ  = ⊤
 
 -- THE DESCENT THE SINK BUYS ITS CALLER, AND IT IS A FACT ABOUT THE
 -- INDEX RATHER THAN A PEELED WITNESS.  `shareAdmit` returns chains at
@@ -160,7 +160,7 @@ monus-sink i below = ∸-monoʳ-< (s≤s below) (toℕ<n i)
 -- order cannot express and the equation carries instead.
 share-go! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo m} (i : Fin n)
             (w : Walk Γ t m lo) (now : Tick)
-            (ev : PlainEvent (Val Γ (lookup Γ i))) → RedEv (lookup Γ i) ev
+            (ev : PlainEvent (Val Γ (lookup Γ i))) → RedEv m (lookup Γ i) ev
           → (ps : List (RegId × Path Γ lo (lookup Γ i) t))
           → (sched : Sched Γ) (st : EvalSt e) → unconnected sched st ≤ m
           → Σ (Out e) λ r → shareGo⇓ {e = e} now i ev ps sched st r
@@ -444,7 +444,7 @@ unconn-switchKill-eq cur sched st refl le = unconn-switchKill cur sched st le
 
 dispatch-share! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo m} (i : Fin n)
                   (below : lo ≤ toℕ i) (w : Walk Γ t m (suc (toℕ i))) (now : Tick)
-                  (ev : PlainEvent (Val Γ (lookup Γ i))) → RedEv (lookup Γ i) ev
+                  (ev : PlainEvent (Val Γ (lookup Γ i))) → RedEv m (lookup Γ i) ev
                 → (sched : Sched Γ) (st : EvalSt e) → unconnected sched st ≤ m
                 → Σ (Out e) λ r → dispatchShare⇓ {e = e} now i below ev sched st r
 dispatch-share! i below w now ev rev sched st le =
@@ -483,17 +483,15 @@ handles-share i below w =
 -- BELOW DOES NOT REACH IT.  That route dies because the candidate
 -- cannot be a premise of a statement about the store; a natural number
 -- is not the candidate, so the bound rides as an inert index and the
--- type descent is untouched.  The shape was put to the checker at
--- minimal scale in all three arrangements: the bound on the candidate
--- is accepted, the two faces merged under one lexicographic measure
--- are REFUSED -- a walk hands the term face an arbitrary term, so that
--- edge has nothing that drops -- and the two faces left stratified
--- with the whole builder recursing on the bound is accepted.  So the
--- shape is the third: the term face stays below the walk exactly as it
--- is, and a connect spends the builder one level down instead of
--- reaching back into its own walk.  The floor arm is then unreachable
--- at a zero bound, since the guard says the slot is shared and
--- unconnected and the bound says no such slot exists.
+-- type descent is untouched.
+--
+-- WHAT IS LEFT IS THE KNOT AND NOTHING ELSE.  The connect arm already
+-- spends the level below and already refutes the zero one, so this leaf
+-- is the walk at a STRICTLY SMALLER bound than its caller's -- which is
+-- what a recursion on the bound is allowed to supply.  Tying it needs
+-- the module CUT at this line: everything above is level-free, so a
+-- level-indexed module can take the walks below it as a parameter and
+-- the file that opens it can close the loop by well-founded recursion.
 --
 -- DEAD ROUTE: merging the term face and the walk into one block puts
 --   both recursions under one measure, and the two move in OPPOSITE
@@ -511,7 +509,7 @@ postulate
 ------------------------------------------------------------------
 
 emits! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo m} (κ : Path Γ lo u t)
-       → Emits {m = m} u κ → (now : Tick) (vs : List (Val Γ u)) → All (Red u) vs
+       → Emits {m = m} u κ → (now : Tick) (vs : List (Val Γ u)) → All (Red m u) vs
        → (sched : Sched Γ) (st : EvalSt e) → unconnected sched st ≤ m
        → Σ (Out e) λ r → emits⇓ {e = e} κ now vs sched st r
 emits! κ em now []       []ᵃ         sched st le = _ , emits-nil
@@ -531,7 +529,7 @@ handles-root : ∀ {n} {Γ : Ctx n} {t lo m} → Handles {Γ = Γ} {t = t} {lo =
 handles-root = (λ _ _ _ _ _ → _ , emit-root) , (λ _ _ _ _ → _ , close-root)
 
 handles-map : ∀ {n} {Γ : Ctx n} {t s u lo m} (fn : FnClo Γ s u) (κ : Path Γ lo u t)
-            → RedFn fn → Handles {m = m} u κ → Handles {m = m} s (map-f fn ↠ κ)
+            → RedFn m fn → Handles {m = m} u κ → Handles {m = m} s (map-f fn ↠ κ)
 handles-map fn κ rf (em , cl) =
     (λ rv now sched st le → let (r , d) = em (rf rv) now sched st le in r , emit-map d)
   , (λ now sched st le → let (r , d) = cl now sched st le in r , close-map d)
@@ -658,7 +656,7 @@ handles-from-inner op allNid inst κ hκ =
 
 consume! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo m}
            (op : AllOp) (nid : NodeId) (κ : Path Γ lo u t) → Handles {m = m} u κ
-         → {o : Val Γ (obs u)} → Red (obs u) o
+         → {o : Val Γ (obs u)} → Red m (obs u) o
          → (now : Tick) (sched : Sched Γ) (st : EvalSt e) → unconnected sched st ≤ m
          → Σ (Out e) λ r → consume⇓ {e = e} op nid κ now o sched st r
 consume! {u = u} mergeAllᵒ nid κ hκ ro now sched st le
@@ -751,7 +749,7 @@ handles-thru-outer op nid κ hκ =
 
 subsAll! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo m}
            (op : AllOp) (ns : NodeState Γ) {b : Val Γ (obs (obs u))}
-         → Red (obs (obs u)) b
+         → Red m (obs (obs u)) b
          → (κ : Path Γ lo u t) → Handles {m = m} u κ
          → (now : Tick) (sched : Sched Γ) (st : EvalSt e) → unconnected sched st ≤ m
          → Σ (Out e) λ r → subscribeAll⇓ {e = e} op ns b κ now sched st r
@@ -806,10 +804,10 @@ subsBatchSync! {u = u} κ em nid now sched₀ st₀ out sched₁ st₁ le neq d
 -- so nothing here reaches the general walk -- which is what keeps this
 -- block mutual with itself alone.
 mutual
-  redExpAcc : ∀ {n} {Γ : Ctx n} {Θ t} (b : Exp Γ [] [] Θ t)
-              (σ : Env Γ Θ) → RedEnv σ
+  redExpAcc : ∀ {n} {Γ : Ctx n} {Θ t m} (b : Exp Γ [] [] Θ t)
+              (σ : Env Γ Θ) → RedEnv m σ
             → (k : ℕ) → T (inputsBelowᵉ k b) → Acc _<_ k
-            → Acc _<_ (gsizeᵉ b) → Red {Γ = Γ} (obs t) (Θ , b , σ)
+            → Acc _<_ (gsizeᵉ b) → Red {Γ = Γ} m (obs t) (Θ , b , σ)
   redExpAcc (input i) σ rσ k ok aK a κ hκ now sched st le =
     red-input i σ k ok aK κ hκ now sched st le
   redExpAcc (ofᵉ ts) σ rσ k ok aK (acc rs) κ hκ now sched st le =
@@ -898,9 +896,9 @@ mutual
   -- ceiling's accessibility is taken apart here rather than passed on,
   -- since `toℕ i < k` is exactly what the guard reduces to at this
   -- former.
-  red-input : ∀ {n} {Γ : Ctx n} {Θ} (i : Fin n) (σ : Env Γ Θ) (k : ℕ)
+  red-input : ∀ {n} {Γ : Ctx n} {Θ m} (i : Fin n) (σ : Env Γ Θ) (k : ℕ)
             → T (toℕ i <ᵇ k) → Acc _<_ k
-            → Red {Γ = Γ} (obs (lookup Γ i)) (Θ , input i , σ)
+            → Red {Γ = Γ} m (obs (lookup Γ i)) (Θ , input i , σ)
   red-input {Γ = Γ} i σ k ok (acc rsK) {lo = lo} κ hκ now sched st le
       with toℕ i <? lo
   ... | no  ¬below = let (r , c) = proj₂ hκ now sched st le
@@ -964,25 +962,52 @@ mutual
   ...   | true  = _ , subs-shared {κ = κ} {below = below} slEq
                         (slot-join {κ = κ} {below = below} doneEq connEq refl)
   ...   | false =
+          red-connect _ i σ d aI κ below now sched slEq st doneEq connEq le
+
+  -- WHERE THE ROUND TRIP IS ORDERED, AND IT IS THE ONLY CLAUSE IN THE
+  -- MODULE THAT LOOKS AT THE BOUND.  The guard says this slot is shared
+  -- and not yet connected, so the count is at least one -- which makes
+  -- a zero bound absurd outright -- and connecting it drops the count,
+  -- so what the definition is subscribed under is the walk ONE LEVEL
+  -- DOWN rather than a fresh one at the same level.
+  red-connect : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo Θ} (m : ℕ)
+                  (i : Fin n) (σ : Env Γ Θ) (d : Closed Γ (lookup Γ i))
+                  {okd : T (inputsBelowᵉ (toℕ i) d)}
+                → Acc _<_ (toℕ i)
+                → (κ : Path Γ lo (lookup Γ i) t) (below : toℕ i < lo)
+                  (now : Tick) (sched : Sched Γ)
+                → Sched.slots sched i ≡ shared d {ok = okd}
+                → (st : EvalSt e)
+                → memberSource (toℕ i) (EvalSt.completedSources st) ≡ false
+                → memberSource (toℕ i) (EvalSt.connectedShares st) ≡ false
+                → unconnected sched st ≤ m
+                → Σ (Out e) λ r → subscribeE⇓ {e = e} (Θ , input i , σ) κ now sched st r
+  red-connect zero i σ d aI κ below now sched slEq st doneEq connEq le
+    with ≤-trans (unconn-connect i sched st slEq connEq) le
+  ... | ()
+  red-connect (suc m′) i σ d {okd} aI κ below now sched slEq st doneEq connEq le
+    with ≤-trans (unconn-connect i sched st slEq connEq) le
+  ... | s≤s le′ =
           let rid = freshId regᵏ (Sched.mint sched)
               (r , dv) =
                 redExpAcc d []ᵉ tt (toℕ i) okd aI
                   (<-wellFounded-fast (gsizeᵉ d))
-                  (share-sink i ≤-refl) (handles-share i ≤-refl (walk-above i)) now
+                  (share-sink i ≤-refl)
+                  (handles-share i ≤-refl (walk-above {m = m′} i)) now
                   (record sched { mint = setAt regᵏ (suc rid) (Sched.mint sched) })
                   (register rid (atSlot i) (lowerFloor below κ)
                     (record st
                       { connectedShares = toℕ i ∷ EvalSt.connectedShares st }))
-                  ≤-refl
+                  le′
           in r , subs-shared {κ = κ} {below = below} slEq
                    (slot-connect doneEq connEq (connect refl dv))
 
   -- THE FUNDAMENTAL THEOREM AT TERMS, which is where the embedding
   -- former hands the recursion back to the expression face.
-  redTmAcc : ∀ {n} {Γ : Ctx n} {Θ u} (tm : Tm Γ [] [] Θ u)
-             (σ : Env Γ Θ) → RedEnv σ
+  redTmAcc : ∀ {n} {Γ : Ctx n} {Θ u m} (tm : Tm Γ [] [] Θ u)
+             (σ : Env Γ Θ) → RedEnv m σ
            → (k : ℕ) → T (inputsBelowᵗ k tm) → Acc _<_ k
-           → Acc _<_ (gsizeᵗ tm) → Red u (evalWith tm σ)
+           → Acc _<_ (gsizeᵗ tm) → Red m u (evalWith tm σ)
   redTmAcc (varᵗ x) σ rσ k ok aK a = redLookup σ rσ x
   redTmAcc unit̂     σ rσ k ok aK a = tt
   redTmAcc (bool̂ b) σ rσ k ok aK a = tt
@@ -1058,11 +1083,11 @@ mutual
   redTmAcc (strmᵗ e) σ rσ k ok aK (acc rs) =
     redExpAcc e σ rσ k ok aK (rs ≤-refl)
 
-  redTmsAcc : ∀ {n} {Γ : Ctx n} {Θ u} (ts : List (Tm Γ [] [] Θ u))
-              (σ : Env Γ Θ) → RedEnv σ
+  redTmsAcc : ∀ {n} {Γ : Ctx n} {Θ u m} (ts : List (Tm Γ [] [] Θ u))
+              (σ : Env Γ Θ) → RedEnv m σ
             → (k : ℕ) → T (inputsBelowᵗˢ k ts) → Acc _<_ k
             → Acc _<_ (gsizeᵗˢ ts)
-            → All (Red u) (map (λ tm → evalWith tm σ) ts)
+            → All (Red m u) (map (λ tm → evalWith tm σ) ts)
   redTmsAcc []       σ rσ k ok aK a = []ᵃ
   redTmsAcc (x ∷ xs) σ rσ k ok aK (acc rs) =
       redTmAcc x σ rσ k (∧ˡ (inputsBelowᵗ k x) (inputsBelowᵗˢ k xs) ok) aK
@@ -1072,10 +1097,10 @@ mutual
 
   -- A FRAME'S FUNCTION, PAIRED WITH THE AMBIENT ENVIRONMENT AND THEN
   -- APPLIED, is the term face at one more entry.
-  redFnAcc : ∀ {n} {Γ : Ctx n} {Θ s u} (f : Fn Γ [] [] Θ s u)
-             (σ : Env Γ Θ) → RedEnv σ
+  redFnAcc : ∀ {n} {Γ : Ctx n} {Θ s u m} (f : Fn Γ [] [] Θ s u)
+             (σ : Env Γ Θ) → RedEnv m σ
            → (k : ℕ) → T (inputsBelowᵗ k f) → Acc _<_ k
-           → Acc _<_ (gsizeᵗ f) → RedFn {Γ = Γ} (Θ , f , σ)
+           → Acc _<_ (gsizeᵗ f) → RedFn {Γ = Γ} m (Θ , f , σ)
   redFnAcc f σ rσ k ok aK a {v} p = redTmAcc f (v ∷ᵉ σ) (p , rσ) k ok aK a
 
 ------------------------------------------------------------------
@@ -1089,13 +1114,13 @@ mutual
 -- now that a value is a CLOSURE: the environment's entries are where
 -- the claim is re-established, once, rather than threaded through every
 -- site that meets a stored value.
-reducible : ∀ {n} {Γ : Ctx n} {Θ t} (b : Exp Γ [] [] Θ t) (σ : Env Γ Θ) → RedEnv σ
-          → Red {Γ = Γ} (obs t) (Θ , b , σ)
+reducible : ∀ {n} {Γ : Ctx n} {Θ t m} (b : Exp Γ [] [] Θ t) (σ : Env Γ Θ) → RedEnv m σ
+          → Red {Γ = Γ} m (obs t) (Θ , b , σ)
 reducible b σ rσ =
   redExpAcc b σ rσ _ (ib-topᵉ b) (<-wellFounded-fast _) (<-wellFounded-fast (gsizeᵉ b))
 
 mutual
-  red-val : ∀ {n} {Γ : Ctx n} (t : Ty) (v : Val Γ t) → Red t v
+  red-val : ∀ {n} {Γ : Ctx n} {m} (t : Ty) (v : Val Γ t) → Red m t v
   red-val unitᵗ     v           = tt
   red-val boolᵗ     v           = tt
   red-val natᵗ      v           = tt
@@ -1107,11 +1132,11 @@ mutual
   red-val (listᵗ s) (x ∷ xs)    = red-val s x ∷ᵃ red-val (listᵗ s) xs
   red-val (obs u)   (Θ , b , σ) = reducible b σ (red-env σ)
 
-  red-env : ∀ {n} {Γ : Ctx n} {Θ : List Ty} (σ : Env Γ Θ) → RedEnv σ
+  red-env : ∀ {n} {Γ : Ctx n} {Θ : List Ty} {m} (σ : Env Γ Θ) → RedEnv m σ
   red-env []ᵉ                 = tt
   red-env (_∷ᵉ_ {s = s} v vs) = red-val s v , red-env vs
 
-redFn : ∀ {n} {Γ : Ctx n} {s u} (fn : FnClo Γ s u) → RedFn fn
+redFn : ∀ {n} {Γ : Ctx n} {s u m} (fn : FnClo Γ s u) → RedFn m fn
 redFn (Θ , f , σ) =
   redFnAcc f σ (red-env σ) _ (ib-topᵗ f)
     (<-wellFounded-fast _) (<-wellFounded-fast (gsizeᵗ f))

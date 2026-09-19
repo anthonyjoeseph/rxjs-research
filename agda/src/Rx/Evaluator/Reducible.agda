@@ -37,22 +37,25 @@ open import Data.Maybe using (just)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; trans)
 
 open import Rx.Prim using (Tick; Source)
 open import Function.Base using (case_of_)
 open import Relation.Nullary using (yes; no)
 open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; obs; listᵗ;
   Ctx; Closed; Val; Tm; FnClo; applyClo; Env; []ᵉ; _∷ᵉ_; evalWith; foldVals;
-  isData; lookupEnv; _≟ᵗ_)
+  isData; lookupEnv; _≟ᵗ_; inputsBelowᵉ)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; AllOp; NodeId;
   scanStep; batchSyncPush; batchSyncFlush; lookupNode; batchSync-st;
   memberSource)
 open import Rx.Evaluator.Domain using (subscribeE⇓; emit⇓; emits⇓; close⇓; drainQueue⇓)
-open import Rx.Slots using (Slots; scripted; shared)
+open import Rx.Slots using (Slot; Slots; scripted; shared)
+open import Decide using (≡ᵇ-refl)
 open import Data.Fin using (Fin; toℕ)
-open import Data.Nat using (ℕ; _+_; _≤_)
-open import Data.Vec using (tabulate; foldr′)
+import Data.Fin as F
+open import Data.Nat using (ℕ; zero; suc; _+_; _≤_; _<_; z≤n; s≤s; _≡ᵇ_)
+open import Data.Nat.Properties using (+-mono-≤; +-mono-<-≤; +-mono-≤-<)
+open import Data.Vec using (tabulate; foldr′; lookup)
 
 ------------------------------------------------------------------
 -- WHAT EVERY FAMILY HERE ANSWERS IN.
@@ -82,14 +85,23 @@ Out {Γ = Γ} {t = t} e = Stream Γ t × Sched Γ × EvalSt e
 -- AND IT IS A FUNCTION OF TWO FIELDS AND NOTHING ELSE, which is what
 -- makes a step's obligation to it cheap: a store handed back with the
 -- same connected list carries the same count, whatever else moved.
+-- AND IT IS A SUM OF PER-SLOT COSTS, SPLIT OUT RATHER THAN SEALED IN
+-- A `where`, because the descent needs the summand named at two
+-- different connected lists at once -- and needs the slot handed to it
+-- as an ARGUMENT, so that a caller holding `slots i ≡ shared d` can
+-- rewrite the cost rather than being stuck under a `with`.
+sumF : ∀ {n} → (Fin n → ℕ) → ℕ
+sumF {n} f = foldr′ _+_ 0 (tabulate {n = n} f)
+
+slotCostS : ∀ {n} {Γ : Ctx n} {k t} → Slot Γ k t → Source → List Source → ℕ
+slotCostS (scripted _) s cs = 0
+slotCostS (shared _)   s cs = if memberSource s cs then 0 else 1
+
+slotCost : ∀ {n} {Γ : Ctx n} → Slots Γ → List Source → Fin n → ℕ
+slotCost slots cs i = slotCostS (slots i) (toℕ i) cs
+
 unconnectedS : ∀ {n} {Γ : Ctx n} → Slots Γ → List Source → ℕ
-unconnectedS {n = n} slots cs =
-  foldr′ _+_ 0 (tabulate {n = n} λ i → slotCost i)
-  where
-    slotCost : Fin n → ℕ
-    slotCost i with slots i
-    ... | scripted _ = 0
-    ... | shared _   = if memberSource (toℕ i) cs then 0 else 1
+unconnectedS slots cs = sumF (slotCost slots cs)
 
 unconnected : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → Sched Γ → EvalSt e → ℕ
 unconnected sched st = unconnectedS (Sched.slots sched) (EvalSt.connectedShares st)
@@ -99,6 +111,70 @@ unconn-cong : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
             → EvalSt.connectedShares st′ ≡ EvalSt.connectedShares st
             → unconnected sched st′ ≡ unconnected sched st
 unconn-cong sched p = cong (unconnectedS (Sched.slots sched)) p
+
+-- WHAT A CONNECT COSTS THE COUNT, WHICH IS THE ORDER THE UPWARD EDGE
+-- IS SPENT AGAINST.  Adding a source to the connected list can only
+-- lower a slot's cost, and at the slot being connected it lowers it
+-- from one to nothing -- the guard says that slot is shared and absent
+-- -- so the sum strictly drops.  Two arithmetic facts over the sum do
+-- all of it, and neither mentions this development: a pointwise-≤
+-- family sums no larger, and one strict drop under a pointwise-≤
+-- family makes the sum strictly smaller.
+sumF-mono : ∀ {n} (f g : Fin n → ℕ) → (∀ j → g j ≤ f j) → sumF g ≤ sumF f
+sumF-mono {zero}  f g le = z≤n
+sumF-mono {suc n} f g le =
+  +-mono-≤ (le F.zero)
+    (sumF-mono (λ j → f (F.suc j)) (λ j → g (F.suc j)) (λ j → le (F.suc j)))
+
+sumF-drop : ∀ {n} (f g : Fin n → ℕ) (i : Fin n)
+          → (∀ j → g j ≤ f j) → g i < f i → sumF g < sumF f
+sumF-drop f g F.zero le lt =
+  +-mono-<-≤ lt
+    (sumF-mono (λ j → f (F.suc j)) (λ j → g (F.suc j)) (λ j → le (F.suc j)))
+sumF-drop f g (F.suc i) le lt =
+  +-mono-≤-< (le F.zero)
+    (sumF-drop (λ j → f (F.suc j)) (λ j → g (F.suc j)) i
+      (λ j → le (F.suc j)) lt)
+
+member-here : ∀ (s : Source) (cs : List Source) → memberSource s (s ∷ cs) ≡ true
+member-here s cs rewrite ≡ᵇ-refl s = refl
+
+cost-mono : ∀ {n} {Γ : Ctx n} (slots : Slots Γ) (s : Source) (cs : List Source)
+            (i : Fin n)
+          → slotCost slots (s ∷ cs) i ≤ slotCost slots cs i
+cost-mono slots s cs i with slots i
+... | scripted _ = z≤n
+... | shared _ with toℕ i ≡ᵇ s | memberSource (toℕ i) cs
+...   | true  | _     = z≤n
+...   | false | true  = z≤n
+...   | false | false = s≤s z≤n
+
+unconn-connect : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+                 (i : Fin n) (sched : Sched Γ) (st : EvalSt e)
+                 {d : Closed Γ (lookup Γ i)}
+                 {okd : T (inputsBelowᵉ (toℕ i) d)}
+               → Sched.slots sched i ≡ shared d {ok = okd}
+               → memberSource (toℕ i) (EvalSt.connectedShares st) ≡ false
+               → suc (unconnectedS (Sched.slots sched)
+                        (toℕ i ∷ EvalSt.connectedShares st))
+                   ≤ unconnected sched st
+unconn-connect i sched st slEq connEq =
+  sumF-drop (slotCost slots cs) (slotCost slots (toℕ i ∷ cs)) i
+    (cost-mono slots (toℕ i) cs) hit
+  where
+    slots = Sched.slots sched
+    cs    = EvalSt.connectedShares st
+
+    lhs≡0 : slotCost slots (toℕ i ∷ cs) i ≡ 0
+    lhs≡0 = trans (cong (λ sl → slotCostS sl (toℕ i) (toℕ i ∷ cs)) slEq)
+                  (cong (λ b → if b then 0 else 1) (member-here (toℕ i) cs))
+
+    rhs≡1 : slotCost slots cs i ≡ 1
+    rhs≡1 = trans (cong (λ sl → slotCostS sl (toℕ i) cs) slEq)
+                  (cong (λ b → if b then 0 else 1) connEq)
+
+    hit : slotCost slots (toℕ i ∷ cs) i < slotCost slots cs i
+    hit rewrite lhs≡0 | rhs≡1 = s≤s z≤n
 
 -- WHAT A STEP OWES THE COUNT, AND IT IS THE CREDIT THE SHAPE ABOVE
 -- BUYS ON.  A frame's obligation is stated under a bound on the store
@@ -178,17 +254,17 @@ postulate
 -- candidate at a type the recursion cannot order.
 mutual
 
-  Red : ∀ {n} {Γ : Ctx n} (t : Ty) → Val Γ t → Set
-  Red unitᵗ     _        = ⊤
-  Red boolᵗ     _        = ⊤
-  Red natᵗ      _        = ⊤
-  Red uniqᵗ     _        = ⊤
-  Red (s ×ᵗ u)  (a , b)  = Red s a × Red u b
-  Red (s +ᵗ u)  (inj₁ a) = Red s a
-  Red (s +ᵗ u)  (inj₂ b) = Red u b
-  Red (listᵗ s) xs       = All (Red s) xs
-  Red {Γ = Γ} (obs u) b =
-    ∀ {t} {e : Closed Γ t} {lo m} (κ : Path Γ lo u t) → Handles {m = m} u κ
+  Red : ∀ {n} {Γ : Ctx n} (m : ℕ) (t : Ty) → Val Γ t → Set
+  Red m unitᵗ     _        = ⊤
+  Red m boolᵗ     _        = ⊤
+  Red m natᵗ      _        = ⊤
+  Red m uniqᵗ     _        = ⊤
+  Red m (s ×ᵗ u)  (a , b)  = Red m s a × Red m u b
+  Red m (s +ᵗ u)  (inj₁ a) = Red m s a
+  Red m (s +ᵗ u)  (inj₂ b) = Red m u b
+  Red m (listᵗ s) xs       = All (Red m s) xs
+  Red {Γ = Γ} m (obs u) b =
+    ∀ {t} {e : Closed Γ t} {lo} (κ : Path Γ lo u t) → Handles {m = m} u κ
     → (now : Tick) (sched : Sched Γ) (st : EvalSt e) → unconnected sched st ≤ m
     → Σ (Out e) λ r → subscribeE⇓ {e = e} b κ now sched st r
 
@@ -198,7 +274,7 @@ mutual
   -- reaches it without asking anything of the store.
   Emits : ∀ {n} {Γ : Ctx n} {t lo m} (u : Ty) → Path Γ lo u t → Set
   Emits {Γ = Γ} {t = t} {m = m} u κ =
-    ∀ {e : Closed Γ t} {v : Val Γ u} → Red u v
+    ∀ {e : Closed Γ t} {v : Val Γ u} → Red m u v
     → (now : Tick) (sched : Sched Γ) (st : EvalSt e) → unconnected sched st ≤ m
     → Σ (Out e) λ r → emit⇓ {e = e} κ now v sched st r
 
@@ -216,17 +292,17 @@ mutual
 -- A FRAME'S FUNCTION CARRIES THE CANDIDATE ACROSS, which is the one
 -- thing a transformer owes and the only thing a path builder asks of
 -- the term face.
-RedFn : ∀ {n} {Γ : Ctx n} {s u} → FnClo Γ s u → Set
-RedFn {Γ = Γ} {s = s} {u = u} fn =
-  ∀ {v : Val Γ s} → Red s v → Red u (applyClo fn v)
+RedFn : ∀ {n} {Γ : Ctx n} {s u} (m : ℕ) → FnClo Γ s u → Set
+RedFn {Γ = Γ} {s = s} {u = u} m fn =
+  ∀ {v : Val Γ s} → Red m s v → Red m u (applyClo fn v)
 
 -- A VALUE ENVIRONMENT IS REDUCIBLE WHEN EVERY ENTRY IS.  Terms are
 -- open in a Θ telescope and a frame's function is a term with one
 -- entry bound, so the fundamental theorem at terms has to be stated
 -- under an environment rather than at closed terms alone.
-RedEnv : ∀ {n} {Γ : Ctx n} {Θ : List Ty} → Env Γ Θ → Set
-RedEnv []ᵉ                   = ⊤
-RedEnv (_∷ᵉ_ {s = t} v vs)   = Red t v × RedEnv vs
+RedEnv : ∀ {n} {Γ : Ctx n} {Θ : List Ty} (m : ℕ) → Env Γ Θ → Set
+RedEnv m []ᵉ                 = ⊤
+RedEnv m (_∷ᵉ_ {s = t} v vs) = Red m t v × RedEnv m vs
 
 ------------------------------------------------------------------
 -- WHAT THE MACHINE HANDS BACK, AND WHY IT IS NOT PROVEN HERE.
@@ -281,18 +357,18 @@ RedEnv (_∷ᵉ_ {s = t} v vs)   = Red t v × RedEnv vs
 --   candidate as function -- for positivity again.  The licence this
 --   route needs exists in neither checker.
 postulate
-  red-scanned : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  red-scanned : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u m}
                   (fn : FnClo Γ (u ×ᵗ s) u) (nid : NodeId)
                   (v : Val Γ s) (st : EvalSt e)
                   {ac : Val Γ u} {st₁ : EvalSt e}
               → scanStep {e = e} fn nid v st ≡ (just ac , st₁)
-              → Red {Γ = Γ} u ac
+              → Red {Γ = Γ} m u ac
 
-  red-flushed : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  red-flushed : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s m}
                   (nid : NodeId) (st : EvalSt e)
                   {g : Val Γ (s ×ᵗ listᵗ s)} {st₁ : EvalSt e}
               → batchSyncFlush {e = e} {s = s} nid st ≡ (just g , st₁)
-              → Red {Γ = Γ} (s ×ᵗ listᵗ s) g
+              → Red {Γ = Γ} m (s ×ᵗ listᵗ s) g
 
 -- THE BRACKET'S PUSH NEVER HANDS BACK WHAT IT IS HOLDING, which is
 -- what takes it out of the group above: the synchronous arm BUFFERS
@@ -303,12 +379,12 @@ postulate
 -- missing place to say it is not needed here.  The premise is what
 -- makes it provable rather than a weakening: the spender is an `Emits`,
 -- whose own signature carries the arriving value's candidate.
-red-pushed : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+red-pushed : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s m}
                (nid : NodeId) (v : Val Γ s) (st : EvalSt e)
                {g : Val Γ (s ×ᵗ listᵗ s)} {st₁ : EvalSt e}
-           → Red {Γ = Γ} s v
+           → Red {Γ = Γ} m s v
            → batchSyncPush {e = e} nid v st ≡ (just g , st₁)
-           → Red {Γ = Γ} (s ×ᵗ listᵗ s) g
+           → Red {Γ = Γ} m (s ×ᵗ listᵗ s) g
 red-pushed {s = s} nid v st rv eq with lookupNode nid (EvalSt.nodes st)
 red-pushed nid v st rv refl | just (batchSync-st false _) = rv , []
 red-pushed {s = s} nid v st rv eq | just (batchSync-st {w} true buf)
@@ -334,8 +410,8 @@ T-if false c ()
 -- itself runs -- it just has to be SAID, because a slot's element type
 -- is `lookup Γ i` and no reduction fires on a neutral index.  What
 -- carries it is the side condition every scripted slot already holds.
-red-data : ∀ {n} {Γ : Ctx n} (u : Ty) → T (isData u) → (v : Val Γ u)
-         → Red {Γ = Γ} u v
+red-data : ∀ {n} {Γ : Ctx n} {m} (u : Ty) → T (isData u) → (v : Val Γ u)
+         → Red {Γ = Γ} m u v
 red-data unitᵗ    _  _       = tt
 red-data natᵗ     _  _       = tt
 red-data uniqᵗ    _  _       = tt
@@ -348,8 +424,8 @@ red-data (s +ᵗ t) ok (inj₂ b) = red-data t (proj₂ (T-if (isData s) (isData
 red-data (listᵗ t) ok xs      = universal (red-data t ok) xs
 red-data (obs u)  () _
 
-redDatas : ∀ {n} {Γ : Ctx n} (u : Ty) → T (isData u) → (vs : List (Val Γ u))
-         → All (Red {Γ = Γ} u) vs
+redDatas : ∀ {n} {Γ : Ctx n} {m} (u : Ty) → T (isData u) → (vs : List (Val Γ u))
+         → All (Red {Γ = Γ} m u) vs
 redDatas u ok []       = []
 redDatas u ok (v ∷ vs) = red-data u ok v ∷ redDatas u ok vs
 
@@ -357,8 +433,8 @@ redDatas u ok (v ∷ vs) = red-data u ok v ∷ redDatas u ok vs
 -- THE TWO CONGRUENCES THE TERM FACE CANNOT DO FOR ITSELF.
 ------------------------------------------------------------------
 
-redLookup : ∀ {n} {Γ : Ctx n} {Θ t} (σ : Env Γ Θ) → RedEnv σ
-          → (x : t ∈ Θ) → Red t (lookupEnv σ x)
+redLookup : ∀ {n} {Γ : Ctx n} {Θ t m} (σ : Env Γ Θ) → RedEnv m σ
+          → (x : t ∈ Θ) → Red m t (lookupEnv σ x)
 redLookup (v ∷ᵉ vs) (p , ps) (here refl) = p
 redLookup (v ∷ᵉ vs) (p , ps) (there x)   = redLookup vs ps x
 
@@ -369,12 +445,12 @@ redLookup (v ∷ᵉ vs) (p , ps) (there x)   = redLookup vs ps x
 -- other former's value is a function of its subterms' values, so
 -- congruence discharges it, while a fold runs its step once per
 -- ELEMENT and the candidate has to be re-established at each.
-redFoldVals : ∀ {n} {Γ : Ctx n} {Θ s u}
+redFoldVals : ∀ {n} {Γ : Ctx n} {Θ s u m}
               (f : Tm Γ [] [] (s ∷ u ∷ Θ) u) (σ : Env Γ Θ)
-            → (∀ {x : Val Γ s} {a : Val Γ u} → Red s x → Red u a
-                 → Red u (evalWith f (x ∷ᵉ a ∷ᵉ σ)))
-            → ∀ {xs : List (Val Γ s)} → All (Red s) xs
-            → ∀ {a : Val Γ u} → Red u a
-            → Red u (foldVals f σ xs a)
+            → (∀ {x : Val Γ s} {a : Val Γ u} → Red m s x → Red m u a
+                 → Red m u (evalWith f (x ∷ᵉ a ∷ᵉ σ)))
+            → ∀ {xs : List (Val Γ s)} → All (Red m s) xs
+            → ∀ {a : Val Γ u} → Red m u a
+            → Red m u (foldVals f σ xs a)
 redFoldVals f σ step []       ra = ra
 redFoldVals f σ step (p ∷ ps) ra = redFoldVals f σ step ps (step p ra)
