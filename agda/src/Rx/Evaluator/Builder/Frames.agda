@@ -101,11 +101,16 @@ postulate
   -- constructors rather than instantiated, which is why the obligation
   -- below is stated as a statement and not as a remark.
   --
-  -- AND WHAT THE PAIR OWES, stated so it can be refuted rather than
-  -- assumed: a subscribe either leaves the parked total no larger or
-  -- strictly drops the unconnected count.  One more induction over the
-  -- delivery relations, in the idiom of the count's own -- and the
-  -- leaves for it are not minted until this parent can spend them.
+  -- AND THE PAIR IS SPENT AS A DISJUNCTION, WHICH IS THE PART THAT IS
+  -- NOT OBVIOUS.  The parked total cannot be a budget the way the count
+  -- is, because a budget has to be PRESERVED across every step and a
+  -- park raises it.  What IS preserved is weaker: the count is under
+  -- its bound, and either STRICTLY under it or the parked total is
+  -- under a bound of its own -- since a subscribe that parks pays a
+  -- connect, which buys the first disjunct, and one that does not keeps
+  -- the second.  That is the obligation to state, one more induction
+  -- over the delivery relations in the idiom of the count's own, and
+  -- its leaves are not minted until this parent can spend them.
   --
   -- DEAD ROUTE: writing it as a body here needs the general path walk,
   --   and the walk's own `from-inner` CLOSING side is what runs the drain

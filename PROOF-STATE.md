@@ -229,16 +229,13 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 
 ### Big picture tier roadmap
 
-- **THEN THE LANE DRAIN, ON THE PAIR ITS HEADER NOW NAMES.** The measure
-  question is answered in `drainQueue!`'s own header: the parked total
-  falls when the queue is popped whole, and the only thing that can put
-  items back is a share fan-out, whose path is installed by a connect —
-  so the bound is the unconnected count and the parked total read
-  LEXICOGRAPHICALLY. What the leg carries out is the second index: a
-  `queued` measure, the obligation that a subscribe either leaves it no
-  larger or drops the count, and the level telescope widened to take
-  both. The residue is stated at full strength and the leaves are minted
-  only where this parent can spend them.
+- **THEN THE LANE DRAIN, ON THE INVARIANT ITS HEADER NOW NAMES.** The
+  measure question is answered where it was asked, in `drainQueue!`'s own
+  header: a pair, spent as a disjunction, because a parked total is
+  raised by a park and so cannot be a budget the way the count is. What
+  the leg carries out is putting that invariant in place of the bare
+  bound the whole builder currently threads — which moves every frame
+  helper's obligation at once, and is why it is a leg rather than a row.
 
 - **THEN THE FLATTENERS AND `takeᵖ`, AND NO FORMER IS OWED AFTER ALL
   (Anthony: "the flattens, mergeAll etc, _are_ the primitives … they can
