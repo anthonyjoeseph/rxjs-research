@@ -589,40 +589,6 @@ refuted: stripped
 probed: stripped
 	@$(call AGDA_RUN_EV,probed/Probed/Main.agda)
 
-# THE SPIKE TREE.  A third Agda library (`rxjs-spike`), with its own `_build`
-# and NO edge to `rxjs-research` -- which is what makes it safe beside a live
-# gate and is the whole reason it is a library rather than a directory of `src`.
-# It holds the toy fragments that decide whether a MECHANISM works before any of
-# it is built for real, so its product is a green or a refutation and never a
-# lemma anything depends on.
-#
-# EVERY FILE IS CHECKED INDEPENDENTLY, and that is deliberate rather than a gap
-# in the wiring law.  The evidence trees each carry a claim root because a probe
-# must be CLAIMED -- it is evidence about a live postulate, and an unclaimed one
-# rots silently.  A spike names no postulate at all; it is a fragment that
-# either expresses the risky shape or does not, and two fragments deciding two
-# different mechanisms have nothing to say to each other.  A root joining them
-# would assert a coherence that is not there, and would make one fragment's
-# refutation take the other's green down with it.
-#
-# AND IT HAS A RETIREMENT CONDITION RATHER THAN A CLAIM ROOT, WHICH IS THE ONE
-# THING A DECIDED EXPERIMENT NEEDS.  The gate typechecks every file here, so the
-# tree cannot rot into not compiling; what it CAN rot into is answering a
-# question nobody is asking any more, and no root would see that.  These
-# fragments decide whether a lexicographic stratification can stand in for the
-# evaluator's gas counter, and they answered yes.  They go — the target with
-# them — in the commit where `agda/src` carries that descent over the real term
-# language, because that commit proves everything they prove and more.  Until
-# then they are the only worked instance of the shape, and deleting them would
-# be deleting the evidence the real proof is being written from.
-spike:
-	@fail=0; n=0; \
-	  for f in agda/spike/Spike/*.agda; do \
-	    n=$$((n + 1)); \
-	    (cd agda/spike && $(AGDA) Spike/$$(basename $$f)) || fail=1; \
-	  done; \
-	  if [ $$fail -eq 0 ]; then echo "spike: $$n module(s) GREEN"; else exit 1; fi
-
 # ONE EVIDENCE FILE, BY PATH -- the probe loop's fast path.  `make agda-dev`
 # resolves only src-relative names, so a probe under construction had no cheap
 # check at all and the only route was the whole claim root.  A file reached
@@ -1162,14 +1128,7 @@ comments-selftest:
 
 # Everything decidable without Agda: seconds, and deliberately FIRST, so a
 # textual violation never costs a full build to discover.  Both gates run it.
-#
-# `spike` IS THE ONE AGDA RUN HERE, AND IT IS LAST FOR THAT REASON.  It costs
-# well under a minute against the tower's tens of them, on a cache no other
-# check shares, so putting it on this list is what gets the fragments checked on
-# BOTH paths -- and the light path is where a tier of experiments does all its
-# work, so a spike gated only by the heavy path would be gated by nothing.  Last
-# in the list keeps the property the list exists for: a textual violation still
-# fails in seconds, ahead of anything that compiles.
+# NOTHING ON IT COMPILES, which is the property the list exists for.
 GATE_CHEAP = wiring-selftest wiring-gate wiring-refuted wiring-probed \
              unsafe-check dup-selftest dup-check \
              imports-selftest imports-check \
@@ -1182,7 +1141,7 @@ GATE_CHEAP = wiring-selftest wiring-gate wiring-refuted wiring-probed \
              recursion-cover-selftest recursion-cover \
              comments-selftest comments-check dev-changed-selftest \
              formers-selftest formers-check \
-             unmap-selftest spike ts-gate
+             unmap-selftest ts-gate
 
 gate-cheap:
 	@for t in $(GATE_CHEAP); do \
