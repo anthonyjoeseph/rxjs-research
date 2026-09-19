@@ -235,24 +235,24 @@ the work that would kill it sits outside by construction.
 
 ### Big picture tier roadmap
 
-- **FIRST, MAKE A POP DESCEND — THE TWO WAYS OF NOT NEEDING IT TO ARE
-  BOTH CLOSED NOW.** The drain's candidate cannot be CARRIED: a
-  store would have to hold a family that takes the store as an
-  argument. And it cannot be MOVED to the spine where a candidate is
-  free: that reorders one instant, which the batching stage reads as a
-  different batch. Both findings sit in the monster's own header. What
-  is left is the measure, whose one fact is that a subscribe never
-  net-increases the total of queued inners — the pop removes one, and
-  only the OUTER emitting during the subscribe puts one back. Probe
-  that before stating it.
+- **FIRST, TIE THE DRAIN INTO THE TERM FACE'S OWN RECURSION — EVERY WAY
+  OF NOT DOING SO IS NOW CLOSED.** The candidate cannot be CARRIED (a
+  store would hold a family taking the store as an argument), cannot be
+  MOVED to the spine (that reorders the flat emit list), and cannot be
+  fetched at ANOTHER BOUND: the bound is mixed-variance in the
+  candidate, a hypothesis at the top and an index of the `Handles` it
+  consumes, so widening and narrowing each need the other. That closes
+  the measure family whole — and no measure was ever owed, since
+  `dq-run` peels its popped list. All four findings sit in the
+  monster's header. What is left is the cycle the layering was built to
+  avoid, and the first question is what orders it.
 
-- **THEN THE DRAIN AS A BODY, ONCE THE POP PAYS FOR ITS SUBSCRIBE.** The
-  pop takes the node's queue WHOLE and subscribes each carried inner
-  once, so the recursion down the popped list is structural and wants no
-  measure; the only non-structural step is the subscribe, and a bound
-  the pop strictly drops is what would fund it — the descent to
-  `beneath` the share connect already spends. If the leg above comes
-  back green this is a body over leaves already declared.
+- **THEN THE DRAIN AS A BODY, WHICH IS A FEW LINES ONCE IT IS IN THE
+  BLOCK.** `dq-run` peels its popped list and `dq-full` restores what it
+  did not reach, so both arms are structural; `dq-nil` is the base. The
+  whole of the difficulty is the subscribe in `dq-run` needing a
+  candidate, so a drain written where the term face can hand it one is a
+  body over leaves already declared.
 
 - **THEN THE DERIVATION-LEVEL OBLIGATIONS THE ARRIVAL SPINE STILL OWES.**
   The delivery cycle's eleven relations carry the count, and the spine
@@ -285,7 +285,7 @@ the work that would kill it sits outside by construction.
 ### The ledger
 
 - **`drainQueue!`** (Rx.Evaluator.Builder.Frames) — FALSITY,
-  `REFUTED, DEAD ROUTE×4`: the tier's monster. A parked lane's backlog, spent
+  `REFUTED, DEAD ROUTE×5`: the tier's monster. A parked lane's backlog, spent
   under the frame whose closing side runs it. Not instantiated.
 
 - **`{mergeAll,switchAll,exhaustAll}ᵖ`** (Rx.Elaborate) — SHAPE,

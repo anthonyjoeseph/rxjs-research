@@ -116,9 +116,22 @@ postulate
   --   termination checker names that one call and no measure in the
   --   builder orders it, because the drain re-subscribes at its own
   --   bound and neither the popped queue nor the store descends.  The
-  --   route is dead in the direction it was tried: the hypothesis is
-  --   right and unfundable, so what has to move is the bound the drain
-  --   subscribes at, not the shape of what it asks for.
+  --   hypothesis is right and unfundable where it stands.
+  --
+  -- DEAD ROUTE: moving the BOUND the drain subscribes at, so the
+  --   candidate arrives from the levels beneath rather than from the
+  --   one being built.  No measure decides this, because no transport
+  --   exists to carry a candidate between bounds in either direction:
+  --   the bound is MIXED-VARIANCE in the candidate.  It is a hypothesis
+  --   at the top, which is antitone, and it also indexes the `Handles`
+  --   the candidate CONSUMES, which is not -- so widening and narrowing
+  --   each need the other, and neither is free.  This closes the family
+  --   rather than one member of it: a queue measure, a per-node
+  --   measure and the unconnected-plus-queued pair all answer "which
+  --   bound descends", and the candidate does not travel between bounds
+  --   whatever the answer.  It also explains why nothing here needed a
+  --   measure in the first place -- `dq-run` peels its popped list, so
+  --   the drain's own recursion was never the difficulty.
   --
   -- DEAD ROUTE: writing it as a body here needs the general path walk,
   --   and the walk's own `from-inner` CLOSING side is what runs the drain
@@ -146,9 +159,9 @@ postulate
   --   chain registered on the same source afterwards; real rxjs
   --   subscribes the parked inner INSIDE the completion, so its value
   --   precedes the sibling's, while a spine-deferred subscribe follows
-  --   it.  Both land in one instant, so the batching stage keeps them
-  --   together and concatenates in STREAM ORDER -- which makes the two
-  --   readings different batches, not different schedules.
+  --   it.  A run's output is a FLAT emit list in canonical order, so
+  --   that is a different `Stream` and not a different schedule --
+  --   nothing downstream of here is reached before the two disagree.
   --
   -- REFUTED: `Refuted.Park-Unpaid` -- the reading that made the park pay
   --   out of the step relation, which no arm of that relation can.

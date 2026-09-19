@@ -241,6 +241,14 @@ mutual
   Handles : ∀ {n} {Γ : Ctx n} {t lo m} (u : Ty) → Path Γ lo u t → Set
   Handles {m = m} u κ = Emits {m = m} u κ × Closes {m = m} κ
 
+-- THE BOUND IS MIXED-VARIANCE HERE, WHICH IS WHY A CANDIDATE DOES NOT
+-- TRAVEL BETWEEN BOUNDS.  It is a hypothesis of the observable case,
+-- which alone would make `Red` antitone in it; but it also indexes the
+-- `Handles` that case CONSUMES, and that half runs the other way.  So
+-- widening and narrowing each need the other, and a site short of a
+-- candidate gains nothing by asking at a different bound -- whichever
+-- way a measure were to point it.
+
 -- A FRAME'S FUNCTION CARRIES THE CANDIDATE ACROSS, which is the one
 -- thing a transformer owes and the only thing a path builder asks of
 -- the term face.
