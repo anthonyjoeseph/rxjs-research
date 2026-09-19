@@ -239,20 +239,21 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
   reading of where the cost now sits, since every per-module figure in the
   numbers file was taken against a machine that no longer exists.
 
-- **THE TWO CUT EDGES GET REAL BODIES.** `drainQueue!` and
-  `handles-share` are the module's only two genuine cycles, stated rather
-  than written so the rest of the builder layers strictly: the lane drain
-  subscribes under a frame whose closing side is the drain, and the share
-  connect re-enters the term face at a slot's definition. Neither is hard
-  — the drain is structural on the carried queue, the connect descends on
-  the slot's own index — and both are a mutual block spanning the module,
-  which is the cost being deferred rather than a fact in doubt. The leg
-  decides whether that block is one or two.
+- **THE FIVE LEAVES ARE ONE PROBLEM, AND THE LEG IS TO FIND ITS MEASURE.**
+  The share fan-out is a body now, over a leaf naming only the WALK a
+  connect spends — which is what showed the rest to be one question. Every
+  remaining leaf wants the term face from inside the walk: the drain and
+  the three store reads each hold a value whose candidate was dropped. A
+  measure ordering that round trip exists, and `walk-above`'s header says
+  what it is and why it cannot be stated where it is needed. So the leg is
+  whether it can be carried anywhere the promise is spent; a no closes off
+  the per-value shape rather than one leaf.
 
 - **THE THREE STORE-RECOVERY LEAVES, AND THE QUESTION IS WHERE TO SAY
-  THEM.** A fold's accumulator, a bracket's held value and its flushed
-  group are each written by a clause holding the candidate and read by a
-  clause holding only the store. The fundamental theorem at values settles
+  THEM.** The leg above decides whether they fall together; this one runs
+  if they do not. A fold's accumulator, a bracket's held value and its
+  flushed group are each written by a clause holding the candidate and
+  read by a clause holding only the store. The fundamental theorem at values settles
   all three on paper; calling it from the walk that spends them is a
   definitional cycle, and an invariant on the state is a dead route the
   header records. So the leg is a placement decision, not a grind, and it
@@ -280,10 +281,10 @@ at either, and one drawn here would forbid the wide refactor that IS the tier.
 
 ### The ledger
 
-- **`drainQueue!`**, **`handles-share`** (Rx.Evaluator.Builder) — FALSITY,
-  `DEAD ROUTE`: the builder's two cut cycles, a lane drain and a share connect.
-  Stated so the rest of the module layers strictly; neither has been
-  instantiated.
+- **`drainQueue!`**, **`walk-above`** (Rx.Evaluator.Builder) — FALSITY,
+  `DEAD ROUTE`: the builder's two cut cycles, a lane drain and the walk a share
+  connect spends. Both want the term face from inside the walk; neither has
+  been instantiated.
 
 - **`{mergeAll,switchAll,exhaustAll}ᵖ`** (Rx.Elaborate) — SHAPE,
   `DEAD ROUTE×4`: the elaboration's per-former plumbing, after the two sources

@@ -27,31 +27,33 @@
 -- frame helpers bottom out in their argument and mention no recursion
 -- at all.  Two edges genuinely close a cycle and each is cut by a leaf:
 -- a lane drain subscribes under a frame whose own closing side drains,
--- and a share connect re-enters the term face at the share's
--- definition.  With those two cut the rest is a straight line -- frame
--- helpers, then the term face with itself, then the fundamental theorem
--- at values, then the general path walk, then the arrival spine.
+-- and a share connect spends the walk at the floor above its slot.
+-- With those two cut the rest is a straight line -- frame helpers, the
+-- share fan-out, then the term face with itself, then the fundamental
+-- theorem at values, then the general path walk, then the arrival
+-- spine.
 module Rx.Evaluator.Builder where
 
 open import Data.Bool using (true; false; T; _∧_)
 open import Data.Bool.ListAction using (any)
 open import Data.Fin using (Fin; toℕ)
+open import Data.Fin.Properties using (toℕ<n)
 open import Data.List using (List; []; _∷_; map)
 open import Data.List.Relation.Unary.All using (All) renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
 open import Data.Maybe using (nothing; just)
-open import Data.Nat using (ℕ; zero; suc; _<_; _≤_; s≤s; _+_; _<ᵇ_; _≡ᵇ_)
+open import Data.Nat using (ℕ; zero; suc; _<_; _≤_; s≤s; _+_; _∸_; _<ᵇ_; _≡ᵇ_)
 open import Data.Nat.Induction using (<-wellFounded-fast)
-open import Data.Nat.Properties using (_<?_; ≮⇒≥; ≤-refl; ≤-trans; m≤n+m; m≤m+n; <ᵇ⇒<)
+open import Data.Nat.Properties using (_<?_; ≮⇒≥; ≤-refl; ≤-trans; m≤n+m; m≤m+n; <ᵇ⇒<; ∸-monoʳ-<)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
-open import Data.Unit using (tt)
+open import Data.Unit using (⊤; tt)
 open import Data.Vec using (lookup)
 open import Induction.WellFounded using (Acc; acc)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 open import Relation.Nullary using (yes; no)
 open import Relation.Nullary.Decidable using (⌊_⌋)
 
-open import Rx.Prim using (Fuel; Tick; hot; cold)
+open import Rx.Prim using (Fuel; Tick; hot; cold; PlainEvent; valueᵖ; completeᵖ)
 open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; obs; listᵗ; _≟ᵗ_;
   Ctx; Closed; Val; Exp; Tm; Fn; FnClo; Env; []ᵉ; _∷ᵉ_; evalWith; unfoldμ;
   input; ofᵉ; emptyᵉ; takeᵉ; batchSyncᵉ; mapᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ;
@@ -70,7 +72,8 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; AllOp; NodeId; Node
   consumeUsable; switchKill; aliveThroughᶠ; markInnerDone; markOuterDone; allFinished;
   mergeAllQueue; scanStep; takeStep; takeSpent; cutAt; batchSyncPush; batchSyncFlush;
   memberSource; register; atSlot; atDyn; lowerFloor; resolve; Arrival; AtFloor; RegId; arrTick;
-  arrTy; arrVal; chainsOf; cascadeLatch; sched-next; sched-init; st-init)
+  arrTy; arrVal; chainsOf; cascadeLatch; sched-next; sched-init; st-init;
+  shareAdmit; shareLatch; isFinᵖ)
 open import Rx.Evaluator.Domain using (emits⇓; subscribeE⇓; consume⇓; drainQueue⇓; subscribeAll⇓; chainStep⇓; cascadeGo⇓; cascade⇓;
   drain⇓; evaluate⇓; emit-root; emit-map; emit-scan; emit-scan-stuck; emit-take-more;
   emit-take-last; emit-take-spent; emit-batchSync; emit-batchSync-held; emit-from-inner;
@@ -83,7 +86,8 @@ open import Rx.Evaluator.Domain using (emits⇓; subscribeE⇓; consume⇓; drai
   consume-merge-sub; consume-merge-park; consume-merge-nil; consume-switch-sub;
   consume-switch-nil; consume-exhaust-sub; consume-exhaust-nil; sub-all; connect; slot-spent;
   slot-join; slot-connect; chain-more; chain-last; casc-nil; casc-cut; casc-live; casc-run;
-  drain-done; drain-empty; drain-step; eval-run)
+  drain-done; drain-empty; drain-step; eval-run; dispatchShare⇓; shareGo⇓; disp;
+  go-nil; go-cut; go-val; go-fin; emit-sink; close-sink)
 open import Rx.Evaluator.Reducible using (Out; Red; Emits; Closes; Handles; RedFn; RedEnv; redDatas; redLookup; redFoldVals;
   red-scanned; red-pushed; red-flushed)
 
@@ -94,11 +98,12 @@ open import Rx.Evaluator.Reducible using (Out; Red; Emits; Closes; Handles; RedF
 -- A LANE DRAIN AND A SHARE CONNECT ARE THE MODULE'S TWO CYCLES, AND
 -- CUTTING THEM HERE IS WHAT MAKES EVERYTHING ELSE A STRAIGHT LINE.
 -- Every other block below takes what it needs from the block above it;
--- these two alone want something declared after them.  Neither is a
--- hard statement -- the drain is structural on the carried queue, and
--- the connect descends on the slot's own index, since a definition may
--- name only inputs strictly below its slot -- so what each costs is
--- not a proof but a mutual block spanning the whole module.
+-- these two alone want something declared after them.  Each is stated
+-- as narrowly as its own cycle allows: the drain leaf is the whole
+-- drain, since what it wants back is the fundamental theorem at values,
+-- while the share leaf is only the WALK a connect spends -- the fan-out
+-- itself, which is what a share actually does, is a body a few lines
+-- down over that walk.
 --
 -- NEITHER HAS BEEN INSTANTIATED.  They are stated at full strength and
 -- the probe that would reach them cannot be written until the module
@@ -120,20 +125,108 @@ postulate
               → Handles u κ → (sched : Sched Γ) (st : EvalSt e)
               → Σ (Out e) λ r → drainQueue⇓ {e = e} op nid κ now q sched st r
 
--- WHAT A SHARE'S SINK DOES WITH A VALUE, WHICH IS FAN IT OUT.  And the
--- share's FLOOR is where the body will come from: the fan-out re-enters
--- at a strictly higher floor -- a chain registered on share `i` can only
--- sink into a share above `i` -- so `n ∸ suc (toℕ i)` descends where
--- `n ∸ lo` stood, and the connect-once ledger is what keeps a second
--- subscriber to the same slot from re-entering at all.
+------------------------------------------------------------------
+-- THE SHARE'S SINK, WHICH FANS A VALUE OUT -- AND THE ONE LEAF LEFT
+-- UNDER IT.
+------------------------------------------------------------------
+
+-- A WALK IS WHAT A PATH IS OWED, AND NAMING IT IS WHAT LETS THE FAN-OUT
+-- BE A BODY.  The sink does not walk anything itself: it hands each
+-- admitted chain to a walk it was GIVEN, so the recursion lives at the
+-- caller and this file's share machinery has none.
+Walk : ∀ {n} (Γ : Ctx n) (t : Ty) (lo : ℕ) → Set
+Walk Γ t lo = ∀ {u} (κ : Path Γ lo u t) → Handles u κ
+
+-- THE PAYLOAD'S CANDIDATE, WHICH ONLY ONE OF THE TWO EVENTS HAS.  An
+-- end carries nothing, so the fan-out's value arm is the only one that
+-- owes a candidate and the completion arm asks for `⊤`.
+RedEv : ∀ {n} {Γ : Ctx n} (u : Ty) → PlainEvent (Val Γ u) → Set
+RedEv u (valueᵖ v) = Red u v
+RedEv u completeᵖ  = ⊤
+
+-- THE DESCENT THE SINK BUYS ITS CALLER, AND IT IS A FACT ABOUT THE
+-- INDEX RATHER THAN A PEELED WITNESS.  `shareAdmit` returns chains at
+-- floor `suc (toℕ i)` IN THEIR TYPE, so a chain registered on share `i`
+-- can only sink into a share strictly above `i`, and the room left
+-- above the floor is what shrinks at every fan-out.
+monus-sink : ∀ {n lo} (i : Fin n) → lo ≤ toℕ i → n ∸ suc (toℕ i) < n ∸ lo
+monus-sink i below = ∸-monoʳ-< (s≤s below) (toℕ<n i)
+
+-- ONE ADMITTED CHAIN AT A TIME, IN REGISTRATION ORDER, EACH MARKED
+-- DELIVERED BEFORE IT RUNS.  A victim cut earlier in this same cascade
+-- is skipped rather than delivered to, which is the one thing the list
+-- order cannot express and the equation carries instead.
+share-go! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo} (i : Fin n)
+            (w : Walk Γ t lo) (now : Tick)
+            (ev : PlainEvent (Val Γ (lookup Γ i))) → RedEv (lookup Γ i) ev
+          → (ps : List (RegId × Path Γ lo (lookup Γ i) t))
+          → (sched : Sched Γ) (st : EvalSt e)
+          → Σ (Out e) λ r → shareGo⇓ {e = e} now i ev ps sched st r
+share-go! i w now ev rev []              sched st = _ , go-nil
+share-go! i w now (valueᵖ v) rv ((rid , p) ∷ ps) sched st
+  with any (_≡ᵇ rid) (EvalSt.cancelled st) in eqc
+... | true  = let (r , g) = share-go! i w now (valueᵖ v) rv ps sched st
+              in r , go-cut eqc g
+... | false =
+      let ((_ , sched₁ , st₁) , f) =
+            proj₁ (w p) rv now sched
+              (record st { delivered = rid ∷ EvalSt.delivered st })
+          (_ , g) = share-go! i w now (valueᵖ v) rv ps sched₁ st₁
+      in _ , go-val eqc f g
+share-go! i w now completeᵖ rv ((rid , p) ∷ ps) sched st
+  with any (_≡ᵇ rid) (EvalSt.cancelled st) in eqc
+... | true  = let (r , g) = share-go! i w now completeᵖ rv ps sched st
+              in r , go-cut eqc g
+... | false =
+      let ((_ , sched₁ , st₁) , f) =
+            proj₂ (w p) now sched
+              (record st { delivered = rid ∷ EvalSt.delivered st })
+          (_ , g) = share-go! i w now completeᵖ rv ps sched₁ st₁
+      in _ , go-fin eqc f g
+
+-- THE LATCH RUNS BEFORE THE FAN-OUT AND THE SWEEP AFTER IT, WHICH IS
+-- WHY BOTH STAY APPLIED.  An end latches the share as completed on the
+-- way in, so a chain subscribing to it DURING the fan-out sees a spent
+-- slot; the registrations are dropped on the way out, once every chain
+-- that was admitted has had its end.
+dispatch-share! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo} (i : Fin n)
+                  (below : lo ≤ toℕ i) (w : Walk Γ t (suc (toℕ i))) (now : Tick)
+                  (ev : PlainEvent (Val Γ (lookup Γ i))) → RedEv (lookup Γ i) ev
+                → (sched : Sched Γ) (st : EvalSt e)
+                → Σ (Out e) λ r → dispatchShare⇓ {e = e} now i below ev sched st r
+dispatch-share! i below w now ev rev sched st =
+  let (_ , g) = share-go! i w now ev rev (shareAdmit i (EvalSt.registry st))
+                  sched (shareLatch i (isFinᵖ ev) st)
+  in _ , disp g
+
+handles-share : ∀ {n} {Γ : Ctx n} {t lo} (i : Fin n) (below : lo ≤ toℕ i)
+              → Walk Γ t (suc (toℕ i))
+              → Handles {Γ = Γ} {t = t} (lookup Γ i) (share-sink i below)
+handles-share i below w =
+    (λ {_} {v} rv now sched st →
+       let (r , d) = dispatch-share! i below w now (valueᵖ v) rv sched st
+       in r , emit-sink d)
+  , (λ now sched st →
+       let (r , d) = dispatch-share! i below w now completeᵖ tt sched st
+       in r , close-sink d)
+
+-- THE LEAF THAT REPLACED THE FAN-OUT, AND IT IS A STATEMENT ABOUT
+-- DECLARATION ORDER RATHER THAN ABOUT SHARES.  What a connect spends is
+-- the general walk at the floor directly above the slot it is
+-- connecting; the walk is written at the foot of this module, and it
+-- reaches the term face back HERE -- a frame's function is handed to the
+-- walk with a fresh accessibility, so nothing around that loop shrinks.
 --
--- DEAD ROUTE: building it in place instead subscribes the slot's
---   DEFINITION, which is an arbitrary term, so the path walk re-enters
---   the term face -- and the term face's own descent is on a size the
---   walk does not carry, so there is nothing at that site to descend on.
+-- DEAD ROUTE: merging the term face and the walk into one block puts
+--   both recursions under one measure, and the two move in OPPOSITE
+--   directions: a connect drops to the floor `toℕ i` its own slot names,
+--   while a fan-out only ever rises to `suc (toℕ i)`, so neither `n ∸ lo`
+--   nor the input ceiling orders the pair.  What does order it is that a
+--   share connects AT MOST ONCE EVER, which is a fact about the store --
+--   and `Rx.Evaluator.Reducible`'s own dead route records why a store
+--   invariant cannot be a premise of the candidate.
 postulate
-  handles-share : ∀ {n} {Γ : Ctx n} {t lo} (i : Fin n) (below : lo ≤ toℕ i)
-                → Handles {Γ = Γ} {t = t} (lookup Γ i) (share-sink i below)
+  walk-above : ∀ {n} {Γ : Ctx n} {t} (i : Fin n) → Walk Γ t (suc (toℕ i))
 
 ------------------------------------------------------------------
 -- SEVERAL VALUES IN ORDER, WHICH IS A SCRIPT'S SYNCHRONOUS PREFIX.
@@ -574,7 +667,7 @@ mutual
               (r , dv) =
                 redExpAcc d []ᵉ tt (toℕ i) okd aI
                   (<-wellFounded-fast (gsizeᵉ d))
-                  (share-sink i ≤-refl) (handles-share i ≤-refl) now
+                  (share-sink i ≤-refl) (handles-share i ≤-refl (walk-above i)) now
                   (record sched { mint = setAt regᵏ (suc rid) (Sched.mint sched) })
                   (register rid (atSlot i) (lowerFloor below κ)
                     (record st
@@ -726,15 +819,23 @@ redFn (Θ , f , σ) =
 -- the one place a path is taken apart rather than extended.
 ------------------------------------------------------------------
 
+-- THE SINK ARM IS THE ONLY ONE THAT IS NOT STRUCTURAL, and what pays
+-- for it is the floor: `shareAdmit` hands back chains at `suc (toℕ i)`,
+-- strictly above the floor this path sinks at, so `n ∸ lo` drops.  Every
+-- other arm peels a frame.
+handlesAcc : ∀ {n} {Γ : Ctx n} {t lo} → Acc _<_ (n ∸ lo) → Walk Γ t lo
+handlesAcc ac       root                    = handles-root
+handlesAcc (acc rec) (share-sink i below)   =
+  handles-share i below (λ {u} κ → handlesAcc (rec (monus-sink i below)) {u} κ)
+handlesAcc ac (map-f fn ↠ κ)          = handles-map fn κ (redFn fn) (handlesAcc ac κ)
+handlesAcc ac (scan-f fn nid ↠ κ)     = handles-scan fn nid κ (handlesAcc ac κ)
+handlesAcc ac (take-f nid ↠ κ)        = handles-take nid κ (handlesAcc ac κ)
+handlesAcc ac (batchSync-f nid ↠ κ)   = handles-batchSync nid κ (handlesAcc ac κ)
+handlesAcc ac (from-inner op a i ↠ κ) = handles-from-inner op a i κ (handlesAcc ac κ)
+handlesAcc ac (thru-outer op nid ↠ κ) = handles-thru-outer op nid κ (handlesAcc ac κ)
+
 handles! : ∀ {n} {Γ : Ctx n} {t u lo} (κ : Path Γ lo u t) → Handles u κ
-handles! root                    = handles-root
-handles! (share-sink i below)    = handles-share i below
-handles! (map-f fn ↠ κ)          = handles-map fn κ (redFn fn) (handles! κ)
-handles! (scan-f fn nid ↠ κ)     = handles-scan fn nid κ (handles! κ)
-handles! (take-f nid ↠ κ)        = handles-take nid κ (handles! κ)
-handles! (batchSync-f nid ↠ κ)   = handles-batchSync nid κ (handles! κ)
-handles! (from-inner op a i ↠ κ) = handles-from-inner op a i κ (handles! κ)
-handles! (thru-outer op nid ↠ κ) = handles-thru-outer op nid κ (handles! κ)
+handles! {n = n} {lo = lo} = handlesAcc (<-wellFounded-fast (n ∸ lo))
 
 ------------------------------------------------------------------
 -- THE ARRIVAL SPINE.
