@@ -36,6 +36,7 @@ open import Verify-Batch-Simultaneous.The-Proof
 open import Verify-Batch-Simultaneous.Batch-Theorems
   using (batch-online)
 
+open import Verify-Input-Well-Formed.Input-Well-Formed using (input-wellFormed)
 ------------------------------------------------------------------
 -- THE EVALUATOR-LEVEL CLAIMS ARE GONE, AND WHAT REMOVED THEM WAS NOT
 -- A TIDY-UP.  Every one of them — the five fuel and unfolding claims,

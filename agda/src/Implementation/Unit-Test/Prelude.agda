@@ -44,7 +44,7 @@ open import Data.Vec using () renaming (_∷_ to _∷ⱽ_; [] to []ⱽ)
 
 open import Rx.Prim using (InstEmit)
 open import Rx.Exp using (Ctx; Closed; Val; natᵗ; emptyᵉ; takeᵉ; nat̂)
-open import Rx.SExp using (SExp; emitᵗ; emitᵛ)
+open import Rx.SExp using (SExp; emitᵗ; plainᵛ)
 open import Rx.Elaborate using (elaborate)
 open import Rx.Envelope.Decode using (decodeStream)
 open import Rx.Evaluator.Builder using (evaluate↓)
@@ -61,7 +61,7 @@ open import Spec using (spec-batchSimultaneous)
 Γ₂ = natᵗ ∷ⱽ natᵗ ∷ⱽ []ⱽ
 
 Γ₂ᵉ : Ctx 2
-Γ₂ᵉ = emitᵛ Γ₂
+Γ₂ᵉ = plainᵛ Γ₂
 
 -- THE TELESCOPE IS EMPTY OBSERVABLES, AND THAT IS A BLOCKAGE RATHER
 -- THAN A CHOICE.  An elaborated program's slots stand at the ENVELOPE,

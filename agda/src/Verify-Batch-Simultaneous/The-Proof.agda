@@ -17,7 +17,7 @@ open import Relation.Binary.PropositionalEquality
 open import Rx.Prim               using (InstEmit; Fuel; Id; Source; _at_from_as_; InstEvent; init; value; close; handoff; complete;
   EmitKind; subscribe; delivery; plumbing; cut; cutPending; exhausted)
 open import Rx.Exp                using (Ctx)
-open import Rx.SExp               using (SExp; emitᵛ)
+open import Rx.SExp               using (SExp; plainᵛ)
 open import Rx.Elaborate          using (elaborate)
 open import Rx.Evaluator.Builder using (evaluate↓)
 open import Rx.Envelope.Decode using (decodeStream)
@@ -1136,6 +1136,6 @@ postulate
   --   never inspects -- and the sampling figure the face stood on.
   formal-verification-batchSimultaneous :
     ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : SExp Γ [] [] [] t)
-      (ins : Slots (emitᵛ Γ)) →
+      (ins : Slots (plainᵛ Γ)) →
     spec-batchSimultaneous (decodeStream (concat (evaluate↓ fuel (elaborate e) ins)))
       ≡ impl-batchSimultaneous (decodeStream (concat (evaluate↓ fuel (elaborate e) ins)))

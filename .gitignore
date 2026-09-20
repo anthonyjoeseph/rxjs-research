@@ -7,6 +7,7 @@ typescript/node_modules
 typescript/.oracle-tmp
 
 # agda
+**/MAlonzo
 **/_build
 # interface files: normally live in _build, but land next to sources under
 # `agda --local-interfaces` (used to keep an experimental/dev interface cache
