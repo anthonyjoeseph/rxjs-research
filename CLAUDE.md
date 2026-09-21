@@ -1,1064 +1,262 @@
 # Working methodology
 
-This repo pairs an **Agda model** (`agda/`) with a **TypeScript implementation** (`typescript/`).
-Agda's spec is gospel; TS conforms to it.
+Agda model (`agda/`) + TypeScript impl (`typescript/`). Agda's spec is gospel; TS conforms.
 
-**THIS FILE IS THE FILE OF RECORD FOR EVERY AGENT DIRECTIVE — DO NOT USE THE
-AUTO-MEMORY DIRECTORY (Anthony).** A ruling, a standing rule, a correction, a "from
-now on" — it goes HERE, in the section it belongs to, in the commit that establishes
-it. The per-project memory directory under `~/.claude/projects/…/memory/` is
-**vestigial**: it was emptied deliberately and nothing is to be written back into it.
-Neither is any other out-of-repo note file — this is the same law as "There is no
-second roadmap" in PROOF-STATE.md, one level up, and for the same reason.
+## This file
 
-**Why, and it is not a filing preference.** A memory file is outside the repo, so no
-gate, no `grep` and no reviewer can see it rot, and it is invisible to every worker —
-the sessions that most need a directive are the ones that never receive it.
+- **File of record for every directive.** Ruling, standing rule, correction, "from now on" — here, in the section it belongs to, same commit. Not recorded until it is in this file; don't answer "noted" and carry it in context only.
+- **Never the auto-memory directory** (`~/.claude/projects/…/memory/`) or any other out-of-repo note. Outside the repo = no gate, no grep, invisible to every worker.
+- **Ask before changing this file (Anthony).** Draft the wording, show it, land it on his yes. An agent's own inference installed as law propagates further than any code change.
+- **Rules here; mechanics in `docs/`** (one file per tool, indexed by `docs/README.md`). Split by KIND, not length. This file carries only what must be obeyed *prophylactically* — before you'd have reason to open a doc.
+- **Rules, not citations.** State the *shape* of a trap, not a name that gets discharged next week. Specific instances live in source headers. Exceptions: the load-bearing documents and commands (this file, PROOF-STATE.md, EVIDENCE.md, `typecheck-performance-numbers.md`, `docs/`, `make` targets, `agda/src`, `agda/evidence`) — vocabulary, not instances.
+- **No calendar dates, including on a ruling (Anthony).** The name alone makes it unarguable; the timestamp does nothing. Conflicting rulings get MERGED, not ordered by date.
+- **No line numbers, here or in a source comment.** A stale name fails a grep loudly; a stale line number resolves, points at unrelated code, and is believed.
+- `make roadmap-check` enforces dates on this file and `docs/`; `make comments-check` on `agda/src` and `agda/evidence`. A date is a build failure.
+- **Edit a single file with `Edit`, not `sed`/python heredoc (Anthony).** Auto mode's Bash preference does not extend to editing. Carve-out: a genuinely multi-hunk patch, with `assert old in s` per hunk, written once at the end.
 
-The corollary is the part that costs something: **a directive is not recorded until it
-is in this file.** Do not answer "noted" and carry the rule only in context — write it
-down, in the same turn.
+## THE GATE — `make gate`
 
-**AND ASK BEFORE YOU CHANGE THIS FILE (Anthony).** Writing a directive down in the
-same turn is the obligation above; deciding what the directive SAYS is not yours. A
-rule here is read by every session and obeyed prophylactically, so an agent's own
-inference installed as law propagates further than any code change and nothing
-downstream ever questions it. Draft the wording, show it, and land it once Anthony
-has said yes — the same rule Main already carries, for the same reason.
+Cheap textual checks run FIRST — seconds by grep vs. many minutes of Agda. **Run it rather than trusting a memo, including this one.**
 
-**THIS FILE HOLDS RULES; `docs/` HOLDS MECHANICS (Anthony).** Every byte here is read
-by every session, so this file carries only what must be obeyed **prophylactically** —
-before you have any reason to open a doc. How a tool works, what its flags mean, which
-trap cost a day, what a measurement showed: that goes in `docs/`, one file per tool,
-indexed by `docs/README.md`. The split is by KIND, not by length. When a rule here has
-a tool behind it, the rule states the shape of the trap and names the doc; the doc
-never restates the rule.
+Every `*-selftest` proves its checker still fires; they are not findings, they are the reason a green check means something.
 
-**AND WRITE RULES, NOT CITATIONS: THIS FILE AVOIDS POINTING AT CODE (Anthony).** A
-rule here outlives every file path, definition name, and line number it might mention,
-so a direct code reference is a decay clock attached to a rule that would otherwise
-stay true. State the _shape_ of the trap or the ruling and let the reader grep — "a
-two-letter constructor of one of this development's own small relations" ages better
-than a name that gets discharged next week, and it teaches the same lesson. Where a
-specific instance really is the content, its home is the source header, which moves
-when the code moves; that is the locality argument the `-- DEAD ROUTE` and `-- PROBED`
-conventions already rest on. The standing exceptions are the load-bearing _documents_
-and _commands_ — this file, PROOF-STATE.md, EVIDENCE.md,
-`typecheck-performance-numbers.md`, `docs/`, `make` targets and
-the directories the laws are stated over (`agda/src`, `agda/evidence`) — which are the
-vocabulary the rules are written in rather than instances they cite.
+| Target | What it will not let you do | Mechanics |
+| --- | --- | --- |
+| `wiring-gate` | a definition/postulate/module with no route to Main; a `⊤`-typed postulate; a bare `open import` in Main. A name PASSED to a postulate earns no credit — that is "a postulate must be a leaf" | [docs/wiring.md](docs/wiring.md) |
+| `wiring-refuted` / `wiring-probed` | same law over the two evidence trees, rooted at `Refuted.Main` / `Probed.Main` | [docs/wiring.md](docs/wiring.md), [docs/evidence.md](docs/evidence.md), EVIDENCE.md |
+| `evidence-check` | E1 a `src` file importing an evidence tree; E2 a probe with no `-- TARGET:`, or one naming a dead statement; E3 a receipt outliving its subject — discharging a postulate fails until the receipt above it is re-read and DELETED; E5 an unstamped or stale fingerprint; E6 a fork that doesn't inhabit `Separates`; E7 a target with no `Confirms` row; E8 the receipt cap | [docs/evidence.md](docs/evidence.md), EVIDENCE.md |
+| `unsafe-check` | `TERMINATING` / `NO_POSITIVITY_CHECK` / `REWRITE` / `--type-in-type` on the proof path. The build is not `--safe`, so this is the only thing stopping a soundness hole | [docs/unsafe-check.md](docs/unsafe-check.md) |
+| `dup-check` | two declarations proving one fact, up to binder spelling and type synonyms | [docs/find.md](docs/find.md) |
+| `imports-check` | an unused import, or an unused name in a surviving clause | [docs/imports-check.md](docs/imports-check.md) |
+| `roadmap-check` | PROOF-STATE unsorted, missing a live postulate or naming a dead one, over the row/preamble budget, dated, fewer than 3 or more than 7 legs, a leg over budget, a wrong DERIVED evidence field, a DIFFICULTY row standing on nothing, or a row of the tier being worked that nothing has instantiated. `make roadmap-evidence` writes the field | [docs/roadmap-check.md](docs/roadmap-check.md) |
+| `monster-check` | a line ADDED to `agda/src` outside the lowest open tier's monster's own dependency CONE — what its statement and body REACH, read off the tree AS EDITED | [docs/monster.md](docs/monster.md) |
+| `roadmap-order` | discharging a GRINDABLE or DIFFICULTY row while its tier holds an open FALSITY or SHAPE. Only DISCHARGE is held — delete, rename, split, restate, reclassify stay free; a PREREQUISITE the risky statement names is exempt | [docs/roadmap-check.md](docs/roadmap-check.md) |
+| `roadmap-moved` | a branch landing proof work with PROOF-STATE byte-identical to **main**. Baseline is the merge-base, so fix-ups inside a branch cost nothing | [docs/roadmap-check.md](docs/roadmap-check.md) |
+| `comments-check` | a date, a historical marker or a LINE NUMBER in `agda/src`/`agda/evidence`; evidence not last and in order; a DOUBLED marker (`-- -- RECOVERY:`); a `TWIN`/`REFUTED`/`PROBED`/`RECOVERY` that doesn't resolve. `DEAD ROUTE` is unvalidated — it names nothing | [docs/comments-check.md](docs/comments-check.md) |
+| the tower (inline in `gate-heavy`) | **a warning is a failure** (`-W error`, exit 42) | [docs/agda-build.md](docs/agda-build.md) |
+| `refuted` / `probed` | the evidence trees not typechecking | EVIDENCE.md |
+| `bug-cache` | a known impl counterexample regressing. `Unit-Test.agda` is off Main, so nothing else would notice | [docs/bug-cache.md](docs/bug-cache.md) |
 
-**AND NO CALENDAR DATES, INCLUDING ON A RULING (Anthony).** An attribution's job is to
-say a rule is Anthony's and not an agent's inference — that is what makes it
-unarguable, and the name alone does all of it. The timestamp beside it does nothing: a
-ruling in the file of record is in force whatever its age, which is what "file of
-record" means, and two rulings that genuinely conflict get MERGED rather than ordered
-by date. Same for the evidence under a rule — the fact that three of four workers died
-polling a build is the argument; when it happened is decoration, and a timing figure
-has one home and this is not it.
-
-**`make roadmap-check` ENFORCES THIS on this file and on `docs/`, and `make
-comments-check` on every comment in `agda/src` and `agda/evidence`; a date is a build
-failure** — since a rule stated in a file nobody checks is the thing this whole section
-is about.
-
-**LINE NUMBERS ARE THE WORST CASE AND THERE IS NO EXCEPTION FOR THEM, HERE OR IN A
-SOURCE COMMENT.** A stale name at least fails a `grep` loudly; a stale line number
-resolves, points at unrelated code, and is believed. Measured on the sweep that recorded
-this rule: of the citations this file carried, two named things that had since been
-deleted, one named a duplicate the compiler had already removed, one enumerated a set of
-`make` targets that had since grown, and every line number in the file was wrong. Not
-one of the rules they were attached to had stopped being true — which is the argument in
-a sentence.
-
-**EDIT A SINGLE FILE WITH THE `Edit` TOOL, NOT WITH `sed` OR A PYTHON HEREDOC
-(Anthony).** Auto mode says to prefer Bash for file work; that preference does not
-extend to editing, and reaching for a shell rewrite of one file costs tokens and a
-round trip to do what one tool call does directly. The carve-out is a genuinely
-multi-hunk patch, where an `assert old in s` per hunk fails loudly on a stale anchor
-and the file is written once at the end — never half-applied.
-
-## THE GATE — `make gate`, and what each check will not let you do
-
-Cheap checks run FIRST, deliberately: an unreachable name or an unsafe pragma is
-decidable in seconds by grep while the full gate costs many minutes, so there is no
-reason to spend those minutes only to fail on something a textual pass already knew.
-**Run it rather than trusting a memo — including this one.**
-
-| Target                                                   | What it enforces                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Mechanics                                         |
-| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------- |
-| `wiring-selftest`                                        | the wiring checker still fires — R2 fires on nothing in `src` today, so without a fixture it would rot untested                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | [docs/wiring.md](docs/wiring.md)                  |
-| `wiring-gate`                                            | every definition, postulate and module has a route to Main; no `⊤`-typed postulate; no bare `open import` in Main. A name PASSED to a postulate gets no credit, which is how "a postulate must be a leaf" is enforced                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | [docs/wiring.md](docs/wiring.md)                  |
-| `wiring-refuted`                                         | same law over `agda/evidence/refuted`, rooted at `Refuted.Main` — every witness is claimed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | [docs/wiring.md](docs/wiring.md), EVIDENCE.md     |
-| `wiring-probed`                                          | same law over `agda/evidence/probed`, rooted at `Probed.Main` — this is what replaced the probes' old self-granted reachability exemptions                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | [docs/evidence.md](docs/evidence.md), EVIDENCE.md |
-| `evidence-selftest`                                      | every evidence law still fires, and the shapes that are LEGAL stay quiet                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | [docs/evidence.md](docs/evidence.md)              |
-| `evidence-check`                                         | E1: no `src` file imports the evidence trees — the `.agda-lib` layout already makes such an import UNRESOLVABLE, so this is the fast legible failure on top of the mechanism. E2: every probe declares a `-- TARGET:` and every target is a LIVE postulate, because a probe whose target is discharged stays green forever while being evidence for nothing. E3: the RECEIPT is held to the same discipline, since it outlives the probe and is usually the only trace left — it sits above a declaration, whose statement must still be a POSTULATE, so DISCHARGING one fails the gate until the receipt above it has been re-read and DELETED.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | [docs/evidence.md](docs/evidence.md), EVIDENCE.md |
-| `unsafe-check`                                           | no `TERMINATING` / `NO_POSITIVITY_CHECK` / `REWRITE` / `--type-in-type` etc. on the proof path. The build is not `--safe`, so this is the only thing stopping a soundness hole                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | [docs/unsafe-check.md](docs/unsafe-check.md)      |
-| `dup-selftest`                                           | the duplicate checker still fires                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | [docs/find.md](docs/find.md)                      |
-| `dup-check`                                              | no two declarations proving the same fact, up to binder spelling and type synonyms                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | [docs/find.md](docs/find.md)                      |
-| `imports-selftest`                                       | the import checker still fires, in both directions                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | [docs/imports-check.md](docs/imports-check.md)    |
-| `imports-check`                                          | NO UNUSED IMPORT, AND NO UNUSED NAME IN A SURVIVING CLAUSE                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | [docs/imports-check.md](docs/imports-check.md)    |
-| `roadmap-selftest`                                       | the roadmap checker still fires                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | [docs/roadmap-check.md](docs/roadmap-check.md)    |
-| `roadmap-check`                                          | PROOF-STATE is sorted riskiest-first, names every live postulate AND NOTHING ELSE in a row head, keeps rows AND TIER PREAMBLES within a character budget — the second because holding every row to a line and writing the finding into the section text above them satisfies the first exactly — carries no date, and neither does this file or `docs/`; opens every tier with a BIG PICTURE ROADMAP of at least three legs and at most seven, each within a prose budget several times a row's, because the legs are the schedule and the rows are only the ledger it is drawn from — the floor so a tier cannot plan one leg ahead, the ceiling so a schedule cannot become a second copy of the ledger, and the gap between them because a route already decided is written down rather than displaced; and every classed row carries the DERIVED evidence field its postulates' headers dictate, which is why a field may be mandatory where the `TWIN:` section it summarises is not — a derived field cannot be filled with filler, so the blank is the product. `make roadmap-evidence` writes it; and no DIFFICULTY row stands on nothing, which is the same law the GRINDABLE half already carried. | [docs/roadmap-check.md](docs/roadmap-check.md)    |
-| `monster-selftest`                                       | the monster checker still fires — the lowest tier binds, an `also:` exception is collected and is not charged, and an anonymous `with` continuation is spliced into what it continues                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | [docs/monster.md](docs/monster.md)                |
-| `monster-check`                                          | every line ADDED to `agda/src` belongs to a declaration inside the lowest open tier's MONSTER's own dependency cone. Not its blast radius — its CONE: what the monster's statement and body REACH, which is the set whose truth decides its own. Read off the tree AS EDITED, which is what makes converting the monster into a body over new leaves a passing commit rather than a forbidden one                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | [docs/monster.md](docs/monster.md)                |
-| `roadmap-moved-selftest`                                 | the movement checker still fires, in both directions — and that a trailing-whitespace edit does NOT count as movement                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | [docs/roadmap-check.md](docs/roadmap-check.md)    |
-| `roadmap-order`                                          | no GRINDABLE or DIFFICULTY row was DISCHARGED while its tier holds an open FALSITY or SHAPE row. A discharge is the one banking move — the name left the postulate ledger and is still declared in `agda/src` — so deleting, renaming, splitting, restating and reclassifying stay free, and a PREREQUISITE the risky statement names in its own header or type is exempt                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | [docs/roadmap-check.md](docs/roadmap-check.md)    |
-| `roadmap-order-selftest`                                 | the ordering checker still fires — and stays QUIET on the four shapes the proof must remain free to take, since a check that held a deletion or a reclassification would be worse than the failure it prevents                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | [docs/roadmap-check.md](docs/roadmap-check.md)    |
-| `roadmap-moved`                                          | PROOF-STATE has CHANGED against **main**. A LEG IS ONE PR, so a branch that leaves the roadmap byte-identical has either finished a leg without retiring it or abandoned one without saying so — while a fix-up INSIDE the branch costs nothing, since the baseline is the merge-base and not the previous commit. On main itself the merge-base is HEAD, so it falls back to the previous commit and a direct landing is still held. The check is deliberately dumb — did the file change — because what it defends is not resolvable by a machine: the checker above verifies a row's NAME, and nothing can verify that the plan a leg describes is still the plan                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | [docs/roadmap-check.md](docs/roadmap-check.md)    |
-| `comments-selftest`                                      | every comment check still fires, and four precision properties still don't                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | [docs/comments-check.md](docs/comments-check.md)  |
-| `comments-check`                                         | no comment in `agda/src` or `agda/evidence` carries a date, a historical marker or a LINE NUMBER — in any of `Module.agda:414`, the extensionless `Wet:514`, or the prose `line 1920`; a block's evidence sits LAST and in order; no marker is DOUBLED into the comment text (`-- -- RECOVERY:`), which is a marker every checker here reads as prose while a human reads it as a marker; every `TWIN`/`REFUTED`/`PROBED`/`RECOVERY` reference RESOLVES — a twin to a definition that is proven and not still a postulate, a spent probe to the sha holding it — while `DEAD ROUTE` is unvalidated because it names nothing                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | [docs/comments-check.md](docs/comments-check.md)  |
-| the tower (inline in `gate-heavy`, no target of its own) | the tower typechecks. **A WARNING IS A FAILURE** (`-W error`, exit 42)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | [docs/agda-build.md](docs/agda-build.md)          |
-| `refuted`                                                | the refutations typecheck                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | EVIDENCE.md                                       |
-| `probed`                                                 | the probes typecheck                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | EVIDENCE.md                                       |
-| `bug-cache`                                              | no known impl counterexample has regressed. `Unit-Test.agda` is off Main, so nothing else would notice it rotting                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | [docs/bug-cache.md](docs/bug-cache.md)            |
-
-Also `make imports-fix` (delete every dead import), `make postulates` (the complete remaining-work ledger, by name),
-`make find` (search by the shape of a STATEMENT — see [docs/find.md](docs/find.md)),
-`make strip-selftest`, `make agda-dev-selftest`.
-
-## The Agda impl MUST mirror the TS impl
-
-If the Agda impl relies on something the TS cannot do, it has diverged and the
-correspondence is void. When in doubt about whether a mechanism is portable, **port it to TS
-and run the oracle before building on it.**
-
-## Open question: is InstEmit provenance sufficient?
-
-The one finding that would force a change: **definitive proof that observable-level provenance is
-fundamentally lossy — that the IMPLEMENTATION contradicts itself, not merely the spec.** This is
-NOT the same as "impl disagrees with the spec": the spec is gospel and we are not uncertain about
-the desired batching, so a single program where the counting machine gets the wrong answer is
-only a _bug we fix by changing the implementation._ The impossibility proof is **two real programs whose primitives
-produce byte-identical emit streams (same provenances, init/close, values, order) but that
-genuinely batch differently when run** (ground truth = what real rxjs does, i.e. its synchronous
-grouping — independently of the Agda spec). Then a _single_ emit stream is demanded to yield two
-different batchings, so NO stream-reading implementation — the entire observable-provenance
-paradigm — can satisfy both. **If you find such a pair, STOP and tell Anthony
-immediately; do not act on it — we decide next steps together.**
-
-## The goal: nothing short of a proof
-
-The ultimate and only goal is a **complete machine-checked proof** that the implementation
-equals the spec — **`agda/src/Verify-Batch-Simultaneous/The-Proof.agda` fully discharged**, **no
-postulates, everything typechecks**, on _every_ canonical program. Partial results, "passes almost all QuickCheck
-seeds", "fixes the common case" — none of these are the finish line. They are waypoints.
-A remaining counterexample (even 1 in 500, even a pathological nested program) means the
-theorem is false and there is no proof. Keep going until it is airtight.
+Also: `make imports-fix`, `make postulates` (the complete remaining-work ledger, by name), `make find`, `make find-prose`, `make strip-selftest`, `make agda-dev-selftest`.
 
 ## Autonomy
 
-You have standing approval to make any change that **does not alter the spec** — implementation
-edits, protocol changes, new operators, refactors, experiments. Don't stop to ask permission
-for these; just go. Finding the right implementation is inherently a throw-a-lot-at-the-wall
-process: try approaches, keep what passes QuickCheck/oracle, revert what doesn't, commit the
-wins. Only pause to ask when a change would touch the **spec** (`agda/src/Spec.agda`),
-or when the spec is genuinely ambiguous (then follow the ambiguity rule below).
+Standing approval for any change that **does not alter the spec** — impl edits, protocol changes, new operators, refactors, experiments. Don't ask; go. Throw a lot at the wall, keep what passes QuickCheck/oracle, revert what doesn't.
 
-**AND THE STOP CONDITIONS ARE AN EXHAUSTIVE LIST — NOTHING ELSE IS ONE (Anthony:
-"never stop working until you hit a stop condition: the spec has to change, or the
-proof is spiraling").** There are three, and all three are questions only Anthony can
-answer:
+**The stop conditions are exhaustive — nothing else is one (Anthony: "never stop working until you hit a stop condition").** All three are questions only Anthony can answer:
 
-- **The spec must move** — a question, and never a patch.
-- **The proof is SPIRALLING** — the same region producing FALSITY across three
-  successive subdivisions. That is the convergence test's own stop condition, defined
-  with the test rather than restated here; it means the mechanism underneath is wrong,
-  and a fourth subdivision is not the answer.
-- **The impossibility pair** — two programs whose primitives produce byte-identical
-  emit streams but that genuinely batch differently. Report it, do not act on it.
+- **The spec must move** (`agda/src/Spec.agda`) — a question, never a patch.
+- **The proof is SPIRALLING** — the same region producing FALSITY across three successive subdivisions. Reconsider the mechanism, don't subdivide a fourth time.
+- **The impossibility pair** — two programs whose primitives produce byte-identical emit streams (same provenances, init/close, values, order) but that genuinely batch differently in real rxjs. **STOP and tell Anthony; do not act on it.** Not the same as "impl disagrees with spec", which is just a bug to fix in the impl.
 
-## Division of labor: the design session directs, Sonnet workers grind
+## The goal
 
-The design-authority session delegates the bulk of the work — clause grinds, falsity
-sweeps, build babysitting — to subagents, keeping design spend confined to rulings,
-directives, and report review. Standing protocol, per Anthony:
+`agda/src/Verify-Batch-Simultaneous/The-Proof.agda` fully discharged, no postulates, everything typechecks, on every canonical program. "Passes almost all seeds" is a waypoint, not the line. One counterexample in 500 means the theorem is false.
 
-- **Workers run on Sonnet 4.6, and `model: "sonnet"` does NOT get you there** — that
-  alias resolves to Sonnet 5 on this provider. Two levers pin a version and **both apply
-  only at session start**, so a running session cannot change or verify its workers'
-  model; say so plainly rather than pretending otherwise.
-  → [docs/delegation.md](docs/delegation.md)
+## Delegation — the design session directs, Sonnet workers grind
 
-- **WORKERS MUST NOT BABYSIT LONG BUILDS — the design session owns the gate.** A worker's job ends when its edits are
-  made and cheaply verified: iterate with **`make agda-dev`**, land only dev-green
-  bodies, hand the long `make gate` BACK to the design session, which can in turn delegate to github actions
-- **AND A WORKER MUST NOT LEAVE A DETACHED BUILD RUNNING WHEN IT REPORTS.** Agda does not
-  lock interfaces, so a worker's "cache-warming" check racing the design session's gate
-  has two processes writing the same `.agdai` — a corrupt cache or a spurious failure, in
-  a run that costs many minutes to repeat. It is also pure waste: the gate rebuilds that
-  module anyway. Kill it before reporting, and say in the report that nothing is still
-  running. **This covers `make agda-dev` too**, which is the easy way to trip it: the dev
-  loop and the gate deliberately share ONE interface cache.
+- **Workers run Sonnet 4.6, and `model: "sonnet"` does NOT get you there** — that alias resolves to Sonnet 5 here. Both levers apply only at session start, so a running session cannot change or verify its workers' model; say so plainly. → [docs/delegation.md](docs/delegation.md)
+- **Workers never babysit long builds.** Iterate with `make agda-dev`, land dev-green bodies, hand `make gate` back to the design session.
+- **A worker must kill any detached build before reporting**, and say nothing is running. Agda doesn't lock interfaces — two processes on one `.agdai` is a corrupt cache or a spurious failure. Covers `make agda-dev`, which shares the gate's cache.
+- **Delegation has a FIXED context cost — amortise it or do it yourself (Anthony).** Delegate on BREADTH (several independent items, concurrently), REPETITION (one context, many similar obligations), or NARROWNESS (a small nameable slice). **Keep DEPTH:** one hard thing in a file already loaded is cheaper to do than to delegate.
+- **The tell, and it is reliable: if writing the directive required you to do the analysis, you have already done the expensive part.**
+- Parallel workers authorized; parallel Agda up to two heavyweight checks at once, cheap modules freely → [docs/typecheck-cost.md](docs/typecheck-cost.md).
+- **Directives carry the law** — every worker prompt restates the rules it needs.
+- Workers don't commit. Land green work via a PR, never a direct push to main — ask first.
+- **Run continuously** (Anthony: "continue and continue, don't stop for context window or usage credits"). Review, merge, launch the next.
 
-- **DELEGATION HAS A FIXED CONTEXT COST — AMORTISE IT OR DO THE WORK YOURSELF
-  (Anthony).** A fresh worker must rebuild the model from nothing: read the 2000-line
-  module, chase the definitions, trace the statement. That cost is roughly CONSTANT in the size of the task, so it is
-  the whole question. Delegate only when it is amortised: **BREADTH** (several
-  independent items, each paying the cost once, concurrently — wall-clock wins even when
-  token-expensive); **REPETITION** (one context, many similar obligations — read once,
-  grind N times); **NARROWNESS** (a small nameable slice rather than a module's whole
-  design).
+## Long Agda builds
 
-  **KEEP DEPTH: a single hard thing in a file the design session already has loaded is
-  CHEAPER TO DO THAN TO DELEGATE**, because the session has already paid the cost and
-  pays it again reviewing the result.
-
-  **THE TELL, and it is reliable: if writing the directive required you to do the
-  analysis, the analysis WAS the expensive part and you have already done it.**
-
-- **Parallel workers are AUTHORIZED, and so is parallel Agda — up to a measured ceiling**
-  (two heavyweight checks at once; cheap modules freely —
-  [docs/typecheck-cost.md](docs/typecheck-cost.md)).
-- **Directives carry the law.** Every worker prompt restates the standing rules it needs:
-  spec is gospel; refute-before-grind; detached builds with EXIT= logs; report numbers
-  plainly including failures; never extrapolate from shallow refutation rows; the
-  impossibility-pair stop rule (report, don't act).
-- Workers don't make commits - they should hand that responsibility back to the design session
-- **Land green work via a PR, never a direct push to main** — ask first
-- **Run continuously** — Anthony: "continue and continue, don't stop for context window
-  or usage credits." When a worker leg finishes, review it, merge it, launch the next.
-
-## Running long Agda builds — the rules; mechanics in `docs/`
-
-**`make gate` IS THE MERGE GATE, AND IT ROUTES — TYPE IT AND LET IT DECIDE.** It takes
-the light path when the changed set is light-checkable and the full tower when it is not,
-and it prints which and why. The
-heavy path can outrun the Bash tool's ceiling of 600 s per foreground call, so
-iterate with **`make agda-dev`** (seconds). **DO NOT RUN `make gate` YOURSELF TO MERGE —
-open a PR and let the `Gate` GitHub Actions workflow run it**, and subscribe to the PR
-with `subscribe_pr_activity` to learn when the run completes rather than polling. Timings:
-`typecheck-performance-numbers.md`.
-
-**AND THE CARVE-OUT IS TERMINATION, NOT ANY NAMEABLE REASON (Anthony).** Forcing
-`make gate-heavy` is for a change that could have broken the TERMINATION CHECK — the one
-property the dev loop cannot see, since it stubs mutual blocks and the real mutual
-recursion is where the induction lives.
-
-- **A WARNING IS A BUILD FAILURE.** Every Agda invocation goes through the Makefile's
-  `AGDA` variable, which carries `-W error` (Agda exits 42). Never call bare `agda` in
-  the Makefile. Never silence a warning to get green — fix the cause; a warning you
-  believe is wrong is a finding, not a filter. The flag must be IDENTICAL in the Makefile
-  and in the dev loop's `agda_flags()`, changed in the SAME commit.
-  → [docs/agda-build.md](docs/agda-build.md)
-- **AGDA NEVER CHECKS `agda/src`. It checks the comment-stripped mirror, and that is why
-  a comment edit is free.** **Never run `agda` against `agda/src` directly** — that
-  builds a second interface cache and every alternation invalidates the other's cone.
-  → [docs/agda-build.md](docs/agda-build.md)
-- **LAUNCH EVERY LONG BUILD WITH `make bg T=<target>`, AS A BACKGROUND TOOL CALL, AND
-  READ THE VERDICT WITH `make bg-check T=<target>`. THOSE ARE THE TWO COMMANDS A
-  SESSION NEEDS.** What each of the three does, since none of them is guessable:
-  **`make bg T=<target>`** runs the build, writes everything to a log, and appends a
-  terminal `EXIT=<code>` line — it BLOCKS until the build is done, which is why it is
-  launched in the background; **`make bg-check T=<target>`** reads that log and reports
-  GREEN / RED-with-the-failing-tail / STILL-RUNNING; **`make bg-wait T=<target>`**
-  blocks until the log is terminal and then exits 0 GREEN / non-zero RED — it is for a
-  human at a terminal, or for a caller that genuinely has to block, and a session
-  driving `make bg` in the background does not need it, because the completion
-  notification IS the wait. **A `sleep N; tail` loop, an
-  `until` loop, or a `pgrep` for the waiter, is the whole apparatus re-implemented
-  worse** **Never hand-roll the wrapper either** — the obvious
-  `(cmd > log; echo EXIT=$?)` exits with `echo`'s status and reports every build green.
-  `make bg` always exits non-zero by design, so **a completion notification is never a
-  result** — `bg-check` is.
-  **AND "DETACHED" MEANS THE BASH TOOL'S OWN BACKGROUND FLAG, NEVER SHELL SYNTAX
-  (Anthony).** Launch `make bg` as a BACKGROUND tool call and type the command
-  itself bare — no `&`, no redirect, NO PIPE. The flag is what gives the run no
-  time limit and a completion notification; a FOREGROUND call is capped at 600 s
-  and a build that outruns the cap is KILLED, which is the one failure the whole
-  apparatus is not immune to — a killed build's log gets its terminal marker only
-  from the recipe's signal trap. The three forbidden decorations are one mistake
-  wearing three faces: a trailing `&` backgrounds a wrapper the harness is already
-  managing, a `>/dev/null 2>&1` throws away the one thing the launch prints (WHERE
-  the log is), and **A PIPE IS THE WORST OF THEM, BECAUSE IT ANSWERS** — a pipeline
-  exits with the LAST command's status, so `make gate | tail` reports the tail's
-  success over a RED build. That is the hand-rolled wrapper's false green exactly,
-  arriving from outside rather than inside: the wrappers defend the LOG, and a pipe
-  goes around the log. The exit status is not the result and hiding it is not the
-  fix; `bg-check` reads the log and is. **AND ONE BUILD AT A TIME** — never launch a
-  second while one is live, since every check here shares one interface cache.
-  → [docs/bg.md](docs/bg.md)
-
-- **THE BASH TOOL'S WORKING DIRECTORY PERSISTS BETWEEN CALLS, SO PIN IT.** A `cd` in one
-  call is where the next call starts, and a `make` typed from the wrong directory finds
-  no Makefile or the wrong one; the harness resets the directory only at a turn boundary,
-  which is exactly when nobody is looking. Use absolute paths, and never rely on a
-  previous call's `cd`.
-- **`touch` does NOT dirty a module — invalidation is by CONTENT.** You cannot force a
-  remeasurement without a real edit.
-- **A PROOF BODY ON THE `budget-sufficient` SPINE MUST BE SEALED (`abstract`), OR VWF
-  DIES** — three multi-hour OOMs came from unsealing one.
-- **A MID-BUILD RSS OF SEVEN TO TWELVE GB IS NORMAL AND IS NOT EVIDENCE OF ANYTHING.**
-  Agda frees nothing across a single invocation, so the figure is the whole run's
-  allocation and the peak lands on whichever module happens to be LATE in the order
-- **THE BUILD IS NOT `--safe`, AND NOTHING MECHANICALLY STOPS AN UNSAFE PRAGMA** — so
-  `make unsafe-check` policies them by grep, and anything it finds on the proof path is a
-  soundness hole no mandate in this file authorises.
-  → [docs/unsafe-check.md](docs/unsafe-check.md)
-- **COST MODEL, in one line: mutual-BLOCK membership is everything and file size is
-  nearly irrelevant** — but run `make agda-dev ARGS='--list <file>'` before believing it,
-  because a module with no mutual block cannot be paying for one, and MEASURE on a
-  coherent cache, because a rebuilding dependency masquerading as module cost has
-  produced four phantom diagnoses. The POSITIVITY splits are done and that question is
-  closed. → [docs/typecheck-cost.md](docs/typecheck-cost.md)
-- **BUT A SECOND AXIS COSTS MORE, AND IT IS NOT FILE SIZE: A BLOCK MEMBER IN NO CYCLE
-  IS NEVER STUBBED, so every focused check of every OTHER member re-proves it in
-  full.** The tell is that per-member times do not vary with the member — a cost that
-  ignores which body is real is not a body cost. `--list` already names the
-  candidates; hoisting means moving them to ANOTHER MODULE, since a definition left in
-  the file is checked when the file is. **Attribute before splitting, on a coherent
-  cache**: measured on one module, moving out the statement telescopes, the lemma shelf
-  and a named signature together bought under two seconds, and moving out four
-  no-cycle members took the per-member loop from timing out to a quarter of the budget.
-  → [docs/agda-dev.md](docs/agda-dev.md)
-- **ALL MEASURED TIMINGS LIVE IN `typecheck-performance-numbers.md`, AND NOWHERE ELSE.**
-  Numbers age far faster than rules, so quoting one elsewhere means maintaining it in two
-  places and getting it wrong in both. `make gate-heavy` and `make agda-dev` append their own,
-  so it stays current on its own.
-
-## ALL NEW PROOF CODE IS WRITTEN IN `agda/src` — the `make wiring` jurisdiction
-
-**New definitions, new lemmas, new assemblies go straight into `agda/src`**, where the
-reachability check, the ⊤-postulate check and the claim graph see them from the first
-minute. Writing in `src` is what makes "did we already prove this?" a `grep` instead of
-a memory.
-
-**AND THE FAILURE THIS PREVENTS IS BEING UNCLAIMED, NOT BEING OUTSIDE `src`.** That
-distinction used to cost nothing, because `src` was the only claimed tree; it is stated
-now because it is not. Work no claim root reaches is what parked itself for months and
-got re-derived — the repo's number-one failure mode — and a tree with its own root and
-its own gate target is not in that position.
-
-**SO EVIDENCE IS WRITTEN OUTSIDE `src`, AND THAT IS NOT AN EXEMPTION (Anthony).** A
-refutation and a probe are not proof code: nothing may depend on either, and a probe in
-particular is a `refl` at a handful of concrete inputs that must never be mistaken for a
-theorem. Both live in `agda/evidence/`, whose two trees each carry their OWN claim root,
-so the wiring law applies out there in full — and a `.agda-lib` boundary makes a `src`
-import of either one UNRESOLVABLE rather than merely forbidden. **`EVIDENCE.md` is the
-law; read it before adding, retargeting or deleting either.**
-
-A bare `probe/` directory once existed for a different reason — `src` had no cheap loop —
-and was deleted when `make agda-dev` gave one. **`evidence/probed/` is not that
-directory**: the old one sat outside every claim graph, this one is rooted at
-`Probed.Main`, gated, and expires its own contents. Do not recreate the former.
+- **`make gate` is the merge gate and it ROUTES — type it and let it decide.** It prints which path and why. **Don't run it to merge — open a PR and let the `Gate` workflow run it.** Timings: `typecheck-performance-numbers.md`.
+- **Carve-out for forcing `gate-heavy`: TERMINATION** — the one property the dev loop can't see, since it stubs mutual blocks.
+- **A warning is a build failure.** Every invocation goes through the Makefile's `AGDA` (carries `-W error`). Never call bare `agda` in the Makefile. Never silence a warning to get green — a warning you believe is wrong is a finding. The flag must be identical in the Makefile and `agda_flags()`, changed in the same commit. → [docs/agda-build.md](docs/agda-build.md)
+- **Agda never checks `agda/src` — it checks the comment-stripped mirror, which is why a comment edit is free.** Never run `agda` against `agda/src` directly: a second interface cache, and every alternation invalidates the other's cone.
+- **Two commands: `make bg T=<target>` as a BACKGROUND tool call, then `make bg-check T=<target>`.** `bg` blocks, logs, appends `EXIT=<code>`. `bg-check` reports GREEN / RED-with-tail / STILL-RUNNING. `bg-wait` is for a human. A `sleep N; tail` or `until` loop is the apparatus re-implemented worse. `make bg` always exits non-zero by design, so **a completion notification is never a result — `bg-check` is.**
+- **"Detached" means the Bash tool's background flag, never shell syntax (Anthony).** Type the command bare. No `&` (backgrounds a wrapper the harness already manages), no `>/dev/null 2>&1` (throws away WHERE the log is), **and never a pipe — a pipeline exits with the LAST command's status, so `make gate | tail` reports the tail's success over a RED build.** A foreground call is capped at 600 s and a build that outruns it is KILLED. **One build at a time.** → [docs/bg.md](docs/bg.md)
+- **The Bash tool's cwd persists between calls — pin it.** Absolute paths; never rely on a previous `cd`.
+- `touch` does NOT dirty a module — invalidation is by CONTENT.
+- **A proof body on the `budget-sufficient` spine must be sealed (`abstract`)** — three multi-hour OOMs came from unsealing one.
+- A mid-build RSS of 7–12 GB is normal and evidence of nothing.
+- **Cost model: mutual-BLOCK membership is everything; file size is nearly irrelevant.** Run `make agda-dev ARGS='--list <file>'` before believing it, and MEASURE on a coherent cache — a rebuilding dependency masquerading as module cost has produced four phantom diagnoses. Positivity splits are done; that question is closed.
+- **Second axis: a block member in NO cycle is never stubbed, so every focused check of every OTHER member re-proves it in full.** Tell: per-member times don't vary with the member. Hoisting means moving to ANOTHER module. Attribute before splitting. → [docs/agda-dev.md](docs/agda-dev.md)
+- **All measured timings live in `typecheck-performance-numbers.md` and nowhere else.** `gate-heavy` and `agda-dev` append their own.
 
 ### `make agda-dev` — the iteration loop
 
 ```
-make agda-dev ARGS='<file> <member>'   one member ← the grind loop; use constantly
+make agda-dev ARGS='<file> <member>'   one member ← the grind loop
 make agda-dev ARGS='<file>'            one module, every member
 make agda-dev ARGS='--list <file>'     free: which members are in which block
+make warm ARGS='<file>'                build a file's deps; unbudgeted
 ```
 
-**`ARGS=` TAKES AT MOST ONE FILE PLUS ONE FOCUS MEMBER.** Two files, or a file and a
-list of members, is not a batch — the loop reads the extra word as the focus member and
-reports that member absent, which reads as a proof failure. One module per call; a sweep
-over several is several calls.
+- **`ARGS=` takes at most ONE file plus ONE focus member.** A second file is read as the focus member and reported absent, which reads as a proof failure.
+- **Dev-green means the types line up, not that the proof is valid — but only where something was STUBBED.** A module with no multi-member block is emitted VERBATIM, so the sweep is a real check there. Where a block is stubbed, termination of the real mutual recursion is not checked.
+- **A dev check that is not seconds is a FINDING, not a budget to raise.** Read `typecheck-performance-numbers.md` first. Work BOTTOM-UP. Third cause the other two hide: the module has outgrown the loop. Do NOT reach for `--only-scope-checking` — measured, buys nothing, removed.
+- **A red `agda-dev` on any file in `src` is a P0 — fix it before the work you were doing.** Never route around it.
+- → [docs/agda-dev.md](docs/agda-dev.md) for the budget, `HOLES=1`, `NOT_DEV_CHECKABLE`.
 
-**Use it throughout development and `make gate` once at the end.** Three rules you must
-carry before opening the doc:
+## Where code goes
 
-- **DEV-GREEN MEANS THE TYPES LINE UP, NOT THAT THE PROOF IS VALID — but only where
-  something was STUBBED.** A module with no multi-member block is emitted VERBATIM, so
-  the sweep is a REAL check there, which is most of the repo. Where a block IS stubbed,
-  **termination of the real mutual recursion is not checked**
-- **A DEV CHECK THAT IS NOT SECONDS IS A FINDING, NOT A BUDGET TO RAISE.** **Read `typecheck-performance-numbers.md` FIRST** **So work BOTTOM-UP: the module you edited, then
-  its consumers. - AND THE TOOL NOW REFUSES RATHER THAN REMINDING YOU.** `make warm ARGS='<file>'` builds a file's
-  dependencies against a module with no bodies, so it works while yours is
-  still broken, and it is unbudgeted by design.
-  **AND THERE IS A THIRD CAUSE THE OTHER TWO HIDE: THE MODULE HAS OUTGROWN THE
-  LOOP.** **DO NOT reach for
-  `--only-scope-checking` here** — it was tried, measured to buy no time (the run
-  is nearly all deserialization) and removed for writing a scope-only interface
+- **All new proof code in `agda/src`**, where reachability, the ⊤-postulate check and the claim graph see it from minute one. That is what makes "did we already prove this?" a grep.
+- The failure prevented is being UNCLAIMED, not being outside `src`. Work no claim root reaches is what parks itself for months and gets re-derived.
+- **Evidence goes outside `src`, and that is not an exemption (Anthony).** A refutation and a probe are not proof code; nothing may depend on either. Both live in `agda/evidence/`, each with its own claim root, gated in full; a `.agda-lib` boundary makes a `src` import unresolvable. **`EVIDENCE.md` is the law — read it before adding, retargeting or deleting either.**
+- Do not recreate the old bare `probe/` directory — it sat outside every claim graph.
 
-- **A RED `agda-dev` ON ANY FILE IN `src` IS A CRITICAL FAILURE — FIX IT IMMEDIATELY.**
-  It is a P0 defect in the tooling, fixed _before_ the work you were doing. Never route
-  around it — not with a skip list, not with "it's just the tool", not by falling back to
-  `make gate-heavy`.
+### Module granularity
 
-- → [docs/agda-dev.md](docs/agda-dev.md) for the budget, `HOLES=1`, why there is no
-  whole-project sweep, and the `NOT_DEV_CHECKABLE` policy.
+- **Cut at mutual-SCC boundaries.** A mutual block is an indivisible checking unit. **Never restructure genuine mutuality to shrink a module** — proof shape wins over check time. Target ≤20 s solo recheck for every non-SCC module. → [docs/typecheck-cost.md](docs/typecheck-cost.md)
+- **A new fact goes in the SHALLOWEST module reaching its consumers, not the deepest that could host it (Anthony).** A four-line lemma near the bottom invalidates that module's whole cone. Check the cone before placing it. Does not contradict `dup-check`'s "move the fact DOWN", which is about a fact that already exists twice.
 
-## Module granularity: keep typechecks short
+## Agda traps
 
-**Cut at mutual-SCC boundaries** — a mutual block is an indivisible checking unit and
-cannot span modules; everything else can and should. **Never restructure genuine
-mutuality** (indirection layers, WF recursion) just to shrink a module: proof shape wins
-over check time. A new lemma family not mutual with an existing SCC gets its own module,
-even when it is "about" that SCC. Target ≤20 s solo recheck for every non-SCC module.
-→ [docs/typecheck-cost.md](docs/typecheck-cost.md)
+Each cost real time at least once, and they share a shape: **Agda reports them against the WRONG thing.** Before reasoning from an Agda error, check whether it is one → [docs/agda-traps.md](docs/agda-traps.md).
 
-**A NEW FACT GOES IN THE SHALLOWEST MODULE THAT REACHES ITS CONSUMERS, NOT THE
-DEEPEST ONE THAT COULD HOST IT (Anthony).** Placing it beside its siblings is the
-instinct and it is usually wrong on cost: a four-line lemma in a module near the
-bottom invalidates that module's whole cone, so the edit costs a full rebuild to
-verify something the dev loop would have checked in seconds one level up — and
-where the deep module has itself outgrown the loop, it costs a CI gate. Check the
-cone before you place it. **This does NOT contradict `dup-check`'s "MOVE THE FACT
-DOWN"** — that rule fires on a fact that already exists TWICE and names the lowest
-module reaching both copies. This one is about a fact with one consumer and no
-duplicate, where nothing is being reconciled and depth buys nothing.
+- "X is not a constructor of T" for something you meant as a variable → grep for `X :` before touching the proof.
+- An implicit used inside an `all`-predicate lambda is a fresh unsolved meta per element → bind it on the clause's left-hand side (`{e = e}`).
 
-## Agda language and stdlib traps
+## Work from the outside in
 
-Traps inside the language, each of which cost real time at least once, and they
-share a shape worth naming: **Agda reports these against the WRONG thing**, so the error
-message actively misdirects. **Before reasoning from an Agda error, check whether it is
-one of them** — [docs/agda-traps.md](docs/agda-traps.md). The one that generalises
-furthest: when an error says "X is not a constructor of T" for something you meant as a
-variable, grep for `X :` before touching the proof. The one that hides longest: an
-implicit used inside an `all`-predicate lambda is a fresh unsolved meta per element, so
-bind it on the clause's left-hand side (`{e = e}`) rather than expecting the lambda to
-see it — the shape and the error it produces are in the doc.
+Datatypes, primitives and end goals first; link with postulates; top-line results stated and typechecking *in terms of postulates*; only then chip away, one at a time.
 
-## Agda: work from the outside in
+- **One at a time means TOPMOST first (Anthony).** Only the layer directly beneath the settled one is being worked; everything below stays postulated. Tell that a session has slipped a layer: the edit threads an argument through a fourth signature while the statement it serves is still red.
+- **A Σ-receipt has content only through its witness.** If every conjunct is upward-closed in the witness, the statement is vacuously satisfiable — check BEFORE grinding. Pin the witness to the one the consumers bound, or put the bound in as a conjunct. A face of this development was machine-refuted as vacuous by exactly this shape.
+- **Recursively: never prove pieces before their assembly exists.** State the assembly with the pieces as postulates, make it typecheck, then prove pieces starting with the MOST UNCERTAIN. Pieces proven ahead of their assembly are speculative inventory, and their sunk cost biases the design toward keeping them.
 
-Define and refine the **datatypes, primitives, and end goals first**, then link them
-together with **postulates**. Before any serious proof work, all types should be settled
-and the top-line results fully stated and typechecking _in terms of postulates_. Only then
-start chipping the postulates away, one at a time, until everything is defined and there are
-no gaps.
+## SEARCH FIRST — assume it already exists
 
-**AND ONE AT A TIME MEANS TOPMOST FIRST (Anthony).** Chipping is not a free-for-all once
-the top line typechecks: the layer directly beneath the settled one is the only layer being
-worked, and everything below it stays POSTULATED — low-risk detail especially, since a
-mechanical transport is exactly what a settled layer above makes cheap, and exactly what
-nothing yet guarantees will still be wanted in the shape it has today. The tell that a
-session has slipped a layer: the edit in hand is threading an argument through a fourth
-signature while the statement it serves is still red.
-
-**A Σ-receipt has content only through its witness.** If every conjunct of a Σ-statement is
-upward-closed in the witness (each survives enlarging it), the statement is vacuously
-satisfiable and proves nothing — check this BEFORE grinding clauses. Pin the witness to the
-one the consumers actually bound (share the Σ with the statement whose witness is spent), or
-put the bound itself in as a conjunct. This is a rule and not a caution because a face of
-this development was machine-refuted as vacuous by exactly this shape, having typechecked
-and read as discharged for as long as nobody asked what its witness was pinned to.
-
-**This rule applies recursively, and violating it inside a subproblem is an anti-pattern:
-never prove pieces before their assembly exists.** For any lemma cluster, first state the
-assembly — the statement that _consumes_ the pieces — with the pieces as postulates, and
-make the whole thing typecheck. Only then prove pieces, starting with the **most uncertain
-one**, so that if the assembly has to change it changes _in place_, cheaply, instead of
-invalidating a pile of finished proofs. Pieces proven ahead of their assembly are
-speculative inventory: they may get thrown out wholesale, and worse, their sunk cost biases
-the design toward keeping them. Better to have a wrong assembly you can amend than proven
-pieces with no assembly at all.
-
-## SEARCH FIRST — assume the thing already exists until proven otherwise
-
-**Before you probe it, prove it, or write it: look for it.** The default assumption is that
-the fact you need is ALREADY IN THE REPO — proven, named, and greppable. That assumption is
-right far more often than it feels, because this campaign has been running long enough that
-most small facts have been needed before. Treat "I need a lemma saying X" as a SEARCH task,
-not a proof task, until a search has actually failed.
-
-This is the same law as the wiring pass, arriving from the other side: the wiring law exists
-so that "did we already prove this?" is a `grep` instead of a memory, and that only pays off
-if you actually run the grep. Every hour spent re-deriving something proven is an hour the
-wiring law already bought back and someone declined to collect.
-
-**The cost is asymmetric and that is the whole argument.** A search costs seconds and its
-worst case is that you learn the shape of the neighbourhood. Skipping it costs whatever you
-build instead — and what you build instead is usually _weaker_ than what was already there,
-because a probe gives a receipt at concrete programs while the existing lemma gives a
-theorem. Three cases from a single night, each found only after the expensive route: three
-probe series were commissioned to test something two proven substitution lemmas already
-settle, and none of them COULD have refuted; a path-length unit was recorded as a
-`-- DEAD ROUTE` on arithmetic that a proven chain lemma delivers exactly, with a sibling
-site already spending it for the identical purpose; and a monotonicity postulate stated
-fresh duplicated a proven widening lemma outright, caught by a name clash — the compiler
-noticing, not the author.
-
-### `make find` FIRST, BEFORE WRITING ANYTHING NEW
+Treat "I need a lemma saying X" as a SEARCH task until a search has failed. The cost is asymmetric: a search costs seconds; skipping it costs whatever you build instead, which is usually *weaker* than what was there.
 
 ```
-make find Q='≤ slotsSize'        every STATEMENT whose type mentions it
+make find Q='≤ slotsSize'     every STATEMENT whose type mentions it
+make find-prose Q='...'       findings, which are prose by construction
 ```
 
-**Run it before you state a postulate, write a lemma, or commission a probe. Not "consider
-searching" — run this command.** It walks the whole of `agda/src` and prints the declared
-TYPE of every match.
+- **Run `make find` before you state a postulate, write a lemma, or commission a probe.** It walks all of `agda/src` and takes no narrowing argument — which is the point: a hand-rolled `grep` was FOLLOWED and still failed, scoped to two arguments instead of the tree.
+- **Run `make find-prose` before picking up any row that is not GRINDABLE, and before commissioning a probe.** It answers *has anyone already been here* — dead routes, coverage boundaries, rulings, measured traps — none of which `make find` can see. Returns the BLOCK. → [docs/find-prose.md](docs/find-prose.md)
+- **Search the CONCLUSION's shape, not the name you imagine.** Names here are idiosyncratic. A miss is weak evidence; two misses on different phrasings is strong. **Read the SIGNATURE, never the header prose** — a header saying a route is dead is a claim about an attempt.
+- **`make dup-check`: a finding is two SITES, not two names.** Agda's `ClashingDefinition` says nothing when either copy is `private`. **When it fires, MOVE THE FACT DOWN — do not pick a winner**; deleting one copy at random re-creates it later. Keep ONE naming convention per class of fact.
+- **This does not license citing something you have not opened.** Find it, read its actual type, confirm the indices line up.
 
-**IT REPLACES A HAND-ROLLED `grep`, AND THAT IS THE POINT — the rule above used to say
-"grep for the conclusion's shape", and it was FOLLOWED and STILL FAILED.** Three lemmas
-were rewritten from scratch and collided on the name with copies that had been sitting in
-a `Part1` module for months. The search had been run, and run for the right shape — it was
-scoped to two `grep` arguments instead of the tree. `make find` takes no argument that
-narrows it, so that mistake is not available. **A rule you can satisfy while still failing
-is a rule that needs a machine.**
+## Survey the hole-set before discharging any of it
 
-Then the judgement no command can do for you: **search for the CONCLUSION's shape, not the
-name you imagine** (names here are idiosyncratic and a name-guess reliably misses); **a
-miss is weak evidence, two misses on different phrasings is strong** — try the operator
-alone, or read what sits AROUND a neighbouring lemma, since related facts cluster in one
-file; and **read the SIGNATURE, never the header prose** — a header saying a route is dead
-is a claim about an attempt, the signature is a fact.
+**Census every site's goal first, then classify, then prove — never site-by-site.** Depth-first grinding is the standard way this campaign loses time: every blocker found late can invalidate proofs already finished above it.
 
-**AND `make find-prose` FOR A FINDING, WHICH IS NOT A TYPE.** `make find` cannot see a
-dead route, a coverage boundary, a ruling or a measured trap — those are prose by
-construction, and the search that misses them reports a clean all-clear. Run it before
-picking up any row that is not GRINDABLE, and before commissioning a probe: the question
-it answers is _has anyone already been here_, and the answer is in a comment block or a
-document rather than in a type. It returns the BLOCK, because one line out of a
-forty-line header is a hit and not an answer. Two phrasings before believing a miss.
-→ [docs/find-prose.md](docs/find-prose.md)
+**Same for ERRORS, because Agda reports one per module and aborts (Anthony).** A red module is a queue of unknown length, and the early runs are fast for the wrong reason — they measure how long it took to ABORT. When a module goes red after a change to something widely consumed, **census the consumer sites TEXTUALLY first**: one grep lists every site, and the build then CONFIRMS a list instead of discovering one.
 
-**AND THE CHECK BEHIND IT: `make dup-check`** fails the build when two declarations prove
-the same fact, up to binder spelling and atomic type synonyms. **A FINDING IS TWO SITES,
-NOT TWO NAMES** — Agda's `ClashingDefinition` says nothing when either copy is `private`
-or the two modules are never in scope together, which is how one fact sat verbatim in two
-faces of this development, invisible to the compiler. **When it fires, MOVE THE FACT DOWN
-— do not pick a winner among the copies**; the usual cause is two SIBLING modules needing
-a fact neither can import from the other, so the repair is to put it in the lowest module
-that reaches both. Deleting one copy at random re-creates it later. **And keep ONE naming
-convention per class of fact**, because two conventions are the machine that generates
-duplicates. → [docs/find.md](docs/find.md)
+- **You usually do NOT need a typecheck to read a goal.** Where the obligation is *declared* — a Σ-returning family whose head fixes the conjunct — the goal is `substitute the witness into the head's conjunct`. Batch Agda won't hand you goal types anyway: holes report source positions, and forcing the type aborts at the FIRST error.
+- **Four buckets, and do the LAST one first.** (a) trivial/inflationary; (b) an existing lemma applies; (c) needs a new lemma; (d) BLOCKED until a signature, a call-site argument or a measure changes. (d) is the schedule. (a) and (b) are the right work to delegate.
+- **Check every conjunct at zero before grinding it.** These bounds routinely go FALSE at `bud = 0`, `ops = 0`, `dep = 0`. A one-screen refutation says the site needs a positivity hypothesis threaded, not a cleverer proof.
+- **Count sites by grepping the BARE postulate name.** A hyphenated guess misses every suffix site and reports a false all-clear.
+- **A shared deferral postulate hides call-site ARGUMENTS, not shapes.** Record each one in the postulate's header the moment you notice it.
 
-**The one thing this rule does NOT license** is assuming a fact exists and building on it
-unchecked. "Assume it exists" is a directive about where to spend the next five minutes, not
-permission to cite something you have not opened. Find it, read its actual type, confirm the
-indices line up — the off-by-one above was invisible from the name and obvious from the type.
+## Keep the repo lean
 
-## Survey the whole hole-set before discharging any of it
+Every definition used somewhere; only the top-level exports are exempt. No back-compat shims, nothing "stored for reference", no legacy, no deprecated. **Don't be afraid to throw out code or documentation** — git history is the archive.
 
-Outside-in applies to the HOLES too, not just the statements. When a batch of deferred sites
-(a shared `-TEMP` postulate, a wall of `?`) has to be discharged, **census every site's goal
-first, then classify, then prove — never site-by-site.** Depth-first grinding through a hole
-set is the standard way this campaign has lost time: each design blocker is discovered only
-when its turn comes, and every blocker found late can invalidate proofs already finished
-above it. The census is one pass and it converts an unknown-length grind into a worklist.
+### DELETION
 
-**AND THE SAME APPLIES TO ERRORS, BECAUSE AGDA REPORTS ONE PER MODULE AND ABORTS
-(Anthony).** A red module is a queue of unknown length, so iterating error-by-error
-pays a whole build per reveal — and the early runs are fast for the wrong reason,
-measuring how long it took to ABORT rather than what the module costs, so the
-timings reassure you exactly while the queue is longest. When a module goes red
-after a change to something widely consumed, CENSUS THE CONSUMER SITES TEXTUALLY
-FIRST: one `grep` for the changed name lists every site at once, and the build then
-CONFIRMS a list instead of discovering one. Worked instance on the caps face: a
-grep for the parts-splitter of the predicate that had gained conjuncts named the
-second failing site in seconds, and it was found a build later instead.
+`make wiring` is trustworthy, so a name it reports is a finding to act on. **Deciding is yours, and asking is the failure mode (Anthony: "let's delete it if it's not used? That seems obvious to me").** Every rule below names something to VERIFY, never a reason to escalate.
 
-- **You usually do NOT need a typecheck to read a goal.** When the obligation is _declared_
-  rather than inferred — a Σ-returning family where each head's signature fixes the conjunct's
-  transformer and index, and the clause supplies the witness — the goal is `substitute the
-witness into the head's conjunct`. Read the signature, read the tuple, done. Free, and no
-  20-minute SCC recheck. Batch-mode Agda will not hand you goal types anyway: holes report
-  only source positions, and forcing the type into an error message aborts the module at the
-  FIRST error, so the "just ask Agda" route costs one full build per site.
-- **Classify into four buckets, and do the LAST one first.** (a) trivial/inflationary — one
-  lemma usually closes many; (b) an existing lemma applies as-is; (c) needs a new lemma;
-  (d) BLOCKED — the site cannot close until a signature, a call-site argument, or a measure
-  changes. Bucket (d) is the schedule. Buckets (a) and (b) are safe, batchable, and the right
-  work to delegate; grinding them first only buys the illusion of progress.
-- **Check every conjunct at zero before grinding it.** These bounds routinely go FALSE at
-  `bud = 0`, `ops = 0`, `dep = 0` — the transformer is the identity there and a positive
-  witness cannot fit. A one-screen refutation in `agda/evidence/refuted/`
-  tells you the site needs a positivity hypothesis threaded rather than a cleverer proof.
-- **Count the sites by grepping the BARE postulate name.** A hyphenated guess
-  (`grep TEMP-`) misses every site where the marker is a SUFFIX and reports a false
-  all-clear; comment mentions of the name inflate the count the other way. Grep the bare
-  word, then subtract the declaration and the prose.
-- **A shared deferral postulate hides call-site ARGUMENTS, not shapes.** Indices and
-  transformers are pinned by the Σ above, so a wrong index is a type error at the reporting
-  clause. What it absorbs is a callee handed the wrong `dep`/`bud`. Record each one in the
-  postulate's header comment the moment you notice it, so the census inherits it instead of
-  rediscovering it.
+- **"No consumer today" and "no consumer ever" are different questions.** A lemma stated AFTER its own specialisation is orphaned by placement and wires in one line. **Prefer wiring to deleting whenever a plausible consumer is nameable.**
+- **The commit message carries the finding** — write what the deleted thing established. If a NAMEABLE future consumer remains, add `-- RECOVERY: git show <sha> restores …` to the header of the thing that would consume it.
+- **A superseded predecessor is deleted, always (Anthony)** — not wired, not parked, not kept until the successor is proven. It drags a whole support cone that every local check reads as wired, because a mutual cluster consumes itself. **But ESTABLISH that it is one first:** both clusters the first sweep reported turned out not to be. The question is not "does a successor exist" but **"does the successor prove everything the predecessor proves?"** — answered by diffing the two bodies' ARMS, not their statements.
 
-## Keep the repo lean — no fat
+## DE-RISK MODE: test for falsity first, grind last (Anthony)
 
-This repo always represents the **most present, up-to-date code**. Every definition must be
-used somewhere — the only exceptions are the top-level, most-important exports. No
-backwards-compatibility shims, nothing "stored for reference", no legacy, no deprecated.
-**Do not be afraid to throw out code or documentation.** Git history is the archive.
+Total risk is the SUM over the ledger, so work is ordered by *risk reduced per unit effort*, not by proof-progress optics. The tier-ordered roadmap is PROOF-STATE.md; read it before picking up any postulate.
 
-### DELETION: an unreachable definition may be deleted on its merits
+### The risk classes — worst first
 
-`make wiring` is trustworthy — every definition, postulate and module in `agda/src`
-has a route to Main today — so a name it reports is a finding to act on.
+Every live postulate carries exactly one. PROOF-STATE assigns them; this file defines them.
 
-**DECIDING IT IS YOURS, AND ASKING IS THE FAILURE MODE (Anthony: "let's delete it
-if it's not used? That seems obvious to me — not sure why you needed my input").**
-A reachability finding is not a design question, and the autonomy grant already
-covers it: no spec moves when dead code goes. The three rules below say how to
-decide, and every one of them names something to VERIFY, never a reason to
-escalate — "prefer wiring when a plausible consumer is nameable" means go look for
-one, and "establish that it is a superseded predecessor" means diff the arms.
-Routing the decision upward turns a check worth minutes into a round trip and
-leaves the finding sitting in the tree meanwhile, which is the state this whole
-section exists to end. Three rules govern acting on it:
+- **FALSITY** — may be false. Worst because retroactive: everything ground above it is wasted, not delayed. **Also where a statement nothing has ever instantiated sits**, however plausible — "may be false" is a claim about what is KNOWN. The class a new postulate is born into; a probe reaching its risky region moves it.
+- **SHAPE** — wrong as written, restatement *guaranteed* (typically a conclusion needing information no hypothesis carries). Worse than DIFFICULTY because restating cascades and can INTRODUCE falsity. **Never grind a SHAPE row; restate it.** A header recording a gap between hypotheses and conclusion has ALREADY put its row here.
+- **VACUITY** — typechecks, asserts nothing. Worse than DIFFICULTY because it reads as discharged. Two live shapes: ⊤-typed postulates, and Σ-statements upward-closed in their witness.
+- **DIFFICULTY** — true and correctly stated, proof is just hard. The DESIGN half (shape of the induction, the measure, the index) is the expensive part. **"True and correctly stated" is a claim about EVIDENCE** — a probe that reached the risky region, a refutation pinning this form, a proven mirror. Absent one the row is SHAPE if the gap is written down and FALSITY if nothing is. **The class with no floor under it and the one that reads as safe**, so it is where an unexamined row lands by gravity.
+- **GRINDABLE** — the shape is ALREADY KNOWN: a proven twin whose clauses correspond, or a mechanical route. Nothing to decide, only to type. Weakest class.
 
-- **"No consumer today" and "no consumer ever" are DIFFERENT QUESTIONS.** A sweep
-  answers the first; only building the consumer answers the second. A definition
-  needed by work not yet written reads as dead, and a lemma stated AFTER its own
-  specialisation is orphaned by placement alone and wires in one line. Prefer
-  wiring to deleting whenever a plausible consumer is nameable.
-- **The commit message carries the finding** for anything substantial removed —
-  write what the deleted thing established, so `git log` answers "what did that
-  prove" without restoring it. Git history is the archive only if someone can
-  find the entry. If the deletion leaves a NAMEABLE future consumer (apparatus
-  a later proof might want back), add a one-line `-- RECOVERY: git show <sha>
-restores …` pointer to the header of the thing that would consume it — same
-  locality rule as `-- DEAD ROUTE`.
-- **A SUPERSEDED PREDECESSOR IS DELETED, ALWAYS (Anthony).** When a
-  successor lands and the generation it replaced is left standing, the old one
-  goes — not wired, not parked, not kept "until the successor is proven". It is
-  the repo's most expensive orphan shape, because a predecessor drags a whole
-  support cone with it and every local check reads that cone as wired: a mutual
-  cluster consumes itself, so "has ≥1 consumer" is satisfied by dead code. Only
-  reachability sees it.
-  **But ESTABLISH that it is one before invoking this rule.** Both clusters the
-  first reachability sweep reported as predecessor generations turned out not to
-  be: one was a checker blind spot (a module APPLICATION conducting the cluster's
-  only edge), the other a MISSING WIRE whose successor was re-proving what the
-  predecessor already proved — delete either and live proof goes with it. The
-  distinguishing question is not "does a successor exist" but **"does the
-  successor prove everything the predecessor proves?"** — and it is answered by
-  diffing the two bodies' arms, not their statements.
+**`make roadmap-check` enforces the floor at both classes that claim something (Anthony).** A DIFFICULTY row whose headers carry no durable marker is a build failure, as a GRINDABLE row naming no twin already was. FALSITY/SHAPE/VACUITY are exempt — they assert nothing about the statement being right. **The repair is never to acquire a marker; it is to reclassify DOWN.**
 
-### DE-RISK MODE: test for falsity first, grind last (Anthony)
+**GRINDABLE is the delegation boundary — that is what the class is for.** The expensive part is already decided and written down, so a fresh context can execute it. A DIFFICULTY row is the design session's own work; delegating one hands over a decision that has not been made, and it comes back as analysis instead of edits. Measured once: a Sonnet-4.6 session discharged seven GRINDABLE rows in under four hours, then spent two full context windows on ONE DIFFICULTY row and produced a proof plan and no code.
 
-**The current pass is DE-RISKING.** Every postulate carries a probability of being FALSE
-or EMPTY, and the proof's total risk is the SUM over the ledger — so work is ordered by
-_risk reduced per unit effort_, not by proof-progress optics. The tier-ordered roadmap
-lives in PROOF-STATE.md (order and one-line hooks only — the research lives in the
-postulates' own headers); read it before picking up any postulate.
+**Risk-reduction priority outranks parallelism: while a tier's roadmap has an open leg above the GRINDABLE ones, do NOT fan workers out across its mechanical rows — work the top leg, and take it yourself (Anthony, twice: "Don't! Do the hard stuff first").** Fan-out looks like leverage and buys optics while the row that could move the ground stays open. **Carve-out: a GENUINE prerequisite the risky row's own statement or header NAMES** — "adjacent" or "same module" is not one, and the near-miss is the common case. Parallel fan-out across mechanical rows is for a tier whose open rows are ALL GRINDABLE.
 
-**THE RISK CLASSES — worst first.** Every live postulate carries exactly one, and the
-class is what orders the work; PROOF-STATE.md assigns them, this file defines them.
+**`make roadmap-order` enforces it.** The pull is structural, not careless: `roadmap-moved` requires every commit to move the roadmap, a risky leg routinely ends in a FINDING rather than a discharge, and a finding-only commit reads as unfinished — so a mechanical row gets closed alongside it to make the commit feel whole. **Settle risk near the trunk:** work proven under an open FALSITY is not delayed but FORFEIT if that statement is refuted.
 
-- **FALSITY** — the statement may be false. Worst because it is retroactive: everything
-  ground above it is wasted, not merely delayed. **This is also where a statement nothing
-  has ever instantiated sits**, however plausible it reads: "may be false" is a claim
-  about what is KNOWN, and nothing is known about an unprobed row. So this is the class a
-  new postulate is born into, and a probe reaching its risky region is what moves it.
-- **SHAPE** — the statement is wrong as written and a restatement is _guaranteed_
-  (typically a conclusion needing information no hypothesis carries). Not FALSITY,
-  because it is already known; worse than DIFFICULTY, because restating cascades through
-  a family and can INTRODUCE falsity — you are changing statements, not discharging them.
-  Never grind a SHAPE row; restate it. **A header recording a gap between what the
-  hypotheses carry and what the conclusion needs has ALREADY put its row here**, whatever
-  class the roadmap says: the finding is the classification, not an input to it.
-- **VACUITY** — it typechecks and asserts nothing. Worse than DIFFICULTY because it reads
-  as discharged. The two live shapes are ⊤-typed postulates and Σ-statements
-  upward-closed in their witness; check both before landing anything.
-- **DIFFICULTY** — true and correctly stated; the proof is just hard. Labour, but labour
-  with a DESIGN decision still inside it: the shape of the induction, the measure that
-  decreases, the index the statement belongs at. Grinding is the right response, and the
-  deciding is the expensive half. **"True and correctly stated" is a claim about EVIDENCE
-  and is earned exactly as GRINDABLE's is** — a probe that reached the risky region, a
-  refutation of the alternatives that pins this form, a proven mirror. Absent one the row
-  is not DIFFICULTY: it is SHAPE if the gap is written down and FALSITY if nothing is.
-  **This class is the one with no floor under it and the one that reads as safe**, so it
-  is where an unexamined row lands by gravity and then sits, scheduled behind rows whose
-  proofs are merely long. Measured on the sweep that set this: one tier held seven rows at
-  `DIFFICULTY, NO EVIDENCE`, not one of them instantiated, and re-reading their own headers
-  moved five.
+**Only BANKING is held (Anthony).** Deleting, renaming, splitting, restating and reclassifying a row are all free. The one held move is a name leaving the postulate ledger while still declared in `agda/src`.
 
-  **AND `make roadmap-check` ENFORCES THE FLOOR, AT BOTH CLASSES THAT CLAIM SOMETHING
-  (Anthony: "we need to mechanically outlaw a 'difficulty' or 'grindable' row with no
-  evidence").** A DIFFICULTY row whose postulates' headers carry no durable marker is a
-  build failure, exactly as a GRINDABLE row naming no proven twin already was. The three
-  classes below them are exempt and that is not leniency: FALSITY, SHAPE and VACUITY
-  assert nothing about the statement being right, so a blank there is the honest reading.
-  The repair for a row that cannot name its evidence is never to acquire a marker — it is
-  to reclassify DOWN.
+**Earning GRINDABLE: name the precedent in a `TWIN:` section**, where `make comments-check` resolves it and refuses a twin that is itself still a postulate. Absent one, the row is DIFFICULTY.
 
-- **GRINDABLE** — true, correctly stated, and the shape is ALREADY KNOWN: a proven twin
-  exists whose clauses correspond, or the route is mechanical — transport a hypothesis,
-  widen a bound, re-establish an invariant a sibling face already preserves at the same
-  indices. Nothing remains to decide, only to type. Weakest class: it is the absence of
-  every risk above it, including the design risk that keeps DIFFICULTY expensive.
+**A class is a property of EVIDENCE, not of confidence, and may only be lowered by evidence that reached the risky region.** Name the region, or the receipt does not count. A row was once downgraded FALSITY → DIFFICULTY on a probe covering only the near-degenerate case, and had to be reverted. **Corollary: a named route is not evidence.** A proof sketch and a green probe of the near-degenerate case lower nothing.
 
-**GRINDABLE IS THE DELEGATION BOUNDARY — THAT IS WHAT THE CLASS IS FOR.** A GRINDABLE row
-is what a worker (or a cheaper model) should be handed: the expensive part, deciding the
-shape, is already done and written down, so a fresh context can execute it without
-rebuilding the design. A DIFFICULTY row is the design session's own work — delegating one
-pays the fixed context cost to hand over a decision that has not been made yet, and it
-comes back as analysis instead of edits. This is the "KEEP DEPTH" rule of the delegation
-section, stated as a property of the row rather than a judgement call at spawn time.
+### Tier order is law (Anthony)
 
-Measured once, and it is why the class exists: a Sonnet-4.6 session discharged seven
-GRINDABLE rows in under four hours (the ledger went 107 → 100, gate green, PROOF-STATE
-updated per commit) and then spent two full context windows on ONE DIFFICULTY row,
-producing a complete proof plan and no code. Same session, same rules, same repo — the
-class of the row predicted the outcome.
+**Lower tiers finish first. Strictly — not "mostly", not "while a build runs".** Each tier is built ON the one below, so grinding an upper-tier statement while a lower tier is open bets on ground a design failure would move. **Carve-out: answering a DESIGN question** — cheap, and it aims the grind. Never grinding over one.
 
-**RISK-REDUCTION PRIORITY OUTRANKS PARALLELISM: WHILE A TIER'S ROADMAP HAS AN OPEN LEG
-ABOVE THE GRINDABLE ONES, DO NOT FAN WORKERS OUT ACROSS ITS MECHANICAL ROWS — WORK THE
-TOP LEG (Anthony, twice — the second time intercepting the spawn mid-turn: "Don't! Do the
-hard stuff first").** This is the ordering law of de-risk mode applied to _scheduling_, so
-it is stated over the ORDER and not over any one class: whatever sits highest in the
-tier's roadmap is what gets worked, and the design session takes it itself. The rule above
-says _who_ work goes to once picked up; this says _what is picked up at all_.
+**Before starting any task: if the postulate is not in the lowest open tier, and the work is not a design question, it is PARKED — say so and take a lowest-tier item.** Which postulates those are lives in PROOF-STATE.md; this file never names them. Measured once at five days of discharges that all went to non-anchor rows while the anchor sat untouched.
 
-The fan-out looks like leverage and buys proof-progress optics while the row that could
-still move the ground stays open — and the per-worker context cost is paid again if a
-design failure on the risky row invalidates what they ground.
+**Within the tier, follow the BIG PICTURE ROADMAP, not the next row down (Anthony).** Take the top leg and work it end to end. The rows are the ledger the legs are drawn from, and reading straight down them proves one postulate at a time — the wrong unit, because the expensive discovery here is never the clause but the neighbours a restatement drags with it, and a row cannot show you those.
 
-**The one carve-out is a GENUINE PREREQUISITE — and verify it, do not assume it.** A
-GRINDABLE row the risky row actually consumes is fair game; "adjacent", "same family" or
-"same module" is NOT, and the near-miss is the common case, since a candidate unblocking a
-SIBLING of the row in hand reads exactly like one unblocking the row in hand. The risky
-row's own statement or header must name the candidate. **This NARROWS PROOF-STATE.md's
-tier preamble**: its licence to grind mechanical rows in parallel is for a tier whose open
-rows are all GRINDABLE.
+### The convergence test
 
-**AND `make roadmap-order` ENFORCES IT: WHILE A TIER HOLDS AN OPEN FALSITY OR SHAPE ROW, A
-COMMIT MAY NOT DISCHARGE A GRINDABLE OR DIFFICULTY ROW OF THAT TIER (Anthony).** The pull
-this resists is structural rather than careless, which is why prose could not hold it:
-`roadmap-moved` requires every commit to move the roadmap, a risky leg routinely ends in a
-FINDING rather than a discharge, and a finding-only commit reads as unfinished because the
-ledger it leaves carries the same rows in the same classes — so a mechanical row gets
-closed alongside it to make the commit feel whole. **Settle risk near the trunk**: a row
-proven under an open FALSITY is proven on ground that may still move, and if the statement
-above it is refuted that work is not delayed but FORFEIT.
+Grinding a FALSITY row routinely spawns new postulates, and a new FALSITY is not by itself bad news.
 
-**THE PROOF STAYS FREE TO TAKE THE SHAPE IT NEEDS — ONLY BANKING IS HELD (Anthony).**
-DELETING a row, RENAMING, SPLITTING, RESTATING and RECLASSIFYING one are all free, and a
-check that held any of them would be the worse failure. The one move held is a name leaving
-the postulate ledger while STILL DECLARED in `agda/src` — a postulate that became a proven
-definition. The carve-out is the GENUINE PREREQUISITE above, now VALIDATED rather than
-asserted: the risky postulate's own header or statement must NAME the row, exactly as a
-`TWIN:` names its precedent.
+- **Converging** — the new FALSITY's risky region is strictly SMALLER (a sub-case of the same edge). Localisation is what buys probeability: a statement about one branch can usually be instantiated; one about a whole clause cannot.
+- **Spiralling** — not smaller, or reaching UPSTREAM into machinery already ground.
+- **Stop condition:** the SAME region producing FALSITY across three successive subdivisions. Wrong design in the mechanism underneath; reconsider it.
 
-**EARNING THE CLASS: NAME THE PRECEDENT.** GRINDABLE is not "feels easy", it is "here is
-the worked instance." The postulate's own header must name the proven twin or the
-mechanical route; absent one, the row is DIFFICULTY. **Name it in a `TWIN:` section, where
-`make comments-check` resolves it** — and refuses a twin that is itself still a postulate,
-which is this rule finally having teeth instead of a convention. Without this the class becomes the
-place everything nobody wants to think about gets parked, which is the one failure mode
-that would make it worse than not having it.
+**FALSITY does not mean the theorem is false** — it means this STATEMENT might be, and you restate. The common refutation is repaired by a hypothesis already available where needed. The expensive shape is a repair needing a hypothesis NOT available at the call site; name that one when you find it.
 
-**A CLASS IS A PROPERTY OF EVIDENCE, NOT OF CONFIDENCE. A RISK CLASS MAY ONLY BE LOWERED
-BY EVIDENCE THAT REACHED THE RISKY REGION.** Name the region the evidence reached, or the
-receipt does not count. This is the general form of "never extrapolate a probe past its
-shapes", and it is the specific way this campaign has made itself feel safer than it was:
-a row was once downgraded FALSITY → DIFFICULTY on a probe covering only the
-near-degenerate case, and had to be reverted. **Corollary: a named route is not
-evidence** — knowing how a proof would go says nothing about whether the statement is
-true. A proof sketch and a green probe of the near-degenerate case lower nothing.
+### Probing
 
-**THE CONVERGENCE TEST — the one thing that distinguishes progress from a spiral.**
-Grinding a FALSITY row routinely spawns new postulates, and spawning a new FALSITY is
-_not_ by itself bad news. Apply this test:
-
-- **Converging** — the new FALSITY's risky region is strictly SMALLER than the one it
-  replaced (a sub-case of the same edge). That is the risk localising, and localisation is
-  what buys probeability: a region small enough to name is a region small enough to
-  instantiate. A statement about a whole clause cannot be probed; a statement about one
-  branch of it usually can.
-- **Spiralling** — the new FALSITY is not smaller, or reaches UPSTREAM into machinery
-  already ground. Each layer needing a fact at least as risky as the layer itself means
-  the decomposition is not converging, and more subdivision will not find the problem.
-- **THE STOP CONDITION, and hold to it:** the SAME region producing FALSITY across three
-  successive subdivisions. That is not a hard proof — it is a wrong design in the
-  mechanism under it, and the response is to reconsider the mechanism, not to subdivide a
-  fourth time.
-
-**FALSITY does not mean the theorem is false.** It means this STATEMENT might be, and if
-it is, you restate. The common refutation is repairable by a hypothesis that is already
-available where it is needed, and costs a restatement. The expensive shape is a refutation
-whose repair needs a hypothesis NOT available at the call site — that one forces the
-design to move, and it is the one worth naming when you find it.
-
-- **A machine refutation is worth as much as a proof — usually more, since it is
-  cheaper.** A false statement found now costs a restatement; found after the towers above
-  it are ground, it costs the towers.
-- **AUDITING STATEMENTS FOR TRUTH IS THE PRIORITY, not a distraction** — especially by
-  machine probe. A `-- SUSPECT:` note is not the correct response to a doubt you can test:
-  test it.
-- **PROBE BEFORE GRINDING.** If a postulate's sides are computable, instantiate it at
-  concrete programs **in `agda/evidence/probed/`, checked with `make agda-dev`** and pinned by `refl` —
-  bug-cache shaped, seconds per loop. Every probe ends in exactly one of two states: a
-  refutation (record, restate, re-rank) or a confidence receipt (`-- PROBED:` in
-  the postulate's own header, saying what shapes were covered). **An unprobed probeable
-  postulate is the cheapest unmanaged risk in the repo.**
-- **AND PROBE THE ASSEMBLY'S CONCLUSION, NOT ONLY ITS LEAVES.** A real body over
-  postulated leaves has a conclusion that COMPUTES exactly as a postulate's does, so
-  it is probeable — and it is the one thing nobody instantiates, because it
-  typechecks and so reads as settled. Its falsity is the retroactive kind: every
-  clause already ground under it was proving something false, and the leaves inherit
-  the defect without any of them being individually wrong. Measured once on this
-  campaign's expensive spine: a leaf was probed, refuted, and the same witness then
-  refuted the definition consuming it, whose own bound was smaller — so the leaf's
-  refutation was the _cheaper_ half of the finding. **The tell that it is worth the
-  minute: the leaf's bound and the assembly's bound are stated in the SAME currency**,
-  since then a witness against one arithmetic is a witness against both, and you get
-  the upper result for free by instantiating the parent at the same program.
-
-- **AND ASSUME A PROBE ALREADY EXISTED, UNTIL A SEARCH HAS FAILED (Anthony).** This
-  is SEARCH FIRST arriving at the evidence, and it binds on every row that is not
-  GRINDABLE — a FALSITY, SHAPE, VACUITY or DIFFICULTY row is exactly the kind that
-  has been picked up before, put down, and probed on the way. The default
-  assumption is that someone has already instantiated this statement, and the
-  search costs one command:
-
+- **A machine refutation is worth as much as a proof — usually more, since it is cheaper.** False now costs a restatement; false under a tower costs the tower.
+- **Auditing statements for truth is the PRIORITY.** A `-- SUSPECT:` note is not the response to a doubt you can test: test it.
+- **PROBE BEFORE GRINDING.** If the sides compute, instantiate at concrete programs in `agda/evidence/probed/`, checked with `make agda-dev`, pinned by `refl`. Every probe ends in a refutation or a `-- PROBED:` receipt saying what shapes were covered. **An unprobed probeable postulate is the cheapest unmanaged risk in the repo.**
+- **Probe the ASSEMBLY's conclusion, not only its leaves.** A real body over postulated leaves has a conclusion that COMPUTES, and nobody instantiates it because it typechecks. Its falsity is the retroactive kind. Tell that it is worth the minute: the leaf's bound and the assembly's bound are stated in the SAME currency.
+- **Assume a probe already existed until a search has failed (Anthony).** Binds on every row that is not GRINDABLE.
   ```
   git log -S'<postulate name>' --all --format='%h %s'
   ```
+  **Search by the TARGET'S NAME, never by the probe directory's path** — probes have not always lived where they live now, so a path-scoped search reports a false ALL-CLEAR. Then `git show <sha>^:<path>`. The receipt convention does not make this redundant: ten receipts in the tree against ninety-eight probe files deleted.
+- **What you recover is usually worth more than a verdict** — the HARNESS (real-evaluator plumbing, ⊔-shaped measures, refutation families already tried) and the BLOCKED/BOUNDED verdicts, which are findings about what CANNOT be probed.
+- **Read the recovered probe's STATEMENT, not its verdict.** A probe is expired by its target being discharged *or restated*, so what you find is usually evidence about a statement that is gone. A green on `A + B + C` says nothing about `(A + B) ⊔ C`.
+- **A probe expires with its target, mechanically.** `-- TARGET: <postulate>`, and `make evidence-check` fails the moment that name leaves the ledger. Then DELETE or retarget it; never relax the check. Probes and refutations decay differently and only one says so: a refutation dies when `src` can no longer STATE it and `make refuted` goes red that day; a probe dies when its target is PROVEN and nothing happens at all. **A probe that outlives its target because what it pins is the EVALUATOR is a unit test — its home is the bug cache.**
+- **A probe's TARGETS are what its ROWS are evidence about**, not everything its findings touch. A receipt naming a statement the rows never reached is a FALSE coverage claim. A FINDING is ordinary prose in whatever statement it CONSTRAINS — usually not the target, and often a definition, which cannot carry a receipt at all; name the probe module in backticks there.
+- **A probe informing N statements gets N one-line pointers, never N copies of its coverage claim.** Several `-- TARGET:` lines in one probe are supported.
+- **Provenance travels with the FINDING, not with the receipt.** Whether something came from instantiation or from reading the definitions belongs beside the claim it justifies, not above a `PROBED:` section where it reads as narrating the ledger.
+- **Determine computability by LOOKING, never from a remembered list.** An `abstract` block seals a family, and blocks get added for performance without the statements changing. Any list of "the computable ones" here would be a research finding pretending to be a rule — one was, and it named a family that had since been sealed.
+- **Hypothesis-side and conclusion-side computability are separate questions.** Say which SIDE is blocked; "sealed somewhere in the statement" does not imply symbolic-or-nothing.
+- **Never extrapolate a probe past its shapes.** Say which were covered and which were not.
+- **Decide which axes CAN refute before sweeping any: only a measure-side axis can.** For `lhs ≤ rhs`, a parameter that moves only the RIGHT weakens the claim, so no instantiation of it can refute — unfalsifiable by construction, however tight the rows read. It runs the other way too: an axis with no coverage is a finding only if it moves the measure. Both errors were made on one row of this campaign.
+- **A row that could not have failed is not a row.** Label every row LOAD-BEARING or DEGENERATE and state what would make it fail. Three ways a probe lies green: **(1) vacuous rows** — the quantifier is empty (`all _ [] = true`, `0 ≤ᵇ _`), so name the covered CONJUNCTS, not the covered programs; **(2) hand-built states** — `record (st-init e) { … }` is not reachable, so reach states by RUNNING, and treat a constructed failing state as a refutation candidate whose reachability is the finding; **(3) reading an assembly backwards** — `P = P-core o₁ … oₖ` proves P FROM the core, never the core.
 
-  **SEARCH BY THE TARGET'S NAME, NEVER BY THE PROBE DIRECTORY'S PATH.** Probes
-  name the statement they test in their own headers, so the name reaches them
-  wherever they lived — and they have not always lived where they live now, so a
-  path-scoped search reports a false ALL-CLEAR, which is the worst possible answer
-  to this question. Then `git show <sha>^:<path>` reads the probe back, and
-  `git log --diff-filter=D` on the commit names everything it deleted.
+### Dead routes
 
-  **The receipt convention does not make this redundant, and the numbers say so:**
-  a probe's finding is supposed to land as a `-- PROBED` line in its target's
-  header, and at the sweep that recorded this rule the tree held ten such receipts
-  against **ninety-eight probe files deleted** over the campaign. A convention
-  capturing a tenth of the evidence is a convention that needs a search behind it.
+A refuted statement and a dead route are different findings, and only the first is machine-checkable — a dead route has no `⊥` to state. **When an attempt fails for a structural reason, add `-- DEAD ROUTE:` to the header of the postulate you were trying to discharge.** Say what was tried and **what structurally blocked it** — "tried X, didn't work" stops nobody.
 
-  **AND WHAT YOU RECOVER IS USUALLY WORTH MORE THAN A VERDICT.** Two kinds of
-  thing, both expensive to rebuild and neither of which fits in a header line.
-  The **HARNESS** — real-evaluator plumbing, the ⊔-shaped measures a bound needs,
-  and the refutation families someone already thought to try — is most of the cost
-  of a probe and none of its receipt. And the **BLOCKED or BOUNDED verdict**: "both
-  families are sealed, so this side cannot be instantiated at all", or "the cost is
-  geometric in two parameters, so this reached k ≤ 4 and not the k = 9 that was
-  asked for". Those are coverage boundaries and infrastructure limits, they are
-  findings about what CANNOT be probed, and rediscovering one costs exactly what it
-  cost the first time.
+- **Machine-checked refutations live in `agda/evidence/refuted/`**, checked by `make refuted` and `make wiring-refuted`. **Keeping one in `src` is actively harmful** — `src` must then keep whatever machinery makes the dead route STATE-able, measured at seven live definitions held up by six refutations. `src` may name a refutation in a `-- REFUTED:` comment; it may never import one.
+- **A dead route is not a licence to weaken the statement.** Deleting a dead-route line requires the route shown WORKABLE, not merely untried again.
 
-  **THE TRAP, AND IT IS THE COMMON CASE: READ THE RECOVERED PROBE'S STATEMENT, NOT
-  ITS VERDICT.** A probe is expired by its target being discharged _or restated_,
-  so the probe you find is usually evidence about the statement that USED to be
-  there. A green on `A + B + C` says nothing about `(A + B) ⊔ C`, which is a
-  strictly smaller bound — the rows have to be re-run even though the harness
-  transfers. This is "never extrapolate a probe past its shapes" applied one level
-  up, to the statement rather than the inputs, and it is the mistake a found probe
-  invites: the verdict is the part you read first and the part least likely to
-  still apply.
+## THE MONSTER — the one thing each tier is trying to kill (Anthony)
 
-- **AND A PROBE EXPIRES WITH ITS TARGET, MECHANICALLY (Anthony).** A probe declares
-  `-- TARGET: <postulate>` and `make evidence-check` fails the moment that name leaves the
-  postulate ledger — discharged, restated or deleted. The probe is then DELETED or
-  retargeted; the check is never relaxed, because an expired probe is exactly what it
-  exists to surface. This is needed because probes and refutations decay differently and
-  only one of them says so: a refutation dies when `src` can no longer STATE it, and `make
-refuted` goes red that day, whereas a probe dies when its target is PROVEN and nothing
-  happens at all — the rows still compute, the `refl`s still hold, and the file stays
-  green forever as evidence for a question already settled. A probe that outlives its
-  target because what it really pins is the EVALUATOR is not a probe: it is a unit test,
-  and its home is the bug cache.
-- **A PROBE'S TARGETS ARE WHAT ITS ROWS ARE EVIDENCE ABOUT — NOT EVERYTHING ITS
-  FINDINGS TOUCH.** A probe yields two products with different homes, and conflating
-  them is how a receipt comes to claim coverage nobody bought. The ROWS are evidence
-  about the statements they instantiate: they land as `TARGET:` declarations and
-  `PROBED:` receipts, and a receipt naming a statement the rows never reached is a FALSE
-  coverage claim — worse than no receipt, since the next reader budgets nothing for a
-  region nothing covered. A FINDING is ordinary charged prose in whatever statement it
-  CONSTRAINS, which is usually not the target: an obligation on a quantity the target
-  merely takes as given is owed where that quantity is DEFINED, and a definition cannot
-  carry a receipt at all, since `make evidence-check` requires one to sit above a
-  postulate. So the finding goes in the definition's own block, naming the probe module
-  in backticks — the sanctioned in-passing form, one hop, and `make find` takes the name.
-- **AND A PROBE INFORMING N STATEMENTS GETS N ONE-LINE POINTERS, NEVER N COPIES OF ITS
-  COVERAGE CLAIM.** Several `-- TARGET:` lines in one probe are supported, so the probe
-  stays the single home for what it covered. N copies is the drift failure the
-  explanation-echo check exists for, arriving one level up: the copies age
-  independently, and nothing then says which one is current.
-- **AND THE PROVENANCE OF A FINDING TRAVELS WITH THE FINDING, NOT WITH THE RECEIPT.**
-  Whether something was turned up by INSTANTIATION or by reading the definitions is a
-  reason to trust it, so it belongs in the same block as the claim it justifies. Put it
-  in an explanation sitting above a `PROBED:` section instead and it reads as narrating
-  the ledger, which is charged, checked, and the wrong place; put it beside the finding
-  and it is neither.
-- **DETERMINE COMPUTABILITY BY LOOKING, NEVER FROM A REMEMBERED LIST.** Whether a family
-  reduces is a property of the code TODAY: an `abstract` block seals it, and blocks get
-  added for measured performance reasons without the statements above them changing. Check
-  the definition site. Any list of "the computable ones" written in this file would be a
-  research finding pretending to be a rule, and would go stale silently — one did, and it
-  named a family that had since been sealed.
-- **HYPOTHESIS-SIDE AND CONCLUSION-SIDE COMPUTABILITY ARE SEPARATE QUESTIONS.** A
-  statement can be unprobeable in its hypotheses (you cannot discharge them at concrete
-  numerals) while its conclusion computes fine. That is still worth probing: compute the
-  conclusion at reachable states, and if a conjunct is false, the hypotheses'
-  satisfiability is a smaller job than proving them. "Sealed somewhere in the statement"
-  does NOT imply symbolic-or-nothing — say which SIDE is blocked.
-- **Never extrapolate a probe past its shapes.** Green on three canonical programs is a
-  receipt, not a theorem; say which shapes were covered and which were not.
-- **AND DECIDE WHICH AXES CAN REFUTE BEFORE SWEEPING ANY OF THEM: ONLY A
-  MEASURE-SIDE AXIS CAN.** For a statement of the form `lhs ≤ rhs`, a parameter
-  that moves only the RIGHT weakens the claim, so no instantiation of it can
-  produce a counterexample — a sweep over such an axis is unfalsifiable by
-  construction, however many rows it has and however tight they read. This is
-  the rule below applied to the STATEMENT rather than to a row, and it is worth
-  having separately because it is decidable by looking at the type, before any
-  harness exists. It also runs the other way, which is where it costs something:
-  an axis with no coverage is a finding only if it moves the measure, so reading
-  a bound-side gap as a risk over-ranks the row and holds a class that nothing
-  is holding. Both errors were made on one row of this campaign, in that order.
-- **A row that could not have failed is not a row.** Label every probe row LOAD-BEARING or
-  DEGENERATE and state what would make it fail. Three ways a probe lies green, all
-  observed in one day, all erring toward false comfort: **(1) vacuous rows** — the
-  quantifier is empty (`all _ [] = true`, `0 ≤ᵇ _`), so name the covered CONJUNCTS, not
-  the covered programs; **(2) hand-built states** — a state written as
-  `record (st-init e) { … }` is not one the evaluator can reach, so reach states by
-  RUNNING, and treat a constructed state where the predicate FAILS as a refutation
-  candidate whose reachability is the finding, not a "non-vacuity witness"; **(3) reading
-  an assembly backwards** — `P = P-core o₁ … oₖ` proves P FROM the postulated core, never
-  the core; the `oᵢ` are its hypotheses.
+Rows are the ledger, legs are the schedule, the MONSTER is what the schedule is FOR. A NAME, because a name is what a machine can hold. `make monster-check` fails on a line added outside its dependency CONE.
 
-**RECORD A DEAD ROUTE WHERE THE NEXT PERSON WILL STAND.** A _refuted statement_ and a
-_dead route_ are different findings, and only the first has a natural home: a refutation
-is machine-checkable, while a dead route has no `⊥` to state — the statement may well be
-true, but _this way of proving it_ cannot work. Such findings historically lived only in
-PROOF-STATE prose, far from the postulate someone picks up six weeks later, and
-re-deriving a dead route is the same wasted week as re-deriving a proof.
+**Choosing one: as likely false as possible, as far down the tree as possible, with as big a blast radius as possible (Anthony).** Falsity and blast radius are both monotone UP the tree, so maximising those two alone returns the tier's top line forever. **Depth is the only pressure that selects anything else** — among nodes that could genuinely be false, take the DEEPEST that still takes its siblings and parents with it.
 
-So: **when an attempt fails for a structural reason, add a `-- DEAD ROUTE <date>:` line to
-the header of the postulate you were trying to discharge** — not to a roadmap, not to a
-separate file. Same locality rule as `-- PROBED`. It must say **what was tried and what
-structurally blocked it**, because "tried X, didn't work" does not stop anyone: "route #2
-is STRUCTURALLY DEAD — `cascadeLatch` sets `dying` before any chain is processed, so the
-invariant cannot be established at that point" does.
+**The floor under the descent is the cone itself**, which is the commit licence: a leaf is usually past it, since its cone is its statement's vocabulary and the assembly it serves is off-tree. **The monster need not be a postulate and usually is not** — a relation every leaf is stated in can be wrong in a way no ledger records.
 
-- **A PROSE note is the home for a dead ROUTE; a machine-checked refutation lives in
-  `agda/evidence/refuted/` (Anthony)** — a separate library checked by `make refuted` and
-  `make wiring-refuted`, whose rules are in **`EVIDENCE.md`; read it before adding,
-  repairing or deleting a refutation, or a probe.** **KEEPING A REFUTATION IN `src` IS ACTIVELY
-  HARMFUL**, because `src` must then keep whatever machinery makes the dead route
-  STATE-able, and that machinery is otherwise deletable — measured at seven live
-  definitions held up by nothing but the six refutations that mention them. `src` may
-  refer to a refutation in a `-- REFUTED:` comment, since a refuted route does not change;
-  it may never import one. This does NOT reopen a tree of failure _notes_: everything in
-  `agda/evidence/refuted/` is TYPECHECKED and claimed by `Refuted.Main`, so it cannot rot
-  unnoticed, while prose outside the claim graph is read by nobody when it would help.
-- **A dead route is not a licence to weaken the statement.** It kills a _route_; the
-  postulate stays at full strength. **Deleting a dead-route line requires the route to be
-  shown WORKABLE**, not merely untried-again — it is evidence, and it ages better than the
-  code around it.
+TOO HIGH is the cone percentage the check prints; TOO DEEP is an offender list that repeats until `also:`-ed in, so a growing `also:` ledger means the monster is misplaced. Exceptions are declared with an `also:` line in the tier's own section, never a flag. → [docs/monster.md](docs/monster.md)
 
-**TIER ORDER IS LAW: LOWER TIERS FINISH FIRST (Anthony).** Strictly — not "mostly", not
-"while a build runs". Each tier is built ON the one below it, so grinding an upper-tier
-statement while a lower tier is open bets on ground that a design failure would move. The
-one carve-out is answering a _design question_ (cheap, and it aims the grind) — never
-grinding over one.
+**A rising postulate count is the mechanism working, not a regression** (Anthony: *"the relentless mindset of reducing those numbers is very harmful"*). One vague postulate split into six specific ones is PROGRESS. The only number that matters is whether `The-Proof.agda` is discharged.
 
-**Before starting any task: if the postulate is not in the lowest open tier, and the work
-is not a design question, it is parked — say so and take a lowest-tier item.** Which
-postulates those are, and why each is ranked where it is, lives in PROOF-STATE.md; **this
-file never names them.** The tier structure exists because priority that lives only in
-prose gets spent on whatever is nearest — measured once at five days of discharges that
-all went to non-anchor rows while the anchor sat untouched.
+- **Do NOT minimise the count, do NOT apologise for it**, do not describe an increase as a cost or a trade.
+- **Do NOT weaken a statement to make it typecheck.** Postulate the full-strength statement and report the obstacle.
+- **Never grind a hard proof when a postulate will do.**
 
-**AND WITHIN THE TIER, THE BIG PICTURE ROADMAP IS THE THING FOLLOWED — NOT THE NEXT ROW
-DOWN (Anthony).** Every tier there opens with its next LEGS, ranked riskiest-first,
-each a GROUP of postulates aggregated across the whole ledger: statements sharing a
-currency, a claim and the sites that consume it, one shelf of mechanical work. Take the
-top leg and work it end to end. The rows are the ledger the legs are drawn from, and
-reading straight down them proves one postulate at a time — which is the wrong unit,
-because the expensive discovery in this campaign is never the clause but the neighbours a
-restatement drags with it, and a row cannot show you those. Where the grouping is not
-real, a leg falls back on the risk classes and may name a single row; that is a leg too.
-`make roadmap-check` holds each tier to AT LEAST THREE legs and AT MOST SEVEN, and each
-leg to a prose budget several times a row's, since a group has no header to send its
-reasoning to.
+## A POSTULATE MUST BE A LEAF (Anthony)
 
-**THREE IS A FLOOR, NOT A QUOTA — WRITE THE FOURTH DOWN (Anthony).** The bound was once
-three at both ends, on the argument that a fourth leg forces a judgement about which of
-the three it displaces. That argument holds for a leg being INVENTED and fails for one
-already DECIDED: a route worked out and cut into commit-sized pieces is the single most
-expensive thing here to rediscover and the cheapest to type, and the displaced leg is not
-reconsidered, it is forgotten. So when the session knows the next five commits, it names
-five. Seven is the ceiling because past that the list has stopped being the next few
-commits and become a second copy of the ledger — and the ledger is what the ROWS are.
-
-**AND THE LEGS DO NOT COVER THE TIER (Anthony).** They are the NEXT legs, not a
-partition of what is left — covering the ledger is the ROWS' job and they already do it.
-What comes after the last leg is left unnamed deliberately: it will be re-grouped by
-whatever the earlier ones turn up, so naming it now writes a schedule that ages before
-anyone reads it. A leg enumerating every remaining row has stopped being a plan.
-
-**AND THE LEGS ARE AIMED AT THE TIER'S MONSTER (Anthony).** The rows are the
-ledger and the legs are the schedule; the MONSTER is what the schedule is FOR. It is the
-one thing in the file naming the risk ABOVE any single statement, so a set of legs that
-does not narrow it is that many commits of work with nothing underneath it that got
-smaller. Write each leg so its own prose says what it decides about the monster; where the
-grouping is real this costs nothing, because a leg is already a group of rows sharing a
-currency and a claim, and the monster is what they are jointly in doubt about.
-
-**AND NARROWING COUNTS — IT IS USUALLY WHAT A LEG BUYS (Anthony).** The monster is
-not expected to FALL to the leg that works it; it is expected to have a smaller region
-left where it could still be false, which is the convergence test arriving at the schedule
-rather than at a postulate. So the outcome to write down when a leg retires is what the
-leg RULED OUT: which shapes now instantiate it, which region is left, and whether the
-monster should move as a result. A monster narrowed that way has moved even when every row
-under it is still open — and narrowing it is not the same as REPLACING it, which is what
-happens when the old one falls or the tier descends past it, and the two must not be
-reported as the same thing.
-
-**AND THE ONE EXCEPTION IS A COST THAT STOPS THE QUESTIONS BEING WORKED AT ALL.** A leg
-that removes such a cost — a loop that is no longer a loop, a check that cannot run,
-apparatus a whole face needs before any of it can be instantiated — narrows nothing on its
-own and is still the right leg, because the monster is unreachable until it lands. It
-justifies itself in its own prose, saying what it unblocks; and it is never more than one
-leg of the set, since a schedule that is all tooling is a tier that has stopped being
-worked.
-
-### THE MONSTER — every tier names the one thing it is trying to kill (Anthony)
-
-A tier's rows are its ledger and its legs are its schedule; the MONSTER is what the
-schedule is FOR, and it is a NAME rather than prose, because a name is the part a
-machine can hold. **`make monster-check` fails when a line added
-to `agda/src` belongs to a declaration outside the lowest open tier's monster's own
-dependency CONE.** Not its blast radius; its cone: what the monster's statement and body
-REACH, which is the set whose truth decides its own. The cone is read off the tree AS
-EDITED, which is what makes converting the monster into a body over new leaves a passing
-commit rather than a forbidden one.
-
-**CHOOSING ONE: AS LIKELY FALSE AS POSSIBLE, AS FAR DOWN THE TREE AS POSSIBLE, AND WITH AS
-BIG A BLAST RADIUS AS POSSIBLE (Anthony).** The three pull against each other and the
-sweet spot is where they balance — but know which one is working. **Falsity and blast
-radius are both monotone UP the tree**, since a parent is false whenever any child is and
-its blast radius contains every child's, so maximising those two alone returns the tier's
-top line, for every tier, forever. **Depth is the only pressure that selects anything
-else.** Read the rule as: among nodes that could genuinely be false, take the DEEPEST one
-that still takes its siblings and parents with it.
-
-**AND THE FLOOR UNDER THE DESCENT IS THE CONE ITSELF.** The cone is the commit licence, so
-pushing the monster down narrows what may be worked — the point, until the work that would
-KILL it falls outside and the gate forbids the only thing worth doing. A leaf is usually
-past that floor: its cone is its statement's vocabulary, so the assembly it serves and its
-own sibling are both off-tree. **The monster need not be a postulate and usually is not** —
-a relation every leaf is stated in can be wrong in a way no ledger records.
-
-Neither failure is a matter of taste. TOO HIGH is the cone percentage the check prints;
-TOO DEEP is an offender list that repeats until it is `also:`-ed in, so a growing `also:`
-ledger is the tier saying its monster is misplaced. An exception is declared with an
-`also:` line in the tier's own section, never a flag — written there it is reviewed with
-the roadmap. → [docs/monster.md](docs/monster.md)
-
-**A RISING POSTULATE COUNT IS THE MECHANISM WORKING, NOT A REGRESSION.** This needs saying
-because every instinct — and every subagent's default — runs the other way. Anthony, in
-the session that set this rule: _"the relentless mindset of reducing those numbers is very
-harmful."_ The ledger is not a scoreboard. One vague postulate split into six specific ones
-is PROGRESS: each is separately attackable and none can hide. The only number that matters
-is whether `The-Proof.agda` is discharged. So, in worker directives and in your own work:
-
-- **Do NOT minimise the postulate count. Do NOT apologise for it.** Do not describe an
-  increase as a cost, a regression, or a trade — it is the intended outcome.
-- **Do NOT weaken a statement to make it typecheck.** Weakening is the one move that looks
-  like a shortcut and is not: it silently makes a claim smaller. Postulate the
-  full-strength statement instead, and report the obstacle.
-- **Never grind a hard proof when a postulate will do.** If a lemma is real mathematics,
-  state it and move on. Note it in the ledger and keep wiring.
-
-### A POSTULATE MUST BE A LEAF (Anthony)
-
-**THE PATTERN THAT DOES THE WORK — postulate-to-assembly conversion.** When a proof has
-nowhere to plug in because its only would-be consumer is itself a monolithic postulate:
-take that postulate, convert it into a REAL DEFINITION over several smaller postulates,
-and have the definition **CALL** the pieces it was always meant to consume. This makes
-each remaining gap greppable and proves nothing hard. **CALL, not pass** — which is the
-rest of this section.
-
-**Nothing proven may be PASSED INTO a postulate as its only use.** Write an assembly as a
-REAL BODY over POSTULATED LEAVES — never as a postulate over proven pieces:
+**Postulate-to-assembly conversion** — when a proof has nowhere to plug in because its only would-be consumer is a monolithic postulate: convert that postulate into a REAL DEFINITION over smaller postulates, and have the definition **CALL** the pieces. **CALL, not pass.**
 
 ```agda
 postulate l₁ : L₁                        -- the gap, a true leaf
@@ -1066,451 +264,122 @@ P : T
 P = <real body applying l₁ …>            -- the composition is CHECKED
 ```
 
-**not** the `-core` form `postulate P-core : L₁ → … → T` with `P = P-core l₁ …`, where the
-composition is asserted and **checked by nobody**. That form verifies only that `L₁…Lₖ`
-and `T` are well-formed types; it never verifies that they SUFFICE. Two postulates each
-shed seven-plus leading hypotheses when finally proven — ingredients claimed, never
-actually ingredients, undetected until someone wrote the real proof. **A `-core`'s
-hypothesis list is a HYPOTHESIS about the route, not a specification**, and the leaf-only
-form is what makes the typechecker say so at the moment the leaf is proven rather than
-months later.
+**Not** `postulate P-core : L₁ → … → T` with `P = P-core l₁ …`, where the composition is checked by nobody. That form verifies only that the types are well-formed, never that they SUFFICE — two postulates each shed seven-plus leading hypotheses when finally proven. **A `-core`'s hypothesis list is a HYPOTHESIS about the route, not a specification.**
 
-**When the body cannot be written yet, postulate the parent BARE and mint no leaves.**
-Nothing is ever blocked: the bare postulate is always available, so the rule only changes
-the ORDER to assembly-first, leaves-second — which is what outside-in already demands
-("never prove pieces before their assembly exists"; leaf-only is that rule with teeth,
-since today "assembly exists" is satisfiable by a postulate that checks nothing). An
-unwritten route goes in the parent's header, not into a type that verifies nothing.
+**When the body cannot be written yet, postulate the parent BARE and mint no leaves.** Nothing is ever blocked; the rule only changes the ORDER to assembly-first. An unwritten route goes in the parent's header.
 
-The payoff is that **a leaf's FIT is tested the moment it is proven**, because its
-consumer is a body that must reduce.
+**Enforced as a corollary of reachability:** `wiring-gate` gives a name passed to a postulate no credit, so a lemma whose only use is being handed to one has no route home. No grandfather list, no name-based heuristic. → [docs/wiring.md](docs/wiring.md)
 
-**HOW THIS IS ENFORCED — as a corollary of reachability, needing no ledger of its own.**
-`make wiring-gate` gives a name PASSED to a postulate no reachability credit from that
-site, so a lemma whose only use is being handed to a postulate has no route home and
-fails. There is no grandfather list and no name-based heuristic: the rule sees EVERY
-postulate, not the ones that happen to be named `-core`. The check reads the eta form and
-the continuation line too, because together they are how this rule's own worked example
-escaped it for months. → [docs/wiring.md](docs/wiring.md)
+**Writing the body does not licence breaking other laws (Anthony).** The temptation is sharp: **writing a body turns an unpaid premise into a TYPE ERROR, and the fastest way to clear one is to add a hypothesis to the parent** — which launders TRACKED debt into UNTRACKED debt, and *feels* like progress because the file goes green.
 
-**WRITING THE BODY DOES NOT LICENSE BREAKING OTHER LAWS (Anthony).** The temptation is
-sharp and specific, so name it: **writing a body turns an unpaid premise into a TYPE
-ERROR, and the fastest way to clear a type error is to add a hypothesis to the parent.**
-That is exactly the laundering "ADDING A HYPOTHESIS IS A RESTATEMENT" forbids — tracked
-debt (a postulate: counted by `make wiring`, carrying a risk class, listed in
-PROOF-STATE) becomes untracked debt (a hypothesis: invisible to all three) — and it
-_feels_ like progress, because the file goes green as you do it.
+**So a missing invariant found by a fit test goes in the INVARIANT RECORD, not in a signature (Anthony).** A field obliges every producer and consumer; a hypothesis obliges only whoever calls today. **Cascading through the record's consumers is the COST OF THE FACT BEING TRUE.**
 
-**So when a fit test reveals a MISSING INVARIANT, it goes in the INVARIANT RECORD, not in
-a signature** (Anthony's ruling; the finding is in the header of the postulate it was
-found at). A field on the invariant record obliges every producer to supply it and every
-consumer to re-establish it, so the typechecker carries the fact everywhere it is needed.
-A hypothesis obliges only whoever happens to call today — the "the call site happens to
-supply it" trap, one call site later. **Cascading through the record's consumers is the
-COST OF THE FACT BEING TRUE, not a reason to avoid it.**
+Likewise: do not WEAKEN the parent, do not close an arm with a vacuous postulate, do not seal a gap in prose. **If a body cannot land without breaking one of these, it has FOUND something and it STOPS.**
 
-The same yields to the rest: do not WEAKEN the parent to make its body typecheck, do not
-close an arm with a ⊤-typed or otherwise vacuous postulate, do not seal a gap in prose.
-**If a body cannot land without breaking one of these, it has FOUND something and it
-STOPS.**
+**A stop is a FINDING, not a discharge (Anthony).** The roadmap row STAYS and the parent is still a parent until the body lands. A good finding is the most convincing thing there is to mistake for progress.
 
-**A STOP IS A FINDING, NOT A DISCHARGE — IT IS NOT DONE TILL IT IS DONE (Anthony).**
-Stopping produces a real result and is the right move; what it does not produce is a
-completed item. The roadmap row STAYS and the parent is still a parent until the body
-actually lands and the parent stops taking proven lemmas. Write the finding in the
-postulate's header, record the ruling, and leave the row exactly where it was. This needs
-saying because a good finding is the most convincing thing there is to mistake for
-progress: genuinely valuable, genuinely publishable in a commit message, and it leaves the
-code in precisely the state it was in — the same failure as **CODE BEATS PROSE**, work
-converted into a paragraph and the paragraph counted as the work.
+**Pass every lemma ETA-EXPANDED with explicit implicits** — `(λ {n} {Γ} → f {n} {Γ})` — or a statement that reduces away its own implicit gives `Unsolved metas`. Other mechanics: [docs/wiring.md](docs/wiring.md).
 
-**Mechanics that bite when you write an assembly** — four of them, each otherwise costing
-a full build, in [docs/wiring.md](docs/wiring.md). The one to carry before you type the
-line: **pass every lemma ETA-EXPANDED with explicit implicits** — `(λ {n} {Γ} → f {n} {Γ})`
-— because when a statement reduces away its own implicit, bare arguments give
-`Unsolved metas`.
+**Two shapes that are almost always wrong — check every new postulate for both.** A conclusion needing information in NONE of its hypotheses; and a Σ-statement upward-closed in its witness. Under de-risk mode these are refutation targets, not `SUSPECT:` notes.
 
-**TWO SHAPES THAT ARE ALMOST ALWAYS WRONG — check every new postulate for both.** A
-statement whose conclusion needs information appearing in NONE of its hypotheses (e.g.
-deriving a path-LENGTH bound from a predicate carrying no length conjunct), and a
-Σ-statement upward-closed in its witness (see "A Σ-receipt has content only through its
-witness" above). Under de-risk mode these are refutation targets, not `SUSPECT:` notes:
-build the counterexample.
+**For the first shape, suspect a MISPLACED CALL before a missing lemma.** Often nothing is unproven — the statement is being made at the wrong INDEX and the caller is what is misplaced. **Tell: the gap is a fixed small offset (one level, one frame, one `suc`)** rather than a missing fact about the domain. The check is cheap: find the same operation where it is already PROVEN and **diff the ARGUMENTS, not the statements.** Which families mirror which is recorded in the source headers, never in a list here. Two postulates fell to moving the call, with no new mathematics. **But a mirrored counterpart is a property some parts happen to have** — don't force the analogy.
 
-**AND FOR THE FIRST SHAPE, SUSPECT A MISPLACED CALL BEFORE A MISSING LEMMA.** When a
-statement's hypotheses cannot supply its conclusion, the instinct is that something is
-unproven. Often nothing is: the statement is being made at the wrong INDEX — a level, a
-fuel, a path depth — and the caller is what is misplaced, not the mathematics. The tell is
-that the gap is a fixed, small offset (one level, one frame, one `suc`) rather than a
-missing fact about the domain. Nothing about the problem changes when you stare at it;
-only where the call sits does.
+**Adding a hypothesis is a RESTATEMENT and needs a restatement's justification.** `A → B` is weaker than `B`, and a hypothesis is invisible to the ledger where a postulate greps, gets counted, carries a class and sits in PROOF-STATE. **The one sufficient justification is that the unconditional form has been REFUTED.** **"The call site happens to supply it" is NOT a reason** — today's call sites are an artifact of today's assembly.
 
-The check is cheap: find the same operation somewhere it is already PROVEN, and diff the
-ARGUMENTS rather than the statements. Two statements can read identically and still differ
-in the index each is made at, which is invisible if you only compare their types.
+## CODE BEATS PROSE (Anthony)
 
-**Parts of this development have a proven counterpart that answers "at what index should
-this be stated?" directly** — a second face of the same operation, already discharged,
-whose clauses correspond one-to-one with the ones still open; where the two disagree, the
-undischarged side is the one that has not been checked. **Which families mirror which is
-recorded in the source headers of the statements themselves**, not in any list kept here,
-which would go stale silently with nothing grepping it. That comparison has retired
-postulates that read as hard: a one-unit gap dismissed as an irreparable off-by-one turned
-out to be a call sitting one level too low, visible the moment its discharged
-counterpart's arguments were put beside it. Two postulates fell to moving the call, with
-no new mathematics. **But a mirrored counterpart is a property some parts of this
-development happen to have, not a general fact** — do not force the analogy where the
-correspondence was never claimed. What generalises is the smaller claim: _an index-shaped
-gap points at the call site, so before proving anything, find the same operation where it
-already works and compare the arguments._
+**A finding written in English that could have been written in Agda is not done — it is deferred.** If you have just worked out that A follows from B, the deliverable is the assembly, not a header paragraph saying so.
 
-**ADDING A HYPOTHESIS IS A RESTATEMENT, AND NEEDS A RESTATEMENT'S JUSTIFICATION.**
-`A → B` is weaker than `B`, and a hypothesis is INVISIBLE to the ledger in a way a
-postulate is not: a postulate greps, gets counted by `make wiring`, carries a risk class,
-and sits in PROOF-STATE; a hypothesis threaded into a signature does none of that. So
-trading a postulate for a hypothesis discharges nothing — it launders TRACKED debt into
-UNTRACKED debt, which is precisely the invisible debt the wiring law exists to prevent, in
-the one form that feels like progress while you do it.
+**The tell:** you write "X could be implemented in terms of Y" / "this reduces to Z" / "the route is …", and then you commit. **That sentence is a work order addressed to you, right now.** Carry it out, or say plainly why you cannot and postulate the residue at full strength.
 
-The one sufficient justification is that the unconditional form has been **REFUTED**: then
-the conditioned form is the true statement replacing a false one, which is not a weakening
-at all. (One inequality on the caps face is FALSE unconditionally — refuted in
-`agda/evidence/refuted/`, against an adversarial stored state — so the conditioned form is the one
-that is stated.)
+An assembly is CHECKED, greppable and counted; a paragraph is checked by nobody, ages silently, and gets re-derived. **Corollary for headers: the moment a header explains a derivation that would typecheck, move it into the derivation.**
 
-**"The call site happens to supply it" is NOT a reason.** Today's call sites are an
-artifact of today's assembly — usually exactly one caller. A hypothesis baked in because
-the current caller offers it makes the statement's shape accidental, and when a second
-caller appears that cannot supply it you do not discover a missing hypothesis, you discover
-the lemma does not apply. Same distinction as "no consumer today" vs "no consumer ever".
+**NEVER WRITE CODE IN A COMMENT (Anthony).** Not a body, not a signature, not a "here is the lemma we need" block. Not checked, not counted, and it *looks* discharged. The excuse that produces it every time is the wiring law — the piece typechecks but its consumer is still a postulate. **The right repair is to convert the consumer into a real body over a smaller leaf**, however thin. If it genuinely cannot be split yet, say in one sentence what is owed and let git hold the text.
 
-### CODE BEATS PROSE: if you can assemble it, ASSEMBLING IT IS THE JOB (Anthony)
+## HEADER SHAPE (Anthony)
 
-**A finding written in English that could have been written in Agda is not done — it is
-deferred.** This is not a matter of priority or of "documentation is also valuable". Work is
-not finished until it is **as discharged as the current knowledge allows**: if you have just
-worked out that A follows from B, the deliverable is the assembly `A = A-core B …`, not a
-header paragraph saying that it does.
+**Explanation first, then evidence — `REFUTED`/`DEAD ROUTE`/`TWIN`, then `PROBED`, then `RECOVERY` — evidence LAST.** That is what gives a long header landmarks. A marker is a **LEDGER ENTRY**: to mention a refutation in passing, name its module in backticks rather than opening a section mid-paragraph.
 
-The tell, and it is easy to miss because the paragraph feels like progress: you write
-"X could be implemented in terms of Y" / "this reduces to Z" / "the route is …", and then
-you commit. **That sentence is a work order addressed to you, right now.** Either carry it
-out, or say plainly why you cannot (a signature must change, a hypothesis is missing, the
-grind is genuinely large) and postulate the residue at full strength. What is forbidden is
-recording the insight and moving on as though the insight were the deliverable.
+**A marker that names something must name something that EXISTS (Anthony).** Write the reference BACKTICKED or DOTTED — English is full of words this tree declares.
 
-Why it matters more here than in ordinary code: an assembly is CHECKED — the typechecker
-holds the reduction to the actual hypotheses, `grep` finds the residue, and the wiring law
-counts it. A paragraph is checked by nobody, ages silently, and gets re-derived. (Two costs
-already paid: an arithmetic lemma sat machine-proven for eight days while a header called
-the same arithmetic "hand derivation, not yet machine"; and a nodry lemma was described in
-prose as assemblable from the walk face's `hasDry` conjunct, and committed that way, when
-the assembly was available — it turned out to discharge a clause outright and prove a
-burst-split transport, both of which the paragraph had silently classified as part of the
-postulate.)
+- **`TWIN:` names a PROVEN definition.** If the named twin is itself still a postulate the class is wrong — the row is DIFFICULTY.
+- **A `PROBED:` receipt for a deleted probe carries the SHA.** A probe is supposed to outlive nothing, so the receipt is all that is left.
+- **`DEAD ROUTE:` is unvalidated by construction** — it records that a *way of proving* cannot work, and there is no object to resolve. The section to reach for when a finding is real but names nothing.
 
-Corollary for headers: a header's job is what CANNOT be code — a refuted route, a coverage
-boundary, a ruling and its rationale, a recovery pointer. The moment a header explains a
-derivation that would typecheck, move it into the derivation.
+**Sections are optional when absent and validated when present — never mandatory.** A filler `TWIN:` is worse than empty: it earns a class the row has not earned.
 
-### A HEADER HAS A SHAPE, AND HISTORY IS NOT PART OF IT (Anthony)
+**The repair for an over-budget block is usually to SPLIT it, not to cut it.** A block is separated by a genuinely blank line, so the ceiling caps ONE unstructured explanation. An essay holding ten findings becomes ten blocks and nothing is lost. Reach for the knife only when a block holds ONE finding and still runs long. Worked instance: a 154-line wall became ten skimmable blocks with no prose deleted.
 
-**EXPLANATION FIRST, THEN EVIDENCE — `REFUTED`/`DEAD ROUTE`/`TWIN`, then `PROBED`,
-then `RECOVERY` — AND THE EVIDENCE COMES LAST.** Not a style preference: it is what
-gives a long header landmarks to skip by, and it is what makes the budget below
-definable at all. Rank one answers _what is ruled out and what the route is_, rank two
-_what was covered_, rank three _where deleted apparatus went_. A marker is a **LEDGER
-ENTRY**, so prose that wants to mention a refutation in passing names its module in
-backticks rather than opening a `REFUTED:` section mid-paragraph — a ledger interleaved
-with the argument is neither.
+**Only the EXPLANATION is charged (Anthony)** — evidence sections and `git show` pointers are free. Budgeting the destination too would mean a finding with nowhere to go gets DELETED. The budget is the measured p99: its job is to declare a block **over-explained**, not to trim writing.
 
-**AND A MARKER THAT NAMES SOMETHING MUST NAME SOMETHING THAT EXISTS (Anthony).** Every
-one of those sections except `DEAD ROUTE` refers to an object that can be deleted, so
-its disappearance is a build failure — the same law `make evidence-check` already puts
-on a probe's `-- TARGET:`, arriving from the header's side and closing the loop with it:
-that check expires a probe when its target is discharged, and this one catches the
-receipt left pointing at the probe it just deleted. **Write the reference BACKTICKED or
-DOTTED**, because English is full of words this tree happens to declare and a bare word
-resolves by accident.
+**Say it once: the explanation does not narrate the ledger below it (Anthony: "no redundancy in documentation").** The prose copy ages while the section stays live, which is how a block ends up carrying a refutation it no longer has. `make comments-check` fires on the narrow half; the rule is wider than the check.
 
-- **`TWIN:` NAMES A PROVEN DEFINITION, AND THAT IS WHAT MAKES "NAME THE PRECEDENT"
-  CHECKABLE.** The de-risk rule below demands a GRINDABLE row name its worked instance;
-  nothing checked it, and a mirror recorded in prose is a claim no machine reads. **If
-  the named twin is ITSELF STILL A POSTULATE the class is wrong** — the route has not
-  been walked, so the row is DIFFICULTY. That is a mis-classification caught
-  mechanically, which is the one thing the class system exists to prevent.
-- **A `PROBED:` RECEIPT FOR A DELETED PROBE CARRIES THE SHA.** A probe is _supposed_ to
-  outlive nothing — it expires with its target — so "the probe is deleted" is a normal
-  state and the receipt is all that is left. Then the sha is the whole recovery route,
-  and it is what makes the `git log -S` rule below actually work rather than aspire to.
-- **`DEAD ROUTE:` IS UNVALIDATED, BY CONSTRUCTION.** It has no referent: it records that
-  a _way of proving_ something cannot work, and there is no object to resolve. That is
-  precisely why it got a prose convention instead of a check, and it is the section to
-  reach for when a finding is real but names nothing.
+**A header records what is true of the STATEMENT, never what happened to the DECLARATION (Anthony).** "Was restated", "was split", "converted from a `-core`", "measured at 400 s" are git's subject. **The superseded framing goes too** — a paragraph kept "so the dead candidates are not retried" is a dead route, which is one `DEAD ROUTE` line.
 
-**THE SECTIONS ARE OPTIONAL WHEN ABSENT AND VALIDATED WHEN PRESENT — NEVER MANDATORY.**
-A required field on a row that has no twin produces a filler `TWIN:`, and filler there
-is **worse than empty**, because it earns a class the row has not earned. Structure is
-enforced on _order and resolution_, never on presence.
+## THE GATE INCLUDES `PROOF-STATE.md` (Anthony)
 
-**AND THE REPAIR FOR AN OVER-BUDGET BLOCK IS USUALLY TO SPLIT IT, NOT TO CUT IT.**
-This is what the budget is FOR, and it is worth knowing before you start deleting: a
-block is separated from the next by a genuinely blank line, so the ceiling caps **one
-unstructured explanation**, not how much a declaration may carry. An essay holding ten
-findings under one banner becomes ten blocks, each with its own heading and its own
-ledger, and nothing is lost — the reader gains landmarks and the budget stops firing
-because each finding now fits. Reach for the knife only when a block holds ONE finding
-and still runs long; then what is over budget is genuinely superseded framing. Worked
-instance: a 154-line wall in the evaluator became ten skimmable blocks with no prose
-deleted at all.
+**`make gate` is necessary, not sufficient. Update PROOF-STATE in the same commit that changes the ledger** — discharged, added, renamed, split, reclassified, reordered. A stale row misdirects the next session's whole leg.
 
-**AND ONLY THE EXPLANATION IS CHARGED (Anthony).** The prose before the first evidence
-marker has a character budget; the evidence sections and any `git show` pointer are
-free. This asymmetry is the entire design, and the tempting symmetric rule is wrong: a
-source header is precisely where the roadmap's own budget SENDS research, so budgeting
-the destination too means a finding with nowhere to go does not MOVE, it gets DELETED —
-the one outcome the directive behind all of this rules out. Same principle as the
-roadmap's rows, where names are free and explaining is charged. The budget is set at
-the measured p99 for a reason: its job is to declare a block **over-explained**, not to
-trim writing, and a module's front matter legitimately runs long.
+**A leg is one PR of work, and `make roadmap-moved` enforces it (Anthony).** A leg is a GROUP sized by the BRANCH: the chunk this session intends to land next. **The unit is the branch, not the commit** — a branch takes as many commits as the work takes, and taxing every keystroke bought edits made to satisfy the check, which is fatal to a check whose subject is whether someone said something true.
 
-**AND SAY IT ONCE: THE EXPLANATION DOES NOT NARRATE THE LEDGER BELOW IT (Anthony: "no
-redundancy in documentation").** A structured section is a machine-checked reference
-sitting a few lines down, so an explanation that also mentions the probe, re-argues the
-dead end, or repeats the sha is spending charged characters to say what the free part
-already says — and says it WORSE, because the prose copy is the one nothing resolves.
-The redundancy is not merely wasteful; it is the mechanism by which the two halves
-DRIFT. The prose copy ages while the section stays live, so a block ends up carrying a
-refutation it no longer has and a coverage claim the receipt contradicts, with no way to
-tell which sentence is the current one. Leaning on the sections is what keeps a header
-lean enough to read: state what the statement SAYS and why it is shaped that way, and
-let `REFUTED`, `DEAD ROUTE`, `TWIN`, `PROBED` and `RECOVERY` carry the evidence — they
-are the vocabulary, not a summary of the paragraph. **`make comments-check` fires when
-an explanation duplicates a section the same block already has**, which is the narrow,
-false-positive-free half; the general rule is wider than the check, and the check is not
-its whole content.
+**Three outcomes, and one always applies (Anthony).** The leg LANDED — retire it, promote the others, write a new one. The leg was NOT FINISHED — **rewrite the first leg as the work that remains**, which is worth more than the retirement. The leg's ROUTE DIED — **DISCARD it**, do not rewrite it; "the work that remains" keeps the old framing and shrinks it, and a refuted framing shrunk still steers the next session. The finding goes where a dead route goes.
 
-**AND A HEADER RECORDS WHAT IS TRUE OF THE STATEMENT, NEVER WHAT HAPPENED TO THE
-DECLARATION (Anthony: "I definitely do want to delete purely historical information —
-nobody needs that").** The four durable markers pass that test — coverage, a dead
-route, a refutation, where deleted apparatus went. "Was restated", "was split", "was
-sealed on", "converted from a `-core`", "measured at 400 s" do not: that is git's
-subject, `git log -S<name> --all` finds it, and it cannot rot there because nobody
-maintains it. **The superseded framing goes too** — a paragraph kept "so the dead
-candidates are not retried" is a dead route, and a dead route is one `DEAD ROUTE` line,
-not the argument that produced it.
+**Every leg after the first may aim at the SAME postulates.** The legs are the next that many commits, not that many subjects. Pick the risk order first, then cut at commit boundaries.
 
-**NEVER WRITE CODE IN A COMMENT (Anthony).** Not a body, not a signature, not a
-"here is the lemma we need" block. This is the sharpest form of the rule above and it is
-absolute: **if you are sure the code is needed, take the time to wire it in — with the
-SIMPLEST assembly that will hold it.** A commented-out proof is the worst of both worlds. It
-is not checked, so it rots the moment anything under it moves; it is not counted, so it is
-invisible to `make postulates`, `make wiring` and PROOF-STATE; and it _looks_ discharged, so
-the next reader budgets nothing for it.
+**The legs are AIMED AT THE MONSTER (Anthony).** A set of legs that does not narrow it is that many commits with nothing underneath it that got smaller. Write each leg so its own prose says what it decides about the monster.
 
-The excuse that produces it, every time, is the wiring law: the piece typechecks but its
-consumer is still a postulate, so `make wiring-gate` calls it unreachable and it gets parked
-in a comment "until the consumer lands". **That is the wrong repair.** The right one is to
-convert the consumer into a real body over a smaller leaf — the postulate-to-assembly
-conversion above — so the piece has somewhere to plug in TODAY. The assembly may be as thin
-as splitting one conjunct off a tuple; thin is fine, because the leaf-only shape is what
-makes the fit checked rather than asserted. (Worked instance: a register-length lemma was
-dev-checked, reverted into a postulate's header as commented code, and landed only after
-that postulate was split into a four-leaf version plus a real body — an assembly that cost
-four lines.)
+**Narrowing counts — it is usually what a leg buys (Anthony).** The monster is not expected to FALL; it is expected to have a smaller region left. When a leg retires, write down what it RULED OUT. **Narrowing is not REPLACING**, which is what happens when the old monster falls or the tier descends past it.
 
-If the consumer genuinely cannot be split yet, **do not keep the code**. Say in one sentence
-what is owed and why the assembly is blocked, and let git history hold the text.
+**One exception: a leg that removes a cost stopping the questions being worked at all** — a loop that is no longer a loop, a check that cannot run, apparatus a face needs before any of it can be instantiated. It narrows nothing and is still right, because the monster is unreachable until it lands. **Never more than one leg of the set** — a schedule that is all tooling is a tier that has stopped being worked.
 
-### THE GATE INCLUDES `PROOF-STATE.md` (Anthony)
+**Three is a FLOOR, not a quota — write the fourth down (Anthony).** A route already worked out and cut into commit-sized pieces is the most expensive thing here to rediscover and the cheapest to type. Seven is the ceiling, past which the list has become a second copy of the ledger. **The legs do NOT cover the tier** — covering it is the ROWS' job.
 
-**`make gate` is necessary, not sufficient. Update PROOF-STATE before every commit that
-changes the ledger, in that same commit** — a postulate discharged, added, renamed, split,
-reclassified, or reordered. The roadmap is the file every session reads FIRST, so a stale
-row misdirects the next session's whole leg; one already did, naming two postulates that had
-become real definitions.
+Update it to its own header's hygiene rules, which are also part of the gate: one line per item (name + class + hook), NO numbering of any kind, research in source headers, completed items DELETED, no dated narrative. → [docs/roadmap-check.md](docs/roadmap-check.md)
 
-**A LEG IS ONE PR OF WORK, AND `make roadmap-moved` ENFORCES IT (Anthony:
-"we should be able to fix errors within a pr without having to touch
-proof-state").** A leg is still a GROUP — that is how PROOF-STATE states it —
-but the group is SIZED BY THE BRANCH: it is the chunk of work this session
-intends to land next, not a theme or a region that happens to be coherent. So
-the roadmap must differ from **main**, and the check fails when a branch lands
-proof work having said nothing about the plan.
+## The wiring law: NEVER LEAVE A PROOF HANGING (Anthony)
 
-**THE UNIT IS THE BRANCH AND NOT THE COMMIT, AND THAT IS THE WHOLE OF THE
-DIFFERENCE (Anthony).** The rule was once stated over the COMMIT, on the same
-reasoning; held there it taxed every keystroke inside a leg rather than the leg.
-A branch lands one leg but takes as many commits as the work takes — a repaired
-reassembly, a missing import, an error the first build found — and each of those
-owed the roadmap a line it had nothing true to say in. What that bought was
-edits made to satisfy the check, which is the one failure mode fatal to a check
-whose entire subject is whether someone said something true. So the baseline is
-the merge-base with main; a fix-up costs nothing, and on main itself the
-merge-base is HEAD, so the check falls back to the previous commit and a direct
-landing is still held.
+**Nothing may exist without a consumer that traces to a top-level theorem.**
 
-**THE THREE OUTCOMES, AND ONE OF THEM ALWAYS APPLIES (Anthony: "we also want to
-discard routes that are no longer applicable").** The leg LANDED: retire it,
-promote the other two, and write a new third — so the file moves. The leg was NOT
-FINISHED: **rewrite the first leg as the work that remains**, which is worth more
-than the retirement, because it is the only record of what the leg turned out to
-cost. Or the leg's ROUTE DIED — the plan it described rested on something now
-known not to work — and then it is **DISCARDED**, not rewritten. The third needs
-saying because the second HIDES it: "the work that remains" is a rewrite that
-keeps the old framing and shrinks it, and a refuted framing shrunk is still a
-refuted framing steering the next session. Nothing of that shape remains to be
-done. The finding goes where a dead route goes — the header of the statement it
-constrains — and the leg replacing it is written from the risk as it NOW stands,
-not from what is left of the old plan. None of the three leaves the roadmap
-untouched, so an unchanged file means a leg was finished without being retired,
-abandoned without being restated, or refuted without being dropped.
+- **Every GAP is a postulate with a real signature** — never a comment, never a missing statement. Then **`make postulates`** IS the complete remaining-work ledger. (Do NOT substitute `grep '^postulate'`: that finds block HEADERS, a third of the count.)
+- **Every definition and postulate is consumed, in code, transitively by a top-level theorem.** Then "did we forget something?" is answered by the typechecker.
 
-**Every leg after the first may aim at the SAME postulates as the first.** The
-legs are not that many subjects — they are the next that many commits, and a
-single group of statements routinely takes several. What the set owes is a
-coherent vision for reducing the most risk, cut into pieces each of which is a
-reasonable single commit. Parcel the work that way: pick the risk order first,
-then cut it at commit boundaries, rather than picking topics and hoping each is
-commit-sized.
+**The workflow:** before proving a lemma, extend the assembly that will consume it — postulating whatever else that assembly needs — and land both in the SAME commit. **If the assembly needs a different signature to accept the piece, change the signature first.**
 
-And update it **to the hygiene rules in its own header, which are also part of the gate**:
-one line per item (name + risk class + hook), NO numbering of any kind, research in source
-headers rather than here, completed items DELETED rather than marked done, no dated
-narrative. Re-read that header when you touch the file; every one of those rules exists
-because it was violated. `make roadmap-check` mechanises the sort, the coverage, its
-REVERSE at row heads (a head may not name a postulate that has been discharged or
-deleted), the row budget and the dates — → [docs/roadmap-check.md](docs/roadmap-check.md).
+**A postulate must ASSERT something.** Wiring an unreachable definition in with a vacuous bridge is worse than leaving it unreachable. Two traps live here: ⊤-typed postulates whose real claim sits in a trailing comment, and Σ-statements upward-closed in their witness.
 
-### The wiring law: NEVER LEAVE A PROOF HANGING (Anthony)
+**Forbidden states.** An **unreachable definition** — a missing wire or dead weight, both findings, and leaving it undecided is not an option. A **lying comment** — prose describing an intent the code does not encode.
 
-**THE RULE. Nothing in this repo may exist without a consumer that traces to a top-level
-theorem.** No invisible debt, no dead code, no gap that lives only in prose. Two corollaries,
-and both are _checkable_ rather than aspirational:
+**MAIN IS THE TOP-LINE PROOF (Anthony).** `agda/src/Main.agda` is the root of the consumption graph and the deletion exemption. **(1) Whatever Main imports sticks around. (2) Main names individual definitions — NEVER a bare `open import`. (3) Main is never touched without Anthony's explicit approval** — draft and ask. `make wiring` reads Main's `using` clauses, so a filename never earns an exemption.
 
-- **Every GAP is a postulate with a real signature** — never a comment, never a merely-missing
-  statement. "This still needs X" in prose is invisible to the compiler and to `grep`. State X.
-  Then **`make postulates`** — every postulate by name — **is** the complete remaining-work
-  ledger and no branch of the proof can hide. (Do NOT substitute `grep '^postulate'`: that
-  finds the block HEADERS, a third of the count, and a branch hidden inside a block is
-  exactly how eight well-formedness postulates once went uncounted while the index claimed
-  the campaign reduced to two.)
-- **Every DEFINITION and every POSTULATE is consumed, in code, transitively by a top-level
-  theorem.** Then "did we forget something?" is answered by the typechecker instead of by
-  memory — if a piece is not needed, `The-Proof.agda` does not compile.
+Main also defines the build's COVERAGE — **`make gate-heavy` IS the claim graph**, and anything outside it is not being checked. **Never close a coverage gap by re-adding a bulk import to Main.**
 
-**THE WORKFLOW that keeps it true.** Before proving a lemma, extend the assembly that will
-consume it — postulating whatever else that assembly needs — and land both in the SAME commit.
-Never finish a proof and leave its wiring "for later": later is where every instance below came
-from. If the assembly needs a different signature to accept the piece, **change the signature
-first.** A piece that cannot be plugged in is not progress, and its shape is not yet known to be
-right.
+**Why this is law:** unwired proven work costs more than refutations. A proof nobody calls sits inert while the work it would have done is re-derived inline, so the same thing is proven twice; and a tower built without its consumer is a tower whose shape was never checked.
 
-**A POSTULATE MUST ASSERT SOMETHING.** Wiring an unreachable definition in with a vacuous
-bridge is worse than leaving it unreachable, because it looks discharged. Two traps, both live
-in this repo: `⊤`-typed postulates whose real claim sits in a trailing comment (fix on sight),
-and Σ-statements that are upward-closed in their witness. Check every new postulate for both
-BEFORE landing it.
+## TypeScript style
 
-**FORBIDDEN STATES.** An **unreachable definition** — one with no route from Main; it is
-either a missing wire or dead weight, both are findings, and leaving it undecided is not an
-option. A **lying comment** — prose describing an intent the code does not encode; one
-record's header said it was "deliberately NOT yet stated" while the record sat stated 60 lines
-below, so a downstream lemma was proven against an assembly that never existed.
+As purely functional as possible: no mutable state, no direct `.subscribe()`. Delegate IO/statefulness to rxjs operators like `scan`. Two reasons — cleanliness, and keeping the primitives and `batchSimultaneous` in near-direct correspondence with the Agda.
 
-**MAIN IS THE TOP-LINE PROOF (Anthony).** `agda/src/Main.agda` is the root of the consumption
-graph and the deletion exemption. Three rules: **(1) whatever Main imports sticks around**;
-**(2) Main names individual definitions — NEVER a bare `open import`**, so that "imported"
-means "claimed" and not merely "compiled"; **(3) Main is never touched without Anthony's
-explicit approval** — draft the change and ask. `make wiring` reads Main's `using` clauses to
-get its reachability seeds, so a filename never earns an exemption and a claim cannot
-self-certify.
+## The change workflow — batchSimultaneous IMPLEMENTATION only
 
-Because Agda compiles exactly what is transitively imported, Main also defines the build's
-COVERAGE — **`make gate-heavy` IS the claim graph**, and anything outside it is not being checked at
-all. `make wiring` guards that boundary directly: a module nothing reaches fails the gate in
-seconds, rather than needing a second full compile of the tower to notice. **Never close a
-coverage gap by re-adding a bulk import to Main — that is the loophole, not the repair.**
+Not for proof work, tooling or documentation.
 
-**WHY THIS IS LAW.** Unwired proven work costs this campaign more than refutations do. Its
-two failure modes: a proof nobody calls sits inert while the work it would have done gets
-re-derived inline at the site that needed it, so the same thing is proven **twice**; and a
-tower built without its consumer is a tower whose shape was never checked against anything.
+1. **Agda first**, before touching TypeScript.
+2. **QuickCheck dev loop** — `npm run agda:qc`. **The spec is gospel; when impl and spec disagree, the implementation is wrong by default.**
+3. **Ignore `The-Proof.agda`** during this phase; errors there are fine.
+4. **Port to TypeScript**, only once QuickCheck passes.
+5. **Oracle** — `npm run oracle`.
+6. **Formal verification last**, in phases, committing in-between results, until there are no gaps.
 
-The checker's exit conditions, how reachability is seeded from `MODULE_ROOTS`, and what the
-selftest pins: → [docs/wiring.md](docs/wiring.md).
+**Resolving ambiguity:** defer to naive plain rxjs — actually run the example and see. If that doesn't settle it, surface the question with a TypeScript rxjs example that **avoids the `*All()` higher-order operators where possible**.
 
-## TypeScript implementation style
+**Authority ordering (Anthony, most → least): Anthony's discretion, then the Agda spec. There is no third source.** `agda/README.autogenerated.md` is NOT an authority (Anthony: "I don't care about the readme.autogenerated, for the record") — nothing generates it, no gate reads it, nothing fails when the spec moves out from under it. Do not resolve an ambiguity by citing it, do not treat a case it is silent on as a gap, do not surface a conflict with it as a question.
 
-- The TS implementation should be as purely functional as possible: avoid manipulating mutable state and avoid calling .subscribe()
-  directly. Delegate any form of IO/statefulness (e.g. accumulation) to rxjs operators like scan.
-- Rationale is twofold: (1) aesthetic/cosmetic cleanliness, and (2) to keep the primitives and batchSimultaneous implementations in
-  near-direct correspondence with the Agda, so translation between the two is straightforward.
+**The Agda impl MUST mirror the TS impl.** If the Agda relies on something TS cannot do, the correspondence is void. When in doubt about portability, **port it to TS and run the oracle before building on it.**
 
-## The change workflow — for changes to the batchSimultaneous IMPLEMENTATION
+## Bug cache
 
-This workflow governs exactly one kind of change: a change to the
-**batchSimultaneous implementation** (the primitives + batching pipeline
-mirrored between `agda/src/Implementation` and `typescript/`) or, rarely and
-only after asking, to its spec. It does not apply to proof work, tooling, or
-documentation — those have their own rules above. For an impl/spec change,
-follow these phases in order:
+Capture an implementation bug immediately as a **row of the corpus** in `agda/src/Implementation/Unit-Test.agda` — a program, not a claim about one. Dead simple: a wall of little entries, no fancy names, no abstraction. **Append-only**, and the invariant is **`make bug-cache` green ⟺ no known counterexample remains**.
 
-1. **Agda first.** Make the change to the spec/impl in Agda before touching TypeScript.
-2. **QuickCheck dev loop.** Use `npm run agda:qc` (the all-Agda QuickCheck comparing
-   `impl-batchSimultaneous` vs `spec-batchSimultaneous`) to align the implementation and
-   spec quickly. **The spec is gospel — do NOT touch it to resolve a mismatch.** When impl
-   and spec disagree, the implementation is wrong by default; change the implementation.
-   Only touch the spec under very special circumstances, and only after asking.
+The run happens in a BINARY, not the typechecker — a row used to be a `refl` over a whole `evaluate` run, so an append-only corpus charged the gate forever. Corollary: a green row is checked by the GHC backend and the FFI, so **no proof may ever depend on the cache**. Delete the module once `The-Proof.agda` is discharged. → [docs/bug-cache.md](docs/bug-cache.md)
 
-   **Resolving ambiguity.** When the spec seems ambiguous or you're unsure what the "right"
-   answer is, defer to **naive plain rxjs** — the semantics should mirror ordinary rxjs
-   wherever a case is underspecified. Actually run the example in rxjs and see. If that
-   still doesn't resolve it, surface the question to the user with a clear TypeScript rxjs
-   example that **avoids the `*All()` higher-order operators where possible** and follows
-   the style of `agda/README.autogenerated.md`'s edge-case examples.
-
-   **AUTHORITY ORDERING WHEN SOURCES CONFLICT** (Anthony, most → least):
-   **Anthony's discretion**, then **the Agda spec**. There is no third source.
-   `agda/README.autogenerated.md` is NOT an authority (Anthony: "I don't care about
-   the readme.autogenerated, for the record") — nothing generates it despite the
-   name, no gate reads it, and no check fails when the spec moves out from under
-   its prose, so ranking it above the spec put a document that cannot rot loudly
-   above the one thing in this repo a machine holds to account. It is the
-   memory-directory argument one file over. Do not resolve an ambiguity by citing
-   it, do not treat a case it is silent on as a gap owed to anyone, and do not
-   surface a conflict with it as a question. This does not soften "the spec is
-   gospel" — that rule orders the spec above the _implementation_, and is what you
-   apply for every impl/spec mismatch.
-
-3. **Ignore `Verify-Batch-Simultaneous/The-Proof.agda` for now.** It may have errors during this
-   phase — that's fine. Leave it until the end.
-4. **Port to TypeScript** — but only once QuickCheck passes.
-5. **Oracle.** Make the fast-check/Agda-alignment oracle (`npm run oracle`, TS-impl vs
-   Agda-impl via the CLI) pass.
-6. **Formal verification, last.** Now prove the implementation equals the spec. Do it in
-   **phases** — leave middle steps as postulates and **commit in-between results**. Work
-   until there are **no gaps**: no postulates, everything typechecks.
-
-## Bug cache: a compiled corpus of counterexamples
-
-When you discover an implementation bug, capture it immediately as a **row of the corpus**
-in `agda/src/Implementation/Unit-Test.agda` — a program, not a claim about one, since both
-properties the cache carries (well-formedness and impl≡spec) are checked of every row by a
-compiled runner. Keep them dead simple: a wall of little entries, no fancy names, no
-abstraction. They are a performance cache of discovered work, **not** meant to survive past
-the proof — delete the module once `The-Proof.agda` is discharged.
-
-The cache is **append-only**, and the invariant is that **`make bug-cache` is green ⟺ no
-known counterexample remains** — green there is the impl≡spec finish line. The run happens in
-a BINARY rather than in the typechecker, and that is not an optimisation: a row used to be a
-`refl` over a whole `evaluate` run, so an append-only corpus charged the gate for every case
-on every run, forever. A cost per row the gate pays forever is the one property this file
-must not have. The corollary is the `measured-not-rechecked` law arriving here: a green row is
-checked by the GHC backend and the FFI rather than by Agda's kernel, so **no proof may ever
-depend on the cache** — which costs nothing, because it is off Main and slated for deletion.
-→ [docs/bug-cache.md](docs/bug-cache.md)
-
-In some cases it might make sense to add a new "naive rx" operator to fix an Agda-impl bug.
-This is allowed and encouraged when it's the best solution. But follow the port order: develop
-the new operator in TypeScript first, as a proper rxjs-delegating, purely-functional operator.
+A new "naive rx" operator to fix an Agda-impl bug is allowed and encouraged when it is the best solution — but follow the port order: TypeScript first, as a proper rxjs-delegating, purely-functional operator.
