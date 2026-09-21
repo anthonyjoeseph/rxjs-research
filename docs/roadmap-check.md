@@ -260,6 +260,17 @@ finish first — so scoping the floor to the lowest open tier binds it exactly w
 is allowed to happen. Measured when the check was written: 24 rows carried `NO EVIDENCE`
 and 1 of them was in the tier being worked.
 
+**And the tier being worked is the FIRST SECTION, not the first section carrying a
+classed row (Anthony).** A finished tier is deleted rather than marked done, so file
+order already answers the question — but read the second way, a tier whose judge is not
+a postulate is invisible. A differential run against the reference implementation and an
+executable match between an operator and its spec are both real tiers with empty
+ledgers, and the scan used to fall straight through them to whichever lower tier held
+the rows. That names a PARKED tier as the one being worked, which inverts the paragraph
+above: the floor's whole narrowness is that a parked row can be restated out from under
+by the tier beneath it. A tier with an empty ledger owes no evidence, which is what
+returning it says.
+
 **The repair is to PROBE, never to reclassify.** Check 9's repair is a reclassification
 because the finding there is that a class claims more than its evidence supports. Here
 there is no class to fall back to — the floor binds on the worst class there is — so the

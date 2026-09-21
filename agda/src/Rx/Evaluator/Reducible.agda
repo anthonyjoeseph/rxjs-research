@@ -967,7 +967,8 @@ mutual
                 (slot-join {κ = κ} {below = below} doneEq connEq refl)
             , []
   ...   | false
-          with redExpAcc d []ᵉ tt (toℕ i) okd aI (<-wellFounded (gsizeᵉ d))
+          with redExpAcc d []ᵉ tt (toℕ i) okd aI
+                 (<-wellFounded (gsizeᵉ d))
                  (share-sink i ≤-refl) now
                  (record sched
                     { mint = setAt regᵏ (suc (freshId regᵏ (Sched.mint sched)))

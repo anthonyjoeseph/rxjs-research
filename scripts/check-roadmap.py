@@ -823,17 +823,26 @@ def unevidenced_difficulty(path, tiers, cen):
 
 
 def lowest_open_tier(tiers):
-    """-> the tier being worked, or None when the file holds no classed row.
+    """-> the tier being worked, or None when the file holds no tier at all.
 
     Tier order is FILE order and needs no separate reading: a finished tier's
-    section is DELETED rather than marked done, so the first section still
-    carrying a classed row is the tier the work is in.  A tier whose rows are
-    all unclassified is carried rather than open, which is what `g-unclassified`
-    already means one row down.
+    section is DELETED rather than marked done, so the FIRST SECTION is the
+    tier the work is in.
+
+    IT IS THE FIRST SECTION AND NOT THE FIRST SECTION CARRYING A CLASSED ROW
+    (Anthony).  Read the second way, a tier whose judge is not a postulate --
+    a differential run against the reference implementation, an executable
+    match between an operator and its spec -- is INVISIBLE, and the scan falls
+    through to whichever lower tier happens to hold the ledger.  That names a
+    PARKED tier as the one being worked, which inverts the very rule the
+    callers below are enforcing: `unevidenced_birth` binds only where work
+    happens precisely because a parked tier's rows can be restated out from
+    under by the tier beneath them, so a receipt bought there is a receipt
+    against a statement that may not survive its own prerequisites.  A tier
+    with an empty ledger owes no evidence, which is what returning it says.
     """
-    for tier, rows, _pre, _legs in tiers:
-        if any(cls for _label, cls, _lineno, _cost in rows):
-            return tier
+    for tier, _rows, _pre, _legs in tiers:
+        return tier
     return None
 
 

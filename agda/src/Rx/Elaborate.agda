@@ -7,22 +7,24 @@ open import Data.List.Membership.Propositional.Properties using (∈-map⁺; ∈
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (Maybe; nothing)
 open import Data.Nat using (ℕ)
-open import Data.Vec.Properties using (lookup-map)
+open import Data.Fin using (Fin)
+open import Data.Vec using (lookup)
+open import Data.Vec.Properties using (lookup-zipWith)
 open import Relation.Binary.PropositionalEquality using (subst; refl)
 
 open import Rx.Exp using (Ty; Ctx; Exp; Tm; Fn; listᵗ; obs; _×ᵗ_; boolᵗ; natᵗ; uniqᵗ; input; ofᵉ; emptyᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ;
-  mapᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ;
+  mapᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; batchSyncᵉ;
   varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; nilᵗ; consᵗ; inlᵗ; inrᵗ; caseᵗ;
   foldᵗ; ifᵗ; primᵗ; strmᵗ; letᵗ; revᵗ; appendᵗ; renTm; renExp; ext∈; add; sub; mul;
   eqᵖ; ltᵖ; eqᵘ; notᵖ)
 open import Rx.Envelope using (instEventᵗ; closeReasonᵗ; emitKindᵗ; eventsᵛ;
                                eventCaseᵛ; splitEventsᵛ; reassembleᵛ; instEmitᵛ;
-                               initᵛ; valueᵛ; closeᵛ; completeᵛ)
-open import Rx.SExp using (SExp; STm; inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; scanˢ;
-                           mergeAllˢ; switchAllˢ; exhaustAllˢ; μˢ; varˢ; deferˢ;
-                           varˢᵗ; unitˢ; boolˢ; natˢ; pairˢ; fstˢ; sndˢ; nilˢ;
-                           consˢ; inlˢ; inrˢ; caseˢ; foldˢ; ifˢ; primˢ; strmˢ;
-                           plainᵗ; plainᶜ; emitᵗ; emitᶜ; emitᵛ)
+                               initᵛ; valueᵛ; closeᵛ; completeᵛ;
+                               machineEmitᵗ)
+open import Rx.SExp using (SExp; STm; inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; scanˢ; mergeAllˢ; switchAllˢ; exhaustAllˢ; μˢ;
+  varˢ; deferˢ; varˢᵗ; unitˢ; boolˢ; natˢ; pairˢ; fstˢ; sndˢ; nilˢ; consˢ; inlˢ; inrˢ; caseˢ;
+  foldˢ; ifˢ; primˢ; strmˢ; plainᵗ; plainᶜ; emitᵗ; emitᶜ; Kinds; scriptedᵏ; sharedᵏ; slotTy;
+  plainᵏ)
 
 ------------------------------------------------------------------
 -- The per-former plumbing the elaboration is a composition of.
@@ -74,6 +76,16 @@ exhaustedᵛ = inrᵗ (inrᵗ unit̂)
 subscribeᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ} → Tm Γ Δᵍ Δ Θ emitKindᵗ
 subscribeᵛ = inlᵗ unit̂
 
+-- THE ARRIVAL KIND, AND IT IS THE ONE THAT PAYS.  `settle` is a no-op
+-- at `subscribe` and at `plumbing`; a `delivery` seeds this instant's
+-- owed from the source's live registration count and pays one against
+-- it.  So the tag an input's per-arrival emit carries is what makes the
+-- batcher's flush point reachable at all -- stamped `subscribe` the
+-- owed table would never seed, `paidOff` would stay false, and every
+-- instant would flush lazily at the next one.
+deliveryᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ} → Tm Γ Δᵍ Δ Θ emitKindᵗ
+deliveryᵛ = inrᵗ (inlᵗ unit̂)
+
 -- a run of `value` events, in order, ahead of whatever closes the list
 valuesᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ a}
         → List (Tm Γ Δᵍ Δ Θ a)
@@ -99,6 +111,108 @@ valuesᵛ (v ∷ vs) rest = consᵗ (valueᵛ v) (valuesᵛ vs rest)
 -- is bound once above the whole walk and read here.  Two colds side by
 -- side therefore get two sources and one instant, which is what the
 -- spec's grouping compares.
+-- THE INPUT SOURCE, WRAPPED HERE RATHER THAN ASSUMED ON THE TABLE.
+-- The slot stands at the author's bare payload, so this is the term
+-- that builds every envelope an input contributes: one `init` naming
+-- the source, then one emit per ARRIVAL carrying that arrival's
+-- values.  Nothing else in the elaboration writes an input's envelope,
+-- which is what makes a well-formedness claim about inputs a lemma
+-- about this definition instead of a hypothesis about the table.
+--
+-- THE AMBIENT INSTANT IS RECOVERED BY GROUPING, NOT BY READING A
+-- CLOCK (Anthony).  A fold over a flat stream cannot tell which values
+-- shared an arrival, so wrapping each separately would split a cold's
+-- subscribe burst into as many instants as it has values.
+-- `batchSyncᵉ` already draws that boundary -- it emits `(head , rest)`,
+-- the whole synchronous group under one value -- so a group IS an
+-- instant and no arm has to ask which kind it is; an isolated
+-- asynchronous arrival is the same shape at `rest ≡ []`.  Nothing here
+-- senses synchrony, which is the property the machine was always
+-- GIVEN and a timing-based repair would have re-derived.
+--
+-- AND THE PER-ARRIVAL TOKEN COMES FROM THE MINT'S PLACEMENT, WHICH IS
+-- THE ARITY THAT LOOKED MISSING.  `mintᵉ` draws once per subscription
+-- of the node it stands at.  The OUTER mint stands at this node, so it
+-- draws one SOURCE token per subscription of the input -- a source's
+-- own arity.  The INNER mint stands at the head of a `mergeAllᵉ`'s
+-- inner, which is subscribed once per outer value, so it draws one
+-- INSTANT token per arrival.  Two arities, one former, and the
+-- difference is where the binder sits.
+--
+-- DEAD ROUTE: bracket the frame with `batchSyncᵉ` and let the GROUPING
+--   stand in for the id.  It brackets without NAMING, so two groups
+--   can never be joined and nothing downstream can compare instants.
+--   The route above is not that one: the group TRIGGERS a mint, and
+--   naming is restored by the token the mint binds.  What survives of
+--   the old objection -- two sources grouping separately -- is a
+--   semantics question and not a blocker, since two independent
+--   arrivals in one turn are two arrivals.
+
+-- WHAT IS DELIBERATELY ABSENT: the `close` at `exhausted`.  The
+-- TypeScript mirror mints one off its script's `isLast`, and
+-- `batchSyncᵉ` hands over no such bit.  It costs nothing HERE because
+-- bracketing rejects a close with no init and never an init with no
+-- close, and settledness is not part of the legality anything claims
+-- (Rx.Protocol) -- so an unclosed registration at the end of a stream
+-- is accepted.  An input that must be seen to complete is owed a
+-- separate reading of the script, not a repair of this term.
+inputᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} (i : Fin n)
+       → Tm Γ Δᵍ Δ Θ uniqᵗ
+       → Exp Γ Δᵍ Δ Θ (machineEmitᵗ (lookup Γ i))
+inputᵖ {Γ = Γ} {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} i frame =
+  mintᵉ (mergeAllᵉ nothing (ofᵉ (strmᵗ announce ∷ strmᵗ deliveries ∷ [])))
+  where
+  a : Ty
+  a = lookup Γ i
+
+  -- under the SOURCE binder
+  Θ¹ : List Ty
+  Θ¹ = uniqᵗ ∷ Θ
+
+  -- under the SOURCE binder, the group, and the INSTANT binder
+  Θ² : List Ty
+  Θ² = uniqᵗ ∷ (a ×ᵗ listᵗ a) ∷ Θ¹
+
+  ↑ : ∀ {r} → Tm Γ Δᵍ Δ Θ r → Tm Γ Δᵍ Δ Θ¹ r
+  ↑ = renTm (λ x → x) (λ x → x) there
+
+  src : Tm Γ Δᵍ Δ Θ¹ uniqᵗ
+  src = varᵗ (here refl)
+
+  -- the registration announcement: one `init`, in the subscribe frame,
+  -- tagged `subscribe` so it owes and pays nothing.  Without it the
+  -- source is absent from `live`, every delivery seeds owed at zero and
+  -- underflows, and the automaton rejects the whole stream.
+  announce : Exp Γ Δᵍ Δ Θ¹ (machineEmitᵗ a)
+  announce =
+    ofᵉ (instEmitᵛ (consᵗ (initᵛ src) nilᵗ) (↑ frame) src subscribeᵛ ∷ [])
+
+  -- inside the INSTANT binder: the token, then the group, then the
+  -- source token, then Θ
+  inst : Tm Γ Δᵍ Δ Θ² uniqᵗ
+  inst = varᵗ (here refl)
+
+  grp : Tm Γ Δᵍ Δ Θ² (a ×ᵗ listᵗ a)
+  grp = varᵗ (there (here refl))
+
+  srcᵍ : Tm Γ Δᵍ Δ Θ² uniqᵗ
+  srcᵍ = varᵗ (there (there (here refl)))
+
+  -- head first, then the tail in arrival order (the `revᵗ` is what
+  -- makes a cons-fold rebuild the list rather than reverse it)
+  evs : Tm Γ Δᵍ Δ Θ² (listᵗ (instEventᵗ uniqᵗ a))
+  evs = consᵗ (valueᵛ (fstᵗ grp))
+              (foldᵗ (revᵗ (sndᵗ grp)) nilᵗ
+                     (consᵗ (valueᵛ (varᵗ (here refl)))
+                            (varᵗ (there (here refl)))))
+
+  -- one arrival: mint its instant, emit its whole group under it
+  stamp : Tm Γ Δᵍ Δ ((a ×ᵗ listᵗ a) ∷ Θ¹) (obs (machineEmitᵗ a))
+  stamp = strmᵗ (mintᵉ (ofᵉ (instEmitᵛ evs inst srcᵍ deliveryᵛ ∷ [])))
+
+  deliveries : Exp Γ Δᵍ Δ Θ¹ (machineEmitᵗ a)
+  deliveries = mergeAllᵉ nothing (mapᵉ stamp (batchSyncᵉ (input i)))
+
 ofᵖ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
     → Tm Γ Δᵍ Δ Θ uniqᵗ
     → List (Tm Γ Δᵍ Δ Θ (plainᵗ t)) → Exp Γ Δᵍ Δ Θ (emitᵗ t)
@@ -587,135 +701,156 @@ frameᵛ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ : List Ty} (Θ : List Ty)
        → Tm Γ Δᵍ Δ (plainᶜ⁺ Θ) uniqᵗ
 frameᵛ Θ = varᵗ (∈-++⁺ʳ (plainᶜ Θ) (here refl))
 
-mutual
+-- THE WALK IS PARAMETERISED BY THE SLOT KINDS, AND BY NOTHING ELSE NEW.
+-- `κ` says how each slot is SUPPLIED, which is the one thing the input
+-- arm has to split on and the one thing an author's tree does not
+-- record (Rx.SExp).  It rides as a module parameter rather than an
+-- argument so that the ~40 recursive calls below read exactly as they
+-- did; `Γ` joins it there because the walk never changes slots.
+module _ {n} {Γ : Ctx n} (κ : Kinds n) where
 
-  toPlain : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
-          → SExp Γ Δᵍ Δ Θ t
-          → Exp (emitᵛ Γ) (emitᶜ Δᵍ) (emitᶜ Δ) (plainᶜ⁺ Θ) (emitᵗ t)
-  -- AN INPUT IS THE ONE SOURCE THIS BODY WRITES, AND IT IS A TRANSPORT
-  -- BECAUSE THE SLOT ALREADY CARRIES ENVELOPES.  The shape on the table
-  -- is a slot carrying PLAIN values that the elaboration wraps instead
-  -- -- a sync bracket for a cold, a bare stamp for a hot -- which moves
-  -- the envelope's construction OUT of the machine and into the term
-  -- language, where every other elaborated behaviour already lives.
+ mutual
 
-  -- THE BRANCH IS AVAILABLE FOR THE ASKING, and the cost is one
-  -- argument.  Cold and hot are not distinguished by the type or by the
-  -- term, so this body cannot split on them as it stands; they ARE
-  -- distinguished by the slot telescope, so an elaboration INDEXED BY
-  -- the telescope splits on them immediately.
+   toPlain : ∀ {Δᵍ Δ Θ : List Ty} {t : Ty}
+           → SExp Γ Δᵍ Δ Θ t
+           → Exp (plainᵏ Γ κ) (emitᶜ Δᵍ) (emitᶜ Δ) (plainᶜ⁺ Θ) (emitᵗ t)
+   -- AN INPUT IS THE ONE SOURCE THIS BODY WRITES, AND IT IS A TRANSPORT
+   -- BECAUSE THE SLOT ALREADY CARRIES ENVELOPES.  The shape on the table
+   -- is a slot carrying PLAIN values that the elaboration wraps instead
+   -- -- a sync bracket for a cold, a bare stamp for a hot -- which moves
+   -- the envelope's construction OUT of the machine and into the term
+   -- language, where every other elaborated behaviour already lives.
 
-  -- AND THE SPLIT'S HOT ARM IS WRITABLE WITH THE PALETTE AS IT STANDS,
-  -- WHICH IS WHAT A MINT'S SCOPE BUYS AND ITS ARITY HIDES.  A hot's
-  -- source must be ONE token every subscriber sees, and the mint binder
-  -- reads as drawing per SUBSCRIPTION -- a COLD's arity -- so a hot
-  -- looks unreachable and the nullary literal, which names a single
-  -- reserved token, looks like the only other candidate; it is not one,
-  -- since two hots standing at it would collapse onto one identifier.
+   -- THE BRANCH IS AVAILABLE FOR THE ASKING, and the cost is one
+   -- argument.  Cold and hot are not distinguished by the type or by the
+   -- term, so this body cannot split on them as it stands; they ARE
+   -- distinguished by the slot telescope, so an elaboration INDEXED BY
+   -- the telescope splits on them immediately.
 
-  -- WHAT SETTLES IT IS THAT THE BINDER DRAWS PER SUBSCRIPTION OF ITS
-  -- OWN NODE AND BINDS INTO THE VALUE TELESCOPE.  At the ROOT, one
-  -- binder per slot draws once for the whole program, and every site
-  -- beneath it -- inside a deferred body, inside an unrolled recursion,
-  -- inside a resubscribed inner stream -- reads a token already
-  -- substituted into its closure.  So "minted once at construction" is
-  -- a question of SCOPE and not of a missing former, and what it costs
-  -- is a renaming of the body's value variables.
+   -- AND THE SPLIT'S HOT ARM IS WRITABLE WITH THE PALETTE AS IT STANDS,
+   -- WHICH IS WHAT A MINT'S SCOPE BUYS AND ITS ARITY HIDES.  A hot's
+   -- source must be ONE token every subscriber sees, and the mint binder
+   -- reads as drawing per SUBSCRIPTION -- a COLD's arity -- so a hot
+   -- looks unreachable and the nullary literal, which names a single
+   -- reserved token, looks like the only other candidate; it is not one,
+   -- since two hots standing at it would collapse onto one identifier.
 
-  -- AN INSTANT IS NOT DRAWN BY A PROGRAM AT ALL, IT IS READ, AND
-  -- MISSING THAT IS WHAT MADE IT LOOK UNREACHABLE.  A source token is
-  -- drawn fresh, once per subscription, which is the arity `mintᵉ`
-  -- has.  An instant is never drawn by whatever needs one: the running
-  -- cascade already has an instant and so does the subscribe frame, and
-  -- a source COPIES whichever of the two is current.  The TypeScript
-  -- mirror puts this beyond doubt -- an instant is made in its driver
-  -- and nowhere else, at the root frame and once per arrival, and every
-  -- other site in the implementation reads it.
+   -- WHAT SETTLES IT IS THAT THE BINDER DRAWS PER SUBSCRIPTION OF ITS
+   -- OWN NODE AND BINDS INTO THE VALUE TELESCOPE.  At the ROOT, one
+   -- binder per slot draws once for the whole program, and every site
+   -- beneath it -- inside a deferred body, inside an unrolled recursion,
+   -- inside a resubscribed inner stream -- reads a token already
+   -- substituted into its closure.  So "minted once at construction" is
+   -- a question of SCOPE and not of a missing former, and what it costs
+   -- is a renaming of the body's value variables.
 
-  -- A READ HAS THE TWO PROPERTIES A MINT CANNOT HAVE, AND HAS THEM FOR
-  -- FREE.  It varies over time, so one source's subscribe burst and its
-  -- later deliveries fall in different instants; and it is shared
-  -- between siblings, so two colds coming alive in one frame read the
-  -- same one.  Those are exactly the two a binder was argued to be
-  -- unable to combine, and the argument only ever ruled out a MINT.
+   -- AN INSTANT IS NOT DRAWN BY A PROGRAM AT ALL, IT IS READ, AND
+   -- MISSING THAT IS WHAT MADE IT LOOK UNREACHABLE.  A source token is
+   -- drawn fresh, once per subscription, which is the arity `mintᵉ`
+   -- has.  An instant is never drawn by whatever needs one: the running
+   -- cascade already has an instant and so does the subscribe frame, and
+   -- a source COPIES whichever of the two is current.  The TypeScript
+   -- mirror puts this beyond doubt -- an instant is made in its driver
+   -- and nowhere else, at the root frame and once per arrival, and every
+   -- other site in the implementation reads it.
 
-  -- AND A WINDOWING FORMER IS NOT THE REPAIR (Anthony: "this is not
-  -- something we want to ever do").  Pairing the machine's ambient
-  -- instant onto each emit would forge nothing, since the token could
-  -- only be copied out of the run -- but the palette is the TypeScript
-  -- one name for name, and rxjs has no such operator, so adding it
-  -- would put the two implementations out of correspondence to buy a
-  -- reading the slot telescope already splits cold from hot with.
+   -- A READ HAS THE TWO PROPERTIES A MINT CANNOT HAVE, AND HAS THEM FOR
+   -- FREE.  It varies over time, so one source's subscribe burst and its
+   -- later deliveries fall in different instants; and it is shared
+   -- between siblings, so two colds coming alive in one frame read the
+   -- same one.  Those are exactly the two a binder was argued to be
+   -- unable to combine, and the argument only ever ruled out a MINT.
 
-  -- WHAT A SLOT'S DEF DOES AT THIS ARM, INSTANTIATED RATHER THAN READ
-  -- OFF THE CODE.  The arm passes the slot STRAIGHT THROUGH: the input
-  -- already stands at the envelope, so nothing is wrapped here and the
-  -- program's own elaboration mints over whatever the slot hands it.  A
-  -- `shared` def is then a program at the envelope that was itself
-  -- elaborated, so it arrives already minted and the mint above it is a
-  -- second layer.  Run at a def that is an elaborated source, the
-  -- second layer costs nothing a consumer can see: the program
-  -- evaluates, the input delivers, and the decoded emit is a single
-  -- coherent envelope.  What the def DOES move is the ambient token,
-  -- since instants are minted from one counter -- a source-free program
-  -- reads its own frame at token 1 in an empty context, at 2 under a
-  -- table of width one whatever the slot holds, and at 3 when the
-  -- program actually reads a def.  So an instant is a token and not a
-  -- frame ORDINAL, and a claim comparing one against a literal is
-  -- comparing against the shape of the table.
-  -- WHAT WAS COVERED, since a definition cannot carry a receipt and the
-  -- rows were scratch: one cold def at one width, read at fuels 0, 1, 2
-  -- and 3, with payload and fuel both varied so neither could be what
-  -- the token was tracking.  Not covered: a hot def, a def reading
-  -- another slot, and every table wider than one.
-  toPlain {Γ = Γ} (inputˢ i)  = subst (Exp _ _ _ _) (lookup-map i emitᵗ Γ)
-                                      (input i)
-  toPlain {Θ = Θ} (ofˢ ts)    = ofᵖ (frameᵛ Θ) (toPlainTms ts)
-  toPlain {Θ = Θ} emptyˢ      = emptyᵖ (frameᵛ Θ)
-  toPlain (takeˢ k e)         = takeᵖ (toPlainTm k) (toPlain e)
-  toPlain (mapˢ f e)          = mapᵖ (toPlainTm f) (toPlain e)
-  toPlain (scanˢ f z e)       = scanᵖ (toPlainTm f) (toPlainTm z) (toPlain e)
-  toPlain (mergeAllˢ k e)     = mergeAllᵖ k (toPlain e)
-  toPlain (switchAllˢ e)      = switchAllᵖ (toPlain e)
-  toPlain (exhaustAllˢ e)     = exhaustAllᵖ (toPlain e)
-  toPlain (μˢ e)              = μᵉ (toPlain e)
-  toPlain (varˢ x)            = varᵉ (∈-map⁺ emitᵗ x)
-  toPlain {Γ = Γ} {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} (deferˢ {t = t} e) =
-    deferᵉ (subst (λ ζ → Exp (emitᵛ Γ) [] ζ (plainᶜ⁺ Θ) (emitᵗ t))
-                  (map-++ emitᵗ Δᵍ Δ) (toPlain e))
+   -- AND A WINDOWING FORMER IS NOT THE REPAIR (Anthony: "this is not
+   -- something we want to ever do").  Pairing the machine's ambient
+   -- instant onto each emit would forge nothing, since the token could
+   -- only be copied out of the run -- but the palette is the TypeScript
+   -- one name for name, and rxjs has no such operator, so adding it
+   -- would put the two implementations out of correspondence to buy a
+   -- reading the slot telescope already splits cold from hot with.
 
-  toPlainTm : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
-            → STm Γ Δᵍ Δ Θ t
-            → Tm (emitᵛ Γ) (emitᶜ Δᵍ) (emitᶜ Δ) (plainᶜ⁺ Θ) (plainᵗ t)
-  toPlainTm (varˢᵗ x)      = varᵗ (∈-++⁺ˡ (∈-map⁺ plainᵗ x))
-  toPlainTm unitˢ          = unit̂
-  toPlainTm (boolˢ b)      = bool̂ b
-  toPlainTm (natˢ k)       = nat̂ k
-  toPlainTm (pairˢ a b)    = pairᵗ (toPlainTm a) (toPlainTm b)
-  toPlainTm (fstˢ p)       = fstᵗ (toPlainTm p)
-  toPlainTm (sndˢ p)       = sndᵗ (toPlainTm p)
-  toPlainTm nilˢ           = nilᵗ
-  toPlainTm (consˢ h t)    = consᵗ (toPlainTm h) (toPlainTm t)
-  toPlainTm (inlˢ a)       = inlᵗ (toPlainTm a)
-  toPlainTm (inrˢ b)       = inrᵗ (toPlainTm b)
-  toPlainTm (caseˢ s l r)  = caseᵗ (toPlainTm s) (toPlainTm l) (toPlainTm r)
-  toPlainTm (foldˢ l z f)  = foldᵗ (toPlainTm l) (toPlainTm z) (toPlainTm f)
-  toPlainTm (ifˢ c a b)    = ifᵗ (toPlainTm c) (toPlainTm a) (toPlainTm b)
-  toPlainTm (primˢ add a)  = primᵗ add  (toPlainTm a)
-  toPlainTm (primˢ sub a)  = primᵗ sub  (toPlainTm a)
-  toPlainTm (primˢ mul a)  = primᵗ mul  (toPlainTm a)
-  toPlainTm (primˢ eqᵖ a)  = primᵗ eqᵖ  (toPlainTm a)
-  toPlainTm (primˢ ltᵖ a)  = primᵗ ltᵖ  (toPlainTm a)
-  toPlainTm (primˢ eqᵘ a)  = primᵗ eqᵘ  (toPlainTm a)
-  toPlainTm (primˢ notᵖ a) = primᵗ notᵖ (toPlainTm a)
-  toPlainTm (strmˢ e)      = strmᵗ (toPlain e)
+   -- WHAT A SLOT'S DEF DOES AT THIS ARM, INSTANTIATED RATHER THAN READ
+   -- OFF THE CODE.  The arm passes the slot STRAIGHT THROUGH: the input
+   -- already stands at the envelope, so nothing is wrapped here and the
+   -- program's own elaboration mints over whatever the slot hands it.  A
+   -- `shared` def is then a program at the envelope that was itself
+   -- elaborated, so it arrives already minted and the mint above it is a
+   -- second layer.  Run at a def that is an elaborated source, the
+   -- second layer costs nothing a consumer can see: the program
+   -- evaluates, the input delivers, and the decoded emit is a single
+   -- coherent envelope.  What the def DOES move is the ambient token,
+   -- since instants are minted from one counter -- a source-free program
+   -- reads its own frame at token 1 in an empty context, at 2 under a
+   -- table of width one whatever the slot holds, and at 3 when the
+   -- program actually reads a def.  So an instant is a token and not a
+   -- frame ORDINAL, and a claim comparing one against a literal is
+   -- comparing against the shape of the table.
+   -- WHAT WAS COVERED, since a definition cannot carry a receipt and the
+   -- rows were scratch: one cold def at one width, read at fuels 0, 1, 2
+   -- and 3, with payload and fuel both varied so neither could be what
+   -- the token was tracking.  Not covered: a hot def, a def reading
+   -- another slot, and every table wider than one.
+   -- THE ONE ARM THAT READS `κ`, and the only place in the walk that
+   -- cares how a slot is supplied.  Both arms land at `emitᵗ (lookup Γ
+   -- i)`: a SCRIPTED slot stands at `plainᵗ`, so `inputᵖ` wrapping it
+   -- gives `machineEmitᵗ (plainᵗ _)`, which IS that type; a SHARED one
+   -- stands at `emitᵗ` already, so the reference is `input i` and
+   -- nothing is wrapped a second time.
+   toPlain {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} (inputˢ i)
+     with lookup κ i | lookup-zipWith slotTy i Γ κ
+   ... | scriptedᵏ | eq =
+         subst (λ u → Exp (plainᵏ Γ κ) (emitᶜ Δᵍ) (emitᶜ Δ) (plainᶜ⁺ Θ)
+                          (machineEmitᵗ u))
+               eq (inputᵖ i (frameᵛ Θ))
+   ... | sharedᵏ   | eq =
+         subst (λ u → Exp (plainᵏ Γ κ) (emitᶜ Δᵍ) (emitᶜ Δ) (plainᶜ⁺ Θ) u)
+               eq (input i)
+   toPlain {Θ = Θ} (ofˢ ts)    = ofᵖ (frameᵛ Θ) (toPlainTms ts)
+   toPlain {Θ = Θ} emptyˢ      = emptyᵖ (frameᵛ Θ)
+   toPlain (takeˢ k e)         = takeᵖ (toPlainTm k) (toPlain e)
+   toPlain (mapˢ f e)          = mapᵖ (toPlainTm f) (toPlain e)
+   toPlain (scanˢ f z e)       = scanᵖ (toPlainTm f) (toPlainTm z) (toPlain e)
+   toPlain (mergeAllˢ k e)     = mergeAllᵖ k (toPlain e)
+   toPlain (switchAllˢ e)      = switchAllᵖ (toPlain e)
+   toPlain (exhaustAllˢ e)     = exhaustAllᵖ (toPlain e)
+   toPlain (μˢ e)              = μᵉ (toPlain e)
+   toPlain (varˢ x)            = varᵉ (∈-map⁺ emitᵗ x)
+   toPlain {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} (deferˢ {t = t} e) =
+     deferᵉ (subst (λ ζ → Exp (plainᵏ Γ κ) [] ζ (plainᶜ⁺ Θ) (emitᵗ t))
+                   (map-++ emitᵗ Δᵍ Δ) (toPlain e))
 
-  -- spelled out rather than `map`ped, so the recursion is structural
-  toPlainTms : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ : List Ty} {t : Ty}
-             → List (STm Γ Δᵍ Δ Θ t)
-             → List (Tm (emitᵛ Γ) (emitᶜ Δᵍ) (emitᶜ Δ) (plainᶜ⁺ Θ) (plainᵗ t))
-  toPlainTms []       = []
-  toPlainTms (m ∷ ms) = toPlainTm m ∷ toPlainTms ms
+   toPlainTm : ∀ {Δᵍ Δ Θ : List Ty} {t : Ty}
+             → STm Γ Δᵍ Δ Θ t
+             → Tm (plainᵏ Γ κ) (emitᶜ Δᵍ) (emitᶜ Δ) (plainᶜ⁺ Θ) (plainᵗ t)
+   toPlainTm (varˢᵗ x)      = varᵗ (∈-++⁺ˡ (∈-map⁺ plainᵗ x))
+   toPlainTm unitˢ          = unit̂
+   toPlainTm (boolˢ b)      = bool̂ b
+   toPlainTm (natˢ k)       = nat̂ k
+   toPlainTm (pairˢ a b)    = pairᵗ (toPlainTm a) (toPlainTm b)
+   toPlainTm (fstˢ p)       = fstᵗ (toPlainTm p)
+   toPlainTm (sndˢ p)       = sndᵗ (toPlainTm p)
+   toPlainTm nilˢ           = nilᵗ
+   toPlainTm (consˢ h t)    = consᵗ (toPlainTm h) (toPlainTm t)
+   toPlainTm (inlˢ a)       = inlᵗ (toPlainTm a)
+   toPlainTm (inrˢ b)       = inrᵗ (toPlainTm b)
+   toPlainTm (caseˢ s l r)  = caseᵗ (toPlainTm s) (toPlainTm l) (toPlainTm r)
+   toPlainTm (foldˢ l z f)  = foldᵗ (toPlainTm l) (toPlainTm z) (toPlainTm f)
+   toPlainTm (ifˢ c a b)    = ifᵗ (toPlainTm c) (toPlainTm a) (toPlainTm b)
+   toPlainTm (primˢ add a)  = primᵗ add  (toPlainTm a)
+   toPlainTm (primˢ sub a)  = primᵗ sub  (toPlainTm a)
+   toPlainTm (primˢ mul a)  = primᵗ mul  (toPlainTm a)
+   toPlainTm (primˢ eqᵖ a)  = primᵗ eqᵖ  (toPlainTm a)
+   toPlainTm (primˢ ltᵖ a)  = primᵗ ltᵖ  (toPlainTm a)
+   toPlainTm (primˢ eqᵘ a)  = primᵗ eqᵘ  (toPlainTm a)
+   toPlainTm (primˢ notᵖ a) = primᵗ notᵖ (toPlainTm a)
+   toPlainTm (strmˢ e)      = strmᵗ (toPlain e)
+
+   -- spelled out rather than `map`ped, so the recursion is structural
+   toPlainTms : ∀ {Δᵍ Δ Θ : List Ty} {t : Ty}
+              → List (STm Γ Δᵍ Δ Θ t)
+              → List (Tm (plainᵏ Γ κ) (emitᶜ Δᵍ) (emitᶜ Δ) (plainᶜ⁺ Θ) (plainᵗ t))
+   toPlainTms []       = []
+   toPlainTms (m ∷ ms) = toPlainTm m ∷ toPlainTms ms
 
 -- THE ELABORATION PROPER, AND THE ONE THING IT ADDS TO THE WALK IS THE
 -- FRAME.  A closed simul program elaborates to a closed plain one, so
@@ -740,7 +875,7 @@ mutual
 -- happen is between two stamps of the SAME run, which the two agree on
 -- exactly.  So the difference is reachable by no program, and the
 -- binder is the tighter of the two rather than a divergence.
-elaborate : ∀ {n} {Γ : Ctx n} {Δᵍ Δ : List Ty} {t : Ty}
+elaborate : ∀ {n} {Γ : Ctx n} (κ : Kinds n) {Δᵍ Δ : List Ty} {t : Ty}
           → SExp Γ Δᵍ Δ [] t
-          → Exp (emitᵛ Γ) (emitᶜ Δᵍ) (emitᶜ Δ) [] (emitᵗ t)
-elaborate e = mintᵉ (toPlain e)
+          → Exp (plainᵏ Γ κ) (emitᶜ Δᵍ) (emitᶜ Δ) [] (emitᵗ t)
+elaborate κ e = mintᵉ (toPlain κ e)

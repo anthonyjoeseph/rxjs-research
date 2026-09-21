@@ -42,6 +42,13 @@
 --
 -- RECOVERY: git show 919f115:agda/evidence/probed/Probed/
 -- RECOVERY: git show 3a3bd405:agda/evidence/probed/Probed/Connect-Count.agda
+-- RECOVERY: git show 15e6c229:agda/evidence/probed/Probed/Pipeline-Claims.agda
+--   holds the online rows, expired by `batch-online` being proven.
+-- RECOVERY: git show 15e6c229:agda/evidence/probed/Probed/MergeMap-Empty.agda
+--   and `.../Share-Channel.agda` hold real-evaluator harnesses -- a
+--   slot-free root at `Ctx 0`, and a five-way share reading -- but each
+--   instantiates a DEFINITION rather than a live statement, so neither
+--   could declare a target.  The harnesses are what is worth recovering.
 module Probed.Main where
 
 -- THE APPARATUS IS CLAIMED FROM THE ROOT rather than from whichever
@@ -49,7 +56,3 @@ module Probed.Main where
 -- row and E6 refuses a `-- FORK:` that does not inhabit `Separates`, so
 -- both belong to the tree and a tree with nothing open still owes them.
 open import Probed.Apparatus using (Confirms; Separates)
-
--- THE PIPELINE-SIDE CLAIMS, claimed from the root for the same reason.
-open import Probed.Pipeline-Claims using (row-online)
-

@@ -101,3 +101,17 @@ module Scope where
 
 both-mods : Nat → Nat
 both-mods w = TopInst.run (Scope.Inst.run (Scope.via-nested-with w))
+
+-- MODULE ARGUMENT ARM.  `import-arg` is passed to `Param` on the import line
+-- and used NOWHERE else, so it is reachable only if the scanner reads module
+-- arguments.  Before it did, the real tree reported `plainPalette` as dead
+-- while the entire evaluator ran at it -- `open import Rx.Slots plainPalette`.
+-- The `using` clause beside it must still confer nothing: that exclusion is
+-- what `depth-capped` proved load-bearing in 2026-08.
+import-arg : Nat → Nat
+import-arg x = x
+
+open import Param import-arg using (apply)
+
+via-import-arg : Nat → Nat
+via-import-arg w = apply (both-mods w)

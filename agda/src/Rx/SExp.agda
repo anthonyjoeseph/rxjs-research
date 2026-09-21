@@ -4,7 +4,7 @@ open import Data.Nat     using (ℕ)
 open import Data.Bool    using (Bool)
 open import Data.List    using (List; []; _∷_; _++_; map)
 open import Data.List.Membership.Propositional using (_∈_)
-open import Data.Vec     using (Vec; lookup) renaming (map to mapⱽ)
+open import Data.Vec     using (Vec; lookup; zipWith) renaming (map to mapⱽ)
 open import Data.Fin     using (Fin)
 open import Data.Maybe   using (Maybe)
 
@@ -133,48 +133,64 @@ emitᵗ t = machineEmitᵗ (plainᵗ t)
 emitᶜ : List Ty → List Ty
 emitᶜ ts = map emitᵗ ts
 
--- AND AN INPUT IS A STREAM TOO, WHICH IS WHY THE INPUT VECTOR WALKS
--- WITH THE STREAM TRANSLATION AND NOT THE VALUE ONE.  The TypeScript
--- mirror settles it: an input source there is built by the driver,
--- which is what mints its source token and stamps its instant, so what
--- reaches the pipeline is already an `InstEmit`.
---
--- SO THE BOUNDARY IS ASSUMED HERE AND NOT PERFORMED, AND THAT IS NOW A
--- CHOICE RATHER THAN A NECESSITY (Anthony).  This walk once carried the
--- argument that reading inputs as bare payloads would oblige the
--- elaboration to WRAP each one, wrapping being an operation no program
--- could perform.  A program can perform it: the envelope's source is a
--- token `mintᵉ` binds, and the rest of the stamp is a fold over the
--- arriving values -- one `scanᵉ` per input, seeded once per
--- subscription.  What the seed still wants is the AMBIENT INSTANT, so
--- that a cold source's synchronous burst INHERITS the subscriber's
--- rather than minting, and that one capability is what is missing.
---
--- The choice is not cosmetic and is the elaboration's to make: wrapping
--- here leaves the slots at plain `Γ` and PROVES that a simul program
--- holds no bare payload in a stream position, where this vector only
--- ASSUMES it.
+------------------------------------------------------------------
+-- How a slot is SUPPLIED, which the author does not see.
+------------------------------------------------------------------
 
--- AND THE OBSTACLE TO WRAPPING WITH A FOLD IS NOT THE STAMP BUT THE
--- GROUPING, WHICH IS WHY A SYNCHRONY-SENSING OPERATOR IS THE WRONG
--- ANSWER (Anthony).  A fold over a flat stream of payloads cannot tell
--- which of them shared an instant, so wrapping each one separately
--- would split a cold source's subscribe burst into as many instants as
--- it has values.  The operator that recovers the boundary by TIMING --
--- collect while a flag says synchronous, release on the first
--- asynchronous turn -- is the standard rxjs repair and it re-derives
--- something this side is GIVEN: the evaluator's cold arms read the
--- split off `ObservableInput`'s own constructor, where the synchronous
--- values are a bound field and the rest are a separate list, and the
--- burst they build carries the whole field under ONE stamp.  Nothing
--- here has ever had to sense synchrony, so nothing should acquire the
--- machinery to.
+-- A SLOT'S KIND IS A PROPERTY OF THE TABLE AND NOT OF THE PROGRAM,
+-- which is why it is not an index of `SExp`.  An author writes
+-- `inputˢ i` without caring whether slot i is fed by a script or
+-- defined by another srxjs program; the ELABORATION cares, because the
+-- two arrive in different shapes, so the kinds are an argument to
+-- `toPlain` and nothing above it changes.
+data Kind : Set where
+  scriptedᵏ : Kind   -- an external source: bare payloads, `inputᵖ` wraps them
+  sharedᵏ   : Kind   -- another srxjs program: already elaborated
+
+Kinds : ℕ → Set
+Kinds n = Vec Kind n
+
+-- WHAT A SLOT STANDS AT, NOW PER SLOT RATHER THAN UNIFORMLY.
 --
--- What that leaves is a question about the PAYLOAD TYPE rather than
--- about a former: a source whose deliveries are already grouped -- one
--- delivery's values carried as a list -- is wrappable by an ordinary
--- fold, since a group IS an instant and no arm has to ask which kind it
--- is.  That is the shape the subscribe burst already has; it is not
--- visible in the type.
-emitᵛ : ∀ {n} → Ctx n → Ctx n
-emitᵛ Γ = mapⱽ emitᵗ Γ
+-- A SCRIPTED SLOT STANDS AT THE PAYLOAD, and it has to: a script is
+-- arbitrary, so standing it at the envelope would let a table name an
+-- instant past the counter and reach the output through `input`
+-- untouched -- exactly how `evaluate-accepted` was refuted.  `inputᵖ`
+-- wrapping it is what makes a claim about inputs a lemma about the
+-- elaboration rather than a hypothesis about the table.
+--
+-- THE TYPESCRIPT MIRROR IS WHAT SETTLES IT RATHER THAN THE PROOF'S
+-- CONVENIENCE.  `input-source.ts`'s `makeInputSource` takes an
+-- `ObservableInput<Val>` -- bare payloads and waits -- and returns an
+-- `Observable<InstEmit<Val>>`.  It is the only door into a pipeline, so
+-- srxjs cannot BE handed a malformed input stream; a slot at the
+-- envelope models a system that can, which is the model being wrong
+-- about the artifact rather than the artifact being unproven.
+--
+-- WHAT UNBLOCKED THE WRAPPING WAS THE GROUPING AND NOT A NEW FORMER.
+-- The standing argument was that a fold over a flat stream cannot tell
+-- which payloads shared an arrival, so wrapping each separately would
+-- split a cold's subscribe burst into as many instants as it has
+-- values -- and that the AMBIENT INSTANT needed to repair it was
+-- unreachable.  A synchrony-sensing operator is the wrong answer
+-- twice: rxjs has none, so the palette would stop mirroring, and it
+-- would re-derive by timing what this side is GIVEN.  `batchSyncᵉ`
+-- already draws the boundary, so a group IS an instant and the mint
+-- has something to key on.  See `inputᵖ` for the placement that gives
+-- one token per arrival.
+--
+-- A SHARED SLOT STANDS AT THE ENVELOPE, and the same objection does
+-- not reach it, because its content is not a script.  A shared
+-- definition is an srxjs program, so it has ALREADY been elaborated
+-- and already carries the envelopes `inputᵖ` would otherwise build --
+-- which is why the reference to it is a transport and not a second
+-- wrapping.  Wrapping it twice is what refuted `mapᵉ laneᵛ ∘
+-- elaborate` as a reading, over an empty inner and so structurally.
+slotTy : Ty → Kind → Ty
+slotTy t scriptedᵏ = plainᵗ t
+slotTy t sharedᵏ   = emitᵗ t
+
+-- the context an elaborated program stands in: the author's types,
+-- read through the kinds
+plainᵏ : ∀ {n} → Ctx n → Kinds n → Ctx n
+plainᵏ Γ κ = zipWith slotTy Γ κ

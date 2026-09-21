@@ -760,11 +760,44 @@ def import_span_lines(visible):
     return spans
 
 
+_IMPORT_HEAD_RE = re.compile(r"^\s*(?:open\s+)?import\s+(\S+)(.*)$")
+_ARG_STOP = {"using", "hiding", "renaming", "public", "as"}
+_IDENT_RE = re.compile(r"[^\s()\{\};]+")
+
+
+def module_arg_names(visible):
+    """Names appearing as MODULE ARGUMENTS on an import statement.
+
+    WHY THESE ARE EDGES WHEN A `using` NAME IS NOT.  `import_span_lines`
+    excludes import lines from the consumer scan on purpose: a name in another
+    module's `using` clause is IMPORTED, not CONSUMED, and counting it let an
+    unused import launder an orphan into looking wired.  A module ARGUMENT is
+    the other thing.  `Rx.Slots plainPalette` and `Rx.Slots narrowPalette` are
+    different modules; the argument is applied, and every definition in the
+    importing file depends on that instantiation.  Excluding it reported the
+    palette as dead while the whole evaluator ran at it.
+
+    Only the HEAD line of a statement is read — a module argument never sits on
+    a `using (...)` continuation — and scanning stops at the first keyword that
+    ends the application."""
+    out = set()
+    for line in visible:
+        m = _IMPORT_HEAD_RE.match(line)
+        if not m:
+            continue
+        for tok in _IDENT_RE.findall(m.group(2)):
+            if tok in _ARG_STOP:
+                break
+            out.add(tok)
+    return out
+
+
 def build_corpus(src_dir, files):
     """Per-file (joined visible text, sorted line-start-offsets) for fast
-    substring search + offset -> line-number lookup, plus the set of line
-    numbers belonging to import statements (never consumers — see
-    `import_span_lines`)."""
+    substring search + offset -> line-number lookup, the set of line numbers
+    belonging to import statements (never consumers — see `import_span_lines`),
+    and the module ARGUMENTS those imports apply (which are — see
+    `module_arg_names`)."""
     corpus = {}
     for relpath in files:
         _raw, visible = load_file(src_dir, relpath)
@@ -774,7 +807,8 @@ def build_corpus(src_dir, files):
             offsets.append(pos)
             pos += len(line)
         text = "".join(visible)
-        corpus[relpath] = (text, offsets, import_span_lines(visible))
+        corpus[relpath] = (text, offsets, import_span_lines(visible),
+                           module_arg_names(visible))
     return corpus
 
 
@@ -1166,7 +1200,7 @@ def build_graph(src_dir, files, defs, def_lines, postulate_names, order,
         for relpath in files:
             if relpath == ROOT_REL:
                 continue
-            text, offsets, import_lines = corpus[relpath]
+            text, offsets, import_lines, _margs = corpus[relpath]
             if not text:
                 continue
             for term in terms:
@@ -1187,6 +1221,28 @@ def build_graph(src_dir, files, defs, def_lines, postulate_names, order,
                                 edges[o].add(name)
                                 consumers[name].add(o)
                     idx = text.find(term, idx + 1)
+
+    # MODULE ARGUMENTS, attributed to the importing file's definitions.  A
+    # module application is a real dependency of everything in the file that
+    # imports it, so the edge runs from each of that file's own definitions to
+    # the argument.  A file with no reachable definition confers nothing, which
+    # is the property that keeps this from being an exemption.
+    for relpath in files:
+        if relpath == ROOT_REL or relpath not in corpus:
+            continue
+        margs = corpus[relpath][3]
+        if not margs:
+            continue
+        targets = [a for a in margs if a in defs]
+        if not targets:
+            continue
+        for nm, d in defs.items():
+            if d.file != relpath:
+                continue
+            for a in targets:
+                if a != nm:
+                    edges[nm].add(a)
+                    consumers[a].add(nm)
     return edges, consumers, seed
 
 

@@ -36,22 +36,25 @@
 ------------------------------------------------------------------
 module Implementation.Unit-Test.Prelude where
 
-open import Data.Bool using (Bool)
+open import Data.Bool using (Bool; true; false; T)
+open import Data.Unit using (tt)
+open import Data.Maybe using (Maybe; just; nothing)
 open import Data.List using (List; []; concat)
 open import Data.Nat using (ℕ)
+open import Data.Fin using (zero; suc)
 open import Data.String using (String)
 open import Data.Vec using () renaming (_∷_ to _∷ⱽ_; [] to []ⱽ)
 
 open import Rx.Prim using (InstEmit)
-open import Rx.Exp using (Ctx; Closed; Val; natᵗ; emptyᵉ; takeᵉ; nat̂)
-open import Rx.SExp using (SExp; emitᵗ; emitᵛ)
+open import Rx.Exp using (Ctx; Closed; Val; natᵗ; listᵗ; takeᵉ; nat̂; inputsBelowᵉ)
+open import Rx.SExp using (SExp; emitᵗ; plainᵏ; Kinds; sharedᵏ; emptyˢ)
 open import Rx.Elaborate using (elaborate)
 open import Rx.Envelope.Decode using (decodeStream)
 open import Rx.Evaluator.Builder using (evaluate↓)
-open import Rx.Slots using (Slots; shared)
+open import Rx.Simul-Slots using (SimulSlots; SimulSlot; sharedˢ; embedSlots)
 open import Rx.Protocol using (wellFormed?)
 open import Rx.Emit-Eq using (eqBatched)
-open import Implementation using (impl-batchSimultaneous)
+open import Rx.Batch using (batchSimultaneousᵖ)
 open import Spec using (spec-batchSimultaneous)
 
 -- the harness's fixed context: two nat-typed slots the AUTHOR sees, and
@@ -60,30 +63,54 @@ open import Spec using (spec-batchSimultaneous)
 Γ₂ : Ctx 2
 Γ₂ = natᵗ ∷ⱽ natᵗ ∷ⱽ []ⱽ
 
-Γ₂ᵉ : Ctx 2
-Γ₂ᵉ = emitᵛ Γ₂
+-- BOTH SLOTS ARE `sharedᵏ`: each one holds another srxjs program, so
+-- it stands at the ENVELOPE and `input` reads it straight.  The kind
+-- vector is not a free choice beside the table -- `SimulSlot` is
+-- indexed by it, so this line and `mkSlots` below are one statement.
+κ₂ : Kinds 2
+κ₂ = sharedᵏ ∷ⱽ sharedᵏ ∷ⱽ []ⱽ
 
--- THE TELESCOPE IS EMPTY OBSERVABLES, AND THAT IS A BLOCKAGE RATHER
--- THAN A CHOICE.  An elaborated program's slots stand at the ENVELOPE,
--- so the two shapes a `Slot` offers are a script -- which would be
--- writing source and instant tokens by hand, the one thing the palette
--- exists to make unsayable -- and a `shared` def, which has to be an
--- elaborated program to carry an envelope honestly.  The def route is
--- what is blocked: the stratification field asks for
--- `T (inputsBelowᵉ k d)` to compute, and `d` is a real body over
--- POSTULATED leaves, so the walk hits a postulate at the first former
--- and gets stuck for every elaborated `d`, at every `k`.  `emptyᵉ` is a
--- constructor and reduces, so it is the one def this table can state,
--- and every `inputˢ` a program draws therefore reaches a source that
--- never emits.
+Γ₂ᵉ : Ctx 2
+Γ₂ᵉ = plainᵏ Γ₂ κ₂
+
+-- THE TABLE IS BUILT FROM TWO AUTHOR-WRITTEN DEFINITIONS, and that is
+-- what a row has to name, because the sweep DRAWS it.  What makes a
+-- drawn table possible at all is that the stratification side
+-- condition COMPUTES: a definition is an `SExp` and every elaboration
+-- leaf is a real body, so `inputsBelowᵉ` of it reduces to a boolean
+-- rather than getting stuck on a postulate.
 --
--- WHAT THAT COSTS THE SWEEP, and it is worth knowing before reading a
--- green: no hot or cold source, so no asynchronous arrival, so the
--- whole timing axis is uncovered -- what remains is the synchronous
--- one, where every value enters through an `ofˢ`.  The blockage lifts
--- on its own the day the elaboration's leaves become definitions.
-slots₂ : Slots Γ₂ᵉ
-slots₂ _ = shared emptyᵉ
+-- IT LIVES HERE RATHER THAN IN THE GENERATOR because a pasted row has
+-- to typecheck where the corpus lives, so the name a row prints has to
+-- be one the corpus can see.
+tOf : (b : Bool) → Maybe (T b)
+tOf true  = just tt
+tOf false = nothing
+
+-- A DEFINITION THAT BREAKS STRATIFICATION FALLS BACK TO SILENCE rather
+-- than being rejected, because this is a total function and the
+-- generator has no way to prove its draw stratified.  In practice the
+-- fallback is unreached -- `genSlotRef k` draws only from slots below
+-- `k` by construction -- but it is what makes the row a program rather
+-- than a proof obligation.
+slot₀ : SExp Γ₂ [] [] [] natᵗ → SimulSlot Γ₂ κ₂ 0 natᵗ sharedᵏ
+slot₀ d with tOf (inputsBelowᵉ 0 (elaborate κ₂ d))
+... | just ok = sharedˢ d {ok = ok}
+... | nothing = sharedˢ emptyˢ
+
+slot₁ : SExp Γ₂ [] [] [] natᵗ → SimulSlot Γ₂ κ₂ 1 natᵗ sharedᵏ
+slot₁ d with tOf (inputsBelowᵉ 1 (elaborate κ₂ d))
+... | just ok = sharedˢ d {ok = ok}
+... | nothing = sharedˢ emptyˢ
+
+-- WRITTEN SLOT BY SLOT rather than with a wildcard: the arm a slot may
+-- use is `lookup κ₂ i`, which does not reduce for an abstract `i`.
+-- That is the kind indexing doing its job -- a table cannot name an
+-- arm without saying which slot it is naming it for.
+mkSlots : SExp Γ₂ [] [] [] natᵗ → SExp Γ₂ [] [] [] natᵗ → SimulSlots Γ₂ κ₂
+mkSlots d₀ d₁ zero          = slot₀ d₀
+mkSlots d₀ d₁ (suc zero)    = slot₁ d₁
+mkSlots d₀ d₁ (suc (suc ()))
 
 -- one cached counterexample: a label, and the run that produced it
 record Case : Set where
@@ -92,7 +119,7 @@ record Case : Set where
     name  : String
     fuel  : ℕ
     prog  : SExp Γ₂ [] [] [] natᵗ
-    slots : Slots Γ₂ᵉ
+    slots : SimulSlots Γ₂ κ₂
 
 open Case using (name; fuel; prog; slots)
 
@@ -120,14 +147,28 @@ capProg e = takeᵉ (nat̂ 24) e
 -- batchings read
 runOf : Case → List (InstEmit (Val Γ₂ᵉ natᵗ))
 runOf c = decodeStream {Γ = Γ₂ᵉ} {a = natᵗ}
-            (concat (evaluate↓ (fuel c) (capProg (elaborate (prog c))) (slots c)))
+            (concat (evaluate↓ (fuel c) (capProg (elaborate κ₂ (prog c))) (embedSlots (slots c))))
 
 -- the decoded stream must satisfy the protocol automaton
 -- (evaluate-well-formed, cached case by case)
 wellFormed : Case → Bool
 wellFormed c = wellFormed? (runOf c)
 
--- impl and spec, fed the SAME stream, must batch it identically
+-- THE SAME ROW, RUN WITH THE OPERATOR INSIDE THE MACHINE.  This is the
+-- left side of `formal-verification-batchSimultaneous`, and it is a
+-- second RUN rather than a function applied to the first: the tree is
+-- the author's program, elaborated, capped, and wrapped in the plain
+-- batching former.  `Val Γ (listᵗ t) = List (Val Γ t)` definitionally,
+-- which is why the two sides below meet without a transport.
+batchedOf : Case → List (InstEmit (List (Val Γ₂ᵉ natᵗ)))
+batchedOf c = decodeStream {Γ = Γ₂ᵉ} {a = listᵗ natᵗ}
+                (concat (evaluate↓ (fuel c)
+                          (batchSimultaneousᵖ (capProg (elaborate κ₂ (prog c))))
+                          (embedSlots (slots c))))
+
+-- THE MACHINE'S BATCHING AND THE SPEC'S MUST AGREE.  The old shape fed
+-- ONE stream to two Agda functions and so tested no evaluator at all;
+-- this compares a run of the batching program against the spec applied
+-- to the run without it.
 agrees : Case → Bool
-agrees c = eqBatched (impl-batchSimultaneous (runOf c))
-                     (spec-batchSimultaneous (runOf c))
+agrees c = eqBatched (batchedOf c) (spec-batchSimultaneous (runOf c))

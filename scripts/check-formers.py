@@ -336,7 +336,17 @@ def elab_arms(elab: str) -> tuple[list[tuple[set[str], set[str]]], str]:
     branch on a former.
     """
     lines = bodies(elab).splitlines()
-    head = re.compile(r"^\s{2}toPlain(Tm|Tms)?\b")
+    # THE BLOCK'S INDENTATION IS READ OFF ITS FIRST CLAUSE, NOT ASSUMED.  These
+    # clauses sit inside a `mutual` block, so their depth is a formatting
+    # choice; pinning it at two spaces made a re-indentation of the
+    # elaboration read as the elaboration having been DELETED, which is the
+    # one failure a coverage check must not have -- it fires loudly while
+    # saying nothing about coverage.
+    anchor = re.compile(r"^(\s+)toPlain(Tm|Tms)?\b")
+    indent = next((m.group(1) for m in map(anchor.match, lines) if m), None)
+    if indent is None:
+        sys.exit("check-formers: no `toPlain` clauses found -- the elaboration moved or was renamed")
+    head = re.compile(r"^" + re.escape(indent) + r"toPlain(Tm|Tms)?\b")
     starts = [i for i, l in enumerate(lines) if head.match(l)]
     covered: set[int] = set()
     arms: list[tuple[set[str], set[str]]] = []
