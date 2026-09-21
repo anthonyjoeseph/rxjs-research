@@ -257,10 +257,12 @@ cone would have nothing to hold.
   on each outer emit; the interaction between a kill and a share's connect is
   the thing under test, and it has no analogue in the other two flatteners.
 
-- **RE-ARM THE GATE.** Put `oracle` back into `GATE_CHEAP` and flip the CI job
-  off `if: false`. The two move together, as the Makefile's note says. Until
-  this leg lands the tier can silently rot, which is the argument for doing it
-  in the same campaign rather than trusting a green memory.
+- **ENABLE THE ORACLE IN CI.** Put `oracle` back into `GATE_CHEAP` and flip
+  its CI job off `if: false`. The two move together, as the Makefile's note
+  says. It is the leg that makes the tier STAY done: until it lands the sweep
+  is a thing somebody remembers running, and a green memory is what this tier
+  was disabled behind in the first place. Nothing in the job may be narrowed
+  to make it pass.
 
 ### The ledger
 
@@ -312,6 +314,14 @@ There is no declaration here whose falsity a cone could bound.
   the first time the match has ever been executed. Expect the first failures
   to be in the generator's reach rather than in the operator, and cache
   counterexamples as rows in `Implementation.Unit-Test` as they are found.
+
+- **ENABLE THE QUICKCHECK IN CI.** Flip its job off `if: false`. Its own note
+  gives two reasons for the disable and BOTH are now spent — the machine it
+  swept has been replaced and the replacement runs, and the elaborator arm it
+  named as permanently red is no longer a postulate. What keeps it off is the
+  operator, so this is the leg that closes the tier: the check that decides
+  tier 2 is the check that then guards it. Nothing in the job may be narrowed
+  to make it pass.
 
 ### The ledger
 
