@@ -332,19 +332,13 @@ decodeSlotAt fuel Γ slotsJ i = nth slotsJ (toℕ i) >>=? λ j →
   if tag is "scripted" then
     (getField "input" j >>=? decodeInput fuel Γ (lookup Γ i) >>=? λ inp →
      tOf (isData (lookup Γ i)) >>=? λ ok → just (scripted {ok = ok} inp))
+     -- scripted slots carry data only; an obs-typed slot must be `shared`
   else if tag is "shared" then
     (getField "def" j >>=? decodeExp fuel Γ [] [] [] (lookup Γ i) >>=? λ d →
-     -- BOTH slot arms carry data only (Rx.Slots): the scripted one for
-     -- descent, the shared one for legality.  An obs-typed slot decodes
-     -- to nothing in either arm, which is the same rejection TS enforces
-     -- twice over — `genValTy` never draws an `obs`, and `wrapCold`
-     -- returns `never` on an `Observable<Observable<A>>`.
-     tOf (isData (lookup Γ i)) >>=? λ ok →
      -- the telescope is stratified: a def may reference only earlier
-     -- slots, so a non-stratified case decodes to nothing — the same
-     -- rejection TS enforces by generator construction
-     tOf (inputsBelowᵉ (toℕ i) d) >>=? λ ok′ →
-     just (shared d {ok = ok} {ok′ = ok′}))
+     -- slots (Rx.Slots), so a non-stratified case decodes to nothing —
+     -- the same rejection TS enforces by generator construction
+     tOf (inputsBelowᵉ (toℕ i) d) >>=? λ ok → just (shared d {ok = ok}))
   else nothing
 
 decodeSlots : ℕ → ∀ {n} (Γ : Ctx n) → List JSON → Maybe (Slots Γ)

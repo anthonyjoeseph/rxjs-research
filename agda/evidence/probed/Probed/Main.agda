@@ -61,3 +61,4 @@ open import Probed.Pipeline-Claims using (row-online)
 -- `Rx.Slots` charged `isData` on both arms; the file records what they
 -- said and what barring them costs.
 open import Probed.Share-Channel using (sawᴰ; bar-engages)
+open import Probed.MergeMap-Empty using (nonvacuous; transparent; silent)

@@ -1,10 +1,10 @@
 -- A COUNTEREXAMPLE TO `run-wellFormed` AS IT WAS STATED, AND THE
 -- REASON IT NOW CARRIES AN ELABORATION PREMISE.
 --
--- `Rx.Slots` closed the forgery channel in the SLOT TABLE by charging
--- `isData` on both slot arms, so no table stands at the type that
--- reached the wire unwrapped.  That left the ROOT PROGRAM untouched,
--- and no condition on slots could ever have reached it.  `run-wellFormed` quantified over an arbitrary
+-- `Rx.Simul-Slots` closed the forgery channel in the SLOT TABLE, by
+-- making a shared definition an `SExp` that reaches the evaluator only
+-- through `elaborate`.  That left the ROOT PROGRAM untouched, and no
+-- condition on slots could ever have reached it.  `run-wellFormed` quantified over an arbitrary
 -- `e : Closed Γ (machineEmitᵗ a)` -- its own header said "every run of
 -- every ELABORATED program" while its statement said every run of every
 -- PLAIN one -- and the gap is inhabited by the same three lines that
@@ -21,9 +21,9 @@
 -- since the definition side is answered by the telescope and not by a
 -- predicate over the whole of `Exp` -- threaded through
 -- `subscribe-shaped`, `cascade-shaped`, `drain-shaped` and
--- `run-wellFormed⇓`.  `input-wellFormed` discharges it at the only
--- call site, since its program is `elaborate (inputˢ i)` and
--- `elab-mint (elab-toPlain _)` is exactly that.
+-- `run-wellFormed⇓`.  `elaborated-accepted` discharges it at the only
+-- call site, since its program is `elaborate κ e` and
+-- `elab-mint (elab-toPlain κ e)` is exactly that.
 --
 -- WHY IT WAS NOT FOUND EARLIER.  The old comment on `run-wellFormed`
 -- gave the reason it was wrong as the reason it was right: "quantified

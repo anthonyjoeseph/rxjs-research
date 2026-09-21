@@ -82,7 +82,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Rx.Prim using (cold; after_,_)
 open import Rx.Exp using (Ctx; obs; natᵗ; Closed; isData;
   input; ofᵉ; mergeAllᵉ; strmᵗ)
-open import Rx.SExp using (inputˢ; plainᵛ; emitᵗ)
+open import Rx.SExp using (inputˢ; plainᵏ; Kinds; scriptedᵏ; emitᵗ)
 open import Rx.Elaborate using (elaborate)
 open import Rx.Slots using (Slots; scripted; shared)
 open import Rx.Envelope.Decode using (decodeStream)
@@ -98,20 +98,29 @@ open import Rx.Protocol using (ProtocolSt; protocol-init; runProtocol)
 Γᴰ : Ctx 2
 Γᴰ = natᵗ ∷ⱽ natᵗ ∷ⱽ []ⱽ
 
-defᴰ : Closed (plainᵛ Γᴰ) natᵗ
+-- BOTH SLOTS READ AS SCRIPTS, which is what makes this the same run
+-- the probe originally measured: before `Rx.SExp.Kinds` existed the
+-- elaboration wrapped EVERY slot in `inputᵖ`, and that is exactly
+-- `scriptedᵏ`.  Slot 1 is nonetheless filled with a `shared` def --
+-- the plain telescope permits that, and the mismatch is the point:
+-- it is the disagreement `Rx.Simul-Slots` exists to make unsayable.
+κᴰ : Kinds 2
+κᴰ = scriptedᵏ ∷ⱽ scriptedᵏ ∷ⱽ []ⱽ
+
+defᴰ : Closed (plainᵏ Γᴰ κᴰ) natᵗ
 defᴰ = mergeAllᵉ nothing (ofᵉ (strmᵗ (input zero) ∷ []))
 
-insᴰ : Slots (plainᵛ Γᴰ)
+insᴰ : Slots (plainᵏ Γᴰ κᴰ)
 insᴰ zero          = scripted (cold (1 ∷ []) ((after 0 , 2) ∷ []))
 insᴰ (suc zero)    = shared defᴰ
 insᴰ (suc (suc ()))
 
-progᴰ : Closed (plainᵛ Γᴰ) (emitᵗ natᵗ)
-progᴰ = elaborate (inputˢ (suc zero))
+progᴰ : Closed (plainᵏ Γᴰ κᴰ) (emitᵗ natᵗ)
+progᴰ = elaborate κᴰ (inputˢ (suc zero))
 
 Sᴰ : Maybe ProtocolSt
 Sᴰ = runProtocol protocol-init
-       (decodeStream {Γ = plainᵛ Γᴰ} {a = natᵗ} (concat (evaluate↓ 60 progᴰ insᴰ)))
+       (decodeStream {Γ = plainᵏ Γᴰ κᴰ} {a = natᵗ} (concat (evaluate↓ 60 progᴰ insᴰ)))
 
 -- DELIBERATELY WRONG: read the normal forms off the errors.
 sawᴰ : Sᴰ ≡ just (record { live = 4 ∷ [] ; horizon = 7
@@ -122,11 +131,31 @@ sawᴰ = refl
 -- THE BAR, which is what O, F, L, E and Y collapsed into.
 ------------------------------------------------------------------
 
--- THE CHANNEL'S SLOT TYPE IS UNINHABITED BY ANY TABLE.  `Slot` charges
--- `T (isData t)` on both arms and `T false` is empty, so no `Slots`
--- exists over a context carrying `obs natᵗ` -- in EITHER arm, so the
--- forged def has nowhere left to stand and neither does the legitimate
--- one.  The five collapsed probes are not missing coverage; they are
--- this equation, which is why it is stated rather than assumed.
+-- THE BAR IS ON SCRIPTS, AND IT IS THE ONLY ONE LEFT.  `Slot.scripted`
+-- charges `T (isData t)` and `T false` is empty, so no table scripts a
+-- slot at `obs natᵗ` -- and `Rx.Simul-Slots.scriptedˢ` charges the same
+-- thing, so the author's telescope does not reopen it.  That is what
+-- closes the forgery channel: the channel is a slot whose VALUES are
+-- observables of envelopes, which the consumer's `mergeAllˢ`
+-- subscribes past `stamp`, and only a script can put a value there
+-- that no elaboration wrote.
+--
+-- THE SHARED ARM CARRIES NO SUCH CONDITION, AND THAT IS A CORRECTION
+-- TO WHAT THIS FILE USED TO SAY.  It read "`Slot` charges `T (isData
+-- t)` on BOTH arms ... so the forged def has nowhere left to stand and
+-- neither does the legitimate one" -- and the second half was the cost
+-- rather than the result.  An observable-typed share is a thing real
+-- authors write, and it is safe for a reason a side condition cannot
+-- express: a shared def is WALKED, so its emissions are syntactically
+-- inside it, and in `Rx.Simul-Slots` it is an `SExp` reaching the
+-- evaluator only through `elaborate`, so every envelope in it was
+-- built by the elaboration whatever its type.  Closed by construction,
+-- at no cost to the domain.
+--
+-- WHAT REMAINS TRUE OF THE FIVE COLLAPSED PROBES (O, F, L, E, Y): the
+-- FORGED ones are still barred, now by provenance instead of by type.
+-- The LEGITIMATE ones -- O and Y, ordinary observable-typed defs --
+-- are no longer barred at all, and were the evidence that the old bar
+-- was overcharging.
 bar-engages : isData (obs natᵗ) ≡ false
 bar-engages = refl

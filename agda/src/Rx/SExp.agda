@@ -4,7 +4,7 @@ open import Data.Nat     using (ℕ)
 open import Data.Bool    using (Bool)
 open import Data.List    using (List; []; _∷_; _++_; map)
 open import Data.List.Membership.Propositional using (_∈_)
-open import Data.Vec     using (Vec; lookup) renaming (map to mapⱽ)
+open import Data.Vec     using (Vec; lookup; zipWith) renaming (map to mapⱽ)
 open import Data.Fin     using (Fin)
 open import Data.Maybe   using (Maybe)
 
@@ -171,3 +171,46 @@ emitᶜ ts = map emitᵗ ts
 -- one token per arrival.
 plainᵛ : ∀ {n} → Ctx n → Ctx n
 plainᵛ Γ = mapⱽ plainᵗ Γ
+
+------------------------------------------------------------------
+-- How a slot is SUPPLIED, which the author does not see.
+------------------------------------------------------------------
+
+-- A SLOT'S KIND IS A PROPERTY OF THE TABLE AND NOT OF THE PROGRAM,
+-- which is why it is not an index of `SExp`.  An author writes
+-- `inputˢ i` without caring whether slot i is fed by a script or
+-- defined by another srxjs program; the ELABORATION cares, because the
+-- two arrive in different shapes, so the kinds are an argument to
+-- `toPlain` and nothing above it changes.
+data Kind : Set where
+  scriptedᵏ : Kind   -- an external source: bare payloads, `inputᵖ` wraps them
+  sharedᵏ   : Kind   -- another srxjs program: already elaborated
+
+Kinds : ℕ → Set
+Kinds n = Vec Kind n
+
+-- WHAT A SLOT STANDS AT, NOW PER SLOT RATHER THAN UNIFORMLY.
+--
+-- A SCRIPTED SLOT STANDS AT THE PAYLOAD, and that is the reading
+-- `plainᵛ` gave every slot before kinds existed.  It has to: a script
+-- is arbitrary, so standing it at the envelope would let a table name
+-- an instant past the counter and reach the output through `input`
+-- untouched -- exactly how `evaluate-accepted` was refuted.  `inputᵖ`
+-- wrapping it is what makes a claim about inputs a lemma about the
+-- elaboration rather than a hypothesis about the table.
+--
+-- A SHARED SLOT STANDS AT THE ENVELOPE, and the same objection does
+-- not reach it, because its content is not a script.  A shared
+-- definition is an srxjs program, so it has ALREADY been elaborated
+-- and already carries the envelopes `inputᵖ` would otherwise build --
+-- which is why the reference to it is a transport and not a second
+-- wrapping.  Wrapping it twice is what refuted `mapᵉ laneᵛ ∘
+-- elaborate` as a reading, over an empty inner and so structurally.
+slotTy : Ty → Kind → Ty
+slotTy t scriptedᵏ = plainᵗ t
+slotTy t sharedᵏ   = emitᵗ t
+
+-- the context an elaborated program stands in: the author's types,
+-- read through the kinds
+plainᵏ : ∀ {n} → Ctx n → Kinds n → Ctx n
+plainᵏ Γ κ = zipWith slotTy Γ κ

@@ -34,7 +34,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Rx.Prim using (ObservableInput; hot; cold; Timed; after_,_)
 open import Rx.Exp using (Ctx; Ty; obs; natᵗ; []ᵉ; Closed)
 open import Rx.SExp using (SExp; STm; inputˢ; ofˢ; strmˢ; mergeAllˢ; emptyˢ;
-  plainᵛ; emitᵗ)
+  plainᵏ; Kinds; scriptedᵏ; emitᵗ)
 open import Rx.Slots using (Slots; scripted)
 open import Rx.Elaborate using (elaborate)
 open import Rx.Envelope.Decode using (decodeStream)
@@ -47,7 +47,12 @@ open import Rx.Protocol using (ProtocolSt; protocol-init; runProtocol)
 Γ₁ : Ctx 1
 Γ₁ = natᵗ ∷ⱽ []ⱽ
 
-ins₁ : Slots (plainᵛ Γ₁)
+-- the one slot is an external source, so the elaboration reads it at
+-- the author's payload and `inputᵖ` wraps each arrival
+κ₁ : Kinds 1
+κ₁ = scriptedᵏ ∷ⱽ []ⱽ
+
+ins₁ : Slots (plainᵏ Γ₁ κ₁)
 ins₁ zero = scripted (cold (1 ∷ []) ((after 0 , 2) ∷ []))
 
 -- ONE input, TWO subscribers
@@ -57,8 +62,8 @@ inner = ofˢ (strmˢ (inputˢ zero) ∷ [])
 src : SExp Γ₁ [] [] [] natᵗ
 src = mergeAllˢ nothing inner
 
-prog : Closed (plainᵛ Γ₁) (emitᵗ natᵗ)
-prog = elaborate src
+prog : Closed (plainᵏ Γ₁ κ₁) (emitᵗ natᵗ)
+prog = elaborate κ₁ src
 
 rootRun = reducible prog []ᵉ tt (root {lo = 1}) 0
             (sched-init prog ins₁) (st-init prog)
@@ -71,11 +76,11 @@ regLive = map (λ r → regSource (proj₁ (proj₂ r))) (EvalSt.registry st₀)
 
 S₀ : Maybe ProtocolSt
 S₀ = runProtocol protocol-init
-       (decodeStream {Γ = plainᵛ Γ₁} {a = natᵗ} (concat burst₀))
+       (decodeStream {Γ = plainᵏ Γ₁ κ₁} {a = natᵗ} (concat burst₀))
 
 Sfull : Maybe ProtocolSt
 Sfull = runProtocol protocol-init
-          (decodeStream {Γ = plainᵛ Γ₁} {a = natᵗ}
+          (decodeStream {Γ = plainᵏ Γ₁ κ₁} {a = natᵗ}
             (concat (evaluate↓ 60 prog ins₁)))
 
 -- DELIBERATELY WRONG: read the normal forms off the errors

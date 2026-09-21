@@ -71,7 +71,7 @@ open import Data.List.Membership.Propositional using (_∈_)
 open import Rx.Protocol using (wellFormed?)
 open import Rx.Emit-Eq using (eqBatched)
 open import Spec using (spec-batchSimultaneous)
-open import Implementation.Unit-Test.Prelude using (Γ₂; slots₂; cached; runOf; batchedOf)
+open import Implementation.Unit-Test.Prelude using (Γ₂; mkSlots; cached; runOf; batchedOf)
 open import Agda.Builtin.IO using (IO)
 open import CLI.IO using (_>>=_; getContents; putStr; Unit)
 
@@ -152,6 +152,26 @@ genSlotRef (suc (suc _)) = genFin2 >>=G λ i → pureG (inputNat i)
 
 genNat : Gen ℕ
 genNat = genB 10
+
+-- ONE SLOT'S DEFINITION.  `genSlotRef` is the FORWARDING arm -- slot
+-- one reading slot zero -- and it is what makes the table a telescope
+-- rather than two independent sources.  On its own it is not enough:
+-- `genSlotRef 0` is `emptyˢ`, so a table drawn from it alone is silent
+-- and the sweep would run every program against nothing, which is what
+-- it already did with the constant table.  The other arms give slot
+-- zero something to say, so the forwarding has traffic to forward.
+genSlotDef : ℕ → Gen (SExp Γ₂ [] [] [] natᵗ)
+genSlotDef k = genB 4 >>=G λ c → genNat >>=G λ x → genNat >>=G λ y →
+       if c ≡ᵇ 0 then genSlotRef k
+  else if c ≡ᵇ 1 then pureG emptyˢ
+  else if c ≡ᵇ 2 then pureG (ofˢ (natˢ x ∷ []))
+  else                pureG (ofˢ (natˢ x ∷ natˢ y ∷ []))
+
+-- THE TELESCOPE IS DRAWN IN ORDER, each slot seeing only the ones
+-- below it, which is exactly the argument `genSlotRef` takes.
+genSlots : Gen (SExp Γ₂ [] [] [] natᵗ × SExp Γ₂ [] [] [] natᵗ)
+genSlots = genSlotDef 0 >>=G λ d₀ → genSlotDef 1 >>=G λ d₁ →
+  pureG (d₀ , d₁)
 
 -- value functions (natᵗ → natᵗ): identity, +k, *k, and a CONSTANT.
 --
@@ -688,25 +708,32 @@ FUEL = 30
 -- either one wants the same row, and a program that fails both dedups
 -- to it instead of being cached twice.
 --
--- THE SLOT TABLE IS A NAME RATHER THAN A RENDERING, because it is a
--- constant: `slots₂` is the one telescope an elaborated program can be
--- driven by today, and a row naming it is reproducible exactly as a
--- printed script was.
-pasteRow : SExp Γ₂ [] [] [] natᵗ → String
-pasteRow e =
+-- THE SLOT TABLE IS NOW RENDERED RATHER THAN NAMED.  It used to be the
+-- constant `slots₂`, so a row naming it was reproducible; the sweep
+-- draws the table now, so a row that named a constant would be a
+-- DIFFERENT run from the one that failed.  Both definitions are
+-- printed through the same `showSExp` the program goes through, and
+-- `mkSlots` is in the prelude so the corpus can see the name.
+pasteRow : SExp Γ₂ [] [] [] natᵗ
+         → SExp Γ₂ [] [] [] natᵗ → SExp Γ₂ [] [] [] natᵗ → String
+pasteRow e d₀ d₁ =
   "\n-- <<<PASTE\n  cached \"?\" " ++ show FUEL ++ "\n          "
-       ++ showSExp e ++ "\n          slots₂ ∷\n-- PASTE>>>\n"
+       ++ showSExp e ++ "\n          (mkSlots (" ++ showSExp d₀ ++ ")\n"
+       ++ "                   (" ++ showSExp d₁ ++ ")) ∷\n-- PASTE>>>\n"
 
 report : SExp Γ₂ [] [] [] natᵗ
+       → SExp Γ₂ [] [] [] natᵗ → SExp Γ₂ [] [] [] natᵗ
        → List (InstEmit (List ℕ)) → List (InstEmit (List ℕ)) → String
-report e impl spec =
+report e d₀ d₁ impl spec =
   "  FAIL\n    impl = " ++ showBatched impl
-       ++ "\n    spec = " ++ showBatched spec ++ pasteRow e
+       ++ "\n    spec = " ++ showBatched spec ++ pasteRow e d₀ d₁
 
 -- a WellFormed violation of the evaluator's raw output
-reportWF : SExp Γ₂ [] [] [] natᵗ → List (InstEmit ℕ) → String
-reportWF e s =
-  "  WF-FAIL\n    stream = " ++ showStream s ++ pasteRow e
+reportWF : SExp Γ₂ [] [] [] natᵗ
+         → SExp Γ₂ [] [] [] natᵗ → SExp Γ₂ [] [] [] natᵗ
+         → List (InstEmit ℕ) → String
+reportWF e d₀ d₁ s =
+  "  WF-FAIL\n    stream = " ++ showStream s ++ pasteRow e d₀ d₁
 
 -- two checks on one generated program: impl ≡ spec on the batched stream,
 -- and the raw stream satisfies the protocol automaton
@@ -746,13 +773,16 @@ oneCase : ℕ → Gen (Marks × List String)
 -- of the author's tree at all and cannot inflate a census; and a cached
 -- row names the author's program, since the cap is the harness's and
 -- `runOf` re-applies it wherever the row is run.
-oneCase d = genExp d >>=G λ e →
-  let c    = cached "?" FUEL e slots₂
+oneCase d = genExp d >>=G λ e → genSlots >>=G λ ds →
+  let d₀   = proj₁ ds
+      d₁   = proj₂ ds
+      c    = cached "?" FUEL e (mkSlots d₀ d₁)
       s    = runOf c
       impl = batchedOf c
       spec = spec-batchSimultaneous s
-      agreeFails = if eqBatched impl spec then [] else report e impl spec ∷ []
-      wfFails    = if wellFormed? s then [] else reportWF e s ∷ []
+      agreeFails = if eqBatched impl spec then []
+                   else report e d₀ d₁ impl spec ∷ []
+      wfFails    = if wellFormed? s then [] else reportWF e d₀ d₁ s ∷ []
   in pureG (marksˢ e , agreeFails ++ᴸ wfFails)
 
 -- accumulate EVERY failing case's reports, in generation order, and tally
@@ -819,14 +849,22 @@ dumpFails (f ∷ fs) = concatStr (f ∷ fs)
 -- approximate because generation is UPSTREAM of evaluation and consumes
 -- the same randomness whether or not the program is then run -- so case
 -- N reached this way is the same program case N is in a full sweep.
+--
+-- IT DRAWS THE SLOT TABLE TOO, AND MUST.  `oneCase` draws a program
+-- and then a telescope; a skip that drew only the program would fall
+-- one table out of phase per case, and every index after the first
+-- would name a different run than the sweep did.  That is the whole
+-- load-bearing claim of this function, so the two draws are kept in
+-- step by construction.
 skipN : ℕ → ℕ → Gen ℕ
 skipN zero    d = pureG 0
-skipN (suc k) d = genExp d >>=G λ _ → skipN k d
+skipN (suc k) d = genExp d >>=G λ _ → genSlots >>=G λ _ → skipN k d
 
 -- the paste row of ONE case, named by its 1-based index
 showAt : ℕ → ℕ → Gen String
 showAt n d = skipN (n ∸ 1) d >>=G λ _ →
-  genExp d >>=G λ e → pureG (pasteRow e)
+  genExp d >>=G λ e → genSlots >>=G λ ds →
+  pureG (pasteRow e (proj₁ ds) (proj₂ ds))
 
 main : IO Unit
 main = getContents >>= λ s →

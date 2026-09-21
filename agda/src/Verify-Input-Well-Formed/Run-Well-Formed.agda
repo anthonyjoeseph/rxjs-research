@@ -57,20 +57,19 @@ open import Data.Fin     using (Fin)
 open import Data.List    using (List; []; _∷_; _++_; concat; length)
 open import Data.List.Properties using (++-assoc)
 open import Data.Maybe   using (just)
+open import Data.Sum using (inj₁; inj₂)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong; subst)
 
 open import Rx.Prim     using (Fuel; InstEmit; PlainEvent; valueᵖ; completeᵖ)
 open import Rx.Exp      using (Ctx; Closed; Val; []ᵉ)
-open import Rx.SExp     using (inputˢ; plainᵛ)
-open import Rx.Elaborated using (Elabᵉ)
+open import Rx.Elaborated using (Elabᵉ; Elabˢ)
 open import Rx.Slots using (Slots)
-open import Rx.Elaborate using (elaborate)
 open import Rx.Envelope using (machineEmitᵗ)
 open import Rx.Envelope.Decode using (decodeStream)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; Stream;
-  chainsOf; arrSource; sched-init; st-init; root)
+  chainsOf; arrSource; sched-init; st-init; root; sched-next; schedGo)
 open import Rx.Evaluator.Domain using (subscribeE⇓; cascade⇓; drain⇓;
                                        evaluate⇓; eval-run;
                                        drain-done; drain-empty; drain-step)
@@ -150,9 +149,23 @@ postulate
     Elabᵉ e →
     subscribeE⇓ {e = e} {lo = n} ([] , e , []ᵉ) root 0
       (sched-init e ins) (st-init e) (burst , sched₀ , st₀) →
+    -- AFTER the derivation, not before: the schedule is an implicit
+    -- solved from the walk, and a premise mentioning `Sched.slots`
+    -- ahead of it eta-expands the selector and leaves the schedule
+    -- unsolvable.  Order is load-bearing here, which is why it is
+    -- written down.
+    Elabˢ ins →
     Σ ProtocolSt λ S₀ →
         WellShaped protocol-init (decodeStream (concat burst)) S₀
       × Owes st₀ S₀
+      -- AND THE TABLE SURVIVES THE WALK.  The premise arrives on `ins`
+      -- and the drain reads it off `Sched.slots sched₀`, so somebody
+      -- has to say those are the same telescope.  The subscribe walk
+      -- installs registry nodes and never rewrites the slot vector, so
+      -- this is true by construction -- but `subscribeE⇓` is a
+      -- relation, so it is carried here exactly as `Owes` is rather
+      -- than left to be re-derived at the join.
+      × Elabˢ (Sched.slots sched₀)
 
 -- LEAF 2: one cascade emits a well-shaped burst and preserves the
 -- agreement.
@@ -185,13 +198,30 @@ postulate
     Elabᵉ e →
     Owes {e = e} st S →
     cascade⇓ {e = e} ar sched′ st (out , sched″ , st′) →
+    Elabˢ (Sched.slots sched′) →
     Σ ProtocolSt λ S′ →
         WellShaped S (decodeStream (concat out)) S′
       × Owes st′ S′
+      -- the cascade may install nodes and enlist sources; it does not
+      -- rewrite the telescope, so the premise is handed on
+      × Elabˢ (Sched.slots sched″)
 
 ------------------------------------------------------------------
 -- The drain, by induction on fuel -- a BODY, not a leaf.
 ------------------------------------------------------------------
+
+-- POPPING AN ARRIVAL LEAVES THE TELESCOPE ALONE.  `sched-next` is
+-- `schedFinish`, which rebuilds the schedule as `record sched { live
+-- = ls }` -- the queue moves, the slot vector does not.  The drain's
+-- step cascades against the POPPED schedule while the premise arrives
+-- about the un-popped one, so without this the two tables are
+-- different terms and the induction will not close.
+sched-next-slots : ∀ {n} {Γ : Ctx n} {sched sched′ : Sched Γ} {a : Arrival Γ}
+                 → sched-next sched ≡ inj₂ (a , sched′)
+                 → Sched.slots sched′ ≡ Sched.slots sched
+sched-next-slots {sched = sched} eqn with schedGo (Sched.live sched)
+sched-next-slots {sched = sched} ()   | inj₁ _
+sched-next-slots {sched = sched} refl | inj₂ (a , ls) = refl
 
 -- IT MIRRORS `drain!` CLAUSE FOR CLAUSE: `drain-done` and
 -- `drain-empty` emit nothing, so the automaton stands still;
@@ -209,12 +239,14 @@ drain-shaped :
   Elabᵉ e →
   Owes {e = e} st S →
   drain⇓ {e = e} fuel sched st rest →
+  Elabˢ (Sched.slots sched) →
   Σ ProtocolSt λ S′ → WellShaped S (decodeStream (concat rest)) S′
-drain-shaped {S = S} el ow drain-done      = S , ws-nil
-drain-shaped {S = S} el ow (drain-empty _) = S , ws-nil
-drain-shaped {S = S} el ow (drain-step {out = out} {rest = rest} _ c d)
+drain-shaped {S = S} el ow drain-done      es = S , ws-nil
+drain-shaped {S = S} el ow (drain-empty _) es = S , ws-nil
+drain-shaped {S = S} el ow (drain-step {out = out} {rest = rest} eqn c d) es
   with cascade-shaped el ow c
-... | S′ , wsOut , ow′ with drain-shaped el ow′ d
+         (subst Elabˢ (sym (sched-next-slots eqn)) es)
+... | S′ , wsOut , ow′ , es′ with drain-shaped el ow′ d es′
 ...   | S″ , wsRest =
       S″ , subst (λ z → WellShaped S z S″) (sym dEq) (ws-++ wsOut wsRest)
       where
@@ -234,13 +266,20 @@ drain-shaped {S = S} el ow (drain-step {out = out} {rest = rest} _ c d)
 -- than over `SExp`, so the simul statement is an instance of this one
 -- rather than a separate claim.
 --
--- IT CARRIES `Elabᵉ e`, AND THE COMMENT THAT USED TO STAND HERE GAVE
+-- IT CARRIES `Elabᵉ e` AND `Elabˢ ins` -- the root was elaborated and
+-- so was the table, each one former deep.  The table's premise is the
+-- price of `Rx.Slots.shared` no longer charging `isData`: that bar
+-- shut the table's forgery channel by side condition and cost the
+-- observable-typed share, which a real author wants; `Rx.Simul-Slots`
+-- shuts it by construction and keeps the share, and this is where the
+-- two statements meet.
+-- AND THE COMMENT THAT USED TO STAND HERE GAVE
 -- THE REASON IT WAS WRONG AS THE REASON IT WAS RIGHT: "the two leaves
 -- know nothing of the author's syntax."  They do not need the author's
 -- syntax; they need to know there IS one.  Without the premise the
 -- statement is FALSE, and not subtly -- `Rx.Slots` shut the forgery
 -- channel in the slot TABLE and left the ROOT PROGRAM arbitrary, so
--- the same three lines that inhabited the table's gap inhabit this
+-- the same three lines that inhabit the table's gap inhabit this
 -- one: `mintᵉ (ofᵉ (instEmitᵛ nilᵗ tok tok deliveryᵛ ∷ []))` is
 -- rejected by `refl` against an ordinary one-input table
 -- (Refuted.Forged-Root).  The premise is ONE FORMER DEEP rather than a
@@ -254,12 +293,12 @@ drain-shaped {S = S} el ow (drain-step {out = out} {rest = rest} _ c d)
 run-wellFormed⇓ :
   ∀ {n} {Γ : Ctx n} {a} {fuel : Fuel} {e : Closed Γ (machineEmitᵗ a)}
     {ins : Slots Γ} (s : Stream Γ (machineEmitᵗ a)) →
-  Elabᵉ e →
+  Elabᵉ e → Elabˢ ins →
   evaluate⇓ fuel e ins s →
   Accepted (runProtocol protocol-init (decodeStream (concat s)))
-run-wellFormed⇓ _ el (eval-run {burst = burst} {rest = rest} sub dr)
-  with subscribe-shaped el sub
-... | S₀ , wsBurst , ow₀ with drain-shaped el ow₀ dr
+run-wellFormed⇓ _ el es (eval-run {burst = burst} {rest = rest} sub dr)
+  with subscribe-shaped el sub es
+... | S₀ , wsBurst , ow₀ , es₀ with drain-shaped el ow₀ dr es₀
 ...   | S₁ , wsRest =
       wellShaped-accepted (subst (λ z → WellShaped protocol-init z S₁)
                                  (sym dEq) (ws-++ wsBurst wsRest))
@@ -272,7 +311,8 @@ run-wellFormed⇓ _ el (eval-run {burst = burst} {rest = rest} sub dr)
 run-wellFormed :
   ∀ {n} {Γ : Ctx n} {a} (fuel : Fuel) (e : Closed Γ (machineEmitᵗ a))
     (ins : Slots Γ) →
-  Elabᵉ e →
+  Elabᵉ e → Elabˢ ins →
   Accepted (runProtocol protocol-init
              (decodeStream (concat (evaluate↓ fuel e ins))))
-run-wellFormed fuel e ins el = run-wellFormed⇓ _ el (proj₂ (evaluate! fuel e ins))
+run-wellFormed fuel e ins el es =
+  run-wellFormed⇓ _ el es (proj₂ (evaluate! fuel e ins))

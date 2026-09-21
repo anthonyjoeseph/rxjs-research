@@ -927,7 +927,7 @@ mutual
         _ , subs-cold-async below slEq refl refl refl
           , satValues (redDatas _ okD sync) ∷ []
   red-input {Γ = Γ} i ρ k ok (acc rsK) {lo = lo} κ now sched st
-      | yes below | shared d {ok = okS} {ok′ = okd} =
+      | yes below | shared d {ok = okd} =
         red-input-shared i d (rsK (<ᵇ⇒< (toℕ i) k ok)) ρ
           κ below now sched slEq st
 
@@ -944,18 +944,17 @@ mutual
   -- recursion returns and what the connect hands straight back.
   red-input-shared : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo Θ}
       (i : Fin n) (d : Closed Γ (lookup Γ i))
-      {okS : T (isData (lookup Γ i))}
       {okd : T (inputsBelowᵉ (toℕ i) d)}
     → Acc _<_ (toℕ i)
     → (ρ : Env Γ Θ)
       (κ : Path Γ lo (lookup Γ i) t) (below : toℕ i < lo)
       (now : Tick) (sched : Sched Γ)
-    → Sched.slots sched i ≡ shared d {ok = okS} {ok′ = okd}
+    → Sched.slots sched i ≡ shared d {ok = okd}
     → (st : EvalSt e)
     → Σ (Stream Γ (lookup Γ i) × Sched Γ × EvalSt e) λ r →
         subscribeE⇓ {e = e} (Θ , input i , ρ) κ now sched st r
           × StreamSat (Red (lookup Γ i)) (proj₁ r)
-  red-input-shared {Γ = Γ} i d {okS} {okd} aI ρ κ below now sched slEq st
+  red-input-shared {Γ = Γ} i d {okd} aI ρ κ below now sched slEq st
       with memberSource (toℕ i) (EvalSt.completedSources st) in doneEq
   ... | true =
         _ , subs-shared {κ = κ} {below = below} slEq

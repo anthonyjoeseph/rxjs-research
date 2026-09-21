@@ -293,9 +293,8 @@ data evaluate⇓ {n} {Γ : Ctx n} {t} :
 
 -- THE SLOT TESTS STAY PREMISES AND THE SCRIPT'S OWN WELL-FORMEDNESS
 -- WITNESS IS BOUND RATHER THAN LEFT TO INFERENCE.  A slot's constructor
--- carries a proof that the element type is data, and a shared def one
--- that its inputs sit below the slot; at a variable type neither
--- reduces, so an
+-- carries a proof that the element type is data, or that a shared def's
+-- inputs sit below the slot; at a variable type neither reduces, so an
 -- unwritten one is an unsolved meta and a build failure.
 data subscribeE⇓ {n} {Γ} {t} {e} where
 
@@ -306,8 +305,8 @@ data subscribeE⇓ {n} {Γ} {t} {e} where
                  (spentBurst , sched , st)
 
   subs-shared : ∀ {lo} {i : Fin n} {d} {κ : Path Γ lo (lookup Γ i) t}
-                  {below : toℕ i < lo} {ok ok′} {Θ ρ} {now sched st r}
-              → Sched.slots sched i ≡ shared d {ok = ok} {ok′ = ok′}
+                  {below : toℕ i < lo} {ok} {Θ ρ} {now sched st r}
+              → Sched.slots sched i ≡ shared d {ok = ok}
               → subscribeSharedSlot⇓ i d κ below now sched st r
               → subscribeE⇓ (Θ , input i , ρ) κ now sched st r
 

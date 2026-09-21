@@ -18,11 +18,13 @@ open import Rx.Prim               using (InstEmit; Fuel; Id; Source; _at_from_as
   EmitKind; subscribe; delivery; plumbing; cut; cutPending; exhausted)
 open import Rx.Exp                using (Ctx; Ty; Exp; listᵗ)
 open import Rx.Envelope           using (machineEmitᵗ)
-open import Rx.SExp               using (SExp; plainᵛ)
+open import Rx.SExp               using (SExp; Kinds; plainᵏ)
 open import Rx.Elaborate          using (elaborate)
 open import Rx.Evaluator.Builder using (evaluate↓)
 open import Rx.Envelope.Decode using (decodeStream)
-open import Rx.Slots using (Slots)
+open import Rx.Simul-Slots using (SimulSlots; embedSlots)
+open import Rx.Elaborated using (elab-mint; elab-toPlain; elab-slots)
+open import Verify-Input-Well-Formed.Run-Well-Formed using (run-wellFormed)
 open import Rx.Batch using (batchSimultaneousᵖ)
 open import Rx.Protocol           using (ProtocolSt; Owed; protocol-init; runProtocol; stepProtocol; paidOff; allZero; Accepted;
   settle; applyEvents; hasOwed; bumpOwed; cancelOwed; removeOne; countIn)
@@ -1121,27 +1123,38 @@ batch-agreement xs acc =
 -- `elaborate`, and saying so by SCOPE costs no hypothesis and leaves
 -- nothing downstream carrying a side condition.
 --
--- THE TABLE NEEDS NO HYPOTHESIS AND THAT IS RECENT.  It used to: a
--- `Slots` was open at an observable-typed SHARED slot, where a
--- definition reaches the wire unwrapped, and the same hand-built emit
--- inhabited the table as well as the root.  `Rx.Slots` charges
--- `isData` on both arms now, so only the root is left to say anything
--- about -- which this statement already does, by quantifying over
--- `SExp` rather than `Closed`.
+-- AND THE TABLE IS SAID BY SCOPE TOO, WHICH IS WHAT LET THIS BECOME A
+-- BODY.  A `Slots` is open at an observable-typed SHARED slot, where a
+-- definition reaches the wire unwrapped and the same hand-built emit
+-- inhabits the table as well as the root.  `SimulSlots` is not: its
+-- shared definitions are `SExp`s and reach the evaluator only through
+-- `embedSlots`, which is `elaborate`.  So BOTH sides of the run are in
+-- the elaboration's image, and neither costs a hypothesis here.
 --
--- SO THIS IS NOW A BODY WAITING TO BE WRITTEN RATHER THAN A CLAIM
--- WAITING FOR A DESIGN.  `Verify-Input-Well-Formed.run-wellFormed`
--- has exactly this shape with an `Elabᵉ` premise in place of the
--- `SExp` index, and `elab-mint (elab-toPlain e)` discharges that
--- premise.  Joining them retires this postulate onto that module's
--- two leaves; it is left standing here only so the ledger records one
--- move at a time.
-postulate
-  elaborated-accepted :
-    ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : SExp Γ [] [] [] t)
-      (ins : Slots (plainᵛ Γ)) →
-    Accepted (runProtocol protocol-init
-               (decodeStream (concat (evaluate↓ fuel (elaborate e) ins))))
+-- THE BODY IS THE JOIN, AND IT IS THREE LINES BECAUSE THE WORK IS IN
+-- THE STATEMENTS RATHER THAN IN THE PROOF.
+-- `Verify-Input-Well-Formed.run-wellFormed` has exactly this shape
+-- with two premises in place of the two indices -- `Elabᵉ e` for the
+-- root and `Elabˢ ins` for the table -- and each index discharges its
+-- own premise by naming the former that built it.  That is the whole
+-- content of the join: an index and a premise are the same fact said
+-- twice, once where it is convenient to USE and once where it is
+-- convenient to PROVE.
+--
+-- WHAT THIS RETIRES: the postulate that stood here, onto
+-- `Run-Well-Formed`'s two leaves (`subscribe-shaped`,
+-- `cascade-shaped`), where the remaining content actually is.  Nothing
+-- is proven that was not proven before -- the ledger simply stops
+-- carrying the same obligation in two places.
+elaborated-accepted :
+  ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (fuel : Fuel) (e : SExp Γ [] [] [] t)
+    (ins : SimulSlots Γ κ) →
+  Accepted (runProtocol protocol-init
+             (decodeStream (concat (evaluate↓ fuel (elaborate κ e) (embedSlots ins)))))
+elaborated-accepted κ fuel e ins =
+  run-wellFormed fuel (elaborate κ e) (embedSlots ins)
+                 (elab-mint (elab-toPlain κ e))
+                 (elab-slots refl ins refl)
 
 -- THE TRANSCRIPTION LEAF: THE NODE COMPUTES THE FOLD.  This is the
 -- only place the evaluator and the batcher meet, and it is local
@@ -1158,11 +1171,11 @@ postulate
 -- argument from being re-derived inside the cascade structure.
 postulate
   batch-transcription :
-    ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : SExp Γ [] [] [] t)
-      (ins : Slots (plainᵛ Γ)) →
-    decodeStream (concat (evaluate↓ fuel (batchSimultaneousᵖ (elaborate e)) ins))
+    ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (fuel : Fuel) (e : SExp Γ [] [] [] t)
+      (ins : SimulSlots Γ κ) →
+    decodeStream (concat (evaluate↓ fuel (batchSimultaneousᵖ (elaborate κ e)) (embedSlots ins)))
       ≡ foldBatch batch-init
-          (decodeStream (concat (evaluate↓ fuel (elaborate e) ins)))
+          (decodeStream (concat (evaluate↓ fuel (elaborate κ e) (embedSlots ins))))
 
 -- THE verified object, end to end: for every SRXJS program, running
 -- the batching operator INSIDE the machine agrees with batching its
@@ -1199,13 +1212,13 @@ postulate
 --   by strengthening an evaluator clause, which cannot see a value it
 --   never inspects -- and the sampling figure the face stood on.
 formal-verification-batchSimultaneous :
-  ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : SExp Γ [] [] [] t)
-    (ins : Slots (plainᵛ Γ)) →
-  decodeStream (concat (evaluate↓ fuel (batchSimultaneousᵖ (elaborate e)) ins))
+  ∀ {n} {Γ : Ctx n} {t} (κ : Kinds n) (fuel : Fuel) (e : SExp Γ [] [] [] t)
+    (ins : SimulSlots Γ κ) →
+  decodeStream (concat (evaluate↓ fuel (batchSimultaneousᵖ (elaborate κ e)) (embedSlots ins)))
     ≡ spec-batchSimultaneous
-        (decodeStream (concat (evaluate↓ fuel (elaborate e) ins)))
-formal-verification-batchSimultaneous fuel e ins =
-  trans (batch-transcription fuel e ins)
+        (decodeStream (concat (evaluate↓ fuel (elaborate κ e) (embedSlots ins))))
+formal-verification-batchSimultaneous κ fuel e ins =
+  trans (batch-transcription κ fuel e ins)
         (sym (batch-agreement
-                (decodeStream (concat (evaluate↓ fuel (elaborate e) ins)))
-                (elaborated-accepted fuel e ins)))
+                (decodeStream (concat (evaluate↓ fuel (elaborate κ e) (embedSlots ins))))
+                (elaborated-accepted κ fuel e ins)))
