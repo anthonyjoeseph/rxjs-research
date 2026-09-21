@@ -35,9 +35,12 @@
 module Verify-Batch-Simultaneous.Batch-Theorems where
 
 open import Data.List    using (List; []; _∷_; _++_)
-open import Data.List.Relation.Binary.Prefix.Heterogeneous using (Prefix)
-open import Data.Product using (_,_)
-open import Relation.Binary.PropositionalEquality using (_≡_)
+-- the constructors are renamed because `[]` and `_∷_` would otherwise
+-- resolve to `Data.List`'s at every use site below
+open import Data.List.Relation.Binary.Prefix.Heterogeneous
+  using (Prefix) renaming ([] to nilᴾ; _∷_ to _∷ᴾ_)
+open import Data.Product using (_,_; proj₁; proj₂)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Rx.Prim        using (InstEmit)
 open import Implementation using (foldBatch; BatchSt; batch-init;
                                  step-batch)
@@ -57,22 +60,61 @@ foldBatch-no-flush st (x ∷ xs) =
   let (out , st′) = step-batch x st
   in out ++ foldBatch-no-flush st′ xs
 
-postulate
-  -- online-ness (extrinsic no-lookahead): once a group is CLOSED it is never
-  -- reopened, so the groups emitted while reading `xs` are a prefix of the
-  -- full output on any extension `xs ++ ys`.  The open tail is deliberately
-  -- excluded on the left — it is not yet a group.
-  -- PROBED: `Probed.Pipeline-Claims`, at the split the restatement was
-  --   made for: `xs` CLOSES one instant and leaves a second OPEN, with
-  --   two live registrations of one source and only one of them paid,
-  --   and `ys` supplies the second payment.  LOAD-BEARING — the left
-  --   side's own `flushBatch` would have forced that open instant out
-  --   as a shorter group, which is the shape that refuted the
-  --   unqualified claim, so the row holds exactly where the old
-  --   statement failed.  Not reached: a right side that opens further
-  --   groups of its own, and any instant closed by a `subscribe`
-  --   rather than by paying off a delivery.
-  batch-online :
-    ∀ {A} (xs ys : List (InstEmit A)) →
-    Prefix _≡_ (foldBatch-no-flush batch-init xs)
-               (foldBatch batch-init (xs ++ ys))
+------------------------------------------------------------------
+-- The one lemma, and it is about `Prefix` rather than about batching.
+------------------------------------------------------------------
+
+-- PREPENDING A COMMON RUN PRESERVES A PREFIX.  This is the whole of
+-- the step case below: the two folds agree on everything `step-batch`
+-- emits for the head and differ only in the tail, so the induction
+-- hands back a prefix of the tails and this carries it past the shared
+-- part.
+prefix-++ᵖ : ∀ {A : Set} (zs : List A) {xs ys : List A}
+           → Prefix _≡_ xs ys → Prefix _≡_ (zs ++ xs) (zs ++ ys)
+prefix-++ᵖ []       p = p
+prefix-++ᵖ (z ∷ zs) p = refl ∷ᴾ prefix-++ᵖ zs p
+
+------------------------------------------------------------------
+-- Online-ness.
+------------------------------------------------------------------
+
+-- THE STATEMENT IS GENERALISED OFF `batch-init` BEFORE IT IS PROVEN,
+-- which is the only real step in this file.  The induction is on `xs`,
+-- and after one emit the fold stands at `proj₂ (step-batch x st)`
+-- rather than at the initial state -- so a claim pinned to
+-- `batch-init` has no induction hypothesis to appeal to.  Quantifying
+-- over the state costs nothing, since nothing below looks inside one.
+--
+-- AND THAT IS WHY THIS IS SHORT: no property of `step-batch` is needed
+-- at all.  Online-ness is not a fact about batching, it is a fact
+-- about the SHAPE of the fold -- each step's output is committed
+-- before the next step runs, so the only difference `ys` can make is
+-- further out. `foldBatch-no-flush` is what makes that sayable, by
+-- dropping the terminal flush that would otherwise force a
+-- still-growing batch out on the left and contradict it.
+online-from : ∀ {A : Set} (st : BatchSt A) (xs ys : List (InstEmit A))
+            → Prefix _≡_ (foldBatch-no-flush st xs) (foldBatch st (xs ++ ys))
+online-from st []       ys = nilᴾ
+online-from st (x ∷ xs) ys =
+  prefix-++ᵖ (proj₁ (step-batch x st))
+             (online-from (proj₂ (step-batch x st)) xs ys)
+
+-- online-ness (extrinsic no-lookahead): once a group is CLOSED it is never
+-- reopened, so the groups emitted while reading `xs` are a prefix of the
+-- full output on any extension `xs ++ ys`.  The open tail is deliberately
+-- excluded on the left — it is not yet a group.
+-- PROBED: `Probed.Pipeline-Claims`, at the split the restatement was
+--   made for: `xs` CLOSES one instant and leaves a second OPEN, with
+--   two live registrations of one source and only one of them paid,
+--   and `ys` supplies the second payment.  LOAD-BEARING — the left
+--   side's own `flushBatch` would have forced that open instant out
+--   as a shorter group, which is the shape that refuted the
+--   unqualified claim, so the row holds exactly where the old
+--   statement failed.  Not reached: a right side that opens further
+--   groups of its own, and any instant closed by a `subscribe`
+--   rather than by paying off a delivery.
+batch-online :
+  ∀ {A} (xs ys : List (InstEmit A)) →
+  Prefix _≡_ (foldBatch-no-flush batch-init xs)
+             (foldBatch batch-init (xs ++ ys))
+batch-online = online-from batch-init
