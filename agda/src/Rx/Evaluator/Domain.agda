@@ -105,7 +105,9 @@
 --   its own input, which is why a pipeline's depth is a sum along the
 --   program and a fold's is a product with a count only the RUN
 --   knows.
-module Rx.Evaluator.Domain where
+open import Rx.Palette using (Palette)
+
+module Rx.Evaluator.Domain (P : Palette) where
 
 open import Data.Bool using (Bool; true; false; not; _∧_; if_then_else_)
 open import Data.Fin using (Fin; toℕ)
@@ -127,8 +129,8 @@ open import Rx.Exp using (obs; Ctx; Val; Closed; Exp; Tm; Fn; FnClo; applyClo;
   Env; _∷ᵉ_; []ᵉ; evalWith; unfoldμ; input; ofᵉ; emptyᵉ; takeᵉ; batchSyncᵉ;
   mapᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; deferᵉ; mintᵉ)
 open import Rx.Mint using (ordinalᵏ; sourceᵏ; nodeᵏ; regᵏ; freshId; setAt)
-open import Rx.Slots using (Slots; scripted; shared)
-open import Rx.Evaluator using (Stream; Burst; Sched; EvalSt; Path; Frame; NodeId; root; share-sink; _↠_; shareAdmit;
+open import Rx.Slots P using (Slots; scripted; shared; embed)
+open import Rx.Evaluator P using (Stream; Burst; Sched; EvalSt; Path; Frame; NodeId; root; share-sink; _↠_; shareAdmit;
   shareLatch; shareFinish; from-inner; splitEvents; splitBurst; burstCompleted; oneShotBurst;
   spentBurst; arrTick; arrVal; chainsOf; cascadeLatch; cascadeFinish; sched-next; sched-init;
   st-init; NodeState; AllOp; RegId; Arrival; AtFloor; arrTy; memberSource; register;
@@ -307,7 +309,7 @@ data subscribeE⇓ {n} {Γ} {t} {e} where
   subs-shared : ∀ {lo} {i : Fin n} {d} {κ : Path Γ lo (lookup Γ i) t}
                   {below : toℕ i < lo} {ok} {Θ ρ} {now sched st r}
               → Sched.slots sched i ≡ shared d {ok = ok}
-              → subscribeSharedSlot⇓ i d κ below now sched st r
+              → subscribeSharedSlot⇓ i (embed d) κ below now sched st r
               → subscribeE⇓ (Θ , input i , ρ) κ now sched st r
 
   subs-hot-done : ∀ {lo} {i : Fin n} {κ : Path Γ lo (lookup Γ i) t}

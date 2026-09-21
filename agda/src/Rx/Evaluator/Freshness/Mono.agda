@@ -17,7 +17,9 @@
 -- argument: the keyed ledger's setter leaves every other key pointwise
 -- alone, so the off-diagonal writes simply are not there to be argued
 -- about.
-module Rx.Evaluator.Freshness.Mono where
+open import Rx.Palette using (Palette)
+
+module Rx.Evaluator.Freshness.Mono (P : Palette) where
 
 open import Data.Bool using (Bool; true; false)
 open import Data.List using (List)
@@ -29,12 +31,12 @@ open import Relation.Nullary using (yes; no)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Exp using (Ctx; Closed; Val; obs; FnClo; _×ᵗ_; _≟ᵗ_)
-open import Rx.Evaluator using (Sched; EvalSt; Path; Frame; NodeId; NodeState;
+open import Rx.Evaluator P using (Sched; EvalSt; Path; Frame; NodeId; NodeState;
   AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ; Stream;
   switchKill; scanDispatch; takeDispatch; thruWrap; cell-st; take-st;
   batchSync-st; mergeAll-st; switch-st; exhaust-st; lookupNode; takeVals)
-open import Rx.Evaluator.Freshness using (nodeCt)
-open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeInner⇓; thruConsume⇓;
+open import Rx.Evaluator.Freshness P using (nodeCt)
+open import Rx.Evaluator.Domain P using (subscribeE⇓; subscribeInner⇓; thruConsume⇓;
   thruWalk⇓; mergeAllDrain⇓; innerFinish⇓; innerReact⇓; stepFrame⇓; pushBurst⇓;
   subscribeAll⇓; sharedConnect⇓; subscribeSharedSlot⇓;
   subs-floor; subs-shared; subs-hot-done; subs-hot-live; subs-cold-sync;

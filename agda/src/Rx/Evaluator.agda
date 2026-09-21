@@ -1,4 +1,6 @@
-module Rx.Evaluator where
+open import Rx.Palette using (Palette)
+
+module Rx.Evaluator (P : Palette) where
 
 open import Data.Bool    using (Bool; true; false; if_then_else_; not; _∨_; _∧_)
 open import Data.Fin     using (Fin; toℕ)
@@ -32,7 +34,7 @@ variable
 -- must reference only strictly earlier slots (a const telescope) —
 -- checked by the generator/decoder, not by these types; a forward
 -- reference is rejected there.
-open import Rx.Slots using (scripted; shared; Slots)
+open import Rx.Slots P using (scripted; shared; Slots)
 open import Rx.Mint using (Mint; mint-init)
 
 -- THE CARRIER IS PLAIN, AND THE PROTOCOL RIDES ON ITS VALUES.  What a

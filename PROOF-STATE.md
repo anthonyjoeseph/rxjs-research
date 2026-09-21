@@ -180,8 +180,14 @@ the row is DIFFICULTY.
 ## The theorem chain (top → leaves)
 
 ```
-formal-verification-batchSimultaneous    The-Proof.agda — a BARE POSTULATE
-                                          while the machine is rewritten — tier 1
+formal-verification-batchSimultaneous    The-Proof.agda — a REAL body over
+ │                                        three leaves — tier 1
+ ├─ batchSimultaneousᵖ                    the operator as a PLAIN FORMER rather
+ │                                        than an Agda fold over a list
+ ├─ batch-transcription                   that former's run computes step-batch
+ ├─ elaborated-accepted                   an elaborated run is protocol-legal
+ │                                        — FALSE at plainPalette; sexpPalette
+ │                                        (Rx.Authored) is the route, now built
  └─ batch-agreement                      proven, and claimed by Main in its
                                           own right rather than through the top
 
@@ -284,11 +290,174 @@ The tier takes a monster at the commit that first states the restatement.
 
 ### The ledger
 
-- **`formal-verification-batchSimultaneous`** (The-Proof) — FALSITY,
-  `RECOVERY`: the top line, bare while the machine under it is rewritten. It
-  was a body over one leaf; that leaf was refuted by a slot table scripted at
-  the envelope type, and its subject is the envelope the evaluator no longer
-  mints.
+- **`batchSimultaneousᵖ`** (The-Proof) — SHAPE: the operator as a node the
+  evaluator RUNS, so the top line is about a streaming operator rather than
+  about a fold over a finished list. The shape is decided and the body is not
+  written: `Implementation.foldBatch` is already `step-batch` threaded as
+  state, so it transcribes as `scanᵉ` carrying `BatchSt` with a `mapᵉ`
+  projecting. It must subscribe NOTHING — a `mergeAllᵉ` formulation moves the
+  mint counter and leaves every id downstream shifted by a renaming.
+  **IT NOW LIVES IN `Rx.Batch`**, an operator's home rather than a claim's,
+  because the HARNESS names it too: `Implementation.Unit-Test.Prelude.batchedOf`
+  runs it in the machine and `agrees` compares that run against the spec
+  applied to the unbatched run. Until it has a body the harness TYPECHECKS
+  against it but cannot RUN — the GHC backend has nothing to compile for a
+  postulate — so the QuickCheck executable is knowingly red and this row is
+  what unblocks it. `impl-batchSimultaneous` is deleted; `foldBatch batch-init`
+  is what the proof's middle rung names.
+- **`batch-transcription`** (The-Proof) — SHAPE: that the former's run computes
+  `step-batch` on the decoded emit. Blocked on the row above — there is no body
+  to induct over until the former has one. It is local because the former is a
+  scan: `sched-init` ignores its expression and fuel is spent per ARRIVAL, so
+  both runs share a scheduler, and acceptance settles an instant inside the
+  cascade that minted it, leaving the accumulator empty at every `drain-step`
+  boundary. It claims only that the machine RUNS the fold; that the fold is
+  correct is `batch-agreement`, over a bare list with no evaluator in scope.
+- **`elaborated-accepted`** (The-Proof) — FALSITY, `RECOVERY`: that an
+  elaborated run is accepted by the automaton. It is stated at
+  `plainPalette`, where it is FALSE, and it is carried in that shape
+  deliberately — see below.
+  **SCOPING TO `SExp` IS NOT ENOUGH ON ITS OWN, AND A MACHINE-CHECKED
+  TABLE SAYS SO.** `shared` takes its def from the palette, and at
+  `plainPalette` that is an arbitrary `Closed Γ t`, so at an observable
+  type the TABLE supplies a program nothing elaborated:
+  `mergeAllˢ nothing (inputˢ zero)` — an ordinary author program — over
+  a slot holding `ofᵉ (strmᵗ (mintᵉ (ofᵉ (instEmitᵛ nilᵗ tok tok
+  deliveryᵛ ∷ [])) ) ∷ [])` drives `runProtocol` to `nothing` by `refl`.
+  No predicate on the AUTHOR'S TREE can see it; the forgery is in the
+  table.
+  **THE ROUTE IS THE PALETTE, NOT A RESTRICTION.** Narrowing `shared` in
+  place — `T (isData t)`, say — does close it, and was tried: it makes
+  the table unrepresentable, because `isData (obs _)` is `false`. It also
+  DELETES the observable-typed slot, so an input that supplies
+  observables becomes undeclarable. That is the evaluator's expressive
+  scope, and the proof does not get to spend it. `Rx.Slots` is instead
+  parameterized by a `Palette` (`Tree` + `embed`), so this row is
+  discharged by restating it over a narrower palette while the CLI, the
+  QuickCheck corpus and the unit tests keep running at `plainPalette`.
+  Both instantiations coexist in one build; `embed` carries NO laws, the
+  evaluator consuming it in exactly two places (`subs-shared`,
+  `red-input-shared`) and the shared-slot descent being
+  `<-wellFounded (gsizeᵉ (embed d))` — accessibility of a number, which
+  survives opacity. **THE NARROW PALETTE IS NOW BUILT** (`Rx.Authored`,
+  `Rx.Palette.SExp`; postulate-free, `-W error`): a legal fragment over
+  `Exp`, mutual with `Tm` on account of `strmᵗ`, exactly as this row
+  anticipated. Six readings in `Probed.Share-Channel` located the
+  channel before it was written, and they are what fixed its shape:
+  a DATA-typed slot cannot forge at all — not because `isData` forbids
+  a closure, but because the reference elaborates to `inputᵖ i` whose
+  deliveries arm is `mergeAllᵉ (mapᵉ stamp (batchSyncᵉ (input i)))`,
+  and `subs-shared` fires at that INNER `input i`, so the definition is
+  substituted UNDER `stamp`; an OBSERVABLE-typed slot stands at
+  `plainᵗ (obs u) = obs (emitᵗ u)`, so its VALUES are observables of
+  envelopes that the consumer's `mergeAllᵖ` subscribes directly via
+  `laneᵛ`, never passing `stamp`. So the bar sits on `strmᵗ` — the only
+  INTRODUCTION form for an observable-typed value — and nowhere else,
+  which is what lets the family catch observables buried in products
+  and lists WITHOUT recursing into the slot's type. It must not recurse
+  into the type: a definition may flatten an `obs natᵗ` of its own
+  making, and `obs natᵗ` is outside the image of `plainᵗ` entirely.
+  **TWO TIDIER SHAPES WERE REFUTED FIRST**, both by measurement. A
+  protocol-blind reading of `SExp` (making a definition BE an author
+  tree) does not exist: at `mergeAllˢ` it must flatten a stream whose
+  values are elaborations and hand back a plain value, and the types
+  say `emitᵗ t` where the reading needs `plainᵗ t`. And making `embed`
+  the flattener's own lane extraction — `mapᵉ laneᵛ ∘ elaborate` —
+  typechecks exactly at the slot type and is wrong: the reference
+  already applies `laneᵛ`, so such a definition is laned twice, and it
+  is read REJECTED over an EMPTY inner, so the fault is structural.
+  **THE PALETTE IS NOT A NARROWING**, which `Probed.Authored-Palette`
+  is there to say: the data-typed definition, the static
+  observable-typed one and the DYNAMIC one — a `mapᵉ` over a live
+  source, which is what an author's `source$.pipe(map(x => inner$))`
+  produces — all derive, and `sexpPalette` reproduces `plainPalette`'s
+  own normal forms with them installed. The run-soundness route
+  (`Run-Well-Formed` → `Input-Well-Formed`, and so `Main`) now runs at
+  it; the CLI, the QuickCheck corpus and the unit tests keep running at
+  `plainPalette`. **AND THE PALETTE EXPOSED A SECOND FORGERY, AT THE ROOT.**
+  `sexpPalette` shut the channel in the slot TABLE and left the ROOT
+  PROGRAM arbitrary: `run-wellFormed` quantified over any
+  `e : Closed Γ (machineEmitᵗ a)` — its header said "every run of every
+  ELABORATED program" while its statement said every PLAIN one — and
+  the same three lines inhabit that gap,
+  `mintᵉ (ofᵉ (instEmitᵛ nilᵗ tok tok deliveryᵛ ∷ []))`, rejected by
+  `refl` against an ordinary one-input table (`Refuted.Forged-Root`).
+  Fixed: `Authᵉ e` is now a premise on `subscribe-shaped`,
+  `cascade-shaped`, `drain-shaped` and `run-wellFormed⇓`, discharged at
+  the only call site by `elab-mint (elab-toPlain _)`.
+  **THE TABLE SIDE NEEDS NO PREMISE AT ALL**, which is worth recording
+  because it is the palette earning its keep: `Sched` holds
+  `slots : Slots Γ`, and at this palette a `shared` slot cannot be
+  BUILT without its authorship, so every `Sched Γ` in scope already has
+  authored slots and extraction is the second projection
+  (`Probed.Authored-Shape`). `Sched.slots` is written once, in
+  `sched-init`, and never rewritten.
+  **THE INDUCTION IS TWO-LAYER, AND THAT IS NOW KNOWN RATHER THAN
+  GUESSED.** `inputᵖ`'s own `stamp` is a `strmᵗ` at an ENVELOPE type,
+  so `auth-strm`'s side condition is uninhabited there
+  (`stamp-is-barred`, by `λ x → x`) — meaning an elaborated tree
+  contains envelope-typed streams that are not elaborations of any
+  `SExp`, `Authᵉ` is NOT closed structurally over the elaboration's
+  image, and `auth-elab` is an opaque escape rather than a convenience.
+  So neither leaf can be an induction on `Authᵉ` alone: at an
+  `auth-elab` node the proof must switch to an induction on the `SExp`
+  the node carries, and the two interleave. It terminates on the
+  measure already in the telescope — `inputsBelowᵉ` drops the slot
+  ceiling at every hop from an elaboration into a slot's definition,
+  the same stratification `red-input-shared` buys its descent from.
+  WHAT IS STILL OWED on this row: (i) a node-authorship invariant on
+  `EvalSt`, carried alongside `Owes` — `Authᵉ e` says the ROOT is
+  authored, while `cascade-shaped` walks a universally quantified `st`
+  whose nodes are authored only in a REAL run; its shape should be
+  settled by the first traffic-bearing frame rather than guessed, since
+  `Owes` itself replaced two guessed bridge clauses that measurement
+  refuted. (ii) joining the two acceptance routes, so that
+  `elaborated-accepted` is a body over `run-wellFormed` rather than a
+  leaf of its own. The refutation was not the slot table alone: `Closed` can build a `delivery` whose source no `init`
+  ever enlisted, `settle` seeds owed from `countIn s []`, and `payOwed`
+  underflows — so the statement is false at `Closed` for reasons scoping to
+  `SExp` removes entirely, at the cost of no hypothesis.
+  **AND A SECOND COUNTEREXAMPLE, WHICH THE PALETTE ROUTE DOES NOT
+  TOUCH.** The forgery above lives in the slot table. This one does not:
+  `mergeAllˢ nothing (ofˢ (strmˢ (inputˢ zero) ∷ []))` — one scripted
+  input, one flattener, no shares and nothing at observable type —
+  drives `runProtocol` to `nothing` by `refl`, at fuel 4, 12, 30 and 60
+  alike, and the ROOT SUBSCRIBE'S OWN BURST is already rejected before
+  the drain runs. Bisected: `emptyˢ` accepted, `inputˢ zero` accepted,
+  `mergeAllˢ (ofˢ (strmˢ emptyˢ))` accepted, the above REJECTED. So it
+  is neither the input nor the flattener but an INPUT UNDER a
+  flattener, and the defect is in `toPlain` rather than in the slot
+  table. Narrowing the palette would not have found it.
+  **THE DECOMPOSITION IS NOW WRITTEN DOWN AND HALF OF IT IS PROVEN**:
+  `docs/run-soundness.md`. `runProtocol` is a pure fold, so acceptance
+  is characterised by a predicate over the STREAM alone —
+  `Verify-Input-Well-Formed.Well-Shaped`, 0 postulates — whose premises
+  are the complement of `stepProtocol`'s rejection sites, one for one.
+  A census of those sites: two are unreachable for elaborated runs
+  (`handoff`, `close _ cutPending` are constructed nowhere in
+  `Rx.Elaborate`), four are stream-local ordering and bracketing, and
+  the remaining three — over-delivery, under-delivery, and an emit into
+  a settled instant — are ONE scalar equation seen from three
+  directions. That equation is `Owes` (Run-Well-Formed), defined rather
+  than postulated: an arrival fans out to exactly as many chains as its
+  source has live announces. It is the single place the evaluator's
+  state reaches the wire.
+  **WHAT IS LEFT IN `Run-Well-Formed` IS TWO LEAVES**, `subscribe-shaped`
+  and `cascade-shaped`, each saying the evaluator emits a well-shaped
+  burst and preserves `Owes`; `drain-shaped` and `run-wellFormed⇓` are
+  bodies over them. The per-former split belongs in `cascade-shaped`,
+  and those formers are exactly the srxjs operators this proof exists
+  to judge. The module is still indexed at `Closed Γ (machineEmitᵗ a)`
+  and inherits the falsity above; re-indexing it to the elaboration
+  remains what discharges this row.
+  **DELETED AS NOT LOAD-BEARING**: `Rx.Evaluator.Freshness.Registry`
+  (registry-id freshness) and `.Shares` (the connect latch). Measured:
+  the automaton never observes a registry id — a registry row reading
+  `4` against a wire reading `3`, both off the one `sourceᵏ` mint at
+  two different moments — so no predicate on `EvalSt.registry` can be
+  an input to a claim about what `runProtocol` accepts. `.Mono` and
+  `.Preserve` are NOT in that category: `Rx.Evaluator.Reducible`
+  consumes them for the descent.
 
 ## Tier 2 — what Main asserts beside the main theorem
 

@@ -118,5 +118,11 @@ foldBatch st []       = flushBatch st
 foldBatch st (x ∷ xs) = let (out , st′) = step-batch x st
                         in out ++ foldBatch st′ xs
 
-impl-batchSimultaneous : ∀ {A : Set} → List (InstEmit A) → List (InstEmit (List A))
-impl-batchSimultaneous = foldBatch batch-init
+-- `impl-batchSimultaneous = foldBatch batch-init` STOOD HERE and is
+-- gone.  It was the batcher as an AGDA FUNCTION, and the harness tested
+-- it against the spec over a list -- which said nothing about the
+-- evaluator, since neither side ran.  What the harness compares now is
+-- a RUN of `Rx.Batch.batchSimultaneousᵖ` inside the machine against the
+-- spec applied to the unbatched run.  `foldBatch batch-init` survives
+-- as the fold itself and is still what the proof's middle rung names;
+-- only the alias, and the claim it invited, are retired.

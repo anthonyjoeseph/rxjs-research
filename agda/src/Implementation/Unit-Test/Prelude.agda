@@ -43,15 +43,16 @@ open import Data.String using (String)
 open import Data.Vec using () renaming (_∷_ to _∷ⱽ_; [] to []ⱽ)
 
 open import Rx.Prim using (InstEmit)
-open import Rx.Exp using (Ctx; Closed; Val; natᵗ; emptyᵉ; takeᵉ; nat̂)
+open import Rx.Exp using (Ctx; Closed; Val; natᵗ; listᵗ; emptyᵉ; takeᵉ; nat̂)
 open import Rx.SExp using (SExp; emitᵗ; plainᵛ)
 open import Rx.Elaborate using (elaborate)
 open import Rx.Envelope.Decode using (decodeStream)
-open import Rx.Evaluator.Builder using (evaluate↓)
-open import Rx.Slots using (Slots; shared)
+open import Rx.Palette using (plainPalette)
+open import Rx.Evaluator.Builder plainPalette using (evaluate↓)
+open import Rx.Slots plainPalette using (Slots; shared)
 open import Rx.Protocol using (wellFormed?)
 open import Rx.Emit-Eq using (eqBatched)
-open import Implementation using (impl-batchSimultaneous)
+open import Rx.Batch using (batchSimultaneousᵖ)
 open import Spec using (spec-batchSimultaneous)
 
 -- the harness's fixed context: two nat-typed slots the AUTHOR sees, and
@@ -127,7 +128,21 @@ runOf c = decodeStream {Γ = Γ₂ᵉ} {a = natᵗ}
 wellFormed : Case → Bool
 wellFormed c = wellFormed? (runOf c)
 
--- impl and spec, fed the SAME stream, must batch it identically
+-- THE SAME ROW, RUN WITH THE OPERATOR INSIDE THE MACHINE.  This is the
+-- left side of `formal-verification-batchSimultaneous`, and it is a
+-- second RUN rather than a function applied to the first: the tree is
+-- the author's program, elaborated, capped, and wrapped in the plain
+-- batching former.  `Val Γ (listᵗ t) = List (Val Γ t)` definitionally,
+-- which is why the two sides below meet without a transport.
+batchedOf : Case → List (InstEmit (List (Val Γ₂ᵉ natᵗ)))
+batchedOf c = decodeStream {Γ = Γ₂ᵉ} {a = listᵗ natᵗ}
+                (concat (evaluate↓ (fuel c)
+                          (batchSimultaneousᵖ (capProg (elaborate (prog c))))
+                          (slots c)))
+
+-- THE MACHINE'S BATCHING AND THE SPEC'S MUST AGREE.  The old shape fed
+-- ONE stream to two Agda functions and so tested no evaluator at all;
+-- this compares a run of the batching program against the spec applied
+-- to the run without it.
 agrees : Case → Bool
-agrees c = eqBatched (impl-batchSimultaneous (runOf c))
-                     (spec-batchSimultaneous (runOf c))
+agrees c = eqBatched (batchedOf c) (spec-batchSimultaneous (runOf c))

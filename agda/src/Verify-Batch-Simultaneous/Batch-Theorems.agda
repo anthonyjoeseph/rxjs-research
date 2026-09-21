@@ -3,9 +3,9 @@
 -- HISTORY, because the shape here is the whole content.  This
 -- claim used to read
 --
---   Prefix _≡_ (impl-batchSimultaneous xs) (impl-batchSimultaneous (xs ++ ys))
+--   Prefix _≡_ (foldBatch batch-init xs) (foldBatch batch-init (xs ++ ys))
 --
--- and it is FALSE.  `impl-batchSimultaneous = foldBatch batch-init`, and
+-- and it is FALSE.  The batcher is `foldBatch batch-init`, and
 -- `foldBatch st [] = flushBatch st` — so on `xs` alone the batcher FLUSHES a
 -- batch that is still open, and on `xs ++ ys` that same batch keeps growing.
 -- Machine refutation in ``git show 94a5a3c^:agda/probe/Battery-Batch-Online.agda``
@@ -39,7 +39,7 @@ open import Data.List.Relation.Binary.Prefix.Heterogeneous using (Prefix)
 open import Data.Product using (_,_)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 open import Rx.Prim        using (InstEmit)
-open import Implementation using (impl-batchSimultaneous; BatchSt; batch-init;
+open import Implementation using (foldBatch; BatchSt; batch-init;
                                  step-batch)
 
 -- The fold's EMITTED groups: `foldBatch` (.Implementation) with its terminal
@@ -75,4 +75,4 @@ postulate
   batch-online :
     ∀ {A} (xs ys : List (InstEmit A)) →
     Prefix _≡_ (foldBatch-no-flush batch-init xs)
-               (impl-batchSimultaneous (xs ++ ys))
+               (foldBatch batch-init (xs ++ ys))

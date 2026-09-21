@@ -25,8 +25,9 @@ open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_
   input; ofᵉ; emptyᵉ; mapᵉ; scanᵉ; takeᵉ; batchSyncᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ;
   varᵉ; deferᵉ; mintᵉ; varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ;
   strmᵗ; nilᵗ; consᵗ; foldᵗ; listᵗ; add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ)
-open import Rx.Evaluator.Builder using (evaluate↓)
-open import Rx.Slots using (scripted; shared; Slot; Slots)
+open import Rx.Palette using (plainPalette)
+open import Rx.Evaluator.Builder plainPalette using (evaluate↓)
+open import Rx.Slots plainPalette using (scripted; shared; Slot; Slots)
 open import CLI.JSON using (jarr; jbool; jnum; jobj; JSON; jstr)
 open import CLI.Encode using (encodeValues)
 

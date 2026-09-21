@@ -1,6 +1,6 @@
 -- An all-Agda QuickCheck: generate random well-typed programs (exp tree +
 -- scripted inputs) over a fixed 2-slot nat context, run them through the
--- evaluator, and check impl-batchSimultaneous ≡ spec-batchSimultaneous on
+-- evaluator, and check the BATCHING RUN ≡ spec-batchSimultaneous on
 -- the resulting stream. A fast in-Agda dev loop for the implementation.
 --
 --   agda --compile --compile-dir=_cli src/QuickCheck.agda
@@ -70,9 +70,8 @@ open import Rx.SExp using (SExp; STm; SFn; inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ
 open import Data.List.Membership.Propositional using (_∈_)
 open import Rx.Protocol using (wellFormed?)
 open import Rx.Emit-Eq using (eqBatched)
-open import Implementation using (impl-batchSimultaneous)
 open import Spec using (spec-batchSimultaneous)
-open import Implementation.Unit-Test.Prelude using (Γ₂; slots₂; cached; runOf)
+open import Implementation.Unit-Test.Prelude using (Γ₂; slots₂; cached; runOf; batchedOf)
 open import Agda.Builtin.IO using (IO)
 open import CLI.IO using (_>>=_; getContents; putStr; Unit)
 
@@ -748,8 +747,9 @@ oneCase : ℕ → Gen (Marks × List String)
 -- row names the author's program, since the cap is the harness's and
 -- `runOf` re-applies it wherever the row is run.
 oneCase d = genExp d >>=G λ e →
-  let s    = runOf (cached "?" FUEL e slots₂)
-      impl = impl-batchSimultaneous s
+  let c    = cached "?" FUEL e slots₂
+      s    = runOf c
+      impl = batchedOf c
       spec = spec-batchSimultaneous s
       agreeFails = if eqBatched impl spec then [] else report e impl spec ∷ []
       wfFails    = if wellFormed? s then [] else reportWF e s ∷ []

@@ -605,7 +605,8 @@ wiring-selftest:
 	  echo "$$out" | grep -q "bad-lemma" || { echo "SELFTEST FAIL: bad-lemma not reported — R2 has stopped firing"; fail=1; }; \
 	  echo "$$out" | grep -q "eta-lemma" || { echo "SELFTEST FAIL: eta-lemma not reported — R2 no longer sees through the mandated eta-expansion"; fail=1; }; \
 	  for n in good-lemma nested computed other top-line via-top via-mod both-mods run \
-	           consume with-only via-with nested-with-only via-nested-with; do \
+	           consume with-only via-with nested-with-only via-nested-with \
+	           import-arg via-import-arg apply; do \
 	    echo "$$out" | grep -q "    $$n$$" && { echo "SELFTEST FAIL: $$n reported, but it is legitimately wired"; fail=1; }; \
 	  done; \
 	  echo "$$out" | grep -q "^    \.\.\." && { echo "SELFTEST FAIL: a bare \`...\` node surfaced as a definition — with-arm owners must be per-site and exempt"; fail=1; }; \

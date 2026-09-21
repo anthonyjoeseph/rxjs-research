@@ -53,3 +53,17 @@ open import Probed.Apparatus using (Confirms; Separates)
 -- THE PIPELINE-SIDE CLAIMS, claimed from the root for the same reason.
 open import Probed.Pipeline-Claims using (row-online)
 
+
+-- THE SHARE-CHANNEL READINGS: which slot types `subs-shared` leaves
+-- open, and the refutation of the lane-based repair.
+open import Probed.Share-Channel using (sawᴰ; sawᴼ; sawᶠ; sawᴸ; sawᴱ; sawʸ)
+
+-- THE PALETTE INSTANTIATED, and its inhabitants run: the predicate
+-- admits the three accepted definitions and the evaluator reproduces
+-- `plainPalette`'s own normal forms with them installed.
+open import Probed.Authored-Palette using (bar-off; bar-on; okᴰ; okᴼ; okʸ)
+
+-- THE SHAPE READINGS taken before either leaf of the run-soundness
+-- route is ground: where the authorship hypothesis comes from, and
+-- what it costs the induction.
+open import Probed.Authored-Shape using (slot-authored; stamp-is-barred)

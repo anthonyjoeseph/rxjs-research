@@ -20,7 +20,9 @@
 -- dispatch, the truncation's, the bracket's two ends, the flattener's
 -- wrap, the merge's bump and the plain install -- are the third.
 -- Nothing here is delicate; it is long because the relation is wide.
-module Rx.Evaluator.Freshness.Preserve where
+open import Rx.Palette using (Palette)
+
+module Rx.Evaluator.Freshness.Preserve (P : Palette) where
 
 open import Data.Bool using (Bool; true; false)
 open import Data.List using (List)
@@ -32,12 +34,12 @@ open import Relation.Nullary using (yes; no)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Exp using (Ctx; Closed; Val; obs; FnClo; _×ᵗ_; _≟ᵗ_)
-open import Rx.Evaluator using (Sched; EvalSt; Path; Frame; NodeId; NodeState;
+open import Rx.Evaluator P using (Sched; EvalSt; Path; Frame; NodeId; NodeState;
   AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ; Stream;
   switchKill; scanDispatch; takeDispatch; thruWrap; mergeAllBump;
   scanVals; takeVals; cell-st; take-st; batchSync-st; mergeAll-st; switch-st;
   exhaust-st; lookupNode)
-open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeInner⇓; thruConsume⇓;
+open import Rx.Evaluator.Domain P using (subscribeE⇓; subscribeInner⇓; thruConsume⇓;
   thruWalk⇓; mergeAllDrain⇓; innerFinish⇓; innerReact⇓; stepFrame⇓; pushBurst⇓;
   subscribeAll⇓; sharedConnect⇓; subscribeSharedSlot⇓;
   subs-floor; subs-shared; subs-hot-done; subs-hot-live; subs-cold-sync;
@@ -52,9 +54,9 @@ open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeInner⇓; thruCon
   step-map; step-scan; step-take; step-batchSync; step-from-inner; step-thru-outer;
   push-nil; push-cons; sub-all; connect-live; connect-died;
   slot-spent; slot-join; slot-connect)
-open import Rx.Evaluator.Freshness using (nodeCt; PreservedBelow; FrameAbove;
+open import Rx.Evaluator.Freshness P using (nodeCt; PreservedBelow; FrameAbove;
   pres-same; pres-trans; pres-write)
-open import Rx.Evaluator.Freshness.Mono using (subscribeE-mono; stepFrame-mono;
+open import Rx.Evaluator.Freshness.Mono P using (subscribeE-mono; stepFrame-mono;
   subscribeInner-mono; thruConsume-mono; switchKill-node)
 
 -- the fold's dispatch rewrites its own node and nothing else
