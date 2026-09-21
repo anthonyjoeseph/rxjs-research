@@ -22,9 +22,7 @@
 -- value IS a body paired with the environment it closed over, so the
 -- expression face concludes about that pair directly and no lemma
 -- relating a peel to a substitution is owed anywhere.
-open import Rx.Palette using (Palette)
-
-module Rx.Evaluator.Reducible (P : Palette) where
+module Rx.Evaluator.Reducible where
 
 open import Data.Bool using (Bool; true; false; if_then_else_; T; _∧_)
 open import Data.Fin using (Fin; toℕ)
@@ -48,7 +46,7 @@ open import Relation.Nullary.Decidable using (⌊_⌋)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 
 open import Rx.Prim using (Tick; PlainEvent; valueᵖ; completeᵖ; hot; cold)
-open import Rx.Slots P using (scripted; shared; Tree; embed)
+open import Rx.Slots using (scripted; shared)
 open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_; listᵗ; obs; _≟ᵗ_;
   Ctx; Closed; Val; Exp; Tm; FnClo; applyClo; Env; []ᵉ; _∷ᵉ_; evalWith; foldVals;
   lookupEnv; input; ofᵉ; emptyᵉ; takeᵉ; batchSyncᵉ;
@@ -61,7 +59,7 @@ open import Rx.Exp.Guarded using (gsizeᵉ; gsizeᵗ; gsizeᵗˢ; gsize-unfoldμ
 open import Rx.Inputs-Below using (ib-unfoldμ; ib-topᵉ)
 open import Rx.Mint using (nodeᵏ; regᵏ; sourceᵏ; freshId; setAt)
 open import Decide using (∧ˡ; ∧ʳ)
-open import Rx.Evaluator P using (Stream; Burst; Sched; EvalSt; Path; Frame; _↠_;
+open import Rx.Evaluator using (Stream; Burst; Sched; EvalSt; Path; Frame; _↠_;
   map-f; take-f; scan-f; batchSync-f; from-inner; thru-outer; share-sink;
   mergeAllᵒ; switchᵒ; exhaustᵒ; AllOp; NodeId; NodeState;
   cell-st; take-st; batchSync-st; mergeAll-st; switch-st; exhaust-st;
@@ -69,9 +67,9 @@ open import Rx.Evaluator P using (Stream; Burst; Sched; EvalSt; Path; Frame; _�
   lookupNode; installNode; oneShotBurst; spentBurst; memberSource;
   splitEvents; splitBurst; consumeUsable; hasRoom; switchKill; thruWrap;
   register; atSlot; lowerFloor; burstCompleted)
-open import Rx.Evaluator.Freshness P using (lookup-set; PreservedBelow)
-open import Rx.Evaluator.Freshness.Preserve P using (subscribeE-preserves)
-open import Rx.Evaluator.Domain P using (srcFrame; subscribeE⇓; pushBurst⇓; stepFrame⇓;
+open import Rx.Evaluator.Freshness using (lookup-set; PreservedBelow)
+open import Rx.Evaluator.Freshness.Preserve using (subscribeE-preserves)
+open import Rx.Evaluator.Domain using (srcFrame; subscribeE⇓; pushBurst⇓; stepFrame⇓;
   step-map; step-scan; step-take; step-batchSync; push-nil; push-cons;
   subs-of; subs-empty; subs-map; subs-take-zero; subs-take-suc; subs-scan;
   subs-batchSync; subs-mint; subs-defer; subs-floor; subs-hot-done; subs-hot-live;
@@ -929,7 +927,7 @@ mutual
         _ , subs-cold-async below slEq refl refl refl
           , satValues (redDatas _ okD sync) ∷ []
   red-input {Γ = Γ} i ρ k ok (acc rsK) {lo = lo} κ now sched st
-      | yes below | shared d {ok = okd} =
+      | yes below | shared d {ok = okS} {ok′ = okd} =
         red-input-shared i d (rsK (<ᵇ⇒< (toℕ i) k ok)) ρ
           κ below now sched slEq st
 
@@ -945,18 +943,19 @@ mutual
   -- this one's values are the definition's, which is what the
   -- recursion returns and what the connect hands straight back.
   red-input-shared : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo Θ}
-      (i : Fin n) (d : Tree Γ (lookup Γ i))
-      {okd : T (inputsBelowᵉ (toℕ i) (embed d))}
+      (i : Fin n) (d : Closed Γ (lookup Γ i))
+      {okS : T (isData (lookup Γ i))}
+      {okd : T (inputsBelowᵉ (toℕ i) d)}
     → Acc _<_ (toℕ i)
     → (ρ : Env Γ Θ)
       (κ : Path Γ lo (lookup Γ i) t) (below : toℕ i < lo)
       (now : Tick) (sched : Sched Γ)
-    → Sched.slots sched i ≡ shared d {ok = okd}
+    → Sched.slots sched i ≡ shared d {ok = okS} {ok′ = okd}
     → (st : EvalSt e)
     → Σ (Stream Γ (lookup Γ i) × Sched Γ × EvalSt e) λ r →
         subscribeE⇓ {e = e} (Θ , input i , ρ) κ now sched st r
           × StreamSat (Red (lookup Γ i)) (proj₁ r)
-  red-input-shared {Γ = Γ} i d {okd} aI ρ κ below now sched slEq st
+  red-input-shared {Γ = Γ} i d {okS} {okd} aI ρ κ below now sched slEq st
       with memberSource (toℕ i) (EvalSt.completedSources st) in doneEq
   ... | true =
         _ , subs-shared {κ = κ} {below = below} slEq
@@ -969,8 +968,8 @@ mutual
                 (slot-join {κ = κ} {below = below} doneEq connEq refl)
             , []
   ...   | false
-          with redExpAcc (embed d) []ᵉ tt (toℕ i) okd aI
-                 (<-wellFounded (gsizeᵉ (embed d)))
+          with redExpAcc d []ᵉ tt (toℕ i) okd aI
+                 (<-wellFounded (gsizeᵉ d))
                  (share-sink i ≤-refl) now
                  (record sched
                     { mint = setAt regᵏ (suc (freshId regᵏ (Sched.mint sched)))

@@ -64,18 +64,17 @@ open import Relation.Binary.PropositionalEquality
 open import Rx.Prim     using (Fuel; InstEmit; PlainEvent; valueᵖ; completeᵖ)
 open import Rx.Exp      using (Ctx; Closed; Val; []ᵉ)
 open import Rx.SExp     using (inputˢ; plainᵛ)
-open import Rx.Authored using (Authᵉ)
-open import Rx.Palette.SExp using (sexpPalette)
-open import Rx.Slots sexpPalette using (Slots)
+open import Rx.Elaborated using (Elabᵉ)
+open import Rx.Slots using (Slots)
 open import Rx.Elaborate using (elaborate)
 open import Rx.Envelope using (machineEmitᵗ)
 open import Rx.Envelope.Decode using (decodeStream)
-open import Rx.Evaluator sexpPalette using (Sched; EvalSt; Arrival; Stream;
+open import Rx.Evaluator using (Sched; EvalSt; Arrival; Stream;
   chainsOf; arrSource; sched-init; st-init; root)
-open import Rx.Evaluator.Domain sexpPalette using (subscribeE⇓; cascade⇓; drain⇓;
+open import Rx.Evaluator.Domain using (subscribeE⇓; cascade⇓; drain⇓;
                                        evaluate⇓; eval-run;
                                        drain-done; drain-empty; drain-step)
-open import Rx.Evaluator.Builder sexpPalette using (evaluate!; evaluate↓)
+open import Rx.Evaluator.Builder using (evaluate!; evaluate↓)
 open import Rx.Protocol using (ProtocolSt; protocol-init; runProtocol;
                                countIn; Accepted; accepted)
 open import Verify-Input-Well-Formed.Well-Shaped using
@@ -148,7 +147,7 @@ postulate
   subscribe-shaped :
     ∀ {n} {Γ : Ctx n} {a} {e : Closed Γ (machineEmitᵗ a)} {ins : Slots Γ}
       {burst sched₀ st₀} →
-    Authᵉ e →
+    Elabᵉ e →
     subscribeE⇓ {e = e} {lo = n} ([] , e , []ᵉ) root 0
       (sched-init e ins) (st-init e) (burst , sched₀ , st₀) →
     Σ ProtocolSt λ S₀ →
@@ -158,13 +157,13 @@ postulate
 -- LEAF 2: one cascade emits a well-shaped burst and preserves the
 -- agreement.
 --
--- ITS AUTHORSHIP PREMISE IS ON `e` AND THAT IS PROBABLY NOT YET
+-- ITS ELABORATION PREMISE IS ON `e` AND THAT IS PROBABLY NOT YET
 -- ENOUGH, which is worth saying before the grind rather than after.
--- `Authᵉ e` says the ROOT is authored; what this leaf walks is `st`,
--- whose nodes were installed by subscribing `e` and are therefore
--- authored in any REAL run -- but `st` is universally quantified here,
--- so nothing in the statement says so.  The missing piece is a
--- node-authorship invariant on `EvalSt`, carried alongside `Owes` and
+-- `Elabᵉ e` says the ROOT is an elaboration; what this leaf walks is
+-- `st`, whose nodes were installed by subscribing `e` and are
+-- therefore elaborations in any REAL run -- but `st` is universally
+-- quantified here, so nothing in the statement says so.  The missing
+-- piece is a node-provenance invariant on `EvalSt`, carried alongside `Owes` and
 -- threaded by `drain-shaped` exactly as `Owes` already is.  It is not
 -- written because guessing its shape is the expensive kind of mistake:
 -- `Owes` itself replaced two guessed bridge clauses that measurement
@@ -183,7 +182,7 @@ postulate
   cascade-shaped :
     ∀ {n} {Γ : Ctx n} {a} {e : Closed Γ (machineEmitᵗ a)}
       {ar : Arrival Γ} {sched′ sched″ st st′ out} {S : ProtocolSt} →
-    Authᵉ e →
+    Elabᵉ e →
     Owes {e = e} st S →
     cascade⇓ {e = e} ar sched′ st (out , sched″ , st′) →
     Σ ProtocolSt λ S′ →
@@ -207,15 +206,15 @@ postulate
 drain-shaped :
   ∀ {n} {Γ : Ctx n} {a} {e : Closed Γ (machineEmitᵗ a)}
     {fuel : Fuel} {sched : Sched Γ} {st : EvalSt e} {rest} {S : ProtocolSt} →
-  Authᵉ e →
+  Elabᵉ e →
   Owes {e = e} st S →
   drain⇓ {e = e} fuel sched st rest →
   Σ ProtocolSt λ S′ → WellShaped S (decodeStream (concat rest)) S′
-drain-shaped {S = S} au ow drain-done      = S , ws-nil
-drain-shaped {S = S} au ow (drain-empty _) = S , ws-nil
-drain-shaped {S = S} au ow (drain-step {out = out} {rest = rest} _ c d)
-  with cascade-shaped au ow c
-... | S′ , wsOut , ow′ with drain-shaped au ow′ d
+drain-shaped {S = S} el ow drain-done      = S , ws-nil
+drain-shaped {S = S} el ow (drain-empty _) = S , ws-nil
+drain-shaped {S = S} el ow (drain-step {out = out} {rest = rest} _ c d)
+  with cascade-shaped el ow c
+... | S′ , wsOut , ow′ with drain-shaped el ow′ d
 ...   | S″ , wsRest =
       S″ , subst (λ z → WellShaped S z S″) (sym dEq) (ws-++ wsOut wsRest)
       where
@@ -235,16 +234,18 @@ drain-shaped {S = S} au ow (drain-step {out = out} {rest = rest} _ c d)
 -- than over `SExp`, so the simul statement is an instance of this one
 -- rather than a separate claim.
 --
--- IT CARRIES `Authᵉ e`, AND THE COMMENT THAT USED TO STAND HERE GAVE
+-- IT CARRIES `Elabᵉ e`, AND THE COMMENT THAT USED TO STAND HERE GAVE
 -- THE REASON IT WAS WRONG AS THE REASON IT WAS RIGHT: "the two leaves
 -- know nothing of the author's syntax."  They do not need the author's
 -- syntax; they need to know there IS one.  Without the premise the
--- statement is FALSE, and not subtly -- `sexpPalette` shut the forgery
+-- statement is FALSE, and not subtly -- `Rx.Slots` shut the forgery
 -- channel in the slot TABLE and left the ROOT PROGRAM arbitrary, so
 -- the same three lines that inhabited the table's gap inhabit this
 -- one: `mintᵉ (ofᵉ (instEmitᵛ nilᵗ tok tok deliveryᵛ ∷ []))` is
 -- rejected by `refl` against an ordinary one-input table
--- (Refuted.Forged-Root).
+-- (Refuted.Forged-Root).  The premise is ONE FORMER DEEP rather than a
+-- second grammar over the whole of `Exp`, because the definition side
+-- is answered by the telescope now and not by a predicate on syntax.
 --
 -- The index is GENERALISED before the derivation is matched on:
 -- `evaluate⇓`'s stream argument is `burst ++ rest`, and matching it
@@ -253,12 +254,12 @@ drain-shaped {S = S} au ow (drain-step {out = out} {rest = rest} _ c d)
 run-wellFormed⇓ :
   ∀ {n} {Γ : Ctx n} {a} {fuel : Fuel} {e : Closed Γ (machineEmitᵗ a)}
     {ins : Slots Γ} (s : Stream Γ (machineEmitᵗ a)) →
-  Authᵉ e →
+  Elabᵉ e →
   evaluate⇓ fuel e ins s →
   Accepted (runProtocol protocol-init (decodeStream (concat s)))
-run-wellFormed⇓ _ au (eval-run {burst = burst} {rest = rest} sub dr)
-  with subscribe-shaped au sub
-... | S₀ , wsBurst , ow₀ with drain-shaped au ow₀ dr
+run-wellFormed⇓ _ el (eval-run {burst = burst} {rest = rest} sub dr)
+  with subscribe-shaped el sub
+... | S₀ , wsBurst , ow₀ with drain-shaped el ow₀ dr
 ...   | S₁ , wsRest =
       wellShaped-accepted (subst (λ z → WellShaped protocol-init z S₁)
                                  (sym dEq) (ws-++ wsBurst wsRest))
@@ -271,7 +272,7 @@ run-wellFormed⇓ _ au (eval-run {burst = burst} {rest = rest} sub dr)
 run-wellFormed :
   ∀ {n} {Γ : Ctx n} {a} (fuel : Fuel) (e : Closed Γ (machineEmitᵗ a))
     (ins : Slots Γ) →
-  Authᵉ e →
+  Elabᵉ e →
   Accepted (runProtocol protocol-init
              (decodeStream (concat (evaluate↓ fuel e ins))))
-run-wellFormed fuel e ins au = run-wellFormed⇓ _ au (proj₂ (evaluate! fuel e ins))
+run-wellFormed fuel e ins el = run-wellFormed⇓ _ el (proj₂ (evaluate! fuel e ins))

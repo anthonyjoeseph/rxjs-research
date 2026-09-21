@@ -28,9 +28,7 @@
 -- out of the counter, and the only frame whose identifier is not fixed
 -- that way is the one its caller handed it -- which is exactly what
 -- `FrameAbove` asks about.
-open import Rx.Palette using (Palette)
-
-module Rx.Evaluator.Freshness (P : Palette) where
+module Rx.Evaluator.Freshness where
 
 open import Data.Bool using (true; false)
 open import Data.Maybe using (just)
@@ -44,7 +42,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; con
 
 open import Rx.Exp using (Ctx; Closed)
 open import Rx.Mint using (nodeᵏ; freshId)
-open import Rx.Evaluator P using (Sched; EvalSt; Frame; NodeId; NodeState;
+open import Rx.Evaluator using (Sched; EvalSt; Frame; NodeId; NodeState;
   map-f; take-f; scan-f; batchSync-f; from-inner; thru-outer;
   lookupNode; setNode)
 

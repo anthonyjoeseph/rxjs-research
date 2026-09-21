@@ -20,14 +20,9 @@ open import Rx.Exp                using (Ctx; Ty; Exp; listᵗ)
 open import Rx.Envelope           using (machineEmitᵗ)
 open import Rx.SExp               using (SExp; plainᵛ)
 open import Rx.Elaborate          using (elaborate)
--- PINNED AT `plainPalette`, WHICH IS THE EVALUATOR AT FULL SCOPE.  The
--- statement below quantifies over every table that palette admits, and
--- `elaborated-accepted` is REFUTED there -- see its ledger row.  Moving
--- this module to a narrower palette is what discharges it.
-open import Rx.Palette using (plainPalette)
-open import Rx.Evaluator.Builder plainPalette using (evaluate↓)
+open import Rx.Evaluator.Builder using (evaluate↓)
 open import Rx.Envelope.Decode using (decodeStream)
-open import Rx.Slots plainPalette using (Slots)
+open import Rx.Slots using (Slots)
 open import Rx.Batch using (batchSimultaneousᵖ)
 open import Rx.Protocol           using (ProtocolSt; Owed; protocol-init; runProtocol; stepProtocol; paidOff; allZero; Accepted;
   settle; applyEvents; hasOwed; bumpOwed; cancelOwed; removeOne; countIn)
@@ -1126,14 +1121,21 @@ batch-agreement xs acc =
 -- `elaborate`, and saying so by SCOPE costs no hypothesis and leaves
 -- nothing downstream carrying a side condition.
 --
--- THIS IS WHAT `Verify-Input-Well-Formed.Run-Well-Formed` OWES, AND IT
--- DOES NOT YET SAY IT.  `run-wellFormed` there is indexed at
--- `Closed Γ (machineEmitᵗ a)` and is refuted by the emit above, as are
--- the three leaves under it -- `Inv` cannot hold of a state no former
--- could have built.  Instantiating it at `elaborate e` would inherit
--- the falsity rather than escape it, so the leaf is stated here in the
--- shape it has to have, and re-indexing that module to the elaboration
--- is what discharges it.
+-- THE TABLE NEEDS NO HYPOTHESIS AND THAT IS RECENT.  It used to: a
+-- `Slots` was open at an observable-typed SHARED slot, where a
+-- definition reaches the wire unwrapped, and the same hand-built emit
+-- inhabited the table as well as the root.  `Rx.Slots` charges
+-- `isData` on both arms now, so only the root is left to say anything
+-- about -- which this statement already does, by quantifying over
+-- `SExp` rather than `Closed`.
+--
+-- SO THIS IS NOW A BODY WAITING TO BE WRITTEN RATHER THAN A CLAIM
+-- WAITING FOR A DESIGN.  `Verify-Input-Well-Formed.run-wellFormed`
+-- has exactly this shape with an `Elabᵉ` premise in place of the
+-- `SExp` index, and `elab-mint (elab-toPlain e)` discharges that
+-- premise.  Joining them retires this postulate onto that module's
+-- two leaves; it is left standing here only so the ledger records one
+-- move at a time.
 postulate
   elaborated-accepted :
     ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : SExp Γ [] [] [] t)

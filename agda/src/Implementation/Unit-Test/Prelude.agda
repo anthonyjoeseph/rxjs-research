@@ -38,6 +38,7 @@ module Implementation.Unit-Test.Prelude where
 
 open import Data.Bool using (Bool)
 open import Data.List using (List; []; concat)
+open import Data.Fin using (zero; suc)
 open import Data.Nat using (ℕ)
 open import Data.String using (String)
 open import Data.Vec using () renaming (_∷_ to _∷ⱽ_; [] to []ⱽ)
@@ -47,9 +48,8 @@ open import Rx.Exp using (Ctx; Closed; Val; natᵗ; listᵗ; emptyᵉ; takeᵉ; 
 open import Rx.SExp using (SExp; emitᵗ; plainᵛ)
 open import Rx.Elaborate using (elaborate)
 open import Rx.Envelope.Decode using (decodeStream)
-open import Rx.Palette using (plainPalette)
-open import Rx.Evaluator.Builder plainPalette using (evaluate↓)
-open import Rx.Slots plainPalette using (Slots; shared)
+open import Rx.Evaluator.Builder using (evaluate↓)
+open import Rx.Slots using (Slots; shared)
 open import Rx.Protocol using (wellFormed?)
 open import Rx.Emit-Eq using (eqBatched)
 open import Rx.Batch using (batchSimultaneousᵖ)
@@ -83,8 +83,14 @@ open import Spec using (spec-batchSimultaneous)
 -- whole timing axis is uncovered -- what remains is the synchronous
 -- one, where every value enters through an `ofˢ`.  The blockage lifts
 -- on its own the day the elaboration's leaves become definitions.
+-- THE TABLE IS WRITTEN SLOT BY SLOT RATHER THAN WITH A WILDCARD
+-- because `shared` now charges `T (isData t)` as well, and that test
+-- needs a CONCRETE `lookup Γ₂ᵉ i` to reduce.  Both slots are `natᵗ`,
+-- so both discharge by unification once the index is split.
 slots₂ : Slots Γ₂ᵉ
-slots₂ _ = shared emptyᵉ
+slots₂ zero          = shared emptyᵉ
+slots₂ (suc zero)    = shared emptyᵉ
+slots₂ (suc (suc ()))
 
 -- one cached counterexample: a label, and the run that produced it
 record Case : Set where

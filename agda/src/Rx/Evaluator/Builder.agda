@@ -30,9 +30,7 @@
 -- SO THE EVALUATOR IS A PROJECTION.  `evaluate↓` is `proj₁` of
 -- `evaluate!`, and a projection computes only as far as the thing
 -- projected is a real body.
-open import Rx.Palette using (Palette)
-
-module Rx.Evaluator.Builder (P : Palette) where
+module Rx.Evaluator.Builder where
 
 open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.Bool.ListAction using (any)
@@ -55,22 +53,22 @@ open import Relation.Nullary.Decidable using (⌊_⌋)
 open import Rx.Prim using (Fuel; Tick)
 open import Rx.Exp using (Ty; obs; _≟ᵗ_; Ctx; Closed; Val; []ᵉ)
 open import Rx.Mint using (nodeᵏ; freshId; setAt)
-open import Rx.Slots P using (Slots)
-open import Rx.Evaluator P using (Stream; Sched; EvalSt; Path; root; share-sink; _↠_;
+open import Rx.Slots using (Slots)
+open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; root; share-sink; _↠_;
   Frame; map-f; scan-f; take-f; batchSync-f; from-inner; thru-outer;
   AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ; NodeId; NodeState;
   cell-st; take-st; batchSync-st; mergeAll-st; switch-st; exhaust-st;
   lookupNode; setNode; hasRoom; aliveThroughᶠ;
   Arrival; arrTick; arrTy; arrVal; AtFloor; RegId; chainsOf; cascadeLatch;
   sched-next; sched-init; st-init; shareAdmit; shareLatch)
-open import Rx.Evaluator.Domain P using (subscribeInner⇓; mergeAllDrain⇓; innerFinish⇓; innerReact⇓; stepFrame⇓; foldPath⇓;
+open import Rx.Evaluator.Domain using (subscribeInner⇓; mergeAllDrain⇓; innerFinish⇓; innerReact⇓; stepFrame⇓; foldPath⇓;
   dispatchShare⇓; shareGo⇓; chainStep⇓; cascadeGo⇓; cascade⇓; drain⇓; evaluate⇓; inner;
   drain-nil; drain-no-room; drain-room; finish-all-drain; finish-switch-clear;
   finish-exhaust-clear; finish-nil; react-false; react-alive; react-dead; step-map; step-scan;
   step-take; step-batchSync; step-from-inner; step-thru-outer; fold-root; fold-sink; fold-step;
   disp; go-nil; go-cut; go-live; chain-step; casc-nil; casc-cut; casc-live; casc-run;
   drain-done; drain-empty; drain-step; eval-run)
-open import Rx.Evaluator.Reducible P using (Red; red-val; red-walk; reducible)
+open import Rx.Evaluator.Reducible using (Red; red-val; red-walk; reducible)
 
 ------------------------------------------------------------------
 -- WHAT EVERY ARRIVING VALUE IS.

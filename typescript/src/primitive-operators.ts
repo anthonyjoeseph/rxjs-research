@@ -12,6 +12,10 @@ import {
   take as rxTake,
   takeWhile,
   tap,
+  Subject as rxSubject,
+  OperatorFunction,
+  EMPTY,
+  concat,
 } from "rxjs";
 import {
   CutLedger,
@@ -39,6 +43,86 @@ import {
 } from "./constructors.js";
 
 export { exhaustAll, mergeAllAll, switchAll } from "./join.js";
+
+export type Sync<A> = {
+  type: "sync";
+  value: A[];
+};
+export type Async<A> = {
+  type: "async";
+  value: A;
+};
+
+export const batchSyncPlain =
+  <A>(): OperatorFunction<A, Sync<A> | Async<A>> =>
+  (ob) =>
+    // state lives PER SUBSCRIPTION (not per pipe): a pipeline containing
+    // batchSync may be subscribed more than once — e.g. a reused cold
+    // inner delivered to a join by several triggers
+    rxDefer(() => {
+      let isSync = true;
+      const coldVals: A[] = [];
+
+      return merge(
+        ob.pipe(
+          mergeMap((val) => {
+            if (isSync) {
+              coldVals.push(val);
+              return EMPTY;
+            }
+            return rxOf({ type: "async" as const, value: val });
+          }),
+        ),
+        rxDefer(() => {
+          isSync = false;
+          return rxOf({ type: "sync" as const, value: coldVals });
+        }),
+      );
+    });
+
+export const wrapCold: {
+  <A>(cold: Observable<Observable<A>>): never;
+  <A>(cold: Observable<A>): Observable<InstEmit<A>>;
+} = (cold: unknown): never => {
+  const source = Symbol();
+  const retval: Observable<InstEmit<unknown>> = concat(
+    rxOf<InstEmit<unknown>>({
+      events: [{ type: "init", source }],
+      instant: SUBSCRIBE_FRAME,
+      source,
+      kind: "subscribe",
+    }),
+    (cold as Observable<InstEmit<unknown>>).pipe(
+      batchSyncPlain(),
+      rxMap((emit): InstEmit<unknown> => {
+        if (emit.type === "sync") {
+          return {
+            kind: "delivery",
+            events: emit.value.map((value) => ({ type: "value", value })),
+            instant: Symbol(),
+            source,
+          };
+        }
+        return {
+          kind: "delivery",
+          events: [{ type: "value", value: emit.value }],
+          instant: Symbol(),
+          source,
+        };
+      }),
+    ),
+    rxOf<InstEmit<unknown>>({
+      events: [
+        { type: "close", source, reason: "exhausted" },
+        { type: "complete" },
+      ],
+      instant: Symbol(),
+      source,
+      kind: "subscribe",
+    }),
+  );
+  return retval as never;
+};
 
 // a one-shot subscription burst (Agda's oneShotBurst): a source that
 // lives and dies inside its own subscribe frame — init, its values,

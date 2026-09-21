@@ -1,10 +1,10 @@
 -- A COUNTEREXAMPLE TO `run-wellFormed` AS IT WAS STATED, AND THE
--- REASON IT NOW CARRIES AN AUTHORSHIP PREMISE.
+-- REASON IT NOW CARRIES AN ELABORATION PREMISE.
 --
--- `sexpPalette` closed the forgery channel in the SLOT TABLE: a shared
--- definition must carry its own authorship, so no table can hand the
--- machine an envelope no elaboration produced.  That left the ROOT
--- PROGRAM untouched.  `run-wellFormed` quantified over an arbitrary
+-- `Rx.Slots` closed the forgery channel in the SLOT TABLE by charging
+-- `isData` on both slot arms, so no table stands at the type that
+-- reached the wire unwrapped.  That left the ROOT PROGRAM untouched,
+-- and no condition on slots could ever have reached it.  `run-wellFormed` quantified over an arbitrary
 -- `e : Closed Γ (machineEmitᵗ a)` -- its own header said "every run of
 -- every ELABORATED program" while its statement said every run of every
 -- PLAIN one -- and the gap is inhabited by the same three lines that
@@ -17,7 +17,9 @@
 -- `payOwed` underflows, and the automaton rejects.  No slot table is
 -- involved: the table below is a single ordinary scripted input.
 --
--- WHAT IT COST TO FIX: one premise, `Authᵉ e`, threaded through
+-- WHAT IT COST TO FIX: one premise, `Elabᵉ e` -- ONE FORMER DEEP,
+-- since the definition side is answered by the telescope and not by a
+-- predicate over the whole of `Exp` -- threaded through
 -- `subscribe-shaped`, `cascade-shaped`, `drain-shaped` and
 -- `run-wellFormed⇓`.  `input-wellFormed` discharges it at the only
 -- call site, since its program is `elaborate (inputˢ i)` and
@@ -43,10 +45,9 @@ open import Rx.Exp using (Ctx; natᵗ; Closed; ofᵉ; mintᵉ; nilᵗ; varᵗ)
 open import Rx.SExp using (plainᵛ; emitᵗ)
 open import Rx.Envelope using (instEmitᵛ)
 open import Rx.Elaborate using (deliveryᵛ)
-open import Rx.Palette using (plainPalette)
-open import Rx.Slots plainPalette using (Slots; scripted)
+open import Rx.Slots using (Slots; scripted)
 open import Rx.Envelope.Decode using (decodeStream)
-open import Rx.Evaluator.Builder plainPalette using (evaluate↓)
+open import Rx.Evaluator.Builder using (evaluate↓)
 open import Rx.Protocol using (ProtocolSt; protocol-init; runProtocol)
 
 Γ₁ : Ctx 1

@@ -25,9 +25,8 @@ open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_
   input; ofᵉ; emptyᵉ; mapᵉ; scanᵉ; takeᵉ; batchSyncᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ;
   varᵉ; deferᵉ; mintᵉ; varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ;
   strmᵗ; nilᵗ; consᵗ; foldᵗ; listᵗ; add; sub; mul; eqᵖ; ltᵖ; eqᵘ; notᵖ)
-open import Rx.Palette using (plainPalette)
-open import Rx.Evaluator.Builder plainPalette using (evaluate↓)
-open import Rx.Slots plainPalette using (scripted; shared; Slot; Slots)
+open import Rx.Evaluator.Builder using (evaluate↓)
+open import Rx.Slots using (scripted; shared; Slot; Slots)
 open import CLI.JSON using (jarr; jbool; jnum; jobj; JSON; jstr)
 open import CLI.Encode using (encodeValues)
 
@@ -333,13 +332,19 @@ decodeSlotAt fuel Γ slotsJ i = nth slotsJ (toℕ i) >>=? λ j →
   if tag is "scripted" then
     (getField "input" j >>=? decodeInput fuel Γ (lookup Γ i) >>=? λ inp →
      tOf (isData (lookup Γ i)) >>=? λ ok → just (scripted {ok = ok} inp))
-     -- scripted slots carry data only; an obs-typed slot must be `shared`
   else if tag is "shared" then
     (getField "def" j >>=? decodeExp fuel Γ [] [] [] (lookup Γ i) >>=? λ d →
+     -- BOTH slot arms carry data only (Rx.Slots): the scripted one for
+     -- descent, the shared one for legality.  An obs-typed slot decodes
+     -- to nothing in either arm, which is the same rejection TS enforces
+     -- twice over — `genValTy` never draws an `obs`, and `wrapCold`
+     -- returns `never` on an `Observable<Observable<A>>`.
+     tOf (isData (lookup Γ i)) >>=? λ ok →
      -- the telescope is stratified: a def may reference only earlier
-     -- slots (Rx.Slots), so a non-stratified case decodes to nothing —
-     -- the same rejection TS enforces by generator construction
-     tOf (inputsBelowᵉ (toℕ i) d) >>=? λ ok → just (shared d {ok = ok}))
+     -- slots, so a non-stratified case decodes to nothing — the same
+     -- rejection TS enforces by generator construction
+     tOf (inputsBelowᵉ (toℕ i) d) >>=? λ ok′ →
+     just (shared d {ok = ok} {ok′ = ok′}))
   else nothing
 
 decodeSlots : ℕ → ∀ {n} (Γ : Ctx n) → List JSON → Maybe (Slots Γ)

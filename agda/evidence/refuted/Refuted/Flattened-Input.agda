@@ -35,14 +35,13 @@ open import Rx.Prim using (ObservableInput; hot; cold; Timed; after_,_)
 open import Rx.Exp using (Ctx; Ty; obs; natᵗ; []ᵉ; Closed)
 open import Rx.SExp using (SExp; STm; inputˢ; ofˢ; strmˢ; mergeAllˢ; emptyˢ;
   plainᵛ; emitᵗ)
-open import Rx.Palette using (plainPalette)
-open import Rx.Slots plainPalette using (Slots; scripted)
+open import Rx.Slots using (Slots; scripted)
 open import Rx.Elaborate using (elaborate)
 open import Rx.Envelope.Decode using (decodeStream)
-open import Rx.Evaluator plainPalette using
+open import Rx.Evaluator using
   (EvalSt; sched-init; st-init; root; regSource)
-open import Rx.Evaluator.Reducible plainPalette using (reducible)
-open import Rx.Evaluator.Builder plainPalette using (evaluate↓)
+open import Rx.Evaluator.Reducible using (reducible)
+open import Rx.Evaluator.Builder using (evaluate↓)
 open import Rx.Protocol using (ProtocolSt; protocol-init; runProtocol)
 
 Γ₁ : Ctx 1
