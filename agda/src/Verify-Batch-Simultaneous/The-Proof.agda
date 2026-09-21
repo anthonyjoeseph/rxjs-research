@@ -1157,12 +1157,30 @@ elaborated-accepted κ fuel e ins =
                  (elab-slots refl ins refl)
 
 -- THE TRANSCRIPTION LEAF: THE NODE COMPUTES THE FOLD.  This is the
--- only place the evaluator and the batcher meet, and it is local
--- because `batchSimultaneousᵖ` is a scan -- one emit in, one emit out,
--- no schedule of its own.  Given acceptance, fan-out exactness settles
--- an instant's owed count inside the cascade that minted it, so the
--- accumulator is EMPTY at every `drain-step` boundary and the induction
--- is per cascade rather than over the whole run.
+-- only place the evaluator and the batcher meet.  Given acceptance,
+-- fan-out exactness settles an instant's owed count inside the cascade
+-- that minted it, so the accumulator is EMPTY at every `drain-step`
+-- boundary and the induction is per cascade rather than over the whole
+-- run.
+--
+-- IT IS FALSE AS IT STANDS, AND SAYING SO IS THE POINT OF THIS NOTE.
+-- The right side is `foldBatch`, which flushes mid-stream on `paidOff`
+-- and flushes the open tail at the end; `Rx.Batch`'s body flushes only
+-- when a LATER instant arrives and has no end hook at all.  Both gaps
+-- are named in that file.  This is not a hard proof waiting for
+-- effort -- it is an equation waiting for its left side, and attempting
+-- it before the operator is finished is wasted work.
+--
+-- AND THE LOCALITY ARGUMENT NEEDS RE-ESTABLISHING.  This header used to
+-- read "it is local because `batchSimultaneousᵖ` is a scan -- one emit
+-- in, one emit out, no schedule of its own".  The operator is now
+-- `mergeAllᵉ ∘ mapᵉ ∘ scanᵉ`, because a batcher must be able to DECLINE
+-- to emit and a scan cannot; `mergeAllᵉ` carries a `mergeAll-st` with a
+-- queue and an active count, so locality is a lemma now rather than an
+-- observation.  It should still hold: `hasRoom nothing active = true`,
+-- so at unlimited concurrency nothing is ever queued and each
+-- synchronous inner drains inside the cascade that opened it.  That is
+-- the first thing to prove here, and `cascade-shaped` wants it too.
 --
 -- WHAT IT IS NOT is a claim about batching.  It says the machine runs
 -- `step-batch`, nothing more; that `step-batch` is correct is

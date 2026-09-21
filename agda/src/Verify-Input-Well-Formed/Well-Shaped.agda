@@ -35,7 +35,7 @@
 -- control flow -- the nested `with`s, `openFresh`, `enter` -- ONCE.
 -- Whatever proves the evaluator's streams well-shaped never reasons
 -- about `stepProtocol` again: only about `settle` and `applyEvents`,
--- which are plain folds.  See docs/run-soundness.md.
+-- which are plain folds.
 module Verify-Input-Well-Formed.Well-Shaped where
 
 open import Data.Bool  using (Bool; true; false; if_then_else_)

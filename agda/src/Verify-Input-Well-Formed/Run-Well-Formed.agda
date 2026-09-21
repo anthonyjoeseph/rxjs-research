@@ -138,6 +138,37 @@ Owes {Γ = Γ} st S =
   ∀ (ar : Arrival Γ) →
     length (chainsOf ar st) ≡ countIn (arrSource ar) (ProtocolSt.live S)
 
+------------------------------------------------------------------
+-- BOUNDARIES -- stop and report rather than pushing through.
+------------------------------------------------------------------
+
+-- These are the shapes where continuing costs more than asking.  They
+-- are design questions wearing a grind's clothes, and each one has
+-- been expensive before.
+--
+--   * A CASE NEEDING MORE OF `Sched.mint` THAN FRESHNESS.
+--     `Rx/Evaluator/Freshness*` already carries freshness and
+--     monotonicity at an arbitrary key.  Needing a stronger fact --
+--     distinctness, an equality, a strict bound -- means the id
+--     discipline is wrong rather than under-proven.
+--
+--   * ANY CASE THAT CANNOT CLOSE WITHOUT RE-OPENING `Rx.Elaborate`.
+--     The elaboration is the thing under judgement here; changing it
+--     to fit a proof is the proof grading its own work.  A real
+--     finding there is welcome, but it is a separate decision.
+--
+--   * A FORMER REACHED THAT EMITS `handoff` OR `close _ cutPending`.
+--     `Well-Shaped` marks rejection sites 5 and 6 UNREACHABLE on the
+--     grounds that nothing in `Rx.Elaborate` constructs either -- only
+--     `Rx.Envelope`'s decoder does.  A new former can reinstate them,
+--     and `EmitOK` would then be missing two premises rather than
+--     carrying two dead ones.
+--
+--   * ANY TEMPTATION TO WEAKEN `Accepted`.  Settledness was
+--     deliberately split out of it (`Rx/Protocol.agda`, the note
+--     crediting Anthony).  The claim is `Accepted` of the run and
+--     nothing less.
+
 -- LEAF 1: the root subscribe emits a well-shaped burst and leaves the
 -- two ledgers agreeing.  `st-init`'s registry is empty and
 -- `protocol-init`'s live set is empty, so the seed is trivial; the

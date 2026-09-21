@@ -181,24 +181,23 @@ the row is DIFFICULTY.
 
 ```
 formal-verification-batchSimultaneous    The-Proof.agda — a REAL body over
- │                                        three leaves — tier 1
- ├─ batchSimultaneousᵖ                    the operator as a PLAIN FORMER rather
- │                                        than an Agda fold over a list
- ├─ batch-transcription                   that former's run computes step-batch
- ├─ elaborated-accepted                   an elaborated run is protocol-legal
- │                                        — FALSE at plainPalette; sexpPalette
- │                                        (Rx.Authored) is the route, now built
- └─ batch-agreement                      proven, and claimed by Main in its
-                                          own right rather than through the top
+ │                                        three leaves
+ ├─ batchSimultaneousᵖ                    Rx/Batch.agda — a REAL body:
+ │                                        scan for the state, mergeMap→EMPTY
+ │                                        for the silence — tier 2 finishes it
+ ├─ batch-transcription                   that operator's run computes
+ │                                        step-batch — tier 3
+ └─ elaborated-accepted                   PROVEN, over run-wellFormed, whose
+     └─ subscribe-shaped, cascade-shaped   two leaves are tier 3
 
-batch-online                              claimed by Main in its own right —
-                                          nothing above consumes it — tier 2
+  batch-agreement, batch-online           PROVEN; claimed by Main in their own
+                                          right — nothing above consumes them
 
   evaluate↓ = proj₁ ∘ evaluate!           Rx/Evaluator/Builder.agda — REAL
      └─ every value-path leaf is a body; the corpus runs; the tower descends
 
-  toPlain                                 Rx/Elaborate.agda — a REAL body over
-     └─ four postulated formers            four leaves — tier 0
+  toPlain                                 Rx/Elaborate.agda — a REAL body,
+                                          0 postulates
 
   every tier above is stated over Rx.Exp's syntax
 ```
@@ -215,319 +214,188 @@ every guard, every `<?` and the dry marker leave the machine entirely.
 A row's class must agree with its postulate's header, which is where the
 research lives; where they disagree, the header wins.
 
-## Tier 1 — the proof statement over the elaboration
+## Tier 1 — the plain evaluator mirrors rxjs
 
-**THE EVALUATOR TIER IS GONE.** Subscribe is a bottom-up burst assembly and the
-candidate recurses on the TYPE, so the machine is DEFINED end to end and
-carries no postulate. A drain that cannot re-mint a parked candidate is not
-statable over a candidate with no bound.
+**THIS TIER HAS NOTHING TO DO WITH SRXJS.** No `SExp`, no elaboration, no
+envelope, no simul variant of anything. The single question is whether
+`Rx.Exp` and its evaluator are a faithful mirror of plain rxjs, and the judge
+is the TypeScript differential harness: `prop-test.ts` draws a program, runs
+it through ordinary rxjs operators in `plain-eval.ts`, runs the same program
+through the Agda evaluator reached via `CLI.Decode`, and compares two LISTS OF
+VALUES exactly. Neither side carries an envelope, which is what makes it a
+comparison of two plain machines rather than of one against a projection.
 
-**AND THE SEAM UNDER IT IS TRANSCRIBED, SO WHAT IS LEFT HERE IS THE STATEMENT.**
-The top line quantifies over a simul tree run through `toPlain`, whose cut and
-three flatteners are now bodies, so every question about what it ASSERTS has
-something compiled to ask it of. The legs are the statement's own — restating
-it, the legality it needs, the purity ruling it may or may not carry a
-hypothesis for, and reducibility's second half.
-
-### The monster
-
-(no monster) — a monster is a NAME, and this tier's statements are not written
-yet. The top line standing today is a bare postulate over the machine that has
-just been replaced, so it is the thing to be RESTATED rather than a thing to
-aim at, and a cone drawn round it would hold the restatement outside itself.
-The tier takes a monster at the commit that first states the restatement.
-
-### Big picture tier roadmap
-
-- **THE TOP LINE, RESTATED AND POSTULATED THROUGH (Anthony: "just make it
-  typecheck for now and postulate out all the details").** The theorem
-  quantified over a SIMUL tree, elaborated by `toPlain` and run on the plain
-  evaluator, with `spec-batchSimultaneous` and its mirror at
-  `instEmitᵗ uniqᵗ a` — no bridge. The impl becomes a `Tm` carrying a free
-  variable of the stream type, `Ty` having no arrows; the spec stays an Agda
-  function over `Val`, being the mathematical statement rather than a library
-  one. Everything between is a leaf postulate. What the leg buys is a tower
-  that TYPECHECKS over the new trees, which is what makes the legs below it
-  arguable from code instead of from prose.
-
-- **THEN WHATEVER LEGALITY THE TOP LINE NEEDS, STATED OVER THE TABLE AND NOT
-  OVER THE RUN.** The old leaf claimed the automaton rejects no emit of a
-  canonical run, and it was false: a slot is writable at the envelope type and
-  elaboration passes an `input` through untouched, so a table naming an instant
-  past the counter reaches the output without entering a clause. The route that
-  split that claim over the syntax died with it. What is owed instead is a
-  predicate on the SLOTS — and the first question it answers is whether it is
-  per-slot or per-table, since a shared slot is read at several sites.
-
-- **THEN THE PURITY RULING, WHICH DECIDES WHETHER THE TOP LINE CARRIES A
-  HYPOTHESIS AT ALL.** A simul tree's non-observable positions take an author's
-  own terms and a unique is reachable from there, so a mapping function can
-  forge an envelope at any instant it likes. Either a predicate on the tree,
-  discharged per program by a decision procedure, or a restriction on the TYPES
-  at those positions in the mould of `isData`, making the forgery
-  unrepresentable. The precedent sits in the tree already — guardedness here is
-  not a predicate but a context gate, synchronous self-reference being a type
-  error. The leg is the ruling and the churn it causes.
-
-- **THEN REDUCIBILITY'S SECOND HALF, AND IT IS WHERE THE RED LINE IS TESTED.**
-  The existing candidate is about a FRESH subscribe and says nothing about a
-  cascade, which resumes stored machinery. Its standing argument that no state
-  invariant is owed rests on a fan-out carrying no PAYLOAD — and protocol
-  traffic is precisely what a fan-out does carry, so the argument does not
-  transfer. The soundness half therefore wants its own invariant on the
-  evaluator's state, seeded at the root and preserved per cascade, leaving the
-  guard measure and the accessibility argument untouched. It holds, or the leg
-  reports.
-
-- **AND THE README'S TWO SEMANTIC LAWS COME BACK HERE, DELETED FOR NOW
-  (Anthony).** `readme-batch-order-is-delivery-order` and
-  `readme-one-subscribe-one-batch` were stated over the machine tier 1 is
-  deleting, so porting them twice buys nothing.  They are gone from `src` and
-  unwired from Main; `git show 729afbd2:agda/src/Readme-Theorems.agda` restores
-  both statements and the header recording that every probe row sat at a
-  program with no flattener — which is where their risk actually lives, and the
-  first thing a restatement owes.
-
-### The ledger
-
-- **`batchSimultaneousᵖ`** (The-Proof) — SHAPE: the operator as a node the
-  evaluator RUNS, so the top line is about a streaming operator rather than
-  about a fold over a finished list. The shape is decided and the body is not
-  written: `Implementation.foldBatch` is already `step-batch` threaded as
-  state, so it transcribes as `scanᵉ` carrying `BatchSt` with a `mapᵉ`
-  projecting. It must subscribe NOTHING — a `mergeAllᵉ` formulation moves the
-  mint counter and leaves every id downstream shifted by a renaming.
-  **IT NOW LIVES IN `Rx.Batch`**, an operator's home rather than a claim's,
-  because the HARNESS names it too: `Implementation.Unit-Test.Prelude.batchedOf`
-  runs it in the machine and `agrees` compares that run against the spec
-  applied to the unbatched run. Until it has a body the harness TYPECHECKS
-  against it but cannot RUN — the GHC backend has nothing to compile for a
-  postulate — so the QuickCheck executable is knowingly red and this row is
-  what unblocks it. `impl-batchSimultaneous` is deleted; `foldBatch batch-init`
-  is what the proof's middle rung names.
-- **`batch-transcription`** (The-Proof) — SHAPE: that the former's run computes
-  `step-batch` on the decoded emit. Blocked on the row above — there is no body
-  to induct over until the former has one. It is local because the former is a
-  scan: `sched-init` ignores its expression and fuel is spent per ARRIVAL, so
-  both runs share a scheduler, and acceptance settles an instant inside the
-  cascade that minted it, leaving the accumulator empty at every `drain-step`
-  boundary. It claims only that the machine RUNS the fold; that the fold is
-  correct is `batch-agreement`, over a bare list with no evaluator in scope.
-- **`elaborated-accepted`** (The-Proof) — FALSITY, `RECOVERY`: that an
-  elaborated run is accepted by the automaton. It is stated at
-  `plainPalette`, where it is FALSE, and it is carried in that shape
-  deliberately — see below.
-  **SCOPING TO `SExp` IS NOT ENOUGH ON ITS OWN, AND A MACHINE-CHECKED
-  TABLE SAYS SO.** `shared` takes its def from the palette, and at
-  `plainPalette` that is an arbitrary `Closed Γ t`, so at an observable
-  type the TABLE supplies a program nothing elaborated:
-  `mergeAllˢ nothing (inputˢ zero)` — an ordinary author program — over
-  a slot holding `ofᵉ (strmᵗ (mintᵉ (ofᵉ (instEmitᵛ nilᵗ tok tok
-  deliveryᵛ ∷ [])) ) ∷ [])` drives `runProtocol` to `nothing` by `refl`.
-  No predicate on the AUTHOR'S TREE can see it; the forgery is in the
-  table.
-  **THE ROUTE IS THE PALETTE, NOT A RESTRICTION.** Narrowing `shared` in
-  place — `T (isData t)`, say — does close it, and was tried: it makes
-  the table unrepresentable, because `isData (obs _)` is `false`. It also
-  DELETES the observable-typed slot, so an input that supplies
-  observables becomes undeclarable. That is the evaluator's expressive
-  scope, and the proof does not get to spend it. `Rx.Slots` is instead
-  parameterized by a `Palette` (`Tree` + `embed`), so this row is
-  discharged by restating it over a narrower palette while the CLI, the
-  QuickCheck corpus and the unit tests keep running at `plainPalette`.
-  Both instantiations coexist in one build; `embed` carries NO laws, the
-  evaluator consuming it in exactly two places (`subs-shared`,
-  `red-input-shared`) and the shared-slot descent being
-  `<-wellFounded (gsizeᵉ (embed d))` — accessibility of a number, which
-  survives opacity. **THE NARROW PALETTE IS NOW BUILT** (`Rx.Authored`,
-  `Rx.Palette.SExp`; postulate-free, `-W error`): a legal fragment over
-  `Exp`, mutual with `Tm` on account of `strmᵗ`, exactly as this row
-  anticipated. Six readings in `Probed.Share-Channel` located the
-  channel before it was written, and they are what fixed its shape:
-  a DATA-typed slot cannot forge at all — not because `isData` forbids
-  a closure, but because the reference elaborates to `inputᵖ i` whose
-  deliveries arm is `mergeAllᵉ (mapᵉ stamp (batchSyncᵉ (input i)))`,
-  and `subs-shared` fires at that INNER `input i`, so the definition is
-  substituted UNDER `stamp`; an OBSERVABLE-typed slot stands at
-  `plainᵗ (obs u) = obs (emitᵗ u)`, so its VALUES are observables of
-  envelopes that the consumer's `mergeAllᵖ` subscribes directly via
-  `laneᵛ`, never passing `stamp`. So the bar sits on `strmᵗ` — the only
-  INTRODUCTION form for an observable-typed value — and nowhere else,
-  which is what lets the family catch observables buried in products
-  and lists WITHOUT recursing into the slot's type. It must not recurse
-  into the type: a definition may flatten an `obs natᵗ` of its own
-  making, and `obs natᵗ` is outside the image of `plainᵗ` entirely.
-  **TWO TIDIER SHAPES WERE REFUTED FIRST**, both by measurement. A
-  protocol-blind reading of `SExp` (making a definition BE an author
-  tree) does not exist: at `mergeAllˢ` it must flatten a stream whose
-  values are elaborations and hand back a plain value, and the types
-  say `emitᵗ t` where the reading needs `plainᵗ t`. And making `embed`
-  the flattener's own lane extraction — `mapᵉ laneᵛ ∘ elaborate` —
-  typechecks exactly at the slot type and is wrong: the reference
-  already applies `laneᵛ`, so such a definition is laned twice, and it
-  is read REJECTED over an EMPTY inner, so the fault is structural.
-  **THE PALETTE IS NOT A NARROWING**, which `Probed.Authored-Palette`
-  is there to say: the data-typed definition, the static
-  observable-typed one and the DYNAMIC one — a `mapᵉ` over a live
-  source, which is what an author's `source$.pipe(map(x => inner$))`
-  produces — all derive, and `sexpPalette` reproduces `plainPalette`'s
-  own normal forms with them installed. The run-soundness route
-  (`Run-Well-Formed` → `Input-Well-Formed`, and so `Main`) now runs at
-  it; the CLI, the QuickCheck corpus and the unit tests keep running at
-  `plainPalette`. **AND THE PALETTE EXPOSED A SECOND FORGERY, AT THE ROOT.**
-  `sexpPalette` shut the channel in the slot TABLE and left the ROOT
-  PROGRAM arbitrary: `run-wellFormed` quantified over any
-  `e : Closed Γ (machineEmitᵗ a)` — its header said "every run of every
-  ELABORATED program" while its statement said every PLAIN one — and
-  the same three lines inhabit that gap,
-  `mintᵉ (ofᵉ (instEmitᵛ nilᵗ tok tok deliveryᵛ ∷ []))`, rejected by
-  `refl` against an ordinary one-input table (`Refuted.Forged-Root`).
-  Fixed: `Authᵉ e` is now a premise on `subscribe-shaped`,
-  `cascade-shaped`, `drain-shaped` and `run-wellFormed⇓`, discharged at
-  the only call site by `elab-mint (elab-toPlain _)`.
-  **THE TABLE SIDE NEEDS NO PREMISE AT ALL**, which is worth recording
-  because it is the palette earning its keep: `Sched` holds
-  `slots : Slots Γ`, and at this palette a `shared` slot cannot be
-  BUILT without its authorship, so every `Sched Γ` in scope already has
-  authored slots and extraction is the second projection
-  (`Probed.Authored-Shape`). `Sched.slots` is written once, in
-  `sched-init`, and never rewritten.
-  **THE INDUCTION IS TWO-LAYER, AND THAT IS NOW KNOWN RATHER THAN
-  GUESSED.** `inputᵖ`'s own `stamp` is a `strmᵗ` at an ENVELOPE type,
-  so `auth-strm`'s side condition is uninhabited there
-  (`stamp-is-barred`, by `λ x → x`) — meaning an elaborated tree
-  contains envelope-typed streams that are not elaborations of any
-  `SExp`, `Authᵉ` is NOT closed structurally over the elaboration's
-  image, and `auth-elab` is an opaque escape rather than a convenience.
-  So neither leaf can be an induction on `Authᵉ` alone: at an
-  `auth-elab` node the proof must switch to an induction on the `SExp`
-  the node carries, and the two interleave. It terminates on the
-  measure already in the telescope — `inputsBelowᵉ` drops the slot
-  ceiling at every hop from an elaboration into a slot's definition,
-  the same stratification `red-input-shared` buys its descent from.
-  WHAT IS STILL OWED on this row: (i) a node-authorship invariant on
-  `EvalSt`, carried alongside `Owes` — `Authᵉ e` says the ROOT is
-  authored, while `cascade-shaped` walks a universally quantified `st`
-  whose nodes are authored only in a REAL run; its shape should be
-  settled by the first traffic-bearing frame rather than guessed, since
-  `Owes` itself replaced two guessed bridge clauses that measurement
-  refuted. (ii) joining the two acceptance routes, so that
-  `elaborated-accepted` is a body over `run-wellFormed` rather than a
-  leaf of its own. The refutation was not the slot table alone: `Closed` can build a `delivery` whose source no `init`
-  ever enlisted, `settle` seeds owed from `countIn s []`, and `payOwed`
-  underflows — so the statement is false at `Closed` for reasons scoping to
-  `SExp` removes entirely, at the cost of no hypothesis.
-  **AND A SECOND COUNTEREXAMPLE, WHICH THE PALETTE ROUTE DOES NOT
-  TOUCH.** The forgery above lives in the slot table. This one does not:
-  `mergeAllˢ nothing (ofˢ (strmˢ (inputˢ zero) ∷ []))` — one scripted
-  input, one flattener, no shares and nothing at observable type —
-  drives `runProtocol` to `nothing` by `refl`, at fuel 4, 12, 30 and 60
-  alike, and the ROOT SUBSCRIBE'S OWN BURST is already rejected before
-  the drain runs. Bisected: `emptyˢ` accepted, `inputˢ zero` accepted,
-  `mergeAllˢ (ofˢ (strmˢ emptyˢ))` accepted, the above REJECTED. So it
-  is neither the input nor the flattener but an INPUT UNDER a
-  flattener, and the defect is in `toPlain` rather than in the slot
-  table. Narrowing the palette would not have found it.
-  **THE DECOMPOSITION IS NOW WRITTEN DOWN AND HALF OF IT IS PROVEN**:
-  `docs/run-soundness.md`. `runProtocol` is a pure fold, so acceptance
-  is characterised by a predicate over the STREAM alone —
-  `Verify-Input-Well-Formed.Well-Shaped`, 0 postulates — whose premises
-  are the complement of `stepProtocol`'s rejection sites, one for one.
-  A census of those sites: two are unreachable for elaborated runs
-  (`handoff`, `close _ cutPending` are constructed nowhere in
-  `Rx.Elaborate`), four are stream-local ordering and bracketing, and
-  the remaining three — over-delivery, under-delivery, and an emit into
-  a settled instant — are ONE scalar equation seen from three
-  directions. That equation is `Owes` (Run-Well-Formed), defined rather
-  than postulated: an arrival fans out to exactly as many chains as its
-  source has live announces. It is the single place the evaluator's
-  state reaches the wire.
-  **WHAT IS LEFT IN `Run-Well-Formed` IS TWO LEAVES**, `subscribe-shaped`
-  and `cascade-shaped`, each saying the evaluator emits a well-shaped
-  burst and preserves `Owes`; `drain-shaped` and `run-wellFormed⇓` are
-  bodies over them. The per-former split belongs in `cascade-shaped`,
-  and those formers are exactly the srxjs operators this proof exists
-  to judge. The module is still indexed at `Closed Γ (machineEmitᵗ a)`
-  and inherits the falsity above; re-indexing it to the elaboration
-  remains what discharges this row.
-  **DELETED AS NOT LOAD-BEARING**: `Rx.Evaluator.Freshness.Registry`
-  (registry-id freshness) and `.Shares` (the connect latch). Measured:
-  the automaton never observes a registry id — a registry row reading
-  `4` against a wire reading `3`, both off the one `sourceᵏ` mint at
-  two different moments — so no predicate on `EvalSt.registry` can be
-  an input to a claim about what `runProtocol` accepts. `.Mono` and
-  `.Preserve` are NOT in that category: `Rx.Evaluator.Reducible`
-  consumes them for the descent.
-
-## Tier 2 — what Main asserts beside the main theorem
-
-**THE MISC TIER, AND IT IS NOW ONE ROW PLUS A DEBT.** It held ten claims about
-the machine — determinacy, fuel coherence, the μ laws, run monotonicity and the
-three timing claims. Every one was stated over the evaluator tier 1 is
-rewriting, so they were deleted with recovery shas rather than transported: a
-claim about the wrong semantics is not evidence about the right one, and none
-of them blocked anything below. What is left standing is the one claim read off
-the batcher rather than the machine.
-
-**SO THE TIER'S REAL CONTENT IS A DEBT, AND IT IS NAMED RATHER THAN CARRIED.**
-Main asserts less than it did, and that is honest only while the restatement is
-scheduled — which is what the legs below are. They cannot start until the new
-machine computes, so this tier stays last for the reason it always was.
+**IT IS DISABLED ON PURPOSE AND THIS TIER IS THE "LATER".** `oracle` is absent
+from `GATE_CHEAP` and its CI job is `if: false` (Anthony: "we want to
+officially disable that check from our gate and from ci, so that we can tackle
+it later"). Done is: the sweep is green and the target is back in the gate.
 
 ### The monster
 
-`batch-online` — the only live statement here, and the only one a concrete
-program still decides. It says the batcher's answer on a prefix is the prefix
-of its answer, which is what makes a streaming reading of the spec legitimate
-at all; its unqualified form was refuted by a split closing one instant and
-leaving a second open, so the form standing today is the repaired one and the
-repair is exactly where it could still be wrong. A leaf's cone is its
-statement's vocabulary.
+(no monster) — nothing here is a claim in Agda. The judge is a differential
+run, so a disagreement is a measurement rather than a false declaration, and a
+cone would have nothing to hold.
 
 ### Big picture tier roadmap
 
-- **RESTATE DETERMINACY OVER THE NEW MACHINE, AND INSTANTIATE IT BEFORE
-  GRINDING ANY OF IT.** The old ring quantified over a subscribe relation of
-  twenty families and nothing ever ran two derivations at one set of indices;
-  the relation went with its evaluator and the ring went with it. What is owed
-  again is the same fact about whatever machine lands — a frame admitting two
-  outputs at one set of indices means the machine is not a function. The leg is
-  to state it, then refute at a single arm before inducting over all of them,
-  which is the cheap order and was never taken.
+- **RE-MEASURE BEFORE FIXING ANYTHING.** The recorded figure — 500 drawn, 400
+  emitting, 498 matching — predates the evaluator rewrite, the `Slots`
+  changes and the kinded contexts. Establish what the sweep says TODAY before
+  spending a commit on a shape that may no longer fail, or on two that have
+  become five. The receipt for this leg is the new numbers, written into
+  `oracle`'s header in the Makefile where the old ones live.
 
-- **THEN THE FUEL AND UNFOLDING LAWS, WHICH ARE THE ONES A PROGRAM DECIDES.**
-  Fuel coherence, `μ-unfold`, and more fuel extending a run rather than
-  rewriting it: three statements the old machine carried with a sweep and three
-  rows behind them. They are cheap to restate and cheap to probe, and the
-  region the old receipts never reached — a program entering a flattening node,
-  a source firing past one tick — is the region the rewrite most changes. The
-  leg's product is rows there, or a refutation.
+- **THE `exhaustAll` OVER A `mergeAll` OF A DOUBLED INNER.** One of the two
+  recorded disagreements. The doubling is what makes it interesting: the inner
+  is subscribed while an outer lane is already active, so it tests exactly the
+  arbitration `exhaustᵒ` exists to perform. Expect the finding to be in the
+  Agda evaluator rather than in the generator — but check the generator first,
+  since a mis-drawn program is cheaper to be wrong about.
 
-- **THEN THE TIMING CLAIMS, WHICH NEED AUTHORING RATHER THAN PROOF.** Locality,
-  non-interference and timing invariance were stated over nine postulated
-  abstractions and asserted close to nothing; `causality` was satisfiable by an
-  empty helper and `defer-shift` was ⊤-typed outright. Restating them means
-  DEFINING the abstractions, which is claim authoring and needs Anthony. **Not
-  GRINDABLE and never will be** — no precedent makes them mechanical, because
-  nothing is stated yet.
+- **THE `switchAll` READING A SHARED SLOT.** The other one. A shared slot is
+  subscribed down the consumer's path, and `switchᵒ` kills its previous inner
+  on each outer emit; the interaction between a kill and a share's connect is
+  the thing under test, and it has no analogue in the other two flatteners.
 
-- **AND `batch-online` IS THE ONE LEG THAT CAN RUN TODAY.** It reads the
-  batcher and not the machine, so the rewrite does not touch it and nothing
-  above it waits. Its receipt sits at the very split that refuted the
-  unqualified form; what it has never been run against is a prefix cut INSIDE a
-  flattened instant, which is the shape the new machine will start producing.
+- **RE-ARM THE GATE.** Put `oracle` back into `GATE_CHEAP` and flip the CI job
+  off `if: false`. The two move together, as the Makefile's note says. Until
+  this leg lands the tier can silently rot, which is the argument for doing it
+  in the same campaign rather than trusting a green memory.
 
 ### The ledger
 
-- **`batch-online`** — DIFFICULTY, `PROBED`: the restated form, instantiated at
-  the very split that refuted the unqualified one — a left side closing one
-  instant and leaving a second open, whose terminal flush was the old
-  statement's counterexample.
-- **The claims Main no longer makes — a DEBT, not a row.** Determinacy, fuel
-  coherence, the two μ laws, run monotonicity and the three timing claims are
-  deleted, not discharged; `git show 729afbd2` restores all four modules and
-  the three rows that were the only instantiation any of them had. They are
-  uncounted here deliberately, because a postulate ledger counts statements
-  `agda/src` makes and `agda/src` no longer makes these.
+(empty — this tier states nothing in Agda, so it postulates nothing.)
+
+
+## Tier 2 — finish `batchSimultaneousᵖ`
+
+**THE OPERATOR HAS A BODY AND THE BODY IS HONEST ABOUT WHAT IT SKIPS.**
+`Rx.Batch` is a `scanᵉ` carrying `BatchStᵗ` behind a `mergeAllᵉ` to `emptyᵉ` —
+scan for the state, mergeMap→EMPTY for the silence, since a batcher is one
+value in and ZERO OR ONE out. Two things are deliberately missing, both named
+in that file: the owed/live arithmetic that decides WHEN an instant flushes,
+and the final flush, `scanᵉ` having no end hook.
+
+**DONE IS THE AGDA QUICKCHECK PASSING FULLY.** `QuickCheck.agda` draws an
+`SExp`, runs the batching operator inside the machine, and compares against
+`spec-batchSimultaneous` applied to the run without it — so it is exactly the
+match this tier is for, and it decides the tier rather than merely informing
+it.
+
+**STOP AND REPORT if this work turns out to need a new former in `Rx.Exp`.**
+Not a suspicion — only if there is provably no way around it. The vocabulary
+is small on purpose and every addition is a forgery surface.
+
+### The monster
+
+(no monster) — the tier is one operator's body against one executable check.
+There is no declaration here whose falsity a cone could bound.
+
+### Big picture tier roadmap
+
+- **THE OWED/LIVE ARITHMETIC INTO `BatchStᵗ`.** `Rx.Protocol`'s automaton run
+  in producing mode: `live` as a `listᵗ uniqᵗ`, `owed` as a
+  `listᵗ (uniqᵗ ×ᵗ natᵗ)`, both data, so both are `Ty`s and the carrier just
+  grows fields. The pending slot is already where a flush announces itself, so
+  this is filling in rather than reshaping. `settleBatch` / `applyBatch` /
+  `paidOff` in `typescript/src/batch-simultaneous.ts` are the reference, and
+  `Implementation.step-batch` is the Agda twin to agree with.
+
+- **`complete` AS A FLUSH TRIGGER.** The missing end hook. `splitEventsᵛ`
+  already returns the completion flag this code ignores, so the source's own
+  completion can close the open batch — which is what `foldBatch`'s terminal
+  `flushBatch` does over a list. Worth doing second: it is only observable
+  once the owed arithmetic has stopped flushing late.
+
+- **DRIVE THE QUICKCHECK TO GREEN.** The sweep can RUN now — the GHC backend
+  had nothing to compile while the operator was a postulate, so this leg is
+  the first time the match has ever been executed. Expect the first failures
+  to be in the generator's reach rather than in the operator, and cache
+  counterexamples as rows in `Implementation.Unit-Test` as they are found.
+
+### The ledger
+
+(empty — `batchSimultaneousᵖ` is a definition, not a postulate.)
+
+
+## Tier 3 — the two run leaves, and the transcription
+
+**THIS IS WHERE THE SRXJS OPERATORS ARE ACTUALLY JUDGED.** `cascade-shaped` is
+one cascade emitting a well-shaped burst and preserving `Owes`, and its
+per-former split is the whole content: `map-f` and `scan-f` are cheap, and the
+traffic-bearing frames — the cut, the three flatteners, a share's connect —
+are the operators this proof exists to judge.
+
+**EXPECT THE ELABORATION TO MOVE, AND PLAN FOR IT.** Writing the proof will
+find things the implementation has wrong, and fixing the implementation will
+find things the proof has wrong. That cycle is the work, not an interruption
+to it — but it is also the failure mode, so report if it starts spiralling out
+rather than in.
+
+**STOP AND REPORT if this needs a new former in `Rx.Exp`** — same bar as tier
+2: only on certainty, never on suspicion. `Run-Well-Formed`'s BOUNDARIES
+header carries the other stop conditions.
+
+### The monster
+
+`Owes` — `Run-Well-Formed.agda`. It is the single place the evaluator's state
+reaches the wire, its own header says "expect it to be wrong in detail and
+corrected by contact", and it replaced four guessed invariants that
+measurement refuted. Every row in this tier routes through it, and it is a
+definition rather than a postulate, so its cone is real.
+
+### Big picture tier roadmap
+
+- **`Owes` UNDER CONTACT, AT THE FIRST TRAFFIC-BEARING FRAME.** The monster,
+  and the one thing worth attacking before anything is ground. Its two sides
+  count in different namespaces — `chainsOf` over registry rows carrying the
+  evaluator's dynamic source ids, `ProtocolSt.live` over announces carrying the
+  ids `mintᵉ` bound — and measured, those differ. So the equation holds only if
+  an arrival carries the WIRE's naming, which is a requirement on the
+  elaboration that nothing yet discharges. Settle it at a cut or a share's
+  connect, where a node is read back out of the registry; do not settle it on
+  `map-f`, which cannot tell the two readings apart.
+
+- **THE mergeAll-LOCALITY LEMMA, WHICH TWO ROWS WANT.** `batchSimultaneousᵖ`
+  is now `mergeAllᵉ ∘ mapᵉ ∘ scanᵉ`, so neither `batch-transcription` nor
+  `cascade-shaped` can treat a flattener as schedule-free any more. The fact
+  to prove: `hasRoom nothing active = true`, so at unlimited concurrency
+  nothing is ever queued and each synchronous inner drains inside the cascade
+  that opened it. Cheap, and it unblocks both.
+
+- **`cascade-shaped`'S CHEAP ARMS, TO FIX THE SHAPE.** `map-f` and `scan-f`
+  leave `sched` and `st` untouched. Landing them first is not grinding for its
+  own sake: it forces the per-former statement into its final form against
+  arms whose content is nil, so the traffic-bearing arms are written against a
+  shape that has already survived contact.
+
+- **THE TRAFFIC-BEARING FRAMES, AND THE ELABORATION CHANGES THEY FORCE.** The
+  cut, the three flatteners, a share's connect. This is the leg where the
+  virtuous cycle is expected to run, so it is also where the spiral is
+  expected if there is one — cut it into commits by FORMER, and report rather
+  than push if two consecutive formers each undo the previous one's fix.
+
+- **`batch-transcription` OVER THE FINISHED OPERATOR.** Blocked until tier 2
+  lands: the equation's right side is `foldBatch`, whose flush points the
+  current body does not have, so the statement is FALSE rather than merely
+  unproven. Its header says so.
+
+- **`subscribe-shaped` LAST.** Deliberately. `st-init`'s registry and
+  `protocol-init`'s live set are both empty, so the seed is trivial and the
+  content is what the subscribe walk installs on the way down — which is a
+  strictly smaller question once `cascade-shaped` has settled what a
+  well-shaped burst and a preserved `Owes` actually are.
+
+### The ledger
+
+- **`batch-transcription`** (The-Proof) — FALSITY, `NO EVIDENCE`: false against
+  the landed operator until tier 2 finishes it; its locality argument also
+  needs re-establishing over `mergeAllᵉ`.
+- **`cascade-shaped`** (Run-Well-Formed) — SHAPE, `NO EVIDENCE`: the per-former
+  split, and the `EvalSt` node-provenance invariant it is probably still
+  missing.
+- **`subscribe-shaped`** (Run-Well-Formed) — DIFFICULTY, `NO EVIDENCE`: trivial
+  seed, content is what the subscribe walk installs; smaller once
+  `cascade-shaped` lands.
 - **FFI, permanently trusted** — `_>>=_`/`getContents`/`putStr` (CLI/IO),
   `randFold`/`natMod` (QuickCheck). Carried, not counted.
