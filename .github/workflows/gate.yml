@@ -348,29 +348,26 @@ jobs:
   # `CLI/Main.agda`, not the tower -- so it restores the same read-only
   # caches the sweep does.
   #
-  # DISABLED DELIBERATELY, AND NO LONGER BECAUSE THE MACHINE IS MISSING
-  # (Anthony: "we want to make sure that the oracle is hooked up to the new
-  # evaluator + exp tree ... BUT we don't actually care yet if it passes").
-  # The condition this job's old note set -- it comes back on when the new
-  # evaluator computes -- HAS been met: the evaluator is defined end to end,
-  # the tower typechecks, and `CLI.Decode` reaches it through `evaluate↓`,
-  # so the CLI this job links is the new machine and not the replaced one.
+  # ON, AND IT WENT ON WHOLE -- which is the one condition the note it
+  # replaces set for switching it back: nothing was narrowed to get here.
+  # The same corpus is drawn at the same size with the same yield, and it
+  # matches on every case.
   #
-  # WIRING VERIFIED, PARITY NOT. A full sweep run against it drew 500 cases
-  # with 400 of them emitting -- so the comparison is not the vacuous kind
-  # that matches because both sides are empty -- and 498 matched. The two
-  # that did not are both flattener shapes: an `exhaustAll` over a
-  # `mergeAll` of a doubled inner, where rx replays the burst and the
-  # evaluator does not, and a `switchAll` reading a shared slot, where the
-  # two agree on the multiset and disagree on where the async value lands.
-  # Those are findings about the rewrite, scheduled rather than fixed here.
+  # WHAT IT COST WAS ONE ORDERING, in the TypeScript leg rather than in the
+  # evaluator. Both recorded divergences were the same cause wearing two
+  # flattener shapes: the driver mints ordinals in REGISTRATION order and
+  # breaks same-tick ties by them, and the plain tree registered a cold's
+  # async tail AFTER replaying its sync prefix while the evaluator registers
+  # BEFORE -- so a cold whose prefix cascade subscribed another source got
+  # the opposite ordinal in each machine, which `exhaustAll` turns into a
+  # whole inner run admitted or dropped. The reasoning is in `plain-eval.ts`
+  # at the shape it governs; register-before is ordinary rxjs, so nothing
+  # here claims a capability rxjs lacks.
   #
-  # SO IT STAYS OFF UNTIL THAT WORK IS TAKEN UP, and the rule the old note
-  # ended with is the one thing that carries over unchanged: nothing here
-  # may be narrowed to make it pass. The job is switched on again whole, or
-  # it stays off.
+  # AND THE RULE THAT CARRIES OVER UNCHANGED: nothing here may be narrowed
+  # to make it pass. A divergence is a finding about one of the two machines,
+  # and it is fixed in whichever of them drifted.
   oracle:
-    if: false
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:

@@ -2,7 +2,6 @@ import {
   EMPTY,
   Observable,
   Subject,
-  concat,
   defer as rxDefer,
   exhaustAll,
   map as rxMap,
@@ -89,12 +88,39 @@ const plainInput = (
     );
     return subject;
   }
+  // A COLD REGISTERS ITS TAIL BEFORE REPLAYING ITS PREFIX, AND THE
+  // ORDER IS OBSERVABLE RATHER THAN COSMETIC. Both orderings are
+  // ordinary rxjs -- a source may schedule and then emit, or emit and
+  // then schedule -- and with real timers the choice decides which of
+  // two same-instant deliveries is armed first. Here it decides the
+  // ORDINAL, since the driver mints those in registration order, so a
+  // cold whose prefix cascade subscribes another source either outranks
+  // that source or is outranked by it.
+  //
+  // `merge` AND NOT `concat`, WHICH IS THE WHOLE EDIT. `concat`
+  // subscribes the tail only once the prefix has completed, so every
+  // source the prefix's own cascade subscribes registers first; the
+  // Agda evaluator registers at the point of subscription, before
+  // handing the prefix back as a burst for its caller to cascade, and
+  // that is forced there rather than chosen -- a subscribe returns its
+  // burst upward, so it cannot run the cascade and then register. The
+  // two must agree for the same reason the hot slot above takes its
+  // ordinal from the slot index instead of minting one, and a flattener
+  // is where a disagreement surfaces: `exhaustAll` refuses an arrival
+  // while an inner is live, so whether the inner's completion or the
+  // outer's next value is delivered first decides whether a whole inner
+  // run is admitted or dropped.
+  //
+  // The cut is handled either way and is not what decides this:
+  // `concat` never subscribes a tail the prefix cut, while a tail
+  // registered first is severed by rx teardown through
+  // `registerSource`'s cancel.
   return rxDefer(() =>
-    concat(
-      rxOf(...input.sync),
+    merge(
       input.async.length === 0
         ? EMPTY
         : tail(driver, resolveTicks(driver.currentTick(), input.async)),
+      rxOf(...input.sync),
     ),
   );
 };

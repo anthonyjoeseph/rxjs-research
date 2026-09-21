@@ -214,61 +214,6 @@ every guard, every `<?` and the dry marker leave the machine entirely.
 A row's class must agree with its postulate's header, which is where the
 research lives; where they disagree, the header wins.
 
-## Tier 1 — the plain evaluator mirrors rxjs
-
-**THIS TIER HAS NOTHING TO DO WITH SRXJS.** No `SExp`, no elaboration, no
-envelope, no simul variant of anything. The single question is whether
-`Rx.Exp` and its evaluator are a faithful mirror of plain rxjs, and the judge
-is the TypeScript differential harness: `prop-test.ts` draws a program, runs
-it through ordinary rxjs operators in `plain-eval.ts`, runs the same program
-through the Agda evaluator reached via `CLI.Decode`, and compares two LISTS OF
-VALUES exactly. Neither side carries an envelope, which is what makes it a
-comparison of two plain machines rather than of one against a projection.
-
-**IT IS DISABLED ON PURPOSE AND THIS TIER IS THE "LATER".** `oracle` is absent
-from `GATE_CHEAP` and its CI job is `if: false` (Anthony: "we want to
-officially disable that check from our gate and from ci, so that we can tackle
-it later"). Done is: the sweep is green and the target is back in the gate.
-
-### The monster
-
-(no monster) — nothing here is a claim in Agda. The judge is a differential
-run, so a disagreement is a measurement rather than a false declaration, and a
-cone would have nothing to hold.
-
-### Big picture tier roadmap
-
-- **RE-MEASURE BEFORE FIXING ANYTHING.** The recorded figure — 500 drawn, 400
-  emitting, 498 matching — predates the evaluator rewrite, the `Slots`
-  changes and the kinded contexts. Establish what the sweep says TODAY before
-  spending a commit on a shape that may no longer fail, or on two that have
-  become five. The receipt for this leg is the new numbers, written into
-  `oracle`'s header in the Makefile where the old ones live.
-
-- **THE `exhaustAll` OVER A `mergeAll` OF A DOUBLED INNER.** One of the two
-  recorded disagreements. The doubling is what makes it interesting: the inner
-  is subscribed while an outer lane is already active, so it tests exactly the
-  arbitration `exhaustᵒ` exists to perform. Expect the finding to be in the
-  Agda evaluator rather than in the generator — but check the generator first,
-  since a mis-drawn program is cheaper to be wrong about.
-
-- **THE `switchAll` READING A SHARED SLOT.** The other one. A shared slot is
-  subscribed down the consumer's path, and `switchᵒ` kills its previous inner
-  on each outer emit; the interaction between a kill and a share's connect is
-  the thing under test, and it has no analogue in the other two flatteners.
-
-- **ENABLE THE ORACLE IN CI.** Put `oracle` back into `GATE_CHEAP` and flip
-  its CI job off `if: false`. The two move together, as the Makefile's note
-  says. It is the leg that makes the tier STAY done: until it lands the sweep
-  is a thing somebody remembers running, and a green memory is what this tier
-  was disabled behind in the first place. Nothing in the job may be narrowed
-  to make it pass.
-
-### The ledger
-
-(empty — this tier states nothing in Agda, so it postulates nothing.)
-
-
 ## Tier 2 — finish `batchSimultaneousᵖ`
 
 **THE OPERATOR HAS A BODY AND THE BODY IS HONEST ABOUT WHAT IT SKIPS.**

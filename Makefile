@@ -1507,17 +1507,18 @@ formers-selftest:
 cli-build: stripped
 	@$(call AGDA_RUN,--compile --compile-dir=../_cli src/CLI/Main.agda)
 
-# NOT A GATE TARGET, AND THAT IS A DECISION RATHER THAN AN OMISSION
-# (Anthony: "we want to officially disable that check from our gate and from
-# ci, so that we can tackle it later").  It is absent from GATE_CHEAP and its
-# CI job is `if: false`; the two are one decision and move together.
+# RUN IN CI, AS ITS OWN JOB RATHER THAN A STEP OF THE GATE.  It compares two
+# machines that take seconds to run, so it has no business waiting on the
+# tower; and it is absent from GATE_CHEAP for the reason that list states over
+# itself -- nothing on it compiles -- while this target links the CLI.  The two
+# facts are not in tension: the job is the gate this target has, and the
+# no-compile invariant is what keeps the cheap list cheap.
 #
-# WHAT IS ALREADY KNOWN ABOUT IT, so that typing it is not a rediscovery: the
-# CLI it links reaches the new evaluator through `CLI.Decode`, a full sweep
-# draws 500 cases with 400 emitting, and 498 of them match.  The two that do
-# not are flattener shapes -- an `exhaustAll` over a `mergeAll` of a doubled
-# inner, and a `switchAll` reading a shared slot -- and they are the work
-# this target is waiting on, not a reason to narrow it.
+# NOTHING HERE MAY BE NARROWED TO MAKE IT PASS.  A divergence is a finding
+# about one of the two machines and is fixed in whichever of them drifted --
+# never by shrinking the corpus, relaxing the comparison, or excluding a
+# shape.  The draw holds its own YIELD for exactly that reason, so a corpus
+# that stopped emitting is red rather than quietly vacuous.
 oracle: cli-build
 	cd typescript && npm run oracle -- $(ARGS)
 
