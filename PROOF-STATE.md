@@ -394,8 +394,8 @@ definition rather than a postulate, so its cone is real.
 - **`cascade-shaped`** (Run-Well-Formed) — SHAPE, `NO EVIDENCE`: the per-former
   split, and the `EvalSt` node-provenance invariant it is probably still
   missing.
-- **`subscribe-shaped`** (Run-Well-Formed) — DIFFICULTY, `NO EVIDENCE`: trivial
-  seed, content is what the subscribe walk installs; smaller once
-  `cascade-shaped` lands.
+- **`subscribe-shaped`** (Run-Well-Formed) — SHAPE, `NO EVIDENCE`: trivial seed,
+  content is what the walk installs — but its `Owes` conclusion carries the
+  monster's own recorded gap, so the class is the gap's and not the grind's.
 - **FFI, permanently trusted** — `_>>=_`/`getContents`/`putStr` (CLI/IO),
   `randFold`/`natMod` (QuickCheck). Carried, not counted.

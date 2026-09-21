@@ -967,6 +967,17 @@ roadmap-selftest:
 	    && { echo "SELFTEST FAIL: the DIFFICULTY floor fired on evid-birth.md, so it does not isolate the birth floor — FALSITY is the class that floor exempts"; fail=1; }; \
 	  echo "$$bir" | grep -q "b-shape" \
 	    && { echo "SELFTEST FAIL: a PARKED tier's uninstantiated row was reported — the floor binds only where work happens, since a parked row can be restated out from under by the tier below it"; fail=1; }; \
+	  bem=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/evid-birth-empty.md \
+	           --ledger scripts/roadmap-selftest/ledger.txt --census scripts/roadmap-selftest/census-birth.txt \
+	           --src-names scripts/roadmap-selftest/src-names.txt 2>&1); \
+	  if scripts/check-roadmap.py --file scripts/roadmap-selftest/evid-birth-empty.md \
+	       --ledger scripts/roadmap-selftest/ledger.txt --census scripts/roadmap-selftest/census-birth.txt \
+	       --src-names scripts/roadmap-selftest/src-names.txt > /dev/null 2>&1; then :; \
+	  else \
+	    echo "SELFTEST FAIL: the birth floor reached PAST a tier with an empty ledger — a tier whose judge is a differential run or an executable match states nothing in Agda, so reading the tier being worked as the first one carrying a CLASSED ROW makes it invisible and names a PARKED tier instead"; fail=1; \
+	  fi; \
+	  echo "$$bem" | grep -q "a-falsity" \
+	    && { echo "SELFTEST FAIL: a row one tier BELOW the empty-ledger tier being worked was named by the birth floor"; fail=1; }; \
 	  echo "$$cln" | grep -q "NOTHING HAS EVER INSTANTIATED" \
 	    && { echo "SELFTEST FAIL: the birth floor fired on a clean roadmap"; fail=1; }; \
 	  cap=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/evid-overcap.md \

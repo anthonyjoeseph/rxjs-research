@@ -57,7 +57,7 @@ exp	μᵉ	mu	yes	yes	binder
 exp	varᵉ	varE	yes	yes	binder
 exp	deferᵉ	defer	yes	yes	protocol
 exp	mintᵉ	mint	yes	yes	protocol
-exp	batchSyncᵉ	batchSync	yes	no	protocol	the author's palette has no counterpart to draw, and the elaboration writes none, so no run the all-Agda sweep produces reaches this former
+exp	batchSyncᵉ	batchSync	yes	yes	protocol	
 tm	varᵗ	varT	yes	yes	-
 tm	unit̂	unitT	yes	yes	-
 tm	bool̂	boolT	yes	yes	-
