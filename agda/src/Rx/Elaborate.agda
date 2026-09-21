@@ -9,8 +9,8 @@ open import Data.Maybe using (Maybe; nothing)
 open import Data.Nat using (ℕ)
 open import Data.Fin using (Fin)
 open import Data.Vec using (lookup)
-open import Data.Vec.Properties using (lookup-map; lookup-zipWith)
-open import Relation.Binary.PropositionalEquality using (subst; refl; cong)
+open import Data.Vec.Properties using (lookup-zipWith)
+open import Relation.Binary.PropositionalEquality using (subst; refl)
 
 open import Rx.Exp using (Ty; Ctx; Exp; Tm; Fn; listᵗ; obs; _×ᵗ_; boolᵗ; natᵗ; uniqᵗ; input; ofᵉ; emptyᵉ; μᵉ; varᵉ; deferᵉ; mintᵉ;
   mapᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; batchSyncᵉ;
@@ -21,12 +21,10 @@ open import Rx.Envelope using (instEventᵗ; closeReasonᵗ; emitKindᵗ; events
                                eventCaseᵛ; splitEventsᵛ; reassembleᵛ; instEmitᵛ;
                                initᵛ; valueᵛ; closeᵛ; completeᵛ;
                                machineEmitᵗ)
-open import Rx.SExp using (SExp; STm; inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; scanˢ;
-                           mergeAllˢ; switchAllˢ; exhaustAllˢ; μˢ; varˢ; deferˢ;
-                           varˢᵗ; unitˢ; boolˢ; natˢ; pairˢ; fstˢ; sndˢ; nilˢ;
-                           consˢ; inlˢ; inrˢ; caseˢ; foldˢ; ifˢ; primˢ; strmˢ;
-                           plainᵗ; plainᶜ; emitᵗ; emitᶜ; plainᵛ;
-                           Kind; Kinds; scriptedᵏ; sharedᵏ; slotTy; plainᵏ)
+open import Rx.SExp using (SExp; STm; inputˢ; ofˢ; emptyˢ; takeˢ; mapˢ; scanˢ; mergeAllˢ; switchAllˢ; exhaustAllˢ; μˢ;
+  varˢ; deferˢ; varˢᵗ; unitˢ; boolˢ; natˢ; pairˢ; fstˢ; sndˢ; nilˢ; consˢ; inlˢ; inrˢ; caseˢ;
+  foldˢ; ifˢ; primˢ; strmˢ; plainᵗ; plainᶜ; emitᵗ; emitᶜ; Kinds; scriptedᵏ; sharedᵏ; slotTy;
+  plainᵏ)
 
 ------------------------------------------------------------------
 -- The per-former plumbing the elaboration is a composition of.
@@ -149,7 +147,7 @@ valuesᵛ (v ∷ vs) rest = consᵗ (valueᵛ v) (valuesᵛ vs rest)
 --   the old objection -- two sources grouping separately -- is a
 --   semantics question and not a blocker, since two independent
 --   arrivals in one turn are two arrivals.
---
+
 -- WHAT IS DELIBERATELY ABSENT: the `close` at `exhausted`.  The
 -- TypeScript mirror mints one off its script's `isLast`, and
 -- `batchSyncᵉ` hands over no such bit.  It costs nothing HERE because

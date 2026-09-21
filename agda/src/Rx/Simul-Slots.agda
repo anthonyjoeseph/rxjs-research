@@ -42,7 +42,7 @@ open import Data.Bool using (T)
 open import Data.List using ([])
 open import Data.Nat  using (ℕ)
 open import Data.Vec  using (lookup)
-open import Data.Fin  using (Fin; toℕ)
+open import Data.Fin  using (toℕ)
 open import Data.Vec.Properties using (lookup-zipWith)
 open import Relation.Binary.PropositionalEquality using (subst; sym)
 

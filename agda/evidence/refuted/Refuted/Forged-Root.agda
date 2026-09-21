@@ -33,16 +33,15 @@
 module Refuted.Forged-Root where
 
 open import Data.Fin using (zero)
-open import Data.List using (List; []; _∷_; concat)
-open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ)
+open import Data.List using ([]; _∷_; concat)
+open import Data.Maybe using (Maybe; nothing)
 open import Data.Vec using () renaming (_∷_ to _∷ⱽ_; [] to []ⱽ)
 open import Data.List.Relation.Unary.Any using (here)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (cold; after_,_)
 open import Rx.Exp using (Ctx; natᵗ; Closed; ofᵉ; mintᵉ; nilᵗ; varᵗ)
-open import Rx.SExp using (plainᵛ; emitᵗ)
+open import Rx.SExp using (Kinds; scriptedᵏ; plainᵏ; emitᵗ)
 open import Rx.Envelope using (instEmitᵛ)
 open import Rx.Elaborate using (deliveryᵛ)
 open import Rx.Slots using (Slots; scripted)
@@ -53,18 +52,23 @@ open import Rx.Protocol using (ProtocolSt; protocol-init; runProtocol)
 Γ₁ : Ctx 1
 Γ₁ = natᵗ ∷ⱽ []ⱽ
 
+-- the slot is fed by a SCRIPT, which is the kind that stands at the
+-- bare payload -- so nothing the table supplies carries an envelope
+κ₁ : Kinds 1
+κ₁ = scriptedᵏ ∷ⱽ []ⱽ
+
 -- an ordinary table: one scripted input, nothing shared, nothing forged
-ins₁ : Slots (plainᵛ Γ₁)
+ins₁ : Slots (plainᵏ Γ₁ κ₁)
 ins₁ zero = scripted (cold (1 ∷ []) ((after 0 , 2) ∷ []))
 
 -- the forgery is the PROGRAM
-forged : Closed (plainᵛ Γ₁) (emitᵗ natᵗ)
+forged : Closed (plainᵏ Γ₁ κ₁) (emitᵗ natᵗ)
 forged = mintᵉ (ofᵉ (instEmitᵛ nilᵗ (varᵗ (here refl)) (varᵗ (here refl))
                                 deliveryᵛ ∷ []))
 
 S : Maybe ProtocolSt
 S = runProtocol protocol-init
-      (decodeStream {Γ = plainᵛ Γ₁} {a = natᵗ}
+      (decodeStream {Γ = plainᵏ Γ₁ κ₁} {a = natᵗ}
         (concat (evaluate↓ 60 forged ins₁)))
 
 saw-forged-root : S ≡ nothing

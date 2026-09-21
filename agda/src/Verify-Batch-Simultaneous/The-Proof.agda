@@ -16,9 +16,8 @@ open import Relation.Binary.PropositionalEquality
 
 open import Rx.Prim               using (InstEmit; Fuel; Id; Source; _at_from_as_; InstEvent; init; value; close; handoff; complete;
   EmitKind; subscribe; delivery; plumbing; cut; cutPending; exhausted)
-open import Rx.Exp                using (Ctx; Ty; Exp; listᵗ)
-open import Rx.Envelope           using (machineEmitᵗ)
-open import Rx.SExp               using (SExp; Kinds; plainᵏ)
+open import Rx.Exp                using (Ctx)
+open import Rx.SExp               using (SExp; Kinds)
 open import Rx.Elaborate          using (elaborate)
 open import Rx.Evaluator.Builder using (evaluate↓)
 open import Rx.Envelope.Decode using (decodeStream)

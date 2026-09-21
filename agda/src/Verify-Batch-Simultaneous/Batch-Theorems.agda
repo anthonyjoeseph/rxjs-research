@@ -103,16 +103,6 @@ online-from st (x ∷ xs) ys =
 -- reopened, so the groups emitted while reading `xs` are a prefix of the
 -- full output on any extension `xs ++ ys`.  The open tail is deliberately
 -- excluded on the left — it is not yet a group.
--- PROBED: `Probed.Pipeline-Claims`, at the split the restatement was
---   made for: `xs` CLOSES one instant and leaves a second OPEN, with
---   two live registrations of one source and only one of them paid,
---   and `ys` supplies the second payment.  LOAD-BEARING — the left
---   side's own `flushBatch` would have forced that open instant out
---   as a shorter group, which is the shape that refuted the
---   unqualified claim, so the row holds exactly where the old
---   statement failed.  Not reached: a right side that opens further
---   groups of its own, and any instant closed by a `subscribe`
---   rather than by paying off a delivery.
 batch-online :
   ∀ {A} (xs ys : List (InstEmit A)) →
   Prefix _≡_ (foldBatch-no-flush batch-init xs)

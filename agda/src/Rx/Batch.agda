@@ -39,19 +39,15 @@
 -- for every value the batcher declines to emit.
 module Rx.Batch where
 
-open import Data.Bool using (Bool)
 open import Data.List using (List; []; _∷_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (nothing)
 open import Relation.Binary.PropositionalEquality using (refl)
 
-open import Rx.Exp      using (Ctx; Ty; Exp; Tm; Fn; listᵗ; boolᵗ; uniqᵗ; unitᵗ;
-                               _×ᵗ_; _+ᵗ_; varᵗ; unit̂; fstᵗ; sndᵗ; pairᵗ; nilᵗ;
-                               consᵗ; inlᵗ; inrᵗ; caseᵗ; foldᵗ; ifᵗ; primᵗ; eqᵘ;
-                               appendᵗ; revᵗ; renTm; strmᵗ; ofᵉ; emptyᵉ;
-                               mapᵉ; scanᵉ; mergeAllᵉ)
-open import Rx.Envelope using (machineEmitᵗ; instEventᵗ; eventsᵛ; instantᵛ;
-                               splitEventsᵛ; reassembleᵛ)
+open import Rx.Exp      using (Ctx; Ty; Exp; Tm; Fn; listᵗ; unitᵗ; _×ᵗ_; _+ᵗ_; varᵗ; unit̂; fstᵗ; sndᵗ; pairᵗ; nilᵗ; consᵗ;
+  inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; eqᵘ; appendᵗ; renTm; strmᵗ; ofᵉ; emptyᵉ; mapᵉ; scanᵉ;
+  mergeAllᵉ)
+open import Rx.Envelope using (machineEmitᵗ; eventsᵛ; instantᵛ; splitEventsᵛ; reassembleᵛ)
 
 ------------------------------------------------------------------
 -- The carrier.

@@ -22,19 +22,18 @@
 -- being subscribed through `mergeAllᵉ`.
 module Refuted.Flattened-Input where
 
-open import Data.Fin using (Fin; zero)
+open import Data.Fin using (zero)
 open import Data.List using (List; []; _∷_; concat; map; length)
-open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; zero; suc)
-open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.Maybe using (Maybe; nothing)
+open import Data.Nat using (ℕ; zero)
+open import Data.Product using (_,_; proj₁; proj₂)
 open import Data.Unit using (tt)
 open import Data.Vec using () renaming (_∷_ to _∷ⱽ_; [] to []ⱽ)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import Rx.Prim using (ObservableInput; hot; cold; Timed; after_,_)
-open import Rx.Exp using (Ctx; Ty; obs; natᵗ; []ᵉ; Closed)
-open import Rx.SExp using (SExp; STm; inputˢ; ofˢ; strmˢ; mergeAllˢ; emptyˢ;
-  plainᵏ; Kinds; scriptedᵏ; emitᵗ)
+open import Rx.Prim using (cold; after_,_)
+open import Rx.Exp using (Ctx; obs; natᵗ; []ᵉ; Closed)
+open import Rx.SExp using (SExp; inputˢ; ofˢ; strmˢ; mergeAllˢ; plainᵏ; Kinds; scriptedᵏ; emitᵗ)
 open import Rx.Slots using (Slots; scripted)
 open import Rx.Elaborate using (elaborate)
 open import Rx.Envelope.Decode using (decodeStream)

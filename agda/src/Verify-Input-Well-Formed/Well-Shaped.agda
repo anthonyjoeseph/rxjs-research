@@ -38,29 +38,23 @@
 -- which are plain folds.
 module Verify-Input-Well-Formed.Well-Shaped where
 
-open import Data.Bool  using (Bool; true; false; if_then_else_)
+open import Data.Bool  using (Bool; true; false)
 open import Data.List  using (List; []; _∷_; _++_)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat   using (ℕ; zero; suc; _≤ᵇ_; _≡ᵇ_)
+open import Data.Nat   using (suc; _≤ᵇ_; _≡ᵇ_)
 open import Data.Nat.Properties using ()
-open import Data.Product using (Σ; _×_; _,_)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
+open import Data.Product using (_×_; _,_)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
 
-open import Rx.Prim using (Id; Source; InstEmit; _at_from_as_; EmitKind; InstEvent)
-open import Rx.Protocol using (ProtocolSt; Owed; protocol-init; runProtocol;
-  stepProtocol; settle; settleInstant; applyEvents; paidOff; allZero;
-  Accepted; accepted)
+open import Decide using (≡ᵇ-refl)
+open import Rx.Prim using (Id; Source; InstEmit; _at_from_as_; InstEvent)
+open import Rx.Protocol using (ProtocolSt; Owed; protocol-init; runProtocol; stepProtocol; settle; applyEvents; paidOff;
+  allZero; Accepted; accepted)
 
 
 ------------------------------------------------------------------
 -- plumbing
 ------------------------------------------------------------------
-
--- the one decidable fact `stepProtocol` needs and the standard library
--- states only in `T` form
-≡ᵇ-refl : ∀ (n : ℕ) → (n ≡ᵇ n) ≡ true
-≡ᵇ-refl zero    = refl
-≡ᵇ-refl (suc n) = ≡ᵇ-refl n
 
 -- THE STATE, SPELLED OUT.  `stepProtocol` nests three `with`s -- on
 -- `ProtocolSt.current ps`, then on `settleInstant ps`, then on

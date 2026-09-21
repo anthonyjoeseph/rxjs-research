@@ -708,12 +708,11 @@ FUEL = 30
 -- either one wants the same row, and a program that fails both dedups
 -- to it instead of being cached twice.
 --
--- THE SLOT TABLE IS NOW RENDERED RATHER THAN NAMED.  It used to be the
--- constant `slots₂`, so a row naming it was reproducible; the sweep
--- draws the table now, so a row that named a constant would be a
--- DIFFERENT run from the one that failed.  Both definitions are
--- printed through the same `showSExp` the program goes through, and
--- `mkSlots` is in the prelude so the corpus can see the name.
+-- THE SLOT TABLE IS RENDERED RATHER THAN NAMED, because the sweep
+-- DRAWS it: a row naming a constant table would be a DIFFERENT run
+-- from the one that failed.  Both definitions are printed through the
+-- same `showSExp` the program goes through, and `mkSlots` is in the
+-- prelude so the corpus can see the name.
 pasteRow : SExp Γ₂ [] [] [] natᵗ
          → SExp Γ₂ [] [] [] natᵗ → SExp Γ₂ [] [] [] natᵗ → String
 pasteRow e d₀ d₁ =

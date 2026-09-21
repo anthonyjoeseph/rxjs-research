@@ -8,8 +8,8 @@
 -- What the top line still owes is the step from a RUN to an accepted
 -- stream, and that is what is stated here.
 --
--- THE INDUCTION IS ON THE RUN AND NOT ON THE TREE, AND THAT IS A
--- MEASURED FINDING RATHER THAN A PREFERENCE.  The obvious shape is to
+-- THE INDUCTION IS ON THE RUN AND NOT ON THE TREE, AND THE TREE ROUTE
+-- IS RULED OUT RATHER THAN MERELY DISLIKED.  The obvious shape is to
 -- induct on `SExp`, assuming a subtree's run is accepted and showing
 -- each former preserves it.  It does not work, because `evaluate↓` is
 -- not structurally recursive on the expression: a run is a subscribe
@@ -18,17 +18,22 @@
 -- Every `delivery`-kind emit -- which is every instant carrying values,
 -- which is the whole subject of batching -- is produced there, so a
 -- tree induction reaches only the half that does not matter.
+
+-- WHAT A COMPOSITIONAL READING WOULD HAVE TO CARRY, read off `mapᵉ`,
+-- the most favourable former in the palette: `step-map` passes `sched`
+-- and `st` through untouched and `frameNodes (map-f _) ≡ []`, so it
+-- installs nothing and burns no fuel.  Three facts hold by `refl` --
+-- `sched-init (mapᵉ f b) ins ≡ sched-init b ins` (the two runs share a
+-- scheduler outright, since `sched-init` and `st-init` both IGNORE
+-- their expression argument and `NodeSt e` is phantom in `e`), both
+-- initial registries are `[]`, and the whole difference between the
+-- runs is a definable transport re-rooting every registry path through
+-- `map-f`.  The transport is what kills the route.
 --
--- PROBED: `mapᵉ` compositionality, the most favourable former in the
---   palette -- `step-map` passes `sched` and `st` through untouched and
---   `frameNodes (map-f _) ≡ []`, so it installs nothing and burns no
---   fuel.  Three facts typecheck by `refl`:
---   `sched-init (mapᵉ f b) ins ≡ sched-init b ins` (the two runs share
---   a scheduler outright -- `sched-init` and `st-init` both IGNORE
---   their expression argument, and `NodeSt e` is phantom in `e`), both
---   initial registries are `[]`, and the whole difference between the
---   runs is a definable transport that re-roots every registry path
---   through `map-f`.
+-- SO THE INVARIANT GOES ON THE STATE, WHICH IS WHERE THOSE SAME THREE
+-- FACTS SAY THE RUN ACTUALLY LIVES: the scheduler is shared, the state
+-- starts identical, the expression is a phantom in both initialisers.
+--
 -- DEAD ROUTE: proving that transport correct.  It must commute with
 --   the evaluator, and the evaluator is TWENTY mutually-defined `⇓`
 --   relations; `subs-map` alone reaches `pushBurst⇓`, `stepFrame⇓`,
@@ -38,12 +43,7 @@
 --   two expressions at two root types, re-running a well-founded
 --   recursion.  For the easiest former there is.  Fuel accounting was
 --   the expected obstruction and is not one; the type indexing is.
---
--- SO THE INVARIANT GOES ON THE STATE, WHICH IS WHERE THE PROBE SAYS
--- THE RUN ACTUALLY LIVES.  The same measurements that killed the tree
--- route recommend this one: the scheduler is shared, the state starts
--- identical, the expression is a phantom in both initialisers.
---
+
 -- AND THE AUTOMATON'S HALF IS NO LONGER HERE AT ALL.  It moved to
 -- `Well-Shaped`, where it is PROVEN: `runProtocol` is a pure fold, so
 -- acceptance is characterised by a predicate over the stream alone,
@@ -53,16 +53,14 @@
 -- whose content the census pins down exactly.
 module Verify-Input-Well-Formed.Run-Well-Formed where
 
-open import Data.Fin     using (Fin)
 open import Data.List    using (List; []; _∷_; _++_; concat; length)
 open import Data.List.Properties using (++-assoc)
-open import Data.Maybe   using (just)
 open import Data.Sum using (inj₁; inj₂)
-open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.Product using (Σ; _×_; _,_; proj₂)
 open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong; subst)
 
-open import Rx.Prim     using (Fuel; InstEmit; PlainEvent; valueᵖ; completeᵖ)
+open import Rx.Prim     using (Fuel; PlainEvent; valueᵖ; completeᵖ)
 open import Rx.Exp      using (Ctx; Closed; Val; []ᵉ)
 open import Rx.Elaborated using (Elabᵉ; Elabˢ)
 open import Rx.Slots using (Slots)
@@ -74,8 +72,7 @@ open import Rx.Evaluator.Domain using (subscribeE⇓; cascade⇓; drain⇓;
                                        evaluate⇓; eval-run;
                                        drain-done; drain-empty; drain-step)
 open import Rx.Evaluator.Builder using (evaluate!; evaluate↓)
-open import Rx.Protocol using (ProtocolSt; protocol-init; runProtocol;
-                               countIn; Accepted; accepted)
+open import Rx.Protocol using (ProtocolSt; protocol-init; runProtocol; countIn; Accepted)
 open import Verify-Input-Well-Formed.Well-Shaped using
   (WellShaped; ws-nil; ws-++; wellShaped-accepted)
 

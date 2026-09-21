@@ -66,7 +66,7 @@ open import Spec using (spec-batchSimultaneous)
 -- BOTH SLOTS ARE `sharedᵏ`: each one holds another srxjs program, so
 -- it stands at the ENVELOPE and `input` reads it straight.  The kind
 -- vector is not a free choice beside the table -- `SimulSlot` is
--- indexed by it, so this line and `slots₂` below are one statement.
+-- indexed by it, so this line and `mkSlots` below are one statement.
 κ₂ : Kinds 2
 κ₂ = sharedᵏ ∷ⱽ sharedᵏ ∷ⱽ []ⱽ
 
@@ -74,14 +74,11 @@ open import Spec using (spec-batchSimultaneous)
 Γ₂ᵉ = plainᵏ Γ₂ κ₂
 
 -- THE TABLE IS BUILT FROM TWO AUTHOR-WRITTEN DEFINITIONS, and that is
--- what a row has to name now that the sweep draws it.  It used to name
--- the constant `slots₂`, because that was the ONE telescope an
--- elaborated program could be driven by: a `shared` def had to be a
--- plain tree carrying an envelope honestly, and the stratification side
--- condition walked it into postulated elaboration leaves and got stuck
--- for every def but `emptyᵉ`.  A definition is an `SExp` now and every
--- leaf is a real body, so the condition COMPUTES -- which is what lets
--- the generator draw a table at all.
+-- what a row has to name, because the sweep DRAWS it.  What makes a
+-- drawn table possible at all is that the stratification side
+-- condition COMPUTES: a definition is an `SExp` and every elaboration
+-- leaf is a real body, so `inputsBelowᵉ` of it reduces to a boolean
+-- rather than getting stuck on a postulate.
 --
 -- IT LIVES HERE RATHER THAN IN THE GENERATOR because a pasted row has
 -- to typecheck where the corpus lives, so the name a row prints has to
@@ -114,11 +111,6 @@ mkSlots : SExp Γ₂ [] [] [] natᵗ → SExp Γ₂ [] [] [] natᵗ → SimulSlo
 mkSlots d₀ d₁ zero          = slot₀ d₀
 mkSlots d₀ d₁ (suc zero)    = slot₁ d₁
 mkSlots d₀ d₁ (suc (suc ()))
-
--- the silent table, kept as a name because the cached corpus was
--- recorded against it
-slots₂ : SimulSlots Γ₂ κ₂
-slots₂ = mkSlots emptyˢ emptyˢ
 
 -- one cached counterexample: a label, and the run that produced it
 record Case : Set where

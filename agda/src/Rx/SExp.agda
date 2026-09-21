@@ -133,45 +133,6 @@ emitᵗ t = machineEmitᵗ (plainᵗ t)
 emitᶜ : List Ty → List Ty
 emitᶜ ts = map emitᵗ ts
 
--- AND AN INPUT IS A STREAM TOO, BUT IT WALKS WITH THE VALUE
--- TRANSLATION, BECAUSE THE ELABORATION WRAPS IT RATHER THAN ASSUMING
--- IT WRAPPED (Anthony).  A slot stands at the author's own bare
--- payload and `inputᵖ` builds every envelope an input contributes.
---
--- THE ALTERNATIVE WAS TO STAND THE SLOT AT THE ENVELOPE, AND IT IS NOT
--- A SPELLING DIFFERENCE -- IT MAKES THE BASE CASE FALSE.  With the
--- slot at `machineEmitᵗ`, `toPlain`'s input arm is a transport and an
--- arbitrary script reaches the output through `input` untouched, so a
--- table naming an instant past the counter is well-typed and enters no
--- clause any induction could split on.  That is exactly how
--- `evaluate-accepted` was refuted.  With the slot at the payload there
--- is nothing for a script to forge: the envelope's fields are written
--- by one term, in one place, and a well-formedness claim about inputs
--- becomes a LEMMA about that term instead of a HYPOTHESIS about the
--- table.
---
--- THE TYPESCRIPT MIRROR IS WHAT SETTLES IT RATHER THAN THE PROOF'S
--- CONVENIENCE.  `input-source.ts`'s `makeInputSource` takes an
--- `ObservableInput<Val>` -- bare payloads and waits -- and returns an
--- `Observable<InstEmit<Val>>`.  It is the only door into a pipeline, so
--- srxjs cannot BE handed a malformed input stream; a slot at the
--- envelope models a system that can, which is the model being wrong
--- about the artifact rather than the artifact being unproven.
---
--- WHAT UNBLOCKED IT WAS THE GROUPING AND NOT A NEW FORMER.  The
--- standing argument was that a fold over a flat stream cannot tell
--- which payloads shared an arrival, so wrapping each separately would
--- split a cold's subscribe burst into as many instants as it has
--- values -- and that the AMBIENT INSTANT needed to repair it was
--- unreachable.  A synchrony-sensing operator is the wrong answer
--- twice: rxjs has none, so the palette would stop mirroring, and it
--- would re-derive by timing what this side is GIVEN.  `batchSyncᵉ`
--- already draws the boundary, so a group IS an instant and the mint
--- has something to key on.  See `inputᵖ` for the placement that gives
--- one token per arrival.
-plainᵛ : ∀ {n} → Ctx n → Ctx n
-plainᵛ Γ = mapⱽ plainᵗ Γ
-
 ------------------------------------------------------------------
 -- How a slot is SUPPLIED, which the author does not see.
 ------------------------------------------------------------------
@@ -191,13 +152,32 @@ Kinds n = Vec Kind n
 
 -- WHAT A SLOT STANDS AT, NOW PER SLOT RATHER THAN UNIFORMLY.
 --
--- A SCRIPTED SLOT STANDS AT THE PAYLOAD, and that is the reading
--- `plainᵛ` gave every slot before kinds existed.  It has to: a script
--- is arbitrary, so standing it at the envelope would let a table name
--- an instant past the counter and reach the output through `input`
+-- A SCRIPTED SLOT STANDS AT THE PAYLOAD, and it has to: a script is
+-- arbitrary, so standing it at the envelope would let a table name an
+-- instant past the counter and reach the output through `input`
 -- untouched -- exactly how `evaluate-accepted` was refuted.  `inputᵖ`
 -- wrapping it is what makes a claim about inputs a lemma about the
 -- elaboration rather than a hypothesis about the table.
+--
+-- THE TYPESCRIPT MIRROR IS WHAT SETTLES IT RATHER THAN THE PROOF'S
+-- CONVENIENCE.  `input-source.ts`'s `makeInputSource` takes an
+-- `ObservableInput<Val>` -- bare payloads and waits -- and returns an
+-- `Observable<InstEmit<Val>>`.  It is the only door into a pipeline, so
+-- srxjs cannot BE handed a malformed input stream; a slot at the
+-- envelope models a system that can, which is the model being wrong
+-- about the artifact rather than the artifact being unproven.
+--
+-- WHAT UNBLOCKED THE WRAPPING WAS THE GROUPING AND NOT A NEW FORMER.
+-- The standing argument was that a fold over a flat stream cannot tell
+-- which payloads shared an arrival, so wrapping each separately would
+-- split a cold's subscribe burst into as many instants as it has
+-- values -- and that the AMBIENT INSTANT needed to repair it was
+-- unreachable.  A synchrony-sensing operator is the wrong answer
+-- twice: rxjs has none, so the palette would stop mirroring, and it
+-- would re-derive by timing what this side is GIVEN.  `batchSyncᵉ`
+-- already draws the boundary, so a group IS an instant and the mint
+-- has something to key on.  See `inputᵖ` for the placement that gives
+-- one token per arrival.
 --
 -- A SHARED SLOT STANDS AT THE ENVELOPE, and the same objection does
 -- not reach it, because its content is not a script.  A shared
