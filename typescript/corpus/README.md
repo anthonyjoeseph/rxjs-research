@@ -10,14 +10,15 @@ One serialized `TestCase` per line, which is exactly what a failing case
 prints — so a divergence the sweep finds is pinned by copying the line.
 
 `burst-carrier` and `depth-first` pin ONE mechanism between them, which is
-worth knowing before reading a green over them. Twelve of their fifteen rows
+worth knowing before reading a green over them. Fourteen of their sixteen rows
 read a single shared slot as both a flattener's outer and its inner, and that
 is exactly the shape a batching carrier gets wrong: the subscriber set is
 re-read between two values of one synchronous emission. Those rows accumulated
 one divergence at a time and converged on it without anyone choosing that, so
 the two files are a deep sample of a narrow region — a carrier passing all
-fifteen has been checked against re-entrant subscription and against almost
-nothing else.
+sixteen has been checked against re-entrant subscription and against almost
+nothing else. The two rows that read the shared slot only as an inner are the
+exchanged pair below, which is pinned for a different question entirely.
 
 `depth-first`'s last two rows are HAND-BUILT and each decides a different
 question about a fan-out run at the connect. The NESTED one reads slot 1 as a
