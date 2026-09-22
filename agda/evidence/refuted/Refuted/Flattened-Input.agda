@@ -23,7 +23,7 @@
 module Refuted.Flattened-Input where
 
 open import Data.Fin using (zero)
-open import Data.List using (List; []; _∷_; _++_; concat; map; length)
+open import Data.List using (List; []; _∷_; concat; map; length)
 open import Data.Maybe using (Maybe; nothing)
 open import Data.Nat using (ℕ; zero)
 open import Data.Product using (_,_; proj₁; proj₂)
@@ -38,7 +38,7 @@ open import Rx.Slots using (Slots; scripted)
 open import Rx.Elaborate using (elaborate)
 open import Rx.Envelope.Decode using (decodeStream)
 open import Rx.Evaluator using
-  (EvalSt; sched-init; st-init; root; regSource)
+  (EvalSt; sched-init; st-init; root; regSource; resolveSegs)
 open import Rx.Evaluator.Reducible using (reducible)
 open import Rx.Evaluator.Builder using (evaluate↓)
 open import Rx.Protocol using (ProtocolSt; protocol-init; runProtocol)
@@ -67,14 +67,16 @@ prog = elaborate κ₁ src
 rootRun = reducible prog []ᵉ tt (root {lo = 1}) 0
             (sched-init prog ins₁) (st-init prog)
 
--- THE WHOLE SUBSCRIBE ANSWER, not its first component.  A subscribe
--- answers with a burst at its own element type AND a stream already at
--- the root, and which of the two a value comes back in is a property of
--- the carrier rather than of this program.  Reading only the burst
--- would leave this refutation to weaken silently the day the root
--- component starts carrying anything.
-rootEmits = proj₁ (proj₁ rootRun) ++ proj₁ (proj₂ (proj₁ rootRun))
-st₀       = proj₂ (proj₂ (proj₂ (proj₁ rootRun)))
+-- THE WHOLE SUBSCRIBE ANSWER, resolved, not any one column of it.  A
+-- subscribe answers with an ordered list of segments, each pairing a
+-- burst at its own element type with a stream the same contribution
+-- already sent to the root, and which column a value comes back in is
+-- a property of the carrier rather than of this program.  `resolveSegs`
+-- is the evaluator's own reading of the pair, so this refutation cannot
+-- weaken silently the day a root column starts carrying anything.
+rootEmits = resolveSegs {Γ = plainᵏ Γ₁ κ₁} {t = emitᵗ natᵗ}
+              (proj₁ (proj₁ rootRun))
+st₀       = proj₂ (proj₂ (proj₁ rootRun))
 
 regLive : List ℕ
 regLive = map (λ r → regSource (proj₁ (proj₂ r))) (EvalSt.registry st₀)

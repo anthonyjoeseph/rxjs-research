@@ -937,12 +937,13 @@ data subscribeAll⇓ {n} {Γ} {t} {e} where
 -- answering the caller stopped being exclusive.  Nor is a candidate the
 -- gap at either end: `red-val` is total, so the arrival side carries no
 -- premise, and `stepFrameAny!` asks nothing about the frames of a path
--- it read out of the registry.  What is left is the MEASURE.  The arm
--- that would build this derivation lives in the candidate, the fold
--- lives above it, and routing the connect makes them one block -- so
--- the candidate's descent on the element type and the fold's on the
--- floor have to be funded together, which is the order `srcFrame`'s
--- header prices.
+-- it read out of the registry.  What is left is the MEASURE, and the
+-- edge that fixes it is `red-walk`: the fold that would fan out steps
+-- a `thru-outer` frame through the candidate, so the fold sits ABOVE
+-- the candidate and the connect would call it from inside.  The two
+-- become one mutual block, and one order has to fund the candidate's
+-- descent on the element type and the fold's on the floor at once --
+-- which is the order `srcFrame`'s header prices, three deep.
 
 -- AND THE FAN-OUT IS THE RIGHT ANSWER, WHICH IS MEASURED RATHER THAN
 -- ARGUED.  Delivering the definition's burst value-major, re-reading
@@ -968,10 +969,8 @@ data subscribeAll⇓ {n} {Γ} {t} {e} where
 -- it, rather than collecting the inners and handing the caller one
 -- list, so the two components are never both live and the order is
 -- carried by the walk instead of by a rule.  What that costs is the
--- fan-out running inside the reducibility cycle, where the paths it
--- folds come out of the REGISTRY and no frame of them carries a
--- candidate -- and the candidate's own header refuses a state
--- precondition, which is the shape that would supply one.
+-- fan-out running inside the reducibility cycle, which is what the
+-- block below prices.
 
 -- DEAD ROUTE: answering at `t` -- folding the burst through the path
 --   INSIDE the subscribe, so the sink clause reaches the fan-out and
