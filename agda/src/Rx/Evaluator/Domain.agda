@@ -177,12 +177,31 @@ srcFrame _                  = ⊤
 -- three values and part at four: a share of `of` read by a `mergeAll`
 -- of itself yields 2,3,4,3,4,4 against rxjs's 2,3,3,4,4,4.
 
--- THE CASCADE PATH IS UNAFFECTED, AND THAT IS WHAT PINS THE CAUSE.  An
--- arrival carries ONE value and the share fan-out re-reads the registry
--- per arrival, so a share fed asynchronously already agrees, and so does
--- a synchronous burst of one.  Only a SYNCHRONOUS burst of two or more
--- diverges -- which is what the oracle's pinned corpus row instantiates,
--- and the three neighbours that separate it were run alongside.
+-- THE REGION IS THREE CONDITIONS AT ONCE, AND DROPPING ANY ONE OF THEM
+-- RESTORES AGREEMENT -- which is what the neighbours drawn around the
+-- oracle's pinned corpus row measured, rather than what reading the
+-- clauses suggested.  There must be (i) a SHARE, (ii) a SYNCHRONOUS
+-- burst of two or more values through it, and (iii) a subscription to
+-- THAT share caused by one of those values.
+--
+-- Each condition has its own witness.  For (i): the identical program
+-- over a scripted cold of the same two sync values agrees, so it is the
+-- sharing and not the burst length or the flattener; and a HOT, the
+-- other source many subscribers share, agrees too, because its values
+-- arrive one per cascade and the cascade fan-out re-reads the registry
+-- per arrival.  For (ii): one sync value agrees, and one sync value plus
+-- an async tail agrees.  For (iii): the same share read through `scan`,
+-- through `take`, through a `batchSync` bracket, and by a flattener
+-- whose inner is NOT the share, all agree -- so a burst crossing a
+-- stateful frame is not the problem, and re-entry is.
+--
+-- Within the region the divergence does not discriminate: `mergeAll`,
+-- that same operator at limit one, `exhaustAll`, a joiner behind a
+-- `map`, a joiner two flatteners down, a `batchSync` between the share
+-- and the joiner, and a share whose def is another share all diverge
+-- alike.  `switchAll` is the one flattener that cannot witness it, and
+-- that is DEGENERATE rather than agreement: it kills the previous inner
+-- on each outer value, so neither machine emits anything at all.
 
 -- NO REPAIR KEEPS THE DISCIPLINE, so this is a finding about the carrier
 -- rather than about the share.  Handing a joiner the undelivered tail is

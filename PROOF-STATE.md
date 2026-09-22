@@ -240,32 +240,39 @@ the one thing here a differential run has actually contradicted.
 
 ### Big picture tier roadmap
 
-- **SEPARATE THE MONSTER FROM THE SHARE, BY INSTANTIATION.** The divergence is
-  known at one family of shapes and suspected of the carrier generally; those
-  are different claims and only the first is measured. Draw the neighbours the
-  corpus row does not reach — a share under each of the other two flatteners,
-  a share whose burst crosses a `batchSync` bracket, two shares feeding one
-  another — and pin which of them the carrier already gets right. A carrier
-  that is wrong only under `mergeAll` is a different repair from one that is
-  wrong wherever a burst is re-entered, and the rewrite below is priced by
-  which it turns out to be.
+- **THE PUSH CARRIER'S SHAPE, IN `Rx.Evaluator.Domain` AND `Rx.Evaluator.Builder`
+  ONLY.** A subscription returns no burst: it takes an output accumulator and
+  hands one back, so a value reaches the root as it is produced and a frame
+  takes ONE value. Those two modules are the whole blast radius of the
+  dispatch cycle, and the builder is what the CLI runs — so the shape is
+  measurable before anything else is restated. The position pair is what
+  decides it and both halves are pinned in the corpus: two inners of one
+  `mergeAll` require opposite output orders, which no fixed channel position
+  and no tail handed to a joiner can produce, and a causal thread gives free.
 
-- **THE PUSH CARRIER, AS A SEPARATE EVALUATOR STATED OVER THE SAME FRAMES.**
-  Values reach the root as produced, threaded through an output accumulator in
-  causal order; a frame takes ONE value; the group an operator bracketing a
-  subscribe call needs is accumulated in its own node state, which is the
-  TypeScript's `isSync` bit and not a property of the carrier. State it and
-  run the oracle against it BEFORE any of the totality tower is restated —
-  the tower is four thousand lines of proof with no postulates in it, and
-  re-proving it against a carrier that has not been measured is the expensive
-  way to discover the second divergence.
+- **`batchSync`'s GROUP OUT OF THE BURST AND INTO ITS OWN NODE STATE.** The one
+  operator whose meaning is currently read OFF the carrier: `batchVals` groups
+  a whole `vals` list while the sync bit is up, which is a property of the
+  thing being deleted. It becomes what the TypeScript already does — a bit in
+  the node's state, set around the body's subscribe, with the values collected
+  as they arrive. Its own leg because it is the one place the rewrite can
+  change an observable answer rather than merely re-thread one, and the
+  corpus row that brackets a self-feeding share is what says whether it did.
+
+- **THE ORACLE AGAINST THE PUSH CARRIER, BOTH STEPS.** Draw and replay, before
+  any of the totality tower is touched: that tower is four thousand lines with
+  no postulates in it, and re-proving it against a carrier nothing has measured
+  is the expensive way to find the second divergence. The three conditions the
+  divergence needs are now known, so a green here is a claim about the region
+  and not about a row — draw AT it: shares under each flattener, nested shares,
+  a bracket between.
 
 - **THE TOTALITY TOWER ONTO THE PUSH CARRIER.** The cycle structure is
   unchanged — a share's connect still re-enters the subscribe cycle, and the
   descent is still the reducibility candidate recursing on the TYPE — so what
   moves is the shape of every family's result, not the argument that they
-  terminate. Take the relation first, then the builder, then the reducibility
-  side; the freshness pair last, since it names the fewest constructors.
+  terminate. Take the reducibility side first, since it names every
+  constructor; the freshness pair last, since it names the fewest.
 
 - **ENABLE THE ORACLE IN CI.** Flip the job off `if: false`. It is the leg
   that makes the tier STAY done: until it lands the sweep is a thing somebody
