@@ -564,6 +564,15 @@ find:
 find-prose:
 	@scripts/find-prose.py "$(Q)"
 
+# WHAT THE GATE COSTS ON CI, FETCHED RATHER THAN RECORDED.  Every other timing
+# in typecheck-performance-numbers.md can be re-measured by re-running it; a CI
+# figure cannot, because the runner image, the toolchain step and the cache key
+# all move underneath it.  So that file carries this command in place of the
+# numbers and the runs stay the authority.  N is how many green runs to read.
+#   make ci-gate-time      make ci-gate-time N=10
+ci-gate-time:
+	@scripts/ci-gate-time.py $(or $(N),5)
+
 # THE REMAINING-WORK LEDGER: every postulate in agda/src, by name.  A grep for
 # `^postulate` finds the 32 BLOCK HEADERS, not the 110 names inside them, so it
 # is not the ledger and never was.  PROOF-STATE must carry a row for each of

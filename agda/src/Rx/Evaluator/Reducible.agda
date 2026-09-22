@@ -143,17 +143,18 @@ Red {Γ = Γ} (obs u) b =
   Σ (Segs Γ u t × Sched Γ × EvalSt e) λ r →
     subscribeE⇓ {e = e} b κ now sched st r × All (λ sg → StreamSat (Red u) (proj₁ sg)) (proj₁ r)
 
--- WHY A SHARE'S FAN-OUT COSTS THE CANDIDATE NOTHING, EVEN THOUGH IT
--- CARRIES A PAYLOAD.  A shared slot subscribes its def ONCE, and the
--- connect folds that def's synchronous values back down every chain
--- already registered -- the connecting reader's own included -- so the
--- fan-out reaches frames no subscribe built and writes their nodes.
--- What keeps that free is not an absence of payload but the candidate
--- being TOTAL at values: every value in the run is reducible whatever
--- state it was stored in, so a cell rewritten by a chain this face
--- never saw is reducible for the same reason the def's own values are.
--- The only thing the fan-out could have cost is an invariant over the
--- store, and a predicate that holds of every value is not one.
+-- WHAT A SHARE'S FAN-OUT COSTS THE CANDIDATE, AND WHERE THAT COST IS
+-- BOOKED.  A shared slot subscribes its def ONCE, and the connect
+-- folds that def's synchronous values back down every chain already
+-- registered -- the connecting reader's own included -- so the fan-out
+-- reaches frames no subscribe built and REWRITES their nodes.  Every
+-- arm of the candidate's own observable case is still paid by the
+-- def's induction hypothesis, because the values are the def's; what
+-- the fan-out costs is the one thing that is not about values leaving
+-- but about state left behind -- a cell written by a chain this face
+-- never saw.  That is `RedNode`, and it is a leaf rather than a
+-- paragraph: the fan-out is why it cannot be read off the subscribe's
+-- own floor.
 
 -- A SPENT SOURCE'S BURST is an end and nothing else, so every
 -- predicate holds of it for want of anything to hold of.
@@ -174,21 +175,23 @@ StreamSat-spent = (tt ∷ []) ∷ []
 -- and the writeback is exactly the fold applied to two things the push
 -- already has.
 
--- AND EVERY INSTANCE OF IT IS DISCHARGED BY `red-val`, WHICH IS WHY
--- THE SCAN ARM ASKS FOR NOTHING THE CALLER MUST CARRY.  The candidate
--- at a value is re-established from the value itself, so the arm's
--- reading of the cell is answered without knowing what wrote it or
--- when.  What this predicate still buys is the SHAPE of the obligation
--- -- where in the push cycle a node is owed at all -- and it is stated
--- rather than inlined so that a frame gaining a payload-bearing store
--- gains a clause here rather than a silent `tt`.
+-- AND THE OBLIGATION IS OWED TO THE TERMINATION CHECKER, NOT TO THE
+-- TYPES.  `red-val` inhabits every instance of this predicate from
+-- nothing, so the scan arm's reading of its cell has a typed answer
+-- that names no state and no hypothesis.  What it does not have is a
+-- STRATIFIED one: `red-val` reaches the candidate at an observable by
+-- RUNNING the stored closure, so an evaluation arm that calls it puts
+-- `redExpAcc` inside its own recursion at an expression drawn out of
+-- the store rather than out of the program.  The leaf below is that
+-- gap and only that gap -- a value read back is reducible, for a
+-- reason this block may not re-derive in place.
 -- DEAD ROUTE: a node-freshness family concluding that a subscribe
 --   writes nothing below its own floor, spent to say the scan's cell
 --   was untouched across the def's subscription.  The connect refutes
 --   the conclusion rather than blocking the proof -- it registers the
 --   caller's continuation and then folds over it, so a subscription
---   does step a frame minted before it began -- and the route was
---   unnecessary either way, since the reading it protected is free.
+--   does step a frame minted before it began, and the offending frame
+--   is this one.
 -- DEAD ROUTE: carrying this in the STATE RECORD instead, as a field
 --   beside the nodes.  It closes a definitional cycle rather than an
 --   import cycle: the candidate's observable arm is indexed by the
@@ -643,6 +646,50 @@ tie-scan : ∀ {n} {Γ : Ctx n} {w w′} {x : Val Γ w} {y : Val Γ w′}
          → _≡_ {A = Maybe (NodeState Γ)} (just (cell-st x)) (just (cell-st y))
          → Red w x → Red w′ y
 tie-scan refl r = r
+
+-- AND THE ONE THING THE FOLD'S NODE OBLIGATION CANNOT ESTABLISH FOR
+-- ITSELF: that the accumulator standing when the push happens is still
+-- a REDUCIBLE cell.  The fold installs at an identifier drawn from the
+-- run's own counter and subscribes with the counter advanced past it,
+-- so nothing the subscription MINTS can name that node.  What can name
+-- it is the chain the subscription REGISTERS -- the connect folds the
+-- def's values down the caller's own continuation, so this frame is
+-- stepped and this cell is REWRITTEN before the subscription returns.
+-- The claim is therefore about the candidate at whatever that fold put
+-- there, not about the table being untouched.
+
+-- WHY IT IS A LEAF AND NOT A LEMMA HERE.  Its type is inhabited --
+-- `red-val` answers it from the value alone -- and the block cannot
+-- USE that answer, because `red-val` at an observable runs the stored
+-- closure and so re-enters `redExpAcc` at an expression the store
+-- chose.  Whatever discharges this has to give the candidate a
+-- stratification the store respects; until then the gap is stated
+-- where its consumer is, at full strength, with the two hypotheses
+-- that once stood in front of it -- the fold's closure and the
+-- accumulator going in -- REMOVED, since the typed answer above shows
+-- they are not what is missing.
+-- DEAD ROUTE: discharging this by `red-val`, which is what its type
+--   asks for and what the scan arm accepts.  It typechecks, and the
+--   fused block then fails termination: the call closes `redExpAcc ->
+--   red-val -> reducible -> redExpAcc` through a closure read out of
+--   the node table, and no argument around that cycle falls.  The room
+--   ceiling cannot reach it -- it descends on unconnected shares, and
+--   reading a cell connects nothing -- and the cycle passes no connect,
+--   so indexing the candidate by the room does not reach it either.
+--   What would is a stratification the STORE respects, which is a
+--   change to `Red` and not to this arm.
+postulate
+  red-scan-installed : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo Θ}
+             (fn : FnClo Γ (u ×ᵗ s) u) (nid : NodeId)
+           → {a : Val Γ u}
+           → ∀ {b : Exp Γ [] [] Θ s} {ρ : Env Γ Θ} {κ : Path Γ lo u t} {now}
+           → (sched : Sched Γ) (st : EvalSt e)
+           → {sched₂ : Sched Γ} {st₁ : EvalSt e} {segs : Segs Γ s t}
+           → subscribeE⇓ {e = e} (Θ , b , ρ) (scan-f fn nid ↠ κ) now
+               (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
+               (installNode nid (cell-st a) st)
+               (segs , sched₂ , st₁)
+           → RedNode {e = e} (scan-f fn nid) st₁
 
 -- ONE READING OF THE CELL, WHICH IS WHERE BOTH HALVES ARE PAID.  The
 -- dispatch it mirrors branches on a lookup the goal does not mention,
@@ -1099,7 +1146,7 @@ redExpAcc (scanᵉ {s = s} {t = u} f z b) ρ rρ k ok aK (acc rs) κ now sched s
           (installNode nid (cell-st (evalWith z ρ)) st) aM rm
       (r , p , sat′ , _) =
         red-pushSegs now (scan-f (_ , f , ρ) nid) tt rf
-          κ sat sched₂ st₁ (λ {w} {a} _ → red-val w a) aM
+          κ sat sched₂ st₁ (red-scan-installed (_ , f , ρ) nid sched st d) aM
           (room-keeps (subscribeE-keeps d) rm)
   in r , subs-scan refl d p , sat′
 redExpAcc (mergeAllᵉ lim b) ρ rρ k ok aK (acc rs) κ now sched st aM rm =

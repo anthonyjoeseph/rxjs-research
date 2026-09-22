@@ -2,10 +2,11 @@
 
 `gate.yml` restores Agda's own `.agdai` interfaces before `make gate` runs, so a
 module whose content is unchanged is not re-elaborated. The gap between that
-working and not working is the largest single lever in CI — measured at roughly
-38x on the gate step, in `typecheck-performance-numbers.md` under *The gate in
-CI*. Same command, same tree, same checks; the only variable is whether the
-restored snapshot is one Agda still considers valid.
+working and not working is the largest single lever in CI — run `make
+ci-gate-time` to see the current spread, and `typecheck-performance-numbers.md`
+under *The gate in CI* for why that number is fetched and not written down. Same
+command, same tree, same checks; the only variable is whether the restored
+snapshot is one Agda still considers valid.
 
 **The reason it fails is never the key SHAPE**, which is what everyone guesses
 first, this doc's author included. It is *which snapshot the prefix restore-key
@@ -79,9 +80,9 @@ actually collects, to avoid a cost that a scheduled job removes for free.
 `make gate` runs the bug cache, which is a real GHC compile — the Agda backend
 emits MAlonzo Haskell for the whole transitive cone, stdlib included, and then
 links a binary. That directory was cached by nothing, so every run paid for all
-of it; the figure is in `typecheck-performance-numbers.md` under *The gate in
-CI*, and it is a large fraction of a WARM gate rather than a rounding error on a
-cold one.
+of it; the figure is in `typecheck-performance-numbers.md` under *The other
+uncached third*, and it is a large fraction of a WARM gate rather than a rounding
+error on a cold one.
 
 **What makes it worth restoring is that the Agda backend is incremental.** On a
 warm `_cli` Agda rewrites the `.hs` of the modules whose interfaces moved, and
