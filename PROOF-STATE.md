@@ -238,24 +238,22 @@ LIST which its caller pushes, rather than values reaching the root as they are
 produced. Everything else in the evaluator is stated in terms of it, and it is
 the one thing here a differential run has actually contradicted.
 
-NARROWED by a push carrier green on all four pinned rows and 500/500 of the
-draw: the burst is not load-bearing anywhere else. Exactly two clauses do not
-survive it, both named rather than suspected — `batchSync`, which has no burst to read its group off and keeps
-its own buffer, and ARRIVAL DELIVERY, where a value and an end sharing one
-call let a joiner's queue drain ahead of the value handed with it.
+NARROWED BY MEASUREMENT. A draw biased at the region reaches it 8 times in
+500 where the old one reached it 0; the burst carrier fails ALL EIGHT and the
+push carrier none. Predicate and carrier agree exactly, which is what says
+the burst is the mechanism and not one symptom of it. Each carrier also fails
+three rows OUTSIDE the region, overlapping in one — those are other bugs.
 
 ### Big picture tier roadmap
 
-- **A DRAW THAT REACHES THE REGION, BEFORE THE TRANSCRIPTION IS PAID FOR.**
-  The reference measured 500/500 against the Agda on the ordinary draw while
-  the pinned corpus stays red, and those two numbers together say the draw
-  does not reach the three-condition region at all — so a push carrier would
-  come back green on exactly the programs the burst carrier is already green
-  on, and the corpus would stay four hand-written rows carrying the finding.
-  Bias the generator at the region: a share under each flattener, a
-  synchronous multi-value share, a subscription caused by one of those,
-  nested shares, a bracket between. That is what makes the next leg's cost
-  worth paying rather than a bet on four rows.
+- **THE THREE ROWS THE BIASED DRAW LEFT RED, AND NONE OF THEM IS THE CARRIER.**
+  All three sit OUTSIDE the region, so whatever they are, the burst is not it.
+  One fails under BOTH carriers — the Agda's own bug, which the old draw never
+  reached. Two fail only under PUSH, and those are what stop the rewrite being
+  a fix rather than a trade: a carrier cannot be transcribed on the strength
+  of eight region rows while it costs two that had nothing to do with the
+  region. Take those two first. The predicate is what makes them cheap to
+  read, because it says where NOT to look.
 
 - **SPLIT THE ARRIVAL, WHICH IS THE PIECE THE REFERENCE ALREADY DECIDED.** An
   `Arrival` carries a value and `isLast`, and `chain-step` folds both through

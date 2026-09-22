@@ -5,6 +5,7 @@ import { serialize } from "./serialize.js";
 import { execAgda } from "./agda-bridge.js";
 import { evaluateRef } from "./ref-eval.js";
 import { evaluatePush } from "./ref-push.js";
+import { reachesRegion } from "./region.js";
 import { readFileSync } from "node:fs";
 
 // THE ORACLE, AND WHAT IT IS AN ORACLE FOR (Anthony: "the sole purpose
@@ -198,8 +199,10 @@ const interpretResults = (
     lines.push(`  ${lhs}.values = ${a}`);
     lines.push(`  ${rhs}.values = ${r}`);
   }
+  const region = testCases.slice(0, n).filter(reachesRegion).length;
   const header =
-    `${n} cases (${live} emitting): values ${valuesOk}/${n} match` +
+    `${n} cases (${live} emitting, ${region} in region):` +
+    ` values ${valuesOk}/${n} match` +
     (agdaResults.length !== rxResults.length
       ? ` (LENGTH MISMATCH: ${lhs} ${agdaResults.length}, ${rhs} ${rxResults.length})`
       : "");
