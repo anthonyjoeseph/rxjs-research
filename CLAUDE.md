@@ -43,6 +43,8 @@ Also: `make imports-fix`, `make postulates` (the complete remaining-work ledger,
 
 Standing approval for any change that **does not alter the spec** — impl edits, protocol changes, new operators, refactors, experiments. Don't ask; go. Throw a lot at the wall, keep what passes QuickCheck/oracle, revert what doesn't.
 
+**The `Exp` tree is FIXED, and the evaluator is not (Anthony).** Its formers are not the spec, so the standing approval above reads as licensing a new one — it does not. Evaluator internals are free: change the relation, the scheduling, the carrier, whatever makes it work and provable. A change that needs a new `Exp` former, or re-types an existing one, is a question instead.
+
 **The stop conditions are exhaustive — nothing else is one (Anthony: "never stop working until you hit a stop condition").** All three are questions only Anthony can answer:
 
 - **The spec must move** (`agda/src/Spec.agda`) — a question, never a patch.
