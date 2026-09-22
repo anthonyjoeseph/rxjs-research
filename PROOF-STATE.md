@@ -267,16 +267,26 @@ also: `dispatchShare!` — its inhabitation, same reason.
   share. A second result component read by a fixed rule is refuted at
   `sharedConnect⇓` by the corpus's exchanged pair.
 
-- **PUSH BY SEGMENTING THE WALK, NOT BY CALLING THE FOLD FROM IT.** A consume
-  that calls `foldPath!` closes an import — `red-consume` is inside
-  `reducible`'s block, `foldPath!` is above it in a module that imports
-  `Reducible`, and `red-step` consumes the walk from inside that block, so the
-  fold cannot be hoisted the other way either. Returning the walk's answer as
-  ORDERED SEGMENTS instead, each either a `u`-group or a root stream, keeps
-  every call pointing down and lets `foldPath!`'s own frame clause resolve
-  them. `thruWrap` survives it: it touches the end bit and the state, never the
-  values. What decides between the two is whether a segment's fold must be
-  visible to the NEXT consume — a corpus question, not an argument.
+- **PUSH BY PASSING THE FOLD DOWN, NOT BY IMPORTING IT UP.** On the relation
+  side pushing is already free: `thruConsume⇓` and `foldPath⇓` are one
+  interleaved block, so a consume may name the fold at no structural cost.
+  Only the builder runs the wrong way, and a closure answers it — `foldPath!`
+  saturated at the frame clause's own `κ` and accumulator, threaded through
+  `red-thru`, `red-step`, `red-push` and `reducible`. That needs no new
+  measure: a frame descent leaves the floor alone, so the one accumulator a
+  subscribe is handed types everywhere under it, and the only floor that moves
+  is the share-sink `foldPath!` already descends at. The subscribe's own
+  accumulator is owed by the CONNECT, below, and by nothing here.
+
+- **ROUTE THE CONNECT THROUGH THE FAN-OUT — THIS LEG IS THE MONSTER.** With the
+  walk pushing, `sharedConnect⇓` stops answering the subscriber that triggered
+  it and delivers value-major through `dispatchShare⇓`, re-reading the registry
+  between values. Here an accumulator is genuinely owed and cannot be borrowed:
+  the connect enters the fan-out at its OWN slot, so the floor does not move
+  and nothing beneath it orders the call. The unconnected-slot count does —
+  `connectedShares` is extended before the recursive call and is raised
+  nowhere, which `Freshness/` already has the shape for. The oracle's three
+  failing rows are what says whether it worked.
 
 - **WHAT THE SINGLETON FOLD COSTS `batchSync`, ONCE THE FAN-OUT RUNS AT ALL.**
   The value walk hands a subscriber one value per `foldPath⇓`, and the one
