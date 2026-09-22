@@ -254,17 +254,16 @@ also: `subscribe-shaped` — same; its conclusion gains the new component, which
 
 ### Big picture tier roadmap
 
-- **ROUTE THE CONNECT THROUGH THE FAN-OUT — THIS LEG IS THE MONSTER.** Nothing
-  has to be built: `shareWalk⇓` already re-reads `shareAdmit` against the state
-  its previous value threaded, and `shareGo⇓` already finishes each fold before
-  the next path. The monster is only that `sharedConnect⇓` never calls it. The
-  carrier ruled out the cheap version: four of five subscribe arms DROPPED
-  the inner subscribe's root column, so wiring the fan-out alone
-  would have emitted nothing at `take`, `map`, `scan` and `sub-all`. Still owed
-  is an accumulator nothing can lend — the connect enters at its OWN slot, so
-  the floor does not move; the unconnected-slot count does, and
-  `connectedShares` is extended before the recursive call and raised nowhere.
-  The oracle's three failing rows are what says whether it worked.
+- **ROUTE THE CONNECT THROUGH THE FAN-OUT — THIS LEG IS THE MONSTER.** The
+  evaluator side is built: `shareWalk⇓` re-reads `shareAdmit` against the state
+  its previous value threaded, `shareGo⇓` finishes each fold before the next
+  path, and the segmented carrier retired the result type that stopped
+  `sharedConnect⇓` calling either — the carrier also ruled out the cheap
+  version, since four of five subscribe arms were dropping the root column it
+  would emit into. What is left is the expensive half and it is on the
+  REDUCIBILITY side: the fold runs inside the candidate's own cycle, over paths
+  read out of the REGISTRY, which stores a path and no candidate for its frames.
+  The values are not the gap. `srcFrame`'s header prices the measure owed.
 
 - **PIN THE WITHIN-SEGMENT ORDER, AT THE FIRST PROGRAM THAT FILLS A ROOT
   COLUMN.** `foldVSegs⇓` and `resolveSegs` both answer a segment's root stream

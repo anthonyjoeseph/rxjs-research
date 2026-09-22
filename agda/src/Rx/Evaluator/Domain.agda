@@ -930,12 +930,16 @@ data subscribeAll⇓ {n} {Γ} {t} {e} where
 -- during the connect delivers to exactly one observer however the
 -- fan-out is written.
 --
--- WHAT STANDS IN THE WAY OF ROUTING IT IS THE RESULT TYPE AND NOTHING
--- ELSE.  A fan-out's emits are at `t`, because a share's subscribers
--- sink at unrelated points of the tree; `subscribeE⇓` answers at `u`,
--- because its caller is a frame that still has path left to push
--- through.  So the connect cannot spend its burst on the registry and
--- also answer its caller.
+-- THE RESULT TYPE IS NOT WHAT STANDS IN THE WAY.  A fan-out's emits are
+-- at `t`, because a share's subscribers sink at unrelated points of the
+-- tree, and the burst its caller still has path to push is at `u`; one
+-- segment carries both, so spending the emission on the registry and
+-- answering the caller stopped being exclusive.  Nor are the VALUES the
+-- gap: the fan-out delivers the share's own emission, and the arm that
+-- would build this derivation subscribes the definition and so already
+-- holds a candidate for exactly them.  What a registry row stores no
+-- candidate for is the FRAMES of the path it carries, which is where
+-- the cycle below bites.
 
 -- AND THE FAN-OUT IS THE RIGHT ANSWER, WHICH IS MEASURED RATHER THAN
 -- ARGUED.  Delivering the definition's burst value-major, re-reading
