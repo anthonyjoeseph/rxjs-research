@@ -938,12 +938,25 @@ data subscribeAll⇓ {n} {Γ} {t} {e} where
 -- gap at either end: `red-val` is total, so the arrival side carries no
 -- premise, and `stepFrameAny!` asks nothing about the frames of a path
 -- it read out of the registry.  What is left is the MEASURE, and the
--- edge that fixes it is `red-walk`: the fold that would fan out steps
--- a `thru-outer` frame through the candidate, so the fold sits ABOVE
--- the candidate and the connect would call it from inside.  The two
--- become one mutual block, and one order has to fund the candidate's
--- descent on the element type and the fold's on the floor at once --
--- which is the order `srcFrame`'s header prices, three deep.
+-- cycle it has to fund is one edge long: a fold reaches `stepFrameAny!`,
+-- which reaches `inner!`, which applies `red-val` at `obs s` -- and
+-- that arm is `reducible`.  Every step of that runs DOWNWARD today, so
+-- adding the one call from the connect closes it, and nineteen
+-- definitions across the two modules become a single mutual block.
+
+-- OF THE THREE COMPONENTS `srcFrame`'s HEADER PRICES, TWO ARE ALREADY
+-- PAID.  The floor's remaining room is `foldPath!`'s own accessibility
+-- argument, and the element type's observable nesting is what funds
+-- `red-val (obs s)` handing back to `reducible` -- the Girard-Tait
+-- descent, running already.  Only the outermost is new, and what it
+-- costs is not an order but a THEOREM: an unconnected-slot count is a
+-- function of the STATE, so the checker cannot read it off an argument,
+-- and each recursive call has to carry a proof that the state it was
+-- handed did not raise it.  `Freshness.Mono` is that proof for the node
+-- counter over the subscribe cycle, clause for clause; the fold
+-- relations have no counterpart yet, and they are the half a fan-out
+-- runs in.  The step itself is the easy end: `connectedShares` is
+-- consed by the two connect arms and read by everything else.
 
 -- AND THE FAN-OUT IS THE RIGHT ANSWER, WHICH IS MEASURED RATHER THAN
 -- ARGUED.  Delivering the definition's burst value-major, re-reading
