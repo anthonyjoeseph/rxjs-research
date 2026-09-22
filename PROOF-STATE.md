@@ -218,18 +218,18 @@ research lives; where they disagree, the header wins.
 
 **THIS TIER HAS NOTHING TO DO WITH SRXJS.** No `SExp`, no elaboration, no
 envelope, no simul variant of anything. The question is whether `Rx.Exp` and
-its evaluator mirror plain rxjs faithfully, and the judge
-is the TypeScript differential harness: `prop-test.ts` draws a program, runs
-it through ordinary rxjs operators in `plain-eval.ts`, runs the same program
+its evaluator mirror plain rxjs, and the judge is the TypeScript differential
+harness: `prop-test.ts` draws a program, runs it through ordinary rxjs
+operators in `plain-eval.ts`, runs the same program
 through the Agda evaluator reached via `CLI.Decode`, and compares two LISTS OF
-VALUES exactly. Neither side carries an envelope, so it compares two plain
-machines, not one against a projection.
+VALUES exactly.
 
 **DONE IS BOTH HALVES OF THE JOB GREEN AND THE TARGET BACK IN THE GATE.** The
-random draw and the replay of the pinned corpus are separate steps; the draw
-is green and the replay is not. Neither may be narrowed to pass. What the
-replay contradicts is the burst carrier, not an operator, and that research
-is in the evaluator's own header.
+random draw and the replay of the pinned corpus are separate steps and both
+are red: 489 of 500 on the draw, 2 of 15 rows on the replay. Neither may be
+narrowed to pass. What both contradict is the burst carrier rather than an
+operator, and every failing case has ONE signature — the evaluator emits
+nothing where rxjs emits — so that is one mechanism seen 13 times.
 
 ### The monster
 
@@ -238,12 +238,12 @@ LIST which its caller pushes, rather than values reaching the root as they are
 produced. Everything else in the evaluator is stated in terms of it, and a
 differential run has contradicted it.
 
-NARROWED BY MEASUREMENT, and one side is now clean. A draw biased at the
-region reaches it 8 times in 500 where the old one reached 0; the burst
-carrier fails all eight and 11 rows in all, the push carrier 0, the pinned
-corpus green beside it. Predicate and carrier agree exactly, so the burst is
-the mechanism and not one symptom. What is left is the transcription: the
-arrival split has landed in Agda, the carrier has not.
+NARROWED TO A COUNT, and one side of it clean. A draw biased at the region
+reaches it 8 times in 500 where the old one reached 0; the evaluator fails all
+eight and 11 in all, a carrier that pushes fails none, and those 11 are pinned
+so the close is a count, not a memory. Predicate and carrier agree exactly, so
+the burst is the mechanism, not a symptom. What is left is the transcription:
+the arrival split has landed, the carrier has not.
 
 also: `chainStep⇓`, `chainStep!` — the carrier is a batch on BOTH faces and only one of them is `subscribeE⇓`; a scheduled arrival folds its value and its end together for the same reason a subscription hands back a list, so the split separating them is the monster's fact landing off the monster's cone.
 
@@ -251,14 +251,14 @@ also: `chainStep⇓`, `chainStep!` — the carrier is a batch on BOTH faces and 
 
 - **THE FLOOR BELONGS ON THE JOINING FRAME, AND ONE INDEX ON THE PATH CANNOT
   SAY IT.** A flattener subscribes its inners at the floor where IT was
-  written, never at the floor of whatever delivered the value — and the two
-  differ exactly when a SHARE is between, since a share's rows are stored at
-  the share's own floor and see fewer slots. An inner subscribed at the
-  delivered floor ENDS instead of reading its input, which reads as a silent
-  program rather than as a scope error. A burst carrier never exposed it,
-  because there the caller supplied the floor. In Agda the floor is one index
-  on `Path Γ lo u t`, so where a joiner's own floor comes from has to be
-  answered before any clause is written.
+  written, never at the floor of whatever delivered the value; the two differ
+  exactly when a SHARE is between, since a slot row is stored and dispatched
+  at `regFloor (atSlot i)` and the `lowerFloor` that puts it there forgets
+  where it came from. The inner may then read only slots at or below `i`, and
+  `subs-floor` ends it dry — a silent program rather than a scope error. The
+  repair is a `Path` constructor for the joining frames carrying BOTH floors,
+  the outer for the registry and the inner for the tail, ordered between: then
+  `lowerFloor` moves the outer and leaves the flattener's own standing.
 
 - **THE CARRIER'S SHAPE INTO `Rx.Evaluator.Domain`, AS A TRANSCRIPTION.** Only
   once the reference is green. The relation is where the design is stated and

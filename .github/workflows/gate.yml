@@ -348,21 +348,21 @@ jobs:
   # `CLI/Main.agda`, not the tower -- so it restores the same read-only
   # caches the sweep does.
   #
-  # STILL OFF, AND THE SWEEP BEING GREEN IS NOT THE CONDITION. The condition
-  # is that the job goes on WHOLE, and the job is two steps: the random draw
-  # and the replay of the pinned corpus. The draw now matches on every case
-  # -- 500 drawn, 400 emitting -- after the plain tree was fixed to register
-  # a cold's async tail BEFORE replaying its sync prefix, which is what the
-  # evaluator does and what ordinary rxjs does; both recorded flattener
-  # divergences were that one ordering. The replay is red, and it is red on
-  # the shape it was pinned for.
+  # STILL OFF, AND WHAT REMAINS RED IS COUNTED RATHER THAN DESCRIBED. The job
+  # is two steps, the random draw and the replay of the pinned corpus, and it
+  # goes on whole or not at all. The draw stands at 489 of 500 against rxjs,
+  # 11 cases; the replay is red on 13 of its 15 rows. A draw that once matched
+  # on every case did so because it never reached the shape -- biasing the
+  # generator at it is what turned an inference into those numbers.
   #
-  # WHAT IS RED IS THE BURST CARRIER. A subscription hands back a burst which
-  # its caller then pushes, so a reaction to a burst's first value runs after
-  # the whole burst is harvested -- and where that reaction SUBSCRIBES the
-  # share the burst came from, rxjs has already moved the observer list on
-  # and the evaluator has not. The measurement and the three neighbours that
-  # separate it are in the evaluator's own header, where the repair is owed.
+  # WHAT IS RED IS THE BURST CARRIER, AND IT IS ONE MECHANISM, NOT ELEVEN. A
+  # subscription hands back a burst which its caller then pushes, so a
+  # reaction to a burst's first value runs after the whole burst is harvested
+  # -- and where that reaction SUBSCRIBES the share the burst came from, rxjs
+  # has already moved the observer list on and the evaluator has not. Every
+  # failing case emits NOTHING where rxjs emits. The measurement and the three
+  # neighbours that separate it are in the evaluator's own header, where the
+  # repair is owed; a carrier that pushes clears all 15 rows and all 500.
   #
   # AND THE RULE THAT DECIDES THE SHAPE OF THAT REPAIR: nothing here may be
   # narrowed to make it pass. A divergence is a finding about one of the two
