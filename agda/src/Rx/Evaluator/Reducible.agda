@@ -114,6 +114,64 @@ Red {Γ = Γ} (obs u) b =
   Σ (Stream Γ u × Sched Γ × EvalSt e) λ r →
     subscribeE⇓ {e = e} b κ now sched st r × StreamSat (Red u) (proj₁ r)
 
+-- WHAT A PUSHING CARRIER DOES TO THIS STATEMENT, AND THE CHEAP HALF IS
+-- THE VISIBLE ONE.  A subscription that pushes emits at the ROOT type,
+-- so there is no element-typed column left to conclude anything about
+-- and the satisfaction half has nowhere to live.  It moves onto the
+-- PATH: the arm takes a fold-builder for the path it is handed, which
+-- is the same obligation read from the other end, and every arm that
+-- used to split a returned burst instead extends that builder by one
+-- frame.  None of that is a research question.
+
+-- THE EXPENSIVE HALF IS THE STORE, AND IT IS WHERE THE CARRIER CHANGE
+-- LANDS.  Under a push the subscribe cycle REACHES the fold, and the
+-- fold reaches a flattener's drain -- so a parked inner is taken back
+-- out of the store inside the very subscribe call that parked it, and
+-- the candidate at that inner is APPLIED to build its subscription
+-- rather than carried alongside one.  Under a batching carrier the
+-- drain hung off a completion the caller delivered after the subscribe
+-- had returned, which is why it sat below this module and cost nothing.
+--
+-- AND TWO SIBLING OBLIGATIONS ARE NOT THE SAME COST, WHICH IS WORTH
+-- SAYING BEFORE EITHER IS PRICED.  A fold's cell and a bracket's buffer
+-- are read back inside a subscribe for the same reason the queue is,
+-- but what they produce is a CLAIM about a list some total function has
+-- already computed.  The evaluator is a projection of this proof, so a
+-- stuck claim on a computed list leaves the run computing and a stuck
+-- subscription does not.
+--
+-- DEAD ROUTE: a leaf for the queue's own obligation.  It typechecks and
+--   it stops the evaluator running, which is the one thing the
+--   differential harness measures -- the applied side of the candidate
+--   is where the run's values come from.
+--
+-- DEAD ROUTE: reaching for the fundamental theorem at VALUES.  It is
+--   total and it settles every store read in one call, which is exactly
+--   what it does for the arrival spine today.  Under a push it is a
+--   MEMBER of the cycle it would be answering -- the fold reaches it and
+--   it reaches the fold -- and the value it is asked about came out of a
+--   store rather than out of a subterm, so nothing descends.
+--
+-- DEAD ROUTE: an invariant on the store written into this recursion.
+--   The arm recurses on the element type; a store predicate reaches the
+--   candidate at whatever type a node happens to hold, which stands in
+--   no relation to it, so the recursion is not structural.  Leaving the
+--   predicate ABSTRACT does not save it either: the proof needs it
+--   STABLE under writes to nodes the abstraction hides, and an abstract
+--   predicate grants no stability.  Requiring stability as a side
+--   hypothesis is the same statement one layer out.
+
+-- WHAT IS LEFT IS A LEVEL, AND IT PAYS FOR THE FLATTENER ONLY.  Quantify
+-- the store predicate INSIDE the observable arm, one level below the arm
+-- itself -- the candidate landing in a level computed from the type, an
+-- observable one above its element.  A flattener's instantiation then
+-- lands exactly where its own arm provides, because the queue holds
+-- values at the type the arm is recursing through.  The SHARE's fan-out
+-- is not reached: a sink pushes into paths read out of the REGISTRY,
+-- whose frames stand at types nothing in the arm names, so their
+-- obligations have no level to be quantified at.  That gap is the
+-- question, and the fan-out is what the carrier change was bought for.
+
 -- WHY A SHARE'S FAN-OUT COSTS THE CANDIDATE NOTHING, WHICH IS THE ONE
 -- THING ABOUT `connect` THAT WAS NOT OBVIOUS.  A shared slot subscribes
 -- its def ONCE and attaches every later reader to that one connection,

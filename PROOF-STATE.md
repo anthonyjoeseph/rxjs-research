@@ -245,25 +245,42 @@ pinned so the close is a count, not a memory. The two failures outside the
 region are the predicate under-reading, not a second mechanism — the pushing
 carrier clears them too. What is left is the carrier itself.
 
+NARROWED AGAIN, on the STATEMENT side. The relation now says the push, so the
+carrier is no longer a question about shape — the six clauses where a pushing
+carrier answers differently from a batching one are written down and check.
+What the monster still holds is whether a tower stands over that shape, and
+the store is where it bites.
+
 also: `chainStep⇓`, `chainStep!` — the carrier is a batch on BOTH faces and only one of them is `subscribeE⇓`; a scheduled arrival folds its value and its end together for the same reason a subscription hands back a list, so the split separating them is the monster's fact landing off the monster's cone.
 
 ### Big picture tier roadmap
 
-- **THE CARRIER'S SHAPE INTO `Rx.Evaluator.Domain`, AS A TRANSCRIPTION.** Only
-  once the reference is green. The relation is where the design is stated and
-  the candidate next door is stated over it, so this is the leg that prices
-  the rest: `Red` at an observable currently concludes that everything the
-  subscription EMITS is reducible at the element type, and a subscription that
-  emits at the ROOT type has no such conclusion to draw — the obligation has
-  to move onto the path, and whether it stays structural in `Ty` is the open
-  question, not the clause work.
+- **THE CANDIDATE'S LEVEL, WHICH IS WHAT THE PUSH CHARGES FOR THE STORE.** A
+  pushing subscribe reaches the fold, and the fold reaches the flattener's
+  DRAIN — so a parked inner is taken back out of the store inside the very
+  subscribe that parked it, and the candidate at that inner is APPLIED to
+  build its subscription rather than merely carried. Three ways to pay are
+  ruled out in `Red`'s header — a leaf, the theorem at values, and an
+  invariant written into the type recursion — and the one that is left costs
+  the candidate a LEVEL. Settle the level, and the arm is a restatement
+  rather than a research question; leave it, and every clause above it is
+  typed against a statement that cannot hold.
 
-- **THE TOTALITY TOWER ONTO THE PUSH CARRIER.** The cycle structure is
-  unchanged — a share's connect still re-enters the subscribe cycle, and the
-  descent is still the reducibility candidate recursing on the TYPE — so what
-  moves is the shape of every family's result, not the argument that they
-  terminate. Take the reducibility side first, since it names every
-  constructor; the freshness pair last, since it names the fewest.
+- **THE OTHER TWO STORE OBLIGATIONS ARE LEAVES, AND SAYING WHY IS THE LEG.**
+  A fold's cell and a bracket's buffer are read back inside a subscribe for
+  the same reason the queue is, and they are NOT the same cost: what they
+  produce is a claim about a list some total function already computed, so a
+  leaf there leaves the evaluator computing and the queue's does not. That
+  asymmetry is the only thing standing between a tower with one open question
+  and a tower with three, so it is worth a leg of its own to state at full
+  strength and wire, rather than discovered again at each site.
+
+- **THE TOWER RE-THREADED ONTO THE PUSH CARRIER.** Not a re-shaping of
+  results: under the push the subscribe cycle and the fold cycle are ONE
+  cycle, spanning the candidate's module and the builder's, so the cut
+  between them has to move before a clause can be typed. Take the cut first
+  and the clauses after; the freshness pair last, since it names the fewest
+  constructors.
 
 - **THE REFERENCE RETIRES WITH THE CARRIER.** `ref-eval.ts` is the burst
   machine, and the moment the Agda pushes it is a superseded predecessor —
