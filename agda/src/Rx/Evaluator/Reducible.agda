@@ -67,7 +67,7 @@ open import Rx.Evaluator using (Stream; Burst; VSegs; oneVSeg; Segs; segsComplet
   switchᵒ; exhaustᵒ; AllOp; NodeId; NodeState; cell-st; take-st; batchSync-st; mergeAll-st;
   switch-st; exhaust-st; takeVals; takeDispatch; scanVals; scanDispatch; batchVals;
   batchDispatch; batchBuf; batchClose; lookupNode; setNode; installNode; oneShotBurst; spentBurst; memberSource; splitEvents;
-  consumeUsable; hasRoom; switchKill; register; atSlot; lowerFloor;
+  consumeUsable; hasRoom; drainSt; switchKill; register; atSlot; lowerFloor;
   aliveThroughᶠ; shareAdmit; shareDying; shareSpend; RegId)
 open import Rx.Evaluator.Unconn-Arith using (unconn; unconn-insert; room-keeps; keeps-refl)
 open import Rx.Evaluator.Keeps using (switchKill-keeps; subscribeE-keeps; subscribeInner-keeps; stepFrame-keeps; pushBurst-keeps;
@@ -85,7 +85,7 @@ open import Rx.Evaluator.Domain using (srcFrame; subscribeE⇓; pushBurst⇓; pu
   connect-live; connect-died;
   subscribeInner⇓; mergeAllDrain⇓; innerFinish⇓; innerReact⇓; foldPath⇓; foldVSegs⇓;
   dispatchShare⇓; shareWalk⇓; shareGo⇓;
-  drain-nil; drain-no-room; drain-room;
+  drain-spent; drain-nil; drain-no-room; drain-room;
   finish-all-drain; finish-switch-clear; finish-exhaust-clear; finish-nil;
   react-false; react-alive; react-dead;
   fold-root; fold-sink; fold-step;
@@ -1052,18 +1052,19 @@ inner! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo}
 
 -- THE PARKED LANE, HANDED BACK ITS QUEUE.  A flattener that could not
 -- subscribe when a value arrived kept it; this is the walk that spends
--- the backlog once a lane frees, one carried value at a time.  The
--- recursion peels the popped queue, so nothing here needs a measure.
--- What leaves is already at the root type, for the reason `drain-room`
--- states: each spend is a subscribe, and a subscribe's answer is pushed
--- where it is produced.
+-- the backlog once a lane frees.  What leaves is already at the root
+-- type, for the reason `drain-room` states: each spend is a subscribe,
+-- and a subscribe's answer is pushed where it is produced.  The queue
+-- is re-read from the node between spends, so the list this recursion
+-- peels is a BOUND on the iterations and not the work itself.
 mergeAllDrain! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo}
                  (allNid : NodeId) (κ : Path Γ lo s t) (now : Tick)
+                 (fuel : List (Val Γ (obs s)))
                  (lim : Maybe ℕ) (act : ℕ) (od : Bool)
                  (q : List (Val Γ (obs s))) (sched : Sched Γ) (st : EvalSt e)
                → ∀ {m} → Acc _<_ m → Room m sched st
                → Σ (Stream Γ t × ℕ × List (Val Γ (obs s)) × Sched Γ × EvalSt e) λ r →
-                   mergeAllDrain⇓ {e = e} allNid κ now lim act od q sched st r
+                   mergeAllDrain⇓ {e = e} allNid κ now fuel lim act od q sched st r
 
 -- A FIN COMPLETES AN INNER ONLY ONCE NOTHING UNDER ITS EXIT FRAME CAN
 -- DELIVER AGAIN, and only a merge's finish subscribes anything -- it
@@ -1519,30 +1520,33 @@ inner! op allNid κ now o sched st aM rm =
           aM rm
   in _ , inner refl d refl
 
-mergeAllDrain! allNid κ now lim act od []      sched st aM rm = _ , drain-nil
-mergeAllDrain! allNid κ now lim act od (o ∷ q) sched st aM rm
+mergeAllDrain! allNid κ now []       lim act od q       sched st aM rm = _ , drain-spent
+mergeAllDrain! allNid κ now (f ∷ fs) lim act od []      sched st aM rm = _ , drain-nil
+mergeAllDrain! {s = s} allNid κ now (f ∷ fs) lim act od (o ∷ q) sched st aM rm
   with hasRoom lim act in eqr
 ... | false = _ , drain-no-room eqr
 ... | true  =
-      let ((inst , segs , done , sched₁ , st₁) , s) =
+      let ((inst , segs , done , sched₁ , st₁) , sb) =
             inner! mergeAllᵒ allNid κ now o sched
               (record st
                  { nodes = setNode allNid (mergeAll-st lim (suc act) q od)
                      (EvalSt.nodes st) })
               aM rm
-          rm₁ = room-keeps (subscribeInner-keeps s) rm
+          rm₁ = room-keeps (subscribeInner-keeps sb) rm
           ((_ , sched₂ , st₂) , fv) =
             foldVSegs! (<-wellFounded _) ≤-refl now κ segs false sched₁ st₁ aM rm₁
-          (_ , d) = mergeAllDrain! allNid κ now lim
-                      (if done then act else suc act) od q sched₂ st₂ aM
+          (lim₂ , act₂ , q₂ , od₂) =
+            drainSt s (lookupNode allNid (EvalSt.nodes st₂))
+          (_ , d) = mergeAllDrain! allNid κ now fs lim₂
+                      (if done then pred act₂ else act₂) od₂ q₂ sched₂ st₂ aM
                       (room-keeps (foldVSegs-keeps fv) rm₁)
-      in _ , drain-room eqr s fv d
+      in _ , drain-room eqr sb fv refl d
 
 innerFinish! {s = s} mergeAllᵒ allNid inst κ now vals sched st
              (just (mergeAll-st {w} lim act q od)) aM rm with w ≟ᵗ s in eqw
 ... | no  _    = _ , finish-nil (cong ⌊_⌋ eqw)
 ... | yes refl =
-      let (_ , d) = mergeAllDrain! allNid κ now lim (pred act) od q sched st aM rm
+      let (_ , d) = mergeAllDrain! allNid κ now q lim (pred act) od q sched st aM rm
       in _ , finish-all-drain d
 innerFinish! switchᵒ allNid inst κ now vals sched st
              (just (switch-st (just c) od)) aM rm with (c ≡ᵇ inst) in eqc

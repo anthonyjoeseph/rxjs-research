@@ -47,7 +47,7 @@ open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeInner⇓; thruCon
   subs-μ; subs-defer; subs-mint;
   inner; consume-all-sub; consume-all-enqueue; consume-all-nil; consume-switch-sub;
   consume-switch-nil; consume-exhaust-sub; consume-exhaust-nil;
-  walk-nil; walk-cons; drain-nil; drain-no-room; drain-room;
+  walk-nil; walk-cons; drain-spent; drain-nil; drain-no-room; drain-room;
   finish-all-drain; finish-switch-clear; finish-exhaust-clear; finish-nil;
   react-false; react-alive; react-dead;
   step-map; step-scan; step-take; step-batchSync; step-from-inner; step-thru-outer;
@@ -260,10 +260,10 @@ thruConsume-keeps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
                   → Keeps {e = e} sched st sched′ st′
 
 mergeAllDrain-keeps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo}
-                        {allNid} {κ : Path Γ lo s t} {now} {lim act od q}
+                        {allNid} {κ : Path Γ lo s t} {now} {fuel lim act od q}
                         {sched sched′ : Sched Γ} {st st′ : EvalSt e}
                         {out act′ q′}
-                    → mergeAllDrain⇓ {e = e} allNid κ now lim act od q sched st
+                    → mergeAllDrain⇓ {e = e} allNid κ now fuel lim act od q sched st
                         (out , act′ , q′ , sched′ , st′)
                     → Keeps {e = e} sched st sched′ st′
 
@@ -405,9 +405,10 @@ thruConsume-keeps (consume-exhaust-sub _ si r fv) =
     (keeps-trans (innerReact-keeps r) (foldVSegs-keeps fv))
 thruConsume-keeps (consume-exhaust-nil _)    = keeps-refl _ _
 
+mergeAllDrain-keeps drain-spent          = keeps-refl _ _
 mergeAllDrain-keeps drain-nil            = keeps-refl _ _
 mergeAllDrain-keeps (drain-no-room _)    = keeps-refl _ _
-mergeAllDrain-keeps (drain-room _ si fv dr) =
+mergeAllDrain-keeps (drain-room _ si fv _ dr) =
   keeps-trans (subscribeInner-keeps si)
     (keeps-trans (foldVSegs-keeps fv) (mergeAllDrain-keeps dr))
 

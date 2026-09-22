@@ -759,6 +759,21 @@ batchClose {t = t} s m =
     (oneVSeg {u = s ×ᵗ listᵗ s} {t = t} (proj₁ (batchBuf s m)))
     (proj₂ (batchBuf s m))
 
+-- WHAT A MERGE'S DRAIN RE-READS BETWEEN SPENDS.  rxjs's buffer is one
+-- mutable array and the loop `shift`s it, so a drain that re-enters
+-- mid-spend -- a shared inner reporting its death through the registry
+-- while its own subscribe is still running -- walks the SAME array and
+-- no item is subscribed twice.  Carrying the tail instead gives each
+-- drain its own copy of it, which is how both spend it.  A node that is
+-- gone, or is holding another shape, reads as a spent queue with no
+-- room, so the drain stops there rather than inventing one.
+drainSt : ∀ {n} {Γ : Ctx n} (s : Ty) → Maybe (NodeState Γ)
+        → Maybe ℕ × ℕ × List (Val Γ (obs s)) × Bool
+drainSt s (just (mergeAll-st {w} lim act q od)) with w ≟ᵗ s
+... | no  _    = just 0 , 0 , [] , false
+... | yes refl = lim , act , q , od
+drainSt s _ = just 0 , 0 , [] , false
+
 -- a from-inner completion is absorbed iff some registration under this inner
 -- instance is still live: its path threads `inst`, it is not cancelled, and it
 -- is not an already-delivered dying-source chain.

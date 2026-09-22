@@ -141,7 +141,7 @@ open import Rx.Evaluator using (Stream; Burst; Sched; EvalSt; Path; Frame; NodeI
   atSlot; atDyn; lowerFloor; map-f; scan-f; take-f; batchSync-f; thru-outer; cell-st; take-st;
   batchSync-st; mergeAll-st; switch-st; exhaust-st; mergeAllᵒ; switchᵒ; exhaustᵒ; lookupNode;
   setNode; hasRoom; switchKill; aliveThroughᶠ; scanDispatch; takeDispatch;
-  batchDispatch; batchClose; thruWrap; consumeUsable; finishUsable; VSegs; oneVSeg; Segs; oneSeg; stepSegs;
+  batchDispatch; batchClose; thruWrap; consumeUsable; finishUsable; drainSt; VSegs; oneVSeg; Segs; oneSeg; stepSegs;
   segVSegs; segsCompleted; resolveSegs)
 
 -- THE FRAME A SUBSCRIBE CAN PUSH, WHICH IS EVERY FRAME BUT ONE, AND
@@ -209,7 +209,7 @@ data thruWalk⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
 
 data mergeAllDrain⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
      ∀ {s lo} →
-     NodeId → Path Γ lo s t → Tick
+     NodeId → Path Γ lo s t → Tick → List (Val Γ (obs s))
    → Maybe ℕ → ℕ → Bool → List (Val Γ (obs s)) → Sched Γ → EvalSt e
    → Stream Γ t × ℕ × List (Val Γ (obs s)) × Sched Γ × EvalSt e → Set
 
@@ -759,15 +759,29 @@ data mergeAllDrain⇓ {n} {Γ} {t} {e} where
   -- burst puts them BEHIND deliveries made during the drain, which only
   -- a frame that COUNTS can tell -- the same distinction `thruConsume⇓`
   -- is stated at, met through the queue instead of through the walk.
-  drain-nil : ∀ {s lo allNid} {κ : Path Γ lo s t} {now} {lim act od sched₀ st₀}
-            → mergeAllDrain⇓ {s = s} allNid κ now lim act od [] sched₀ st₀
-                ([] , act , [] , sched₀ , st₀)
+  -- THE COUNT IS THE DESCENT AND THE NODE IS THE TRUTH.  A drain
+  -- re-reads the buffer it is spending, so nothing about what is left
+  -- can be carried; what is carried is a LIST whose length bounds the
+  -- iterations, because the node's queue is not an argument this
+  -- recursion falls on.  It is the queue as the drain found it, which
+  -- is exact while nothing enqueues mid-drain and an under-count when
+  -- something does -- and an under-count leaves items parked for the
+  -- next completion rather than spending one twice.
+  drain-spent : ∀ {s lo allNid} {κ : Path Γ lo s t} {now}
+                  {lim act od q sched₀ st₀}
+              → mergeAllDrain⇓ {s = s} allNid κ now [] lim act od q sched₀ st₀
+                  ([] , act , q , sched₀ , st₀)
 
-  drain-no-room : ∀ {s lo allNid} {κ : Path Γ lo s t} {now}
+  drain-nil : ∀ {s lo allNid} {κ : Path Γ lo s t} {now}
+                {f fs lim act od sched₀ st₀}
+            → mergeAllDrain⇓ {s = s} allNid κ now (f ∷ fs) lim act od []
+                sched₀ st₀ ([] , act , [] , sched₀ , st₀)
+
+  drain-no-room : ∀ {s lo allNid} {κ : Path Γ lo s t} {now} {f fs}
                     {lim act od} {o : Val Γ (obs s)} {q sched₀ st₀}
                 → hasRoom lim act ≡ false
-                → mergeAllDrain⇓ allNid κ now lim act od (o ∷ q) sched₀ st₀
-                    ([] , act , o ∷ q , sched₀ , st₀)
+                → mergeAllDrain⇓ allNid κ now (f ∷ fs) lim act od (o ∷ q)
+                    sched₀ st₀ ([] , act , o ∷ q , sched₀ , st₀)
 
   -- THE SHORTENED QUEUE AND THE RAISED COUNT ARE BOTH WRITTEN BEFORE
   -- THE SUBSCRIBE, NOT AFTER IT.  A batch write-back leaves the node
@@ -781,10 +795,10 @@ data mergeAllDrain⇓ {n} {Γ} {t} {e} where
   -- What stays carried rather than re-read is the count the recursion
   -- walks on, because re-reading the queue is what would let a
   -- re-entrant enqueue feed this drain its own tail forever.
-  drain-room : ∀ {s lo allNid} {κ : Path Γ lo s t} {now}
+  drain-room : ∀ {s lo allNid} {κ : Path Γ lo s t} {now} {f fs}
                  {lim act od} {o : Val Γ (obs s)} {q sched₀ st₀}
                  {inst segs done sched₁ st₁} {out sched₂ st₂}
-                 {out′ act′ q′ sched₃ st₃}
+                 {lim₂ act₂ q₂ od₂} {out′ act′ q′ sched₃ st₃}
              → hasRoom lim act ≡ true
              → subscribeInner⇓ mergeAllᵒ allNid κ now o sched₀
                  (record st₀
@@ -792,10 +806,12 @@ data mergeAllDrain⇓ {n} {Γ} {t} {e} where
                         (EvalSt.nodes st₀) })
                  (inst , segs , done , sched₁ , st₁)
              → foldVSegs⇓ now κ segs false sched₁ st₁ (out , sched₂ , st₂)
-             → mergeAllDrain⇓ allNid κ now lim
-                 (if done then act else suc act) od q sched₂ st₂
+             → drainSt s (lookupNode allNid (EvalSt.nodes st₂))
+                 ≡ (lim₂ , act₂ , q₂ , od₂)
+             → mergeAllDrain⇓ allNid κ now fs lim₂
+                 (if done then pred act₂ else act₂) od₂ q₂ sched₂ st₂
                  (out′ , act′ , q′ , sched₃ , st₃)
-             → mergeAllDrain⇓ allNid κ now lim act od (o ∷ q) sched₀ st₀
+             → mergeAllDrain⇓ allNid κ now (f ∷ fs) lim act od (o ∷ q) sched₀ st₀
                  (out ++ out′ , act′ , q′ , sched₃ , st₃)
 
 data innerFinish⇓ {n} {Γ} {t} {e} where
@@ -803,7 +819,7 @@ data innerFinish⇓ {n} {Γ} {t} {e} where
   finish-all-drain : ∀ {s lo allNid inst} {κ : Path Γ lo s t} {now}
                        {vals : List (Val Γ s)} {sched st} {lim act q od}
                        {out act′ q′ sched′ st′}
-                   → mergeAllDrain⇓ allNid κ now lim (pred act) od q sched st
+                   → mergeAllDrain⇓ allNid κ now q lim (pred act) od q sched st
                        (out , act′ , q′ , sched′ , st′)
                    → innerFinish⇓ mergeAllᵒ allNid inst κ now vals sched st
                        (just (mergeAll-st {t = s} lim act q od))
