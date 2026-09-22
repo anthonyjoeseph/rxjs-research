@@ -95,15 +95,14 @@ take-pres nid vals fin sched st (just (switch-st _ _))       f≤nid = pres-same
 take-pres nid vals fin sched st (just (exhaust-st _ _))      f≤nid = pres-same _ _ refl
 
 -- the flattener's wrap marks its own node done
-wrap-pres : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} {f}
+wrap-pres : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {f}
               (op : AllOp) (nid : NodeId) (fin : Bool)
-              (vs : List (Val Γ u))
               (sched′ : Sched Γ) (st′ : EvalSt e)
           → f ≤ nid
-          → PreservedBelow f st′ (proj₂ (proj₂ (proj₂
-              (thruWrap {e = e} op nid fin (vs , sched′ , st′)))))
-wrap-pres op nid false vs sched′ st′ f≤nid = pres-same _ _ refl
-wrap-pres mergeAllᵒ nid true vs sched′ st′ f≤nid
+          → PreservedBelow f st′ (proj₂ (proj₂
+              (thruWrap {e = e} op nid fin (sched′ , st′))))
+wrap-pres op nid false sched′ st′ f≤nid = pres-same _ _ refl
+wrap-pres mergeAllᵒ nid true sched′ st′ f≤nid
   with lookupNode nid (EvalSt.nodes st′)
 ... | just (mergeAll-st lim act q _) = pres-write _ _ (mergeAll-st lim act q true) refl f≤nid
 ... | just (cell-st _)               = pres-same _ _ refl
@@ -112,7 +111,7 @@ wrap-pres mergeAllᵒ nid true vs sched′ st′ f≤nid
 ... | just (switch-st _ _)           = pres-same _ _ refl
 ... | just (exhaust-st _ _)          = pres-same _ _ refl
 ... | nothing                        = pres-same _ _ refl
-wrap-pres switchᵒ nid true vs sched′ st′ f≤nid
+wrap-pres switchᵒ nid true sched′ st′ f≤nid
   with lookupNode nid (EvalSt.nodes st′)
 ... | just (switch-st cur _)         = pres-write _ _ (switch-st cur true) refl f≤nid
 ... | just (cell-st _)               = pres-same _ _ refl
@@ -121,7 +120,7 @@ wrap-pres switchᵒ nid true vs sched′ st′ f≤nid
 ... | just (mergeAll-st _ _ _ _)     = pres-same _ _ refl
 ... | just (exhaust-st _ _)          = pres-same _ _ refl
 ... | nothing                        = pres-same _ _ refl
-wrap-pres exhaustᵒ nid true vs sched′ st′ f≤nid
+wrap-pres exhaustᵒ nid true sched′ st′ f≤nid
   with lookupNode nid (EvalSt.nodes st′)
 ... | just (exhaust-st act _)        = pres-write _ _ (exhaust-st act true) refl f≤nid
 ... | just (cell-st _)               = pres-same _ _ refl
@@ -179,11 +178,11 @@ stepFrame-preserves : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
                         (f : ℕ) {fr : Frame Γ s u} {κ : Path Γ lo u t}
                         {now} {vals : List (Val Γ s)} {fin}
                         {sched sched₁ : Sched Γ} {st st₁ : EvalSt e}
-                        {vals′ fin′} {roots : Stream Γ t}
+                        {segs fin′}
                     → f ≤ nodeCt sched
                     → FrameAbove f fr
                     → stepFrame⇓ {e = e} now fr κ vals fin sched st
-                        (vals′ , fin′ , roots , sched₁ , st₁)
+                        (segs , fin′ , sched₁ , st₁)
                     → PreservedBelow f st st₁
 
 subscribeAll-preserves : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
@@ -200,64 +199,62 @@ subscribeInner-preserves : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
                              (f : ℕ) {op} {allNid} {κ : Path Γ lo u t} {now}
                              {o : Val Γ (obs u)}
                              {sched sched′ : Sched Γ} {st st′ : EvalSt e}
-                             {inst vs done} {roots : Stream Γ t}
+                             {inst segs done}
                          → f ≤ nodeCt sched
                          → subscribeInner⇓ {e = e} op allNid κ now o sched st
-                             (inst , vs , done , roots , sched′ , st′)
+                             (inst , segs , done , sched′ , st′)
                          → PreservedBelow f st st′
 
 thruWalk-preserves : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
                        (f : ℕ) {op} {nid} {κ : Path Γ lo u t} {now} {os}
-                       {sched₀ sched₂ : Sched Γ} {st₀ st₂ : EvalSt e} {vs}
-                       {roots : Stream Γ t}
+                       {sched₀ sched₂ : Sched Γ} {st₀ st₂ : EvalSt e} {segs}
                    → f ≤ nodeCt sched₀
                    → f ≤ nid
                    → thruWalk⇓ {e = e} op nid κ now os sched₀ st₀
-                       (vs , roots , sched₂ , st₂)
+                       (segs , sched₂ , st₂)
                    → PreservedBelow f st₀ st₂
 
 thruConsume-preserves : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
                           (f : ℕ) {op} {nid} {κ : Path Γ lo u t} {now}
                           {o : Val Γ (obs u)}
-                          {sched₀ sched₁ : Sched Γ} {st₀ st₁ : EvalSt e} {vs}
-                          {roots : Stream Γ t}
+                          {sched₀ sched₁ : Sched Γ} {st₀ st₁ : EvalSt e} {segs}
                       → f ≤ nodeCt sched₀
                       → f ≤ nid
                       → thruConsume⇓ {e = e} op nid κ now o sched₀ st₀
-                          (vs , roots , sched₁ , st₁)
+                          (segs , sched₁ , st₁)
                       → PreservedBelow f st₀ st₁
 
 mergeAllDrain-preserves : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
                             (f : ℕ) {allNid} {κ : Path Γ lo u t} {now}
                             {lim act od q}
                             {sched₀ sched₂ : Sched Γ} {st₀ st₂ : EvalSt e}
-                            {vs act′ q′} {roots : Stream Γ t}
+                            {segs act′ q′}
                         → f ≤ nodeCt sched₀
                         → f ≤ allNid
                         → mergeAllDrain⇓ {e = e} allNid κ now lim act od q
-                            sched₀ st₀ (vs , act′ , q′ , roots , sched₂ , st₂)
+                            sched₀ st₀ (segs , act′ , q′ , sched₂ , st₂)
                         → PreservedBelow f st₀ st₂
 
 innerFinish-preserves : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
                           (f : ℕ) {op} {allNid} {inst} {κ : Path Γ lo u t}
                           {now} {vals : List (Val Γ u)}
                           {sched sched′ : Sched Γ} {st st′ : EvalSt e} {ns}
-                          {vals′ done} {roots : Stream Γ t}
+                          {segs done}
                       → f ≤ nodeCt sched
                       → f ≤ allNid
                       → innerFinish⇓ {e = e} op allNid inst κ now vals sched st
-                          ns (vals′ , done , roots , sched′ , st′)
+                          ns (segs , done , sched′ , st′)
                       → PreservedBelow f st st′
 
 innerReact-preserves : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
                          (f : ℕ) {op} {allNid} {inst} {κ : Path Γ lo u t}
                          {now} {vals : List (Val Γ u)}
                          {sched sched₁ : Sched Γ} {st st₁ : EvalSt e} {fin}
-                         {vals′ fin′} {roots : Stream Γ t}
+                         {segs fin′}
                      → f ≤ nodeCt sched
                      → f ≤ allNid
                      → innerReact⇓ {e = e} op allNid inst κ now vals sched st
-                         fin (vals′ , fin′ , roots , sched₁ , st₁)
+                         fin (segs , fin′ , sched₁ , st₁)
                      → PreservedBelow f st st₁
 
 sharedConnect-preserves : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo}
@@ -330,9 +327,9 @@ stepFrame-preserves f le fa
 stepFrame-preserves f le fa (step-from-inner r) =
   innerReact-preserves f le (proj₁ fa) r
 stepFrame-preserves f le fa
-  (step-thru-outer {op = op} {nid} {fin = fin} {vs = vs} {roots = _} {sched′} {st′} w) =
+  (step-thru-outer {op = op} {nid} {fin = fin} {sched′ = sched′} {st′ = st′} w) =
   pres-trans (thruWalk-preserves f le fa w)
-             (wrap-pres op nid fin vs sched′ st′ fa)
+             (wrap-pres op nid fin sched′ st′ fa)
 
 subscribeAll-preserves f le (sub-all refl sub push) =
   pres-trans (pres-trans (pres-write _ _ _ refl le)

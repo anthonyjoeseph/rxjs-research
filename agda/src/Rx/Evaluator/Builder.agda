@@ -54,7 +54,7 @@ open import Rx.Prim using (Fuel; Tick)
 open import Rx.Exp using (Ty; obs; _≟ᵗ_; Ctx; Closed; Val; []ᵉ)
 open import Rx.Mint using (nodeᵏ; freshId; setAt)
 open import Rx.Slots using (Slots)
-open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; root; share-sink; _↠_;
+open import Rx.Evaluator using (Stream; VSegs; Sched; EvalSt; Path; root; share-sink; _↠_;
   Frame; map-f; scan-f; take-f; batchSync-f; from-inner; thru-outer;
   AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ; NodeId; NodeState;
   cell-st; take-st; batchSync-st; mergeAll-st; switch-st; exhaust-st;
@@ -62,6 +62,7 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; root; share-sink; _
   Arrival; arrTick; arrTy; arrVal; AtFloor; RegId; chainsOf; cascadeLatch;
   sched-next; sched-init; st-init; shareAdmit; shareDying)
 open import Rx.Evaluator.Domain using (subscribeInner⇓; mergeAllDrain⇓; innerFinish⇓; innerReact⇓; stepFrame⇓; foldPath⇓;
+  foldVSegs⇓; segs-nil; segs-last; segs-more;
   dispatchShare⇓; shareWalk⇓; shareGo⇓; chainStep⇓; cascadeGo⇓; cascade⇓; drain⇓; evaluate⇓; inner;
   drain-nil; drain-no-room; drain-room; finish-all-drain; finish-switch-clear;
   finish-exhaust-clear; finish-nil; react-false; react-alive; react-dead; step-map; step-scan;
@@ -95,7 +96,7 @@ allRed u (v ∷ vs) = red-val u v ∷ᵃ allRed u vs
 inner! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo}
          (op : AllOp) (allNid : NodeId) (κ : Path Γ lo s t) (now : Tick)
          (o : Val Γ (obs s)) (sched : Sched Γ) (st : EvalSt e)
-       → Σ (NodeId × List (Val Γ s) × Bool × Stream Γ t × Sched Γ × EvalSt e) λ r →
+       → Σ (NodeId × VSegs Γ s t × Bool × Sched Γ × EvalSt e) λ r →
            subscribeInner⇓ {e = e} op allNid κ now o sched st r
 inner! op allNid κ now o sched st =
   let inst = freshId nodeᵏ (Sched.mint sched)
@@ -112,14 +113,14 @@ mergeAllDrain! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo}
                  (allNid : NodeId) (κ : Path Γ lo s t) (now : Tick)
                  (lim : Maybe ℕ) (act : ℕ) (od : Bool)
                  (q : List (Val Γ (obs s))) (sched : Sched Γ) (st : EvalSt e)
-               → Σ (List (Val Γ s) × ℕ × List (Val Γ (obs s)) × Stream Γ t × Sched Γ × EvalSt e) λ r →
+               → Σ (VSegs Γ s t × ℕ × List (Val Γ (obs s)) × Sched Γ × EvalSt e) λ r →
                    mergeAllDrain⇓ {e = e} allNid κ now lim act od q sched st r
 mergeAllDrain! allNid κ now lim act od []      sched st = _ , drain-nil
 mergeAllDrain! allNid κ now lim act od (o ∷ q) sched st
   with hasRoom lim act in eqr
 ... | false = _ , drain-no-room eqr
 ... | true  =
-      let ((inst , vs , done , _ , sched₁ , st₁) , s) =
+      let ((inst , segs , done , sched₁ , st₁) , s) =
             inner! mergeAllᵒ allNid κ now o sched
               (record st
                  { nodes = setNode allNid (mergeAll-st lim act q od)
@@ -142,7 +143,7 @@ innerFinish! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo}
                (op : AllOp) (allNid inst : NodeId) (κ : Path Γ lo s t)
                (now : Tick) (vals : List (Val Γ s))
                (sched : Sched Γ) (st : EvalSt e) (ns : Maybe (NodeState Γ))
-             → Σ (List (Val Γ s) × Bool × Stream Γ t × Sched Γ × EvalSt e) λ r →
+             → Σ (VSegs Γ s t × Bool × Sched Γ × EvalSt e) λ r →
                  innerFinish⇓ {e = e} op allNid inst κ now vals sched st ns r
 
 innerFinish! {s = s} mergeAllᵒ allNid inst κ now vals sched st
@@ -182,7 +183,7 @@ innerReact! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo}
               (op : AllOp) (allNid inst : NodeId) (κ : Path Γ lo s t)
               (now : Tick) (vals : List (Val Γ s))
               (sched : Sched Γ) (st : EvalSt e) (fin : Bool)
-            → Σ (List (Val Γ s) × Bool × Stream Γ t × Sched Γ × EvalSt e) λ r →
+            → Σ (VSegs Γ s t × Bool × Sched Γ × EvalSt e) λ r →
                 innerReact⇓ {e = e} op allNid inst κ now vals sched st fin r
 innerReact! op allNid inst κ now vals sched st false = _ , react-false
 innerReact! op allNid inst κ now vals sched st true
@@ -203,7 +204,7 @@ stepFrameAny! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
                 (now : Tick) (fr : Frame Γ s u) (κ : Path Γ lo u t)
                 (vals : List (Val Γ s)) (fin : Bool)
                 (sched : Sched Γ) (st : EvalSt e)
-              → Σ (List (Val Γ u) × Bool × Stream Γ t × Sched Γ × EvalSt e) λ r →
+              → Σ (VSegs Γ u t × Bool × Sched Γ × EvalSt e) λ r →
                   stepFrame⇓ {e = e} now fr κ vals fin sched st r
 stepFrameAny! now (map-f fn)       κ vals fin sched st = _ , step-map
 stepFrameAny! now (scan-f fn nid)  κ vals fin sched st = _ , step-scan
@@ -235,6 +236,13 @@ mutual
             → Σ (Stream Γ t × Sched Γ × EvalSt e) λ r →
                 foldPath⇓ {e = e} now κ vals fin sched st r
 
+  foldVSegs! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
+               (ac : Acc _<_ (n ∸ lo)) (now : Tick) (κ : Path Γ lo u t)
+               (segs : VSegs Γ u t) (fin : Bool)
+               (sched : Sched Γ) (st : EvalSt e)
+             → Σ (Stream Γ t × Sched Γ × EvalSt e) λ r →
+                 foldVSegs⇓ {e = e} now κ segs fin sched st r
+
   dispatchShare! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo} {i : Fin n}
                    (ac : Acc _<_ (n ∸ suc (toℕ i))) (below : lo ≤ toℕ i)
                    (now : Tick) (vals : List (Val Γ _)) (fin : Bool)
@@ -263,10 +271,26 @@ mutual
                     now vals fin sched st
     in _ , fold-sink d
   foldPath! ac now (fr ↠ κ) vals fin sched st =
-    let ((vals′ , fin′ , _ , sched₁ , st₁) , sf) =
+    let ((segs , fin′ , sched₁ , st₁) , sf) =
           stepFrameAny! now fr κ vals fin sched st
-        (_ , rest) = foldPath! ac now κ vals′ fin′ sched₁ st₁
+        (_ , rest) = foldVSegs! ac now κ segs fin′ sched₁ st₁
     in _ , fold-step sf rest
+
+  -- THE MEASURE IS THE PAIR (PATH, SEGMENT LIST), LEXICOGRAPHIC.
+  -- `foldPath!` reaches here only at a strictly smaller path, this
+  -- reaches `foldPath!` at an equal one, and it reaches itself at an
+  -- equal path with a shorter list -- so the accessibility argument
+  -- crosses untouched, exactly as the frame clause already passed it.
+  foldVSegs! ac now κ [] fin sched st =
+    let (_ , f) = foldPath! ac now κ [] fin sched st
+    in _ , segs-nil f
+  foldVSegs! ac now κ ((vs , rts) ∷ []) fin sched st =
+    let (_ , f) = foldPath! ac now κ vs fin sched st
+    in _ , segs-last f
+  foldVSegs! ac now κ ((vs , rts) ∷ s ∷ ss) fin sched st =
+    let ((emits , sched₁ , st₁) , f) = foldPath! ac now κ vs false sched st
+        (_ , r) = foldVSegs! ac now κ (s ∷ ss) fin sched₁ st₁
+    in _ , segs-more f r
 
   dispatchShare! {i = i} ac below now vals fin sched st =
     let (_ , w) = shareWalk! ac now vals fin sched (shareDying i fin st)

@@ -226,7 +226,7 @@ VALUES exactly.
 
 **DONE IS BOTH HALVES OF THE JOB GREEN AND THE TARGET BACK IN THE GATE.** The
 seed sweep and the replay of the pinned corpus are separate steps and both are
-red: 488 of 500 on the sweep, and on the replay 0 of 11 `burst-carrier`, 3 of 5
+red: 488 of 500 on the sweep, and on the replay 0 of 11 `burst-carrier`, 2 of 5
 `depth-first`, 13 of 15 `obs-accumulator`. Neither may be narrowed to pass.
 Every failing case has ONE signature — the evaluator emits a strict PREFIX of
 what rxjs emits, usually nothing at all.

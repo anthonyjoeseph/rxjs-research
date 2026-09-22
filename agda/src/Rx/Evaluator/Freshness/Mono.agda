@@ -98,15 +98,14 @@ takeDispatch-node nid vals fin sched st (just (exhaust-st _ _))      = ≤-refl
 
 -- the flattener's wrap marks its own node done and hands the walk's
 -- mint straight back
-thruWrap-node : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+thruWrap-node : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
                   (op : AllOp) (nid : NodeId) (fin : Bool)
-                  (vs : List (Val Γ u))
                   (sched′ : Sched Γ) (st′ : EvalSt e)
               → nodeCt sched′
-                ≤ nodeCt (proj₁ (proj₂ (proj₂
-                    (thruWrap {e = e} op nid fin (vs , sched′ , st′)))))
-thruWrap-node op nid false vs sched′ st′ = ≤-refl
-thruWrap-node mergeAllᵒ nid true vs sched′ st′
+                ≤ nodeCt (proj₁ (proj₂
+                    (thruWrap {e = e} op nid fin (sched′ , st′))))
+thruWrap-node op nid false sched′ st′ = ≤-refl
+thruWrap-node mergeAllᵒ nid true sched′ st′
   with lookupNode nid (EvalSt.nodes st′)
 ... | just (mergeAll-st _ _ _ _) = ≤-refl
 ... | just (cell-st _)           = ≤-refl
@@ -115,7 +114,7 @@ thruWrap-node mergeAllᵒ nid true vs sched′ st′
 ... | just (switch-st _ _)       = ≤-refl
 ... | just (exhaust-st _ _)      = ≤-refl
 ... | nothing                    = ≤-refl
-thruWrap-node switchᵒ nid true vs sched′ st′
+thruWrap-node switchᵒ nid true sched′ st′
   with lookupNode nid (EvalSt.nodes st′)
 ... | just (switch-st _ _)       = ≤-refl
 ... | just (cell-st _)           = ≤-refl
@@ -124,7 +123,7 @@ thruWrap-node switchᵒ nid true vs sched′ st′
 ... | just (mergeAll-st _ _ _ _) = ≤-refl
 ... | just (exhaust-st _ _)      = ≤-refl
 ... | nothing                    = ≤-refl
-thruWrap-node exhaustᵒ nid true vs sched′ st′
+thruWrap-node exhaustᵒ nid true sched′ st′
   with lookupNode nid (EvalSt.nodes st′)
 ... | just (exhaust-st _ _)      = ≤-refl
 ... | just (cell-st _)           = ≤-refl
@@ -149,10 +148,9 @@ pushBurst-mono : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
 
 stepFrame-mono : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
                    {fr : Frame Γ s u} {κ : Path Γ lo u t} {now} {vals fin}
-                   {sched sched₁ : Sched Γ} {st st₁ : EvalSt e} {vals′ fin′}
-                   {roots : Stream Γ t}
+                   {sched sched₁ : Sched Γ} {st st₁ : EvalSt e} {segs fin′}
                → stepFrame⇓ {e = e} now fr κ vals fin sched st
-                   (vals′ , fin′ , roots , sched₁ , st₁)
+                   (segs , fin′ , sched₁ , st₁)
                → nodeCt sched ≤ nodeCt sched₁
 
 subscribeAll-mono : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
@@ -167,48 +165,47 @@ subscribeAll-mono : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
 subscribeInner-mono : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
                         {op} {allNid} {κ : Path Γ lo u t} {now}
                         {o : Val Γ (obs u)} {sched sched′ : Sched Γ}
-                        {st st′ : EvalSt e} {inst vs done}
-                        {roots : Stream Γ t}
+                        {st st′ : EvalSt e} {inst segs done}
                     → subscribeInner⇓ {e = e} op allNid κ now o sched st
-                        (inst , vs , done , roots , sched′ , st′)
+                        (inst , segs , done , sched′ , st′)
                     → nodeCt sched ≤ nodeCt sched′
 
 thruWalk-mono : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
                   {op} {nid} {κ : Path Γ lo u t} {now}
                   {vals : List (Val Γ (obs u))} {sched sched′ : Sched Γ}
-                  {st st′ : EvalSt e} {vs} {roots : Stream Γ t}
-              → thruWalk⇓ {e = e} op nid κ now vals sched st (vs , roots , sched′ , st′)
+                  {st st′ : EvalSt e} {segs}
+              → thruWalk⇓ {e = e} op nid κ now vals sched st (segs , sched′ , st′)
               → nodeCt sched ≤ nodeCt sched′
 
 thruConsume-mono : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
                      {op} {nid} {κ : Path Γ lo u t} {now}
                      {o : Val Γ (obs u)} {sched sched′ : Sched Γ}
-                     {st st′ : EvalSt e} {vs} {roots : Stream Γ t}
-                 → thruConsume⇓ {e = e} op nid κ now o sched st (vs , roots , sched′ , st′)
+                     {st st′ : EvalSt e} {segs}
+                 → thruConsume⇓ {e = e} op nid κ now o sched st (segs , sched′ , st′)
                  → nodeCt sched ≤ nodeCt sched′
 
 mergeAllDrain-mono : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo}
                        {allNid} {κ : Path Γ lo s t} {now} {lim act od q}
                        {sched sched′ : Sched Γ} {st st′ : EvalSt e}
-                       {vs act′ q′} {roots : Stream Γ t}
+                       {segs act′ q′}
                    → mergeAllDrain⇓ {e = e} allNid κ now lim act od q sched st
-                       (vs , act′ , q′ , roots , sched′ , st′)
+                       (segs , act′ , q′ , sched′ , st′)
                    → nodeCt sched ≤ nodeCt sched′
 
 innerFinish-mono : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo}
                      {op} {allNid inst} {κ : Path Γ lo s t} {now}
                      {vals : List (Val Γ s)} {sched sched′ : Sched Γ}
-                     {st st′ : EvalSt e} {m} {vs fin} {roots : Stream Γ t}
+                     {st st′ : EvalSt e} {m} {segs fin}
                  → innerFinish⇓ {e = e} op allNid inst κ now vals sched st m
-                     (vs , fin , roots , sched′ , st′)
+                     (segs , fin , sched′ , st′)
                  → nodeCt sched ≤ nodeCt sched′
 
 innerReact-mono : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo}
                     {op} {allNid inst} {κ : Path Γ lo s t} {now}
                     {vals : List (Val Γ s)} {sched sched′ : Sched Γ}
-                    {st st′ : EvalSt e} {alive} {vs fin} {roots : Stream Γ t}
+                    {st st′ : EvalSt e} {alive} {segs fin}
                 → innerReact⇓ {e = e} op allNid inst κ now vals sched st alive
-                    (vs , fin , roots , sched′ , st′)
+                    (segs , fin , sched′ , st′)
                 → nodeCt sched ≤ nodeCt sched′
 
 sharedConnect-mono : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo}
@@ -262,7 +259,7 @@ stepFrame-mono (step-take {nid = nid} {vals = vals} {fin} {sched} {st}) =
   takeDispatch-node nid vals fin sched st (lookupNode nid (EvalSt.nodes st))
 stepFrame-mono (step-from-inner r)   = innerReact-mono r
 stepFrame-mono (step-thru-outer {op = op} {nid} {fin = fin} w) =
-  ≤-trans (thruWalk-mono w) (thruWrap-node op nid fin _ _ _)
+  ≤-trans (thruWalk-mono w) (thruWrap-node op nid fin _ _)
 
 subscribeAll-mono (sub-all refl sub push) =
   ≤-trans (≤-trans (n≤1+n _) (subscribeE-mono sub)) (pushBurst-mono push)

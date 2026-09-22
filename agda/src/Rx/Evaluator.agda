@@ -54,6 +54,25 @@ Burst Γ t = List (PlainEvent (Val Γ t))
 Stream : ∀ {n} → Ctx n → Ty → Set          -- bursts, in canonical order
 Stream Γ t = List (Burst Γ t)
 
+-- AN ORDERED ANSWER, AND THE ORDER IS THE WHOLE POINT.  Subscribing
+-- can hand values back at the element type AND send bursts straight to
+-- the root, and which of the two came first is a property of the
+-- PROGRAM rather than of the carrier: the oracle's exchanged pair
+-- carries the same values out of a flattener and out of a share, and
+-- rxjs answers `[7,1,2]` one way round and `[1,2,7]` the other.  So no
+-- fixed rule for reading a group beside a stream can be right, and the
+-- order goes into the answer -- one segment per subscribe that
+-- contributed, in the order they ran.
+VSegs : ∀ {n} → Ctx n → Ty → Ty → Set
+VSegs Γ u t = List (List (Val Γ u) × Stream Γ t)
+
+-- THE ONE-SEGMENT ANSWER, which is what every former that cannot reach
+-- the root produces and is the shape this carrier widened from.  A
+-- reading of the tree that only ever meets these is reading the case
+-- the exchanged pair does not separate.
+oneVSeg : ∀ {n} {Γ : Ctx n} {u t} → List (Val Γ u) → VSegs Γ u t
+oneVSeg vs = (vs , []) ∷ []
+
 ------------------------------------------------------------------
 -- The global scheduler
 ------------------------------------------------------------------
@@ -505,6 +524,19 @@ splitBurst (b ∷ bs) =
       (vs′ , c′) = splitBurst bs
   in vs ++ vs′ , c ∨ c′
 
+-- READING AN ORDERED ANSWER BY A FIXED RULE, WHICH IS EXACTLY WHAT
+-- THE EXCHANGED PAIR REFUTES.  These two exist only where a carrier
+-- ABOVE the segments is still a group beside a stream and has to be
+-- handed one: they are the seam, and they are what the subscribe side
+-- gaining segments of its own deletes.  Nothing else may call them.
+vsegVals : ∀ {n} {Γ : Ctx n} {u t} → VSegs Γ u t → List (Val Γ u)
+vsegVals []             = []
+vsegVals ((vs , _) ∷ ss) = vs ++ vsegVals ss
+
+vsegRoots : ∀ {n} {Γ : Ctx n} {u t} → VSegs Γ u t → Stream Γ t
+vsegRoots []              = []
+vsegRoots ((_ , rs) ∷ ss) = rs ++ vsegRoots ss
+
 hasComplete : ∀ {n} {Γ : Ctx n} {u} → Burst Γ u → Bool
 hasComplete = any isFinᵖ
   where isFinᵖ : ∀ {A : Set} → PlainEvent A → Bool
@@ -685,29 +717,29 @@ finishUsable _         _ _    _                                = false
 -- while the outer's own burst is still being walked, so a verdict
 -- computed before the write is a verdict about a store that no longer
 -- holds.
-thruWrap : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+thruWrap : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
          → AllOp → NodeId → Bool
-         → List (Val Γ u) × Sched Γ × EvalSt e
-         → List (Val Γ u) × Bool × Sched Γ × EvalSt e
-thruWrap op nid false (vs , sched′ , st′) = vs , false , sched′ , st′
-thruWrap mergeAllᵒ nid true (vs , sched′ , st′)
+         → Sched Γ × EvalSt e
+         → Bool × Sched Γ × EvalSt e
+thruWrap op nid false (sched′ , st′) = false , sched′ , st′
+thruWrap mergeAllᵒ nid true (sched′ , st′)
   with lookupNode nid (EvalSt.nodes st′)
 ... | just (mergeAll-st lim act q _) =
-      vs , (act ≡ᵇ 0) ∧ null q , sched′ ,
+      (act ≡ᵇ 0) ∧ null q , sched′ ,
       record st′ { nodes = setNode nid (mergeAll-st lim act q true) (EvalSt.nodes st′) }
-... | _ = vs , true , sched′ , st′
-thruWrap switchᵒ nid true (vs , sched′ , st′)
+... | _ = true , sched′ , st′
+thruWrap switchᵒ nid true (sched′ , st′)
   with lookupNode nid (EvalSt.nodes st′)
 ... | just (switch-st cur _) =
-      vs , is-nothing cur , sched′ ,
+      is-nothing cur , sched′ ,
       record st′ { nodes = setNode nid (switch-st cur true) (EvalSt.nodes st′) }
-... | _ = vs , true , sched′ , st′
-thruWrap exhaustᵒ nid true (vs , sched′ , st′)
+... | _ = true , sched′ , st′
+thruWrap exhaustᵒ nid true (sched′ , st′)
   with lookupNode nid (EvalSt.nodes st′)
 ... | just (exhaust-st act _) =
-      vs , not act , sched′ ,
+      not act , sched′ ,
       record st′ { nodes = setNode nid (exhaust-st act true) (EvalSt.nodes st′) }
-... | _ = vs , true , sched′ , st′
+... | _ = true , sched′ , st′
 
 
 -- a shared slot: identity IS the index, source toℕ i (a hot's

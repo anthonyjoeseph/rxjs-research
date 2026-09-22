@@ -59,14 +59,12 @@ open import Rx.Exp.Guarded using (gsizeᵉ; gsizeᵗ; gsizeᵗˢ; gsize-unfoldμ
 open import Rx.Inputs-Below using (ib-unfoldμ; ib-topᵉ)
 open import Rx.Mint using (nodeᵏ; regᵏ; sourceᵏ; freshId; setAt)
 open import Decide using (∧ˡ; ∧ʳ)
-open import Rx.Evaluator using (Stream; Burst; Sched; EvalSt; Path; Frame; _↠_;
-  map-f; take-f; scan-f; batchSync-f; from-inner; thru-outer; share-sink;
-  mergeAllᵒ; switchᵒ; exhaustᵒ; AllOp; NodeId; NodeState;
-  cell-st; take-st; batchSync-st; mergeAll-st; switch-st; exhaust-st;
-  takeVals; takeDispatch; scanVals; scanDispatch; batchVals; batchDispatch;
-  lookupNode; installNode; oneShotBurst; spentBurst; memberSource;
-  splitEvents; splitBurst; consumeUsable; hasRoom; switchKill; thruWrap;
-  register; atSlot; lowerFloor; burstCompleted)
+open import Rx.Evaluator using (Stream; Burst; VSegs; vsegVals; Sched; EvalSt; Path; Frame; _↠_; map-f; take-f; scan-f;
+  batchSync-f; from-inner; thru-outer; share-sink; mergeAllᵒ; switchᵒ; exhaustᵒ; AllOp; NodeId;
+  NodeState; cell-st; take-st; batchSync-st; mergeAll-st; switch-st; exhaust-st; takeVals;
+  takeDispatch; scanVals; scanDispatch; batchVals; batchDispatch; lookupNode; installNode;
+  oneShotBurst; spentBurst; memberSource; splitEvents; splitBurst; consumeUsable; hasRoom;
+  switchKill; register; atSlot; lowerFloor; burstCompleted)
 open import Rx.Evaluator.Freshness using (lookup-set; PreservedBelow)
 open import Rx.Evaluator.Freshness.Preserve using (subscribeE-preserves)
 open import Rx.Evaluator.Domain using (srcFrame; subscribeE⇓; pushBurst⇓; stepFrame⇓;
@@ -202,6 +200,21 @@ RedEnv : ∀ {n} {Γ : Ctx n} {Θ : List Ty} → Env Γ Θ → Set
 RedEnv []ᵉ                  = ⊤
 RedEnv (_∷ᵉ_ {s = t} v vs)  = Red t v × RedEnv vs
 
+-- THE REDUCIBILITY PREDICATE ON A LIST OF SEGMENTS.  Each segment is a
+-- pair of a value list and a root stream; the predicate asks that every
+-- value in every segment's value list is reducible.
+VSegsSat : ∀ {n} {Γ : Ctx n} {t u} (P : Val Γ u → Set) → VSegs Γ u t → Set
+VSegsSat P = All (λ seg → All P (proj₁ seg))
+
+-- FLATTENING A REDUCIBLE SEGMENT LIST PRESERVES THE PREDICATE.  The
+-- flat value column is the concatenation of the per-segment columns;
+-- each is reducible by hypothesis, and `++⁺` glues them together.
+satVsegVals : ∀ {n} {Γ : Ctx n} {t u} {P : Val Γ u → Set}
+              {segs : VSegs Γ u t}
+            → VSegsSat P segs → All P (vsegVals segs)
+satVsegVals []         = []
+satVsegVals (ps ∷ pss) = ++⁺ ps (satVsegVals pss)
+
 -- THE SAME CLAIM ONE BATCH DOWN: a frame, the values that arrived at
 -- it, and the candidate carried across to what leaves.  The push above
 -- walks a stream burst by burst, so it is stated over a stream while
@@ -211,9 +224,9 @@ RedStep : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
         → Tick → Frame Γ s u → Path Γ lo u t
         → List (Val Γ s) → Bool → Sched Γ → EvalSt e → Set
 RedStep {Γ = Γ} {t = t} {e = e} {u = u} now f κ vals fin sched st =
-  Σ (List (Val Γ u) × Bool × Stream Γ t × Sched Γ × EvalSt e) λ r →
-    stepFrame⇓ {e = e} now f κ vals fin sched st r × All (Red u) (proj₁ r)
-      × RedNode f (proj₂ (proj₂ (proj₂ (proj₂ r))))
+  Σ (VSegs Γ u t × Bool × Sched Γ × EvalSt e) λ r →
+    stepFrame⇓ {e = e} now f κ vals fin sched st r × VSegsSat (Red u) (proj₁ r)
+      × RedNode f (proj₂ (proj₂ (proj₂ r)))
 
 -- A SPLIT TAKES THE VALUE COLUMN OUT OF A BURST, and nothing else, so
 -- whatever held of every value the burst carried holds of every value
@@ -233,48 +246,6 @@ satSplitBurst []         []       = []
 satSplitBurst (b ∷ bs) (q ∷ qs) =
   ++⁺ (satSplitEvents b q) (satSplitBurst bs qs)
 
--- AND THE WRAP AROUND THE WALK NEVER TOUCHES THAT COLUMN.  What it
--- decides is whether the operator is finished and what its node then
--- holds, both of which the candidate is silent about; the values pass
--- through every arm unchanged.  Spelling the arms out is the price of
--- the machine reading its own store: a catch-all in the definition
--- does not reduce against a catch-all in a proof.
-thruWrap-vals : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-                (op : AllOp) (nid : NodeId) (fin : Bool)
-                {vs : List (Val Γ u)}
-                {sched′ : Sched Γ} {st′ : EvalSt e}
-              → proj₁ (thruWrap {e = e} op nid fin (vs , sched′ , st′)) ≡ vs
-thruWrap-vals mergeAllᵒ nid false = refl
-thruWrap-vals switchᵒ   nid false = refl
-thruWrap-vals exhaustᵒ  nid false = refl
-thruWrap-vals mergeAllᵒ nid true {st′ = st′}
-  with lookupNode nid (EvalSt.nodes st′)
-... | nothing                    = refl
-... | just (cell-st _)           = refl
-... | just (take-st _)           = refl
-... | just (batchSync-st _)      = refl
-... | just (mergeAll-st _ _ _ _) = refl
-... | just (switch-st _ _)       = refl
-... | just (exhaust-st _ _)      = refl
-thruWrap-vals switchᵒ nid true {st′ = st′}
-  with lookupNode nid (EvalSt.nodes st′)
-... | nothing                    = refl
-... | just (cell-st _)           = refl
-... | just (take-st _)           = refl
-... | just (batchSync-st _)      = refl
-... | just (mergeAll-st _ _ _ _) = refl
-... | just (switch-st _ _)       = refl
-... | just (exhaust-st _ _)      = refl
-thruWrap-vals exhaustᵒ nid true {st′ = st′}
-  with lookupNode nid (EvalSt.nodes st′)
-... | nothing                    = refl
-... | just (cell-st _)           = refl
-... | just (take-st _)           = refl
-... | just (batchSync-st _)      = refl
-... | just (mergeAll-st _ _ _ _) = refl
-... | just (switch-st _ _)       = refl
-... | just (exhaust-st _ _)      = refl
-
 -- CONSUMING ONE ARRIVING OBSERVABLE, and walking a list of them, with
 -- the candidate carried across.  These are the flattener's two halves
 -- of `RedStep`, stated separately for the same reason the machine
@@ -285,15 +256,15 @@ RedConsume : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
            → AllOp → NodeId → Path Γ lo u t → Tick
            → Val Γ (obs u) → Sched Γ → EvalSt e → Set
 RedConsume {Γ = Γ} {t = t} {e = e} {u = u} op nid κ now o sched st =
-  Σ (List (Val Γ u) × Stream Γ t × Sched Γ × EvalSt e) λ r →
-    thruConsume⇓ {e = e} op nid κ now o sched st r × All (Red u) (proj₁ r)
+  Σ (VSegs Γ u t × Sched Γ × EvalSt e) λ r →
+    thruConsume⇓ {e = e} op nid κ now o sched st r × VSegsSat (Red u) (proj₁ r)
 
 RedWalk : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
         → AllOp → NodeId → Path Γ lo u t → Tick
         → List (Val Γ (obs u)) → Sched Γ → EvalSt e → Set
 RedWalk {Γ = Γ} {t = t} {e = e} {u = u} op nid κ now vals sched st =
-  Σ (List (Val Γ u) × Stream Γ t × Sched Γ × EvalSt e) λ r →
-    thruWalk⇓ {e = e} op nid κ now vals sched st r × All (Red u) (proj₁ r)
+  Σ (VSegs Γ u t × Sched Γ × EvalSt e) λ r →
+    thruWalk⇓ {e = e} op nid κ now vals sched st r × VSegsSat (Red u) (proj₁ r)
 
 -- THE HOP IS PAID FOR BY THE ARRIVING VALUE'S OWN CANDIDATE, which is
 -- what makes this a body rather than a leaf.  A subscribe arm hands
@@ -337,7 +308,7 @@ red-consume {u = u} mergeAllᵒ nid κ now ro sched st
                                  (Sched.mint sched) })
                    st
           in _ , consume-all-sub eq eqr (inner refl d refl)
-               , satSplitBurst burst ss
+               , satSplitBurst burst ss ∷ []
 
 red-consume {u = u} switchᵒ nid κ now ro sched st
   with lookupNode nid (EvalSt.nodes st) in eq
@@ -362,7 +333,7 @@ red-consume {u = u} switchᵒ nid κ now ro sched st
                                (Sched.mint sched₁) })
                  st₁
         in _ , consume-switch-sub eq eqk (inner refl d refl)
-             , satSplitBurst burst ss
+             , satSplitBurst burst ss ∷ []
 
 red-consume {u = u} exhaustᵒ nid κ now ro sched st
   with lookupNode nid (EvalSt.nodes st) in eq
@@ -388,7 +359,7 @@ red-consume {u = u} exhaustᵒ nid κ now ro sched st
                              (Sched.mint sched) })
                st
       in _ , consume-exhaust-sub eq (inner refl d refl)
-           , satSplitBurst burst ss
+           , satSplitBurst burst ss ∷ []
 
 -- THE WALK IS THE CONSUME THREADED, and the column it returns is the
 -- concatenation of the columns each arrival produced.
@@ -400,7 +371,7 @@ red-walk : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
          → RedWalk {e = e} op nid κ now vals sched st
 red-walk op nid κ now []       sched st = _ , walk-nil , []
 red-walk op nid κ now (r ∷ rs) sched st =
-  let ((_ , _ , sched₁ , st₁) , c , rv) = red-consume op nid κ now r sched st
+  let ((_ , sched₁ , st₁) , c , rv) = red-consume op nid κ now r sched st
       (_ , w , rv′) = red-walk op nid κ now rs sched₁ st₁
   in _ , walk-cons c w , ++⁺ rv rv′
 
@@ -425,9 +396,7 @@ red-thru : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
          → RedStep {e = e} now (thru-outer op nid) κ vals fin sched st
 red-thru now op nid κ rv fin sched st =
   let (_ , w , rvs) = red-walk op nid κ now rv sched st
-  in _ , step-thru-outer w
-       , subst (All (Red _)) (sym (thruWrap-vals op nid fin)) rvs
-       , tt
+  in _ , step-thru-outer w , rvs , tt
 
 -- The end carries no payload, so a burst's values are the only thing
 -- to check and a burst with none is satisfied outright.
@@ -545,7 +514,7 @@ red-take : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo}
          → RedStep {e = e} now (take-f nid) κ vals fin sched st
 red-take now nid κ rv fin sched st =
   _ , step-take
-    , redTakeDispatch nid fin sched st (lookupNode nid (EvalSt.nodes st)) rv
+    , redTakeDispatch nid fin sched st (lookupNode nid (EvalSt.nodes st)) rv ∷ []
     , tt
 
 -- THE BRACKET REGROUPS AND INVENTS NOTHING, so its whole obligation is
@@ -581,7 +550,7 @@ red-batchSync : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo}
               → RedStep {e = e} now (batchSync-f nid) κ vals fin sched st
 red-batchSync now nid κ rv fin sched st =
   _ , step-batchSync
-    , redBatchDispatch nid st (lookupNode nid (EvalSt.nodes st)) rv
+    , redBatchDispatch nid st (lookupNode nid (EvalSt.nodes st)) rv ∷ []
     , tt
 
 -- A FOLD IS ITS ACCUMULATOR THREADED ALONG THE BATCH, and so is the
@@ -683,7 +652,7 @@ red-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
 red-scan now fn nid κ rf rv fin sched st rn =
   let (rvs , rn′) = redScanDispatch fn nid fin sched st
                        (lookupNode nid (EvalSt.nodes st)) refl rn rf rv
-  in _ , step-scan , rvs , rn′
+  in _ , step-scan , rvs ∷ [] , rn′
 
 -- STEPPING ONE FRAME, DISPATCHED ON THE FRAME, AND ONLY EVER A SOURCE
 -- FRAME.  The mapping arm is a body because nothing about it is
@@ -700,7 +669,7 @@ red-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
            (sched : Sched Γ) (st : EvalSt e) → RedNode f st
          → RedStep {e = e} now f κ vals fin sched st
 red-step now (map-f fn) sv rf κ rv fin sched st rn =
-  _ , step-map , redMapVals fn rf rv , tt
+  _ , step-map , redMapVals fn rf rv ∷ [] , tt
 red-step now (scan-f fn nid) sv rf κ rv fin sched st rn =
   red-scan now fn nid κ rf rv fin sched st rn
 red-step now (take-f nid) sv rf κ rv fin sched st rn =
@@ -729,12 +698,12 @@ red-push : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
          → RedPush {e = e} now f κ burst sched st
 red-push now f sv rf κ {[]}     []       sched st rn = _ , push-nil , []
 red-push now f sv rf κ {b ∷ bs} (p ∷ ps) sched st rn =
-  let ((vals′ , fin′ , _ , sched₁ , st₁) , d , rv , rn₁) =
+  let ((segs , fin′ , sched₁ , st₁) , d , rv , rn₁) =
         red-step now f sv rf κ (satSplitEvents b p)
           (proj₂ (splitEvents b)) sched st rn
       ((rest , _ , sched₂ , st₂) , dr , sr) = red-push now f sv rf κ ps sched₁ st₁ rn₁
   in _ , push-cons refl d dr
-       , satEvents rv (satFin fin′) ∷ sr
+       , satEvents (satVsegVals rv) (satFin fin′) ∷ sr
 
 -- an entry of a reducible environment is reducible
 redLookup : ∀ {n} {Γ : Ctx n} {Θ t} (ρ : Env Γ Θ) → RedEnv ρ

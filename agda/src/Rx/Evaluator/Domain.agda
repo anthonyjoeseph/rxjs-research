@@ -142,7 +142,7 @@ open import Rx.Evaluator using (Stream; Burst; Sched; EvalSt; Path; Frame; NodeI
   batchSync-f; thru-outer; cell-st; take-st; batchSync-st; mergeAll-st; switch-st; exhaust-st;
   mergeAllᵒ; switchᵒ; exhaustᵒ; lookupNode; setNode; hasRoom; mergeAllBump; switchKill;
   aliveThroughᶠ; scanDispatch; takeDispatch; batchDispatch; thruWrap; consumeUsable;
-  finishUsable)
+  finishUsable; VSegs; oneVSeg; vsegVals; vsegRoots)
 
 -- THE FRAME A SUBSCRIBE CAN PUSH, WHICH IS EVERY FRAME BUT ONE, AND
 -- SAYING SO IN A TYPE IS WHAT TAKES THE DRAIN OUT OF A PUSH CYCLE.  A
@@ -193,43 +193,43 @@ data subscribeInner⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
      ∀ {u lo} →
      AllOp → NodeId → Path Γ lo u t → Tick
    → Val Γ (obs u) → Sched Γ → EvalSt e
-   → NodeId × List (Val Γ u) × Bool × Stream Γ t × Sched Γ × EvalSt e → Set
+   → NodeId × VSegs Γ u t × Bool × Sched Γ × EvalSt e → Set
 
 data thruConsume⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
      ∀ {u lo} →
      AllOp → NodeId → Path Γ lo u t → Tick
    → Val Γ (obs u) → Sched Γ → EvalSt e
-   → List (Val Γ u) × Stream Γ t × Sched Γ × EvalSt e → Set
+   → VSegs Γ u t × Sched Γ × EvalSt e → Set
 
 data thruWalk⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
      ∀ {u lo} →
      AllOp → NodeId → Path Γ lo u t → Tick
    → List (Val Γ (obs u)) → Sched Γ → EvalSt e
-   → List (Val Γ u) × Stream Γ t × Sched Γ × EvalSt e → Set
+   → VSegs Γ u t × Sched Γ × EvalSt e → Set
 
 data mergeAllDrain⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
      ∀ {s lo} →
      NodeId → Path Γ lo s t → Tick
    → Maybe ℕ → ℕ → Bool → List (Val Γ (obs s)) → Sched Γ → EvalSt e
-   → List (Val Γ s) × ℕ × List (Val Γ (obs s)) × Stream Γ t × Sched Γ × EvalSt e → Set
+   → VSegs Γ s t × ℕ × List (Val Γ (obs s)) × Sched Γ × EvalSt e → Set
 
 data innerFinish⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
      ∀ {s lo} →
      AllOp → NodeId → NodeId → Path Γ lo s t → Tick
    → List (Val Γ s) → Sched Γ → EvalSt e → Maybe (NodeState Γ)
-   → List (Val Γ s) × Bool × Stream Γ t × Sched Γ × EvalSt e → Set
+   → VSegs Γ s t × Bool × Sched Γ × EvalSt e → Set
 
 data innerReact⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
      ∀ {s lo} →
      AllOp → NodeId → NodeId → Path Γ lo s t → Tick
    → List (Val Γ s) → Sched Γ → EvalSt e → Bool
-   → List (Val Γ s) × Bool × Stream Γ t × Sched Γ × EvalSt e → Set
+   → VSegs Γ s t × Bool × Sched Γ × EvalSt e → Set
 
 data stepFrame⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
      ∀ {s u lo} →
      Tick → Frame Γ s u → Path Γ lo u t
    → List (Val Γ s) → Bool → Sched Γ → EvalSt e
-   → List (Val Γ u) × Bool × Stream Γ t × Sched Γ × EvalSt e → Set
+   → VSegs Γ u t × Bool × Sched Γ × EvalSt e → Set
 
 data pushBurst⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
      ∀ {s u lo} →
@@ -314,6 +314,12 @@ data foldPath⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
    → List (Val Γ u) → Bool → Sched Γ → EvalSt e
    → Stream Γ t × Sched Γ × EvalSt e → Set
 
+data foldVSegs⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
+     ∀ {u lo} →
+     Tick → Path Γ lo u t
+   → VSegs Γ u t → Bool → Sched Γ → EvalSt e
+   → Stream Γ t × Sched Γ × EvalSt e → Set
+
 ------------------------------------------------------------------
 -- THE ARRIVAL SPINE.  Structurally recursive in the evaluator, and
 -- related here only because each of these reaches a cycle above and so
@@ -341,21 +347,16 @@ data evaluate⇓ {n} {Γ : Ctx n} {t} :
 
 ----------------------------------------------------------------------
 -- HELPERS FOR COMPUTED-INDEX CONSTRUCTORS.  `scanDispatch` and
--- `takeDispatch` return `List × Bool × Sched × EvalSt`; `thruWrap`
--- returns the same shape.  The widened result adds `Stream Γ t` in
--- the third position; these two functions insert it.
+-- `takeDispatch` return `List × Bool × Sched × EvalSt`; `injectRoot`
+-- lifts that shape into the widened result -- one segment, whose root
+-- component is empty because a frame that computes its own output
+-- cannot reach the root.
 ----------------------------------------------------------------------
 
 injectRoot : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
              → List (Val Γ u) × Bool × Sched Γ × EvalSt e
-             → List (Val Γ u) × Bool × Stream Γ t × Sched Γ × EvalSt e
-injectRoot (vs , fin , sc , st) = vs , fin , [] , sc , st
-
-injectRoot′ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-              → Stream Γ t
-              → List (Val Γ u) × Bool × Sched Γ × EvalSt e
-              → List (Val Γ u) × Bool × Stream Γ t × Sched Γ × EvalSt e
-injectRoot′ roots (vs , fin , sc , st) = vs , fin , roots , sc , st
+             → VSegs Γ u t × Bool × Sched Γ × EvalSt e
+injectRoot (vs , fin , sc , st) = oneVSeg vs , fin , sc , st
 
 ----------------------------------------------------------------------
 -- THE CONSTRUCTORS.  One per clause of the function each family
@@ -585,6 +586,14 @@ data subscribeE⇓ {n} {Γ} {t} {e} where
 -- case by minting an instance and closing it dry.  Here the hop's
 -- premise IS a sub-derivation at the arriving value, so there is
 -- nothing to ask and no arm to answer.
+--
+-- A SUBSCRIBE ANSWERS AT BOTH TYPES AT ONCE, which is why one segment
+-- is a PAIR and not just a value list.  `subscribeE⇓` hands back a
+-- burst at `u` beside a stream already at `t`, and both come from the
+-- one subscribe this constructor ran -- so segmenting further cannot
+-- make the order between them unaskable, the way it does for the order
+-- between two inners.  It has to be decided, and `foldVSegs⇓` decides
+-- it.
 data subscribeInner⇓ {n} {Γ} {t} {e} where
   inner : ∀ {u lo op allNid} {κ : Path Γ lo u t} {now}
             {o : Val Γ (obs u)} {sched st inst burst roots sched′ st′ vs done}
@@ -594,7 +603,7 @@ data subscribeInner⇓ {n} {Γ} {t} {e} where
             (burst , roots , sched′ , st′)
         → splitBurst burst ≡ (vs , done)
         → subscribeInner⇓ op allNid κ now o sched st
-            (inst , vs , done , roots , sched′ , st′)
+            (inst , (vs , roots) ∷ [] , done , sched′ , st′)
 
 -- EACH COLLAPSE CARRIES THE SIDE CONDITION THAT DISTINGUISHES IT, so
 -- no fallback here stands free.  A prover that CHOOSES its own run is
@@ -606,14 +615,14 @@ data thruConsume⇓ {n} {Γ} {t} {e} where
 
   consume-all-sub : ∀ {u lo nid} {κ : Path Γ lo u t} {now}
                       {o : Val Γ (obs u)} {sched₀ st₀} {lim act q od}
-                      {inst vs done roots sched₁ st₁}
+                      {inst segs done sched₁ st₁}
                   → lookupNode nid (EvalSt.nodes st₀)
                       ≡ just (mergeAll-st {t = u} lim act q od)
                   → hasRoom lim act ≡ true
                   → subscribeInner⇓ mergeAllᵒ nid κ now o sched₀ st₀
-                      (inst , vs , done , roots , sched₁ , st₁)
+                      (inst , segs , done , sched₁ , st₁)
                   → thruConsume⇓ mergeAllᵒ nid κ now o sched₀ st₀
-                      ( vs , roots , sched₁
+                      ( segs , sched₁
                       , record st₁
                           { nodes = mergeAllBump nid done (EvalSt.nodes st₁) } )
 
@@ -623,7 +632,7 @@ data thruConsume⇓ {n} {Γ} {t} {e} where
                           ≡ just (mergeAll-st {t = u} lim act q od)
                       → hasRoom lim act ≡ false
                       → thruConsume⇓ mergeAllᵒ nid κ now o sched₀ st₀
-                          ( [] , [] , sched₀
+                          ( [] , sched₀
                           , record st₀
                               { nodes = setNode nid
                                   (mergeAll-st lim act (q ++ o ∷ []) od)
@@ -633,17 +642,17 @@ data thruConsume⇓ {n} {Γ} {t} {e} where
                     {o : Val Γ (obs u)} {sched₀ st₀}
                   → consumeUsable mergeAllᵒ u (lookupNode nid (EvalSt.nodes st₀)) ≡ false
                   → thruConsume⇓ mergeAllᵒ nid κ now o sched₀ st₀
-                      ([] , [] , sched₀ , st₀)
+                      ([] , sched₀ , st₀)
 
   consume-switch-sub : ∀ {u lo nid} {κ : Path Γ lo u t} {now}
                          {o : Val Γ (obs u)} {sched₀ st₀} {cur od}
-                         {sched₁ st₁} {inst vs done roots sched₂ st₂}
+                         {sched₁ st₁} {inst segs done sched₂ st₂}
                      → lookupNode nid (EvalSt.nodes st₀) ≡ just (switch-st cur od)
                      → switchKill cur sched₀ st₀ ≡ (sched₁ , st₁)
                      → subscribeInner⇓ switchᵒ nid κ now o sched₁ st₁
-                         (inst , vs , done , roots , sched₂ , st₂)
+                         (inst , segs , done , sched₂ , st₂)
                      → thruConsume⇓ switchᵒ nid κ now o sched₀ st₀
-                         ( vs , roots , sched₂
+                         ( segs , sched₂
                          , record st₂
                              { nodes = setNode nid
                                  (switch-st (if done then nothing else just inst) od)
@@ -653,17 +662,17 @@ data thruConsume⇓ {n} {Γ} {t} {e} where
                        {o : Val Γ (obs u)} {sched₀ st₀}
                      → consumeUsable switchᵒ u (lookupNode nid (EvalSt.nodes st₀)) ≡ false
                      → thruConsume⇓ switchᵒ nid κ now o sched₀ st₀
-                         ([] , [] , sched₀ , st₀)
+                         ([] , sched₀ , st₀)
 
   consume-exhaust-sub : ∀ {u lo nid} {κ : Path Γ lo u t} {now}
                           {o : Val Γ (obs u)} {sched₀ st₀} {od}
-                          {inst vs done roots sched₁ st₁}
+                          {inst segs done sched₁ st₁}
                       → lookupNode nid (EvalSt.nodes st₀)
                           ≡ just (exhaust-st false od)
                       → subscribeInner⇓ exhaustᵒ nid κ now o sched₀ st₀
-                          (inst , vs , done , roots , sched₁ , st₁)
+                          (inst , segs , done , sched₁ , st₁)
                       → thruConsume⇓ exhaustᵒ nid κ now o sched₀ st₀
-                          ( vs , roots , sched₁
+                          ( segs , sched₁
                           , record st₁
                               { nodes = setNode nid (exhaust-st (not done) od)
                                   (EvalSt.nodes st₁) } )
@@ -672,32 +681,32 @@ data thruConsume⇓ {n} {Γ} {t} {e} where
                         {o : Val Γ (obs u)} {sched₀ st₀}
                       → consumeUsable exhaustᵒ u (lookupNode nid (EvalSt.nodes st₀)) ≡ false
                       → thruConsume⇓ exhaustᵒ nid κ now o sched₀ st₀
-                          ([] , [] , sched₀ , st₀)
+                          ([] , sched₀ , st₀)
 
 data thruWalk⇓ {n} {Γ} {t} {e} where
 
   walk-nil : ∀ {u lo op nid} {κ : Path Γ lo u t} {now} {sched₀ st₀}
-           → thruWalk⇓ op nid κ now [] sched₀ st₀ ([] , [] , sched₀ , st₀)
+           → thruWalk⇓ op nid κ now [] sched₀ st₀ ([] , sched₀ , st₀)
 
   walk-cons : ∀ {u lo op nid} {κ : Path Γ lo u t} {now}
                 {o : Val Γ (obs u)} {os sched₀ st₀}
-                {vs roots₁ sched₁ st₁} {vs′ roots₂ sched₂ st₂}
-            → thruConsume⇓ op nid κ now o sched₀ st₀ (vs , roots₁ , sched₁ , st₁)
-            → thruWalk⇓ op nid κ now os sched₁ st₁ (vs′ , roots₂ , sched₂ , st₂)
+                {segs₁ sched₁ st₁} {segs₂ sched₂ st₂}
+            → thruConsume⇓ op nid κ now o sched₀ st₀ (segs₁ , sched₁ , st₁)
+            → thruWalk⇓ op nid κ now os sched₁ st₁ (segs₂ , sched₂ , st₂)
             → thruWalk⇓ op nid κ now (o ∷ os) sched₀ st₀
-                (vs ++ vs′ , roots₁ ++ roots₂ , sched₂ , st₂)
+                (segs₁ ++ segs₂ , sched₂ , st₂)
 
 data mergeAllDrain⇓ {n} {Γ} {t} {e} where
 
   drain-nil : ∀ {s lo allNid} {κ : Path Γ lo s t} {now} {lim act od sched₀ st₀}
             → mergeAllDrain⇓ {s = s} allNid κ now lim act od [] sched₀ st₀
-                ([] , act , [] , [] , sched₀ , st₀)
+                ([] , act , [] , sched₀ , st₀)
 
   drain-no-room : ∀ {s lo allNid} {κ : Path Γ lo s t} {now}
                     {lim act od} {o : Val Γ (obs s)} {q sched₀ st₀}
                 → hasRoom lim act ≡ false
                 → mergeAllDrain⇓ allNid κ now lim act od (o ∷ q) sched₀ st₀
-                    ([] , act , o ∷ q , [] , sched₀ , st₀)
+                    ([] , act , o ∷ q , sched₀ , st₀)
 
   -- THE SHORTENED QUEUE IS WRITTEN BEFORE THE SUBSCRIBE, NOT AFTER THE
   -- WHOLE DRAIN.  A batch write-back leaves the node holding the items
@@ -707,29 +716,29 @@ data mergeAllDrain⇓ {n} {Γ} {t} {e} where
   -- diverged.
   drain-room : ∀ {s lo allNid} {κ : Path Γ lo s t} {now}
                  {lim act od} {o : Val Γ (obs s)} {q sched₀ st₀}
-                 {inst vs done roots₁ sched₁ st₁} {vs′ act′ q′ roots₂ sched₂ st₂}
+                 {inst segs done sched₁ st₁} {segs′ act′ q′ sched₂ st₂}
              → hasRoom lim act ≡ true
              → subscribeInner⇓ mergeAllᵒ allNid κ now o sched₀
                  (record st₀
                     { nodes = setNode allNid (mergeAll-st {t = s} lim act q od)
                         (EvalSt.nodes st₀) })
-                 (inst , vs , done , roots₁ , sched₁ , st₁)
+                 (inst , segs , done , sched₁ , st₁)
              → mergeAllDrain⇓ allNid κ now lim
                  (if done then act else suc act) od q sched₁ st₁
-                 (vs′ , act′ , q′ , roots₂ , sched₂ , st₂)
+                 (segs′ , act′ , q′ , sched₂ , st₂)
              → mergeAllDrain⇓ allNid κ now lim act od (o ∷ q) sched₀ st₀
-                 (vs ++ vs′ , act′ , q′ , roots₁ ++ roots₂ , sched₂ , st₂)
+                 (segs ++ segs′ , act′ , q′ , sched₂ , st₂)
 
 data innerFinish⇓ {n} {Γ} {t} {e} where
 
   finish-all-drain : ∀ {s lo allNid inst} {κ : Path Γ lo s t} {now}
                        {vals : List (Val Γ s)} {sched st} {lim act q od}
-                       {vs act′ q′ roots sched′ st′}
+                       {segs act′ q′ sched′ st′}
                    → mergeAllDrain⇓ allNid κ now lim (pred act) od q sched st
-                       (vs , act′ , q′ , roots , sched′ , st′)
+                       (segs , act′ , q′ , sched′ , st′)
                    → innerFinish⇓ mergeAllᵒ allNid inst κ now vals sched st
                        (just (mergeAll-st {t = s} lim act q od))
-                       ( vals ++ vs , od ∧ (act′ ≡ᵇ 0) ∧ null q′ , roots , sched′
+                       ( (vals , []) ∷ segs , od ∧ (act′ ≡ᵇ 0) ∧ null q′ , sched′
                        , record st′
                            { nodes = setNode allNid (mergeAll-st lim act′ q′ od)
                                (EvalSt.nodes st′) } )
@@ -739,7 +748,7 @@ data innerFinish⇓ {n} {Γ} {t} {e} where
                       → (c ≡ᵇ inst) ≡ true
                       → innerFinish⇓ switchᵒ allNid inst κ now vals sched st
                           (just (switch-st (just c) od))
-                          ( vals , od , [] , sched
+                          ( oneVSeg vals , od , sched
                           , record st
                               { nodes = setNode allNid (switch-st nothing od)
                                   (EvalSt.nodes st) } )
@@ -748,7 +757,7 @@ data innerFinish⇓ {n} {Γ} {t} {e} where
                            {vals : List (Val Γ s)} {sched st} {act od}
                        → innerFinish⇓ exhaustᵒ allNid inst κ now vals sched st
                            (just (exhaust-st act od))
-                           ( vals , od , [] , sched
+                           ( oneVSeg vals , od , sched
                            , record st
                                { nodes = setNode allNid (exhaust-st false od)
                                    (EvalSt.nodes st) } )
@@ -757,20 +766,20 @@ data innerFinish⇓ {n} {Γ} {t} {e} where
                  {vals : List (Val Γ s)} {sched st ns}
              → finishUsable op s inst ns ≡ false
              → innerFinish⇓ op allNid inst κ now vals sched st ns
-                 (vals , false , [] , sched , st)
+                 (oneVSeg vals , false , sched , st)
 
 data innerReact⇓ {n} {Γ} {t} {e} where
 
   react-false : ∀ {s lo op allNid inst} {κ : Path Γ lo s t} {now}
                   {vals : List (Val Γ s)} {sched st}
               → innerReact⇓ op allNid inst κ now vals sched st false
-                  (vals , false , [] , sched , st)
+                  (oneVSeg vals , false , sched , st)
 
   react-alive : ∀ {s lo op allNid inst} {κ : Path Γ lo s t} {now}
                   {vals : List (Val Γ s)} {sched st}
               → any (aliveThroughᶠ inst st) (EvalSt.registry st) ≡ true
               → innerReact⇓ op allNid inst κ now vals sched st true
-                  (vals , false , [] , sched , st)
+                  (oneVSeg vals , false , sched , st)
 
   react-dead : ∀ {s lo op allNid inst} {κ : Path Γ lo s t} {now}
                  {vals : List (Val Γ s)} {sched st r}
@@ -792,7 +801,7 @@ data stepFrame⇓ {n} {Γ} {t} {e} where
   step-map : ∀ {s u lo} {fn : FnClo Γ s u} {κ : Path Γ lo u t}
                {now} {vals : List (Val Γ s)} {fin sched st}
            → stepFrame⇓ now (map-f fn) κ vals fin sched st
-               (map (applyClo fn) vals , fin , [] , sched , st)
+               (oneVSeg (map (applyClo fn) vals) , fin , sched , st)
 
   step-scan : ∀ {s u lo} {fn : FnClo Γ (u ×ᵗ s) u} {nid} {κ : Path Γ lo u t}
                 {now} {vals : List (Val Γ s)} {fin sched st}
@@ -809,8 +818,10 @@ data stepFrame⇓ {n} {Γ} {t} {e} where
   step-batchSync : ∀ {s lo nid} {κ : Path Γ lo (s ×ᵗ listᵗ s) t}
                      {now} {vals : List (Val Γ s)} {fin sched st}
                  → stepFrame⇓ now (batchSync-f nid) κ vals fin sched st
-                     ( batchDispatch nid vals st (lookupNode nid (EvalSt.nodes st))
-                     , fin , [] , sched , st )
+                     ( oneVSeg {u = s ×ᵗ listᵗ s}
+                         (batchDispatch nid vals st
+                           (lookupNode nid (EvalSt.nodes st)))
+                     , fin , sched , st )
 
   step-from-inner : ∀ {s lo op allNid inst} {κ : Path Γ lo s t}
                       {now} {vals : List (Val Γ s)} {fin sched st r}
@@ -820,11 +831,11 @@ data stepFrame⇓ {n} {Γ} {t} {e} where
 
   step-thru-outer : ∀ {u lo op nid} {κ : Path Γ lo u t}
                       {now} {vals : List (Val Γ (obs u))} {fin sched st}
-                      {vs roots sched′ st′}
+                      {segs sched′ st′}
                   → thruWalk⇓ op nid κ now vals sched st
-                      (vs , roots , sched′ , st′)
+                      (segs , sched′ , st′)
                   → stepFrame⇓ now (thru-outer op nid) κ vals fin sched st
-                      (injectRoot′ roots (thruWrap op nid fin (vs , sched′ , st′)))
+                      (segs , thruWrap op nid fin (sched′ , st′))
 
 data pushBurst⇓ {n} {Γ} {t} {e} where
 
@@ -833,15 +844,15 @@ data pushBurst⇓ {n} {Γ} {t} {e} where
 
   push-cons : ∀ {s u lo} {f : Frame Γ s u} {κ : Path Γ lo u t} {now}
                 {b : Burst Γ s} {bs sched st} {vs c}
-                {vals′ fin′ roots₁ sched₁ st₁} {rest roots₂ sched₂ st₂}
+                {segs fin′ sched₁ st₁} {rest roots₂ sched₂ st₂}
             → splitEvents b ≡ (vs , c)
             → stepFrame⇓ now f κ vs c sched st
-                (vals′ , fin′ , roots₁ , sched₁ , st₁)
+                (segs , fin′ , sched₁ , st₁)
             → pushBurst⇓ now f κ bs sched₁ st₁ (rest , roots₂ , sched₂ , st₂)
             → pushBurst⇓ now f κ (b ∷ bs) sched st
-                ( (map valueᵖ vals′ ++ (if fin′ then completeᵖ ∷ [] else []))
+                ( (map valueᵖ (vsegVals segs) ++ (if fin′ then completeᵖ ∷ [] else []))
                   ∷ rest
-                , roots₁ ++ roots₂ , sched₂ , st₂ )
+                , vsegRoots segs ++ roots₂ , sched₂ , st₂ )
 
 -- THIS IS WHERE A FLATTENER'S TWO INNERS ARE WALKED, AND SO WHERE THE
 -- ORDER BETWEEN THEM IS EITHER KEPT OR LOST.  The outer is subscribed
@@ -1082,12 +1093,50 @@ data foldPath⇓ {n} {Γ} {t} {e} where
 
   fold-step : ∀ {lo s u now} {f : Frame Γ s u}
                 {path′ : Path Γ lo u t} {vals fin sched st}
-                {vals′ fin′ roots sched₁ st₁} {rest sched₂ st₂}
+                {segs fin′ sched₁ st₁} {r}
             → stepFrame⇓ now f path′ vals fin sched st
-                (vals′ , fin′ , roots , sched₁ , st₁)
-            → foldPath⇓ now path′ vals′ fin′ sched₁ st₁ (rest , sched₂ , st₂)
-            → foldPath⇓ now (f ↠ path′) vals fin sched st
-                (roots ++ rest , sched₂ , st₂)
+                (segs , fin′ , sched₁ , st₁)
+            → foldVSegs⇓ now path′ segs fin′ sched₁ st₁ r
+            → foldPath⇓ now (f ↠ path′) vals fin sched st r
+
+-- RESOLVING AN ORDERED ANSWER, ONE SEGMENT AT A TIME AND IN ORDER.  A
+-- step hands back what each inner subscribe contributed, kept apart;
+-- resolving folds each segment's value group rootward on its own and
+-- lays the result down AFTER the root stream that same segment already
+-- sent, so the two halves of one inner stay adjacent and the inners
+-- stay in the order they ran.  Concatenating the two columns instead
+-- -- every group, then every root stream -- is what the corpus's
+-- exchanged pair refutes.
+--
+-- ONLY THE LAST SEGMENT CARRIES THE `fin`.  A completion is the whole
+-- path finishing, not one inner's contribution ending, so every
+-- earlier segment folds with `false` and the flag is spent once.
+--
+-- ROOT STREAM BEFORE VALUE GROUP WITHIN ONE SEGMENT IS THE UNTESTED
+-- HALF.  It is what the frame step answered before there were segments
+-- at all, so the corpus cannot move on it -- and it cannot until a
+-- root component stops being empty, which is a share connecting.  The
+-- argument for it is that a connect fans out to subscribers already
+-- registered, so that delivery ran before the subscribe holding this
+-- segment existed; the leg that fills the root components is where
+-- that stops being an argument.
+data foldVSegs⇓ {n} {Γ} {t} {e} where
+  segs-nil : ∀ {u lo now} {κ : Path Γ lo u t} {fin sched st r}
+           → foldPath⇓ now κ [] fin sched st r
+           → foldVSegs⇓ now κ [] fin sched st r
+
+  segs-last : ∀ {u lo now} {κ : Path Γ lo u t} {vs rts fin sched st}
+                {emits sched₁ st₁}
+            → foldPath⇓ now κ vs fin sched st (emits , sched₁ , st₁)
+            → foldVSegs⇓ now κ ((vs , rts) ∷ []) fin sched st
+                (rts ++ emits , sched₁ , st₁)
+
+  segs-more : ∀ {u lo now} {κ : Path Γ lo u t} {vs rts s ss fin sched st}
+                {emits sched₁ st₁} {rest sched₂ st₂}
+            → foldPath⇓ now κ vs false sched st (emits , sched₁ , st₁)
+            → foldVSegs⇓ now κ (s ∷ ss) fin sched₁ st₁ (rest , sched₂ , st₂)
+            → foldVSegs⇓ now κ ((vs , rts) ∷ s ∷ ss) fin sched st
+                (rts ++ emits ++ rest , sched₂ , st₂)
 
 data chainStep⇓ {n} {Γ} {t} {e} where
   chain-step : ∀ {a : Arrival Γ} {lo} {path : Path Γ lo (arrTy a) t}
