@@ -33,6 +33,7 @@ Every `*-selftest` proves its checker still fires; they are not findings, they a
 | `roadmap-order` | discharging a GRINDABLE or DIFFICULTY row while its tier holds an open FALSITY or SHAPE. Only DISCHARGE is held — delete, rename, split, restate, reclassify stay free; a PREREQUISITE the risky statement names is exempt | [docs/roadmap-check.md](docs/roadmap-check.md) |
 | `roadmap-moved` | a branch landing proof work with PROOF-STATE byte-identical to **main**. Baseline is the merge-base, so fix-ups inside a branch cost nothing | [docs/roadmap-check.md](docs/roadmap-check.md) |
 | `comments-check` | a date, a historical marker or a LINE NUMBER in `agda/src`/`agda/evidence`; evidence not last and in order; a DOUBLED marker (`-- -- RECOVERY:`); a `TWIN`/`REFUTED`/`PROBED`/`RECOVERY` that doesn't resolve. `DEAD ROUTE` is unvalidated — it names nothing | [docs/comments-check.md](docs/comments-check.md) |
+| `recursion-cover` | a cycle in the evaluator's call graph that no declared descent covers — so it names a termination failure in SECONDS, before any tower runs | [docs/recursion-cover.md](docs/recursion-cover.md) |
 | the tower (inline in `gate-heavy`) | **a warning is a failure** (`-W error`, exit 42) | [docs/agda-build.md](docs/agda-build.md) |
 | `refuted` / `probed` | the evidence trees not typechecking | EVIDENCE.md |
 | `bug-cache` | a known impl counterexample regressing. `Unit-Test.agda` is off Main, so nothing else would notice | [docs/bug-cache.md](docs/bug-cache.md) |
