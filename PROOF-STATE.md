@@ -280,10 +280,12 @@ also: `dispatchShare!` — its inhabitation, same reason.
   is the share-sink `foldPath!` already descends at. The subscribe's own
   accumulator is owed by the CONNECT, below, and by nothing here.
 
-- **ROUTE THE CONNECT THROUGH THE FAN-OUT — THIS LEG IS THE MONSTER.** With the
-  walk pushing, `sharedConnect⇓` stops answering the subscriber that triggered
-  it and delivers value-major through `dispatchShare⇓`, re-reading the registry
-  between values. Here an accumulator is genuinely owed and cannot be borrowed:
+- **ROUTE THE CONNECT THROUGH THE FAN-OUT — THIS LEG IS THE MONSTER.** Nothing
+  has to be built: `shareWalk⇓` already re-reads `shareAdmit` against the state
+  its previous value threaded, and `shareGo⇓` already finishes each fold before
+  the next path, so the machinery the corpus demands is there and correct. The
+  monster is only that `sharedConnect⇓` never calls it. Here an accumulator is
+  genuinely owed and cannot be borrowed:
   the connect enters the fan-out at its OWN slot, so the floor does not move
   and nothing beneath it orders the call. The unconnected-slot count does —
   `connectedShares` is extended before the recursive call and is raised
