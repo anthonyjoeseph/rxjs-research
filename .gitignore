@@ -5,6 +5,11 @@
 **/node_modules
 typescript/node_modules
 typescript/.oracle-tmp
+# the deep sweep's own emit dir and the failures it appends -- a divergence
+# is pinned by COPYING the printed program into `corpus/`, never by
+# committing the raw log, which would be a corpus nobody shrank
+typescript/.deep-tmp
+typescript/corpus/.deep-failures.ndjson
 
 # agda
 **/MAlonzo

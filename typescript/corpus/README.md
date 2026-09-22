@@ -113,22 +113,33 @@ reading is not itself pinned by anything here, which is why the matrix holds
 the share form alone: the twenty-one say the fix cannot be special-cased to
 shares, and they do not say more than that.
 
-The matrix is now GREEN and the drawn half nearly so, and what closed them
-was TWO mechanisms rather than one. Folding a subscribe's answer at the
-subscribe closes the matrix outright — all twenty-four rows, both orders, all
-three flatteners — and fifty-four of the seventy-seven drawn rows with it.
-The drawn rows that survived that all read the same way: the same multiset
-as rxjs, with one value delivered LATE. They were a source's value and its
-END being folded into each registered chain TOGETHER, one chain at a time, so
-the first chain's completion — and the queue drain or fan-out it subscribes —
-got ahead of the second chain's value. A subject walks its observers once for
-`next` and again for `complete`, and splitting the cascade into those two
-passes closes fifteen more.
+The file is now GREEN, and what closed it was FOUR mechanisms rather than
+one. Folding a subscribe's answer at the subscribe closes the matrix
+outright — all twenty-four rows, both orders, all three flatteners — and
+fifty-four of the seventy-seven drawn rows with it.
 
-Eight drawn rows remain red and they are not this file's subject. They are
-kept here because a corpus that holds a mechanism's whole history is worth
-more than one pruned to what it currently proves, and because the eight are
-where the next divergence will be read off.
+The drawn rows that survived that all read the same way: the same multiset
+as rxjs, with one value delivered LATE. Three orderings were wrong under
+that one symptom, and each was found only once the one above it was fixed.
+A source's value and its END were folded into each registered chain
+TOGETHER, one chain at a time, so the first chain's completion — and the
+queue drain or fan-out it subscribes — got ahead of the second chain's
+value; a subject walks its observers once for `next` and again for
+`complete`, and splitting the cascade into those two passes closes fifteen
+more. The source was then being closed before the FIRST of those passes
+rather than between them, which hands a mid-`next` subscriber an immediate
+completion; that closes four. A merge's drain was carrying its queue across
+its own spends instead of re-reading it from the node, which closes three.
+And the last one is the same ordering question one level further in: the
+drain ran before the dying inner's own last value had been folded down the
+path, so a subscription that value caused registered behind the queue's
+item rather than ahead of it — invisible in the answer, whose segments were
+already laid down in rxjs's order, and visible only to a later reader of
+the registry.
+
+That every one of those four is an ORDER rather than a value is the file's
+real finding, and it is why the drawn half was worth keeping at full size:
+each fix left a residue that looked exactly like the one before it.
 
 The twelve `map` rows stay CONTROLS whatever the rest of the file does —
 they are what says a divergence here is the frame's cell and not the share.
