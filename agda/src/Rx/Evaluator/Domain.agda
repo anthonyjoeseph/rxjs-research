@@ -128,7 +128,7 @@ open import Rx.Exp using (obs; Ctx; Val; Closed; Exp; Tm; Fn; FnClo; applyClo;
   mapᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; deferᵉ; mintᵉ)
 open import Rx.Mint using (ordinalᵏ; sourceᵏ; nodeᵏ; regᵏ; freshId; setAt)
 open import Rx.Slots using (Slots; scripted; shared)
-open import Rx.Evaluator using (Stream; Burst; Sched; EvalSt; Path; Frame; NodeId; root; share-sink; _↠_; shareAdmit;
+open import Rx.Evaluator using (Stream; Burst; Sched; EvalSt; Path; Frame; NodeId; root; share-sink; _↠[_]_; shareAdmit;
   shareLatch; shareFinish; from-inner; splitEvents; splitBurst; burstCompleted; oneShotBurst;
   spentBurst; arrTick; arrVal; chainsOf; cascadeLatch; cascadeFinish; sched-next; sched-init;
   st-init; NodeState; AllOp; RegId; Arrival; AtFloor; arrTy; memberSource; register;
@@ -442,7 +442,7 @@ data subscribeE⇓ {n} {Γ} {t} {e} where
                     {κ : Path Γ lo u t} {now sched st nid burst sched₁ st₁ r}
                 → evalWith count ρ ≡ suc k
                 → freshId nodeᵏ (Sched.mint sched) ≡ nid
-                → subscribeE⇓ (Θ , b , ρ) (take-f nid ↠ κ) now
+                → subscribeE⇓ (Θ , b , ρ) (take-f nid ↠[ ≤-refl ] κ) now
                     (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
                     (installNode nid (take-st (suc k)) st)
                     (burst , sched₁ , st₁)
@@ -458,7 +458,7 @@ data subscribeE⇓ {n} {Γ} {t} {e} where
                      {κ : Path Γ lo (u ×ᵗ listᵗ u) t}
                      {now sched st nid burst sched₁ st₁ out sched₂ st₂}
                  → freshId nodeᵏ (Sched.mint sched) ≡ nid
-                 → subscribeE⇓ (Θ , b , ρ) (batchSync-f nid ↠ κ) now
+                 → subscribeE⇓ (Θ , b , ρ) (batchSync-f nid ↠[ ≤-refl ] κ) now
                      (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
                      (installNode nid (batchSync-st true) st)
                      (burst , sched₁ , st₁)
@@ -473,7 +473,7 @@ data subscribeE⇓ {n} {Γ} {t} {e} where
   subs-map : ∀ {lo s u Θ} {ρ : Env Γ Θ} {f : Fn Γ [] [] Θ s u}
                {b : Exp Γ [] [] Θ s} {κ : Path Γ lo u t}
                {now sched st burst sched₁ st₁ r}
-           → subscribeE⇓ (Θ , b , ρ) (map-f (Θ , f , ρ) ↠ κ) now sched st
+           → subscribeE⇓ (Θ , b , ρ) (map-f (Θ , f , ρ) ↠[ ≤-refl ] κ) now sched st
                (burst , sched₁ , st₁)
            → pushBurst⇓ now (map-f (Θ , f , ρ)) κ burst sched₁ st₁ r
            → subscribeE⇓ (Θ , mapᵉ f b , ρ) κ now sched st r
@@ -482,7 +482,7 @@ data subscribeE⇓ {n} {Γ} {t} {e} where
                 {b : Exp Γ [] [] Θ s} {κ : Path Γ lo u t}
                 {now sched st nid burst sched₁ st₁ r}
             → freshId nodeᵏ (Sched.mint sched) ≡ nid
-            → subscribeE⇓ (Θ , b , ρ) (scan-f (Θ , f , ρ) nid ↠ κ) now
+            → subscribeE⇓ (Θ , b , ρ) (scan-f (Θ , f , ρ) nid ↠[ ≤-refl ] κ) now
                 (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
                 (installNode nid (cell-st (evalWith i ρ)) st)
                 (burst , sched₁ , st₁)
@@ -537,7 +537,7 @@ data subscribeE⇓ {n} {Γ} {t} {e} where
                                      ; pending = (suc now , (Θ , body , ρ)) ∷ [] }
                               ∷ Sched.live sched }
                  , register rid (atDyn src lo)
-                            (thru-outer mergeAllᵒ nid ↠ κ)
+                            (thru-outer mergeAllᵒ nid ↠[ ≤-refl ] κ)
                             (installNode nid
                               (mergeAll-st {t = u} nothing 0 [] false) st) )
 
@@ -566,7 +566,7 @@ data subscribeInner⇓ {n} {Γ} {t} {e} where
   inner : ∀ {u lo op allNid} {κ : Path Γ lo u t} {now}
             {o : Val Γ (obs u)} {sched st inst burst sched′ st′ vs done}
         → freshId nodeᵏ (Sched.mint sched) ≡ inst
-        → subscribeE⇓ o (from-inner op allNid inst ↠ κ) now
+        → subscribeE⇓ o (from-inner op allNid inst ↠[ ≤-refl ] κ) now
             (record sched { mint = setAt nodeᵏ (suc inst) (Sched.mint sched) }) st
             (burst , sched′ , st′)
         → splitBurst burst ≡ (vs , done)
@@ -825,7 +825,7 @@ data subscribeAll⇓ {n} {Γ} {t} {e} where
   sub-all : ∀ {u lo op} {ns : NodeState Γ} {b : Val Γ (obs (obs u))}
               {κ : Path Γ lo u t} {now sched st nid burst sched₁ st₁ r}
           → freshId nodeᵏ (Sched.mint sched) ≡ nid
-          → subscribeE⇓ b (thru-outer op nid ↠ κ) now
+          → subscribeE⇓ b (thru-outer op nid ↠[ ≤-refl ] κ) now
               (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
               (installNode nid ns st)
               (burst , sched₁ , st₁)
@@ -948,13 +948,13 @@ data foldPath⇓ {n} {Γ} {t} {e} where
             → dispatchShare⇓ now i below vals fin sched st r
             → foldPath⇓ now (share-sink i below) vals fin sched st r
 
-  fold-step : ∀ {lo s u now} {f : Frame Γ s u}
-                {path′ : Path Γ lo u t} {vals fin sched st}
+  fold-step : ∀ {lo ℓ s u now} {f : Frame Γ s u} {le : lo ≤ ℓ}
+                {path′ : Path Γ ℓ u t} {vals fin sched st}
                 {vals′ fin′ sched₁ st₁ r}
             → stepFrame⇓ now f path′ vals fin sched st
                 (vals′ , fin′ , sched₁ , st₁)
             → foldPath⇓ now path′ vals′ fin′ sched₁ st₁ r
-            → foldPath⇓ now (f ↠ path′) vals fin sched st r
+            → foldPath⇓ {lo = lo} now (f ↠[ le ] path′) vals fin sched st r
 
 -- A VALUE AND AN END NEVER SHARE A FOLD.  An arrival carries both, and
 -- folding them together is what a carrier handing its caller a LIST

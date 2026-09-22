@@ -59,7 +59,7 @@ open import Rx.Exp.Guarded using (gsizeᵉ; gsizeᵗ; gsizeᵗˢ; gsize-unfoldμ
 open import Rx.Inputs-Below using (ib-unfoldμ; ib-topᵉ)
 open import Rx.Mint using (nodeᵏ; regᵏ; sourceᵏ; freshId; setAt)
 open import Decide using (∧ˡ; ∧ʳ)
-open import Rx.Evaluator using (Stream; Burst; Sched; EvalSt; Path; Frame; _↠_;
+open import Rx.Evaluator using (Stream; Burst; Sched; EvalSt; Path; Frame; _↠[_]_;
   map-f; take-f; scan-f; batchSync-f; from-inner; thru-outer; share-sink;
   mergeAllᵒ; switchᵒ; exhaustᵒ; AllOp; NodeId; NodeState;
   cell-st; take-st; batchSync-st; mergeAll-st; switch-st; exhaust-st;
@@ -331,7 +331,7 @@ red-consume {u = u} mergeAllᵒ nid κ now ro sched st
 ...     | false = _ , consume-all-enqueue eq eqr , []
 ...     | true =
           let ((burst , _ , _) , d , ss) =
-                ro (from-inner mergeAllᵒ nid (freshId nodeᵏ (Sched.mint sched)) ↠ κ) now
+                ro (from-inner mergeAllᵒ nid (freshId nodeᵏ (Sched.mint sched)) ↠[ ≤-refl ] κ) now
                    (record sched
                       { mint = setAt nodeᵏ (suc (freshId nodeᵏ (Sched.mint sched)))
                                  (Sched.mint sched) })
@@ -356,7 +356,7 @@ red-consume {u = u} switchᵒ nid κ now ro sched st
 ... | just (switch-st cur od) with switchKill cur sched st in eqk
 ...   | (sched₁ , st₁) =
         let ((burst , _ , _) , d , ss) =
-              ro (from-inner switchᵒ nid (freshId nodeᵏ (Sched.mint sched₁)) ↠ κ) now
+              ro (from-inner switchᵒ nid (freshId nodeᵏ (Sched.mint sched₁)) ↠[ ≤-refl ] κ) now
                  (record sched₁
                     { mint = setAt nodeᵏ (suc (freshId nodeᵏ (Sched.mint sched₁)))
                                (Sched.mint sched₁) })
@@ -382,7 +382,7 @@ red-consume {u = u} exhaustᵒ nid κ now ro sched st
       _ , consume-exhaust-nil (cong (consumeUsable exhaustᵒ u) eq) , []
 ... | just (exhaust-st false od) =
       let ((burst , _ , _) , d , ss) =
-            ro (from-inner exhaustᵒ nid (freshId nodeᵏ (Sched.mint sched)) ↠ κ) now
+            ro (from-inner exhaustᵒ nid (freshId nodeᵏ (Sched.mint sched)) ↠[ ≤-refl ] κ) now
                (record sched
                   { mint = setAt nodeᵏ (suc (freshId nodeᵏ (Sched.mint sched)))
                              (Sched.mint sched) })
@@ -620,7 +620,7 @@ red-scan-installed : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo Θ}
          → ∀ {b : Exp Γ [] [] Θ s} {ρ : Env Γ Θ} {κ : Path Γ lo u t} {now}
          → (sched : Sched Γ) (st : EvalSt e)
          → {sched₂ : Sched Γ} {st₁ : EvalSt e} {burst : Stream Γ s}
-         → subscribeE⇓ {e = e} (Θ , b , ρ) (scan-f fn nid ↠ κ) now
+         → subscribeE⇓ {e = e} (Θ , b , ρ) (scan-f fn nid ↠[ ≤-refl ] κ) now
              (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
              (installNode nid (cell-st a) st)
              (burst , sched₂ , st₁)
@@ -797,7 +797,7 @@ mutual
         ((burst , sched₁ , st₁) , d , sat) =
           redExpAcc b ρ rρ k okb aK
             (rs (s≤s (m≤n+m (gsizeᵉ b) (gsizeᵗ f))))
-            (map-f (_ , f , ρ) ↠ κ) now sched st
+            (map-f (_ , f , ρ) ↠[ ≤-refl ] κ) now sched st
         (r , p , sat′) =
           red-push now (map-f (_ , f , ρ)) tt
             (redFnAcc f ρ rρ k okf aK
@@ -813,7 +813,7 @@ mutual
         ((burst , sched₂ , st₁) , d , sat) =
           redExpAcc b ρ rρ k okb aK
             (rs (s≤s (m≤n+m (gsizeᵉ b) (gsizeᵗ c))))
-            (take-f nid ↠ κ) now
+            (take-f nid ↠[ ≤-refl ] κ) now
             (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
             (installNode nid (take-st (suc j)) st)
         (r , p , sat′) = red-push now (take-f nid) tt tt κ sat sched₂ st₁ tt
@@ -822,7 +822,7 @@ mutual
     let nid = freshId nodeᵏ (Sched.mint sched)
         ((burst , sched₂ , st₁) , d , sat) =
           redExpAcc b ρ rρ k ok aK (rs ≤-refl)
-            (batchSync-f nid ↠ κ) now
+            (batchSync-f nid ↠[ ≤-refl ] κ) now
             (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
             (installNode nid (batchSync-st true) st)
         ((out , sched₃ , st₂) , p , sat′) =
@@ -844,7 +844,7 @@ mutual
           redExpAcc b ρ rρ k okb aK
             (rs (s≤s (≤-trans (m≤n+m (gsizeᵉ b) (gsizeᵗ z))
                               (m≤n+m (gsizeᵗ z + gsizeᵉ b) (gsizeᵗ f)))))
-            (scan-f (_ , f , ρ) nid ↠ κ) now
+            (scan-f (_ , f , ρ) nid ↠[ ≤-refl ] κ) now
             (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
             (installNode nid (cell-st (evalWith z ρ)) st)
         (r , p , sat′) =
@@ -855,7 +855,7 @@ mutual
     let nid = freshId nodeᵏ (Sched.mint sched)
         ((burst , sched₂ , st₁) , d , sat) =
           redExpAcc b ρ rρ k ok aK (rs ≤-refl)
-            (thru-outer mergeAllᵒ nid ↠ κ) now
+            (thru-outer mergeAllᵒ nid ↠[ ≤-refl ] κ) now
             (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
             (installNode nid (mergeAll-st lim 0 [] false) st)
         (r , p , sat′) =
@@ -865,7 +865,7 @@ mutual
     let nid = freshId nodeᵏ (Sched.mint sched)
         ((burst , sched₂ , st₁) , d , sat) =
           redExpAcc b ρ rρ k ok aK (rs ≤-refl)
-            (thru-outer switchᵒ nid ↠ κ) now
+            (thru-outer switchᵒ nid ↠[ ≤-refl ] κ) now
             (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
             (installNode nid (switch-st nothing false) st)
         (r , p , sat′) =
@@ -875,7 +875,7 @@ mutual
     let nid = freshId nodeᵏ (Sched.mint sched)
         ((burst , sched₂ , st₁) , d , sat) =
           redExpAcc b ρ rρ k ok aK (rs ≤-refl)
-            (thru-outer exhaustᵒ nid ↠ κ) now
+            (thru-outer exhaustᵒ nid ↠[ ≤-refl ] κ) now
             (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
             (installNode nid (exhaust-st false false) st)
         (r , p , sat′) =

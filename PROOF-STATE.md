@@ -226,10 +226,10 @@ VALUES exactly.
 
 **DONE IS BOTH HALVES OF THE JOB GREEN AND THE TARGET BACK IN THE GATE.** The
 random draw and the replay of the pinned corpus are separate steps and both
-are red: 489 of 500 on the draw, 2 of 15 rows on the replay. Neither may be
+are red: 490 of 500 on the draw, 3 of 15 rows on the replay. Neither may be
 narrowed to pass. What both contradict is the burst carrier rather than an
 operator, and every failing case has ONE signature — the evaluator emits
-nothing where rxjs emits — so that is one mechanism seen 13 times.
+nothing where rxjs emits — so that is one mechanism seen 12 times.
 
 ### The monster
 
@@ -240,25 +240,14 @@ differential run has contradicted it.
 
 NARROWED TO A COUNT, and one side of it clean. A draw biased at the region
 reaches it 8 times in 500 where the old one reached 0; the evaluator fails all
-eight and 11 in all, a carrier that pushes fails none, and those 11 are pinned
-so the close is a count, not a memory. Predicate and carrier agree exactly, so
-the burst is the mechanism, not a symptom. What is left is the transcription:
-the arrival split has landed, the carrier has not.
+eight and 10 in all, a carrier that pushes fails none, and those rows are
+pinned so the close is a count, not a memory. The two failures outside the
+region are the predicate under-reading, not a second mechanism — the pushing
+carrier clears them too. What is left is the carrier itself.
 
 also: `chainStep⇓`, `chainStep!` — the carrier is a batch on BOTH faces and only one of them is `subscribeE⇓`; a scheduled arrival folds its value and its end together for the same reason a subscription hands back a list, so the split separating them is the monster's fact landing off the monster's cone.
 
 ### Big picture tier roadmap
-
-- **THE FLOOR BELONGS ON THE JOINING FRAME, AND ONE INDEX ON THE PATH CANNOT
-  SAY IT.** A flattener subscribes its inners at the floor where IT was
-  written, never at the floor of whatever delivered the value; the two differ
-  exactly when a SHARE is between, since a slot row is stored and dispatched
-  at `regFloor (atSlot i)` and the `lowerFloor` that puts it there forgets
-  where it came from. The inner may then read only slots at or below `i`, and
-  `subs-floor` ends it dry — a silent program rather than a scope error. The
-  repair is a `Path` constructor for the joining frames carrying BOTH floors,
-  the outer for the registry and the inner for the tail, ordered between: then
-  `lowerFloor` moves the outer and leaves the flattener's own standing.
 
 - **THE CARRIER'S SHAPE INTO `Rx.Evaluator.Domain`, AS A TRANSCRIPTION.** Only
   once the reference is green. The relation is where the design is stated and
@@ -275,6 +264,14 @@ also: `chainStep⇓`, `chainStep!` — the carrier is a batch on BOTH faces and 
   moves is the shape of every family's result, not the argument that they
   terminate. Take the reducibility side first, since it names every
   constructor; the freshness pair last, since it names the fewest.
+
+- **THE REFERENCE RETIRES WITH THE CARRIER.** `ref-eval.ts` is the burst
+  machine, and the moment the Agda pushes it is a superseded predecessor —
+  deleted, not parked, and `ref-push.ts` takes the `--machine ref` name so the
+  transcription check keeps meaning what it says. It is its own leg because
+  the check that entitles every measurement here is the one being rewired, and
+  a leg that both moves the carrier and re-points its judge has nothing left
+  to check itself against.
 
 - **ENABLE THE ORACLE IN CI.** Flip the job off `if: false`. It is the leg
   that makes the tier STAY done: until it lands the sweep is a thing somebody

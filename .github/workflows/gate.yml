@@ -350,8 +350,8 @@ jobs:
   #
   # STILL OFF, AND WHAT REMAINS RED IS COUNTED RATHER THAN DESCRIBED. The job
   # is two steps, the random draw and the replay of the pinned corpus, and it
-  # goes on whole or not at all. The draw stands at 489 of 500 against rxjs,
-  # 11 cases; the replay is red on 13 of its 15 rows. A draw that once matched
+  # goes on whole or not at all. The draw stands at 490 of 500 against rxjs,
+  # 10 cases; the replay is red on 12 of its 15 rows. A draw that once matched
   # on every case did so because it never reached the shape -- biasing the
   # generator at it is what turned an inference into those numbers.
   #
@@ -363,6 +363,9 @@ jobs:
   # failing case emits NOTHING where rxjs emits. The measurement and the three
   # neighbours that separate it are in the evaluator's own header, where the
   # repair is owed; a carrier that pushes clears all 15 rows and all 500.
+  # Two of the ten sit outside the region the predicate names, and the pushing
+  # carrier wins those too -- the predicate under-reads, it is not a second
+  # mechanism.
   #
   # AND THE RULE THAT DECIDES THE SHAPE OF THAT REPAIR: nothing here may be
   # narrowed to make it pass. A divergence is a finding about one of the two

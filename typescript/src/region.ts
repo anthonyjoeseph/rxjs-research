@@ -18,6 +18,14 @@ import type { TestCase } from "./prop-test.js";
 // The three tests are all UNDER-approximations: an unknown answers NO.
 // That is the safe direction for a coverage count, which would otherwise
 // report its own optimism as reach.
+//
+// AND THE UNDER-READING IS MEASURED, NOT ASSUMED: the burst carrier loses
+// two cases of the draw that this predicate places outside the region, and
+// the pushing carrier wins both.  So the misses are the predicate being
+// conservative, not a second mechanism -- which is the reading available
+// only because the two carriers are counted separately.  A case outside
+// the region that the pushing carrier ALSO loses would be the other
+// finding, and there is none.
 
 // Every input index reachable by SUBSCRIBING this expression.  A `strmT`
 // is a VALUE, not a subscription -- whatever it names is reached only

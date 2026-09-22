@@ -301,7 +301,25 @@ data Path {n} (Γ : Ctx n) : ℕ → Ty → Ty → Set where   -- floor → sour
                -- the chain ends at shared slot i, not the root: its
                -- values are delivered to the share's subject and fan
                -- out to every chain registered on source toℕ i
-  _↠_        : ∀ {lo s u t} → Frame Γ s u → Path Γ lo u t → Path Γ lo s t
+  _↠[_]_     : ∀ {lo ℓ s u t} → Frame Γ s u → lo ≤ ℓ → Path Γ ℓ u t → Path Γ lo s t
+               -- THE CONS RELAXES THE FLOOR, AND THAT IS WHAT LETS A
+               -- FLATTENER KEEP ITS OWN.  The index is a LOWER bound on
+               -- the path's sinks, so a tail standing at `ℓ` inhabits
+               -- every `lo ≤ ℓ` and the relaxation is sound by itself.
+               -- What it buys is that `lowerFloor` composes at the head
+               -- instead of descending: a registration moves the OUTER
+               -- floor, where the registry's measure reads it, and every
+               -- floor further along survives the move.
+               --
+               -- It is the joining frames that need one to survive.  A
+               -- flattener subscribes its inners at the floor where IT
+               -- was written, and with one index for the whole path that
+               -- floor is overwritten by whichever registration delivered
+               -- the value -- a share's, which sees strictly fewer slots.
+               -- The inner then meets `subs-floor` and ends dry instead
+               -- of reading its input, which shows up as a silent program
+               -- rather than as a scope error.  Every other frame builds
+               -- with `≤-refl` and notices nothing.
 
 Chain : ∀ {n} → Ctx n → ℕ → Ty → Set   -- a registration: its source element type packed with its rootward path
 Chain Γ lo t = Σ Ty (λ s → Path Γ lo s t)
@@ -344,7 +362,7 @@ lowerFloor : ∀ {n} {Γ : Ctx n} {s t} {lo lo′} → lo′ ≤ lo
            → Path Γ lo s t → Path Γ lo′ s t
 lowerFloor le root             = root
 lowerFloor le (share-sink i p) = share-sink i (≤-trans le p)
-lowerFloor le (f ↠ p)          = f ↠ lowerFloor le p
+lowerFloor le (f ↠[ h ] p)     = f ↠[ ≤-trans le h ] p
 
 frameNodes : ∀ {n} {Γ : Ctx n} {s u} → Frame Γ s u → List NodeId
 frameNodes (map-f _)          = []
@@ -357,7 +375,7 @@ frameNodes (thru-outer _ k)   = k ∷ []
 pathHasNode : ∀ {n} {Γ : Ctx n} {s t} → NodeId → Path Γ lo s t → Bool
 pathHasNode nid root           = false
 pathHasNode nid (share-sink i _) = false
-pathHasNode nid (f ↠ p)       = any (_≡ᵇ nid) (frameNodes f) ∨ pathHasNode nid p
+pathHasNode nid (f ↠[ _ ] p)  = any (_≡ᵇ nid) (frameNodes f) ∨ pathHasNode nid p
 
 -- Registrations carry an identity so a mid-cascade cut can name its
 -- victims: a cancelled registration's snapshot chain must deliver
