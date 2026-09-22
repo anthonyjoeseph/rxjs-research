@@ -61,7 +61,7 @@ open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; uniqᵗ; _×ᵗ_; _+ᵗ_
 open import Rx.Exp.Guarded using (gsizeᵉ; gsizeᵗ; gsizeᵗˢ; gsize-unfoldμ)
 open import Rx.Inputs-Below using (ib-unfoldμ; ib-topᵉ)
 open import Rx.Mint using (nodeᵏ; regᵏ; sourceᵏ; freshId; setAt)
-open import Decide using (∧ˡ; ∧ʳ)
+open import Decide using (∧ˡ; ∧ʳ; ≡ᵇ-refl)
 open import Rx.Evaluator using (Stream; Burst; VSegs; Segs; segsCompleted; segVSegs; stepSegs; Sched; EvalSt; Path; Frame;
   _↠_; map-f; take-f; scan-f; batchSync-f; from-inner; thru-outer; share-sink; root; mergeAllᵒ;
   switchᵒ; exhaustᵒ; AllOp; NodeId; NodeState; cell-st; take-st; batchSync-st; mergeAll-st;
@@ -70,8 +70,6 @@ open import Rx.Evaluator using (Stream; Burst; VSegs; Segs; segsCompleted; segVS
   splitBurst; consumeUsable; hasRoom; switchKill; register; atSlot; lowerFloor;
   aliveThroughᶠ; shareAdmit; shareDying; RegId)
 open import Rx.Evaluator.Unconn-Arith using (unconn; unconn-insert)
-open import Rx.Evaluator.Freshness using (lookup-set; PreservedBelow)
-open import Rx.Evaluator.Freshness.Preserve using (subscribeE-preserves)
 open import Rx.Evaluator.Domain using (srcFrame; subscribeE⇓; pushBurst⇓; pushSegs⇓; stepFrame⇓;
   step-map; step-scan; step-take; step-batchSync; step-from-inner; push-nil; push-cons;
   psegs-nil; psegs-cons;
@@ -605,6 +603,15 @@ redScanVals fn rf ra (p ∷ ps) =
   let (qs , last) = redScanVals fn rf (rf (ra , p)) ps
   in rf (ra , p) ∷ qs , last
 
+-- a node just written reads back as what was written
+lookup-set : ∀ {n} {Γ : Ctx n} (nid : NodeId) (ns : NodeState Γ)
+             (ts : List (NodeId × NodeState Γ))
+           → lookupNode nid (setNode nid ns ts) ≡ just ns
+lookup-set nid ns []             rewrite ≡ᵇ-refl nid = refl
+lookup-set nid ns ((k , s) ∷ r) with k ≡ᵇ nid in eq
+... | true  rewrite ≡ᵇ-refl nid = refl
+... | false rewrite eq = lookup-set nid ns r
+
 -- the cell read back is the one written, so its payload is that payload
 tie-scan : ∀ {n} {Γ : Ctx n} {w w′} {x : Val Γ w} {y : Val Γ w′}
          → _≡_ {A = Maybe (NodeState Γ)} (just (cell-st x)) (just (cell-st y))
@@ -612,33 +619,56 @@ tie-scan : ∀ {n} {Γ : Ctx n} {w w′} {x : Val Γ w} {y : Val Γ w′}
 tie-scan refl r = r
 
 -- AND THE ONE THING THE FOLD'S NODE OBLIGATION CANNOT ESTABLISH FOR
--- ITSELF: that the accumulator installed just before a subscription is
--- the one still standing when the push happens.  A node is keyed by an
--- identifier drawn from the run's own counter, the fold installs at the
--- counter's current value and subscribes with it advanced, and a
--- subscription writes no node below the counter it started at -- so the
--- accumulator is untouched for structural reasons rather than by any
--- property of the candidate.  The floor spent here is the advanced
--- counter itself, which is the tightest one the fold can offer and the
--- only one under which its own node is strictly below.
-red-scan-installed : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo Θ}
-           (fn : FnClo Γ (u ×ᵗ s) u) (nid : NodeId)
-           {a : Val Γ u} → Red u a
-         → ∀ {b : Exp Γ [] [] Θ s} {ρ : Env Γ Θ} {κ : Path Γ lo u t} {now}
-         → (sched : Sched Γ) (st : EvalSt e)
-         → {sched₂ : Sched Γ} {st₁ : EvalSt e} {segs : Segs Γ s t}
-         → subscribeE⇓ {e = e} (Θ , b , ρ) (scan-f fn nid ↠ κ) now
-             (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
-             (installNode nid (cell-st a) st)
-             (segs , sched₂ , st₁)
-         → RedNode {e = e} (scan-f fn nid) st₁
-red-scan-installed fn nid {a} ra sched st d eq =
-  tie-scan (trans (sym (trans (PreservedBelow.below
-                                 (subscribeE-preserves (suc nid) ≤-refl d)
-                                 nid ≤-refl)
-                              (lookup-set nid (cell-st a) (EvalSt.nodes st))))
-                  eq)
-           ra
+-- ITSELF: that the accumulator standing when the push happens is still
+-- a REDUCIBLE cell.  The fold installs at an identifier drawn from the
+-- run's own counter and subscribes with the counter advanced past it,
+-- so nothing the subscription MINTS can name that node.  What can name
+-- it is the chain the subscription REGISTERS, which is why the claim is
+-- about the candidate rather than about the table being untouched.
+
+-- A CONNECT REACHES THIS VERY NODE, AND THAT IS WHAT MAKES THE CLOSURE
+-- HYPOTHESIS LOAD-BEARING.  A scan over a share, at the slot's first
+-- subscription, registers the whole continuation -- this frame included
+-- -- and then folds the definition's synchronous values back down it,
+-- so `scanDispatch` runs at this identifier before the subscription has
+-- returned.  The cell is REWRITTEN, holding what those values fold to;
+-- it is reducible because the closure is, so the form without `RedFn`
+-- asserts something no hypothesis of it carries.
+
+-- WHAT AN HONEST PROOF WANTS, AND WHY IT IS NOT A LEMMA IN THIS
+-- MODULE.  Two invariants over the STATE rather than one fact about one
+-- node: every cell in the table holds a reducible value, and every
+-- chain the registry holds is built of reducible closures.  The second
+-- is what makes the first inductive, because a fold runs whatever
+-- closures the registry hands it and no frame it meets was built here.
+-- Neither can be stated below this module -- both mention the
+-- candidate -- so the leaf sits where its consumer is.
+
+-- DEAD ROUTE: a node-freshness family concluding `PreservedBelow (suc
+--   nid)` across the subscribe cycle, spent here to say the cell was
+--   untouched.  The route above refutes the conclusion rather than
+--   blocking the proof: the fold steps a frame the CALLER built, so a
+--   subscription does write strictly below its own floor -- and no
+--   hypothesis available here excludes it, because the offending frame
+--   is this one.
+
+-- RECOVERY: git show 33078215:agda/src/Rx/Evaluator/Freshness/Preserve.agda
+--   is that family, and `git show
+--   33078215:agda/src/Rx/Evaluator/Freshness/Mono.agda` the
+--   monotonicity it stood on, both proven over the thirteen relations
+--   the subscribe cycle held before the connect joined it to the fold.
+postulate
+  red-scan-installed : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo Θ}
+             (fn : FnClo Γ (u ×ᵗ s) u) (nid : NodeId) → RedFn fn
+           → {a : Val Γ u} → Red u a
+           → ∀ {b : Exp Γ [] [] Θ s} {ρ : Env Γ Θ} {κ : Path Γ lo u t} {now}
+           → (sched : Sched Γ) (st : EvalSt e)
+           → {sched₂ : Sched Γ} {st₁ : EvalSt e} {segs : Segs Γ s t}
+           → subscribeE⇓ {e = e} (Θ , b , ρ) (scan-f fn nid ↠ κ) now
+               (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
+               (installNode nid (cell-st a) st)
+               (segs , sched₂ , st₁)
+           → RedNode {e = e} (scan-f fn nid) st₁
 
 -- ONE READING OF THE CELL, WHICH IS WHERE BOTH HALVES ARE PAID.  The
 -- dispatch it mirrors branches on a lookup the goal does not mention,
@@ -1077,7 +1107,7 @@ redExpAcc (scanᵉ {s = s} {t = u} f z b) ρ rρ k ok aK (acc rs) κ now sched s
           (installNode nid (cell-st (evalWith z ρ)) st) aM rm
       (r , p , sat′ , _) =
         red-pushSegs now (scan-f (_ , f , ρ) nid) tt rf
-          κ sat sched₂ st₁ (red-scan-installed (_ , f , ρ) nid rz sched st d)
+          κ sat sched₂ st₁ (red-scan-installed (_ , f , ρ) nid rf rz sched st d)
   in r , subs-scan refl d p , sat′
 redExpAcc (mergeAllᵉ lim b) ρ rρ k ok aK (acc rs) κ now sched st aM rm =
   let nid = freshId nodeᵏ (Sched.mint sched)

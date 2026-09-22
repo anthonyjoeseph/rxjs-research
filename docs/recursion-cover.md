@@ -58,8 +58,7 @@ appears.
 whole point** — a peel is what a counter the machine reads needs, and there is
 no such counter. Every cycle standing today is declared structural, and each
 one names in its own header what its members descend on: the type at
-`red-data`/`redDatas`, the derivation at the two thirteen-member Freshness
-inductions.
+`red-data`/`redDatas`, the path's own floor at the evaluator's fold.
 
 ## The call graph is over-approximated, deliberately
 

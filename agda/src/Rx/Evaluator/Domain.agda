@@ -992,10 +992,10 @@ data subscribeAll⇓ {n} {Γ} {t} {e} where
 -- whatever was a member still is.  The antitone form takes exactly
 -- that, and the cons form is its special case at the connect itself.
 
--- THE RING IS `Freshness.Mono`'S SHAPE, over the same thirteen
--- subscribe relations clause for clause -- and it has to reach five
--- more, the fold's, which is also what the two Freshness inductions
--- themselves come to owe the moment this relation calls a fold.
+-- THE RING IS ONE CLAUSE PER CONSTRUCTOR OF EVERY RELATION THE CYCLE
+-- PASSES THROUGH, and this relation calling a fold is what fixes how
+-- many that is: the thirteen of the subscribe cycle AND the five of the
+-- fold's, in one block, because the connect joined the two into one.
 
 -- AND THAT IS WHAT PAYS FOR THE RE-SEEDING RATHER THAN ROUTING ROUND
 -- IT.  The count is the OUTERMOST component, so the two accessibilities

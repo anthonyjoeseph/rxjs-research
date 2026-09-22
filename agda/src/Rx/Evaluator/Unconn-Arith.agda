@@ -49,7 +49,6 @@ open import Data.Nat.ListAction using (sum)
 open import Data.Nat.Properties using
   (≤-refl; ≤-trans; +-mono-≤; +-mono-<-≤; +-mono-≤-<)
 open import Data.Vec using (lookup)
-open import Data.Product using (_×_; _,_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Decide using (≡ᵇ-refl)
@@ -141,21 +140,29 @@ unconn-insert sl cs i eqi fresh =
 -- came from, so a relation indexed by states would need a transport at
 -- every arm that rebuilds one; indexed by the fields it does not,
 -- because the projection out of a record update reduces.
-KeepsC : ∀ {n} {Γ : Ctx n} → Slots Γ → List Source → Slots Γ → List Source → Set
-KeepsC sl cs sl′ cs′ =
-  (sl′ ≡ sl) × (∀ s → memberSource s cs ≡ true → memberSource s cs′ ≡ true)
+--
+-- AND IT IS A RECORD RATHER THAN THE PAIR IT WRAPS, because the set
+-- appears in that pair only under `memberSource`.  A transparent alias
+-- leaves a reflexivity whose two sides are the same state asking Agda
+-- to solve the set by INVERTING a fold, which it refuses at depth; the
+-- record keeps the type rigid, so the same clause matches structurally.
+record KeepsC {n} {Γ : Ctx n} (sl : Slots Γ) (cs : List Source)
+              (sl′ : Slots Γ) (cs′ : List Source) : Set where
+  constructor keepsC
+  field table : sl′ ≡ sl
+        mem   : ∀ s → memberSource s cs ≡ true → memberSource s cs′ ≡ true
 
 keeps-refl : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (cs : List Source) → KeepsC sl cs sl cs
-keeps-refl sl cs = refl , λ _ h → h
+keeps-refl sl cs = keepsC refl λ _ h → h
 
 keeps-trans : ∀ {n} {Γ : Ctx n} {sl sl′ sl″ : Slots Γ} {cs cs′ cs″ : List Source}
             → KeepsC sl cs sl′ cs′ → KeepsC sl′ cs′ sl″ cs″ → KeepsC sl cs sl″ cs″
-keeps-trans (refl , f) (refl , g) = refl , λ s h → g s (f s h)
+keeps-trans (keepsC refl f) (keepsC refl g) = keepsC refl λ s h → g s (f s h)
 
 -- the connect's own step: one index joins the set and the table is untouched
 keeps-cons : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (cs : List Source) (s : Source)
            → KeepsC sl cs sl (s ∷ cs)
-keeps-cons sl cs s = refl , mem-cons
+keeps-cons sl cs s = keepsC refl mem-cons
   where
   mem-cons : ∀ r → memberSource r cs ≡ true → memberSource r (s ∷ cs) ≡ true
   mem-cons r h rewrite h = ∨-zeroʳ (sameSource r s)
@@ -171,5 +178,5 @@ keeps-cons sl cs s = refl , mem-cons
 -- the witness, which is the one edge that may.
 room-keeps : ∀ {n} {Γ : Ctx n} {sl sl′ : Slots Γ} {cs cs′ : List Source} {m}
            → KeepsC sl cs sl′ cs′ → unconn sl cs ≤ m → unconn sl′ cs′ ≤ m
-room-keeps {sl = sl} {cs = cs} {cs′ = cs′} (refl , mono) le =
+room-keeps {sl = sl} {cs = cs} {cs′ = cs′} (keepsC refl mono) le =
   ≤-trans (unconn-antitone sl cs cs′ mono) le

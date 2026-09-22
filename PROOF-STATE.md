@@ -259,11 +259,10 @@ also: `subscribe-shaped` — same; its conclusion gains the new component, which
   argument the call costs. It travels as a CEILING with its witness beside it,
   never as an accessibility at the count: only the connect peels the witness
   and every other step hands the same variable on and re-proves the bound.
-  Re-proving it is what the `Freshness.Mono`-shaped ring is for, and the ring
-  is owed over EIGHTEEN
-  relations, not thirteen — the connect closed the subscribe cycle and the fold
-  cycle into one. So the leg is the ring, the ceiling at every builder applying
-  the candidate, and the oracle over the corpus that was silent.
+  Re-proving it is a ring of one clause per constructor, owed over EIGHTEEN
+  relations rather than thirteen — the connect closed the subscribe cycle and
+  the fold cycle into one. So the leg is the ring, the ceiling at every builder
+  applying the candidate, and the oracle over the corpus that was silent.
 
 - **PIN THE WITHIN-SEGMENT ORDER, AT THE FIRST PROGRAM THAT FILLS A ROOT
   COLUMN.** `foldVSegs⇓` and `resolveSegs` both answer a segment's root stream
@@ -302,7 +301,10 @@ also: `subscribe-shaped` — same; its conclusion gains the new component, which
 
 ### The ledger
 
-(empty — this tier states nothing in Agda, so it postulates nothing.)
+- **`red-scan-installed`** (Reducible) — FALSITY, `RECOVERY`: a share
+  connecting under a scan re-enters that scan's own frame, so the cell is
+  rewritten rather than untouched, and its reducibility needs invariants over
+  the node table and the registry that nothing states yet.
 
 
 ## Tier 2 — finish `batchSimultaneousᵖ`
@@ -440,8 +442,9 @@ definition rather than a postulate, so its cone is real.
 - **`cascade-shaped`** (Run-Well-Formed) — SHAPE, `NO EVIDENCE`: the per-former
   split, and the `EvalSt` node-provenance invariant it is probably still
   missing.
-- **`subscribe-shaped`** (Run-Well-Formed) — SHAPE, `NO EVIDENCE`: trivial seed,
-  content is what the walk installs — but its `Owes` conclusion carries the
-  monster's own recorded gap, so the class is the gap's and not the grind's.
+- **`subscribe-shaped`** (Run-Well-Formed) — SHAPE, `NO EVIDENCE`: trivial
+  seed, content is what the walk installs — but its `Owes` conclusion carries
+  the monster's own recorded gap, so the class is the gap's and not the
+  grind's.
 - **FFI, permanently trusted** — `_>>=_`/`getContents`/`putStr` (CLI/IO),
   `randFold`/`natMod` (QuickCheck). Carried, not counted.

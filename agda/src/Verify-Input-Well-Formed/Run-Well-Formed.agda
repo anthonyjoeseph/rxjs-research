@@ -145,10 +145,10 @@ Owes {Γ = Γ} st S =
 -- been expensive before.
 --
 --   * A CASE NEEDING MORE OF `Sched.mint` THAN FRESHNESS.
---     `Rx/Evaluator/Freshness*` already carries freshness and
---     monotonicity at an arbitrary key.  Needing a stronger fact --
---     distinctness, an equality, a strict bound -- means the id
---     discipline is wrong rather than under-proven.
+--     `Rx.Mint` is the whole of the id discipline: a key's counter
+--     rises and nothing reads one twice.  Needing a stronger fact --
+--     distinctness, an equality, a strict bound -- means the discipline
+--     is wrong rather than under-proven.
 --
 --   * ANY CASE THAT CANNOT CLOSE WITHOUT RE-OPENING `Rx.Elaborate`.
 --     The elaboration is the thing under judgement here; changing it
