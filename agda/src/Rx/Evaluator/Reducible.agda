@@ -317,9 +317,9 @@ ReactFn {Γ = Γ} {t = t} e =
 -- than after the walk that produced it, and the fold is a member of the
 -- fused block this half of the flattener sits outside of -- so it
 -- travels as an argument, eta-expanded, exactly as `ReactFn` does.
-FoldFn : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Set
-FoldFn {Γ = Γ} {t = t} e =
-  ∀ {s lo} (now : Tick) (κ : Path Γ lo s t) (segs : VSegs Γ s t) (fin : Bool)
+FoldAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) {s lo} → Path Γ lo s t → Set
+FoldAt {Γ = Γ} {t = t} e {s = s} κ =
+  ∀ (now : Tick) (segs : VSegs Γ s t) (fin : Bool)
     (sched : Sched Γ) (st : EvalSt e)
   → ∀ {m} → Acc _<_ m → Room m sched st
   → Σ (Stream Γ t × Sched Γ × EvalSt e) λ r →
@@ -357,7 +357,7 @@ RedWalk {Γ = Γ} {t = t} {e = e} op nid κ now vals sched st =
 red-consume : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
               (op : AllOp) (nid : NodeId) (κ : Path Γ lo u t)
               (now : Tick) {o : Val Γ (obs u)} → Red (obs u) o
-            → ReactFn e → FoldFn e
+            → ReactFn e → FoldAt e κ
             → ∀ (sched : Sched Γ) (st : EvalSt e) {m}
             → Acc _<_ m → Room m sched st
             → RedConsume {e = e} op nid κ now o sched st
@@ -396,7 +396,7 @@ red-consume {u = u} mergeAllᵒ nid κ now ro react fold sched st aM rm
               ((rsegs , _ , sched₂ , st₂) , r) =
                 react mergeAllᵒ nid inst κ now [] sched₁ st₁
                   (segsCompleted segs) aM rm₁
-              (_ , fv) = fold now κ (segVSegs segs ++ rsegs) false sched₂ st₂ aM
+              (_ , fv) = fold now (segVSegs segs ++ rsegs) false sched₂ st₂ aM
                            (room-keeps (innerReact-keeps r) rm₁)
           in _ , consume-all-sub eq eqr (inner refl d refl) r fv
 
@@ -431,7 +431,7 @@ red-consume {u = u} switchᵒ nid κ now ro react fold sched st aM rm
             ((rsegs , _ , sched₃ , st₃) , r) =
               react switchᵒ nid inst κ now [] sched₂ st₂
                 (segsCompleted segs) aM rm₂
-            (_ , fv) = fold now κ (segVSegs segs ++ rsegs) false sched₃ st₃ aM
+            (_ , fv) = fold now (segVSegs segs ++ rsegs) false sched₃ st₃ aM
                          (room-keeps (innerReact-keeps r) rm₂)
         in _ , consume-switch-sub eq eqk refl (inner refl d refl) r fv
 
@@ -465,7 +465,7 @@ red-consume {u = u} exhaustᵒ nid κ now ro react fold sched st aM rm
           ((rsegs , _ , sched₂ , st₂) , r) =
             react exhaustᵒ nid inst κ now [] sched₁ st₁
               (segsCompleted segs) aM rm₁
-          (_ , fv) = fold now κ (segVSegs segs ++ rsegs) false sched₂ st₂ aM
+          (_ , fv) = fold now (segVSegs segs ++ rsegs) false sched₂ st₂ aM
                        (room-keeps (innerReact-keeps r) rm₁)
       in _ , consume-exhaust-sub eq (inner refl d refl) r fv
 
@@ -475,7 +475,7 @@ red-walk : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
            (op : AllOp) (nid : NodeId) (κ : Path Γ lo u t)
            (now : Tick) {vals : List (Val Γ (obs u))}
          → All (Red (obs u)) vals
-         → ReactFn e → FoldFn e
+         → ReactFn e → FoldAt e κ
          → ∀ (sched : Sched Γ) (st : EvalSt e) {m}
          → Acc _<_ m → Room m sched st
          → RedWalk {e = e} op nid κ now vals sched st
@@ -506,7 +506,7 @@ red-thru : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
            {vals : List (Val Γ (obs u))} → All (Red (obs u)) vals → (fin : Bool)
          → ∀ (sched : Sched Γ) (st : EvalSt e) {m}
          → Acc _<_ m → Room m sched st
-         → ReactFn e → FoldFn e
+         → ReactFn e → FoldAt e κ
          → RedStep {e = e} now (thru-outer op nid) κ vals fin sched st
 red-thru now op nid κ rv fin sched st aM rm react fold =
   let (_ , w) = red-walk op nid κ now rv react fold sched st aM rm
@@ -584,13 +584,14 @@ satValues (p ∷ ps) = p ∷ satValues ps
 -- the values theorem the returned column is closed by.  Neither can be
 -- CALLED from a face that sits outside the block, so the frame that
 -- needs them carries them, and the five that do not pay nothing.
-RedFrame : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} → Frame Γ s u → Set
-RedFrame (map-f fn)                  = RedFn fn
-RedFrame (scan-f fn nid)             = RedFn fn
-RedFrame (take-f nid)                = ⊤
-RedFrame (batchSync-f nid)           = ⊤
-RedFrame (from-inner op allNid inst) = ⊤
-RedFrame {Γ = Γ} {e = e} (thru-outer op nid) = ReactFn e × FoldFn e
+RedFrame : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
+         → Frame Γ s u → Path Γ lo u t → Set
+RedFrame (map-f fn)                  κ = RedFn fn
+RedFrame (scan-f fn nid)             κ = RedFn fn
+RedFrame (take-f nid)                κ = ⊤
+RedFrame (batchSync-f nid)           κ = ⊤
+RedFrame (from-inner op allNid inst) κ = ⊤
+RedFrame {Γ = Γ} {e = e} (thru-outer op nid) κ = ReactFn e × FoldAt e κ
 
 redMapVals : ∀ {n} {Γ : Ctx n} {s u} (fn : FnClo Γ s u) → RedFn fn
            → {vals : List (Val Γ s)} → All (Red s) vals
@@ -775,22 +776,22 @@ red-scan now fn nid κ rf rv fin sched st rn =
 -- from a source former, so it arrives here never, and a leaf stated for
 -- it would have been a claim about a run this face cannot reach.
 red-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
-           (now : Tick) (f : Frame Γ s u) → srcFrame f → RedFrame {e = e} f
-         → (κ : Path Γ lo u t)
-           {vals : List (Val Γ s)} → All (Red s) vals → (fin : Bool)
+           (now : Tick) (f : Frame Γ s u) → srcFrame f
+         → (κ : Path Γ lo u t) → RedFrame {e = e} f κ
+         → {vals : List (Val Γ s)} → All (Red s) vals → (fin : Bool)
          → ∀ (sched : Sched Γ) (st : EvalSt e) → RedNode f st
          → ∀ {m} → Acc _<_ m → Room m sched st
          → RedStep {e = e} now f κ vals fin sched st
-red-step now (map-f fn) sv rf κ rv fin sched st rn aM rm =
+red-step now (map-f fn) sv κ rf rv fin sched st rn aM rm =
   _ , step-map , redMapVals fn rf rv ∷ [] , tt
-red-step now (scan-f fn nid) sv rf κ rv fin sched st rn aM rm =
+red-step now (scan-f fn nid) sv κ rf rv fin sched st rn aM rm =
   red-scan now fn nid κ rf rv fin sched st rn
-red-step now (take-f nid) sv rf κ rv fin sched st rn aM rm =
+red-step now (take-f nid) sv κ rf rv fin sched st rn aM rm =
   red-take now nid κ rv fin sched st
-red-step now (batchSync-f nid) sv rf κ rv fin sched st rn aM rm =
+red-step now (batchSync-f nid) sv κ rf rv fin sched st rn aM rm =
   red-batchSync now nid κ rv fin sched st
-red-step now (from-inner op allNid inst) () rf κ rv fin sched st rn aM rm
-red-step now (thru-outer op nid) sv (react , fold) κ rv fin sched st rn aM rm =
+red-step now (from-inner op allNid inst) () κ rf rv fin sched st rn aM rm
+red-step now (thru-outer op nid) sv κ (react , fold) rv fin sched st rn aM rm =
   red-thru now op nid κ rv fin sched st aM rm react fold
 
 -- a frame's completion flag becomes at most one event
@@ -847,19 +848,19 @@ redBatchClose {t = t} s m rvs =
 -- on the values alone, which is why the reassembly costs one append of
 -- an end and one real obligation.
 red-push : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
-           (now : Tick) (f : Frame Γ s u) → srcFrame f → RedFrame {e = e} f
-         → (κ : Path Γ lo u t)
-           {burst : Stream Γ s} → StreamSat (Red s) burst
+           (now : Tick) (f : Frame Γ s u) → srcFrame f
+         → (κ : Path Γ lo u t) → RedFrame {e = e} f κ
+         → {burst : Stream Γ s} → StreamSat (Red s) burst
          → ∀ (sched : Sched Γ) (st : EvalSt e) → RedNode f st
          → ∀ {m} → Acc _<_ m → Room m sched st
          → RedPush {e = e} now f κ burst sched st
-red-push now f sv rf κ {[]}     []       sched st rn aM rm = _ , push-nil , [] , rn
-red-push now f sv rf κ {b ∷ bs} (p ∷ ps) sched st rn aM rm =
+red-push now f sv κ rf {[]}     []       sched st rn aM rm = _ , push-nil , [] , rn
+red-push now f sv κ rf {b ∷ bs} (p ∷ ps) sched st rn aM rm =
   let ((segs , fin′ , sched₁ , st₁) , d , rv , rn₁) =
-        red-step now f sv rf κ (satSplitEvents b p)
+        red-step now f sv κ rf (satSplitEvents b p)
           (proj₂ (splitEvents b)) sched st rn aM rm
       ((rest , sched₂ , st₂) , dr , sr , rn₂) =
-        red-push now f sv rf κ ps sched₁ st₁ rn₁ aM
+        red-push now f sv κ rf ps sched₁ st₁ rn₁ aM
           (room-keeps (stepFrame-keeps d) rm)
   in _ , push-cons refl d dr
        , ++⁺ (satStepSegs fin′ rv) sr
@@ -870,9 +871,9 @@ red-push now f sv rf κ {b ∷ bs} (p ∷ ps) sched st rn aM rm =
 -- unchanged, and the satisfaction travels from red-push's output to the
 -- segment list.
 red-pushSegs : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
-               (now : Tick) (f : Frame Γ s u) → srcFrame f → RedFrame {e = e} f
-             → (κ : Path Γ lo u t)
-               {segs : Segs Γ s t}
+               (now : Tick) (f : Frame Γ s u) → srcFrame f
+             → (κ : Path Γ lo u t) → RedFrame {e = e} f κ
+             → {segs : Segs Γ s t}
              → All (λ sg → StreamSat (Red s) (proj₁ sg)) segs
              → ∀ (sched : Sched Γ) (st : EvalSt e) → RedNode f st
              → ∀ {m} → Acc _<_ m → Room m sched st
@@ -880,12 +881,12 @@ red-pushSegs : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
                  pushSegs⇓ {e = e} now f κ segs sched st r
                    × All (λ sg → StreamSat (Red u) (proj₁ sg)) (proj₁ r)
                    × RedNode f (proj₂ (proj₂ r))
-red-pushSegs now f sv rf κ []        sched st rn aM rm = _ , psegs-nil , [] , rn
-red-pushSegs now f sv rf κ (ss ∷ sss) sched st rn aM rm =
+red-pushSegs now f sv κ rf []        sched st rn aM rm = _ , psegs-nil , [] , rn
+red-pushSegs now f sv κ rf (ss ∷ sss) sched st rn aM rm =
   let ((out , sched₁ , st₁) , pb , sat₁ , rn₁) =
-        red-push now f sv rf κ ss sched st rn aM rm
+        red-push now f sv κ rf ss sched st rn aM rm
       ((rest , sched₂ , st₂) , ps , sat₂ , rn₂) =
-        red-pushSegs now f sv rf κ sss sched₁ st₁ rn₁ aM
+        red-pushSegs now f sv κ rf sss sched₁ st₁ rn₁ aM
           (room-keeps (pushBurst-keeps pb) rm)
   in _ , psegs-cons pb ps , [] ∷ ++⁺ sat₁ sat₂ , rn₂
 
@@ -1098,7 +1099,8 @@ innerReact! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo}
 -- meets; a subscribe meets the other five and never this one.  The
 -- split is checked rather than asserted -- `srcFrame`'s `()` next door
 -- is Agda refusing the frame, not a convention about callers.
-stepFrameAny! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
+stepFrameAny! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo ℓ}
+                (ac : Acc _<_ (n ∸ ℓ)) (le : ℓ ≤ lo)
                 (now : Tick) (fr : Frame Γ s u) (κ : Path Γ lo u t)
                 (vals : List (Val Γ s)) (fin : Bool)
                 (sched : Sched Γ) (st : EvalSt e)
@@ -1129,24 +1131,11 @@ foldVSegs! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo ℓ}
            → Σ (Stream Γ t × Sched Γ × EvalSt e) λ r →
                foldVSegs⇓ {e = e} now κ segs fin sched st r
 
--- THE FOLD AS THE FLATTENER'S HALF RECEIVES IT.  A path folded at a
--- subscribe opens its own descent on the floor instead of continuing
--- the caller's, so the accessibility is built here rather than
--- threaded: the two runs are over disjoint stretches of the path and
--- neither is below the other.
---
--- AND THE RE-SEED IS ONE OF EXACTLY TWO EDGES HOLDING THE EVALUATOR'S
--- CYCLE OPEN, which is worth saying here because the descent it drops
--- is one the code already performs.  `red-consume` applies this fold at
--- `κ`, and the `foldPath!` clause that reached it was at `fr ↠[ h ] κ`
--- -- one frame larger.  So the missing fact is not a measure but a
--- SIGHTLINE: `FoldFn` carries the slot accessibility and not the
--- floor's, so this seeds where it could take the caller's, and the
--- application is through a closure where Agda would want a call.  The
--- repair is the boundary, not the mathematics -- which is the one
--- respect this edge differs from the candidate's, priced at `allRed`.
-foldAnyPath! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → FoldFn e
-
+-- A SUBSCRIBE'S OWN FOLD STILL OPENS ITS OWN DESCENT ON THE FLOOR, and
+-- that one is not a re-seed standing in for a descent the caller had:
+-- the subscribe arms descend on the program's size, so there is no
+-- floor accessibility upstream of them to continue.  The two runs are
+-- over disjoint stretches of the path and neither is below the other.
 dispatchShare! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo} {i : Fin n}
                  (ac : Acc _<_ (n ∸ suc (toℕ i))) (below : lo ≤ toℕ i)
                  (now : Tick) (vals : List (Val Γ _)) (fin : Bool)
@@ -1219,10 +1208,10 @@ redExpAcc (mapᵉ {s = s} f b) ρ rρ k ok aK (acc rs) κ now sched st aM rm =
           (rs (s≤s (m≤n+m (gsizeᵉ b) (gsizeᵗ f))))
           (map-f (_ , f , ρ) ↠[ ≤-refl ] κ) now sched st aM rm
       (r , p , sat′ , _) =
-        red-pushSegs now (map-f (_ , f , ρ)) tt
+        red-pushSegs now (map-f (_ , f , ρ)) tt κ
           (redFnAcc f ρ rρ k okf aK
             (rs (s≤s (m≤m+n (gsizeᵗ f) (gsizeᵉ b)))))
-          κ sat sched₁ st₁ tt aM (room-keeps (subscribeE-keeps d) rm)
+          sat sched₁ st₁ tt aM (room-keeps (subscribeE-keeps d) rm)
   in r , subs-map d p , sat′
 redExpAcc (takeᵉ c b) ρ rρ k ok aK (acc rs) κ now sched st aM rm
   with evalWith c ρ in ceq
@@ -1236,7 +1225,7 @@ redExpAcc (takeᵉ c b) ρ rρ k ok aK (acc rs) κ now sched st aM rm
           (take-f nid ↠[ ≤-refl ] κ) now
           (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
           (installNode nid (take-st (suc j)) st) aM rm
-      (r , p , sat′ , _) = red-pushSegs now (take-f nid) tt tt κ sat sched₂ st₁ tt aM
+      (r , p , sat′ , _) = red-pushSegs now (take-f nid) tt κ tt sat sched₂ st₁ tt aM
                              (room-keeps (subscribeE-keeps d) rm)
   in r , subs-take-suc ceq refl d p , sat′
 redExpAcc (batchSyncᵉ {t = u} b) ρ rρ k ok aK (acc rs) κ now sched st aM rm =
@@ -1247,7 +1236,7 @@ redExpAcc (batchSyncᵉ {t = u} b) ρ rρ k ok aK (acc rs) κ now sched st aM rm
           (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
           (installNode nid (batchSync-st {s = u} true [] false) st) aM rm
       ((out , sched₃ , st₂) , p , sat′ , _) =
-        red-pushSegs now (batchSync-f nid) tt tt κ sat sched₂ st₁ tt aM
+        red-pushSegs now (batchSync-f nid) tt κ tt sat sched₂ st₁ tt aM
           (room-keeps (subscribeE-keeps d) rm)
   in _ , subs-batchSync refl d p
        , ++⁺ sat′ (redBatchClose u (lookupNode nid (EvalSt.nodes st₂))
@@ -1272,8 +1261,8 @@ redExpAcc (scanᵉ {s = s} {t = u} f z b) ρ rρ k ok aK (acc rs) κ now sched s
           (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
           (installNode nid (cell-st (evalWith z ρ)) st) aM rm
       (r , p , sat′ , _) =
-        red-pushSegs now (scan-f (_ , f , ρ) nid) tt rf
-          κ sat sched₂ st₁ (red-scan-installed (_ , f , ρ) nid sched st d) aM
+        red-pushSegs now (scan-f (_ , f , ρ) nid) tt κ rf
+          sat sched₂ st₁ (red-scan-installed (_ , f , ρ) nid sched st d) aM
           (room-keeps (subscribeE-keeps d) rm)
   in r , subs-scan refl d p , sat′
 redExpAcc (mergeAllᵉ lim b) ρ rρ k ok aK (acc rs) κ now sched st aM rm =
@@ -1284,8 +1273,11 @@ redExpAcc (mergeAllᵉ lim b) ρ rρ k ok aK (acc rs) κ now sched st aM rm =
           (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
           (installNode nid (mergeAll-st lim 0 [] false) st) aM rm
       (r , p , sat′ , _) =
-        red-pushSegs now (thru-outer mergeAllᵒ nid) tt
-          (innerReact! , foldAnyPath!) κ sat sched₂ st₁ tt aM
+        red-pushSegs now (thru-outer mergeAllᵒ nid) tt κ
+          (innerReact! , λ now′ segs′ fin′ sched′ st′ {m′} aM′ rm′ →
+             foldVSegs! (<-wellFounded _) ≤-refl now′ κ segs′ fin′ sched′ st′
+               {m′} aM′ rm′)
+          sat sched₂ st₁ tt aM
           (room-keeps (subscribeE-keeps d) rm)
   in r , subs-merge-all (sub-all refl d p) , sat′
 redExpAcc (switchAllᵉ b) ρ rρ k ok aK (acc rs) κ now sched st aM rm =
@@ -1296,8 +1288,11 @@ redExpAcc (switchAllᵉ b) ρ rρ k ok aK (acc rs) κ now sched st aM rm =
           (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
           (installNode nid (switch-st nothing false) st) aM rm
       (r , p , sat′ , _) =
-        red-pushSegs now (thru-outer switchᵒ nid) tt
-          (innerReact! , foldAnyPath!) κ sat sched₂ st₁ tt aM
+        red-pushSegs now (thru-outer switchᵒ nid) tt κ
+          (innerReact! , λ now′ segs′ fin′ sched′ st′ {m′} aM′ rm′ →
+             foldVSegs! (<-wellFounded _) ≤-refl now′ κ segs′ fin′ sched′ st′
+               {m′} aM′ rm′)
+          sat sched₂ st₁ tt aM
           (room-keeps (subscribeE-keeps d) rm)
   in r , subs-switch-all (sub-all refl d p) , sat′
 redExpAcc (exhaustAllᵉ b) ρ rρ k ok aK (acc rs) κ now sched st aM rm =
@@ -1308,8 +1303,11 @@ redExpAcc (exhaustAllᵉ b) ρ rρ k ok aK (acc rs) κ now sched st aM rm =
           (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
           (installNode nid (exhaust-st false false) st) aM rm
       (r , p , sat′ , _) =
-        red-pushSegs now (thru-outer exhaustᵒ nid) tt
-          (innerReact! , foldAnyPath!) κ sat sched₂ st₁ tt aM
+        red-pushSegs now (thru-outer exhaustᵒ nid) tt κ
+          (innerReact! , λ now′ segs′ fin′ sched′ st′ {m′} aM′ rm′ →
+             foldVSegs! (<-wellFounded _) ≤-refl now′ κ segs′ fin′ sched′ st′
+               {m′} aM′ rm′)
+          sat sched₂ st₁ tt aM
           (room-keeps (subscribeE-keeps d) rm)
   in r , subs-exhaust-all (sub-all refl d p) , sat′
 redExpAcc (μᵉ body) ρ rρ k ok aK (acc rs) κ now sched st aM rm =
@@ -1598,16 +1596,18 @@ innerReact! op allNid inst κ now vals sched st true aM rm
                       (lookupNode allNid (EvalSt.nodes st)) aM rm
       in _ , react-dead eqa f
 
-stepFrameAny! now (map-f fn)       κ vals fin sched st aM rm = _ , step-map
-stepFrameAny! now (scan-f fn nid)  κ vals fin sched st aM rm = _ , step-scan
-stepFrameAny! now (take-f nid)     κ vals fin sched st aM rm = _ , step-take
-stepFrameAny! now (batchSync-f nid) κ vals fin sched st aM rm = _ , step-batchSync
-stepFrameAny! now (from-inner op allNid inst) κ vals fin sched st aM rm =
+stepFrameAny! ac le now (map-f fn)       κ vals fin sched st aM rm = _ , step-map
+stepFrameAny! ac le now (scan-f fn nid)  κ vals fin sched st aM rm = _ , step-scan
+stepFrameAny! ac le now (take-f nid)     κ vals fin sched st aM rm = _ , step-take
+stepFrameAny! ac le now (batchSync-f nid) κ vals fin sched st aM rm = _ , step-batchSync
+stepFrameAny! ac le now (from-inner op allNid inst) κ vals fin sched st aM rm =
   let (_ , r) = innerReact! op allNid inst κ now vals sched st fin aM rm
   in _ , step-from-inner r
-stepFrameAny! {u = u} now (thru-outer op nid) κ vals fin sched st aM rm =
-  let (_ , w) = red-walk op nid κ now (allRed (obs u) vals)
-                  innerReact! foldAnyPath! sched st aM rm
+stepFrameAny! {u = u} ac le now (thru-outer op nid) κ vals fin sched st aM rm =
+  let (_ , w) = red-walk op nid κ now (allRed (obs u) vals) innerReact!
+                  (λ now′ segs′ fin′ sched′ st′ {m′} aM′ rm′ →
+                     foldVSegs! ac le now′ κ segs′ fin′ sched′ st′ {m′} aM′ rm′)
+                  sched st aM rm
   in _ , step-thru-outer w
 
 ------------------------------------------------------------------
@@ -1621,7 +1621,7 @@ foldPath! (acc rec) le now (share-sink i below) vals fin sched st aM rm =
   in _ , fold-sink d
 foldPath! ac le now (fr ↠[ h ] κ) vals fin sched st aM rm =
   let ((segs , fin′ , sched₁ , st₁) , sf) =
-        stepFrameAny! now fr κ vals fin sched st aM rm
+        stepFrameAny! ac (≤-trans le h) now fr κ vals fin sched st aM rm
       (_ , rest) = foldVSegs! ac (≤-trans le h) now κ segs fin′ sched₁ st₁ aM
                      (room-keeps (stepFrame-keeps sf) rm)
   in _ , fold-step sf rest
@@ -1642,9 +1642,6 @@ foldVSegs! ac le now κ ((vs , rts) ∷ s ∷ ss) fin sched st aM rm =
       (_ , r) = foldVSegs! ac le now κ (s ∷ ss) fin sched₁ st₁ aM
                   (room-keeps (foldPath-keeps f) rm)
   in _ , segs-more f r
-
-foldAnyPath! now κ segs fin sched st aM rm =
-  foldVSegs! (<-wellFounded _) ≤-refl now κ segs fin sched st aM rm
 
 dispatchShare! {i = i} ac below now vals fin sched st aM rm =
   let (_ , w) = shareWalk! ac now vals fin sched (shareDying i fin st) aM
