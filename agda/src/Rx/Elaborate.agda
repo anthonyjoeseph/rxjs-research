@@ -504,6 +504,27 @@ cutClosesᵛ os = revᵗ (foldᵗ os nilᵗ
 -- dropped rather than waited for; and at ZERO it never subscribes its
 -- source at all, which is the fact a count-down silently gets wrong.
 --
+-- AND THE RESIDUE THAT ENDING LEAVES IS MEASURED HARMLESS ON BOTH
+-- CHANNELS A PROGRAM HAS.  Once the quota is spent the remainder is
+-- zero, so the taken list is empty and every emit after the cut carries
+-- bookkeeping and no payload — the value projection is the comparison
+-- being made, and it cannot see one.  The other channel would be a
+-- share the twin's unsubscribe tears down and this leaves standing, and
+-- that one was RUN rather than reasoned: with every reset off, which is
+-- what this development's share is, dropping to refcount zero
+-- subscribes the source no second time and a later subscriber joins the
+-- live share.  A refcount that never falls costs nothing where a
+-- refcount that falls costs nothing either.
+--
+-- WHAT SURVIVES IS TRAFFIC AFTER THE COMPLETION, AND IT IS A LEDGER
+-- QUESTION RATHER THAN A VALUE ONE.  The twin has unsubscribed, so the
+-- registrations its source opens past the cut never exist; here they
+-- are forwarded and their closes with them.  Both readings balance, and
+-- they balance over different traffic — which is the one thing a
+-- consumer counting lanes could tell apart, and the reason this is
+-- named where a lane count would meet it rather than left to be
+-- rediscovered from the emptiness of the payloads.
+--
 -- THE SEED'S EMIT COMPONENT IS UNOBSERVABLE, exactly as `scanᵖ`'s is: a
 -- scan emits the result of its FIRST application and never the seed, so
 -- the tokens below are read by nothing and claim no freshness.  One
