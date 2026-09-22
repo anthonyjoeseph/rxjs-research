@@ -233,20 +233,18 @@ what rxjs emits, usually nothing at all.
 
 ### The monster
 
-`sharedConnect⇓` — a share emitting during its own connect hands the burst
-BACK to the subscriber that triggered it and never enters its fan-out, so
-every subscriber that emission creates is served by nobody.
+`sharedConnect⇓` — a share emitting during its own connect serves the wrong
+set of subscribers, so every reader that emission was supposed to reach is
+served by nobody.
 
 Worth killing because the region's three conditions are this one clause and
 not three facts: a hot-fed share agrees because a cascade folds one arrival at
-a time and so enters the fan-out; one synchronous value agrees because one
-observer is all there is; re-entry is required because only a subscriber the
-burst creates is absent when it is handed back.
+a time, one synchronous value agrees because one observer is all there is, and
+re-entry is required because only a subscriber the burst creates is absent when
+it is handed back. The clause now registers the caller's chain and folds the
+def's values down the fan-out, which is what the region asked for and what
+NOTHING has measured; the oracle is the instrument and it has not run.
 
-also: `dispatchShare⇓` — the fan-out the connect does not enter, which is the
-bug stated as a cone: the two are disjoint today and the wiring that joins them
-is the monster's own leg.
-also: `dispatchShare!` — its inhabitation, same reason.
 also: `evaluate⇓` — the carrier's downstream: a subscribe's RESULT TYPE is what every carrier leg widens, so the top-line runner changes shape whatever the monster is, which is the shape propagating rather than the monster moving.
 also: `evaluate!` — same, its inhabitation.
 also: `run-wellFormed⇓` — same, the one proof that reads the runner's stream.
@@ -254,15 +252,24 @@ also: `subscribe-shaped` — same; its conclusion gains the new component, which
 
 ### Big picture tier roadmap
 
-- **THREAD THE ROOM THROUGH THE FUSED BLOCK — THIS LEG IS THE MONSTER.** The
-  connect's call is LANDED and the count is proven, so what remains is the one
-  argument the call costs. It travels as a CEILING with its witness beside it,
-  never as an accessibility at the count: only the connect peels the witness
-  and every other step hands the same variable on and re-proves the bound.
-  Re-proving it is a ring of one clause per constructor, owed over EIGHTEEN
-  relations rather than thirteen — the connect closed the subscribe cycle and
-  the fold cycle into one. So the leg is the ring, the ceiling at every builder
-  applying the candidate, and the oracle over the corpus that was silent.
+- **RUN THE ORACLE AGAINST THE FIXED CONNECT — THIS LEG IS THE MONSTER.** The
+  clause now registers the caller's chain and folds the def's values down the
+  fan-out, and nothing has measured it: the corpus that was silent was last run
+  against the evaluator the fix replaced. The same command answers a second
+  question for free, because the CLI compiles through GHC and so runs the
+  termination checker the dev loop stubs — the candidate now reaches `red-val`
+  at a value read out of the store, which is a new edge into its own block. A
+  red here is a finding about which of the two machines drifted, never a reason
+  to narrow the corpus.
+
+- **DELETE `RedNode`, ON THE EVIDENCE THE LEG ABOVE RETURNS.** Every instance
+  of it is discharged by `red-val` with no hypothesis, so as a conjunct of
+  `RedPush` and `RedStep` it reads as content and carries none — the VACUITY
+  shape, and worse than an absent obligation because it looks discharged. What
+  it still buys is the SHAPE: where in the push cycle a node is owed at all.
+  Held behind the termination answer rather than done now, because a checker
+  that rejects the new edge says the predicate is not reachable-free after all,
+  and then it is the state invariant that is owed instead.
 
 - **PIN THE WITHIN-SEGMENT ORDER, AT THE FIRST PROGRAM THAT FILLS A ROOT
   COLUMN.** `foldVSegs⇓` and `resolveSegs` both answer a segment's root stream
@@ -301,10 +308,7 @@ also: `subscribe-shaped` — same; its conclusion gains the new component, which
 
 ### The ledger
 
-- **`red-scan-installed`** (Reducible) — FALSITY, `RECOVERY`: a share
-  connecting under a scan re-enters that scan's own frame, so the cell is
-  rewritten rather than untouched, and its reducibility needs invariants over
-  the node table and the registry that nothing states yet.
+No live postulates — the tier's remaining work is measurement, not proof.
 
 
 ## Tier 2 — finish `batchSimultaneousᵖ`
