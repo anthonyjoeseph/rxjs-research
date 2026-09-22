@@ -38,8 +38,18 @@ conservative in the direction that matters and cannot pass a recursion it has
 not seen.
 """
 import argparse
+import glob
 import re
 import sys
+
+# THE SUBJECT IS THE EVALUATOR, NOT ONE MODULE OF IT.  A cycle is a property of
+# the call graph and moves with the code: the check was pointed at the one file
+# that held the burst walk, so relocating a fold would have carried the
+# recursion out from under it in silence.  A glob is covered by construction --
+# a module added to the evaluator is checked the day it appears, which is the
+# whole difference between a check and a habit.
+EVALUATOR = "agda/src/Rx/Evaluator.agda"
+EVALUATOR_DIR = "agda/src/Rx/Evaluator"
 
 WORD = r"[A-Za-z][A-Za-z0-9'´ᵃ-ᵪ₀-₟′!↓⇓-]*"
 SIG = re.compile(r"^(" + WORD + r")\s*:\s")
@@ -146,18 +156,15 @@ def multi_sccs(edges, nodes):
     return out
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--file", default="agda/src/Rx/Evaluator/Builder.agda")
-    args = ap.parse_args()
-
-    names, edges, peels, declared = parse(args.file)
+def audit(path):
+    """-> (findings, declaration count, peel count, named-cycle count)."""
+    names, edges, peels, declared = parse(path)
     findings = []
 
     for caller, callee in sorted(peels):
         if callee not in edges.get(caller, ()):
             findings.append(
-                f"declared PEEL {caller} -> {callee} is not a call in {args.file}")
+                f"declared PEEL {caller} -> {callee} is not a call in {path}")
 
     cut = {a: {b for b in bs if (a, b) not in peels} for a, bs in edges.items()}
     surviving = multi_sccs(cut, names)
@@ -165,13 +172,34 @@ def main():
     for comp in surviving:
         if comp not in declared:
             findings.append(
-                "cycle covered by no declared descent: "
+                f"{path}: cycle covered by no declared descent: "
                 + " ".join(sorted(comp)))
     for comp in declared:
         if comp not in surviving:
             findings.append(
-                "declared STRUCTURAL SCC is no longer a cycle: "
+                f"{path}: declared STRUCTURAL SCC is no longer a cycle: "
                 + " ".join(sorted(comp)))
+
+    return findings, len(names), len(peels), len(declared)
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--file", action="append",
+                    help="one module; repeatable.  Default: every module of "
+                         "the evaluator, found by glob.")
+    args = ap.parse_args()
+
+    files = args.file or sorted(
+        [EVALUATOR] + glob.glob(EVALUATOR_DIR + "/**/*.agda", recursive=True))
+
+    findings, names, peels, declared = [], 0, 0, 0
+    for path in files:
+        f, n, p, d = audit(path)
+        findings += f
+        names += n
+        peels += p
+        declared += d
 
     if findings:
         print("recursion-cover: " + str(len(findings)) + " finding(s):")
@@ -185,9 +213,9 @@ def main():
         print("code, which is what makes it worse than no declaration.")
         return 1
 
-    print(f"recursion-cover: {args.file} — {len(names)} declaration(s), "
-          f"{len(peels)} declared peel(s) cut, "
-          f"{len(declared)} structural cycle(s) left standing and named, "
+    print(f"recursion-cover: {len(files)} module(s) — {names} declaration(s), "
+          f"{peels} declared peel(s) cut, "
+          f"{declared} structural cycle(s) left standing and named, "
           f"no cycle uncovered")
     return 0
 

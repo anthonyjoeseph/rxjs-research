@@ -443,6 +443,9 @@ T-if : ∀ (b c : Bool) → T (if b then c else false) → T b × T c
 T-if true  c ok = tt , ok
 T-if false c ()
 
+-- The pair descends on the element TYPE, which is an argument of both
+-- and shrinks at the one clause that crosses between them.
+-- STRUCTURAL SCC: red-data redDatas
 red-data : ∀ {n} {Γ : Ctx n} (u : Ty) → T (isData u) → (v : Val Γ u)
          → Red {Γ = Γ} u v
 redDatas : ∀ {n} {Γ : Ctx n} (u : Ty) → T (isData u) → (vs : List (Val Γ u))
@@ -1145,3 +1148,252 @@ mutual
   red-env : ∀ {n} {Γ : Ctx n} {Θ : List Ty} (ρ : Env Γ Θ) → RedEnv ρ
   red-env []ᵉ                 = tt
   red-env (_∷ᵉ_ {s = s} v vs) = red-val s v , red-env vs
+
+------------------------------------------------------------------
+-- WHAT EVERY ARRIVING VALUE IS.
+------------------------------------------------------------------
+
+-- THE CANDIDATE AT A LIST, WHICH IS THE ONLY THING THE ARRIVAL SIDE
+-- EVER ASKS FOR.  A cascade walks values it read out of a schedule and
+-- a flattening frame walks observables it read out of a burst; neither
+-- carries a premise, and neither needs one, because the claim at a
+-- value is re-established from the value itself.
+allRed : ∀ {n} {Γ : Ctx n} (u : Ty) (vs : List (Val Γ u)) → All (Red u) vs
+allRed u []       = []ᵃ
+allRed u (v ∷ vs) = red-val u v ∷ᵃ allRed u vs
+
+------------------------------------------------------------------
+-- THE COMPLETION SIDE, WHICH NO SUBSCRIBE REACHES.
+------------------------------------------------------------------
+
+-- ONE INNER SUBSCRIPTION, OPENED AT A FRESHLY COUNTED INSTANCE.  The
+-- subscribe itself is the candidate at the arriving observable, which
+-- quantifies over every schedule and every state -- so the advanced
+-- mint this arm builds is one of them by construction and nothing is
+-- threaded.
+inner! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo}
+         (op : AllOp) (allNid : NodeId) (κ : Path Γ lo s t) (now : Tick)
+         (o : Val Γ (obs s)) (sched : Sched Γ) (st : EvalSt e)
+       → Σ (NodeId × VSegs Γ s t × Bool × Sched Γ × EvalSt e) λ r →
+           subscribeInner⇓ {e = e} op allNid κ now o sched st r
+inner! op allNid κ now o sched st =
+  let inst = freshId nodeᵏ (Sched.mint sched)
+      ((segs , sched′ , st′) , d , _) =
+        red-val (obs _) o (from-inner op allNid inst ↠ κ) now
+          (record sched { mint = setAt nodeᵏ (suc inst) (Sched.mint sched) }) st
+  in _ , inner refl d refl
+
+-- THE PARKED LANE, HANDED BACK ITS QUEUE.  A flattener that could not
+-- subscribe when a value arrived kept it; this is the walk that spends
+-- the backlog once a lane frees, one carried value at a time.  The
+-- recursion peels the popped queue, so nothing here needs a measure.
+mergeAllDrain! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo}
+                 (allNid : NodeId) (κ : Path Γ lo s t) (now : Tick)
+                 (lim : Maybe ℕ) (act : ℕ) (od : Bool)
+                 (q : List (Val Γ (obs s))) (sched : Sched Γ) (st : EvalSt e)
+               → Σ (VSegs Γ s t × ℕ × List (Val Γ (obs s)) × Sched Γ × EvalSt e) λ r →
+                   mergeAllDrain⇓ {e = e} allNid κ now lim act od q sched st r
+mergeAllDrain! allNid κ now lim act od []      sched st = _ , drain-nil
+mergeAllDrain! allNid κ now lim act od (o ∷ q) sched st
+  with hasRoom lim act in eqr
+... | false = _ , drain-no-room eqr
+... | true  =
+      let ((inst , segs , done , sched₁ , st₁) , s) =
+            inner! mergeAllᵒ allNid κ now o sched
+              (record st
+                 { nodes = setNode allNid (mergeAll-st lim act q od)
+                     (EvalSt.nodes st) })
+          (_ , d) = mergeAllDrain! allNid κ now lim
+                      (if done then act else suc act) od q sched₁ st₁
+      in _ , drain-room eqr s d
+
+-- A FIN COMPLETES AN INNER ONLY ONCE NOTHING UNDER ITS EXIT FRAME CAN
+-- DELIVER AGAIN, and only a merge's finish subscribes anything -- it
+-- drains the queue the lane limit had held back, which is the second
+-- place a value becomes a subscription and the one no subscribe
+-- reaches.
+--
+-- EVERY OTHER READING IS THE COLLAPSE, AND IT IS SPELT OUT RATHER THAN
+-- CAUGHT, because the fallback carries a side condition and a
+-- condition on two variables does not reduce.  One clause per operator
+-- per shape the store can be in, each handing back the same `refl`.
+innerFinish! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo}
+               (op : AllOp) (allNid inst : NodeId) (κ : Path Γ lo s t)
+               (now : Tick) (vals : List (Val Γ s))
+               (sched : Sched Γ) (st : EvalSt e) (ns : Maybe (NodeState Γ))
+             → Σ (VSegs Γ s t × Bool × Sched Γ × EvalSt e) λ r →
+                 innerFinish⇓ {e = e} op allNid inst κ now vals sched st ns r
+
+innerFinish! {s = s} mergeAllᵒ allNid inst κ now vals sched st
+             (just (mergeAll-st {w} lim act q od)) with w ≟ᵗ s in eqw
+... | no  _    = _ , finish-nil (cong ⌊_⌋ eqw)
+... | yes refl =
+      let (_ , d) = mergeAllDrain! allNid κ now lim (pred act) od q sched st
+      in _ , finish-all-drain d
+innerFinish! switchᵒ allNid inst κ now vals sched st
+             (just (switch-st (just c) od)) with (c ≡ᵇ inst) in eqc
+... | true  = _ , finish-switch-clear eqc
+... | false = _ , finish-nil eqc
+innerFinish! exhaustᵒ allNid inst κ now vals sched st
+             (just (exhaust-st act od)) = _ , finish-exhaust-clear
+
+innerFinish! mergeAllᵒ allNid inst κ now vals sched st nothing = _ , finish-nil refl
+innerFinish! mergeAllᵒ allNid inst κ now vals sched st (just (cell-st _)) = _ , finish-nil refl
+innerFinish! mergeAllᵒ allNid inst κ now vals sched st (just (take-st _)) = _ , finish-nil refl
+innerFinish! mergeAllᵒ allNid inst κ now vals sched st (just (batchSync-st _)) = _ , finish-nil refl
+innerFinish! mergeAllᵒ allNid inst κ now vals sched st (just (switch-st _ _)) = _ , finish-nil refl
+innerFinish! mergeAllᵒ allNid inst κ now vals sched st (just (exhaust-st _ _)) = _ , finish-nil refl
+innerFinish! switchᵒ allNid inst κ now vals sched st nothing = _ , finish-nil refl
+innerFinish! switchᵒ allNid inst κ now vals sched st (just (cell-st _)) = _ , finish-nil refl
+innerFinish! switchᵒ allNid inst κ now vals sched st (just (take-st _)) = _ , finish-nil refl
+innerFinish! switchᵒ allNid inst κ now vals sched st (just (batchSync-st _)) = _ , finish-nil refl
+innerFinish! switchᵒ allNid inst κ now vals sched st (just (mergeAll-st _ _ _ _)) = _ , finish-nil refl
+innerFinish! switchᵒ allNid inst κ now vals sched st (just (exhaust-st _ _)) = _ , finish-nil refl
+innerFinish! switchᵒ allNid inst κ now vals sched st (just (switch-st nothing _)) = _ , finish-nil refl
+innerFinish! exhaustᵒ allNid inst κ now vals sched st nothing = _ , finish-nil refl
+innerFinish! exhaustᵒ allNid inst κ now vals sched st (just (cell-st _)) = _ , finish-nil refl
+innerFinish! exhaustᵒ allNid inst κ now vals sched st (just (take-st _)) = _ , finish-nil refl
+innerFinish! exhaustᵒ allNid inst κ now vals sched st (just (batchSync-st _)) = _ , finish-nil refl
+innerFinish! exhaustᵒ allNid inst κ now vals sched st (just (mergeAll-st _ _ _ _)) = _ , finish-nil refl
+innerFinish! exhaustᵒ allNid inst κ now vals sched st (just (switch-st _ _)) = _ , finish-nil refl
+
+innerReact! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo}
+              (op : AllOp) (allNid inst : NodeId) (κ : Path Γ lo s t)
+              (now : Tick) (vals : List (Val Γ s))
+              (sched : Sched Γ) (st : EvalSt e) (fin : Bool)
+            → Σ (VSegs Γ s t × Bool × Sched Γ × EvalSt e) λ r →
+                innerReact⇓ {e = e} op allNid inst κ now vals sched st fin r
+innerReact! op allNid inst κ now vals sched st false = _ , react-false
+innerReact! op allNid inst κ now vals sched st true
+  with any (aliveThroughᶠ inst st) (EvalSt.registry st) in eqa
+... | true  = _ , react-alive eqa
+... | false =
+      let (_ , f) = innerFinish! op allNid inst κ now vals sched st
+                      (lookupNode allNid (EvalSt.nodes st))
+      in _ , react-dead eqa f
+
+-- THE FRAME STEP OVER EVERY FRAME, WHICH IS THE CANDIDATE'S OWN PLUS
+-- THE ONE IT REFUSES.  The arrival spine walks a path it read out of
+-- the registry, so it meets `from-inner` and nothing restricts what it
+-- meets; a subscribe meets the other five and never this one.  The
+-- split is checked rather than asserted -- `srcFrame`'s `()` next door
+-- is Agda refusing the frame, not a convention about callers.
+stepFrameAny! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
+                (now : Tick) (fr : Frame Γ s u) (κ : Path Γ lo u t)
+                (vals : List (Val Γ s)) (fin : Bool)
+                (sched : Sched Γ) (st : EvalSt e)
+              → Σ (VSegs Γ u t × Bool × Sched Γ × EvalSt e) λ r →
+                  stepFrame⇓ {e = e} now fr κ vals fin sched st r
+stepFrameAny! now (map-f fn)       κ vals fin sched st = _ , step-map
+stepFrameAny! now (scan-f fn nid)  κ vals fin sched st = _ , step-scan
+stepFrameAny! now (take-f nid)     κ vals fin sched st = _ , step-take
+stepFrameAny! now (batchSync-f nid) κ vals fin sched st = _ , step-batchSync
+stepFrameAny! now (from-inner op allNid inst) κ vals fin sched st =
+  let (_ , r) = innerReact! op allNid inst κ now vals sched st fin
+  in _ , step-from-inner r
+stepFrameAny! {u = u} now (thru-outer op nid) κ vals fin sched st =
+  let (_ , w , _) = red-walk op nid κ now (allRed (obs u) vals) sched st
+  in _ , step-thru-outer w
+
+------------------------------------------------------------------
+-- THE SHARE FAN-OUT, WHOSE DESCENT IS THE FLOOR.
+------------------------------------------------------------------
+
+-- A chain registered on a share sinks STRICTLY above that share, so
+-- the room left above the floor is what shrinks at every fan-out and
+-- the path itself never has to.
+monus-sink : ∀ {n lo} (i : Fin n) → lo ≤ toℕ i → n ∸ suc (toℕ i) < n ∸ lo
+monus-sink i below = ∸-monoʳ-< (s≤s below) (toℕ<n i)
+
+mutual
+
+  foldPath! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
+              (ac : Acc _<_ (n ∸ lo)) (now : Tick) (κ : Path Γ lo u t)
+              (vals : List (Val Γ u)) (fin : Bool)
+              (sched : Sched Γ) (st : EvalSt e)
+            → Σ (Stream Γ t × Sched Γ × EvalSt e) λ r →
+                foldPath⇓ {e = e} now κ vals fin sched st r
+
+  foldVSegs! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
+               (ac : Acc _<_ (n ∸ lo)) (now : Tick) (κ : Path Γ lo u t)
+               (segs : VSegs Γ u t) (fin : Bool)
+               (sched : Sched Γ) (st : EvalSt e)
+             → Σ (Stream Γ t × Sched Γ × EvalSt e) λ r →
+                 foldVSegs⇓ {e = e} now κ segs fin sched st r
+
+  dispatchShare! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo} {i : Fin n}
+                   (ac : Acc _<_ (n ∸ suc (toℕ i))) (below : lo ≤ toℕ i)
+                   (now : Tick) (vals : List (Val Γ _)) (fin : Bool)
+                   (sched : Sched Γ) (st : EvalSt e)
+                 → Σ (Stream Γ t × Sched Γ × EvalSt e) λ r →
+                     dispatchShare⇓ {e = e} now i below vals fin sched st r
+
+  shareWalk! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {i : Fin n}
+               (ac : Acc _<_ (n ∸ suc (toℕ i))) (now : Tick)
+               (vals : List (Val Γ _)) (fin : Bool)
+               (sched : Sched Γ) (st : EvalSt e)
+             → Σ (Stream Γ t × Sched Γ × EvalSt e) λ r →
+                 shareWalk⇓ {e = e} now i vals fin sched st r
+
+  shareGo! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {i : Fin n}
+             (ac : Acc _<_ (n ∸ suc (toℕ i))) (now : Tick)
+             (v : Val Γ _) (fin : Bool)
+             (ps : List (RegId × Path Γ (suc (toℕ i)) _ t))
+             (sched : Sched Γ) (st : EvalSt e)
+           → Σ (Stream Γ t × Sched Γ × EvalSt e) λ r →
+               shareGo⇓ {e = e} now i v fin ps sched st r
+
+  foldPath! ac now root vals fin sched st = _ , fold-root
+  foldPath! (acc rec) now (share-sink i below) vals fin sched st =
+    let (_ , d) = dispatchShare! (rec (monus-sink i below)) below
+                    now vals fin sched st
+    in _ , fold-sink d
+  foldPath! ac now (fr ↠ κ) vals fin sched st =
+    let ((segs , fin′ , sched₁ , st₁) , sf) =
+          stepFrameAny! now fr κ vals fin sched st
+        (_ , rest) = foldVSegs! ac now κ segs fin′ sched₁ st₁
+    in _ , fold-step sf rest
+
+  -- THE MEASURE IS THE PAIR (PATH, SEGMENT LIST), LEXICOGRAPHIC.
+  -- `foldPath!` reaches here only at a strictly smaller path, this
+  -- reaches `foldPath!` at an equal one, and it reaches itself at an
+  -- equal path with a shorter list -- so the accessibility argument
+  -- crosses untouched, exactly as the frame clause already passed it.
+  foldVSegs! ac now κ [] fin sched st =
+    let (_ , f) = foldPath! ac now κ [] fin sched st
+    in _ , segs-nil f
+  foldVSegs! ac now κ ((vs , rts) ∷ []) fin sched st =
+    let (_ , f) = foldPath! ac now κ vs fin sched st
+    in _ , segs-last f
+  foldVSegs! ac now κ ((vs , rts) ∷ s ∷ ss) fin sched st =
+    let ((emits , sched₁ , st₁) , f) = foldPath! ac now κ vs false sched st
+        (_ , r) = foldVSegs! ac now κ (s ∷ ss) fin sched₁ st₁
+    in _ , segs-more f r
+
+  dispatchShare! {i = i} ac below now vals fin sched st =
+    let (_ , w) = shareWalk! ac now vals fin sched (shareDying i fin st)
+    in _ , disp w
+
+  shareWalk! ac now [] fin sched st = _ , walk-nil
+  shareWalk! {i = i} ac now (v ∷ []) fin sched st =
+    let (_ , g) = shareGo! ac now v fin
+                    (shareAdmit i (EvalSt.registry st)) sched st
+    in _ , walk-last g
+  shareWalk! {i = i} ac now (v ∷ w ∷ vs) fin sched₀ st₀ =
+    let ((emits , sched₁ , st₁) , g) =
+          shareGo! ac now v false
+            (shareAdmit i (EvalSt.registry st₀)) sched₀ st₀
+        (_ , r) = shareWalk! ac now (w ∷ vs) fin sched₁ st₁
+    in _ , walk-more g r
+
+  shareGo! ac now v fin [] sched st = _ , go-nil
+  shareGo! {i = i} ac now v fin ((rid , p) ∷ ps) sched st
+    with any (_≡ᵇ rid) (EvalSt.cancelled st) in eqc
+  ... | true  = let (_ , g) = shareGo! ac now v fin ps sched st
+                in _ , go-cut eqc g
+  ... | false =
+        let ((emits , sched₁ , st₁) , f) =
+              foldPath! ac now p (v ∷ []) fin sched
+                (record st { delivered = rid ∷ EvalSt.delivered st })
+            (_ , g) = shareGo! ac now v fin ps sched₁ st₁
+        in _ , go-live eqc f g

@@ -4,11 +4,10 @@
 
 ## What it is for
 
-The evaluator's recursion has one genuine cycle, and what stops it is an
-accessibility witness over `Rx.Strat-Order._≺_` threaded as an argument. The
-stratification rests on that order having **one constructor per re-entry
-edge**, which is a coverage claim: a re-entry site inhabiting none of the three
-is a site the order does not cover.
+What stops the evaluator's recursion is a descent threaded as an **argument**
+— an accessibility, or the subject the clause is matching on. That rests on a
+coverage claim: every cycle in the call graph is one some argument carries, and
+a re-entry site nothing descends at is a site the reading does not cover.
 
 Agda holds most of that itself. Because the witness is an argument rather than
 a counter the machine reads, the termination checker verifies every member of
@@ -20,7 +19,9 @@ order quietly stopped being true. That is the silent failure this exists for.
 
 ## What it does
 
-1. Build the call graph of the target module, over its own top-level names.
+1. Build the call graph of each module, over its own top-level names. The
+   subject is **every module of the evaluator**, found by glob — `--file` takes
+   one instead, and is repeatable.
 2. Cut every edge the source declares as a **peel**.
 3. Every multi-member cycle still standing must be declared **structural**.
 
@@ -43,21 +44,22 @@ cannot carry a cycle. A `STRUCTURAL SCC` says the members descend on an
 argument of their own — the one thing here taken on the source's word, which is
 why it has to be said out loud rather than by being left off a list.
 
-## The reading it currently certifies
+## Why the subject is the whole evaluator
 
-The target is `Rx/Evaluator/Builder.agda`, and it certifies one cycle: the
-seven-member block the hop closes, declared structural because the `Acc`
-argument is what each member descends on. No peel is declared at all, and that
-is the doorless shape's whole point — a peel is what a counter the machine
-reads needs, and there is no such counter.
+It was one module for as long as that module held the burst walk, and that is
+exactly the shape this check cannot afford: a cycle is a property of the call
+graph and **moves with the code**, so relocating a fold would have carried the
+recursion out from under the check in silence — the one failure it exists to
+stop, arriving through the check's own configuration. A glob is covered by
+construction, and a module added to the evaluator is checked the day it
+appears.
 
-Two members sit outside it and the reasons are worth having in hand:
-
-- **The merge join's drain needs no component of its own.** It rides its own
-  queue, and its one outward call descends inside the callee.
-- **The share hop does not join the triple.** It reaches the frame walk one way
-  only, so it composes by being a separate stratum rather than by sharing a
-  measure.
+**No peel is declared anywhere in the tree, and that is the doorless shape's
+whole point** — a peel is what a counter the machine reads needs, and there is
+no such counter. Every cycle standing today is declared structural, and each
+one names in its own header what its members descend on: the type at
+`red-data`/`redDatas`, the derivation at the two thirteen-member Freshness
+inductions.
 
 ## The call graph is over-approximated, deliberately
 
@@ -72,8 +74,7 @@ anyway.
 
 A self-edge is invisible to a component check, so `subscribeE!` at a `μᵉ` node
 — which unfolds its body rather than descending into it — is not an edge this
-can cut or see. That one is covered by `unfoldμ-shrinks` and the `ltS`
-constructor instead.
+can cut or see. Agda's own termination checker is what holds that one.
 
 **And a name the tokeniser cannot spell is a name it cannot see.** The
 builder's members all end in `!`, and while that character was outside the word

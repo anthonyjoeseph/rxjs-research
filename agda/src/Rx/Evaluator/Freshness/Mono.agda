@@ -133,6 +133,14 @@ thruWrap-node exhaustᵒ nid true sched′ st′
 ... | just (switch-st _ _)       = ≤-refl
 ... | nothing                    = ≤-refl
 
+-- THE THIRTEEN-MEMBER INDUCTION, AND WHAT IT DESCENDS ON.  Every
+-- clause below matches a constructor of the relation its member is
+-- stated over and recurses on that constructor's own sub-derivations,
+-- so the block peels no edge and carries no counter.  That is the one
+-- reading `make recursion-cover` takes on the source's word, so it is
+-- written out rather than left unlisted, and the check fails the day
+-- the names stop naming a cycle.
+-- STRUCTURAL SCC: subscribeE-mono subscribeSharedSlot-mono subscribeInner-mono subscribeAll-mono stepFrame-mono pushBurst-mono pushSegs-mono thruWalk-mono thruConsume-mono innerReact-mono innerFinish-mono mergeAllDrain-mono sharedConnect-mono
 subscribeE-mono : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
                     {b : Val Γ (obs u)} {κ : Path Γ lo u t} {now}
                     {sched sched₂ : Sched Γ} {st st₁ : EvalSt e}

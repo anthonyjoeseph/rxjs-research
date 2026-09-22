@@ -153,6 +153,14 @@ kill-pres : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {f}
 kill-pres nothing  sched st refl = pres-same _ _ refl
 kill-pres (just v) sched st refl = pres-same _ _ refl
 
+-- THE THIRTEEN-MEMBER INDUCTION, AND WHAT IT DESCENDS ON.  Every
+-- clause below matches a constructor of the relation its member is
+-- stated over and recurses on that constructor's own sub-derivations,
+-- so the block peels no edge and carries no counter.  That is the one
+-- reading `make recursion-cover` takes on the source's word, so it is
+-- written out rather than left unlisted, and the check fails the day
+-- the names stop naming a cycle.
+-- STRUCTURAL SCC: subscribeE-preserves subscribeSharedSlot-preserves subscribeInner-preserves subscribeAll-preserves stepFrame-preserves pushBurst-preserves pushSegs-preserves thruWalk-preserves thruConsume-preserves innerReact-preserves innerFinish-preserves mergeAllDrain-preserves sharedConnect-preserves
 subscribeE-preserves : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
                          (f : ℕ) {b : Val Γ (obs u)} {κ : Path Γ lo u t} {now}
                          {sched sched₂ : Sched Γ} {st st₁ : EvalSt e}
