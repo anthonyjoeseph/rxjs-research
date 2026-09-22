@@ -30,50 +30,6 @@
 -- SO THE EVALUATOR IS A PROJECTION.  `evaluate↓` is `proj₁` of
 -- `evaluate!`, and a projection computes only as far as the thing
 -- projected is a real body.
-
--- AND THE PRICE OF THAT IS THAT NOTHING HERE CAN BE MEASURED BEFORE IT
--- IS PROVEN TOTAL.  The differential harness reaches this machine
--- through the projection, so a RUN is a corollary of the inhabitation
--- argument rather than something available alongside it: there is no
--- fuel-bounded reading of these families to point an oracle at while
--- the tower is being rebuilt.  For an ordinary clause that costs
--- nothing, since the statement is settled and only the proof is open.
--- It is a carrier CHANGE that pays: the shape of every family's result
--- moves, the candidate next door is stated over that shape, and a
--- differential verdict on whether the new carrier matches rxjs arrives
--- only after all of it is closed -- which is the wrong order, since the
--- verdict is what says whether the shape was worth proving.  The way
--- round it is not a second reading of these families but a REFERENCE
--- implementation in the TypeScript, where the mirror is owed anyway and
--- a partial function is free; settle the design against rxjs there, and
--- let this tower be the transcription of something already measured.
-
--- THE MEASURE A FAN-OUT NEEDS IS NOT THE ONE THE FOLD RUNS ON, AND THE
--- DIFFERENCE IS WHICH END THE PATH IS ROOTED AT.  A share's sink pushes
--- into rows read out of the registry, and a row's path is rooted where
--- the CASCADE began rather than above the frame being stepped -- so the
--- floor climbs across a fan-out where the fold's own measure needs it to
--- fall.  Nothing is wrong with that measure; it is answering the other
--- question.
-
--- WHAT DOES FALL IS THE COUNT OF SHARED SLOTS NOT YET CONNECTED, AND
--- THE SHARE'S ONE ODD RULING IS WHAT MAKES IT SO.  A slot connects at
--- the first subscription and never disconnects, so its mark is written
--- before its def is subscribed and is never taken back; and the only
--- door from a subscription into a fan-out is that connect.  A cycle
--- that closes therefore passes a connect it has not passed before, and
--- the unconnected slots are a finite set that only shrinks -- so the
--- measure is that count, lexicographically above the floor the fold
--- already carries, which is non-increasing everywhere else for the same
--- reason.
---
--- AND THE PREMISE IS MEASURED RATHER THAN ASSUMED, BECAUSE A BOUND
--- NOTHING REACHES IS NO EVIDENCE.  Run over the differential corpus and
--- the random draw with a reconnect and a depth bound armed in the
--- pushing reference: the cycle DOES nest, reaching depth two, and no
--- run reconnected a slot or outran the count.  What that does not cover
--- is width -- the draw's programs carry at most three slots, so the
--- bound was only ever tested against three.
 module Rx.Evaluator.Builder where
 
 open import Data.Bool using (Bool; true; false; if_then_else_)
@@ -85,7 +41,7 @@ open import Data.List.Relation.Unary.All using (All) renaming ([] to []ᵃ; _∷
 open import Data.Maybe using (Maybe; nothing; just)
 open import Data.Nat using (ℕ; zero; suc; pred; _≤_; _<_; _∸_; s≤s; _≡ᵇ_)
 open import Data.Nat.Induction using (<-wellFounded)
-open import Data.Nat.Properties using (∸-monoʳ-<; ≤-refl; ≤-trans)
+open import Data.Nat.Properties using (∸-monoʳ-<)
 open import Data.Product using (Σ; _×_; _,_; proj₁)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (tt)
@@ -98,7 +54,7 @@ open import Rx.Prim using (Fuel; Tick)
 open import Rx.Exp using (Ty; obs; _≟ᵗ_; Ctx; Closed; Val; []ᵉ)
 open import Rx.Mint using (nodeᵏ; freshId; setAt)
 open import Rx.Slots using (Slots)
-open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; root; share-sink; _↠[_]_;
+open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; root; share-sink; _↠_;
   Frame; map-f; scan-f; take-f; batchSync-f; from-inner; thru-outer;
   AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ; NodeId; NodeState;
   cell-st; take-st; batchSync-st; mergeAll-st; switch-st; exhaust-st;
@@ -110,7 +66,7 @@ open import Rx.Evaluator.Domain using (subscribeInner⇓; mergeAllDrain⇓; inne
   drain-nil; drain-no-room; drain-room; finish-all-drain; finish-switch-clear;
   finish-exhaust-clear; finish-nil; react-false; react-alive; react-dead; step-map; step-scan;
   step-take; step-batchSync; step-from-inner; step-thru-outer; fold-root; fold-sink; fold-step;
-  disp; go-nil; go-cut; go-live; chain-more; chain-last; casc-nil; casc-cut; casc-live; casc-run;
+  disp; go-nil; go-cut; go-live; chain-step; casc-nil; casc-cut; casc-live; casc-run;
   drain-done; drain-empty; drain-step; eval-run)
 open import Rx.Evaluator.Reducible using (Red; red-val; red-walk; reducible)
 
@@ -144,7 +100,7 @@ inner! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo}
 inner! op allNid κ now o sched st =
   let inst = freshId nodeᵏ (Sched.mint sched)
       ((burst , sched′ , st′) , d , _) =
-        red-val (obs _) o (from-inner op allNid inst ↠[ ≤-refl ] κ) now
+        red-val (obs _) o (from-inner op allNid inst ↠ κ) now
           (record sched { mint = setAt nodeᵏ (suc inst) (Sched.mint sched) }) st
   in _ , inner refl d refl
 
@@ -270,19 +226,10 @@ stepFrameAny! {u = u} now (thru-outer op nid) κ vals fin sched st =
 monus-sink : ∀ {n lo} (i : Fin n) → lo ≤ toℕ i → n ∸ suc (toℕ i) < n ∸ lo
 monus-sink i below = ∸-monoʳ-< (s≤s below) (toℕ<n i)
 
--- AND THE WALK'S MEASURE IS THE FLOOR IT STARTED AT, NOT THE ONE IT
--- STANDS ON.  A cons may relax the floor, so the tail sits at or above
--- the head and a transported accessibility would be a new one -- which
--- is exactly what the descent across the fan-out cycle cannot afford.
--- Carrying the relaxation as a PROOF instead leaves the original
--- accessibility untouched all the way to the sink, where the two
--- compose into the bound `monus-sink` wants.
-
 mutual
 
-  foldPath! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo ℓ}
-              (ac : Acc _<_ (n ∸ lo)) (le : lo ≤ ℓ)
-              (now : Tick) (κ : Path Γ ℓ u t)
+  foldPath! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
+              (ac : Acc _<_ (n ∸ lo)) (now : Tick) (κ : Path Γ lo u t)
               (vals : List (Val Γ u)) (fin : Bool)
               (sched : Sched Γ) (st : EvalSt e)
             → Σ (Stream Γ t × Sched Γ × EvalSt e) λ r →
@@ -303,16 +250,15 @@ mutual
            → Σ (Stream Γ t × Sched Γ × EvalSt e) λ r →
                shareGo⇓ {e = e} now i vals fin ps sched st r
 
-  foldPath! ac le now root vals fin sched st = _ , fold-root
-  foldPath! (acc rec) le now (share-sink i below) vals fin sched st =
-    let (_ , d) = dispatchShare! (rec (monus-sink i (≤-trans le below))) below
+  foldPath! ac now root vals fin sched st = _ , fold-root
+  foldPath! (acc rec) now (share-sink i below) vals fin sched st =
+    let (_ , d) = dispatchShare! (rec (monus-sink i below)) below
                     now vals fin sched st
     in _ , fold-sink d
-  foldPath! ac le now (fr ↠[ h ] κ) vals fin sched st =
+  foldPath! ac now (fr ↠ κ) vals fin sched st =
     let ((vals′ , fin′ , sched₁ , st₁) , sf) =
           stepFrameAny! now fr κ vals fin sched st
-        (_ , rest) = foldPath! ac (≤-trans le h) now κ
-                       vals′ fin′ sched₁ st₁
+        (_ , rest) = foldPath! ac now κ vals′ fin′ sched₁ st₁
     in _ , fold-step sf rest
 
   dispatchShare! {i = i} ac below now vals fin sched st =
@@ -328,7 +274,7 @@ mutual
                 in _ , go-cut eqc g
   ... | false =
         let ((emits , sched₁ , st₁) , f) =
-              foldPath! ac ≤-refl now p vals fin sched
+              foldPath! ac now p vals fin sched
                 (record st { delivered = rid ∷ EvalSt.delivered st })
             (_ , g) = shareGo! ac now vals fin ps sched₁ st₁
         in _ , go-live eqc f g
@@ -342,16 +288,10 @@ chainStep! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
              (sched : Sched Γ) (st : EvalSt e)
            → Σ (Stream Γ t × Sched Γ × EvalSt e) λ r →
                chainStep⇓ {e = e} a c sched st r
-chainStep! {n = n} a (lo , path) sched st with Arrival.isLast a in eqL
-... | false = let (_ , f) = foldPath! (<-wellFounded (n ∸ lo)) ≤-refl (arrTick a)
-                              path (arrVal a ∷ []) false sched st
-              in _ , chain-more eqL f
-... | true  = let ((_ , sched₁ , st₁) , f) =
-                    foldPath! (<-wellFounded (n ∸ lo)) ≤-refl (arrTick a)
-                      path (arrVal a ∷ []) false sched st
-                  (_ , g) = foldPath! (<-wellFounded (n ∸ lo)) ≤-refl (arrTick a)
-                      path [] true sched₁ st₁
-              in _ , chain-last eqL f g
+chainStep! {n = n} a (lo , path) sched st =
+  let (_ , f) = foldPath! (<-wellFounded (n ∸ lo)) (arrTick a) path
+                  (arrVal a ∷ []) (Arrival.isLast a) sched st
+  in _ , chain-step f
 
 cascadeGo! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
              (a : Arrival Γ) (chains : List (RegId × AtFloor Γ (arrTy a) t))

@@ -227,66 +227,65 @@ VALUES exactly.
 **DONE IS BOTH HALVES OF THE JOB GREEN AND THE TARGET BACK IN THE GATE.** The
 random draw and the replay of the pinned corpus are separate steps and both
 are red: 490 of 500 on the draw, 3 of 15 rows on the replay. Neither may be
-narrowed to pass. What both contradict is the burst carrier rather than an
-operator, and every failing case has ONE signature — the evaluator emits
-nothing where rxjs emits — so that is one mechanism seen 12 times.
+narrowed to pass. Every failing case has ONE signature — the evaluator emits
+NOTHING where rxjs emits.
 
 ### The monster
 
-`subscribeE⇓`'s burst carrier — a subscription's result is a LIST which its
-caller pushes, rather than values reaching the root as produced. Everything
-else in the evaluator is stated in terms of it, and a differential run has
-contradicted it.
+`dispatchShare⇓` — the share's fan-out reads its subscriber set ONCE, before
+delivering any value of a synchronous emission. Every re-entrant subscription
+in the region is created by one of those values and so is invisible to the
+read that precedes them all.
 
 NARROWED TO A COUNT. A region-biased draw reaches it 8 times in 500 where the
 old one reached 0; the evaluator fails all eight and 10 in all, a pushing
 carrier fails none, and those rows are pinned, so the close is a count rather
 than a memory.
 
-NARROWED AGAIN, on the STATEMENT side. The relation now says the push, so the
-carrier is no longer a question about shape. What is left is whether a tower
-stands over it, and the store is where that bites.
+NARROWED BY RULING THE CARRIER OUT, which is what the descent to this node
+bought. A full per-value push was built and its tower died of ONE obstruction
+seven times over — `Red Q (obs u)` puts `Q` at both signs, so no predicate
+parameter has a sign, and the routes are recorded dead in `Reducible.agda`.
+Reverting to the burst carrier restores a tower that typechecks and links, so
+the falsity is not in `subscribeE⇓` handing back a list: a subscription may
+return whatever it likes, and only the fan-out has to interleave.
 
-NARROWED FROM THE OTHER END, AND THE CARRIER QUESTION IS CLOSED. The batching
-carrier's refutation has ONE mechanism: a share's subscriber set has to be
-re-read between two values of a single synchronous emission, which a batch
-reads once — so re-entrancy is the semantics rather than an artefact of how
-the push was written, and a queue that defers the subscribe reorders while a
-stack that keeps the order interleaves the writes identically. What is left of
-the monster is the store obligation a re-entering subscription creates, with
-six routes dead in `Reducible.agda`; the carrier is no longer in the region.
+THE SIGNATURE SAYS WHICH READ IS WRONG, AND IT IS NOT AN ORDER. On the row the
+region was drawn around — `mergeAll (map (λ v → S) S)` over a shared
+`S = of [1,2,3,4]` — rxjs emits `2,3,3,4,4,4` and the evaluator emits NOTHING.
+A transposed list would carry the same six values; an empty one says the
+re-entrant subscribers did not exist when the values were delivered. So the
+single registry read is the whole of it, and the emission ORDER is downstream
+of repairing that, not a second defect.
 
-also: `chainStep⇓`, `chainStep!` — the carrier is a batch on BOTH faces and only one of them is `subscribeE⇓`; a scheduled arrival folds its value and its end together for the same reason a subscription hands back a list, so the split separating them is the monster's fact landing off the monster's cone.
+WHAT REMAINS OPEN IS THE PRICE OF A VALUE-MAJOR WALK. Delivering one value at
+a time is what rxjs does and what re-reading the registry requires, and it
+hands `batchSync` a singleton where it expects a subscribe frame's whole
+group — `batchVals true (v ∷ vs) = (v , vs) ∷ []` is one batch per burst, and
+a per-value walk makes it one batch per value.
 
 ### Big picture tier roadmap
 
-- **AN INDEX UNDER THE STORE OBLIGATION, DECOUPLED FROM PATH AND TYPE.** The
-  candidate has to ASSUME a store fact and RE-ESTABLISH it while that fact names
-  the candidate, so no predicate parameter has one sign and seven routes in
-  `Reducible.agda` die of it. An index is the shape that survives, and the
-  structural candidates are already among the seven: the path's length descends
-  for a fold's cell, which is subscribed at a suffix, and climbs for an emitted
-  observable, which is subscribed at an extension. So it is a fresh index, and
-  the question to settle before typing one is what a run bounds it BY — an
-  approximation that stops at a depth is not a derivation, and `evaluate↓`
-  computes through a projection.
+- **THE FAN-OUT WALKS VALUES, NOT SUBSCRIBERS.** `dispatchShare⇓` loops over
+  the emission's values and, for each, re-reads `shareAdmit i (registry st)`
+  and delivers that one value to every admitted chain in registration order.
+  A subscription created while value `j` is in flight is in the registry the
+  next read consults, so it receives the rest of the emission and nothing
+  earlier — which is the joiner's behaviour stated as a consequence of the
+  walk rather than as a join index the registry would have to carry. The
+  measure does not move: the outer loop is structural on the value list, the
+  inner on the admitted list, and the descent into `foldPath⇓` is still the
+  slot index `monus-sink` already names.
 
-- **THE FRESHNESS FACE GAINS THE PREMISE ANY PUSH OWES IT.** A pushing
-  subscription writes the nodes its continuation's frames name, however the
-  push is carried, so `subscribeE-preserves` is false as stated — refuted at
-  the very fold the store question is about. The repair is the premise its
-  frame-level members already carry, added across the family; `pushBurst⇓` has
-  no subject left and its member goes. It is a leg rather than a fix-up
-  because it is the one piece the store question cannot move: whatever carries
-  a fold's cell, the premise is owed all the same.
-
-- **THE TOWER RE-THREADED ONTO THE PUSH.** Not a re-shaping
-  of results: under any push the subscribe cycle and the fold cycle are ONE
-  cycle, spanning the candidate's module and the builder's, so the cut between
-  them has to move before a clause can be typed. The measure the fan-out needs
-  is written down in `Builder.agda`'s header — the count of shared slots not
-  yet connected, above the floor the fold already runs on — and lands here,
-  since nothing consumes a measure until the block it measures exists.
+- **WHAT THE SINGLETON FOLD COSTS `batchSync`, MEASURED RATHER THAN ARGUED.**
+  A value-major walk hands a subscriber one value per `foldPath⇓`, and the one
+  former that can see a burst reads the whole of it: the sync bit turns a
+  subscribe frame's values into a single group, so a per-value walk turns them
+  into one group each. Either the bit is the wrong state for it to hold — rxjs
+  batches by TICK, and a burst is only this evaluator's stand-in for one — or
+  the walk has to hand a subscriber its whole entitled suffix and lose the
+  interleave. The corpus carries `batchSync` rows on both sides of the region,
+  so the oracle decides this and no reading of the clauses does.
 
 - **THE ORACLE HAS TWO SIDES AND BOTH ARE AUTHORITIES (Anthony).** The compiled
   Agda and plain rxjs, and nothing else may stand on either: a hand-written
