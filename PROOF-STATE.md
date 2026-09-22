@@ -258,15 +258,16 @@ also: `dispatchShare!` — its inhabitation, same reason.
   share. A second result component read by a fixed rule is refuted at
   `sharedConnect⇓` by the corpus's exchanged pair.
 
-- **WHERE THE FAN-OUT'S FRAME WITNESSES COME FROM, WHICH IS THE NEXT WALL.**
-  Pushing at the point of production puts `foldPath⇓` inside the reducibility
-  cycle, and the paths a share folds are read out of the REGISTRY, so no frame
-  of them arrives with a candidate. The two suppliers are a state precondition
-  on `Red` — which its own header refuses, and which is impredicative besides,
-  a registry ranging over frames at any type — and a call to the fundamental
-  theorem, which ties the knot the candidate exists to avoid. Decide this
-  before writing the walk: it is what says whether the walk is a re-threading
-  or a restatement of the candidate.
+- **THE MEASURE THAT PUSHING RE-OWES, AND IT IS THE PRICE OF THE WHOLE LEG.**
+  Handing bursts UP is what today keeps the fold out of the subscribe's cycle;
+  pushing where produced puts it back, and `srcFrame`'s header prices it. The
+  order is three deep — unconnected slots, then the share floor's room, then
+  observable nesting — and the outermost is a fact about `connectedShares` that
+  only a separate induction over the derivations can supply, in the shape
+  `Freshness/` already has. Nothing here is measurable until it closes: a
+  postulated residue does not compute, so the oracle cannot rule on the design
+  until the descent does. That inverts this campaign's usual order and is the
+  reason to state the assembly first and prove into it.
 
 - **WHAT THE SINGLETON FOLD COSTS `batchSync`, ONCE THE FAN-OUT RUNS AT ALL.**
   The value walk hands a subscriber one value per `foldPath⇓`, and the one

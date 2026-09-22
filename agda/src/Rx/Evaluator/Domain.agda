@@ -154,6 +154,19 @@ open import Rx.Evaluator using (Stream; Burst; Sched; EvalSt; Path; Frame; NodeI
 -- registry holds.  So the completion side -- react, finish, drain, and
 -- the queued subscribe they end in -- is not reachable from a subscribe
 -- at all, and the cycle that a measure was owed for does not exist.
+
+-- AND THAT IS PRECISELY WHAT A SHARE'S FAN-OUT AT THE CONNECT WOULD
+-- SPEND, WHICH IS WHY IT IS WORTH PRICING HERE RATHER THAN DISCOVERING
+-- LATER.  Handing a burst UP is what keeps the two halves apart; a
+-- subscribe that pushes where it produces puts the fold back inside
+-- the subscribe's own cycle and re-owes the measure this arrangement
+-- retired.  The order that would fund it is three deep -- the
+-- UNCONNECTED-SLOT count outermost, which only a connect moves and
+-- which nothing anywhere raises, the share floor's remaining room
+-- next, and the element type's observable nesting under that -- and
+-- each component is the one the edge above it cannot order.  So the
+-- price is not a lemma but a measure, and `connectedShares` stops
+-- being bookkeeping and becomes load-bearing.
 srcFrame : ∀ {n} {Γ : Ctx n} {s u} → Frame Γ s u → Set
 srcFrame (from-inner _ _ _) = ⊥
 srcFrame _                  = ⊤
