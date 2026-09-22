@@ -212,7 +212,13 @@ StreamSat-spent = (tt ∷ []) ∷ []
 --   candidate's own observable arm is the same cycle stated directly,
 --   and it does not decrease: the arm recurses on the element type,
 --   while a predicate over a store reaches the candidate at whatever
---   type a node happens to hold, which is unrelated to it.
+--   type a node happens to hold, which is unrelated to it.  Stating
+--   that predicate as an indexed FAMILY answers the descent and not the
+--   cycle -- a family owes no size-change, and it is then refused for
+--   positivity the moment the arm ASSUMES it, while the control that
+--   only CONCLUDES it is green.  So the obstruction is the assumption
+--   rather than the mention, and no way of writing the predicate moves
+--   it.
 --   Parameterising the state record over an abstract node predicate is
 --   that same cycle DEFERRED -- the instantiation ties the knot, and
 --   the executable face pays a threaded parameter it only ever meets
@@ -1488,11 +1494,37 @@ reducible b ρ rρ =
 -- CLOSURE CARRIER COSTS.  A value at observable type IS a body paired
 -- with an environment, and an entry of that environment at observable
 -- type is another such value -- so nothing could be claimed of the
--- pair that is not already claimed of its entries, and the descent is
--- on the VALUE rather than on the type.  This is why no site that
--- meets a stored observable has to thread a reducibility premise: it
--- re-establishes the claim here, once.
+-- pair that is not already claimed of its entries, and this is why no
+-- site that meets a stored observable threads a reducibility premise:
+-- it re-establishes the claim here, once.
+--
+-- THE DESCENT IS NOT ON THE VALUE, and that is this function's whole
+-- remaining cost.  The cascade `reducible` starts comes back to this
+-- function at values the run BUILT -- a burst arriving at a flattener,
+-- a queue entry a lane limit held back, a cell an operator folded --
+-- and not one of those is a component of the value that was handed in.
+-- A model carrying closures, an environment that deepens by one entry
+-- per folded value, and nothing else of the evaluator in it, is refused
+-- for termination; so the gap is in the shape rather than in the
+-- machinery standing around it.
+--
+-- AND THE RE-ENTRY IS FORCED RATHER THAN CHOSEN.  `Red` promises
+-- something of EVERY store, so a body running under it knows nothing
+-- about the store it was handed and has no premise to read a stored
+-- value's claim out of.  The weakening that would give it one is the
+-- store precondition `RedNode`'s header refuses.
 -- STRUCTURAL SCC: red-val red-env
+--
+-- DEAD ROUTE: PARKING the claim instead -- a refused arrival handed
+--   back beside its value as a return rather than written into the
+--   store, so that the spend applies a candidate it was given.  Nothing
+--   is stored, so the positivity cycle the store route dies of does not
+--   arise, and a model of it is green.  It stops being green the moment
+--   a path-indexed cell ledger exists beside it: the parked row has to
+--   carry the ledger standing at the path it will be spent at, the
+--   ledger names the candidate, and the candidate takes a ledger -- so
+--   the parked row reaches itself to the left of an arrow.  Parking and
+--   a cell ledger are alternatives, never a pair.
 
 red-val unitᵗ     v           = tt
 red-val boolᵗ     v           = tt

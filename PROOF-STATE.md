@@ -224,12 +224,11 @@ operators in `plain-eval.ts`, runs the same program
 through the Agda evaluator reached via `CLI.Decode`, and compares two LISTS OF
 VALUES exactly.
 
-**DONE IS BOTH HALVES OF THE JOB GREEN AND THE TARGET BACK IN THE GATE.** The
-seed sweep and the replay of the pinned corpus are separate steps and both are
-red: 488 of 500 on the sweep, and on the replay 0 of 11 `burst-carrier`, 2 of 5
-`depth-first`, 13 of 15 `obs-accumulator`. Neither may be narrowed to pass.
-Every failing case has ONE signature — the evaluator emits a strict PREFIX of
-what rxjs emits, usually nothing at all.
+**DONE IS BOTH HALVES OF THE JOB GREEN AND THE TARGET BACK IN THE GATE.** Both
+halves are green on the values: the sweep matches 500 of 500, the pinned replay
+1 of 1, and neither may be narrowed to pass. The GATE half is not — the
+evaluator does not terminate, so the CLI links only with the checker off, and a
+sweep run by hand is the green memory this tier was disabled behind.
 
 ### The monster
 
@@ -241,9 +240,11 @@ Worth killing because the region's three conditions are this one clause and
 not three facts: a hot-fed share agrees because a cascade folds one arrival at
 a time, one synchronous value agrees because one observer is all there is, and
 re-entry is required because only a subscriber the burst creates is absent when
-it is handed back. The clause now registers the caller's chain and folds the
-def's values down the fan-out, which is what the region asked for and what
-NOTHING has measured; the oracle is the instrument and it has not run.
+it is handed back. The clause registers the caller's chain and folds the def's
+values down the fan-out, and the oracle has now run against it: 500 of 500 on
+the sweep, the pinned replay green. That does not kill it — the instrument
+links only with the termination checker off — but the region it could still be
+false in no longer includes any program the sweep draws.
 
 also: `evaluate⇓` — the carrier's downstream: a subscribe's RESULT TYPE is what every carrier leg widens, so the top-line runner changes shape whatever the monster is, which is the shape propagating rather than the monster moving.
 also: `evaluate!` — same, its inhabitation.
@@ -252,25 +253,14 @@ also: `subscribe-shaped` — same; its conclusion gains the new component, which
 
 ### Big picture tier roadmap
 
-- **DECIDE WHAT MEASURE THE CONNECT'S FOLD RUNS UNDER — THE CYCLE IS THE
-  EVALUATOR'S RECURSION, NOT THE PROOF'S.** `Builder` extracts `reducible`
-  and `foldPath!` as the executable evaluator, so the cycle the fold closed
-  is a run SUBSCRIBING a closure it read back out of a store, and that
-  subscription's segments are its data. Which rules out every repair putting
-  a leaf where the read is — an evaluator that hits an
-  unreachable at the first queued inner. Neither measure to hand
-  covers it — a queued subscribe passes no connect, so the room stands, and
-  the closure comes from the store, so the expression size resets. The fork
-  is a third measure or a scheduling change keeping the drain out of the
-  fold. `make recursion-cover` decides either in seconds.
-
-- **RUN THE ORACLE AGAINST THE FIXED CONNECT — THIS LEG IS THE MONSTER.** The
-  clause now registers the caller's chain and folds the def's values down the
-  fan-out, and nothing has measured it: the corpus that was silent was last run
-  against the evaluator the fix replaced. Blocked behind the leg above, because
-  the CLI compiles through GHC and a tower that does not terminate emits no
-  binary to measure with. A red here is a finding about which of the two
-  machines drifted, never a reason to narrow the corpus.
+- **FIND A MEASURE FOR THE STORE RE-ENTRY — THE CARRYING ARM OF THE FORK IS
+  SHUT.** The cycle is the evaluator's own: `red-val` re-establishes a stored
+  closure's candidate by restarting the cascade at an expression the store
+  chose. The fork was a third measure or carrying the claim so no read needs
+  one, and the carrying arm is refuted in every form — `red-val`'s and
+  `RedNode`'s headers carry the four. So the measure is the arm left, and it
+  covers three doors at once: an arriving burst, a lane's backlog, a folded
+  cell. `make recursion-cover` names the cycle in seconds.
 
 - **PIN THE WITHIN-SEGMENT ORDER, AT THE FIRST PROGRAM THAT FILLS A ROOT
   COLUMN.** `foldVSegs⇓` and `resolveSegs` both answer a segment's root stream
@@ -309,10 +299,8 @@ also: `subscribe-shaped` — same; its conclusion gains the new component, which
 
 ### The ledger
 
-- **`red-scan-installed`** (Reducible) — DIFFICULTY, `DEAD ROUTE`: the scan's
-  cell is still reducible after the def's subscribe folds the connect down the
-  caller's own chain. `red-val` inhabits the type and the fused block may not
-  use it.
+(no rows — what this tier owes is a termination measure, and
+`make recursion-cover` is its ledger, not the postulate count.)
 
 
 ## Tier 2 — finish `batchSimultaneousᵖ`

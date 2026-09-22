@@ -209,6 +209,15 @@ NodeId = ℕ            -- numbered in subscription order
 -- function and has no such source, and the bracket's buffer is read
 -- back at a boundary no hypothesis reaches, so that one is closed by
 -- the values face, which is total.
+--
+-- THE QUEUE IS READ BACK AT SUCH A BOUNDARY TOO, so its cost is the
+-- buffer's and not the cheap one.  The hypothesis that admitted an
+-- entry belongs to a subscribe, and the read is the DRAIN, which hangs
+-- off an inner's completion and can fall in any later tick -- so
+-- nothing but the store itself crosses from one to the other, and the
+-- store may not carry a claim.  Two of the three arms are therefore
+-- closed by the values face and one by an invariant nobody has, which
+-- is the opposite of the split this census first drew.
 data NodeState {n} (Γ : Ctx n) : Set where
   cell-st    : ∀ {t} → Val Γ t → NodeState Γ
                -- ONE CARRIED VALUE, AND IT IS NOT SCAN'S.  Every
