@@ -134,14 +134,14 @@ open import Rx.Exp using (obs; Ctx; Val; Closed; Exp; Tm; Fn; FnClo; applyClo;
   mapᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; deferᵉ; mintᵉ)
 open import Rx.Mint using (ordinalᵏ; sourceᵏ; nodeᵏ; regᵏ; freshId; setAt)
 open import Rx.Slots using (Slots; scripted; shared)
-open import Rx.Evaluator using (Stream; Burst; Sched; EvalSt; Path; Frame; NodeId; root; share-sink; _↠_; shareAdmit;
-  shareDying; shareFinish; from-inner; splitEvents; oneShotBurst; spentBurst; arrTick; arrVal;
+open import Rx.Evaluator using (Stream; Burst; Sched; EvalSt; Path; Frame; NodeId; root; share-sink; _↠[_]_; shareAdmit;
+  shareDying; shareSpend; shareFinish; from-inner; splitEvents; oneShotBurst; spentBurst; arrTick; arrVal;
   chainsOf; cascadeLatch; cascadeFinish; sched-next; sched-init; st-init; NodeState; AllOp;
   RegId; Arrival; AtFloor; arrTy; memberSource; register; installNode; resolve; dropSource;
   atSlot; atDyn; lowerFloor; map-f; scan-f; take-f; batchSync-f; thru-outer; cell-st; take-st;
   batchSync-st; mergeAll-st; switch-st; exhaust-st; mergeAllᵒ; switchᵒ; exhaustᵒ; lookupNode;
-  setNode; hasRoom; mergeAllBump; switchKill; aliveThroughᶠ; scanDispatch; takeDispatch;
-  batchDispatch; thruWrap; consumeUsable; finishUsable; VSegs; oneVSeg; Segs; oneSeg; stepSegs;
+  setNode; hasRoom; switchKill; aliveThroughᶠ; scanDispatch; takeDispatch;
+  batchDispatch; batchClose; thruWrap; consumeUsable; finishUsable; VSegs; oneVSeg; Segs; oneSeg; stepSegs;
   segVSegs; segsCompleted; resolveSegs)
 
 -- THE FRAME A SUBSCRIBE CAN PUSH, WHICH IS EVERY FRAME BUT ONE, AND
@@ -310,7 +310,7 @@ data shareWalk⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
 data shareGo⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
      ∀ {lo} →
      Tick → (i : Fin n)
-   → Val Γ (lookup Γ i) → Bool
+   → List (Val Γ (lookup Γ i)) → Bool
    → List (RegId × Path Γ lo (lookup Γ i) t) → Sched Γ → EvalSt e
    → Stream Γ t × Sched Γ × EvalSt e → Set
 
@@ -469,7 +469,7 @@ data subscribeE⇓ {n} {Γ} {t} {e} where
                     {κ : Path Γ lo u t} {now sched st nid segs₁ sched₁ st₁ r}
                 → evalWith count ρ ≡ suc k
                 → freshId nodeᵏ (Sched.mint sched) ≡ nid
-                → subscribeE⇓ (Θ , b , ρ) (take-f nid ↠ κ) now
+                → subscribeE⇓ (Θ , b , ρ) (take-f nid ↠[ ≤-refl ] κ) now
                     (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
                     (installNode nid (take-st (suc k)) st)
                     (segs₁ , sched₁ , st₁)
@@ -477,22 +477,32 @@ data subscribeE⇓ {n} {Γ} {t} {e} where
                 → subscribeE⇓ (Θ , takeᵉ count b , ρ) κ now sched st r
 
   -- THE BRACKET IS OPENED BY THE INSTALL AND CLOSED WHEN THE
-  -- SUBSCRIBE CALL RETURNS, WHICH IS WHERE THE BIT GOES DOWN.  No
-  -- buffer is kept and no flush is owed: a subscription hands its
-  -- whole output back as BURSTS, so the group the bracket wants is
-  -- what `batchVals` reads straight off the burst it is stepping.
+  -- SUBSCRIBE CALL RETURNS, WHICH IS WHERE THE BIT GOES DOWN AND THE
+  -- GROUP LEAVES.  Everything that reached the frame while the bit was
+  -- up is in the buffer and nothing went downstream, so the flush is
+  -- the last thing this subscribe answers -- which is where the
+  -- TypeScript's second `defer` sits in its `merge`.
+  --
+  -- AND THE TWO ROUTES IN MEET AT THE BUFFER RATHER THAN IN THE
+  -- ANSWER, WHICH IS WHY THERE IS ONLY ONE FLUSH.  Values reach the
+  -- frame either as the body's own segments, pushed here, or through
+  -- the registered path a share's fan-out walks during the very same
+  -- call; only the first is `segs₁`.  Both write the buffer, so
+  -- reading it once at the boundary groups them together.
   subs-batchSync : ∀ {lo u Θ} {ρ : Env Γ Θ} {b : Exp Γ [] [] Θ u}
                      {κ : Path Γ lo (u ×ᵗ listᵗ u) t}
                      {now sched st nid segs₁ sched₁ st₁ out sched₂ st₂}
                  → freshId nodeᵏ (Sched.mint sched) ≡ nid
-                 → subscribeE⇓ (Θ , b , ρ) (batchSync-f nid ↠ κ) now
+                 → subscribeE⇓ (Θ , b , ρ) (batchSync-f nid ↠[ ≤-refl ] κ) now
                      (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
-                     (installNode nid (batchSync-st true) st)
+                     (installNode nid (batchSync-st {s = u} true [] false) st)
                      (segs₁ , sched₁ , st₁)
                  → pushSegs⇓ now (batchSync-f nid) κ segs₁ sched₁ st₁
                      (out , sched₂ , st₂)
                  → subscribeE⇓ (Θ , batchSyncᵉ b , ρ) κ now sched st
-                     (out , sched₂ , installNode nid (batchSync-st false) st₂)
+                     ( out ++ batchClose u (lookupNode nid (EvalSt.nodes st₂))
+                     , sched₂
+                     , installNode nid (batchSync-st {s = u} false [] false) st₂)
 
   -- A MAP INSTALLS NOTHING, WHICH IS WHY THIS ARM IS SHORTER THAN
   -- EVERY OTHER SUBSCRIBE ARM HERE.  There is no node to mint, so no
@@ -500,7 +510,7 @@ data subscribeE⇓ {n} {Γ} {t} {e} where
   subs-map : ∀ {lo s u Θ} {ρ : Env Γ Θ} {f : Fn Γ [] [] Θ s u}
                {b : Exp Γ [] [] Θ s} {κ : Path Γ lo u t}
                {now sched st segs₁ sched₁ st₁ r}
-           → subscribeE⇓ (Θ , b , ρ) (map-f (Θ , f , ρ) ↠ κ) now sched st
+           → subscribeE⇓ (Θ , b , ρ) (map-f (Θ , f , ρ) ↠[ ≤-refl ] κ) now sched st
                (segs₁ , sched₁ , st₁)
            → pushSegs⇓ now (map-f (Θ , f , ρ)) κ segs₁ sched₁ st₁ r
            → subscribeE⇓ (Θ , mapᵉ f b , ρ) κ now sched st r
@@ -509,7 +519,7 @@ data subscribeE⇓ {n} {Γ} {t} {e} where
                 {b : Exp Γ [] [] Θ s} {κ : Path Γ lo u t}
                 {now sched st nid segs₁ sched₁ st₁ r}
             → freshId nodeᵏ (Sched.mint sched) ≡ nid
-            → subscribeE⇓ (Θ , b , ρ) (scan-f (Θ , f , ρ) nid ↠ κ) now
+            → subscribeE⇓ (Θ , b , ρ) (scan-f (Θ , f , ρ) nid ↠[ ≤-refl ] κ) now
                 (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
                 (installNode nid (cell-st (evalWith i ρ)) st)
                 (segs₁ , sched₁ , st₁)
@@ -564,7 +574,7 @@ data subscribeE⇓ {n} {Γ} {t} {e} where
                                      ; pending = (suc now , (Θ , body , ρ)) ∷ [] }
                               ∷ Sched.live sched }
                  , register rid (atDyn src lo)
-                            (thru-outer mergeAllᵒ nid ↠ κ)
+                            (thru-outer mergeAllᵒ nid ↠[ ≤-refl ] κ)
                             (installNode nid
                               (mergeAll-st {t = u} nothing 0 [] false) st) )
 
@@ -601,7 +611,7 @@ data subscribeInner⇓ {n} {Γ} {t} {e} where
   inner : ∀ {u lo op allNid} {κ : Path Γ lo u t} {now}
             {o : Val Γ (obs u)} {sched st inst segs sched′ st′ done}
         → freshId nodeᵏ (Sched.mint sched) ≡ inst
-        → subscribeE⇓ o (from-inner op allNid inst ↠ κ) now
+        → subscribeE⇓ o (from-inner op allNid inst ↠[ ≤-refl ] κ) now
             (record sched { mint = setAt nodeᵏ (suc inst) (Sched.mint sched) }) st
             (segs , sched′ , st′)
         → segsCompleted segs ≡ done
@@ -616,18 +626,33 @@ data subscribeInner⇓ {n} {Γ} {t} {e} where
 -- SOME derivation with a reducible column.
 data thruConsume⇓ {n} {Γ} {t} {e} where
 
+  -- THE LANE IS TAKEN BEFORE THE INNER IS SUBSCRIBED, AND THE INNER'S
+  -- DEATH IS ONE EVENT WHICHEVER WAY IT ARRIVES.  Recording the start
+  -- afterwards reads the two routes an inner can die by as one: a leaf
+  -- reports its end in the subscribe ANSWER, but a shared definition
+  -- reports it through the registry, re-entrantly, while this very
+  -- subscribe is still running -- so the freeing ran against a count
+  -- that had not been raised yet, `pred 0` swallowed it, and the write
+  -- afterwards took a lane for an inner that was already gone.  Raising
+  -- it first is what gives the re-entrant end something to spend, and
+  -- the answer-carried end then spends it through the SAME relation
+  -- instead of a second rule that has to agree with it.  `drain-room`
+  -- had already found this for the queue and not for the count.
   consume-all-sub : ∀ {u lo nid} {κ : Path Γ lo u t} {now}
                       {o : Val Γ (obs u)} {sched₀ st₀} {lim act q od}
-                      {inst segs done sched₁ st₁}
+                      {inst segs done sched₁ st₁} {segs′ fin sched₂ st₂}
                   → lookupNode nid (EvalSt.nodes st₀)
                       ≡ just (mergeAll-st {t = u} lim act q od)
                   → hasRoom lim act ≡ true
-                  → subscribeInner⇓ mergeAllᵒ nid κ now o sched₀ st₀
+                  → subscribeInner⇓ mergeAllᵒ nid κ now o sched₀
+                      (record st₀
+                        { nodes = setNode nid (mergeAll-st lim (suc act) q od)
+                            (EvalSt.nodes st₀) })
                       (inst , segs , done , sched₁ , st₁)
+                  → innerReact⇓ mergeAllᵒ nid inst κ now [] sched₁ st₁ done
+                      (segs′ , fin , sched₂ , st₂)
                   → thruConsume⇓ mergeAllᵒ nid κ now o sched₀ st₀
-                      ( segs , sched₁
-                      , record st₁
-                          { nodes = mergeAllBump nid done (EvalSt.nodes st₁) } )
+                      (segs ++ segs′ , sched₂ , st₂)
 
   consume-all-enqueue : ∀ {u lo nid} {κ : Path Γ lo u t} {now}
                           {o : Val Γ (obs u)} {sched₀ st₀} {lim act q od}
@@ -650,16 +675,19 @@ data thruConsume⇓ {n} {Γ} {t} {e} where
   consume-switch-sub : ∀ {u lo nid} {κ : Path Γ lo u t} {now}
                          {o : Val Γ (obs u)} {sched₀ st₀} {cur od}
                          {sched₁ st₁} {inst segs done sched₂ st₂}
+                         {segs′ fin sched₃ st₃}
                      → lookupNode nid (EvalSt.nodes st₀) ≡ just (switch-st cur od)
                      → switchKill cur sched₀ st₀ ≡ (sched₁ , st₁)
-                     → subscribeInner⇓ switchᵒ nid κ now o sched₁ st₁
+                     → freshId nodeᵏ (Sched.mint sched₁) ≡ inst
+                     → subscribeInner⇓ switchᵒ nid κ now o sched₁
+                         (record st₁
+                           { nodes = setNode nid (switch-st (just inst) od)
+                               (EvalSt.nodes st₁) })
                          (inst , segs , done , sched₂ , st₂)
+                     → innerReact⇓ switchᵒ nid inst κ now [] sched₂ st₂ done
+                         (segs′ , fin , sched₃ , st₃)
                      → thruConsume⇓ switchᵒ nid κ now o sched₀ st₀
-                         ( segs , sched₂
-                         , record st₂
-                             { nodes = setNode nid
-                                 (switch-st (if done then nothing else just inst) od)
-                                 (EvalSt.nodes st₂) } )
+                         (segs ++ segs′ , sched₃ , st₃)
 
   consume-switch-nil : ∀ {u lo nid} {κ : Path Γ lo u t} {now}
                        {o : Val Γ (obs u)} {sched₀ st₀}
@@ -669,16 +697,18 @@ data thruConsume⇓ {n} {Γ} {t} {e} where
 
   consume-exhaust-sub : ∀ {u lo nid} {κ : Path Γ lo u t} {now}
                           {o : Val Γ (obs u)} {sched₀ st₀} {od}
-                          {inst segs done sched₁ st₁}
+                          {inst segs done sched₁ st₁} {segs′ fin sched₂ st₂}
                       → lookupNode nid (EvalSt.nodes st₀)
                           ≡ just (exhaust-st false od)
-                      → subscribeInner⇓ exhaustᵒ nid κ now o sched₀ st₀
+                      → subscribeInner⇓ exhaustᵒ nid κ now o sched₀
+                          (record st₀
+                            { nodes = setNode nid (exhaust-st true od)
+                                (EvalSt.nodes st₀) })
                           (inst , segs , done , sched₁ , st₁)
+                      → innerReact⇓ exhaustᵒ nid inst κ now [] sched₁ st₁ done
+                          (segs′ , fin , sched₂ , st₂)
                       → thruConsume⇓ exhaustᵒ nid κ now o sched₀ st₀
-                          ( segs , sched₁
-                          , record st₁
-                              { nodes = setNode nid (exhaust-st (not done) od)
-                                  (EvalSt.nodes st₁) } )
+                          (segs ++ segs′ , sched₂ , st₂)
 
   consume-exhaust-nil : ∀ {u lo nid} {κ : Path Γ lo u t} {now}
                         {o : Val Γ (obs u)} {sched₀ st₀}
@@ -711,19 +741,25 @@ data mergeAllDrain⇓ {n} {Γ} {t} {e} where
                 → mergeAllDrain⇓ allNid κ now lim act od (o ∷ q) sched₀ st₀
                     ([] , act , o ∷ q , sched₀ , st₀)
 
-  -- THE SHORTENED QUEUE IS WRITTEN BEFORE THE SUBSCRIBE, NOT AFTER THE
-  -- WHOLE DRAIN.  A batch write-back leaves the node holding the items
-  -- already spent, so anything re-entering this node mid-drain reads a
-  -- queue that is no longer true — and rxjs takes the item OUT of the
-  -- buffer before it subscribes it, so the batch form was the one that
-  -- diverged.
+  -- THE SHORTENED QUEUE AND THE RAISED COUNT ARE BOTH WRITTEN BEFORE
+  -- THE SUBSCRIBE, NOT AFTER IT.  A batch write-back leaves the node
+  -- holding the items already spent, so anything re-entering this node
+  -- mid-drain reads a queue that is no longer true — and rxjs takes the
+  -- item OUT of the buffer and raises `active` before it subscribes,
+  -- so the batch form was the one that diverged.  The count is the same
+  -- question and was missed: an inner whose end comes back through the
+  -- registry frees its lane while this subscribe is still running, and
+  -- against an unraised count that freeing lands on a SIBLING's lane.
+  -- What stays carried rather than re-read is the count the recursion
+  -- walks on, because re-reading the queue is what would let a
+  -- re-entrant enqueue feed this drain its own tail forever.
   drain-room : ∀ {s lo allNid} {κ : Path Γ lo s t} {now}
                  {lim act od} {o : Val Γ (obs s)} {q sched₀ st₀}
                  {inst segs done sched₁ st₁} {segs′ act′ q′ sched₂ st₂}
              → hasRoom lim act ≡ true
              → subscribeInner⇓ mergeAllᵒ allNid κ now o sched₀
                  (record st₀
-                    { nodes = setNode allNid (mergeAll-st {t = s} lim act q od)
+                    { nodes = setNode allNid (mergeAll-st {t = s} lim (suc act) q od)
                         (EvalSt.nodes st₀) })
                  (inst , segs , done , sched₁ , st₁)
              → mergeAllDrain⇓ allNid κ now lim
@@ -821,10 +857,9 @@ data stepFrame⇓ {n} {Γ} {t} {e} where
   step-batchSync : ∀ {s lo nid} {κ : Path Γ lo (s ×ᵗ listᵗ s) t}
                      {now} {vals : List (Val Γ s)} {fin sched st}
                  → stepFrame⇓ now (batchSync-f nid) κ vals fin sched st
-                     ( oneVSeg {u = s ×ᵗ listᵗ s}
-                         (batchDispatch nid vals st
-                           (lookupNode nid (EvalSt.nodes st)))
-                     , fin , sched , st )
+                     (injectRoot {u = s ×ᵗ listᵗ s}
+                       (batchDispatch nid vals fin sched st
+                         (lookupNode nid (EvalSt.nodes st))))
 
   step-from-inner : ∀ {s lo op allNid inst} {κ : Path Γ lo s t}
                       {now} {vals : List (Val Γ s)} {fin sched st r}
@@ -908,7 +943,7 @@ data subscribeAll⇓ {n} {Γ} {t} {e} where
   sub-all : ∀ {u lo op} {ns : NodeState Γ} {b : Val Γ (obs (obs u))}
               {κ : Path Γ lo u t} {now sched st nid segs₁ sched₁ st₁ r}
           → freshId nodeᵏ (Sched.mint sched) ≡ nid
-          → subscribeE⇓ b (thru-outer op nid ↠ κ) now
+          → subscribeE⇓ b (thru-outer op nid ↠[ ≤-refl ] κ) now
               (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
               (installNode nid ns st)
               (segs₁ , sched₁ , st₁)
@@ -1183,26 +1218,41 @@ data dispatchShare⇓ {n} {Γ} {t} {e} where
        → dispatchShare⇓ {lo = lo} now i below vals fin sched st
            (shareFinish i fin r)
 
--- THE LAST VALUE IS TOLD APART BY ITS TAIL BEING EMPTY, which is what
--- carries `fin` to exactly one delivery.  A share's end belongs to the
--- emission's final value and to no earlier one, and matching the tail
--- says so without a Bool computed from a length.
+-- EVERY VALUE IS DELIVERED WITH `fin` FALSE AND THE END IS THE WALK'S
+-- BASE CASE, so `fin` reaches exactly one delivery without any clause
+-- having to tell the last value apart by its tail.  It also means an
+-- emission that carries an end and no values is not the degenerate
+-- case: it is this recursion at depth zero.
 data shareWalk⇓ {n} {Γ} {t} {e} where
-  walk-nil : ∀ {now} {i : Fin n} {fin sched st}
-           → shareWalk⇓ now i [] fin sched st ([] , sched , st)
+  walk-nil : ∀ {now} {i : Fin n} {sched st}
+           → shareWalk⇓ now i [] false sched st ([] , sched , st)
 
-  walk-last : ∀ {now} {i : Fin n} {v fin sched st r}
-            → shareGo⇓ now i v fin
-                (shareAdmit i (EvalSt.registry st)) sched st r
-            → shareWalk⇓ now i (v ∷ []) fin sched st r
+  -- THE END IS A DELIVERY OF ITS OWN, AND IT READS THE REGISTRY AS IT
+  -- THEN STANDS.  Riding it on the last value meant the end reached
+  -- exactly the chains that value reached -- a snapshot taken before
+  -- that value was pushed -- so a chain REGISTERED BY THAT PUSH was
+  -- never told the share ended, and `shareFinish` then dropped it.
+  -- Nothing reaches such a joiner afterwards: its flattener's lane is
+  -- freed by the completion and by nothing else, so it holds one
+  -- forever.  Separating them is also the order rxjs emits in, whose
+  -- subject pushes `next` to the observers it had and `complete` to
+  -- the ones it has; the two coincide only when nothing subscribed
+  -- mid-burst, which is the case that used to be tested.
+  --
+  -- The share is CLOSED before this delivery rather than after it, and
+  -- the argument for that half of the order is at `shareSpend`.
+  walk-end : ∀ {now} {i : Fin n} {sched st r}
+           → shareGo⇓ now i [] true
+               (shareAdmit i (EvalSt.registry st)) sched (shareSpend i st) r
+           → shareWalk⇓ now i [] true sched st r
 
-  walk-more : ∀ {now} {i : Fin n} {v w vs fin sched₀ st₀}
+  walk-more : ∀ {now} {i : Fin n} {v vs fin sched₀ st₀}
                 {emits sched₁ st₁ rest sched₂ st₂}
-            → shareGo⇓ now i v false
+            → shareGo⇓ now i (v ∷ []) false
                 (shareAdmit i (EvalSt.registry st₀)) sched₀ st₀
                 (emits , sched₁ , st₁)
-            → shareWalk⇓ now i (w ∷ vs) fin sched₁ st₁ (rest , sched₂ , st₂)
-            → shareWalk⇓ now i (v ∷ w ∷ vs) fin sched₀ st₀
+            → shareWalk⇓ now i vs fin sched₁ st₁ (rest , sched₂ , st₂)
+            → shareWalk⇓ now i (v ∷ vs) fin sched₀ st₀
                 (emits ++ rest , sched₂ , st₂)
 
 -- THE CANCELLATION TEST STAYS A PREMISE RATHER THAN A SIDE CONDITION.
@@ -1211,24 +1261,24 @@ data shareWalk⇓ {n} {Γ} {t} {e} where
 -- both apply.  `go-live` is where the threading shows: what the tail is
 -- handed is the head's own results.
 data shareGo⇓ {n} {Γ} {t} {e} where
-  go-nil : ∀ {lo now} {i : Fin n} {v fin sched st}
-         → shareGo⇓ {lo = lo} now i v fin [] sched st ([] , sched , st)
+  go-nil : ∀ {lo now} {i : Fin n} {vals fin sched st}
+         → shareGo⇓ {lo = lo} now i vals fin [] sched st ([] , sched , st)
 
-  go-cut : ∀ {lo now} {i : Fin n} {v fin rid}
+  go-cut : ∀ {lo now} {i : Fin n} {vals fin rid}
              {p : Path Γ lo (lookup Γ i) t} {ps sched st r}
          → any (_≡ᵇ rid) (EvalSt.cancelled st) ≡ true
-         → shareGo⇓ now i v fin ps sched st r
-         → shareGo⇓ now i v fin ((rid , p) ∷ ps) sched st r
+         → shareGo⇓ now i vals fin ps sched st r
+         → shareGo⇓ now i vals fin ((rid , p) ∷ ps) sched st r
 
-  go-live : ∀ {lo now} {i : Fin n} {v fin rid}
+  go-live : ∀ {lo now} {i : Fin n} {vals fin rid}
               {p : Path Γ lo (lookup Γ i) t} {ps sched₀ st₀}
               {emits sched₁ st₁ rest sched₂ st₂}
           → any (_≡ᵇ rid) (EvalSt.cancelled st₀) ≡ false
-          → foldPath⇓ now p (v ∷ []) fin sched₀
+          → foldPath⇓ now p vals fin sched₀
               (record st₀ { delivered = rid ∷ EvalSt.delivered st₀ })
               (emits , sched₁ , st₁)
-          → shareGo⇓ now i v fin ps sched₁ st₁ (rest , sched₂ , st₂)
-          → shareGo⇓ now i v fin ((rid , p) ∷ ps) sched₀ st₀
+          → shareGo⇓ now i vals fin ps sched₁ st₁ (rest , sched₂ , st₂)
+          → shareGo⇓ now i vals fin ((rid , p) ∷ ps) sched₀ st₀
               (emits ++ rest , sched₂ , st₂)
 
 -- THE PATH IS WALKED SINKWARD AND THE BURST IS ASSEMBLED AT THE ROOT,
@@ -1249,13 +1299,13 @@ data foldPath⇓ {n} {Γ} {t} {e} where
             → dispatchShare⇓ now i below vals fin sched st r
             → foldPath⇓ now (share-sink i below) vals fin sched st r
 
-  fold-step : ∀ {lo s u now} {f : Frame Γ s u}
-                {path′ : Path Γ lo u t} {vals fin sched st}
+  fold-step : ∀ {lo ℓ s u now} {f : Frame Γ s u} {le : lo ≤ ℓ}
+                {path′ : Path Γ ℓ u t} {vals fin sched st}
                 {segs fin′ sched₁ st₁} {r}
             → stepFrame⇓ now f path′ vals fin sched st
                 (segs , fin′ , sched₁ , st₁)
             → foldVSegs⇓ now path′ segs fin′ sched₁ st₁ r
-            → foldPath⇓ now (f ↠ path′) vals fin sched st r
+            → foldPath⇓ {lo = lo} now (f ↠[ le ] path′) vals fin sched st r
 
 -- RESOLVING AN ORDERED ANSWER, ONE SEGMENT AT A TIME AND IN ORDER.  A
 -- step hands back what each inner subscribe contributed, kept apart;

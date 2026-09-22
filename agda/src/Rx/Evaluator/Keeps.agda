@@ -31,7 +31,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Rx.Exp using (Ctx; Closed; Val; obs; FnClo; _×ᵗ_; _≟ᵗ_)
 open import Rx.Evaluator using (Sched; EvalSt; Path; Frame; NodeId; NodeState;
   AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ; Segs; Stream;
-  switchKill; scanDispatch; takeDispatch; thruWrap; shareDying; shareFinish;
+  switchKill; scanDispatch; takeDispatch; batchDispatch; thruWrap; shareDying; shareSpend; shareFinish;
   cell-st; take-st; batchSync-st; mergeAll-st; switch-st; exhaust-st;
   lookupNode; takeVals)
 open import Rx.Evaluator.Unconn-Arith using (KeepsC; keeps-refl; keeps-trans;
@@ -53,7 +53,7 @@ open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeInner⇓; thruCon
   step-map; step-scan; step-take; step-batchSync; step-from-inner; step-thru-outer;
   push-nil; push-cons; sub-all; connect-live; connect-died;
   slot-spent; slot-join; slot-connect;
-  disp; walk-last; walk-more; go-nil; go-cut; go-live;
+  disp; walk-end; walk-more; go-nil; go-cut; go-live;
   fold-root; fold-sink; fold-step; segs-nil; segs-last; segs-more)
 
 -- THE PAIR OF FIELDS, NAMED ONCE.  Spelling both projections at every
@@ -90,7 +90,7 @@ scanDispatch-keeps {u = u} fn nid vals fin sched st (just (cell-st {w} a))
 ... | yes refl = keeps-refl _ _
 scanDispatch-keeps fn nid vals fin sched st nothing                      = keeps-refl _ _
 scanDispatch-keeps fn nid vals fin sched st (just (take-st _))           = keeps-refl _ _
-scanDispatch-keeps fn nid vals fin sched st (just (batchSync-st _))      = keeps-refl _ _
+scanDispatch-keeps fn nid vals fin sched st (just (batchSync-st _ _ _))      = keeps-refl _ _
 scanDispatch-keeps fn nid vals fin sched st (just (mergeAll-st _ _ _ _)) = keeps-refl _ _
 scanDispatch-keeps fn nid vals fin sched st (just (switch-st _ _))       = keeps-refl _ _
 scanDispatch-keeps fn nid vals fin sched st (just (exhaust-st _ _))      = keeps-refl _ _
@@ -110,10 +110,31 @@ takeDispatch-keeps nid vals fin sched st (just (take-st k))
 ... | false = keeps-refl _ _
 takeDispatch-keeps nid vals fin sched st nothing                      = keeps-refl _ _
 takeDispatch-keeps nid vals fin sched st (just (cell-st _))           = keeps-refl _ _
-takeDispatch-keeps nid vals fin sched st (just (batchSync-st _))      = keeps-refl _ _
+takeDispatch-keeps nid vals fin sched st (just (batchSync-st _ _ _))      = keeps-refl _ _
 takeDispatch-keeps nid vals fin sched st (just (mergeAll-st _ _ _ _)) = keeps-refl _ _
 takeDispatch-keeps nid vals fin sched st (just (switch-st _ _))       = keeps-refl _ _
 takeDispatch-keeps nid vals fin sched st (just (exhaust-st _ _))      = keeps-refl _ _
+
+-- the bracket writes its buffer while the bit is up and nothing after
+batchDispatch-keeps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+                        (nid : NodeId) (vals : List (Val Γ s)) (fin : Bool)
+                        (sched : Sched Γ) (st : EvalSt e) (m : Maybe (NodeState Γ))
+                    → Keeps {e = e} sched st
+                        (proj₁ (proj₂ (proj₂
+                          (batchDispatch {e = e} nid vals fin sched st m))))
+                        (proj₂ (proj₂ (proj₂
+                          (batchDispatch {e = e} nid vals fin sched st m))))
+batchDispatch-keeps {s = s} nid vals fin sched st (just (batchSync-st {w} true bur done))
+  with w ≟ᵗ s
+... | no  _    = keeps-refl _ _
+... | yes refl = keeps-refl _ _
+batchDispatch-keeps nid vals fin sched st (just (batchSync-st false _ _)) = keeps-refl _ _
+batchDispatch-keeps nid vals fin sched st nothing                        = keeps-refl _ _
+batchDispatch-keeps nid vals fin sched st (just (cell-st _))             = keeps-refl _ _
+batchDispatch-keeps nid vals fin sched st (just (take-st _))             = keeps-refl _ _
+batchDispatch-keeps nid vals fin sched st (just (mergeAll-st _ _ _ _))   = keeps-refl _ _
+batchDispatch-keeps nid vals fin sched st (just (switch-st _ _))         = keeps-refl _ _
+batchDispatch-keeps nid vals fin sched st (just (exhaust-st _ _))        = keeps-refl _ _
 
 -- the flattener's wrap marks its own node done
 thruWrap-keeps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
@@ -128,7 +149,7 @@ thruWrap-keeps mergeAllᵒ nid true sched′ st′
 ... | just (mergeAll-st _ _ _ _) = keeps-refl _ _
 ... | just (cell-st _)           = keeps-refl _ _
 ... | just (take-st _)           = keeps-refl _ _
-... | just (batchSync-st _)      = keeps-refl _ _
+... | just (batchSync-st _ _ _)  = keeps-refl _ _
 ... | just (switch-st _ _)       = keeps-refl _ _
 ... | just (exhaust-st _ _)      = keeps-refl _ _
 ... | nothing                    = keeps-refl _ _
@@ -137,7 +158,7 @@ thruWrap-keeps switchᵒ nid true sched′ st′
 ... | just (switch-st _ _)       = keeps-refl _ _
 ... | just (cell-st _)           = keeps-refl _ _
 ... | just (take-st _)           = keeps-refl _ _
-... | just (batchSync-st _)      = keeps-refl _ _
+... | just (batchSync-st _ _ _)  = keeps-refl _ _
 ... | just (mergeAll-st _ _ _ _) = keeps-refl _ _
 ... | just (exhaust-st _ _)      = keeps-refl _ _
 ... | nothing                    = keeps-refl _ _
@@ -146,12 +167,18 @@ thruWrap-keeps exhaustᵒ nid true sched′ st′
 ... | just (exhaust-st _ _)      = keeps-refl _ _
 ... | just (cell-st _)           = keeps-refl _ _
 ... | just (take-st _)           = keeps-refl _ _
-... | just (batchSync-st _)      = keeps-refl _ _
+... | just (batchSync-st _ _ _)  = keeps-refl _ _
 ... | just (mergeAll-st _ _ _ _) = keeps-refl _ _
 ... | just (switch-st _ _)       = keeps-refl _ _
 ... | nothing                    = keeps-refl _ _
 
--- the share's dying mark, and its retirement, touch neither field
+-- the share's dying mark, its closure, and its retirement touch neither
+-- field
+shareSpend-keeps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+                     (i : Fin n) (sched : Sched Γ) (st : EvalSt e)
+                 → Keeps {e = e} sched st sched (shareSpend {e = e} i st)
+shareSpend-keeps i sched st = keeps-refl _ _
+
 shareDying-keeps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
                      (i : Fin n) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
                  → Keeps {e = e} sched st sched (shareDying {e = e} i fin st)
@@ -343,7 +370,8 @@ pushSegs-keeps (psegs-cons pb ps) =
   keeps-trans (pushBurst-keeps pb) (pushSegs-keeps ps)
 
 stepFrame-keeps step-map       = keeps-refl _ _
-stepFrame-keeps step-batchSync = keeps-refl _ _
+stepFrame-keeps (step-batchSync {nid = nid} {vals = vals} {fin} {sched} {st}) =
+  batchDispatch-keeps nid vals fin sched st (lookupNode nid (EvalSt.nodes st))
 stepFrame-keeps (step-scan {fn = fn} {nid} {vals = vals} {fin} {sched} {st}) =
   scanDispatch-keeps fn nid vals fin sched st (lookupNode nid (EvalSt.nodes st))
 stepFrame-keeps (step-take {nid = nid} {vals = vals} {fin} {sched} {st}) =
@@ -361,14 +389,17 @@ thruWalk-keeps walk-nil        = keeps-refl _ _
 thruWalk-keeps (walk-cons c w) =
   keeps-trans (thruConsume-keeps c) (thruWalk-keeps w)
 
-thruConsume-keeps (consume-all-sub _ _ si)  = subscribeInner-keeps si
+thruConsume-keeps (consume-all-sub _ _ si r)  =
+  keeps-trans (subscribeInner-keeps si) (innerReact-keeps r)
 thruConsume-keeps (consume-all-enqueue _ _) = keeps-refl _ _
 thruConsume-keeps (consume-all-nil _)       = keeps-refl _ _
 thruConsume-keeps
-  (consume-switch-sub {sched₀ = sched₀} {st₀ = st₀} {cur = cur} _ kl si) =
-  keeps-trans (switchKill-keeps cur sched₀ st₀ kl) (subscribeInner-keeps si)
+  (consume-switch-sub {sched₀ = sched₀} {st₀ = st₀} {cur = cur} _ kl _ si r) =
+  keeps-trans (switchKill-keeps cur sched₀ st₀ kl)
+    (keeps-trans (subscribeInner-keeps si) (innerReact-keeps r))
 thruConsume-keeps (consume-switch-nil _)     = keeps-refl _ _
-thruConsume-keeps (consume-exhaust-sub _ si) = subscribeInner-keeps si
+thruConsume-keeps (consume-exhaust-sub _ si r) =
+  keeps-trans (subscribeInner-keeps si) (innerReact-keeps r)
 thruConsume-keeps (consume-exhaust-nil _)    = keeps-refl _ _
 
 mergeAllDrain-keeps drain-nil            = keeps-refl _ _
@@ -415,7 +446,7 @@ dispatchShare-keeps (disp {i = i} {fin = fin} {sched = sched} {st = st} w) =
               (shareFinish-keeps i fin _)
 
 shareWalk-keeps walk-nil        = keeps-refl _ _
-shareWalk-keeps (walk-last g)   = shareGo-keeps g
+shareWalk-keeps (walk-end g)    = shareGo-keeps g
 shareWalk-keeps (walk-more g w) =
   keeps-trans (shareGo-keeps g) (shareWalk-keeps w)
 

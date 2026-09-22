@@ -61,3 +61,52 @@ so a file holding only drawn rows would read as covering the region while
 testing the easy half of it. `f (acc , x) = strm (mergeAll (of [ acc , strm
 (of [ x ]) ]))` over a three-value source is the whole of the shape; both
 carriers agree with rxjs on all five.
+
+`deferred-push` pins ONE mechanism, and it is the consequence of the sentence
+`depth-first` ends on: what a subscribe emits has to be pushed where it is
+produced. A flattener's inner subscribe answers with a burst at its own
+element type, and that burst crosses the path BELOW the flattener later —
+once the walk that produced it is over. A share connecting does not wait: its
+connect fans out through the chains already registered, and a registered chain
+is the whole path, so those values cross that path AT THE SUBSCRIBE. Two
+routes, one deferred and one eager; the concatenation that reassembles them
+puts the emissions back in the right ORDER, so nothing below can tell — unless
+something below is COUNTING.
+
+That is the axis the file's last twenty-four rows are built on, and they are
+HAND-BUILT as a matrix rather than a sample: three flatteners (`switchAll`,
+`mergeAll`, `exhaustAll`) against two orders (a literal inner before the share
+and after it) against four frames sitting between the flattener and the root.
+The twelve rows whose frame is `map` all agree; the twelve whose frame is
+`take`, `scan` or `batchSync` all diverge, every one of them, in both orders
+and under all three flatteners. A frame with no cell cannot see the
+difference and a frame with one always does — which is what makes the split a
+claim about the mechanism rather than about twelve programs. `scan` is the
+loudest of the three, answering with nothing where rxjs answers with three
+values, because an accumulator carries the error forward instead of merely
+reordering around it.
+
+The seventy-seven rows before them are DRAWN, shrunk one at a time from a
+sweep of eight hundred thousand generated programs — of which they are every
+divergence found. Fifty-six are the matrix's red half met in the wild: a
+flattener reading a shared slot, with a `batchSync`, a `take` or a `scan`
+between that flattener and the root. What they add is the DENOMINATOR, and a
+sweep that size turning up no other shape is what says the region is one
+region.
+
+The remaining twenty-one are the reason the matrix is not the whole statement.
+They carry a flattener and a counting frame and NO share — the eager side is a
+cold slot subscribed twice (whose sync values re-anchor at each subscription),
+or a `mu` feeding back, or a second flattener's inner. Read that way they are
+one mechanism with the matrix, because a share is not what makes the other
+route eager; RE-ENTRY is, and a share is only its most reliable source. That
+reading is not itself pinned by anything here, which is why the matrix holds
+the share form alone: the twenty-one say the fix cannot be special-cased to
+shares, and they do not say more than that.
+
+Both halves are RED, and are meant to be. This file states an open defect
+rather than guarding a closed one, so a green over it is not something to
+read yet; it goes green when a subscribe's answer stops being pushed after
+the walk that produced it. The twelve `map` rows are the exception and they
+are CONTROLS — they are what says the divergence is the frame's cell and not
+the share.

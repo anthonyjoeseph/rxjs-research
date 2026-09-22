@@ -63,7 +63,7 @@ chainStep! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
            → Σ (Stream Γ t × Sched Γ × EvalSt e) λ r →
                chainStep⇓ {e = e} a c sched st r
 chainStep! {n = n} a (lo , path) sched st =
-  let (_ , f) = foldPath! (<-wellFounded (n ∸ lo)) (arrTick a) path
+  let (_ , f) = foldPath! (<-wellFounded (n ∸ lo)) ≤-refl (arrTick a) path
                   (arrVal a ∷ []) (Arrival.isLast a) sched st
                   (<-wellFounded _) ≤-refl
   in _ , chain-step f
