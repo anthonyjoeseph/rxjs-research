@@ -241,10 +241,8 @@ not three facts: a hot-fed share agrees because a cascade folds one arrival at
 a time, one synchronous value agrees because one observer is all there is, and
 re-entry is required because only a subscriber the burst creates is absent when
 it is handed back. The clause registers the caller's chain and folds the def's
-values down the fan-out, and the oracle has now run against it: 500 of 500 on
-the sweep, the pinned replay green. That does not kill it — the instrument
-links only with the termination checker off — but the region it could still be
-false in no longer includes any program the sweep draws.
+values down the fan-out. The sweep now matches on every case it draws, which
+narrows where it could be false without killing it.
 
 also: `evaluate⇓` — the carrier's downstream: a subscribe's RESULT TYPE is what every carrier leg widens, so the top-line runner changes shape whatever the monster is, which is the shape propagating rather than the monster moving.
 also: `evaluate!` — same, its inhabitation.

@@ -1525,6 +1525,24 @@ reducible b ρ rρ =
 --   ledger names the candidate, and the candidate takes a ledger -- so
 --   the parked row reaches itself to the left of an arrow.  Parking and
 --   a cell ledger are alternatives, never a pair.
+--
+-- DEAD ROUTE: STRATIFYING the candidate -- a bound on it, and a store
+--   value served by an oracle for every SMALLER bound instead of by a
+--   call back into the cascade.  The order it wants is the bound then
+--   the type, and the checker never gets to read it: a bound carried as
+--   a `<` hypothesis is a proof term the termination checker does not
+--   look at, so the only form that checks is the one whose bound steps
+--   down by one at each use.  That is a counter the run spends, which
+--   is the measure this development is trying not to need.
+--
+-- DEAD ROUTE: a LEDGER for the flattener's backlog, as the cell ledger
+--   does for a scan.  A queue entry is an observable at the element
+--   type, so its claim wants a path at that type -- and the frame an
+--   inner's spend stands on is one level BELOW it, where the entry
+--   cannot even be stated.  Stated instead at the outer's frame, where
+--   the types do line up, it is refused for termination and the frame
+--   is a SIBLING of the spend's, on no path the spend holds.  The cell
+--   ledger survives because a scan's cell is at its own frame's type.
 
 red-val unitᵗ     v           = tt
 red-val boolᵗ     v           = tt

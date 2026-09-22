@@ -71,10 +71,10 @@ Standing approval for any change that **does not alter the spec** — impl edits
 
 ## Long Agda builds
 
-- **`make gate` is the merge gate and it ROUTES — type it and let it decide.** It prints which path and why. **Don't run it to merge — open a PR and let the `Gate` workflow run it.** Timings: `typecheck-performance-numbers.md`.
-- **Carve-out for forcing `gate-heavy`: TERMINATION** — the one property the dev loop can't see, since it stubs mutual blocks.
+- **`make gate` is the merge gate and it ROUTES — type it and let it decide.** It prints which path and why. Timings: `typecheck-performance-numbers.md`.
+- `gate-heavy` is the only thing that sees TERMINATION, since the dev loop stubs mutual blocks.
 - **A warning is a build failure.** Every invocation goes through the Makefile's `AGDA` (carries `-W error`). Never call bare `agda` in the Makefile. Never silence a warning to get green — a warning you believe is wrong is a finding. The flag must be identical in the Makefile and `agda_flags()`, changed in the same commit. → [docs/agda-build.md](docs/agda-build.md)
-- **Agda never checks `agda/src` — it checks the comment-stripped mirror, which is why a comment edit is free.** Never run `agda` against `agda/src` directly: a second interface cache, and every alternation invalidates the other's cone.
+- **Agda never checks `agda/src` — it checks the comment-stripped mirror, which is why a comment edit is free.** A direct `agda` run on `agda/src` is a second interface cache, alternating with the mirror's.
 - **Two commands: `make bg T=<target>` as a BACKGROUND tool call, then `make bg-check T=<target>`.** `bg` blocks, logs, appends `EXIT=<code>`. `bg-check` reports GREEN / RED-with-tail / STILL-RUNNING. `bg-wait` is for a human. A `sleep N; tail` or `until` loop is the apparatus re-implemented worse. `make bg` always exits non-zero by design, so **a completion notification is never a result — `bg-check` is.**
 - **"Detached" means the Bash tool's background flag, never shell syntax (Anthony).** Type the command bare. No `&` (backgrounds a wrapper the harness already manages), no `>/dev/null 2>&1` (throws away WHERE the log is), **and never a pipe — a pipeline exits with the LAST command's status, so `make gate | tail` reports the tail's success over a RED build.** A foreground call is capped at 600 s and a build that outruns it is KILLED. **One build at a time.** → [docs/bg.md](docs/bg.md)
 - **The Bash tool's cwd persists between calls — pin it.** Absolute paths; never rely on a previous `cd`.
