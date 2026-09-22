@@ -275,6 +275,21 @@ the thing we are trying to kill, written without backticks.
     check("leaf" in reach({"asm"}, edges),
           "and with it the leaf is inside")
 
+    # WHAT IS CHARGED IS CODE ARRIVING.  A header sits ABOVE its declaration
+    # and so inside the range of the one before it, so charging comments would
+    # report a finding written exactly where the convention says to write it.
+    check(is_comment("-- a finding"), "a line comment is not charged")
+    check(is_comment("      -- an indented one"), "nor an indented one")
+    check(is_comment("--"), "nor a bare `--`")
+    check(is_comment(""), "nor a blank line")
+    check(is_comment("   "), "nor a whitespace-only line")
+    check(not is_comment("foo = bar"), "while a body IS charged")
+    check(not is_comment("_-->_ : A → B"),
+          "and so is an operator clause headed by `-->`, which `--` does not "
+          "open a comment on")
+    check(not is_comment("  x --y"),
+          "and a trailing comment does not excuse the code before it")
+
     os.unlink(tmp)
     if fails:
         for f in fails:
@@ -290,7 +305,9 @@ the thing we are trying to kill, written without backticks.
           "spliced into the declaration it continues -- without which an "
           "assembly applying its leaves in a `with` arm reaches none of them, "
           "which is the shape that made the first run of this check report "
-          "nine offenders that were all its own body)")
+          "nine offenders that were all its own body; and a comment or a blank "
+          "line is not work ARRIVING, while a clause headed by an operator "
+          "`--` does not open a comment on still is)")
 
 
 def reach(seed, edges):
@@ -313,8 +330,24 @@ def merge_base():
     return None
 
 
+# A COMMENT IS NOT WORK ARRIVING, AND A LINE IS OWNED BY THE DECLARATION IT
+# SITS INSIDE -- so charging comments would charge a header to whatever
+# declaration happens to precede it, which is the one directly ABOVE the
+# thing the header is about.  A finding written where the convention says to
+# write it would then be off-monster by construction, and the repair on offer
+# would be to move it somewhere it does not belong.  Agda's `--` opens a
+# comment only when what follows is not a symbol character, so `-->` at the
+# head of an operator clause is code and is still charged.
+COMMENT_RE = re.compile(r"^\s*--(?:[^!-/:-@\[-^`{-~]|$)")
+
+
+def is_comment(text):
+    return text.strip() == "" or COMMENT_RE.match(text) is not None
+
+
 def added_lines(base, src_rel):
-    """(relpath-within-src, new lineno) for every ADDED line under agda/src."""
+    """(relpath-within-src, new lineno) for every ADDED line of CODE under
+    agda/src; blank lines and `--` comments are not charged."""
     p = subprocess.run(
         ["git", "diff", "-U0", base, "--", src_rel],
         capture_output=True, text=True)
@@ -331,7 +364,7 @@ def added_lines(base, src_rel):
             n = int(m.group(1))
             continue
         if line.startswith("+") and not line.startswith("+++"):
-            if cur:
+            if cur and not is_comment(line[1:]):
                 hits.append((cur, n))
             n += 1
         elif line.startswith(" "):

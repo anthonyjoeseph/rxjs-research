@@ -1507,12 +1507,18 @@ formers-selftest:
 cli-build: stripped
 	@$(call AGDA_RUN,--compile --compile-dir=../_cli src/CLI/Main.agda)
 
-# RUN IN CI, AS ITS OWN JOB RATHER THAN A STEP OF THE GATE.  It compares two
-# machines that take seconds to run, so it has no business waiting on the
-# tower; and it is absent from GATE_CHEAP for the reason that list states over
-# itself -- nothing on it compiles -- while this target links the CLI.  The two
-# facts are not in tension: the job is the gate this target has, and the
-# no-compile invariant is what keeps the cheap list cheap.
+# ITS OWN CI JOB RATHER THAN A STEP OF THE GATE, AND THAT JOB IS STILL OFF.
+# It compares two machines that take seconds to run, so it has no business
+# waiting on the tower; and it is absent from GATE_CHEAP for the reason that
+# list states over itself -- nothing on it compiles -- while this target links
+# the CLI.  The two facts are not in tension: the job is the gate this target
+# has, and the no-compile invariant is what keeps the cheap list cheap.
+#
+# AND THE DRAW ALONE IS NOT THE TARGET.  Running it bare sweeps random
+# programs; the pinned corpus is replayed by passing `--cases`, which is what
+# the CI job does as a second step and what a session checking this target
+# must do too.  The draw is green and the replay is not, so a bare run here
+# reports a green the job would not.
 #
 # NOTHING HERE MAY BE NARROWED TO MAKE IT PASS.  A divergence is a finding
 # about one of the two machines and is fixed in whichever of them drifted --

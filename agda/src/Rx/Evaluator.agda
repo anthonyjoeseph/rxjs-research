@@ -723,6 +723,11 @@ thruWrap exhaustᵒ nid true (vs , sched′ , st′)
 -- and refuse to adopt them on a cut or a join.  That mark was a field
 -- of the carrier; with the protocol in the values, a frame reads the
 -- distinction off the registry it already consults.
+--
+-- AND A SYNCHRONOUS CONNECT BURST OF TWO OR MORE VALUES DOES NOT AGREE
+-- WITH rxjs, which is a finding about the burst carrier rather than
+-- about anything here: `Rx.Evaluator.Domain` states the discipline and
+-- carries the measurement that refutes it.
 
 -- Latch completion AND mark the share dying, so that a cut landing
 -- mid-fan-out can tell a share that has already finished from one

@@ -165,6 +165,38 @@ srcFrame _                  = ⊤
 -- on.
 ------------------------------------------------------------------
 
+-- AND A SHARE REFUTES THAT FACT, WHICH IS THE ONE SHAPE IT CANNOT
+-- MODEL.  The discipline is sound exactly while a downstream reaction
+-- cannot change what the source still owes, and a share is where it
+-- can: a value delivered to a subscriber may SUBSCRIBE that same share,
+-- and rxjs re-reads the subject's observer list between every pair of
+-- values, so the joiner receives the rest of the burst.  Here the burst
+-- is harvested whole before any of it is pushed, so the joiner
+-- registers against a source with nothing left to give.  The fan-out is
+-- SUBSCRIBER-MAJOR where rxjs is VALUE-MAJOR, and the two agree up to
+-- three values and part at four: a share of `of` read by a `mergeAll`
+-- of itself yields 2,3,4,3,4,4 against rxjs's 2,3,3,4,4,4.
+
+-- THE CASCADE PATH IS UNAFFECTED, AND THAT IS WHAT PINS THE CAUSE.  An
+-- arrival carries ONE value and the share fan-out re-reads the registry
+-- per arrival, so a share fed asynchronously already agrees, and so does
+-- a synchronous burst of one.  Only a SYNCHRONOUS burst of two or more
+-- diverges -- which is what the oracle's pinned corpus row instantiates,
+-- and the three neighbours that separate it were run alongside.
+
+-- NO REPAIR KEEPS THE DISCIPLINE, so this is a finding about the carrier
+-- rather than about the share.  Handing a joiner the undelivered tail is
+-- subscriber-major and fails at four values.  Dispatching the burst
+-- value-major through the registry makes those emits ROOT-level while
+-- the subscriber's own burst is still deferred to the unwind, and no
+-- fixed position for them is right -- a share ahead of a sibling inner
+-- needs them first, a share behind one needs them last, and the two
+-- shapes differ only in that order.  What agrees is a PUSH carrier: a
+-- value reaches the root as it is produced, through an output threaded
+-- in causal order, and the group an operator bracketing a subscribe call
+-- needs is accumulated in its own node state instead of read off the
+-- burst -- which is what the TypeScript's `isSync` bit already does.
+
 data subscribeE⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
      ∀ {u lo} →
      Val Γ (obs u) → Path Γ lo u t → Tick → Sched Γ → EvalSt e

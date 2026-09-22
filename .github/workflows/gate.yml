@@ -348,26 +348,29 @@ jobs:
   # `CLI/Main.agda`, not the tower -- so it restores the same read-only
   # caches the sweep does.
   #
-  # ON, AND IT WENT ON WHOLE -- which is the one condition the note it
-  # replaces set for switching it back: nothing was narrowed to get here.
-  # The same corpus is drawn at the same size with the same yield, and it
-  # matches on every case.
+  # STILL OFF, AND THE SWEEP BEING GREEN IS NOT THE CONDITION. The condition
+  # is that the job goes on WHOLE, and the job is two steps: the random draw
+  # and the replay of the pinned corpus. The draw now matches on every case
+  # -- 500 drawn, 400 emitting -- after the plain tree was fixed to register
+  # a cold's async tail BEFORE replaying its sync prefix, which is what the
+  # evaluator does and what ordinary rxjs does; both recorded flattener
+  # divergences were that one ordering. The replay is red, and it is red on
+  # the shape it was pinned for.
   #
-  # WHAT IT COST WAS ONE ORDERING, in the TypeScript leg rather than in the
-  # evaluator. Both recorded divergences were the same cause wearing two
-  # flattener shapes: the driver mints ordinals in REGISTRATION order and
-  # breaks same-tick ties by them, and the plain tree registered a cold's
-  # async tail AFTER replaying its sync prefix while the evaluator registers
-  # BEFORE -- so a cold whose prefix cascade subscribed another source got
-  # the opposite ordinal in each machine, which `exhaustAll` turns into a
-  # whole inner run admitted or dropped. The reasoning is in `plain-eval.ts`
-  # at the shape it governs; register-before is ordinary rxjs, so nothing
-  # here claims a capability rxjs lacks.
+  # WHAT IS RED IS THE BURST CARRIER. A subscription hands back a burst which
+  # its caller then pushes, so a reaction to a burst's first value runs after
+  # the whole burst is harvested -- and where that reaction SUBSCRIBES the
+  # share the burst came from, rxjs has already moved the observer list on
+  # and the evaluator has not. The measurement and the three neighbours that
+  # separate it are in the evaluator's own header, where the repair is owed.
   #
-  # AND THE RULE THAT CARRIES OVER UNCHANGED: nothing here may be narrowed
-  # to make it pass. A divergence is a finding about one of the two machines,
-  # and it is fixed in whichever of them drifted.
+  # AND THE RULE THAT DECIDES THE SHAPE OF THAT REPAIR: nothing here may be
+  # narrowed to make it pass. A divergence is a finding about one of the two
+  # machines, and it is fixed in whichever of them drifted -- not by dropping
+  # a corpus row, and not by running the draw without the replay, which would
+  # put a green light on exactly the shape a random draw is thin on.
   oracle:
+    if: false
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:

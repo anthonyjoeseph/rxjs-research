@@ -214,6 +214,70 @@ every guard, every `<?` and the dry marker leave the machine entirely.
 A row's class must agree with its postulate's header, which is where the
 research lives; where they disagree, the header wins.
 
+## Tier 1 — the plain evaluator mirrors rxjs
+
+**THIS TIER HAS NOTHING TO DO WITH SRXJS.** No `SExp`, no elaboration, no
+envelope, no simul variant of anything. The question is whether `Rx.Exp` and
+its evaluator mirror plain rxjs faithfully, and the judge
+is the TypeScript differential harness: `prop-test.ts` draws a program, runs
+it through ordinary rxjs operators in `plain-eval.ts`, runs the same program
+through the Agda evaluator reached via `CLI.Decode`, and compares two LISTS OF
+VALUES exactly. Neither side carries an envelope, so it compares two plain
+machines, not one against a projection.
+
+**DONE IS BOTH HALVES OF THE JOB GREEN AND THE TARGET BACK IN THE GATE.** The
+random draw and the replay of the pinned corpus are separate steps; the draw
+is green and the replay is not. Neither may be narrowed to pass. What the
+replay contradicts is the burst carrier, not an operator, and that research
+is in the evaluator's own header.
+
+### The monster
+
+`subscribeE⇓`'s burst carrier — the fact that a subscription's result is a
+LIST which its caller pushes, rather than values reaching the root as they are
+produced. Everything else in the evaluator is stated in terms of it, and it is
+the one thing here a differential run has actually contradicted.
+
+### Big picture tier roadmap
+
+- **SEPARATE THE MONSTER FROM THE SHARE, BY INSTANTIATION.** The divergence is
+  known at one family of shapes and suspected of the carrier generally; those
+  are different claims and only the first is measured. Draw the neighbours the
+  corpus row does not reach — a share under each of the other two flatteners,
+  a share whose burst crosses a `batchSync` bracket, two shares feeding one
+  another — and pin which of them the carrier already gets right. A carrier
+  that is wrong only under `mergeAll` is a different repair from one that is
+  wrong wherever a burst is re-entered, and the rewrite below is priced by
+  which it turns out to be.
+
+- **THE PUSH CARRIER, AS A SEPARATE EVALUATOR STATED OVER THE SAME FRAMES.**
+  Values reach the root as produced, threaded through an output accumulator in
+  causal order; a frame takes ONE value; the group an operator bracketing a
+  subscribe call needs is accumulated in its own node state, which is the
+  TypeScript's `isSync` bit and not a property of the carrier. State it and
+  run the oracle against it BEFORE any of the totality tower is restated —
+  the tower is four thousand lines of proof with no postulates in it, and
+  re-proving it against a carrier that has not been measured is the expensive
+  way to discover the second divergence.
+
+- **THE TOTALITY TOWER ONTO THE PUSH CARRIER.** The cycle structure is
+  unchanged — a share's connect still re-enters the subscribe cycle, and the
+  descent is still the reducibility candidate recursing on the TYPE — so what
+  moves is the shape of every family's result, not the argument that they
+  terminate. Take the relation first, then the builder, then the reducibility
+  side; the freshness pair last, since it names the fewest constructors.
+
+- **ENABLE THE ORACLE IN CI.** Flip the job off `if: false`. It is the leg
+  that makes the tier STAY done: until it lands the sweep is a thing somebody
+  remembers running, and a green memory is what this tier was disabled behind
+  in the first place. `oracle` stays out of `GATE_CHEAP`, whose invariant is
+  that nothing on it compiles, and this target links the CLI.
+
+### The ledger
+
+(empty — this tier states nothing in Agda, so it postulates nothing.)
+
+
 ## Tier 2 — finish `batchSimultaneousᵖ`
 
 **THE OPERATOR HAS A BODY AND THE BODY IS HONEST ABOUT WHAT IT SKIPS.**
