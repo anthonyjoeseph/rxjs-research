@@ -288,15 +288,14 @@ also: `chainStep⇓`, `chainStep!` — the carrier is a batch on BOTH faces and 
   yet connected, above the floor the fold already runs on — and lands here,
   since nothing consumes a measure until the block it measures exists.
 
-- **THE REFERENCE RETIRES WITH THE CARRIER.** `ref-eval.ts` is the burst
-  machine and `ref-push.ts` now meets the tier's own closing condition against
-  rxjs — 500/500 on the draw and 15/15 on the pinned rows, where the burst one
-  loses ten and three — so it is a superseded predecessor the moment the Agda
-  pushes: deleted, not parked, with `ref-push.ts` taking the `--machine ref`
-  name so the transcription check keeps meaning what it says. It is its own leg
-  because the check that entitles every measurement here is the one being
-  rewired, and a leg that both moves the carrier and re-points its judge has
-  nothing left to check itself against.
+- **THE ORACLE HAS TWO SIDES AND BOTH ARE AUTHORITIES (Anthony).** The compiled
+  Agda and plain rxjs, and nothing else may stand on either: a hand-written
+  transcription of the evaluator on the machine side makes the comparison one
+  between two things this repo authored, which is green for reasons that say
+  nothing about rxjs. `plain-eval.ts` is one rxjs operator per former by
+  construction, and a former that cannot be written as one is the finding it
+  exists to make. So a carrier is measured by transcribing it into the Agda and
+  running the oracle, never by a second machine in the TypeScript.
 
 - **ENABLE THE ORACLE IN CI.** Flip the job off `if: false`. It is the leg
   that makes the tier STAY done: until it lands the sweep is a thing somebody

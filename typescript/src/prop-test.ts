@@ -3,8 +3,6 @@ import { evaluatePlain } from "./plain-eval.js";
 import { genTestCases } from "./generator.js";
 import { serialize } from "./serialize.js";
 import { execAgda } from "./agda-bridge.js";
-import { evaluateRef } from "./ref-eval.js";
-import { evaluatePush } from "./ref-push.js";
 import { reachesRegion } from "./region.js";
 import { readFileSync } from "node:fs";
 
@@ -99,27 +97,13 @@ const readSeedFromCli = (): string | undefined => readFlag("seed");
 // prints.  Without it a divergence is reproducible only by re-running
 // the sweep that found it, and a generator edit moves every offset.
 const readCasesFromCli = (): string | undefined => readFlag("cases");
-// `--machine ref` PUTS THE REFERENCE EVALUATOR ON THE ORACLE SIDE, in
-// place of the compiled Agda.  It exists because the Agda evaluator is
-// `proj₁` of its own inhabitation proof, so a run of it is a corollary
-// of the totality tower -- and a change to the CARRIER cannot be
-// measured until that whole tower is closed again, which is the wrong
-// order, since the measurement is what says whether the new shape was
-// worth proving.  The reference is a partial function, so it can be
-// moved and run in a minute.  It is not an authority: while the two
-// agree it stands in for the Agda, and where they diverge the Agda is
-// right by construction and the reference has a transcription bug.
-// `--baseline` picks what it is compared AGAINST, `rx` by default.
-// `--machine agda --baseline ref` is the TRANSCRIPTION check: it asks
-// whether the reference still IS the Agda, which is the only thing that
-// entitles a measurement taken on the reference to be believed about the
-// tower.  Run it before trusting a reference verdict, never after.
-//
-// `push` IS THE CANDIDATE CARRIER AND IS DELIBERATELY NOT THE AGDA, so
-// `--machine agda --baseline push` is not a transcription check and a
-// divergence there is not a bug -- it is the difference being measured.
-// What decides it is `--machine push --baseline rx`: rxjs is the only
-// authority either carrier answers to.
+// THE TWO SIDES ARE THE COMPILED AGDA AND PLAIN RXJS, AND NOTHING ELSE
+// MAY STAND ON EITHER.  A third machine here would be a semantics this
+// repo wrote to check its own semantics against, and a green between
+// two things we authored says nothing about rxjs -- which is the only
+// authority the evaluator answers to.  `--machine` picks what is under
+// test, `--baseline` what it is compared against; the defaults are the
+// only pairing that measures anything.
 const readMachineFromCli = (): string | undefined => readFlag("machine");
 const readBaselineFromCli = (): string | undefined => readFlag("baseline");
 
@@ -265,7 +249,7 @@ async function main() {
   const casesFile = readCasesFromCli();
   const machine = readMachineFromCli() ?? "agda";
   const baseline = readBaselineFromCli() ?? "rx";
-  const known = ["agda", "ref", "push", "rx"];
+  const known = ["agda", "rx"];
   for (const [flag, v] of [
     ["machine", machine],
     ["baseline", baseline],
@@ -282,19 +266,11 @@ async function main() {
         ? genTestCases(cliSeed, operator)
         : drawCorpus(operator);
   const run = async (which: string): Promise<EvalResult[]> =>
-    which === "ref"
+    which === "rx"
       ? testCases.map((testCase): EvalResult => ({
-          values: evaluateRef(testCase),
+          values: evaluatePlain(testCase),
         }))
-      : which === "push"
-        ? testCases.map((testCase): EvalResult => ({
-            values: evaluatePush(testCase),
-          }))
-        : which === "rx"
-          ? testCases.map((testCase): EvalResult => ({
-              values: evaluatePlain(testCase),
-            }))
-          : await execAgda(testCases.map(serialize));
+      : await execAgda(testCases.map(serialize));
   if (machine !== "agda" || baseline !== "rx")
     console.log(`comparing ${machine} against ${baseline}`);
   const agdaResults = await run(machine);
