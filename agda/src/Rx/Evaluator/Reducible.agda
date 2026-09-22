@@ -266,8 +266,18 @@ Red {Γ = Γ} Q (obs u) b =
 -- subscribe cycle that re-enters, and the routes below are the price of
 -- that rather than a sign that the carrier is wrong.
 --
--- AND WHAT A REPAIR HAS TO ADD IS AN INDEX, WHICH IS WHY NONE OF THE SIX
--- IS IT.  Two weakenings read as the repair and neither is one.  Stop
+-- AND THE STATEMENT IS TRUE WHERE IT IS HARDEST, WHICH IS A COUNT AND
+-- NOT A HOPE.  The region the store obligation is about is the fold
+-- whose accumulator TYPE carries an observable, since that is the only
+-- shape whose cell a reducibility argument has to say anything about.
+-- Ten of the draw's four hundred emitting programs reach it, and a
+-- pushing reference agrees with rxjs on all ten -- so what is missing
+-- here is a proof and not a fact.  Those ten are pinned in the oracle's
+-- corpus for that reason: two and a half percent of a sweep is not
+-- something to re-find by luck.
+--
+-- AND WHAT A REPAIR HAS TO ADD IS AN INDEX, WHICH IS WHY NONE OF THE
+-- SEVEN IS IT.  Two weakenings read as the repair and neither is one.  Stop
 -- re-establishing the predicate in the conclusion and the candidate is
 -- contravariant, which is the direction a fold wants -- but a sink is a
 -- HYPOTHESIS that names the predicate, so the negative occurrence there
