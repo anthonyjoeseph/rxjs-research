@@ -60,13 +60,13 @@ open import Rx.Evaluator using (Stream; Sched; EvalSt; Path; root; share-sink; _
   cell-st; take-st; batchSync-st; mergeAll-st; switch-st; exhaust-st;
   lookupNode; setNode; hasRoom; aliveThroughᶠ;
   Arrival; arrTick; arrTy; arrVal; AtFloor; RegId; chainsOf; cascadeLatch;
-  sched-next; sched-init; st-init; shareAdmit; shareLatch)
+  sched-next; sched-init; st-init; shareAdmit; shareDying)
 open import Rx.Evaluator.Domain using (subscribeInner⇓; mergeAllDrain⇓; innerFinish⇓; innerReact⇓; stepFrame⇓; foldPath⇓;
-  dispatchShare⇓; shareGo⇓; chainStep⇓; cascadeGo⇓; cascade⇓; drain⇓; evaluate⇓; inner;
+  dispatchShare⇓; shareWalk⇓; shareGo⇓; chainStep⇓; cascadeGo⇓; cascade⇓; drain⇓; evaluate⇓; inner;
   drain-nil; drain-no-room; drain-room; finish-all-drain; finish-switch-clear;
   finish-exhaust-clear; finish-nil; react-false; react-alive; react-dead; step-map; step-scan;
   step-take; step-batchSync; step-from-inner; step-thru-outer; fold-root; fold-sink; fold-step;
-  disp; go-nil; go-cut; go-live; chain-step; casc-nil; casc-cut; casc-live; casc-run;
+  disp; walk-nil; walk-last; walk-more; go-nil; go-cut; go-live; chain-step; casc-nil; casc-cut; casc-live; casc-run;
   drain-done; drain-empty; drain-step; eval-run)
 open import Rx.Evaluator.Reducible using (Red; red-val; red-walk; reducible)
 
@@ -242,13 +242,20 @@ mutual
                  → Σ (Stream Γ t × Sched Γ × EvalSt e) λ r →
                      dispatchShare⇓ {e = e} now i below vals fin sched st r
 
+  shareWalk! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {i : Fin n}
+               (ac : Acc _<_ (n ∸ suc (toℕ i))) (now : Tick)
+               (vals : List (Val Γ _)) (fin : Bool)
+               (sched : Sched Γ) (st : EvalSt e)
+             → Σ (Stream Γ t × Sched Γ × EvalSt e) λ r →
+                 shareWalk⇓ {e = e} now i vals fin sched st r
+
   shareGo! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {i : Fin n}
              (ac : Acc _<_ (n ∸ suc (toℕ i))) (now : Tick)
-             (vals : List (Val Γ _)) (fin : Bool)
+             (v : Val Γ _) (fin : Bool)
              (ps : List (RegId × Path Γ (suc (toℕ i)) _ t))
              (sched : Sched Γ) (st : EvalSt e)
            → Σ (Stream Γ t × Sched Γ × EvalSt e) λ r →
-               shareGo⇓ {e = e} now i vals fin ps sched st r
+               shareGo⇓ {e = e} now i v fin ps sched st r
 
   foldPath! ac now root vals fin sched st = _ , fold-root
   foldPath! (acc rec) now (share-sink i below) vals fin sched st =
@@ -262,21 +269,31 @@ mutual
     in _ , fold-step sf rest
 
   dispatchShare! {i = i} ac below now vals fin sched st =
-    let (_ , g) = shareGo! ac now vals fin
-                    (shareAdmit i (EvalSt.registry st))
-                    sched (shareLatch i fin st)
-    in _ , disp g
+    let (_ , w) = shareWalk! ac now vals fin sched (shareDying i fin st)
+    in _ , disp w
 
-  shareGo! ac now vals fin [] sched st = _ , go-nil
-  shareGo! {i = i} ac now vals fin ((rid , p) ∷ ps) sched st
+  shareWalk! ac now [] fin sched st = _ , walk-nil
+  shareWalk! {i = i} ac now (v ∷ []) fin sched st =
+    let (_ , g) = shareGo! ac now v fin
+                    (shareAdmit i (EvalSt.registry st)) sched st
+    in _ , walk-last g
+  shareWalk! {i = i} ac now (v ∷ w ∷ vs) fin sched₀ st₀ =
+    let ((emits , sched₁ , st₁) , g) =
+          shareGo! ac now v false
+            (shareAdmit i (EvalSt.registry st₀)) sched₀ st₀
+        (_ , r) = shareWalk! ac now (w ∷ vs) fin sched₁ st₁
+    in _ , walk-more g r
+
+  shareGo! ac now v fin [] sched st = _ , go-nil
+  shareGo! {i = i} ac now v fin ((rid , p) ∷ ps) sched st
     with any (_≡ᵇ rid) (EvalSt.cancelled st) in eqc
-  ... | true  = let (_ , g) = shareGo! ac now vals fin ps sched st
+  ... | true  = let (_ , g) = shareGo! ac now v fin ps sched st
                 in _ , go-cut eqc g
   ... | false =
         let ((emits , sched₁ , st₁) , f) =
-              foldPath! ac now p vals fin sched
+              foldPath! ac now p (v ∷ []) fin sched
                 (record st { delivered = rid ∷ EvalSt.delivered st })
-            (_ , g) = shareGo! ac now vals fin ps sched₁ st₁
+            (_ , g) = shareGo! ac now v fin ps sched₁ st₁
         in _ , go-live eqc f g
 
 ------------------------------------------------------------------

@@ -23,18 +23,24 @@
 -- DERIVATION and never of the run: nothing is tested, and no
 -- constructor emits the marker.
 
--- A SUBSCRIPTION EMITS AT THE ROOT TYPE, ONE VALUE AT A TIME, AND THAT
--- IS WHAT MAKES DEPTH-FIRST THE RECURSION'S OWN ORDER RATHER THAN A
--- PROPERTY SOMETHING HAD TO RE-ESTABLISH.  A subscription used to hand
--- its whole output back at the SOURCE's element type, and each
--- enclosing frame pushed that finished list through itself; a source
--- was therefore materialised whole before any of it descended, so a
--- re-entrant subscribe wrote into a registry that the loop it should
--- have joined had already read past.  Carrying the rest of the path
--- INTO the subscribe fixes it at the root: a value reaches the
--- subscriber before the next one is produced, exactly as an rxjs
--- observer does, and the burst-pushing family is deleted rather than
--- repaired.
+-- A SUBSCRIPTION EMITS AT THE ROOT TYPE, AND THAT IS WHAT MAKES
+-- DEPTH-FIRST THE RECURSION'S OWN ORDER RATHER THAN A PROPERTY
+-- SOMETHING HAD TO RE-ESTABLISH.  A subscription used to hand its
+-- whole output back at the SOURCE's element type, and each enclosing
+-- frame pushed that finished list through itself, so the order a value
+-- reached the root in was assembled on the way out rather than being
+-- the order it was produced in.  Carrying the rest of the path INTO
+-- the subscribe puts it back: a subscription's result is already at
+-- `t`, and the burst-pushing family is deleted rather than repaired.
+--
+-- IT DOES NOT BY ITSELF MAKE A RE-ENTRANT SUBSCRIBE VISIBLE, and that
+-- is the distinction the root type costs nothing to blur.  A value may
+-- still be handed to a whole loop at once, and the fan-out at a share
+-- did exactly that, reading its subscriber list before any value of an
+-- emission was delivered -- so a subscription created by one of those
+-- values joined a loop that had already read past it and received
+-- NOTHING, which is the empty list the oracle measured against rxjs's
+-- six values.  Where the emission order lives is `shareWalk⇓`, below.
 --
 -- AND IT IS WHAT LETS EVERY OPERATOR BE WRITTEN AS ITS MIRROR IS.  A
 -- frame handed a finished list could group it, count it or truncate it
@@ -129,7 +135,7 @@ open import Rx.Exp using (obs; Ctx; Val; Closed; Exp; Tm; Fn; FnClo; applyClo;
 open import Rx.Mint using (ordinalᵏ; sourceᵏ; nodeᵏ; regᵏ; freshId; setAt)
 open import Rx.Slots using (Slots; scripted; shared)
 open import Rx.Evaluator using (Stream; Burst; Sched; EvalSt; Path; Frame; NodeId; root; share-sink; _↠_; shareAdmit;
-  shareLatch; shareFinish; from-inner; splitEvents; splitBurst; burstCompleted; oneShotBurst;
+  shareDying; shareFinish; from-inner; splitEvents; splitBurst; burstCompleted; oneShotBurst;
   spentBurst; arrTick; arrVal; chainsOf; cascadeLatch; cascadeFinish; sched-next; sched-init;
   st-init; NodeState; AllOp; RegId; Arrival; AtFloor; arrTy; memberSource; register;
   installNode; resolve; dropSource; atSlot; atDyn; lowerFloor; map-f; scan-f; take-f;
@@ -248,10 +254,23 @@ data dispatchShare⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
    → List (Val Γ (lookup Γ i)) → Bool → Sched Γ → EvalSt e
    → Stream Γ t × Sched Γ × EvalSt e → Set
 
+-- THE VALUE LOOP SITS ABOVE THE SUBSCRIBER LOOP, which is the whole of
+-- the fan-out's order: one value is delivered to every admitted chain
+-- before the next value is delivered to any, and the admitted list is
+-- re-derived from the registry between them.  That is what makes a
+-- subscription created by value `j` receive values after `j` and none
+-- before -- the joiner's entitlement as a CONSEQUENCE of when the list
+-- is read, so nothing has to carry a join index and no registry row
+-- gains a field.
+data shareWalk⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
+     Tick → (i : Fin n)
+   → List (Val Γ (lookup Γ i)) → Bool → Sched Γ → EvalSt e
+   → Stream Γ t × Sched Γ × EvalSt e → Set
+
 data shareGo⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
      ∀ {lo} →
      Tick → (i : Fin n)
-   → List (Val Γ (lookup Γ i)) → Bool
+   → Val Γ (lookup Γ i) → Bool
    → List (RegId × Path Γ lo (lookup Γ i) t) → Sched Γ → EvalSt e
    → Stream Γ t × Sched Γ × EvalSt e → Set
 
@@ -784,6 +803,27 @@ data subscribeAll⇓ {n} {Γ} {t} {e} where
 -- THE CONNECT'S OWN GUARD IS NOT INDEXED HERE EITHER, AND THE SAME
 -- RULING AS THE UNFOLD'S APPLIES: a run's answer to a question this
 -- relation does not name is owed by the inhabitation proof.
+
+-- A SYNCHRONOUS SHARE NEVER CONSULTS ITS OWN REGISTRY, and that -- not
+-- the order the registry is read in -- is what the oracle measures.
+-- Both arms hand the definition's burst BACK, at the share's element
+-- type, so the subscriber whose arrival triggered the connect receives
+-- every value and the fan-out below is not entered at all.  It is
+-- entered only from `foldPath⇓`'s sink clause, which a chain reaches
+-- when an ASYNCHRONOUS arrival is folded -- so a hot-fed share fans out
+-- per arrival and agrees with rxjs, and a share whose definition emits
+-- during the connect delivers to exactly one observer however the
+-- fan-out is written.
+--
+-- WHAT STANDS IN THE WAY OF ROUTING IT IS THE RESULT TYPE AND NOTHING
+-- ELSE.  A fan-out's emits are at `t`, because a share's subscribers
+-- sink at unrelated points of the tree; `subscribeE⇓` answers at `u`,
+-- because its caller is a frame that still has path left to push
+-- through.  So the connect cannot spend its burst on the registry and
+-- also answer its caller, and the two readings of that -- keep the
+-- source type and lose the fan-out, or answer at `t` and give every
+-- frame somewhere to put a root-level emit -- are the same question the
+-- carrier is.
 data sharedConnect⇓ {n} {Γ} {t} {e} where
 
   connect-live : ∀ {lo} {i : Fin n} {d} {κ : Path Γ lo (lookup Γ i) t}
@@ -844,14 +884,36 @@ data subscribeSharedSlot⇓ {n} {Γ} {t} {e} where
 -- fan-out re-enters at the floor the sink's own premise names, so the
 -- relation carries that premise as a constructor argument and the
 -- descent it buys is a fact about the index rather than a peeled
--- witness.  `shareFinish`, `shareAdmit` and `shareLatch` compute, so
+-- witness.  `shareFinish`, `shareAdmit` and `shareDying` compute, so
 -- they stay applied.
 data dispatchShare⇓ {n} {Γ} {t} {e} where
   disp : ∀ {lo now} {i : Fin n} {below : lo ≤ toℕ i}
            {vals fin sched st r}
-       → shareGo⇓ now i vals fin
-           (shareAdmit i (EvalSt.registry st)) sched (shareLatch i fin st) r
-       → dispatchShare⇓ now i below vals fin sched st (shareFinish i fin r)
+       → shareWalk⇓ now i vals fin sched (shareDying i fin st) r
+       → dispatchShare⇓ {lo = lo} now i below vals fin sched st
+           (shareFinish i fin r)
+
+-- THE LAST VALUE IS TOLD APART BY ITS TAIL BEING EMPTY, which is what
+-- carries `fin` to exactly one delivery.  A share's end belongs to the
+-- emission's final value and to no earlier one, and matching the tail
+-- says so without a Bool computed from a length.
+data shareWalk⇓ {n} {Γ} {t} {e} where
+  walk-nil : ∀ {now} {i : Fin n} {fin sched st}
+           → shareWalk⇓ now i [] fin sched st ([] , sched , st)
+
+  walk-last : ∀ {now} {i : Fin n} {v fin sched st r}
+            → shareGo⇓ now i v fin
+                (shareAdmit i (EvalSt.registry st)) sched st r
+            → shareWalk⇓ now i (v ∷ []) fin sched st r
+
+  walk-more : ∀ {now} {i : Fin n} {v w vs fin sched₀ st₀}
+                {emits sched₁ st₁ rest sched₂ st₂}
+            → shareGo⇓ now i v false
+                (shareAdmit i (EvalSt.registry st₀)) sched₀ st₀
+                (emits , sched₁ , st₁)
+            → shareWalk⇓ now i (w ∷ vs) fin sched₁ st₁ (rest , sched₂ , st₂)
+            → shareWalk⇓ now i (v ∷ w ∷ vs) fin sched₀ st₀
+                (emits ++ rest , sched₂ , st₂)
 
 -- THE CANCELLATION TEST STAYS A PREMISE RATHER THAN A SIDE CONDITION.
 -- It is decidable and it decides which of two clauses ran, so the
@@ -859,24 +921,24 @@ data dispatchShare⇓ {n} {Γ} {t} {e} where
 -- both apply.  `go-live` is where the threading shows: what the tail is
 -- handed is the head's own results.
 data shareGo⇓ {n} {Γ} {t} {e} where
-  go-nil : ∀ {lo now} {i : Fin n} {vals fin sched st}
-         → shareGo⇓ {lo = lo} now i vals fin [] sched st ([] , sched , st)
+  go-nil : ∀ {lo now} {i : Fin n} {v fin sched st}
+         → shareGo⇓ {lo = lo} now i v fin [] sched st ([] , sched , st)
 
-  go-cut : ∀ {lo now} {i : Fin n} {vals fin rid}
+  go-cut : ∀ {lo now} {i : Fin n} {v fin rid}
              {p : Path Γ lo (lookup Γ i) t} {ps sched st r}
          → any (_≡ᵇ rid) (EvalSt.cancelled st) ≡ true
-         → shareGo⇓ now i vals fin ps sched st r
-         → shareGo⇓ now i vals fin ((rid , p) ∷ ps) sched st r
+         → shareGo⇓ now i v fin ps sched st r
+         → shareGo⇓ now i v fin ((rid , p) ∷ ps) sched st r
 
-  go-live : ∀ {lo now} {i : Fin n} {vals fin rid}
+  go-live : ∀ {lo now} {i : Fin n} {v fin rid}
               {p : Path Γ lo (lookup Γ i) t} {ps sched₀ st₀}
               {emits sched₁ st₁ rest sched₂ st₂}
           → any (_≡ᵇ rid) (EvalSt.cancelled st₀) ≡ false
-          → foldPath⇓ now p vals fin sched₀
+          → foldPath⇓ now p (v ∷ []) fin sched₀
               (record st₀ { delivered = rid ∷ EvalSt.delivered st₀ })
               (emits , sched₁ , st₁)
-          → shareGo⇓ now i vals fin ps sched₁ st₁ (rest , sched₂ , st₂)
-          → shareGo⇓ now i vals fin ((rid , p) ∷ ps) sched₀ st₀
+          → shareGo⇓ now i v fin ps sched₁ st₁ (rest , sched₂ , st₂)
+          → shareGo⇓ now i v fin ((rid , p) ∷ ps) sched₀ st₀
               (emits ++ rest , sched₂ , st₂)
 
 -- THE PATH IS WALKED SINKWARD AND THE BURST IS ASSEMBLED AT THE ROOT,

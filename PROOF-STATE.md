@@ -232,10 +232,10 @@ NOTHING where rxjs emits.
 
 ### The monster
 
-`dispatchShare⇓` — the share's fan-out reads its subscriber set ONCE, before
-delivering any value of a synchronous emission. Every re-entrant subscription
-in the region is created by one of those values and so is invisible to the
-read that precedes them all.
+`sharedConnect⇓` — a share whose definition emits during the connect hands the
+burst BACK to the subscriber that triggered it, at the share's element type,
+and never enters its own fan-out. Every other subscriber the emission creates
+is delivered to by nobody.
 
 NARROWED TO A COUNT. A region-biased draw reaches it 8 times in 500 where the
 old one reached 0; the evaluator fails all eight and 10 in all, a pushing
@@ -250,42 +250,48 @@ Reverting to the burst carrier restores a tower that typechecks and links, so
 the falsity is not in `subscribeE⇓` handing back a list: a subscription may
 return whatever it likes, and only the fan-out has to interleave.
 
-THE SIGNATURE SAYS WHICH READ IS WRONG, AND IT IS NOT AN ORDER. On the row the
-region was drawn around — `mergeAll (map (λ v → S) S)` over a shared
-`S = of [1,2,3,4]` — rxjs emits `2,3,3,4,4,4` and the evaluator emits NOTHING.
-A transposed list would carry the same six values; an empty one says the
-re-entrant subscribers did not exist when the values were delivered. So the
-single registry read is the whole of it, and the emission ORDER is downstream
-of repairing that, not a second defect.
+NARROWED PAST THE FAN-OUT ENTIRELY, BY A CHANGE THAT MOVED NOTHING. The
+fan-out now walks values and re-reads the registry between them, it typechecks
+and it terminates — and the corpus replays byte-identically, 0/11, 2/4, 13/15.
+A rewrite of the fan-out's order that changes no answer is a measurement that
+the fan-out does not run: `dispatchShare⇓` is reached only from `foldPath⇓`'s
+sink clause, which a chain reaches on an ASYNCHRONOUS arrival, and every row of
+the region emits synchronously.
 
-WHAT REMAINS OPEN IS THE PRICE OF A VALUE-MAJOR WALK. Delivering one value at
-a time is what rxjs does and what re-reading the registry requires, and it
-hands `batchSync` a singleton where it expects a subscribe frame's whole
-group — `batchVals true (v ∷ vs) = (v , vs) ∷ []` is one batch per burst, and
-a per-value walk makes it one batch per value.
+SO THE REGION'S THREE CONDITIONS ARE ONE MECHANISM, WHICH IS WHAT A MONSTER IS
+FOR. A hot-fed share agrees because a cascade folds one arrival at a time and
+so does enter the fan-out; one synchronous value agrees because one observer is
+all there is; and re-entry is required because only a subscription the burst
+itself creates is absent when the burst is handed back. Each witness was read
+as a separate fact about the region and all three are this one clause.
+
+WHAT IS LEFT IS A TYPE, AND IT IS THE CARRIER QUESTION AGAIN. A fan-out's emits
+are at `t`; `subscribeE⇓` answers at `u`, because its caller is a frame with
+path left to push through. A connect cannot both spend its burst on the
+registry and answer its caller, so either the source type goes or the fan-out
+does.
 
 ### Big picture tier roadmap
 
-- **THE FAN-OUT WALKS VALUES, NOT SUBSCRIBERS.** `dispatchShare⇓` loops over
-  the emission's values and, for each, re-reads `shareAdmit i (registry st)`
-  and delivers that one value to every admitted chain in registration order.
-  A subscription created while value `j` is in flight is in the registry the
-  next read consults, so it receives the rest of the emission and nothing
-  earlier — which is the joiner's behaviour stated as a consequence of the
-  walk rather than as a join index the registry would have to carry. The
-  measure does not move: the outer loop is structural on the value list, the
-  inner on the admitted list, and the descent into `foldPath⇓` is still the
-  slot index `monus-sink` already names.
+- **THE CONNECT SPENDS ITS BURST ON THE REGISTRY, WHICH COSTS A RESULT TYPE.**
+  `sharedConnect⇓` routes the definition's burst through the fan-out instead of
+  returning it, and the subscriber that triggered the connect is served by its
+  own registration — it is registered before the definition is subscribed, so
+  nothing is lost, only re-routed. What that costs is the answer at `u`: the
+  emits come back at `t`. Decide it at ONE site before typing any of it, since
+  the frames are what pay — either every frame gains somewhere to put a
+  root-level emit, or the connect keeps a source-typed answer and the fan-out
+  is fed some other way.
 
-- **WHAT THE SINGLETON FOLD COSTS `batchSync`, MEASURED RATHER THAN ARGUED.**
-  A value-major walk hands a subscriber one value per `foldPath⇓`, and the one
+- **WHAT THE SINGLETON FOLD COSTS `batchSync`, ONCE THE FAN-OUT RUNS AT ALL.**
+  The value walk hands a subscriber one value per `foldPath⇓`, and the one
   former that can see a burst reads the whole of it: the sync bit turns a
   subscribe frame's values into a single group, so a per-value walk turns them
   into one group each. Either the bit is the wrong state for it to hold — rxjs
   batches by TICK, and a burst is only this evaluator's stand-in for one — or
-  the walk has to hand a subscriber its whole entitled suffix and lose the
-  interleave. The corpus carries `batchSync` rows on both sides of the region,
-  so the oracle decides this and no reading of the clauses does.
+  the walk hands a subscriber its whole entitled suffix and loses the
+  interleave. Unmeasurable until the leg above lands, because no row of the
+  corpus reaches the walk today.
 
 - **THE ORACLE HAS TWO SIDES AND BOTH ARE AUTHORITIES (Anthony).** The compiled
   Agda and plain rxjs, and nothing else may stand on either: a hand-written

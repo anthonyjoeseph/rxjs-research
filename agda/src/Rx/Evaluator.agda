@@ -724,15 +724,22 @@ thruWrap exhaustᵒ nid true (vs , sched′ , st′)
 -- of the carrier; with the protocol in the values, a frame reads the
 -- distinction off the registry it already consults.
 
--- Latch completion AND mark the share dying, so that a cut landing
--- mid-fan-out can tell a share that has already finished from one
--- still running; the registry entries drop at shareFinish.
-shareLatch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+-- Mark the share dying, so that a cut landing mid-fan-out can tell a
+-- share that has already finished from one still running; the registry
+-- entries drop at shareFinish.
+--
+-- DYING IS SET BEFORE THE FAN-OUT AND COMPLETION IS LATCHED AFTER IT,
+-- and the two have to be separated because a fan-out's own values
+-- create subscribers.  A share whose definition completes with its
+-- values reaches here with `fin` already true, so a latch taken first
+-- makes `slot-spent` the arm every re-entrant subscription lands on --
+-- the share reads as finished to the very values that have not been
+-- delivered yet.  rxjs's subject is not complete until after the last
+-- `next`, and a joiner arriving between two of them receives the rest.
+shareDying : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
            → (i : Fin n) → Bool → EvalSt e → EvalSt e
-shareLatch i false st₀ = st₀
-shareLatch i true  st₀ =
-  record st₀ { completedSources = toℕ i ∷ EvalSt.completedSources st₀
-             ; dying = toℕ i ∷ EvalSt.dying st₀ }
+shareDying i false st₀ = st₀
+shareDying i true  st₀ = record st₀ { dying = toℕ i ∷ EvalSt.dying st₀ }
 
 -- the registrations this share owes an emit: source matches and the
 -- chain's element type is the share's
@@ -759,7 +766,8 @@ shareFinish i true  (emits , sched′ , st′) =
   let kept = dropSource (toℕ i) (EvalSt.registry st′)
   in emits ,
      record sched′ { live = sweepLive kept (Sched.live sched′) } ,
-     record st′ { registry = kept }
+     record st′ { registry = kept
+                ; completedSources = toℕ i ∷ EvalSt.completedSources st′ }
 
 -- one arrival, count(source) emits: every live registration chain of
 -- the arrival's source forwards EXACTLY ONE emit (possibly valueless),
