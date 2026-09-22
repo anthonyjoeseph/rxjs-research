@@ -25,11 +25,13 @@ plain alias of slot 0 and runs the re-entrant shape over slot 1, so one share's
 emission is delivered through another's; rxjs answers it exactly as the
 un-nested row, which says a share transposes LOCALLY and no ordering across
 nested shares is wanted. It decides a second thing, and that one is a
-refutation: its answer drops a value unless each value's fold is COMPLETE
-before the next value is read, because the fold is what registers the
-subscriber that the next value is delivered to. So an implementation that
-collects a walk's emissions and folds them afterwards — however faithfully it
-preserves their order — cannot produce this row. The ORDER one is the mirror of the row above it —
+refutation: its answer drops a value unless a SHARE's fold of each value is
+COMPLETE before the next value is read, because that fold is what subscribes
+the inner whose chain the next value is delivered to. Collecting a share's
+emissions and folding them afterwards cannot produce this row, whatever order
+it keeps them in. It says nothing about a FLATTENER's walk, whose inners
+arrive in one burst and whose feedback path, if it has one, no row here
+reaches. The ORDER one is the mirror of the row above it —
 `of[of[7], share]` against `of[share, of[7]]` — and the pair is a refutation
 rather than a sample: both carry the same values out of the flattener and the
 same values out of the share, and rxjs answers `[7,1,2]` and `[1,2,7]`. So a

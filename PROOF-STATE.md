@@ -269,16 +269,16 @@ also: `dispatchShare!` — its inhabitation, same reason.
   share. A second result component read by a fixed rule is refuted at
   `sharedConnect⇓` by the corpus's exchanged pair.
 
-- **PUSH BY PASSING THE FOLD DOWN, NOT BY IMPORTING IT UP.** On the relation
-  side pushing is already free: `thruConsume⇓` and `foldPath⇓` are one
-  interleaved block, so a consume may name the fold at no structural cost.
-  Only the builder runs the wrong way, and a closure answers it — `foldPath!`
-  saturated at the frame clause's own `κ` and accumulator, threaded through
-  `red-thru`, `red-step`, `red-push` and `reducible`. That needs no new
-  measure: a frame descent leaves the floor alone, so the one accumulator a
-  subscribe is handed types everywhere under it, and the only floor that moves
-  is the share-sink `foldPath!` already descends at. The subscribe's own
-  accumulator is owed by the CONNECT, below, and by nothing here.
+- **PUSH BY SEGMENTING THE FLATTENER'S WALK.** The walk hands back ORDERED
+  SEGMENTS — each a group at the element type or a stream already at the root —
+  and `foldPath!`'s own frame clause resolves them, so every call still points
+  down. On the relation side this costs nothing: `thruConsume⇓` and `foldPath⇓`
+  are already one interleaved block. Folding from inside the consume instead is
+  the expensive reading, and a closure does not buy it off — the termination
+  checker has to SEE the fold applied to a structurally smaller path, which an
+  applied argument hides, so that reading puts `reducible` inside the fan-out's
+  block. Segments stand unrefuted: the nested row constrains the SHARE's walk,
+  which already complies.
 
 - **ROUTE THE CONNECT THROUGH THE FAN-OUT — THIS LEG IS THE MONSTER.** Nothing
   has to be built: `shareWalk⇓` already re-reads `shareAdmit` against the state
