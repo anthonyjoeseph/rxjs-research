@@ -248,15 +248,15 @@ subscribeInner-keeps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
 thruWalk-keeps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
                    {op} {nid} {κ : Path Γ lo u t} {now}
                    {vals : List (Val Γ (obs u))} {sched sched′ : Sched Γ}
-                   {st st′ : EvalSt e} {segs}
-               → thruWalk⇓ {e = e} op nid κ now vals sched st (segs , sched′ , st′)
+                   {st st′ : EvalSt e} {out}
+               → thruWalk⇓ {e = e} op nid κ now vals sched st (out , sched′ , st′)
                → Keeps {e = e} sched st sched′ st′
 
 thruConsume-keeps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
                       {op} {nid} {κ : Path Γ lo u t} {now}
                       {o : Val Γ (obs u)} {sched sched′ : Sched Γ}
-                      {st st′ : EvalSt e} {segs}
-                  → thruConsume⇓ {e = e} op nid κ now o sched st (segs , sched′ , st′)
+                      {st st′ : EvalSt e} {out}
+                  → thruConsume⇓ {e = e} op nid κ now o sched st (out , sched′ , st′)
                   → Keeps {e = e} sched st sched′ st′
 
 mergeAllDrain-keeps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo}
@@ -389,17 +389,20 @@ thruWalk-keeps walk-nil        = keeps-refl _ _
 thruWalk-keeps (walk-cons c w) =
   keeps-trans (thruConsume-keeps c) (thruWalk-keeps w)
 
-thruConsume-keeps (consume-all-sub _ _ si r)  =
-  keeps-trans (subscribeInner-keeps si) (innerReact-keeps r)
+thruConsume-keeps (consume-all-sub _ _ si r fv)  =
+  keeps-trans (subscribeInner-keeps si)
+    (keeps-trans (innerReact-keeps r) (foldVSegs-keeps fv))
 thruConsume-keeps (consume-all-enqueue _ _) = keeps-refl _ _
 thruConsume-keeps (consume-all-nil _)       = keeps-refl _ _
 thruConsume-keeps
-  (consume-switch-sub {sched₀ = sched₀} {st₀ = st₀} {cur = cur} _ kl _ si r) =
+  (consume-switch-sub {sched₀ = sched₀} {st₀ = st₀} {cur = cur} _ kl _ si r fv) =
   keeps-trans (switchKill-keeps cur sched₀ st₀ kl)
-    (keeps-trans (subscribeInner-keeps si) (innerReact-keeps r))
+    (keeps-trans (subscribeInner-keeps si)
+      (keeps-trans (innerReact-keeps r) (foldVSegs-keeps fv)))
 thruConsume-keeps (consume-switch-nil _)     = keeps-refl _ _
-thruConsume-keeps (consume-exhaust-sub _ si r) =
-  keeps-trans (subscribeInner-keeps si) (innerReact-keeps r)
+thruConsume-keeps (consume-exhaust-sub _ si r fv) =
+  keeps-trans (subscribeInner-keeps si)
+    (keeps-trans (innerReact-keeps r) (foldVSegs-keeps fv))
 thruConsume-keeps (consume-exhaust-nil _)    = keeps-refl _ _
 
 mergeAllDrain-keeps drain-nil            = keeps-refl _ _

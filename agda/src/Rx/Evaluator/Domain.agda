@@ -199,13 +199,13 @@ data thruConsume⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
      ∀ {u lo} →
      AllOp → NodeId → Path Γ lo u t → Tick
    → Val Γ (obs u) → Sched Γ → EvalSt e
-   → VSegs Γ u t × Sched Γ × EvalSt e → Set
+   → Stream Γ t × Sched Γ × EvalSt e → Set
 
 data thruWalk⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
      ∀ {u lo} →
      AllOp → NodeId → Path Γ lo u t → Tick
    → List (Val Γ (obs u)) → Sched Γ → EvalSt e
-   → VSegs Γ u t × Sched Γ × EvalSt e → Set
+   → Stream Γ t × Sched Γ × EvalSt e → Set
 
 data mergeAllDrain⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
      ∀ {s lo} →
@@ -624,6 +624,17 @@ data subscribeInner⇓ {n} {Γ} {t} {e} where
 -- available at every input -- and every one of these has an empty
 -- value column, which would discharge any statement quantified over
 -- SOME derivation with a reducible column.
+-- A CONSUME ANSWERS AT THE ROOT TYPE, BECAUSE WHAT A SUBSCRIBE EMITS
+-- IS PUSHED WHERE IT IS PRODUCED.  An inner subscribed here can reach
+-- the path below the flattener before this consume has returned: a
+-- share connecting fans out through the chains already registered, and
+-- a registered chain is the whole path.  An answer carried back as an
+-- unresolved burst and folded once the walk is over therefore arrives
+-- BEHIND deliveries that were made during it.  Concatenation puts the
+-- two back in the right ORDER, so nothing below can tell -- unless
+-- something below is COUNTING, which a `take`, a `scan` and a
+-- `batchSync` each are.  So the fold happens here and what leaves is
+-- already at `t`.
 data thruConsume⇓ {n} {Γ} {t} {e} where
 
   -- THE LANE IS TAKEN BEFORE THE INNER IS SUBSCRIBED, AND THE INNER'S
@@ -641,6 +652,7 @@ data thruConsume⇓ {n} {Γ} {t} {e} where
   consume-all-sub : ∀ {u lo nid} {κ : Path Γ lo u t} {now}
                       {o : Val Γ (obs u)} {sched₀ st₀} {lim act q od}
                       {inst segs done sched₁ st₁} {segs′ fin sched₂ st₂}
+                      {out sched₃ st₃}
                   → lookupNode nid (EvalSt.nodes st₀)
                       ≡ just (mergeAll-st {t = u} lim act q od)
                   → hasRoom lim act ≡ true
@@ -651,8 +663,10 @@ data thruConsume⇓ {n} {Γ} {t} {e} where
                       (inst , segs , done , sched₁ , st₁)
                   → innerReact⇓ mergeAllᵒ nid inst κ now [] sched₁ st₁ done
                       (segs′ , fin , sched₂ , st₂)
+                  → foldVSegs⇓ now κ (segs ++ segs′) false sched₂ st₂
+                      (out , sched₃ , st₃)
                   → thruConsume⇓ mergeAllᵒ nid κ now o sched₀ st₀
-                      (segs ++ segs′ , sched₂ , st₂)
+                      (out , sched₃ , st₃)
 
   consume-all-enqueue : ∀ {u lo nid} {κ : Path Γ lo u t} {now}
                           {o : Val Γ (obs u)} {sched₀ st₀} {lim act q od}
@@ -675,7 +689,7 @@ data thruConsume⇓ {n} {Γ} {t} {e} where
   consume-switch-sub : ∀ {u lo nid} {κ : Path Γ lo u t} {now}
                          {o : Val Γ (obs u)} {sched₀ st₀} {cur od}
                          {sched₁ st₁} {inst segs done sched₂ st₂}
-                         {segs′ fin sched₃ st₃}
+                         {segs′ fin sched₃ st₃} {out sched₄ st₄}
                      → lookupNode nid (EvalSt.nodes st₀) ≡ just (switch-st cur od)
                      → switchKill cur sched₀ st₀ ≡ (sched₁ , st₁)
                      → freshId nodeᵏ (Sched.mint sched₁) ≡ inst
@@ -686,8 +700,10 @@ data thruConsume⇓ {n} {Γ} {t} {e} where
                          (inst , segs , done , sched₂ , st₂)
                      → innerReact⇓ switchᵒ nid inst κ now [] sched₂ st₂ done
                          (segs′ , fin , sched₃ , st₃)
+                     → foldVSegs⇓ now κ (segs ++ segs′) false sched₃ st₃
+                         (out , sched₄ , st₄)
                      → thruConsume⇓ switchᵒ nid κ now o sched₀ st₀
-                         (segs ++ segs′ , sched₃ , st₃)
+                         (out , sched₄ , st₄)
 
   consume-switch-nil : ∀ {u lo nid} {κ : Path Γ lo u t} {now}
                        {o : Val Γ (obs u)} {sched₀ st₀}
@@ -698,6 +714,7 @@ data thruConsume⇓ {n} {Γ} {t} {e} where
   consume-exhaust-sub : ∀ {u lo nid} {κ : Path Γ lo u t} {now}
                           {o : Val Γ (obs u)} {sched₀ st₀} {od}
                           {inst segs done sched₁ st₁} {segs′ fin sched₂ st₂}
+                          {out sched₃ st₃}
                       → lookupNode nid (EvalSt.nodes st₀)
                           ≡ just (exhaust-st false od)
                       → subscribeInner⇓ exhaustᵒ nid κ now o sched₀
@@ -707,8 +724,10 @@ data thruConsume⇓ {n} {Γ} {t} {e} where
                           (inst , segs , done , sched₁ , st₁)
                       → innerReact⇓ exhaustᵒ nid inst κ now [] sched₁ st₁ done
                           (segs′ , fin , sched₂ , st₂)
+                      → foldVSegs⇓ now κ (segs ++ segs′) false sched₂ st₂
+                          (out , sched₃ , st₃)
                       → thruConsume⇓ exhaustᵒ nid κ now o sched₀ st₀
-                          (segs ++ segs′ , sched₂ , st₂)
+                          (out , sched₃ , st₃)
 
   consume-exhaust-nil : ∀ {u lo nid} {κ : Path Γ lo u t} {now}
                         {o : Val Γ (obs u)} {sched₀ st₀}
@@ -723,11 +742,11 @@ data thruWalk⇓ {n} {Γ} {t} {e} where
 
   walk-cons : ∀ {u lo op nid} {κ : Path Γ lo u t} {now}
                 {o : Val Γ (obs u)} {os sched₀ st₀}
-                {segs₁ sched₁ st₁} {segs₂ sched₂ st₂}
-            → thruConsume⇓ op nid κ now o sched₀ st₀ (segs₁ , sched₁ , st₁)
-            → thruWalk⇓ op nid κ now os sched₁ st₁ (segs₂ , sched₂ , st₂)
+                {out₁ sched₁ st₁} {out₂ sched₂ st₂}
+            → thruConsume⇓ op nid κ now o sched₀ st₀ (out₁ , sched₁ , st₁)
+            → thruWalk⇓ op nid κ now os sched₁ st₁ (out₂ , sched₂ , st₂)
             → thruWalk⇓ op nid κ now (o ∷ os) sched₀ st₀
-                (segs₁ ++ segs₂ , sched₂ , st₂)
+                (out₁ ++ out₂ , sched₂ , st₂)
 
 data mergeAllDrain⇓ {n} {Γ} {t} {e} where
 
@@ -869,11 +888,11 @@ data stepFrame⇓ {n} {Γ} {t} {e} where
 
   step-thru-outer : ∀ {u lo op nid} {κ : Path Γ lo u t}
                       {now} {vals : List (Val Γ (obs u))} {fin sched st}
-                      {segs sched′ st′}
+                      {out sched′ st′}
                   → thruWalk⇓ op nid κ now vals sched st
-                      (segs , sched′ , st′)
+                      (out , sched′ , st′)
                   → stepFrame⇓ now (thru-outer op nid) κ vals fin sched st
-                      (segs , thruWrap op nid fin (sched′ , st′))
+                      (([] , out) ∷ [] , thruWrap op nid fin (sched′ , st′))
 
 data pushBurst⇓ {n} {Γ} {t} {e} where
 
@@ -1320,14 +1339,14 @@ data foldPath⇓ {n} {Γ} {t} {e} where
 -- path finishing, not one inner's contribution ending, so every
 -- earlier segment folds with `false` and the flag is spent once.
 --
--- ROOT STREAM BEFORE VALUE GROUP WITHIN ONE SEGMENT IS THE UNTESTED
--- HALF.  It is what the frame step answered before there were segments
--- at all, so the corpus cannot move on it -- and it cannot until a
--- root component stops being empty, which is a share connecting.  The
--- argument for it is that a connect fans out to subscribers already
--- registered, so that delivery ran before the subscribe holding this
--- segment existed; the leg that fills the root components is where
--- that stops being an argument.
+-- ROOT STREAM BEFORE VALUE GROUP WITHIN ONE SEGMENT, AND THE
+-- FLATTENER IS WHAT MAKES THE CHOICE OBSERVABLE.  Its step folds each
+-- arriving observable where that observable is subscribed and hands
+-- the result back in the ROOT column, leaving an empty value group
+-- that carries the walk's completion and nothing else -- so reading
+-- the two columns the other way would put that completion ahead of
+-- every delivery the walk made.  A frame that subscribes nothing
+-- leaves the root column empty and cannot tell the orders apart.
 data foldVSegs⇓ {n} {Γ} {t} {e} where
   segs-nil : ∀ {u lo now} {κ : Path Γ lo u t} {fin sched st r}
            → foldPath⇓ now κ [] fin sched st r

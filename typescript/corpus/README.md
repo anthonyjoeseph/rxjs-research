@@ -78,13 +78,22 @@ HAND-BUILT as a matrix rather than a sample: three flatteners (`switchAll`,
 `mergeAll`, `exhaustAll`) against two orders (a literal inner before the share
 and after it) against four frames sitting between the flattener and the root.
 The twelve rows whose frame is `map` all agree; the twelve whose frame is
-`take`, `scan` or `batchSync` all diverge, every one of them, in both orders
-and under all three flatteners. A frame with no cell cannot see the
+`take`, `scan` or `batchSync` diverged, every one of them, in both orders and
+under all three flatteners, until a subscribe's answer started being folded
+down the path AT the subscribe. A frame with no cell cannot see the
 difference and a frame with one always does — which is what makes the split a
-claim about the mechanism rather than about twelve programs. `scan` is the
-loudest of the three, answering with nothing where rxjs answers with three
-values, because an accumulator carries the error forward instead of merely
-reordering around it.
+claim about the mechanism rather than about twelve programs, and what makes
+the matrix's green a statement about one mechanism rather than twelve
+programs happening to agree.
+
+Whoever reads the matrix's twelve `scan` and `take` rows should know the
+binder they turn on, because a hand-built row got it wrong once and read as a
+divergence far louder than the one it was pinning. A fold's function binds ONE
+variable, the PAIR of accumulator and value — so an arithmetic step is
+`add (fst var₀) (snd var₀)`, and a bare `var₀` at the element type is a
+program the evaluator is right to refuse. Six rows here carried that shape and
+answered with nothing, which is exactly what a real divergence in this region
+would look like.
 
 The seventy-seven rows before them are DRAWN, shrunk one at a time from a
 sweep of eight hundred thousand generated programs — of which they are every
@@ -104,9 +113,21 @@ reading is not itself pinned by anything here, which is why the matrix holds
 the share form alone: the twenty-one say the fix cannot be special-cased to
 shares, and they do not say more than that.
 
-Both halves are RED, and are meant to be. This file states an open defect
-rather than guarding a closed one, so a green over it is not something to
-read yet; it goes green when a subscribe's answer stops being pushed after
-the walk that produced it. The twelve `map` rows are the exception and they
-are CONTROLS — they are what says the divergence is the frame's cell and not
-the share.
+The matrix is now GREEN and the drawn half is not, and the gap between the
+two is the finding this file currently holds. Folding a subscribe's answer at
+the subscribe closes the matrix outright — all twenty-four rows, both orders,
+all three flatteners — and closes fifty-four of the seventy-seven drawn rows
+with it. Of the twenty-three that remain, nineteen carry a mergeAll with a
+CONCURRENCY LIMIT, which is the one other place an answer is still collected
+and folded after the fact: a queued inner is subscribed when a lane frees, and
+that subscribe's own emissions are carried back through the finishing inner's
+burst rather than pushed where they were produced. The four that carry no
+limit are not explained by that and are not yet explained by anything.
+
+Every remaining divergence has the same SHAPE, which is worth more than the
+count: rxjs and the evaluator emit the same multiset, and a value the
+evaluator delivers is one the evaluator delivers LATE. So what is left is
+the same deferral seen through a second route, not a second defect.
+
+The twelve `map` rows stay CONTROLS whatever the rest of the file does —
+they are what says a divergence here is the frame's cell and not the share.

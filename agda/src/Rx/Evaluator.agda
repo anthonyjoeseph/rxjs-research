@@ -579,10 +579,9 @@ oneSeg bs = (bs , []) ∷ []
 -- apart costs them a burst each.
 --
 -- THE COMPLETION RIDES THE LAST SEGMENT, which is the reading closest
--- to the one burst this used to answer: at one segment -- every frame
--- but `thru-outer`, and `thru-outer` whenever its outer delivered at
--- most one observable -- the answer is the old one term for term, so
--- the only shapes that move are the ones the split is for.
+-- to the one burst this used to answer: at one segment the answer is
+-- the old one term for term, so the only shapes that move are the ones
+-- the split is for.  A drain is what still answers at several.
 stepSegs : ∀ {n} {Γ : Ctx n} {u t} → VSegs Γ u t → Bool → Segs Γ u t
 stepSegs [] fin =
   ((if fin then completeᵖ ∷ [] else []) ∷ [] , []) ∷ []
@@ -593,9 +592,9 @@ stepSegs ((vs , rs) ∷ s ∷ ss) fin =
 
 -- RESOLVING AT THE TOP, WHERE BOTH COLUMNS ARE ALREADY AT `t` AND
 -- RESOLVING IS CONCATENATING.  Root stream before value stream within
--- one segment, which is the rule `foldVSegs⇓` resolves by; the two
--- used to disagree, and while every root component is empty neither
--- reading is observable.
+-- one segment, which is the rule `foldVSegs⇓` resolves by.  A
+-- flattener's step is what fills the root component, and it is the
+-- frame the two readings disagree on.
 resolveSegs : ∀ {n} {Γ : Ctx n} {t} → Segs Γ t t → Stream Γ t
 resolveSegs []               = []
 resolveSegs ((bs , rs) ∷ ss) = rs ++ bs ++ resolveSegs ss
