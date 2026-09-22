@@ -95,11 +95,11 @@ allRed u (v ∷ vs) = red-val u v ∷ᵃ allRed u vs
 inner! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo}
          (op : AllOp) (allNid : NodeId) (κ : Path Γ lo s t) (now : Tick)
          (o : Val Γ (obs s)) (sched : Sched Γ) (st : EvalSt e)
-       → Σ (NodeId × List (Val Γ s) × Bool × Sched Γ × EvalSt e) λ r →
+       → Σ (NodeId × List (Val Γ s) × Bool × Stream Γ t × Sched Γ × EvalSt e) λ r →
            subscribeInner⇓ {e = e} op allNid κ now o sched st r
 inner! op allNid κ now o sched st =
   let inst = freshId nodeᵏ (Sched.mint sched)
-      ((burst , sched′ , st′) , d , _) =
+      ((burst , _ , sched′ , st′) , d , _) =
         red-val (obs _) o (from-inner op allNid inst ↠ κ) now
           (record sched { mint = setAt nodeᵏ (suc inst) (Sched.mint sched) }) st
   in _ , inner refl d refl
@@ -112,14 +112,14 @@ mergeAllDrain! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo}
                  (allNid : NodeId) (κ : Path Γ lo s t) (now : Tick)
                  (lim : Maybe ℕ) (act : ℕ) (od : Bool)
                  (q : List (Val Γ (obs s))) (sched : Sched Γ) (st : EvalSt e)
-               → Σ (List (Val Γ s) × ℕ × List (Val Γ (obs s)) × Sched Γ × EvalSt e) λ r →
+               → Σ (List (Val Γ s) × ℕ × List (Val Γ (obs s)) × Stream Γ t × Sched Γ × EvalSt e) λ r →
                    mergeAllDrain⇓ {e = e} allNid κ now lim act od q sched st r
 mergeAllDrain! allNid κ now lim act od []      sched st = _ , drain-nil
 mergeAllDrain! allNid κ now lim act od (o ∷ q) sched st
   with hasRoom lim act in eqr
 ... | false = _ , drain-no-room eqr
 ... | true  =
-      let ((inst , vs , done , sched₁ , st₁) , s) =
+      let ((inst , vs , done , _ , sched₁ , st₁) , s) =
             inner! mergeAllᵒ allNid κ now o sched
               (record st
                  { nodes = setNode allNid (mergeAll-st lim act q od)
@@ -142,7 +142,7 @@ innerFinish! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo}
                (op : AllOp) (allNid inst : NodeId) (κ : Path Γ lo s t)
                (now : Tick) (vals : List (Val Γ s))
                (sched : Sched Γ) (st : EvalSt e) (ns : Maybe (NodeState Γ))
-             → Σ (List (Val Γ s) × Bool × Sched Γ × EvalSt e) λ r →
+             → Σ (List (Val Γ s) × Bool × Stream Γ t × Sched Γ × EvalSt e) λ r →
                  innerFinish⇓ {e = e} op allNid inst κ now vals sched st ns r
 
 innerFinish! {s = s} mergeAllᵒ allNid inst κ now vals sched st
@@ -182,7 +182,7 @@ innerReact! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo}
               (op : AllOp) (allNid inst : NodeId) (κ : Path Γ lo s t)
               (now : Tick) (vals : List (Val Γ s))
               (sched : Sched Γ) (st : EvalSt e) (fin : Bool)
-            → Σ (List (Val Γ s) × Bool × Sched Γ × EvalSt e) λ r →
+            → Σ (List (Val Γ s) × Bool × Stream Γ t × Sched Γ × EvalSt e) λ r →
                 innerReact⇓ {e = e} op allNid inst κ now vals sched st fin r
 innerReact! op allNid inst κ now vals sched st false = _ , react-false
 innerReact! op allNid inst κ now vals sched st true
@@ -203,7 +203,7 @@ stepFrameAny! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
                 (now : Tick) (fr : Frame Γ s u) (κ : Path Γ lo u t)
                 (vals : List (Val Γ s)) (fin : Bool)
                 (sched : Sched Γ) (st : EvalSt e)
-              → Σ (List (Val Γ u) × Bool × Sched Γ × EvalSt e) λ r →
+              → Σ (List (Val Γ u) × Bool × Stream Γ t × Sched Γ × EvalSt e) λ r →
                   stepFrame⇓ {e = e} now fr κ vals fin sched st r
 stepFrameAny! now (map-f fn)       κ vals fin sched st = _ , step-map
 stepFrameAny! now (scan-f fn nid)  κ vals fin sched st = _ , step-scan
@@ -263,7 +263,7 @@ mutual
                     now vals fin sched st
     in _ , fold-sink d
   foldPath! ac now (fr ↠ κ) vals fin sched st =
-    let ((vals′ , fin′ , sched₁ , st₁) , sf) =
+    let ((vals′ , fin′ , _ , sched₁ , st₁) , sf) =
           stepFrameAny! now fr κ vals fin sched st
         (_ , rest) = foldPath! ac now κ vals′ fin′ sched₁ st₁
     in _ , fold-step sf rest
@@ -355,7 +355,7 @@ drain! (suc k) sched st with sched-next sched in eqn
 evaluate! : ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slots Γ)
           → Σ (Stream Γ t) λ s → evaluate⇓ fuel e ins s
 evaluate! {n = n} fuel e ins =
-  let ((burst , sched₀ , st₀) , s , _) =
+  let ((burst , roots , sched₀ , st₀) , s , _) =
         reducible e []ᵉ tt (root {lo = n}) 0 (sched-init e ins) (st-init e)
       (rest , d) = drain! fuel sched₀ st₀
   in _ , eval-run s d

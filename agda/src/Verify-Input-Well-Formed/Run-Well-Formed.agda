@@ -173,19 +173,20 @@ Owes {Γ = Γ} st S =
 postulate
   subscribe-shaped :
     ∀ {n} {Γ : Ctx n} {a} {e : Closed Γ (machineEmitᵗ a)} {ins : Slots Γ}
-      {burst sched₀ st₀} →
+      {burst sched₀ st₀} {roots : Stream Γ (machineEmitᵗ a)} →
     Elabᵉ e →
     subscribeE⇓ {e = e} {lo = n} ([] , e , []ᵉ) root 0
-      (sched-init e ins) (st-init e) (burst , sched₀ , st₀) →
+      (sched-init e ins) (st-init e) (burst , roots , sched₀ , st₀) →
     -- AFTER the derivation, not before: the schedule is an implicit
     -- solved from the walk, and a premise mentioning `Sched.slots`
     -- ahead of it eta-expands the selector and leaves the schedule
     -- unsolvable.  Order is load-bearing here, which is why it is
     -- written down.
     Elabˢ ins →
-    Σ ProtocolSt λ S₀ →
+    Σ ProtocolSt λ S₀ → Σ ProtocolSt λ S₁ →
         WellShaped protocol-init (decodeStream (concat burst)) S₀
-      × Owes st₀ S₀
+      × WellShaped S₀ (decodeStream (concat roots)) S₁
+      × Owes st₀ S₁
       -- AND THE TABLE SURVIVES THE WALK.  The premise arrives on `ins`
       -- and the drain reads it off `Sched.slots sched₀`, so somebody
       -- has to say those are the same telescope.  The subscribe walk
@@ -315,26 +316,40 @@ drain-shaped {S = S} el ow (drain-step {out = out} {rest = rest} eqn c d) es
 -- is answered by the telescope now and not by a predicate on syntax.
 --
 -- The index is GENERALISED before the derivation is matched on:
--- `evaluate⇓`'s stream argument is `burst ++ rest`, and matching it
--- against `proj₁ (evaluate! ...)` in place loses the connection
--- between the two halves and the term.
+-- `evaluate⇓`'s stream argument is `burst ++ roots ++ rest`, and
+-- matching it against `proj₁ (evaluate! ...)` in place loses the
+-- connection between the two halves and the term.
 run-wellFormed⇓ :
   ∀ {n} {Γ : Ctx n} {a} {fuel : Fuel} {e : Closed Γ (machineEmitᵗ a)}
     {ins : Slots Γ} (s : Stream Γ (machineEmitᵗ a)) →
   Elabᵉ e → Elabˢ ins →
   evaluate⇓ fuel e ins s →
   Accepted (runProtocol protocol-init (decodeStream (concat s)))
-run-wellFormed⇓ _ el es (eval-run {burst = burst} {rest = rest} sub dr)
+run-wellFormed⇓ _ el es
+    (eval-run {burst = burst} {roots = roots} {rest = rest} sub dr)
   with subscribe-shaped el sub es
-... | S₀ , wsBurst , ow₀ , es₀ with drain-shaped el ow₀ dr es₀
-...   | S₁ , wsRest =
-      wellShaped-accepted (subst (λ z → WellShaped protocol-init z S₁)
-                                 (sym dEq) (ws-++ wsBurst wsRest))
+... | S₀ , S₁ , wsBurst , wsRoots , ow₁ , es₀
+    with drain-shaped el ow₁ dr es₀
+...   | S₂ , wsRest =
+      wellShaped-accepted (subst (λ z → WellShaped protocol-init z S₂)
+                                 (sym dEq)
+                                 (ws-++ (ws-++ wsBurst wsRoots) wsRest))
       where
-      dEq : decodeStream (concat (burst ++ rest))
-              ≡ decodeStream (concat burst) ++ decodeStream (concat rest)
-      dEq = trans (cong decodeStream (concat-++ burst rest))
-                  (decodeStream-++ (concat burst) (concat rest))
+      dEq : decodeStream (concat (burst ++ roots ++ rest))
+              ≡ (decodeStream (concat burst) ++ decodeStream (concat roots))
+                  ++ decodeStream (concat rest)
+      dEq =
+        trans
+          (trans (cong decodeStream
+                       (trans (concat-++ burst (roots ++ rest))
+                              (cong (concat burst ++_) (concat-++ roots rest))))
+                 (trans (decodeStream-++ (concat burst)
+                                         (concat roots ++ concat rest))
+                        (cong (decodeStream (concat burst) ++_)
+                              (decodeStream-++ (concat roots) (concat rest)))))
+          (sym (++-assoc (decodeStream (concat burst))
+                         (decodeStream (concat roots))
+                         (decodeStream (concat rest))))
 
 run-wellFormed :
   ∀ {n} {Γ : Ctx n} {a} (fuel : Fuel) (e : Closed Γ (machineEmitᵗ a))

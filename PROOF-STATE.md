@@ -246,6 +246,10 @@ also: `dispatchShare⇓` — the fan-out the connect does not enter, which is th
 bug stated as a cone: the two are disjoint today and the first leg's wiring is
 exactly what joins them.
 also: `dispatchShare!` — its inhabitation, same reason.
+also: `evaluate⇓` — the carrier's downstream: a subscribe's RESULT TYPE is what the first leg widens, so the top-line runner changes shape whatever the monster is, which is the shape propagating rather than the monster moving.
+also: `evaluate!` — same, its inhabitation.
+also: `run-wellFormed⇓` — same, the one proof that reads the runner's stream.
+also: `subscribe-shaped` — same; its conclusion gains the new component, which is the widening stated where that proof consumes it.
 
 ### Big picture tier roadmap
 
