@@ -260,10 +260,11 @@ also: `subscribe-shaped` — same; its conclusion gains the new component, which
   path, and the segmented carrier retired the result type that stopped
   `sharedConnect⇓` calling either — the carrier also ruled out the cheap
   version, since four of five subscribe arms were dropping the root column it
-  would emit into. What is left is the expensive half and it is on the
-  REDUCIBILITY side: the fold runs inside the candidate's own cycle, over paths
-  read out of the REGISTRY, which stores a path and no candidate for its frames.
-  The values are not the gap. `srcFrame`'s header prices the measure owed.
+  would emit into. What is left is the MEASURE. Neither end is short a
+  candidate: `red-val` is total, and `stepFrameAny!` asks nothing of a registry
+  path's frames. Routing the connect puts the candidate and `foldPath!` in one
+  mutual block, so their two descents have to be funded together — the order
+  `srcFrame`'s header prices.
 
 - **PIN THE WITHIN-SEGMENT ORDER, AT THE FIRST PROGRAM THAT FILLS A ROOT
   COLUMN.** `foldVSegs⇓` and `resolveSegs` both answer a segment's root stream

@@ -934,12 +934,15 @@ data subscribeAll⇓ {n} {Γ} {t} {e} where
 -- at `t`, because a share's subscribers sink at unrelated points of the
 -- tree, and the burst its caller still has path to push is at `u`; one
 -- segment carries both, so spending the emission on the registry and
--- answering the caller stopped being exclusive.  Nor are the VALUES the
--- gap: the fan-out delivers the share's own emission, and the arm that
--- would build this derivation subscribes the definition and so already
--- holds a candidate for exactly them.  What a registry row stores no
--- candidate for is the FRAMES of the path it carries, which is where
--- the cycle below bites.
+-- answering the caller stopped being exclusive.  Nor is a candidate the
+-- gap at either end: `red-val` is total, so the arrival side carries no
+-- premise, and `stepFrameAny!` asks nothing about the frames of a path
+-- it read out of the registry.  What is left is the MEASURE.  The arm
+-- that would build this derivation lives in the candidate, the fold
+-- lives above it, and routing the connect makes them one block -- so
+-- the candidate's descent on the element type and the fold's on the
+-- floor have to be funded together, which is the order `srcFrame`'s
+-- header prices.
 
 -- AND THE FAN-OUT IS THE RIGHT ANSWER, WHICH IS MEASURED RATHER THAN
 -- ARGUED.  Delivering the definition's burst value-major, re-reading
