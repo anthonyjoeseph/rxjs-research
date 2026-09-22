@@ -257,14 +257,13 @@ also: `subscribe-shaped` — same; its conclusion gains the new component, which
 - **ROUTE THE CONNECT THROUGH THE FAN-OUT — THIS LEG IS THE MONSTER.** The
   evaluator side is built — `shareWalk⇓` and `shareGo⇓` both — and the
   segmented carrier retired the result type that stopped `sharedConnect⇓`
-  calling either. What is
-  left is the MEASURE, and it is the only route: the reducibility-side fold
-  that would avoid it needs the candidate parameterised over a state
-  predicate, which was built and puts that predicate at both signs of the
-  observable arm. So the builder's fold it is, and calling it closes a cycle
-  through `red-val` that re-seeds both of `redExpAcc`'s accessibilities. Only a
-  state-dependent unconnected-slot count survives the loop, and that is a
-  `Freshness.Mono` over the fold relations before it is an order.
+  calling either, and calling it closes a cycle through `red-val` that re-seeds
+  both of `redExpAcc`'s accessibilities. The measure paying for that re-seeding
+  is RECOVERED rather than owed: the unconnected-share count, arithmetic
+  already proven, sits OUTSIDE both, and its monotonicity half is syntactic —
+  the slot table has one writer in the evaluator and the connected set is only
+  ever consed. So the leg is the nineteen-member block, two Σ conjuncts per
+  builder carrying table and set forward, and the connect's own call.
 
 - **PIN THE WITHIN-SEGMENT ORDER, AT THE FIRST PROGRAM THAT FILLS A ROOT
   COLUMN.** `foldVSegs⇓` and `resolveSegs` both answer a segment's root stream

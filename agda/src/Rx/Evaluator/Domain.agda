@@ -955,15 +955,37 @@ data subscribeAll⇓ {n} {Γ} {t} {e} where
 -- way when the connect calls it.  That is sound today only because
 -- `red-val` sits BELOW the candidate and the call is not recursive.
 
--- SO THE PRICE IS ONE QUANTITY THAT SURVIVES THE WHOLE LOOP, AND IT IS
--- A THEOREM RATHER THAN AN ORDER.  An unconnected-slot count is a
--- function of the STATE, which the checker cannot read off an argument,
--- so every call in the cycle has to carry a proof that the state it was
--- handed did not raise it.  `Freshness.Mono` is that proof for the node
--- counter over the thirteen subscribe relations, clause for clause; the
--- fold relations have no counterpart, and they are the half a fan-out
--- runs in.  The step itself is the cheap end: `connectedShares` is
--- consed by the two connect arms and by nothing else.
+-- SO THE PRICE IS ONE QUANTITY THAT SURVIVES THE WHOLE LOOP, AND THE
+-- ARITHMETIC OF IT IS ALREADY PROVEN.  The quantity is the unconnected
+-- SHARE count, summed over the slot table: a shared slot reads one
+-- until the connected set holds it, a scripted slot reads nought
+-- whatever the set holds.  It drops strictly across the connect arm on
+-- exactly the two facts that arm already binds -- the slot's `shared`
+-- shape and the membership reading `false` -- so neither is a new
+-- hypothesis nor an arithmetic side condition, but the branch the
+-- clause is already standing in.  Conditioning on the shape is what
+-- makes it true rather than what weakens it: without it a scripted
+-- slot connects and moves nothing.
+
+-- AND THE HALF THAT READS LIKE A MONOTONICITY THEOREM IS SYNTACTIC.
+-- The count is taken over the slot TABLE and the connected set, and
+-- neither can move against it: the table has ONE writer in the whole
+-- evaluator, the run's own initialisation, and the set is only ever
+-- consed, since every state below that initialisation is reached by
+-- record update.  So no relation in the cycle can raise the count, and
+-- what each builder owes is not a `Freshness.Mono` over the fold
+-- relations but two conjuncts in its own Σ result -- the table it
+-- hands back is the one it was given, and the set it hands back
+-- extends -- discharged where the body is written, the way `RedPush`
+-- already carries `RedNode`.
+
+-- AND THAT IS WHAT PAYS FOR THE RE-SEEDING RATHER THAN ROUTING ROUND
+-- IT.  The count is the OUTERMOST component, so the two accessibilities
+-- `reducible` seeds afresh are seeded UNDER a component that has
+-- already dropped, and the lexicographic step belongs to the loop
+-- rather than to any one call in it.  Which is why the re-seeding
+-- stopped being the obstruction the moment the outer component was
+-- found: it was only ever fatal to an order with nothing above it.
 
 -- AND THE MEASURE IS OWED ONLY BECAUSE THE FOLD BEING CALLED IS THE
 -- BUILDER'S, WHICH IS WHY IT IS WORTH SAYING WHAT THE OTHER FOLD COSTS
@@ -1041,6 +1063,18 @@ data subscribeAll⇓ {n} {Γ} {t} {e} where
 --   built, and it puts the predicate at BOTH SIGNS of the observable
 --   arm, which takes a state and answers with one.  `RedNode`'s own
 --   header carries the routes out of that.
+
+-- RECOVERY: git show 104d61de^:agda/src/Rx/Evaluator/Unconn-Arith.agda
+--   restores the count's whole arithmetic proven -- consing a source
+--   never raises it, a slot reading one drops the sum strictly when
+--   its own source is consed, and a `shared` slot outside the set
+--   reads one.  Chained, that last pair is the connect step from the
+--   two facts the arm binds.  The count itself is in the same commit's
+--   `git show 104d61de^:agda/src/Rx/Evaluator.agda`, and `Slot` has
+--   not moved since, so both port back unedited.  Deleted with them
+--   was `Refuted.Scripted-Connect`, which refutes the membership-ONLY
+--   form and so refutes nothing the module proves -- it is the witness
+--   that the `shared` premise is load-bearing rather than defensive.
 data sharedConnect⇓ {n} {Γ} {t} {e} where
 
   connect-live : ∀ {lo} {i : Fin n} {d} {κ : Path Γ lo (lookup Γ i) t}

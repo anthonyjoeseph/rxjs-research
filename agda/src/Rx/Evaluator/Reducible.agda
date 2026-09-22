@@ -25,16 +25,19 @@
 module Rx.Evaluator.Reducible where
 
 open import Data.Bool using (Bool; true; false; if_then_else_; T; _∧_)
+open import Data.Bool.ListAction using (any)
 open import Data.Fin using (Fin; toℕ)
+open import Data.Fin.Properties using (toℕ<n)
 open import Data.List using (List; []; _∷_; _++_; map)
 open import Data.List.Relation.Unary.All using (All; []; _∷_)
+open import Data.List.Relation.Unary.All using () renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All.Properties using (++⁺)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; zero; suc; _<_; s≤s; _+_; _<ᵇ_)
+open import Data.Nat using (ℕ; zero; suc; pred; _≤_; _<_; _∸_; s≤s; _+_; _<ᵇ_; _≡ᵇ_)
 open import Data.Nat.Induction using (<-wellFounded)
-open import Data.Nat.Properties using (_<?_; ≮⇒≥; ≤-refl; ≤-trans; m≤n+m; m≤m+n; <ᵇ⇒<)
+open import Data.Nat.Properties using (_<?_; ≮⇒≥; ≤-refl; ≤-trans; m≤n+m; m≤m+n; <ᵇ⇒<; ∸-monoʳ-<)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
@@ -60,15 +63,16 @@ open import Rx.Inputs-Below using (ib-unfoldμ; ib-topᵉ)
 open import Rx.Mint using (nodeᵏ; regᵏ; sourceᵏ; freshId; setAt)
 open import Decide using (∧ˡ; ∧ʳ)
 open import Rx.Evaluator using (Stream; Burst; VSegs; Segs; segsCompleted; segVSegs; stepSegs; Sched; EvalSt; Path; Frame;
-  _↠_; map-f; take-f; scan-f; batchSync-f; from-inner; thru-outer; share-sink; mergeAllᵒ;
+  _↠_; map-f; take-f; scan-f; batchSync-f; from-inner; thru-outer; share-sink; root; mergeAllᵒ;
   switchᵒ; exhaustᵒ; AllOp; NodeId; NodeState; cell-st; take-st; batchSync-st; mergeAll-st;
   switch-st; exhaust-st; takeVals; takeDispatch; scanVals; scanDispatch; batchVals;
-  batchDispatch; lookupNode; installNode; oneShotBurst; spentBurst; memberSource; splitEvents;
-  splitBurst; consumeUsable; hasRoom; switchKill; register; atSlot; lowerFloor)
+  batchDispatch; lookupNode; setNode; installNode; oneShotBurst; spentBurst; memberSource; splitEvents;
+  splitBurst; consumeUsable; hasRoom; switchKill; register; atSlot; lowerFloor;
+  aliveThroughᶠ; shareAdmit; shareDying; RegId)
 open import Rx.Evaluator.Freshness using (lookup-set; PreservedBelow)
 open import Rx.Evaluator.Freshness.Preserve using (subscribeE-preserves)
 open import Rx.Evaluator.Domain using (srcFrame; subscribeE⇓; pushBurst⇓; pushSegs⇓; stepFrame⇓;
-  step-map; step-scan; step-take; step-batchSync; push-nil; push-cons;
+  step-map; step-scan; step-take; step-batchSync; step-from-inner; push-nil; push-cons;
   psegs-nil; psegs-cons;
   subs-of; subs-empty; subs-map; subs-take-zero; subs-take-suc; subs-scan;
   subs-batchSync; subs-mint; subs-defer; subs-floor; subs-hot-done; subs-hot-live;
@@ -76,8 +80,16 @@ open import Rx.Evaluator.Domain using (srcFrame; subscribeE⇓; pushBurst⇓; pu
   subs-switch-all; subs-exhaust-all; thruConsume⇓; thruWalk⇓;
   step-thru-outer; inner; consume-all-sub; consume-all-enqueue; consume-all-nil;
   consume-switch-sub; consume-switch-nil; consume-exhaust-sub; consume-exhaust-nil;
-  walk-nil; walk-cons; subs-shared; slot-spent; slot-join; slot-connect;
-  connect-live; connect-died)
+  walk-nil; walk-cons; walk-last; walk-more; subs-shared; slot-spent; slot-join; slot-connect;
+  connect-live; connect-died;
+  subscribeInner⇓; mergeAllDrain⇓; innerFinish⇓; innerReact⇓; foldPath⇓; foldVSegs⇓;
+  dispatchShare⇓; shareWalk⇓; shareGo⇓;
+  drain-nil; drain-no-room; drain-room;
+  finish-all-drain; finish-switch-clear; finish-exhaust-clear; finish-nil;
+  react-false; react-alive; react-dead;
+  fold-root; fold-sink; fold-step;
+  segs-nil; segs-last; segs-more;
+  disp; go-nil; go-cut; go-live)
 
 -- A PLAIN EVENT CARRIES A PAYLOAD ONLY IN ITS VALUE ARM; the end
 -- carries none and so constrains nothing.
