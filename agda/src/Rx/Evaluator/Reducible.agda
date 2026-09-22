@@ -160,17 +160,34 @@ Red {Γ = Γ} (obs u) b =
 --   STABLE under writes to nodes the abstraction hides, and an abstract
 --   predicate grants no stability.  Requiring stability as a side
 --   hypothesis is the same statement one layer out.
+--
+-- DEAD ROUTE: moving the fan-out OUT of the subscribe cycle, so that the
+--   arm never reaches the registry at all.  Measured in the pushing
+--   reference rather than argued: a flattener reads its own completion
+--   at the moment its subscribe RETURNS, so a fan-out queued past that
+--   point arrives at a node that has already declared itself finished
+--   and its values are dropped.  That is the burst carrier's own defect
+--   reintroduced by another door, and deferring the completion with it
+--   is the carrier question over again.
+--
+-- DEAD ROUTE: a registry invariant mutually recursive with this
+--   candidate.  Its calls land at whatever types the registry happens
+--   to hold, which no measure orders against the type this recursion
+--   runs on.  Making the candidate INDUCTIVE rather than a recursion
+--   does not save it either: the invariant would stand in a hypothesis,
+--   so the occurrence is negative.
 
--- WHAT IS LEFT IS A LEVEL, AND IT PAYS FOR THE FLATTENER ONLY.  Quantify
--- the store predicate INSIDE the observable arm, one level below the arm
--- itself -- the candidate landing in a level computed from the type, an
--- observable one above its element.  A flattener's instantiation then
--- lands exactly where its own arm provides, because the queue holds
--- values at the type the arm is recursing through.  The SHARE's fan-out
--- is not reached: a sink pushes into paths read out of the REGISTRY,
--- whose frames stand at types nothing in the arm names, so their
--- obligations have no level to be quantified at.  That gap is the
--- question, and the fan-out is what the carrier change was bought for.
+-- THE FLATTENER'S HALF COSTS NOTHING AND THE SHARE'S IS THE WHOLE
+-- QUESTION, WHICH IS NOT HOW IT LOOKED FROM THE STATEMENT.  A merge's
+-- queue holds values at the type this arm is already recursing through,
+-- so the conjunct saying they are reducible is ordinary structural
+-- recursion and lands in `Set` beside every other arm -- no level, and
+-- no predicate quantified inside the arm.  A SHARE's sink is the one
+-- that does not: it pushes into paths read out of the REGISTRY, and a
+-- frame along one of those stands at a type the arm never names, so an
+-- invariant covering them reaches the candidate at types standing in no
+-- relation to the one being recursed on.  That is what the carrier
+-- change bought and it is open.
 
 -- WHY A SHARE'S FAN-OUT COSTS THE CANDIDATE NOTHING, WHICH IS THE ONE
 -- THING ABOUT `connect` THAT WAS NOT OBVIOUS.  A shared slot subscribes

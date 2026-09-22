@@ -251,16 +251,14 @@ also: `chainStep⇓`, `chainStep!` — the carrier is a batch on BOTH faces and 
 
 ### Big picture tier roadmap
 
-- **THE CANDIDATE'S LEVEL, WHICH IS WHAT THE PUSH CHARGES FOR THE STORE.** A
-  pushing subscribe reaches the fold, and the fold reaches the flattener's
-  DRAIN — so a parked inner is taken back out of the store inside the very
-  subscribe that parked it, and the candidate at that inner is APPLIED to
-  build its subscription rather than merely carried. Three ways to pay are
-  ruled out in `Red`'s header — a leaf, the theorem at values, and an
-  invariant written into the type recursion — and the one that is left costs
-  the candidate a LEVEL. Settle the level, and the arm is a restatement
-  rather than a research question; leave it, and every clause above it is
-  typed against a statement that cannot hold.
+- **DOES A SUBSCRIBE EVER DISPATCH TO A ROW IT DID NOT ITSELF REGISTER?** The
+  share's fan-out is the only thing putting registry paths in the candidate's
+  reach, and the registry is read at a CONNECT — an already-connected slot
+  registers and returns without dispatching, and a later emission reaches the
+  fan-out from the arrival loop, outside the arm. So the rows a subscribe can
+  push to may all be ones that subscribe registered, which would move the
+  obligation from the registry to the cascade and put it at types the arm
+  names. Settle that first: it decides whether the arm is statable at all.
 
 - **THE OTHER TWO STORE OBLIGATIONS ARE LEAVES, AND SAYING WHY IS THE LEG.**
   A fold's cell and a bracket's buffer are read back inside a subscribe for
