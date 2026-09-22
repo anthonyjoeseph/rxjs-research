@@ -1,4 +1,4 @@
-import { Closed, Exp, Fn, PrimOp, Tm, Ty, Val } from "./exp.js";
+import { Closed, Exp, Fn, PrimOp, Tm, Ty, Val, tyEq } from "./exp.js";
 import type { ObservableInput, Slot, TestCase, Timed } from "./prop-test.js";
 
 // The differential-testing generator: deterministic, seeded canonical
@@ -56,22 +56,6 @@ const natT: Ty = { type: "nat" };
 const uniqT: Ty = { type: "uniq" };
 const prodNN: Ty = { type: "prod", fst: natT, snd: natT };
 const prodUU: Ty = { type: "prod", fst: uniqT, snd: uniqT };
-
-const tyEq = (a: Ty, b: Ty): boolean => {
-  if (a.type === "prod" && b.type === "prod")
-    return tyEq(a.fst, b.fst) && tyEq(a.snd, b.snd);
-  if (a.type === "sum" && b.type === "sum")
-    return tyEq(a.left, b.left) && tyEq(a.right, b.right);
-  if (a.type === "obs" && b.type === "obs") return tyEq(a.elem, b.elem);
-  if (a.type === "list" && b.type === "list") return tyEq(a.elem, b.elem);
-  return (
-    a.type === b.type &&
-    a.type !== "prod" &&
-    a.type !== "sum" &&
-    a.type !== "obs" &&
-    a.type !== "list"
-  );
-};
 
 // value types only (no obs): scripted-slot element types and the types a
 // term inhabits. obs types arise only as the SOURCE of an *All join

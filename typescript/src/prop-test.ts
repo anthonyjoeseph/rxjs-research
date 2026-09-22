@@ -3,6 +3,7 @@ import { evaluatePlain } from "./plain-eval.js";
 import { genTestCases } from "./generator.js";
 import { serialize } from "./serialize.js";
 import { execAgda } from "./agda-bridge.js";
+import { evaluateRef } from "./ref-eval.js";
 import { readFileSync } from "node:fs";
 
 // THE ORACLE, AND WHAT IT IS AN ORACLE FOR (Anthony: "the sole purpose
@@ -96,6 +97,23 @@ const readSeedFromCli = (): string | undefined => readFlag("seed");
 // prints.  Without it a divergence is reproducible only by re-running
 // the sweep that found it, and a generator edit moves every offset.
 const readCasesFromCli = (): string | undefined => readFlag("cases");
+// `--machine ref` PUTS THE REFERENCE EVALUATOR ON THE ORACLE SIDE, in
+// place of the compiled Agda.  It exists because the Agda evaluator is
+// `proj₁` of its own inhabitation proof, so a run of it is a corollary
+// of the totality tower -- and a change to the CARRIER cannot be
+// measured until that whole tower is closed again, which is the wrong
+// order, since the measurement is what says whether the new shape was
+// worth proving.  The reference is a partial function, so it can be
+// moved and run in a minute.  It is not an authority: while the two
+// agree it stands in for the Agda, and where they diverge the Agda is
+// right by construction and the reference has a transcription bug.
+// `--baseline` picks what it is compared AGAINST, `rx` by default.
+// `--machine agda --baseline ref` is the TRANSCRIPTION check: it asks
+// whether the reference still IS the Agda, which is the only thing that
+// entitles a measurement taken on the reference to be believed about the
+// tower.  Run it before trusting a reference verdict, never after.
+const readMachineFromCli = (): string | undefined => readFlag("machine");
+const readBaselineFromCli = (): string | undefined => readFlag("baseline");
 
 // A TOKEN IN A VALUE POSITION IS REFUSED, WHICH IS THE ONE PLACE A
 // SYMBOL WOULD LIE.  `JSON.stringify` drops a symbol silently, so a
@@ -143,10 +161,17 @@ const render = (values: Val[]): string => (
 // toward a coverage claim is the vacuous-row failure this file's own
 // EMPTY-output incident already records, one notch weaker: there the
 // check could not fail, here most of it does not.
+//
+// AND THE SIDES ARE NAMED BY THE CALLER, because the oracle side is not
+// always the Agda: a reference run puts a transcription there, and a
+// report calling it `agda` would be a lying label on the one output a
+// reader takes a verdict from.
 const interpretResults = (
   agdaResults: EvalResult[],
   rxResults: EvalResult[],
   testCases: TestCase[],
+  lhs: string = "agda",
+  rhs: string = "rx",
 ): { report: string; ok: boolean; live: number } => {
   const n = Math.min(agdaResults.length, rxResults.length);
   const lines: string[] = [];
@@ -163,13 +188,13 @@ const interpretResults = (
     }
     lines.push(`case ${i}: values ✗`);
     lines.push(`  program     = ${serialize(testCases[i])}`);
-    lines.push(`  agda.values = ${a}`);
-    lines.push(`  rx.values   = ${r}`);
+    lines.push(`  ${lhs}.values = ${a}`);
+    lines.push(`  ${rhs}.values = ${r}`);
   }
   const header =
     `${n} cases (${live} emitting): values ${valuesOk}/${n} match` +
     (agdaResults.length !== rxResults.length
-      ? ` (LENGTH MISMATCH: agda ${agdaResults.length}, rx ${rxResults.length})`
+      ? ` (LENGTH MISMATCH: ${lhs} ${agdaResults.length}, ${rhs} ${rxResults.length})`
       : "");
   return {
     report: [header, ...lines].join("\n"),
@@ -228,6 +253,15 @@ async function main() {
   const operator = readOperatorFromCli();
   const cliSeed = readSeedFromCli();
   const casesFile = readCasesFromCli();
+  const machine = readMachineFromCli() ?? "agda";
+  const baseline = readBaselineFromCli() ?? "rx";
+  const known = ["agda", "ref", "rx"];
+  for (const [flag, v] of [
+    ["machine", machine],
+    ["baseline", baseline],
+  ])
+    if (!known.includes(v))
+      throw new Error(`--${flag} takes ${known.join(" | ")}, not '${v}'`);
   const testCases =
     casesFile !== undefined
       ? readFileSync(casesFile, "utf8")
@@ -237,14 +271,26 @@ async function main() {
       : cliSeed !== undefined
         ? genTestCases(cliSeed, operator)
         : drawCorpus(operator);
-  const agdaResults = await execAgda(testCases.map(serialize));
-  const rxResults = testCases.map((testCase): EvalResult => ({
-    values: evaluatePlain(testCase),
-  }));
+  const run = async (which: string): Promise<EvalResult[]> =>
+    which === "ref"
+      ? testCases.map((testCase): EvalResult => ({
+          values: evaluateRef(testCase),
+        }))
+      : which === "rx"
+        ? testCases.map((testCase): EvalResult => ({
+            values: evaluatePlain(testCase),
+          }))
+        : await execAgda(testCases.map(serialize));
+  if (machine !== "agda" || baseline !== "rx")
+    console.log(`comparing ${machine} against ${baseline}`);
+  const agdaResults = await run(machine);
+  const rxResults = await run(baseline);
   const { report, ok, live } = interpretResults(
     agdaResults,
     rxResults,
     testCases,
+    machine,
+    baseline,
   );
   console.log(report);
   // a zero-case run is a failure too: it means the generator produced

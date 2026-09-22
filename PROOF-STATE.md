@@ -240,16 +240,6 @@ the one thing here a differential run has actually contradicted.
 
 ### Big picture tier roadmap
 
-- **A REFERENCE EVALUATOR IN THE TYPESCRIPT, SO THE CARRIER CAN BE MEASURED AT
-  ALL.** The Agda machine is `proj₁` of its own inhabitation proof, so a run
-  is a corollary of the tower and there is nothing to point an oracle at while
-  the tower is open — a carrier change is therefore proven first and judged
-  after, which is the wrong order. The mirror is owed to the TypeScript anyway
-  and a partial function is free there: transcribe the frames, the path, the
-  node store and the registry, keep it burst-carried, and pin it against
-  `plain-eval`'s rxjs on the draw and the corpus. Green here reproduces
-  today's Agda, divergence included — which is what makes it a reference.
-
 - **THE PUSH CARRIER IN THE REFERENCE, DECIDED BY THE POSITION PAIR.** A
   subscription returns no burst: it pushes each value through its path as the
   value is produced, so a reaction runs before the source is read again. The
@@ -258,8 +248,20 @@ the one thing here a differential run has actually contradicted.
   handed to a joiner can give, and a causal thread gives free. `batchSync`'s
   group moves with it, out of `batchVals` reading a burst and into the node's
   own state, which is the one place the rewrite can change an answer rather
-  than re-thread one. Draw AT the region: shares under each flattener, nested
-  shares, a bracket between.
+  than re-thread one. The reference is where this is cheap; the check that it
+  is still the Agda is `--machine agda --baseline ref`, spent before the
+  rewrite and not after.
+
+- **A DRAW THAT REACHES THE REGION, BEFORE THE TRANSCRIPTION IS PAID FOR.**
+  The reference measured 500/500 against the Agda on the ordinary draw while
+  the pinned corpus stays red, and those two numbers together say the draw
+  does not reach the three-condition region at all — so a push carrier would
+  come back green on exactly the programs the burst carrier is already green
+  on, and the corpus would stay four hand-written rows carrying the finding.
+  Bias the generator at the region: a share under each flattener, a
+  synchronous multi-value share, a subscription caused by one of those,
+  nested shares, a bracket between. That is what makes the next leg's cost
+  worth paying rather than a bet on four rows.
 
 - **THE CARRIER'S SHAPE INTO `Rx.Evaluator.Domain`, AS A TRANSCRIPTION.** Only
   once the reference is green. The relation is where the design is stated and

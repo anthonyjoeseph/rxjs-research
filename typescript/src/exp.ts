@@ -204,6 +204,28 @@ const valEq = (a: Val, b: Val): boolean => {
   return a === b;
 };
 
+// Agda's `_≟ᵗ_`, and it is not decoration: the machine's node store and
+// registry carry their element types EXISTENTIALLY, so every read of a
+// stored observable or accumulator pays one of these before it trusts
+// what it found. A reader that skipped it would forward a value at the
+// wrong type rather than forward nothing, which is the one failure the
+// Agda's own `Maybe`-shaped reads are written to rule out.
+export const tyEq = (a: Ty, b: Ty): boolean => {
+  if (a.type === "prod" && b.type === "prod")
+    return tyEq(a.fst, b.fst) && tyEq(a.snd, b.snd);
+  if (a.type === "sum" && b.type === "sum")
+    return tyEq(a.left, b.left) && tyEq(a.right, b.right);
+  if (a.type === "obs" && b.type === "obs") return tyEq(a.elem, b.elem);
+  if (a.type === "list" && b.type === "list") return tyEq(a.elem, b.elem);
+  return (
+    a.type === b.type &&
+    a.type !== "prod" &&
+    a.type !== "sum" &&
+    a.type !== "obs" &&
+    a.type !== "list"
+  );
+};
+
 export const evalWith = (tm: Tm, env: Val[]): Val => {
   switch (tm.type) {
     case "varT":
