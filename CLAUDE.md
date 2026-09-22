@@ -65,6 +65,7 @@ Standing approval for any change that **does not alter the spec** — impl edits
 - Parallel workers authorized; parallel Agda up to two heavyweight checks at once, cheap modules freely → [docs/typecheck-cost.md](docs/typecheck-cost.md).
 - **Directives carry the law** — every worker prompt restates the rules it needs.
 - Workers don't commit. Land green work via a PR, never a direct push to main — ask first.
+- **Stage explicitly while a worker holds a file — never `git add -A` (Anthony).**
 - **Run continuously** (Anthony: "continue and continue, don't stop for context window or usage credits"). Review, merge, launch the next.
 
 ## Long Agda builds
