@@ -273,15 +273,15 @@ does.
 
 ### Big picture tier roadmap
 
-- **THE CONNECT SPENDS ITS BURST ON THE REGISTRY, WHICH COSTS A RESULT TYPE.**
+- **THE CONNECT SPENDS ITS BURST ON THE REGISTRY, AND THE ANSWER STAYS AT `u`.**
   `sharedConnect⇓` routes the definition's burst through the fan-out instead of
   returning it, and the subscriber that triggered the connect is served by its
   own registration — it is registered before the definition is subscribed, so
-  nothing is lost, only re-routed. What that costs is the answer at `u`: the
-  emits come back at `t`. Decide it at ONE site before typing any of it, since
-  the frames are what pay — either every frame gains somewhere to put a
-  root-level emit, or the connect keeps a source-typed answer and the fan-out
-  is fed some other way.
+  nothing is lost, only re-routed. Answering at `t` instead is DEAD, recorded at
+  `sharedConnect⇓`: `Red (obs u)` quantifies the root type inside its own arm,
+  so a root-typed result makes the conjunct impredicative and takes the descent
+  with it. So the fan-out's emits have to reach the root without the subscribe's
+  result type changing, and where they attach is the leg.
 
 - **WHAT THE SINGLETON FOLD COSTS `batchSync`, ONCE THE FAN-OUT RUNS AT ALL.**
   The value walk hands a subscriber one value per `foldPath⇓`, and the one

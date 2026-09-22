@@ -262,6 +262,23 @@ data dispatchShare⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
 -- before -- the joiner's entitlement as a CONSEQUENCE of when the list
 -- is read, so nothing has to carry a join index and no registry row
 -- gains a field.
+--
+-- AND THE ORDER IT IMPLEMENTS IS A DEPTH-FIRST WALK OF AN EXECUTION
+-- TREE IN WHICH EACH NODE ORDERS ITS OWN CHILDREN (Anthony).  A
+-- flattener orders them by (inner, then value); a share orders them by
+-- (value, then subscriber).  Those are opposite, which is why no single
+-- sort key over the whole emission can be right -- one uniform order
+-- repairs the share and breaks every flattener, and a global emission
+-- counter is that key by another name.  So the transpose belongs at the
+-- share and nowhere else, which is what this loop is.
+--
+-- THE ROUTE IF THIS ONE FAILS is to make the traversal's position
+-- EXPLICIT: stamp each emit with its path through that tree and sort
+-- lexicographically, rather than relying on each node to emit its
+-- children in order.  Not taken, and the reason is worth keeping: the
+-- stamp needs a significance ordering ACROSS NESTED SHARES, and nothing
+-- yet justifies one.  An unjustified total order is cheap to write,
+-- typechecks, and is the shape this campaign has lost the most time to.
 data shareWalk⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
      Tick → (i : Fin n)
    → List (Val Γ (lookup Γ i)) → Bool → Sched Γ → EvalSt e
@@ -820,10 +837,23 @@ data subscribeAll⇓ {n} {Γ} {t} {e} where
 -- sink at unrelated points of the tree; `subscribeE⇓` answers at `u`,
 -- because its caller is a frame that still has path left to push
 -- through.  So the connect cannot spend its burst on the registry and
--- also answer its caller, and the two readings of that -- keep the
--- source type and lose the fan-out, or answer at `t` and give every
--- frame somewhere to put a root-level emit -- are the same question the
--- carrier is.
+-- also answer its caller.
+
+-- DEAD ROUTE: answering at `t` -- folding the burst through the path
+--   INSIDE the subscribe, so the sink clause reaches the fan-out and
+--   `sharedConnect⇓` has nothing left to hand back.  It is blocked by
+--   `Red`, not by the evaluator: the candidate's observable arm reads
+--   `Red (obs u) b` as a subscription derivation together with
+--   `StreamSat (Red u)` over its result, and that recursive occurrence
+--   at a STRICTLY SMALLER type is the whole of the Girard-Tait descent.
+--   The root type is quantified INSIDE that arm -- `∀ {t} (κ : Path Γ lo
+--   u t)` -- so a result at `t` makes the conjunct `StreamSat (Red t)`,
+--   which is not smaller, is impredicative, and ranges over `obs u`
+--   itself.  The descent is denominated in the SOURCE type, and a
+--   root-typed answer has no source type in it.  Worth stating because
+--   the per-value push was refuted with the root type attached and the
+--   two came apart here: it is the TYPE that kills it, and no carrier
+--   that keeps the root type can be rescued by emitting differently.
 data sharedConnect⇓ {n} {Γ} {t} {e} where
 
   connect-live : ∀ {lo} {i : Fin n} {d} {κ : Path Γ lo (lookup Γ i) t}
