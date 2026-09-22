@@ -416,7 +416,8 @@ innerReact-keeps react-false      = keeps-refl _ _
 innerReact-keeps (react-alive _)  = keeps-refl _ _
 innerReact-keeps (react-dead _ f) = innerFinish-keeps f
 
-innerFinish-keeps (finish-all-drain dr)   = mergeAllDrain-keeps dr
+innerFinish-keeps (finish-all-drain fp dr) =
+  keeps-trans (foldPath-keeps fp) (mergeAllDrain-keeps dr)
 innerFinish-keeps (finish-switch-clear _) = keeps-refl _ _
 innerFinish-keeps finish-exhaust-clear    = keeps-refl _ _
 innerFinish-keeps (finish-nil _)          = keeps-refl _ _

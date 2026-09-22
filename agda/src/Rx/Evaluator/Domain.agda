@@ -816,18 +816,38 @@ data mergeAllDrain⇓ {n} {Γ} {t} {e} where
 
 data innerFinish⇓ {n} {Γ} {t} {e} where
 
+  -- THE DYING INNER'S LAST VALUE REACHES THE SINK BEFORE THE DRAIN
+  -- RUNS, AND THAT IS AN ORDER BETWEEN EFFECTS RATHER THAN BETWEEN
+  -- EMITS.  The stream this hands back is the same either way -- the
+  -- value's fold, then the drain's, then the completion -- so the
+  -- thing the old form got wrong was invisible in its own answer: it
+  -- subscribed the queued inner while the value was still unfolded,
+  -- and anything that value causes to SUBSCRIBE was therefore
+  -- registered behind the queue's item instead of ahead of it.  On a
+  -- shared source read in registration order that is a different
+  -- observer list for every later value of the same burst, and a
+  -- `switchAll` downstream then cuts a registration that had not yet
+  -- spoken.  rxjs fixes the order at the inner subscriber: `next`
+  -- runs the whole sink chain, and only the later `complete` drops
+  -- the lane and shifts the buffer.
+  --
+  -- So the fold moves INSIDE the rule and its result travels in the
+  -- root column, where it is already at `t` and nothing below folds
+  -- it twice.  The value group left behind is empty and carries the
+  -- walk's completion alone.
   finish-all-drain : ∀ {s lo allNid inst} {κ : Path Γ lo s t} {now}
                        {vals : List (Val Γ s)} {sched st} {lim act q od}
-                       {out act′ q′ sched′ st′}
-                   → mergeAllDrain⇓ allNid κ now q lim (pred act) od q sched st
-                       (out , act′ , q′ , sched′ , st′)
+                       {outV sched₁ st₁} {out act′ q′ sched₂ st₂}
+                   → foldPath⇓ now κ vals false sched st (outV , sched₁ , st₁)
+                   → mergeAllDrain⇓ allNid κ now q lim (pred act) od q sched₁ st₁
+                       (out , act′ , q′ , sched₂ , st₂)
                    → innerFinish⇓ mergeAllᵒ allNid inst κ now vals sched st
                        (just (mergeAll-st {t = s} lim act q od))
-                       ( (vals , []) ∷ ([] , out) ∷ []
-                       , od ∧ (act′ ≡ᵇ 0) ∧ null q′ , sched′
-                       , record st′
+                       ( ([] , outV ++ out) ∷ []
+                       , od ∧ (act′ ≡ᵇ 0) ∧ null q′ , sched₂
+                       , record st₂
                            { nodes = setNode allNid (mergeAll-st lim act′ q′ od)
-                               (EvalSt.nodes st′) } )
+                               (EvalSt.nodes st₂) } )
 
   finish-switch-clear : ∀ {s lo allNid inst} {κ : Path Γ lo s t} {now}
                           {vals : List (Val Γ s)} {sched st} {c od}

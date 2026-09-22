@@ -1546,8 +1546,11 @@ innerFinish! {s = s} mergeAllᵒ allNid inst κ now vals sched st
              (just (mergeAll-st {w} lim act q od)) aM rm with w ≟ᵗ s in eqw
 ... | no  _    = _ , finish-nil (cong ⌊_⌋ eqw)
 ... | yes refl =
-      let (_ , d) = mergeAllDrain! allNid κ now q lim (pred act) od q sched st aM rm
-      in _ , finish-all-drain d
+      let ((_ , sched₁ , st₁) , fp) =
+            foldPath! (<-wellFounded _) ≤-refl now κ vals false sched st aM rm
+          (_ , d) = mergeAllDrain! allNid κ now q lim (pred act) od q sched₁ st₁ aM
+                      (room-keeps (foldPath-keeps fp) rm)
+      in _ , finish-all-drain fp d
 innerFinish! switchᵒ allNid inst κ now vals sched st
              (just (switch-st (just c) od)) aM rm with (c ≡ᵇ inst) in eqc
 ... | true  = _ , finish-switch-clear eqc
