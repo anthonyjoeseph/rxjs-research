@@ -260,15 +260,15 @@ also: `chainStep⇓`, `chainStep!` — the carrier is a batch on BOTH faces and 
 
 ### Big picture tier roadmap
 
-- **THE STATE PREDICATE OUT OF THE CANDIDATE ALTOGETHER.** Six routes are dead
-  in `Reducible.agda` and they share a wall: the predicate stands at both signs,
-  so a fold's arm transports the environment it holds to neither a stronger nor
-  a weaker one. Dropping the conclusion side is not the repair — the SINK is a
-  hypothesis naming the predicate, which turns its sign over and leaves the mix.
-  What is left is a candidate naming no state, with a fold's cell supplied as an
-  equation by the arm that wrote it, since under a push the writer and the
-  reader are the same call. Probe it before typing it: the arrival side reads a
-  cell no arm is inside. First; the rest stand over it.
+- **AN INDEX UNDER THE STORE OBLIGATION, WHICH IS WHAT THE SIX ROUTES WANTED.**
+  The candidate has to ASSUME a store fact and RE-ESTABLISH it while that fact
+  names the candidate, so no predicate parameter has one sign and six routes in
+  `Reducible.agda` die of it. The shape that survives is an INDEX: what comes
+  out sits one below what went in. The first act is to find whether the run
+  already carries one — `redExpAcc` descends on a slot floor and on a guarded
+  size — since a fresh index has to be reconciled with `evaluate↓` computing
+  through a `proj₁`, and an approximation that stops at a depth is not a
+  derivation. First; the rest stand over it.
 
 - **THE FRESHNESS FACE GAINS THE PREMISE ANY PUSH OWES IT.** A pushing
   subscription writes the nodes its continuation's frames name, however the

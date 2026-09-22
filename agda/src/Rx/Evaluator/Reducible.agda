@@ -266,17 +266,17 @@ Red {Γ = Γ} Q (obs u) b =
 -- subscribe cycle that re-enters, and the routes below are the price of
 -- that rather than a sign that the carrier is wrong.
 --
--- AND A REPAIR HAS TO REMOVE THE PREDICATE, NOT ONE OF ITS SIDES.  The
--- obvious weakening is to stop re-establishing it in the conclusion, so
--- that the candidate is contravariant and a fold transports into its own
--- strengthening; the sink is what defeats it.  A sink is a HYPOTHESIS
--- and it names the predicate, so the predicate's negative occurrence
--- there is a positive one here and the mix survives -- the arm would
--- have to hand a stored value's subscription a sink at the weaker
--- predicate while holding one at the stronger.  So the shape with a sign
--- is the one naming no state at all, and what that shape owes is the
--- fold's cell AT THE MOMENT OF THE READ, which under a push is a moment
--- the arm that wrote it has not yet left.
+-- AND WHAT A REPAIR HAS TO ADD IS AN INDEX, WHICH IS WHY NONE OF THE SIX
+-- IS IT.  Two weakenings read as the repair and neither is one.  Stop
+-- re-establishing the predicate in the conclusion and the candidate is
+-- contravariant, which is the direction a fold wants -- but a sink is a
+-- HYPOTHESIS that names the predicate, so the negative occurrence there
+-- is a positive one here and the mix survives.  Drop the predicate
+-- instead and the sink has no precondition to stand on, since the frames
+-- it steps read the very cells in question.  The statement is therefore
+-- one that ASSUMES a store fact and RE-ESTABLISHES it while the fact
+-- names the candidate, and the shape that makes that well-founded is an
+-- index: what comes out sits one below what went in.
 --
 -- DEAD ROUTE: quantifying the predicate inside the arm.  It is
 --   IMPREDICATIVE and no level assignment repairs it: the predicate that
