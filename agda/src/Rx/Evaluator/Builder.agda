@@ -32,7 +32,7 @@
 -- projected is a real body.
 module Rx.Evaluator.Builder where
 
-open import Data.Bool using (true; false)
+open import Data.Bool using (Bool; true; false)
 open import Data.Bool.ListAction using (any)
 open import Data.List using (List; []; _∷_)
 open import Data.List.Relation.Unary.All using (All) renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
@@ -44,12 +44,12 @@ open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (tt)
 
 open import Rx.Prim using (Fuel)
-open import Rx.Exp using (Ctx; Closed; []ᵉ)
+open import Rx.Exp using (Ctx; Closed; []ᵉ; Val)
 open import Rx.Slots using (Slots)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; root; Arrival; arrTick; arrTy; arrVal; AtFloor; RegId; chainsOf;
   cascadeLatch; sched-next; sched-init; st-init)
 open import Rx.Evaluator.Domain using (chainStep⇓; cascadeGo⇓; cascade⇓; drain⇓; evaluate⇓;
-  chain-step; casc-nil; casc-cut; casc-live; casc-run;
+  chain-step; casc-nil; casc-cut; casc-live; casc-run; casc-run-last;
   drain-done; drain-empty; drain-step; eval-run)
 open import Rx.Evaluator.Reducible using (reducible; foldPath!)
 
@@ -58,39 +58,49 @@ open import Rx.Evaluator.Reducible using (reducible; foldPath!)
 ------------------------------------------------------------------
 
 chainStep! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-             (a : Arrival Γ) (c : AtFloor Γ (arrTy a) t)
+             (a : Arrival Γ) (vs : List (Val Γ (arrTy a))) (fin : Bool)
+             (c : AtFloor Γ (arrTy a) t)
              (sched : Sched Γ) (st : EvalSt e)
            → Σ (Stream Γ t × Sched Γ × EvalSt e) λ r →
-               chainStep⇓ {e = e} a c sched st r
-chainStep! {n = n} a (lo , path) sched st =
+               chainStep⇓ {e = e} a vs fin c sched st r
+chainStep! {n = n} a vs fin (lo , path) sched st =
   let (_ , f) = foldPath! (<-wellFounded (n ∸ lo)) ≤-refl (arrTick a) path
-                  (arrVal a ∷ []) (Arrival.isLast a) sched st
+                  vs fin sched st
                   (<-wellFounded _) ≤-refl
   in _ , chain-step f
 
 cascadeGo! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-             (a : Arrival Γ) (chains : List (RegId × AtFloor Γ (arrTy a) t))
+             (a : Arrival Γ) (vs : List (Val Γ (arrTy a))) (fin : Bool)
+             (chains : List (RegId × AtFloor Γ (arrTy a) t))
              (sched : Sched Γ) (st : EvalSt e)
            → Σ (Stream Γ t × Sched Γ × EvalSt e) λ r →
-               cascadeGo⇓ {e = e} a chains sched st r
-cascadeGo! a []               sched st = _ , casc-nil
-cascadeGo! a ((rid , c) ∷ cs) sched st
+               cascadeGo⇓ {e = e} a vs fin chains sched st r
+cascadeGo! a vs fin []               sched st = _ , casc-nil
+cascadeGo! a vs fin ((rid , c) ∷ cs) sched st
   with any (_≡ᵇ rid) (EvalSt.cancelled st) in eqc
-... | true  = let (_ , g) = cascadeGo! a cs sched st in _ , casc-cut eqc g
+... | true  = let (_ , g) = cascadeGo! a vs fin cs sched st in _ , casc-cut eqc g
 ... | false =
       let ((emits , sched₁ , st₁) , s) =
-            chainStep! a c sched
+            chainStep! a vs fin c sched
               (record st { delivered = rid ∷ EvalSt.delivered st })
-          (_ , g) = cascadeGo! a cs sched₁ st₁
+          (_ , g) = cascadeGo! a vs fin cs sched₁ st₁
       in _ , casc-live eqc s g
 
 cascade! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
            (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e)
          → Σ (Stream Γ t × Sched Γ × EvalSt e) λ r →
              cascade⇓ {e = e} a sched st r
-cascade! a sched st =
-  let (_ , g) = cascadeGo! a (chainsOf a st) sched (cascadeLatch a sched st)
-  in _ , casc-run g
+cascade! a sched st with Arrival.isLast a in eql
+... | false =
+      let (_ , g) = cascadeGo! a (arrVal a ∷ []) false (chainsOf a st) sched
+                      (cascadeLatch a sched st)
+      in _ , casc-run eql g
+... | true  =
+      let ((_ , sched₁ , st₁) , g) =
+            cascadeGo! a (arrVal a ∷ []) false (chainsOf a st) sched
+              (cascadeLatch a sched st)
+          (_ , g′) = cascadeGo! a [] true (chainsOf a st) sched₁ st₁
+      in _ , casc-run-last eql g g′
 
 drain! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
          (fuel : Fuel) (sched : Sched Γ) (st : EvalSt e)

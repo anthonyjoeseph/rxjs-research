@@ -113,21 +113,22 @@ reading is not itself pinned by anything here, which is why the matrix holds
 the share form alone: the twenty-one say the fix cannot be special-cased to
 shares, and they do not say more than that.
 
-The matrix is now GREEN and the drawn half is not, and the gap between the
-two is the finding this file currently holds. Folding a subscribe's answer at
-the subscribe closes the matrix outright — all twenty-four rows, both orders,
-all three flatteners — and closes fifty-four of the seventy-seven drawn rows
-with it. Of the twenty-three that remain, nineteen carry a mergeAll with a
-CONCURRENCY LIMIT, which is the one other place an answer is still collected
-and folded after the fact: a queued inner is subscribed when a lane frees, and
-that subscribe's own emissions are carried back through the finishing inner's
-burst rather than pushed where they were produced. The four that carry no
-limit are not explained by that and are not yet explained by anything.
+The matrix is now GREEN and the drawn half nearly so, and what closed them
+was TWO mechanisms rather than one. Folding a subscribe's answer at the
+subscribe closes the matrix outright — all twenty-four rows, both orders, all
+three flatteners — and fifty-four of the seventy-seven drawn rows with it.
+The drawn rows that survived that all read the same way: the same multiset
+as rxjs, with one value delivered LATE. They were a source's value and its
+END being folded into each registered chain TOGETHER, one chain at a time, so
+the first chain's completion — and the queue drain or fan-out it subscribes —
+got ahead of the second chain's value. A subject walks its observers once for
+`next` and again for `complete`, and splitting the cascade into those two
+passes closes fifteen more.
 
-Every remaining divergence has the same SHAPE, which is worth more than the
-count: rxjs and the evaluator emit the same multiset, and a value the
-evaluator delivers is one the evaluator delivers LATE. So what is left is
-the same deferral seen through a second route, not a second defect.
+Eight drawn rows remain red and they are not this file's subject. They are
+kept here because a corpus that holds a mechanism's whole history is worth
+more than one pruned to what it currently proves, and because the eight are
+where the next divergence will be read off.
 
 The twelve `map` rows stay CONTROLS whatever the rest of the file does —
 they are what says a divergence here is the frame's cell and not the share.

@@ -211,7 +211,7 @@ data mergeAllDrain⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
      ∀ {s lo} →
      NodeId → Path Γ lo s t → Tick
    → Maybe ℕ → ℕ → Bool → List (Val Γ (obs s)) → Sched Γ → EvalSt e
-   → VSegs Γ s t × ℕ × List (Val Γ (obs s)) × Sched Γ × EvalSt e → Set
+   → Stream Γ t × ℕ × List (Val Γ (obs s)) × Sched Γ × EvalSt e → Set
 
 data innerFinish⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
      ∀ {s lo} →
@@ -333,11 +333,12 @@ data foldVSegs⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
 ------------------------------------------------------------------
 
 data chainStep⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
-     (a : Arrival Γ) → AtFloor Γ (arrTy a) t → Sched Γ → EvalSt e
+     (a : Arrival Γ) → List (Val Γ (arrTy a)) → Bool
+   → AtFloor Γ (arrTy a) t → Sched Γ → EvalSt e
    → Stream Γ t × Sched Γ × EvalSt e → Set
 
 data cascadeGo⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
-     (a : Arrival Γ)
+     (a : Arrival Γ) → List (Val Γ (arrTy a)) → Bool
    → List (RegId × AtFloor Γ (arrTy a) t) → Sched Γ → EvalSt e
    → Stream Γ t × Sched Γ × EvalSt e → Set
 
@@ -750,6 +751,14 @@ data thruWalk⇓ {n} {Γ} {t} {e} where
 
 data mergeAllDrain⇓ {n} {Γ} {t} {e} where
 
+  -- A DRAINED SUBSCRIBE IS A SUBSCRIBE, SO ITS ANSWER IS PUSHED WHERE
+  -- IT IS PRODUCED.  This is the second route a flattener subscribes by
+  -- and the one no walk reaches: a lane frees, the queue is spent, and
+  -- each spend can fan out through chains already registered below this
+  -- flattener.  Carrying those answers back to the finishing inner's
+  -- burst puts them BEHIND deliveries made during the drain, which only
+  -- a frame that COUNTS can tell -- the same distinction `thruConsume⇓`
+  -- is stated at, met through the queue instead of through the walk.
   drain-nil : ∀ {s lo allNid} {κ : Path Γ lo s t} {now} {lim act od sched₀ st₀}
             → mergeAllDrain⇓ {s = s} allNid κ now lim act od [] sched₀ st₀
                 ([] , act , [] , sched₀ , st₀)
@@ -774,29 +783,32 @@ data mergeAllDrain⇓ {n} {Γ} {t} {e} where
   -- re-entrant enqueue feed this drain its own tail forever.
   drain-room : ∀ {s lo allNid} {κ : Path Γ lo s t} {now}
                  {lim act od} {o : Val Γ (obs s)} {q sched₀ st₀}
-                 {inst segs done sched₁ st₁} {segs′ act′ q′ sched₂ st₂}
+                 {inst segs done sched₁ st₁} {out sched₂ st₂}
+                 {out′ act′ q′ sched₃ st₃}
              → hasRoom lim act ≡ true
              → subscribeInner⇓ mergeAllᵒ allNid κ now o sched₀
                  (record st₀
                     { nodes = setNode allNid (mergeAll-st {t = s} lim (suc act) q od)
                         (EvalSt.nodes st₀) })
                  (inst , segs , done , sched₁ , st₁)
+             → foldVSegs⇓ now κ segs false sched₁ st₁ (out , sched₂ , st₂)
              → mergeAllDrain⇓ allNid κ now lim
-                 (if done then act else suc act) od q sched₁ st₁
-                 (segs′ , act′ , q′ , sched₂ , st₂)
+                 (if done then act else suc act) od q sched₂ st₂
+                 (out′ , act′ , q′ , sched₃ , st₃)
              → mergeAllDrain⇓ allNid κ now lim act od (o ∷ q) sched₀ st₀
-                 (segs ++ segs′ , act′ , q′ , sched₂ , st₂)
+                 (out ++ out′ , act′ , q′ , sched₃ , st₃)
 
 data innerFinish⇓ {n} {Γ} {t} {e} where
 
   finish-all-drain : ∀ {s lo allNid inst} {κ : Path Γ lo s t} {now}
                        {vals : List (Val Γ s)} {sched st} {lim act q od}
-                       {segs act′ q′ sched′ st′}
+                       {out act′ q′ sched′ st′}
                    → mergeAllDrain⇓ allNid κ now lim (pred act) od q sched st
-                       (segs , act′ , q′ , sched′ , st′)
+                       (out , act′ , q′ , sched′ , st′)
                    → innerFinish⇓ mergeAllᵒ allNid inst κ now vals sched st
                        (just (mergeAll-st {t = s} lim act q od))
-                       ( (vals , []) ∷ segs , od ∧ (act′ ≡ᵇ 0) ∧ null q′ , sched′
+                       ( (vals , []) ∷ ([] , out) ∷ []
+                       , od ∧ (act′ ≡ᵇ 0) ∧ null q′ , sched′
                        , record st′
                            { nodes = setNode allNid (mergeAll-st lim act′ q′ od)
                                (EvalSt.nodes st′) } )
@@ -1366,34 +1378,56 @@ data foldVSegs⇓ {n} {Γ} {t} {e} where
                 (rts ++ emits ++ rest , sched₂ , st₂)
 
 data chainStep⇓ {n} {Γ} {t} {e} where
-  chain-step : ∀ {a : Arrival Γ} {lo} {path : Path Γ lo (arrTy a) t}
+  chain-step : ∀ {a : Arrival Γ} {vs fin lo} {path : Path Γ lo (arrTy a) t}
                  {sched st r}
-             → foldPath⇓ (arrTick a) path (arrVal a ∷ [])
-                 (Arrival.isLast a) sched st r
-             → chainStep⇓ a (lo , path) sched st r
+             → foldPath⇓ (arrTick a) path vs fin sched st r
+             → chainStep⇓ a vs fin (lo , path) sched st r
 
 data cascadeGo⇓ {n} {Γ} {t} {e} where
-  casc-nil : ∀ {a sched₀ st₀}
-           → cascadeGo⇓ a [] sched₀ st₀ ([] , sched₀ , st₀)
-  casc-cut : ∀ {a rid} {c : AtFloor Γ (arrTy a) t} {chains sched₀ st₀ r}
+  casc-nil : ∀ {a vs fin sched₀ st₀}
+           → cascadeGo⇓ a vs fin [] sched₀ st₀ ([] , sched₀ , st₀)
+  casc-cut : ∀ {a vs fin rid} {c : AtFloor Γ (arrTy a) t} {chains sched₀ st₀ r}
            → any (_≡ᵇ rid) (EvalSt.cancelled st₀) ≡ true
-           → cascadeGo⇓ a chains sched₀ st₀ r
-           → cascadeGo⇓ a ((rid , c) ∷ chains) sched₀ st₀ r
-  casc-live : ∀ {a rid} {c : AtFloor Γ (arrTy a) t} {chains sched₀ st₀}
+           → cascadeGo⇓ a vs fin chains sched₀ st₀ r
+           → cascadeGo⇓ a vs fin ((rid , c) ∷ chains) sched₀ st₀ r
+  casc-live : ∀ {a vs fin rid} {c : AtFloor Γ (arrTy a) t} {chains sched₀ st₀}
                 {emits sched₁ st₁ rest sched₂ st₂}
             → any (_≡ᵇ rid) (EvalSt.cancelled st₀) ≡ false
-            → chainStep⇓ a c sched₀
+            → chainStep⇓ a vs fin c sched₀
                 (record st₀ { delivered = rid ∷ EvalSt.delivered st₀ })
                 (emits , sched₁ , st₁)
-            → cascadeGo⇓ a chains sched₁ st₁ (rest , sched₂ , st₂)
-            → cascadeGo⇓ a ((rid , c) ∷ chains) sched₀ st₀
+            → cascadeGo⇓ a vs fin chains sched₁ st₁ (rest , sched₂ , st₂)
+            → cascadeGo⇓ a vs fin ((rid , c) ∷ chains) sched₀ st₀
                 (emits ++ rest , sched₂ , st₂)
 
+-- A VALUE AND THE END THAT RIDES WITH IT ARE TWO PASSES OVER THE SAME
+-- CHAINS, NOT ONE PASS CARRYING BOTH.  A subject's `next` walks its
+-- observers and its `complete` walks them again, so a chain that
+-- SUBSCRIBES on the end -- a flattener's queue draining as a lane
+-- frees, a share's fan-out at a connect -- cannot run until every
+-- observer has had the value.  Folding the pair into each chain in turn
+-- lets the first chain's completion, and everything it subscribes, get
+-- ahead of the second chain's value; the multiset is the same either
+-- way, so only a frame downstream of the second chain can tell, which
+-- is what makes this a different question from the order WITHIN one
+-- chain.  The snapshot is taken once and both passes walk it: a chain
+-- that joins between them subscribed to a source the latch has already
+-- closed, and gets its completion from there.
 data cascade⇓ {n} {Γ} {t} {e} where
   casc-run : ∀ {a sched st} {emits sched′ st′}
-           → cascadeGo⇓ a (chainsOf a st) sched (cascadeLatch a sched st)
-               (emits , sched′ , st′)
+           → Arrival.isLast a ≡ false
+           → cascadeGo⇓ a (arrVal a ∷ []) false (chainsOf a st) sched
+               (cascadeLatch a sched st) (emits , sched′ , st′)
            → cascade⇓ a sched st (emits , cascadeFinish a sched′ st′)
+
+  casc-run-last : ∀ {a sched st} {emits sched₁ st₁} {ends sched₂ st₂}
+                → Arrival.isLast a ≡ true
+                → cascadeGo⇓ a (arrVal a ∷ []) false (chainsOf a st) sched
+                    (cascadeLatch a sched st) (emits , sched₁ , st₁)
+                → cascadeGo⇓ a [] true (chainsOf a st) sched₁ st₁
+                    (ends , sched₂ , st₂)
+                → cascade⇓ a sched st
+                    (emits ++ ends , cascadeFinish a sched₂ st₂)
 
 data drain⇓ {n} {Γ} {t} {e} where
   drain-done : ∀ {sched st}

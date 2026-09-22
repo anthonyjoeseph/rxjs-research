@@ -262,9 +262,9 @@ thruConsume-keeps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
 mergeAllDrain-keeps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo}
                         {allNid} {κ : Path Γ lo s t} {now} {lim act od q}
                         {sched sched′ : Sched Γ} {st st′ : EvalSt e}
-                        {segs act′ q′}
+                        {out act′ q′}
                     → mergeAllDrain⇓ {e = e} allNid κ now lim act od q sched st
-                        (segs , act′ , q′ , sched′ , st′)
+                        (out , act′ , q′ , sched′ , st′)
                     → Keeps {e = e} sched st sched′ st′
 
 innerFinish-keeps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo}
@@ -407,8 +407,9 @@ thruConsume-keeps (consume-exhaust-nil _)    = keeps-refl _ _
 
 mergeAllDrain-keeps drain-nil            = keeps-refl _ _
 mergeAllDrain-keeps (drain-no-room _)    = keeps-refl _ _
-mergeAllDrain-keeps (drain-room _ si dr) =
-  keeps-trans (subscribeInner-keeps si) (mergeAllDrain-keeps dr)
+mergeAllDrain-keeps (drain-room _ si fv dr) =
+  keeps-trans (subscribeInner-keeps si)
+    (keeps-trans (foldVSegs-keeps fv) (mergeAllDrain-keeps dr))
 
 innerReact-keeps react-false      = keeps-refl _ _
 innerReact-keeps (react-alive _)  = keeps-refl _ _
