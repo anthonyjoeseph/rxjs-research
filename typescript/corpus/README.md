@@ -19,6 +19,21 @@ the two files are a deep sample of a narrow region — a carrier passing all
 fifteen has been checked against re-entrant subscription and against almost
 nothing else.
 
+`depth-first`'s last two rows are HAND-BUILT and each decides a different
+question about a fan-out run at the connect. The NESTED one reads slot 1 as a
+plain alias of slot 0 and runs the re-entrant shape over slot 1, so one share's
+emission is delivered through another's; rxjs answers it exactly as the
+un-nested row, which says a share transposes LOCALLY and no ordering across
+nested shares is wanted. The ORDER one is the mirror of the row above it —
+`of[of[7], share]` against `of[share, of[7]]` — and the pair is a refutation
+rather than a sample: both carry the same values out of the flattener and the
+same values out of the share, and rxjs answers `[7,1,2]` and `[1,2,7]`. So a
+subscribe answering with a burst at its own element type PLUS a stream already
+at the root cannot be read by any fixed rule, whichever order the two are
+concatenated in; what a subscribe emits has to be pushed where it is produced.
+Both rows agree under the burst carrier today, and the ORDER row is a guard
+rather than a divergence.
+
 `obs-accumulator` is the other kind of file: pinned by SEARCH rather than by
 divergence, because the region it holds is the one the proof's store obligation
 is about and the draw barely reaches it. A fold whose accumulator type contains

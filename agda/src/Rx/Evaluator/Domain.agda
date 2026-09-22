@@ -272,13 +272,17 @@ data dispatchShare⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
 -- counter is that key by another name.  So the transpose belongs at the
 -- share and nowhere else, which is what this loop is.
 --
--- THE ROUTE IF THIS ONE FAILS is to make the traversal's position
+-- THE ROUTE IF THIS ONE FAILS was to make the traversal's position
 -- EXPLICIT: stamp each emit with its path through that tree and sort
 -- lexicographically, rather than relying on each node to emit its
--- children in order.  Not taken, and the reason is worth keeping: the
--- stamp needs a significance ordering ACROSS NESTED SHARES, and nothing
--- yet justifies one.  An unjustified total order is cheap to write,
--- typechecks, and is the shape this campaign has lost the most time to.
+-- children in order.  It is not wanted, and that is now measured
+-- rather than deferred: the stamp's cost was a significance ordering
+-- ACROSS NESTED SHARES, and the nested row of
+-- `typescript/corpus/depth-first.ndjson` answers exactly as its
+-- un-nested twin does -- one share read through another, with the
+-- inner loop entered once per outer value and nothing ranking the two.
+-- A local transpose composes, so there is nothing for a total order to
+-- decide.
 data shareWalk⇓ {n} {Γ : Ctx n} {t} {e : Closed Γ t} :
      Tick → (i : Fin n)
    → List (Val Γ (lookup Γ i)) → Bool → Sched Γ → EvalSt e
@@ -838,6 +842,35 @@ data subscribeAll⇓ {n} {Γ} {t} {e} where
 -- because its caller is a frame that still has path left to push
 -- through.  So the connect cannot spend its burst on the registry and
 -- also answer its caller.
+
+-- AND THE FAN-OUT IS THE RIGHT ANSWER, WHICH IS MEASURED RATHER THAN
+-- ARGUED.  Delivering the definition's burst value-major, re-reading
+-- the registry between values, reproduces rxjs by hand on all three
+-- shapes of `typescript/corpus/depth-first.ndjson`'s re-entrant rows,
+-- the NESTED one included -- a share read through another share, where
+-- the inner fan-out is entered once per outer value and the two orders
+-- compose with nothing ranking them.  So there is no question left
+-- about the ORDER a share emits in, and no significance ordering
+-- across nested shares is wanted.
+
+-- THE OPEN QUESTION IS WHERE A FAN-OUT'S EMITS ATTACH, AND IT IS NOT
+-- ANSWERED BY A SECOND RESULT COMPONENT.  That reading -- a burst at
+-- `u` for the caller to push and a stream already at `t` beside it --
+-- is refuted by the last two rows of that corpus, which are the same
+-- flattener with its two inners exchanged: both hand back the same
+-- values in both components, and rxjs answers `[7,1,2]` for one and
+-- `[1,2,7]` for the other.  No fixed rule for concatenating the two
+-- reads both, because what separates them is WHEN each was produced.
+
+-- WHAT SURVIVES THAT PAIR IS PUSHING WHERE A VALUE IS PRODUCED.  A
+-- flattener's walk folds each inner's burst rootward as it consumes
+-- it, rather than collecting the inners and handing the caller one
+-- list, so the two components are never both live and the order is
+-- carried by the walk instead of by a rule.  What that costs is the
+-- fan-out running inside the reducibility cycle, where the paths it
+-- folds come out of the REGISTRY and no frame of them carries a
+-- candidate -- and the candidate's own header refuses a state
+-- precondition, which is the shape that would supply one.
 
 -- DEAD ROUTE: answering at `t` -- folding the burst through the path
 --   INSIDE the subscribe, so the sink clause reaches the fan-out and

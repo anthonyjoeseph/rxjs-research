@@ -249,15 +249,24 @@ also: `dispatchShare!` — its inhabitation, same reason.
 
 ### Big picture tier roadmap
 
-- **THE CONNECT SPENDS ITS BURST ON THE REGISTRY, AND THE ANSWER STAYS AT `u`.**
-  `sharedConnect⇓` routes the definition's burst through the fan-out instead of
-  returning it, and the subscriber that triggered the connect is served by its
-  own registration — it is registered before the definition is subscribed, so
-  nothing is lost, only re-routed. Answering at `t` instead is DEAD, recorded at
-  `sharedConnect⇓`: `Red (obs u)` quantifies the root type inside its own arm,
-  so a root-typed result makes the conjunct impredicative and takes the descent
-  with it. So the fan-out's emits have to reach the root without the subscribe's
-  result type changing, and where they attach is the leg.
+- **A FLATTENER'S WALK PUSHES EACH INNER WHERE IT IS PRODUCED.** The connect's
+  burst belongs in the fan-out — measured, on three shapes including a nested
+  share — and the only reading of WHERE its emits attach that survives the
+  corpus is that nothing collects them: a walk folds each inner rootward as it
+  consumes it, so a subscribe never holds a burst at `u` and a stream at `t` at
+  once. That is the change, and it is in `consume⇓`/`walk⇓` rather than in the
+  share. A second result component read by a fixed rule is refuted at
+  `sharedConnect⇓` by the corpus's exchanged pair.
+
+- **WHERE THE FAN-OUT'S FRAME WITNESSES COME FROM, WHICH IS THE NEXT WALL.**
+  Pushing at the point of production puts `foldPath⇓` inside the reducibility
+  cycle, and the paths a share folds are read out of the REGISTRY, so no frame
+  of them arrives with a candidate. The two suppliers are a state precondition
+  on `Red` — which its own header refuses, and which is impredicative besides,
+  a registry ranging over frames at any type — and a call to the fundamental
+  theorem, which ties the knot the candidate exists to avoid. Decide this
+  before writing the walk: it is what says whether the walk is a re-threading
+  or a restatement of the candidate.
 
 - **WHAT THE SINGLETON FOLD COSTS `batchSync`, ONCE THE FAN-OUT RUNS AT ALL.**
   The value walk hands a subscriber one value per `foldPath⇓`, and the one
