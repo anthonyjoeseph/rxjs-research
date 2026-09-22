@@ -212,15 +212,17 @@ data NodeState {n} (Γ : Ctx n) : Set where
                -- face did not pay one before and its clauses now do.
   switch-st  : (currentInner : Maybe NodeId) (outerDone : Bool) → NodeState Γ
   exhaust-st : (innerActive outerDone : Bool) → NodeState Γ
-  batchSync-st : Bool → NodeState Γ
-               -- ONE BIT AND NO BUFFER, WHICH IS WHAT THE BURST MODEL
-               -- TAKES AWAY.  A subscription hands its whole output back
-               -- as BURSTS, so the group a bracket wants is already
-               -- assembled by the time a frame sees it and there is
-               -- nothing to accumulate.  What is left is the bit itself:
-               -- whether the subscribe call has returned, which is the
-               -- one thing about synchrony a plain rxjs operator may
-               -- know and the whole of what `captureSync` reads.
+  batchSync-st : ∀ {t} → Bool → List (Val Γ t) → NodeState Γ
+               -- A BIT AND A BUFFER, AND THE BUFFER IS WHAT A PUSHING
+               -- CARRIER OWES BACK.  The bit is whether the subscribe
+               -- call has returned, which is the one thing about
+               -- synchrony a plain rxjs operator may know and the whole
+               -- of what `captureSync` reads.  While it is set nothing
+               -- leaves -- the end included, since a source finishing
+               -- inside the call has to leave WITH its group rather
+               -- than ahead of it -- and the clause that closes the
+               -- bracket flushes what accumulated here.  The element
+               -- type is existential, so each read pays a `_≟ᵗ_`.
 
 NodeSt : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Set
 NodeSt {Γ = Γ} e = List (NodeId × NodeState Γ)   -- assoc list, subscription order
@@ -460,6 +462,28 @@ installNode : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 installNode nid nodeState st =
   record st { nodes = setNode nid nodeState (EvalSt.nodes st) }
 
+-- WHAT A PUSH THREADS, AND IT IS THE WHOLE OF THE CARRIER CHANGE.  A
+-- subscription no longer hands its caller a burst to deliver, so what
+-- every clause carries instead is what has reached the ROOT so far,
+-- beside the schedule and the state.  One triple, threaded in and out,
+-- which is what lets a reaction to a value run while the source is
+-- still emitting rather than after it has finished.
+W : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Set
+W {Γ = Γ} {t = t} e = Stream Γ t × Sched Γ × EvalSt e
+
+-- AND THE TWO BITS A CLAUSE REPORTS BACK, EACH ASKED BY ONE SIDE.
+-- ALIVE is the SOURCE's question: a `take` that cuts mid-emission
+-- unsubscribes its source, so a synchronous source pushing value by
+-- value has to stop -- which a carrier holding the whole emission never
+-- had to ask.  DONE is the CONSUMER's: the burst reading looked for a
+-- `completeᵖ` in the list it was handed, and with nothing handed back
+-- each clause says for itself whether a completion left it.
+Pushed : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Set
+Pushed e = Bool × W e
+
+Subbed : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Set
+Subbed e = Bool × W e
+
 st-init : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) → EvalSt e
 st-init e = record { registry = [] ; nodes = []
                    ; connectedShares = [] ; completedSources = []
@@ -606,26 +630,48 @@ scanDispatch {u = u} fn nid vals fin sched st (just (cell-st {w} a))
                                   (EvalSt.nodes st) }
 scanDispatch fn nid vals fin sched st _ = [] , fin , sched , st
 
--- THE BRACKET, AND THE BURST IS THE BATCH.  While the bit is up —
--- inside the subscribe call — the whole burst leaves as ONE value
--- carrying all of it, head and tail, so the result is nonempty by
--- construction and needs no `Ty` former of its own; an empty burst
--- produces no value at all rather than an empty group, which is what
--- the TypeScript does when its burst array comes back empty.  Once the
--- bit is down every value leaves as its own group of one.  That is the
--- TypeScript's `isSync` exactly, and it is the whole of what a plain
--- operator may know about synchrony.
+-- THE BRACKET'S GROUPING, AND THE FLAG IS WHAT DECIDES IT.  While the
+-- bit is up the accumulated buffer leaves as ONE value carrying all of
+-- it, head and tail, so the result is nonempty by construction and
+-- needs no `Ty` former of its own; an empty buffer produces no value at
+-- all rather than an empty group.  Once the bit is down every value
+-- leaves as its own group of one.  That is the TypeScript's `isSync`
+-- exactly, and it is the whole of what a plain operator may know about
+-- synchrony.
 batchVals : ∀ {n} {Γ : Ctx n} {s} → Bool → List (Val Γ s)
           → List (Val Γ (s ×ᵗ listᵗ s))
 batchVals _     []       = []
 batchVals true  (v ∷ vs) = (v , vs) ∷ []
 batchVals false (v ∷ vs) = (v , []) ∷ batchVals false vs
 
-batchDispatch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-              → NodeId → List (Val Γ s) → EvalSt e → Maybe (NodeState Γ)
-              → List (Val Γ (s ×ᵗ listᵗ s))
-batchDispatch nid vals st (just (batchSync-st sync)) = batchVals sync vals
-batchDispatch nid vals st _                          = []
+-- WHAT THE BRACKET HAS ACCUMULATED, AT THE FRAME'S OWN ELEMENT TYPE.  A
+-- node that is absent, is not a bracket, or holds another type reads as
+-- empty: the subscription invariant says none of the three happens, and
+-- degrading to forwarding NOTHING is what every other read here does
+-- rather than risk a wrong one.
+batchTake : ∀ {n} {Γ : Ctx n} → (s : Ty) → Maybe (NodeState Γ) → List (Val Γ s)
+batchTake s (just (batchSync-st {t = w} _ buf)) with w ≟ᵗ s
+... | yes refl = buf
+... | no  _    = []
+batchTake s _  = []
+
+-- THE BRACKET'S WHOLE STEP.  Inside the call nothing leaves, THE END
+-- INCLUDED: a source finishing within the subscribe has to leave with
+-- its group rather than ahead of it, so the completion is swallowed
+-- here and re-emitted by the clause that closes the bracket.
+batchStep : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+          → NodeId → List (Val Γ s) → Bool → EvalSt e → Maybe (NodeState Γ)
+          → List (Val Γ (s ×ᵗ listᵗ s)) × Bool × EvalSt e
+batchStep {s = s} nid vals fin st (just (batchSync-st {t = w} sync buf))
+  with w ≟ᵗ s
+... | no  _    = [] , fin , st
+... | yes refl =
+      if sync
+      then ( [] , false
+           , record st { nodes = setNode nid (batchSync-st true (buf ++ vals))
+                                         (EvalSt.nodes st) } )
+      else (batchVals false vals , fin , st)
+batchStep nid vals fin st _ = [] , fin , st
 
 -- a from-inner completion is absorbed iff some registration under this inner
 -- instance is still live: its path threads `inst`, it is not cancelled, and it
@@ -695,6 +741,20 @@ finishUsable mergeAllᵒ s inst (just (mergeAll-st {w} _ _ _ _)) = ⌊ w ≟ᵗ 
 finishUsable switchᵒ   s inst (just (switch-st (just c) _))    = c ≡ᵇ inst
 finishUsable exhaustᵒ  s inst (just (exhaust-st _ _))          = true
 finishUsable _         _ _    _                                = false
+
+-- HAS THE OPERATOR EMITTED ITS OWN END?  `thruWrap` is what emits one,
+-- and this is the reading it makes, taken AFTER THE FACT because a lane
+-- can be drained and refilled while the outer's end is in flight.  It
+-- is a separate name because two clauses that never call `thruWrap` ask
+-- the same question: what a subscription of an `*All` reports back, and
+-- what a joiner's queue drain leaves behind.
+allDone : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+        → AllOp → NodeId → EvalSt e → Bool
+allDone op nid st with lookupNode nid (EvalSt.nodes st) | op
+... | just (mergeAll-st _ act q od) | mergeAllᵒ = od ∧ (act ≡ᵇ 0) ∧ null q
+... | just (switch-st cur od)       | switchᵒ   = od ∧ is-nothing cur
+... | just (exhaust-st act od)      | exhaustᵒ  = od ∧ not act
+... | _                             | _         = false
 
 -- THE OUTER HAS FINISHED, RECORDED AND READ BACK IN ONE BREATH.  An
 -- `*All` outlives its outer for exactly as long as something is still
