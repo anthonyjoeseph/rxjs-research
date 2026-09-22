@@ -251,23 +251,23 @@ also: `chainStep⇓`, `chainStep!` — the carrier is a batch on BOTH faces and 
 
 ### Big picture tier roadmap
 
-- **THE RE-THREAD, CARRYING THE MEASURE THE FAN-OUT NEEDS.** The measure is
-  found and written down in `Builder.agda`'s header: the count of shared
-  slots not yet connected, lexicographically above the floor the fold
-  already runs on, sound because a slot connects once and a connect is the
-  only door from a subscription into a fan-out. It cannot land alone —
-  nothing consumes it until the block it measures exists — so it lands with
-  the carrier. That makes this the tier's one big commit, and the leg is
-  sized by it rather than by a row.
+- **THE RE-THREAD, CARRYING THE MEASURE AND THE STATE PREDICATE.** Two
+  findings size this leg. The measure the fan-out needs is written down in
+  `Builder.agda`'s header — the count of shared slots not yet connected,
+  above the floor the fold already runs on — and cannot land alone, since
+  nothing consumes a measure until the block it measures exists. The fold's
+  cell is not a leaf and never was: under a push the only writer of that node
+  is the sink, so the candidate carries a state predicate as a PARAMETER,
+  which is what keeps it predicative. Both land with the carrier or not at all.
 
-- **THE OTHER TWO STORE OBLIGATIONS ARE LEAVES, AND SAYING WHY IS THE LEG.**
-  A fold's cell and a bracket's buffer are read back inside a subscribe for
-  the same reason the queue is, and they are NOT the same cost: what they
-  produce is a claim about a list some total function already computed, so a
-  leaf there leaves the evaluator computing and the queue's does not. That
-  asymmetry is the only thing standing between a tower with one open question
-  and a tower with three, so it is worth a leg of its own to state at full
-  strength and wire, rather than discovered again at each site.
+- **THE FRESHNESS FACE GAINS THE PREMISE THE CARRIER OWES IT.** A subscription
+  now steps the frames of its own continuation, so it writes the nodes those
+  frames name and `subscribeE-preserves` is false as stated — refuted at the
+  very fold the candidate's predicate is about. The repair is the premise its
+  frame-level members already carry, added across the family; `pushBurst⇓` has
+  no subject left and its member goes. It is a leg rather than a fix-up
+  because the candidate cannot discharge its own stability hypothesis until
+  this lands, and every arm of the re-thread needs that discharge.
 
 - **THE TOWER RE-THREADED ONTO THE PUSH CARRIER.** Not a re-shaping of
   results: under the push the subscribe cycle and the fold cycle are ONE

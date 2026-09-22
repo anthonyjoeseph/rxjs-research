@@ -11,11 +11,13 @@
 -- positively.
 --
 -- WHY THE STATE IS QUANTIFIED RATHER THAN CONSTRAINED.  `subscribeE⇓`
--- takes the scheduler and the evaluator state as plain indices with no
--- precondition, so the candidate can demand subscribability in EVERY
--- state -- which is what lets a flattener's hop subscribe its inner in
--- whatever state the outer delivery reached, with no invariant
--- threaded.
+-- takes the carrier as a plain index with no precondition, so the
+-- candidate can demand subscribability in EVERY state -- which is what
+-- lets a flattener's hop subscribe its inner in whatever state the
+-- outer delivery reached, with nothing about the store to re-establish
+-- first.  What IS threaded is a predicate the arm never looks inside:
+-- it comes in, every write the arm makes is above the floor it was
+-- given, and it goes back out.
 --
 -- AND THE ENVIRONMENT IS CARRIED RATHER THAN SUBSTITUTED, WHICH IS
 -- WHAT MAKES THE WHOLE SUBSTITUTION LAYER UNNECESSARY.  An observable
@@ -32,7 +34,7 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Data.List.Relation.Unary.All.Properties using (++⁺)
 open import Data.Maybe using (Maybe; just; nothing)
-open import Data.Nat using (ℕ; zero; suc; _<_; s≤s; _+_; _<ᵇ_)
+open import Data.Nat using (ℕ; zero; suc; _≤_; _<_; s≤s; _+_; _<ᵇ_)
 open import Data.Nat.Induction using (<-wellFounded)
 open import Data.Nat.Properties using (_<?_; ≮⇒≥; ≤-refl; ≤-trans; m≤n+m; m≤m+n; <ᵇ⇒<)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
@@ -60,16 +62,18 @@ open import Rx.Inputs-Below using (ib-unfoldμ; ib-topᵉ)
 open import Rx.Mint using (nodeᵏ; regᵏ; sourceᵏ; freshId; setAt)
 open import Decide using (∧ˡ; ∧ʳ)
 open import Rx.Evaluator using (Stream; Burst; Sched; EvalSt; Path; Frame; _↠[_]_;
+  W; Pushed; Subbed; schW; stW; allDone; batchTake; batchStep;
   map-f; take-f; scan-f; batchSync-f; from-inner; thru-outer; share-sink;
   mergeAllᵒ; switchᵒ; exhaustᵒ; AllOp; NodeId; NodeState;
   cell-st; take-st; batchSync-st; mergeAll-st; switch-st; exhaust-st;
-  takeVals; takeDispatch; scanVals; scanDispatch; batchVals; batchDispatch;
+  takeVals; takeDispatch; scanVals; scanDispatch; batchVals;
   lookupNode; installNode; oneShotBurst; spentBurst; memberSource;
   splitEvents; splitBurst; consumeUsable; hasRoom; switchKill; thruWrap;
   register; atSlot; lowerFloor; burstCompleted)
-open import Rx.Evaluator.Freshness using (lookup-set; PreservedBelow)
+open import Rx.Evaluator.Freshness using (lookup-set; PreservedBelow; nodeCt)
 open import Rx.Evaluator.Freshness.Preserve using (subscribeE-preserves)
-open import Rx.Evaluator.Domain using (srcFrame; subscribeE⇓; pushBurst⇓; stepFrame⇓;
+open import Rx.Evaluator.Domain using (subscribeE⇓; pushAll⇓; pushVals⇓; foldPath⇓;
+  stepFrame⇓;
   step-map; step-scan; step-take; step-batchSync; push-nil; push-cons;
   subs-of; subs-empty; subs-map; subs-take-zero; subs-take-suc; subs-scan;
   subs-batchSync; subs-mint; subs-defer; subs-floor; subs-hot-done; subs-hot-live;
@@ -94,25 +98,54 @@ EvSat P completeᵖ  = ⊤
 StreamSat : ∀ {A : Set} → (A → Set) → List (List (PlainEvent A)) → Set
 StreamSat P = All (All (EvSat P))
 
+-- A STATE PREDICATE, AND THE ONLY REASON IT IS SPELLED OUT RATHER THAN
+-- WRITTEN INLINE: it ranges over every root the candidate might be
+-- asked about, because the candidate's own arm quantifies over those.
+StPred : ∀ {n} → Ctx n → Set₁
+StPred Γ = ∀ {t} {e : Closed Γ t} → EvalSt e → Set
+
+-- WHAT A STATE PREDICATE OWES, AND IT IS ONE THING.  Everything the
+-- candidate's arms write outside a sink is written at a node they have
+-- just minted, so a predicate about nodes minted EARLIER survives all
+-- of it; the freshness face already concludes exactly that, in exactly
+-- this vocabulary, so the hypothesis is discharged at every call site
+-- by a lemma rather than by an argument.
+Stable : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → ℕ → (EvalSt e → Set) → Set
+Stable {e = e} φ Q =
+  ∀ {st st′ : EvalSt e} → PreservedBelow φ st st′ → Q st → Q st′
+
+-- ONE PUSH INTO A PATH, WHICH IS WHAT A SUBSCRIPTION IS NOW HANDED
+-- INSTEAD OF A LIST TO HAND BACK.  The fold is the unit rather than the
+-- emission, because that is the granularity the relation's own step
+-- arm works at: a frame is stepped once per fold, and a sink for a
+-- longer path is the shorter one with a step in front of it.
+Sink : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
+     → (Val Γ u → Set) → (EvalSt e → Set) → Path Γ lo u t → Set
+Sink {Γ = Γ} {e = e} {u = u} P Q κ =
+  ∀ (now : Tick) {vals : List (Val Γ u)} → All P vals
+  → (fin : Bool) (w : W e) → Q (stW w)
+  → Σ (Pushed e) λ r → foldPath⇓ {e = e} now κ vals fin w r × Q (stW (proj₂ r))
+
 -- THE CANDIDATE.  At a data type it is trivial, because nothing about
 -- a number can fail to be reducible; at an observable it is the pair
 -- the whole argument turns on -- a subscription derivation in every
 -- state, and the guarantee that everything that derivation emits is
 -- itself reducible at the element type.
-Red : ∀ {n} {Γ : Ctx n} (t : Ty) → Val Γ t → Set
-Red unitᵗ     _        = ⊤
-Red boolᵗ     _        = ⊤
-Red natᵗ      _        = ⊤
-Red uniqᵗ     _        = ⊤
-Red (s ×ᵗ t)  (a , b)  = Red s a × Red t b
-Red (s +ᵗ t)  (inj₁ a) = Red s a
-Red (s +ᵗ t)  (inj₂ b) = Red t b
-Red (listᵗ t) vs       = All (Red t) vs
-Red {Γ = Γ} (obs u) b =
-  ∀ {t} {e : Closed Γ t} {lo} (κ : Path Γ lo u t) (now : Tick)
-    (sched : Sched Γ) (st : EvalSt e) →
-  Σ (Stream Γ u × Sched Γ × EvalSt e) λ r →
-    subscribeE⇓ {e = e} b κ now sched st r × StreamSat (Red u) (proj₁ r)
+Red : ∀ {n} {Γ : Ctx n} → StPred Γ → (t : Ty) → Val Γ t → Set
+Red Q unitᵗ     _        = ⊤
+Red Q boolᵗ     _        = ⊤
+Red Q natᵗ      _        = ⊤
+Red Q uniqᵗ     _        = ⊤
+Red Q (s ×ᵗ t)  (a , b)  = Red Q s a × Red Q t b
+Red Q (s +ᵗ t)  (inj₁ a) = Red Q s a
+Red Q (s +ᵗ t)  (inj₂ b) = Red Q t b
+Red Q (listᵗ t) vs       = All (Red Q t) vs
+Red {Γ = Γ} Q (obs u) b =
+  ∀ {t} {e : Closed Γ t} {lo} (κ : Path Γ lo u t) (φ : ℕ)
+  → Stable {e = e} φ Q
+  → Sink {e = e} (Red Q u) Q κ
+  → (now : Tick) (w : W e) → φ ≤ nodeCt (schW w) → Q (stW w)
+  → Σ (Subbed e) λ r → subscribeE⇓ {e = e} b κ now w r × Q (stW (proj₂ r))
 
 -- WHAT A PUSHING CARRIER DOES TO THIS STATEMENT, AND THE CHEAP HALF IS
 -- THE VISIBLE ONE.  A subscription that pushes emits at the ROOT type,
@@ -201,37 +234,54 @@ Red {Γ = Γ} (obs u) b =
 -- that does not: it pushes into paths read out of the REGISTRY, and a
 -- frame along one of those stands at a type the arm never names, so an
 -- invariant covering them reaches the candidate at types standing in no
--- relation to the one being recursed on.  That is what the carrier
--- change bought and it is open.
+-- relation to the one being recursed on.  A fold's cell is the same
+-- shape read at a different node, and both are paid the same way.
 
--- WHY A SHARE'S FAN-OUT COSTS THE CANDIDATE NOTHING, WHICH IS THE ONE
--- THING ABOUT `connect` THAT WAS NOT OBVIOUS.  A shared slot subscribes
--- its def ONCE and attaches every later reader to that one connection,
--- so the natural fear is that reducibility must be maintained as an
--- INVARIANT ON STORED STATE.  Nothing of the kind is owed, because the
--- fan-out carries NO PAYLOAD: a late reader's arm emits nothing at all,
--- a spent slot's arm emits only the end, and the only arm carrying
--- values is the one that subscribes the def -- whose values are the
--- def's, which is the induction hypothesis.  The semantic fact
--- underneath is that this share does not replay, so there is nothing
--- stored for the invariant to be about.
+-- AND THE FOLD'S CELL IS WHAT IS LEFT, WHICH IS A STATE OBLIGATION THE
+-- SINK ITSELF CREATES.  A fold reads its accumulator back out of a node
+-- and emits it, so its sink can only hand reducible values on if that
+-- node already holds one.  Under a carrier that handed a finished list
+-- back, the node was written AFTER the source's subscription had
+-- returned, so the obligation was re-established at one state by a
+-- preservation argument and never questioned in between.  Under a push
+-- the writes are interleaved with the subscription that provokes them,
+-- and the only writer of that node is the sink -- so what the sink owes
+-- is not a fact about a state but a fact it carries THROUGH the
+-- subscription it is passed into.
+--
+-- WHICH IS WHY THE STATE PREDICATE IS A PARAMETER OF THE CANDIDATE AND
+-- NOT A QUANTIFIER INSIDE IT.  The predicate has to reach the candidate
+-- at the accumulator type of every fold along the path, and a path is
+-- quantified here rather than recursed on, so nothing orders those
+-- types against the one this recursion runs on: written concretely it
+-- would be a mutual definition with no measure.  As a PARAMETER it
+-- costs nothing at all -- the arm threads it in and out without looking
+-- inside, every recursive occurrence is at the same parameter, and the
+-- caller does the instantiating, which it may do because by then this
+-- definition is finished and `Red Q u a` is just an application.  The
+-- one thing the arm needs of it is stability under writes made
+-- elsewhere, which is a hypothesis in exactly the freshness face's
+-- vocabulary.
+--
+-- DEAD ROUTE: quantifying the predicate inside the arm instead, which
+--   is the same design one step less careful.  It is IMPREDICATIVE and
+--   no level assignment repairs it: the predicate that gets
+--   instantiated says a stored value is reducible, so it lives one
+--   level above the candidate, while quantifying over it puts the
+--   candidate one level above it.
+--
+-- THE SAME CARRIER REFUTES THE FRESHNESS FACE'S UNCONDITIONAL FORM, and
+-- the two findings are one fact read from two ends.  A subscription now
+-- STEPS the frames of its own continuation, so it writes the nodes
+-- those frames name, and `subscribeE-preserves` without a premise about
+-- the path is false at exactly the fold this arm is about.  The premise
+-- it gains is the one its frame-level members already carry.
 
 -- A SPENT SOURCE'S BURST is an end and nothing else, so every
 -- predicate holds of it for want of anything to hold of.
 StreamSat-spent : ∀ {n} {Γ : Ctx n} {u} {P : Val Γ u → Set}
                 → StreamSat P (spentBurst {Γ = Γ} {u = u})
 StreamSat-spent = (tt ∷ []) ∷ []
-
--- PUSHING A BURST THROUGH A FRAME, WITH THE CANDIDATE CARRIED ACROSS.
--- The transformer arms all have the same two-step shape -- run the
--- source, then push what it emitted through this frame -- so the second
--- step is one obligation stated once rather than several.
-RedPush : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
-        → Tick → Frame Γ s u → Path Γ lo u t
-        → Stream Γ s → Sched Γ → EvalSt e → Set
-RedPush {Γ = Γ} {e = e} {u = u} now f κ burst sched st =
-  Σ (Stream Γ u × Sched Γ × EvalSt e) λ r →
-    pushBurst⇓ {e = e} now f κ burst sched st r × StreamSat (Red u) (proj₁ r)
 
 -- A MAPPING FRAME APPLIES ITS CLOSURE TO EVERY ARRIVING VALUE, so what
 -- it produces is reducible exactly when the closure sends reducible to
@@ -240,9 +290,9 @@ RedPush {Γ = Γ} {e = e} {u = u} now f κ burst sched st =
 -- call: the fundamental theorem at terms is a member of the recursion
 -- at the foot of this module, so a walk declared above it cannot name
 -- it.
-RedFn : ∀ {n} {Γ : Ctx n} {s u} → FnClo Γ s u → Set
-RedFn {Γ = Γ} {s = s} {u = u} fn =
-  ∀ {v : Val Γ s} → Red s v → Red u (applyClo fn v)
+RedFn : ∀ {n} {Γ : Ctx n} → StPred Γ → ∀ {s u} → FnClo Γ s u → Set
+RedFn {Γ = Γ} Q {s = s} {u = u} fn =
+  ∀ {v : Val Γ s} → Red Q s v → Red Q u (applyClo fn v)
 
 -- WHAT A FRAME'S OWN NODE MUST HOLD, AND IT IS ONLY EVER THE FOLD
 -- THAT ASKS.  The node census says every other frame reads a store
@@ -261,49 +311,50 @@ RedFn {Γ = Γ} {s = s} {u = u} fn =
 --   import cycle: the candidate's observable arm is indexed by the
 --   subscription relation, which is itself indexed by the state
 --   record, so a field of that record naming the candidate is
---   circular however the modules are cut.  A PRECONDITION on the
---   candidate's own observable arm is the same cycle stated directly,
---   and it does not decrease: the arm recurses on the element type,
---   while a predicate over a store reaches the candidate at whatever
---   type a node happens to hold, which is unrelated to it.
---   Parameterising the state record over an abstract node predicate is
---   that same cycle DEFERRED -- the instantiation ties the knot, and
---   the executable face pays a threaded parameter it only ever meets
---   at the trivial predicate.  And a SYNTACTIC invariant saying a
---   stored value is the denotation of a closed term is VACUOUS:
---   reflection is total, so every value is one and the pairing carries
---   no information.
-RedNode : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+--   circular however the modules are cut.  Parameterising the state
+--   record over an abstract node predicate is that same cycle
+--   DEFERRED -- the instantiation ties the knot, and the executable
+--   face pays a threaded parameter it only ever meets at the trivial
+--   predicate.  And a SYNTACTIC invariant saying a stored value is the
+--   denotation of a closed term is VACUOUS: reflection is total, so
+--   every value is one and the pairing carries no information.
+--
+-- AND THIS IS THE ONE THE CALLER PUTS IN THE CANDIDATE'S PREDICATE
+-- SLOT, WHICH IS WHY IT NAMES A SINGLE NODE.  The fold's arm knows the
+-- identifier it just minted; a predicate about the whole table would
+-- oblige every other writer for nothing, and it is the writes by
+-- OTHERS that have to pass through untouched.
+RedNode : ∀ {n} {Γ : Ctx n} → StPred Γ → ∀ {t} {e : Closed Γ t} {s u}
         → Frame Γ s u → EvalSt e → Set
-RedNode {Γ = Γ} (scan-f fn nid) st =
+RedNode {Γ = Γ} Q (scan-f fn nid) st =
   ∀ {w} {a : Val Γ w}
-  → lookupNode nid (EvalSt.nodes st) ≡ just (cell-st a) → Red w a
-RedNode (map-f fn)                  st = ⊤
-RedNode (take-f nid)                st = ⊤
-RedNode (batchSync-f nid)           st = ⊤
-RedNode (from-inner op allNid inst) st = ⊤
-RedNode (thru-outer op nid)         st = ⊤
+  → lookupNode nid (EvalSt.nodes st) ≡ just (cell-st a) → Red Q w a
+RedNode Q (map-f fn)                  st = ⊤
+RedNode Q (take-f nid)                st = ⊤
+RedNode Q (batchSync-f nid)           st = ⊤
+RedNode Q (from-inner op allNid inst) st = ⊤
+RedNode Q (thru-outer op nid)         st = ⊤
 
 -- A VALUE ENVIRONMENT IS REDUCIBLE WHEN EVERY ENTRY IS.  Terms are
 -- open in a Θ telescope and a frame's closure pairs a term with one
 -- such environment, so the fundamental theorem at terms has to be
 -- stated under an environment rather than at closed terms alone.
-RedEnv : ∀ {n} {Γ : Ctx n} {Θ : List Ty} → Env Γ Θ → Set
-RedEnv []ᵉ                  = ⊤
-RedEnv (_∷ᵉ_ {s = t} v vs)  = Red t v × RedEnv vs
+RedEnv : ∀ {n} {Γ : Ctx n} → StPred Γ → ∀ {Θ : List Ty} → Env Γ Θ → Set
+RedEnv Q []ᵉ                  = ⊤
+RedEnv Q (_∷ᵉ_ {s = t} v vs)  = Red Q t v × RedEnv Q vs
 
--- THE SAME CLAIM ONE BATCH DOWN: a frame, the values that arrived at
--- it, and the candidate carried across to what leaves.  The push above
--- walks a stream burst by burst, so it is stated over a stream while
--- this is stated over one list, which is where every operator's own
--- machinery sits.
-RedStep : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
+-- ONE FRAME STEPPED: what arrived at it, and the candidate carried
+-- across to what leaves.  This is where a frame's own node is both
+-- SPENT and RE-ESTABLISHED, which is the shape that lets a sink built
+-- over this step hand its caller the predicate back -- the one place
+-- in the module that has to say anything about a store at all.
+RedStep : ∀ {n} {Γ : Ctx n} (Q : StPred Γ) {t} {e : Closed Γ t} {s u lo}
         → Tick → Frame Γ s u → Path Γ lo u t
-        → List (Val Γ s) → Bool → Sched Γ → EvalSt e → Set
-RedStep {Γ = Γ} {e = e} {u = u} now f κ vals fin sched st =
-  Σ (List (Val Γ u) × Bool × Sched Γ × EvalSt e) λ r →
-    stepFrame⇓ {e = e} now f κ vals fin sched st r × All (Red u) (proj₁ r)
-      × RedNode f (proj₂ (proj₂ (proj₂ r)))
+        → List (Val Γ s) → Bool → W e → Set
+RedStep {Γ = Γ} Q {e = e} {u = u} now f κ vals fin w =
+  Σ (List (Val Γ u) × Bool × Bool × W e) λ r →
+    stepFrame⇓ {e = e} now f κ vals fin w r × All (Red Q u) (proj₁ r)
+      × RedNode Q f (stW (proj₂ (proj₂ (proj₂ r))))
 
 -- A SPLIT TAKES THE VALUE COLUMN OUT OF A BURST, and nothing else, so
 -- whatever held of every value the burst carried holds of every value
@@ -365,25 +416,30 @@ thruWrap-vals exhaustᵒ nid true {st′ = st′}
 ... | just (switch-st _ _)       = refl
 ... | just (exhaust-st _ _)      = refl
 
--- CONSUMING ONE ARRIVING OBSERVABLE, and walking a list of them, with
--- the candidate carried across.  These are the flattener's two halves
--- of `RedStep`, stated separately for the same reason the machine
--- states them separately: what a consume decides is whether the
--- observable is taken at all, and every operator answers that off the
--- store.
-RedConsume : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
+-- CONSUMING ONE ARRIVING OBSERVABLE, and walking a list of them.
+-- These are the flattener's two halves of `RedStep`, stated separately
+-- for the same reason the machine states them separately: what a
+-- consume decides is whether the observable is taken at all, and every
+-- operator answers that off the store.
+--
+-- AND NEITHER CARRIES A VALUE COLUMN ANY MORE, which is the carrier
+-- paying off where it was expected to cost.  An inner's values reach
+-- the root down the inner's OWN path, so a consume hands its caller a
+-- state and nothing else, and the satisfaction half that used to be
+-- stated here is discharged where the inner is subscribed instead.
+-- What is left to carry is the state predicate, which every arm passes
+-- through untouched.
+RedConsume : ∀ {n} {Γ : Ctx n} (Q : StPred Γ) {t} {e : Closed Γ t} {u lo}
            → AllOp → NodeId → Path Γ lo u t → Tick
-           → Val Γ (obs u) → Sched Γ → EvalSt e → Set
-RedConsume {Γ = Γ} {e = e} {u = u} op nid κ now o sched st =
-  Σ (List (Val Γ u) × Sched Γ × EvalSt e) λ r →
-    thruConsume⇓ {e = e} op nid κ now o sched st r × All (Red u) (proj₁ r)
+           → Val Γ (obs u) → W e → Set
+RedConsume {Γ = Γ} Q {e = e} {u = u} op nid κ now o w =
+  Σ (W e) λ w′ → thruConsume⇓ {e = e} op nid κ now o w w′ × Q (stW w′)
 
-RedWalk : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
+RedWalk : ∀ {n} {Γ : Ctx n} (Q : StPred Γ) {t} {e : Closed Γ t} {u lo}
         → AllOp → NodeId → Path Γ lo u t → Tick
-        → List (Val Γ (obs u)) → Sched Γ → EvalSt e → Set
-RedWalk {Γ = Γ} {e = e} {u = u} op nid κ now vals sched st =
-  Σ (List (Val Γ u) × Sched Γ × EvalSt e) λ r →
-    thruWalk⇓ {e = e} op nid κ now vals sched st r × All (Red u) (proj₁ r)
+        → List (Val Γ (obs u)) → W e → Set
+RedWalk {Γ = Γ} Q {e = e} {u = u} op nid κ now vals w =
+  Σ (W e) λ w′ → thruWalk⇓ {e = e} op nid κ now vals w w′ × Q (stW w′)
 
 -- THE HOP IS PAID FOR BY THE ARRIVING VALUE'S OWN CANDIDATE, which is
 -- what makes this a body rather than a leaf.  A subscribe arm hands
@@ -581,19 +637,19 @@ satValues (p ∷ ps) = p ∷ satValues ps
 -- arrived, so it owes the same thing -- what it additionally needs,
 -- the first component of that pair being reducible, is the store
 -- obligation beside this one rather than anything about the closure.
-RedFrame : ∀ {n} {Γ : Ctx n} {s u} → Frame Γ s u → Set
-RedFrame (map-f fn)                  = RedFn fn
-RedFrame (scan-f fn nid)             = RedFn fn
-RedFrame (take-f nid)                = ⊤
-RedFrame (batchSync-f nid)           = ⊤
-RedFrame (from-inner op allNid inst) = ⊤
-RedFrame (thru-outer op nid)         = ⊤
+RedFrame : ∀ {n} {Γ : Ctx n} → StPred Γ → ∀ {s u} → Frame Γ s u → Set
+RedFrame Q (map-f fn)                  = RedFn Q fn
+RedFrame Q (scan-f fn nid)             = RedFn Q fn
+RedFrame Q (take-f nid)                = ⊤
+RedFrame Q (batchSync-f nid)           = ⊤
+RedFrame Q (from-inner op allNid inst) = ⊤
+RedFrame Q (thru-outer op nid)         = ⊤
 
-redMapVals : ∀ {n} {Γ : Ctx n} {s u} (fn : FnClo Γ s u) → RedFn fn
-           → {vals : List (Val Γ s)} → All (Red s) vals
-           → All (Red u) (map (applyClo fn) vals)
-redMapVals fn rf []       = []
-redMapVals fn rf (p ∷ ps) = rf p ∷ redMapVals fn rf ps
+redMapVals : ∀ {n} {Γ : Ctx n} (Q : StPred Γ) {s u} (fn : FnClo Γ s u) → RedFn Q fn
+           → {vals : List (Val Γ s)} → All (Red Q s) vals
+           → All (Red Q u) (map (applyClo fn) vals)
+redMapVals Q fn rf []       = []
+redMapVals Q fn rf (p ∷ ps) = rf p ∷ redMapVals Q fn rf ps
 
 -- A TRUNCATION CANNOT INVENT A VALUE, WHICH IS WHY THE TAKE ARM NEEDS
 -- NOTHING FROM THE STORE.  The node a take installs holds a COUNT, and
