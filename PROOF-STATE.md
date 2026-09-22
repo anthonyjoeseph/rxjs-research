@@ -255,16 +255,16 @@ also: `subscribe-shaped` — same; its conclusion gains the new component, which
 ### Big picture tier roadmap
 
 - **ROUTE THE CONNECT THROUGH THE FAN-OUT — THIS LEG IS THE MONSTER.** The
-  evaluator side is built: `shareWalk⇓` re-reads `shareAdmit` against the state
-  its previous value threaded, `shareGo⇓` finishes each fold before the next
-  path, and the segmented carrier retired the result type that stopped
-  `sharedConnect⇓` calling either — and ruled out the cheap version, since four
-  of five subscribe arms dropped the root column it would emit into. What is
-  left is ONE measure component. Routing closes a
-  one-edge cycle through `red-val`, fusing nineteen definitions into one block.
-  Two of the three components `srcFrame` prices are already running; the
-  outermost is an unconnected-slot count, a function of the STATE, so it costs
-  a `Freshness.Mono` over the fold relations before it costs an order.
+  evaluator side is built — `shareWalk⇓` and `shareGo⇓` both — and the
+  segmented carrier retired the result type that stopped `sharedConnect⇓`
+  calling either, then ruled out the cheap version, since four of five
+  subscribe arms dropped the root column it would emit into. What is
+  left is ONE measure component, and it is the only one. Routing closes a
+  one-edge cycle through `red-val`, fusing nineteen definitions into one block —
+  and `reducible` re-seeds both of `redExpAcc`'s accessibilities, so nothing
+  already threaded survives the loop. What does is an unconnected-slot count, a
+  function of the STATE, which costs a `Freshness.Mono` over the fold relations
+  before it costs an order.
 
 - **PIN THE WITHIN-SEGMENT ORDER, AT THE FIRST PROGRAM THAT FILLS A ROOT
   COLUMN.** `foldVSegs⇓` and `resolveSegs` both answer a segment's root stream

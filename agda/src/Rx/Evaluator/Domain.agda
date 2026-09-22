@@ -944,19 +944,26 @@ data subscribeAll⇓ {n} {Γ} {t} {e} where
 -- adding the one call from the connect closes it, and nineteen
 -- definitions across the two modules become a single mutual block.
 
--- OF THE THREE COMPONENTS `srcFrame`'s HEADER PRICES, TWO ARE ALREADY
--- PAID.  The floor's remaining room is `foldPath!`'s own accessibility
--- argument, and the element type's observable nesting is what funds
--- `red-val (obs s)` handing back to `reducible` -- the Girard-Tait
--- descent, running already.  Only the outermost is new, and what it
--- costs is not an order but a THEOREM: an unconnected-slot count is a
--- function of the STATE, so the checker cannot read it off an argument,
--- and each recursive call has to carry a proof that the state it was
+-- AND NONE OF THE ACCESSIBILITIES ALREADY IN THE CYCLE CAN FUND IT,
+-- WHICH IS WHAT MAKES THE OUTERMOST COMPONENT LOAD-BEARING RATHER THAN
+-- OUTER.  `reducible` re-seeds both of `redExpAcc`'s -- the input
+-- ceiling at the body's own top and the expression size at its own
+-- `gsizeᵉ` -- and `red-val` at `obs` is exactly that call.  So the
+-- inner returning through the fold arrives with a fresh ceiling, a
+-- fresh size, and a body standing in no relation to the one the cycle
+-- started at, and the fold's own floor argument is re-seeded the same
+-- way when the connect calls it.  That is sound today only because
+-- `red-val` sits BELOW the candidate and the call is not recursive.
+
+-- SO THE PRICE IS ONE QUANTITY THAT SURVIVES THE WHOLE LOOP, AND IT IS
+-- A THEOREM RATHER THAN AN ORDER.  An unconnected-slot count is a
+-- function of the STATE, which the checker cannot read off an argument,
+-- so every call in the cycle has to carry a proof that the state it was
 -- handed did not raise it.  `Freshness.Mono` is that proof for the node
--- counter over the subscribe cycle, clause for clause; the fold
--- relations have no counterpart yet, and they are the half a fan-out
--- runs in.  The step itself is the easy end: `connectedShares` is
--- consed by the two connect arms and read by everything else.
+-- counter over the thirteen subscribe relations, clause for clause; the
+-- fold relations have no counterpart, and they are the half a fan-out
+-- runs in.  The step itself is the cheap end: `connectedShares` is
+-- consed by the two connect arms and by nothing else.
 
 -- AND THE FAN-OUT IS THE RIGHT ANSWER, WHICH IS MEASURED RATHER THAN
 -- ARGUED.  Delivering the definition's burst value-major, re-reading
