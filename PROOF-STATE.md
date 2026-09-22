@@ -233,23 +233,19 @@ nothing where rxjs emits — so that is one mechanism seen 12 times.
 
 ### The monster
 
-`subscribeE⇓`'s burst carrier — the fact that a subscription's result is a
-LIST which its caller pushes, rather than values reaching the root as they are
-produced. Everything else in the evaluator is stated in terms of it, and a
-differential run has contradicted it.
+`subscribeE⇓`'s burst carrier — a subscription's result is a LIST which its
+caller pushes, rather than values reaching the root as produced. Everything
+else in the evaluator is stated in terms of it, and a differential run has
+contradicted it.
 
-NARROWED TO A COUNT, and one side of it clean. A draw biased at the region
-reaches it 8 times in 500 where the old one reached 0; the evaluator fails all
-eight and 10 in all, a carrier that pushes fails none, and those rows are
-pinned so the close is a count, not a memory. The two failures outside the
-region are the predicate under-reading, not a second mechanism — the pushing
-carrier clears them too. What is left is the carrier itself.
+NARROWED TO A COUNT. A region-biased draw reaches it 8 times in 500 where the
+old one reached 0; the evaluator fails all eight and 10 in all, a pushing
+carrier fails none, and those rows are pinned, so the close is a count rather
+than a memory.
 
 NARROWED AGAIN, on the STATEMENT side. The relation now says the push, so the
-carrier is no longer a question about shape — the six clauses where a pushing
-carrier answers differently from a batching one are written down and check.
-What the monster still holds is whether a tower stands over that shape, and
-the store is where it bites.
+carrier is no longer a question about shape. What is left is whether a tower
+stands over it, and the store is where that bites.
 
 also: `chainStep⇓`, `chainStep!` — the carrier is a batch on BOTH faces and only one of them is `subscribeE⇓`; a scheduled arrival folds its value and its end together for the same reason a subscription hands back a list, so the split separating them is the monster's fact landing off the monster's cone.
 
