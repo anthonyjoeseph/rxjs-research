@@ -26,3 +26,13 @@ an observable is what makes a scan cell's contents something a reducibility
 argument has to carry; ten of the draw's four hundred emitting programs have
 one, so a green sweep is thin evidence there and a redraw is not to be relied
 on. Nine of the ten agree under both carriers and are here to stay agreeing.
+
+Its last five rows are HAND-BUILT, because the draw reaches the region without
+reaching its hard half: in every drawn row the fold REPLACES its accumulator,
+and in none of them does it plug the accumulator into the observable it
+produces. That one shape is what makes a scan cell deepen by a flattener per
+folded value, and it is the case a syntactic bound on the store cannot cover —
+so a file holding only drawn rows would read as covering the region while
+testing the easy half of it. `f (acc , x) = strm (mergeAll (of [ acc , strm
+(of [ x ]) ]))` over a three-value source is the whole of the shape; both
+carriers agree with rxjs on all five.
