@@ -97,6 +97,52 @@ const readSeedFromCli = (): string | undefined => readFlag("seed");
 // prints.  Without it a divergence is reproducible only by re-running
 // the sweep that found it, and a generator edit moves every offset.
 const readCasesFromCli = (): string | undefined => readFlag("cases");
+
+// KEY ORDER IS NOT CONTENT, so two spellings of one row compare equal.
+// A hand-written row and the compact line a failing case prints carry
+// the same program in different orders, which is exactly the pair a
+// textual comparison would miss.
+const canonical = (v: unknown): string =>
+  JSON.stringify(v, (_k, x: unknown) =>
+    x !== null && typeof x === "object" && !Array.isArray(x)
+      ? Object.fromEntries(
+          Object.entries(x as Record<string, unknown>).sort(([a], [b]) =>
+            a < b ? -1 : 1,
+          ),
+        )
+      : x,
+  );
+
+// A PINNED FILE'S ROW COUNT IS A COVERAGE CLAIM, AND A REPEATED ROW
+// MAKES IT A FALSE ONE.  Two rows naming one program cannot fail
+// independently, so the count reads as reach the file does not have --
+// the same shape of lie as a green sweep that never entered the region,
+// and just as invisible while the number is only ever read.
+//
+// It is not a hypothetical: a row is pinned by COPYING the line a
+// failing case prints, so a program already pinned by hand gets pinned
+// again in the other spelling, and the file then reports a bigger
+// denominator every summary of the run quotes.
+const refuseDuplicates = (file: string, cases: TestCase[]): void => {
+  const keys = cases.map(canonical);
+  const dup = keys
+    .map((k, i) => ({ i, first: keys.indexOf(k) }))
+    .find(({ i, first }) => first !== i);
+  if (dup !== undefined)
+    throw new Error(
+      `${file}: row ${dup.i} names the same program as row ${dup.first} — ` +
+        `a row that cannot fail independently of another inflates the count ` +
+        `this file is read for`,
+    );
+};
+
+const replayCases = (file: string): TestCase[] => {
+  const cases = readFileSync(file, "utf8")
+    .split("\n")
+    .filter((line) => line.trim().length > 0)
+    .map((line) => JSON.parse(line) as TestCase);
+  return (refuseDuplicates(file, cases), cases);
+};
 // THE TWO SIDES ARE THE COMPILED AGDA AND PLAIN RXJS, AND NOTHING ELSE
 // MAY STAND ON EITHER.  A third machine here would be a semantics this
 // repo wrote to check its own semantics against, and a green between
@@ -258,10 +304,7 @@ async function main() {
       throw new Error(`--${flag} takes ${known.join(" | ")}, not '${v}'`);
   const testCases =
     casesFile !== undefined
-      ? readFileSync(casesFile, "utf8")
-          .split("\n")
-          .filter((line) => line.trim().length > 0)
-          .map((line) => JSON.parse(line) as TestCase)
+      ? replayCases(casesFile)
       : cliSeed !== undefined
         ? genTestCases(cliSeed, operator)
         : drawCorpus(operator);
