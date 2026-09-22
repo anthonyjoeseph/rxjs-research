@@ -267,15 +267,16 @@ also: `dispatchShare!` — its inhabitation, same reason.
   share. A second result component read by a fixed rule is refuted at
   `sharedConnect⇓` by the corpus's exchanged pair.
 
-- **WHAT PUSHING COSTS IS AN IMPORT CYCLE BEFORE IT IS A MEASURE.** `foldPath!`
-  hands the floor's `Acc` across `fr ↠ κ` UNCHANGED, so folding rootward at the
-  walk re-owes nothing on that axis. What it re-owes is WHERE the fold lives:
-  `red-consume` sits inside `reducible`'s own block, `foldPath!` sits above it
-  in `Builder`, and `Builder` imports `Reducible` — so pushing closes that
-  import and the fan-out descends into the reducibility cycle. Hoisting the
-  walk out instead is not available: `red-step` consumes it from inside that
-  same block. `reducible` then needs an `Acc` it has never carried, and the
-  unconnected-slot count is what funds it.
+- **PUSH BY SEGMENTING THE WALK, NOT BY CALLING THE FOLD FROM IT.** A consume
+  that calls `foldPath!` closes an import — `red-consume` is inside
+  `reducible`'s block, `foldPath!` is above it in a module that imports
+  `Reducible`, and `red-step` consumes the walk from inside that block, so the
+  fold cannot be hoisted the other way either. Returning the walk's answer as
+  ORDERED SEGMENTS instead, each either a `u`-group or a root stream, keeps
+  every call pointing down and lets `foldPath!`'s own frame clause resolve
+  them. `thruWrap` survives it: it touches the end bit and the state, never the
+  values. What decides between the two is whether a segment's fold must be
+  visible to the NEXT consume — a corpus question, not an argument.
 
 - **WHAT THE SINGLETON FOLD COSTS `batchSync`, ONCE THE FAN-OUT RUNS AT ALL.**
   The value walk hands a subscriber one value per `foldPath⇓`, and the one
