@@ -32,13 +32,12 @@ open import Relation.Nullary using (yes; no)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Exp using (Ctx; Closed; Val; obs; FnClo; _×ᵗ_; _≟ᵗ_)
-open import Rx.Evaluator using (Sched; EvalSt; Path; Frame; NodeId; NodeState;
-  AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ; Stream;
-  switchKill; scanDispatch; takeDispatch; thruWrap; mergeAllBump;
-  scanVals; takeVals; cell-st; take-st; batchSync-st; mergeAll-st; switch-st;
-  exhaust-st; lookupNode)
+open import Rx.Evaluator using (Sched; EvalSt; Path; Frame; NodeId; NodeState; AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ; Segs;
+  switchKill; scanDispatch; takeDispatch; thruWrap; mergeAllBump; scanVals; takeVals; cell-st;
+  take-st; batchSync-st; mergeAll-st; switch-st; exhaust-st; lookupNode)
 open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeInner⇓; thruConsume⇓;
   thruWalk⇓; mergeAllDrain⇓; innerFinish⇓; innerReact⇓; stepFrame⇓; pushBurst⇓;
+  pushSegs⇓; psegs-nil; psegs-cons;
   subscribeAll⇓; sharedConnect⇓; subscribeSharedSlot⇓;
   subs-floor; subs-shared; subs-hot-done; subs-hot-live; subs-cold-sync;
   subs-cold-async; subs-of; subs-empty; subs-map; subs-take-zero; subs-take-suc;
@@ -55,7 +54,7 @@ open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeInner⇓; thruCon
 open import Rx.Evaluator.Freshness using (nodeCt; PreservedBelow; FrameAbove;
   pres-same; pres-trans; pres-write)
 open import Rx.Evaluator.Freshness.Mono using (subscribeE-mono; stepFrame-mono;
-  subscribeInner-mono; thruConsume-mono; switchKill-node)
+  subscribeInner-mono; thruConsume-mono; switchKill-node; pushBurst-mono)
 
 -- the fold's dispatch rewrites its own node and nothing else
 scan-pres : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} {f}
@@ -157,22 +156,31 @@ kill-pres (just v) sched st refl = pres-same _ _ refl
 subscribeE-preserves : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
                          (f : ℕ) {b : Val Γ (obs u)} {κ : Path Γ lo u t} {now}
                          {sched sched₂ : Sched Γ} {st st₁ : EvalSt e}
-                         {burst : Stream Γ u} {roots : Stream Γ t}
+                         {segs : Segs Γ u t}
                      → f ≤ nodeCt sched
                      → subscribeE⇓ {e = e} b κ now sched st
-                         (burst , roots , sched₂ , st₁)
+                         (segs , sched₂ , st₁)
                      → PreservedBelow f st st₁
 
 pushBurst-preserves : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
                         (f : ℕ) {fr : Frame Γ s u} {κ : Path Γ lo u t}
                         {now} {ems}
                         {sched sched₂ : Sched Γ} {st st₂ : EvalSt e} {rest}
-                        {roots : Stream Γ t}
                     → f ≤ nodeCt sched
                     → FrameAbove f fr
                     → pushBurst⇓ {e = e} now fr κ ems sched st
-                        (rest , roots , sched₂ , st₂)
+                        (rest , sched₂ , st₂)
                     → PreservedBelow f st st₂
+
+pushSegs-preserves : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
+                       (f : ℕ) {fr : Frame Γ s u} {κ : Path Γ lo u t}
+                       {now} {segs}
+                       {sched sched₂ : Sched Γ} {st st₂ : EvalSt e} {out}
+                   → f ≤ nodeCt sched
+                   → FrameAbove f fr
+                   → pushSegs⇓ {e = e} now fr κ segs sched st
+                       (out , sched₂ , st₂)
+                   → PreservedBelow f st st₂
 
 stepFrame-preserves : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
                         (f : ℕ) {fr : Frame Γ s u} {κ : Path Γ lo u t}
@@ -188,11 +196,11 @@ stepFrame-preserves : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
 subscribeAll-preserves : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
                            (f : ℕ) {op} {ns : NodeState Γ}
                            {b : Val Γ (obs (obs u))} {κ : Path Γ lo u t} {now}
-                           {sched sched₂ : Sched Γ} {st st₁ : EvalSt e} {burst}
-                           {roots : Stream Γ t}
+                           {sched sched₂ : Sched Γ} {st st₁ : EvalSt e}
+                           {segs : Segs Γ u t}
                        → f ≤ nodeCt sched
                        → subscribeAll⇓ {e = e} op ns b κ now sched st
-                           (burst , roots , sched₂ , st₁)
+                           (segs , sched₂ , st₁)
                        → PreservedBelow f st st₁
 
 subscribeInner-preserves : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
@@ -260,19 +268,19 @@ innerReact-preserves : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
 sharedConnect-preserves : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo}
                             (f : ℕ) {i} {d} {κ : Path Γ lo _ t} {below}
                             {now} {sched sched₁ : Sched Γ}
-                            {st st₂ : EvalSt e} {burst} {roots : Stream Γ t}
+                            {st st₂ : EvalSt e} {segs : Segs Γ _ t}
                         → f ≤ nodeCt sched
                         → sharedConnect⇓ {e = e} i d κ below now sched st
-                            (burst , roots , sched₁ , st₂)
+                            (segs , sched₁ , st₂)
                         → PreservedBelow f st st₂
 
 subscribeSharedSlot-preserves : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo}
                                   (f : ℕ) {i} {d} {κ : Path Γ lo _ t} {below}
                                   {now} {sched sched₁ : Sched Γ}
-                                  {st st₂ : EvalSt e} {burst} {roots : Stream Γ t}
+                                  {st st₂ : EvalSt e} {segs : Segs Γ _ t}
                               → f ≤ nodeCt sched
                               → subscribeSharedSlot⇓ {e = e} i d κ below now
-                                  sched st (burst , roots , sched₁ , st₂)
+                                  sched st (segs , sched₁ , st₂)
                               → PreservedBelow f st st₂
 
 subscribeE-preserves f le (subs-floor _)            = pres-same _ _ refl
@@ -286,23 +294,23 @@ subscribeE-preserves f le subs-empty                = pres-same _ _ refl
 subscribeE-preserves f le (subs-take-zero _)        = pres-same _ _ refl
 subscribeE-preserves f le (subs-map sub push) =
   pres-trans (subscribeE-preserves f le sub)
-             (pushBurst-preserves f (≤-trans le (subscribeE-mono sub)) _ push)
+             (pushSegs-preserves f (≤-trans le (subscribeE-mono sub)) _ push)
 subscribeE-preserves f le (subs-take-suc {k = k} _ refl sub push) =
   pres-trans (pres-trans (pres-write _ _ (take-st (suc k)) refl le)
                          (subscribeE-preserves f (≤-trans le (n≤1+n _)) sub))
-             (pushBurst-preserves f
+             (pushSegs-preserves f
                 (≤-trans (≤-trans le (n≤1+n _)) (subscribeE-mono sub)) le push)
 subscribeE-preserves f le (subs-batchSync refl sub push) =
   pres-trans
     (pres-trans (pres-trans (pres-write _ _ (batchSync-st true) refl le)
                             (subscribeE-preserves f (≤-trans le (n≤1+n _)) sub))
-                (pushBurst-preserves f
+                (pushSegs-preserves f
                    (≤-trans (≤-trans le (n≤1+n _)) (subscribeE-mono sub)) le push))
     (pres-write _ _ (batchSync-st false) refl le)
 subscribeE-preserves f le (subs-scan refl sub push) =
   pres-trans (pres-trans (pres-write _ _ _ refl le)
                          (subscribeE-preserves f (≤-trans le (n≤1+n _)) sub))
-             (pushBurst-preserves f
+             (pushSegs-preserves f
                 (≤-trans (≤-trans le (n≤1+n _)) (subscribeE-mono sub)) le push)
 subscribeE-preserves f le (subs-merge-all sa)       = subscribeAll-preserves f le sa
 subscribeE-preserves f le (subs-switch-all sa)      = subscribeAll-preserves f le sa
@@ -315,6 +323,11 @@ pushBurst-preserves f le fa push-nil = pres-same _ _ refl
 pushBurst-preserves f le fa (push-cons _ stp rest) =
   pres-trans (stepFrame-preserves f le fa stp)
              (pushBurst-preserves f (≤-trans le (stepFrame-mono stp)) fa rest)
+
+pushSegs-preserves f le fa psegs-nil = pres-same _ _ refl
+pushSegs-preserves f le fa (psegs-cons pb ps) =
+  pres-trans (pushBurst-preserves f le fa pb)
+             (pushSegs-preserves f (≤-trans le (pushBurst-mono pb)) fa ps)
 
 stepFrame-preserves f le fa step-map       = pres-same _ _ refl
 stepFrame-preserves f le fa step-batchSync = pres-same _ _ refl
@@ -334,7 +347,7 @@ stepFrame-preserves f le fa
 subscribeAll-preserves f le (sub-all refl sub push) =
   pres-trans (pres-trans (pres-write _ _ _ refl le)
                          (subscribeE-preserves f (≤-trans le (n≤1+n _)) sub))
-             (pushBurst-preserves f
+             (pushSegs-preserves f
                 (≤-trans (≤-trans le (n≤1+n _)) (subscribeE-mono sub)) le push)
 
 subscribeInner-preserves f le (inner refl sub _) =

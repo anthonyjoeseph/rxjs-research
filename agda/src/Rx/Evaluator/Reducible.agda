@@ -59,16 +59,17 @@ open import Rx.Exp.Guarded using (gsizeᵉ; gsizeᵗ; gsizeᵗˢ; gsize-unfoldμ
 open import Rx.Inputs-Below using (ib-unfoldμ; ib-topᵉ)
 open import Rx.Mint using (nodeᵏ; regᵏ; sourceᵏ; freshId; setAt)
 open import Decide using (∧ˡ; ∧ʳ)
-open import Rx.Evaluator using (Stream; Burst; VSegs; vsegVals; Sched; EvalSt; Path; Frame; _↠_; map-f; take-f; scan-f;
-  batchSync-f; from-inner; thru-outer; share-sink; mergeAllᵒ; switchᵒ; exhaustᵒ; AllOp; NodeId;
-  NodeState; cell-st; take-st; batchSync-st; mergeAll-st; switch-st; exhaust-st; takeVals;
-  takeDispatch; scanVals; scanDispatch; batchVals; batchDispatch; lookupNode; installNode;
-  oneShotBurst; spentBurst; memberSource; splitEvents; splitBurst; consumeUsable; hasRoom;
-  switchKill; register; atSlot; lowerFloor; burstCompleted)
+open import Rx.Evaluator using (Stream; Burst; VSegs; Segs; segsCompleted; segVSegs; stepSegs; Sched; EvalSt; Path; Frame;
+  _↠_; map-f; take-f; scan-f; batchSync-f; from-inner; thru-outer; share-sink; mergeAllᵒ;
+  switchᵒ; exhaustᵒ; AllOp; NodeId; NodeState; cell-st; take-st; batchSync-st; mergeAll-st;
+  switch-st; exhaust-st; takeVals; takeDispatch; scanVals; scanDispatch; batchVals;
+  batchDispatch; lookupNode; installNode; oneShotBurst; spentBurst; memberSource; splitEvents;
+  splitBurst; consumeUsable; hasRoom; switchKill; register; atSlot; lowerFloor)
 open import Rx.Evaluator.Freshness using (lookup-set; PreservedBelow)
 open import Rx.Evaluator.Freshness.Preserve using (subscribeE-preserves)
-open import Rx.Evaluator.Domain using (srcFrame; subscribeE⇓; pushBurst⇓; stepFrame⇓;
+open import Rx.Evaluator.Domain using (srcFrame; subscribeE⇓; pushBurst⇓; pushSegs⇓; stepFrame⇓;
   step-map; step-scan; step-take; step-batchSync; push-nil; push-cons;
+  psegs-nil; psegs-cons;
   subs-of; subs-empty; subs-map; subs-take-zero; subs-take-suc; subs-scan;
   subs-batchSync; subs-mint; subs-defer; subs-floor; subs-hot-done; subs-hot-live;
   subs-cold-sync; subs-cold-async; subs-μ; sub-all; subs-merge-all;
@@ -109,8 +110,8 @@ Red (listᵗ t) vs       = All (Red t) vs
 Red {Γ = Γ} (obs u) b =
   ∀ {t} {e : Closed Γ t} {lo} (κ : Path Γ lo u t) (now : Tick)
     (sched : Sched Γ) (st : EvalSt e) →
-  Σ (Stream Γ u × Stream Γ t × Sched Γ × EvalSt e) λ r →
-    subscribeE⇓ {e = e} b κ now sched st r × StreamSat (Red u) (proj₁ r)
+  Σ (Segs Γ u t × Sched Γ × EvalSt e) λ r →
+    subscribeE⇓ {e = e} b κ now sched st r × All (λ sg → StreamSat (Red u) (proj₁ sg)) (proj₁ r)
 
 -- WHY A SHARE'S FAN-OUT COSTS THE CANDIDATE NOTHING, WHICH IS THE ONE
 -- THING ABOUT `connect` THAT WAS NOT OBVIOUS.  A shared slot subscribes
@@ -129,28 +130,6 @@ Red {Γ = Γ} (obs u) b =
 StreamSat-spent : ∀ {n} {Γ : Ctx n} {u} {P : Val Γ u → Set}
                 → StreamSat P (spentBurst {Γ = Γ} {u = u})
 StreamSat-spent = (tt ∷ []) ∷ []
-
--- PUSHING A BURST THROUGH A FRAME, WITH THE CANDIDATE CARRIED ACROSS.
--- The transformer arms all have the same two-step shape -- run the
--- source, then push what it emitted through this frame -- so the second
--- step is one obligation stated once rather than several.
-RedPush : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
-        → Tick → Frame Γ s u → Path Γ lo u t
-        → Stream Γ s → Sched Γ → EvalSt e → Set
-RedPush {Γ = Γ} {t = t} {e = e} {u = u} now f κ burst sched st =
-  Σ (Stream Γ u × Stream Γ t × Sched Γ × EvalSt e) λ r →
-    pushBurst⇓ {e = e} now f κ burst sched st r × StreamSat (Red u) (proj₁ r)
-
--- A MAPPING FRAME APPLIES ITS CLOSURE TO EVERY ARRIVING VALUE, so what
--- it produces is reducible exactly when the closure sends reducible to
--- reducible.  That is the only thing a frame wants from the term face,
--- and it has to be stated as a HYPOTHESIS rather than reached by a
--- call: the fundamental theorem at terms is a member of the recursion
--- at the foot of this module, so a walk declared above it cannot name
--- it.
-RedFn : ∀ {n} {Γ : Ctx n} {s u} → FnClo Γ s u → Set
-RedFn {Γ = Γ} {s = s} {u = u} fn =
-  ∀ {v : Val Γ s} → Red s v → Red u (applyClo fn v)
 
 -- WHAT A FRAME'S OWN NODE MUST HOLD, AND IT IS ONLY EVER THE FOLD
 -- THAT ASKS.  The node census says every other frame reads a store
@@ -192,6 +171,30 @@ RedNode (batchSync-f nid)           st = ⊤
 RedNode (from-inner op allNid inst) st = ⊤
 RedNode (thru-outer op nid)         st = ⊤
 
+-- PUSHING A BURST THROUGH A FRAME, WITH THE CANDIDATE CARRIED ACROSS.
+-- The transformer arms all have the same two-step shape -- run the
+-- source, then push what it emitted through this frame -- so the second
+-- step is one obligation stated once rather than several.
+RedPush : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
+        → Tick → Frame Γ s u → Path Γ lo u t
+        → Stream Γ s → Sched Γ → EvalSt e → Set
+RedPush {Γ = Γ} {t = t} {e = e} {u = u} now f κ burst sched st =
+  Σ (Segs Γ u t × Sched Γ × EvalSt e) λ r →
+    pushBurst⇓ {e = e} now f κ burst sched st r
+      × All (λ sg → StreamSat (Red u) (proj₁ sg)) (proj₁ r)
+      × RedNode f (proj₂ (proj₂ r))
+
+-- A MAPPING FRAME APPLIES ITS CLOSURE TO EVERY ARRIVING VALUE, so what
+-- it produces is reducible exactly when the closure sends reducible to
+-- reducible.  That is the only thing a frame wants from the term face,
+-- and it has to be stated as a HYPOTHESIS rather than reached by a
+-- call: the fundamental theorem at terms is a member of the recursion
+-- at the foot of this module, so a walk declared above it cannot name
+-- it.
+RedFn : ∀ {n} {Γ : Ctx n} {s u} → FnClo Γ s u → Set
+RedFn {Γ = Γ} {s = s} {u = u} fn =
+  ∀ {v : Val Γ s} → Red s v → Red u (applyClo fn v)
+
 -- A VALUE ENVIRONMENT IS REDUCIBLE WHEN EVERY ENTRY IS.  Terms are
 -- open in a Θ telescope and a frame's closure pairs a term with one
 -- such environment, so the fundamental theorem at terms has to be
@@ -205,15 +208,6 @@ RedEnv (_∷ᵉ_ {s = t} v vs)  = Red t v × RedEnv vs
 -- value in every segment's value list is reducible.
 VSegsSat : ∀ {n} {Γ : Ctx n} {t u} (P : Val Γ u → Set) → VSegs Γ u t → Set
 VSegsSat P = All (λ seg → All P (proj₁ seg))
-
--- FLATTENING A REDUCIBLE SEGMENT LIST PRESERVES THE PREDICATE.  The
--- flat value column is the concatenation of the per-segment columns;
--- each is reducible by hypothesis, and `++⁺` glues them together.
-satVsegVals : ∀ {n} {Γ : Ctx n} {t u} {P : Val Γ u → Set}
-              {segs : VSegs Γ u t}
-            → VSegsSat P segs → All P (vsegVals segs)
-satVsegVals []         = []
-satVsegVals (ps ∷ pss) = ++⁺ ps (satVsegVals pss)
 
 -- THE SAME CLAIM ONE BATCH DOWN: a frame, the values that arrived at
 -- it, and the candidate carried across to what leaves.  The push above
@@ -245,6 +239,17 @@ satSplitBurst : ∀ {n} {Γ : Ctx n} {u} {P : Val Γ u → Set}
 satSplitBurst []         []       = []
 satSplitBurst (b ∷ bs) (q ∷ qs) =
   ++⁺ (satSplitEvents b q) (satSplitBurst bs qs)
+
+-- PROJECTING StreamSat DOWN TO THE splitBurst COLUMN.  A Segs segment
+-- pairs a burst stream with a root stream; the VSegs image splits that
+-- burst's values out, and the existing satSplitBurst lemma closes the
+-- gap one segment at a time.
+satSegVSegs : ∀ {n} {Γ : Ctx n} {u t} {P : Val Γ u → Set}
+              {segs : Segs Γ u t}
+            → All (λ sg → StreamSat P (proj₁ sg)) segs
+            → VSegsSat P (segVSegs segs)
+satSegVSegs []         = []
+satSegVSegs (ss ∷ sss) = satSplitBurst _ ss ∷ satSegVSegs sss
 
 -- CONSUMING ONE ARRIVING OBSERVABLE, and walking a list of them, with
 -- the candidate carried across.  These are the flattener's two halves
@@ -301,14 +306,14 @@ red-consume {u = u} mergeAllᵒ nid κ now ro sched st
 ...   | yes refl with hasRoom lim act in eqr
 ...     | false = _ , consume-all-enqueue eq eqr , []
 ...     | true =
-          let ((burst , _ , _ , _) , d , ss) =
+          let ((segs , _ , _) , d , ss) =
                 ro (from-inner mergeAllᵒ nid (freshId nodeᵏ (Sched.mint sched)) ↠ κ) now
                    (record sched
                       { mint = setAt nodeᵏ (suc (freshId nodeᵏ (Sched.mint sched)))
                                  (Sched.mint sched) })
                    st
           in _ , consume-all-sub eq eqr (inner refl d refl)
-               , satSplitBurst burst ss ∷ []
+               , satSegVSegs ss
 
 red-consume {u = u} switchᵒ nid κ now ro sched st
   with lookupNode nid (EvalSt.nodes st) in eq
@@ -326,14 +331,14 @@ red-consume {u = u} switchᵒ nid κ now ro sched st
       _ , consume-switch-nil (cong (consumeUsable switchᵒ u) eq) , []
 ... | just (switch-st cur od) with switchKill cur sched st in eqk
 ...   | (sched₁ , st₁) =
-        let ((burst , _ , _ , _) , d , ss) =
+        let ((segs , _ , _) , d , ss) =
               ro (from-inner switchᵒ nid (freshId nodeᵏ (Sched.mint sched₁)) ↠ κ) now
                  (record sched₁
                     { mint = setAt nodeᵏ (suc (freshId nodeᵏ (Sched.mint sched₁)))
                                (Sched.mint sched₁) })
                  st₁
         in _ , consume-switch-sub eq eqk (inner refl d refl)
-             , satSplitBurst burst ss ∷ []
+             , satSegVSegs ss
 
 red-consume {u = u} exhaustᵒ nid κ now ro sched st
   with lookupNode nid (EvalSt.nodes st) in eq
@@ -352,14 +357,14 @@ red-consume {u = u} exhaustᵒ nid κ now ro sched st
 ... | just (exhaust-st true _) =
       _ , consume-exhaust-nil (cong (consumeUsable exhaustᵒ u) eq) , []
 ... | just (exhaust-st false od) =
-      let ((burst , _ , _ , _) , d , ss) =
+      let ((segs , _ , _) , d , ss) =
             ro (from-inner exhaustᵒ nid (freshId nodeᵏ (Sched.mint sched)) ↠ κ) now
                (record sched
                   { mint = setAt nodeᵏ (suc (freshId nodeᵏ (Sched.mint sched)))
                              (Sched.mint sched) })
                st
       in _ , consume-exhaust-sub eq (inner refl d refl)
-           , satSplitBurst burst ss ∷ []
+           , satSegVSegs ss
 
 -- THE WALK IS THE CONSUME THREADED, and the column it returns is the
 -- concatenation of the columns each arrival produced.
@@ -588,12 +593,11 @@ red-scan-installed : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo Θ}
            {a : Val Γ u} → Red u a
          → ∀ {b : Exp Γ [] [] Θ s} {ρ : Env Γ Θ} {κ : Path Γ lo u t} {now}
          → (sched : Sched Γ) (st : EvalSt e)
-         → {sched₂ : Sched Γ} {st₁ : EvalSt e} {burst : Stream Γ s}
-             {roots : Stream Γ t}
+         → {sched₂ : Sched Γ} {st₁ : EvalSt e} {segs : Segs Γ s t}
          → subscribeE⇓ {e = e} (Θ , b , ρ) (scan-f fn nid ↠ κ) now
              (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
              (installNode nid (cell-st a) st)
-             (burst , roots , sched₂ , st₁)
+             (segs , sched₂ , st₁)
          → RedNode {e = e} (scan-f fn nid) st₁
 red-scan-installed fn nid {a} ra sched st d eq =
   tie-scan (trans (sym (trans (PreservedBelow.below
@@ -686,6 +690,18 @@ satFin : ∀ {A : Set} {P : A → Set} (b : Bool)
 satFin true  = tt ∷ []
 satFin false = []
 
+-- ASSEMBLING SEGS SATISFACTION FROM VSEGS SATISFACTION THROUGH stepSegs.
+-- Each clause mirrors the matching arm of stepSegs directly: nil hands
+-- back only the completion flag, the last segment appends it, and every
+-- earlier segment carries its values alone with the flag deferred.
+satStepSegs : ∀ {n} {Γ : Ctx n} {u t} {P : Val Γ u → Set}
+              (fin : Bool) {segs : VSegs Γ u t}
+            → VSegsSat P segs
+            → All (λ sg → StreamSat P (proj₁ sg)) (stepSegs segs fin)
+satStepSegs fin []            = (satFin fin ∷ []) ∷ []
+satStepSegs fin (rv ∷ [])     = (satEvents rv (satFin fin) ∷ []) ∷ []
+satStepSegs fin (rv ∷ p ∷ ps) = (satValues rv ∷ []) ∷ satStepSegs fin (p ∷ ps)
+
 -- PUSHING A STREAM THROUGH A FRAME IS A WALK, AND THE WALK IS A BODY.
 -- Each burst is split, stepped and reassembled; the candidate travels
 -- on the values alone, which is why the reassembly costs one append of
@@ -696,14 +712,37 @@ red-push : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
            {burst : Stream Γ s} → StreamSat (Red s) burst
          → (sched : Sched Γ) (st : EvalSt e) → RedNode f st
          → RedPush {e = e} now f κ burst sched st
-red-push now f sv rf κ {[]}     []       sched st rn = _ , push-nil , []
+red-push now f sv rf κ {[]}     []       sched st rn = _ , push-nil , [] , rn
 red-push now f sv rf κ {b ∷ bs} (p ∷ ps) sched st rn =
   let ((segs , fin′ , sched₁ , st₁) , d , rv , rn₁) =
         red-step now f sv rf κ (satSplitEvents b p)
           (proj₂ (splitEvents b)) sched st rn
-      ((rest , _ , sched₂ , st₂) , dr , sr) = red-push now f sv rf κ ps sched₁ st₁ rn₁
+      ((rest , sched₂ , st₂) , dr , sr , rn₂) = red-push now f sv rf κ ps sched₁ st₁ rn₁
   in _ , push-cons refl d dr
-       , satEvents (satVsegVals rv) (satFin fin′) ∷ sr
+       , ++⁺ (satStepSegs fin′ rv) sr
+       , rn₂
+
+-- ITERATING red-push OVER A SEGS LIST.  Each segment's stream is
+-- pushed independently; the root stream of each segment passes through
+-- unchanged, and the satisfaction travels from red-push's output to the
+-- segment list.
+red-pushSegs : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
+               (now : Tick) (f : Frame Γ s u) → srcFrame f → RedFrame f
+             → (κ : Path Γ lo u t)
+               {segs : Segs Γ s t}
+             → All (λ sg → StreamSat (Red s) (proj₁ sg)) segs
+             → (sched : Sched Γ) (st : EvalSt e) → RedNode f st
+             → Σ (Segs Γ u t × Sched Γ × EvalSt e) λ r →
+                 pushSegs⇓ {e = e} now f κ segs sched st r
+                   × All (λ sg → StreamSat (Red u) (proj₁ sg)) (proj₁ r)
+                   × RedNode f (proj₂ (proj₂ r))
+red-pushSegs now f sv rf κ []        sched st rn = _ , psegs-nil , [] , rn
+red-pushSegs now f sv rf κ (ss ∷ sss) sched st rn =
+  let ((out , sched₁ , st₁) , pb , sat₁ , rn₁) =
+        red-push now f sv rf κ ss sched st rn
+      ((rest , sched₂ , st₂) , ps , sat₂ , rn₂) =
+        red-pushSegs now f sv rf κ sss sched₁ st₁ rn₁
+  in _ , psegs-cons pb ps , [] ∷ ++⁺ sat₁ sat₂ , rn₂
 
 -- an entry of a reducible environment is reducible
 redLookup : ∀ {n} {Γ : Ctx n} {Θ t} (ρ : Env Γ Θ) → RedEnv ρ
@@ -758,45 +797,45 @@ mutual
             → Acc _<_ (gsizeᵉ b) → Red {Γ = Γ} (obs t) (Θ , b , ρ)
   redExpAcc (input i) ρ rρ k ok aK a = red-input i ρ k ok aK
   redExpAcc (ofᵉ ts) ρ rρ k ok aK (acc rs) κ now sched st =
-    _ , subs-of , satOneShot (redTmsAcc ts ρ rρ k ok aK (rs ≤-refl))
+    _ , subs-of , satOneShot (redTmsAcc ts ρ rρ k ok aK (rs ≤-refl)) ∷ []
   redExpAcc emptyᵉ ρ rρ k ok aK a κ now sched st =
-    _ , subs-empty , satOneShot []
+    _ , subs-empty , satOneShot [] ∷ []
   redExpAcc (mapᵉ {s = s} f b) ρ rρ k ok aK (acc rs) κ now sched st =
     let okf = ∧ˡ (inputsBelowᵗ k f) (inputsBelowᵉ k b) ok
         okb = ∧ʳ (inputsBelowᵗ k f) (inputsBelowᵉ k b) ok
-        ((burst , _ , sched₁ , st₁) , d , sat) =
+        ((segs , sched₁ , st₁) , d , sat) =
           redExpAcc b ρ rρ k okb aK
             (rs (s≤s (m≤n+m (gsizeᵉ b) (gsizeᵗ f))))
             (map-f (_ , f , ρ) ↠ κ) now sched st
-        (r , p , sat′) =
-          red-push now (map-f (_ , f , ρ)) tt
+        (r , p , sat′ , _) =
+          red-pushSegs now (map-f (_ , f , ρ)) tt
             (redFnAcc f ρ rρ k okf aK
               (rs (s≤s (m≤m+n (gsizeᵗ f) (gsizeᵉ b)))))
             κ sat sched₁ st₁ tt
     in r , subs-map d p , sat′
   redExpAcc (takeᵉ c b) ρ rρ k ok aK (acc rs) κ now sched st
     with evalWith c ρ in ceq
-  ... | zero  = _ , subs-take-zero ceq , satOneShot []
+  ... | zero  = _ , subs-take-zero ceq , satOneShot [] ∷ []
   ... | suc j =
     let okb = ∧ʳ (inputsBelowᵗ k c) (inputsBelowᵉ k b) ok
         nid = freshId nodeᵏ (Sched.mint sched)
-        ((burst , _ , sched₂ , st₁) , d , sat) =
+        ((segs , sched₂ , st₁) , d , sat) =
           redExpAcc b ρ rρ k okb aK
             (rs (s≤s (m≤n+m (gsizeᵉ b) (gsizeᵗ c))))
             (take-f nid ↠ κ) now
             (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
             (installNode nid (take-st (suc j)) st)
-        (r , p , sat′) = red-push now (take-f nid) tt tt κ sat sched₂ st₁ tt
+        (r , p , sat′ , _) = red-pushSegs now (take-f nid) tt tt κ sat sched₂ st₁ tt
     in r , subs-take-suc ceq refl d p , sat′
   redExpAcc (batchSyncᵉ b) ρ rρ k ok aK (acc rs) κ now sched st =
     let nid = freshId nodeᵏ (Sched.mint sched)
-        ((burst , _ , sched₂ , st₁) , d , sat) =
+        ((segs , sched₂ , st₁) , d , sat) =
           redExpAcc b ρ rρ k ok aK (rs ≤-refl)
             (batchSync-f nid ↠ κ) now
             (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
             (installNode nid (batchSync-st true) st)
-        ((out , _ , sched₃ , st₂) , p , sat′) =
-          red-push now (batchSync-f nid) tt tt κ sat sched₂ st₁ tt
+        (r , p , sat′ , _) =
+          red-pushSegs now (batchSync-f nid) tt tt κ sat sched₂ st₁ tt
     in _ , subs-batchSync refl d p , sat′
   redExpAcc (scanᵉ {s = s} {t = u} f z b) ρ rρ k ok aK (acc rs) κ now sched st =
     let zbe = inputsBelowᵗ k z ∧ inputsBelowᵉ k b
@@ -810,46 +849,46 @@ mutual
         rz  = redTmAcc z ρ rρ k okz aK
                 (rs (s≤s (≤-trans (m≤m+n (gsizeᵗ z) (gsizeᵉ b))
                                   (m≤n+m (gsizeᵗ z + gsizeᵉ b) (gsizeᵗ f)))))
-        ((burst , _ , sched₂ , st₁) , d , sat) =
+        ((segs , sched₂ , st₁) , d , sat) =
           redExpAcc b ρ rρ k okb aK
             (rs (s≤s (≤-trans (m≤n+m (gsizeᵉ b) (gsizeᵗ z))
                               (m≤n+m (gsizeᵗ z + gsizeᵉ b) (gsizeᵗ f)))))
             (scan-f (_ , f , ρ) nid ↠ κ) now
             (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
             (installNode nid (cell-st (evalWith z ρ)) st)
-        (r , p , sat′) =
-          red-push now (scan-f (_ , f , ρ) nid) tt rf
+        (r , p , sat′ , _) =
+          red-pushSegs now (scan-f (_ , f , ρ) nid) tt rf
             κ sat sched₂ st₁ (red-scan-installed (_ , f , ρ) nid rz sched st d)
     in r , subs-scan refl d p , sat′
   redExpAcc (mergeAllᵉ lim b) ρ rρ k ok aK (acc rs) κ now sched st =
     let nid = freshId nodeᵏ (Sched.mint sched)
-        ((burst , _ , sched₂ , st₁) , d , sat) =
+        ((segs , sched₂ , st₁) , d , sat) =
           redExpAcc b ρ rρ k ok aK (rs ≤-refl)
             (thru-outer mergeAllᵒ nid ↠ κ) now
             (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
             (installNode nid (mergeAll-st lim 0 [] false) st)
-        (r , p , sat′) =
-          red-push now (thru-outer mergeAllᵒ nid) tt tt κ sat sched₂ st₁ tt
+        (r , p , sat′ , _) =
+          red-pushSegs now (thru-outer mergeAllᵒ nid) tt tt κ sat sched₂ st₁ tt
     in r , subs-merge-all (sub-all refl d p) , sat′
   redExpAcc (switchAllᵉ b) ρ rρ k ok aK (acc rs) κ now sched st =
     let nid = freshId nodeᵏ (Sched.mint sched)
-        ((burst , _ , sched₂ , st₁) , d , sat) =
+        ((segs , sched₂ , st₁) , d , sat) =
           redExpAcc b ρ rρ k ok aK (rs ≤-refl)
             (thru-outer switchᵒ nid ↠ κ) now
             (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
             (installNode nid (switch-st nothing false) st)
-        (r , p , sat′) =
-          red-push now (thru-outer switchᵒ nid) tt tt κ sat sched₂ st₁ tt
+        (r , p , sat′ , _) =
+          red-pushSegs now (thru-outer switchᵒ nid) tt tt κ sat sched₂ st₁ tt
     in r , subs-switch-all (sub-all refl d p) , sat′
   redExpAcc (exhaustAllᵉ b) ρ rρ k ok aK (acc rs) κ now sched st =
     let nid = freshId nodeᵏ (Sched.mint sched)
-        ((burst , _ , sched₂ , st₁) , d , sat) =
+        ((segs , sched₂ , st₁) , d , sat) =
           redExpAcc b ρ rρ k ok aK (rs ≤-refl)
             (thru-outer exhaustᵒ nid ↠ κ) now
             (record sched { mint = setAt nodeᵏ (suc nid) (Sched.mint sched) })
             (installNode nid (exhaust-st false false) st)
-        (r , p , sat′) =
-          red-push now (thru-outer exhaustᵒ nid) tt tt κ sat sched₂ st₁ tt
+        (r , p , sat′ , _) =
+          red-pushSegs now (thru-outer exhaustᵒ nid) tt tt κ sat sched₂ st₁ tt
     in r , subs-exhaust-all (sub-all refl d p) , sat′
   redExpAcc (μᵉ body) ρ rρ k ok aK (acc rs) κ now sched st =
     let (r , d , sat) =
@@ -883,19 +922,19 @@ mutual
             → Red {Γ = Γ} (obs (lookup Γ i)) (Θ , input i , ρ)
   red-input {Γ = Γ} i ρ k ok (acc rsK) {lo = lo} κ now sched st
       with toℕ i <? lo
-  ... | no  ¬below = _ , subs-floor (≮⇒≥ ¬below) , StreamSat-spent
+  ... | no  ¬below = _ , subs-floor (≮⇒≥ ¬below) , StreamSat-spent ∷ []
   ... | yes below  with Sched.slots sched i in slEq
   ...   | scripted {ok = okD} (hot async)
           with memberSource (toℕ i) (EvalSt.completedSources st) in doneEq
-  ...     | true  = _ , subs-hot-done below slEq doneEq , StreamSat-spent
+  ...     | true  = _ , subs-hot-done below slEq doneEq , StreamSat-spent ∷ []
   ...     | false = _ , subs-hot-live below slEq doneEq refl , []
   red-input {Γ = Γ} i ρ k ok (acc rsK) {lo = lo} κ now sched st
       | yes below | scripted {ok = okD} (cold sync []) =
-        _ , subs-cold-sync below slEq , satOneShot (redDatas _ okD sync)
+        _ , subs-cold-sync below slEq , satOneShot (redDatas _ okD sync) ∷ []
   red-input {Γ = Γ} i ρ k ok (acc rsK) {lo = lo} κ now sched st
       | yes below | scripted {ok = okD} (cold sync (d ∷ ds)) =
         _ , subs-cold-async below slEq refl refl refl
-          , satValues (redDatas _ okD sync) ∷ []
+          , (satValues (redDatas _ okD sync) ∷ []) ∷ []
   red-input {Γ = Γ} i ρ k ok (acc rsK) {lo = lo} κ now sched st
       | yes below | shared d {ok = okd} =
         red-input-shared i d (rsK (<ᵇ⇒< (toℕ i) k ok)) ρ
@@ -921,15 +960,15 @@ mutual
       (now : Tick) (sched : Sched Γ)
     → Sched.slots sched i ≡ shared d {ok = okd}
     → (st : EvalSt e)
-    → Σ (Stream Γ (lookup Γ i) × Stream Γ t × Sched Γ × EvalSt e) λ r →
+    → Σ (Segs Γ (lookup Γ i) t × Sched Γ × EvalSt e) λ r →
         subscribeE⇓ {e = e} (Θ , input i , ρ) κ now sched st r
-          × StreamSat (Red (lookup Γ i)) (proj₁ r)
+          × All (λ sg → StreamSat (Red (lookup Γ i)) (proj₁ sg)) (proj₁ r)
   red-input-shared {Γ = Γ} {t = t} i d {okd} aI ρ κ below now sched slEq st
       with memberSource (toℕ i) (EvalSt.completedSources st) in doneEq
   ... | true =
         _ , subs-shared {κ = κ} {below = below} slEq
               (slot-spent {κ = κ} {below = below} doneEq)
-          , StreamSat-spent
+          , StreamSat-spent ∷ []
   ... | false
         with memberSource (toℕ i) (EvalSt.connectedShares st) in connEq
   ...   | true =
@@ -947,8 +986,8 @@ mutual
                    (lowerFloor below κ)
                    (record st
                      { connectedShares = toℕ i ∷ EvalSt.connectedShares st }))
-  ...     | ((burst , _ , sched₁ , st₂) , dv , dsat)
-            with burstCompleted burst in compEq
+  ...     | ((segs , sched₁ , st₂) , dv , dsat)
+            with segsCompleted segs in compEq
   ...       | false =
               _ , subs-shared {κ = κ} {below = below} slEq
                     (slot-connect {κ = κ} {below = below} doneEq connEq

@@ -29,13 +29,13 @@ open import Relation.Nullary using (yes; no)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Exp using (Ctx; Closed; Val; obs; FnClo; _×ᵗ_; _≟ᵗ_)
-open import Rx.Evaluator using (Sched; EvalSt; Path; Frame; NodeId; NodeState;
-  AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ; Stream;
-  switchKill; scanDispatch; takeDispatch; thruWrap; cell-st; take-st;
-  batchSync-st; mergeAll-st; switch-st; exhaust-st; lookupNode; takeVals)
+open import Rx.Evaluator using (Sched; EvalSt; Path; Frame; NodeId; NodeState; AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ; Segs;
+  switchKill; scanDispatch; takeDispatch; thruWrap; cell-st; take-st; batchSync-st;
+  mergeAll-st; switch-st; exhaust-st; lookupNode; takeVals)
 open import Rx.Evaluator.Freshness using (nodeCt)
 open import Rx.Evaluator.Domain using (subscribeE⇓; subscribeInner⇓; thruConsume⇓;
   thruWalk⇓; mergeAllDrain⇓; innerFinish⇓; innerReact⇓; stepFrame⇓; pushBurst⇓;
+  pushSegs⇓; psegs-nil; psegs-cons;
   subscribeAll⇓; sharedConnect⇓; subscribeSharedSlot⇓;
   subs-floor; subs-shared; subs-hot-done; subs-hot-live; subs-cold-sync;
   subs-cold-async; subs-of; subs-empty; subs-map; subs-take-zero; subs-take-suc;
@@ -136,15 +136,21 @@ thruWrap-node exhaustᵒ nid true sched′ st′
 subscribeE-mono : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
                     {b : Val Γ (obs u)} {κ : Path Γ lo u t} {now}
                     {sched sched₂ : Sched Γ} {st st₁ : EvalSt e}
-                    {burst : Stream Γ u} {roots : Stream Γ t}
-                → subscribeE⇓ {e = e} b κ now sched st (burst , roots , sched₂ , st₁)
+                    {segs : Segs Γ u t}
+                → subscribeE⇓ {e = e} b κ now sched st (segs , sched₂ , st₁)
                 → nodeCt sched ≤ nodeCt sched₂
 
 pushBurst-mono : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
                    {fr : Frame Γ s u} {κ : Path Γ lo u t} {now} {burst}
-                   {sched sched₂ : Sched Γ} {st st₁ : EvalSt e} {out} {roots : Stream Γ t}
-               → pushBurst⇓ {e = e} now fr κ burst sched st (out , roots , sched₂ , st₁)
+                   {sched sched₂ : Sched Γ} {st st₁ : EvalSt e} {out}
+               → pushBurst⇓ {e = e} now fr κ burst sched st (out , sched₂ , st₁)
                → nodeCt sched ≤ nodeCt sched₂
+
+pushSegs-mono : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
+                  {fr : Frame Γ s u} {κ : Path Γ lo u t} {now} {segs}
+                  {sched sched₂ : Sched Γ} {st st₁ : EvalSt e} {out}
+              → pushSegs⇓ {e = e} now fr κ segs sched st (out , sched₂ , st₁)
+              → nodeCt sched ≤ nodeCt sched₂
 
 stepFrame-mono : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
                    {fr : Frame Γ s u} {κ : Path Γ lo u t} {now} {vals fin}
@@ -156,10 +162,10 @@ stepFrame-mono : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u lo}
 subscribeAll-mono : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
                       {op} {ns : NodeState Γ} {b : Val Γ (obs (obs u))}
                       {κ : Path Γ lo u t} {now}
-                      {sched sched₂ : Sched Γ} {st st₁ : EvalSt e} {burst}
-                      {roots : Stream Γ t}
+                      {sched sched₂ : Sched Γ} {st st₁ : EvalSt e}
+                      {segs : Segs Γ u t}
                   → subscribeAll⇓ {e = e} op ns b κ now sched st
-                      (burst , roots , sched₂ , st₁)
+                      (segs , sched₂ , st₁)
                   → nodeCt sched ≤ nodeCt sched₂
 
 subscribeInner-mono : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u lo}
@@ -210,18 +216,18 @@ innerReact-mono : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo}
 
 sharedConnect-mono : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo}
                        {i} {d} {κ : Path Γ lo _ t} {below} {now}
-                       {sched sched₁ : Sched Γ} {st st₂ : EvalSt e} {burst}
-                       {roots : Stream Γ t}
+                       {sched sched₁ : Sched Γ} {st st₂ : EvalSt e}
+                       {segs : Segs Γ _ t}
                    → sharedConnect⇓ {e = e} i d κ below now sched st
-                       (burst , roots , sched₁ , st₂)
+                       (segs , sched₁ , st₂)
                    → nodeCt sched ≤ nodeCt sched₁
 
 subscribeSharedSlot-mono : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {lo}
                              {i} {d} {κ : Path Γ lo _ t} {below} {now}
-                             {sched sched₁ : Sched Γ} {st st₂ : EvalSt e} {burst}
-                             {roots : Stream Γ t}
+                             {sched sched₁ : Sched Γ} {st st₂ : EvalSt e}
+                             {segs : Segs Γ _ t}
                          → subscribeSharedSlot⇓ {e = e} i d κ below now sched st
-                             (burst , roots , sched₁ , st₂)
+                             (segs , sched₁ , st₂)
                          → nodeCt sched ≤ nodeCt sched₁
 
 subscribeE-mono (subs-floor _)                = ≤-refl
@@ -234,13 +240,13 @@ subscribeE-mono subs-of                       = ≤-refl
 subscribeE-mono subs-empty                    = ≤-refl
 subscribeE-mono (subs-take-zero _)            = ≤-refl
 subscribeE-mono (subs-map sub push) =
-  ≤-trans (subscribeE-mono sub) (pushBurst-mono push)
+  ≤-trans (subscribeE-mono sub) (pushSegs-mono push)
 subscribeE-mono (subs-take-suc _ refl sub push) =
-  ≤-trans (≤-trans (n≤1+n _) (subscribeE-mono sub)) (pushBurst-mono push)
+  ≤-trans (≤-trans (n≤1+n _) (subscribeE-mono sub)) (pushSegs-mono push)
 subscribeE-mono (subs-batchSync refl sub push) =
-  ≤-trans (≤-trans (n≤1+n _) (subscribeE-mono sub)) (pushBurst-mono push)
+  ≤-trans (≤-trans (n≤1+n _) (subscribeE-mono sub)) (pushSegs-mono push)
 subscribeE-mono (subs-scan refl sub push) =
-  ≤-trans (≤-trans (n≤1+n _) (subscribeE-mono sub)) (pushBurst-mono push)
+  ≤-trans (≤-trans (n≤1+n _) (subscribeE-mono sub)) (pushSegs-mono push)
 subscribeE-mono (subs-merge-all sa)           = subscribeAll-mono sa
 subscribeE-mono (subs-switch-all sa)          = subscribeAll-mono sa
 subscribeE-mono (subs-exhaust-all sa)         = subscribeAll-mono sa
@@ -250,6 +256,9 @@ subscribeE-mono (subs-mint _ sub)             = subscribeE-mono sub
 
 pushBurst-mono push-nil              = ≤-refl
 pushBurst-mono (push-cons _ st rest) = ≤-trans (stepFrame-mono st) (pushBurst-mono rest)
+
+pushSegs-mono psegs-nil          = ≤-refl
+pushSegs-mono (psegs-cons pb ps) = ≤-trans (pushBurst-mono pb) (pushSegs-mono ps)
 
 stepFrame-mono step-map              = ≤-refl
 stepFrame-mono step-batchSync        = ≤-refl
@@ -262,7 +271,7 @@ stepFrame-mono (step-thru-outer {op = op} {nid} {fin = fin} w) =
   ≤-trans (thruWalk-mono w) (thruWrap-node op nid fin _ _)
 
 subscribeAll-mono (sub-all refl sub push) =
-  ≤-trans (≤-trans (n≤1+n _) (subscribeE-mono sub)) (pushBurst-mono push)
+  ≤-trans (≤-trans (n≤1+n _) (subscribeE-mono sub)) (pushSegs-mono push)
 
 subscribeInner-mono (inner refl sub _) = ≤-trans (n≤1+n _) (subscribeE-mono sub)
 

@@ -254,28 +254,27 @@ also: `subscribe-shaped` — same; its conclusion gains the new component, which
 
 ### Big picture tier roadmap
 
-- **SEGMENT THE CARRIER: A SUBSCRIBE ANSWERS WITH AN ORDERED LIST OF THEM.**
-  One segment per inner a walk consumes — a burst at `u` paired with the stream
-  that inner already sent to `t` — concatenated in order by `pushBurst⇓` and
-  resolved wherever something folds: `foldPath!`'s frame clause, and `eval-run`
-  at the top, where both are already at `t` and resolving is concatenating. The
-  pair the leg before landed is the ONE-SEGMENT case, so this leg is measured
-  the same way — the corpus cannot move while every root component is `[]`, and
-  the exchanged pair splits only once the leg below fills them. That it reaches
-  the SUBSCRIBE rather than stopping at the walk is a fact about `sub-all`, and
-  is recorded there with the route that would need no carrier at all.
-
 - **ROUTE THE CONNECT THROUGH THE FAN-OUT — THIS LEG IS THE MONSTER.** Nothing
   has to be built: `shareWalk⇓` already re-reads `shareAdmit` against the state
   its previous value threaded, and `shareGo⇓` already finishes each fold before
-  the next path, so the machinery the corpus demands is there and correct. The
-  monster is only that `sharedConnect⇓` never calls it. Here an accumulator is
-  genuinely owed and cannot be borrowed:
-  the connect enters the fan-out at its OWN slot, so the floor does not move
-  and nothing beneath it orders the call. The unconnected-slot count does —
-  `connectedShares` is extended before the recursive call and is raised
-  nowhere, which `Freshness/` already has the shape for. The oracle's three
-  failing rows are what says whether it worked.
+  the next path. The monster is only that `sharedConnect⇓` never calls it. The
+  carrier ruled out the cheap version: four of five subscribe arms DROPPED
+  the inner subscribe's root column, so wiring the fan-out alone
+  would have emitted nothing at `take`, `map`, `scan` and `sub-all`. Still owed
+  is an accumulator nothing can lend — the connect enters at its OWN slot, so
+  the floor does not move; the unconnected-slot count does, and
+  `connectedShares` is extended before the recursive call and raised nowhere.
+  The oracle's three failing rows are what says whether it worked.
+
+- **PIN THE WITHIN-SEGMENT ORDER, AT THE FIRST PROGRAM THAT FILLS A ROOT
+  COLUMN.** `foldVSegs⇓` and `resolveSegs` both answer a segment's root stream
+  BEFORE its values, and nothing has tested that: every root component is `[]`
+  until the leg above runs, so the two readings are indistinguishable today and
+  were unified on an argument rather than a measurement. The argument is that a
+  connect fans out to subscribers already registered, so their delivery ran
+  before the subscribe holding this segment existed. A probe instantiating the
+  resolved stream at the exchanged pair decides it — and decides it alone,
+  rather than through three simultaneous changes to the corpus.
 
 - **WHAT THE SINGLETON FOLD COSTS `batchSync`, ONCE THE FAN-OUT RUNS AT ALL.**
   The value walk hands a subscriber one value per `foldPath⇓`, and the one

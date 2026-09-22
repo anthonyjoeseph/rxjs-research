@@ -524,18 +524,48 @@ splitBurst (b ∷ bs) =
       (vs′ , c′) = splitBurst bs
   in vs ++ vs′ , c ∨ c′
 
--- READING AN ORDERED ANSWER BY A FIXED RULE, WHICH IS EXACTLY WHAT
--- THE EXCHANGED PAIR REFUTES.  These two exist only where a carrier
--- ABOVE the segments is still a group beside a stream and has to be
--- handed one: they are the seam, and they are what the subscribe side
--- gaining segments of its own deletes.  Nothing else may call them.
-vsegVals : ∀ {n} {Γ : Ctx n} {u t} → VSegs Γ u t → List (Val Γ u)
-vsegVals []             = []
-vsegVals ((vs , _) ∷ ss) = vs ++ vsegVals ss
+-- THE SAME ORDERED ANSWER ONE LEVEL UP, WHERE A CONTRIBUTION IS A
+-- STREAM RATHER THAN A VALUE LIST.  A subscribe hands its output back
+-- as BURSTS, because the bracketing is what a `batchSync` downstream
+-- reads off it, so a subscribe-side segment pairs a stream at `u` with
+-- the stream that same contribution sent to the root.
+Segs : ∀ {n} → Ctx n → Ty → Ty → Set
+Segs Γ u t = List (Stream Γ u × Stream Γ t)
 
-vsegRoots : ∀ {n} {Γ : Ctx n} {u t} → VSegs Γ u t → Stream Γ t
-vsegRoots []              = []
-vsegRoots ((_ , rs) ∷ ss) = rs ++ vsegRoots ss
+-- THE ONE-SEGMENT ANSWER, which is every subscribe that cannot reach
+-- the root -- today that is all of them, since nothing on this side
+-- mints a root emit until the connect is routed through the fan-out.
+oneSeg : ∀ {n} {Γ : Ctx n} {u t} → Stream Γ u → Segs Γ u t
+oneSeg bs = (bs , []) ∷ []
+
+-- ONE OUTPUT BURST PER SEGMENT, WHICH IS WHERE A FLATTENER'S ORDER
+-- SURVIVES THE PUSH -- AND WHERE THE BRACKETING CHANGES.  A push used
+-- to answer one burst per INPUT burst, concatenating every segment's
+-- values into it, which collapses two inners delivered in the same
+-- burst.  That is exactly the exchanged pair's shape, so keeping them
+-- apart costs them a burst each.
+--
+-- THE COMPLETION RIDES THE LAST SEGMENT, which is the reading closest
+-- to the one burst this used to answer: at one segment -- every frame
+-- but `thru-outer`, and `thru-outer` whenever its outer delivered at
+-- most one observable -- the answer is the old one term for term, so
+-- the only shapes that move are the ones the split is for.
+stepSegs : ∀ {n} {Γ : Ctx n} {u t} → VSegs Γ u t → Bool → Segs Γ u t
+stepSegs [] fin =
+  ((if fin then completeᵖ ∷ [] else []) ∷ [] , []) ∷ []
+stepSegs ((vs , rs) ∷ []) fin =
+  ((map valueᵖ vs ++ (if fin then completeᵖ ∷ [] else [])) ∷ [] , rs) ∷ []
+stepSegs ((vs , rs) ∷ s ∷ ss) fin =
+  (map valueᵖ vs ∷ [] , rs) ∷ stepSegs (s ∷ ss) fin
+
+-- RESOLVING AT THE TOP, WHERE BOTH COLUMNS ARE ALREADY AT `t` AND
+-- RESOLVING IS CONCATENATING.  Root stream before value stream within
+-- one segment, which is the rule `foldVSegs⇓` resolves by; the two
+-- used to disagree, and while every root component is empty neither
+-- reading is observable.
+resolveSegs : ∀ {n} {Γ : Ctx n} {t} → Segs Γ t t → Stream Γ t
+resolveSegs []               = []
+resolveSegs ((bs , rs) ∷ ss) = rs ++ bs ++ resolveSegs ss
 
 hasComplete : ∀ {n} {Γ : Ctx n} {u} → Burst Γ u → Bool
 hasComplete = any isFinᵖ
@@ -545,6 +575,22 @@ hasComplete = any isFinᵖ
 
 burstCompleted : ∀ {n} {Γ : Ctx n} {u} → Stream Γ u → Bool
 burstCompleted = any hasComplete
+
+-- WHETHER A SEGMENTED ANSWER ENDED, WHICH IS THE ONE QUESTION THAT
+-- MAY BE ASKED ACROSS SEGMENTS.  A completion is somewhere or nowhere
+-- and reading it back tells you nothing about order, so this is not
+-- the seam `vsegVals` is -- and it is stated as a predicate rather
+-- than a flattening so that no ordered answer is handed out.
+segsCompleted : ∀ {n} {Γ : Ctx n} {u t} → Segs Γ u t → Bool
+segsCompleted = any (λ sg → burstCompleted (proj₁ sg))
+
+-- DROPPING ONE LEVEL OF BRACKETING AND NOTHING ELSE.  A flattener's
+-- inner is subscribed and its answer walked by a frame that wants
+-- VALUES, not bursts; the segments and their root columns survive
+-- one for one, so this is a change of what a segment CARRIES and
+-- never of how many there are or what order they are in.
+segVSegs : ∀ {n} {Γ : Ctx n} {u t} → Segs Γ u t → VSegs Γ u t
+segVSegs = map (λ sg → proj₁ (splitBurst (proj₁ sg)) , proj₂ sg)
 
 -- THE PER-FRAME SEMANTICS, AND EVERY ONE OF THEM TAKES A BURST.  A
 -- subscription hands its whole output back at once, so what arrives

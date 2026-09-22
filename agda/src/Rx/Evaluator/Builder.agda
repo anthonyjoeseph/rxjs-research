@@ -100,7 +100,7 @@ inner! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s lo}
            subscribeInner⇓ {e = e} op allNid κ now o sched st r
 inner! op allNid κ now o sched st =
   let inst = freshId nodeᵏ (Sched.mint sched)
-      ((burst , _ , sched′ , st′) , d , _) =
+      ((segs , sched′ , st′) , d , _) =
         red-val (obs _) o (from-inner op allNid inst ↠ κ) now
           (record sched { mint = setAt nodeᵏ (suc inst) (Sched.mint sched) }) st
   in _ , inner refl d refl
@@ -379,7 +379,7 @@ drain! (suc k) sched st with sched-next sched in eqn
 evaluate! : ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slots Γ)
           → Σ (Stream Γ t) λ s → evaluate⇓ fuel e ins s
 evaluate! {n = n} fuel e ins =
-  let ((burst , roots , sched₀ , st₀) , s , _) =
+  let ((segs , sched₀ , st₀) , s , _) =
         reducible e []ᵉ tt (root {lo = n}) 0 (sched-init e ins) (st-init e)
       (rest , d) = drain! fuel sched₀ st₀
   in _ , eval-run s d
