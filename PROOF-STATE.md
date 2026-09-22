@@ -252,16 +252,17 @@ also: `subscribe-shaped` — same; its conclusion gains the new component, which
 
 ### Big picture tier roadmap
 
-- **CARRY THE SATISFACTION THE CONNECT ALREADY COMPUTES, INSTEAD OF
-  RE-DERIVING IT INSIDE THE FOLD.** Folding the def's values down the
-  registered chains put the fold family inside the candidate's own recursion,
-  and the fold re-establishes the candidate at a value by RUNNING it — two
-  edges, `stepFrameAny!` through `allRed` and `inner!` through `red-val`, and
-  no others. The connect binds the def's `StreamSat` and drops it unused,
-  which is what both arms go looking for; threading it through the ten `!`
-  signatures cuts them without touching `Red`. The two reads out of the STORE
-  it cannot reach become leaves of `red-scan-installed`'s shape.
-  `make recursion-cover` decides it in seconds, before any tower runs.
+- **DECIDE WHAT MEASURE THE CONNECT'S FOLD RUNS UNDER — THE CYCLE IS THE
+  EVALUATOR'S RECURSION, NOT THE PROOF'S.** `Builder` extracts `reducible`
+  and `foldPath!` as the executable evaluator, so the cycle the fold closed
+  is a run SUBSCRIBING a closure it read back out of a store, and that
+  subscription's segments are its data. Which rules out every repair putting
+  a leaf where the read is — an evaluator that hits an
+  unreachable at the first queued inner. Neither measure to hand
+  covers it — a queued subscribe passes no connect, so the room stands, and
+  the closure comes from the store, so the expression size resets. The fork
+  is a third measure or a scheduling change keeping the drain out of the
+  fold. `make recursion-cover` decides either in seconds.
 
 - **RUN THE ORACLE AGAINST THE FIXED CONNECT — THIS LEG IS THE MONSTER.** The
   clause now registers the caller's chain and folds the def's values down the

@@ -978,6 +978,20 @@ red-env : ∀ {n} {Γ : Ctx n} {Θ : List Ty} (ρ : Env Γ Θ) → RedEnv ρ
 -- a flattening frame walks observables it read out of a burst; neither
 -- carries a premise, and neither needs one, because the claim at a
 -- value is re-established from the value itself.
+--
+-- AND RE-ESTABLISHING IT IS THE EVALUATOR RUNNING, NOT A PROOF STEP --
+-- which is what decides the shape of every repair to the cycle this
+-- sits on.  `Rx.Evaluator.Builder` takes `reducible` and `foldPath!`
+-- as the executable evaluator, so the candidate at an observable is
+-- how a run SUBSCRIBES a closure it read back out of a store, and the
+-- subscription's segments are its data rather than its witness.  A
+-- leaf standing where that call stands is therefore not deferred debt:
+-- it is an evaluator that hits an unreachable at the first queued
+-- inner.  So the cycle cannot be cut by postulating what the arrival
+-- side reads, and its termination is the EVALUATOR's question --
+-- neither measure to hand answers it, since a queued subscribe passes
+-- no connect, which leaves the room standing, and the closure it takes
+-- comes from the store, which resets the expression size.
 allRed : ∀ {n} {Γ : Ctx n} (u : Ty) (vs : List (Val Γ u)) → All (Red u) vs
 
 -- ONE INNER SUBSCRIPTION, OPENED AT A FRESHLY COUNTED INSTANCE.  The
