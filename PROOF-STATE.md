@@ -232,44 +232,20 @@ NOTHING where rxjs emits.
 
 ### The monster
 
-`sharedConnect⇓` — a share whose definition emits during the connect hands the
-burst BACK to the subscriber that triggered it, at the share's element type,
-and never enters its own fan-out. Every other subscriber the emission creates
-is delivered to by nobody.
+`sharedConnect⇓` — a share emitting during its own connect hands the burst
+BACK to the subscriber that triggered it and never enters its fan-out, so
+every subscriber that emission creates is served by nobody.
 
-NARROWED TO A COUNT. A region-biased draw reaches it 8 times in 500 where the
-old one reached 0; the evaluator fails all eight and 10 in all, a pushing
-carrier fails none, and those rows are pinned, so the close is a count rather
-than a memory.
+Worth killing because the region's three conditions are this one clause and
+not three facts: a hot-fed share agrees because a cascade folds one arrival at
+a time and so enters the fan-out; one synchronous value agrees because one
+observer is all there is; re-entry is required because only a subscriber the
+burst creates is absent when it is handed back.
 
-NARROWED BY RULING THE CARRIER OUT, which is what the descent to this node
-bought. A full per-value push was built and its tower died of ONE obstruction
-seven times over — `Red Q (obs u)` puts `Q` at both signs, so no predicate
-parameter has a sign, and the routes are recorded dead in `Reducible.agda`.
-Reverting to the burst carrier restores a tower that typechecks and links, so
-the falsity is not in `subscribeE⇓` handing back a list: a subscription may
-return whatever it likes, and only the fan-out has to interleave.
-
-NARROWED PAST THE FAN-OUT ENTIRELY, BY A CHANGE THAT MOVED NOTHING. The
-fan-out now walks values and re-reads the registry between them, it typechecks
-and it terminates — and the corpus replays byte-identically, 0/11, 2/4, 13/15.
-A rewrite of the fan-out's order that changes no answer is a measurement that
-the fan-out does not run: `dispatchShare⇓` is reached only from `foldPath⇓`'s
-sink clause, which a chain reaches on an ASYNCHRONOUS arrival, and every row of
-the region emits synchronously.
-
-SO THE REGION'S THREE CONDITIONS ARE ONE MECHANISM, WHICH IS WHAT A MONSTER IS
-FOR. A hot-fed share agrees because a cascade folds one arrival at a time and
-so does enter the fan-out; one synchronous value agrees because one observer is
-all there is; and re-entry is required because only a subscription the burst
-itself creates is absent when the burst is handed back. Each witness was read
-as a separate fact about the region and all three are this one clause.
-
-WHAT IS LEFT IS A TYPE, AND IT IS THE CARRIER QUESTION AGAIN. A fan-out's emits
-are at `t`; `subscribeE⇓` answers at `u`, because its caller is a frame with
-path left to push through. A connect cannot both spend its burst on the
-registry and answer its caller, so either the source type goes or the fan-out
-does.
+also: `dispatchShare⇓` — the fan-out the connect does not enter, which is the
+bug stated as a cone: the two are disjoint today and the first leg's wiring is
+exactly what joins them.
+also: `dispatchShare!` — its inhabitation, same reason.
 
 ### Big picture tier roadmap
 
