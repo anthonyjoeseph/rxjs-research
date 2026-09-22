@@ -249,6 +249,15 @@ also: `dispatchShare!` — its inhabitation, same reason.
 
 ### Big picture tier roadmap
 
+- **WIDEN THE CARRIER FIRST, WITH THE SECOND COMPONENT EMPTY EVERYWHERE.** A
+  subscribe answers with a burst at `u` AND a stream already at `t`; landing
+  that shape while every constructor hands back `[]` for the second changes no
+  answer, so the bulk of the leg — eleven families, forty-seven constructors,
+  and their builder and candidate mirrors — is mechanical and is MEASURED by
+  the corpus staying exactly where it is. Do it before either change below,
+  because both of them are small diffs on top of it and neither can be read
+  while the carrier is still moving under them.
+
 - **A FLATTENER'S WALK PUSHES EACH INNER WHERE IT IS PRODUCED.** The connect's
   burst belongs in the fan-out — measured, on three shapes including a nested
   share — and the only reading of WHERE its emits attach that survives the
@@ -264,10 +273,8 @@ also: `dispatchShare!` — its inhabitation, same reason.
   order is three deep — unconnected slots, then the share floor's room, then
   observable nesting — and the outermost is a fact about `connectedShares` that
   only a separate induction over the derivations can supply, in the shape
-  `Freshness/` already has. Nothing here is measurable until it closes: a
-  postulated residue does not compute, so the oracle cannot rule on the design
-  until the descent does. That inverts this campaign's usual order and is the
-  reason to state the assembly first and prove into it.
+  `Freshness/` already has. It is owed by the WALK, not by the share, which is
+  what lets the leg land in pieces at all.
 
 - **WHAT THE SINGLETON FOLD COSTS `batchSync`, ONCE THE FAN-OUT RUNS AT ALL.**
   The value walk hands a subscriber one value per `foldPath⇓`, and the one
