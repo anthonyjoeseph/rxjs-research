@@ -267,14 +267,15 @@ also: `dispatchShare!` — its inhabitation, same reason.
   share. A second result component read by a fixed rule is refuted at
   `sharedConnect⇓` by the corpus's exchanged pair.
 
-- **THE MEASURE THAT PUSHING RE-OWES, AND IT IS THE PRICE OF THE WHOLE LEG.**
-  Handing bursts UP is what today keeps the fold out of the subscribe's cycle;
-  pushing where produced puts it back, and `srcFrame`'s header prices it. The
-  order is three deep — unconnected slots, then the share floor's room, then
-  observable nesting — and the outermost is a fact about `connectedShares` that
-  only a separate induction over the derivations can supply, in the shape
-  `Freshness/` already has. It is owed by the WALK, not by the share, which is
-  what lets the leg land in pieces at all.
+- **WHAT PUSHING COSTS IS AN IMPORT CYCLE BEFORE IT IS A MEASURE.** `foldPath!`
+  hands the floor's `Acc` across `fr ↠ κ` UNCHANGED, so folding rootward at the
+  walk re-owes nothing on that axis. What it re-owes is WHERE the fold lives:
+  `red-consume` sits inside `reducible`'s own block, `foldPath!` sits above it
+  in `Builder`, and `Builder` imports `Reducible` — so pushing closes that
+  import and the fan-out descends into the reducibility cycle. Hoisting the
+  walk out instead is not available: `red-step` consumes it from inside that
+  same block. `reducible` then needs an `Acc` it has never carried, and the
+  unconnected-slot count is what funds it.
 
 - **WHAT THE SINGLETON FOLD COSTS `batchSync`, ONCE THE FAN-OUT RUNS AT ALL.**
   The value walk hands a subscriber one value per `foldPath⇓`, and the one
