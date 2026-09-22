@@ -47,7 +47,7 @@ open import Rx.Prim using (Fuel)
 open import Rx.Exp using (Ctx; Closed; []ᵉ; Val)
 open import Rx.Slots using (Slots)
 open import Rx.Evaluator using (Stream; Sched; EvalSt; root; Arrival; arrTick; arrTy; arrVal; AtFloor; RegId; chainsOf;
-  cascadeLatch; sched-next; sched-init; st-init)
+  cascadeOpen; cascadeClose; sched-next; sched-init; st-init)
 open import Rx.Evaluator.Domain using (chainStep⇓; cascadeGo⇓; cascade⇓; drain⇓; evaluate⇓;
   chain-step; casc-nil; casc-cut; casc-live; casc-run; casc-run-last;
   drain-done; drain-empty; drain-step; eval-run)
@@ -93,13 +93,14 @@ cascade! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 cascade! a sched st with Arrival.isLast a in eql
 ... | false =
       let (_ , g) = cascadeGo! a (arrVal a ∷ []) false (chainsOf a st) sched
-                      (cascadeLatch a sched st)
+                      (cascadeOpen st)
       in _ , casc-run eql g
 ... | true  =
       let ((_ , sched₁ , st₁) , g) =
             cascadeGo! a (arrVal a ∷ []) false (chainsOf a st) sched
-              (cascadeLatch a sched st)
-          (_ , g′) = cascadeGo! a [] true (chainsOf a st) sched₁ st₁
+              (cascadeOpen st)
+          (_ , g′) = cascadeGo! a [] true (chainsOf a st₁) sched₁
+                       (cascadeClose a st₁)
       in _ , casc-run-last eql g g′
 
 drain! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}

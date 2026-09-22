@@ -929,23 +929,34 @@ shareFinish i true  (emits , sched′ , st′) =
 -- share fan-outs, themselves one per registration of their share
 -- opens the cascade's per-arrival ledger: delivered/cancelled reset,
 -- the registration watermark stamped (newer registrations were born
--- this cascade and owe nothing).  A spent source (final scripted
--- value) is latched completed BEFORE its last delivery fans out — as
--- a Subject closes before delivering its completion — so a subscriber
--- joining mid-cascade already sees the one-shot close/complete; it is
--- also marked dying, so a chain that has already spent this
--- source's final delivery is not asked for another; its registry
--- entries drop at cascadeFinish.  Colds and
--- deferᵉ hops get latched too, harmlessly: their sources are
--- per-subscription, never re-subscribed
-cascadeLatch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-             → Arrival Γ → Sched Γ → EvalSt e → EvalSt e
-cascadeLatch a sched st₀ =
-  record (if Arrival.isLast a
-          then record st₀ { completedSources = arrSource a ∷ EvalSt.completedSources st₀ }
-          else st₀)
-    { delivered = [] ; cancelled = []
-    ; dying = if Arrival.isLast a then arrSource a ∷ [] else [] }
+-- this cascade and owe nothing).  THE SOURCE IS NOT CLOSED HERE, AND
+-- THAT IS THE WHOLE OF THE DIFFERENCE BETWEEN THE TWO PASSES.  A
+-- subject is open for the whole of its `next`, so a chain that
+-- subscribes to this very source while its value is being delivered —
+-- a flattener's inner, a shared def connecting — must find it LIVE and
+-- get a live subscription.  Closing it up front hands that subscriber
+-- an immediate completion instead, which an `exhaustAll` reads as its
+-- lane freeing and a `take` reads as its source ending.
+cascadeOpen : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → EvalSt e → EvalSt e
+cascadeOpen st₀ =
+  record st₀ { delivered = [] ; cancelled = [] ; dying = [] }
+
+-- closes it, BETWEEN the two passes: the spent source is latched
+-- completed before its completion fans out, so a subscriber joining
+-- from here on sees the one-shot close; it is also marked dying, so a
+-- chain that has already spent this source's final delivery is not
+-- asked for another; its registry entries drop at cascadeFinish.
+-- `delivered` restarts because the end pass is its own walk over the
+-- chains and `dying` is read against it; `cancelled` does NOT, because
+-- a chain cut during the value pass stays cut.  Colds and deferᵉ hops
+-- get latched too, harmlessly: their sources are per-subscription,
+-- never re-subscribed
+cascadeClose : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+             → Arrival Γ → EvalSt e → EvalSt e
+cascadeClose a st₁ =
+  record st₁ { completedSources = arrSource a ∷ EvalSt.completedSources st₁
+             ; delivered = []
+             ; dying = arrSource a ∷ [] }
 
 -- the spent source's registrations drop at the end, and the sweep
 -- collects its live entry

@@ -136,7 +136,7 @@ open import Rx.Mint using (ordinalᵏ; sourceᵏ; nodeᵏ; regᵏ; freshId; setA
 open import Rx.Slots using (Slots; scripted; shared)
 open import Rx.Evaluator using (Stream; Burst; Sched; EvalSt; Path; Frame; NodeId; root; share-sink; _↠[_]_; shareAdmit;
   shareDying; shareSpend; shareFinish; from-inner; splitEvents; oneShotBurst; spentBurst; arrTick; arrVal;
-  chainsOf; cascadeLatch; cascadeFinish; sched-next; sched-init; st-init; NodeState; AllOp;
+  chainsOf; cascadeOpen; cascadeClose; cascadeFinish; sched-next; sched-init; st-init; NodeState; AllOp;
   RegId; Arrival; AtFloor; arrTy; memberSource; register; installNode; resolve; dropSource;
   atSlot; atDyn; lowerFloor; map-f; scan-f; take-f; batchSync-f; thru-outer; cell-st; take-st;
   batchSync-st; mergeAll-st; switch-st; exhaust-st; mergeAllᵒ; switchᵒ; exhaustᵒ; lookupNode;
@@ -1410,22 +1410,22 @@ data cascadeGo⇓ {n} {Γ} {t} {e} where
 -- ahead of the second chain's value; the multiset is the same either
 -- way, so only a frame downstream of the second chain can tell, which
 -- is what makes this a different question from the order WITHIN one
--- chain.  The snapshot is taken once and both passes walk it: a chain
--- that joins between them subscribed to a source the latch has already
--- closed, and gets its completion from there.
+-- chain.  Each pass takes its OWN snapshot, because a chain that
+-- subscribed during the value pass is an observer of an open subject
+-- and is owed the completion.
 data cascade⇓ {n} {Γ} {t} {e} where
   casc-run : ∀ {a sched st} {emits sched′ st′}
            → Arrival.isLast a ≡ false
            → cascadeGo⇓ a (arrVal a ∷ []) false (chainsOf a st) sched
-               (cascadeLatch a sched st) (emits , sched′ , st′)
+               (cascadeOpen st) (emits , sched′ , st′)
            → cascade⇓ a sched st (emits , cascadeFinish a sched′ st′)
 
   casc-run-last : ∀ {a sched st} {emits sched₁ st₁} {ends sched₂ st₂}
                 → Arrival.isLast a ≡ true
                 → cascadeGo⇓ a (arrVal a ∷ []) false (chainsOf a st) sched
-                    (cascadeLatch a sched st) (emits , sched₁ , st₁)
-                → cascadeGo⇓ a [] true (chainsOf a st) sched₁ st₁
-                    (ends , sched₂ , st₂)
+                    (cascadeOpen st) (emits , sched₁ , st₁)
+                → cascadeGo⇓ a [] true (chainsOf a st₁) sched₁
+                    (cascadeClose a st₁) (ends , sched₂ , st₂)
                 → cascade⇓ a sched st
                     (emits ++ ends , cascadeFinish a sched₂ st₂)
 
