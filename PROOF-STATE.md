@@ -247,34 +247,46 @@ NARROWED AGAIN, on the STATEMENT side. The relation now says the push, so the
 carrier is no longer a question about shape. What is left is whether a tower
 stands over it, and the store is where that bites.
 
+NARROWED FROM THE OTHER END, AND THE TWO JUDGES NOW DISAGREE. The batching
+carrier is refuted by the draw; the INLINE push is refuted by the descent — a
+subscription that steps the frames of its own continuation writes a fold's
+accumulator from inside itself, and four routes for carrying that obligation
+are recorded dead in `Reducible.agda`. So what is left of the monster is not
+whether values are pushed but whether a pushing carrier can avoid re-entering
+a fold's own frame, which is a strictly smaller region than either judge has
+ruled on.
+
 also: `chainStep⇓`, `chainStep!` — the carrier is a batch on BOTH faces and only one of them is `subscribeE⇓`; a scheduled arrival folds its value and its end together for the same reason a subscription hands back a list, so the split separating them is the monster's fact landing off the monster's cone.
 
 ### Big picture tier roadmap
 
-- **THE RE-THREAD, CARRYING THE MEASURE AND THE STATE PREDICATE.** Two
-  findings size this leg. The measure the fan-out needs is written down in
-  `Builder.agda`'s header — the count of shared slots not yet connected,
-  above the floor the fold already runs on — and cannot land alone, since
-  nothing consumes a measure until the block it measures exists. The fold's
-  cell is not a leaf and never was: under a push the only writer of that node
-  is the sink, so the candidate carries a state predicate as a PARAMETER,
-  which is what keeps it predicative. Both land with the carrier or not at all.
+- **A CARRIER THAT DOES NOT RE-ENTER A FOLD'S OWN FRAME, MEASURED BEFORE IT IS
+  PROVEN.** The inline push is refuted by the descent, not by the draw: four
+  routes for carrying a fold's accumulator obligation are dead in
+  `Reducible.agda`'s header. What the batching carrier had, and the whole of
+  what the candidate spent it on, is that a subscription never stepped a frame
+  of its own continuation. A TRAMPOLINED push — emissions queued at the
+  outermost subscribe, drained in creation order — keeps the values the draw
+  says the batch loses and may keep that property too. A carrier is cheap in
+  the TypeScript, so settle it there: a reference beside `ref-push.ts`, same
+  500-draw, same 15 rows. First — every leg below is stated over it.
 
-- **THE FRESHNESS FACE GAINS THE PREMISE THE CARRIER OWES IT.** A subscription
-  now steps the frames of its own continuation, so it writes the nodes those
-  frames name and `subscribeE-preserves` is false as stated — refuted at the
-  very fold the candidate's predicate is about. The repair is the premise its
+- **THE FRESHNESS FACE GAINS THE PREMISE ANY PUSH OWES IT.** A pushing
+  subscription writes the nodes its continuation's frames name, however the
+  push is carried, so `subscribeE-preserves` is false as stated — refuted at
+  the very fold the store question is about. The repair is the premise its
   frame-level members already carry, added across the family; `pushBurst⇓` has
   no subject left and its member goes. It is a leg rather than a fix-up
-  because the candidate cannot discharge its own stability hypothesis until
-  this lands, and every arm of the re-thread needs that discharge.
+  because it is the one piece the carrier verdict cannot move, so it is the
+  work that is safe to land while that verdict is being measured.
 
-- **THE TOWER RE-THREADED ONTO THE PUSH CARRIER.** Not a re-shaping of
-  results: under the push the subscribe cycle and the fold cycle are ONE
-  cycle, spanning the candidate's module and the builder's, so the cut
-  between them has to move before a clause can be typed. Take the cut first
-  and the clauses after; the freshness pair last, since it names the fewest
-  constructors.
+- **THE TOWER RE-THREADED ONTO WHATEVER CARRIER SURVIVES.** Not a re-shaping
+  of results: under any push the subscribe cycle and the fold cycle are ONE
+  cycle, spanning the candidate's module and the builder's, so the cut between
+  them has to move before a clause can be typed. The measure the fan-out needs
+  is written down in `Builder.agda`'s header — the count of shared slots not
+  yet connected, above the floor the fold already runs on — and lands here,
+  since nothing consumes a measure until the block it measures exists.
 
 - **THE REFERENCE RETIRES WITH THE CARRIER.** `ref-eval.ts` is the burst
   machine, and the moment the Agda pushes it is a superseded predecessor —
