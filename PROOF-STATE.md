@@ -254,17 +254,16 @@ also: `subscribe-shaped` — same; its conclusion gains the new component, which
 
 ### Big picture tier roadmap
 
-- **ROUTE THE CONNECT THROUGH THE FAN-OUT — THIS LEG IS THE MONSTER.** The
-  evaluator side is built — `shareWalk⇓` and `shareGo⇓` both — and the
-  segmented carrier retired the result type that stopped `sharedConnect⇓`
-  calling either, and calling it closes a cycle through `red-val` that re-seeds
-  both of `redExpAcc`'s accessibilities. The measure paying for that re-seeding
-  is RECOVERED rather than owed: the unconnected-share count, arithmetic
-  already proven, sits OUTSIDE both, and its monotonicity half is syntactic —
-  the slot table has one writer in the evaluator and the connected set is only
-  ever consed. So the leg is the fused candidate-and-fold block, a
-  `Freshness.Mono`-shaped ring reading table and set off derivations every Σ
-  already carries, and the connect's call.
+- **THREAD THE ROOM THROUGH THE FUSED BLOCK — THIS LEG IS THE MONSTER.** The
+  connect's call is LANDED and the count is proven, so what remains is the one
+  argument the call costs. It travels as a CEILING with its witness beside it,
+  never as an accessibility at the count: only the connect peels the witness
+  and every other step hands the same variable on and re-proves the bound.
+  Re-proving it is what the `Freshness.Mono`-shaped ring is for, and the ring
+  is owed over EIGHTEEN
+  relations, not thirteen — the connect closed the subscribe cycle and the fold
+  cycle into one. So the leg is the ring, the ceiling at every builder applying
+  the candidate, and the oracle over the corpus that was silent.
 
 - **PIN THE WITHIN-SEGMENT ORDER, AT THE FIRST PROGRAM THAT FILLS A ROOT
   COLUMN.** `foldVSegs⇓` and `resolveSegs` both answer a segment's root stream

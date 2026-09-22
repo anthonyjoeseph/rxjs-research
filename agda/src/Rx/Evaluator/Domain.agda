@@ -1045,6 +1045,20 @@ data subscribeAll⇓ {n} {Γ} {t} {e} where
 -- fan-out running inside the reducibility cycle, which is what the
 -- block below prices.
 
+-- AND THE CONNECT IS THE FAN-OUT'S ONLY CONSUMER, WHICH IS WHY IT HAS
+-- TO FOLD.  A subscribe NEVER walks its own path: every leaf hands its
+-- values back in the segment's unresolved column and whoever consumed
+-- that subscribe pushes them through its frame.  A share's definition
+-- is subscribed at `share-sink i` and nothing consumes it, so with the
+-- connect handing those segments straight up, `dispatchShare⇓` was
+-- unreachable and the registry was read by nobody -- a joiner, and
+-- every re-entrant subscriber, saw an empty stream while the FIRST
+-- subscriber still answered correctly off the raw column.  Folding
+-- here is the missing consumer and nothing else; the trigger then
+-- receives its own values the way a joiner does, through the chain it
+-- registered, so its unresolved column is empty by the same argument
+-- that makes `slot-join`'s empty.
+
 -- DEAD ROUTE: answering at `t` -- folding the burst through the path
 --   INSIDE the subscribe, so the sink clause reaches the fan-out and
 --   `sharedConnect⇓` has nothing left to hand back.  It is blocked by
@@ -1097,6 +1111,7 @@ data sharedConnect⇓ {n} {Γ} {t} {e} where
 
   connect-live : ∀ {lo} {i : Fin n} {d} {κ : Path Γ lo (lookup Γ i) t}
                    {below : toℕ i < lo} {now sched st rid segs sched₁ st₁}
+                   {out sched₂ st₂}
                → freshId regᵏ (Sched.mint sched) ≡ rid
                → subscribeE⇓ ([] , d , []ᵉ) (share-sink i ≤-refl) now
                    (record sched { mint = setAt regᵏ (suc rid) (Sched.mint sched) })
@@ -1105,10 +1120,14 @@ data sharedConnect⇓ {n} {Γ} {t} {e} where
                        { connectedShares = toℕ i ∷ EvalSt.connectedShares st }))
                    (segs , sched₁ , st₁)
                → segsCompleted segs ≡ false
-               → sharedConnect⇓ i d κ below now sched st (segs , sched₁ , st₁)
+               → foldVSegs⇓ now (share-sink i ≤-refl) (segVSegs segs) false
+                   sched₁ st₁ (out , sched₂ , st₂)
+               → sharedConnect⇓ i d κ below now sched st
+                   (([] , out) ∷ [] , sched₂ , st₂)
 
   connect-died : ∀ {lo} {i : Fin n} {d} {κ : Path Γ lo (lookup Γ i) t}
                    {below : toℕ i < lo} {now sched st rid segs sched₁ st₁}
+                   {out sched₂ st₂}
                → freshId regᵏ (Sched.mint sched) ≡ rid
                → subscribeE⇓ ([] , d , []ᵉ) (share-sink i ≤-refl) now
                    (record sched { mint = setAt regᵏ (suc rid) (Sched.mint sched) })
@@ -1117,12 +1136,14 @@ data sharedConnect⇓ {n} {Γ} {t} {e} where
                        { connectedShares = toℕ i ∷ EvalSt.connectedShares st }))
                    (segs , sched₁ , st₁)
                → segsCompleted segs ≡ true
+               → foldVSegs⇓ now (share-sink i ≤-refl) (segVSegs segs) true
+                   sched₁ st₁ (out , sched₂ , st₂)
                → sharedConnect⇓ i d κ below now sched st
-                   ( segs , sched₁
-                   , record st₁
-                       { registry = dropSource (toℕ i) (EvalSt.registry st₁)
+                   ( ([] , out) ∷ [] , sched₂
+                   , record st₂
+                       { registry = dropSource (toℕ i) (EvalSt.registry st₂)
                        ; completedSources =
-                           toℕ i ∷ EvalSt.completedSources st₁ } )
+                           toℕ i ∷ EvalSt.completedSources st₂ } )
 
 data subscribeSharedSlot⇓ {n} {Γ} {t} {e} where
 

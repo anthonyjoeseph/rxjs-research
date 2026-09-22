@@ -37,6 +37,7 @@ open import Data.Bool.ListAction using (any)
 open import Data.List using (List; []; _∷_)
 open import Data.List.Relation.Unary.All using (All) renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
 open import Data.Nat using (zero; suc; _∸_; _≡ᵇ_)
+open import Data.Nat.Properties using (≤-refl)
 open import Data.Nat.Induction using (<-wellFounded)
 open import Data.Product using (Σ; _×_; _,_; proj₁)
 open import Data.Sum using (inj₁; inj₂)
@@ -113,6 +114,7 @@ evaluate! : ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slot
 evaluate! {n = n} fuel e ins =
   let ((segs , sched₀ , st₀) , s , _) =
         reducible e []ᵉ tt (root {lo = n}) 0 (sched-init e ins) (st-init e)
+          (<-wellFounded _) ≤-refl
       (rest , d) = drain! fuel sched₀ st₀
   in _ , eval-run s d
 
