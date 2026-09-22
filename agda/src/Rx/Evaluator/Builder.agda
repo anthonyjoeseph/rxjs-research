@@ -30,6 +30,23 @@
 -- SO THE EVALUATOR IS A PROJECTION.  `evaluate↓` is `proj₁` of
 -- `evaluate!`, and a projection computes only as far as the thing
 -- projected is a real body.
+
+-- AND THE PRICE OF THAT IS THAT NOTHING HERE CAN BE MEASURED BEFORE IT
+-- IS PROVEN TOTAL.  The differential harness reaches this machine
+-- through the projection, so a RUN is a corollary of the inhabitation
+-- argument rather than something available alongside it: there is no
+-- fuel-bounded reading of these families to point an oracle at while
+-- the tower is being rebuilt.  For an ordinary clause that costs
+-- nothing, since the statement is settled and only the proof is open.
+-- It is a carrier CHANGE that pays: the shape of every family's result
+-- moves, the candidate next door is stated over that shape, and a
+-- differential verdict on whether the new carrier matches rxjs arrives
+-- only after all of it is closed -- which is the wrong order, since the
+-- verdict is what says whether the shape was worth proving.  The way
+-- round it is not a second reading of these families but a REFERENCE
+-- implementation in the TypeScript, where the mirror is owed anyway and
+-- a partial function is free; settle the design against rxjs there, and
+-- let this tower be the transcription of something already measured.
 module Rx.Evaluator.Builder where
 
 open import Data.Bool using (Bool; true; false; if_then_else_)

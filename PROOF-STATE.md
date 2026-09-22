@@ -240,32 +240,35 @@ the one thing here a differential run has actually contradicted.
 
 ### Big picture tier roadmap
 
-- **THE PUSH CARRIER'S SHAPE, IN `Rx.Evaluator.Domain` AND `Rx.Evaluator.Builder`
-  ONLY.** A subscription returns no burst: it takes an output accumulator and
-  hands one back, so a value reaches the root as it is produced and a frame
-  takes ONE value. Those two modules are the whole blast radius of the
-  dispatch cycle, and the builder is what the CLI runs — so the shape is
-  measurable before anything else is restated. The position pair is what
-  decides it and both halves are pinned in the corpus: two inners of one
-  `mergeAll` require opposite output orders, which no fixed channel position
-  and no tail handed to a joiner can produce, and a causal thread gives free.
+- **A REFERENCE EVALUATOR IN THE TYPESCRIPT, SO THE CARRIER CAN BE MEASURED AT
+  ALL.** The Agda machine is `proj₁` of its own inhabitation proof, so a run
+  is a corollary of the tower and there is nothing to point an oracle at while
+  the tower is open — a carrier change is therefore proven first and judged
+  after, which is the wrong order. The mirror is owed to the TypeScript anyway
+  and a partial function is free there: transcribe the frames, the path, the
+  node store and the registry, keep it burst-carried, and pin it against
+  `plain-eval`'s rxjs on the draw and the corpus. Green here reproduces
+  today's Agda, divergence included — which is what makes it a reference.
 
-- **`batchSync`'s GROUP OUT OF THE BURST AND INTO ITS OWN NODE STATE.** The one
-  operator whose meaning is currently read OFF the carrier: `batchVals` groups
-  a whole `vals` list while the sync bit is up, which is a property of the
-  thing being deleted. It becomes what the TypeScript already does — a bit in
-  the node's state, set around the body's subscribe, with the values collected
-  as they arrive. Its own leg because it is the one place the rewrite can
-  change an observable answer rather than merely re-thread one, and the
-  corpus row that brackets a self-feeding share is what says whether it did.
+- **THE PUSH CARRIER IN THE REFERENCE, DECIDED BY THE POSITION PAIR.** A
+  subscription returns no burst: it pushes each value through its path as the
+  value is produced, so a reaction runs before the source is read again. The
+  position rows are what decide the shape — two inners of one `mergeAll`
+  require opposite output orders, which no fixed channel position and no tail
+  handed to a joiner can give, and a causal thread gives free. `batchSync`'s
+  group moves with it, out of `batchVals` reading a burst and into the node's
+  own state, which is the one place the rewrite can change an answer rather
+  than re-thread one. Draw AT the region: shares under each flattener, nested
+  shares, a bracket between.
 
-- **THE ORACLE AGAINST THE PUSH CARRIER, BOTH STEPS.** Draw and replay, before
-  any of the totality tower is touched: that tower is four thousand lines with
-  no postulates in it, and re-proving it against a carrier nothing has measured
-  is the expensive way to find the second divergence. The three conditions the
-  divergence needs are now known, so a green here is a claim about the region
-  and not about a row — draw AT it: shares under each flattener, nested shares,
-  a bracket between.
+- **THE CARRIER'S SHAPE INTO `Rx.Evaluator.Domain`, AS A TRANSCRIPTION.** Only
+  once the reference is green. The relation is where the design is stated and
+  the candidate next door is stated over it, so this is the leg that prices
+  the rest: `Red` at an observable currently concludes that everything the
+  subscription EMITS is reducible at the element type, and a subscription that
+  emits at the ROOT type has no such conclusion to draw — the obligation has
+  to move onto the path, and whether it stays structural in `Ty` is the open
+  question, not the clause work.
 
 - **THE TOTALITY TOWER ONTO THE PUSH CARRIER.** The cycle structure is
   unchanged — a share's connect still re-enters the subscribe cycle, and the
