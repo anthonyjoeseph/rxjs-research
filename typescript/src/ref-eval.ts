@@ -958,15 +958,33 @@ const machine = (ctx: Ty[]) => {
     const gone = chainsOf(a, latched).reduce<Out>(
       (acc, chain) => {
         if (acc.st.cancelled.includes(chain.rid)) return acc;
-        const folded = foldPath(
+        const val = foldPath(
           a.tick,
           chain.path,
           [a.payload],
-          a.isLast,
+          false,
           acc.sched,
           { ...acc.st, delivered: [chain.rid, ...acc.st.delivered] },
           chain.lo,
         );
+        const folded = a.isLast
+          ? (() => {
+              const end = foldPath(
+                a.tick,
+                chain.path,
+                [],
+                true,
+                val.sched,
+                val.st,
+                chain.lo,
+              );
+              return {
+                stream: [...val.stream, ...end.stream],
+                sched: end.sched,
+                st: end.st,
+              };
+            })()
+          : val;
         return {
           stream: [...acc.stream, ...folded.stream],
           sched: folded.sched,

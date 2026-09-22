@@ -235,26 +235,19 @@ is in the evaluator's own header.
 
 `subscribeE⇓`'s burst carrier — the fact that a subscription's result is a
 LIST which its caller pushes, rather than values reaching the root as they are
-produced. Everything else in the evaluator is stated in terms of it, and it is
-the one thing here a differential run has actually contradicted.
+produced. Everything else in the evaluator is stated in terms of it, and a
+differential run has contradicted it.
 
 NARROWED BY MEASUREMENT, and one side is now clean. A draw biased at the
 region reaches it 8 times in 500 where the old one reached 0; the burst
-carrier fails all eight and 11 rows in all, the push carrier 0, with the
-pinned corpus green beside it. Predicate and carrier agree exactly, which
-says the burst is the mechanism rather than one symptom. What is left is
-that all of this is measured in TypeScript.
+carrier fails all eight and 11 rows in all, the push carrier 0, the pinned
+corpus green beside it. Predicate and carrier agree exactly, so the burst is
+the mechanism and not one symptom. What is left is the transcription: the
+arrival split has landed in Agda, the carrier has not.
+
+also: `chainStep⇓`, `chainStep!` — the carrier is a batch on BOTH faces and only one of them is `subscribeE⇓`; a scheduled arrival folds its value and its end together for the same reason a subscription hands back a list, so the split separating them is the monster's fact landing off the monster's cone.
 
 ### Big picture tier roadmap
-
-- **SPLIT THE ARRIVAL, WHICH IS THE PIECE THE REFERENCE ALREADY DECIDED.** An
-  `Arrival` carries a value and `isLast`, and `chain-step` folds both through
-  one `foldPath⇓`. Under a push carrier that is wrong and the reference proved
-  it: `fromInner` REACTS to an end, so a queued inner subscribed in that
-  reaction emits before the value delivered alongside. So `chainStep⇓` becomes
-  a value step and then an end step, and the share fan-out with it. It sits
-  BELOW `subscribeE⇓` and its shape is settled, which is why it goes ahead of
-  the clause work rather than inside it.
 
 - **THE FLOOR BELONGS ON THE JOINING FRAME, AND ONE INDEX ON THE PATH CANNOT
   SAY IT.** A flattener subscribes its inners at the floor where IT was

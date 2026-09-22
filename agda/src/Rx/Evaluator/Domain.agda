@@ -956,12 +956,35 @@ data foldPath⇓ {n} {Γ} {t} {e} where
             → foldPath⇓ now path′ vals′ fin′ sched₁ st₁ r
             → foldPath⇓ now (f ↠ path′) vals fin sched st r
 
+-- A VALUE AND AN END NEVER SHARE A FOLD.  An arrival carries both, and
+-- folding them together is what a carrier handing its caller a LIST
+-- could afford: the frames that REACT to an end -- a joiner draining its
+-- queue is the one that bites -- then ran only once the emission had
+-- already been delivered.  Deliver one value at a time and the reaction
+-- runs INSIDE the fold, so an inner subscribed there emits AHEAD of the
+-- value it arrived beside.  The order is the whole of the difference;
+-- nothing here decides which values exist.
+--
+-- Stated now rather than waited for, because the split is a no-op while
+-- the carrier is a burst and load-bearing the moment it is not.  That it
+-- changes nothing today is measured, not assumed: the split reference in
+-- `typescript/src/ref-eval.ts` agrees with the unsplit evaluator here on
+-- every case of the differential draw, values and order alike.
 data chainStep⇓ {n} {Γ} {t} {e} where
-  chain-step : ∀ {a : Arrival Γ} {lo} {path : Path Γ lo (arrTy a) t}
+  chain-more : ∀ {a : Arrival Γ} {lo} {path : Path Γ lo (arrTy a) t}
                  {sched st r}
-             → foldPath⇓ (arrTick a) path (arrVal a ∷ [])
-                 (Arrival.isLast a) sched st r
+             → Arrival.isLast a ≡ false
+             → foldPath⇓ (arrTick a) path (arrVal a ∷ []) false sched st r
              → chainStep⇓ a (lo , path) sched st r
+
+  chain-last : ∀ {a : Arrival Γ} {lo} {path : Path Γ lo (arrTy a) t}
+                 {sched st} {o₁ sched₁ st₁} {o₂ sched₂ st₂}
+             → Arrival.isLast a ≡ true
+             → foldPath⇓ (arrTick a) path (arrVal a ∷ []) false sched st
+                 (o₁ , sched₁ , st₁)
+             → foldPath⇓ (arrTick a) path [] true sched₁ st₁
+                 (o₂ , sched₂ , st₂)
+             → chainStep⇓ a (lo , path) sched st (o₁ ++ o₂ , sched₂ , st₂)
 
 data cascadeGo⇓ {n} {Γ} {t} {e} where
   casc-nil : ∀ {a sched₀ st₀}

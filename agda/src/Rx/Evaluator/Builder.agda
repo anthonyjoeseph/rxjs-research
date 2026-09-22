@@ -83,7 +83,7 @@ open import Rx.Evaluator.Domain using (subscribeInner⇓; mergeAllDrain⇓; inne
   drain-nil; drain-no-room; drain-room; finish-all-drain; finish-switch-clear;
   finish-exhaust-clear; finish-nil; react-false; react-alive; react-dead; step-map; step-scan;
   step-take; step-batchSync; step-from-inner; step-thru-outer; fold-root; fold-sink; fold-step;
-  disp; go-nil; go-cut; go-live; chain-step; casc-nil; casc-cut; casc-live; casc-run;
+  disp; go-nil; go-cut; go-live; chain-more; chain-last; casc-nil; casc-cut; casc-live; casc-run;
   drain-done; drain-empty; drain-step; eval-run)
 open import Rx.Evaluator.Reducible using (Red; red-val; red-walk; reducible)
 
@@ -305,10 +305,16 @@ chainStep! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
              (sched : Sched Γ) (st : EvalSt e)
            → Σ (Stream Γ t × Sched Γ × EvalSt e) λ r →
                chainStep⇓ {e = e} a c sched st r
-chainStep! {n = n} a (lo , path) sched st =
-  let (_ , f) = foldPath! (<-wellFounded (n ∸ lo)) (arrTick a) path
-                  (arrVal a ∷ []) (Arrival.isLast a) sched st
-  in _ , chain-step f
+chainStep! {n = n} a (lo , path) sched st with Arrival.isLast a in eqL
+... | false = let (_ , f) = foldPath! (<-wellFounded (n ∸ lo)) (arrTick a)
+                              path (arrVal a ∷ []) false sched st
+              in _ , chain-more eqL f
+... | true  = let ((_ , sched₁ , st₁) , f) =
+                    foldPath! (<-wellFounded (n ∸ lo)) (arrTick a)
+                      path (arrVal a ∷ []) false sched st
+                  (_ , g) = foldPath! (<-wellFounded (n ∸ lo)) (arrTick a)
+                      path [] true sched₁ st₁
+              in _ , chain-last eqL f g
 
 cascadeGo! : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
              (a : Arrival Γ) (chains : List (RegId × AtFloor Γ (arrTy a) t))
